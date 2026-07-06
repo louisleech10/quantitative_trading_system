@@ -13,6 +13,18 @@
 set -u
 TTL_SECONDS=900   # token 有效 15 分鐘；過期需重跑 gate（防舊 token 綠燈無關的後續派工）
 GATE_DIR=".claude/gate"
+[ -n "${GATE_DIR_OVERRIDE:-}" ] && GATE_DIR="${GATE_DIR_OVERRIDE}"
+
+_append_gate_deny_audit() {
+  local reason="$1"
+  local tool="$2"
+  local kind="$3"
+  local ts
+  ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date '+%Y-%m-%dT%H:%M:%SZ')"
+  mkdir -p "${GATE_DIR}" 2>/dev/null || true
+  { printf '{"event":"gate_deny","ts":"%s","tool":"%s","kind":"%s","reason":"%s"}\n' \
+      "$ts" "$tool" "$kind" "$reason"; } >> "${GATE_DIR}/audit.log" 2>/dev/null || true
+}
 
 INPUT="$(cat)"
 command -v jq >/dev/null 2>&1 || exit 0   # 無 jq → fail-open，不鎖死
@@ -50,12 +62,16 @@ esac
 [ -z "$kind" ] && exit 0   # 非 gated 動作 → 放行
 
 token="$GATE_DIR/${kind}.token"
+deny_reason="no_fresh_token"
 if [ -f "$token" ]; then
   now="$(date +%s)"; mtime="$(stat -f %m "$token" 2>/dev/null || stat -c %Y "$token" 2>/dev/null || echo 0)"
   if [ $(( now - mtime )) -le "$TTL_SECONDS" ]; then
     exit 0   # fresh token → 放行
   fi
+  deny_reason="token_expired"
 fi
+
+_append_gate_deny_audit "$deny_reason" "$tool_name" "$kind"
 
 # fail-closed：擋下，告訴 Claude 怎麼開門
 cat >&2 <<EOF

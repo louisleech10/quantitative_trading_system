@@ -22,8 +22,25 @@ VENV_PY="${REPO_ROOT}/venv/bin/python"
 # GATE_DIR_OVERRIDE:governance 測試隔離用(token/audit 寫進 tmp,不汙染真實信任工件)
 GATE_DIR="${GATE_DIR_OVERRIDE:-.claude/gate}"; AUDIT="${GATE_DIR}/audit.log"; mkdir -p "${GATE_DIR}"
 
+_print_usage() {
+  cat <<'EOF'
+用法範例：
+  bash scripts/gate.sh dispatch --intent "..." --risk low|high \
+       --facts-asked "..." --review-role "..." --template "..." [--adversarial PATH|waived:reason]
+  bash scripts/gate.sh dispatch ... [--reconcile PATH]  # 高風險 adversarial 含 BLOCKING/ID: 時必填
+  bash scripts/gate.sh artifact --file docs/X_SPEC.md \
+       --template-opened templates/SPEC_TEMPLATE.md --sections "§G Golden 狀態=filled; §0.A=N/A:..."
+  bash scripts/gate.sh register-output <task-id> <handoffs/path.md>
+  bash scripts/dispatch.sh --intent "..." --risk low|high ...  # 自動補 --task-id / --output
+EOF
+}
+
 kind="${1:-}"; shift || true
-[ "${kind}" = "dispatch" ] || [ "${kind}" = "artifact" ] || [ "${kind}" = "register-output" ] || { echo "ERROR: kind 必須是 dispatch|artifact|register-output"; exit 1; }
+[ "${kind}" = "dispatch" ] || [ "${kind}" = "artifact" ] || [ "${kind}" = "register-output" ] || {
+  echo "ERROR: kind 必須是 dispatch|artifact|register-output"
+  _print_usage
+  exit 1
+}
 
 intent=""; risk=""; facts_asked=""; review_role=""; template=""; adversarial=""
 reconcile=""
@@ -359,7 +376,9 @@ elif [ "${kind}" = "artifact" ]; then
 fi
 
 if [ -n "${missing}" ]; then
-  echo "GATE 拒發 token — 缺以下必填："; printf "%b" "${missing}"; exit 1
+  echo "GATE 拒發 token — 缺以下必填："; printf "%b" "${missing}"
+  _print_usage
+  exit 1
 fi
 
 token="${GATE_DIR}/${kind}.token"; ts="$(date '+%Y-%m-%d %H:%M:%S')"

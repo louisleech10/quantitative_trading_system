@@ -1,24 +1,23 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-07-05 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-07-06 | **Branch**: main
 
-## ★制度層總審查 epic — Phase A(憲法重構+合約補齊)✅ 完成待 commit
+## ★制度層總審查 epic — Phase B(治理腳本補強)✅ 完成待 commit
 
-### 本 session 完成(走完整大任務管線,全程機檢+雙家族+code review)
-- **SPEC/TODO**:`docs/INSTREV_PHASEA_{SPEC,TODO}.md`(template+coverage 三道機檢過)+ 簡述/manifest `handoffs/20260705-INSTREV-PHASEA-BRIEF-MANIFEST.md`(16 個 [A-x])。
-- **雙家族 adversarial**:Codex 3 + Composer 12 findings(含 2 BLOCKING)→ reconcile `handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md`;R1 雙 REJECTED(抓 SPEC 落後 TODO 的選層對調)→ 修 → **R2 雙戳記 APPROVED**(sha256:6a14a0f6)。
-- **實作**(Composer 2.5)+ **Codex code review** 抓 2 BLOCKING(ORCH §6/§7 殘留 Codex 主力預設、CLAUDE 三方鐵律 token 在但義務被壓掉)→ Composer 修 → **Codex 閉合重驗雙 CLOSED**。
-- **成果**:copilot 739→8 行 pointer;CLAUDE.md 216→128 行(敘事移 `docs/SCAR_LEDGER.md`,規則零刪減 grep 驗);任務分派決策表單一化;選層 ORCH §1 單一「現行分工行」(動態,現行=**Composer 實作+Codex review**,07-05 額度切換);合約補 5 項制度;輪詢 10 分鐘、debug 2 輪(含 BOOTSTRAP);ARCH/DEV banner。
-- **記憶層(Phase 6,Claude 自做)**:feedback_task_routing 標 SUPERSEDED、dispatch_polling 改 pointer、executor_override 更新現行分工、MEMORY.md 索引同步。
+### 本 session 完成(走完整中任務管線,全程機檢+adversarial+雙戳記+閉合重驗)
+- **SPEC/TODO**:`docs/INSTREV_PHASEB_{SPEC,TODO}.md`(中,RISK-HIT: b;template_check PASS)。
+- **adversarial**:Codex 8 findings(2 BLOCKING+4 MAJOR+2 MINOR,REJECT)→ 全數 ACCEPTED+SPEC/TODO 逐項修訂 → Codex 閉合重驗 8 findings 全 CLOSED。reconcile 雙戳記(sha256:1e919edd,`reconcile_stamps_check` 為權威)。
+- **實作**(Composer)+ **Codex code review**(3 findings,APPROVE-WITH-FIXES)→ Composer 修 → 閉合重驗 REVIEW-2/3 CLOSED、REVIEW-1(pre-existing checker 非UTF-8 crash,折入修)再修 → Codex 最終 REVIEW-1 CLOSED。
+- **成果(四 Task)**:U-9 `check_agent_contract_sync.sh` 兩層(CONTRACT_REQUIRED/PLANNER_REQUIRED)+選層單一來源反向檢查+A-12 新 token;U-12 `gate_check.sh` DENY(no_fresh_token/token_expired)落 audit.log(護欄 `||true` 保 exit 2);U-14 `pre-commit` index-only 尾空白 auto-fix(排除 fenced/hard-break/表格,binary-safe)+checker 缺 backing 提示;U-15 `gate.sh` 用法模板+新 `scripts/dispatch.sh`(碰撞 fail-closed+透傳)。
+- **驗收(Claude 獨立跑)**:governance 140 passed/9 pre-existing failed(stash 確認非本批,舊 spec/fixture 不符演進規則);既有 `test_verify_gate*.py` 斷言 0 改動(防假綠);sync check exit 0;U-9 反向檢查/U-12 DENY 留痕 falsifiability spot-check 過;postflight data_cache 完整;CLAUDE.md 乾淨。
 
-### 驗收(Claude 獨立跑,不採信執行端 STATUS)
-- postflight data_cache 完整未縮減;sync check ✅;CLAUDE 128/copilot 8 行;3輪·5分鐘 全 repo 清零;現行分工錨點=1;零刪減 12 token + 合約 A-12 token 全在;敘事負向核對乾淨。
+### 踩坑(執行端越權)
+- Composer 於 impl 輪對 `.claude/gate/audit.log` 跑 `git checkout` 清測試污染,連帶移除 RECSTAMP 的 committee_dispatch,使 reconcile provenance 暫時對不上;處置=重跑 gate 派工補回該審計事件(harness task 輸出可稽核)。後續派工明禁 `git checkout` tracked 檔。
 
 ### 下一步
-1. **commit + push**(本次即將做)。
-2. **Phase B(腳本,中風險)**:U-9 sync 重構(加 A-12 token 到 CONTRACT_TOKENS)、U-12 gate DENY 落 audit、U-14 claim auto-fix、U-15 錯誤訊息模板。
-3. **Phase C(觀察)**:U-13 批次戳記慣例、U-20/21 證據累積。
-4. 之後才回 IC Analysis(前置=使用者手動生成 FF 測試資料;ROADMAP P0 IC 節)。
+1. **commit + push**(本次即將做)+ 更新 ROADMAP。
+2. **技術債另記**:governance 9 pre-existing 紅(b4/b5/r7:舊 spec/fixture 不符演進後 template_check/D-1/provenance)—與 Phase B 無關,擇期清。
+3. **Phase C(觀察)**:U-13 批次戳記慣例、U-20/21 證據累積。之後回 IC Analysis(前置=使用者手動生成 FF 測試資料)。
 
 ## 鐵律(慢測試/執行)
 - 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員派工帶 --task-id+--output,產出後 register-output。
-- pre-existing 失敗=test_ic_engine。執行端可能誤還原根 HANDOFF——commit 前重驗內容。
+- 執行端產物不可信;接回只讀 diff+測試+摘要,diff 既有測試斷言防假綠;**執行端不得 git checkout tracked 共用檔**。

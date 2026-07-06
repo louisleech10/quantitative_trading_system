@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # pre-commit — 掃描 staged HANDOFF/handoffs/docs markdown 的 claim-object。
 set -u
+set -o pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
 cd "$ROOT" || exit 1
 py="venv/bin/python"
@@ -9,4 +10,98 @@ if [ ! -x "$py" ] || [ ! -f "$checker" ]; then
   echo "pre-commit: venv/bin/python 或 verification_claim_check.py 缺失" >&2
   exit 1
 fi
+
+# index-only 尾隨空白移除（不碰工作樹；fenced/hard-break/表格列保留）
+_strip_staged_trailing_ws() {
+  local rel="$1"
+  local old_sha new_sha mode tmp_blob tmp_out py_rc
+  old_sha="$(git rev-parse ":${rel}" 2>/dev/null)" || return 0
+
+  tmp_blob="$(mktemp)"
+  tmp_out="$(mktemp)"
+  if ! git cat-file blob ":${rel}" >"$tmp_blob" 2>/dev/null; then
+    rm -f "$tmp_blob" "$tmp_out"
+    return 0
+  fi
+
+  py_rc=0
+  "$py" -c '
+import sys
+
+SKIP_EXIT = 2
+
+def strip_trailing_ws(content):
+    lines = content.splitlines(keepends=True)
+    if not lines and content:
+        lines = [content]
+    out = []
+    in_fence = False
+    for line in lines:
+        stripped_line = line.rstrip("\r\n")
+        newline = line[len(stripped_line):]
+        fence_toggle = stripped_line.strip().startswith("```")
+        if in_fence:
+            out.append(line)
+            if fence_toggle:
+                in_fence = False
+            continue
+        if fence_toggle:
+            in_fence = True
+            out.append(line)
+            continue
+        if stripped_line.startswith("|") and "|" in stripped_line[1:]:
+            out.append(line)
+            continue
+        # 剛好兩空白 = Markdown hard break，保留
+        if stripped_line.endswith("  ") and not stripped_line.endswith("   "):
+            out.append(line)
+            continue
+        trimmed = stripped_line.rstrip(" \t")
+        out.append(trimmed + newline)
+    return "".join(out)
+
+raw_bytes = sys.stdin.buffer.read()
+try:
+    raw = raw_bytes.decode("utf-8")
+except UnicodeDecodeError:
+    sys.stdout.buffer.write(raw_bytes)
+    sys.exit(SKIP_EXIT)
+
+result = strip_trailing_ws(raw)
+if raw.endswith("\n") and result and not result.endswith("\n"):
+    result += "\n"
+sys.stdout.buffer.write(result.encode("utf-8"))
+' <"$tmp_blob" >"$tmp_out" || py_rc=$?
+  rm -f "$tmp_blob"
+
+  # 非 UTF-8 / decode skip：不改 index
+  if [ "$py_rc" -eq 2 ]; then
+    rm -f "$tmp_out"
+    return 0
+  fi
+  if [ "$py_rc" -ne 0 ]; then
+    rm -f "$tmp_out"
+    return 0
+  fi
+
+  new_sha="$(git hash-object -w --stdin <"$tmp_out")" || {
+    rm -f "$tmp_out"
+    return 0
+  }
+  rm -f "$tmp_out"
+
+  if [ "$old_sha" != "$new_sha" ]; then
+    mode="$(git ls-files -s -- "$rel" 2>/dev/null | awk "{print \$1; exit}")"
+    [ -z "$mode" ] && mode="100644"
+    git update-index --cacheinfo "$mode" "$new_sha" "$rel" 2>/dev/null || true
+  fi
+}
+
+while IFS= read -r -d '' rel; do
+  [ -n "$rel" ] || continue
+  case "$rel" in
+    HANDOFF.md|handoffs/*.md|docs/*.md) _strip_staged_trailing_ws "$rel" ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
 exec "$py" "$checker" --staged

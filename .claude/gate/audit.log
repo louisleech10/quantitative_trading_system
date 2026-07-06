@@ -8740,3 +8740,163 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-CODEREVIEW-codex.md", "output_sha256": "8c34e7fed828482ab6c24cfc8e97606ebbae21a15b6c6715e2f01fcb24da86d8", "task_id": "instrev-phasea-codereview", "ts": "2026-07-05T14:32:59Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-CODEREVIEW-codex-r2.md", "output_sha256": "0de0c7c19276dbaccf9276e613ee49f4db9be5520aeb9b78b9a5585d8f54eb71", "task_id": "instrev-phasea-codereview-r2", "ts": "2026-07-05T14:32:59Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-impl.md", "output_sha256": "8c8a05ed019c1f7db087cf69e95302a29165cbfd8a88757694c740a4984a5c25", "task_id": "instrev-phasea-impl", "ts": "2026-07-05T14:35:00Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-CODEREVIEW-codex.md", "output_sha256": "pending", "task_id": "20260705-INSTREV-PHASEB-CODEREVIEW", "ts": "2026-07-05T23:12:24Z"}
+=== 2026-07-06 07:12:24 | dispatch ===
+  ts=2026-07-06 07:12:24
+  kind=dispatch
+  intent=Codex code review Phase B 實作 diff(5 腳本+dispatch.sh+4 新測),查 fail-closed 弱化/index-only 正確性/測試可證偽/語義守恆
+  risk=low
+  facts_asked=none-needed:審查對象為 repo 內實作 diff,無只有使用者知道的事實
+  review_role=Codex=code reviewer(另一方,實作者 Composer 不自審);對照 SPEC/TODO 與 8 findings 處置驗收
+  template=n/a:code review 派工,非 spec 實作派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-FIX-composer.md", "output_sha256": "pending", "task_id": "20260705-INSTREV-PHASEB-FIX", "ts": "2026-07-05T23:27:02Z"}
+=== 2026-07-06 07:27:03 | dispatch ===
+  ts=2026-07-06 07:27:03
+  kind=dispatch
+  intent=Composer 修 Codex code review 3 findings(REVIEW-1 pre-commit 非UTF-8 binary-safe skip/REVIEW-2 保留 file mode/REVIEW-3 dispatch test 強斷言)
+  risk=low
+  facts_asked=none-needed:修 review findings,對象為 repo 內實作,無只有使用者知道的事實
+  review_role=Codex=原 reviewer,修完由其閉合重驗(§B8);實作者 Composer 不自審
+  template=n/a:修 code review findings,非 spec 實作派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-ADV-RECONCILE.md", "output_sha256": "fc30ffde54e6a04779e71395e8ab8cd606e584c6a5d59ced9789bdf5cd0335c5", "task_id": "20260705-INSTREV-PHASEB-RECSTAMP-CODEX", "ts": "2026-07-05T23:31:34Z"}
+=== 2026-07-06 07:31:34 | dispatch ===
+  ts=2026-07-06 07:31:34
+  kind=dispatch
+  intent=[還原被 checkout 誤刪] Codex 閉合重驗+RECONCILE-STAMP codex
+  risk=low
+  facts_asked=none-needed
+  review_role=Codex=閉合重驗
+  template=n/a:戳記派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-ADV-RECONCILE.md", "output_sha256": "fc30ffde54e6a04779e71395e8ab8cd606e584c6a5d59ced9789bdf5cd0335c5", "task_id": "20260705-INSTREV-PHASEB-RECSTAMP-COMPOSER", "ts": "2026-07-05T23:31:34Z"}
+=== 2026-07-06 07:31:34 | dispatch ===
+  ts=2026-07-06 07:31:34
+  kind=dispatch
+  intent=[還原被 checkout 誤刪] Composer 審 reconcile+RECONCILE-STAMP composer
+  risk=low
+  facts_asked=none-needed
+  review_role=Composer=reconcile 忠實審
+  template=n/a:戳記派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-REVIEWCLOSE-codex.md", "output_sha256": "pending", "task_id": "20260705-INSTREV-PHASEB-REVIEWCLOSE", "ts": "2026-07-05T23:42:18Z"}
+=== 2026-07-06 07:42:18 | dispatch ===
+  ts=2026-07-06 07:42:18
+  kind=dispatch
+  intent=Codex 閉合重驗 code review 3 findings(REVIEW-1/2/3)修法是否真關閉,重跑非UTF-8/mode/explicit-task-id 反例
+  risk=low
+  facts_asked=none-needed:審查對象為 repo 內修後實作
+  review_role=Codex=原 reviewer,閉合重驗自己 3 findings(可證偽)
+  template=n/a:閉合重驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-FIX2-composer.md", "output_sha256": "pending", "task_id": "20260705-INSTREV-PHASEB-FIX2", "ts": "2026-07-06T00:07:37Z"}
+=== 2026-07-06 08:07:37 | dispatch ===
+  ts=2026-07-06 08:07:37
+  kind=dispatch
+  intent=Composer 關閉 REVIEW-1:checker 對非UTF-8 staged md 改 graceful exit 2(不 traceback crash),與既有工作樹 FileReadError 契約一致
+  risk=low
+  facts_asked=none-needed:REVIEW-1 經證實為 pre-existing checker 缺口(HEAD 同 crash),折入 Phase B 關閉
+  review_role=Codex=原 reviewer,修完閉合重驗;Composer 實作者不自審
+  template=n/a:review 閉合修法
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-REVIEWCLOSE2-codex.md", "output_sha256": "pending", "task_id": "20260705-INSTREV-PHASEB-REVIEWCLOSE2", "ts": "2026-07-06T00:19:37Z"}
+=== 2026-07-06 08:19:37 | dispatch ===
+  ts=2026-07-06 08:19:37
+  kind=dispatch
+  intent=Codex 最終閉合 REVIEW-1(非UTF-8 staged md checker 改 graceful exit 2)
+  risk=low
+  facts_asked=none-needed
+  review_role=Codex=原 reviewer 最終閉合
+  template=n/a:閉合
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-ADV-codex.md", "output_sha256": "5c84f25fa7d09c781b7a84840e3f3601d3ca72ac6fd18c7a1f9967b3e6fd187c", "task_id": "20260705-INSTREV-PHASEB-ADV", "ts": "2026-07-06T00:38:53Z"}
+=== 2026-07-06 08:38:53 | dispatch ===
+  ts=2026-07-06 08:38:53
+  kind=dispatch
+  intent=[還原] Codex adversarial Phase B SPEC/TODO
+  risk=low
+  facts_asked=none-needed
+  review_role=Codex=adversary
+  template=n/a:adv review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEB-impl.md", "output_sha256": "da660cbc5e1446234d46d3badfb440da527153637f736bb506e68d852baba5d9", "task_id": "20260705-INSTREV-PHASEB-IMPL", "ts": "2026-07-06T00:38:53Z"}
+=== 2026-07-06 08:38:53 | dispatch ===
+  ts=2026-07-06 08:38:53
+  kind=dispatch
+  intent=[還原] Composer 實作 Phase B
+  risk=low
+  facts_asked=none-needed
+  review_role=Composer=impl
+  template=n/a:impl
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-ADV-codex.md", "output_sha256": "5c84f25fa7d09c781b7a84840e3f3601d3ca72ac6fd18c7a1f9967b3e6fd187c", "task_id": "20260705-INSTREV-PHASEB-ADV", "ts": "2026-07-06T00:38:53Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-CODEREVIEW-codex.md", "output_sha256": "1be4d23a61829169663d66f40a346612935200c81e5d6592de08fbab02c92a17", "task_id": "20260705-INSTREV-PHASEB-CODEREVIEW", "ts": "2026-07-06T00:38:53Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-REVIEWCLOSE-codex.md", "output_sha256": "7b6e58ad67e07812b912fd15eece2215a45fef8330c1a554228a0913c7eddcde", "task_id": "20260705-INSTREV-PHASEB-REVIEWCLOSE", "ts": "2026-07-06T00:38:54Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-REVIEWCLOSE2-codex.md", "output_sha256": "0fe42626b50f5f64a3bf9b8d1e4ddbd14b213835ecf8232954169cb899962639", "task_id": "20260705-INSTREV-PHASEB-REVIEWCLOSE2", "ts": "2026-07-06T00:38:54Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-impl.md", "output_sha256": "da660cbc5e1446234d46d3badfb440da527153637f736bb506e68d852baba5d9", "task_id": "20260705-INSTREV-PHASEB-IMPL", "ts": "2026-07-06T00:38:54Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-FIX-composer.md", "output_sha256": "790059e09a22dc7d0c08b01fabd7191cd7215fa7a71841eeface7af1ee1d2e29", "task_id": "20260705-INSTREV-PHASEB-FIX", "ts": "2026-07-06T00:38:54Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-FIX2-composer.md", "output_sha256": "d30f3ac632aaa4f4f6a24dddee93e136b0ed01014b479f1726d246e5a093015f", "task_id": "20260705-INSTREV-PHASEB-FIX2", "ts": "2026-07-06T00:38:54Z"}

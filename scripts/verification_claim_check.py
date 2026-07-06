@@ -915,6 +915,16 @@ def _run_git(args: list[str], cwd: Path | None = None) -> subprocess.CompletedPr
     )
 
 
+def _run_git_bytes(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
+    """binary-safe git 子程序（避免非 UTF-8 blob 在 subprocess 層 decode crash）。"""
+    return subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        capture_output=True,
+        check=False,
+    )
+
+
 def _is_tracked_or_staged(path: Path) -> bool:
     """W12：receipt 須已 tracked 或 staged；測試隔離模式跳過。"""
     if _is_test_isolation():
@@ -1451,22 +1461,34 @@ def _git_staged_scannable_paths() -> list[str]:
     return paths
 
 
+def _decode_utf8_blob(rel_path: str, raw: bytes) -> str:
+    """strict UTF-8 decode；失敗時 raise FileReadError（與 working tree 契約一致）。"""
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise FileReadError(rel_path, "not valid UTF-8 (staged blob)") from exc
+
+
 def _git_staged_blob(rel_path: str) -> str | None:
     """從 index blob 讀 staged 內容（非 working tree）。"""
-    proc = _run_git(["show", f":{rel_path}"])
+    proc = _run_git_bytes(["show", f":{rel_path}"])
     if proc.returncode != 0:
         return None
-    return proc.stdout
+    return _decode_utf8_blob(rel_path, proc.stdout)
 
 
 def _git_staged_added_line_numbers(rel_path: str) -> set[int]:
     """從 git diff --cached -U0 取 staged 相對 HEAD 的新增行行號（1-based）。"""
-    proc = _run_git(["diff", "--cached", "-U0", "--", rel_path])
+    proc = _run_git_bytes(["diff", "--cached", "-U0", "--", rel_path])
     if proc.returncode != 0 or not proc.stdout.strip():
         return set()
+    try:
+        diff_text = proc.stdout.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise FileReadError(rel_path, "not valid UTF-8 (staged blob)") from exc
     added: set[int] = set()
     new_line = 0
-    for line in proc.stdout.splitlines():
+    for line in diff_text.splitlines():
         if line.startswith("@@"):
             match = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
             if match:
@@ -1573,6 +1595,18 @@ def check_stdin_operational(source_file: str, content: str) -> list[Violation]:
     return violations
 
 
+def _print_violation(v: Violation) -> None:
+    """印出違規行；缺 backing 的 operational claim 追加可貼修法提示。"""
+    print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)
+    if v.message == "operational claim 缺少 VERIFY/REF/SIGNOFF backing":
+        print(
+            "  → 建議加 VERIFY:<receipt-id> 或 "
+            "VERIFY-EXEMPT:<類別>:<id>（例：VERIFY-EXEMPT:doc-example:phase-b）",
+            file=sys.stderr,
+        )
+    print(v.unit_text, file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI 進入點。"""
     parser = argparse.ArgumentParser(description="Verification claim checker (router, not judge).")
@@ -1601,8 +1635,7 @@ def main(argv: list[str] | None = None) -> int:
         violations = check_stdin_operational(args.stdin_operational_file, stdin_content)
         if violations:
             for v in violations:
-                print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)
-                print(v.unit_text, file=sys.stderr)
+                _print_violation(v)
             return 1
         return 0
 
@@ -1610,7 +1643,14 @@ def main(argv: list[str] | None = None) -> int:
     staged_content_map: dict[str, str] | None = None
     staged_added_lines_map: dict[str, set[int]] | None = None
     if args.staged:
-        staged_paths, staged_content_map, staged_added_lines_map = _git_staged_markdown_files()
+        try:
+            staged_paths, staged_content_map, staged_added_lines_map = _git_staged_markdown_files()
+        except FileReadError as exc:
+            print(
+                f"verification_claim_check.py: cannot read {exc.rel_path}: {exc.detail}",
+                file=sys.stderr,
+            )
+            return 2
         paths.extend(staged_paths)
     if args.range_spec:
         paths.extend(_git_range_files(args.range_spec))
@@ -1634,8 +1674,7 @@ def main(argv: list[str] | None = None) -> int:
             violations = check_unit(unit, open_pending)
             if violations:
                 for v in violations:
-                    print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)
-                    print(v.unit_text, file=sys.stderr)
+                    _print_violation(v)
                 return 1
             return 0
 
@@ -1670,8 +1709,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if violations:
         for v in violations:
-            print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)
-            print(v.unit_text, file=sys.stderr)
+            _print_violation(v)
         return 1
     return 0
 
