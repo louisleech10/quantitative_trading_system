@@ -8900,3 +8900,20 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-impl.md", "output_sha256": "da660cbc5e1446234d46d3badfb440da527153637f736bb506e68d852baba5d9", "task_id": "20260705-INSTREV-PHASEB-IMPL", "ts": "2026-07-06T00:38:54Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-FIX-composer.md", "output_sha256": "790059e09a22dc7d0c08b01fabd7191cd7215fa7a71841eeface7af1ee1d2e29", "task_id": "20260705-INSTREV-PHASEB-FIX", "ts": "2026-07-06T00:38:54Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEB-FIX2-composer.md", "output_sha256": "d30f3ac632aaa4f4f6a24dddee93e136b0ed01014b479f1726d246e5a093015f", "task_id": "20260705-INSTREV-PHASEB-FIX2", "ts": "2026-07-06T00:38:54Z"}
+{"event":"gate_deny","ts":"2026-07-06T05:08:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+=== 2026-07-06 13:08:56 | dispatch ===
+  ts=2026-07-06 13:08:56
+  kind=dispatch
+  intent=codex adversarial review IC fail-closed 守衛修法 diff
+  risk=high
+  facts_asked=none-needed: 修法性質由讀碼+golden byte-equal 實證
+  review_role=adversary:codex 挑戰3點;實作者Claude不自審
+  template=n/a: 既有 diff 的 code review 非 SPEC 派工
+  adversarial=waived:本次 dispatch 本身就是 adversarial review,無前置 adversarial 文件
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

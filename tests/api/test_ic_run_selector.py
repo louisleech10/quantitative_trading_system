@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 from unittest.mock import patch
 
 import pytest
 
+from api.models.ic_models import ICAnalyzeRequest
 from api.services.cross_symbol_training_service import CrossSymbolTrainingService
+from api.services.ic_analysis_service import ICAnalysisService
 from momentum.factories import create_feature_library
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
 HASH_A = "1c4b825498449860a639b0ac37f66d73"
 HASH_B = "90f586663db18ba594b21ce909ad83e0"
+UNREGISTERED_HASH = "00000000000000000000000000000000"
 ORPHAN_HASHES = (
     "4d26a4d46e8f53d9a443a1d65f93f831",
     "5218729ca187e1df263143e649bc5349",
@@ -49,10 +54,14 @@ def pinned_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 
 def _require_mini_registry_runs(pinned_registry: Path) -> None:
     library = create_feature_library()
-    if library._registry.get(SYMBOL, TIMEFRAME, HASH_A) is None:
-        pytest.skip(f"missing registry run {HASH_A}")
-    if library._registry.get(SYMBOL, TIMEFRAME, HASH_B) is None:
-        pytest.skip(f"missing registry run {HASH_B}")
+    for hash_ in (HASH_A, HASH_B):
+        entry = library._registry.get(SYMBOL, TIMEFRAME, hash_)
+        if entry is None:
+            pytest.skip(f"missing registry run {hash_}")
+        # registry 條目存在不代表底層 12h 特徵資料已物化(gitignored;乾淨 checkout 無此資料)。
+        # 未物化時 load() 會 raise;此處改為誠實 skip,避免把「資料未備」誤報為測試失敗。
+        if not library._registry.is_materialized(entry):
+            pytest.skip(f"registry run {hash_} not materialized (12h feature data absent)")
 
 
 def _capture_run_metrics(config_hash: Optional[str]) -> Dict[str, Any]:
@@ -156,7 +165,77 @@ def test_live_registry_skips_orphan_latest() -> None:
     """Live-registry canary：readable-latest 不得選 orphan（空 path / 缺 manifest）。"""
     library = create_feature_library()
     entry = library._registry.find_latest_materialized(SYMBOL, TIMEFRAME)
-    assert entry is not None
+    # canary 只在 live registry 真有已物化的 12h run 時有意義；乾淨 checkout 無 12h 資料時誠實 skip。
+    if entry is None:
+        pytest.skip(f"no materialized {SYMBOL}/{TIMEFRAME} run in live registry")
     selected = str(entry.get("config_hash") or "")
     assert selected not in ORPHAN_HASHES
     assert library._registry.is_materialized(entry)
+
+
+async def _drive_to_terminal(
+    service: ICAnalysisService, request: ICAnalyzeRequest, timeout_seconds: int = 30
+) -> Dict[str, Any]:
+    """啟動 IC 任務並輪詢至 completed/failed，回傳終態 status。"""
+    started = await service.start_analysis(request)
+    task_id = started["task_id"]
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        status = service.get_task_status(task_id)
+        if status and status.get("status") in ("completed", "failed"):
+            return status
+        await asyncio.sleep(0.05)
+    raise TimeoutError(f"task did not terminate: {task_id}")
+
+
+@pytest.mark.ic_run_selector
+def test_failclosed_registry_miss_without_features_path(pinned_registry: Path) -> None:
+    """契約(hermetic)：config_hash 未註冊 + 無 features_path → fail-closed(run not found)，
+    不靜默回退挑別的 run。此路徑在載入資料前即 raise，故不需真實 12h 特徵——即使 gitignored
+    資料缺席也能守住 run-selector 的核心保證(彌補 skip-guard 在乾淨 checkout 略過的覆蓋)。"""
+    service = ICAnalysisService()
+    request = ICAnalyzeRequest(
+        symbol=SYMBOL,
+        timeframe=TIMEFRAME,
+        config_hash=UNREGISTERED_HASH,
+        mode="longitudinal",
+    )
+    status = asyncio.run(_drive_to_terminal(service, request))
+    assert status["status"] == "failed"
+    assert "run not found" in str(status.get("error", ""))
+
+
+@pytest.mark.ic_run_selector
+def test_relaxed_explicit_features_path_passes_through(
+    pinned_registry: Path, tmp_path: Path
+) -> None:
+    """契約(hermetic)：config_hash 未註冊但呼叫端明確給 features_path(+meta_path/labels_path)
+    → 不因未註冊而擋，analyzer 收到該 exact features_path。stub analyzer 不跑真分析、不觸真實資料，
+    直接驗證放寬後的路由行為(mutation:若守衛仍硬擋，此測會轉 failed 而非 completed)。"""
+    captured: Dict[str, Any] = {}
+
+    class _FakeAnalyzer:
+        def analyze(self, **kwargs: Any) -> Dict[str, Any]:
+            captured.update(kwargs)
+            return {"metadata": {}, "features": {}}
+
+    features_path = str(tmp_path / "explicit_top50.h5")
+    meta_path = str(tmp_path / "explicit_meta.json")
+    with patch(
+        "api.services.ic_analysis_service.create_ic_analyzer",
+        return_value=_FakeAnalyzer(),
+    ):
+        service = ICAnalysisService()
+        request = ICAnalyzeRequest(
+            symbol=SYMBOL,
+            timeframe=TIMEFRAME,
+            config_hash=UNREGISTERED_HASH,
+            features_path=features_path,
+            meta_path=meta_path,
+            labels_path=str(tmp_path / "labels.h5"),
+            mode="longitudinal",
+        )
+        status = asyncio.run(_drive_to_terminal(service, request))
+
+    assert status["status"] == "completed", status.get("error")
+    assert captured.get("features_path") == features_path

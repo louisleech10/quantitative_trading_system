@@ -9,13 +9,16 @@
 - **Phase C**:**U-13**(批次戳記慣例+同檔並發序列化)✅ 本次寫進 ORCH §戳記後。**U-20/U-21 裁決本身=先別做**(U-20 累積 violation 證據再機械化;U-21 維持 scorecard 不裁定)→ 屬長期觀察項,非待辦。
 - **結論:制度層 epic 的可實作項全數完成**;U-20/21 為 standing 監測項。
 
-### ★新 session 起點 = IC 測試定向重驗(中任務,命中 a+d → 完整管線+另一方 review)
-- **緣由**:SPEC conformance 後重跑 51 個 IC Phase0/1 測試(VERIFY:20260706T044007Z-ic-phase01-rerun-20260706,exit1)= **45 passed / 6 failed**。45 個屬核心正確性(phase0_golden/timeaxis/crash/decay/1a_split/1a_oos/split_adapter,用已提交 fixture)。
-- **6 紅根因**(實查非猜):全是 `run not found` — goldens/run_selector 釘死在**舊 run**(1a_cut1=`a384e6d22…`、run_selector=12h `1c4b825…`/`90f586…`),現 registry 只有**現行資料集 `4a8a0b37…`**(batch「FF for IC Analysis Test」);輸入 .h5 gitignored 故乾淨 checkout 湊不齊。
-- **⚠️疑似回歸待裁**:`ic_analysis_service.py:180-184`(run-selector 硬化 commit 643c5c2)即使給了明確 `features_path`,只要 config_hash 未註冊就先 `raise run not found` → **把 1a_cut1 golden replay 路徑弄斷且無人察覺**(receipt 紀律晚於此)。**是回歸(服務該認 features_path) vs 設計(測試須 seed registry)= 委員會裁,勿 solo**。
-- **任務範圍**:① 釐清 643c5c2 fail-closed 性質 ② 依現行資料集 `4a8a0b37…` 重凍 goldens/run_selector fixture(或註冊舊 run)。目標=IC 測試全綠且每項有真 receipt。**建議新 session 起跑**(context 乾淨)。
-- **原 IC 路線圖**(重驗後接回):第二刀 `analyze_cross_sectional` 防洩漏;續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;P0.5 grouped_ic 止血。目標=79 全合成 IC 測試換端到端真實資料。
-- **已完成前置**:IC SPEC conformance pass ✅ commit(4 份過 template_check;RISK-HIT+FACT-RECEIPT 補齊,受查發現 4 份皆對應已落地工作 PHASE0=11507f5/1a=done/RUN_SELECTOR=643c5c2/CONTRACT=ic_split_adapter.py,FACT-RECEIPT 全 2026-07-06 當日重跑無湊假)。FF 測試資料就緒同上。
+### IC 測試定向重驗 已辦(2026-07-06,含 Codex adversarial review)
+- **成果**:IC Phase0/1 targeted 測試 **49 passed / 4 skipped / 0 failed**(起初 45/6;VERIFY:20260706T052454Z-ic-reverify-final-20260706,exit0)。
+- **修法**:`ic_analysis_service.py` fail-closed 守衛收斂到 registry 解析路徑——`config_hash` 未註冊時,只有 features_path **也**缺席才 `raise run not found`;呼叫端明確給 features_path(golden/artifact replay)不再被擋。run-selector「靜默錯 run」保證不變(features_path 缺席仍 fail-closed)。**證據**:2 golden byte-equal frozen baseline + 2 hermetic 契約測試(fail-closed 保留/relaxation 生效)+ mutation(還原硬守衛→relaxation 測試轉 fail)。
+- **run_selector 4 測試**:改 `is_materialized` skip-guard——12h 特徵資料 gitignored,乾淨 checkout 缺 → 誠實 skip(非造綠);契約覆蓋由上述 hermetic 測試(不需真資料)補回。
+- **Codex review**:[P1](skip 掩蓋契約)已補 hermetic 測試閉合。殘留 **[P2 另立]**:給了 features_path 卻與 config_hash 不一致時未校驗一致性(pre-existing,我的改把它擴到未註冊 hash);不擋本刀,另開小 epic。
+- **⚠️ 未重凍舊-run goldens**:1a_cut1 golden 沿用**已存在的** input .h5(a384e6d2,present),未把 registry 對準現行 `4a8a0b37…`。run_selector 若要實際執行(非 skip)仍需生成 12h 資料——屬 provisioning,未做。
+
+### ★下一站 = IC 1a 第二刀(cross_sectional `analyze_cross_sectional` 防洩漏)
+- 續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;P0.5 grouped_ic 止血。目標=79 全合成 IC 測試換端到端真實資料。**建議新 session 起跑**(context 乾淨)。
+- 前置皆就緒:IC SPEC conformance ✅、targeted 重驗 ✅、FF 測試資料(3 sym×1h+12h、max_lag 後、`data_cache/features/`)✅。
 
 ### 技術債(另記,不擋)
 - governance 9 pre-existing 紅(b4/b5/r7:舊 spec/fixture 不符演進後 template_check/D-1/provenance)。

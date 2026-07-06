@@ -1,0 +1,169 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+13:04:13 [INFO] Loaded feature registry with 3 entries
+collected 51 items
+
+tests/momentum/test_ic_phase0_golden.py::test_grouped_baseline PASSED    [  1%]
+tests/momentum/test_ic_phase0_golden.py::test_feature_filter_baseline 
+-------------------------------- live log call ---------------------------------
+13:04:13 [INFO] IC config loaded
+PASSED                                                                   [  3%]
+tests/momentum/test_ic_phase0_golden.py::test_decay_baseline 
+-------------------------------- live log call ---------------------------------
+13:04:13 [INFO] Decay: 1/2 fit warnings summarized (low_variance=1)
+PASSED                                                                   [  5%]
+tests/momentum/test_ic_crash_real_config.py::test_stage4_grouped_uses_real_pydantic_config 
+-------------------------------- live log call ---------------------------------
+13:04:13 [INFO] IC config loaded
+PASSED                                                                   [  7%]
+tests/momentum/test_ic_crash_real_config.py::test_default_grouped_config_does_not_raise_with_kline 
+-------------------------------- live log call ---------------------------------
+13:04:13 [INFO] IC config loaded
+13:04:13 [INFO] Decay: 2/2 fit warnings summarized (low_variance=2)
+PASSED                                                                   [  9%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_parses_second_epoch_as_datetime_index PASSED [ 11%]
+tests/momentum/test_ic_timeaxis.py::test_iter_time_groups_handles_second_epoch_kline_shape PASSED [ 13%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_implausible_numeric_timestamps PASSED [ 15%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_parses_millisecond_epoch PASSED [ 17%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_nan_timestamp PASSED [ 19%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_exact_unsupported_magnitude PASSED [ 21%]
+tests/momentum/test_ic_timeaxis.py::test_compute_grouped_ic_rejects_explicit_by_volatility PASSED [ 23%]
+tests/momentum/test_ic_decay_log.py::test_compute_ic_decay_aggregates_fit_warnings 
+-------------------------------- live log call ---------------------------------
+13:04:13 [INFO] Decay: 1/2 fit warnings summarized (low_variance=1)
+PASSED                                                                   [ 25%]
+tests/momentum/test_ic_decay_log.py::test_compute_ic_decay_logs_summary_when_all_fits_succeed 
+-------------------------------- live log call ---------------------------------
+13:04:13 [INFO] Decay: 0/1 fit warnings summarized (none)
+PASSED                                                                   [ 27%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_resolve_expected_freq PASSED [ 29%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_metadata_symbol_required PASSED [ 31%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_metadata_symbol_outside_allowlist_blocked PASSED [ 33%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_icconfig_new_fields_default_off PASSED [ 35%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_analyze_builds_holdout PASSED [ 37%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_holdout_purge_covers_horizon PASSED [ 39%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_purge_uses_effective_not_default PASSED [ 41%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_analyze_split_gap_blocked PASSED [ 43%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_split_valid_passes PASSED [ 45%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_mask_survives_event_filter PASSED [ 47%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_pipeline_order_split_before_preprocessing PASSED [ 49%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_effective_horizon_resolution PASSED [ 50%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_ic_rolling_warmup 
+-------------------------------- live log call ---------------------------------
+13:04:13 [INFO] IC autocorr persistent: count=2
+PASSED                                                                   [ 52%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_min_test_rows_skipped PASSED [ 54%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_summary_and_threshold_same_scope PASSED [ 56%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_stage5_metrics_all_oos PASSED [ 58%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_decay_redundancy_scope_test 
+-------------------------------- live log call ---------------------------------
+13:04:14 [INFO] Redundancy filter completed: method=greedy input=1 output=1
+PASSED                                                                   [ 60%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_purge_label_mutation_does_not_change_test_rolling_ic 
+-------------------------------- live log call ---------------------------------
+13:04:14 [INFO] IC autocorr persistent: count=2
+13:04:14 [INFO] IC autocorr persistent: count=2
+PASSED                                                                   [ 62%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_winsorize_type_branch_uses_train_slice_only 
+-------------------------------- live log call ---------------------------------
+13:04:14 [INFO] Data preprocessing complete: columns=1
+13:04:14 [INFO] Data preprocessing complete: columns=1
+PASSED                                                                   [ 64%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_holdout_embargo_delays_test_start PASSED [ 66%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_toggles_path 
+-------------------------------- live log call ---------------------------------
+13:04:14 [INFO] Data preprocessing complete: columns=2
+13:04:14 [INFO] Data preprocessing complete: columns=2
+PASSED                                                                   [ 68%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_fallback_insufficient_data_marks_applied_false 
+-------------------------------- live log call ---------------------------------
+13:04:14 [INFO] Data preprocessing complete: columns=2
+13:04:14 [INFO] IC autocorr persistent: count=2
+13:04:14 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+13:04:14 [INFO] Filtered features saved: data_cache/features/BTCUSDT_1h_filtered.h5
+13:04:14 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 70%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_irregular_timestamps_still_fail_closed PASSED [ 72%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_applied_true_when_sufficient 
+-------------------------------- live log call ---------------------------------
+13:04:14 [INFO] Data preprocessing complete: columns=2
+13:04:14 [INFO] IC autocorr persistent: count=2
+13:04:14 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+13:04:14 [INFO] Filtered features saved: data_cache/features/BTCUSDT_1h_filtered.h5
+13:04:14 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 74%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_via_config_override 
+-------------------------------- live log call ---------------------------------
+13:04:14 [INFO] Loaded feature registry with 3 entries
+PASSED                                                                   [ 76%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 
+-------------------------------- live log call ---------------------------------
+13:04:14 [INFO] Loaded feature registry with 3 entries
+13:04:14 [INFO] IC config loaded
+13:04:14 [INFO] IC analysis task started: b76fb6b3-b9b0-49d4-b220-6b3924953011
+13:04:14 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+13:04:14 [INFO] Data preprocessing complete: columns=50
+13:04:14 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+13:04:14 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+13:04:15 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+13:04:18 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+13:04:18 [INFO] IC analysis task completed: b76fb6b3-b9b0-49d4-b220-6b3924953011
+PASSED                                                                   [ 78%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 
+-------------------------------- live log call ---------------------------------
+13:04:20 [INFO] Loaded feature registry with 3 entries
+13:04:20 [INFO] IC config loaded
+13:04:20 [INFO] IC analysis task started: 7ad49da5-c93a-4e8b-aaec-d0a0142f4499
+13:04:20 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+13:04:21 [INFO] Data preprocessing complete: columns=50
+13:04:21 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+13:04:21 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+13:04:21 [INFO] Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+13:04:22 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+13:04:22 [INFO] IC analysis task completed: 7ad49da5-c93a-4e8b-aaec-d0a0142f4499
+PASSED                                                                   [ 80%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_wraps_cpcv PASSED [ 82%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_wraps_wf PASSED [ 84%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_l5_wf_cross_fold_embargo_violation_raises PASSED [ 86%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_detects_embargo_relaxation 
+-------------------------------- live log call ---------------------------------
+13:04:23 [WARNING] CombinatorialPurgedCV: embargo 清空訓練集，自動降低 embargo
+13:04:23 [ERROR] CPCV embargo mismatch for BTCUSDT fold 0: returned=2 expected=0 extra=[58, 59]
+PASSED                                                                   [ 88%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_l6_cpcv_test_boundaries_rebuilt_independently PASSED [ 90%]
+tests/api/test_ic_run_selector.py::test_disambig_same_tf_different_hash 
+-------------------------------- live log call ---------------------------------
+13:04:23 [INFO] Loaded feature registry with 3 entries
+SKIPPED (registry run 1c4b825498449860a639b0ac37f66d73 not materiali...) [ 92%]
+tests/api/test_ic_run_selector.py::test_backward_compat_matches_baseline 
+-------------------------------- live log call ---------------------------------
+13:04:23 [INFO] Loaded feature registry with 3 entries
+SKIPPED (registry run 1c4b825498449860a639b0ac37f66d73 not materiali...) [ 94%]
+tests/api/test_ic_run_selector.py::test_ml_caller_load_multi_kwargs_match_baseline 
+-------------------------------- live log call ---------------------------------
+13:04:23 [INFO] Loaded feature registry with 3 entries
+SKIPPED (registry run 1c4b825498449860a639b0ac37f66d73 not materiali...) [ 96%]
+tests/api/test_ic_run_selector.py::test_live_registry_skips_orphan_latest 
+-------------------------------- live log call ---------------------------------
+13:04:23 [INFO] Loaded feature registry with 3 entries
+SKIPPED (no materialized BTCUSDT/12h run in live registry)               [ 98%]
+tests/golden/ic_phase1_contract/test_baseline_frozen.py::test_baseline_exists PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/momentum/test_ic_phase0_golden.py::test_decay_baseline
+tests/momentum/test_ic_decay_log.py::test_compute_ic_decay_aggregates_fit_warnings
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:947: OptimizeWarning: Covariance of the parameters could not be estimated
+    params, _ = optimize.curve_fit(model, x, y, maxfev=2000)
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 47 passed, 4 skipped, 3 warnings in 10.04s ==================
