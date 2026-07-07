@@ -336,6 +336,7 @@ class ICConfig(BaseModel):
     oos_test_size: float = Field(default=0.2, gt=0.0, lt=1.0)
     embargo: int = Field(default=0, ge=0)
     min_test_rows: int = Field(default=131, ge=1)
+    min_label_coverage_tol: float = Field(default=0.01, ge=0.0, lt=1.0)
     global_settings: ICGlobalConfig = Field(
         default_factory=ICGlobalConfig,
         alias="global",

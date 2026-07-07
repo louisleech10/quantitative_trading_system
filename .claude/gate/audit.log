@@ -9053,3 +9053,221 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-ROWINDEX-REVIEW-composer.md", "output_sha256": "c09504d31eddabbfd652e0540cea7c5702da78a6fa6536fa57145d1afb41573a", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:26:48Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260707-CUT2-ROWINDEX-REVIEW-codex.md", "output_sha256": "f833332631b7ee08b628271bc0a509064b7fc29d545489a23adfac3cf73c19cd", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:26:48Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260707-cut2-rowindex-signoff.md", "output_sha256": "c1acd8b9ba125ffefbb1a28c88ea63648728e7b16f5b3299257ef3c54d6825a8", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:26:48Z"}
+=== 2026-07-07 12:06:53 | artifact ===
+  ts=2026-07-07 12:06:53
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1a_CUT2_XSECTIONAL_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled RISK-HIT a,b,d; §A=filled FACT-RECEIPT 附偵察 VERIFY; §C=filled 解耦+consumer map; §G Golden 狀態=filled 真12h run 3sym; §P=filled Phase1 F1/Phase2 F4/Phase3 F2/Phase4 F3; §V=filled mutation; §R=filled; §N=filled 1d頻率地圖 deferred
+  spec=
+  todo=
+  manifest=
+=== 2026-07-07 12:09:49 | artifact ===
+  ts=2026-07-07 12:09:49
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1a_CUT2_XSECTIONAL_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=SPEC覆蓋追溯=filled; §0全域=filled; §B批次=filled 4 phase; 派工prompt=filled
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-07T04:18:08Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "cut2-xsec-specadv", "ts": "2026-07-07T04:18:42Z"}
+=== 2026-07-07 12:18:42 | dispatch ===
+  ts=2026-07-07 12:18:42
+  kind=dispatch
+  intent=第二刀主體 SPEC/TODO adversarial review(freeze 前,唯讀):挑 blocking findings
+  risk=low
+  facts_asked=VERIFY:20260707T023954Z-cut2-xsectional-label-f1;split_per_symbol 可複用
+  review_role=adversarial-challenge
+  template=n/a:review-only 不創治理文件
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "cut2-xsec-stamp", "ts": "2026-07-07T04:54:02Z"}
+=== 2026-07-07 12:54:02 | dispatch ===
+  ts=2026-07-07 12:54:02
+  kind=dispatch
+  intent=reconcile 戳記複核(唯讀+append RECONCILE-STAMP):Codex+Composer 複核裁決忠實+修訂落實,APPROVED 或 REJECT
+  risk=low
+  facts_asked=reconcile 已含 D-1~D-4+使用者D-2選項一;SPEC/TODO 已修訂 template PASS
+  review_role=reconcile-stamp 複核(盯 Claude 腿)
+  template=n/a:review-only append 戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "cut2-xsec-stamp-reverify", "ts": "2026-07-07T04:57:54Z"}
+=== 2026-07-07 12:57:54 | dispatch ===
+  ts=2026-07-07 12:57:54
+  kind=dispatch
+  intent=Codex 複驗 3 殘留 blocking 是否真關閉(TODO Task1.1 fail-closed 單位/Batch2 D-2/Task4.1 stale field)+append APPROVED 或再 REJECT
+  risk=low
+  facts_asked=3 blocking 已修:TODO Task1.1 改 fail-closed 單位契約禁1e12猜;Batch2 改 fail-closed;Task4.1 移除 min_label_coverage 舊欄名
+  review_role=finding-closure 複驗(原提出方)
+  template=n/a:review-only append 戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-STAMP-composer-FINAL.md", "output_sha256": "pending", "task_id": "cut2-xsec-stamp-cfinal", "ts": "2026-07-07T05:02:40Z"}
+=== 2026-07-07 13:02:40 | dispatch ===
+  ts=2026-07-07 13:02:40
+  kind=dispatch
+  intent=Composer 正規戳記 append(已 APPROVED,補機檢正規式)
+  risk=low
+  facts_asked=body sha256:5be0f6d40c6cb35a63e8bfa117c5b40f3df180468497a2435763b300b6777d86
+  review_role=reconcile-stamp canonical
+  template=n/a:review append
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-STAMP-codex-FINAL.md", "output_sha256": "pending", "task_id": "cut2-xsec-stamp-cxfinal", "ts": "2026-07-07T05:02:40Z"}
+=== 2026-07-07 13:02:40 | dispatch ===
+  ts=2026-07-07 13:02:40
+  kind=dispatch
+  intent=Codex 正規戳記 append(複驗已關閉,補機檢正規式)
+  risk=low
+  facts_asked=body sha256:5be0f6d40c6cb35a63e8bfa117c5b40f3df180468497a2435763b300b6777d86
+  review_role=reconcile-stamp canonical
+  template=n/a:review append
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-STAMP-composer-FINAL.md", "output_sha256": "53a434ee993fa8f6ab46b794e66fd3335a23d56c33a02b1d16a2177c387062c8", "task_id": "cut2-xsec-stamp-cfinal", "ts": "2026-07-07T05:04:49Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-STAMP-codex-FINAL.md", "output_sha256": "761014bfe24a9e1617014dcd6a3c0364d76fbbbcd40f6db41b7a7470e6642a6a", "task_id": "cut2-xsec-stamp-cxfinal", "ts": "2026-07-07T05:04:49Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md", "output_sha256": "14672cc63c6cee515423733207ac5d1fee16cee0fdb4c67fd5e2762fca61b916", "task_id": "cut2-xsec-stamp-cfinal", "ts": "2026-07-07T05:05:47Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md", "output_sha256": "14672cc63c6cee515423733207ac5d1fee16cee0fdb4c67fd5e2762fca61b916", "task_id": "cut2-xsec-stamp-cxfinal", "ts": "2026-07-07T05:05:47Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md", "output_sha256": "14672cc63c6cee515423733207ac5d1fee16cee0fdb4c67fd5e2762fca61b916", "task_id": "cut2-xsec-impl", "ts": "2026-07-07T05:07:24Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md", "output_sha256": "98315c2b4cdd31652bf21486f3274539c54a306d5fedb6265996145c929fc22b", "task_id": "cut2-xsec-impl", "ts": "2026-07-07T05:08:19Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md", "output_sha256": "98315c2b4cdd31652bf21486f3274539c54a306d5fedb6265996145c929fc22b", "task_id": "cut2-xsec-impl-v2", "ts": "2026-07-07T05:08:30Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md", "output_sha256": "98315c2b4cdd31652bf21486f3274539c54a306d5fedb6265996145c929fc22b", "task_id": "cut2-xsec-impl-v2", "ts": "2026-07-07T05:08:41Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md", "output_sha256": "98315c2b4cdd31652bf21486f3274539c54a306d5fedb6265996145c929fc22b", "task_id": "cut2-xsec-impl-v2", "ts": "2026-07-07T05:08:51Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-IMPL-RESULT.md", "output_sha256": "pending", "task_id": "cut2-xsec-impl-v2", "ts": "2026-07-07T05:08:52Z"}
+=== 2026-07-07 13:08:52 | dispatch ===
+  ts=2026-07-07 13:08:52
+  kind=dispatch
+  intent=第二刀主體 cross_sectional 防洩漏實作 F1/F4/F2/F3;照 freeze SPEC/TODO,Composer 實作,Codex 另審
+  risk=high
+  facts_asked=SPEC/TODO freeze 三方戳記 APPROVED;VERIFY:20260707T023954Z;D-1~D-4
+  review_role=實作端 Composer,Codex 另審
+  template=spec:docs/IC_PHASE1_1a_CUT2_XSECTIONAL_SPEC.md
+  adversarial=handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md
+  reconcile=handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1a_CUT2_XSECTIONAL_SPEC.md
+  todo=docs/IC_PHASE1_1a_CUT2_XSECTIONAL_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-CODEREVIEW-codex.md", "output_sha256": "pending", "task_id": "cut2-xsec-codereview", "ts": "2026-07-07T05:18:47Z"}
+=== 2026-07-07 13:18:47 | dispatch ===
+  ts=2026-07-07 13:18:47
+  kind=dispatch
+  intent=Codex 獨立 code review + adversarial 資料正確性挑戰(實作 diff);查 F3 mutation 弱點/purge_gap=0 偏離/洩漏/假綠/scope
+  risk=low
+  facts_asked=Composer 已實作;48 passed+2 pre-existing fail(HEAD 亦 fail);Claude 標的疑點 F3 mutation 套套/purge_gap=0
+  review_role=code-review 實作端不自審
+  template=n/a:review-only
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md", "output_sha256": "98315c2b4cdd31652bf21486f3274539c54a306d5fedb6265996145c929fc22b", "task_id": "cut2-xsec-fixround", "ts": "2026-07-07T05:34:30Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-FIXROUND-RESULT.md", "output_sha256": "pending", "task_id": "cut2-xsec-fixround", "ts": "2026-07-07T05:34:31Z"}
+=== 2026-07-07 13:34:31 | dispatch ===
+  ts=2026-07-07 13:34:31
+  kind=dispatch
+  intent=第二刀 fix-round:修 Codex 4 findings(F4 邊界 BLOCKING/F3 mutation/F1 容孔 Option B/int64);Composer 修,Codex 複驗
+  risk=high
+  facts_asked=Codex verdict FAIL;F1 容孔矛盾 Claude 裁 Option B;SPEC 已同步
+  review_role=Composer 修 Codex 複驗閉合
+  template=spec:docs/IC_PHASE1_1a_CUT2_XSECTIONAL_SPEC.md
+  adversarial=handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md
+  reconcile=handoffs/CUT2-XSECTIONAL-SPECADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1a_CUT2_XSECTIONAL_SPEC.md
+  todo=docs/IC_PHASE1_1a_CUT2_XSECTIONAL_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-CLOSURE-codex.md", "output_sha256": "pending", "task_id": "cut2-xsec-closure", "ts": "2026-07-07T05:40:17Z"}
+=== 2026-07-07 13:40:17 | dispatch ===
+  ts=2026-07-07 13:40:17
+  kind=dispatch
+  intent=Codex 複驗 fix-round 4 finding 是否真關閉(原提出方,重跑 BLOCKING repro)+ 資料正確性簽核
+  risk=low
+  facts_asked=FIX-1~4 已修;Claude 自跑 18 passed;F3 mutation 改 effective_horizon=0→SplitPairLeakageError
+  review_role=finding-closure 複驗 + data-correctness signoff
+  template=n/a:review-only
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-XSECTIONAL-SIGNOFF-composer.md", "output_sha256": "pending", "task_id": "cut2-xsec-signoff-composer", "ts": "2026-07-07T05:43:55Z"}
+=== 2026-07-07 13:43:55 | dispatch ===
+  ts=2026-07-07 13:43:55
+  kind=dispatch
+  intent=Composer 家族資料正確性簽核腿(最終狀態獨立複核:生成→計算→merge→split→無洩漏)
+  risk=low
+  facts_asked=fix-round 已閉;Codex+Claude 已簽 DATA-CORRECT PASS;18 passed
+  review_role=data-correctness signoff 第三家族
+  template=n/a:review-only
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-codex.md", "output_sha256": "8f495c30669e8c1fc6bb5678fdefa166c1cfc70a1f66dc9aaed43e9f81f6dcbf", "task_id": "cut2-xsec-specadv", "ts": "2026-07-07T05:53:20Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-CODEREVIEW-codex.md", "output_sha256": "81f6e6c7d1683f94c6aebea17f61851c1c248431aaf22e71dfe9d7f1e97ab88f", "task_id": "cut2-xsec-codereview", "ts": "2026-07-07T05:53:20Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-CLOSURE-codex.md", "output_sha256": "e709353cc28a9956bcfc4188724ce15e9778a2f9331fd544b32223e642338133", "task_id": "cut2-xsec-closure", "ts": "2026-07-07T05:53:20Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-SIGNOFF-composer.md", "output_sha256": "545b68e52d39052496bf529b1aaecf74543fb09f0ad6ccebbed5b661ee325bb5", "task_id": "cut2-xsec-signoff-composer", "ts": "2026-07-07T05:53:20Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-composer.md", "output_sha256": "da486ce28ac63ad781d89fcd713f994cb97f439b7b530920f855146e7d96d073", "task_id": "cut2-xsec-specadv", "ts": "2026-07-07T05:55:19Z"}

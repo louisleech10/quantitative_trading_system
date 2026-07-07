@@ -197,7 +197,10 @@ def test_analyze_cross_sectional_includes_symbol_matrix_and_validation():
         index=index,
     )
 
-    report = orchestrator.analyze_cross_sectional(features)
+    report = orchestrator.analyze_cross_sectional(
+        features,
+        config_override={"ic_train_test_split": False},
+    )
 
     matrix = report.get("cross_sectional_symbol_ic")
     assert isinstance(matrix, dict)

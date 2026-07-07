@@ -1,13 +1,14 @@
 # Handoff
 **Agent**: Claude | **Time**: 2026-07-07 | **Branch**: main
 
-## ✅ 剛完成:IC 第二刀首項 row_index attach(commit 6a991c2,已 push)
-- `feature_library._attach_row_index` 在 V2 load 路徑貼回真時間軸(鏡像 `_attach_cgsa_row_index`);只改 index,值/欄/列不變。修全 tf config_hash 載入掉時間軸→切分校驗誤判 raise 的 bug。
-- 回歸 `tests/momentum/test_feature_library_row_index.py tests/momentum/test_feature_library_config_hash.py tests/api/test_ic_analysis_service.py` 13 passed VERIFY:20260706T165905Z-cut2-rowindex-regression exit0;三方數據正確性簽核 PASS 零 BLOCKING(RECONCILE-STAMP codex+composer APPROVED)。docs/IC_PHASE1_1a_CUT2_ROWINDEX_{SPEC,TODO}。
-- Follow-up(登記未做):ingest cache 版本化、1d 頻率地圖、conftest scoped-collect clobber L6.5 golden、full-analyze 效能(歸「79 測試換真資料」epic)。
+## ✅ 剛完成:IC 第二刀主體 cross_sectional 防洩漏(2026-07-07,待 commit) SIGNOFF:claude:DATA-CORRECT SIGNOFF:codex:DATA-CORRECT SIGNOFF:composer:DATA-CORRECT
+- **F1** `_append_cross_sectional_labels` kline int64-ts→datetime 對齊(修第一刀回歸的橫截面標籤全 NaN);**F4** per-symbol 覆蓋守衛 fail-closed(all-NaN/短序列無條件擋);**F2** 單軸 labels_path fail-closed;**F3** 全域同步時間邊界 OOS holdout+purge+embargo,test-only 覆蓋全部 report 輸出。VERIFY:20260707T023954Z-cut2-xsectional-label-f1
+- **驗收**:Claude 自跑 18 passed,解耦 grep=0,postflight OK;三方簽核全 PASS(Codex adversarial 抓 F4 邊界 BLOCKING→fix-round→原提出方複驗閉合);SPEC 雙 RECONCILE-STAMP APPROVED provenance。SIGNOFF:codex:DATA-CORRECT
+- **殘留(正交非本刀)**:`test_ic_filter_orchestrator.py` 2 pre-existing fail(單幣 analyze 合成 fixture 撞 rows-purge 校驗,HEAD 亦 fail,git stash 已驗)。REF:handoffs/CUT2-XSECTIONAL-SIGNOFF-claude.md
+- **前刀**:row_index attach(commit 6a991c2 已 push)V2 load 貼回真時間軸=本刀 F1 修的回歸來源。REF:handoffs/CUT2-XSECTIONAL-SIGNOFF-claude.md
 
-## ★下一站 = IC 第二刀主體:cross_sectional `analyze_cross_sectional` 防洩漏(大任務 a/b/d)
-**目標**:把 `momentum/Analysis/ic_filter_orchestrator.py:528 analyze_cross_sectional` 提升到第一刀(單幣 `analyze`)的防洩漏標準。**須走完整管線 SPEC+TODO+雙家族 adversarial + 全三方數據正確性簽核**(多 symbol 跨界洩漏=數據正確性 scope)。
+## ★下一站 = IC 1a 剩餘刀:1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;grouped_ic 止血
+- 治理修補(SCAR 已入):SPEC consumer-map 須含所有對 load 結果 reindex/merge 的 consumer + 真路徑 red-on-break 測試(第一刀漏 `_append_cross_sectional_labels` 教訓)。REF:docs/SCAR_LEDGER.md
 
 **已偵察到的洩漏面(新 session 須自行驗證勿盡信)**:
 1. **label 只按 timestamp 對齊**(:558-561 `label_series.reindex(timestamp_index)` 掉 symbol level)→ per-(timestamp,symbol) label 可能貼到別 symbol 的列。**最可疑的跨界洩漏點**。對照 memory「IC Phase1 決策」:ML孤島 positional-index 切片→多 symbol 跨界洩漏,SplitPlan 須 per-symbol。

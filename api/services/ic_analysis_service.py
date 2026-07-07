@@ -168,6 +168,7 @@ class ICAnalysisService:
                     labels_path=labels_path,
                     config_override=config_override,
                     progress_callback=progress_callback,
+                    timeframe=request.timeframe,
                 )
             else:
                 symbol = request.symbol
@@ -1401,8 +1402,29 @@ class ICAnalysisService:
             raw_data = kline_reader.read_klines(symbol, timeframe)
             if raw_data is None or raw_data.empty or "close" not in raw_data.columns:
                 raise ValueError(f"kline data unavailable for {symbol}/{timeframe}")
+            if "timestamp" not in raw_data.columns:
+                raise ValueError(f"kline data missing timestamp for {symbol}/{timeframe}")
+            ts_raw = raw_data["timestamp"]
+            if not np.issubdtype(ts_raw.dtype, np.integer):
+                raise ValueError(
+                    f"kline timestamp for {symbol}/{timeframe} must be integer epoch seconds, "
+                    f"got {ts_raw.dtype}"
+                )
+            ts_values = ts_raw.to_numpy()
+            if ts_values.size > 0 and np.any(ts_values < 0):
+                raise ValueError(
+                    f"kline timestamp for {symbol}/{timeframe} contains negative values"
+                )
+            if ts_values.size > 1 and np.any(np.diff(ts_values) <= 0):
+                raise ValueError(
+                    f"kline timestamp for {symbol}/{timeframe} must be strictly "
+                    "increasing without duplicates"
+                )
+            kline_index = pd.DatetimeIndex(pd.to_datetime(ts_raw, unit="s"))
+            close = raw_data["close"].copy()
+            close.index = kline_index
             label_series = label_generator.generate_returns_by_type(
-                raw_data["close"],
+                close,
                 1,
                 "log",
             )
@@ -1410,7 +1432,25 @@ class ICAnalysisService:
             if not symbol_mask.any():
                 continue
             symbol_index = working_df.index[symbol_mask].droplevel(symbol_level_idx)
+            if not isinstance(symbol_index, pd.DatetimeIndex):
+                symbol_index = pd.DatetimeIndex(pd.to_datetime(symbol_index))
             aligned = label_series.reindex(symbol_index)
+            matched_mask = symbol_index.isin(kline_index)
+            if bool(matched_mask.any()):
+                matched_index = symbol_index[matched_mask]
+                direct = label_series.reindex(matched_index)
+                reindexed = aligned.reindex(matched_index)
+                valid = direct.notna().to_numpy() & reindexed.notna().to_numpy()
+                if bool(valid.any()):
+                    np.testing.assert_allclose(
+                        reindexed.to_numpy(dtype=np.float64)[valid],
+                        direct.to_numpy(dtype=np.float64)[valid],
+                        rtol=1e-5,
+                        atol=1e-5,
+                        err_msg=(
+                            f"label misalignment for {symbol}/{timeframe} at matched timestamps"
+                        ),
+                    )
             working_df.loc[symbol_mask, "return_1"] = aligned.to_numpy()
 
         return working_df

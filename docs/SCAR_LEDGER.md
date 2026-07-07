@@ -16,3 +16,5 @@
 | VERIFY claim / receipt gate | 2026-07-01：FF 驗收 smoke 寫成「已驗」→ 捏造通過 | 合約 VERIFY 義務；HANDOFF 鐵律 VERIFY receipt | handoffs/instrev-evidence |
 | 選層動態制（D-4） | 2026-07-05 總審查：選層三處三答案分叉（記憶 vs CLAUDE vs ORCH 不一致） | ORCH §1 單一「現行分工」行；CLAUDE 決策表 pointer | handoffs/20260705-INSTREV-RECONCILE.md |
 | 06-03 選層 A/B 實證 | 2026-06-03：codex≈cursor 正確性對等，選層差異在成本/嚴謹度非能力 | ORCH §1 誠實邊界句；§8 T-D | ORCH §1、§8 |
+| SPEC consumer-map 須含所有 reindex/merge 下游 | 2026-07-07：第一刀（load 貼回 DatetimeIndex）三方簽核+13passed 卻漏——`_append_cross_sectional_labels` 未列入 consumer map，其對 kline(RangeIndex) reindex 隱性依賴舊 positional 契約 → producer 改真時間軸後橫截面標籤 100% 全 NaN、IC 靜默全壞（0/5088），僅在使用者要求動工前真資料實跑才現形 | SPEC §C consumer map 須含「對 load 結果 reindex/merge 的所有跨模組 consumer」+ 每列出 consumer 須一條真路徑 red-on-break 測試；index 型別變更 Golden 須含 downstream 端到端斷言 | handoffs/CUT2-XSECTIONAL-RECON.md（VERIFY:20260707T023954Z-cut2-xsectional-label-f1） |
+| cross_sectional 真路徑須真測非 stub | 2026-07-07：唯一 cross_sectional 測試用 monkeypatch 假 frame+stub analyzer+無空值 oracle → 翻轉 producer index 型別零測試轉紅（廉價綠燈） | 測試設計章程；聲稱驗正確性的測試須 red-on-break；端到端須跑真 load_multi→append labels→analyze | 同上 |

@@ -1,0 +1,25 @@
+cross rows total: 5088
+[F1 現況邏輯] return_1 非 NaN: 0/5088
+[修法] return_1 非 NaN: 5085/5088
+[修法] forward+末列NaN 正確: True
+[修法] per-symbol 標籤各異(無跨界污染): True | {'BTCUSDT': -0.0030444664880633354, 'ETHUSDT': -0.0044412147253751755, 'BCHUSDT': -0.01195237785577774}
+RESULT bug_reproduced=True fix_effective=True
+2026-07-07 10:39:52,268 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-07-07 10:39:52,369] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-07-07 10:39:52,369 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+[2026-07-07 10:39:53,660] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 9 entries
+2026-07-07 10:39:53,660 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 9 entries
+2026-07-07 10:39:53,994 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-07-07 10:39:54,002 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/12h: 1696 bars are continuous
+2026-07-07 10:39:54,002 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from BTCUSDT/12h in 0.008s
+2026-07-07 10:39:54,006 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-07-07 10:39:54,006 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+2026-07-07 10:39:54,009 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BCHUSDT/12h: 1696 bars are continuous
+2026-07-07 10:39:54,009 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from BCHUSDT/12h in 0.002s
+2026-07-07 10:39:54,010 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-07-07 10:39:54,012 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/12h: 1696 bars are continuous
+2026-07-07 10:39:54,012 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from BTCUSDT/12h in 0.002s
+2026-07-07 10:39:54,016 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-07-07 10:39:54,016 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+2026-07-07 10:39:54,019 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BCHUSDT/12h: 1696 bars are continuous
+2026-07-07 10:39:54,019 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from BCHUSDT/12h in 0.002s

@@ -33,10 +33,12 @@ from momentum.core.contracts import (
     TimestampDiscontinuityError,
     _coerce_timestamp_array,
     _normalize_symbol_value,
+    split_per_symbol,
     validate_split_pair_integrity,
 )
 from momentum.core.protocols import IKlineReader
 from momentum.factories import create_label_generator
+from momentum.Analysis.ic_split_adapter import ICSplitAdapter
 
 
 logger = get_logger(__name__)
@@ -228,6 +230,196 @@ def _build_holdout_split_plan(
         allowed_symbols={normalized_symbol},
     )
     return train_plan, test_plan
+
+
+def _resolve_cross_sectional_label_horizon(label_col: str) -> int:
+    """cross_sectional 標籤實際 horizon（return_1→1，非 config 預設 default_horizon）。"""
+    match = re.fullmatch(r"return_(\d+)", label_col)
+    if match:
+        return int(match.group(1))
+    return 1
+
+
+def _labels_df_has_symbol_dimension(labels_df: pd.DataFrame) -> bool:
+    """labels_path 是否含 per-symbol 維度（MultiIndex symbol level）。"""
+    if not isinstance(labels_df.index, pd.MultiIndex):
+        return False
+    names = {str(name).lower() for name in labels_df.index.names if name is not None}
+    return bool(names.intersection({"symbol", "_symbol"}))
+
+
+def _enforce_cross_sectional_label_coverage(
+    numeric_df: pd.DataFrame,
+    label_col: str,
+    symbol_level_idx: int,
+    effective_horizon: int,
+    tol: float,
+) -> dict[str, float]:
+    """per-symbol 標籤覆蓋率守衛（D-3：結構性下界，非全域平均）。"""
+    per_symbol_coverage: dict[str, float] = {}
+    for symbol, group in numeric_df.groupby(level=symbol_level_idx, sort=True):
+        labels = group[label_col]
+        len_s = int(len(labels))
+        if len_s == 0:
+            raise InvalidInputError(f"symbol {symbol} has no rows for label coverage check")
+        if int(labels.notna().sum()) == 0:
+            raise InvalidInputError(
+                f"symbol {symbol} has all-NaN labels (fail-closed)"
+            )
+        if len_s <= effective_horizon:
+            raise InvalidInputError(
+                f"symbol {symbol} has {len_s} rows, insufficient for "
+                f"forward horizon {effective_horizon}"
+            )
+        coverage_s = float(labels.notna().sum()) / len_s
+        floor_s = (len_s - effective_horizon) / len_s
+        threshold = floor_s * (1.0 - tol)
+        if coverage_s < threshold:
+            raise InvalidInputError(
+                f"label coverage too low for {symbol}: "
+                f"actual={coverage_s:.4f}, required>={threshold:.4f} "
+                f"(floor={floor_s:.4f}, horizon={effective_horizon})"
+            )
+        per_symbol_coverage[str(symbol)] = coverage_s
+    return per_symbol_coverage
+
+
+def _cross_sectional_to_split_frame(
+    numeric_df: pd.DataFrame,
+    symbol_level_idx: int,
+    time_level_idx: int,
+) -> pd.DataFrame:
+    """將 MultiIndex cross-sectional frame 轉成 split_per_symbol 契約用的 flat frame。"""
+    ts = numeric_df.index.get_level_values(time_level_idx)
+    symbols = numeric_df.index.get_level_values(symbol_level_idx)
+    return pd.DataFrame(
+        {
+            "symbol": symbols,
+            "timestamp": pd.to_datetime(_coerce_timestamp_array(ts)),
+        }
+    )
+
+
+def _build_cross_sectional_global_split(
+    numeric_df: pd.DataFrame,
+    symbol_level_idx: int,
+    time_level_idx: int,
+    config: ICConfig,
+    expected_freq: pd.Timedelta,
+    effective_horizon: int,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """全域同步時間邊界 holdout（D-1）：所有 symbol 共用同一日曆切點。"""
+    split_frame = _cross_sectional_to_split_frame(
+        numeric_df, symbol_level_idx, time_level_idx
+    )
+    ts_values = split_frame["timestamp"].to_numpy()
+    unique_ts = pd.DatetimeIndex(pd.unique(ts_values)).sort_values()
+    n_ts = int(len(unique_ts))
+    if n_ts < 2:
+        raise InvalidInputError("cross_sectional split requires at least 2 unique timestamps")
+
+    split_point = int(np.floor((1.0 - float(config.oos_test_size)) * n_ts))
+    if split_point < 1 or split_point >= n_ts:
+        raise InvalidInputError(
+            "cross_sectional oos_test_size leaves no train or test timestamps"
+        )
+
+    t_train_end = pd.Timestamp(unique_ts[split_point - 1])
+    purge_td = effective_horizon * expected_freq
+    embargo_td = int(config.embargo) * expected_freq
+    test_start = t_train_end + purge_td + embargo_td
+
+    ts_series = pd.Series(pd.to_datetime(ts_values))
+    train_mask = (ts_series <= t_train_end).to_numpy(dtype=bool)
+    test_mask = (ts_series >= test_start).to_numpy(dtype=bool)
+
+    min_rows = int(config.min_test_rows)
+    train_rows = int(train_mask.sum())
+    test_rows = int(test_mask.sum())
+    if train_rows < min_rows or test_rows < min_rows:
+        raise InvalidInputError(
+            "cross_sectional train/test rows below min_test_rows",
+        )
+
+    per_symbol_test_rows: dict[str, int] = {}
+    symbols_arr = split_frame["symbol"].to_numpy()
+    for symbol in pd.unique(symbols_arr):
+        symbol_mask = symbols_arr == symbol
+        symbol_test = int((test_mask & symbol_mask).sum())
+        if symbol_test < min_rows:
+            raise InvalidInputError(
+                f"cross_sectional test rows below min_test_rows for {symbol}: "
+                f"{symbol_test} < {min_rows}"
+            )
+        per_symbol_test_rows[str(symbol)] = symbol_test
+
+    adapter = ICSplitAdapter(expected_freq=str(expected_freq))
+    audit_frame = adapter._with_row_positions(split_frame, "symbol", "timestamp")
+    base_hash = adapter._base_universe_hash(audit_frame, "symbol", "timestamp")
+    allowed_symbols = {
+        _normalize_symbol_value(value) for value in pd.unique(symbols_arr)
+    }
+
+    def splitter(group: pd.DataFrame) -> Any:
+        group_ts = pd.to_datetime(group["timestamp"])
+        train_local = np.flatnonzero(group_ts <= t_train_end)
+        test_local = np.flatnonzero(group_ts >= test_start)
+        if train_local.size == 0 or test_local.size == 0:
+            raise InvalidInputError(
+                f"cross_sectional split produced empty train/test for "
+                f"{group['symbol'].iloc[0]}"
+            )
+        yield train_local, test_local
+
+    plan_pairs = split_per_symbol(
+        split_frame,
+        splitter,
+        "symbol",
+        "timestamp",
+        purge_gap=0,
+        embargo=int(config.embargo),
+        purge_semantic="timedelta",
+        expected_freq=str(expected_freq),
+        base_universe_hash=base_hash,
+        allowed_symbols=allowed_symbols,
+    )
+    for train_plan, test_plan in plan_pairs:
+        validate_split_pair_integrity(
+            train_plan,
+            test_plan,
+            audit_frame["timestamp"].to_numpy(),
+            audit_frame["symbol"].to_numpy(),
+            allowed_symbols=allowed_symbols,
+        )
+
+    train_max_time = pd.Timestamp(ts_series[train_mask].max())
+    test_min_time = pd.Timestamp(ts_series[test_mask].min())
+    required_gap = purge_td + embargo_td
+    actual_gap = test_min_time - train_max_time
+    if actual_gap < required_gap:
+        raise InvalidInputError(
+            "cross_sectional split gap smaller than purge+embargo: "
+            f"actual={actual_gap}, required>={required_gap}"
+        )
+
+    split_meta = {
+        "requested": True,
+        "applied": True,
+        "scope": "cross_sectional_global_time_holdout",
+        "oos_guarantees": True,
+        "effective_horizon": effective_horizon,
+        "purge_td": str(purge_td),
+        "embargo_td": str(embargo_td),
+        "train_max_time": str(train_max_time),
+        "test_min_time": str(test_min_time),
+        "train_rows": train_rows,
+        "test_rows": test_rows,
+        "per_symbol_test_rows": per_symbol_test_rows,
+        "expected_freq": str(expected_freq),
+        "base_universe_hash": base_hash,
+        "n_split_plans": len(plan_pairs),
+    }
+    return train_mask, test_mask, split_meta
 
 
 def _derive_stage_masks(
@@ -531,6 +723,7 @@ class ICFilterOrchestrator:
         labels_path: Optional[str] = None,
         config_override: Optional[dict] = None,
         progress_callback: Optional[Callable] = None,
+        timeframe: Optional[str] = None,
     ) -> dict:
         """Cross-sectional IC: rank corr(feature_{i,t}, return_{i,t+1}) across symbols at each timestamp."""
 
@@ -554,11 +747,13 @@ class ICFilterOrchestrator:
         labels_df = self._load_labels_hdf5(labels_path) if labels_path else None
 
         if labels_df is not None and not labels_df.empty:
+            if not _labels_df_has_symbol_dimension(labels_df):
+                raise InvalidInputError(
+                    "cross_sectional labels_path 單軸不支援;用 kline 衍生標籤或另立 per-symbol labels epic"
+                )
             label_series = self._select_label_series(labels_df, config)
-            timestamp_index = features.index.droplevel(symbol_level_idx)
-            aligned = label_series.reindex(timestamp_index)
             working_df = features.copy()
-            working_df["_label"] = aligned.to_numpy()
+            working_df["_label"] = label_series.reindex(features.index).to_numpy()
             label_col = "_label"
         else:
             working_df = features.copy()
@@ -580,14 +775,59 @@ class ICFilterOrchestrator:
         if not feature_cols:
             raise InvalidInputError("no numeric feature columns found for cross-sectional analysis")
 
+        effective_horizon = _resolve_cross_sectional_label_horizon(label_col)
+        per_symbol_coverage = _enforce_cross_sectional_label_coverage(
+            numeric_df,
+            label_col,
+            symbol_level_idx,
+            effective_horizon,
+            config.min_label_coverage_tol,
+        )
+        mean_coverage = float(np.mean(list(per_symbol_coverage.values())))
+
+        split_meta: Optional[dict[str, Any]] = None
+        analysis_df = numeric_df
+        if config.ic_train_test_split:
+            if not timeframe:
+                raise InvalidInputError(
+                    "timeframe is required for cross_sectional ic_train_test_split"
+                )
+            if timeframe not in EXPECTED_FREQ_BY_TIMEFRAME:
+                raise InvalidInputError(
+                    f"Unsupported timeframe for cross_sectional split: {timeframe!r}"
+                )
+            expected_freq = EXPECTED_FREQ_BY_TIMEFRAME[timeframe]
+            time_levels = [
+                idx for idx in range(numeric_df.index.nlevels) if idx != symbol_level_idx
+            ]
+            if not time_levels:
+                raise InvalidInputError("cannot infer timestamp level for cross-sectional analysis")
+            time_level_idx = time_levels[0] if len(time_levels) == 1 else time_levels[0]
+            try:
+                train_mask, test_mask, split_meta = _build_cross_sectional_global_split(
+                    numeric_df,
+                    symbol_level_idx,
+                    time_level_idx,
+                    config,
+                    expected_freq,
+                    effective_horizon,
+                )
+            except InvalidInputError as exc:
+                raise InvalidInputError(
+                    f"cross_sectional ic_train_test_split failed: {exc}"
+                ) from exc
+            analysis_df = numeric_df.iloc[np.flatnonzero(test_mask)]
+
         self._report_progress(0, "cross_sectional", 0.2, "preparing grouped slices")
 
-        time_levels = [idx for idx in range(numeric_df.index.nlevels) if idx != symbol_level_idx]
+        time_levels = [
+            idx for idx in range(analysis_df.index.nlevels) if idx != symbol_level_idx
+        ]
         if not time_levels:
             raise InvalidInputError("cannot infer timestamp level for cross-sectional analysis")
 
         grouped_level: Any = time_levels[0] if len(time_levels) == 1 else time_levels
-        grouped = numeric_df.groupby(level=grouped_level, sort=True)
+        grouped = analysis_df.groupby(level=grouped_level, sort=True)
         ic_series: dict[str, list[float]] = {column: [] for column in feature_cols}
         n_slices = 0
 
@@ -662,21 +902,25 @@ class ICFilterOrchestrator:
         ]
 
         symbol_ic_matrix = self._build_cross_sectional_symbol_matrix(
-            numeric_df=numeric_df,
+            numeric_df=analysis_df,
             feature_cols=ranked_features,
             label_col=label_col,
             symbol_level_idx=symbol_level_idx,
         )
         cross_symbol_validation = self._build_cross_symbol_validation(symbol_ic_matrix)
 
-        metadata = {
+        metadata: dict[str, Any] = {
             "mode": "cross_sectional",
             "n_symbols": int(features.index.get_level_values(symbol_level_idx).nunique()),
             "symbols": symbol_ic_matrix.get("symbols", []),
             "n_timestamps": int(n_slices),
             "total_features_input": len(feature_cols),
             "total_features_output": len(feature_cols),
+            "per_symbol_coverage": per_symbol_coverage,
+            "mean_label_coverage": mean_coverage,
         }
+        if split_meta is not None:
+            metadata["ic_train_test_split"] = split_meta
 
         analysis_results = {
             "filter_log": {
