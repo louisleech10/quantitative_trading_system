@@ -1,28 +1,26 @@
 # Handoff
 **Agent**: Claude | **Time**: 2026-07-07 | **Branch**: main
 
-## ★IC 第二刀首項 = feature_library.load 貼回時間軸(row_index attach) — ✅ 完成(三方簽核 PASS)
+## ✅ 剛完成:IC 第二刀首項 row_index attach(commit 6a991c2,已 push)
+- `feature_library._attach_row_index` 在 V2 load 路徑貼回真時間軸(鏡像 `_attach_cgsa_row_index`);只改 index,值/欄/列不變。修全 tf config_hash 載入掉時間軸→切分校驗誤判 raise 的 bug。
+- 回歸 `tests/momentum/test_feature_library_row_index.py tests/momentum/test_feature_library_config_hash.py tests/api/test_ic_analysis_service.py` 13 passed VERIFY:20260706T165905Z-cut2-rowindex-regression exit0;三方數據正確性簽核 PASS 零 BLOCKING(RECONCILE-STAMP codex+composer APPROVED)。docs/IC_PHASE1_1a_CUT2_ROWINDEX_{SPEC,TODO}。
+- Follow-up(登記未做):ingest cache 版本化、1d 頻率地圖、conftest scoped-collect clobber L6.5 golden、full-analyze 效能(歸「79 測試換真資料」epic)。
 
-### 成果
-- **根因**:載入走 V2 reader 回位置整數 index,從不貼回時間軸→下游寫 np.arange 偽 timestamps→頻率校驗誤判 raise。全 tf 中(1h 走現成 fixture 未現形)。
-- **修法**:`feature_library.py` 新增 `_attach_row_index`(鏡像 `_attach_cgsa_row_index`),`_load_internal` V2 分支 return 前貼回;無 sidecar→no-op,長度不符→ValueError。只改 index,值/欄/列/檔大小不變。
-- **測試**:新增 row_index attach 單元(no-op/length-guard)+ 真 run 值守恆/時間軸 byte-equal;追蹤測試 retarget 至失敗邊界(materialize→真時間軸→split 校驗不 raise;218k 特徵 full analyze>17min 屬正交效能問題)。回歸 `tests/momentum/test_feature_library_row_index.py tests/momentum/test_feature_library_config_hash.py tests/api/test_ic_analysis_service.py` 13 passed VERIFY:20260706T165905Z-cut2-rowindex-regression exit0;解耦 grep=0;mutation 對照已證。
-- **清中毒 cache**:刪 bug 期 BTC/12h/e53e2290 ingest cache(arange 偽軸,gitignored,已重生真時間軸)。
+## ★下一站 = IC 第二刀主體:cross_sectional `analyze_cross_sectional` 防洩漏(大任務 a/b/d)
+**目標**:把 `momentum/Analysis/ic_filter_orchestrator.py:528 analyze_cross_sectional` 提升到第一刀(單幣 `analyze`)的防洩漏標準。**須走完整管線 SPEC+TODO+雙家族 adversarial + 全三方數據正確性簽核**(多 symbol 跨界洩漏=數據正確性 scope)。
 
-### 三方數據正確性簽核(全 PASS 零 BLOCKING)
-- Claude 自產 + Codex adversarial(語義時間 oracle 交叉驗列序 0 mismatch,9 run)+ Composer 資料正確性,各自獨立實跑。產出:`handoffs/CUT2-ROWINDEX-REVIEW-{codex,composer}.md`。
-- reconcile:`handoffs/CUT2-ROWINDEX-RECONCILE.md`,RECONCILE-STAMP codex+composer APPROVED,reconcile_stamps_check PASS(body sha256:22153e82…)。
-- NON-BLOCKING 已修:還原 L6.5 golden(conftest scoped-collect 副作用)、SPEC §G-3/TODO 對齊 retarget。
+**已偵察到的洩漏面(新 session 須自行驗證勿盡信)**:
+1. **label 只按 timestamp 對齊**(:558-561 `label_series.reindex(timestamp_index)` 掉 symbol level)→ per-(timestamp,symbol) label 可能貼到別 symbol 的列。**最可疑的跨界洩漏點**。對照 memory「IC Phase1 決策」:ML孤島 positional-index 切片→多 symbol 跨界洩漏,SplitPlan 須 per-symbol。
+2. **無 OOS / 無 purge·embargo**:full-sample IC,無 holdout split(單幣 `analyze` 有 `_build_holdout_split_plan`);look-ahead 未圍。
+3. cross_sectional labels 來自 `api/services/ic_analysis_service.py:_append_cross_sectional_labels`(_run_analysis :159)——per-symbol 正確性未驗。
+4. 呼叫鏈:`_run_analysis`(:125-171)load_multi→concat→set_index("_symbol")→append labels→analyze_cross_sectional。
 
-### Follow-up(登記,不阻本刀)
-- IC ingest cache 版本化/timestamp 校驗(防殘留中毒 h5 被 exists-gate 重用)。
-- `tests/conftest.py:108` scoped pytest 收集 clobber L6.5 golden inventory——測試基建 smell。
-- 1d `EXPECTED_FREQ_BY_TIMEFRAME` 補值(需真 1d run)。
-- full-analyze(218k 特徵>17min)完成驗收 →「79 合成 IC 測試換真實資料」epic。
+**前置就緒**:真實 FF 測試資料(3 sym×1h + 兩套 12h,`data_cache/features/`);第一刀 CUT1 的 per-symbol SplitPlan/purge 契約(`momentum/core/contracts.py` validate_split_*)可複用。
+**建議**:新 session 先跑投偵察(讀 analyze_cross_sectional 全文 + _append_cross_sectional_labels + 用真實多 symbol 資料實跑觀察 label 對齊),再寫 SPEC。
 
-### 續(第二刀後段)
+## 續(cross_sectional 之後)
 - 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;grouped_ic 止血。
 
 ## 鐵律(慢測試/執行)
-- 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員派工帶 --task-id+--output,產出後 register-output。
-- 執行端產物不可信;接回只讀 diff+測試+摘要,diff 既有測試斷言防假綠;執行端不得 git checkout tracked 共用檔。
+- 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員審查派工用 `gate.sh dispatch --task-id --risk low --template "n/a:"`(勿 --risk high --adversarial waived);codex exec 必接 `< /dev/null`。委員產出 register-output 才過 pre-commit claim checker。
+- 執行端產物不可信;接回只讀 diff+測試+摘要;執行端不得 git checkout tracked 共用檔。
