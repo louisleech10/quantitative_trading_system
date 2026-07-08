@@ -1,27 +1,18 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-07-07 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-07-08 | **Branch**: main
 
-## ✅ 剛完成:IC 第二刀主體 cross_sectional 防洩漏(2026-07-07,待 commit) SIGNOFF:claude:DATA-CORRECT SIGNOFF:codex:DATA-CORRECT SIGNOFF:composer:DATA-CORRECT
-- **F1** `_append_cross_sectional_labels` kline int64-ts→datetime 對齊(修第一刀回歸的橫截面標籤全 NaN);**F4** per-symbol 覆蓋守衛 fail-closed(all-NaN/短序列無條件擋);**F2** 單軸 labels_path fail-closed;**F3** 全域同步時間邊界 OOS holdout+purge+embargo,test-only 覆蓋全部 report 輸出。VERIFY:20260707T023954Z-cut2-xsectional-label-f1
-- **驗收**:Claude 自跑 18 passed,解耦 grep=0,postflight OK;三方簽核全 PASS(Codex adversarial 抓 F4 邊界 BLOCKING→fix-round→原提出方複驗閉合);SPEC 雙 RECONCILE-STAMP APPROVED provenance。SIGNOFF:codex:DATA-CORRECT
-- **殘留(正交非本刀)**:`test_ic_filter_orchestrator.py` 2 pre-existing fail(單幣 analyze 合成 fixture 撞 rows-purge 校驗,HEAD 亦 fail,git stash 已驗)。REF:handoffs/CUT2-XSECTIONAL-SIGNOFF-claude.md
-- **前刀**:row_index attach(commit 6a991c2 已 push)V2 load 貼回真時間軸=本刀 F1 修的回歸來源。REF:handoffs/CUT2-XSECTIONAL-SIGNOFF-claude.md
+## ✅ 剛完成:IC 1a 剩餘刀順序裁定(三方委員會一致+使用者裁定)
+- 三方獨立偵察+提案:handoffs/IC1A-CUTS-ORDER-{claude,codex,composer}.md(gate register-output 已註冊,task-id IC1A-CUTS-ORDER)
+- **裁定順序**:① 1-align 前瞻硬閘(大)→ ② 1e HAC+1b FDR 合刀「顯著性正確化」(大)→ ③ 1c Net IC 量綱(大)→ ④ 1d attribution 正名+NaN(中/大開工定)→ ⑤ 1f 空圖 schema+grouped 殘留(小-中,最後)
+- **偵察關鍵事實(三方 receipt 交叉驗證)**:validate_alignment=NotImplementedError stub 零 caller(contracts.py:764);FDR adjust_multiple_comparisons 從未被呼叫+前端 fdr_correction 幽靈開關(store 不送);Net IC 量綱錯(net_ic_analyzer.py:34);attribution 真 OLS 存在但 _run_factor_exposure 不呼叫+fillna(0) 遍地;HAC 缺(statistical_validator.py:119 i.i.d. t-test);1f 巢狀 quantile_returns vs 前端頂層讀(恒空);**grouped_ic 崩潰已修(Phase 0 11507f5),移出清單**,殘留 schema/UX 面併 1f
+- ROADMAP P0 已更新裁定;grouped_ic 殘留=IC-PERF(P1 正交 epic)
 
-## ★下一站 = IC 1a 剩餘刀:1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;grouped_ic 止血
-- 治理修補(SCAR 已入):SPEC consumer-map 須含所有對 load 結果 reindex/merge 的 consumer + 真路徑 red-on-break 測試(第一刀漏 `_append_cross_sectional_labels` 教訓)。REF:docs/SCAR_LEDGER.md
-
-**已偵察到的洩漏面(新 session 須自行驗證勿盡信)**:
-1. **label 只按 timestamp 對齊**(:558-561 `label_series.reindex(timestamp_index)` 掉 symbol level)→ per-(timestamp,symbol) label 可能貼到別 symbol 的列。**最可疑的跨界洩漏點**。對照 memory「IC Phase1 決策」:ML孤島 positional-index 切片→多 symbol 跨界洩漏,SplitPlan 須 per-symbol。
-2. **無 OOS / 無 purge·embargo**:full-sample IC,無 holdout split(單幣 `analyze` 有 `_build_holdout_split_plan`);look-ahead 未圍。
-3. cross_sectional labels 來自 `api/services/ic_analysis_service.py:_append_cross_sectional_labels`(_run_analysis :159)——per-symbol 正確性未驗。
-4. 呼叫鏈:`_run_analysis`(:125-171)load_multi→concat→set_index("_symbol")→append labels→analyze_cross_sectional。
-
-**前置就緒**:真實 FF 測試資料(3 sym×1h + 兩套 12h,`data_cache/features/`);第一刀 CUT1 的 per-symbol SplitPlan/purge 契約(`momentum/core/contracts.py` validate_split_*)可複用。
-**建議**:新 session 先跑投偵察(讀 analyze_cross_sectional 全文 + _append_cross_sectional_labels + 用真實多 symbol 資料實跑觀察 label 對齊),再寫 SPEC。
-
-## 續(cross_sectional 之後)
-- 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;grouped_ic 止血。
+## ★下一站 = 1-align 前瞻硬閘(大管線起手)
+- 走完整大管線:SPEC+TODO(gate artifact token)→ 雙家族 adversarial → reconcile 雙 RECONCILE-STAMP → freeze → **Codex 實作 + Composer review**(2026-07-08 使用者指示切換)→ 三方數據正確性簽核
+- Scope 核心:實作 validate_alignment(Feature_t vs Target_{t+lag} 硬閘)+接進 orchestrator 縱向 label reindex 路徑(:754-756 無 lag 不變量檢查);cut2 oracle 只蓋 cross_sectional kline 路徑
+- SPEC 事實依據直接引用三方偵察檔 receipt(新分工:偵察交委員,Claude 只抽驗分歧點——已存記憶)
+- Composer 提醒:1-align 若只包裝 cut2 oracle 可降小,但傾向維持中/大(longitudinal/外來 labels/多 horizon caller-map+red-on-break)
 
 ## 鐵律(慢測試/執行)
-- 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員審查派工用 `gate.sh dispatch --task-id --risk low --template "n/a:"`(勿 --risk high --adversarial waived);codex exec 必接 `< /dev/null`。委員產出 register-output 才過 pre-commit claim checker。
+- 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員審查派工 `gate.sh dispatch --task-id --risk low --template "n/a:"`;codex exec 必接 `< /dev/null`。委員產出 register-output 才過 claim checker。
 - 執行端產物不可信;接回只讀 diff+測試+摘要;執行端不得 git checkout tracked 共用檔。
