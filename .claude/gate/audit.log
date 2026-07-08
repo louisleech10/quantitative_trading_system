@@ -9271,3 +9271,251 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-CLOSURE-codex.md", "output_sha256": "e709353cc28a9956bcfc4188724ce15e9778a2f9331fd544b32223e642338133", "task_id": "cut2-xsec-closure", "ts": "2026-07-07T05:53:20Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-SIGNOFF-composer.md", "output_sha256": "545b68e52d39052496bf529b1aaecf74543fb09f0ad6ccebbed5b661ee325bb5", "task_id": "cut2-xsec-signoff-composer", "ts": "2026-07-07T05:53:20Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-composer.md", "output_sha256": "da486ce28ac63ad781d89fcd713f994cb97f439b7b530920f855146e7d96d073", "task_id": "cut2-xsec-specadv", "ts": "2026-07-07T05:55:19Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1A-CUTS-ORDER", "ts": "2026-07-08T13:51:45Z"}
+=== 2026-07-08 21:51:45 | dispatch ===
+  ts=2026-07-08 21:51:45
+  kind=dispatch
+  intent=派 Codex+Composer 各自獨立偵察 IC 1a 剩餘刀現況並提施工順序,與 Claude 版三方 reconcile 後交使用者裁定
+  risk=low
+  facts_asked=none-needed: 純諮詢排序,事實由各委員自行偵察 code
+  review_role=三方互為 adversary:Codex/Composer/Claude 各自全面獨立提案後交叉挑戰
+  template=n/a: 委員會諮詢非 SPEC 實作
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-CUTS-ORDER-codex.md", "output_sha256": "56bf0790cf635a9a8af655dc17512967f16beb23a9ed4bca6ddc1776709b70c1", "task_id": "IC1A-CUTS-ORDER", "ts": "2026-07-08T13:55:50Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-REMAINING-CUTS-ORDER-claude.md", "output_sha256": "74ffee0e4a868f0f86cb1b1a8be54ea22a7864d702d17bc0352ea67803f43be8", "task_id": "IC1A-CUTS-ORDER", "ts": "2026-07-08T13:55:50Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-CUTS-ORDER-composer.md", "output_sha256": "f6fc564c16f767769cc1b44d4317c5aa4726f2bb161a7687d407de9adafa53bb", "task_id": "IC1A-CUTS-ORDER", "ts": "2026-07-08T14:17:24Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-SPECADV-PROMPT.md", "output_sha256": "b9ec8386ec670b5b4ca18527e46c9beb5848a5412dade97080b59be32659a8cc", "task_id": "cut2-xsec-specadv", "ts": "2026-07-08T14:21:36Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-IMPL-PROMPT.md", "output_sha256": "db6393da55d83b6f75c873eed60484f95ee2cd74b9d1d42056ac9e5d8b940b7f", "task_id": "cut2-xsec-impl", "ts": "2026-07-08T14:21:37Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-CODEREVIEW-PROMPT.md", "output_sha256": "30a50bd5b634eefc5942ba98632248f6e86df19184aca3863a137a28f04b041d", "task_id": "cut2-xsec-codereview", "ts": "2026-07-08T14:21:37Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-FIXROUND-PROMPT.md", "output_sha256": "f0f7aea09940f40b5dc55350b68050b6e0977a3b4b9a959754521202cc7e2687", "task_id": "cut2-xsec-fixround", "ts": "2026-07-08T14:21:37Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-CLOSURE-PROMPT.md", "output_sha256": "129ce3c0c0ef5a6a824279eec0434627cca0ca6854600c58dd0fc4985c79128c", "task_id": "cut2-xsec-closure", "ts": "2026-07-08T14:21:37Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-STAMP-PROMPT.md", "output_sha256": "d604bfa51ceda916961da3eff524138ca63c420eaa7a37a0f869a18d49a22625", "task_id": "cut2-xsec-stamp", "ts": "2026-07-08T14:21:37Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-CUTS-ORDER-CONSULT-PROMPT.md", "output_sha256": "329ecc25f6f125f29151c7bfaa5d7a151e7935e0eb198182cbb55b5ed55e10a6", "task_id": "IC1A-CUTS-ORDER", "ts": "2026-07-08T14:21:37Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-XSECTIONAL-BRIEF.md", "output_sha256": "42faf550f89bbe4d5c3f62a8508443c3b87e33b8e4e5c5f2a914320c23969dc4", "task_id": "cut2-xsec-specadv", "ts": "2026-07-08T14:21:53Z"}
+=== 2026-07-08 22:24:09 | artifact ===
+  ts=2026-07-08 22:24:09
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=a,b,d; §A=FACT-RECEIPT 三方偵察檔+本session抽驗; §C=consumer-map含stage0/stage2/_slice_by_mask/cross_sectional; §G=真3sym 1h+12h oracle; §P=3 Phase; §V=mutation紅測; §R=回退; §N=deferred登記
+  spec=
+  todo=
+  manifest=
+=== 2026-07-08 22:26:12 | artifact ===
+  ts=2026-07-08 22:26:12
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=全域規則; §B=批次策略; Task 各含驗證/邊界/不可做; 100% SPEC ID 追溯
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-specadv", "ts": "2026-07-08T14:29:57Z"}
+=== 2026-07-08 22:29:57 | dispatch ===
+  ts=2026-07-08 22:29:57
+  kind=dispatch
+  intent=雙家族 adversarial 審 1-align SPEC+TODO,獵靜默錯位面漏列/gate 誤殺/mutation 假綠
+  risk=low
+  facts_asked=none-needed: SPEC 事實依據=三方偵察檔+抽驗 receipt,審查端自行驗證
+  review_role=Codex+Composer 皆 adversary,各自全面挑戰前提,產 BLOCKING/NON-BLOCKING findings
+  template=n/a: adversarial review 派工非 SPEC 實作
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  todo=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-specadv", "ts": "2026-07-08T14:30:09Z"}
+=== 2026-07-08 22:30:09 | dispatch ===
+  ts=2026-07-08 22:30:09
+  kind=dispatch
+  intent=雙家族 adversarial 審 1-align SPEC+TODO,獵靜默錯位面漏列/gate 誤殺/mutation 假綠
+  risk=low
+  facts_asked=none-needed: SPEC 事實依據=三方偵察檔+抽驗 receipt,審查端自行驗證
+  review_role=Codex+Composer 皆 adversary,各自全面挑戰前提,產 BLOCKING/NON-BLOCKING findings
+  template=n/a: adversarial review 派工非 SPEC 實作
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  todo=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SPECADV-codex.md", "output_sha256": "7dcd57851a35d67bf33c17a2a73d9fdc1359316f40e5a22880a32430ab7b9a41", "task_id": "ic1a-align-specadv", "ts": "2026-07-08T14:55:33Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SPECADV-composer.md", "output_sha256": "6780c09c8e81a4230474eef777b188443d92c7f770d713f14bc9e87722d047be", "task_id": "ic1a-align-specadv", "ts": "2026-07-08T14:56:56Z"}
+=== 2026-07-08 22:56:56 | artifact ===
+  ts=2026-07-08 22:56:56
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=v2 修雙家族 13 BLOCKING/MAJOR: consumer-map 補全/Tier-1 int64 相容/oracle bar 語義/freq 兩段政策/horizon resolver/M5 雙腿/Golden 唯讀/Phase3 defer
+  spec=
+  todo=
+  manifest=
+=== 2026-07-08 22:56:56 | artifact ===
+  ts=2026-07-08 22:56:56
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=v2 同步 SPEC v2
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-specadv-r2", "ts": "2026-07-08T15:00:52Z"}
+=== 2026-07-08 23:00:52 | dispatch ===
+  ts=2026-07-08 23:00:52
+  kind=dispatch
+  intent=R1 原提出方(Codex+Composer)複驗 SPEC/TODO v2 是否真閉合全部 BLOCKING,重跑同一反例
+  risk=low
+  facts_asked=none-needed: v2 §ADV-RESOLUTION 逐項對照 R1 findings,複驗端重跑自己的反例
+  review_role=Codex 複驗 ADV-CODEX-1~9;Composer 複驗 ADV-COMPOSER-1~11;各自可證偽重查
+  template=n/a: R2 閉合複驗派工非實作
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  todo=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SPECADV-R2-codex.md", "output_sha256": "a06361b045c1952c681237799a051ab7433d0461b6879cade7f7fc4d5c6d2647", "task_id": "ic1a-align-specadv-r2", "ts": "2026-07-08T15:04:13Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SPECADV-R2-composer.md", "output_sha256": "0fd4ca8f1ca3d6515bcd498ff2aba0bb7ad30bb602436a0bce6b6ebe27c2a4df", "task_id": "ic1a-align-specadv-r2", "ts": "2026-07-08T15:05:41Z"}
+=== 2026-07-08 23:05:41 | artifact ===
+  ts=2026-07-08 23:05:41
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=v3: 修 R2 STILL-OPEN(2.4 跨 dtype 交集)+NEW MAJOR(D-4 index 同型化寫回)+typo
+  spec=
+  todo=
+  manifest=
+=== 2026-07-08 23:05:41 | artifact ===
+  ts=2026-07-08 23:05:41
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=v3 同步
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-specadv-r3", "ts": "2026-07-08T15:07:19Z"}
+=== 2026-07-08 23:07:19 | dispatch ===
+  ts=2026-07-08 23:07:19
+  kind=dispatch
+  intent=v3 增量(D-4 同型化寫回+Task 2.4 修法)送雙方複驗:Composer 驗 STILL-OPEN/NEW-ISSUE 閉合,Codex 確認 v3 增量不影響其 v2 APPROVE
+  risk=low
+  facts_asked=none-needed: v3 diff 對照 R2 findings,複驗端重跑反例
+  review_role=Composer 複驗 ADV-COMPOSER-1A+NEW-ISSUE;Codex 增量確認 D-4 無新洞
+  template=n/a: R3 增量閉合複驗派工非實作
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  todo=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SPECADV-R3-codex.md", "output_sha256": "5e22c6d62fdcab030c6bf823a74417a3ed0c98ed4368db2dc0c7084d265db7e5", "task_id": "ic1a-align-specadv-r3", "ts": "2026-07-08T15:09:38Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SPECADV-R3-composer.md", "output_sha256": "5f985b3a7121d3110683ef1b1499cbea8027f5edd54d489ba4d62c2e3d8ca5ec", "task_id": "ic1a-align-specadv-r3", "ts": "2026-07-08T15:11:48Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-stamp", "ts": "2026-07-08T22:33:36Z"}
+=== 2026-07-09 06:33:36 | dispatch ===
+  ts=2026-07-09 06:33:36
+  kind=dispatch
+  intent=Codex+Composer 對 IC1A-ALIGN-RECONCILE.md append 機檢戳記(R3 已雙 APPROVE,此為機器強制戳記落點)
+  risk=low
+  facts_asked=none-needed: R3 已雙 APPROVE,僅補機檢戳記
+  review_role=雙家族各自確認 reconcile 摘要與自己 R3 結論一致後 append 戳記
+  template=n/a: reconcile 戳記派工非實作
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-RECONCILE.md", "output_sha256": "a1bb6740786912dd0419709cd5cb2a7bcb0981ff3c4f8858a9dd3c3925779eb0", "task_id": "ic1a-align-stamp", "ts": "2026-07-08T22:36:16Z"}
+=== 2026-07-09 06:36:36 | artifact ===
+  ts=2026-07-09 06:36:36
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=標 Frozen(雙戳記 PASS)
+  spec=
+  todo=
+  manifest=
+=== 2026-07-09 06:36:36 | artifact ===
+  ts=2026-07-09 06:36:36
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=標 Frozen
+  spec=
+  todo=
+  manifest=
