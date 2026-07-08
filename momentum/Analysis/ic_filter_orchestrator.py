@@ -111,13 +111,58 @@ def _resolve_effective_label_horizon(
     config: ICConfig,
     labels_df: Optional[pd.DataFrame],
 ) -> int:
-    """沿用 label stage 的 default_horizon fallback 規則提前解 horizon。"""
-    del labels_df
+    """解析實際 label horizon；labels 欄名優先，無 labels 時才 fallback。"""
+    if labels_df is not None:
+        parsed: list[tuple[str, int]] = []
+        for column in labels_df.columns:
+            try:
+                parsed.append((str(column), _resolve_label_horizon_from_column(str(column), config)))
+            except InvalidInputError:
+                continue
+        if not parsed:
+            raise InvalidInputError("label horizon cannot be resolved from labels_df columns")
+        default_horizon = int(config.global_settings.default_horizon)
+        selected_column, resolved = parsed[0]
+        for column, horizon in parsed:
+            if horizon == default_horizon:
+                selected_column = column
+                resolved = horizon
+                break
+        logger.info(
+            "Resolved label horizon from labels_df column",
+            extra={
+                "horizon_source": "column_parse",
+                "effective_horizon": int(resolved),
+                "selected_label_column": selected_column,
+                "parsed_label_horizons": {column: horizon for column, horizon in parsed},
+            },
+        )
+        if default_horizon == resolved:
+            return default_horizon
+        return int(resolved)
+
     horizons = list(config.labels.horizons or [])
     if not horizons:
         raise ValueError("labels.horizons must contain at least one horizon")
     default_horizon = int(config.global_settings.default_horizon)
-    return default_horizon if default_horizon in horizons else int(horizons[0])
+    resolved = default_horizon if default_horizon in horizons else int(horizons[0])
+    logger.warning(
+        "Falling back to configured label horizon because labels_df is unavailable",
+        extra={"horizon_source": "default_fallback", "effective_horizon": resolved},
+    )
+    return resolved
+
+
+def _resolve_label_horizon_from_column(name: str, config: ICConfig) -> int:
+    """由 label 欄名解析 bar 數 horizon；無法證明單位換算時 fail-closed。"""
+    del config
+    match = re.fullmatch(r"return_(\d+)", name)
+    if match:
+        return int(match.group(1))
+    unit_match = re.fullmatch(r"(?:label_)?return_(\d+)([a-zA-Z]+)", name)
+    if unit_match:
+        raise InvalidInputError(f"label horizon has unsupported unit: {name}")
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
 
 
 def _base_universe_hash(index: pd.Index, symbol: str) -> str:
@@ -173,9 +218,10 @@ def _build_holdout_split_plan(
     symbol: str,
     expected_freq: pd.Timedelta,
     purge_gap: int,
+    labels_df: Optional[pd.DataFrame] = None,
 ) -> tuple[SplitPlan, SplitPlan] | SkippedResult:
     """建立單幣 chronological holdout train/test SplitPlan。"""
-    effective_horizon = _resolve_effective_label_horizon(config, None)
+    effective_horizon = _resolve_effective_label_horizon(config, labels_df)
     if int(purge_gap) < effective_horizon:
         raise ValueError("purge_gap must be >= effective label horizon")
     n_rows = len(features_df)
@@ -552,6 +598,7 @@ class ICFilterOrchestrator:
                 symbol,
                 expected_freq,
                 purge_gap=effective_horizon,
+                labels_df=labels_df,
             )
             if isinstance(split_result, SkippedResult):
                 return self._run_full_sample_fallback(

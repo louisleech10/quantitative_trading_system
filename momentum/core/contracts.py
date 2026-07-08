@@ -761,9 +761,240 @@ class AlignmentSpec:
             raise ValueError("freq must be a valid pandas frequency") from exc
 
 
-def validate_alignment(feature_data: Any, target_data: Any, spec: AlignmentSpec) -> None:
-    """驗證 Feature_t 與 Target_t+lag 對齊；實作留待 1-align。"""
-    raise NotImplementedError("1-align 落地")
+class AlignmentViolationError(ValueError):
+    """Feature/target 時間軸或 label 值不符合對齊契約。"""
+
+
+@dataclass(frozen=True)
+class AlignmentReport:
+    """Feature_t 與 Target_t+lag 對齊檢查摘要。"""
+
+    gap_count: int
+    gap_rate: float
+    checked_samples: int
+
+
+_ALIGNMENT_COVERAGE_TOLERANCE = 0.01
+
+
+def _extract_alignment_index(data: Any, ts_col: str, role: str) -> pd.Index:
+    """取出對齊檢查使用的時間軸。"""
+    if isinstance(data, (pd.Series, pd.DataFrame)):
+        if ts_col in data:
+            return pd.Index(data[ts_col], name=ts_col)
+        return data.index
+    raise AlignmentViolationError(f"{role} must be a pandas Series or DataFrame")
+
+
+def _normalize_alignment_index(index: pd.Index, role: str) -> pd.DatetimeIndex:
+    """依 D-1 將 DatetimeIndex 或 int64 epoch 秒正規化為 DatetimeIndex。"""
+    if isinstance(index, pd.MultiIndex):
+        raise AlignmentViolationError(f"{role} index must not be MultiIndex")
+    if isinstance(index, pd.RangeIndex):
+        raise AlignmentViolationError(f"{role} index must carry timestamps, not RangeIndex")
+
+    if isinstance(index, pd.DatetimeIndex):
+        ts = pd.DatetimeIndex(index)
+    elif pd.api.types.is_integer_dtype(index.dtype):
+        values = index.to_numpy(dtype=np.int64)
+        if values.size and (np.any(np.abs(values) > 1_000_000_000_000)):
+            raise AlignmentViolationError(f"{role} index looks like milliseconds, expected epoch seconds")
+        ts = pd.to_datetime(values, unit="s")
+    else:
+        try:
+            ts = pd.DatetimeIndex(pd.to_datetime(index, errors="raise"))
+        except (TypeError, ValueError) as exc:
+            raise AlignmentViolationError(f"{role} index must be datetime-like or int64 epoch seconds") from exc
+
+    if ts.hasnans:
+        raise AlignmentViolationError(f"{role} index contains NaT")
+    if not ts.is_monotonic_increasing:
+        raise AlignmentViolationError(f"{role} index must be monotonic increasing")
+    if not ts.is_unique:
+        raise AlignmentViolationError(f"{role} index must be unique")
+    return ts
+
+
+def _alignment_values(data: Any) -> pd.Series:
+    """取出 target label 數值序列。"""
+    if isinstance(data, pd.Series):
+        return data
+    if isinstance(data, pd.DataFrame):
+        numeric_cols = list(data.select_dtypes(include=[np.number]).columns)
+        if not numeric_cols:
+            raise AlignmentViolationError("target_data must contain a numeric label column")
+        return data[numeric_cols[0]]
+    raise AlignmentViolationError("target_data must be a pandas Series or DataFrame")
+
+
+def _count_structural_tail_nans(values: pd.Series) -> int:
+    """計算尾端連續 NaN 數。"""
+    mask = values.isna().to_numpy()
+    count = 0
+    for is_nan in mask[::-1]:
+        if not is_nan:
+            break
+        count += 1
+    return count
+
+
+def _cadence_report(ts: pd.DatetimeIndex, expected_freq: str) -> tuple[int, float]:
+    """依 D-3 檢查非 gap cadence，並回傳 gap 摘要。"""
+    if len(ts) <= 1:
+        return 0, 0.0
+    diff_ns = np.diff(ts.asi8)
+    if np.any(diff_ns <= 0):
+        raise AlignmentViolationError("timestamps must be strictly increasing")
+    median_ns = float(np.median(diff_ns))
+    gap_mask = diff_ns > (1.5 * median_ns)
+    non_gap = diff_ns[~gap_mask]
+    if non_gap.size == 0:
+        raise AlignmentViolationError("cannot infer cadence from non-gap timestamps")
+    values, counts = np.unique(non_gap, return_counts=True)
+    cadence_ns = int(values[int(np.argmax(counts))])
+    expected_ns = pd.tseries.frequencies.to_offset(expected_freq).nanos
+    tolerance = max(expected_ns * 0.05, 1.0)
+    if abs(cadence_ns - expected_ns) > tolerance:
+        raise AlignmentViolationError(
+            f"cadence mismatch: expected {expected_freq}, got {pd.Timedelta(cadence_ns, unit='ns')}"
+        )
+    gap_count = int(gap_mask.sum())
+    gap_rate = gap_count / max(int(diff_ns.size), 1)
+    return gap_count, float(gap_rate)
+
+
+def _sensitive_alignment_rows(values: pd.Series, ts: pd.DatetimeIndex) -> np.ndarray:
+    """找出 label 變異突變點與 gap 邊界，供 Tier-2 oracle 強制抽樣。"""
+    sensitive: set[int] = set()
+    if len(values) >= 2:
+        arr = values.to_numpy(dtype="float64", copy=False)
+        diffs = np.abs(np.diff(arr))
+        finite = np.flatnonzero(np.isfinite(diffs))
+        if finite.size:
+            positive = finite[diffs[finite] > 0.0]
+            ranked = positive if positive.size else finite
+            ranked = ranked[np.argsort(diffs[ranked], kind="mergesort")[::-1]]
+            for left_row in ranked[:16]:
+                sensitive.add(int(left_row))
+                sensitive.add(int(left_row + 1))
+
+    if len(ts) >= 2:
+        diff_ns = np.diff(ts.asi8)
+        median_ns = float(np.median(diff_ns))
+        gap_left_rows = np.flatnonzero(diff_ns > (1.5 * median_ns))
+        for left_row in gap_left_rows:
+            sensitive.add(int(left_row))
+            sensitive.add(int(left_row + 1))
+
+    return np.array(sorted(sensitive), dtype=int)
+
+
+def _sample_alignment_positions(
+    candidate_positions: np.ndarray,
+    sample_size: int,
+    *,
+    sensitive_positions: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """以確定性分層抽樣檢查頭尾、等距位置與變異敏感區。"""
+    if candidate_positions.size <= sample_size:
+        return candidate_positions
+    head = candidate_positions[:2]
+    tail = candidate_positions[-2:]
+    candidate_set = set(candidate_positions.tolist())
+    used = set(np.concatenate([head, tail]).tolist())
+    if sensitive_positions is not None and sensitive_positions.size:
+        used.update(int(pos) for pos in sensitive_positions.tolist() if int(pos) in candidate_set)
+
+    remaining = max(sample_size - len(used), 0)
+    if remaining:
+        grid_idx = np.linspace(0, candidate_positions.size - 1, num=min(remaining, candidate_positions.size))
+        grid = candidate_positions[np.unique(np.rint(grid_idx).astype(int))]
+    else:
+        grid = np.array([], dtype=int)
+    return np.array(sorted(used.union(grid.tolist())), dtype=int)
+
+
+def validate_alignment(
+    feature_data: Any,
+    target_data: Any,
+    spec: AlignmentSpec,
+    *,
+    close: Optional[pd.Series] = None,
+    sample_size: int = 64,
+) -> AlignmentReport:
+    """驗證 Feature_t 與 Target_t+lag 的時間軸與 bar-ordinal label 值。"""
+    feature_index = _normalize_alignment_index(
+        _extract_alignment_index(feature_data, spec.feature_ts_col, "feature_data"),
+        "feature_data",
+    )
+    target_index = _normalize_alignment_index(
+        _extract_alignment_index(target_data, spec.target_ts_col, "target_data"),
+        "target_data",
+    )
+    if len(feature_index) == 0 or len(target_index) == 0:
+        raise AlignmentViolationError("feature_data and target_data must be non-empty")
+    if not feature_index.equals(target_index):
+        raise AlignmentViolationError("feature and target timestamps must match exactly")
+
+    gap_count, gap_rate = _cadence_report(feature_index, spec.freq)
+    target_values = _alignment_values(target_data)
+    if target_values.isna().all():
+        raise AlignmentViolationError("target_data cannot be all NaN")
+    tail_nans = _count_structural_tail_nans(target_values)
+    if tail_nans != spec.lag:
+        raise AlignmentViolationError(
+            f"target trailing NaN count must equal lag: expected {spec.lag}, got {tail_nans}"
+        )
+    valid_ratio = float(target_values.notna().sum()) / float(len(target_values))
+    expected_valid_ratio = (max(len(target_values) - spec.lag, 0) / float(len(target_values))) * (
+        1.0 - _ALIGNMENT_COVERAGE_TOLERANCE
+    )
+    if valid_ratio < expected_valid_ratio:
+        raise AlignmentViolationError(
+            f"target coverage too low: actual={valid_ratio:.4f}, required>={expected_valid_ratio:.4f}"
+        )
+
+    checked_samples = 0
+    if close is not None:
+        close_index = _normalize_alignment_index(close.index, "close")
+        close_series = pd.Series(close.to_numpy(dtype="float64", copy=False), index=close_index)
+        positioner = pd.Series(np.arange(len(close_series), dtype=int), index=close_index)
+        positions = positioner.reindex(feature_index).to_numpy()
+        known_positions = ~pd.isna(positions)
+        safe_positions = np.full(len(positions), -1, dtype=int)
+        safe_positions[known_positions] = positions[known_positions].astype(int)
+        in_bounds = known_positions & (safe_positions + spec.lag < len(close_series))
+        value_mask = target_values.notna().to_numpy()
+        candidate_rows = np.flatnonzero(in_bounds & value_mask)
+        if candidate_rows.size < 8:
+            raise AlignmentViolationError("insufficient valid samples for alignment oracle")
+        sensitive_rows = _sensitive_alignment_rows(target_values, feature_index)
+        sampled_rows = _sample_alignment_positions(
+            candidate_rows,
+            int(sample_size),
+            sensitive_positions=sensitive_rows,
+        )
+        for row in sampled_rows:
+            close_pos = int(safe_positions[row])
+            current = close_series.iloc[close_pos]
+            future = close_series.iloc[close_pos + spec.lag]
+            got = float(target_values.iloc[row])
+            if pd.isna(current) or pd.isna(future) or pd.isna(got):
+                continue
+            expected = float(np.log(future / current))
+            if not np.isclose(got, expected, atol=1e-6, rtol=1e-5, equal_nan=False):
+                raise AlignmentViolationError(
+                    f"label mismatch at {feature_index[row]}: expected {expected}, got {got}"
+                )
+            checked_samples += 1
+        if checked_samples < 8:
+            raise AlignmentViolationError("insufficient checked samples for alignment oracle")
+
+    return AlignmentReport(
+        gap_count=gap_count,
+        gap_rate=gap_rate,
+        checked_samples=checked_samples,
+    )
 
 
 @dataclass(frozen=True)

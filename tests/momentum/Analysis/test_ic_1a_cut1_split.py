@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 import h5py
@@ -13,8 +14,10 @@ from momentum.Analysis.ic_filter_orchestrator import (
     _derive_stage_masks,
     _resolve_effective_label_horizon,
     _resolve_expected_freq,
+    _resolve_label_horizon_from_column,
     _resolve_metadata_symbol_allowlist,
 )
+from momentum.core.exceptions import InvalidInputError
 from momentum.core.contracts import TimestampDiscontinuityError
 
 
@@ -287,3 +290,57 @@ def test_effective_horizon_resolution() -> None:
     config = ICConfig(global_settings={"default_horizon": 5}, labels={"horizons": [13]})
 
     assert _resolve_effective_label_horizon(config, None) == 13
+
+
+def test_horizon_resolver_uses_return_column_before_default_m7(caplog: pytest.LogCaptureFixture) -> None:
+    """M7 receipt: reverting column parsing to default_horizon makes purge_gap assertions fail."""
+    features_df = _real_btc_1h_features()
+    labels_df = _labels_from_close(features_df, 5)
+    config = ICConfig(
+        ic_train_test_split=True,
+        min_test_rows=20,
+        global_settings={"default_horizon": 1},
+    )
+    expected_freq = _resolve_expected_freq({"timeframe": "1h"})
+
+    assert _resolve_label_horizon_from_column("return_5", config) == 5
+    with caplog.at_level(logging.INFO):
+        assert _resolve_effective_label_horizon(config, labels_df) == 5
+    matching_records = [
+        record
+        for record in caplog.records
+        if getattr(record, "horizon_source", None) == "column_parse"
+    ]
+    assert matching_records
+    assert getattr(matching_records[-1], "selected_label_column") == "return_5"
+    assert getattr(matching_records[-1], "effective_horizon") == 5
+
+    train_plan, test_plan = _build_holdout_split_plan(
+        features_df,
+        config,
+        "BTCUSDT",
+        expected_freq,
+        purge_gap=5,
+        labels_df=labels_df,
+    )
+
+    split_point = int(np.floor((1.0 - config.oos_test_size) * len(features_df)))
+    assert int(test_plan.row_index[0]) - split_point == 5
+    assert train_plan.purge_gap == 5
+    assert test_plan.purge_gap == 5
+    with pytest.raises(ValueError, match="purge_gap"):
+        _build_holdout_split_plan(
+            features_df,
+            config,
+            "BTCUSDT",
+            expected_freq,
+            purge_gap=1,
+            labels_df=labels_df,
+        )
+
+
+def test_horizon_resolver_rejects_unconvertible_unit_column() -> None:
+    config = ICConfig()
+
+    with pytest.raises(InvalidInputError, match="unsupported unit"):
+        _resolve_label_horizon_from_column("label_return_1d", config)

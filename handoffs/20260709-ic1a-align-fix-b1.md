@@ -1,0 +1,12 @@
+# ic1a-align-fix-b1
+- 正在做: B1 review blocking fixes completed in local working tree.
+- 待辦: external Composer/Claude review of `IC1A-ALIGN-FIX-B1-RESULT.md` and diff.
+- 阻塞: none.
+- 本次決策: kept `AlignmentSpec` unchanged; coverage tolerance uses existing IC label coverage tolerance default `0.01`.
+- 本次決策: replaced seeded random sampling with deterministic head/tail, equidistant strata, label-jump rows, and gap-boundary rows.
+- 踩坑提醒: close-axis holes are no longer immediate oracle errors; insufficient labels are enforced by coverage and valid oracle sample gates.
+- 驗證: `pytest tests/momentum/core/test_alignment_contract.py tests/momentum/Analysis/test_ic_1a_cut1_split.py -q` -> 29 passed in 0.52s.
+- 驗證: `pytest tests/momentum/ -k horizon_resolver -q` -> 2 passed, 977 deselected in 1.58s.
+- 驗證: `grep -r "from api\\." momentum/ || true` -> no output.
+- 驗證: `git diff -- data_cache` -> no output.
+- 產出檔: handoffs/IC1A-ALIGN-FIX-B1-RESULT.md.
