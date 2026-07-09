@@ -237,6 +237,73 @@ def test_analyze_cross_sectional_includes_symbol_matrix_and_validation():
     assert validation.get("best_symbol") in symbols
 
 
+def test_cross_sectional_labels_path_accepts_epoch_seconds_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """labels_path MultiIndex 的 int64 秒 timestamp level 需先 D-1 正規化再 reindex。"""
+    orchestrator = ICFilterOrchestrator(load_ic_config())
+    timestamps = pd.date_range("2024-01-01", periods=8, freq="12h")
+    symbols = ["BTCUSDT", "ETHUSDT"]
+    feature_index = pd.MultiIndex.from_product(
+        [timestamps, symbols],
+        names=["timestamp", "_symbol"],
+    )
+    features = pd.DataFrame(
+        {"feature": np.linspace(0.0, 1.0, len(feature_index))},
+        index=feature_index,
+    )
+    label_index = pd.MultiIndex.from_arrays(
+        [
+            feature_index.get_level_values("timestamp").astype("int64") // 1_000_000_000,
+            feature_index.get_level_values("_symbol"),
+        ],
+        names=["timestamp", "_symbol"],
+    )
+    labels_df = pd.DataFrame(
+        {"return_1": np.r_[np.linspace(0.1, 0.2, len(label_index) - 2), np.nan, np.nan]},
+        index=label_index,
+    )
+    monkeypatch.setattr(orchestrator, "_load_labels_hdf5", lambda _path: labels_df)
+
+    report = orchestrator.analyze_cross_sectional(
+        features,
+        labels_path="dummy.h5",
+        config_override={"ic_train_test_split": False},
+    )
+
+    assert report["metadata"]["mode"] == "cross_sectional"
+    assert report["metadata"]["mean_label_coverage"] > 0
+
+
+def test_cross_sectional_labels_path_rejects_unsorted_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """labels_path MultiIndex 亂序需在 reindex 前 fail-closed。"""
+    orchestrator = ICFilterOrchestrator(load_ic_config())
+    timestamps = pd.date_range("2024-01-01", periods=8, freq="12h")
+    symbols = ["BTCUSDT", "ETHUSDT"]
+    feature_index = pd.MultiIndex.from_product(
+        [timestamps, symbols],
+        names=["timestamp", "_symbol"],
+    )
+    features = pd.DataFrame(
+        {"feature": np.linspace(0.0, 1.0, len(feature_index))},
+        index=feature_index,
+    )
+    labels_df = pd.DataFrame(
+        {"return_1": np.linspace(0.1, 0.2, len(feature_index))},
+        index=feature_index,
+    ).iloc[::-1]
+    monkeypatch.setattr(orchestrator, "_load_labels_hdf5", lambda _path: labels_df)
+
+    with pytest.raises(InvalidInputError, match="monotonic"):
+        orchestrator.analyze_cross_sectional(
+            features,
+            labels_path="dummy.h5",
+            config_override={"ic_train_test_split": False},
+        )
+
+
 def test_build_cross_symbol_validation_skips_when_symbol_insufficient():
     """當 Symbol 數不足時，應回傳 skipped 狀態。"""
     orchestrator = ICFilterOrchestrator(load_ic_config())

@@ -371,6 +371,63 @@ def _labels_df_has_symbol_dimension(labels_df: pd.DataFrame) -> bool:
     return bool(names.intersection({"symbol", "_symbol"}))
 
 
+def _normalize_cross_sectional_labels_index(
+    labels_df: pd.DataFrame,
+    *,
+    symbol_level_idx: int,
+) -> pd.DataFrame:
+    """D-1: cross-sectional labels_path 的 timestamp level 必須可驗證且單調。"""
+    if not isinstance(labels_df.index, pd.MultiIndex):
+        raise InvalidInputError("cross_sectional labels_path must use MultiIndex")
+    if not labels_df.index.is_monotonic_increasing:
+        raise InvalidInputError("cross_sectional labels_path index must be monotonic increasing")
+    if not labels_df.index.is_unique:
+        raise InvalidInputError("cross_sectional labels_path index must be unique")
+
+    time_level_idx = next(
+        (idx for idx in range(labels_df.index.nlevels) if idx != symbol_level_idx),
+        None,
+    )
+    if time_level_idx is None:
+        raise InvalidInputError("cross_sectional labels_path timestamp level missing")
+
+    time_values = pd.Index(labels_df.index.get_level_values(time_level_idx))
+    if isinstance(time_values, pd.DatetimeIndex):
+        normalized_time = pd.DatetimeIndex(time_values)
+    elif pd.api.types.is_integer_dtype(time_values.dtype):
+        values = time_values.to_numpy(dtype=np.int64)
+        if values.size and bool(np.any(np.abs(values) > 1_000_000_000_000)):
+            raise InvalidInputError(
+                "cross_sectional labels_path timestamp index looks like milliseconds, "
+                "expected epoch seconds"
+            )
+        normalized_time = pd.DatetimeIndex(pd.to_datetime(values, unit="s"))
+    else:
+        try:
+            normalized_time = pd.DatetimeIndex(pd.to_datetime(time_values, errors="raise"))
+        except (TypeError, ValueError) as exc:
+            raise InvalidInputError(
+                "cross_sectional labels_path timestamp index must be datetime-like "
+                "or int64 epoch seconds"
+            ) from exc
+    if normalized_time.hasnans:
+        raise InvalidInputError("cross_sectional labels_path timestamp index contains NaT")
+
+    arrays = [
+        normalized_time
+        if idx == time_level_idx
+        else labels_df.index.get_level_values(idx)
+        for idx in range(labels_df.index.nlevels)
+    ]
+    normalized = labels_df.copy()
+    normalized.index = pd.MultiIndex.from_arrays(arrays, names=labels_df.index.names)
+    if not normalized.index.is_monotonic_increasing:
+        raise InvalidInputError("cross_sectional labels_path index must be monotonic increasing")
+    if not normalized.index.is_unique:
+        raise InvalidInputError("cross_sectional labels_path index must be unique")
+    return normalized
+
+
 def _enforce_cross_sectional_label_coverage(
     numeric_df: pd.DataFrame,
     label_col: str,
@@ -894,6 +951,16 @@ class ICFilterOrchestrator:
                 raise InvalidInputError(
                     "cross_sectional labels_path 單軸不支援;用 kline 衍生標籤或另立 per-symbol labels epic"
                 )
+            labels_index_names = list(labels_df.index.names)
+            labels_symbol_level_idx = labels_df.index.nlevels - 1
+            if "_symbol" in labels_index_names:
+                labels_symbol_level_idx = labels_index_names.index("_symbol")
+            elif "symbol" in labels_index_names:
+                labels_symbol_level_idx = labels_index_names.index("symbol")
+            labels_df = _normalize_cross_sectional_labels_index(
+                labels_df,
+                symbol_level_idx=labels_symbol_level_idx,
+            )
             label_series = self._select_label_series(labels_df, config)
             working_df = features.copy()
             working_df["_label"] = label_series.reindex(features.index).to_numpy()

@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
+import pytest
 from scipy import optimize, stats
 
 from momentum.Analysis.ic_engine import ICEngine
+from momentum.core.contracts import AlignmentViolationError
 
 
 def _make_sample_data(n_samples: int = 50):
@@ -167,6 +169,35 @@ def test_grouped_ic_by_regime():
     assert "by_regime" in grouped
     assert "bull" in grouped["by_regime"]
     assert "bear" in grouped["by_regime"]
+
+
+def test_align_label_to_group_rejects_equal_length_misalignment():
+    """M2: 同長錯位不可靜默 positional 對齊。"""
+    group_df = pd.DataFrame(
+        {"feature": [1.0, 2.0, 3.0]},
+        index=pd.date_range("2024-01-01", periods=3, freq="D"),
+    )
+    label = pd.Series(
+        [0.1, 0.2, 0.3],
+        index=pd.date_range("2024-01-02", periods=3, freq="D"),
+        name="return_1",
+    )
+
+    with pytest.raises(AlignmentViolationError, match="equal length"):
+        ICEngine._align_label_to_group(label, group_df)
+
+
+def test_align_label_to_group_reindexes_subset_labels():
+    """不同長度時保留既有 reindex 語義。"""
+    index = pd.date_range("2024-01-01", periods=3, freq="D")
+    group_df = pd.DataFrame({"feature": [1.0, 2.0, 3.0]}, index=index)
+    label = pd.Series([0.1, 0.3], index=index[[0, 2]], name="return_1")
+
+    aligned = ICEngine._align_label_to_group(label, group_df)
+
+    assert aligned.index.equals(group_df.index)
+    assert np.isnan(aligned.iloc[1])
+    assert aligned.name == "return_1"
 
 
 def test_ic_autocorrelation_high_for_stable_series():

@@ -19,6 +19,7 @@ from momentum.FeatureEngineering.consumer_gate import (
     effective_run_status,
     is_source_run_status_reusable,
 )
+from momentum.core.contracts import AlignmentViolationError
 from momentum.core.logging import get_logger
 from momentum.core.protocols import IFeatureReader
 
@@ -595,11 +596,13 @@ class ICEngine:
     def _align_label_to_group(label: pd.Series, group_df: pd.DataFrame) -> pd.Series:
         label_series = label if isinstance(label, pd.Series) else pd.Series(label)
         label_name = label_series.name or "label"
-        if len(label_series) == len(group_df) and not label_series.index.equals(group_df.index):
-            return pd.Series(label_series.to_numpy(), index=group_df.index, name=label_name)
-        if not label_series.index.equals(group_df.index):
-            return label_series.reindex(group_df.index).rename(label_name)
-        return label_series.rename(label_name)
+        if label_series.index.equals(group_df.index):
+            return label_series.rename(label_name)
+        if len(label_series) == len(group_df):
+            raise AlignmentViolationError(
+                "label/group index mismatch with equal length; refusing positional alignment"
+            )
+        return label_series.reindex(group_df.index).rename(label_name)
 
     @staticmethod
     def _apply_selection_window(

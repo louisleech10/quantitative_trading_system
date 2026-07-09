@@ -1,0 +1,20 @@
+# IC1A ALIGN IMPL B3 RESULT
+- task-id: ic1a-align-impl-b3
+- scope: TODO Task 2.5 + 2.6 only
+- changed: momentum/Analysis/ic_engine.py; momentum/Analysis/ic_filter_orchestrator.py
+- tests changed: tests/momentum/test_ic_engine.py; tests/momentum/test_ic_filter_orchestrator.py
+- cut2 assertions: tests/momentum/test_ic_cross_sectional_cut2.py diff empty
+- 2.5: _align_label_to_group now fast-paths equal index, raises on equal-length index mismatch, reindexes only unequal length
+- 2.5 caller grep: line 585 _compute_l7_raw_group_ic; line 596 helper definition
+- M2 receipt: test_align_label_to_group_rejects_equal_length_misalignment passed under pytest -k grouped/align_label/cross_sectional
+- 2.6: labels_path MultiIndex timestamp level validates/normalizes datetime or int64 epoch seconds before reindex
+- 2.6: labels_path full MultiIndex must be monotonic and unique before/after normalization
+- 2.6: coverage remains delegated to _enforce_cross_sectional_label_coverage; no Tier-2 close oracle added
+- debug iteration 1: initial helper rejected duplicated timestamp level across symbols; fixed to require uniqueness on full MultiIndex only
+- tests: pytest tests/momentum/ -k 'grouped or align_label or cross_sectional' -q => 20 passed
+- tests: pytest tests/momentum/test_ic_filter_orchestrator.py -q => 44 passed
+- tests: pytest tests/momentum/core/ tests/momentum/Analysis/ -q => 390 passed
+- tests: grep -r 'from api\.' momentum/ | wc -l => 0
+- data_cache: no code change targets data_cache; long Analysis suite emitted existing test logs/artifacts under data_cache
+- schema/numeric impact: no output schema change; no numeric threshold/NaN/inf gate changes
+- commit: none

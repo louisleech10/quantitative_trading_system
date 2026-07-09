@@ -9708,3 +9708,39 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-CLOSE-B2-composer.md", "output_sha256": "4e118ddeecc020263e479a02715550117f4ba02c337dd25a37b58f76b969a8b3", "task_id": "ic1a-align-close-b2", "ts": "2026-07-09T02:14:25Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1A-ALIGN-RECONCILE.md", "output_sha256": "c255e67f754ee319d19a8da161eb3edfadb951aec0dc51a8252e2630cfd626ed", "task_id": "ic1a-align-impl-b3", "ts": "2026-07-09T02:17:23Z"}
+=== 2026-07-09 10:17:24 | dispatch ===
+  ts=2026-07-09 10:17:24
+  kind=dispatch
+  intent=Codex 實作 1-align B3(Task 2.5 _align_label_to_group 長度巧合消滅+2.6 analyze_cross_sectional labels Tier-1)
+  risk=high
+  facts_asked=none-needed: SPEC v3 Frozen,B1/B2 已閉合落地
+  review_role=Composer 後續 review;Codex 不自審
+  template=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  adversarial=handoffs/IC1A-ALIGN-RECONCILE.md
+  reconcile=handoffs/IC1A-ALIGN-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  todo=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-IMPL-B3-RESULT.md", "output_sha256": "e72f4377682ef4bddace5045f1c3d0ccb21d73bd8931a4000925309eb1fcbf6b", "task_id": "ic1a-align-impl-b3", "ts": "2026-07-09T02:25:18Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-review-b3", "ts": "2026-07-09T02:25:18Z"}
+=== 2026-07-09 10:25:18 | dispatch ===
+  ts=2026-07-09 10:25:18
+  kind=dispatch
+  intent=Composer review B3(2.5 align_label_to_group+2.6 xsec labels Tier-1)
+  risk=low
+  facts_asked=none-needed
+  review_role=Composer adversarial review;Codex 不自審
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-REVIEW-B3-composer.md", "output_sha256": "c08fc9347b1d08dbf7ddf513d1f76e0aa9bc390c49023b7246bdafae2fc624f8", "task_id": "ic1a-align-review-b3", "ts": "2026-07-09T02:29:19Z"}
