@@ -914,6 +914,17 @@ def _sample_alignment_positions(
     return np.array(sorted(used.union(grid.tolist())), dtype=int)
 
 
+# Tier-2 逐點 oracle 支援的報酬型別;excess/risk_adjusted/winsorized 屬視窗/基準轉換
+# 無逐點封閉式,只走 Tier-1(caller 不得對其傳 close)。
+_ORACLE_RETURN_KINDS = {
+    "log": lambda current, future: float(np.log(future / current)),
+    "simple": lambda current, future: float(future / current - 1.0),
+}
+
+# 公開常數:caller 判斷「此 return_type 是否可傳 close 啟用 Tier-2」的單一真相源。
+ORACLE_RETURN_KINDS = frozenset(_ORACLE_RETURN_KINDS)
+
+
 def validate_alignment(
     feature_data: Any,
     target_data: Any,
@@ -921,6 +932,7 @@ def validate_alignment(
     *,
     close: Optional[pd.Series] = None,
     sample_size: int = 64,
+    return_kind: str = "log",
 ) -> AlignmentReport:
     """驗證 Feature_t 與 Target_t+lag 的時間軸與 bar-ordinal label 值。"""
     feature_index = _normalize_alignment_index(
@@ -956,6 +968,11 @@ def validate_alignment(
 
     checked_samples = 0
     if close is not None:
+        oracle = _ORACLE_RETURN_KINDS.get(return_kind)
+        if oracle is None:
+            raise AlignmentViolationError(
+                f"unsupported oracle return_kind: {return_kind}; Tier-2 supports {sorted(_ORACLE_RETURN_KINDS)}"
+            )
         close_index = _normalize_alignment_index(close.index, "close")
         close_series = pd.Series(close.to_numpy(dtype="float64", copy=False), index=close_index)
         positioner = pd.Series(np.arange(len(close_series), dtype=int), index=close_index)
@@ -981,7 +998,7 @@ def validate_alignment(
             got = float(target_values.iloc[row])
             if pd.isna(current) or pd.isna(future) or pd.isna(got):
                 continue
-            expected = float(np.log(future / current))
+            expected = oracle(current, future)
             if not np.isclose(got, expected, atol=1e-6, rtol=1e-5, equal_nan=False):
                 raise AlignmentViolationError(
                     f"label mismatch at {feature_index[row]}: expected {expected}, got {got}"

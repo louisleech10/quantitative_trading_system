@@ -9785,3 +9785,21 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260709-ic1a-align-b2-golden-rca.md", "output_sha256": "0d95c8225d2e80a600f656a9ecf1abea1325acd41018a061c16f31212e5bfc5b", "task_id": "ic1a-align-b2-golden-rca", "ts": "2026-07-09T03:29:38Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260709-ic1a-align-fix2-b2.md", "output_sha256": "fb4a0608bb759a29102479b8b419a527670d4027a6d93452900a7f1d4fb7324c", "task_id": "ic1a-align-fix2-b2", "ts": "2026-07-09T03:29:38Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260709-ic1a-align-signoff.md", "output_sha256": "c1fa019d075cc7a46c7811219a866370191179a5bc8b57972ea6829825dfd0ed", "task_id": "ic1a-align-signoff", "ts": "2026-07-09T03:29:38Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-b1gap-review", "ts": "2026-07-09T05:25:58Z"}
+=== 2026-07-09 13:25:58 | dispatch ===
+  ts=2026-07-09 13:25:58
+  kind=dispatch
+  intent=Codex 審 B-1 增量(Tier-2 oracle 加 simple 型+跨型別誤配抓+不支援 fail-closed)
+  risk=low
+  facts_asked=none-needed: 省步版經使用者核可,SPEC 增補記 HANDOFF 由下一 session 併入
+  review_role=Codex adversarial;Claude 實作不自審
+  template=n/a: 增量 code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-B1GAP-REVIEW-codex.md", "output_sha256": "6e5c10cd4166801d4d76cc82c6044afbe9422b852d0d7d425c371ec5f4be2eab", "task_id": "ic1a-align-b1gap-review", "ts": "2026-07-09T05:29:49Z"}

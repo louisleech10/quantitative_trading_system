@@ -198,3 +198,55 @@ def test_alignment_spec_rejects_invalid_freq() -> None:
             lag=1,
             freq="not-a-frequency",
         )
+
+
+# ---- B-1:非 log 報酬型 Tier-2 oracle(simple)----
+
+
+def test_validate_alignment_simple_return_oracle_passes() -> None:
+    """simple 報酬 label 配 return_kind='simple' → Tier-2 逐點驗證放行。"""
+    index = pd.date_range("2025-01-01", periods=24, freq="1h")
+    features = pd.DataFrame({"factor": np.arange(len(index), dtype=float)}, index=index)
+    close = _close(index)
+    labels = pd.Series(close.shift(-1) / close - 1.0, index=index, name="return_1")
+
+    report = validate_alignment(features, labels, _spec(), close=close, return_kind="simple")
+
+    assert report.checked_samples >= 8
+
+
+def test_validate_alignment_simple_return_shifted_raises() -> None:
+    """M1(simple 版):label 平移 1 bar 必抓。"""
+    index = pd.date_range("2025-01-01", periods=24, freq="1h")
+    features = pd.DataFrame({"factor": np.arange(len(index), dtype=float)}, index=index)
+    close = _close(index)
+    labels = pd.Series(close.shift(-1) / close - 1.0, index=index, name="return_1")
+    shifted_values = np.roll(labels.to_numpy(), 1)
+    shifted = pd.Series(shifted_values, index=index, name="return_1")
+    shifted.iloc[-1] = np.nan
+    shifted.iloc[0] = shifted_values[1]  # 保頭部有值、尾端結構 NaN==lag
+
+    with pytest.raises(AlignmentViolationError, match="label mismatch"):
+        validate_alignment(features, shifted, _spec(), close=close, sample_size=8, return_kind="simple")
+
+
+def test_validate_alignment_cross_kind_mismatch_raises() -> None:
+    """simple label 被當 log 驗(或反之)→ 必抓;證明 oracle 分支可證偽非裝飾。"""
+    index = pd.date_range("2025-01-01", periods=24, freq="1h")
+    features = pd.DataFrame({"factor": np.arange(len(index), dtype=float)}, index=index)
+    close = _close(index)
+    simple_labels = pd.Series(close.shift(-1) / close - 1.0, index=index, name="return_1")
+
+    with pytest.raises(AlignmentViolationError, match="label mismatch"):
+        validate_alignment(features, simple_labels, _spec(), close=close, return_kind="log")
+
+
+def test_validate_alignment_unsupported_return_kind_fail_closed() -> None:
+    """excess/risk_adjusted/winsorized 無逐點 oracle;傳 close 配不支援型別 → raise 不猜。"""
+    index = pd.date_range("2025-01-01", periods=24, freq="1h")
+    features = pd.DataFrame({"factor": np.arange(len(index), dtype=float)}, index=index)
+    close = _close(index)
+    labels = _labels_from_close(close, lag=1)
+
+    with pytest.raises(AlignmentViolationError, match="unsupported oracle return_kind"):
+        validate_alignment(features, labels, _spec(), close=close, return_kind="winsorized")

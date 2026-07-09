@@ -29,6 +29,7 @@ from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedRes
 from momentum.core.exceptions import InsufficientDataError, InvalidInputError
 from momentum.core.logging import get_logger
 from momentum.core.contracts import (
+    ORACLE_RETURN_KINDS,
     AlignmentSpec,
     AlignmentViolationError,
     SplitPlan,
@@ -1844,11 +1845,13 @@ class ICFilterOrchestrator:
                             raw_data["close"].to_numpy(copy=False),
                             index=close_index,
                         )
+            _rk = active_config.labels.return_type
             report = validate_alignment(
                 normalized_features,
                 label_series,
                 _alignment_spec(meta, horizon),
-                close=close if active_config.labels.return_type == "log" else None,
+                close=close if _rk in ORACLE_RETURN_KINDS else None,
+                return_kind=_rk,
             )
             features_df = _assign_datetime_index_preserving_values(
                 features_df, feature_index, "features_df"
@@ -1937,7 +1940,8 @@ class ICFilterOrchestrator:
             features_for_gate,
             label_series,
             _alignment_spec(metadata, horizon),
-            close=close if labels_cfg.return_type == "log" else None,
+            close=close if labels_cfg.return_type in ORACLE_RETURN_KINDS else None,
+            return_kind=labels_cfg.return_type,
         )
         if features_df is not None:
             normalized_features = _assign_datetime_index_preserving_values(
