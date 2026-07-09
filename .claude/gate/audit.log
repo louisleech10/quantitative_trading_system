@@ -9744,3 +9744,21 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-REVIEW-B3-composer.md", "output_sha256": "c08fc9347b1d08dbf7ddf513d1f76e0aa9bc390c49023b7246bdafae2fc624f8", "task_id": "ic1a-align-review-b3", "ts": "2026-07-09T02:29:19Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-fixture-mig", "ts": "2026-07-09T02:40:12Z"}
+=== 2026-07-09 10:40:12 | dispatch ===
+  ts=2026-07-09 10:40:12
+  kind=dispatch
+  intent=Codex 遷移 5 個 label 欄名 fixture 到 return_1(SPEC 遷移義務),不弱化 resolver
+  risk=low
+  facts_asked=none-needed: 2 FF 紅已證 pre-existing
+  review_role=Claude 接回 diff 驗無斷言弱化
+  template=n/a: 測試 fixture 遷移
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-FIXTUREMIG-RESULT.md", "output_sha256": "f6335c25bf5b42e96c847a0cc329671f1620553ee6eb37db9990c13b1a39116f", "task_id": "ic1a-align-fixture-mig", "ts": "2026-07-09T02:49:32Z"}

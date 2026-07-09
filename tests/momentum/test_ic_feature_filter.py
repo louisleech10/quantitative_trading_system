@@ -152,15 +152,15 @@ def test_analyze_applies_feature_filter_metadata_and_summary_limit(tmp_path: Pat
     n_samples = 120
     n_features = 8
     rng = np.random.default_rng(123)
+    timestamps = np.arange(n_samples, dtype=np.int64) * 12 * 60 * 60
     features = pd.DataFrame(
         rng.normal(size=(n_samples, n_features)).astype(np.float32),
         columns=[f"feature_{idx}" for idx in range(n_features)],
-        index=pd.Index(np.arange(n_samples), name="timestamp"),
+        index=pd.Index(timestamps, name="timestamp"),
     )
-    labels = pd.DataFrame(
-        {"label": rng.normal(size=n_samples).astype(np.float32)},
-        index=features.index,
-    )
+    label_values = rng.normal(size=n_samples).astype(np.float32)
+    label_values[-1] = np.nan
+    labels = pd.DataFrame({"return_1": label_values}, index=features.index)
     features_path = tmp_path / "features.h5"
     labels_path = tmp_path / "labels.h5"
     meta_path = tmp_path / "meta.json"

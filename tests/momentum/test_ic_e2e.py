@@ -89,15 +89,15 @@ def _write_meta_json(path: Path, feature_names: list[str]) -> None:
 
 def _make_sample_dataset(n_samples: int, n_features: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     rng = np.random.default_rng(42)
+    timestamps = np.arange(n_samples, dtype=np.int64) * 12 * 60 * 60
     features = pd.DataFrame(
         rng.normal(size=(n_samples, n_features)).astype(np.float32),
         columns=[f"feature_{i}" for i in range(n_features)],
-        index=pd.Index(np.arange(n_samples), name="timestamp"),
+        index=pd.Index(timestamps, name="timestamp"),
     )
-    labels = pd.DataFrame(
-        {"label": rng.normal(size=n_samples).astype(np.float32)},
-        index=features.index,
-    )
+    label_values = rng.normal(size=n_samples).astype(np.float32)
+    label_values[-1] = np.nan
+    labels = pd.DataFrame({"return_1": label_values}, index=features.index)
     return features, labels
 
 
