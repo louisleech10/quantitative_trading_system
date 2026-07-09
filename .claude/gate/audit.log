@@ -9762,3 +9762,26 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-FIXTUREMIG-RESULT.md", "output_sha256": "f6335c25bf5b42e96c847a0cc329671f1620553ee6eb37db9990c13b1a39116f", "task_id": "ic1a-align-fixture-mig", "ts": "2026-07-09T02:49:32Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-signoff", "ts": "2026-07-09T03:01:35Z"}
+=== 2026-07-09 11:01:35 | dispatch ===
+  ts=2026-07-09 11:01:35
+  kind=dispatch
+  intent=Codex adversarial 簽核腿+Composer 數據正確性簽核腿,1-align 全刀真資料
+  risk=low
+  facts_asked=none-needed: Claude 腿已跑(G-1a/G-2/G-3 PASS,G-1b 抽樣邊界記檔)
+  review_role=Codex=explicit adversarial 獵漏+實跑反例;Composer=數據正確性獨立驗;任一方有疑=不通過
+  template=n/a: 三方數據正確性簽核派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SIGNOFF-claude.md", "output_sha256": "b6738ed69d970e013a9fcccc6588987a27e2c6e79fcddd5a8de2e6246f5aa09d", "task_id": "ic1a-align-signoff", "ts": "2026-07-09T03:02:42Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SIGNOFF-composer.md", "output_sha256": "d589604b1bfccd1b8878303bca2c5993cc1a6dd7f6f20bd60a6fbe8d436808f9", "task_id": "ic1a-align-signoff", "ts": "2026-07-09T03:18:46Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-SIGNOFF-codex.md", "output_sha256": "5a80277f3a746b552003fd5c9d21efc3ef4723fc7acb6dce75d794bd5e0ffb85", "task_id": "ic1a-align-signoff", "ts": "2026-07-09T03:25:51Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260709-ic1a-align-b2-golden-rca.md", "output_sha256": "0d95c8225d2e80a600f656a9ecf1abea1325acd41018a061c16f31212e5bfc5b", "task_id": "ic1a-align-b2-golden-rca", "ts": "2026-07-09T03:29:38Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260709-ic1a-align-fix2-b2.md", "output_sha256": "fb4a0608bb759a29102479b8b419a527670d4027a6d93452900a7f1d4fb7324c", "task_id": "ic1a-align-fix2-b2", "ts": "2026-07-09T03:29:38Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260709-ic1a-align-signoff.md", "output_sha256": "c1fa019d075cc7a46c7811219a866370191179a5bc8b57972ea6829825dfd0ed", "task_id": "ic1a-align-signoff", "ts": "2026-07-09T03:29:38Z"}

@@ -1,17 +1,19 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-07-08 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-07-09 | **Branch**: main
 
-## ✅ 剛完成:IC 1a 剩餘刀順序裁定(三方委員會一致+使用者裁定)
-- 三方獨立偵察+提案:handoffs/IC1A-CUTS-ORDER-{claude,codex,composer}.md(gate register-output 已註冊,task-id IC1A-CUTS-ORDER)
-- **裁定順序**:① 1-align 前瞻硬閘(大)→ ② 1e HAC+1b FDR 合刀「顯著性正確化」(大)→ ③ 1c Net IC 量綱(大)→ ④ 1d attribution 正名+NaN(中/大開工定)→ ⑤ 1f 空圖 schema+grouped 殘留(小-中,最後)
-- **偵察關鍵事實(三方 receipt 交叉驗證)**:validate_alignment=NotImplementedError stub 零 caller(contracts.py:764);FDR adjust_multiple_comparisons 從未被呼叫+前端 fdr_correction 幽靈開關(store 不送);Net IC 量綱錯(net_ic_analyzer.py:34);attribution 真 OLS 存在但 _run_factor_exposure 不呼叫+fillna(0) 遍地;HAC 缺(statistical_validator.py:119 i.i.d. t-test);1f 巢狀 quantile_returns vs 前端頂層讀(恒空);**grouped_ic 崩潰已修(Phase 0 11507f5),移出清單**,殘留 schema/UX 面併 1f
-- ROADMAP P0 已更新裁定;grouped_ic 殘留=IC-PERF(P1 正交 epic)
+## ✅ 剛完成:IC 1a 剩餘刀①「1-align 前瞻錯位硬閘」全刀閉合(2026-07-09,本次 commit)
+SIGNOFF:claude:DATA-CORRECT SIGNOFF:codex:DATA-CORRECT SIGNOFF:composer:DATA-CORRECT
+- **SPEC v3 Frozen**(R1-R3 雙家族 adversarial,雙 RECONCILE-STAMP)→B1 kernel+horizon resolver(fd5866f)→B2 四主路徑接線+D-4 寫回(854d444)→B3 grouped/xsec(78c85bb)→fixture 遷移(e47933d)。REF:handoffs/IC1A-ALIGN-RECONCILE.md
+- **重大破案**:cut1 golden 舊 baseline 凍到壞行為——rolling IC index-join 0 列(features int64 vs label RangeIndex),summary 全 None 被當標準答案;B2 修活後重凍(MIXED 裁定:index 修正留+float64 強轉修掉,dtype 保留後 grouped/turnover 與舊 baseline maxdiff=0)。RCA 詳 handoffs/IC1A-ALIGN-B2-GOLDEN-RCA-codex.md 與 -composer.md 兩檔;摘要 REF:handoffs/IC1A-ALIGN-SIGNOFF-claude.md
+- **驗收**:全套 momentum 986 passed;golden 2 passed;M1-M7 mutation 轉紅 receipt 全;Codex adversarial 簽核 10 攻擊情境全攔(錯tf/亂序/重複ts/毫秒/跨symbol標籤/邊界腐化/外部labels/等長平移×2)。REF:handoffs/IC1A-ALIGN-SIGNOFF-claude.md REF:handoffs/IC1A-ALIGN-SIGNOFF-codex.md REF:handoffs/IC1A-ALIGN-SIGNOFF-composer.md
+- **殘留(登記,不擋)**:①2 pre-existing FF 紅(test_pipeline_with_preprocessing/test_full_pipeline_overhead,pre-B1+真資料實證同紅,另案;REF:handoffs/IC1A-ALIGN-SIGNOFF-claude.md);②Tier-2 抽樣不承諾任意單點值腐化偵測(非對齊類故障,golden 全值層承擔);③B3 3 NON-BLOCKING(2.6 例外型別等,詳 handoffs/IC1A-ALIGN-REVIEW-B3-composer.md);④report timestamp 序列化 epoch→ISO(前端現用 index 軸無影響,types 註記待補);⑤data_cache/features/BTCUSDT_1h_filtered.h5 曾被 B2 開發期中間版蓋寫(既有設計寫入點,內容=衍生物,下次正確 run 會覆新)。
 
-## ★進行中 = 1-align 前瞻硬閘:SPEC v3 已 Frozen(2026-07-09),待派實作
-- **R1-R3 adversarial 全程**:R1 雙 REJECT(Codex 7B+Composer 6B)→v2 修全部→R2 Codex APPROVE/Composer 抓 v2 新洞(2.4 跨 dtype 交集恆空)→v3 加 D-4 同型化寫回→R3 雙 APPROVE;雙 RECONCILE-STAMP 機檢 PASS(handoffs/IC1A-ALIGN-RECONCILE.md)
-- **SPEC 核心**:D-1 int64 秒相容/D-2 bar-ordinal oracle/D-3 兩段 freq/D-4 同型化寫回;Task 1.1 kernel+1.2 horizon resolver(修既存 purge lookahead)+2.1-2.6 六接線點;Golden 真 3sym data_cache 唯讀;M1-M7(M5 雙腿)
-- **下一步**:派 Codex 實作 B1(Task 1.1+1.2)→Composer code review→B2(2.1-2.4)→B3(2.5-2.6)→三方數據正確性簽核。實作註記:尾端 NaN==lag 對完整軸驗(Codex R2 note)
+## ★下一站 = 剩餘刀②「1e HAC + 1b FDR 合刀(顯著性正確化)」(大管線)
+- 裁定順序(2026-07-08 使用者):①1-align ✅→**②1e+1b**→③1c Net IC 量綱→④1d attribution→⑤1f 空圖+grouped schema 殘留。REF:handoffs/IC1A-ALIGN-RECONCILE.md
+- 偵察事實(三方 receipt,詳 handoffs/IC1A-CUTS-ORDER-codex.md 與 -composer.md):rolling IC 當 i.i.d. 跑 t-test(statistical_validator.py:119)無 HAC;`adjust_multiple_comparisons`(fdr_bh)存在零 caller;選擇=裸 p≤0.05(orchestrator _apply_thresholds);前端 fdr_correction 幽靈開關(store 不送);`SelectionScope` 契約在、生產 0 使用。若拆刀必 1e 先。
+- 1-align 交付凍結:`effective_horizon` 語意=Task 1.2 resolver 單一真相源,1e+1b 須複用(SPEC §N 交付義務)。
+- 流程同本刀:偵察交委員(附 receipt)→Claude 全量自產判斷→SPEC+TODO→雙家族 adversarial→雙戳記 freeze→Codex 實作+Composer review→三方簽核。
 
 ## 鐵律(慢測試/執行)
-- 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員審查派工 `gate.sh dispatch --task-id --risk low --template "n/a:"`;codex exec 必接 `< /dev/null`。委員產出 register-output 才過 claim checker。
+- 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員審查派工 `gate.sh dispatch --task-id --risk low --template "n/a:"`;實作派工 --risk high 附 --spec/--todo/--adversarial(過戳記機檢的 reconcile 檔)/--reconcile;codex exec 必接 `< /dev/null`。委員產出 register-output 才過 claim checker。
 - 執行端產物不可信;接回只讀 diff+測試+摘要;執行端不得 git checkout tracked 共用檔。
