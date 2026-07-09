@@ -136,6 +136,8 @@ def test_pipeline_with_tail_risk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
 
 def test_pipeline_with_preprocessing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """L6.5 預處理設計範圍=Winsor+Fracdiff(2026-07-09 使用者定);rank/zscore/gaussian
+    config key 被接受但不生效——本測試釘住此邊界:開啟它們不得產生對應欄位。"""
     config = _base_pipeline_override()
     config["atomic_indicators"]["microstructure"]["enabled"] = True
     config["preprocessing"] = {
@@ -149,13 +151,17 @@ def test_pipeline_with_preprocessing(tmp_path: Path, monkeypatch: pytest.MonkeyP
         "adaptive_zscore": {"enabled": True, "windows": [55], "apply_to": "all", "epsilon": 1e-8},
     }
 
-    _result, _factory, manifest = _generate(
+    result, _factory, manifest = _generate(
         config, tmp_path, monkeypatch, persist=True
     )
     columns = _manifest_columns(manifest)
 
-    assert any(col.endswith("_rank") for col in columns)
-    assert any("_zscore_" in col for col in columns)
+    assert result.feature_count > 0
+    assert any(col.startswith("ms_") for col in columns)
+    # L6.5 scope guard:rank/gaussian 不屬 L6.5,開了也不得產預處理欄。
+    # 注意:zscore 不能用 substring 守衛——ms_vpin_zscore_* 是 microstructure 指標非 L6.5 產物。
+    assert not any(col.endswith("_rank") for col in columns)
+    assert not any("_gauss" in col for col in columns)
 
 
 def test_pipeline_all_new_features(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

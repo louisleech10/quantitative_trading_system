@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from functools import lru_cache
 
@@ -252,11 +253,20 @@ def test_full_pipeline_overhead() -> None:
 
     assert base_result.feature_count > 0
     assert new_result.feature_count > base_result.feature_count
-    new_columns = (
-        list(new_result.features_df.columns)
-        if not new_result.features_df.empty
-        else new_result.metadata.get("feature_names", [])
-    )
+    # CGSA 路徑 features_df 為空且 metadata.feature_names 為空 list;欄名真相源=manifest
+    new_columns = list(new_result.features_df.columns)
+    if not new_columns:
+        manifest_path = new_result.metadata.get("manifest_path")
+        assert manifest_path, "manifest_path missing; cannot resolve feature columns"
+        with open(manifest_path, encoding="utf-8") as fh:
+            manifest = json.load(fh)
+        groups = manifest.get("groups")
+        if groups is None:
+            groups = manifest["artifacts"]["raw"]["groups"]
+        group_values = groups.values() if isinstance(groups, dict) else groups
+        new_columns = [
+            str(column) for group in group_values for column in group.get("columns", [])
+        ]
     assert any(col.startswith("ms_") for col in new_columns)
     assert any(col.startswith("ent_") for col in new_columns)
     assert any(col.startswith("tr_") for col in new_columns)
