@@ -40,7 +40,7 @@ def _real_btc_1h_features(limit: int = 300) -> pd.DataFrame:
 
 
 def _labels_from_close(features_df: pd.DataFrame, horizon: int = 5) -> pd.DataFrame:
-    labels = features_df["close"].pct_change(periods=horizon).shift(-horizon).fillna(0.0)
+    labels = features_df["close"].pct_change(periods=horizon).shift(-horizon)
     return pd.DataFrame({f"return_{horizon}": labels.astype("float64")}, index=features_df.index)
 
 

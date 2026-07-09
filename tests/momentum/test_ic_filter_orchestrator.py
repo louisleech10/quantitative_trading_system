@@ -1,4 +1,5 @@
 import json
+import hashlib
 from typing import Optional
 from pathlib import Path
 
@@ -8,7 +9,12 @@ import pandas as pd
 import pytest
 
 from momentum.Analysis.ic_config_schema import ICConfig, load_ic_config
-from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+from momentum.Analysis.ic_filter_orchestrator import (
+    ICFilterOrchestrator,
+    _slice_by_mask,
+    _slice_raw_data_by_mask,
+)
+from momentum.core.contracts import AlignmentReport, AlignmentViolationError
 from momentum.core.exceptions import InsufficientDataError, InvalidInputError
 
 
@@ -77,18 +83,28 @@ def _write_meta_json(path: Path, features: list[str]) -> None:
     path.write_text(json.dumps(meta, ensure_ascii=True), encoding="utf-8")
 
 
-def test_ic_filter_orchestrator_analyze(tmp_path: Path):
+def _log_return_config() -> ICConfig:
+    config_data = load_ic_config().model_dump()
+    config_data["labels"]["return_type"] = "log"
+    return ICConfig.model_validate(config_data)
+
+
+def test_ic_filter_orchestrator_analyze(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """驗證 analyze 端到端輸出與報告結構。"""
     np.random.seed(42)
     n_samples = 120
     n_features = 8
+    timestamps = pd.Index(
+        1_704_067_200 + np.arange(n_samples, dtype=np.int64) * 43_200,
+        name="timestamp",
+    )
     features = pd.DataFrame(
         np.random.randn(n_samples, n_features).astype(np.float32),
         columns=[f"feature_{i}" for i in range(n_features)],
-        index=pd.Index(np.arange(n_samples), name="timestamp"),
+        index=timestamps,
     )
     labels = pd.DataFrame(
-        {"label": np.random.randn(n_samples).astype(np.float32)},
+        {"return_1": np.r_[np.random.randn(n_samples - 1).astype(np.float32), np.nan]},
         index=features.index,
     )
 
@@ -101,6 +117,7 @@ def test_ic_filter_orchestrator_analyze(tmp_path: Path):
 
     config = load_ic_config()
     orchestrator = ICFilterOrchestrator(config)
+    monkeypatch.setattr(orchestrator, "_persist_outputs", lambda *args, **kwargs: {})
 
     report = orchestrator.analyze(
         features_path=str(features_path),
@@ -117,17 +134,21 @@ def test_ic_filter_orchestrator_analyze(tmp_path: Path):
     assert refilter_report["metadata"]["total_features_input"] == n_features
 
 
-def test_event_filter_fallback(tmp_path: Path):
+def test_event_filter_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """事件數不足時應回退 Global Mode。"""
     np.random.seed(7)
     n_samples = 120
+    timestamps = pd.Index(
+        1_704_067_200 + np.arange(n_samples, dtype=np.int64) * 43_200,
+        name="timestamp",
+    )
     features = pd.DataFrame(
         np.random.randn(n_samples, 5).astype(np.float32),
         columns=[f"feature_{i}" for i in range(5)],
-        index=pd.Index(np.arange(n_samples), name="timestamp"),
+        index=timestamps,
     )
     labels = pd.DataFrame(
-        {"label": np.random.randn(n_samples).astype(np.float32)},
+        {"return_1": np.r_[np.random.randn(n_samples - 1).astype(np.float32), np.nan]},
         index=features.index,
     )
 
@@ -149,6 +170,7 @@ def test_event_filter_fallback(tmp_path: Path):
 
     config = load_ic_config()
     orchestrator = ICFilterOrchestrator(load_ic_config())
+    monkeypatch.setattr(orchestrator, "_persist_outputs", lambda *args, **kwargs: {})
     report = orchestrator.analyze(
         features_path=str(features_path),
         labels_path=str(labels_path),
@@ -409,21 +431,31 @@ def test_get_filtered_features_returns_copy():
 
 def test_stage0_ingestion_uses_meta_and_reindexes_labels(tmp_path: Path):
     """metadata_json 與 labels reindex 分支。"""
+    timestamps = pd.Index(
+        1_704_067_200 + np.arange(120, dtype=np.int64) * 43_200,
+        name="timestamp",
+    )
     features = pd.DataFrame(
         {
             "f1": np.random.randn(120).astype(np.float32),
             "nan_col": [np.nan] * 110 + [1.0] * 10,
         },
-        index=pd.Index(np.arange(120), name="timestamp"),
+        index=timestamps,
+    )
+    label_timestamps = pd.Index(
+        1_704_067_200 + np.arange(-10, 120, dtype=np.int64) * 43_200,
+        name="timestamp",
     )
     labels = pd.DataFrame(
-        {"label": np.random.randn(120).astype(np.float32)},
-        index=pd.Index(np.arange(1000, 1120), name="timestamp"),
+        {"return_1": np.r_[np.random.randn(129).astype(np.float32), np.nan]},
+        index=label_timestamps,
     )
 
     meta = {
         "f1": {"name": "f1", "category": "trend", "layer": 1, "data_source": "close"},
         "nan_col": {"name": "nan_col", "category": "trend", "layer": 1, "data_source": "close"},
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
     }
 
     features_path = tmp_path / "features.h5"
@@ -456,7 +488,11 @@ def test_stage2_label_generation_with_kline_reader(tmp_path: Path):
     """缺 labels 時改用 kline_reader 產生。"""
     class _DummyReader:
         def read_klines(self, _symbol, _timeframe):
-            return pd.DataFrame({"close": [1.0, 2.0, 3.0]}, index=pd.RangeIndex(3))
+            index = pd.Index(
+                1_704_067_200 + np.arange(16, dtype=np.int64) * 43_200,
+                name="timestamp",
+            )
+            return pd.DataFrame({"close": np.linspace(1.0, 2.0, 16)}, index=index)
 
     config = load_ic_config()
     config_data = config.model_dump()
@@ -494,12 +530,329 @@ def test_stage2_label_generation_missing_close_raises():
         orchestrator._stage2_label_generation(None, metadata, load_ic_config(), _DummyReader())
 
 
+def test_alignment_gate_stage2_normalizes_kline_axis_and_preserves_values():
+    """Stage2 kline labels 經 gate 後寫回 DatetimeIndex，數值 payload 不變。"""
+    class _DummyReader:
+        def read_klines(self, _symbol, _timeframe):
+            index = pd.Index(
+                1_704_067_200 + np.arange(16, dtype=np.int64) * 43_200,
+                name="timestamp",
+            )
+            return pd.DataFrame({"close": np.linspace(1.0, 2.0, 16)}, index=index)
+
+    config = load_ic_config()
+    metadata = {"symbol": "BTCUSDT", "timeframe": "12h"}
+    feature_index = pd.Index(
+        1_704_067_200 + np.arange(16, dtype=np.int64) * 43_200,
+        name="timestamp",
+    )
+    features_df = pd.DataFrame({"f1": np.arange(16, dtype=np.float64)}, index=feature_index)
+    before = features_df.to_numpy().tobytes()
+    orchestrator = ICFilterOrchestrator(config)
+
+    label_series, labels_df = orchestrator._stage2_label_generation(
+        None, metadata, config, _DummyReader(), features_df=features_df
+    )
+
+    assert isinstance(features_df.index, pd.DatetimeIndex)
+    assert labels_df.index.equals(features_df.index)
+    assert label_series.index.equals(features_df.index)
+    assert features_df.to_numpy().tobytes() == before
+
+
+def test_alignment_gate_stage0_external_labels_reject_rangeindex(tmp_path: Path):
+    """Stage0 外部 labels 無時間軸時 fail-closed。"""
+    features = pd.DataFrame(
+        {"f1": np.random.randn(120).astype(np.float32)},
+        index=pd.Index(
+            1_704_067_200 + np.arange(120, dtype=np.int64) * 43_200,
+            name="timestamp",
+        ),
+    )
+    labels = pd.DataFrame(
+        {"return_1": np.r_[np.random.randn(119).astype(np.float32), np.nan]},
+        index=pd.RangeIndex(120),
+    )
+    meta = {
+        "f1": {"name": "f1", "category": "trend", "layer": 1, "data_source": "close"},
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+    }
+    features_path = tmp_path / "features.h5"
+    labels_path = tmp_path / "labels.h5"
+    _write_features_h5(features_path, features, metadata_json=meta)
+    labels_path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(labels_path, "w") as file:
+        group = file.create_group("BTCUSDT/12h")
+        group.create_dataset("labels", data=labels.to_numpy(dtype=np.float32))
+        str_dtype = h5py.string_dtype(encoding="utf-8")
+        group.create_dataset(
+            "label_names",
+            data=np.array(labels.columns.tolist(), dtype=object),
+            dtype=str_dtype,
+        )
+
+    orchestrator = ICFilterOrchestrator(load_ic_config())
+    with pytest.raises(AlignmentViolationError, match="RangeIndex"):
+        orchestrator._stage0_ingestion(str(features_path), str(labels_path), None)
+
+
+def test_alignment_gate_stage0_wrong_tf_raises(tmp_path: Path):
+    """M4: 12h features 搭配 1h labels 時，Stage0 外部 labels gate 應 fail-closed。"""
+    n_features = 120
+    start_ts = 1_704_067_200
+    feature_index = pd.Index(
+        start_ts + np.arange(n_features, dtype=np.int64) * 43_200,
+        name="timestamp",
+    )
+    features = pd.DataFrame(
+        {"f1": np.linspace(0.0, 1.0, n_features, dtype=np.float32)},
+        index=feature_index,
+    )
+    hourly_index = pd.Index(
+        start_ts + np.arange((n_features - 1) * 12 + 1, dtype=np.int64) * 3_600,
+        name="timestamp",
+    )
+    hourly_close = np.linspace(100.0, 125.0, len(hourly_index), dtype=np.float32)
+    hourly_returns = np.r_[
+        np.log(hourly_close[1:] / hourly_close[:-1]).astype(np.float32),
+        np.nan,
+    ]
+    labels = pd.DataFrame({"return_1": hourly_returns}, index=hourly_index)
+    meta = {
+        "f1": {"name": "f1", "category": "trend", "layer": 1, "data_source": "close"},
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+    }
+
+    class _DummyReader:
+        def read_klines(self, _symbol, _timeframe):
+            return pd.DataFrame(
+                {"close": np.linspace(100.0, 125.0, n_features, dtype=np.float32)},
+                index=feature_index,
+            )
+
+    features_path = tmp_path / "features.h5"
+    labels_path = tmp_path / "labels.h5"
+    _write_features_h5(features_path, features, metadata_json=meta)
+    _write_labels_h5(labels_path, labels)
+
+    config = _log_return_config()
+    orchestrator = ICFilterOrchestrator(config)
+    with pytest.raises(AlignmentViolationError):
+        orchestrator._stage0_ingestion(
+            str(features_path), str(labels_path), None, config=config, kline_reader=_DummyReader()
+        )
+
+
+def test_alignment_gate_m5_dual_leg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """M5: gate ON 應抓 M1 錯位；同資料在 no-op gate 下應讓測試邏輯轉紅。"""
+    n_features = 120
+    start_ts = 1_704_067_200
+    feature_index = pd.Index(
+        start_ts + np.arange(n_features, dtype=np.int64) * 43_200,
+        name="timestamp",
+    )
+    features = pd.DataFrame(
+        {"f1": np.linspace(0.0, 1.0, n_features, dtype=np.float32)},
+        index=feature_index,
+    )
+    close_values = np.linspace(100.0, 125.0, n_features, dtype=np.float32)
+    correct_returns = np.r_[
+        np.log(close_values[1:] / close_values[:-1]).astype(np.float32),
+        np.nan,
+    ]
+    shifted_returns = np.r_[correct_returns[1:-1], correct_returns[0], np.nan].astype(np.float32)
+    labels = pd.DataFrame({"return_1": shifted_returns}, index=feature_index)
+    meta = {
+        "f1": {"name": "f1", "category": "trend", "layer": 1, "data_source": "close"},
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+    }
+
+    class _DummyReader:
+        def read_klines(self, _symbol, _timeframe):
+            return pd.DataFrame({"close": close_values}, index=feature_index)
+
+    features_path = tmp_path / "features.h5"
+    labels_path = tmp_path / "labels.h5"
+    _write_features_h5(features_path, features, metadata_json=meta)
+    _write_labels_h5(labels_path, labels)
+
+    def _assert_gate_rejects_shifted_labels() -> None:
+        config = _log_return_config()
+        orchestrator = ICFilterOrchestrator(config)
+        rejected = False
+        try:
+            orchestrator._stage0_ingestion(
+                str(features_path), str(labels_path), None, config=config, kline_reader=_DummyReader()
+            )
+        except AlignmentViolationError:
+            rejected = True
+        assert rejected, "alignment gate did not reject shifted labels"
+
+    _assert_gate_rejects_shifted_labels()
+
+    import momentum.Analysis.ic_filter_orchestrator as orchestrator_module
+
+    def _noop_validate(*_args, **_kwargs):
+        return AlignmentReport(gap_count=0, gap_rate=0.0, checked_samples=0)
+
+    monkeypatch.setattr(orchestrator_module, "validate_alignment", _noop_validate)
+    with pytest.raises(AssertionError, match="did not reject shifted labels"):
+        _assert_gate_rejects_shifted_labels()
+
+
+def test_alignment_gate_stage0_and_stage2_close_preserve_raw_dtype(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """B2-DTYPE-01/02: caller 傳入 gate 的 close dtype 與 raw_data 保持一致。"""
+    n_features = 120
+    timestamps = pd.Index(
+        1_704_067_200 + np.arange(n_features, dtype=np.int64) * 43_200,
+        name="timestamp",
+    )
+    close_values = np.linspace(100.0, 125.0, n_features, dtype=np.float32)
+    labels = pd.DataFrame(
+        {
+            "return_1": np.r_[
+                np.log(close_values[1:] / close_values[:-1]).astype(np.float32),
+                np.nan,
+            ]
+        },
+        index=timestamps,
+    )
+    features = pd.DataFrame(
+        {"f1": np.linspace(0.0, 1.0, n_features, dtype=np.float32)},
+        index=timestamps,
+    )
+    meta = {
+        "f1": {"name": "f1", "category": "trend", "layer": 1, "data_source": "close"},
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+    }
+
+    class _DummyReader:
+        def read_klines(self, _symbol, _timeframe):
+            return pd.DataFrame({"close": close_values}, index=timestamps)
+
+    captured_close_dtypes: list[np.dtype] = []
+
+    import momentum.Analysis.ic_filter_orchestrator as orchestrator_module
+
+    def _capture_validate(*_args, close=None, **_kwargs):
+        if close is not None:
+            captured_close_dtypes.append(close.dtype)
+        return AlignmentReport(gap_count=0, gap_rate=0.0, checked_samples=0)
+
+    monkeypatch.setattr(orchestrator_module, "validate_alignment", _capture_validate)
+
+    features_path = tmp_path / "features.h5"
+    labels_path = tmp_path / "labels.h5"
+    _write_features_h5(features_path, features, metadata_json=meta)
+    _write_labels_h5(labels_path, labels)
+
+    config = _log_return_config()
+    orchestrator = ICFilterOrchestrator(config)
+    orchestrator._stage0_ingestion(
+        str(features_path), str(labels_path), None, config=config, kline_reader=_DummyReader()
+    )
+    orchestrator._stage2_label_generation(
+        None, {"symbol": "BTCUSDT", "timeframe": "12h"}, config, _DummyReader(), features_df=features.copy()
+    )
+
+    assert captured_close_dtypes == [np.dtype("float32"), np.dtype("float32")]
+
+
+def test_alignment_gate_m6_noop_validate_keeps_ic_output_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """M6: 正確資料 gate on/off 不改 IC summary 輸出。"""
+    np.random.seed(123)
+    n_samples = 120
+    timestamps = pd.Index(
+        1_704_067_200 + np.arange(n_samples, dtype=np.int64) * 43_200,
+        name="timestamp",
+    )
+    signal = np.sin(np.linspace(0.0, 12.0, n_samples)).astype(np.float32)
+    features = pd.DataFrame(
+        {
+            "feature_signal": signal,
+            "feature_noise": np.random.randn(n_samples).astype(np.float32),
+        },
+        index=timestamps,
+    )
+    labels = pd.DataFrame(
+        {"return_1": np.r_[signal[:-1], np.nan].astype(np.float32)},
+        index=timestamps,
+    )
+    features_path = tmp_path / "features.h5"
+    labels_path = tmp_path / "labels.h5"
+    meta_path = tmp_path / "meta.json"
+    _write_features_h5(features_path, features)
+    _write_labels_h5(labels_path, labels)
+    _write_meta_json(meta_path, list(features.columns))
+
+    def _summary_sha(report: dict) -> str:
+        payload = json.dumps(report["summary_table"], sort_keys=True, default=str)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    config = load_ic_config()
+    gate_on = ICFilterOrchestrator(config)
+    monkeypatch.setattr(gate_on, "_persist_outputs", lambda *args, **kwargs: {})
+    report_on = gate_on.analyze(str(features_path), str(labels_path), str(meta_path))
+
+    import momentum.Analysis.ic_filter_orchestrator as orchestrator_module
+
+    def _noop_validate(*_args, **_kwargs):
+        return AlignmentReport(gap_count=0, gap_rate=0.0, checked_samples=0)
+
+    monkeypatch.setattr(orchestrator_module, "validate_alignment", _noop_validate)
+    gate_off = ICFilterOrchestrator(config)
+    monkeypatch.setattr(gate_off, "_persist_outputs", lambda *args, **kwargs: {})
+    report_off = gate_off.analyze(str(features_path), str(labels_path), str(meta_path))
+
+    assert _summary_sha(report_on) == _summary_sha(report_off)
+
+
+def test_slice_alignment_same_length_misaligned_label_raises():
+    """M2: 同長列序錯位不可走 positional slice。"""
+    index = pd.date_range("2024-01-01", periods=12, freq="12h", name="timestamp")
+    features = pd.DataFrame({"f1": np.arange(12, dtype=float)}, index=index)
+    labels = pd.Series(np.arange(12, dtype=float), index=index + pd.Timedelta("12h"))
+    mask = np.array([True, False] * 6)
+
+    with pytest.raises(AlignmentViolationError, match="must match"):
+        _slice_by_mask(features, labels, mask)
+
+
+def test_slice_alignment_raw_data_misaligned_same_length_raises():
+    """M2 raw leg: raw_data 同長但 timestamp 錯位不可 positional slice。"""
+    index = pd.date_range("2024-01-01", periods=12, freq="12h", name="timestamp")
+    features = pd.DataFrame({"f1": np.arange(12, dtype=float)}, index=index)
+    sliced_features = features.iloc[::2]
+    raw_data = pd.DataFrame(
+        {"close": np.arange(12, dtype=float)},
+        index=index + pd.Timedelta("12h"),
+    )
+    mask = np.array([True, False] * 6)
+
+    with pytest.raises(AlignmentViolationError, match="must match"):
+        _slice_raw_data_by_mask(raw_data, features, sliced_features, mask)
+
+
 def test_stage3_event_filter_uses_raw_data():
     """事件過濾應使用 kline_reader 的 raw_data。"""
     class _DummyReader:
         def read_klines(self, _symbol, _timeframe):
             values = np.arange(50, dtype=float)
-            return pd.DataFrame({"close": values}, index=pd.Index(values.astype(int)))
+            index = pd.Index(
+                1_704_067_200 + np.arange(50, dtype=np.int64) * 43_200,
+                name="timestamp",
+            )
+            return pd.DataFrame({"close": values}, index=index)
 
     config = load_ic_config()
     config_data = config.model_dump()
@@ -512,7 +865,11 @@ def test_stage3_event_filter_uses_raw_data():
     )
     config = ICConfig.model_validate(config_data)
     orchestrator = ICFilterOrchestrator(load_ic_config())
-    features_df = pd.DataFrame({"f1": np.arange(50, dtype=float)}, index=pd.Index(range(50)))
+    index = pd.DatetimeIndex(
+        pd.to_datetime(1_704_067_200 + np.arange(50, dtype=np.int64) * 43_200, unit="s"),
+        name="timestamp",
+    )
+    features_df = pd.DataFrame({"f1": np.arange(50, dtype=float)}, index=index)
     label = pd.Series(np.arange(50, dtype=float) / 10.0, index=features_df.index)
 
     filtered_features, filtered_label, info = orchestrator._stage3_event_filter(
@@ -520,8 +877,8 @@ def test_stage3_event_filter_uses_raw_data():
     )
 
     assert info["mode"] == "query"
-    assert filtered_features.index.tolist() == list(range(11, 50))
-    assert filtered_label.index.tolist() == list(range(11, 50))
+    assert filtered_features.index.equals(index[11:])
+    assert filtered_label.index.equals(index[11:])
 
 
 def test_stage4_ic_calculation_with_kline_reader():

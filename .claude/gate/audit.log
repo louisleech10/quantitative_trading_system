@@ -9601,3 +9601,110 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-FIX-B1-RESULT.md", "output_sha256": "0f246005bf0a8199c8bd825baf5afc32a0bedeaf7c9b78cacbf699eb74ed83d5", "task_id": "ic1a-align-fix-b1", "ts": "2026-07-08T23:02:38Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260709-ic1a-align-fix-b1.md", "output_sha256": "c6c3f0ce66af3eb700395b7250c76c5b8006885355d6c459275b86be7f2d217f", "task_id": "ic1a-align-fix-b1", "ts": "2026-07-08T23:02:52Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260709-ic1a-align-review-b1.md", "output_sha256": "199dfaa968b2ec81c83bbba050899b9929a7f8b065603404aec999c39d0b9f73", "task_id": "ic1a-align-review-b1", "ts": "2026-07-08T23:02:53Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1A-ALIGN-RECONCILE.md", "output_sha256": "c255e67f754ee319d19a8da161eb3edfadb951aec0dc51a8252e2630cfd626ed", "task_id": "ic1a-align-impl-b2", "ts": "2026-07-08T23:03:34Z"}
+=== 2026-07-09 07:03:35 | dispatch ===
+  ts=2026-07-09 07:03:35
+  kind=dispatch
+  intent=Codex 實作 1-align B2(Task 2.1 Stage2 gate+D-4 寫回/2.2 Stage0 外部 labels/2.3 slice×2/2.4 event_filter 適配)
+  risk=high
+  facts_asked=none-needed: SPEC v3 Frozen,B1 kernel 已閉合落地
+  review_role=Composer 後續 code review;Codex 不自審
+  template=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  adversarial=handoffs/IC1A-ALIGN-RECONCILE.md
+  reconcile=handoffs/IC1A-ALIGN-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  todo=docs/IC_PHASE1_1A_ALIGN_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-b2-golden-rca", "ts": "2026-07-09T00:17:11Z"}
+=== 2026-07-09 08:17:11 | dispatch ===
+  ts=2026-07-09 08:17:11
+  kind=dispatch
+  intent=雙委員查 B2 golden 漂移根因:1e-4 微擾+7 特徵 threshold 翻類,分類=修正已知錯 vs 引入新錯
+  risk=low
+  facts_asked=none-needed: Claude 已排除軸錯位假說(kline==features 20352 列 offset 0),diff 樣本在派工檔
+  review_role=Codex+Composer 各自全面查根因,互為交叉驗證;結論須 bisect 級證據
+  template=n/a: 根因調查委員會派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-B2-GOLDEN-RCA-composer.md", "output_sha256": "8a8d30edb09c506e060682a00796cf0c63c433329cac5091e4f212fc21382e6e", "task_id": "ic1a-align-b2-golden-rca", "ts": "2026-07-09T00:31:41Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-B2-GOLDEN-RCA-codex.md", "output_sha256": "e291bd7256e26da7b4f607dcb220192646a950dd01051fd72cb28553e57f6336", "task_id": "ic1a-align-b2-golden-rca", "ts": "2026-07-09T00:54:21Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-fix-b2", "ts": "2026-07-09T00:54:21Z"}
+=== 2026-07-09 08:54:21 | dispatch ===
+  ts=2026-07-09 08:54:21
+  kind=dispatch
+  intent=Codex 修 stage2 float64 強轉(保留原 dtype),使 golden diff 收斂到純 index 修正最小集,再重凍 baseline
+  risk=low
+  facts_asked=none-needed: 雙 RCA 互證,MIXED 裁定=index 修正保留+dtype 強轉修掉
+  review_role=Composer 複驗:dtype 修後 turnover/grouped 須與 baseline 完全相等,重凍集只含 rolling/summary/stage5
+  template=n/a: fix-round
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-review-b2", "ts": "2026-07-09T01:45:32Z"}
+=== 2026-07-09 09:45:32 | dispatch ===
+  ts=2026-07-09 09:45:32
+  kind=dispatch
+  intent=Composer 對 B2 全量 code review+dtype fix 閉合複驗(重跑 RCA 探針)+ISO timestamp 序列化全棧接線查核
+  risk=low
+  facts_asked=none-needed: MIXED 裁定已執行,golden 重凍 2 passed
+  review_role=Composer adversarial review;Codex 實作不自審
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-REVIEW-B2-composer.md", "output_sha256": "6842d4162f9d3f556f4ec58d17beac2ea30e4231891eac44025e7b69827065dd", "task_id": "ic1a-align-review-b2", "ts": "2026-07-09T01:53:48Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-fix2-b2", "ts": "2026-07-09T01:53:48Z"}
+=== 2026-07-09 09:53:48 | dispatch ===
+  ts=2026-07-09 09:53:48
+  kind=dispatch
+  intent=Codex 補 B2 review 3 BLOCKING(stage0 M4 測試/M5 雙腿/stage0 close dtype 一致)
+  risk=low
+  facts_asked=none-needed
+  review_role=Composer 原提出方複驗閉合
+  template=n/a: fix-round
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-FIX2-B2-RESULT.md", "output_sha256": "3095048f88d2a2651e08760a226a61a7a18360fe3ce9ba5b990bc6c33a366874", "task_id": "ic1a-align-fix2-b2", "ts": "2026-07-09T02:11:08Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1a-align-close-b2", "ts": "2026-07-09T02:11:08Z"}
+=== 2026-07-09 10:11:08 | dispatch ===
+  ts=2026-07-09 10:11:08
+  kind=dispatch
+  intent=Composer 原提出方複驗 B2 fix2 三 BLOCKING 真閉合
+  risk=low
+  facts_asked=none-needed
+  review_role=Composer 重跑自己 finding 反例
+  template=n/a: 閉合複驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-CLOSE-B2-composer.md", "output_sha256": "4e118ddeecc020263e479a02715550117f4ba02c337dd25a37b58f76b969a8b3", "task_id": "ic1a-align-close-b2", "ts": "2026-07-09T02:14:25Z"}

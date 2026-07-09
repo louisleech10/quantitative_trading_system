@@ -17,6 +17,7 @@ from momentum.Analysis.ic_filter_orchestrator import (
 from api.models.ic_models import ICAnalyzeRequest
 from api.services.ic_analysis_service import ICAnalysisService
 from momentum.core.contracts import TimestampDiscontinuityError
+from momentum.core.contracts import AlignmentViolationError
 from tests.momentum.Analysis.test_ic_1a_cut1_split import _write_ic_inputs
 
 
@@ -43,6 +44,13 @@ def _label(features: pd.DataFrame) -> pd.Series:
         features["trend"].shift(-1).fillna(0.0)
         + features["momentum"].shift(-2).fillna(0.0)
     ).rename("label")
+
+
+def _return_label(features: pd.DataFrame, horizon: int = 5) -> pd.Series:
+    values = _label(features).astype("float64").copy()
+    if horizon > 0:
+        values.iloc[-horizon:] = np.nan
+    return values.rename(f"return_{horizon}")
 
 
 def _split_context(features: pd.DataFrame, config: Optional[ICConfig] = None) -> dict:
@@ -321,7 +329,7 @@ def test_holdout_embargo_delays_test_start() -> None:
 
 def test_flag_toggles_path(tmp_path: Path) -> None:
     features = _real_btc_frame()
-    labels = pd.DataFrame({"return_5": _label(features)}, index=features.index)
+    labels = pd.DataFrame({"return_5": _return_label(features)}, index=features.index)
     features_path, labels_path, meta_path = _write_ic_inputs(tmp_path, features, labels)
 
     # 預設已 ON（簽核後），off 分支須顯式關閉
@@ -370,7 +378,7 @@ def test_flag_toggles_path(tmp_path: Path) -> None:
 
 def test_fallback_insufficient_data_marks_applied_false(tmp_path: Path) -> None:
     features = _real_btc_frame(limit=120)
-    labels = pd.DataFrame({"return_5": _label(features)}, index=features.index)
+    labels = pd.DataFrame({"return_5": _return_label(features)}, index=features.index)
     features_path, labels_path, meta_path = _write_ic_inputs(tmp_path, features, labels)
 
     report = ICFilterOrchestrator(ICConfig()).analyze(
@@ -402,10 +410,10 @@ def test_irregular_timestamps_still_fail_closed(tmp_path: Path) -> None:
         },
         index=index,
     )
-    labels = pd.DataFrame({"return_5": _label(features)}, index=features.index)
+    labels = pd.DataFrame({"return_5": _return_label(features)}, index=features.index)
     features_path, labels_path, meta_path = _write_ic_inputs(tmp_path, features, labels)
 
-    with pytest.raises(TimestampDiscontinuityError):
+    with pytest.raises((TimestampDiscontinuityError, AlignmentViolationError)):
         ICFilterOrchestrator(ICConfig()).analyze(
             str(features_path),
             str(labels_path),
@@ -415,7 +423,7 @@ def test_irregular_timestamps_still_fail_closed(tmp_path: Path) -> None:
 
 def test_oos_applied_true_when_sufficient(tmp_path: Path) -> None:
     features = _real_btc_frame(limit=760)
-    labels = pd.DataFrame({"return_5": _label(features)}, index=features.index)
+    labels = pd.DataFrame({"return_5": _return_label(features)}, index=features.index)
     features_path, labels_path, meta_path = _write_ic_inputs(tmp_path, features, labels)
 
     report = ICFilterOrchestrator(ICConfig()).analyze(

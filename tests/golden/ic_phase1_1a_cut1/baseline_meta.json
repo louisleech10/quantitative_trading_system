@@ -9,7 +9,7 @@
     "truncation_mode": "none"
   },
   "baseline_file": "tests/golden/ic_phase1_1a_cut1/baseline_old_btc_1h_a384e6d2.json",
-  "baseline_sha256": "5bd46bd2fdf80c213aa7e60d28f23b04c768ab59b6fa1689416598024bdd3ecc",
+  "baseline_sha256": "963ba4f210f192c3d8c96870f06022b93b254fc04ae949a6dc2e69a555c0e820",
   "config_hash": "a384e6d22ca15fc639757cb3162e7cb3",
   "materialized_inputs": {
     "features_path": "tests/golden/ic_phase1_1a_cut1/inputs/BTCUSDT_1h_a384e6d22ca15fc639757cb3162e7cb3_top50.h5",
@@ -74,6 +74,8 @@
     "A deterministic feature_filter subset is used to avoid local OOM from full 90857 x 20352 materialization.",
     "G1 tests must replay the exact request recorded here before comparing v1 output."
   ],
+  "rebaseline_reason": "1-align B2: 舊 baseline 凍到 rolling IC index-join 0 列的壞行為(RCA: handoffs/IC1A-ALIGN-B2-GOLDEN-RCA-{codex,composer}.md);MIXED 裁定 index 修正保留+float64 強轉修掉後重凍",
+  "rebaselined_at": "2026-07-09",
   "reference_registry": {
     "feature_count": 90857,
     "row_count": 20352,

@@ -29,11 +29,14 @@ from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedRes
 from momentum.core.exceptions import InsufficientDataError, InvalidInputError
 from momentum.core.logging import get_logger
 from momentum.core.contracts import (
+    AlignmentSpec,
+    AlignmentViolationError,
     SplitPlan,
     TimestampDiscontinuityError,
     _coerce_timestamp_array,
     _normalize_symbol_value,
     split_per_symbol,
+    validate_alignment,
     validate_split_pair_integrity,
 )
 from momentum.core.protocols import IKlineReader
@@ -87,6 +90,80 @@ def _resolve_expected_freq(metadata: Optional[dict]) -> pd.Timedelta:
     if timeframe not in EXPECTED_FREQ_BY_TIMEFRAME:
         raise ValueError(f"Unsupported or missing timeframe for IC split: {timeframe!r}")
     return EXPECTED_FREQ_BY_TIMEFRAME[timeframe]
+
+
+def _alignment_freq_from_metadata(metadata: Optional[dict]) -> str:
+    """由 metadata 取得 alignment gate 使用的 pandas freq 字串。"""
+    timeframe = (metadata or {}).get("timeframe")
+    if timeframe not in EXPECTED_FREQ_BY_TIMEFRAME:
+        raise ValueError(f"Unsupported or missing timeframe for alignment: {timeframe!r}")
+    return str(timeframe)
+
+
+def _normalize_ic_time_index(index: pd.Index, role: str) -> pd.DatetimeIndex:
+    """D-1/D-4: DatetimeIndex 或 int64 epoch 秒正規化為 DatetimeIndex。"""
+    if isinstance(index, pd.MultiIndex):
+        raise AlignmentViolationError(f"{role} index must not be MultiIndex")
+    if isinstance(index, pd.RangeIndex):
+        raise AlignmentViolationError(f"{role} index must carry timestamps, not RangeIndex")
+
+    if isinstance(index, pd.DatetimeIndex):
+        ts = pd.DatetimeIndex(index)
+    elif pd.api.types.is_integer_dtype(index.dtype):
+        values = index.to_numpy(dtype=np.int64)
+        if values.size and bool(np.any(np.abs(values) > 1_000_000_000_000)):
+            raise AlignmentViolationError(f"{role} index looks like milliseconds, expected epoch seconds")
+        ts = pd.to_datetime(values, unit="s")
+    else:
+        try:
+            ts = pd.DatetimeIndex(pd.to_datetime(index, errors="raise"))
+        except (TypeError, ValueError) as exc:
+            raise AlignmentViolationError(f"{role} index must be datetime-like or int64 epoch seconds") from exc
+
+    if ts.hasnans:
+        raise AlignmentViolationError(f"{role} index contains NaT")
+    if not ts.is_monotonic_increasing:
+        raise AlignmentViolationError(f"{role} index must be monotonic increasing")
+    if not ts.is_unique:
+        raise AlignmentViolationError(f"{role} index must be unique")
+    return pd.DatetimeIndex(ts, name=index.name)
+
+
+def _normalize_frame_time_index(frame: pd.DataFrame, role: str) -> pd.DatetimeIndex:
+    """取 DataFrame timestamp 欄或 index 作 D-1 時間軸。"""
+    if "timestamp" in frame.columns:
+        return _normalize_ic_time_index(pd.Index(frame["timestamp"], name="timestamp"), role)
+    return _normalize_ic_time_index(frame.index, role)
+
+
+def _numeric_payload_sha256(data: pd.Series | pd.DataFrame) -> str:
+    """值守恆 receipt: index rewrite 前後數值 payload 必須相同。"""
+    values = data.to_numpy(copy=False)
+    return hashlib.sha256(np.ascontiguousarray(values).tobytes()).hexdigest()
+
+
+def _assign_datetime_index_preserving_values(
+    data: pd.Series | pd.DataFrame,
+    index: pd.DatetimeIndex,
+    role: str,
+) -> pd.Series | pd.DataFrame:
+    """D-4 寫回 DatetimeIndex，且驗證只改 index、不改值。"""
+    before = _numeric_payload_sha256(data)
+    updated = data.copy(deep=False)
+    updated.index = pd.DatetimeIndex(index, name=data.index.name)
+    after = _numeric_payload_sha256(updated)
+    if before != after:
+        raise AlignmentViolationError(f"{role} index normalization changed values")
+    return updated
+
+
+def _alignment_spec(metadata: Optional[dict], horizon: int) -> AlignmentSpec:
+    return AlignmentSpec(
+        feature_ts_col="timestamp",
+        target_ts_col="timestamp",
+        lag=int(horizon),
+        freq=_alignment_freq_from_metadata(metadata),
+    )
 
 
 def _resolve_metadata_symbol_allowlist(
@@ -499,9 +576,18 @@ def _slice_by_mask(
     selected_positions = np.flatnonzero(mask_arr)
     sliced_features = features_df.iloc[selected_positions]
     if len(label_series) == len(features_df):
+        feature_index = _normalize_ic_time_index(features_df.index, "features_df")
+        label_index = _normalize_ic_time_index(label_series.index, "label_series")
+        if not feature_index.equals(label_index):
+            raise AlignmentViolationError("label_series index must match features_df before positional slicing")
         sliced_label = label_series.iloc[selected_positions]
     else:
-        sliced_label = label_series.reindex(sliced_features.index)
+        label_index = _normalize_ic_time_index(label_series.index, "label_series")
+        sliced_index = _normalize_ic_time_index(sliced_features.index, "sliced_features")
+        normalized_label = label_series.copy(deep=False)
+        normalized_label.index = label_index
+        sliced_label = normalized_label.reindex(sliced_index)
+        sliced_label.index = sliced_features.index
     return sliced_features, sliced_label
 
 
@@ -519,10 +605,20 @@ def _slice_raw_data_by_mask(
         raise ValueError("split mask length must match features length")
     selected_positions = np.flatnonzero(mask_arr)
     if len(raw_data) == len(features_df):
+        raw_index = _normalize_frame_time_index(raw_data, "raw_data")
+        feature_index = _normalize_ic_time_index(features_df.index, "features_df")
+        if not raw_index.equals(feature_index):
+            raise AlignmentViolationError("raw_data index must match features_df before positional slicing")
         sliced_raw = raw_data.iloc[selected_positions].copy()
         sliced_raw.index = sliced_features.index
         return sliced_raw
-    return raw_data.reindex(sliced_features.index)
+    raw_index = _normalize_frame_time_index(raw_data, "raw_data")
+    sliced_index = _normalize_ic_time_index(sliced_features.index, "sliced_features")
+    normalized_raw = raw_data.copy(deep=False)
+    normalized_raw.index = raw_index
+    sliced_raw = normalized_raw.reindex(sliced_index)
+    sliced_raw.index = sliced_features.index
+    return sliced_raw
 
 
 def _split_fallback_metadata(reason: str, details: dict[str, Any]) -> dict[str, Any]:
@@ -583,7 +679,7 @@ class ICFilterOrchestrator:
 
         self._report_progress(0, "ingestion", 0.02, "loading inputs")
         features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
-            features_path, labels_path, meta_path
+            features_path, labels_path, meta_path, config=config, kline_reader=kline_reader
         )
 
         split_context: Optional[dict] = None
@@ -650,7 +746,7 @@ class ICFilterOrchestrator:
 
         self._report_progress(2, "label_generation", 0.25, "aligning labels")
         label_series, labels_df = self._stage2_label_generation(
-            labels_df, metadata, config, kline_reader
+            labels_df, metadata, config, kline_reader, features_df=features_df
         )
 
         self._report_progress(3, "event_filter", 0.35, "applying event filter")
@@ -1646,6 +1742,8 @@ class ICFilterOrchestrator:
         features_path: str,
         labels_path: str,
         meta_path: Optional[str],
+        config: Optional[ICConfig] = None,
+        kline_reader: Optional[IKlineReader] = None,
     ) -> tuple[pd.DataFrame, Optional[pd.DataFrame], dict, dict]:
         features_df, features_meta = self._load_features_hdf5(features_path)
         labels_df = self._load_labels_hdf5(labels_path)
@@ -1654,14 +1752,55 @@ class ICFilterOrchestrator:
             meta = features_meta
 
         if labels_df is not None and not labels_df.empty:
-            if not labels_df.index.equals(features_df.index):
-                labels_df = labels_df.reindex(features_df.index)
+            active_config = config or self._config
+            feature_index = _normalize_ic_time_index(features_df.index, "features_df")
+            label_index = _normalize_ic_time_index(labels_df.index, "labels_df")
+            normalized_features = features_df.copy(deep=False)
+            normalized_features.index = feature_index
+            normalized_labels = labels_df.copy(deep=False)
+            normalized_labels.index = label_index
+            if not label_index.equals(feature_index):
+                normalized_labels = normalized_labels.reindex(feature_index)
+            label_series = self._select_label_series(normalized_labels, active_config)
+            if label_series.isna().all():
+                raise AlignmentViolationError("selected label is all NaN after feature reindex")
+            horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+            close = None
+            if kline_reader is not None and meta:
+                symbol = meta.get("symbol")
+                timeframe = meta.get("timeframe")
+                if symbol and timeframe:
+                    raw_data = kline_reader.read_klines(symbol, timeframe)
+                    if raw_data is not None and not raw_data.empty and "close" in raw_data.columns:
+                        close_index = _normalize_frame_time_index(raw_data, "raw_data")
+                        close = pd.Series(
+                            raw_data["close"].to_numpy(copy=False),
+                            index=close_index,
+                        )
+            report = validate_alignment(
+                normalized_features,
+                label_series,
+                _alignment_spec(meta, horizon),
+                close=close if active_config.labels.return_type == "log" else None,
+            )
+            features_df = _assign_datetime_index_preserving_values(
+                features_df, feature_index, "features_df"
+            )
+            labels_df = _assign_datetime_index_preserving_values(
+                normalized_labels, feature_index, "labels_df"
+            )
 
         removed_nan = self._validate_input(features_df, labels_df, meta)
         stage0_log = {
             "input_features": int(features_df.shape[1]),
             "removed_nan_features": removed_nan,
         }
+        if labels_df is not None and not labels_df.empty:
+            stage0_log["alignment_report"] = {
+                "gap_count": int(report.gap_count),
+                "gap_rate": float(report.gap_rate),
+                "checked_samples": int(report.checked_samples),
+            }
 
         if removed_nan:
             features_df = features_df.drop(columns=removed_nan)
@@ -1685,6 +1824,7 @@ class ICFilterOrchestrator:
         metadata: dict,
         config: ICConfig,
         kline_reader: Optional[IKlineReader],
+        features_df: Optional[pd.DataFrame] = None,
     ) -> tuple[pd.Series, pd.DataFrame]:
         if labels_df is not None and not labels_df.empty:
             label_series = self._select_label_series(labels_df, config)
@@ -1699,20 +1839,48 @@ class ICFilterOrchestrator:
         if raw_data is None or raw_data.empty or "close" not in raw_data.columns:
             raise InvalidInputError("raw close data is required for label generation")
 
+        close_index = _normalize_frame_time_index(raw_data, "raw_data")
+        close = pd.Series(
+            raw_data["close"].to_numpy(copy=False),
+            index=close_index,
+        )
         labels_cfg = config.labels
-        horizon = config.global_settings.default_horizon
-        if horizon not in labels_cfg.horizons:
-            horizon = labels_cfg.horizons[0]
+        horizon = _resolve_effective_label_horizon(config, None)
 
         label_generator = create_label_generator()
         label_series = label_generator.generate_returns_by_type(
-            raw_data["close"],
+            close,
             horizon,
             labels_cfg.return_type,
         )
         labels_df = pd.DataFrame(
-            {f"return_{horizon}": label_series}, index=raw_data.index
+            {f"return_{horizon}": label_series}, index=close_index
         )
+        if features_df is None:
+            feature_index = close_index
+            features_for_gate = pd.DataFrame(index=feature_index)
+        else:
+            feature_index = _normalize_ic_time_index(features_df.index, "features_df")
+            features_for_gate = features_df.copy(deep=False)
+            features_for_gate.index = feature_index
+
+        labels_for_gate = labels_df.reindex(feature_index)
+        label_series = labels_for_gate[f"return_{horizon}"]
+        validate_alignment(
+            features_for_gate,
+            label_series,
+            _alignment_spec(metadata, horizon),
+            close=close if labels_cfg.return_type == "log" else None,
+        )
+        if features_df is not None:
+            normalized_features = _assign_datetime_index_preserving_values(
+                features_df, feature_index, "features_df"
+            )
+            features_df.index = normalized_features.index
+        labels_df = _assign_datetime_index_preserving_values(
+            labels_for_gate, feature_index, "labels_df"
+        )
+        label_series = labels_df[f"return_{horizon}"]
         return label_series, labels_df
 
     def _stage3_event_filter(
@@ -1730,14 +1898,26 @@ class ICFilterOrchestrator:
         query = event_cfg.query
         timestamps = None
 
-        filter_base = features_df
+        feature_index = _normalize_ic_time_index(features_df.index, "features_df")
+        label_index = _normalize_ic_time_index(label_series.index, "label_series")
+        if not feature_index.equals(label_index):
+            raise AlignmentViolationError("label_series index must match features_df before event filtering")
+
+        normalized_features = features_df.copy(deep=False)
+        normalized_features.index = feature_index
+        normalized_label = label_series.copy(deep=False)
+        normalized_label.index = feature_index
+
+        filter_base = normalized_features
         if kline_reader is not None and metadata:
             symbol = metadata.get("symbol")
             timeframe = metadata.get("timeframe")
             if symbol and timeframe:
                 raw_data = kline_reader.read_klines(symbol, timeframe)
                 if raw_data is not None and not raw_data.empty:
-                    filter_base = raw_data
+                    raw_index = _normalize_frame_time_index(raw_data, "raw_data")
+                    filter_base = raw_data.copy(deep=False)
+                    filter_base.index = raw_index
 
         filtered_df, info = self._event_filter.apply_filter(
             filter_base, query=query, timestamps=timestamps
@@ -1747,8 +1927,13 @@ class ICFilterOrchestrator:
             info["fallback"] = True
             return features_df, label_series, info
 
-        idx = filtered_df.index
-        return features_df.loc[idx], label_series.loc[idx], info
+        filtered_index = _normalize_ic_time_index(filtered_df.index, "filtered_events")
+        selected_index = feature_index.intersection(filtered_index)
+        if selected_index.empty:
+            raise AlignmentViolationError("event filter produced no timestamps overlapping features")
+        filtered_features = normalized_features.loc[selected_index]
+        filtered_label = normalized_label.loc[selected_index]
+        return filtered_features, filtered_label, info
 
     def _apply_feature_filter(
         self,
