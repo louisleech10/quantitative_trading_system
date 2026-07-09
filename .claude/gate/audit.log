@@ -9891,3 +9891,295 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-RESTAMP-V31-composer.md", "output_sha256": "f374bc02b11f70e183c0d40653c281ebe6590c74eb173a421e4960e1f022b131", "task_id": "ic1a-align-restamp-v31-composer", "ts": "2026-07-09T06:00:02Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-RECONCILE.md", "output_sha256": "545e41481038e166a61495a212bfb663912313b198329bde19bcf612176d82eb", "task_id": "ic1a-align-restamp-v31-composer", "ts": "2026-07-09T06:00:02Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-RECON-codex.md", "output_sha256": "307d2d937c4d72b623f7c9841958c58147814a6b1c56213fa7eb2cdeaeec5cdf", "task_id": "ic1eb-recon-codex", "ts": "2026-07-09T06:31:28Z"}
+=== 2026-07-09 15:15:18 | artifact ===
+  ts=2026-07-09 15:15:18
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=大 a,b,d; §A=三方偵察 receipt(IC1EB-RECON-{claude,codex,composer}); §G=行為變更型 selection-diff Golden; §P=kernel→接線→xsec→前後端; §V=M-A~M-H mutation; §R; §N=deep NW/bootstrap 另立
+  spec=
+  todo=
+  manifest=
+=== 2026-07-09 15:17:55 | artifact ===
+  ts=2026-07-09 15:17:55
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0 全域規則; §B 批次策略; Phase 1-5 Task 細目(驗證/邊界/不可做全 Task 齊); 追溯=SPEC Task 1.1-5.1+M-A~M-H+G-1~G-3 全覆蓋
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-RECON-composer.md", "output_sha256": "b65b64d3103717e5aa522665ef71e54bcddfe50ab2228799303e5939a098151b", "task_id": "ic1eb-recon-composer", "ts": "2026-07-09T07:21:37Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-SPECADV-codex.md", "output_sha256": "pending", "task_id": "ic1eb-specadv-codex", "ts": "2026-07-09T07:21:37Z"}
+=== 2026-07-09 15:21:37 | dispatch ===
+  ts=2026-07-09 15:21:37
+  kind=dispatch
+  intent=1e+1b SPEC/TODO 雙家族 adversarial R1(Codex 家族):獵矛盾/空殼/錯誤統計假設,附實核 receipt
+  risk=low
+  facts_asked=D-A kernel 統計正確性;FDR n_tests/scope 設計;α 政策;全棧接線完整性;§A fact vs assumption
+  review_role=codex adversarial-review
+  template=n/a: spec-adversarial
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-SPECADV-composer.md", "output_sha256": "pending", "task_id": "ic1eb-specadv-composer", "ts": "2026-07-09T07:21:37Z"}
+=== 2026-07-09 15:21:37 | dispatch ===
+  ts=2026-07-09 15:21:37
+  kind=dispatch
+  intent=1e+1b SPEC/TODO 雙家族 adversarial R1(Composer 家族):獵矛盾/空殼/錯誤統計假設,附實核 receipt
+  risk=low
+  facts_asked=同 codex 家族但獨立重判前提
+  review_role=composer adversarial-review
+  template=n/a: spec-adversarial
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-SPECADV-composer.md", "output_sha256": "cb704fb9b1ba6d57801b2f7978394128736f9b1741720b5c129e5e60e5698930", "task_id": "ic1eb-specadv-composer", "ts": "2026-07-09T07:27:20Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-SPECADV-codex.md", "output_sha256": "0c3d5ac827521f739cff842614f4a7c1c61b09fa855cba5ee78e97ad2399bbab", "task_id": "ic1eb-specadv-codex", "ts": "2026-07-09T07:37:21Z"}
+=== 2026-07-09 15:37:21 | artifact ===
+  ts=2026-07-09 15:37:21
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=v2:R1 雙家族 4 BLOCKING+12 MAJOR 逐項裁決入 §ADV-RESOLUTION;D-A 寫死 auto_bw/use_t;D-H horizon 先解析;G-1 結構化 hash;α 六格
+  spec=
+  todo=
+  manifest=
+=== 2026-07-09 15:37:21 | artifact ===
+  ts=2026-07-09 15:37:21
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=v2 對應 SPEC v2:Task 1.1/2.2/2.3/2.4/3.1/4.1/4.2/5.1 修訂+§0 禁 git stash
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-SPECADV-R2-codex.md", "output_sha256": "pending", "task_id": "ic1eb-specadv-r2-codex", "ts": "2026-07-09T07:43:19Z"}
+=== 2026-07-09 15:43:19 | dispatch ===
+  ts=2026-07-09 15:43:19
+  kind=dispatch
+  intent=1e+1b SPEC/TODO v2 閉合複驗(Codex 家族):原提出方逐條覆核 R1 findings 是否真閉合
+  risk=low
+  facts_asked=ADV-CODEX-1~9 各自的修法是否落實且可證偽;重跑原反例
+  review_role=codex closure-review
+  template=n/a: adversarial-r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-SPECADV-R2-composer.md", "output_sha256": "pending", "task_id": "ic1eb-specadv-r2-composer", "ts": "2026-07-09T07:43:19Z"}
+=== 2026-07-09 15:43:19 | dispatch ===
+  ts=2026-07-09 15:43:19
+  kind=dispatch
+  intent=1e+1b SPEC/TODO v2 閉合複驗(Composer 家族):原提出方逐條覆核 R1 findings 是否真閉合
+  risk=low
+  facts_asked=ADV-COMPOSER-1~13 各自的修法是否落實且可證偽;重跑原反例
+  review_role=composer closure-review
+  template=n/a: adversarial-r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-SPECADV-R2-codex.md", "output_sha256": "dad1db818547e56fa1e42169da6af5778b3b0300c6fd76b39677deacda857464", "task_id": "ic1eb-specadv-r2-codex", "ts": "2026-07-09T07:46:07Z"}
+=== 2026-07-09 15:46:07 | artifact ===
+  ts=2026-07-09 15:46:07
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=v2.1:修 R2 NEW-CODEX-R2-1——D-G OFF 態表述統一 canonical significance.fdr.enabled=false
+  spec=
+  todo=
+  manifest=
+=== 2026-07-09 15:46:07 | artifact ===
+  ts=2026-07-09 15:46:07
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=v2.1:Task 4.3 threshold_log 命名對齊 canonical
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-SPECADV-R2-composer.md", "output_sha256": "479bfaa0fa6f0f9b6d81450aa103c5433e03256e798363d82f7f0bc1c39759c4", "task_id": "ic1eb-specadv-r2-composer", "ts": "2026-07-09T11:24:10Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-RIGOR-codex.md", "output_sha256": "pending", "task_id": "ic1eb-rigor-codex", "ts": "2026-07-09T11:25:31Z"}
+=== 2026-07-09 19:25:31 | dispatch ===
+  ts=2026-07-09 19:25:31
+  kind=dispatch
+  intent=統計嚴謹度充分性諮詢(Codex):HAC+BH-FDR 於 feature 級 IC 篩選是否夠嚴謹;相依性下 FDR 方法選擇;IC Gatekeeper 其餘統計面盤點
+  risk=low
+  facts_asked=BH 在高相關特徵下的 PRDS 假設;BY/Romano-Wolf 替代;策略層 data-snooping 是否另層;ICIR/monotonicity/decay 推斷缺口
+  review_role=codex rigor-consult
+  template=n/a: rigor-consult
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RIGOR-composer.md", "output_sha256": "pending", "task_id": "ic1eb-rigor-composer", "ts": "2026-07-09T11:25:31Z"}
+=== 2026-07-09 19:25:31 | dispatch ===
+  ts=2026-07-09 19:25:31
+  kind=dispatch
+  intent=統計嚴謹度充分性諮詢(Composer):同 charter 獨立作答
+  risk=low
+  facts_asked=同 codex charter 獨立重判
+  review_role=composer rigor-consult
+  template=n/a: rigor-consult
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-RIGOR-codex.md", "output_sha256": "66dffe24afd34a689f40359368ecb827dbd6e2fbc58db94cfb93a843f472cf4b", "task_id": "ic1eb-rigor-codex", "ts": "2026-07-09T11:28:43Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-RIGOR-composer.md", "output_sha256": "b0930b087eb12c60e910ea1c765389d9820d84bd01dcb43e32937ea30511bbbe", "task_id": "ic1eb-rigor-composer", "ts": "2026-07-09T11:31:06Z"}
+=== 2026-07-09 19:31:06 | artifact ===
+  ts=2026-07-09 19:31:06
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=v2.2:嚴謹度委員會三腿聯集收編——M-B 增相關 null 場景;fdr_assumption_note 披露;§N 增 fdr_by/romano_wolf/描述性指標正名/策略層 snooping epic
+  spec=
+  todo=
+  manifest=
+=== 2026-07-09 19:31:06 | artifact ===
+  ts=2026-07-09 19:31:06
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=v2.2:T-2.2a 相關 null 場景;Task 2.4 assumption note
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "01746ce61dbafcbd667fed458aa76b017a8f614cc3c7daf5d6df510c38753cd9", "task_id": "ic1eb-r3-stamp-codex", "ts": "2026-07-09T11:32:44Z"}
+=== 2026-07-09 19:32:44 | dispatch ===
+  ts=2026-07-09 19:32:44
+  kind=dispatch
+  intent=1e+1b R3 增量確認+reconcile 戳記(Codex):覆核 v2.1 修 NEW-CODEX-R2-1+v2.2 嚴謹度收編,滿意則 append RECONCILE-STAMP
+  risk=low
+  facts_asked=fdr:disabled 第四命名是否消滅;v2.2 delta 是否引入新洞;reconcile 是否忠實
+  review_role=codex r3-stamp
+  template=n/a: stamp-review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-R3-codex.md", "output_sha256": "eb18e6d468717375f4e2b6a18ffe21234463b2ae5eef81b9892509b352ac1041", "task_id": "ic1eb-r3-stamp-codex", "ts": "2026-07-09T11:35:06Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "cfd3ed0f367128e4fcf260177d28ffd945c7a722b2be64a389201a4724599446", "task_id": "ic1eb-r3-stamp-codex", "ts": "2026-07-09T11:35:07Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "cfd3ed0f367128e4fcf260177d28ffd945c7a722b2be64a389201a4724599446", "task_id": "ic1eb-stamp-composer", "ts": "2026-07-09T11:35:07Z"}
+=== 2026-07-09 19:35:07 | dispatch ===
+  ts=2026-07-09 19:35:07
+  kind=dispatch
+  intent=1e+1b reconcile 戳記(Composer):審 reconcile 忠實性+v2.1/v2.2 delta 後 append RECONCILE-STAMP
+  risk=low
+  facts_asked=reconcile 是否忠實反映 R1/R2/嚴謹度過程;v2.2 delta 是否與你的 R2 APPROVE+RIGOR 結論一致
+  review_role=composer stamp-review
+  template=n/a: stamp-review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-STAMP-composer.md", "output_sha256": "612800e50d8c22f16bb73dc52cf8732b3af5d310376d3dcfd7c5203131660c11", "task_id": "ic1eb-stamp-composer", "ts": "2026-07-09T11:37:41Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "dc3427019535a96ae04e05cdb4b999d1e830c3a20a98de2fdbc57ebc0766c3a4", "task_id": "ic1eb-stamp-composer", "ts": "2026-07-09T11:37:41Z"}
+=== 2026-07-09 19:37:55 | artifact ===
+  ts=2026-07-09 19:37:55
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=標頭改 Frozen(雙 RECONCILE-STAMP 機檢 PASS sha256:b77932d8)
+  spec=
+  todo=
+  manifest=
