@@ -3,6 +3,7 @@
 > **Frozen**:R1-R3 雙家族 adversarial 全閉合;雙 RECONCILE-STAMP 機檢 PASS(handoffs/IC1A-ALIGN-RECONCILE.md sha256:d68783b6…)。實作期間改本檔須重開 reconcile。
 
 > v3 2026-07-08:修 R2 Composer STILL-OPEN(ADV-COMPOSER-1A:Task 2.4 跨 dtype 交集恆空)+ NEW-ISSUE MAJOR(index 同型化)→新增 **D-4**;Codex R2 已 APPROVE v2(v3 增量送雙方 R3 確認)。
+> v3.1 2026-07-09:B-1 缺口補齊文檔化(省步版使用者核可,程式碼 24f36d7 已落地+Codex 增量審查 handoffs/IC1A-ALIGN-B1GAP-REVIEW-codex.md)——Task 1.1 增補 **return_kind 語義**(見 §P Task 1.1 D-5);不動 §G/§V/§C 任何既有裁決;改後重跑 reconcile 戳記。
 
 > 來源:三方委員會偵察 `handoffs/IC1A-CUTS-ORDER-codex.md`+`IC1A-CUTS-ORDER-composer.md`+`IC1A-REMAINING-CUTS-ORDER-claude.md`(task-id IC1A-CUTS-ORDER)+ Claude 抽驗　|　v2 2026-07-08:修雙家族 adversarial 全部 BLOCKING(`handoffs/IC1A-ALIGN-SPECADV-{codex,composer}.md`,雙 REJECT→本版逐項回應,見 §ADV-RESOLUTION)　|　對應 TODO:docs/IC_PHASE1_1A_ALIGN_TODO.md
 
@@ -72,6 +73,7 @@ RISK-HIT: a,b,d
 
 ### Phase 1 — kernel + horizon resolver(依賴:無)
 **Task 1.1 — `validate_alignment` 落地**:Tier-1(型別 D-1/單調唯一/cadence D-3/尾端結構 NaN==lag/覆蓋率);Tier-2(close 給定時,bar-ordinal 抽樣 oracle D-2,抽樣強制含頭 2+尾 2+變異敏感區+隨機,有效樣本<8→raise)。例外 `AlignmentViolationError`(命名對照 contracts 既有家族定案)。
+- **D-5 return_kind 語義(v3.1,B-1 補齊,程式碼 24f36d7)**:Tier-2 oracle 由 `return_kind` 參數化,支援集=`ORACLE_RETURN_KINDS`(contracts.py 公開 frozenset,現=`{log, simple}`;`log=ln(close[i+lag]/close[i])`、`simple=close[i+lag]/close[i]-1`,皆 bar-ordinal D-2)。此常數=caller 判斷「此 return_type 可否傳 close 啟用 Tier-2」的**單一真相源**,caller 禁自建支援清單。`excess`/`risk_adjusted`/`winsorized` 等視窗/基準轉換型**無逐點封閉式**→只走 Tier-1,caller 不得對其傳 close;傳 close 且 return_kind 不在支援集→`AlignmentViolationError`(fail-closed,不靜默跳過 Tier-2)。oracle 測試面:tests/momentum/core/test_alignment_contract.py(log/simple 對稱 19 tests+M1 轉紅雙型皆驗)。
 **Task 1.2 — 共用 horizon resolver(COMPOSER-4,修既存 lookahead 面)**:抽 `_resolve_label_horizon_from_column(name)`(regex 對齊 `_resolve_cross_sectional_label_horizon` 的 `return_(\d+)`;`label_return_{n}d` 等含單位名→單位換算為 bar 數或 raise);`_resolve_effective_label_horizon` 改真解析(labels_df 欄名優先,fallback default 須 log warning+metadata 標記);縱向 `purge_gap` 與 gate `spec.lag` 同源。mutation:`return_5`+`default_horizon=1`→purge 斷言 FAIL 轉紅。
 
 ### Phase 2 — 縱向主路徑接線(依賴:P1)

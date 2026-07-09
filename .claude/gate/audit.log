@@ -9803,3 +9803,91 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-B1GAP-REVIEW-codex.md", "output_sha256": "6e5c10cd4166801d4d76cc82c6044afbe9422b852d0d7d425c371ec5f4be2eab", "task_id": "ic1a-align-b1gap-review", "ts": "2026-07-09T05:29:49Z"}
+=== 2026-07-09 13:50:18 | artifact ===
+  ts=2026-07-09 13:50:18
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1A_ALIGN_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=v3.1 增補:Task 1.1 return_kind 語義(B-1 省步版文檔債,程式碼已落地 24f36d7+Codex 增量審查);§G/§V 不變;改後重跑 reconcile 戳記
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1A-ALIGN-RECONCILE.md", "output_sha256": "a5e972ba56548f865f40561e3dcab1d2c2637c96fa3b743f97e10d9f930bf433", "task_id": "ic1a-align-restamp-v31-codex", "ts": "2026-07-09T05:52:57Z"}
+=== 2026-07-09 13:52:58 | dispatch ===
+  ts=2026-07-09 13:52:58
+  kind=dispatch
+  intent=1-align reconcile v3.1 增補重戳:Codex 審 SPEC D-5 return_kind 增補忠實性後 append RECONCILE-STAMP
+  risk=low
+  facts_asked=SPEC v3.1 diff 是否忠實描述 24f36d7 已落地行為;是否未偷改既有裁決;與 B1GAP 審查結論是否一致
+  review_role=codex stamp-review
+  template=n/a: stamp-review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECON-composer.md", "output_sha256": "pending", "task_id": "ic1eb-recon-composer", "ts": "2026-07-09T05:53:00Z"}
+=== 2026-07-09 13:53:00 | dispatch ===
+  ts=2026-07-09 13:53:00
+  kind=dispatch
+  intent=1e HAC + 1b FDR 合刀偵察:Composer 獨立讀碼盤點 p-value 生產→消費鏈與接線面,附 receipt
+  risk=low
+  facts_asked=rolling IC 結構與自相關現實;compute_ic_statistics/_apply_thresholds 全 caller map;SelectionScope 契約現況;FDR 幽靈開關前後端;statsmodels/bootstrap 可用面;effective_horizon resolver 複用點;deep 路徑 newey_west 硬編面
+  review_role=composer recon-consult
+  template=n/a: recon-consult
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-RESTAMP-V31-codex.md", "output_sha256": "1bd1828d893aef198653cf87e5e25ef067cfc4b11d9e0c57270eb73a816b2de7", "task_id": "ic1a-align-restamp-v31-codex", "ts": "2026-07-09T05:55:47Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-RECONCILE.md", "output_sha256": "886d5d79063135b87f8f04911ce63bc20e7ed65e2292aca620b13039d8000b34", "task_id": "ic1a-align-restamp-v31-codex", "ts": "2026-07-09T05:55:47Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1A-ALIGN-RECONCILE.md", "output_sha256": "886d5d79063135b87f8f04911ce63bc20e7ed65e2292aca620b13039d8000b34", "task_id": "ic1a-align-restamp-v31-composer", "ts": "2026-07-09T05:56:00Z"}
+=== 2026-07-09 13:56:00 | dispatch ===
+  ts=2026-07-09 13:56:00
+  kind=dispatch
+  intent=1-align reconcile v3.1 增補重戳:Composer 審 SPEC D-5 return_kind 增補忠實性後 append RECONCILE-STAMP
+  risk=low
+  facts_asked=SPEC v3.1 diff 是否忠實描述 24f36d7 已落地行為;是否未偷改既有裁決;與 B1GAP 審查結論是否一致
+  review_role=composer stamp-review
+  template=n/a: stamp-review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-RECON-codex.md", "output_sha256": "pending", "task_id": "ic1eb-recon-codex", "ts": "2026-07-09T05:56:00Z"}
+=== 2026-07-09 13:56:00 | dispatch ===
+  ts=2026-07-09 13:56:00
+  kind=dispatch
+  intent=1e HAC + 1b FDR 合刀偵察:Codex 獨立讀碼盤點 p-value 生產→消費鏈與接線面,附 receipt
+  risk=low
+  facts_asked=rolling IC 結構與自相關現實;compute_ic_statistics/_apply_thresholds 全 caller map;SelectionScope 契約現況;FDR 幽靈開關前後端;statsmodels/bootstrap 可用面;effective_horizon resolver 複用點;deep 路徑 newey_west 硬編面
+  review_role=codex recon-consult
+  template=n/a: recon-consult
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-RESTAMP-V31-composer.md", "output_sha256": "f374bc02b11f70e183c0d40653c281ebe6590c74eb173a421e4960e1f022b131", "task_id": "ic1a-align-restamp-v31-composer", "ts": "2026-07-09T06:00:02Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1A-ALIGN-RECONCILE.md", "output_sha256": "545e41481038e166a61495a212bfb663912313b198329bde19bcf612176d82eb", "task_id": "ic1a-align-restamp-v31-composer", "ts": "2026-07-09T06:00:02Z"}
