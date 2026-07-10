@@ -10330,3 +10330,139 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-BASELINE-REVIEW-codex.md", "output_sha256": "pending", "task_id": "IC1EB-BASEREV-codex", "ts": "2026-07-10T07:13:27Z"}
+=== 2026-07-10 15:13:27 | dispatch ===
+  ts=2026-07-10 15:13:27
+  kind=dispatch
+  intent=IC1EB baseline capture 設計委員審查(codex):覆蓋足夠性/可重放性/五hash 能否支撐 B5 G-1/G-2
+  risk=low
+  facts_asked=使用者已裁決:維持9顆縱向矩陣+本session主導+Grok入委員會審查腿(2026-07-10);baseline規模/500截斷=編排端裁量待審
+  review_role=三家全面看各自獨立審;codex 同時負責挑戰編排端前提(§G覆蓋是否有第二個xsec型盲點)
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-BASELINE-REVIEW-composer.md", "output_sha256": "pending", "task_id": "IC1EB-BASEREV-composer", "ts": "2026-07-10T07:13:28Z"}
+=== 2026-07-10 15:13:28 | dispatch ===
+  ts=2026-07-10 15:13:28
+  kind=dispatch
+  intent=IC1EB baseline capture 設計委員審查(composer):覆蓋足夠性/可重放性/五hash 能否支撐 B5 G-1/G-2
+  risk=low
+  facts_asked=使用者已裁決:維持9顆縱向矩陣+本session主導+Grok入委員會審查腿(2026-07-10);baseline規模/500截斷=編排端裁量待審
+  review_role=三家全面看各自獨立審;composer 同時負責挑戰編排端前提(§G覆蓋是否有第二個xsec型盲點)
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-BASELINE-REVIEW-grok.md", "output_sha256": "pending", "task_id": "IC1EB-BASEREV-grok", "ts": "2026-07-10T07:13:28Z"}
+=== 2026-07-10 15:13:28 | dispatch ===
+  ts=2026-07-10 15:13:28
+  kind=dispatch
+  intent=IC1EB baseline capture 設計委員審查(grok):覆蓋足夠性/可重放性/五hash 能否支撐 B5 G-1/G-2
+  risk=low
+  facts_asked=使用者已裁決:維持9顆縱向矩陣+本session主導+Grok入委員會審查腿(2026-07-10);baseline規模/500截斷=編排端裁量待審
+  review_role=三家全面看各自獨立審;grok 同時負責挑戰編排端前提(§G覆蓋是否有第二個xsec型盲點)
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-BASELINE-REVERIFY-codex.md", "output_sha256": "pending", "task_id": "IC1EB-BASEREV2-codex", "ts": "2026-07-10T11:17:22Z"}
+=== 2026-07-10 19:17:22 | dispatch ===
+  ts=2026-07-10 19:17:22
+  kind=dispatch
+  intent=IC1EB baseline v2 複驗(codex):對已發布 handoffs/ic1eb_baseline/ 複驗自家 BLOCKING findings 是否真關閉
+  risk=low
+  facts_asked=v2 已依 IC1EB-BASELINE-RECONCILE.md F1-F17 重寫重跑;13腿發布完成;data_cache 指紋零變化;使用者裁決維持9縱向+吸收xsec架構
+  review_role=codex 複驗自己 R1 提出的 BLOCKING/MAJOR findings(原反例重打),兼查 reconcile 裁決是否有走樣
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-BASELINE-REVERIFY-composer.md", "output_sha256": "pending", "task_id": "IC1EB-BASEREV2-composer", "ts": "2026-07-10T11:17:22Z"}
+=== 2026-07-10 19:17:22 | dispatch ===
+  ts=2026-07-10 19:17:22
+  kind=dispatch
+  intent=IC1EB baseline v2 複驗(composer):對已發布 handoffs/ic1eb_baseline/ 複驗自家 BLOCKING findings 是否真關閉
+  risk=low
+  facts_asked=v2 已依 IC1EB-BASELINE-RECONCILE.md F1-F17 重寫重跑;13腿發布完成;data_cache 指紋零變化;使用者裁決維持9縱向+吸收xsec架構
+  review_role=composer 複驗自己 R1 提出的 BLOCKING/MAJOR findings(原反例重打),兼查 reconcile 裁決是否有走樣
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-BASELINE-REVERIFY-grok.md", "output_sha256": "pending", "task_id": "IC1EB-BASEREV2-grok", "ts": "2026-07-10T11:17:22Z"}
+=== 2026-07-10 19:17:22 | dispatch ===
+  ts=2026-07-10 19:17:22
+  kind=dispatch
+  intent=IC1EB baseline v2 複驗(grok):對已發布 handoffs/ic1eb_baseline/ 複驗自家 BLOCKING findings 是否真關閉
+  risk=low
+  facts_asked=v2 已依 IC1EB-BASELINE-RECONCILE.md F1-F17 重寫重跑;13腿發布完成;data_cache 指紋零變化;使用者裁決維持9縱向+吸收xsec架構
+  review_role=grok 複驗自己 R1 提出的 BLOCKING/MAJOR findings(原反例重打),兼查 reconcile 裁決是否有走樣
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-BASELINE-REVERIFY-R3-codex.md", "output_sha256": "pending", "task_id": "IC1EB-BASEREV3-codex", "ts": "2026-07-10T13:07:53Z"}
+=== 2026-07-10 21:07:53 | dispatch ===
+  ts=2026-07-10 21:07:53
+  kind=dispatch
+  intent=IC1EB baseline v3 複驗 R3(codex):對 v3 產物複驗 R2 八條 STILL-OPEN 是否真關閉
+  risk=low
+  facts_asked=v3 依 RECONCILE R2 節裁決重寫重跑;14腿發布;content-hash 指紋零變化;q95 顆實測 tier=low_confidence/n=85/α=0.1;F14b 裁決文字已修正(結構性不可能,receipt=真相)
+  review_role=codex 複驗自己 R2 的八條 STILL-OPEN(原反例重打);F14b 若不同意裁決請給碼證反駁
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-BASELINE-REVERIFY-R4-codex.md", "output_sha256": "pending", "task_id": "IC1EB-BASEREV4-codex", "ts": "2026-07-10T13:53:19Z"}
+=== 2026-07-10 21:53:19 | dispatch ===
+  ts=2026-07-10 21:53:19
+  kind=dispatch
+  intent=IC1EB baseline v4 複驗 R4(codex):複驗 R3 兩條 STILL-OPEN(F10b/F4c)
+  risk=low
+  facts_asked=v4 修復:manifest.subsets 十組(含xsec)全載 selected_names+sha+family_distribution;summary_row_keysets_sha256 逐列 keyset 入 hash+G1 逐列缺欄即 raise;14腿重跑發布;content指紋零變化
+  review_role=codex 以 R3 原反例重打 F10b/F4c;順手確認前六條未回歸
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
