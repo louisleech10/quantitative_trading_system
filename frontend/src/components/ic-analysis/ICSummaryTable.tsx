@@ -32,7 +32,15 @@ interface ICSummaryTableProps {
   taskId?: string | null;
 }
 
-type SortField = 'rank' | 'ic_mean' | 'icir' | 'ic_hit_rate' | 't_stat' | 'p_value' | 'monotonicity_score';
+type SortField =
+  | 'rank'
+  | 'ic_mean'
+  | 'icir'
+  | 'ic_hit_rate'
+  | 't_stat'
+  | 'p_value'
+  | 'p_value_adj'
+  | 'monotonicity_score';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -40,6 +48,14 @@ const AUTO_SUGGEST_LIMIT = 12;
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** 共用 finite formatter：非有限 → '--'（CODEX-6；禁前端統計推導） */
+function formatFinite(value: unknown, digits: number): string {
+  if (isFiniteNumber(value)) {
+    return value.toFixed(digits);
+  }
+  return '--';
 }
 
 export default function ICSummaryTable({
@@ -72,79 +88,10 @@ export default function ICSummaryTable({
     [watchlistEntries]
   );
 
-  const resolveTStat = useCallback((item: ICFeatureInfo): number | null => {
-    if (typeof item.t_stat === 'number' && Number.isFinite(item.t_stat)) {
-      return item.t_stat;
-    }
-
-    if (!isCrossSectional || crossSectionalSampleSize < 2) {
-      return null;
-    }
-
-    const icMean = item.ic_mean;
-    const icir = item.icir;
-    if (!Number.isFinite(icMean) || !Number.isFinite(icir) || icir === 0) {
-      return null;
-    }
-
-    const icStd = Math.abs(icMean / icir);
-    if (!Number.isFinite(icStd) || icStd <= 0) {
-      return null;
-    }
-
-    return icMean / (icStd / Math.sqrt(crossSectionalSampleSize));
-  }, [isCrossSectional, crossSectionalSampleSize]);
-
-  const resolveICStd = useCallback((item: ICFeatureInfo): number | null => {
-    if (typeof item.ic_std === 'number' && Number.isFinite(item.ic_std) && item.ic_std > 0) {
-      return item.ic_std;
-    }
-
-    const icMean = item.ic_mean;
-    const icir = item.icir;
-    if (!Number.isFinite(icMean) || !Number.isFinite(icir) || icir === 0) {
-      return null;
-    }
-
-    const derivedStd = Math.abs(icMean / icir);
-    if (!Number.isFinite(derivedStd) || derivedStd <= 0) {
-      return null;
-    }
-    return derivedStd;
-  }, []);
-
-  const resolveConfidenceInterval = useCallback((item: ICFeatureInfo): { lower: number; upper: number } | null => {
-    if (!isCrossSectional || crossSectionalSampleSize < 2) {
-      return null;
-    }
-
-    const icMean = item.ic_mean;
-    const icStd = resolveICStd(item);
-    if (!Number.isFinite(icMean) || icStd === null || icStd <= 0) {
-      return null;
-    }
-
-    const standardError = icStd / Math.sqrt(crossSectionalSampleSize);
-    if (!Number.isFinite(standardError) || standardError <= 0) {
-      return null;
-    }
-
-    const margin = 1.96 * standardError;
-    return {
-      lower: icMean - margin,
-      upper: icMean + margin,
-    };
-  }, [crossSectionalSampleSize, isCrossSectional, resolveICStd]);
-
   const getSortValue = useCallback((item: ICFeatureInfo, field: SortField): number => {
-    if (field === 't_stat') {
-      const value = resolveTStat(item);
-      return value ?? Number.NEGATIVE_INFINITY;
-    }
-
     const value = item[field as keyof ICFeatureInfo];
-    return typeof value === 'number' && Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
-  }, [resolveTStat]);
+    return isFiniteNumber(value) ? value : Number.NEGATIVE_INFINITY;
+  }, []);
 
   const sortedData = useMemo(() => {
     const cloned = [...data];
@@ -322,6 +269,9 @@ export default function ICSummaryTable({
     setWatchlistInfo(`Auto-Suggest 已更新 ${updatedCount} 個候選因子`);
   };
 
+  // silence unused prop lint (仍由 caller 傳入以保持 API 相容)
+  void crossSectionalSampleSize;
+
   return (
     <Card>
       <CardHeader>
@@ -365,7 +315,7 @@ export default function ICSummaryTable({
                   )}
                   <TableHead className="w-[70px]">排名</TableHead>
                   <TableHead>特徵</TableHead>
-                  <TableHead className="w-[120px]">
+                  <TableHead className="w-[120px]" title="描述性 rolling 均值,非檢定量">
                     <SortButton field="ic_mean" label="IC Mean" />
                   </TableHead>
                   <TableHead className="w-[120px]">
@@ -379,12 +329,24 @@ export default function ICSummaryTable({
                       <TableHead className="w-[120px]">
                         <SortButton field="t_stat" label="t-stat" />
                       </TableHead>
+                      <TableHead className="w-[120px]">
+                        <SortButton field="p_value" label="P-Value" />
+                      </TableHead>
                       <TableHead className="w-[180px]">CI 95%</TableHead>
+                      <TableHead className="w-[120px]">
+                        <SortButton field="p_value_adj" label="q" />
+                      </TableHead>
                     </>
                   ) : (
                     <>
                       <TableHead className="w-[120px]">
+                        <SortButton field="t_stat" label="t-stat" />
+                      </TableHead>
+                      <TableHead className="w-[120px]">
                         <SortButton field="p_value" label="P-Value" />
+                      </TableHead>
+                      <TableHead className="w-[120px]">
+                        <SortButton field="p_value_adj" label="q" />
                       </TableHead>
                       <TableHead className="w-[140px]">
                         <SortButton field="monotonicity_score" label="單調性" />
@@ -397,8 +359,6 @@ export default function ICSummaryTable({
               <TableBody>
                 {sortedData.map((item, index) => {
                   const isSelected = item.feature_name === selectedFeature;
-                  const tStat = resolveTStat(item);
-                  const confidenceInterval = resolveConfidenceInterval(item);
                   return (
                     <TableRow
                       key={`${item.feature_name}-${index}`}
@@ -417,33 +377,49 @@ export default function ICSummaryTable({
                       <TableCell className="font-medium text-slate-100">
                         {item.feature_name}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-slate-200">
-                        {item.ic_mean?.toFixed(4)}
+                      <TableCell
+                        className="font-mono text-xs text-slate-200"
+                        title="描述性 rolling 均值,非檢定量"
+                      >
+                        {formatFinite(item.ic_mean, 4)}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-emerald-300">
-                        {item.icir?.toFixed(3)}
+                        {formatFinite(item.icir, 3)}
                       </TableCell>
                       {isCrossSectional ? (
                         <>
                           <TableCell className="font-mono text-xs text-slate-300">
-                            {typeof item.ic_hit_rate === 'number' ? `${(item.ic_hit_rate * 100).toFixed(1)}%` : '--'}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-slate-300">
-                            {typeof tStat === 'number' && Number.isFinite(tStat) ? tStat.toFixed(3) : '--'}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-slate-300">
-                            {confidenceInterval
-                              ? `[${confidenceInterval.lower.toFixed(4)}, ${confidenceInterval.upper.toFixed(4)}]`
+                            {isFiniteNumber(item.ic_hit_rate)
+                              ? `${(item.ic_hit_rate * 100).toFixed(1)}%`
                               : '--'}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-300">
+                            {formatFinite(item.t_stat, 3)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-300">
+                            {formatFinite(item.p_value, 4)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-300">
+                            {/* 無後端 CI 欄 → 誠實 '--'；禁前端 SE 推導 */}
+                            {'--'}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-300">
+                            {formatFinite(item.p_value_adj, 4)}
                           </TableCell>
                         </>
                       ) : (
                         <>
                           <TableCell className="font-mono text-xs text-slate-300">
-                            {item.p_value?.toFixed(4)}
+                            {formatFinite(item.t_stat, 3)}
                           </TableCell>
                           <TableCell className="font-mono text-xs text-slate-300">
-                            {item.monotonicity_score?.toFixed(2) ?? '--'}
+                            {formatFinite(item.p_value, 4)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-300">
+                            {formatFinite(item.p_value_adj, 4)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-300">
+                            {formatFinite(item.monotonicity_score, 2)}
                           </TableCell>
                         </>
                       )}
@@ -492,7 +468,7 @@ export default function ICSummaryTable({
 
             {watchlistFeature && (
               <div className="text-xs text-slate-400">
-                IC: {watchlistFeature.ic_mean.toFixed(4)} | ICIR: {watchlistFeature.icir.toFixed(3)}
+                IC: {formatFinite(watchlistFeature.ic_mean, 4)} | ICIR: {formatFinite(watchlistFeature.icir, 3)}
               </div>
             )}
           </div>

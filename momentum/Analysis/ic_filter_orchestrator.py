@@ -79,13 +79,42 @@ LOCKED_STAGE_KEYS: set[str] = {
     "ai_summary",
 }
 
-STAGE_OVERRIDE_PATHS: dict[str, tuple[str, str]] = {
+# path 可為二層或更深嵌套；fdr_correction 為 UI 邊界唯一轉名點 → significance.fdr.enabled
+STAGE_OVERRIDE_PATHS: dict[str, tuple[str, ...]] = {
     "event_filtering": ("event_filter", "enabled"),
     "ic_decay": ("report", "include_decay_analysis"),
     "grouped_ic": ("report", "include_regime_analysis"),
     "turnover_analysis": ("turnover", "enabled"),
     "ai_summary": ("report", "ai_summary"),
+    "fdr_correction": ("significance", "fdr", "enabled"),
 }
+
+
+def _set_nested_bool(data: dict, path: tuple[str, ...], value: bool) -> None:
+    """沿 path 設定巢狀 bool；中途缺節或非 dict 則靜默跳過（保既有未知 key 行為）。"""
+    if not path:
+        return
+    cursor: Any = data
+    for part in path[:-1]:
+        if not isinstance(cursor, dict):
+            return
+        child = cursor.get(part)
+        if not isinstance(child, dict):
+            return
+        cursor = child
+    if isinstance(cursor, dict):
+        cursor[path[-1]] = bool(value)
+
+
+def _config_significance_maxlags(config: ICConfig) -> Optional[int]:
+    """自 schema 讀 significance.maxlags（None=自動頻寬）。"""
+    sig = getattr(config, "significance", None)
+    if sig is None:
+        return None
+    raw = sig.get("maxlags") if isinstance(sig, dict) else getattr(sig, "maxlags", None)
+    if raw is None:
+        return None
+    return int(raw)
 
 EXPECTED_FREQ_BY_TIMEFRAME: dict[str, pd.Timedelta] = {
     "1h": pd.Timedelta("1h"),
@@ -402,7 +431,12 @@ def _select_inframe_return_n_column(columns: Any) -> Optional[str]:
     return matches[0][1]
 
 
-def _compute_hac_on_ic_series(values: np.ndarray, horizon: int) -> dict:
+def _compute_hac_on_ic_series(
+    values: np.ndarray,
+    horizon: int,
+    *,
+    maxlags: Optional[int] = None,
+) -> dict:
     """對 xsec 逐期 IC 序列做 NW HAC（z=IC 本身；L/cap/p 同 D-A）。
 
     Returns:
@@ -418,8 +452,17 @@ def _compute_hac_on_ic_series(values: np.ndarray, horizon: int) -> dict:
         return _hac_nan_result(n_obs=n_valid, maxlags=np.nan)
 
     min_lag_floor = horizon - 1
-    auto_bw = int(4 * (n_valid / 100.0) ** (2.0 / 9.0))
-    L = max(auto_bw, min_lag_floor)
+    if maxlags is not None:
+        maxlags_int = int(maxlags)
+        if maxlags_int < min_lag_floor:
+            raise ValueError(
+                f"maxlags={maxlags_int} < horizon-1={min_lag_floor}; "
+                "explicit maxlags must be >= horizon-1"
+            )
+        L = maxlags_int
+    else:
+        auto_bw = int(4 * (n_valid / 100.0) ** (2.0 / 9.0))
+        L = max(auto_bw, min_lag_floor)
     if L >= n_valid - 1 or n_valid < max(8, 2 * L):
         return _hac_nan_result(n_obs=n_valid, maxlags=L)
 
@@ -1179,7 +1222,11 @@ class ICFilterOrchestrator:
                 p_value = float("nan")
                 maxlags_by_feature[feature_name] = np.nan
             else:
-                hac = _compute_hac_on_ic_series(values, sig_horizon)
+                hac = _compute_hac_on_ic_series(
+                    values,
+                    sig_horizon,
+                    maxlags=_config_significance_maxlags(config),
+                )
                 t_stat = float(hac["t_stat"]) if hac.get("t_stat") is not None else float("nan")
                 p_value = float(hac["p_value"]) if hac.get("p_value") is not None else float("nan")
                 maxlags_by_feature[feature_name] = hac.get("maxlags", np.nan)
@@ -1213,8 +1260,11 @@ class ICFilterOrchestrator:
                 p_values_map[name] = float("nan")
         # 同 stage5：一律算 BH q 填 p_value_adj；enabled 旗標僅披露（xsec 無 p 閘）
         fdr_enabled = self._resolve_fdr_enabled(config)
+        fdr_method = self._resolve_fdr_method(config)
         alpha_for_fdr = float(config.thresholds.p_value_max)
-        q_values, n_tests = apply_fdr(p_values_map, alpha_for_fdr)
+        q_values, n_tests = apply_fdr(
+            p_values_map, alpha_for_fdr, method=fdr_method
+        )
         for item in summary_table:
             name = str(item["feature_name"])
             q = q_values.get(name, float("nan"))
@@ -1268,8 +1318,10 @@ class ICFilterOrchestrator:
             "horizon_source_name": horizon_source_name,
             "significance": {
                 "fdr": {
+                    # D-G：method 恆 canonical；OFF 唯一表述=enabled=false
                     "enabled": bool(fdr_enabled),
-                    "method": "fdr_bh" if fdr_enabled else "none",
+                    "method": fdr_method,
+                    "alpha_effective": float(alpha_for_fdr),
                 },
                 "maxlags": maxlags_meta,
                 "n_tests": int(n_tests),
@@ -2447,13 +2499,17 @@ class ICFilterOrchestrator:
             horizon = int(_resolve_effective_label_horizon(config, None))
 
         ic_stats = compute_hac_ic_statistics(
-            features_for_stats, label_for_stats, horizon=horizon
+            features_for_stats,
+            label_for_stats,
+            horizon=horizon,
+            maxlags=_config_significance_maxlags(config),
         )
 
         alpha_effective, alpha_source, selection_mode = self._resolve_alpha_policy(
             config, event_info
         )
         fdr_enabled = self._resolve_fdr_enabled(config)
+        fdr_method = self._resolve_fdr_method(config)
 
         # 全 evaluated 集合（stage5 進場全欄）先算 BH q，先於任何門檻（D-C）
         universe_features = [str(c) for c in features_for_stats.columns]
@@ -2465,7 +2521,9 @@ class ICFilterOrchestrator:
             except (TypeError, ValueError):
                 p_values[feature] = float("nan")
 
-        q_values, n_tests = apply_fdr(p_values, alpha_effective)
+        q_values, n_tests = apply_fdr(
+            p_values, alpha_effective, method=fdr_method
+        )
         for feature, q in q_values.items():
             item = dict(ic_stats.get(feature) or {})
             item.setdefault("p_value", p_values.get(feature, np.nan))
@@ -2488,13 +2546,14 @@ class ICFilterOrchestrator:
         symbol = self._resolve_scope_symbol(split_context, metadata)
         config_hash = self._hash_config(config)
         scope_id = f"{config_hash}:{split_label}"
+        # D-G：method 恆=canonical fdr method；OFF 唯一表述=enabled=false
         selection_scope = SelectionScope(
             scope_id=scope_id,
             universe_features=universe_features,
             split_label=split_label,  # type: ignore[arg-type]
             evaluated_features=evaluated_features,
             n_tests=n_tests,
-            method="fdr_bh" if fdr_enabled else "none",
+            method=fdr_method,
             base_universe_hash=_base_universe_hash(features_for_stats.index, symbol),
         )
 
@@ -2512,7 +2571,7 @@ class ICFilterOrchestrator:
         significance_meta = {
             "fdr": {
                 "enabled": bool(fdr_enabled),
-                "method": "fdr_bh" if fdr_enabled else "none",
+                "method": fdr_method,
                 "alpha_effective": float(alpha_effective),
             },
             "maxlags": maxlags_meta,
@@ -2593,7 +2652,7 @@ class ICFilterOrchestrator:
         return p_value_max, "threshold_default", None
 
     def _resolve_fdr_enabled(self, config: ICConfig) -> bool:
-        """FDR 預設 ON（D-G）。B4 接 schema 前：允許測試 override / 既有 significance 屬性。"""
+        """FDR 預設 ON（D-G）。優先測試 override，否則讀 canonical significance.fdr.enabled。"""
         override = getattr(self, "_fdr_enabled_override", None)
         if override is not None:
             return bool(override)
@@ -2609,6 +2668,25 @@ class ICFilterOrchestrator:
         if enabled is None:
             return True
         return bool(enabled)
+
+    def _resolve_fdr_method(self, config: ICConfig) -> str:
+        """讀 canonical significance.fdr.method 並傳給 apply_fdr（禁幽靈 config）。
+
+        理由：schema 既有 method 欄且 SPEC 預留 fdr_by/romano_wolf 升級路徑；
+        必須由 consumer 實際讀取，而非硬編。OFF 時 method 仍為 canonical 名稱，
+        唯一 OFF 表述=enabled=false（D-G）。
+        """
+        default = "fdr_bh"
+        sig = getattr(config, "significance", None)
+        if sig is None:
+            return default
+        fdr = sig.get("fdr") if isinstance(sig, dict) else getattr(sig, "fdr", None)
+        if fdr is None:
+            return default
+        raw = fdr.get("method") if isinstance(fdr, dict) else getattr(fdr, "method", None)
+        method = str(raw or default).strip().lower() or default
+        # 生產路徑目前僅實作 BH；未知 method 交 apply_fdr→adjust_multiple_comparisons 處理
+        return method
 
     def _stage6_redundancy(
         self,
@@ -3245,17 +3323,13 @@ class ICFilterOrchestrator:
                 path = STAGE_OVERRIDE_PATHS.get(key)
                 if path is None:
                     continue
-                section, field = path
-                if isinstance(data.get(section), dict):
-                    data[section][field] = bool(enabled)
+                _set_nested_bool(data, path, bool(enabled))
 
             for key, enabled in module_overrides.items():
                 path = MODULE_ENABLED_PATHS.get(key)
                 if path is None:
                     continue
-                section, field = path
-                if isinstance(data.get(section), dict):
-                    data[section][field] = bool(enabled)
+                _set_nested_bool(data, path, bool(enabled))
         else:
             preset = presets.get(active_preset) or presets.get("intermediate") or {}
             deep_enabled = bool(preset.get("deep_analysis", True))
@@ -3276,6 +3350,17 @@ class ICFilterOrchestrator:
                     section, field = path
                     if isinstance(data.get(section), dict):
                         data[section][field] = False
+
+            # 具名 preset 同樣映射 fdr_correction→significance.fdr.enabled
+            # （UI 三 preset 皆 fdr_correction=true；缺 stage_overrides 時強制 ON）
+            stage_overrides = custom.get("stage_overrides") or {}
+            fdr_path = STAGE_OVERRIDE_PATHS["fdr_correction"]
+            if "fdr_correction" in stage_overrides:
+                _set_nested_bool(
+                    data, fdr_path, bool(stage_overrides["fdr_correction"])
+                )
+            else:
+                _set_nested_bool(data, fdr_path, True)
 
         return ICConfig.model_validate(data)
 

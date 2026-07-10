@@ -11,6 +11,8 @@ interface FeatureTierPanelProps {
   featureToggles: Record<string, boolean>;
   onChangeTier: (tier: FeatureTierLevel) => void;
   onToggleFeature: (key: string) => void;
+  /** 分析模式：xsec 無 p 閘，tooltip 需分模式誠實（D-H） */
+  analysisMode?: 'global' | 'cross_sectional' | string;
 }
 
 const LOCKED_KEYS = new Set(['ic_calculation', 'monotonicity_test', 'ai_summary']);
@@ -35,18 +37,36 @@ const TOGGLES: Array<{ key: string; label: string; tier: 'L1' | 'L2' | 'L3'; tip
   { key: 'long_short_analysis', label: 'Long/Short Analysis (Module 8)', tier: 'L2', tip: '多空不對稱分析' },
   { key: 'feature_quality_diagnostics', label: 'Feature Quality Diag (Module 9)', tier: 'L2', tip: '品質診斷' },
   { key: 'net_ic_analysis', label: 'Net IC Analysis (Module 10)', tier: 'L2', tip: '成本調整後淨 IC' },
-  { key: 'fdr_correction', label: 'FDR 多重比較校正', tier: 'L3', tip: '高階統計校正' },
+  {
+    key: 'fdr_correction',
+    label: 'FDR 多重比較校正',
+    tier: 'L3',
+    // tip 由 resolveToggleTip 依 mode 覆寫；此處為 longitudinal 預設
+    tip: '啟用時 p 閘用 BH q（p_value_adj）；關閉時用 HAC raw p。預設 ON',
+  },
   { key: 'vif_filter', label: 'VIF 篩選', tier: 'L3', tip: '高階共線性過濾' },
   { key: 'factor_centrality', label: 'Factor Centrality/PCA (Module 2)', tier: 'L3', tip: 'PCA 因子中心性' },
   { key: 'factor_orthogonalization', label: 'Factor Orthogonalization (Module 6)', tier: 'L3', tip: '因子正交化' },
   { key: 'factor_exposure', label: 'Factor Exposure (Module 7)', tier: 'L3', tip: '因子曝險歸因' },
 ];
 
+/** 分模式誠實 FDR tip：xsec 無門檻行為（D-H），不得寫「關閉時用 raw p 閘」。 */
+function resolveToggleTip(key: string, defaultTip: string, analysisMode?: string): string {
+  if (key !== 'fdr_correction') {
+    return defaultTip;
+  }
+  if (analysisMode === 'cross_sectional') {
+    return 'Cross-sectional：計算並披露 t-stat/raw p/BH q（p_value_adj），不新增 p 閘（維持 ICIR 排序）。預設 ON';
+  }
+  return '啟用時 p 閘用 BH q（p_value_adj）；關閉時用 HAC raw p。預設 ON';
+}
+
 export default function FeatureTierPanel({
   featureTier,
   featureToggles,
   onChangeTier,
   onToggleFeature,
+  analysisMode,
 }: FeatureTierPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -109,7 +129,9 @@ export default function FeatureTierPanel({
                               <Info className="h-3 w-3" />
                             </button>
                           </TooltipTrigger>
-                          <TooltipContent>{item.tip}</TooltipContent>
+                          <TooltipContent>
+                            {resolveToggleTip(item.key, item.tip, analysisMode)}
+                          </TooltipContent>
                         </Tooltip>
                       </label>
                     );

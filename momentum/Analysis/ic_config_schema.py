@@ -282,6 +282,20 @@ class ShapleyConfig(BaseModel):
     use_approximation: bool = True
 
 
+class SignificanceFdrSchema(BaseModel):
+    """FDR 校正子節（canonical: significance.fdr.*；D-F/D-G）。"""
+
+    enabled: bool = True
+    method: str = "fdr_bh"
+
+
+class SignificanceSchema(BaseModel):
+    """顯著性 canonical 節（與 report metadata 同形嵌套；禁 fdr_enabled 平鋪別名）。"""
+
+    fdr: SignificanceFdrSchema = Field(default_factory=SignificanceFdrSchema)
+    maxlags: Optional[int] = None
+
+
 class FeatureTierPreset(BaseModel):
     description: str
     deep_analysis: bool = False
@@ -367,6 +381,7 @@ class ICConfig(BaseModel):
     deep_analysis_global: DeepAnalysisGlobalConfig = Field(default_factory=DeepAnalysisGlobalConfig)
     shapley: ShapleyConfig = Field(default_factory=ShapleyConfig)
     feature_tiers: FeatureTierConfig = Field(default_factory=FeatureTierConfig)
+    significance: SignificanceSchema = Field(default_factory=SignificanceSchema)
     feature_filter: Optional[FeatureFilterSchema] = None
 
 

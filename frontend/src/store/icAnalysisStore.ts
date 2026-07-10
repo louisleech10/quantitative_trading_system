@@ -75,7 +75,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     long_short_analysis: false,
     feature_quality_diagnostics: false,
     net_ic_analysis: false,
-    fdr_correction: false,
+    fdr_correction: true,
     vif_filter: false,
     factor_centrality: false,
     factor_orthogonalization: false,
@@ -101,7 +101,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     long_short_analysis: true,
     feature_quality_diagnostics: true,
     net_ic_analysis: true,
-    fdr_correction: false,
+    fdr_correction: true,
     vif_filter: false,
     factor_centrality: true,
     factor_orthogonalization: false,
@@ -295,6 +295,8 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
       turnover_analysis: Boolean(state.featureToggles.turnover_analysis),
       event_filtering: Boolean(state.featureToggles.event_filtering),
       ai_summary: Boolean(state.featureToggles.ai_summary),
+      // UI 邊界唯一轉名點 → 後端 significance.fdr.enabled（D-G / Task 4.2）
+      fdr_correction: Boolean(state.featureToggles.fdr_correction),
     };
 
     const moduleOverrides: Record<string, boolean> = {
@@ -310,17 +312,28 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
       net_ic_analysis: Boolean(state.featureToggles.net_ic_analysis),
     };
 
+    // 具名 preset 也必須送出 fdr_correction，否則 UI preset ON 會在後端靜默丟失
+    // （backend 具名 preset 分支會映射 fdr_correction→significance.fdr.enabled）
+    if (state.featureTier === 'custom') {
+      return {
+        feature_tiers: {
+          active_preset: 'custom',
+          custom_overrides: {
+            stage_overrides: stageOverrides,
+            module_overrides: moduleOverrides,
+          },
+        },
+      };
+    }
+
     return {
       feature_tiers: {
         active_preset: state.featureTier,
-        ...(state.featureTier === 'custom'
-          ? {
-              custom_overrides: {
-                stage_overrides: stageOverrides,
-                module_overrides: moduleOverrides,
-              },
-            }
-          : {}),
+        custom_overrides: {
+          stage_overrides: {
+            fdr_correction: Boolean(state.featureToggles.fdr_correction),
+          },
+        },
       },
     };
   },

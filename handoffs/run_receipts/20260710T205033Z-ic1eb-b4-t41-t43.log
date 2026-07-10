@@ -1,0 +1,56 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+04:50:31 [INFO] Loaded feature registry with 11 entries
+collected 7 items
+
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_schema_default_fdr_on 
+-------------------------------- live log call ---------------------------------
+04:50:31 [INFO] IC config loaded
+PASSED                                                                   [ 14%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_no_flat_fdr_enabled_alias PASSED [ 28%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_hop_chain_fdr_false_to_report_metadata 
+-------------------------------- live log call ---------------------------------
+04:50:31 [INFO] IC config loaded
+04:50:31 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+04:50:31 [INFO] IC config loaded
+PASSED                                                                   [ 42%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_hop_chain_fdr_true 
+-------------------------------- live log call ---------------------------------
+04:50:31 [INFO] IC config loaded
+04:50:31 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+PASSED                                                                   [ 57%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_stage5_consumes_maxlags_from_schema 
+-------------------------------- live log call ---------------------------------
+04:50:31 [INFO] IC config loaded
+04:50:31 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+PASSED                                                                   [ 71%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t43_mg_two_state_fdr_gate_separable 
+-------------------------------- live log call ---------------------------------
+04:50:31 [INFO] IC config loaded
+04:50:31 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+04:50:32 [INFO] IC config loaded
+04:50:32 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+04:50:32 [INFO] IC config loaded
+04:50:32 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+04:50:32 [INFO] IC config loaded
+04:50:32 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+04:50:32 [INFO] IC config loaded
+04:50:32 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+04:50:32 [INFO] IC config loaded
+04:50:32 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+PASSED                                                                   [ 85%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t43_legacy_report_null_p_compat_fields_present PASSED [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 7 passed, 1 warning in 1.83s =========================

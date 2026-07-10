@@ -1,0 +1,99 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+05:25:38 [INFO] Loaded feature registry with 11 entries
+collected 11 items
+
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_schema_default_fdr_on 
+-------------------------------- live log call ---------------------------------
+05:25:39 [INFO] IC config loaded
+PASSED                                                                   [  9%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_no_flat_fdr_enabled_alias PASSED [ 18%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_preset_intermediate_maps_fdr_on 
+-------------------------------- live log call ---------------------------------
+05:25:39 [INFO] IC config loaded
+05:25:39 [INFO] IC config loaded
+PASSED                                                                   [ 27%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_hop_chain_fdr_false_to_report_metadata 
+-------------------------------- live log call ---------------------------------
+05:25:39 [INFO] IC config loaded
+05:25:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+05:25:39 [INFO] IC config loaded
+PASSED                                                                   [ 36%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_hop_chain_fdr_true 
+-------------------------------- live log call ---------------------------------
+05:25:39 [INFO] IC config loaded
+05:25:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+PASSED                                                                   [ 45%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_stage5_consumes_maxlags_from_schema 
+-------------------------------- live log call ---------------------------------
+05:25:39 [INFO] IC config loaded
+05:25:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+PASSED                                                                   [ 54%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_stage5_consumes_fdr_method_from_schema 
+-------------------------------- live log call ---------------------------------
+05:25:39 [INFO] IC config loaded
+05:25:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+PASSED                                                                   [ 63%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t43_mg_two_state_fdr_gate_full_e2e 
+-------------------------------- live log call ---------------------------------
+05:25:39 [INFO] IC config loaded
+05:25:39 [INFO] IC config loaded
+05:25:39 [INFO] Data preprocessing complete: columns=16
+05:25:39 [INFO] IC autocorr persistent: count=16
+05:25:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+05:25:39 [INFO] Redundancy filter completed: method=greedy input=3 output=3
+05:25:39 [INFO] IC config loaded
+05:25:39 [INFO] IC config loaded
+05:25:39 [INFO] Data preprocessing complete: columns=16
+05:25:39 [INFO] IC autocorr persistent: count=16
+05:25:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+05:25:39 [INFO] Redundancy filter completed: method=greedy input=3 output=3
+05:25:39 [INFO] IC config loaded
+05:25:39 [INFO] IC config loaded
+05:25:39 [INFO] Data preprocessing complete: columns=16
+05:25:39 [INFO] IC autocorr persistent: count=16
+05:25:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+05:25:40 [INFO] Redundancy filter completed: method=greedy input=3 output=3
+05:25:40 [INFO] IC config loaded
+05:25:40 [INFO] IC config loaded
+05:25:40 [INFO] Data preprocessing complete: columns=16
+05:25:40 [INFO] IC autocorr persistent: count=16
+05:25:40 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+05:25:40 [INFO] Redundancy filter completed: method=greedy input=3 output=3
+05:25:40 [INFO] IC config loaded
+05:25:40 [INFO] IC config loaded
+05:25:40 [INFO] Data preprocessing complete: columns=16
+05:25:40 [INFO] IC autocorr persistent: count=16
+05:25:40 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+05:25:40 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+05:25:40 [INFO] IC config loaded
+05:25:40 [INFO] IC config loaded
+05:25:40 [INFO] Data preprocessing complete: columns=16
+05:25:40 [INFO] IC autocorr persistent: count=16
+05:25:40 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+05:25:40 [INFO] Redundancy filter completed: method=greedy input=4 output=4
+PASSED                                                                   [ 72%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t43_legacy_report_null_p_compat_fields_present PASSED [ 81%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_off_method_never_none 
+-------------------------------- live log call ---------------------------------
+05:25:40 [INFO] IC config loaded
+05:25:40 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+PASSED                                                                   [ 90%]
+tests/momentum/test_ic_1eb_b4_fullstack.py::test_t41_xsec_metadata_has_alpha_effective_and_canonical_method 
+-------------------------------- live log call ---------------------------------
+05:25:40 [INFO] IC config loaded
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 11 passed, 1 warning in 2.39s =========================

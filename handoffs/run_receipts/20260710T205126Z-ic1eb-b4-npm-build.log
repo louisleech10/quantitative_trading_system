@@ -1,0 +1,91 @@
+
+> frontend@0.1.0 build
+> next build
+
+   ▲ Next.js 15.3.4
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 2000ms
+   Linting and checking validity of types ...
+
+./src/components/feature-factory/FeatureTable.tsx
+269:6  Warning: React Hook useEffect has missing dependencies: 'sortBy' and 'sortOrder'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/feature-factory/GenerationProgress.tsx
+199:6  Warning: React Hook useEffect has a missing dependency: 'enqueueCompletion'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/pattern/details/charts/RegimeClusterChart.tsx
+66:9  Warning: The 'clusterStats' logical expression could make the dependencies of useMemo Hook (at line 76) change on every render. To fix this, wrap the initialization of 'clusterStats' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+66:9  Warning: The 'clusterStats' logical expression could make the dependencies of useMemo Hook (at line 87) change on every render. To fix this, wrap the initialization of 'clusterStats' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/20) ...
+   Generating static pages (5/20) 
+   Generating static pages (10/20) 
+   Generating static pages (15/20) 
+ ✓ Generating static pages (20/20)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                          Size  First Load JS
+┌ ○ /                                               176 B         105 kB
+├ ○ /_not-found                                     990 B         103 kB
+├ ○ /chart                                         4.8 kB         162 kB
+├ ○ /charts                                       10.8 kB         173 kB
+├ ○ /data-preparation                             5.69 kB         107 kB
+├ ○ /feature-factory                              84.7 kB         356 kB
+├ ○ /ic-analysis                                  35.4 kB         367 kB
+├ ○ /lstm-model                                   8.06 kB         217 kB
+├ ○ /optimization-execution                       4.33 kB         150 kB
+├ ƒ /optimization-execution/result/[taskId]       3.17 kB         280 kB
+├ ○ /optimization-hyperparameter                  2.16 kB         151 kB
+├ ƒ /optimization-hyperparameter/result/[taskId]  2.35 kB         225 kB
+├ ƒ /optimization-result/[taskId]                 16.6 kB         276 kB
+├ ƒ /optimization-result/[taskId]/pipeline        5.86 kB         166 kB
+├ ○ /patterns                                     6.91 kB         230 kB
+├ ƒ /patterns/[id]                                4.05 kB         112 kB
+├ ƒ /patterns/analysis/[caseId]                   4.62 kB         261 kB
+├ ○ /patterns/create                              3.13 kB         111 kB
+├ ○ /patterns/xgboost-analysis                    10.5 kB         334 kB
+├ ƒ /patterns/xgboost-analysis/[task_id]/details  3.45 kB         290 kB
+├ ○ /result                                       7.17 kB         109 kB
+├ ○ /search                                         15 kB         222 kB
+├ ○ /strategy-demo                                7.38 kB         169 kB
+└ ○ /strategy-test                                27.9 kB         176 kB
++ First Load JS shared by all                      102 kB
+  ├ chunks/1684-344e2bd830439ec7.js               46.4 kB
+  ├ chunks/4bd1b696-4a894461da942b84.js           53.2 kB
+  └ other shared chunks (total)                    2.1 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+(node:97788) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:98152) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:99727) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:274) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1702) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6678) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6677) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6679) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6681) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6680) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6676) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6675) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:7558) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

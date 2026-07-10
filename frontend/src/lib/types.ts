@@ -1997,9 +1997,13 @@ export interface ICFeatureInfo {
   ic_mean: number;
   ic_std?: number;
   icir: number;
-  p_value: number;
+  /** HAC raw p；舊 report / 不可用時可為 null（CODEX-6） */
+  p_value?: number | null;
+  /** BH FDR q（p_value_adj）；舊 report 可缺欄 */
+  p_value_adj?: number | null;
   ic_hit_rate?: number;
-  t_stat?: number;
+  /** HAC t-stat；禁前端 i.i.d. 推導 */
+  t_stat?: number | null;
   monotonicity_score?: number;
   coverage?: number;
   turnover_rate?: number;

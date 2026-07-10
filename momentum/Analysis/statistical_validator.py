@@ -153,13 +153,17 @@ def compute_hac_ic_statistics(
 
 
 def apply_fdr(
-    p_values: dict[str, float], alpha: float
+    p_values: dict[str, float],
+    alpha: float,
+    *,
+    method: str = "fdr_bh",
 ) -> tuple[dict[str, float], int]:
-    """BH FDR 應用層：finite p 子集校正，NaN 保位；不做 α 比較。
+    """FDR 應用層：finite p 子集校正，NaN 保位；不做 α 比較。
 
     Args:
         p_values: feature → raw p
         alpha: 保留簽名供下游消費；本函式不依 α 過濾
+        method: 傳給 adjust_multiple_comparisons（消費 schema significance.fdr.method）
 
     Returns:
         (q_values, n_tests)；n_tests = finite p 個數
@@ -181,9 +185,9 @@ def apply_fdr(
     if n_tests == 0:
         return {key: np.nan for key in p_values}, 0
 
-    # 既有 BH 路徑（不重寫 _fdr_bh）
+    # 消費 schema method（禁幽靈 config）；預設 fdr_bh
     adjusted = StatisticalValidator({}).adjust_multiple_comparisons(
-        finite, method="fdr_bh"
+        finite, method=str(method or "fdr_bh")
     )
 
     q_values: dict[str, float] = {}

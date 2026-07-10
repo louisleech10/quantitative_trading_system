@@ -190,6 +190,7 @@ export default function ICConfigPanel({
         featureToggles={featureToggles}
         onChangeTier={onChangeFeatureTier}
         onToggleFeature={onToggleFeature}
+        analysisMode={config.mode}
       />
 
       <div className="space-y-4">

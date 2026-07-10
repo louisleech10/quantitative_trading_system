@@ -10804,3 +10804,90 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B4-GROK", "ts": "2026-07-10T20:42:48Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-B4-IMPL-RESULT.md", "output_sha256": "pending", "task_id": "IC1EB-B4-GROK", "ts": "2026-07-10T20:42:49Z"}
+=== 2026-07-11 04:42:49 | dispatch ===
+  ts=2026-07-11 04:42:49
+  kind=dispatch
+  intent=IC1EB B4 實作派工(Grok 4.5):Task 4.1-4.3 config+API+前端全棧接通
+  risk=high
+  facts_asked=B3 三方 PASS 已入版 546f50a;階梯續派 Grok;preset 預設 true=「驗過就別預設關閉」鐵律,不另問
+  review_role=B4 交付後 Codex+Composer 雙審;Claude 驗收(全棧三欄 wiring 稽核+npm build+兩態 e2e)
+  template=templates 已於凍結時跟過(同 IC1EB-B1-GROK 票)
+  adversarial=handoffs/IC1EB-RECONCILE.md
+  reconcile=handoffs/IC1EB-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  todo=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B4-REVIEW-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B4-REV-codex", "ts": "2026-07-10T21:07:06Z"}
+=== 2026-07-11 05:07:06 | dispatch ===
+  ts=2026-07-11 05:07:06
+  kind=dispatch
+  intent=IC1EB B4 code review(codex):Task 4.1-4.3 全棧接通(config/前端/兩態 e2e)
+  risk=low
+  facts_asked=B4 由 Grok 實作;Claude 已驗:1033 綠/npm build 綠/前端 iid 推導 grep=0/三 preset true+getEffectiveConfig 送出/G-1 抽驗 ALL MATCH/canonical significance.fdr 節在 metadata
+  review_role=codex 全棧三欄稽核(後端/前端/wiring):每跳接點鏈完整?兩態 e2e 走真映射鏈?幽靈開關真滅?第四命名?前端殘留統計推導?
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-B4-REVIEW-composer.md", "output_sha256": "pending", "task_id": "IC1EB-B4-REV-composer", "ts": "2026-07-10T21:07:06Z"}
+=== 2026-07-11 05:07:06 | dispatch ===
+  ts=2026-07-11 05:07:06
+  kind=dispatch
+  intent=IC1EB B4 code review(composer):Task 4.1-4.3 全棧接通(config/前端/兩態 e2e)
+  risk=low
+  facts_asked=B4 由 Grok 實作;Claude 已驗:1033 綠/npm build 綠/前端 iid 推導 grep=0/三 preset true+getEffectiveConfig 送出/G-1 抽驗 ALL MATCH/canonical significance.fdr 節在 metadata
+  review_role=composer 全棧三欄稽核(後端/前端/wiring):每跳接點鏈完整?兩態 e2e 走真映射鏈?幽靈開關真滅?第四命名?前端殘留統計推導?
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B4-GROK-FIX1", "ts": "2026-07-10T21:14:06Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B4-IMPL-RESULT-FIX1.md", "output_sha256": "pending", "task_id": "IC1EB-B4-GROK-FIX1", "ts": "2026-07-10T21:14:08Z"}
+=== 2026-07-11 05:14:08 | dispatch ===
+  ts=2026-07-11 05:14:08
+  kind=dispatch
+  intent=IC1EB B4 修復輪1(Grok):codex 五 BLOCKING(preset 映射丟失/method=none 違 D-G/e2e 非真端到端/前端缺欄/method 幽靈)
+  risk=high
+  facts_asked=codex B4 review 五 BLOCKING 附可證偽反例;composer PASS(漏抓記分);tsc 既存 10 errors 與本批無關
+  review_role=修復後 codex 複驗
+  template=templates 已於凍結時跟過(同 IC1EB-B1-GROK 票)
+  adversarial=handoffs/IC1EB-RECONCILE.md
+  reconcile=handoffs/IC1EB-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  todo=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B4-REVIEW-R2-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B4-REV2-codex", "ts": "2026-07-10T21:31:49Z"}
+=== 2026-07-11 05:31:49 | dispatch ===
+  ts=2026-07-11 05:31:49
+  kind=dispatch
+  intent=IC1EB B4 FIX1 複驗(codex):五 BLOCKING 閉合確認
+  risk=low
+  facts_asked=FIX1 完成;Claude 已驗:1037 綠/npm build 綠/preset 分支映射入碼(orchestrator:3354)/FDR OFF method=none 三處清除(殘留 none 屬 event/truncation/redundancy 無關域)
+  review_role=codex 五反例逐一重打
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
