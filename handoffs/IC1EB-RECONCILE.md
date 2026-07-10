@@ -21,3 +21,5 @@
 (委員 append:`RECONCILE-STAMP: <codex|composer> APPROVED YYYY-MM-DD sha256:<body_hash> task:<task-id>`;body_hash 用 `bash scripts/reconcile_body_hash.sh handoffs/IC1EB-RECONCILE.md` 取得;任一方不滿意改 append REJECTED+理由)
 RECONCILE-STAMP: codex APPROVED 2026-07-09 sha256:b77932d811a9011faf7aeba7b64e2667b5134277c969d971aa6529e9f1a36043 task:ic1eb-r3-stamp-codex
 RECONCILE-STAMP: composer APPROVED 2026-07-09 sha256:b77932d811a9011faf7aeba7b64e2667b5134277c969d971aa6529e9f1a36043 task:ic1eb-stamp-composer
+
+Verdict: APPROVE(雙家族閉合;出處=IC1EB-SPECADV-R2-composer.md「Verdict: APPROVE」13/13+IC1EB-R3-codex.md「Verdict: APPROVE」;本行位於戳記區後,不入 body hash)

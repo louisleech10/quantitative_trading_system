@@ -10466,3 +10466,116 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "dc3427019535a96ae04e05cdb4b999d1e830c3a20a98de2fdbc57ebc0766c3a4", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:29:37Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-R3-codex.md", "output_sha256": "eb18e6d468717375f4e2b6a18ffe21234463b2ae5eef81b9892509b352ac1041", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:30:26Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-SPECADV-R2-composer.md", "output_sha256": "479bfaa0fa6f0f9b6d81450aa103c5433e03256e798363d82f7f0bc1c39759c4", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:30:42Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:32:31Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:32:44Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:32:59Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:33:15Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:33:29Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-B1-IMPL-RESULT.md", "output_sha256": "pending", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:33:30Z"}
+=== 2026-07-10 22:33:31 | dispatch ===
+  ts=2026-07-10 22:33:31
+  kind=dispatch
+  intent=IC1EB B1 實作派工(Grok 4.5):Task 1.1-1.3 統計 kernel
+  risk=high
+  facts_asked=使用者已裁決:B1 先派 Grok(加密驗收期);baseline v4 三家複驗全 PASS 已發布;SPEC/TODO v2.2 凍結+雙戳記 sha256:b77932d8(reconcile_stamps_check 實跑 PASS)
+  review_role=B1 交付後 Codex+Composer 雙審(非作者);Claude 批批驗收 golden hash/mutation/防假綠 diff
+  template=templates/SPEC_TEMPLATE.md+TODO_TEMPLATE.md 已於凍結時跟過(gate artifact 軌跡在 audit.log 2026-07-09)
+  adversarial=handoffs/IC1EB-RECONCILE.md
+  reconcile=handoffs/IC1EB-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  todo=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-B1-IMPL-RESULT.md", "output_sha256": "a6346d3c8c66256275ab9a132408a1612536b1220ea8d22f1996a7027c1d2aed", "task_id": "IC1EB-B1-GROK", "ts": "2026-07-10T14:40:17Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B1-REVIEW-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B1-REV-codex", "ts": "2026-07-10T14:41:39Z"}
+=== 2026-07-10 22:41:39 | dispatch ===
+  ts=2026-07-10 22:41:39
+  kind=dispatch
+  intent=IC1EB B1 code review(codex):Grok 實作之統計 kernel(Task 1.1-1.3)對照凍結 SPEC 全面審
+  risk=low
+  facts_asked=B1 由 Grok 實作(加密驗收期第1件);Claude 已親跑 75 綠+diff 零刪斷言+postflight;RESULT sha 已 register
+  review_role=codex 對照 SPEC D-A/D-B/D-C 逐公式驗(oracle allclose/fail-closed/邊界表);挑戰統計正確性與假綠可能
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-B1-REVIEW-composer.md", "output_sha256": "pending", "task_id": "IC1EB-B1-REV-composer", "ts": "2026-07-10T14:41:39Z"}
+=== 2026-07-10 22:41:39 | dispatch ===
+  ts=2026-07-10 22:41:39
+  kind=dispatch
+  intent=IC1EB B1 code review(composer):Grok 實作之統計 kernel(Task 1.1-1.3)對照凍結 SPEC 全面審
+  risk=low
+  facts_asked=B1 由 Grok 實作(加密驗收期第1件);Claude 已親跑 75 綠+diff 零刪斷言+postflight;RESULT sha 已 register
+  review_role=composer 對照 SPEC D-A/D-B/D-C 逐公式驗(oracle allclose/fail-closed/邊界表);挑戰統計正確性與假綠可能
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B1-GROK-FIX1", "ts": "2026-07-10T14:58:49Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B1-IMPL-RESULT-FIX1.md", "output_sha256": "pending", "task_id": "IC1EB-B1-GROK-FIX1", "ts": "2026-07-10T14:58:50Z"}
+=== 2026-07-10 22:58:50 | dispatch ===
+  ts=2026-07-10 22:58:50
+  kind=dispatch
+  intent=IC1EB B1 修復輪1(Grok):codex review 三條 finding(D-B paired bootstrap/邊界測試/轉紅 receipt)
+  risk=high
+  facts_asked=codex B1 review BLOCK 三實質 finding,Claude 親驗 D-B 違規成立(block_bootstrap.py:92-108 重抽 centered z 非 (x,y) 對);oracle/M-A 已有 Claude+Composer 雙 receipt
+  review_role=修復後 codex 複驗自家 findings(Finding 閉合);composer 兩條 NON-BLOCKING 一併處理
+  template=templates 已於凍結時跟過(同 IC1EB-B1-GROK 票)
+  adversarial=handoffs/IC1EB-RECONCILE.md
+  reconcile=handoffs/IC1EB-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  todo=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1EB-B1-IMPL-RESULT-FIX1.md", "output_sha256": "fdf1a6118de43415ca9b62c6bd38e8b65646de2ecdb064c38ea61983f1263a7f", "task_id": "IC1EB-B1-GROK-FIX1", "ts": "2026-07-10T15:02:37Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B1-REVIEW-R2-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B1-REV2-codex", "ts": "2026-07-10T15:03:45Z"}
+=== 2026-07-10 23:03:45 | dispatch ===
+  ts=2026-07-10 23:03:45
+  kind=dispatch
+  intent=IC1EB B1 FIX1 複驗(codex):三條 finding 閉合確認
+  risk=low
+  facts_asked=FIX1 完成:D-B 成對重抽(Claude 親驗 block_bootstrap.py 重寫)/邊界測試+3/真紅跑 receipt(FAILED exit=1 已還原);78 綠 Claude 親跑;oracle/M-A 已有 Claude+Composer 雙 receipt;你上輪環境卡死建議 OPENBLAS_NUM_THREADS=1
+  review_role=codex 複驗自家三條 finding(原反例重打)+補自家 oracle/M-A receipt(限執行緒重試)
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B1-REVIEW-R3-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B1-REV3-codex", "ts": "2026-07-10T15:39:27Z"}
+=== 2026-07-10 23:39:27 | dispatch ===
+  ts=2026-07-10 23:39:27
+  kind=dispatch
+  intent=IC1EB B1 R3 終驗(codex):審計編排端 gate+紅跑 transcript,裁定兩條 STILL-OPEN
+  risk=low
+  facts_asked=你的沙箱跑不完長測(40-160s 掐斷);編排端(非作者)已錄全程 transcript handoffs/IC1EB-B1-GATE-RECEIPT.log:78 綠×2+真紅跑 exit=1+還原 sha 一致+無 mutant 殘留;composer R1 已獨立 PASS
+  review_role=codex 審計 transcript 完整性/一致性(sha 鏈/FAILED 證據/還原鏈);可自行抽跑單測驗證任一環節
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

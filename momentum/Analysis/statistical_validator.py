@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Optional
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,192 @@ from momentum.core.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+
+def _hac_nan_result(n_obs: int = 0, maxlags: float = np.nan) -> dict:
+    """HAC fail-closed 結果（全 NaN 統計量）。"""
+    maxlags_out: float | int
+    if isinstance(maxlags, (int, np.integer)) or (
+        isinstance(maxlags, float) and np.isfinite(maxlags)
+    ):
+        maxlags_out = int(maxlags)
+    else:
+        maxlags_out = np.nan
+    return {
+        "t_stat": np.nan,
+        "p_value": np.nan,
+        "se": np.nan,
+        "n_obs": int(n_obs),
+        "maxlags": maxlags_out,
+    }
+
+
+def _newey_west_bartlett_se(z: np.ndarray, maxlags: int) -> float:
+    """Newey-West HAC SE（Bartlett 核），對齊 statsmodels OLS intercept + HAC。
+
+    se = sqrt(S / n)，S = γ0 + 2 Σ_j w_j γ_j，w_j = 1 - j/(L+1)，
+    γ_j = (1/n) Σ_t e_t e_{t-j}，e = z - mean(z)。
+    """
+    n = int(z.size)
+    if n < 1:
+        return float("nan")
+    e = z - float(np.mean(z))
+    gamma0 = float(np.dot(e, e) / n)
+    s = gamma0
+    L = int(maxlags)
+    if L < 0:
+        raise ValueError(f"maxlags must be >= 0, got {maxlags}")
+    for j in range(1, L + 1):
+        weight = 1.0 - j / (L + 1)
+        gamma_j = float(np.dot(e[j:], e[:-j]) / n)
+        s += 2.0 * weight * gamma_j
+    if s < 0.0:
+        s = 0.0
+    return float(np.sqrt(s / n))
+
+
+def _spearman_contribution_z(x: np.ndarray, y: np.ndarray) -> Optional[np.ndarray]:
+    """u=zscore(rank(x)), v=zscore(rank(y)), z=u*v；rank 退化回 None。"""
+    if x.size < 2 or y.size < 2 or x.size != y.size:
+        return None
+    rx = stats.rankdata(x, method="average").astype(float)
+    ry = stats.rankdata(y, method="average").astype(float)
+    sx = float(np.std(rx, ddof=1))
+    sy = float(np.std(ry, ddof=1))
+    if sx == 0.0 or sy == 0.0 or not np.isfinite(sx) or not np.isfinite(sy):
+        return None
+    u = (rx - float(np.mean(rx))) / sx
+    v = (ry - float(np.mean(ry))) / sy
+    return u * v
+
+
+def compute_hac_ic_statistics(
+    features_df: pd.DataFrame,
+    label: pd.Series,
+    horizon: int,
+    *,
+    maxlags: Optional[int] = None,
+) -> dict[str, dict]:
+    """逐 bar Spearman 貢獻序列 + Newey-West HAC 顯著性（spearman only）。
+
+    參數全寫死：auto_bw=int(4*(n_valid/100)**(2/9))；L=max(auto_bw, horizon-1)；
+    p=2*t.sf(|t|, df=n_valid-1)。mean(z) 僅供內部 t 檢定，不回傳 ic_mean。
+
+    Returns:
+        per-feature dict：t_stat / p_value / se / n_obs / maxlags
+    """
+    if horizon is None or int(horizon) < 1:
+        raise ValueError(f"horizon must be >= 1, got {horizon}")
+    horizon = int(horizon)
+    min_lag_floor = horizon - 1
+
+    if maxlags is not None:
+        maxlags_int = int(maxlags)
+        if maxlags_int < min_lag_floor:
+            raise ValueError(
+                f"maxlags={maxlags_int} < horizon-1={min_lag_floor}; "
+                "explicit maxlags must be >= horizon-1"
+            )
+
+    if features_df is None or label is None:
+        return {}
+    if not isinstance(features_df, pd.DataFrame) or features_df.shape[1] == 0:
+        return {}
+
+    label_s = label if isinstance(label, pd.Series) else pd.Series(label)
+    results: dict[str, dict] = {}
+
+    for col in features_df.columns:
+        x = features_df[col]
+        pair = pd.concat([x, label_s], axis=1, join="inner").dropna()
+        n_valid = int(pair.shape[0])
+        if n_valid < 2:
+            results[str(col)] = _hac_nan_result(n_obs=n_valid, maxlags=np.nan)
+            continue
+
+        if maxlags is not None:
+            L = int(maxlags)
+        else:
+            auto_bw = int(4 * (n_valid / 100.0) ** (2.0 / 9.0))
+            L = max(auto_bw, min_lag_floor)
+
+        # fail-closed：先算 L 再判
+        if L >= n_valid - 1 or n_valid < max(8, 2 * L):
+            results[str(col)] = _hac_nan_result(n_obs=n_valid, maxlags=L)
+            continue
+
+        x_arr = pair.iloc[:, 0].to_numpy(dtype=float)
+        y_arr = pair.iloc[:, 1].to_numpy(dtype=float)
+        z = _spearman_contribution_z(x_arr, y_arr)
+        if z is None:
+            results[str(col)] = _hac_nan_result(n_obs=n_valid, maxlags=L)
+            continue
+
+        se = _newey_west_bartlett_se(z, L)
+        mean_z = float(np.mean(z))
+        if not np.isfinite(se) or se == 0.0:
+            results[str(col)] = _hac_nan_result(n_obs=n_valid, maxlags=L)
+            continue
+
+        t_stat = float(mean_z / se)
+        p_value = float(2.0 * stats.t.sf(abs(t_stat), df=n_valid - 1))
+        results[str(col)] = {
+            "t_stat": t_stat,
+            "p_value": p_value,
+            "se": float(se),
+            "n_obs": n_valid,
+            "maxlags": int(L),
+        }
+
+    return results
+
+
+def apply_fdr(
+    p_values: dict[str, float], alpha: float
+) -> tuple[dict[str, float], int]:
+    """BH FDR 應用層：finite p 子集校正，NaN 保位；不做 α 比較。
+
+    Args:
+        p_values: feature → raw p
+        alpha: 保留簽名供下游消費；本函式不依 α 過濾
+
+    Returns:
+        (q_values, n_tests)；n_tests = finite p 個數
+    """
+    del alpha  # 不做 α 比較；參數保留供 API 相容
+    if not p_values:
+        return {}, 0
+
+    finite: dict[str, float] = {}
+    for key, value in p_values.items():
+        try:
+            fv = float(value)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(fv):
+            finite[key] = fv
+
+    n_tests = len(finite)
+    if n_tests == 0:
+        return {key: np.nan for key in p_values}, 0
+
+    # 既有 BH 路徑（不重寫 _fdr_bh）
+    adjusted = StatisticalValidator({}).adjust_multiple_comparisons(
+        finite, method="fdr_bh"
+    )
+
+    q_values: dict[str, float] = {}
+    for key, value in p_values.items():
+        try:
+            fv = float(value)
+        except (TypeError, ValueError):
+            q_values[key] = np.nan
+            continue
+        if np.isfinite(fv):
+            q_values[key] = float(adjusted[key])
+        else:
+            q_values[key] = np.nan
+    return q_values, n_tests
 
 
 class StatisticalValidator:
