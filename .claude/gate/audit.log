@@ -10700,3 +10700,107 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B3-GROK", "ts": "2026-07-10T19:49:01Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-B3-IMPL-RESULT.md", "output_sha256": "pending", "task_id": "IC1EB-B3-GROK", "ts": "2026-07-10T19:49:02Z"}
+=== 2026-07-11 03:49:02 | dispatch ===
+  ts=2026-07-11 03:49:02
+  kind=dispatch
+  intent=IC1EB B3 實作派工(Grok 4.5):Task 3.1 cross_sectional 顯著性最小面
+  risk=high
+  facts_asked=B2 三方審 PASS 已入版 9df75d3;階梯續派 Grok;xsec 舊路徑 baseline 已凍(xsec 顆+F14 raise receipt)
+  review_role=B3 交付後 Codex+Composer 雙審;Claude 驗收(xsec baseline 比對+mutation)
+  template=templates 已於凍結時跟過(同 IC1EB-B1-GROK 票)
+  adversarial=handoffs/IC1EB-RECONCILE.md
+  reconcile=handoffs/IC1EB-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  todo=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B3-REVIEW-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B3-REV-codex", "ts": "2026-07-10T20:17:33Z"}
+=== 2026-07-11 04:17:33 | dispatch ===
+  ts=2026-07-11 04:17:33
+  kind=dispatch
+  intent=IC1EB B3 code review(codex):Task 3.1 xsec 顯著性(D-H)
+  risk=low
+  facts_asked=B3 由 Grok 實作;Claude 已驗:1023 綠/xsec baseline G-1 五hash+ICIR 排序 hash 全 MATCH/p 500全誠實/既有測試僅簽名適配
+  review_role=codex 對照 D-H 逐點驗:horizon 於改名前解析/h=None→NaN+horizon_unresolved 禁反保守/HAC 取代 iid t/fallback-1 收斂禁兩套/M-J mutation 真紅
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-B3-REVIEW-composer.md", "output_sha256": "pending", "task_id": "IC1EB-B3-REV-composer", "ts": "2026-07-10T20:17:33Z"}
+=== 2026-07-11 04:17:33 | dispatch ===
+  ts=2026-07-11 04:17:33
+  kind=dispatch
+  intent=IC1EB B3 code review(composer):Task 3.1 xsec 顯著性(D-H)
+  risk=low
+  facts_asked=B3 由 Grok 實作;Claude 已驗:1023 綠/xsec baseline G-1 五hash+ICIR 排序 hash 全 MATCH/p 500全誠實/既有測試僅簽名適配
+  review_role=composer 對照 D-H 逐點驗:horizon 於改名前解析/h=None→NaN+horizon_unresolved 禁反保守/HAC 取代 iid t/fallback-1 收斂禁兩套/M-J mutation 真紅
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B3-GROK-FIX1", "ts": "2026-07-10T20:23:11Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B3-IMPL-RESULT-FIX1.md", "output_sha256": "pending", "task_id": "IC1EB-B3-GROK-FIX1", "ts": "2026-07-10T20:23:12Z"}
+=== 2026-07-11 04:23:12 | dispatch ===
+  ts=2026-07-11 04:23:12
+  kind=dispatch
+  intent=IC1EB B3 修復輪1(Grok):in-frame 一般 return_N 候選辨識(SPEC §ADV CODEX-3)
+  risk=high
+  facts_asked=codex B3 review 1 BLOCK:in-frame 候選硬編 return_1,SPEC §ADV L16 明文 in-frame return_N→同;Claude 查證 SPEC 文字成立;其餘 6 項 PASS;composer PASS
+  review_role=修復後 codex 複驗該條
+  template=templates 已於凍結時跟過(同 IC1EB-B1-GROK 票)
+  adversarial=handoffs/IC1EB-RECONCILE.md
+  reconcile=handoffs/IC1EB-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  todo=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B3-REVIEW-R2-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B3-REV2-codex", "ts": "2026-07-10T20:29:11Z"}
+=== 2026-07-11 04:29:11 | dispatch ===
+  ts=2026-07-11 04:29:11
+  kind=dispatch
+  intent=IC1EB B3 FIX1 複驗(codex):in-frame return_N 候選辨識閉合
+  risk=low
+  facts_asked=FIX1 完成;Claude 親驗你的反例(alpha+return_5 in-frame,無 labels_path,n=1500)→label_horizon=5/maxlags=5/不 raise;11 xsec 測試綠
+  review_role=codex 原反例重打該條;抽查其餘 6 PASS 未回歸
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B3-REVIEW-R3-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B3-REV3-codex", "ts": "2026-07-10T20:33:48Z"}
+=== 2026-07-11 04:33:48 | dispatch ===
+  ts=2026-07-11 04:33:48
+  kind=dispatch
+  intent=IC1EB B3 R3 裁定確認(codex):BLOCK 依據歸屬釐清
+  risk=low
+  facts_asked=你 R2 八項全 CLOSED/PASS;BLOCK 唯一依據=SCOPE_CHANGES 執行副作用(cut1 既有測試覆寫 gitignored 衍生檔,mtime 04:30);該行為先於 B3 存在(今日 probe/其他 run 亦多次覆寫同檔),非本 diff 引入
+  review_role=codex 裁定:副作用歸屬 B3 diff 或既有測試設計債;後者則改判並由編排端立 P2 債
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

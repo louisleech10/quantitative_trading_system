@@ -1,0 +1,95 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31a_xsec_p_not_none_matches_kernel_and_separates_iid 
+-------------------------------- live log call ---------------------------------
+04:39:49 [INFO] IC config loaded
+PASSED                                                                   [100%]
+
+============================== 1 passed in 1.18s ===============================
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31a_xsec_p_not_none_matches_kernel_and_separates_iid 
+-------------------------------- live log call ---------------------------------
+04:39:54 [INFO] IC config loaded
+FAILED                                                                   [100%]
+
+=================================== FAILURES ===================================
+/Users/louis/Desktop/quantitative_trading_system/tests/momentum/test_ic_1eb_b3_xsec.py:111: assert False
+=========================== short test summary info ============================
+FAILED tests/momentum/test_ic_1eb_b3_xsec.py::test_t31a_xsec_p_not_none_matches_kernel_and_separates_iid
+============================== 1 failed in 1.07s ===============================
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31a_xsec_p_not_none_matches_kernel_and_separates_iid 
+-------------------------------- live log call ---------------------------------
+04:39:58 [INFO] IC config loaded
+PASSED                                                                   [100%]
+
+============================== 1 passed in 1.06s ===============================
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31b_labels_path_return_5_maxlags_floor 
+-------------------------------- live log call ---------------------------------
+04:40:03 [INFO] IC config loaded
+PASSED                                                                   [100%]
+
+============================== 1 passed in 1.01s ===============================
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31b_labels_path_return_5_maxlags_floor 
+-------------------------------- live log call ---------------------------------
+04:40:07 [INFO] IC config loaded
+FAILED                                                                   [100%]
+
+=================================== FAILURES ===================================
+/Users/louis/Desktop/quantitative_trading_system/tests/momentum/test_ic_1eb_b3_xsec.py:185: assert True is False
+=========================== short test summary info ============================
+FAILED tests/momentum/test_ic_1eb_b3_xsec.py::test_t31b_labels_path_return_5_maxlags_floor
+============================== 1 failed in 1.03s ===============================
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31b_labels_path_return_5_maxlags_floor 
+-------------------------------- live log call ---------------------------------
+04:40:12 [INFO] IC config loaded
+PASSED                                                                   [100%]
+
+============================== 1 passed in 1.03s ===============================
+MUTATION PROBE PASS [iid-swap]: red exit=1, restore ok
+MUTATION PROBE PASS [label-rename]: red exit=1, restore ok
+MUTATION PROBE PASS: both A(iid) and B(label-rename)

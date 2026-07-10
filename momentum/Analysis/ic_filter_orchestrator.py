@@ -22,8 +22,12 @@ from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.ic_reporter import ICReporter
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
 from momentum.Analysis.redundancy_filter import RedundancyFilter
+from scipy import stats as scipy_stats
+
 from momentum.Analysis.statistical_validator import (
     StatisticalValidator,
+    _hac_nan_result,
+    _newey_west_bartlett_se,
     apply_fdr,
     compute_hac_ic_statistics,
 )
@@ -94,6 +98,7 @@ FDR_ASSUMPTION_NOTE = (
     "BH assumes PRDS; correlated features may yield slight FDR optimism"
 )
 TESTED_ESTIMATOR_BAR_LEVEL = "bar_level_spearman"
+TESTED_ESTIMATOR_XSEC_PERIOD_IC = "cross_sectional_period_ic"
 
 
 def _resolve_expected_freq(metadata: Optional[dict]) -> pd.Timedelta:
@@ -367,12 +372,71 @@ def _build_holdout_split_plan(
     return train_plan, test_plan
 
 
-def _resolve_cross_sectional_label_horizon(label_col: str) -> int:
-    """cross_sectional 標籤實際 horizon（return_1→1，非 config 預設 default_horizon）。"""
-    match = re.fullmatch(r"return_(\d+)", label_col)
-    if match:
-        return int(match.group(1))
-    return 1
+def _resolve_cross_sectional_label_horizon(label_col: str) -> Optional[int]:
+    """xsec label bar-horizon；不可解析→None（禁 fallback h=1 假 horizon）。
+
+    必須在 `_label` 改名前對**原始欄名**呼叫（CODEX-3 / D-H）。
+    與 `_resolve_label_horizon_from_column` 單一真相源收斂，禁兩套。
+    """
+    try:
+        return _resolve_label_horizon_from_column(str(label_col), None)  # type: ignore[arg-type]
+    except InvalidInputError:
+        return None
+
+
+def _select_inframe_return_n_column(columns: Any) -> Optional[str]:
+    """in-frame 候選：自欄名挑 `return_N`（regex return_(\\d+)）。
+
+    多欄確定性規則（明文凍結）：取 **N 最小**；N 相同時取欄名字典序第一。
+    優先序位置等同舊硬編 `return_1`（label > return_N > future_return > target > y）。
+    """
+    matches: list[tuple[int, str]] = []
+    for col in columns:
+        name = str(col)
+        match = re.fullmatch(r"return_(\d+)", name)
+        if match:
+            matches.append((int(match.group(1)), name))
+    if not matches:
+        return None
+    matches.sort(key=lambda item: (item[0], item[1]))
+    return matches[0][1]
+
+
+def _compute_hac_on_ic_series(values: np.ndarray, horizon: int) -> dict:
+    """對 xsec 逐期 IC 序列做 NW HAC（z=IC 本身；L/cap/p 同 D-A）。
+
+    Returns:
+        t_stat / p_value / se / n_obs / maxlags（fail-closed 時統計量 NaN）
+    """
+    if horizon is None or int(horizon) < 1:
+        raise ValueError(f"horizon must be >= 1, got {horizon}")
+    horizon = int(horizon)
+    z = np.asarray(values, dtype=float)
+    z = z[np.isfinite(z)]
+    n_valid = int(z.size)
+    if n_valid < 2:
+        return _hac_nan_result(n_obs=n_valid, maxlags=np.nan)
+
+    min_lag_floor = horizon - 1
+    auto_bw = int(4 * (n_valid / 100.0) ** (2.0 / 9.0))
+    L = max(auto_bw, min_lag_floor)
+    if L >= n_valid - 1 or n_valid < max(8, 2 * L):
+        return _hac_nan_result(n_obs=n_valid, maxlags=L)
+
+    se = _newey_west_bartlett_se(z, L)
+    mean_z = float(np.mean(z))
+    if not np.isfinite(se) or se == 0.0:
+        return _hac_nan_result(n_obs=n_valid, maxlags=L)
+
+    t_stat = float(mean_z / se)
+    p_value = float(2.0 * scipy_stats.t.sf(abs(t_stat), df=n_valid - 1))
+    return {
+        "t_stat": t_stat,
+        "p_value": p_value,
+        "se": float(se),
+        "n_obs": n_valid,
+        "maxlags": int(L),
+    }
 
 
 def _labels_df_has_symbol_dimension(labels_df: pd.DataFrame) -> bool:
@@ -957,6 +1021,9 @@ class ICFilterOrchestrator:
             symbol_level_idx = index_names.index("symbol")
 
         label_col: Optional[str] = None
+        # D-H / CODEX-3：horizon 必須在 `_label` 改名前對原始欄名解析
+        horizon_source_name: Optional[str] = None
+        sig_horizon: Optional[int] = None
         labels_df = self._load_labels_hdf5(labels_path) if labels_path else None
 
         if labels_df is not None and not labels_df.empty:
@@ -975,14 +1042,32 @@ class ICFilterOrchestrator:
                 symbol_level_idx=labels_symbol_level_idx,
             )
             label_series = self._select_label_series(labels_df, config)
+            # 原始欄名（改名前）；Series.name 在 _select_label_series 取自 labels_df 欄
+            if label_series.name is not None:
+                horizon_source_name = str(label_series.name)
+            else:
+                horizon_source_name = str(labels_df.columns[0])
+            sig_horizon = _resolve_cross_sectional_label_horizon(horizon_source_name)
             working_df = features.copy()
             working_df["_label"] = label_series.reindex(features.index).to_numpy()
             label_col = "_label"
         else:
+            # in-frame 候選優先序（維持既有；return_1 泛化為 return_N / CODEX-3）：
+            # label > return_N(多欄→N 最小, 同 N 字典序第一) > future_return > target > y
             working_df = features.copy()
-            for candidate in ["label", "return_1", "future_return", "target", "y"]:
+            for candidate in ["label", "return_N", "future_return", "target", "y"]:
+                if candidate == "return_N":
+                    chosen = _select_inframe_return_n_column(working_df.columns)
+                    if chosen is None:
+                        continue
+                    label_col = chosen
+                    horizon_source_name = chosen
+                    sig_horizon = _resolve_cross_sectional_label_horizon(chosen)
+                    break
                 if candidate in working_df.columns:
                     label_col = candidate
+                    horizon_source_name = candidate
+                    sig_horizon = _resolve_cross_sectional_label_horizon(candidate)
                     break
 
         if label_col is None:
@@ -998,7 +1083,9 @@ class ICFilterOrchestrator:
         if not feature_cols:
             raise InvalidInputError("no numeric feature columns found for cross-sectional analysis")
 
-        effective_horizon = _resolve_cross_sectional_label_horizon(label_col)
+        # 覆蓋率/split purge 需要整數 horizon；不可解析時僅結構下界 1（**不**用於顯著性）
+        structural_horizon = int(sig_horizon) if sig_horizon is not None else 1
+        effective_horizon = structural_horizon
         per_symbol_coverage = _enforce_cross_sectional_label_coverage(
             numeric_df,
             label_col,
@@ -1072,6 +1159,7 @@ class ICFilterOrchestrator:
         self._report_progress(1, "cross_sectional", 0.8, "building cross-sectional report")
 
         summary_table: list[dict[str, Any]] = []
+        maxlags_by_feature: dict[str, Any] = {}
         for feature_name in feature_cols:
             values = np.array(ic_series.get(feature_name, []), dtype=float)
             if values.size == 0:
@@ -1079,16 +1167,22 @@ class ICFilterOrchestrator:
                 ic_std = np.nan
                 icir = np.nan
                 ic_hit_rate = np.nan
-                t_stat = np.nan
             else:
                 ic_mean = float(np.nanmean(values))
                 ic_std = float(np.nanstd(values))
                 icir = float(ic_mean / ic_std) if ic_std > 0 else np.nan
                 ic_hit_rate = float(np.mean(values > 0))
-                if values.size > 1 and ic_std > 0:
-                    t_stat = float(ic_mean / (ic_std / np.sqrt(values.size)))
-                else:
-                    t_stat = np.nan
+
+            # D-H：h 可解析→HAC t/p；h=None→p 族全 NaN（禁假 horizon 反保守 p）
+            if sig_horizon is None:
+                t_stat = float("nan")
+                p_value = float("nan")
+                maxlags_by_feature[feature_name] = np.nan
+            else:
+                hac = _compute_hac_on_ic_series(values, sig_horizon)
+                t_stat = float(hac["t_stat"]) if hac.get("t_stat") is not None else float("nan")
+                p_value = float(hac["p_value"]) if hac.get("p_value") is not None else float("nan")
+                maxlags_by_feature[feature_name] = hac.get("maxlags", np.nan)
 
             summary_table.append(
                 {
@@ -1097,7 +1191,8 @@ class ICFilterOrchestrator:
                     "ic_std": ic_std,
                     "icir": icir,
                     "t_stat": t_stat,
-                    "p_value": None,
+                    "p_value": p_value,
+                    "p_value_adj": float("nan"),
                     "ic_hit_rate": ic_hit_rate,
                     "monotonicity_score": None,
                     "long_short_spread": None,
@@ -1107,6 +1202,26 @@ class ICFilterOrchestrator:
                     "regime_robust": None,
                 }
             )
+
+        # FDR 對該路徑全 feature（n_tests=finite p）；排序仍按 ICIR、不加門檻
+        p_values_map: dict[str, float] = {}
+        for item in summary_table:
+            name = str(item["feature_name"])
+            try:
+                p_values_map[name] = float(item["p_value"])
+            except (TypeError, ValueError):
+                p_values_map[name] = float("nan")
+        # 同 stage5：一律算 BH q 填 p_value_adj；enabled 旗標僅披露（xsec 無 p 閘）
+        fdr_enabled = self._resolve_fdr_enabled(config)
+        alpha_for_fdr = float(config.thresholds.p_value_max)
+        q_values, n_tests = apply_fdr(p_values_map, alpha_for_fdr)
+        for item in summary_table:
+            name = str(item["feature_name"])
+            q = q_values.get(name, float("nan"))
+            try:
+                item["p_value_adj"] = float(q)
+            except (TypeError, ValueError):
+                item["p_value_adj"] = float("nan")
 
         summary_table = sorted(
             summary_table,
@@ -1132,6 +1247,13 @@ class ICFilterOrchestrator:
         )
         cross_symbol_validation = self._build_cross_symbol_validation(symbol_ic_matrix)
 
+        finite_maxlags = [
+            int(v)
+            for v in maxlags_by_feature.values()
+            if v is not None and np.isfinite(float(v))
+        ]
+        maxlags_meta: Optional[int] = max(finite_maxlags) if finite_maxlags else None
+
         metadata: dict[str, Any] = {
             "mode": "cross_sectional",
             "n_symbols": int(features.index.get_level_values(symbol_level_idx).nunique()),
@@ -1141,6 +1263,19 @@ class ICFilterOrchestrator:
             "total_features_output": len(feature_cols),
             "per_symbol_coverage": per_symbol_coverage,
             "mean_label_coverage": mean_coverage,
+            "horizon_unresolved": bool(sig_horizon is None),
+            "label_horizon": sig_horizon,
+            "horizon_source_name": horizon_source_name,
+            "significance": {
+                "fdr": {
+                    "enabled": bool(fdr_enabled),
+                    "method": "fdr_bh" if fdr_enabled else "none",
+                },
+                "maxlags": maxlags_meta,
+                "n_tests": int(n_tests),
+                "tested_estimator": TESTED_ESTIMATOR_XSEC_PERIOD_IC,
+                "fdr_assumption_note": FDR_ASSUMPTION_NOTE,
+            },
         }
         if split_meta is not None:
             metadata["ic_train_test_split"] = split_meta

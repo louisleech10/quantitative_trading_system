@@ -1,0 +1,57 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 11 items
+
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31a_xsec_p_not_none_matches_kernel_and_separates_iid 
+-------------------------------- live log call ---------------------------------
+04:27:25 [INFO] IC config loaded
+PASSED                                                                   [  9%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31a_iid_mutation_would_fail_separation 
+-------------------------------- live log call ---------------------------------
+04:27:25 [INFO] IC config loaded
+PASSED                                                                   [ 18%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31b_labels_path_return_5_maxlags_floor 
+-------------------------------- live log call ---------------------------------
+04:27:26 [INFO] IC config loaded
+PASSED                                                                   [ 27%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31b_resolve_on_label_renamed_is_none PASSED [ 36%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31b_mutation_resolve_after_rename_loses_horizon 
+-------------------------------- live log call ---------------------------------
+04:27:26 [INFO] IC config loaded
+PASSED                                                                   [ 45%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31c_horizon_unresolved_p_all_nan 
+-------------------------------- live log call ---------------------------------
+04:27:26 [INFO] IC config loaded
+PASSED                                                                   [ 54%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31_inframe_return_5_no_labels_path 
+-------------------------------- live log call ---------------------------------
+04:27:26 [INFO] IC config loaded
+PASSED                                                                   [ 63%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31_inframe_multi_return_n_picks_min_n 
+-------------------------------- live log call ---------------------------------
+04:27:26 [INFO] IC config loaded
+PASSED                                                                   [ 72%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31_inframe_label_beats_return_n 
+-------------------------------- live log call ---------------------------------
+04:27:26 [INFO] IC config loaded
+PASSED                                                                   [ 81%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31_sort_still_by_icir_no_threshold 
+-------------------------------- live log call ---------------------------------
+04:27:26 [INFO] IC config loaded
+PASSED                                                                   [ 90%]
+tests/momentum/test_ic_1eb_b3_xsec.py::test_t31_fdr_q_matches_apply_fdr 
+-------------------------------- live log call ---------------------------------
+04:27:26 [INFO] IC config loaded
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 11 passed, 1 warning in 1.98s =========================

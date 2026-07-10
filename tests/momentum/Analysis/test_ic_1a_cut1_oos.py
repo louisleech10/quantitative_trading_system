@@ -186,6 +186,7 @@ def test_summary_and_threshold_same_scope() -> None:
         orchestrator._config,
         {},
         split_context=context,
+        metadata={"symbol": "BTCUSDT"},
     )
 
     assert stage5["scope"] == "test"
@@ -211,10 +212,22 @@ def test_stage5_metrics_all_oos() -> None:
     }
 
     clean_stage5 = orchestrator._stage5_statistical_validation(
-        features, label, ic_results, orchestrator._config, {}, split_context=context
+        features,
+        label,
+        ic_results,
+        orchestrator._config,
+        {},
+        split_context=context,
+        metadata={"symbol": "BTCUSDT"},
     )
     dirty_stage5 = orchestrator._stage5_statistical_validation(
-        dirty, label, ic_results, orchestrator._config, {}, split_context=context
+        dirty,
+        label,
+        ic_results,
+        orchestrator._config,
+        {},
+        split_context=context,
+        metadata={"symbol": "BTCUSDT"},
     )
 
     assert dirty_stage5["coverage"] == clean_stage5["coverage"]
