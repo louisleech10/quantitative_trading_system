@@ -33,12 +33,17 @@ class ICReporter:
             analysis_results.get("rolling_ic_series", {})
         )
 
+        meta = self._sanitize_metadata_for_json(metadata or {})
+        summary_table = self._sanitize_summary_table_for_json(
+            analysis_results.get("summary_table", [])
+        )
+
         report = {
             "version": "1.0",
             "generated_at": datetime.utcnow().isoformat(),
-            "metadata": metadata or {},
+            "metadata": meta,
             "filter_log": analysis_results.get("filter_log", {}),
-            "summary_table": analysis_results.get("summary_table", []),
+            "summary_table": summary_table,
             "ic_decay": analysis_results.get("ic_decay", {}),
             "quantile_returns": analysis_results.get("quantile_returns", {}),
             "grouped_ic": analysis_results.get("grouped_ic", {}),
@@ -111,6 +116,7 @@ class ICReporter:
         summary_table = report.get("summary_table", []) if isinstance(report, dict) else []
         deep_payload = deep_report or self._resolve_deep_report(report)
 
+        # 既有欄名/順序 byte 不變；t_stat / p_value_adj 僅追加於末尾（Task 2.4）
         base_columns = [
             "rank",
             "feature_name",
@@ -126,6 +132,8 @@ class ICReporter:
             "decay_type",
             "long_short_spread",
             "max_correlation",
+            "t_stat",
+            "p_value_adj",
         ]
         deep_columns = [
             "factor_return_ls_mean",
@@ -158,7 +166,12 @@ class ICReporter:
                 "feature_name": feature_name,
                 "ic_mean": item.get("ic_mean"),
                 "icir": item.get("icir"),
+                # 舊欄 p_value：保留 raw float（含 NaN→csv 寫成 "nan"），
+                # 禁經 _jsonable_scalar 以免 byte 從 "nan" 變空欄（Task 2.4 硬規格）
                 "p_value": item.get("p_value"),
+                # 新欄：JSON/下游可 null；CSV 允許 None→空欄（舊 baseline 無此欄）
+                "t_stat": self._jsonable_scalar(item.get("t_stat")),
+                "p_value_adj": self._jsonable_scalar(item.get("p_value_adj")),
                 "ic_hit_rate": item.get("ic_hit_rate"),
                 "monotonicity_score": item.get("monotonicity_score"),
                 "coverage": item.get("coverage"),
@@ -428,6 +441,59 @@ class ICReporter:
         if "timestamp" in features_df.columns:
             return features_df["timestamp"].to_numpy(dtype=np.int64)
         return np.arange(len(features_df), dtype=np.int64)
+
+    @staticmethod
+    def _jsonable_scalar(value: Any) -> Any:
+        """非有限 float（NaN/inf）→ None（JSON null）。"""
+        if value is None:
+            return None
+        try:
+            if isinstance(value, (float, np.floating, int, np.integer)):
+                fv = float(value)
+                if not math.isfinite(fv):
+                    return None
+                return fv
+        except (TypeError, ValueError):
+            return value
+        return value
+
+    def _sanitize_summary_table_for_json(self, summary_table: Any) -> list:
+        """summary 列中 t_stat/p_value/p_value_adj 的 NaN → null。"""
+        if not isinstance(summary_table, list):
+            return []
+        sanitized: list = []
+        for item in summary_table:
+            if not isinstance(item, dict):
+                sanitized.append(item)
+                continue
+            row = dict(item)
+            for key in ("p_value", "t_stat", "p_value_adj"):
+                if key in row:
+                    row[key] = self._jsonable_scalar(row.get(key))
+            sanitized.append(row)
+        return sanitized
+
+    def _sanitize_metadata_for_json(self, metadata: dict) -> dict:
+        """確保 significance 節存在時結構完整；scalar NaN → null。"""
+        meta = dict(metadata or {})
+        significance = meta.get("significance")
+        if isinstance(significance, dict):
+            sig = dict(significance)
+            fdr = sig.get("fdr")
+            if isinstance(fdr, dict):
+                fdr_clean = dict(fdr)
+                if "alpha_effective" in fdr_clean:
+                    fdr_clean["alpha_effective"] = self._jsonable_scalar(
+                        fdr_clean.get("alpha_effective")
+                    )
+                sig["fdr"] = fdr_clean
+            if "maxlags" in sig:
+                sig["maxlags"] = self._jsonable_scalar(sig.get("maxlags"))
+            if "n_tests" in sig:
+                n_tests = sig.get("n_tests")
+                sig["n_tests"] = int(n_tests) if n_tests is not None else 0
+            meta["significance"] = sig
+        return meta
 
     def _sample_rolling_series(self, rolling_series: dict) -> dict:
         if not isinstance(rolling_series, dict):

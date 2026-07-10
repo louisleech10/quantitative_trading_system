@@ -409,23 +409,45 @@ def test_collect_ic_decay_warnings_and_metadata():
 
 
 def test_stage5_statistical_validation_adjusted_p_threshold():
-    """adjusted_p_threshold 應覆蓋 p_value_max。"""
+    """【語意遷移】adjusted_p_threshold 不再覆蓋 p_value_max；α 政策依 tier。
+
+    舊語意：adjusted_p_threshold 直接覆寫 p_value_max。
+    新語意（D-E）：sufficient→alpha=p_value_max；low_confidence→max(p,0.10)。
+    本測保留「stage5 可跑 + summary_table 產出」結構斷言，並驗證 α 政策。
+    """
     orchestrator = ICFilterOrchestrator(load_ic_config())
     config = load_ic_config()
-    features_df = pd.DataFrame({"f1": [0.1, 0.2, 0.15, 0.25, 0.3]}, dtype=np.float32)
-    label_series = pd.Series([0.1, 0.2, 0.1, 0.2, 0.1], index=features_df.index)
+    # 足夠長序列避免 HAC fail-closed
+    rng = np.random.default_rng(42)
+    n = 128
+    features_df = pd.DataFrame(
+        {"f1": rng.normal(size=n).astype(np.float32)},
+        index=pd.RangeIndex(n),
+    )
+    label_series = pd.Series(rng.normal(size=n), index=features_df.index)
     ic_results = {
         "rolling_ic": {"f1": {"window_2": [0.1, 0.2, 0.15]}},
         "icir": {"f1": {"icir": 0.1, "ic_mean": 0.1, "ic_hit_rate": 1.0}},
         "ic_decay": {},
     }
+    # adjusted_p_threshold 存在但不得覆蓋 α
     event_info = {"tier": "sufficient", "adjusted_p_threshold": 0.2}
 
     result = orchestrator._stage5_statistical_validation(
-        features_df, label_series, ic_results, config, event_info
+        features_df,
+        label_series,
+        ic_results,
+        config,
+        event_info,
+        metadata={"symbol": "BTCUSDT"},
     )
 
     assert "summary_table" in result
+    assert result["threshold_log"]["alpha_effective"] == float(
+        config.thresholds.p_value_max
+    )
+    assert result["threshold_log"]["alpha_source"] == "threshold_default"
+    assert result["threshold_log"]["alpha_effective"] != 0.2
 
 
 def test_apply_config_override_rejects_non_dict():
@@ -1030,6 +1052,7 @@ def test_apply_thresholds_missing_and_long_short():
             "ic_mean": 0.1,
             "icir": 0.1,
             "p_value": 0.01,
+            "p_value_adj": 0.01,
             "ic_hit_rate": 0.4,
             "monotonicity_score": 0.1,
             "coverage": 0.6,
@@ -1040,6 +1063,7 @@ def test_apply_thresholds_missing_and_long_short():
             "ic_mean": 0.1,
             "icir": 0.1,
             "p_value": 0.01,
+            "p_value_adj": 0.01,
             "ic_hit_rate": 0.6,
             "monotonicity_score": 0.1,
             "coverage": 0.4,
@@ -1050,6 +1074,7 @@ def test_apply_thresholds_missing_and_long_short():
             "ic_mean": 0.1,
             "icir": 0.1,
             "p_value": 0.01,
+            "p_value_adj": 0.01,
             "ic_hit_rate": 0.6,
             "monotonicity_score": 0.1,
             "coverage": 0.6,
@@ -1057,7 +1082,10 @@ def test_apply_thresholds_missing_and_long_short():
         },
     ]
 
-    _, log = orchestrator._apply_thresholds(summary_table, config.thresholds, 0.05)
+    # 語意遷移：第三參更名 alpha_effective；FDR on 消費 p_value_adj（已補欄，斷言同舊）
+    _, log = orchestrator._apply_thresholds(
+        summary_table, config.thresholds, 0.05, fdr_enabled=True
+    )
     assert "f1" in log["removed_features"]["ic_hit_rate"]
     assert "f2" in log["removed_features"]["coverage"]
     assert "f3" in log["removed_features"]["long_short_spread"]

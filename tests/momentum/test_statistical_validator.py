@@ -16,13 +16,13 @@ from momentum.Analysis.statistical_validator import (
 from tests.momentum.helpers.block_bootstrap import block_bootstrap_ic_pvalue
 
 
-def test_compute_ic_statistics_matches_ttest():
-    """t-stat 與 p-value 與 scipy 驗算一致。"""
+def test_compute_pooled_ic_statistics_deprecated_matches_ttest():
+    """【語意遷移】舊 pooled 函式改名後，t-stat/p-value 與 scipy 驗算一致（斷言未放寬）。"""
     values = np.array([0.1, 0.2, 0.05, 0.15, 0.12], dtype=float)
     rolling = {"feat": {"window_5": values.tolist()}}
 
     validator = StatisticalValidator({"p_value_max": 0.05})
-    stats_result = validator.compute_ic_statistics(rolling)["feat"]
+    stats_result = validator.compute_pooled_ic_statistics_deprecated(rolling)["feat"]
 
     expected = stats.ttest_1samp(values, 0.0, nan_policy="omit")
     mean = float(np.mean(values))
@@ -36,21 +36,6 @@ def test_compute_ic_statistics_matches_ttest():
     assert np.isclose(stats_result["ci_lower"], mean - margin)
     assert np.isclose(stats_result["ci_upper"], mean + margin)
     assert stats_result["n_observations"] == n_obs
-
-
-def test_apply_significance_filter_low_confidence():
-    """low_confidence 時 p-value 閾值放寬至 0.10。"""
-    validator = StatisticalValidator({"p_value_max": 0.05})
-    ic_stats = {
-        "good": {"p_value": 0.08, "n_observations": 60},
-        "bad": {"p_value": 0.12, "n_observations": 60},
-    }
-
-    filtered = validator.apply_significance_filter(
-        ic_stats, sample_tier="low_confidence"
-    )
-    assert "good" in filtered
-    assert "bad" not in filtered
 
 
 def test_adjust_multiple_comparisons():
@@ -80,32 +65,19 @@ def test_adjust_multiple_comparisons_empty_and_unknown():
     assert raw == {"a": 0.2}
 
 
-def test_apply_significance_filter_default_threshold():
-    """p_value_max 為 None 時回退預設。"""
-    validator = StatisticalValidator({"p_value_max": 0.05})
-    ic_stats = {"feat": {"p_value": 0.04}}
-
-    filtered = validator.apply_significance_filter(ic_stats, p_value_max=None)
-    assert "feat" in filtered
-
-
 def test_compute_stats_edge_cases():
     """樣本不足或 std=0 應回 NaN。"""
     validator = StatisticalValidator({})
 
-    stats_small = validator.compute_ic_statistics({"feat": {"window": [0.1]}})["feat"]
+    stats_small = validator.compute_pooled_ic_statistics_deprecated(
+        {"feat": {"window": [0.1]}}
+    )["feat"]
     assert np.isnan(stats_small["t_stat"])
 
-    stats_zero_std = validator.compute_ic_statistics({"feat": {"window": [0.0, 0.0, 0.0]}})["feat"]
+    stats_zero_std = validator.compute_pooled_ic_statistics_deprecated(
+        {"feat": {"window": [0.0, 0.0, 0.0]}}
+    )["feat"]
     assert np.isnan(stats_zero_std["t_stat"])
-
-
-def test_apply_significance_filter_skips_nan():
-    """p_value 為 NaN 時應被跳過。"""
-    validator = StatisticalValidator({})
-    ic_stats = {"feat": {"p_value": np.nan}}
-
-    assert validator.apply_significance_filter(ic_stats) == {}
 
 
 def test_collect_values_and_to_list_branches():

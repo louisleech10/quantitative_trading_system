@@ -10579,3 +10579,124 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B2-GROK", "ts": "2026-07-10T15:47:02Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-B2-IMPL-RESULT.md", "output_sha256": "pending", "task_id": "IC1EB-B2-GROK", "ts": "2026-07-10T15:47:03Z"}
+=== 2026-07-10 23:47:03 | dispatch ===
+  ts=2026-07-10 23:47:03
+  kind=dispatch
+  intent=IC1EB B2 實作派工(Grok 4.5):Task 2.1-2.5 縱向主路徑接線(stage5 消費 HAC q)
+  risk=high
+  facts_asked=B1 三方審全 PASS 已合入 c0b29ac;階梯續派 Grok;baseline v4 唯讀凍結;SPEC/TODO v2.2+雙戳記 b77932d8
+  review_role=B2 交付後 Codex+Composer 雙審(非作者);Claude 驗收(G-1 相關欄不動+mutation receipt+防假綠 diff)
+  template=templates 已於凍結時跟過(同 IC1EB-B1-GROK 票)
+  adversarial=handoffs/IC1EB-RECONCILE.md
+  reconcile=handoffs/IC1EB-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  todo=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/RULE-PROPOSAL-REVIEW-codex.md", "output_sha256": "pending", "task_id": "IC1EB-RULEPROP-codex", "ts": "2026-07-10T15:47:53Z"}
+=== 2026-07-10 23:47:53 | dispatch ===
+  ts=2026-07-10 23:47:53
+  kind=dispatch
+  intent=規則提案詰問(codex):編排端自產物先審後跑(RULE-PROPOSAL-ORCH-SELF-ARTIFACT)
+  risk=low
+  facts_asked=出生事故=1e+1b baseline 單人設計執行,三家 R1 全 BLOCK 抓出實害;使用者已質疑流程並要求制度修補;條文4點見提案檔
+  review_role=codex 挑戰條文可鑽性/機械化可行性/成本效益;composer 另附 baseline v2→v4 delta 確認節
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/RULE-PROPOSAL-REVIEW-composer.md", "output_sha256": "pending", "task_id": "IC1EB-RULEPROP-composer", "ts": "2026-07-10T15:47:53Z"}
+=== 2026-07-10 23:47:53 | dispatch ===
+  ts=2026-07-10 23:47:53
+  kind=dispatch
+  intent=規則提案詰問(composer):編排端自產物先審後跑(RULE-PROPOSAL-ORCH-SELF-ARTIFACT)
+  risk=low
+  facts_asked=出生事故=1e+1b baseline 單人設計執行,三家 R1 全 BLOCK 抓出實害;使用者已質疑流程並要求制度修補;條文4點見提案檔
+  review_role=composer 挑戰條文可鑽性/機械化可行性/成本效益;composer 另附 baseline v2→v4 delta 確認節
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B2-REVIEW-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B2-REV-codex", "ts": "2026-07-10T16:22:21Z"}
+=== 2026-07-11 00:22:21 | dispatch ===
+  ts=2026-07-11 00:22:21
+  kind=dispatch
+  intent=IC1EB B2 code review(codex):Task 2.1-2.5 主路徑接線(stage5 HAC q/α 政策/SelectionScope/reporter/刪幽靈)
+  risk=low
+  facts_asked=B2 由 Grok 實作(階梯);Claude 已驗:1015 綠(親跑193s)/斷言刪除僅限 Task2.5 遷移/G-1 抽驗一顆五hash 全 MATCH+新欄在/禁項未動;Grok 另重凍 1a golden 本地 baseline(行為變更後果,須專項審)
+  review_role=codex 對照 SPEC D-C~D-G+TODO Phase2 逐項驗;專項:①1a golden 重凍合法性(有無藉機掩蓋非顯著欄漂移)②M-B 相關 null 場景真實跑③α 六格+scope 契約 mutation 轉紅
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1EB-B2-REVIEW-composer.md", "output_sha256": "pending", "task_id": "IC1EB-B2-REV-composer", "ts": "2026-07-10T16:22:21Z"}
+=== 2026-07-11 00:22:21 | dispatch ===
+  ts=2026-07-11 00:22:21
+  kind=dispatch
+  intent=IC1EB B2 code review(composer):Task 2.1-2.5 主路徑接線(stage5 HAC q/α 政策/SelectionScope/reporter/刪幽靈)
+  risk=low
+  facts_asked=B2 由 Grok 實作(階梯);Claude 已驗:1015 綠(親跑193s)/斷言刪除僅限 Task2.5 遷移/G-1 抽驗一顆五hash 全 MATCH+新欄在/禁項未動;Grok 另重凍 1a golden 本地 baseline(行為變更後果,須專項審)
+  review_role=composer 對照 SPEC D-C~D-G+TODO Phase2 逐項驗;專項:①1a golden 重凍合法性(有無藉機掩蓋非顯著欄漂移)②M-B 相關 null 場景真實跑③α 六格+scope 契約 mutation 轉紅
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-RECONCILE.md", "output_sha256": "9ef9d6dce84d8c66339a96efed2da88f12946d56d14c0f1bd2a65f1546fba17d", "task_id": "IC1EB-B2-GROK-FIX1", "ts": "2026-07-10T18:56:28Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B2-IMPL-RESULT-FIX1.md", "output_sha256": "pending", "task_id": "IC1EB-B2-GROK-FIX1", "ts": "2026-07-10T18:56:29Z"}
+=== 2026-07-11 02:56:29 | dispatch ===
+  ts=2026-07-11 02:56:29
+  kind=dispatch
+  intent=IC1EB B2 修復輪1(Grok):codex review 六條 P1(refilter scope 漂移/假symbol/reporter byte/M-B 規格/mutation 真紅/1a 重凍越界)
+  risk=high
+  facts_asked=codex B2 review BLOCK 六 P1;Claude 親驗 refilter split_context 缺+symbol UNKNOWN 字面量成立;composer 同 diff PASS(漏抓,記分)
+  review_role=修復後 codex 複驗自家 findings;composer 補審修復面
+  template=templates 已於凍結時跟過(同 IC1EB-B1-GROK 票)
+  adversarial=handoffs/IC1EB-RECONCILE.md
+  reconcile=handoffs/IC1EB-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+  todo=docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1EB-B2-REVIEW-R2-codex.md", "output_sha256": "pending", "task_id": "IC1EB-B2-REV2-codex", "ts": "2026-07-10T19:23:52Z"}
+=== 2026-07-11 03:23:52 | dispatch ===
+  ts=2026-07-11 03:23:52
+  kind=dispatch
+  intent=IC1EB B2 FIX1 複驗(codex):六條 P1 閉合確認
+  risk=low
+  facts_asked=FIX1:refilter 重建 split_context/UNKNOWN 改 raise/reporter byte 修/M-B 重推導+binom CI/mutation 真紅/1a 重凍處置=隔離(原始為 gitignored 無法 restore,本地滅失,B5 worktree 重生;Claude 修正先前『已還原』誤報);全套 1016 綠+1a 2 skip(skip-if-absent 誠實態)
+  review_role=codex 原反例重打六條;1a 隔離處置合理性一併裁
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

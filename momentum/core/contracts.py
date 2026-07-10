@@ -726,7 +726,8 @@ class SelectionScope:
 
     scope_id: str
     universe_features: List[str]
-    split_label: Literal["train", "val", "test"]
+    # "full" = 無 train/test split 的明示全樣本標籤（Task 2.3 契約擴充，非放寬）
+    split_label: Literal["train", "val", "test", "full"]
     evaluated_features: List[str]
     n_tests: int
     method: str
@@ -734,8 +735,8 @@ class SelectionScope:
 
     def __post_init__(self) -> None:
         """驗證 evaluated_features 必須屬於 universe 且 n_tests 一致。"""
-        if self.split_label not in {"train", "val", "test"}:
-            raise ValueError("split_label must be one of train, val, test")
+        if self.split_label not in {"train", "val", "test", "full"}:
+            raise ValueError("split_label must be one of train, val, test, full")
         if not set(self.evaluated_features).issubset(set(self.universe_features)):
             raise ValueError("evaluated_features must be a subset of universe_features")
         if self.n_tests != len(self.evaluated_features):

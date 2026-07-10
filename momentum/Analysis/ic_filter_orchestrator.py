@@ -22,7 +22,11 @@ from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.ic_reporter import ICReporter
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
 from momentum.Analysis.redundancy_filter import RedundancyFilter
-from momentum.Analysis.statistical_validator import StatisticalValidator
+from momentum.Analysis.statistical_validator import (
+    StatisticalValidator,
+    apply_fdr,
+    compute_hac_ic_statistics,
+)
 from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
 from momentum.Analysis.ic_config_schema import FeatureFilterSchema, ICConfig
 from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedResult
@@ -32,6 +36,7 @@ from momentum.core.contracts import (
     ORACLE_RETURN_KINDS,
     AlignmentSpec,
     AlignmentViolationError,
+    SelectionScope,
     SplitPlan,
     TimestampDiscontinuityError,
     _coerce_timestamp_array,
@@ -83,6 +88,12 @@ EXPECTED_FREQ_BY_TIMEFRAME: dict[str, pd.Timedelta] = {
     "4h": pd.Timedelta("4h"),
     "12h": pd.Timedelta("12h"),
 }
+
+# D-F / Composer v2.2：固定一行 PRDS 披露（report metadata significance.fdr_assumption_note）
+FDR_ASSUMPTION_NOTE = (
+    "BH assumes PRDS; correlated features may yield slight FDR optimism"
+)
+TESTED_ESTIMATOR_BAR_LEVEL = "bar_level_spearman"
 
 
 def _resolve_expected_freq(metadata: Optional[dict]) -> pd.Timedelta:
@@ -860,6 +871,7 @@ class ICFilterOrchestrator:
             config,
             event_info,
             split_context=split_context,
+            metadata=metadata,
         )
 
         self._report_progress(6, "redundancy", 0.82, "removing redundancy")
@@ -1311,24 +1323,31 @@ class ICFilterOrchestrator:
         merged = self._deep_merge(config_data, {"thresholds": thresholds or {}})
         config = ICConfig.model_validate(merged)
 
+        # 與首跑同 scope：從 cache 重建 split_context（OOS→test，full→None）
+        split_context = self._ic_cache.get("split_context")
+        metadata = self._ic_cache.get("metadata", {})
+
         stage5_results = self._stage5_statistical_validation(
             self._ic_cache["features_df"],
             self._ic_cache["label_series"],
             self._ic_cache,
             config,
             self._ic_cache.get("event_info", {}),
+            split_context=split_context,
+            metadata=metadata,
         )
 
         stage6_results = self._stage6_redundancy(
             self._ic_cache["features_df"],
             stage5_results["passed_features"],
             self._ic_cache["icir"],
-            self._ic_cache.get("metadata", {}),
+            metadata,
+            split_context=split_context,
         )
 
         report = self._stage7_report(
             self._ic_cache["features_df"],
-            self._ic_cache.get("metadata", {}),
+            metadata,
             self._ic_cache,
             stage5_results,
             stage6_results,
@@ -1336,6 +1355,7 @@ class ICFilterOrchestrator:
             self._ic_cache.get("preproc_log", {}),
             self._ic_cache.get("event_info", {}),
             self._ic_cache.get("feature_filter_info", {}),
+            split_context=split_context,
         )
 
         self._report = report
@@ -2233,6 +2253,35 @@ class ICFilterOrchestrator:
 
         return ic_results
 
+    @staticmethod
+    def _resolve_scope_symbol(
+        split_context: Optional[dict],
+        metadata: Optional[dict],
+    ) -> str:
+        """解析 SelectionScope 用的真實 symbol；缺則 raise，禁虛構 UNKNOWN。
+
+        優先序：split_context.allowed_symbols → split_context.symbol → metadata.symbol。
+        正規化走既有 `_normalize_symbol_value`（缺值/sentinel fail-closed）。
+        """
+        if split_context is not None:
+            allowed = split_context.get("allowed_symbols")
+            if allowed:
+                first = (
+                    allowed[0]
+                    if isinstance(allowed, (list, tuple))
+                    else next(iter(allowed))
+                )
+                return _normalize_symbol_value(first)
+            if split_context.get("symbol") is not None:
+                return _normalize_symbol_value(split_context["symbol"])
+        if metadata is not None and metadata.get("symbol") is not None:
+            return _normalize_symbol_value(metadata["symbol"])
+        raise ValueError(
+            "SelectionScope base_universe_hash requires authentic symbol "
+            "(split_context.allowed_symbols/symbol or metadata.symbol); "
+            "refusing fabricated identity"
+        )
+
     def _stage5_statistical_validation(
         self,
         features_df: pd.DataFrame,
@@ -2241,9 +2290,14 @@ class ICFilterOrchestrator:
         config: ICConfig,
         event_info: dict,
         split_context: Optional[dict] = None,
+        metadata: Optional[dict] = None,
     ) -> dict:
-        rolling_ic = ic_results.get("rolling_ic", {})
+        """Stage5：HAC 顯著性 + FDR q 閘 + SelectionScope（Task 2.1–2.3）。
+
+        rolling_ic 保留於 ic_results 供診斷，不再餵入 p-value 鏈。
+        """
         icir = ic_results.get("icir", {})
+        event_info = event_info or {}
         test_mask = split_context.get("test_mask") if split_context else None
         features_for_stats, label_for_stats = _slice_by_mask(
             features_df,
@@ -2251,13 +2305,87 @@ class ICFilterOrchestrator:
             test_mask,
         )
 
-        ic_stats = self._stat_validator.compute_ic_statistics(rolling_ic)
-        tier = event_info.get("tier", "sufficient")
-        p_value_max = config.thresholds.p_value_max
-        if event_info.get("adjusted_p_threshold") and not np.isnan(
-            event_info.get("adjusted_p_threshold")
-        ):
-            p_value_max = event_info.get("adjusted_p_threshold")
+        # horizon：split_context 優先，否則 resolver（禁硬編 default）
+        if split_context is not None and split_context.get("effective_horizon") is not None:
+            horizon = int(split_context["effective_horizon"])
+        else:
+            horizon = int(_resolve_effective_label_horizon(config, None))
+
+        ic_stats = compute_hac_ic_statistics(
+            features_for_stats, label_for_stats, horizon=horizon
+        )
+
+        alpha_effective, alpha_source, selection_mode = self._resolve_alpha_policy(
+            config, event_info
+        )
+        fdr_enabled = self._resolve_fdr_enabled(config)
+
+        # 全 evaluated 集合（stage5 進場全欄）先算 BH q，先於任何門檻（D-C）
+        universe_features = [str(c) for c in features_for_stats.columns]
+        p_values: dict[str, float] = {}
+        for feature in universe_features:
+            raw_p = (ic_stats.get(feature) or {}).get("p_value", np.nan)
+            try:
+                p_values[feature] = float(raw_p)
+            except (TypeError, ValueError):
+                p_values[feature] = float("nan")
+
+        q_values, n_tests = apply_fdr(p_values, alpha_effective)
+        for feature, q in q_values.items():
+            item = dict(ic_stats.get(feature) or {})
+            item.setdefault("p_value", p_values.get(feature, np.nan))
+            item.setdefault("t_stat", np.nan)
+            item["p_value_adj"] = q
+            ic_stats[feature] = item
+
+        evaluated_features = [
+            feature
+            for feature in universe_features
+            if np.isfinite(p_values.get(feature, np.nan))
+        ]
+        if n_tests != len(evaluated_features):
+            raise ValueError(
+                f"n_tests ({n_tests}) must equal len(evaluated_features) "
+                f"({len(evaluated_features)})"
+            )
+
+        split_label = "test" if split_context is not None else "full"
+        symbol = self._resolve_scope_symbol(split_context, metadata)
+        config_hash = self._hash_config(config)
+        scope_id = f"{config_hash}:{split_label}"
+        selection_scope = SelectionScope(
+            scope_id=scope_id,
+            universe_features=universe_features,
+            split_label=split_label,  # type: ignore[arg-type]
+            evaluated_features=evaluated_features,
+            n_tests=n_tests,
+            method="fdr_bh" if fdr_enabled else "none",
+            base_universe_hash=_base_universe_hash(features_for_stats.index, symbol),
+        )
+
+        maxlags_values = [
+            (ic_stats.get(f) or {}).get("maxlags")
+            for f in evaluated_features
+        ]
+        finite_maxlags = [
+            int(v)
+            for v in maxlags_values
+            if v is not None and np.isfinite(float(v))
+        ]
+        maxlags_meta: Optional[int] = max(finite_maxlags) if finite_maxlags else None
+
+        significance_meta = {
+            "fdr": {
+                "enabled": bool(fdr_enabled),
+                "method": "fdr_bh" if fdr_enabled else "none",
+                "alpha_effective": float(alpha_effective),
+            },
+            "maxlags": maxlags_meta,
+            "n_tests": int(n_tests),
+            "scope_id": scope_id,
+            "tested_estimator": TESTED_ESTIMATOR_BAR_LEVEL,
+            "fdr_assumption_note": FDR_ASSUMPTION_NOTE,
+        }
 
         quantile_results = self._monotonicity.compute_all(
             features_for_stats, label_for_stats
@@ -2278,8 +2406,18 @@ class ICFilterOrchestrator:
         passed_features, threshold_log = self._apply_thresholds(
             summary_table,
             config.thresholds,
-            p_value_max,
+            alpha_effective,
+            fdr_enabled=fdr_enabled,
         )
+        threshold_log = {
+            **threshold_log,
+            "alpha_effective": float(alpha_effective),
+            "n_tests": int(n_tests),
+            "fdr_enabled": bool(fdr_enabled),
+            "alpha_source": alpha_source,
+        }
+        if selection_mode is not None:
+            threshold_log["selection_mode"] = selection_mode
 
         return {
             "summary_table": summary_table,
@@ -2291,7 +2429,51 @@ class ICFilterOrchestrator:
             "threshold_log": threshold_log,
             "label_series": label_for_stats,
             "scope": "test" if split_context is not None else "full",
+            "selection_scope": selection_scope,
+            "significance": significance_meta,
+            "alpha_effective": float(alpha_effective),
+            "alpha_source": alpha_source,
+            "selection_mode": selection_mode,
+            "fdr_enabled": bool(fdr_enabled),
+            "n_tests": int(n_tests),
         }
+
+    @staticmethod
+    def _resolve_alpha_policy(
+        config: ICConfig, event_info: dict
+    ) -> tuple[float, str, Optional[str]]:
+        """D-E α 政策：sufficient/marginal→p_value_max；low_confidence→max(p,0.10)。
+
+        不再用 adjusted_p_threshold 直接覆蓋 p_value_max（舊幽靈語意廢除）。
+        """
+        p_value_max = float(config.thresholds.p_value_max)
+        tier = str((event_info or {}).get("tier") or "sufficient")
+        if tier == "low_confidence":
+            return (
+                float(max(p_value_max, 0.10)),
+                "event_tier_low_confidence",
+                "exploratory_low_confidence",
+            )
+        # sufficient / marginal / 其他 → threshold_default
+        return p_value_max, "threshold_default", None
+
+    def _resolve_fdr_enabled(self, config: ICConfig) -> bool:
+        """FDR 預設 ON（D-G）。B4 接 schema 前：允許測試 override / 既有 significance 屬性。"""
+        override = getattr(self, "_fdr_enabled_override", None)
+        if override is not None:
+            return bool(override)
+        sig = getattr(config, "significance", None)
+        if sig is None:
+            return True
+        fdr = sig.get("fdr") if isinstance(sig, dict) else getattr(sig, "fdr", None)
+        if fdr is None:
+            return True
+        enabled = (
+            fdr.get("enabled") if isinstance(fdr, dict) else getattr(fdr, "enabled", None)
+        )
+        if enabled is None:
+            return True
+        return bool(enabled)
 
     def _stage6_redundancy(
         self,
@@ -2398,6 +2580,10 @@ class ICFilterOrchestrator:
             ic_results.get("ic_decay", {}),
             feature_filter_info,
             scope="test" if split_context is not None else None,
+            selection_scope=stage5_results.get("selection_scope"),
+            significance=stage5_results.get("significance"),
+            selection_mode=stage5_results.get("selection_mode"),
+            alpha_source=stage5_results.get("alpha_source"),
         )
         report = self._reporter.generate_json_report(analysis_results, report_meta)
 
@@ -2423,6 +2609,8 @@ class ICFilterOrchestrator:
             "feature_filter_info": feature_filter_info,
             "stage0_log": stage0_log,
             "preproc_log": preproc_log,
+            # refilter 必須與首跑同 HAC/FDR scope（OOS→test_mask；full→None）
+            "split_context": split_context,
         }
         self._monotonicity_cache = stage5_results.get("monotonicity", {})
         self._corr_cache = correlation_matrix
@@ -2544,6 +2732,8 @@ class ICFilterOrchestrator:
                     "ic_std": icir_item.get("ic_std"),
                     "icir": icir_item.get("icir"),
                     "p_value": stats_item.get("p_value"),
+                    "t_stat": stats_item.get("t_stat"),
+                    "p_value_adj": stats_item.get("p_value_adj"),
                     "ic_hit_rate": icir_item.get("ic_hit_rate"),
                     "monotonicity_score": quantile_item.get(
                         "monotonicity_score"
@@ -2563,8 +2753,11 @@ class ICFilterOrchestrator:
         self,
         summary_table: list[dict],
         thresholds: Any,
-        p_value_max: float,
+        alpha_effective: float,
+        *,
+        fdr_enabled: bool = True,
     ) -> tuple[list[str], dict]:
+        """門檻過濾；p 閘消費 p_value_adj（FDR on）或 p_value（FDR off）。"""
         passed: list[str] = []
         removed: dict[str, list[str]] = {
             "ic_mean": [],
@@ -2587,8 +2780,9 @@ class ICFilterOrchestrator:
             if not self._passes_threshold(row.get("icir"), thresholds.icir_min):
                 removed["icir"].append(name)
                 continue
+            p_field = "p_value_adj" if fdr_enabled else "p_value"
             if not self._passes_threshold(
-                row.get("p_value"), p_value_max, inverse=True
+                row.get(p_field), alpha_effective, inverse=True
             ):
                 removed["p_value"].append(name)
                 continue
@@ -2645,6 +2839,10 @@ class ICFilterOrchestrator:
         ic_decay: dict,
         feature_filter_info: Optional[dict] = None,
         scope: Optional[str] = None,
+        selection_scope: Optional[SelectionScope] = None,
+        significance: Optional[dict] = None,
+        selection_mode: Optional[str] = None,
+        alpha_source: Optional[str] = None,
     ) -> dict:
         meta = dict(metadata) if metadata else {}
         warnings = []
@@ -2667,6 +2865,22 @@ class ICFilterOrchestrator:
         )
         if scope is not None:
             meta["scope"] = scope
+        if selection_scope is not None:
+            meta["selection_scope"] = {
+                "scope_id": selection_scope.scope_id,
+                "universe_features": list(selection_scope.universe_features),
+                "split_label": selection_scope.split_label,
+                "evaluated_features": list(selection_scope.evaluated_features),
+                "n_tests": int(selection_scope.n_tests),
+                "method": selection_scope.method,
+                "base_universe_hash": selection_scope.base_universe_hash,
+            }
+        if significance is not None:
+            meta["significance"] = significance
+        if selection_mode is not None:
+            meta["selection_mode"] = selection_mode
+        if alpha_source is not None:
+            meta["alpha_source"] = alpha_source
         return meta
 
     @staticmethod

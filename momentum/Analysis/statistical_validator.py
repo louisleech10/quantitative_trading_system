@@ -207,8 +207,14 @@ class StatisticalValidator:
         self._config = config or {}
         self._default_p_value_max = float(self._config.get("p_value_max", 0.05))
 
-    def compute_ic_statistics(self, rolling_ic_dict: dict) -> dict[str, dict]:
-        """計算每個特徵的 IC 統計量。"""
+    def compute_pooled_ic_statistics_deprecated(
+        self, rolling_ic_dict: dict
+    ) -> dict[str, dict]:
+        """【已棄用】多窗 rolling IC 串接 + i.i.d. t-test。
+
+        僅供語意遷移測試對照；生產路徑必須使用 compute_hac_ic_statistics。
+        舊名 compute_ic_statistics 已移除，不得再被生產 import。
+        """
 
         stats_results: dict[str, dict] = {}
         for feature, windows in (rolling_ic_dict or {}).items():
@@ -216,30 +222,6 @@ class StatisticalValidator:
             ic_stats = self._compute_stats(values)
             stats_results[feature] = ic_stats
         return stats_results
-
-    def apply_significance_filter(
-        self,
-        ic_stats: dict,
-        p_value_max: float = 0.05,
-        sample_tier: str = "sufficient",
-    ) -> dict[str, dict]:
-        """根據 p-value 過濾。"""
-
-        if p_value_max is None:
-            p_value_max = self._default_p_value_max
-
-        threshold = float(p_value_max)
-        if sample_tier == "low_confidence":
-            threshold = max(threshold, 0.10)
-
-        filtered: dict[str, dict] = {}
-        for feature, stats_item in (ic_stats or {}).items():
-            p_value = stats_item.get("p_value", np.nan)
-            if np.isnan(p_value):
-                continue
-            if p_value <= threshold:
-                filtered[feature] = stats_item
-        return filtered
 
     def adjust_multiple_comparisons(
         self, p_values: dict, method: str = "fdr_bh"

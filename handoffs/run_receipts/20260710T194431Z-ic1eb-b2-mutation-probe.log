@@ -1,0 +1,43 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_statistical_validator.py::test_t13_block_bootstrap_agrees_with_kernel PASSED [100%]
+
+============================== 1 passed in 1.83s ===============================
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_statistical_validator.py::test_t13_block_bootstrap_agrees_with_kernel FAILED [100%]
+
+=================================== FAILURES ===================================
+_________________ test_t13_block_bootstrap_agrees_with_kernel __________________
+tests/momentum/test_statistical_validator.py:408: in test_t13_block_bootstrap_agrees_with_kernel
+    assert abs(kp - bp) <= tol, f"{name}: |{kp}-{bp}|={abs(kp-bp)} > {tol}"
+E   AssertionError: null: |0.31159782791865875-0.591704147926037|=0.28010632000737823 > 0.05
+E   assert 0.28010632000737823 <= 0.05
+E    +  where 0.28010632000737823 = abs((0.31159782791865875 - 0.591704147926037))
+=========================== short test summary info ============================
+FAILED tests/momentum/test_statistical_validator.py::test_t13_block_bootstrap_agrees_with_kernel
+============================== 1 failed in 1.47s ===============================
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/test_statistical_validator.py::test_t13_block_bootstrap_agrees_with_kernel PASSED [100%]
+
+============================== 1 passed in 1.70s ===============================
+MUTATION PROBE PASS: red exit=1, restore sha match, re-green ok
