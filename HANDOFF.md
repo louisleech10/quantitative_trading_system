@@ -1,17 +1,22 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-07-09 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-07-10 | **Branch**: main
 
-## ✅ 剛完成:1e+1b「顯著性正確化」SPEC v2.2+TODO v2.2 雙戳記凍結(本次 commit)
-- **B-1 文檔債已閉**(57e9ac8):1-align SPEC v3.1 D-5 return_kind+雙家族重戳機檢 PASS。
-- **管線全走**:三方偵察(IC1EB-RECON-{claude,codex,composer},Claude 全量自產版在列)→SPEC/TODO v1→R1 雙家族 adversarial 雙 REJECT(4 BLOCKING:auto_bw/p 分布不確定、xsec `_label` 改名丟 horizon(codex 抓,Claude 親驗 :966/:359)、fdr 第四命名)→v2/v2.1 逐項 ACCEPT→R2(Composer 13/13 CLOSED APPROVE;Codex 8/9→v2.1 修)→R3 Codex APPROVE→**雙 RECONCILE-STAMP 機檢 PASS(sha256:b77932d8,task:ic1eb-r3-stamp-codex/ic1eb-stamp-composer)**。
-- **使用者質疑觸發嚴謹度委員會**(ic1eb-rigor-*,三腿):HAC+BH=feature 級篩選標準工具,三方 FREEZE-OK;聯集收編 v2.2=M-B 增相關 null 場景(PRDS 實測化)+fdr_assumption_note+§N 登記(fdr_by/romano_wolf/描述性正名/策略層 snooping epic→ROADMAP P2 新節)。
-- **SPEC 核心**:kernel=bar-level Spearman 貢獻序列+NW(auto_bw=int(4*(n/100)^(2/9)),L=max(auto,h-1),p=t 分布,oracle=statsmodels use_t=True);BH-FDR 對全 evaluated 集合先算 q 再進閘;SelectionScope 接線;canonical `significance.fdr.*`;前端刪 resolveTStat/resolveConfidenceInterval i.i.d. 推導;xsec horizon 改名前解析;Golden=G-1 五 hash 不變腿+G-2 selection-diff+G-3 fail-closed;M-A~M-J mutation。
-- 委員產出全部 register-output;過程檔見 handoffs/IC1EB-*。
+## ✅ 剛完成:Grok 4.5 資格認證(R1+R2)+執行端分工二調
+- Grok 4.5 §8 T-A~T-D 資格認證完成,方法論/結果/receipts 全在 `docs/reviews/grok_4_5_evaluation.md`(唯一合併回 main 的產物;測試 worktree 已依使用者裁定清除)。
+- **分工(2026-07-10 使用者指示,ORCH §1 已更新)**:中/大實作=Codex(gpt-5.6-sol high)/Grok 4.5 依額度動態;Composer 2.5 主打 review/adversarial;實作型 SPEC/TODO 初稿=Composer 起草試點(設計/研究型仍全員三版);簽核 quorum=Claude+Codex+Composer 不變;Grok 前 ~5 真實任務加密驗收+記 executor_scorecard。
+- VERIFY: `grep model ~/.codex/config.toml` + `codex exec` header → `model: gpt-5.6-sol` / `reasoning effort: high`(2026-07-10 實跑)
+- grok 派工語法:`timeout <s> grok -p "<prompt>" -m grok-4.5 --cwd <絕對路徑> --sandbox workspace --always-approve --output-format plain < /dev/null`(⚠️ --cwd 相對路徑會失敗;gate_check 視 grok 為 dispatch 通道)
 
-## ★下一站(使用者指示:freeze commit 後停下討論)
-1. **與使用者討論後才動**:預產 Golden baseline 快照(`handoffs/ic1eb_baseline/`,舊路徑 report+五 hash,SPEC §G 程序)→ B1-B5 批次派工(Codex 實作+Composer review,依 TODO §B)→ 三方數據正確性簽核。
-2. 後續刀:③1c Net IC 量綱→④1d attribution→⑤1f 空圖+grouped schema。
+## ★下一站:IC 1e+1b(FDR/HAC 顯著性正確化)B1-B5 開跑(使用者 2026-07-10 拍板;建議新 session 從此接手)
+1. **Claude 預產 Golden baseline**(`handoffs/ic1eb_baseline/`,舊路徑 report+五 hash,SPEC §G 程序;不得由實作者自產,實作端唯讀消費)。
+2. gate `--risk high` 附 `--spec docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md --todo docs/IC_PHASE1_1E1B_SIGNIF_TODO.md --adversarial handoffs/IC1EB-RECONCILE.md`。
+   - VERIFY: `reconcile_stamps_check.sh handoffs/IC1EB-RECONCILE.md codex,composer` → PASS sha256:b77932d8(2026-07-10 重跑)
+3. **B1 先派 Grok**(批次階梯,B1 乾淨過才放 B2-B5,依 TODO §B)→ Codex+Composer 雙審 → Claude 批批驗收(golden 五hash/mutation/防假綠 diff,不採信自報)→ 同批重派 ≤2 輪不過→斷路器換 Codex、Grok 降回 review。
+4. 全批完成 → 三方數據正確性簽核(Claude+Codex+Composer,本輪全為非作者)。
+- SPEC 凍結軌跡/核心設計(kernel=bar-level Spearman+NW,BH-FDR 先算 q 再進閘,SelectionScope,canonical significance.fdr.*)見 handoffs/IC1EB-* 與 git log 上一則 handoff;Golden=G-1 五hash+G-2 selection-diff+G-3 fail-closed;M-A~M-J mutation。
+- 後續刀:③1c Net IC 量綱→④1d attribution→⑤1f 空圖+grouped schema(ROADMAP L42 已同步分工)。
 
-## 鐵律(慢測試/執行)
-- 「已驗/passed」須帶 VERIFY receipt。委員審查派工 `gate.sh dispatch --risk low --template "n/a:"`;實作派工 --risk high 附 --spec/--todo/--adversarial(過戳記機檢的 handoffs/IC1EB-RECONCILE.md)/--reconcile;codex exec 必接 `< /dev/null`;產出 register-output。
-- 執行端產物不可信;接回只讀 diff+測試+摘要;執行端不得 git checkout/stash tracked 檔(Golden baseline 唯讀消費預產快照)。
+## 鐵律(不變)
+- 「已驗/passed」須帶 VERIFY receipt;審查派工 `--risk low --template "n/a:"`;實作派工 `--risk high` 附 spec/todo/adversarial;codex exec 必接 `< /dev/null`;委員產出 register-output。
+- 執行端產物不可信;接回只讀 diff+測試+摘要;執行端不得 git checkout/stash tracked 檔(baseline 唯讀消費預產快照)。
+- 未 commit 殘留:`.claude/settings.json`(使用者本機權限/模式調整,留使用者決定是否入版)。
