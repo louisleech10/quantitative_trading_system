@@ -8,9 +8,9 @@
 - 審計鏈:handoffs/P2DEBT-T1-*(全 register-output);docsync 前置=handoffs/P2DEBT-DOCSYNC-RECONCILE.md。
 
 ## ★★ 當前 session = P2 債餘四票(獨立票,逐項閉合;分工=四調行 ORCH §1)
-2. legacy 測試寫 data_cache:1a cut1 等走真 service 路徑覆寫 data_cache 衍生檔;修法=測試輸出 tmp redirect(參考 1e+1b capture persist patch);出處=IC1EB-B3-REVIEW-R3-codex.md。
-3. tsc 既存 errors:frontend feature-factory 測試檔全部既存型別錯誤(2026-07-11 實測 11,勿釘死數字)。
-4. codex 沙箱間歇卡死(觀察債):CLI 0.144.1 蒐證→回報 OpenAI 或固化繞法入 ORCH;**本 session 新樣本 4 起**:TODO 複驗 template_check replay hang×2、實作 scope gate comm/sort/diff hang×2(見 P2DEBT-T1-{TODO-REVERIFY,IMPL-RESULT}-codex.md);另 docsync 補腿+實作主體正常=卡死集中在管線外圍 shell 命令。
+2. legacy 測試寫 data_cache(升級「大」RISK-HIT a,b):SPEC R4 凍結雙 STAMP(Composer R1-R3→斷路器換手 Codex R4,process-global gate 過 to_thread 原型 8/8);TODO R3 凍結中(Composer R1-R2→斷路器換手 Grok R3;grok+composer 已 STAMP,**餘 codex §B8 複驗腿等配額**)→正式化→實作。審計鏈 handoffs/P2DEBT-T2-*。
+3. tsc 既存 errors:SPEC R1 出稿(11 顆全測試側,RISK-HIT none)+grok 審 APPROVE;**餘 codex 二審等配額**→TODO→實作。
+4. codex 沙箱卡死:蒐證檔=handoffs/P2DEBT-T4-CODEX-SANDBOX-EVIDENCE.md(n=4,模式=卡外部 shell 工具鏈,Python/pytest 正常;A 案繞法已擬,閉合時委員會裁);+quota 上限事件 19:07 恢復(動態選層依據)。
 5. 1a cut1 golden provenance 閉合(2 BLOCK 拆票):恢復+改寫 rebaseline_* 審計欄/reuse guard fail-closed 校驗+generator 測試/獨立重放 receipt 禁現綠自證/payload 處置寫死;與票 2 相鄰施工;閉合須 Grok+Codex 複驗(§B8)。
 - 新制度(使用者 2026-07-11):開 session 先稽核 HANDOFF+相關文件 vs repo 實況再開工(已入 CLAUDE.md)。
 
