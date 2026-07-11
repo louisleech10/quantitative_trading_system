@@ -7,11 +7,25 @@
 - 成果:假陽率 0.43→0.06(M-A);xsec p 誠實化;fdr toggle 全棧真接通;G-1 13 顆五hash 不變;G-2 diff=handoffs/IC1EB-GOLDEN-DIFF.md。
 - 治理:規則四條使用者採納 2026-07-11(handoffs/RULE-PROPOSAL-RECONCILE.md)+SCAR 三連環登記(docs/SCAR_LEDGER.md 末列);RULEIMPL 初稿 grok R3 判 PASS SIGNOFF:RULEIMPL-REVIEW-R3-grok.md,codex 補審待排。
 
-## ★下一站
-1. RULEIMPL(park 於 R5,2026-07-11):定稿=handoffs/RULEIMPL-SPEC-DRAFT-R5.md;審查鏈=composer 起草×5/grok R5 判 PASS SIGNOFF:RULEIMPL-REVIEW-R5-grok.md/codex R5 殘 4 條(handoffs/RULEIMPL-REVIEW-R5-codex.md)——性質=正式化時綁定項(cutoff full-SHA 開票填/base fallback 演算法字面修/digest exclusion set 枚舉/sidecar 自參照排除)。下一步:正式化 SPEC/TODO(gate artifact+範本)時逐項落值→codex 終驗→派實作。
-2. ROADMAP ③ 1c Net IC 量綱(下一刀)。
-3. P2 債:governance 既有 9 紅(b4×3+b5×5+r7,先於本 session,歸屬驗證=HANDOFF 前版+git log 3edfa6c)/legacy 測試寫 data_cache tmp redirect/tsc 既存 10 errors/codex 沙箱間歇卡死觀察。
-4. Grok 記分素材(加密驗收期,裁決留使用者):B1-B5 交付均一輪修復閉合;審查腿多次高品質 findings;停手紀律好(BLOCKED-1A);弱項=橫切面不變量/測試嚴謹捷徑/一次越權重凍 1a(記檔 handoffs/ic1a_cut1_refreeze_quarantine)。
+## ★★ Session 排程(使用者 2026-07-11 裁定:P2 債與 1c 拆開,先債後刀)
+
+### 下一個 session = P2 債四項(獨立票,逐項閉合)
+1. governance 9 紅:tests/governance b4×3+b5×5+redteam r7——7/5 制度強化(template_check 3edfa6c 等)後測試 fixture 過期斷言舊行為;修法方向=遷移 fixture 至現行檢查器語意,禁放鬆檢查器換綠;歸屬驗證=git log 3edfa6c+worktree 對照。
+2. legacy 測試寫 data_cache:1a cut1 等舊測試走真 service 路徑覆寫 data_cache 衍生檔;修法方向=測試輸出 tmp redirect(參考 1e+1b capture 的 persist patch 模式);出處=handoffs/IC1EB-B3-REVIEW-R3-codex.md 歸屬裁定。
+3. tsc 既存 10 errors(frontend npx tsc --noEmit,全在 feature-factory 測試檔;非 1e+1b 引入〔REF:handoffs/IC1EB-B4-REVIEW-codex.md〕);本票目標=修掉這 10 個既存型別錯誤。
+4. codex 沙箱間歇卡死(觀察債):CLI 0.144.1 重運算命令偶發停滯;本票蒐證(復現條件/頻率)後決定回報 OpenAI 或固化繞法入 ORCH。
+- 分工=四調現行行(ORCH §1);Grok 記分照跑。
+- 併行可選:RULEIMPL 正式化(見下)可併本 session 或另排,由使用者屆時定。
+
+### 之後的 session = ROADMAP ③ 1c Net IC 量綱(大,完整管線)
+- 病灶:momentum/Analysis/net_ic_analyzer.py:34 把交易成本(報酬率量綱)直接從 IC(相關係數,無量綱)裡減——量綱不合,淨 IC 數字無數學意義(ROADMAP L42 ③)。
+- 前置:P2 債 session 完成(乾淨基線);SPEC/TODO 走完整管線後才動工。
+
+### RULEIMPL(park 於 R5,2026-07-11)
+定稿=handoffs/RULEIMPL-SPEC-DRAFT-R5.md;grok R5 判 PASS SIGNOFF:RULEIMPL-REVIEW-R5-grok.md;codex R5 殘 4 條(handoffs/RULEIMPL-REVIEW-R5-codex.md)=正式化時綁定項(cutoff full-SHA 開票填/base fallback 字面/digest exclusion set/sidecar 自參照排除)。正式化(gate artifact+範本)時逐項落值→codex 終驗→再派工。
+
+### Grok 記分素材(加密驗收期,裁決留使用者)
+B1-B5 交付均一輪修復閉合;審查腿多次高品質 findings;停手紀律好(BLOCKED-1A);弱項=橫切面不變量/測試嚴謹捷徑/一次越權重凍 1a(記檔 handoffs/ic1a_cut1_refreeze_quarantine)。
 
 ## 鐵律(不變)+本 epic 新教訓
 - 審查用 --risk low --template "n/a:";實作用 --risk high 附三件;codex exec 必接 < /dev/null;register-output;10 分鐘回報;執行端產物不可信;baseline 唯讀。
