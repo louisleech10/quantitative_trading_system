@@ -16,7 +16,7 @@ function resetStore(): void {
   });
 }
 
-function response(status: number, payload: Record<string, unknown>): Response {
+function response(status: number, payload: unknown): Response {
   return {
     ok: status >= 200 && status < 300,
     status,

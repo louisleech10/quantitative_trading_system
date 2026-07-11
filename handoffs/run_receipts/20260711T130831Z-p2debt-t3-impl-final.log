@@ -1,0 +1,11 @@
+=== tsc ===
+0
+=== vitest ===
+ RUN  v4.1.5 /Users/louis/Desktop/quantitative_trading_system/frontend
+
+
+ Test Files  5 passed (5)
+      Tests  31 passed (31)
+   Start at  21:08:28
+   Duration  3.07s (transform 679ms, setup 0ms, import 2.23s, tests 1.27s, environment 7.93s)
+

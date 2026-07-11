@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260711T130831Z-p2debt-t3-impl-final",
+  "claim_id": "p2debt-t3-impl-final",
+  "command": [
+    "bash",
+    "-c",
+    "cd frontend && echo \"=== tsc ===\" && npx tsc --noEmit 2>&1 | grep -c \"error TS\"; echo \"=== vitest ===\" && npm test -- src/components/feature-factory/__tests__/run_lifecycle.test.tsx src/components/feature-factory/__tests__/RunManagerPanel.batchDeleteWhole.test.tsx src/hooks/useFeatureFactory.batchDate.test.ts src/lib/runExplorer.test.ts src/store/featureFactoryStore.test.ts 2>&1 | tail -8"
+  ],
+  "command_sha256": "288d3465a4339bd52eea2087c5f45114cbd5f48e258457f1843ad5fea0349762",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "47ac7b3ae6c62c998aee7c534dd2eba4dad18dca",
+  "tree_dirty": true,
+  "started_at": "2026-07-11T13:08:24Z",
+  "ended_at": "2026-07-11T13:08:31Z",
+  "duration_seconds": 7.212462,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": "Tests  31 passed (31)",
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 31,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "c0fe9492d615fd4d24ea3feb36df4017040ca0d464c09b6dbcbc049bcdc73c5e",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "c0fe9492d615fd4d24ea3feb36df4017040ca0d464c09b6dbcbc049bcdc73c5e",
+  "log_path": "handoffs/run_receipts/20260711T130831Z-p2debt-t3-impl-final.log",
+  "tail_excerpt": [
+    "=== tsc ===",
+    "0",
+    "=== vitest ===",
+    " RUN  v4.1.5 /Users/louis/Desktop/quantitative_trading_system/frontend",
+    "",
+    "",
+    " Test Files  5 passed (5)",
+    "      Tests  31 passed (31)",
+    "   Start at  21:08:28",
+    "   Duration  3.07s (transform 679ms, setup 0ms, import 2.23s, tests 1.27s, environment 7.93s)",
+    ""
+  ]
+}

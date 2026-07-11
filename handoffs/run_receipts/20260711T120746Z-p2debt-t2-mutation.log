@@ -1,0 +1,115 @@
+[conftest.py] Python path configured: /Users/louis/Desktop/quantitative_trading_system
+[conftest.py] sys.path[0]: /Users/louis/Desktop/quantitative_trading_system
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/momentum/Analysis/test_ic_data_cache_hermetic.py::test_mutation_redirect_disabled_caught 
+-------------------------------- live log setup --------------------------------
+20:07:36 [INFO] Loaded feature registry with 11 entries
+20:07:37 [WARNING] /Users/louis/.matplotlib is not a writable directory
+20:07:37 [WARNING] Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-r3fqgbtq because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+20:07:37 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+20:07:37 [INFO] Registered adapter: crypto_spot
+20:07:37 [INFO] Loaded feature registry with 11 entries
+20:07:37 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+20:07:39 [INFO] Restored 9 persisted feature task(s) from disk
+20:07:39 [INFO] 所有中間件已設置完成
+20:07:39 [INFO] 異常處理器設置完成
+20:07:39 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+20:07:39 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+20:07:39 [INFO] Created global CaseStorageManager instance
+20:07:39 [INFO] CaseImportService initialized
+20:07:39 [INFO] Created global CaseImportService instance with shared storage
+20:07:39 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+20:07:39 [INFO] KlineDownloadService initialized
+20:07:39 [INFO] Rate limiter initialized: 1000 req/min
+20:07:39 [INFO] BinanceProvider initialized
+20:07:39 [INFO] Registered provider: binance (rate_limit=1000/min)
+20:07:39 [INFO] Registered BinanceProvider to KlineDownloadService
+20:07:39 [INFO] BatchDownloadService initialized
+20:07:39 [INFO] Created global BatchDownloadService instance with shared storage
+20:07:39 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+20:07:39 [INFO] KlineDownloadService initialized
+20:07:39 [INFO] Rate limiter initialized: 1000 req/min
+20:07:39 [INFO] BinanceProvider initialized
+20:07:39 [INFO] Registered provider: binance (rate_limit=1000/min)
+20:07:39 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+20:07:39 [INFO] IndicatorEngine initialized
+20:07:39 [INFO] ChartDataService initialized with IndicatorEngine
+20:07:39 [INFO] OptimizationTaskService initialized
+20:07:39 [INFO] Loaded feature registry with 11 entries
+20:07:39 [INFO] Loaded feature registry with 11 entries
+20:07:39 [INFO] Loaded feature registry with 11 entries
+20:07:40 [INFO] Loaded feature registry with 11 entries
+20:07:40 [INFO] WebSocketConnectionManager initialized
+20:07:40 [INFO] All API routes registered successfully
+MUTATION_CANARY=1
+PASSED
+
+============================== 1 passed in 3.99s ===============================
+[2026-07-11 20:07:32,854] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-07-11 20:07:32,854 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+[2026-07-11 20:07:36,947] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 20:07:36,947 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+2026-07-11 20:07:37,327 - matplotlib - DEBUG - matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+2026-07-11 20:07:37,333 - matplotlib - WARNING - /Users/louis/.matplotlib is not a writable directory
+2026-07-11 20:07:37,336 - matplotlib - WARNING - Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-r3fqgbtq because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+2026-07-11 20:07:37,337 - matplotlib - DEBUG - CONFIGDIR=/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-r3fqgbtq
+2026-07-11 20:07:37,339 - matplotlib - DEBUG - interactive is False
+2026-07-11 20:07:37,340 - matplotlib - DEBUG - platform is darwin
+2026-07-11 20:07:37,793 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 20:07:37,800 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+[2026-07-11 20:07:37,802] INFO momentum.FeatureEngineering.adapters.adapter_registry: Registered adapter: crypto_spot
+2026-07-11 20:07:37,802 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Registered adapter: crypto_spot
+[2026-07-11 20:07:37,804] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 20:07:37,804 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+2026-07-11 20:07:37,922 - api.feature_factory_service - INFO - CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+2026-07-11 20:07:38,276 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 20:07:38,426 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 20:07:38,514 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 20:07:38,706 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 20:07:38,847 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 20:07:38,928 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 20:07:39,202 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 20:07:39,326 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 20:07:39,417 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 20:07:39,420 - api.feature_factory_service - INFO - Restored 9 persisted feature task(s) from disk
+2026-07-11 20:07:39,432 - api.middleware - INFO - 所有中間件已設置完成
+2026-07-11 20:07:39,434 - api.exception_handler - INFO - 異常處理器設置完成
+2026-07-11 20:07:39,493 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+2026-07-11 20:07:39,529 - api.case_storage - INFO - CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+2026-07-11 20:07:39,531 - api.case_storage - INFO - Created global CaseStorageManager instance
+2026-07-11 20:07:39,532 - api.case_import_service - INFO - CaseImportService initialized
+2026-07-11 20:07:39,533 - api.case_import_service - INFO - Created global CaseImportService instance with shared storage
+2026-07-11 20:07:39,535 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+2026-07-11 20:07:39,536 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-07-11 20:07:39,538 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-07-11 20:07:39,539 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-07-11 20:07:39,540 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-07-11 20:07:39,541 - api.batch_download_service - INFO - Registered BinanceProvider to KlineDownloadService
+2026-07-11 20:07:39,543 - api.batch_download_service - INFO - BatchDownloadService initialized
+2026-07-11 20:07:39,544 - api.batch_download_service - INFO - Created global BatchDownloadService instance with shared storage
+2026-07-11 20:07:39,552 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-07-11 20:07:39,553 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-07-11 20:07:39,555 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-07-11 20:07:39,556 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-07-11 20:07:39,557 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-07-11 20:07:39,558 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-07-11 20:07:39,560 - momentum.Indicators.indicator_engine - INFO - IndicatorEngine initialized
+2026-07-11 20:07:39,561 - api.chart_data_service - INFO - ChartDataService initialized with IndicatorEngine
+2026-07-11 20:07:39,589 - api.optimization_task_service - INFO - OptimizationTaskService initialized
+[2026-07-11 20:07:39,689] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 20:07:39,689 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+[2026-07-11 20:07:39,696] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 20:07:39,696 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+[2026-07-11 20:07:39,791] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 20:07:39,791 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+[2026-07-11 20:07:40,007] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 20:07:40,007 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+2026-07-11 20:07:40,030 - api.websocket_manager - INFO - WebSocketConnectionManager initialized
+2026-07-11 20:07:40,183 - api.routes - INFO - All API routes registered successfully

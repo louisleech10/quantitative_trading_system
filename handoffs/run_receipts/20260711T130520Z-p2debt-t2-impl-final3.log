@@ -1,0 +1,638 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+20:53:06 [INFO] Loaded feature registry with 11 entries
+collected 10 items
+
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_fallback_insufficient_data_marks_applied_false 
+-------------------------------- live log setup --------------------------------
+20:53:07 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+20:53:07 [INFO] Registered adapter: crypto_spot
+20:53:07 [INFO] Loaded feature registry with 11 entries
+20:53:07 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+20:53:09 [INFO] Restored 9 persisted feature task(s) from disk
+20:53:09 [INFO] 所有中間件已設置完成
+20:53:09 [INFO] 異常處理器設置完成
+20:53:09 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+20:53:09 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+20:53:09 [INFO] Created global CaseStorageManager instance
+20:53:09 [INFO] CaseImportService initialized
+20:53:09 [INFO] Created global CaseImportService instance with shared storage
+20:53:09 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+20:53:09 [INFO] KlineDownloadService initialized
+20:53:09 [INFO] Rate limiter initialized: 1000 req/min
+20:53:09 [INFO] BinanceProvider initialized
+20:53:09 [INFO] Registered provider: binance (rate_limit=1000/min)
+20:53:09 [INFO] Registered BinanceProvider to KlineDownloadService
+20:53:09 [INFO] BatchDownloadService initialized
+20:53:09 [INFO] Created global BatchDownloadService instance with shared storage
+20:53:09 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+20:53:09 [INFO] KlineDownloadService initialized
+20:53:09 [INFO] Rate limiter initialized: 1000 req/min
+20:53:09 [INFO] BinanceProvider initialized
+20:53:09 [INFO] Registered provider: binance (rate_limit=1000/min)
+20:53:09 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+20:53:09 [INFO] IndicatorEngine initialized
+20:53:09 [INFO] ChartDataService initialized with IndicatorEngine
+20:53:09 [INFO] OptimizationTaskService initialized
+20:53:09 [INFO] Loaded feature registry with 11 entries
+20:53:09 [INFO] Loaded feature registry with 11 entries
+20:53:09 [INFO] Loaded feature registry with 11 entries
+20:53:09 [INFO] Loaded feature registry with 11 entries
+20:53:09 [INFO] WebSocketConnectionManager initialized
+20:53:10 [INFO] All API routes registered successfully
+-------------------------------- live log call ---------------------------------
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Data preprocessing complete: columns=2
+20:53:10 [INFO] IC autocorr persistent: count=2
+20:53:10 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:53:10 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+20:53:10 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+20:53:10 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 10%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_applied_true_when_sufficient 
+-------------------------------- live log call ---------------------------------
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Data preprocessing complete: columns=2
+20:53:10 [INFO] IC autocorr persistent: count=2
+20:53:10 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+20:53:10 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+20:53:10 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 20%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_full_pipeline_global_mode 
+-------------------------------- live log call ---------------------------------
+20:53:10 [INFO] IC config loaded
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Data preprocessing complete: columns=8
+20:53:10 [INFO] IC autocorr persistent: count=8
+20:53:10 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:53:10 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+20:53:10 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+20:53:10 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_e2e_test.json
+PASSED                                                                   [ 30%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_refilter_uses_cache 
+-------------------------------- live log call ---------------------------------
+20:53:10 [INFO] IC config loaded
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Data preprocessing complete: columns=6
+20:53:10 [INFO] IC autocorr persistent: count=6
+20:53:10 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:53:10 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+20:53:10 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+20:53:10 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_e2e_test.json
+20:53:10 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:53:10 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+20:53:10 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+20:53:10 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_e2e_test.json
+PASSED                                                                   [ 40%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_event_mode_with_query 
+-------------------------------- live log call ---------------------------------
+20:53:10 [INFO] IC config loaded
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Data preprocessing complete: columns=6
+20:53:10 [INFO] IC autocorr persistent: count=4
+20:53:10 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:53:10 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+20:53:10 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+20:53:10 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_e2e_test.json
+PASSED                                                                   [ 50%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_report_json_structure 
+-------------------------------- live log call ---------------------------------
+20:53:10 [INFO] IC config loaded
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Resolved label horizon from labels_df column
+20:53:10 [INFO] Data preprocessing complete: columns=5
+20:53:10 [INFO] IC autocorr persistent: count=5
+20:53:10 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:53:11 [INFO] Redundancy filter completed: method=greedy input=4 output=4
+20:53:11 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+20:53:11 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_e2e_test.json
+PASSED                                                                   [ 60%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_performance_800_features SKIPPED [ 70%]
+tests/momentum/test_ic_feature_filter.py::test_analyze_applies_feature_filter_metadata_and_summary_limit 
+-------------------------------- live log call ---------------------------------
+20:53:11 [INFO] IC config loaded
+20:53:11 [INFO] Resolved label horizon from labels_df column
+20:53:11 [INFO] Resolved label horizon from labels_df column
+20:53:11 [INFO] Data preprocessing complete: columns=8
+20:53:11 [INFO] IC autocorr persistent: count=3
+20:53:11 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:53:11 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 80%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 
+-------------------------------- live log call ---------------------------------
+20:53:12 [INFO] Loaded feature registry with 11 entries
+20:53:12 [INFO] IC config loaded
+20:53:12 [INFO] IC analysis task started: 9deeb249-5f94-4f5d-a8a8-a3124ae1a29c
+20:53:12 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+20:53:12 [INFO] Data preprocessing complete: columns=50
+20:53:12 [INFO] Read 20352 klines from BTCUSDT/1h in 0.014s
+20:53:12 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:53:13 [INFO] IC autocorr persistent: count=38
+20:53:13 [INFO] Read 20352 klines from BTCUSDT/1h in 0.013s
+20:54:02 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+20:54:04 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:54:13 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+20:54:13 [INFO] IC analysis task completed: 9deeb249-5f94-4f5d-a8a8-a3124ae1a29c
+PASSED                                                                   [ 90%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 
+-------------------------------- live log call ---------------------------------
+20:54:19 [INFO] Loaded feature registry with 11 entries
+20:54:19 [INFO] IC config loaded
+20:54:19 [INFO] IC analysis task started: 58bb85db-19cf-4acd-b7f7-a4f7adcabbf5
+20:54:19 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+20:54:19 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:54:19 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:54:20 [INFO] Data preprocessing complete: columns=50
+20:54:20 [INFO] Read 20352 klines from BTCUSDT/1h in 0.015s
+20:54:20 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+20:54:20 [INFO] IC autocorr persistent: count=46
+20:54:20 [INFO] Read 20352 klines from BTCUSDT/1h in 0.011s
+20:54:21 [INFO] Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+20:54:25 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-414/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+20:54:25 [INFO] IC analysis task completed: 58bb85db-19cf-4acd-b7f7-a4f7adcabbf5
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:318: RuntimeWarning: Mean of empty slice
+    ic_mean = float(np.nanmean(values))
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/nanfunctions.py:1879: RuntimeWarning: Degrees of freedom <= 0 for slice.
+    var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/momentum/test_ic_e2e.py:236: Set RUN_IC_E2E_PERF=1 to run
+============= 9 passed, 1 skipped, 3 warnings in 80.87s (0:01:20) ==============
+DIGEST_DIFF_EMPTY[V1]=1
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+20:55:53 [INFO] Loaded feature registry with 11 entries
+collected 2 items
+
+tests/api/test_ic_analysis_service.py::test_analyze_real_run_split_validation_passes_with_real_axis 
+-------------------------------- live log setup --------------------------------
+20:55:55 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+20:55:55 [INFO] Registered adapter: crypto_spot
+20:55:55 [INFO] Loaded feature registry with 11 entries
+20:55:55 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+20:55:56 [INFO] Restored 9 persisted feature task(s) from disk
+20:55:56 [INFO] 所有中間件已設置完成
+20:55:56 [INFO] 異常處理器設置完成
+20:55:56 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+20:55:56 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+20:55:56 [INFO] Created global CaseStorageManager instance
+20:55:56 [INFO] CaseImportService initialized
+20:55:56 [INFO] Created global CaseImportService instance with shared storage
+20:55:56 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+20:55:56 [INFO] KlineDownloadService initialized
+20:55:56 [INFO] Rate limiter initialized: 1000 req/min
+20:55:56 [INFO] BinanceProvider initialized
+20:55:56 [INFO] Registered provider: binance (rate_limit=1000/min)
+20:55:56 [INFO] Registered BinanceProvider to KlineDownloadService
+20:55:56 [INFO] BatchDownloadService initialized
+20:55:56 [INFO] Created global BatchDownloadService instance with shared storage
+20:55:56 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+20:55:56 [INFO] KlineDownloadService initialized
+20:55:56 [INFO] Rate limiter initialized: 1000 req/min
+20:55:56 [INFO] BinanceProvider initialized
+20:55:56 [INFO] Registered provider: binance (rate_limit=1000/min)
+20:55:56 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+20:55:56 [INFO] IndicatorEngine initialized
+20:55:56 [INFO] ChartDataService initialized with IndicatorEngine
+20:55:56 [INFO] OptimizationTaskService initialized
+20:55:56 [INFO] Loaded feature registry with 11 entries
+20:55:56 [INFO] Loaded feature registry with 11 entries
+20:55:57 [INFO] Loaded feature registry with 11 entries
+20:55:57 [INFO] Loaded feature registry with 11 entries
+20:55:57 [INFO] WebSocketConnectionManager initialized
+20:55:57 [INFO] All API routes registered successfully
+-------------------------------- live log call ---------------------------------
+20:55:57 [INFO] Loaded feature registry with 11 entries
+20:55:57 [INFO] Loaded feature registry with 11 entries
+20:56:13 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+PASSED                                                                   [ 50%]
+tests/api/test_ic_analysis_service.py::test_resolve_run_path_contains_config_hash 
+-------------------------------- live log call ---------------------------------
+20:58:56 [INFO] Loaded feature registry with 11 entries
+20:58:56 [INFO] Loaded feature registry with 11 entries
+20:59:17 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+PASSED                                                                   [100%]
+
+======================== 2 passed in 203.97s (0:03:23) =========================
+DIGEST_DIFF_EMPTY[V2]=1
+[2026-07-11 21:00:43,390] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-07-11 21:00:43,390 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+[2026-07-11 21:00:47,197] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:00:47,197 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+[conftest.py] Python path configured: /Users/louis/Desktop/quantitative_trading_system
+[conftest.py] sys.path[0]: /Users/louis/Desktop/quantitative_trading_system
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+21:00:47 [INFO] Loaded feature registry with 11 entries
+collected 3 items
+
+tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py::test_golden_redirect_on_off_sha256 2026-07-11 21:00:48,331 - matplotlib - DEBUG - matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+2026-07-11 21:00:48,338 - matplotlib - DEBUG - CONFIGDIR=/Users/louis/.matplotlib
+2026-07-11 21:00:48,340 - matplotlib - DEBUG - interactive is False
+2026-07-11 21:00:48,340 - matplotlib - DEBUG - platform is darwin
+2026-07-11 21:00:48,843 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 21:00:48,850 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+
+-------------------------------- live log setup --------------------------------
+21:00:48 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+[2026-07-11 21:00:48,851] INFO momentum.FeatureEngineering.adapters.adapter_registry: Registered adapter: crypto_spot
+2026-07-11 21:00:48,851 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Registered adapter: crypto_spot
+21:00:48 [INFO] Registered adapter: crypto_spot
+[2026-07-11 21:00:48,851] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:00:48,851 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+21:00:48 [INFO] Loaded feature registry with 11 entries
+2026-07-11 21:00:48,992 - api.feature_factory_service - INFO - CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+21:00:48 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+2026-07-11 21:00:49,310 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 21:00:49,461 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 21:00:49,557 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 21:00:49,793 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 21:00:49,918 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 21:00:50,031 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 21:00:50,316 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 21:00:50,454 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 21:00:50,557 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 21:00:50,559 - api.feature_factory_service - INFO - Restored 9 persisted feature task(s) from disk
+21:00:50 [INFO] Restored 9 persisted feature task(s) from disk
+2026-07-11 21:00:50,569 - api.middleware - INFO - 所有中間件已設置完成
+21:00:50 [INFO] 所有中間件已設置完成
+2026-07-11 21:00:50,570 - api.exception_handler - INFO - 異常處理器設置完成
+21:00:50 [INFO] 異常處理器設置完成
+2026-07-11 21:00:50,627 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+21:00:50 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+2026-07-11 21:00:50,665 - api.case_storage - INFO - CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+21:00:50 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+2026-07-11 21:00:50,665 - api.case_storage - INFO - Created global CaseStorageManager instance
+21:00:50 [INFO] Created global CaseStorageManager instance
+2026-07-11 21:00:50,665 - api.case_import_service - INFO - CaseImportService initialized
+21:00:50 [INFO] CaseImportService initialized
+2026-07-11 21:00:50,665 - api.case_import_service - INFO - Created global CaseImportService instance with shared storage
+21:00:50 [INFO] Created global CaseImportService instance with shared storage
+2026-07-11 21:00:50,666 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+21:00:50 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+2026-07-11 21:00:50,666 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+21:00:50 [INFO] KlineDownloadService initialized
+2026-07-11 21:00:50,666 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+21:00:50 [INFO] Rate limiter initialized: 1000 req/min
+2026-07-11 21:00:50,666 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+21:00:50 [INFO] BinanceProvider initialized
+2026-07-11 21:00:50,666 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+21:00:50 [INFO] Registered provider: binance (rate_limit=1000/min)
+2026-07-11 21:00:50,666 - api.batch_download_service - INFO - Registered BinanceProvider to KlineDownloadService
+21:00:50 [INFO] Registered BinanceProvider to KlineDownloadService
+2026-07-11 21:00:50,667 - api.batch_download_service - INFO - BatchDownloadService initialized
+21:00:50 [INFO] BatchDownloadService initialized
+2026-07-11 21:00:50,667 - api.batch_download_service - INFO - Created global BatchDownloadService instance with shared storage
+21:00:50 [INFO] Created global BatchDownloadService instance with shared storage
+2026-07-11 21:00:50,675 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+21:00:50 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-07-11 21:00:50,675 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+21:00:50 [INFO] KlineDownloadService initialized
+2026-07-11 21:00:50,675 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+21:00:50 [INFO] Rate limiter initialized: 1000 req/min
+2026-07-11 21:00:50,675 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+21:00:50 [INFO] BinanceProvider initialized
+2026-07-11 21:00:50,675 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+21:00:50 [INFO] Registered provider: binance (rate_limit=1000/min)
+2026-07-11 21:00:50,676 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+21:00:50 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-07-11 21:00:50,677 - momentum.Indicators.indicator_engine - INFO - IndicatorEngine initialized
+21:00:50 [INFO] IndicatorEngine initialized
+2026-07-11 21:00:50,677 - api.chart_data_service - INFO - ChartDataService initialized with IndicatorEngine
+21:00:50 [INFO] ChartDataService initialized with IndicatorEngine
+2026-07-11 21:00:50,710 - api.optimization_task_service - INFO - OptimizationTaskService initialized
+21:00:50 [INFO] OptimizationTaskService initialized
+[2026-07-11 21:00:50,826] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:00:50,826 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+21:00:50 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 21:00:50,831] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:00:50,831 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+21:00:50 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 21:00:50,943] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:00:50,943 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+21:00:50 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 21:00:51,058] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:00:51,058 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+21:00:51 [INFO] Loaded feature registry with 11 entries
+2026-07-11 21:00:51,081 - api.websocket_manager - INFO - WebSocketConnectionManager initialized
+21:00:51 [INFO] WebSocketConnectionManager initialized
+2026-07-11 21:00:51,346 - api.routes - INFO - All API routes registered successfully
+21:00:51 [INFO] All API routes registered successfully
+2026-07-11 21:00:51,357 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 21:00:51,358] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:00:51,358 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+-------------------------------- live log call ---------------------------------
+21:00:51 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 21:00:51,394] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 21:00:51,394 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+21:00:51 [INFO] IC config loaded
+2026-07-11 21:00:51,394 - api.ic_analysis_service - INFO - IC analysis task started: 86a0296b-96f3-4ed6-8bb5-19c54b7a095f
+21:00:51 [INFO] IC analysis task started: 86a0296b-96f3-4ed6-8bb5-19c54b7a095f
+2026-07-11 21:00:51,395 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:00:51 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-07-11 21:00:51,432 - h5py._conv - DEBUG - Creating converter from 3 to 5
+[2026-07-11 21:00:51,690] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 21:00:51,690 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+21:00:51 [INFO] Data preprocessing complete: columns=50
+2026-07-11 21:00:51,709 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 21:00:51,709 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.018s
+21:00:51 [INFO] Read 20352 klines from BTCUSDT/1h in 0.018s
+[2026-07-11 21:00:51,713] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:00:51,713 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:00:51 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:00:52,336] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=38
+2026-07-11 21:00:52,336 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=38
+21:00:52 [INFO] IC autocorr persistent: count=38
+2026-07-11 21:00:52,351 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 21:00:52,351 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.015s
+21:00:52 [INFO] Read 20352 klines from BTCUSDT/1h in 0.015s
+[2026-07-11 21:01:38,133] INFO momentum.Analysis.ic_engine: Decay: 50/50 fit warnings summarized (insufficient_points=50)
+2026-07-11 21:01:38,133 - momentum.Analysis.ic_engine - INFO - Decay: 50/50 fit warnings summarized (insufficient_points=50)
+21:01:38 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+[2026-07-11 21:01:40,011] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:01:40,011 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:01:40 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:01:47,981] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/test_golden_redirect_on_off_sh0/tmp_a/reports/ic_report_ic_gatekeeper.json
+2026-07-11 21:01:47,981 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/test_golden_redirect_on_off_sh0/tmp_a/reports/ic_report_ic_gatekeeper.json
+21:01:47 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/test_golden_redirect_on_off_sh0/tmp_a/reports/ic_report_ic_gatekeeper.json
+2026-07-11 21:01:47,983 - api.ic_analysis_service - INFO - IC analysis task completed: 86a0296b-96f3-4ed6-8bb5-19c54b7a095f
+21:01:47 [INFO] IC analysis task completed: 86a0296b-96f3-4ed6-8bb5-19c54b7a095f
+2026-07-11 21:01:53,487 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 21:01:53,489] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:01:53,489 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+21:01:53 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 21:01:53,522] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 21:01:53,522 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+21:01:53 [INFO] IC config loaded
+2026-07-11 21:01:53,523 - api.ic_analysis_service - INFO - IC analysis task started: 0b6b39e6-b969-4e15-95b5-17421bc77191
+21:01:53 [INFO] IC analysis task started: 0b6b39e6-b969-4e15-95b5-17421bc77191
+2026-07-11 21:01:53,523 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:01:53 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+[2026-07-11 21:01:53,738] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 21:01:53,738 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+21:01:53 [INFO] Data preprocessing complete: columns=50
+2026-07-11 21:01:53,753 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 21:01:53,753 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.015s
+21:01:53 [INFO] Read 20352 klines from BTCUSDT/1h in 0.015s
+[2026-07-11 21:01:53,755] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:01:53,755 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:01:53 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:01:54,180] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=38
+2026-07-11 21:01:54,180 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=38
+21:01:54 [INFO] IC autocorr persistent: count=38
+2026-07-11 21:01:54,190 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 21:01:54,190 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.010s
+21:01:54 [INFO] Read 20352 klines from BTCUSDT/1h in 0.010s
+[2026-07-11 21:02:29,487] INFO momentum.Analysis.ic_engine: Decay: 50/50 fit warnings summarized (insufficient_points=50)
+2026-07-11 21:02:29,487 - momentum.Analysis.ic_engine - INFO - Decay: 50/50 fit warnings summarized (insufficient_points=50)
+21:02:29 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+[2026-07-11 21:02:31,322] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:02:31,322 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:02:31 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:02:39,341] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/test_golden_redirect_on_off_sh0/tmp_b/reports/ic_report_ic_gatekeeper.json
+2026-07-11 21:02:39,341 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/test_golden_redirect_on_off_sh0/tmp_b/reports/ic_report_ic_gatekeeper.json
+21:02:39 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/test_golden_redirect_on_off_sh0/tmp_b/reports/ic_report_ic_gatekeeper.json
+2026-07-11 21:02:39,350 - api.ic_analysis_service - INFO - IC analysis task completed: 0b6b39e6-b969-4e15-95b5-17421bc77191
+21:02:39 [INFO] IC analysis task completed: 0b6b39e6-b969-4e15-95b5-17421bc77191
+2026-07-11 21:03:19,897 - asyncio - DEBUG - Using selector: KqueueSelector
+FAILED
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 2026-07-11 21:03:21,113 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 21:03:21,116] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:03:21,116 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+
+-------------------------------- live log call ---------------------------------
+21:03:21 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 21:03:21,197] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 21:03:21,197 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+21:03:21 [INFO] IC config loaded
+2026-07-11 21:03:21,199 - api.ic_analysis_service - INFO - IC analysis task started: 2fef96e7-3fe1-4e07-8100-c36ddfea59b1
+21:03:21 [INFO] IC analysis task started: 2fef96e7-3fe1-4e07-8100-c36ddfea59b1
+2026-07-11 21:03:21,200 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:03:21 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+[2026-07-11 21:03:21,426] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 21:03:21,426 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+21:03:21 [INFO] Data preprocessing complete: columns=50
+2026-07-11 21:03:21,440 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 21:03:21,440 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.014s
+21:03:21 [INFO] Read 20352 klines from BTCUSDT/1h in 0.014s
+[2026-07-11 21:03:21,444] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:03:21,444 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:03:21 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:03:21,960] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=38
+2026-07-11 21:03:21,960 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=38
+21:03:21 [INFO] IC autocorr persistent: count=38
+2026-07-11 21:03:21,972 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 21:03:21,973 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.012s
+21:03:21 [INFO] Read 20352 klines from BTCUSDT/1h in 0.012s
+[2026-07-11 21:04:03,530] INFO momentum.Analysis.ic_engine: Decay: 50/50 fit warnings summarized (insufficient_points=50)
+2026-07-11 21:04:03,530 - momentum.Analysis.ic_engine - INFO - Decay: 50/50 fit warnings summarized (insufficient_points=50)
+21:04:03 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+[2026-07-11 21:04:05,705] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:04:05,705 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:04:05 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:04:18,660] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-07-11 21:04:18,660 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+21:04:18 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-07-11 21:04:18,669 - api.ic_analysis_service - INFO - IC analysis task completed: 2fef96e7-3fe1-4e07-8100-c36ddfea59b1
+21:04:18 [INFO] IC analysis task completed: 2fef96e7-3fe1-4e07-8100-c36ddfea59b1
+PASSED
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 2026-07-11 21:04:27,312 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 21:04:27,327] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 21:04:27,327 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+
+-------------------------------- live log call ---------------------------------
+21:04:27 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 21:04:27,519] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 21:04:27,519 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+21:04:27 [INFO] IC config loaded
+2026-07-11 21:04:27,522 - api.ic_analysis_service - INFO - IC analysis task started: 453533a0-43b5-4743-adb1-357f8c56c0a9
+21:04:27 [INFO] IC analysis task started: 453533a0-43b5-4743-adb1-357f8c56c0a9
+2026-07-11 21:04:27,523 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:04:27 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+[2026-07-11 21:04:27,622] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:04:27,622 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:04:27 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:04:27,622] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:04:27,622 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:04:27 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:04:29,279] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 21:04:29,279 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+21:04:29 [INFO] Data preprocessing complete: columns=50
+2026-07-11 21:04:29,338 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 21:04:29,338 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.030s
+21:04:29 [INFO] Read 20352 klines from BTCUSDT/1h in 0.030s
+[2026-07-11 21:04:29,346] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 21:04:29,346 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+21:04:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 21:04:30,805] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=46
+2026-07-11 21:04:30,805 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=46
+21:04:30 [INFO] IC autocorr persistent: count=46
+2026-07-11 21:04:30,828 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 21:04:30,828 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.022s
+21:04:30 [INFO] Read 20352 klines from BTCUSDT/1h in 0.022s
+[2026-07-11 21:04:32,918] INFO momentum.Analysis.ic_engine: Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+2026-07-11 21:04:32,918 - momentum.Analysis.ic_engine - INFO - Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+21:04:32 [INFO] Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+[2026-07-11 21:04:36,913] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-07-11 21:04:36,913 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+21:04:36 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-07-11 21:04:36,915 - api.ic_analysis_service - INFO - IC analysis task completed: 453533a0-43b5-4743-adb1-357f8c56c0a9
+21:04:36 [INFO] IC analysis task completed: 453533a0-43b5-4743-adb1-357f8c56c0a9
+PASSED
+
+=================================== FAILURES ===================================
+______________________ test_golden_redirect_on_off_sha256 ______________________
+/Users/louis/Desktop/quantitative_trading_system/tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py:67: in test_golden_redirect_on_off_sha256
+    hashes.append(_hash(asyncio.run(golden._run_baseline(split_on=False))))
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py:642: in run_until_complete
+    return future.result()
+/Users/louis/Desktop/quantitative_trading_system/tests/momentum/Analysis/test_ic_1a_cut1_golden.py:59: in _run_baseline
+    started = await service.start_analysis(request)
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:58: in start_analysis
+    analyzer = create_ic_analyzer(config_override)
+/Users/louis/Desktop/quantitative_trading_system/momentum/factories.py:447: in create_ic_analyzer
+    ic_config = load_ic_config(api_override=config)
+/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_config_schema.py:428: in load_ic_config
+    default_data = _read_yaml(Path(default_path), required=True)
+/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_config_schema.py:412: in _read_yaml
+    raise FileNotFoundError(f"IC config file not found: {path}")
+E   FileNotFoundError: IC config file not found: config/ic_config.yaml
+------------------------------ Captured log setup ------------------------------
+DEBUG    matplotlib:__init__.py:341 matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+DEBUG    matplotlib:__init__.py:341 CONFIGDIR=/Users/louis/.matplotlib
+DEBUG    matplotlib:__init__.py:1512 interactive is False
+DEBUG    matplotlib:__init__.py:1513 platform is darwin
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+INFO     momentum.FeatureEngineering.adapters.adapter_registry:adapter_registry.py:21 Registered adapter: crypto_spot
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 11 entries
+INFO     api.feature_factory_service:feature_factory_service.py:144 CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_BCHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_BCHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_BCHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_BTCUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_BTCUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_ETHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4446 Auto-registered manifest as browse task browse_ETHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+INFO     api.feature_factory_service:feature_factory_service.py:4451 Restored 9 persisted feature task(s) from disk
+INFO     api.middleware:middleware.py:226 所有中間件已設置完成
+INFO     api.exception_handler:exceptions.py:219 異常處理器設置完成
+INFO     api.standalone_search_service:standalone_search_service.py:177 StandaloneSearchService initialized - momentum modules will be loaded on demand
+INFO     api.case_storage:case_storage.py:69 CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+INFO     api.case_storage:case_storage.py:421 Created global CaseStorageManager instance
+INFO     api.case_import_service:case_import_service.py:50 CaseImportService initialized
+INFO     api.case_import_service:case_import_service.py:579 Created global CaseImportService instance with shared storage
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+INFO     momentum.DataExtraction.kline_download_service.KlineDownloadService:kline_download_service.py:196 KlineDownloadService initialized
+INFO     momentum.DataExtraction.providers.binance_provider.RateLimiter:binance_provider.py:81 Rate limiter initialized: 1000 req/min
+INFO     momentum.DataExtraction.kline_provider_base.Binance:binance_provider.py:219 BinanceProvider initialized
+INFO     momentum.DataExtraction.kline_download_service.ProviderRegistry:kline_download_service.py:82 Registered provider: binance (rate_limit=1000/min)
+INFO     api.batch_download_service:batch_download_service.py:131 Registered BinanceProvider to KlineDownloadService
+INFO     api.batch_download_service:batch_download_service.py:139 BatchDownloadService initialized
+INFO     api.batch_download_service:batch_download_service.py:1018 Created global BatchDownloadService instance with shared storage
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/kline_cache.h5
+INFO     momentum.DataExtraction.kline_download_service.KlineDownloadService:kline_download_service.py:196 KlineDownloadService initialized
+INFO     momentum.DataExtraction.providers.binance_provider.RateLimiter:binance_provider.py:81 Rate limiter initialized: 1000 req/min
+INFO     momentum.DataExtraction.kline_provider_base.Binance:binance_provider.py:219 BinanceProvider initialized
+INFO     momentum.DataExtraction.kline_download_service.ProviderRegistry:kline_download_service.py:82 Registered provider: binance (rate_limit=1000/min)
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/kline_cache.h5
+INFO     momentum.Indicators.indicator_engine:indicator_engine.py:95 IndicatorEngine initialized
+INFO     api.chart_data_service:chart_data_service.py:81 ChartDataService initialized with IndicatorEngine
+INFO     api.optimization_task_service:optimization_task_service.py:175 OptimizationTaskService initialized
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 11 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 11 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 11 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 11 entries
+INFO     api.websocket_manager:optimization_ws.py:58 WebSocketConnectionManager initialized
+INFO     api.routes:main.py:385 All API routes registered successfully
+------------------------------ Captured log call -------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 11 entries
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:437 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:83 IC analysis task started: 86a0296b-96f3-4ed6-8bb5-19c54b7a095f
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+DEBUG    h5py._conv:dataset.py:903 Creating converter from 3 to 5
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:75 Data preprocessing complete: columns=50
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.018s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:272 Falling back to configured label horizon because labels_df is unavailable
+INFO     momentum.Analysis.ic_engine:ic_engine.py:463 IC autocorr persistent: count=38
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.015s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:372 Decay: 50/50 fit warnings summarized (insufficient_points=50)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:272 Falling back to configured label horizon because labels_df is unavailable
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:413 IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/test_golden_redirect_on_off_sh0/tmp_a/reports/ic_report_ic_gatekeeper.json
+INFO     api.ic_analysis_service:ic_analysis_service.py:253 IC analysis task completed: 86a0296b-96f3-4ed6-8bb5-19c54b7a095f
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 11 entries
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:437 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:83 IC analysis task started: 0b6b39e6-b969-4e15-95b5-17421bc77191
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:75 Data preprocessing complete: columns=50
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.015s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:272 Falling back to configured label horizon because labels_df is unavailable
+INFO     momentum.Analysis.ic_engine:ic_engine.py:463 IC autocorr persistent: count=38
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.010s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:372 Decay: 50/50 fit warnings summarized (insufficient_points=50)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:272 Falling back to configured label horizon because labels_df is unavailable
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:413 IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-416/test_golden_redirect_on_off_sh0/tmp_b/reports/ic_report_ic_gatekeeper.json
+INFO     api.ic_analysis_service:ic_analysis_service.py:253 IC analysis task completed: 0b6b39e6-b969-4e15-95b5-17421bc77191
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+=============================== warnings summary ===============================
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:318: RuntimeWarning: Mean of empty slice
+    ic_mean = float(np.nanmean(values))
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/nanfunctions.py:1879: RuntimeWarning: Degrees of freedom <= 0 for slice.
+    var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py::test_golden_redirect_on_off_sha256
+============= 1 failed, 2 passed, 3 warnings in 231.37s (0:03:51) ==============
+DIGEST_DIFF_EMPTY[V5]=1

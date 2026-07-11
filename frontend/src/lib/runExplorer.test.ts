@@ -48,14 +48,15 @@ describe('runExplorer', () => {
       baseRun({ config_hash: 'cfg_old', browse_task_id: 'browse_BTCUSDT_12h_cfg_old' }),
       baseRun({ config_hash: 'cfg_new', browse_task_id: 'browse_BTCUSDT_12h_cfg_new' }),
     ];
-    const currentTask = {
+    const currentTask: FeatureTask = {
       task_id: 'task-1',
       status: 'completed',
       progress: 1,
       current_stage: null,
       completed_stages: [],
+      error: null,
       run_identity: { symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'cfg_new' },
-    } as FeatureTask;
+    };
     expect(pickDefaultRun(runs, currentTask, null)?.config_hash).toBe('cfg_new');
   });
 

@@ -19,7 +19,7 @@ function runsUrl(): string {
   return `${API_BASE}${API_PREFIX}/runs`;
 }
 
-function response(status: number, payload: Record<string, unknown>) {
+function response(status: number, payload: unknown) {
   return {
     ok: status >= 200 && status < 300,
     status,

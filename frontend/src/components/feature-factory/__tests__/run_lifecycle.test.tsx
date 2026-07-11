@@ -45,6 +45,7 @@ const task: FeatureTask = {
   progress: 0,
   current_stage: null,
   completed_stages: [],
+  error: null,
 };
 
 describe('run lifecycle', () => {
@@ -85,7 +86,7 @@ describe('run lifecycle', () => {
 
   it('renders completion queue and retains item on 422', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422 }));
-    useFeatureFactoryStore.setState({ completionQueue: [run] });
+    useFeatureFactoryStore.setState({ completionQueue: [{ ...run, source: 'single' as const }] });
     render(<RunRetentionDialog />);
     fireEvent.change(screen.getByLabelText('Run alias'), { target: { value: 'alpha' } });
     fireEvent.click(screen.getByText('命名並保留'));

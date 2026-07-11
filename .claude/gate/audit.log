@@ -12012,3 +12012,669 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-SPEC-REVIEW-grok.md", "output_sha256": "86fe59dca5f6c89cee271cd309936147c242c28539f058d40df7c19d505e8c46", "task_id": "p2debt-t3", "ts": "2026-07-11T08:44:12Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-TODO-REVERIFY-R3-composer.md", "output_sha256": "f7c9d1ecdb59b0276037f1a4398b3410807fbd49e3978e95e2a0c92db81e05f1", "task_id": "p2debt-t2", "ts": "2026-07-11T08:45:35Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:07:58Z"}
+=== 2026-07-11 19:07:58 | dispatch ===
+  ts=2026-07-11 19:07:58
+  kind=dispatch
+  intent=票 2 TODO R3 codex §B8 複驗(配額恢復補腿)
+  risk=low
+  facts_asked=none-needed:複驗輪
+  review_role=codex 複驗
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:07:58Z"}
+=== 2026-07-11 19:07:58 | dispatch ===
+  ts=2026-07-11 19:07:58
+  kind=dispatch
+  intent=票 3 SPEC R1 codex 二審(配額恢復補腿)
+  risk=low
+  facts_asked=none-needed:審查輪
+  review_role=codex 審
+  template=n/a:review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-SPEC-REVIEW-codex.md", "output_sha256": "b3fabca1aa47a41bfb5359db2c06806eca593317c229e1cdeafd4cb46b18c518", "task_id": "p2debt-t3", "ts": "2026-07-11T11:11:33Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:11:33Z"}
+=== 2026-07-11 19:11:33 | dispatch ===
+  ts=2026-07-11 19:11:33
+  kind=dispatch
+  intent=票 3 SPEC R2 定向修正派 Composer(codex 2 finding:假綠 receipt+scope gate 力學)
+  risk=low
+  facts_asked=none-needed:findings 附精確修法
+  review_role=codex 複驗(R2 後)
+  template=n/a:SPEC 改稿派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-TODO-REVERIFY-R3-codex.md", "output_sha256": "75544313dc0a4af45e17aa6deb8efae02c044d023c1e6edcf21bc15a549fd9ba", "task_id": "p2debt-t2", "ts": "2026-07-11T11:13:03Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:13:03Z"}
+=== 2026-07-11 19:13:03 | dispatch ===
+  ts=2026-07-11 19:13:03
+  kind=dispatch
+  intent=票 2 TODO R4 定向修派 grok(codex 3 finding:§8 masking/§7 dirty-overlap/2.5 count assert)
+  risk=low
+  facts_asked=none-needed:findings 附反例
+  review_role=codex 複驗(R4 後)
+  template=n/a:TODO 改稿派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:14:58Z"}
+=== 2026-07-11 19:14:58 | dispatch ===
+  ts=2026-07-11 19:14:58
+  kind=dispatch
+  intent=票 3 SPEC R2 codex 原提出方複驗
+  risk=low
+  facts_asked=none-needed:複驗輪
+  review_role=codex 複驗
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:15:43Z"}
+=== 2026-07-11 19:15:44 | dispatch ===
+  ts=2026-07-11 19:15:44
+  kind=dispatch
+  intent=票 2 TODO R4 codex 原提出方複驗(§8/§7/2.5 三反例重跑)
+  risk=low
+  facts_asked=none-needed:複驗輪
+  review_role=codex 複驗
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-TODO-REVERIFY-R4-codex.md", "output_sha256": "8b024cb30517af35d72dcb0bf27d36448320fe051d882a0a3e7f4c67260fbecf", "task_id": "p2debt-t2", "ts": "2026-07-11T11:20:34Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:20:34Z"}
+=== 2026-07-11 19:20:34 | dispatch ===
+  ts=2026-07-11 19:20:34
+  kind=dispatch
+  intent=票 2 TODO R5 grok 單點修(Task 4.1 content gate 計數 assert,防 0 檔 fail-open)
+  risk=low
+  facts_asked=none-needed:單點
+  review_role=codex 單點複驗
+  template=n/a:TODO 微修派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-SPEC-REVERIFY-codex.md", "output_sha256": "b49d64afdc936184553872931da15fe703acb921089cd22052b5d58fdd40914b", "task_id": "p2debt-t3", "ts": "2026-07-11T11:21:22Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:22:01Z"}
+=== 2026-07-11 19:22:01 | dispatch ===
+  ts=2026-07-11 19:22:01
+  kind=dispatch
+  intent=票 3 SPEC R3 composer 單點修(Gate C 誤殺合法插入→per-file 計數制)+主委 receipt 附件
+  risk=low
+  facts_asked=none-needed:單點
+  review_role=codex 單點複驗
+  template=n/a:SPEC 微修派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:22:43Z"}
+=== 2026-07-11 19:22:43 | dispatch ===
+  ts=2026-07-11 19:22:43
+  kind=dispatch
+  intent=票 2 TODO R5 codex 單點複驗(Task 4.1 計數 assert 閉合)
+  risk=low
+  facts_asked=none-needed:單點複驗
+  review_role=codex 複驗
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:24:49Z"}
+=== 2026-07-11 19:24:49 | dispatch ===
+  ts=2026-07-11 19:24:49
+  kind=dispatch
+  intent=票 3 SPEC R3 codex 單點複驗(Gate C per-file 計數制)
+  risk=low
+  facts_asked=none-needed:單點複驗
+  review_role=codex 複驗
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-SPEC-REVERIFY-R3-codex.md", "output_sha256": "9fba9a0f2d8d838df9ab3e972f1b42ee59615644db31b7dfe21fc3ec30997c1d", "task_id": "p2debt-t3", "ts": "2026-07-11T11:29:57Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:29:57Z"}
+=== 2026-07-11 19:29:57 | dispatch ===
+  ts=2026-07-11 19:29:57
+  kind=dispatch
+  intent=票 3 SPEC R4 composer 單點修(Gate A error-path fail-open→rg rc 三態制)
+  risk=low
+  facts_asked=none-needed:單點
+  review_role=codex 單點複驗
+  template=n/a:SPEC 微修派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-TODO-REVERIFY-R5-codex.md", "output_sha256": "3308f4214913840bacbf877e5c1a4c4ae690e804afdbefd413cc5dba40914f2d", "task_id": "p2debt-t2", "ts": "2026-07-11T11:30:33Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:30:33Z"}
+=== 2026-07-11 19:30:33 | dispatch ===
+  ts=2026-07-11 19:30:33
+  kind=dispatch
+  intent=票 2 TODO R5 composer diff 重確認(R3→R5 兩輪單點修)
+  risk=low
+  facts_asked=none-needed:diff 確認輪
+  review_role=composer 確認
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:31:45Z"}
+=== 2026-07-11 19:31:45 | dispatch ===
+  ts=2026-07-11 19:31:45
+  kind=dispatch
+  intent=票 3 SPEC R4 codex 單點複驗(Gate A rc 三態)
+  risk=low
+  facts_asked=none-needed:單點複驗
+  review_role=codex 複驗
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-TODO-REVERIFY-R5-composer.md", "output_sha256": "54030f0a4b932c94c8f84370b3515f360b2898ed6d1245d2be29b955e6533928", "task_id": "p2debt-t2", "ts": "2026-07-11T11:32:43Z"}
+=== 2026-07-11 19:33:05 | artifact ===
+  ts=2026-07-11 19:33:05
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/P2DEBT_T2_DCREDIRECT_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=大 RISK-HIT: a,b+白話簡述; §A=filled canonical+FACT-RECEIPT; §COVERAGE=全集表; §SEAM=S1-S11+原型; §G=Run A/B/C; §ISOLATION=I1-I3; §V=digest+mutation; §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-07-11 19:34:31 | artifact ===
+  ts=2026-07-11 19:34:31
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/P2DEBT_T2_DCREDIRECT_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=階段1=SPEC 覆蓋追溯; Phase1-4=施工項含 seam/coverage/isolation/golden; Final Acceptance=digest+scope gate+mutation
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:35:48Z"}
+=== 2026-07-11 19:35:48 | dispatch ===
+  ts=2026-07-11 19:35:48
+  kind=dispatch
+  intent=票 2 TODO R6 範本結構整備派 Composer(機檢 per-Task 欄位;內容零語意變更)
+  risk=low
+  facts_asked=none-needed:結構整備輪
+  review_role=grok+codex diff 重確認(R6 後)
+  template=n/a:TODO 結構整備
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-SPEC-REVERIFY-R4-codex.md", "output_sha256": "2fa13f60e881c34a5b6233790573d4fe3c27e55844b9bcddf5e4e965e690824a", "task_id": "p2debt-t3", "ts": "2026-07-11T11:36:17Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:36:17Z"}
+=== 2026-07-11 19:36:17 | dispatch ===
+  ts=2026-07-11 19:36:17
+  kind=dispatch
+  intent=票 3 SPEC R4 grok diff 重確認(R1→R4 三輪單點修)
+  risk=low
+  facts_asked=none-needed:diff 確認輪
+  review_role=grok 確認
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-SPEC-REVERIFY-R4-grok.md", "output_sha256": "ff88a1f4ea89849f068e120dab87cca265d7161d91e3c1f7dc771aa9ea37f732", "task_id": "p2debt-t3", "ts": "2026-07-11T11:37:47Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:38:08Z"}
+=== 2026-07-11 19:38:08 | dispatch ===
+  ts=2026-07-11 19:38:08
+  kind=dispatch
+  intent=票 3 TODO 初稿起草派 Composer(自雙 STAMP SPEC R4;須自跑 template_check PASS)
+  risk=low
+  facts_asked=none-needed:SPEC 凍結
+  review_role=grok+codex 審(TODO 後)
+  template=n/a:TODO 起草派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:39:00Z"}
+=== 2026-07-11 19:39:00 | dispatch ===
+  ts=2026-07-11 19:39:00
+  kind=dispatch
+  intent=票 2 TODO R6 雙家 diff 重確認(結構整備零語意變更)
+  risk=low
+  facts_asked=none-needed:diff 確認輪
+  review_role=grok+codex 確認
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:41:00Z"}
+=== 2026-07-11 19:41:00 | dispatch ===
+  ts=2026-07-11 19:41:00
+  kind=dispatch
+  intent=票 3 TODO R1 雙審(grok+codex)
+  risk=low
+  facts_asked=none-needed:審查輪
+  review_role=grok+codex 雙審
+  template=n/a:review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-TODO-REVERIFY-R6-grok.md", "output_sha256": "dedd536c3cf941d7f930ba3ec73e0a5eed1ef00f2aa72e3bc091f84f324a8918", "task_id": "p2debt-t2", "ts": "2026-07-11T11:42:12Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-TODO-REVERIFY-R6-codex.md", "output_sha256": "cf887dbd9e650aa3f0dab9469b708c733cfe3a323834266894e546cfaf83d5b9", "task_id": "p2debt-t2", "ts": "2026-07-11T11:43:33Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-TODO-REVIEW-grok.md", "output_sha256": "249436dedf171095661c9265065eff32b93bbb31583faa9fee111514e5bdcdff", "task_id": "p2debt-t3", "ts": "2026-07-11T11:43:40Z"}
+=== 2026-07-11 19:44:02 | artifact ===
+  ts=2026-07-11 19:44:02
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/P2DEBT_T2_DCREDIRECT_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=階段1=SPEC 覆蓋追溯; Phase1-4=施工項; Final Acceptance=digest+scope+mutation
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2", "ts": "2026-07-11T11:44:44Z"}
+=== 2026-07-11 19:44:44 | dispatch ===
+  ts=2026-07-11 19:44:44
+  kind=dispatch
+  intent=reconcile 戳記輪:codex 先戳(驗敘事忠實+正式版 diff)
+  risk=low
+  facts_asked=none-needed:戳記輪
+  review_role=codex+composer 戳記
+  template=n/a:戳記派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-RECONCILE.md", "output_sha256": "d10607ece1e6c8cf4e6525afd4fa21e2a74f18e5cb37beabce44ff896fa1e0fe", "task_id": "p2debt-t2", "ts": "2026-07-11T11:47:41Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-TODO-REVIEW-codex.md", "output_sha256": "6702d8ce598977e1beec64005666136b705899afc1afc27f3bae713c9f4eee71", "task_id": "p2debt-t3", "ts": "2026-07-11T11:48:23Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:48:42Z"}
+=== 2026-07-11 19:48:42 | dispatch ===
+  ts=2026-07-11 19:48:42
+  kind=dispatch
+  intent=票 3 TODO R2 定向修派 Composer(codex:驗收遮蔽/vitest skip/目標行不實)
+  risk=low
+  facts_asked=none-needed:findings 明確
+  review_role=codex 複驗(R2 後)
+  template=n/a:TODO 改稿派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-RECONCILE.md", "output_sha256": "b15299e170340bff5834172f703e67d807d8454c0109651f75c3843c9870ad52", "task_id": "p2debt-t2", "ts": "2026-07-11T11:49:22Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/P2DEBT-T2-RECONCILE.md", "output_sha256": "b15299e170340bff5834172f703e67d807d8454c0109651f75c3843c9870ad52", "task_id": "p2debt-t2", "ts": "2026-07-11T11:49:40Z"}
+=== 2026-07-11 19:49:41 | dispatch ===
+  ts=2026-07-11 19:49:41
+  kind=dispatch
+  intent=票 2 實作派 Codex:legacy 測試 data_cache tmp redirect(大票;SPEC/TODO 正式版+雙戳 reconcile PASS)
+  risk=high
+  facts_asked=none-needed:SPEC §A 待確認無+雙 STAMP
+  review_role=grok+composer 雙審(實作後)
+  template=docs/P2DEBT_T2_DCREDIRECT_SPEC.md:template_check PASS
+  adversarial=handoffs/P2DEBT-T2-RECONCILE.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/P2DEBT_T2_DCREDIRECT_SPEC.md
+  todo=docs/P2DEBT_T2_DCREDIRECT_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:52:42Z"}
+=== 2026-07-11 19:52:42 | dispatch ===
+  ts=2026-07-11 19:52:42
+  kind=dispatch
+  intent=票 3 TODO R2 codex 原提出方複驗
+  risk=low
+  facts_asked=none-needed:複驗輪
+  review_role=codex 複驗
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-TODO-REVERIFY-codex.md", "output_sha256": "86d5f8e1412cb0d74bb48fdc2a71d00fc30fc2ab1415bd2e9db81fed10f5921a", "task_id": "p2debt-t3", "ts": "2026-07-11T11:58:14Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T11:58:39Z"}
+=== 2026-07-11 19:58:39 | dispatch ===
+  ts=2026-07-11 19:58:39
+  kind=dispatch
+  intent=斷路器換手:票 3 TODO R3 由 grok 修(run_step 變數作用域+grep -c 多檔計數;composer 兩輪未閉)
+  risk=low
+  facts_asked=none-needed:換手依斷路器鐵律
+  review_role=codex 複驗(R3 後)
+  template=n/a:TODO 換手改稿
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T12:03:29Z"}
+=== 2026-07-11 20:03:29 | dispatch ===
+  ts=2026-07-11 20:03:29
+  kind=dispatch
+  intent=票 3 TODO R3 codex 單點複驗(shell 力學換手稿)
+  risk=low
+  facts_asked=none-needed:複驗輪
+  review_role=codex 複驗
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-TODO-REVERIFY-R3-codex.md", "output_sha256": "17909ffbe6e4367e5fb965deb92c46d1dc863eba708586a57564b1e8b9c268e8", "task_id": "p2debt-t3", "ts": "2026-07-11T12:07:33Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-R3-CHAIR-DELEGATED-RECEIPT.md", "output_sha256": "29f9ac2246fcadfcc692f0b445e56852e52296028e6f02aab13b185044d3e734", "task_id": "p2debt-t3", "ts": "2026-07-11T12:27:35Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T12:27:35Z"}
+=== 2026-07-11 20:27:35 | dispatch ===
+  ts=2026-07-11 20:27:35
+  kind=dispatch
+  intent=票 3 TODO R3 codex 補戳(讀主委 delegated receipt+快速 diff,不跑卡死命令)
+  risk=low
+  facts_asked=none-needed:繞法補戳
+  review_role=codex 戳記
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T12:30:14Z"}
+=== 2026-07-11 20:30:14 | dispatch ===
+  ts=2026-07-11 20:30:14
+  kind=dispatch
+  intent=票 3 R3 第二方獨立重現 codex 反例(codex 配額 down 至 00:08;§B8 raiser 不可用替代)
+  risk=low
+  facts_asked=none-needed:機械反例重現
+  review_role=composer 第二方重現
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-R3-2ND-REPRO-composer.md", "output_sha256": "fb5c9528d09ab0198d72bdf58841dff5ee8f3e595040e588860abdfdb4559e02", "task_id": "p2debt-t3", "ts": "2026-07-11T12:35:58Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-IMPL-CHAIR-FINDING.md", "output_sha256": "bd4578014999a137df3ed216560cfb12f9730bce291e75e9641d90056296f309", "task_id": "p2debt-t2", "ts": "2026-07-11T12:37:01Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/P2DEBT-T2-RECONCILE.md", "output_sha256": "b15299e170340bff5834172f703e67d807d8454c0109651f75c3843c9870ad52", "task_id": "p2debt-t2", "ts": "2026-07-11T12:37:01Z"}
+=== 2026-07-11 20:37:02 | dispatch ===
+  ts=2026-07-11 20:37:02
+  kind=dispatch
+  intent=票 2 實作修 BLOCKING C-1(hermetic skip 白名單誤判)派 codex
+  risk=high
+  facts_asked=none-needed:主委 finding 附直接證據+修法要求
+  review_role=grok+composer 雙審(修後)
+  template=docs/P2DEBT_T2_DCREDIRECT_SPEC.md:已凍結
+  adversarial=handoffs/P2DEBT-T2-RECONCILE.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/P2DEBT_T2_DCREDIRECT_SPEC.md
+  todo=docs/P2DEBT_T2_DCREDIRECT_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T12:43:34Z"}
+=== 2026-07-11 20:43:34 | dispatch ===
+  ts=2026-07-11 20:43:34
+  kind=dispatch
+  intent=票 3 R3 codex 正式 §B8 追認(配額恢復;靜態:讀 chair+composer receipt+diff)
+  risk=low
+  facts_asked=none-needed:追認輪
+  review_role=codex 追認
+  template=n/a:複驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-TODO-REVERIFY-R3-RATIFY-codex.md", "output_sha256": "df20423b5f7950d5efd1465c22e86bcb7e72ac7a3aaebfa58c9780553e7c7811", "task_id": "p2debt-t3", "ts": "2026-07-11T12:44:56Z"}
+=== 2026-07-11 20:45:33 | artifact ===
+  ts=2026-07-11 20:45:33
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/P2DEBT_T3_TSCFIX_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=RISK-HIT none; §A=canonical+FACT-RECEIPT; §C=test-only scope; §G=N/A; §V=Gate A/B/C+scope; §P; §R; §N
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/P2DEBT-T2-RECONCILE.md", "output_sha256": "b15299e170340bff5834172f703e67d807d8454c0109651f75c3843c9870ad52", "task_id": "p2debt-t2", "ts": "2026-07-11T12:47:25Z"}
+=== 2026-07-11 20:47:26 | dispatch ===
+  ts=2026-07-11 20:47:26
+  kind=dispatch
+  intent=票 2 harness C-1 二次修(skip_lines 須排除 verbose 進度行,只取 summary)派 codex
+  risk=high
+  facts_asked=none-needed:主委已精確診斷+驗證修法
+  review_role=grok+composer 雙審
+  template=docs/P2DEBT_T2_DCREDIRECT_SPEC.md:凍結
+  adversarial=handoffs/P2DEBT-T2-RECONCILE.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/P2DEBT_T2_DCREDIRECT_SPEC.md
+  todo=docs/P2DEBT_T2_DCREDIRECT_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T12:49:15Z"}
+=== 2026-07-11 20:49:15 | dispatch ===
+  ts=2026-07-11 20:49:15
+  kind=dispatch
+  intent=票 3 SPEC 正式版 conformance pass 派 composer(機檢錨點;零語意變更)
+  risk=low
+  facts_asked=none-needed:結構整備
+  review_role=chair 驗 diff+template_check
+  template=n/a:結構整備
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-11 20:51:42 | artifact ===
+  ts=2026-07-11 20:51:42
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/P2DEBT_T3_TSCFIX_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=階段1=覆蓋; Task 1.1-1.5; Gate A/B/C; Final Acceptance
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T12:52:37Z"}
+=== 2026-07-11 20:52:37 | dispatch ===
+  ts=2026-07-11 20:52:37
+  kind=dispatch
+  intent=票 3 reconcile 戳記:codex 先(驗敘事+正式版 diff)
+  risk=low
+  facts_asked=none-needed:戳記輪
+  review_role=codex+composer 戳記
+  template=n/a:戳記派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-RECONCILE.md", "output_sha256": "80f03cf0c76b74010457f6b0a5bb7e8459fd8e595888c020d346151d60f599f8", "task_id": "p2debt-t3", "ts": "2026-07-11T12:57:02Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/P2DEBT-T3-RECONCILE.md", "output_sha256": "80f03cf0c76b74010457f6b0a5bb7e8459fd8e595888c020d346151d60f599f8", "task_id": "p2debt-t3", "ts": "2026-07-11T12:57:33Z"}
+=== 2026-07-11 20:57:37 | dispatch ===
+  ts=2026-07-11 20:57:37
+  kind=dispatch
+  intent=票 3 實作派 codex:frontend 5 測試檔 tsc 11 錯誤清零(SPEC/TODO 正式版+雙戳 reconcile PASS)
+  risk=high
+  facts_asked=none-needed:SPEC §A 待確認無+雙 STAMP
+  review_role=grok+composer 雙審(實作後)
+  template=docs/P2DEBT_T3_TSCFIX_SPEC.md:PASS
+  adversarial=handoffs/P2DEBT-T3-RECONCILE.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/P2DEBT_T3_TSCFIX_SPEC.md
+  todo=docs/P2DEBT_T3_TSCFIX_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t3", "ts": "2026-07-11T13:03:40Z"}
+=== 2026-07-11 21:03:40 | dispatch ===
+  ts=2026-07-11 21:03:40
+  kind=dispatch
+  intent=票 3 實作雙審(grok+composer):diff 防假綠+驗收複跑
+  risk=low
+  facts_asked=none-needed:實作後審查
+  review_role=grok+composer 雙審
+  template=n/a:review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-IMPL-REVIEW-grok.md", "output_sha256": "1adeb9d30f28dbc22522a8db22ff03d7edbe1e26128b0923703e9eb47d438bf8", "task_id": "p2debt-t3", "ts": "2026-07-11T13:06:39Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-IMPL-REVIEW-composer.md", "output_sha256": "cc5191e7f4ce2e6a7cb0800c4569673efa9f61e526a4f80b01f4cc2e4b239fbc", "task_id": "p2debt-t3", "ts": "2026-07-11T13:06:39Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-IMPL-RESULT-codex.md", "output_sha256": "e126e3c0e51fed21a38fcca6a6786935ba45d1ec827f60423de895a662f4d8b8", "task_id": "p2debt-t3", "ts": "2026-07-11T13:06:40Z"}
