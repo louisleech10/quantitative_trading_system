@@ -1,0 +1,288 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 18 items
+
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_fast_btc_12h_f754_invariant 
+-------------------------------- live log call ---------------------------------
+06:10:10 [INFO] Loaded feature registry with 11 entries
+06:10:10 [INFO] Loaded feature registry with 11 entries
+06:10:10 [INFO] IC config loaded
+06:10:10 [INFO] IC analysis task started: 27d0416f-3df9-4d2c-8f2d-5720bee8a577
+06:10:10 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:10:10 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:10 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:11 [INFO] Data preprocessing complete: columns=499
+06:10:11 [INFO] Read 1696 klines from BTCUSDT/12h in 0.005s
+06:10:11 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:12 [INFO] IC autocorr persistent: count=464
+06:10:12 [INFO] Read 1696 klines from BTCUSDT/12h in 0.004s
+06:10:16 [INFO] Decay: 173/499 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=171)
+06:10:26 [INFO] IC analysis task completed: 27d0416f-3df9-4d2c-8f2d-5720bee8a577
+PASSED                                                                   [  5%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[event_BTCUSDT_12h_e53e2290] 
+-------------------------------- live log call ---------------------------------
+06:10:26 [INFO] Loaded feature registry with 11 entries
+06:10:26 [INFO] IC config loaded
+06:10:26 [INFO] IC analysis task started: 08ddc1f6-07a8-4d98-998f-dd1d152dabbd
+06:10:26 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:10:26 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:26 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:27 [INFO] Data preprocessing complete: columns=499
+06:10:27 [INFO] Read 1696 klines from BTCUSDT/12h in 0.003s
+06:10:27 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:27 [INFO] Read 1696 klines from BTCUSDT/12h in 0.003s
+06:10:28 [INFO] Data preprocessing complete: columns=499
+06:10:28 [INFO] Read 1696 klines from BTCUSDT/12h in 0.003s
+06:10:28 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:28 [INFO] Read 1696 klines from BTCUSDT/12h in 0.003s
+06:10:28 [INFO] IC autocorr persistent: count=498
+06:10:28 [INFO] Read 1696 klines from BTCUSDT/12h in 0.003s
+06:10:35 [INFO] Decay: 499/499 fit warnings summarized (insufficient_points=499)
+06:10:38 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:42 [INFO] IC analysis task completed: 08ddc1f6-07a8-4d98-998f-dd1d152dabbd
+PASSED                                                                   [ 11%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[event_lowconf_BTCUSDT_12h_e53e2290] 
+-------------------------------- live log call ---------------------------------
+06:10:43 [INFO] Loaded feature registry with 11 entries
+06:10:43 [INFO] IC config loaded
+06:10:43 [INFO] IC analysis task started: 6f73d4f9-b9c1-43bd-bea2-2395b073c97a
+06:10:43 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:10:43 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:43 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:44 [INFO] Data preprocessing complete: columns=499
+06:10:44 [INFO] Read 1696 klines from BTCUSDT/12h in 0.003s
+06:10:44 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:44 [INFO] Read 1696 klines from BTCUSDT/12h in 0.003s
+06:10:44 [INFO] Data preprocessing complete: columns=499
+06:10:44 [INFO] Read 1696 klines from BTCUSDT/12h in 0.004s
+06:10:44 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:44 [INFO] Read 1696 klines from BTCUSDT/12h in 0.004s
+06:10:45 [INFO] Read 1696 klines from BTCUSDT/12h in 0.004s
+06:10:50 [INFO] Decay: 499/499 fit warnings summarized (insufficient_points=499)
+06:10:53 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:57 [INFO] IC analysis task completed: 6f73d4f9-b9c1-43bd-bea2-2395b073c97a
+PASSED                                                                   [ 16%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[full_BTCUSDT_12h_e53e2290] 
+-------------------------------- live log call ---------------------------------
+06:10:58 [INFO] Loaded feature registry with 11 entries
+06:10:58 [INFO] IC config loaded
+06:10:58 [INFO] IC analysis task started: ea1da3b9-5750-4f9d-92be-8344d0c17a5d
+06:10:58 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:10:58 [INFO] Data preprocessing complete: columns=499
+06:10:58 [INFO] Read 1696 klines from BTCUSDT/12h in 0.003s
+06:10:58 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:10:59 [INFO] IC autocorr persistent: count=467
+06:10:59 [INFO] Read 1696 klines from BTCUSDT/12h in 0.004s
+06:11:15 [INFO] Decay: 499/499 fit warnings summarized (insufficient_points=499)
+06:11:20 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:11:27 [INFO] IC analysis task completed: ea1da3b9-5750-4f9d-92be-8344d0c17a5d
+PASSED                                                                   [ 22%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BCHUSDT_12h_e53e2290] 
+-------------------------------- live log call ---------------------------------
+06:11:28 [INFO] Loaded feature registry with 11 entries
+06:11:28 [INFO] IC config loaded
+06:11:28 [INFO] IC analysis task started: 6836d80b-8034-4674-a017-95043e5a023e
+06:11:28 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:11:28 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:11:28 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:11:29 [INFO] Data preprocessing complete: columns=498
+06:11:29 [INFO] Read 1696 klines from BCHUSDT/12h in 0.003s
+06:11:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:11:29 [INFO] IC autocorr persistent: count=465
+06:11:29 [INFO] Read 1696 klines from BCHUSDT/12h in 0.004s
+06:11:34 [INFO] Decay: 197/498 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=195)
+06:11:44 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+06:11:44 [INFO] IC analysis task completed: 6836d80b-8034-4674-a017-95043e5a023e
+PASSED                                                                   [ 27%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BCHUSDT_12h_f754aad4] 
+-------------------------------- live log call ---------------------------------
+06:11:44 [INFO] Loaded feature registry with 11 entries
+06:11:44 [INFO] IC config loaded
+06:11:44 [INFO] IC analysis task started: 931fe419-7cc9-4852-b0c6-b88704f9d825
+06:11:44 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:11:44 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:11:44 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:11:45 [INFO] Data preprocessing complete: columns=498
+06:11:45 [INFO] Read 1696 klines from BCHUSDT/12h in 0.003s
+06:11:45 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:11:46 [INFO] IC autocorr persistent: count=468
+06:11:46 [INFO] Read 1696 klines from BCHUSDT/12h in 0.004s
+06:11:50 [INFO] Decay: 210/498 fit warnings summarized (insufficient_points=1, low_r2=209)
+06:12:00 [INFO] Redundancy filter completed: method=greedy input=3 output=3
+06:12:00 [INFO] IC analysis task completed: 931fe419-7cc9-4852-b0c6-b88704f9d825
+PASSED                                                                   [ 33%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BCHUSDT_1h_4a8a0b37] 
+-------------------------------- live log call ---------------------------------
+06:12:00 [INFO] Loaded feature registry with 11 entries
+06:12:00 [INFO] IC config loaded
+06:12:00 [INFO] IC analysis task started: 4fac6a47-fbef-4c16-b8d5-5dcd1c523ca7
+06:12:00 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:12:01 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:01 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:02 [INFO] Data preprocessing complete: columns=499
+06:12:02 [INFO] Read 20352 klines from BCHUSDT/1h in 0.009s
+06:12:02 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:04 [INFO] IC autocorr persistent: count=371
+06:12:04 [INFO] Read 20352 klines from BCHUSDT/1h in 0.008s
+06:12:10 [INFO] Decay: 98/499 fit warnings summarized (fit_exception=1, low_r2=97)
+06:12:26 [INFO] Redundancy filter completed: method=greedy input=1 output=1
+06:12:26 [INFO] IC analysis task completed: 4fac6a47-fbef-4c16-b8d5-5dcd1c523ca7
+PASSED                                                                   [ 38%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BTCUSDT_12h_e53e2290] 
+-------------------------------- live log call ---------------------------------
+06:12:28 [INFO] Loaded feature registry with 11 entries
+06:12:28 [INFO] IC config loaded
+06:12:28 [INFO] IC analysis task started: 004214a0-f44b-4b8d-9e25-b2b2eda7cf40
+06:12:28 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:12:28 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:28 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:29 [INFO] Data preprocessing complete: columns=499
+06:12:29 [INFO] Read 1696 klines from BTCUSDT/12h in 0.004s
+06:12:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:30 [INFO] IC autocorr persistent: count=462
+06:12:30 [INFO] Read 1696 klines from BTCUSDT/12h in 0.004s
+06:12:35 [INFO] Decay: 166/499 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=164)
+06:12:44 [INFO] IC analysis task completed: 004214a0-f44b-4b8d-9e25-b2b2eda7cf40
+PASSED                                                                   [ 44%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BTCUSDT_1h_4a8a0b37] 
+-------------------------------- live log call ---------------------------------
+06:12:45 [INFO] Loaded feature registry with 11 entries
+06:12:45 [INFO] IC config loaded
+06:12:45 [INFO] IC analysis task started: a41a5604-e3a9-4a1e-ad72-a7eb574367c1
+06:12:45 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:12:45 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:45 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:46 [INFO] Data preprocessing complete: columns=499
+06:12:46 [INFO] Read 20352 klines from BTCUSDT/1h in 0.009s
+06:12:46 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:12:48 [INFO] IC autocorr persistent: count=390
+06:12:48 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+06:12:54 [INFO] Decay: 95/499 fit warnings summarized (low_r2=95)
+06:13:10 [INFO] IC analysis task completed: a41a5604-e3a9-4a1e-ad72-a7eb574367c1
+PASSED                                                                   [ 50%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_e53e2290] 
+-------------------------------- live log call ---------------------------------
+06:13:13 [INFO] Loaded feature registry with 11 entries
+06:13:13 [INFO] IC config loaded
+06:13:13 [INFO] IC analysis task started: c8f5d8a4-5a75-4257-ab5b-7beaee14dff1
+06:13:13 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:13:13 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:13 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:13 [INFO] Data preprocessing complete: columns=500
+06:13:13 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+06:13:13 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:14 [INFO] IC autocorr persistent: count=466
+06:13:14 [INFO] Read 1696 klines from ETHUSDT/12h in 0.009s
+06:13:19 [INFO] Decay: 173/500 fit warnings summarized (insufficient_points=1, low_r2=172)
+06:13:28 [INFO] IC analysis task completed: c8f5d8a4-5a75-4257-ab5b-7beaee14dff1
+PASSED                                                                   [ 55%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_f754aad4] 
+-------------------------------- live log call ---------------------------------
+06:13:29 [INFO] Loaded feature registry with 11 entries
+06:13:29 [INFO] IC config loaded
+06:13:29 [INFO] IC analysis task started: 342ebcff-dea2-44ce-be6e-1a0d3d4bb640
+06:13:29 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:13:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:29 [INFO] Data preprocessing complete: columns=499
+06:13:29 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+06:13:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:30 [INFO] IC autocorr persistent: count=467
+06:13:30 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+06:13:35 [INFO] Decay: 180/499 fit warnings summarized (insufficient_points=1, low_r2=179)
+06:13:45 [INFO] IC analysis task completed: 342ebcff-dea2-44ce-be6e-1a0d3d4bb640
+PASSED                                                                   [ 61%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_1h_4a8a0b37] 
+-------------------------------- live log call ---------------------------------
+06:13:46 [INFO] Loaded feature registry with 11 entries
+06:13:46 [INFO] IC config loaded
+06:13:46 [INFO] IC analysis task started: 8f11728c-a444-4d3a-9f35-6667570644a1
+06:13:46 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:13:46 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:46 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:47 [INFO] Data preprocessing complete: columns=500
+06:13:47 [INFO] Read 20352 klines from ETHUSDT/1h in 0.009s
+06:13:47 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+06:13:49 [INFO] IC autocorr persistent: count=359
+06:13:49 [INFO] Read 20352 klines from ETHUSDT/1h in 0.008s
+06:13:55 [INFO] Decay: 117/500 fit warnings summarized (fit_exception=2, insufficient_points=1, low_r2=114)
+06:14:11 [INFO] IC analysis task completed: 8f11728c-a444-4d3a-9f35-6667570644a1
+PASSED                                                                   [ 66%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[xsec_3sym_12h_e53e2290] 
+-------------------------------- live log call ---------------------------------
+06:14:13 [INFO] Loaded feature registry with 11 entries
+06:14:24 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:14:24 [INFO] Read 1696 klines from BTCUSDT/12h in 0.005s
+06:14:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.005s
+06:14:24 [INFO] Read 1696 klines from BCHUSDT/12h in 0.003s
+06:14:24 [INFO] IC config loaded
+PASSED                                                                   [ 72%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_manifest_covers_13_runs PASSED [ 77%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g3_sample_insufficient_p_nan_gate PASSED [ 83%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g3_all_nan_and_std0_p_nan PASSED [ 88%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g3_selection_scope_contract_raise PASSED [ 94%]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g3_xsec_labels_path_still_raises 
+-------------------------------- live log call ---------------------------------
+06:15:49 [INFO] Loaded feature registry with 11 entries
+06:15:59 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+06:15:59 [INFO] Read 1696 klines from BTCUSDT/12h in 0.005s
+06:15:59 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+06:15:59 [INFO] Read 1696 klines from BCHUSDT/12h in 0.003s
+06:15:59 [INFO] IC config loaded
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_fast_btc_12h_f754_invariant
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BCHUSDT_12h_e53e2290]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BCHUSDT_12h_f754aad4]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BCHUSDT_1h_4a8a0b37]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BTCUSDT_12h_e53e2290]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_e53e2290]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_f754aad4]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_1h_4a8a0b37]
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:950: OptimizeWarning: Covariance of the parameters could not be estimated
+    params, _ = optimize.curve_fit(model, x, y, maxfev=2000)
+
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_fast_btc_12h_f754_invariant
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BCHUSDT_12h_e53e2290]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BCHUSDT_12h_f754aad4]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_BTCUSDT_12h_e53e2290]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_e53e2290]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_f754aad4]
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:947: RuntimeWarning: overflow encountered in exp
+    return a * np.exp(-lam * h) + c
+
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py: 35 warnings
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:995: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+    return float(stats.spearmanr(x, y)[0])
+
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py: 4571 warnings
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_e53e2290]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_f754aad4]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_1h_4a8a0b37]
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:318: RuntimeWarning: Mean of empty slice
+    ic_mean = float(np.nanmean(values))
+
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_e53e2290]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_12h_f754aad4]
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant[long_ETHUSDT_1h_4a8a0b37]
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/nanfunctions.py:1879: RuntimeWarning: Degrees of freedom <= 0 for slice.
+    var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py: 4563 warnings
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2898: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[None, :]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================ 18 passed, 9190 warnings in 349.77s (0:05:49) =================
