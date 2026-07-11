@@ -336,7 +336,7 @@ def test_r7_gate_task_id_appends_committee_dispatch(tmp_path: Path) -> None:
     """R7：gate dispatch --task-id + adversarial → audit 有 committee_dispatch 且 hash 符。"""
     gate_tmp = tempfile.mkdtemp(prefix="gate_r7_test_")
     adv_path = REPO_ROOT / "handoffs" / "20990101-R7-ADV-COMPOSER.md"
-    adv_path.write_text("# R7 adversarial review\nVERDICT: APPROVED\n", encoding="utf-8")
+    adv_path.write_text("# R7 adversarial review\nVerdict: APPROVED\n", encoding="utf-8")
     rel = "handoffs/20990101-R7-ADV-COMPOSER.md"
 
     env = dict(os.environ, GATE_DIR_OVERRIDE=gate_tmp)

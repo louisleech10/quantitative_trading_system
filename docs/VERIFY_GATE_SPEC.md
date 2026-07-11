@@ -7,17 +7,18 @@
 
 ## §RISK 風險分級
 **high** — 原則 (b)：碰 PreToolUse/git hooks/CI/所有 HANDOFF 與 commit 流程（跨流程共用路徑）。未命中 (a)/(d)：不改數值/ML/回測正確性 → §G 於 §N 標 N/A。
+- RISK-HIT: b
 **要求強度**：雙家族 adversarial（已跑 v1;v2 須重審）+ TODO + Composer 實作 + Codex review。
 **硬性順序條件（Composer,不可違）**：**先寫 claim-object 偵測測試套件達「誤報=0」門檻,才接 PreToolUse**;未達標 → v1 降為「commit-hook + CI + receipt」不上 PreToolUse 全攔。
 
 ## §A 假設與待使用者確認
 - **已確認**：① 使用者 2026-07-01 定「全硬化」+ 加 Gemini 議平衡 + 掃全流程;② v1 範圍取捨 + v2 約束式硬化經四方 reconcile。
 - **已確認（讀碼實證,附來源）**：
-  - `scripts/gate_check.sh` matcher 僅 `Task|Bash|Write`,不掃 HANDOFF 內容、不管 commit-msg（grep matcher 行）;jq 缺失 fail-open（L18 附近 exit 0）。
+  - `scripts/gate_check.sh` matcher 僅 `Task|Bash|Write`,不掃 HANDOFF 內容、不管 commit-msg（grep matcher 行）;jq 缺失 fail-open（L18 附近 exit 0）。FACT-RECEIPT: grep -n 'Task)' scripts/gate_check.sh → 印出 37:  Task)（Composer 實跑 2026-07-11）
   - `.git/hooks/` 無自訂 hook（僅 `.sample`;`ls` 確認）。
   - `.github/workflows/` 存在（`l65_benchmark.yml`）→ CI 可用作 enforcement 後盾。
   - `scripts/reconcile_stamps_check.sh` 以 grep 戳記行為主,不驗戳記來源（自承 tamper-evident 非防偽造）。
-  - `scripts/mutation_probe_check.sh` 規則 3 跑 `pytest -k test_mutation_`,結尾 echo PASS/FAIL,現無 receipt 輸出。
+  - `scripts/mutation_probe_check.sh` 規則 3 跑 `pytest -k test_mutation_`,結尾 echo PASS/FAIL,現無 receipt 輸出。FACT-RECEIPT: grep -n '^echo "→ 跑 mutation 探針: pytest -k test_mutation_' scripts/mutation_probe_check.sh → 印出 74:echo "→ 跑 mutation 探針: pytest -k test_mutation_ $*"（Composer 實跑 2026-07-11）
 - **待確認：無**。
 
 ## §C 約束（引用,不重抄）

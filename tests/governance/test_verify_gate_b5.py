@@ -268,8 +268,9 @@ def test_b5_spec_command_output_fact_receipt_missing_fails(tmp_path: Path) -> No
             [
                 "## §RISK",
                 "risk",
+                "- RISK-HIT: none",
                 "## §A",
-                "- 已確認: pytest tests/governance/test_verify_gate.py -q 輸出 49 passed",
+                "- **已確認**：pytest tests/governance/test_verify_gate.py -q 輸出 49 passed",
                 "- 待確認：無",
                 "## §C",
                 "c",
@@ -299,8 +300,10 @@ def test_b5_spec_fact_receipt_missing_fails(tmp_path: Path) -> None:
             [
                 "## §RISK",
                 "risk",
+                "- RISK-HIT: none",
                 "## §A",
-                "- 已確認:raw_data.index 是 DatetimeIndex",
+                "- **已確認**：raw_data.index 是 DatetimeIndex",
+                "- 待確認：無",
                 "## §C",
                 "c",
                 "## §P",
@@ -329,8 +332,9 @@ def test_b5_spec_fact_receipt_present_passes(tmp_path: Path) -> None:
             [
                 "## §RISK",
                 "risk",
+                "- RISK-HIT: none",
                 "## §A",
-                "- 已確認:raw_data.index 是 DatetimeIndex FACT-RECEIPT:receipt-abc",
+                "- **已確認**：raw_data.index 是 DatetimeIndex FACT-RECEIPT:receipt-abc",
                 "- 待確認：無",
                 "## §C",
                 "c",
@@ -359,6 +363,7 @@ def test_b5_spec_pending_confirmation_passes(tmp_path: Path) -> None:
             [
                 "## §RISK",
                 "risk",
+                "- RISK-HIT: none",
                 "## §A",
                 "- 待確認:raw_data.index 是否 DatetimeIndex",
                 "- 待確認：無",
@@ -379,6 +384,37 @@ def test_b5_spec_pending_confirmation_passes(tmp_path: Path) -> None:
     )
     proc = _run_template_check("spec", fixture)
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_b5_spec_missing_risk_hit_fails(tmp_path: Path) -> None:
+    """5.3：canonical fact receipt 齊但缺 RISK-HIT → template_check FAIL。"""
+    fixture = _write_fixture(
+        tmp_path / "docs" / "MISSING_RISK_HIT_SPEC.md",
+        "\n".join(
+            [
+                "## §RISK",
+                "risk",
+                "## §A",
+                "- **已確認**：raw_data.index 是 DatetimeIndex FACT-RECEIPT:receipt-abc",
+                "- 待確認：無",
+                "## §C",
+                "c",
+                "## §P",
+                "p",
+                "## §V",
+                "v",
+                "## §R",
+                "r",
+                "## §N",
+                "§G：N/A — test",
+                "## §G",
+                "N/A",
+            ]
+        ),
+    )
+    proc = _run_template_check("spec", fixture)
+    assert proc.returncode == 1
+    assert "RISK-HIT" in proc.stdout
 
 
 def test_b5_existing_verify_gate_spec_still_passes() -> None:

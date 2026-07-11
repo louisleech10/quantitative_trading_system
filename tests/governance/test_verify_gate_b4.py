@@ -231,7 +231,7 @@ def test_mutation_probe_key_lines_stable_green_vs_red(tmp_path: Path) -> None:
 def test_gate_adversarial_rejects_non_adv_non_reconcile(tmp_path: Path) -> None:
     """Task 4.2：非 ADV 且非 reconcile 任意路徑 → gate 拒。"""
     fake = tmp_path / "not-adv.md"
-    fake.write_text("# not an ADV\n", encoding="utf-8")
+    fake.write_text("# not an ADV\nVerdict: REJECTED\n", encoding="utf-8")
     proc = _run_gate_adversarial(str(fake))
     assert proc.returncode == 1
     combined = proc.stdout + proc.stderr
@@ -241,7 +241,7 @@ def test_gate_adversarial_rejects_non_adv_non_reconcile(tmp_path: Path) -> None:
 def test_gate_adversarial_rejects_without_dispatch(tmp_path: Path) -> None:
     """Task 4.2：fake ADV 無 task 審計 → gate 拒。"""
     fake_adv = REPO_ROOT / "handoffs" / "20990101-B4-FAKE-ADV-COMPOSER.md"
-    fake_adv.write_text("# fake adversarial\n", encoding="utf-8")
+    fake_adv.write_text("# fake adversarial\nVerdict: REJECTED\n", encoding="utf-8")
     rel = "handoffs/20990101-B4-FAKE-ADV-COMPOSER.md"
     try:
         proc = _run_gate_adversarial(rel)
@@ -255,7 +255,7 @@ def test_gate_adversarial_rejects_without_dispatch(tmp_path: Path) -> None:
 def test_gate_adversarial_passes_with_dispatch(tmp_path: Path) -> None:
     """Task 4.2：有 committee_dispatch 審計 → gate 過。"""
     adv_path = REPO_ROOT / "handoffs" / "20990101-B4-TEST-ADV-COMPOSER.md"
-    adv_path.write_text("# real adversarial review\nVERDICT: APPROVED\n", encoding="utf-8")
+    adv_path.write_text("# real adversarial review\nVerdict: APPROVED\n", encoding="utf-8")
 
     committee_audit = Path(os.environ[COMMITTEE_AUDIT_ENV])
     rel = "handoffs/20990101-B4-TEST-ADV-COMPOSER.md"
@@ -272,6 +272,16 @@ def test_gate_adversarial_passes_with_dispatch(tmp_path: Path) -> None:
         assert "GATE PASS" in proc.stdout
     finally:
         adv_path.unlink(missing_ok=True)
+
+
+def test_gate_adversarial_rejects_uppercase_verdict(tmp_path: Path) -> None:
+    """Task 4.2：全大寫 VERDICT 不符合 D-1 錨點 → gate 拒。"""
+    fake_adv = tmp_path / "20990101-B4-UPPER-VERDICT-COMPOSER.md"
+    fake_adv.write_text("# uppercase verdict\nVERDICT: APPROVED\n", encoding="utf-8")
+    proc = _run_gate_adversarial(str(fake_adv))
+    assert proc.returncode == 1
+    combined = proc.stdout + proc.stderr
+    assert "缺 Verdict 行" in combined or "D-1" in combined
 
 
 def test_reconcile_rejects_stamp_without_dispatch(tmp_path: Path) -> None:
