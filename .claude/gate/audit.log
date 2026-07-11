@@ -11322,3 +11322,43 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event":"gate_deny","ts":"2026-07-11T05:08:33Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-11T05:22:58Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-11T05:22:58Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-docsync", "ts": "2026-07-11T05:26:02Z"}
+=== 2026-07-11 13:26:02 | dispatch ===
+  ts=2026-07-11 13:26:02
+  kind=dispatch
+  intent=P2 債開工前文件同步稽核雙審(grok+composer 各自獨立驗證 HANDOFF/ROADMAP 差異清單)
+  risk=low
+  facts_asked=none-needed:文件現況核對,receipt 已附
+  review_role=grok+composer 雙審
+  template=n/a:review 派工非 SPEC/TODO 產物
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-DOCSYNC-REVIEW-grok.md", "output_sha256": "4743d5f4f4d5b1e0db5f43534c2f291c94e73eaa4a668fb751f073e68df61c67", "task_id": "p2debt-docsync", "ts": "2026-07-11T05:31:20Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-docsync", "ts": "2026-07-11T05:36:28Z"}
+=== 2026-07-11 13:36:28 | dispatch ===
+  ts=2026-07-11 13:36:28
+  kind=dispatch
+  intent=補派 Codex 第三審腿:文件同步稽核委員會審查(委員會審查=三家行)
+  risk=low
+  facts_asked=none-needed:同 task 補腿,receipt 已附
+  review_role=codex 委員會第三腿
+  template=n/a:review 派工非 SPEC/TODO 產物
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-DOCSYNC-REVIEW-composer.md", "output_sha256": "b5ed2997334864aca0750ea9a3b1382b3e43daea2146625612811b4cc251d51b", "task_id": "p2debt-docsync", "ts": "2026-07-11T05:37:53Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-DOCSYNC-REVIEW-codex.md", "output_sha256": "960a0a982b68e8e76bf2d61d81d4e582bc60b831f1dccfb063d97a85202e52f3", "task_id": "p2debt-docsync", "ts": "2026-07-11T05:42:30Z"}

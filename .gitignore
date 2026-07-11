@@ -178,3 +178,6 @@ handoffs/ic1eb_baseline/
 handoffs/ic1eb_baseline_n50_superseded/
 handoffs/ic1eb_baseline_v2_superseded/
 handoffs/ic1eb_baseline_v3_superseded/
+# B5 新路徑 freeze reports(G-2 腳本可重產;manifest 摘要見 IC1EB-GOLDEN-DIFF.md)
+handoffs/ic1eb_newpath_freeze/
+handoffs/ic1eb_newpath_freeze.bak.*/
