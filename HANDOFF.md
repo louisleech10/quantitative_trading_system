@@ -8,7 +8,7 @@
 - 治理:規則四條使用者採納 2026-07-11(handoffs/RULE-PROPOSAL-RECONCILE.md)+SCAR 三連環登記(docs/SCAR_LEDGER.md 末列);RULEIMPL 初稿 grok R3 判 PASS SIGNOFF:RULEIMPL-REVIEW-R3-grok.md,codex 補審待排。
 
 ## ★下一站
-1. RULEIMPL:codex 補審初稿(handoffs/RULEIMPL-SPEC-DRAFT-R3.md)→正式化 SPEC/TODO(gate artifact+範本)→實作(SPEC_TEMPLATE §G 機讀欄/template_check/gate validation-run/消費端拒收)。
+1. RULEIMPL(park 於 R5,2026-07-11):定稿=handoffs/RULEIMPL-SPEC-DRAFT-R5.md;審查鏈=composer 起草×5/grok R5 判 PASS SIGNOFF:RULEIMPL-REVIEW-R5-grok.md/codex R5 殘 4 條(handoffs/RULEIMPL-REVIEW-R5-codex.md)——性質=正式化時綁定項(cutoff full-SHA 開票填/base fallback 演算法字面修/digest exclusion set 枚舉/sidecar 自參照排除)。下一步:正式化 SPEC/TODO(gate artifact+範本)時逐項落值→codex 終驗→派實作。
 2. ROADMAP ③ 1c Net IC 量綱(下一刀)。
 3. P2 債:governance 既有 9 紅(b4×3+b5×5+r7,先於本 session,歸屬驗證=HANDOFF 前版+git log 3edfa6c)/legacy 測試寫 data_cache tmp redirect/tsc 既存 10 errors/codex 沙箱間歇卡死觀察。
 4. Grok 記分素材(加密驗收期,裁決留使用者):B1-B5 交付均一輪修復閉合;審查腿多次高品質 findings;停手紀律好(BLOCKED-1A);弱項=橫切面不變量/測試嚴謹捷徑/一次越權重凍 1a(記檔 handoffs/ic1a_cut1_refreeze_quarantine)。

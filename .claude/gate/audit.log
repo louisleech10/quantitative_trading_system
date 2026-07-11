@@ -11254,3 +11254,71 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event":"gate_deny","ts":"2026-07-11T03:14:31Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/RULEIMPL-REVIEW-codex.md", "output_sha256": "pending", "task_id": "RULEIMPL-REV-codex", "ts": "2026-07-11T03:44:37Z"}
+=== 2026-07-11 11:44:38 | dispatch ===
+  ts=2026-07-11 11:44:38
+  kind=dispatch
+  intent=RULEIMPL 初稿補審(codex,第二非作者腿)
+  risk=low
+  facts_asked=初稿=composer 起草三輪;grok R3 PASS;你的視角=canonical runner/消費端拒收設計原出自你的修文,驗落地忠實度
+  review_role=codex 對照自家 RULE-PROPOSAL 修文驗 R3 稿忠實度+機械化可行性
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/RULEIMPL-SPEC-DRAFT-R4.md", "output_sha256": "pending", "task_id": "RULEIMPL-DRAFT-R4-composer", "ts": "2026-07-11T03:48:49Z"}
+=== 2026-07-11 11:48:49 | dispatch ===
+  ts=2026-07-11 11:48:49
+  kind=dispatch
+  intent=RULEIMPL 初稿修訂輪4(composer):codex 七 BLOCKING
+  risk=low
+  facts_asked=codex 補審 7 BLOCKING 各附修文(manifest schema 必填清單/grandfather 逃脫/聯檢 CLI 凍結/條文3 落地/發布循環拆解/exit-code 強制/IC1EB 過渡 sidecar);grok R3 已 PASS 的部分勿回退
+  review_role=修訂後 codex+grok 雙複驗
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/RULEIMPL-REVIEW-R4-codex.md", "output_sha256": "pending", "task_id": "RULEIMPL-REV4", "ts": "2026-07-11T04:01:38Z"}
+=== 2026-07-11 12:01:38 | dispatch ===
+  ts=2026-07-11 12:01:38
+  kind=dispatch
+  intent=RULEIMPL R4 雙複驗(codex+grok 並行)
+  risk=low
+  facts_asked=composer R4 交付,宣稱吸收 codex 七 BLOCKING 修文+保留 grok R3 PASS 內容
+  review_role=codex 驗自家七條閉合;grok 驗 R3 PASS 無回退+新內容無新縫
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/RULEIMPL-SPEC-DRAFT-R5.md", "output_sha256": "pending", "task_id": "RULEIMPL-DRAFT-R5-composer", "ts": "2026-07-11T04:16:23Z"}
+=== 2026-07-11 12:16:23 | dispatch ===
+  ts=2026-07-11 12:16:23
+  kind=dispatch
+  intent=RULEIMPL R5 終輪修訂(composer):codex 4 殘項+grok 新縫
+  risk=low
+  facts_asked=R4 雙 BLOCK:codex 殘 4(grandfather git-ref 唯一語義/counterfactual 分類綁 digest/command canonical 序列化/sidecar 防竄改綁戳記);grok 新縫見其 R4 檔;本輪為本 session 終輪,未收斂則 park 記錄
+  review_role=修訂後 codex+grok 終驗
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
