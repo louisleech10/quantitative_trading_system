@@ -20,6 +20,7 @@
 ### 之後的 session = ROADMAP ③ 1c Net IC 量綱(大,完整管線)
 - 病灶:momentum/Analysis/net_ic_analyzer.py:34 把交易成本(報酬率量綱)直接從 IC(相關係數,無量綱)裡減——量綱不合,淨 IC 數字無數學意義(ROADMAP L42 ③)。
 - 前置:P2 債 session 完成(乾淨基線);SPEC/TODO 走完整管線後才動工。
+- **facts-asked 預登記(使用者 2026-07-11 預留,SPEC 偵察時必問使用者)**:①交易成本來源=使用者輸入/固定預設/按 symbol 費率表?②要不要「不計成本直接算 Net IC(=原始 IC)」模式與對照欄?③成本率的 UI 入口與預設值。使用者明示「到 1c 時再討論」,禁提前替使用者假設。
 
 ### RULEIMPL(park 於 R5,2026-07-11)
 定稿=handoffs/RULEIMPL-SPEC-DRAFT-R5.md;grok R5 判 PASS SIGNOFF:RULEIMPL-REVIEW-R5-grok.md;codex R5 殘 4 條(handoffs/RULEIMPL-REVIEW-R5-codex.md)=正式化時綁定項(cutoff full-SHA 開票填/base fallback 字面/digest exclusion set/sidecar 自參照排除)。正式化(gate artifact+範本)時逐項落值→codex 終驗→再派工。
