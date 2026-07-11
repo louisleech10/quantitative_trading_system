@@ -152,6 +152,12 @@ def compute_hac_ic_statistics(
     return results
 
 
+# 生產 FDR 唯一 canonical 方法（D-F/D-G）；三層契約恆等集合
+# apply_fdr / SignificanceFdrSchema / _resolve_fdr_method 接受集合必須 == {"fdr_bh"}
+# exact-whitelist：禁 .strip()/.lower()/str 正規化；禁 silent raw-p 降級
+_ALLOWED_FDR_METHODS: frozenset[str] = frozenset({"fdr_bh"})
+
+
 def apply_fdr(
     p_values: dict[str, float],
     alpha: float,
@@ -163,12 +169,25 @@ def apply_fdr(
     Args:
         p_values: feature → raw p
         alpha: 保留簽名供下游消費；本函式不依 α 過濾
-        method: 傳給 adjust_multiple_comparisons（消費 schema significance.fdr.method）
+        method: 必須**精確**等於 ``"fdr_bh"``（三層白名單恆等）。
+            不接受大小寫變體、前後空白、顯式 ``None``、空字串、非字串或任何
+            其他值；函式參數缺省 ``"fdr_bh"`` 僅表達缺鍵語意，與顯式 ``None``
+            不同。亦不做 ``.strip()`` / ``.lower()`` 正規化（fail-closed）。
 
     Returns:
         (q_values, n_tests)；n_tests = finite p 個數
+
+    Raises:
+        ValueError: method 不是精確 ``"fdr_bh"`` 時（避免對外謊報 p_value_adj 已校正）
     """
     del alpha  # 不做 α 比較；參數保留供 API 相容
+    # exact match only — 與 schema Literal / _resolve_fdr_method 接受集合恆等
+    if method not in _ALLOWED_FDR_METHODS:
+        raise ValueError(
+            f"Unsupported FDR method={method!r}; canonical only: exact 'fdr_bh' "
+            "(fail-closed: no strip/lower/normalize; no silent raw-p fallback)"
+        )
+
     if not p_values:
         return {}, 0
 
@@ -185,9 +204,9 @@ def apply_fdr(
     if n_tests == 0:
         return {key: np.nan for key in p_values}, 0
 
-    # 消費 schema method（禁幽靈 config）；預設 fdr_bh
+    # 白名單已通過；交既有 adjust_multiple_comparisons（本體不動，B1 禁項）
     adjusted = StatisticalValidator({}).adjust_multiple_comparisons(
-        finite, method=str(method or "fdr_bh")
+        finite, method=method
     )
 
     q_values: dict[str, float] = {}

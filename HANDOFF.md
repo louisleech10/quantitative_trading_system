@@ -1,20 +1,19 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-07-10 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-07-11 | **Branch**: main
 
-## ✅ 剛完成:1e+1b Golden baseline 預產+三家四輪 adversarial 複驗全 PASS
-- 產物:`handoffs/ic1eb_baseline/`(v4;13 report+1 labels-raise receipt+inputs/19 檔防偽 sha+manifest;gitignored 同 1a 先例,B5 skip-if-absent)。程序=`scripts/capture_ic1eb_baseline.py`(premat sha500 inputs/persist patch no-op/content 指紋 29GB 前後零 diff)。
-- 審計鏈:設計 `IC1EB-BASELINE-DESIGN.md` → R1 三家全 BLOCK → `IC1EB-BASELINE-RECONCILE.md`(F1-F17+R2 節) → v2/v3/v4 迭代 → Grok/Composer PASS+Codex R4 全 CLOSED PASS(`IC1EB-BASELINE-REVERIFY*`)。
-- 重大教訓(規則提案 `handoffs/RULE-PROPOSAL-ORCH-SELF-ARTIFACT.md` 待委員詰問+SCAR 登記):編排端自產物先審後跑;逃脫點=gate 不攔編排端 Bash+SPEC 指派單人無審查義務。
-- 使用者新規:①一切輸出附白話解釋+專有名詞「中文(English/縮寫)」對照(記憶已更新)②Grok 入委員會審查腿+I/O 觀察(ORCH §1 三調)。
+## ✅ 1e+1b epic 閉合:B1-B5 入版+三方數據正確性簽核全 PASS
+- 簽核:Claude+Composer+Codex(R4)全 DATA-CORRECT PASS SIGNOFF:IC1EB-SIGNOFF-claude.md:IC1EB-SIGNOFF-composer.md:IC1EB-SIGNOFF-R4-codex.md;簽核輪 Codex 三輪抓 FDR method 契約縫→signfix×2(Grok)+signfix3(Composer 斷路器換手)修畢。
+- 最終驗收:`venv/bin/python -m pytest tests/momentum/ -q`(含 tests/momentum/Analysis/test_ic_1eb_b5_golden.py)=1067 passed+3 skipped VERIFY:ic1eb-epic-final-gate。
+- 成果:假陽率 0.43→0.06(M-A);xsec p 誠實化;fdr toggle 全棧真接通;G-1 13 顆五hash 不變;G-2 diff=handoffs/IC1EB-GOLDEN-DIFF.md。
+- 治理:規則四條使用者採納 2026-07-11(handoffs/RULE-PROPOSAL-RECONCILE.md)+SCAR 三連環登記(docs/SCAR_LEDGER.md 末列);RULEIMPL 初稿 grok R3 判 PASS SIGNOFF:RULEIMPL-REVIEW-R3-grok.md,codex 補審待排。
 
-## ★下一站:B1 派 Grok(Task 1.1-1.3 統計 kernel)
-1. `bash scripts/agent_preflight.sh` → gate `--risk high --spec docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md --todo docs/IC_PHASE1_1E1B_SIGNIF_TODO.md --adversarial handoffs/IC1EB-RECONCILE.md`(stamps PASS sha256:b77932d8 已重驗)。
-2. 派工 prompt 備妥:`handoffs/IC1EB-B1-IMPL-PROMPT.md`;grok 語法見上一則 handoff(--cwd 絕對路徑)。
-3. B1 乾淨過才放 B2-B5;同批 ≤2 輪不過→斷路器換 Codex;Codex+Composer 雙審;Claude 批批驗收(golden hash/mutation/防假綠 diff)。
-4. 並行:規則提案送三家詰問;Composer 收 baseline v2→v4 delta 通知。
+## ★下一站
+1. RULEIMPL:codex 補審初稿(handoffs/RULEIMPL-SPEC-DRAFT-R3.md)→正式化 SPEC/TODO(gate artifact+範本)→實作(SPEC_TEMPLATE §G 機讀欄/template_check/gate validation-run/消費端拒收)。
+2. ROADMAP ③ 1c Net IC 量綱(下一刀)。
+3. P2 債:governance 既有 9 紅(b4×3+b5×5+r7,先於本 session,歸屬驗證=HANDOFF 前版+git log 3edfa6c)/legacy 測試寫 data_cache tmp redirect/tsc 既存 10 errors/codex 沙箱間歇卡死觀察。
+4. Grok 記分素材(加密驗收期,裁決留使用者):B1-B5 交付均一輪修復閉合;審查腿多次高品質 findings;停手紀律好(BLOCKED-1A);弱項=橫切面不變量/測試嚴謹捷徑/一次越權重凍 1a(記檔 handoffs/ic1a_cut1_refreeze_quarantine)。
 
-## 鐵律(不變)
-- 審查派工 `--risk low --template "n/a:"`;實作派工 `--risk high` 附 spec/todo/adversarial;codex exec 必接 `< /dev/null`;委員產出 register-output;派工進度每 10 分鐘回報。
-- 執行端產物不可信;接回讀 diff+測試+摘要;`handoffs/ic1eb_baseline/` 唯讀消費,禁重產(manifest 有 content 指紋+inputs sha 防偽)。
-- 背景長任務掛雙層監看(log 關鍵字+PID 存活)。
-- 未 commit 殘留:`.claude/settings.json`(使用者本機,留使用者)。
+## 鐵律(不變)+本 epic 新教訓
+- 審查用 --risk low --template "n/a:";實作用 --risk high 附三件;codex exec 必接 < /dev/null;register-output;10 分鐘回報;執行端產物不可信;baseline 唯讀。
+- 新:背景長任務雙層監看(log+PID);codex 命令一次一條/venv 顯式/60s 棄;禁 -m "test" 探測 commit;mutation 紅燈行 SUPERSEDED 註記;RESULT 檔 VERIFY 零豁免;golden 產物須入版或外部雜湊否則滅失無解。
+- 未 commit 殘留:.claude/settings.json(使用者本機)。

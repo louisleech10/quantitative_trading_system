@@ -380,6 +380,31 @@ def test_t12b_apply_fdr_nan_preserve_and_n_tests():
     assert np.isnan(q_all["a"]) and np.isnan(q_all["b"])
 
 
+def test_t12c_apply_fdr_unknown_method_raises():
+    """SIGNFIX/SIGNFIX2：未知 method 禁 fail-open raw-p；exact-whitelist 僅 fdr_bh。"""
+    p_values = {"a": 0.01, "b": 0.04}
+    # 含大小寫/空白/None/空字串/非字串 — 一律 raise（禁 strip/lower 正規化）
+    for bad in (
+        "typo",
+        "bonferroni",
+        "fdr_by",
+        "fdr",
+        "",
+        "unknown",
+        "FDR_BH",
+        " fdr_bh ",
+        None,
+        "banana",
+        123,
+    ):
+        with pytest.raises(ValueError, match="Unsupported FDR method"):
+            apply_fdr(p_values, alpha=0.05, method=bad)  # type: ignore[arg-type]
+    # 白名單合法值仍可跑，且不得等於 raw p（對多假設 BH 會抬升）
+    q, n_tests = apply_fdr(p_values, alpha=0.05, method="fdr_bh")
+    assert n_tests == 2
+    assert q["a"] >= p_values["a"] or np.isclose(q["a"], p_values["a"])
+
+
 def test_t13_block_bootstrap_agrees_with_kernel():
     """T-1.3: bootstrap 與 kernel 同判，|p 差|≤0.05（固定 seed）。"""
     alpha = 0.05

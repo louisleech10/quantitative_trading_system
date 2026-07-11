@@ -483,14 +483,31 @@ def test_t41_stage5_consumes_maxlags_from_schema():
             assert int(ml) == 6
 
 
+def test_t41_schema_rejects_unknown_fdr_method():
+    """SIGNFIX：未知 significance.fdr.method 在 config 解析即拒（schema 限域）。"""
+    from pydantic import ValidationError
+
+    data = _lenient_config().model_dump(by_alias=True)
+    data["significance"] = {
+        "fdr": {"enabled": True, "method": "typo"},
+        "maxlags": None,
+    }
+    with pytest.raises(ValidationError):
+        ICConfig.model_validate(data)
+
+    # 既有共用 util 的 bonferroni 亦不得經 schema 進生產 FDR 路徑
+    data["significance"]["fdr"]["method"] = "bonferroni"
+    with pytest.raises(ValidationError):
+        ICConfig.model_validate(data)
+
+
 def test_t41_stage5_consumes_fdr_method_from_schema():
-    """FIX1-(5)：apply_fdr / stage5 消費 significance.fdr.method（非幽靈）。"""
+    """FIX1-(5)+SIGNFIX：stage5 消費 canonical method=fdr_bh（非幽靈）；q 與 apply_fdr 一致。"""
     features, label = _synth_features_labels(n=200, n_features=3, seed=44)
     cfg = _lenient_config()
     data = cfg.model_dump(by_alias=True)
-    # bonferroni 會被 adjust_multiple_comparisons 實際消費（可與 fdr_bh 區分）
     data["significance"] = {
-        "fdr": {"enabled": True, "method": "bonferroni"},
+        "fdr": {"enabled": True, "method": "fdr_bh"},
         "maxlags": None,
     }
     config = ICConfig.model_validate(data)
@@ -503,20 +520,158 @@ def test_t41_stage5_consumes_fdr_method_from_schema():
         event_info={"tier": "sufficient"},
         metadata={"symbol": "BTCUSDT"},
     )
-    assert result["significance"]["fdr"]["method"] == "bonferroni"
-    assert result["selection_scope"].method == "bonferroni"
+    assert result["significance"]["fdr"]["method"] == "fdr_bh"
+    assert result["selection_scope"].method == "fdr_bh"
+    assert orch._resolve_fdr_method(config) == "fdr_bh"
 
-    # 對照：同一 p map 用 apply_fdr(method=bonferroni) 應與 summary q 一致
+    # 對照：同一 p map 用 apply_fdr(method=fdr_bh) 應與 summary q 一致
     p_map = {
         str(row["feature_name"]): float(row["p_value"])
         for row in result["summary_table"]
         if row.get("p_value") is not None and np.isfinite(float(row["p_value"]))
     }
-    q_expected, _ = apply_fdr(p_map, 0.05, method="bonferroni")
+    q_expected, _ = apply_fdr(p_map, 0.05, method="fdr_bh")
     for row in result["summary_table"]:
         name = str(row["feature_name"])
         if name in q_expected and np.isfinite(q_expected[name]):
             assert np.isclose(float(row["p_value_adj"]), q_expected[name], rtol=1e-12)
+
+
+def test_t41_resolve_fdr_method_unknown_raises():
+    """SIGNFIX：dict-like / 繞過 schema 時 _resolve_fdr_method 仍 fail-closed。"""
+    features, label = _synth_features_labels(n=80, n_features=2, seed=7)
+    del features, label  # 僅需 orchestrator
+    orch = ICFilterOrchestrator(_lenient_config())
+
+    class _Fdr:
+        enabled = True
+        method = "typo"
+
+    class _Sig:
+        fdr = _Fdr()
+
+    class _Cfg:
+        significance = _Sig()
+
+    with pytest.raises(ValueError, match="Unsupported significance.fdr.method"):
+        orch._resolve_fdr_method(_Cfg())  # type: ignore[arg-type]
+
+
+# ── SIGNFIX2/3：三層 exact-whitelist 契約矩陣 ───────────────────────────────
+# 接受集合恆等 {"fdr_bh"}。逐格：ok=接受；raise=ValueError/ValidationError；
+# default=consumer 對**缺鍵**用 schema 預設 "fdr_bh"（合法；顯式 None 須 raise）。
+_MISSING_METHOD_KEY = object()
+
+_FDR_METHOD_CONTRACT_MATRIX = [
+    # (method, apply_fdr, schema, consumer_bypass)
+    ("fdr_bh", "ok", "ok", "ok"),
+    ("FDR_BH", "raise", "raise", "raise"),
+    (" fdr_bh ", "raise", "raise", "raise"),
+    (None, "raise", "raise", "raise"),
+    ("", "raise", "raise", "raise"),
+    ("banana", "raise", "raise", "raise"),
+    (_MISSING_METHOD_KEY, "ok", "ok", "default"),
+]
+
+
+@pytest.mark.parametrize(
+    "method,apply_expect,schema_expect,consumer_expect",
+    _FDR_METHOD_CONTRACT_MATRIX,
+    ids=[
+        "exact_fdr_bh",
+        "upper_FDR_BH",
+        "padded_fdr_bh",
+        "None",
+        "empty_str",
+        "banana",
+        "missing_method_key",
+    ],
+)
+def test_signfix2_fdr_method_three_layer_exact_whitelist_matrix(
+    method: object,
+    apply_expect: str,
+    schema_expect: str,
+    consumer_expect: str,
+) -> None:
+    """SIGNFIX2/3：apply_fdr × schema × 繞過-schema consumer 對同一值行為對齊。
+
+    合法唯一 exact ``"fdr_bh"``；顯式 ``None`` 三層皆 raise；缺鍵 consumer 用
+    schema 預設 ``"fdr_bh"``（與顯式 ``None`` 分離）。
+    """
+    from pydantic import ValidationError
+
+    p_values = {"a": 0.01, "b": 0.04}
+
+    # ── layer 1: direct apply_fdr ──────────────────────────────────────────
+    if apply_expect == "ok":
+        if method is _MISSING_METHOD_KEY:
+            q, n_tests = apply_fdr(p_values, alpha=0.05)
+        else:
+            q, n_tests = apply_fdr(p_values, alpha=0.05, method=method)  # type: ignore[arg-type]
+        assert n_tests == 2
+        assert set(q) == {"a", "b"}
+        assert q["a"] <= q["b"] or np.isclose(q["a"], q["b"])
+    else:
+        assert apply_expect == "raise"
+        with pytest.raises(ValueError, match="Unsupported FDR method"):
+            apply_fdr(p_values, alpha=0.05, method=method)  # type: ignore[arg-type]
+
+    # ── layer 2: schema (ICConfig.model_validate) ─────────────────────────
+    data = _lenient_config().model_dump(by_alias=True)
+    if method is _MISSING_METHOD_KEY:
+        data["significance"] = {
+            "fdr": {"enabled": True},
+            "maxlags": None,
+        }
+    else:
+        data["significance"] = {
+            "fdr": {"enabled": True, "method": method},
+            "maxlags": None,
+        }
+    if schema_expect == "ok":
+        cfg = ICConfig.model_validate(data)
+        assert cfg.significance.fdr.method == "fdr_bh"
+    else:
+        assert schema_expect == "raise"
+        with pytest.raises(ValidationError):
+            ICConfig.model_validate(data)
+
+    # ── layer 3: consumer 繞過 schema（dict-like raw path）────────────────
+    orch = ICFilterOrchestrator(_lenient_config())
+
+    class _Fdr:
+        enabled = True
+
+        def __init__(self, m: object) -> None:
+            self.method = m
+
+    class _Sig:
+        def __init__(self, m: object) -> None:
+            self.fdr = _Fdr(m)
+
+    class _Cfg:
+        def __init__(self, m: object) -> None:
+            self.significance = _Sig(m)
+
+    if consumer_expect == "ok":
+        assert orch._resolve_fdr_method(_Cfg(method)) == "fdr_bh"  # type: ignore[arg-type]
+    elif consumer_expect == "default":
+        assert method is _MISSING_METHOD_KEY
+        # 缺鍵 dict 路徑 → schema 預設 fdr_bh（合法；與顯式 None 分離）
+        class _CfgMissing:
+            significance = {"fdr": {"enabled": True}}  # no method key
+
+        assert orch._resolve_fdr_method(_CfgMissing()) == "fdr_bh"  # type: ignore[arg-type]
+    else:
+        assert consumer_expect == "raise"
+        with pytest.raises(ValueError, match="Unsupported significance.fdr.method"):
+            orch._resolve_fdr_method(_Cfg(method))  # type: ignore[arg-type]
+        if method is None:
+            class _CfgDictNone:
+                significance = {"fdr": {"enabled": True, "method": None}}
+
+            with pytest.raises(ValueError, match="Unsupported significance.fdr.method"):
+                orch._resolve_fdr_method(_CfgDictNone())  # type: ignore[arg-type]
 
 
 # ── T-4.3 = M-G 兩態 e2e（真 analyze→stage7→report）─────────────────────────

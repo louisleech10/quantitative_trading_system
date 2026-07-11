@@ -283,10 +283,17 @@ class ShapleyConfig(BaseModel):
 
 
 class SignificanceFdrSchema(BaseModel):
-    """FDR 校正子節（canonical: significance.fdr.*；D-F/D-G）。"""
+    """FDR 校正子節（canonical: significance.fdr.*；D-F/D-G）。
+
+    method 限域精確 ``"fdr_bh"``（三層接受集合恆等：schema / ``_resolve_fdr_method``
+    / ``apply_fdr`` 皆僅 ``{"fdr_bh"}``）。``Literal`` 拒絕大小寫變體、空白、
+    顯式 ``None``、空字串與未知字串；**缺** ``method`` 鍵時用預設 ``"fdr_bh"``
+    （顯式 ``None`` 與缺鍵不同，三層皆拒）。禁靜默降級為 raw p 後仍標
+    ``p_value_adj``（fail-closed）。
+    """
 
     enabled: bool = True
-    method: str = "fdr_bh"
+    method: Literal["fdr_bh"] = "fdr_bh"
 
 
 class SignificanceSchema(BaseModel):

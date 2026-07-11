@@ -1,0 +1,37 @@
+{
+ "854d444": {
+  "file_sha256": "b31115d284b2452abbb193e62e369944cc53a214f0df758e7043c4cd3af4c40b",
+  "normalized_sha256(exempt generated_at)": "2f3617b96cab5817168f3e7fb77e9fc7b0936a4688e48d99ee5839af9ba7c1ec",
+  "meta_request_config_override": {
+   "ic_train_test_split": false
+  },
+  "meta_reproduction_command": "python tests/golden/ic_phase1_1a_cut1/freeze_baseline.py --max-features 50 --timeout-seconds 1800",
+  "commit_full_sha": "854d4448fc70d1c2760874921debfb8737afe9ab",
+  "archived_artifact": "baseline_old_regen_854d444.json",
+  "archived_meta": "baseline_meta_regen_854d444.json"
+ },
+ "c0b29ac": {
+  "file_sha256": "3d2232c17a1c14fc4e369fad1198e46810ac8e670c721446cd78b9ba87571f8a",
+  "normalized_sha256(exempt generated_at)": "2f3617b96cab5817168f3e7fb77e9fc7b0936a4688e48d99ee5839af9ba7c1ec",
+  "meta_request_config_override": {
+   "ic_train_test_split": false
+  },
+  "meta_reproduction_command": "python tests/golden/ic_phase1_1a_cut1/freeze_baseline.py --max-features 50 --timeout-seconds 1800",
+  "commit_full_sha": "c0b29ac62e70db21d19c31cf1bd65f8fd3f2feac",
+  "archived_artifact": "baseline_old_regen_c0b29ac.json",
+  "archived_meta": "baseline_meta_regen_c0b29ac.json"
+ },
+ "cross_commit_normalized_equal": true,
+ "procedure": "patched freeze_baseline.py(顯式 ic_train_test_split=False+inputs 重用)複製入各 worktree,對該 commit 之 momentum/api 舊碼執行",
+ "regen_script": {
+  "file": "freeze_baseline_used_for_regen.py",
+  "sha256": "7f35f550f35606793f5cafc39b290bb8fefa6a613277b09a3413f39203861136",
+  "note": "此為含顯式 config_override={'ic_train_test_split': False}+inputs 重用之腳本快照;重生程序=將本檔複製入該 commit 之 git worktree 同路徑後執行(原 commit 之腳本無 override,直接跑不能重產,見 codex R3 反證)"
+ },
+ "inputs": {
+  "BTCUSDT_1h_a384e6d22ca15fc639757cb3162e7cb3_top50.h5": "fb3332ba7c28a7dfaba6fa6d1fc353c3f5f0cad0113cbf13b311fb61ee91ba21",
+  "BTCUSDT_1h_a384e6d22ca15fc639757cb3162e7cb3_top50_meta.json": "c3aa5921d9e82712b1893ee9daaef5ee01aa2d012047d8977ec6c6cfecabf37f"
+ },
+ "normalized_sha_rule": "json.loads→pop 頂層 generated_at→json.dumps(sort_keys=True, ensure_ascii=False) UTF-8→sha256",
+ "reproduction": "git worktree add <dir> <commit_full_sha> && 複製本目錄 freeze_baseline_used_for_regen.py 至 <dir>/tests/golden/ic_phase1_1a_cut1/freeze_baseline.py && 複製 inputs(sha 如上)至同層 inputs/ && ln -s 主樹 data_cache && venv python 執行該腳本"
+}

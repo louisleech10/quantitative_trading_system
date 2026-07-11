@@ -1,0 +1,97 @@
+{
+  "actual_result_metadata": {
+    "config_hash": "a384e6d22ca15fc639757cb3162e7cb3",
+    "feature_count_filtered": 50,
+    "feature_count_original": 50,
+    "feature_filter_applied": true,
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "truncation_mode": "none"
+  },
+  "baseline_file": "tests/golden/ic_phase1_1a_cut1/baseline_old_btc_1h_a384e6d2.json",
+  "baseline_sha256": "b31115d284b2452abbb193e62e369944cc53a214f0df758e7043c4cd3af4c40b",
+  "config_hash": "a384e6d22ca15fc639757cb3162e7cb3",
+  "materialized_inputs": {
+    "features_path": "tests/golden/ic_phase1_1a_cut1/inputs/BTCUSDT_1h_a384e6d22ca15fc639757cb3162e7cb3_top50.h5",
+    "meta_path": "tests/golden/ic_phase1_1a_cut1/inputs/BTCUSDT_1h_a384e6d22ca15fc639757cb3162e7cb3_top50_meta.json",
+    "selected_features": [
+      "None_12h_microstructure_roll_spread_13_55_Cross",
+      "None_12h_microstructure_roll_spread_13_55_Ratio",
+      "None_12h_tail_risk_gpr_21_100_Cross",
+      "None_12h_tail_risk_gpr_21_100_Ratio",
+      "None_12h_tail_risk_max_drawdown_21_100_Cross",
+      "None_12h_tail_risk_max_drawdown_21_100_Ratio",
+      "None_12h_tail_risk_rsj_13_55_Cross",
+      "None_12h_tail_risk_rsj_13_55_Ratio",
+      "None_12h_tail_risk_rv_down_13_55_Cross",
+      "None_12h_tail_risk_rv_down_13_55_Ratio",
+      "None_12h_tail_risk_rv_up_13_55_Cross",
+      "None_12h_tail_risk_rv_up_13_55_Ratio",
+      "None_12h_tail_risk_ud_vol_ratio_13_55_Cross",
+      "None_12h_tail_risk_ud_vol_ratio_13_55_Ratio",
+      "None_1h_microstructure_roll_spread_13_55_Cross",
+      "None_1h_microstructure_roll_spread_13_55_Ratio",
+      "None_1h_tail_risk_gpr_21_100_Cross",
+      "None_1h_tail_risk_gpr_21_100_Ratio",
+      "None_1h_tail_risk_max_drawdown_21_100_Cross",
+      "None_1h_tail_risk_max_drawdown_21_100_Ratio",
+      "None_1h_tail_risk_rsj_13_55_Cross",
+      "None_1h_tail_risk_rsj_13_55_Ratio",
+      "None_1h_tail_risk_rv_down_13_55_Cross",
+      "None_1h_tail_risk_rv_down_13_55_Ratio",
+      "None_1h_tail_risk_rv_up_13_55_Cross",
+      "None_1h_tail_risk_rv_up_13_55_Ratio",
+      "None_1h_tail_risk_ud_vol_ratio_13_55_Cross",
+      "None_1h_tail_risk_ud_vol_ratio_13_55_Ratio",
+      "avg-price_12h_Lag_1",
+      "avg-price_12h_Lag_13",
+      "avg-price_12h_Lag_2",
+      "avg-price_12h_Lag_21",
+      "avg-price_12h_Lag_3",
+      "avg-price_12h_Lag_34",
+      "avg-price_12h_Lag_5",
+      "avg-price_12h_Lag_8",
+      "avg-price_1h_Lag_1",
+      "avg-price_1h_Lag_13",
+      "avg-price_1h_Lag_2",
+      "avg-price_1h_Lag_21",
+      "avg-price_1h_Lag_3",
+      "avg-price_1h_Lag_34",
+      "avg-price_1h_Lag_5",
+      "avg-price_1h_Lag_8",
+      "close-volume_12h_volume_OBV",
+      "close-volume_12h_volume_OBV_Abs",
+      "close-volume_12h_volume_OBV_Clip",
+      "close-volume_12h_volume_OBV_DecayLinear_W13",
+      "close-volume_12h_volume_OBV_DecayLinear_W21",
+      "close-volume_12h_volume_OBV_DecayLinear_W5"
+    ],
+    "selection": "sorted(feature_names)[:max_features]"
+  },
+  "mode": "longitudinal",
+  "notes": [
+    "Baseline is generated through ICAnalysisService.start_analysis() and get_result(task_id).",
+    "A deterministic feature_filter subset is used to avoid local OOM from full 90857 x 20352 materialization.",
+    "G1 tests must replay the exact request recorded here before comparing v1 output."
+  ],
+  "reference_registry": {
+    "feature_count": 90857,
+    "row_count": 20352,
+    "symbol": "BTCUSDT",
+    "timeframe": "1h"
+  },
+  "reproduction_command": "python tests/golden/ic_phase1_1a_cut1/freeze_baseline.py --max-features 50 --timeout-seconds 1800",
+  "request": {
+    "config_hash": "a384e6d22ca15fc639757cb3162e7cb3",
+    "config_override": {
+      "ic_train_test_split": false
+    },
+    "feature_filter": {
+      "max_features": 50
+    },
+    "mode": "longitudinal",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h"
+  },
+  "task_id_used_for_freeze": "5f189e91-5683-4b1c-9fe5-d8ea13f6195f"
+}

@@ -2672,21 +2672,45 @@ class ICFilterOrchestrator:
     def _resolve_fdr_method(self, config: ICConfig) -> str:
         """讀 canonical significance.fdr.method 並傳給 apply_fdr（禁幽靈 config）。
 
-        理由：schema 既有 method 欄且 SPEC 預留 fdr_by/romano_wolf 升級路徑；
-        必須由 consumer 實際讀取，而非硬編。OFF 時 method 仍為 canonical 名稱，
-        唯一 OFF 表述=enabled=false（D-G）。
+        三層接受集合恆等 ``{"fdr_bh"}``（與 ``apply_fdr`` / ``SignificanceFdrSchema``
+        一致；exact-whitelist，禁 strip/lower 正規化）。
+
+        取值語意：
+        - 經 schema 驗證的 config 物件：``Literal["fdr_bh"]`` 已保證合法，直接通過。
+        - dict/raw 繞過 schema：**缺** ``method`` 鍵（或 object 無該屬性）→ 使用
+          schema 預設 ``"fdr_bh"``（與 ``SignificanceFdrSchema.method`` 預設對齊，屬合法）。
+        - **顯式** ``method`` 鍵存在且值非精確 ``"fdr_bh"``（含 ``None``、
+          ``"FDR_BH"`` / ``" fdr_bh "`` / ``""`` / 未知字串）→ ``ValueError``
+          （fail-closed；禁 ``raw or default``）。
+
+        OFF 時 method 仍為 canonical 名稱；唯一 OFF 表述=enabled=false（D-G）。
+        未來 fdr_by/romano_wolf 升級須同步擴張三處白名單，禁再走 raw-p 靜默降級。
         """
+        # 與 apply_fdr._ALLOWED_FDR_METHODS / SignificanceFdrSchema Literal 恆等
         default = "fdr_bh"
+        allowed = frozenset({"fdr_bh"})
         sig = getattr(config, "significance", None)
         if sig is None:
             return default
         fdr = sig.get("fdr") if isinstance(sig, dict) else getattr(sig, "fdr", None)
         if fdr is None:
             return default
-        raw = fdr.get("method") if isinstance(fdr, dict) else getattr(fdr, "method", None)
-        method = str(raw or default).strip().lower() or default
-        # 生產路徑目前僅實作 BH；未知 method 交 apply_fdr→adjust_multiple_comparisons 處理
-        return method
+        if isinstance(fdr, dict):
+            if "method" not in fdr:
+                return default  # 缺鍵 → schema 預設
+            raw = fdr["method"]
+        else:
+            if not hasattr(fdr, "method"):
+                return default  # 缺屬性 → schema 預設
+            raw = fdr.method
+        # 顯式 None 或非白名單值 → fail-closed（與缺鍵語意分離）
+        if raw is None or raw not in allowed:
+            raise ValueError(
+                f"Unsupported significance.fdr.method={raw!r}; "
+                "canonical only: exact 'fdr_bh' "
+                "(fail-closed: no strip/lower/normalize; no silent raw-p fallback)"
+            )
+        return raw
 
     def _stage6_redundancy(
         self,
