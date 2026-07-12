@@ -19,8 +19,22 @@ Task-id: p2debt-t4 | 蒐證人: Claude(觀察債,小任務自做) | CLI: codex 0
 3. 疑似方向:codex 沙箱(Seatbelt/landlock)對某些 pipe/subprocess 組合的 IO 攔截死鎖;與運算量無關(comm 兩個 32 行檔也卡)。
 4. quota 事件獨立於卡死,但同影響派工可用性,列動態選層依據。
 
-## 根因確認(2026-07-12 web 研究,主委查 GitHub — 推翻「疑似」為實錘)
-**已知 upstream bug,非我方設定問題,其他使用者早已反映**:
+## 根因強候選(2026-07-12 web 研究,主委查 GitHub — 症狀吻合,版本時間線未證)
+> ⚠️ 誠實修正(使用者 2026-07-12 質疑):此為**症狀吻合的強候選**,非「實錘」。#7852 機制與我方現象吻合,
+> 但**未確認版本時間線**——使用者記得「之前順利」。兩假設未分辨:
+> **H1 工作負載改變**(長期 bug,本 session 才大量跑 shell 管線驗證 comm/bash 腳本才踩到;以前多為寫碼+pytest 單進程)
+> vs **H2 版本退化**(升級 0.144.1 後才壞,同管線舊版能跑)。分辨需:同管線命令在舊版 codex 是否卡(資料未取)。
+> 另:gpt-5.6-sol **模型非死鎖主因**——pipe deadlock 是 CLI 層 spawn/wait 子進程行為,與推理模型無關;變數是 CLI 版本。
+> A′ mitigation 與 DELEGATED 繞法**不受此不確定性影響**(避開管線在兩假設下皆有效),故處置照舊。
+
+### 歸因修正(Grok X/web recon 2026-07-12,handoffs/T4-GROK-XSEARCH-RECON.md)
+**#7852 很可能不是我方 bug**:issue 收斂 repro(ghul0)=`codex exec --full-auto`+asyncio.to_thread 特有;
+**無 --full-auto 的純 codex exec 正常**。我方派工用 `-s workspace-write` **且 auto 模式擋 --full-auto**(見 reference_dispatch_cli_invocation)→ 對不上。
+**更吻合=macOS 專屬族(皆 OPEN)**:#18243(macOS workspace-write/read-only shell 卡,danger-full-access 才行)、#19020(macOS 0.122.0 workspace-write hang)。
+**版本時間線**:Grok 查 0.66→0.144 **無官方「已修」/「安全版本區間」,無乾淨退化分界**;2025-11 已有 process-group 修補(#5258/#6575)但問題跨版本未清。
+→ 我方「之前順利」偏向 H1(以前沒跑管線)但無硬證。處置(A′ 首選/DELEGATED fallback)不變;danger-full-access 可繞但棄隔離(不採)。
+
+**症狀吻合的 upstream 族(候選,非單一定論)**:
 - **openai/codex#7852**(2025-12-11 開,**至今 OPEN 未修**):`--sandbox workspace-write`/`--full-auto` 下命令無限卡、
   子進程 orphan 於 sleeping 態。根因=process group 管理缺陷:子進程未 `setpgid(0,0)` 隔離、
   signal 只打直接子 PID 非 process group、**孫進程 orphan 後 keep pipe open → codex 等 EOF → pipe deadlock**。
