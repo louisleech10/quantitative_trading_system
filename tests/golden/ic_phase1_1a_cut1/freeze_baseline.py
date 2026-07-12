@@ -11,6 +11,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import h5py
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
@@ -55,10 +57,65 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _validate_reusable_inputs(
+    h5_path: Path,
+    meta_path: Path,
+    max_features: int,
+) -> list[str]:
+    """以 pinned digest 與 H5 schema 驗證 committed canonical input。"""
+    baseline_meta = json.loads(META_PATH.read_text(encoding="utf-8"))
+    manifest = baseline_meta.get("input_manifest")
+    if not isinstance(manifest, dict):
+        raise RuntimeError("missing pinned input_manifest in baseline metadata")
+    if _sha256(h5_path) != manifest.get("h5_sha256"):
+        raise RuntimeError("canonical H5 SHA256 differs from pinned manifest")
+    if _sha256(meta_path) != manifest.get("meta_sha256"):
+        raise RuntimeError("canonical meta SHA256 differs from pinned manifest")
+
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    subset = meta.get("baseline_subset", {})
+    selected = subset.get("selected_features")
+    if (
+        meta.get("symbol") != SYMBOL
+        or meta.get("timeframe") != TIMEFRAME
+        or meta.get("config_hash") != CONFIG_HASH
+        or subset.get("max_features") != max_features
+        or not isinstance(selected, list)
+    ):
+        raise RuntimeError("canonical meta identity/subset does not match freeze request")
+
+    group_key = f"{SYMBOL}/{TIMEFRAME}"
+    with h5py.File(h5_path, "r") as handle:
+        if list(handle.keys()) != [SYMBOL] or group_key not in handle:
+            raise RuntimeError("canonical H5 symbol/timeframe group mismatch")
+        group = handle[group_key]
+        if set(group.keys()) != {"features", "timestamps", "feature_names"}:
+            raise RuntimeError("canonical H5 schema mismatch")
+        features = group["features"]
+        timestamps = group["timestamps"][:]
+        raw_names = group["feature_names"][:]
+        feature_order = [x.decode("utf-8") if isinstance(x, bytes) else str(x) for x in raw_names]
+        if features.ndim != 2 or features.shape != (len(timestamps), len(feature_order)):
+            raise RuntimeError("canonical H5 dataset shape mismatch")
+        if feature_order != selected:
+            raise RuntimeError("canonical H5 feature order differs from selected_features")
+        if timestamps.ndim != 1 or len(timestamps) != features.shape[0]:
+            raise RuntimeError("canonical H5 row index shape mismatch")
+    return selected
+
+
 def _materialize_deterministic_subset(
     service: ICAnalysisService,
     max_features: int,
 ) -> tuple[Path, Path, list[str]]:
+    h5_existing = INPUT_DIR / f"{SYMBOL}_{TIMEFRAME}_{CONFIG_HASH}_top{max_features}.h5"
+    meta_existing = INPUT_DIR / f"{SYMBOL}_{TIMEFRAME}_{CONFIG_HASH}_top{max_features}_meta.json"
+    if h5_existing.exists() != meta_existing.exists():
+        raise RuntimeError("canonical input pair is incomplete; refusing overwrite")
+    if h5_existing.exists() and meta_existing.exists():
+        sel = _validate_reusable_inputs(h5_existing, meta_existing, max_features)
+        return h5_existing, meta_existing, sel
+
     reader = create_feature_reader()
     feature_names = reader.list_features_v2(SYMBOL, TIMEFRAME, CONFIG_HASH)
     selected_features = sorted(feature_names)[:max_features]
@@ -87,6 +144,12 @@ def _materialize_deterministic_subset(
         "source_feature_count": len(feature_names),
     }
     meta_path.write_bytes(_canonical_bytes(meta_payload))
+    try:
+        selected_features = _validate_reusable_inputs(h5_path, meta_path, max_features)
+    except Exception:
+        h5_path.unlink(missing_ok=True)
+        meta_path.unlink(missing_ok=True)
+        raise
     return h5_path, meta_path, selected_features
 
 
@@ -104,6 +167,9 @@ async def _run_baseline(
         timeframe=TIMEFRAME,
         config_hash=CONFIG_HASH,
         mode=MODE,
+        # G-OLD=flag-off:顯式寫死(schema 預設 True;原凍結者曾以未入腳本的 override 產出
+        # full-sample 內容——854d444 測試綠可證——本行永久關閉該隱形參數債,2026-07-11)
+        config_override={"ic_train_test_split": False},
         feature_filter=FeatureFilterConfig(max_features=max_features),
     )
     start = time.monotonic()
@@ -141,6 +207,7 @@ def _build_meta(
         "mode": MODE,
         "config_hash": CONFIG_HASH,
         "feature_filter": {"max_features": max_features},
+        "config_override": {"ic_train_test_split": False},
     }
     metadata = result.get("metadata", {}) if isinstance(result.get("metadata"), dict) else {}
     command = [
@@ -169,6 +236,21 @@ def _build_meta(
             "meta_path": str(meta_path.relative_to(REPO_ROOT)),
             "selection": "sorted(feature_names)[:max_features]",
             "selected_features": selected_features,
+        },
+        "input_manifest": {
+            "h5_sha256": _sha256(features_path),
+            "meta_sha256": _sha256(meta_path),
+            "schema": f"{SYMBOL}/{TIMEFRAME}:features,timestamps,feature_names",
+        },
+        "canonical_projection": {
+            "comparison": "canonical JSON normalized SHA256 or deep-equal",
+            "exempt_fields": ["generated_at", "task_id_used_for_freeze"],
+        },
+        "provenance_limitations": {
+            "gate_a": "Committed input SHA/schema guard plus semantic golden replay is the reproducible provenance gate.",
+            "gate_b": "Source-to-input rebuild is manual and is not reproducible from a clean checkout because the feature registry is gitignored and Feature Factory code may drift.",
+            "manual_rebuild_config_hash": CONFIG_HASH,
+            "manual_rebuild_command": " ".join(command),
         },
         "task_id_used_for_freeze": task_id,
         "actual_result_metadata": {

@@ -1,0 +1,104 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+16:19:55 [INFO] Loaded feature registry with 11 entries
+collected 10 items
+
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py::test_reuse_rejects_h5_value_mutation_with_unchanged_meta[flag_off] PASSED [ 10%]
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py::test_reuse_rejects_h5_value_mutation_with_unchanged_meta[flag_on] PASSED [ 20%]
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py::test_reuse_rejects_selected_features_h5_divergence[flag_off] PASSED [ 30%]
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py::test_reuse_rejects_selected_features_h5_divergence[flag_on] PASSED [ 40%]
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py::test_reuse_rejects_embedded_config_hash_mutation[flag_off] PASSED [ 50%]
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py::test_reuse_rejects_embedded_config_hash_mutation[flag_on] PASSED [ 60%]
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py::test_gate_b_registry_rebuild_matches_pinned_input_sha[flag_off] PASSED [ 70%]
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py::test_gate_b_registry_rebuild_matches_pinned_input_sha[flag_on] PASSED [ 80%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 
+-------------------------------- live log setup --------------------------------
+16:19:56 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+16:19:56 [INFO] Registered adapter: crypto_spot
+16:19:56 [INFO] Loaded feature registry with 11 entries
+16:19:56 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+16:19:56 [INFO] Restored 9 persisted feature task(s) from disk
+16:19:57 [INFO] 所有中間件已設置完成
+16:19:57 [INFO] 異常處理器設置完成
+16:19:57 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+16:19:57 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+16:19:57 [INFO] Created global CaseStorageManager instance
+16:19:57 [INFO] CaseImportService initialized
+16:19:57 [INFO] Created global CaseImportService instance with shared storage
+16:19:57 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+16:19:57 [INFO] KlineDownloadService initialized
+16:19:57 [INFO] Rate limiter initialized: 1000 req/min
+16:19:57 [INFO] BinanceProvider initialized
+16:19:57 [INFO] Registered provider: binance (rate_limit=1000/min)
+16:19:57 [INFO] Registered BinanceProvider to KlineDownloadService
+16:19:57 [INFO] BatchDownloadService initialized
+16:19:57 [INFO] Created global BatchDownloadService instance with shared storage
+16:19:57 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+16:19:57 [INFO] KlineDownloadService initialized
+16:19:57 [INFO] Rate limiter initialized: 1000 req/min
+16:19:57 [INFO] BinanceProvider initialized
+16:19:57 [INFO] Registered provider: binance (rate_limit=1000/min)
+16:19:57 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+16:19:57 [INFO] IndicatorEngine initialized
+16:19:57 [INFO] ChartDataService initialized with IndicatorEngine
+16:19:57 [INFO] OptimizationTaskService initialized
+16:19:57 [INFO] Loaded feature registry with 11 entries
+16:19:57 [INFO] Loaded feature registry with 11 entries
+16:19:57 [INFO] Loaded feature registry with 11 entries
+16:19:57 [INFO] Loaded feature registry with 11 entries
+16:19:57 [INFO] WebSocketConnectionManager initialized
+16:19:57 [INFO] All API routes registered successfully
+-------------------------------- live log call ---------------------------------
+16:19:58 [INFO] Loaded feature registry with 11 entries
+16:19:58 [INFO] IC config loaded
+16:19:58 [INFO] IC analysis task started: 3a8ded88-3e9a-4bf7-852e-e3377ababf1f
+16:19:58 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+16:19:58 [INFO] Data preprocessing complete: columns=50
+16:19:58 [INFO] Read 20352 klines from BTCUSDT/1h in 0.010s
+16:19:58 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+16:19:58 [INFO] IC autocorr persistent: count=38
+16:19:58 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+16:20:25 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+16:20:26 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+16:20:31 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-513/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+16:20:31 [INFO] IC analysis task completed: 3a8ded88-3e9a-4bf7-852e-e3377ababf1f
+PASSED                                                                   [ 90%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 
+-------------------------------- live log call ---------------------------------
+16:20:35 [INFO] Loaded feature registry with 11 entries
+16:20:35 [INFO] IC config loaded
+16:20:35 [INFO] IC analysis task started: ff02b81b-3879-4c87-a737-bacd9ea15558
+16:20:35 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+16:20:35 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+16:20:35 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+16:20:35 [INFO] Data preprocessing complete: columns=50
+16:20:35 [INFO] Read 20352 klines from BTCUSDT/1h in 0.010s
+16:20:35 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+16:20:36 [INFO] IC autocorr persistent: count=46
+16:20:36 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+16:20:36 [INFO] Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+16:20:38 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-513/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+16:20:38 [INFO] IC analysis task completed: ff02b81b-3879-4c87-a737-bacd9ea15558
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:318: RuntimeWarning: Mean of empty slice
+    ic_mean = float(np.nanmean(values))
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/nanfunctions.py:1879: RuntimeWarning: Degrees of freedom <= 0 for slice.
+    var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 10 passed, 3 warnings in 44.74s ========================

@@ -9,8 +9,20 @@
     "truncation_mode": "none"
   },
   "baseline_file": "tests/golden/ic_phase1_1a_cut1/baseline_new_btc_1h_a384e6d2.json",
-  "baseline_sha256": "946591ad73a402dc1b5a0c3fff1c1474fa55e4f252f1ee25bc0a6315b1fabbe8",
+  "baseline_sha256": "35e15ce9e217492e031fab34fe82936544455fed7f74c80520a408feef5d7b68",
+  "canonical_projection": {
+    "comparison": "canonical JSON normalized SHA256 or deep-equal",
+    "exempt_fields": [
+      "generated_at",
+      "task_id_used_for_freeze"
+    ]
+  },
   "config_hash": "a384e6d22ca15fc639757cb3162e7cb3",
+  "input_manifest": {
+    "h5_sha256": "fb3332ba7c28a7dfaba6fa6d1fc353c3f5f0cad0113cbf13b311fb61ee91ba21",
+    "meta_sha256": "c3aa5921d9e82712b1893ee9daaef5ee01aa2d012047d8977ec6c6cfecabf37f",
+    "schema": "BTCUSDT/1h:features,timestamps,feature_names"
+  },
   "materialized_inputs": {
     "features_path": "tests/golden/ic_phase1_1a_cut1/inputs/BTCUSDT_1h_a384e6d22ca15fc639757cb3162e7cb3_top50.h5",
     "meta_path": "tests/golden/ic_phase1_1a_cut1/inputs/BTCUSDT_1h_a384e6d22ca15fc639757cb3162e7cb3_top50_meta.json",
@@ -74,17 +86,50 @@
     "A deterministic feature_filter subset is used to avoid local OOM from full 90857 x 20352 materialization.",
     "G1 tests must replay the exact request recorded here before comparing v1 output."
   ],
-  "rebaseline_reason": "1-align B2: 舊 baseline 凍到 rolling IC index-join 0 列的壞行為(RCA: handoffs/IC1A-ALIGN-B2-GOLDEN-RCA-{codex,composer}.md);MIXED 裁定 index 修正保留+float64 強轉修掉後重凍",
-  "rebaselined_at": "2026-07-09",
   "reference_registry": {
     "feature_count": 90857,
     "row_count": 20352,
     "symbol": "BTCUSDT",
     "timeframe": "1h"
   },
-  "reproduction_command": "python tests/golden/ic_phase1_1a_cut1/freeze_baseline.py --max-features 50 --timeout-seconds 1200",
+  "rebaseline_reason": {
+    "b2_rolling_oracle_alignment": "B2 fixed a rolling join between feature epoch-index and label RangeIndex that produced zero joined rows and all-None output; RCA: handoffs/IC1A-ALIGN-B2-GOLDEN-RCA-{codex,composer}.md.",
+    "explicit_flag_off_override": "The flag-off freeze now records ic_train_test_split=false explicitly, closing the hidden parameter debt from the original freeze invocation.",
+    "post_b2_code_drift_oracle": "A new post-B2 oracle was required because normalized working-tree output 85f65830 contains full selection_scope/FDR structure while the 854d444 regeneration at 2f3617b9 had selection_scope=None."
+  },
+  "rebaselined_at": "2026-07-11",
+    "provenance_events": [
+    {
+      "at": "2026-07-09",
+      "event": "B2 rolling-oracle alignment baseline freeze",
+      "references": [
+        "handoffs/IC1A-ALIGN-B2-GOLDEN-RCA-codex.md",
+        "handoffs/IC1A-ALIGN-B2-GOLDEN-RCA-composer.md"
+      ]
+    },
+    {
+      "at": "2026-07-11",
+      "event": "Post-B2 oracle refreeze with explicit flag-on override and current selection_scope/FDR structure",
+      "task_id": "7efe2abf-ffbd-453e-b6e6-bab69c218f35"
+    },
+    {
+      "at": "2026-07-12",
+      "event": "R2 provenance correction and content-addressed input manifest added",
+      "reference": "handoffs/P2DEBT-T5-RECONCILE.md"
+    }
+    ],
+    "provenance_limitations": {
+        "gate_a": "Committed input SHA/schema guard plus semantic golden replay is the reproducible provenance gate.",
+        "gate_b": "Source-to-input rebuild is manual and is not reproducible from a clean checkout because the feature registry is gitignored and Feature Factory code may drift.",
+        "manual_rebuild_config_hash": "a384e6d22ca15fc639757cb3162e7cb3",
+        "manual_rebuild_command": "python tests/golden/ic_phase1_1a_cut1/freeze_baseline_new.py --max-features 50 --timeout-seconds 1800"
+    },
+    "reproduction_command": "python tests/golden/ic_phase1_1a_cut1/freeze_baseline_new.py --max-features 50 --timeout-seconds 1800",
   "request": {
     "config_hash": "a384e6d22ca15fc639757cb3162e7cb3",
+    "config_override": {
+      "ic_train_test_split": true
+    },
     "feature_filter": {
       "max_features": 50
     },
@@ -92,5 +137,5 @@
     "symbol": "BTCUSDT",
     "timeframe": "1h"
   },
-  "task_id_used_for_freeze": "78813d7f-d0fc-43c8-b722-4b94474a7902"
+  "task_id_used_for_freeze": "7efe2abf-ffbd-453e-b6e6-bab69c218f35"
 }
