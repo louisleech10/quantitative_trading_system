@@ -13015,3 +13015,328 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t6-spec-draft", "ts": "2026-07-12T01:44:41Z"}
+=== 2026-07-12 09:44:41 | dispatch ===
+  ts=2026-07-12 09:44:41
+  kind=dispatch
+  intent=p2debt-t6 SPEC/TODO draft R1 by composer: rename test label fixtures return_N to conform to fail-closed resolver; per-nodeid horizon inventory
+  risk=low
+  facts_asked=n/a: chair rootcause in P2DEBT-T6-CHAIR-ROOTCAUSE.md
+  review_role=composer=drafter; grok+composer dual adversarial next; chair reconcile
+  template=n/a: impl-type SPEC/TODO draft
+  adversarial=waived:draft stage, adversarial follows
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t4-grok-xsearch", "ts": "2026-07-12T02:11:24Z"}
+=== 2026-07-12 10:11:24 | dispatch ===
+  ts=2026-07-12 10:11:24
+  kind=dispatch
+  intent=codex sandbox hang recon: Grok X/web search for latest 2026 info on openai/codex#7852 workspace-write pipe deadlock, any fix/newer version/workaround
+  risk=low
+  facts_asked=n/a: read-only recon
+  review_role=grok=recon; chair verifies claims not oracle
+  template=n/a: X/web recon
+  adversarial=waived:read-only recon, findings feed verification not override
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/T4-GROK-XSEARCH-RECON.md", "output_sha256": "76702f909ea8c8d3211d12c6875cb7de4af062da2e611f9a38422acfb42005f2", "task_id": "t4-grok-xsearch", "ts": "2026-07-12T02:16:25Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t6-adv-grok", "ts": "2026-07-12T02:24:26Z"}
+=== 2026-07-12 10:24:26 | dispatch ===
+  ts=2026-07-12 10:24:26
+  kind=dispatch
+  intent=p2debt-t6 SPEC/TODO R1 dual-family adversarial by grok
+  risk=low
+  facts_asked=n/a: draft+rootcause in handoffs
+  review_role=grok=adversarial reviewer (drafter=composer, no self-review)
+  template=n/a: SPEC/TODO adversarial
+  adversarial=waived:this IS the adversarial dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "t6-adv-codex", "ts": "2026-07-12T02:24:26Z"}
+=== 2026-07-12 10:24:26 | dispatch ===
+  ts=2026-07-12 10:24:26
+  kind=dispatch
+  intent=p2debt-t6 SPEC/TODO R1 dual-family adversarial by codex
+  risk=low
+  facts_asked=n/a: draft+rootcause in handoffs
+  review_role=codex=adversarial reviewer (drafter=composer, no self-review)
+  template=n/a: SPEC/TODO adversarial
+  adversarial=waived:this IS the adversarial dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-ADV-grok.md", "output_sha256": "01241fb2c81dd7d108228773853755c12d5b2ac64b1231641614d245f6ec1e35", "task_id": "t6-adv-grok", "ts": "2026-07-12T02:27:34Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-ADV-codex.md", "output_sha256": "46c4d59463e996ca15d44fe3b1ae6bb739c393ce13f7d478ff2a60f668f6040a", "task_id": "t6-adv-codex", "ts": "2026-07-12T02:30:26Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t6-recon-grok", "ts": "2026-07-12T02:30:26Z"}
+=== 2026-07-12 10:30:26 | dispatch ===
+  ts=2026-07-12 10:30:26
+  kind=dispatch
+  intent=p2debt-t6 reconcile stamp by grok
+  risk=low
+  facts_asked=n/a
+  review_role=grok=reconcile stamp
+  template=n/a: reconcile stamp
+  adversarial=waived:reconcile stamp
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "t6-recon-codex", "ts": "2026-07-12T02:30:27Z"}
+=== 2026-07-12 10:30:27 | dispatch ===
+  ts=2026-07-12 10:30:27
+  kind=dispatch
+  intent=p2debt-t6 reconcile stamp by codex (B8 BLOCK closure confirm)
+  risk=low
+  facts_asked=n/a
+  review_role=codex=reconcile stamp + BLOCK closure
+  template=n/a: reconcile stamp
+  adversarial=waived:reconcile stamp
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-RECONCILE.md", "output_sha256": "1a76e7a0059537f4484326eb64b281bc37c996c44ef0de3dde54c93d53071322", "task_id": "t6-recon-grok", "ts": "2026-07-12T02:35:38Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-RECONCILE.md", "output_sha256": "1a76e7a0059537f4484326eb64b281bc37c996c44ef0de3dde54c93d53071322", "task_id": "t6-recon-codex", "ts": "2026-07-12T02:35:38Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "t6-impl-codex", "ts": "2026-07-12T02:35:53Z"}
+=== 2026-07-12 10:35:53 | dispatch ===
+  ts=2026-07-12 10:35:53
+  kind=dispatch
+  intent=p2debt-t6 impl by codex: rename A1/A2/A3 label fixtures to return_5 + falsifiable assert per dual-stamped reconcile
+  risk=low
+  facts_asked=n/a: reconcile 定稿 scope binding
+  review_role=codex=implementer; grok+composer dual review next; chair verifies
+  template=n/a: impl per reconcile
+  adversarial=waived:test-only impl per dual-stamped reconcile, falsifiable by mutation
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t6-strat-grok", "ts": "2026-07-12T03:30:34Z"}
+=== 2026-07-12 11:30:34 | dispatch ===
+  ts=2026-07-12 11:30:34
+  kind=dispatch
+  intent=p2debt-t6 test-strategy consult by grok: delete vs real-kline-fixture vs mock for 23 stale synthetic fixture tests
+  risk=low
+  facts_asked=n/a: chair analysis in TESTSTRATEGY-CHAIR
+  review_role=grok=design consult
+  template=n/a: strategy consult
+  adversarial=waived:read-only design consult
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t6-strat-composer", "ts": "2026-07-12T03:30:34Z"}
+=== 2026-07-12 11:30:34 | dispatch ===
+  ts=2026-07-12 11:30:34
+  kind=dispatch
+  intent=p2debt-t6 test-strategy consult by composer
+  risk=low
+  facts_asked=n/a: chair analysis in TESTSTRATEGY-CHAIR
+  review_role=composer=design consult
+  template=n/a: strategy consult
+  adversarial=waived:read-only design consult
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-TESTSTRATEGY-grok.md", "output_sha256": "f0d7f1424923e7b30b715e9634a38bad0d283e52b092e88d6135413c55bda677", "task_id": "t6-strat-grok", "ts": "2026-07-12T03:43:15Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-TESTSTRATEGY-composer.md", "output_sha256": "89f45eb0ebdba7c9f644571b9b67571702f41b40b08901c979212cef1a94ce32", "task_id": "t6-strat-composer", "ts": "2026-07-12T03:43:15Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-ADV-grok.md", "output_sha256": "01241fb2c81dd7d108228773853755c12d5b2ac64b1231641614d245f6ec1e35", "task_id": "t6-adv-grok", "ts": "2026-07-12T03:43:15Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-ADV-codex.md", "output_sha256": "46c4d59463e996ca15d44fe3b1ae6bb739c393ce13f7d478ff2a60f668f6040a", "task_id": "t6-adv-codex", "ts": "2026-07-12T03:43:16Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T6-IMPL-RESULT-codex.md", "output_sha256": "9f06d1ce6c3ab73af9f5f96e4ec19dead5bc6c13bdb5f8eb4f2df6d1160c8d3f", "task_id": "t6-impl-codex", "ts": "2026-07-12T03:43:16Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "icatm-adv-codex", "ts": "2026-07-12T03:47:15Z"}
+=== 2026-07-12 11:47:15 | dispatch ===
+  ts=2026-07-12 11:47:15
+  kind=dispatch
+  intent=ic-api-testmodern SPEC R1 adversarial by codex (fresh adversary)
+  risk=low
+  facts_asked=n/a: SPEC+consults in handoffs
+  review_role=codex=adversarial (drafter=Claude, no self-review)
+  template=n/a: SPEC adversarial
+  adversarial=waived:this IS adversarial dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "icatm-adv-grok", "ts": "2026-07-12T03:47:15Z"}
+=== 2026-07-12 11:47:15 | dispatch ===
+  ts=2026-07-12 11:47:15
+  kind=dispatch
+  intent=ic-api-testmodern SPEC R1 adversarial by grok (faithfulness+PIT)
+  risk=low
+  facts_asked=n/a
+  review_role=grok=adversarial
+  template=n/a: SPEC adversarial
+  adversarial=waived:this IS adversarial dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-ADV-codex.md", "output_sha256": "be4c2784df538d568c9961dfec119dd3e0f58b28fd14fbc7fecb167f300847e5", "task_id": "icatm-adv-codex", "ts": "2026-07-12T03:52:30Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-ADV-grok.md", "output_sha256": "dbdc27140da38dc40a208b05f06e2986c1c17d2706220b9b3eb73f7d3252b09b", "task_id": "icatm-adv-grok", "ts": "2026-07-12T03:52:30Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "icatm-recon-codex", "ts": "2026-07-12T05:34:37Z"}
+=== 2026-07-12 13:34:37 | dispatch ===
+  ts=2026-07-12 13:34:37
+  kind=dispatch
+  intent=icatm reconcile R2 stamp by codex (B8 BLOCK closure)
+  risk=low
+  facts_asked=n/a
+  review_role=codex=reconcile stamp+BLOCK closure
+  template=n/a: reconcile stamp
+  adversarial=n/a: reconcile stamp
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "icatm-recon-grok", "ts": "2026-07-12T05:34:37Z"}
+=== 2026-07-12 13:34:37 | dispatch ===
+  ts=2026-07-12 13:34:37
+  kind=dispatch
+  intent=icatm reconcile R2 stamp by grok (B8 BLOCK closure)
+  risk=low
+  facts_asked=n/a
+  review_role=grok=reconcile stamp+BLOCK closure
+  template=n/a: reconcile stamp
+  adversarial=n/a: reconcile stamp
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "icatm-recon-composer", "ts": "2026-07-12T05:34:37Z"}
+=== 2026-07-12 13:34:37 | dispatch ===
+  ts=2026-07-12 13:34:37
+  kind=dispatch
+  intent=icatm reconcile R2 review by composer (me-draft/composer-review model test)
+  risk=low
+  facts_asked=n/a
+  review_role=composer=independent R2 review
+  template=n/a: reconcile review
+  adversarial=n/a: review
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-RECONCILE.md", "output_sha256": "f543a2a7e17261b17265e7b656b7b465d7d1bf2d05b50657d26f2d5524f65694", "task_id": "icatm-recon-codex", "ts": "2026-07-12T05:36:06Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-RECONCILE.md", "output_sha256": "f543a2a7e17261b17265e7b656b7b465d7d1bf2d05b50657d26f2d5524f65694", "task_id": "icatm-recon-grok", "ts": "2026-07-12T05:36:06Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-RECON-REVIEW-composer.md", "output_sha256": "2371030e160f225315e1c35acceb8f152064c1c547f29b4503e75ceff66d35dc", "task_id": "icatm-recon-composer", "ts": "2026-07-12T05:38:19Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC-API-TESTMODERN-ADV-codex.md", "output_sha256": "be4c2784df538d568c9961dfec119dd3e0f58b28fd14fbc7fecb167f300847e5", "task_id": "icatm-impl-codex", "ts": "2026-07-12T05:38:19Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "icatm-impl-codex", "ts": "2026-07-12T05:39:06Z"}
+=== 2026-07-12 13:39:06 | dispatch ===
+  ts=2026-07-12 13:39:06
+  kind=dispatch
+  intent=icatm Phase1 impl by codex: build real-kline ETHUSDT/12h fixture + PIT self-test mutations + dedup per stamped R2 reconcile
+  risk=high
+  facts_asked=n/a: R2 reconcile stamped
+  review_role=codex=implementer; grok+composer dual review + 3-party data-correctness signoff next
+  template=n/a: impl per stamped reconcile
+  adversarial=waived:R2 reconcile 已 codex+grok 雙戳+機檢 PASS+composer CONCUR(見 handoffs/IC-API-TESTMODERN-RECONCILE.md 戳記與 RECON-REVIEW-composer.md)
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "icatm-impl-fix", "ts": "2026-07-12T06:09:36Z"}
+=== 2026-07-12 14:09:36 | dispatch ===
+  ts=2026-07-12 14:09:36
+  kind=dispatch
+  intent=icatm impl fix: warmup off-by-2 for rvol_20 (chair-diagnosed root cause)
+  risk=low
+  facts_asked=chair probe receipt: rvol_20 exactly 1 non-finite at first target row; rolling(20) of shift(1) series needs 21 warmup, builder gives 19
+  review_role=codex=fixer; grok+composer review + 3-party signoff next
+  template=n/a: surgical warmup fix
+  adversarial=waived:chair-diagnosed 1-line warmup fix, verified by all-512-finite probe
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-IMPL-RESULT-codex.md", "output_sha256": "e972cd8a9c7e74483969a21bcd7400b9b6a9b9388f935eed4b3995ff855124f6", "task_id": "icatm-impl-fix", "ts": "2026-07-12T06:17:37Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "icatm-dc-grok", "ts": "2026-07-12T06:17:37Z"}
+=== 2026-07-12 14:17:37 | dispatch ===
+  ts=2026-07-12 14:17:37
+  kind=dispatch
+  intent=icatm Phase1 3-party data-correctness signoff + impl review by grok
+  risk=low
+  facts_asked=n/a: chair signoff in DATACORRECT-CHAIR
+  review_role=grok=independent data-correctness signer+impl review
+  template=n/a: data-correctness signoff
+  adversarial=waived:this IS the signoff dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "icatm-dc-composer", "ts": "2026-07-12T06:17:37Z"}
+=== 2026-07-12 14:17:37 | dispatch ===
+  ts=2026-07-12 14:17:37
+  kind=dispatch
+  intent=icatm Phase1 3-party data-correctness signoff + impl review by composer
+  risk=low
+  facts_asked=n/a
+  review_role=composer=independent data-correctness signer+impl review
+  template=n/a: data-correctness signoff
+  adversarial=waived:this IS the signoff dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-DATACORRECT-grok.md", "output_sha256": "adb314531afb91994483dcd8efeeafd9403c7e7d084d5f36eeb4dc6b97cc5e58", "task_id": "icatm-dc-grok", "ts": "2026-07-12T06:20:17Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-DATACORRECT-composer.md", "output_sha256": "6511e8efb8fabb8713cc2041fc371c1ea9813c81f44da4cdd98757dd084c1459", "task_id": "icatm-dc-composer", "ts": "2026-07-12T06:20:18Z"}
