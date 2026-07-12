@@ -1,0 +1,362 @@
+<title>多智能體協作工作流程圖</title>
+<style>
+  :root{
+    --bg:#eef1f6; --panel:#ffffff; --panel-2:#f6f8fb; --ink:#1a2030; --ink-soft:#59617a;
+    --line:#d3dae6; --line-strong:#b7c1d4;
+    --gate:#b3760a; --gate-bg:#fdf3df; --gate-line:#e6c583;
+    --yes:#1f7a4d; --yes-bg:#e5f4ec; --no:#b23a24; --no-bg:#fbe9e4;
+    --claude:#4d5ee0; --codex:#0d8f80; --grok:#7b53e6; --composer:#d24d76;
+    --shadow:0 1px 2px rgba(26,32,48,.06),0 6px 18px rgba(26,32,48,.06);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI","PingFang TC","Noto Sans TC",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#12151e; --panel:#1a1f2b; --panel-2:#20263400; --ink:#e7ebf3; --ink-soft:#98a2ba;
+      --line:#2c3444; --line-strong:#3c465a;
+      --gate:#eab861; --gate-bg:#2a2314; --gate-line:#5a4a22;
+      --yes:#5cc78d; --yes-bg:#16281f; --no:#f0836a; --no-bg:#2c1a15;
+      --claude:#8a97f2; --codex:#3fc4b2; --grok:#a98cf5; --composer:#ef86a6;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12151e; --panel:#1a1f2b; --ink:#e7ebf3; --ink-soft:#98a2ba;
+    --line:#2c3444; --line-strong:#3c465a;
+    --gate:#eab861; --gate-bg:#2a2314; --gate-line:#5a4a22;
+    --yes:#5cc78d; --yes-bg:#16281f; --no:#f0836a; --no-bg:#2c1a15;
+    --claude:#8a97f2; --codex:#3fc4b2; --grok:#a98cf5; --composer:#ef86a6;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f6; --panel:#ffffff; --ink:#1a2030; --ink-soft:#59617a;
+    --line:#d3dae6; --line-strong:#b7c1d4;
+    --gate:#b3760a; --gate-bg:#fdf3df; --gate-line:#e6c583;
+    --yes:#1f7a4d; --yes-bg:#e5f4ec; --no:#b23a24; --no-bg:#fbe9e4;
+    --claude:#4d5ee0; --codex:#0d8f80; --grok:#7b53e6; --composer:#d24d76;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;
+    -webkit-font-smoothing:antialiased;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 72px}
+  header.top{margin-bottom:14px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  h1{font-size:29px;margin:.28em 0 .15em;letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--ink-soft);max-width:60ch;margin:0}
+  .grid{display:grid;grid-template-columns:1fr 320px;gap:30px;margin-top:26px;align-items:start}
+  @media (max-width:860px){.grid{grid-template-columns:1fr}}
+
+  /* flow spine */
+  .flow{display:flex;flex-direction:column;gap:0}
+  .node{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 17px;
+    box-shadow:var(--shadow);position:relative}
+  .connect{width:2px;height:20px;background:var(--line-strong);margin:0 auto;flex:none}
+  .connect.tall{height:26px}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;border-radius:7px;
+    background:var(--panel-2);border:1px solid var(--line);font:600 12px/1 var(--mono);color:var(--ink-soft);margin-right:9px}
+  .node h3{margin:0;font-size:15.5px;display:flex;align-items:center;gap:2px}
+  .node p{margin:7px 0 0;color:var(--ink-soft);font-size:13.5px}
+  .who{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+    padding:2px 8px;border-radius:999px;margin:9px 6px 0 0}
+  .who .dot{width:7px;height:7px;border-radius:50%}
+  .w-claude{color:var(--claude);background:color-mix(in srgb,var(--claude) 12%,transparent)}
+  .w-codex{color:var(--codex);background:color-mix(in srgb,var(--codex) 12%,transparent)}
+  .w-grok{color:var(--grok);background:color-mix(in srgb,var(--grok) 12%,transparent)}
+  .w-composer{color:var(--composer);background:color-mix(in srgb,var(--composer) 13%,transparent)}
+  .d-claude{background:var(--claude)}.d-codex{background:var(--codex)}.d-grok{background:var(--grok)}.d-composer{background:var(--composer)}
+
+  /* start / end pills */
+  .terminus{align-self:center;background:var(--ink);color:var(--bg);font-weight:600;
+    padding:9px 20px;border-radius:999px;font-size:14px;box-shadow:var(--shadow)}
+  :root[data-theme="dark"] .terminus,@media (prefers-color-scheme:dark){.terminus{color:#0d1017}}
+
+  /* decision */
+  .decide{border:1.5px solid var(--gate-line);background:var(--gate-bg)}
+  .decide h3 .q{color:var(--gate);font-weight:800;margin-right:6px}
+  .branches{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:13px}
+  @media (max-width:520px){.branches{grid-template-columns:1fr}}
+  .branch{border-radius:10px;padding:10px 12px;font-size:13px;border:1px solid transparent}
+  .branch .tag{font-weight:800;font-size:11.5px;letter-spacing:.05em;display:inline-block;margin-bottom:3px}
+  .b-yes{background:var(--yes-bg);border-color:color-mix(in srgb,var(--yes) 30%,transparent)}
+  .b-yes .tag{color:var(--yes)}
+  .b-no{background:var(--no-bg);border-color:color-mix(in srgb,var(--no) 30%,transparent)}
+  .b-no .tag{color:var(--no)}
+  .branch .loop{color:var(--ink-soft);font-size:12px;margin-top:4px}
+
+  /* gate marker */
+  .gate{border-left:4px solid var(--gate);background:var(--gate-bg)}
+  .gate .glabel{display:inline-flex;align-items:center;gap:6px;color:var(--gate);font-weight:700;font-size:12.5px;
+    letter-spacing:.04em;text-transform:uppercase}
+  .gate code{font-family:var(--mono);font-size:12px;background:color-mix(in srgb,var(--gate) 15%,transparent);
+    padding:1px 6px;border-radius:5px;color:var(--ink)}
+
+  .recon{border-style:dashed;border-color:var(--line-strong);background:var(--panel-2)}
+  .recon h3{font-size:14px}
+
+  /* sidebar */
+  aside{position:sticky;top:24px;display:flex;flex-direction:column;gap:18px}
+  @media (max-width:860px){aside{position:static}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 17px;box-shadow:var(--shadow)}
+  .card h2{margin:0 0 12px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+  .mem{display:flex;gap:11px;padding:9px 0;border-top:1px solid var(--line)}
+  .mem:first-of-type{border-top:0;padding-top:2px}
+  .chip{flex:none;width:11px;height:11px;border-radius:50%;margin-top:5px}
+  .mem b{font-size:14px;display:block}
+  .mem span{font-size:12.5px;color:var(--ink-soft)}
+  .key{display:flex;align-items:center;gap:9px;font-size:13px;padding:6px 0}
+  .key .sw{width:26px;height:16px;border-radius:5px;flex:none;border:1px solid var(--line)}
+  .gates li,.rules li{margin:0 0 9px;padding-left:2px;font-size:13px;color:var(--ink)}
+  .gates code{font-family:var(--mono);font-size:11.5px;color:var(--gate);font-weight:600}
+  .gates b,.rules b{color:var(--ink)}
+  ul.clean{list-style:none;margin:0;padding:0}
+  .rules li{position:relative;padding-left:18px;color:var(--ink-soft)}
+  .rules li::before{content:"";position:absolute;left:0;top:8px;width:7px;height:7px;border-radius:2px;background:var(--gate)}
+  .detail{margin-top:40px;border-top:1px solid var(--line);padding-top:30px}
+  .detail-h{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 18px}
+  .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  @media (max-width:860px){.detail-grid{grid-template-columns:1fr}}
+  .xp{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px 18px 6px;box-shadow:var(--shadow)}
+  .xp-tag{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+  .xp h3{font-size:15.5px;margin:.5em 0 .3em;text-wrap:balance}
+  .xp p{font-size:13px;color:var(--ink-soft);margin:0 0 11px}
+  .xp b{color:var(--ink)}
+  .xp code{font-family:var(--mono);font-size:11.5px;background:var(--panel-2);border:1px solid var(--line);
+    padding:1px 5px;border-radius:5px;color:var(--ink);word-break:break-word;line-height:1.9}
+  .foot{color:var(--ink-soft);font-size:12px;margin-top:26px;text-align:center}
+  .foot code{font-family:var(--mono)}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Multi-Agent 協作協議 · 白話流程圖</div>
+    <h1>一個需求進來，怎麼走到 commit？</h1>
+    <p class="sub">從「判斷任務大小」開始，中／大任務走完整管線：主委起草 → 委員獵漏 → 化解 → 閘門放行 → 實作 → 簽核 → 進版。每一個「通過」都要有證據，不靠嘴說。</p>
+  </header>
+
+  <div class="grid">
+    <!-- MAIN FLOW -->
+    <main class="flow">
+      <div class="terminus">📥 收到需求</div>
+      <div class="connect"></div>
+
+      <div class="node decide">
+        <h3><span class="q">?</span>這是小任務嗎？</h3>
+        <p>判準：只改 1 個函式／局部 bug、能本地 pytest 驗、不碰資料正確性或共用路徑。</p>
+        <div class="branches">
+          <div class="branch b-yes">
+            <span class="tag">是 · 小</span>
+            Claude 自己做 + 自跑測試，<b>不派委員</b>（省 token）→ 直接 commit。
+          </div>
+          <div class="branch b-no">
+            <span class="tag">否 · 中／大</span>
+            進入下方完整管線。碰資料品質／跨模組／難回退／ML 正確性 = 大。
+          </div>
+        </div>
+      </div>
+      <div class="connect tall"></div>
+
+      <div class="node recon">
+        <h3>🔍 先手：web / X 搜尋已知問題</h3>
+        <p>燒委員會前先花一次搜尋——工具 bug、錯誤訊息、已知限制、前例，世界上多半有人踩過，能省好幾輪。<b>但搜尋是偵察不是判決</b>，找到的解法仍要在我方環境實測，絕不凌駕資料正確性驗證。</p>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node">
+        <h3><span class="num">1</span>主委起草 SPEC／TODO</h3>
+        <p>規格一律由主委起草，而且<b>照範本寫</b>（<code style="font-family:var(--mono);font-size:12px">templates/SPEC_TEMPLATE.md</code>）：每份 SPEC 要有風險分級、每個 Task 的驗證方式／邊界／「不可做」欄，並<b>附一份測試章程</b>（要測什麼、怎麼證明測得對）。</p>
+        <span class="who w-claude"><span class="dot d-claude"></span>Claude 起草</span>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node gate">
+        <span class="glabel">🔒 GATE · 機器強制</span>
+        <h3 style="margin-top:6px"><code>template_check</code>（格式 + 實際內容）</h3>
+        <p>不只看「有沒有那個標題」，還看<b>內容是否真的填了</b>：風險分級那行不能空、每個 Task 要有驗證／邊界欄、涉及數值的地方要有 sha256／容差 token。範本沒跟好、內容缺 → 拒發派工 token。</p>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node">
+        <h3><span class="num">2</span>雙／三家 adversarial 審查</h3>
+        <p>每個委員<b>各自獨立</b>去挑毛病，而且必須給「可證偽的反例」——不是說「看起來 OK」，是真的跑一個例子證明會壞。<b>測試本身也受審</b>：一個號稱「驗正確性」的測試，要能證明「把碼改壞它會變紅」，廉價綠燈不算。</p>
+        <span class="who w-grok"><span class="dot d-grok"></span>Grok 獵漏</span>
+        <span class="who w-codex"><span class="dot d-codex"></span>Codex 獵漏</span>
+        <span class="who w-composer"><span class="dot d-composer"></span>Composer 加入</span>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node decide">
+        <h3><span class="q">?</span>有人 BLOCK 嗎？</h3>
+        <div class="branches">
+          <div class="branch b-no">
+            <span class="tag">有 BLOCK</span>
+            主委 reconcile：把所有發現逐項納入改進。
+            <div class="loop">🔁 回第 2 步重審／重戳，直到化解</div>
+          </div>
+          <div class="branch b-yes">
+            <span class="tag">全 APPROVE</span>
+            或 BLOCK 已被化解 → 往下走。
+          </div>
+        </div>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node">
+        <h3><span class="num">3</span>委員蓋章確認化解</h3>
+        <p>原提出 BLOCK 的委員親自複驗確認真的解了（不憑「已修」信任），在定稿附上 <code style="font-family:var(--mono);font-size:12px">RECONCILE-STAMP APPROVED</code>。</p>
+        <span class="who w-grok"><span class="dot d-grok"></span>Grok</span>
+        <span class="who w-codex"><span class="dot d-codex"></span>Codex</span>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node gate">
+        <span class="glabel">🔒 GATE · 機器強制</span>
+        <h3 style="margin-top:6px"><code>reconcile_stamps_check</code></h3>
+        <p>沒有委員戳記 → <b>拒發實作 token</b>。防止「主委自己寫個 reconcile、沒人複核就開工」。</p>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node">
+        <h3><span class="num">4</span>實作</h3>
+        <p>實作者寫碼、需要時也自己跑指令。<b>誰實作是動態的</b>——Codex 與 Grok 依當下額度／指示切換，兩者都可能實作、也都可能當代跑或審查。<b>主委只讀 receipt（收據），自己不下場跑</b>，避免變成自己審自己。</p>
+        <span class="who w-codex"><span class="dot d-codex"></span>Codex 實作／審查</span>
+        <span class="who w-grok"><span class="dot d-grok"></span>Grok 實作／代跑／審查</span>
+        <span class="who w-claude"><span class="dot d-claude"></span>Claude 只讀 receipt</span>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node decide">
+        <h3><span class="q">?</span>同一個問題卡超過 2 輪？</h3>
+        <div class="branches">
+          <div class="branch b-no">
+            <span class="tag">是 · 卡住</span>
+            斷路器：立刻換手／開委員會診斷，禁止 solo 硬磨。
+          </div>
+          <div class="branch b-yes">
+            <span class="tag">否 · 順利</span>
+            繼續驗收。
+          </div>
+        </div>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node">
+        <h3><span class="num">5</span>雙家實作審 + 主委獨立驗收</h3>
+        <p>另一方 code review（實作者不自審）；主委<b>親自重跑驗證，不憑執行端自報</b>「我過了」。</p>
+        <span class="who w-grok"><span class="dot d-grok"></span>Grok</span>
+        <span class="who w-composer"><span class="dot d-composer"></span>Composer</span>
+        <span class="who w-claude"><span class="dot d-claude"></span>Claude 驗收</span>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node decide">
+        <h3><span class="q">?</span>碰到資料正確性？（RISK-HIT a／d）</h3>
+        <div class="branches">
+          <div class="branch b-no">
+            <span class="tag">是</span>
+            三方資料正確性簽核：Claude + Grok + Composer 各<b>獨立</b>簽「資料正確」。<b>任一方有疑 → 不通過</b>，不靠使用者驗收。
+          </div>
+          <div class="branch b-yes">
+            <span class="tag">否</span>
+            跳過，直接進 commit 閘門。
+          </div>
+        </div>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node gate">
+        <span class="glabel">🔒 GATE · 機器強制</span>
+        <h3 style="margin-top:6px"><code>claim checker</code>（pre-commit）</h3>
+        <p>commit 訊息裡任何「通過／全綠／已驗證」的宣稱，都必須附一個 <code>VERIFY:&lt;receipt-id&gt;</code>（真跑過的收據）。指不出證據就擋下 commit。</p>
+      </div>
+      <div class="connect"></div>
+
+      <div class="node">
+        <h3><span class="num">6</span>commit + push + 更新 HANDOFF／ROADMAP</h3>
+        <p>進版，並同步交接文件與路線圖到現況。</p>
+        <span class="who w-claude"><span class="dot d-claude"></span>Claude</span>
+      </div>
+      <div class="connect"></div>
+      <div class="terminus">✅ 入版完成</div>
+    </main>
+
+    <!-- SIDEBAR -->
+    <aside>
+      <div class="card">
+        <h2>委員名單 · 誰做什麼</h2>
+        <div class="mem"><span class="chip d-claude"></span><div><b>Claude</b>（主委）<span>起草 SPEC、reconcile 化解、只讀 receipt 驗收、簽核。全程協調者。</span></div></div>
+        <div class="mem"><span class="chip d-codex"></span><div><b>Codex</b><span>實作 + adversarial 獵漏（反例級嚴謹）。<b>與 Grok 動態互換</b>實作／審查角色。</span></div></div>
+        <div class="mem"><span class="chip d-grok"></span><div><b>Grok</b><span>實作／代跑／adversarial 獵漏 / web·X 搜尋——<b>依額度與當下指示動態</b>，不是只有代跑。</span></div></div>
+        <div class="mem"><span class="chip d-composer"></span><div><b>Composer</b><span>審查 + 資料正確性簽核。<b>不寫初稿</b>，加入多家審查陣容。</span></div></div>
+      </div>
+
+      <div class="card">
+        <h2>Yes／No 讀法</h2>
+        <div class="key"><span class="sw" style="background:var(--yes-bg);border-color:var(--yes)"></span>綠 = 往下走 / 通過</div>
+        <div class="key"><span class="sw" style="background:var(--no-bg);border-color:var(--no)"></span>紅 = 回頭修 / 換手 / 停</div>
+        <div class="key"><span class="sw" style="background:var(--gate-bg);border-color:var(--gate)"></span>琥珀 = 判斷點 / 閘門</div>
+      </div>
+
+      <div class="card">
+        <h2>🔒 五道 Fail-Closed 閘門</h2>
+        <ul class="clean gates">
+          <li><b>派工 token</b> — <code>gate.sh dispatch</code>：派委員前要先開閘留痕。</li>
+          <li><b>template_check</b>：SPEC/TODO 範本格式 + 實際內容都要對，才發派工。</li>
+          <li><b>reconcile stamps</b>：沒委員戳記 → 拒發實作 token。</li>
+          <li><b>claim checker</b>：commit 的「通過」宣稱要附 VERIFY receipt。</li>
+          <li><b>register-output</b>：委員產出要登記（比對真跑輸出，防偽造）。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>幾條不變的鐵律</h2>
+        <ul class="clean rules">
+          <li>小任務不派工，Claude 自己做（省 token）。</li>
+          <li>web recon 先手，但 <b>recon ≠ 判決</b>，要自驗。</li>
+          <li>主委只讀 receipt，自己不下場跑。</li>
+          <li>同問題卡 2 輪 → 斷路器換手／委員會。</li>
+          <li>三方簽核：<b>任一方有疑就不過</b>。</li>
+          <li>審查勝簽核：至少一腿要真跑反例，不是確認式點頭。</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <section class="detail">
+    <h2 class="detail-h">運作細節 · 白話怎麼跑的</h2>
+    <div class="detail-grid">
+      <article class="xp">
+        <span class="xp-tag" style="color:var(--gate)">① 蓋章 + 機器強制</span>
+        <h3>委員怎麼「蓋章」，機器怎麼「逼你」有蓋章</h3>
+        <p><b>蓋章</b>：委員審完，在定稿檔末尾附一行——<br><code>RECONCILE-STAMP: grok APPROVED 2026-07-12 sha256:5a8f… task:t6-recon-grok</code></p>
+        <p>那串 <b>sha256 是「定稿內容的指紋」</b>。只要有人偷改一個字，指紋就對不上、戳記自動作廢——所以不能先蓋章再改內容。</p>
+        <p><b>機器強制</b>：一個腳本（<code>reconcile_stamps_check</code>）在你要開工／commit 前自動跑，它會 ①重算內容指紋比對戳記 ②去 audit log 查這個委員是不是真的被派工跑過 ③對照委員自己的輸出檔。三者全對才放行，否則<b>拒發 token</b>。人說「我蓋了」不算，機器去驗指紋+派工紀錄才算。</p>
+      </article>
+
+      <article class="xp">
+        <span class="xp-tag" style="color:var(--claude)">② receipt 收據</span>
+        <h3>receipt 從哪來、裡面有什麼</h3>
+        <p>跑驗收指令時<b>不直接跑</b>，是用一個外殼（<code>run_with_receipt.py</code>）包著跑。它自動把整場記成一個 json 檔：</p>
+        <p style="margin:6px 0 0"><code>claim_id</code>（唯一 id）· <code>command</code>（跑了什麼）· <code>exit_code</code>（0=成功）· <code>started/ended_at</code>（時間）· <code>輸出 log</code>。</p>
+        <p>之後任何「31 passed / 全綠」的宣稱，都要<b>引用這個 receipt id</b>；機器會回去查它真的存在、真的 exit 0、跑的檔案對得上。<b>「通過」不是嘴說，是指得出一張真跑過的收據。</b>主委也只信 receipt，不信執行端自己回報「我過了」。</p>
+      </article>
+
+      <article class="xp">
+        <span class="xp-tag" style="color:var(--codex)">③ 範本 + 測試章程</span>
+        <h3>寫作有範本、測試有規範，都機器＋人審</h3>
+        <p><b>範本</b>：SPEC/TODO 照 <code>templates/</code> 寫。<code>template_check</code> 不只查「標題有沒有」，更查<b>內容有沒有真填</b>——風險分級不能空、每個 Task 要有驗證／邊界／不可做欄、數值處要有 sha256／容差 token。缺一項就拒發派工。</p>
+        <p><b>測試章程</b>（<code>docs/TEST_DESIGN_CHARTER.md</code>）：每份 SPEC 要附。核心一句——<b>號稱「驗正確性」的測試，必須能證明「把碼改壞它會 FAIL」</b>（可證偽／mutation）。廉價綠燈不算保證。測試設計本身也由委員會專審，量化統計嚴謹另有清單。</p>
+      </article>
+
+      <article class="xp">
+        <span class="xp-tag" style="color:var(--no)">④ FAIL-CLOSED</span>
+        <h3>什麼是 fail-closed（預設關門）</h3>
+        <p>一道門有兩種預設：</p>
+        <p><b>fail-open（預設開）</b>：出錯／沒驗到就<b>放行</b>——方便，但可能把壞東西放進去。</p>
+        <p><b>fail-closed（預設關）</b>：只要驗證沒通過、或根本沒驗，就<b>擋下</b>。門天生鎖著，要拿出正確證據（token／指紋戳記／receipt）才開。</p>
+        <p>這整套閘門全是 fail-closed——<b>寧可誤擋（麻煩但安全），也不誤放（把假綠放進版）</b>。所以你會看到 commit 被擋好幾次：那不是壞掉，是門在盡責，逼你補上證據。</p>
+      </article>
+    </div>
+  </section>
+
+  <p class="foot">量化交易系統 · Multi-Agent 協作協議現況（2026-07）· 依 <code style="font-family:var(--mono)">docs/MULTI_AGENT_ORCHESTRATION.md</code> 與本 session 實踐繪製</p>
+</div>
