@@ -1,27 +1,29 @@
 # Handoff
 **Agent**: Claude(Opus 4.8) | **Time**: 2026-07-12 | **Branch**: main
 
-## ✅ 已閉合入版
-- 票 1 governance(d0d0ebf);票 3 tsc(492c4cc)。
+## ✅ P2 債已閉合入版
+- 票 1 governance 9 紅(d0d0ebf, 151 passed)。
+- 票 3 tsc 11→0(492c4cc, vitest 31 綠, grok+composer 雙審)。
+- 票 2 data_cache redirect(**e6825d9, 已 push**):process-global patch+S1-S11 seam manifest+逐檔 digest oracle;final7 V1 9p/V2 2p/V5 3p/V7 133p+V6 no-new-red,scripts/run_ic_persist_hermetic.sh --set all exit0 VERIFY:20260712T011428Z-p2debt-t2-impl-final7;finding 鏈 C-1~C-5+雙家族審 CE8 全閉合;C-5 digest 抓到真洩漏證守衛可證偽。
 
-## ▶ 票 2 data_cache redirect(大)——實作雙審中(未 commit)
-- **final6**: V1 9p/V2 2p/V5 3p/V7 133p+8skip 五 set DIGEST_DIFF_EMPTY=1,V6 9p+23既有紅但 V6_NO_NEW_RED=1,scripts/run_ic_persist_hermetic.sh --set all exit_code=0 VERIFY:20260712T003131Z-p2debt-t2-impl-final6
-- 驗收 finding 鏈 C-1~C-5 全閉合:C-1 skip anchor/C-2+C-3 chdir cwd 依賴/C-4 V6 既有紅(雙STAMP改準則)
-  /C-5 V7 真洩漏(守衛立功,lightgbm save+_persist_outputs 補接縫)。
-- **現正進行**:grok+composer 雙家族實作 adversarial 審(brief=handoffs/P2DEBT-T2-IMPL-REVIEW-BRIEF.md;
-  產出 P2DEBT-T2-IMPL-REVIEW-{grok,composer}.md)。VERIFY-EXEMPT:wip:p2debt-t2-review
-- 分工鐵律(使用者):修=codex/跑=grok/主委只讀 receipt,三方分離,主委不自跑代跑。
-- **⚠️ commit scoping 待決**:4 個 freeze/baseline 腳本混雜票 2(run_with_manual_redirect 包裝)
-  +票 5(h5 快取/config_override 854d444);審查給建議後再切 git add -p。
-  純票 5 禁 commit:tests/golden/*/baseline_*.json、l65/test_inventory.txt。
-- 雙審 APPROVE → commit(票 2 檔 scope,見 brief)+push → 更新 ROADMAP。
+## ▶ P2 債剩餘
+- **票 4** codex 沙箱卡死蒐證:handoffs/P2DEBT-T4-CODEX-SANDBOX-EVIDENCE.md;A/B 案(ORCH 繞法 vs 報 OpenAI)委員會裁決待開。
+- **票 5** 1a cut1 golden provenance:與票 2 相鄰;**票 2 已留 4 個 freeze 腳本的票5 hunk 於 working tree**
+  (h5 快取/config_override 854d444)+baseline_*.json+l65/test_inventory.txt 未 commit,票5 收。
+- **票 6(新,C-4/P-2 裁決)**:label horizon 既有紅(api IC full analysis 23 nodeid+service cross-sectional 3);
+  fixture `label` 欄名 vs 生產 `_resolve_label_horizon_from_column` 只認 `return_(\d+)`;涉 a 類完整管線。
 
-## 新票候補
-- 票 6(P-2 裁決):label horizon 既有紅(api IC full analysis 23 nodeid+service cross-sectional 3);
-  fixture `label` 欄名 vs 生產 `return_(\d+)` 解析器;涉 a 類完整管線。
-- 票 4 蒐證(A/B 裁決);票 5 golden provenance(與票 2 相鄰,含上述混雜檔票 5 hunk)。
+## 未 commit 殘留(刻意)
+- .claude/settings.json(本機)。
+- handoffs/*.md 票2 審計鏈(~40 檔 provenance):claim checker 擋 7 檔草稿/prose,未入 e6825d9;
+  在 working tree,可另開 provenance commit 或下 session 處理(run_receipts json/log 已入版)。
+- 票 5 golden hunk(見上)。
 
-## 教訓(SCAR 素材)
-- chdir 型 hermetic 測試落地前必附 cwd 依賴盤點(C-2/C-3 三連環)。
-- 驗收解析 CLI 輸出附真實樣本(C-1);digest oracle 抓到真洩漏證明守衛可證偽非廉價綠(C-5)。
-- 未 commit 殘留:.claude/settings.json(本機)+票 5 golden hunk+票 2 全部產物。
+## 教訓(SCAR 素材,待彙整入 SCAR_LEDGER)
+- chdir 型 hermetic 測試落地前必附 cwd 依賴盤點(C-2/C-3 三連環:config/kline/git rev-parse)。
+- 驗收解析 CLI 輸出附真實樣本 fixture(C-1 skip 行格式);禁 `| tail` 遮 rc。
+- digest oracle 抓到真洩漏=守衛可證偽非廉價綠(C-5);接縫完整性須 per-seam arity fail-closed(CE8)。
+- 分工:實作 Codex/代跑 Grok/主委只讀 receipt 不自跑;codex 不可自報「grok 跑過」(provenance)。
+
+## 下一步(使用者排程 project_session_plan)
+P2 債剩餘(票4/5/6)→ 1c Net IC 量綱(大,獨立 session)→ 1d/1f → 實測 → AI Agent 地基 → V2。
