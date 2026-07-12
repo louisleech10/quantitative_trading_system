@@ -330,7 +330,10 @@ cursor-agent --list-models   # 或 cursor-agent models
 - **stdin 卡住**：背景/管線環境下 `codex exec` 會等 stdin → 指令末尾加 `< /dev/null` 關閉。
 - **resume 旗標**：`codex exec resume` **不吃** `-s`/`-o`（那是 `exec` 的）；sandbox 沿用原 session，prompt 直接當參數。
 - **驗收讀摘要不讀全文**：讀 receipt 或 `pytest -q -ra` 尾段摘要，token 成本與 test 數量脫鉤（見 §4）。⚠️ **禁 `| tail` 取 rc**：pipeline exit code = 最後一段（tail 恆 0），會遮蔽真實 rc；要 rc 用 `> log 2>&1; echo RC=$?` 或讀 run_with_receipt 的 exit_code（2026-07-11 票2 C-1 兩度被騙,出處 SCAR）。
-- **codex 沙箱 shell 工具鏈間歇卡死（DELEGATED-TO-ORCHESTRATOR，票4 蒐證 2026-07-12 固化）**：codex 沙箱對某些 pipe/subprocess 組合（bash 腳本 replay、coreutils `comm`/`sort`/`diff` 管線）會間歇死鎖，**與運算量無關**（兩個 32 行檔的 `comm` 也卡），Python/pytest/rg/讀寫檔路徑正常。合約：codex 任務中**外部 shell 管線或 repo bash 腳本卡 >60s → 標 `DELEGATED-TO-ORCHESTRATOR` 誠實交回該命令**，由編排端（Claude）或指定 runner（Grok）代跑並附 receipt；codex 只交程式碼 + Python 級驗證，**不得捏造未跑結果、不得自報他方代跑**（provenance）。回報 OpenAI 延後至 n≥8 或找到穩定最小重現（票4-B，未達門檻）。
+- **codex 沙箱 shell 管線 pipe deadlock（票4 根因確認 2026-07-12）**：**已知 upstream bug openai/codex#7852（OPEN）**——`--sandbox workspace-write` 下孫進程 orphan 後 keep pipe open，codex 等 EOF → **pipe deadlock**；非我方設定問題。故多進程 shell 管線（`comm`/`sort`/`diff`、`<()` process substitution、長 `|` 串接、bash 腳本）會間歇卡死，**與運算量無關**（32 行檔 `comm` 也卡），Python/pytest/rg/單命令讀寫檔正常。
+  - **A′ 根治 mitigation（首選）**：codex 派工命令**避開多進程管線/process substitution** → 改單命令寫檔再讀檔，多數任務即順跑不必 delegate。
+  - **A fallback**：真需管線且無法拆 → 標 `DELEGATED-TO-ORCHESTRATOR` 誠實交回，由 Claude/Grok 代跑附 receipt；codex **不得捏造未跑結果、不得自報他方代跑**（provenance）。
+  - **B**：#7852 已由他人回報且根因精確，**不需另開工單**；補 macOS repro 屬對外發文需使用者核可。
 
 ---
 

@@ -19,6 +19,23 @@ Task-id: p2debt-t4 | 蒐證人: Claude(觀察債,小任務自做) | CLI: codex 0
 3. 疑似方向:codex 沙箱(Seatbelt/landlock)對某些 pipe/subprocess 組合的 IO 攔截死鎖;與運算量無關(comm 兩個 32 行檔也卡)。
 4. quota 事件獨立於卡死,但同影響派工可用性,列動態選層依據。
 
+## 根因確認(2026-07-12 web 研究,主委查 GitHub — 推翻「疑似」為實錘)
+**已知 upstream bug,非我方設定問題,其他使用者早已反映**:
+- **openai/codex#7852**(2025-12-11 開,**至今 OPEN 未修**):`--sandbox workspace-write`/`--full-auto` 下命令無限卡、
+  子進程 orphan 於 sleeping 態。根因=process group 管理缺陷:子進程未 `setpgid(0,0)` 隔離、
+  signal 只打直接子 PID 非 process group、**孫進程 orphan 後 keep pipe open → codex 等 EOF → pipe deadlock**。
+- 完美對應我方現象:多進程 shell 管線(comm/sort/diff、bash 腳本)才卡(pipe 多進程易留 orphan)、
+  Python/pytest 不卡(單進程)、與運算量無關(32 行 comm 也卡=pipe 死鎖非算太久)。
+- 相關:#7846(process substitution 同根因)、#4337(shell-wrapped timeout 卡死)、
+  #18243(macOS workspace-write/read-only shell 卡,只有 danger-full-access 能跑)。
+
+### 處置修正(取代原 A/B)
+- **A′ 根治性 mitigation(新,已入 ORCH)**:codex 派工命令**避開多進程管線/process substitution**——
+  改單命令寫檔→再讀檔(而非 `comm`/`diff <()`/長 `|` 串接)→ 繞過 pipe-orphan 觸發點,多數任務即可「順利運作」不必 delegate。
+- **A(繞法)保留為 fallback**:真需 shell 管線且無法拆 → DELEGATED-TO-ORCHESTRATOR(已入 ORCH §8)。
+- **B 改寫**:**不需另開新工單**——#7852 已由他人回報且根因精確;可選擇在 #7852 補一則 macOS Seatbelt repro
+  (comm 兩 32 行檔即卡)增加訊號,但屬對外發文=需使用者核可,非自動執行。
+
 ## 建議處置(二選一,委員會/使用者裁)
 - **A 固化繞法入 ORCH(建議)**:派工合約加一條——「codex 任務中 shell 管線/repo bash 腳本卡 >60s:改由編排端(Claude)代跑該驗證命令並附 receipt,codex 只交代碼與 Python 級驗證」;成本低,立即止血。
 - **B 回報 OpenAI**:樣本尚少(n=4)且無最小重現(卡死非確定性);建議累積至 n≥8 或找到穩定重現組合再報,避免無效工單。
