@@ -68,6 +68,7 @@
   - R3:api/services、api/routes 直接 import `momentum/FeatureEngineering` 具體工具未走 factory(run_locks/run_paths/hardware_utils…,12 筆)。
   - **phase4 scanner 只窄查特定檔**(R2 僅 strategy_backtest、R3 僅 2 factory、且不查 R4),故長期被誤報全綠。
 - **待判定**:上述 R2/R3 是**真違規**還是 `momentum/FeatureEngineering` 應**豁免為共用基礎設施**(如 momentum.core)?屬架構判斷,須三方 triage(不是 doc 能定)。
+- **Claude 初判(2026-07-13,待三方 triage 確認,勿當定案)**:被 import 的多為**共用基礎設施/唯讀介面**——`run_paths`(路徑 helper)、`run_locks`(per-run lease)、`hardware_utils`(tier 偵測)、`feature_reader`/`feature_library`(唯讀消費介面)、`consumer_gate`(fail-open 契約 helper)、`warmup_lookup`(warmup 查表)。性質接近已被 scanner 白名單的 `momentum.core`,**多半是良性共用底層**,非跨域伸手進別域內部業務邏輯。**風險低**(不碰數值/回測正確性 a/d、系統運作正常、無實際壞行為);**難度多為輕**:預期 triage 結論=把這批 shared-util/interface **納入 scanner 白名單或移入 momentum.core**(scanner 設定+doc 決策,非重寫);唯 R4 的 1 筆 service→service 需一個小 protocol/factory 間接(contained 改動)。它之所以「看起來嚇人」只是被半套 phase4 蓋住而靜默累積,非真的壞掉。
 - **範圍**:triage 後,真違規者改走 protocol/factory 或明確把共用工具納入 scanner 白名單;動 api/services + momentum/Analysis 共用路徑(RISK-HIT b),走完整管線+驗證。
 - **附帶**:scanner 覆蓋自身也要校準——`check_decoupling.sh` 的「Rule 6」只查 api/services 的 lambda monkeypatch(非所有 callback bypass),也不查 canonical R6/Rule 8;納 CI 前須先確立各檢查真實覆蓋範圍,勿再宣稱「查全」。ARCHITECTURE/PRODUCT_VISION 已據實標。
 - **狀態**:已立票未啟動;不擋 IC。
