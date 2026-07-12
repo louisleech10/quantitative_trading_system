@@ -56,3 +56,8 @@ Task-id: p2debt-t4 | 蒐證人: Claude(觀察債,小任務自做) | CLI: codex 0
 
 ## 本票狀態(CLOSED 2026-07-12)
 裁定=採建議 **A**:DELEGATED-TO-ORCHESTRATOR 繞法已固化入 `docs/MULTI_AGENT_ORCHESTRATION.md` §8 派工管線踩坑(含「不得自報他方代跑」provenance 條款);同處順修 `| tail` 遮 rc 反教訓(票2 C-1)。**B(回報 OpenAI)延後**:n=4 未達 n≥8 門檻且無穩定最小重現;後續 codex 派工順手累積樣本,達門檻再開子任務。小任務 Claude 自收,不派工。
+
+## 樣本累積 log(持續,使用者 2026-07-12 定「處置不變但繼續蒐集」)
+每次 codex 派工遇卡死/異常順手一行:日期｜命令類型｜flag(-s/--full-auto?)｜是否 DELEGATED｜receipt。
+達 n≥8 穩定樣本或找到最小重現 → 評估是否值得對外(#18243 族)補 repro(需使用者核可)。
+- (2026-07-11 前樣本 n≈4 見上「樣本清單」表;此後續記於此)
