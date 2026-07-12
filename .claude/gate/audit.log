@@ -13340,3 +13340,183 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-DATACORRECT-grok.md", "output_sha256": "adb314531afb91994483dcd8efeeafd9403c7e7d084d5f36eeb4dc6b97cc5e58", "task_id": "icatm-dc-grok", "ts": "2026-07-12T06:20:17Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-DATACORRECT-composer.md", "output_sha256": "6511e8efb8fabb8713cc2041fc371c1ea9813c81f44da4cdd98757dd084c1459", "task_id": "icatm-dc-composer", "ts": "2026-07-12T06:20:18Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "icatm-p2scope-grok", "ts": "2026-07-12T06:35:22Z"}
+=== 2026-07-12 14:35:22 | dispatch ===
+  ts=2026-07-12 14:35:22
+  kind=dispatch
+  intent=icatm Phase2 scope: classify 5 synthetic service-ingest IC test files as migrate vs legitimate-synthetic
+  risk=low
+  facts_asked=n/a: 5 files enumerated by chair grep
+  review_role=grok=scope classifier
+  template=n/a: scope consult
+  adversarial=waived:read-only scope consult
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "icatm-p2scope-composer", "ts": "2026-07-12T06:35:22Z"}
+=== 2026-07-12 14:35:22 | dispatch ===
+  ts=2026-07-12 14:35:22
+  kind=dispatch
+  intent=icatm Phase2 scope classify by composer
+  risk=low
+  facts_asked=n/a
+  review_role=composer=scope classifier
+  template=n/a: scope consult
+  adversarial=waived:read-only scope consult
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-P2SCOPE-grok.md", "output_sha256": "fce36ece5d23877a6231e9b0fa719dace73eccf10edb8a08aa8535db8b1b250f", "task_id": "icatm-p2scope-grok", "ts": "2026-07-12T06:49:28Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC-API-TESTMODERN-P2SCOPE-composer.md", "output_sha256": "47d9ae6d4854804d02e5ab6b2a7a9a64d63845f52852db22b45433ca89e298ea", "task_id": "icatm-p2scope-composer", "ts": "2026-07-12T06:49:29Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t5-adv-grok", "ts": "2026-07-12T07:52:13Z"}
+=== 2026-07-12 15:52:13 | dispatch ===
+  ts=2026-07-12 15:52:13
+  kind=dispatch
+  intent=p2debt-t5 golden provenance SPEC R1 adversarial by grok
+  risk=low
+  facts_asked=n/a: SPEC+working-tree golden diff
+  review_role=grok=adversarial (drafter=Claude)
+  template=n/a: SPEC adversarial
+  adversarial=waived:this IS adversarial dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "t5-adv-codex", "ts": "2026-07-12T07:52:13Z"}
+=== 2026-07-12 15:52:13 | dispatch ===
+  ts=2026-07-12 15:52:13
+  kind=dispatch
+  intent=p2debt-t5 golden provenance SPEC R1 adversarial by codex
+  risk=low
+  facts_asked=n/a
+  review_role=codex=adversarial (drafter=Claude)
+  template=n/a: SPEC adversarial
+  adversarial=waived:this IS adversarial dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-ADV-codex.md", "output_sha256": "8e6a85829bba3025344f691bda27c0c3f2bf0465253f3fb93865bff569fd71e1", "task_id": "t5-adv-codex", "ts": "2026-07-12T07:54:57Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-ADV-grok.md", "output_sha256": "9e41ef88fa91db0ce56be75b4ed5073875f97a7423531702bcece6e3744d079c", "task_id": "t5-adv-grok", "ts": "2026-07-12T07:57:31Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "t5-recon-codex", "ts": "2026-07-12T07:58:35Z"}
+=== 2026-07-12 15:58:35 | dispatch ===
+  ts=2026-07-12 15:58:35
+  kind=dispatch
+  intent=p2debt-t5 reconcile R2 stamp by codex (B8 closure)
+  risk=low
+  facts_asked=n/a
+  review_role=codex=reconcile stamp+BLOCK closure
+  template=n/a: reconcile stamp
+  adversarial=n/a: reconcile stamp
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t5-recon-grok", "ts": "2026-07-12T07:58:35Z"}
+=== 2026-07-12 15:58:35 | dispatch ===
+  ts=2026-07-12 15:58:35
+  kind=dispatch
+  intent=p2debt-t5 reconcile R2 stamp by grok (B8 closure)
+  risk=low
+  facts_asked=n/a
+  review_role=grok=reconcile stamp+BLOCK closure
+  template=n/a: reconcile stamp
+  adversarial=n/a: reconcile stamp
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-RECONCILE.md", "output_sha256": "8749e798622823be8aae355aaf8482bbf0dc0bbad4f0f149eaeb74136829877f", "task_id": "t5-recon-codex", "ts": "2026-07-12T07:59:48Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-RECONCILE.md", "output_sha256": "8749e798622823be8aae355aaf8482bbf0dc0bbad4f0f149eaeb74136829877f", "task_id": "t5-recon-grok", "ts": "2026-07-12T07:59:48Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "t5-impl-codex", "ts": "2026-07-12T08:00:03Z"}
+=== 2026-07-12 16:00:03 | dispatch ===
+  ts=2026-07-12 16:00:03
+  kind=dispatch
+  intent=p2debt-t5 impl by codex: content-addressed reuse guard + honest provenance + A/B replay per stamped R2
+  risk=high
+  facts_asked=n/a: R2 stamped
+  review_role=codex=impl; grok+composer review + 3-party golden signoff next
+  template=n/a: impl per stamped reconcile
+  adversarial=waived:R2 codex+grok 雙戳+reconcile_stamps_check PASS
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "t5-gateb-concur", "ts": "2026-07-12T08:11:06Z"}
+=== 2026-07-12 16:11:06 | dispatch ===
+  ts=2026-07-12 16:11:06
+  kind=dispatch
+  intent=p2debt-t5 Gate B feasibility concur by codex+grok
+  risk=low
+  facts_asked=n/a: chair finding
+  review_role=codex+grok=concur Gate B redefinition
+  template=n/a: concur
+  adversarial=waived:concur on factual constraint
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-IMPL-RESULT-codex.md", "output_sha256": "f18f580b906aa0e60db10df215f65202742d0c4577cc441cca59183347c6b69c", "task_id": "t5-impl-codex", "ts": "2026-07-12T08:15:56Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-GATEB-FINDING-CHAIR.md", "output_sha256": "27a94f548f9ff64b6ccf0c7cc85731457a424d82a0e1421b95df8629db9cd9f2", "task_id": "t5-gateb-concur", "ts": "2026-07-12T08:15:56Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t5-golden-grok", "ts": "2026-07-12T08:16:43Z"}
+=== 2026-07-12 16:16:43 | dispatch ===
+  ts=2026-07-12 16:16:43
+  kind=dispatch
+  intent=p2debt-t5 3-party golden data-correctness signoff by grok
+  risk=low
+  facts_asked=n/a: chair signoff
+  review_role=grok=golden signer
+  template=n/a: golden signoff
+  adversarial=waived:this IS signoff
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "t5-golden-composer", "ts": "2026-07-12T08:16:43Z"}
+=== 2026-07-12 16:16:43 | dispatch ===
+  ts=2026-07-12 16:16:43
+  kind=dispatch
+  intent=p2debt-t5 3-party golden signoff by composer
+  risk=low
+  facts_asked=n/a
+  review_role=composer=golden signer
+  template=n/a: golden signoff
+  adversarial=waived:this IS signoff
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-GOLDEN-grok.md", "output_sha256": "23da203b66f964e6c192ad2b9457ac119a9c59f508347820deabb51c80cb170a", "task_id": "t5-golden-grok", "ts": "2026-07-12T08:19:51Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-GOLDEN-composer.md", "output_sha256": "527b41229ab7895dc7eed0acb57d98b6e5afcf79b050ff6ac569959775c4c0f5", "task_id": "t5-golden-composer", "ts": "2026-07-12T08:19:51Z"}
