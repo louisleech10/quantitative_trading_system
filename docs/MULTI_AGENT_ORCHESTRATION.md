@@ -249,6 +249,13 @@ headless 模式**不會互動提問**（codex sandbox 內自動執行 / cursor `
 - 升級時給使用者：兩輪各自的 SPEC 調整、執行端 BLOCKED 原因、我的根因假設。
 - 背景任務一律帶 `timeout`（已實行），避免掛死燒額度。
 
+### web recon 先手（省 token，2026-07-12 使用者提，票4 實證）
+**在燒委員會多輪迭代前，先花一次 web 搜尋**——多數「工具/函式庫 bug、錯誤訊息、已知限制、標準演算法/最佳實踐、框架行為、架構 prior-art」世界上早有人踩過或討論過。票4 實證:與其累積 n≥8 樣本 + 委員猜 Seatbelt，一次搜尋就命中 openai/codex#7852 精確根因（省數輪）。
+- **適用**:debug（錯誤訊息/stack trace/「X 是不是已知 bug」）、「這是不是已知限制」、既有演算法/最佳實踐、API/框架行為、架構/研究 prior-art。屬「最便宜驗證」的延伸（見 CLAUDE.md）。
+- **執行**:Claude 有 WebSearch/WebFetch，最快最可靠，由 Claude 在立案/debug 時先手；Grok 若有搜尋能力可補位。codex 沙箱多半無網路，不倚賴其搜尋。
+- **⚠️ recon 非 oracle（鐵律級 caveat）**:web 內容可能過時/錯誤，視同「不可信偵察輸入」——**只餵我方驗證，絕不取代跑真 receipt / 資料正確性三方簽核**。尤其**禁**用「網路說沒問題」凌駕 Data Truth 或 Feature Factory 資料正確性 gate。找到解法仍須在我方環境實測確認（如票4 的 A′ mitigation 仍要實跑驗證有效）。
+- **對外發文另計**:搜尋是唯讀 recon,自由做;回報/發 issue/PR 到外部=對外行動,須使用者核可。
+
 ### postflight FAIL 處置（council Round 2 #Composer6）
 - **不收**，立刻停下調查。
 - **程式碼**可回滾：`git stash` / `git checkout -- <檔>` / `git reset` 還原到派工前。
