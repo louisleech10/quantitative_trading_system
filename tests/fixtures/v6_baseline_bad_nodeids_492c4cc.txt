@@ -1,24 +1,13 @@
-# Pinned at main@492c4cc; source: P2DEBT-T2 C-4 dual-stamp reviews (grok + composer, 2026-07-11).
-tests/api/test_export_api.py::test_export_ai_json_200
-tests/api/test_export_api.py::test_export_csv_detailed_factor_return
-tests/api/test_export_api.py::test_export_csv_detailed_without_module_422
-tests/api/test_export_api.py::test_export_csv_summary_200
-tests/api/test_export_api.py::test_export_hdf5_200
-tests/api/test_export_api.py::test_export_invalid_format_422
-tests/api/test_export_api.py::test_export_markdown_200
-tests/api/test_ic_analysis_api.py::test_ic_export_csv
-tests/api/test_ic_analysis_api.py::test_ic_export_hdf5
-tests/api/test_ic_analysis_api.py::test_ic_grouped
-tests/api/test_ic_analysis_api.py::test_ic_quantile_and_correlation
-tests/api/test_ic_analysis_api.py::test_ic_refilter
-tests/api/test_ic_analysis_api.py::test_ic_result
-tests/api/test_ic_analysis_api.py::test_ic_summary
-tests/api/test_ic_analysis_api.py::test_ic_task_status
-tests/api/test_ic_analysis_api.py::test_ic_top_features
-tests/api/test_ic_deep_analysis.py::test_deep_analysis_result
-tests/api/test_ic_deep_analysis.py::test_deep_analysis_result_serializes_numpy_scalars
-tests/api/test_ic_deep_analysis.py::test_deep_analysis_start
-tests/api/test_ic_deep_analysis.py::test_full_analysis
-tests/api/test_ic_deep_analysis.py::test_full_analysis_endpoint
-tests/api/test_ic_deep_analysis.py::test_full_analysis_with_deep_analysis_config
-tests/api/test_ic_deep_analysis.py::test_start_deep_analysis_and_get_result
+# V6 known-baseline red nodeids (ticket-2 hermetic V6 gate).
+#
+# ORIGINAL (2026-07-11, P2DEBT-T2 C-4 dual-stamp grok+composer, pinned @main 492c4cc):
+#   23 API IC nodeids were RED on main due to stale synthetic fixtures (label naming /
+#   cadence / trailing-NaN, violating the real-kline 鐵律). Ticket-2's V6 gate tolerated
+#   them via "no NEW red ⊆ baseline".
+#
+# CLEARED (2026-07-12, IC-API-TEST-MODERNIZATION epic Phase 1, commit 56a9566):
+#   The epic migrated those 3 API test files to a real-kline-derived shared fixture
+#   (tests/fixtures/ic_api_real_kline.py); all 23 are now GREEN (+3 dedup-deleted).
+#   Verified: run_ic_persist_hermetic.sh --set V6 -> 29 passed, NEW_RED=(none),
+#   V6_NO_NEW_RED=1, DIGEST_DIFF_EMPTY[V6]=1. Baseline emptied -> V6 gate now expects
+#   the set fully green (any future red FAILS, no tolerance).
