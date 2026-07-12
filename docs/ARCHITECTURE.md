@@ -6,7 +6,7 @@
 - **版本**: 7.0
 - **最後更新**: 2026-05-25
 - **狀態**: 生產中 + 持續開發
-- **更新內容**: 
+- **更新內容**:
   - v7.0 (2026-05-25): 同步 Feature Factory Granular Control（per-indicator 細粒度控制、Preset API、Batch-Toggle API、175 tests）；L6.5 優化系列（native-tf path -45.4%、d_star cache v3、Numba Fast ADF、joblib 並行化）；L7 storage 增強（sharded npy、hardware-adaptive 壓縮、IC-First raw/ cleanup）；IC engine cache hit path；Feature Browser CGSA 優化；per-indicator warmup lookup；FeatureTimeSeriesChart 重構
   - v6.1 (2026-05-07): 修正 Feature Storage artifact 描述（HDF5 legacy → V7 per-group parquet）；新增 L65 V2 IC-First canonical path（`{SYMBOL}/{TF}/{config_hash}/raw|processed`）；同步 Artifact Contract Table 與目錄樹
   - v6.0 (2026-03-15): 同步 Feature Factory MultiTF 整合 + 多標的批次計算 — MultiTF 路由策略、AlignmentMode paradigm、FeatureFactoryBatchService 架構（ProcessPoolExecutor + TTL 清理）
@@ -57,7 +57,7 @@
 3. 提供完整的研究到實盤工作流
 4. 支持多市場擴展（加密貨幣 → 台股 → 美股）
 
-### 開發狀態總覽 (2026 Q1)
+### 開發狀態總覽（各 Phase 里程碑;最後校對 2026-07-12。近期進度以 `HANDOFF.md` / `docs/ROADMAP.md` 為準）
 | Phase | 內容 | 狀態 |
 |-------|------|------|
 | Phase 1 | 案例搜索系統 + Web UI | ✅ 已完成 |
@@ -149,19 +149,29 @@ IDE: VS Code
 
 ## 解耦架構原則
 
-> 此節源自 REFACTOR_ARCHITECTURE_V4，定義系統的 7 條架構規則。
+> **規範權威**:7 條解耦規則的 canonical 定義**唯一住在 `CLAUDE.md` §The 7 Decoupling Rules**;本節僅為架構視角的重述與現況佐證,如與 CLAUDE.md 有出入,以 CLAUDE.md 為準。
+> 此節源自 REFACTOR_ARCHITECTURE_V4。歷史上本表 Rule 5/6 曾誤寫為 singleton/callback(與 canonical 的 Config/Test 不符),已於 docdrift(2026-07-12)改正——singleton/callback 降為獨立 named invariant Rule 8/9(見下)。
 
-### 架構規則 (全部已通過驗證)
+### 架構規則(canonical,與 CLAUDE.md 同步)
 
-| 規則 | 描述 | 狀態 |
+| 規則 | 描述 | 現況 |
 |------|------|------|
-| Rule 1 | `momentum/` 不得依賴 `api/` | ✅ 0 violation |
-| Rule 2 | `momentum/` 跨 Domain 不得直接 import（透過 Protocol 注入） | ✅ 0 violation |
-| Rule 3 | `api/services/` 不得直接建構 `momentum/` 物件（使用 `factories.py`） | ✅ 0 violation |
-| Rule 4 | `api/services/` 之間不得互相 import | ✅ 0 violation |
-| Rule 5 | 不得有 Mutable global singleton | ✅ 已修復 |
-| Rule 6 | 無 callback/closure bypass | ✅ 通過 |
-| Rule 7 | `api/models` ↔ `momentum/core` 無互相依賴 | ✅ 通過 |
+| Rule 1 | `momentum/` 不得依賴 `api/` | ✅ 0 violation(`grep "from api\." momentum/`==0) |
+| Rule 2 | `momentum/` 跨 Domain 不得直接 import（透過 Protocol 注入） | ⚠️ **`check_decoupling.sh` 報 5 筆**:`momentum/Analysis/*` 直接 import `momentum/FeatureEngineering`(warmup_lookup/consumer_gate/feature_reader);phase4 窄查(僅 strategy_backtest)通過。是否屬真違規或該豁免共用工具,待 triage(見 ROADMAP P2) |
+| Rule 3 | `api/services/` 不得直接建構 `momentum/` 物件（使用 `factories.py`） | ⚠️ **`check_decoupling.sh` 報 12 筆**:api/services、api/routes 直接 import `momentum/FeatureEngineering` 具體工具(run_locks/run_paths/hardware_utils/feature_reader…)未走 factory;待 triage(見 ROADMAP P2) |
+| Rule 4 | `api/services/` 之間不得互相 import | ⚠️ **1 已知違規**:`feature_factory_batch_adapters.py:9` import `feature_factory_service`(feature-explorer 系列引入,`check_decoupling.sh` 紅;待修/另立債票) |
+| Rule 5 | **Config 單一來源**（`momentum/core/config.py` 或 `api/core/config.py`；momentum 不得 import `api.core.config`） | ✅ scanner 綠 |
+| Rule 6 | **測試不依賴 `run_api.py`**（`pytest tests/momentum/` 可獨立跑） | ✅ `check_decoupling_phase4.sh` 綠(**註**:phase4 僅實跑 `tests/momentum/Strategy/` 子集=135 passed,非全 `tests/momentum/`;full 覆蓋未機械強制) |
+| Rule 7 | `api/models` ↔ `momentum/core` 無互相依賴 | ✅ 0 violation |
+
+**具名不變式(named invariants;非「7 條」之一,獨立追蹤,詳見 CLAUDE.md)**:
+
+| 不變式 | 描述 | 現況(誠實) |
+|--------|------|-----------|
+| Rule 8 | 不得有 Mutable global singleton | ⚠️ **仍有殘留**:`chart_signal_service.py`/`signal_analysis_service.py`/`data_source_registry.py` 等 `_instance` singleton 尚在,列技術債追蹤(勿宣稱「已修復」) |
+| Rule 9 | 無跨界 callback/closure/lambda monkeypatch bypass | ✅ 由 `check_decoupling.sh` lambda 檢查強制(該腳本內部標「Rule 6」=此不變式) |
+
+> **兩支 scanner 編號語意不同**:`check_decoupling.sh` 的「Rule 5」=Config(canonical R5)、「Rule 6」=callback bypass(=Rule 9);`check_decoupling_phase4.sh` 的「Rule 6」=獨立 pytest(canonical R6)。canonical 編號以 CLAUDE.md 為準。
 
 ### Protocol 注入機制
 
@@ -214,6 +224,8 @@ class IPositionSizer(Protocol):
 
 ```python
 # momentum/factories.py — 涵蓋所有 Domain 的工廠函式
+# ⚠️ 以下為示意分類,非完整清單;權威來源 = momentum/factories.py 本體
+#    (2026-07-12 計 78 個 create_* 工廠函式;新增工廠時不必回填本表,以原始碼為準)。
 
 # ── Data ──
 create_kline_storage_manager()
@@ -292,9 +304,45 @@ create_optimization_result()
 # ── Strategy（Phase 4）──
 create_backtest_engine()
 create_position_sizer()
+create_strategy_backtest_objective()
+create_model_hyperparam_objective()
+
+# ── Feature Factory 週邊（V7 / registry / MCP）──
+create_feature_preprocessor()
+create_feature_reader()
+create_feature_library()
+create_feature_registry()
+create_feature_toggle_registry()
+create_column_group_registry()
+create_feature_factory_mcp()
+
+# ── IC 週邊（artifact / split / report / lifecycle）──
+create_ic_artifact_writer()
+create_ic_reporter()
+create_ic_split_adapter()
+create_time_splitter()
+create_run_lifecycle_manager()
+create_multi_symbol_runner()
+create_label_generator()
+create_cv_validator()
+
+# ── Analysis / Diagnostics 週邊 ──
+create_analysis_exporter()
+create_coverage_analyzer()
+create_drift_analyzer()
+create_prediction_analyzer()
+create_result_analyzer()
+create_psi_calculator()
+create_regime_detector()
+create_lstm_engine()
+
+# ── Cache ──
+create_indicator_cache()
+create_kline_cache()
 
 # ── Utility ──
 get_data_source_values()
+# ...（其餘見 momentum/factories.py，勿以本表為完整依據）
 ```
 
 ### 呼叫流程
@@ -474,8 +522,9 @@ grep -r "from momentum\.Indicators" momentum/Analysis/
 
 **自動化檢查**（CI/CD 整合，未來實作）:
 ```bash
-# 未來可加入 pre-commit hook
-python scripts/check_architecture_rules.py
+# 解耦驗證(canonical R1-7 + named invariant scanner)
+bash scripts/check_decoupling.sh
+bash scripts/check_decoupling_phase4.sh
 ```
 
 #### 文檔同步要求
@@ -484,14 +533,14 @@ python scripts/check_architecture_rules.py
 1. [ARCHITECTURE.md](./ARCHITECTURE.md) - 更新 Domain 定義、Protocol 列表
 2. [PRODUCT_VISION.md](./PRODUCT_VISION.md) - 如影響版本演進路徑
 3. [*.PLAN.md](.) - 更新對應 Task 的 PLAN 文件
-4. [.github/copilot-instructions.md](../.github/copilot-instructions.md) - 更新 AI Agent 快速參考
+4. [CLAUDE.md](../CLAUDE.md) / [AGENTS.md](../AGENTS.md) / [.cursorrules](../.cursorrules) - 全 agent 規範入口(copilot-instructions 已於 2026-07-05 淘汰)
 
 #### 實例：Task 1 (FeatureFactory) 解耦設計
 
-**符合解耦原則的設計**：
-- ✅ 7 層 Pipeline 每層獨立可測試（Rule 6）
+**符合解耦原則的設計**（下方括號為此設計呼應的規則精神;canonical 定義見 CLAUDE.md）：
+- ✅ 7 層 Pipeline 每層獨立可測試（此處指模組可測性;canonical Rule 6 專指「測試不依賴 `run_api.py`」）
 - ✅ 透過 `create_feature_factory()` 建構（Rule 3）
-- ✅ Config-driven，Preset 從 YAML 讀取（Rule 5）
+- ✅ Config-driven，Preset 從 YAML 讀取（Rule 5 Config 單一來源精神）
 - ✅ 不依賴 `api/` 層，純 `momentum/` 內邏輯（Rule 1）
 - ✅ 跨 Domain 依賴（讀取 K 線）透過 `IKlineReader` Protocol（Rule 2）
 
@@ -530,7 +579,7 @@ python scripts/check_architecture_rules.py
 ┌───────────────────────▼──────────────────────────────┐
 │             api/services/ (Business Logic)            │
 │  28+ 個服務, 透過 factories.py 建構 Domain 物件       │
-│  Services 之間不互相呼叫 (Rule 4)                     │
+│  Services 之間不互相呼叫 (Rule 4;現有 1 已知違規待修)  │
 │                                                      │
 │  KlineDataService ─── 統一 K 線存取 (快取+下載)       │
 │  ChartDataService ─── 圖表數據 + 指標計算             │
@@ -1386,12 +1435,14 @@ Stage 8: 報告生成
 
 **Rule 1-7 完全遵守**：
 - ✅ Rule 1: `momentum/` 不依賴 `api/`（0 violation，grep 驗證通過）
-- ✅ Rule 2: 跨 Domain 使用 Protocol 注入（IICAnalyzer、ILabelGenerator、ICVValidator）
-- ✅ Rule 3: API Service 使用 Factory 建構（`create_ic_analyzer()` 來自 `momentum/factories.py`）
-- ✅ Rule 4: Service 之間無互相 import（0 violation）
-- ✅ Rule 5: 無 Mutable global singleton
-- ✅ Rule 6: 無 callback/closure bypass
+- ✅ Rule 2: 本 IC 模組跨 Domain 使用 Protocol 注入（IICAnalyzer、ILabelGenerator、ICVValidator）——**惟全庫 `check_decoupling.sh` R2 報 5 筆(FeatureEngineering 共用工具),見「解耦架構原則」主表**
+- ✅ Rule 3: 本 IC 模組 API Service 使用 Factory 建構（`create_ic_analyzer()`）——**惟全庫 R3 報 12 筆未走 factory 的具體 import,見主表**
+- ⚠️ Rule 4: 本 IC 模組內無 service 互 import;但**全庫現有 1 已知違規**(`feature_factory_batch_adapters.py`,見「解耦架構原則」節)
+- ✅ Rule 5: Config 單一來源（momentum 不 import `api.core.config`）
+- ✅ Rule 6: 測試不依賴 `run_api.py`（`pytest tests/momentum/` 獨立跑）
 - ✅ Rule 7: `api/models` ↔ `momentum/core` 無互相依賴
+
+（singleton/callback 屬 named invariant Rule 8/9,見本檔「解耦架構原則」節;Rule 8 現況仍有殘留,勿於此宣稱已修復。）
 
 **Protocol 擴展**：
 ```python
@@ -1492,7 +1543,7 @@ XGBoostAnalyzer                LightGBMAnalyzer
 - 10 個測試檔案，160+ 測試案例
 - 邊界條件：100% 覆蓋
 - Protocol 合規性：100% 通過
-- 架構合規：REFACTOR_ARCHITECTURE_V4 Rule 1-7 全部通過
+- 架構合規：本模組符合 Protocol/Factory 設計;**惟全庫 `check_decoupling.sh` 現有 R2/R3/R4 既存違規(共 18 筆,見「解耦架構原則」主表與 ROADMAP P2 債票),故不宜宣稱「Rule 1-7 全部通過」**
 
 ---
 
@@ -1801,13 +1852,15 @@ class FeatureFactoryBatchService:
 
 ## 待開發功能
 
+> ⚠️ 本清單為概略優先序,可能落後實際進度;個別功能真實狀態以 `HANDOFF.md` / `docs/ROADMAP.md` 與原始碼為準。
+
 ### ⏳ 1. 前端 UI 整合（優先級：🔥 高）
 
 各系統前端視覺化頁面開發與整合：
 - IC Deep Analysis 前端互動面板
 - Model Enhancement 前端儀表板
 - Strategy 回測結果視覺化
-- Feature Factory 管理介面
+- Feature Factory 管理介面 / Feature Explorer(**部分已建**,feature-explorer 系列 commit;整合與品質彙整持續中)
 
 ### ⏳ 2. 實盤部署（優先級：🟡 低）
 

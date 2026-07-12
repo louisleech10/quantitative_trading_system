@@ -1,6 +1,7 @@
 # 開發指南
 
 > ⚠️ 治理制度(協作/派工/gate)以 `CLAUDE.md` 與 `docs/MULTI_AGENT_ORCHESTRATION.md` 為準;本檔最後驗證 2026-07-05,其後細節可能過時。
+> ⚠️ **規範權威**:7 條解耦規則、數據真實性、核心原則、程式標準的 canonical 定義以 `CLAUDE.md` 為唯一權威;本檔只提供 how-to/範例/教學,如與 CLAUDE.md 有出入以 CLAUDE.md 為準。
 
 ## 文檔信息
 - **版本**: 1.1
@@ -51,12 +52,15 @@
 ✅ 先寫清晰代碼，再用profiler找瓶頸優化
 ```
 
-### 4. AI驅動開發模式
+### 4. AI驅動開發模式（現行:多 agent 協作,非單一 Claude）
 ```
-人工：定義需求 + 驗證結果
-Claude Code CLI：生成實現 + 修復bug
-協作：快速迭代 + 持續改進
+使用者：定義需求 + 最終否決權
+Claude(編排/主委)：判任務大小、起草 SPEC、規劃與驗收、code review 把關
+執行端(Codex / Grok / Composer,動態選層)：實作 + debug（被派工,守合約）
+品質保證：中/大任務走完整管線(SPEC+TODO+雙家族 adversarial+三方簽核+gate)
 ```
+> 完整分工與派工協議見 `CLAUDE.md`(任務分派規則)與 `docs/MULTI_AGENT_ORCHESTRATION.md`;
+> 舊「人工定義+Claude 單獨實作+人工驗證」工作流已被上述多 agent/三方簽核取代。
 
 ---
 
@@ -234,19 +238,32 @@ def search_cases(config: SearchConfig) -> List[CaseData]:
 
 ### 核心要求
 
-#### ⚠️ 嚴禁事項
-```
-❌ 絕對禁止：
-  - 假數據（如 ['BTC', 'ETH', 'SOL'] 這種列表）
-  - 虛擬數據（如 random.random() 生成的測試數據）
-  - 硬編碼數值（如 threshold = 0.05）
-  - 示例數據作為默認值
+#### ⚠️ 嚴禁事項（適用範圍:**生產路徑 + 數據正確性測試**）
 
-為什麼嚴禁？
-  → 影響系統可靠性
-  → 導致測試結果不真實
-  → 可能被誤用到生產環境
-  → 難以追蹤數據來源
+> 本節禁令**依情境分層**,不是對所有 `np.random` 一律封殺。canonical 判準見 `docs/IC_API_TEST_LAYERING.md`(L0 純邏輯/L1 API 表面/L2 真管線)。
+> 受控合成資料在 **L0 邏輯/契約測試(不走 IC ingest)、adversarial mutation 探針、效能壓測** 中**合法且必要**(真 kline 反而毀掉可證偽性);唯獨**數據正確性 / IC 數值 / PIT 無洩漏**類測試**必用真實 kline `data_cache/feature_klines/kline_cache.h5`,禁合成 fixture**(專案鐵律,見 CLAUDE.md 三方簽核節)。
+> ⚠️ **L1 缺口特別注意**:凡**走 IC service ingest** 的測試(即使只斷言 HTTP/schema/task 生命週期、不斷言 IC 數值)仍屬 L1,**須用真 kline 衍生共用 fixture**(`tests/fixtures/ic_api_real_kline.py`),**不得用合成餵 ingest**——否則重犯 Phase 1 違憲型(見 IC_API_TEST_LAYERING.md L16-17)。只有**完全不 ingest** 的純路由/schema/元件函式測試才是 L0、可合成。
+
+```
+❌ 生產路徑絕對禁止：
+  - 假數據（如 硬編碼 ['BTC', 'ETH', 'SOL'] 這種清單當真實資料源）
+  - 虛擬數據冒充真實市場資料
+  - 業務邏輯裡硬編碼數值（如 threshold = 0.05 應走 config）
+  - 以示例數據作為生產預設值
+
+❌ 數據正確性/IC/PIT 測試禁止：
+  - 用合成 fixture 冒充真實 IC 輸入面（Phase 1 違憲型,見 TEST_LAYERING）
+  - 用 sanitized fixture 做回歸（須 byte-faithful 或真實 ingestion）
+
+✅ 合法（勿誤禁）：
+  - L0 邏輯/契約測試用受控合成(404/422、filter 直呼、schema)
+  - adversarial mutation 探針故意餵壞資料證 fail-closed 護欄
+  - FDR/顯著性、OOS purge、效能壓測用 seeded np.random 受控矩陣
+
+為什麼要分層？
+  → 生產假數據 → 影響可靠性、可能污染上線
+  → 數據正確性測試用合成 → 結果不真實、洩漏漏測（假綠）
+  → 但 mutation/perf 測若強用真 kline → 無法製造壞例、毀可證偽性
 ```
 
 #### ✅ 正確做法
@@ -326,22 +343,30 @@ def example_usage():
 
 ### 測試數據規範
 
+> ⚠️ **分層,非一律**:下面「用真實資料子集」是**數據正確性 / IC / PIT 類測試(L2)**的規範。
+> **L0 邏輯/契約、mutation 探針、效能壓測用受控合成資料合法**——見 `docs/IC_API_TEST_LAYERING.md` 與上文「嚴禁事項」分層說明。判準:此測試若斷言「真實 IC 數值 / 無洩漏 / 資料正確」→ 必真 kline;若只測路由/schema/護欄行為/效能 → 合成恰當。
+
 ```python
-# ✅ 正確：測試也使用真實數據的子集
-def test_search_function():
-    # 使用真實數據的最近10條記錄作為測試
+# ✅ 正確（L2 數據正確性測試）：使用真實數據的子集
+def test_ic_values_are_correct():
+    # 使用真實 kline，斷言 IC 數值/PIT 正確
     test_data = fetch_real_data('BTCUSDT', limit=10)
-    
     result = search_cases(test_data)
-    
     assert len(result) > 0
 
-# ❌ 錯誤：測試使用假數據
-def test_search_function():
+# ❌ 錯誤（L2 卻用合成 fixture 冒充真實 IC 輸入面 → 假綠）
+def test_ic_values_are_correct_BAD():
     test_data = pd.DataFrame({
-        'price': [100, 101, 102],  # 假數據
+        'price': [100, 101, 102],   # 合成資料冒充真實 → 數據正確性測試違憲
         'volume': [1000, 2000, 3000]
     })
+
+# ✅ 也正確（L0/mutation/perf）：受控合成是對的工具
+def test_fail_closed_on_wrong_tf():
+    # 故意餵錯 TF 證護欄會擋——真 kline 無法製造此壞例
+    bad = _make_wrong_tf_frame(seed=0)
+    with pytest.raises(FailClosedError):
+        pipeline.run(bad)
 ```
 
 ---
@@ -1410,7 +1435,7 @@ from api.services import DataService  # 本地模組
 # 命名規範
 class MyClass:  # PascalCase
     CONSTANT = 100  # UPPER_CASE
-    
+
     def my_method(self):  # snake_case
         local_variable = 1  # snake_case
         return local_variable
@@ -1431,16 +1456,16 @@ def fetch_data(
 ) -> pd.DataFrame:
     """
     獲取K線數據
-    
+
     Args:
         symbol: 交易對符號
         start_date: 開始日期 (YYYY-MM-DD)
         end_date: 結束日期 (YYYY-MM-DD)
         timeframe: 時間框架，默認1小時
-    
+
     Returns:
         包含OHLCV數據的DataFrame
-    
+
     Raises:
         ValueError: 如果日期格式錯誤
         APIError: 如果API調用失敗
@@ -1480,22 +1505,22 @@ def search_cases(
 ) -> List[CaseData]:
     """
     搜索符合條件的交易案例
-    
+
     根據配置的條件搜索歷史數據，找出符合特定模式的案例。
     支持正例和反例搜索。
-    
+
     Args:
         config: 搜索配置對象，包含所有搜索條件
         data_source: 數據源名稱，默認為binance
-    
+
     Returns:
         案例數據列表，每個案例包含完整的OHLCV數據和標記
-    
+
     Raises:
         ValueError: 如果config無效或缺少必要參數
         DataSourceError: 如果data_source不支持
         APIError: 如果API調用失敗
-    
+
     Example:
         >>> config = SearchConfig(
         ...     timeframe='12h',
@@ -1506,7 +1531,7 @@ def search_cases(
         >>> cases = search_cases(config)
         >>> len(cases)
         150
-    
+
     Note:
         此函數可能需要較長時間執行（取決於日期範圍）
         建議使用異步版本或顯示進度條
@@ -1622,10 +1647,10 @@ interface ChartProps {
   onError?: (error: Error) => void;
 }
 
-export const TradingChart: React.FC<ChartProps> = ({ 
-  caseId, 
+export const TradingChart: React.FC<ChartProps> = ({
+  caseId,
   symbol,
-  onError 
+  onError
 }) => {
   const [data, setData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1808,7 +1833,7 @@ class APIClient {
 
   async get<T>(endpoint: string): Promise<T> {
     const response = await fetch(`${this.baseURL}${endpoint}`);
-    
+
     if (!response.ok) {
       throw new APIError(
         `API request failed: ${response.statusText}`,
@@ -1962,9 +1987,9 @@ if not data.empty:
 def calculate_sharpe_ratio(returns, risk_free_rate=0.02):
     """
     計算Sharpe Ratio（夏普比率）
-    
+
     公式：(投資組合報酬率 - 無風險利率) / 報酬率標準差
-    
+
     意義：衡量每承擔一單位風險所獲得的超額報酬
     數值 > 1 表示風險調整後的報酬良好
     """
@@ -1996,10 +2021,10 @@ def test_calculate_ema_basic():
     # Arrange
     data = pd.Series([1, 2, 3, 4, 5])
     period = 3
-    
+
     # Act
     result = calculate_ema(data, period)
-    
+
     # Assert
     assert len(result) == len(data)
     assert not result.isna().all()  # 不是全部NaN
@@ -2011,7 +2036,7 @@ def test_calculate_ema_edge_cases():
     empty_data = pd.Series([])
     result = calculate_ema(empty_data, 3)
     assert len(result) == 0
-    
+
     # 數據長度小於週期
     short_data = pd.Series([1, 2])
     result = calculate_ema(short_data, 5)
@@ -2022,7 +2047,7 @@ def test_calculate_ema_with_real_data():
     # 使用真實數據的小子集（不要用假數據！）
     real_data = fetch_real_data('BTCUSDT', limit=100)
     result = calculate_ema(real_data['close'], 20)
-    
+
     assert len(result) == 100
     assert result.iloc[-1] > 0  # 價格應該為正
 
@@ -2056,10 +2081,10 @@ def test_search_cases_endpoint():
         "end_date": "2024-01-31",
         "price_change": 0.10
     }
-    
+
     # 調用API
     response = client.post("/api/v1/search/execute", json={"config": config})
-    
+
     # 驗證響應
     assert response.status_code == 200
     assert response.json()["success"] is True
@@ -2070,9 +2095,9 @@ def test_search_with_invalid_config():
     invalid_config = {
         "timeframe": "invalid"  # 無效的timeframe
     }
-    
+
     response = client.post("/api/v1/search/execute", json={"config": invalid_config})
-    
+
     assert response.status_code == 400
     assert response.json()["success"] is False
 ```
@@ -2275,18 +2300,18 @@ def search_cases(symbol: str, start_date: str, end_date: str):
     # 驗證symbol格式
     if not re.match(r'^[A-Z]{3,10}USDT$', symbol):
         raise ValueError(f"Invalid symbol format: {symbol}")
-    
+
     # 驗證日期格式
     try:
         start = datetime.strptime(start_date, '%Y-%m-%d')
         end = datetime.strptime(end_date, '%Y-%m-%d')
     except ValueError:
         raise ValueError("日期格式必須為 YYYY-MM-DD")
-    
+
     # 驗證日期範圍
     if start > end:
         raise ValueError("開始日期不能晚於結束日期")
-    
+
     if (end - start).days > 365:
         raise ValueError("日期範圍不能超過365天")
 ```

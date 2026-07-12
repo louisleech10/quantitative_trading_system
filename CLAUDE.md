@@ -96,6 +96,8 @@ Feature Factory **資料正確性** scope：生成→計算→merge（多TF對�
 
 ## The 7 Decoupling Rules (Zero Tolerance)
 
+> **本表 = 7 條解耦規則的唯一權威(canonical single source)。** ARCHITECTURE.md / DEV_GUIDE.md 只得 pointer 回本節,不得自列不同版本。歷史上 ARCHITECTURE §162 曾把 R5/R6 寫成 singleton/callback(見下 Rule 8/9),為漂移,已改正(docdrift 2026-07-12)。
+
 | # | Rule | Quick Check |
 |---|------|-------------|
 | 1 | `momentum/` never imports `api/` | `grep -r "from api\." momentum/` → 0 |
@@ -105,6 +107,12 @@ Feature Factory **資料正確性** scope：生成→計算→merge（多TF對�
 | 5 | Config single source | `momentum/core/config.py` or `api/core/config.py` |
 | 6 | Tests without `run_api.py` | `pytest tests/momentum/` standalone |
 | 7 | DTOs don't cross boundaries | `api/models/` ↔ `momentum/core/contracts.py` |
+
+**具名不變式(named invariants,非「7 條」之一,獨立追蹤)**:
+- **Rule 8 — 不得有 Mutable global singleton**:目標態;**現況仍有殘留**(`api/services/chart_signal_service.py`、`signal_analysis_service.py`、`data_source_registry.py` 等 `_instance` singleton),列為技術債追蹤,勿宣稱「已修復」。
+- **Rule 9 — 無跨界 callback/closure/lambda monkeypatch bypass**:由 `scripts/check_decoupling.sh` 的 lambda-monkeypatch 檢查強制(該腳本內部標為「Rule 6」,語意=本 Rule 9,見腳本註解頭)。
+
+> **兩支 scanner 的編號語意不同,勿混淆**:`check_decoupling.sh` 內部「Rule 5」=Config(canonical R5)、「Rule 6」=callback bypass(=Rule 9);`check_decoupling_phase4.sh` 的「Rule 6」=獨立 pytest(canonical R6)。canonical 編號以本表為準。
 
 ---
 

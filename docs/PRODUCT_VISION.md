@@ -342,17 +342,19 @@ api/agent/
 
 ### 持續解耦原則
 
-**所有版本演進必須遵循 REFACTOR_ARCHITECTURE_V4 的 7 條規則**：
+**所有版本演進必須遵循 7 條解耦規則**（canonical 定義唯一權威 = `CLAUDE.md` §The 7 Decoupling Rules;本表僅示意各版本演進方向,規則本體與現況以 CLAUDE.md 為準）：
 
-| 規則 | V1.0 | V2.0 | V3.0 |
+> ⚠️ **現況欄據實**(2026-07-12 `check_decoupling.sh` 實跑):R2/R3/R4 目前**有既存違規**(多為 `momentum/FeatureEngineering` 共用工具的具體 import + 1 筆 service→service),非全綠;是否屬真違規或應豁免為共用基礎設施,列 ROADMAP P2 債票 triage。勿再標「已達成」。
+
+| 規則 | V1.0 現況 | V2.0 | V3.0 |
 |------|------|------|------|
-| **Rule 1**: `momentum` 不依賴 `api` | ✅ 已達成 | 必須保持 | 必須保持 |
-| **Rule 2**: Domain 內部用 Protocol | ✅ 已達成（IModelTrainer、IOptimizationObjective） | 擴展至 NLU | 擴展至 Agent |
-| **Rule 3**: `api/services` 用 Factory 注入 | ✅ 已達成 | 新增 Chat Service | 新增 Agent Service |
-| **Rule 4**: Service 間禁止直接調用 | ✅ 已達成 | 必須保持 | 必須保持 |
-| **Rule 5**: Config 單一來源 | ✅ 已達成 | 擴展至 Prompt Config | 擴展至 Policy Config |
-| **Rule 6**: Test 配置隔離 | ✅ 已達成 | 必須保持 | 必須保持 |
-| **Rule 7**: DTO 不跨層 | ✅ 已達成 | 必須保持 | 必須保持 |
+| **Rule 1**: `momentum` 不依賴 `api` | ✅ 0 violation | 必須保持 | 必須保持 |
+| **Rule 2**: Domain 內部用 Protocol | ⚠️ scanner 報 5 筆(FeatureEngineering 共用工具);待 triage | 擴展至 NLU | 擴展至 Agent |
+| **Rule 3**: `api/services` 用 Factory 注入 | ⚠️ scanner 報 12 筆(同上);待 triage | 新增 Chat Service | 新增 Agent Service |
+| **Rule 4**: Service 間禁止直接調用 | ⚠️ 1 已知違規(`feature_factory_batch_adapters.py`) | 必須保持 | 必須保持 |
+| **Rule 5**: Config 單一來源 | ✅ scanner 綠 | 擴展至 Prompt Config | 擴展至 Policy Config |
+| **Rule 6**: 測試不依賴 `run_api.py` | ✅ phase4(Strategy/ 子集)綠 | 必須保持 | 必須保持 |
+| **Rule 7**: DTO 不跨層 | ✅ 0 violation | 必須保持 | 必須保持 |
 
 ### 模組化擴展策略
 

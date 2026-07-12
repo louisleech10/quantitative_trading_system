@@ -1,5 +1,9 @@
 # 全系統解耦 Prompt V4.2
 
+> 🕰️ **歷史文件(HISTORICAL,非現行治理權威)**:本檔是 2025 年一次性用來**產生** `REFACTOR_ARCHITECTURE_V4` 的 refactor prompt,保留供追溯。
+> **現行 7 條解耦規則的 canonical 唯一權威 = `CLAUDE.md` §The 7 Decoupling Rules**;本檔下方「Binding Documents (Immutable) / 唯一且不可變」等宣稱**已失效**,勿據以行事。
+> **編號對照(本檔=舊 V4 方案 → canonical)**:本檔 Rule 4(禁 service 呼叫 service internal)、Rule 5(禁 singleton)、Rule 6(禁 callback/closure bypass)在 canonical 中分別對應 **named invariant Rule 9 / Rule 8 / Rule 9**;canonical 的 Rule 4/5/6 語意不同(services 不互 import / Config 單一來源 / 測試不依賴 run_api),以 CLAUDE.md 為準。
+>
 > **Changelog**: V4.1 → V4.2
 > - 修正：Allowed Actions / Output / No Bypass 治理語義
 
@@ -12,7 +16,7 @@
 
 **Authority & Bias**：此 Prompt 以「執行風險最小化」為最高優先，偏向保守與可回滾。
 
-**Binding Documents (Immutable)**：以下文件為唯一且不可變的治理依據，任何變更均視為違規：
+**Binding Documents (Immutable)**〔⚠️ 已失效——見本檔頂部歷史 banner;現行治理權威=CLAUDE.md〕：以下文件為唯一且不可變的治理依據，任何變更均視為違規：
 - `docs/Prompt用Codex -Adversarial Principal Engineer.md`
 - `docs/全系統解耦Prompt.md`（本文件）
 

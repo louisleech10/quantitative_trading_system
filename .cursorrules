@@ -3,6 +3,7 @@
 ## 協作協議（每次必執行）
 
 **開始前**：讀取根目錄 `HANDOFF.md`（當前任務狀態、決策、阻塞）
+**規範權威**：7 條解耦規則的 canonical 唯一權威 = `CLAUDE.md` §The 7 Decoupling Rules（Rule 5=Config 單一來源、Rule 6=測試不依賴 run_api.py；singleton/callback 屬獨立 named invariant Rule 8/9）。他檔如有出入以 CLAUDE.md 為準。
 **結束前(必執行)**:寫交接到 `handoffs/<YYYYMMDD>-<task-id>.md`(append-only,≤30 行:正在做/待辦/阻塞/本次決策/踩坑提醒);根 `HANDOFF.md` 由 Claude 維護,執行端不得改寫
 
 ---

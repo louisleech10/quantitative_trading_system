@@ -55,6 +55,17 @@
 - **範圍**:盤點所有 preset 定義與引用點（config/前端/文件）→ 確認零真實使用者 → 移除或明確 deprecate;涉 config schema 下游,走「中」型管線。
 - **狀態**:已排程未啟動;不擋 IC。
 
+### P2 — 解耦 Rule 4 既存違規修復(2026-07-12 doc 漂移施工揪出,使用者裁定立票、code 暫不動)
+- **問題(不只 Rule 4,doc review 揭更廣)**:`check_decoupling.sh` 2026-07-12 實跑報 **R2=5、R3=12、R4=1** 全紅:
+  - R4:`api/services/feature_factory_batch_adapters.py:9` service→service import(1 筆)。
+  - R2:`momentum/Analysis/*` 直接 import `momentum/FeatureEngineering`(warmup_lookup/consumer_gate/feature_reader,5 筆)。
+  - R3:api/services、api/routes 直接 import `momentum/FeatureEngineering` 具體工具未走 factory(run_locks/run_paths/hardware_utils…,12 筆)。
+  - **phase4 scanner 只窄查特定檔**(R2 僅 strategy_backtest、R3 僅 2 factory、且不查 R4),故長期被誤報全綠。
+- **待判定**:上述 R2/R3 是**真違規**還是 `momentum/FeatureEngineering` 應**豁免為共用基礎設施**(如 momentum.core)?屬架構判斷,須三方 triage(不是 doc 能定)。
+- **範圍**:triage 後,真違規者改走 protocol/factory 或明確把共用工具納入 scanner 白名單;動 api/services + momentum/Analysis 共用路徑(RISK-HIT b),走完整管線+驗證。
+- **附帶**:scanner 覆蓋自身也要校準——`check_decoupling.sh` 的「Rule 6」只查 api/services 的 lambda monkeypatch(非所有 callback bypass),也不查 canonical R6/Rule 8;納 CI 前須先確立各檢查真實覆蓋範圍,勿再宣稱「查全」。ARCHITECTURE/PRODUCT_VISION 已據實標。
+- **狀態**:已立票未啟動;不擋 IC。
+
 ### P2 — 統計嚴謹度後續登記(2026-07-09 嚴謹度委員會三腿一致,出處 handoffs/IC1EB-RIGOR-{claude,codex,composer}.md)
 - **策略層 data-snooping epic**:White RC/Hansen SPA/Deflated Sharpe/PBO=回測/策略選擇層,與特徵級 FDR 互補不互代;未啟動。
 - **FDR 方法升級選項**:`fdr_by`(任意相依保證)/`romano_wolf`(resampling stepdown);M-B 相關 null 實測帶外時 BY 為既定升級路徑。

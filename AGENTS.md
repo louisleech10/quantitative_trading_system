@@ -3,7 +3,7 @@
 ## 第一步（必執行）
 
 1. 讀 `HANDOFF.md` — 當前任務狀態
-2. 讀 `CLAUDE.md` — 完整專案規範
+2. 讀 `CLAUDE.md` — 完整專案規範。**7 條解耦規則的 canonical 唯一權威 = `CLAUDE.md` §The 7 Decoupling Rules**(Rule 5=Config 單一來源、Rule 6=測試不依賴 run_api.py;singleton/callback 屬獨立 named invariant Rule 8/9)。其他文件如有出入,一律以 CLAUDE.md 為準,勿照 ARCHITECTURE.md 舊版行事。
 
 ## 最後一步（必執行）
 

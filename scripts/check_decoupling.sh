@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================
 # Decoupling Compliance Scanner
-# Checks all 7 architecture rules and reports violations.
+# Checks decoupling invariants and reports violations.
 # Usage: bash scripts/check_decoupling.sh
 # Exit code 0 = all pass, 1 = violations found
+#
+# ⚠️ 編號對照(canonical 定義見 CLAUDE.md §The 7 Decoupling Rules):
+#   本腳本「Rule 1-4, 7」== canonical R1-4, R7。
+#   本腳本「Rule 5」(禁 momentum import api.core.config) == canonical R5(Config 單一來源)。
+#   本腳本「Rule 6」(禁跨界 lambda monkeypatch)         == named invariant Rule 9(callback bypass),
+#                                                          **非** canonical R6(獨立 pytest,由 check_decoupling_phase4.sh 驗)。
+#   歷史語意漂移,標籤保留避免破壞既有引用;canonical 編號一律以 CLAUDE.md 為準。
 # ============================================================
 set -euo pipefail
 

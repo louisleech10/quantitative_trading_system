@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+# ⚠️ 編號對照(canonical 定義見 CLAUDE.md §The 7 Decoupling Rules):
+#   本腳本抽驗 Rule 1/2/3 == canonical R1/R2/R3;
+#   本腳本「Rule 6」(pytest tests/momentum/Strategy/ 可獨立跑) == canonical R6(測試不依賴 run_api.py)。
+#   注意:另一支 check_decoupling.sh 的「Rule 6」語意不同(=callback bypass / named invariant Rule 9)。
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
