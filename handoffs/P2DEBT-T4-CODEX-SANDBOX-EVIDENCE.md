@@ -23,5 +23,5 @@ Task-id: p2debt-t4 | 蒐證人: Claude(觀察債,小任務自做) | CLI: codex 0
 - **A 固化繞法入 ORCH(建議)**:派工合約加一條——「codex 任務中 shell 管線/repo bash 腳本卡 >60s:改由編排端(Claude)代跑該驗證命令並附 receipt,codex 只交代碼與 Python 級驗證」;成本低,立即止血。
 - **B 回報 OpenAI**:樣本尚少(n=4)且無最小重現(卡死非確定性);建議累積至 n≥8 或找到穩定重現組合再報,避免無效工單。
 
-## 本票狀態
-蒐證持續(每次 codex 派工順手記);A 案繞法文字已擬,可隨下次 ORCH 更新入檔。不阻其他票。
+## 本票狀態(CLOSED 2026-07-12)
+裁定=採建議 **A**:DELEGATED-TO-ORCHESTRATOR 繞法已固化入 `docs/MULTI_AGENT_ORCHESTRATION.md` §8 派工管線踩坑(含「不得自報他方代跑」provenance 條款);同處順修 `| tail` 遮 rc 反教訓(票2 C-1)。**B(回報 OpenAI)延後**:n=4 未達 n≥8 門檻且無穩定最小重現;後續 codex 派工順手累積樣本,達門檻再開子任務。小任務 Claude 自收,不派工。

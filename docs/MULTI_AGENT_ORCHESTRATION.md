@@ -329,7 +329,8 @@ cursor-agent --list-models   # 或 cursor-agent models
 ### 派工管線踩坑（onboarding 必知）
 - **stdin 卡住**：背景/管線環境下 `codex exec` 會等 stdin → 指令末尾加 `< /dev/null` 關閉。
 - **resume 旗標**：`codex exec resume` **不吃** `-s`/`-o`（那是 `exec` 的）；sandbox 沿用原 session，prompt 直接當參數。
-- **驗收讀摘要不讀全文**：`pytest -q | tail`，token 成本與 test 數量脫鉤（見 §4）。
+- **驗收讀摘要不讀全文**：讀 receipt 或 `pytest -q -ra` 尾段摘要，token 成本與 test 數量脫鉤（見 §4）。⚠️ **禁 `| tail` 取 rc**：pipeline exit code = 最後一段（tail 恆 0），會遮蔽真實 rc；要 rc 用 `> log 2>&1; echo RC=$?` 或讀 run_with_receipt 的 exit_code（2026-07-11 票2 C-1 兩度被騙,出處 SCAR）。
+- **codex 沙箱 shell 工具鏈間歇卡死（DELEGATED-TO-ORCHESTRATOR，票4 蒐證 2026-07-12 固化）**：codex 沙箱對某些 pipe/subprocess 組合（bash 腳本 replay、coreutils `comm`/`sort`/`diff` 管線）會間歇死鎖，**與運算量無關**（兩個 32 行檔的 `comm` 也卡），Python/pytest/rg/讀寫檔路徑正常。合約：codex 任務中**外部 shell 管線或 repo bash 腳本卡 >60s → 標 `DELEGATED-TO-ORCHESTRATOR` 誠實交回該命令**，由編排端（Claude）或指定 runner（Grok）代跑並附 receipt；codex 只交程式碼 + Python 級驗證，**不得捏造未跑結果、不得自報他方代跑**（provenance）。回報 OpenAI 延後至 n≥8 或找到穩定最小重現（票4-B，未達門檻）。
 
 ---
 
