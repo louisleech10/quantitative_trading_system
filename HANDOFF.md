@@ -8,10 +8,14 @@
   合成假資料違反真-kline 鐵律→改真 ETHUSDT/12h 衍生共用 fixture(tests/fixtures/ic_api_real_kline.py);
   tests/api/test_ic_analysis_api.py 等 31 passed VERIFY:20260712T062029Z-icatm-phase1-accept;PIT 三方 DATA-CORRECT PASS(Claude+grok+composer 獨立簽)。
 
-## ▶ 剩餘
-- **epic Phase 2**:test_ic_e2e.py 等其他 synthetic API 測試同法遷真 kline(composer 諮詢點名);Phase 3=文件化 API 測試分層。
+## ✅ IC-API epic 三 Phase 全閉合(a39dc6c)
+- Phase 1 實作(56a9566,31 passed,PIT 三方簽核);Phase 2 三方 scope 裁決=遷移空集
+  (5 momentum IC 合成測試全 LEGIT:護欄/FDR/OOS/mutation 探針+管線煙測,遷真 kline 反毀可證偽);
+  Phase 3=docs/IC_API_TEST_LAYERING.md(L0/L1/L2 分層+該用真kline vs 合成合法判準)。
+
+## ▶ 剩餘(其他票)
 - **票 5** golden provenance(大):工作樹留 5 個 golden 檔(baseline_*.json+2 freeze 票5 hunk+l65)。
-- 票 6 原 nodeid 已由 epic Phase 1 消化(23 轉綠+去重 3);票 2 v6_baseline 可縮(epic 後由 Claude 更新)。
+- 票 6 原 nodeid 已由 epic Phase 1 消化(23 轉綠+去重 3);票 2 v6_baseline 可縮(由 Claude 更新)。
 
 ## 制度收穫(本 session 入 ORCH/memory)
 - web recon 先手省 token(recon≠oracle 鐵律);codex 沙箱 A′ 避管線;`| tail` 遮 rc 反教訓。
