@@ -1,0 +1,88 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+14:20:22 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+14:20:22 [INFO] Registered adapter: crypto_spot
+14:20:22 [INFO] Loaded feature registry with 11 entries
+14:20:22 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+14:20:23 [INFO] Restored 9 persisted feature task(s) from disk
+14:20:23 [INFO] 所有中間件已設置完成
+14:20:23 [INFO] 異常處理器設置完成
+14:20:23 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+14:20:23 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+14:20:23 [INFO] Created global CaseStorageManager instance
+14:20:23 [INFO] CaseImportService initialized
+14:20:23 [INFO] Created global CaseImportService instance with shared storage
+14:20:23 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+14:20:23 [INFO] KlineDownloadService initialized
+14:20:23 [INFO] Rate limiter initialized: 1000 req/min
+14:20:23 [INFO] BinanceProvider initialized
+14:20:23 [INFO] Registered provider: binance (rate_limit=1000/min)
+14:20:23 [INFO] Registered BinanceProvider to KlineDownloadService
+14:20:23 [INFO] BatchDownloadService initialized
+14:20:23 [INFO] Created global BatchDownloadService instance with shared storage
+14:20:23 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+14:20:23 [INFO] KlineDownloadService initialized
+14:20:23 [INFO] Rate limiter initialized: 1000 req/min
+14:20:23 [INFO] BinanceProvider initialized
+14:20:23 [INFO] Registered provider: binance (rate_limit=1000/min)
+14:20:23 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+14:20:23 [INFO] IndicatorEngine initialized
+14:20:23 [INFO] ChartDataService initialized with IndicatorEngine
+14:20:23 [INFO] OptimizationTaskService initialized
+14:20:24 [INFO] Loaded feature registry with 11 entries
+14:20:24 [INFO] Loaded feature registry with 11 entries
+14:20:24 [INFO] Loaded feature registry with 11 entries
+14:20:24 [INFO] Loaded feature registry with 11 entries
+14:20:24 [INFO] Loaded feature registry with 11 entries
+14:20:24 [INFO] WebSocketConnectionManager initialized
+14:20:24 [INFO] All API routes registered successfully
+collected 31 items
+
+tests/momentum/Analysis/test_ic_api_real_kline_pit.py::test_feature_shift_negative_one_fails_self_test 
+-------------------------------- live log setup --------------------------------
+14:20:24 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+14:20:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.009s
+PASSED                                                                   [  3%]
+tests/momentum/Analysis/test_ic_api_real_kline_pit.py::test_backward_label_fails_self_test PASSED [  6%]
+tests/api/test_ic_analysis_api.py::test_ic_task_status 
+-------------------------------- live log setup --------------------------------
+14:20:24 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+14:20:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+14:20:24 [INFO] 正在啟動 Case Search API...
+PASSED                                                                   [  9%]
+tests/api/test_ic_analysis_api.py::test_ic_result PASSED                 [ 12%]
+tests/api/test_ic_analysis_api.py::test_ic_summary PASSED                [ 16%]
+tests/api/test_ic_analysis_api.py::test_ic_top_features PASSED           [ 19%]
+tests/api/test_ic_analysis_api.py::test_ic_quantile_and_correlation PASSED [ 22%]
+tests/api/test_ic_analysis_api.py::test_ic_grouped PASSED                [ 25%]
+tests/api/test_ic_analysis_api.py::test_ic_config_update PASSED          [ 29%]
+tests/api/test_ic_analysis_api.py::test_ic_refilter PASSED               [ 32%]
+tests/api/test_ic_analysis_api.py::test_ic_export_csv PASSED             [ 35%]
+tests/api/test_ic_analysis_api.py::test_ic_export_hdf5 PASSED            [ 38%]
+tests/api/test_ic_deep_analysis.py::test_list_available_features_success PASSED [ 41%]
+tests/api/test_ic_deep_analysis.py::test_list_available_features_not_found PASSED [ 45%]
+tests/api/test_ic_deep_analysis.py::test_start_deep_analysis_and_get_result PASSED [ 48%]
+tests/api/test_ic_deep_analysis.py::test_start_deep_analysis_invalid_task_id PASSED [ 51%]
+tests/api/test_ic_deep_analysis.py::test_get_deep_analysis_result_invalid_task_id PASSED [ 54%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_endpoint PASSED   [ 58%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_with_deep_analysis_config PASSED [ 61%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_request_validation_top_n PASSED [ 64%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_request_validation_required_labels_path PASSED [ 67%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_start PASSED      [ 70%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_result_serializes_numpy_scalars PASSED [ 74%]
+tests/api/test_export_api.py::test_export_csv_summary_200 PASSED         [ 77%]
+tests/api/test_export_api.py::test_export_csv_detailed_factor_return PASSED [ 80%]
+tests/api/test_export_api.py::test_export_ai_json_200 PASSED             [ 83%]
+tests/api/test_export_api.py::test_export_markdown_200 PASSED            [ 87%]
+tests/api/test_export_api.py::test_export_hdf5_200 PASSED                [ 90%]
+tests/api/test_export_api.py::test_export_unknown_task_404 PASSED        [ 93%]
+tests/api/test_export_api.py::test_export_invalid_format_422 PASSED      [ 96%]
+tests/api/test_export_api.py::test_export_csv_detailed_without_module_422 PASSED [100%]
+
+============================== 31 passed in 6.68s ==============================

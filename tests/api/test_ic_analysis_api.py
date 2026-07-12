@@ -1,11 +1,8 @@
 """IC analysis API tests."""
 
-import json
 import time
 from pathlib import Path
 
-import h5py
-import numpy as np
 import pytest
 from binance.client import Client
 from fastapi.testclient import TestClient
@@ -13,6 +10,7 @@ from fastapi.testclient import TestClient
 Client.ping = lambda self: {}
 
 from api.main import app
+from tests.fixtures.ic_api_real_kline import ic_api_real_kline
 
 
 client = TestClient(app)
@@ -21,40 +19,6 @@ pytestmark = [
     pytest.mark.ic_persist_redirect,
     pytest.mark.usefixtures("ic_persist_redirect"),
 ]
-
-
-def _write_features_h5(path: Path, features: np.ndarray, timestamps: np.ndarray, names: list[str]) -> None:
-    with h5py.File(path, "w") as file:
-        group = file.create_group("data")
-        group.create_dataset("features", data=features, compression="gzip")
-        group.create_dataset("timestamps", data=timestamps, compression="gzip")
-        str_dtype = h5py.string_dtype(encoding="utf-8")
-        group.create_dataset("feature_names", data=np.array(names, dtype=object), dtype=str_dtype)
-
-
-def _write_labels_h5(path: Path, labels: np.ndarray, timestamps: np.ndarray, names: list[str]) -> None:
-    with h5py.File(path, "w") as file:
-        group = file.create_group("data")
-        group.create_dataset("labels", data=labels, compression="gzip")
-        group.create_dataset("timestamps", data=timestamps, compression="gzip")
-        str_dtype = h5py.string_dtype(encoding="utf-8")
-        group.create_dataset("label_names", data=np.array(names, dtype=object), dtype=str_dtype)
-
-
-def _write_meta_json(path: Path, feature_names: list[str]) -> None:
-    payload = {
-        "symbol": "TESTUSDT",
-        "timeframe": "12h",
-        "case_id": "ic_api_test",
-    }
-    for name in feature_names:
-        payload[name] = {
-            "name": name,
-            "category": "test",
-            "layer": 1,
-            "data_source": "close",
-        }
-    path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
 
 
 def _wait_for_task(task_id: str, timeout: float = 15.0) -> None:
@@ -71,29 +35,13 @@ def _wait_for_task(task_id: str, timeout: float = 15.0) -> None:
     pytest.fail("task timeout")
 
 
-def _build_ic_analysis_task(tmp_path_factory: pytest.TempPathFactory) -> dict:
-    temp_dir = tmp_path_factory.mktemp("ic_api")
-    features_path = temp_dir / "features.h5"
-    labels_path = temp_dir / "labels.h5"
-    meta_path = temp_dir / "meta.json"
-
-    rng = np.random.default_rng(42)
-    n_samples = 120
-    n_features = 6
-    features = rng.normal(size=(n_samples, n_features)).astype(np.float32)
-    labels = rng.normal(size=(n_samples, 1)).astype(np.float32)
-    timestamps = np.arange(n_samples, dtype=np.int64)
-    feature_names = [f"feature_{i}" for i in range(n_features)]
-
-    _write_features_h5(features_path, features, timestamps, feature_names)
-    _write_labels_h5(labels_path, labels, timestamps, ["label"])
-    _write_meta_json(meta_path, feature_names)
-
+def _build_ic_analysis_task(real_kline: dict) -> dict:
     request_data = {
-        "features_path": str(features_path),
-        "labels_path": str(labels_path),
-        "meta_path": str(meta_path),
+        "features_path": real_kline["features_path"],
+        "labels_path": real_kline["labels_path"],
+        "meta_path": real_kline["meta_path"],
         "config_override": {
+            **real_kline["config_override"],
             "ic_train_test_split": False,
             "thresholds": {
                 "ic_mean_min": -1.0,
@@ -108,24 +56,24 @@ def _build_ic_analysis_task(tmp_path_factory: pytest.TempPathFactory) -> dict:
         },
     }
 
-    response = client.post("/api/v1/ic/analyze", json=request_data)
-    assert response.status_code == 200
-    task_id = response.json()["task_id"]
+    with client:
+        response = client.post("/api/v1/ic/analyze", json=request_data)
+        assert response.status_code == 200
+        task_id = response.json()["task_id"]
+        _wait_for_task(task_id)
 
-    _wait_for_task(task_id)
-
-    return {"task_id": task_id, "feature_names": feature_names}
+    return {"task_id": task_id, "feature_names": real_kline["feature_names"]}
 
 
 @pytest.fixture(scope="session")
 def ic_analysis_task(
-    tmp_path_factory: pytest.TempPathFactory,
+    ic_api_real_kline: dict,
     redirect_patch_set,
     redirect_root_session: Path,
 ) -> dict:
     ctx = redirect_patch_set.activate(redirect_root_session, owner="ic_analysis_task")
     try:
-        return _build_ic_analysis_task(tmp_path_factory)
+        return _build_ic_analysis_task(ic_api_real_kline)
     finally:
         assert not ctx.spy.violations
         redirect_patch_set.deactivate(ctx)

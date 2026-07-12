@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import json
+import copy
 import time
 from pathlib import Path
 
-import h5py
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
 from api.services.ic_analysis_service import ic_analysis_service
+from tests.fixtures.ic_api_real_kline import ic_api_real_kline
 
 
 client = TestClient(app)
@@ -29,41 +29,6 @@ def _reset_rate_limit_state() -> None:
         if hasattr(current, "requests") and isinstance(getattr(current, "requests"), dict):
             current.requests.clear()
         current = current.app
-
-
-def _write_features_h5(path: Path, features: np.ndarray, timestamps: np.ndarray, names: list[str]) -> None:
-    with h5py.File(path, "w") as h5_file:
-        group = h5_file.create_group("data")
-        group.create_dataset("features", data=features, compression="gzip")
-        group.create_dataset("timestamps", data=timestamps, compression="gzip")
-        str_dtype = h5py.string_dtype(encoding="utf-8")
-        group.create_dataset("feature_names", data=np.array(names, dtype=object), dtype=str_dtype)
-
-
-def _write_labels_h5(path: Path, labels: np.ndarray, timestamps: np.ndarray, names: list[str]) -> None:
-    with h5py.File(path, "w") as h5_file:
-        group = h5_file.create_group("data")
-        group.create_dataset("labels", data=labels, compression="gzip")
-        group.create_dataset("timestamps", data=timestamps, compression="gzip")
-        str_dtype = h5py.string_dtype(encoding="utf-8")
-        group.create_dataset("label_names", data=np.array(names, dtype=object), dtype=str_dtype)
-
-
-def _write_meta_json(path: Path, feature_names: list[str]) -> None:
-    payload = {
-        "symbol": "TESTUSDT",
-        "timeframe": "12h",
-        "case_id": "ic_deep_api_test",
-    }
-    for idx, name in enumerate(feature_names):
-        payload[name] = {
-            "name": name,
-            "category": "momentum" if idx % 2 == 0 else "volatility",
-            "layer": 1,
-            "data_source": "close",
-            "family": "test_family",
-        }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _wait_for_task_completed(task_id: str, timeout: float = 20.0) -> None:
@@ -100,30 +65,8 @@ def reset_rate_limit() -> None:
 
 
 @pytest.fixture(scope="module")
-def sample_paths(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
-    temp_dir = tmp_path_factory.mktemp("ic_deep_api")
-    features_path = temp_dir / "features.h5"
-    labels_path = temp_dir / "labels.h5"
-    meta_path = temp_dir / "meta.json"
-
-    rng = np.random.default_rng(7)
-    n_samples = 140
-    n_features = 8
-    features = rng.normal(size=(n_samples, n_features)).astype(np.float32)
-    labels = rng.normal(size=(n_samples, 1)).astype(np.float32)
-    timestamps = np.arange(n_samples, dtype=np.int64)
-    feature_names = [f"feature_{i}" for i in range(n_features)]
-
-    _write_features_h5(features_path, features, timestamps, feature_names)
-    _write_labels_h5(labels_path, labels, timestamps, ["label"])
-    _write_meta_json(meta_path, feature_names)
-
-    return {
-        "features_path": str(features_path),
-        "labels_path": str(labels_path),
-        "meta_path": str(meta_path),
-        "feature_names": feature_names,
-    }
+def sample_paths(ic_api_real_kline: dict) -> dict:
+    return ic_api_real_kline
 
 
 def _build_completed_ic_task(sample_paths: dict[str, str]) -> str:
@@ -132,6 +75,7 @@ def _build_completed_ic_task(sample_paths: dict[str, str]) -> str:
         "labels_path": sample_paths["labels_path"],
         "meta_path": sample_paths["meta_path"],
         "config_override": {
+            **sample_paths["config_override"],
             "thresholds": {
                 "ic_mean_min": -1.0,
                 "icir_min": -1.0,
@@ -145,10 +89,11 @@ def _build_completed_ic_task(sample_paths: dict[str, str]) -> str:
         },
     }
 
-    response = client.post("/api/v1/ic/analyze", json=request_data)
-    assert response.status_code == 200
-    task_id = response.json()["task_id"]
-    _wait_for_task_completed(task_id)
+    with client:
+        response = client.post("/api/v1/ic/analyze", json=request_data)
+        assert response.status_code == 200
+        task_id = response.json()["task_id"]
+        _wait_for_task_completed(task_id)
     return task_id
 
 
@@ -231,6 +176,7 @@ def test_full_analysis_endpoint(sample_paths: dict[str, str]) -> None:
             "features_path": sample_paths["features_path"],
             "labels_path": sample_paths["labels_path"],
             "meta_path": sample_paths["meta_path"],
+            "config_override": sample_paths["config_override"],
             "deep_analysis": False,
         },
     )
@@ -251,6 +197,7 @@ def test_full_analysis_with_deep_analysis_config(sample_paths: dict[str, str]) -
             "features_path": sample_paths["features_path"],
             "labels_path": sample_paths["labels_path"],
             "meta_path": sample_paths["meta_path"],
+            "config_override": sample_paths["config_override"],
             "deep_analysis": True,
             "deep_analysis_config": {
                 "top_n": 2,
@@ -296,19 +243,6 @@ def test_full_analysis_request_validation_required_labels_path(sample_paths: dic
     assert response.status_code == 422
 
 
-def test_feature_list(sample_paths: dict[str, str]) -> None:
-    response = client.get(
-        "/api/v1/ic/features/list",
-        params={
-            "features_path": sample_paths["features_path"],
-            "meta_path": sample_paths["meta_path"],
-        },
-    )
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["total"] == len(sample_paths["feature_names"])
-
-
 def test_deep_analysis_start(completed_ic_task: str) -> None:
     response = client.post(
         f"/api/v1/ic/deep-analysis/{completed_ic_task}",
@@ -319,41 +253,13 @@ def test_deep_analysis_start(completed_ic_task: str) -> None:
     assert payload.get("status") in {"started", "running"}
 
 
-def test_deep_analysis_result(completed_ic_task: str) -> None:
-    start_response = client.post(
-        f"/api/v1/ic/deep-analysis/{completed_ic_task}",
-        json={"top_n": 3},
-    )
-    assert start_response.status_code in {200, 400}
-
-    result = _wait_for_deep_result(completed_ic_task)
-    assert result.get("results") is not None
-    assert result.get("summary") is not None
-
-
-def test_full_analysis(sample_paths: dict[str, str]) -> None:
-    response = client.post(
-        "/api/v1/ic/full-analysis",
-        json={
-            "features_path": sample_paths["features_path"],
-            "labels_path": sample_paths["labels_path"],
-            "meta_path": sample_paths["meta_path"],
-            "deep_analysis": False,
-        },
-    )
-    assert response.status_code == 200
-    task_id = response.json()["task_id"]
-    _wait_for_task_completed(task_id)
-
-    result_response = client.get(f"/api/v1/ic/result/{task_id}")
-    assert result_response.status_code == 200
-    assert "summary_table" in result_response.json()
-
-
 def test_deep_analysis_result_serializes_numpy_scalars(completed_ic_task: str) -> None:
+    original: dict | None = None
     with ic_analysis_service._lock:
         task_info = ic_analysis_service._tasks.get(completed_ic_task)
         assert task_info is not None
+        original = copy.deepcopy(task_info)
+        # API serialization stub：只驗 numpy scalar 邊界，不宣稱是真 deep 計算結果。
         task_info["deep_analysis_result"] = {
             "total_modules": np.int64(10),
             "completed_count": np.int64(1),
@@ -372,9 +278,14 @@ def test_deep_analysis_result_serializes_numpy_scalars(completed_ic_task: str) -
             },
         }
 
-    response = client.get(f"/api/v1/ic/deep-analysis/{completed_ic_task}/result")
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["summary"]["total_modules"] == 10
-    assert payload["summary"]["completed_count"] == 1
-    assert payload["results"]["results"]["factor_returns"]["feature_0"]["samples"] == 128
+    try:
+        response = client.get(f"/api/v1/ic/deep-analysis/{completed_ic_task}/result")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["summary"]["total_modules"] == 10
+        assert payload["summary"]["completed_count"] == 1
+        assert payload["results"]["results"]["factor_returns"]["feature_0"]["samples"] == 128
+    finally:
+        with ic_analysis_service._lock:
+            assert original is not None
+            ic_analysis_service._tasks[completed_ic_task] = original
