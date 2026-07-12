@@ -12678,3 +12678,340 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-IMPL-REVIEW-grok.md", "output_sha256": "1adeb9d30f28dbc22522a8db22ff03d7edbe1e26128b0923703e9eb47d438bf8", "task_id": "p2debt-t3", "ts": "2026-07-11T13:06:39Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-IMPL-REVIEW-composer.md", "output_sha256": "cc5191e7f4ce2e6a7cb0800c4569673efa9f61e526a4f80b01f4cc2e4b239fbc", "task_id": "p2debt-t3", "ts": "2026-07-11T13:06:39Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T3-IMPL-RESULT-codex.md", "output_sha256": "e126e3c0e51fed21a38fcca6a6786935ba45d1ec827f60423de895a662f4d8b8", "task_id": "p2debt-t3", "ts": "2026-07-11T13:06:40Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-IMPL-CHAIR-FINDING-C2.md", "output_sha256": "e6bae201039b1974d37614032db2b9ae1c3639e798f1fb6dce0a6e245ce65598", "task_id": "p2debt-t2", "ts": "2026-07-11T13:36:44Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/P2DEBT-T2-RECONCILE.md", "output_sha256": "b15299e170340bff5834172f703e67d807d8454c0109651f75c3843c9870ad52", "task_id": "p2debt-t2", "ts": "2026-07-11T13:36:51Z"}
+=== 2026-07-11 21:36:52 | dispatch ===
+  ts=2026-07-11 21:36:52
+  kind=dispatch
+  intent=票 2 實作修 C-2(Run C OFF 模式 chdir 破壞相對 config 路徑)派 codex
+  risk=high
+  facts_asked=none-needed:主委 finding 附 traceback+修法
+  review_role=grok+composer 雙審
+  template=docs/P2DEBT_T2_DCREDIRECT_SPEC.md:凍結
+  adversarial=handoffs/P2DEBT-T2-RECONCILE.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/P2DEBT_T2_DCREDIRECT_SPEC.md
+  todo=docs/P2DEBT_T2_DCREDIRECT_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-c3fix", "ts": "2026-07-11T14:09:11Z"}
+=== 2026-07-11 22:09:11 | dispatch ===
+  ts=2026-07-11 22:09:11
+  kind=dispatch
+  intent=p2debt-t2 C-3 fix: cwd-dep inventory + _repo_root cwd-independent fix, breaker handoff to codex
+  risk=low
+  facts_asked=n/a: chair receipts in finding file
+  review_role=codex=implementer(finder-fixes handoff); chair reruns V5 to verify
+  template=n/a: impl fix dispatch
+  adversarial=waived:low-risk test-harness fix, chair verifies by rerun
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-C3FIX-RESULT-codex.md", "output_sha256": "d6fb6546d7aaee6322081f3b6929eee1c07a76d4092f1b3223f1316f26d8ce89", "task_id": "p2debt-t2-c3fix", "ts": "2026-07-11T14:13:22Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-c3fix-v5run", "ts": "2026-07-11T14:13:22Z"}
+=== 2026-07-11 22:13:23 | dispatch ===
+  ts=2026-07-11 22:13:23
+  kind=dispatch
+  intent=p2debt-t2 C-3 delegated V5 acceptance run by grok (user: chair must not self-run)
+  risk=low
+  facts_asked=n/a: pure execution of acceptance command
+  review_role=grok=runner; chair reads receipt only
+  template=n/a: delegated acceptance run
+  adversarial=waived:execution-only, falsifiable via receipt log
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-C3FIX-V5RUN-grok.md", "output_sha256": "b3724fabe21c2592172f7537d673a15d7eeffecff460daf4ddec4e1ed007b22a", "task_id": "p2debt-t2-c3fix-v5run", "ts": "2026-07-11T14:19:21Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-final4-run", "ts": "2026-07-11T14:19:21Z"}
+=== 2026-07-11 22:19:21 | dispatch ===
+  ts=2026-07-11 22:19:21
+  kind=dispatch
+  intent=p2debt-t2 full hermetic V1-V7 acceptance run by grok with receipt claim p2debt-t2-impl-final4
+  risk=low
+  facts_asked=n/a: pure execution
+  review_role=grok=runner+verdict; chair reads receipt only
+  template=n/a: delegated acceptance run
+  adversarial=waived:execution-only, falsifiable via receipt
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-v6-codex", "ts": "2026-07-11T14:30:34Z"}
+=== 2026-07-11 22:30:34 | dispatch ===
+  ts=2026-07-11 22:30:34
+  kind=dispatch
+  intent=p2debt-t2 V6 rerun by codex to discriminate grok-sandbox false-red vs real failure
+  risk=low
+  facts_asked=n/a: pure execution discriminator
+  review_role=codex=runner; chair compares receipts
+  template=n/a: delegated acceptance run
+  adversarial=waived:execution-only
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-c4-review-grok", "ts": "2026-07-11T14:36:12Z"}
+=== 2026-07-11 22:36:12 | dispatch ===
+  ts=2026-07-11 22:36:12
+  kind=dispatch
+  intent=p2debt-t2 C-4 ruling review: V6 pre-existing red, gate deviation P-1/P-2/P-3
+  risk=low
+  facts_asked=n/a: receipts in finding
+  review_role=grok=reviewer stamp/block
+  template=n/a: ruling review
+  adversarial=waived:review dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-c4-review-composer", "ts": "2026-07-11T14:36:12Z"}
+=== 2026-07-11 22:36:12 | dispatch ===
+  ts=2026-07-11 22:36:12
+  kind=dispatch
+  intent=p2debt-t2 C-4 ruling review by composer
+  risk=low
+  facts_asked=n/a: receipts in finding
+  review_role=composer=reviewer stamp/block
+  template=n/a: ruling review
+  adversarial=waived:review dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-C4-REVIEW-grok.md", "output_sha256": "370470051a9279bb856fbbece26939eacddb8b61af4a9ab70b1d5478f5d8b304", "task_id": "p2debt-t2-c4-review-grok", "ts": "2026-07-11T14:39:18Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-C4-REVIEW-composer.md", "output_sha256": "1b828148b22e84c6efd21810e9d7618e4569a6aefacf3931bbbcc1d24f772005", "task_id": "p2debt-t2-c4-review-composer", "ts": "2026-07-11T14:42:53Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-p1-impl", "ts": "2026-07-11T14:42:53Z"}
+=== 2026-07-11 22:42:53 | dispatch ===
+  ts=2026-07-11 22:42:53
+  kind=dispatch
+  intent=p2debt-t2 P-1 mechanization: V6 nodeid-subset gate in harness + baseline file + SPEC amendment per C-4 dual-approved ruling
+  risk=low
+  facts_asked=n/a: ruling receipts in C4 reviews
+  review_role=codex=implementer; grok runs final5; chair reads receipts
+  template=n/a: impl per dual-stamped ruling
+  adversarial=waived:mechanized gate per committee conditions, falsifiable by final5 run
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-P1-IMPL-RESULT-codex.md", "output_sha256": "0789dcf397ad5d9905c87ef3d131989ab4e62aef5f6483f6076aac30bd39bf0f", "task_id": "p2debt-t2-p1-impl", "ts": "2026-07-11T14:48:48Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-p1-polarity", "ts": "2026-07-11T14:48:48Z"}
+=== 2026-07-11 22:48:48 | dispatch ===
+  ts=2026-07-11 22:48:48
+  kind=dispatch
+  intent=p2debt-t2 P-1 gate polarity runs by grok: positive V6 + negative counterexample + restore
+  risk=low
+  facts_asked=n/a: execution per codex DELEGATED items
+  review_role=grok=runner; chair reads receipt
+  template=n/a: delegated polarity runs
+  adversarial=waived:execution-only
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-P1-POLARITY-grok.md", "output_sha256": "9661c1e595c67d7ada7b16c681bd5cb3499f6779457d52078e6e967acd668b05", "task_id": "p2debt-t2-p1-polarity", "ts": "2026-07-11T14:52:50Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-final5-run", "ts": "2026-07-11T14:52:50Z"}
+=== 2026-07-11 22:52:50 | dispatch ===
+  ts=2026-07-11 22:52:50
+  kind=dispatch
+  intent=p2debt-t2 final5 full hermetic V1-V7 acceptance run by grok, receipt claim p2debt-t2-impl-final5
+  risk=low
+  facts_asked=n/a: pure execution
+  review_role=grok=runner+verdict; chair reads receipt
+  template=n/a: delegated acceptance run
+  adversarial=waived:execution-only
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-c5fix", "ts": "2026-07-11T15:12:25Z"}
+=== 2026-07-11 23:12:25 | dispatch ===
+  ts=2026-07-11 23:12:25
+  kind=dispatch
+  intent=p2debt-t2 C-5 fix: V7 redirect seam gap, lightgbm save + orchestrator reports write paths leak to repo data_cache
+  risk=low
+  facts_asked=n/a: chair evidence in finding C5
+  review_role=codex=fixer; grok=runner; chair reads receipts
+  template=n/a: impl fix dispatch
+  adversarial=waived:guard-caught leak, fix verified by falsifiable V7 digest gate
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-c5fix", "ts": "2026-07-12T00:14:20Z"}
+=== 2026-07-12 08:14:20 | dispatch ===
+  ts=2026-07-12 08:14:20
+  kind=dispatch
+  intent=p2debt-t2 C-5 fix: V7 redirect seam gap, lightgbm save + orchestrator reports write paths leak to repo data_cache
+  risk=low
+  facts_asked=n/a: chair evidence in finding C5
+  review_role=codex=fixer; grok=runner; chair reads receipts
+  template=n/a: impl fix dispatch
+  adversarial=waived:guard-caught leak, fix verified by falsifiable V7 digest gate
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-C5FIX-RESULT-codex.md", "output_sha256": "4dca01fcd66462623f8b45ad917833efbcf26d12b7ba175fa204cff17e6483c9", "task_id": "p2debt-t2-c5fix", "ts": "2026-07-12T00:17:51Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-c5-v7run", "ts": "2026-07-12T00:17:51Z"}
+=== 2026-07-12 08:17:51 | dispatch ===
+  ts=2026-07-12 08:17:51
+  kind=dispatch
+  intent=p2debt-t2 C-5 V7 acceptance run by grok after seam fix
+  risk=low
+  facts_asked=n/a: pure execution
+  review_role=grok=runner+verdict; chair reads receipt
+  template=n/a: delegated acceptance run
+  adversarial=waived:execution-only, falsifiable via digest gate
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-C5-V7RUN-grok.md", "output_sha256": "8716cfd805ee18f87377987393e6ade69924c329b4ef2fcf78bab7dcd0d8cba6", "task_id": "p2debt-t2-c5-v7run", "ts": "2026-07-12T00:20:18Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-final6-run", "ts": "2026-07-12T00:20:18Z"}
+=== 2026-07-12 08:20:18 | dispatch ===
+  ts=2026-07-12 08:20:18
+  kind=dispatch
+  intent=p2debt-t2 final6 full hermetic V1-V7 clean receipt run by grok, claim p2debt-t2-impl-final6
+  risk=low
+  facts_asked=n/a: pure execution
+  review_role=grok=runner+verdict; chair reads receipt
+  template=n/a: delegated acceptance run
+  adversarial=waived:execution-only
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/run_receipts/20260712T003131Z-p2debt-t2-impl-final6.json", "output_sha256": "4e11626ddabc3f8c08ca264767c846523504cccd82d1118938de72decd0e69c6", "task_id": "p2debt-t2-final6-run", "ts": "2026-07-12T00:34:35Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-impl-review-grok", "ts": "2026-07-12T00:34:35Z"}
+=== 2026-07-12 08:34:35 | dispatch ===
+  ts=2026-07-12 08:34:35
+  kind=dispatch
+  intent=p2debt-t2 implementation dual review by grok (adversarial leak hunt)
+  risk=low
+  facts_asked=n/a: brief+receipts provided
+  review_role=grok=reviewer APPROVE/BLOCK
+  template=n/a: impl code review
+  adversarial=waived:this IS the review dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-impl-review-composer", "ts": "2026-07-12T00:34:35Z"}
+=== 2026-07-12 08:34:36 | dispatch ===
+  ts=2026-07-12 08:34:36
+  kind=dispatch
+  intent=p2debt-t2 implementation dual review by composer (adversarial leak hunt)
+  risk=low
+  facts_asked=n/a: brief+receipts provided
+  review_role=composer=reviewer APPROVE/BLOCK
+  template=n/a: impl code review
+  adversarial=waived:this IS the review dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-IMPL-REVIEW-grok.md", "output_sha256": "6261d34b57e8fd385e3eb2bde6bf66d73d14930653e47b1a7794e83fbf6c7034", "task_id": "p2debt-t2-impl-review-grok", "ts": "2026-07-12T00:44:41Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-IMPL-REVIEW-composer.md", "output_sha256": "40e61828d4c6fefba8ca32fba7f46f04f68058130da4d394ffdebe6f600148f6", "task_id": "p2debt-t2-impl-review-composer", "ts": "2026-07-12T00:54:15Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-ce8fix", "ts": "2026-07-12T00:54:15Z"}
+=== 2026-07-12 08:54:15 | dispatch ===
+  ts=2026-07-12 08:54:15
+  kind=dispatch
+  intent=p2debt-t2 CE8 fix: per-seam installer arity validation + real activate subtarget tests; demote probe/S9-S11 overclaims per dual-BLOCK grok+composer
+  risk=low
+  facts_asked=n/a: dual review findings in REVIEW-{grok,composer}.md
+  review_role=codex=fixer; grok=reverify original CE8 counterexample per B8; chair reads receipts
+  template=n/a: impl fix per dual-block review
+  adversarial=waived:fix per two independent BLOCK reviews, reverified by original finder
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-CE8FIX-RESULT-codex.md", "output_sha256": "e44974e20cdb9370a8f04ba465d531399be2ee09fb46b252091cec6cc800851f", "task_id": "p2debt-t2-ce8fix", "ts": "2026-07-12T00:59:00Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-ce8-reverify", "ts": "2026-07-12T00:59:00Z"}
+=== 2026-07-12 08:59:00 | dispatch ===
+  ts=2026-07-12 08:59:00
+  kind=dispatch
+  intent=p2debt-t2 CE8 closure reverify by grok (original finder, B8) + real V7 digest receipt
+  risk=low
+  facts_asked=n/a: CE8 finding+fix in review/result files
+  review_role=grok=original-finder reverify+runner; chair reads receipt
+  template=n/a: B8 reverify + delegated run
+  adversarial=waived:B8 closure by original finder, falsifiable
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T2-CE8-REVERIFY-grok.md", "output_sha256": "6d02c160dba648b405acddc1a24a9f93d0fc9da54069c9437185a2970a94749d", "task_id": "p2debt-t2-ce8-reverify", "ts": "2026-07-12T01:02:13Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "p2debt-t2-final7-run", "ts": "2026-07-12T01:02:13Z"}
+=== 2026-07-12 09:02:13 | dispatch ===
+  ts=2026-07-12 09:02:13
+  kind=dispatch
+  intent=p2debt-t2 final7 full hermetic V1-V7 clean receipt post-CE8-fix by grok, claim p2debt-t2-impl-final7
+  risk=low
+  facts_asked=n/a: pure execution
+  review_role=grok=runner+verdict; chair reads receipt
+  template=n/a: delegated acceptance run
+  adversarial=waived:execution-only
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

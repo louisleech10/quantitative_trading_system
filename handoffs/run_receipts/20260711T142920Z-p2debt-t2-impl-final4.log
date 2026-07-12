@@ -1,0 +1,1887 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+22:20:12 [INFO] Loaded feature registry with 11 entries
+collected 10 items
+
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_fallback_insufficient_data_marks_applied_false 
+-------------------------------- live log setup --------------------------------
+22:20:12 [WARNING] /Users/louis/.matplotlib is not a writable directory
+22:20:12 [WARNING] Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-v9uslubf because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+22:20:12 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+22:20:12 [INFO] Registered adapter: crypto_spot
+22:20:12 [INFO] Loaded feature registry with 11 entries
+22:20:12 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+22:20:13 [INFO] Restored 9 persisted feature task(s) from disk
+22:20:13 [INFO] 所有中間件已設置完成
+22:20:13 [INFO] 異常處理器設置完成
+22:20:13 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+22:20:13 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+22:20:13 [INFO] Created global CaseStorageManager instance
+22:20:13 [INFO] CaseImportService initialized
+22:20:13 [INFO] Created global CaseImportService instance with shared storage
+22:20:13 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+22:20:13 [INFO] KlineDownloadService initialized
+22:20:13 [INFO] Rate limiter initialized: 1000 req/min
+22:20:13 [INFO] BinanceProvider initialized
+22:20:13 [INFO] Registered provider: binance (rate_limit=1000/min)
+22:20:13 [INFO] Registered BinanceProvider to KlineDownloadService
+22:20:13 [INFO] BatchDownloadService initialized
+22:20:13 [INFO] Created global BatchDownloadService instance with shared storage
+22:20:13 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+22:20:13 [INFO] KlineDownloadService initialized
+22:20:13 [INFO] Rate limiter initialized: 1000 req/min
+22:20:13 [INFO] BinanceProvider initialized
+22:20:13 [INFO] Registered provider: binance (rate_limit=1000/min)
+22:20:13 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+22:20:13 [INFO] IndicatorEngine initialized
+22:20:13 [INFO] ChartDataService initialized with IndicatorEngine
+22:20:13 [INFO] OptimizationTaskService initialized
+22:20:13 [INFO] Loaded feature registry with 11 entries
+22:20:13 [INFO] Loaded feature registry with 11 entries
+22:20:13 [INFO] Loaded feature registry with 11 entries
+22:20:13 [INFO] Loaded feature registry with 11 entries
+22:20:13 [INFO] WebSocketConnectionManager initialized
+22:20:14 [INFO] All API routes registered successfully
+-------------------------------- live log call ---------------------------------
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Data preprocessing complete: columns=2
+22:20:14 [INFO] IC autocorr persistent: count=2
+22:20:14 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:14 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+22:20:14 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+22:20:14 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 10%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_applied_true_when_sufficient 
+-------------------------------- live log call ---------------------------------
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Data preprocessing complete: columns=2
+22:20:14 [INFO] IC autocorr persistent: count=2
+22:20:14 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+22:20:14 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+22:20:14 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 20%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_full_pipeline_global_mode 
+-------------------------------- live log call ---------------------------------
+22:20:14 [INFO] IC config loaded
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Data preprocessing complete: columns=8
+22:20:14 [INFO] IC autocorr persistent: count=8
+22:20:14 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:14 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+22:20:14 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+22:20:14 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_e2e_test.json
+PASSED                                                                   [ 30%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_refilter_uses_cache 
+-------------------------------- live log call ---------------------------------
+22:20:14 [INFO] IC config loaded
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Data preprocessing complete: columns=6
+22:20:14 [INFO] IC autocorr persistent: count=6
+22:20:14 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:14 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+22:20:14 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+22:20:14 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_e2e_test.json
+22:20:14 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:14 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+22:20:14 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+22:20:14 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_e2e_test.json
+PASSED                                                                   [ 40%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_event_mode_with_query 
+-------------------------------- live log call ---------------------------------
+22:20:14 [INFO] IC config loaded
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Data preprocessing complete: columns=6
+22:20:14 [INFO] IC autocorr persistent: count=4
+22:20:14 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:14 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+22:20:14 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+22:20:14 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_e2e_test.json
+PASSED                                                                   [ 50%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_report_json_structure 
+-------------------------------- live log call ---------------------------------
+22:20:14 [INFO] IC config loaded
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Data preprocessing complete: columns=5
+22:20:14 [INFO] IC autocorr persistent: count=5
+22:20:14 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:14 [INFO] Redundancy filter completed: method=greedy input=4 output=4
+22:20:14 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/features/BTCUSDT_12h_filtered.h5
+22:20:14 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_e2e_test.json
+PASSED                                                                   [ 60%]
+tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_performance_800_features SKIPPED [ 70%]
+tests/momentum/test_ic_feature_filter.py::test_analyze_applies_feature_filter_metadata_and_summary_limit 
+-------------------------------- live log call ---------------------------------
+22:20:14 [INFO] IC config loaded
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Resolved label horizon from labels_df column
+22:20:14 [INFO] Data preprocessing complete: columns=8
+22:20:14 [INFO] IC autocorr persistent: count=3
+22:20:14 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:14 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 80%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 
+-------------------------------- live log call ---------------------------------
+22:20:15 [INFO] Loaded feature registry with 11 entries
+22:20:15 [INFO] IC config loaded
+22:20:15 [INFO] IC analysis task started: cce4df31-8b78-43a5-84b5-c0094b42c7bc
+22:20:15 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:20:15 [INFO] Data preprocessing complete: columns=50
+22:20:15 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+22:20:15 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:15 [INFO] IC autocorr persistent: count=38
+22:20:15 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+22:20:45 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+22:20:47 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:53 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+22:20:53 [INFO] IC analysis task completed: cce4df31-8b78-43a5-84b5-c0094b42c7bc
+PASSED                                                                   [ 90%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 
+-------------------------------- live log call ---------------------------------
+22:20:56 [INFO] Loaded feature registry with 11 entries
+22:20:57 [INFO] IC config loaded
+22:20:57 [INFO] IC analysis task started: 2e75302b-cba0-4c08-a71d-561b78fdcbf5
+22:20:57 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:20:57 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:57 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:57 [INFO] Data preprocessing complete: columns=50
+22:20:57 [INFO] Read 20352 klines from BTCUSDT/1h in 0.010s
+22:20:57 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+22:20:57 [INFO] IC autocorr persistent: count=46
+22:20:57 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+22:20:58 [INFO] Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+22:21:00 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-424/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+22:21:00 [INFO] IC analysis task completed: 2e75302b-cba0-4c08-a71d-561b78fdcbf5
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:318: RuntimeWarning: Mean of empty slice
+    ic_mean = float(np.nanmean(values))
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/nanfunctions.py:1879: RuntimeWarning: Degrees of freedom <= 0 for slice.
+    var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/momentum/test_ic_e2e.py:236: Set RUN_IC_E2E_PERF=1 to run
+================== 9 passed, 1 skipped, 4 warnings in 49.46s ===================
+DIGEST_DIFF_EMPTY[V1]=1
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+22:21:59 [INFO] Loaded feature registry with 11 entries
+collected 2 items
+
+tests/api/test_ic_analysis_service.py::test_analyze_real_run_split_validation_passes_with_real_axis 
+-------------------------------- live log setup --------------------------------
+22:22:00 [WARNING] /Users/louis/.matplotlib is not a writable directory
+22:22:00 [WARNING] Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-attntv1c because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+22:22:00 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+22:22:00 [INFO] Registered adapter: crypto_spot
+22:22:00 [INFO] Loaded feature registry with 11 entries
+22:22:00 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+22:22:01 [INFO] Restored 9 persisted feature task(s) from disk
+22:22:01 [INFO] 所有中間件已設置完成
+22:22:01 [INFO] 異常處理器設置完成
+22:22:01 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+22:22:01 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+22:22:01 [INFO] Created global CaseStorageManager instance
+22:22:01 [INFO] CaseImportService initialized
+22:22:01 [INFO] Created global CaseImportService instance with shared storage
+22:22:01 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+22:22:01 [INFO] KlineDownloadService initialized
+22:22:01 [INFO] Rate limiter initialized: 1000 req/min
+22:22:01 [INFO] BinanceProvider initialized
+22:22:01 [INFO] Registered provider: binance (rate_limit=1000/min)
+22:22:01 [INFO] Registered BinanceProvider to KlineDownloadService
+22:22:01 [INFO] BatchDownloadService initialized
+22:22:01 [INFO] Created global BatchDownloadService instance with shared storage
+22:22:01 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+22:22:01 [INFO] KlineDownloadService initialized
+22:22:01 [INFO] Rate limiter initialized: 1000 req/min
+22:22:01 [INFO] BinanceProvider initialized
+22:22:01 [INFO] Registered provider: binance (rate_limit=1000/min)
+22:22:01 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+22:22:01 [INFO] IndicatorEngine initialized
+22:22:01 [INFO] ChartDataService initialized with IndicatorEngine
+22:22:01 [INFO] OptimizationTaskService initialized
+22:22:01 [INFO] Loaded feature registry with 11 entries
+22:22:01 [INFO] Loaded feature registry with 11 entries
+22:22:01 [INFO] Loaded feature registry with 11 entries
+22:22:01 [INFO] Loaded feature registry with 11 entries
+22:22:01 [INFO] WebSocketConnectionManager initialized
+22:22:01 [INFO] All API routes registered successfully
+-------------------------------- live log call ---------------------------------
+22:22:01 [INFO] Loaded feature registry with 11 entries
+22:22:01 [INFO] Loaded feature registry with 11 entries
+22:22:12 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+PASSED                                                                   [ 50%]
+tests/api/test_ic_analysis_service.py::test_resolve_run_path_contains_config_hash 
+-------------------------------- live log call ---------------------------------
+22:23:00 [INFO] Loaded feature registry with 11 entries
+22:23:00 [INFO] Loaded feature registry with 11 entries
+22:23:11 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=================== 2 passed, 1 warning in 72.15s (0:01:12) ====================
+DIGEST_DIFF_EMPTY[V2]=1
+[2026-07-11 22:24:07,182] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-07-11 22:24:07,182 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+[2026-07-11 22:24:09,255] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:24:09,255 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+[conftest.py] Python path configured: /Users/louis/Desktop/quantitative_trading_system
+[conftest.py] sys.path[0]: /Users/louis/Desktop/quantitative_trading_system
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+22:24:09 [INFO] Loaded feature registry with 11 entries
+collected 3 items
+
+tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py::test_golden_redirect_on_off_sha256 2026-07-11 22:24:09,836 - matplotlib - DEBUG - matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+2026-07-11 22:24:09,840 - matplotlib - WARNING - /Users/louis/.matplotlib is not a writable directory
+
+-------------------------------- live log setup --------------------------------
+22:24:09 [WARNING] /Users/louis/.matplotlib is not a writable directory
+2026-07-11 22:24:09,841 - matplotlib - WARNING - Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-tfcnjyng because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+22:24:09 [WARNING] Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-tfcnjyng because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+2026-07-11 22:24:09,841 - matplotlib - DEBUG - CONFIGDIR=/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-tfcnjyng
+2026-07-11 22:24:09,842 - matplotlib - DEBUG - interactive is False
+2026-07-11 22:24:09,842 - matplotlib - DEBUG - platform is darwin
+2026-07-11 22:24:10,143 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:24:10,149 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+22:24:10 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+[2026-07-11 22:24:10,149] INFO momentum.FeatureEngineering.adapters.adapter_registry: Registered adapter: crypto_spot
+2026-07-11 22:24:10,149 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Registered adapter: crypto_spot
+22:24:10 [INFO] Registered adapter: crypto_spot
+[2026-07-11 22:24:10,150] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:24:10,150 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+22:24:10 [INFO] Loaded feature registry with 11 entries
+2026-07-11 22:24:10,260 - api.feature_factory_service - INFO - CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+22:24:10 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+2026-07-11 22:24:10,409 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 22:24:10,486 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 22:24:10,545 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 22:24:10,683 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 22:24:10,757 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 22:24:10,810 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 22:24:10,951 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-07-11 22:24:11,025 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-07-11 22:24:11,082 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-07-11 22:24:11,083 - api.feature_factory_service - INFO - Restored 9 persisted feature task(s) from disk
+22:24:11 [INFO] Restored 9 persisted feature task(s) from disk
+2026-07-11 22:24:11,087 - api.middleware - INFO - 所有中間件已設置完成
+22:24:11 [INFO] 所有中間件已設置完成
+2026-07-11 22:24:11,087 - api.exception_handler - INFO - 異常處理器設置完成
+22:24:11 [INFO] 異常處理器設置完成
+2026-07-11 22:24:11,119 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+22:24:11 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+2026-07-11 22:24:11,137 - api.case_storage - INFO - CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+22:24:11 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+2026-07-11 22:24:11,138 - api.case_storage - INFO - Created global CaseStorageManager instance
+22:24:11 [INFO] Created global CaseStorageManager instance
+2026-07-11 22:24:11,138 - api.case_import_service - INFO - CaseImportService initialized
+22:24:11 [INFO] CaseImportService initialized
+2026-07-11 22:24:11,138 - api.case_import_service - INFO - Created global CaseImportService instance with shared storage
+22:24:11 [INFO] Created global CaseImportService instance with shared storage
+2026-07-11 22:24:11,138 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+22:24:11 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+2026-07-11 22:24:11,138 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+22:24:11 [INFO] KlineDownloadService initialized
+2026-07-11 22:24:11,138 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+22:24:11 [INFO] Rate limiter initialized: 1000 req/min
+2026-07-11 22:24:11,138 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+22:24:11 [INFO] BinanceProvider initialized
+2026-07-11 22:24:11,138 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+22:24:11 [INFO] Registered provider: binance (rate_limit=1000/min)
+2026-07-11 22:24:11,138 - api.batch_download_service - INFO - Registered BinanceProvider to KlineDownloadService
+22:24:11 [INFO] Registered BinanceProvider to KlineDownloadService
+2026-07-11 22:24:11,138 - api.batch_download_service - INFO - BatchDownloadService initialized
+22:24:11 [INFO] BatchDownloadService initialized
+2026-07-11 22:24:11,138 - api.batch_download_service - INFO - Created global BatchDownloadService instance with shared storage
+22:24:11 [INFO] Created global BatchDownloadService instance with shared storage
+2026-07-11 22:24:11,142 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+22:24:11 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-07-11 22:24:11,142 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+22:24:11 [INFO] KlineDownloadService initialized
+2026-07-11 22:24:11,142 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+22:24:11 [INFO] Rate limiter initialized: 1000 req/min
+2026-07-11 22:24:11,142 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+22:24:11 [INFO] BinanceProvider initialized
+2026-07-11 22:24:11,142 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+22:24:11 [INFO] Registered provider: binance (rate_limit=1000/min)
+2026-07-11 22:24:11,142 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+22:24:11 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-07-11 22:24:11,143 - momentum.Indicators.indicator_engine - INFO - IndicatorEngine initialized
+22:24:11 [INFO] IndicatorEngine initialized
+2026-07-11 22:24:11,143 - api.chart_data_service - INFO - ChartDataService initialized with IndicatorEngine
+22:24:11 [INFO] ChartDataService initialized with IndicatorEngine
+2026-07-11 22:24:11,158 - api.optimization_task_service - INFO - OptimizationTaskService initialized
+22:24:11 [INFO] OptimizationTaskService initialized
+[2026-07-11 22:24:11,216] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:24:11,216 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+22:24:11 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 22:24:11,220] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:24:11,220 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+22:24:11 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 22:24:11,276] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:24:11,276 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+22:24:11 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 22:24:11,394] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:24:11,394 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+22:24:11 [INFO] Loaded feature registry with 11 entries
+2026-07-11 22:24:11,406 - api.websocket_manager - INFO - WebSocketConnectionManager initialized
+22:24:11 [INFO] WebSocketConnectionManager initialized
+2026-07-11 22:24:11,484 - api.routes - INFO - All API routes registered successfully
+22:24:11 [INFO] All API routes registered successfully
+2026-07-11 22:24:11,488 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:24:11,489] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:24:11,489 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+-------------------------------- live log call ---------------------------------
+22:24:11 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 22:24:11,505] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:24:11,505 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+22:24:11 [INFO] IC config loaded
+2026-07-11 22:24:11,505 - api.ic_analysis_service - INFO - IC analysis task started: 934f48f0-1988-4745-a79c-d93329c181bc
+22:24:11 [INFO] IC analysis task started: 934f48f0-1988-4745-a79c-d93329c181bc
+2026-07-11 22:24:11,505 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:24:11 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-07-11 22:24:11,523 - h5py._conv - DEBUG - Creating converter from 3 to 5
+[2026-07-11 22:24:11,643] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 22:24:11,643 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+22:24:11 [INFO] Data preprocessing complete: columns=50
+2026-07-11 22:24:11,652 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:24:11,652 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.009s
+22:24:11 [INFO] Read 20352 klines from BTCUSDT/1h in 0.009s
+[2026-07-11 22:24:11,654] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:24:11,654 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:24:11 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:24:11,961] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=38
+2026-07-11 22:24:11,961 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=38
+22:24:11 [INFO] IC autocorr persistent: count=38
+2026-07-11 22:24:11,969 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:24:11,969 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.008s
+22:24:11 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+[2026-07-11 22:24:37,025] INFO momentum.Analysis.ic_engine: Decay: 50/50 fit warnings summarized (insufficient_points=50)
+2026-07-11 22:24:37,025 - momentum.Analysis.ic_engine - INFO - Decay: 50/50 fit warnings summarized (insufficient_points=50)
+22:24:37 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+[2026-07-11 22:24:38,141] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:24:38,141 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:24:38 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:24:44,276] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/test_golden_redirect_on_off_sh0/tmp_a/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:24:44,276 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/test_golden_redirect_on_off_sh0/tmp_a/reports/ic_report_ic_gatekeeper.json
+22:24:44 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/test_golden_redirect_on_off_sh0/tmp_a/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:24:44,280 - api.ic_analysis_service - INFO - IC analysis task completed: 934f48f0-1988-4745-a79c-d93329c181bc
+22:24:44 [INFO] IC analysis task completed: 934f48f0-1988-4745-a79c-d93329c181bc
+2026-07-11 22:24:47,839 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:24:47,839] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:24:47,839 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+22:24:47 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 22:24:47,856] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:24:47,856 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+22:24:47 [INFO] IC config loaded
+2026-07-11 22:24:47,856 - api.ic_analysis_service - INFO - IC analysis task started: 4550ce7d-6111-46c4-91cb-05c2a804509e
+22:24:47 [INFO] IC analysis task started: 4550ce7d-6111-46c4-91cb-05c2a804509e
+2026-07-11 22:24:47,857 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:24:47 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+[2026-07-11 22:24:47,984] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 22:24:47,984 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+22:24:47 [INFO] Data preprocessing complete: columns=50
+2026-07-11 22:24:47,992 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:24:47,992 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.008s
+22:24:47 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+[2026-07-11 22:24:47,994] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:24:47,994 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:24:47 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:24:48,292] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=38
+2026-07-11 22:24:48,292 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=38
+22:24:48 [INFO] IC autocorr persistent: count=38
+2026-07-11 22:24:48,300 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:24:48,300 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.007s
+22:24:48 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+[2026-07-11 22:25:14,271] INFO momentum.Analysis.ic_engine: Decay: 50/50 fit warnings summarized (insufficient_points=50)
+2026-07-11 22:25:14,271 - momentum.Analysis.ic_engine - INFO - Decay: 50/50 fit warnings summarized (insufficient_points=50)
+22:25:14 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+[2026-07-11 22:25:15,343] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:25:15,343 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:25:15 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:25:21,004] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/test_golden_redirect_on_off_sh0/tmp_b/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:25:21,004 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/test_golden_redirect_on_off_sh0/tmp_b/reports/ic_report_ic_gatekeeper.json
+22:25:21 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/test_golden_redirect_on_off_sh0/tmp_b/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:25:21,006 - api.ic_analysis_service - INFO - IC analysis task completed: 4550ce7d-6111-46c4-91cb-05c2a804509e
+22:25:21 [INFO] IC analysis task completed: 4550ce7d-6111-46c4-91cb-05c2a804509e
+2026-07-11 22:25:51,494 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:25:51,518] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:25:51,518 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+22:25:51 [INFO] IC config loaded
+2026-07-11 22:25:51,521 - api.ic_analysis_service - INFO - IC analysis task started: 3cc9e6c0-908f-48a9-ab27-4767bb1bc9cf
+22:25:51 [INFO] IC analysis task started: 3cc9e6c0-908f-48a9-ab27-4767bb1bc9cf
+2026-07-11 22:25:51,521 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:25:51 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+[2026-07-11 22:25:51,689] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 22:25:51,689 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+22:25:51 [INFO] Data preprocessing complete: columns=50
+2026-07-11 22:25:51,699 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:25:51,699 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.010s
+22:25:51 [INFO] Read 20352 klines from BTCUSDT/1h in 0.010s
+[2026-07-11 22:25:51,703] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:25:51,703 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:25:51 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:25:52,015] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=38
+2026-07-11 22:25:52,015 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=38
+22:25:52 [INFO] IC autocorr persistent: count=38
+2026-07-11 22:25:52,023 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:25:52,023 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.008s
+22:25:52 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+[2026-07-11 22:26:17,321] INFO momentum.Analysis.ic_engine: Decay: 50/50 fit warnings summarized (insufficient_points=50)
+2026-07-11 22:26:17,321 - momentum.Analysis.ic_engine - INFO - Decay: 50/50 fit warnings summarized (insufficient_points=50)
+22:26:17 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+[2026-07-11 22:26:18,376] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:26:18,376 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:26:18 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:26:23,942] INFO momentum.Analysis.ic_reporter: IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:26:23,942 - momentum.Analysis.ic_reporter - INFO - IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+22:26:23 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:26:23,942 - api.ic_analysis_service - INFO - IC analysis task completed: 3cc9e6c0-908f-48a9-ab27-4767bb1bc9cf
+22:26:23 [INFO] IC analysis task completed: 3cc9e6c0-908f-48a9-ab27-4767bb1bc9cf
+ab_hash=1a30560ea95970ee48791ceed9a695229e4bc9cb30781b54e192b31d602edb41
+PASSED
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 2026-07-11 22:26:54,776 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:26:54,777] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:26:54,777 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+
+-------------------------------- live log call ---------------------------------
+22:26:54 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 22:26:54,811] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:26:54,811 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+22:26:54 [INFO] IC config loaded
+2026-07-11 22:26:54,812 - api.ic_analysis_service - INFO - IC analysis task started: 235ef423-54f7-48fc-883b-c98ecbdff329
+22:26:54 [INFO] IC analysis task started: 235ef423-54f7-48fc-883b-c98ecbdff329
+2026-07-11 22:26:54,812 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:26:54 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+[2026-07-11 22:26:54,973] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 22:26:54,973 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+22:26:54 [INFO] Data preprocessing complete: columns=50
+2026-07-11 22:26:54,983 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:26:54,984 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.010s
+22:26:54 [INFO] Read 20352 klines from BTCUSDT/1h in 0.010s
+[2026-07-11 22:26:54,987] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:26:54,987 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:26:54 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:26:55,335] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=38
+2026-07-11 22:26:55,335 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=38
+22:26:55 [INFO] IC autocorr persistent: count=38
+2026-07-11 22:26:55,346 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:26:55,346 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.010s
+22:26:55 [INFO] Read 20352 klines from BTCUSDT/1h in 0.010s
+[2026-07-11 22:27:22,325] INFO momentum.Analysis.ic_engine: Decay: 50/50 fit warnings summarized (insufficient_points=50)
+2026-07-11 22:27:22,325 - momentum.Analysis.ic_engine - INFO - Decay: 50/50 fit warnings summarized (insufficient_points=50)
+22:27:22 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+[2026-07-11 22:27:23,395] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:27:23,395 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:27:23 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:27:29,099] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:27:29,099 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+22:27:29 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:27:29,101 - api.ic_analysis_service - INFO - IC analysis task completed: 235ef423-54f7-48fc-883b-c98ecbdff329
+22:27:29 [INFO] IC analysis task completed: 235ef423-54f7-48fc-883b-c98ecbdff329
+PASSED
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 2026-07-11 22:27:32,967 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:27:32,968] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 11 entries
+2026-07-11 22:27:32,968 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 11 entries
+
+-------------------------------- live log call ---------------------------------
+22:27:32 [INFO] Loaded feature registry with 11 entries
+[2026-07-11 22:27:32,986] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:27:32,986 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+22:27:32 [INFO] IC config loaded
+2026-07-11 22:27:32,986 - api.ic_analysis_service - INFO - IC analysis task started: fb0ae5df-6a2e-4f87-aac9-fa8253829888
+22:27:32 [INFO] IC analysis task started: fb0ae5df-6a2e-4f87-aac9-fa8253829888
+2026-07-11 22:27:32,987 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:27:32 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+[2026-07-11 22:27:33,002] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:27:33,002 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:27:33 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:27:33,002] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:27:33,002 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:27:33 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:27:33,176] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=50
+2026-07-11 22:27:33,176 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=50
+22:27:33 [INFO] Data preprocessing complete: columns=50
+2026-07-11 22:27:33,184 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:27:33,184 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.008s
+22:27:33 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+[2026-07-11 22:27:33,185] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+2026-07-11 22:27:33,185 - momentum.Analysis.ic_filter_orchestrator - WARNING - Falling back to configured label horizon because labels_df is unavailable
+22:27:33 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+[2026-07-11 22:27:33,404] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=46
+2026-07-11 22:27:33,404 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=46
+22:27:33 [INFO] IC autocorr persistent: count=46
+2026-07-11 22:27:33,412 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-07-11 22:27:33,412 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.007s
+22:27:33 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+[2026-07-11 22:27:34,061] INFO momentum.Analysis.ic_engine: Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+2026-07-11 22:27:34,061 - momentum.Analysis.ic_engine - INFO - Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+22:27:34 [INFO] Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+[2026-07-11 22:27:36,149] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:27:36,149 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+22:27:36 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-426/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-07-11 22:27:36,151 - api.ic_analysis_service - INFO - IC analysis task completed: fb0ae5df-6a2e-4f87-aac9-fa8253829888
+22:27:36 [INFO] IC analysis task completed: fb0ae5df-6a2e-4f87-aac9-fa8253829888
+PASSED
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:318: RuntimeWarning: Mean of empty slice
+    ic_mean = float(np.nanmean(values))
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/nanfunctions.py:1879: RuntimeWarning: Degrees of freedom <= 0 for slice.
+    var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 3 passed, 4 warnings in 207.94s (0:03:27) ===================
+DIGEST_DIFF_EMPTY[V5]=1
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+22:28:35 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+22:28:35 [INFO] Registered adapter: crypto_spot
+22:28:35 [INFO] Loaded feature registry with 11 entries
+22:28:35 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+22:28:36 [INFO] Restored 9 persisted feature task(s) from disk
+22:28:36 [INFO] 所有中間件已設置完成
+22:28:36 [INFO] 異常處理器設置完成
+22:28:36 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+22:28:36 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+22:28:36 [INFO] Created global CaseStorageManager instance
+22:28:36 [INFO] CaseImportService initialized
+22:28:36 [INFO] Created global CaseImportService instance with shared storage
+22:28:36 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+22:28:36 [INFO] KlineDownloadService initialized
+22:28:36 [INFO] Rate limiter initialized: 1000 req/min
+22:28:36 [INFO] BinanceProvider initialized
+22:28:36 [INFO] Registered provider: binance (rate_limit=1000/min)
+22:28:36 [INFO] Registered BinanceProvider to KlineDownloadService
+22:28:36 [INFO] BatchDownloadService initialized
+22:28:36 [INFO] Created global BatchDownloadService instance with shared storage
+22:28:36 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+22:28:36 [INFO] KlineDownloadService initialized
+22:28:36 [INFO] Rate limiter initialized: 1000 req/min
+22:28:36 [INFO] BinanceProvider initialized
+22:28:36 [INFO] Registered provider: binance (rate_limit=1000/min)
+22:28:36 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+22:28:36 [INFO] IndicatorEngine initialized
+22:28:36 [INFO] ChartDataService initialized with IndicatorEngine
+22:28:36 [INFO] OptimizationTaskService initialized
+22:28:36 [INFO] Loaded feature registry with 11 entries
+22:28:36 [INFO] Loaded feature registry with 11 entries
+22:28:36 [INFO] Loaded feature registry with 11 entries
+22:28:36 [INFO] Loaded feature registry with 11 entries
+22:28:37 [INFO] Loaded feature registry with 11 entries
+22:28:37 [INFO] WebSocketConnectionManager initialized
+22:28:37 [INFO] All API routes registered successfully
+collected 32 items
+
+tests/api/test_ic_analysis_api.py::test_ic_task_status 
+-------------------------------- live log setup --------------------------------
+22:28:37 [WARNING] /Users/louis/.matplotlib is not a writable directory
+22:28:37 [WARNING] Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-h1ru33lw because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+22:28:37 [INFO] IC config loaded
+22:28:37 [INFO] IC analysis task started: eacfe8fd-0497-4c34-8032-f17691c541e4
+22:28:37 [INFO] [a8ff01f4] POST /api/v1/ic/analyze - 200 - 0.021s
+22:28:37 [INFO] HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+22:28:37 [INFO] [fc5d85b0] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.001s
+22:28:37 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:37 [INFO] [fe743ff1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+22:28:37 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:37 [INFO] [13449354] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:37 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:38 [INFO] [3839642a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:38 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:38 [INFO] [d5799804] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:38 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:38 [INFO] [22210fb9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:38 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:38 [INFO] [12f37809] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:38 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:38 [INFO] [fc7f48ee] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:38 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:39 [INFO] [7d0f13b5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:39 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:39 [INFO] [e0ed1ef5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:39 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:39 [INFO] [d4d7f3dd] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:39 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:39 [INFO] [5728981d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:39 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:39 [INFO] [bbfa8d02] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:39 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:40 [INFO] [ecb4a304] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:40 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:40 [INFO] [c56696a0] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:40 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:40 [INFO] [bb2fba08] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:40 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:40 [INFO] [ae601ad9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:40 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:40 [INFO] [201860bc] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:40 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:41 [INFO] [0d5059e9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:41 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:41 [INFO] [7e553956] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:41 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:41 [INFO] [116f3bcd] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:41 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:41 [INFO] [3261e3d5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:41 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:42 [INFO] [16d82e6e] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:42 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:42 [INFO] [9caa18e3] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:42 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:42 [INFO] [83b1ffd8] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:42 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:42 [INFO] [d51cf214] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:42 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:42 [INFO] [6f960f9b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:42 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:43 [INFO] [4e5dfd93] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:43 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:43 [INFO] [21c877cc] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:43 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:43 [INFO] [69886b31] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:43 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:43 [INFO] [05393f07] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:43 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:43 [INFO] [3df71a2b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:43 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:44 [INFO] [235c7dc2] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:44 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:44 [INFO] [9b4db290] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:44 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:44 [INFO] [61d9a983] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+22:28:44 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:44 [INFO] [0edc7ac4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:44 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:45 [INFO] [ca391645] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:45 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:45 [INFO] [2006e7b4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:45 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:45 [INFO] [4f1727d6] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:45 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:45 [INFO] [a03b1924] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:45 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:45 [INFO] [876da125] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:45 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:46 [INFO] [2bbdb762] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:46 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:46 [INFO] [4268a401] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+22:28:46 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:46 [INFO] [31244e16] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:46 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:46 [INFO] [57c556a8] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:46 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:46 [INFO] [ad576a7e] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:46 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:47 [INFO] [f001537d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:47 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:47 [INFO] [0e46aed5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:47 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:47 [INFO] [2f064287] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:47 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:47 [INFO] [194d1356] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:47 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:47 [INFO] [82f15d9a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:47 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:48 [INFO] [420ac2f7] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:48 [INFO] [a75d3ebe] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:48 [INFO] [aa4dac84] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:48 [INFO] [d1468084] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:48 [INFO] [0dbb8162] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:49 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:49 [INFO] [dfbffec4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:49 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:49 [INFO] [36c25e02] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:49 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:49 [INFO] [ca348a6d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+22:28:49 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:49 [INFO] [71e2d30d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:49 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:50 [INFO] [21e82a56] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:50 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:50 [INFO] [a45072e4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:50 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:50 [INFO] [0d07ee6a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+22:28:50 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:50 [INFO] [c0f6c4b1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:50 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:50 [INFO] [401ea0bf] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:50 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:51 [INFO] [756d0940] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:51 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:51 [INFO] [a4924b4f] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:51 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:51 [INFO] [e37c4999] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:51 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:51 [INFO] [177e0029] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.004s
+22:28:51 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:51 [INFO] [b20c0b6b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:51 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:52 [INFO] [7954d01c] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+22:28:52 [INFO] [1dfcddf1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+ERROR                                                                    [  3%]
+tests/api/test_ic_analysis_api.py::test_ic_result ERROR                  [  6%]
+tests/api/test_ic_analysis_api.py::test_ic_summary ERROR                 [  9%]
+tests/api/test_ic_analysis_api.py::test_ic_top_features ERROR            [ 12%]
+tests/api/test_ic_analysis_api.py::test_ic_quantile_and_correlation ERROR [ 15%]
+tests/api/test_ic_analysis_api.py::test_ic_grouped ERROR                 [ 18%]
+tests/api/test_ic_analysis_api.py::test_ic_config_update 
+-------------------------------- live log call ---------------------------------
+22:28:52 [INFO] IC config loaded
+22:28:52 [INFO] [4d73f056] PUT /api/v1/ic/config - 200 - 0.017s
+22:28:52 [INFO] HTTP Request: PUT http://testserver/api/v1/ic/config "HTTP/1.1 200 OK"
+PASSED                                                                   [ 21%]
+tests/api/test_ic_analysis_api.py::test_ic_refilter ERROR                [ 25%]
+tests/api/test_ic_analysis_api.py::test_ic_export_csv ERROR              [ 28%]
+tests/api/test_ic_analysis_api.py::test_ic_export_hdf5 ERROR             [ 31%]
+tests/api/test_ic_deep_analysis.py::test_list_available_features_success 
+-------------------------------- live log call ---------------------------------
+22:28:52 [INFO] [26617ada] GET /api/v1/ic/features/list - 200 - 0.002s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/features/list?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-427%2Fic_deep_api0%2Ffeatures.h5&meta_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-427%2Fic_deep_api0%2Fmeta.json "HTTP/1.1 200 OK"
+PASSED                                                                   [ 34%]
+tests/api/test_ic_deep_analysis.py::test_list_available_features_not_found 
+-------------------------------- live log call ---------------------------------
+22:28:52 [WARNING] HTTP 404: features_path not found: /tmp/not_exists_features.h5
+22:28:52 [INFO] [707e0e06] GET /api/v1/ic/features/list - 404 - 0.001s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/features/list?features_path=%2Ftmp%2Fnot_exists_features.h5 "HTTP/1.1 404 Not Found"
+PASSED                                                                   [ 37%]
+tests/api/test_ic_deep_analysis.py::test_start_deep_analysis_and_get_result 
+-------------------------------- live log setup --------------------------------
+22:28:52 [INFO] IC config loaded
+22:28:52 [INFO] IC analysis task started: 28e49b47-4d24-4369-9645-47089b89b75f
+22:28:52 [INFO] [5179112c] POST /api/v1/ic/analyze - 200 - 0.018s
+22:28:52 [ERROR] IC analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 228, in _run_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+22:28:52 [INFO] HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+22:28:52 [INFO] [ab4030f2] GET /api/v1/ic/task/28e49b47-4d24-4369-9645-47089b89b75f - 200 - 0.001s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/28e49b47-4d24-4369-9645-47089b89b75f "HTTP/1.1 200 OK"
+ERROR                                                                    [ 40%]
+tests/api/test_ic_deep_analysis.py::test_start_deep_analysis_invalid_task_id 
+-------------------------------- live log call ---------------------------------
+22:28:52 [WARNING] HTTP 404: Task not found: nonexistent-task
+22:28:52 [INFO] [4ed33bb6] POST /api/v1/ic/deep-analysis/nonexistent-task - 404 - 0.002s
+22:28:52 [INFO] HTTP Request: POST http://testserver/api/v1/ic/deep-analysis/nonexistent-task "HTTP/1.1 404 Not Found"
+PASSED                                                                   [ 43%]
+tests/api/test_ic_deep_analysis.py::test_get_deep_analysis_result_invalid_task_id 
+-------------------------------- live log call ---------------------------------
+22:28:52 [WARNING] HTTP 404: Task not found: nonexistent-task
+22:28:52 [INFO] [1e25740b] GET /api/v1/ic/deep-analysis/nonexistent-task/result - 404 - 0.001s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/deep-analysis/nonexistent-task/result "HTTP/1.1 404 Not Found"
+PASSED                                                                   [ 46%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_endpoint 
+-------------------------------- live log call ---------------------------------
+22:28:52 [INFO] IC config loaded
+22:28:52 [INFO] IC full analysis task started: 8d7738d4-9288-4a82-84e0-ae96ad81c978
+22:28:52 [INFO] [c82ba1e8] POST /api/v1/ic/full-analysis - 200 - 0.020s
+22:28:52 [ERROR] IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+22:28:52 [INFO] HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+22:28:52 [INFO] [9ae43e82] GET /api/v1/ic/task/8d7738d4-9288-4a82-84e0-ae96ad81c978 - 200 - 0.001s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/8d7738d4-9288-4a82-84e0-ae96ad81c978 "HTTP/1.1 200 OK"
+FAILED                                                                   [ 50%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_with_deep_analysis_config 
+-------------------------------- live log call ---------------------------------
+22:28:52 [INFO] IC config loaded
+22:28:52 [INFO] IC full analysis task started: a30cc25f-2942-49c0-b869-af71f00f578e
+22:28:52 [INFO] [83e52439] POST /api/v1/ic/full-analysis - 200 - 0.019s
+22:28:52 [ERROR] IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+22:28:52 [INFO] HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+22:28:52 [INFO] [72c7cd2c] GET /api/v1/ic/task/a30cc25f-2942-49c0-b869-af71f00f578e - 200 - 0.001s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/a30cc25f-2942-49c0-b869-af71f00f578e "HTTP/1.1 200 OK"
+FAILED                                                                   [ 53%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_request_validation_top_n 
+-------------------------------- live log call ---------------------------------
+22:28:52 [WARNING] Validation error: [{'type': 'less_than_equal', 'loc': ('body', 'top_n'), 'msg': 'Input should be less than or equal to 200', 'input': 999, 'ctx': {'le': 200}}]
+22:28:52 [INFO] [a362a709] POST /api/v1/ic/deep-analysis/nonexistent-task - 422 - 0.002s
+22:28:52 [INFO] HTTP Request: POST http://testserver/api/v1/ic/deep-analysis/nonexistent-task "HTTP/1.1 422 Unprocessable Entity"
+PASSED                                                                   [ 56%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_request_validation_required_labels_path 
+-------------------------------- live log call ---------------------------------
+22:28:52 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'labels_path'), 'msg': 'Field required', 'input': {'features_path': '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-427/ic_deep_api0/features.h5', 'meta_path': '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-427/ic_deep_api0/meta.json'}}]
+22:28:52 [INFO] [5971b881] POST /api/v1/ic/full-analysis - 422 - 0.001s
+22:28:52 [INFO] HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 422 Unprocessable Entity"
+PASSED                                                                   [ 59%]
+tests/api/test_ic_deep_analysis.py::test_feature_list 
+-------------------------------- live log call ---------------------------------
+22:28:52 [INFO] [18fc429a] GET /api/v1/ic/features/list - 200 - 0.002s
+22:28:52 [INFO] HTTP Request: GET http://testserver/api/v1/ic/features/list?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-427%2Fic_deep_api0%2Ffeatures.h5&meta_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-427%2Fic_deep_api0%2Fmeta.json "HTTP/1.1 200 OK"
+PASSED                                                                   [ 62%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_start ERROR       [ 65%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_result ERROR      [ 68%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis 
+-------------------------------- live log call ---------------------------------
+22:28:53 [INFO] IC config loaded
+22:28:53 [INFO] IC full analysis task started: 98d05727-7df3-4743-87da-e6b26b1164b1
+22:28:53 [INFO] [2ddb40ce] POST /api/v1/ic/full-analysis - 200 - 0.018s
+22:28:53 [ERROR] IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+22:28:53 [INFO] HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+22:28:53 [INFO] [5a829338] GET /api/v1/ic/task/98d05727-7df3-4743-87da-e6b26b1164b1 - 200 - 0.001s
+22:28:53 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/98d05727-7df3-4743-87da-e6b26b1164b1 "HTTP/1.1 200 OK"
+FAILED                                                                   [ 71%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_result_serializes_numpy_scalars ERROR [ 75%]
+tests/api/test_export_api.py::test_export_csv_summary_200 
+-------------------------------- live log setup --------------------------------
+22:28:53 [INFO] IC config loaded
+22:28:53 [INFO] IC analysis task started: 759a8cea-0ff0-4616-b3d8-371e20602940
+22:28:53 [INFO] [dbf5ed0f] POST /api/v1/ic/analyze - 200 - 0.018s
+22:28:53 [ERROR] IC analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 228, in _run_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+22:28:53 [INFO] HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+22:28:53 [INFO] [4b4e58ef] GET /api/v1/ic/task/759a8cea-0ff0-4616-b3d8-371e20602940 - 200 - 0.001s
+22:28:53 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/759a8cea-0ff0-4616-b3d8-371e20602940 "HTTP/1.1 200 OK"
+ERROR                                                                    [ 78%]
+tests/api/test_export_api.py::test_export_csv_detailed_factor_return ERROR [ 81%]
+tests/api/test_export_api.py::test_export_ai_json_200 ERROR              [ 84%]
+tests/api/test_export_api.py::test_export_markdown_200 ERROR             [ 87%]
+tests/api/test_export_api.py::test_export_hdf5_200 ERROR                 [ 90%]
+tests/api/test_export_api.py::test_export_unknown_task_404 
+-------------------------------- live log call ---------------------------------
+22:28:53 [WARNING] HTTP 404: Task not found: unknown-task-id
+22:28:53 [INFO] [2900407d] GET /api/v1/ic/export/unknown-task-id/csv_summary - 404 - 0.001s
+22:28:53 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/unknown-task-id/csv_summary "HTTP/1.1 404 Not Found"
+PASSED                                                                   [ 93%]
+tests/api/test_export_api.py::test_export_invalid_format_422 ERROR       [ 96%]
+tests/api/test_export_api.py::test_export_csv_detailed_without_module_422 ERROR [100%]
+
+==================================== ERRORS ====================================
+____________________ ERROR at setup of test_ic_task_status _____________________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+---------------------------- Captured stderr setup -----------------------------
+2026-07-11 22:28:37,347 - matplotlib - DEBUG - matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+2026-07-11 22:28:37,351 - matplotlib - WARNING - /Users/louis/.matplotlib is not a writable directory
+2026-07-11 22:28:37,352 - matplotlib - WARNING - Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-h1ru33lw because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+2026-07-11 22:28:37,352 - matplotlib - DEBUG - CONFIGDIR=/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-h1ru33lw
+2026-07-11 22:28:37,353 - matplotlib - DEBUG - interactive is False
+2026-07-11 22:28:37,353 - matplotlib - DEBUG - platform is darwin
+2026-07-11 22:28:37,374 - h5py._conv - DEBUG - Creating converter from 5 to 3
+2026-07-11 22:28:37,381 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:28:37,401] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:28:37,401 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-07-11 22:28:37,402 - api.ic_analysis_service - INFO - IC analysis task started: eacfe8fd-0497-4c34-8032-f17691c541e4
+2026-07-11 22:28:37,403 - api.middleware.request - INFO - [a8ff01f4] POST /api/v1/ic/analyze - 200 - 0.021s
+2026-07-11 22:28:37,404 - h5py._conv - DEBUG - Creating converter from 3 to 5
+2026-07-11 22:28:37,409 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+2026-07-11 22:28:37,409 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:37,411 - api.middleware.request - INFO - [fc5d85b0] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.001s
+2026-07-11 22:28:37,411 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:37,618 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:37,622 - api.middleware.request - INFO - [fe743ff1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+2026-07-11 22:28:37,624 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:37,831 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:37,835 - api.middleware.request - INFO - [13449354] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:37,837 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:38,043 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:38,047 - api.middleware.request - INFO - [3839642a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:38,049 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:38,252 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:38,256 - api.middleware.request - INFO - [d5799804] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:38,258 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:38,464 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:38,467 - api.middleware.request - INFO - [22210fb9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:38,469 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:38,674 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:38,678 - api.middleware.request - INFO - [12f37809] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:38,680 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:38,886 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:38,889 - api.middleware.request - INFO - [fc7f48ee] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:38,891 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:39,096 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:39,100 - api.middleware.request - INFO - [7d0f13b5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:39,102 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:39,306 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:39,309 - api.middleware.request - INFO - [e0ed1ef5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:39,311 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:39,514 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:39,518 - api.middleware.request - INFO - [d4d7f3dd] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:39,520 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:39,726 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:39,730 - api.middleware.request - INFO - [5728981d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:39,732 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:39,938 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:39,942 - api.middleware.request - INFO - [bbfa8d02] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:39,944 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:40,145 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:40,149 - api.middleware.request - INFO - [ecb4a304] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:40,151 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:40,358 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:40,362 - api.middleware.request - INFO - [c56696a0] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:40,364 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:40,566 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:40,570 - api.middleware.request - INFO - [bb2fba08] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:40,572 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:40,778 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:40,782 - api.middleware.request - INFO - [ae601ad9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:40,784 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:40,988 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:40,992 - api.middleware.request - INFO - [201860bc] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:40,994 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:41,196 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:41,200 - api.middleware.request - INFO - [0d5059e9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:41,202 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:41,405 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:41,408 - api.middleware.request - INFO - [7e553956] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:41,410 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:41,617 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:41,621 - api.middleware.request - INFO - [116f3bcd] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:41,623 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:41,829 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:41,833 - api.middleware.request - INFO - [3261e3d5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:41,835 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:42,041 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:42,045 - api.middleware.request - INFO - [16d82e6e] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:42,047 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:42,254 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:42,258 - api.middleware.request - INFO - [9caa18e3] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:42,260 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:42,466 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:42,470 - api.middleware.request - INFO - [83b1ffd8] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:42,472 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:42,678 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:42,682 - api.middleware.request - INFO - [d51cf214] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:42,684 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:42,888 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:42,892 - api.middleware.request - INFO - [6f960f9b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:42,894 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:43,098 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:43,102 - api.middleware.request - INFO - [4e5dfd93] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:43,104 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:43,310 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:43,314 - api.middleware.request - INFO - [21c877cc] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:43,316 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:43,521 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:43,525 - api.middleware.request - INFO - [69886b31] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:43,527 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:43,734 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:43,737 - api.middleware.request - INFO - [05393f07] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:43,739 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:43,945 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:43,949 - api.middleware.request - INFO - [3df71a2b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:43,951 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:44,157 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:44,161 - api.middleware.request - INFO - [235c7dc2] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:44,163 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:44,369 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:44,373 - api.middleware.request - INFO - [9b4db290] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:44,375 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:44,581 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:44,586 - api.middleware.request - INFO - [61d9a983] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+2026-07-11 22:28:44,587 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:44,792 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:44,795 - api.middleware.request - INFO - [0edc7ac4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:44,797 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:45,003 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:45,008 - api.middleware.request - INFO - [ca391645] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:45,010 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:45,214 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:45,217 - api.middleware.request - INFO - [2006e7b4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:45,219 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:45,421 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:45,425 - api.middleware.request - INFO - [4f1727d6] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:45,427 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:45,632 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:45,636 - api.middleware.request - INFO - [a03b1924] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:45,638 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:45,840 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:45,844 - api.middleware.request - INFO - [876da125] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:45,846 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:46,048 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:46,051 - api.middleware.request - INFO - [2bbdb762] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:46,053 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:46,256 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:46,260 - api.middleware.request - INFO - [4268a401] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+2026-07-11 22:28:46,262 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:46,468 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:46,472 - api.middleware.request - INFO - [31244e16] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:46,474 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:46,675 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:46,679 - api.middleware.request - INFO - [57c556a8] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:46,681 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:46,887 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:46,890 - api.middleware.request - INFO - [ad576a7e] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:46,892 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:47,099 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:47,102 - api.middleware.request - INFO - [f001537d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:47,104 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:47,311 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:47,315 - api.middleware.request - INFO - [0e46aed5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:47,317 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:47,521 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:47,525 - api.middleware.request - INFO - [2f064287] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:47,527 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:47,732 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:47,736 - api.middleware.request - INFO - [194d1356] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:47,738 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:47,943 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:47,947 - api.middleware.request - INFO - [82f15d9a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:47,949 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:48,156 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:48,160 - api.middleware.request - INFO - [420ac2f7] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:48,163 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:48,366 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:48,370 - api.middleware.request - INFO - [a75d3ebe] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:48,372 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:48,578 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:48,582 - api.middleware.request - INFO - [aa4dac84] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:48,584 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:48,786 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:48,790 - api.middleware.request - INFO - [d1468084] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:48,792 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:48,995 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:48,999 - api.middleware.request - INFO - [0dbb8162] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:49,000 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:49,204 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:49,208 - api.middleware.request - INFO - [dfbffec4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:49,210 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:49,416 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:49,420 - api.middleware.request - INFO - [36c25e02] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:49,422 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:49,628 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:49,633 - api.middleware.request - INFO - [ca348a6d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+2026-07-11 22:28:49,635 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:49,838 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:49,841 - api.middleware.request - INFO - [71e2d30d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:49,843 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:50,050 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:50,054 - api.middleware.request - INFO - [21e82a56] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:50,056 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:50,260 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:50,264 - api.middleware.request - INFO - [a45072e4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:50,266 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:50,471 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:50,475 - api.middleware.request - INFO - [0d07ee6a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+2026-07-11 22:28:50,477 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:50,679 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:50,683 - api.middleware.request - INFO - [c0f6c4b1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:50,685 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:50,887 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:50,891 - api.middleware.request - INFO - [401ea0bf] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:50,893 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:51,095 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:51,099 - api.middleware.request - INFO - [756d0940] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:51,101 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:51,307 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:51,311 - api.middleware.request - INFO - [a4924b4f] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:51,313 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:51,519 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:51,523 - api.middleware.request - INFO - [e37c4999] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:51,524 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:51,727 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:51,733 - api.middleware.request - INFO - [177e0029] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.004s
+2026-07-11 22:28:51,735 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:51,941 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:51,945 - api.middleware.request - INFO - [b20c0b6b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:51,947 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:52,151 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:52,155 - api.middleware.request - INFO - [7954d01c] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:52,157 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+2026-07-11 22:28:52,364 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:52,367 - api.middleware.request - INFO - [1dfcddf1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+2026-07-11 22:28:52,369 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+------------------------------ Captured log setup ------------------------------
+DEBUG    matplotlib:__init__.py:341 matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+WARNING  matplotlib:__init__.py:537 /Users/louis/.matplotlib is not a writable directory
+WARNING  matplotlib:__init__.py:550 Matplotlib created a temporary cache directory at /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-h1ru33lw because there was an issue with the default path (/Users/louis/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+DEBUG    matplotlib:__init__.py:341 CONFIGDIR=/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/matplotlib-h1ru33lw
+DEBUG    matplotlib:__init__.py:1512 interactive is False
+DEBUG    matplotlib:__init__.py:1513 platform is darwin
+DEBUG    h5py._conv:dataset.py:178 Creating converter from 5 to 3
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:437 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:83 IC analysis task started: eacfe8fd-0497-4c34-8032-f17691c541e4
+INFO     api.middleware.request:middleware.py:64 [a8ff01f4] POST /api/v1/ic/analyze - 200 - 0.021s
+DEBUG    h5py._conv:dataset.py:903 Creating converter from 3 to 5
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [fc5d85b0] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.001s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [fe743ff1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [13449354] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [3839642a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [d5799804] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [22210fb9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [12f37809] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [fc7f48ee] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [7d0f13b5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [e0ed1ef5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [d4d7f3dd] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [5728981d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [bbfa8d02] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [ecb4a304] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [c56696a0] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [bb2fba08] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [ae601ad9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [201860bc] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [0d5059e9] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [7e553956] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [116f3bcd] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [3261e3d5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [16d82e6e] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [9caa18e3] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [83b1ffd8] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [d51cf214] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [6f960f9b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [4e5dfd93] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [21c877cc] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [69886b31] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [05393f07] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [3df71a2b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [235c7dc2] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [9b4db290] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [61d9a983] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [0edc7ac4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [ca391645] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [2006e7b4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [4f1727d6] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [a03b1924] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [876da125] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [2bbdb762] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [4268a401] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [31244e16] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [57c556a8] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [ad576a7e] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [f001537d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [0e46aed5] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [2f064287] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [194d1356] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [82f15d9a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [420ac2f7] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [a75d3ebe] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [aa4dac84] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [d1468084] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [0dbb8162] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [dfbffec4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [36c25e02] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [ca348a6d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [71e2d30d] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [21e82a56] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [a45072e4] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [0d07ee6a] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.003s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [c0f6c4b1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [401ea0bf] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [756d0940] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [a4924b4f] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [e37c4999] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [177e0029] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.004s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [b20c0b6b] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [7954d01c] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [1dfcddf1] GET /api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 - 200 - 0.002s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/eacfe8fd-0497-4c34-8032-f17691c541e4 "HTTP/1.1 200 OK"
+_______________________ ERROR at setup of test_ic_result _______________________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+______________________ ERROR at setup of test_ic_summary _______________________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+____________________ ERROR at setup of test_ic_top_features ____________________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+______________ ERROR at setup of test_ic_quantile_and_correlation ______________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+______________________ ERROR at setup of test_ic_grouped _______________________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+______________________ ERROR at setup of test_ic_refilter ______________________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+_____________________ ERROR at setup of test_ic_export_csv _____________________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+____________________ ERROR at setup of test_ic_export_hdf5 _____________________
+tests/api/test_ic_analysis_api.py:128: in ic_analysis_task
+    return _build_ic_analysis_task(tmp_path_factory)
+tests/api/test_ic_analysis_api.py:115: in _build_ic_analysis_task
+    _wait_for_task(task_id)
+tests/api/test_ic_analysis_api.py:71: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+__________ ERROR at setup of test_start_deep_analysis_and_get_result ___________
+tests/api/test_ic_deep_analysis.py:163: in completed_ic_task
+    return _build_completed_ic_task(sample_paths)
+tests/api/test_ic_deep_analysis.py:151: in _build_completed_ic_task
+    _wait_for_task_completed(task_id)
+tests/api/test_ic_deep_analysis.py:78: in _wait_for_task_completed
+    pytest.fail(f"task failed: {data.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+---------------------------- Captured stderr setup -----------------------------
+2026-07-11 22:28:52,831 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:28:52,848] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:28:52,848 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-07-11 22:28:52,848 - api.ic_analysis_service - INFO - IC analysis task started: 28e49b47-4d24-4369-9645-47089b89b75f
+2026-07-11 22:28:52,850 - api.middleware.request - INFO - [5179112c] POST /api/v1/ic/analyze - 200 - 0.018s
+2026-07-11 22:28:52,852 - api.ic_analysis_service - ERROR - IC analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 228, in _run_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+2026-07-11 22:28:52,865 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+2026-07-11 22:28:52,865 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:52,866 - api.middleware.request - INFO - [ab4030f2] GET /api/v1/ic/task/28e49b47-4d24-4369-9645-47089b89b75f - 200 - 0.001s
+2026-07-11 22:28:52,867 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/28e49b47-4d24-4369-9645-47089b89b75f "HTTP/1.1 200 OK"
+------------------------------ Captured log setup ------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:437 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:83 IC analysis task started: 28e49b47-4d24-4369-9645-47089b89b75f
+INFO     api.middleware.request:middleware.py:64 [5179112c] POST /api/v1/ic/analyze - 200 - 0.018s
+ERROR    api.ic_analysis_service:ic_analysis_service.py:256 IC analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 228, in _run_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [ab4030f2] GET /api/v1/ic/task/28e49b47-4d24-4369-9645-47089b89b75f - 200 - 0.001s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/28e49b47-4d24-4369-9645-47089b89b75f "HTTP/1.1 200 OK"
+__________________ ERROR at setup of test_deep_analysis_start __________________
+tests/api/test_ic_deep_analysis.py:163: in completed_ic_task
+    return _build_completed_ic_task(sample_paths)
+tests/api/test_ic_deep_analysis.py:151: in _build_completed_ic_task
+    _wait_for_task_completed(task_id)
+tests/api/test_ic_deep_analysis.py:78: in _wait_for_task_completed
+    pytest.fail(f"task failed: {data.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+_________________ ERROR at setup of test_deep_analysis_result __________________
+tests/api/test_ic_deep_analysis.py:163: in completed_ic_task
+    return _build_completed_ic_task(sample_paths)
+tests/api/test_ic_deep_analysis.py:151: in _build_completed_ic_task
+    _wait_for_task_completed(task_id)
+tests/api/test_ic_deep_analysis.py:78: in _wait_for_task_completed
+    pytest.fail(f"task failed: {data.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+_____ ERROR at setup of test_deep_analysis_result_serializes_numpy_scalars _____
+tests/api/test_ic_deep_analysis.py:163: in completed_ic_task
+    return _build_completed_ic_task(sample_paths)
+tests/api/test_ic_deep_analysis.py:151: in _build_completed_ic_task
+    _wait_for_task_completed(task_id)
+tests/api/test_ic_deep_analysis.py:78: in _wait_for_task_completed
+    pytest.fail(f"task failed: {data.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+________________ ERROR at setup of test_export_csv_summary_200 _________________
+tests/api/test_export_api.py:133: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:82: in _wait_for_task
+    pytest.fail(f"task failed: {payload.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+---------------------------- Captured stderr setup -----------------------------
+2026-07-11 22:28:53,031 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:28:53,047] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:28:53,047 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-07-11 22:28:53,048 - api.ic_analysis_service - INFO - IC analysis task started: 759a8cea-0ff0-4616-b3d8-371e20602940
+2026-07-11 22:28:53,050 - api.middleware.request - INFO - [dbf5ed0f] POST /api/v1/ic/analyze - 200 - 0.018s
+2026-07-11 22:28:53,051 - api.ic_analysis_service - ERROR - IC analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 228, in _run_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+2026-07-11 22:28:53,052 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+2026-07-11 22:28:53,053 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:53,054 - api.middleware.request - INFO - [4b4e58ef] GET /api/v1/ic/task/759a8cea-0ff0-4616-b3d8-371e20602940 - 200 - 0.001s
+2026-07-11 22:28:53,054 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/759a8cea-0ff0-4616-b3d8-371e20602940 "HTTP/1.1 200 OK"
+------------------------------ Captured log setup ------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:437 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:83 IC analysis task started: 759a8cea-0ff0-4616-b3d8-371e20602940
+INFO     api.middleware.request:middleware.py:64 [dbf5ed0f] POST /api/v1/ic/analyze - 200 - 0.018s
+ERROR    api.ic_analysis_service:ic_analysis_service.py:256 IC analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 228, in _run_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [4b4e58ef] GET /api/v1/ic/task/759a8cea-0ff0-4616-b3d8-371e20602940 - 200 - 0.001s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/759a8cea-0ff0-4616-b3d8-371e20602940 "HTTP/1.1 200 OK"
+___________ ERROR at setup of test_export_csv_detailed_factor_return ___________
+tests/api/test_export_api.py:133: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:82: in _wait_for_task
+    pytest.fail(f"task failed: {payload.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+__________________ ERROR at setup of test_export_ai_json_200 ___________________
+tests/api/test_export_api.py:133: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:82: in _wait_for_task
+    pytest.fail(f"task failed: {payload.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+__________________ ERROR at setup of test_export_markdown_200 __________________
+tests/api/test_export_api.py:133: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:82: in _wait_for_task
+    pytest.fail(f"task failed: {payload.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+____________________ ERROR at setup of test_export_hdf5_200 ____________________
+tests/api/test_export_api.py:133: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:82: in _wait_for_task
+    pytest.fail(f"task failed: {payload.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+_______________ ERROR at setup of test_export_invalid_format_422 _______________
+tests/api/test_export_api.py:133: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:82: in _wait_for_task
+    pytest.fail(f"task failed: {payload.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+________ ERROR at setup of test_export_csv_detailed_without_module_422 _________
+tests/api/test_export_api.py:133: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:82: in _wait_for_task
+    pytest.fail(f"task failed: {payload.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+=================================== FAILURES ===================================
+_________________________ test_full_analysis_endpoint __________________________
+tests/api/test_ic_deep_analysis.py:239: in test_full_analysis_endpoint
+    _wait_for_task_completed(task_id)
+tests/api/test_ic_deep_analysis.py:78: in _wait_for_task_completed
+    pytest.fail(f"task failed: {data.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+----------------------------- Captured stderr call -----------------------------
+2026-07-11 22:28:52,887 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:28:52,906] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:28:52,906 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-07-11 22:28:52,906 - api.ic_analysis_service - INFO - IC full analysis task started: 8d7738d4-9288-4a82-84e0-ae96ad81c978
+2026-07-11 22:28:52,906 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:52,908 - api.middleware.request - INFO - [c82ba1e8] POST /api/v1/ic/full-analysis - 200 - 0.020s
+2026-07-11 22:28:52,910 - api.ic_analysis_service - ERROR - IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+2026-07-11 22:28:52,911 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+2026-07-11 22:28:52,911 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:52,912 - api.middleware.request - INFO - [9ae43e82] GET /api/v1/ic/task/8d7738d4-9288-4a82-84e0-ae96ad81c978 - 200 - 0.001s
+2026-07-11 22:28:52,913 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/8d7738d4-9288-4a82-84e0-ae96ad81c978 "HTTP/1.1 200 OK"
+------------------------------ Captured log call -------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:437 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:749 IC full analysis task started: 8d7738d4-9288-4a82-84e0-ae96ad81c978
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [c82ba1e8] POST /api/v1/ic/full-analysis - 200 - 0.020s
+ERROR    api.ic_analysis_service:ic_analysis_service.py:838 IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [9ae43e82] GET /api/v1/ic/task/8d7738d4-9288-4a82-84e0-ae96ad81c978 - 200 - 0.001s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/8d7738d4-9288-4a82-84e0-ae96ad81c978 "HTTP/1.1 200 OK"
+_________________ test_full_analysis_with_deep_analysis_config _________________
+tests/api/test_ic_deep_analysis.py:274: in test_full_analysis_with_deep_analysis_config
+    _wait_for_task_completed(task_id)
+tests/api/test_ic_deep_analysis.py:78: in _wait_for_task_completed
+    pytest.fail(f"task failed: {data.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+----------------------------- Captured stderr call -----------------------------
+2026-07-11 22:28:52,922 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:28:52,938] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:28:52,938 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-07-11 22:28:52,938 - api.ic_analysis_service - INFO - IC full analysis task started: a30cc25f-2942-49c0-b869-af71f00f578e
+2026-07-11 22:28:52,938 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:52,941 - api.middleware.request - INFO - [83e52439] POST /api/v1/ic/full-analysis - 200 - 0.019s
+2026-07-11 22:28:52,942 - api.ic_analysis_service - ERROR - IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+2026-07-11 22:28:52,943 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+2026-07-11 22:28:52,943 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:52,944 - api.middleware.request - INFO - [72c7cd2c] GET /api/v1/ic/task/a30cc25f-2942-49c0-b869-af71f00f578e - 200 - 0.001s
+2026-07-11 22:28:52,945 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/a30cc25f-2942-49c0-b869-af71f00f578e "HTTP/1.1 200 OK"
+------------------------------ Captured log call -------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:437 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:749 IC full analysis task started: a30cc25f-2942-49c0-b869-af71f00f578e
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [83e52439] POST /api/v1/ic/full-analysis - 200 - 0.019s
+ERROR    api.ic_analysis_service:ic_analysis_service.py:838 IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [72c7cd2c] GET /api/v1/ic/task/a30cc25f-2942-49c0-b869-af71f00f578e - 200 - 0.001s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/a30cc25f-2942-49c0-b869-af71f00f578e "HTTP/1.1 200 OK"
+______________________________ test_full_analysis ______________________________
+tests/api/test_ic_deep_analysis.py:346: in test_full_analysis
+    _wait_for_task_completed(task_id)
+tests/api/test_ic_deep_analysis.py:78: in _wait_for_task_completed
+    pytest.fail(f"task failed: {data.get('error')}")
+E   Failed: task failed: label horizon cannot be resolved from column: label
+----------------------------- Captured stderr call -----------------------------
+2026-07-11 22:28:52,987 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-11 22:28:53,003] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-11 22:28:53,003 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-07-11 22:28:53,003 - api.ic_analysis_service - INFO - IC full analysis task started: 98d05727-7df3-4743-87da-e6b26b1164b1
+2026-07-11 22:28:53,004 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:53,006 - api.middleware.request - INFO - [2ddb40ce] POST /api/v1/ic/full-analysis - 200 - 0.018s
+2026-07-11 22:28:53,007 - api.ic_analysis_service - ERROR - IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+2026-07-11 22:28:53,008 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+2026-07-11 22:28:53,008 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-07-11 22:28:53,010 - api.middleware.request - INFO - [5a829338] GET /api/v1/ic/task/98d05727-7df3-4743-87da-e6b26b1164b1 - 200 - 0.001s
+2026-07-11 22:28:53,010 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/ic/task/98d05727-7df3-4743-87da-e6b26b1164b1 "HTTP/1.1 200 OK"
+------------------------------ Captured log call -------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:437 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:749 IC full analysis task started: 98d05727-7df3-4743-87da-e6b26b1164b1
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [2ddb40ce] POST /api/v1/ic/full-analysis - 200 - 0.018s
+ERROR    api.ic_analysis_service:ic_analysis_service.py:838 IC full analysis task failed: label horizon cannot be resolved from column: label
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 787, in _run_full_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 857, in analyze
+    features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2042, in _stage0_ingestion
+    horizon = _resolve_label_horizon_from_column(str(label_series.name), active_config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 288, in _resolve_label_horizon_from_column
+    raise InvalidInputError(f"label horizon cannot be resolved from column: {name}")
+momentum.core.exceptions.InvalidInputError: label horizon cannot be resolved from column: label
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/ic/full-analysis "HTTP/1.1 200 OK"
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.middleware.request:middleware.py:64 [5a829338] GET /api/v1/ic/task/98d05727-7df3-4743-87da-e6b26b1164b1 - 200 - 0.001s
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/ic/task/98d05727-7df3-4743-87da-e6b26b1164b1 "HTTP/1.1 200 OK"
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR tests/api/test_ic_analysis_api.py::test_ic_task_status - Failed: task timeout
+ERROR tests/api/test_ic_analysis_api.py::test_ic_result - Failed: task timeout
+ERROR tests/api/test_ic_analysis_api.py::test_ic_summary - Failed: task timeout
+ERROR tests/api/test_ic_analysis_api.py::test_ic_top_features - Failed: task timeout
+ERROR tests/api/test_ic_analysis_api.py::test_ic_quantile_and_correlation - Failed: task timeout
+ERROR tests/api/test_ic_analysis_api.py::test_ic_grouped - Failed: task timeout
+ERROR tests/api/test_ic_analysis_api.py::test_ic_refilter - Failed: task timeout
+ERROR tests/api/test_ic_analysis_api.py::test_ic_export_csv - Failed: task timeout
+ERROR tests/api/test_ic_analysis_api.py::test_ic_export_hdf5 - Failed: task timeout
+ERROR tests/api/test_ic_deep_analysis.py::test_start_deep_analysis_and_get_result - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_ic_deep_analysis.py::test_deep_analysis_start - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_ic_deep_analysis.py::test_deep_analysis_result - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_ic_deep_analysis.py::test_deep_analysis_result_serializes_numpy_scalars - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_export_api.py::test_export_csv_summary_200 - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_export_api.py::test_export_csv_detailed_factor_return - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_export_api.py::test_export_ai_json_200 - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_export_api.py::test_export_markdown_200 - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_export_api.py::test_export_hdf5_200 - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_export_api.py::test_export_invalid_format_422 - Failed: task failed: label horizon cannot be resolved from column: label
+ERROR tests/api/test_export_api.py::test_export_csv_detailed_without_module_422 - Failed: task failed: label horizon cannot be resolved from column: label
+FAILED tests/api/test_ic_deep_analysis.py::test_full_analysis_endpoint - Failed: task failed: label horizon cannot be resolved from column: label
+FAILED tests/api/test_ic_deep_analysis.py::test_full_analysis_with_deep_analysis_config - Failed: task failed: label horizon cannot be resolved from column: label
+FAILED tests/api/test_ic_deep_analysis.py::test_full_analysis - Failed: task failed: label horizon cannot be resolved from column: label
+============== 3 failed, 9 passed, 1 warning, 20 errors in 18.18s ==============
+DIGEST_DIFF_EMPTY[V6]=1

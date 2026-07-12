@@ -12,6 +12,12 @@ from momentum.Analysis.model_types import (
     PRMetrics,
     PrecisionAtKResult,
 )
+from tests.fixtures.ic_persist_redirect import get_active_redirect_root
+
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
 
 
 def test_train_model_returns_model_performance(synthetic_training_data):
@@ -279,7 +285,9 @@ def test_save_load_format_error_branches(trained_lightgbm, tmp_path):
     with pytest.raises(ValueError, match=".pkl"):
         trained_lightgbm.save_model(str(wrong_suffix))
 
-    payload_path = Path("data_cache/models/lightgbm_bad_payload.pkl")
+    redirect_root = get_active_redirect_root()
+    assert redirect_root is not None
+    payload_path = redirect_root / "models/lightgbm_bad_payload.pkl"
     payload_path.parent.mkdir(parents=True, exist_ok=True)
     loader = LightGBMAnalyzer()
 

@@ -389,6 +389,8 @@ def test_flag_toggles_path(tmp_path: Path) -> None:
     assert on_report["metadata"]["ic_train_test_split"]["applied"] is True
 
 
+@pytest.mark.ic_persist_redirect
+@pytest.mark.usefixtures("ic_persist_redirect")
 def test_fallback_insufficient_data_marks_applied_false(tmp_path: Path) -> None:
     features = _real_btc_frame(limit=120)
     labels = pd.DataFrame({"return_5": _return_label(features)}, index=features.index)
@@ -434,6 +436,8 @@ def test_irregular_timestamps_still_fail_closed(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.ic_persist_redirect
+@pytest.mark.usefixtures("ic_persist_redirect")
 def test_oos_applied_true_when_sufficient(tmp_path: Path) -> None:
     features = _real_btc_frame(limit=760)
     labels = pd.DataFrame({"return_5": _return_label(features)}, index=features.index)

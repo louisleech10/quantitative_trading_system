@@ -17,6 +17,8 @@ from tests.fixtures.data_manifest import (
     verify_kline_entry,
 )
 
+pytest_plugins = ["tests.fixtures.ic_persist_redirect_plugin"]
+
 FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
 FEATURE_KLINE_H5_PATH = Path(FEATURE_KLINE_CACHE_DIR) / "kline_cache.h5"
 

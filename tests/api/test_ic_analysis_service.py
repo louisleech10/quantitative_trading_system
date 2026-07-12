@@ -54,6 +54,8 @@ def _require_run() -> None:
 # 失敗點就是 _materialize_features_for_ic→h5 時間軸→_validate_expected_frequency;
 # 在該邊界斷言即完整、可證偽閉合此 finding。mutation:還原 attach → h5 落 arange
 # 偽時間軸 → 下方 assert(真時間軸 + 驗證不 raise)FAIL。
+@pytest.mark.ic_persist_redirect
+@pytest.mark.usefixtures("ic_persist_redirect")
 def test_analyze_real_run_split_validation_passes_with_real_axis() -> None:
     _require_run()
     service = ICAnalysisService()
@@ -76,6 +78,8 @@ def test_analyze_real_run_split_validation_passes_with_real_axis() -> None:
 
 
 @pytest.mark.ic_run_selector
+@pytest.mark.ic_persist_redirect
+@pytest.mark.usefixtures("ic_persist_redirect")
 def test_resolve_run_path_contains_config_hash() -> None:
     _require_run()
     service = ICAnalysisService()

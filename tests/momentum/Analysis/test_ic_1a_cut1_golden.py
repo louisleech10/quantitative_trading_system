@@ -12,6 +12,11 @@ import pytest
 from api.models.ic_models import FeatureFilterConfig, ICAnalyzeRequest
 from api.services.ic_analysis_service import ICAnalysisService
 
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
 
 BASE_DIR = Path("tests/golden/ic_phase1_1a_cut1")
 BASELINE_PATH = BASE_DIR / "baseline_old_btc_1h_a384e6d2.json"

@@ -17,6 +17,11 @@ from api.services.ic_analysis_service import ic_analysis_service
 
 client = TestClient(app)
 
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
 
 def _reset_rate_limit_state() -> None:
     current = app.middleware_stack
@@ -121,8 +126,7 @@ def sample_paths(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     }
 
 
-@pytest.fixture(scope="module")
-def completed_ic_task(sample_paths: dict[str, str]) -> str:
+def _build_completed_ic_task(sample_paths: dict[str, str]) -> str:
     request_data = {
         "features_path": sample_paths["features_path"],
         "labels_path": sample_paths["labels_path"],
@@ -146,6 +150,20 @@ def completed_ic_task(sample_paths: dict[str, str]) -> str:
     task_id = response.json()["task_id"]
     _wait_for_task_completed(task_id)
     return task_id
+
+
+@pytest.fixture(scope="module")
+def completed_ic_task(
+    sample_paths: dict[str, str],
+    redirect_patch_set,
+    redirect_root_module: Path,
+) -> str:
+    ctx = redirect_patch_set.activate(redirect_root_module, owner="completed_ic_task")
+    try:
+        return _build_completed_ic_task(sample_paths)
+    finally:
+        assert not ctx.spy.violations
+        redirect_patch_set.deactivate(ctx)
 
 
 def test_list_available_features_success(sample_paths: dict[str, str]) -> None:

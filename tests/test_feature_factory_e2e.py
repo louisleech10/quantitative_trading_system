@@ -7,8 +7,23 @@ import pytest
 
 from momentum.factories import create_feature_factory, create_kline_storage_manager
 from momentum.FeatureEngineering.config_manager import ConfigManager
+from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
 from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+from tests.fixtures.ic_persist_redirect import get_active_redirect_root
+
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
+
+def _create_e2e_factory():
+    factory = create_feature_factory()
+    active_root = get_active_redirect_root()
+    if active_root is not None:
+        factory._storage = FeatureStorage(str(active_root / "features"))
+    return factory
 
 
 def _load_data(symbol: str, timeframe: str):
@@ -33,7 +48,7 @@ def _has_timeframes(symbol: str, timeframes: list[str]) -> bool:
 
 def test_standard_preset_btcusdt():
     _require_data("BTCUSDT", "12h")
-    factory = create_feature_factory()
+    factory = _create_e2e_factory()
     result = factory.generate_features(
         "BTCUSDT",
         "12h",
@@ -46,7 +61,7 @@ def test_standard_preset_btcusdt():
 
 def test_minimal_preset():
     _require_data("BTCUSDT", "12h")
-    factory = create_feature_factory()
+    factory = _create_e2e_factory()
     result = factory.generate_features(
         "BTCUSDT",
         "12h",
@@ -58,7 +73,7 @@ def test_minimal_preset():
 
 def test_multi_data_source():
     _require_data("BTCUSDT", "12h")
-    factory = create_feature_factory()
+    factory = _create_e2e_factory()
     override = {
         "data_sources": {"enabled_sources": ["close", "volume", "taker_ratio"]},
         "atomic_indicators": {"trend": {"enabled": True}},
@@ -75,7 +90,7 @@ def test_multi_timeframe_alignment():
     if not _has_timeframes(symbol, timeframes):
         pytest.skip("missing multi-timeframe data")
 
-    factory = create_feature_factory()
+    factory = _create_e2e_factory()
     config = ConfigManager().get_merged_config(
         {"timeframes": {"primary": "12h", "training": timeframes}}
     )
@@ -90,7 +105,7 @@ def test_multi_timeframe_alignment():
 
 def test_user_override_rsi_period():
     _require_data("BTCUSDT", "12h")
-    factory = create_feature_factory()
+    factory = _create_e2e_factory()
     override = {
         "atomic_indicators": {
             "momentum": {
@@ -121,7 +136,7 @@ def test_no_future_leak_alignment_check():
 
 def test_naming_convention_basic():
     _require_data("BTCUSDT", "12h")
-    factory = create_feature_factory()
+    factory = _create_e2e_factory()
     result = factory.generate_features("BTCUSDT", "12h", config_override={"preset": "minimal"})
     for name in result.features_df.columns:
         assert name
@@ -135,7 +150,7 @@ def test_naming_convention_basic():
 
 def test_metadata_completeness():
     _require_data("BTCUSDT", "12h")
-    factory = create_feature_factory()
+    factory = _create_e2e_factory()
     result = factory.generate_features("BTCUSDT", "12h", config_override={"preset": "minimal"})
     metadata = result.metadata
     assert metadata["feature_count"] == result.feature_count

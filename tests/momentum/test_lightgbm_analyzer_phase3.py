@@ -8,6 +8,11 @@ import pytest
 from momentum.Analysis.lightgbm_analyzer import LightGBMAnalyzer
 from momentum.core.protocols import IModelTrainer
 
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
 
 def _make_binary_data(n_samples: int = 160, n_features: int = 8):
     rng = np.random.default_rng(42)

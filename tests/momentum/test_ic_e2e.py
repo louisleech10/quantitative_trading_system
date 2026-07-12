@@ -10,6 +10,11 @@ import pytest
 
 from momentum.factories import create_ic_analyzer
 
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
 
 _RUN_E2E_PERF = os.getenv("RUN_IC_E2E_PERF") == "1"
 

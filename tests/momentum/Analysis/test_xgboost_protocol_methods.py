@@ -10,6 +10,11 @@ from momentum.Analysis.lightgbm_analyzer import LightGBMAnalyzer
 from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
 from momentum.core.protocols import IModelTrainer
 
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
 
 def _make_binary_data(n_samples: int = 180, n_features: int = 8):
     rng = np.random.default_rng(7)

@@ -17,6 +17,11 @@ from api.main import app
 
 client = TestClient(app)
 
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
 
 def _write_features_h5(path: Path, features: np.ndarray, timestamps: np.ndarray, names: list[str]) -> None:
     with h5py.File(path, "w") as file:
@@ -66,8 +71,7 @@ def _wait_for_task(task_id: str, timeout: float = 15.0) -> None:
     pytest.fail("task timeout")
 
 
-@pytest.fixture(scope="session")
-def ic_analysis_task(tmp_path_factory: pytest.TempPathFactory) -> dict:
+def _build_ic_analysis_task(tmp_path_factory: pytest.TempPathFactory) -> dict:
     temp_dir = tmp_path_factory.mktemp("ic_api")
     features_path = temp_dir / "features.h5"
     labels_path = temp_dir / "labels.h5"
@@ -111,6 +115,20 @@ def ic_analysis_task(tmp_path_factory: pytest.TempPathFactory) -> dict:
     _wait_for_task(task_id)
 
     return {"task_id": task_id, "feature_names": feature_names}
+
+
+@pytest.fixture(scope="session")
+def ic_analysis_task(
+    tmp_path_factory: pytest.TempPathFactory,
+    redirect_patch_set,
+    redirect_root_session: Path,
+) -> dict:
+    ctx = redirect_patch_set.activate(redirect_root_session, owner="ic_analysis_task")
+    try:
+        return _build_ic_analysis_task(tmp_path_factory)
+    finally:
+        assert not ctx.spy.violations
+        redirect_patch_set.deactivate(ctx)
 
 
 def test_ic_task_status(ic_analysis_task: dict) -> None:

@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from tests.fixtures.ic_persist_redirect_manual import run_with_manual_redirect  # noqa: E402
 from api.models.ic_models import FeatureFilterConfig, ICAnalyzeRequest  # noqa: E402
 from api.services.ic_analysis_service import ICAnalysisService  # noqa: E402
 from momentum.factories import create_feature_reader  # noqa: E402
@@ -223,4 +224,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    with run_with_manual_redirect():
+        raise SystemExit(main())

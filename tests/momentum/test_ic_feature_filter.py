@@ -11,6 +11,11 @@ from momentum.Analysis.ic_config_schema import FeatureFilterSchema, load_ic_conf
 from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
 from momentum.core.exceptions import InvalidInputError
 
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
 
 def _orchestrator() -> ICFilterOrchestrator:
     return ICFilterOrchestrator(load_ic_config())

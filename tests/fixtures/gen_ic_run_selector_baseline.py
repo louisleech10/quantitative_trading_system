@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from tests.fixtures.ic_persist_redirect_manual import run_with_manual_redirect
 from api.models.ic_models import ICAnalyzeRequest
 from api.services.ic_analysis_service import ICAnalysisService
 from momentum.factories import create_feature_library
@@ -221,4 +222,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    with run_with_manual_redirect():
+        asyncio.run(main())

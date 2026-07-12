@@ -9,6 +9,11 @@ import pytest
 from momentum.Analysis.lightgbm_analyzer import LightGBMAnalyzer
 from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
 
+pytestmark = [
+    pytest.mark.ic_persist_redirect,
+    pytest.mark.usefixtures("ic_persist_redirect"),
+]
+
 
 ENGINES = ("lightgbm", "xgboost")
 
