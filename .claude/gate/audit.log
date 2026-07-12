@@ -13520,3 +13520,57 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-GOLDEN-grok.md", "output_sha256": "23da203b66f964e6c192ad2b9457ac119a9c59f508347820deabb51c80cb170a", "task_id": "t5-golden-grok", "ts": "2026-07-12T08:19:51Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/P2DEBT-T5-GOLDEN-composer.md", "output_sha256": "527b41229ab7895dc7eed0acb57d98b6e5afcf79b050ff6ac569959775c4c0f5", "task_id": "t5-golden-composer", "ts": "2026-07-12T08:19:51Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docdrift-study-grok", "ts": "2026-07-12T11:38:45Z"}
+=== 2026-07-12 19:38:45 | dispatch ===
+  ts=2026-07-12 19:38:45
+  kind=dispatch
+  intent=docdrift study by grok: resolve rule5/6 conflict + overlap analysis + single-source proposal
+  risk=low
+  facts_asked=n/a: chair drift map
+  review_role=grok=drift researcher
+  template=n/a: research consult
+  adversarial=waived:read-only research
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docdrift-study-codex", "ts": "2026-07-12T11:38:45Z"}
+=== 2026-07-12 19:38:45 | dispatch ===
+  ts=2026-07-12 19:38:45
+  kind=dispatch
+  intent=docdrift study by codex: resolve rule5/6 conflict + overlap analysis + single-source proposal
+  risk=low
+  facts_asked=n/a: chair drift map
+  review_role=codex=drift researcher
+  template=n/a: research consult
+  adversarial=waived:read-only research
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docdrift-study-composer", "ts": "2026-07-12T11:38:45Z"}
+=== 2026-07-12 19:38:45 | dispatch ===
+  ts=2026-07-12 19:38:45
+  kind=dispatch
+  intent=docdrift study by composer: resolve rule5/6 conflict + overlap analysis + single-source proposal
+  risk=low
+  facts_asked=n/a: chair drift map
+  review_role=composer=drift researcher
+  template=n/a: research consult
+  adversarial=waived:read-only research
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCDRIFT-STUDY-grok.md", "output_sha256": "548271ff275b6ffdbd8d9b72372f1634f9f64e600bb37f5efc8172338285883f", "task_id": "docdrift-study-grok", "ts": "2026-07-12T11:43:18Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCDRIFT-STUDY-codex.md", "output_sha256": "fac1a757209497f7453010aac89cc18df6a9e29bcf76665a7dc61913b88b7f32", "task_id": "docdrift-study-codex", "ts": "2026-07-12T11:43:18Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCDRIFT-STUDY-composer.md", "output_sha256": "6d92bbdb49b8d7844f6ca38996cb48d0ca2bb0fd8bbac05e10b6ba28f579fc6e", "task_id": "docdrift-study-composer", "ts": "2026-07-12T11:43:18Z"}
