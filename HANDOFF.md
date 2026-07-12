@@ -1,22 +1,20 @@
 # Handoff
 **Agent**: Claude(Opus 4.8) | **Time**: 2026-07-12 | **Branch**: main
 
-## ✅ 本 session:doc 漂移 D1+D2 施工 + 委員 review 修訂(純文件治理,未改程式邏輯;未 commit)
-**D1**:CLAUDE.md §The 7 Decoupling Rules 定 canonical 唯一權威 + named invariant Rule 8(singleton,誠實記殘留)/Rule 9(callback);ARCH §162 錯表→canonical、§1402 假✅修正;AGENTS/.cursorrules/DEV_GUIDE 頂加 pointer;兩 scanner 加註解頭編號對照(grep 零改)。
-**D2**:factory map 補漏+標「權威=factories.py 78 個」;§60 日期;FF UI「部分已建」;DEV_GUIDE §237 blanket-ban→分層(對齊 IC_API_TEST_LAYERING)、§327、§54 多agent。
+## ✅ 本 session 完成(全 push,工作樹乾淨除既有 settings/audit)
+**D1+D2 doc 漂移治理(commit b3f67bf)**:解耦規則定 CLAUDE.md 為 canonical 唯一權威;假綠全據實化;兩競爭權威 doc(PRODUCT_VISION/全系統解耦Prompt)降級;測試分層修正。codex+composer 雙審 BLOCK→修→codex 閉合全 CLOSED。
+**簡化研究三家收斂 + reconcile(commit 5ff380d)**:Claude 自產 + codex+composer+grok 三家互審;定案兩批次。
 
-## 🔴 委員 review(codex+composer 雙 BLOCK)揪出更廣真相——已全數修訂
-- **R2/R3/R4 全紅,非只 R4**:`check_decoupling.sh` 實跑 R2=5、R3=12、R4=1;phase4 只窄查特定檔故長期誤報綠(**我首輪 tail 截斷只看到 R4,驗收失誤,composer 抓到**)。R2/R3=momentum/Analysis 與 api/* 直接 import `momentum/FeatureEngineering` 共用工具(warmup_lookup/consumer_gate/run_paths…)。ARCH 主表/IC 小節/PRODUCT_VISION 已全改據實⚠️。
-- **兩個競爭權威 doc(我首輪漏)**:PRODUCT_VISION.md 自列 7 規則+R2/R3/R4「已達成」假綠→改 pointer+據實;全系統解耦Prompt.md 宣稱「唯一且不可變」+舊 R4/R5/R6→加 HISTORICAL banner+舊→canonical 對照+inline 標失效。
-- scanner over-claim 收斂(ROADMAP 不再稱「查全 R1-7」;canonical R6 標明 phase4 僅跑 Strategy/ 子集);DEV_GUIDE 補 L1 缺口(走 ingest 即使只斷 schema 仍須真 kline);§541 R6 語意釐清。
-- 閉合自驗:grep C1/C2/C3 無殘留假綠/競爭權威✅;phase4 135 passed✅。review 檔=handoffs/DOCDRIFT-D1D2-REVIEW-{codex,composer}.md。
-- **codex 閉合重驗**(handoffs/DOCDRIFT-D1D2-REVIEW-codex-closure.md):競爭權威+R2/R3 主表已 CLOSED;再揪 ARCH:1546「Rule 1-7 全部通過」殘留→**已修**(改為「不宜宣稱全部通過」+指債票);最終 grep 全庫無殘留假綠✅。**所有 BLOCKING 已閉合**。
+## 🔴 揪出的既存問題(已入帳,待各自票)
+1. **解耦 R2/R3/R4 全紅(18 筆)**:phase4 是半套 scanner 誤報綠;真狀態 R2=5/R3=12/R4=1(FeatureEngineering 共用工具直接 import)。ROADMAP P2 triage 債票(架構判斷:真違規 vs 該豁免)。
+2. **TGF 觸發器既存斷鏈**:模板指「Feature Factory 章/API 節」但無對應穩定 H2。已定案納入簡化 epic 批次 A 修。
 
-## 🔴 待你決策/待辦
-- **解耦 R2/R3/R4 既存違規**(共 18 筆)已立 ROADMAP P2 債票:R2/R3 是真違規還是 FeatureEngineering 該豁免為共用基礎設施=架構 triage(非 doc 能定);code 本 session 不動(你 2026-07-12 裁定立票)。
-- **commit**:doc diff 待你點頭(排除 .claude/settings.json 既有改動、.claude/gate/audit.log)。
-- 派 codex 閉合重驗中(確認 findings 真關閉)。
-- 之後:文檔簡化研究(委員會,接 D1/D2)。
+## ▶ 下一步:文檔簡化 epic(使用者定案兩批都做,TGF 納入)
+中型文件治理,走完整管線。**下一步 = Claude 起草批次 A SPEC**(每段刪/外移/留分類 + 先建後刪 anchor + 驗收腳本)→ 雙家族 adversarial 審 → reconcile 戳 → 實作 → 另一方 review。
+- **批次 A**(應做):修 TGF 斷鏈 + 建 ARCH `## Feature Factory 架構` 穩定 H2 + 刀1(已實現 853→能力索引+修假綠狀態欄)+ 刀3 目錄 364→~80 + 修 README 假行數。預期 ARCH ~1150-1350。
+- **批次 B**(後排):刀2(DEV 8 通用章→300-450)+ 解耦枚舉→pointer(留 Artifact Contract/V2V3 why)+ 修 §1277+ 損壞 markdown+錯置 API 區塊。預期全檔 ~2200-2500(−44〜−51%)。
+- 鐵律:驗收看資訊類型非硬行數;抽 contract 非整批上移;單檔 A/B/C 不拆 appendix。
+- 研究鏈:handoffs/DOCDRIFT-SIMPLIFY-{STUDY-claude/codex/composer/grok,RECONCILE}.md。
 
 ## 其他剩餘(doc 後)
-1c Net IC 量綱(大,net_ic_analyzer.py:34)→1d/1f→實測→AI Agent。
+1c Net IC 量綱(大,正確性紅線,net_ic_analyzer.py:34)→1d/1f→實測→AI Agent。

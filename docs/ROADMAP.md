@@ -55,6 +55,12 @@
 - **範圍**:盤點所有 preset 定義與引用點（config/前端/文件）→ 確認零真實使用者 → 移除或明確 deprecate;涉 config schema 下游,走「中」型管線。
 - **狀態**:已排程未啟動;不擋 IC。
 
+### P2 — 文檔簡化 epic(2026-07-12 三家研究收斂+使用者定案兩批次,出處 handoffs/DOCDRIFT-SIMPLIFY-{STUDY-*,RECONCILE}.md)
+- **為何**:ARCH(2044)+DEV_GUIDE(2434)=4478 行,漂移面大、假綠濃縮;真 ROI=抗漂移+消假綠(非省 token)。
+- **範圍(兩批)**:A=修 TGF 斷鏈+建 ARCH `## Feature Factory 架構` 穩定 H2+刀1 已實現 853→能力索引(修假綠狀態欄)+刀3 目錄→~80+README 假行數;B=刀2 DEV 8 通用章→300-450+解耦枚舉→pointer(留 Artifact Contract/V2V3 why)+修 §1277+ 損壞 markdown。預期全檔→~2200-2500(−44〜−51%)。
+- **鐵律**:驗收看資訊類型非硬行數;抽 contract 非整批上移;單檔 A/B/C 不拆 appendix;先建後刪 anchor。
+- **狀態**:研究+reconcile 完成;下一步 Claude 起草批次 A SPEC→雙家族審→實作。中型文件治理完整管線。
+
 ### P2 — 解耦 Rule 4 既存違規修復(2026-07-12 doc 漂移施工揪出,使用者裁定立票、code 暫不動)
 - **問題(不只 Rule 4,doc review 揭更廣)**:`check_decoupling.sh` 2026-07-12 實跑報 **R2=5、R3=12、R4=1** 全紅:
   - R4:`api/services/feature_factory_batch_adapters.py:9` service→service import(1 筆)。
