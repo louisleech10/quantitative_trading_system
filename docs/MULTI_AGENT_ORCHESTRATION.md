@@ -34,7 +34,7 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 | 3 | code review | 另一方執行端 | 中/大必派，實作者不自審 |
 | — | 規劃委員會 read-only | **`agy -p`**（Gemini） | 諮詢用,不得寫入 |
 
-**現行分工(2026-07-11 使用者指示,四調):中/大實作=Codex(`codex`,gpt-5.6-sol high);code review/adversarial=Grok 4.5(`grok`)+Composer 2.5(`cursor-agent`)雙審;實作型 SPEC/TODO 初稿=Composer 起草→兩家非作者審;委員會審查=Codex+Composer+Grok 三家(Grok I/O 留存 handoffs/ 供觀察);簽核 quorum=Claude+Codex+Composer 不變(Grok 簽核票待驗收期滿裁決);小=Claude 自做。Grok 評鑑記分持續(docs/reviews/grok_4_5_evaluation.md+HANDOFF 記分素材)。** 選層為**動態**:一律以使用者最新指示為準(依各 agent usage 切換,未來或加新執行端;新執行端須先過 §8 T-D 對等性測試才可寫入)。
+**現行分工(2026-07-12 使用者二次澄清,五調):SPEC/TODO 初稿=**Claude 主委一律起草**(綜合型與全新從零都是;Composer 不再寫初稿,挪審查端——出處 memory feedback_claude_draft_composer_review);中/大實作=**Codex／Grok 動態互換**(依額度/當下指示切換,本 session Grok 大量代跑+實作,非只代跑);code review/adversarial=**Grok+Composer(+Codex)多家**(不是只派 Composer;雙/三家 adversarial 一律保留,實作者不自審);委員會審查=Codex+Composer+Grok 三家(Grok I/O 留存 handoffs/ 供觀察);簽核 quorum=Claude+Codex+Composer 不變(Grok 簽核票待驗收期滿裁決);小=Claude 自做。Grok 評鑑記分持續(docs/reviews/grok_4_5_evaluation.md+HANDOFF 記分素材)。** 選層為**動態**:一律以使用者最新指示為準(依各 agent usage 切換,未來或加新執行端;新執行端須先過 §8 T-D 對等性測試才可寫入)。
 
 誠實邊界：A/B 顯示 codex≈cursor 正確性對等(標準題天花板),選層差異在**人體工學/成本與高風險嚴謹度紀錄**,非 coding 能力;cursor review codex 擋推理/結構盲點,**擋不了共享錯前提/缺使用者事實**(C3)→ facts-first 仍最優先。06-03 定層歷史見 `docs/SCAR_LEDGER.md`。
 
