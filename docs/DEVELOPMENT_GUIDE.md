@@ -1274,9 +1274,12 @@ async def process_large_dataset(task_id, symbols):
                 description=f"處理中... ({idx+1}/{total})",
                 symbol=symbol
             )
+```
+
 前端輪詢最佳實踐
 規則: 長時間任務必須使用輪詢而非直接等待HTTP響應
-typescript// ✅ 正確的輪詢實現
+```typescript
+// ✅ 正確的輪詢實現
 useEffect(() => {
   if (!taskId) return;
   
@@ -1294,114 +1297,53 @@ useEffect(() => {
   // ✅ 清理函數防止內存洩漏
   return () => clearInterval(pollInterval);
 }, [taskId]);
+```
+
 常見錯誤和避免方法
 ❌ 錯誤1: 前端直接等待長時間響應
-typescript// 錯誤：會超時
+```typescript
+// 錯誤：會超時
 const result = await apiClient.longRunningTask();
+```
+
 ✅ 正確: 啟動任務→輪詢狀態→獲取結果
-typescript// 正確：異步追蹤
+```typescript
+// 正確：異步追蹤
 const { task_id } = await apiClient.startTask();
 await pollUntilComplete(task_id);
 const result = await apiClient.getResult(task_id);
+```
+
 ❌ 錯誤2: 固定的進度更新頻率
-python# 錯誤：不管有多少symbol都是每10個更新
+```python
+# 錯誤：不管有多少symbol都是每10個更新
 if (idx + 1) % 10 == 0:
     update_progress()
+```
+
 ✅ 正確: 動態調整頻率
-python# 正確：根據總數動態調整
+```python
+# 正確：根據總數動態調整
 update_interval = max(1, total // 20)
 if (idx + 1) % update_interval == 0:
     update_progress()
+```
+
 ❌ 錯誤3: 忘記清理interval
-typescript// 錯誤：可能造成內存洩漏
+```typescript
+// 錯誤：可能造成內存洩漏
 setInterval(checkStatus, 2000);
+```
+
 ✅ 正確: 使用cleanup函數
-typescript// 正確：確保清理
+```typescript
+// 正確：確保清理
 useEffect(() => {
   const id = setInterval(checkStatus, 2000);
   return () => clearInterval(id);
 }, []);
+```
 
-
----
-
-### 📄 docs/API_SPECIFICATION.md
-
-**位置3**: 在任務狀態查詢API章節補充
-
-找到這一段（大約在第400行附近）：
-```markdown
-## GET /api/v1/search/task/{task_id}
-
-### Response
-```json
-{
-  "success": true,
-  "data": {
-    "task_id": "...",
-    "status": "running",
-    ...
-  }
-}
-
-**在這個Response之後補充**：
-```markdown
-### TaskProgress詳細結構
-
-任務進度信息包含以下欄位：
-```json
-{
-  "progress": {
-    "current_step": 15,              // 當前處理到第幾步
-    "total_steps": 200,              // 總共需要處理多少步
-    "percentage": 7.5,               // 完成百分比
-    "step_description": "處理交易對中...",  // 當前步驟描述
-    "current_symbol": "BTCUSDT",     // 當前處理的symbol
-    "processed_symbols": [           // 已處理的symbol列表
-      "ETHUSDT",
-      "ADAUSDT",
-      ...
-    ],
-    "estimated_remaining_seconds": 1200,  // 預估剩餘時間（秒）
-    "errors": [],                    // 錯誤列表
-    "warnings": []                   // 警告列表
-  }
-}
-前端輪詢建議
-輪詢參數:
-
-輪詢間隔: 2-3秒
-超時設定: 600秒（10分鐘）
-錯誤重試: 最多3次，間隔3秒
-
-輪詢流程:
-1. 啟動任務獲取task_id
-2. 每2秒查詢一次狀態
-3. 如果status=completed，停止輪詢並獲取結果
-4. 如果status=failed，顯示錯誤並停止
-5. 如果超過10分鐘，顯示超時警告
-示例代碼:
-typescriptasync function waitForTaskCompletion(taskId: string) {
-  const maxWaitTime = 600000;  // 10分鐘
-  const pollInterval = 2000;   // 2秒
-  const startTime = Date.now();
-  
-  while (Date.now() - startTime < maxWaitTime) {
-    const response = await apiClient.getTaskStatus(taskId);
-    
-    if (response.data.status === 'completed') {
-      return await apiClient.getTaskResult(taskId);
-    } else if (response.data.status === 'failed') {
-      throw new Error(response.data.error_message);
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
-  }
-  
-  throw new Error('Task timeout');
-}
-
----
 
 ## Python開發規範
 
@@ -2375,8 +2317,13 @@ npm run build
 ❌ 錯誤：
 ```python
 workers = 8  # 假設所有人都用M1
+```
+
 ✅ 正確：
-pythonworkers = get_optimal_workers()  # 動態偵測
+```python
+workers = get_optimal_workers()  # 動態偵測
+```
+
 必須考慮資源限制
 所有並行處理必須：
 

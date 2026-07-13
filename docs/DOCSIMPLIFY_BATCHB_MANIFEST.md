@@ -199,6 +199,7 @@
 - 數據真實性 L0/L1/L2、真實 kline、禁 sanitized：不在 D1 壓縮範圍，既有 doc 唯讀且未入表。
 - retryable/non-retryable 與 hot-loop log：分別綁定 INV-B-ERR-03、INV-B-LOG-05，非「刪」。
 - 硬體自適應章、DEV 權威 banner、長時間任務節：不在 D1 壓縮範圍，target view 只執行 B0 結構修復。
+- **B1 凍結基準（B0 後記入,SPEC L85）**：`## 長時間任務與 API 生命週期` 節(修復後 live DEV)content-hash=`sha256:42eb43771901e789a99f3de88f1e806fd277aa1983ae543cb5ce4d264229a509`——B1/B2 期間該節 hash 不得變。
 - ARCH R2/R3/R4 誠實表、R8 殘留與 scanner 編號語意：架構規則 heading/table 原樣留。
 - V2/V3 why、Artifact Contract、呼叫流程：對應 heading 與 fence/table 全為原樣留。
 - ARCH Feature Factory 章位於 ARCHVIEW 外，既有 ARCH 全程唯讀。
