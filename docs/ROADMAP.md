@@ -59,7 +59,7 @@
 - **為何**:ARCH(2044)+DEV_GUIDE(2434)=4478 行,漂移面大、假綠濃縮;真 ROI=抗漂移+消假綠(非省 token)。
 - **範圍(兩批)**:A=修 TGF 斷鏈+建 ARCH `## Feature Factory 架構` 穩定 H2+刀1 已實現 853→能力索引(修假綠狀態欄)+刀3 目錄→~80+README 假行數;B=刀2 DEV 8 通用章→300-450+解耦枚舉→pointer(留 Artifact Contract/V2V3 why)+修 §1277+ 損壞 markdown。預期全檔→~2200-2500(−44〜−51%)。
 - **鐵律**:驗收看資訊類型非硬行數;抽 contract 非整批上移;單檔 A/B/C 不拆 appendix;先建後刪 anchor。
-- **狀態**:**批次 A 完成(2026-07-13)**——A00 manifest LOCKED→A0.1 FF H2→A0.2 DEV rename+TGF 斷鏈修復→A1 能力索引(853→表,native-tf drift+CAP-14 stage 舊錯一併正名)→A2 目錄+README;anchor checker(`scripts/check_doc_anchors.sh`+11 tests)入庫;§V 全套 gate PASS;ARCH 2044→935 行。每步 Codex 實作+composer/grok 對抗審+閉合重驗(4 輪 BLOCK 全閉)。**批次 B SPEC 已定案(2026-07-13,v2r14,三家 14 輪對抗收斂+reconcile 戳記 PASS)**——待 TODO 生成後 B00→B0→B1/B2 實作;核心=target view+manifest post-state validator。
+- **狀態**:**批次 A 完成(2026-07-13)**——A00 manifest LOCKED→A0.1 FF H2→A0.2 DEV rename+TGF 斷鏈修復→A1 能力索引(853→表,native-tf drift+CAP-14 stage 舊錯一併正名)→A2 目錄+README;anchor checker(`scripts/check_doc_anchors.sh`+11 tests)入庫;§V 全套 gate PASS;ARCH 2044→935 行。每步 Codex 實作+composer/grok 對抗審+閉合重驗(4 輪 BLOCK 全閉)。**批次 B 完成(2026-07-13)**——B00 manifest LOCKED→B0 修損壞(byte==target view,被吞三章重見)→B1 八章壓縮(2382→823)→B2 解耦節收斂(935→643);post-state validator 全量 PASS。**epic 收官:全檔 4478→1466 行(-67%)**,契約全留可機檢、假綠清零、TGF 斷鏈修復。
 
 ### P2 — 解耦 Rule 4 既存違規修復(2026-07-12 doc 漂移施工揪出,使用者裁定立票、code 暫不動)
 - **問題(不只 Rule 4,doc review 揭更廣)**:`check_decoupling.sh` 2026-07-12 實跑報 **R2=5、R3=12、R4=1** 全紅:

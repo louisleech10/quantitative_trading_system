@@ -176,175 +176,11 @@ IDE: VS Code
 
 ### Protocol 注入機制
 
-`momentum/` 內跨 Domain 依賴透過 Protocol 介面解耦（`momentum/core/protocols.py`）：
-
-```python
-class IKlineReader(Protocol):
-    """K 線讀取介面 — DataExtraction Domain 實作"""
-    def read_klines(self, symbol, timeframe, start_time, end_time) -> pd.DataFrame: ...
-    def read_klines_around_timestamp(self, symbol, timeframe, timestamp, ...) -> pd.DataFrame: ...
-    def get_metadata(self, symbol, timeframe) -> dict: ...
-
-class IIndicatorEngine(Protocol):
-    """指標計算介面 — Indicators Domain 實作"""
-    def calculate_indicators_from_dataframe(self, df, config) -> pd.DataFrame: ...
-
-class IModelTrainer(Protocol):
-    """模型訓練介面 — Analysis Domain 實作（XGBoost + LightGBM）"""
-    def train_model(self, X, y, config) -> Any: ...
-    def predict_proba(self, features) -> Any: ...
-    def get_feature_importance(self, method, top_n) -> Any: ...
-    def save_model(self, path) -> None: ...
-    def load_model(self, path) -> None: ...
-    def get_model_type(self) -> str: ...
-    def get_model_params(self) -> Dict[str, Any]: ...
-    def get_native_model(self) -> Any: ...
-
-class IOptimizationObjective(Protocol):
-    """可插拔優化目標介面 — Optimization Domain 實作"""
-    @property
-    def name(self) -> str: ...
-    @property
-    def direction(self) -> str: ...
-    def create_search_space(self, trial) -> Dict[str, Any]: ...
-    def evaluate(self, params) -> float: ...
-
-class IBacktestEngine(Protocol):
-    """回測引擎介面 — Strategy Domain 實作（Phase 4）"""
-    def run_backtest(self, signals, kline_data, config) -> Any: ...
-    def get_performance_metrics(self) -> Dict[str, float]: ...
-
-class IPositionSizer(Protocol):
-    """部位管理介面 — Strategy Domain 實作（Phase 4）"""
-    def calculate_position_size(self, signal, equity, risk_params) -> float: ...
-```
+- **INV-B-ARCH-01 Protocol權威指向protocols.py**：跨 Domain 依賴以 `momentum/core/protocols.py` 的 Protocol 注入；介面清單與簽名只以該檔為準，可用 `rg -n '^class I.*\(Protocol\)' momentum/core/protocols.py` 重生。
 
 ### Factory 模式
 
-所有 Domain 物件的建構集中在 `momentum/factories.py`：
-
-```python
-# momentum/factories.py — 涵蓋所有 Domain 的工廠函式
-# ⚠️ 以下為示意分類,非完整清單;權威來源 = momentum/factories.py 本體
-#    (2026-07-12 計 78 個 create_* 工廠函式;新增工廠時不必回填本表,以原始碼為準)。
-
-# ── Data ──
-create_kline_storage_manager()
-create_kline_download_service()
-create_binance_provider()
-
-# ── Search ──
-create_momentum_data_loader()
-create_case_search_engine()
-create_search_configuration()
-create_filter_condition()
-
-# ── Market ──
-create_market_config()
-
-# ── Indicators ──
-create_indicator_engine()
-
-# ── Analysis ──
-create_signal_density_analyzer()
-create_xgboost_analyzer()
-create_model_storage()
-create_feature_storage()
-create_feature_extractor()
-create_feature_validator()
-create_strategy_params()
-create_lightgbm_analyzer()       # Phase 3.7 新增
-create_model_trainer()           # Phase 3.7 新增（通用引擎建構）
-create_model_comparison()        # Phase 3.7 新增
-create_model_config_manager()    # Phase 3.7 新增
-
-# ── IC Gatekeeper ──
-create_ic_analyzer()             # Phase 2
-
-# ── IC Deep Analysis（Phase 2.4-2.12）──
-create_factor_return_analyzer()
-create_factor_centrality_analyzer()
-create_trend_analyzer()
-create_parameter_sensitivity_analyzer()
-create_rolling_oos_validator()
-create_factor_orthogonalizer()
-create_factor_exposure_analyzer()
-create_long_short_analyzer()
-create_feature_quality_diagnostics()
-create_net_ic_analyzer()
-
-# ── Model Enhancement（Phase 3.5）──
-create_probability_calibrator()
-create_walk_forward_validator()
-create_sample_weight_calculator()
-create_adversarial_validator()
-create_combinatorial_purged_cv()
-create_learning_curve_analyzer()
-
-# ── Feature Factory（Phase 1）──
-create_feature_factory()
-
-# ── Statistics ──
-create_expectancy_calculator()
-create_bootstrap_estimator()
-create_cross_symbol_validator()
-create_regime_analyzer()
-
-# ── Pattern ──
-create_pattern_extractor()
-create_pattern_storage()
-create_pattern_validator()
-create_pattern_rule()
-create_pattern()
-
-# ── Optimization ──
-create_parameter_ranges()
-create_optuna_optimizer()
-create_optimization_result()
-
-# ── Strategy（Phase 4）──
-create_backtest_engine()
-create_position_sizer()
-create_strategy_backtest_objective()
-create_model_hyperparam_objective()
-
-# ── Feature Factory 週邊（V7 / registry / MCP）──
-create_feature_preprocessor()
-create_feature_reader()
-create_feature_library()
-create_feature_registry()
-create_feature_toggle_registry()
-create_column_group_registry()
-create_feature_factory_mcp()
-
-# ── IC 週邊（artifact / split / report / lifecycle）──
-create_ic_artifact_writer()
-create_ic_reporter()
-create_ic_split_adapter()
-create_time_splitter()
-create_run_lifecycle_manager()
-create_multi_symbol_runner()
-create_label_generator()
-create_cv_validator()
-
-# ── Analysis / Diagnostics 週邊 ──
-create_analysis_exporter()
-create_coverage_analyzer()
-create_drift_analyzer()
-create_prediction_analyzer()
-create_result_analyzer()
-create_psi_calculator()
-create_regime_detector()
-create_lstm_engine()
-
-# ── Cache ──
-create_indicator_cache()
-create_kline_cache()
-
-# ── Utility ──
-get_data_source_values()
-# ...（其餘見 momentum/factories.py，勿以本表為完整依據）
-```
+- **INV-B-ARCH-02 Factory權威指向factories.py**：Domain 物件由 `momentum/factories.py` 集中建構；工廠清單與簽名只以該檔為準，可用 `rg -n '^def (create_|get_)' momentum/factories.py` 重生。
 
 ### 呼叫流程
 
@@ -379,7 +215,7 @@ Data Layer (HDF5 / API / SQLite)
 
 ### 持續解耦要求
 
-> **Authority**: 所有新功能開發、架構演進必須遵循本節要求，參見 [PRODUCT_VISION.md](./PRODUCT_VISION.md) 版本演進策略。
+- **INV-B-ARCH-09 持續解耦指向PRODUCT_VISION**：所有新功能與架構演進遵循 `CLAUDE.md` canonical 規則；版本演進理由與方向參見 [PRODUCT_VISION.md](./PRODUCT_VISION.md)。
 
 #### 為何需要持續解耦？
 
@@ -397,155 +233,27 @@ V3.0（2027+）: 全自主 AI Agent
 
 #### 解耦規則適用範圍
 
-| 規則 | V1.0 | V2.0 擴展 | V3.0 擴展 |
-|------|------|------------|------------|
-| **Rule 1** | `momentum/` 不依賴 `api/` | 必須保持 | 必須保持 |
-| **Rule 2** | Domain 內用 Protocol | 擴展至 NLU Domain | 擴展至 Agent Domain |
-| **Rule 3** | Service 用 Factory | 新增 `create_chat_service()` | 新增 `create_agent_orchestrator()` |
-| **Rule 4** | Service 間禁止直接調用 | 必須保持 | 必須保持 |
-| **Rule 5** | Config 單一來源 | 擴展至 Prompt Config | 擴展至 Policy Config |
-| **Rule 6** | Test 配置隔離 | 必須保持 | 必須保持 |
-| **Rule 7** | DTO 不跨層 | 必須保持 | 必須保持 |
+- **INV-B-ARCH-03 解耦規則適用所有版本**：`CLAUDE.md` 的 canonical Rule 1–7 同時約束 V1、V2 與 V3；新增 NLU／Agent Domain、Prompt／Policy Config 或 factory 時不得改變依賴方向。
 
 #### 新模組開發檢查清單
 
-**每個新 Task/Feature 開發前必須確認**：
-
-- [ ] **依賴方向檢查**: 新模組是否依賴了不該依賴的層？
-  - ❌ `momentum/` 內不可 `import api.*`
-  - ❌ `api/routes/` 內不可直接 `import momentum.*.Engine()`
-  - ✅ 透過 `momentum/factories.py` 建構物件
-  
-- [ ] **Protocol 介面設計**: 跨 Domain 依賴是否定義了 Protocol？
-  - ❌ `from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer`
-  - ✅ `from momentum.core.protocols import IModelTrainer`
-  
-- [ ] **Factory 註冊**: 新引擎是否加入 `momentum/factories.py`？
-  ```python
-  # ✅ 範例
-  def create_new_engine(config: Optional[dict] = None) -> NewEngine:
-      return NewEngine(config or {})
-  ```
-  
-- [ ] **Config 管理**: 新配置是否加入 `momentum/core/config.py` 或 `api/core/config.py`？
-  - ❌ 硬編碼在程式碼內
-  - ✅ 從 Config 物件讀取
-  
-- [ ] **測試隔離**: 測試是否可以不啟動完整系統？
-  - ❌ 測試需要 `run_api.py` 啟動後才能跑
-  - ✅ 測試可直接 `pytest tests/momentum/` 執行
-  
-- [ ] **Artifact 契約**: 新資料格式是否記錄在 Artifact Contract Table？
+- **INV-B-ARCH-04 新模組依canonical checklist**：依 `CLAUDE.md` 逐項確認依賴方向、Protocol、Factory、Config 單一來源、測試隔離與 DTO 邊界；新增資料格式另須更新本節 Artifact Contract Table。
 
 #### 常見違規案例
 
-**❌ 反模式 1: Service 直接建構引擎**
-```python
-# api/services/new_service.py
-from momentum.Analysis.new_engine import NewEngine
-
-class NewService:
-    def __init__(self):
-        self.engine = NewEngine()  # ❌ 違反 Rule 3
-```
-
-**✅ 正確做法**:
-```python
-# api/services/new_service.py
-from momentum.core.protocols import INewEngine
-
-class NewService:
-    def __init__(self, engine: INewEngine):  # ✅ 注入 Protocol
-        self.engine = engine
-
-# api/main.py
-from momentum.factories import create_new_engine
-engine = create_new_engine()
-service = NewService(engine=engine)
-```
-
-**❌ 反模式 2: momentum 依賴 api**
-```python
-# momentum/Analysis/analyzer.py
-from api.core.logging import get_logger  # ❌ 違反 Rule 1
-
-logger = get_logger(__name__)
-```
-
-**✅ 正確做法**:
-```python
-# momentum/Analysis/analyzer.py
-from momentum.core.logging import get_logger  # ✅ 使用 momentum 內部 logging
-
-logger = get_logger(__name__)
-```
-
-**❌ 反模式 3: 跨 Domain 直接 import**
-```python
-# momentum/Analysis/feature_engineer.py
-from momentum.DataExtraction.kline_storage import KlineStorageManager  # ❌ 違反 Rule 2
-
-class FeatureEngineer:
-    def __init__(self):
-        self.kline_storage = KlineStorageManager()
-```
-
-**✅ 正確做法**:
-```python
-# momentum/core/protocols.py
-class IKlineReader(Protocol):
-    def read_klines(...) -> pd.DataFrame: ...
-
-# momentum/Analysis/feature_engineer.py
-from momentum.core.protocols import IKlineReader
-
-class FeatureEngineer:
-    def __init__(self, kline_reader: IKlineReader):  # ✅ Protocol 注入
-        self.kline_reader = kline_reader
-```
+- **INV-B-ARCH-05 違規案例保留一組**：反例是 service 直接建構 concrete engine；正例是 service 依賴 `momentum/core/protocols.py` 的 Protocol，並由 composition root 呼叫 `momentum/factories.py` 注入實作。
 
 #### 解耦驗證工具
 
-**手動檢查命令**（開發過程中使用）:
-```bash
-# 檢查 momentum → api 的違規依賴
-grep -r "from api\." momentum/
-grep -r "import api\." momentum/
-
-# 檢查 Service 直接建構違規
-grep -r "= .*Engine()" api/services/
-grep -r "= .*Analyzer()" api/services/
-
-# 檢查跨 Domain 直接 import
-grep -r "from momentum\.DataExtraction" momentum/Analysis/
-grep -r "from momentum\.Indicators" momentum/Analysis/
-```
-
-**自動化檢查**（CI/CD 整合，未來實作）:
-```bash
-# 解耦驗證(canonical R1-7 + named invariant scanner)
-bash scripts/check_decoupling.sh
-bash scripts/check_decoupling_phase4.sh
-```
+- **INV-B-ARCH-06 scanner命令可重生**：完整驗證入口為 `bash scripts/check_decoupling.sh` 與 `bash scripts/check_decoupling_phase4.sh`；兩支 scanner 的編號語意差以上方原樣留說明為準。
 
 #### 文檔同步要求
 
-**每次架構變更必須同步更新**：
-1. [ARCHITECTURE.md](./ARCHITECTURE.md) - 更新 Domain 定義、Protocol 列表
-2. [PRODUCT_VISION.md](./PRODUCT_VISION.md) - 如影響版本演進路徑
-3. [*.PLAN.md](.) - 更新對應 Task 的 PLAN 文件
-4. [CLAUDE.md](../CLAUDE.md) / [AGENTS.md](../AGENTS.md) / [.cursorrules](../.cursorrules) - 全 agent 規範入口(copilot-instructions 已於 2026-07-05 淘汰)
+- **INV-B-ARCH-07 架構變更同步canonical**：架構變更同步更新本檔與相關 PLAN；若影響版本演進則更新 `PRODUCT_VISION.md`，若影響治理規則則以 `CLAUDE.md` canonical 為唯一修改入口。
 
 #### 實例：Task 1 (FeatureFactory) 解耦設計
 
-**符合解耦原則的設計**（下方括號為此設計呼應的規則精神;canonical 定義見 CLAUDE.md）：
-- ✅ 7 層 Pipeline 每層獨立可測試（此處指模組可測性;canonical Rule 6 專指「測試不依賴 `run_api.py`」）
-- ✅ 透過 `create_feature_factory()` 建構（Rule 3）
-- ✅ Config-driven，Preset 從 YAML 讀取（Rule 5 Config 單一來源精神）
-- ✅ 不依賴 `api/` 層，純 `momentum/` 內邏輯（Rule 1）
-- ✅ 跨 Domain 依賴（讀取 K 線）透過 `IKlineReader` Protocol（Rule 2）
-
-**參見**: [Feature_Factory_PLAN.md](./Feature_Factory_PLAN.md) V7 的 decoupling 架構對齊章節
+- **INV-B-ARCH-08 FeatureFactory案例指向專節**：Feature Factory 的解耦與跨層契約見 [Feature Factory 架構](#feature-factory-架構)；canonical Rule 1–7 仍以 `CLAUDE.md` 為準。
 
 ---
 
