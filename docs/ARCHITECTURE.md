@@ -151,15 +151,17 @@ IDE: VS Code
 
 > **規範權威**:7 條解耦規則的 canonical 定義**唯一住在 `CLAUDE.md` §The 7 Decoupling Rules**;本節僅為架構視角的重述與現況佐證,如與 CLAUDE.md 有出入,以 CLAUDE.md 為準。
 > 此節源自 REFACTOR_ARCHITECTURE_V4。歷史上本表 Rule 5/6 曾誤寫為 singleton/callback(與 canonical 的 Config/Test 不符),已於 docdrift(2026-07-12)改正——singleton/callback 降為獨立 named invariant Rule 8/9(見下)。
+> **R2/R3 豁免機制**:唯一機讀來源是 `scripts/decouple_allowlist.md`；六個既有共用模組與 AST 新揭露 pending-triage 項目的精準 symbol 契約只在該 manifest 維護，不在文件複製清單。裁決出處為 `handoffs/20260713-DECOUPLE-TRIAGE-RECONCILE.md`，scanner 內建 body-hash 戳記驗證，manifest 變更須重新核可。
+> **已知掃描缺口**:`api/models/` 尚未納入 R3 roots，已列 follow-up triage，不得把目前 R3=0 解讀為涵蓋該目錄。
 
 ### 架構規則(canonical,與 CLAUDE.md 同步)
 
 | 規則 | 描述 | 現況 |
 |------|------|------|
 | Rule 1 | `momentum/` 不得依賴 `api/` | ✅ 0 violation(`grep "from api\." momentum/`==0) |
-| Rule 2 | `momentum/` 跨 Domain 不得直接 import（透過 Protocol 注入） | ⚠️ **`check_decoupling.sh` 報 5 筆**:`momentum/Analysis/*` 直接 import `momentum/FeatureEngineering`(warmup_lookup/consumer_gate/feature_reader);phase4 窄查(僅 strategy_backtest)通過。是否屬真違規或該豁免共用工具,待 triage(見 ROADMAP P2) |
-| Rule 3 | `api/services/` 不得直接建構 `momentum/` 物件（使用 `factories.py`） | ⚠️ **`check_decoupling.sh` 報 12 筆**:api/services、api/routes 直接 import `momentum/FeatureEngineering` 具體工具(run_locks/run_paths/hardware_utils/feature_reader…)未走 factory;待 triage(見 ROADMAP P2) |
-| Rule 4 | `api/services/` 之間不得互相 import | ⚠️ **1 已知違規**:`feature_factory_batch_adapters.py:9` import `feature_factory_service`(feature-explorer 系列引入,`check_decoupling.sh` 紅;待修/另立債票) |
+| Rule 2 | `momentum/` 跨 Domain 不得直接 import（透過 Protocol 注入） | ✅ AST scanner 白名單放行後 0；舊 scanner 5 筆既存 finding 已依 DECOUPLE-TRIAGE 裁決，另 5 筆 AST 新揭露依 manifest 暫豁免並待 DECOUPLE-TRIAGE-2 |
+| Rule 3 | `api/services/` 不得直接建構 `momentum/` 物件（使用 `factories.py`） | ✅ AST scanner 白名單放行後 0；舊 scanner 10 筆既存 finding 已依 DECOUPLE-TRIAGE 裁決（R2/R3 合計 15 筆） |
+| Rule 4 | `api/services/` 之間不得互相 import | ✅ 0 violation（DECOUPLE-FIX4 已修） |
 | Rule 5 | **Config 單一來源**（`momentum/core/config.py` 或 `api/core/config.py`；momentum 不得 import `api.core.config`） | ✅ scanner 綠 |
 | Rule 6 | **測試不依賴 `run_api.py`**（`pytest tests/momentum/` 可獨立跑） | ✅ `check_decoupling_phase4.sh` 綠(**註**:phase4 僅實跑 `tests/momentum/Strategy/` 子集=135 passed,非全 `tests/momentum/`;full 覆蓋未機械強制) |
 | Rule 7 | `api/models` ↔ `momentum/core` 無互相依賴 | ✅ 0 violation |
