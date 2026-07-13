@@ -1,12 +1,11 @@
 # 開發指南
 
-> ⚠️ 治理制度(協作/派工/gate)以 `CLAUDE.md` 與 `docs/MULTI_AGENT_ORCHESTRATION.md` 為準;本檔最後驗證 2026-07-05,其後細節可能過時。
+> ⚠️ 治理制度(協作/派工/gate)以 `CLAUDE.md` 與 `docs/MULTI_AGENT_ORCHESTRATION.md` 為準;本檔 2026-07-13 經批次 B 全文治理(manifest 逐塊授權+機檢驗收),留存內容皆為慢變契約;日常時效以 git log 為準。
 > ⚠️ **規範權威**:7 條解耦規則、數據真實性、核心原則、程式標準的 canonical 定義以 `CLAUDE.md` 為唯一權威;本檔只提供 how-to/範例/教學,如與 CLAUDE.md 有出入以 CLAUDE.md 為準。
 
 ## 文檔信息
-- **版本**: 1.1
-- **最後更新**: 2026-02-14
-- **適用範圍**: 前端 + 後端開發
+- **最後更新**: 以 `git log -1 --format=%cs docs/DEVELOPMENT_GUIDE.md` 為準（手寫日期必漂，不再維護）
+- **適用範圍**: 前端 + 後端開發；本檔只承載慢變的專案 invariant，即時狀態見 HANDOFF/ROADMAP
 
 ---
 

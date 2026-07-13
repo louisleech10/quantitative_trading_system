@@ -3,9 +3,8 @@
 > ⚠️ 治理制度(協作/派工/gate)以 `CLAUDE.md` 與 `docs/MULTI_AGENT_ORCHESTRATION.md` 為準;本檔最後驗證 2026-07-05,其後細節可能過時。
 
 ## 文檔版本
-- **版本**: 7.0
-- **最後更新**: 2026-05-25
-- **狀態**: 生產中 + 持續開發
+- **最後更新**: 以 `git log -1 --format=%cs docs/ARCHITECTURE.md` 為準（手寫日期必漂，不再維護）
+- **狀態**: 即時狀態以 HANDOFF/ROADMAP 為準;下列為歷史 changelog（追加式,非現況聲稱）
 - **更新內容**:
   - v7.0 (2026-05-25): 同步 Feature Factory Granular Control（per-indicator 細粒度控制、Preset API、Batch-Toggle API）；L6.5 優化系列（native-tf path -45.4%、d_star cache v3、Numba Fast ADF、joblib 並行化）；L7 storage 增強（sharded npy、hardware-adaptive 壓縮、IC-First raw/ cleanup）；IC engine cache hit path；Feature Browser CGSA 優化；per-indicator warmup lookup；FeatureTimeSeriesChart 重構
   - v6.1 (2026-05-07): 修正 Feature Storage artifact 描述（HDF5 legacy → V7 per-group parquet）；新增 L65 V2 IC-First canonical path（`{SYMBOL}/{TF}/{config_hash}/raw|processed`）；同步 Artifact Contract Table 與目錄樹
