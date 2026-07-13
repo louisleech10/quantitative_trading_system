@@ -421,6 +421,12 @@ class FeatureReader:
         )
 
     @staticmethod
+    def get_v2_artifact(manifest: Dict[str, Any], kind: str) -> Dict[str, Any]:
+        """Stable public API for resolving a V2 manifest artifact."""
+
+        return FeatureReader._get_v2_artifact(manifest, kind)
+
+    @staticmethod
     def _get_v2_artifact(manifest: dict, artifact_kind: str) -> Dict[str, Any]:
         artifacts = manifest.get("artifacts", {})
         artifact = artifacts.get(artifact_kind)

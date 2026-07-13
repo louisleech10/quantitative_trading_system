@@ -133,7 +133,7 @@ class CoverageAnalyzer:
 
     @staticmethod
     def _collect_v2_columns(manifest: dict) -> list[str]:
-        artifact = FeatureReader._get_v2_artifact(manifest, "raw")
+        artifact = FeatureReader.get_v2_artifact(manifest, "raw")
         columns: list[str] = []
         for group_info in artifact.get("groups", {}).values():
             if not isinstance(group_info, dict):
@@ -400,7 +400,7 @@ class CoverageAnalyzer:
 
             manifest, _config_hash = bundle
             symbol_manifests[symbol] = manifest
-            artifact = FeatureReader._get_v2_artifact(manifest, "raw")
+            artifact = FeatureReader.get_v2_artifact(manifest, "raw")
             all_groups.update(str(name) for name in artifact.get("groups", {}).keys())
 
         matrix: dict[str, dict[str, float | None]] = {
@@ -412,7 +412,7 @@ class CoverageAnalyzer:
             if manifest is None:
                 continue
 
-            artifact = FeatureReader._get_v2_artifact(manifest, "raw")
+            artifact = FeatureReader.get_v2_artifact(manifest, "raw")
             for group_name, group_info in artifact.get("groups", {}).items():
                 if not isinstance(group_info, dict):
                     continue
@@ -497,7 +497,7 @@ class CoverageAnalyzer:
                 continue
 
             manifest, config_hash = bundle
-            artifact = FeatureReader._get_v2_artifact(manifest, "raw")
+            artifact = FeatureReader.get_v2_artifact(manifest, "raw")
             groups = artifact.get("groups", {})
             group_info = groups.get(target_group)
             if not isinstance(group_info, dict):
