@@ -40,61 +40,17 @@ else
 fi
 echo ""
 
-# ── Rule 2: momentum/ cross-domain concrete imports ─────────
-R2=$(grep -rn --include='*.py' '^from momentum\.' momentum/ \
-  | grep -v '__pycache__' \
-  | grep -v 'from momentum\.core\.' \
-  | grep -v 'from momentum\.factories' \
-  | grep -v '/tests/' \
-  | grep -v 'momentum/core/contracts\.py' \
-  | python3 -c "
-import sys, re
-for line in sys.stdin:
-    line = line.strip()
-    m = re.match(r'momentum/([^/]+)/.+:\d+:from momentum\.([^. ]+)', line)
-    if m and m.group(1) != m.group(2):
-        print(line)
-" 2>/dev/null || true)
-R2_COUNT=$([ -z "$R2" ] && echo 0 || echo "$R2" | wc -l | tr -d ' ')
-if [ "$R2_COUNT" -gt 0 ]; then
-  echo -e "${RED}❌ Rule 2 FAIL${NC}: momentum/ cross-domain concrete imports ($R2_COUNT violations)"
-  echo "$R2"
-  FAIL=1
+# ── Rule 2/3: AST scanner + stamped precise allowlist ─────────
+PYTHON_BIN="venv/bin/python"
+[ -x "$PYTHON_BIN" ] || PYTHON_BIN="python3"
+if R23_OUTPUT=$("$PYTHON_BIN" scripts/check_decoupling_imports.py 2>&1); then
+  echo -e "${GREEN}✅ Rule 2 PASS${NC}: no unapproved cross-domain concrete imports in momentum/"
+  echo -e "${GREEN}✅ Rule 3 PASS${NC}: api/ concrete imports conform to the stamped allowlist"
+  echo "$R23_OUTPUT"
 else
-  echo -e "${GREEN}✅ Rule 2 PASS${NC}: no cross-domain concrete imports in momentum/"
-fi
-echo ""
-
-# ── Rule 3: api/ must not directly import momentum concrete ─
-# Top-level imports in services
-R3_SVC=$(grep -rn --include='*.py' '^from momentum\.' api/services/ \
-  | grep -v '__pycache__' \
-  | grep -v 'from momentum\.factories' \
-  | grep -v 'from momentum\.core\.' || true)
-# Lazy/deferred imports in services
-R3_SVC_LAZY=$(grep -rn --include='*.py' '    from momentum\.' api/services/ \
-  | grep -v '__pycache__' \
-  | grep -v 'from momentum\.factories' \
-  | grep -v 'from momentum\.core\.' || true)
-# Routes
-R3_ROUTES=$(grep -rn --include='*.py' '^from momentum\.' api/routes/ \
-  | grep -v '__pycache__' \
-  | grep -v 'from momentum\.factories' \
-  | grep -v 'from momentum\.core\.' || true)
-# Websocket
-R3_WS=$(grep -rn --include='*.py' '^from momentum\.' api/websocket/ \
-  | grep -v '__pycache__' \
-  | grep -v 'from momentum\.factories' \
-  | grep -v 'from momentum\.core\.' || true)
-
-R3_ALL=$(printf '%s\n%s\n%s\n%s' "$R3_SVC" "$R3_SVC_LAZY" "$R3_ROUTES" "$R3_WS" | grep -v '^$' || true)
-R3_COUNT=$([ -z "$R3_ALL" ] && echo 0 || echo "$R3_ALL" | wc -l | tr -d ' ')
-if [ "$R3_COUNT" -gt 0 ]; then
-  echo -e "${RED}❌ Rule 3 FAIL${NC}: api/ directly imports momentum concrete ($R3_COUNT violations)"
-  echo "$R3_ALL"
+  echo -e "${RED}❌ Rule 2/3 FAIL${NC}: AST import scanner rejected the tree or manifest"
+  echo "$R23_OUTPUT"
   FAIL=1
-else
-  echo -e "${GREEN}✅ Rule 3 PASS${NC}: api/ only imports via factories/core"
 fi
 echo ""
 
