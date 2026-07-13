@@ -5452,9 +5452,9 @@ class FeatureFactoryService:
         if not config_hash:
             raise ValueError("CGSA row_index is declared but config_hash is unavailable")
 
-        from momentum.FeatureEngineering.feature_reader import FeatureReader
+        from momentum.factories import create_feature_reader
 
-        reader = FeatureReader(str(self._cgsa_feature_base_path(context)))
+        reader = create_feature_reader(str(self._cgsa_feature_base_path(context)))
         return reader.load_row_index_v2(
             str(context["symbol"]),
             str(context["timeframe"]),
