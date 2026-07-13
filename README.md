@@ -677,12 +677,12 @@ perf: 優化DataFrame操作使用向量化
 
 ### 核心文檔
 
-| 文檔 | 說明 | 行數 |
+| 文檔 | 說明 | 長度 |
 |------|------|------|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系統整體架構設計 | ~1800 |
-| [API_SPECIFICATION.md](docs/API_SPECIFICATION.md) | API接口規範 | ~1800 |
-| [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) | 開發規範和指南 | ~3500 |
-| [PRODUCT_VISION.md](docs/PRODUCT_VISION.md) | V1/V2/V3 產品願景 | - |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系統整體架構設計 | 見檔案本身 |
+| [API_SPECIFICATION.md](docs/API_SPECIFICATION.md) | API接口規範 | 見檔案本身 |
+| [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) | 開發規範和指南 | 見檔案本身 |
+| [PRODUCT_VISION.md](docs/PRODUCT_VISION.md) | V1/V2/V3 產品願景 | 見檔案本身 |
 
 ### 快速鏈接
 
