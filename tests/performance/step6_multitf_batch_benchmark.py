@@ -18,6 +18,7 @@ from api.services.feature_factory_batch_adapters import (
     FeatureFactoryQualityAdapter,
 )
 from api.services.feature_factory_batch_service import FeatureFactoryBatchService
+from api.services.feature_factory_service import feature_factory_service
 from momentum.factories import create_feature_factory, create_kline_storage_manager
 
 
@@ -145,8 +146,8 @@ async def main() -> None:
     single_stats = _benchmark_single_symbol(factory, single_symbol)
 
     service = FeatureFactoryBatchService(
-        browse_registrar=FeatureFactoryBrowseAdapter(),
-        quality_computer=FeatureFactoryQualityAdapter(),
+        browse_registrar=FeatureFactoryBrowseAdapter(feature_factory_service),
+        quality_computer=FeatureFactoryQualityAdapter(feature_factory_service),
     )
     batch_1tf: Optional[Dict[str, Any]] = None
     batch_3tf: Optional[Dict[str, Any]] = None

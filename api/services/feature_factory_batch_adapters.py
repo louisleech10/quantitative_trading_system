@@ -6,13 +6,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from api.services.feature_factory_service import feature_factory_service
-
-
 class FeatureFactoryBrowseAdapter:
     """Register parquet/manifest feature outputs for Feature Explorer."""
 
-    def __init__(self, service: Any = feature_factory_service) -> None:
+    def __init__(self, service: Any) -> None:
         self._service = service
 
     def register(self, symbol: str, timeframe: str, manifest_path: str) -> str:
@@ -24,7 +21,7 @@ class FeatureFactoryBrowseAdapter:
 class FeatureFactoryQualityAdapter:
     """Compute batch quality summaries through the Feature Factory browse path."""
 
-    def __init__(self, service: Any = feature_factory_service) -> None:
+    def __init__(self, service: Any) -> None:
         self._service = service
 
     def compute(self, manifest_path: str) -> dict:

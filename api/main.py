@@ -56,8 +56,8 @@ async def lifespan(app: FastAPI):
     global batch_service
     if batch_service is None:
         batch_service = FeatureFactoryBatchService(
-            browse_registrar=FeatureFactoryBrowseAdapter(),
-            quality_computer=FeatureFactoryQualityAdapter(),
+            browse_registrar=FeatureFactoryBrowseAdapter(feature_factory_service),
+            quality_computer=FeatureFactoryQualityAdapter(feature_factory_service),
             run_deleter=feature_factory_service.delete_run,
         )
         set_feature_factory_batch_service(batch_service)
