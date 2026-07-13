@@ -925,9 +925,15 @@ class ICAnalysisService:
         symbol: Optional[str] = task_info.get("req_symbol")
         timeframe: Optional[str] = task_info.get("req_timeframe")
         features_path: Optional[str] = task_info.get("req_features_path")
+        config_hash: Optional[str] = task_info.get("req_config_hash")
 
         # --- 2. Load feature DataFrame ---
-        df = self._load_features_for_transforms(symbol, timeframe, features_path)
+        df = self._load_features_for_transforms(
+            symbol,
+            timeframe,
+            features_path,
+            config_hash=config_hash,
+        )
         logger.info("[apply_transforms] Loaded features: %d rows x %d cols", len(df), len(df.columns))
 
         # --- 3. Filter to selected_features (only those actually present) ---
@@ -993,17 +999,10 @@ class ICAnalysisService:
         symbol: Optional[str],
         timeframe: Optional[str],
         features_path: Optional[str],
+        config_hash: Optional[str] = None,
     ):
         """Load feature DataFrame from FeatureLibrary (symbol/timeframe) or HDF5 path."""
         import pandas as pd
-
-        if symbol and timeframe:
-            try:
-                from momentum.FeatureEngineering.feature_library import FeatureLibrary
-                library = FeatureLibrary()
-                return library.load(symbol, timeframe)
-            except Exception as exc:
-                logger.warning("[apply_transforms] FeatureLibrary.load failed: %s; trying path fallback", exc)
 
         if features_path:
             p = Path(features_path)
@@ -1014,6 +1013,16 @@ class ICAnalysisService:
             if features_path.endswith(".parquet"):
                 return pd.read_parquet(features_path)
             raise ValueError(f"Unsupported features file format: {features_path}")
+
+        if symbol and timeframe:
+            try:
+                return self._feature_library.load(
+                    symbol,
+                    timeframe,
+                    config_hash=config_hash,
+                )
+            except Exception as exc:
+                logger.warning("[apply_transforms] FeatureLibrary.load failed: %s; trying path fallback", exc)
 
         raise ValueError(
             "Cannot load features: no symbol/timeframe or features_path stored in task. "
