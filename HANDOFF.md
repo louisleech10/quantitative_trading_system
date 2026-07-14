@@ -18,4 +18,4 @@
 2. 1c Net IC 量綱(大,正確性紅線)→1d/1f→實測→AI Agent(原排序)。
 
 ## ⚠️ 未 commit
-handoffs/ 審計鏈與 docs/DECOUPLE_*_SPEC/TODO(治理文檔,是否入庫待使用者;程式碼 11 commits 已入庫未 push——push 待指示,因量大先留)。
+handoffs/ 審計鏈(本地留審計依慣例);SPEC/TODO+ROADMAP/HANDOFF 已 commit,**12 commits 已 push**(5bf64aa..3cdf216,依「commit 後直接 push」鐵律)。
