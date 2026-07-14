@@ -1,4 +1,9 @@
-"""Hardware tier helpers for Feature Factory optimization toggles."""
+"""Feature Factory hardware-tier 運維政策表。
+
+此模組依 RAM tier 提供 l65_workers、l3_persist_mode、cgsa_shard_bytes
+等 Feature Factory 執行與資源政策。目前 package 位置錯位為已知技術債，
+搬遷選項見 ROADMAP DECOUPLE-TRIAGE-2 附帶項。
+"""
 
 from __future__ import annotations
 
