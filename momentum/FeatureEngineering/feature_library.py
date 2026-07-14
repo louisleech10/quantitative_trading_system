@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -50,6 +50,31 @@ class FeatureLibrary:
         if timeframe:
             entries = [entry for entry in entries if entry.get("timeframe") == timeframe]
         return [self._to_entry(entry) for entry in entries]
+
+    def get_entry(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """無寫方法的轉發 façade；不承諾回傳物 immutability。
+
+        ``FeatureRegistry.get`` 回傳 copy；本方法維持底層既有語意，
+        不額外轉換、過濾或加上 defensive copy。
+        """
+        return self._registry.get(symbol, timeframe, config_hash)
+
+    def find_latest_materialized(
+        self,
+        symbol: str,
+        timeframe: str,
+    ) -> Optional[Dict[str, Any]]:
+        """無寫方法的轉發 façade；不承諾回傳物 immutability。
+
+        底層目前回傳 registry 內部 dict，mutable leak 是既有現況；
+        本零行為變更票不加 defensive copy。
+        """
+        return self._registry.find_latest_materialized(symbol, timeframe)
 
     def load(
         self,

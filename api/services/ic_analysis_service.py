@@ -180,7 +180,7 @@ class ICAnalysisService:
 
                 if symbol and timeframe:
                     if config_hash:
-                        entry = self._feature_library._registry.get(symbol, timeframe, config_hash)
+                        entry = self._feature_library.get_entry(symbol, timeframe, config_hash)
                         # fail-closed 僅在需要由 registry 解析/物化資料時才強制——這才是 run-selector
                         # 消歧保證的作用點(features_path 缺席→避免靜默挑到別的 run)。呼叫端已明確
                         # 提供 features_path(如 golden replay/artifact 重放)時,不因該 run 未註冊而擋。
@@ -190,7 +190,7 @@ class ICAnalysisService:
                         if entry is None and not features_path:
                             raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
                     else:
-                        entry = self._feature_library._registry.find_latest_materialized(
+                        entry = self._feature_library.find_latest_materialized(
                             symbol,
                             timeframe,
                         )
