@@ -13,9 +13,10 @@
 - 全套件既有紅=~50 failed/171 errors(redirect/label-horizon/registry fixture 等,composer parent-worktree 對照證實非本 session 引入)。
 - commit 訊息 operational claim 需 VERIFY:<receipt 檔> backing(hook 強制)。
 
-## ▶ 下一步
-1. **DECOUPLE-SCAN2 已完成(2026-07-14)**:R4 AST 接管+api/models 掃描根+2 筆 triage(刪死 import/白名單 1 條);manifest 10 條重戳 PASS;55 tests;殘餘=pending 3 筆綁 Optuna epic 退場(使用者裁定)+relocate-to-core-constants P3+timeframe 重複副本債。
-2. 1c Net IC 量綱(大,正確性紅線)→1d/1f→實測→AI Agent(原排序)。
+## ▶ 下一步(使用者 2026-07-14 定)
+1. **1c Net IC 量綱**(大,正確性紅線,net_ic_analyzer.py:34 相關係數減報酬率;**走邊做邊與使用者討論參數**,使用者明示此票多處需其輸入;分工=**Grok 實作/Codex+Composer 審查**(2026-07-14 三調,ORCH §1))。
+2. **DECOUPLE-SCAN2 已完成(2026-07-14)**:R4 AST 接管+api/models 掃描根+2 筆 triage(刪死 import/白名單 1 條);manifest 10 條重戳 PASS;55 tests;殘餘=pending 3 筆綁 Optuna epic 退場(使用者裁定)+relocate-to-core-constants P3+timeframe 重複副本債。
+3. 後續:1d attribution→1f 空圖→實測→AI Agent(原排序)。
 
 ## ⚠️ 未 commit
 handoffs/ 審計鏈(本地留審計依慣例);SPEC/TODO+ROADMAP/HANDOFF 已 commit,**12 commits 已 push**(5bf64aa..3cdf216,依「commit 後直接 push」鐵律)。
