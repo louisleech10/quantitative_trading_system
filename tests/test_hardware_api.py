@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from api.core.config import settings
 from api.routes import config as config_route
+from api.services import hardware_info_service
 from momentum.FeatureEngineering.utils.hardware_utils import get_tier_config as real_tier_config
 
 
@@ -42,10 +43,10 @@ def _tier_config(tier: str, **overrides: object) -> dict:
 
 def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """測試硬體 endpoint 回傳正確 JSON 結構與建議設定。"""
-    monkeypatch.setattr(config_route, "psutil", FakePsutil)
-    monkeypatch.setattr(config_route, "get_memory_tier", lambda: "16gb")
+    monkeypatch.setattr(hardware_info_service, "psutil", FakePsutil)
+    monkeypatch.setattr(hardware_info_service, "get_memory_tier", lambda: "16gb")
     monkeypatch.setattr(
-        config_route,
+        hardware_info_service,
         "get_tier_config",
         lambda tier: _tier_config(
             tier,
@@ -91,10 +92,10 @@ def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: p
 
 def test_hardware_endpoint_tier_matches_util(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """測試 endpoint 的 memory tier 與工具函式回傳一致。"""
-    monkeypatch.setattr(config_route, "psutil", FakePsutil)
-    monkeypatch.setattr(config_route, "get_memory_tier", lambda: "24gb")
+    monkeypatch.setattr(hardware_info_service, "psutil", FakePsutil)
+    monkeypatch.setattr(hardware_info_service, "get_memory_tier", lambda: "24gb")
     monkeypatch.setattr(
-        config_route,
+        hardware_info_service,
         "get_tier_config",
         lambda tier: _tier_config(
             tier,
@@ -115,10 +116,10 @@ def test_hardware_endpoint_tier_matches_util(client: TestClient, monkeypatch: py
 def test_hardware_endpoint_missing_data_cache(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """測試 data_cache 缺失時 disk 資訊回傳 0 而非 crash。"""
     missing_path = tmp_path / "missing" / "data_cache"
-    monkeypatch.setattr(config_route, "psutil", FakePsutil)
-    monkeypatch.setattr(config_route, "get_memory_tier", lambda: "8gb")
+    monkeypatch.setattr(hardware_info_service, "psutil", FakePsutil)
+    monkeypatch.setattr(hardware_info_service, "get_memory_tier", lambda: "8gb")
     monkeypatch.setattr(
-        config_route,
+        hardware_info_service,
         "get_tier_config",
         lambda tier: _tier_config(
             tier,
