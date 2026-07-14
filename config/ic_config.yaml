@@ -180,9 +180,8 @@ feature_quality_diagnostics:
 
 net_ic_analysis:
   enabled: true
-  default_cost_bps: 5
-  slippage_bps: 2
-  cost_scenarios: [1, 3, 5, 10, 20]
+  cost_enabled: false
+  cost_bps: null
   participation_rate: 0.01
 
 # === 功能層級管理 ===

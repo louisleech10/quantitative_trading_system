@@ -57,13 +57,19 @@ def test_compute_all_outputs_metrics():
     assert "time_series" in results["feature_a"]
 
 
-def test_net_ic_proxy():
-    """Net IC 近似值計算正確。"""
-    analyzer = TurnoverAnalyzer({"transaction_cost": 0.01})
+def test_cost_drag_proxy_hand_calc():
+    """成本拖累手算:(10/1e4)*1.5==0.0015(§T 無 ×2;舊 0.1-0.01×2=0.08 固化混量綱+四腿=錯)。"""
+    analyzer = TurnoverAnalyzer({})
 
-    net_ic = analyzer.compute_net_ic_proxy(gross_ic=0.1, turnover_rate=2.0)
+    drag = analyzer.compute_cost_drag_proxy(turnover_rate=1.5, cost_bps=10.0)
 
-    assert np.isclose(net_ic, 0.08)
+    assert np.isclose(drag, 0.0015)
+
+
+def test_cost_drag_proxy_zero_turnover():
+    """邊界:turnover=0 → 0.0。"""
+    analyzer = TurnoverAnalyzer({})
+    assert analyzer.compute_cost_drag_proxy(turnover_rate=0.0, cost_bps=10.0) == 0.0
 
 
 def test_turnover_handles_empty_and_qcut_failure(monkeypatch):
@@ -89,11 +95,32 @@ def test_rank_change_and_autocorr_empty():
     assert np.isnan(analyzer.compute_factor_autocorrelation(series))
 
 
-def test_net_ic_proxy_nan_turnover():
-    """Turnover 為 NaN 時回 NaN。"""
+def test_cost_drag_proxy_nan_turnover_raises():
+    """舊斷言為何錯:nan→nan 靜默;SPEC v1.1=負/非有限 turnover→raise ValueError(禁 clamp)。"""
     analyzer = TurnoverAnalyzer({})
 
-    assert np.isnan(analyzer.compute_net_ic_proxy(gross_ic=0.1, turnover_rate=float("nan")))
+    with pytest.raises(ValueError):
+        analyzer.compute_cost_drag_proxy(turnover_rate=float("nan"), cost_bps=10.0)
+
+
+def test_cost_drag_proxy_negative_turnover_raises():
+    analyzer = TurnoverAnalyzer({})
+    with pytest.raises(ValueError):
+        analyzer.compute_cost_drag_proxy(turnover_rate=-0.2, cost_bps=10.0)
+
+
+def test_mutation_m8_restore_proxy_subtraction(monkeypatch):
+    """M8:恢復 proxy 混減(gross_ic - λ×turnover) → 手算紅。"""
+    analyzer = TurnoverAnalyzer({})
+
+    def mixed(self, turnover_rate, cost_bps=None, gross_ic=0.1, transaction_cost=0.01):  # type: ignore[no-untyped-def]
+        # 舊混量綱:0.1 - 0.01*2 = 0.08 路徑
+        return float(gross_ic - transaction_cost * float(turnover_rate))
+
+    monkeypatch.setattr(TurnoverAnalyzer, "compute_cost_drag_proxy", mixed)
+    with pytest.raises(AssertionError):
+        drag = analyzer.compute_cost_drag_proxy(turnover_rate=1.5, cost_bps=10.0)
+        assert np.isclose(drag, 0.0015)
 
 
 def test_compute_all_defaults_num_quantiles():

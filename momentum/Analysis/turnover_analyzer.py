@@ -122,19 +122,32 @@ class TurnoverAnalyzer:
             ],
         }
 
-    def compute_net_ic_proxy(
+    def compute_cost_drag_proxy(
         self,
-        gross_ic: float,
         turnover_rate: float,
-        transaction_cost: float | None = None,
+        cost_bps: float,
     ) -> float:
-        """Net IC ≈ Gross IC - λ × Turnover。"""
+        """成本拖累(報酬空間)=(cost_bps/10000)×turnover;無 ×2、禁混減 IC。
 
-        if transaction_cost is None:
-            transaction_cost = self._transaction_cost
-        if turnover_rate is None or np.isnan(turnover_rate):
-            return float("nan")
-        return float(gross_ic - transaction_cost * turnover_rate)
+        負/非有限 turnover → raise ValueError(禁 clamp;對齊 SPEC v1.1)。
+        """
+        try:
+            t = float(turnover_rate)
+            bps = float(cost_bps)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"cost_drag_proxy requires finite cost_bps and non-negative finite turnover; "
+                f"got cost_bps={cost_bps!r}, turnover_rate={turnover_rate!r}"
+            ) from exc
+        if not np.isfinite(t) or t < 0.0:
+            raise ValueError(
+                f"turnover_rate must be finite and >= 0, got {turnover_rate!r}"
+            )
+        if not np.isfinite(bps) or not (0.0 < bps <= 1000.0):
+            raise ValueError(
+                f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+            )
+        return float((bps / 10000.0) * t)
 
     def compute_all(self, features_df: pd.DataFrame, num_quantiles: int = 5) -> dict[str, dict]:
         """批次計算所有特徵的換手率指標。"""

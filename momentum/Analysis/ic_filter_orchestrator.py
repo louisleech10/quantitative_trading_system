@@ -1940,6 +1940,7 @@ class ICFilterOrchestrator:
         return analyzer.run_full_diagnostics(features_df, rolling_ic_dict=rolling_ic_dict)
 
     def _run_net_ic(self, selected_features: list[str], config: ICConfig) -> dict:
+        """Net IC runner(B-strict):兩參 batch_analyze,不傳 factor_returns。"""
         from momentum.Analysis.net_ic_analyzer import NetICAnalyzer
 
         analyzer = NetICAnalyzer(config.net_ic_analysis.model_dump())
@@ -1953,6 +1954,7 @@ class ICFilterOrchestrator:
             for name, data in (self._report or {}).get("turnover_analysis", {}).items()
             if name in selected_features
         }
+        # 明確兩參:1c 內不傳 factor_returns(canonical series 屬票 1c-FR)
         return analyzer.batch_analyze(summary, turnover_data)
 
     def _emit_deep_progress(self, callback: Optional[Callable], payload: dict) -> None:

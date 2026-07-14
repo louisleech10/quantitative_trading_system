@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Optional, Literal, Any, Dict
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from momentum.core.logging import get_logger
 
@@ -264,11 +265,38 @@ class FeatureQualityDiagnosticsConfig(BaseModel):
 
 
 class NetICAnalysisConfig(BaseModel):
+    """Net IC 成本設定(B-strict):無 default_cost_bps;0 bps 非法。"""
+
     enabled: bool = True
-    default_cost_bps: float = Field(default=5.0, ge=0.0, le=10000.0)
-    slippage_bps: float = Field(default=2.0, ge=0.0, le=10000.0)
-    cost_scenarios: list[float] = Field(default_factory=lambda: [1, 3, 5, 10, 20])
+    cost_enabled: bool = False
+    cost_bps: Optional[float] = None
     participation_rate: float = Field(default=0.01, ge=0.0, le=1.0)
+
+    @field_validator("cost_bps")
+    @classmethod
+    def _validate_cost_bps_domain(cls, v: Optional[float]) -> Optional[float]:
+        """非 None 一律驗域(有限且 0<x≤1000);與 enabled 無關。"""
+        if v is None:
+            return None
+        try:
+            bps = float(v)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"cost_bps must be finite and in (0, 1000], got {v!r}"
+            ) from exc
+        if not math.isfinite(bps) or not (0.0 < bps <= 1000.0):
+            raise ValueError(
+                f"cost_bps must be finite and in (0, 1000], got {v!r}"
+            )
+        return bps
+
+    @model_validator(mode="after")
+    def _require_bps_when_enabled(self) -> "NetICAnalysisConfig":
+        if self.cost_enabled and self.cost_bps is None:
+            raise ValueError(
+                "cost_enabled=True requires cost_bps to be set (0 is illegal)"
+            )
+        return self
 
 
 class DeepAnalysisGlobalConfig(BaseModel):

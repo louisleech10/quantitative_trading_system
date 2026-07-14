@@ -147,7 +147,7 @@ class ICReporter:
             "orthogonal_residual_ratio",
             "exposure_hhi",
             "quality_stationary",
-            "net_ic",
+            "cost_drag_return",
         ]
 
         enable_deep = bool(deep_payload)
@@ -206,7 +206,8 @@ class ICReporter:
             "rolling": "rolling_oos",
             "long_short": "long_short_analysis",
             "quality": "feature_quality_diagnostics",
-            "net_ic": "net_ic_analysis",
+            # 短名 net_ic 已廢(B-strict);僅允許完整模組鍵 net_ic_analysis
+            "net_ic_analysis": "net_ic_analysis",
         }
         resolved_module = module_alias.get(module_name, module_name)
         module_data = deep_payload.get(resolved_module)
@@ -628,10 +629,10 @@ class ICReporter:
                 None,
                 "is_stationary",
             ),
-            "net_ic": self._safe_nested(
+            "cost_drag_return": self._safe_nested(
                 self._safe_nested(deep_payload.get("net_ic_analysis"), "features", feature_name),
                 None,
-                "net_ic",
+                "cost_drag_return",
             ),
         }
 

@@ -1,45 +1,79 @@
-"""Module 10: Net IC analyzer."""
+"""Module 10: Net IC analyzer (B-strict: 成本拖累,禁混量綱減)."""
 
 from __future__ import annotations
 
-from typing import Optional
+import math
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr
 
 from momentum.core.logging import get_logger
 
 
 logger = get_logger(__name__)
 
+_TURNOVER_SEMANTICS = "membership_change_both_legs_per_bar"
+_COST_SEMANTICS = "per_rebalance_not_annualized"
+_UNAVAILABLE_REASON = "canonical_factor_return_series_not_built (1c-FR)"
+
+
+def _unavailable(reason: str = _UNAVAILABLE_REASON) -> dict[str, Any]:
+    """§U conditional metric unavailable 形狀。"""
+    return {"status": "unavailable", "value": None, "reason": reason}
+
+
+def _finite_or_null(value: Any) -> float | None:
+    """非有限 number → null(JSON strict 邊界)。"""
+    if value is None:
+        return None
+    try:
+        fv = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(fv):
+        return None
+    return fv
+
+
+def _validate_cost_params(cost_enabled: bool, cost_bps: float | None) -> None:
+    """三層統一 validator 偽碼:非 None 一律驗域;enabled 另驗非 None。"""
+    if cost_bps is not None:
+        try:
+            bps = float(cost_bps)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+            ) from exc
+        if not math.isfinite(bps) or not (0.0 < bps <= 1000.0):
+            raise ValueError(
+                f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+            )
+    if cost_enabled and cost_bps is None:
+        raise ValueError("cost_enabled=True requires cost_bps to be set (0 is illegal)")
+
 
 class NetICAnalyzer:
     def __init__(self, config: dict):
         cfg = config or {}
         self._config = cfg
-        self._default_cost_bps = float(cfg.get("default_cost_bps", 5.0))
-        self._cost_scenarios = list(cfg.get("cost_scenarios", [1, 3, 5, 10, 20]))
+        self._cost_enabled = bool(cfg.get("cost_enabled", False))
+        raw_bps = cfg.get("cost_bps", None)
+        self._cost_bps: float | None
+        if raw_bps is None:
+            self._cost_bps = None
+        else:
+            self._cost_bps = float(raw_bps)
+        _validate_cost_params(self._cost_enabled, self._cost_bps)
         self._participation_rate = float(cfg.get("participation_rate", 0.01))
 
-    def compute_net_ic(
-        self,
-        gross_ic: float,
-        turnover: float,
-        cost_bps: Optional[float] = None,
-    ) -> dict:
-        use_cost = float(self._default_cost_bps if cost_bps is None else cost_bps)
-        gross_ic_value = float(gross_ic)
-        turnover_value = max(0.0, float(turnover))
-        net_ic = gross_ic_value - (use_cost / 10000.0) * turnover_value * 2.0
-        return {
-            "gross_ic": gross_ic_value,
-            "net_ic": float(net_ic),
-            "turnover": turnover_value,
-            "cost_bps": use_cost,
-            "profitable_after_cost": bool(net_ic > 0),
-            "breakeven_cost_bps": float((gross_ic_value * 10000.0) / (turnover_value * 2.0)) if turnover_value > 0 else np.inf,
-        }
+    @staticmethod
+    def compute_cost_drag(cost_bps: float, turnover: float) -> float:
+        """成本拖累(報酬空間)= (cost_bps/10000)×turnover;無 ×2。
+
+        呼叫前提:turnover 已過 profile 檢查(有限且 ≥0)。
+        """
+        return float((float(cost_bps) / 10000.0) * float(turnover))
 
     def compute_net_factor_return(
         self,
@@ -47,7 +81,13 @@ class NetICAnalyzer:
         turnover_series: pd.Series,
         cost_bps: Optional[float] = None,
     ) -> dict:
-        use_cost = float(self._default_cost_bps if cost_bps is None else cost_bps)
+        """Deprecated(1c):canonical 因子報酬序列未建立前勿用於 batch_analyze。
+
+        保留函式本體供日後 1c-FR;本票 batch_analyze 不再呼叫。
+        """
+        use_cost = float(
+            self._cost_bps if cost_bps is None else cost_bps
+        ) if (cost_bps is not None or self._cost_bps is not None) else 0.0
         aligned = pd.concat(
             [gross_return_series.rename("gross"), turnover_series.rename("turnover")],
             axis=1,
@@ -60,7 +100,7 @@ class NetICAnalyzer:
                 "cost_drag": np.nan,
             }
 
-        cost_term = (use_cost / 10000.0) * aligned["turnover"].astype(float) * 2.0
+        cost_term = (use_cost / 10000.0) * aligned["turnover"].astype(float)
         net_series = aligned["gross"].astype(float) - cost_term
         return {
             "net_return_series": net_series.astype(float).tolist(),
@@ -71,21 +111,26 @@ class NetICAnalyzer:
 
     def cost_sensitivity_analysis(
         self,
-        gross_ic: float,
+        cost_bps: float,
         turnover: float,
-        scenarios: Optional[list[float]] = None,
-    ) -> dict:
-        cost_scenarios = scenarios or self._cost_scenarios
-        rows = []
-        for scenario_cost in cost_scenarios:
-            result = self.compute_net_ic(gross_ic, turnover, cost_bps=float(scenario_cost))
-            rows.append({
-                "cost_bps": float(scenario_cost),
-                "net_ic": float(result["net_ic"]),
-            })
-        return {
-            "scenarios": rows,
-        }
+    ) -> list[dict[str, float]]:
+        """成本階梯掃描:{c/2,c,2c,5c} clamp [0.1,1000] 四捨五入 0.1 去重。
+
+        每項僅 {cost_bps, cost_drag_return};無 net_ic 鍵。
+        """
+        c = float(cost_bps)
+        t = float(turnover)
+        raw = [c / 2.0, c, 2.0 * c, 5.0 * c]
+        ladder = sorted(
+            {round(min(1000.0, max(0.1, x)), 1) for x in raw}
+        )
+        return [
+            {
+                "cost_bps": float(scenario),
+                "cost_drag_return": self.compute_cost_drag(scenario, t),
+            }
+            for scenario in ladder
+        ]
 
     def estimate_factor_capacity(
         self,
@@ -93,6 +138,7 @@ class NetICAnalyzer:
         avg_daily_volume_usd: Optional[float] = None,
         participation_rate: float = 0.01,
     ) -> dict:
+        """容量估計(計算本體不變;calibration 由 batch 組 dict 時注入)。"""
         turnover_value = max(0.0, float(turnover))
         if avg_daily_volume_usd is None or avg_daily_volume_usd <= 0:
             return {
@@ -118,12 +164,31 @@ class NetICAnalyzer:
             "capacity_tier": tier,
         }
 
+    def _capacity_payload(
+        self,
+        turnover: float,
+        avg_daily_volume_usd: Optional[float],
+    ) -> dict[str, Any]:
+        raw = self.estimate_factor_capacity(
+            turnover=float(turnover),
+            avg_daily_volume_usd=avg_daily_volume_usd,
+            participation_rate=self._participation_rate,
+        )
+        return {
+            "estimated_capacity_usd": _finite_or_null(raw.get("estimated_capacity_usd")),
+            "capacity_tier": str(raw.get("capacity_tier", "unknown")),
+            "calibration": "uncalibrated",
+        }
+
     def batch_analyze(
         self,
         ic_summary: dict[str, dict],
         turnover_data: dict[str, float],
         factor_returns: Optional[dict[str, pd.Series]] = None,
     ) -> dict:
+        """依 cost_enabled 輸出 §U 三 profile;忽略 factor_returns 注入。"""
+        del factor_returns  # 1c 內不使用;1c-FR 前恒 unavailable
+
         if not turnover_data:
             return {
                 "skipped": True,
@@ -131,85 +196,117 @@ class NetICAnalyzer:
                 "features": {},
                 "summary": {
                     "total_analyzed": 0,
+                    "evaluable_count": 0,
                     "profitable_count": 0,
-                    "avg_ic_loss_pct": np.nan,
-                    "rank_correlation_gross_vs_net": np.nan,
                 },
             }
 
         feature_results: dict[str, dict] = {}
-        gross_values: list[float] = []
-        net_values: list[float] = []
+        cost_drags: list[float] = []
 
         for feature_name, metric in ic_summary.items():
-            turnover = turnover_data.get(feature_name)
-            if turnover is None:
+            if feature_name not in turnover_data:
                 feature_results[feature_name] = {
                     "skipped": True,
                     "reason": "turnover_missing",
                 }
                 continue
 
-            gross_ic = metric.get("gross_ic", metric.get("ic_mean", metric.get("mean_ic", np.nan)))
-            if not np.isfinite(float(gross_ic)):
+            turnover_raw = turnover_data[feature_name]
+            try:
+                turnover_f = float(turnover_raw)
+            except (TypeError, ValueError):
+                feature_results[feature_name] = {
+                    "skipped": True,
+                    "reason": "non_finite_turnover",
+                }
+                continue
+
+            if not math.isfinite(turnover_f):
+                feature_results[feature_name] = {
+                    "skipped": True,
+                    "reason": "non_finite_turnover",
+                }
+                continue
+
+            if turnover_f < 0.0:
+                # 禁 max(0,·) 靜默 clamp
+                feature_results[feature_name] = {
+                    "skipped": True,
+                    "reason": "negative_turnover",
+                }
+                continue
+
+            gross_ic = metric.get(
+                "gross_ic", metric.get("ic_mean", metric.get("mean_ic", np.nan))
+            )
+            try:
+                gross_f = float(gross_ic)
+            except (TypeError, ValueError):
                 feature_results[feature_name] = {
                     "skipped": True,
                     "reason": "gross_ic_missing",
                 }
                 continue
 
-            net_result = self.compute_net_ic(float(gross_ic), float(turnover))
-            net_result["cost_sensitivity"] = self.cost_sensitivity_analysis(
-                gross_ic=float(gross_ic),
-                turnover=float(turnover),
-            )["scenarios"]
+            if not math.isfinite(gross_f):
+                feature_results[feature_name] = {
+                    "skipped": True,
+                    "reason": "gross_ic_missing",
+                }
+                continue
 
             volume = metric.get("avg_daily_volume_usd")
-            net_result["capacity"] = self.estimate_factor_capacity(
-                turnover=float(turnover),
+            capacity = self._capacity_payload(
+                turnover=turnover_f,
                 avg_daily_volume_usd=float(volume) if volume is not None else None,
-                participation_rate=self._participation_rate,
             )
 
-            if factor_returns and feature_name in factor_returns:
-                gross_series = factor_returns[feature_name]
-                turnover_series = pd.Series(float(turnover), index=gross_series.index)
-                net_result["net_factor_return"] = self.compute_net_factor_return(
-                    gross_series,
-                    turnover_series,
-                )
-
-            feature_results[feature_name] = net_result
-            gross_values.append(float(net_result["gross_ic"]))
-            net_values.append(float(net_result["net_ic"]))
-
-        profitable_count = sum(
-            1
-            for value in feature_results.values()
-            if isinstance(value, dict) and not value.get("skipped") and value.get("profitable_after_cost")
-        )
-        total_analyzed = sum(1 for value in feature_results.values() if not value.get("skipped"))
-
-        ic_loss_pct = []
-        for value in feature_results.values():
-            if value.get("skipped"):
+            if not self._cost_enabled:
+                # SCHEMA_GROSS_ONLY
+                feature_results[feature_name] = {
+                    "gross_ic": gross_f,
+                    "turnover": turnover_f,
+                    "turnover_semantics": _TURNOVER_SEMANTICS,
+                    "capacity": capacity,
+                    "net_factor_return": _unavailable(),
+                }
                 continue
-            gross_ic = float(value["gross_ic"])
-            net_ic = float(value["net_ic"])
-            if gross_ic != 0:
-                ic_loss_pct.append((gross_ic - net_ic) / abs(gross_ic) * 100.0)
 
-        rank_corr = np.nan
-        if len(gross_values) >= 2 and len(net_values) >= 2:
-            corr = spearmanr(np.array(gross_values), np.array(net_values)).correlation
-            rank_corr = float(corr) if np.isfinite(corr) else np.nan
+            # SCHEMA_COST_ENABLED
+            assert self._cost_bps is not None  # validated in __init__
+            cost_bps = float(self._cost_bps)
+            drag = self.compute_cost_drag(cost_bps, turnover_f)
+            cost_drags.append(drag)
+            feature_results[feature_name] = {
+                "gross_ic": gross_f,
+                "turnover": turnover_f,
+                "turnover_semantics": _TURNOVER_SEMANTICS,
+                "capacity": capacity,
+                "net_factor_return": _unavailable(),
+                "cost_bps": cost_bps,
+                "cost_semantics": _COST_SEMANTICS,
+                "cost_drag_return": drag,
+                "cost_sensitivity": self.cost_sensitivity_analysis(cost_bps, turnover_f),
+                "breakeven_cost_bps": _unavailable(),
+                "profitable_after_cost": _unavailable(),
+            }
+
+        total_analyzed = sum(
+            1 for value in feature_results.values() if not value.get("skipped")
+        )
+        # 1c:evaluable_count 恒 0(無 canonical 報酬序列);profitable 只計 evaluable
+        summary: dict[str, Any] = {
+            "total_analyzed": int(total_analyzed),
+            "evaluable_count": 0,
+            "profitable_count": 0,
+        }
+        if self._cost_enabled:
+            summary["avg_cost_drag_return"] = (
+                float(np.mean(cost_drags)) if cost_drags else None
+            )
 
         return {
             "features": feature_results,
-            "summary": {
-                "total_analyzed": int(total_analyzed),
-                "profitable_count": int(profitable_count),
-                "avg_ic_loss_pct": float(np.mean(ic_loss_pct)) if ic_loss_pct else np.nan,
-                "rank_correlation_gross_vs_net": rank_corr,
-            },
+            "summary": summary,
         }
