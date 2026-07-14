@@ -13,7 +13,6 @@ Ultra Think 優化記錄:
 from typing import Dict, Any, List, Optional, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict, ValidationInfo
 import math
-from momentum.Indicators.types import DataSourceEnum
 
 
 class TrainingWindowConfig(BaseModel):
