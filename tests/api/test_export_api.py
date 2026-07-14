@@ -56,27 +56,28 @@ def export_task(
     redirect_patch_set,
     redirect_root_session: Path,
 ) -> dict:
+    """建 task 時短暫 activate;yield 期間不得持有 _ACTIVE(否則後續 suite ERROR)。"""
+    analyze_payload = {
+        "features_path": ic_api_real_kline["features_path"],
+        "labels_path": ic_api_real_kline["labels_path"],
+        "meta_path": ic_api_real_kline["meta_path"],
+        "config_override": {
+            **ic_api_real_kline["config_override"],
+            "thresholds": {
+                "ic_mean_min": -1.0,
+                "icir_min": -1.0,
+                "p_value_max": 1.0,
+                "ic_hit_rate_min": 0.0,
+                "monotonicity_score_min": 0.0,
+                "coverage_min": 0.0,
+                "long_short_spread": {"enabled": False},
+            },
+            "redundancy": {"correlation_threshold": 0.999},
+        },
+    }
+
     redirect_ctx = redirect_patch_set.activate(redirect_root_session, owner="export_task")
     try:
-        analyze_payload = {
-            "features_path": ic_api_real_kline["features_path"],
-            "labels_path": ic_api_real_kline["labels_path"],
-            "meta_path": ic_api_real_kline["meta_path"],
-            "config_override": {
-                **ic_api_real_kline["config_override"],
-                "thresholds": {
-                    "ic_mean_min": -1.0,
-                    "icir_min": -1.0,
-                    "p_value_max": 1.0,
-                    "ic_hit_rate_min": 0.0,
-                    "monotonicity_score_min": 0.0,
-                    "coverage_min": 0.0,
-                    "long_short_spread": {"enabled": False},
-                },
-                "redundancy": {"correlation_threshold": 0.999},
-            },
-        }
-
         with client:
             analyze_response = client.post("/api/v1/ic/analyze", json=analyze_payload)
             assert analyze_response.status_code == 200
@@ -114,14 +115,17 @@ def export_task(
                 "features",
                 data=ic_api_real_kline["features"].iloc[:1, :2].to_numpy(dtype=np.float64),
             )
+        assert not redirect_ctx.spy.violations
+    finally:
+        # setup 結束即釋放;session-scoped yield 不得跨測持有 redirect
+        redirect_patch_set.deactivate(redirect_ctx)
 
+    try:
         yield {"task_id": task_id, "module": "factor_returns"}
+    finally:
         if original is not None:
             with ic_analysis_service._lock:
                 ic_analysis_service._tasks[task_id] = original
-    finally:
-        assert not redirect_ctx.spy.violations
-        redirect_patch_set.deactivate(redirect_ctx)
 
 
 def test_export_csv_summary_200(export_task: dict) -> None:

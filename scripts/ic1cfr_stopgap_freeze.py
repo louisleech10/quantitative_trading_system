@@ -705,12 +705,22 @@ def _parse_pytest_failed_nodeids(stdout: str, stderr: str = "") -> list[str]:
         nodeids.add(m.group(1).strip())
 
     # collection errors without :: (file-level only; 行內不得含雙冒號)
+    # 必須像測試路徑(含 / 或 tests 前綴)。拒絕 log 偽陽性:
+    #   "ERROR    momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:1800 ..."
+    # (pytest Captured log / logger:pathname:lineno 格式)
     for line in text.splitlines():
         if "::" in line:
             continue
         m = re.match(r"^ERROR\s+(?:collecting\s+)?(\S+\.py)\b", line)
-        if m:
-            nodeids.add(m.group(1).strip())
+        if not m:
+            continue
+        path = m.group(1).strip()
+        if "/" not in path and not path.startswith("tests"):
+            continue
+        # logger pathname 常含 "pkg.mod:file.py" 單冒號前綴
+        if re.match(r"^[A-Za-z_][\w.]*:", path):
+            continue
+        nodeids.add(path)
 
     # pytest -q 末端 ERRORS 區塊
     for m in re.finditer(

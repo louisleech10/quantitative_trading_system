@@ -73,9 +73,11 @@ def ic_analysis_task(
 ) -> dict:
     ctx = redirect_patch_set.activate(redirect_root_session, owner="ic_analysis_task")
     try:
-        return _build_ic_analysis_task(ic_api_real_kline)
-    finally:
+        result = _build_ic_analysis_task(ic_api_real_kline)
         assert not ctx.spy.violations
+        return result
+    finally:
+        # deactivate 必須無條件執行,否則 assert 失敗會洩漏 _ACTIVE → 後續 suite ERROR
         redirect_patch_set.deactivate(ctx)
 
 

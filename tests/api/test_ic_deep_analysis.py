@@ -106,9 +106,11 @@ def completed_ic_task(
 ) -> str:
     ctx = redirect_patch_set.activate(redirect_root_module, owner="completed_ic_task")
     try:
-        return _build_completed_ic_task(sample_paths)
-    finally:
+        result = _build_completed_ic_task(sample_paths)
         assert not ctx.spy.violations
+        return result
+    finally:
+        # deactivate 必須無條件執行,否則 assert 失敗會洩漏 _ACTIVE → 後續 suite ERROR
         redirect_patch_set.deactivate(ctx)
 
 

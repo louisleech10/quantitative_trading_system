@@ -791,13 +791,27 @@ function ICAnalysisPageContent() {
                         <FactorEquityCurveChart
                           data={report?.quantile_returns?.[activeFeature || ''] || null}
                           featureName={activeFeature}
+                          loading={isDeepRunning || deepAnalysisStatus === 'running'}
+                          error={
+                            deepAnalysisStatus === 'failed' && error
+                              ? error
+                              : null
+                          }
                         />
                       </ChartErrorBoundary>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <ChartErrorBoundary title="C13 Factor Return">
-                        <FactorReturnChart data={deepAnalysisReport?.factor_returns} />
+                        <FactorReturnChart
+                          data={deepAnalysisReport?.factor_returns}
+                          loading={isDeepRunning || deepAnalysisStatus === 'running'}
+                          error={
+                            deepAnalysisStatus === 'failed' && error
+                              ? error
+                              : null
+                          }
+                        />
                       </ChartErrorBoundary>
                       <ChartErrorBoundary title="C14 Factor Centrality">
                         <FactorCentralityChart data={deepAnalysisReport?.factor_centrality} />

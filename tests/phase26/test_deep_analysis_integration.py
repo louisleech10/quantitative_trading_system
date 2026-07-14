@@ -213,9 +213,15 @@ def test_all_modules_skip(monkeypatch):
 
     report = orchestrator.run_deep_analysis(force_modules=all_modules)
 
+    # 舊斷言為何錯: skipped_count==10 假設 FR 亦走 skipped;
+    # IC1C-FR-STOPGAP 出口 sanitizer 將 results.factor_returns 換 §U →
+    # module_summary=unavailable, unavailable 不計 skipped → skipped_count=9。
     assert report.completed_count == 0
-    assert report.skipped_count == 10
+    assert report.skipped_count == 9
+    assert report.module_summary["factor_returns"] == "unavailable"
+    assert report.results["factor_returns"]["status"] == "unavailable"
     assert len(report.results) == 10
+    # runner 層仍可能把 FR 寫入 deep_analysis_errors;sanitizer 不剝 errors 列表
     assert len(report.deep_analysis_errors) == 10
 
 
@@ -225,13 +231,14 @@ def test_skipped_result_format(monkeypatch):
     def _fail(*args, **kwargs):
         raise RuntimeError("format-check")
 
-    monkeypatch.setattr(orchestrator, "_run_factor_return", _fail)
+    # 錯誤分類/SkippedResult 格式改測非 FR 模組:FR 出口恒 unavailable,無法當 skipped 形狀 oracle
+    monkeypatch.setattr(orchestrator, "_run_factor_centrality", _fail)
 
-    report = orchestrator.run_deep_analysis(force_modules=["factor_returns"])
+    report = orchestrator.run_deep_analysis(force_modules=["factor_centrality"])
 
     assert len(report.deep_analysis_errors) == 1
     skipped = report.deep_analysis_errors[0]
-    assert skipped.module_name == "factor_returns"
+    assert skipped.module_name == "factor_centrality"
     assert skipped.reason == "format-check"
     assert skipped.error_type == "INTERNAL_ERROR"
     assert isinstance(skipped.retryable, bool)
@@ -244,11 +251,13 @@ def test_timeout_handling(monkeypatch):
     def _timeout(*args, **kwargs):
         raise TimeoutError("computation timeout")
 
-    monkeypatch.setattr(orchestrator, "_run_factor_return", _timeout)
+    # 舊斷言為何錯: force FR → module_summary=="skipped";
+    # STOPGAP 出口 sanitizer 將 FR 收斂為 unavailable,timeout 分類改測 factor_centrality。
+    monkeypatch.setattr(orchestrator, "_run_factor_centrality", _timeout)
 
-    report = orchestrator.run_deep_analysis(force_modules=["factor_returns"])
+    report = orchestrator.run_deep_analysis(force_modules=["factor_centrality"])
 
-    assert report.module_summary["factor_returns"] == "skipped"
+    assert report.module_summary["factor_centrality"] == "skipped"
     skipped = report.deep_analysis_errors[0]
     assert skipped.error_type == "COMPUTATION_TIMEOUT"
     assert skipped.retryable is True
@@ -270,11 +279,13 @@ def test_error_handling_degradation(monkeypatch, raised, expected_error_type, ex
     def _raise(*args, **kwargs):
         raise raised
 
-    monkeypatch.setattr(orchestrator, "_run_factor_return", _raise)
+    # 舊斷言為何錯: 以 FR runner 驗證 skipped 錯誤分類;
+    # STOPGAP FR 出口 sanitizer → unavailable,分類 oracle 改用 factor_centrality。
+    monkeypatch.setattr(orchestrator, "_run_factor_centrality", _raise)
 
-    report = orchestrator.run_deep_analysis(force_modules=["factor_returns"])
+    report = orchestrator.run_deep_analysis(force_modules=["factor_centrality"])
 
-    assert report.module_summary["factor_returns"] == "skipped"
+    assert report.module_summary["factor_centrality"] == "skipped"
     skipped = report.deep_analysis_errors[0]
     assert skipped.error_type == expected_error_type
     assert skipped.retryable is expected_retryable

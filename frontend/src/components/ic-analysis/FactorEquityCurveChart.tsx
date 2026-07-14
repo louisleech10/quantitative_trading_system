@@ -1,261 +1,137 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
-import html2canvas from 'html2canvas';
-import { Area, ComposedChart, Line, CartesianGrid, Tooltip, ResponsiveContainer, XAxis, YAxis } from 'recharts';
-import { EquityCurvePoint, QuantileReturnData } from '@/lib/types';
+import { QuantileReturnData } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+/**
+ * IC1C-FR-STOPGAP Task 2.2: Equity Curve 整圖下架。
+ * producer monotonicity_tester 丟 timestamp,本圖按位置 high-low 相減——錯位同病。
+ * 文案與 FactorReturnChart 一致;待 1c-FR 重建(grep 錨點: 1c-FR)。
+ * producer 本體不動(修復歸 1c-FR-FULL)。
+ */
+export const FACTOR_EQUITY_UNAVAILABLE_NOTICE =
+  '錯位序列已下架,待 1c-FR 重建';
+
 interface FactorEquityCurveChartProps {
+  /** 主流程 quantile_returns 仍可能傳入;stopgap 一律不繪 */
   data?: QuantileReturnData | null;
   featureName?: string | null;
+  loading?: boolean;
+  error?: string | null;
 }
 
-interface EquityCurveChartPoint extends EquityCurvePoint {
-  short_value: number | null;
+/**
+ * stopgap: 恒不下畫 equity 點(禁位置相減 fallback)。
+ * mutation M4 會模擬「恢復畫 legacy equity」使斷言轉紅。
+ * 參數保留以維持 API 形狀(呼叫端仍傳 data);本體故意忽略。
+ */
+export function extractFactorEquityCurvePoints(
+  data?: QuantileReturnData | null
+): Array<{ bar_index: number; ls_spread: number }> {
+  // 整圖下架:永不從 quantile_returns 位置相減出有限序列
+  void data;
+  return [];
 }
 
-const MAX_POINTS = 1500;
-
-function downsample<T extends { bar_index: number }>(points: T[], maxPoints: number): T[] {
-  if (points.length <= maxPoints) {
-    return points;
-  }
-
-  const stride = Math.ceil((points.length - 1) / (maxPoints - 1));
-  const sampled: T[] = [];
-  for (let index = 0; index < points.length; index += stride) {
-    sampled.push(points[index]);
-  }
-
-  const last = points[points.length - 1];
-  if (sampled[sampled.length - 1]?.bar_index !== last.bar_index) {
-    sampled.push(last);
-  }
-
-  return sampled;
+export function shouldShowFactorEquityUnavailableNotice(
+  data?: QuantileReturnData | null
+): boolean {
+  // 主流程與 deep 報告載入皆下架:有/無資料都警示(缺鍵走 empty)
+  void data;
+  return true;
 }
 
-function parseQuantileIndex(key: string): number {
-  const match = key.match(/Q(\d+)/i);
-  if (!match) {
-    return Number.NaN;
-  }
-  return Number(match[1]);
-}
-
-export default function FactorEquityCurveChart({ data, featureName }: FactorEquityCurveChartProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  const transformed = useMemo(() => {
-    const cumulativeReturns = data?.cumulative_returns;
-    if (!cumulativeReturns || typeof cumulativeReturns !== 'object') {
-      return {
-        points: [] as EquityCurveChartPoint[],
-        rawPoints: [] as EquityCurveChartPoint[],
-        lowKey: null as string | null,
-        highKey: null as string | null,
-      };
-    }
-
-    const quantileKeys = Object.keys(cumulativeReturns)
-      .filter((key) => Number.isFinite(parseQuantileIndex(key)))
-      .sort((a, b) => parseQuantileIndex(a) - parseQuantileIndex(b));
-
-    if (quantileKeys.length === 0) {
-      return {
-        points: [] as EquityCurveChartPoint[],
-        rawPoints: [] as EquityCurveChartPoint[],
-        lowKey: null as string | null,
-        highKey: null as string | null,
-      };
-    }
-
-    const lowKey = quantileKeys[0];
-    const highKey = quantileKeys[quantileKeys.length - 1];
-    const lowSeries = Array.isArray(cumulativeReturns[lowKey]) ? cumulativeReturns[lowKey] : [];
-    const highSeries = Array.isArray(cumulativeReturns[highKey]) ? cumulativeReturns[highKey] : [];
-
-    const length = Math.min(lowSeries.length, highSeries.length);
-    if (length === 0) {
-      return {
-        points: [] as EquityCurveChartPoint[],
-        rawPoints: [] as EquityCurveChartPoint[],
-        lowKey,
-        highKey,
-      };
-    }
-
-    const points: EquityCurveChartPoint[] = [];
-    let runningMax = Number.NEGATIVE_INFINITY;
-
-    for (let barIndex = 0; barIndex < length; barIndex += 1) {
-      const lowRaw = Number(lowSeries[barIndex]);
-      const highRaw = Number(highSeries[barIndex]);
-      const low = Number.isFinite(lowRaw) ? lowRaw : null;
-      const high = Number.isFinite(highRaw) ? highRaw : null;
-      const spread = low !== null && high !== null ? high - low : null;
-
-      let drawdown: number | undefined;
-      if (spread !== null) {
-        runningMax = Math.max(runningMax, spread);
-        drawdown = spread - runningMax;
-      }
-
-      points.push({
-        bar_index: barIndex,
-        Q1: low ?? Number.NaN,
-        Q5: high ?? Number.NaN,
-        short_value: low !== null ? -low : null,
-        ls_spread: spread ?? Number.NaN,
-        drawdown,
-      });
-    }
-
-    return {
-      points: downsample(points, MAX_POINTS),
-      rawPoints: points,
-      lowKey,
-      highKey,
-    };
-  }, [data]);
-
-  const metrics = useMemo(() => {
-    if (transformed.rawPoints.length === 0) {
-      return {
-        totalReturn: null as number | null,
-        maxDrawdown: null as number | null,
-        sharpe: null as number | null,
-      };
-    }
-
-    const spreadSeries = transformed.rawPoints
-      .map((point) => point.ls_spread)
-      .filter((value) => Number.isFinite(value));
-
-    const totalReturn = spreadSeries.length > 0 ? spreadSeries[spreadSeries.length - 1] : null;
-
-    const drawdownSeries = transformed.rawPoints
-      .map((point) => point.drawdown)
-      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-    const maxDrawdown = drawdownSeries.length > 0 ? Math.min(...drawdownSeries) : null;
-
-    const spreadReturns: number[] = [];
-    for (let index = 1; index < spreadSeries.length; index += 1) {
-      spreadReturns.push(spreadSeries[index] - spreadSeries[index - 1]);
-    }
-
-    let sharpe: number | null = null;
-    if (spreadReturns.length > 1) {
-      const mean = spreadReturns.reduce((sum, value) => sum + value, 0) / spreadReturns.length;
-      const variance = spreadReturns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (spreadReturns.length - 1);
-      const std = Math.sqrt(variance);
-      if (Number.isFinite(std) && std > 0) {
-        sharpe = (mean / std) * Math.sqrt(252);
-      }
-    }
-
-    return {
-      totalReturn,
-      maxDrawdown,
-      sharpe,
-    };
-  }, [transformed.rawPoints]);
-
-  const handleExportPNG = async () => {
-    if (!containerRef.current) {
-      return;
-    }
-
-    const canvas = await html2canvas(containerRef.current);
-    const link = document.createElement('a');
-    link.download = `factor_equity_curve_${Date.now()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  };
-
-  return (
-    <Card ref={containerRef}>
-      <CardHeader className="flex flex-row items-start justify-between gap-3">
-        <div>
+export default function FactorEquityCurveChart({
+  data,
+  featureName,
+  loading = false,
+  error = null,
+}: FactorEquityCurveChartProps) {
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Equity Curve（累積淨值）</CardTitle>
           <CardDescription>
             {featureName ? `特徵：${featureName}` : '尚未選擇特徵'}
           </CardDescription>
-        </div>
-        <button type="button" onClick={handleExportPNG} className="text-xs text-cyan-300">PNG</button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {transformed.points.length === 0 ? (
-          <div className="h-[300px] flex items-center justify-center text-slate-400">暫無累積淨值資料</div>
-        ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={transformed.points} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-white/10" />
-              <XAxis dataKey="bar_index" className="text-xs" />
-              <YAxis className="text-xs" />
-              <Tooltip
-                contentStyle={{
-                  background: '#1a233a',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                }}
-                formatter={(value: number, name: string) => {
-                  if (!Number.isFinite(value)) {
-                    return ['--', name];
-                  }
-                  return [value.toFixed(4), name];
-                }}
-                labelFormatter={(barIndex: number) => `Bar ${barIndex}`}
-              />
-              <Area
-                type="monotone"
-                dataKey="drawdown"
-                stroke="none"
-                fill="#ef444433"
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="Q5"
-                stroke="#22c55e"
-                strokeWidth={2}
-                dot={false}
-                name={`Long (${transformed.highKey || 'Q-high'})`}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="short_value"
-                stroke="#ef4444"
-                strokeWidth={2}
-                dot={false}
-                name={`Short (${transformed.lowKey || 'Q-low'} × -1)`}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="ls_spread"
-                stroke="#7dd3fc"
-                strokeWidth={2}
-                dot={false}
-                name="L-S Spread"
-                connectNulls={false}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        )}
+        </CardHeader>
+        <CardContent>
+          <div
+            data-testid="factor-equity-loading"
+            className="h-[300px] flex items-center justify-center text-slate-400"
+          >
+            載入中...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-300">
-          <div>
-            Total Return: {typeof metrics.totalReturn === 'number' ? metrics.totalReturn.toFixed(4) : '--'}
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Equity Curve（累積淨值）</CardTitle>
+          <CardDescription>
+            {featureName ? `特徵：${featureName}` : '尚未選擇特徵'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            role="alert"
+            data-testid="factor-equity-error"
+            className="h-[300px] flex items-center justify-center text-rose-300"
+          >
+            {error}
           </div>
-          <div>
-            Max Drawdown: {typeof metrics.maxDrawdown === 'number' ? metrics.maxDrawdown.toFixed(4) : '--'}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // 缺鍵 / 無 data → empty(仍不下畫);有 data(含 legacy finite)→ 下架警示
+  if (data == null) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Equity Curve（累積淨值）</CardTitle>
+          <CardDescription>
+            {featureName ? `特徵：${featureName}` : '尚未選擇特徵'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* 主流程缺 quantile 亦不得暗示可繪;統一下架文案 */}
+          <div
+            data-testid="factor-equity-unavailable"
+            role="status"
+            className="h-[300px] flex items-center justify-center text-amber-300 text-center px-4"
+          >
+            {FACTOR_EQUITY_UNAVAILABLE_NOTICE}
           </div>
-          <div>
-            Sharpe Ratio: {typeof metrics.sharpe === 'number' ? metrics.sharpe.toFixed(3) : '--'}
-          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // legacy finite 或任何 quantile_returns → 警示空態;extract 恒 [] 防回歸
+  void extractFactorEquityCurvePoints(data);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Equity Curve（累積淨值）</CardTitle>
+        <CardDescription>
+          {featureName ? `特徵：${featureName}` : '尚未選擇特徵'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div
+          data-testid="factor-equity-unavailable"
+          role="status"
+          className="h-[300px] flex items-center justify-center text-amber-300 text-center px-4"
+        >
+          {FACTOR_EQUITY_UNAVAILABLE_NOTICE}
         </div>
       </CardContent>
     </Card>

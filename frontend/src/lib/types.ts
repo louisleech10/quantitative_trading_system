@@ -2228,7 +2228,12 @@ export interface SkippedResult {
   timestamp?: string;
 }
 
-export type FactorReturnData = Record<string, {
+/**
+ * IC1C-FR-STOPGAP: results.factor_returns 實際形狀 = §U discriminated union(T-S4)。
+ * 非 per-feature map;legacy 有限 map 僅 runtime 可能殘留,型別不收納為合法形狀。
+ * ok → value 為 feature map + reason=null; unavailable → value=null + reason 非空。
+ */
+export type FactorReturnLegacyFeaturePayload = {
   quantile_returns_summary?: Record<string, number>;
   long_short_mean_return?: number;
   risk_metrics?: Record<string, number>;
@@ -2237,7 +2242,24 @@ export type FactorReturnData = Record<string, {
   num_quantiles_used?: number;
   skipped?: boolean;
   reason?: string;
-}>;
+};
+
+export type FactorReturnLegacyMap = Record<string, FactorReturnLegacyFeaturePayload>;
+
+export type FactorReturnDataOk = {
+  status: 'ok';
+  value: FactorReturnLegacyMap;
+  reason: null;
+};
+
+export type FactorReturnDataUnavailable = {
+  status: 'unavailable';
+  value: null;
+  reason: string;
+};
+
+/** ICReport.factor_returns / API 節 = §U union(非只新增旁路型別)。 */
+export type FactorReturnData = FactorReturnDataOk | FactorReturnDataUnavailable;
 
 export interface FactorCentralityData {
   pca_summary?: {
