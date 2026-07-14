@@ -12319,3 +12319,8 @@ Final audit stdout:
 GIT_DIFF_CHECK=PASS
 DATA_CACHE_STATUS_EMPTY=true
 ```
+
+## Task 1.4 重戳+篡改 mutation(主委實跑 2026-07-14) — 判定: APPROVED
+- reconcile_stamps_check → PASS(65a7c0a9,codex+composer 雙 APPROVED,含少數意見註記忠實確認)。
+- check_decoupling.sh → ALL RULES PASS exit 0。
+- 篡改 mutation:manifest 改一字 → exit 1;還原 → exit 0。

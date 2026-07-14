@@ -13,8 +13,8 @@
 - 全套件既有紅=~50 failed/171 errors(redirect/label-horizon/registry fixture 等,composer parent-worktree 對照證實非本 session 引入)。
 - commit 訊息 operational claim 需 VERIFY:<receipt 檔> backing(hook 強制)。
 
-## ▶ 下一步(使用者未排序的殘餘)
-1. **DECOUPLE-TRIAGE-2**(P2):pending 3 筆(Optimization→Strategy/Analysis)真偽 triage+api/models 掃描根缺口+R4 grep import 形式盲區(細節見 ROADMAP 解耦節)。
+## ▶ 下一步
+1. **DECOUPLE-SCAN2 已完成(2026-07-14)**:R4 AST 接管+api/models 掃描根+2 筆 triage(刪死 import/白名單 1 條);manifest 10 條重戳 PASS;55 tests;殘餘=pending 3 筆綁 Optuna epic 退場(使用者裁定)+relocate-to-core-constants P3+timeframe 重複副本債。
 2. 1c Net IC 量綱(大,正確性紅線)→1d/1f→實測→AI Agent(原排序)。
 
 ## ⚠️ 未 commit

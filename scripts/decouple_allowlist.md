@@ -23,3 +23,5 @@
 ## 戳記
 
 <!-- v2 格式：RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<body-hash> task:<task-id> — <理由> -->
+RECONCILE-STAMP: codex APPROVED 2026-07-14 sha256:65a7c0a97bf13cf4514c71070bff8b64fba31d1829a53dc49bd53b0455efff8e task:DECOUPLE-SCAN2 — 既有 9 條與前版逐行一致；新增 SUPPORTED_TIMEFRAMES 精準 symbol 豁免符合 DECOUPLE-SCAN2 多數終判，contract 忠實保留 relocate-to-core-constants P3 的 codex 少數意見與重複副本債。
+RECONCILE-STAMP: composer APPROVED 2026-07-14 sha256:65a7c0a97bf13cf4514c71070bff8b64fba31d1829a53dc49bd53b0455efff8e task:DECOUPLE-SCAN2 — 既有 9 條與 aad9495^ 逐列等值未動；第 10 條 feature_config/SUPPORTED_TIMEFRAMES 白名單與 §C 終判一致（symbol 級、module_import=deny、owner=committee/DECOUPLE-SCAN2），contract 忠實含 relocate-to-core-constants P3（codex 少數意見）及重複副本債另記。
