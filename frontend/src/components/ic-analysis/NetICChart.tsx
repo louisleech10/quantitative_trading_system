@@ -9,6 +9,18 @@ import {
 } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+/**
+ * 成本語意註記(Task 3.1):per-rebalance、未年化、禁跨 TF 直比。
+ * gross-only 與 cost-enabled 皆顯示(啟用成本時亦同語意;未啟用時為預告)。
+ * 對齊後端 cost_semantics=`per_rebalance_not_annualized`(含 per_rebalance 供靜態 grep)。
+ */
+/** 後端 cost_semantics 字面值錨點(不得年化;grep 驗 per_rebalance)。 */
+export const NET_IC_COST_SEMANTICS = 'per_rebalance_not_annualized' as const;
+
+/** 面向使用者繁中說明;括號內保留 per-rebalance 可讀寫法。 */
+export const NET_IC_COST_SEMANTICS_NOTE =
+  '成本為每次再平衡(per-rebalance),未年化;不同 timeframe 間不可直接比較';
+
 interface NetICChartProps {
   data?: NetICAnalysisData;
   /** loading 態(由父層傳) */
@@ -111,6 +123,12 @@ export default function NetICChart({ data, loading = false, error = null }: NetI
       <Card>
         <CardHeader>
           <CardTitle className="text-base">成本拖累(報酬空間)</CardTitle>
+          <CardDescription
+            data-testid="netic-cost-semantics-note"
+            title={NET_IC_COST_SEMANTICS_NOTE}
+          >
+            {NET_IC_COST_SEMANTICS_NOTE}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div
@@ -129,6 +147,12 @@ export default function NetICChart({ data, loading = false, error = null }: NetI
       <Card>
         <CardHeader>
           <CardTitle className="text-base">成本拖累(報酬空間)</CardTitle>
+          <CardDescription
+            data-testid="netic-cost-semantics-note"
+            title={NET_IC_COST_SEMANTICS_NOTE}
+          >
+            {NET_IC_COST_SEMANTICS_NOTE}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div
@@ -156,6 +180,13 @@ export default function NetICChart({ data, loading = false, error = null }: NetI
           <CardDescription>
             {hasAnyCost ? 'Gross IC vs 成本拖累' : 'Gross IC（未啟用成本）'}
           </CardDescription>
+          <p
+            data-testid="netic-cost-semantics-note"
+            title={NET_IC_COST_SEMANTICS_NOTE}
+            className="text-xs text-slate-400 mt-1"
+          >
+            {NET_IC_COST_SEMANTICS_NOTE}
+          </p>
         </CardHeader>
         <CardContent>
           <div
@@ -172,7 +203,7 @@ export default function NetICChart({ data, loading = false, error = null }: NetI
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <CardTitle className="text-base">成本拖累(報酬空間)</CardTitle>
             <CardDescription>
@@ -180,6 +211,13 @@ export default function NetICChart({ data, loading = false, error = null }: NetI
                 ? 'Gross IC vs cost_drag_return（情境自後端 cost_sensitivity）'
                 : 'Gross-only 模式（未啟用成本）'}
             </CardDescription>
+            <p
+              data-testid="netic-cost-semantics-note"
+              title={NET_IC_COST_SEMANTICS_NOTE}
+              className="text-xs text-slate-400 mt-1"
+            >
+              {NET_IC_COST_SEMANTICS_NOTE}
+            </p>
           </div>
           {hasAnyCost && scenarioOptions.length > 0 && (
             <select
@@ -207,7 +245,38 @@ export default function NetICChart({ data, loading = false, error = null }: NetI
               <YAxis dataKey="gross_ic" name="Gross IC" type="number" hide />
             )}
             <ZAxis dataKey="turnover" range={[40, 300]} />
-            <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+            <Tooltip
+              cursor={{ strokeDasharray: '3 3' }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const row = payload[0]?.payload as {
+                  feature?: string;
+                  gross_ic?: number;
+                  cost_drag_return?: number;
+                  turnover?: number;
+                };
+                return (
+                  <div className="rounded border border-white/10 bg-slate-900/95 px-2 py-1.5 text-xs text-slate-100 shadow">
+                    {row.feature != null && <div className="font-medium mb-0.5">{row.feature}</div>}
+                    {typeof row.gross_ic === 'number' && (
+                      <div>Gross IC: {row.gross_ic.toFixed(4)}</div>
+                    )}
+                    {typeof row.cost_drag_return === 'number' && (
+                      <div>cost_drag_return: {row.cost_drag_return.toFixed(6)}</div>
+                    )}
+                    {typeof row.turnover === 'number' && (
+                      <div>turnover: {row.turnover.toFixed(4)}</div>
+                    )}
+                    <div
+                      className="mt-1 max-w-[220px] text-slate-400 leading-snug"
+                      data-testid="netic-tooltip-semantics"
+                    >
+                      {NET_IC_COST_SEMANTICS_NOTE}
+                    </div>
+                  </div>
+                );
+              }}
+            />
             <ReferenceLine segment={[{ x: -1, y: -1 }, { x: 1, y: 1 }]} stroke="#94a3b8" strokeDasharray="3 3" />
             <Scatter data={chartData} fill="#38bdf8" />
           </ScatterChart>

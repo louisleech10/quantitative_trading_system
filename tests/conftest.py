@@ -17,6 +17,16 @@ from tests.fixtures.data_manifest import (
     verify_kline_entry,
 )
 
+# 離線鐵則(IC1C TODO r7 / codex B2-B2):在任何測試模組 import api.main 之前
+# stub Binance Client.ping,避免 collect/TestClient lifespan 觸外網。
+# 沿用 ic_persist_redirect 的「fixture/conftest 層隔離」模式(模組載入時生效)。
+try:
+    from binance.client import Client as _BinanceClient
+
+    _BinanceClient.ping = lambda self: {}  # type: ignore[method-assign]
+except Exception:  # pragma: no cover - binance 未安裝時略過
+    pass
+
 pytest_plugins = ["tests.fixtures.ic_persist_redirect_plugin"]
 
 FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"

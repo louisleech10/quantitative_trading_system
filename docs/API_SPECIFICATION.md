@@ -1,11 +1,12 @@
 # API 端點規範
 
 ## 文檔資訊
-- **版本**: 6.0
-- **最後更新**: 2026-03-15
+- **版本**: 6.1
+- **最後更新**: 2026-07-14
 - **Base URL**: `http://localhost:8000`（開發環境）
 - **API Prefix**: `/api/v1`
 - **變更記錄**:
+  - v6.1 (2026-07-14): 新增 **§14.11.1 Net IC 分析契約**（IC1C B-strict）— typed `net_ic` 欄、§U 三 profile、conditional union、422 語意；`net_ic` 鍵禁止輸出；成本=per-rebalance 未年化
   - v6.0 (2026-03-15): 新增 Feature Factory MultiTF + Batch API（Section 20）- 單標的 generate（含 timeframe 驗證）、多標的 batch 啟動（BatchGenerateRequest）、批次任務查詢（BatchTaskStatusResponse）、WebSocket 批次進度推送；基於 Feature_Factory_MultiTF_MultiSymbol_TODO V7
   - v5.0 (2026-03-08): 新增 Feature Factory Granular Control API（Section 19）- Per-Indicator 細粒度控制 3 個端點（Schema / Batch Toggle / Preset）；基於 FEATURE_FACTORY_GRANULAR_CONTROL_PLAN V1.2
   - v4.0 (2026-02-18): 新增 Model Enhancement API（Section 16）- Phase 3.5 模型增強系統 8 個端點；新增 Hyperparameter Optimization API（Section 17）及 Execution Optimization API（Section 18）- Phase 4 回測系統優化；更新 Router 註冊對照表
@@ -679,7 +680,7 @@ GET /api/v1/pattern-analysis/model/exists/{case_id}
 ## 15. Dual-Engine ML API (Phase 3.7)
 
 > **路由**: `api/routes/pattern_analysis.py` | **Prefix**: `/api/v1/pattern-analysis`
-> 
+>
 > Phase 3.7 新增的雙引擎 ML API，支援 LightGBM 與 XGBoost 通用訓練、單引擎專屬訓練、雙引擎對比報告，以及通用批量分析（xgboost / lightgbm / both）。
 
 ### 15.1 通用模型訓練
@@ -1268,31 +1269,135 @@ GET /api/v1/ic/result/{task_id}
 }
 ```
 
-### 14.11 取得 SHAP 解釋
+### 14.11 Deep Analysis（既有 IC task 上跑深度模組）
 ```http
 POST /api/v1/ic/deep-analysis/{task_id}
+GET  /api/v1/ic/deep-analysis/{task_id}/result
 ```
 
-**Request Body**:
+- **POST** 啟動背景 deep analysis，回 `{task_id, status}`（非完整結果）。
+- **GET** 輪詢至 completed 取得各模組產物（含 `net_ic_analysis`）。
+- Request model：`DeepAnalysisRequest`（`api/models/ic_models.py`）。
+
+**Request Body（含 Net IC 成本 typed 欄）**:
 ```json
 {
-  "case_indices": [0, 10, 50, 100],
-  "features": ["rsi_14", "macd", "ema_cross"]
+  "modules": {"net_ic_analysis": true},
+  "net_ic": {"cost_enabled": true, "cost_bps": 7.0},
+  "config_override": null,
+  "selected_features": null,
+  "top_n": 30
 }
 ```
 
-**Response**:
+- request 欄名 **`net_ic`**（typed）；config / 模組鍵名 **`net_ic_analysis`** — 兩者語意不同，前端不得混用。
+- 舊 request 省略 `net_ic` → 預設 `cost_enabled=false` → **GROSS_ONLY** 相容。
+
+### 14.11.1 Net IC 分析契約（IC1C B-strict）
+
+> 對應 SPEC：`docs/IC1C_NETIC_SPEC.md` §U / §T；模型：`NetICAnalysisRequest` + deep 結果中的 `net_ic_analysis` 子樹。
+
+#### Typed 成本欄（request）
+
+| 欄位 | 型別 | 預設 | 說明 |
+|------|------|------|------|
+| `net_ic.cost_enabled` | bool | `false` | 是否輸出成本子樹 |
+| `net_ic.cost_bps` | float \| null | `null` | 單次再平衡成本（bps）；**0 非法** |
+
+**域驗證（與 enabled 無關）**：`cost_bps is not None` 時必須有限且 `0 < cost_bps ≤ 1000`。  
+**啟用時額外**：`cost_enabled=true` 要求 `cost_bps` 非 null。  
+「無成本」唯一表示 = `cost_enabled=false`（不得以 `cost_bps=0` 表示）。
+
+#### HTTP 422 語意（fail-closed，同步於 request 邊界）
+
+以下皆回 **422**（Pydantic / model_validator；含雙入口）：
+
+| 條件 | 說明 |
+|------|------|
+| `cost_bps=0` / `NaN` / `inf` / `>1000` / 非有限 | 域非法 |
+| `{cost_enabled:true}` 且缺 `cost_bps` | 啟用未帶成本 |
+| `{cost_enabled:false, cost_bps:NaN}` | 即使未啟用，非 None 亦驗域 |
+| `config_override.net_ic_analysis` 出現 | **整節 reject**（白名單空集）；typed 欄為唯一入口 |
+| `DeepAnalysisRequest.config_override` 與 `ICAnalyzeRequest.config_override` | **雙入口**皆拒絕 `net_ic_analysis` 鍵 |
+
+merge 順序：typed `net_ic` **最後**注入 engine config，override 不得蓋 typed。
+
+#### 輸出：§U 三 profile（鍵集合 equality；多/少鍵 = 非法）
+
+每 feature 恰落下列之一（`net_ic` **鍵全樹禁止輸出，含別名**）：
+
+| Profile | 觸發 | 精確鍵集合 |
+|---------|------|------------|
+| **SCHEMA_SKIPPED** | turnover 缺 / 非有限 / **負值**；或 gross_ic 非有限 | `{skipped, reason}` |
+| **SCHEMA_GROSS_ONLY** | `cost_enabled=false` 且非 skipped | `{gross_ic, turnover, turnover_semantics, capacity, net_factor_return}` |
+| **SCHEMA_COST_ENABLED** | `cost_enabled=true` 且非 skipped | GROSS_ONLY ∪ `{cost_bps, cost_semantics, cost_drag_return, cost_sensitivity, breakeven_cost_bps, profitable_after_cost}` |
+
+- `turnover_semantics` 恒 = `"membership_change_both_legs_per_bar"`
+- `cost_semantics` 恒 = `"per_rebalance_not_annualized"`（**未年化**；不同 timeframe **不可直接比較**）
+- `cost_drag_return = (cost_bps/10000) × turnover`（**無 ×2**；quantile_turnover 已含進出雙腿）
+- `capacity` 子鍵恰為 `{estimated_capacity_usd: number|null, capacity_tier: str, calibration: "uncalibrated"}`
+
+#### Conditional metric union（存在時形狀）
+
+`net_factor_return` / `breakeven_cost_bps` / `profitable_after_cost` 當鍵存在時**必為**：
+
+```json
+{"status": "ok"|"unavailable", "value": <number|bool|null>, "reason": <string|null>}
+```
+
+- `status=="unavailable"` → `value==null` 且 `reason` 非空  
+- `status=="ok"` → `reason==null`  
+- 禁裸 null / 裸 number / 頂層 reason  
+
+**1c 現況**（canonical 因子報酬序列未建，票 1c-FR）：上述三欄恒  
+`{"status":"unavailable","value":null,"reason":"canonical_factor_return_series_not_built (1c-FR)"}`。
+
+#### Response 片段示例（COST_ENABLED feature）
+
 ```json
 {
-  "shap_values": {
-    "case_0": {"rsi_14": 0.12, "macd": -0.05, "ema_cross": 0.08},
-    "case_10": {"rsi_14": 0.08, "macd": -0.02, "ema_cross": 0.11}
-  },
-  "feature_importance": [
-    {"feature": "ema_cross", "mean_abs_shap": 0.095},
-    {"feature": "rsi_14", "mean_abs_shap": 0.087},
-    {"feature": "macd", "mean_abs_shap": 0.042}
-  ]
+  "net_ic_analysis": {
+    "features": {
+      "log_return_1": {
+        "gross_ic": 0.04,
+        "turnover": 0.8,
+        "turnover_semantics": "membership_change_both_legs_per_bar",
+        "capacity": {
+          "estimated_capacity_usd": null,
+          "capacity_tier": "unknown",
+          "calibration": "uncalibrated"
+        },
+        "net_factor_return": {
+          "status": "unavailable",
+          "value": null,
+          "reason": "canonical_factor_return_series_not_built (1c-FR)"
+        },
+        "cost_bps": 7.0,
+        "cost_semantics": "per_rebalance_not_annualized",
+        "cost_drag_return": 0.00056,
+        "cost_sensitivity": [
+          {"cost_bps": 3.5, "cost_drag_return": 0.00028},
+          {"cost_bps": 7.0, "cost_drag_return": 0.00056}
+        ],
+        "breakeven_cost_bps": {
+          "status": "unavailable",
+          "value": null,
+          "reason": "canonical_factor_return_series_not_built (1c-FR)"
+        },
+        "profitable_after_cost": {
+          "status": "unavailable",
+          "value": null,
+          "reason": "canonical_factor_return_series_not_built (1c-FR)"
+        }
+      }
+    },
+    "summary": {
+      "total_analyzed": 1,
+      "evaluable_count": 0,
+      "profitable_count": 0,
+      "avg_cost_drag_return": 0.00056
+    }
+  }
 }
 ```
 
