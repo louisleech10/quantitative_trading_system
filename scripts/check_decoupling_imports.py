@@ -240,6 +240,11 @@ def _is_r4_module(module: str) -> bool:
     )
 
 
+def _is_package_module(module: str, repo_root: Path) -> bool:
+    """依 repo 路徑判斷 module 是否為任意深度 package。"""
+    return (repo_root.joinpath(*module.split("."))).is_dir()
+
+
 def _scan_r4_file(path: Path, repo_root: Path) -> list[Violation]:
     """掃描單一 service；相對 import 必先 resolve，self 僅精確 module 等值。"""
     source_module, source_is_package = _source_module(path, repo_root)
@@ -257,10 +262,10 @@ def _scan_r4_file(path: Path, repo_root: Path) -> list[Violation]:
             continue
         base = _resolve_relative_module(node, source_module, source_is_package)
         for alias in node.names:
-            package_level = base in {"api", "api.services", "api.routes"}
-            if base == "api" and alias.name in {"services", "routes"}:
-                target = f"api.{alias.name}"
-            elif base in {"api.services", "api.routes"}:
+            package_level = base == "api" or (
+                _is_r4_module(base) and _is_package_module(base, repo_root)
+            )
+            if package_level:
                 target = f"{base}.{alias.name}"
             else:
                 target = base

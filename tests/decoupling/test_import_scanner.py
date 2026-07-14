@@ -343,6 +343,22 @@ def test_r4_init_package_import_is_still_rejected(tmp_path: Path) -> None:
     assert result.count("R4") == 1
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from . import bar\n",
+        "from api.services.sub.pkg import bar\n",
+    ],
+)
+def test_r4_nested_package_level_imports_are_rejected(
+    tmp_path: Path, source: str
+) -> None:
+    """R4 矩陣⑪c-d：任意深度 package-level import 均展開子模組後判紅。"""
+    result = _scan_service(tmp_path, source, relative="sub/pkg/__init__.py")
+    assert result.count("R4") == 1
+    assert result.violations[0].target == "api.services.sub.pkg.bar"
+
+
 def test_r4_exact_absolute_self_is_only_self_exemption(tmp_path: Path) -> None:
     """R4 矩陣⑫：絕對完整 module 精確等值的 self from/import 綠。"""
     result = _scan_service(
