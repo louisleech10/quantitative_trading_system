@@ -783,6 +783,89 @@ def _build_diff_manifest(
     }
 
 
+# G-NEW2 gross_ic 不變式常數(r7/r7b;與 freeze_new2 共用)
+GROSS_IC_MAX_ABS_DIFF = 0.2
+# 同號門檻:max(|gi|)≥此值時強制同號(0 無正負號,與 material 值不同號)
+GROSS_IC_SIGN_MIN_ABS = 0.05
+
+
+def check_gross_ic_pair(
+    gi_old: Any,
+    gi_new: Any,
+    *,
+    max_abs_diff: float = GROSS_IC_MAX_ABS_DIFF,
+    sign_min_abs: float = GROSS_IC_SIGN_MIN_ABS,
+) -> list[str]:
+    """r7b gross_ic 不變式(純函式,供 new2 比對與 --self-test)。
+
+    語意(Frozen TODO:127):
+      1) 兩側皆須可轉 float 且 finite 且 ∈[-1,1]
+      2) |gi_new - gi_old| ≤ max_abs_diff(主脫鉤防線)
+      3) 同號:僅當 max(|gi|)≥sign_min_abs 時強制同號;
+         0 無正負號(sign(0)≠sign(0.2)),故 (0.0,0.2) FAIL;
+         近零雙側皆 |gi|<門檻(如 0.021/-0.016)不檢同號。
+    """
+    errs: list[str] = []
+    try:
+        gi_o = float(gi_old)  # type: ignore[arg-type]
+        gi_a = float(gi_new)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return [f"gross_ic not numeric G-NEW={gi_old!r} API={gi_new!r}"]
+    if not math.isfinite(gi_a) or not math.isfinite(gi_o):
+        return [f"gross_ic non-finite G-NEW={gi_o!r} API={gi_a!r}"]
+    if not (-1.0 <= gi_a <= 1.0) or not (-1.0 <= gi_o <= 1.0):
+        return [f"gross_ic out of [-1,1] G-NEW={gi_o!r} API={gi_a!r}"]
+    abs_diff = abs(gi_a - gi_o)
+    if abs_diff > max_abs_diff:
+        errs.append(
+            f"gross_ic |diff|={abs_diff!r} > {max_abs_diff} "
+            f"G-NEW={gi_o!r} API={gi_a!r}"
+        )
+    # max(|gi|)≥sign_min_abs → 必同號;0 無號,與非零 material 值視為不同號
+    max_abs_gi = max(abs(gi_a), abs(gi_o))
+    if max_abs_gi >= sign_min_abs:
+        if gi_a == 0.0 or gi_o == 0.0:
+            if gi_a != gi_o:
+                errs.append(
+                    f"gross_ic sign mismatch G-NEW={gi_o!r} API={gi_a!r} "
+                    f"(min_abs_for_sign={sign_min_abs}; zero has no sign)"
+                )
+        elif gi_a * gi_o < 0.0:
+            errs.append(
+                f"gross_ic sign mismatch G-NEW={gi_o!r} API={gi_a!r} "
+                f"(min_abs_for_sign={sign_min_abs}; max(|gi|)≥threshold)"
+            )
+    return errs
+
+
+def self_test_gross_ic_r7b_predicates() -> None:
+    """codex R2 五案 predicate self-test(r7b 語意)。
+
+    1 near-zero opposite → PASS(max<0.05,不檢同號)
+    2 threshold opposite → FAIL(max≥0.05 異號)
+    3 zero-vs-material → FAIL(0 無號,max=0.2≥0.05)
+    4 |diff|>0.2 → FAIL
+    5 non-finite / out-of-range → FAIL
+    """
+    cases: list[tuple[str, Any, Any, bool]] = [
+        ("near_zero_opposite", 0.021, -0.016, True),
+        ("threshold_opposite", 0.06, -0.06, False),
+        ("zero_vs_material", 0.0, 0.2, False),
+        ("diff_gt_0_2", 0.5, 0.1, False),
+        ("non_finite", float("nan"), 0.1, False),
+        ("out_of_range", 1.5, 0.1, False),
+    ]
+    # 核心 5 組語意(codex 列名)+out_of_range 併入第 5 類;兩者皆須 FAIL
+    for name, g_old, g_new, expect_pass in cases:
+        errs = check_gross_ic_pair(g_old, g_new)
+        ok = len(errs) == 0
+        if ok != expect_pass:
+            raise AssertionError(
+                f"r7b self-test {name}: expected_pass={expect_pass} "
+                f"got_ok={ok} errs={errs} pair=({g_old!r},{g_new!r})"
+            )
+
+
 def self_test_allowlist_rejects_bogus() -> None:
     """codex 反例自測:注入 bogus_unapproved_field / bogus_summary 必紅。
 
@@ -1071,10 +1154,411 @@ def freeze_new() -> Path:
     return out_json
 
 
-def freeze_new2() -> None:
-    raise NotImplementedError(
-        "G-NEW2 freeze is Phase 2 (B2); implement after API wiring"
+def _canonical_feature_digest(feat: dict[str, Any]) -> str:
+    """feature 級 dict 的 strict JSON sha256(sort_keys, allow_nan=False)。"""
+    text = json.dumps(feat, sort_keys=True, allow_nan=False, ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _extract_net_ic_features_from_deep_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """自 deep-analysis result response 抽出 net_ic_analysis.features。"""
+    # response shape: {results: DeepAnalysisReport-dict, status, ...}
+    # DeepAnalysisReport: {results: {net_ic_analysis: {features, summary}}, ...}
+    outer = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(outer, dict):
+        raise SystemExit("G-NEW2 FAIL: deep result missing results dict")
+    module_map = outer.get("results") if isinstance(outer.get("results"), dict) else outer
+    if not isinstance(module_map, dict):
+        raise SystemExit("G-NEW2 FAIL: cannot locate module results map")
+    net_ic = module_map.get("net_ic_analysis")
+    if not isinstance(net_ic, dict):
+        raise SystemExit(
+            f"G-NEW2 FAIL: net_ic_analysis missing/not dict: {type(net_ic)}"
+        )
+    if net_ic.get("skipped"):
+        raise SystemExit(
+            f"G-NEW2 FAIL: net_ic_analysis top-level skipped: {net_ic.get('reason')}"
+        )
+    features = net_ic.get("features")
+    if not isinstance(features, dict) or not features:
+        raise SystemExit("G-NEW2 FAIL: net_ic_analysis.features empty/missing")
+    return features
+
+
+def freeze_new2() -> Path:
+    """G-NEW2:三段 bootstrap API 路徑,比對 G-NEW COST_ENABLED(排除三注入特徵)。
+
+    1a POST /api/v1/ic/analyze → poll completed
+    1b POST /deep-analysis/{task_id} body net_ic:{cost_enabled:true,cost_bps:10}
+    1c poll GET /deep-analysis/{task_id}/result
+    2  vs g_new.json result_cost_enabled:除 gross_ic 外逐鍵等值;
+       gross_ic 驗 r7b(有限/∈[-1,1]/數量同;max(|gi|)≥0.05 必同號+|diff|≤0.2)
+    3  產出 g_new2.{json,sha256}
+
+    離線鐵則:自帶 Binance Client.ping stub,不依賴外網。
+    """
+    import tempfile
+    import time
+
+    # r7b predicate 先自測,失敗不得凍基線
+    self_test_gross_ic_r7b_predicates()
+
+    # 離線隔離:在 import api.main / TestClient 進 lifespan 前 stub ping
+    from binance.client import Client as _BinanceClient
+
+    _BinanceClient.ping = lambda self: {}  # type: ignore[method-assign]
+
+    from fastapi.testclient import TestClient
+
+    from api.main import app
+    from tests.fixtures.ic_api_real_kline import (
+        FEATURE_NAMES,
+        HORIZON,
+        RETURN_TYPE,
+        SYMBOL,
+        TIMEFRAME,
+        build_real_kline_frames,
+        _write_h5,
     )
+    from tests.fixtures.ic_persist_redirect_manual import run_with_manual_redirect
+    from momentum.factories import create_kline_storage_manager
+
+    g_new_path = OUT_DIR / "g_new.json"
+    if not g_new_path.is_file():
+        raise SystemExit(f"G-NEW2 requires G-NEW first: missing {g_new_path}")
+    g_new = json.loads(g_new_path.read_text(encoding="utf-8"))
+    g_new_cost = g_new.get("result_cost_enabled") or {}
+    g_new_features = g_new_cost.get("features") or {}
+    if not isinstance(g_new_features, dict) or not g_new_features:
+        raise SystemExit("G-NEW2 FAIL: g_new.result_cost_enabled.features empty")
+
+    if not KLINE_CACHE.is_file():
+        raise FileNotFoundError(f"requires_kline: missing {KLINE_CACHE}")
+
+    storage = create_kline_storage_manager(cache_dir=str(KLINE_CACHE.parent))
+    kline = storage.read_klines(SYMBOL, TIMEFRAME, validate_continuity=False)
+    if kline is None or getattr(kline, "empty", True):
+        raise RuntimeError(f"requires_kline: no data for {SYMBOL}/{TIMEFRAME}")
+
+    features_df, labels = build_real_kline_frames(kline)
+    timestamps = features_df.index.to_numpy(dtype="int64", copy=True)
+
+    redirect_root = OUT_DIR / "_g_new2_redirect"
+    redirect_root.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="ic1c_g_new2_") as tmp:
+        tmp_path = Path(tmp)
+        features_path = tmp_path / "features.h5"
+        labels_path = tmp_path / "labels.h5"
+        meta_path = tmp_path / "meta.json"
+        _write_h5(
+            features_path,
+            "features",
+            features_df.to_numpy(dtype=np.float64),
+            timestamps,
+            list(FEATURE_NAMES),
+        )
+        _write_h5(
+            labels_path,
+            "labels",
+            labels.to_numpy(dtype=np.float64)[:, None],
+            timestamps,
+            ["return_5"],
+        )
+        meta = {
+            "symbol": SYMBOL,
+            "timeframe": TIMEFRAME,
+            "case_id": "ic1c_g_new2",
+        }
+        meta.update(
+            {
+                name: {
+                    "name": name,
+                    "category": "price_derived",
+                    "layer": 1,
+                    "data_source": "kline",
+                }
+                for name in FEATURE_NAMES
+            }
+        )
+        meta_path.write_text(
+            json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
+        analyze_body = {
+            "features_path": str(features_path),
+            "labels_path": str(labels_path),
+            "meta_path": str(meta_path),
+            "config_override": {
+                "labels": {"return_type": RETURN_TYPE, "horizons": [HORIZON]},
+                "thresholds": {
+                    "ic_mean_min": -1.0,
+                    "icir_min": -1.0,
+                    "p_value_max": 1.0,
+                    "ic_hit_rate_min": 0.0,
+                    "monotonicity_score_min": 0.0,
+                    "coverage_min": 0.0,
+                    "long_short_spread": {"enabled": False},
+                },
+                "redundancy": {"correlation_threshold": 0.999},
+            },
+        }
+        deep_body = {
+            "top_n": len(FEATURE_NAMES),
+            "selected_features": list(FEATURE_NAMES),
+            "modules": {
+                "factor_return": False,
+                "factor_centrality": False,
+                "trend_analysis": False,
+                "parameter_sensitivity": False,
+                "rolling_oos": False,
+                "factor_orthogonalization": False,
+                "factor_exposure": False,
+                "long_short_analysis": False,
+                "feature_quality_diagnostics": False,
+                "net_ic_analysis": True,
+            },
+            "net_ic": {"cost_enabled": True, "cost_bps": G_NEW_COST_BPS},
+            "config_override": None,
+        }
+
+        with run_with_manual_redirect(redirect_root):
+            client = TestClient(app)
+            with client:
+                # 1a
+                r = client.post("/api/v1/ic/analyze", json=analyze_body)
+                if r.status_code != 200:
+                    raise SystemExit(
+                        f"G-NEW2 FAIL: analyze HTTP {r.status_code}: {r.text[:500]}"
+                    )
+                task_id = r.json()["task_id"]
+                t0 = time.time()
+                while time.time() - t0 < 120.0:
+                    st = client.get(f"/api/v1/ic/task/{task_id}")
+                    if st.status_code != 200:
+                        raise SystemExit(
+                            f"G-NEW2 FAIL: task status HTTP {st.status_code}"
+                        )
+                    body = st.json()
+                    if body.get("status") == "completed":
+                        break
+                    if body.get("status") == "failed":
+                        raise SystemExit(
+                            f"G-NEW2 FAIL: analyze failed: {body.get('error')}"
+                        )
+                    time.sleep(0.5)
+                else:
+                    raise SystemExit("G-NEW2 FAIL: analyze timeout")
+
+                # 1b
+                r2 = client.post(
+                    f"/api/v1/ic/deep-analysis/{task_id}", json=deep_body
+                )
+                if r2.status_code != 200:
+                    raise SystemExit(
+                        f"G-NEW2 FAIL: deep-analysis HTTP {r2.status_code}: "
+                        f"{r2.text[:500]}"
+                    )
+
+                # 1c
+                t1 = time.time()
+                deep_payload: dict[str, Any] | None = None
+                while time.time() - t1 < 60.0:
+                    r3 = client.get(f"/api/v1/ic/deep-analysis/{task_id}/result")
+                    if r3.status_code != 200:
+                        raise SystemExit(
+                            f"G-NEW2 FAIL: deep result HTTP {r3.status_code}"
+                        )
+                    deep_payload = r3.json()
+                    status = (deep_payload or {}).get("status")
+                    if status == "completed":
+                        break
+                    if status == "failed":
+                        raise SystemExit(
+                            f"G-NEW2 FAIL: deep failed: "
+                            f"{(deep_payload or {}).get('error')}"
+                        )
+                    time.sleep(0.5)
+                else:
+                    raise SystemExit("G-NEW2 FAIL: deep-analysis timeout 60s")
+
+        assert deep_payload is not None
+        api_features = _extract_net_ic_features_from_deep_payload(deep_payload)
+
+    # 步驟 2 比對(TODO r7 / codex B2-B1):排除三注入特徵後,
+    # 其餘鍵逐鍵等值;gross_ic 另驗不變式(有限/∈[-1,1]/數量/同號+|diff|≤0.2)。
+    # 說明:G-NEW gross_ic=freeze spearman;API=IC pipeline ic_mean — 來源不同故不做等值。
+    from tests.momentum.Analysis.test_net_ic_schema_profiles import (
+        SCHEMA_COST_ENABLED,
+        SCHEMA_SKIPPED,
+    )
+
+    compare_names = sorted(
+        (set(g_new_features.keys()) | set(api_features.keys())) - set(G_COMPARE_EXCLUDE)
+    )
+    diffs: list[str] = []
+    # gross_ic 不進逐鍵等值;其餘全部鍵維持等值(含 capacity/cost/union)
+    ALLOW_VALUE_DIFF_KEYS = frozenset({"gross_ic"})
+    # r7b 語意:max(|gi|)≥GROSS_IC_SIGN_MIN_ABS → 必同號;0 無號;否則僅 |diff|≤0.2
+    # (見 check_gross_ic_pair / self_test_gross_ic_r7b_predicates)
+
+    g_new_non_inject = [
+        n
+        for n in g_new_features
+        if n not in G_COMPARE_EXCLUDE and isinstance(g_new_features.get(n), dict)
+    ]
+    api_non_inject = [
+        n
+        for n in api_features
+        if n not in G_COMPARE_EXCLUDE and isinstance(api_features.get(n), dict)
+    ]
+    if len(g_new_non_inject) != len(api_non_inject):
+        diffs.append(
+            f"gross_ic feature count: G-NEW={len(g_new_non_inject)} "
+            f"API={len(api_non_inject)}"
+        )
+    if set(g_new_non_inject) != set(api_non_inject):
+        diffs.append(
+            f"gross_ic feature set mismatch: "
+            f"only_g_new={sorted(set(g_new_non_inject) - set(api_non_inject))} "
+            f"only_api={sorted(set(api_non_inject) - set(g_new_non_inject))}"
+        )
+
+    for name in compare_names:
+        old_f = g_new_features.get(name)
+        new_f = api_features.get(name)
+        if not isinstance(old_f, dict):
+            diffs.append(f"{name}: missing in G-NEW cost features")
+            continue
+        if not isinstance(new_f, dict):
+            diffs.append(f"{name}: missing in API G-NEW2 features")
+            continue
+        if old_f.get("skipped") or new_f.get("skipped"):
+            if set(new_f.keys()) != set(SCHEMA_SKIPPED) and new_f.get("skipped"):
+                diffs.append(f"{name}: API SKIPPED keys != SCHEMA_SKIPPED")
+            if old_f.get("skipped") != new_f.get("skipped") or old_f.get(
+                "reason"
+            ) != new_f.get("reason"):
+                # 非注入特徵兩邊皆不應 skip;若一邊 skip 則 fail
+                diffs.append(
+                    f"{name}: skip mismatch G-NEW={old_f.get('reason')} "
+                    f"API={new_f.get('reason')}"
+                )
+            continue
+
+        n_keys = set(new_f.keys())
+        if n_keys != set(SCHEMA_COST_ENABLED):
+            diffs.append(
+                f"{name}: API keys {sorted(n_keys)} != SCHEMA_COST_ENABLED"
+            )
+            continue
+
+        # cost_bps 必須為 G_NEW_COST_BPS
+        if float(new_f.get("cost_bps", -1)) != float(G_NEW_COST_BPS):
+            diffs.append(
+                f"{name}: cost_bps={new_f.get('cost_bps')!r} != {G_NEW_COST_BPS}"
+            )
+
+        # turnover 必須與 G-NEW 等值(同源 quantile_turnover)
+        if old_f.get("turnover") != new_f.get("turnover"):
+            # 允許 float 微差
+            try:
+                if not math.isclose(
+                    float(old_f["turnover"]),
+                    float(new_f["turnover"]),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    diffs.append(
+                        f"{name}: turnover G-NEW={old_f.get('turnover')!r} "
+                        f"API={new_f.get('turnover')!r}"
+                    )
+            except (TypeError, ValueError, KeyError):
+                diffs.append(f"{name}: turnover incomparable")
+
+        # 獨立 cost_drag oracle(禁 import analyzer)
+        try:
+            t = float(new_f["turnover"])
+            bps = float(new_f["cost_bps"])
+            drag = float(new_f["cost_drag_return"])
+            expected = _canonical_cost_drag(bps, t)
+            if abs(drag - expected) > 1e-12:
+                diffs.append(
+                    f"{name}: cost_drag_return={drag!r} != canonical {expected!r}"
+                )
+        except (TypeError, ValueError, KeyError) as exc:
+            diffs.append(f"{name}: cost_drag recompute failed: {exc}")
+
+        # 除 gross_ic 外逐鍵等值(含 cost_sensitivity / union / semantics / capacity)
+        o_keys = set(old_f.keys())
+        for k in sorted((o_keys | n_keys) - ALLOW_VALUE_DIFF_KEYS):
+            if k not in old_f:
+                diffs.append(f"{name}: key {k!r} only in API")
+                continue
+            if k not in new_f:
+                diffs.append(f"{name}: key {k!r} only in G-NEW")
+                continue
+            if old_f.get(k) != new_f.get(k):
+                diffs.append(
+                    f"{name}.{k}: G-NEW={old_f.get(k)!r} API={new_f.get(k)!r}"
+                )
+
+        # gross_ic 不變式(r7b):見 check_gross_ic_pair
+        for err in check_gross_ic_pair(old_f.get("gross_ic"), new_f.get("gross_ic")):
+            diffs.append(f"{name}: {err}")
+
+        # 禁 net_ic
+        if "net_ic" in new_f:
+            diffs.append(f"{name}: forbidden net_ic key present")
+
+    if diffs:
+        for line in diffs[:40]:
+            print(f"G-NEW2 DIFF: {line}", file=sys.stderr)
+        if len(diffs) > 40:
+            print(f"... and {len(diffs) - 40} more", file=sys.stderr)
+        raise SystemExit(f"G-NEW2 FAIL: {len(diffs)} feature mismatch(es)")
+
+    non_finite_fields: list[str] = []
+    sanitized_features = _sanitize_for_strict_json(
+        api_features, path="features", non_finite_fields=non_finite_fields
+    )
+    payload: dict[str, Any] = {
+        "fixture_sha256": _sha256_file(FIXTURE_PATH),
+        "git_head": _git_head(),
+        "generated_by": "ic1c_freeze_baseline --baseline new2",
+        "g_new_sha256": _sha256_file(g_new_path),
+        "cost_bps": G_NEW_COST_BPS,
+        "compare_exclude_features": sorted(G_COMPARE_EXCLUDE),
+        "non_finite_fields": sorted(
+            p[len("features.") :] if p.startswith("features.") else p
+            for p in non_finite_fields
+        ),
+        "result": {
+            "features": sanitized_features,
+            "summary": (deep_payload.get("results") or {})
+            .get("results", {})
+            .get("net_ic_analysis", {})
+            .get("summary"),
+        },
+        "deep_status": deep_payload.get("status"),
+    }
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_json = OUT_DIR / "g_new2.json"
+    out_sha = OUT_DIR / "g_new2.sha256"
+    text = json.dumps(payload, sort_keys=True, allow_nan=False, ensure_ascii=False)
+    if not text.endswith("\n"):
+        text = text + "\n"
+    out_json.write_text(text, encoding="utf-8")
+    digest = hashlib.sha256(out_json.read_bytes()).hexdigest()
+    rel = out_json.relative_to(REPO_ROOT).as_posix()
+    out_sha.write_text(f"{digest}  {rel}\n", encoding="utf-8")
+    print(f"wrote {rel}")
+    print(f"sha256={digest}")
+    print(
+        f"compared_features={len(compare_names)} exclude={sorted(G_COMPARE_EXCLUDE)}"
+    )
+    return out_json
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1093,7 +1577,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.self_test:
         self_test_allowlist_rejects_bogus()
-        print("self-test PASS: bogus_unapproved_field/bogus_summary rejected")
+        self_test_gross_ic_r7b_predicates()
+        print(
+            "self-test PASS: bogus_unapproved_field/bogus_summary rejected; "
+            "r7b gross_ic predicates ok"
+        )
         return 0
     if not args.baseline:
         parser.error("--baseline is required unless --self-test")
@@ -1105,14 +1593,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.baseline == "new2":
         freeze_new2()
-        return 1
+        return 0
     parser.error(f"unknown baseline: {args.baseline}")
     return 2
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except NotImplementedError as exc:
-        print(f"NotImplementedError: {exc}", file=sys.stderr)
-        raise SystemExit(2) from exc
+    raise SystemExit(main())

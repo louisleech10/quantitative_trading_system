@@ -36,7 +36,7 @@ describe('useFeatureFactory startBatchGeneration date payload', () => {
   });
 
   it('sends start_date and end_date when provided', async () => {
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn(async () => {
       return response(200, { task_id: 'batch-with-dates', status: 'pending', total: 2 });
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -58,7 +58,7 @@ describe('useFeatureFactory startBatchGeneration date payload', () => {
   });
 
   it('omits undefined dates when not provided', async () => {
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn(async () => {
       return response(200, { task_id: 'batch-no-dates', status: 'pending', total: 2 });
     });
     vi.stubGlobal('fetch', fetchMock);

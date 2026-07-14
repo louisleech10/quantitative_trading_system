@@ -55,6 +55,7 @@ function ICAnalysisPageContent() {
     featureFilter,
     selectedFeatures,
     deepAnalysisModules,
+    netIcConfig,
     deepAnalysisStatus,
     deepAnalysisProgress,
     deepAnalysisReport,
@@ -69,6 +70,7 @@ function ICAnalysisPageContent() {
     setFeatureFilter,
     setSelectedFeatures,
     setDeepAnalysisModules,
+    setNetIcConfig,
     setDeepAnalysisStatus,
     setDeepAnalysisProgress,
     setDeepAnalysisReport,
@@ -76,6 +78,7 @@ function ICAnalysisPageContent() {
     setActiveTab,
     setFeatureTier,
     toggleFeature,
+    buildDeepAnalysisRequest,
   } = useICAnalysisStore();
 
   const {
@@ -416,10 +419,9 @@ function ICAnalysisPageContent() {
     setError(null);
 
     try {
-      await startDeepAnalysis(taskId, {
+      const payload = buildDeepAnalysisRequest({
         selected_features: candidates,
         top_n: candidates.length,
-        modules: deepAnalysisModules,
         config_override: {
           factor_exposure: {
             neutralization_mode: neutralizationMode,
@@ -427,6 +429,7 @@ function ICAnalysisPageContent() {
           },
         },
       });
+      await startDeepAnalysis(taskId, payload);
 
       let done = false;
       while (!done) {
@@ -434,6 +437,12 @@ function ICAnalysisPageContent() {
         setDeepAnalysisProgress(response.progress ?? 0);
 
         if (response.summary) {
+          // deep report 結構: { results: { net_ic_analysis, ... }, module_summary, ... }
+          const deepPayload = (response.results || {}) as Record<string, unknown>;
+          const moduleResults =
+            deepPayload.results && typeof deepPayload.results === 'object'
+              ? (deepPayload.results as Record<string, unknown>)
+              : deepPayload;
           const merged = {
             deep_analysis_enabled: true,
             deep_analysis_summary: {
@@ -442,9 +451,11 @@ function ICAnalysisPageContent() {
               skipped: response.summary.skipped_count,
               failed: response.summary.failed_count,
             },
-            ...(response.results || {}),
+            deep_analysis_errors: deepPayload.deep_analysis_errors,
+            module_statuses: response.module_status,
+            ...moduleResults,
           };
-          setDeepAnalysisReport(merged);
+          setDeepAnalysisReport(merged as typeof deepAnalysisReport);
         }
 
         setDeepAnalysisModuleStatus(response.module_status || []);
@@ -690,11 +701,16 @@ function ICAnalysisPageContent() {
               <DeepAnalysisConfigPanel
                 selectedFeatureCount={selectedFeatures.length}
                 modules={deepAnalysisModules}
+                netIcConfig={netIcConfig}
                 neutralizationMode={neutralizationMode}
                 onModulesChange={setDeepAnalysisModules}
+                onNetIcConfigChange={setNetIcConfig}
                 onNeutralizationModeChange={setNeutralizationMode}
                 onStart={handleStartDeepAnalysis}
                 isRunning={isDeepRunning}
+                formError={
+                  deepAnalysisStatus === 'failed' && error ? error : null
+                }
               />
 
               {deepAnalysisStatus === 'running' && (
@@ -819,8 +835,16 @@ function ICAnalysisPageContent() {
                       <ChartErrorBoundary title="C21 Quality Dashboard">
                         <FeatureQualityDashboard data={deepAnalysisReport?.feature_quality_diagnostics} />
                       </ChartErrorBoundary>
-                      <ChartErrorBoundary title="C22 Net IC">
-                        <NetICChart data={deepAnalysisReport?.net_ic_analysis} />
+                      <ChartErrorBoundary title="C22 成本拖累">
+                        <NetICChart
+                          data={deepAnalysisReport?.net_ic_analysis}
+                          loading={isDeepRunning || deepAnalysisStatus === 'running'}
+                          error={
+                            deepAnalysisStatus === 'failed' && error
+                              ? error
+                              : null
+                          }
+                        />
                       </ChartErrorBoundary>
                     </div>
                   </TabsContent>

@@ -2,66 +2,216 @@
 
 import { useMemo, useState } from 'react';
 import { Scatter, ScatterChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ZAxis, ReferenceLine } from 'recharts';
-import { NetICAnalysisData } from '@/lib/types';
+import {
+  NetICAnalysisData,
+  NetICFeatureCostEnabled,
+  NetICFeatureResult,
+} from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface NetICChartProps {
   data?: NetICAnalysisData;
+  /** loading 態(由父層傳) */
+  loading?: boolean;
+  /** error 態文案 */
+  error?: string | null;
 }
 
-export default function NetICChart({ data }: NetICChartProps) {
-  const [costBps, setCostBps] = useState<number>(5);
+function isSkippedFeature(
+  feat: NetICFeatureResult
+): feat is Extract<NetICFeatureResult, { skipped: true }> {
+  return 'skipped' in feat && feat.skipped === true;
+}
+
+function isCostEnabledFeature(feat: NetICFeatureResult): feat is NetICFeatureCostEnabled {
+  if (isSkippedFeature(feat)) return false;
+  return (
+    typeof (feat as NetICFeatureCostEnabled).cost_drag_return === 'number' ||
+    Array.isArray((feat as NetICFeatureCostEnabled).cost_sensitivity)
+  );
+}
+
+function hasFiniteTurnover(feat: NetICFeatureResult): boolean {
+  if (isSkippedFeature(feat)) return false;
+  return typeof feat.turnover === 'number' && Number.isFinite(feat.turnover);
+}
+
+function hasFiniteGrossIc(feat: NetICFeatureResult): boolean {
+  if (isSkippedFeature(feat)) return false;
+  return typeof feat.gross_ic === 'number' && Number.isFinite(feat.gross_ic);
+}
+
+export default function NetICChart({ data, loading = false, error = null }: NetICChartProps) {
+  const features =
+    data && !data.skipped && data.features ? data.features : ({} as Record<string, NetICFeatureResult>);
+  const entries = Object.entries(features);
+
+  // scenario 選項只從後端 cost_sensitivity 讀,禁硬編 [1,3,5,10,20]
+  const scenarioOptions = useMemo(() => {
+    const bpsSet = new Set<number>();
+    for (const [, feat] of entries) {
+      if (isSkippedFeature(feat) || !isCostEnabledFeature(feat)) continue;
+      for (const row of feat.cost_sensitivity || []) {
+        if (typeof row.cost_bps === 'number' && Number.isFinite(row.cost_bps)) {
+          bpsSet.add(row.cost_bps);
+        }
+      }
+      if (typeof feat.cost_bps === 'number' && Number.isFinite(feat.cost_bps)) {
+        bpsSet.add(feat.cost_bps);
+      }
+    }
+    return Array.from(bpsSet).sort((a, b) => a - b);
+  }, [entries]);
+
+  const [selectedBps, setSelectedBps] = useState<number | null>(null);
+  const activeBps = selectedBps ?? scenarioOptions[0] ?? null;
+
+  const allSkipped =
+    entries.length > 0 && entries.every(([, feat]) => isSkippedFeature(feat));
+  const hasAnyCost = entries.some(
+    ([, feat]) => !isSkippedFeature(feat) && isCostEnabledFeature(feat)
+  );
+  const missingTurnoverOnly =
+    entries.length > 0 &&
+    entries.every(([, feat]) => isSkippedFeature(feat) || !hasFiniteTurnover(feat)) &&
+    !allSkipped;
 
   const chartData = useMemo(() => {
-    const features = data?.features || {};
-    return Object.entries(features)
-      .filter(([, value]) => !value.skipped)
+    return entries
+      .filter(([, value]) => !isSkippedFeature(value))
+      .filter(([, value]) => hasFiniteTurnover(value))
+      // R2-NEW-1:缺 gross_ic / 非有限 → 不造 0,直接剔除;全剔除→empty 態
+      .filter(([, value]) => hasFiniteGrossIc(value))
       .map(([feature, value]) => {
-        const scenario = (value.cost_sensitivity || []).find((item) => item.cost_bps === costBps);
+        const nonSkipped = value as Exclude<NetICFeatureResult, { skipped: true }>;
+        const costFeat = isCostEnabledFeature(nonSkipped) ? nonSkipped : null;
+        const scenario =
+          activeBps != null && costFeat
+            ? (costFeat.cost_sensitivity || []).find((item) => item.cost_bps === activeBps)
+            : undefined;
+        const costDrag =
+          scenario?.cost_drag_return ??
+          (costFeat && typeof costFeat.cost_drag_return === 'number'
+            ? costFeat.cost_drag_return
+            : undefined);
         return {
           feature,
-          gross_ic: value.gross_ic ?? 0,
-          net_ic: scenario?.net_ic ?? value.net_ic ?? 0,
-          turnover: value.turnover ?? 0.1,
-          profitable: scenario ? scenario.net_ic > 0 : Boolean(value.profitable_after_cost),
+          gross_ic: nonSkipped.gross_ic,
+          cost_drag_return: costDrag,
+          turnover: nonSkipped.turnover as number,
         };
-      });
-  }, [costBps, data?.features]);
+      })
+      .filter((row) =>
+        hasAnyCost ? typeof row.cost_drag_return === 'number' : true
+      );
+  }, [entries, activeBps, hasAnyCost]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">成本拖累(報酬空間)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div
+            data-testid="netic-loading"
+            className="h-[260px] flex items-center justify-center text-slate-400"
+          >
+            載入中...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">成本拖累(報酬空間)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div
+            role="alert"
+            data-testid="netic-error"
+            className="h-[260px] flex items-center justify-center text-rose-300"
+          >
+            {error}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data || entries.length === 0 || allSkipped || missingTurnoverOnly || chartData.length === 0) {
+    const emptyMsg = allSkipped
+      ? '全部特徵 SKIPPED'
+      : missingTurnoverOnly || chartData.length === 0
+        ? '無資料'
+        : '暫無成本拖累資料';
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">成本拖累(報酬空間)</CardTitle>
+          <CardDescription>
+            {hasAnyCost ? 'Gross IC vs 成本拖累' : 'Gross IC（未啟用成本）'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            data-testid="netic-empty"
+            className="h-[260px] flex items-center justify-center text-slate-400"
+          >
+            {emptyMsg}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-base">C22 Net IC Chart</CardTitle>
-            <CardDescription>Gross vs Net IC（成本情境可切換）</CardDescription>
+            <CardTitle className="text-base">成本拖累(報酬空間)</CardTitle>
+            <CardDescription>
+              {hasAnyCost
+                ? 'Gross IC vs cost_drag_return（情境自後端 cost_sensitivity）'
+                : 'Gross-only 模式（未啟用成本）'}
+            </CardDescription>
           </div>
-          <select
-            value={costBps}
-            onChange={(event) => setCostBps(Number(event.target.value))}
-            className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-slate-200"
-          >
-            {[1, 3, 5, 10, 20].map((item) => (
-              <option key={item} value={item}>{item} bps</option>
-            ))}
-          </select>
+          {hasAnyCost && scenarioOptions.length > 0 && (
+            <select
+              value={activeBps ?? ''}
+              onChange={(event) => setSelectedBps(Number(event.target.value))}
+              className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-slate-200"
+              data-testid="netic-scenario-select"
+            >
+              {scenarioOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item} bps
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </CardHeader>
       <CardContent>
-        {chartData.length === 0 ? (
-          <div className="h-[260px] flex items-center justify-center text-slate-400">暫無 Net IC 資料</div>
-        ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <ScatterChart>
-              <XAxis dataKey="gross_ic" name="Gross IC" type="number" />
-              <YAxis dataKey="net_ic" name="Net IC" type="number" />
-              <ZAxis dataKey="turnover" range={[40, 300]} />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-              <ReferenceLine segment={[{ x: -1, y: -1 }, { x: 1, y: 1 }]} stroke="#94a3b8" strokeDasharray="3 3" />
-              <Scatter data={chartData} fill="#38bdf8" />
-            </ScatterChart>
-          </ResponsiveContainer>
-        )}
+        <ResponsiveContainer width="100%" height={260}>
+          <ScatterChart>
+            <XAxis dataKey="gross_ic" name="Gross IC" type="number" />
+            {hasAnyCost ? (
+              <YAxis dataKey="cost_drag_return" name="cost_drag_return" type="number" />
+            ) : (
+              <YAxis dataKey="gross_ic" name="Gross IC" type="number" hide />
+            )}
+            <ZAxis dataKey="turnover" range={[40, 300]} />
+            <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+            <ReferenceLine segment={[{ x: -1, y: -1 }, { x: 1, y: 1 }]} stroke="#94a3b8" strokeDasharray="3 3" />
+            <Scatter data={chartData} fill="#38bdf8" />
+          </ScatterChart>
+        </ResponsiveContainer>
       </CardContent>
     </Card>
   );

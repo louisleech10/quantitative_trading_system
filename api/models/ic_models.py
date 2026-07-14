@@ -1,8 +1,11 @@
 """IC analysis API models."""
 
+from __future__ import annotations
+
+import math
 from typing import Optional, List, Dict, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class FeatureFilterConfig(BaseModel):
@@ -28,11 +31,61 @@ class DeepAnalysisModules(BaseModel):
     net_ic_analysis: bool = True
 
 
+class NetICAnalysisRequest(BaseModel):
+    """Deep analysis 成本參數(typed 一等公民)。
+
+    統一 validator 偽碼(TODO Task 2.1 / Task 1.1 ④):
+    - cost_bps 非 None → 一律驗域(有限且 0<x≤1000),與 enabled 無關
+    - cost_enabled=True → 另驗 cost_bps 非 None
+    - 0 非法;「無成本」唯一表示=cost_enabled=False
+    """
+
+    cost_enabled: bool = False
+    cost_bps: Optional[float] = None
+
+    @model_validator(mode="after")
+    def _validate_cost_params(self) -> "NetICAnalysisRequest":
+        cost_bps = self.cost_bps
+        if cost_bps is not None:
+            try:
+                bps = float(cost_bps)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+                ) from exc
+            if not math.isfinite(bps) or not (0.0 < bps <= 1000.0):
+                raise ValueError(
+                    f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+                )
+        if self.cost_enabled and cost_bps is None:
+            raise ValueError(
+                "cost_enabled=True requires cost_bps to be set (0 is illegal)"
+            )
+        return self
+
+
+def _reject_net_ic_analysis_in_config_override(
+    config_override: Optional[Dict[str, Any]],
+) -> None:
+    """T-F12:config_override 禁止 net_ic_analysis 整節(白名單空集)。"""
+    if isinstance(config_override, dict) and "net_ic_analysis" in config_override:
+        raise ValueError(
+            "config_override.net_ic_analysis is rejected; "
+            "use typed 'net_ic' field on DeepAnalysisRequest"
+        )
+
+
 class DeepAnalysisRequest(BaseModel):
     selected_features: Optional[List[str]] = None
     top_n: int = Field(default=30, ge=1, le=200)
     modules: DeepAnalysisModules = Field(default_factory=DeepAnalysisModules)
     config_override: Optional[Dict[str, Any]] = None
+    net_ic: NetICAnalysisRequest = Field(default_factory=NetICAnalysisRequest)
+
+    @model_validator(mode="after")
+    def _reject_net_ic_override(self) -> "DeepAnalysisRequest":
+        _reject_net_ic_analysis_in_config_override(self.config_override)
+        return self
 
 
 class ICResultV2Response(BaseModel):
@@ -107,6 +160,12 @@ class ICAnalyzeRequest(BaseModel):
         None,
         description="Feature tier configuration override",
     )
+
+    @model_validator(mode="after")
+    def _reject_net_ic_override(self) -> "ICAnalyzeRequest":
+        """T-F12 雙入口:ICAnalyzeRequest.config_override 亦拒 net_ic_analysis 整節。"""
+        _reject_net_ic_analysis_in_config_override(self.config_override)
+        return self
 
 
 class ICFullAnalysisRequest(ICAnalyzeRequest):

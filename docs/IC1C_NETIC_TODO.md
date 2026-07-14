@@ -1,4 +1,4 @@
-# IC 1c Net IC 量綱正確化 TODO(版本 **Frozen r6(2026-07-14)**——六輪三家 adversarial 全閉合(grok r3/composer r5/codex r6 APPROVE),RECONCILE-STAMP 機檢 PASS(body sha256:936daabc)/基於 docs/IC1C_NETIC_SPEC.md **v1.1**(負 turnover→SKIPPED 補裁)/2026-07-14;r1 16 主題+r2 三家 REJECT(codex 7B/composer 2B/grok 1B)合併 T-F17~T-F26 全落本版,見 handoffs/20260714-IC1C-TODOREV-RECONCILE.md)
+# IC 1c Net IC 量綱正確化 TODO(版本 **Frozen r7(2026-07-14,r7=B2 審後修訂:G-NEW2 gross_ic 不變式+離線鐵則+單檔擴scope核可,交 codex 閉合輪核可)**——六輪三家 adversarial 全閉合(grok r3/composer r5/codex r6 APPROVE),RECONCILE-STAMP 機檢 PASS(body sha256:936daabc)/基於 docs/IC1C_NETIC_SPEC.md **v1.1**(負 turnover→SKIPPED 補裁)/2026-07-14;r1 16 主題+r2 三家 REJECT(codex 7B/composer 2B/grok 1B)合併 T-F17~T-F26 全落本版,見 handoffs/20260714-IC1C-TODOREV-RECONCILE.md)
 
 ## §0 全域規則與約束(執行端讀完即可遵守)
 
@@ -16,6 +16,8 @@
 - 防假綠:不得放寬既有斷言換綠;改寫舊測試須附「舊斷言為何錯」(SPEC §V 改寫表);JSON 禁 NaN/inf 字面值。
 - 資料:驗證一律真-kline fixture `tests/fixtures/ic_api_real_kline.py`;禁新合成 fixture;禁碰 `data_cache/`。
 - commit 訊息 operational claim 須 `VERIFY:<receipt>` backing;每 Phase 獨立 commit 可 revert。
+- **擴 scope 核可記錄(r7)**:`frontend/src/hooks/useFeatureFactory.batchDate.test.ts` 單檔最小 eslint 修(刪未用參數)——編排端 2026-07-14 正式核可(理由:既存 lint 錯擋 Frozen 要求的 `npm build` gate,最小 enabler;語意中性,codex 已驗)。
+- **離線可重現鐵則(r7,codex B2-B2)**:B2/B3 Gate 全部命令(collect/probe/new2)須在**無網環境**可重現——`api.main` import 的 Binance ping 須以 fixture/conftest 層 stub 隔離(沿用既有 `ic_persist_redirect` 模式),freeze 腳本 new2 模式同樣自帶隔離;禁靠環境在線才綠。
 
 ## §B 批次執行策略
 
@@ -122,7 +124,7 @@
 - 驗證:T4 vitest 具名(r3 補三態 oracle):`sends_cost_bps`(UI 7bps→request payload 7)+`shows_error_on_422`(API 422→表單錯誤文字可見)+`shows_empty_on_all_skipped`(全 SKIPPED→空狀態非 spinner)+`shows_no_data_when_turnover_missing`+同檔 probe `test_mutation_m4_frontend_drop_cost`;T2 `test_cost_bps_fullstack_wiring`(request 7→engine artifact 記 7)+probe `test_mutation_m4_drop_cost_passthrough`;`npm --prefix frontend run build` 綠;靜態檢查鎖**舊 fallback 表達式**(T-F8):`grep -nE "useState\(5\)|turnover \?\? 0\.1|\|\| ?0\.1" NetICChart.tsx`==0(UI `step={0.1}`/`min=0.1` 合法不受限);行為守衛=T4 RTL 測試「缺 turnover→顯示無資料、不代入任何數值」。
 
 ### Phase 2 測試+Gate(=§B B2→B3 命令;離線可 collect,fixture 層隔離 Binance ping)
-- **G-NEW2 定義(T-F5,可執行 oracle;r5 統一編號)**:`scripts/ic1c_freeze_baseline.py --baseline new2` 流程:**步驟 1 取得 API 輸出(三段 bootstrap,deep-analysis 掛既有 IC task 下)**:1a `POST /api/v1/ic/analyze`(fixture paths)→輪詢至 completed 得 `task_id`;1b `POST .../deep-analysis/{task_id}`(body 含 `net_ic:{cost_enabled:true,cost_bps:10}`;現行 route 為背景任務,POST 只回 `{task_id,status}`);1c 輪詢 `GET .../deep-analysis/{task_id}/result`(0.5s 間隔,timeout 60s)至 completed 取 features dict(參照 `tests/api/test_ic_deep_analysis.py::completed_ic_task` fixture 既有模式,含 `ic_persist_redirect`)。**步驟 2 比對**:與 G-NEW(config 直開 10bps)feature 級 dict 逐鍵 sha256 等值——比對集=排除三個人為注入特徵(oc_return/hl_range/zscore_20)後的其餘特徵(API 路徑無法複製 post-hoc 注入;排除集寫死於腳本常數)。**步驟 3**:不等→列出 diff+exit 1;產出 `handoffs/ic1c_baseline/g_new2.{json,sha256}`。離線 collect 前置已入 §B B2 Gate 行。T2 測試矩陣另含雙 override 入口 422+`{cost_enabled:false, cost_bps:NaN}` 422(T-F7)。
+- **G-NEW2 定義(T-F5,可執行 oracle;r5 統一編號)**:`scripts/ic1c_freeze_baseline.py --baseline new2` 流程:**步驟 1 取得 API 輸出(三段 bootstrap,deep-analysis 掛既有 IC task 下)**:1a `POST /api/v1/ic/analyze`(fixture paths)→輪詢至 completed 得 `task_id`;1b `POST .../deep-analysis/{task_id}`(body 含 `net_ic:{cost_enabled:true,cost_bps:10}`;現行 route 為背景任務,POST 只回 `{task_id,status}`);1c 輪詢 `GET .../deep-analysis/{task_id}/result`(0.5s 間隔,timeout 60s)至 completed 取 features dict(參照 `tests/api/test_ic_deep_analysis.py::completed_ic_task` fixture 既有模式,含 `ic_persist_redirect`)。**步驟 2 比對(r7 修訂,codex B2-B1 finding 走 Frozen 變更程序)**:與 G-NEW(config 直開 10bps)feature 級 dict 逐鍵 sha256 等值——比對集=排除三注入特徵後的其餘特徵;**`gross_ic` 鍵另則**(B2 實作發現:API 路徑 IC 由完整 pipeline 計算,與 freeze 腳本直算 spearman 來源不同,值必然差——非成本傳導缺陷):`gross_ic` 不做等值,改驗不變式=有限、∈[-1,1]、非注入 feature 數相同、且 **API 側 gross_ic 與 G-NEW 側 |diff|≤0.2;同號檢查僅在 max(|gi|)≥0.05 時強制**(r7b:近零 IC 兩路徑〔freeze spearman vs pipeline ic_mean〕異號屬噪聲,實證 log_return_3 +0.021/-0.016;主脫鉤防線=|diff|≤0.2);其餘全部鍵(turnover/cost_bps/cost_drag_return/cost_sensitivity/union 三欄/capacity)維持逐鍵 sha256 等值。本修訂由 codex 閉合輪核可後生效。**步驟 3**:不等→列出 diff+exit 1;產出 `handoffs/ic1c_baseline/g_new2.{json,sha256}`。離線 collect 前置已入 §B B2 Gate 行。T2 測試矩陣另含雙 override 入口 422+`{cost_enabled:false, cost_bps:NaN}` 422(T-F7)。
 
 ## Phase 3 — UI 語意註記(目標:禁年化/禁跨 TF 直比進 UI;完成後狀態:零 schema 變更收尾)
 

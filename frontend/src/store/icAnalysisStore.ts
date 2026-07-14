@@ -7,6 +7,7 @@ import {
   ICAnalysisConfig,
   ICReport,
   ModuleStatus,
+  NetICAnalysisRequest,
 } from '@/lib/types';
 
 type ICAnalysisStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed';
@@ -24,6 +25,8 @@ interface ICAnalysisState {
   featureFilter: FeatureFilterConfig;
   selectedFeatures: string[];
   deepAnalysisModules: DeepAnalysisConfig['modules'];
+  /** 成本參數(request 欄 net_ic);預設關閉、無寫死 bps。 */
+  netIcConfig: NetICAnalysisRequest;
   deepAnalysisStatus: 'idle' | 'running' | 'completed' | 'failed';
   deepAnalysisProgress: number;
   deepAnalysisReport: ICReport | null;
@@ -43,6 +46,7 @@ interface ICAnalysisState {
   setFeatureFilter: (filter: FeatureFilterConfig) => void;
   setSelectedFeatures: (featureNames: string[]) => void;
   setDeepAnalysisModules: (modules: DeepAnalysisConfig['modules']) => void;
+  setNetIcConfig: (config: NetICAnalysisRequest) => void;
   setDeepAnalysisStatus: (status: ICAnalysisState['deepAnalysisStatus']) => void;
   setDeepAnalysisProgress: (progress: number) => void;
   setDeepAnalysisReport: (report: ICReport | null) => void;
@@ -51,6 +55,12 @@ interface ICAnalysisState {
   setFeatureTier: (tier: FeatureTierLevel) => void;
   toggleFeature: (key: string) => void;
   getEffectiveConfig: () => Partial<ICAnalysisConfig>;
+  /** 組 deep-analysis request body(含 net_ic)。 */
+  buildDeepAnalysisRequest: (opts: {
+    selected_features?: string[];
+    top_n?: number;
+    config_override?: Record<string, unknown>;
+  }) => DeepAnalysisConfig;
   resetReport: () => void;
 }
 
@@ -150,6 +160,12 @@ const defaultDeepAnalysisModules: DeepAnalysisConfig['modules'] = {
   net_ic_analysis: true,
 };
 
+/** 無成本預設:cost_enabled=False;禁寫死 5bps。 */
+const defaultNetIcConfig: NetICAnalysisRequest = {
+  cost_enabled: false,
+  cost_bps: null,
+};
+
 const defaultConfig: ICAnalysisConfig = {
   features_path: '',
   labels_path: '',
@@ -188,6 +204,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   },
   selectedFeatures: [],
   deepAnalysisModules: defaultDeepAnalysisModules,
+  netIcConfig: { ...defaultNetIcConfig },
   deepAnalysisStatus: 'idle',
   deepAnalysisProgress: 0,
   deepAnalysisReport: null,
@@ -236,11 +253,27 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
     set((state) => ({ featureFilter: { ...state.featureFilter, ...filter } })),
   setSelectedFeatures: (featureNames) => set({ selectedFeatures: featureNames }),
   setDeepAnalysisModules: (modules) => set({ deepAnalysisModules: modules }),
+  setNetIcConfig: (netIcConfig) => set({ netIcConfig: { ...netIcConfig } }),
   setDeepAnalysisStatus: (deepAnalysisStatus) => set({ deepAnalysisStatus }),
   setDeepAnalysisProgress: (deepAnalysisProgress) => set({ deepAnalysisProgress }),
   setDeepAnalysisReport: (deepAnalysisReport) => set({ deepAnalysisReport }),
   setDeepAnalysisModuleStatus: (deepAnalysisModuleStatus) => set({ deepAnalysisModuleStatus }),
   setActiveTab: (activeTab) => set({ activeTab }),
+  buildDeepAnalysisRequest: (opts) => {
+    const state = get();
+    return {
+      selected_features: opts.selected_features,
+      top_n: opts.top_n ?? 30,
+      modules: state.deepAnalysisModules,
+      config_override: opts.config_override,
+      net_ic: {
+        cost_enabled: Boolean(state.netIcConfig.cost_enabled),
+        cost_bps: state.netIcConfig.cost_enabled
+          ? state.netIcConfig.cost_bps ?? null
+          : state.netIcConfig.cost_bps ?? null,
+      },
+    };
+  },
   setFeatureTier: (featureTier) =>
     set((state) => {
       if (featureTier === 'custom') {

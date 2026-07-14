@@ -319,11 +319,13 @@ export function useICAnalysis() {
 
   const startDeepAnalysis = useCallback(
     async (taskId: string, config: DeepAnalysisConfig) => {
+      // request 欄名 net_ic;模組鍵 net_ic_analysis — service 負責映射
       const payload = {
         selected_features: config.selected_features,
         top_n: config.top_n ?? 30,
         modules: config.modules,
         config_override: config.config_override,
+        net_ic: config.net_ic ?? { cost_enabled: false, cost_bps: null },
       };
       const result = await requestJson<{ task_id: string; status: string }>(`/deep-analysis/${taskId}`, {
         method: 'POST',

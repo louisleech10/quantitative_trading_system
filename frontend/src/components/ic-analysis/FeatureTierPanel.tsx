@@ -36,7 +36,7 @@ const TOGGLES: Array<{ key: string; label: string; tier: 'L1' | 'L2' | 'L3'; tip
   { key: 'rolling_oos', label: 'Rolling OOS (Module 5)', tier: 'L2', tip: '滾動樣本外驗證' },
   { key: 'long_short_analysis', label: 'Long/Short Analysis (Module 8)', tier: 'L2', tip: '多空不對稱分析' },
   { key: 'feature_quality_diagnostics', label: 'Feature Quality Diag (Module 9)', tier: 'L2', tip: '品質診斷' },
-  { key: 'net_ic_analysis', label: 'Net IC Analysis (Module 10)', tier: 'L2', tip: '成本調整後淨 IC' },
+  { key: 'net_ic_analysis', label: '成本拖累分析 (Module 10)', tier: 'L2', tip: '成本拖累(報酬空間),非淨 IC 混減' },
   {
     key: 'fdr_correction',
     label: 'FDR 多重比較校正',

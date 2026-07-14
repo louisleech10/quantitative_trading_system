@@ -1126,8 +1126,18 @@ class ICAnalysisService:
         return result
 
     def _build_deep_module_override(self, request: DeepAnalysisRequest) -> Dict[str, Any]:
+        """組 deep 模組 override;typed net_ic 欄最後注入,override 不得蓋 typed。
+
+        注意:request 欄名 `net_ic`,config/模組鍵 `net_ic_analysis`——此處映射。
+        config_override.net_ic_analysis 已於 Pydantic 層整節 reject(T-F12)。
+        """
         modules = request.modules
-        return {
+        # 先吃 config_override(其他節仍允許);防禦性剔除 net_ic_analysis
+        base: Dict[str, Any] = dict(request.config_override or {})
+        base.pop("net_ic_analysis", None)
+
+        net_ic = request.net_ic
+        typed: Dict[str, Any] = {
             "factor_return": {"enabled": modules.factor_return},
             "factor_centrality": {"enabled": modules.factor_centrality},
             "trend_analysis": {"enabled": modules.trend_analysis},
@@ -1137,9 +1147,15 @@ class ICAnalysisService:
             "factor_exposure": {"enabled": modules.factor_exposure},
             "long_short_analysis": {"enabled": modules.long_short_analysis},
             "feature_quality_diagnostics": {"enabled": modules.feature_quality_diagnostics},
-            "net_ic_analysis": {"enabled": modules.net_ic_analysis},
-            **(request.config_override or {}),
+            # typed 最後:enabled + cost 三鍵(T-F16 union 序列化由 _to_json_compatible 保形)
+            "net_ic_analysis": {
+                "enabled": modules.net_ic_analysis,
+                "cost_enabled": bool(net_ic.cost_enabled),
+                "cost_bps": net_ic.cost_bps,
+            },
         }
+        # merge 順序:base 先、typed 後 → typed 覆蓋同鍵
+        return self._deep_merge(base, typed)
 
     def _resolve_selected_features(
         self,
@@ -1195,8 +1211,17 @@ class ICAnalysisService:
 
         return deep_payload
 
+    # conditional metric 三鍵(T-F16):序列化時原樣保留,禁扁平化為裸 number/null
+    _CONDITIONAL_METRIC_KEYS: frozenset[str] = frozenset(
+        {"net_factor_return", "breakeven_cost_bps", "profitable_after_cost"}
+    )
+    _UNION_SHAPE_KEYS: frozenset[str] = frozenset({"status", "value", "reason"})
+
     def _to_json_compatible(self, value: Any, ic_response_v2: bool = False) -> Any:
-        """Recursively normalize nested values for FastAPI/Pydantic serialization."""
+        """Recursively normalize nested values for FastAPI/Pydantic serialization.
+
+        T-F16:conditional metric 三鍵物件({status,value,reason})原樣保留禁扁平化。
+        """
 
         if value is None:
             return value
@@ -1232,13 +1257,28 @@ class ICAnalysisService:
             )
 
         if isinstance(value, dict):
-            return {
-                str(key): self._to_json_compatible(
-                    item,
-                    ic_response_v2=ic_response_v2,
-                )
-                for key, item in value.items()
-            }
+            # discriminated union 形狀:{status, value, reason} — 遞迴保形,不抽 value
+            if set(value.keys()) == self._UNION_SHAPE_KEYS:
+                return {
+                    "status": self._to_json_compatible(
+                        value.get("status"), ic_response_v2=ic_response_v2
+                    ),
+                    "value": self._to_json_compatible(
+                        value.get("value"), ic_response_v2=ic_response_v2
+                    ),
+                    "reason": self._to_json_compatible(
+                        value.get("reason"), ic_response_v2=ic_response_v2
+                    ),
+                }
+            out: Dict[str, Any] = {}
+            for key, item in value.items():
+                sk = str(key)
+                # 三鍵在父 dict 層確保仍為物件(若誤傳裸值則包回 unavailable 形不在此;僅保 dict)
+                if sk in self._CONDITIONAL_METRIC_KEYS and isinstance(item, dict):
+                    out[sk] = self._to_json_compatible(item, ic_response_v2=ic_response_v2)
+                else:
+                    out[sk] = self._to_json_compatible(item, ic_response_v2=ic_response_v2)
+            return out
 
         if isinstance(value, (list, tuple, set)):
             return [

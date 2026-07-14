@@ -2160,11 +2160,19 @@ export interface DeepAnalysisModules {
   net_ic_analysis: boolean;
 }
 
+/** Deep analysis 成本參數(與 API NetICAnalysisRequest 同構)。 */
+export interface NetICAnalysisRequest {
+  cost_enabled: boolean;
+  cost_bps?: number | null;
+}
+
 export interface DeepAnalysisConfig {
   selected_features?: string[];
   top_n?: number;
   modules: DeepAnalysisModules;
   config_override?: Record<string, unknown>;
+  /** request 欄名 net_ic;config/模組鍵 net_ic_analysis — 不得混用。 */
+  net_ic?: NetICAnalysisRequest;
 }
 
 export interface ModuleStatus {
@@ -2448,31 +2456,112 @@ export interface FeatureQualityDiagnosticsData {
   };
 }
 
-export interface NetICAnalysisData {
-  skipped?: boolean;
-  reason?: string;
-  features?: Record<string, {
-    gross_ic?: number;
-    net_ic?: number;
-    turnover?: number;
-    cost_bps?: number;
-    profitable_after_cost?: boolean;
-    breakeven_cost_bps?: number;
-    cost_sensitivity?: Array<{ cost_bps: number; net_ic: number }>;
-    capacity?: {
-      estimated_capacity_usd?: number;
-      capacity_tier?: string;
-    };
-    skipped?: boolean;
-    reason?: string;
-  }>;
-  summary?: {
-    total_analyzed?: number;
-    profitable_count?: number;
-    avg_ic_loss_pct?: number;
-    rank_correlation_gross_vs_net?: number;
+/**
+ * §U conditional metric — 真 discriminated union(同構 API)。
+ * ok → value 有值 + reason=null; unavailable → value=null + reason 非空。
+ * 禁止 status:'ok'+value:null 或 status:'unavailable'+reason:null 等非法形狀。
+ */
+export type ConditionalMetricOk = {
+  status: 'ok';
+  value: number | boolean;
+  reason: null;
+};
+
+export type ConditionalMetricUnavailable = {
+  status: 'unavailable';
+  value: null;
+  reason: string;
+};
+
+export type ConditionalMetricUnion =
+  | ConditionalMetricOk
+  | ConditionalMetricUnavailable;
+
+/** capacity 子鍵集合(SPEC v1.1 精確鍵,多/少=FAIL)。 */
+export type NetICCapacity = {
+  estimated_capacity_usd: number | null;
+  capacity_tier: string;
+  /** 恒 "uncalibrated"(未建 canonical capacity 校準前) */
+  calibration: 'uncalibrated';
+};
+
+/** SCHEMA_SKIPPED 精確鍵={skipped, reason};排除全部非 skipped 鍵。 */
+export type NetICFeatureSkipped = {
+  skipped: true;
+  reason: string;
+  gross_ic?: never;
+  turnover?: never;
+  turnover_semantics?: never;
+  capacity?: never;
+  net_factor_return?: never;
+  cost_bps?: never;
+  cost_semantics?: never;
+  cost_drag_return?: never;
+  cost_sensitivity?: never;
+  breakeven_cost_bps?: never;
+  profitable_after_cost?: never;
+};
+
+/** GROSS_ONLY 共用欄(無 cost / 無 skipped)。 */
+type NetICFeatureGrossCore = {
+  gross_ic: number;
+  turnover: number;
+  turnover_semantics: string;
+  capacity: NetICCapacity;
+  net_factor_return: ConditionalMetricUnion;
+};
+
+/** SCHEMA_GROSS_ONLY 精確鍵集合;cost_* / skipped 以 never 排除混合 profile。 */
+export type NetICFeatureGrossOnly = NetICFeatureGrossCore & {
+  cost_bps?: never;
+  cost_semantics?: never;
+  cost_drag_return?: never;
+  cost_sensitivity?: never;
+  breakeven_cost_bps?: never;
+  profitable_after_cost?: never;
+  skipped?: never;
+  reason?: never;
+};
+
+/** SCHEMA_COST_ENABLED = GROSS core ∪ 全部 cost 鍵;排除 skipped 鍵。 */
+export type NetICFeatureCostEnabled = NetICFeatureGrossCore & {
+  cost_bps: number;
+  cost_semantics: string;
+  cost_drag_return: number;
+  cost_sensitivity: Array<{ cost_bps: number; cost_drag_return: number }>;
+  breakeven_cost_bps: ConditionalMetricUnion;
+  profitable_after_cost: ConditionalMetricUnion;
+  skipped?: never;
+  reason?: never;
+};
+
+/** 三 profile 精確型別 union(非全 optional 單 interface;非 subtype 互滲)。 */
+export type NetICFeatureResult =
+  | NetICFeatureSkipped
+  | NetICFeatureGrossOnly
+  | NetICFeatureCostEnabled;
+
+/** 頂層:模組 SKIPPED 或完整 features+summary。 */
+export type NetICAnalysisSkipped = {
+  skipped: true;
+  reason: string;
+  features?: never;
+  summary?: never;
+};
+
+export type NetICAnalysisOk = {
+  skipped?: never;
+  features: Record<string, NetICFeatureResult>;
+  summary: {
+    total_analyzed: number;
+    evaluable_count: number;
+    profitable_count: number;
+    /** cost_enabled 時存在;GROSS_ONLY 可省略 */
+    avg_cost_drag_return?: number;
   };
-}
+};
+
+export type NetICAnalysisData = NetICAnalysisSkipped | NetICAnalysisOk;
 
 export interface CorrelationMatrix {
   method?: 'pearson' | 'spearman' | 'kendall';

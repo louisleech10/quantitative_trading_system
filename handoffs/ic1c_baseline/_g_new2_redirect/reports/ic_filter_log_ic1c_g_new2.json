@@ -1,0 +1,60 @@
+{
+  "stage0_ingestion": {
+    "input_features": 7,
+    "removed_nan_features": [],
+    "alignment_report": {
+      "gap_count": 0,
+      "gap_rate": 0.0,
+      "checked_samples": 0
+    }
+  },
+  "stage1_preprocessing": {
+    "removed_features": {},
+    "winsorized_features": [
+      "log_return_1",
+      "log_return_3",
+      "rvol_20",
+      "zscore_20",
+      "hl_range",
+      "oc_return",
+      "close_sma_ratio_20"
+    ],
+    "skipped_winsorization": []
+  },
+  "stage3_event_filter": {
+    "mode": "none"
+  },
+  "feature_filter": {
+    "feature_count_original": 7,
+    "feature_count_filtered": 7,
+    "feature_filter_applied": false,
+    "truncation_mode": "none",
+    "truncation_order": null
+  },
+  "stage5_thresholds": {
+    "input_features": 7,
+    "output_features": 7,
+    "removed_features": {
+      "ic_mean": [],
+      "icir": [],
+      "p_value": [],
+      "ic_hit_rate": [],
+      "monotonicity": [],
+      "coverage": [],
+      "long_short_spread": []
+    },
+    "alpha_effective": 1.0,
+    "n_tests": 7,
+    "fdr_enabled": true,
+    "alpha_source": "threshold_default"
+  },
+  "stage6_redundancy": {
+    "method": "greedy",
+    "input_features": 7,
+    "output_features": 6,
+    "removed_features": [
+      "oc_return"
+    ],
+    "correlation_threshold": 0.999
+  }
+}
