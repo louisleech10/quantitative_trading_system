@@ -170,7 +170,8 @@ class FeatureFilterSchema(BaseModel):
 
 
 class FactorReturnConfig(BaseModel):
-    enabled: bool = True
+    # IC1C-FR-STOPGAP: default-off(ls_returns 時間錯位止血;修復歸 1c-FR-FULL)
+    enabled: bool = False
     num_quantiles: int = Field(default=5, ge=2, le=20)
     calculate_risk_metrics: bool = True
     risk_free_rate: float = Field(default=0.0, ge=-1.0, le=1.0)

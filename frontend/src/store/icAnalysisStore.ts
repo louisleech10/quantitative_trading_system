@@ -104,7 +104,8 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     event_filtering: true,
     redundancy_method_selection: true,
     turnover_analysis: true,
-    factor_return: true,
+    // IC1C-FR-STOPGAP: default-off(ls_returns misaligned; 1c-FR-FULL)
+    factor_return: false,
     trend_analysis: true,
     parameter_sensitivity: true,
     rolling_oos: true,
@@ -130,7 +131,8 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     event_filtering: true,
     redundancy_method_selection: true,
     turnover_analysis: true,
-    factor_return: true,
+    // IC1C-FR-STOPGAP: default-off(ls_returns misaligned; 1c-FR-FULL)
+    factor_return: false,
     trend_analysis: true,
     parameter_sensitivity: true,
     rolling_oos: true,
@@ -148,7 +150,8 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
 const LOCKED_TOGGLES = new Set(['ic_calculation', 'monotonicity_test', 'ai_summary']);
 
 const defaultDeepAnalysisModules: DeepAnalysisConfig['modules'] = {
-  factor_return: true,
+  // IC1C-FR-STOPGAP: default-off(ls_returns misaligned; 1c-FR-FULL)
+  factor_return: false,
   factor_centrality: true,
   trend_analysis: true,
   parameter_sensitivity: true,

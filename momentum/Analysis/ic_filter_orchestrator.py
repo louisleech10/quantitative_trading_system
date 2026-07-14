@@ -34,7 +34,11 @@ from momentum.Analysis.statistical_validator import (
 from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
 from momentum.Analysis.ic_config_schema import FeatureFilterSchema, ICConfig
 from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedResult
-from momentum.core.exceptions import InsufficientDataError, InvalidInputError
+from momentum.core.exceptions import (
+    InsufficientDataError,
+    InvalidInputError,
+    ModuleUnavailableError,
+)
 from momentum.core.logging import get_logger
 from momentum.core.contracts import (
     ORACLE_RETURN_KINDS,
@@ -1625,86 +1629,111 @@ class ICFilterOrchestrator:
 
         cache_key = self._compute_deep_cache_key(selected, config)
         force_set = set(force_modules or [])
+        cache_hit_only = (not force_set) and (cache_key in self._deep_analysis_cache)
 
-        if not force_set and cache_key in self._deep_analysis_cache:
-            cached = deepcopy(self._deep_analysis_cache[cache_key])
-            logger.info("Deep analysis cache hit: key=%s", cache_key)
-            return cached
-
-        base_report = DeepAnalysisReport()
-        if cache_key in self._deep_analysis_cache:
+        if cache_hit_only:
             base_report = deepcopy(self._deep_analysis_cache[cache_key])
+            logger.info("Deep analysis cache hit: key=%s", cache_key)
+        else:
+            base_report = DeepAnalysisReport()
+            if cache_key in self._deep_analysis_cache:
+                # force-merge:以 cache 為 base 再重跑 force_modules(legacy FR 可能殘留)
+                base_report = deepcopy(self._deep_analysis_cache[cache_key])
 
-        module_runners: list[tuple[str, Callable[..., dict]]] = [
-            ("factor_returns", self._run_factor_return),
-            ("factor_centrality", self._run_factor_centrality),
-            ("trend_analysis", self._run_trend_analysis),
-            ("parameter_sensitivity", self._run_parameter_sensitivity),
-            ("rolling_oos", self._run_rolling_oos),
-            ("factor_orthogonalization", self._run_factor_orthogonalization),
-            ("factor_exposure", self._run_factor_exposure),
-            ("long_short_analysis", self._run_long_short),
-            ("feature_quality_diagnostics", self._run_feature_quality_diagnostics),
-            ("net_ic_analysis", self._run_net_ic),
-        ]
+            module_runners: list[tuple[str, Callable[..., dict]]] = [
+                ("factor_returns", self._run_factor_return),
+                ("factor_centrality", self._run_factor_centrality),
+                ("trend_analysis", self._run_trend_analysis),
+                ("parameter_sensitivity", self._run_parameter_sensitivity),
+                ("rolling_oos", self._run_rolling_oos),
+                ("factor_orthogonalization", self._run_factor_orthogonalization),
+                ("factor_exposure", self._run_factor_exposure),
+                ("long_short_analysis", self._run_long_short),
+                ("feature_quality_diagnostics", self._run_feature_quality_diagnostics),
+                ("net_ic_analysis", self._run_net_ic),
+            ]
 
-        run_targets: list[tuple[str, Callable[..., dict]]] = []
-        for module_name, runner in module_runners:
-            if force_set and module_name not in force_set:
-                continue
-            if (not force_set) and (not self._is_module_enabled(module_name, config)):
-                continue
-            run_targets.append((module_name, runner))
+            run_targets: list[tuple[str, Callable[..., dict]]] = []
+            for module_name, runner in module_runners:
+                if force_set and module_name not in force_set:
+                    continue
+                if (not force_set) and (not self._is_module_enabled(module_name, config)):
+                    continue
+                run_targets.append((module_name, runner))
 
-        total_targets = max(1, len(run_targets))
-        started = time.perf_counter()
+            total_targets = max(1, len(run_targets))
+            started = time.perf_counter()
 
-        for idx, (module_name, runner) in enumerate(run_targets, start=1):
-            module_started = time.perf_counter()
-            try:
-                result = runner(selected, config)
-                base_report.results[module_name] = result
-                base_report.module_summary[module_name] = "completed"
-                logger.info(
-                    "Deep module completed: %s in %.2fs",
-                    module_name,
-                    time.perf_counter() - module_started,
-                )
-            except Exception as exc:  # noqa: BLE001
-                skipped = self._classify_and_skip(module_name, exc)
-                base_report.deep_analysis_errors.append(skipped)
-                base_report.results[module_name] = {
-                    "skipped": True,
-                    "reason": skipped.reason,
-                    "error_type": skipped.error_type,
+            for idx, (module_name, runner) in enumerate(run_targets, start=1):
+                module_started = time.perf_counter()
+                try:
+                    result = runner(selected, config)
+                    base_report.results[module_name] = result
+                    base_report.module_summary[module_name] = "completed"
+                    logger.info(
+                        "Deep module completed: %s in %.2fs",
+                        module_name,
+                        time.perf_counter() - module_started,
+                    )
+                except ModuleUnavailableError as exc:
+                    # 刻意下架:§U union + summary unavailable;不入 deep_analysis_errors
+                    base_report.results[module_name] = {
+                        "status": "unavailable",
+                        "value": None,
+                        "reason": str(exc),
+                    }
+                    base_report.module_summary[module_name] = "unavailable"
+                    logger.info(
+                        "Deep module unavailable: %s, reason=%s (%.2fs)",
+                        module_name,
+                        str(exc),
+                        time.perf_counter() - module_started,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    skipped = self._classify_and_skip(module_name, exc)
+                    base_report.deep_analysis_errors.append(skipped)
+                    base_report.results[module_name] = {
+                        "skipped": True,
+                        "reason": skipped.reason,
+                        "error_type": skipped.error_type,
+                    }
+                    base_report.module_summary[module_name] = "skipped"
+                    logger.warning(
+                        "Deep module skipped: %s, reason=%s", module_name, skipped.reason
+                    )
+
+                payload = {
+                    "stage": "deep_analysis",
+                    "module_name": module_name,
+                    "progress": float(idx / total_targets),
+                    "message": f"{module_name} completed ({idx}/{total_targets})",
                 }
-                base_report.module_summary[module_name] = "skipped"
-                logger.warning("Deep module skipped: %s, reason=%s", module_name, skipped.reason)
+                self._emit_deep_progress(
+                    progress_callback or self._progress_callback, payload
+                )
 
-            payload = {
-                "stage": "deep_analysis",
-                "module_name": module_name,
-                "progress": float(idx / total_targets),
-                "message": f"{module_name} completed ({idx}/{total_targets})",
-            }
-            self._emit_deep_progress(progress_callback or self._progress_callback, payload)
+            base_report.total_execution_time_s = float(time.perf_counter() - started)
 
-        base_report.total_execution_time_s = float(time.perf_counter() - started)
+            all_module_names = [name for name, _ in module_runners]
+            for module_name in all_module_names:
+                base_report.module_summary.setdefault(module_name, "not_run")
 
-        all_module_names = [name for name, _ in module_runners]
-        for module_name in all_module_names:
-            base_report.module_summary.setdefault(module_name, "not_run")
+            base_report.completed_count = sum(
+                1 for status in base_report.module_summary.values() if status == "completed"
+            )
+            base_report.skipped_count = sum(
+                1 for status in base_report.module_summary.values() if status == "skipped"
+            )
+            base_report.failed_count = 0
 
-        base_report.completed_count = sum(
-            1 for status in base_report.module_summary.values() if status == "completed"
-        )
-        base_report.skipped_count = sum(
-            1 for status in base_report.module_summary.values() if status == "skipped"
-        )
-        base_report.failed_count = 0
+            # 寫入 cache 前先 sanitize,避免 dirty legacy 再被 force-merge 讀出
+            base_report = self._sanitize_deep_report_factor_returns(base_report)
+            self._cache_deep_analysis_result(cache_key, base_report)
+            base_report = deepcopy(base_report)
 
-        self._cache_deep_analysis_result(cache_key, base_report)
-        return deepcopy(base_report)
+        # 單一收斂點:cache-hit / force-merge / 全量重算 最終 return 前必過 sanitizer
+        # (冪等;cache-hit 路徑此為唯一 sanitize,force 路徑為雙重保險)
+        return self._sanitize_deep_report_factor_returns(base_report)
 
     def _compute_deep_cache_key(self, selected_features: list[str], config: ICConfig) -> str:
         deep_cfg = {
@@ -1777,12 +1806,41 @@ class ICFilterOrchestrator:
         )
 
     def _run_factor_return(self, selected_features: list[str], config: ICConfig) -> dict:
-        from momentum.Analysis.factor_return_analyzer import FactorReturnAnalyzer
+        # IC1C-FR-STOPGAP: ls_returns 時間錯位,fail-close 下架;計算修復歸 1c-FR-FULL
+        # 不呼叫 FactorReturnAnalyzer.compute_batch
+        raise ModuleUnavailableError(
+            "ls_returns_timestamp_misaligned (1c-FR-FULL)"
+        )
 
-        features_df = self._ic_cache["features_df"][selected_features]
-        labels = self._ic_cache["label_series"]
-        analyzer = FactorReturnAnalyzer(config.factor_return.model_dump())
-        return analyzer.compute_batch(features_df, labels, top_n=len(selected_features))
+    @staticmethod
+    def _sanitize_deep_report_factor_returns(report: DeepAnalysisReport) -> DeepAnalysisReport:
+        """對 DeepAnalysisReport 的 results/module_summary/計數套 factor_return sanitizer。"""
+        from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
+
+        envelope = {
+            "results": report.results if isinstance(report.results, dict) else {},
+            "module_summary": (
+                report.module_summary if isinstance(report.module_summary, dict) else {}
+            ),
+            "completed_count": int(report.completed_count),
+            "skipped_count": int(report.skipped_count),
+            "failed_count": int(report.failed_count),
+        }
+        cleaned = sanitize_factor_returns(envelope)
+        if isinstance(cleaned, dict):
+            results = cleaned.get("results")
+            if isinstance(results, dict):
+                report.results = results
+            summary = cleaned.get("module_summary")
+            if isinstance(summary, dict):
+                report.module_summary = summary
+            if "completed_count" in cleaned:
+                report.completed_count = int(cleaned["completed_count"])
+            if "skipped_count" in cleaned:
+                report.skipped_count = int(cleaned["skipped_count"])
+            if "failed_count" in cleaned:
+                report.failed_count = int(cleaned["failed_count"])
+        return report
 
     def _run_factor_centrality(self, selected_features: list[str], config: ICConfig) -> dict:
         from momentum.Analysis.factor_centrality_analyzer import FactorCentralityAnalyzer
@@ -3367,6 +3425,9 @@ class ICFilterOrchestrator:
                         data[section][field] = False
             else:
                 for section, field in MODULE_ENABLED_PATHS.values():
+                    # IC1C-FR-STOPGAP: tier 不強制開啟 factor_return(default-off 三態)
+                    if section == "factor_return":
+                        continue
                     if isinstance(data.get(section), dict):
                         data[section][field] = True
                 for module_name in disabled_modules:

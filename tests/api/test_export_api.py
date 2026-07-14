@@ -88,7 +88,9 @@ def export_task(
             task_info = ic_analysis_service._tasks.get(task_id)
             if task_info is not None:
                 original = copy.deepcopy(task_info)
-                # API serialization stub：export seam 所需容器，非 IC 輸入或真 deep 指標聲明。
+                # API serialization stub：export seam 所需容器。
+                # 舊斷言為何錯: 注入 finite long_short_mean_return 固化錯位 CSV 形狀;
+                # STOPGAP sanitizer 下架 → detailed CSV 無有限報酬葉(見 test_export_csv_detailed_factor_return)。
                 task_info["deep_analysis_result"] = {
                     "results": {
                         "factor_returns": {
@@ -134,6 +136,9 @@ def test_export_csv_detailed_factor_return(export_task: dict) -> None:
     )
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
+    # IC1C-FR-STOPGAP: CSV 不得洩漏注入的有限 long_short_mean_return(0.03)
+    body = response.content.decode("utf-8")
+    assert "0.03" not in body
 
 
 def test_export_ai_json_200(export_task: dict) -> None:

@@ -260,7 +260,9 @@ def test_deep_analysis_result_serializes_numpy_scalars(completed_ic_task: str) -
         task_info = ic_analysis_service._tasks.get(completed_ic_task)
         assert task_info is not None
         original = copy.deepcopy(task_info)
-        # API serialization stub：只驗 numpy scalar 邊界，不宣稱是真 deep 計算結果。
+        # API serialization stub：驗 numpy scalar 邊界 + STOPGAP sanitizer。
+        # 舊斷言為何錯: 注入 finite factor_returns samples==128 固化錯位輸出形狀;
+        # sanitizer 下架 → factor_returns 為 §U 佔位,無有限葉。
         task_info["deep_analysis_result"] = {
             "total_modules": np.int64(10),
             "completed_count": np.int64(1),
@@ -284,8 +286,14 @@ def test_deep_analysis_result_serializes_numpy_scalars(completed_ic_task: str) -
         assert response.status_code == 200
         payload = response.json()
         assert payload["summary"]["total_modules"] == 10
-        assert payload["summary"]["completed_count"] == 1
-        assert payload["results"]["results"]["factor_returns"]["feature_0"]["samples"] == 128
+        # FR legacy completed → unavailable 後 completed_count 重算為 0(unavailable 不計)
+        assert payload["summary"]["completed_count"] == 0
+        fr = payload["results"]["results"]["factor_returns"]
+        assert fr.get("status") == "unavailable"
+        assert fr.get("value") is None
+        assert "feature_0" not in fr
+        ms = (payload.get("results") or {}).get("module_summary") or {}
+        assert ms.get("factor_returns") == "unavailable"
     finally:
         with ic_analysis_service._lock:
             assert original is not None
@@ -622,3 +630,509 @@ def test_mutation_m4_drop_cost_passthrough(monkeypatch: pytest.MonkeyPatch) -> N
     with pytest.raises(AssertionError):
         assert override["net_ic_analysis"].get("cost_bps") == 7.0
         assert override["net_ic_analysis"].get("cost_enabled") is True
+
+
+# ---------------------------------------------------------------------------
+# IC1C-FR-STOPGAP Task 1.2 — factor_return sanitizer 七掛點 + 冪等 + M2
+# ---------------------------------------------------------------------------
+
+from momentum.Analysis.deep_analysis_types import DeepAnalysisReport  # noqa: E402
+from momentum.Analysis.factor_return_sanitizer import (  # noqa: E402
+    FACTOR_RETURNS_PLACEHOLDER,
+    assert_no_finite_in_factor_returns_subtree,
+    has_finite_numeric_leaf,
+    sanitize_factor_returns,
+)
+import momentum.Analysis.factor_return_sanitizer as _fr_sanitizer_mod  # noqa: E402
+from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator  # noqa: E402
+from momentum.Analysis.ic_reporter import ICReporter  # noqa: E402
+from momentum.Analysis.ic_config_schema import ICConfig  # noqa: E402
+import json  # noqa: E402
+import tempfile  # noqa: E402
+from dataclasses import asdict  # noqa: E402
+
+
+def _legacy_factor_returns_payload() -> dict:
+    """有限 numeric leaf 的 legacy factor_returns(錯位序列形狀)。"""
+    return {
+        "feature_0": {
+            "long_short_mean_return": 0.11,
+            "samples": 128,
+            "risk_metrics": {"sharpe": 1.5, "max_drawdown": -0.08},
+        }
+    }
+
+
+def _legacy_summary_null_row() -> dict:
+    """含三個 summary null keys 的 legacy 列(證 _SUMMARY_NULL_KEYS 有牙)。"""
+    return {
+        "feature_name": "feature_0",
+        "ic_mean": 0.05,
+        "icir": 0.5,
+        "factor_return_ls_mean": 0.11,
+        "factor_return_sharpe": 1.5,
+        "factor_return_max_drawdown": -0.08,
+    }
+
+
+def _assert_fr_no_finite(payload: object) -> None:
+    if payload is None:
+        return
+    if isinstance(payload, dict) and payload.get("status") == "unavailable":
+        assert payload.get("value") is None
+        assert not has_finite_numeric_leaf(payload)
+        return
+    # nested under results / deep report
+    if isinstance(payload, dict):
+        if "factor_returns" in payload:
+            _assert_fr_no_finite(payload["factor_returns"])
+            return
+        if "results" in payload and isinstance(payload["results"], dict):
+            if "factor_returns" in payload["results"]:
+                _assert_fr_no_finite(payload["results"]["factor_returns"])
+                return
+    assert not has_finite_numeric_leaf(payload), f"finite leaf leaked: {payload!r}"
+
+
+def _seed_orch_with_legacy_deep_cache(
+    *,
+    fr_payload: dict | None = None,
+    fr_mean: float = 0.11,
+) -> tuple[ICFilterOrchestrator, ICConfig]:
+    """注入 _ic_cache + deep cache 含 legacy FR,供 cache-hit / force-merge 測。"""
+    config = ICConfig()
+    orch = ICFilterOrchestrator(config)
+    payload = fr_payload if fr_payload is not None else {
+        "feature_0": {"long_short_mean_return": fr_mean, "samples": 128}
+    }
+    legacy_report = DeepAnalysisReport(
+        results={
+            "factor_returns": payload,
+            "trend_analysis": {"placeholder": True},
+        },
+        module_summary={
+            "factor_returns": "completed",
+            "trend_analysis": "completed",
+        },
+        completed_count=2,
+        skipped_count=0,
+    )
+    orch._ic_cache = {
+        "features_df": __import__("pandas").DataFrame({"f": [1.0, 2.0]}),
+        "label_series": __import__("pandas").Series([0.1, 0.2]),
+        "metadata": {},
+        "icir": {},
+        "rolling_ic": {},
+        "ic_decay": {},
+        "grouped_ic": {},
+        "event_info": {},
+        "stage0_log": {},
+        "preproc_log": {},
+    }
+    orch._filtered_features_df = orch._ic_cache["features_df"]
+    cache_key = orch._compute_deep_cache_key(["f"], orch._apply_tier_config(config))
+    orch._deep_analysis_cache[cache_key] = legacy_report
+    return orch, config
+
+
+def test_sanitizer_cache_hit_legacy() -> None:
+    """(a) orchestrator cache-hit: legacy 有限值 → sanitize 後無有限葉 + summary/count。"""
+    orch, _config = _seed_orch_with_legacy_deep_cache()
+
+    out = orch.run_deep_analysis(selected_features=["f"])
+    assert "factor_returns" in out.results
+    _assert_fr_no_finite(out.results["factor_returns"])
+    assert out.results["factor_returns"].get("status") == "unavailable"
+    # B1-1: summary 不得殘 completed;unavailable 不計 completed_count
+    assert out.module_summary.get("factor_returns") == "unavailable"
+    assert out.completed_count == 1  # only trend_analysis
+    assert out.skipped_count == 0
+
+
+def test_sanitizer_cache_force_merge_legacy() -> None:
+    """B-R2-1: cache 有 legacy FR + force 其他模組(merge 非早退)→ 輸出無有限 FR 葉。
+
+    路徑:force_modules=["trend_analysis"] 且 deep cache 命中 → 走 merge 而非 cache-hit
+    早退;legacy FR 不得以 long_short_mean_return 有限值洩出,summary/count 一致。
+    """
+    orch, _config = _seed_orch_with_legacy_deep_cache(
+        fr_payload={"feature_0": {"long_short_mean_return": 0.42}},
+        fr_mean=0.42,
+    )
+
+    # 避免真跑 trend(無 rolling_ic);只證 merge 出口仍 sanitize FR
+    def _fake_trend(selected_features, config):  # type: ignore[no-untyped-def]
+        return {"direction": "up", "score": 0.9}
+
+    orch._run_trend_analysis = _fake_trend  # type: ignore[method-assign]
+
+    out = orch.run_deep_analysis(
+        selected_features=["f"],
+        force_modules=["trend_analysis"],
+    )
+    fr = out.results.get("factor_returns")
+    assert fr is not None
+    _assert_fr_no_finite(fr)
+    assert fr.get("status") == "unavailable"
+    assert out.module_summary.get("factor_returns") == "unavailable"
+    # trend re-run completed; FR unavailable 不計 → completed_count == 1
+    assert out.module_summary.get("trend_analysis") == "completed"
+    assert out.completed_count == 1
+    assert "0.42" not in __import__("json").dumps(out.results.get("factor_returns"))
+
+
+def test_sanitizer_raw_json_legacy(completed_ic_task: str) -> None:
+    """(b) API raw JSON export: inject finite → dump 無有限 factor_returns 葉。"""
+    original = None
+    with ic_analysis_service._lock:
+        task_info = ic_analysis_service._tasks.get(completed_ic_task)
+        assert task_info is not None
+        original = copy.deepcopy(task_info)
+        result = dict(task_info.get("result") or {})
+        result["deep_analysis_report"] = {
+            "results": {"factor_returns": _legacy_factor_returns_payload()},
+        }
+        # also top-level for raw report path
+        result["factor_returns"] = _legacy_factor_returns_payload()
+        task_info["result"] = result
+
+    try:
+        response = client.get(f"/api/v1/ic/export/{completed_ic_task}/json")
+        assert response.status_code == 200
+        body = response.json() if response.headers.get("content-type", "").startswith("application/json") else json.loads(response.content.decode("utf-8"))
+        # export returns file-like; TestClient may expose body as content
+        if not isinstance(body, dict):
+            body = json.loads(response.content.decode("utf-8"))
+        if "factor_returns" in body:
+            _assert_fr_no_finite(body["factor_returns"])
+        deep = body.get("deep_analysis_report") or {}
+        if isinstance(deep, dict) and "factor_returns" in deep:
+            _assert_fr_no_finite(deep["factor_returns"])
+        if isinstance(deep, dict) and isinstance(deep.get("results"), dict) and "factor_returns" in deep["results"]:
+            _assert_fr_no_finite(deep["results"]["factor_returns"])
+        # whole tree: any factor_returns node must lack finite leaves
+        def walk(obj: object) -> None:
+            if isinstance(obj, dict):
+                if "factor_returns" in obj:
+                    _assert_fr_no_finite(obj["factor_returns"])
+                for v in obj.values():
+                    walk(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    walk(v)
+        walk(body)
+    finally:
+        with ic_analysis_service._lock:
+            assert original is not None
+            ic_analysis_service._tasks[completed_ic_task] = original
+
+
+def test_sanitizer_task_storage_roundtrip(completed_ic_task: str) -> None:
+    """(c) serializer+task storage → get_deep_analysis_result 皆無有限葉。"""
+    original = None
+    with ic_analysis_service._lock:
+        task_info = ic_analysis_service._tasks.get(completed_ic_task)
+        assert task_info is not None
+        original = copy.deepcopy(task_info)
+
+    try:
+        # 模擬 serializer 寫入(與 production _serialize_deep_report 同路徑)
+        legacy_report = DeepAnalysisReport(
+            results={"factor_returns": _legacy_factor_returns_payload()},
+            module_summary={"factor_returns": "completed"},
+            completed_count=1,
+        )
+        serialized = ic_analysis_service._serialize_deep_report(legacy_report)
+        _assert_fr_no_finite(serialized)
+        with ic_analysis_service._lock:
+            task_info = ic_analysis_service._tasks.get(completed_ic_task)
+            assert task_info is not None
+            task_info["deep_analysis_result"] = serialized
+
+        got = ic_analysis_service.get_deep_analysis_result(completed_ic_task)
+        assert got is not None
+        _assert_fr_no_finite(got)
+
+        # 即使 task_info 被直接注入 legacy(繞 serializer),get 仍 sanitize
+        with ic_analysis_service._lock:
+            task_info = ic_analysis_service._tasks.get(completed_ic_task)
+            assert task_info is not None
+            task_info["deep_analysis_result"] = {
+                "results": {"factor_returns": _legacy_factor_returns_payload()},
+                "module_summary": {"factor_returns": "completed"},
+            }
+        got2 = ic_analysis_service.get_deep_analysis_result(completed_ic_task)
+        assert got2 is not None
+        _assert_fr_no_finite(got2)
+    finally:
+        with ic_analysis_service._lock:
+            assert original is not None
+            ic_analysis_service._tasks[completed_ic_task] = original
+
+
+def test_sanitizer_csv_legacy() -> None:
+    """(d) detailed CSV: legacy finite → 輸出無有限 long_short_mean_return 值。"""
+    reporter = ICReporter({})
+    report = {
+        "summary_table": [{"feature_name": "feature_0", "ic_mean": 0.05, "icir": 0.5}],
+        "deep_analysis_report": {
+            "results": {"factor_returns": _legacy_factor_returns_payload()},
+        },
+    }
+    csv_text = reporter.generate_detailed_csv(report, "factor_returns")
+    # 佔位後 flatten 可能含 status/reason 字串,不得含有限報酬數值
+    assert "0.11" not in csv_text
+    assert "1.5" not in csv_text
+    assert "-0.08" not in csv_text
+
+
+def test_sanitizer_ai_json_legacy() -> None:
+    """(e) AI JSON: factor_returns 子樹禁任何有限 numeric leaf(通用 oracle)。"""
+    reporter = ICReporter({})
+    report = {
+        "summary_table": [_legacy_summary_null_row()],
+        "deep_analysis_report": {
+            "results": {"factor_returns": _legacy_factor_returns_payload()},
+        },
+        # 亦附 top-level 誤嵌 size meta 形狀(防假綠)
+        "factor_returns": {
+            **_legacy_factor_returns_payload(),
+            "size": 1,
+            "keys": ["feature_0"],
+        },
+    }
+    payload = reporter.generate_ai_json(report)
+    summaries = payload.get("module_summaries") or {}
+    fr_sum = summaries.get("factor_returns")
+    if fr_sum is not None:
+        assert isinstance(fr_sum, dict)
+        assert fr_sum.get("status") == "unavailable"
+        assert not has_finite_numeric_leaf(fr_sum)
+    # 通用:遞迴掃 factor_returns 子樹禁任何有限 numeric leaf
+    assert_no_finite_in_factor_returns_subtree(payload)
+
+
+def _assert_markdown_factor_returns_no_finite(md: str) -> None:
+    """對**真實 Markdown 字串產物**判定:深度摘要 factor_returns 行禁有限 numeric。
+
+    解析 ``- factor_returns: {...}`` 行(ast.literal_eval),再以
+    has_finite_numeric_leaf 判定;不對輸入 re-sanitize,避免假綠。
+    """
+    import ast
+    import re
+
+    assert isinstance(md, str) and md, "markdown product empty"
+    # 字面禁 legacy 有限報酬字樣(輔助)
+    for banned in ("0.11", "0.42", "long_short_mean_return"):
+        # long_short_mean_return 不應出現在 MD 摘要(佔位僅 status/reason)
+        if banned == "long_short_mean_return" and banned in md:
+            raise AssertionError(f"markdown leaks key {banned!r}")
+        if banned != "long_short_mean_return" and banned in md:
+            raise AssertionError(f"markdown leaks finite literal {banned!r}")
+
+    in_deep = False
+    fr_lines: list[str] = []
+    for line in md.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            in_deep = stripped == "## 深度分析摘要"
+            continue
+        if in_deep and stripped.startswith("- factor_returns:"):
+            fr_lines.append(stripped)
+
+    if not fr_lines:
+        # 無 FR 行亦可(default-off);有 deep 節但無 FR 不算洩漏
+        return
+
+    for line in fr_lines:
+        payload_str = line.split(":", 1)[1].strip()
+        try:
+            value = ast.literal_eval(payload_str)
+        except (SyntaxError, ValueError) as exc:
+            # 無法解析時,若行內出現獨立有限數字亦紅(排除 1c-FR 類 token)
+            if re.search(r"(?<![A-Za-z])\d+\.\d+|(?<![A-Za-z-])\b\d+\b(?!c-)", payload_str):
+                raise AssertionError(
+                    f"markdown factor_returns unparsable with numeric: {line!r}"
+                ) from exc
+            continue
+        if has_finite_numeric_leaf(value):
+            raise AssertionError(
+                f"finite numeric in markdown factor_returns product: {value!r} line={line!r}"
+            )
+        # §U 期望:status unavailable 且無 size/samples 等 meta
+        if isinstance(value, dict):
+            if value.get("status") == "unavailable" and "size" in value:
+                raise AssertionError(f"unavailable FR still has size meta: {value!r}")
+
+
+def test_sanitizer_markdown_legacy() -> None:
+    """(f) Markdown: **實際 MD 產物** factor_returns 段落無有限 numeric leaf。"""
+    reporter = ICReporter({})
+    report = {
+        "summary_table": [_legacy_summary_null_row()],
+        "deep_analysis_report": {
+            "results": {
+                "factor_returns": {
+                    **_legacy_factor_returns_payload(),
+                    "size": 1,
+                }
+            },
+        },
+    }
+    md = reporter.generate_enhanced_markdown(report)
+    # oracle 必須打在真實 Markdown 字串,不可 re-sanitize 輸入後再驗
+    _assert_markdown_factor_returns_no_finite(md)
+    assert "0.11" not in md
+
+
+def test_sanitizer_export_all_legacy() -> None:
+    """(g) export_all raw dump: JSON 檔無有限 factor_returns 葉。"""
+    reporter = ICReporter({})
+    report = {
+        "summary_table": [_legacy_summary_null_row()],
+        "deep_analysis_report": {
+            "results": {"factor_returns": _legacy_factor_returns_payload()},
+        },
+        "factor_returns": _legacy_factor_returns_payload(),
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = reporter.export_all(report, tmp, "stopgap")
+        raw = Path(paths["json"]).read_text(encoding="utf-8")
+        data = json.loads(raw)
+        assert_no_finite_in_factor_returns_subtree(data)
+        # summary 三欄 null
+        for row in data.get("summary_table") or []:
+            if isinstance(row, dict):
+                for k in (
+                    "factor_return_ls_mean",
+                    "factor_return_sharpe",
+                    "factor_return_max_drawdown",
+                ):
+                    if k in row:
+                        assert row[k] is None
+
+
+def test_sanitizer_save_report_legacy_no_leak() -> None:
+    """具名:save_report 注入 legacy → 落檔無有限 FR 葉(B1-2 SAVE_REPORT_LEAK)。"""
+    reporter = ICReporter({"ai_summary": False})
+    report = {
+        "summary_table": [_legacy_summary_null_row()],
+        "factor_returns": _legacy_factor_returns_payload(),
+        "deep_analysis_report": {
+            "results": {"factor_returns": _legacy_factor_returns_payload()},
+            "module_summary": {"factor_returns": "completed"},
+            "completed_count": 1,
+        },
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = reporter.save_report(report, tmp, "save_leak_probe")
+        raw = Path(paths["json"]).read_text(encoding="utf-8")
+        data = json.loads(raw)
+        assert_no_finite_in_factor_returns_subtree(data)
+        assert "0.11" not in raw
+        # summary 狀態一致
+        deep = data.get("deep_analysis_report") or {}
+        if isinstance(deep, dict) and isinstance(deep.get("module_summary"), dict):
+            assert deep["module_summary"].get("factor_returns") == "unavailable"
+        if isinstance(deep, dict) and "completed_count" in deep:
+            assert deep["completed_count"] == 0
+
+
+def test_sanitizer_summary_null_keys_in_fixture() -> None:
+    """legacy fixture 含三 summary keys → sanitize 後皆 null。"""
+    row = _legacy_summary_null_row()
+    for k in (
+        "factor_return_ls_mean",
+        "factor_return_sharpe",
+        "factor_return_max_drawdown",
+    ):
+        assert k in row and row[k] is not None
+    cleaned = sanitize_factor_returns({"summary_table": [row]})
+    out_row = cleaned["summary_table"][0]
+    assert out_row["factor_return_ls_mean"] is None
+    assert out_row["factor_return_sharpe"] is None
+    assert out_row["factor_return_max_drawdown"] is None
+
+
+def test_sanitizer_idempotent() -> None:
+    """佔位再過 → 不變。"""
+    once = sanitize_factor_returns({"results": {"factor_returns": _legacy_factor_returns_payload()}})
+    twice = sanitize_factor_returns(once)
+    assert twice == once
+    assert twice["results"]["factor_returns"] == FACTOR_RETURNS_PLACEHOLDER
+    # missing key 不 crash
+    assert sanitize_factor_returns({"results": {"trend_analysis": {"x": 1}}})["results"]["trend_analysis"]["x"] == 1
+
+
+def test_mutation_m2_bypass_sanitizer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """M2:繞 sanitizer → legacy payload 測試紅(基線綠→注入紅→還原)。"""
+
+    def identity(payload):  # type: ignore[no-untyped-def]
+        return payload
+
+    monkeypatch.setattr(
+        "momentum.Analysis.factor_return_sanitizer.sanitize_factor_returns",
+        identity,
+    )
+    # reporter 掛點 import 時已綁定? generate_detailed_csv 內 local import → monkeypatch 模組屬性生效
+    reporter = ICReporter({})
+    report = {
+        "summary_table": [{"feature_name": "feature_0", "ic_mean": 0.05, "icir": 0.5}],
+        "deep_analysis_report": {
+            "results": {"factor_returns": _legacy_factor_returns_payload()},
+        },
+    }
+    csv_text = reporter.generate_detailed_csv(report, "factor_returns")
+    # 繞過後應露出有限值;斷言「無 0.11」應紅
+    with pytest.raises(AssertionError):
+        assert "0.11" not in csv_text
+
+
+def test_mutation_m2b_clear_summary_null_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    """清空 _SUMMARY_NULL_KEYS → summary null 斷言必紅(證 keys 有牙)。"""
+    monkeypatch.setattr(_fr_sanitizer_mod, "_SUMMARY_NULL_KEYS", frozenset())
+    row = _legacy_summary_null_row()
+    cleaned = _fr_sanitizer_mod.sanitize_factor_returns({"summary_table": [row]})
+    out_row = cleaned["summary_table"][0]
+    with pytest.raises(AssertionError):
+        assert out_row["factor_return_ls_mean"] is None
+        assert out_row["factor_return_sharpe"] is None
+        assert out_row["factor_return_max_drawdown"] is None
+
+
+def test_mutation_m2c_restore_finite_metadata() -> None:
+    """恢復 finite size:1 metadata 於 factor_returns → 通用 oracle 必紅。"""
+    poisoned = {
+        "factor_returns": {
+            "status": "unavailable",
+            "value": None,
+            "reason": "x",
+            "size": 1,  # finite meta 洩漏
+        }
+    }
+    with pytest.raises(AssertionError):
+        assert_no_finite_in_factor_returns_subtree(poisoned)
+
+
+def test_mutation_m2d_markdown_restore_size_meta(monkeypatch: pytest.MonkeyPatch) -> None:
+    """B-R2-2: monkeypatch _build_module_summaries 恢復 size:1 → MD oracle 必紅。
+
+    證 Markdown wiring 真連到產物 oracle,非只對 re-sanitize 輸入假綠。
+    """
+
+    def _leaky_summaries(self, deep_payload):  # type: ignore[no-untyped-def]
+        return {"factor_returns": {"size": 1}}
+
+    monkeypatch.setattr(ICReporter, "_build_module_summaries", _leaky_summaries)
+    reporter = ICReporter({})
+    report = {
+        "summary_table": [_legacy_summary_null_row()],
+        "deep_analysis_report": {
+            "results": {"factor_returns": _legacy_factor_returns_payload()},
+        },
+    }
+    md = reporter.generate_enhanced_markdown(report)
+    # 產物必含 size:1;對真實 MD 的 oracle 必須 raise
+    assert "size" in md and "1" in md
+    with pytest.raises(AssertionError):
+        _assert_markdown_factor_returns_no_finite(md)

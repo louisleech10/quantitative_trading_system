@@ -112,8 +112,9 @@ performance:
   n_jobs: -1  # CPU 併行數
 
 # --- Phase 2.4 深度分析 Config ---
+# IC1C-FR-STOPGAP: default-off(ls_returns 時間錯位止血;修復歸 1c-FR-FULL)
 factor_return:
-  enabled: true
+  enabled: false
   num_quantiles: 5
   calculate_risk_metrics: true
   risk_free_rate: 0.0

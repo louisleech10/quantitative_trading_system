@@ -28,7 +28,9 @@ def test_advanced_preset_enables_all():
     orchestrator = ICFilterOrchestrator(config)
 
     applied = orchestrator._apply_tier_config(config)
-    assert applied.factor_return.enabled is True
+    # 舊斷言為何錯: tier 後 `factor_return.enabled is True` 固化 tier 強制開啟錯位模組;
+    # IC1C-FR-STOPGAP 從 tier 強制清單排除 factor_return → 保持 default-off False。
+    assert applied.factor_return.enabled is False
     assert applied.factor_orthogonalization.enabled is True
     assert applied.factor_exposure.enabled is True
 

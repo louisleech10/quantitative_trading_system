@@ -115,6 +115,12 @@ class ICReporter:
 
         summary_table = report.get("summary_table", []) if isinstance(report, dict) else []
         deep_payload = deep_report or self._resolve_deep_report(report)
+        # IC1C-FR-STOPGAP: summary 三欄讀 factor_returns 前必過 sanitizer
+        from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
+
+        if isinstance(deep_payload, dict):
+            deep_payload = sanitize_factor_returns(deep_payload)
+
 
         # 既有欄名/順序 byte 不變；t_stat / p_value_adj 僅追加於末尾（Task 2.4）
         base_columns = [
@@ -199,6 +205,11 @@ class ICReporter:
             raise ValueError("module_name is required")
 
         deep_payload = self._resolve_deep_report(report)
+        # IC1C-FR-STOPGAP: detailed CSV 出口必過 sanitizer
+        from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
+
+        if isinstance(deep_payload, dict):
+            deep_payload = sanitize_factor_returns(deep_payload)
         module_alias = {
             "factor_return": "factor_returns",
             "factor_centrality": "factor_centrality",
@@ -210,7 +221,7 @@ class ICReporter:
             "net_ic_analysis": "net_ic_analysis",
         }
         resolved_module = module_alias.get(module_name, module_name)
-        module_data = deep_payload.get(resolved_module)
+        module_data = deep_payload.get(resolved_module) if isinstance(deep_payload, dict) else None
         if module_data is None:
             raise ValueError(f"module not found: {module_name}")
 
@@ -242,6 +253,11 @@ class ICReporter:
         risk_warnings = self._generate_risk_warnings(report, top_features)
         recommendations = self._generate_recommendations(risk_warnings)
         deep_payload = deep_report or self._resolve_deep_report(report)
+        # IC1C-FR-STOPGAP: AI JSON 出口必過 sanitizer
+        from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
+
+        if isinstance(deep_payload, dict):
+            deep_payload = sanitize_factor_returns(deep_payload)
 
         payload = {
             "version": report.get("version", "1.0"),
@@ -280,6 +296,11 @@ class ICReporter:
             reverse=True,
         )[:10]
         deep_payload = deep_report or self._resolve_deep_report(report)
+        # IC1C-FR-STOPGAP: Markdown 出口必過 sanitizer
+        from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
+
+        if isinstance(deep_payload, dict):
+            deep_payload = sanitize_factor_returns(deep_payload)
 
         lines = [
             "# IC Gatekeep Enhanced Report",
@@ -326,19 +347,26 @@ class ICReporter:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
+        # IC1C-FR-STOPGAP: export_all raw dump 必過 sanitizer
+        from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
+
+        safe_report = (
+            sanitize_factor_returns(report) if isinstance(report, dict) else report
+        )
+
         json_path = output_path / f"ic_report_{case_id}.json"
         ai_json_path = output_path / f"ic_ai_{case_id}.json"
         csv_summary_path = output_path / f"ic_summary_{case_id}.csv"
         markdown_path = output_path / f"ic_report_{case_id}.md"
 
         with json_path.open("w", encoding="utf-8") as file:
-            json.dump(report, file, ensure_ascii=True, separators=(",", ":"))
+            json.dump(safe_report, file, ensure_ascii=True, separators=(",", ":"))
 
         with ai_json_path.open("w", encoding="utf-8") as file:
-            json.dump(self.generate_ai_json(report), file, ensure_ascii=False, indent=2)
+            json.dump(self.generate_ai_json(safe_report), file, ensure_ascii=False, indent=2)
 
-        csv_summary_path.write_text(self.generate_summary_csv(report), encoding="utf-8")
-        markdown_path.write_text(self.generate_enhanced_markdown(report), encoding="utf-8")
+        csv_summary_path.write_text(self.generate_summary_csv(safe_report), encoding="utf-8")
+        markdown_path.write_text(self.generate_enhanced_markdown(safe_report), encoding="utf-8")
 
         exports: dict[str, str] = {
             "json": str(json_path),
@@ -347,13 +375,13 @@ class ICReporter:
             "markdown": str(markdown_path),
         }
 
-        deep_payload = self._resolve_deep_report(report)
+        deep_payload = self._resolve_deep_report(safe_report)
         for module_name in deep_payload.keys():
             if module_name in {"deep_analysis_errors", "module_statuses", "deep_analysis_summary"}:
                 continue
             detailed_path = output_path / f"ic_{module_name}_{case_id}.csv"
             detailed_path.write_text(
-                self.generate_detailed_csv(report, module_name),
+                self.generate_detailed_csv(safe_report, module_name),
                 encoding="utf-8",
             )
             exports[f"csv_detailed_{module_name}"] = str(detailed_path)
@@ -395,19 +423,28 @@ class ICReporter:
         return str(path)
 
     def save_report(self, report: dict, output_dir: str, case_id: str) -> dict[str, str]:
-        """持久化所有報告產出。"""
+        """持久化所有報告產出。
+
+        IC1C-FR-STOPGAP: 落檔前必過 sanitizer,禁 legacy 有限 factor_returns 葉洩漏。
+        """
 
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
+
+        from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
+
+        safe_report = (
+            sanitize_factor_returns(report) if isinstance(report, dict) else report
+        )
 
         json_path = output_path / f"ic_report_{case_id}.json"
         markdown_path = output_path / f"ic_summary_{case_id}.md"
 
         with json_path.open("w", encoding="utf-8") as file:
-            json.dump(report, file, ensure_ascii=True, separators=(",", ":"))
+            json.dump(safe_report, file, ensure_ascii=True, separators=(",", ":"))
 
         if self._config.get("ai_summary", True):
-            summary = self.generate_ai_summary(report)
+            summary = self.generate_ai_summary(safe_report)
             with markdown_path.open("w", encoding="utf-8") as file:
                 file.write(summary)
 
@@ -712,6 +749,13 @@ class ICReporter:
         for key, value in deep_payload.items():
             if not isinstance(value, dict):
                 continue
+            # IC1C-FR-STOPGAP: factor_returns 佔位勿展成 keys/size 有限 meta
+            if key == "factor_returns" and value.get("status") == "unavailable":
+                summaries[key] = {
+                    "status": "unavailable",
+                    "reason": value.get("reason"),
+                }
+                continue
             if "summary" in value and isinstance(value["summary"], dict):
                 summaries[key] = value["summary"]
             else:
@@ -777,4 +821,7 @@ class ICReporter:
             if isinstance(results, dict) and module_name in results:
                 output[key] = results[module_name]
 
-        return output
+        # IC1C-FR-STOPGAP: inject/serialize 出口禁有限 factor_returns 葉
+        from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
+
+        return sanitize_factor_returns(output)

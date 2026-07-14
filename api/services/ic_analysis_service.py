@@ -32,6 +32,7 @@ from momentum.factories import (
     create_ic_artifact_writer,
     create_ic_reporter,
     create_kline_storage_manager,
+    sanitize_factor_returns,
 )
 from momentum.core.contracts import ICResult
 
@@ -435,7 +436,11 @@ class ICAnalysisService:
             payload_for_export.setdefault("deep_analysis_report", deep_report)
 
         if normalized_format == "json":
-            content = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+            # IC1C-FR-STOPGAP: raw JSON 出口必過 sanitizer(legacy 有限 factor_returns)
+            safe_report = (
+                sanitize_factor_returns(report) if isinstance(report, dict) else report
+            )
+            content = json.dumps(safe_report, ensure_ascii=False, indent=2).encode("utf-8")
             return {
                 "type": "bytes",
                 "content": BytesIO(content),
@@ -719,7 +724,8 @@ class ICAnalysisService:
 
         normalized = self._to_json_compatible(deep_result)
         if isinstance(normalized, dict):
-            return normalized
+            # IC1C-FR-STOPGAP: 讀出端再 sanitize(legacy task_info 有限值)
+            return sanitize_factor_returns(normalized)
         return {"raw": normalized}
 
     async def start_full_analysis(self, request: ICFullAnalysisRequest) -> Dict[str, str]:
@@ -1188,7 +1194,8 @@ class ICAnalysisService:
 
         normalized = self._to_json_compatible(raw)
         if isinstance(normalized, dict):
-            return normalized
+            # IC1C-FR-STOPGAP: serializer + task storage 出口必過 sanitizer
+            return sanitize_factor_returns(normalized)
         return {"raw": normalized}
 
     def _attach_cross_symbol_context(self, deep_payload: Dict[str, Any], analyzer: Any) -> Dict[str, Any]:

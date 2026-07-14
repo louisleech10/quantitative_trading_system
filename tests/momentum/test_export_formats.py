@@ -151,7 +151,10 @@ def test_detailed_csv_factor_return_format() -> None:
     reporter = ICReporter({})
     csv_text = reporter.generate_detailed_csv(_sample_report(), "factor_returns")
     assert csv_text.startswith("\ufeff")
-    assert "long_short_mean_return" in csv_text
+    # 舊斷言為何錯: 含 `long_short_mean_return` 有限值固化錯位序列 CSV 形狀;
+    # IC1C-FR-STOPGAP sanitizer → 佔位,無有限報酬數值(0.11 等)。
+    assert "0.11" not in csv_text
+    assert "unavailable" in csv_text or "status" in csv_text
 
 
 def test_detailed_csv_all_modules() -> None:

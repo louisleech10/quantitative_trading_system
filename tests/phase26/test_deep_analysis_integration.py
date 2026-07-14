@@ -93,7 +93,10 @@ def test_run_deep_analysis_generates_report_and_progress():
     assert isinstance(report, DeepAnalysisReport)
     assert report.total_modules == 10
     assert report.completed_count >= 1
-    assert "factor_returns" in report.results
+    # 舊斷言為何錯: `"factor_returns" in report.results` 假設預設會跑 FR;
+    # IC1C-FR-STOPGAP default-off → not_run 且無 results 節。
+    assert report.module_summary.get("factor_returns") == "not_run"
+    assert "factor_returns" not in report.results
     assert len(progress_events) > 0
     assert all("module_name" in event for event in progress_events)
 
@@ -108,9 +111,12 @@ def test_module_failure_is_isolated(monkeypatch):
 
     report = orchestrator.run_deep_analysis(force_modules=["trend_analysis", "factor_returns"])
 
-    assert report.module_summary["factor_returns"] == "completed"
+    # 舊斷言為何錯: force→`completed` 假設 compute_batch 仍可跑;
+    # IC1C-FR-STOPGAP 顯式開 → unavailable(非 completed),且不入 deep_analysis_errors。
+    assert report.module_summary["factor_returns"] == "unavailable"
     assert report.module_summary["trend_analysis"] == "skipped"
     assert any(err.module_name == "trend_analysis" for err in report.deep_analysis_errors)
+    assert "factor_returns" not in [e.module_name for e in report.deep_analysis_errors]
 
 
 def test_cache_hit_and_force_modules_recompute(monkeypatch):
@@ -176,11 +182,13 @@ def test_partial_failure_continues(monkeypatch):
         force_modules=["factor_returns", "factor_centrality", "trend_analysis"]
     )
 
-    assert report.module_summary["factor_returns"] == "completed"
+    # 舊斷言為何錯: force→`completed`;STOPGAP 顯式開→unavailable。
+    assert report.module_summary["factor_returns"] == "unavailable"
     assert report.module_summary["factor_centrality"] == "skipped"
     assert report.module_summary["trend_analysis"] == "completed"
     assert report.module_summary["rolling_oos"] == "not_run"
     assert any(error.module_name == "factor_centrality" for error in report.deep_analysis_errors)
+    assert "factor_returns" not in [e.module_name for e in report.deep_analysis_errors]
 
 
 def test_all_modules_skip(monkeypatch):

@@ -639,6 +639,18 @@ def create_ic_reporter(config: Optional[dict] = None) -> "ICReporter":
     return ICReporter(config=config or {})
 
 
+def sanitize_factor_returns(payload: Any) -> Any:
+    """Factory re-export — IC1C-FR-STOPGAP factor_returns 輸出邊界 sanitizer.
+
+    api/services 不得直接 import momentum.Analysis.*;經 factories 取得純函式。
+    """
+    from momentum.Analysis.factor_return_sanitizer import (
+        sanitize_factor_returns as _sanitize_factor_returns,
+    )
+
+    return _sanitize_factor_returns(payload)
+
+
 def create_model_hyperparam_objective(**kwargs: Any) -> "ModelHyperparamObjective":
     """Factory — Optuna objective for model hyper-parameter tuning."""
     from momentum.Optimization.objectives.model_hyperparam import ModelHyperparamObjective

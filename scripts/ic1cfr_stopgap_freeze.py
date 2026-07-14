@@ -20,12 +20,14 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import math
 import re
 import subprocess
 import sys
+from collections import Counter
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -91,13 +93,20 @@ CANONICAL_EXCLUDE_JSON_PATHS: frozenset[str] = frozenset(
 )
 
 # factory / direct consumer 掃描正規化規則(B0 artifact 與 Task 1.3 測試共用語意)
-# 字串拆開避免本腳本被 rg 自命中(scanner self-noise)
+# B1 退修:AST 掃描(import alias + Call 計數,同行多 ctor 不去重)
 FACTORY_CREATE_SYMBOL = "create_factor_return" + "_analyzer"
-DIRECT_CTOR_PATTERN = r"FactorReturn" + r"Analyzer\("
+DIRECT_CLASS_NAME = "FactorReturn" + "Analyzer"
 # factory 定義檔本身不算 caller
 FACTORY_DEFINITION_FILE = "momentum/factories.py"
 # 本 freeze 腳本不入 allowlist(掃描器/註解非 production consumer)
 SCANNER_SELF_REL = "scripts/ic1cfr_stopgap_freeze.py"
+# AST 掃描根目錄
+SCAN_ROOTS: tuple[str, ...] = ("momentum", "api", "scripts", "tests")
+# §G 非 FR 比對時額外剔除的 path 前綴(factor_returns 本體屬 scope-expected)
+FR_SCOPE_PATH_PREFIXES: tuple[str, ...] = (
+    "report.results.factor_returns",
+    "report.module_summary.factor_returns",
+)
 
 
 def _sha256_file(path: Path) -> str:
@@ -442,19 +451,137 @@ def _rg_lines(pattern: str, *paths: str) -> list[str]:
     return lines
 
 
-def normalize_factory_scan_hits(
-    create_hits: Iterable[str],
-    direct_hits: Iterable[str],
-) -> dict[str, list[str]]:
-    """正規化 factory caller / direct consumer 掃描結果(B0 與 Task 1.3 共用規則).
+def _rel_posix(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix().replace("\\", "/")
 
-    - factory callers: 命中 `create_factor_return_analyzer` 且**非** factories.py 定義檔
-    - direct consumers: 命中 `FactorReturnAnalyzer(` 的 file:line(含 factories 定義體)
-    - 路徑相對 repo root;去重後排序
+
+def _ast_collect_calls_in_file(
+    path: Path,
+    *,
+    target_names: frozenset[str],
+) -> list[tuple[int, int]]:
+    """AST 掃描單一 .py:回傳 (lineno, col_offset) 的 Call 命中(含 alias).
+
+    - 追蹤 ``from X import Target as Alias`` / ``import X; X.Target``
+    - 只計 Call node(``Alias(...)`` / ``Target(...)``);同行多 ctor 各計一次
+    - 不計 ``Target.method(...)``(Attribute 呼叫,非建構)
     """
+    try:
+        src = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    try:
+        tree = ast.parse(src, filename=str(path))
+    except SyntaxError:
+        return []
+
+    # local name → whether it resolves to a target symbol
+    aliases: dict[str, str] = {}
+    hits: list[tuple[int, int]] = []
+
+    class Visitor(ast.NodeVisitor):
+        def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # noqa: N802
+            for alias in node.names:
+                raw = alias.name
+                asname = alias.asname or raw
+                if raw in target_names:
+                    aliases[asname] = raw
+            self.generic_visit(node)
+
+        def visit_Import(self, node: ast.Import) -> None:  # noqa: N802
+            # ``import momentum.Analysis.factor_return_analyzer as fra`` 不直接給 class 名
+            # 僅當 module 末端名恰好是 target 時(罕見)才記;一般 ctor 走 From-import
+            for alias in node.names:
+                raw = alias.name.split(".")[-1]
+                asname = alias.asname or raw
+                if raw in target_names:
+                    aliases[asname] = raw
+            self.generic_visit(node)
+
+        def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+            func = node.func
+            if isinstance(func, ast.Name):
+                name = func.id
+                if name in target_names or name in aliases:
+                    hits.append((node.lineno, node.col_offset))
+            elif isinstance(func, ast.Attribute):
+                # module.FactorReturnAnalyzer(...) form
+                if func.attr in target_names:
+                    hits.append((node.lineno, node.col_offset))
+            self.generic_visit(node)
+
+    # also treat bare target name as callable without import(tests that do from-import
+    # are covered; definition sites import locally inside function — ImportFrom visitor
+    # still sees them when walking the whole module tree)
+    Visitor().visit(tree)
+    return hits
+
+
+def scan_factor_return_consumers_ast(
+    roots: Iterable[str] = SCAN_ROOTS,
+) -> dict[str, list[str]]:
+    """AST 掃描 factory callers + direct FactorReturnAnalyzer ctor 消費者.
+
+    - factory_callers: 檔相對路徑(factories.py 定義檔排除;scanner self 排除)
+    - direct_consumers: ``path:line:col``(同行多 ctor 不去重;含 factories 定義體)
+    """
+    factory_targets = frozenset({FACTORY_CREATE_SYMBOL})
+    direct_targets = frozenset({DIRECT_CLASS_NAME})
+
     factory_callers: set[str] = set()
-    for line in create_hits:
-        # format: path:lineno:content
+    direct_consumers: list[str] = []
+
+    for root_name in roots:
+        root = REPO_ROOT / root_name
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            rel = _rel_posix(path)
+            if rel == SCANNER_SELF_REL or rel.endswith("/" + SCANNER_SELF_REL):
+                continue
+            # factory calls
+            for lineno, _col in _ast_collect_calls_in_file(path, target_names=factory_targets):
+                if rel == FACTORY_DEFINITION_FILE or rel.endswith(
+                    "/" + FACTORY_DEFINITION_FILE
+                ):
+                    continue
+                factory_callers.add(rel)
+            # direct ctors — 每 Call 一筆 path:line:col(不去重)
+            for lineno, col in _ast_collect_calls_in_file(path, target_names=direct_targets):
+                direct_consumers.append(f"{rel}:{lineno}:{col}")
+
+    direct_consumers_sorted = sorted(
+        direct_consumers,
+        key=lambda s: (
+            s.rsplit(":", 2)[0],
+            int(s.rsplit(":", 2)[1]),
+            int(s.rsplit(":", 2)[2]),
+        ),
+    )
+    return {
+        "factory_callers": sorted(factory_callers),
+        "direct_consumers": direct_consumers_sorted,
+    }
+
+
+def normalize_factory_scan_hits(
+    create_hits: Iterable[str] | None = None,
+    direct_hits: Iterable[str] | None = None,
+) -> dict[str, list[str]]:
+    """正規化 factory caller / direct consumer(B0 與 Task 1.3 共用).
+
+    B1 起優先走 AST(``scan_factor_return_consumers_ast``)。
+    仍接受舊 rg 行格式作向後相容,但測試應改呼叫 AST 入口。
+    """
+    if create_hits is None and direct_hits is None:
+        return scan_factor_return_consumers_ast()
+
+    # legacy rg path(保留給任何仍傳 rg 行的呼叫端)
+    factory_callers: set[str] = set()
+    for line in create_hits or []:
         parts = line.split(":", 2)
         if len(parts) < 2:
             continue
@@ -464,12 +591,11 @@ def normalize_factory_scan_hits(
         if rel == SCANNER_SELF_REL or rel.endswith("/" + SCANNER_SELF_REL):
             continue
         if rel == FACTORY_DEFINITION_FILE or rel.endswith("/" + FACTORY_DEFINITION_FILE):
-            # 定義不算 caller
             continue
         factory_callers.add(rel)
 
-    direct_consumers: set[str] = set()
-    for line in direct_hits:
+    direct_consumers: list[str] = []
+    for line in direct_hits or []:
         parts = line.split(":", 2)
         if len(parts) < 2:
             continue
@@ -481,7 +607,8 @@ def normalize_factory_scan_hits(
         lineno = parts[1]
         if not lineno.isdigit():
             continue
-        direct_consumers.add(f"{rel}:{lineno}")
+        # legacy 無 col → 用 0;多 ctor 同行無法區分(故應改 AST)
+        direct_consumers.append(f"{rel}:{lineno}:0")
 
     return {
         "factory_callers": sorted(factory_callers),
@@ -489,33 +616,55 @@ def normalize_factory_scan_hits(
     }
 
 
+def _direct_consumer_line_key(entry: str) -> str:
+    """``path:line:col`` → ``path:line``(與 B0 舊 allowlist 比對用)."""
+    parts = entry.rsplit(":", 2)
+    if len(parts) == 3 and parts[1].isdigit():
+        return f"{parts[0]}:{parts[1]}"
+    return entry
+
+
+def compare_consumer_allowlist(
+    current: dict[str, list[str]],
+    frozen: dict[str, set[str]],
+) -> tuple[list[str], list[str]]:
+    """回傳 (extra_factory_callers, extra_direct_consumers).
+
+    direct: 以 path:line 計數(Counter);現況 count > 凍結 count → 多出的每次算一 extra。
+    支援舊凍結檔(path:line,無 col)與新 AST 輸出(path:line:col)。
+    """
+    extra_callers = sorted(set(current["factory_callers"]) - frozen["factory_callers"])
+
+    frozen_line_counts: Counter[str] = Counter()
+    for item in frozen["direct_consumers"]:
+        frozen_line_counts[_direct_consumer_line_key(item)] += 1
+
+    current_line_counts: Counter[str] = Counter()
+    for item in current["direct_consumers"]:
+        current_line_counts[_direct_consumer_line_key(item)] += 1
+
+    extra_direct: list[str] = []
+    for key, cur_n in sorted(current_line_counts.items()):
+        frozen_n = frozen_line_counts.get(key, 0)
+        if cur_n > frozen_n:
+            for i in range(frozen_n, cur_n):
+                extra_direct.append(f"{key}#occ{i + 1}")
+    return extra_callers, extra_direct
+
+
 def freeze_factory_allowlist() -> str:
-    """rg 掃描並寫成可機讀 allowlist 文字."""
-    create_hits = _rg_lines(
-        FACTORY_CREATE_SYMBOL,
-        "momentum",
-        "api",
-        "scripts",
-        "tests",
-    )
-    direct_hits = _rg_lines(
-        DIRECT_CTOR_PATTERN,
-        "momentum",
-        "api",
-        "scripts",
-        "tests",
-    )
-    norm = normalize_factory_scan_hits(create_hits, direct_hits)
+    """AST 掃描並寫成可機讀 allowlist 文字."""
+    norm = scan_factor_return_consumers_ast()
 
     # 欄位分隔用 ASCII RS 風格明確標記,避免空白被顯示吞掉:
-    # 每行: <kind>|<path-or-path:line>
+    # 每行: <kind>|<path-or-path:line:col>
     lines = [
         "# IC1CFR-STOPGAP B0 factory allowlist (frozen)",
-        f"# scanner: rg -n {FACTORY_CREATE_SYMBOL!r} + rg -n {DIRECT_CTOR_PATTERN!r}",
+        f"# scanner: AST Call of {FACTORY_CREATE_SYMBOL!r} + {DIRECT_CLASS_NAME!r}",
         "# rules: factory definition (momentum/factories.py) excluded from factory_callers;",
-        "#        direct_consumers keep file:line including factories.py definition body;",
-        f"#        scanner self ({SCANNER_SELF_REL}) excluded.",
-        "# format: factory_caller|<relpath> OR direct_consumer|<relpath>:<lineno>",
+        "#        direct_consumers keep path:line:col (multi-ctor on same line not deduped);",
+        f"#        scanner self ({SCANNER_SELF_REL}) excluded; import aliases tracked.",
+        "# format: factory_caller|<relpath> OR direct_consumer|<relpath>:<lineno>:<col>",
         "# section: factory_callers",
     ]
     for item in norm["factory_callers"]:
@@ -646,6 +795,275 @@ def check_nodeids() -> int:
     return 0
 
 
+AFTER_DEFAULT_JSON = OUT_DIR / "after_default.json"
+AFTER_EXPLICIT_JSON = OUT_DIR / "after_explicit.json"
+UNAVAILABLE_REASON = "ls_returns_timestamp_misaligned (1c-FR-FULL)"
+
+
+def _report_dict_from_orch(force_modules: list[str] | None) -> dict[str, Any]:
+    orch = _build_orchestrator_with_real_kline()
+    report = orch.run_deep_analysis(force_modules=force_modules)
+    report_dict = _sanitize_for_strict_json(asdict(report))
+    if not isinstance(report_dict, dict):
+        raise SystemExit("FAIL: report serialize not dict")
+    return report_dict
+
+
+def _is_fr_scope_path(path: str) -> bool:
+    for prefix in FR_SCOPE_PATH_PREFIXES:
+        if path == prefix or path.startswith(prefix + "."):
+            return True
+    return False
+
+
+def _leaf_paths(obj: Any, *, path: str = "") -> dict[str, Any]:
+    """展開 JSON 樹為 path→leaf 值(dict/list 繼續;葉含 null/bool/number/str)."""
+    out: dict[str, Any] = {}
+    if isinstance(obj, dict):
+        if not obj:
+            out[path] = {}
+            return out
+        for k, v in obj.items():
+            child = f"{path}.{k}" if path else str(k)
+            out.update(_leaf_paths(v, path=child))
+        return out
+    if isinstance(obj, list):
+        if not obj:
+            out[path] = []
+            return out
+        for i, v in enumerate(obj):
+            child = f"{path}.{i}" if path else str(i)
+            out.update(_leaf_paths(v, path=child))
+        return out
+    out[path] = obj
+    return out
+
+
+def compare_non_fr_paths_exact(
+    before_payload: dict[str, Any],
+    after_payload: dict[str, Any],
+    *,
+    exclude: frozenset[str] = CANONICAL_EXCLUDE_JSON_PATHS,
+) -> list[str]:
+    """§G 非 FR 逐 JSON-path exact compare(atol=0).
+
+    排除:canonical exclude 清單 + factor_returns scope path。
+    回傳 path diff 字串列表;空=通過。
+    """
+    before_stripped = strip_canonical_excludes(before_payload, patterns=exclude)
+    after_stripped = strip_canonical_excludes(after_payload, patterns=exclude)
+
+    # 只比 report.results[非 FR] 與非 FR module_summary 等;用全樹 leaf 後濾 FR scope
+    before_leaves = {
+        p: v
+        for p, v in _leaf_paths(before_stripped).items()
+        if p.startswith("report.") and not _is_fr_scope_path(p)
+    }
+    after_leaves = {
+        p: v
+        for p, v in _leaf_paths(after_stripped).items()
+        if p.startswith("report.") and not _is_fr_scope_path(p)
+    }
+
+    diffs: list[str] = []
+    all_paths = sorted(set(before_leaves) | set(after_leaves))
+    for p in all_paths:
+        if p not in before_leaves:
+            diffs.append(f"+ {p} = {after_leaves[p]!r} (only in after)")
+            continue
+        if p not in after_leaves:
+            diffs.append(f"- {p} = {before_leaves[p]!r} (only in before)")
+            continue
+        bv = before_leaves[p]
+        av = after_leaves[p]
+        if bv != av:
+            # 浮點欄亦 atol=0(SPEC §G)
+            diffs.append(f"~ {p}: before={bv!r} after={av!r}")
+    return diffs
+
+
+def assert_non_fr_exact_vs_before(
+    after_payload: dict[str, Any],
+    *,
+    before_path: Path = BEFORE_JSON,
+    mode: str = "after",
+) -> None:
+    """讀 before.json 與 after payload 做 §G 非 FR exact;FAIL 列 path diff."""
+    if not before_path.is_file():
+        raise SystemExit(f"FAIL {mode}: missing before baseline {before_path}")
+    before_payload = json.loads(before_path.read_text(encoding="utf-8"))
+    if not isinstance(before_payload, dict):
+        raise SystemExit(f"FAIL {mode}: before.json root not dict")
+    diffs = compare_non_fr_paths_exact(before_payload, after_payload)
+    if diffs:
+        print(f"FAIL {mode}: non-FR path diffs ({len(diffs)}):", file=sys.stderr)
+        for d in diffs[:200]:
+            print(f"  {d}", file=sys.stderr)
+        if len(diffs) > 200:
+            print(f"  ... and {len(diffs) - 200} more", file=sys.stderr)
+        raise SystemExit(f"FAIL {mode}: non-FR exact compare failed ({len(diffs)} paths)")
+
+
+def self_prove_non_fr_gate_reds_on_tamper(
+    after_payload: dict[str, Any],
+    *,
+    before_path: Path = BEFORE_JSON,
+) -> None:
+    """自證:刻意改一個非 FR 模組值 → compare 必紅(否則 gate 無牙)."""
+    before_payload = json.loads(before_path.read_text(encoding="utf-8"))
+    tampered = json.loads(json.dumps(after_payload))
+    results = (tampered.get("report") or {}).get("results") or {}
+    # 挑一個非 FR 模組注入可觀測漂移
+    target_mod = None
+    for name in sorted(results.keys()):
+        if name == "factor_returns":
+            continue
+        if isinstance(results[name], dict):
+            target_mod = name
+            break
+    if target_mod is None:
+        raise SystemExit("FAIL self-prove: no non-FR module in after results to tamper")
+    # 注入明確假值
+    results[target_mod] = dict(results[target_mod])
+    results[target_mod]["__ic1cfr_tamper_probe__"] = 0.123456789
+    diffs = compare_non_fr_paths_exact(before_payload, tampered)
+    probe_hits = [d for d in diffs if "__ic1cfr_tamper_probe__" in d]
+    if not probe_hits:
+        raise SystemExit(
+            "FAIL self-prove: tampering non-FR module did not produce path diff "
+            f"(gate toothless; target={target_mod})"
+        )
+    print(f"self-prove non-FR gate red OK: target={target_mod} diffs={len(probe_hits)}")
+
+
+def freeze_after_default() -> int:
+    """§G after-default: pure default-off → factor_returns not_run + 無 results 節.
+
+    以 force_modules=全模組除 factor_returns 跑(對照 before 的非 FR 節);
+    factor_return 不在 force 且 default-off → not_run。
+    另做 §G 非 FR 逐 path exact vs before.json。
+    """
+    from datetime import datetime, timezone
+
+    force = [m for m in ALL_DEEP_MODULES if m != "factor_returns"]
+    report_dict = _report_dict_from_orch(force)
+
+    module_summary = report_dict.get("module_summary") or {}
+    fr_status = module_summary.get("factor_returns")
+    results = report_dict.get("results") or {}
+    if fr_status != "not_run":
+        raise SystemExit(
+            f"FAIL after-default: module_summary.factor_returns={fr_status!r} expected 'not_run'"
+        )
+    if "factor_returns" in results:
+        raise SystemExit(
+            "FAIL after-default: results.factor_returns present (expected absent under not_run)"
+        )
+
+    generated_at = datetime.now(timezone.utc).isoformat()
+    payload: dict[str, Any] = {
+        "generated_at": generated_at,
+        "generated_by": "ic1cfr_stopgap_freeze --after-default",
+        "lineage": {
+            "fixture_sha256": _sha256_file(FIXTURE_PATH),
+            "fixture_path": FIXTURE_PATH.relative_to(REPO_ROOT).as_posix(),
+            "git_head": _git_head(),
+            "kline_cache": KLINE_CACHE.relative_to(REPO_ROOT).as_posix(),
+            "generated_at": generated_at,
+            "mode": "after-default",
+        },
+        "canonical_exclude_json_paths": sorted(CANONICAL_EXCLUDE_JSON_PATHS),
+        "report": report_dict,
+    }
+
+    # §G: 非 FR 逐 path exact vs before + 自證 gate 有牙
+    assert_non_fr_exact_vs_before(payload, mode="after-default")
+    self_prove_non_fr_gate_reds_on_tamper(payload)
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    raw_digest = _write_json(AFTER_DEFAULT_JSON, payload)
+    canon = canonical_sha256(payload)
+    rel = AFTER_DEFAULT_JSON.relative_to(REPO_ROOT).as_posix()
+    print(f"wrote {rel}")
+    print(f"raw_sha256={raw_digest}")
+    print(f"canonical_sha256={canon}")
+    print(f"module_summary.factor_returns={fr_status}")
+    print("factor_returns_results_absent=yes")
+    print("non_fr_exact_vs_before=pass")
+    return 0
+
+
+def freeze_after_explicit() -> int:
+    """§G after-explicit: force_modules 含 factor_returns → §U union + summary unavailable.
+
+    另做 §G 非 FR 逐 path exact vs before.json。
+    """
+    from datetime import datetime, timezone
+
+    report_dict = _report_dict_from_orch(list(ALL_DEEP_MODULES))
+
+    module_summary = report_dict.get("module_summary") or {}
+    fr_status = module_summary.get("factor_returns")
+    fr_body = (report_dict.get("results") or {}).get("factor_returns")
+    if fr_status != "unavailable":
+        raise SystemExit(
+            f"FAIL after-explicit: module_summary.factor_returns={fr_status!r} "
+            "expected 'unavailable'"
+        )
+    if not isinstance(fr_body, dict):
+        raise SystemExit("FAIL after-explicit: results.factor_returns missing or not dict")
+    if fr_body.get("status") != "unavailable":
+        raise SystemExit(
+            f"FAIL after-explicit: union status={fr_body.get('status')!r} expected unavailable"
+        )
+    if fr_body.get("value") is not None:
+        raise SystemExit("FAIL after-explicit: union value must be null")
+    reason = str(fr_body.get("reason") or "")
+    if UNAVAILABLE_REASON not in reason and "ls_returns_timestamp_misaligned" not in reason:
+        raise SystemExit(f"FAIL after-explicit: unexpected reason={reason!r}")
+    if _has_finite_numeric_leaf(fr_body):
+        raise SystemExit("FAIL after-explicit: factor_returns still has finite numeric leaf")
+
+    errors = report_dict.get("deep_analysis_errors") or []
+    for err in errors:
+        if isinstance(err, dict) and err.get("module_name") == "factor_returns":
+            raise SystemExit(
+                "FAIL after-explicit: factor_returns must not appear in deep_analysis_errors"
+            )
+
+    generated_at = datetime.now(timezone.utc).isoformat()
+    payload: dict[str, Any] = {
+        "generated_at": generated_at,
+        "generated_by": "ic1cfr_stopgap_freeze --after-explicit",
+        "lineage": {
+            "fixture_sha256": _sha256_file(FIXTURE_PATH),
+            "fixture_path": FIXTURE_PATH.relative_to(REPO_ROOT).as_posix(),
+            "git_head": _git_head(),
+            "kline_cache": KLINE_CACHE.relative_to(REPO_ROOT).as_posix(),
+            "generated_at": generated_at,
+            "mode": "after-explicit",
+        },
+        "canonical_exclude_json_paths": sorted(CANONICAL_EXCLUDE_JSON_PATHS),
+        "report": report_dict,
+    }
+
+    assert_non_fr_exact_vs_before(payload, mode="after-explicit")
+    self_prove_non_fr_gate_reds_on_tamper(payload)
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    raw_digest = _write_json(AFTER_EXPLICIT_JSON, payload)
+    canon = canonical_sha256(payload)
+    rel = AFTER_EXPLICIT_JSON.relative_to(REPO_ROOT).as_posix()
+    print(f"wrote {rel}")
+    print(f"raw_sha256={raw_digest}")
+    print(f"canonical_sha256={canon}")
+    print(f"module_summary.factor_returns={fr_status}")
+    print("factor_returns_union=unavailable")
+    print("factor_returns_finite_leaves=no")
+    print("non_fr_exact_vs_before=pass")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="IC1CFR stopgap §G freeze")
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -668,13 +1086,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.after_default:
-        raise NotImplementedError(
-            "--after-default is Phase 1 (B1); implement after default-off + sanitizer"
-        )
+        return freeze_after_default()
     if args.after_explicit:
-        raise NotImplementedError(
-            "--after-explicit is Phase 1 (B1); implement after ModuleUnavailableError path"
-        )
+        return freeze_after_explicit()
     if args.check_nodeids:
         return check_nodeids()
     if args.before:
@@ -683,8 +1097,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except NotImplementedError as exc:
-        print(f"NotImplementedError: {exc}", file=sys.stderr)
-        raise SystemExit(2) from exc
+    raise SystemExit(main())

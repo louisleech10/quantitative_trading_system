@@ -19,7 +19,8 @@ class FeatureFilterConfig(BaseModel):
 
 
 class DeepAnalysisModules(BaseModel):
-    factor_return: bool = True
+    # IC1C-FR-STOPGAP: default-off(單數 factor_return;修復歸 1c-FR-FULL)
+    factor_return: bool = False
     factor_centrality: bool = True
     trend_analysis: bool = True
     parameter_sensitivity: bool = True
