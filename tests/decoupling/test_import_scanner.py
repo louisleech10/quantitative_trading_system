@@ -67,6 +67,15 @@ def _scan(
     )
 
 
+def _scan_service(tmp_path: Path, source: str, relative: str = "foo.py") -> scanner.ScanResult:
+    """建立可解析 repo-relative module 的隔離 service tree。"""
+    momentum_root, api_roots, manifest = _write_tree(tmp_path, "x = 1\n")
+    service_file = api_roots[0] / relative
+    service_file.parent.mkdir(parents=True, exist_ok=True)
+    service_file.write_text(source, encoding="utf-8")
+    return _scan(momentum_root, api_roots, manifest)
+
+
 def test_allowed_module_and_symbol_pass(tmp_path: Path) -> None:
     """矩陣①：精準 module+symbol 白名單通過。"""
     roots = _write_tree(tmp_path, "from momentum.B.util import ok_fn\n")
@@ -260,3 +269,176 @@ def test_rejected_stamp_verifier_fails_before_scanning(tmp_path: Path) -> None:
             manifest,
             stamp_verifier=lambda _: (False, "fixture rejected"),
         )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from api.services.bar import Service\n",
+        "import api.services.bar\n",
+        "from api.services import bar\n",
+        "from api import services\n",
+    ],
+)
+def test_r4_other_service_and_package_forms_are_rejected(
+    tmp_path: Path, source: str
+) -> None:
+    """R4 矩陣①-④：他 service 與兩種 package 聚合形式全紅。"""
+    result = _scan_service(tmp_path, source)
+    assert result.count("R4") == 1
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from api.routes.config import router\n",
+        "from api import routes\n",
+        "from ..routes import config\n",
+    ],
+)
+def test_r4_routes_absolute_aggregate_and_relative_are_rejected(
+    tmp_path: Path, source: str
+) -> None:
+    """R4 矩陣⑤-⑦：routes 絕對、聚合、相對三式全紅。"""
+    result = _scan_service(tmp_path, source)
+    assert result.count("R4") == 1
+
+
+@pytest.mark.parametrize(
+    "source",
+    ["from .bar import Service\n", "from . import bar\n"],
+)
+def test_r4_relative_service_forms_resolve_then_reject(
+    tmp_path: Path, source: str
+) -> None:
+    """R4 矩陣⑧-⑨：相對 import 先 resolve 再判紅。"""
+    result = _scan_service(tmp_path, source)
+    assert result.count("R4") == 1
+    assert result.violations[0].target == "api.services.bar"
+
+
+def test_r4_nested_same_basename_is_not_self(tmp_path: Path) -> None:
+    """R4 矩陣⑩：nested foo 不得用 basename 誤豁免頂層 foo。"""
+    result = _scan_service(
+        tmp_path,
+        "from api.services.foo import Service\n",
+        relative="sub/foo.py",
+    )
+    assert result.count("R4") == 1
+
+
+def test_r4_init_has_no_special_exemption(tmp_path: Path) -> None:
+    """R4 矩陣⑪：services/__init__.py 沒有 package 特權。"""
+    result = _scan_service(
+        tmp_path,
+        "from api.services.foo import Service\n",
+        relative="__init__.py",
+    )
+    assert result.count("R4") == 1
+
+
+def test_r4_init_package_import_is_still_rejected(tmp_path: Path) -> None:
+    """R4 矩陣⑪b：__init__ 內 import api.services 仍屬 package-level 紅。"""
+    result = _scan_service(tmp_path, "import api.services\n", relative="__init__.py")
+    assert result.count("R4") == 1
+
+
+def test_r4_exact_absolute_self_is_only_self_exemption(tmp_path: Path) -> None:
+    """R4 矩陣⑫：絕對完整 module 精確等值的 self from/import 綠。"""
+    result = _scan_service(
+        tmp_path,
+        "from api.services.foo import Service\nimport api.services.foo\n",
+    )
+    assert result.count("R4") == 0
+
+
+def test_r4_package_level_self_spelling_is_still_rejected(tmp_path: Path) -> None:
+    """R4 矩陣⑬：from api.services import foo 即使在 foo.py 仍紅。"""
+    result = _scan_service(tmp_path, "from api.services import foo\n")
+    assert result.count("R4") == 1
+
+
+def test_r4_api_models_import_is_green(tmp_path: Path) -> None:
+    """R4 矩陣⑭：非禁止面的 api.models import 綠。"""
+    result = _scan_service(tmp_path, "import api.models.case_models\n")
+    assert result.count("R4") == 0
+
+
+def test_r4_multi_alias_and_semicolon_are_all_scanned(tmp_path: Path) -> None:
+    """R4 矩陣⑮：多 alias/分號行不漏掃。"""
+    result = _scan_service(
+        tmp_path,
+        "import api.models.case_models, api.services.bar; import api.routes.config\n",
+    )
+    assert result.count("R4") == 2
+
+
+def test_r4_type_checking_import_is_rejected(tmp_path: Path) -> None:
+    """R4 TYPE_CHECKING 獨立測：條件式型別 import 仍是依賴。"""
+    result = _scan_service(
+        tmp_path,
+        "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from .bar import Service\n",
+    )
+    assert result.count("R4") == 1
+
+
+def test_r4_overlevel_relative_import_resolves_before_check(tmp_path: Path) -> None:
+    """R4 邊界：越層 from ...api import services resolve 後仍紅。"""
+    result = _scan_service(tmp_path, "from ...api import services\n")
+    assert result.count("R4") == 1
+
+
+def _scan_model(
+    tmp_path: Path,
+    source: str,
+    rows: Iterable[tuple[str, str, str, str, str]] | None = None,
+) -> scanner.ScanResult:
+    """建立含 api/models root 的 R3 隔離樹。"""
+    momentum_root, api_roots, manifest = _write_tree(tmp_path, "x = 1\n", rows=rows)
+    models_root = tmp_path / "api" / "models"
+    models_root.mkdir(parents=True)
+    (models_root / "model.py").write_text(source, encoding="utf-8")
+    return _scan(momentum_root, [*api_roots, models_root], manifest)
+
+
+def test_r3_models_non_allowlisted_momentum_import_is_rejected(tmp_path: Path) -> None:
+    """R3 models 矩陣①：未白名單的 momentum concrete import 紅。"""
+    result = _scan_model(
+        tmp_path,
+        "from momentum.FeatureEngineering.feature_library import FeatureLibrary\n",
+    )
+    assert result.count("R3") == 1
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from momentum.core.config import FeatureConfig\n",
+        "from momentum.factories import create_feature_factory\n",
+    ],
+)
+def test_r3_models_core_and_factories_imports_are_green(
+    tmp_path: Path, source: str
+) -> None:
+    """R3 models 矩陣②-③：canonical core/factories 邊界維持綠。"""
+    result = _scan_model(tmp_path, source)
+    assert result.count("R3") == 0
+
+
+def test_r3_models_supported_timeframes_precise_symbol_is_allowed(tmp_path: Path) -> None:
+    """R3 models 矩陣④：SUPPORTED_TIMEFRAMES 僅精準 symbol 放行。"""
+    rows = [
+        (
+            "momentum.FeatureEngineering.feature_config",
+            "SUPPORTED_TIMEFRAMES",
+            "deny",
+            "committee/DECOUPLE-SCAN2",
+            "fixture contract",
+        )
+    ]
+    result = _scan_model(
+        tmp_path,
+        "from momentum.FeatureEngineering.feature_config import SUPPORTED_TIMEFRAMES\n",
+        rows=rows,
+    )
+    assert result.count("R3") == 0

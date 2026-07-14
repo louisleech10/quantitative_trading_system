@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""以 AST 檢查 canonical Rule 2 / Rule 3 的具體 import。"""
+"""以 AST 檢查 canonical Rule 2 / Rule 3 / Rule 4 的具體 import。"""
 
 from __future__ import annotations
 
@@ -196,6 +196,82 @@ def _target_domain(module: str) -> str | None:
     return parts[1] if len(parts) > 1 and parts[0] == "momentum" else None
 
 
+def _source_module(path: Path, repo_root: Path) -> tuple[str, bool]:
+    """以 repo-relative path 算出完整 source module 與 package 身分。"""
+    try:
+        relative = path.relative_to(repo_root)
+    except ValueError as exc:
+        raise ScannerError(f"R4 source 不在 repo root 下: {path}") from exc
+    parts = list(relative.with_suffix("").parts)
+    is_package = bool(parts and parts[-1] == "__init__")
+    if is_package:
+        parts.pop()
+    if not parts:
+        raise ScannerError(f"R4 source module 無法解析: {path}")
+    return ".".join(parts), is_package
+
+
+def _resolve_relative_module(
+    node: ast.ImportFrom,
+    source_module: str,
+    source_is_package: bool,
+) -> str:
+    """依 Python package 語意先把相對 ImportFrom resolve 成絕對 module。"""
+    if node.level == 0:
+        return node.module or ""
+    package = source_module if source_is_package else source_module.rpartition(".")[0]
+    parts = package.split(".") if package else []
+    ascend = node.level - 1
+    if ascend > len(parts):
+        base_parts: list[str] = []
+    elif ascend:
+        base_parts = parts[:-ascend]
+    else:
+        base_parts = parts
+    if node.module:
+        base_parts.extend(node.module.split("."))
+    return ".".join(base_parts)
+
+
+def _is_r4_module(module: str) -> bool:
+    """判斷目標是否落在 R4 的 services/routes 禁止面。"""
+    return module == "api.services" or module.startswith("api.services.") or (
+        module == "api.routes" or module.startswith("api.routes.")
+    )
+
+
+def _scan_r4_file(path: Path, repo_root: Path) -> list[Violation]:
+    """掃描單一 service；相對 import 必先 resolve，self 僅精確 module 等值。"""
+    source_module, source_is_package = _source_module(path, repo_root)
+    violations: list[Violation] = []
+    for node in ast.walk(_parse(path)):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                package_level = alias.name in {"api.services", "api.routes"}
+                if _is_r4_module(alias.name) and (
+                    package_level or alias.name != source_module
+                ):
+                    violations.append(Violation(path, node.lineno, "R4", "import", alias.name))
+            continue
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        base = _resolve_relative_module(node, source_module, source_is_package)
+        for alias in node.names:
+            package_level = base in {"api", "api.services", "api.routes"}
+            if base == "api" and alias.name in {"services", "routes"}:
+                target = f"api.{alias.name}"
+            elif base in {"api.services", "api.routes"}:
+                target = f"{base}.{alias.name}"
+            else:
+                target = base
+            if not _is_r4_module(target):
+                continue
+            if not package_level and target == source_module:
+                continue
+            violations.append(Violation(path, node.lineno, "R4", "from", target))
+    return violations
+
+
 def _scan_file(
     path: Path,
     rule: str,
@@ -222,8 +298,9 @@ def scan(
     api_roots: Sequence[Path],
     manifest_path: Path,
     stamp_verifier: StampVerifier = verify_manifest_stamp,
+    service_root: Path | None = None,
 ) -> ScanResult:
-    """掃描 R2/R3；測試可在函式層注入 verifier，CLI 永遠使用真 verifier。"""
+    """掃描 R2/R3/R4；測試可在函式層注入 verifier，CLI 永遠用真 verifier。"""
     ok, message = stamp_verifier(manifest_path)
     if not ok:
         raise ScannerError(f"戳記驗證失敗: {message or manifest_path}")
@@ -235,6 +312,15 @@ def scan(
             violations.extend(_scan_file(path, "R2", entries, domain))
     for path in _python_files(api_roots):
         violations.extend(_scan_file(path, "R3", entries))
+    if service_root is None:
+        service_root = next(
+            (root for root in api_roots if root.name == "services" and root.parent.name == "api"),
+            None,
+        )
+    if service_root is not None:
+        repo_root = momentum_root.parent
+        for path in _python_files([service_root]):
+            violations.extend(_scan_r4_file(path, repo_root))
     return ScanResult(tuple(sorted(violations, key=lambda item: (str(item.path), item.line, item.target))))
 
 
@@ -246,15 +332,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         result = scan(
             repo_root / "momentum",
-            [repo_root / "api" / name for name in ("services", "routes", "websocket")],
+            [
+                repo_root / "api" / name
+                for name in ("services", "routes", "websocket", "models")
+            ],
             repo_root / "scripts" / "decouple_allowlist.md",
+            service_root=repo_root / "api" / "services",
         )
     except ScannerError as exc:
         print(f"DECOUPLING IMPORT SCANNER ERROR: {exc}", file=sys.stderr)
         return 1
     for violation in result.violations:
         print(violation.render())
-    print(f"R2={result.count('R2')} R3={result.count('R3')}")
+    print(f"R2={result.count('R2')} R3={result.count('R3')} R4={result.count('R4')}")
     return 1 if result.violations else 0
 
 

@@ -40,37 +40,18 @@ else
 fi
 echo ""
 
-# ── Rule 2/3: AST scanner + stamped precise allowlist ─────────
+# ── Rule 2/3/4: AST scanner + stamped precise allowlist ───────
 PYTHON_BIN="venv/bin/python"
 [ -x "$PYTHON_BIN" ] || PYTHON_BIN="python3"
 if R23_OUTPUT=$("$PYTHON_BIN" scripts/check_decoupling_imports.py 2>&1); then
   echo -e "${GREEN}✅ Rule 2 PASS${NC}: no unapproved cross-domain concrete imports in momentum/"
   echo -e "${GREEN}✅ Rule 3 PASS${NC}: api/ concrete imports conform to the stamped allowlist"
+  echo -e "${GREEN}✅ Rule 4 PASS${NC}: no service-to-service or service-to-route imports"
   echo "$R23_OUTPUT"
 else
-  echo -e "${RED}❌ Rule 2/3 FAIL${NC}: AST import scanner rejected the tree or manifest"
+  echo -e "${RED}❌ Rule 2/3/4 FAIL${NC}: AST import scanner rejected the tree or manifest"
   echo "$R23_OUTPUT"
   FAIL=1
-fi
-echo ""
-
-# ── Rule 4: api/services/ must not import each other or routes ─
-# Zero tolerance: catch both top-level and lazy (indented) imports
-# Filter out comments: lines where the import is inside a # comment
-R4_SVC=$(grep -rn --include='*.py' 'from api\.services\.' api/services/ \
-  | grep -v '__pycache__' \
-  | grep -v '#.*from api\.services\.' || true)
-R4_ROUTES=$(grep -rn --include='*.py' 'from api\.routes\.' api/services/ \
-  | grep -v '__pycache__' \
-  | grep -v '#.*from api\.routes\.' || true)
-R4_ALL=$(printf '%s\n%s' "$R4_SVC" "$R4_ROUTES" | grep -v '^$' || true)
-R4_COUNT=$([ -z "$R4_ALL" ] && echo 0 || echo "$R4_ALL" | wc -l | tr -d ' ')
-if [ "$R4_COUNT" -gt 0 ]; then
-  echo -e "${RED}❌ Rule 4 FAIL${NC}: service cross-imports ($R4_COUNT violations)"
-  echo "$R4_ALL"
-  FAIL=1
-else
-  echo -e "${GREEN}✅ Rule 4 PASS${NC}: no service-to-service imports"
 fi
 echo ""
 
