@@ -18,9 +18,8 @@
 | momentum.Strategy.performance_metrics | PerformanceMetrics | deny | pending/DECOUPLE-TRIAGE-2 | 舊 scanner 盲區既存依賴，暫豁免維持現狀；真偽 triage 另立票 |
 | momentum.Analysis.strategy_registry | strategy_registry | deny | pending/DECOUPLE-TRIAGE-2 | 舊 scanner 盲區既存依賴，暫豁免維持現狀；真偽 triage 另立票 |
 | momentum.Analysis.pareto_analyzer | ParetoAnalyzer | deny | pending/DECOUPLE-TRIAGE-2 | 舊 scanner 盲區既存依賴，暫豁免維持現狀；真偽 triage 另立票 |
+| momentum.FeatureEngineering.feature_config | SUPPORTED_TIMEFRAMES | deny | committee/DECOUPLE-SCAN2 | 行為凍結 timeframe 驗證常數；relocate-to-core-constants P3（codex 少數意見）；重複副本債另記 |
 
 ## 戳記
 
 <!-- v2 格式：RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<body-hash> task:<task-id> — <理由> -->
-RECONCILE-STAMP: composer APPROVED 2026-07-14 sha256:ddd5fb355be78a4152127cacdb3392acd9498bd4fb077c5b8217fd933d24105d task:DECOUPLE-ALLOWLIST — FF 六條與 RECONCILE §C-2/C-3 一致且 feature_library 禁入；symbol 集 grep 抽驗吻合 15 筆 baseline；pending 三筆 Optimization 縮排盲區既存依賴暫豁免，follow-up DECOUPLE-TRIAGE-2。
-RECONCILE-STAMP: codex APPROVED 2026-07-14 sha256:ddd5fb355be78a4152127cacdb3392acd9498bd4fb077c5b8217fd933d24105d task:DECOUPLE-ALLOWLIST — ROADMAP 已核可並正式登記 DECOUPLE-TRIAGE-2：pending 三筆、api/models 掃描缺口及退場條件（委員會 triage 後轉正豁免或改 protocol/factory）均已明列。
