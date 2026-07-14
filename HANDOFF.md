@@ -13,7 +13,8 @@
 - pytest collect 副作用 `tests/golden/l65/test_inventory.txt` 每次 revert;全套件既有紅(~44f/32e)非本票。
 
 ## ▶ 下一步
-1. **1c-FR 票**(canonical time-aligned factor-portfolio return series:修 ls_returns reset_index 錯位/模組資料通道/breakeven·profitable 實值/持有期矩陣/rank_corr 恢復;RISK-HIT a,d 大,完整管線)——排序待使用者定(原排序=1d attribution→1f 空圖)。
+1. **1c-FR 委員會+使用者定案(2026-07-14)**:codex 事實核查推翻「無消費者」(factor_return 錯位序列預設 enabled+reporter:581-588+前端 page.tsx:800 展示中);裁決=①**IC1C-FR-STOPGAP 立即做**(fail-close 錯位輸出,中型,進行中)②**IC1C-FR-FULL=1d 之後近期排入**;審計 handoffs/20260714-IC1CFR-NECESSITY-*+RECONCILE。
+2. 排序:STOPGAP→1d attribution→**1c-FR-FULL**→1f 空圖→實測→AI Agent。
 2. 1d attribution 正名+NaN fail-closed(中/大)→1f 空圖 schema(小-中)→實測→AI Agent。
 3. 小債:API_SPECIFICATION 行尾空白(codex NB)/serial redirect ERROR 歸屬(單獨跑綠)。
 
