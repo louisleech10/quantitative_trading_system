@@ -1,22 +1,16 @@
 # Handoff
-**Agent**: Claude(Fable 5) | **Time**: 2026-07-14 上午 | **Branch**: main
+**Agent**: Claude(Fable 5) | **Time**: 2026-07-14 下午 | **Branch**: main
 
-## ✅ 本 session 完成:解耦三段全落地(triage→修復→白名單機制→P3 整理)
-1. **DECOUPLE-TRIAGE**(四家委員會+reconcile 雙 v2 戳記):18 筆裁決=13 白名單/1 修後豁免/3 真違規;R3-10 揭發為現行 bug。
-2. **DECOUPLE-FIX4**(4 commits 6c5ed66..1bd9021):R3-10 path-first+釘 config_hash/R3-9 factory/R4-1 必填注入/R2-4 去 private;G1 修前後 4 類 sha256 等值+G2 三場景+M1-M4 mutation;Composer+Grok 雙 PASS。
-3. **DECOUPLE-ALLOWLIST**(4 commits 7bd3d60..a45284f):R2/R3 改 **AST 掃描器**+manifest 白名單(module+symbol+owner+contract,**戳記機檢 fail-closed**,CLI 無 bypass)+31 regression tests;AST 揭露 Optimization 5 筆舊盲區→pending 表暫豁免(委員戳記裁決);篡改一字→scanner 紅 實證;`check_decoupling.sh` **ALL RULES PASS**。
-4. **DECOUPLE-P3**(3 commits 160aa77/c2fd04b/cb783cf):route hardware 下沉/hardware_utils 正名/`_registry` façade;零行為變更(golden JSON+AST dump 等值+轉發 mock);兩家雙 PASS。
-- 全程 SPEC/TODO 三家對抗審(FIX4 走 r2、ALLOWLIST 走 r4、P3 走 r3 才收斂),閉合重驗+處置檔雙戳記皆機檢 PASS;審計鏈在 handoffs/DECOUPLE-*。
+## 🔄 進行中:1c Net IC 量綱正確化(大,RISK-HIT a,b,d,完整管線)
+1. **SPEC v1.0 Frozen**(docs/IC1C_NETIC_SPEC.md):五輪三家 adversarial(r1 17B→r5 0B)全閉合;RECONCILE 戳記機檢 PASS(codex/composer/grok,body sha256:ab910286)。裁決=**B-strict**:禁相關係數減報酬率;`net_ic` 鍵全樹禁止;canonical 因子報酬序列拆票 **1c-FR**(codex 實證 `ls_returns` reset_index 位置相減錯位),1c 內 net_factor_return/breakeven/profitable 一律 unavailable+reason;成本公式**去 ×2**(quantile_turnover 已含雙腿);§U 三 profile 鍵集合+discriminated union;cost_bps 域 (0,1000] 三層 fail-closed(0 非法);審計鏈 handoffs/20260714-IC1C-SPECREV-*。
+2. **TODO r6 Frozen(2026-07-14)**:六輪三家 adversarial(15B→0;grok r3/composer r5/codex r6 APPROVE);RECONCILE-STAMP 機檢 PASS(body 936daabc);SPEC 同步補 v1.1(負 turnover→SKIPPED 禁 clamp,三家核可)。receipt=handoffs/IC1C-GOVERNANCE-RECEIPT.md。
+3. **下一步:B0 派工 Grok**(baseline 凍結,workspace 沙箱)→B1(核心+momentum 消費點)→B2(全棧接線)→B3(UI 註記);每批 Codex+Composer 審查,Gate 命令在 TODO §B;派工進度 10 分鐘回報。
 
-## 📌 慣例注意
-- pytest collect 副作用檔 `tests/golden/l65/test_inventory.txt` 每次 revert(既有慣例)。
-- 全套件既有紅=~50 failed/171 errors(redirect/label-horizon/registry fixture 等,composer parent-worktree 對照證實非本 session 引入)。
-- commit 訊息 operational claim 需 VERIFY:<receipt 檔> backing(hook 強制)。
-
-## ▶ 下一步(使用者 2026-07-14 定)
-1. **1c Net IC 量綱**(大,正確性紅線,net_ic_analyzer.py:34 相關係數減報酬率;**使用者參數已訪談(2026-07-14,入 ROADMAP 1c 節)**:成本=前端輸入+啟用勾選(禁寫死,全棧接線)/timeframe 情境掃描/capacity 低優先;分工=**Grok 實作/Codex+Composer 審查**(2026-07-14 三調,ORCH §1))。
-2. **DECOUPLE-SCAN2 已完成(2026-07-14)**:R4 AST 接管+api/models 掃描根+2 筆 triage(刪死 import/白名單 1 條);manifest 10 條重戳 PASS;55 tests;殘餘=pending 3 筆綁 Optuna epic 退場(使用者裁定)+relocate-to-core-constants P3+timeframe 重複副本債。
-3. 後續:1d attribution→1f 空圖→實測→AI Agent(原排序)。
+## 📌 慣例/本 session 新裁定
+- **Grok 審查輪改用 `--sandbox workspace` 直接寫產出檔**(2026-07-14 使用者質疑唯讀限制後改制,記憶已更新);read-only 只留純諮詢。
+- RECONCILE 戳記須 v2 格式:`## 戳記` 區段+`RECONCILE-STAMP: <family> APPROVED <date> sha256:<body-hash> task:<id>`,委員自算 hash;grok 家族用 check 腳本第二參數納入。
+- pytest collect 副作用檔 `tests/golden/l65/test_inventory.txt` 每次 revert;全套件既有紅 ~50 failed/171 errors(非本 session 引入)。
+- commit 訊息 operational claim 需 VERIFY:<receipt>(hook 強制)。
 
 ## ⚠️ 未 commit
-handoffs/ 審計鏈(本地留審計依慣例);SPEC/TODO+ROADMAP/HANDOFF 已 commit,**12 commits 已 push**(5bf64aa..3cdf216,依「commit 後直接 push」鐵律)。
+docs/IC1C_NETIC_{SPEC,TODO}.md+handoffs/ 審計鏈全未 commit(待 TODO Frozen 後與 ROADMAP/HANDOFF 一併 commit+push)。
