@@ -14,7 +14,7 @@
 - commit 訊息 operational claim 需 VERIFY:<receipt 檔> backing(hook 強制)。
 
 ## ▶ 下一步(使用者 2026-07-14 定)
-1. **1c Net IC 量綱**(大,正確性紅線,net_ic_analyzer.py:34 相關係數減報酬率;**走邊做邊與使用者討論參數**,使用者明示此票多處需其輸入;分工=**Grok 實作/Codex+Composer 審查**(2026-07-14 三調,ORCH §1))。
+1. **1c Net IC 量綱**(大,正確性紅線,net_ic_analyzer.py:34 相關係數減報酬率;**使用者參數已訪談(2026-07-14,入 ROADMAP 1c 節)**:成本=前端輸入+啟用勾選(禁寫死,全棧接線)/timeframe 情境掃描/capacity 低優先;分工=**Grok 實作/Codex+Composer 審查**(2026-07-14 三調,ORCH §1))。
 2. **DECOUPLE-SCAN2 已完成(2026-07-14)**:R4 AST 接管+api/models 掃描根+2 筆 triage(刪死 import/白名單 1 條);manifest 10 條重戳 PASS;55 tests;殘餘=pending 3 筆綁 Optuna epic 退場(使用者裁定)+relocate-to-core-constants P3+timeframe 重複副本債。
 3. 後續:1d attribution→1f 空圖→實測→AI Agent(原排序)。
 
