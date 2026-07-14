@@ -1,22 +1,22 @@
 # Handoff
-**Agent**: Claude(Fable 5) | **Time**: 2026-07-14 晚 | **Branch**: main
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-15 | **Branch**: main
 
-## ✅ 本 session 完成:1c Net IC 量綱正確化全程落地(治理+實作四批)
-1. **治理**:SPEC v1.1(五輪三家 adversarial 17B→0)+TODO r7b(六輪 15B→0+實作期三次 Frozen 修訂皆委員核可);雙 RECONCILE-STAMP v2 機檢 PASS;裁決=**B-strict**(禁 IC 減報酬率/net_ic 鍵全樹禁絕/成本去 ×2/canonical 因子報酬序列拆票 **1c-FR**,期間 breakeven/profitable=unavailable union)。
-2. **實作 B0-B3 四 commits**(f1d85c5/2133c77/04ac6fb/77af3d3,全 push):B0 G-OLD 凍結;B1 核心修復(59 tests+9 mutation probe+G-NEW allowlist golden);B2 全棧接線(API typed 422 雙 override 封死/前端成本輸入/TS discriminated union/G-NEW2 API 傳導 golden+離線可重現);B3 UI 語意註記+API 文件。每批 Claude 獨立實跑 Gate+雙審 APPROVE;B1 一輪退修、B2 兩輪退修+**斷路器換手 composer**(同號 predicate);receipts=handoffs/IC1C-B{0,1,2,3}-RECEIPT.md。
-3. 使用者訪談三決策全落地:成本前端輸入+勾選(5bps 寫死三處拔除)/per-rebalance 語意禁年化/capacity 標 uncalibrated。
+## ✅ 本 session 完成:1c Net IC 量綱正確化 + 1c-FR 止血票(兩票全完工)
+1. **1c(B-strict)**:治理(SPEC 五輪+TODO 六輪三家 adversarial)+實作 B0-B3 四批(f1d85c5/2133c77/04ac6fb/77af3d3)。禁 IC 減報酬率/`net_ic` 鍵全樹禁絕/成本去 ×2/成本前端輸入 fail-closed(5bps 寫死三處拔除)/per-rebalance 語意註記。
+2. **1c-FR-STOPGAP(錯位因子報酬輸出止血)**:四方委員會揭「無消費者」前提不成立(錯位 ls_returns 預設 enabled+活在 UI)→使用者裁定立即止血。治理(SPEC 四輪+TODO 三輪)+實作 B0-B2 三批(8be3056/41c26e0/81724c7)。**default-off 三態契約**(預設 not_run 無節/顯式開啟回 §U unavailable union/deep 關 not_run)+**統一收斂 sanitizer**(public run_deep_analysis 最終 return 前+cache 寫入前;codex 三輪實證揪出 save_report/cache-hit/cache force-merge 三條洩漏路徑)+AST consumer guard+前端兩圖三態下架。
+3. codex 貢獻最大:實跑注入 legacy payload 證明洩漏(0.42)、實跑我的 gate 命令發現零測試假綠、代驗 resolved 33 為真修復。
 
 ## 📌 慣例/新裁定
-- Grok 審查/實作輪一律 `--sandbox workspace` 直接寫檔(2026-07-14 使用者質疑後改制,記憶已更新)。
-- RECONCILE 戳記 v2:`## 戳記` 區段+body-hash+task:<id>,委員自算;grok 家族用 check 第二參數。
-- tests/conftest.py 全域 stub Binance ping=r7 離線鐵則 enabler(雙審核可)。
-- pytest collect 副作用 `tests/golden/l65/test_inventory.txt` 每次 revert;全套件既有紅(~44f/32e)非本票。
+- Grok 審查/實作一律 `--sandbox workspace` 直接寫檔;grok 家族入 reconcile_stamps_check 第二參數。
+- pytest collect 副作用 `tests/golden/l65/test_inventory.txt` 每次 revert。
+- 全套件 baseline nodeids=77(B0 凍結),B2 後 current=44/new_failures=0/resolved=33。
+- `--check-nodeids` 為 fail-closed 機械 gate(pytest 崩潰/中斷→exit 1,不得空集合假綠)。
 
 ## ▶ 下一步
-1. **1c-FR 委員會+使用者定案(2026-07-14)**:codex 事實核查推翻「無消費者」(factor_return 錯位序列預設 enabled+reporter:581-588+前端 page.tsx:800 展示中);裁決=①**IC1C-FR-STOPGAP 立即做**(fail-close 錯位輸出,中型,進行中)②**IC1C-FR-FULL=1d 之後近期排入**;審計 handoffs/20260714-IC1CFR-NECESSITY-*+RECONCILE。
-2. 排序:STOPGAP→1d attribution→**1c-FR-FULL**→1f 空圖→實測→AI Agent。
-2. 1d attribution 正名+NaN fail-closed(中/大)→1f 空圖 schema(小-中)→實測→AI Agent。
-3. 小債:API_SPECIFICATION 行尾空白(codex NB)/serial redirect ERROR 歸屬(單獨跑綠)。
+1. **1d attribution 正名+NaN fail-closed**(中/大;原排序下一站)。
+2. **1c-FR-FULL**(canonical timestamp-aligned factor-portfolio return series 重建;修 ls_returns reset_index 錯位+模組資料通道+breakeven/profitable 實值)——使用者定=**1d 之後近期排入**。
+3. 1f 空圖 schema→實測→AI Agent。
+4. 小債:API_SPECIFICATION 行尾空白;long_short_analysis irregular-subset Sharpe 語意另票候選。
 
 ## ⚠️ 未 commit
-無(審計鏈+baseline 全入版)。
+無。
