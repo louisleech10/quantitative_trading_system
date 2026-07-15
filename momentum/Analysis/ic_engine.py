@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy import optimize, stats
 
+from momentum.Analysis.pit_stats import rolling_window_rank_corr
 from momentum.FeatureEngineering.consumer_gate import (
     assert_consumer_run_status,
     effective_run_status,
@@ -274,7 +275,12 @@ class ICEngine:
         stride: int = 1,
         method: str = "spearman",
     ) -> dict[str, dict]:
-        """Rolling IC 時間序列."""
+        """Rolling IC 時間序列.
+
+        spearman：每窗內 rank + batch corr（PIT，見 ``pit_stats.rolling_window_rank_corr``）。
+        pearson / 其他：raw 值 rolling pearson（行為不變）。
+        輸出 list 長度 = emitted window-ends（window-1, window-1+stride, ...）。
+        """
 
         label_name = label.name or "label"
         aligned = pd.concat(
@@ -286,18 +292,21 @@ class ICEngine:
         adjusted_windows = self._adjust_rolling_windows(windows)
         results: dict[str, dict] = {name: {} for name in features_df.columns}
 
-        if method == "spearman":
-            ranked_features = aligned[features_df.columns].rank(axis=0, method="average")
-            ranked_label = aligned[label_name].rank(method="average")
-            x_values = ranked_features.to_numpy(dtype=float)
-            y_values = ranked_label.to_numpy(dtype=float)
-        else:
-            x_values = aligned[features_df.columns].to_numpy(dtype=float)
-            y_values = aligned[label_name].to_numpy(dtype=float)
+        # raw values — spearman 不再全序列 pre-rank（P0-1 look-ahead 修正）
+        x_values = aligned[features_df.columns].to_numpy(dtype=float)
+        y_values = aligned[label_name].to_numpy(dtype=float)
 
         for window in adjusted_windows:
             window_key = f"window_{window}"
-            corr_matrix = self._rolling_corr_matrix(x_values, y_values, window, stride)
+            if method == "spearman":
+                corr_matrix = rolling_window_rank_corr(
+                    x_values, y_values, window=int(window), stride=int(stride)
+                )
+            else:
+                # pearson（及 non-spearman）：維持 raw rolling pearson
+                corr_matrix = self._rolling_corr_matrix(
+                    x_values, y_values, window, stride
+                )
             for idx, feature in enumerate(features_df.columns):
                 results[feature][window_key] = corr_matrix[:, idx].tolist()
         return results
