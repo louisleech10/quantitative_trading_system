@@ -13574,3 +13574,3967 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCDRIFT-STUDY-grok.md", "output_sha256": "548271ff275b6ffdbd8d9b72372f1634f9f64e600bb37f5efc8172338285883f", "task_id": "docdrift-study-grok", "ts": "2026-07-12T11:43:18Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCDRIFT-STUDY-codex.md", "output_sha256": "fac1a757209497f7453010aac89cc18df6a9e29bcf76665a7dc61913b88b7f32", "task_id": "docdrift-study-codex", "ts": "2026-07-12T11:43:18Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCDRIFT-STUDY-composer.md", "output_sha256": "6d92bbdb49b8d7844f6ca38996cb48d0ca2bb0fd8bbac05e10b6ba28f579fc6e", "task_id": "docdrift-study-composer", "ts": "2026-07-12T11:43:18Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docdrift-review", "ts": "2026-07-12T12:31:16Z"}
+=== 2026-07-12 20:31:16 | dispatch ===
+  ts=2026-07-12 20:31:16
+  kind=dispatch
+  intent=code review DOCDRIFT D1+D2 doc governance diff (read-only)
+  risk=low
+  facts_asked=diff faithful? residual false-green? self-contradiction? pointer stability?
+  review_role=codex+composer adversarial doc review
+  template=n/a: pure doc governance review, brief=handoffs/DOCDRIFT-D1D2-REVIEW-BRIEF.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docdrift-review", "ts": "2026-07-12T12:40:23Z"}
+=== 2026-07-12 20:40:23 | dispatch ===
+  ts=2026-07-12 20:40:23
+  kind=dispatch
+  intent=closure re-verify DOCDRIFT D1+D2 fixes after BLOCK
+  risk=low
+  facts_asked=are all BLOCKING findings truly closed?
+  review_role=codex closure re-review
+  template=n/a: closure re-review of prior BLOCK findings
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docdrift-simplify", "ts": "2026-07-12T12:49:03Z"}
+=== 2026-07-12 20:49:03 | dispatch ===
+  ts=2026-07-12 20:49:03
+  kind=dispatch
+  intent=committee research review of doc simplification proposal (read-only)
+  risk=low
+  facts_asked=line estimates realistic? move-vs-delete boundary? simplification ROI? anchor preservation?
+  review_role=codex+composer research committee
+  template=n/a: research proposal review, chair version=handoffs/DOCDRIFT-SIMPLIFY-STUDY-claude.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docdrift-simplify", "ts": "2026-07-12T12:52:45Z"}
+=== 2026-07-12 20:52:45 | dispatch ===
+  ts=2026-07-12 20:52:45
+  kind=dispatch
+  intent=re-run codex simplification research (prior -o overwrote report)
+  risk=low
+  facts_asked=line estimates? move-vs-delete? ROI? anchors?
+  review_role=codex research committee (2nd family)
+  template=n/a: research review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-12 21:16:30 | artifact ===
+  ts=2026-07-12 21:16:30
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DOCSIMPLIFY_BATCHA_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=中/RISK-HIT:b; §A=待確認:無(研究已定案 reconcile); §C=filled; §G=N/A:非數值/ML(純文件治理); §P=5 Task; §V=filled(anchor grep 驗收腳本); §R=filled; §N=§G N/A理由
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a", "ts": "2026-07-12T13:18:37Z"}
+=== 2026-07-12 21:18:37 | dispatch ===
+  ts=2026-07-12 21:18:37
+  kind=dispatch
+  intent=three-family adversarial review of batch-A doc-simplify SPEC (read-only)
+  risk=low
+  facts_asked=gaps? unfalsifiable acceptance? missing per-段 classification? anchor/TGF risk? over/under scope?
+  review_role=codex+composer+grok adversarial SPEC review
+  template=n/a: SPEC adversarial review, spec=docs/DOCSIMPLIFY_BATCHA_SPEC.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-12T22:18:59Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a", "ts": "2026-07-12T22:19:06Z"}
+=== 2026-07-13 06:19:06 | dispatch ===
+  ts=2026-07-13 06:19:06
+  kind=dispatch
+  intent=three-family adversarial review of batch-A doc-simplify SPEC (read-only)
+  risk=low
+  facts_asked=gaps? unfalsifiable acceptance? missing classification? anchor/TGF risk? scope?
+  review_role=codex+composer+grok adversarial SPEC review
+  template=n/a: SPEC adversarial review, spec=docs/DOCSIMPLIFY_BATCHA_SPEC.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a", "ts": "2026-07-12T22:27:31Z"}
+=== 2026-07-13 06:27:31 | dispatch ===
+  ts=2026-07-13 06:27:31
+  kind=dispatch
+  intent=three-family closure re-verify of SPEC v2 + reconcile stamp
+  risk=low
+  facts_asked=are your prior BLOCKING findings closed in v2?
+  review_role=codex+composer+grok closure re-review
+  template=n/a: closure re-review, spec=docs/DOCSIMPLIFY_BATCHA_SPEC.md v2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a-stamp-codex", "ts": "2026-07-12T22:50:55Z"}
+=== 2026-07-13 06:50:55 | dispatch ===
+  ts=2026-07-13 06:50:55
+  kind=dispatch
+  intent=派 Codex 驗 DOCSIMPLIFY-A-RECONCILE 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed: reconcile 忠實度純由 SPEC/review 檔靜態比對
+  review_role=single-executor:n/a
+  template=n/a: reconcile stamp review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a-stamp-composer", "ts": "2026-07-12T22:52:08Z"}
+=== 2026-07-13 06:52:08 | dispatch ===
+  ts=2026-07-13 06:52:08
+  kind=dispatch
+  intent=派 composer 驗 DOCSIMPLIFY-A-RECONCILE 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed: reconcile 忠實度純由 SPEC/review 檔靜態比對
+  review_role=single-executor:composer
+  template=n/a: reconcile stamp review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a-stamp-grok", "ts": "2026-07-12T22:52:08Z"}
+=== 2026-07-13 06:52:08 | dispatch ===
+  ts=2026-07-13 06:52:08
+  kind=dispatch
+  intent=派 grok 驗 DOCSIMPLIFY-A-RECONCILE 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed: reconcile 忠實度純由 SPEC/review 檔靜態比對
+  review_role=single-executor:grok
+  template=n/a: reconcile stamp review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a-stamp-codex", "ts": "2026-07-12T22:57:30Z"}
+=== 2026-07-13 06:57:30 | dispatch ===
+  ts=2026-07-13 06:57:30
+  kind=dispatch
+  intent=重派 codex 驗 DOCSIMPLIFY-A-RECONCILE r2 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed: reconcile 忠實度純由 SPEC/review 檔靜態比對
+  review_role=single-executor:codex
+  template=n/a: reconcile stamp review r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a-stamp-composer", "ts": "2026-07-12T22:57:30Z"}
+=== 2026-07-13 06:57:30 | dispatch ===
+  ts=2026-07-13 06:57:30
+  kind=dispatch
+  intent=重派 composer 驗 DOCSIMPLIFY-A-RECONCILE r2 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed: reconcile 忠實度純由 SPEC/review 檔靜態比對
+  review_role=single-executor:composer
+  template=n/a: reconcile stamp review r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a-stamp-grok", "ts": "2026-07-12T22:57:30Z"}
+=== 2026-07-13 06:57:30 | dispatch ===
+  ts=2026-07-13 06:57:30
+  kind=dispatch
+  intent=重派 grok 驗 DOCSIMPLIFY-A-RECONCILE r2 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed: reconcile 忠實度純由 SPEC/review 檔靜態比對
+  review_role=single-executor:grok
+  template=n/a: reconcile stamp review r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCSIMPLIFY-A-RECONCILE.md", "output_sha256": "6fef5aad01fec6de809ba04cd8831f63a36cd4b522bacb1c07aca857806c1163", "task_id": "docsimplify-a-stamp-codex", "ts": "2026-07-12T23:00:13Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCSIMPLIFY-A-RECONCILE.md", "output_sha256": "6fef5aad01fec6de809ba04cd8831f63a36cd4b522bacb1c07aca857806c1163", "task_id": "docsimplify-a-stamp-composer", "ts": "2026-07-12T23:00:13Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCSIMPLIFY-A-RECONCILE.md", "output_sha256": "6fef5aad01fec6de809ba04cd8831f63a36cd4b522bacb1c07aca857806c1163", "task_id": "docsimplify-a-stamp-grok", "ts": "2026-07-12T23:00:13Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a00", "ts": "2026-07-12T23:03:00Z"}
+=== 2026-07-13 07:03:00 | dispatch ===
+  ts=2026-07-13 07:03:00
+  kind=dispatch
+  intent=派 Codex 執行 DOCSIMPLIFY A00 只讀 inventory 產 disposition manifest(不刪改既有 doc)
+  risk=low
+  facts_asked=none-needed: A00 只讀 ARCH/API_SPEC 靜態 inventory,無需使用者事實
+  review_role=committee review-lock:manifest 落地後 codex+composer+grok 三家 review-lock;實作端不自審
+  template=n/a: A00 只讀 inventory/manifest 產出(review-lock 前置,非 code 編輯 TODO);SPEC 已三家 stamp
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHA_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a00-lock-codex", "ts": "2026-07-12T23:13:16Z"}
+=== 2026-07-13 07:13:16 | dispatch ===
+  ts=2026-07-13 07:13:16
+  kind=dispatch
+  intent=派 codex review-lock A00 disposition manifest(刪除授權關卡)
+  risk=low
+  facts_asked=none-needed: manifest 審查純靜態比對 ARCH 原文
+  review_role=single-executor:codex
+  template=n/a: manifest review-lock 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a00-lock-composer", "ts": "2026-07-12T23:13:16Z"}
+=== 2026-07-13 07:13:16 | dispatch ===
+  ts=2026-07-13 07:13:16
+  kind=dispatch
+  intent=派 composer review-lock A00 disposition manifest(刪除授權關卡)
+  risk=low
+  facts_asked=none-needed: manifest 審查純靜態比對 ARCH 原文
+  review_role=single-executor:composer
+  template=n/a: manifest review-lock 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a00-lock-grok", "ts": "2026-07-12T23:13:16Z"}
+=== 2026-07-13 07:13:16 | dispatch ===
+  ts=2026-07-13 07:13:16
+  kind=dispatch
+  intent=派 grok review-lock A00 disposition manifest(刪除授權關卡)
+  risk=low
+  facts_asked=none-needed: manifest 審查純靜態比對 ARCH 原文
+  review_role=single-executor:grok
+  template=n/a: manifest review-lock 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a00-r2", "ts": "2026-07-12T23:17:03Z"}
+=== 2026-07-13 07:17:03 | dispatch ===
+  ts=2026-07-13 07:17:03
+  kind=dispatch
+  intent=退修:派 Codex 修 A00 manifest r2(兩家 review-lock BLOCK 合併8項)
+  risk=low
+  facts_asked=none-needed: 修 manifest 依兩家審查檔 findings,無需使用者事實
+  review_role=committee closure:composer+grok 原提出方重跑同反例閉合驗證
+  template=n/a: manifest 退修,非 code TODO
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a00-close-composer", "ts": "2026-07-12T23:27:04Z"}
+=== 2026-07-13 07:27:04 | dispatch ===
+  ts=2026-07-13 07:27:04
+  kind=dispatch
+  intent=派 composer 閉合重驗 A00 manifest r2(原提出方重跑同反例)
+  risk=low
+  facts_asked=none-needed: 閉合重驗依原審查檔反例
+  review_role=single-executor:composer
+  template=n/a: manifest 閉合重驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a00-close-grok", "ts": "2026-07-12T23:27:04Z"}
+=== 2026-07-13 07:27:04 | dispatch ===
+  ts=2026-07-13 07:27:04
+  kind=dispatch
+  intent=派 grok 閉合重驗 A00 manifest r2(原提出方重跑同反例)
+  risk=low
+  facts_asked=none-needed: 閉合重驗依原審查檔反例
+  review_role=single-executor:grok
+  template=n/a: manifest 閉合重驗派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-A-RECONCILE.md", "output_sha256": "6fef5aad01fec6de809ba04cd8831f63a36cd4b522bacb1c07aca857806c1163", "task_id": "docsimplify-a01", "ts": "2026-07-12T23:32:20Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-A-RECONCILE.md", "output_sha256": "5d6ca6d5b5700bcc867f14919b713aed47f906f36a3c628cdd1221452e43b9c4", "task_id": "docsimplify-a01", "ts": "2026-07-12T23:33:20Z"}
+=== 2026-07-13 07:33:21 | dispatch ===
+  ts=2026-07-13 07:33:21
+  kind=dispatch
+  intent=派 Codex 實作 A0.1:ARCH 新建 Feature Factory 架構 H2(依 LOCKED manifest 留項,SPEC L65-69)
+  risk=high
+  facts_asked=none-needed: SPEC v2 已三家 stamp,manifest 已兩家 review-lock 閉合
+  review_role=實作=Codex;review=composer+grok(實作者不自審)
+  template=跟過:SPEC docs/DOCSIMPLIFY_BATCHA_SPEC.md v2 全錨點
+  adversarial=handoffs/DOCSIMPLIFY-A-RECONCILE.md
+  reconcile=handoffs/DOCSIMPLIFY-A-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHA_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a01-rev-composer", "ts": "2026-07-12T23:46:23Z"}
+=== 2026-07-13 07:46:23 | dispatch ===
+  ts=2026-07-13 07:46:23
+  kind=dispatch
+  intent=派 composer code review A0.1 ARCH FF H2 實作(實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed: review 依 SPEC/manifest/diff 靜態+實跑驗證
+  review_role=single-executor:composer
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a01-rev-grok", "ts": "2026-07-12T23:46:23Z"}
+=== 2026-07-13 07:46:23 | dispatch ===
+  ts=2026-07-13 07:46:23
+  kind=dispatch
+  intent=派 grok code review A0.1 ARCH FF H2 實作(實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed: review 依 SPEC/manifest/diff 靜態+實跑驗證
+  review_role=single-executor:grok
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a01-fix", "ts": "2026-07-12T23:50:38Z"}
+=== 2026-07-13 07:50:38 | dispatch ===
+  ts=2026-07-13 07:50:38
+  kind=dispatch
+  intent=退修:派 Codex 修 A0.1 新節 native-tf 契約句(兩家 BLOCK B1+主委實測確認)
+  risk=low
+  facts_asked=none-needed: 修法依實作+測試 receipt 三方收斂
+  review_role=committee closure:composer+grok 原提出方重驗
+  template=n/a: 單句退修
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a01-close-composer", "ts": "2026-07-12T23:51:29Z"}
+=== 2026-07-13 07:51:29 | dispatch ===
+  ts=2026-07-13 07:51:29
+  kind=dispatch
+  intent=派 composer 閉合重驗 A0.1 B1 native-tf 句修正
+  risk=low
+  facts_asked=none-needed: 閉合依原反例
+  review_role=single-executor:composer
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a01-close-grok", "ts": "2026-07-12T23:51:29Z"}
+=== 2026-07-13 07:51:29 | dispatch ===
+  ts=2026-07-13 07:51:29
+  kind=dispatch
+  intent=派 grok 閉合重驗 A0.1 B1 native-tf 句修正
+  risk=low
+  facts_asked=none-needed: 閉合依原反例
+  review_role=single-executor:grok
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-A-RECONCILE.md", "output_sha256": "5d6ca6d5b5700bcc867f14919b713aed47f906f36a3c628cdd1221452e43b9c4", "task_id": "docsimplify-a02", "ts": "2026-07-12T23:52:49Z"}
+=== 2026-07-13 07:52:50 | dispatch ===
+  ts=2026-07-13 07:52:50
+  kind=dispatch
+  intent=派 Codex 實作 A0.2:DEV rename 長任務 H2+同 commit 改 inbound+修 TGF 三列穩定 anchor(SPEC L71-78)
+  risk=high
+  facts_asked=none-needed: SPEC v2 已三家 stamp,A0.1 已閉合(依賴滿足)
+  review_role=實作=Codex;review=composer+grok(實作者不自審)
+  template=跟過:SPEC docs/DOCSIMPLIFY_BATCHA_SPEC.md v2 全錨點
+  adversarial=handoffs/DOCSIMPLIFY-A-RECONCILE.md
+  reconcile=handoffs/DOCSIMPLIFY-A-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHA_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a02-rev-composer", "ts": "2026-07-12T23:55:48Z"}
+=== 2026-07-13 07:55:48 | dispatch ===
+  ts=2026-07-13 07:55:48
+  kind=dispatch
+  intent=派 composer code review A0.2 DEV rename+TGF 三列(實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed: review 依 SPEC/diff 靜態+實跑
+  review_role=single-executor:composer
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a02-rev-grok", "ts": "2026-07-12T23:55:48Z"}
+=== 2026-07-13 07:55:48 | dispatch ===
+  ts=2026-07-13 07:55:48
+  kind=dispatch
+  intent=派 grok code review A0.2 DEV rename+TGF 三列(實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed: review 依 SPEC/diff 靜態+實跑
+  review_role=single-executor:grok
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-checker", "ts": "2026-07-12T23:58:35Z"}
+=== 2026-07-13 07:58:35 | dispatch ===
+  ts=2026-07-13 07:58:35
+  kind=dispatch
+  intent=派 Codex 建 check_doc_anchors.sh+tests/fixtures(SPEC §V L98-101 交付物,A1/A2 驗收依賴)
+  risk=low
+  facts_asked=none-needed: checker 規格 SPEC 已凍結
+  review_role=review=composer+grok 後續
+  template=n/a: 工具腳本交付物,規格在 SPEC §V
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-checker-rev-composer", "ts": "2026-07-13T00:02:24Z"}
+=== 2026-07-13 08:02:24 | dispatch ===
+  ts=2026-07-13 08:02:24
+  kind=dispatch
+  intent=派 composer review anchor checker+可證偽測試(實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: 工具+測試設計審
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-checker-rev-grok", "ts": "2026-07-13T00:02:24Z"}
+=== 2026-07-13 08:02:24 | dispatch ===
+  ts=2026-07-13 08:02:24
+  kind=dispatch
+  intent=派 grok review anchor checker+可證偽測試(實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: 工具+測試設計審
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-checker-fix2", "ts": "2026-07-13T00:15:55Z"}
+=== 2026-07-13 08:15:55 | dispatch ===
+  ts=2026-07-13 08:15:55
+  kind=dispatch
+  intent=退修:派 Codex 修 anchor checker slug underscore+可證偽測試(composer BLOCK)
+  risk=low
+  facts_asked=none-needed: mutation receipt 在 composer 審查檔
+  review_role=committee closure:composer 原提出方重驗
+  template=n/a: checker 退修
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-checker-fix3", "ts": "2026-07-13T00:17:08Z"}
+=== 2026-07-13 08:17:08 | dispatch ===
+  ts=2026-07-13 08:17:08
+  kind=dispatch
+  intent=重派(SMALL_INLINE 標記):Codex 修 checker slug underscore+可證偽測試
+  risk=low
+  facts_asked=none-needed
+  review_role=committee closure:composer
+  template=n/a: SMALL_INLINE checker 退修
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-checker-close", "ts": "2026-07-13T00:19:25Z"}
+=== 2026-07-13 08:19:25 | dispatch ===
+  ts=2026-07-13 08:19:25
+  kind=dispatch
+  intent=派 composer 閉合重驗 checker slug 修復
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-A-RECONCILE.md", "output_sha256": "5d6ca6d5b5700bcc867f14919b713aed47f906f36a3c628cdd1221452e43b9c4", "task_id": "docsimplify-a1", "ts": "2026-07-13T00:21:11Z"}
+=== 2026-07-13 08:21:12 | dispatch ===
+  ts=2026-07-13 08:21:12
+  kind=dispatch
+  intent=派 Codex 實作 A1.1:已實現功能→能力索引表(依 LOCKED manifest,SPEC L81-85)
+  risk=high
+  facts_asked=none-needed: manifest LOCKED,A0.1/A0.2/checker 皆閉合
+  review_role=實作=Codex;review=composer+grok(實作者不自審)
+  template=跟過:SPEC docs/DOCSIMPLIFY_BATCHA_SPEC.md v2 全錨點
+  adversarial=handoffs/DOCSIMPLIFY-A-RECONCILE.md
+  reconcile=handoffs/DOCSIMPLIFY-A-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHA_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a1-rev-composer", "ts": "2026-07-13T00:36:25Z"}
+=== 2026-07-13 08:36:25 | dispatch ===
+  ts=2026-07-13 08:36:25
+  kind=dispatch
+  intent=派 composer review A1 能力索引化(manifest diff 對抗驗證,實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a1-rev-grok", "ts": "2026-07-13T00:36:25Z"}
+=== 2026-07-13 08:36:25 | dispatch ===
+  ts=2026-07-13 08:36:25
+  kind=dispatch
+  intent=派 grok review A1 能力索引化(manifest diff 對抗驗證,實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a1-fix", "ts": "2026-07-13T00:40:01Z"}
+=== 2026-07-13 08:40:01 | dispatch ===
+  ts=2026-07-13 08:40:01
+  kind=dispatch
+  intent=退修:派 Codex 修 A1 兩家 BLOCK 4項(CAP-14 stage 序+3 留項淨刪)
+  risk=low
+  facts_asked=none-needed
+  review_role=committee closure:composer+grok 原提出方重驗
+  template=n/a: SMALL_INLINE A1 退修
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a1-close-composer", "ts": "2026-07-13T00:42:37Z"}
+=== 2026-07-13 08:42:37 | dispatch ===
+  ts=2026-07-13 08:42:37
+  kind=dispatch
+  intent=派 composer 閉合重驗 A1 修復
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a1-close-grok", "ts": "2026-07-13T00:42:37Z"}
+=== 2026-07-13 08:42:37 | dispatch ===
+  ts=2026-07-13 08:42:37
+  kind=dispatch
+  intent=派 grok 閉合重驗 A1 修復
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-A-RECONCILE.md", "output_sha256": "5d6ca6d5b5700bcc867f14919b713aed47f906f36a3c628cdd1221452e43b9c4", "task_id": "docsimplify-a2", "ts": "2026-07-13T00:44:42Z"}
+=== 2026-07-13 08:44:42 | dispatch ===
+  ts=2026-07-13 08:44:42
+  kind=dispatch
+  intent=派 Codex 實作 A2:目錄§636-999 收斂+README 假行數(SPEC L87-93,依 LOCKED manifest)
+  risk=high
+  facts_asked=none-needed: manifest LOCKED,A1 閉合
+  review_role=實作=Codex;review=composer+grok
+  template=跟過:SPEC docs/DOCSIMPLIFY_BATCHA_SPEC.md v2
+  adversarial=handoffs/DOCSIMPLIFY-A-RECONCILE.md
+  reconcile=handoffs/DOCSIMPLIFY-A-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHA_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a2-rev-composer", "ts": "2026-07-13T00:51:48Z"}
+=== 2026-07-13 08:51:48 | dispatch ===
+  ts=2026-07-13 08:51:48
+  kind=dispatch
+  intent=派 composer review A2 目錄收斂+README(實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-a2-rev-grok", "ts": "2026-07-13T00:51:48Z"}
+=== 2026-07-13 08:51:48 | dispatch ===
+  ts=2026-07-13 08:51:48
+  kind=dispatch
+  intent=派 grok review A2 目錄收斂+README(實作者Codex不自審)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-13 15:22:12 | artifact ===
+  ts=2026-07-13 15:22:12
+  kind=artifact
+  intent=起草文檔簡化批次 B SPEC
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK §A §C §P §V §R §N 全含;§G N/A 於 §N 登記(純文件治理不碰 a/d,等效基準=disposition manifest,同批次 A 前例)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-specrev-codex", "ts": "2026-07-13T07:24:23Z"}
+=== 2026-07-13 15:24:23 | dispatch ===
+  ts=2026-07-13 15:24:23
+  kind=dispatch
+  intent=派 codex adversarial 審批次 B SPEC v1
+  risk=low
+  facts_asked=none-needed: SPEC 附 FACT-RECEIPT 實測
+  review_role=single-executor:codex adversarial
+  template=n/a: SPEC adversarial review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-specrev-composer", "ts": "2026-07-13T07:24:23Z"}
+=== 2026-07-13 15:24:23 | dispatch ===
+  ts=2026-07-13 15:24:23
+  kind=dispatch
+  intent=派 composer adversarial 審批次 B SPEC v1
+  risk=low
+  facts_asked=none-needed: SPEC 附 FACT-RECEIPT 實測
+  review_role=single-executor:composer adversarial
+  template=n/a: SPEC adversarial review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-specrev-grok", "ts": "2026-07-13T07:24:23Z"}
+=== 2026-07-13 15:24:24 | dispatch ===
+  ts=2026-07-13 15:24:24
+  kind=dispatch
+  intent=派 grok adversarial 審批次 B SPEC v1
+  risk=low
+  facts_asked=none-needed: SPEC 附 FACT-RECEIPT 實測
+  review_role=single-executor:grok adversarial
+  template=n/a: SPEC adversarial review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close2-codex", "ts": "2026-07-13T07:50:40Z"}
+=== 2026-07-13 15:50:40 | dispatch ===
+  ts=2026-07-13 15:50:40
+  kind=dispatch
+  intent=派 codex 復驗批次 B SPEC v2r2 其 STILL-OPEN 項
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close2-composer", "ts": "2026-07-13T07:50:40Z"}
+=== 2026-07-13 15:50:40 | dispatch ===
+  ts=2026-07-13 15:50:40
+  kind=dispatch
+  intent=派 composer 復驗批次 B SPEC v2r2 其 STILL-OPEN 項
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: closure 復驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close3-codex", "ts": "2026-07-13T08:05:46Z"}
+=== 2026-07-13 16:05:46 | dispatch ===
+  ts=2026-07-13 16:05:46
+  kind=dispatch
+  intent=派 codex 復驗 v2r3 五修
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r3
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close3-composer", "ts": "2026-07-13T08:05:47Z"}
+=== 2026-07-13 16:05:47 | dispatch ===
+  ts=2026-07-13 16:05:47
+  kind=dispatch
+  intent=派 composer 復驗 v2r3 五修
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: closure 復驗 r3
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close4-codex", "ts": "2026-07-13T08:30:39Z"}
+=== 2026-07-13 16:30:39 | dispatch ===
+  ts=2026-07-13 16:30:39
+  kind=dispatch
+  intent=派 codex 復驗 v2r4 (N3 identity/normalization+N4 差分斷言+§V 同步)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r4
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close5-codex", "ts": "2026-07-13T08:45:29Z"}
+=== 2026-07-13 16:45:29 | dispatch ===
+  ts=2026-07-13 16:45:29
+  kind=dispatch
+  intent=派 codex 復驗 v2r5(block 邊界唯一化+新增 heading 白名單)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r5
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close6-codex", "ts": "2026-07-13T08:58:48Z"}
+=== 2026-07-13 16:58:48 | dispatch ===
+  ts=2026-07-13 16:58:48
+  kind=dispatch
+  intent=派 codex 復驗 v2r6 oracle 公式
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r6
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-delta-composer", "ts": "2026-07-13T09:00:52Z"}
+=== 2026-07-13 17:00:52 | dispatch ===
+  ts=2026-07-13 17:00:52
+  kind=dispatch
+  intent=派 composer delta 復驗 v2r4-r6 增修
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: delta 復驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-delta-grok", "ts": "2026-07-13T09:00:53Z"}
+=== 2026-07-13 17:00:53 | dispatch ===
+  ts=2026-07-13 17:00:53
+  kind=dispatch
+  intent=派 grok delta 復驗 v2r4-r6 增修
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: delta 復驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close7-grok", "ts": "2026-07-13T09:17:00Z"}
+=== 2026-07-13 17:17:01 | dispatch ===
+  ts=2026-07-13 17:17:01
+  kind=dispatch
+  intent=派 grok 復驗 v2r7(lang_push 單一語意+B00 fence-aware 邊界+事實更正)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: closure 復驗 r7
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close7-codex", "ts": "2026-07-13T09:17:01Z"}
+=== 2026-07-13 17:17:01 | dispatch ===
+  ts=2026-07-13 17:17:01
+  kind=dispatch
+  intent=派 codex 復驗 v2r7(lang_push 單一語意+B00 fence-aware 邊界+事實更正)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r7
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close8-grok", "ts": "2026-07-13T09:32:07Z"}
+=== 2026-07-13 17:32:08 | dispatch ===
+  ts=2026-07-13 17:32:08
+  kind=dispatch
+  intent=派 grok 復驗 v2r8 virtual-repaired baseline
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: closure 復驗 r8
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close8-codex", "ts": "2026-07-13T09:32:08Z"}
+=== 2026-07-13 17:32:08 | dispatch ===
+  ts=2026-07-13 17:32:08
+  kind=dispatch
+  intent=派 codex 復驗 v2r8 virtual-repaired baseline
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r8
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close9-grok", "ts": "2026-07-13T09:48:11Z"}
+=== 2026-07-13 17:48:11 | dispatch ===
+  ts=2026-07-13 17:48:11
+  kind=dispatch
+  intent=派 grok 復驗 v2r9 target view 統一
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: closure 復驗 r9
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close9-codex", "ts": "2026-07-13T09:48:12Z"}
+=== 2026-07-13 17:48:12 | dispatch ===
+  ts=2026-07-13 17:48:12
+  kind=dispatch
+  intent=派 codex 復驗 v2r9 target view 統一
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r9
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close10-grok", "ts": "2026-07-13T10:02:44Z"}
+=== 2026-07-13 18:02:44 | dispatch ===
+  ts=2026-07-13 18:02:44
+  kind=dispatch
+  intent=派 grok 復驗 v2r10 殘留清理
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: closure 復驗 r10
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close10-codex", "ts": "2026-07-13T10:02:45Z"}
+=== 2026-07-13 18:02:45 | dispatch ===
+  ts=2026-07-13 18:02:45
+  kind=dispatch
+  intent=派 codex 復驗 v2r10 殘留清理
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r10
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close11-grok", "ts": "2026-07-13T10:16:48Z"}
+=== 2026-07-13 18:16:48 | dispatch ===
+  ts=2026-07-13 18:16:48
+  kind=dispatch
+  intent=派 grok 復驗 v2r11
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: closure 復驗 r11
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close11-codex", "ts": "2026-07-13T10:16:48Z"}
+=== 2026-07-13 18:16:48 | dispatch ===
+  ts=2026-07-13 18:16:48
+  kind=dispatch
+  intent=派 codex 復驗 v2r11
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r11
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close12-codex", "ts": "2026-07-13T10:30:12Z"}
+=== 2026-07-13 18:30:12 | dispatch ===
+  ts=2026-07-13 18:30:12
+  kind=dispatch
+  intent=派 codex 復驗 v2r12 post-state 模式
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r12
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close13-codex", "ts": "2026-07-13T10:42:50Z"}
+=== 2026-07-13 18:42:50 | dispatch ===
+  ts=2026-07-13 18:42:50
+  kind=dispatch
+  intent=派 codex 復驗 v2r13 post-state 完備性
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r13
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-close14-codex", "ts": "2026-07-13T10:55:08Z"}
+=== 2026-07-13 18:55:09 | dispatch ===
+  ts=2026-07-13 18:55:09
+  kind=dispatch
+  intent=派 codex 復驗 v2r14
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: closure 復驗 r14
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-final-grok", "ts": "2026-07-13T10:57:02Z"}
+=== 2026-07-13 18:57:02 | dispatch ===
+  ts=2026-07-13 18:57:02
+  kind=dispatch
+  intent=派 grok 最終 delta 快驗 v2r12-r14
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: final delta 快驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-final-composer", "ts": "2026-07-13T10:57:02Z"}
+=== 2026-07-13 18:57:02 | dispatch ===
+  ts=2026-07-13 18:57:02
+  kind=dispatch
+  intent=派 composer 最終 delta 快驗 v2r12-r14
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: final delta 快驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-stamp-codex", "ts": "2026-07-13T11:01:29Z"}
+=== 2026-07-13 19:01:29 | dispatch ===
+  ts=2026-07-13 19:01:29
+  kind=dispatch
+  intent=派 codex 驗批次 B reconcile 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: reconcile stamp review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-stamp-composer", "ts": "2026-07-13T11:01:29Z"}
+=== 2026-07-13 19:01:29 | dispatch ===
+  ts=2026-07-13 19:01:29
+  kind=dispatch
+  intent=派 composer 驗批次 B reconcile 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: reconcile stamp review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-stamp-grok", "ts": "2026-07-13T11:01:29Z"}
+=== 2026-07-13 19:01:29 | dispatch ===
+  ts=2026-07-13 19:01:29
+  kind=dispatch
+  intent=派 grok 驗批次 B reconcile 忠實度並 append 機檢戳記
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: reconcile stamp review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-stamp-codex", "ts": "2026-07-13T11:27:07Z"}
+=== 2026-07-13 19:27:07 | dispatch ===
+  ts=2026-07-13 19:27:07
+  kind=dispatch
+  intent=重派 codex 驗批次 B reconcile r2 忠實度並戳記
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:codex
+  template=n/a: reconcile stamp review r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-stamp-composer", "ts": "2026-07-13T11:27:07Z"}
+=== 2026-07-13 19:27:07 | dispatch ===
+  ts=2026-07-13 19:27:07
+  kind=dispatch
+  intent=重派 composer 驗批次 B reconcile r2 忠實度並戳記
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: reconcile stamp review r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-stamp-grok", "ts": "2026-07-13T11:27:07Z"}
+=== 2026-07-13 19:27:07 | dispatch ===
+  ts=2026-07-13 19:27:07
+  kind=dispatch
+  intent=重派 grok 驗批次 B reconcile r2 忠實度並戳記
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: reconcile stamp review r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCSIMPLIFY-B-RECONCILE.md", "output_sha256": "3fb9ea8d879a6621744affb7e7abcdc1cd3f778b395fabeae5aed453449e2fe5", "task_id": "docsimplify-b-stamp-codex", "ts": "2026-07-13T11:31:03Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCSIMPLIFY-B-RECONCILE.md", "output_sha256": "3fb9ea8d879a6621744affb7e7abcdc1cd3f778b395fabeae5aed453449e2fe5", "task_id": "docsimplify-b-stamp-composer", "ts": "2026-07-13T11:31:04Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DOCSIMPLIFY-B-RECONCILE.md", "output_sha256": "3fb9ea8d879a6621744affb7e7abcdc1cd3f778b395fabeae5aed453449e2fe5", "task_id": "docsimplify-b-stamp-grok", "ts": "2026-07-13T11:31:04Z"}
+=== 2026-07-13 19:43:52 | artifact ===
+  ts=2026-07-13 19:43:52
+  kind=artifact
+  intent=生成批次 B TODO(依 v2r14 SPEC,V13 prompt)
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=## §0/## §B/每 Task 驗證·邊界·不可做 全含;依 SPEC §P B00/B0/B1/B2 展開
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-todorev-composer", "ts": "2026-07-13T11:46:26Z"}
+=== 2026-07-13 19:46:26 | dispatch ===
+  ts=2026-07-13 19:46:26
+  kind=dispatch
+  intent=派 composer adversarial 審批次 B TODO(v13 prompt 產出)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=跟過:TODO_GENERATION_PROMPT V13
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-todorev-grok", "ts": "2026-07-13T11:46:27Z"}
+=== 2026-07-13 19:46:27 | dispatch ===
+  ts=2026-07-13 19:46:27
+  kind=dispatch
+  intent=派 grok adversarial 審批次 B TODO(v13 prompt 產出)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=跟過:TODO_GENERATION_PROMPT V13
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-todoclose-composer", "ts": "2026-07-13T12:12:15Z"}
+=== 2026-07-13 20:12:15 | dispatch ===
+  ts=2026-07-13 20:12:15
+  kind=dispatch
+  intent=派 composer 閉合重驗 TODO r2
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: TODO 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-b-todoclose-grok", "ts": "2026-07-13T12:12:16Z"}
+=== 2026-07-13 20:12:16 | dispatch ===
+  ts=2026-07-13 20:12:16
+  kind=dispatch
+  intent=派 grok 閉合重驗 TODO r2
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: TODO 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-B-RECONCILE.md", "output_sha256": "3fb9ea8d879a6621744affb7e7abcdc1cd3f778b395fabeae5aed453449e2fe5", "task_id": "docsimplify-bb1", "ts": "2026-07-13T12:25:43Z"}
+=== 2026-07-13 20:25:44 | dispatch ===
+  ts=2026-07-13 20:25:44
+  kind=dispatch
+  intent=派 Codex 執行批次 B BB-1(B00.3 validator→B00.1 view+manifest→B00.2 驗真保全,只讀既有 doc)
+  risk=high
+  facts_asked=none-needed: SPEC v2r14+TODO r2 皆委員 PASS,reconcile 戳記 PASS
+  review_role=實作=Codex;review-lock=composer+grok(實作者不自審)
+  template=跟過:SPEC+TODO 雙機檢 PASS
+  adversarial=handoffs/DOCSIMPLIFY-B-RECONCILE.md
+  reconcile=handoffs/DOCSIMPLIFY-B-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb1-lock-composer", "ts": "2026-07-13T12:52:20Z"}
+=== 2026-07-13 20:52:20 | dispatch ===
+  ts=2026-07-13 20:52:20
+  kind=dispatch
+  intent=派 composer review-lock BB-1 B00 產物(刪除授權關卡)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: review-lock
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb1-lock-grok", "ts": "2026-07-13T12:52:20Z"}
+=== 2026-07-13 20:52:20 | dispatch ===
+  ts=2026-07-13 20:52:20
+  kind=dispatch
+  intent=派 grok review-lock BB-1 B00 產物(刪除授權關卡)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: review-lock
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-B-RECONCILE.md", "output_sha256": "3fb9ea8d879a6621744affb7e7abcdc1cd3f778b395fabeae5aed453449e2fe5", "task_id": "docsimplify-bb2", "ts": "2026-07-13T13:01:06Z"}
+=== 2026-07-13 21:01:07 | dispatch ===
+  ts=2026-07-13 21:01:07
+  kind=dispatch
+  intent=派 Codex 執行 BB-2(B0.1 依施工圖修 DEV 損壞,主 gate=byte==TARGETVIEW)
+  risk=high
+  facts_asked=none-needed: B00 已 LOCKED(76c89e0)
+  review_role=實作=Codex;review=composer+grok
+  template=跟過:SPEC+TODO 機檢 PASS
+  adversarial=handoffs/DOCSIMPLIFY-B-RECONCILE.md
+  reconcile=handoffs/DOCSIMPLIFY-B-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb2-rev-composer", "ts": "2026-07-13T13:14:38Z"}
+=== 2026-07-13 21:14:38 | dispatch ===
+  ts=2026-07-13 21:14:38
+  kind=dispatch
+  intent=派 composer review B0.1(byte copy 等值執行+主委代執行披露)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb2-rev-grok", "ts": "2026-07-13T13:14:38Z"}
+=== 2026-07-13 21:14:38 | dispatch ===
+  ts=2026-07-13 21:14:38
+  kind=dispatch
+  intent=派 grok review B0.1(byte copy 等值執行+主委代執行披露)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb2-close", "ts": "2026-07-13T13:29:01Z"}
+=== 2026-07-13 21:29:01 | dispatch ===
+  ts=2026-07-13 21:29:01
+  kind=dispatch
+  intent=派 composer 復驗 B0 hash 補記
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: 單點閉合
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb2-close2", "ts": "2026-07-13T13:51:33Z"}
+=== 2026-07-13 21:51:33 | dispatch ===
+  ts=2026-07-13 21:51:33
+  kind=dispatch
+  intent=派 composer 復驗 B0 hash 補記 r2(空值已修正為實算)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: 單點閉合 r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-B-RECONCILE.md", "output_sha256": "3fb9ea8d879a6621744affb7e7abcdc1cd3f778b395fabeae5aed453449e2fe5", "task_id": "docsimplify-bb3", "ts": "2026-07-13T13:53:28Z"}
+=== 2026-07-13 21:53:29 | dispatch ===
+  ts=2026-07-13 21:53:29
+  kind=dispatch
+  intent=派 Codex 執行 BB-3(B1.1 DEV 八章壓縮,依 LOCKED manifest)
+  risk=high
+  facts_asked=none-needed: B0 閉合,manifest LOCKED
+  review_role=實作=Codex;review=composer+grok
+  template=跟過:SPEC+TODO 機檢 PASS
+  adversarial=handoffs/DOCSIMPLIFY-B-RECONCILE.md
+  reconcile=handoffs/DOCSIMPLIFY-B-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb3-rev-composer", "ts": "2026-07-13T14:09:57Z"}
+=== 2026-07-13 22:09:57 | dispatch ===
+  ts=2026-07-13 22:09:57
+  kind=dispatch
+  intent=派 composer review B1.1 八章壓縮(manifest diff 對抗)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb3-rev-grok", "ts": "2026-07-13T14:09:57Z"}
+=== 2026-07-13 22:09:57 | dispatch ===
+  ts=2026-07-13 22:09:57
+  kind=dispatch
+  intent=派 grok review B1.1 八章壓縮(manifest diff 對抗)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DOCSIMPLIFY-B-RECONCILE.md", "output_sha256": "3fb9ea8d879a6621744affb7e7abcdc1cd3f778b395fabeae5aed453449e2fe5", "task_id": "docsimplify-bb4", "ts": "2026-07-13T14:14:50Z"}
+=== 2026-07-13 22:14:51 | dispatch ===
+  ts=2026-07-13 22:14:51
+  kind=dispatch
+  intent=派 Codex 執行 BB-4(B2.1 ARCH 解耦節收斂,批次 B 最後一步)
+  risk=high
+  facts_asked=none-needed: B1 閉合,manifest LOCKED
+  review_role=實作=Codex;review=composer+grok
+  template=跟過:SPEC+TODO 機檢 PASS
+  adversarial=handoffs/DOCSIMPLIFY-B-RECONCILE.md
+  reconcile=handoffs/DOCSIMPLIFY-B-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCSIMPLIFY_BATCHB_SPEC.md
+  todo=docs/DOCSIMPLIFY_BATCHB_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb4-rev-composer", "ts": "2026-07-13T14:26:10Z"}
+=== 2026-07-13 22:26:10 | dispatch ===
+  ts=2026-07-13 22:26:10
+  kind=dispatch
+  intent=派 composer review B2.1 ARCH 解耦節收斂(批次 B 最終審)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:composer
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "docsimplify-bb4-rev-grok", "ts": "2026-07-13T14:26:10Z"}
+=== 2026-07-13 22:26:10 | dispatch ===
+  ts=2026-07-13 22:26:10
+  kind=dispatch
+  intent=派 grok review B2.1 ARCH 解耦節收斂(批次 B 最終審)
+  risk=low
+  facts_asked=none-needed
+  review_role=single-executor:grok
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-TRIAGE", "ts": "2026-07-13T15:23:45Z"}
+=== 2026-07-13 23:23:45 | dispatch ===
+  ts=2026-07-13 23:23:45
+  kind=dispatch
+  intent=解耦R2/R3/R4 18筆triage:三家(codex/composer/grok)全面互審Claude初判 handoffs/20260713-DECOUPLE-TRIAGE-claude.md
+  risk=low
+  facts_asked=scanner實跑18筆清單+7模組實查(wc/imports)已附初判檔
+  review_role=codex+composer+grok各自產完整triage版+對抗審Claude初判
+  template=n/a: review/triage任務非SPEC/TODO產物
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260713-DECOUPLE-TRIAGE-composer.md", "output_sha256": "fb92dab8601c25664e4a0756ac4bf1cb4920f780a63d9200073b1cc36ec02d9b", "task_id": "DECOUPLE-TRIAGE", "ts": "2026-07-13T15:26:43Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260713-DECOUPLE-TRIAGE-grok.md", "output_sha256": "0f15d203260215d9014758e4c0ce55592acb2290880dc6e8263aa3379815c66c", "task_id": "DECOUPLE-TRIAGE", "ts": "2026-07-13T15:27:28Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260713-DECOUPLE-TRIAGE-codex.md", "output_sha256": "7fbf022c65f9fb8abbf52c7e97b310cd25caec0465142b5d2edd66ab7fa5d95c", "task_id": "DECOUPLE-TRIAGE", "ts": "2026-07-13T15:31:27Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-TRIAGE", "ts": "2026-07-13T15:33:08Z"}
+=== 2026-07-13 23:33:08 | dispatch ===
+  ts=2026-07-13 23:33:08
+  kind=dispatch
+  intent=reconcile 戳記輪:三家核對 handoffs/20260713-DECOUPLE-TRIAGE-RECONCILE.md 忠實度並 append RECONCILE-STAMP
+  risk=low
+  facts_asked=四份完整版已互審,reconcile 逐家原計數列項
+  review_role=codex+composer+grok 各驗自家立場收錄忠實+裁決 approve/reject
+  template=n/a: reconcile 戳記非 SPEC/TODO 產物
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260713-DECOUPLE-TRIAGE-RECONCILE.md", "output_sha256": "d5cf12f5c10272bd32b9ca0c2425e2fabf2d8f3d002978b818b20cad725a1866", "task_id": "DECOUPLE-TRIAGE", "ts": "2026-07-13T15:35:17Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-TRIAGE", "ts": "2026-07-13T15:36:43Z"}
+=== 2026-07-13 23:36:43 | dispatch ===
+  ts=2026-07-13 23:36:43
+  kind=dispatch
+  intent=v2 戳記補正輪:codex/composer 依機檢格式補 RECONCILE-STAMP(帶 body sha256+task-id)
+  risk=low
+  facts_asked=第一輪三家已 APPROVED(v1);僅格式補正
+  review_role=codex+composer 確認本體未變後 append v2 戳記
+  template=n/a: 戳記格式補正
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-14 00:37:19 | artifact ===
+  ts=2026-07-14 00:37:19
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DECOUPLE_FIX4_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(中,RISK-HIT: b,d); §A=filled(FACT-RECEIPT 4 現場實查); §C=filled; §G=filled(R3-10 修前後等值 receipt); §P=4 Task; §V=filled(mutation 對 R3-10); §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-07-14 00:44:43 | artifact ===
+  ts=2026-07-14 00:44:43
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DECOUPLE_FIX4_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=filled; §B=2批次(B0 baseline receipt/B1 四Task); 每Task 驗證/邊界/不可做=filled
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DECOUPLE-FIX4-ADV-codex.md", "output_sha256": "pending", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T16:46:28Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DECOUPLE-FIX4-ADV-codex.md", "output_sha256": "pending", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T16:46:36Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T16:46:48Z"}
+=== 2026-07-14 00:46:48 | dispatch ===
+  ts=2026-07-14 00:46:48
+  kind=dispatch
+  intent=SPEC+TODO 三家 adversarial review(codex/composer/grok);Blocking 修齊後才 Frozen 並另發實作 token
+  risk=low
+  facts_asked=SPEC §A 6 receipt;RISK-HIT b,d;TODO template PASS
+  review_role=三家獨立對抗審,依 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  template=n/a: 本輪=審查派工,產物非 SPEC/TODO
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-FIX4-ADV-grok.md", "output_sha256": "bf6d3ff36526380351c28a9478aa4e70541ed1dab3f79d9f2390f8c38ff5aabd", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T16:50:21Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-FIX4-ADV-composer.md", "output_sha256": "8b987d940513b75459cf33ba2d26738de4fb1a17c6a2d77edc20117945d426f5", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T16:50:44Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-FIX4-ADV-codex.md", "output_sha256": "088eda123905241c49dc74a604b8d18dfb8f3bf148e25efa78e5b6170d527a44", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T16:55:26Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T16:59:15Z"}
+=== 2026-07-14 00:59:15 | dispatch ===
+  ts=2026-07-14 00:59:15
+  kind=dispatch
+  intent=r2 閉合重驗:三家各自重跑自家 BLOCKING/MAJOR 反例確認真關閉
+  risk=low
+  facts_asked=SPEC/TODO r2 已依三家 findings 全修,template PASS
+  review_role=codex/composer/grok 原提出方閉合驗證
+  template=n/a: 閉合重驗非 SPEC/TODO 產物
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DECOUPLE-FIX4-ADV-codex.md", "output_sha256": "7a5b8226cc58e47c03684fdf5d0ffbda8829a315ea37f51476372b9fda149f61", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:04:27Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DECOUPLE-FIX4-ADV-codex.md", "output_sha256": "7a5b8226cc58e47c03684fdf5d0ffbda8829a315ea37f51476372b9fda149f61", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:04:36Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DECOUPLE-FIX4-ADV-codex.md", "output_sha256": "7a5b8226cc58e47c03684fdf5d0ffbda8829a315ea37f51476372b9fda149f61", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:05:38Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/DECOUPLE-FIX4-ADV-codex.md", "output_sha256": "7a5b8226cc58e47c03684fdf5d0ffbda8829a315ea37f51476372b9fda149f61", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:05:45Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-FIX4-ADV-CODEX.md", "output_sha256": "7a5b8226cc58e47c03684fdf5d0ffbda8829a315ea37f51476372b9fda149f61", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:06:18Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-FIX4-ADV-COMPOSER.md", "output_sha256": "da097bff3f32c09e92eea39497065e3f27008a665ddd321a04aaf1e315bf7363", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:06:18Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:06:50Z"}
+=== 2026-07-14 01:06:50 | dispatch ===
+  ts=2026-07-14 01:06:50
+  kind=dispatch
+  intent=處置檔戳記輪:codex/composer 驗 ADV-RECONCILE 忠實度並 append v2 戳記
+  risk=low
+  facts_asked=三家閉合已 FROZEN-OK;處置檔僅彙整
+  review_role=codex+composer 戳記
+  template=n/a: 戳記輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-FIX4-ADV-CODEX.md,handoffs/DECOUPLE-FIX4-ADV-COMPOSER.md", "output_sha256": "pending", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:08:25Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-FIX4-ADV-CODEX.md,handoffs/DECOUPLE-FIX4-ADV-COMPOSER.md", "output_sha256": "pending", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:08:35Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-FIX4-ADV-CODEX.md", "output_sha256": "7a5b8226cc58e47c03684fdf5d0ffbda8829a315ea37f51476372b9fda149f61", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:09:05Z"}
+=== 2026-07-14 01:09:05 | dispatch ===
+  ts=2026-07-14 01:09:05
+  kind=dispatch
+  intent=B0 派工:Codex 依 Frozen TODO Task 0 唯讀取證產出 handoffs/DECOUPLE-FIX4-G-RECEIPT.md
+  risk=high
+  facts_asked=SPEC/TODO r2 Frozen;三家 FROZEN-OK;ADV-RECONCILE 雙戳記 PASS
+  review_role=codex 執行,B0 Gate 主委機檢
+  template=docs/DECOUPLE_FIX4_TODO.md
+  adversarial=handoffs/DECOUPLE-FIX4-ADV-CODEX.md
+  reconcile=handoffs/DECOUPLE-FIX4-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DECOUPLE_FIX4_SPEC.md
+  todo=docs/DECOUPLE_FIX4_TODO.md
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-FIX4-G-RECEIPT.md", "output_sha256": "3011620808037490b174fed90b4c162eb589ab3d7a6428838b2f1289d073ef36", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:13:09Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-FIX4-ADV-CODEX.md", "output_sha256": "7a5b8226cc58e47c03684fdf5d0ffbda8829a315ea37f51476372b9fda149f61", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:13:10Z"}
+=== 2026-07-14 01:13:10 | dispatch ===
+  ts=2026-07-14 01:13:10
+  kind=dispatch
+  intent=B1 派工:Codex 依 Frozen TODO 實作 Task 1.1-1.4,各自獨立 commit
+  risk=high
+  facts_asked=B0 receipt PASS(G1 凍結/G2 三組雙 config)
+  review_role=codex 實作;實作後 composer+grok code review
+  template=docs/DECOUPLE_FIX4_TODO.md
+  adversarial=handoffs/DECOUPLE-FIX4-ADV-CODEX.md
+  reconcile=handoffs/DECOUPLE-FIX4-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DECOUPLE_FIX4_SPEC.md
+  todo=docs/DECOUPLE_FIX4_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T17:37:52Z"}
+=== 2026-07-14 01:37:52 | dispatch ===
+  ts=2026-07-14 01:37:52
+  kind=dispatch
+  intent=B1 code review:composer+grok 兩家審 Codex 實作(4 commits)
+  risk=low
+  facts_asked=targeted 75 passed 主委實跑;scanner 5/10/0;G1 hash 不變;M1-M4 receipt
+  review_role=composer+grok 全面 code review,實作者 codex 不自審
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-FIX4-CODEREV-composer.md", "output_sha256": "77188e4a02491e3f6a100057ed011ce1275fb3b6b9a344ce68bfba85a5ca8f8b", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T22:38:07Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-FIX4-CODEREV-grok.md", "output_sha256": "a5b38e7c76223a6d3573271f77a7819e5ab0abe948e1d402918e4e2a4f557a19", "task_id": "DECOUPLE-FIX4", "ts": "2026-07-13T22:38:07Z"}
+=== 2026-07-14 06:39:13 | artifact ===
+  ts=2026-07-14 06:39:13
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DECOUPLE_ALLOWLIST_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(中,RISK-HIT: b); §A=filled(scanner 實作 receipt); §C=filled; §G=N/A→§N(零數值); §P=3 Task; §V=filled(可證偽含反向注入測試); §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-07-14 06:40:50 | artifact ===
+  ts=2026-07-14 06:40:50
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DECOUPLE_ALLOWLIST_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0/§B/每Task驗證邊界不可做=filled
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T22:42:00Z"}
+=== 2026-07-14 06:42:00 | dispatch ===
+  ts=2026-07-14 06:42:00
+  kind=dispatch
+  intent=SPEC+TODO 三家 adversarial review(codex/composer/grok)
+  risk=low
+  facts_asked=SPEC §A 4 receipt;RISK-HIT b;TODO PASS
+  review_role=三家獨立對抗審 per templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  template=n/a: 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-ALLOWLIST-ADV-GROK.md", "output_sha256": "4c8a443847dd26afd3832d07506864688db21a9d9d4af42ddb4a703ebe9cb70f", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T22:45:02Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-ALLOWLIST-ADV-COMPOSER.md", "output_sha256": "29af5e0cbd290f894815f66d29f60e8fc2be601039ef53711dd0cd39722cd01d", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T22:45:08Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-ALLOWLIST-ADV-CODEX.md", "output_sha256": "19b3c95db48f55fa196e52c43da17e12ff273d88ee1d6c36c288f09b792f0493", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T22:45:37Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T22:49:05Z"}
+=== 2026-07-14 06:49:05 | dispatch ===
+  ts=2026-07-14 06:49:05
+  kind=dispatch
+  intent=r2 閉合重驗:三家重跑自家反例
+  risk=low
+  facts_asked=r2 依 9B/14M 重寫為 AST+戳記機檢
+  review_role=三家原提出方閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-13T23:09:09Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:09:21Z"}
+=== 2026-07-14 07:09:21 | dispatch ===
+  ts=2026-07-14 07:09:21
+  kind=dispatch
+  intent=r4 閉合重驗(codex,僅機械計數一致性)
+  risk=low
+  facts_asked=r3 唯一 STILL-OPEN=TODO 計數殘留,已統一
+  review_role=codex 原提出方閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:11:49Z"}
+=== 2026-07-14 07:11:49 | dispatch ===
+  ts=2026-07-14 07:11:49
+  kind=dispatch
+  intent=處置檔戳記輪:codex/composer 驗忠實度 append v2 戳記
+  risk=low
+  facts_asked=三家閉合全 FROZEN-OK
+  review_role=codex+composer 戳記
+  template=n/a: 戳記輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-ALLOWLIST-ADV-CODEX.md", "output_sha256": "e7a6df1f60e08cafdae3fba1dd5fde8742d932fc90448d9001aa6d9929e56a82", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:12:59Z"}
+=== 2026-07-14 07:13:00 | dispatch ===
+  ts=2026-07-14 07:13:00
+  kind=dispatch
+  intent=B1 派工:Codex 依 Frozen TODO 實作 Task 1.1/1.2/1.4
+  risk=high
+  facts_asked=三家閉合 FROZEN-OK;處置檔雙戳記 PASS
+  review_role=codex 實作;後續 composer+grok code review
+  template=docs/DECOUPLE_ALLOWLIST_TODO.md
+  adversarial=handoffs/DECOUPLE-ALLOWLIST-ADV-CODEX.md
+  reconcile=handoffs/DECOUPLE-ALLOWLIST-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DECOUPLE_ALLOWLIST_SPEC.md
+  todo=docs/DECOUPLE_ALLOWLIST_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-ALLOWLIST-ADV-CODEX.md", "output_sha256": "e7a6df1f60e08cafdae3fba1dd5fde8742d932fc90448d9001aa6d9929e56a82", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:18:22Z"}
+=== 2026-07-14 07:18:23 | dispatch ===
+  ts=2026-07-14 07:18:23
+  kind=dispatch
+  intent=B1 續作:依 SPEC §C r4 增補(pending 表 3 module)解除 blocker,完成 1.1 T1c 起+1.2+1.4
+  risk=high
+  facts_asked=AST 揭露 5 筆 Optimization 縮排 import;處置=pending 表交戳記輪裁決
+  review_role=codex 續作;後續 composer+grok review
+  template=docs/DECOUPLE_ALLOWLIST_TODO.md
+  adversarial=handoffs/DECOUPLE-ALLOWLIST-ADV-CODEX.md
+  reconcile=handoffs/DECOUPLE-ALLOWLIST-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DECOUPLE_ALLOWLIST_SPEC.md
+  todo=docs/DECOUPLE_ALLOWLIST_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:33:18Z"}
+=== 2026-07-14 07:33:18 | dispatch ===
+  ts=2026-07-14 07:33:18
+  kind=dispatch
+  intent=B1 code review:composer+grok 審 Codex 實作(3 commits)
+  risk=low
+  facts_asked=31 tests 主委實跑;fail-closed 實證;M1-M4 receipt
+  review_role=composer+grok 全面 code review
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-ALLOWLIST-CODEREV-composer.md", "output_sha256": "1ea2bb6fb254ce997daa91ea41b872b317c5835b5b094f86972fc81d94bfdbf0", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:35:51Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-ALLOWLIST-CODEREV-grok.md", "output_sha256": "0d9bdaabcd68e3ae371ce777125bbbaf9a75c3650e32c6c12e7c2ae97f5857e6", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:35:51Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:36:15Z"}
+=== 2026-07-14 07:36:15 | dispatch ===
+  ts=2026-07-14 07:36:15
+  kind=dispatch
+  intent=Task 1.3 manifest 戳記輪:codex+composer 審 scripts/decouple_allowlist.md 本體(含 pending 表 3 筆裁決)並 append v2 戳記
+  risk=low
+  facts_asked=B1 兩家 code review PASS;grok 對 pending 表意見=有條件認可
+  review_role=codex+composer 戳記;pending 表任一家 REJECT 則退回改 code
+  template=n/a: 戳記輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-ALLOWLIST", "ts": "2026-07-13T23:39:10Z"}
+=== 2026-07-14 07:39:10 | dispatch ===
+  ts=2026-07-14 07:39:10
+  kind=dispatch
+  intent=codex 重戳 manifest:其 REJECTED 條件(DECOUPLE-TRIAGE-2 入 ROADMAP)已補
+  risk=low
+  facts_asked=ROADMAP 已登記 DECOUPLE-TRIAGE-2 票(docs/ROADMAP.md 解耦節)
+  review_role=codex 重審戳記
+  template=n/a: 戳記輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-14 07:52:23 | artifact ===
+  ts=2026-07-14 07:52:23
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DECOUPLE_P3_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(中,RISK-HIT: b); §A=filled(3 現場 receipt); §C=filled; §G=N/A→§N(純委派零行為變更); §P=3 Task; §V=filled; §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-07-14 07:52:23 | artifact ===
+  ts=2026-07-14 07:52:23
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DECOUPLE_P3_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0/§B/每Task=filled
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-P3", "ts": "2026-07-13T23:54:23Z"}
+=== 2026-07-14 07:54:23 | dispatch ===
+  ts=2026-07-14 07:54:23
+  kind=dispatch
+  intent=SPEC+TODO 三家 adversarial review
+  risk=low
+  facts_asked=4 receipt;RISK-HIT b;零行為變更票
+  review_role=codex+composer+grok 對抗審
+  template=n/a: 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-P3-ADV-GROK.md", "output_sha256": "dd4eec0b9283093b0634862fcc2dfffc3c04e8993f0e1a794f0fa16ec876c7c3", "task_id": "DECOUPLE-P3", "ts": "2026-07-13T23:57:01Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-P3-ADV-CODEX.md", "output_sha256": "33235be385033de1dfd451a9f0c802433a779792c2d76bca7f3c656f742e08c3", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T00:02:41Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-P3-ADV-COMPOSER.md", "output_sha256": "e6b6508e16471d21507ab2057835cfc9ff5ece2511ab89bb24994ac4ab505ed3", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T01:09:23Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T01:11:07Z"}
+=== 2026-07-14 09:11:07 | dispatch ===
+  ts=2026-07-14 09:11:07
+  kind=dispatch
+  intent=r2 閉合重驗:三家重跑自家反例
+  risk=low
+  facts_asked=r2 依 5B/11M 修齊(build_hardware_info 改名/test_hardware_api 入 scope/golden JSON/AST dump gate/façade 契約/applied_settings 禁修)
+  review_role=三家原提出方閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T01:23:46Z"}
+=== 2026-07-14 09:23:46 | dispatch ===
+  ts=2026-07-14 09:23:46
+  kind=dispatch
+  intent=codex r3 閉合(ADV-CODEX-4 補修)
+  risk=low
+  facts_asked=T1d 改 AST allow-set(含 from api import services);Gate 納 T1a-d;R4 盲區入 ROADMAP TRIAGE-2 可追蹤
+  review_role=codex 原提出方閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T01:26:13Z"}
+=== 2026-07-14 09:26:13 | dispatch ===
+  ts=2026-07-14 09:26:13
+  kind=dispatch
+  intent=處置檔戳記輪:codex/composer append v2 戳記
+  risk=low
+  facts_asked=三家閉合 FROZEN-OK
+  review_role=codex+composer 戳記
+  template=n/a: 戳記輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-P3-ADV-CODEX.md", "output_sha256": "664462ed1a5d7a084b13c265ba90fe64459bb0404a3f44f122732931d81aea69", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T01:28:47Z"}
+=== 2026-07-14 09:28:48 | dispatch ===
+  ts=2026-07-14 09:28:48
+  kind=dispatch
+  intent=B1 派工:Codex 依 Frozen TODO 實作 Task 1.1-1.3
+  risk=high
+  facts_asked=三家閉合 FROZEN-OK;處置檔雙戳記 PASS
+  review_role=codex 實作;後續 composer+grok review
+  template=docs/DECOUPLE_P3_TODO.md
+  adversarial=handoffs/DECOUPLE-P3-ADV-CODEX.md
+  reconcile=handoffs/DECOUPLE-P3-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DECOUPLE_P3_SPEC.md
+  todo=docs/DECOUPLE_P3_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-P3-ADV-CODEX.md", "output_sha256": "664462ed1a5d7a084b13c265ba90fe64459bb0404a3f44f122732931d81aea69", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T01:29:21Z"}
+=== 2026-07-14 09:29:22 | dispatch ===
+  ts=2026-07-14 09:29:22
+  kind=dispatch
+  intent=B1 派工:Codex 依 Frozen TODO 實作 Task 1.1-1.3
+  risk=high
+  facts_asked=三家閉合 FROZEN-OK;處置檔雙戳記 PASS(e84a900a)
+  review_role=codex 實作;後續 composer+grok review
+  template=docs/DECOUPLE_P3_TODO.md
+  adversarial=handoffs/DECOUPLE-P3-ADV-CODEX.md
+  reconcile=handoffs/DECOUPLE-P3-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DECOUPLE_P3_SPEC.md
+  todo=docs/DECOUPLE_P3_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T02:20:18Z"}
+=== 2026-07-14 10:20:18 | dispatch ===
+  ts=2026-07-14 10:20:18
+  kind=dispatch
+  intent=B1 code review:composer+grok 審 3 commits
+  risk=low
+  facts_asked=主委實跑 44 passed/scanner 全綠/斷言零變動
+  review_role=composer+grok 全面 code review
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-P3-CODEREV-grok.md", "output_sha256": "e476ee1cc35fa732200091f4b97f34be53887adf29cf2dc764f008b1b174d767", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T02:23:01Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-P3-CODEREV-composer.md", "output_sha256": "5958c888fe4548eb445886327c7b6dedda57b477094a9f918af820f82dc43aaa", "task_id": "DECOUPLE-P3", "ts": "2026-07-14T02:23:23Z"}
+=== 2026-07-14 11:19:06 | artifact ===
+  ts=2026-07-14 11:19:06
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DECOUPLE_SCAN2_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(小-中,RISK-HIT: b); §A=filled(偵察 receipt); §C=filled; §G=N/A→§N(掃描器側); §P=3 Task; §V=filled(矩陣擴充); §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-07-14 11:19:06 | artifact ===
+  ts=2026-07-14 11:19:06
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DECOUPLE_SCAN2_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0/§B/每Task=filled
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T03:21:18Z"}
+=== 2026-07-14 11:21:18 | dispatch ===
+  ts=2026-07-14 11:21:18
+  kind=dispatch
+  intent=SPEC+TODO 三家 adversarial review(含 2 筆 models triage 裁決)
+  risk=low
+  facts_asked=3 receipt;api/models 僅 2 筆;R4 grep 盲區已實證
+  review_role=codex+composer+grok 對抗審+triage 裁決
+  template=n/a: 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-SCAN2-ADV-GROK.md", "output_sha256": "166be21ce3a59df09083c2d3269dfbe2e333794f4633443ace1b3389cbe8dd88", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T03:25:06Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-SCAN2-ADV-COMPOSER.md", "output_sha256": "5e57bd3a791f56058260f6a1bd6d6b70563e2d9a6e565b02c02e158742541cb0", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T03:25:18Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-SCAN2-ADV-CODEX.md", "output_sha256": "0ef1e654b33e3d38ea1a0912d61f0933ba0d734b8239da5f114f781b8468d30a", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T03:29:02Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T03:31:48Z"}
+=== 2026-07-14 11:31:48 | dispatch ===
+  ts=2026-07-14 11:31:48
+  kind=dispatch
+  intent=r2 閉合重驗:三家重跑自家反例
+  risk=low
+  facts_asked=r2 依 3B/13M 重寫;triage 終判=刪 DataSourceEnum+白名單 SUPPORTED_TIMEFRAMES(codex 少數意見存檔)
+  review_role=三家原提出方閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T03:34:45Z"}
+=== 2026-07-14 11:34:45 | dispatch ===
+  ts=2026-07-14 11:34:45
+  kind=dispatch
+  intent=處置檔戳記輪
+  risk=low
+  facts_asked=三家 FROZEN-OK
+  review_role=codex+composer 戳記
+  template=n/a: 戳記輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/DECOUPLE-SCAN2-ADV-CODEX.md", "output_sha256": "815a0759f0e260c3513d687afd7ed87431fd5f198f25199d41f4c13bbfb8bed2", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T03:36:12Z"}
+=== 2026-07-14 11:36:13 | dispatch ===
+  ts=2026-07-14 11:36:13
+  kind=dispatch
+  intent=B1 派工:Codex 依 Frozen TODO 實作 Task 1.1-1.3
+  risk=high
+  facts_asked=三家 FROZEN-OK;處置檔雙戳記 PASS(2ffdeaf9)
+  review_role=codex 實作;後續 composer+grok review
+  template=docs/DECOUPLE_SCAN2_TODO.md
+  adversarial=handoffs/DECOUPLE-SCAN2-ADV-CODEX.md
+  reconcile=handoffs/DECOUPLE-SCAN2-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DECOUPLE_SCAN2_SPEC.md
+  todo=docs/DECOUPLE_SCAN2_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T04:14:40Z"}
+=== 2026-07-14 12:14:40 | dispatch ===
+  ts=2026-07-14 12:14:40
+  kind=dispatch
+  intent=B1 code review:composer+grok
+  risk=low
+  facts_asked=53 tests 主委實跑;戳記前紅=正確 fail-closed
+  review_role=composer+grok 全面 code review
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-SCAN2-CODEREV-grok.md", "output_sha256": "dce1b324d90918270c78e5e6d61fbaa49751e4b1d33d3e72ef92f894efa576e1", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T04:18:32Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/DECOUPLE-SCAN2-CODEREV-composer.md", "output_sha256": "b824772397c8eac3331562998ead99d3ed9cffd8053c9b43bf90ac0a28e8fed8", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T04:37:25Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T04:37:49Z"}
+=== 2026-07-14 12:37:49 | dispatch ===
+  ts=2026-07-14 12:37:49
+  kind=dispatch
+  intent=退修:Codex 修 grok B1(receipt T1a 錯稱)+B2(nested package 假綠)
+  risk=low
+  facts_asked=grok 函式實測反例:sub/pkg/__init__.py from . import bar 綠(應紅)
+  review_role=codex 修;grok 原提出方閉合
+  template=n/a: 退修派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T04:43:36Z"}
+=== 2026-07-14 12:43:36 | dispatch ===
+  ts=2026-07-14 12:43:36
+  kind=dispatch
+  intent=grok 原提出方閉合重驗(B1/B2 修復)
+  risk=low
+  facts_asked=nested 修前 2 failed→修後紅;55 passed;receipt 更正節
+  review_role=grok 閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "DECOUPLE-SCAN2", "ts": "2026-07-14T04:44:59Z"}
+=== 2026-07-14 12:44:59 | dispatch ===
+  ts=2026-07-14 12:44:59
+  kind=dispatch
+  intent=Task 1.4 manifest 重戳輪:codex+composer 審 10 條 append v2 戳記
+  risk=low
+  facts_asked=code review 全 PASS(grok 閉合);manifest 10 條含新條目+少數意見註記
+  review_role=codex+composer 戳記
+  template=n/a: 戳記輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-14T06:27:13Z","tool":"Write","kind":"artifact","reason":"token_expired"}
+=== 2026-07-14 14:27:26 | artifact ===
+  ts=2026-07-14 14:27:26
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(RISK-HIT: a,b,d); §A=filled(4 FACT-RECEIPT+使用者2026-07-14已確認+委員會待裁二案); §C=filled(consumer-map含reporter/service/frontend); §G=filled(行為變更型選擇性等值golden); §P=filled(Phase0-3); §V=filled(M1-M4 mutation); §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-07-14 14:33:45 | dispatch ===
+  ts=2026-07-14 14:33:45
+  kind=dispatch
+  intent=IC1C SPEC adversarial 審查:三家(codex/composer/grok)獵洞 docs/IC1C_NETIC_SPEC.md,產出 BLOCKING/NON-BLOCKING finding 至 handoffs/
+  risk=low
+  facts_asked=使用者參數已訪談 2026-07-14(成本前端輸入/情境掃描/capacity 低優先,ROADMAP 1c 節);修法二案委員會裁
+  review_role=codex+composer+grok 各自獨立全量審,Claude reconcile
+  template=n/a: 審查型派工,SPEC=docs/IC1C_NETIC_SPEC.md(template_check PASS)
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:37:30Z"}
+=== 2026-07-14 14:37:30 | dispatch ===
+  ts=2026-07-14 14:37:30
+  kind=dispatch
+  intent=IC1C SPEC adversarial 審查(補記 task-id:三家已派,grok/composer 已交卷,codex 進行中)
+  risk=low
+  facts_asked=使用者參數已訪談 2026-07-14(ROADMAP 1c 節)
+  review_role=codex+composer+grok 獨立全量審,Claude reconcile
+  template=n/a: 審查型派工,SPEC=docs/IC1C_NETIC_SPEC.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-grok.md", "output_sha256": "3671c1bf0066627b930e0288af6558b522af63146f5a5df092f8619d6b869363", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:37:30Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-composer.md", "output_sha256": "ed50c88de4ad82506f44e1061d06eccba6aa7311987a8cd9fe33f4e4da8b7308", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:37:30Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-codex.md", "output_sha256": "c087ae189e3bca53140fdcbcedfa0b2ad76aeb2c8cfe2f969e9c816db9a48103", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:38:18Z"}
+=== 2026-07-14 14:39:43 | artifact ===
+  ts=2026-07-14 14:39:43
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(RISK-HIT: a,b,d); §A=filled(RULING-FINAL B-strict+封存A條件); §T=new(turnover語意); §C=filled(consumer-map補全17處); §G=filled(全鍵集合equality+canonical重算+G-OLD/G-NEW分層); §P=filled(1.2改fail-closed,proxy納scope); §V=filled(M1-M8+新建vs改寫表); §R/§N=filled
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:42:12Z"}
+=== 2026-07-14 14:42:12 | dispatch ===
+  ts=2026-07-14 14:42:12
+  kind=dispatch
+  intent=IC1C SPEC r2 閉合重驗:三家原委員逐 finding 驗關閉+RECONCILE 戳記
+  risk=low
+  facts_asked=r1 三家 REJECT 17 finding 已全 ACCEPT 入 r2(RECONCILE)
+  review_role=codex+composer+grok 原提出方閉合重驗(章程 B8)
+  template=n/a: 閉合重驗派工,brief=handoffs/20260714-IC1C-SPECREV-R2-BRIEF.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-R2-grok.md", "output_sha256": "43e89b2bc4583b9097973b1b55dcf7aa08e0fd6b68a129cb2bca3037f7dd22b2", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:44:59Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-R2-composer.md", "output_sha256": "7e44c6852c01bc742892e0728ac99475f714ecfb6ec4813c737d2c819754b091", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:44:59Z"}
+=== 2026-07-14 14:45:57 | artifact ===
+  ts=2026-07-14 14:45:57
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=r3 修訂:§G 三套精確鍵集合 profile;discriminated union 統一凍結;cost_enabled schema 提前 Phase 1;override reject 補 cost_enabled/cost_scenarios;§V 依章程 B1.1/B4 綁測試檔:函式+自證 mutation probe
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-R2-codex.md", "output_sha256": "cdd8f8e14308a33a04b6cb9a609473b5ed50cc374b7163a34583f1c74bc8b329", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:48:12Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:48:48Z"}
+=== 2026-07-14 14:48:48 | dispatch ===
+  ts=2026-07-14 14:48:48
+  kind=dispatch
+  intent=IC1C SPEC r3 閉合重驗:codex 驗 CODEX-3/5/6/7+R2-1 是否關閉
+  risk=low
+  facts_asked=r2 輪 composer/grok APPROVE+STAMP;codex 5B 已全落 r3(§U/三profile/phase提前/整節reject/章程化mutation)
+  review_role=codex 原提出方閉合重驗
+  template=n/a: 閉合重驗,SPEC=docs/IC1C_NETIC_SPEC.md v0.3
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-R3-codex.md", "output_sha256": "50e540374e12a4944db9bd0542f63bb6a0717f962864398d100202078b72f775", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:52:01Z"}
+=== 2026-07-14 14:52:01 | artifact ===
+  ts=2026-07-14 14:52:01
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=r4:§U union僅約束存在鍵+presence由profile定;階梯算法提前§T/Phase1,Phase3只剩UI註記;finite/range validator凍結;T4前端自證probe(vitest)補齊
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:54:28Z"}
+=== 2026-07-14 14:54:28 | dispatch ===
+  ts=2026-07-14 14:54:28
+  kind=dispatch
+  intent=IC1C SPEC r4 閉合重驗:codex 驗 CODEX-7/R3-1/R3-2/R3-3 是否關閉
+  risk=low
+  facts_asked=r4 已落 union存在性語意/階梯移Phase1/finite validator+M10/T4 vitest probe
+  review_role=codex 原提出方閉合重驗
+  template=n/a: 閉合重驗,SPEC=docs/IC1C_NETIC_SPEC.md v0.4
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-R4-codex.md", "output_sha256": "a42e88e18a6ac6b8fd50e1521727057870a3726798143debe5ddc453bd4cb03f", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:56:30Z"}
+=== 2026-07-14 14:56:30 | artifact ===
+  ts=2026-07-14 14:56:30
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=r5:裁 cost_bps=0 非法(無成本=cost_enabled=False)三處同步;M10 三層各綁具名 test+各自同檔 probe
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T06:57:47Z"}
+=== 2026-07-14 14:57:47 | dispatch ===
+  ts=2026-07-14 14:57:47
+  kind=dispatch
+  intent=IC1C SPEC r5 閉合重驗:codex 驗 R4-1/R4-2 是否關閉
+  risk=low
+  facts_asked=r5 已裁 cost_bps=0 非法三處同步+M10 三層逐層 probe
+  review_role=codex 原提出方閉合重驗
+  template=n/a: 閉合重驗,SPEC=docs/IC1C_NETIC_SPEC.md v0.5
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-R5-codex.md", "output_sha256": "35ba4b76ef24ebd3938ccf878287cb46a04d08b2af40e642236238a00861b1af", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T07:00:48Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T07:00:48Z"}
+=== 2026-07-14 15:00:48 | dispatch ===
+  ts=2026-07-14 15:00:48
+  kind=dispatch
+  intent=IC1C SPEC r3-r5 delta concur:composer+grok 快速複核 codex 輪修訂
+  risk=low
+  facts_asked=codex r5 APPROVE+STAMP;delta=§U(union/profile/finite)/階梯移Phase1/M9-M10/T4-T5 probe/cost_bps=0非法
+  review_role=composer+grok delta concur
+  template=n/a: delta concur,SPEC=docs/IC1C_NETIC_SPEC.md v0.5
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-R5-composer.md", "output_sha256": "2caa42264520c672c0698b2c9eaf9f49a6e5ac956995d06b54f5dbbdef778728", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T07:02:50Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-R5-grok.md", "output_sha256": "2cdb49788b5438dcc5156d0f0417cbbf77486c74b2094664a47f2e8d82941157", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T07:03:53Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T07:04:51Z"}
+=== 2026-07-14 15:04:51 | dispatch ===
+  ts=2026-07-14 15:04:51
+  kind=dispatch
+  intent=RECONCILE v2 格式戳記補正:三家已 APPROVE(見各自 R5/R2 檔),補機檢格式戳記行
+  risk=low
+  facts_asked=reconcile_stamps_check 需 '## 戳記' 區段+body-hash 格式;三家 APPROVE 檔已註冊
+  review_role=codex+composer+grok 各自驗 body 後 append v2 戳記
+  template=n/a: 戳記補正
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-SPECREV-RECONCILE.md", "output_sha256": "a9a740cc6f9b7907e33e66af94ff25a0e798aec0e9d4adddfa7ef8dd951132f2", "task_id": "IC1C-SPECREV", "ts": "2026-07-14T07:06:53Z"}
+=== 2026-07-14 15:07:24 | artifact ===
+  ts=2026-07-14 15:07:24
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=filled; §B=4批次; Phase0-3 全 Task 含驗證/邊界/不可做; 100%覆蓋 SPEC v1.0 Task/M1-M10/G-OLD·G-NEW·G-NEW2
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:10:16Z"}
+=== 2026-07-14 15:10:16 | dispatch ===
+  ts=2026-07-14 15:10:16
+  kind=dispatch
+  intent=IC1C TODO adversarial 審查:三家對 docs/IC1C_NETIC_TODO.md 獵洞(vs SPEC v1.0 Frozen)
+  risk=low
+  facts_asked=SPEC 已五輪三家閉合+戳記機檢 PASS
+  review_role=codex+composer+grok 獨立審 TODO,用 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  template=n/a: TODO 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-codex.md", "output_sha256": "6166ca684145eca53d211ee6db08355834db97d2b8c68825419efe82f984f8d1", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:13:33Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-composer.md", "output_sha256": "401c31e657b22821ad970da3892fcedf547f297e3c488dd365bf984081d33e62", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:13:34Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-grok.md", "output_sha256": "5d5e5bee9a8ba1724853647b7683cfead6f6ee208b2a94ba22327b445bf04518", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:15:00Z"}
+=== 2026-07-14 15:16:04 | artifact ===
+  ts=2026-07-14 15:16:04
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=r2:T-F1~T-F16 全落(新 Task 1.4 reporter/export;gate 命令帶參;freeze 三模式+獨立 verifier;SCHEMA 專檔;域驗證非None一律;capacity null;0.1 grep 修正;7條checklist)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:19:20Z"}
+=== 2026-07-14 15:19:20 | dispatch ===
+  ts=2026-07-14 15:19:20
+  kind=dispatch
+  intent=IC1C TODO r2 閉合重驗:三家原委員逐 finding 驗關閉+戳記
+  risk=low
+  facts_asked=r1 15 BLOCKING+12 MAJOR 合併 T-F1~T-F16 全 ACCEPT 落 r2
+  review_role=三家原提出方閉合重驗(章程 B8)+RECONCILE 戳記
+  template=n/a: 閉合重驗,TODO=docs/IC1C_NETIC_TODO.md r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R2-composer.md", "output_sha256": "74ade7a4d677eed303b981a1d32a908d0a12d8cd52cf33bce980acb16320d732", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:22:16Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R2-codex.md", "output_sha256": "c5325b43777f2c40870a32e83ed0f22f01ecde793db2239c2e9ca0bd29006550", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:22:25Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R2-grok.md", "output_sha256": "935744058f39f7321272c12af973f3aa4b30579b583a49636eef1517b7c2c6b4", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:22:49Z"}
+=== 2026-07-14 15:23:16 | artifact ===
+  ts=2026-07-14 15:23:16
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=v1.1 補裁:負 turnover→SKIPPED(禁 max(0,·) 靜默 clamp);capacity 允許子鍵入 §U;交 TODO r3 閉合輪三家核可
+  spec=
+  todo=
+  manifest=
+=== 2026-07-14 15:23:30 | artifact ===
+  ts=2026-07-14 15:23:30
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=r3:真 fixture 特徵名/validator 非None一律驗域偽碼統一/負turnover SKIPPED去clamp/G-NEW2 async 入口/npm --prefix/reporter裸number/UI三態oracle/phase26入Gate/docs唯一路徑
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:35:48Z"}
+=== 2026-07-14 15:35:48 | dispatch ===
+  ts=2026-07-14 15:35:48
+  kind=dispatch
+  intent=IC1C TODO r3 閉合重驗:三家驗 r2 findings(T-F17~T-F26)關閉+SPEC v1.1 負turnover補裁核可+戳記
+  risk=low
+  facts_asked=r2 三家 REJECT 全 ACCEPT 落 r3;SPEC §U v1.1 補裁負 turnover→SKIPPED
+  review_role=三家原提出方閉合重驗+v1.1 核可+RECONCILE 戳記
+  template=n/a: 閉合重驗,TODO=docs/IC1C_NETIC_TODO.md r3
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R3-composer.md", "output_sha256": "03d33f970d84cb5431832b636f065a38ad963c8cbe57764bd2ca0663088bd901", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:38:23Z"}
+=== 2026-07-14 15:38:48 | artifact ===
+  ts=2026-07-14 15:38:48
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=r4:Task1.3 邊界去clamp字樣;G-NEW2 兩段式bootstrap偽碼;Phase3 Gate對齊§B;npm prefix補齊;collect-only 命令
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R3-codex.md", "output_sha256": "2253ddbbb3cc0c2af1abb00985d073ca580c67a54b3fabec01999e60031c33fa", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:41:15Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R3-grok.md", "output_sha256": "fd085b67d7feee5545cabc694405dd3f62a88e5982efa5d733d01bcebc129f5b", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T07:41:15Z"}
+=== 2026-07-14 15:41:34 | artifact ===
+  ts=2026-07-14 15:41:34
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=r5:§0 SKIPPED 補負值;T1 具名負turnover測試+G-NEW注入;G-NEW2 排除注入特徵比對;雙跑hash字面命令;capacity 鍵集合斷言;--collect-only入§B B2
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-14T08:51:34Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-14T08:51:39Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T08:51:50Z"}
+=== 2026-07-14 16:51:50 | dispatch ===
+  ts=2026-07-14 16:51:50
+  kind=dispatch
+  intent=IC1C TODO r5 閉合重驗:codex(r3 5B)+composer(r3 1B)驗關閉
+  risk=low
+  facts_asked=r5 已落負turnover具名測試/capacity恰等/雙跑字面命令/collect-only入Gate/bootstrap偽碼/clamp殘字清除
+  review_role=codex+composer 原提出方閉合重驗
+  template=n/a: 閉合重驗,TODO=docs/IC1C_NETIC_TODO.md r5
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R5-composer.md", "output_sha256": "07d236a2aa5dc6f77f52a6d770b6f6b032975d51f59272ca3bb5bad0ef351f8c", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T08:54:25Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R5-codex.md", "output_sha256": "e93756d1cb8b5f6d6cea070dd7e97f30da7ad5457caa33e95523505408c1f3aa", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T08:55:32Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T08:56:11Z"}
+=== 2026-07-14 16:56:11 | dispatch ===
+  ts=2026-07-14 16:56:11
+  kind=dispatch
+  intent=IC1C TODO r6 閉合:codex 驗 R5-1/R5-2 關閉
+  risk=low
+  facts_asked=r6:G-NEW 不變欄比對排除三注入特徵(改驗 SKIPPED 形狀);raise 或 0.0 擇一已刪,唯一=raise
+  review_role=codex 原提出方閉合
+  template=n/a: 閉合重驗,TODO=docs/IC1C_NETIC_TODO.md r6
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-R6-codex.md", "output_sha256": "727cc4dd42865d6a671dc03b71caaaa1fc229d24006a07b4d8065cb9e9f9e447", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T08:57:51Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T08:58:25Z"}
+=== 2026-07-14 16:58:25 | dispatch ===
+  ts=2026-07-14 16:58:25
+  kind=dispatch
+  intent=RECONCILE 定稿統一戳記:三家對最終 body 自算 hash 補 v2 戳記(grok 舊戳因 body 演進已失效)
+  risk=low
+  facts_asked=三家 verdict 已齊(grok r3/composer r5/codex r6 APPROVE)
+  review_role=三家驗定稿 body 一致後各 append 戳記
+  template=n/a: 戳記補正
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1C-TODOREV-RECONCILE.md", "output_sha256": "eb976a7e7f8553f7638875c478e2494d7fcb409b473672fe43245d54ebd127bd", "task_id": "IC1C-TODOREV", "ts": "2026-07-14T08:59:53Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260714-IC1C-TODOREV-RECONCILE.md", "output_sha256": "eb976a7e7f8553f7638875c478e2494d7fcb409b473672fe43245d54ebd127bd", "task_id": "IC1C-B0", "ts": "2026-07-14T09:02:59Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260714-IC1C-TODOREV-R6-codex.md", "output_sha256": "727cc4dd42865d6a671dc03b71caaaa1fc229d24006a07b4d8065cb9e9f9e447", "task_id": "IC1C-B0", "ts": "2026-07-14T09:03:09Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B0-ADV-CODEX.md", "output_sha256": "727cc4dd42865d6a671dc03b71caaaa1fc229d24006a07b4d8065cb9e9f9e447", "task_id": "IC1C-B0", "ts": "2026-07-14T09:03:58Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B0-ADV-COMPOSER.md", "output_sha256": "07d236a2aa5dc6f77f52a6d770b6f6b032975d51f59272ca3bb5bad0ef351f8c", "task_id": "IC1C-B0", "ts": "2026-07-14T09:03:58Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1C-B0-ADV-CODEX.md,handoffs/IC1C-B0-ADV-COMPOSER.md", "output_sha256": "pending", "task_id": "IC1C-B0", "ts": "2026-07-14T09:04:10Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B0", "ts": "2026-07-14T09:04:47Z"}
+=== 2026-07-14 17:04:47 | dispatch ===
+  ts=2026-07-14 17:04:47
+  kind=dispatch
+  intent=IC1C-B0 adversarial provenance 補記:ADV-CODEX 檔=TODOREV R6 codex 閉合判詞複本(原審計 task IC1C-TODOREV)
+  risk=low
+  facts_asked=n/a
+  review_role=codex
+  template=n/a: provenance 補記
+  adversarial=handoffs/IC1C-B0-ADV-CODEX.md
+  reconcile=handoffs/20260714-IC1C-TODOREV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B0", "ts": "2026-07-14T09:04:48Z"}
+=== 2026-07-14 17:04:48 | dispatch ===
+  ts=2026-07-14 17:04:48
+  kind=dispatch
+  intent=IC1C-B0 adversarial provenance 補記:ADV-COMPOSER 檔=TODOREV R5 composer 閉合判詞複本
+  risk=low
+  facts_asked=n/a
+  review_role=composer
+  template=n/a: provenance 補記
+  adversarial=handoffs/IC1C-B0-ADV-COMPOSER.md
+  reconcile=handoffs/20260714-IC1C-TODOREV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1C-B0-ADV-CODEX.md,handoffs/IC1C-B0-ADV-COMPOSER.md", "output_sha256": "pending", "task_id": "IC1C-B0", "ts": "2026-07-14T09:04:57Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1C-B0-ADV-CODEX.md,handoffs/IC1C-B0-ADV-COMPOSER.md", "output_sha256": "pending", "task_id": "IC1C-B0", "ts": "2026-07-14T09:05:05Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1C-B0-ADV-CODEX.md", "output_sha256": "727cc4dd42865d6a671dc03b71caaaa1fc229d24006a07b4d8065cb9e9f9e447", "task_id": "IC1C-B0", "ts": "2026-07-14T09:05:45Z"}
+=== 2026-07-14 17:05:46 | dispatch ===
+  ts=2026-07-14 17:05:46
+  kind=dispatch
+  intent=IC1C B0 實作派工:Grok 依 Frozen TODO Task 0.1 建 baseline 凍結腳本+G-OLD(adversarial=TODO 六輪閉合判詞 ADV 複本)
+  risk=high
+  facts_asked=SPEC v1.1+TODO r6 已凍結,雙 RECONCILE-STAMP 機檢 PASS
+  review_role=Codex+Composer 批後審查
+  template=docs/IC1C_NETIC_TODO.md Task 0.1
+  adversarial=handoffs/IC1C-B0-ADV-CODEX.md
+  reconcile=handoffs/20260714-IC1C-TODOREV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC1C_NETIC_SPEC.md
+  todo=docs/IC1C_NETIC_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B0", "ts": "2026-07-14T09:10:14Z"}
+=== 2026-07-14 17:10:14 | dispatch ===
+  ts=2026-07-14 17:10:14
+  kind=dispatch
+  intent=IC1C B0 code review:codex+composer 審 Grok 產出(freeze/validate 腳本+G-OLD)
+  risk=low
+  facts_asked=Claude 已獨立實跑 Gate PASS(hash 6e23ff63)
+  review_role=codex+composer 實作者不自審
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B0-CODEREV-composer.md", "output_sha256": "23aaa8f4b7d9c15cfcdf518f9ebc6f577e6078603cdfdaacd468e4b12df127d4", "task_id": "IC1C-B0", "ts": "2026-07-14T09:12:49Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B0-CODEREV-codex.md", "output_sha256": "3ec19da5ea7c4a8d3837c340b792eb73606bfd365584005da0d4bfb8da2e4ad9", "task_id": "IC1C-B0", "ts": "2026-07-14T09:19:11Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1C-B0-ADV-CODEX.md", "output_sha256": "727cc4dd42865d6a671dc03b71caaaa1fc229d24006a07b4d8065cb9e9f9e447", "task_id": "IC1C-B1", "ts": "2026-07-14T09:20:32Z"}
+=== 2026-07-14 17:20:32 | dispatch ===
+  ts=2026-07-14 17:20:32
+  kind=dispatch
+  intent=IC1C B1 實作派工:Grok 依 Frozen TODO Tasks 1.1-1.4(B-strict 核心修復+momentum 消費點)
+  risk=high
+  facts_asked=B0 已入版 f1d85c5,G-OLD 凍結;TODO r6 Frozen
+  review_role=Codex+Composer 批後審查
+  template=docs/IC1C_NETIC_TODO.md Phase 1
+  adversarial=handoffs/IC1C-B0-ADV-CODEX.md
+  reconcile=handoffs/20260714-IC1C-TODOREV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC1C_NETIC_SPEC.md
+  todo=docs/IC1C_NETIC_TODO.md
+  manifest=
+ts=2026-07-14 17:24:36 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T092436Z-mutation-multi.json
+ts=2026-07-14 17:24:51 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T092451Z-mutation-multi.json
+ts=2026-07-14 17:25:48 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T092548Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B1", "ts": "2026-07-14T09:26:28Z"}
+=== 2026-07-14 17:26:28 | dispatch ===
+  ts=2026-07-14 17:26:28
+  kind=dispatch
+  intent=IC1C B1 code review:codex+composer 審 Grok Phase 1 實作
+  risk=low
+  facts_asked=Claude 獨立實跑 Gate 全綠(57 passed/9 probes/G-NEW 53e55e27/scanner PASS)
+  review_role=codex+composer 實作者不自審
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-14 17:28:11 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T092810Z-mutation-multi.json
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B1-CODEREV-composer.md", "output_sha256": "4f4c916ae01bacccea95aec8c03228d0d12788b77fcf219177302f28c7525b21", "task_id": "IC1C-B1", "ts": "2026-07-14T09:29:13Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B1-CODEREV-codex.md", "output_sha256": "e53f85b83bb4f2059a4b596b0afbc2124d632b6d25ee65caf8fe440170519105", "task_id": "IC1C-B1", "ts": "2026-07-14T09:33:35Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B1", "ts": "2026-07-14T09:34:01Z"}
+=== 2026-07-14 17:34:01 | dispatch ===
+  ts=2026-07-14 17:34:01
+  kind=dispatch
+  intent=IC1C B1 退修:Grok 修 codex 4 BLOCKING(G-NEW GROSS_ONLY/manifest 假綠/遺失測試/scope 聲稱)
+  risk=low
+  facts_asked=codex 實證 manifest 注入 bogus 欄位不紅;composer APPROVE 0B
+  review_role=codex 閉合重驗(原提出方)
+  template=n/a: 退修派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-14 17:37:31 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T093731Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B1", "ts": "2026-07-14T09:48:54Z"}
+=== 2026-07-14 17:48:54 | dispatch ===
+  ts=2026-07-14 17:48:54
+  kind=dispatch
+  intent=IC1C B1 退修閉合:codex 重跑自己 4 BLOCKING 反例
+  risk=low
+  facts_asked=Grok 已修:三 profile 雙樹/allowlist 寫死+bogus 負例 self-test/empty_aligned 移植/SCOPE 誠實聲明
+  review_role=codex 原提出方閉合重驗
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B1-CODEREV-R2-codex.md", "output_sha256": "1b07e5331f003f481480bae50fbd7de2fe8ec2aeb5c39cb8b492c8cb563fb4e7", "task_id": "IC1C-B1", "ts": "2026-07-14T10:04:28Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1C-B0-ADV-CODEX.md", "output_sha256": "727cc4dd42865d6a671dc03b71caaaa1fc229d24006a07b4d8065cb9e9f9e447", "task_id": "IC1C-B2", "ts": "2026-07-14T10:06:38Z"}
+=== 2026-07-14 18:06:39 | dispatch ===
+  ts=2026-07-14 18:06:39
+  kind=dispatch
+  intent=IC1C B2 實作派工:Grok 依 Frozen TODO Tasks 2.1+2.2(API typed 422+前端成本輸入全棧接線)
+  risk=high
+  facts_asked=B1 已入版 2133c77(B-strict 核心+G-NEW 凍結)
+  review_role=Codex+Composer 批後審查
+  template=docs/IC1C_NETIC_TODO.md Phase 2
+  adversarial=handoffs/IC1C-B0-ADV-CODEX.md
+  reconcile=handoffs/20260714-IC1C-TODOREV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC1C_NETIC_SPEC.md
+  todo=docs/IC1C_NETIC_TODO.md
+  manifest=
+ts=2026-07-14 18:17:03 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T101703Z-mutation-multi.json
+ts=2026-07-14 18:18:30 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T101830Z-mutation-multi.json
+ts=2026-07-14 18:20:18 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T102018Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B2", "ts": "2026-07-14T10:21:21Z"}
+=== 2026-07-14 18:21:21 | dispatch ===
+  ts=2026-07-14 18:21:21
+  kind=dispatch
+  intent=IC1C B2 code review:codex+composer 審 Grok Phase 2 實作,重點三處現場調適
+  risk=low
+  facts_asked=Claude 獨立實跑 Gate 全綠(27+4probes+前端5+build+new2 57cdbc20)
+  review_role=codex+composer 實作者不自審
+  template=n/a: code review 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-14 18:23:29 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T102329Z-mutation-multi.json
+ts=2026-07-14 18:23:41 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T102341Z-mutation-multi.json
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B2-CODEREV-composer.md", "output_sha256": "4ea6d2ed1d047bdae9e821dd1efc8a17c497f4246c824f5c4e38987cafab7c35", "task_id": "IC1C-B2", "ts": "2026-07-14T10:24:25Z"}
+ts=2026-07-14 18:24:41 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T102441Z-mutation-multi.json
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B2-CODEREV-codex.md", "output_sha256": "2a5ac04f0646bb0e775f7e5107d14213d84b6d322c539aa436beed9460943272", "task_id": "IC1C-B2", "ts": "2026-07-14T10:28:19Z"}
+=== 2026-07-14 18:29:02 | artifact ===
+  ts=2026-07-14 18:29:02
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=r7 修訂:G-NEW2 oracle 改良(gross_ic 排除+不變式替代,交 codex 閉合輪核可);batchDate.test 單檔擴 scope 核可記錄
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B2", "ts": "2026-07-14T10:29:41Z"}
+=== 2026-07-14 18:29:41 | dispatch ===
+  ts=2026-07-14 18:29:41
+  kind=dispatch
+  intent=IC1C B2 退修:Grok 修 codex B2/B3/B4+依 TODO r7 改 G-NEW2 oracle;B5 已由編排端核可記錄
+  risk=low
+  facts_asked=codex 5B;composer 0B;TODO r7 修訂待 codex 閉合核可
+  review_role=codex 閉合重驗
+  template=n/a: 退修派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-14 18:33:09 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T103309Z-mutation-multi.json
+ts=2026-07-14 18:34:31 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T103431Z-mutation-multi.json
+=== 2026-07-14 18:35:49 | artifact ===
+  ts=2026-07-14 18:35:49
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1C_NETIC_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=r7b:同號檢查加近零門檻 max|gi|>=0.05(路徑噪聲),交 codex 閉合裁決
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B2", "ts": "2026-07-14T10:36:14Z"}
+=== 2026-07-14 18:36:14 | dispatch ===
+  ts=2026-07-14 18:36:14
+  kind=dispatch
+  intent=IC1C B2 退修閉合:codex 重跑 5 BLOCKING 反例+核可 TODO r7/r7b 修訂
+  risk=low
+  facts_asked=Grok 已修 B1-B4;B5 編排端核可;離線雙模式 Gate 自測綠
+  review_role=codex 原提出方閉合重驗
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B2-CODEREV-R2-codex.md", "output_sha256": "d46586ca09891dc5779fdd844bf51c78c146e5516e899e46c524e48a61b1478f", "task_id": "IC1C-B2", "ts": "2026-07-14T10:43:24Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B2", "ts": "2026-07-14T10:44:11Z"}
+=== 2026-07-14 18:44:11 | dispatch ===
+  ts=2026-07-14 18:44:11
+  kind=dispatch
+  intent=IC1C B2 退修 r2:Grok 修 codex R2 4 BLOCKING(同號 gate 零值漏洞/TS never 排除/T4 production 路徑/gross_ic ??0 假值)
+  risk=low
+  facts_asked=codex 實證 zero-vs-material PASS 漏洞;B2/B5 已 CLOSED
+  review_role=codex 閉合重驗;同批第二輪,再敗依斷路器換手
+  template=n/a: 退修派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-14 18:47:00 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T104700Z-mutation-multi.json
+ts=2026-07-14 18:48:03 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T104803Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B2", "ts": "2026-07-14T10:49:38Z"}
+=== 2026-07-14 18:49:38 | dispatch ===
+  ts=2026-07-14 18:49:38
+  kind=dispatch
+  intent=IC1C B2 退修 r2 閉合:codex 重跑 4 反例(同號 predicate/TS never/T4 production 路徑/假 0)
+  risk=low
+  facts_asked=Grok r2 修畢;Claude 獨立驗:8 前端 tests/27 API/self-test r7b predicates ok
+  review_role=codex 原提出方閉合重驗
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B2-CODEREV-R3-codex.md", "output_sha256": "002f4ed184ada953e82a81f07f25aa0f3851ecf1d7cd75f3529c965f112b2ef4", "task_id": "IC1C-B2", "ts": "2026-07-14T10:52:57Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B2", "ts": "2026-07-14T10:53:28Z"}
+=== 2026-07-14 18:53:28 | dispatch ===
+  ts=2026-07-14 18:53:28
+  kind=dispatch
+  intent=IC1C B2 斷路器換手:Composer 修最後 1 BLOCKING(同號 gate predicate 依 Frozen r7b 語意)
+  risk=low
+  facts_asked=Grok 同批兩輪未閉合此條;codex 裁決 0 無號應 FAIL
+  review_role=codex 閉合重驗
+  template=n/a: 斷路器換手微修
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B2", "ts": "2026-07-14T10:55:52Z"}
+=== 2026-07-14 18:55:52 | dispatch ===
+  ts=2026-07-14 18:55:52
+  kind=dispatch
+  intent=IC1C B2 最終閉合:codex 驗 composer 換手修的同號 predicate
+  risk=low
+  facts_asked=composer 修畢;self-test r7b predicates ok;new2 實資料仍 PASS sha 不變
+  review_role=codex 原提出方閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B2-CODEREV-R4-codex.md", "output_sha256": "d2577bd9922bd5e62456fccc27b62d89c527ca807b360c620d7860a9f9104391", "task_id": "IC1C-B2", "ts": "2026-07-14T10:58:21Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1C-B0-ADV-CODEX.md", "output_sha256": "727cc4dd42865d6a671dc03b71caaaa1fc229d24006a07b4d8065cb9e9f9e447", "task_id": "IC1C-B3", "ts": "2026-07-14T10:59:48Z"}
+=== 2026-07-14 18:59:49 | dispatch ===
+  ts=2026-07-14 18:59:49
+  kind=dispatch
+  intent=IC1C B3 實作派工:Grok 依 Frozen TODO Task 3.1(UI 語意註記+docs 收尾,零 schema)
+  risk=high
+  facts_asked=B2 已入版 04ac6fb
+  review_role=Codex+Composer 批後審查
+  template=docs/IC1C_NETIC_TODO.md Phase 3
+  adversarial=handoffs/IC1C-B0-ADV-CODEX.md
+  reconcile=handoffs/20260714-IC1C-TODOREV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC1C_NETIC_SPEC.md
+  todo=docs/IC1C_NETIC_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1C-B3", "ts": "2026-07-14T11:18:57Z"}
+=== 2026-07-14 19:18:57 | dispatch ===
+  ts=2026-07-14 19:18:57
+  kind=dispatch
+  intent=IC1C B3 code review:codex+composer 審 Task 3.1+裁決 conftest 越界
+  risk=low
+  facts_asked=Claude 獨立驗:build 綠/per_rebalance=3/new2 等值/兩 scanner PASS;conftest.py stub Binance ping 超允許檔
+  review_role=codex+composer
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B3-CODEREV-composer.md", "output_sha256": "fcb835a9c5e4ab21350eddb7ce54050082f757edf939b8f968a4e9e5f178e32e", "task_id": "IC1C-B3", "ts": "2026-07-14T11:22:03Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1C-B3-CODEREV-codex.md", "output_sha256": "c7bf1477127b8df8dc895defd72e50c5697af6f677ceca411c07db8f562551e4", "task_id": "IC1C-B3", "ts": "2026-07-14T11:27:27Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-NECESSITY", "ts": "2026-07-14T13:27:46Z"}
+=== 2026-07-14 21:27:46 | dispatch ===
+  ts=2026-07-14 21:27:46
+  kind=dispatch
+  intent=1c-FR 必要性委員會:三家獨立全量評估(是否必要/何時做/重開條件)
+  risk=low
+  facts_asked=使用者明言其推理僅初步理解;Claude 自產版已寫(claude.md);ML cost-aware 為關鍵未決點
+  review_role=codex+composer+grok 各自獨立全面評估,禁分角度;Claude 版僅供對照非錨定
+  template=n/a: 委員會諮詢
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-NECESSITY-composer.md", "output_sha256": "bf19eac388a56ab095833ee792160d8461d0aef41cdca77b951bfa24816e6ea0", "task_id": "IC1CFR-NECESSITY", "ts": "2026-07-14T13:30:09Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-NECESSITY-grok.md", "output_sha256": "a05c0a4abe418362ac17c8607a38f45a341ae6595a10a627337979472cc51fdd", "task_id": "IC1CFR-NECESSITY", "ts": "2026-07-14T13:30:19Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-NECESSITY-codex.md", "output_sha256": "2b81782930e4cc9a45457ef0ae115a9388d487a24913184d30966e041283002e", "task_id": "IC1CFR-NECESSITY", "ts": "2026-07-14T13:31:33Z"}
+=== 2026-07-14 22:17:05 | artifact ===
+  ts=2026-07-14 22:17:05
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_STOPGAP_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=中(RISK-HIT: a,b);§A=FACT-RECEIPT 4 條+LS 模組同病待驗;§C consumer;§G=N/A 理由(fail-close 下架非數值變更,golden=下架前後 diff 表);§P 三 Task;§V mutation;§R;§N
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:18:53Z"}
+=== 2026-07-14 22:18:53 | dispatch ===
+  ts=2026-07-14 22:18:53
+  kind=dispatch
+  intent=STOPGAP SPEC adversarial:三家審 docs/IC1CFR_STOPGAP_SPEC.md
+  risk=low
+  facts_asked=使用者已裁立即止血;LS 模組同病與否=委員讀碼裁定
+  review_role=codex+composer+grok 獨立審
+  template=n/a: SPEC 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-grok.md", "output_sha256": "7c3a281ddc62f7925961937b472c97ea70570b8892bed7751897e3c44075a5bb", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:24:12Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-composer.md", "output_sha256": "d6e0719f001fd8a8324a2ea0ce15c56ce82af17057fe763b43847a8c27b69612", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:25:10Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-codex.md", "output_sha256": "7195332fa5f6aa657c33f5fcbc3cca7fac31ed7fc6d8fd194efd7cae0c8885d1", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:28:34Z"}
+=== 2026-07-14 22:29:27 | artifact ===
+  ts=2026-07-14 22:29:27
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_STOPGAP_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=r2:S-F1~S-F8 全落(四處預設+tier 例外/EquityCurve 獨立下架/邊界 sanitizer/§U 佔位定案/§G JSON-path/factory gate/LS 出 scope)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:32:55Z"}
+=== 2026-07-14 22:32:55 | dispatch ===
+  ts=2026-07-14 22:32:55
+  kind=dispatch
+  intent=STOPGAP SPEC r2 閉合重驗:三家原委員驗 S-F1~S-F8 關閉
+  risk=low
+  facts_asked=r1 13B 合併 S-F1~S-F8 全 ACCEPT 落 r2;EquityCurve 獨立下架 Task 2.2;sanitizer 單一邊界
+  review_role=codex+composer+grok 原提出方閉合重驗+RECONCILE 戳記
+  template=n/a: 閉合重驗,SPEC=docs/IC1CFR_STOPGAP_SPEC.md r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R2-codex.md", "output_sha256": "95c16e737831bebb3d079df32cefeffac75713d08717f6aca793b98c094c546f", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:35:43Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R2-composer.md", "output_sha256": "7283ece672639ca2c2069e58a593008112ded82f9605a944856a965be4a936a2", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:36:35Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R2-grok.md", "output_sha256": "a0611bf1e834167ce8c9f94acdf508705e85e355c58139c6c09e9cbccf2a1370", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:36:36Z"}
+=== 2026-07-14 22:37:21 | artifact ===
+  ts=2026-07-14 22:37:21
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_STOPGAP_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=r3:default-off 契約定案(選項B:not_run+無節=誠實;顯式開才佔位;sanitizer 堵legacy)+FACT 更正(_apply_tier_config@orchestrator:3335,3371;ic_models 欄位單數 factor_return)+§G 頂層計數排除
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:50:32Z"}
+=== 2026-07-14 22:50:32 | dispatch ===
+  ts=2026-07-14 22:50:32
+  kind=dispatch
+  intent=STOPGAP SPEC r3 閉合:三家驗 default-off 契約+FACT 更正關閉
+  risk=low
+  facts_asked=r3 採選項 B(not_run 誠實);FACT 全查真碼更正;§G 頂層計數排除
+  review_role=codex+composer+grok 閉合重驗+戳記(body hash 自算)
+  template=n/a: 閉合重驗 r3
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R3-codex.md", "output_sha256": "d3bc013dd3a8e80fbdd04c3f64d1118e375f86ab5b5d25e4d5e4cd2f28438114", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:53:25Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R3-composer.md", "output_sha256": "415adb0e51b9d5e5fdff35966fbed996ba57a04405e58dfabe676be619d5da3b", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:54:16Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R3-grok.md", "output_sha256": "6726197462376b78717130dfadf1bc3a8b97d2b2c8db0f07a7d4a0b6f2b3ddc1", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T14:54:22Z"}
+=== 2026-07-14 22:54:58 | artifact ===
+  ts=2026-07-14 22:54:58
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_STOPGAP_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=r4:pure-tier→not_run(非佔位)+ModuleUnavailableError 專屬 except 分支寫 unavailable union+完成 count 排除+force 不跨 deep-off+§G before 用實凍值 completed
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T15:07:08Z"}
+=== 2026-07-14 23:07:08 | dispatch ===
+  ts=2026-07-14 23:07:08
+  kind=dispatch
+  intent=STOPGAP SPEC r4 閉合:codex 驗 CX-1~4/grok 驗 B1 關閉
+  risk=low
+  facts_asked=r4:pure-tier=not_run/ModuleUnavailableError except 分支/force 不跨 deep-off/§G before 實凍值
+  review_role=codex+grok 閉合(composer r3 已 APPROVE,r4 delta 快速 concur)+戳記
+  template=n/a: 閉合重驗 r4
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R4-codex.md", "output_sha256": "31968836b13cfe932e06a9a777585611898d6acae79abfe140484c472f58fb3a", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T15:08:36Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R4-composer.md", "output_sha256": "4e3efc619f7276c9c2394f87ccd8766b5cfb0fa76d90e8f32c3f1447adc3d105", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T15:09:17Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T15:09:51Z"}
+=== 2026-07-14 23:09:51 | dispatch ===
+  ts=2026-07-14 23:09:51
+  kind=dispatch
+  intent=STOPGAP SPEC r4 codex 重派:澄清此為凍結前 SPEC adversarial 審查(TODO 依 templates/TODO_GENERATION_PROMPT 於 SPEC 凍結後才生,非缺失)
+  risk=low
+  facts_asked=codex r4 因 TODO 不存在流程性 BLOCKED,但已驗控制流無技術 finding;composer CONCUR
+  review_role=codex 對 SPEC 內容給技術裁決
+  template=n/a: 閉合重驗 r4 重派
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R4-grok.md", "output_sha256": "f9f56bdd6c2b9bc8ea8b1a4723d17d5e0fef5c2c3d8afb1166fc88875752f7e1", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T15:10:38Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-R4b-codex.md", "output_sha256": "dde72c172ecffa18dcf7f8f6cfcb8d1d9f9ff0e8ca03f718320edce2dd8a8675", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T15:12:31Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-RECONCILE.md", "output_sha256": "d73fcabaab66b07b138eb50bfba91e80436ca0de469a52647270ec156954420b", "task_id": "IC1CFR-STOPGAP", "ts": "2026-07-14T15:22:59Z"}
+=== 2026-07-14 23:23:22 | artifact ===
+  ts=2026-07-14 23:23:22
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_STOPGAP_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0 全域規則;§B 兩批(B1後端+B2前端);Phase1 Task1.1-1.3+Phase2 Task2.1-2.2 全含驗證/邊界/不可做;100%覆蓋 SPEC Task/M1-M4/§G兩版本
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T15:24:55Z"}
+=== 2026-07-14 23:24:56 | dispatch ===
+  ts=2026-07-14 23:24:56
+  kind=dispatch
+  intent=STOPGAP TODO adversarial:三家審 docs/IC1CFR_STOPGAP_TODO.md vs Frozen SPEC
+  risk=low
+  facts_asked=SPEC v1.0 Frozen 四輪三家 APPROVE+戳記機檢 PASS
+  review_role=codex+composer+grok 獨立審 TODO
+  template=n/a: TODO 審查派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-TODO-composer.md", "output_sha256": "e0875a42fa91fb5fe27f5a05fab1e4215dd208425cf0b9888436f896adcb0de6", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T15:27:16Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-TODO-grok.md", "output_sha256": "924e5790f569121dfb9e1fd8b1b90577ea9c1f2041ac7ae27262d5b1e46fe5b7", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T15:28:46Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-TODO-codex.md", "output_sha256": "4024e9b11724bfa17321f5f36e5c0540e72c8a03c73b37a8b220861618c06f11", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T15:29:27Z"}
+=== 2026-07-14 23:30:31 | artifact ===
+  ts=2026-07-14 23:30:31
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_STOPGAP_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=r2:T-S1~T-S8(canonicalize hash/cache+raw-JSON sanitizer 掛點/M3-M4 probe/types 實形狀/after-explicit golden/§V 逐筆表/factory allowlist 凍死/baseline nodeid gate)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T15:33:41Z"}
+=== 2026-07-14 23:33:41 | dispatch ===
+  ts=2026-07-14 23:33:41
+  kind=dispatch
+  intent=STOPGAP TODO r2 閉合:三家驗 T-S1~T-S8 關閉
+  risk=low
+  facts_asked=r1 合併 14 finding 全 ACCEPT 落 r2;關鍵=cache-hit sanitizer 洩漏路徑+factory allowlist 凍死+baseline nodeid gate
+  review_role=三家原提出方閉合重驗+戳記
+  template=n/a: 閉合重驗 TODO r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-TODO-R2-codex.md", "output_sha256": "7e03715c4c4ed5a1b133eaedc365eb3e07d6ee957a7767b99c98841b0faff8ad", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T15:38:38Z"}
+=== 2026-07-15 00:02:53 | artifact ===
+  ts=2026-07-15 00:02:53
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_STOPGAP_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=r3:sanitizer 檔路徑定死+七掛點逐一具名測試/baseline nodeid --check-nodeids 機械 gate/direct allowlist 含 factories.py:454/前端 gate 命令修正(vitest 分開 filter+具名檔路徑)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T16:24:36Z"}
+=== 2026-07-15 00:24:36 | dispatch ===
+  ts=2026-07-15 00:24:36
+  kind=dispatch
+  intent=STOPGAP TODO r3 閉合:三家驗 finding 關閉+戳記
+  risk=low
+  facts_asked=codex r2 4B 全落 r3(T-S9~T-S12);composer/grok r1 finding 對 r3 驗
+  review_role=三家閉合重驗+戳記
+  template=n/a: 閉合重驗 TODO r3
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-TODO-R3-codex.md", "output_sha256": "2e2c1e16ca485477e62849af77636f2ce13287d149b6546fa842f8b23f4d8cfc", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T16:27:14Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-TODO-R3-composer.md", "output_sha256": "2a5ccabe2f4d96e7675c7dbcc6f919e98803bb2c78ad448f257cb7c227d7cc0b", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T16:27:31Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-TODO-R3-grok.md", "output_sha256": "de8a1fce011c2c8fec524868664e6f5d74aad514f76739d2631e45fe3dd50ecf", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T16:29:13Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260714-IC1CFR-STOPGAP-TODO-RECONCILE.md", "output_sha256": "e42db469c1b8b429a06921712729119027a8f9268ed61b3f12c67e65d905f293", "task_id": "IC1CFR-STOPGAP-TODO", "ts": "2026-07-14T16:29:13Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B0", "ts": "2026-07-14T16:40:16Z"}
+=== 2026-07-15 00:40:16 | dispatch ===
+  ts=2026-07-15 00:40:16
+  kind=dispatch
+  intent=provenance 補記:ADV-CODEX=TODO r3 codex APPROVE 複本
+  risk=low
+  facts_asked=n/a
+  review_role=codex
+  template=n/a
+  adversarial=handoffs/IC1CFR-B0-ADV-CODEX.md
+  reconcile=handoffs/20260714-IC1CFR-STOPGAP-TODO-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B0-ADV-CODEX.md", "output_sha256": "2e2c1e16ca485477e62849af77636f2ce13287d149b6546fa842f8b23f4d8cfc", "task_id": "IC1CFR-B0", "ts": "2026-07-14T16:40:16Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1CFR-B0-ADV-CODEX.md", "output_sha256": "2e2c1e16ca485477e62849af77636f2ce13287d149b6546fa842f8b23f4d8cfc", "task_id": "IC1CFR-B0", "ts": "2026-07-14T16:40:24Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/IC1CFR-B0-ADV-CODEX.md", "output_sha256": "2e2c1e16ca485477e62849af77636f2ce13287d149b6546fa842f8b23f4d8cfc", "task_id": "IC1CFR-B0", "ts": "2026-07-14T16:40:30Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B0", "ts": "2026-07-14T16:40:42Z"}
+=== 2026-07-15 00:40:42 | dispatch ===
+  ts=2026-07-15 00:40:42
+  kind=dispatch
+  intent=provenance:ADV-COMPOSER=TODO r3 composer APPROVE 複本
+  risk=low
+  facts_asked=n/a
+  review_role=composer
+  template=n/a
+  adversarial=handoffs/IC1CFR-B0-ADV-COMPOSER.md
+  reconcile=handoffs/20260714-IC1CFR-STOPGAP-TODO-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B0-ADV-COMPOSER.md", "output_sha256": "2a5ccabe2f4d96e7675c7dbcc6f919e98803bb2c78ad448f257cb7c227d7cc0b", "task_id": "IC1CFR-B0", "ts": "2026-07-14T16:40:42Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1CFR-B0-ADV-COMPOSER.md", "output_sha256": "2a5ccabe2f4d96e7675c7dbcc6f919e98803bb2c78ad448f257cb7c227d7cc0b", "task_id": "IC1CFR-B0", "ts": "2026-07-14T16:40:50Z"}
+=== 2026-07-15 00:40:51 | dispatch ===
+  ts=2026-07-15 00:40:51
+  kind=dispatch
+  intent=STOPGAP B0 實作:Grok 依 Frozen TODO Task 0.1(before baseline+factory allowlist+pytest nodeid 凍結)
+  risk=high
+  facts_asked=SPEC v1.0+TODO r3 Frozen,雙戳記機檢 PASS
+  review_role=Codex+Composer 批後審查
+  template=docs/IC1CFR_STOPGAP_TODO.md Task 0.1
+  adversarial=handoffs/IC1CFR-B0-ADV-COMPOSER.md
+  reconcile=handoffs/20260714-IC1CFR-STOPGAP-TODO-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC1CFR_STOPGAP_SPEC.md
+  todo=docs/IC1CFR_STOPGAP_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B0", "ts": "2026-07-14T17:29:13Z"}
+=== 2026-07-15 01:29:13 | dispatch ===
+  ts=2026-07-15 01:29:13
+  kind=dispatch
+  intent=STOPGAP B0 code review:codex+composer 審 Grok baseline 凍結
+  risk=low
+  facts_asked=Claude 驗:before.json 4298 有限葉+summary completed/allowlist 含 factories.py:454/79 nodeids/零 runtime 變更;Grok 自報 canonical 雙跑 hash 一致 2b6489da
+  review_role=codex+composer 實作者不自審
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B0-CODEREV-codex.md", "output_sha256": "e4722637286cc6097caa0790d2dd71a23c2a45ec358377181555c79861d52c97", "task_id": "IC1CFR-B0", "ts": "2026-07-14T17:40:09Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B0", "ts": "2026-07-14T17:40:36Z"}
+=== 2026-07-15 01:40:36 | dispatch ===
+  ts=2026-07-15 01:40:36
+  kind=dispatch
+  intent=STOPGAP B0 退修:Grok 修 codex 1 BLOCKING(check-nodeids fail-open+collection regex 誤截)
+  risk=low
+  facts_asked=codex 其餘 6 項全 PASS(canonical/決定性/allowlist/零變更)
+  review_role=codex 閉合重驗
+  template=n/a: 退修
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B0", "ts": "2026-07-14T18:02:44Z"}
+=== 2026-07-15 02:02:44 | dispatch ===
+  ts=2026-07-15 02:02:44
+  kind=dispatch
+  intent=STOPGAP B0 退修閉合:codex 驗 fail-open+regex 關閉
+  risk=low
+  facts_asked=Grok 修:fail-closed(rc非0且解析空→exit1)+regex 排除雙冒號+baseline 重建 79→77(0 file-only);before.json/sha256/allowlist 未動
+  review_role=codex 原提出方閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B0-CODEREV-composer.md", "output_sha256": "03f0e9f42db6d670de2c7a692a22a6d008634ebe64baa55fec19b7d5f4954419", "task_id": "IC1CFR-B0", "ts": "2026-07-14T18:06:14Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B0-CODEREV-R2-codex.md", "output_sha256": "55a7d0d79ee378133e8800a9f7792ef9c571ca1f613affab1ea183dacd8af911", "task_id": "IC1CFR-B0", "ts": "2026-07-14T18:10:17Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1CFR-B0-ADV-COMPOSER.md", "output_sha256": "2a5ccabe2f4d96e7675c7dbcc6f919e98803bb2c78ad448f257cb7c227d7cc0b", "task_id": "IC1CFR-B1", "ts": "2026-07-14T18:11:10Z"}
+=== 2026-07-15 02:11:11 | dispatch ===
+  ts=2026-07-15 02:11:11
+  kind=dispatch
+  intent=STOPGAP B1 實作:Grok 依 Frozen TODO Tasks 1.1-1.3(後端下架+sanitizer+consumer gate)
+  risk=high
+  facts_asked=B0 已入版 8be3056(baseline+allowlist+77 nodeids)
+  review_role=Codex+Composer 批後審查
+  template=docs/IC1CFR_STOPGAP_TODO.md Phase 1
+  adversarial=handoffs/IC1CFR-B0-ADV-COMPOSER.md
+  reconcile=handoffs/20260714-IC1CFR-STOPGAP-TODO-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC1CFR_STOPGAP_SPEC.md
+  todo=docs/IC1CFR_STOPGAP_TODO.md
+  manifest=
+ts=2026-07-15 02:21:14 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T182114Z-mutation-multi.json
+ts=2026-07-15 02:22:28 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T182228Z-mutation-multi.json
+ts=2026-07-15 02:24:32 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T182431Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B1", "ts": "2026-07-14T18:24:58Z"}
+=== 2026-07-15 02:24:58 | dispatch ===
+  ts=2026-07-15 02:24:58
+  kind=dispatch
+  intent=STOPGAP B1 code review:codex+composer 審 Grok Phase 1(含 scope 外 factories.py 再匯出)
+  risk=low
+  facts_asked=Claude 獨立驗:38 tests/6 probes/scanner PASS/after-default=not_run 無節/after-explicit=union 零有限葉
+  review_role=codex+composer 實作者不自審
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-15 02:27:07 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T182707Z-mutation-multi.json
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B1-CODEREV-composer.md", "output_sha256": "096d4d6445c443df35b349c98f80fcd6acc995c329635ac2681569c783bdbb19", "task_id": "IC1CFR-B1", "ts": "2026-07-14T18:27:56Z"}
+ts=2026-07-15 02:28:53 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T182853Z-mutation-multi.json
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B1-CODEREV-codex.md", "output_sha256": "f6abb7cfd2512b79dfeeb65784cd6bcbf0f68510512ee5478c41f43ad48d2948", "task_id": "IC1CFR-B1", "ts": "2026-07-14T18:36:37Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B1", "ts": "2026-07-14T18:37:17Z"}
+=== 2026-07-15 02:37:17 | dispatch ===
+  ts=2026-07-15 02:37:17
+  kind=dispatch
+  intent=STOPGAP B1 退修:Grok 修 codex 6 BLOCKING(save_report 實證洩漏/cache summary 不一致/inject list/§G 比對缺/guard 可繞/測試假綠)
+  risk=low
+  facts_asked=composer APPROVE 0B;codex 實跑證 save_report LEAK 0.42
+  review_role=codex 閉合重驗
+  template=n/a: 退修
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-15 02:43:46 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T184346Z-mutation-multi.json
+ts=2026-07-15 02:45:08 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T184508Z-mutation-multi.json
+ts=2026-07-15 02:46:40 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T184640Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B1", "ts": "2026-07-14T18:47:08Z"}
+=== 2026-07-15 02:47:08 | dispatch ===
+  ts=2026-07-15 02:47:08
+  kind=dispatch
+  intent=STOPGAP B1 退修閉合:codex 重跑 6 反例(含 save_report LEAK 0.42)
+  risk=low
+  facts_asked=Grok 修畢;Claude 驗:44 tests/8 probes/§G non-FR exact pass/scanner PASS
+  review_role=codex 原提出方閉合
+  template=n/a: 閉合重驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B1-CODEREV-R2-codex.md", "output_sha256": "0bac2cd0888cb87eed7f4a0258f4f3ec9668950ed2d65917c08dd9d5c9f75da1", "task_id": "IC1CFR-B1", "ts": "2026-07-14T18:56:32Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B1", "ts": "2026-07-14T18:57:05Z"}
+=== 2026-07-15 02:57:05 | dispatch ===
+  ts=2026-07-15 02:57:05
+  kind=dispatch
+  intent=STOPGAP B1 退修r2:Grok 修 codex 2 新 BLOCKING(cache force-merge 洩漏/Markdown oracle 假綠)
+  risk=low
+  facts_asked=codex 5/6 CLOSED;實跑 CACHE_FORCE_MERGE_LEAK 0.42 completed 2
+  review_role=codex 閉合;同批第二輪,再敗換手
+  template=n/a: 退修 r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-15 03:00:18 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T190018Z-mutation-multi.json
+ts=2026-07-15 03:01:20 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T190120Z-mutation-multi.json
+ts=2026-07-15 03:03:29 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T190329Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B1", "ts": "2026-07-14T19:03:49Z"}
+=== 2026-07-15 03:03:49 | dispatch ===
+  ts=2026-07-15 03:03:49
+  kind=dispatch
+  intent=STOPGAP B1 退修r2 閉合:codex 驗 cache force-merge+Markdown oracle
+  risk=low
+  facts_asked=Grok 改統一收斂點(最終 return 前 sanitize)+cache 寫入前亦 sanitize;M1 探針擴雙層;46 tests/9 probes
+  review_role=codex 原提出方閉合
+  template=n/a: 閉合重驗 r2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-15 03:07:05 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260714T190705Z-mutation-multi.json
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B1-CODEREV-R3-codex.md", "output_sha256": "2a8a24106cdfb513bc2ecb9079aa896d32643ea9162a3d51139118a122e966a3", "task_id": "IC1CFR-B1", "ts": "2026-07-14T19:07:57Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/IC1CFR-B0-ADV-COMPOSER.md", "output_sha256": "2a5ccabe2f4d96e7675c7dbcc6f919e98803bb2c78ad448f257cb7c227d7cc0b", "task_id": "IC1CFR-B2", "ts": "2026-07-14T19:09:10Z"}
+=== 2026-07-15 03:09:11 | dispatch ===
+  ts=2026-07-15 03:09:11
+  kind=dispatch
+  intent=STOPGAP B2 實作:Grok 依 Frozen TODO Tasks 2.1-2.2(前端兩圖下架)
+  risk=high
+  facts_asked=B1 已入版 41c26e0(後端下架+統一 sanitizer)
+  review_role=Codex+Composer 批後審查
+  template=docs/IC1CFR_STOPGAP_TODO.md Phase 2
+  adversarial=handoffs/IC1CFR-B0-ADV-COMPOSER.md
+  reconcile=handoffs/20260714-IC1CFR-STOPGAP-TODO-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/IC1CFR_STOPGAP_SPEC.md
+  todo=docs/IC1CFR_STOPGAP_TODO.md
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B2", "ts": "2026-07-14T20:24:51Z"}
+=== 2026-07-15 04:24:51 | dispatch ===
+  ts=2026-07-15 04:24:51
+  kind=dispatch
+  intent=STOPGAP B2 code review:codex+composer 審前端下架+裁決 scope 擴張三項
+  risk=low
+  facts_asked=Claude 驗前端 20 tests/build 綠;check-nodeids 本機逾時,Grok 自報 new_failures=0(委員請代驗)
+  review_role=codex+composer
+  template=n/a: code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B2-CODEREV-composer.md", "output_sha256": "53257d2a5d7bfe5b4f059fb66852df2ced71b733f4cc891ba38c019a0f75c72e", "task_id": "IC1CFR-B2", "ts": "2026-07-14T20:26:39Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B2-CODEREV-codex.md", "output_sha256": "efd22c7b81048e84ff35a75ea1f7c035252d3275fb608a1d038a91ee187ae2de", "task_id": "IC1CFR-B2", "ts": "2026-07-14T20:40:17Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B2", "ts": "2026-07-14T20:40:43Z"}
+=== 2026-07-15 04:40:43 | dispatch ===
+  ts=2026-07-15 04:40:43
+  kind=dispatch
+  intent=STOPGAP B2 退修:Grok 修 codex 1 BLOCKING(FactorReturnChart 缺鍵三態未警示)
+  risk=low
+  facts_asked=codex 其餘全 PASS;composer APPROVE 0B
+  review_role=codex 閉合
+  template=n/a: 退修
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "IC1CFR-B2", "ts": "2026-07-14T20:43:18Z"}
+=== 2026-07-15 04:43:18 | dispatch ===
+  ts=2026-07-15 04:43:18
+  kind=dispatch
+  intent=STOPGAP B2 退修閉合:codex 驗缺鍵三態
+  risk=low
+  facts_asked=Grok 修畢;Claude 驗 21 tests(+1)/build 綠
+  review_role=codex 原提出方閉合
+  template=n/a: 閉合
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/IC1CFR-B2-CODEREV-R2-codex.md", "output_sha256": "9ee54431e70a148779b81b0645664e8353bfee1a364e26f99c455215fa393e92", "task_id": "IC1CFR-B2", "ts": "2026-07-14T21:01:45Z"}
+{"event":"gate_deny","ts":"2026-07-14T21:02:04Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+=== 2026-07-15 08:52:28 | dispatch ===
+  ts=2026-07-15 08:52:28
+  kind=dispatch
+  intent=1d 偵察稽核:三委員(Codex/Composer/Grok)各自獨立重跑偵察,比對 handoffs/1d-RECON-claude.md 找漏抓錯——factor_attribution 幽靈接線/NaN 靜默點清單/正名對象/下游消費者/baseline 策略
+  risk=low
+  facts_asked=calculate_factor_attribution 是否真全 production 未接;factor_attribution 下游消費者;NaN 靜默點完整清單;正名對象是否只有 unexplained
+  review_role=recon-audit(委員各產獨立 receipt,非 code review)
+  template=n/a:偵察稽核非 SPEC/TODO 派工,委員讀 1d-RECON-claude.md 後獨立查證產 receipt
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-15 10:12:37 | dispatch ===
+  ts=2026-07-15 10:12:37
+  kind=dispatch
+  intent=1c-FR-FULL 聯合偵察:三委員各獨立偵察 factor-return 錯位序列正確重建範圍,對照 handoffs/1cFRFULL-RECON-claude.md——位置相減完整清單/STOPGAP 反轉面/breakeven-profitable 回填/下游全圖/正確方法論/測試策略/scope 邊界
+  risk=low
+  facts_asked=位置相減點是否只有 :70-71/:87+monotonicity_tester;STOPGAP 反轉完整清單;breakeven/profitable 觸點;canonical 逐時間戳對齊構造
+  review_role=recon-audit(聯合偵察,委員各產獨立 receipt)
+  template=n/a:偵察稽核非 SPEC/TODO 派工,委員讀 1cFRFULL-RECON-claude.md 後獨立查證產 receipt
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-15 11:14:09 | artifact ===
+  ts=2026-07-15 11:14:09
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_FULL_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=大 RISK-HIT:a,b,d; §A=P1 canonical 已確認 2026-07-15+FACT-RECEIPT 引偵察; §C=STOPGAP 反轉 consumer-map; §G=真kline P1 golden+mutation; §P=F0-F5; §V=mutation 位置相減必FAIL; §R=per-phase revert; §N=登記
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1cfr-full-spec-adv", "ts": "2026-07-15T03:17:37Z"}
+=== 2026-07-15 11:17:37 | dispatch ===
+  ts=2026-07-15 11:17:37
+  kind=dispatch
+  intent=IC1CFR_FULL_SPEC v0.1 三家 adversarial 對抗審:雙家族獵漏,挑戰 P1 定義完整性/consumer-map 是否漏觸點/§G golden 可證偽性/Phase 依賴/正名是否徹底/六個待裁決策的預設立場
+  risk=low
+  facts_asked=P1 序列定義是否有洩漏或未定義邊界;STOPGAP 反轉 consumer-map 是否漏;golden 是否真可證偽;正名是否徹底禁冒充橫截面
+  review_role=SPEC adversarial(三家獨立 BLOCKING/ID 標記,實作前對抗審)
+  template=n/a:SPEC adversarial review,委員讀 docs/IC1CFR_FULL_SPEC.md + templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md 產 finding receipt
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-15 12:46:27 | artifact ===
+  ts=2026-07-15 12:46:27
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC1CFR_FULL_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=v0.2 納 R1 三家 adversarial:B1 series 通道/B2 公式鎖 mid=0全序列/B3 §U discriminator+reporter unwrap/B4 §G 數值atol+hash/B5 breakeven 閉式/B6 PIT expanding 本票修+enabled ON/B7 PRESET-RULING/B8 F4依賴F0-F2;MAJOR:Trend/cache version/正名 deny-allow/Equity unavailable
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1cfr-full-spec-r2", "ts": "2026-07-15T04:49:00Z"}
+=== 2026-07-15 12:49:01 | dispatch ===
+  ts=2026-07-15 12:49:01
+  kind=dispatch
+  intent=IC1CFR_FULL_SPEC v0.2 R2 閉合複驗:三家原提出方各用自己 R1 反例確認 v0.2 是否真閉合(可證偽),並審新增 PIT expanding scope 有無新洞(warmup 邊界/PIT 不變式/turnover 雙邊一致)
+  risk=low
+  facts_asked=R1 各 BLOCKING/MAJOR 在 v0.2 是否閉合;PIT expanding 是否引入新問題;PRESET-RULING 六項是否接受
+  review_role=R2 閉合複驗(原提出方 reverify + 新 delta 審)
+  template=n/a:R2 closure reverify,委員讀 docs/IC1CFR_FULL_SPEC.md v0.2 + handoffs/1cFRFULL-SPEC-ADV-R1-RECONCILE.md + 自己 R1 receipt,逐 finding 標 CLOSED/OPEN+反例重跑
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1cfr-full-spec-r3", "ts": "2026-07-15T04:56:17Z"}
+=== 2026-07-15 12:56:17 | dispatch ===
+  ts=2026-07-15 12:56:17
+  kind=dispatch
+  intent=IC1CFR_FULL_SPEC v0.3 R3 閉合複驗:三家確認 R2 各 OPEN(§G 6-bar hand-calc/warmup config/PIT 分位演算法/winsorize PIT/turnover 尺度/§U 分層/consumer-map 補/F2 出口/F3 fixture)是否閉合;逐項 CLOSED/OPEN;全 CLOSED→FREEZE-OK
+  risk=low
+  facts_asked=R2 OPEN 是否在 v0.3 閉合;6-bar hand-calc 數值是否正確可證偽;PIT winsorize/分位演算法是否無殘留發明點
+  review_role=R3 閉合複驗(原提出方 reverify R2 OPEN)
+  template=n/a:R3 closure,委員讀 docs/IC1CFR_FULL_SPEC.md v0.3 + 自己 R2 receipt,逐 R2 OPEN 標 CLOSED/OPEN + Verdict FREEZE-OK/有OPEN
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1cfr-full-spec-r4", "ts": "2026-07-15T05:52:27Z"}
+=== 2026-07-15 13:52:27 | dispatch ===
+  ts=2026-07-15 13:52:27
+  kind=dispatch
+  intent=IC1CFR_FULL_SPEC v0.4 R4 最終閉合:確認 R3 唯一 BLOCKING(hand-calc)已閉——7-bar position=[0,0,-1,1,0,-1,1] 獨立 pandas 重跑一致;winsorize 分位 0.01/0.99+small-sample no-op 鎖;look-ahead 稽核完整;無殘留 5-bar/錯函式名。全 CLOSED→FREEZE-OK
+  risk=low
+  facts_asked=7-bar 數字獨立重跑是否一致;winsorize 鎖是否無發明點;有無其他殘留
+  review_role=R4 最終閉合確認
+  template=n/a:R4 final closure,委員讀 v0.4 §G/§C + 自己重跑 pd.qcut 對 7-bar,標 FREEZE-OK/有OPEN
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic1cfr-full-lookahead", "ts": "2026-07-15T06:09:17Z"}
+=== 2026-07-15 14:09:17 | dispatch ===
+  ts=2026-07-15 14:09:17
+  kind=dispatch
+  intent=1c-FR-FULL 專項 look-ahead 完整稽核:三家各自逐行掃 factor-return 整條路徑(analyzer 每方法+orchestrator 接線+上游 feature/label+net_ic turnover)找未來資訊洩漏,交叉覆核 Claude 四項,確認 winsorize_min_samples=100 閉合 grok OPEN-R4-1
+  risk=low
+  facts_asked=整條路徑除 qcut/winsorize 外有無漏列 look-ahead 源;上游 feature/label 是否洩漏;winsorize_min_samples=100 是否真 identity
+  review_role=專項 look-ahead 稽核(逐行,可交叉驗證)
+  template=n/a:look-ahead 專項,委員讀 handoffs/1cFRFULL-LOOKAHEAD-AUDIT-DISPATCH.md 逐行掃產 receipt
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "ic-lookahead-audit", "ts": "2026-07-15T06:26:47Z"}
+=== 2026-07-15 14:26:47 | dispatch ===
+  ts=2026-07-15 14:26:47
+  kind=dispatch
+  intent=IC Analysis look-ahead 全面盤點(使用者深修裁定):三家聯合逐模組掃 momentum/Analysis 全部,分類 signal-leak/非signal/clean/model-split,建 master inventory,定位所有全期/未來資訊污染 signal 或 user metric 之處
+  risk=low
+  facts_asked=全 IC Analysis signal-leak 清單;條件式觸發項;model train/test 洩漏;既有防線覆蓋邊界;修法分層優先序
+  review_role=look-ahead 全面盤點(逐模組 inventory,非實作)
+  template=n/a:IC look-ahead inventory,委員讀 handoffs/ICLOOKAHEAD-AUDIT-DISPATCH.md 逐模組掃產 receipt
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
