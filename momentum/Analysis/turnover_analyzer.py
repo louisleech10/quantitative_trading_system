@@ -2,13 +2,51 @@
 
 from __future__ import annotations
 
+from typing import Any, Optional
+
 import numpy as np
 import pandas as pd
 
+from momentum.Analysis.pit_stats import (
+    MIN_SAMPLES,
+    first_valid_index,
+    pit_expanding_qcut_label,
+    pit_expanding_rank,
+)
 from momentum.core.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+
+def _jsonable_aligned(
+    values: pd.Series,
+    *,
+    first_valid: Optional[int],
+) -> list[Optional[float]]:
+    """對齊源 index：warmup [0, first_valid) → JSON null；非有限 → null。"""
+    out: list[Optional[float]] = []
+    for i, val in enumerate(values.to_numpy(dtype=float, copy=False)):
+        if first_valid is None or i < first_valid:
+            out.append(None)
+            continue
+        if val is None or not np.isfinite(val):
+            out.append(None)
+        else:
+            out.append(float(val))
+    return out
+
+
+def _timestamp_list(index: pd.Index) -> list[Any]:
+    result: list[Any] = []
+    for ts in index.tolist():
+        if hasattr(ts, "isoformat"):
+            result.append(ts.isoformat())
+        elif isinstance(ts, (int, np.integer)):
+            result.append(int(ts))
+        else:
+            result.append(str(ts))
+    return result
 
 
 class TurnoverAnalyzer:
@@ -18,39 +56,62 @@ class TurnoverAnalyzer:
         self._config = config or {}
         self._transaction_cost = float(self._config.get("transaction_cost", 0.001))
         self._num_quantiles = int(self._config.get("num_quantiles", 5))
+        self._min_samples = int(self._config.get("min_samples", MIN_SAMPLES))
 
-    def compute_quantile_turnover(self, feature: pd.Series, num_quantiles: int = 5) -> float:
-        """分位數換手率：頂部分位 (Q5) 的成分每期變化比例。"""
+    def compute_quantile_turnover(
+        self, feature: pd.Series, num_quantiles: int = 5
+    ) -> float:
+        """分位數換手率：頂部分位成分每期變化比例（PIT qcut，禁 dropna）。"""
 
-        series = feature.dropna()
+        series = feature if isinstance(feature, pd.Series) else pd.Series(feature)
         if series.empty or series.size < 2:
             return float("nan")
 
         num_quantiles = max(int(num_quantiles or self._num_quantiles), 2)
         try:
-            quantiles = pd.qcut(series, q=num_quantiles, labels=False, duplicates="drop")
+            quantiles = pit_expanding_qcut_label(
+                series,
+                q=num_quantiles,
+                min_samples=self._min_samples,
+                duplicates="drop",
+            )
         except ValueError as exc:
-            logger.warning("qcut failed for turnover: %s", exc)
+            logger.warning("pit qcut failed for turnover: %s", exc)
             return float("nan")
 
-        top_mask = quantiles == quantiles.max()
-        changes = top_mask.astype(int).diff().abs().dropna()
-        if changes.empty:
+        if quantiles.notna().sum() == 0:
+            return float("nan")
+
+        max_label = quantiles.max(skipna=True)
+        if pd.isna(max_label):
+            return float("nan")
+
+        top_mask = (quantiles == max_label).astype(float)
+        top_mask = top_mask.where(quantiles.notna(), np.nan)
+        changes = top_mask.diff().abs()
+        finite = changes[np.isfinite(changes.to_numpy(dtype=float))]
+        if finite.empty:
             return 0.0
-        return float(changes.mean())
+        return float(finite.mean())
 
     def compute_rank_change_rate(self, feature: pd.Series) -> float:
-        """排名變化率：所有因子排名的平均位移。"""
+        """排名變化率：PIT expanding rank 後平均 |Δrank|（禁 dropna）。"""
 
-        series = feature.dropna()
+        series = feature if isinstance(feature, pd.Series) else pd.Series(feature)
         if series.size < 2:
             return float("nan")
 
-        ranks = series.rank(method="average")
-        diffs = ranks.diff().abs().dropna()
-        if diffs.empty:
+        ranks = pit_expanding_rank(
+            series, min_samples=self._min_samples, ties="average"
+        )
+        if ranks.notna().sum() == 0:
+            return float("nan")
+
+        diffs = ranks.diff().abs()
+        finite = diffs[np.isfinite(diffs.to_numpy(dtype=float))]
+        if finite.empty:
             return 0.0
-        return float(diffs.mean())
+        return float(finite.mean())
 
     def compute_factor_autocorrelation(self, feature: pd.Series) -> float:
         """因子自相關：corr(values_t, values_{t-1})。"""
@@ -65,10 +126,15 @@ class TurnoverAnalyzer:
         feature: pd.Series,
         num_quantiles: int = 5,
     ) -> dict[str, list]:
-        """回傳逐 bar turnover / rank change 時序。"""
+        """回傳逐 bar turnover / rank change 時序。
 
-        series = feature.dropna()
-        if series.empty or series.size < 2:
+        S2/RULING-5：對齊源 raw index 長度 n；warmup ``[0, first_valid)`` = JSON null；
+        **禁 dropna**（legacy n-1 → n）。
+        """
+
+        series = feature if isinstance(feature, pd.Series) else pd.Series(feature)
+        n = int(series.size)
+        if n == 0:
             return {
                 "quantile_turnovers": [],
                 "rank_change_rates": [],
@@ -76,50 +142,53 @@ class TurnoverAnalyzer:
             }
 
         num_quantiles = max(int(num_quantiles or self._num_quantiles), 2)
+        first_valid = first_valid_index(series, min_samples=self._min_samples)
+
         try:
-            quantiles = pd.qcut(series, q=num_quantiles, labels=False, duplicates="drop")
+            quantiles = pit_expanding_qcut_label(
+                series,
+                q=num_quantiles,
+                min_samples=self._min_samples,
+                duplicates="drop",
+            )
         except ValueError as exc:
-            logger.warning("qcut failed for turnover time series: %s", exc)
+            logger.warning("pit qcut failed for turnover time series: %s", exc)
+            # 仍對齊源 n，全 null（不裁成空陣列）
+            nulls: list[Optional[float]] = [None] * n
             return {
-                "quantile_turnovers": [],
-                "rank_change_rates": [],
-                "timestamps": [],
+                "quantile_turnovers": nulls,
+                "rank_change_rates": nulls,
+                "timestamps": _timestamp_list(series.index),
             }
 
-        top_mask = (quantiles == quantiles.max()).astype(float)
-        quantile_turnovers = top_mask.diff().abs().dropna().astype(float)
+        ranks = pit_expanding_rank(
+            series, min_samples=self._min_samples, ties="average"
+        )
 
-        ranks = series.rank(method="average")
-        rank_change_rates = ranks.diff().abs().dropna().astype(float)
+        max_label = quantiles.max(skipna=True)
+        top_mask = pd.Series(np.nan, index=series.index, dtype=float)
+        if pd.notna(max_label):
+            top_mask = (quantiles == max_label).astype(float)
+            top_mask = top_mask.where(quantiles.notna(), np.nan)
 
-        if quantile_turnovers.empty or rank_change_rates.empty:
-            return {
-                "quantile_turnovers": [],
-                "rank_change_rates": [],
-                "timestamps": [],
-            }
+        quantile_turnovers = top_mask.diff().abs()
+        rank_change_rates = ranks.diff().abs()
 
-        common_index = quantile_turnovers.index.intersection(rank_change_rates.index)
-        if common_index.empty:
-            return {
-                "quantile_turnovers": [],
-                "rank_change_rates": [],
-                "timestamps": [],
-            }
+        # RULING-5 / §MS：warmup = [0, first_valid) null；t=first_valid 本身 valid。
+        # diff 需前一根 → first_valid 前為 NA 會讓 diff 成 NaN；首個可算 bar 無前態
+        # → change 定義為 0.0（causal 只用 [0..first_valid]），後續 bar 照常 diff。
+        if first_valid is not None:
+            quantile_turnovers.iloc[first_valid] = 0.0
+            rank_change_rates.iloc[first_valid] = 0.0
 
         return {
-            "quantile_turnovers": [
-                float(value)
-                for value in quantile_turnovers.loc[common_index].tolist()
-            ],
-            "rank_change_rates": [
-                float(value)
-                for value in rank_change_rates.loc[common_index].tolist()
-            ],
-            "timestamps": [
-                ts.isoformat() if hasattr(ts, "isoformat") else int(ts) if isinstance(ts, (int, np.integer)) else str(ts)
-                for ts in common_index.tolist()
-            ],
+            "quantile_turnovers": _jsonable_aligned(
+                quantile_turnovers, first_valid=first_valid
+            ),
+            "rank_change_rates": _jsonable_aligned(
+                rank_change_rates, first_valid=first_valid
+            ),
+            "timestamps": _timestamp_list(series.index),
         }
 
     def compute_cost_drag_proxy(
@@ -149,17 +218,23 @@ class TurnoverAnalyzer:
             )
         return float((bps / 10000.0) * t)
 
-    def compute_all(self, features_df: pd.DataFrame, num_quantiles: int = 5) -> dict[str, dict]:
+    def compute_all(
+        self, features_df: pd.DataFrame, num_quantiles: int = 5
+    ) -> dict[str, dict]:
         """批次計算所有特徵的換手率指標。"""
 
         results: dict[str, dict] = {}
         num_quantiles = num_quantiles or self._num_quantiles
         for feature_name in features_df.columns:
             series = features_df[feature_name]
-            turnover = self.compute_quantile_turnover(series, num_quantiles=num_quantiles)
+            turnover = self.compute_quantile_turnover(
+                series, num_quantiles=num_quantiles
+            )
             rank_change = self.compute_rank_change_rate(series)
             autocorr = self.compute_factor_autocorrelation(series)
-            turnover_series = self.compute_turnover_time_series(series, num_quantiles=num_quantiles)
+            turnover_series = self.compute_turnover_time_series(
+                series, num_quantiles=num_quantiles
+            )
             results[feature_name] = {
                 "quantile_turnover": turnover,
                 "rank_change_rate": rank_change,

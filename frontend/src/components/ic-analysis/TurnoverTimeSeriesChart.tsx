@@ -59,8 +59,14 @@ export default function TurnoverTimeSeriesChart({ data, featureName }: TurnoverT
 
     const rows: TurnoverChartPoint[] = [];
     for (let index = 0; index < size; index += 1) {
-      const turnover = Number(quantileTurnovers[index]);
-      const rankChange = Number(rankChangeRates[index]);
+      // S2/RULING-5: skip JSON null warmup（Number(null)===0 會誤畫）
+      const rawTurnover = quantileTurnovers[index];
+      const rawRankChange = rankChangeRates[index];
+      if (rawTurnover == null || rawRankChange == null) {
+        continue;
+      }
+      const turnover = Number(rawTurnover);
+      const rankChange = Number(rawRankChange);
       if (!Number.isFinite(turnover) || !Number.isFinite(rankChange)) {
         continue;
       }

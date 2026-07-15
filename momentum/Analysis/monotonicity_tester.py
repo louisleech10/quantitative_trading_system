@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from momentum.Analysis.pit_stats import MIN_SAMPLES, pit_expanding_qcut_label
 from momentum.core.logging import get_logger
 
 
@@ -19,6 +20,7 @@ class MonotonicityTester:
         self._config = config or {}
         self._default_quantiles = int(self._config.get("num_quantiles", 5))
         self._min_group_size = int(self._config.get("min_group_size", 30))
+        self._min_samples = int(self._config.get("min_samples", MIN_SAMPLES))
 
     def compute_quantile_returns(
         self,
@@ -26,7 +28,7 @@ class MonotonicityTester:
         label: pd.Series,
         num_quantiles: int = 5,
     ) -> dict:
-        """分位數收益分析。"""
+        """分位數收益分析（PIT bin + pit_pool 聚合）。"""
 
         data = self._prepare_data(feature, label)
         if data.empty:
@@ -39,10 +41,18 @@ class MonotonicityTester:
         if quantile_bins is None:
             return self._empty_quantile_result(num_quantiles)
 
-        quantile_mean_returns = {}
-        cumulative_returns = {}
-        for quantile in sorted(quantile_bins.unique()):
-            label_key = f"Q{quantile + 1}"
+        # §P0-2-AGG: 預填 Q1..QK；缺 bin → NaN（score 端該 diff 不計）
+        quantile_mean_returns = {
+            f"Q{i + 1}": np.nan for i in range(num_quantiles)
+        }
+        cumulative_returns = {
+            f"Q{i + 1}": [] for i in range(num_quantiles)
+        }
+        for quantile in sorted(q for q in quantile_bins.unique() if pd.notna(q)):
+            q_int = int(quantile)
+            if q_int < 0 or q_int >= num_quantiles:
+                continue
+            label_key = f"Q{q_int + 1}"
             mask = quantile_bins == quantile
             values = data.loc[mask, "label"].astype(float)
             if values.empty:
@@ -66,18 +76,25 @@ class MonotonicityTester:
         }
 
     def compute_monotonicity_score(self, quantile_returns: dict) -> float:
-        """單調性評分 (0.0 ~ 1.0)。"""
+        """單調性評分 (0.0 ~ 1.0)。§P0-2-AGG: 缺 bin 的 diff 不計。"""
 
         mean_returns = quantile_returns.get("quantile_mean_returns", {})
         if not mean_returns:
             return 0.0
 
         ordered_keys = sorted(mean_returns.keys())
-        values = [mean_returns[key] for key in ordered_keys]
-        diffs = np.diff(values)
-        if diffs.size == 0:
+        values = np.asarray(
+            [mean_returns[key] for key in ordered_keys], dtype=float
+        )
+        if values.size < 2:
             return 0.0
 
+        # 缺 bin → 相鄰 diff 不計（寫死,非整分位 drop）
+        finite_pair = np.isfinite(values[:-1]) & np.isfinite(values[1:])
+        if not np.any(finite_pair):
+            return 0.0
+        diffs = values[1:] - values[:-1]
+        diffs = diffs[finite_pair]
         score = float(np.mean(diffs > 0))
         return max(0.0, min(1.0, score))
 
@@ -87,7 +104,7 @@ class MonotonicityTester:
         label: pd.Series,
         num_quantiles: int = 5,
     ) -> dict:
-        """Long-Short Spread + t-test。"""
+        """Long-Short Spread + t-test（同 PIT bin）。"""
 
         data = self._prepare_data(feature, label)
         if data.empty:
@@ -110,8 +127,17 @@ class MonotonicityTester:
                 "sharpe": np.nan,
             }
 
-        low_mask = quantile_bins == quantile_bins.min()
-        high_mask = quantile_bins == quantile_bins.max()
+        valid_bins = quantile_bins.dropna()
+        if valid_bins.empty:
+            return {
+                "spread": np.nan,
+                "tstat": np.nan,
+                "pvalue": np.nan,
+                "sharpe": np.nan,
+            }
+
+        low_mask = quantile_bins == valid_bins.min()
+        high_mask = quantile_bins == valid_bins.max()
         low_values = data.loc[low_mask, "label"].astype(float)
         high_values = data.loc[high_mask, "label"].astype(float)
 
@@ -181,20 +207,32 @@ class MonotonicityTester:
     def _assign_quantiles(
         self, data: pd.DataFrame, num_quantiles: int
     ) -> pd.Series | None:
+        """PIT expanding qcut label（§P0-2 / RULING-2）。
+
+        effective_count(t)<min_samples → bin=NA（§MS）。
+        """
         try:
-            bins = pd.qcut(
-                data["feature"], q=num_quantiles, labels=False, duplicates="drop"
+            bins = pit_expanding_qcut_label(
+                data["feature"],
+                q=num_quantiles,
+                min_samples=self._min_samples,
+                duplicates="drop",
             )
         except ValueError as exc:
-            logger.warning("qcut failed: %s", exc)
+            logger.warning("pit_expanding_qcut_label failed: %s", exc)
             if num_quantiles > 3:
                 return self._assign_quantiles(data, 3)
             return None
 
         if bins.isna().all():
+            if num_quantiles > 3:
+                return self._assign_quantiles(data, 3)
             return None
 
-        actual_bins = int(bins.max()) + 1
+        valid = bins.dropna()
+        if valid.empty:
+            return None
+        actual_bins = int(valid.max()) + 1
         if actual_bins < num_quantiles and num_quantiles > 3:
             return self._assign_quantiles(data, 3)
         return bins

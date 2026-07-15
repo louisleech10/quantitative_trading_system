@@ -1,11 +1,12 @@
-"""LA-0 M-lookahead mutation 測試（B1 骨架 + B2 rolling IC PIT）。
+"""LA-0 M-lookahead mutation 測試（B1 骨架 + B2 rolling IC + B3 mono/turnover PIT）。
 
-SPEC: docs/IC_LA0_SPEC.md LA0-1 / RULING-1
-TODO: docs/IC_LA0_TODO.md Task 2.1
+SPEC: docs/IC_LA0_SPEC.md LA0-1 / LA0-2 / RULING-1 / RULING-2 / RULING-5
+TODO: docs/IC_LA0_TODO.md Task 2.1 / 3.1 / 3.2
 
 B1 交付 fixture + truncate helper。
 B2 填 ``test_rolling_ic_pit``（P0-1 rolling IC 窗內 rank）。
-B3–B4 / B6 仍為 placeholder。
+B3 填 ``test_mono_pit`` / ``test_turnover_pit``。
+B4 / B6 仍為 placeholder。
 """
 
 from __future__ import annotations
@@ -17,6 +18,9 @@ import pandas as pd
 import pytest
 
 from momentum.Analysis.ic_engine import ICEngine
+from momentum.Analysis.monotonicity_tester import MonotonicityTester
+from momentum.Analysis.pit_stats import MIN_SAMPLES, first_valid_index
+from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
 
 # ---------------------------------------------------------------------------
 # 共用 helper（B2–B6 引用）
@@ -271,13 +275,216 @@ def test_rolling_ic_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Placeholders — B3 / B4 / B6 填入（勿刪 nodeid 名稱）
+# B3 — P0-2 mono / turnover PIT（M-lookahead + mutation）
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="B3: P0-2 mono/turnover M-lookahead mutation — not in B1 scope")
-def test_mono_turnover_pit() -> None:
-    """B3 nodeid placeholder."""
+def _build_mono_feature_label(
+    kline: pd.DataFrame,
+    n_rows: int = 400,
+) -> Tuple[pd.Series, pd.Series]:
+    close = _close_col(kline).iloc[:n_rows].reset_index(drop=True)
+    feature = close.pct_change(5).rename("feature")
+    label = close.pct_change(-1).rename("label")
+    return feature, label
+
+
+def test_mono_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
+    """P0-2 mono：主錨 early bin_t equal；mutation 回退全窗 qcut→FAIL；score 為 float scalar。
+
+    驗收（TODO Task 3.1）:
+      1. 截尾 → early bin_t element-equal（atol 1e-12）
+      2. mutation：legacy 全窗 qcut → early equal 必須 FAIL
+      3. mono score 型別 float scalar
+    """
+    kline = la0_real_kline["BTCUSDT_1h"]
+    tr = 40
+    num_q = 5
+    tester = MonotonicityTester({"num_quantiles": num_q, "min_group_size": 10})
+
+    feature, label = _build_mono_feature_label(kline, n_rows=400)
+    # 在 production 的 joint dropna 樣本上截尾，避免 feature/label 各自 NaN 對齊漂移
+    data_full = tester._prepare_data(feature, label)
+    assert len(data_full) > MIN_SAMPLES + tr + 20
+    data_trunc = data_full.iloc[:-tr].copy()
+
+    bins_full = tester._assign_quantiles(data_full, num_q)
+    bins_trunc = tester._assign_quantiles(data_trunc, num_q)
+    assert bins_full is not None and bins_trunc is not None
+
+    # 主錨：early bin_t equal（prepared 序列前 n-TR）
+    early_full = bins_full.iloc[:-tr].to_numpy(dtype=float)
+    early_trunc = bins_trunc.to_numpy(dtype=float)
+    assert early_full.shape == early_trunc.shape
+    np.testing.assert_allclose(
+        early_full,
+        early_trunc,
+        atol=ATOL_F64,
+        equal_nan=True,
+        err_msg="mono PIT early bin_t M-lookahead failed",
+    )
+    assert np.isfinite(early_full).sum() > 10
+
+    # scalar 契約
+    qret = tester.compute_quantile_returns(feature, label, num_quantiles=num_q)
+    score = tester.compute_monotonicity_score(qret)
+    assert isinstance(score, float)
+    assert 0.0 <= score <= 1.0
+
+    # mutation：legacy 全窗 qcut → early equal 必須 FAIL
+    try:
+        legacy_full = pd.qcut(
+            data_full["feature"], q=num_q, labels=False, duplicates="drop"
+        )
+        legacy_trunc = pd.qcut(
+            data_trunc["feature"], q=num_q, labels=False, duplicates="drop"
+        )
+    except ValueError as exc:  # pragma: no cover
+        pytest.fail(f"legacy qcut failed unexpectedly: {exc}")
+    with pytest.raises(AssertionError):
+        np.testing.assert_allclose(
+            legacy_full.iloc[:-tr].to_numpy(dtype=float),
+            legacy_trunc.to_numpy(dtype=float),
+            atol=ATOL_F64,
+            equal_nan=True,
+        )
+
+
+def test_turnover_array_len_and_warmup_null(
+    la0_real_kline: Dict[str, pd.DataFrame],
+) -> None:
+    """S2 / RULING-5 contract（TODO Task 3.2 指定 nodeid）。
+
+    鎖：
+      - len(array) == 源 raw n
+      - warmup [0, first_valid) 為 JSON null
+      - index first_valid 非 null（== 0.0；首個可算 bar 無前態 → change=0）
+    """
+    kline = la0_real_kline["BTCUSDT_1h"]
+    analyzer = TurnoverAnalyzer({"num_quantiles": 5})
+    feature, _ = _build_mono_feature_label(kline, n_rows=400)
+    raw = feature  # 源 raw index（含 NaN 頭段）— 不 dropna
+    n = len(raw)
+    assert n > MIN_SAMPLES + 20
+
+    ts = analyzer.compute_turnover_time_series(raw, num_quantiles=5)
+    fv = first_valid_index(raw, min_samples=MIN_SAMPLES)
+    assert fv is not None
+    assert fv >= MIN_SAMPLES - 1
+
+    for key in ("quantile_turnovers", "rank_change_rates"):
+        arr = ts[key]
+        assert len(arr) == n, f"{key} len must == 源 raw n ({n})"
+        assert all(v is None for v in arr[:fv]), (
+            f"{key} warmup [0, first_valid) must be JSON null"
+        )
+        # RULING-5：t=first_valid 本身 valid 不 null（首 bar change=0.0）
+        assert arr[fv] is not None, (
+            f"{key}[{fv}] must be non-null at first_valid (got null — 假綠若放寬)"
+        )
+        assert abs(float(arr[fv]) - 0.0) <= ATOL_F64, (
+            f"{key}[{fv}] must be 0.0 at first_valid, got {arr[fv]!r}"
+        )
+
+    assert len(ts["timestamps"]) == n
+
+
+def test_turnover_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
+    """P0-2 turnover：early equal + len==源 n + warmup null contract；mutation 回退全域→FAIL。
+
+    驗收（TODO Task 3.2 / S2 / RULING-5）:
+      1. 截尾 → early turnover/rank_change equal
+      2. len(array)==源 raw n 且 warmup [0, first_valid) 為 JSON null；
+         first_valid 本身 == 0.0（非 null）
+      3. mutation：legacy 全域 qcut/rank + dropna → contract/early FAIL
+    """
+    kline = la0_real_kline["BTCUSDT_1h"]
+    tr = 40
+    analyzer = TurnoverAnalyzer({"num_quantiles": 5})
+
+    feature, _ = _build_mono_feature_label(kline, n_rows=400)
+    # 源 raw index（含 NaN 頭段）— 不 dropna
+    raw = feature
+    raw_t = truncate_future(raw, tr)
+    n = len(raw)
+    assert n > MIN_SAMPLES + tr + 20
+
+    ts_full = analyzer.compute_turnover_time_series(raw, num_quantiles=5)
+    ts_trunc = analyzer.compute_turnover_time_series(raw_t, num_quantiles=5)
+
+    # --- contract: len == 源 raw n + warmup null + first_valid == 0.0 ---
+    assert len(ts_full["quantile_turnovers"]) == n
+    assert len(ts_full["rank_change_rates"]) == n
+    assert len(ts_full["timestamps"]) == n
+    fv = first_valid_index(raw, min_samples=MIN_SAMPLES)
+    assert fv is not None
+    assert all(v is None for v in ts_full["quantile_turnovers"][:fv])
+    assert all(v is None for v in ts_full["rank_change_rates"][:fv])
+    # RULING-5：t=first_valid 本身 valid 不 null（==0.0）；禁放寬為「不強制 non-null」
+    assert ts_full["quantile_turnovers"][fv] is not None
+    assert ts_full["rank_change_rates"][fv] is not None
+    assert abs(float(ts_full["quantile_turnovers"][fv]) - 0.0) <= ATOL_F64
+    assert abs(float(ts_full["rank_change_rates"][fv]) - 0.0) <= ATOL_F64
+    # first_valid dense with leading NaN from pct_change may be > 99
+    assert fv >= MIN_SAMPLES - 1
+
+    # --- M-lookahead early equal on finite post-warmup segment ---
+    keep = n - tr
+    for key in ("quantile_turnovers", "rank_change_rates"):
+        full_arr = ts_full[key][:keep]
+        trunc_arr = ts_trunc[key][:keep]
+        # None-safe compare
+        for i, (a, b) in enumerate(zip(full_arr, trunc_arr)):
+            if a is None and b is None:
+                continue
+            if a is None or b is None:
+                raise AssertionError(f"{key}[{i}] null mismatch: {a!r} vs {b!r}")
+            assert abs(float(a) - float(b)) <= ATOL_F64, (
+                f"{key}[{i}] early equal fail: {a} vs {b}"
+            )
+
+    # scalar paths also finite after enough history
+    qt = analyzer.compute_quantile_turnover(raw, num_quantiles=5)
+    rc = analyzer.compute_rank_change_rate(raw)
+    assert np.isfinite(qt)
+    assert np.isfinite(rc)
+
+    # --- mutation: legacy global qcut/rank + dropna → length n-1 且 early 洩漏 ---
+    def _legacy_turnover_ts(series: pd.Series) -> dict:
+        s = series.dropna()
+        if s.empty or s.size < 2:
+            return {"quantile_turnovers": [], "rank_change_rates": []}
+        quantiles = pd.qcut(s, q=5, labels=False, duplicates="drop")
+        top_mask = (quantiles == quantiles.max()).astype(float)
+        q_to = top_mask.diff().abs().dropna().astype(float)
+        ranks = s.rank(method="average")
+        r_ch = ranks.diff().abs().dropna().astype(float)
+        common = q_to.index.intersection(r_ch.index)
+        return {
+            "quantile_turnovers": [float(v) for v in q_to.loc[common].tolist()],
+            "rank_change_rates": [float(v) for v in r_ch.loc[common].tolist()],
+        }
+
+    legacy_full = _legacy_turnover_ts(raw)
+    legacy_trunc = _legacy_turnover_ts(raw_t)
+    # S2 contract must FAIL for legacy (n-1, no null warmup)
+    assert len(legacy_full["quantile_turnovers"]) != n
+    with pytest.raises(AssertionError):
+        assert len(legacy_full["quantile_turnovers"]) == n
+        assert all(v is None for v in legacy_full["quantile_turnovers"][:fv])
+
+    # early value leak: truncate changes early global ranks
+    # compare prefix of legacy arrays (aligned by position after dropna)
+    lf = np.asarray(legacy_full["rank_change_rates"][: max(0, keep - 5)], dtype=float)
+    lt = np.asarray(legacy_trunc["rank_change_rates"][: len(lf)], dtype=float)
+    if len(lf) > 20 and len(lt) == len(lf):
+        with pytest.raises(AssertionError):
+            np.testing.assert_allclose(lf, lt, atol=ATOL_F64, equal_nan=True)
+
+
+# ---------------------------------------------------------------------------
+# Placeholders — B4 / B6 填入（勿刪 nodeid 名稱）
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.skip(reason="B4: P0-3 preprocessor pit_expanding M-lookahead — not in B1 scope")

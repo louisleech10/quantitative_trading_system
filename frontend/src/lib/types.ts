@@ -2020,8 +2020,9 @@ export interface ICDecayData {
 }
 
 export interface TurnoverTimeSeriesData {
-  quantile_turnovers: number[];
-  rank_change_rates: number[];
+  /** S2/RULING-5: warmup [0, first_valid) 為 null；長度=源 raw n */
+  quantile_turnovers: (number | null)[];
+  rank_change_rates: (number | null)[];
   timestamps: Array<number | string>;
 }
 
