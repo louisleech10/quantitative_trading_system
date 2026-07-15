@@ -24,7 +24,9 @@
 - **✅ IC Analysis look-ahead 全面盤點完成(四方 CONVERGED)**:`ICLOOKAHEAD-MASTER.md`。結構性瀰漫;**split 只擋 stage1 winsorize 一部分**。**P0(預設必踩)**:①`ic_engine:290` rolling IC spearman **全序列 pre-rank**(污染 ICIR/門檻/deep 全鏈;`_rolling_spearman` 窗內版存在未用)②stage5 mono/turnover 全窗 qcut→門檻淘汰(預設 0.6)③stage1 winsorize/zscore full-sample fallback。**P1**:regime 分位/long_short/fallback silent/FR。四方實跑證(截未來 bar→早期輸出變)。
 - **✅ 使用者裁定(2026-07-15)=先 P0 統一整治,FR 併入**。歷史釐清:IC 之前只做「OOS切分+stage1 train-fit」防線,從未審分析模組內部計算→切分給假安心感(見 memory project_ic_analysis_lookahead_remediation)。
 - **▶ 下一步:LA-0(P0)remediation** — 開工前聯合偵察(Claude+三委員)P0-1 rolling IC 窗內 rank(啟用既有 `_rolling_spearman`)+P0-2 stage5 分位 PIT+P0-3 stage1 fallback→SPEC 起草→三家 adversarial→凍結→實作→三家 DATA-CORRECT(a,d)。FR v0.4 SPEC 已凍結就緒,併入統一 PIT helper。
-- **⚠️ 未 commit 治理產物**:本 session 大量 handoffs/(1d-RECON*/1cFRFULL-*/ICLOOKAHEAD-*)+ docs/IC1CFR_FULL_SPEC.md v0.4 + HANDOFF/ROADMAP/memory。建議動 P0 前先 commit 這批治理產物(SPEC+審計鏈)。
+- **✅ 治理產物已 commit+push**(2026-07-15,branch `docs/ic-lookahead-remediation-gov`,commit `3da0a0a`):docs/IC1CFR_FULL_SPEC.md v0.4 + HANDOFF + ROADMAP + gate audit。審計鏈 handoffs/ 為 gitignored 本地工作檔(未進版,符慣例)。
+- **➡️ 下個 session 從這裡接手 LA-0(P0)**:①聚焦偵察(Claude+三委員)**只針對 P0 三點**——P0-1 rolling IC 窗內 rank(啟用 `_rolling_spearman`)/P0-2 stage5 分位 PIT/P0-3 stage1 fallback→②SPEC 起草→③三家 adversarial→④凍結→⑤實作+三家 DATA-CORRECT。FR v0.4 SPEC 併入統一 PIT helper。
+- **⚠️ 勿重工**:全 33 模組 look-ahead 盤點**已完成**(master=handoffs/ICLOOKAHEAD-MASTER.md,含 P0/P1/P2 全清單+實跑證,gitignored 本地在)。新 session 的偵察=**從 master 起、聚焦 P0**,**不要**再全模組重掃。P1/P2 待 P0 後續 Phase。
 
 ## ✅ 上個 session 完成(兩票全入版 push)
 1. **1c Net IC 量綱正確化**:治理(SPEC 五輪+TODO 六輪三家 adversarial)+實作 B0-B3 四批(f1d85c5/2133c77/04ac6fb/77af3d3)。B-strict=禁 IC 減報酬率/`net_ic` 鍵全樹禁絕/成本去 ×2/成本前端輸入 fail-closed(5bps 寫死三處拔除)/per-rebalance 語意註記。docs/IC1C_NETIC_{SPEC,TODO}.md。
