@@ -348,6 +348,23 @@ if [ "${kind}" = "dispatch" ]; then
       *) [ -n "${spec}" ] || miss spec "高風險對 SPEC 派工必填 --spec <SPEC路徑>（非 spec 派工 --template 填 n/a:理由）" ;;
     esac
   fi
+  # Review-quorum 閘(2026-07-15 使用者定,scar:單家 review 連錯三批):中/大實作 batch N≥1 派工前,
+  #   前一批須 ≥2 個「非實作者」家族 code review(ORCH §1「code review=Codex+Composer 雙家」)。
+  #   從 impl task_id 自動推導(<root>-impl-b<N>-<impl_family>),無 flag 可繞、憑印象也擋得住。
+  case "${task_id}" in
+    *-impl-b[0-9]*-*)
+      _rq_fam="${task_id##*-}"
+      _rq_rest="${task_id%-*}"
+      _rq_bN="${_rq_rest##*-}"
+      _rq_root="${_rq_rest%-impl-*}"
+      _rq_n="${_rq_bN#b}"
+      if printf '%s' "${_rq_n}" | grep -qE '^[0-9]+$' && [ "${_rq_n}" -ge 1 ]; then
+        _rq_prev="${_rq_root}-b$(( _rq_n - 1 ))"
+        bash "${SCRIPT_DIR}/review_quorum_check.sh" "${_rq_prev}" "${_rq_fam}" \
+          || { echo "GATE 拒發 token — 前一批 ${_rq_prev} 未達雙家 review quorum(ORCH §1 code review=Codex+Composer);見上,補派第二家後再派本批。"; exit 1; }
+      fi
+      ;;
+  esac
   # 範本錨點機檢（提供即驗，不合規拒發 token）—— 把「有沒有照範本」變機器可驗
   if [ -n "${spec}" ]; then
     bash scripts/template_check.sh spec "${spec}" || { echo "ERROR: SPEC 未過範本機檢（見上），拒發 token。"; exit 1; }

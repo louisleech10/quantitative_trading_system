@@ -29,13 +29,13 @@ All code must support this evolution via clean decoupling.
 | **判準** | 改 1 函式/test/局部 bug；不命中 a-d；可本地 pytest 驗 | 單一 module、動既有 caller；不命中 a-d | 命中任一 a-d（模組會變、原則不變；不看檔案數） |
 | **管線** | Claude 自己做 + 自跑測試，不派工（省 token） | 完整管線：**SPEC + TODO + adversarial**，**不得跳步/不跳**（D-1） | 同左 + 白話簡述/manifest + **雙家族** adversarial reconcile |
 | **執行端** | — | 見 `docs/MULTI_AGENT_ORCHESTRATION.md` §1 **現行分工行**；動態，以使用者當下指示為準 | 同左 |
-| **code review** | — | 必派另一方，實作者不自審 | 同左 |
+| **code review** | — | **Codex+Composer 雙家**（兩個非實作者家族，實作者不自審；ORCH §1） | 同左 |
 | **SMALL_INLINE** | scope + 驗收命令 + 允許檔 + 禁止事項 | — | — |
 
 **高風險原則 (a)-(d)**：(a) 數值/資料品質 (b) 跨模組/共用路徑 (c) 多 phase/難回退 (d) ML/回測正確性。範例：Feature Factory/cache、IC Gatekeeper、回測引擎。
 
 **固定條款**（使用者定死，出處見 `docs/SCAR_LEDGER.md`）：
-- **中/大鐵律**：① 完整管線不得跳步（SPEC/TODO/adversarial 都要）② 必派另一方 code review ③ 大任務附白話簡述 ④ 省步唯一允許=動工前明列讓使用者**否決** ⑤ **派工進度每 10 分鐘回報一次**
+- **中/大鐵律**：① 完整管線不得跳步（SPEC/TODO/adversarial 都要）② **code review = Codex+Composer 雙家**（兩個非實作者家族，非「一家」；ORCH §1；**機器強制** `scripts/review_quorum_check.sh`，接入 `gate.sh` 派下一批 impl 前驗前批 quorum，不足→拒發 token）③ 大任務附白話簡述 ④ 省步唯一允許=動工前明列讓使用者**否決** ⑤ **派工進度每 10 分鐘回報一次**
 - **判不出大小**：明講不確定 + 先當「中」——**絕不靜默假設**
 - **膨脹升級 5 訊號**：檔案數超預期 / 碰 `factories.py`·`protocols.py`·`config.py` / 新 caller / 測試面擴大 / 觸及 a-d
 - **派工前後**：`bash scripts/agent_preflight.sh` → 派工 → `bash scripts/agent_postflight.sh`；PASS 才驗收
