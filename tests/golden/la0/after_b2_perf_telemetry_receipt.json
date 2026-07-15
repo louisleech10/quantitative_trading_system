@@ -1,0 +1,100 @@
+{
+  "schema_version": "la0_b2_perf_receipt_v1",
+  "note": "RULING-1 non-blocking telemetry after P0-1 window-rank fix; not a merge gate",
+  "n_rows": 2000,
+  "rolling_windows": [
+    21,
+    63,
+    126
+  ],
+  "runs": [
+    {
+      "n_rows": 2000,
+      "n_features": 15,
+      "rolling_windows": [
+        21,
+        63,
+        126
+      ],
+      "method_spearman_wall_s": 0.47362979199999966,
+      "method_pearson_wall_s": 0.004435167000000018,
+      "legacy_global_rank_wall_s": 0.005045834000000138,
+      "rss_max_raw": 335872000,
+      "emitted_lens": {
+        "window_21": 1980,
+        "window_63": 1938,
+        "window_126": 1875
+      },
+      "spearman_over_legacy_x": 93.86551202437232
+    },
+    {
+      "n_rows": 2000,
+      "n_features": 50,
+      "rolling_windows": [
+        21,
+        63,
+        126
+      ],
+      "method_spearman_wall_s": 0.8513920419999996,
+      "method_pearson_wall_s": 0.013419916999999337,
+      "legacy_global_rank_wall_s": 0.013533999999999935,
+      "rss_max_raw": 356630528,
+      "emitted_lens": {
+        "window_21": 1980,
+        "window_63": 1938,
+        "window_126": 1875
+      },
+      "spearman_over_legacy_x": 62.9076431210288
+    },
+    {
+      "n_rows": 2000,
+      "n_features": 150,
+      "rolling_windows": [
+        21,
+        63,
+        126
+      ],
+      "method_spearman_wall_s": 2.4957065,
+      "method_pearson_wall_s": 0.041577582999999585,
+      "legacy_global_rank_wall_s": 0.040076208000000335,
+      "rss_max_raw": 413761536,
+      "emitted_lens": {
+        "window_21": 1980,
+        "window_63": 1938,
+        "window_126": 1875
+      },
+      "spearman_over_legacy_x": 62.27401804082809
+    },
+    {
+      "n_rows": 2000,
+      "n_features": 500,
+      "rolling_windows": [
+        21,
+        63,
+        126
+      ],
+      "method_spearman_wall_s": 8.338586583000001,
+      "method_pearson_wall_s": 0.13748437499999966,
+      "legacy_global_rank_wall_s": 0.1388862909999986,
+      "rss_max_raw": 614481920,
+      "emitted_lens": {
+        "window_21": 1980,
+        "window_63": 1938,
+        "window_126": 1875
+      },
+      "spearman_over_legacy_x": 60.0389464140855
+    }
+  ],
+  "mutation": {
+    "fix_early_max_abs_delta": 0.0,
+    "legacy_early_max_abs_delta": 0.009701408515148335,
+    "verdict": "fix_green_legacy_red"
+  },
+  "b0_before_reference": {
+    "path": "tests/golden/la0/before_perf_telemetry_receipt.json",
+    "btc_wall_s": 0.6335220419999956,
+    "btc_n_features": 15,
+    "btc_n_rows": 2000,
+    "note": "B0 wall is full orchestrator stage1/4/5 not pure compute_rolling_ic"
+  }
+}

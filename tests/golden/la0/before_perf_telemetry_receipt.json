@@ -1,0 +1,68 @@
+{
+  "early_prefix_n": 64,
+  "note": "Live wall/rss + actual_default_N (source universe without cap); not part of baseline sha256 gate",
+  "runs": [
+    {
+      "actual_default_N": 437066,
+      "config_hash": "4a8a0b3726cc906ab3534994605e77f5",
+      "method": "spearman",
+      "n_features": 15,
+      "n_passed": 3,
+      "n_rejected": 12,
+      "n_rows": 2000,
+      "rolling_windows": [
+        21,
+        63,
+        126
+      ],
+      "rss_before_raw": 622706688,
+      "rss_max_raw": 622706688,
+      "scan": {
+        "batch_size": 30,
+        "batches_fail": 8,
+        "batches_ok": 42,
+        "max_batches": 50,
+        "n_passed_pool": 3,
+        "n_rejected_pool": 1251,
+        "sample_n": 2000
+      },
+      "scan_wall_total_s": 36.536326377,
+      "selection_method": "hash_even_sample_batch_stage5_scan_then_balance:sort_by_sha256(seed:name);even_stride_sample;analyze_batches(size=30);collect_passed∪rejected;final=sorted(passed)[:P]+sorted(rejected)[:R];re-analyze_final",
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "wall_seconds": 0.4593050000000005
+    },
+    {
+      "actual_default_N": 218410,
+      "config_hash": "e53e22906c35363757f4cd49d27f973e",
+      "method": "spearman",
+      "n_features": 14,
+      "n_passed": 2,
+      "n_rejected": 12,
+      "n_rows": 1696,
+      "rolling_windows": [
+        21,
+        63,
+        126
+      ],
+      "rss_before_raw": 622706688,
+      "rss_max_raw": 622706688,
+      "scan": {
+        "batch_size": 30,
+        "batches_fail": 1,
+        "batches_ok": 49,
+        "max_batches": 50,
+        "n_passed_pool": 2,
+        "n_rejected_pool": 1459,
+        "sample_n": 2000
+      },
+      "scan_wall_total_s": 41.70691075299992,
+      "selection_method": "hash_even_sample_batch_stage5_scan_then_balance:sort_by_sha256(seed:name);even_stride_sample;analyze_batches(size=30);collect_passed∪rejected;final=sorted(passed)[:P]+sorted(rejected)[:R];re-analyze_final",
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "wall_seconds": 0.4693584160000057
+    }
+  ],
+  "schema_version": "la0_b0_perf_receipt_v2",
+  "selection_method": "hash_even_sample_batch_stage5_scan_then_balance:sort_by_sha256(seed:name);even_stride_sample;analyze_batches(size=30);collect_passed∪rejected;final=sorted(passed)[:P]+sorted(rejected)[:R];re-analyze_final"
+}

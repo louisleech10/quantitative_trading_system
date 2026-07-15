@@ -1,0 +1,170 @@
+{
+  "baseline_subset": {
+    "actual_default_N": 218410,
+    "config_hash": "e53e22906c35363757f4cd49d27f973e",
+    "cut_method": "timestamp_tail_sort_index",
+    "final_attempt": 0,
+    "final_passed_target": 12,
+    "final_rejected_target": 12,
+    "final_selected": [
+      "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "close_12h_cycle_HT-TRENDMODE_Sign",
+      "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "close_12h_momentum_APO_12-26-0",
+      "close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "close_12h_momentum_APO_13-55-0_Log1p",
+      "close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "close_12h_momentum_APO_34-89-0_Abs",
+      "hlc_12h_momentum_ADXR_89_Abs",
+      "volume_12h_trend_MAVP_21_TsArgmin_W5"
+    ],
+    "index_end": "2026-04-27 12:00:00",
+    "index_start": "2024-01-01 00:00:00",
+    "kline_h5_group": "/ETHUSDT/12h/data",
+    "n_selected_passed": 2,
+    "n_selected_rejected": 12,
+    "n_selected_total": 14,
+    "nan_ratio": {
+      "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 0.038325471698113206,
+      "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 0.038325471698113206,
+      "close_12h_cycle_HT-TRENDMODE_Sign": 0.0,
+      "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.007075471698113208,
+      "close_12h_momentum_APO_12-26-0": 0.01474056603773585,
+      "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 0.017099056603773585,
+      "close_12h_momentum_APO_13-34-0_Kurt_W13": 0.02653301886792453,
+      "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.03891509433962264,
+      "close_12h_momentum_APO_13-55-0_Log1p": 0.031839622641509434,
+      "close_12h_momentum_APO_13-55-0_Momentum_L144": 0.11674528301886793,
+      "close_12h_momentum_APO_21-55-0_Momentum_L144": 0.11674528301886793,
+      "close_12h_momentum_APO_34-89-0_Abs": 0.05188679245283019,
+      "hlc_12h_momentum_ADXR_89_Abs": 0.15625,
+      "volume_12h_trend_MAVP_21_TsArgmin_W5": 0.01945754716981132
+    },
+    "phase": "final",
+    "scan": {
+      "batch_size": 30,
+      "batches_fail": 1,
+      "batches_ok": 49,
+      "max_batches": 50,
+      "n_passed_pool": 2,
+      "n_rejected_pool": 1459,
+      "sample_n": 2000
+    },
+    "selected_features": [
+      "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "close_12h_cycle_HT-TRENDMODE_Sign",
+      "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "close_12h_momentum_APO_12-26-0",
+      "close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "close_12h_momentum_APO_13-55-0_Log1p",
+      "close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "close_12h_momentum_APO_34-89-0_Abs",
+      "hlc_12h_momentum_ADXR_89_Abs",
+      "volume_12h_trend_MAVP_21_TsArgmin_W5"
+    ],
+    "selected_passed": [
+      "hlc_12h_momentum_ADXR_89_Abs",
+      "volume_12h_trend_MAVP_21_TsArgmin_W5"
+    ],
+    "selected_rejected": [
+      "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "close_12h_cycle_HT-TRENDMODE_Sign",
+      "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "close_12h_momentum_APO_12-26-0",
+      "close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "close_12h_momentum_APO_13-55-0_Log1p",
+      "close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "close_12h_momentum_APO_34-89-0_Abs"
+    ],
+    "selection_method": "hash_even_sample_batch_stage5_scan_then_balance:sort_by_sha256(seed:name);even_stride_sample;analyze_batches(size=30);collect_passed∪rejected;final=sorted(passed)[:P]+sorted(rejected)[:R];re-analyze_final",
+    "source_feature_count": 218410,
+    "strata_seed": "la0_b0_stratified_v1",
+    "tail_bars_actual": 1696,
+    "tail_bars_requested": 2000
+  },
+  "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34"
+  },
+  "close_12h_cycle_HT-SINE-LeadSine_Range_W3": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-LeadSine_Range_W3"
+  },
+  "close_12h_cycle_HT-TRENDMODE_Sign": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-TRENDMODE_Sign"
+  },
+  "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13"
+  },
+  "close_12h_momentum_APO_12-26-0": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_12-26-0"
+  },
+  "close_12h_momentum_APO_12-26-0_TsArgmin_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_12-26-0_TsArgmin_W5"
+  },
+  "close_12h_momentum_APO_13-34-0_Kurt_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_13-34-0_Kurt_W13"
+  },
+  "close_12h_momentum_APO_13-55-0_Kurt_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_13-55-0_Kurt_W13"
+  },
+  "close_12h_momentum_APO_13-55-0_Log1p": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_13-55-0_Log1p"
+  },
+  "close_12h_momentum_APO_13-55-0_Momentum_L144": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_13-55-0_Momentum_L144"
+  },
+  "close_12h_momentum_APO_21-55-0_Momentum_L144": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_21-55-0_Momentum_L144"
+  },
+  "close_12h_momentum_APO_34-89-0_Abs": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_34-89-0_Abs"
+  },
+  "config_hash": "e53e22906c35363757f4cd49d27f973e",
+  "hlc_12h_momentum_ADXR_89_Abs": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "hlc_12h_momentum_ADXR_89_Abs"
+  },
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "volume_12h_trend_MAVP_21_TsArgmin_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "volume_12h_trend_MAVP_21_TsArgmin_W5"
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "schema_version": "la0_attribution_allowlist_v1",
+  "spec_ref": "docs/IC_LA0_SPEC.md §G L2 + RULING-4",
+  "todo_ref": "docs/IC_LA0_TODO.md Task 0.2",
+  "policy": {
+    "b6_fill_only": ["before", "after", "delta"],
+    "forbid_add_expected_rows_after_b0": true,
+    "unlisted_diff": "unexpected",
+    "control_must_be_stable": true,
+    "control_delta_atol": 1e-12,
+    "class_enum": [
+      "expected-leakfix",
+      "expected-downstream",
+      "unexpected"
+    ]
+  },
+  "rows": [
+    {
+      "name": "rolling_ic_spearman",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-1",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_rolling_ic_pit",
+        "control": "pearson_rolling_ic"
+      },
+      "class": "expected-leakfix",
+      "reason": "spearman rolling IC 全序列 pre-rank→窗內 rank; early pure-TEST emitted ends 應變"
+    },
+    {
+      "name": "icir",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-1-downstream",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_rolling_ic_pit",
+        "control": "pearson_rolling_ic"
+      },
+      "class": "expected-downstream",
+      "reason": "ICIR 由 rolling IC 衍生; spearman 修後隨之變"
+    },
+    {
+      "name": "ic_hit_rate",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-1-downstream",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_rolling_ic_pit",
+        "control": "pearson_rolling_ic"
+      },
+      "class": "expected-downstream",
+      "reason": "hit_rate 由 rolling IC 符號比例衍生"
+    },
+    {
+      "name": "mono_bin_t",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-2",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_mono_pit",
+        "control": null
+      },
+      "class": "expected-leakfix",
+      "reason": "主錨: per-bar bin_t 由全域 qcut→pit_expanding_qcut_label"
+    },
+    {
+      "name": "monotonicity_score",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-2-downstream",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_mono_pit",
+        "control": null
+      },
+      "class": "expected-downstream",
+      "reason": "scalar mono 由 pit_pool 聚合; 輔證非主錨"
+    },
+    {
+      "name": "quantile_mean_returns",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-2-downstream",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_mono_pit",
+        "control": null
+      },
+      "class": "expected-downstream",
+      "reason": "μ_k 依 PIT bin 重算"
+    },
+    {
+      "name": "turnover_scalar",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-2",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_turnover_pit",
+        "control": null
+      },
+      "class": "expected-leakfix",
+      "reason": "quantile turnover 全域 qcut→PIT"
+    },
+    {
+      "name": "turnover_time_series",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-2",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_turnover_array_len_and_warmup_null",
+        "control": null
+      },
+      "class": "expected-leakfix",
+      "reason": "S2: 長度 n-1→n + warmup null + PIT qcut 值變"
+    },
+    {
+      "name": "rank_change_rate",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-2",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_turnover_pit",
+        "control": null
+      },
+      "class": "expected-leakfix",
+      "reason": "全域 rank→pit_expanding_rank 再 diff"
+    },
+    {
+      "name": "rank_change_time_series",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-2",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_turnover_array_len_and_warmup_null",
+        "control": null
+      },
+      "class": "expected-leakfix",
+      "reason": "S2 schema + PIT rank_change series"
+    },
+    {
+      "name": "stage1_winsorize_full_sample_fallback",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-3",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_preproc_pit",
+        "control": "train_mask_winsorize"
+      },
+      "class": "expected-leakfix",
+      "reason": "fit_mask=None/full_sample 路徑改 pit_expanding 或 fail-closed; early 值變"
+    },
+    {
+      "name": "passed_features_set",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "P0-2-downstream",
+      "oracle_passed": {
+        "m_lookahead": "test_la0_lookahead.py::test_mono_pit",
+        "control": null
+      },
+      "class": "expected-downstream",
+      "reason": "mono_min=0.6 硬閘可能因 PIT mono 翻轉 selection"
+    },
+    {
+      "name": "control_pearson_rolling_ic",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "control",
+      "oracle_passed": {
+        "m_lookahead": null,
+        "control": "pearson_rolling_ic"
+      },
+      "class": "expected-leakfix",
+      "reason": "CONTROL-STABLE: pearson 路徑不改; 必 |Δ|≈0 否則 FAIL"
+    },
+    {
+      "name": "control_train_mask_winsorize",
+      "before": null,
+      "after": null,
+      "delta": null,
+      "component": "control",
+      "oracle_passed": {
+        "m_lookahead": null,
+        "control": "train_mask_winsorize"
+      },
+      "class": "expected-leakfix",
+      "reason": "CONTROL-STABLE: train_mask 段 winsorize 不應被 PIT 誤傷; 必 |Δ|≈0"
+    }
+  ]
+}
