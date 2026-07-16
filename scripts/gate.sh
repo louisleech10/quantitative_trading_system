@@ -359,9 +359,17 @@ if [ "${kind}" = "dispatch" ]; then
       _rq_root="${_rq_rest%-impl-*}"
       _rq_n="${_rq_bN#b}"
       if printf '%s' "${_rq_n}" | grep -qE '^[0-9]+$' && [ "${_rq_n}" -ge 1 ]; then
-        _rq_prev="${_rq_root}-b$(( _rq_n - 1 ))"
-        bash "${SCRIPT_DIR}/review_quorum_check.sh" "${_rq_prev}" "${_rq_fam}" \
-          || { echo "GATE 拒發 token — 前一批 ${_rq_prev} 未達雙家 review quorum(ORCH §1 code review=Codex+Composer);見上,補派第二家後再派本批。"; exit 1; }
+        # 往下找真正的前一批:descoped 批次(audit 無該 batch review 派工)跳過,避免誤擋(如 FR/B5 descope→B6 的前批實為 B4)
+        _rq_p=$(( _rq_n - 1 )); _rq_prev=""
+        while [ "${_rq_p}" -ge 0 ]; do
+          _rq_cand="${_rq_root}-b${_rq_p}"
+          if grep -q "\"task_id\": \"${_rq_cand}-review" "${AUDIT}" 2>/dev/null; then _rq_prev="${_rq_cand}"; break; fi
+          _rq_p=$(( _rq_p - 1 ))
+        done
+        if [ -n "${_rq_prev}" ]; then
+          bash "${SCRIPT_DIR}/review_quorum_check.sh" "${_rq_prev}" "${_rq_fam}" \
+            || { echo "GATE 拒發 token — 前一批 ${_rq_prev} 未達雙家 review quorum(ORCH §1 code review=Codex+Composer);見上,補派第二家後再派本批。"; exit 1; }
+        fi
       fi
       ;;
   esac
