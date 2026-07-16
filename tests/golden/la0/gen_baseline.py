@@ -755,6 +755,8 @@ def _train_mask_winsorize_control(
         upper=upper,
         metadata=None,
         fit_mask=train_mask,
+        # B4+：train_mask 路徑須顯式 fit_mode（unset+None fail-closed）
+        fit_mode="train_mask",
     )
     train_vals = clipped.loc[clipped.index[train_mask]]
     # early-prefix: 前 EARLY_PREFIX_N 列 × 全欄 flatten 不實用；存 per-col early values 的 hash + 首列向量

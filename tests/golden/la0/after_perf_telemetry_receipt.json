@@ -1,0 +1,60 @@
+{
+  "note": "B6 after PIT engine telemetry; frozen B0 inputs re-analyzed",
+  "runs": [
+    {
+      "after_file": "BTCUSDT_1h_baseline_after.json",
+      "after_sha256": "6b13a11484795476b69212f828f0b26e7be8ba1efba38f8f5ded05215902df05",
+      "baseline_role": "after_pit",
+      "config_override": null,
+      "n_passed": 1,
+      "n_rejected": 14,
+      "rss_after_raw": 352043008,
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "wall_seconds": 8.228292083
+    },
+    {
+      "after_file": "ETHUSDT_12h_baseline_after.json",
+      "after_sha256": "2b59150286f01950ac0218b1e7678c44ef9ceb43fc7513b54c38cbbfb49f3162",
+      "baseline_role": "after_pit",
+      "config_override": null,
+      "n_passed": 2,
+      "n_rejected": 12,
+      "rss_after_raw": 357761024,
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "wall_seconds": 6.607489333
+    }
+  ],
+  "runs_split_off": [
+    {
+      "after_file": "BTCUSDT_1h_baseline_after_split_off.json",
+      "after_sha256": "633b77be05efe9f53f1ef7bd04ff451c37651986bc32c259afe97fddec16602a",
+      "baseline_role": "after_pit_split_off",
+      "config_override": {
+        "ic_train_test_split": false
+      },
+      "n_passed": 0,
+      "n_rejected": 15,
+      "rss_after_raw": 368934912,
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "wall_seconds": 54.521482416999994
+    },
+    {
+      "after_file": "ETHUSDT_12h_baseline_after_split_off.json",
+      "after_sha256": "9c38e176849280c91ecda3945230ae934f190795fe32e95e040b34d216630c86",
+      "baseline_role": "after_pit_split_off",
+      "config_override": {
+        "ic_train_test_split": false
+      },
+      "n_passed": 0,
+      "n_rejected": 14,
+      "rss_after_raw": 375603200,
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "wall_seconds": 41.078279417000005
+    }
+  ],
+  "schema_version": "la0_b6_after_perf_receipt_v1"
+}

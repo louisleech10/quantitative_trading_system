@@ -1,0 +1,1568 @@
+{
+  "after_baselines": {
+    "BTCUSDT_1h": "tests/golden/la0/BTCUSDT_1h_baseline_after.json",
+    "ETHUSDT_12h": "tests/golden/la0/ETHUSDT_12h_baseline_after.json",
+    "pit_stats_version": "la0_b1_v1",
+    "sha256_prefix": {
+      "BTCUSDT_1h": "6b13a11484795476",
+      "ETHUSDT_12h": "2b59150286f01950"
+    }
+  },
+  "after_baselines_split_off": {
+    "BTCUSDT_1h": "tests/golden/la0/BTCUSDT_1h_baseline_after_split_off.json",
+    "ETHUSDT_12h": "tests/golden/la0/ETHUSDT_12h_baseline_after_split_off.json",
+    "config": {
+      "ic_train_test_split": false
+    },
+    "pit_stats_version": "la0_b1_v1",
+    "sha256_prefix": {
+      "BTCUSDT_1h": "633b77be05efe9f5",
+      "ETHUSDT_12h": "9c38e176849280c9"
+    }
+  },
+  "allowlist_ref": "tests/golden/la0/attribution_allowlist.json",
+  "before_baselines": {
+    "BTCUSDT_1h": "tests/golden/la0/BTCUSDT_1h_baseline.json",
+    "ETHUSDT_12h": "tests/golden/la0/ETHUSDT_12h_baseline.json",
+    "sha256_prefix": {
+      "BTCUSDT_1h": "a25e9c126d6483bf",
+      "ETHUSDT_12h": "e7dc68444b363b76"
+    }
+  },
+  "policy": {
+    "b6_fill_only": [
+      "before",
+      "after",
+      "delta"
+    ],
+    "class_enum": [
+      "expected-leakfix",
+      "expected-downstream",
+      "unexpected"
+    ],
+    "control_delta_atol": 1e-12,
+    "control_must_be_stable": true,
+    "forbid_add_expected_rows_after_b0": true,
+    "unlisted_diff": "unexpected"
+  },
+  "rows": [
+    {
+      "after": {
+        "digest": "e6033463a54e4848d7c4c340a3b233a8e3ed30a7bc01288e48746b8321b5ebba",
+        "n_series": 45
+      },
+      "before": {
+        "digest": "e95fb7f9525b7ca69b5458fa8480f25633b36d22e51d4bc846d63202c9ff7d6e",
+        "n_series": 45
+      },
+      "class": "expected-leakfix",
+      "component": "P0-1",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "e6033463a54e4848d7c4c340a3b233a8e3ed30a7bc01288e48746b8321b5ebba",
+            "n_series": 45
+          },
+          "before": {
+            "digest": "e95fb7f9525b7ca69b5458fa8480f25633b36d22e51d4bc846d63202c9ff7d6e",
+            "n_series": 45
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "cd8d1a83d6e950cc0a9c908357a412a1efcf43580f83656e56b840bdca3de525",
+            "n_series": 42
+          },
+          "before": {
+            "digest": "682f19ceddc6455da940dcc0df54abe82b744a84c5ed9e6ea174b0945065bf32",
+            "n_series": 42
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "rolling_ic_spearman",
+      "oracle_passed": {
+        "control": "pearson_rolling_ic",
+        "m_lookahead": "test_la0_lookahead.py::test_rolling_ic_pit"
+      },
+      "reason": "spearman rolling IC 全序列 pre-rank→窗內 rank; early pure-TEST emitted ends 應變"
+    },
+    {
+      "after": {
+        "digest": "837380df51865c041f02469a318c4058e05b59fa629dad474320a4aeb55d0037",
+        "values": {
+          "avg-price_1h_Lag_5": -1.9930289640883605,
+          "close-volume_12h_volume_OBV_Lag_3": -0.16333389993221997,
+          "close-volume_12h_volume_OBV_Mean_W13": -0.20056203543137743,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": -0.07988095825664512,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": -0.5271884999401724,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": -0.07302058953460365,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": -0.4704897514312155,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.10272420772981526,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": -0.011595816662064403,
+          "close_12h_momentum_APO_5-21-0_Std_W89": -0.024586125220545995,
+          "close_12h_momentum_APO_8-34-0_Range_W5": -0.025562176372580687,
+          "close_12h_momentum_CMO_13_Range_W34": 0.10538911012740555,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.9867893516447046,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 1.6622281212469319,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.9445104843513565
+        }
+      },
+      "before": {
+        "digest": "39eb689b02d51629a0dd02fef0b7db42cb716d7537a6b8fd39ed1f5a618f96f8",
+        "values": {
+          "avg-price_1h_Lag_5": -1.8555202776273385,
+          "close-volume_12h_volume_OBV_Lag_3": -0.11029892581726894,
+          "close-volume_12h_volume_OBV_Mean_W13": -0.2676517286706831,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": -0.14668664492703035,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": -0.5433116999756413,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": -0.14036169620131997,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": -0.4577301946396581,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.11211233342065725,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 0.0765078130408834,
+          "close_12h_momentum_APO_5-21-0_Std_W89": -0.06711353333543885,
+          "close_12h_momentum_APO_8-34-0_Range_W5": -0.06674172764285571,
+          "close_12h_momentum_CMO_13_Range_W34": 0.07628342993445926,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 1.1945795491522553,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 1.4398938686455913,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 1.212279612622039
+        }
+      },
+      "class": "expected-downstream",
+      "component": "P0-1-downstream",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "837380df51865c041f02469a318c4058e05b59fa629dad474320a4aeb55d0037",
+            "values": {
+              "avg-price_1h_Lag_5": -1.9930289640883605,
+              "close-volume_12h_volume_OBV_Lag_3": -0.16333389993221997,
+              "close-volume_12h_volume_OBV_Mean_W13": -0.20056203543137743,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": -0.07988095825664512,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": -0.5271884999401724,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": -0.07302058953460365,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": -0.4704897514312155,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.10272420772981526,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": -0.011595816662064403,
+              "close_12h_momentum_APO_5-21-0_Std_W89": -0.024586125220545995,
+              "close_12h_momentum_APO_8-34-0_Range_W5": -0.025562176372580687,
+              "close_12h_momentum_CMO_13_Range_W34": 0.10538911012740555,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.9867893516447046,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 1.6622281212469319,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.9445104843513565
+            }
+          },
+          "before": {
+            "digest": "39eb689b02d51629a0dd02fef0b7db42cb716d7537a6b8fd39ed1f5a618f96f8",
+            "values": {
+              "avg-price_1h_Lag_5": -1.8555202776273385,
+              "close-volume_12h_volume_OBV_Lag_3": -0.11029892581726894,
+              "close-volume_12h_volume_OBV_Mean_W13": -0.2676517286706831,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": -0.14668664492703035,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": -0.5433116999756413,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": -0.14036169620131997,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": -0.4577301946396581,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.11211233342065725,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 0.0765078130408834,
+              "close_12h_momentum_APO_5-21-0_Std_W89": -0.06711353333543885,
+              "close_12h_momentum_APO_8-34-0_Range_W5": -0.06674172764285571,
+              "close_12h_momentum_CMO_13_Range_W34": 0.07628342993445926,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 1.1945795491522553,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 1.4398938686455913,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 1.212279612622039
+            }
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "94b4d64375e4a08f643e1db15689746a7cf662100d167f4046fa2bbdbbf1627c",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 0.1255613122640016,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": -0.017022084503603194,
+              "close_12h_cycle_HT-TRENDMODE_Sign": -0.13848989756556607,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.24267067980170626,
+              "close_12h_momentum_APO_12-26-0": -0.5645892927550344,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 0.22923903371478327,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": -0.2378769394997602,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.16273810812277117,
+              "close_12h_momentum_APO_13-55-0_Log1p": -0.6566214502043176,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": -0.044700163586792914,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": -0.048598291533547396,
+              "close_12h_momentum_APO_34-89-0_Abs": 0.15463216220669457,
+              "hlc_12h_momentum_ADXR_89_Abs": 1.6938624339791841,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 0.7535506950727763
+            }
+          },
+          "before": {
+            "digest": "066a8e7b28a37def537ed77cdfaf2c12b9c170feb2c6167805efc5abdad5800f",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": -0.027332712432336145,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": -0.1645486945067296,
+              "close_12h_cycle_HT-TRENDMODE_Sign": -0.16119216027953656,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.3153542661472861,
+              "close_12h_momentum_APO_12-26-0": -0.4712587012050803,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 0.31112053988714267,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": -0.16701761296836423,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.2189564569401817,
+              "close_12h_momentum_APO_13-55-0_Log1p": -0.5931224617630649,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": -0.05609519724060989,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": -0.11240753147832544,
+              "close_12h_momentum_APO_34-89-0_Abs": 0.010971867519103303,
+              "hlc_12h_momentum_ADXR_89_Abs": 1.6725482242663485,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 0.7134724951241025
+            }
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "icir",
+      "oracle_passed": {
+        "control": "pearson_rolling_ic",
+        "m_lookahead": "test_la0_lookahead.py::test_rolling_ic_pit"
+      },
+      "reason": "ICIR 由 rolling IC 衍生; spearman 修後隨之變"
+    },
+    {
+      "after": {
+        "digest": "bd719ebe15585102cd266f54fe5727f72dbe0ba6873a456e6dc44315a504e0e0",
+        "values": {
+          "avg-price_1h_Lag_5": 0.03076923076923077,
+          "close-volume_12h_volume_OBV_Lag_3": 0.33076923076923076,
+          "close-volume_12h_volume_OBV_Mean_W13": 0.4,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.4846153846153846,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.27692307692307694,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.36153846153846153,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.2794871794871795,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.5794871794871795,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 0.5076923076923077,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 0.4717948717948718,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 0.517948717948718,
+          "close_12h_momentum_CMO_13_Range_W34": 0.5102564102564102,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.8102564102564103,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.9333333333333333,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.8179487179487179
+        }
+      },
+      "before": {
+        "digest": "948b380fde6f5c7de98c11f5c7a7d543bab36a5260a4e83b0f2c070ce7a78488",
+        "values": {
+          "avg-price_1h_Lag_5": 0.035897435897435895,
+          "close-volume_12h_volume_OBV_Lag_3": 0.3717948717948718,
+          "close-volume_12h_volume_OBV_Mean_W13": 0.358974358974359,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.5076923076923077,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.258974358974359,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.3487179487179487,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.27692307692307694,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.5794871794871795,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 0.5384615384615384,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 0.4641025641025641,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 0.5333333333333333,
+          "close_12h_momentum_CMO_13_Range_W34": 0.517948717948718,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.841025641025641,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.9102564102564102,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.8794871794871795
+        }
+      },
+      "class": "expected-downstream",
+      "component": "P0-1-downstream",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "bd719ebe15585102cd266f54fe5727f72dbe0ba6873a456e6dc44315a504e0e0",
+            "values": {
+              "avg-price_1h_Lag_5": 0.03076923076923077,
+              "close-volume_12h_volume_OBV_Lag_3": 0.33076923076923076,
+              "close-volume_12h_volume_OBV_Mean_W13": 0.4,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.4846153846153846,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.27692307692307694,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.36153846153846153,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.2794871794871795,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.5794871794871795,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 0.5076923076923077,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 0.4717948717948718,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 0.517948717948718,
+              "close_12h_momentum_CMO_13_Range_W34": 0.5102564102564102,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.8102564102564103,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.9333333333333333,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.8179487179487179
+            }
+          },
+          "before": {
+            "digest": "948b380fde6f5c7de98c11f5c7a7d543bab36a5260a4e83b0f2c070ce7a78488",
+            "values": {
+              "avg-price_1h_Lag_5": 0.035897435897435895,
+              "close-volume_12h_volume_OBV_Lag_3": 0.3717948717948718,
+              "close-volume_12h_volume_OBV_Mean_W13": 0.358974358974359,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.5076923076923077,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.258974358974359,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.3487179487179487,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.27692307692307694,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.5794871794871795,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 0.5384615384615384,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 0.4641025641025641,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 0.5333333333333333,
+              "close_12h_momentum_CMO_13_Range_W34": 0.517948717948718,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.841025641025641,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.9102564102564102,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.8794871794871795
+            }
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "47a916b5fbfc1b14bd06cc89be2d9a3fdd07a352242426121bd6988836befb06",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 0.5515151515151515,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 0.6151515151515151,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 0.5181818181818182,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.6,
+              "close_12h_momentum_APO_12-26-0": 0.2696969696969697,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 0.5272727272727272,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 0.40606060606060607,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.47575757575757577,
+              "close_12h_momentum_APO_13-55-0_Log1p": 0.22121212121212122,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 0.4818181818181818,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 0.5363636363636364,
+              "close_12h_momentum_APO_34-89-0_Abs": 0.5545454545454546,
+              "hlc_12h_momentum_ADXR_89_Abs": 0.9515151515151515,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 0.6787878787878788
+            }
+          },
+          "before": {
+            "digest": "55fa78ff7c88e4855c46202724484efeb69a490e883857499d52ebc9ecda92e6",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 0.4909090909090909,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 0.6151515151515151,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 0.4666666666666667,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.593939393939394,
+              "close_12h_momentum_APO_12-26-0": 0.3090909090909091,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 0.5969696969696969,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 0.40606060606060607,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.4696969696969697,
+              "close_12h_momentum_APO_13-55-0_Log1p": 0.24848484848484848,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 0.4121212121212121,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 0.46060606060606063,
+              "close_12h_momentum_APO_34-89-0_Abs": 0.5303030303030303,
+              "hlc_12h_momentum_ADXR_89_Abs": 0.9484848484848485,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 0.6484848484848484
+            }
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "ic_hit_rate",
+      "oracle_passed": {
+        "control": "pearson_rolling_ic",
+        "m_lookahead": "test_la0_lookahead.py::test_rolling_ic_pit"
+      },
+      "reason": "hit_rate 由 rolling IC 符號比例衍生"
+    },
+    {
+      "after": {
+        "digest": "4c2eaeedd134910ce2f03f7006da1be0f7897b4a2def5088a8e2a6c4aa141ae7",
+        "n": 15
+      },
+      "before": {
+        "digest": "343a24087e57765c75bae706c54184587893ab007157eeb1e928163b4faa94c2",
+        "n": 15
+      },
+      "class": "expected-leakfix",
+      "component": "P0-2",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "4c2eaeedd134910ce2f03f7006da1be0f7897b4a2def5088a8e2a6c4aa141ae7",
+            "n": 15
+          },
+          "before": {
+            "digest": "343a24087e57765c75bae706c54184587893ab007157eeb1e928163b4faa94c2",
+            "n": 15
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "d3ecf5d9adae6a8ff1048d7f7fbe35dd785ac1fcc03add8cc41769e47ffc4289",
+            "n": 14
+          },
+          "before": {
+            "digest": "086e7aa497f2ac0f3abe7e32a75f7bac3146e7ee43fa43ee63e5cc362fb6f808",
+            "n": 14
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "mono_bin_t",
+      "oracle_passed": {
+        "control": null,
+        "m_lookahead": "test_la0_lookahead.py::test_mono_pit"
+      },
+      "reason": "主錨: per-bar bin_t 由全域 qcut→pit_expanding_qcut_label"
+    },
+    {
+      "after": {
+        "digest": "4744937e1e7c392d451f850b9923a3cf93c31f2b59b9f0c40c459e0ffda690b7",
+        "values": {
+          "avg-price_1h_Lag_5": 0.6666666666666666,
+          "close-volume_12h_volume_OBV_Lag_3": 0.5,
+          "close-volume_12h_volume_OBV_Mean_W13": 0.0,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.5,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.5,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.6666666666666666,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.0,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.5,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 1.0,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 0.5,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 0.75,
+          "close_12h_momentum_CMO_13_Range_W34": 0.5,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.75,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.5,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.5
+        }
+      },
+      "before": {
+        "digest": "db56388e3c36bd1582554466046abf1e6165066dc620cc71759630e17477ef93",
+        "values": {
+          "avg-price_1h_Lag_5": 0.0,
+          "close-volume_12h_volume_OBV_Lag_3": 0.5,
+          "close-volume_12h_volume_OBV_Mean_W13": 0.5,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.5,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.5,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.0,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.5,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.5,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 0.25,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 0.5,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 0.5,
+          "close_12h_momentum_CMO_13_Range_W34": 0.5,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.75,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.75,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.75
+        }
+      },
+      "class": "expected-downstream",
+      "component": "P0-2-downstream",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "4744937e1e7c392d451f850b9923a3cf93c31f2b59b9f0c40c459e0ffda690b7",
+            "values": {
+              "avg-price_1h_Lag_5": 0.6666666666666666,
+              "close-volume_12h_volume_OBV_Lag_3": 0.5,
+              "close-volume_12h_volume_OBV_Mean_W13": 0.0,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.5,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.5,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.6666666666666666,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.0,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.5,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 1.0,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 0.5,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 0.75,
+              "close_12h_momentum_CMO_13_Range_W34": 0.5,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.75,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.5,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.5
+            }
+          },
+          "before": {
+            "digest": "db56388e3c36bd1582554466046abf1e6165066dc620cc71759630e17477ef93",
+            "values": {
+              "avg-price_1h_Lag_5": 0.0,
+              "close-volume_12h_volume_OBV_Lag_3": 0.5,
+              "close-volume_12h_volume_OBV_Mean_W13": 0.5,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.5,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.5,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.0,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.5,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.5,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 0.25,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 0.5,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 0.5,
+              "close_12h_momentum_CMO_13_Range_W34": 0.5,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.75,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.75,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.75
+            }
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "7dcc7608f359ac1614e530cc433b15366b9cc1ee9fda375b8c6ff9c833a4115f",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 0.5,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 0.75,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 0.0,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.0,
+              "close_12h_momentum_APO_12-26-0": 0.5,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 1.0,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 0.25,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.75,
+              "close_12h_momentum_APO_13-55-0_Log1p": 0.25,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 0.5,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 0.5,
+              "close_12h_momentum_APO_34-89-0_Abs": 0.25,
+              "hlc_12h_momentum_ADXR_89_Abs": 0.75,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 1.0
+            }
+          },
+          "before": {
+            "digest": "cbb138755459837c233798048ace367464b7e6fff95254b600e320deb167730e",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 0.75,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 0.75,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 0.0,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.0,
+              "close_12h_momentum_APO_12-26-0": 0.5,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 0.0,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 0.25,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.75,
+              "close_12h_momentum_APO_13-55-0_Log1p": 0.25,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 0.5,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 0.75,
+              "close_12h_momentum_APO_34-89-0_Abs": 0.75,
+              "hlc_12h_momentum_ADXR_89_Abs": 0.75,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 1.0
+            }
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "monotonicity_score",
+      "oracle_passed": {
+        "control": null,
+        "m_lookahead": "test_la0_lookahead.py::test_mono_pit"
+      },
+      "reason": "scalar mono 由 pit_pool 聚合; 輔證非主錨"
+    },
+    {
+      "after": {
+        "digest": "4550d91d4cbc1bfc6aced3b397b7bbf31904a935a9b122c8b61b69f944b87a30",
+        "n": 15
+      },
+      "before": {
+        "digest": "22330372373763fb3e864918b8e8b95f360dd95620bdd272898d608cd0b8e07f",
+        "n": 15
+      },
+      "class": "expected-downstream",
+      "component": "P0-2-downstream",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "4550d91d4cbc1bfc6aced3b397b7bbf31904a935a9b122c8b61b69f944b87a30",
+            "n": 15
+          },
+          "before": {
+            "digest": "22330372373763fb3e864918b8e8b95f360dd95620bdd272898d608cd0b8e07f",
+            "n": 15
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "ed84f51a306083e3a693f911267d9d5f0472cec903687f0ff493a0c113dbebbd",
+            "n": 14
+          },
+          "before": {
+            "digest": "ed96a866cfb1253cffc1d8f326c0791621d860f49e1035d228ac1910a1cb0c24",
+            "n": 14
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "quantile_mean_returns",
+      "oracle_passed": {
+        "control": null,
+        "m_lookahead": "test_la0_lookahead.py::test_mono_pit"
+      },
+      "reason": "μ_k 依 PIT bin 重算"
+    },
+    {
+      "after": {
+        "digest": "389b20a3474cce6eb0be041caba6baa6e8ba6ae0c28c8978972b3eefa82e3577",
+        "values": {
+          "avg-price_1h_Lag_5": 0.061016949152542375,
+          "close-volume_12h_volume_OBV_Lag_3": 0.023728813559322035,
+          "close-volume_12h_volume_OBV_Mean_W13": 0.010169491525423728,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.010169491525423728,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.013559322033898305,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.003389830508474576,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.010169491525423728,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.006779661016949152,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 0.003389830508474576,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 0.003389830508474576,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 0.013559322033898305,
+          "close_12h_momentum_CMO_13_Range_W34": 0.006779661016949152,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.013559322033898305,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.15593220338983052,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.020338983050847456
+        }
+      },
+      "before": {
+        "digest": "a5840c6b8670e9a3b1111ec98637a43221c2e24cfcd79b6276de90a5ed150c7a",
+        "values": {
+          "avg-price_1h_Lag_5": 0.012690355329949238,
+          "close-volume_12h_volume_OBV_Lag_3": 0.015228426395939087,
+          "close-volume_12h_volume_OBV_Mean_W13": 0.01015228426395939,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.005076142131979695,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.01015228426395939,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.005076142131979695,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.0025380710659898475,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.01015228426395939,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 0.005076142131979695,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 0.005076142131979695,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 0.012690355329949238,
+          "close_12h_momentum_CMO_13_Range_W34": 0.005076142131979695,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.015228426395939087,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.14720812182741116,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.015228426395939087
+        }
+      },
+      "class": "expected-leakfix",
+      "component": "P0-2",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "389b20a3474cce6eb0be041caba6baa6e8ba6ae0c28c8978972b3eefa82e3577",
+            "values": {
+              "avg-price_1h_Lag_5": 0.061016949152542375,
+              "close-volume_12h_volume_OBV_Lag_3": 0.023728813559322035,
+              "close-volume_12h_volume_OBV_Mean_W13": 0.010169491525423728,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.010169491525423728,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.013559322033898305,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.003389830508474576,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.010169491525423728,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.006779661016949152,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 0.003389830508474576,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 0.003389830508474576,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 0.013559322033898305,
+              "close_12h_momentum_CMO_13_Range_W34": 0.006779661016949152,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.013559322033898305,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.15593220338983052,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.020338983050847456
+            }
+          },
+          "before": {
+            "digest": "a5840c6b8670e9a3b1111ec98637a43221c2e24cfcd79b6276de90a5ed150c7a",
+            "values": {
+              "avg-price_1h_Lag_5": 0.012690355329949238,
+              "close-volume_12h_volume_OBV_Lag_3": 0.015228426395939087,
+              "close-volume_12h_volume_OBV_Mean_W13": 0.01015228426395939,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.005076142131979695,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.01015228426395939,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.005076142131979695,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.0025380710659898475,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.01015228426395939,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 0.005076142131979695,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 0.005076142131979695,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 0.012690355329949238,
+              "close_12h_momentum_CMO_13_Range_W34": 0.005076142131979695,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.015228426395939087,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.14720812182741116,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.015228426395939087
+            }
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "6f737832467cc4fadbc1a5cc1db6dbd0a7b2d411a4f80920931b5edd75e71c52",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 0.02553191489361702,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 0.15319148936170213,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 0.00851063829787234,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.01702127659574468,
+              "close_12h_momentum_APO_12-26-0": 0.03404255319148936,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 0.09361702127659574,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 0.11914893617021277,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.11063829787234042,
+              "close_12h_momentum_APO_13-55-0_Log1p": 0.03404255319148936,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 0.03404255319148936,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 0.03404255319148936,
+              "close_12h_momentum_APO_34-89-0_Abs": 0.00851063829787234,
+              "hlc_12h_momentum_ADXR_89_Abs": 0.02127659574468085,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 0.1702127659574468
+            }
+          },
+          "before": {
+            "digest": "c42251292150c0b26aa230ed8392e3f2a66f2565dfcf9556830ae4d25ed2ee20",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 0.029940119760479042,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 0.15568862275449102,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 0.0,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 0.0,
+              "close_12h_momentum_APO_12-26-0": 0.03592814371257485,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 0.09580838323353294,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 0.1317365269461078,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 0.1317365269461078,
+              "close_12h_momentum_APO_13-55-0_Log1p": 0.029940119760479042,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 0.04790419161676647,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 0.04790419161676647,
+              "close_12h_momentum_APO_34-89-0_Abs": 0.011976047904191617,
+              "hlc_12h_momentum_ADXR_89_Abs": 0.011976047904191617,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 0.19161676646706588
+            }
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "turnover_scalar",
+      "oracle_passed": {
+        "control": null,
+        "m_lookahead": "test_la0_lookahead.py::test_turnover_pit"
+      },
+      "reason": "quantile turnover 全域 qcut→PIT"
+    },
+    {
+      "after": {
+        "digest": "1a48bae926247926569ad6ec2cc62dace4a5354dc654a51ff0c6e402a7065ea5",
+        "lens": {
+          "avg-price_1h_Lag_5": 395,
+          "close-volume_12h_volume_OBV_Lag_3": 395,
+          "close-volume_12h_volume_OBV_Mean_W13": 395,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 395,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 395,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 395,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 395,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 395,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 395,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 395,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 395,
+          "close_12h_momentum_CMO_13_Range_W34": 395,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 395,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 395,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 395
+        }
+      },
+      "before": {
+        "digest": "9a9203d652e52837d43b22762080447af7f8337809bde63c341ba3fd2b7ee686",
+        "lens": {
+          "avg-price_1h_Lag_5": 394,
+          "close-volume_12h_volume_OBV_Lag_3": 394,
+          "close-volume_12h_volume_OBV_Mean_W13": 394,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 394,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 394,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 394,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 394,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 394,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 394,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 394,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 394,
+          "close_12h_momentum_CMO_13_Range_W34": 394,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 394,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 394,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 394
+        }
+      },
+      "class": "expected-leakfix",
+      "component": "P0-2",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "1a48bae926247926569ad6ec2cc62dace4a5354dc654a51ff0c6e402a7065ea5",
+            "lens": {
+              "avg-price_1h_Lag_5": 395,
+              "close-volume_12h_volume_OBV_Lag_3": 395,
+              "close-volume_12h_volume_OBV_Mean_W13": 395,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 395,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 395,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 395,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 395,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 395,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 395,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 395,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 395,
+              "close_12h_momentum_CMO_13_Range_W34": 395,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 395,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 395,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 395
+            }
+          },
+          "before": {
+            "digest": "9a9203d652e52837d43b22762080447af7f8337809bde63c341ba3fd2b7ee686",
+            "lens": {
+              "avg-price_1h_Lag_5": 394,
+              "close-volume_12h_volume_OBV_Lag_3": 394,
+              "close-volume_12h_volume_OBV_Mean_W13": 394,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 394,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 394,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 394,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 394,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 394,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 394,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 394,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 394,
+              "close_12h_momentum_CMO_13_Range_W34": 394,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 394,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 394,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 394
+            }
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "bd84fbec5384a01383faeef173a27aea0b2158a105b209531344fb55a95439db",
+            "lens": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 335,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 335,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 335,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 335,
+              "close_12h_momentum_APO_12-26-0": 335,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 335,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 335,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 335,
+              "close_12h_momentum_APO_13-55-0_Log1p": 335,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 335,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 335,
+              "close_12h_momentum_APO_34-89-0_Abs": 335,
+              "hlc_12h_momentum_ADXR_89_Abs": 335,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 335
+            }
+          },
+          "before": {
+            "digest": "2e44c68756bccdd8c553c0603104e58673cb52d7e2308ac9a4ce7051fc877b1c",
+            "lens": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 334,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 334,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 334,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 334,
+              "close_12h_momentum_APO_12-26-0": 334,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 334,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 334,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 334,
+              "close_12h_momentum_APO_13-55-0_Log1p": 334,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 334,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 334,
+              "close_12h_momentum_APO_34-89-0_Abs": 334,
+              "hlc_12h_momentum_ADXR_89_Abs": 334,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 334
+            }
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "turnover_time_series",
+      "oracle_passed": {
+        "control": null,
+        "m_lookahead": "test_la0_lookahead.py::test_turnover_array_len_and_warmup_null"
+      },
+      "reason": "S2: 長度 n-1→n + warmup null + PIT qcut 值變"
+    },
+    {
+      "after": {
+        "digest": "d1cfbc6162e8820c31b7611a3e6666a35bcaef8bebb4842b2816ad763c847502",
+        "values": {
+          "avg-price_1h_Lag_5": 3.6389830508474574,
+          "close-volume_12h_volume_OBV_Lag_3": 3.26271186440678,
+          "close-volume_12h_volume_OBV_Mean_W13": 1.2966101694915255,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 2.364406779661017,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 3.4661016949152543,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 1.2220338983050847,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 1.3779661016949152,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 2.198305084745763,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 1.2254237288135594,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 1.7271186440677966,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 3.5983050847457627,
+          "close_12h_momentum_CMO_13_Range_W34": 1.8288135593220338,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 6.923728813559322,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 31.63050847457627,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 4.977966101694915
+        }
+      },
+      "before": {
+        "digest": "70c7de66a2d49796d20420281a1064e4660c0d9ff860434ad9fc81fd5275b2fe",
+        "values": {
+          "avg-price_1h_Lag_5": 7.133248730964467,
+          "close-volume_12h_volume_OBV_Lag_3": 4.871827411167513,
+          "close-volume_12h_volume_OBV_Mean_W13": 1.4911167512690355,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 2.9606598984771573,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 4.5469543147208125,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 1.3083756345177664,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 1.4911167512690355,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 2.9428934010152283,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 1.6129441624365481,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 2.1408629441624365,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 5.206852791878172,
+          "close_12h_momentum_CMO_13_Range_W34": 2.046954314720812,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 9.044416243654823,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 47.46192893401015,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 7.58756345177665
+        }
+      },
+      "class": "expected-leakfix",
+      "component": "P0-2",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "d1cfbc6162e8820c31b7611a3e6666a35bcaef8bebb4842b2816ad763c847502",
+            "values": {
+              "avg-price_1h_Lag_5": 3.6389830508474574,
+              "close-volume_12h_volume_OBV_Lag_3": 3.26271186440678,
+              "close-volume_12h_volume_OBV_Mean_W13": 1.2966101694915255,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 2.364406779661017,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 3.4661016949152543,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 1.2220338983050847,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 1.3779661016949152,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 2.198305084745763,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 1.2254237288135594,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 1.7271186440677966,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 3.5983050847457627,
+              "close_12h_momentum_CMO_13_Range_W34": 1.8288135593220338,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 6.923728813559322,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 31.63050847457627,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 4.977966101694915
+            }
+          },
+          "before": {
+            "digest": "70c7de66a2d49796d20420281a1064e4660c0d9ff860434ad9fc81fd5275b2fe",
+            "values": {
+              "avg-price_1h_Lag_5": 7.133248730964467,
+              "close-volume_12h_volume_OBV_Lag_3": 4.871827411167513,
+              "close-volume_12h_volume_OBV_Mean_W13": 1.4911167512690355,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 2.9606598984771573,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 4.5469543147208125,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 1.3083756345177664,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 1.4911167512690355,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 2.9428934010152283,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 1.6129441624365481,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 2.1408629441624365,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 5.206852791878172,
+              "close_12h_momentum_CMO_13_Range_W34": 2.046954314720812,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 9.044416243654823,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 47.46192893401015,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 7.58756345177665
+            }
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "817c56f7acefd4140029548204914dbe3f72fae08f716c6c9353979845658188",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 4.497872340425532,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 29.851063829787233,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 15.870212765957447,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 14.078723404255319,
+              "close_12h_momentum_APO_12-26-0": 5.919148936170213,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 13.202127659574469,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 29.03404255319149,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 25.485106382978724,
+              "close_12h_momentum_APO_13-55-0_Log1p": 3.676595744680851,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 8.108510638297872,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 7.631914893617021,
+              "close_12h_momentum_APO_34-89-0_Abs": 4.127659574468085,
+              "hlc_12h_momentum_ADXR_89_Abs": 2.5659574468085107,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 26.017021276595745
+            }
+          },
+          "before": {
+            "digest": "7142aca0901a4f24cf5eecb8ca95d6a4aeb5a7919093ed1d94e9900db591587b",
+            "values": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 7.335329341317365,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 44.26347305389221,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 21.062874251497007,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 19.682634730538922,
+              "close_12h_momentum_APO_12-26-0": 10.236526946107784,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 21.169161676646706,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 46.9940119760479,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 42.91616766467066,
+              "close_12h_momentum_APO_13-55-0_Log1p": 6.3053892215568865,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 16.362275449101798,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 15.594311377245509,
+              "close_12h_momentum_APO_34-89-0_Abs": 6.497005988023952,
+              "hlc_12h_momentum_ADXR_89_Abs": 4.137724550898204,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 40.83532934131737
+            }
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "rank_change_rate",
+      "oracle_passed": {
+        "control": null,
+        "m_lookahead": "test_la0_lookahead.py::test_turnover_pit"
+      },
+      "reason": "全域 rank→pit_expanding_rank 再 diff"
+    },
+    {
+      "after": {
+        "digest": "9fa2b6feac92cb95bcf07f307ff7c690c9cd8fabd523af3d7367f928712edf72",
+        "lens": {
+          "avg-price_1h_Lag_5": 395,
+          "close-volume_12h_volume_OBV_Lag_3": 395,
+          "close-volume_12h_volume_OBV_Mean_W13": 395,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 395,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 395,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 395,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 395,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 395,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 395,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 395,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 395,
+          "close_12h_momentum_CMO_13_Range_W34": 395,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 395,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 395,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 395
+        }
+      },
+      "before": {
+        "digest": "df0e328d8ba07a9045a8332bbd1657dd155483322064194faeb2aa7f8540469c",
+        "lens": {
+          "avg-price_1h_Lag_5": 394,
+          "close-volume_12h_volume_OBV_Lag_3": 394,
+          "close-volume_12h_volume_OBV_Mean_W13": 394,
+          "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 394,
+          "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 394,
+          "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 394,
+          "close_12h_cycle_HT-SINE-Sine_Skew_W34": 394,
+          "close_12h_cycle_HT-SINE-Sine_Slope_W89": 394,
+          "close_12h_momentum_APO_12-26-0_Slope_W55": 394,
+          "close_12h_momentum_APO_5-21-0_Std_W89": 394,
+          "close_12h_momentum_APO_8-34-0_Range_W5": 394,
+          "close_12h_momentum_CMO_13_Range_W34": 394,
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5": 394,
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8": 394,
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 394
+        }
+      },
+      "class": "expected-leakfix",
+      "component": "P0-2",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "9fa2b6feac92cb95bcf07f307ff7c690c9cd8fabd523af3d7367f928712edf72",
+            "lens": {
+              "avg-price_1h_Lag_5": 395,
+              "close-volume_12h_volume_OBV_Lag_3": 395,
+              "close-volume_12h_volume_OBV_Mean_W13": 395,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 395,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 395,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 395,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 395,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 395,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 395,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 395,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 395,
+              "close_12h_momentum_CMO_13_Range_W34": 395,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 395,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 395,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 395
+            }
+          },
+          "before": {
+            "digest": "df0e328d8ba07a9045a8332bbd1657dd155483322064194faeb2aa7f8540469c",
+            "lens": {
+              "avg-price_1h_Lag_5": 394,
+              "close-volume_12h_volume_OBV_Lag_3": 394,
+              "close-volume_12h_volume_OBV_Mean_W13": 394,
+              "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 394,
+              "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 394,
+              "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 394,
+              "close_12h_cycle_HT-SINE-Sine_Skew_W34": 394,
+              "close_12h_cycle_HT-SINE-Sine_Slope_W89": 394,
+              "close_12h_momentum_APO_12-26-0_Slope_W55": 394,
+              "close_12h_momentum_APO_5-21-0_Std_W89": 394,
+              "close_12h_momentum_APO_8-34-0_Range_W5": 394,
+              "close_12h_momentum_CMO_13_Range_W34": 394,
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5": 394,
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8": 394,
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 394
+            }
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "c7c4c5a573130457ee9cad7e7eb5fd05404b74495eedad49e990f40829194f22",
+            "lens": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 335,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 335,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 335,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 335,
+              "close_12h_momentum_APO_12-26-0": 335,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 335,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 335,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 335,
+              "close_12h_momentum_APO_13-55-0_Log1p": 335,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 335,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 335,
+              "close_12h_momentum_APO_34-89-0_Abs": 335,
+              "hlc_12h_momentum_ADXR_89_Abs": 335,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 335
+            }
+          },
+          "before": {
+            "digest": "23755791578d54f11c0e75f30b1f64d1382186b03a971d4fe8ce0c2514519bf3",
+            "lens": {
+              "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 334,
+              "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 334,
+              "close_12h_cycle_HT-TRENDMODE_Sign": 334,
+              "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 334,
+              "close_12h_momentum_APO_12-26-0": 334,
+              "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 334,
+              "close_12h_momentum_APO_13-34-0_Kurt_W13": 334,
+              "close_12h_momentum_APO_13-55-0_Kurt_W13": 334,
+              "close_12h_momentum_APO_13-55-0_Log1p": 334,
+              "close_12h_momentum_APO_13-55-0_Momentum_L144": 334,
+              "close_12h_momentum_APO_21-55-0_Momentum_L144": 334,
+              "close_12h_momentum_APO_34-89-0_Abs": 334,
+              "hlc_12h_momentum_ADXR_89_Abs": 334,
+              "volume_12h_trend_MAVP_21_TsArgmin_W5": 334
+            }
+          },
+          "delta": 1.0
+        }
+      },
+      "name": "rank_change_time_series",
+      "oracle_passed": {
+        "control": null,
+        "m_lookahead": "test_la0_lookahead.py::test_turnover_array_len_and_warmup_null"
+      },
+      "reason": "S2 schema + PIT rank_change series"
+    },
+    {
+      "after": {
+        "nan_mask_sha256": "6868298928ebe77160eb0f69bf465f2b6baca651f6c601ecaf38ebdaa567ca10",
+        "shape": [
+          2000,
+          15
+        ],
+        "value_sha256": "02c4f67fd0d210ca8effa49ec0f815cc6d4cd92e563f71e785321912fe681af6"
+      },
+      "before": {
+        "nan_mask_sha256": "6868298928ebe77160eb0f69bf465f2b6baca651f6c601ecaf38ebdaa567ca10",
+        "shape": [
+          2000,
+          15
+        ],
+        "value_sha256": "02c4f67fd0d210ca8effa49ec0f815cc6d4cd92e563f71e785321912fe681af6"
+      },
+      "class": "expected-leakfix",
+      "component": "P0-3",
+      "delta": 0.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "nan_mask_sha256": "6868298928ebe77160eb0f69bf465f2b6baca651f6c601ecaf38ebdaa567ca10",
+            "shape": [
+              2000,
+              15
+            ],
+            "value_sha256": "02c4f67fd0d210ca8effa49ec0f815cc6d4cd92e563f71e785321912fe681af6"
+          },
+          "before": {
+            "nan_mask_sha256": "6868298928ebe77160eb0f69bf465f2b6baca651f6c601ecaf38ebdaa567ca10",
+            "shape": [
+              2000,
+              15
+            ],
+            "value_sha256": "02c4f67fd0d210ca8effa49ec0f815cc6d4cd92e563f71e785321912fe681af6"
+          },
+          "delta": 0.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "nan_mask_sha256": "6e0a5d6d529e620c8588da92d12c74de5152e98916399d5ef06df5039dc3dcb3",
+            "shape": [
+              1696,
+              14
+            ],
+            "value_sha256": "7685e18d66f1b817d50c9b1b876915003d6b2a7e58dcafc9c36faff4bdea2776"
+          },
+          "before": {
+            "nan_mask_sha256": "6e0a5d6d529e620c8588da92d12c74de5152e98916399d5ef06df5039dc3dcb3",
+            "shape": [
+              1696,
+              14
+            ],
+            "value_sha256": "7685e18d66f1b817d50c9b1b876915003d6b2a7e58dcafc9c36faff4bdea2776"
+          },
+          "delta": 0.0
+        }
+      },
+      "name": "stage1_winsorize_full_sample_fallback",
+      "oracle_passed": {
+        "control": "train_mask_winsorize",
+        "m_lookahead": "test_la0_lookahead.py::test_preproc_pit"
+      },
+      "reason": "fit_mask=None/full_sample 路徑改 pit_expanding 或 fail-closed; early 值變"
+    },
+    {
+      "after": {
+        "count": 1,
+        "names": [
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5"
+        ],
+        "rejected_count": 14,
+        "rejected_sha256": "cf074b1bd6f0b905a88ba92a96dc8d27f887c2f20dbd11dcb1b9a38da1f77956",
+        "sha256": "912474786c600a3a7e2ada4fdefed05863d795f9661d26d20b31e68bb9870203"
+      },
+      "before": {
+        "count": 3,
+        "names": [
+          "close_12h_momentum_PPO_12-26-0_Kurt_W5",
+          "close_1h_trend_BBANDS-Upper_34_Skew_W8",
+          "hlc_12h_momentum_MINUS-DI_233_ZScore_W13"
+        ],
+        "rejected_count": 12,
+        "rejected_sha256": "9696bf368a856744710165336737dd0f866d77d205f2dfe9c367f560b6f31767",
+        "sha256": "d4339de5e23b90d888166e4d7bbd8ca803287af941200fbea3072ee5534930e7"
+      },
+      "class": "expected-downstream",
+      "component": "P0-2-downstream",
+      "delta": 1.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "count": 1,
+            "names": [
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5"
+            ],
+            "rejected_count": 14,
+            "rejected_sha256": "cf074b1bd6f0b905a88ba92a96dc8d27f887c2f20dbd11dcb1b9a38da1f77956",
+            "sha256": "912474786c600a3a7e2ada4fdefed05863d795f9661d26d20b31e68bb9870203"
+          },
+          "before": {
+            "count": 3,
+            "names": [
+              "close_12h_momentum_PPO_12-26-0_Kurt_W5",
+              "close_1h_trend_BBANDS-Upper_34_Skew_W8",
+              "hlc_12h_momentum_MINUS-DI_233_ZScore_W13"
+            ],
+            "rejected_count": 12,
+            "rejected_sha256": "9696bf368a856744710165336737dd0f866d77d205f2dfe9c367f560b6f31767",
+            "sha256": "d4339de5e23b90d888166e4d7bbd8ca803287af941200fbea3072ee5534930e7"
+          },
+          "delta": 1.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "count": 2,
+            "names": [
+              "hlc_12h_momentum_ADXR_89_Abs",
+              "volume_12h_trend_MAVP_21_TsArgmin_W5"
+            ],
+            "rejected_count": 12,
+            "rejected_sha256": "77af0497693786a1fbf5b5690c4c3fdf5462a06d049734d65617b141da35e0ba",
+            "sha256": "054dfa0dc7b21e146de9faabe452663b7f6254513edb3f63d51909a05af49bb4"
+          },
+          "before": {
+            "count": 2,
+            "names": [
+              "hlc_12h_momentum_ADXR_89_Abs",
+              "volume_12h_trend_MAVP_21_TsArgmin_W5"
+            ],
+            "rejected_count": 12,
+            "rejected_sha256": "77af0497693786a1fbf5b5690c4c3fdf5462a06d049734d65617b141da35e0ba",
+            "sha256": "054dfa0dc7b21e146de9faabe452663b7f6254513edb3f63d51909a05af49bb4"
+          },
+          "delta": 0.0
+        }
+      },
+      "name": "passed_features_set",
+      "oracle_passed": {
+        "control": null,
+        "m_lookahead": "test_la0_lookahead.py::test_mono_pit"
+      },
+      "reason": "mono_min=0.6 硬閘可能因 PIT mono 翻轉 selection"
+    },
+    {
+      "after": {
+        "digest": "29e404412e877c874d7fd9a51081ee16e86dc204f00c74d62c8e28c50a51cebb",
+        "n_series": 45
+      },
+      "before": {
+        "digest": "29e404412e877c874d7fd9a51081ee16e86dc204f00c74d62c8e28c50a51cebb",
+        "n_series": 45
+      },
+      "class": "expected-leakfix",
+      "component": "control",
+      "delta": 0.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "digest": "29e404412e877c874d7fd9a51081ee16e86dc204f00c74d62c8e28c50a51cebb",
+            "n_series": 45
+          },
+          "before": {
+            "digest": "29e404412e877c874d7fd9a51081ee16e86dc204f00c74d62c8e28c50a51cebb",
+            "n_series": 45
+          },
+          "delta": 0.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "digest": "6530b2331f0f00b110e1035d7f6a83386473edaaf06d560af508512aa4a7d7a8",
+            "n_series": 42
+          },
+          "before": {
+            "digest": "6530b2331f0f00b110e1035d7f6a83386473edaaf06d560af508512aa4a7d7a8",
+            "n_series": 42
+          },
+          "delta": 0.0
+        }
+      },
+      "name": "control_pearson_rolling_ic",
+      "oracle_passed": {
+        "control": "pearson_rolling_ic",
+        "m_lookahead": null
+      },
+      "reason": "CONTROL-STABLE: pearson 路徑不改; 必 |Δ|≈0 否則 FAIL"
+    },
+    {
+      "after": {
+        "first_row_sha256": "b10548e7aa67689e19ecf26580c0f9c9194ebf731a70d8e04558d7b7b91db019",
+        "nan_mask_sha256": "833e79d2ffdcf151fab91bede156592e1f8e607468257b09b48e23848ef731ba",
+        "shape": [
+          1600,
+          15
+        ],
+        "value_sha256": "8e65c9e83b72a2b64187bb3012212ccaee54caeb9ea35165229865a6efe76b69"
+      },
+      "before": {
+        "first_row_sha256": "b10548e7aa67689e19ecf26580c0f9c9194ebf731a70d8e04558d7b7b91db019",
+        "nan_mask_sha256": "833e79d2ffdcf151fab91bede156592e1f8e607468257b09b48e23848ef731ba",
+        "shape": [
+          1600,
+          15
+        ],
+        "value_sha256": "8e65c9e83b72a2b64187bb3012212ccaee54caeb9ea35165229865a6efe76b69"
+      },
+      "class": "expected-leakfix",
+      "component": "control",
+      "delta": 0.0,
+      "dual_symbol": {
+        "BTCUSDT_1h": {
+          "after": {
+            "first_row_sha256": "b10548e7aa67689e19ecf26580c0f9c9194ebf731a70d8e04558d7b7b91db019",
+            "nan_mask_sha256": "833e79d2ffdcf151fab91bede156592e1f8e607468257b09b48e23848ef731ba",
+            "shape": [
+              1600,
+              15
+            ],
+            "value_sha256": "8e65c9e83b72a2b64187bb3012212ccaee54caeb9ea35165229865a6efe76b69"
+          },
+          "before": {
+            "first_row_sha256": "b10548e7aa67689e19ecf26580c0f9c9194ebf731a70d8e04558d7b7b91db019",
+            "nan_mask_sha256": "833e79d2ffdcf151fab91bede156592e1f8e607468257b09b48e23848ef731ba",
+            "shape": [
+              1600,
+              15
+            ],
+            "value_sha256": "8e65c9e83b72a2b64187bb3012212ccaee54caeb9ea35165229865a6efe76b69"
+          },
+          "delta": 0.0
+        },
+        "ETHUSDT_12h": {
+          "after": {
+            "first_row_sha256": "83509ab0ec63d3304ac2c878dbfa35e4a5bfb05d6a529b6a02c08346a346aed7",
+            "nan_mask_sha256": "7ddd6b68381ebf7f0ab5601c96005becb05baa47586835efdb9de78f11d0b6e0",
+            "shape": [
+              1356,
+              14
+            ],
+            "value_sha256": "3b397f3ff07d8f074aae44d10e7c5c5cd369d239a3589cefcd49826d7d264c8c"
+          },
+          "before": {
+            "first_row_sha256": "83509ab0ec63d3304ac2c878dbfa35e4a5bfb05d6a529b6a02c08346a346aed7",
+            "nan_mask_sha256": "7ddd6b68381ebf7f0ab5601c96005becb05baa47586835efdb9de78f11d0b6e0",
+            "shape": [
+              1356,
+              14
+            ],
+            "value_sha256": "3b397f3ff07d8f074aae44d10e7c5c5cd369d239a3589cefcd49826d7d264c8c"
+          },
+          "delta": 0.0
+        }
+      },
+      "name": "control_train_mask_winsorize",
+      "oracle_passed": {
+        "control": "train_mask_winsorize",
+        "m_lookahead": null
+      },
+      "reason": "CONTROL-STABLE: train_mask 段 winsorize 不應被 PIT 誤傷; 必 |Δ|≈0"
+    }
+  ],
+  "schema_version": "la0_attribution_v1",
+  "spec_ref": "docs/IC_LA0_SPEC.md §G L2 + RULING-4",
+  "summary": {
+    "by_class": {
+      "expected-downstream": 5,
+      "expected-leakfix": 9
+    },
+    "by_component": {
+      "P0-1": [
+        {
+          "class": "expected-leakfix",
+          "delta": 1.0,
+          "name": "rolling_ic_spearman"
+        }
+      ],
+      "P0-1-downstream": [
+        {
+          "class": "expected-downstream",
+          "delta": 1.0,
+          "name": "icir"
+        },
+        {
+          "class": "expected-downstream",
+          "delta": 1.0,
+          "name": "ic_hit_rate"
+        }
+      ],
+      "P0-2": [
+        {
+          "class": "expected-leakfix",
+          "delta": 1.0,
+          "name": "mono_bin_t"
+        },
+        {
+          "class": "expected-leakfix",
+          "delta": 1.0,
+          "name": "turnover_scalar"
+        },
+        {
+          "class": "expected-leakfix",
+          "delta": 1.0,
+          "name": "turnover_time_series"
+        },
+        {
+          "class": "expected-leakfix",
+          "delta": 1.0,
+          "name": "rank_change_rate"
+        },
+        {
+          "class": "expected-leakfix",
+          "delta": 1.0,
+          "name": "rank_change_time_series"
+        }
+      ],
+      "P0-2-downstream": [
+        {
+          "class": "expected-downstream",
+          "delta": 1.0,
+          "name": "monotonicity_score"
+        },
+        {
+          "class": "expected-downstream",
+          "delta": 1.0,
+          "name": "quantile_mean_returns"
+        },
+        {
+          "class": "expected-downstream",
+          "delta": 1.0,
+          "name": "passed_features_set"
+        }
+      ],
+      "P0-3": [
+        {
+          "class": "expected-leakfix",
+          "delta": 0.0,
+          "name": "stage1_winsorize_full_sample_fallback"
+        }
+      ],
+      "control": [
+        {
+          "class": "expected-leakfix",
+          "delta": 0.0,
+          "name": "control_pearson_rolling_ic"
+        },
+        {
+          "class": "expected-leakfix",
+          "delta": 0.0,
+          "name": "control_train_mask_winsorize"
+        }
+      ]
+    },
+    "control_stable": true,
+    "n_rows": 14,
+    "n_unexpected": 0,
+    "s2_turnover_size": {
+      "BTCUSDT_1h_after_lens": {
+        "avg-price_1h_Lag_5": 395,
+        "close-volume_12h_volume_OBV_Lag_3": 395,
+        "close-volume_12h_volume_OBV_Mean_W13": 395,
+        "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 395,
+        "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 395,
+        "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 395,
+        "close_12h_cycle_HT-SINE-Sine_Skew_W34": 395,
+        "close_12h_cycle_HT-SINE-Sine_Slope_W89": 395,
+        "close_12h_momentum_APO_12-26-0_Slope_W55": 395,
+        "close_12h_momentum_APO_5-21-0_Std_W89": 395,
+        "close_12h_momentum_APO_8-34-0_Range_W5": 395,
+        "close_12h_momentum_CMO_13_Range_W34": 395,
+        "close_12h_momentum_PPO_12-26-0_Kurt_W5": 395,
+        "close_1h_trend_BBANDS-Upper_34_Skew_W8": 395,
+        "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 395
+      },
+      "BTCUSDT_1h_before_lens": {
+        "avg-price_1h_Lag_5": 394,
+        "close-volume_12h_volume_OBV_Lag_3": 394,
+        "close-volume_12h_volume_OBV_Mean_W13": 394,
+        "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 394,
+        "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 394,
+        "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 394,
+        "close_12h_cycle_HT-SINE-Sine_Skew_W34": 394,
+        "close_12h_cycle_HT-SINE-Sine_Slope_W89": 394,
+        "close_12h_momentum_APO_12-26-0_Slope_W55": 394,
+        "close_12h_momentum_APO_5-21-0_Std_W89": 394,
+        "close_12h_momentum_APO_8-34-0_Range_W5": 394,
+        "close_12h_momentum_CMO_13_Range_W34": 394,
+        "close_12h_momentum_PPO_12-26-0_Kurt_W5": 394,
+        "close_1h_trend_BBANDS-Upper_34_Skew_W8": 394,
+        "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 394
+      },
+      "ETHUSDT_12h_after_lens": {
+        "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 335,
+        "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 335,
+        "close_12h_cycle_HT-TRENDMODE_Sign": 335,
+        "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 335,
+        "close_12h_momentum_APO_12-26-0": 335,
+        "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 335,
+        "close_12h_momentum_APO_13-34-0_Kurt_W13": 335,
+        "close_12h_momentum_APO_13-55-0_Kurt_W13": 335,
+        "close_12h_momentum_APO_13-55-0_Log1p": 335,
+        "close_12h_momentum_APO_13-55-0_Momentum_L144": 335,
+        "close_12h_momentum_APO_21-55-0_Momentum_L144": 335,
+        "close_12h_momentum_APO_34-89-0_Abs": 335,
+        "hlc_12h_momentum_ADXR_89_Abs": 335,
+        "volume_12h_trend_MAVP_21_TsArgmin_W5": 335
+      },
+      "ETHUSDT_12h_before_lens": {
+        "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": 334,
+        "close_12h_cycle_HT-SINE-LeadSine_Range_W3": 334,
+        "close_12h_cycle_HT-TRENDMODE_Sign": 334,
+        "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": 334,
+        "close_12h_momentum_APO_12-26-0": 334,
+        "close_12h_momentum_APO_12-26-0_TsArgmin_W5": 334,
+        "close_12h_momentum_APO_13-34-0_Kurt_W13": 334,
+        "close_12h_momentum_APO_13-55-0_Kurt_W13": 334,
+        "close_12h_momentum_APO_13-55-0_Log1p": 334,
+        "close_12h_momentum_APO_13-55-0_Momentum_L144": 334,
+        "close_12h_momentum_APO_21-55-0_Momentum_L144": 334,
+        "close_12h_momentum_APO_34-89-0_Abs": 334,
+        "hlc_12h_momentum_ADXR_89_Abs": 334,
+        "volume_12h_trend_MAVP_21_TsArgmin_W5": 334
+      },
+      "note": "legacy n-1 → after n (aligned source index; JSON null warmup)"
+    },
+    "unexpected_names": [],
+    "unexpected_reasons": {},
+    "unlisted_diff_names": []
+  },
+  "todo_ref": "docs/IC_LA0_TODO.md Task 6.1"
+}

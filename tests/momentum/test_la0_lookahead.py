@@ -1,18 +1,24 @@
-"""LA-0 M-lookahead mutation 測試（B1 骨架 + B2 rolling IC + B3 mono/turnover + B4 preproc）。
+"""LA-0 M-lookahead mutation 測試（B1–B6）。
 
-SPEC: docs/IC_LA0_SPEC.md LA0-1 / LA0-2 / LA0-3 / RULING-1 / RULING-2 / RULING-3 / RULING-5
-TODO: docs/IC_LA0_TODO.md Task 2.1 / 3.1 / 3.2 / 4.1 / 4.2
+SPEC: docs/IC_LA0_SPEC.md LA0-1 / LA0-2 / LA0-3 / LA0-5 / RULING-1..5 / §G
+TODO: docs/IC_LA0_TODO.md Task 2.1 / 3.1 / 3.2 / 4.1 / 4.2 / 6.1
 
 B1 交付 fixture + truncate helper。
 B2 填 ``test_rolling_ic_pit``（P0-1 rolling IC 窗內 rank）。
 B3 填 ``test_mono_pit`` / ``test_turnover_pit``。
 B4 填 ``test_preproc_pit``。
-B6 仍為 placeholder。
+B6 填 ``test_cross_symbol_isolation`` / ``test_attribution_schema_valid`` /
+   ``test_after_golden_deep_equal``（after golden 強 gate）/
+   ``test_after_golden_split_off_deep_equal``（flag-off / pit_expanding live gate）。
 """
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Tuple
+import copy
+import hashlib
+import json
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -21,8 +27,31 @@ import pytest
 from momentum.Analysis.data_preprocessor import DataPreprocessor
 from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
-from momentum.Analysis.pit_stats import MIN_SAMPLES, first_valid_index
+from momentum.Analysis.pit_stats import MIN_SAMPLES, PIT_STATS_VERSION, first_valid_index
 from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
+
+LA0_GOLDEN_DIR = Path(__file__).resolve().parents[1] / "golden" / "la0"
+ATTR_ALLOWLIST = LA0_GOLDEN_DIR / "attribution_allowlist.json"
+ATTR_JSON = LA0_GOLDEN_DIR / "attribution.json"
+AFTER_BTC = LA0_GOLDEN_DIR / "BTCUSDT_1h_baseline_after.json"
+AFTER_ETH = LA0_GOLDEN_DIR / "ETHUSDT_12h_baseline_after.json"
+AFTER_BTC_SPLIT_OFF = LA0_GOLDEN_DIR / "BTCUSDT_1h_baseline_after_split_off.json"
+AFTER_ETH_SPLIT_OFF = LA0_GOLDEN_DIR / "ETHUSDT_12h_baseline_after_split_off.json"
+BEFORE_BTC = LA0_GOLDEN_DIR / "BTCUSDT_1h_baseline.json"
+BEFORE_ETH = LA0_GOLDEN_DIR / "ETHUSDT_12h_baseline.json"
+
+CLASS_ENUM = {"expected-leakfix", "expected-downstream", "unexpected"}
+REQUIRED_ROW_KEYS = {
+    "name",
+    "before",
+    "after",
+    "delta",
+    "component",
+    "oracle_passed",
+    "class",
+    "reason",
+}
+CONTROL_ATOL = 1e-12
 
 # ---------------------------------------------------------------------------
 # 共用 helper（B2–B6 引用）
@@ -593,15 +622,342 @@ def test_preproc_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Placeholders — B6 填入（勿刪 nodeid 名稱）
+# B6 — 跨 symbol 隔離 + 歸因表 validator + after golden deep-equal
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="B6: cross-symbol isolation — not in B1 scope")
-def test_cross_symbol_isolation() -> None:
-    """B6 nodeid placeholder."""
+def _hash_series_payload(arr: np.ndarray) -> str:
+    out = np.asarray(arr, dtype=np.float64).reshape(-1).copy()
+    nan_mask = ~np.isfinite(out)
+    out[nan_mask] = -9.87654321e30
+    payload = out.tobytes(order="C") + f"|nan_count={int(nan_mask.sum())}".encode()
+    return hashlib.sha256(payload).hexdigest()
 
 
-@pytest.mark.skip(reason="B6: attribution schema validator — not in B1 scope")
+def test_cross_symbol_isolation(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
+    """BTC-only 擾動不得改變 ETH 引擎輸出 hash（跨 symbol/TF 隔離）。
+
+    SPEC §G L3 / TODO Task 6.1 T8。
+    """
+    btc = la0_real_kline["BTCUSDT_1h"]
+    eth = la0_real_kline["ETHUSDT_12h"]
+    engine = ICEngine({})
+    mono = MonotonicityTester({})
+    to_an = TurnoverAnalyzer({})
+    prep = DataPreprocessor(_preproc_config())
+
+    def _engine_digest(kline: pd.DataFrame, *, n_rows: int, seed: int) -> str:
+        feats, label = _build_rolling_ic_inputs(kline, n_rows=n_rows)
+        # 可選 seed 擾動：只在呼叫端對 BTC 注入
+        if seed != 0:
+            rng = np.random.default_rng(seed)
+            noise = rng.normal(0.0, 0.05, size=feats.shape)
+            feats = feats + noise
+
+        rolling = engine.compute_rolling_ic(
+            feats, label, windows=[21], stride=1, method="spearman"
+        )
+        f0 = str(feats.columns[0])
+        ric = np.asarray(rolling[f0]["window_21"], dtype=np.float64)
+
+        feat_s, lab_s = _build_mono_feature_label(kline, n_rows=n_rows)
+        if seed != 0:
+            rng = np.random.default_rng(seed + 1)
+            feat_s = feat_s + rng.normal(0.0, 0.05, size=len(feat_s))
+        data = mono._prepare_data(feat_s, lab_s)
+        n_q = mono._select_num_quantiles(len(data), 5)
+        bins = mono._assign_quantiles(data, n_q)
+        assert bins is not None
+        qret = mono.compute_quantile_returns(feat_s, lab_s, num_quantiles=n_q)
+        score = float(mono.compute_monotonicity_score(qret))
+
+        q_to = to_an.compute_quantile_turnover(feat_s)
+        ts = to_an.compute_turnover_time_series(feat_s)
+        pre, _ = prep.preprocess(
+            pd.DataFrame({"f0": feat_s.fillna(0.0)}), fit_mode="pit_expanding"
+        )
+
+        parts = [
+            _hash_series_payload(ric),
+            _hash_series_payload(bins.to_numpy(dtype=np.float64)),
+            f"mono={score:.12g}",
+            f"qto={q_to:.12g}" if q_to is not None and np.isfinite(q_to) else "qto=nan",
+            _hash_series_payload(
+                np.asarray(ts.get("quantile_turnovers") or [], dtype=np.float64)
+            ),
+            _hash_series_payload(pre["f0"].to_numpy(dtype=np.float64)),
+        ]
+        return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+    eth_clean = _engine_digest(eth, n_rows=min(400, len(eth)), seed=0)
+    # BTC 強擾動
+    _ = _engine_digest(btc, n_rows=400, seed=0)
+    _ = _engine_digest(btc, n_rows=400, seed=99)
+    eth_after_btc_perturb = _engine_digest(eth, n_rows=min(400, len(eth)), seed=0)
+
+    assert eth_clean == eth_after_btc_perturb, (
+        "cross-symbol isolation broken: ETH digest changed after BTC-only perturb"
+    )
+
+
+def _load_la0_baseline_maps() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    allow = json.loads(ATTR_ALLOWLIST.read_text(encoding="utf-8"))
+    before_map = {
+        "BTCUSDT_1h": json.loads(BEFORE_BTC.read_text(encoding="utf-8")),
+        "ETHUSDT_12h": json.loads(BEFORE_ETH.read_text(encoding="utf-8")),
+    }
+    after_map = {
+        "BTCUSDT_1h": json.loads(AFTER_BTC.read_text(encoding="utf-8")),
+        "ETHUSDT_12h": json.loads(AFTER_ETH.read_text(encoding="utf-8")),
+    }
+    return allow, before_map, after_map
+
+
 def test_attribution_schema_valid() -> None:
-    """B6 nodeid placeholder."""
+    """RULING-4 / §G L2：禁洗歸因 validator。
+
+    (a) 每列 class == B0 predeclare allowlist class（禁 silent 重分類）
+    (b) 未列 extractable metric 有 diff → unexpected → FAIL
+    (c) 非-control expected-leakfix 值變須綁 m_lookahead oracle
+    + before/after/delta 可重算（亂改值打紅）+ control-stable + S2
+    """
+    from tests.golden.la0.build_after_and_attribution import (  # noqa: WPS433
+        validate_attribution_payload,
+    )
+
+    assert ATTR_ALLOWLIST.is_file(), f"missing {ATTR_ALLOWLIST}"
+    assert ATTR_JSON.is_file(), f"missing {ATTR_JSON}"
+    assert BEFORE_BTC.is_file() and BEFORE_ETH.is_file()
+    assert AFTER_BTC.is_file() and AFTER_ETH.is_file()
+
+    allow, before_map, after_map = _load_la0_baseline_maps()
+    attr = json.loads(ATTR_JSON.read_text(encoding="utf-8"))
+
+    validate_attribution_payload(attr, allow, before_map, after_map)
+
+    after_btc = after_map["BTCUSDT_1h"]
+    after_eth = after_map["ETHUSDT_12h"]
+    assert after_btc.get("baseline_role") == "after_pit"
+    assert after_eth.get("baseline_role") == "after_pit"
+    assert after_btc.get("pit_stats_version") == PIT_STATS_VERSION
+    assert after_eth.get("pit_stats_version") == PIT_STATS_VERSION
+
+    # S2：turnover after len > before（n-1→n）
+    s2 = (attr.get("summary") or {}).get("s2_turnover_size") or {}
+    b_lens = s2.get("BTCUSDT_1h_before_lens") or {}
+    a_lens = s2.get("BTCUSDT_1h_after_lens") or {}
+    if b_lens and a_lens:
+        for feat in b_lens:
+            if feat in a_lens and b_lens[feat] is not None and a_lens[feat] is not None:
+                assert int(a_lens[feat]) == int(b_lens[feat]) + 1, (
+                    f"S2 size: {feat} before={b_lens[feat]} after={a_lens[feat]}"
+                )
+
+
+def test_attribution_validator_mutation_rejects_wash() -> None:
+    """手動亂改非-control 值 / 洗 class / 漏列 metric → validator 必打紅。"""
+    from tests.golden.la0 import build_after_and_attribution as b6  # noqa: WPS433
+
+    allow, before_map, after_map = _load_la0_baseline_maps()
+    attr = json.loads(ATTR_JSON.read_text(encoding="utf-8"))
+
+    # --- mutation 1：非-control 列 after 值被洗 ---
+    dirty = copy.deepcopy(attr)
+    target = next(
+        r
+        for r in dirty["rows"]
+        if r["name"] == "rolling_ic_spearman"
+    )
+    target["after"] = {"digest": "0" * 64, "n_series": 0}
+    target["dual_symbol"]["BTCUSDT_1h"]["after"] = target["after"]
+    with pytest.raises(AssertionError, match="washed|after"):
+        b6.validate_attribution_payload(dirty, allow, before_map, after_map)
+
+    # --- mutation 2：silent 重分類 expected-leakfix → expected-downstream ---
+    reclass = copy.deepcopy(attr)
+    row_rc = next(r for r in reclass["rows"] if r["name"] == "mono_bin_t")
+    assert row_rc["class"] == "expected-leakfix"
+    row_rc["class"] = "expected-downstream"
+    with pytest.raises(AssertionError, match="washed|class"):
+        b6.validate_attribution_payload(reclass, allow, before_map, after_map)
+
+    # --- mutation 3：expected-leakfix 值變但剝除 m_lookahead oracle ---
+    no_oracle = copy.deepcopy(attr)
+    row_no = next(r for r in no_oracle["rows"] if r["name"] == "turnover_scalar")
+    assert abs(float(row_no["delta"])) > 0
+    row_no["oracle_passed"] = {"m_lookahead": None, "control": None}
+    with pytest.raises(AssertionError, match="m_lookahead|oracle"):
+        b6.validate_attribution_payload(no_oracle, allow, before_map, after_map)
+
+    # --- mutation 4：漏列 metric（allowlist 拿掉仍有 diff 的列）→ unlisted ---
+    thin_allow = copy.deepcopy(allow)
+    thin_allow["rows"] = [
+        r for r in thin_allow["rows"] if r["name"] != "icir"
+    ]
+    # attr 也拿掉 icir 列以通過 name 對齊，但 extractable catalog 仍會掃到 icir diff
+    thin_attr = copy.deepcopy(attr)
+    thin_attr["rows"] = [r for r in thin_attr["rows"] if r["name"] != "icir"]
+    thin_attr["summary"] = dict(thin_attr.get("summary") or {})
+    thin_attr["summary"]["n_unexpected"] = 0
+    with pytest.raises(AssertionError, match="unlisted"):
+        b6.validate_attribution_payload(
+            thin_attr, thin_allow, before_map, after_map
+        )
+
+    # --- mutation 5：build_attribution 對非-control 無 oracle 可標 unexpected ---
+    # 偽造 allow 列：expected-leakfix 但 m_lookahead=null，且 after≠before
+    fake_allow = {
+        "policy": allow["policy"],
+        "rows": [
+            {
+                "name": "rolling_ic_spearman",
+                "before": None,
+                "after": None,
+                "delta": None,
+                "component": "P0-1",
+                "oracle_passed": {"m_lookahead": None, "control": None},
+                "class": "expected-leakfix",
+                "reason": "mutation fake missing oracle",
+            },
+            next(r for r in allow["rows"] if r["name"] == "control_pearson_rolling_ic"),
+        ],
+    }
+    # 暫時覆寫 OUT allowlist 不可行；直接呼叫 classify + 組 rows
+    filled = copy.deepcopy(fake_allow["rows"][0])
+    b_v = b6.metric_value(before_map["BTCUSDT_1h"], "rolling_ic_spearman")
+    a_v = b6.metric_value(after_map["BTCUSDT_1h"], "rolling_ic_spearman")
+    d = b6.delta_of(b_v, a_v)
+    assert d != 0.0
+    filled["before"] = b_v
+    filled["after"] = a_v
+    filled["delta"] = d
+    cls, reason = b6.classify_row_runtime(filled, d=d, eth_d=d)
+    assert cls == "unexpected"
+    assert reason == "leakfix_without_m_lookahead_oracle"
+
+
+def _assert_live_vs_after_golden(
+    *,
+    before_path: Path,
+    after_path: Path,
+    key: str,
+    config_override: dict[str, Any] | None,
+    expected_role: str,
+    expect_split: bool,
+) -> None:
+    """實跑 analyze → element 級 deep-equal vs after golden（非只比靜態 hash）。"""
+    from tests.golden.la0.build_after_and_attribution import (  # noqa: WPS433
+        collect_after_from_frozen,
+        metric_value,
+    )
+
+    before = json.loads(before_path.read_text(encoding="utf-8"))
+    golden = json.loads(after_path.read_text(encoding="utf-8"))
+    live, _telem = collect_after_from_frozen(
+        before,
+        config_override=config_override,
+        baseline_role=expected_role,
+    )
+
+    assert golden.get("baseline_role") == expected_role
+    assert live.get("baseline_role") == expected_role
+    assert bool(live["config_snapshot"]["ic_train_test_split"]) is expect_split
+    assert bool(golden["config_snapshot"]["ic_train_test_split"]) is expect_split
+
+    # pearson / spearman / mono / turnover / winsorize（stage1）
+    checks = (
+        "control_pearson_rolling_ic",
+        "rolling_ic_spearman",
+        "mono_bin_t",
+        "monotonicity_score",
+        "turnover_time_series",
+        "turnover_scalar",
+        "rank_change_time_series",
+        "stage1_winsorize_full_sample_fallback",
+    )
+    if expect_split:
+        checks = checks + ("control_train_mask_winsorize",)
+
+    for metric in checks:
+        g_v = metric_value(golden, metric)
+        l_v = metric_value(live, metric)
+        assert g_v == l_v, f"{key}/{metric}: live != after golden"
+
+    assert (
+        live["input_contract"]["features_h5_sha256"]
+        == before["input_contract"]["features_h5_sha256"]
+    )
+    assert live["pit_stats_version"] == PIT_STATS_VERSION
+    assert golden["pit_stats_version"] == PIT_STATS_VERSION
+
+    if not expect_split:
+        # split OFF → pit_expanding（非 train_mask）
+        fit_mode = (live.get("stage1") or {}).get("preproc_log", {}).get("fit_mode")
+        assert fit_mode == "pit_expanding", f"{key}: fit_mode={fit_mode}"
+        g_fit = (golden.get("stage1") or {}).get("preproc_log", {}).get("fit_mode")
+        assert g_fit == "pit_expanding"
+
+
+def test_after_golden_deep_equal() -> None:
+    """B6 golden 強 gate：split-ON 凍結輸入 live re-analyze vs after golden。"""
+    assert AFTER_BTC.is_file() and AFTER_ETH.is_file()
+    for after_path, before_path, key in (
+        (AFTER_BTC, BEFORE_BTC, "BTCUSDT_1h"),
+        (AFTER_ETH, BEFORE_ETH, "ETHUSDT_12h"),
+    ):
+        _assert_live_vs_after_golden(
+            before_path=before_path,
+            after_path=after_path,
+            key=key,
+            config_override=None,
+            expected_role="after_pit",
+            expect_split=True,
+        )
+
+
+def test_after_golden_split_off_deep_equal() -> None:
+    """⑤ flag-off / split-OFF live 強 gate（禁假綠）。
+
+    實跑 analyze(ic_train_test_split=False) → pit_expanding after-golden
+    element 級 deep-equal（pearson/spearman/mono/turnover/winsorize）。
+    非只比靜態 artifact hash。
+    """
+    from tests.golden.la0.build_after_and_attribution import (  # noqa: WPS433
+        SPLIT_OFF_OVERRIDE,
+        metric_value,
+    )
+
+    assert AFTER_BTC_SPLIT_OFF.is_file() and AFTER_ETH_SPLIT_OFF.is_file()
+
+    for after_path, before_path, key in (
+        (AFTER_BTC_SPLIT_OFF, BEFORE_BTC, "BTCUSDT_1h"),
+        (AFTER_ETH_SPLIT_OFF, BEFORE_ETH, "ETHUSDT_12h"),
+    ):
+        _assert_live_vs_after_golden(
+            before_path=before_path,
+            after_path=after_path,
+            key=key,
+            config_override=SPLIT_OFF_OVERRIDE,
+            expected_role="after_pit_split_off",
+            expect_split=False,
+        )
+
+    # 回退 legacy 假綠防護：split-OFF golden 不得等於 split-ON after
+    # （PIT 路徑不同；若誤共用 split-ON artifact 會被抓）
+    for path_on, path_off, key in (
+        (AFTER_BTC, AFTER_BTC_SPLIT_OFF, "BTCUSDT_1h"),
+        (AFTER_ETH, AFTER_ETH_SPLIT_OFF, "ETHUSDT_12h"),
+    ):
+        on = json.loads(path_on.read_text(encoding="utf-8"))
+        off = json.loads(path_off.read_text(encoding="utf-8"))
+        # stage1：split ON=train_mask vs OFF=pit_expanding → winsorize hash 應異
+        on_s1 = metric_value(on, "stage1_winsorize_full_sample_fallback")
+        off_s1 = metric_value(off, "stage1_winsorize_full_sample_fallback")
+        assert on_s1 != off_s1, (
+            f"{key}: split-OFF stage1 identical to split-ON "
+            f"(flag-off gate would be fake-green if shared)"
+        )
+        # spearman 在 full series vs test-only 範圍不同 → digest 必異
+        on_ric = metric_value(on, "rolling_ic_spearman")
+        off_ric = metric_value(off, "rolling_ic_spearman")
+        assert on_ric != off_ric, f"{key}: split-OFF rolling IC == split-ON (suspect)"
