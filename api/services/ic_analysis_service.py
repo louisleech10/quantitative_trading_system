@@ -243,13 +243,30 @@ class ICAnalysisService:
                     task_info["progress"] = 1.0
                     task_info["result"] = report
 
-            self._notify_callbacks(task_id, {
+            # LA-1 B3-TASK-01：completion callback 必含 root 紅標
+            completed_payload: Dict[str, Any] = {
                 "task_id": task_id,
                 "stage": "completed",
                 "progress": 1.0,
                 "message": "completed",
                 "status": "completed",
-            })
+            }
+            if isinstance(report, dict):
+                from momentum.Analysis.ic_reporter import normalize_analysis_status
+
+                completed_payload["analysis_status"] = normalize_analysis_status(
+                    report.get("analysis_status")
+                )
+                if "oos_guarantees" in report:
+                    completed_payload["oos_guarantees"] = bool(report.get("oos_guarantees"))
+                else:
+                    completed_payload["oos_guarantees"] = (
+                        completed_payload["analysis_status"] == "ok_oos"
+                    )
+            else:
+                completed_payload["analysis_status"] = "degraded_full_sample"
+                completed_payload["oos_guarantees"] = False
+            self._notify_callbacks(task_id, completed_payload)
 
             logger.info("IC analysis task completed: %s", task_id)
 
@@ -278,7 +295,7 @@ class ICAnalysisService:
             task_info = self._tasks.get(task_id)
             if not task_info:
                 return None
-            return {
+            payload = {
                 "task_id": task_info["task_id"],
                 "status": task_info["status"],
                 "progress": task_info.get("progress", 0.0),
@@ -287,6 +304,21 @@ class ICAnalysisService:
                 "applied_tier": task_info.get("applied_tier", "intermediate"),
                 "error": task_info.get("error"),
             }
+            # LA-1 B3-ENUM-01：completed 時鏡像 root 紅標（fail-closed normalize）
+            result = task_info.get("result")
+            if isinstance(result, dict) and task_info.get("status") == "completed":
+                from momentum.Analysis.ic_reporter import normalize_analysis_status
+
+                payload["analysis_status"] = normalize_analysis_status(
+                    result.get("analysis_status")
+                )
+                if "oos_guarantees" in result:
+                    payload["oos_guarantees"] = bool(result.get("oos_guarantees"))
+                else:
+                    payload["oos_guarantees"] = (
+                        payload["analysis_status"] == "ok_oos"
+                    )
+            return payload
 
     def get_result(self, task_id: str, schema_version: Optional[int] = None) -> Optional[Any]:
         """Get task result."""
@@ -421,12 +453,14 @@ class ICAnalysisService:
         if normalized_format == "hdf5":
             metadata = report.get("metadata", {}) if isinstance(report, dict) else {}
             export_path = self._resolve_filtered_path(metadata)
-            if not export_path.exists():
-                raise FileNotFoundError("Filtered features not found")
+            # LA-1 B3-H5-01：拒 stale stable-path
+            from momentum.Analysis.ic_reporter import assert_filtered_export_fresh
+
+            fresh_path = assert_filtered_export_fresh(report, export_path)
             return {
                 "type": "file",
-                "path": export_path,
-                "filename": export_path.name,
+                "path": fresh_path,
+                "filename": fresh_path.name,
                 "media_type": "application/x-hdf5",
             }
 
@@ -832,14 +866,33 @@ class ICAnalysisService:
                     task_info["result"] = report
                     task_info["deep_analysis_result"] = deep_result
 
-            self._notify_callbacks(task_id, {
+            # LA-1 B3-TASK-01：full-analysis completion callback 必含 root 紅標
+            full_completed_payload: Dict[str, Any] = {
                 "task_id": task_id,
                 "stage": "completed",
                 "current_step": "completed",
                 "progress": 1.0,
                 "message": "full analysis completed",
                 "status": "completed",
-            })
+            }
+            if isinstance(report, dict):
+                from momentum.Analysis.ic_reporter import normalize_analysis_status
+
+                full_completed_payload["analysis_status"] = normalize_analysis_status(
+                    report.get("analysis_status")
+                )
+                if "oos_guarantees" in report:
+                    full_completed_payload["oos_guarantees"] = bool(
+                        report.get("oos_guarantees")
+                    )
+                else:
+                    full_completed_payload["oos_guarantees"] = (
+                        full_completed_payload["analysis_status"] == "ok_oos"
+                    )
+            else:
+                full_completed_payload["analysis_status"] = "degraded_full_sample"
+                full_completed_payload["oos_guarantees"] = False
+            self._notify_callbacks(task_id, full_completed_payload)
         except Exception as exc:
             logger.error("IC full analysis task failed: %s", exc, exc_info=True)
 
@@ -984,11 +1037,48 @@ class ICAnalysisService:
             except ImportError:
                 logger.error("[apply_transforms] scipy not available, skipping gaussian")
 
-        # --- 5. Persist result ---
+        # --- 5. Persist result（含 LA-1 B3 analysis_status attr）---
+        result_report = task_info.get("result") if isinstance(task_info, dict) else None
+        from momentum.Analysis.ic_reporter import normalize_analysis_status
+
+        # B3-ENUM-01：非字面 ok_oos 一律 degraded（禁 default ok_oos）
+        raw_status = None
+        oos_guarantees: Optional[bool] = None
+        if isinstance(result_report, dict):
+            raw_status = result_report.get("analysis_status")
+            if "oos_guarantees" in result_report:
+                oos_guarantees = bool(result_report.get("oos_guarantees"))
+        analysis_status = normalize_analysis_status(raw_status)
+        if oos_guarantees is None:
+            oos_guarantees = analysis_status == "ok_oos"
+
         output_dir = Path("data_cache/reports")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"post_ic_transforms_{task_id}.h5"
         df.to_hdf(str(output_path), key="features", mode="w", complevel=5)
+        # oracle ⑤ / B3-XFORM-01：analysis_status attr 必寫；失敗 raise（禁吞回 success）
+        from momentum.Analysis.ic_reporter import DegradedOOSViolation
+
+        try:
+            import h5py
+
+            with h5py.File(str(output_path), "a") as handle:
+                status_s = str(analysis_status)
+                handle.attrs["analysis_status"] = status_s
+                handle.attrs["oos_guarantees"] = bool(oos_guarantees)
+                if "features" in handle:
+                    handle["features"].attrs["analysis_status"] = status_s
+        except DegradedOOSViolation:
+            raise
+        except Exception as exc:  # noqa: BLE001 — 轉唯一 gate exception
+            logger.error(
+                "[apply_transforms] failed to write analysis_status attr: %s",
+                exc,
+                exc_info=True,
+            )
+            raise DegradedOOSViolation(
+                f"transforms HDF5 analysis_status attr write failed: {exc}"
+            ) from exc
         logger.info("[apply_transforms] Saved %d x %d to %s", len(df), len(df.columns), output_path)
 
         return {
@@ -998,6 +1088,8 @@ class ICAnalysisService:
             "output_path": str(output_path),
             "output_rows": len(df),
             "output_cols": len(df.columns),
+            "analysis_status": analysis_status,
+            "oos_guarantees": oos_guarantees,
         }
 
     def _load_features_for_transforms(

@@ -45,13 +45,19 @@ export default function GroupedICBarChart({ groupedIC, featureName }: GroupedICB
     const groupData = groupedIC[selectedGroup] || {};
     return Object.entries(groupData).map(([group, value]) => {
       if (typeof value === 'number') {
-        return { group, ic: value };
+        // NaN/非有限 → null（禁 ?? 0 假零）
+        const ic = Number.isFinite(value) ? value : null;
+        return { group, ic };
       }
       if (value && typeof value === 'object' && featureName) {
-        const featureValue = (value as Record<string, number>)[featureName] ?? 0;
-        return { group, ic: featureValue };
+        const raw = (value as Record<string, number | null | undefined>)[featureName];
+        if (raw === undefined || raw === null) {
+          return { group, ic: null };
+        }
+        const num = typeof raw === 'number' ? raw : Number(raw);
+        return { group, ic: Number.isFinite(num) ? num : null };
       }
-      return { group, ic: 0 };
+      return { group, ic: null };
     });
   }, [groupedIC, selectedGroup, featureName]);
 
@@ -82,6 +88,13 @@ export default function GroupedICBarChart({ groupedIC, featureName }: GroupedICB
         </div>
       </CardHeader>
       <CardContent>
+        {/* B3-FE-01：暴露生產 chartData 供 DOM 斷言（禁測試內複製 mapping） */}
+        <div
+          data-testid="grouped-ic-chart-payload"
+          data-chart={JSON.stringify(chartData)}
+          hidden
+          aria-hidden
+        />
         {chartData.length === 0 ? (
           <div className="flex items-center justify-center h-[240px] text-slate-400">
             暫無分組結果

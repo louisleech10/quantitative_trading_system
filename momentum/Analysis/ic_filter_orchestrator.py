@@ -842,6 +842,8 @@ class ICFilterOrchestrator:
         self._deep_analysis_cache: "OrderedDict[str, DeepAnalysisReport]" = OrderedDict()
         # LA-0 B4：當次 analyze 注入的 fit_mode（deep key / refilter revalidate）
         self._active_fit_mode: Optional[str] = None
+        # LA-1 B3：fallback 內層 analyze 禁 persist（G-C）；唯一寫出在 wrapper 加 root 後
+        self._suppress_persist: bool = False
 
         self._progress_callback: Optional[Callable] = None
 
@@ -1044,21 +1046,42 @@ class ICFilterOrchestrator:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
 
         LA-0 RULING-3：呼叫前鎖 fit_mode=full_sample + oos_guarantees=False 紅標。
+        LA-1 B3：logger.warning + 禁內層 persist + root 紅標後唯一寫出。
         """
+        details = details or {}
+        train_rows = int(details.get("train_rows", 0))
+        test_rows = int(details.get("test_rows", 0))
+        min_test_rows = int(details.get("min_test_rows", 0))
+        logger.warning(
+            "IC full-sample fallback triggered: reason=%s train_rows=%s "
+            "test_rows=%s min_test_rows=%s fit_mode=full_sample",
+            reason,
+            train_rows,
+            test_rows,
+            min_test_rows,
+        )
+
         fallback_override = deepcopy(config_override) if config_override else {}
         fallback_override["ic_train_test_split"] = False
         # 注入 full_sample（禁落入 pit_expanding / unset）
         prep_override = dict(fallback_override.get("preprocessing") or {})
         prep_override["fit_mode"] = "full_sample"
         fallback_override["preprocessing"] = prep_override
-        report = self.analyze(
-            features_path,
-            labels_path,
-            meta_path,
-            config_override=fallback_override,
-            progress_callback=progress_callback,
-            kline_reader=kline_reader,
-        )
+
+        prev_suppress = self._suppress_persist
+        self._suppress_persist = True
+        try:
+            report = self.analyze(
+                features_path,
+                labels_path,
+                meta_path,
+                config_override=fallback_override,
+                progress_callback=progress_callback,
+                kline_reader=kline_reader,
+            )
+        finally:
+            self._suppress_persist = prev_suppress
+
         report_meta = dict(report.get("metadata") or {})
         report_meta.pop("scope", None)
         report_meta["ic_train_test_split"] = _split_fallback_metadata(reason, details)
@@ -1066,8 +1089,88 @@ class ICFilterOrchestrator:
         report_meta["oos_guarantees"] = False
         report_meta["pit_stats_version"] = PIT_STATS_VERSION
         report["metadata"] = report_meta
+
+        # root 紅標 + pass_class（權威在 wrapper 加註之後）
+        self._annotate_root_status_and_pass_class(
+            report,
+            analysis_status="degraded_full_sample",
+            oos_guarantees=False,
+        )
+
+        # G-C：唯一寫出點 = root 欄位加註之後（外層未 suppress 時）
+        if not self._suppress_persist:
+            features_df = None
+            if isinstance(self._ic_cache, dict):
+                features_df = self._ic_cache.get("features_df")
+            if features_df is not None:
+                self._persist_outputs(
+                    features_df,
+                    self._filtered_features_df,
+                    report,
+                    report_meta,
+                    report.get("filter_log") or {},
+                )
+
         self._report = report
         return report
+
+    @staticmethod
+    def _resolve_root_status(report_meta: dict) -> tuple[str, bool]:
+        """由 metadata 推 root analysis_status / oos_guarantees。
+
+        OOS 宣稱 iff analysis_status=="ok_oos"（G-A2）。
+        """
+        meta = report_meta or {}
+        if meta.get("oos_guarantees") is False:
+            return "degraded_full_sample", False
+        if meta.get("fit_mode") == "full_sample":
+            return "degraded_full_sample", False
+        split = meta.get("ic_train_test_split")
+        if isinstance(split, dict):
+            if split.get("oos_guarantees") is False or split.get("applied") is False:
+                return "degraded_full_sample", False
+            if split.get("applied") is True and split.get("oos_guarantees") is not False:
+                return "ok_oos", True
+        if meta.get("oos_guarantees") is True:
+            return "ok_oos", True
+        return "degraded_full_sample", False
+
+    @staticmethod
+    def _annotate_root_status_and_pass_class(
+        report: dict,
+        *,
+        analysis_status: str,
+        oos_guarantees: bool,
+    ) -> None:
+        """寫 root 紅標 + summary_table/filter_log pass_class（G-A2）。"""
+        report["analysis_status"] = analysis_status
+        report["oos_guarantees"] = bool(oos_guarantees)
+        pass_class = (
+            "oos" if analysis_status == "ok_oos" else "full_sample_research_only"
+        )
+        summary = report.get("summary_table")
+        if isinstance(summary, list):
+            for row in summary:
+                if isinstance(row, dict):
+                    row["pass_class"] = pass_class
+        filter_log = report.get("filter_log")
+        if isinstance(filter_log, dict):
+            stage5 = filter_log.get("stage5_thresholds")
+            if isinstance(stage5, dict):
+                of = stage5.get("output_features")
+                if isinstance(of, dict):
+                    of["pass_class"] = pass_class
+                    of.setdefault(
+                        "count",
+                        of.get("count", stage5.get("input_features")),
+                    )
+                else:
+                    # 保留 count 語意，附 pass_class（oracle ② 路徑）
+                    stage5["output_features"] = {
+                        "count": of if isinstance(of, int) else 0,
+                        "pass_class": pass_class,
+                    }
+                stage5["pass_class"] = pass_class
 
     def analyze_cross_sectional(
         self,
@@ -1386,6 +1489,14 @@ class ICFilterOrchestrator:
         }
 
         report = self._reporter.generate_json_report(analysis_results, metadata)
+        # LA-1 B3-CX-01：xsec 無 full_sample fallback，但仍必須有 root 紅標/pass_class。
+        # OOS 宣稱 iff analysis_status=="ok_oos"（有 split 且 oos_guarantees）；否則 degraded。
+        status, oos = self._resolve_root_status(metadata)
+        self._annotate_root_status_and_pass_class(
+            report,
+            analysis_status=status,
+            oos_guarantees=oos,
+        )
         self._report = report
         self._report_progress(2, "cross_sectional", 1.0, "completed")
         return report
@@ -2985,13 +3096,23 @@ class ICFilterOrchestrator:
         )
         report = self._reporter.generate_json_report(analysis_results, report_meta)
 
-        self._persist_outputs(
-            features_df,
-            stage6_results.get("filtered_df"),
+        # LA-1 B3：root 紅標 + pass_class（正常路徑 ok_oos；full_sample → degraded）
+        status, oos = self._resolve_root_status(report_meta)
+        self._annotate_root_status_and_pass_class(
             report,
-            report_meta,
-            filter_log,
+            analysis_status=status,
+            oos_guarantees=oos,
         )
+
+        # G-C：fallback 內層 skip；正常路徑寫出
+        if not self._suppress_persist:
+            self._persist_outputs(
+                features_df,
+                stage6_results.get("filtered_df"),
+                report,
+                report_meta,
+                filter_log,
+            )
 
         self._filtered_features_df = stage6_results.get("filtered_df")
 
@@ -3329,14 +3450,49 @@ class ICFilterOrchestrator:
         filter_log: dict,
     ) -> dict:
         output_paths: dict[str, str] = {}
+        analysis_status = None
+        oos_guarantees = None
+        source_generated_at = None
+        if isinstance(report, dict):
+            # B3-ENUM-01：persist 讀取點 fail-closed（非字面 ok_oos → degraded）
+            from momentum.Analysis.ic_reporter import normalize_analysis_status
+
+            analysis_status = normalize_analysis_status(report.get("analysis_status"))
+            if "oos_guarantees" in report:
+                oos_guarantees = bool(report.get("oos_guarantees"))
+            else:
+                oos_guarantees = analysis_status == "ok_oos"
+            source_generated_at = report.get("generated_at")
+
+        # B3-H5-01：當次 run 是否寫出 filtered 必記在 metadata，避免 export 讀到穩定路徑舊檔
+        report_meta = report.setdefault("metadata", {}) if isinstance(report, dict) else {}
+        if not isinstance(report_meta, dict):
+            report_meta = {}
+            if isinstance(report, dict):
+                report["metadata"] = report_meta
 
         if filtered_df is not None and not filtered_df.empty:
             output_path = self._resolve_filtered_path(metadata)
-            output_paths["filtered_features"] = self._reporter.save_filtered_features(
+            saved = self._reporter.save_filtered_features(
                 filtered_df,
                 list(filtered_df.columns),
                 output_path,
+                analysis_status=analysis_status,
+                oos_guarantees=oos_guarantees,
+                source_generated_at=str(source_generated_at)
+                if source_generated_at is not None
+                else None,
             )
+            output_paths["filtered_features"] = saved
+            report_meta["filtered_features_written"] = True
+            report_meta["filtered_features_path"] = saved
+            if source_generated_at is not None:
+                report_meta["filtered_generated_at"] = str(source_generated_at)
+        else:
+            # 空 filtered：明確標記未寫出，export 必須拒穩定路徑舊檔
+            report_meta["filtered_features_written"] = False
+            report_meta.pop("filtered_features_path", None)
+            report_meta.pop("filtered_generated_at", None)
 
         report_paths = self._reporter.save_report(
             report,

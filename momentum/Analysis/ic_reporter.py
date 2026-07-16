@@ -8,7 +8,7 @@ from io import StringIO
 from datetime import datetime
 import math
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Optional
 
 import h5py
 import numpy as np
@@ -18,6 +18,292 @@ from momentum.core.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+# OOS 宣稱關鍵字（degraded 出口禁出現未降級文案）
+_OOS_CLAIM_MARKERS = (
+    "oos-passed",
+    "oos_passed",
+    "oos guarantee",
+    "out-of-sample passed",
+    "out_of_sample_passed",
+    "ok_oos",
+)
+
+
+class DegradedOOSViolation(Exception):
+    """degraded 報表被當 OOS 消費、或缺少 research-only 標記時 raise。
+
+    LA-1 B3：全 8 gate 共用此唯一 exception（禁 return-False 雙軌）。
+    """
+
+
+def _is_degraded(report: Mapping[str, Any] | None) -> bool:
+    """兩值 fail-closed：僅字面 ``ok_oos`` 視為 OOS；缺失/未知/其餘一律 degraded。
+
+    LA-1 B3-ENUM-01：禁 default ok_oos。
+    """
+    if not isinstance(report, Mapping):
+        return True
+    return report.get("analysis_status") != "ok_oos"
+
+
+def normalize_analysis_status(raw: Any) -> str:
+    """將任意 status 正規化為兩值契約（fail-closed）。
+
+    僅字面 ``ok_oos`` 保留；``None``/空/未知 → ``degraded_full_sample``。
+    """
+    if raw == "ok_oos":
+        return "ok_oos"
+    if raw == "degraded_full_sample":
+        return "degraded_full_sample"
+    # research_only 等別名、未知字串、None → degraded
+    if raw in {"research_only", "degraded", "full_sample"}:
+        return "degraded_full_sample"
+    if isinstance(raw, str) and raw.strip() and raw != "ok_oos":
+        # 未知非空字串仍不當 OOS；統一 degraded 契約值
+        return "degraded_full_sample"
+    return "degraded_full_sample"
+
+
+def gate_summary_table_pass_class(report: Mapping[str, Any]) -> None:
+    """Oracle ①：degraded 時 summary_table 每列 pass_class != \"oos\"。"""
+    if not _is_degraded(report):
+        return
+    rows = report.get("summary_table") or []
+    if not isinstance(rows, list):
+        raise DegradedOOSViolation("summary_table missing under degraded")
+    if not rows:
+        return
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise DegradedOOSViolation(f"summary_table[{i}] not object")
+        pc = row.get("pass_class")
+        if pc is None or pc == "oos":
+            raise DegradedOOSViolation(
+                f"summary_table[{i}] pass_class={pc!r} (need research-only marker)"
+            )
+
+
+def gate_filter_log_output_features(report: Mapping[str, Any]) -> None:
+    """Oracle ②：degraded 時 filter_log.stage5_thresholds.output_features 附 pass_class。"""
+    if not _is_degraded(report):
+        return
+    fl = report.get("filter_log") or {}
+    if not isinstance(fl, dict):
+        raise DegradedOOSViolation("filter_log missing under degraded")
+    s5 = fl.get("stage5_thresholds") or {}
+    if not isinstance(s5, dict):
+        raise DegradedOOSViolation("stage5_thresholds missing under degraded")
+    of = s5.get("output_features")
+    marker = None
+    if isinstance(of, dict):
+        marker = of.get("pass_class")
+    elif of is None:
+        marker = s5.get("pass_class")
+    if marker is None or marker == "oos":
+        raise DegradedOOSViolation(
+            f"stage5_thresholds.output_features pass_class={marker!r}"
+        )
+
+
+def gate_hdf5_analysis_status_attr(
+    path: str | Path,
+    *,
+    expect_degraded: bool = True,
+) -> None:
+    """Oracle ③：filtered HDF5 必須有 analysis_status attr。"""
+    p = Path(path)
+    if not p.is_file():
+        raise DegradedOOSViolation(f"HDF5 missing: {p}")
+    with h5py.File(p, "r") as handle:
+        status = None
+        if "analysis_status" in handle.attrs:
+            status = handle.attrs["analysis_status"]
+        elif "filtered" in handle and "analysis_status" in handle["filtered"].attrs:
+            status = handle["filtered"].attrs["analysis_status"]
+        else:
+            # 掃 group attrs
+            for key in handle.keys():
+                grp = handle[key]
+                if hasattr(grp, "attrs") and "analysis_status" in grp.attrs:
+                    status = grp.attrs["analysis_status"]
+                    break
+    if status is None:
+        raise DegradedOOSViolation(f"HDF5 missing analysis_status attr: {p}")
+    status_s = status.decode() if isinstance(status, (bytes, bytearray)) else str(status)
+    if expect_degraded and status_s == "ok_oos":
+        raise DegradedOOSViolation(
+            f"HDF5 analysis_status claims ok_oos under degraded: {status_s}"
+        )
+    if expect_degraded and status_s not in {"degraded_full_sample", "research_only"}:
+        # 允許 research-only 別名；主契約 = degraded_full_sample
+        if status_s != "degraded_full_sample":
+            raise DegradedOOSViolation(
+                f"HDF5 analysis_status unexpected under degraded: {status_s!r}"
+            )
+
+
+def gate_ai_json_oos_text(
+    ai_payload: Mapping[str, Any],
+    report: Mapping[str, Any] | None = None,
+) -> None:
+    """Oracle ④：degraded 時 AI JSON 禁 OOS 宣稱、必 research-only 標。"""
+    degraded = _is_degraded(report) if report is not None else (
+        ai_payload.get("analysis_status") == "degraded_full_sample"
+        or ai_payload.get("oos_guarantees") is False
+        or ai_payload.get("research_only") is True
+    )
+    # 呼叫端在 degraded report 上必須驗
+    if report is not None and not _is_degraded(report):
+        return
+    if report is not None and _is_degraded(report):
+        degraded = True
+    if not degraded:
+        return
+
+    if ai_payload.get("research_only") is not True and ai_payload.get(
+        "analysis_status"
+    ) not in {"degraded_full_sample", "research_only"}:
+        raise DegradedOOSViolation("ai_json missing research-only / degraded marker")
+
+    top = ai_payload.get("top_features") or []
+    if isinstance(top, list):
+        for i, item in enumerate(top):
+            if not isinstance(item, dict):
+                continue
+            pc = item.get("pass_class")
+            if pc == "oos":
+                raise DegradedOOSViolation(f"ai_json top_features[{i}] pass_class=oos")
+            # degraded 時若有 features 應標 research-only
+            if pc is None and top:
+                raise DegradedOOSViolation(
+                    f"ai_json top_features[{i}] missing pass_class under degraded"
+                )
+
+    blob = json.dumps(ai_payload, ensure_ascii=False).lower()
+    for marker in _OOS_CLAIM_MARKERS:
+        if marker in blob and "research" not in blob:
+            raise DegradedOOSViolation(f"ai_json OOS claim without research-only: {marker}")
+    # 明確 ok_oos 字樣在 degraded 下禁止
+    if '"analysis_status": "ok_oos"' in blob or '"analysis_status":"ok_oos"' in blob:
+        raise DegradedOOSViolation("ai_json claims analysis_status=ok_oos under degraded")
+
+
+def gate_api_csv_carrier(
+    *,
+    headers: Mapping[str, str] | None,
+    body: str,
+    report: Mapping[str, Any] | None = None,
+    expect_degraded: bool = True,
+) -> None:
+    """Oracle ⑤ CSV：HTTP header X-Analysis-Status + 檔首註解行。"""
+    if report is not None and not _is_degraded(report) and not expect_degraded:
+        return
+    if not expect_degraded and report is not None and not _is_degraded(report):
+        return
+    headers = {str(k).lower(): str(v) for k, v in (headers or {}).items()}
+    status_hdr = headers.get("x-analysis-status")
+    if not status_hdr:
+        raise DegradedOOSViolation("CSV missing X-Analysis-Status header")
+    if expect_degraded and status_hdr == "ok_oos":
+        raise DegradedOOSViolation("CSV header claims ok_oos under degraded")
+    first_line = (body or "").splitlines()[0] if body else ""
+    if not first_line.lstrip().startswith("#"):
+        raise DegradedOOSViolation("CSV missing leading comment marker line")
+    if "analysis_status" not in first_line and status_hdr not in first_line:
+        raise DegradedOOSViolation("CSV comment line missing analysis_status")
+
+
+def gate_api_transforms_carrier(
+    response: Mapping[str, Any],
+    *,
+    hdf5_path: str | Path | None = None,
+    expect_degraded: bool = True,
+) -> None:
+    """Oracle ⑤ transforms：response.analysis_status + 輸出 HDF5 attr。"""
+    status = response.get("analysis_status") if isinstance(response, Mapping) else None
+    if status is None:
+        raise DegradedOOSViolation("ApplyTransformsResponse missing analysis_status")
+    if expect_degraded and status == "ok_oos":
+        raise DegradedOOSViolation("transforms response claims ok_oos under degraded")
+    path = hdf5_path or (response.get("output_path") if isinstance(response, Mapping) else None)
+    if path:
+        gate_hdf5_analysis_status_attr(path, expect_degraded=expect_degraded)
+
+
+def gate_task_payload_status(payload: Mapping[str, Any]) -> None:
+    """task completion / result payload 必含 root 紅標。"""
+    if not isinstance(payload, Mapping):
+        raise DegradedOOSViolation("task payload not object")
+    # payload 可能是 report 本體或包一層 result
+    report = payload.get("result") if "result" in payload and isinstance(
+        payload.get("result"), Mapping
+    ) else payload
+    if not isinstance(report, Mapping):
+        raise DegradedOOSViolation("task payload missing report")
+    # completion callback 可能把紅標放在 payload 根（B3-TASK-01）
+    if "analysis_status" not in report and "analysis_status" in payload:
+        report = payload
+    if "analysis_status" not in report:
+        raise DegradedOOSViolation("task payload missing analysis_status")
+    if "oos_guarantees" not in report and "oos_guarantees" not in payload:
+        raise DegradedOOSViolation("task payload missing oos_guarantees")
+
+
+def assert_filtered_export_fresh(
+    result: Mapping[str, Any] | None,
+    export_path: str | Path,
+) -> Path:
+    """B3-H5-01：export 前驗當次 run freshness；stale / 空 filtered → raise FileNotFoundError。
+
+    當次 run 未寫出 filtered（空結果）或 HDF5 的 source_generated_at 與 report
+    對不上時，拒絕回傳 stable-path 上可能殘留的上一輪檔案。
+    """
+    path = Path(export_path)
+    if not isinstance(result, Mapping):
+        raise FileNotFoundError("Filtered features not found: missing result")
+    meta = result.get("metadata") if isinstance(result.get("metadata"), Mapping) else {}
+    written = meta.get("filtered_features_written")
+    if written is False:
+        raise FileNotFoundError(
+            "Filtered features empty for this run; refuse stale stable-path export"
+        )
+    expected_gen = meta.get("filtered_generated_at") or result.get("generated_at")
+    if not expected_gen:
+        raise FileNotFoundError(
+            "Filtered features provenance missing; refuse unstamped export"
+        )
+    if not path.is_file():
+        raise FileNotFoundError(f"Filtered features not found: {path}")
+    with h5py.File(path, "r") as handle:
+        file_gen = None
+        if "source_generated_at" in handle.attrs:
+            file_gen = handle.attrs["source_generated_at"]
+        elif "filtered" in handle and "source_generated_at" in handle["filtered"].attrs:
+            file_gen = handle["filtered"].attrs["source_generated_at"]
+    if isinstance(file_gen, (bytes, bytearray)):
+        file_gen = file_gen.decode()
+    if file_gen is None or str(file_gen) != str(expected_gen):
+        raise FileNotFoundError(
+            "Filtered features stale relative to this run "
+            f"(file={file_gen!r} expected={expected_gen!r})"
+        )
+    expected_task = meta.get("filtered_source_task_id")
+    if expected_task is not None:
+        with h5py.File(path, "r") as handle:
+            file_tid = None
+            if "source_task_id" in handle.attrs:
+                file_tid = handle.attrs["source_task_id"]
+            elif "filtered" in handle and "source_task_id" in handle["filtered"].attrs:
+                file_tid = handle["filtered"].attrs["source_task_id"]
+        if isinstance(file_tid, (bytes, bytearray)):
+            file_tid = file_tid.decode()
+        if file_tid is None or str(file_tid) != str(expected_task):
+            raise FileNotFoundError(
+                "Filtered features task_id mismatch "
+                f"(file={file_tid!r} expected={expected_task!r})"
+            )
+    return path
 
 
 class ICReporter:
@@ -239,7 +525,10 @@ class ICReporter:
         return f"\ufeff{output.getvalue()}"
 
     def generate_ai_json(self, report: dict, deep_report: dict | None = None) -> dict:
-        """生成 AI 可讀 JSON。"""
+        """生成 AI 可讀 JSON。
+
+        LA-1 B3：degraded 時 OOS 文案 fail-closed（research-only 標，禁冒充 OOS）。
+        """
 
         summary_table = report.get("summary_table", []) if isinstance(report, dict) else []
         top_n = int(self._config.get("ai_json_top_n", 30))
@@ -259,14 +548,50 @@ class ICReporter:
         if isinstance(deep_payload, dict):
             deep_payload = sanitize_factor_returns(deep_payload)
 
+        # B3-ENUM-01：讀取點 fail-closed — 非字面 ok_oos 一律 degraded
+        if isinstance(report, dict):
+            analysis_status = normalize_analysis_status(report.get("analysis_status"))
+            oos_guarantees = report.get("oos_guarantees")
+            degraded = _is_degraded(report)
+        else:
+            analysis_status = "degraded_full_sample"
+            oos_guarantees = False
+            degraded = True
+        pass_class = (
+            "full_sample_research_only" if degraded else "oos"
+        )
+        if degraded:
+            risk_warnings = list(risk_warnings or [])
+            risk_warnings.insert(
+                0,
+                "RESEARCH-ONLY: full-sample fallback — not OOS-validated; "
+                "do not treat top_features as out-of-sample passed.",
+            )
+
         payload = {
-            "version": report.get("version", "1.0"),
-            "generated_at": report.get("generated_at", datetime.utcnow().isoformat()),
+            "version": report.get("version", "1.0") if isinstance(report, dict) else "1.0",
+            "generated_at": (
+                report.get("generated_at", datetime.utcnow().isoformat())
+                if isinstance(report, dict)
+                else datetime.utcnow().isoformat()
+            ),
+            "analysis_status": analysis_status,
+            "oos_guarantees": (
+                bool(oos_guarantees) if oos_guarantees is not None else (not degraded)
+            ),
+            "research_only": bool(degraded),
             "interpretation_guide": {
                 "ic_mean": "IC 均值，越大代表預測能力越強",
                 "icir": "IC 資訊比率，建議 > 0.5",
                 "p_value": "統計顯著性，建議 < 0.05",
                 "long_short_spread": "分位數多空價差，越大越好",
+                **(
+                    {
+                        "pass_class": "full_sample_research_only 表示非 OOS 保證，僅研究用途",
+                    }
+                    if degraded
+                    else {}
+                ),
             },
             "top_features": [
                 {
@@ -275,6 +600,7 @@ class ICReporter:
                     "ic_mean": item.get("ic_mean"),
                     "icir": item.get("icir"),
                     "p_value": item.get("p_value"),
+                    "pass_class": item.get("pass_class") or pass_class,
                 }
                 for item in top_features
             ],
@@ -393,8 +719,17 @@ class ICReporter:
         features_df: pd.DataFrame,
         selected_features: list[str],
         output_path: str,
+        analysis_status: Optional[str] = None,
+        oos_guarantees: Optional[bool] = None,
+        source_generated_at: Optional[str] = None,
+        source_task_id: Optional[str] = None,
+        **kwargs: Any,
     ) -> str:
-        """儲存精選特徵矩陣至 HDF5。"""
+        """儲存精選特徵矩陣至 HDF5。
+
+        LA-1 B3：寫 analysis_status / oos_guarantees attr（oracle ③ carrier）。
+        B3-H5-01：寫 source_generated_at / source_task_id 供 export freshness 對帳。
+        """
 
         if features_df is None or features_df.empty:
             raise ValueError("features_df is empty")
@@ -418,6 +753,21 @@ class ICReporter:
                 dtype=str_dtype,
             )
             group.attrs["feature_count"] = len(selected_features)
+            if analysis_status is not None:
+                status_s = str(analysis_status)
+                group.attrs["analysis_status"] = status_s
+                file.attrs["analysis_status"] = status_s
+            if oos_guarantees is not None:
+                group.attrs["oos_guarantees"] = bool(oos_guarantees)
+                file.attrs["oos_guarantees"] = bool(oos_guarantees)
+            if source_generated_at is not None:
+                gen_s = str(source_generated_at)
+                group.attrs["source_generated_at"] = gen_s
+                file.attrs["source_generated_at"] = gen_s
+            if source_task_id is not None:
+                tid_s = str(source_task_id)
+                group.attrs["source_task_id"] = tid_s
+                file.attrs["source_task_id"] = tid_s
 
         logger.info("Filtered features saved: %s", path)
         return str(path)
