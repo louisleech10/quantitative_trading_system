@@ -1,0 +1,86 @@
+{
+  "avg-price_1h_Lag_5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_5"
+  },
+  "baseline_subset": {
+    "cut_method": "timestamp_tail_sort_index",
+    "n_bars": 100,
+    "purpose": "fallback_insufficient_data",
+    "source_h5": "BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5_strat_p3r12_a0_tail2000.h5"
+  },
+  "close-volume_12h_volume_OBV_Lag_3": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_Lag_3"
+  },
+  "close-volume_12h_volume_OBV_Mean_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_Mean_W13"
+  },
+  "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-PHASOR-InPhase_Max_W5"
+  },
+  "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-LeadSine_Rank_W8"
+  },
+  "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-LeadSine_Skew_W34"
+  },
+  "close_12h_cycle_HT-SINE-Sine_Skew_W34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-Sine_Skew_W34"
+  },
+  "close_12h_cycle_HT-SINE-Sine_Slope_W89": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-Sine_Slope_W89"
+  },
+  "close_12h_momentum_APO_12-26-0_Slope_W55": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_12-26-0_Slope_W55"
+  },
+  "close_12h_momentum_APO_5-21-0_Std_W89": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_5-21-0_Std_W89"
+  },
+  "close_12h_momentum_APO_8-34-0_Range_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_8-34-0_Range_W5"
+  },
+  "close_12h_momentum_CMO_13_Range_W34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_CMO_13_Range_W34"
+  },
+  "close_12h_momentum_PPO_12-26-0_Kurt_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_PPO_12-26-0_Kurt_W5"
+  },
+  "close_1h_trend_BBANDS-Upper_34_Skew_W8": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_1h_trend_BBANDS-Upper_34_Skew_W8"
+  },
+  "config_hash": "4a8a0b3726cc906ab3534994605e77f5",
+  "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "hlc_12h_momentum_MINUS-DI_233_ZScore_W13"
+  },
+  "symbol": "BTCUSDT",
+  "timeframe": "1h"
+}

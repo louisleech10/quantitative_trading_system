@@ -1,0 +1,26 @@
+{
+  "schema_version": "la1_attribution_allowlist_v1",
+  "spec_ref": "docs/IC_LA1_SPEC.md §G",
+  "todo_ref": "docs/IC_LA1_TODO.md Task 0.2",
+  "policy": {
+    "unlisted_diff": "unexpected",
+    "b0_rows_empty": true,
+    "append_batches": ["B1", "B2", "B3"],
+    "forbid_append_after_b4_start": true,
+    "class_enum": [
+      "P1-1",
+      "P1-1b",
+      "P1-1c",
+      "P1-2",
+      "P1-3-obs"
+    ]
+  },
+  "class_enum": [
+    "P1-1",
+    "P1-1b",
+    "P1-1c",
+    "P1-2",
+    "P1-3-obs"
+  ],
+  "rows": []
+}

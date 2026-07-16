@@ -1,0 +1,179 @@
+{
+  "avg-price_1h_Lag_5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_5"
+  },
+  "baseline_subset": {
+    "actual_default_N": 437066,
+    "config_hash": "4a8a0b3726cc906ab3534994605e77f5",
+    "cut_method": "timestamp_tail_sort_index",
+    "final_attempt": 0,
+    "final_passed_target": 12,
+    "final_rejected_target": 12,
+    "final_selected": [
+      "avg-price_1h_Lag_5",
+      "close-volume_12h_volume_OBV_Lag_3",
+      "close-volume_12h_volume_OBV_Mean_W13",
+      "close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "close_12h_momentum_APO_12-26-0_Slope_W55",
+      "close_12h_momentum_APO_5-21-0_Std_W89",
+      "close_12h_momentum_APO_8-34-0_Range_W5",
+      "close_12h_momentum_CMO_13_Range_W34",
+      "close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "hlc_12h_momentum_MINUS-DI_233_ZScore_W13"
+    ],
+    "index_end": "2026-04-27 23:00:00",
+    "index_start": "2026-02-03 16:00:00",
+    "kline_h5_group": "/BTCUSDT/1h/data",
+    "n_selected_passed": 3,
+    "n_selected_rejected": 12,
+    "n_selected_total": 15,
+    "nan_ratio": {
+      "avg-price_1h_Lag_5": 0.0,
+      "close-volume_12h_volume_OBV_Lag_3": 0.0,
+      "close-volume_12h_volume_OBV_Mean_W13": 0.0,
+      "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": 0.0,
+      "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": 0.0,
+      "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": 0.0,
+      "close_12h_cycle_HT-SINE-Sine_Skew_W34": 0.0,
+      "close_12h_cycle_HT-SINE-Sine_Slope_W89": 0.0,
+      "close_12h_momentum_APO_12-26-0_Slope_W55": 0.0,
+      "close_12h_momentum_APO_5-21-0_Std_W89": 0.0,
+      "close_12h_momentum_APO_8-34-0_Range_W5": 0.0,
+      "close_12h_momentum_CMO_13_Range_W34": 0.0,
+      "close_12h_momentum_PPO_12-26-0_Kurt_W5": 0.0,
+      "close_1h_trend_BBANDS-Upper_34_Skew_W8": 0.0,
+      "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": 0.0
+    },
+    "phase": "final",
+    "scan": {
+      "batch_size": 30,
+      "batches_fail": 8,
+      "batches_ok": 42,
+      "max_batches": 50,
+      "n_passed_pool": 3,
+      "n_rejected_pool": 1251,
+      "sample_n": 2000
+    },
+    "selected_features": [
+      "avg-price_1h_Lag_5",
+      "close-volume_12h_volume_OBV_Lag_3",
+      "close-volume_12h_volume_OBV_Mean_W13",
+      "close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "close_12h_momentum_APO_12-26-0_Slope_W55",
+      "close_12h_momentum_APO_5-21-0_Std_W89",
+      "close_12h_momentum_APO_8-34-0_Range_W5",
+      "close_12h_momentum_CMO_13_Range_W34",
+      "close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "hlc_12h_momentum_MINUS-DI_233_ZScore_W13"
+    ],
+    "selected_passed": [
+      "close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "hlc_12h_momentum_MINUS-DI_233_ZScore_W13"
+    ],
+    "selected_rejected": [
+      "avg-price_1h_Lag_5",
+      "close-volume_12h_volume_OBV_Lag_3",
+      "close-volume_12h_volume_OBV_Mean_W13",
+      "close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "close_12h_momentum_APO_12-26-0_Slope_W55",
+      "close_12h_momentum_APO_5-21-0_Std_W89",
+      "close_12h_momentum_APO_8-34-0_Range_W5",
+      "close_12h_momentum_CMO_13_Range_W34"
+    ],
+    "selection_method": "hash_even_sample_batch_stage5_scan_then_balance:sort_by_sha256(seed:name);even_stride_sample;analyze_batches(size=30);collect_passed∪rejected;final=sorted(passed)[:P]+sorted(rejected)[:R];re-analyze_final",
+    "source_feature_count": 437066,
+    "strata_seed": "la0_b0_stratified_v1",
+    "tail_bars_actual": 2000,
+    "tail_bars_requested": 2000
+  },
+  "close-volume_12h_volume_OBV_Lag_3": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_Lag_3"
+  },
+  "close-volume_12h_volume_OBV_Mean_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_Mean_W13"
+  },
+  "close_12h_cycle_HT-PHASOR-InPhase_Max_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-PHASOR-InPhase_Max_W5"
+  },
+  "close_12h_cycle_HT-SINE-LeadSine_Rank_W8": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-LeadSine_Rank_W8"
+  },
+  "close_12h_cycle_HT-SINE-LeadSine_Skew_W34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-LeadSine_Skew_W34"
+  },
+  "close_12h_cycle_HT-SINE-Sine_Skew_W34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-Sine_Skew_W34"
+  },
+  "close_12h_cycle_HT-SINE-Sine_Slope_W89": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-Sine_Slope_W89"
+  },
+  "close_12h_momentum_APO_12-26-0_Slope_W55": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_12-26-0_Slope_W55"
+  },
+  "close_12h_momentum_APO_5-21-0_Std_W89": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_5-21-0_Std_W89"
+  },
+  "close_12h_momentum_APO_8-34-0_Range_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_8-34-0_Range_W5"
+  },
+  "close_12h_momentum_CMO_13_Range_W34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_CMO_13_Range_W34"
+  },
+  "close_12h_momentum_PPO_12-26-0_Kurt_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_PPO_12-26-0_Kurt_W5"
+  },
+  "close_1h_trend_BBANDS-Upper_34_Skew_W8": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_1h_trend_BBANDS-Upper_34_Skew_W8"
+  },
+  "config_hash": "4a8a0b3726cc906ab3534994605e77f5",
+  "hlc_12h_momentum_MINUS-DI_233_ZScore_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "hlc_12h_momentum_MINUS-DI_233_ZScore_W13"
+  },
+  "symbol": "BTCUSDT",
+  "timeframe": "1h"
+}

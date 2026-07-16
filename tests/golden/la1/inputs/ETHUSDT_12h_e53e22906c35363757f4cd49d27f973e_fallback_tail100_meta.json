@@ -1,0 +1,81 @@
+{
+  "baseline_subset": {
+    "cut_method": "timestamp_tail_sort_index",
+    "n_bars": 100,
+    "purpose": "fallback_insufficient_data",
+    "source_h5": "ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e_strat_p2r12_a0_tail2000.h5"
+  },
+  "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34"
+  },
+  "close_12h_cycle_HT-SINE-LeadSine_Range_W3": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-SINE-LeadSine_Range_W3"
+  },
+  "close_12h_cycle_HT-TRENDMODE_Sign": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-TRENDMODE_Sign"
+  },
+  "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13"
+  },
+  "close_12h_momentum_APO_12-26-0": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_12-26-0"
+  },
+  "close_12h_momentum_APO_12-26-0_TsArgmin_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_12-26-0_TsArgmin_W5"
+  },
+  "close_12h_momentum_APO_13-34-0_Kurt_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_13-34-0_Kurt_W13"
+  },
+  "close_12h_momentum_APO_13-55-0_Kurt_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_13-55-0_Kurt_W13"
+  },
+  "close_12h_momentum_APO_13-55-0_Log1p": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_13-55-0_Log1p"
+  },
+  "close_12h_momentum_APO_13-55-0_Momentum_L144": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_13-55-0_Momentum_L144"
+  },
+  "close_12h_momentum_APO_21-55-0_Momentum_L144": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_21-55-0_Momentum_L144"
+  },
+  "close_12h_momentum_APO_34-89-0_Abs": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close_12h_momentum_APO_34-89-0_Abs"
+  },
+  "config_hash": "e53e22906c35363757f4cd49d27f973e",
+  "hlc_12h_momentum_ADXR_89_Abs": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "hlc_12h_momentum_ADXR_89_Abs"
+  },
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "volume_12h_trend_MAVP_21_TsArgmin_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "volume_12h_trend_MAVP_21_TsArgmin_W5"
+  }
+}
