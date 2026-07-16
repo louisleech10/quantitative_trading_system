@@ -1,5 +1,5 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-16 | **Branch**: **feat/ic-la0-p0-impl**(9 commits,未 push) | **狀態**: ✅ **LA-0(P0)全數完成**——三 P0 洩漏修復+雙家 review+三方 DATA-CORRECT PASS
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-16 | **Branch**: **main**(LA-0 已合併+push) | **狀態**: ✅ **LA-0(P0)全數完成**——三 P0 洩漏修復+雙家 review+三方 DATA-CORRECT PASS
 
 ## ✅ LA-0(P0)look-ahead 整治 完工(branch feat/ic-la0-p0-impl,9 commits)
 - **三個 P0 look-ahead 修復**(每批 Grok 實作→Codex+Composer 雙家 review→codex 每批抓真finding→finding-closure→commit):
@@ -15,7 +15,7 @@
 ## ▶▶ 下一站:LA-1(P1 look-ahead 收尾)——新 session 從這裡開始
 - **範圍(P1,預設開著但非硬閘,來自 master `handoffs/ICLOOKAHEAD-MASTER.md` P1 節)**:①**regime** `ic_engine.py:1091-1098` rule `nanpercentile(vol,80/20)` **全期** vol 分位→污染 grouped IC(`include_regime_analysis=True` 預設)②**long_short** `long_short_analyzer.py:202` 全序列 qcut(deep 預設 enabled)③fallback silent 紅標。**複用 LA-0 建好的 `momentum/Analysis/pit_stats.py` 七原語**(regime→`pit_expanding_quantile`/percentile;long_short→`pit_expanding_qcut_label`,同 P0-2 家族)。
 - **如何開始(新 session)**:①開場先稽核 HANDOFF/ROADMAP/master vs repo 實況(鐵律)②走完整大任務管線:聯合偵察(Claude+三委員平行,聚焦 P1 兩點)→SPEC 起草(Claude)→三家 adversarial→凍結(freeze-stamp)→TODO→逐批 Grok 實作+**Codex+Composer 雙家 code review**(機器閘門 `review_quorum_check.sh` 已強制;grok 實作者不自審)→每批過 review 後 commit→B6 式三方 DATA-CORRECT。③參考 LA-0 全套審計檔 `handoffs/LA0-*` 當範本。
-- **前置**:LA-0 branch `feat/ic-la0-p0-impl` 已 push+PR(見下);LA-1 可另開 branch(基於 LA-0 或 main-merged 後)。
+- **前置**:LA-0 已合併並 push 到 **main**;LA-1 從 main 起(建議另開 branch)。
 - **相關 memory**:`project_ic_analysis_lookahead_remediation`、`feedback_code_review_two_families`(中/大雙家 review)、`feedback_recon_joint_with_committee`。
 - **⚠️ deferred(勿現在做)**:粗/精篩 funnel + IC-PERF(特徵上限保護)=**整個 IC Gatekeeper 完成後**才做(使用者 2026-07-16 定,memory `project_ic_feature_selection_funnel`);過渡期跑 IC 傳 feature_filter 別丟全量(否則 OOM)。pre-existing 7 紅(redirect state-leak 測試順序污染,非本 epic)另票。
 
