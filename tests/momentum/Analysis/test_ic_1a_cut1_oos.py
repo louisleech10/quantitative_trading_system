@@ -24,6 +24,23 @@ from tests.momentum.Analysis.test_ic_1a_cut1_split import _write_ic_inputs
 KLINE_CACHE_PATH = Path("data_cache/feature_klines/kline_cache.h5")
 
 
+def _nan_aware_equal(left: object, right: object) -> bool:
+    """結構等價；float NaN 視為相等（dict/list 遞迴）。"""
+    if isinstance(left, dict) and isinstance(right, dict):
+        if left.keys() != right.keys():
+            return False
+        return all(_nan_aware_equal(left[k], right[k]) for k in left)
+    if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+        if len(left) != len(right):
+            return False
+        return all(_nan_aware_equal(a, b) for a, b in zip(left, right))
+    if isinstance(left, float) and isinstance(right, float):
+        if np.isnan(left) and np.isnan(right):
+            return True
+        return left == right
+    return left == right
+
+
 def _real_btc_frame(limit: int = 180) -> pd.DataFrame:
     with h5py.File(KLINE_CACHE_PATH, "r") as file:
         data = file["BTCUSDT/1h/data"][:limit]
@@ -231,8 +248,11 @@ def test_stage5_metrics_all_oos() -> None:
     )
 
     assert dirty_stage5["coverage"] == clean_stage5["coverage"]
-    assert dirty_stage5["turnover"] == clean_stage5["turnover"]
-    assert dirty_stage5["summary_table"] == clean_stage5["summary_table"]
+    # B3 turnover/mono scalar 可為 NaN；dict/list == 對 NaN 不成立 → nan-aware 等價
+    assert _nan_aware_equal(dirty_stage5["turnover"], clean_stage5["turnover"])
+    assert _nan_aware_equal(
+        dirty_stage5["summary_table"], clean_stage5["summary_table"]
+    )
 
 
 def test_decay_redundancy_scope_test() -> None:
@@ -309,8 +329,12 @@ def test_winsorize_type_branch_uses_train_slice_only() -> None:
         }
     )
 
-    clean_df, clean_log = preprocessor.preprocess(type_like, fit_mask=context["train_mask"])
-    dirty_df, dirty_log = preprocessor.preprocess(changed_test, fit_mask=context["train_mask"])
+    clean_df, clean_log = preprocessor.preprocess(
+        type_like, fit_mask=context["train_mask"], fit_mode="train_mask"
+    )
+    dirty_df, dirty_log = preprocessor.preprocess(
+        changed_test, fit_mask=context["train_mask"], fit_mode="train_mask"
+    )
 
     assert clean_log["skipped_winsorization"] == ["type_signal"]
     assert dirty_log["skipped_winsorization"] == clean_log["skipped_winsorization"]

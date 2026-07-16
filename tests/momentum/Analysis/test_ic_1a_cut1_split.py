@@ -242,9 +242,16 @@ def test_pipeline_order_split_before_preprocessing(tmp_path: Path) -> None:
     orchestrator = ICFilterOrchestrator(ICConfig(min_test_rows=20))
     calls: list[str] = []
 
-    def stage1(features: pd.DataFrame, metadata: dict, fit_mask=None):
+    def stage1(
+        features: pd.DataFrame,
+        metadata: dict,
+        fit_mask=None,
+        fit_mode=None,
+    ):
         calls.append("stage1")
         assert fit_mask is not None
+        # LA-0 B4：split ON → orchestrator 注入 train_mask
+        assert fit_mode == "train_mask"
         assert int(fit_mask.sum()) == int(metadata["ic_train_test_split"]["train_rows"])
         return features, {"fit_mask_rows": int(fit_mask.sum())}
 

@@ -4,6 +4,7 @@ from typing import Optional
 import h5py
 import numpy as np
 import pandas as pd
+import pytest
 
 from momentum.Analysis.data_preprocessor import DataPreprocessor
 
@@ -135,11 +136,13 @@ def test_constant_from_train_only() -> None:
 
 
 def test_preprocess_legacy_no_mask_unchanged() -> None:
+    """LA-0 B4：legacy unset+None 由「不變」強化為 fail-closed raise。"""
     features = _real_btc_1h_features()
     preprocessor = _preprocessor({"standardize": {"method": "time_series_zscore"}})
 
-    legacy, legacy_log = preprocessor.preprocess(features)
-    explicit_none, explicit_log = preprocessor.preprocess(features, fit_mask=None)
-
-    pd.testing.assert_frame_equal(explicit_none, legacy)
-    assert explicit_log == legacy_log
+    with pytest.raises(ValueError, match="fail-closed"):
+        preprocessor.preprocess(features)
+    with pytest.raises(ValueError, match="fail-closed"):
+        preprocessor.preprocess(features, fit_mask=None)
+    with pytest.raises(ValueError, match="fail-closed"):
+        preprocessor.preprocess(features, fit_mask=None, fit_mode="unset")
