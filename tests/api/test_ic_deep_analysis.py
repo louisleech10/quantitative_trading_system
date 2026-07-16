@@ -162,6 +162,103 @@ def test_start_deep_analysis_and_get_result(completed_ic_task: str) -> None:
     assert 0.0 <= deep_result["progress"] <= 1.0
 
 
+def test_api_deep_cache_key_includes_fit_mode(completed_ic_task: str) -> None:
+    """LA-0 B4 #6：真 API 路徑 deep cache key 必含 fit_mode + pit_stats_version。
+
+    非僅 private method：POST /ic/analyze 完成後，經 API 觸發 deep-analysis，
+    驗證真 API 留下的 analyzer 上 key payload 含 mode/version，且 mode 變 key 變。
+    """
+    import hashlib
+    import json
+
+    from momentum.Analysis.pit_stats import PIT_STATS_VERSION
+
+    analyzer = ic_analysis_service.get_analyzer(completed_ic_task)
+    assert analyzer is not None
+
+    # 真 analyze API 後 fit_mode 已由 orchestrator 注入（split 預設 ON → train_mask）
+    fit_mode = getattr(analyzer, "_active_fit_mode", None)
+    assert fit_mode in {"train_mask", "pit_expanding", "full_sample"}, fit_mode
+
+    with ic_analysis_service._lock:
+        task_info = ic_analysis_service._tasks.get(completed_ic_task)
+        assert task_info is not None
+        result = task_info.get("result") or {}
+    meta = result.get("metadata") or {}
+    cache_meta = (analyzer._ic_cache or {}).get("metadata") or {}
+    observed_mode = meta.get("fit_mode") or cache_meta.get("fit_mode")
+    assert observed_mode == fit_mode
+    assert (
+        meta.get("pit_stats_version") == PIT_STATS_VERSION
+        or cache_meta.get("pit_stats_version") == PIT_STATS_VERSION
+    )
+
+    # 真 API deep-analysis（modules 全關：仍走 run_deep_analysis → key 建構路徑）
+    deep_req = {
+        "top_n": 2,
+        "modules": {
+            "factor_return": False,
+            "factor_centrality": False,
+            "trend_analysis": False,
+            "parameter_sensitivity": False,
+            "rolling_oos": False,
+            "factor_orthogonalization": False,
+            "factor_exposure": False,
+            "long_short_analysis": False,
+        },
+    }
+    response = client.post(
+        f"/api/v1/ic/deep-analysis/{completed_ic_task}",
+        json=deep_req,
+    )
+    assert response.status_code == 200, response.text
+    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    assert deep_result.get("status") in {"completed", "failed"}
+
+    filtered = getattr(analyzer, "_filtered_features_df", None)
+    if filtered is not None and len(filtered.columns) > 0:
+        features_for_key = sorted(list(filtered.columns[:2]))
+    else:
+        features_for_key = ["f"]
+
+    cfg = analyzer._apply_tier_config(analyzer._config)
+    key_a = analyzer._compute_deep_cache_key(features_for_key, cfg)
+    deep_cfg = {
+        "factor_return": cfg.factor_return.model_dump(),
+        "factor_centrality": cfg.factor_centrality.model_dump(),
+        "trend_analysis": cfg.trend_analysis.model_dump(),
+        "parameter_sensitivity": cfg.parameter_sensitivity.model_dump(),
+        "rolling_oos": cfg.rolling_oos.model_dump(),
+        "factor_orthogonalization": cfg.factor_orthogonalization.model_dump(),
+        "factor_exposure": cfg.factor_exposure.model_dump(),
+        "long_short_analysis": cfg.long_short_analysis.model_dump(),
+        "feature_quality_diagnostics": cfg.feature_quality_diagnostics.model_dump(),
+        "net_ic_analysis": cfg.net_ic_analysis.model_dump(),
+        "deep_analysis_global": cfg.deep_analysis_global.model_dump(),
+    }
+    payload = {
+        "features": sorted(features_for_key),
+        "deep_config": deep_cfg,
+        "pit_stats_version": PIT_STATS_VERSION,
+        "fit_mode": fit_mode,
+    }
+    expected = hashlib.md5(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    assert key_a == expected
+
+    # mode 變 → key 變（cache 隔離）
+    prev = analyzer._active_fit_mode
+    analyzer._active_fit_mode = (
+        "pit_expanding" if fit_mode != "pit_expanding" else "full_sample"
+    )
+    try:
+        key_b = analyzer._compute_deep_cache_key(features_for_key, cfg)
+        assert key_a != key_b
+    finally:
+        analyzer._active_fit_mode = prev
+
+
 def test_start_deep_analysis_invalid_task_id() -> None:
     response = client.post("/api/v1/ic/deep-analysis/nonexistent-task", json={"top_n": 5})
     assert response.status_code == 404

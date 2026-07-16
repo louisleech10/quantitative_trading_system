@@ -1,12 +1,13 @@
-"""LA-0 M-lookahead mutation 測試（B1 骨架 + B2 rolling IC + B3 mono/turnover PIT）。
+"""LA-0 M-lookahead mutation 測試（B1 骨架 + B2 rolling IC + B3 mono/turnover + B4 preproc）。
 
-SPEC: docs/IC_LA0_SPEC.md LA0-1 / LA0-2 / RULING-1 / RULING-2 / RULING-5
-TODO: docs/IC_LA0_TODO.md Task 2.1 / 3.1 / 3.2
+SPEC: docs/IC_LA0_SPEC.md LA0-1 / LA0-2 / LA0-3 / RULING-1 / RULING-2 / RULING-3 / RULING-5
+TODO: docs/IC_LA0_TODO.md Task 2.1 / 3.1 / 3.2 / 4.1 / 4.2
 
 B1 交付 fixture + truncate helper。
 B2 填 ``test_rolling_ic_pit``（P0-1 rolling IC 窗內 rank）。
 B3 填 ``test_mono_pit`` / ``test_turnover_pit``。
-B4 / B6 仍為 placeholder。
+B4 填 ``test_preproc_pit``。
+B6 仍為 placeholder。
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from momentum.Analysis.data_preprocessor import DataPreprocessor
 from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
 from momentum.Analysis.pit_stats import MIN_SAMPLES, first_valid_index
@@ -483,13 +485,116 @@ def test_turnover_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Placeholders — B4 / B6 填入（勿刪 nodeid 名稱）
+# B4 — P0-3 preprocessor fit_mode 四出口（M-lookahead + mutation + control）
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="B4: P0-3 preprocessor pit_expanding M-lookahead — not in B1 scope")
-def test_preproc_pit() -> None:
-    """B4 nodeid placeholder."""
+def _preproc_config() -> dict:
+    return {
+        "winsorization": {
+            "enabled": True,
+            "method": "percentile",
+            "lower_percentile": 1.0,
+            "upper_percentile": 99.0,
+        },
+        "missing_values": {"max_fill_forward": 0, "min_coverage": 0.0},
+        "standardize": {"method": "none"},
+    }
+
+
+def _feature_frame_from_kline(kline: pd.DataFrame, n_rows: int = 400) -> pd.DataFrame:
+    close = _close_col(kline).iloc[:n_rows].reset_index(drop=True)
+    ret1 = close.pct_change(1)
+    # 注入尾端極端值，使 full_sample winsor 邊界明顯受未來影響
+    series = ret1.fillna(0.0).to_numpy(dtype=np.float64).copy()
+    if len(series) > 10:
+        series[-5:] = series[-5:] + 50.0  # 尾端 outlier
+    return pd.DataFrame({"f0": series})
+
+
+def test_preproc_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
+    """P0-3：pit_expanding 截尾 early equal；full_sample mutation FAIL；
+    train_mask control 排尾 train 段 equal；unset+None raise。
+    """
+    kline = la0_real_kline["BTCUSDT_1h"]
+    features = _feature_frame_from_kline(kline, n_rows=400)
+    tr = 40
+    keep = len(features) - tr
+    assert keep > MIN_SAMPLES + 20
+    first_valid = MIN_SAMPLES - 1  # dense 無 NaN → t=99
+    early_slice = slice(first_valid, keep)
+
+    prep = DataPreprocessor(_preproc_config())
+
+    # --- 1) pit_expanding：截尾 → early equal ---
+    full_pit, log_pit = prep.preprocess(features, fit_mode="pit_expanding")
+    trunc_pit, _ = prep.preprocess(
+        truncate_future(features, tr), fit_mode="pit_expanding"
+    )
+    assert log_pit["fit_mode"] == "pit_expanding"
+    assert log_pit["oos_guarantees"] is True
+    np.testing.assert_allclose(
+        full_pit["f0"].iloc[early_slice].to_numpy(dtype=np.float64),
+        trunc_pit["f0"].iloc[first_valid:keep].to_numpy(dtype=np.float64),
+        atol=ATOL_F64,
+        equal_nan=True,
+    )
+    # #5：final first-valid == §MS canonical（dense → 99）；禁雙 warmup 198
+    const_valid = log_pit.get("per_bar_validity", {}).get("constant", {}).get("f0")
+    assert const_valid is not None
+    fv_mask = next(i for i, v in enumerate(const_valid) if v)
+    fv_data = int(full_pit["f0"].notna().to_numpy().argmax())
+    assert fv_mask == first_valid
+    assert fv_data == first_valid
+
+
+    # --- 2) mutation：full_sample 全期 fit → 截尾 early 必變 → FAIL 契約 ---
+    full_fs, log_fs = prep.preprocess(features, fit_mode="full_sample")
+    trunc_fs, _ = prep.preprocess(
+        truncate_future(features, tr), fit_mode="full_sample"
+    )
+    assert log_fs["fit_mode"] == "full_sample"
+    assert log_fs["oos_guarantees"] is False
+    with pytest.raises(AssertionError):
+        np.testing.assert_allclose(
+            full_fs["f0"].iloc[early_slice].to_numpy(dtype=np.float64),
+            trunc_fs["f0"].iloc[first_valid:keep].to_numpy(dtype=np.float64),
+            atol=ATOL_F64,
+            equal_nan=True,
+        )
+
+    # --- 3) train_mask control：只污染 test 尾 → train 段 equal ---
+    n = len(features)
+    train_mask = np.zeros(n, dtype=bool)
+    split = int(n * 0.8)
+    train_mask[:split] = True
+    dirty = features.copy()
+    dirty.loc[~train_mask, "f0"] = dirty.loc[~train_mask, "f0"] + 1e3
+    clean_tm, log_tm = prep.preprocess(
+        features, fit_mask=train_mask, fit_mode="train_mask"
+    )
+    dirty_tm, _ = prep.preprocess(
+        dirty, fit_mask=train_mask, fit_mode="train_mask"
+    )
+    assert log_tm["fit_mode"] == "train_mask"
+    assert log_tm["oos_guarantees"] is True
+    np.testing.assert_allclose(
+        dirty_tm.loc[train_mask, "f0"].to_numpy(dtype=np.float64),
+        clean_tm.loc[train_mask, "f0"].to_numpy(dtype=np.float64),
+        atol=ATOL_F64,
+        equal_nan=True,
+    )
+
+    # --- 4) unset + None → fail-closed ---
+    with pytest.raises(ValueError, match="fail-closed"):
+        prep.preprocess(features)
+    with pytest.raises(ValueError, match="fail-closed"):
+        prep.preprocess(features, fit_mask=None, fit_mode="unset")
+
+
+# ---------------------------------------------------------------------------
+# Placeholders — B6 填入（勿刪 nodeid 名稱）
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.skip(reason="B6: cross-symbol isolation — not in B1 scope")

@@ -32,6 +32,9 @@ class PreprocessingConfig(BaseModel):
         max_fill_forward: int = 3
         min_coverage: float = 0.3
 
+    # LA-0 RULING-3：schema default=unset（fail-closed）；orchestrator 強制注入，
+    # 禁 global default pit_expanding。合法值 train_mask|pit_expanding|full_sample|unset。
+    fit_mode: Literal["train_mask", "pit_expanding", "full_sample", "unset"] = "unset"
     winsorization: WinsorConfig = WinsorConfig()
     missing_values: MissingConfig = MissingConfig()
 

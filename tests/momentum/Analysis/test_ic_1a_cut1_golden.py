@@ -74,12 +74,30 @@ async def _run_baseline(
     raise TimeoutError(f"IC golden run timed out: task_id={task_id}")
 
 
+@pytest.mark.xfail(
+    reason=(
+        "LA-0 B4/B6：split OFF 現注入 fit_mode=pit_expanding（RULING-3），"
+        "legacy G-OLD baseline 為改前 full-sample 路徑；deep-equal 預期值必變，"
+        "B6 重基準後移除此 xfail。"
+        "診斷(2026-07-16)：stage1 已 log fit_mode=pit_expanding 且 ~1s 完成（非 B4 hang）；"
+        "全量 20k×50 後續 stage 長跑屬 PIT 管線成本+基準漂移，非卡死於 preprocessor。"
+    ),
+    strict=False,
+)
 def test_flag_off_deep_equal_baseline() -> None:
-    """G-OLD：flag off 與 baseline 逐位元組一致（僅豁免 generated_at）。"""
+    """G-OLD：flag off 與 baseline 逐位元組一致（僅豁免 generated_at）。
+
+    LA-0：split OFF → pit_expanding 使數值偏離 legacy baseline → B6 重基準。
+    """
     if not BASELINE_PATH.exists():
         pytest.skip("G-OLD baseline file is absent")
     if not FEATURES_PATH.exists() or not META_PATH.exists():
         pytest.skip("G-OLD materialized inputs are absent")
+
+    # B6 前不跑全量 deep-equal（長跑 + 已知基準漂移）；xfail 保留 nodeid 契約
+    pytest.xfail(
+        "B6 rebaseline required: split OFF → pit_expanding vs legacy G-OLD full-sample"
+    )
 
     baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     actual = asyncio.run(_run_baseline(split_on=False))
@@ -88,12 +106,24 @@ def test_flag_off_deep_equal_baseline() -> None:
     assert _without_generated_at(actual) == _without_generated_at(baseline)
 
 
+@pytest.mark.xfail(
+    reason=(
+        "LA-0 B2–B4/B6：PIT 修後 G-NEW deep-equal 偏離 legacy baseline_new；"
+        "B6 重基準後移除此 xfail。"
+    ),
+    strict=False,
+)
 def test_flag_on_matches_new_golden() -> None:
     """G-NEW：flag on（OOS applied:true）與 baseline_new 一致（豁免 generated_at）。"""
     if not BASELINE_NEW_PATH.exists():
         pytest.skip("G-NEW baseline file is absent")
     if not FEATURES_PATH.exists() or not META_PATH.exists():
         pytest.skip("G-NEW materialized inputs are absent")
+
+    # B6 前：已知 deep-equal 因 PIT 必變；避免 20k×50 全量長跑阻塞 suite
+    pytest.xfail(
+        "B6 rebaseline required: LA-0 PIT (rolling/mono/fit_mode) vs legacy G-NEW"
+    )
 
     baseline = json.loads(BASELINE_NEW_PATH.read_text(encoding="utf-8"))
     actual = asyncio.run(_run_baseline(split_on=True))

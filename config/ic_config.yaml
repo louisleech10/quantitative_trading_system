@@ -9,6 +9,10 @@ global:
 
 # 預處理
 preprocessing:
+  # LA-0 RULING-3：default unset（fail-closed）；orchestrator 注入
+  # train_mask（split ON）/ pit_expanding（split OFF）/ full_sample（fallback 逃生）
+  # 禁把此欄改成 global pit_expanding 預設
+  fit_mode: "unset"
   winsorization:
     enabled: true  # 是否啟用極端值截斷
     method: "percentile"  # percentile | mad | zscore | none

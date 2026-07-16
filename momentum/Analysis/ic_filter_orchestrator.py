@@ -21,6 +21,7 @@ from momentum.Analysis.event_filter import EventFilter
 from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.ic_reporter import ICReporter
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
+from momentum.Analysis.pit_stats import PIT_STATS_VERSION
 from momentum.Analysis.redundancy_filter import RedundancyFilter
 from scipy import stats as scipy_stats
 
@@ -839,6 +840,8 @@ class ICFilterOrchestrator:
         self._report: Optional[dict] = None
         self._filtered_features_df: Optional[pd.DataFrame] = None
         self._deep_analysis_cache: "OrderedDict[str, DeepAnalysisReport]" = OrderedDict()
+        # LA-0 B4：當次 analyze 注入的 fit_mode（deep key / refilter revalidate）
+        self._active_fit_mode: Optional[str] = None
 
         self._progress_callback: Optional[Callable] = None
 
@@ -918,11 +921,26 @@ class ICFilterOrchestrator:
             }
 
         self._report_progress(1, "preprocessing", 0.12, "preprocessing features")
+        fit_mode, fit_mask = self._resolve_stage1_fit(
+            config, split_context=split_context
+        )
         features_df, preproc_log = self._stage1_preprocessing(
             features_df,
             metadata,
-            fit_mask=split_context.get("train_mask") if split_context else None,
+            fit_mask=fit_mask,
+            fit_mode=fit_mode,
         )
+        # 傳播到 metadata（refilter revalidate + report 紅標）
+        metadata = dict(metadata) if metadata else {}
+        metadata["fit_mode"] = fit_mode
+        metadata["pit_stats_version"] = PIT_STATS_VERSION
+        if fit_mode == "full_sample":
+            metadata["oos_guarantees"] = False
+        elif "oos_guarantees" not in metadata and (
+            not isinstance(metadata.get("ic_train_test_split"), dict)
+        ):
+            # split 路徑已在 ic_train_test_split 寫 oos_guarantees=True
+            metadata["oos_guarantees"] = bool(preproc_log.get("oos_guarantees", True))
 
         self._report_progress(2, "label_generation", 0.25, "aligning labels")
         label_series, labels_df = self._stage2_label_generation(
@@ -1023,9 +1041,16 @@ class ICFilterOrchestrator:
         reason: str,
         details: dict[str, Any],
     ) -> dict:
-        """以 flag-off 重跑 full-sample，並只追加 fallback metadata。"""
+        """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
+
+        LA-0 RULING-3：呼叫前鎖 fit_mode=full_sample + oos_guarantees=False 紅標。
+        """
         fallback_override = deepcopy(config_override) if config_override else {}
         fallback_override["ic_train_test_split"] = False
+        # 注入 full_sample（禁落入 pit_expanding / unset）
+        prep_override = dict(fallback_override.get("preprocessing") or {})
+        prep_override["fit_mode"] = "full_sample"
+        fallback_override["preprocessing"] = prep_override
         report = self.analyze(
             features_path,
             labels_path,
@@ -1037,6 +1062,9 @@ class ICFilterOrchestrator:
         report_meta = dict(report.get("metadata") or {})
         report_meta.pop("scope", None)
         report_meta["ic_train_test_split"] = _split_fallback_metadata(reason, details)
+        report_meta["fit_mode"] = "full_sample"
+        report_meta["oos_guarantees"] = False
+        report_meta["pit_stats_version"] = PIT_STATS_VERSION
         report["metadata"] = report_meta
         self._report = report
         return report
@@ -1503,10 +1531,39 @@ class ICFilterOrchestrator:
         }
 
     def refilter(self, thresholds: dict) -> dict:
-        """使用新門檻重新篩選（不重算 IC）。"""
+        """使用新門檻重新篩選（不重算 IC）。
+
+        LA-0 M4：refilter 無獨立 cache key → 前檢 metadata
+        pit_stats_version / fit_mode；不符則 invalidate 並 raise（禁重用舊污染 cache）。
+        """
 
         if self._ic_cache is None or self._monotonicity_cache is None:
             raise ValueError("IC cache is empty, run analyze() first")
+
+        # revalidate version/mode（無獨立 refilter key）
+        cached_meta = self._ic_cache.get("metadata") or {}
+        preproc_log = self._ic_cache.get("preproc_log") or {}
+        cached_version = cached_meta.get("pit_stats_version") or preproc_log.get(
+            "pit_stats_version"
+        )
+        cached_mode = cached_meta.get("fit_mode") or preproc_log.get("fit_mode")
+        current_mode = self._active_fit_mode or cached_mode
+        if (
+            cached_version != PIT_STATS_VERSION
+            or cached_mode is None
+            or (current_mode is not None and cached_mode != current_mode)
+        ):
+            # invalidate 重算：清 cache，呼叫端須 re-run analyze()
+            self._ic_cache = None
+            self._monotonicity_cache = None
+            self._corr_cache = None
+            self._clear_deep_analysis_cache()
+            raise ValueError(
+                "IC cache invalidated: pit_stats_version/fit_mode mismatch "
+                f"(cached_version={cached_version!r} current={PIT_STATS_VERSION!r}, "
+                f"cached_mode={cached_mode!r} current_mode={current_mode!r}); "
+                "re-run analyze() before refilter()"
+            )
 
         self._clear_deep_analysis_cache()
 
@@ -1749,9 +1806,19 @@ class ICFilterOrchestrator:
             "net_ic_analysis": config.net_ic_analysis.model_dump(),
             "deep_analysis_global": config.deep_analysis_global.model_dump(),
         }
+        # LA-0 M4：key 必含 pit_stats_version + fit_mode
+        fit_mode = self._active_fit_mode
+        if fit_mode is None and self._ic_cache is not None:
+            meta = self._ic_cache.get("metadata") or {}
+            preproc = self._ic_cache.get("preproc_log") or {}
+            fit_mode = meta.get("fit_mode") or preproc.get("fit_mode")
+        if fit_mode is None:
+            fit_mode = getattr(config.preprocessing, "fit_mode", "unset")
         payload = {
             "features": sorted(selected_features),
             "deep_config": deep_cfg,
+            "pit_stats_version": PIT_STATS_VERSION,
+            "fit_mode": fit_mode,
         }
         dump = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return hashlib.md5(dump.encode("utf-8")).hexdigest()
@@ -2147,13 +2214,47 @@ class ICFilterOrchestrator:
 
         return features_df, labels_df, meta, stage0_log
 
+    def _resolve_stage1_fit(
+        self,
+        config: ICConfig,
+        split_context: Optional[dict],
+    ) -> tuple[str, Optional[np.ndarray]]:
+        """RULING-3 caller→fit_mode 映射（orchestrator 強制注入，禁 unset 進 preprocess）。
+
+        - config.preprocessing.fit_mode == full_sample → full_sample（fallback/研究）
+        - split ON → train_mask + train_mask
+        - split OFF → pit_expanding
+        """
+        cfg_mode = str(getattr(config.preprocessing, "fit_mode", "unset") or "unset")
+        if cfg_mode == "full_sample":
+            self._active_fit_mode = "full_sample"
+            return "full_sample", None
+        if split_context is not None:
+            self._active_fit_mode = "train_mask"
+            return "train_mask", split_context.get("train_mask")
+        # split off：生產分析路徑 → PIT（非 silent full-sample）
+        self._active_fit_mode = "pit_expanding"
+        return "pit_expanding", None
+
     def _stage1_preprocessing(
         self,
         features_df: pd.DataFrame,
         metadata: dict,
         fit_mask: Optional[np.ndarray] = None,
+        fit_mode: Optional[str] = None,
     ) -> tuple[pd.DataFrame, dict]:
-        return self._preprocessor.preprocess(features_df, metadata, fit_mask=fit_mask)
+        if fit_mode is None or fit_mode == "unset":
+            raise ValueError(
+                "orchestrator _stage1_preprocessing requires explicit fit_mode "
+                "!= unset (RULING-3 fail-closed invariant)"
+            )
+        self._active_fit_mode = fit_mode
+        return self._preprocessor.preprocess(
+            features_df,
+            metadata,
+            fit_mask=fit_mask,
+            fit_mode=fit_mode,
+        )
 
     def _stage2_label_generation(
         self,

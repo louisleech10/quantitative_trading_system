@@ -28,6 +28,7 @@ EXPECTED_CALLERS = {
     "tests/golden/ic_phase1_1a_cut1/freeze_baseline.py",
     "tests/golden/ic_phase1_1a_cut1/freeze_baseline_new.py",
     "tests/golden/ic_phase1_contract/freeze_baseline.py",
+    "tests/golden/la0/gen_baseline.py",  # LA-0 B0 baseline generator
     "tests/momentum/Analysis/test_ic_1a_cut1_golden.py",
     "tests/momentum/Analysis/test_ic_1a_cut1_oos.py",
     "tests/momentum/Analysis/test_ic_1a_cut1_split.py",
@@ -37,6 +38,7 @@ EXPECTED_CALLERS = {
     "tests/momentum/test_ic_e2e.py",
     "tests/momentum/test_ic_feature_filter.py",
     "tests/momentum/test_ic_filter_orchestrator.py",
+    "tests/momentum/test_la0_b4_orchestrator.py",  # LA-0 B4 refilter/deep-key
     "tests/phase25/test_long_short_analyzer.py",
     "tests/phase26/test_deep_analysis_integration.py",
 }
