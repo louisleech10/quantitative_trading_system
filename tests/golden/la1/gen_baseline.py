@@ -240,10 +240,11 @@ def _isolate_orchestrator_persist(orchestrator: Any) -> Path:
         features_df: pd.DataFrame,
         selected_features: list,
         output_path: str,
+        **kwargs: Any,
     ) -> str:
         name = Path(output_path).name
         target = str(tmp / "features" / name)
-        return orig_save_filtered(features_df, selected_features, target)
+        return orig_save_filtered(features_df, selected_features, target, **kwargs)
 
     reporter.save_report = _save_report  # type: ignore[method-assign]
     reporter.save_filter_log = _save_filter_log  # type: ignore[method-assign]

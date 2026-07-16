@@ -14,13 +14,17 @@ import numpy as np
 import pandas as pd
 from scipy import optimize, stats
 
-from momentum.Analysis.pit_stats import rolling_window_rank_corr
+from momentum.Analysis.pit_stats import (
+    pit_expanding_quantile_thresholds,
+    rolling_window_rank_corr,
+)
 from momentum.FeatureEngineering.consumer_gate import (
     assert_consumer_run_status,
     effective_run_status,
     is_source_run_status_reusable,
 )
 from momentum.core.contracts import AlignmentViolationError
+from momentum.core.exceptions import InvalidInputError
 from momentum.core.logging import get_logger
 from momentum.core.protocols import IFeatureReader
 
@@ -1086,6 +1090,78 @@ class ICEngine:
             features_df, label, close, config
         )
 
+    @staticmethod
+    def _parse_regime_vol_percentiles(regime_defs: dict) -> tuple[float, float]:
+        """解析並驗界 regime high/low vol percent（config 語意=percent，非 fraction）。
+
+        非 finite / 非 numeric / 越界 / 反序 → InvalidInputError（禁漏 TypeError/ValueError）。
+        合法預設 20/80 → lo_q=0.2, hi_q=0.8。
+        """
+        raw_high = regime_defs.get("high_vol_percentile", 80)
+        raw_low = regime_defs.get("low_vol_percentile", 20)
+
+        def _to_finite_float(raw: object, name: str) -> float:
+            if raw is None:
+                raise InvalidInputError(
+                    f"regime_definitions.{name} must be finite numeric, got None"
+                )
+            try:
+                val = float(raw)
+            except (TypeError, ValueError) as exc:
+                raise InvalidInputError(
+                    f"regime_definitions.{name} must be finite numeric, got {raw!r}"
+                ) from exc
+            if not np.isfinite(val):
+                raise InvalidInputError(
+                    f"regime_definitions.{name} must be finite numeric, got {raw!r}"
+                )
+            return float(val)
+
+        high_pct = _to_finite_float(raw_high, "high_vol_percentile")
+        low_pct = _to_finite_float(raw_low, "low_vol_percentile")
+        # 0 ≤ low_pct < high_pct ≤ 100
+        if low_pct < 0 or high_pct > 100 or low_pct >= high_pct:
+            raise InvalidInputError(
+                f"regime_definitions percentiles invalid: "
+                f"require 0 <= low_vol_percentile < high_vol_percentile <= 100, "
+                f"got low={low_pct}, high={high_pct}"
+            )
+        return low_pct, high_pct
+
+    def _build_regime_rule_masks(
+        self,
+        close: pd.Series,
+        config: dict,
+    ) -> dict[str, pd.Series] | None:
+        """產線 rule mask 建構（PIT high/low + EMA bull/bear）。
+
+        Returns:
+            masks dict，或空 vol 時 ``None``（caller 對應 return {{}}）。
+        """
+        ema_55 = close.ewm(span=55, adjust=False).mean()
+        vol = close.pct_change(fill_method=None).rolling(55).std()
+
+        regime_defs = config.get("regime_definitions", {}) or {}
+        low_pct, high_pct = self._parse_regime_vol_percentiles(regime_defs)
+
+        # 空 vol guard 保留（Opt-A legacy：len(close)<55 等 → by_regime={}）
+        vol_values = vol.dropna()
+        if vol_values.empty:
+            return None
+
+        lo_q = low_pct / 100.0
+        hi_q = high_pct / 100.0
+        lo_t, hi_t = pit_expanding_quantile_thresholds(
+            vol, lo_q=lo_q, hi_q=hi_q, min_samples=100
+        )
+
+        return {
+            "bull": (close > ema_55).fillna(False),
+            "bear": (close < ema_55).fillna(False),
+            "high_vol": (vol >= hi_t).fillna(False),
+            "low_vol": (vol <= lo_t).fillna(False),
+        }
+
     def _compute_regime_groups_rule(
         self,
         features_df: pd.DataFrame,
@@ -1093,25 +1169,14 @@ class ICEngine:
         close: pd.Series,
         config: dict,
     ) -> dict[str, dict]:
-        """原始規則式 regime 分組（bull/bear/high_vol/low_vol）。"""
-        ema_55 = close.ewm(span=55, adjust=False).mean()
-        vol = close.pct_change(fill_method=None).rolling(55).std()
+        """規則式 regime 分組（bull/bear/high_vol/low_vol）。
 
-        regime_defs = config.get("regime_definitions", {})
-        high_pct = regime_defs.get("high_vol_percentile", 80)
-        low_pct = regime_defs.get("low_vol_percentile", 20)
-        vol_values = vol.dropna()
-        if vol_values.empty:
+        high/low vol 門檻為 per-t expanding PIT（LA-1 P1-1）；
+        bull/bear 維持 EMA 因果規則不變。
+        """
+        masks = self._build_regime_rule_masks(close, config)
+        if masks is None:
             return {}
-        high_thresh = np.nanpercentile(vol_values, high_pct)
-        low_thresh = np.nanpercentile(vol_values, low_pct)
-
-        masks = {
-            "bull": close > ema_55,
-            "bear": close < ema_55,
-            "high_vol": vol >= high_thresh,
-            "low_vol": vol <= low_thresh,
-        }
 
         results: dict[str, dict] = {}
         method = config.get("method", self._methods[0])
@@ -1140,6 +1205,7 @@ class ICEngine:
         n_clusters = kmeans_cfg.get("n_clusters", 4)
         lookback = kmeans_cfg.get("lookback", 55)
         min_samples = kmeans_cfg.get("min_samples_for_fit", 100)
+        refit_interval = kmeans_cfg.get("refit_interval", 50)
 
         volume = raw_data.get("volume")
         if volume is not None:
@@ -1149,8 +1215,12 @@ class ICEngine:
             n_clusters=n_clusters,
             lookback=lookback,
             min_samples_for_fit=min_samples,
+            refit_interval=refit_interval,
         )
-        detection = detector.detect(close, volume, expanding=True)
+        # LA-1 §N：IC caller 層鎖 expanding=True（全域 detect 仍允許 False→_fit_global）
+        expanding_locked = True
+        assert expanding_locked is True, "IC kmeans path requires expanding=True"
+        detection = detector.detect(close, volume, expanding=expanding_locked)
 
         results: dict[str, dict] = {}
         method = config.get("method", self._methods[0])

@@ -12,9 +12,13 @@ from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 
 CLASS_ENUM = frozenset({"P1-1", "P1-1b", "P1-1c", "P1-2", "P1-3-obs"})
+# 五路徑 baseline（gen_baseline PATH_KEYS）歸因 class；P1-3-obs 為 report-root 非 five-path
+FIVE_PATH_CLASSES = frozenset({"P1-1", "P1-1b", "P1-1c", "P1-2"})
 # schema 硬需求：五鍵齊全（path/index/old/new/class）；old/new 可 null 但鍵須存在
 REQUIRED_ROW_KEYS = frozenset({"path", "index", "old", "new", "class"})
 REQUIRED_FORMAT_KEYS = REQUIRED_ROW_KEYS
+# Task 1.5：diff 數 0 時 machine-readable 說明（optional top-level）
+ZERO_DIFF_JUSTIFICATIONS_KEY = "zero_diff_justifications"
 
 
 @dataclass
@@ -48,8 +52,106 @@ def load_allowlist(path: Path | str) -> dict[str, Any]:
     return data
 
 
-def validate_allowlist_schema(allowlist: dict[str, Any]) -> list[str]:
-    """檢查 allowlist schema（B0：rows 可空）。"""
+def baseline_has_path(baseline: Any, path: str) -> bool:
+    """dotted JSON path 是否存在於 baseline 物件（逐段 dict key）。"""
+    if not isinstance(path, str) or not path:
+        return False
+    cur: Any = baseline
+    for part in path.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return False
+        cur = cur[part]
+    return True
+
+
+def validate_allowlist_paths_against_baseline(
+    allowlist: dict[str, Any],
+    baseline: dict[str, Any],
+    *,
+    classes: frozenset[str] | None = None,
+) -> list[str]:
+    """每筆 five-path class row 的 path 必須存在於 baseline JSON。
+
+    不存在 → schema FAIL（防 phantom path 如 regime_kmeans.labels_sha256）。
+    P1-3-obs 為 report-root 欄位，不在 gen_baseline 五路徑內，預設略過。
+    """
+    target = classes if classes is not None else FIVE_PATH_CLASSES
+    errors: list[str] = []
+    rows = allowlist.get("rows")
+    if not isinstance(rows, list):
+        return errors
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+        cls = row.get("class")
+        if cls not in target:
+            continue
+        path = row.get("path")
+        if not isinstance(path, str):
+            errors.append(f"allowlist.rows[{i}]: path must be str for baseline check")
+            continue
+        if not baseline_has_path(baseline, path):
+            errors.append(
+                f"allowlist.rows[{i}]: path {path!r} not present in baseline JSON "
+                f"(class={cls!r})"
+            )
+    return errors
+
+
+def validate_zero_diff_justifications(allowlist: dict[str, Any]) -> list[str]:
+    """檢查 optional `zero_diff_justifications`（TODO Task 1.5 diff 0 說明）。
+
+    形狀：
+      - 缺鍵：合法（B0 / 尚未宣告零 diff class）
+      - 值必須為 object
+      - key ∈ CLASS_ENUM
+      - value = non-empty str **或** object 含 non-empty str `reason`
+        （可附 `evidence` 等自由欄位）
+    """
+    errors: list[str] = []
+    if ZERO_DIFF_JUSTIFICATIONS_KEY not in allowlist:
+        return errors
+    body = allowlist[ZERO_DIFF_JUSTIFICATIONS_KEY]
+    if not isinstance(body, dict):
+        return [
+            f"{ZERO_DIFF_JUSTIFICATIONS_KEY} must be object, got {type(body).__name__}"
+        ]
+    for key, val in body.items():
+        if key not in CLASS_ENUM:
+            errors.append(
+                f"{ZERO_DIFF_JUSTIFICATIONS_KEY}.{key!r}: class not in class_enum"
+            )
+            continue
+        if isinstance(val, str):
+            if not val.strip():
+                errors.append(
+                    f"{ZERO_DIFF_JUSTIFICATIONS_KEY}.{key}: reason string must be non-empty"
+                )
+        elif isinstance(val, dict):
+            reason = val.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                errors.append(
+                    f"{ZERO_DIFF_JUSTIFICATIONS_KEY}.{key}: object must contain "
+                    f"non-empty str 'reason'"
+                )
+        else:
+            errors.append(
+                f"{ZERO_DIFF_JUSTIFICATIONS_KEY}.{key}: must be str or object "
+                f"with reason, got {type(val).__name__}"
+            )
+    return errors
+
+
+def validate_allowlist_schema(
+    allowlist: dict[str, Any],
+    *,
+    baseline: dict[str, Any] | None = None,
+) -> list[str]:
+    """檢查 allowlist schema（B0：rows 可空）。
+
+    baseline 若提供：five-path class 的每 row path 必須存在於 baseline。
+    若含 `zero_diff_justifications`：鍵/值形狀須合法（Task 1.5）。
+    """
     errors: list[str] = []
     if "schema_version" not in allowlist:
         errors.append("missing schema_version")
@@ -71,6 +173,9 @@ def validate_allowlist_schema(allowlist: dict[str, Any]) -> list[str]:
     else:
         for i, row in enumerate(rows):
             errors.extend(_format_errors_for_row(row, loc=f"allowlist.rows[{i}]"))
+    errors.extend(validate_zero_diff_justifications(allowlist))
+    if baseline is not None:
+        errors.extend(validate_allowlist_paths_against_baseline(allowlist, baseline))
     return errors
 
 
@@ -83,9 +188,16 @@ def _format_errors_for_row(row: Any, loc: str) -> list[str]:
             errors.append(f"{loc}: missing required key {key!r}")
     if "path" in row and not isinstance(row["path"], str):
         errors.append(f"{loc}: path must be str")
-    # index: int | str | list（exact locator）；禁缺鍵、禁 null
+    # index: int | str | list（exact locator）；禁缺鍵、禁 null、禁 wildcard
     if "index" in row and row["index"] is None:
         errors.append(f"{loc}: index must not be null")
+    # B3-ATTR-02：element-exact 契約 — 拒 index 字面 "*" / 萬用字元
+    if "index" in row and row["index"] == "*":
+        errors.append(f"{loc}: index wildcard '*' forbidden (element-exact required)")
+    if "index" in row and isinstance(row["index"], str) and "*" in row["index"]:
+        errors.append(
+            f"{loc}: index must not contain wildcard '*': {row['index']!r}"
+        )
     # class 必存在且 ∈ enum（鍵缺由 REQUIRED_FORMAT_KEYS 報）
     if "class" in row and row["class"] not in CLASS_ENUM:
         errors.append(f"{loc}: class not in class_enum: {row.get('class')!r}")

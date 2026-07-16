@@ -66,6 +66,7 @@ ic_calculation:
       n_clusters: 4  # 聚類數量（4=高波趨勢/中波趨勢/中波盤整/低波盤整）
       lookback: 55  # 特徵計算回看窗口
       min_samples_for_fit: 100  # 最少樣本數才進行聚類
+      refit_interval: 50  # Segment-causal refit 間隔（固定常數，禁依 n 推導）
 
 # 篩選門檻
 thresholds:

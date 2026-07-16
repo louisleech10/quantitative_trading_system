@@ -1,11 +1,15 @@
 {
   "schema_version": "la1_attribution_allowlist_v1",
   "spec_ref": "docs/IC_LA1_SPEC.md §G",
-  "todo_ref": "docs/IC_LA1_TODO.md Task 0.2",
+  "todo_ref": "docs/IC_LA1_TODO.md Task 0.2 / Task 1.5 / Task 3.3",
   "policy": {
     "unlisted_diff": "unexpected",
     "b0_rows_empty": true,
-    "append_batches": ["B1", "B2", "B3"],
+    "append_batches": [
+      "B1",
+      "B2",
+      "B3"
+    ],
     "forbid_append_after_b4_start": true,
     "class_enum": [
       "P1-1",
@@ -22,5 +26,995 @@
     "P1-2",
     "P1-3-obs"
   ],
-  "rows": []
+  "rows": [
+    {
+      "path": "regime_rule.mask_membership.regimes.high_vol.membership_sha256",
+      "index": "high_vol",
+      "old": "bf7dc663e7b015f8d88bea2a7a114789f97324d2b6d82ecc8440cf16aae0554c",
+      "new": "904ff483ddfe5c7a2e2c80125980c9f2103e20c96ce59e93e70303be75ccf0c9",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.high_vol.true_count",
+      "index": "high_vol",
+      "old": 4060,
+      "new": 3239,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.low_vol.membership_sha256",
+      "index": "low_vol",
+      "old": "75559bb09a83e0a1f16c2550915476801682e1e1a50e346c9de410fd1bcaf31c",
+      "new": "ec939d6bebdfe14e14ef2ce392e27e8c684591ccdcd2de4941238d6aecd61149",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.low_vol.true_count",
+      "index": "low_vol",
+      "old": 4060,
+      "new": 5589,
+      "class": "P1-1"
+    },
+    {
+      "path": "xgboost_phases.labels_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "58e84ec77222644e99cece12fa48f8193cb3514ccc617c1257398b0690ffae3b",
+      "new": "dce7c33c76c8d4c530d2013470d26e4186a85a0a4b59509f02b7b2916d3186af",
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.value_counts.high_vol_trending",
+      "index": "high_vol_trending",
+      "old": 3369,
+      "new": 2430,
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.value_counts.low_vol_ranging",
+      "index": "low_vol_ranging",
+      "old": 7843,
+      "new": 9896,
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.value_counts.mid_vol_ranging",
+      "index": "mid_vol_ranging",
+      "old": 4133,
+      "new": 6487,
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.value_counts.mid_vol_trending",
+      "index": "mid_vol_trending",
+      "old": 4980,
+      "new": 1512,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.value_sha256",
+      "index": "high_vol_trending",
+      "old": "37d8eb6e536504bb2ad305969b29cbd8d1a7c90d43fe8abcc4766289cb933ecc",
+      "new": "40dc06d5fd88215678c1a21e55e4e652ddcfc220d4c14ea597ebcb9e4e904e59",
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.avg-price_1h_Lag_5.ic",
+      "index": "high_vol_trending/avg-price_1h_Lag_5",
+      "old": -0.24503698057385323,
+      "new": -0.3189128701870518,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close-volume_12h_volume_OBV_Lag_3.ic",
+      "index": "high_vol_trending/close-volume_12h_volume_OBV_Lag_3",
+      "old": -0.07563173381801647,
+      "new": -0.18389493613711544,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close-volume_12h_volume_OBV_Mean_W13.ic",
+      "index": "high_vol_trending/close-volume_12h_volume_OBV_Mean_W13",
+      "old": -0.12856788062654284,
+      "new": -0.10649111126404766,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": -0.1508896798155719,
+      "new": -0.031407737147500205,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": -0.09680406460279306,
+      "new": -0.45091590527414377,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": -0.13445982786333116,
+      "new": -0.0023590326311734313,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-SINE-Sine_Skew_W34.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": -0.1874663128134005,
+      "new": -0.06145253074840727,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-SINE-Sine_Slope_W89.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": 0.008201297176940896,
+      "new": 0.09213002425929608,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_12-26-0_Slope_W55.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": -0.10517184658176593,
+      "new": 0.16685635833486778,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_5-21-0_Std_W89.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": 0.06745199836628842,
+      "new": -0.1027355160554409,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_8-34-0_Range_W5.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": -0.2384884271876942,
+      "new": 0.13886440908831815,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_CMO_13_Range_W34.ic",
+      "index": "high_vol_trending/close_12h_momentum_CMO_13_Range_W34",
+      "old": 0.03996938952259097,
+      "new": -0.13222623867295094,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_PPO_12-26-0_Kurt_W5.ic",
+      "index": "high_vol_trending/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.24538259092083212,
+      "new": -0.054645153094351306,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_1h_trend_BBANDS-Upper_34_Skew_W8.ic",
+      "index": "high_vol_trending/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": 0.1548519244626677,
+      "new": 0.5474158368895211,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.ic",
+      "index": "high_vol_trending/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": 0.2886448471790194,
+      "new": -0.023002080033034295,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.value_sha256",
+      "index": "low_vol_ranging",
+      "old": "1e0e8353ef7719aa32963c9c64928932e6e7edf831a561277a4103ce0d8312db",
+      "new": "c71ca98c0fbba7f56a8d564eba8bb73013e879e38b3aeb26600d6eda4dd1a054",
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.avg-price_1h_Lag_5.ic",
+      "index": "low_vol_ranging/avg-price_1h_Lag_5",
+      "old": -0.18688882113783467,
+      "new": -0.24363708801735792,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close-volume_12h_volume_OBV_Lag_3.ic",
+      "index": "low_vol_ranging/close-volume_12h_volume_OBV_Lag_3",
+      "old": -0.15230423686778863,
+      "new": -0.062462096854861975,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close-volume_12h_volume_OBV_Mean_W13.ic",
+      "index": "low_vol_ranging/close-volume_12h_volume_OBV_Mean_W13",
+      "old": -0.18358724109706454,
+      "new": -0.045025612576544,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": 0.098127108824812,
+      "new": -0.08968966263772514,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": -0.020842018227298486,
+      "new": -0.09209741236857776,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": -0.047555957807958654,
+      "new": 0.06773175923680057,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-SINE-Sine_Skew_W34.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": -0.07358047662141748,
+      "new": -0.024536547543076742,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-SINE-Sine_Slope_W89.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": 0.15272750014764352,
+      "new": 0.0268405462506752,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_12-26-0_Slope_W55.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": -0.0072531934775135355,
+      "new": 0.053305660346404944,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_5-21-0_Std_W89.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": -0.06492646669328245,
+      "new": -0.09946919604704675,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_8-34-0_Range_W5.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": -0.04274317818534722,
+      "new": 0.015616380062093026,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_CMO_13_Range_W34.ic",
+      "index": "low_vol_ranging/close_12h_momentum_CMO_13_Range_W34",
+      "old": 0.0016257263380886817,
+      "new": -0.050208030626707596,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_PPO_12-26-0_Kurt_W5.ic",
+      "index": "low_vol_ranging/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.21753808660542587,
+      "new": 0.18773775896496037,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_1h_trend_BBANDS-Upper_34_Skew_W8.ic",
+      "index": "low_vol_ranging/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": 0.2033026236754095,
+      "new": 0.2588467113057054,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.ic",
+      "index": "low_vol_ranging/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": 0.11220966072153343,
+      "new": 0.25390054420428476,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.value_sha256",
+      "index": "mid_vol_ranging",
+      "old": "23748dbd6e6118cc248ef776bbea3d43552af3fca0a281ba2396102562794bc1",
+      "new": "fad3b09b30254dbc4f5a650358671b0212a8ff9b40f87669faa1018121a09ffe",
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.avg-price_1h_Lag_5.ic",
+      "index": "mid_vol_ranging/avg-price_1h_Lag_5",
+      "old": -0.23505557061462598,
+      "new": -0.39485082271943234,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close-volume_12h_volume_OBV_Lag_3.ic",
+      "index": "mid_vol_ranging/close-volume_12h_volume_OBV_Lag_3",
+      "old": -0.1198388203173404,
+      "new": -0.18744754206970832,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close-volume_12h_volume_OBV_Mean_W13.ic",
+      "index": "mid_vol_ranging/close-volume_12h_volume_OBV_Mean_W13",
+      "old": 0.015959306443487385,
+      "new": -0.34839812305035067,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": -0.12714153429351727,
+      "new": -0.3417103431049278,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": -0.2434605371940128,
+      "new": -0.438072350720448,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": 0.06203415807688559,
+      "new": -0.30421973228768484,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-SINE-Sine_Skew_W34.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": -0.05237994678394255,
+      "new": -0.33313981109194113,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-SINE-Sine_Slope_W89.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": 0.13083458625303115,
+      "new": 0.07981901900823904,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_12-26-0_Slope_W55.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": 0.08272706664676682,
+      "new": -0.37907881483769024,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_5-21-0_Std_W89.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": -0.16845182697402494,
+      "new": -0.2723045554106866,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_8-34-0_Range_W5.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": 0.15008070092924514,
+      "new": -0.2064794150500901,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_CMO_13_Range_W34.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_CMO_13_Range_W34",
+      "old": 0.13095046381796188,
+      "new": -0.02593370287307196,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_PPO_12-26-0_Kurt_W5.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.29267355884029744,
+      "new": 0.4363137332337879,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_1h_trend_BBANDS-Upper_34_Skew_W8.ic",
+      "index": "mid_vol_ranging/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": 0.2509985923024928,
+      "new": 0.09245978695648867,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.ic",
+      "index": "mid_vol_ranging/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": 0.34131542090661054,
+      "new": 0.32001438145029854,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.value_sha256",
+      "index": "mid_vol_trending",
+      "old": "4a3ed2aafd057a21fc7a51e8bd37c751211cfc9632e9d31170a0c13e77f6c21e",
+      "new": "0c424233ad6acbce2365fd2b557eed6911176e48931f5057adccc1f0fdf65e82",
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.avg-price_1h_Lag_5.ic",
+      "index": "mid_vol_trending/avg-price_1h_Lag_5",
+      "old": -0.4008434313052046,
+      "new": -0.20715224450141256,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close-volume_12h_volume_OBV_Lag_3.ic",
+      "index": "mid_vol_trending/close-volume_12h_volume_OBV_Lag_3",
+      "old": -0.2753623884805353,
+      "new": 0.039043641927627666,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close-volume_12h_volume_OBV_Mean_W13.ic",
+      "index": "mid_vol_trending/close-volume_12h_volume_OBV_Mean_W13",
+      "old": -0.12921168341678532,
+      "new": -0.17023680041962608,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": -0.2371757364870293,
+      "new": 0.013300971060148286,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": -0.41003487280386947,
+      "new": -0.22196130898682176,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": -0.1791413127390998,
+      "new": -0.15258320567405484,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-SINE-Sine_Skew_W34.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": -0.20275712570044513,
+      "new": -0.20417776953566777,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-SINE-Sine_Slope_W89.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": 0.0050610491506174905,
+      "new": 0.035601678365976226,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_12-26-0_Slope_W55.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": -0.17465783905498317,
+      "new": -0.13403277843036082,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_5-21-0_Std_W89.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": -0.11113941276295414,
+      "new": -0.056866929583039544,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_8-34-0_Range_W5.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": -0.2539820379871104,
+      "new": 0.02074708332784183,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_CMO_13_Range_W34.ic",
+      "index": "mid_vol_trending/close_12h_momentum_CMO_13_Range_W34",
+      "old": -0.15135043160644163,
+      "new": 0.3058325600471496,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_PPO_12-26-0_Kurt_W5.ic",
+      "index": "mid_vol_trending/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.13642238622209255,
+      "new": 0.3866516027334243,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_1h_trend_BBANDS-Upper_34_Skew_W8.ic",
+      "index": "mid_vol_trending/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": 0.5742857142857143,
+      "new": 0.21480609880568496,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.ic",
+      "index": "mid_vol_trending/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": 0.30975686536126235,
+      "new": 0.4095529037417118,
+      "class": "P1-1c"
+    },
+    {
+      "path": "analysis_status",
+      "index": "root",
+      "old": null,
+      "new": "degraded_full_sample",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "analysis_status",
+      "index": "root",
+      "old": null,
+      "new": "ok_oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "oos_guarantees",
+      "index": "root",
+      "old": null,
+      "new": false,
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "oos_guarantees",
+      "index": "root",
+      "old": null,
+      "new": true,
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "avg-price_1h_Lag_5",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "avg-price_1h_Lag_5",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close-volume_12h_volume_OBV_Lag_3",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close-volume_12h_volume_OBV_Lag_3",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close-volume_12h_volume_OBV_Mean_W13",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close-volume_12h_volume_OBV_Mean_W13",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_12-26-0",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_12-26-0",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_13-55-0_Log1p",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_13-55-0_Log1p",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_34-89-0_Abs",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_34-89-0_Abs",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_CMO_13_Range_W34",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_CMO_13_Range_W34",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "hlc_12h_momentum_ADXR_89_Abs",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "hlc_12h_momentum_ADXR_89_Abs",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "summary_table.pass_class",
+      "index": "volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "filter_log.stage5_thresholds.output_features.pass_class",
+      "index": "degraded_full_sample",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "filter_log.stage5_thresholds.pass_class",
+      "index": "degraded_full_sample",
+      "old": null,
+      "new": "full_sample_research_only",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "filter_log.stage5_thresholds.output_features.pass_class",
+      "index": "ok_oos",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    },
+    {
+      "path": "filter_log.stage5_thresholds.pass_class",
+      "index": "ok_oos",
+      "old": null,
+      "new": "oos",
+      "class": "P1-3-obs"
+    }
+  ],
+  "zero_diff_justifications": {
+    "P1-1b": {
+      "reason": "BTCUSDT/1h kline n=20352 >= min_samples_for_fit=100; RegimeDetector.detect(expanding=True) method=kmeans with _fallback_rule_based call_count=0 on full series; B0 five-path has no regime_fallback key so P1-1b has no baseline surface to attribute. Behavior gated by test_regime_fallback_truth_table. OOS baseline.fallback receipt deep-equal after re-run (metadata_sha256=7093c8d11151fb10869623a521b1c26058b43ef3bfdb4cb5501b35a37bbf8bc4).",
+      "evidence": {
+        "detect_method": "kmeans",
+        "n_bars": 20352,
+        "min_samples_for_fit": 100,
+        "fallback_rule_based_calls": 0,
+        "baseline_regime_fallback_key_present": false,
+        "forced_fallback_vs_pit_rule_match": "300/300",
+        "oos_fallback_receipt_equal_baseline": true,
+        "oos_fallback_metadata_sha256": "7093c8d11151fb10869623a521b1c26058b43ef3bfdb4cb5501b35a37bbf8bc4",
+        "receipt_command": "python -c recompute detect spy + OOS fallback via gen_baseline helpers; 2026-07-17 B1-fix3"
+      }
+    }
+  }
 }

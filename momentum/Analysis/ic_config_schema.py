@@ -93,10 +93,12 @@ class ICCalculationConfig(BaseModel):
             "high_vol_percentile": 80,
             "low_vol_percentile": 20,
         }
+        # RegimeKmeansConfig keys（LA-1：refit_interval 進 schema，default 50）
         regime_kmeans: dict = {
             "n_clusters": 4,
             "lookback": 55,
             "min_samples_for_fit": 100,
+            "refit_interval": 50,
         }
 
     grouped_analysis: GroupedConfig = GroupedConfig()
