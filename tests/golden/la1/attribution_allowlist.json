@@ -1,7 +1,7 @@
 {
   "schema_version": "la1_attribution_allowlist_v1",
   "spec_ref": "docs/IC_LA1_SPEC.md §G",
-  "todo_ref": "docs/IC_LA1_TODO.md Task 0.2 / Task 1.5 / Task 3.3",
+  "todo_ref": "docs/IC_LA1_TODO.md Task 0.2 / Task 1.5 / Task 2.2 / Task 3.3",
   "policy": {
     "unlisted_diff": "unexpected",
     "b0_rows_empty": true,
@@ -999,6 +999,923 @@
       "old": null,
       "new": "oos",
       "class": "P1-3-obs"
+    },
+    {
+      "path": "long_short.value_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "f078272aea6f7bf750a93a991ceff69c24598a2003d295b50eb5078456473ce7",
+      "new": "defbf4406f85a137eff78bade7b94fe89adbf67d791543f5a7257780df7d20c5",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.nan_mask_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "9ff7ead314c6c5a34f442be13c2d065246737106dda287694c5756e28f79bd7d",
+      "new": "8629e9c4c061311a54e7c6415c844e787a1996fc81a7f97f9429066eb90be0d3",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.avg-price_1h_Lag_5.long_ic",
+      "index": "BTCUSDT/1h/avg-price_1h_Lag_5",
+      "old": 0.039747828841293596,
+      "new": -0.046061898448986886,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.avg-price_1h_Lag_5.long_mean_return",
+      "index": "BTCUSDT/1h/avg-price_1h_Lag_5",
+      "old": -0.0015459436372407996,
+      "new": -0.00015843268115612273,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.avg-price_1h_Lag_5.short_ic",
+      "index": "BTCUSDT/1h/avg-price_1h_Lag_5",
+      "old": 0.17534902933224242,
+      "new": 0.16595298861317212,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.avg-price_1h_Lag_5.short_mean_return",
+      "index": "BTCUSDT/1h/avg-price_1h_Lag_5",
+      "old": -0.0021683023985764735,
+      "new": -0.0013693522951851507,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.avg-price_1h_Lag_5.recommendation",
+      "index": "BTCUSDT/1h/avg-price_1h_Lag_5",
+      "old": "雙向交易",
+      "new": "只做空",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Lag_3.long_ic",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Lag_3",
+      "old": -0.1523723274236294,
+      "new": -0.05465062090178675,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Lag_3.long_mean_return",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Lag_3",
+      "old": -0.00014665666044591494,
+      "new": -2.9877652513219955e-05,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Lag_3.short_ic",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Lag_3",
+      "old": 0.010800104201469037,
+      "new": 0.03531450003808497,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Lag_3.short_mean_return",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Lag_3",
+      "old": -0.0007514359790887406,
+      "new": -0.0014891143143177033,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Mean_W13.long_ic",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Mean_W13",
+      "old": -0.04290078139971852,
+      "new": -0.011239651340260028,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Mean_W13.long_mean_return",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Mean_W13",
+      "old": -0.0010947142007215968,
+      "new": -0.00024485010089296284,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Mean_W13.short_ic",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Mean_W13",
+      "old": 0.05711644992736772,
+      "new": -0.05949839880231218,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Mean_W13.short_mean_return",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Mean_W13",
+      "old": 1.8306113594207005e-05,
+      "new": -0.001842956954297928,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close-volume_12h_volume_OBV_Mean_W13.recommendation",
+      "index": "BTCUSDT/1h/close-volume_12h_volume_OBV_Mean_W13",
+      "old": "只做空",
+      "new": "不建議",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.long_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": -0.055097954426113295,
+      "new": -0.020307131951315217,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": 0.00043032970634470144,
+      "new": 0.00028501793091401274,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.short_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": -0.07716001378821151,
+      "new": 0.024642881571979712,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": 0.00015256695449352263,
+      "new": 0.0004432874729035567,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.recommendation",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": "不建議",
+      "new": "只做空",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.long_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": -0.11095768422705052,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": -0.000791742113129846,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.short_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": 0.05494674423420626,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": -0.0006367447653396759,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.recommendation",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": "只做空",
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.num_quantiles_used",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": 3,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.long_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": -0.07415862352651664,
+      "new": -0.046336582970858825,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": 0.00025179205885987724,
+      "new": 0.0005918988660604012,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.short_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": -0.015767444380116506,
+      "new": 0.005379246238004323,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": -0.00027762971818447114,
+      "new": -0.00013168300901140486,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.recommendation",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": "不建議",
+      "new": "只做空",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Skew_W34.long_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": 0.1382043502098236,
+      "new": 0.09915177787132352,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Skew_W34.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": -0.002065199651058365,
+      "new": -0.0008321412770152923,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Skew_W34.short_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": -0.0420606759860929,
+      "new": -0.04299248654866418,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Skew_W34.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": -0.0011226672734787216,
+      "new": -0.0009888559791814552,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Slope_W89.long_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": 0.04344216604808372,
+      "new": -0.04663608583660119,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Slope_W89.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": 8.141189211546773e-05,
+      "new": 0.0008236471559349173,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Slope_W89.short_ic",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": -0.08348164121867518,
+      "new": -0.03193475570430191,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Slope_W89.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": 0.0008123779296875,
+      "new": 0.0006251242898759388,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-Sine_Slope_W89.recommendation",
+      "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": "只做多",
+      "new": "不建議",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_Slope_W55.long_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": -0.030300596756205028,
+      "new": 0.010056971729194262,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_Slope_W55.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": 0.0007154036507370209,
+      "new": 0.0002934751682260039,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_Slope_W55.short_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": 0.011742223061105842,
+      "new": 0.009963825941263287,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_Slope_W55.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": 0.0004258870333433151,
+      "new": -5.492267258670352e-05,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_Slope_W55.recommendation",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": "只做空",
+      "new": "雙向交易",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_5-21-0_Std_W89.long_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": -0.024434554623964024,
+      "new": -0.177066338421357,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_5-21-0_Std_W89.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": -0.0003836423922807742,
+      "new": -0.0010346169583499432,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_5-21-0_Std_W89.short_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": 0.07668993941758152,
+      "new": 0.04046051809321343,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_5-21-0_Std_W89.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": -0.0005215231856058476,
+      "new": -0.0005086262878816072,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_8-34-0_Range_W5.long_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": -0.058957364190783554,
+      "new": -0.11742336116710968,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_8-34-0_Range_W5.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": -0.00024789299456601217,
+      "new": -0.000660511809335628,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_8-34-0_Range_W5.short_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": -0.0726128333297502,
+      "new": -0.052140728289453084,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_8-34-0_Range_W5.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": -0.0005802460695536474,
+      "new": -0.0007979482497406732,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_CMO_13_Range_W34.long_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_CMO_13_Range_W34",
+      "old": 0.06891692292040777,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_CMO_13_Range_W34.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_CMO_13_Range_W34",
+      "old": 1.0724978398550585e-05,
+      "new": 0.006996800005435943,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_CMO_13_Range_W34.short_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_CMO_13_Range_W34",
+      "old": -0.0265913902055242,
+      "new": 0.06806821947497181,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_CMO_13_Range_W34.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_CMO_13_Range_W34",
+      "old": -0.0011399072013301157,
+      "new": -0.0003513834553380166,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_CMO_13_Range_W34.recommendation",
+      "index": "BTCUSDT/1h/close_12h_momentum_CMO_13_Range_W34",
+      "old": "只做多",
+      "new": "只做空",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_PPO_12-26-0_Kurt_W5.long_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.08957616606942867,
+      "new": 0.07627122038504752,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_PPO_12-26-0_Kurt_W5.long_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.0006307119672948664,
+      "new": 0.0004231035324835008,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_PPO_12-26-0_Kurt_W5.short_ic",
+      "index": "BTCUSDT/1h/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.028578039381936468,
+      "new": -0.015346934064534697,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_PPO_12-26-0_Kurt_W5.short_mean_return",
+      "index": "BTCUSDT/1h/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.0006827494229781016,
+      "new": 0.00018004365995818493,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_PPO_12-26-0_Kurt_W5.recommendation",
+      "index": "BTCUSDT/1h/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": "雙向交易",
+      "new": "只做多",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_1h_trend_BBANDS-Upper_34_Skew_W8.long_ic",
+      "index": "BTCUSDT/1h/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": 0.11547625889249985,
+      "new": 0.10611910195409367,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_1h_trend_BBANDS-Upper_34_Skew_W8.long_mean_return",
+      "index": "BTCUSDT/1h/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": 0.001076333271514816,
+      "new": 0.0011573905168577683,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_1h_trend_BBANDS-Upper_34_Skew_W8.short_ic",
+      "index": "BTCUSDT/1h/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": -0.048278651790458996,
+      "new": -0.07314729287856148,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_1h_trend_BBANDS-Upper_34_Skew_W8.short_mean_return",
+      "index": "BTCUSDT/1h/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": 0.0005173385890205402,
+      "new": -8.992473176129833e-05,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.long_ic",
+      "index": "BTCUSDT/1h/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": -0.05202900057690661,
+      "new": 0.007057174326920095,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.long_mean_return",
+      "index": "BTCUSDT/1h/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": 0.0008252424183230715,
+      "new": 0.0013289158850644542,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.short_ic",
+      "index": "BTCUSDT/1h/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": 0.006885087524167246,
+      "new": -0.0344907999026673,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.short_mean_return",
+      "index": "BTCUSDT/1h/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": 0.0005951773687656293,
+      "new": 0.00030336678028106687,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.recommendation",
+      "index": "BTCUSDT/1h/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": "只做空",
+      "new": "只做多",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.value_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "a0335c588ccca10cfdf9e480bcdd671178baa11e1f3ed9b78d9586f6ed7efad4",
+      "new": "9b90ae9197ffc8c94dbdb4bcee9b3ba1dfb468ad83623949ebe9667a7c71e29a",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.nan_mask_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "49a2ec7b706f6e8caa76c118ec9624f48bb39cdb0832f41def7a4006de5f3753",
+      "new": "8f1b044ec363df610daa9e8eb6d9ab7c6dbb539aa4c24086d88a7b8a9137aa9a",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.long_ic",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": -0.022026616033299175,
+      "new": -0.01473955422714903,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": -0.004146009133412288,
+      "new": -0.00416831834749742,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.short_ic",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": -0.06261500517796269,
+      "new": -0.012103725159270056,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": -0.012039437137007896,
+      "new": -0.00817122459411621,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Range_W3.long_ic",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": 0.0009643870479249764,
+      "new": -0.032375560628041436,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Range_W3.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": -0.0005949751230386588,
+      "new": 0.00039445426541642725,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Range_W3.short_ic",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": -0.09960448393525903,
+      "new": -0.11400469967196383,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Range_W3.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": -0.003173328123517483,
+      "new": -0.0016194586475465707,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Range_W3.recommendation",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": "只做多",
+      "new": "不建議",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0.long_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0",
+      "old": 0.04783687564480636,
+      "new": -0.016344092517404676,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0",
+      "old": -0.0001628408739874671,
+      "new": -0.0004809889228501802,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0.short_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0",
+      "old": 0.05481090699495638,
+      "new": 0.09573827131270764,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0",
+      "old": 0.0019127822172516646,
+      "new": 0.003632937533414958,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0.recommendation",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0",
+      "old": "雙向交易",
+      "new": "只做空",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_TsArgmin_W5.long_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": 0.02292762644529455,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_TsArgmin_W5.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": 0.001878549443914535,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_TsArgmin_W5.short_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": 0.010119614564859951,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_TsArgmin_W5.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": -0.001374179347184017,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_TsArgmin_W5.recommendation",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": "雙向交易",
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_12-26-0_TsArgmin_W5.num_quantiles_used",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": 2,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-34-0_Kurt_W13.long_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": -0.08409659063115893,
+      "new": -0.06807684346863573,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-34-0_Kurt_W13.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": -0.003991414529574316,
+      "new": -0.004775911792333172,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-34-0_Kurt_W13.short_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": -0.03853126419140437,
+      "new": -0.025150521252727844,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-34-0_Kurt_W13.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": -0.006825522334514149,
+      "new": -0.004200380326925603,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Kurt_W13.long_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": 0.02371912548737604,
+      "new": -0.014346920384067412,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Kurt_W13.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": 0.002847711459513989,
+      "new": 0.0022916500885738853,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Kurt_W13.short_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": -0.010062917530806518,
+      "new": -0.004151467533546333,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Kurt_W13.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": -0.0001805213837674712,
+      "new": 0.0014043245784206063,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Kurt_W13.recommendation",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": "只做多",
+      "new": "不建議",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Log1p.long_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": 0.0027871924731636072,
+      "new": -0.03994036541375201,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Log1p.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": 0.005426825093859024,
+      "new": 0.004121707697383693,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Log1p.short_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": 0.04819775497102269,
+      "new": 0.044382966354039904,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Log1p.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": 0.0015811845546460333,
+      "new": 0.001544810184711812,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Log1p.recommendation",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": "雙向交易",
+      "new": "只做空",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Momentum_L144.long_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": -0.0028475871569774098,
+      "new": 0.05258251699508404,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Momentum_L144.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": 0.003065124129130812,
+      "new": 0.0006222579051071489,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Momentum_L144.short_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": 0.0823981263256114,
+      "new": 0.06577422850791803,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Momentum_L144.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": -0.0004926567500959488,
+      "new": -0.0012530292280846173,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_13-55-0_Momentum_L144.recommendation",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": "只做空",
+      "new": "雙向交易",
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_21-55-0_Momentum_L144.long_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": -0.0808354579279201,
+      "new": -0.13668278447551988,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_21-55-0_Momentum_L144.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": -0.0019071138084833347,
+      "new": -0.00024707944077603957,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_21-55-0_Momentum_L144.short_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": 0.09603030195860297,
+      "new": 0.07772331104999565,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_21-55-0_Momentum_L144.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": -0.0028384295939600447,
+      "new": -0.00358798324659064,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_34-89-0_Abs.long_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_34-89-0_Abs",
+      "old": 0.0032846704769759526,
+      "new": 0.03388913168260202,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_34-89-0_Abs.long_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_34-89-0_Abs",
+      "old": 0.0013605772798035334,
+      "new": 8.270000589304958e-05,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_34-89-0_Abs.short_ic",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_34-89-0_Abs",
+      "old": 0.06376449072040727,
+      "new": 0.06876494983509406,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_momentum_APO_34-89-0_Abs.short_mean_return",
+      "index": "ETHUSDT/12h/close_12h_momentum_APO_34-89-0_Abs",
+      "old": -0.003378465562454438,
+      "new": -0.003228574860322877,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_ADXR_89_Abs.long_ic",
+      "index": "ETHUSDT/12h/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.15819808506286526,
+      "new": 0.17486289042646716,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_ADXR_89_Abs.long_mean_return",
+      "index": "ETHUSDT/12h/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.006220385667938339,
+      "new": 0.007949035394759406,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_ADXR_89_Abs.short_ic",
+      "index": "ETHUSDT/12h/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.07659788758001067,
+      "new": 0.0886086784538003,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.hlc_12h_momentum_ADXR_89_Abs.short_mean_return",
+      "index": "ETHUSDT/12h/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.00832017643526456,
+      "new": 0.007753708633766355,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.volume_12h_trend_MAVP_21_TsArgmin_W5.long_mean_return",
+      "index": "ETHUSDT/12h/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": 0.005279345813023021,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.volume_12h_trend_MAVP_21_TsArgmin_W5.short_ic",
+      "index": "ETHUSDT/12h/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": -0.04776491425421788,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.volume_12h_trend_MAVP_21_TsArgmin_W5.short_mean_return",
+      "index": "ETHUSDT/12h/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": 0.0006008470617748776,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.volume_12h_trend_MAVP_21_TsArgmin_W5.recommendation",
+      "index": "ETHUSDT/12h/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": "不建議",
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.volume_12h_trend_MAVP_21_TsArgmin_W5.num_quantiles_used",
+      "index": "ETHUSDT/12h/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": 3,
+      "new": null,
+      "class": "P1-2"
     }
   ],
   "zero_diff_justifications": {

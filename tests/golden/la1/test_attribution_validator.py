@@ -32,6 +32,7 @@ from tests.golden.la1.attribution_validator import (
 LA1_DIR = Path(__file__).resolve().parent
 ALLOWLIST_PATH = LA1_DIR / "attribution_allowlist.json"
 BTC_BASELINE_PATH = LA1_DIR / "BTCUSDT_1h_baseline.json"
+ETH_BASELINE_PATH = LA1_DIR / "ETHUSDT_12h_baseline.json"
 
 
 def _populated_allowlist() -> dict[str, Any]:
@@ -191,8 +192,12 @@ def test_allowlist_json_loads() -> None:
     payload = json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
     assert isinstance(payload.get("rows"), list)
     assert "schema_version" in payload
-    baseline = json.loads(BTC_BASELINE_PATH.read_text(encoding="utf-8"))
-    errs = validate_allowlist_schema(payload, baseline=baseline)
+    baseline_btc = json.loads(BTC_BASELINE_PATH.read_text(encoding="utf-8"))
+    baseline_eth = json.loads(ETH_BASELINE_PATH.read_text(encoding="utf-8"))
+    # 多 symbol 聯集：P1-2 long_short 的 ETH feature path 僅存在於 ETH baseline
+    errs = validate_allowlist_schema(
+        payload, baseline=[baseline_btc, baseline_eth]
+    )
     assert not errs, errs
     # B1-fix3：P1-1c 須含真實 regime_kmeans.*（非 phantom labels_sha256）
     km_rows = [
@@ -227,6 +232,7 @@ def test_allowlist_json_loads() -> None:
         "filter_log.stage5_thresholds.pass_class",
     }
     p13_news = set()
+    p12_rows = 0
     for row in payload["rows"]:
         assert set(row.keys()) >= {"path", "index", "old", "new", "class"}
         assert row.get("index") != "*"
@@ -234,8 +240,14 @@ def test_allowlist_json_loads() -> None:
             assert row["path"] in p13_paths
             p13_news.add((row["path"], row["new"]))
         elif row.get("class") in FIVE_PATH_CLASSES:
-            # F-B1-001：five-path class path 必須存在於 baseline
-            assert baseline_has_path(baseline, row["path"]), row["path"]
+            # F-B1-001：five-path class path 必須存在於 BTC∪ETH baseline
+            assert baseline_has_path(baseline_btc, row["path"]) or baseline_has_path(
+                baseline_eth, row["path"]
+            ), row["path"]
+            if row.get("class") == "P1-2":
+                p12_rows += 1
+    # Task 2.2：B2 須 append 至少一筆 P1-2 long_short diff
+    assert p12_rows > 0, "expected P1-2 allowlist rows after B2"
     # B3-ATTR-01：須含 normal pass_class=oos 與 filter_log diffs
     assert ("summary_table.pass_class", "oos") in p13_news
     assert ("summary_table.pass_class", "full_sample_research_only") in p13_news
@@ -250,7 +262,7 @@ def test_allowlist_json_loads() -> None:
 
 
 def test_allowlist_phantom_path_fails_baseline_schema() -> None:
-    """F-B1-001：path 不在 baseline → schema FAIL。"""
+    """F-B1-001：path 不在 baseline → schema FAIL（單 symbol 語意保留）。"""
     baseline = json.loads(BTC_BASELINE_PATH.read_text(encoding="utf-8"))
     # 真實鍵：xgboost_phases 有 labels_sha256；regime_kmeans 無
     assert baseline_has_path(baseline, "xgboost_phases.labels_sha256")
@@ -275,6 +287,73 @@ def test_allowlist_phantom_path_fails_baseline_schema() -> None:
     assert any("not present in baseline" in e for e in errs), errs
     path_errs = validate_allowlist_paths_against_baseline(phantom, baseline)
     assert path_errs
+
+
+def test_baseline_union_positive_and_negative() -> None:
+    """F-B2-005：多 symbol 聯集正反例；單 baseline 缺 path 仍 FAIL。"""
+    baseline_btc = json.loads(BTC_BASELINE_PATH.read_text(encoding="utf-8"))
+    baseline_eth = json.loads(ETH_BASELINE_PATH.read_text(encoding="utf-8"))
+
+    btc_feats = set(
+        ((baseline_btc.get("long_short") or {}).get("features") or {}).keys()
+    )
+    eth_feats = set(
+        ((baseline_eth.get("long_short") or {}).get("features") or {}).keys()
+    )
+    only_eth = sorted(eth_feats - btc_feats)
+    assert only_eth, "expected at least one ETH-only long_short feature in baselines"
+    feat_name = only_eth[0]
+    eth_only_path = f"long_short.features.{feat_name}.long_ic"
+    assert baseline_has_path(baseline_eth, eth_only_path)
+    assert not baseline_has_path(baseline_btc, eth_only_path)
+
+    row = {
+        "path": eth_only_path,
+        "index": "ETHUSDT/12h",
+        "old": 0.0,
+        "new": 0.1,
+        "class": "P1-2",
+    }
+    allow = {
+        "schema_version": "la1_attr_v1",
+        "class_enum": sorted(CLASS_ENUM),
+        "rows": [row],
+    }
+
+    # 正例：BTC∪ETH 聯集 → path 存在 → PASS
+    errs_union = validate_allowlist_paths_against_baseline(
+        allow, baseline=[baseline_btc, baseline_eth]
+    )
+    assert not errs_union, errs_union
+    errs_schema_union = validate_allowlist_schema(
+        allow, baseline=[baseline_btc, baseline_eth]
+    )
+    assert not errs_schema_union, errs_schema_union
+
+    # 反例 1：僅 BTC 單 baseline → ETH-only path 查不到 → FAIL（單 symbol 語意保留）
+    errs_btc_only = validate_allowlist_paths_against_baseline(allow, baseline_btc)
+    assert errs_btc_only, "ETH-only path must FAIL against BTC-only baseline"
+    assert any("not present in baseline" in e for e in errs_btc_only)
+
+    # 反例 2：聯集仍找不到的 phantom → FAIL
+    phantom = {
+        "schema_version": "la1_attr_v1",
+        "class_enum": sorted(CLASS_ENUM),
+        "rows": [
+            {
+                "path": "long_short.features.no_such_feature_anywhere.long_ic",
+                "index": "ETHUSDT/12h",
+                "old": 0.0,
+                "new": 0.1,
+                "class": "P1-2",
+            }
+        ],
+    }
+    errs_phantom = validate_allowlist_paths_against_baseline(
+        phantom, baseline=[baseline_btc, baseline_eth]
+    )
+    assert errs_phantom, "path missing from both baselines must FAIL"
+    assert any("not present in baseline" in e for e in errs_phantom)
 
 
 def test_allowlist_schema_rejects_wildcard_index() -> None:

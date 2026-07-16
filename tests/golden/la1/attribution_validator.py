@@ -66,16 +66,26 @@ def baseline_has_path(baseline: Any, path: str) -> bool:
 
 def validate_allowlist_paths_against_baseline(
     allowlist: dict[str, Any],
-    baseline: dict[str, Any],
+    baseline: dict[str, Any] | Sequence[dict[str, Any]],
     *,
     classes: frozenset[str] | None = None,
 ) -> list[str]:
     """每筆 five-path class row 的 path 必須存在於 baseline JSON。
 
-    不存在 → schema FAIL（防 phantom path 如 regime_kmeans.labels_sha256）。
+    ``baseline`` 可為單一物件或 list/tuple（多 symbol 聯集，如 BTC∪ETH）。
+    不存在於任一 baseline → schema FAIL（防 phantom path 如 regime_kmeans.labels_sha256）。
     P1-3-obs 為 report-root 欄位，不在 gen_baseline 五路徑內，預設略過。
     """
     target = classes if classes is not None else FIVE_PATH_CLASSES
+    baselines: list[dict[str, Any]]
+    if isinstance(baseline, dict):
+        baselines = [baseline]
+    elif isinstance(baseline, Sequence) and not isinstance(baseline, (str, bytes)):
+        baselines = [b for b in baseline if isinstance(b, dict)]
+    else:
+        baselines = []
+    if not baselines:
+        return ["baseline path check: no valid baseline object(s)"]
     errors: list[str] = []
     rows = allowlist.get("rows")
     if not isinstance(rows, list):
@@ -90,7 +100,7 @@ def validate_allowlist_paths_against_baseline(
         if not isinstance(path, str):
             errors.append(f"allowlist.rows[{i}]: path must be str for baseline check")
             continue
-        if not baseline_has_path(baseline, path):
+        if not any(baseline_has_path(b, path) for b in baselines):
             errors.append(
                 f"allowlist.rows[{i}]: path {path!r} not present in baseline JSON "
                 f"(class={cls!r})"
@@ -145,11 +155,13 @@ def validate_zero_diff_justifications(allowlist: dict[str, Any]) -> list[str]:
 def validate_allowlist_schema(
     allowlist: dict[str, Any],
     *,
-    baseline: dict[str, Any] | None = None,
+    baseline: dict[str, Any] | Sequence[dict[str, Any]] | None = None,
 ) -> list[str]:
     """檢查 allowlist schema（B0：rows 可空）。
 
-    baseline 若提供：five-path class 的每 row path 必須存在於 baseline。
+    baseline 若提供：five-path class 的每 row path 必須存在於 baseline
+    （可為單一物件或 list/tuple 聯集，如 BTC∪ETH）。
+    單 baseline 語意保留：任一 path 在該物件查不到 → FAIL。
     若含 `zero_diff_justifications`：鍵/值形狀須合法（Task 1.5）。
     """
     errors: list[str] = []

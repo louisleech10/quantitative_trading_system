@@ -1,7 +1,7 @@
-"""LA-1 M-lookahead 測試（B0 骨架 + B1 填實；B2 skip；B3 已填）。
+"""LA-1 M-lookahead 測試（B0 骨架 + B1/B2/B3 填實）。
 
 SPEC: docs/IC_LA1_SPEC.md
-TODO: docs/IC_LA1_TODO.md Task 0.3 / Phase B1
+TODO: docs/IC_LA1_TODO.md Task 0.3 / Phase B1 / Phase B2
 
 collect == 10:
   - test_regime_pit[rule]
@@ -15,7 +15,7 @@ collect == 10:
   - test_return_nan_mask_invariance
   - test_fallback_loud_and_status
 
-B1 去 skip 填實；B2 仍 skip；B3 fallback loud 已填。
+B1/B2 去 skip 填實；B3 fallback loud 已填。
 collect 不觸 data_cache 副作用。
 """
 
@@ -32,7 +32,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from momentum.Analysis.deep_analysis_types import SkippedResult
 from momentum.Analysis.ic_engine import ICEngine
+from momentum.Analysis.long_short_analyzer import LongShortAnalyzer
 from momentum.Analysis.pit_stats import (
     effective_count,
     pit_expanding_quantile_thresholds,
@@ -59,8 +61,6 @@ ATTR_ALLOWLIST = LA1_GOLDEN_DIR / "attribution_allowlist.json"
 BASELINE_BTC = LA1_GOLDEN_DIR / "BTCUSDT_1h_baseline.json"
 BASELINE_ETH = LA1_GOLDEN_DIR / "ETHUSDT_12h_baseline.json"
 GEN_BASELINE = LA1_GOLDEN_DIR / "gen_baseline.py"
-
-SKIP_B2 = pytest.mark.skip(reason="LA1-B2 pending")
 
 ATOL = 1e-12
 M_TRUNC_RATIO = 0.75
@@ -882,22 +882,289 @@ def test_la1_b1_production_mutations_red(
 # ---------------------------------------------------------------------------
 # B2 — long_short PIT
 # ---------------------------------------------------------------------------
-@SKIP_B2
-def test_long_short_pit(la1_baseline_paths: Dict[str, Path]) -> None:
-    """P1-2：feature 原時序分箱 + M-trunc early bin flip + reduced-bin。"""
-    raise NotImplementedError("LA1-B2 fill-in: test_long_short_pit")
+def _legacy_global_qcut_bins(
+    feature: pd.Series, future_returns: pd.Series, q: int = 5
+) -> pd.Series:
+    """改前語意：concat dropna 後全域 qcut（僅供 legacy flip>0 對照，非產線）。"""
+    data = pd.concat(
+        [feature.rename("f"), future_returns.rename("r")], axis=1
+    ).dropna()
+    if len(data) < q:
+        return pd.Series(np.nan, index=feature.index, dtype=float)
+    try:
+        raw = pd.qcut(data["f"], q=q, labels=False, duplicates="drop")
+    except ValueError:
+        return pd.Series(np.nan, index=feature.index, dtype=float)
+    return pd.Series(raw, index=data.index, dtype=float).reindex(feature.index)
 
 
-@SKIP_B2
-def test_long_short_fixed_q(la1_baseline_paths: Dict[str, Path]) -> None:
-    """n≥200 → num_quantiles_used==5（固定 q）。"""
-    raise NotImplementedError("LA1-B2 fill-in: test_long_short_fixed_q")
+def _count_early_float_label_flips(
+    full_bins: pd.Series, trunc_bins: pd.Series, early_end: int
+) -> int:
+    n = min(early_end, len(full_bins), len(trunc_bins))
+    flips = 0
+    for i in range(n):
+        a = full_bins.iloc[i]
+        b = trunc_bins.iloc[i]
+        a_nan = pd.isna(a)
+        b_nan = pd.isna(b)
+        if a_nan and b_nan:
+            continue
+        if a_nan != b_nan or float(a) != float(b):
+            flips += 1
+    return flips
 
 
-@SKIP_B2
-def test_return_nan_mask_invariance(la1_baseline_paths: Dict[str, Path]) -> None:
-    """竄改未來報酬 NaN 分布 → bins 逐元素不變。"""
-    raise NotImplementedError("LA1-B2 fill-in: test_return_nan_mask_invariance")
+def _series_equal_nan(a: pd.Series, b: pd.Series) -> int:
+    """逐元素相等（NaN==NaN）；回傳 diff 個數。"""
+    same = (a.isna() & b.isna()) | (
+        a.notna()
+        & b.notna()
+        & (a.to_numpy(dtype=float) == b.to_numpy(dtype=float))
+    )
+    return int((~same).sum())
+
+
+def _analyze_capture_bins(
+    analyzer: LongShortAnalyzer,
+    feature: pd.Series,
+    future_returns: pd.Series,
+    num_quantiles: int,
+) -> Tuple[Any, pd.Series, pd.Series, pd.Series]:
+    """經產線 analyze() 捕捉 bins/long_mask/short_mask（F-B2-001：禁只測 helper）。
+
+    攔截 analyze→compute_side_masks 真呼叫，mutant 若在 analyze 對 feat 做
+    ``feat.where(ret.notna())`` 會改寫 bins，本 helper 必見差。
+    """
+    captured: Dict[str, Any] = {}
+    real_masks = analyzer.compute_side_masks
+
+    def _spy(
+        feat: pd.Series,
+        fut: Optional[pd.Series] = None,
+        num_q: Optional[int] = None,
+    ) -> tuple[pd.Series, pd.Series, pd.Series]:
+        bins, long_m, short_m = real_masks(feat, fut, num_q)
+        captured["bins"] = bins
+        captured["long_mask"] = long_m
+        captured["short_mask"] = short_m
+        captured["feat_arg"] = pd.Series(feat, dtype=float).copy()
+        return bins, long_m, short_m
+
+    with mock.patch.object(analyzer, "compute_side_masks", _spy):
+        result = analyzer.analyze(feature, future_returns, num_quantiles=num_quantiles)
+    assert "bins" in captured, "analyze() did not call compute_side_masks"
+    return (
+        result,
+        captured["bins"],
+        captured["long_mask"],
+        captured["short_mask"],
+    )
+
+
+def test_long_short_pit(
+    la1_baseline_paths: Dict[str, Path],
+    btc_close: pd.Series,
+) -> None:
+    """P1-2：產線 analyze() bins/mask — M-trunc early flip + reduced-bin 不建議。"""
+    # 真實 kline 前綴（禁合成 fixture）；長度足以過 bin min_samples 且 M-trunc 可分辨
+    n = 2000
+    feature = btc_close.iloc[:n].astype(float)
+    future_returns = feature.pct_change(-1)
+    n_keep = _m_trunc_n_keep(n)
+    early_end = _early_window_end(n_keep)
+    assert n_keep > early_end > 100
+
+    analyzer = LongShortAnalyzer(
+        {
+            "num_quantiles": 5,
+            "long_quantiles": [4, 5],
+            "short_quantiles": [1, 2],
+        }
+    )
+    q = 5
+
+    # --- legacy 全域 qcut（concat-dropna 後）early flip 改前 > 0 ---
+    full_leg = _legacy_global_qcut_bins(feature, future_returns, q=q)
+    trunc_leg = _legacy_global_qcut_bins(
+        feature.iloc[:n_keep], future_returns.iloc[:n_keep], q=q
+    )
+    bin_flip_pre = _count_early_float_label_flips(full_leg, trunc_leg, early_end)
+    assert bin_flip_pre > 0, f"legacy global qcut early bin flip={bin_flip_pre}"
+
+    # --- 產線 analyze() PIT：early bin / long_mask flip == 0 ---
+    full_out, full_bins, full_long, _fs = _analyze_capture_bins(
+        analyzer, feature, future_returns, q
+    )
+    trunc_out, trunc_bins, trunc_long, _ts = _analyze_capture_bins(
+        analyzer,
+        feature.iloc[:n_keep],
+        future_returns.iloc[:n_keep],
+        q,
+    )
+    bin_flip_post = _count_early_float_label_flips(full_bins, trunc_bins, early_end)
+    assert bin_flip_post == 0, f"PIT early bin flip={bin_flip_post}"
+    long_flip = _count_early_bool_flips(full_long, trunc_long, early_end)
+    assert long_flip == 0, f"PIT early long_mask flip={long_flip}"
+
+    # 產線 analyze() 真輸出
+    assert isinstance(full_out, dict), f"unexpected skip: {full_out!r}"
+    assert full_out["num_quantiles_used"] == q
+    assert full_out["recommendation"] in (
+        "雙向交易",
+        "只做多",
+        "只做空",
+        "不建議",
+    )
+    assert isinstance(trunc_out, dict)
+    assert trunc_out["num_quantiles_used"] == q
+
+    # --- reduced-bin：2-unique × q=5 → 產線 bins isna + 雙側空 + recommendation==不建議 ---
+    # n 足夠（≥100）→ 非 SkippedResult；僅結構 n_feat<100 才 cannot form quantiles
+    med = float(feature.median())
+    two_level = feature.apply(lambda x: 0.0 if x < med else 1.0)
+    red_result, red_bins, red_long, red_short = _analyze_capture_bins(
+        analyzer, two_level, future_returns, q
+    )
+    post_warm = red_bins.iloc[100:]
+    assert int(post_warm.notna().sum()) == 0, (
+        f"reduced-bin expected all-NaN post-warmup, got "
+        f"{int(post_warm.notna().sum())} labels"
+    )
+    assert isinstance(red_result, dict), (
+        f"reduced-bin with n={n}>=100 must not SkippedResult, got {red_result!r}"
+    )
+    assert red_result["long_analysis"]["samples"] == 0
+    assert red_result["short_analysis"]["samples"] == 0
+    assert np.isnan(red_result["long_analysis"]["mean_return"])
+    assert np.isnan(red_result["short_analysis"]["mean_return"])
+    assert np.isnan(red_result["long_analysis"]["ic"])
+    assert np.isnan(red_result["short_analysis"]["ic"])
+    assert red_result["recommendation"] == "不建議"
+    assert red_result["num_quantiles_used"] == q
+    assert not bool(red_long.any())
+    assert not bool(red_short.any())
+
+    # --- batch_analyze 真輸出（同 reduced-bin 語意）---
+    batch = analyzer.batch_analyze(
+        pd.DataFrame({"f0": two_level}),
+        future_returns,
+        top_n=1,
+    )
+    assert "f0" in batch
+    assert batch["f0"].get("skipped") is not True
+    assert batch["f0"]["recommendation"] == "不建議"
+    assert batch["f0"]["long_analysis"]["samples"] == 0
+    assert batch["f0"]["short_analysis"]["samples"] == 0
+
+    # --- 重複 timestamp 邊界：analyze 不炸 ---
+    if len(feature) >= 200:
+        dup_feature = pd.Series(
+            feature.iloc[:200].to_numpy(),
+            index=list(range(100)) + list(range(100)),
+            dtype=float,
+        )
+        dup_ret = pd.Series(
+            future_returns.iloc[:200].to_numpy(),
+            index=dup_feature.index,
+            dtype=float,
+        )
+        dup_out, dup_bins, _, _ = _analyze_capture_bins(
+            analyzer, dup_feature, dup_ret, q
+        )
+        assert len(dup_bins) == len(dup_feature)
+        assert isinstance(dup_out, (dict, SkippedResult))
+
+    # --- ±inf future_returns 不進 metrics（F-B2-004）---
+    ret_inf = future_returns.copy()
+    ret_inf.iloc[150:160] = np.inf
+    ret_inf.iloc[160:170] = -np.inf
+    inf_out, _, _, _ = _analyze_capture_bins(analyzer, feature, ret_inf, q)
+    assert isinstance(inf_out, dict), f"unexpected skip with ±inf returns: {inf_out!r}"
+    for side in ("long_analysis", "short_analysis"):
+        mr = inf_out[side]["mean_return"]
+        assert mr is None or (isinstance(mr, float) and np.isnan(mr)) or np.isfinite(
+            mr
+        ), f"{side}.mean_return not finite/NaN: {mr!r}"
+        assert int(inf_out[side]["samples"]) >= 0
+
+
+def test_long_short_fixed_q(
+    la1_baseline_paths: Dict[str, Path],
+    btc_close: pd.Series,
+) -> None:
+    """n≥200 → 產線 analyze() num_quantiles_used==5（固定 q，禁降 q）。"""
+    n = 220
+    feature = btc_close.iloc[:n].astype(float)
+    future_returns = feature.pct_change(-1)
+    analyzer = LongShortAnalyzer(config={"num_quantiles": 5})
+    result, bins, _, _ = _analyze_capture_bins(analyzer, feature, future_returns, 5)
+    assert isinstance(result, dict), f"unexpected skip: {result!r}"
+    assert result["num_quantiles_used"] == 5
+    assert int(bins.notna().sum()) > 0
+    # 常數尾端（legacy 降 q 觸發點）仍報固定 q
+    const_tail = feature.copy()
+    const_tail.iloc[-40:] = float(const_tail.iloc[-41])
+    result_const, _, _, _ = _analyze_capture_bins(
+        analyzer, const_tail, future_returns, 5
+    )
+    if isinstance(result_const, dict):
+        assert result_const["num_quantiles_used"] == 5
+
+
+def test_return_nan_mask_invariance(
+    la1_baseline_paths: Dict[str, Path],
+    btc_close: pd.Series,
+) -> None:
+    """竄改未來報酬 NaN 分布 → 產線 analyze() bins 逐元素相等（RB-3；不等=FAIL）。
+
+    核心斷言走 analyze() 真路徑（F-B2-001）：mutant 若 analyze 內
+    ``compute_side_masks(feat.where(ret.notna()), …)`` 必改 bins → 本測紅。
+    """
+    n = 800
+    feature = btc_close.iloc[:n].astype(float)
+    base_ret = feature.pct_change(-1)
+    analyzer = LongShortAnalyzer(config={"num_quantiles": 5})
+
+    out_base, bins_base, _, _ = _analyze_capture_bins(
+        analyzer, feature, base_ret, 5
+    )
+    assert isinstance(out_base, dict)
+
+    # mutation A：尾端 returns 全 NaN
+    ret_a = base_ret.copy()
+    ret_a.iloc[int(0.5 * n) :] = np.nan
+    out_a, bins_a, _, _ = _analyze_capture_bins(analyzer, feature, ret_a, 5)
+
+    # mutation B：交錯 NaN mask
+    ret_b = base_ret.copy()
+    ret_b.iloc[::3] = np.nan
+    out_b, bins_b, _, _ = _analyze_capture_bins(analyzer, feature, ret_b, 5)
+
+    # mutation C：幾乎全 NaN returns（僅保留前 50；仍過 module min_samples=30）
+    ret_c = base_ret.copy()
+    ret_c.iloc[50:] = np.nan
+    out_c, bins_c, _, _ = _analyze_capture_bins(analyzer, feature, ret_c, 5)
+
+    for name, bins_m, out_m in (
+        ("A", bins_a, out_a),
+        ("B", bins_b, out_b),
+        ("C", bins_c, out_c),
+    ):
+        n_diff = _series_equal_nan(bins_base, bins_m)
+        assert n_diff == 0, (
+            f"return-NaN mask mutation {name} changed {n_diff} bins via analyze() "
+            f"(RB-3 leak: bins depend on future_returns)"
+        )
+        # metrics 可變；analyze 必須可跑（dict 或 samples 不足 skip）
+        assert isinstance(out_m, (dict, SkippedResult))
+
+    # batch_analyze 同 invariance：兩 mask 下 skipped/num_quantiles 結構可解析
+    df = pd.DataFrame({"x": feature})
+    batch_a = analyzer.batch_analyze(df, ret_a, top_n=1)
+    batch_b = analyzer.batch_analyze(df, ret_b, top_n=1)
+    assert "x" in batch_a and "x" in batch_b
+
 
 
 # ---------------------------------------------------------------------------
