@@ -1,7 +1,22 @@
 # Handoff
-**Agent**: Claude(Fable 5) | **Time**: 2026-07-17 | **Branch**: **main**(LA-1 已合併+push) | **狀態**: ✅ **LA-1(P1)完工並合併 main**——五洩漏全修+三方 DATA-CORRECT PASS
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-18 | **Branch**: **main** | **狀態**: ✅ **LA-2 SPEC v0.5 + TODO v0.4 正式凍結**(三家 stamp APPROVED+機檢 PASS);**下一步=開 impl branch 派 B0**
 
-## ▶▶ 下一站:LA-2(P2 前瞻收尾)——**新 session 從這裡開始**
+## ▶▶ LA-2 治理完成,待實作
+- **凍結**:SPEC `docs/IC_LA2_SPEC.md` v0.5(file sha `4b70bf7d…`)+TODO `docs/IC_LA2_TODO.md` v0.4;**三家 RECONCILE-STAMP APPROVED + `reconcile_stamps_check.sh` 兩份 PASS**(SPEC 本體 hash `89062f4a…`/TODO `09b907ac…`;`handoffs/LA2-{SPEC,TODO}-FREEZE-RECONCILE.md`)。治理歷程:SPEC R1-R5、TODO R1-R4 各三家 adversarial(逐輪收斂)。
+- **下一步(依序)**:①(未做)commit 凍結治理產物(SPEC/TODO/handoffs;使用者定 commit 時機)②開 branch `feat/ic-la2-p2-impl`(從 main)③**逐批 Grok 實作**:B0(baseline+骨架 12 nodeid+eval_scope_field_map)→{B1 winsorized 禁用、B2 model OOT、B3 條件模組 可並行}→B4(mutation 全家+golden+三方 DATA-CORRECT)+**每批 Codex+Composer 雙家 review**(機器閘 `review_quorum_check.sh`;實作者不自審)+finding-closure+過 review commit④B4 三方 DATA-CORRECT(a,d 高風險)。
+- **TODO §0.6-APPENDIX = exact-struct 權威**(receipt dataclass/canonical sha256 hash/envelope/verify_*/FactorModuleResult union/28 path 表);實作以此+§0 規則為準,不必回讀 SPEC。
+- **SPEC errata(TODO 權威)**:`validate_split_pair_integrity:559`(非 validate_train_test_pair);cal/PR=cv_oof only(非 SPEC:68 XOR);DEC 2026-07-18 使用者定案。
+- **使用者四決策(2026-07-18)**:DEC-1 winsorized 禁用;DEC-2 config 債修(placement=B2.2);DEC-3 factor proxy 修到對;model OOT 本票完成(不拆)。
+
+## ▶ LA-2 SPEC 已凍結(背景)
+- **SPEC**:`docs/IC_LA2_SPEC.md` **v0.5**(file sha256 `4b70bf7d…`);R1-R5 各三家 adversarial(9→2→2→A1-12→5殘句,逐輪收斂)+ freeze-stamp 三家 APPROVED(`handoffs/LA2-FREEZE-STAMP-{codex,grok,composer}.md`;reconcile `LA2-SPEC-FREEZE-RECONCILE.md`)。**⚠️ 機器 stamp 格式待補**:委員蓋的是 SPEC file sha,`reconcile_stamps_check.sh` 需 `RECONCILE-STAMP:`(冒號)+reconcile 本體 hash → **派 B0-B4 實作前**補正式戳記。
+- **使用者決策定案(2026-07-18,白話檢查點)**:DEC-1=**winsorized 標籤禁用/捨棄**(fail-closed raise);DEC-2=config 債(calibrator/sample_weight)**要修,placement 交委員會**;DEC-3=factor market_proxy(forward label)**本票修到對**(改 trailing close-ret);**model OOT 本票完成修正**(不拆獨立票)。四項皆與凍結 SPEC 預設一致,freeze 不動。
+- **SPEC v0.5 核心**:taxonomy 三分(C-1 causal-PIT/C-2 promotion-train-mask pattern/C-3 diagnostic-loud factor)+軌2 model in-sample 樂觀;OOT 綁 canonical `SplitPlan`+嚴格 `<`(擋 off-by-one);欄位級 eval_scope 閉集表;晉升 server 權威(create+PUT);SPEC/TODO 邊界裁決(安全語義留 SPEC,確切 struct 歸 TODO,三家接受)。
+- **下一步**:①TODO 起草(Claude,`docs/IC_LA2_TODO.md`,承 LA-1 TODO 範式+SPEC ID 覆蓋表)②TODO 三家 adversarial→凍結③補 reconcile 正式戳記過機檢④逐批 Grok 實作+Codex+Composer 雙家 review⑤B4 三方 DATA-CORRECT。branch 建議 `feat/ic-la2-p2-impl`。
+- **audit 鏈**:`handoffs/LA2-RECON-*`+`LA2-SPEC-ADV-R{1..5}-{codex,grok,composer}+RECONCILE`+`LA2-FREEZE-*`(gitignored 本地)。
+
+## (以下為原 LA-2 起始交接,已完成偵察→凍結)
+- **範圍(P2,來自 master `handoffs/ICLOOKAHEAD-MASTER.md` P2 節)**:①**winsorized label** 禁用/PIT(`label_generator.py:71-80` `return_type=winsorized` 全期裁尾;預設 simple 不走,條件觸發)②**model OOT-only 契約**(lightgbm/xgboost/calibration/sample_weight/probability_calibrator 的 post-fit 指標對全樣本/caller array→改 train/test 紀律)③**條件模組 train-fit/標註**(`factor_orthogonalizer`/`factor_exposure_analyzer` 預設 OFF、`pattern_extractor` 全 quantile 門檻、`regime_detector._fit_global`〔expanding=False 全期 fit;LA-1 已鎖 IC/XGBoost caller 不傳 False,LA-2 完整因果化〕)。
 - **範圍(P2,來自 master `handoffs/ICLOOKAHEAD-MASTER.md` P2 節)**:①**winsorized label** 禁用/PIT(`label_generator.py:71-80` `return_type=winsorized` 全期裁尾;預設 simple 不走,條件觸發)②**model OOT-only 契約**(lightgbm/xgboost/calibration/sample_weight/probability_calibrator 的 post-fit 指標對全樣本/caller array→改 train/test 紀律)③**條件模組 train-fit/標註**(`factor_orthogonalizer`/`factor_exposure_analyzer` 預設 OFF、`pattern_extractor` 全 quantile 門檻、`regime_detector._fit_global`〔expanding=False 全期 fit;LA-1 已鎖 IC/XGBoost caller 不傳 False,LA-2 完整因果化〕)。
 - **性質**:P2 = **條件式/預設不走/model**——比 P0/P1(預設路徑)低風險,但要把前瞻整治 epic 完整收掉。
 - **資源分配已決(2026-07-17 使用者)=全力 Phase 1**:LA-2→1c-FR-FULL→1d→1f 收完才啟 Phase 2A。
