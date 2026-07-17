@@ -32,6 +32,19 @@
   - **🚨 P0 止血**:grouped/decay 崩潰、幽靈開關群(feature_filter/turnover/slippage)、靜默空圖、大尺度 cap。
   - **大尺度(430K)架構**:見 `handoffs/20260624-ic-optimization-CONVERGED.md`(串流分塊不物化全矩陣)。每優先項走完整 SPEC 管線。
 - **分階段執行計畫(四家收斂)**:`handoffs/20260624-ic-roadmap-phasing-CONVERGED.md`(七 Phase,contract-first+雙軌)。
+- **★★ IC Gatekeeper 七 Phase 全景(骨架;狀態即時;細節見上述 CONVERGED 檔+各 Phase SPEC)** — *本表=canonical 全景,勿再壓成一行;新增/完成 Phase 直接更新此表*:
+  | Phase | 內容 | 狀態 |
+  |---|---|---|
+  | **0 止血+正確性硬閘** | crash/時間軸/feature-guard/空圖/大尺度 cap | ✅ 完成(`11507f5`) |
+  | **1 正確性 kernel + contract(能信)** | 1-contract/1a 切分+接線/1-align 前瞻閘/1e HAC+1b FDR/1c Net IC+1c-FR/1d attribution/1f 空圖;**+前瞻整治 LA-0(P0)✅/LA-1(P1)✅/LA-2(P2)** | 🔵 **進行中**(尾巴=LA-2+1c-FR-FULL+1d+1f) |
+  | **2A 事件 case-control 語義 kernel(主戰場,小尺度先驗)** | 事件清單 ingestion+事件前窗對齊+AUC/t-stat+正反 matching(同波動/regime)+事件 OOS(purged CV)+FDR+波動調整 | ❌ 未啟動(大,需設計;依賴 P0 前置+P1 子集) |
+  | **3 串流承載(430K×百 symbol)** | direct L7+chunk iterator+row mask+metric sink+candidate set+**staged screening(=粗/精篩 funnel)+redundancy cap**+cross-sectional 串流;**IC-PERF/feature 上限保護在此** | ❌ 未啟動(大,基礎軌;依賴 P1 contract) |
+  | **2B 事件 case-control 大尺度整合** | event mask×streaming chunks+artifact+全 430K universe 篩選 | ❌ 未啟動(依賴 2A+3) |
+  | **4 整合+進階** | **IC→ML 橋(複用 ML 孤島非重寫)**+多因子組合+**邊際/residual IC**+HRP/Grinold+DSR/PBO/MinBTL+Pooled IC+**容量**+centrality auto-run;**regime-conditional IC 驗證(HMM/GMM 選型+小樣本+多重檢定)歸此,獨立票、條件觸發** | ❌ 未啟動 |
+  | **5 Agent 顧問層(V2)** | 結構化可機讀輸出+嚴謹度指標+Agent 委員會式解讀 | ❌ 未啟動(依賴 P1+P4) |
+  - **funnel/IC-PERF 定位**:非獨立 deferred 項,=Phase 3(staged screening/redundancy cap)+Phase 4(多因子);「等整張 map 完成才做」≡「等 P1 收完進 P3/4」(memory `project_ic_feature_selection_funnel`)。
+  - **regime IC 驗證定位**:Phase 4 進階層,**獨立票、條件觸發**(只有要讓 regime-conditional IC 當決策級才做;現只進報告非 gate,不做也不出錯)。2026-07-17 使用者提出。
+  - **待決(committee 無法代決)**:Phase 2A vs Phase 1 資源分配(先全力收 P1,還是 P1+2A 並進?)。walk-forward/CPCV 已決=複用 ML 孤島(下方)。
 - **決策**:walk-forward/CPCV **复用 ML 孤島**非重寫;contract-first 不硬接舊全 DataFrame 路徑。
 - **狀態(2026-06-26)**:
   - **Phase 0 止血+正確性硬閘 ✅ 完成**(commit `11507f5`):CRASH/TIMEAXIS/BYVOL/FEATURE-GUARD/DECAY-LOG/UX-ERR 六 epic + 實機 45k smoke。
@@ -49,7 +62,7 @@
     - **✅ IC 測試定向重驗完成(2026-07-06,含 Codex adversarial review)**：SPEC conformance 後重跑 51 個 Phase0/1 測試曾 45/6；6 紅根因＝goldens/run_selector 釘死舊 config_hash 未註冊 + run-selector 硬化(643c5c2)把「明確給 features_path 卻要求 config_hash 註冊」的 golden replay 路徑弄斷。**修法**：`ic_analysis_service` fail-closed 收斂到 registry 解析路徑（features_path 缺席才 raise；明確給 path 不擋），run-selector 靜默錯 run 保證不變（golden byte-equal + 2 hermetic 契約測試 + mutation 證偽 pin 住）；run_selector 4 測試改 is_materialized skip-guard（12h 資料 gitignored，誠實 skip 非造綠）。終態 **49 passed/4 skipped/0 failed**（VERIFY:20260706T052454Z-ic-reverify-final）。Codex [P1]（skip 掩蓋契約）已補 hermetic 測試閉合；殘留 [P2]：features_path 與 config_hash 不一致未校驗（pre-existing，另立）。FF 測試資料已就緒（3 sym×1h+12h 對齊、max_lag 後、`data_cache/features/`）。
     - **✅ run_selector 重凍完成(2026-07-06,含 Codex review)**：使用者補生兩套競爭 12h run（e53e2290+f754aad4，同 tf 不同 config、row 同 feature 異），重凍 generator/baseline/mini_registry/測試常數+防漂移不變式+3 sibling 測試改 hash；targeted 19 passed/1 xfailed（VERIFY:20260706T135518Z-ic-runselector-final）。
     - **✅ 第二刀首項 bug 修復完成（2026-07-07，全三方數據正確性簽核 PASS）**：`feature_library._attach_row_index`（鏡像 `_attach_cgsa_row_index`）在 V2 load 路徑貼回 `load_row_index_v2` 真時間軸；無 sidecar→no-op，長度不符→ValueError；只改 index，值/欄/列/檔大小不變（G-1 值守恆 + G-2 時間軸 byte-equal，真 12h run e53e2290/f754aad4 皆驗）。追蹤測試由 full-analyze xfail retarget 至失敗邊界斷言（218k 特徵 full analyze>17min 屬正交效能問題，歸「79 測試換真資料」epic）。清 bug 期中毒 ingest cache。**三方 PASS 零 BLOCKING**：Claude 自產 + Codex adversarial（語義時間 oracle 交叉驗列序 0 mismatch）+ Composer 資料正確性；RECONCILE-STAMP codex+composer APPROVED。docs/IC_PHASE1_1a_CUT2_ROWINDEX_{SPEC,TODO}。follow-up：ingest cache 版本化、1d 頻率地圖、conftest scoped-collect clobber golden。
-  - Phase 2A(事件 case-control 主戰場)/Phase 3(430K 串流)/2B/4/5 未啟動。詳 phasing-CONVERGED 七 Phase。
+  - Phase 2A/3/2B/4/5 未啟動——**全景+內容見上方「★★ IC Gatekeeper 七 Phase 全景」canonical 表**(勿再各處分列不同步)。
 
 ### P0.5 — IC 效能 + grouped_ic 崩潰止血(已盤點,可立即動)
 - **為何**:使用者實測選 run 跑 analyze 卡死+崩潰;三方 reconcile 完成。
