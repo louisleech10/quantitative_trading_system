@@ -15,12 +15,18 @@ export default function RegimeRadarChart({ groupedIC, featureName }: RegimeRadar
     const regimeData = groupedIC?.by_regime || {};
     return Object.entries(regimeData).map(([regime, value]) => {
       if (typeof value === 'number') {
-        return { regime, value };
+        // NaN/非有限 → null（禁 ?? 0 假零）
+        return { regime, value: Number.isFinite(value) ? value : null };
       }
       if (value && typeof value === 'object' && featureName) {
-        return { regime, value: (value as Record<string, number>)[featureName] ?? 0 };
+        const raw = (value as Record<string, number | null | undefined>)[featureName];
+        if (raw === undefined || raw === null) {
+          return { regime, value: null };
+        }
+        const num = typeof raw === 'number' ? raw : Number(raw);
+        return { regime, value: Number.isFinite(num) ? num : null };
       }
-      return { regime, value: 0 };
+      return { regime, value: null };
     });
   }, [groupedIC, featureName]);
 
@@ -33,6 +39,13 @@ export default function RegimeRadarChart({ groupedIC, featureName }: RegimeRadar
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* B3-FE-01：暴露生產 chartData 供 DOM 斷言（禁測試內複製 mapping） */}
+        <div
+          data-testid="regime-radar-chart-payload"
+          data-chart={JSON.stringify(chartData)}
+          hidden
+          aria-hidden
+        />
         {chartData.length === 0 ? (
           <div className="flex items-center justify-center h-[240px] text-slate-400">
             暫無 Regime 數據

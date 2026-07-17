@@ -313,10 +313,17 @@ def pit_expanding_qcut_label(
     q: int,
     min_samples: int = MIN_SAMPLES,
     duplicates: str = "drop",
+    require_full_q: bool = False,
 ) -> pd.Series:
     """per-t expanding qcut → 當前 bar 分位 **label**（非分位值）。
 
     effective_count(t) < min_samples → NaN（§MS，非 t < min_samples）。
+
+    Parameters
+    ----------
+    require_full_q:
+        True 且該 t 實際 bin 數 ``nunique < q`` → 當根 NaN（Policy-Strict）。
+        預設 False = 舊行為（duplicates='drop' 後可能 label 落在 reduced bins）。
     """
     index = _index_of(series)
     values = _as_1d_float(series)
@@ -342,10 +349,16 @@ def pit_expanding_qcut_label(
             bins = pd.qcut(finite, q=q, labels=False, duplicates=duplicates)
         except ValueError:
             continue
+        bins_arr = bins.to_numpy() if isinstance(bins, pd.Series) else np.asarray(bins)
+        if require_full_q:
+            # 實際可分 bin 數不足 q → 當根 NaN（Policy-Strict，LA-1）
+            n_unique = int(pd.Series(bins_arr).nunique(dropna=True))
+            if n_unique < q:
+                continue
         # map current value's position among finite → last finite is current if finite
         # current is at end of hist; its rank among finite is the last finite entry
         # because we included t and values[t] is finite.
-        label = bins.iloc[-1] if isinstance(bins, pd.Series) else bins[-1]
+        label = bins_arr[-1]
         if pd.isna(label):
             continue
         out[t] = float(label)
@@ -394,6 +407,26 @@ def pit_expanding_bounds(
     return (
         pd.Series(lo_out, index=index, dtype=float),
         pd.Series(hi_out, index=index, dtype=float),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 3b. pit_expanding_quantile_thresholds（regime 契約薄 wrapper）
+# ---------------------------------------------------------------------------
+def pit_expanding_quantile_thresholds(
+    series: ArrayLike,
+    lo_q: float,
+    hi_q: float,
+    min_samples: int = MIN_SAMPLES,
+) -> Tuple[pd.Series, pd.Series]:
+    """regime 用 per-t expanding 分位門檻 (lo, hi)。
+
+    內部零新演算法，直接委派 ``pit_expanding_bounds``。
+    **regime 契約**：warmup（invalid）唯一回值 = ``(-inf, +inf)``，
+    使 ``vol >= hi`` / ``vol <= lo`` 在 warmup 皆為 False（不進 high/low）。
+    """
+    return pit_expanding_bounds(
+        series, lo_q=lo_q, hi_q=hi_q, min_samples=min_samples
     )
 
 

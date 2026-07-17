@@ -2095,6 +2095,10 @@ export type GroupedICData = Record<string, Record<string, number> | Record<strin
 
 export interface ICReport {
   version?: string;
+  /** LA-1 B3：ok_oos | degraded_full_sample（optional 相容舊 artifact；禁 |string 塌 union） */
+  analysis_status?: 'ok_oos' | 'degraded_full_sample';
+  /** LA-1 B3：root 鏡像 OOS 保證（optional 相容舊 artifact） */
+  oos_guarantees?: boolean;
   metadata?: Record<string, unknown>;
   filter_log?: FilterLogData;
   summary_table?: ICFeatureInfo[];

@@ -207,10 +207,17 @@ class _RedirectingReporter:
         )
 
     def save_filtered_features(
-        self, features_df: Any, feature_names: list[str], output_path: str
+        self,
+        features_df: Any,
+        feature_names: list[str],
+        output_path: str,
+        **kwargs: Any,
     ) -> Any:
         return self._reporter.save_filtered_features(
-            features_df, feature_names, str(_redirect_path(output_path))
+            features_df,
+            feature_names,
+            str(_redirect_path(output_path)),
+            **kwargs,
         )
 
 

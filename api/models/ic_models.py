@@ -186,6 +186,9 @@ class ICTaskStatusResponse(BaseModel):
     progress: float
     current_stage: Optional[str] = None
     error: Optional[str] = None
+    # LA-1 B3：completed 時可帶 root 紅標（optional，舊 client 相容）
+    analysis_status: Optional[str] = None
+    oos_guarantees: Optional[bool] = None
 
 
 class ICTopFeaturesRequest(BaseModel):
@@ -258,3 +261,12 @@ class ApplyTransformsResponse(BaseModel):
     output_path: str
     output_rows: int
     output_cols: int
+    # LA-1 B3 oracle ⑤：transforms carrier 紅標（與 report root 同源）
+    analysis_status: Optional[str] = Field(
+        default=None,
+        description="ok_oos | degraded_full_sample；degraded 時輸出僅 research-only",
+    )
+    oos_guarantees: Optional[bool] = Field(
+        default=None,
+        description="root 鏡像；False 表示無 OOS 保證",
+    )

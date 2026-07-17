@@ -30,6 +30,7 @@ import FactorEquityCurveChart from '@/components/ic-analysis/FactorEquityCurveCh
 import CrossSectionalICHeatmap from '@/components/ic-analysis/CrossSectionalICHeatmap';
 import CrossSymbolValidationPanel from '@/components/ic-analysis/CrossSymbolValidationPanel';
 import PartialFailureBanner from '@/components/ic-analysis/PartialFailureBanner';
+import DegradedBanner from '@/components/ic-analysis/DegradedBanner';
 import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -555,6 +556,8 @@ function ICAnalysisPageContent() {
               </div>
               <ExportButtons taskId={taskId} report={report} summaryTable={summaryTable} targetId={EXPORT_TARGET_ID} />
             </div>
+
+            <DegradedBanner />
 
             {summaryText && (
               <div className="glass-panel rounded-2xl border border-white/10 p-5">

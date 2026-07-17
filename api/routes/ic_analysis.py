@@ -316,7 +316,10 @@ async def refilter(
 
 @router.get("/export/{task_id}")
 async def export_filtered_features(task_id: str):
-    """Export filtered features HDF5."""
+    """Export filtered features HDF5.
+
+    LA-1 B3-H5-01：export 前驗當次 run freshness；stale stable-path → 404。
+    """
     try:
         result = ic_analysis_service.get_result(task_id)
         if result is None:
@@ -324,10 +327,17 @@ async def export_filtered_features(task_id: str):
 
         metadata = result.get("metadata", {}) if isinstance(result, dict) else {}
         export_path = _resolve_filtered_path(metadata)
-        if not export_path.exists():
-            raise HTTPException(status_code=404, detail="Filtered features not found")
+        from momentum.Analysis.ic_reporter import assert_filtered_export_fresh
 
-        return FileResponse(export_path)
+        try:
+            fresh_path = assert_filtered_export_fresh(
+                result if isinstance(result, dict) else None,
+                export_path,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        return FileResponse(fresh_path)
     except HTTPException:
         raise
     except Exception as exc:
@@ -392,7 +402,10 @@ async def export_analysis(
 
 @router.get("/export-csv/{task_id}")
 async def export_filtered_csv(task_id: str):
-    """Export filtered features as CSV."""
+    """Export filtered features as CSV.
+
+    LA-1 B3 oracle ⑤：HTTP header ``X-Analysis-Status`` + 檔首註解行。
+    """
     try:
         analyzer = ic_analysis_service.get_analyzer(task_id)
         if analyzer is None:
@@ -402,11 +415,29 @@ async def export_filtered_csv(task_id: str):
         if filtered_df is None or filtered_df.empty:
             raise HTTPException(status_code=404, detail="Filtered features not found")
 
-        output_dir = Path("data_cache/reports")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"ic_filtered_{task_id}.csv"
-        filtered_df.to_csv(output_path, index=True)
-        return FileResponse(output_path)
+        result = ic_analysis_service.get_result(task_id)
+        # LA-1 B3-ENUM-01：讀取點 fail-closed — 非字面 ok_oos 一律 degraded
+        from momentum.Analysis.ic_reporter import normalize_analysis_status
+
+        if isinstance(result, dict):
+            raw_status = result.get("analysis_status")
+        else:
+            raw_status = None  # 缺 result / 非 dict → degraded
+        analysis_status = normalize_analysis_status(raw_status)
+
+        from io import StringIO
+
+        buf = StringIO()
+        buf.write(f"# analysis_status={analysis_status}\n")
+        filtered_df.to_csv(buf, index=True)
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "X-Analysis-Status": analysis_status,
+                "Content-Disposition": f'attachment; filename="ic_filtered_{task_id}.csv"',
+            },
+        )
     except HTTPException:
         raise
     except Exception as exc:

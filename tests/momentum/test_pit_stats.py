@@ -21,6 +21,7 @@ from momentum.Analysis.pit_stats import (
     pit_expanding_mad,
     pit_expanding_mean_std,
     pit_expanding_qcut_label,
+    pit_expanding_quantile_thresholds,
     pit_expanding_rank,
     pit_train_fit,
     pit_valid_mask,
@@ -29,6 +30,20 @@ from momentum.Analysis.pit_stats import (
 
 ATOL = 1e-12
 RNG = np.random.default_rng(42)
+
+
+def _assert_regime_warmup_pm_inf_contract(
+    lo: pd.Series, hi: pd.Series, min_samples: int
+) -> None:
+    """regime 契約：warmup 唯一合法值 = (-inf, +inf)；違約 raise AssertionError。"""
+    warm = max(0, int(min_samples) - 1)
+    assert warm > 0, "min_samples must be > 1 for warmup contract"
+    assert lo.iloc[:warm].eq(-np.inf).all(), (
+        f"warmup lo must be -inf, got nan_count={int(lo.iloc[:warm].isna().sum())}"
+    )
+    assert hi.iloc[:warm].eq(np.inf).all(), (
+        f"warmup hi must be +inf, got nan_count={int(hi.iloc[:warm].isna().sum())}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -332,6 +347,22 @@ class TestPitExpandingQcutLabel:
         out = pit_expanding_qcut_label(s, q=3, min_samples=10)
         assert len(out) == 0
 
+    def test_require_full_q_two_unique(self) -> None:
+        """2-unique × q=5：require_full_q True→NaN；False→label==0.0（legacy）。"""
+        # 受控二值序列，長度 ≥100 使 t 過 min_samples
+        n = 150
+        vals = np.array([0.0, 1.0] * (n // 2), dtype=float)
+        s = pd.Series(vals)
+        t = 120  # ≥ min_samples=100
+        labels_strict = pit_expanding_qcut_label(
+            s, q=5, min_samples=100, require_full_q=True
+        )
+        labels_legacy = pit_expanding_qcut_label(
+            s, q=5, min_samples=100, require_full_q=False
+        )
+        assert pd.isna(labels_strict.iloc[t])
+        assert labels_legacy.iloc[t] == pytest.approx(0.0, abs=ATOL)
+
 
 # ---------------------------------------------------------------------------
 # pit_expanding_bounds
@@ -373,6 +404,90 @@ class TestPitExpandingBounds:
     def test_n_lt_min_samples_all_inf(self) -> None:
         s = pd.Series(RNG.normal(size=50))
         lo, hi = pit_expanding_bounds(s, 0.1, 0.9, min_samples=100)
+        assert lo.eq(-np.inf).all()
+        assert hi.eq(np.inf).all()
+
+
+# ---------------------------------------------------------------------------
+# pit_expanding_quantile_thresholds（LA-1 wrapper）
+# ---------------------------------------------------------------------------
+class TestPitExpandingQuantileThresholds:
+    def test_quantile_thresholds_matches_bounds_zero_diff(
+        self, dense_series: pd.Series
+    ) -> None:
+        """wrapper 與 bounds 零 diff（atol=1e-12）。"""
+        lo_b, hi_b = pit_expanding_bounds(
+            dense_series, 0.2, 0.8, min_samples=MIN_SAMPLES
+        )
+        lo_t, hi_t = pit_expanding_quantile_thresholds(
+            dense_series, 0.2, 0.8, min_samples=MIN_SAMPLES
+        )
+        np.testing.assert_allclose(
+            lo_t.to_numpy(), lo_b.to_numpy(), atol=ATOL, equal_nan=True
+        )
+        np.testing.assert_allclose(
+            hi_t.to_numpy(), hi_b.to_numpy(), atol=ATOL, equal_nan=True
+        )
+
+    def test_quantile_thresholds_warmup_is_pm_inf(
+        self, dense_series: pd.Series
+    ) -> None:
+        """regime 契約：warmup 唯一回值 = (-inf, +inf)。"""
+        lo, hi = pit_expanding_quantile_thresholds(
+            dense_series, 0.2, 0.8, min_samples=MIN_SAMPLES
+        )
+        _assert_regime_warmup_pm_inf_contract(lo, hi, MIN_SAMPLES)
+        fv = first_valid_index(dense_series, min_samples=MIN_SAMPLES)
+        assert fv is not None
+        assert np.isfinite(lo.iloc[fv])
+        assert np.isfinite(hi.iloc[fv])
+
+    def test_quantile_thresholds_warmup_nan_mutation_fails_contract(
+        self, dense_series: pd.Series, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """mutation：warmup 改回 NaN 必打紅（TODO Task 1.1 regime 契約）。
+
+        monkeypatch ``pit_expanding_bounds`` 在 warmup 輸出 NaN；
+        契約 helper 必須 ``pytest.raises(AssertionError)``。
+        """
+        import momentum.Analysis.pit_stats as pit_mod
+
+        real_bounds = pit_mod.pit_expanding_bounds
+
+        def _mutant_bounds(  # type: ignore[no-untyped-def]
+            series, lo_q, hi_q, min_samples=MIN_SAMPLES
+        ):
+            lo, hi = real_bounds(
+                series, lo_q, hi_q, min_samples=min_samples
+            )
+            lo = lo.copy()
+            hi = hi.copy()
+            # 舊 bug 模式：warmup 填 NaN 而非 ±inf
+            warm = max(0, int(min_samples) - 1)
+            lo.iloc[:warm] = np.nan
+            hi.iloc[:warm] = np.nan
+            return lo, hi
+
+        monkeypatch.setattr(pit_mod, "pit_expanding_bounds", _mutant_bounds)
+        lo, hi = pit_mod.pit_expanding_quantile_thresholds(
+            dense_series, 0.2, 0.8, min_samples=MIN_SAMPLES
+        )
+        with pytest.raises(AssertionError):
+            _assert_regime_warmup_pm_inf_contract(lo, hi, MIN_SAMPLES)
+
+    def test_quantile_thresholds_lo_ge_hi_raises(self) -> None:
+        s = pd.Series(RNG.normal(size=50))
+        with pytest.raises(ValueError):
+            pit_expanding_quantile_thresholds(s, 0.8, 0.2, min_samples=10)
+
+    def test_quantile_thresholds_empty(self) -> None:
+        s = pd.Series([], dtype=float)
+        lo, hi = pit_expanding_quantile_thresholds(s, 0.2, 0.8, min_samples=10)
+        assert len(lo) == 0 and len(hi) == 0
+
+    def test_quantile_thresholds_all_nan(self) -> None:
+        s = pd.Series([np.nan] * 50)
+        lo, hi = pit_expanding_quantile_thresholds(s, 0.2, 0.8, min_samples=10)
         assert lo.eq(-np.inf).all()
         assert hi.eq(np.inf).all()
 
