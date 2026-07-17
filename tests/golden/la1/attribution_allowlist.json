@@ -1004,14 +1004,14 @@
       "path": "long_short.value_sha256",
       "index": "BTCUSDT/1h",
       "old": "f078272aea6f7bf750a93a991ceff69c24598a2003d295b50eb5078456473ce7",
-      "new": "defbf4406f85a137eff78bade7b94fe89adbf67d791543f5a7257780df7d20c5",
+      "new": "5a95258cc508d089a0300a3bde09c31d38f5a4c3c500e839b34c2c1a62f4a904",
       "class": "P1-2"
     },
     {
       "path": "long_short.nan_mask_sha256",
       "index": "BTCUSDT/1h",
       "old": "9ff7ead314c6c5a34f442be13c2d065246737106dda287694c5756e28f79bd7d",
-      "new": "8629e9c4c061311a54e7c6415c844e787a1996fc81a7f97f9429066eb90be0d3",
+      "new": "ecdadfab8af2867a7ccbecf642c0dfd31abdeaf0979c60eb383f7a8f1c69b3ce",
       "class": "P1-2"
     },
     {
@@ -1179,14 +1179,14 @@
       "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.recommendation",
       "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
       "old": "只做空",
-      "new": null,
+      "new": "不建議",
       "class": "P1-2"
     },
     {
       "path": "long_short.features.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.num_quantiles_used",
       "index": "BTCUSDT/1h/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
       "old": 3,
-      "new": null,
+      "new": 5,
       "class": "P1-2"
     },
     {
@@ -1515,14 +1515,14 @@
       "path": "long_short.value_sha256",
       "index": "ETHUSDT/12h",
       "old": "a0335c588ccca10cfdf9e480bcdd671178baa11e1f3ed9b78d9586f6ed7efad4",
-      "new": "9b90ae9197ffc8c94dbdb4bcee9b3ba1dfb468ad83623949ebe9667a7c71e29a",
+      "new": "97633f243534ea636dfe5c3eb1accf9022a6728354a1088e8d2d5662655e89e2",
       "class": "P1-2"
     },
     {
       "path": "long_short.nan_mask_sha256",
       "index": "ETHUSDT/12h",
       "old": "49a2ec7b706f6e8caa76c118ec9624f48bb39cdb0832f41def7a4006de5f3753",
-      "new": "8f1b044ec363df610daa9e8eb6d9ab7c6dbb539aa4c24086d88a7b8a9137aa9a",
+      "new": "9df85aa9f595693a6b726a6f8cad4f040755420167f4696ef9083adff23fcecb",
       "class": "P1-2"
     },
     {
@@ -1655,14 +1655,14 @@
       "path": "long_short.features.close_12h_momentum_APO_12-26-0_TsArgmin_W5.recommendation",
       "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
       "old": "雙向交易",
-      "new": null,
+      "new": "不建議",
       "class": "P1-2"
     },
     {
       "path": "long_short.features.close_12h_momentum_APO_12-26-0_TsArgmin_W5.num_quantiles_used",
       "index": "ETHUSDT/12h/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
       "old": 2,
-      "new": null,
+      "new": 5,
       "class": "P1-2"
     },
     {
@@ -1914,8 +1914,1127 @@
       "path": "long_short.features.volume_12h_trend_MAVP_21_TsArgmin_W5.num_quantiles_used",
       "index": "ETHUSDT/12h/volume_12h_trend_MAVP_21_TsArgmin_W5",
       "old": 3,
+      "new": 5,
+      "class": "P1-2"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.high_vol.membership_sha256",
+      "index": "high_vol",
+      "old": "ebde124c7ee99cd5516b285c647644c9e2b2a04103053c71c9bfe85d903bea14",
+      "new": "4e8b7352bffea2b922dede8f99aeac661890e582752f64a9d41af54ccfeb603e",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.high_vol.true_count",
+      "index": "high_vol",
+      "old": 329,
+      "new": 417,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.high_vol.true_rate",
+      "index": "high_vol",
+      "old": 0.19398584905660377,
+      "new": 0.24587264150943397,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.low_vol.membership_sha256",
+      "index": "low_vol",
+      "old": "17fb03582ec304d77bfcf24e9ae4f26a3924e7c5725606d011e53c3b916e7642",
+      "new": "094bbe5d19b2b6bdebbab3e62aeb2d0ae25db61ab604b07599a848f98cee16bf",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.low_vol.true_count",
+      "index": "low_vol",
+      "old": 329,
+      "new": 190,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.low_vol.true_rate",
+      "index": "low_vol",
+      "old": 0.19398584905660377,
+      "new": 0.11202830188679246,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.ic",
+      "index": "high_vol/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": -0.12215880024572463,
+      "new": -0.18328432668278985,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-SINE-LeadSine_Range_W3.ic",
+      "index": "high_vol/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": 0.13962470593278822,
+      "new": 0.17393657424106193,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-TRENDMODE_Sign.ic",
+      "index": "high_vol/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": -0.048410288955202614,
+      "new": -0.010783590801377103,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.ic",
+      "index": "high_vol/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": 0.26855328518329885,
+      "new": 0.2461481473351725,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_12-26-0.ic",
+      "index": "high_vol/close_12h_momentum_APO_12-26-0",
+      "old": 0.1552743004011491,
+      "new": 0.17389494029794225,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_12-26-0_TsArgmin_W5.ic",
+      "index": "high_vol/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": -0.019672734076447644,
+      "new": 0.06411504828106213,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_13-34-0_Kurt_W13.ic",
+      "index": "high_vol/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": 0.21616910750093132,
+      "new": 0.15389887987496173,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_13-55-0_Kurt_W13.ic",
+      "index": "high_vol/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": 0.2539302802460698,
+      "new": 0.20223665223665227,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_13-55-0_Log1p.ic",
+      "index": "high_vol/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": 0.12688689143679752,
+      "new": 0.16613234809817995,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_13-55-0_Momentum_L144.ic",
+      "index": "high_vol/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": -0.13253588516746412,
+      "new": -0.14740259740259742,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_21-55-0_Momentum_L144.ic",
+      "index": "high_vol/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": -0.10523077976211344,
+      "new": -0.10775807646191059,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_34-89-0_Abs.ic",
+      "index": "high_vol/close_12h_momentum_APO_34-89-0_Abs",
+      "old": 0.023548309935486907,
+      "new": -0.0895775461458139,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.hlc_12h_momentum_ADXR_89_Abs.ic",
+      "index": "high_vol/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.19024507055615647,
+      "new": 0.10610816528582519,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.volume_12h_trend_MAVP_21_TsArgmin_W5.ic",
+      "index": "high_vol/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": -0.07879108450787693,
+      "new": -0.16683263602991566,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.value_sha256",
+      "index": "high_vol",
+      "old": "fbd13363ad45d6d74fce2b7d9817e971df8f4e0816bb7eb0b8266fd6ea7c6b04",
+      "new": "1e619df67657a0b227a0439b3b04d9bfe0c425ca3cd5ac3ea7720b333b6cfe34",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.feature_name_set_sha256",
+      "index": "low_vol",
+      "old": "c712131f49cc45d15855aa96a66a3e5544d39a3173933f139c4549d8253d7416",
+      "new": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.n_features",
+      "index": "low_vol",
+      "old": 14,
+      "new": 0,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.nan_mask_sha256",
+      "index": "low_vol",
+      "old": "babdfcf7fa2a4b2056bf9a61400c65545a44bea1b7b51bb302b6bf509715910d",
+      "new": "3bd2e4d5b613e779a9c2aed80f4d0e1105c765ec1bb38edfab937e61f69a043c",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "index": "low_vol/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": {
+        "ic": -0.00957035928058279
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "index": "low_vol/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": {
+        "ic": 0.15574428820264724
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-TRENDMODE_Sign",
+      "index": "low_vol/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": {
+        "ic": 0.1785999065922733
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "index": "low_vol/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": {
+        "ic": 0.17274451656055692
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_12-26-0",
+      "index": "low_vol/close_12h_momentum_APO_12-26-0",
+      "old": {
+        "ic": 0.002460697197539303
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "index": "low_vol/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": {
+        "ic": 0.6109766974077427
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "index": "low_vol/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": {
+        "ic": -0.06773752563226247
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "index": "low_vol/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": {
+        "ic": -0.014559125085440876
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_13-55-0_Log1p",
+      "index": "low_vol/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": {
+        "ic": 0.13134420186077822
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "index": "low_vol/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": {
+        "ic": -0.3830485304169515
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "index": "low_vol/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": {
+        "ic": -0.3551606288448394
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_34-89-0_Abs",
+      "index": "low_vol/close_12h_momentum_APO_34-89-0_Abs",
+      "old": {
+        "ic": -0.16582260954440164
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.hlc_12h_momentum_ADXR_89_Abs",
+      "index": "low_vol/hlc_12h_momentum_ADXR_89_Abs",
+      "old": {
+        "ic": 0.37412188222209525
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "index": "low_vol/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": {
+        "ic": 0.32151263373671307
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.value_sha256",
+      "index": "low_vol",
+      "old": "32e093c3cb9066e675b68d1a572c12b7d02cc8044848cd00ccd06f2aa7e33e65",
+      "new": "f4a4dcc7c37f6441888141d40157ad0f16aa235c92bf2023a4cb4406490628c5",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": -0.18779258732170204,
+      "new": -0.15108233581271335,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-SINE-LeadSine_Range_W3.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": 0.11690379553693146,
+      "new": 0.1371328540069414,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-TRENDMODE_Sign.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": -0.0043253764444990735,
+      "new": -0.05445200774856434,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.ic",
+      "index": "high_vol_trending/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": 0.12002263223769952,
+      "new": 0.3400242156133116,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_12-26-0.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_12-26-0",
+      "old": 0.15154971770578946,
+      "new": 0.21334075309814657,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_12-26-0_TsArgmin_W5.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": 0.012799907330326168,
+      "new": -0.07707126101917156,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_13-34-0_Kurt_W13.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": -0.03009899474596361,
+      "new": 0.2799427611101101,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_13-55-0_Kurt_W13.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": 0.19595247352871342,
+      "new": 0.3149208113364824,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_13-55-0_Log1p.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": 0.073605463457381,
+      "new": 0.1903126172997927,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_13-55-0_Momentum_L144.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": -0.22639479603803744,
+      "new": -0.17026951931091971,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_21-55-0_Momentum_L144.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": -0.13984776237419427,
+      "new": -0.10200197280746542,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.close_12h_momentum_APO_34-89-0_Abs.ic",
+      "index": "high_vol_trending/close_12h_momentum_APO_34-89-0_Abs",
+      "old": -0.047573780197400065,
+      "new": -0.040818027746452816,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.hlc_12h_momentum_ADXR_89_Abs.ic",
+      "index": "high_vol_trending/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.10565838802291887,
+      "new": 0.21546669705568866,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.per_feature.volume_12h_trend_MAVP_21_TsArgmin_W5.ic",
+      "index": "high_vol_trending/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": 0.2406825152897302,
+      "new": -0.013712977262760212,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.high_vol_trending.value_sha256",
+      "index": "high_vol_trending",
+      "old": "606d1b414f135380701c9a57d008705ecc749e87f3105b5c35a63c88e847b73f",
+      "new": "70806fa0fbb0fa96b2e83cd7d2d47e9bc25c77d970198ff357e5442252611eff",
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": -0.2529112428750329,
+      "new": -0.49457781339291623,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-SINE-LeadSine_Range_W3.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": 0.0805474023611833,
+      "new": -0.30586080586080583,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-TRENDMODE_Sign.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": -0.3670508644966108,
+      "new": 0.1966989481173608,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.ic",
+      "index": "low_vol_ranging/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": 0.20063138720464682,
+      "new": -0.17034505878375555,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_12-26-0.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_12-26-0",
+      "old": 0.007432818753573469,
+      "new": 0.10744810744810745,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_12-26-0_TsArgmin_W5.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": 0.3353315952951541,
+      "new": -0.02389262885734545,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_13-34-0_Kurt_W13.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": 0.15773123180360002,
+      "new": 0.19111586240066708,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_13-55-0_Kurt_W13.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": -0.046464646464646465,
+      "new": 0.14163614163614163,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_13-55-0_Log1p.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": -0.029161187079518598,
+      "new": -0.11204396405917703,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_13-55-0_Momentum_L144.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": -0.20754716981132074,
+      "new": -0.1862026862026862,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_21-55-0_Momentum_L144.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": -0.10790928149418715,
+      "new": 0.1752136752136752,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.close_12h_momentum_APO_34-89-0_Abs.ic",
+      "index": "low_vol_ranging/close_12h_momentum_APO_34-89-0_Abs",
+      "old": -0.3429389531022142,
+      "new": -0.14835164835164835,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.hlc_12h_momentum_ADXR_89_Abs.ic",
+      "index": "low_vol_ranging/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.2998151002834832,
+      "new": 0.7135878195251015,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.per_feature.volume_12h_trend_MAVP_21_TsArgmin_W5.ic",
+      "index": "low_vol_ranging/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": 0.17966775530247592,
+      "new": 0.23879317123049887,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.low_vol_ranging.value_sha256",
+      "index": "low_vol_ranging",
+      "old": "cdb9a3d5777e49e86871f6b7e6be37b55ae21d0279da46962ed372e8e068d6c3",
+      "new": "67ad06753494386cc57a1211a83b5600bc0831b5ee373bfcb0dbba93142aa04b",
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": -0.00017347558512433492,
+      "new": -0.19251425714300513,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-SINE-LeadSine_Range_W3.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": 0.003873840017807954,
+      "new": 0.010664042170172675,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-TRENDMODE_Sign.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": -0.1655084816663675,
+      "new": -0.02527321659478274,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.ic",
+      "index": "mid_vol_ranging/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": -0.31514522601389416,
+      "new": -0.016882253105330328,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_12-26-0.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_12-26-0",
+      "old": -0.12141535615171138,
+      "new": 0.12587862918684647,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_12-26-0_TsArgmin_W5.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": -0.15709447625590714,
+      "new": -0.11940095693786225,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_13-34-0_Kurt_W13.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": -0.37877999485114566,
+      "new": -0.10364134763234416,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_13-55-0_Kurt_W13.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": -0.21022201665124884,
+      "new": 0.15968522242438207,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_13-55-0_Log1p.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": -0.2890925386423846,
+      "new": -0.11178119254618152,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_13-55-0_Momentum_L144.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": 0.21676158547406,
+      "new": -0.23369811748887526,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_21-55-0_Momentum_L144.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": -0.10834875115633674,
+      "new": -0.23790767611916103,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.close_12h_momentum_APO_34-89-0_Abs.ic",
+      "index": "mid_vol_ranging/close_12h_momentum_APO_34-89-0_Abs",
+      "old": 0.03330346045160271,
+      "new": -0.08177160338022235,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.hlc_12h_momentum_ADXR_89_Abs.ic",
+      "index": "mid_vol_ranging/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.3139057536325553,
+      "new": 0.23247826557472978,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.per_feature.volume_12h_trend_MAVP_21_TsArgmin_W5.ic",
+      "index": "mid_vol_ranging/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": 0.6177677382455391,
+      "new": 0.363191596229061,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_ranging.value_sha256",
+      "index": "mid_vol_ranging",
+      "old": "d24686f9e5355f52e4f272085819dae4cca1152d319bb89077e834b1edb59d42",
+      "new": "5d8b15f12343a30dc32bfc91a603c81aa4f4a196f00a05ebce4bea862ac9fe31",
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-PHASOR-Quadrature_Std_W34.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
+      "old": 0.018226611524254227,
+      "new": -0.0071587911516677975,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-SINE-LeadSine_Range_W3.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-SINE-LeadSine_Range_W3",
+      "old": 0.04181191942385973,
+      "new": 0.09223609772132503,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-TRENDMODE_Sign.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": -0.11498859752942281,
+      "new": -0.2525494791673259,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.ic",
+      "index": "mid_vol_trending/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": 0.36465870750071844,
+      "new": 0.18701644418175573,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_12-26-0.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_12-26-0",
+      "old": 0.09996868802838953,
+      "new": -0.010446301105207782,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_12-26-0_TsArgmin_W5.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_12-26-0_TsArgmin_W5",
+      "old": -0.047401863777347314,
+      "new": 0.12494312542616401,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_13-34-0_Kurt_W13.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_13-34-0_Kurt_W13",
+      "old": -0.010542907615509233,
+      "new": -0.30053832159756483,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_13-55-0_Kurt_W13.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_13-55-0_Kurt_W13",
+      "old": -0.04243860180381254,
+      "new": -0.20239071308615728,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_13-55-0_Log1p.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_13-55-0_Log1p",
+      "old": -0.019059945981589926,
+      "new": 0.06481689399079268,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_13-55-0_Momentum_L144.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_13-55-0_Momentum_L144",
+      "old": 0.12088634680072723,
+      "new": -0.0038167723111545877,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_21-55-0_Momentum_L144.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_21-55-0_Momentum_L144",
+      "old": 0.30306256760015077,
+      "new": 0.05586844907228984,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.close_12h_momentum_APO_34-89-0_Abs.ic",
+      "index": "mid_vol_trending/close_12h_momentum_APO_34-89-0_Abs",
+      "old": 0.09374902149578068,
+      "new": -0.01837581391088283,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.hlc_12h_momentum_ADXR_89_Abs.ic",
+      "index": "mid_vol_trending/hlc_12h_momentum_ADXR_89_Abs",
+      "old": 0.4126139130948999,
+      "new": 0.37995470549325905,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.per_feature.volume_12h_trend_MAVP_21_TsArgmin_W5.ic",
+      "index": "mid_vol_trending/volume_12h_trend_MAVP_21_TsArgmin_W5",
+      "old": 0.17901879942327925,
+      "new": 0.23603310593488175,
+      "class": "P1-1c"
+    },
+    {
+      "path": "regime_kmeans.per_regime.mid_vol_trending.value_sha256",
+      "index": "mid_vol_trending",
+      "old": "bb63cddeee186e3558f0bbd9e58146eae461985da4a7b3f3bb9278baaa2360d1",
+      "new": "30ada2b0da6147eaa1f026b30688d84c526652dc5097f4270631da1f2c8a285e",
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.labels_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "d9e2b1211b27c84e62d624281034f2033341f2cc57aeec6051e4ac4c036dc4b5",
+      "new": "bd529dd3905f10ab7cbe1d06809b89571aaea9632b6f368b247a07ffe529799c",
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.value_counts.high_vol_trending",
+      "index": "high_vol_trending",
+      "old": 445,
+      "new": 632,
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.value_counts.low_vol_ranging",
+      "index": "low_vol_ranging",
+      "old": 264,
+      "new": 474,
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.value_counts.mid_vol_ranging",
+      "index": "mid_vol_ranging",
+      "old": 495,
+      "new": 383,
+      "class": "P1-1c"
+    },
+    {
+      "path": "xgboost_phases.value_counts.mid_vol_trending",
+      "index": "mid_vol_trending",
+      "old": 465,
+      "new": 180,
+      "class": "P1-1c"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_Sign.error_type",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": "NUMERICAL_ERROR",
       "new": null,
       "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_Sign.num_quantiles_used",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": null,
+      "new": 5,
+      "class": "P1-2",
+      "added_key": true
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_Sign.reason",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": "cannot form quantiles",
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_Sign.recommendation",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": null,
+      "new": "不建議",
+      "class": "P1-2",
+      "added_key": true
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_Sign.skipped",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_Sign",
+      "old": true,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.error_type",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": "NUMERICAL_ERROR",
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.num_quantiles_used",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": null,
+      "new": 5,
+      "class": "P1-2",
+      "added_key": true
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.reason",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": "cannot form quantiles",
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.recommendation",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": null,
+      "new": "不建議",
+      "class": "P1-2",
+      "added_key": true
+    },
+    {
+      "path": "long_short.features.close_12h_cycle_HT-TRENDMODE_TsArgmax_W13.skipped",
+      "index": "ETHUSDT/12h/close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
+      "old": true,
+      "new": null,
+      "class": "P1-2"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.high_vol.true_rate",
+      "index": "high_vol",
+      "old": 0.19948899371069181,
+      "new": 0.1591489779874214,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.mask_membership.regimes.low_vol.true_rate",
+      "index": "low_vol",
+      "old": 0.19948899371069181,
+      "new": 0.2746167452830189,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.feature_name_set_sha256",
+      "index": "high_vol",
+      "old": "3324f654e8a8b157ccf295600266c28ef12488b7091329c49ff36a4d25ab49d7",
+      "new": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.n_features",
+      "index": "high_vol",
+      "old": 15,
+      "new": 0,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.nan_mask_sha256",
+      "index": "high_vol",
+      "old": "c95ed5b033e36302f6892101ecde0503f0567a014b4e00410fe98c693e358ea2",
+      "new": "3bd2e4d5b613e779a9c2aed80f4d0e1105c765ec1bb38edfab937e61f69a043c",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.avg-price_1h_Lag_5",
+      "index": "high_vol/avg-price_1h_Lag_5",
+      "old": {
+        "ic": -0.2104409295805861
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close-volume_12h_volume_OBV_Lag_3",
+      "index": "high_vol/close-volume_12h_volume_OBV_Lag_3",
+      "old": {
+        "ic": 0.2884570517850528
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close-volume_12h_volume_OBV_Mean_W13",
+      "index": "high_vol/close-volume_12h_volume_OBV_Mean_W13",
+      "old": {
+        "ic": -0.10842438465024538
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "index": "high_vol/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": {
+        "ic": -0.19007293248504806
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "index": "high_vol/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": {
+        "ic": 0.031231478496443716
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "index": "high_vol/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": {
+        "ic": -0.10842438465024538
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "index": "high_vol/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": {
+        "ic": -0.08648892692011573
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "index": "high_vol/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": {
+        "ic": -0.04566353195314334
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_12-26-0_Slope_W55",
+      "index": "high_vol/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": {
+        "ic": -0.10842438465024538
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_5-21-0_Std_W89",
+      "index": "high_vol/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": {
+        "ic": -0.23849509533821975
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_APO_8-34-0_Range_W5",
+      "index": "high_vol/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": {
+        "ic": -0.16683143894029107
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_CMO_13_Range_W34",
+      "index": "high_vol/close_12h_momentum_CMO_13_Range_W34",
+      "old": {
+        "ic": 0.11607286569573672
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "index": "high_vol/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": {
+        "ic": 0.32465633967361474
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "index": "high_vol/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": {
+        "ic": 0.006928604838824447
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.per_feature.hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "index": "high_vol/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": {
+        "ic": 0.1448935287850479
+      },
+      "new": null,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.high_vol.value_sha256",
+      "index": "high_vol",
+      "old": "99f2486272322d96da8e681ba9ce8310dd2df8fd21bcb760ef0e667f5c7de526",
+      "new": "f4a4dcc7c37f6441888141d40157ad0f16aa235c92bf2023a4cb4406490628c5",
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.avg-price_1h_Lag_5.ic",
+      "index": "low_vol/avg-price_1h_Lag_5",
+      "old": -0.25862997918035074,
+      "new": -0.1595429467039093,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close-volume_12h_volume_OBV_Lag_3.ic",
+      "index": "low_vol/close-volume_12h_volume_OBV_Lag_3",
+      "old": 0.11468976941170758,
+      "new": -0.07999842572006176,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close-volume_12h_volume_OBV_Mean_W13.ic",
+      "index": "low_vol/close-volume_12h_volume_OBV_Mean_W13",
+      "old": -0.3757118621001012,
+      "new": -0.10289898959495743,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-PHASOR-InPhase_Max_W5.ic",
+      "index": "low_vol/close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+      "old": -0.024388091900439897,
+      "new": -0.10194995198552814,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-SINE-LeadSine_Rank_W8.ic",
+      "index": "low_vol/close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+      "old": 0.32116031191396505,
+      "new": 0.11549732453802827,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-SINE-LeadSine_Skew_W34.ic",
+      "index": "low_vol/close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+      "old": 0.21869215169084602,
+      "new": 0.10350748567449766,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-SINE-Sine_Skew_W34.ic",
+      "index": "low_vol/close_12h_cycle_HT-SINE-Sine_Skew_W34",
+      "old": -0.04054522303354537,
+      "new": -0.0273392059225765,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_cycle_HT-SINE-Sine_Slope_W89.ic",
+      "index": "low_vol/close_12h_cycle_HT-SINE-Sine_Slope_W89",
+      "old": 0.011146369707016216,
+      "new": 0.06494525334539974,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_12-26-0_Slope_W55.ic",
+      "index": "low_vol/close_12h_momentum_APO_12-26-0_Slope_W55",
+      "old": 0.2940748458403949,
+      "new": 0.09736029957732222,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_5-21-0_Std_W89.ic",
+      "index": "low_vol/close_12h_momentum_APO_5-21-0_Std_W89",
+      "old": 0.026736363536188665,
+      "new": -0.04076242586011721,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_APO_8-34-0_Range_W5.ic",
+      "index": "low_vol/close_12h_momentum_APO_8-34-0_Range_W5",
+      "old": -0.35168052082535567,
+      "new": -0.06470944773078754,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_CMO_13_Range_W34.ic",
+      "index": "low_vol/close_12h_momentum_CMO_13_Range_W34",
+      "old": 0.24006527731646424,
+      "new": -0.027115005751330596,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_12h_momentum_PPO_12-26-0_Kurt_W5.ic",
+      "index": "low_vol/close_12h_momentum_PPO_12-26-0_Kurt_W5",
+      "old": 0.32714691679084856,
+      "new": 0.19202254421536075,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.close_1h_trend_BBANDS-Upper_34_Skew_W8.ic",
+      "index": "low_vol/close_1h_trend_BBANDS-Upper_34_Skew_W8",
+      "old": 0.23059156103310957,
+      "new": 0.17269444857282168,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.per_feature.hlc_12h_momentum_MINUS-DI_233_ZScore_W13.ic",
+      "index": "low_vol/hlc_12h_momentum_MINUS-DI_233_ZScore_W13",
+      "old": 0.3686415478665346,
+      "new": 0.18807965498498477,
+      "class": "P1-1"
+    },
+    {
+      "path": "regime_rule.per_regime.low_vol.value_sha256",
+      "index": "low_vol",
+      "old": "b22234199e5c1958de4d3e6535f619268d7b55c492eed7eaad497817f83c9a30",
+      "new": "ec09e6e72f5cccf2ca37c53871354852e8c91252bcbae8455f32a184dae2362e",
+      "class": "P1-1"
     }
   ],
   "zero_diff_justifications": {

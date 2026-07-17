@@ -1,0 +1,80 @@
+{
+  "content_sha256": "5c96c867dc364e0c9ccdd48613e912030a2a208f138eebf996746db6a015cd32",
+  "discover_matrix": [
+    {
+      "control_kind": "regime_off",
+      "run_wall_s": 16.671,
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "volatile_paths": [
+        "/generated_at",
+        "/metadata/filtered_features_path",
+        "/metadata/filtered_generated_at"
+      ]
+    },
+    {
+      "control_kind": "ls_off",
+      "run_wall_s": 16.542,
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "volatile_paths": [
+        "/generated_at",
+        "/metadata/filtered_features_path",
+        "/metadata/filtered_generated_at"
+      ]
+    },
+    {
+      "control_kind": "non_trigger_fallback",
+      "run_wall_s": 16.565,
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "volatile_paths": [
+        "/generated_at",
+        "/metadata/filtered_features_path",
+        "/metadata/filtered_generated_at"
+      ]
+    },
+    {
+      "control_kind": "regime_off",
+      "run_wall_s": 13.192,
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "volatile_paths": [
+        "/generated_at",
+        "/metadata/filtered_features_path",
+        "/metadata/filtered_generated_at"
+      ]
+    },
+    {
+      "control_kind": "ls_off",
+      "run_wall_s": 13.277,
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "volatile_paths": [
+        "/generated_at",
+        "/metadata/filtered_features_path",
+        "/metadata/filtered_generated_at"
+      ]
+    },
+    {
+      "control_kind": "non_trigger_fallback",
+      "run_wall_s": 13.317,
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "volatile_paths": [
+        "/generated_at",
+        "/metadata/filtered_features_path",
+        "/metadata/filtered_generated_at"
+      ]
+    }
+  ],
+  "observed_pointers": [
+    "/generated_at",
+    "/metadata/filtered_features_path",
+    "/metadata/filtered_generated_at"
+  ],
+  "observed_pointers_sha256": "35d57589bc7b4b0d984d75c78bb045e1e2f31b8194d5a766e95d47ddbc11358c",
+  "receipt_note": "paths = union of exact RFC6901 leaf diffs across CONTROL_KINDS×RUNS with isolated tmp; only producer-clear timestamp/tmp-path admitted; numeric/set/order diffs fail closed",
+  "rules_sha256": "763ecc7090c47e730a1f01c1e99d70a9f59bb6cbeb5b26f77cdff0b90a01e5be",
+  "schema_version": "la1_control_volatile_receipt_v1"
+}

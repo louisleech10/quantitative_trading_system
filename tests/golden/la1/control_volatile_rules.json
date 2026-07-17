@@ -1,0 +1,23 @@
+[
+  {
+    "expected_type": "str",
+    "pointer": "/generated_at",
+    "producer_ref": "momentum/Analysis/ic_reporter.py:329",
+    "reason": "per-run wall-clock from ICReporter.build_report",
+    "validator": "iso8601_timestamp"
+  },
+  {
+    "expected_type": "str",
+    "pointer": "/metadata/filtered_features_path",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:3488",
+    "reason": "absolute path under process-local sidefx tmp for filtered HDF5",
+    "validator": "isolated_tmp_path"
+  },
+  {
+    "expected_type": "str",
+    "pointer": "/metadata/filtered_generated_at",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:3490",
+    "reason": "mirrors report generated_at after filtered features write",
+    "validator": "iso8601_timestamp"
+  }
+]
