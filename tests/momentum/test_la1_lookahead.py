@@ -292,6 +292,29 @@ def _scalar_differs(old: Any, new: Any) -> bool:
     return False
 
 
+def _resolve_baseline_leaf(baseline: dict, path: str) -> tuple[bool, Any]:
+    """dotted path 是否存在於 baseline；回傳 (found, leaf)。"""
+    cur: Any = baseline
+    for part in path.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return False, None
+        cur = cur[part]
+    return True, cur
+
+
+def _allowlist_row_in_baseline_scope(row: dict, baseline: dict) -> bool:
+    """列是否屬於本測 baseline 符號域（path 存在且 old==B0 leaf）。
+
+    共享 allowlist 混有 BTC+ETH 真 diff：ETH feature 子集 path 不在 BTC
+    baseline；同 path 的 value_sha256/value_counts 則以 old≠B0 區分。
+    """
+    path = str(row.get("path") or "")
+    found, leaf = _resolve_baseline_leaf(baseline, path)
+    if not found:
+        return False
+    return not _scalar_differs(leaf, row.get("old"))
+
+
 def _build_regime_kmeans_attribution_diffs(
     baseline_km: dict,
     new_km: dict,
@@ -658,23 +681,43 @@ def _assert_kmeans_pit(
     )
     validate_diffs_or_raise(all_diffs, allowlist)
 
-    # 反向：allowlist 中 xgboost_phases + regime_kmeans P1-1c 列皆須被真 diff 命中
+    # 反向：allowlist 中 **BTC-scoped** xgboost_phases + regime_kmeans P1-1c
+    # 列皆須被本測 builder 真 diff 命中。
+    #
+    # 共享 allowlist 含 ETH recursive 補列（disjoint feature 子集 + 同 path
+    # 不同 old 的 value_sha256/value_counts）。本測只跑 BTC/1h，builder 無法
+    # 產出 ETH leaf → 反向只要求「path 在 BTC baseline 且 old==B0 leaf」。
+    # 禁為綠刪 ETH 真 diff（B4 ETH forward 仍需那些列）。
     produced_keys = {
         (d["path"], d["index"], d["old"], d["new"], d["class"]) for d in all_diffs
     }
     required_prefixes = ("xgboost_phases.", "regime_kmeans.")
     n_km_allow = 0
+    n_xgb_allow = 0
+    n_cross_symbol_skipped = 0
     for row in allowlist.get("rows") or []:
         if row.get("class") != "P1-1c":
             continue
         path = str(row.get("path") or "")
         if not path.startswith(required_prefixes):
             continue
+        if not _allowlist_row_in_baseline_scope(row, baseline):
+            n_cross_symbol_skipped += 1
+            continue
         if path.startswith("regime_kmeans."):
             n_km_allow += 1
+        else:
+            n_xgb_allow += 1
         key = (row["path"], row["index"], row["old"], row["new"], row["class"])
         assert key in produced_keys, f"allowlist P1-1c row not produced: {row}"
-    assert n_km_allow > 0, "allowlist missing regime_kmeans.* P1-1c rows"
+    assert n_km_allow > 0, "allowlist missing BTC-scoped regime_kmeans.* P1-1c rows"
+    assert n_xgb_allow > 0, "allowlist missing BTC-scoped xgboost_phases.* P1-1c rows"
+    # ETH-only / cross-symbol 補列必須存在於共享帳本（否則 B4 ETH 會紅），
+    # 且不得被誤當 BTC reverse 必達。
+    assert n_cross_symbol_skipped > 0, (
+        "expected cross-symbol P1-1c rows in shared allowlist "
+        f"(km ETH feats / ETH xgb); got skipped={n_cross_symbol_skipped}"
+    )
 
 
 def _assert_mid_segment_pit(close: pd.Series, volume: pd.Series) -> None:

@@ -95,6 +95,39 @@ def _load_baseline(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _scalar_differs(old: Any, new: Any) -> bool:
+    """old/new 是否不同（NaN==NaN）。與 test_la1_lookahead reverse scope 同源。"""
+    if old != new:
+        if isinstance(old, float) and isinstance(new, float):
+            if old != old and new != new:  # NaN
+                return False
+        return True
+    return False
+
+
+def _resolve_baseline_leaf(baseline: dict, path: str) -> tuple[bool, Any]:
+    """dotted path 是否存在於 baseline；回傳 (found, leaf)。"""
+    cur: Any = baseline
+    for part in path.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return False, None
+        cur = cur[part]
+    return True, cur
+
+
+def _allowlist_row_in_baseline_scope(row: dict, baseline: dict) -> bool:
+    """列是否屬於本測 baseline 符號域（path 存在且 old==B0 leaf）。
+
+    共享 allowlist 混有 BTC+ETH 真 diff：跨 symbol feature 子集 path 不在
+    對側 baseline；同 path 的 value_sha256 則以 old≠B0 區分。
+    """
+    path = str(row.get("path") or "")
+    found, leaf = _resolve_baseline_leaf(baseline, path)
+    if not found:
+        return False
+    return not _scalar_differs(leaf, row.get("old"))
+
+
 def _run_for_symbol(symbol: str) -> Tuple[dict, Path, Path]:
     run = next(r for r in RUNS if r["symbol"] == symbol)
     h5, meta = _resolve_la0_feature_inputs(run)
@@ -895,7 +928,13 @@ def test_b4_modified_path_attribution_unexpected_zero() -> None:
 # ④ 跨 symbol ETH：全量 diffs 送 validator；gap>0 即 FAIL
 # ---------------------------------------------------------------------------
 def test_b4_cross_symbol_eth_independent() -> None:
-    """ETHUSDT/12h：control + 全修改路徑 recursive；零容忍 gap。"""
+    """ETHUSDT/12h：control + 全修改路徑 recursive；零容忍 gap + ETH reverse。
+
+    forward：all_diffs ⊆ allowlist（UNEXPECTED=0）。
+    reverse：allowlist 中 **ETH-scoped** P1-1c regime_kmeans/xgboost_phases
+    列皆須被本測 ETH builder 真 diff 命中（鏡像 BTC reverse；baseline=ETH）。
+    BTC-scoped 列 skip，但 n_cross_symbol_skipped>0 防刪跨 symbol 真 row。
+    """
     allowlist = load_allowlist(ALLOWLIST_PATH)
     baseline = _load_baseline(ETH_BASELINE_PATH)
     assert baseline["symbol"] == "ETHUSDT"
@@ -941,6 +980,51 @@ def test_b4_cross_symbol_eth_independent() -> None:
         )
     assert result.machine_line() == "UNEXPECTED=0"
     assert result.unexpected_count == 0
+    validate_diffs_or_raise(all_diffs, allowlist)
+
+    # 反向：allowlist 中 **ETH-scoped** xgboost_phases + regime_kmeans P1-1c
+    # 列皆須被本測 ETH five-path builder 真 diff 命中。
+    #
+    # 共享 allowlist 含 BTC recursive 列；本測只跑 ETH/12h，builder 無法產出
+    # BTC leaf → 反向只要求「path 在 ETH baseline 且 old==ETH B0 leaf」。
+    # 禁為綠刪 BTC 真 diff（BTC reverse / B4 BTC forward 仍需那些列）。
+    # allowlist P1-1c 五鍵皆為可 hash 標量；recursive walker 偶有 dict leaf
+    # （非 P1-1c 帳本列），建 set 時略過 unhashable，不影響 reverse 比對。
+    produced_keys: set[tuple] = set()
+    for d in all_diffs:
+        key = (d["path"], d["index"], d["old"], d["new"], d["class"])
+        try:
+            hash(key)
+        except TypeError:
+            continue
+        produced_keys.add(key)
+    required_prefixes = ("xgboost_phases.", "regime_kmeans.")
+    n_km_allow = 0
+    n_xgb_allow = 0
+    n_cross_symbol_skipped = 0
+    for row in allowlist.get("rows") or []:
+        if row.get("class") != "P1-1c":
+            continue
+        path = str(row.get("path") or "")
+        if not path.startswith(required_prefixes):
+            continue
+        if not _allowlist_row_in_baseline_scope(row, baseline):
+            n_cross_symbol_skipped += 1
+            continue
+        if path.startswith("regime_kmeans."):
+            n_km_allow += 1
+        else:
+            n_xgb_allow += 1
+        key = (row["path"], row["index"], row["old"], row["new"], row["class"])
+        assert key in produced_keys, f"allowlist P1-1c row not produced (ETH): {row}"
+    assert n_km_allow > 0, "allowlist missing ETH-scoped regime_kmeans.* P1-1c rows"
+    assert n_xgb_allow > 0, "allowlist missing ETH-scoped xgboost_phases.* P1-1c rows"
+    # BTC-only / cross-symbol 列必須存在於共享帳本（否則 BTC reverse 會紅），
+    # 且不得被誤當 ETH reverse 必達。
+    assert n_cross_symbol_skipped > 0, (
+        "expected cross-symbol P1-1c rows in shared allowlist "
+        f"(km BTC feats / BTC xgb); got skipped={n_cross_symbol_skipped}"
+    )
 
 
 def test_b4_machine_line_unexpected_zero_empty_and_listed() -> None:
