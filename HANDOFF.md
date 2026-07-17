@@ -1,5 +1,39 @@
 # Handoff
-**Agent**: Claude(Fable 5) | **Time**: 2026-07-16 | **Branch**: main→feat/ic-la1-p1-impl | **狀態**: 🔒 **LA-1 SPEC v0.4.3 + TODO v2.3 雙凍結**→ ▶ B0 實作派工(Grok)
+**Agent**: Claude(Fable 5) | **Time**: 2026-07-17 | **Branch**: feat/ic-la1-p1-impl(7 commits 已 push) | **狀態**: ✅ **LA-1(P1)完工**——五洩漏全修+三方 DATA-CORRECT PASS,未合併 main(待使用者)
+
+## ✅ LA-1(P1)look-ahead 完工(branch feat/ic-la1-p1-impl,7 commits)
+- **五洩漏全修**:B0 baseline(707ab82)→B1 regime PIT〔P1-1 rule 分位/P1-1b fallback/P1-1c kmeans Segment-causal〕(aa2e7bd)→B2 long_short qcut PIT〔RB-3 feature 原時序+Policy-Strict〕(dba5716)→B3 fallback loud〔root 紅標+G-A2+禁內層 persist+五 oracle〕(38f164c)→B4 golden 重基準+control 全樹凍結(e7da153)→B4 reverse-check symbol-aware(7629022)。
+- **每批 Grok 實作→Codex+Composer 雙家 review(每批抓真 finding/假綠)→finding-closure→commit**。codex 假綠嗅覺全程關鍵(B0 validator 只比 path+index/B1-B2 測 helper 不測產線 mutant/B4 control 投影漏 raw leaf)。
+- **✅ 三方 DATA-CORRECT PASS**:Claude(綠測+code-level 洩漏真除)/Codex-Luna(diff 審+親自 mutate 驗)/Composer(BTC69/ETH65 partition);Grok=實作者不簽。三方各自 adversarial 證三洩漏可證偽(P1-1c MUTANT_FLIP=1 等)。收官抓到 golden 帳本 bug(reverse-check symbol 盲,非產線洩漏)→BTC+ETH 對稱 reverse 修畢。審計 handoffs/LA1-B42-DATACORRECT-{claude,codex,composer}.md。
+- **治理**:SPEC v0.4.3+TODO v2.3 雙凍結(4輪 SPEC adversarial+5輪 freeze-stamp+2輪 TODO;三家 hash gate PASS)。scope=P1-1/1b/1c(kmeans 使用者裁併入完整修)+P1-2+P1-3;FR/`_fit_global` §N exclude。
+
+## ⚙ Codex 模型評測(使用者 2026-07-17)
+- backing GPT-5.6 Sol medium→**Luna**;effort MAX→**xhigh**。**皆無能力退步,與 Sol medium 基線持平**(假綠嗅覺/誠實斷路器/RFC6901 深度同級;MAX 285k vs xhigh 299k token 相近)。xhigh 對 review/DATA-CORRECT 型任務夠用。評測 handoffs/CODEX-LUNA-MAX-EVAL-{claude,grok}.md。
+
+## 📌 收官待辦(使用者定)
+- **合併 main**:LA-1 未合併,PR/merge 待使用者(如 LA-0)。
+- **regime-conditional IC 驗證**(使用者關注):kmeans regime 非最佳實務+小樣本/多重檢定雜訊大→若要當決策級須另立驗證 epic(HMM/GMM 選型+per-regime 最小樣本+多重檢定校正);目前 grouped_ic 只進報告非 gate,不污染核心篩選,當探索視角安全。
+- **ETH reverse 已補**(非列債);pre-existing 7 紅(redirect state-leak 測試順序)非本 epic 另票;funnel/IC-PERF 仍 deferred(Gatekeeper 完成後)。
+
+## (以下歷史)LA-1 實作細節
+
+## ▶ 實作進度
+- **✅ B0 commit 707ab82**:雙家過(codex 2 BLOCKING→fix→CLOSED)。
+- **✅ B3 commit 38f164c**:fallback loud 全套(root 紅標 fail-closed/禁內層 persist/五 oracle 28 gate 測/前端)。review=Composer APPROVE;**Codex 9 findings 兩輪 fix**;**B3-TEST-01 兩輪未閉→斷路器委員會**(Claude+codex+composer 三方設計 callback 真鏈測試,SYNTHESIS 零自由度)→Grok 實作 6 測→codex CLOSURE-3 APPROVE。共用檔(test_la1_lookahead.py/allowlist)隨 B1 commit。
+- **✅ B1 commit aa2e7bd**(2026-07-17):regime PIT 三點全落(rule 分位/fallback 真值表/kmeans Segment-causal)。review 三輪 fix:codex 3B(expanding guard 過寬/測試假綠改產線/xgboost exact)+composer 2B(allowlist path≠schema/warmup mutation 缺)+**編排端抽驗抓 allowlist 缺 regime_kmeans rows(fix3)**→雙家重跑反例全 CLOSED+APPROVE。契約漂移裁定:collect==10(+production_mutations_red,雙家 accept+docstring 修)。
+- **✅ B2 commit dba5716**:long_short PIT(RB-3 原時序分箱/Policy-Strict/固定 q/migration 6 列)。review=Composer APPROVE;Codex 5B(RB-3 假綠測 helper 不測 analyze/私加 bin_min_samples 入口/skip 語意/±inf gate/validator scope 漂移〔編排端裁追認〕)→fix→全 CLOSED+APPROVE。
+- **▶ B4 收官(接近完工)**:golden 重基準+歸因對帳+5 wash+跨 symbol 全落。review 多輪:codex B4 四輪(control 三輪常數→無 artifact→投影→**委員會 full-tree**〔黑名單 scrub+RFC6901 denylist+兩跑 receipt+sentinel,handoffs/LA1-B4CONTROL-COMMITTEE-SYNTHESIS.md〕)+allowlist 補列 supp/supp2(owning-batch 授權,BTC41+ETH119 exact+9 discriminator 修+added_key 綁 symbol 雙錨);composer APPROVE;freeze 指紋 re-stamp(codex 追認 `2e0991f4…`)。golden **45 passed**、--check exit 0(6 control artifact)。**唯一 open=B4-CODEX-1 control 終閉**(進行中 blrzecoyh)。
+- **⚙ Codex 模型換 GPT-5.6 Luna MAX(使用者 2026-07-17)**:smoke PASS(讀檔理解精準);終閉任務=能力評測主樣本;Claude+委員平行評 vs Sol medium(handoffs/CODEX-LUNA-MAX-EVAL-*)。
+- **✅ B4 commit e7da153**(control 全樹凍結+歸因+補列)。
+- **▶ B4.2 三方 DATA-CORRECT(進行中,抓到真 golden 帳本 bug)**:
+  - Claude leg ✅ PASS(綠測+code-level 洩漏真除);handoffs/LA1-B42-DATACORRECT-claude.md。
+  - **三方一致:三洩漏修法資料正確**(各自 adversarial mutation 證可證偽,P1-1c MUTANT_FLIP=1 等)。
+  - **Composer+Claude 獨立重現 `test_regime_pit[kmeans]` FAIL**(reverse-check 紅,1493s)。**根因(Grok 診斷+實證)**:reverse-check symbol 盲——跑 BTC kmeans 卻要求 allowlist **所有** regime_kmeans row(含 56 個 ETH-only 特徵真 row)都在 BTC 產出裡。**非 allowlist 錯**(ETH row 是 ETH forward 需要的真 diff),是**測試斷言 bug**。
+  - **Grok 修**(僅改 test_la1_lookahead.py reverse-check→symbol-aware:path 在 BTC baseline 且 old==B0 才要求 BTC 產出;ETH row skip 但加 `n_cross_symbol_skipped>0` 防刪;BTC 斷言未弱化+加 n_xgb_allow>0)。Claude diff 審=**非假綠**(加嚴非弱化)。
+  - **⚠️ 待複驗提**:ETH 無獨立 reverse 覆蓋(既存缺口,非本次引入)——ETH phantom row 目前偵測不到,codex 複驗應補 ETH reverse 或明列債。
+  - **⚙ Codex 模型 MAX→xhigh**(第二步):MAX 兩軸樣本皆無退步(終閉自校欄位/DATA-CORRECT 自發 mutation A/B);xhigh 樣本=codex-xhigh DATA-CORRECT(bbaoqaw34,與 grok 改測試並行故 verdict 混淆,主要當能力樣本)。評測 handoffs/CODEX-LUNA-MAX-EVAL-*。
+- **剩餘**:kmeans 修轉綠確認→codex+composer 複驗 grok 測試改(防假綠+ETH reverse 缺口)→三方乾淨重簽→commit phantom 修→LA-1 完工。
+- 審計:handoffs/LA1-B{0,1,3}-{IMPL,REVIEW}-*+LA1-B3TEST01-COMMITTEE-*(含 SYNTHESIS)。
 
 ## 🔒 雙凍結紀錄
 - **SPEC** `docs/IC_LA1_SPEC.md` **v0.4.3**(file sha `41499dae…`);凍結檔 `handoffs/LA1-SPEC-FREEZE-RECONCILE.md`(canonical 戳記 task `20260716-la1-freeze5-*`,register-output×3,`reconcile_stamps_check.sh` **PASS** body sha `3dd1e94c…`);史料 `-history.md`。freeze 5 輪:codex 連 3 輪 REJECT 抓真洞(B1.3 邊界舊句/§A 基數 8→12〔grok 同抓〕/migration 幽靈列+`:23` 非 nodeid)。
