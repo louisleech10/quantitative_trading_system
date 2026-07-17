@@ -44,7 +44,7 @@
   | **5 Agent 顧問層(V2)** | 結構化可機讀輸出+嚴謹度指標+Agent 委員會式解讀 | ❌ 未啟動(依賴 P1+P4) |
   - **funnel/IC-PERF 定位**:非獨立 deferred 項,=Phase 3(staged screening/redundancy cap)+Phase 4(多因子);「等整張 map 完成才做」≡「等 P1 收完進 P3/4」(memory `project_ic_feature_selection_funnel`)。
   - **regime IC 驗證定位**:Phase 4 進階層,**獨立票、條件觸發**(只有要讓 regime-conditional IC 當決策級才做;現只進報告非 gate,不做也不出錯)。2026-07-17 使用者提出。
-  - **待決(committee 無法代決)**:Phase 2A vs Phase 1 資源分配(先全力收 P1,還是 P1+2A 並進?)。walk-forward/CPCV 已決=複用 ML 孤島(下方)。
+  - **✅ 資源分配已決(2026-07-17 使用者)=全力收 Phase 1**(不與 Phase 2A 並進;P1 尾巴 LA-2→1c-FR-FULL→1d→1f 收完才啟 2A)。walk-forward/CPCV 已決=複用 ML 孤島(下方)。
 - **決策**:walk-forward/CPCV **复用 ML 孤島**非重寫;contract-first 不硬接舊全 DataFrame 路徑。
 - **狀態(2026-06-26)**:
   - **Phase 0 止血+正確性硬閘 ✅ 完成**(commit `11507f5`):CRASH/TIMEAXIS/BYVOL/FEATURE-GUARD/DECAY-LOG/UX-ERR 六 epic + 實機 45k smoke。

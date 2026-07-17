@@ -1,7 +1,17 @@
 # Handoff
-**Agent**: Claude(Fable 5) | **Time**: 2026-07-17 | **Branch**: feat/ic-la1-p1-impl(7 commits 已 push) | **狀態**: ✅ **LA-1(P1)完工**——五洩漏全修+三方 DATA-CORRECT PASS,未合併 main(待使用者)
+**Agent**: Claude(Fable 5) | **Time**: 2026-07-17 | **Branch**: **main**(LA-1 已合併+push) | **狀態**: ✅ **LA-1(P1)完工並合併 main**——五洩漏全修+三方 DATA-CORRECT PASS
 
-## ✅ LA-1(P1)look-ahead 完工(branch feat/ic-la1-p1-impl,7 commits)
+## ▶▶ 下一站:LA-2(P2 前瞻收尾)——**新 session 從這裡開始**
+- **範圍(P2,來自 master `handoffs/ICLOOKAHEAD-MASTER.md` P2 節)**:①**winsorized label** 禁用/PIT(`label_generator.py:71-80` `return_type=winsorized` 全期裁尾;預設 simple 不走,條件觸發)②**model OOT-only 契約**(lightgbm/xgboost/calibration/sample_weight/probability_calibrator 的 post-fit 指標對全樣本/caller array→改 train/test 紀律)③**條件模組 train-fit/標註**(`factor_orthogonalizer`/`factor_exposure_analyzer` 預設 OFF、`pattern_extractor` 全 quantile 門檻、`regime_detector._fit_global`〔expanding=False 全期 fit;LA-1 已鎖 IC/XGBoost caller 不傳 False,LA-2 完整因果化〕)。
+- **性質**:P2 = **條件式/預設不走/model**——比 P0/P1(預設路徑)低風險,但要把前瞻整治 epic 完整收掉。
+- **資源分配已決(2026-07-17 使用者)=全力 Phase 1**:LA-2→1c-FR-FULL→1d→1f 收完才啟 Phase 2A。
+- **如何開始(新 session,照 LA-0/LA-1 範本)**:①開場先稽核 HANDOFF/ROADMAP/master vs repo 實況(鐵律)②走完整大任務管線:**聯合偵察(Claude+三委員平行,聚焦 P2 三點)**→SPEC 起草(Claude)→三家 adversarial→凍結(freeze-stamp)→TODO→逐批 Grok 實作+**Codex+Composer 雙家 review**(機器閘門 `review_quorum_check.sh`;實作者不自審)→每批過 review commit→三方 DATA-CORRECT(a,d 高風險)。③範本=`handoffs/LA1-*`(recon/SPEC/TODO/DATACORRECT 全套)。
+- **複用**:`momentum/Analysis/pit_stats.py` 七原語(LA-0 建;winsorized label 用 `pit_expanding_bounds`,同 P1-2/P0-2 家族)。
+- **前置**:LA-1 已合併 main(merge `8214d5f`);LA-2 從 main 起(建議另開 branch `feat/ic-la2-p2-impl`)。
+- **相關 memory**:`project_ic_analysis_lookahead_remediation`、`feedback_code_review_two_families`、`feedback_recon_joint_with_committee`、`reference_codex_luna_effort_eval`(codex=Luna/xhigh)。
+- **⚠️ 勿重工**:全 IC look-ahead 盤點已完成(master 含 P0/P1/P2 全清單+實跑證);LA-2 偵察=**從 master P2 起、聚焦三點**,不重掃全模組。
+
+## ✅ LA-1(P1)look-ahead 完工並合併 main(merge 8214d5f;branch feat/ic-la1-p1-impl 已刪)
 - **五洩漏全修**:B0 baseline(707ab82)→B1 regime PIT〔P1-1 rule 分位/P1-1b fallback/P1-1c kmeans Segment-causal〕(aa2e7bd)→B2 long_short qcut PIT〔RB-3 feature 原時序+Policy-Strict〕(dba5716)→B3 fallback loud〔root 紅標+G-A2+禁內層 persist+五 oracle〕(38f164c)→B4 golden 重基準+control 全樹凍結(e7da153)→B4 reverse-check symbol-aware(7629022)。
 - **每批 Grok 實作→Codex+Composer 雙家 review(每批抓真 finding/假綠)→finding-closure→commit**。codex 假綠嗅覺全程關鍵(B0 validator 只比 path+index/B1-B2 測 helper 不測產線 mutant/B4 control 投影漏 raw leaf)。
 - **✅ 三方 DATA-CORRECT PASS**:Claude(綠測+code-level 洩漏真除)/Codex-Luna(diff 審+親自 mutate 驗)/Composer(BTC69/ETH65 partition);Grok=實作者不簽。三方各自 adversarial 證三洩漏可證偽(P1-1c MUTANT_FLIP=1 等)。收官抓到 golden 帳本 bug(reverse-check symbol 盲,非產線洩漏)→BTC+ETH 對稱 reverse 修畢。審計 handoffs/LA1-B42-DATACORRECT-{claude,codex,composer}.md。
@@ -10,10 +20,11 @@
 ## ⚙ Codex 模型評測(使用者 2026-07-17)
 - backing GPT-5.6 Sol medium→**Luna**;effort MAX→**xhigh**。**皆無能力退步,與 Sol medium 基線持平**(假綠嗅覺/誠實斷路器/RFC6901 深度同級;MAX 285k vs xhigh 299k token 相近)。xhigh 對 review/DATA-CORRECT 型任務夠用。評測 handoffs/CODEX-LUNA-MAX-EVAL-{claude,grok}.md。
 
-## 📌 收官待辦(使用者定)
-- **合併 main**:LA-1 未合併,PR/merge 待使用者(如 LA-0)。
-- **regime-conditional IC 驗證**(使用者關注):kmeans regime 非最佳實務+小樣本/多重檢定雜訊大→若要當決策級須另立驗證 epic(HMM/GMM 選型+per-regime 最小樣本+多重檢定校正);目前 grouped_ic 只進報告非 gate,不污染核心篩選,當探索視角安全。
-- **ETH reverse 已補**(非列債);pre-existing 7 紅(redirect state-leak 測試順序)非本 epic 另票;funnel/IC-PERF 仍 deferred(Gatekeeper 完成後)。
+## 📌 已收官/背景
+- **✅ 合併 main 完成**(merge `8214d5f`;本地+遠端 branch 已刪);/tmp log+.DS_Store 已清;432MB 舊 epic baseline 使用者定留著。
+- **✅ IC Gatekeeper 七 Phase 全景已補進 ROADMAP canonical 表**(`c50d79e`)——防再遺漏;funnel/IC-PERF=Phase 3+4、regime 驗證=Phase 4 獨立票條件觸發(memory `project_regime_ic_validation_positioning`)。
+- **regime-conditional IC 驗證**(使用者關注):kmeans 非最佳實務+小樣本雜訊→歸 Phase 4 獨立票、條件觸發(現 grouped_ic 只進報告非 gate,不污染核心篩選)。
+- pre-existing 7 紅(redirect state-leak 測試順序)非本 epic 另票;funnel/IC-PERF=Phase 3/4(Gatekeeper 後段)。
 
 ## (以下歷史)LA-1 實作細節
 
