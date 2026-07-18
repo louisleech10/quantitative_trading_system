@@ -981,7 +981,7 @@ class ICReporter:
             "factor_return_sharpe": self._safe_nested(
                 self._safe_nested(deep_payload.get("factor_returns"), feature_name, "risk_metrics"),
                 None,
-                "sharpe",
+                "sharpe_ratio",
             ),
             "factor_return_max_drawdown": self._safe_nested(
                 self._safe_nested(deep_payload.get("factor_returns"), feature_name, "risk_metrics"),

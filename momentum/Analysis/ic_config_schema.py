@@ -186,10 +186,15 @@ class FeatureFilterSchema(BaseModel):
 
 class FactorReturnConfig(BaseModel):
     # IC1C-FR-STOPGAP: default-off(ls_returns 時間錯位止血;修復歸 1c-FR-FULL)
+    # enabled flip 延到 F5.2(F0+F2+F3+F4 全綠後)
     enabled: bool = False
     num_quantiles: int = Field(default=5, ge=2, le=20)
     calculate_risk_metrics: bool = True
     risk_free_rate: float = Field(default=0.0, ge=-1.0, le=1.0)
+    # F0.1: 分位冷啟動(與 min_samples 獨立);t < warmup_periods → position=0
+    warmup_periods: int = Field(default=20, ge=0)
+    # F0.1: 全序列最低列數 gate(production 預設 30;test-config 可降,ge=2)
+    min_samples: int = Field(default=30, ge=2)
 
 
 class FactorCentralityConfig(BaseModel):
