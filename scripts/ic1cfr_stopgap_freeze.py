@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""IC1C-FR-STOPGAP §G baseline 凍結腳本(Task 0.1 / B0).
+"""IC1C-FR-STOPGAP / 1c-FR-FULL §G baseline 凍結腳本(Task 0.1 / B0 + FULL B0.1).
 
 用法:
   python scripts/ic1cfr_stopgap_freeze.py --before
   python scripts/ic1cfr_stopgap_freeze.py --check-nodeids
   python scripts/ic1cfr_stopgap_freeze.py --after-default   # Phase 1 佔位
   python scripts/ic1cfr_stopgap_freeze.py --after-explicit  # Phase 1 佔位
+  # 1c-FR-FULL B0.1 profiles:
+  python scripts/ic1cfr_stopgap_freeze.py --profile before-full \\
+      --fixture ic_api_real_kline --out handoffs/ic1cfr_full_baseline/before.json
+  python scripts/ic1cfr_stopgap_freeze.py --profile after-full \\
+      --fixture ic_api_real_kline --out handoffs/ic1cfr_full_baseline/after_full.json
 
 --before:
   1) 真-kline fixture 跑 run_deep_analysis(全模組 enabled)→
@@ -13,6 +18,12 @@
   2) canonical hash(剔除精確 JSON-path 漂移欄後 sha256)→ before.sha256
   3) 凍 factory allowlist + pytest baseline nodeids
   4) lineage: fixture_sha256 / git_head
+
+--profile before-full / after-full (1c-FR-FULL B0.1):
+  真-kline 跑 deep analysis → --out JSON + 印 sha256;
+  before-full 期望 FR unavailable(stopgap 現態)+非 FR 模組 path 值;
+  after-full 同結構骨架(F0 後重凍 ok union;本批僅旗標/骨架);
+  before-full 另凍 decoupling_baseline.txt(R2/R3/R4 計數).
 
 零 runtime 變更:僅新增本腳本與 handoffs/ 產物。
 """
@@ -40,12 +51,18 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 OUT_DIR = REPO_ROOT / "handoffs" / "ic1cfr_stopgap_baseline"
+FULL_BASELINE_DIR = REPO_ROOT / "handoffs" / "ic1cfr_full_baseline"
 FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "ic_api_real_kline.py"
 KLINE_CACHE = REPO_ROOT / "data_cache" / "feature_klines" / "kline_cache.h5"
 BEFORE_JSON = OUT_DIR / "before.json"
 BEFORE_SHA = OUT_DIR / "before.sha256"
 FACTORY_ALLOWLIST = OUT_DIR / "factory_allowlist.txt"
 PYTEST_NODEIDS = OUT_DIR / "pytest_baseline_nodeids.txt"
+FULL_BEFORE_JSON = FULL_BASELINE_DIR / "before.json"
+FULL_AFTER_JSON = FULL_BASELINE_DIR / "after_full.json"
+DECOUPLING_BASELINE = FULL_BASELINE_DIR / "decoupling_baseline.txt"
+ALLOWED_FIXTURES: frozenset[str] = frozenset({"ic_api_real_kline"})
+FULL_PROFILES: frozenset[str] = frozenset({"before-full", "after-full"})
 
 # 與 B0 / Gate B2 相同 suite 與收集規則(T-S10)
 PYTEST_SUITE_ARGS: tuple[str, ...] = (
@@ -1074,8 +1091,232 @@ def freeze_after_explicit() -> int:
     return 0
 
 
+def _resolve_out_path(profile: str, out: str | None) -> Path:
+    """解析 --out;預設 before.json / after_full.json under full baseline dir."""
+    if out:
+        path = Path(out)
+        if not path.is_absolute():
+            path = REPO_ROOT / path
+        return path
+    if profile == "before-full":
+        return FULL_BEFORE_JSON
+    if profile == "after-full":
+        return FULL_AFTER_JSON
+    raise SystemExit(f"FAIL: unknown profile for out path: {profile!r}")
+
+
+def freeze_decoupling_baseline(*, out_path: Path = DECOUPLING_BASELINE) -> str:
+    """跑 check_decoupling.sh,寫 R2/R3/R4 計數 baseline 一行.
+
+    現況 pre-existing 債 R2=1 R3=17 R4=2;gate=baseline-delta 不增。
+    """
+    script = REPO_ROOT / "scripts" / "check_decoupling.sh"
+    if not script.is_file():
+        raise SystemExit(f"FAIL: missing {script}")
+    proc = subprocess.run(
+        ["bash", str(script)],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    matches = re.findall(r"R2=\d+ R3=\d+ R4=\d+", combined)
+    if not matches:
+        raise SystemExit(
+            "FAIL: check_decoupling.sh produced no R2=… R3=… R4=… line; "
+            f"returncode={proc.returncode}\ntail:\n{combined[-1500:]}"
+        )
+    # 取最後一筆(腳本可能多行;canonical 為總結行)
+    line = matches[-1]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    text = line if line.endswith("\n") else line + "\n"
+    out_path.write_text(text, encoding="utf-8")
+    rel = out_path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    print(f"wrote {rel}: {line}")
+    return line
+
+
+def _assert_fixture_name(fixture: str | None) -> None:
+    name = fixture or "ic_api_real_kline"
+    if name not in ALLOWED_FIXTURES:
+        raise SystemExit(
+            f"FAIL: unknown --fixture {name!r}; allowed={sorted(ALLOWED_FIXTURES)}"
+        )
+    if not FIXTURE_PATH.is_file():
+        raise SystemExit(f"FAIL: fixture missing: {FIXTURE_PATH}")
+    if not KLINE_CACHE.is_file():
+        raise SystemExit(f"FAIL: requires_kline: missing {KLINE_CACHE}")
+
+
+def _build_full_profile_payload(
+    profile: str,
+    report_dict: dict[str, Any],
+) -> dict[str, Any]:
+    """1c-FR-FULL baseline payload:頂層 results + report + lineage."""
+    from datetime import datetime, timezone
+
+    generated_at = datetime.now(timezone.utc).isoformat()
+    results = report_dict.get("results") or {}
+    module_summary = report_dict.get("module_summary") or {}
+    if not isinstance(results, dict):
+        raise SystemExit(f"FAIL {profile}: report.results not dict")
+    return {
+        "generated_at": generated_at,
+        "generated_by": f"ic1cfr_stopgap_freeze --profile {profile}",
+        "profile": profile,
+        "lineage": {
+            "fixture_sha256": _sha256_file(FIXTURE_PATH),
+            "fixture_path": FIXTURE_PATH.relative_to(REPO_ROOT).as_posix(),
+            "git_head": _git_head(),
+            "kline_cache": KLINE_CACHE.relative_to(REPO_ROOT).as_posix(),
+            "generated_at": generated_at,
+            "mode": profile,
+            "fixture": "ic_api_real_kline",
+        },
+        "canonical_exclude_json_paths": sorted(CANONICAL_EXCLUDE_JSON_PATHS),
+        # 頂層 results / module_summary:TODO B0.1 驗收「頂層 results 鍵集合」
+        "results": results,
+        "module_summary": module_summary,
+        "deep_analysis": report_dict,
+        "report": report_dict,
+    }
+
+
+def freeze_profile_before_full(*, out: str | None = None, fixture: str | None = None) -> int:
+    """1c-FR-FULL B0.1: stopgap 現態(FR unavailable)+非 FR 模組 path 值.
+
+    寫 --out(預設 handoffs/ic1cfr_full_baseline/before.json)+印 sha256;
+    並凍 decoupling_baseline.txt。
+    """
+    _assert_fixture_name(fixture)
+    out_path = _resolve_out_path("before-full", out)
+
+    report_dict = _report_dict_from_orch(list(ALL_DEEP_MODULES))
+    module_summary = report_dict.get("module_summary") or {}
+    fr_status = module_summary.get("factor_returns")
+    fr_body = (report_dict.get("results") or {}).get("factor_returns")
+
+    if fr_status != "unavailable":
+        raise SystemExit(
+            f"FAIL before-full: module_summary.factor_returns={fr_status!r} "
+            "expected 'unavailable' (stopgap 現態)"
+        )
+    if not isinstance(fr_body, dict):
+        raise SystemExit("FAIL before-full: results.factor_returns missing or not dict")
+    if fr_body.get("status") != "unavailable":
+        raise SystemExit(
+            f"FAIL before-full: union status={fr_body.get('status')!r} expected unavailable"
+        )
+    if fr_body.get("value") is not None:
+        raise SystemExit("FAIL before-full: union value must be null under stopgap")
+    reason = str(fr_body.get("reason") or "")
+    if UNAVAILABLE_REASON not in reason and "ls_returns_timestamp_misaligned" not in reason:
+        raise SystemExit(f"FAIL before-full: unexpected reason={reason!r}")
+    if _has_finite_numeric_leaf(fr_body):
+        raise SystemExit("FAIL before-full: factor_returns still has finite numeric leaf")
+
+    # 非 FR 模組至少一節有內容(path 值凍結用)
+    results = report_dict.get("results") or {}
+    non_fr = [k for k in results if k != "factor_returns"]
+    if not non_fr:
+        raise SystemExit("FAIL before-full: no non-FR module results to freeze")
+
+    payload = _build_full_profile_payload("before-full", report_dict)
+    if "results" not in payload:
+        raise SystemExit("FAIL before-full: payload missing top-level results")
+
+    raw_digest = _write_json(out_path, payload)
+    canon = canonical_sha256(payload)
+    try:
+        rel = out_path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        rel = str(out_path)
+
+    # decoupling baseline(B0.1 硬性)
+    decouple_line = freeze_decoupling_baseline()
+
+    print(f"wrote {rel}")
+    print(f"raw_sha256={raw_digest}")
+    print(f"canonical_sha256={canon}")
+    print(f"module_summary.factor_returns={fr_status}")
+    print("factor_returns_union=unavailable")
+    print(f"non_fr_modules={sorted(non_fr)}")
+    print(f"decoupling_baseline={decouple_line}")
+    print(f"sha256sum {rel} = {raw_digest}")
+    return 0
+
+
+def freeze_profile_after_full(*, out: str | None = None, fixture: str | None = None) -> int:
+    """1c-FR-FULL after-full:同結構骨架;F0 後期望 ok union,本批僅旗標/骨架.
+
+    現況(pre-F0)FR 仍可能 unavailable——仍寫 JSON+sha256 供管線可跑;
+    F0 gate 重凍時若 status==ok 則記錄 schema_version 等。
+    """
+    _assert_fixture_name(fixture)
+    out_path = _resolve_out_path("after-full", out)
+
+    report_dict = _report_dict_from_orch(list(ALL_DEEP_MODULES))
+    module_summary = report_dict.get("module_summary") or {}
+    fr_status = module_summary.get("factor_returns")
+    fr_body = (report_dict.get("results") or {}).get("factor_returns")
+    results = report_dict.get("results") or {}
+    if not isinstance(results, dict) or not results:
+        raise SystemExit("FAIL after-full: report.results missing or empty")
+
+    payload = _build_full_profile_payload("after-full", report_dict)
+    # F0 後:ok union 形狀註記(骨架已支援;未達 ok 不硬 fail——本批 B0 僅骨架)
+    if isinstance(fr_body, dict) and fr_body.get("status") == "ok":
+        value = fr_body.get("value") or {}
+        if isinstance(value, dict):
+            payload["after_full_notes"] = {
+                "factor_returns_status": "ok",
+                "schema_version": value.get("schema_version"),
+                "semantics": value.get("semantics"),
+            }
+    else:
+        payload["after_full_notes"] = {
+            "factor_returns_status": fr_status,
+            "note": (
+                "pre-F0 scaffold: FR not yet ok union; re-freeze after F0 for "
+                "canonical after_full hashes"
+            ),
+        }
+
+    raw_digest = _write_json(out_path, payload)
+    canon = canonical_sha256(payload)
+    try:
+        rel = out_path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        rel = str(out_path)
+
+    print(f"wrote {rel}")
+    print(f"raw_sha256={raw_digest}")
+    print(f"canonical_sha256={canon}")
+    print(f"module_summary.factor_returns={fr_status}")
+    print(f"after_full_notes={payload.get('after_full_notes')}")
+    print(f"sha256sum {rel} = {raw_digest}")
+    return 0
+
+
+def freeze_profile(
+    profile: str,
+    *,
+    out: str | None = None,
+    fixture: str | None = None,
+) -> int:
+    """分派 --profile before-full / after-full."""
+    if profile not in FULL_PROFILES:
+        raise SystemExit(
+            f"FAIL: unknown --profile {profile!r}; allowed={sorted(FULL_PROFILES)}"
+        )
+    if profile == "before-full":
+        return freeze_profile_before_full(out=out, fixture=fixture)
+    return freeze_profile_after_full(out=out, fixture=fixture)
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="IC1CFR stopgap §G freeze")
+    parser = argparse.ArgumentParser(description="IC1CFR stopgap / FULL §G freeze")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--before", action="store_true", help="Freeze pre-stopgap baseline")
     mode.add_argument(
@@ -1093,8 +1334,25 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Diff current suite failures vs B0 pytest_baseline_nodeids.txt",
     )
+    mode.add_argument(
+        "--profile",
+        choices=sorted(FULL_PROFILES),
+        help="1c-FR-FULL baseline profile: before-full | after-full",
+    )
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="Output JSON path (profiles only; default under handoffs/ic1cfr_full_baseline/)",
+    )
+    parser.add_argument(
+        "--fixture",
+        default="ic_api_real_kline",
+        help="Fixture name (only ic_api_real_kline; real kline, no synthetic)",
+    )
     args = parser.parse_args(argv)
 
+    if args.profile:
+        return freeze_profile(args.profile, out=args.out, fixture=args.fixture)
     if args.after_default:
         return freeze_after_default()
     if args.after_explicit:
@@ -1108,3 +1366,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
