@@ -57,19 +57,39 @@ def _populated_allowlist() -> dict[str, Any]:
     }
 
 
+def _assert_b1_raise_only_rows(rows: list) -> None:
+    """B1 Task 1.2：恰 4 個 P2-1-disable raise-only（無 old/new 數值）。"""
+    p21 = [r for r in rows if r.get("class") == "P2-1-disable"]
+    assert len(p21) == 4, f"expected 4 P2-1-disable rows, got {len(p21)}"
+    expected_paths = {
+        "momentum/FeatureEngineering/labels/label_generator.py::generate_returns_by_type",
+        "momentum/Analysis/ic_config_schema.py::return_type Literal",
+        "momentum/Analysis/ic_filter_orchestrator.py:2380",
+        "momentum/Analysis/ic_engine.py::_compute_returns",
+    }
+    assert {r["path"] for r in p21} == expected_paths
+    for r in p21:
+        assert r.get("behavior") == "raises"
+        assert r.get("reason_code") == "LOOKAHEAD_LABEL_UNSUPPORTED"
+        assert r.get("old") is None
+        assert r.get("new") is None
+        assert r.get("index") == "winsorized"
+
+
 @pytest.fixture(scope="module")
 def allowlist() -> dict:
     data = load_allowlist(ALLOWLIST_PATH)
     errs = validate_allowlist_schema(data)
     assert not errs, errs
     assert isinstance(data.get("rows"), list)
-    assert data["rows"] == []  # B0 空 rows
+    # B0 空 rows；B1 append 4× P2-1-disable raise-only（TODO Task 1.2）
+    _assert_b1_raise_only_rows(data["rows"])
     assert set(data.get("class_enum") or []) == CLASS_ENUM
     return data
 
 
 def test_empty_diff_passes(allowlist: dict) -> None:
-    """空 diff + B0 空 rows → PASS。"""
+    """空 diff → PASS（allowlist 可有 B1 raise-only rows；無 unlisted）。"""
     result = validate_diffs([], allowlist)
     assert result.ok is True
     assert result.unexpected_count == 0
@@ -159,10 +179,10 @@ def test_wrong_class_fails() -> None:
 
 
 def test_allowlist_json_loads() -> None:
-    """sanity：attribution_allowlist.json schema + 28 path map。"""
+    """sanity：attribution_allowlist.json schema + 28 path map + B1 raise-only rows。"""
     payload = json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
     assert isinstance(payload.get("rows"), list)
-    assert payload["rows"] == []
+    _assert_b1_raise_only_rows(payload["rows"])
     assert "schema_version" in payload
     assert set(payload["class_enum"]) == CLASS_ENUM
     assert len(payload["class_enum"]) == 8

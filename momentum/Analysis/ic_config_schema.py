@@ -40,16 +40,26 @@ class PreprocessingConfig(BaseModel):
 
 
 class LabelConfig(BaseModel):
+    # LA-2 DEC-1：winsorized 已自 Literal 移除；傳入 → 422 + LOOKAHEAD_LABEL_UNSUPPORTED
     return_type: Literal[
         "simple",
         "log",
         "excess",
         "risk_adjusted",
-        "winsorized",
     ] = "simple"
     horizons: list[int] = [1, 2, 3, 5, 8, 13, 21]
     horizons_time: Optional[list[str]] = None
-    winsorize_returns: bool = True
+
+    @field_validator("return_type", mode="before")
+    @classmethod
+    def _reject_winsorized_return_type(cls, value: Any) -> Any:
+        """winsorized 禁用：固定 reason-code（與 LabelGenerator / orch / engine 一致）。"""
+        if isinstance(value, str) and value == "winsorized":
+            # 延遲 import 避免 schema↔labels 循環；字面量必須與 label_generator 常數一致
+            raise ValueError(
+                "LOOKAHEAD_LABEL_UNSUPPORTED: winsorized return_type is disabled (LA-2 DEC-1)"
+            )
+        return value
 
 
 class EventFilterConfig(BaseModel):

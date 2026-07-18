@@ -269,12 +269,15 @@ def test_compute_rolling_ic_pearson_short_window():
 
 
 def test_compute_returns_fallback():
-    """return_type 不支援時回退 simple。"""
+    """LA-2 B1：return_type 不支援時 fail-closed raise（禁 silent 回退 simple）。"""
     engine = ICEngine({})
     close = pd.Series([1.0, 2.0, 3.0])
 
-    values = engine._compute_returns(close, horizon=1, return_type="unknown")
-    assert np.isclose(values.iloc[0], 1.0)
+    with pytest.raises(ValueError, match="Unsupported return_type"):
+        engine._compute_returns(close, horizon=1, return_type="unknown")
+
+    with pytest.raises(NotImplementedError, match="LOOKAHEAD_LABEL_UNSUPPORTED"):
+        engine._compute_returns(close, horizon=1, return_type="winsorized")
 
 
 def test_select_icir_series_fallbacks():

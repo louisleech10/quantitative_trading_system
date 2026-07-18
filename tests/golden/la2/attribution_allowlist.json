@@ -4,7 +4,8 @@
   "todo_ref": "docs/IC_LA2_TODO.md Task 0.2 / §0.6-APPENDIX C",
   "policy": {
     "unlisted_diff": "unexpected",
-    "b0_rows_empty": true,
+    "b0_rows_empty": false,
+    "b1_raise_only_rows": 4,
     "append_batches": [
       "B1",
       "B2",
@@ -32,7 +33,44 @@
     "P2-3b-promotion-guard",
     "P2-3c-regime-remove"
   ],
-  "rows": [],
+  "rows": [
+    {
+      "path": "momentum/FeatureEngineering/labels/label_generator.py::generate_returns_by_type",
+      "index": "winsorized",
+      "old": null,
+      "new": null,
+      "class": "P2-1-disable",
+      "behavior": "raises",
+      "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    },
+    {
+      "path": "momentum/Analysis/ic_config_schema.py::return_type Literal",
+      "index": "winsorized",
+      "old": null,
+      "new": null,
+      "class": "P2-1-disable",
+      "behavior": "raises",
+      "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    },
+    {
+      "path": "momentum/Analysis/ic_filter_orchestrator.py:2380",
+      "index": "winsorized",
+      "old": null,
+      "new": null,
+      "class": "P2-1-disable",
+      "behavior": "raises",
+      "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    },
+    {
+      "path": "momentum/Analysis/ic_engine.py::_compute_returns",
+      "index": "winsorized",
+      "old": null,
+      "new": null,
+      "class": "P2-1-disable",
+      "behavior": "raises",
+      "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    }
+  ],
   "eval_scope_field_map": {
     "/model_performance/in_sample_train_auc": {
       "eval_scope": "in_sample_research_only",

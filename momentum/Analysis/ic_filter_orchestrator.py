@@ -2375,6 +2375,15 @@ class ICFilterOrchestrator:
         kline_reader: Optional[IKlineReader],
         features_df: Optional[pd.DataFrame] = None,
     ) -> tuple[pd.Series, pd.DataFrame]:
+        # LA-2 DEC-1：winsorized fail-closed — 必須在 preloaded early return 之前，
+        # 使 preloaded labels 與 generate 路徑皆擋（與 LabelGenerator / schema 同 reason）。
+        if config.labels.return_type == "winsorized":
+            from momentum.FeatureEngineering.labels.label_generator import (
+                WINSORIZED_DISABLED_MSG,
+            )
+
+            raise NotImplementedError(WINSORIZED_DISABLED_MSG)
+
         if labels_df is not None and not labels_df.empty:
             label_series = self._select_label_series(labels_df, config)
             return label_series, labels_df

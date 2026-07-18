@@ -47,16 +47,16 @@ def test_generate_risk_adjusted_return_handles_zero_vol():
 
 
 def test_generate_winsorized_return():
-    """測試截尾收益率限制在分位區間內。"""
+    """LA-2 DEC-1：winsorized 禁用，直呼本體亦 raise。"""
+    from momentum.FeatureEngineering.labels.label_generator import WINSORIZED_DISABLED_MSG
+
     close = pd.Series([1.0, 2.0, 100.0, 2.0, 1.0])
     generator = LabelGenerator({})
 
-    result = generator.generate_winsorized_return(close, horizon=1, lower=0.1, upper=0.9)
-    ret = close.shift(-1) / close - 1
-    lo, hi = ret.quantile(0.1), ret.quantile(0.9)
-
-    assert result.max() <= hi or np.isnan(result.max())
-    assert result.min() >= lo or np.isnan(result.min())
+    with pytest.raises(NotImplementedError) as ei:
+        generator.generate_winsorized_return(close, horizon=1, lower=0.1, upper=0.9)
+    assert WINSORIZED_DISABLED_MSG in str(ei.value)
+    assert "LOOKAHEAD_LABEL_UNSUPPORTED" in str(ei.value)
 
 
 def test_generate_returns_by_type_dispatch():

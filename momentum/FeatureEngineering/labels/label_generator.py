@@ -9,6 +9,12 @@ from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+# LA-2 DEC-1：winsorized 標籤禁用；三層 fail-closed 共用 reason-code literal
+LOOKAHEAD_LABEL_UNSUPPORTED = "LOOKAHEAD_LABEL_UNSUPPORTED"
+WINSORIZED_DISABLED_MSG = (
+    f"{LOOKAHEAD_LABEL_UNSUPPORTED}: winsorized return_type is disabled (LA-2 DEC-1)"
+)
+
 
 class LabelGenerator:
     """Multi-horizon binary/regression label generation."""
@@ -71,13 +77,11 @@ class LabelGenerator:
     def generate_winsorized_return(
         self, close: pd.Series, horizon: int, lower: float = 0.01, upper: float = 0.99
     ) -> pd.Series:
-        """Winsorized return"""
-        if lower >= upper:
-            logger.error("lower must be less than upper for winsorized return")
-            raise ValueError("lower must be less than upper for winsorized return")
-        ret = close.shift(-horizon) / close - 1
-        lo, hi = ret.quantile(lower), ret.quantile(upper)
-        return ret.clip(lo, hi)
+        """Winsorized return — 已禁用（LA-2 DEC-1）。
+
+        方法本體 fail-closed：直呼亦 raise，不保留可跑洩漏碼。
+        """
+        raise NotImplementedError(WINSORIZED_DISABLED_MSG)
 
     def generate_returns_by_type(
         self,
@@ -86,13 +90,17 @@ class LabelGenerator:
         return_type: str,
         benchmark_close: pd.Series | None = None,
     ) -> pd.Series:
-        """Dispatch return generation by return_type."""
+        """Dispatch return generation by return_type.
+
+        winsorized → NotImplementedError(LOOKAHEAD_LABEL_UNSUPPORTED)（LA-2 DEC-1）。
+        """
+        if return_type == "winsorized":
+            raise NotImplementedError(WINSORIZED_DISABLED_MSG)
         dispatch = {
             "simple": lambda: self.generate_return(close, horizon),
             "log": lambda: self.generate_log_return(close, horizon),
             "excess": lambda: self.generate_excess_return(close, benchmark_close, horizon),
             "risk_adjusted": lambda: self.generate_risk_adjusted_return(close, horizon),
-            "winsorized": lambda: self.generate_winsorized_return(close, horizon),
         }
         if return_type not in dispatch:
             logger.error("Unsupported return_type: %s", return_type)
