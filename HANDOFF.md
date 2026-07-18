@@ -12,9 +12,12 @@
 - **final gate**:`pytest tests/momentum/test_la2_lookahead.py tests/golden/la2/` → **31 passed 0 skip/xfail** 真 kline。
 - 審計:`handoffs/LA2-*`(RECON/SPEC-ADV/TODO-ADV/FREEZE/B{0..4}-{IMPL,REVIEW,CLOSURE}/B42-DATACORRECT-{claude,composer,codex}/DC-REVERIFY;gitignored 本地)。
 
-## ▶ 下一站(資源分配已決 2026-07-17 使用者=全力 Phase 1,序:LA-2→**1c-FR-FULL**→1d→1f 收完才啟 Phase 2A)
-- **1c-FR-FULL**:因子報酬序列=**單標的逐因子擇時多空**(單 symbol high/low 永不共時,教科書橫截面公式不可行);必正名禁冒充橫截面(memory `project_1cfr_full_p1_canonical`)。
-- 開始照大任務管線:開場稽核 HANDOFF/ROADMAP/master vs repo→聯合偵察(Claude+三委員平行)→SPEC(Claude 起草)→三家 adversarial→凍結→TODO→逐批 Grok 實作+Codex+Composer 雙家 review→三方 DATA-CORRECT。範本=`handoffs/LA{1,2}-*` 全套。
+## ▶ 下一站=**1c-FR-FULL**(資源序 LA-2→1c-FR-FULL→1d→1f;併入 IC-LOOKAHEAD-REMEDIATION epic 的 P1-4/P0-2 分位家族)
+- **canonical**:因子報酬序列=**單標的逐因子擇時多空**(單 symbol high/low 永不共時,教科書橫截面不可行);必正名禁冒充橫截面(memory `project_1cfr_full_p1_canonical`)。
+- **⚠ 開場稽核(2026-07-18)已抓 HANDOFF/ROADMAP 過時 2 處**:①偵察+SPEC **早已完成**(非「從頭走」);②SPEC「已凍結就緒」是**分裂裁決**——R4 Codex/Composer FREEZE-OK 但 **Grok OPEN-R4-1 BLOCKING**(§G winsorize identity vs §C 嚴格 PIT 契約自撞),ROADMAP 只寫半套。
+- **實況/現狀**:`docs/IC1CFR_FULL_SPEC.md` 偵察(`handoffs/1cFRFULL-RECON/LOOKAHEAD-*`)+R1-R4 adversarial 全做完;Claude 已起草 **v0.5 修補**閉合 Grok OPEN-R4-1(採 Grok 選項3:§C 鎖 `winsorize_min_samples=100` no-op 門檻〔已在 line 42〕+§V M-winsorize 明綁 real-kline n≥100、synthetic 7-bar 禁驗 winsorize)。**TODO `docs/IC1CFR_FULL_TODO.md` 尚未生成**;`pit_stats.py`(LA-0 產物)為 PIT 複用目標。
+- **✅ SPEC v0.6 FROZEN(2026-07-18)**:R5 三家確認 OPEN-R4-1 閉合後,使用者質疑「上一站不是已禁 winsorize?」→ 釐清=LA-2 禁的是 winsorized **標籤**、本票是 FR **策略報酬序列** winsorize(兩條不同路徑)→ 交委員會辯存廢 → **四方一致 REMOVE**(FR 是診斷非交易 PnL,裁尾藏尾部;砍掉整包 min_samples/M-winsorize/OPEN-R4-1 複雜度;memory `project_1cfr_winsorize_removed`)。SPEC 改 `ls_return_full=position×future_return`(raw identity)。三家戳記輪 codex+composer+grok RECONCILE-STAMP APPROVED,`reconcile_stamps_check.sh` PASS(body sha256:dd357efd)。審計=`handoffs/1cFRFULL-{WINSOR-PREMISE-*,SPEC-R5-*,SPEC-STAMP-*}`。
+- **下一步=TODO 起草**:Claude 起草 `docs/IC1CFR_FULL_TODO.md`(依凍結 v0.6 SPEC 的 §P Phase DAG F0→F5)→三家 adversarial→TODO 凍結+RECONCILE-STAMP→逐批 Grok 實作+Codex+Composer 雙家 review→三方 DATA-CORRECT。`pit_stats.py`(LA-0)為 PIT qcut 複用目標。範本=`handoffs/LA{0,1,2}-*`。分工=Grok 實作/Codex+Composer 審查。
 
 ## 📌 慣例/環境(沿用)
 - 派工走 `scripts/cx_run.sh <codex|grok|composer> <brief> <output> [effort]`(絕對路徑+固定 template,根除 backtick/&/PATH 反覆犯)。Grok=實作者;reviewer=Codex+Composer;gate.sh dispatch 開 token+register-output。
