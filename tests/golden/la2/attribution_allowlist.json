@@ -1,0 +1,150 @@
+{
+  "schema_version": "la2_attribution_allowlist_v1",
+  "spec_ref": "docs/IC_LA2_SPEC.md §G",
+  "todo_ref": "docs/IC_LA2_TODO.md Task 0.2 / §0.6-APPENDIX C",
+  "policy": {
+    "unlisted_diff": "unexpected",
+    "b0_rows_empty": true,
+    "append_batches": [
+      "B1",
+      "B2",
+      "B3"
+    ],
+    "forbid_append_after_b4_start": true,
+    "class_enum": [
+      "P2-1-disable",
+      "P2-2-oot",
+      "P2-2-scope-tag",
+      "P2-3a-factor-loud",
+      "P2-3a-proxy-causal",
+      "P2-3b-pattern-trainmask",
+      "P2-3b-promotion-guard",
+      "P2-3c-regime-remove"
+    ]
+  },
+  "class_enum": [
+    "P2-1-disable",
+    "P2-2-oot",
+    "P2-2-scope-tag",
+    "P2-3a-factor-loud",
+    "P2-3a-proxy-causal",
+    "P2-3b-pattern-trainmask",
+    "P2-3b-promotion-guard",
+    "P2-3c-regime-remove"
+  ],
+  "rows": [],
+  "eval_scope_field_map": {
+    "/model_performance/in_sample_train_auc": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/fit_pool_auc": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/overfitting_score": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/precision": {
+      "eval_scope": "cv_oof",
+      "consumer": "research_only"
+    },
+    "/model_performance/recall": {
+      "eval_scope": "cv_oof",
+      "consumer": "research_only"
+    },
+    "/model_performance/f1_score": {
+      "eval_scope": "cv_oof",
+      "consumer": "research_only"
+    },
+    "/model_performance/cv_auc_mean": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/cv_auc_std": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/oot_auc": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/calibration_curve": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/brier_score": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/ece": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/pr_curve": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/pr_auc": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/precision_at_k": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/recommend_k": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/expectancy": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/sharpe_proxy": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/bootstrap_ci": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/predictions/train": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/predictions/oot": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/feature_importance": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/feature_importance_all": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/permutation_importance": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/fold_importance_stability": {
+      "eval_scope": "cv_oof",
+      "consumer": "research_only"
+    },
+    "/model_performance/shap_sample": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/regime_analysis": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/cross_symbol_validation": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    }
+  }
+}

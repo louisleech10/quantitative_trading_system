@@ -1,0 +1,23 @@
+{
+  "caller": "XGBoostAnalyzer.train_model",
+  "cv_folds": 3,
+  "eval_size": 0.2,
+  "face": "model",
+  "return_type": "simple",
+  "time_series_split": true,
+  "xgboost_params": {
+    "colsample_bytree": 1.0,
+    "eval_metric": "auc",
+    "learning_rate": 0.1,
+    "max_depth": 3,
+    "min_child_weight": 1,
+    "n_estimators": 30,
+    "n_jobs": 1,
+    "random_state": 42,
+    "reg_alpha": 0.0,
+    "reg_lambda": 1.0,
+    "subsample": 1.0,
+    "tree_method": "hist",
+    "use_label_encoder": false
+  }
+}
