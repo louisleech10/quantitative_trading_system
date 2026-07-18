@@ -1,19 +1,19 @@
-"""LA-2 M-lookahead 測試（B0 骨架 12 nodeid；B1–B3 已填實）。
+"""LA-2 M-lookahead 測試（B0 骨架 12 nodeid；B1–B4 mutation 全套）。
 
 SPEC: docs/IC_LA2_SPEC.md
-TODO: docs/IC_LA2_TODO.md Task 0.3 / 1.1 / 2.* / 3.*
+TODO: docs/IC_LA2_TODO.md Task 0.3 / 1–3.* / 4.1
 
-collect == 12:
-  - test_winsorized_disabled          ← B1
-  - test_model_oot_contract           ← B2
-  - test_model_service_oot            ← B2
+collect == 12（0 skip / 0 xfail）:
+  - test_winsorized_disabled          ← B1 C-1 raise（非 flip）
+  - test_model_oot_contract           ← B2 軌2 provenance（OOT 嚴格 < / OOF digest）
+  - test_model_service_oot            ← B2/B4 全矩陣 scope + cross_symbol deny
   - test_config_theater               ← B2
   - test_calibrator_receipt           ← B2
-  - test_pattern_train_mask           ← B3
-  - test_pattern_promotion_guard      ← B3
+  - test_pattern_train_mask           ← B3/B4 C-2 early flip 改前>0 改後=0
+  - test_pattern_promotion_guard      ← B3 C-2 晉升 provenance
   - test_plan_identity_mismatch       ← B3
-  - test_regime_no_global_fit         ← B3
-  - test_factor_loud                  ← B3
+  - test_regime_no_global_fit         ← B3 C-1 regime 移除不可達
+  - test_factor_loud                  ← B3/B4 C-3 loud + control deep-equal + proxy
   - test_adversarial_validator_diagnostic_only  ← B3
   - test_analysis_status_diagnostic   ← B3
 
@@ -623,6 +623,101 @@ def test_model_service_oot() -> None:
     assert "P2-2-oot" in classes
     assert "P2-2-scope-tag" in classes
 
+    # --- B4 T14/U17：真走 xgboost_batch_service 產線 cross_symbol 路徑 ---
+    # 必呼 service._build_cross_symbol_validation（內含 eligibility + LOSO）；
+    # 移除/改壞 service 內 run_leave_one_symbol_out 呼叫 → 本段必 FAIL。
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from api.services.xgboost_batch_service import XGBoostBatchService
+    from momentum.Analysis.cross_symbol_validator import CrossSymbolValidator
+
+    batch_src = (
+        _REPO_ROOT / "api" / "services" / "xgboost_batch_service.py"
+    ).read_text(encoding="utf-8")
+    assert "run_leave_one_symbol_out" in batch_src
+    assert "if len(indices) < 10:" in batch_src  # eligibility 閘門
+    assert "_build_cross_symbol_validation" in batch_src
+    # _run_batch_analysis 必須接線呼叫產線方法（只留 helper 不接線 → 紅）
+    assert "self._build_cross_symbol_validation(" in batch_src
+
+    rng_cs = np.random.default_rng(42)
+    # 插入序非字母序；ADA < min_rows → ineligible；eligible = ETH+BTC（≥2）
+    symbol_order = ["ETHUSDT", "BTCUSDT", "ADAUSDT"]
+    row_counts = {"ETHUSDT": 36, "BTCUSDT": 40, "ADAUSDT": 5}
+    X_chunks: list[np.ndarray] = []
+    y_chunks: list[np.ndarray] = []
+    case_symbols: list[str] = []
+    for sym in symbol_order:
+        n = row_counts[sym]
+        Xs = rng_cs.normal(size=(n, 3))
+        ys = (rng_cs.random(n) > 0.45).astype(int)
+        ys[0], ys[1] = 0, 1  # 雙類別，AUC 可算
+        X_chunks.append(Xs)
+        y_chunks.append(ys)
+        case_symbols.extend([sym] * n)
+    X_cs = np.vstack(X_chunks)
+    y_cs = np.concatenate(y_chunks)
+    valid_cases_cs = [SimpleNamespace(symbol=s) for s in case_symbols]
+
+    # 真 service 實例：走產線方法（非鏡像 CrossSymbolValidator 直呼）
+    service = XGBoostBatchService.__new__(XGBoostBatchService)
+    service.logger = MagicMock()
+    service.cross_symbol_validator = CrossSymbolValidator(
+        params={"n_estimators": 8, "n_jobs": 1, "verbosity": 0, "max_depth": 2}
+    )
+    cross_list = service._build_cross_symbol_validation(
+        symbols=symbol_order,
+        valid_cases=valid_cases_cs,
+        X=X_cs,
+        y=y_cs,
+    )
+    assert cross_list is not None, (
+        "batch service cross_symbol 產線必須回傳 LOSO list（None=LOSO 未跑/失敗）"
+    )
+    assert isinstance(cross_list, list)
+    assert len(cross_list) >= 2
+    targets = sorted(r["target_symbol"] for r in cross_list)
+    # ADAUSDT <10 必須被 eligibility 剔除；eligible top-2 = BTC+ETH
+    assert "ADAUSDT" not in targets
+    eligible = ["BTCUSDT", "ETHUSDT"]
+    assert targets == eligible
+
+    # 同 batch Step9 尾：list payload → apply_service_matrix_scopes
+    cross_raw = {
+        "model_performance": {
+            "in_sample_train_auc": 0.8,
+            "cv_auc_mean": 0.7,
+            "brier_score": 0.2,
+            "pr_auc": 0.4,
+        },
+        "cross_symbol_validation": cross_list,
+        "feature_importance": [{"feature": "f0", "importance": 0.5}],
+        "shap_sample": {"sample_size": 5},
+        "precision_at_k": {"recommended_k": 5, "precision_at_k": {5: 0.9}},
+        "expectancy": {"expectancy": 0.01},
+        "bootstrap_ci": {},
+        "predictions": {},
+        "permutation_importance": {},
+        "fold_importance_stability": {},
+        "regime_analysis": None,
+        "oot_receipt": None,
+    }
+    scoped_cs = apply_service_matrix_scopes(cross_raw, has_oot_held_out=False)
+    assert "cross_symbol_validation" in scoped_cs["matrix_consumer_deny"]
+    assert scoped_cs["matrix_eval_scope"].get("cross_symbol_validation") == (
+        "in_sample_research_only"
+    )
+    # 不得被標成 oot（本票無 LOSO receipt / 非 oot 分支）
+    assert scoped_cs["matrix_eval_scope"].get("cross_symbol_validation") != "oot"
+    cs_payload = scoped_cs.get("cross_symbol_validation") or {}
+    assert isinstance(cs_payload, dict)
+    assert cs_payload.get("eval_scope") == "in_sample_research_only"
+    assert cs_payload.get("consumer") == "deny"
+    items = cs_payload.get("items") or []
+    assert len(items) >= 2
+    assert sorted(r["target_symbol"] for r in items) == eligible
+
 
 def test_config_theater() -> None:
     """B2：calibrator/sample_weight enabled=true,wired=false 可見。"""
@@ -837,6 +932,17 @@ def test_pattern_train_mask() -> None:
             # threshold ≠ confidence（可證偽：誤用 confidence 當 threshold）
             assert thr != r.confidence or abs(thr) > 1.0 or thr == 0.0
 
+    # --- B4 C-2：legacy full-sample early-flip 改前>0；train-mask 改後=0 ---
+    from tests.golden.la2.gen_baseline import _pattern_early_flip_manifest
+
+    legacy_flip = _pattern_early_flip_manifest(X, y)
+    n_th_legacy = int(legacy_flip["pattern"]["n_threshold_flip"])
+    n_cf_legacy = int(legacy_flip["pattern"]["n_confidence_flip"])
+    assert n_th_legacy > 0 and n_cf_legacy > 0, (
+        f"C-2 mutation oracle requires pre-fix full-sample flip>0; "
+        f"got th={n_th_legacy} cf={n_cf_legacy}"
+    )
+
     # trunc 未來：train-y-only → early 門檻/confidence 不因未來翻轉
     n_keep = 320
     X_trunc = X.iloc[:n_keep]
@@ -863,8 +969,25 @@ def test_pattern_train_mask() -> None:
         for r in rules_trunc
         if len(r.feature_conditions) == 1
     }
-    # train 段相同 → 單特徵門檻集合應一致
+    # train 段相同 → 單特徵門檻集合應一致 → post-fix flip count = 0
     assert thr_full == thr_trunc, (thr_full, thr_trunc)
+    conf_full = {r.rule_id: r.confidence for r in rules}
+    conf_trunc = {r.rule_id: r.confidence for r in rules_trunc}
+    shared_ids = set(conf_full) & set(conf_trunc)
+    assert shared_ids, "need shared rule_ids for confidence flip=0"
+    n_conf_flip_post = sum(
+        1
+        for rid in shared_ids
+        if not np.isclose(conf_full[rid], conf_trunc[rid], atol=_ATOL, rtol=0.0)
+    )
+    assert n_conf_flip_post == 0, (
+        f"C-2 train-mask post-fix confidence flip must be 0, got {n_conf_flip_post}"
+    )
+    n_thr_flip_post = 0 if thr_full == thr_trunc else 1
+    assert n_thr_flip_post == 0
+    # 可證偽對照：legacy full-sample flip 仍 >0（改前），post train-mask =0（改後）
+    assert n_th_legacy > 0 and n_thr_flip_post == 0
+    assert n_cf_legacy > 0 and n_conf_flip_post == 0
 
 
 def test_pattern_promotion_guard() -> None:
@@ -1068,8 +1191,9 @@ def test_plan_identity_mismatch() -> None:
 
 
 def test_regime_no_global_fit() -> None:
-    """B3：_fit_global / expanding 參數移除不可達。"""
+    """B3/B4：_fit_global / expanding 參數移除不可達；golden face == control PIT。"""
     import inspect
+    import json
 
     from momentum.Analysis.regime_detector import RegimeDetector
     from momentum.factories import create_regime_detector
@@ -1090,6 +1214,16 @@ def test_regime_no_global_fit() -> None:
     r2 = det.detect(close)
     assert len(r1.labels) == len(close)
     np.testing.assert_array_equal(r1.labels, r2.labels)
+
+    # B4：重基準後 regime_fit_global.labels == control.regime_pit（PIT-only）
+    for name in ("BTCUSDT_1h_baseline.json", "ETHUSDT_12h_baseline.json"):
+        bl = json.loads(
+            (_REPO_ROOT / "tests" / "golden" / "la2" / name).read_text(encoding="utf-8")
+        )
+        rg = (bl.get("regime_fit_global") or {}).get("labels_sha256")
+        cp = ((bl.get("control") or {}).get("regime_pit") or {}).get("labels_sha256")
+        assert rg and cp and rg == cp, f"{name}: regime face must equal control PIT"
+        assert (bl.get("regime_fit_global") or {}).get("pit_only") is True
 
 
 def test_factor_loud() -> None:
@@ -1184,13 +1318,14 @@ def test_factor_loud() -> None:
 
     # B3-F9：orchestrator production 結果保留 typed_result（非純 asdict）
     orch = ICFilterOrchestrator.__new__(ICFilterOrchestrator)
+    close_series = pd.Series(
+        100 + np.cumsum(rng.normal(0, 1, len(factors))),
+        index=factors.index,
+    )
     orch._ic_cache = {
         "features_df": factors,
         "icir": {"f0": 0.1, "f1": 0.05, "f2": 0.02},
-        "close_series": pd.Series(
-            100 + np.cumsum(rng.normal(0, 1, len(factors))),
-            index=factors.index,
-        ),
+        "close_series": close_series,
     }
     orth_cfg = SimpleNamespace(
         method="gram_schmidt",
@@ -1213,6 +1348,87 @@ def test_factor_loud() -> None:
                 "deep_analysis": {"factor_orthogonalization": prod},
             }
         )
+
+    # B4-F1：產線 _run_factor_exposure 必須用 trailing close-ret（lag≥1）
+    # 產線 ic_filter_orchestrator:2155-2156 改 shift(-1) 時本段必 FAIL
+    from unittest.mock import patch
+
+    from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
+    from momentum.Analysis.ic_config_schema import ICConfig
+
+    captured_proxy: dict[str, pd.Series] = {}
+    real_neutralize = FactorExposureAnalyzer.neutralize_factor_matrix
+
+    def _spy_neutralize(
+        self: object,
+        factor_values: pd.DataFrame,
+        market_proxy: pd.Series,
+        mode: str,
+        lookback: int,
+    ):
+        captured_proxy["market_proxy"] = market_proxy.copy()
+        return real_neutralize(self, factor_values, market_proxy, mode, lookback)
+
+    ic_cfg = ICConfig()
+    with patch.object(
+        FactorExposureAnalyzer, "neutralize_factor_matrix", _spy_neutralize
+    ):
+        exp_prod = ICFilterOrchestrator._run_factor_exposure(
+            orch, list(factors.columns), ic_cfg
+        )
+    assert exp_prod.get("proxy_kind") == "trailing_close_ret"
+    assert int(exp_prod.get("proxy_lag") or 0) == 1
+    assert isinstance(exp_prod.get("typed_result"), FactorModuleResult)
+    assert exp_prod["oos_guarantees"] is False
+    assert "market_proxy" in captured_proxy
+    lag1 = close_series.pct_change().shift(1)
+    forward = close_series.pct_change().shift(-1)
+    mp = captured_proxy["market_proxy"]
+    # 真值：proxy == lag1；≠ forward（產線改 shift(-1) → 此 assert 紅）
+    np.testing.assert_allclose(
+        mp.fillna(0).to_numpy(),
+        lag1.reindex(mp.index).fillna(0).to_numpy(),
+        atol=_ATOL,
+        equal_nan=True,
+    )
+    assert not np.allclose(
+        mp.fillna(0).to_numpy(),
+        forward.reindex(mp.index).fillna(0).to_numpy(),
+        equal_nan=False,
+    ), "production market_proxy must not equal forward pct_change().shift(-1)"
+
+    # B4 C-3：factor OFF control deep-equal + proxy-causal face 歸因存在
+    import json
+
+    from tests.golden.la2.attribution_validator import (
+        load_allowlist,
+        validate_diffs,
+    )
+
+    al = load_allowlist(_REPO_ROOT / "tests/golden/la2/attribution_allowlist.json")
+    # control factor_disabled 在 BTC/ETH baseline 均 skipped
+    for name in ("BTCUSDT_1h_baseline.json", "ETHUSDT_12h_baseline.json"):
+        bl = json.loads(
+            (_REPO_ROOT / "tests/golden/la2" / name).read_text(encoding="utf-8")
+        )
+        ctrl = (bl.get("control") or {}).get("factor_disabled") or {}
+        assert ctrl.get("enabled") is False
+        assert ctrl.get("skipped") is True
+        # GS/PCA 算法面 control 路徑：enabled face 的 gs/pca 與 B0 byte-stable
+        # （EXPECTED_FACE 已鎖；此處斷言 proxy_kind 因果）
+        exp = ((bl.get("factor") or {}).get("exposure") or {})
+        assert exp.get("proxy_kind") == "trailing_close_ret"
+        assert int(exp.get("proxy_lag") or 0) == 1
+    # face rebaseline diffs 全列 allowlist → 0 unexpected
+    face_diffs = [
+        r
+        for r in (al.get("rows") or [])
+        if r.get("behavior") == "face_rebaseline"
+        and r.get("class") == "P2-3a-proxy-causal"
+    ]
+    assert len(face_diffs) >= 2  # BTC+ETH exposure
+    result = validate_diffs(face_diffs, al)
+    assert result.ok is True and result.unexpected_count == 0
 
 
 def test_adversarial_validator_diagnostic_only() -> None:

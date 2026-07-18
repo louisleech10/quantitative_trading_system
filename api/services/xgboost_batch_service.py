@@ -959,33 +959,13 @@ class XGBoostBatchService:
                 "samples": sample_values.tolist()
             }
 
-            # 跨幣種泛化驗證（至少兩個標的）
-            cross_symbol_validation = None
-            if len(symbols) >= 2:
-                try:
-                    X_by_symbol: Dict[str, np.ndarray] = {}
-                    y_by_symbol: Dict[str, np.ndarray] = {}
-                    symbol_indices: Dict[str, List[int]] = {sym: [] for sym in symbols}
-
-                    for idx, case in enumerate(valid_cases):
-                        if case.symbol in symbol_indices:
-                            symbol_indices[case.symbol].append(idx)
-
-                    for sym, indices in symbol_indices.items():
-                        if len(indices) < 10:
-                            continue
-                        X_by_symbol[sym] = X[indices]
-                        y_by_symbol[sym] = y[indices]
-
-                    if len(X_by_symbol) >= 2:
-                        results = self.cross_symbol_validator.run_leave_one_symbol_out(
-                            symbols=list(X_by_symbol.keys()),
-                            X_by_symbol=X_by_symbol,
-                            y_by_symbol=y_by_symbol
-                        )
-                        cross_symbol_validation = [r.to_dict() for r in results]
-                except Exception as e:
-                    self.logger.warning(f"跨幣種泛化驗證失敗: {str(e)}")
+            # 跨幣種泛化驗證（至少兩個標的）——產線路徑見 _build_cross_symbol_validation
+            cross_symbol_validation = self._build_cross_symbol_validation(
+                symbols=symbols,
+                valid_cases=valid_cases,
+                X=X,
+                y=y,
+            )
             
             # ===== Step 8: 儲存模型 =====
             self.task_manager.update_progress(task_id, 95, '儲存模型', '儲存分析結果...')
@@ -1125,6 +1105,48 @@ class XGBoostBatchService:
         """取得預測 DataFrame（若有快取）"""
         cached = self.task_cache.get_result(task_id)
         return cached.predictions_df if cached else None
+
+    def _build_cross_symbol_validation(
+        self,
+        symbols: List[str],
+        valid_cases: List[Any],
+        X: np.ndarray,
+        y: np.ndarray,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """跨幣種 LOSO 產線路徑（eligibility min_rows=10 + LOSO + list payload）。
+
+        由 `_run_batch_analysis` 呼叫；B4 測試亦直接呼叫本方法以鎖住
+        `self.cross_symbol_validator.run_leave_one_symbol_out` 接線
+        （移除/改壞該呼叫 → 測試必 FAIL）。
+        """
+        if len(symbols) < 2:
+            return None
+        try:
+            X_by_symbol: Dict[str, np.ndarray] = {}
+            y_by_symbol: Dict[str, np.ndarray] = {}
+            symbol_indices: Dict[str, List[int]] = {sym: [] for sym in symbols}
+
+            for idx, case in enumerate(valid_cases):
+                if case.symbol in symbol_indices:
+                    symbol_indices[case.symbol].append(idx)
+
+            for sym, indices in symbol_indices.items():
+                if len(indices) < 10:
+                    continue
+                X_by_symbol[sym] = X[indices]
+                y_by_symbol[sym] = y[indices]
+
+            if len(X_by_symbol) >= 2:
+                results = self.cross_symbol_validator.run_leave_one_symbol_out(
+                    symbols=list(X_by_symbol.keys()),
+                    X_by_symbol=X_by_symbol,
+                    y_by_symbol=y_by_symbol,
+                )
+                return [r.to_dict() for r in results]
+            return None
+        except Exception as e:
+            self.logger.warning(f"跨幣種泛化驗證失敗: {str(e)}")
+            return None
 
     def _build_sequence_features(
         self,

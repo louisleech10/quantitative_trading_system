@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""LA-2 B0: 可重現改前 golden baseline（四面 legacy + control + 軌2 index identity）。
+"""LA-2 B4 rebaseline golden（post B1/B2/B3；B0 legacy face 另凍 B0_LEGACY_*）。
 
-SPEC: docs/IC_LA2_SPEC.md §G / B0.1
-TODO: docs/IC_LA2_TODO.md Task 0.1（U6/U19）
+SPEC: docs/IC_LA2_SPEC.md §G / B4.1
+TODO: docs/IC_LA2_TODO.md Task 4.1（+ Task 0.1 入口契約）
 
 入口契約（T7 / analyzer 直呼，禁 orch.analyze 副作用）:
   - kline: data_cache/feature_klines/kline_cache.h5 → /{SYMBOL}/{tf}/data
   - features: 複用 LA-0 真實 HDF5（非合成）
   - 四面 caller:
-      ① pattern → PatternExtractor.extract_decision_rules
-      ② regime_fit_global → RegimeDetector.detect(expanding=False)
-      ③ factor → FactorOrthogonalizer.gram_schmidt/pca + FactorExposureAnalyzer
+      ① pattern → PatternExtractor.extract_decision_rules(train SplitPlan)
+      ② regime_fit_global → RegimeDetector.detect(PIT-only；_fit_global 已移除)
+      ③ factor → FactorOrthogonalizer + FactorExposureAnalyzer(trailing close-ret)
       ④ model → XGBoostAnalyzer.train_model + service 全矩陣
          (predictions/recommend_k/precision@K/expectancy/sharpe/
           bootstrap_ci/permutation/fold_importance/shap；
-          cross_symbol 明列 exclude)
+          cross_symbol 明列 exclude；B4 unit 另走 LOSO smoke)
   - winsorized **不列** baseline（DEC-1 禁用 → oracle=raises）
   - persist 隔離：不觸發產線 save_report / data_cache/reports
 
@@ -22,7 +22,8 @@ TODO: docs/IC_LA2_TODO.md Task 0.1（U6/U19）
   pattern / regime_fit_global / factor / model
 
 control:
-  regime_pit (expanding=True) / factor_disabled / pattern_not_extracted
+  regime_pit (PIT) / factor_disabled / pattern_not_extracted
+  （control 面 byte-equal B0 stamp）
 
 --check assert:
   ① 兩 input kline sha literal 重驗
@@ -70,8 +71,8 @@ INPUTS_DIR = OUTPUT_DIR / "inputs"
 KLINE_CACHE_DIR = "data_cache/feature_klines"
 KLINE_H5_PATH = REPO_ROOT / KLINE_CACHE_DIR / "kline_cache.h5"
 KLINE_H5_GROUP_TEMPLATE = "/{symbol}/{timeframe}/data"
-SCHEMA_VERSION = "la2_b0_v1"
-CONTROL_SCHEMA_VERSION = "la2_b0_control_v1"
+SCHEMA_VERSION = "la2_b4_v1"
+CONTROL_SCHEMA_VERSION = "la2_b4_control_v1"
 
 # U6 cold-start dataset sha literals（與 LA-1 同源檔）
 EXPECTED_KLINE: dict[tuple[str, str], dict[str, Any]] = {
@@ -143,14 +144,14 @@ EVAL_SIZE = 0.2
 CV_FOLDS = 3
 HORIZON_BARS = 1  # binary label = sign of next-bar simple return
 
-# B0-F2：凍結 baseline file sha256 literal（--check 竄改任一面值 → FAIL）
-# 由 write 後重算填入；改 n_rules / train_auc / labels 等任一面 → 檔案 digest 必變。
+# B4 rebaseline 後凍結 file sha256 literal（--check 竄改任一面值 → FAIL）
+# 由 write 後重算填入；改 n_rules / in_sample_train_auc / labels 等任一面 → 檔案 digest 必變。
 EXPECTED_BASELINE_FILE_SHA256: dict[str, str] = {
     "BTCUSDT_1h_baseline.json": (
-        "5db5cb62a74ee4b4f244af1fadcd01424ac4b57c40f15c70475f60f0301e49d2"
+        "4ff4d2e7fd6d3afb379f4516460da90029c07df70c2f68e55658d1b1f63a4c10"
     ),
     "ETHUSDT_12h_baseline.json": (
-        "1151631e933c5f0c2b89bd3831e5552e89b8a6a64fc45be562a14c3f013c9244"
+        "11aabdd49566529097813742bcd397c9c9e0fae105f271334f263cedbef895e2"
     ),
 }
 
@@ -171,8 +172,9 @@ FACE_VALUE_HASH_PATHS: tuple[str, ...] = (
     "control.regime_pit.labels_sha256",
 )
 
-# write 後 stamp；--check 比對（竄改任一面值 → FAIL）
-EXPECTED_FACE_VALUE_HASHES: dict[str, dict[str, Any]] = {
+# B0 legacy face 凍結（commit 463bfb5；B4-F4 真 diff 對照，非 self-referential allowlist）
+# control / GS / PCA / model index+perf+service 應與 B4 live 同；pattern/regime/exposure 為改前值。
+B0_LEGACY_FACE_VALUE_HASHES: dict[str, dict[str, Any]] = {
     "BTCUSDT_1h_baseline.json": {
         "control.regime_pit.labels_sha256": "dce7c33c76c8d4c530d2013470d26e4186a85a0a4b59509f02b7b2916d3186af",
         "factor.exposure.beta_neutral_value_sha256": "2fc88ac6c6a42294b30fddda46e5d2d475b6c0c123b00dab7c278be00b8766de",
@@ -201,6 +203,42 @@ EXPECTED_FACE_VALUE_HASHES: dict[str, dict[str, Any]] = {
         "pattern.n_rules": 8,
         "pattern.threshold_value_sha256": "fb2e5821d88520df337ac3f71244c576521bfb65e5515c1ebd7dac92e3c1ebb5",
         "regime_fit_global.labels_sha256": "73de118ed59c97271c2fc9ef19f1c50851dbdbea0e8748ef37b8585001b3c3e4",
+        "regime_fit_global.name_set_sha256": "77607ef9f51409176605c820717e1e73ad602f2ef8840b4e179d52ceab1066cb",
+    },
+}
+
+# write 後 stamp（B4 rebaseline）；--check 比對（竄改任一面值 → FAIL）
+# control.regime_pit / factor.gs|pca / model.index_identity|performance|service_matrix 與 B0 byte-equal；
+# 修改路徑：pattern train-mask、regime_fit_global→PIT、factor exposure proxy-causal。
+EXPECTED_FACE_VALUE_HASHES: dict[str, dict[str, Any]] = {
+    "BTCUSDT_1h_baseline.json": {
+        "control.regime_pit.labels_sha256": "dce7c33c76c8d4c530d2013470d26e4186a85a0a4b59509f02b7b2916d3186af",
+        "factor.exposure.beta_neutral_value_sha256": "a84e59c72c4dd47418b5f4e61d0200d8314c1242ff3f7b358e941e8747bfd488",
+        "factor.gram_schmidt.value_sha256": "9ff82b0fa1b88d182a2e052988aa580e2fed8d68d82d3cee9bbb4ae7f0a260e5",
+        "factor.pca.value_sha256": "23d66d29e38c834b4548b1d9a616682afbabe16081d4ee5a5876739c569d8ed2",
+        "model.index_identity.eval_idx_hash": "2f18a447cc0e3afe5e7fce2e879b987891f09c4290cc98f1d62a622eedd2816a",
+        "model.index_identity.fit_idx_hash": "0d10b5c25c1690d937b0f9beb47a825b9c5c3599a9264853eb41a84ee168a61f",
+        "model.performance_value_sha256": "0c62130cbde8e65a4a241d771cb27d60ee61a17aec2ed377a2ff4616dcc3c22d",
+        "model.service_matrix.matrix_value_sha256": "26b4c0c8d500dee05c87eb357e8ff51046b3dbf0b29136fbdd8592fe45d131b1",
+        "pattern.confidence_value_sha256": "5b304771b363decd64db4ad1f60b6eea34d7db33c5f344fbfc7c2d1eb7b26972",
+        "pattern.n_rules": 6,
+        "pattern.threshold_value_sha256": "bfdf521263e6a41e06edb0452e57f38e1588e5498c8a5030cfc5c2c60501c30b",
+        "regime_fit_global.labels_sha256": "dce7c33c76c8d4c530d2013470d26e4186a85a0a4b59509f02b7b2916d3186af",
+        "regime_fit_global.name_set_sha256": "77607ef9f51409176605c820717e1e73ad602f2ef8840b4e179d52ceab1066cb",
+    },
+    "ETHUSDT_12h_baseline.json": {
+        "control.regime_pit.labels_sha256": "bd529dd3905f10ab7cbe1d06809b89571aaea9632b6f368b247a07ffe529799c",
+        "factor.exposure.beta_neutral_value_sha256": "2351204a20e3eba72a5969241e65ea286d203ce4fbb7db43ba8bed8285149588",
+        "factor.gram_schmidt.value_sha256": "95f53add33db873106783c5a6a416cbf93fdc9ec27a38aeb2e5c801213b6d74e",
+        "factor.pca.value_sha256": "2ff63630b2d08acaa37626771a9696010330d3fadb02e3b36f508b5eb06bcc33",
+        "model.index_identity.eval_idx_hash": "3c062920a9d64447d12b59dba8b7cf4448a7d61f900b5b0b66cf4e9ff9a9ae5a",
+        "model.index_identity.fit_idx_hash": "96f4490491734dc4345339789408cad5ac83bac8b37a634c963a4f9ddfa926b1",
+        "model.performance_value_sha256": "7d22764ba7a0b577fed49a0b025aa63ee14c845f9999248f031228fd97a0dc62",
+        "model.service_matrix.matrix_value_sha256": "80866e511e5c9f6b07ce9556439e92c6906c8ae88a2a668e1ad67664cbfb7d2e",
+        "pattern.confidence_value_sha256": "cf58351d16585311e383913eaaf65183aad4ae65f90d2b19c3298374f21cb454",
+        "pattern.n_rules": 8,
+        "pattern.threshold_value_sha256": "e8de4c8cbd70b0784ba967c8415e94f288bbc0030bda947a7b3dc9d6548c8510",
+        "regime_fit_global.labels_sha256": "bd529dd3905f10ab7cbe1d06809b89571aaea9632b6f368b247a07ffe529799c",
         "regime_fit_global.name_set_sha256": "77607ef9f51409176605c820717e1e73ad602f2ef8840b4e179d52ceab1066cb",
     },
 }
@@ -638,9 +676,12 @@ def _run_regime_face(
     *,
     expanding: bool,
 ) -> dict[str, Any]:
-    """C-1：RegimeDetector.detect — expanding=False → _fit_global legacy。"""
+    """C-1：RegimeDetector.detect — B3 後僅 PIT；expanding 參數僅作 face 標籤。
+
+    B4 rebaseline：regime_fit_global face == control.regime_pit（_fit_global 已移除）。
+    """
     detector = create_regime_detector(n_clusters=4, lookback=55)
-    # LA-2 B3: expanding/_fit_global removed; always PIT (face metadata still records intended legacy flag)
+    # LA-2 B3: expanding/_fit_global removed; always PIT
     result = detector.detect(close, volume)
     labels = [str(x) for x in result.labels]
     if isinstance(close.index, pd.DatetimeIndex):
@@ -652,12 +693,9 @@ def _run_regime_face(
     # JSON 鍵一律 Python 原生型別
     ts_list_i = [int(t) for t in ts_list]
     return {
-        "caller": (
-            "RegimeDetector.detect(expanding=False→_fit_global)"
-            if not expanding
-            else "RegimeDetector.detect(expanding=True→PIT)"
-        ),
-        "expanding": bool(expanding),
+        "caller": "RegimeDetector.detect(PIT_only;_fit_global_removed)",
+        "expanding": bool(expanding),  # face tag only; runtime always PIT
+        "pit_only": True,
         "method": str(result.method),
         "n_clusters": int(result.n_clusters),
         "len": int(len(labels)),
@@ -761,7 +799,8 @@ def _run_factor_face(
         "exposure": {
             **exp_payload,
             "beta_neutral_value_sha256": neut_hash,
-            "proxy_kind_legacy": "forward_label_series",
+            "proxy_kind": "trailing_close_ret",
+            "proxy_lag": 1,
             "proxy_sha256": _hash_float_array(
                 proxy.to_numpy(dtype=float)
             ),
@@ -1307,8 +1346,8 @@ def run_one(run: dict[str, str]) -> dict[str, Any]:
     rows, sha16 = _kline_group_dataset_sha16(symbol, timeframe)
     baseline: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
-        "spec_ref": "docs/IC_LA2_SPEC.md §G / B0.1",
-        "todo_ref": "docs/IC_LA2_TODO.md Task 0.1",
+        "spec_ref": "docs/IC_LA2_SPEC.md §G / B4.1",
+        "todo_ref": "docs/IC_LA2_TODO.md Task 4.1",
         "symbol": symbol,
         "timeframe": timeframe,
         "config_hash": config_hash,
@@ -1322,13 +1361,18 @@ def run_one(run: dict[str, str]) -> dict[str, Any]:
             "kline_rows": rows,
             "kline_sha16": sha16,
             "callers": {
-                "pattern": "PatternExtractor.extract_decision_rules",
-                "regime_fit_global": "RegimeDetector.detect(expanding=False)",
-                "factor": "FactorOrthogonalizer + FactorExposureAnalyzer",
+                "pattern": "PatternExtractor.extract_decision_rules(train SplitPlan)",
+                "regime_fit_global": "RegimeDetector.detect(PIT_only)",
+                "factor": "FactorOrthogonalizer + FactorExposureAnalyzer(trailing_close_ret)",
                 "model": "XGBoostAnalyzer.train_model(time_series_split=True)",
             },
             "winsorized_listed": False,
-            "note": "winsorized excluded (DEC-1 disable → oracle=raises)",
+            "note": (
+                "B4 rebaseline post B1/B2/B3; winsorized excluded "
+                "(DEC-1 disable → oracle=raises); control paths byte-equal to B0"
+            ),
+            "rebaseline_batch": "B4",
+            "provenance": "la2_b4_v1",
         },
         "canonical_mutation": {
             "m_trunc": "n_keep=int(0.75*n)",
@@ -1549,7 +1593,7 @@ def check_baselines() -> None:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="LA-2 B0 gen_baseline")
+    parser = argparse.ArgumentParser(description="LA-2 B4 gen_baseline (rebaseline)")
     parser.add_argument(
         "--check",
         action="store_true",

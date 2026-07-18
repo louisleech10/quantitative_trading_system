@@ -9,9 +9,11 @@
     "append_batches": [
       "B1",
       "B2",
-      "B3"
+      "B3",
+      "B4"
     ],
     "forbid_append_after_b4_start": true,
+    "b4_rebaseline": true,
     "class_enum": [
       "P2-1-disable",
       "P2-2-oot",
@@ -274,6 +276,84 @@
       "class": "P2-3a-factor-loud",
       "behavior": "diagnostic_marker",
       "note": "Task 3.4 adversarial_validator diagnostic_only"
+    },
+    {
+      "path": "pattern.threshold_value_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "0c253b46367fdc3e765403ac5c91aa0ca36e16fd8ccff22286fc8ab30bd0bc20",
+      "new": "bfdf521263e6a41e06edb0452e57f38e1588e5498c8a5030cfc5c2c60501c30b",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "face_rebaseline",
+      "note": "B4 rebaseline: train SplitPlan quantile thresholds"
+    },
+    {
+      "path": "pattern.confidence_value_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "8d3e0c3f8556c0665c4b10bc0453449c59e47caa164e8a3d9640574bd108ea4e",
+      "new": "5b304771b363decd64db4ad1f60b6eea34d7db33c5f344fbfc7c2d1eb7b26972",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "face_rebaseline",
+      "note": "B4 rebaseline: train-y-only confidence"
+    },
+    {
+      "path": "pattern.threshold_value_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "fb2e5821d88520df337ac3f71244c576521bfb65e5515c1ebd7dac92e3c1ebb5",
+      "new": "e8de4c8cbd70b0784ba967c8415e94f288bbc0030bda947a7b3dc9d6548c8510",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "face_rebaseline"
+    },
+    {
+      "path": "pattern.confidence_value_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "0e6b4ef7d14173c9ee01e397c36d70acaa9b13682549b6ef829221af74465bc2",
+      "new": "cf58351d16585311e383913eaaf65183aad4ae65f90d2b19c3298374f21cb454",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "face_rebaseline"
+    },
+    {
+      "path": "regime_fit_global.labels_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "267f795ed303c9117a20e09025c2c08038e1e685247fbb4b2b618700e2b1101e",
+      "new": "dce7c33c76c8d4c530d2013470d26e4186a85a0a4b59509f02b7b2916d3186af",
+      "class": "P2-3c-regime-remove",
+      "behavior": "face_rebaseline",
+      "note": "B4: _fit_global removed → labels == control.regime_pit (PIT)"
+    },
+    {
+      "path": "regime_fit_global.labels_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "73de118ed59c97271c2fc9ef19f1c50851dbdbea0e8748ef37b8585001b3c3e4",
+      "new": "bd529dd3905f10ab7cbe1d06809b89571aaea9632b6f368b247a07ffe529799c",
+      "class": "P2-3c-regime-remove",
+      "behavior": "face_rebaseline",
+      "note": "B4: labels == control.regime_pit (PIT)"
+    },
+    {
+      "path": "factor.exposure.beta_neutral_value_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "2fc88ac6c6a42294b30fddda46e5d2d475b6c0c123b00dab7c278be00b8766de",
+      "new": "a84e59c72c4dd47418b5f4e61d0200d8314c1242ff3f7b358e941e8747bfd488",
+      "class": "P2-3a-proxy-causal",
+      "behavior": "face_rebaseline",
+      "note": "B4: market_proxy trailing close-ret lag1 (not forward label)"
+    },
+    {
+      "path": "factor.exposure.beta_neutral_value_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "4ebf98c408eb8ff7acdf6ec0fe833d416125ff72936e8b4576c560034a0d6de7",
+      "new": "2351204a20e3eba72a5969241e65ea286d203ce4fbb7db43ba8bed8285149588",
+      "class": "P2-3a-proxy-causal",
+      "behavior": "face_rebaseline"
+    },
+    {
+      "path": "model.model_performance.train_auc",
+      "index": "field_rename_face",
+      "old": "train_auc",
+      "new": "in_sample_train_auc+eval_scope+fit_pool_auc+oot_status",
+      "class": "P2-2-oot",
+      "behavior": "face_rebaseline",
+      "note": "B4 face: train_auc removed; performance_value_sha256 numeric-stable"
     }
   ],
   "eval_scope_field_map": {

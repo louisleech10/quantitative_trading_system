@@ -383,28 +383,50 @@ def allowlist_rows_fingerprint(allowlist: dict[str, Any]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+# B4 freeze literal（B4-F3）：final gate 必須用寫死 sha256，禁 caller 自傳假凍結值。
+# 重算：allowlist_rows_fingerprint(load_allowlist(...))；rows 變 → 必改此 literal。
+FROZEN_ALLOWLIST_ROWS_SHA256 = (
+    "cb469e0fb1436cb4b8c2670446c94c51fc5814b2771672984cf27e7588d2e512"
+)
+
+
 def validate_allowlist_not_expanded(
     allowlist: dict[str, Any],
     *,
-    frozen_fingerprint: str,
+    frozen_fingerprint: str | None = None,
 ) -> list[str]:
-    """B4：allowlist rows fingerprint 必須等於凍結值；擅擴/竄改 → errors。"""
-    if not isinstance(frozen_fingerprint, str) or not frozen_fingerprint.strip():
+    """B4：allowlist rows fingerprint 必須等於凍結值；擅擴/竄改 → errors。
+
+    frozen_fingerprint 省略時使用 FROZEN_ALLOWLIST_ROWS_SHA256 literal（final gate）。
+    """
+    fp = (
+        frozen_fingerprint
+        if frozen_fingerprint is not None
+        else FROZEN_ALLOWLIST_ROWS_SHA256
+    )
+    if not isinstance(fp, str) or not fp.strip():
         return ["frozen_fingerprint must be non-empty str"]
     live = allowlist_rows_fingerprint(allowlist)
-    if live != frozen_fingerprint:
+    if live != fp:
         n = len(allowlist.get("rows") or []) if isinstance(allowlist.get("rows"), list) else -1
         return [
             f"allowlist expanded or mutated after B4 freeze "
-            f"(rows={n}, got_fp={live}, frozen_fp={frozen_fingerprint})"
+            f"(rows={n}, got_fp={live}, frozen_fp={fp})"
         ]
     return []
+
+
+def validate_allowlist_freeze(allowlist: dict[str, Any]) -> list[str]:
+    """B4 final gate：以寫死 FROZEN_ALLOWLIST_ROWS_SHA256 驗 freeze（禁 caller 覆寫）。"""
+    return validate_allowlist_not_expanded(
+        allowlist, frozen_fingerprint=FROZEN_ALLOWLIST_ROWS_SHA256
+    )
 
 
 def validate_allowlist_not_expanded_or_raise(
     allowlist: dict[str, Any],
     *,
-    frozen_fingerprint: str,
+    frozen_fingerprint: str | None = None,
 ) -> str:
     """validate_allowlist_not_expanded；失敗 raise AttributionValidationError。"""
     errs = validate_allowlist_not_expanded(
@@ -413,6 +435,51 @@ def validate_allowlist_not_expanded_or_raise(
     if errs:
         raise AttributionValidationError("; ".join(errs))
     return allowlist_rows_fingerprint(allowlist)
+
+
+def face_diff_class_for_path(path: str) -> str:
+    """FACE_VALUE_HASH_PATHS → attribution class_enum（B4 face rebaseline）。"""
+    if path.startswith("pattern."):
+        return "P2-3b-pattern-trainmask"
+    if path.startswith("regime_fit_global."):
+        return "P2-3c-regime-remove"
+    if path.startswith("factor.exposure."):
+        return "P2-3a-proxy-causal"
+    if path.startswith("model."):
+        return "P2-2-oot"
+    if path.startswith("control."):
+        # control 應 byte-equal；若出現 diff 不可洗成已修
+        return "P2-3c-regime-remove"
+    raise ValueError(f"no class mapping for face path: {path!r}")
+
+
+def compute_face_rebaseline_diffs(
+    *,
+    legacy_faces: dict[str, Any],
+    live_faces: dict[str, Any],
+    index: str,
+    face_paths: Sequence[str],
+) -> list[dict[str, Any]]:
+    """B0 legacy face 值 vs 當前 live face 值 → 真實 face diffs（非 allowlist 自比）。
+
+    每個 changed face 一列 {path,index,old,new,class}；未變不列。
+    """
+    diffs: list[dict[str, Any]] = []
+    for path in face_paths:
+        old = legacy_faces.get(path)
+        new = live_faces.get(path)
+        if old == new:
+            continue
+        diffs.append(
+            {
+                "path": path,
+                "index": index,
+                "old": old,
+                "new": new,
+                "class": face_diff_class_for_path(path),
+            }
+        )
+    return diffs
 
 
 # ---------------------------------------------------------------------------

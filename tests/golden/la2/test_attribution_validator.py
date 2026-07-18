@@ -21,12 +21,15 @@ from tests.golden.la2.attribution_validator import (
     CANONICAL_EVAL_SCOPE_PATHS,
     CLASS_ENUM,
     EXPECTED_EVAL_SCOPE_PATH_COUNT,
+    FROZEN_ALLOWLIST_ROWS_SHA256,
     WASH_CASE_NAMES,
     AttributionValidationError,
     apply_wash_mutation,
     allowlist_rows_fingerprint,
     baseline_has_path,
+    compute_face_rebaseline_diffs,
     load_allowlist,
+    validate_allowlist_freeze,
     validate_allowlist_not_expanded,
     validate_allowlist_schema,
     validate_diffs,
@@ -311,7 +314,7 @@ def test_wash_mutation_rejects(wash_case: str, allowlist: dict) -> None:
         assert validate_diffs(diffs, seed_al).ok is True
 
     if wash_case == "unauthorized_allowlist_expand":
-        # fingerprint 擅擴亦可獨立打紅
+        # B4-F3：final gate 用寫死 literal（禁 caller 自傳 fingerprint 洗綠）
         expanded = copy.deepcopy(allowlist)
         expanded["rows"] = list(expanded.get("rows") or []) + [
             {
@@ -322,11 +325,22 @@ def test_wash_mutation_rejects(wash_case: str, allowlist: dict) -> None:
                 "class": "P2-2-scope-tag",
             }
         ]
-        frozen = allowlist_rows_fingerprint(allowlist)
-        errs = validate_allowlist_not_expanded(
-            expanded, frozen_fingerprint=frozen
-        )
-        assert errs, "expanded allowlist must fail fingerprint gate"
+        errs = validate_allowlist_freeze(expanded)
+        assert errs, "expanded allowlist must fail frozen literal gate"
+        # 對照：即使 phantom row 同時進 diff+allowlist，literal freeze 仍紅
+        assert validate_diffs(
+            [
+                {
+                    "path": "phantom.unauthorized",
+                    "index": "x",
+                    "old": 1,
+                    "new": 2,
+                    "class": "P2-2-scope-tag",
+                }
+            ],
+            expanded,
+        ).ok is True  # self-listed phantom 可過 diffs
+        assert validate_allowlist_freeze(expanded), "literal freeze must still FAIL"
 
 
 def test_la2_skeleton_nodeid_contract() -> None:
@@ -347,3 +361,163 @@ def test_la2_skeleton_nodeid_contract() -> None:
     for name in skel.EXPECTED_NODEIDS:
         fn = getattr(skel, name)
         assert callable(fn)
+        # B4 final gate：禁 skip/xfail markers
+        markers = getattr(fn, "pytestmark", [])
+        names = {
+            m.name if hasattr(m, "name") else getattr(m, "mark", None) and m.mark.name
+            for m in (markers if isinstance(markers, list) else [markers])
+        }
+        assert "skip" not in names and "xfail" not in names, (
+            f"{name} must not be skip/xfail for B4 final gate"
+        )
+
+
+def test_b4_rebaseline_face_diffs_zero_unexpected(allowlist: dict) -> None:
+    """B4-F4：B0 legacy face vs live baseline 真 diff 逐筆對 allowlist（非自比）。
+
+    親跑反例：移除一個 changed face → FAIL；phantom unlisted → FAIL。
+    """
+    from tests.golden.la2.gen_baseline import (
+        B0_LEGACY_FACE_VALUE_HASHES,
+        EXPECTED_FACE_VALUE_HASHES,
+        FACE_VALUE_HASH_PATHS,
+        extract_face_value_hashes,
+    )
+
+    # allowlist 仍須含 face_rebaseline 列（schema 面）
+    face_rows = [
+        r
+        for r in (allowlist.get("rows") or [])
+        if r.get("behavior") == "face_rebaseline"
+    ]
+    assert len(face_rows) >= 8, f"expected ≥8 face rebaseline rows, got {len(face_rows)}"
+    classes = {r["class"] for r in face_rows}
+    assert "P2-3b-pattern-trainmask" in classes
+    assert "P2-3c-regime-remove" in classes
+    assert "P2-3a-proxy-causal" in classes
+    assert "P2-2-oot" in classes
+
+    # B4-F3：live allowlist 必須通過寫死 literal freeze
+    freeze_errs = validate_allowlist_freeze(allowlist)
+    assert not freeze_errs, freeze_errs
+    assert allowlist_rows_fingerprint(allowlist) == FROZEN_ALLOWLIST_ROWS_SHA256
+
+    # 真實 face diff：B0 legacy stamp vs live baseline JSON
+    index_by_name = {
+        "BTCUSDT_1h_baseline.json": "BTCUSDT/1h",
+        "ETHUSDT_12h_baseline.json": "ETHUSDT/12h",
+    }
+    all_live_diffs: list[dict[str, Any]] = []
+    for name, legacy in B0_LEGACY_FACE_VALUE_HASHES.items():
+        path = LA2_DIR / name
+        data = json.loads(path.read_text(encoding="utf-8"))
+        live = extract_face_value_hashes(data)
+        # live 亦須等於 B4 EXPECTED stamp
+        for k in FACE_VALUE_HASH_PATHS:
+            assert live.get(k) == EXPECTED_FACE_VALUE_HASHES[name][k], (
+                f"{name}:{k} live != EXPECTED"
+            )
+        diffs = compute_face_rebaseline_diffs(
+            legacy_faces=legacy,
+            live_faces=live,
+            index=index_by_name[name],
+            face_paths=FACE_VALUE_HASH_PATHS,
+        )
+        assert diffs, f"{name}: expected ≥1 face change vs B0 legacy"
+        all_live_diffs.extend(diffs)
+
+    # 每個 changed face 都在 allowlist；unlisted → FAIL
+    result = validate_diffs(all_live_diffs, allowlist)
+    assert result.ok is True, result.messages
+    assert result.unexpected_count == 0
+    assert result.machine_line() == "UNEXPECTED=0"
+    # pattern / regime / exposure 皆應出現於真 diff
+    diff_classes = {d["class"] for d in all_live_diffs}
+    assert "P2-3b-pattern-trainmask" in diff_classes
+    assert "P2-3c-regime-remove" in diff_classes
+    assert "P2-3a-proxy-causal" in diff_classes
+
+    # 反例①：從 allowlist 移除一個 changed face → 真 diff unlisted FAIL
+    stripped = copy.deepcopy(allowlist)
+    kill = all_live_diffs[0]
+    stripped["rows"] = [
+        r
+        for r in (stripped.get("rows") or [])
+        if not (
+            r.get("path") == kill["path"]
+            and r.get("index") == kill["index"]
+            and r.get("old") == kill["old"]
+            and r.get("new") == kill["new"]
+            and r.get("class") == kill["class"]
+        )
+    ]
+    bad = validate_diffs(all_live_diffs, stripped)
+    assert bad.ok is False and bad.unexpected_count >= 1
+
+    # 反例②：phantom allowlist row（+ 同 phantom 進 diff）仍被 literal freeze 打紅
+    phantom_row = {
+        "path": "phantom.face",
+        "index": "x",
+        "old": "a",
+        "new": "b",
+        "class": "P2-2-scope-tag",
+    }
+    expanded = copy.deepcopy(allowlist)
+    expanded["rows"] = list(expanded.get("rows") or []) + [phantom_row]
+    assert validate_diffs([phantom_row], expanded).ok is True  # self-listed
+    assert validate_allowlist_freeze(expanded), "phantom expand must FAIL freeze literal"
+
+
+def test_b4_control_paths_byte_equal_to_b0_stamp() -> None:
+    """B4：control 路徑仍 byte-equal B0 凍結值（regime_pit / factor OFF / pattern 未晉升）。"""
+    from tests.golden.la2.gen_baseline import EXPECTED_FACE_VALUE_HASHES
+
+    # control.regime_pit 與 B0 相同（見 EXPECTED 註解 + 歷史 stamp）
+    b0_control_regime = {
+        "BTCUSDT_1h_baseline.json": (
+            "dce7c33c76c8d4c530d2013470d26e4186a85a0a4b59509f02b7b2916d3186af"
+        ),
+        "ETHUSDT_12h_baseline.json": (
+            "bd529dd3905f10ab7cbe1d06809b89571aaea9632b6f368b247a07ffe529799c"
+        ),
+    }
+    # B0 control-stable faces（GS/PCA/model index/perf/service 未改）
+    control_stable_paths = (
+        "control.regime_pit.labels_sha256",
+        "factor.gram_schmidt.value_sha256",
+        "factor.pca.value_sha256",
+        "model.index_identity.fit_idx_hash",
+        "model.index_identity.eval_idx_hash",
+        "model.performance_value_sha256",
+        "model.service_matrix.matrix_value_sha256",
+    )
+    for name, faces in EXPECTED_FACE_VALUE_HASHES.items():
+        path = LA2_DIR / name
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert faces["control.regime_pit.labels_sha256"] == b0_control_regime[name]
+        # live baseline control kinds
+        ctrl = data.get("control") or {}
+        assert ctrl.get("factor_disabled", {}).get("enabled") is False
+        assert ctrl.get("pattern_not_extracted", {}).get("extracted") is False
+        assert (
+            data["regime_fit_global"]["labels_sha256"]
+            == data["control"]["regime_pit"]["labels_sha256"]
+        )
+        for p in control_stable_paths:
+            # face stamp matches live baseline
+            cur = data
+            for part in p.split("."):
+                cur = cur[part]
+            assert cur == faces[p], f"{name}:{p} live != frozen"
+
+
+def test_b4_wash_count_at_least_five() -> None:
+    """B4：validator ≥5 wash 打紅（WASH_CASE_NAMES 契約）。"""
+    assert len(WASH_CASE_NAMES) >= 5
+    assert set(WASH_CASE_NAMES) >= {
+        "control_path_inject_diff",
+        "track2_fullsample_claim_oot",
+        "delete_loud_claim_tagged",
+        "wrong_class_swap",
+        "unauthorized_allowlist_expand",
+    }
