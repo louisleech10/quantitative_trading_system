@@ -242,27 +242,10 @@ class XGBoostTaskService:
                 feature_names
             )
             
-            # 4. 提取決策規則
-            self.task_manager.update_progress(task_id, 70, '提取決策規則...')
-            
-            rules = await asyncio.to_thread(
-                self.pattern_extractor.extract_decision_rules,
-                self.xgboost_analyzer.model,
-                X, y, feature_names,
-                top_n_rules, min_support
-            )
-
-            # 4.1 取得預測機率與摘要
-            predictions_output = await asyncio.to_thread(
-                self.xgboost_analyzer.get_predictions,
-                X, y, case_ids
-            )
-
-            y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
-
-            # LA-2 B2 F3：建 train/OOT SplitPlan + OotReceipt（動態 has_oot_held_out）
+            # LA-2 B2/B3：先建 train/OOT SplitPlan + OotReceipt，再 train-mask 抽規則
             import pickle
             from momentum.Analysis.eval_scope_utils import build_service_oot_bundle
+            from momentum.core.contracts import canonical_split_plan_hash
 
             try:
                 model_artifact = pickle.dumps(self.xgboost_analyzer.model)
@@ -281,6 +264,48 @@ class XGBoostTaskService:
             has_oot_held_out = bool(oot_bundle["has_oot_held_out"])
             oot_receipt = oot_bundle["oot_receipt"]
             oot_idx = oot_bundle["oot_idx"]
+            train_plan = oot_bundle.get("train_plan")
+            eval_plan = oot_bundle.get("eval_plan")
+            if train_plan is None:
+                # 無 held-out：用全列 train plan 抽規則（in_sample_rules=true，不可晉升）
+                from momentum.core.contracts import SplitPlan
+
+                train_plan = SplitPlan(
+                    split_label="train",
+                    index_kind="positional",
+                    row_index=np.arange(len(y), dtype=int),
+                    time_bounds=(None, None),
+                    purge_gap=0,
+                    embargo=0,
+                    purge_semantic="rows",
+                    expected_freq=None,
+                    base_universe_hash=f"xgb_task:{case_id}",
+                    symbol=str(case_id),
+                )
+
+            # 4. 提取決策規則（train-mask + plan identity）
+            self.task_manager.update_progress(task_id, 70, '提取決策規則...')
+            expected_hash = canonical_split_plan_hash(train_plan)
+            rules = await asyncio.to_thread(
+                self.pattern_extractor.extract_decision_rules,
+                self.xgboost_analyzer.model,
+                X,
+                y,
+                feature_names,
+                top_n_rules,
+                min_support,
+                split=train_plan,
+                expected_plan_hash=expected_hash,
+                oot_split=eval_plan,
+            )
+
+            # 4.1 取得預測機率與摘要
+            predictions_output = await asyncio.to_thread(
+                self.xgboost_analyzer.get_predictions,
+                X, y, case_ids
+            )
+
+            y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
 
             # F8：OOT 指標只在 held-out 上算；無 OOT 則源頭不產生全樣本值
             precision_at_k = None
@@ -452,6 +477,12 @@ class XGBoostTaskService:
             result = apply_service_matrix_scopes(result, has_oot_held_out=has_oot_held_out)
 
             result = sanitize_for_json(result)
+            # LA-2 B3-F1：晉升 verify 必備三份 provenance（sanitize 後再掛，保 bytes/SplitPlan）
+            if train_plan is not None:
+                result["train_plan"] = train_plan
+            if eval_plan is not None:
+                result["eval_plan"] = eval_plan
+            result["model_artifact"] = model_artifact
             
             try:
                 predictions_df = pd.DataFrame({

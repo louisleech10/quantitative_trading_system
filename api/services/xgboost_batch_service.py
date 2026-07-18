@@ -741,17 +741,64 @@ class XGBoostBatchService:
                 feature_names
             )
             
-            # ===== Step 7: 提取決策規則 =====
+            # LA-2 B2/B3：先建 train/OOT plan，再 train-mask 抽規則
+            import pickle
+            from momentum.Analysis.eval_scope_utils import build_service_oot_bundle
+            from momentum.core.contracts import SplitPlan, canonical_split_plan_hash
+
+            try:
+                model_artifact = pickle.dumps(analyzer.model)
+            except Exception:  # noqa: BLE001
+                model_artifact = b"xgb-batch-artifact"
+            oot_bundle = build_service_oot_bundle(
+                n_samples=len(y),
+                model_artifact=model_artifact,
+                trusted_issuer="xgboost_batch_service",
+                oot_ratio=0.2,
+                horizon=1,
+                embargo=int(embargo_pct or 0) if embargo_pct else 0,
+                purge_gap=int(purge_gap or 0) if purge_gap else 0,
+                symbol=",".join(symbols) if symbols else None,
+                base_universe_hash=f"xgb_batch:{timeframe}:{len(y)}",
+            )
+            has_oot_held_out = bool(oot_bundle["has_oot_held_out"])
+            oot_receipt = oot_bundle["oot_receipt"]
+            oot_idx = oot_bundle["oot_idx"]
+            train_plan = oot_bundle.get("train_plan")
+            eval_plan = oot_bundle.get("eval_plan")
+            if train_plan is None:
+                train_plan = SplitPlan(
+                    split_label="train",
+                    index_kind="positional",
+                    row_index=np.arange(len(y), dtype=int),
+                    time_bounds=(None, None),
+                    purge_gap=0,
+                    embargo=0,
+                    purge_semantic="rows",
+                    expected_freq=None,
+                    base_universe_hash=f"xgb_batch:{timeframe}:{len(y)}",
+                    symbol=",".join(symbols) if symbols else None,
+                )
+
+            # ===== Step 7: 提取決策規則（train-mask）=====
             self.task_manager.update_progress(task_id, 85, '提取規則', '提取決策規則...')
             
             if analysis_engine == "lightgbm":
+                # U15：LGBM 跳過 pattern 晉升（記錄性 asymmetry，禁順手接線）
                 rules = []
             else:
+                expected_hash = canonical_split_plan_hash(train_plan)
                 rules = await asyncio.to_thread(
                     self.pattern_extractor.extract_decision_rules,
                     analyzer.model,
-                    X, y, feature_names,
-                    top_n_rules, min_support
+                    X,
+                    y,
+                    feature_names,
+                    top_n_rules,
+                    min_support,
+                    split=train_plan,
+                    expected_plan_hash=expected_hash,
+                    oot_split=eval_plan,
                 )
 
             predictions_output = await asyncio.to_thread(
@@ -794,29 +841,6 @@ class XGBoostBatchService:
                         'max': float(np.max(y_pred_proba)) if y_pred_proba.size else 0.0,
                     },
                 }
-
-            # LA-2 B2 F3/F8：train/OOT SplitPlan + 僅 held-out 算 OOT 指標
-            import pickle
-            from momentum.Analysis.eval_scope_utils import build_service_oot_bundle
-
-            try:
-                model_artifact = pickle.dumps(analyzer.model)
-            except Exception:  # noqa: BLE001
-                model_artifact = b"xgb-batch-artifact"
-            oot_bundle = build_service_oot_bundle(
-                n_samples=len(y),
-                model_artifact=model_artifact,
-                trusted_issuer="xgboost_batch_service",
-                oot_ratio=0.2,
-                horizon=1,
-                embargo=int(embargo_pct or 0) if embargo_pct else 0,
-                purge_gap=int(purge_gap or 0) if purge_gap else 0,
-                symbol=",".join(symbols) if symbols else None,
-                base_universe_hash=f"xgb_batch:{timeframe}:{len(y)}",
-            )
-            has_oot_held_out = bool(oot_bundle["has_oot_held_out"])
-            oot_receipt = oot_bundle["oot_receipt"]
-            oot_idx = oot_bundle["oot_idx"]
 
             precision_at_k = None
             expectancy = None
@@ -1053,6 +1077,12 @@ class XGBoostBatchService:
 
             # 清理 result 中的 numpy 類型，防止 JSON 序列化錯誤
             result = sanitize_for_json(result)
+            # LA-2 B3-F1：晉升 verify 必備三份 provenance（sanitize 後再掛）
+            if train_plan is not None:
+                result["train_plan"] = train_plan
+            if eval_plan is not None:
+                result["eval_plan"] = eval_plan
+            result["model_artifact"] = model_artifact
             
             try:
                 predictions_df = pd.DataFrame({

@@ -1238,10 +1238,8 @@ class ICEngine:
             min_samples_for_fit=min_samples,
             refit_interval=refit_interval,
         )
-        # LA-1 §N：IC caller 層鎖 expanding=True（全域 detect 仍允許 False→_fit_global）
-        expanding_locked = True
-        assert expanding_locked is True, "IC kmeans path requires expanding=True"
-        detection = detector.detect(close, volume, expanding=expanding_locked)
+        # LA-2 B3：detect 固定 PIT Segment-causal（expanding/_fit_global 已移除）
+        detection = detector.detect(close, volume)
 
         results: dict[str, dict] = {}
         method = config.get("method", self._methods[0])

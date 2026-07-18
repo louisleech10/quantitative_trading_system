@@ -220,6 +220,60 @@
       "class": "P2-2-scope-tag",
       "behavior": "config_theater",
       "note": "Task 2.3 config theater marker"
+    },
+    {
+      "path": "deep_analysis/factor_orthogonalization",
+      "index": "FactorModuleResult",
+      "old": "Dict[str,Any] unscoped",
+      "new": "oos_guarantees=false,fit_scope=full_sample",
+      "class": "P2-3a-factor-loud",
+      "behavior": "typed_loud",
+      "note": "GS/PCA algo unchanged; loud typed contract"
+    },
+    {
+      "path": "deep_analysis/factor_exposure/market_proxy",
+      "index": "proxy_kind",
+      "old": "label_series_forward",
+      "new": "trailing_close_ret_lag1",
+      "class": "P2-3a-proxy-causal",
+      "behavior": "proxy_causal",
+      "note": "close.pct_change().shift(1); close_series in _ic_cache"
+    },
+    {
+      "path": "pattern_extractor/extract_decision_rules",
+      "index": "train_mask",
+      "old": "full_sample_quantile",
+      "new": "SplitPlan_train_mask+train_y_only",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "train_mask",
+      "note": "quantile/base_prob/confidence/lift train-y-only"
+    },
+    {
+      "path": "pattern_management/create+PUT",
+      "index": "promotion",
+      "old": "client_rules_metadata_status",
+      "new": "task_id+oot_receipt_server_authority",
+      "class": "P2-3b-promotion-guard",
+      "behavior": "server_guard",
+      "note": "status=active iff verify_oot_receipt; client fields rejected"
+    },
+    {
+      "path": "regime_detector/detect",
+      "index": "expanding_fit_global",
+      "old": "expanding=False→_fit_global",
+      "new": "removed_PIT_only",
+      "class": "P2-3c-regime-remove",
+      "behavior": "hard_remove",
+      "note": "expanding param + _fit_global method removed"
+    },
+    {
+      "path": "adversarial_validator",
+      "index": "diagnostic_only",
+      "old": "unmarked",
+      "new": "analysis_status=diagnostic_only+signal_use_denied",
+      "class": "P2-3a-factor-loud",
+      "behavior": "diagnostic_marker",
+      "note": "Task 3.4 adversarial_validator diagnostic_only"
     }
   ],
   "eval_scope_field_map": {

@@ -1,7 +1,15 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-18 | **Branch**: **main** | **狀態**: ✅ **LA-2 SPEC v0.5 + TODO v0.4 正式凍結**(三家 stamp APPROVED+機檢 PASS);**下一步=開 impl branch 派 B0**
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-18 | **Branch**: **feat/ic-la2-p2-impl** | **狀態**: ▶ **LA-2 實作中:B0/B1/B2 已 commit,B3 派工中**
 
-## ▶▶ LA-2 治理完成,待實作
+## ▶▶ LA-2 實作進度(branch feat/ic-la2-p2-impl)
+- **✅ B0**(baseline+骨架,`463bfb5`):gen_baseline 四面 legacy+control+eval_scope_field_map 28path+12 nodeid 骨架;雙家 review 抓假凍結/假紅→修→closure。
+- **✅ B1**(winsorized 禁用,`38ec882`):三層 fail-closed+engine/orch 對齊;雙家抓 2 繞過(方法本體/orch preloaded)+reader 假綠→修→closure。
+- **✅ B2**(model OOT 契約,`24376dd`,33 檔):contracts receipts(field-wise hash 防撞+envelope verify 不可繞)+validate_oot_label_horizon(嚴格<+跨symbol+timestamp gap)+OOT 真接線 service+calibrator 禁自簽+train_auc rename+cal/PR=cv_oof(OOF 不足 OMIT);雙家 REJECT 4B(契約可繞/空殼)→修 F1-F10→兩輪 closure(codex 深挖 B2-05 跨symbol/B2-06 unknown)→CLOSED。
+- **▶ B3 派工中**(條件模組):Task 3.1 regime `_fit_global` 硬移除+逐 nodeid 遷移(test_regime_detector 15+la1:575-628)/3.2 pattern train-mask+SplitPlan caller+train-y+晉升 server 閉環(create+PUT+task_id receipt)/3.3 factor typed loud+market_proxy→trailing close-ret(close carrier 進 _ic_cache)+FactorModuleResult/deny_factor_in_ok_oos/3.4 批尾 allowlist+adversarial_validator 標註。
+- **待 B4**:mutation 全家+golden **rebaseline**(train_auc 欄位名變後需重基準 performance_value_sha)+三方 DATA-CORRECT(a,d)。
+- **每批循環**:Grok 實作→Claude 自驗→Codex+Composer 雙家 review(親自 mutate)→Grok 修→finding-closure→review_quorum_check(prefix `20260718-la2-bN` implementer grok)→commit(只 stage 該批檔,排除 settings/audit/l65 inventory side-effect)。
+
+## (以下背景)LA-2 治理完成
 - **凍結**:SPEC `docs/IC_LA2_SPEC.md` v0.5(file sha `4b70bf7d…`)+TODO `docs/IC_LA2_TODO.md` v0.4;**三家 RECONCILE-STAMP APPROVED + `reconcile_stamps_check.sh` 兩份 PASS**(SPEC 本體 hash `89062f4a…`/TODO `09b907ac…`;`handoffs/LA2-{SPEC,TODO}-FREEZE-RECONCILE.md`)。治理歷程:SPEC R1-R5、TODO R1-R4 各三家 adversarial(逐輪收斂)。
 - **下一步(依序)**:①(未做)commit 凍結治理產物(SPEC/TODO/handoffs;使用者定 commit 時機)②開 branch `feat/ic-la2-p2-impl`(從 main)③**逐批 Grok 實作**:B0(baseline+骨架 12 nodeid+eval_scope_field_map)→{B1 winsorized 禁用、B2 model OOT、B3 條件模組 可並行}→B4(mutation 全家+golden+三方 DATA-CORRECT)+**每批 Codex+Composer 雙家 review**(機器閘 `review_quorum_check.sh`;實作者不自審)+finding-closure+過 review commit④B4 三方 DATA-CORRECT(a,d 高風險)。
 - **TODO §0.6-APPENDIX = exact-struct 權威**(receipt dataclass/canonical sha256 hash/envelope/verify_*/FactorModuleResult union/28 path 表);實作以此+§0 規則為準,不必回讀 SPEC。

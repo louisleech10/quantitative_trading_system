@@ -411,23 +411,16 @@ function XGBoostAnalysisContent() {
     setError(null);
     try {
       const symbols = result.symbols?.join('_') || result.symbol;
+      // LA-2 B3：server 權威 — 只帶 task_id；rules/metrics 由 server 從 oot_receipt 重建
+      // threshold=condition 分位值（非 confidence）由 server 從 feature_conditions 寫入
+      if (!taskId) {
+        throw new Error('缺少 task_id，無法晉升模式（server 需 oot_receipt）');
+      }
       const request: CreatePatternRequest = {
         name: `${result.engine_type || 'XGBoost'}_${symbols}_${result.timeframe}_${Date.now()}`,
         description: `${result.engine_type || 'XGBoost'} 分析結果 - ${symbols} ${result.timeframe}`,
-        rules: result.decision_rules.slice(0, 10).map((rule, i) => ({ feature: rule.condition.split(' ')[0] || `rule_${i + 1}`, operator: '>=', threshold: rule.confidence, description: rule.condition })),
-        case_id: `${symbols}_${result.timeframe}`,
-        xgboost_importance: result.feature_importance.reduce((acc, item) => ({ ...acc, [item.feature]: item.importance }), {}),
-        performance_metrics: {
-          precision: result.model_performance.precision || 0,
-          recall: result.model_performance.recall || 0,
-          f1_score: result.model_performance.f1_score || 0,
-          in_sample_train_auc: result.model_performance.in_sample_train_auc || 0,
-          cv_auc_mean: result.model_performance.cv_auc_mean || 0,
-          cv_auc_std: result.model_performance.cv_auc_std || 0,
-          overfitting_score: result.model_performance.overfitting_score || 0
-        },
+        task_id: taskId,
         tags: [result.engine_type || 'xgboost', ...((result.symbols && result.symbols.length > 0) ? result.symbols : [result.symbol]), result.timeframe],
-        metadata: result.metadata || {}
       };
       const response = await createPattern(request);
       if (response.success && response.pattern) addPattern(response.pattern);

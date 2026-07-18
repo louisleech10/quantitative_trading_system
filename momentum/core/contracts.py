@@ -1975,9 +1975,10 @@ class FactorModuleResult:
 
 
 def deny_factor_in_ok_oos(report: Dict[str, Any]) -> None:
-    """root analysis_status==ok_oos 且 factor loud 存在 → raise。
+    """root analysis_status==ok_oos 且 factor/diagnostic loud 存在 → raise。
 
     B3 consumer/export/persist 出口呼叫；B2 只建型別與 verifier。
+    亦掃 nested ``diagnostic_only`` / ``signal_use_denied``（U18 adversarial）。
     """
     if not isinstance(report, dict):
         return
@@ -1985,12 +1986,21 @@ def deny_factor_in_ok_oos(report: Dict[str, Any]) -> None:
     if root_status != "ok_oos":
         return
 
-    def _walk(node: Any) -> None:
+    def _walk(node: Any, *, is_root: bool = False) -> None:
         if isinstance(node, FactorModuleResult):
             raise ValueError(
                 "deny_factor_in_ok_oos: FactorModuleResult present under ok_oos"
             )
         if isinstance(node, dict):
+            # nested diagnostic_only / signal_use_denied under ok_oos → deny signal
+            if not is_root and (
+                node.get("signal_use_denied") is True
+                or node.get("diagnostic_only") is True
+                or node.get("analysis_status") == "diagnostic_only"
+            ):
+                raise ValueError(
+                    "deny_factor_in_ok_oos: diagnostic_only/signal_use_denied under ok_oos"
+                )
             # raw dict 亦 deny（掃 oos_guarantees 鍵 / module factor）
             if (
                 "oos_guarantees" in node
@@ -2002,12 +2012,12 @@ def deny_factor_in_ok_oos(report: Dict[str, Any]) -> None:
                     "deny_factor_in_ok_oos: factor loud dict present under ok_oos"
                 )
             for value in node.values():
-                _walk(value)
+                _walk(value, is_root=False)
         elif isinstance(node, (list, tuple)):
             for item in node:
-                _walk(item)
+                _walk(item, is_root=False)
 
-    _walk(report)
+    _walk(report, is_root=True)
 
 
 def build_eval_scope_map(keys: Optional[Iterable[str]] = None) -> Dict[str, str]:

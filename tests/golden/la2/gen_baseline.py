@@ -483,8 +483,25 @@ def _run_pattern_face(
     model: Any,
 ) -> dict[str, Any]:
     """C-2：PatternExtractor.extract_decision_rules — 門檻 + confidence 凍結。"""
+    from momentum.core.contracts import SplitPlan, canonical_split_plan_hash
+
     extractor = create_pattern_extractor()
     feature_names = list(X.columns)
+    # B3-F4：extract_decision_rules 必填 train SplitPlan
+    n = int(len(y))
+    n_train = max(1, int(n * 0.8))
+    train_plan = SplitPlan(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.arange(0, n_train, dtype=int),
+        time_bounds=(None, None),
+        purge_gap=0,
+        embargo=0,
+        purge_semantic="rows",
+        expected_freq=None,
+        base_universe_hash="la2_gen_baseline_pattern",
+        symbol=None,
+    )
     rules = extractor.extract_decision_rules(
         model=model,
         X=X,
@@ -492,6 +509,8 @@ def _run_pattern_face(
         feature_names=feature_names,
         top_n=10,
         min_support=10,
+        split=train_plan,
+        expected_plan_hash=canonical_split_plan_hash(train_plan),
     )
     rules_payload: list[dict[str, Any]] = []
     thresholds: list[float] = []
@@ -621,7 +640,8 @@ def _run_regime_face(
 ) -> dict[str, Any]:
     """C-1：RegimeDetector.detect — expanding=False → _fit_global legacy。"""
     detector = create_regime_detector(n_clusters=4, lookback=55)
-    result = detector.detect(close, volume, expanding=expanding)
+    # LA-2 B3: expanding/_fit_global removed; always PIT (face metadata still records intended legacy flag)
+    result = detector.detect(close, volume)
     labels = [str(x) for x in result.labels]
     if isinstance(close.index, pd.DatetimeIndex):
         ts_list = [int(x) for x in (close.index.asi8 // 10**9).tolist()]
@@ -1269,16 +1289,16 @@ def run_one(run: dict[str, str]) -> dict[str, Any]:
 
     # ---- ③ factor enabled=True ----
     t0 = time.perf_counter()
-    # market_proxy legacy = forward simple return on feature index
-    fwd_label = close_feat.pct_change().shift(-1)
-    factor_payload = _run_factor_face(X, fwd_label, enabled=True)
+    # B3-F10：causal close carrier（lag≥1），禁 forward label 當 proxy 基線
+    trailing_close_ret = close_feat.pct_change().shift(1)
+    factor_payload = _run_factor_face(X, trailing_close_ret, enabled=True)
     print(
         f"[gen_baseline] {symbol}/{timeframe}: factor "
         f"gs={factor_payload.get('gram_schmidt', {}).get('shape')} "
         f"wall={time.perf_counter()-t0:.2f}s"
     )
 
-    factor_disabled = _run_factor_face(X, fwd_label, enabled=False)
+    factor_disabled = _run_factor_face(X, trailing_close_ret, enabled=False)
     control_payload = _build_control_payload(regime_pit, factor_disabled)
 
     # ---- C-2 early-flip manifest ----

@@ -28,12 +28,29 @@ class AdversarialValidationConfig(BaseModel):
 
 
 class AdversarialValidator:
-    """Adversarial Validation + Feature-Level Tests + Leakage Detection。"""
+    """Adversarial Validation + Feature-Level Tests + Leakage Detection。
+
+    LA-2 B3：``diagnostic_only`` — train∪test 域分類刻意，**非交易 signal**。
+    root ``ok_oos`` 時仍 deny 進 signal（見 ``test_analysis_status_diagnostic``）。
+    """
+
+    # 具名標記：consumer 必須尊重 diagnostic_only（禁當 signal）
+    DIAGNOSTIC_ONLY: bool = True
+    ANALYSIS_STATUS: str = "diagnostic_only"
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = AdversarialValidationConfig(**(config or {}))
         self.logger = get_logger(__name__)
         self._drift_analyzer = DriftAnalyzer()
+
+    def _diagnostic_envelope(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """為所有輸出掛 diagnostic_only 標記。"""
+        out = dict(payload)
+        out["diagnostic_only"] = True
+        out["analysis_status"] = "diagnostic_only"
+        out["oos_guarantees"] = False
+        out["signal_use_denied"] = True
+        return out
 
     def validate_distribution(
         self,
@@ -48,20 +65,24 @@ class AdversarialValidator:
                 reason="X_train 或 X_test 為空",
                 error_type="INSUFFICIENT_DATA",
             )
-            return {"distribution_test": {"status": "skipped", "skipped": skipped.__dict__}}
+            return self._diagnostic_envelope(
+                {"distribution_test": {"status": "skipped", "skipped": skipped.__dict__}}
+            )
 
         if len(X_test) < 20:
             self.logger.warning("AdversarialValidator: X_test < 20，AUC 可能不可靠")
 
         if len(X_train) == len(X_test) and np.allclose(X_train.to_numpy(dtype=float), X_test.to_numpy(dtype=float), equal_nan=True):
-            return {
-                "distribution_test": {
-                    "auc": 0.5,
-                    "std": 0.0,
-                    "status": "good",
-                    "top_discriminating_features": X_train.columns[:5].tolist(),
+            return self._diagnostic_envelope(
+                {
+                    "distribution_test": {
+                        "auc": 0.5,
+                        "std": 0.0,
+                        "status": "good",
+                        "top_discriminating_features": X_train.columns[:5].tolist(),
+                    }
                 }
-            }
+            )
 
         X_all = pd.concat([X_train, X_test], axis=0).reset_index(drop=True)
         y_domain = np.concatenate([np.zeros(len(X_train), dtype=int), np.ones(len(X_test), dtype=int)])
@@ -81,24 +102,26 @@ class AdversarialValidator:
         auc_std = float(np.std(aucs))
         status = self._status_from_auc(auc_mean)
 
-        return {
-            "distribution_test": {
-                "auc": auc_mean,
-                "std": auc_std,
-                "status": status,
-                "top_discriminating_features": top_features,
+        return self._diagnostic_envelope(
+            {
+                "distribution_test": {
+                    "auc": auc_mean,
+                    "std": auc_std,
+                    "status": status,
+                    "top_discriminating_features": top_features,
+                }
             }
-        }
+        )
 
     def feature_level_tests(
         self,
         X_train: pd.DataFrame,
         X_test: pd.DataFrame,
         method: str = "ks",
-    ) -> Dict[str, Dict]:
+    ) -> Dict[str, Any]:
         self._ensure_compatible_columns(X_train, X_test)
 
-        results: Dict[str, Dict] = {}
+        results: Dict[str, Any] = {}
         for feature in X_train.columns:
             train_col = X_train[feature].to_numpy(dtype=float)
             test_col = X_test[feature].to_numpy(dtype=float)
@@ -129,7 +152,8 @@ class AdversarialValidator:
                 "method": method,
             }
 
-        return results
+        # F11：direct-call 輸出亦掛 diagnostic_only（算法不變，僅標註）
+        return self._diagnostic_envelope(results)
 
     def detect_leakage(
         self,
@@ -139,7 +163,9 @@ class AdversarialValidator:
         future_window: int = 5,
     ) -> Dict[str, Any]:
         if timestamps is None:
-            return {"suspicious_features": [], "autocorrelation_flags": {}, "status": "skipped"}
+            return self._diagnostic_envelope(
+                {"suspicious_features": [], "autocorrelation_flags": {}, "status": "skipped"}
+            )
 
         if future_window > len(X) / 2:
             raise ValueError("future_window 過大，超過樣本長度一半")
@@ -171,11 +197,13 @@ class AdversarialValidator:
             if is_suspicious:
                 suspicious_features.append(feature)
 
-        return {
-            "suspicious_features": suspicious_features,
-            "autocorrelation_flags": autocorrelation_flags,
-            "status": "ok",
-        }
+        return self._diagnostic_envelope(
+            {
+                "suspicious_features": suspicious_features,
+                "autocorrelation_flags": autocorrelation_flags,
+                "status": "ok",
+            }
+        )
 
     def full_validation(
         self,
@@ -192,7 +220,12 @@ class AdversarialValidator:
             leakage = self.detect_leakage(X_train, y_train, timestamps)
 
         distribution_status = distribution.get("distribution_test", {}).get("status", "good")
-        feature_statuses = [entry.get("status") for entry in feature_tests.values()]
+        # 跳過 F11 envelope 鍵（bool/str），只讀 per-feature status dict
+        feature_statuses = [
+            entry.get("status")
+            for entry in feature_tests.values()
+            if isinstance(entry, dict) and "status" in entry
+        ]
         if distribution_status == "severe" or "severe" in feature_statuses:
             overall_status = "severe"
         elif distribution_status == "warning" or "warning" in feature_statuses:
@@ -206,15 +239,17 @@ class AdversarialValidator:
         if leakage.get("suspicious_features"):
             recommendations.append("建議檢查潛在時間洩漏特徵")
 
-        return {
-            "adversarial_validation": {
-                "distribution_test": distribution.get("distribution_test", {}),
-                "feature_level_tests": feature_tests,
-                "leakage_detection": leakage,
-                "overall_status": overall_status,
-                "recommendations": recommendations,
+        return self._diagnostic_envelope(
+            {
+                "adversarial_validation": {
+                    "distribution_test": distribution.get("distribution_test", {}),
+                    "feature_level_tests": feature_tests,
+                    "leakage_detection": leakage,
+                    "overall_status": overall_status,
+                    "recommendations": recommendations,
+                }
             }
-        }
+        )
 
     @staticmethod
     def _create_domain_classifier() -> Any:

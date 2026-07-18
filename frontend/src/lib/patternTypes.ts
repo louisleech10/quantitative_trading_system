@@ -72,23 +72,20 @@ export interface Pattern {
   };
 }
 
+/** LA-2 B3：server 權威 — 帶 task_id，禁 client rules/metrics/metadata */
 export interface CreatePatternRequest {
   name: string;
   description: string;
-  rules: PatternRule[];
-  case_id: string;
-  xgboost_importance: Record<string, number>;
-  performance_metrics: Record<string, number>;
+  task_id: string;
   tags?: string[];
-  metadata?: Record<string, unknown>;
 }
 
+/** LA-2 B3：禁 client status/metadata；可選 task_id re-verify */
 export interface UpdatePatternRequest {
   name?: string;
   description?: string;
-  status?: string;
   tags?: string[];
-  metadata?: Record<string, unknown>;
+  task_id?: string;
 }
 
 export interface PatternListResponse {

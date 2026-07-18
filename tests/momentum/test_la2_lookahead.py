@@ -1,24 +1,23 @@
-"""LA-2 M-lookahead 測試（B0 骨架 12 nodeid；B1 填實 test_winsorized_disabled）。
+"""LA-2 M-lookahead 測試（B0 骨架 12 nodeid；B1–B3 已填實）。
 
 SPEC: docs/IC_LA2_SPEC.md
-TODO: docs/IC_LA2_TODO.md Task 0.3 / 1.1 / 1.2
+TODO: docs/IC_LA2_TODO.md Task 0.3 / 1.1 / 2.* / 3.*
 
 collect == 12:
-  - test_winsorized_disabled          ← B1 實作
-  - test_model_oot_contract           ← B2 xfail
-  - test_model_service_oot            ← B2 xfail
-  - test_config_theater               ← B2 xfail
-  - test_calibrator_receipt           ← B2 xfail
-  - test_pattern_train_mask           ← B3 xfail
-  - test_pattern_promotion_guard      ← B3 xfail
-  - test_plan_identity_mismatch       ← B3 xfail
-  - test_regime_no_global_fit         ← B3 xfail
-  - test_factor_loud                  ← B3 xfail
-  - test_adversarial_validator_diagnostic_only  ← B3 xfail
-  - test_analysis_status_diagnostic   ← B3/B4 xfail
+  - test_winsorized_disabled          ← B1
+  - test_model_oot_contract           ← B2
+  - test_model_service_oot            ← B2
+  - test_config_theater               ← B2
+  - test_calibrator_receipt           ← B2
+  - test_pattern_train_mask           ← B3
+  - test_pattern_promotion_guard      ← B3
+  - test_plan_identity_mismatch       ← B3
+  - test_regime_no_global_fit         ← B3
+  - test_factor_loud                  ← B3
+  - test_adversarial_validator_diagnostic_only  ← B3
+  - test_analysis_status_diagnostic   ← B3
 
-B1 以外骨架 xfail（B4 final gate 禁殘留 skip/xfail；B2-B3 去 xfail 填實）。
-collect 不觸 data_cache 副作用。
+B4 final gate 禁殘留 skip/xfail。collect 不觸 data_cache 副作用。
 """
 
 from __future__ import annotations
@@ -774,43 +773,540 @@ def test_calibrator_receipt() -> None:
     assert "calibrator_receipt" in ok2
 
 
-@pytest.mark.xfail(reason=_XFAIL_REASON, strict=True)
 def test_pattern_train_mask() -> None:
-    """B3：pattern train-mask + train-y 統計。"""
-    raise NotImplementedError("B3 Task 3.2")
+    """B3：pattern train-mask + train-y 統計；缺 split / 非 train fail-closed。"""
+    import xgboost as xgb
+
+    from momentum.Analysis.pattern_extractor import (
+        PatternExtractor,
+        PatternSplitRequiredError,
+    )
+    from momentum.core.contracts import SplitPlan, canonical_split_plan_hash
+    from momentum.factories import create_xgboost_analyzer
+
+    rng = np.random.default_rng(42)
+    n = 400
+    X = pd.DataFrame(
+        {
+            "f0": rng.normal(size=n),
+            "f1": rng.normal(size=n),
+            "f2": rng.normal(size=n),
+        }
+    )
+    y = ((X["f0"] > 0) & (X["f1"] > 0)).astype(int).to_numpy()
+    analyzer = create_xgboost_analyzer()
+    analyzer.train_model(X, y)
+    extractor = PatternExtractor()
+
+    # 缺 split → fail-closed
+    with pytest.raises(PatternSplitRequiredError):
+        extractor.extract_decision_rules(
+            analyzer.model, X, y, list(X.columns), top_n=5, min_support=5
+        )
+
+    # 非 train split → fail-closed
+    test_plan = _make_split_plan(np.arange(300, 400), label="test", universe="pat-u")
+    with pytest.raises(PatternSplitRequiredError):
+        extractor.extract_decision_rules(
+            analyzer.model,
+            X,
+            y,
+            list(X.columns),
+            top_n=5,
+            min_support=5,
+            split=test_plan,
+        )
+
+    train_plan = _make_split_plan(np.arange(0, 300), label="train", universe="pat-u")
+    rules = extractor.extract_decision_rules(
+        analyzer.model,
+        X,
+        y,
+        list(X.columns),
+        top_n=10,
+        min_support=5,
+        split=train_plan,
+        expected_plan_hash=canonical_split_plan_hash(train_plan),
+    )
+    assert len(rules) >= 1
+    # threshold 為 train 分位值（finite），非 confidence
+    for r in rules:
+        assert 0.0 <= r.confidence <= 1.0
+        for _f, _op, thr in r.feature_conditions:
+            assert np.isfinite(thr)
+            # threshold ≠ confidence（可證偽：誤用 confidence 當 threshold）
+            assert thr != r.confidence or abs(thr) > 1.0 or thr == 0.0
+
+    # trunc 未來：train-y-only → early 門檻/confidence 不因未來翻轉
+    n_keep = 320
+    X_trunc = X.iloc[:n_keep]
+    y_trunc = y[:n_keep]
+    # train plan 仍為 [0,300) 且在 trunc 內
+    rules_trunc = extractor.extract_decision_rules(
+        analyzer.model,
+        X_trunc,
+        y_trunc,
+        list(X.columns),
+        top_n=10,
+        min_support=5,
+        split=train_plan,
+    )
+    # 同 train mask → 門檻一致（early equal）
+    assert len(rules) > 0 and len(rules_trunc) > 0
+    thr_full = {
+        (r.feature_conditions[0][0], r.feature_conditions[0][2])
+        for r in rules
+        if len(r.feature_conditions) == 1
+    }
+    thr_trunc = {
+        (r.feature_conditions[0][0], r.feature_conditions[0][2])
+        for r in rules_trunc
+        if len(r.feature_conditions) == 1
+    }
+    # train 段相同 → 單特徵門檻集合應一致
+    assert thr_full == thr_trunc, (thr_full, thr_trunc)
 
 
-@pytest.mark.xfail(reason=_XFAIL_REASON, strict=True)
 def test_pattern_promotion_guard() -> None:
-    """B3：晉升 server 權威（create+PUT）。"""
-    raise NotImplementedError("B3 Task 3.2")
+    """B3：晉升 server 權威（create+PUT）；偽造 client 欄位拒；OOT lift 來源。"""
+    from momentum.Analysis.eval_scope_utils import build_service_oot_bundle
+    from api.services.pattern_management_service import PatternManagementService
+
+    artifact = b"promo-artifact-v1"
+    bundle = build_service_oot_bundle(
+        n_samples=200,
+        model_artifact=artifact,
+        trusted_issuer="xgboost_task_service",
+        oot_ratio=0.2,
+        horizon=1,
+        embargo=0,
+        symbol="BTCUSDT",
+        base_universe_hash="promo-u",
+    )
+    assert bundle["oot_receipt"] is not None
+
+    task_result = {
+        "case_id": "BTCUSDT_1h",
+        "oot_receipt": bundle["oot_receipt"],
+        # B3-F1：三份 provenance 必填，缺→非 active
+        "train_plan": bundle["train_plan"],
+        "eval_plan": bundle["eval_plan"],
+        "model_artifact": artifact,
+        "decision_rules": [
+            {
+                "rule_id": 1,
+                "condition": "f0 > 0.1",
+                "support": 50,
+                "confidence": 0.7,
+                "lift": 1.2,  # train lift
+                "oot_lift": 1.5,  # OOT lift（晉升必須用此）
+                "feature_conditions": [
+                    {"feature": "f0", "operator": ">", "threshold": 0.1}
+                ],
+            }
+        ],
+        "feature_importance": [{"feature": "f0", "importance": 0.9}],
+        "model_performance": {
+            "value": {"in_sample_train_auc": 0.99, "oot_auc": 0.6},
+            "eval_scope": {
+                "in_sample_train_auc": "in_sample_research_only",
+                "oot_auc": "oot",
+            },
+        },
+    }
+    store: dict = {"task-ok": task_result}
+    svc = PatternManagementService(task_result_lookup=lambda tid: store.get(tid))
+
+    # 偽造 client rules/metadata/status → 拒
+    bad = svc.create_pattern(
+        name="bad",
+        description="d",
+        task_id="task-ok",
+        rules=[{"feature": "hack", "operator": ">", "threshold": 99, "description": "x"}],
+    )
+    assert bad["success"] is False
+    assert "rules" in bad["error"]
+
+    bad_meta = svc.create_pattern(
+        name="bad2",
+        description="d",
+        task_id="task-ok",
+        metadata={"forged": True},
+    )
+    assert bad_meta["success"] is False
+
+    # 合法 create → active（有 oot_receipt + 三 provenance + finite oot_lift）
+    ok = svc.create_pattern(
+        name="good",
+        description="from task",
+        task_id="task-ok",
+        tags=["t1"],
+    )
+    assert ok["success"] is True, ok
+    assert ok["pattern"]["status"] == "active"
+    # OOT lift 來源
+    assert ok["pattern"]["performance_metrics"].get("oot_lift_source") == "oot"
+    assert ok["pattern"]["performance_metrics"].get("oot_lift_mean") == pytest.approx(1.5)
+    # threshold = 分位值 0.1 非 confidence 0.7
+    assert ok["pattern"]["rules"][0]["threshold"] == pytest.approx(0.1)
+
+    # B3-F1 反例：缺三 provenance → 非 active（可證偽）
+    store["task-no-prov"] = {
+        k: v
+        for k, v in task_result.items()
+        if k not in ("train_plan", "eval_plan", "model_artifact")
+    }
+    no_prov = svc.create_pattern(name="np", description="d", task_id="task-no-prov")
+    assert no_prov["success"] is True, no_prov
+    assert no_prov["pattern"]["status"] != "active"
+    assert "provenance" in str(
+        no_prov["pattern"].get("metadata", {}).get("promotion_blocked_reason", "")
+    ) or no_prov["pattern"]["status"] == "testing"
+
+    # B3-F6：缺 oot_lift → 非 active
+    store["task-no-lift"] = {
+        **task_result,
+        "decision_rules": [
+            {
+                **task_result["decision_rules"][0],
+                "oot_lift": None,
+            }
+        ],
+    }
+    no_lift = svc.create_pattern(name="nl", description="d", task_id="task-no-lift")
+    assert no_lift["success"] is True, no_lift
+    assert no_lift["pattern"]["status"] != "active"
+
+    # 缺 oot_receipt → 非 active（仍可建立 testing）
+    store["task-no-oot"] = {
+        "case_id": "x",
+        "decision_rules": task_result["decision_rules"],
+        "feature_importance": [{"feature": "f0", "importance": 0.1}],
+        "model_performance": {
+            "value": {"in_sample_train_auc": 0.5, "cv_auc_mean": 0.5},
+            "eval_scope": {
+                "in_sample_train_auc": "in_sample_research_only",
+                "cv_auc_mean": "cv_oof",
+            },
+        },
+    }
+    no_oot = svc.create_pattern(name="n", description="d", task_id="task-no-oot")
+    assert no_oot["success"] is True, no_oot
+    assert no_oot["pattern"]["status"] != "active"
+
+    # 假 oot_receipt digest → 非 active
+    forged_env = dict(bundle["oot_receipt"])
+    forged_env["envelope_digest"] = "0" * 64
+    store["task-forged"] = {**task_result, "oot_receipt": forged_env}
+    forged = svc.create_pattern(name="f", description="d", task_id="task-forged")
+    assert forged["success"] is True
+    assert forged["pattern"]["status"] != "active"
+
+    # PUT status 拒
+    pid = ok["pattern_id"]
+    put_bad = svc.update_pattern(pid, status="active")
+    assert put_bad["success"] is False
+    assert "status" in put_bad["error"]
+    put_meta = svc.update_pattern(pid, metadata={"x": 1})
+    assert put_meta["success"] is False
 
 
-@pytest.mark.xfail(reason=_XFAIL_REASON, strict=True)
 def test_plan_identity_mismatch() -> None:
     """B3：pattern/model plan_hash mismatch → fail-closed。"""
-    raise NotImplementedError("B3 Task 3.2")
+    from momentum.Analysis.pattern_extractor import (
+        PatternExtractor,
+        PatternPlanIdentityError,
+        PatternSplitRequiredError,
+    )
+    from momentum.core.contracts import canonical_split_plan_hash
+    from momentum.factories import create_xgboost_analyzer
+
+    rng = np.random.default_rng(0)
+    n = 200
+    X = pd.DataFrame({"a": rng.normal(size=n), "b": rng.normal(size=n)})
+    y = (X["a"] > 0).astype(int).to_numpy()
+    analyzer = create_xgboost_analyzer()
+    analyzer.train_model(X, y)
+
+    plan_a = _make_split_plan(np.arange(0, 150), label="train", universe="u-a")
+    plan_b = _make_split_plan(np.arange(0, 150), label="train", universe="u-b")
+    # 同 cutoff 長度但 universe/symbol 不同 → hash 不同
+    assert canonical_split_plan_hash(plan_a) != canonical_split_plan_hash(plan_b)
+
+    extractor = PatternExtractor()
+    with pytest.raises(PatternPlanIdentityError):
+        extractor.extract_decision_rules(
+            analyzer.model,
+            X,
+            y,
+            list(X.columns),
+            top_n=3,
+            min_support=5,
+            split=plan_a,
+            expected_plan_hash=canonical_split_plan_hash(plan_b),
+        )
+
+    # 同 plan 三 cutoff 同 row 但不同 identity（symbol）
+    plan_c = _make_split_plan(
+        np.arange(0, 150), label="train", symbol="ETHUSDT", universe="u-a"
+    )
+    plan_d = _make_split_plan(
+        np.arange(0, 150), label="train", symbol="BTCUSDT", universe="u-a"
+    )
+    assert canonical_split_plan_hash(plan_c) != canonical_split_plan_hash(plan_d)
+    with pytest.raises(PatternPlanIdentityError):
+        extractor.extract_decision_rules(
+            analyzer.model,
+            X,
+            y,
+            list(X.columns),
+            top_n=3,
+            min_support=5,
+            split=plan_c,
+            expected_plan_hash=canonical_split_plan_hash(plan_d),
+        )
 
 
-@pytest.mark.xfail(reason=_XFAIL_REASON, strict=True)
 def test_regime_no_global_fit() -> None:
     """B3：_fit_global / expanding 參數移除不可達。"""
-    raise NotImplementedError("B3 Task 3.1")
+    import inspect
+
+    from momentum.Analysis.regime_detector import RegimeDetector
+    from momentum.factories import create_regime_detector
+
+    det = create_regime_detector(n_clusters=3, lookback=20, min_samples_for_fit=50)
+    sig = inspect.signature(RegimeDetector.detect)
+    assert "expanding" not in sig.parameters
+    assert not hasattr(det, "_fit_global")
+    with pytest.raises(TypeError):
+        det.detect(pd.Series([1.0, 2.0, 3.0]), expanding=False)  # type: ignore[call-arg]
+    with pytest.raises(AttributeError):
+        det._fit_global(pd.DataFrame({"volatility": [0.1]}))  # type: ignore[attr-defined]
+
+    # 產線 PIT 仍可用
+    rng = np.random.default_rng(1)
+    close = pd.Series(100 + np.cumsum(rng.normal(0, 0.5, 400)))
+    r1 = det.detect(close)
+    r2 = det.detect(close)
+    assert len(r1.labels) == len(close)
+    np.testing.assert_array_equal(r1.labels, r2.labels)
 
 
-@pytest.mark.xfail(reason=_XFAIL_REASON, strict=True)
 def test_factor_loud() -> None:
-    """B3：factor typed loud + market_proxy 因果化。"""
-    raise NotImplementedError("B3 Task 3.3")
+    """B3：factor typed loud + market_proxy 因果化 + deny gate。"""
+    from dataclasses import asdict
+    from types import SimpleNamespace
+
+    from momentum.core.contracts import (
+        ExposurePayload,
+        FactorModuleResult,
+        OrthogonalizationPayload,
+        deny_factor_in_ok_oos,
+    )
+    from momentum.Analysis.factor_orthogonalizer import FactorOrthogonalizer
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    # typed contract hard asserts
+    orth = FactorModuleResult(
+        module="orthogonalization",
+        oos_guarantees=False,
+        fit_scope="full_sample",
+        payload=OrthogonalizationPayload(
+            method="gram_schmidt",
+            orthogonalized_hash="abc",
+            summary={"method": "gram_schmidt"},
+        ),
+    )
+    assert orth.oos_guarantees is False
+    assert orth.fit_scope == "full_sample"
+
+    with pytest.raises(ValueError):
+        FactorModuleResult(
+            module="orthogonalization",
+            oos_guarantees=True,  # type: ignore[arg-type]
+            fit_scope="full_sample",
+            payload=OrthogonalizationPayload(
+                method="gs", orthogonalized_hash="x", summary={}
+            ),
+        )
+
+    # GS 算法不改：兩次 deep-equal
+    rng = np.random.default_rng(7)
+    factors = pd.DataFrame(
+        rng.normal(size=(200, 3)), columns=["f0", "f1", "f2"]
+    )
+    fo = FactorOrthogonalizer({})
+    t1, s1 = fo.gram_schmidt(factors)
+    t2, s2 = fo.gram_schmidt(factors)
+    np.testing.assert_allclose(t1.to_numpy(), t2.to_numpy(), atol=_ATOL)
+    assert s1["method"] == s2["method"] == "gram_schmidt"
+
+    # root ok_oos + nested factor loud → deny
+    report = {
+        "analysis_status": "ok_oos",
+        "deep_analysis": {
+            "factor_orthogonalization": asdict(orth),
+        },
+    }
+    with pytest.raises(ValueError, match="deny_factor_in_ok_oos"):
+        deny_factor_in_ok_oos(report)
+
+    # degraded root 可帶 factor loud
+    report2 = {
+        "analysis_status": "degraded_full_sample",
+        "deep_analysis": {"factor_orthogonalization": asdict(orth)},
+    }
+    deny_factor_in_ok_oos(report2)  # no raise
+
+    # proxy lag≥1：pct_change().shift(1) 不見當根 close / forward label
+    close = pd.Series([100.0, 110.0, 121.0, 133.1], index=pd.RangeIndex(4))
+    proxy = close.pct_change().shift(1)
+    # bar 0,1 NaN；bar 2 = (110-100)/100 = 0.1（只用到 close[1], close[0]）
+    assert np.isnan(proxy.iloc[0]) and np.isnan(proxy.iloc[1])
+    assert proxy.iloc[2] == pytest.approx(0.1)
+    # 與 forward label 不同：forward = close.pct_change().shift(-1) 用未來
+    forward = close.pct_change().shift(-1)
+    assert not np.allclose(
+        proxy.fillna(0).to_numpy(), forward.fillna(0).to_numpy(), equal_nan=False
+    )
+
+    exp = FactorModuleResult(
+        module="exposure",
+        oos_guarantees=False,
+        fit_scope="full_sample",
+        payload=ExposurePayload(
+            proxy_kind="trailing_close_ret",
+            exposure_hash="e1",
+            summary={"proxy_lag": 1},
+        ),
+    )
+    assert exp.payload.proxy_kind == "trailing_close_ret"
+
+    # B3-F9：orchestrator production 結果保留 typed_result（非純 asdict）
+    orch = ICFilterOrchestrator.__new__(ICFilterOrchestrator)
+    orch._ic_cache = {
+        "features_df": factors,
+        "icir": {"f0": 0.1, "f1": 0.05, "f2": 0.02},
+        "close_series": pd.Series(
+            100 + np.cumsum(rng.normal(0, 1, len(factors))),
+            index=factors.index,
+        ),
+    }
+    orth_cfg = SimpleNamespace(
+        method="gram_schmidt",
+        enabled=True,
+        model_dump=lambda: {"method": "gram_schmidt"},
+    )
+    cfg = SimpleNamespace(factor_orthogonalization=orth_cfg)
+    prod = ICFilterOrchestrator._run_factor_orthogonalization(
+        orch, list(factors.columns), cfg  # type: ignore[arg-type]
+    )
+    assert isinstance(prod.get("typed_result"), FactorModuleResult)
+    assert prod["oos_guarantees"] is False
+    assert prod["fit_scope"] == "full_sample"
+    assert prod["module"] == "orthogonalization"
+    # production envelope under ok_oos → deny
+    with pytest.raises(ValueError, match="deny_factor_in_ok_oos"):
+        deny_factor_in_ok_oos(
+            {
+                "analysis_status": "ok_oos",
+                "deep_analysis": {"factor_orthogonalization": prod},
+            }
+        )
 
 
-@pytest.mark.xfail(reason=_XFAIL_REASON, strict=True)
 def test_adversarial_validator_diagnostic_only() -> None:
-    """B3：adversarial_validator diagnostic_only 標記。"""
-    raise NotImplementedError("B3 Task 3.4")
+    """B3：adversarial_validator diagnostic_only 標記存在（含 F11 direct methods）。"""
+    from momentum.Analysis.adversarial_validator import AdversarialValidator
+
+    assert AdversarialValidator.DIAGNOSTIC_ONLY is True
+    assert AdversarialValidator.ANALYSIS_STATUS == "diagnostic_only"
+
+    rng = np.random.default_rng(3)
+    X_train = pd.DataFrame(rng.normal(size=(80, 3)), columns=list("abc"))
+    X_test = pd.DataFrame(rng.normal(size=(40, 3)) + 0.5, columns=list("abc"))
+    av = AdversarialValidator({"n_estimators": 20, "cv": 2})
+    out = av.validate_distribution(X_train, X_test)
+    assert out.get("diagnostic_only") is True
+    assert out.get("analysis_status") == "diagnostic_only"
+    assert out.get("signal_use_denied") is True
+    assert out.get("oos_guarantees") is False
+
+    # F11：feature_level_tests / detect_leakage 直出亦須 envelope（漏標→FAIL）
+    feat = av.feature_level_tests(X_train, X_test)
+    assert feat.get("diagnostic_only") is True
+    assert feat.get("analysis_status") == "diagnostic_only"
+    assert feat.get("signal_use_denied") is True
+    assert feat.get("oos_guarantees") is False
+    # per-feature 結果仍在（算法不變）
+    assert any(isinstance(v, dict) and "ks_statistic" in v for v in feat.values())
+
+    y = rng.integers(0, 2, size=len(X_train)).astype(float)
+    ts = np.arange(len(X_train), dtype=np.int64)
+    leak = av.detect_leakage(X_train, y, ts, future_window=5)
+    assert leak.get("diagnostic_only") is True
+    assert leak.get("analysis_status") == "diagnostic_only"
+    assert leak.get("signal_use_denied") is True
+    assert leak.get("oos_guarantees") is False
+    assert "suspicious_features" in leak
+    assert leak.get("status") in {"ok", "skipped"}
+
+    full = av.full_validation(X_train, X_test)
+    assert full.get("diagnostic_only") is True
+    assert full.get("analysis_status") == "diagnostic_only"
 
 
-@pytest.mark.xfail(reason=_XFAIL_REASON, strict=True)
 def test_analysis_status_diagnostic() -> None:
-    """B3/B4：analysis_status=diagnostic_only + consumer deny。"""
-    raise NotImplementedError("B3 Task 3.4 / B4")
+    """B3：adversarial diagnostic_only + root ok_oos 時仍 deny 進 signal。"""
+    from momentum.Analysis.adversarial_validator import AdversarialValidator
+    from momentum.Analysis.ic_reporter import ICReporter
+    from momentum.core.contracts import deny_factor_in_ok_oos
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    av = AdversarialValidator({"n_estimators": 10, "cv": 2})
+    rng = np.random.default_rng(5)
+    X_train = pd.DataFrame(rng.normal(size=(60, 2)), columns=["x", "y"])
+    X_test = pd.DataFrame(rng.normal(size=(30, 2)), columns=["x", "y"])
+    out = av.validate_distribution(X_train, X_test)
+
+    # marker 存在
+    assert out["analysis_status"] == "diagnostic_only"
+    assert out["signal_use_denied"] is True
+
+    # root ok_oos + diagnostic nested → 真 production deny（contracts + export + get_result）
+    report = {
+        "analysis_status": "ok_oos",
+        "adversarial_validation": out,
+    }
+    with pytest.raises(ValueError, match="diagnostic_only|signal"):
+        deny_factor_in_ok_oos(report)
+
+    # production export 出口（ic_reporter.export_all）
+    reporter = ICReporter(config={})
+    with pytest.raises(ValueError, match="diagnostic_only|signal|deny_factor"):
+        reporter.export_all(report, output_dir="/tmp/la2_b3_diag_export", case_id="diag")
+
+    # production API 出口 get_result
+    svc = ICAnalysisService()
+    tid = "la2-b3-diag-task"
+    with svc._lock:
+        svc._tasks[tid] = {
+            "task_id": tid,
+            "status": "completed",
+            "progress": 1.0,
+            "result": report,
+        }
+    with pytest.raises(ValueError, match="diagnostic_only|signal|deny_factor"):
+        svc.get_result(tid)
+
+    # factor deny 仍獨立可證
+    report_f = {
+        "analysis_status": "ok_oos",
+        "factor": {
+            "module": "exposure",
+            "oos_guarantees": False,
+            "fit_scope": "full_sample",
+        },
+    }
+    with pytest.raises(ValueError, match="deny_factor_in_ok_oos"):
+        deny_factor_in_ok_oos(report_f)

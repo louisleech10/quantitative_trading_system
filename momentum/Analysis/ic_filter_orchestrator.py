@@ -45,9 +45,13 @@ from momentum.core.contracts import (
     ORACLE_RETURN_KINDS,
     AlignmentSpec,
     AlignmentViolationError,
+    ExposurePayload,
+    FactorModuleResult,
+    OrthogonalizationPayload,
     SelectionScope,
     SplitPlan,
     TimestampDiscontinuityError,
+    deny_factor_in_ok_oos,
     _coerce_timestamp_array,
     _normalize_symbol_value,
     split_per_symbol,
@@ -2080,6 +2084,9 @@ class ICFilterOrchestrator:
         return analyzer.validate_batch(features_df, labels, top_n=len(selected_features))
 
     def _run_factor_orthogonalization(self, selected_features: list[str], config: ICConfig) -> dict:
+        """C-3 loud：GS/PCA 算法不變；結果包 FactorModuleResult（oos_guarantees=False）。"""
+        import hashlib
+
         from momentum.Analysis.factor_orthogonalizer import FactorOrthogonalizer
 
         factors = self._ic_cache["features_df"][selected_features]
@@ -2094,17 +2101,59 @@ class ICFilterOrchestrator:
             transformed, summary = analyzer.pca_orthogonalize(factors)
         else:
             transformed, summary = analyzer.gram_schmidt(factors)
-        return {
-            **summary,
+
+        orth_hash = hashlib.sha256(
+            np.ascontiguousarray(
+                transformed.to_numpy(dtype=np.float64) if not transformed.empty else np.array([])
+            ).tobytes()
+        ).hexdigest()
+        payload = OrthogonalizationPayload(
+            method=str(summary.get("method", method)),
+            orthogonalized_hash=orth_hash,
+            summary={**summary, "transformed_shape": list(transformed.shape)},
+        )
+        typed = FactorModuleResult(
+            module="orthogonalization",
+            oos_guarantees=False,
+            fit_scope="full_sample",
+            payload=payload,
+        )
+        # B3-F9：保留 typed（envelope），禁純 asdict 丟型別
+        out: dict[str, Any] = {
+            "typed_result": typed,
+            "module": typed.module,
+            "oos_guarantees": typed.oos_guarantees,
+            "fit_scope": typed.fit_scope,
+            "payload": typed.payload,
             "transformed_shape": list(transformed.shape),
+            "export_scope": "in_sample_research_only",
+            "consumer_deny": True,
         }
+        out.update(summary)
+        return out
 
     def _run_factor_exposure(self, selected_features: list[str], config: ICConfig) -> dict:
+        """C-3 loud + DEC-3：market_proxy = trailing close-ret（lag≥1），非 forward label。"""
+        import hashlib
+
         from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
 
         analyzer = FactorExposureAnalyzer(config.factor_exposure.model_dump())
         factor_values = self._ic_cache["features_df"][selected_features]
-        market_proxy = pd.to_numeric(self._ic_cache.get("label_series"), errors="coerce")
+
+        # DEC-3：trailing close return，decision-ts=前一 bar close（不見當根 close）
+        close_series = self._ic_cache.get("close_series")
+        if close_series is None:
+            # 無 close carrier → fail-closed（禁 silent fallback 到 label_series）
+            raise InvalidInputError(
+                "factor_exposure requires _ic_cache['close_series'] "
+                "(trailing close-ret proxy; label_series forward proxy forbidden)"
+            )
+        close_aligned = pd.to_numeric(close_series, errors="coerce").reindex(
+            factor_values.index
+        )
+        # lag≥1：pct_change().shift(1) → bar t 只用 close[t-1]/close[t-2]
+        market_proxy = close_aligned.pct_change().shift(1)
         positions = pd.Series(1.0 / max(1, len(factor_values)), index=factor_values.index)
 
         neutralization_mode = str(config.factor_exposure.neutralization_mode)
@@ -2132,7 +2181,7 @@ class ICFilterOrchestrator:
         if isinstance(original_hhi, (int, float)) and isinstance(neutralized_hhi, (int, float)):
             delta_hhi = float(original_hhi) - float(neutralized_hhi)
 
-        return {
+        summary = {
             "portfolio_exposure": exposure.to_dict(),
             "factor_betas": exposure.to_dict(),
             "factor_attribution": {
@@ -2152,7 +2201,39 @@ class ICFilterOrchestrator:
             "neutralized_portfolio_exposure": neutralized_exposure.to_dict(),
             "neutralized_concentration": neutralized_concentration,
             "neutralization_delta_hhi": delta_hhi,
+            "proxy_kind": "trailing_close_ret",
+            "proxy_lag": 1,
         }
+        exp_hash = hashlib.sha256(
+            json.dumps(
+                {k: v for k, v in summary["portfolio_exposure"].items()},
+                sort_keys=True,
+                default=str,
+            ).encode()
+        ).hexdigest()
+        payload = ExposurePayload(
+            proxy_kind="trailing_close_ret",
+            exposure_hash=exp_hash,
+            summary=summary,
+        )
+        typed = FactorModuleResult(
+            module="exposure",
+            oos_guarantees=False,
+            fit_scope="full_sample",
+            payload=payload,
+        )
+        # B3-F9：保留 typed（envelope），禁純 asdict 丟型別
+        out: dict[str, Any] = {
+            "typed_result": typed,
+            "module": typed.module,
+            "oos_guarantees": typed.oos_guarantees,
+            "fit_scope": typed.fit_scope,
+            "payload": typed.payload,
+            "export_scope": "in_sample_research_only",
+            "consumer_deny": True,
+        }
+        out.update(summary)
+        return out
 
     def _run_long_short(self, selected_features: list[str], config: ICConfig) -> dict:
         from momentum.Analysis.long_short_analyzer import LongShortAnalyzer
@@ -2708,6 +2789,15 @@ class ICFilterOrchestrator:
                 config.ic_calculation.grouped_analysis.model_dump(),
             )
 
+        # LA-2 B3 close carrier：對齊 features_df index
+        close_series_out: Optional[pd.Series] = None
+        if raw_data_for_ic is not None and "close" in getattr(raw_data_for_ic, "columns", []):
+            close_series_out = pd.to_numeric(raw_data_for_ic["close"], errors="coerce")
+            close_series_out = close_series_out.reindex(features_df.index)
+        elif raw_data is not None and "close" in getattr(raw_data, "columns", []):
+            close_series_out = pd.to_numeric(raw_data["close"], errors="coerce")
+            close_series_out = close_series_out.reindex(features_df.index)
+
         ic_results = {
             "label_series": label_series,
             "ic_values": ic_values,
@@ -2716,6 +2806,7 @@ class ICFilterOrchestrator:
             "ic_autocorr": ic_autocorr,
             "ic_decay": ic_decay,
             "grouped_ic": grouped_ic,
+            "close_series": close_series_out,
             "scope": "test" if split_context is not None else "full",
         }
 
@@ -3125,9 +3216,17 @@ class ICFilterOrchestrator:
 
         self._filtered_features_df = stage6_results.get("filtered_df")
 
+        # LA-2 B3：close carrier 進 _ic_cache（index 對齊 features_df；factor proxy 用）
+        close_series: Optional[pd.Series] = None
+        if isinstance(ic_results, dict) and ic_results.get("close_series") is not None:
+            close_series = pd.to_numeric(ic_results["close_series"], errors="coerce")
+            if isinstance(close_series, pd.Series):
+                close_series = close_series.reindex(features_df.index)
+
         self._ic_cache = {
             "features_df": features_df,
             "label_series": ic_results.get("label_series"),
+            "close_series": close_series,
             "metadata": metadata,
             "icir": ic_results.get("icir", {}),
             "rolling_ic": ic_results.get("rolling_ic", {}),

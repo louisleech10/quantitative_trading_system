@@ -17,12 +17,12 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePatternStore } from '@/store/patternStore';
 import { createPattern } from '@/lib/api/patternApi';
-import type { CreatePatternRequest, PatternRule } from '@/lib/patternTypes';
+import type { CreatePatternRequest } from '@/lib/patternTypes';
 
 interface Props {
   prefillData?: {
-    case_id: string;
-    rules?: PatternRule[];
+    task_id?: string;
+    case_id?: string;
     performance_metrics?: unknown;
   };
 }
@@ -31,36 +31,15 @@ export default function CreatePatternForm({ prefillData }: Props) {
   const router = useRouter();
   const { addPattern } = usePatternStore();
   
-  // 表單狀態
+  // 表單狀態（LA-2 B3：server 權威 — 需 task_id；rules 由 server 重建）
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [caseId, setCaseId] = useState(prefillData?.case_id || '');
-  const [rules, setRules] = useState<PatternRule[]>(prefillData?.rules || [
-    { feature: '', operator: '>', threshold: 0, description: '' }
-  ]);
+  const [taskId, setTaskId] = useState(prefillData?.task_id || '');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
-  const [status, setStatus] = useState<string>('testing');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // 新增規則
-  const handleAddRule = () => {
-    setRules([...rules, { feature: '', operator: '>', threshold: 0, description: '' }]);
-  };
-  
-  // 刪除規則
-  const handleRemoveRule = (index: number) => {
-    setRules(rules.filter((_, i) => i !== index));
-  };
-  
-  // 更新規則
-  const handleRuleChange = (index: number, field: keyof PatternRule, value: unknown) => {
-    const updated = [...rules];
-    updated[index] = { ...updated[index], [field]: value };
-    setRules(updated);
-  };
   
   // 新增標籤
   const handleAddTag = () => {
@@ -80,18 +59,7 @@ export default function CreatePatternForm({ prefillData }: Props) {
     const newErrors: Record<string, string> = {};
     
     if (!name.trim()) newErrors.name = '樣式名稱必填';
-    if (!caseId.trim()) newErrors.case_id = '案例 ID 必填';
-    if (rules.length === 0) newErrors.rules = '至少需要一條規則';
-    
-    // 驗證每條規則
-    rules.forEach((rule, index) => {
-      if (!rule.feature.trim()) {
-        newErrors[`rule_${index}_feature`] = `規則 ${index + 1} 的特徵必填`;
-      }
-      if (rule.threshold === null || rule.threshold === undefined) {
-        newErrors[`rule_${index}_threshold`] = `規則 ${index + 1} 的閾值必填`;
-      }
-    });
+    if (!taskId.trim()) newErrors.task_id = 'task_id 必填（server 從 oot_receipt 重建 rules）';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -109,16 +77,8 @@ export default function CreatePatternForm({ prefillData }: Props) {
       const request: CreatePatternRequest = {
         name,
         description,
-        case_id: caseId,
-        rules: rules.map(r => ({
-          feature: r.feature,
-          operator: r.operator,
-          threshold: r.threshold,
-          description: r.description
-        })),
+        task_id: taskId,
         tags: tags.length > 0 ? tags : undefined,
-        xgboost_importance: {},
-        performance_metrics: (prefillData?.performance_metrics as Record<string, number>) ?? {}
       };
       
       const created = await createPattern(request);
@@ -168,128 +128,21 @@ export default function CreatePatternForm({ prefillData }: Props) {
             />
           </div>
           
-          {/* 案例 ID */}
+          {/* task_id（server 從 oot_receipt 重建 rules/status） */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">案例 ID *</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Task ID *</label>
             <input
               type="text"
-              value={caseId}
-              onChange={(e) => setCaseId(e.target.value)}
-              placeholder="例如：ETHUSDT_12h"
+              value={taskId}
+              onChange={(e) => setTaskId(e.target.value)}
+              placeholder="XGBoost / batch 分析 task_id"
               className="w-full px-3 py-2 border border-white/10 rounded text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             />
-            {errors.case_id && <p className="text-rose-300 text-sm mt-1">{errors.case_id}</p>}
+            {errors.task_id && <p className="text-rose-300 text-sm mt-1">{errors.task_id}</p>}
+            <p className="text-xs text-slate-500 mt-1">
+              rules / performance / status 由 server 依 OOT receipt 推導（禁 client 偽造）
+            </p>
           </div>
-          
-          {/* 狀態 */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">狀態</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-white/10 rounded text-slate-100 bg-slate-900/60 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
-            >
-              <option value="testing">測試中</option>
-              <option value="active">啟用</option>
-              <option value="archived">封存</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      
-      {/* 規則列表 */}
-      <div className="glass-panel rounded-xl border border-white/10 p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-slate-100">樣式規則</h2>
-          <button
-            type="button"
-            onClick={handleAddRule}
-            className="px-3 py-1 bg-blue-500/20 text-blue-200 border border-blue-400/40 rounded text-sm hover:bg-blue-500/30"
-          >
-            + 新增規則
-          </button>
-        </div>
-        
-        {errors.rules && <p className="text-rose-300 text-sm mb-3">{errors.rules}</p>}
-        
-        <div className="space-y-4">
-          {rules.map((rule, index) => (
-            <div key={index} className="p-4 border border-white/10 rounded bg-white/5">
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="font-semibold text-slate-100">規則 {index + 1}</h3>
-                {rules.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRule(index)}
-                    className="text-rose-300 text-sm hover:text-rose-200"
-                  >
-                    刪除
-                  </button>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-4 gap-3">
-                {/* 特徵 */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">特徵 *</label>
-                  <input
-                    type="text"
-                    value={rule.feature}
-                    onChange={(e) => handleRuleChange(index, 'feature', e.target.value)}
-                    placeholder="例如：ema_20"
-                    className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
-                  />
-                  {errors[`rule_${index}_feature`] && (
-                    <p className="text-rose-300 text-xs mt-1">{errors[`rule_${index}_feature`]}</p>
-                  )}
-                </div>
-                
-                {/* 操作符 */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">操作符 *</label>
-                  <select
-                    value={rule.operator}
-                    onChange={(e) => handleRuleChange(index, 'operator', e.target.value)}
-                    className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 bg-slate-900/60 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
-                  >
-                    <option value=">">{'>'}</option>
-                    <option value="<">{'<'}</option>
-                    <option value=">=">{'>='}</option>
-                    <option value="<=">{'<='}</option>
-                    <option value="==">{'=='}</option>
-                    <option value="!=">{'!='}</option>
-                  </select>
-                </div>
-                
-                {/* 閾值 */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">閾值 *</label>
-                  <input
-                    type="number"
-                    step="unknown"
-                    value={rule.threshold}
-                    onChange={(e) => handleRuleChange(index, 'threshold', parseFloat(e.target.value))}
-                    className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
-                  />
-                  {errors[`rule_${index}_threshold`] && (
-                    <p className="text-rose-300 text-xs mt-1">{errors[`rule_${index}_threshold`]}</p>
-                  )}
-                </div>
-                
-                {/* 說明 */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">說明</label>
-                  <input
-                    type="text"
-                    value={rule.description || ''}
-                    onChange={(e) => handleRuleChange(index, 'description', e.target.value)}
-                    placeholder="選填"
-                    className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
       
