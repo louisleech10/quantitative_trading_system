@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "face": "factor",
+  "modules": [
+    "gram_schmidt",
+    "pca",
+    "exposure"
+  ],
+  "proxy_kind_legacy": "forward_label_series"
+}

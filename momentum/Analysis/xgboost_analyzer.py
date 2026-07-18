@@ -19,7 +19,7 @@ from pathlib import Path
 import xgboost as xgb
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score
-from sklearn.metrics import precision_recall_curve, auc
+from sklearn.metrics import precision_recall_curve, auc as sk_auc
 from sklearn.inspection import permutation_importance
 
 from momentum.core.logging import get_logger
@@ -88,20 +88,24 @@ class OOTValidationResult:
 
 @dataclass
 class ModelPerformance:
-    """模型效能指標"""
-    train_auc: float
+    """模型效能指標（LA-2 B2：train_auc → in_sample_train_auc）"""
+    in_sample_train_auc: float
     cv_auc_mean: float
     cv_auc_std: float
     precision: float
     recall: float
     f1_score: float
-    overfitting_score: float  # train_auc - cv_auc_mean
+    overfitting_score: float  # in_sample_train_auc - cv_auc_mean
     brier_score: Optional[float] = None
     ece: Optional[float] = None
     calibration_quality: Optional[str] = None
     pr_auc: Optional[float] = None
     positive_rate: Optional[float] = None
-    
+    fit_pool_auc: Optional[float] = None
+    eval_scope: Optional[Dict[str, str]] = None
+    oot_auc: Optional[float] = None
+    oot_status: Optional[str] = None
+
     def is_overfitting(self, threshold: float = 0.15) -> bool:
         """是否過擬合"""
         return self.overfitting_score > threshold
@@ -389,6 +393,8 @@ class XGBoostAnalyzer:
             if split_idx < 1 or split_idx >= len(y_sorted):
                 raise ValueError("時間序列切分比例不合理，請調整 eval_size")
 
+            train_idx = order[:split_idx]
+            val_idx = order[split_idx:]
             X_train = X_sorted[:split_idx]
             X_val = X_sorted[split_idx:]
             y_train = y_sorted[:split_idx]
@@ -424,6 +430,12 @@ class XGBoostAnalyzer:
 
             y_train = y_array[train_idx]
             y_val = y_array[val_idx]
+
+        # LA-2 B2：記錄 ES fit pool（train∪val）供 fit_pool_auc
+        self._train_only_idx = np.asarray(train_idx, dtype=int)
+        self._fit_pool_idx = np.concatenate(
+            [np.asarray(train_idx, dtype=int), np.asarray(val_idx, dtype=int)]
+        )
         
         self.logger.info(
             f"訓練集: {len(X_train)} 樣本, 驗證集: {len(X_val)} 樣本"
@@ -444,9 +456,9 @@ class XGBoostAnalyzer:
         self._shap_explainer = None
         self._shap_model_id = None
         
-        # 計算訓練集 AUC
+        # in_sample train-only AUC（log 用；正式指標由 validate_model 產出）
         y_train_pred = self.model.predict_proba(X_train)[:, 1]
-        train_auc = roc_auc_score(y_train, y_train_pred)
+        in_sample_train_auc_log = roc_auc_score(y_train, y_train_pred)
         
         # 驗證模型
         performance = self.validate_model(
@@ -458,7 +470,7 @@ class XGBoostAnalyzer:
         )
         
         self.logger.info(
-            f"訓練完成 - Train AUC: {train_auc:.4f}, "
+            f"訓練完成 - in_sample_train_auc: {in_sample_train_auc_log:.4f}, "
             f"CV AUC: {performance.cv_auc_mean:.4f} ± {performance.cv_auc_std:.4f}"
         )
         
@@ -1023,7 +1035,7 @@ class XGBoostAnalyzer:
 
         y_pred_proba = self.model.predict_proba(X)[:, 1]
         precision, recall, thresholds = precision_recall_curve(y, y_pred_proba)
-        pr_auc = float(auc(recall, precision))
+        pr_auc = float(sk_auc(recall, precision))
         positive_rate = float(np.mean(y))
         baseline = positive_rate
 
@@ -1105,7 +1117,16 @@ class XGBoostAnalyzer:
         cv_precision_scores = []
         cv_recall_scores = []
         cv_f1_scores = []
-        
+        # LA-2 B2：收集 OOF 預測 → cal/PR/Brier/ECE scope=cv_oof；per-fold OofReceipt
+        oof_pred = np.full(len(y_ordered), np.nan, dtype=float)
+        oof_receipts: List[Dict[str, Any]] = []
+        try:
+            import pickle
+
+            _cv_artifact = pickle.dumps(self.model) if self.model is not None else b"xgb-cv"
+        except Exception:  # noqa: BLE001
+            _cv_artifact = b"xgb-cv-fallback"
+
         for fold, (train_idx, val_idx) in enumerate(split_iter):
             X_train_fold = X_ordered[train_idx]
             X_val_fold = X_ordered[val_idx]
@@ -1120,6 +1141,39 @@ class XGBoostAnalyzer:
             # 預測
             y_pred_proba = model_fold.predict_proba(X_val_fold)[:, 1]
             y_pred = model_fold.predict(X_val_fold)
+            oof_pred[val_idx] = y_pred_proba
+
+            # F7：per-fold make_oof_receipt（供 consumer 重算）
+            try:
+                from momentum.core.contracts import (
+                    SplitPlan,
+                    build_receipt_envelope,
+                    make_oof_receipt,
+                )
+
+                fold_plan = SplitPlan(
+                    split_label="train",
+                    index_kind="positional",
+                    row_index=np.arange(len(y_ordered), dtype=int),
+                    time_bounds=(0, max(len(y_ordered) - 1, 0)),
+                    purge_gap=int(purge_gap or 0),
+                    embargo=0,
+                    purge_semantic="rows",
+                    base_universe_hash="xgb_cv_universe",
+                    symbol=None,
+                )
+                # factory 要求 1-D（禁 reshape 繞過）；splitter 輸出已是 1-D
+                oof_r = make_oof_receipt(
+                    fold_plan,
+                    fold_id=fold,
+                    fit_idx=np.asarray(train_idx, dtype=int),
+                    eval_idx=np.asarray(val_idx, dtype=int),
+                    model_artifact=_cv_artifact,
+                    trusted_issuer="xgboost_analyzer",
+                )
+                oof_receipts.append(build_receipt_envelope("oof", oof_r))
+            except Exception as oof_exc:  # noqa: BLE001
+                self.logger.warning(f"OofReceipt fold {fold} 略過: {oof_exc}")
             
             # 計算指標
             if len(np.unique(y_val_fold)) < 2:
@@ -1143,17 +1197,30 @@ class XGBoostAnalyzer:
                 f"AUC: {auc:.4f}, Precision: {precision:.4f}, "
                 f"Recall: {recall:.4f}, F1: {f1:.4f}"
             )
+        self.last_oof_receipts = oof_receipts
         
-        # 計算訓練集 AUC（使用完整模型）
+        # in_sample_train_auc：最終模型在訓練列上的樂觀 AUC（research_only）
         if self.model is None:
             raise ValueError("模型尚未訓練")
         
-        y_train_pred = self.model.predict_proba(X_ordered)[:, 1]
+        y_is_pred = self.model.predict_proba(X_ordered)[:, 1]
         if len(np.unique(y_ordered)) < 2:
-            train_auc = np.nan
-            self.logger.warning("訓練集只有單一類別，Train AUC 設為 NaN")
+            in_sample_train_auc = np.nan
+            self.logger.warning("訓練集只有單一類別，in_sample_train_auc 設為 NaN")
         else:
-            train_auc = roc_auc_score(y_ordered, y_train_pred)
+            in_sample_train_auc = float(roc_auc_score(y_ordered, y_is_pred))
+
+        # fit_pool_auc：ES train∪val 池（若 train_model 有記錄）
+        fit_pool_auc: Optional[float] = None
+        fit_pool_idx = getattr(self, "_fit_pool_idx", None)
+        if fit_pool_idx is not None and len(fit_pool_idx) > 0:
+            pool_idx = np.asarray(fit_pool_idx, dtype=int)
+            X_pool = X_input[pool_idx]
+            y_pool = y_input[pool_idx]
+            if len(np.unique(y_pool)) >= 2:
+                fit_pool_auc = float(
+                    roc_auc_score(y_pool, self.model.predict_proba(X_pool)[:, 1])
+                )
         
         # 平均指標
         valid_auc_scores = [v for v in cv_auc_scores if not np.isnan(v)]
@@ -1164,41 +1231,113 @@ class XGBoostAnalyzer:
             cv_auc_mean = float(np.mean(valid_auc_scores))
             cv_auc_std = float(np.std(valid_auc_scores))
         
-        if np.isnan(train_auc) or np.isnan(cv_auc_mean):
+        if np.isnan(in_sample_train_auc) or np.isnan(cv_auc_mean):
             overfitting_score = np.nan
         else:
-            overfitting_score = train_auc - cv_auc_mean
+            overfitting_score = in_sample_train_auc - cv_auc_mean
 
-        # 校準指標與 PR AUC
-        calibration_metrics = self.calculate_calibration_metrics(X_ordered, y_ordered)
-        pr_metrics = self.calculate_pr_metrics(X_ordered, y_ordered)
+        # cal/PR/Brier/ECE ← OOF 預測（scope=cv_oof）；OOF 不足 → OMIT+deny（禁 in-sample 冒充）
+        oof_mask = ~np.isnan(oof_pred)
+        oof_sufficient = (
+            oof_mask.sum() >= 2 and len(np.unique(y_ordered[oof_mask])) >= 2
+        )
+        metrics_omitted: List[str] = []
+        if oof_sufficient:
+            calibration_metrics = self.calibration_analyzer.calculate_metrics(
+                y_ordered[oof_mask], oof_pred[oof_mask]
+            )
+            precision_c, recall_c, thresholds_c = precision_recall_curve(
+                y_ordered[oof_mask], oof_pred[oof_mask]
+            )
+            pr_auc_val = float(sk_auc(recall_c, precision_c))
+            positive_rate = float(np.mean(y_ordered[oof_mask]))
+            brier_val = calibration_metrics.brier_score
+            ece_val = calibration_metrics.ece
+            cal_quality = calibration_metrics.calibration_quality
+            self.last_calibration_curve = calibration_metrics.curve_data
+            self.last_pr_curve = {
+                "precision": precision_c.tolist(),
+                "recall": recall_c.tolist(),
+                "thresholds": thresholds_c.tolist(),
+                "pr_auc": pr_auc_val,
+                "eval_scope": "cv_oof",
+            }
+        else:
+            # F5：不足則 OMIT，不得用 full-sample 值標 cv_oof
+            pr_auc_val = np.nan
+            positive_rate = float(np.mean(y_ordered)) if len(y_ordered) else 0.0
+            brier_val = None
+            ece_val = None
+            cal_quality = "OMITTED"
+            self.last_calibration_curve = None
+            self.last_pr_curve = {
+                "status": "OMITTED",
+                "reason": "insufficient_oof",
+                "eval_scope": "cv_oof",
+                "consumer": "deny",
+            }
+            metrics_omitted.extend(
+                ["brier_score", "ece", "pr_auc", "calibration_curve", "pr_curve"]
+            )
 
-        if not np.isnan(cv_auc_mean) and not np.isnan(pr_metrics.pr_auc):
-            roc_pr_gap = cv_auc_mean - pr_metrics.pr_auc
+        if (
+            oof_sufficient
+            and not np.isnan(cv_auc_mean)
+            and not np.isnan(pr_auc_val)
+        ):
+            roc_pr_gap = cv_auc_mean - pr_auc_val
             if roc_pr_gap > 0.15:
                 self.logger.warning(
                     f"ROC AUC 與 PR AUC 差距較大 ({roc_pr_gap:.4f})，ROC AUC 可能過度樂觀"
                 )
+
+        from momentum.core.contracts import build_eval_scope_map
+
+        scope_keys = [
+            "in_sample_train_auc",
+            "fit_pool_auc",
+            "overfitting_score",
+            "precision",
+            "recall",
+            "f1_score",
+            "cv_auc_mean",
+            "cv_auc_std",
+            "oot_auc",
+        ]
+        if oof_sufficient:
+            scope_keys.extend(
+                ["brier_score", "ece", "pr_auc", "calibration_curve", "pr_curve"]
+            )
+        eval_scope = build_eval_scope_map(scope_keys)
         
-        # 建立效能物件
+        # 建立效能物件（缺 held-out → oot OMITTED，非 silent 全樣本）
         performance = ModelPerformance(
-            train_auc=train_auc,
+            in_sample_train_auc=in_sample_train_auc,
             cv_auc_mean=cv_auc_mean,
             cv_auc_std=cv_auc_std,
-            precision=np.mean(cv_precision_scores),
-            recall=np.mean(cv_recall_scores),
-            f1_score=np.mean(cv_f1_scores),
+            precision=float(np.mean(cv_precision_scores)),
+            recall=float(np.mean(cv_recall_scores)),
+            f1_score=float(np.mean(cv_f1_scores)),
             overfitting_score=overfitting_score,
-            brier_score=calibration_metrics.brier_score,
-            ece=calibration_metrics.ece,
-            calibration_quality=calibration_metrics.calibration_quality,
-            pr_auc=pr_metrics.pr_auc,
-            positive_rate=pr_metrics.positive_rate
+            brier_score=brier_val,
+            ece=ece_val,
+            calibration_quality=cal_quality,
+            pr_auc=pr_auc_val if oof_sufficient else None,
+            positive_rate=positive_rate,
+            fit_pool_auc=fit_pool_auc,
+            eval_scope=eval_scope,
+            oot_auc=None,
+            oot_status="OMITTED",
         )
+        # 附加 OOF receipts / OMIT 清單（供 service 寫入）
+        self.last_metrics_omitted = metrics_omitted
+        if hasattr(performance, "__dict__"):
+            performance.__dict__["oof_receipts"] = list(getattr(self, "last_oof_receipts", []) or [])
+            performance.__dict__["metrics_omitted"] = list(metrics_omitted)
         
         self.logger.info(
             f"交叉驗證完成 - "
-            f"Train AUC: {performance.train_auc:.4f}, "
+            f"in_sample_train_auc: {performance.in_sample_train_auc:.4f}, "
             f"CV AUC: {performance.cv_auc_mean:.4f} ± {performance.cv_auc_std:.4f}, "
             f"Overfitting: {performance.overfitting_score:.4f}"
         )
@@ -1302,7 +1441,14 @@ class XGBoostAnalyzer:
         cv_auc_mean: Optional[float] = None,
         oot_period_start: str = "",
         oot_period_end: str = "",
-        threshold: float = 0.5
+        threshold: float = 0.5,
+        *,
+        train_plan: Optional[Any] = None,
+        eval_plan: Optional[Any] = None,
+        horizon: Optional[int] = None,
+        bar_duration: Optional[Any] = None,
+        ts: Optional[np.ndarray] = None,
+        embargo: Optional[int] = None,
     ) -> OOTValidationResult:
         """
         Out-of-Time 驗證
@@ -1316,12 +1462,14 @@ class XGBoostAnalyzer:
             oot_period_start: OOT 期間開始時間
             oot_period_end: OOT 期間結束時間
             threshold: 分類閾值（預設 0.5）
+            train_plan/eval_plan/horizon: 若提供 → 呼 validate_oot_label_horizon（F6）
             
         Returns:
             OOTValidationResult 物件
             
         Raises:
             ValueError: 模型未訓練或 OOT 樣本不足
+            SplitPairLeakageError: 違序 horizon 邊界
         """
         if self.model is None:
             raise ValueError("模型尚未訓練，請先調用 train_model()")
@@ -1332,6 +1480,19 @@ class XGBoostAnalyzer:
         
         if len(y_oot) == 0 or len(X_oot) != len(y_oot):
             raise ValueError(f"OOT 標籤長度不匹配: X={len(X_oot)}, y={len(y_oot)}")
+
+        # F6：有 SplitPlan 時強制 horizon 嚴格 <
+        if train_plan is not None and eval_plan is not None and horizon is not None:
+            from momentum.core.contracts import validate_oot_label_horizon
+
+            validate_oot_label_horizon(
+                train_plan,
+                eval_plan,
+                int(horizon),
+                bar_duration=bar_duration,
+                ts=ts,
+                embargo=embargo,
+            )
         
         self.logger.info(
             f"開始 OOT 驗證 - 樣本數: {len(X_oot)}, "

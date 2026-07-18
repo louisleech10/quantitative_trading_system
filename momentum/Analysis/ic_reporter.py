@@ -673,6 +673,12 @@ class ICReporter:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
+        # LA-2 B3：root ok_oos + factor loud → fail-closed deny
+        if isinstance(report, dict):
+            from momentum.core.contracts import deny_factor_in_ok_oos
+
+            deny_factor_in_ok_oos(report)
+
         # IC1C-FR-STOPGAP: export_all raw dump 必過 sanitizer
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 
@@ -776,10 +782,16 @@ class ICReporter:
         """持久化所有報告產出。
 
         IC1C-FR-STOPGAP: 落檔前必過 sanitizer,禁 legacy 有限 factor_returns 葉洩漏。
+        LA-2 B3：root ok_oos + factor loud → deny。
         """
 
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
+
+        if isinstance(report, dict):
+            from momentum.core.contracts import deny_factor_in_ok_oos
+
+            deny_factor_in_ok_oos(report)
 
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 

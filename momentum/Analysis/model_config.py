@@ -63,6 +63,10 @@ class ModelConfigManager:
         },
     }
 
+    # LA-2 B2 Task 2.3：yaml enabled≠runtime wired 的模組（本票不接線）
+    # train_model 路徑未接 probability_calibration / sample_weight
+    UNWIRED_MODULES: frozenset = frozenset({"probability_calibration", "sample_weight"})
+
     def __init__(self, config_path: str = "config/model_config.yaml"):
         self.config_path = Path(config_path)
         self._yaml_config: Dict[str, Any] = {}
@@ -85,7 +89,52 @@ class ModelConfigManager:
         if not isinstance(content, dict):
             raise ValueError("YAML 配置格式錯誤，必須為字典")
         logger.info(f"成功載入 YAML 配置: {config_path}")
-        return content
+        return self._annotate_wired_flags(content)
+
+    def _annotate_wired_flags(self, content: Dict[str, Any]) -> Dict[str, Any]:
+        """reader/DTO 加 wired:bool（runtime 未接線 → wired=false）。
+
+        DEC-2：probability_calibration / sample_weight yaml enabled=true 但
+        train_model 無 wiring → 標註可見，本票不接線。
+        """
+        out = dict(content)
+        for module_name in self.UNWIRED_MODULES:
+            section = out.get(module_name)
+            if not isinstance(section, dict):
+                continue
+            annotated = dict(section)
+            # 權威：runtime 未接線 → wired=false（即使 enabled=true）
+            annotated["wired"] = False
+            annotated["wired_note"] = (
+                "已宣告未接線：yaml enabled 不影響 train_model runtime；"
+                "完整接線另立 productionization epic"
+            )
+            out[module_name] = annotated
+        return out
+
+    def get_module_wiring(self, module_name: str) -> Dict[str, Any]:
+        """回傳模組 enabled/wired 可見狀態（UI/測試用）。"""
+        section = self._yaml_config.get(module_name) or {}
+        if not isinstance(section, dict):
+            section = {}
+        enabled = bool(section.get("enabled", False))
+        wired = bool(section.get("wired", module_name not in self.UNWIRED_MODULES))
+        return {
+            "module": module_name,
+            "enabled": enabled,
+            "wired": wired,
+            "theater": bool(enabled and not wired),
+            "note": section.get("wired_note"),
+        }
+
+    def list_config_theater_modules(self) -> List[Dict[str, Any]]:
+        """列出 enabled=true 但 wired=false 的 config theater 模組。"""
+        result: List[Dict[str, Any]] = []
+        for name in sorted(self.UNWIRED_MODULES):
+            info = self.get_module_wiring(name)
+            if info["theater"]:
+                result.append(info)
+        return result
 
     def from_dict(self, config: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(config)

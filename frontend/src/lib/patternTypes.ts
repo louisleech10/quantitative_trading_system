@@ -30,7 +30,7 @@ export interface Pattern {
     precision: number;
     recall: number;
     f1_score: number;
-    train_auc?: number;
+    in_sample_train_auc?: number;
     cv_auc_mean?: number;
     cv_auc_std?: number;
     overfitting_score?: number;
@@ -72,23 +72,20 @@ export interface Pattern {
   };
 }
 
+/** LA-2 B3：server 權威 — 帶 task_id，禁 client rules/metrics/metadata */
 export interface CreatePatternRequest {
   name: string;
   description: string;
-  rules: PatternRule[];
-  case_id: string;
-  xgboost_importance: Record<string, number>;
-  performance_metrics: Record<string, number>;
+  task_id: string;
   tags?: string[];
-  metadata?: Record<string, unknown>;
 }
 
+/** LA-2 B3：禁 client status/metadata；可選 task_id re-verify */
 export interface UpdatePatternRequest {
   name?: string;
   description?: string;
-  status?: string;
   tags?: string[];
-  metadata?: Record<string, unknown>;
+  task_id?: string;
 }
 
 export interface PatternListResponse {
@@ -162,7 +159,8 @@ export interface ModelPerformance {
   test_recall?: number;
   test_f1?: number;
   test_auc?: number;
-  train_auc: number;
+  /** LA-2 B2: renamed from train_auc (no coexistence) */
+  in_sample_train_auc: number;
   cv_auc_mean: number;
   cv_auc_std: number;
   precision: number;
@@ -174,6 +172,10 @@ export interface ModelPerformance {
   calibration_quality?: string;
   pr_auc?: number;
   positive_rate?: number;
+  fit_pool_auc?: number | null;
+  eval_scope?: Record<string, string>;
+  oot_status?: string | null;
+  oot_auc?: number | null;
 }
 
 export interface PrecisionAtKResult {
@@ -286,7 +288,8 @@ export interface BatchAnalysisRequest {
 
 export interface ModelPerformanceResponse {
   engine_type?: string;
-  train_auc: number;
+  /** LA-2 B2: renamed from train_auc */
+  in_sample_train_auc: number;
   cv_auc_mean: number;
   cv_auc_std: number;
   precision: number;
@@ -300,6 +303,9 @@ export interface ModelPerformanceResponse {
   pr_auc?: number | null;
   positive_rate?: number | null;
   training_time_seconds?: number | null;
+  fit_pool_auc?: number | null;
+  eval_scope?: Record<string, string>;
+  oot_status?: string | null;
 }
 
 export interface ComparisonReportResponse {

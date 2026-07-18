@@ -1,0 +1,7 @@
+{
+  "caller": "RegimeDetector.detect",
+  "expanding": false,
+  "face": "regime_fit_global",
+  "lookback": 55,
+  "n_clusters": 4
+}

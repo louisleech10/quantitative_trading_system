@@ -212,6 +212,29 @@ export default function EngineConfigPanel({
             </div>
           )}
         </div>
+
+        {/* LA-2 B2 Task 2.3：config theater — enabled≠wired 可見 */}
+        <div
+          className="rounded-lg border border-amber-700/50 p-3 bg-amber-950/30 text-sm space-y-2"
+          data-testid="config-theater-panel"
+        >
+          <Label className="text-amber-200 font-medium">設定宣告狀態（未接線）</Label>
+          <p className="text-xs text-amber-100/80">
+            下列模組在 model_config.yaml 可 enabled=true，但 train_model runtime 尚未接線（wired=false）。
+          </p>
+          <ul className="space-y-1 text-amber-100/90">
+            <li data-testid="config-theater-probability_calibration">
+              <span className="font-mono">probability_calibration</span>
+              {' '}
+              <span className="text-amber-300">enabled≠wired · 已宣告未接線</span>
+            </li>
+            <li data-testid="config-theater-sample_weight">
+              <span className="font-mono">sample_weight</span>
+              {' '}
+              <span className="text-amber-300">enabled≠wired · 已宣告未接線</span>
+            </li>
+          </ul>
+        </div>
       </CardContent>
     </Card>
   );

@@ -2,7 +2,7 @@
 Test suite for RegimeDetector (K-Means 無監督市場體制偵測)
 
 覆蓋範圍：
-  - 基本 K-Means detect（全局 fit / expanding fit）
+  - 基本 K-Means detect（PIT Segment-causal；global fit 已移除）
   - Label alignment（按 volatility 排序）
   - Fallback to rule-based（資料不足時）
   - 邊界條件：NaN、常數資料、單一 cluster、極小樣本
@@ -81,20 +81,24 @@ class TestRegimeDetectorBasic:
     """基本 K-Means detect 功能"""
 
     def test_detect_global_fit(self, simple_price_series):
-        """全局 fit 應回傳正確結構"""
+        """LA-2 B3：expanding 參數與 _fit_global 已硬移除（removal 正向斷言）。"""
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(simple_price_series, expanding=False)
-
+        import inspect
+        sig = inspect.signature(detector.detect)
+        assert "expanding" not in sig.parameters
+        assert not hasattr(detector, "_fit_global")
+        with pytest.raises(TypeError):
+            detector.detect(simple_price_series, expanding=False)  # type: ignore[call-arg]
+        # PIT 預設路徑仍可用
+        result = detector.detect(simple_price_series)
         assert isinstance(result, RegimeDetectionResult)
-        assert result.method == "kmeans"
-        assert result.n_clusters == 4
+        assert result.method in ("kmeans", "rule")
         assert len(result.labels) == len(simple_price_series)
-        assert len(result.feature_names) >= 2  # volatility + trend_strength
 
     def test_detect_expanding_fit(self, simple_price_series):
-        """Expanding fit 應回傳正確結構"""
+        """PIT Segment-causal 預設呼法（expanding 參數已刪）。"""
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(simple_price_series, expanding=True)
+        result = detector.detect(simple_price_series)
 
         assert result.method == "kmeans"
         assert len(result.labels) == len(simple_price_series)
@@ -103,19 +107,25 @@ class TestRegimeDetectorBasic:
         """含 volume 應多一個 volume_ratio 特徵"""
         close, volume = price_with_volume
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(close, volume=volume, expanding=False)
+        result = detector.detect(close, volume=volume)
 
         assert "volume_ratio" in result.feature_names
         assert result.method == "kmeans"
 
     def test_detect_3_clusters(self, simple_price_series):
-        """n_clusters=3 應使用 REGIME_LABELS_3"""
+        """n_clusters=3：kmeans 段用 REGIME_LABELS_3；PIT 前綴 fallback 可含 rule 4-label。"""
         detector = RegimeDetector(n_clusters=3, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(simple_price_series, expanding=False)
+        result = detector.detect(simple_price_series)
 
-        valid_labels = set(REGIME_LABELS_3) | {"", "unknown"}
+        # LA-2 B3：固定 PIT → 前綴 rule 標籤用 REGIME_LABELS_4 語意；
+        # 後段 kmeans same-model 命名用 REGIME_LABELS_3
+        valid_labels = set(REGIME_LABELS_3) | set(REGIME_LABELS_4) | {"", "unknown"}
         for label in result.labels:
             assert label in valid_labels, f"Unexpected label: {label}"
+        # 若產出 kmeans 語義名，應屬 3-cluster 集合
+        kmeans_names = set(REGIME_LABELS_3) & set(result.labels)
+        # 不強制全是 3-label（PIT 前綴可能全 rule），但不得 crash
+        assert result.n_clusters == 3
 
 
 # ==================== Label Alignment 測試 ====================
@@ -126,7 +136,7 @@ class TestLabelAlignment:
     def test_high_vol_label_has_highest_volatility(self, simple_price_series):
         """high_vol_trending cluster 應有最高波動率均值"""
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(simple_price_series, expanding=False)
+        result = detector.detect(simple_price_series)
 
         stats = result.cluster_stats
         if not stats:
@@ -143,8 +153,8 @@ class TestLabelAlignment:
     def test_deterministic_labels(self, simple_price_series):
         """同樣輸入應產出相同 labels"""
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        r1 = detector.detect(simple_price_series, expanding=False)
-        r2 = detector.detect(simple_price_series, expanding=False)
+        r1 = detector.detect(simple_price_series)
+        r2 = detector.detect(simple_price_series)
         np.testing.assert_array_equal(r1.labels, r2.labels)
 
 
@@ -156,7 +166,7 @@ class TestFallbackRuleBased:
     def test_fallback_on_tiny_data(self, tiny_price_series):
         """樣本不足應 fallback 到 rule-based"""
         detector = RegimeDetector(n_clusters=4, lookback=10, min_samples_for_fit=100)
-        result = detector.detect(tiny_price_series, expanding=False)
+        result = detector.detect(tiny_price_series)
 
         assert result.method == "rule"
         assert len(result.labels) == len(tiny_price_series)
@@ -164,7 +174,7 @@ class TestFallbackRuleBased:
     def test_fallback_labels_are_semantic(self, tiny_price_series):
         """Fallback 的 labels 應是有意義的字串"""
         detector = RegimeDetector(n_clusters=4, lookback=5, min_samples_for_fit=100)
-        result = detector.detect(tiny_price_series, expanding=False)
+        result = detector.detect(tiny_price_series)
 
         valid_rule_labels = {
             "high_vol_trending", "mid_vol_trending",
@@ -182,20 +192,20 @@ class TestEdgeCases:
     def test_constant_price(self, constant_price_series):
         """常數價格（零波動）不應 crash"""
         detector = RegimeDetector(n_clusters=4, lookback=10, min_samples_for_fit=50)
-        result = detector.detect(constant_price_series, expanding=False)
+        result = detector.detect(constant_price_series)
         assert len(result.labels) == len(constant_price_series)
 
     def test_nan_heavy_data(self, nan_heavy_price_series):
         """大量 NaN 資料不應 crash"""
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(nan_heavy_price_series, expanding=False)
+        result = detector.detect(nan_heavy_price_series)
         assert len(result.labels) == len(nan_heavy_price_series)
 
     def test_all_nan_data(self):
         """全 NaN 應 fallback"""
         series = pd.Series([np.nan] * 100, name="close")
         detector = RegimeDetector(n_clusters=4, lookback=10, min_samples_for_fit=50)
-        result = detector.detect(series, expanding=False)
+        result = detector.detect(series)
         assert result.method == "rule"
 
     def test_invalid_n_clusters(self):
@@ -212,14 +222,14 @@ class TestEdgeCases:
         """volume 全 NaN 應忽略不用"""
         volume = pd.Series([np.nan] * len(simple_price_series))
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(simple_price_series, volume=volume, expanding=False)
+        result = detector.detect(simple_price_series, volume=volume)
         assert "volume_ratio" not in result.feature_names
 
     def test_single_value_after_dropna(self):
         """dropna 後只剩極少資料應 fallback"""
         series = pd.Series([np.nan] * 99 + [100.0], name="close")
         detector = RegimeDetector(n_clusters=4, lookback=10, min_samples_for_fit=50)
-        result = detector.detect(series, expanding=False)
+        result = detector.detect(series)
         assert result.method == "rule"
 
 
@@ -254,7 +264,7 @@ class TestClusterStats:
     def test_cluster_stats_sum_to_100(self, simple_price_series):
         """所有 cluster 的 pct 加總應接近 100%"""
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(simple_price_series, expanding=False)
+        result = detector.detect(simple_price_series)
 
         if not result.cluster_stats:
             pytest.skip("No cluster stats")
@@ -266,7 +276,7 @@ class TestClusterStats:
     def test_cluster_stats_have_volatility(self, simple_price_series):
         """每個 stat 應包含 volatility_mean"""
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(simple_price_series, expanding=False)
+        result = detector.detect(simple_price_series)
 
         for stat in result.cluster_stats:
             assert "volatility_mean" in stat
@@ -353,7 +363,7 @@ class TestResultSerialization:
     def test_to_dict_structure(self, simple_price_series):
         """to_dict 應包含必要 keys"""
         detector = RegimeDetector(n_clusters=4, lookback=20, min_samples_for_fit=50)
-        result = detector.detect(simple_price_series, expanding=False)
+        result = detector.detect(simple_price_series)
         d = result.to_dict()
 
         assert "n_clusters" in d

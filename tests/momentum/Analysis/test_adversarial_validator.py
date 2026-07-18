@@ -53,7 +53,10 @@ def test_A6_all_features_drifted(adversarial_validator, synthetic_binary_data):
     X_test = X.iloc[800:1200].copy() + 3.0
     result = adversarial_validator.feature_level_tests(X_train, X_test)
     assert result
-    assert all(v["status"] in {"warning", "severe"} for v in result.values())
+    feature_rows = [v for v in result.values() if isinstance(v, dict) and "status" in v]
+    assert feature_rows
+    assert all(v["status"] in {"warning", "severe"} for v in feature_rows)
+    assert result.get("diagnostic_only") is True
 
 
 def test_A7_all_nan_feature(adversarial_validator, synthetic_binary_data):
@@ -98,11 +101,13 @@ def test_feature_level_tests_returns_expected_schema(adversarial_validator, synt
     X, _ = synthetic_binary_data
     result = adversarial_validator.feature_level_tests(X.iloc[:600], X.iloc[600:1200])
     assert result
-    first_value = next(iter(result.values()))
+    first_value = next(v for v in result.values() if isinstance(v, dict) and "ks_statistic" in v)
     assert "ks_statistic" in first_value
     assert "ks_pvalue" in first_value
     assert "psi" in first_value
     assert "status" in first_value
+    assert result.get("diagnostic_only") is True
+    assert result.get("signal_use_denied") is True
 
 
 def test_detect_leakage_schema(adversarial_validator, synthetic_binary_data, synthetic_timestamps):
@@ -116,6 +121,8 @@ def test_detect_leakage_schema(adversarial_validator, synthetic_binary_data, syn
     assert "suspicious_features" in leakage
     assert "autocorrelation_flags" in leakage
     assert leakage["status"] in {"ok", "skipped"}
+    assert leakage.get("diagnostic_only") is True
+    assert leakage.get("signal_use_denied") is True
 
 
 def test_full_validation_recommendations_type(adversarial_validator, synthetic_binary_data, synthetic_timestamps):

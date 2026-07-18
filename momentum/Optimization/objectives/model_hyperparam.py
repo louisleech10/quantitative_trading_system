@@ -123,14 +123,15 @@ class ModelHyperparamObjective(IOptimizationObjective):
                 raise ValueError(f"不支援的引擎: {self.engine}")
 
             val_auc = self._extract_metric(perf, ["val_auc", "val_auc_mean", "cv_auc_mean", "auc_val"])
-            train_auc = self._extract_metric(
+            # LA-2 B2 F9：統一 in_sample_train_auc（不再寫/讀 orphan train_auc）
+            in_sample_train_auc = self._extract_metric(
                 perf,
-                ["train_auc", "train_auc_mean", "auc_train"],
+                ["in_sample_train_auc"],
                 default=val_auc,
             )
-            gap = train_auc - val_auc
+            gap = in_sample_train_auc - val_auc
 
-            self._set_trial_user_attrs(train_auc, val_auc, gap)
+            self._set_trial_user_attrs(in_sample_train_auc, val_auc, gap)
 
             if gap > self.max_train_val_gap:
                 raise optuna.TrialPruned(
@@ -141,7 +142,8 @@ class ModelHyperparamObjective(IOptimizationObjective):
                 logger.warning(f"Validation AUC below random baseline: {val_auc:.4f}")
 
             logger.info(
-                f"ModelHyperparamObjective score={val_auc:.6f}, train_auc={train_auc:.6f}, "
+                f"ModelHyperparamObjective score={val_auc:.6f}, "
+                f"in_sample_train_auc={in_sample_train_auc:.6f}, "
                 f"gap={gap:.6f}, engine={self.engine}"
             )
             return val_auc
@@ -176,10 +178,12 @@ class ModelHyperparamObjective(IOptimizationObjective):
             return float(default)
         raise ValueError(f"無法從模型輸出提取指標: {list(candidate_names)}")
 
-    def _set_trial_user_attrs(self, train_auc: float, val_auc: float, gap: float) -> None:
+    def _set_trial_user_attrs(
+        self, in_sample_train_auc: float, val_auc: float, gap: float
+    ) -> None:
         if self._current_trial is None:
             return
-        self._current_trial.set_user_attr("train_auc", train_auc)
+        self._current_trial.set_user_attr("in_sample_train_auc", in_sample_train_auc)
         self._current_trial.set_user_attr("val_auc", val_auc)
         self._current_trial.set_user_attr("train_val_gap", gap)
 

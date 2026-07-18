@@ -253,6 +253,7 @@ class ICAnalysisService:
             }
             if isinstance(report, dict):
                 from momentum.Analysis.ic_reporter import normalize_analysis_status
+                from momentum.core.contracts import deny_factor_in_ok_oos
 
                 completed_payload["analysis_status"] = normalize_analysis_status(
                     report.get("analysis_status")
@@ -263,6 +264,15 @@ class ICAnalysisService:
                     completed_payload["oos_guarantees"] = (
                         completed_payload["analysis_status"] == "ok_oos"
                     )
+                # LA-2 B3：root ok_oos + nested factor loud → deny
+                try:
+                    deny_factor_in_ok_oos(report)
+                    deny_factor_in_ok_oos(completed_payload)
+                except ValueError as deny_exc:
+                    logger.error("deny_factor_in_ok_oos: %s", deny_exc)
+                    completed_payload["analysis_status"] = "degraded_full_sample"
+                    completed_payload["oos_guarantees"] = False
+                    completed_payload["factor_deny_reason"] = str(deny_exc)
             else:
                 completed_payload["analysis_status"] = "degraded_full_sample"
                 completed_payload["oos_guarantees"] = False
@@ -333,6 +343,10 @@ class ICAnalysisService:
 
         normalized = self._to_json_compatible(result)
         if isinstance(normalized, dict):
+            # LA-2 B3-F2：回傳出口 deny root ok_oos + factor/diagnostic loud
+            from momentum.core.contracts import deny_factor_in_ok_oos
+
+            deny_factor_in_ok_oos(normalized)
             if not settings.ic_response_v2 or schema_version != 2:
                 return normalized
             return self._build_v2_result(task_id, task_info, normalized)
@@ -445,6 +459,19 @@ class ICAnalysisService:
 
         if not isinstance(report, dict):
             raise ValueError(f"Result not found: {task_id}")
+
+        # LA-2 B3-F2：匯出出口一律 deny ok_oos + factor/diagnostic loud
+        from momentum.core.contracts import deny_factor_in_ok_oos
+
+        deny_factor_in_ok_oos(report)
+        if isinstance(deep_report, dict):
+            # deep nested under root-like envelope for walk
+            deny_factor_in_ok_oos(
+                {
+                    "analysis_status": report.get("analysis_status"),
+                    "deep_analysis_report": deep_report,
+                }
+            )
 
         normalized_format = (format_type or "").strip().lower()
         if normalized_format not in {"json", "ai_json", "csv_summary", "csv_detailed", "markdown", "hdf5"}:
@@ -877,6 +904,7 @@ class ICAnalysisService:
             }
             if isinstance(report, dict):
                 from momentum.Analysis.ic_reporter import normalize_analysis_status
+                from momentum.core.contracts import deny_factor_in_ok_oos
 
                 full_completed_payload["analysis_status"] = normalize_analysis_status(
                     report.get("analysis_status")
@@ -889,6 +917,22 @@ class ICAnalysisService:
                     full_completed_payload["oos_guarantees"] = (
                         full_completed_payload["analysis_status"] == "ok_oos"
                     )
+                # LA-2 B3-F2：full-analysis completion 亦 deny factor/diagnostic loud
+                try:
+                    deny_factor_in_ok_oos(report)
+                    deny_factor_in_ok_oos(full_completed_payload)
+                    if isinstance(deep_result, dict):
+                        deny_factor_in_ok_oos(
+                            {
+                                "analysis_status": report.get("analysis_status"),
+                                "deep_analysis_report": deep_result,
+                            }
+                        )
+                except ValueError as deny_exc:
+                    logger.error("deny_factor_in_ok_oos (full): %s", deny_exc)
+                    full_completed_payload["analysis_status"] = "degraded_full_sample"
+                    full_completed_payload["oos_guarantees"] = False
+                    full_completed_payload["factor_deny_reason"] = str(deny_exc)
             else:
                 full_completed_payload["analysis_status"] = "degraded_full_sample"
                 full_completed_payload["oos_guarantees"] = False

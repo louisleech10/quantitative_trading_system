@@ -116,9 +116,11 @@ def _build_predictions_df(task_result: dict):
 
 
 def _build_model_performance_response(performance: dict) -> GenericModelPerformanceResponse:
+    # LA-2 B2 F9：canonical key = in_sample_train_auc only（禁 train_auc 並存）
+    in_sample = performance.get("in_sample_train_auc", 0.0)
     return GenericModelPerformanceResponse(
         engine_type=performance.get("engine_type"),
-        train_auc=float(performance.get("train_auc", 0.0)),
+        in_sample_train_auc=float(in_sample or 0.0),
         cv_auc_mean=float(performance.get("cv_auc_mean", 0.0)),
         cv_auc_std=float(performance.get("cv_auc_std", 0.0)),
         precision=float(performance.get("precision", 0.0)),
@@ -132,6 +134,9 @@ def _build_model_performance_response(performance: dict) -> GenericModelPerforma
         pr_auc=performance.get("pr_auc"),
         positive_rate=performance.get("positive_rate"),
         training_time_seconds=performance.get("training_time_seconds"),
+        fit_pool_auc=performance.get("fit_pool_auc"),
+        eval_scope=performance.get("eval_scope"),
+        oot_status=performance.get("oot_status"),
     )
 
 

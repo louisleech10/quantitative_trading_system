@@ -16,8 +16,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePatternStore } from '@/store/patternStore';
-import { deletePattern, updatePattern } from '@/lib/api/patternApi';
-import type { Pattern, UpdatePatternRequest } from '@/lib/patternTypes';
+import { deletePattern } from '@/lib/api/patternApi';
+import type { Pattern } from '@/lib/patternTypes';
 
 interface IndicatorConfigItem {
   indicator?: string;
@@ -30,9 +30,10 @@ interface Props {
   onUpdate?: () => void;
 }
 
-export default function PatternDetail({ pattern, onUpdate }: Props) {
+export default function PatternDetail({ pattern }: Props) {
+  // B3-F3：onUpdate 保留在 Props 供 caller 相容，本元件未使用（eslint no-unused-vars）
   const router = useRouter();
-  const { deletePattern: deletePatternInStore, updatePattern: updatePatternInStore } = usePatternStore();
+  const { deletePattern: deletePatternInStore } = usePatternStore();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
@@ -52,20 +53,7 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
     }
   };
   
-  // 切換狀態
-  const handleStatusChange = async (newStatus: string) => {
-    try {
-      const request: UpdatePatternRequest = {
-        status: newStatus
-      };
-      await updatePattern(pattern.pattern_id, request);
-      updatePatternInStore(pattern.pattern_id, { status: newStatus as Pattern['status'] });
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      console.error('更新狀態失敗:', error);
-      alert('更新失敗: ' + (error instanceof Error ? error.message : '未知錯誤'));
-    }
-  };
+  // LA-2 B3：status 由 server oot_receipt 推導，禁 client 直改
   
   return (
     <div className="space-y-6">
@@ -96,20 +84,11 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
             </div>
           </div>
           
-          {/* 操作按鈕 */}
+          {/* 操作按鈕（status 唯讀 — server OOT receipt 權威） */}
           <div className="flex gap-2">
-            {/* 狀態切換 */}
-            <select
-              value={pattern.status}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="px-3 py-2 border border-white/10 rounded bg-white/5 text-slate-100"
-            >
-              <option value="active">啟用</option>
-              <option value="testing">測試</option>
-              <option value="archived">封存</option>
-            </select>
-            
-            {/* 刪除按鈕 */}
+            <span className="px-3 py-2 border border-white/10 rounded bg-white/5 text-slate-300 text-sm">
+              status: {pattern.status}（server 推導）
+            </span>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="px-4 py-2 bg-rose-500/20 text-rose-100 rounded border border-rose-400/40 hover:bg-rose-500/30"
@@ -187,12 +166,12 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
                 </div>
               )}
               
-              {/* Train AUC (XGBoost) */}
-              {pattern.performance_metrics.train_auc !== undefined && (
+              {/* In-sample Train AUC (XGBoost; LA-2 B2 rename) */}
+              {pattern.performance_metrics.in_sample_train_auc !== undefined && (
                 <div className="text-center p-4 bg-white/5 border border-white/10 rounded">
-                  <p className="text-sm text-slate-400 font-medium mb-1">Train AUC</p>
+                  <p className="text-sm text-slate-400 font-medium mb-1">In-sample Train AUC</p>
                   <p className="text-2xl font-semibold text-blue-300">
-                    {(pattern.performance_metrics.train_auc * 100).toFixed(1)}%
+                    {(pattern.performance_metrics.in_sample_train_auc * 100).toFixed(1)}%
                   </p>
                 </div>
               )}

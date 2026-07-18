@@ -24,10 +24,9 @@ preprocessing:
 
 # Label 設定
 labels:
-  return_type: "simple"  # simple | log | excess | risk_adjusted | winsorized
+  return_type: "simple"  # simple | log | excess | risk_adjusted（winsorized 已禁用 LA-2 DEC-1）
   horizons: [1, 2, 3, 5, 8, 13, 21]  # bar 數 horizon
   horizons_time: null  # 時間語義 horizon (可選)
-  winsorize_returns: true  # 是否截尾收益
 
 # 事件過濾
 event_filter:

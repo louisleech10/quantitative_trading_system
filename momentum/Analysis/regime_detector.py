@@ -112,17 +112,13 @@ class RegimeDetector:
         self,
         close: pd.Series,
         volume: Optional[pd.Series] = None,
-        expanding: bool = True,
     ) -> RegimeDetectionResult:
         """
-        偵測市場 regime。
+        偵測市場 regime（固定 PIT Segment-causal；LA-2 已移除 expanding/_fit_global）。
 
         Args:
             close: 收盤價序列（必須有 index）
             volume: 成交量序列（可選，增強聚類品質）
-            expanding: True=expanding window fit（防 look-ahead）；
-                False=全期 ``_fit_global``（§N residual / P2；IC/XGBoost
-                caller 不得傳 False，見呼叫層鎖）。
 
         Returns:
             RegimeDetectionResult
@@ -139,11 +135,8 @@ class RegimeDetector:
             )
             return self._fallback_rule_based(close, volume, features_df)
 
-        # expanding=False → _fit_global（P2 residual；全域 guard 已撤，見 SPEC §N）
-        if expanding:
-            labels = self._fit_expanding(valid_df, close=close, volume=volume)
-        else:
-            labels = self._fit_global(valid_df)
+        # 固定 Segment-causal PIT（expanding/_fit_global 已於 LA-2 B3 硬移除）
+        labels = self._fit_expanding(valid_df, close=close, volume=volume)
 
         # 回填到原始 index
         full_labels = np.full(len(features_df), "", dtype=object)
@@ -173,12 +166,9 @@ class RegimeDetector:
         若 index 為 None，使用 close 的 index。
         回傳 List[str]，長度 == len(index)。
 
-        LA-1 §N：XGBoost 路徑 caller 鎖 expanding=True（不得全期 fit）。
+        固定 PIT Segment-causal（無 expanding 參數）。
         """
-        # caller 層鎖：本路徑固定 PIT Segment-causal，不暴露 expanding 參數
-        expanding_locked = True
-        assert expanding_locked is True, "XGBoost phases path requires expanding=True"
-        result = self.detect(close, volume, expanding=expanding_locked)
+        result = self.detect(close, volume)
         labels_series = pd.Series(result.labels, index=close.index)
 
         target_index = index if index is not None else close.index
@@ -213,21 +203,6 @@ class RegimeDetector:
             features["volume_ratio"] = volume / vol_ma_safe
 
         return pd.DataFrame(features, index=close.index)
-
-    def _fit_global(self, valid_df: pd.DataFrame) -> np.ndarray:
-        """全局 fit（§N exclude / P2 residual；detect 不再呼叫）。"""
-        scaler = StandardScaler()
-        X = scaler.fit_transform(valid_df.values)
-
-        km = KMeans(
-            n_clusters=self.n_clusters,
-            random_state=self.random_state,
-            n_init=10,
-            max_iter=300,
-        )
-        raw_labels = km.fit_predict(X)
-
-        return self._align_labels(raw_labels, valid_df["volatility"].values)
 
     def _fit_expanding(
         self,
@@ -331,22 +306,6 @@ class RegimeDetector:
             label_names = [f"regime_{i}" for i in range(n_actual)]
 
         return {int(old): label_names[i] for i, old in enumerate(sorted_labels)}
-
-    def _align_labels(
-        self, raw_labels: np.ndarray, volatility: np.ndarray
-    ) -> np.ndarray:
-        """
-        按 cluster 內的 volatility 均值降序排序，
-        確保 label 語義穩定（高波動 → 低波動）。
-
-        供 ``_fit_global``（§N residual）使用；expanding 路徑改走
-        ``_build_name_map`` per-segment same-model re-predict。
-        """
-        mapping = self._build_name_map(raw_labels, volatility)
-        result = np.array(
-            [mapping.get(int(l), "unknown") for l in raw_labels], dtype=object
-        )
-        return result
 
     def _compute_pit_rule_labels(
         self,

@@ -217,10 +217,10 @@ def _assert_kmeans_pit_post_zero(
     n_keep: int,
     early_end: int,
 ) -> RegimeDetectionResult:
-    """產線 RegimeDetector.detect(expanding=True) early flip==0 + 非全 unknown。"""
-    full = detector.detect(close, volume, expanding=True)
+    """產線 RegimeDetector.detect() early flip==0 + 非全 unknown。"""
+    full = detector.detect(close, volume)
     trunc = detector.detect(
-        close.iloc[:n_keep], volume.iloc[:n_keep], expanding=True
+        close.iloc[:n_keep], volume.iloc[:n_keep]
     )
     flip_post = _count_early_label_flips(full.labels, trunc.labels, early_end)
     assert flip_post == 0, f"kmeans PIT early label flip={flip_post}"
@@ -405,10 +405,10 @@ def _assert_mid_segment_pit_post_zero(
         refit_interval=refit_interval,
     )
     full = det.detect(
-        close.iloc[: need + 100], volume.iloc[: need + 100], expanding=True
+        close.iloc[: need + 100], volume.iloc[: need + 100]
     )
     trunc = det.detect(
-        close.iloc[:trunc_at], volume.iloc[:trunc_at], expanding=True
+        close.iloc[:trunc_at], volume.iloc[:trunc_at]
     )
     nontrivial = [str(x) for x in full.labels if str(x) not in ("", "unknown")]
     assert len(nontrivial) > 0, "mid_segment labels all empty/unknown"
@@ -572,26 +572,29 @@ def _assert_kmeans_pit(
     n_derived = max(50, len(close) // 10)
     assert n_derived != REFIT_INTERVAL_CONST
 
-    # --- legacy expanding=False（_fit_global）early flip > 0 ---
-    full_leg = detector.detect(close, volume, expanding=False)
-    trunc_leg = detector.detect(
-        close.iloc[:n_keep], volume.iloc[:n_keep], expanding=False
-    )
-    flip_pre = _count_early_label_flips(full_leg.labels, trunc_leg.labels, early_end)
-    assert flip_pre > 0, f"legacy global-fit early label flip={flip_pre}"
+    # --- LA-2 B3：expanding / _fit_global 硬移除（參數不存在 + 方法不可達）---
+    import inspect
+    sig = inspect.signature(RegimeDetector.detect)
+    assert "expanding" not in sig.parameters
+    assert not hasattr(detector, "_fit_global")
+    with pytest.raises(TypeError):
+        detector.detect(close, volume, expanding=False)  # type: ignore[call-arg]
+    with pytest.raises(AttributeError):
+        detector._fit_global(pd.DataFrame({"volatility": [0.1, 0.2]}))  # type: ignore[attr-defined]
 
     # --- 產線 Segment-causal early flip == 0 ---
     full = _assert_kmeans_pit_post_zero(
         detector, close, volume, n_keep, early_end
     )
 
-    # --- caller 層鎖：IC kmeans / XGBoost phases 固定 expanding=True ---
-    expand_calls: List[bool] = []
+    # --- caller 層：IC kmeans / XGBoost phases 走 detect() 無 expanding 參數 ---
+    detect_calls = 0
     real_detect = RegimeDetector.detect
 
-    def _spy_detect(self, close_s, volume_s=None, expanding=True):  # type: ignore[no-untyped-def]
-        expand_calls.append(bool(expanding))
-        return real_detect(self, close_s, volume_s, expanding=expanding)
+    def _spy_detect(self, close_s, volume_s=None):  # type: ignore[no-untyped-def]
+        nonlocal detect_calls
+        detect_calls += 1
+        return real_detect(self, close_s, volume_s)
 
     with mock.patch.object(RegimeDetector, "detect", _spy_detect):
         det2 = create_regime_detector(
@@ -621,13 +624,7 @@ def _assert_kmeans_pit(
                 "method": "spearman",
             },
         )
-    assert expand_calls, "expected detect calls from IC/XGBoost callers"
-    assert all(c is True for c in expand_calls), expand_calls
-    # 全域 expanding=False 仍允許（§N residual → P2 _fit_global）
-    ok_global = detector.detect(
-        close.iloc[:500], volume.iloc[:500], expanding=False
-    )
-    assert ok_global.method in ("kmeans", "rule")
+    assert detect_calls > 0, "expected detect calls from IC/XGBoost callers"
 
     # --- FINDING-3：產線 detect_phases_for_index vs baseline exact allowlist ---
     # detect_phases_for_index 為 detect 薄封裝；短序列對齊後用全長 detect 真輸出建 diff
@@ -636,7 +633,7 @@ def _assert_kmeans_pit(
     phases_short = detector.detect_phases_for_index(
         short_c, short_v, index=short_c.index
     )
-    det_short = detector.detect(short_c, short_v, expanding=True)
+    det_short = detector.detect(short_c, short_v)
     assert [str(x) for x in phases_short] == [str(x) for x in det_short.labels]
 
     phases = [str(x) for x in full.labels]
@@ -767,7 +764,7 @@ def test_regime_fallback_truth_table(
     det_fb = RegimeDetector(
         n_clusters=4, lookback=55, min_samples_for_fit=10_000
     )
-    result_fb = det_fb.detect(close_mid, vol_mid, expanding=True)
+    result_fb = det_fb.detect(close_mid, vol_mid)
     assert result_fb.method == "rule"
     vol_series = _rolling_vol(close_mid)
     counts = effective_count(vol_series)
@@ -805,9 +802,9 @@ def test_regime_fallback_truth_table(
     det_pit = RegimeDetector(
         n_clusters=4, lookback=55, min_samples_for_fit=max(n + 1, 10_000)
     )
-    full_fb = det_pit.detect(btc_close, btc_volume, expanding=True)
+    full_fb = det_pit.detect(btc_close, btc_volume)
     trunc_fb = det_pit.detect(
-        btc_close.iloc[:n_keep], btc_volume.iloc[:n_keep], expanding=True
+        btc_close.iloc[:n_keep], btc_volume.iloc[:n_keep]
     )
     assert full_fb.method == "rule" and trunc_fb.method == "rule"
     flip = _count_early_label_flips(full_fb.labels, trunc_fb.labels, early_end)
@@ -841,7 +838,6 @@ def test_la1_b1_production_mutations_red(
         self: RegimeDetector,
         close: pd.Series,
         volume: Optional[pd.Series] = None,
-        expanding: bool = True,
     ) -> RegimeDetectionResult:
         return RegimeDetectionResult(
             labels=np.full(len(close), "unknown", dtype=object),
@@ -869,7 +865,7 @@ def test_la1_b1_production_mutations_red(
                 short_early,
             )
 
-    # --- mutant 3: 去 same-model re-predict → 退回全期 _fit_global 當 expanding ---
+    # --- mutant 3: 去 same-model re-predict → 退回全期 fit（模擬已移除的 _fit_global）---
     real_fit_exp = RegimeDetector._fit_expanding
 
     def _no_repredict_expanding(
@@ -878,8 +874,25 @@ def test_la1_b1_production_mutations_red(
         close: Optional[pd.Series] = None,
         volume: Optional[pd.Series] = None,
     ) -> np.ndarray:
-        # look-ahead：用全期 fit 取代 Segment-causal
-        return self._fit_global(valid_df)
+        # look-ahead：用全期 fit 取代 Segment-causal（_fit_global 已移除，inline 模擬）
+        from sklearn.cluster import KMeans
+        from sklearn.preprocessing import StandardScaler
+
+        scaler = StandardScaler()
+        X = scaler.fit_transform(valid_df.values)
+        km = KMeans(
+            n_clusters=self.n_clusters,
+            random_state=self.random_state,
+            n_init=10,
+            max_iter=300,
+        )
+        raw_labels = km.fit_predict(X)
+        name_map = self._build_name_map(
+            raw_labels, valid_df["volatility"].to_numpy(dtype=np.float64)
+        )
+        return np.array(
+            [name_map.get(int(r), "unknown") for r in raw_labels], dtype=object
+        )
 
     with mock.patch.object(
         RegimeDetector, "_fit_expanding", _no_repredict_expanding
@@ -900,12 +913,10 @@ def test_la1_b1_production_mutations_red(
         self: RegimeDetector,
         close: pd.Series,
         volume: Optional[pd.Series] = None,
-        expanding: bool = True,
     ) -> RegimeDetectionResult:
-        if expanding:
-            # 依最終 n 推導 interval（SPEC 禁止）
-            self.refit_interval = max(50, len(close) // 10)
-        return real_detect(self, close, volume, expanding=expanding)
+        # 依最終 n 推導 interval（SPEC 禁止）
+        self.refit_interval = max(50, len(close) // 10)
+        return real_detect(self, close, volume)
 
     with mock.patch.object(RegimeDetector, "detect", _n_derived_detect):
         with pytest.raises(AssertionError):

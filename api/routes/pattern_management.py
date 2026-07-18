@@ -33,18 +33,13 @@ pattern_service = PatternManagementService()
 
 @router.post("/define")
 async def create_pattern(request: CreatePatternRequest):
-    """建立新模式"""
+    """建立新模式（server 權威：task_id → oot_receipt 重建）。"""
     try:
-        rules_dict = [rule.dict() for rule in request.rules]
         result = pattern_service.create_pattern(
             name=request.name,
             description=request.description,
-            rules=rules_dict,
-            case_id=request.case_id,
-            xgboost_importance=request.xgboost_importance,
-            performance_metrics=request.performance_metrics,
+            task_id=request.task_id,
             tags=request.tags,
-            metadata=request.metadata
         )
         if not result["success"]:
             error_detail = result.get("error", "未知錯誤")
@@ -128,15 +123,14 @@ async def get_pattern_summary(pattern_id: str):
 
 @router.put("/{pattern_id}")
 async def update_pattern(pattern_id: str, request: UpdatePatternRequest):
-    """更新模式"""
+    """更新模式（禁 client status/metadata；可帶 task_id re-verify）。"""
     try:
         result = pattern_service.update_pattern(
             pattern_id=pattern_id,
             name=request.name,
             description=request.description,
-            status=request.status,
             tags=request.tags,
-            metadata=request.metadata
+            task_id=request.task_id,
         )
         if not result["success"]:
             raise HTTPException(status_code=400, detail=result.get("error"))

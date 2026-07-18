@@ -49,7 +49,7 @@ def _train_sample_model():
     analyzer = XGBoostAnalyzer()
     performance = analyzer.train_model(X, y)
     
-    logger.info(f"訓練集 AUC: {performance.train_auc:.4f}")
+    logger.info(f"訓練集 AUC: {performance.in_sample_train_auc:.4f}")
     logger.info(f"交叉驗證 AUC: {performance.cv_auc_mean:.4f} ± {performance.cv_auc_std:.4f}")
     logger.info(f"Precision: {performance.precision:.4f}")
     logger.info(f"Recall: {performance.recall:.4f}")
@@ -57,7 +57,7 @@ def _train_sample_model():
     logger.info(f"Overfitting Score: {performance.overfitting_score:.4f}")
     
     # 驗證
-    assert performance.train_auc > 0.5, "訓練 AUC 應該 > 0.5"
+    assert performance.in_sample_train_auc > 0.5, "訓練 AUC 應該 > 0.5"
     assert performance.cv_auc_mean > 0.5, "交叉驗證 AUC 應該 > 0.5"
     assert 0 <= performance.overfitting_score <= 1, "Overfitting score 應該在 [0, 1] 範圍"
     

@@ -552,9 +552,9 @@ class RollingAUCResponse(BaseModel):
 
 
 class ModelPerformanceResponse(BaseModel):
-    """模型效能回應"""
+    """模型效能回應（LA-2 B2：train_auc → in_sample_train_auc）"""
     engine_type: Optional[str] = None
-    train_auc: float
+    in_sample_train_auc: float
     cv_auc_mean: float
     cv_auc_std: float
     precision: float
@@ -568,6 +568,9 @@ class ModelPerformanceResponse(BaseModel):
     positive_rate: Optional[float] = None
     oot_auc: Optional[float] = None
     training_time_seconds: Optional[float] = None
+    fit_pool_auc: Optional[float] = None
+    eval_scope: Optional[Dict[str, str]] = None
+    oot_status: Optional[str] = None
 
 
 class ValidationConfig(BaseModel):

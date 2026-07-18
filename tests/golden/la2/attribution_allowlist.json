@@ -1,0 +1,473 @@
+{
+  "schema_version": "la2_attribution_allowlist_v1",
+  "spec_ref": "docs/IC_LA2_SPEC.md §G",
+  "todo_ref": "docs/IC_LA2_TODO.md Task 0.2 / §0.6-APPENDIX C",
+  "policy": {
+    "unlisted_diff": "unexpected",
+    "b0_rows_empty": false,
+    "b1_raise_only_rows": 4,
+    "append_batches": [
+      "B1",
+      "B2",
+      "B3",
+      "B4"
+    ],
+    "forbid_append_after_b4_start": true,
+    "b4_rebaseline": true,
+    "class_enum": [
+      "P2-1-disable",
+      "P2-2-oot",
+      "P2-2-scope-tag",
+      "P2-3a-factor-loud",
+      "P2-3a-proxy-causal",
+      "P2-3b-pattern-trainmask",
+      "P2-3b-promotion-guard",
+      "P2-3c-regime-remove"
+    ]
+  },
+  "class_enum": [
+    "P2-1-disable",
+    "P2-2-oot",
+    "P2-2-scope-tag",
+    "P2-3a-factor-loud",
+    "P2-3a-proxy-causal",
+    "P2-3b-pattern-trainmask",
+    "P2-3b-promotion-guard",
+    "P2-3c-regime-remove"
+  ],
+  "rows": [
+    {
+      "path": "momentum/FeatureEngineering/labels/label_generator.py::generate_returns_by_type",
+      "index": "winsorized",
+      "old": null,
+      "new": null,
+      "class": "P2-1-disable",
+      "behavior": "raises",
+      "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    },
+    {
+      "path": "momentum/Analysis/ic_config_schema.py::return_type Literal",
+      "index": "winsorized",
+      "old": null,
+      "new": null,
+      "class": "P2-1-disable",
+      "behavior": "raises",
+      "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    },
+    {
+      "path": "momentum/Analysis/ic_filter_orchestrator.py:2380",
+      "index": "winsorized",
+      "old": null,
+      "new": null,
+      "class": "P2-1-disable",
+      "behavior": "raises",
+      "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    },
+    {
+      "path": "momentum/Analysis/ic_engine.py::_compute_returns",
+      "index": "winsorized",
+      "old": null,
+      "new": null,
+      "class": "P2-1-disable",
+      "behavior": "raises",
+      "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    },
+    {
+      "path": "/model_performance/train_auc",
+      "index": "field_rename",
+      "old": "train_auc",
+      "new": "in_sample_train_auc",
+      "class": "P2-2-oot",
+      "behavior": "rename",
+      "note": "train_auc→in_sample_train_auc no coexistence"
+    },
+    {
+      "path": "/model_performance/fit_pool_auc",
+      "index": "new_field",
+      "old": null,
+      "new": "fit_pool_auc",
+      "class": "P2-2-oot",
+      "behavior": "add_field",
+      "note": "ES train∪val pool AUC (in_sample_research_only)"
+    },
+    {
+      "path": "/model_performance/oot_auc",
+      "index": "no_held_out",
+      "old": "silent_full_sample_or_missing",
+      "new": "OMITTED",
+      "class": "P2-2-oot",
+      "behavior": "omit_without_held_out",
+      "note": "缺 held-out → OMITTED+deny 非 silent 全樣本"
+    },
+    {
+      "path": "task_result/oot_receipt",
+      "index": "write_chain",
+      "old": null,
+      "new": "OotReceipt|null",
+      "class": "P2-2-oot",
+      "behavior": "receipt_chain",
+      "note": "xgboost_task/batch/model_task 同鏈；無 receipt=不可晉升"
+    },
+    {
+      "path": "task_result/calibrator_receipt",
+      "index": "verify_fail_closed",
+      "old": "warn_or_missing",
+      "new": "CalibratorReceipt envelope required",
+      "class": "P2-2-oot",
+      "behavior": "fail_closed",
+      "note": "fit+fit_from_predictions 共用 verify_calibrator_receipt"
+    },
+    {
+      "path": "/model_performance/calibration_curve",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/brier_score",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/ece",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/pr_curve",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/pr_auc",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/recommend_k",
+      "index": "eval_scope",
+      "old": "full_sample",
+      "new": "oot",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/precision_at_k",
+      "index": "eval_scope",
+      "old": "full_sample",
+      "new": "oot",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/feature_importance",
+      "index": "eval_scope",
+      "old": "unscoped",
+      "new": "in_sample_research_only",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag_deny"
+    },
+    {
+      "path": "/model_performance/shap_sample",
+      "index": "eval_scope",
+      "old": "unscoped",
+      "new": "in_sample_research_only",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag_deny"
+    },
+    {
+      "path": "/model_performance/cross_symbol_validation",
+      "index": "eval_scope",
+      "old": "unscoped",
+      "new": "in_sample_research_only",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag_deny"
+    },
+    {
+      "path": "/model_performance/regime_analysis",
+      "index": "eval_scope",
+      "old": "unscoped",
+      "new": "in_sample_research_only",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag_deny"
+    },
+    {
+      "path": "config/model_config.yaml::probability_calibration",
+      "index": "wired",
+      "old": "enabled_true_silent",
+      "new": "wired=false",
+      "class": "P2-2-scope-tag",
+      "behavior": "config_theater",
+      "note": "Task 2.3 config theater marker"
+    },
+    {
+      "path": "config/model_config.yaml::sample_weight",
+      "index": "wired",
+      "old": "enabled_true_silent",
+      "new": "wired=false",
+      "class": "P2-2-scope-tag",
+      "behavior": "config_theater",
+      "note": "Task 2.3 config theater marker"
+    },
+    {
+      "path": "deep_analysis/factor_orthogonalization",
+      "index": "FactorModuleResult",
+      "old": "Dict[str,Any] unscoped",
+      "new": "oos_guarantees=false,fit_scope=full_sample",
+      "class": "P2-3a-factor-loud",
+      "behavior": "typed_loud",
+      "note": "GS/PCA algo unchanged; loud typed contract"
+    },
+    {
+      "path": "deep_analysis/factor_exposure/market_proxy",
+      "index": "proxy_kind",
+      "old": "label_series_forward",
+      "new": "trailing_close_ret_lag1",
+      "class": "P2-3a-proxy-causal",
+      "behavior": "proxy_causal",
+      "note": "close.pct_change().shift(1); close_series in _ic_cache"
+    },
+    {
+      "path": "pattern_extractor/extract_decision_rules",
+      "index": "train_mask",
+      "old": "full_sample_quantile",
+      "new": "SplitPlan_train_mask+train_y_only",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "train_mask",
+      "note": "quantile/base_prob/confidence/lift train-y-only"
+    },
+    {
+      "path": "pattern_management/create+PUT",
+      "index": "promotion",
+      "old": "client_rules_metadata_status",
+      "new": "task_id+oot_receipt_server_authority",
+      "class": "P2-3b-promotion-guard",
+      "behavior": "server_guard",
+      "note": "status=active iff verify_oot_receipt; client fields rejected"
+    },
+    {
+      "path": "regime_detector/detect",
+      "index": "expanding_fit_global",
+      "old": "expanding=False→_fit_global",
+      "new": "removed_PIT_only",
+      "class": "P2-3c-regime-remove",
+      "behavior": "hard_remove",
+      "note": "expanding param + _fit_global method removed"
+    },
+    {
+      "path": "adversarial_validator",
+      "index": "diagnostic_only",
+      "old": "unmarked",
+      "new": "analysis_status=diagnostic_only+signal_use_denied",
+      "class": "P2-3a-factor-loud",
+      "behavior": "diagnostic_marker",
+      "note": "Task 3.4 adversarial_validator diagnostic_only"
+    },
+    {
+      "path": "pattern.threshold_value_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "0c253b46367fdc3e765403ac5c91aa0ca36e16fd8ccff22286fc8ab30bd0bc20",
+      "new": "bfdf521263e6a41e06edb0452e57f38e1588e5498c8a5030cfc5c2c60501c30b",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "face_rebaseline",
+      "note": "B4 rebaseline: train SplitPlan quantile thresholds"
+    },
+    {
+      "path": "pattern.confidence_value_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "8d3e0c3f8556c0665c4b10bc0453449c59e47caa164e8a3d9640574bd108ea4e",
+      "new": "5b304771b363decd64db4ad1f60b6eea34d7db33c5f344fbfc7c2d1eb7b26972",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "face_rebaseline",
+      "note": "B4 rebaseline: train-y-only confidence"
+    },
+    {
+      "path": "pattern.threshold_value_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "fb2e5821d88520df337ac3f71244c576521bfb65e5515c1ebd7dac92e3c1ebb5",
+      "new": "e8de4c8cbd70b0784ba967c8415e94f288bbc0030bda947a7b3dc9d6548c8510",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "face_rebaseline"
+    },
+    {
+      "path": "pattern.confidence_value_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "0e6b4ef7d14173c9ee01e397c36d70acaa9b13682549b6ef829221af74465bc2",
+      "new": "cf58351d16585311e383913eaaf65183aad4ae65f90d2b19c3298374f21cb454",
+      "class": "P2-3b-pattern-trainmask",
+      "behavior": "face_rebaseline"
+    },
+    {
+      "path": "regime_fit_global.labels_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "267f795ed303c9117a20e09025c2c08038e1e685247fbb4b2b618700e2b1101e",
+      "new": "dce7c33c76c8d4c530d2013470d26e4186a85a0a4b59509f02b7b2916d3186af",
+      "class": "P2-3c-regime-remove",
+      "behavior": "face_rebaseline",
+      "note": "B4: _fit_global removed → labels == control.regime_pit (PIT)"
+    },
+    {
+      "path": "regime_fit_global.labels_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "73de118ed59c97271c2fc9ef19f1c50851dbdbea0e8748ef37b8585001b3c3e4",
+      "new": "bd529dd3905f10ab7cbe1d06809b89571aaea9632b6f368b247a07ffe529799c",
+      "class": "P2-3c-regime-remove",
+      "behavior": "face_rebaseline",
+      "note": "B4: labels == control.regime_pit (PIT)"
+    },
+    {
+      "path": "factor.exposure.beta_neutral_value_sha256",
+      "index": "BTCUSDT/1h",
+      "old": "2fc88ac6c6a42294b30fddda46e5d2d475b6c0c123b00dab7c278be00b8766de",
+      "new": "a84e59c72c4dd47418b5f4e61d0200d8314c1242ff3f7b358e941e8747bfd488",
+      "class": "P2-3a-proxy-causal",
+      "behavior": "face_rebaseline",
+      "note": "B4: market_proxy trailing close-ret lag1 (not forward label)"
+    },
+    {
+      "path": "factor.exposure.beta_neutral_value_sha256",
+      "index": "ETHUSDT/12h",
+      "old": "4ebf98c408eb8ff7acdf6ec0fe833d416125ff72936e8b4576c560034a0d6de7",
+      "new": "2351204a20e3eba72a5969241e65ea286d203ce4fbb7db43ba8bed8285149588",
+      "class": "P2-3a-proxy-causal",
+      "behavior": "face_rebaseline"
+    },
+    {
+      "path": "model.model_performance.train_auc",
+      "index": "field_rename_face",
+      "old": "train_auc",
+      "new": "in_sample_train_auc+eval_scope+fit_pool_auc+oot_status",
+      "class": "P2-2-oot",
+      "behavior": "face_rebaseline",
+      "note": "B4 face: train_auc removed; performance_value_sha256 numeric-stable"
+    }
+  ],
+  "eval_scope_field_map": {
+    "/model_performance/in_sample_train_auc": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/fit_pool_auc": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/overfitting_score": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/precision": {
+      "eval_scope": "cv_oof",
+      "consumer": "research_only"
+    },
+    "/model_performance/recall": {
+      "eval_scope": "cv_oof",
+      "consumer": "research_only"
+    },
+    "/model_performance/f1_score": {
+      "eval_scope": "cv_oof",
+      "consumer": "research_only"
+    },
+    "/model_performance/cv_auc_mean": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/cv_auc_std": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/oot_auc": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/calibration_curve": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/brier_score": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/ece": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/pr_curve": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/pr_auc": {
+      "eval_scope": "cv_oof",
+      "consumer": "ok"
+    },
+    "/model_performance/precision_at_k": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/recommend_k": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/expectancy": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/sharpe_proxy": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/bootstrap_ci": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/predictions/train": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/predictions/oot": {
+      "eval_scope": "oot",
+      "consumer": "ok"
+    },
+    "/model_performance/feature_importance": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/feature_importance_all": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/permutation_importance": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/fold_importance_stability": {
+      "eval_scope": "cv_oof",
+      "consumer": "research_only"
+    },
+    "/model_performance/shap_sample": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/regime_analysis": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    },
+    "/model_performance/cross_symbol_validation": {
+      "eval_scope": "in_sample_research_only",
+      "consumer": "deny"
+    }
+  }
+}

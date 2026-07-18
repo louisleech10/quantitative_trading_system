@@ -724,7 +724,7 @@ class XGBoostBatchService:
             )
             
             self.logger.info(
-                f"模型訓練完成 - Train AUC: {performance.train_auc:.4f}, "
+                f"模型訓練完成 - in_sample_train_auc: {performance.in_sample_train_auc:.4f}, "
                 f"CV AUC: {performance.cv_auc_mean:.4f}"
             )
             
@@ -741,17 +741,64 @@ class XGBoostBatchService:
                 feature_names
             )
             
-            # ===== Step 7: 提取決策規則 =====
+            # LA-2 B2/B3：先建 train/OOT plan，再 train-mask 抽規則
+            import pickle
+            from momentum.Analysis.eval_scope_utils import build_service_oot_bundle
+            from momentum.core.contracts import SplitPlan, canonical_split_plan_hash
+
+            try:
+                model_artifact = pickle.dumps(analyzer.model)
+            except Exception:  # noqa: BLE001
+                model_artifact = b"xgb-batch-artifact"
+            oot_bundle = build_service_oot_bundle(
+                n_samples=len(y),
+                model_artifact=model_artifact,
+                trusted_issuer="xgboost_batch_service",
+                oot_ratio=0.2,
+                horizon=1,
+                embargo=int(embargo_pct or 0) if embargo_pct else 0,
+                purge_gap=int(purge_gap or 0) if purge_gap else 0,
+                symbol=",".join(symbols) if symbols else None,
+                base_universe_hash=f"xgb_batch:{timeframe}:{len(y)}",
+            )
+            has_oot_held_out = bool(oot_bundle["has_oot_held_out"])
+            oot_receipt = oot_bundle["oot_receipt"]
+            oot_idx = oot_bundle["oot_idx"]
+            train_plan = oot_bundle.get("train_plan")
+            eval_plan = oot_bundle.get("eval_plan")
+            if train_plan is None:
+                train_plan = SplitPlan(
+                    split_label="train",
+                    index_kind="positional",
+                    row_index=np.arange(len(y), dtype=int),
+                    time_bounds=(None, None),
+                    purge_gap=0,
+                    embargo=0,
+                    purge_semantic="rows",
+                    expected_freq=None,
+                    base_universe_hash=f"xgb_batch:{timeframe}:{len(y)}",
+                    symbol=",".join(symbols) if symbols else None,
+                )
+
+            # ===== Step 7: 提取決策規則（train-mask）=====
             self.task_manager.update_progress(task_id, 85, '提取規則', '提取決策規則...')
             
             if analysis_engine == "lightgbm":
+                # U15：LGBM 跳過 pattern 晉升（記錄性 asymmetry，禁順手接線）
                 rules = []
             else:
+                expected_hash = canonical_split_plan_hash(train_plan)
                 rules = await asyncio.to_thread(
                     self.pattern_extractor.extract_decision_rules,
                     analyzer.model,
-                    X, y, feature_names,
-                    top_n_rules, min_support
+                    X,
+                    y,
+                    feature_names,
+                    top_n_rules,
+                    min_support,
+                    split=train_plan,
+                    expected_plan_hash=expected_hash,
+                    oot_split=eval_plan,
                 )
 
             predictions_output = await asyncio.to_thread(
@@ -795,66 +842,74 @@ class XGBoostBatchService:
                     },
                 }
 
-            # Precision@K 與推薦 K
-            precision_at_k_result = await asyncio.to_thread(
-                analyzer.calculate_precision_at_k,
-                X, y
-            )
-            recommended = analyzer.recommend_k(
-                y_true=y,
-                y_pred_proba=y_pred_proba,
-                target_precision=0.75
-            )
-            if hasattr(precision_at_k_result, 'to_dict'):
-                precision_at_k = {
-                    **precision_at_k_result.to_dict(),
-                    "recommended_k": recommended.get("recommended_k"),
-                    "recommended_threshold": recommended.get("threshold"),
-                    "recommended_precision": recommended.get("precision")
-                }
-            else:
-                precision_at_k = {
-                    "precision_at_k": {int(item.k): float(item.precision) for item in precision_at_k_result},
-                    "threshold_at_k": {},
-                    "sample_count_at_k": {int(item.k): int(item.n_total) for item in precision_at_k_result},
-                    "recommended_k": recommended.get("recommended_k"),
-                    "recommended_threshold": recommended.get("threshold"),
-                    "recommended_precision": recommended.get("precision")
-                }
-
-            # 期望值估算（若案例包含 price_change）
+            precision_at_k = None
             expectancy = None
+            bootstrap_ci = None
             price_changes = self._resolve_case_price_changes(valid_cases)
-            if price_changes is not None:
-                threshold = recommended.get("threshold") or 0.6
-                trade_returns = price_changes[y_pred_proba >= float(threshold)]
-                expectancy_result = self.expectancy_calculator.estimate_expectancy(
-                    price_changes=price_changes,
-                    predicted_proba=y_pred_proba,
-                    threshold=float(threshold)
-                )
-                sharpe_proxy = self.expectancy_calculator.calculate_sharpe_proxy(
-                    trade_returns if len(trade_returns) > 0 else np.array([])
-                )
-                expectancy = {
-                    **expectancy_result.to_dict(),
-                    "sharpe_proxy": float(sharpe_proxy) if sharpe_proxy is not None else None
-                }
+            if has_oot_held_out and oot_idx is not None and len(oot_idx) > 0:
+                if isinstance(X, pd.DataFrame):
+                    X_oot = X.iloc[oot_idx]
+                else:
+                    X_oot = X[oot_idx]
+                y_oot = np.asarray(y)[oot_idx]
+                y_pred_oot = np.asarray(y_pred_proba)[oot_idx]
 
-            # Bootstrap 信賴區間
-            bootstrap_ci = {}
-            for metric in ["auc", "pr_auc"]:
-                try:
-                    ci_result = self.bootstrap_estimator.bootstrap_confidence_interval(
-                        y_true=y,
-                        y_pred_proba=y_pred_proba,
-                        metric=metric,
-                        n_bootstrap=200,
-                        confidence=0.9
+                precision_at_k_result = await asyncio.to_thread(
+                    analyzer.calculate_precision_at_k,
+                    X_oot, y_oot
+                )
+                recommended = analyzer.recommend_k(
+                    y_true=y_oot,
+                    y_pred_proba=y_pred_oot,
+                    target_precision=0.75
+                )
+                if hasattr(precision_at_k_result, 'to_dict'):
+                    precision_at_k = {
+                        **precision_at_k_result.to_dict(),
+                        "recommended_k": recommended.get("recommended_k"),
+                        "recommended_threshold": recommended.get("threshold"),
+                        "recommended_precision": recommended.get("precision")
+                    }
+                else:
+                    precision_at_k = {
+                        "precision_at_k": {int(item.k): float(item.precision) for item in precision_at_k_result},
+                        "threshold_at_k": {},
+                        "sample_count_at_k": {int(item.k): int(item.n_total) for item in precision_at_k_result},
+                        "recommended_k": recommended.get("recommended_k"),
+                        "recommended_threshold": recommended.get("threshold"),
+                        "recommended_precision": recommended.get("precision")
+                    }
+
+                if price_changes is not None:
+                    pc_oot = np.asarray(price_changes)[oot_idx]
+                    threshold = recommended.get("threshold") or 0.6
+                    trade_returns = pc_oot[y_pred_oot >= float(threshold)]
+                    expectancy_result = self.expectancy_calculator.estimate_expectancy(
+                        price_changes=pc_oot,
+                        predicted_proba=y_pred_oot,
+                        threshold=float(threshold)
                     )
-                    bootstrap_ci[metric] = ci_result.to_dict()
-                except Exception as e:
-                    self.logger.warning(f"Bootstrap {metric} 計算失敗: {str(e)}")
+                    sharpe_proxy = self.expectancy_calculator.calculate_sharpe_proxy(
+                        trade_returns if len(trade_returns) > 0 else np.array([])
+                    )
+                    expectancy = {
+                        **expectancy_result.to_dict(),
+                        "sharpe_proxy": float(sharpe_proxy) if sharpe_proxy is not None else None
+                    }
+
+                bootstrap_ci = {}
+                for metric in ["auc", "pr_auc"]:
+                    try:
+                        ci_result = self.bootstrap_estimator.bootstrap_confidence_interval(
+                            y_true=y_oot,
+                            y_pred_proba=y_pred_oot,
+                            metric=metric,
+                            n_bootstrap=200,
+                            confidence=0.9
+                        )
+                        bootstrap_ci[metric] = ci_result.to_dict()
+                    except Exception as e:
+                        self.logger.warning(f"Bootstrap {metric} 計算失敗: {str(e)}")
 
             # Permutation Importance
             permutation_importance = await asyncio.to_thread(
@@ -904,33 +959,13 @@ class XGBoostBatchService:
                 "samples": sample_values.tolist()
             }
 
-            # 跨幣種泛化驗證（至少兩個標的）
-            cross_symbol_validation = None
-            if len(symbols) >= 2:
-                try:
-                    X_by_symbol: Dict[str, np.ndarray] = {}
-                    y_by_symbol: Dict[str, np.ndarray] = {}
-                    symbol_indices: Dict[str, List[int]] = {sym: [] for sym in symbols}
-
-                    for idx, case in enumerate(valid_cases):
-                        if case.symbol in symbol_indices:
-                            symbol_indices[case.symbol].append(idx)
-
-                    for sym, indices in symbol_indices.items():
-                        if len(indices) < 10:
-                            continue
-                        X_by_symbol[sym] = X[indices]
-                        y_by_symbol[sym] = y[indices]
-
-                    if len(X_by_symbol) >= 2:
-                        results = self.cross_symbol_validator.run_leave_one_symbol_out(
-                            symbols=list(X_by_symbol.keys()),
-                            X_by_symbol=X_by_symbol,
-                            y_by_symbol=y_by_symbol
-                        )
-                        cross_symbol_validation = [r.to_dict() for r in results]
-                except Exception as e:
-                    self.logger.warning(f"跨幣種泛化驗證失敗: {str(e)}")
+            # 跨幣種泛化驗證（至少兩個標的）——產線路徑見 _build_cross_symbol_validation
+            cross_symbol_validation = self._build_cross_symbol_validation(
+                symbols=symbols,
+                valid_cases=valid_cases,
+                X=X,
+                y=y,
+            )
             
             # ===== Step 8: 儲存模型 =====
             self.task_manager.update_progress(task_id, 95, '儲存模型', '儲存分析結果...')
@@ -973,6 +1008,12 @@ class XGBoostBatchService:
                 "actual_returns": price_changes.tolist() if price_changes is not None else None
             }
 
+            from momentum.Analysis.eval_scope_utils import (
+                apply_service_matrix_scopes,
+                performance_to_scoped_dict,
+            )
+
+            # LA-2 B2 F3：has_oot_held_out 動態；有 OOT 才寫 oot_receipt
             result = {
                 'symbols': symbols,  # 改為 symbols 列表
                 'engine': analysis_engine,
@@ -984,7 +1025,7 @@ class XGBoostBatchService:
                 'negative_cases': int(negative_count),
                 'features_generated': len(feature_names),
                 'feature_names': feature_names,
-                'model_performance': performance.__dict__,
+                'model_performance': performance_to_scoped_dict(performance),
                 'feature_importance': [fi.__dict__ for fi in feature_importance],
                 'feature_importance_all': {
                     key: [fi.__dict__ for fi in values]
@@ -1008,11 +1049,20 @@ class XGBoostBatchService:
                 'pr_curve': getattr(analyzer, 'last_pr_curve', None),
                 'regime_analysis': regime_analysis,
                 'model_saved': True,
-                'model_path': model_path
+                'model_path': model_path,
+                'oot_receipt': oot_receipt,
+                'oof_receipts': list(getattr(analyzer, 'last_oof_receipts', []) or []),
             }
-            
+            result = apply_service_matrix_scopes(result, has_oot_held_out=has_oot_held_out)
+
             # 清理 result 中的 numpy 類型，防止 JSON 序列化錯誤
             result = sanitize_for_json(result)
+            # LA-2 B3-F1：晉升 verify 必備三份 provenance（sanitize 後再掛）
+            if train_plan is not None:
+                result["train_plan"] = train_plan
+            if eval_plan is not None:
+                result["eval_plan"] = eval_plan
+            result["model_artifact"] = model_artifact
             
             try:
                 predictions_df = pd.DataFrame({
@@ -1055,6 +1105,48 @@ class XGBoostBatchService:
         """取得預測 DataFrame（若有快取）"""
         cached = self.task_cache.get_result(task_id)
         return cached.predictions_df if cached else None
+
+    def _build_cross_symbol_validation(
+        self,
+        symbols: List[str],
+        valid_cases: List[Any],
+        X: np.ndarray,
+        y: np.ndarray,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """跨幣種 LOSO 產線路徑（eligibility min_rows=10 + LOSO + list payload）。
+
+        由 `_run_batch_analysis` 呼叫；B4 測試亦直接呼叫本方法以鎖住
+        `self.cross_symbol_validator.run_leave_one_symbol_out` 接線
+        （移除/改壞該呼叫 → 測試必 FAIL）。
+        """
+        if len(symbols) < 2:
+            return None
+        try:
+            X_by_symbol: Dict[str, np.ndarray] = {}
+            y_by_symbol: Dict[str, np.ndarray] = {}
+            symbol_indices: Dict[str, List[int]] = {sym: [] for sym in symbols}
+
+            for idx, case in enumerate(valid_cases):
+                if case.symbol in symbol_indices:
+                    symbol_indices[case.symbol].append(idx)
+
+            for sym, indices in symbol_indices.items():
+                if len(indices) < 10:
+                    continue
+                X_by_symbol[sym] = X[indices]
+                y_by_symbol[sym] = y[indices]
+
+            if len(X_by_symbol) >= 2:
+                results = self.cross_symbol_validator.run_leave_one_symbol_out(
+                    symbols=list(X_by_symbol.keys()),
+                    X_by_symbol=X_by_symbol,
+                    y_by_symbol=y_by_symbol,
+                )
+                return [r.to_dict() for r in results]
+            return None
+        except Exception as e:
+            self.logger.warning(f"跨幣種泛化驗證失敗: {str(e)}")
+            return None
 
     def _build_sequence_features(
         self,

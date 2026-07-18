@@ -14,7 +14,7 @@ class DummyTrainer:
 
     def train_model(self, features, labels, feature_names, *args, **kwargs):
         return ModelPerformance(
-            train_auc=min(1.0, self._cv_auc + 0.03),
+            in_sample_train_auc=min(1.0, self._cv_auc + 0.03),
             cv_auc_mean=self._cv_auc,
             cv_auc_std=0.01,
             precision=0.7,

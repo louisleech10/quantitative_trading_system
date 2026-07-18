@@ -1008,13 +1008,34 @@ class ICEngine:
         return float(stats.spearmanr(x, y)[0])
 
     def _compute_returns(
-        self, close: pd.Series, horizon: int, return_type: str
+        self,
+        close: pd.Series,
+        horizon: int,
+        return_type: str,
+        benchmark_close: Optional[pd.Series] = None,
     ) -> pd.Series:
-        if return_type == "log":
-            return np.log(close.shift(-horizon) / close)
-        if return_type not in {"simple", "log"}:
-            logger.warning("Unsupported return_type=%s, fallback to simple", return_type)
-        return close.shift(-horizon) / close - 1
+        """與 orch / LabelGenerator 同源 dispatch（禁 silent 回退 simple）。
+
+        行為表（engine == orch/LG，atol 數值路徑）::
+
+            return_type     | 行為
+            ----------------|------------------------------------------
+            simple          | LabelGenerator.generate_return
+            log             | LabelGenerator.generate_log_return
+            excess          | LabelGenerator.generate_excess_return
+                            | （缺 benchmark_close → ValueError，兩路徑同）
+            risk_adjusted   | LabelGenerator.generate_risk_adjusted_return
+            winsorized      | NotImplementedError LOOKAHEAD_LABEL_UNSUPPORTED
+            other           | ValueError Unsupported return_type（禁 silent simple）
+        """
+        from momentum.factories import create_label_generator
+
+        return create_label_generator().generate_returns_by_type(
+            close,
+            horizon,
+            return_type,
+            benchmark_close=benchmark_close,
+        )
 
     def _select_icir_series(self, windows: dict) -> list[float]:
         if not windows:
@@ -1217,10 +1238,8 @@ class ICEngine:
             min_samples_for_fit=min_samples,
             refit_interval=refit_interval,
         )
-        # LA-1 §N：IC caller 層鎖 expanding=True（全域 detect 仍允許 False→_fit_global）
-        expanding_locked = True
-        assert expanding_locked is True, "IC kmeans path requires expanding=True"
-        detection = detector.detect(close, volume, expanding=expanding_locked)
+        # LA-2 B3：detect 固定 PIT Segment-causal（expanding/_fit_global 已移除）
+        detection = detector.detect(close, volume)
 
         results: dict[str, dict] = {}
         method = config.get("method", self._methods[0])

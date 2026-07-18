@@ -46,6 +46,8 @@ validation:
 
 probability_calibration:
   enabled: true
+  # LA-2 B2：wired 由 model_config reader 注入；runtime train_model 未接線
+  wired: false
   method: auto
   cv: 5
   min_samples_isotonic: 1000
@@ -64,6 +66,8 @@ walk_forward:
 
 sample_weight:
   enabled: true
+  # LA-2 B2：wired 由 reader 注入；runtime train_model 未接線（接線需 train-only provenance）
+  wired: false
   strategies:
     - time_decay
     - class_balance

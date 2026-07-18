@@ -249,18 +249,58 @@ class ModelEnhancementService:
             await asyncio.sleep(0.05)
 
     def _run_calibration(self, request: CalibrateRequest) -> Any:
+        """LA-2 B2：signal-facing 缺 CalibratorReceipt  provenance → fail-closed。"""
+        from momentum.core.contracts import ReceiptVerificationError
+
         payload = self._load_task_payload(request.model_task_id)
         calibrator = self.calibrator_factory(config=self._request_to_config(request))
+
+        train_plan = payload.get("train_plan")
+        calib_idx = payload.get("calib_idx")
+        model_artifact = payload.get("model_artifact")
+        # 統一 key：calibrator_receipt（envelope 或 receipt 物件）；禁自簽
+        receipt = payload.get("calibrator_receipt")
+        if receipt is None:
+            receipt = payload.get("calibrator_receipt_obj")  # legacy alias only for in-memory
+        # signal-facing：缺 split/artifact/receipt 即 fail-closed（非 warn、不自簽）
+        if train_plan is None or calib_idx is None or model_artifact is None:
+            raise ReceiptVerificationError(
+                "CalibratorReceipt required for signal-facing calibration "
+                "(missing train_plan/calib_idx/model_artifact in task payload)"
+            )
+        if receipt is None:
+            raise ReceiptVerificationError(
+                "CalibratorReceipt required for signal-facing calibration "
+                "(missing calibrator_receipt in task payload; no self-issue)"
+            )
+        # envelope dict → fields 重建 CalibratorReceipt
+        if isinstance(receipt, dict) and "fields" in receipt:
+            from momentum.core.contracts import CalibratorReceipt as _CalibR
+
+            fields = receipt["fields"]
+            receipt = _CalibR(
+                split_plan_hash=str(fields["split_plan_hash"]),
+                calib_idx_hash=str(fields["calib_idx_hash"]),
+                train_idx_hash=str(fields["train_idx_hash"]),
+                model_artifact_digest=str(fields["model_artifact_digest"]),
+                trusted_issuer=str(fields["trusted_issuer"]),
+            )
 
         y_true = payload.get("y_true")
         y_pred_proba = payload.get("y_pred_proba")
         if y_true is not None and y_pred_proba is not None:
-            return calibrator.fit_from_predictions(
+            result = calibrator.fit_from_predictions(
                 y_true=np.asarray(y_true),
                 y_pred_proba=np.asarray(y_pred_proba),
                 method=request.method,
                 cv=request.cv,
+                train_plan=train_plan,
+                calib_idx=calib_idx,
+                model_artifact=model_artifact,
+                receipt=receipt,
+                require_receipt=True,
             )
+            return result
 
         model = payload.get("model")
         X_cal = payload.get("X_cal")
@@ -272,6 +312,11 @@ class ModelEnhancementService:
                 y_cal=np.asarray(y_cal),
                 method=request.method,
                 cv=request.cv,
+                train_plan=train_plan,
+                calib_idx=calib_idx,
+                model_artifact=model_artifact,
+                receipt=receipt,
+                require_receipt=True,
             )
 
         return SkippedResult(

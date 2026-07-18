@@ -7,11 +7,13 @@ from domain-internal modules so that ``api/`` can depend on
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from enum import Enum
 from collections.abc import Callable, Iterable
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+import hashlib
+import json
 
 import numpy as np
 import pandas as pd
@@ -1107,3 +1109,971 @@ def derive_status(
     if failed_engines and present_engines > 0:
         return LayerStatus.engine_partial
     return LayerStatus.ok
+
+
+# ── LA-2 B2: OOF/OOT/Calibrator receipts + horizon OOT check (§0.6-APPENDIX) ──
+
+EvalScope = Literal["oot", "cv_oof", "in_sample_research_only"]
+
+# 後端 issuer allowlist（tamper-evident 誠實邊界，非密碼學防偽）
+TRUSTED_RECEIPT_ISSUERS: frozenset[str] = frozenset(
+    {
+        "xgboost_task_service",
+        "xgboost_batch_service",
+        "model_task_service",
+        "probability_calibrator",
+        "lightgbm_analyzer",
+        "xgboost_analyzer",
+        "test_issuer",
+    }
+)
+
+RECEIPT_ENVELOPE_VERSION = 1
+
+# §0.6-C 28-path eval_scope 閉集（service/analyzer 共用）
+MODEL_PERFORMANCE_EVAL_SCOPE: Dict[str, EvalScope] = {
+    "in_sample_train_auc": "in_sample_research_only",
+    "fit_pool_auc": "in_sample_research_only",
+    "overfitting_score": "in_sample_research_only",
+    "precision": "cv_oof",
+    "recall": "cv_oof",
+    "f1_score": "cv_oof",
+    "cv_auc_mean": "cv_oof",
+    "cv_auc_std": "cv_oof",
+    "oot_auc": "oot",
+    "calibration_curve": "cv_oof",
+    "brier_score": "cv_oof",
+    "ece": "cv_oof",
+    "pr_curve": "cv_oof",
+    "pr_auc": "cv_oof",
+    "precision_at_k": "oot",
+    "recommend_k": "oot",
+    "expectancy": "oot",
+    "sharpe_proxy": "oot",
+    "bootstrap_ci": "oot",
+    "predictions/train": "in_sample_research_only",
+    "predictions/oot": "oot",
+    "feature_importance": "in_sample_research_only",
+    "feature_importance_all": "in_sample_research_only",
+    "permutation_importance": "in_sample_research_only",
+    "fold_importance_stability": "cv_oof",
+    "shap_sample": "in_sample_research_only",
+    "regime_analysis": "in_sample_research_only",
+    "cross_symbol_validation": "in_sample_research_only",
+}
+
+# consumer deny for in_sample_research_only fields（promotion/signal 禁）
+EVAL_SCOPE_CONSUMER_DENY: frozenset[str] = frozenset(
+    {
+        "in_sample_train_auc",
+        "fit_pool_auc",
+        "overfitting_score",
+        "predictions/train",
+        "feature_importance",
+        "feature_importance_all",
+        "permutation_importance",
+        "shap_sample",
+        "regime_analysis",
+        "cross_symbol_validation",
+    }
+)
+
+OMITTED_METRIC = "OMITTED"
+
+
+class ReceiptVerificationError(ValueError):
+    """OOF/OOT/Calibrator receipt 驗證失敗（fail-closed）。"""
+
+
+class MetricsOmittedError(ValueError):
+    """缺 held-out 時 OOT 指標 OMITTED + deny（非 silent 全樣本）。"""
+
+
+def _require_1d_row_index(row_index: Any, *, where: str = "row_index") -> np.ndarray:
+    """row_index 必須 1-D（2-D 不可先 reshape 繞過 hash 身份）。"""
+    arr = np.asarray(row_index)
+    if arr.ndim != 1:
+        raise ValueError(
+            f"{where} must be 1-D (got ndim={arr.ndim}); "
+            "2-D input is rejected at factory and hash (no reshape(-1) bypass)"
+        )
+    return np.ascontiguousarray(arr, dtype="<i8")
+
+
+def _canonical_row_index_bytes(row_index: Any) -> bytes:
+    """canonical hash 用 row_index bytes：dtype '<i8'、1-D contiguous。"""
+    return _require_1d_row_index(row_index).tobytes()
+
+
+def _field_sha256(payload: bytes) -> bytes:
+    """單欄獨立 sha256 digest（32 bytes）。"""
+    return hashlib.sha256(payload).digest()
+
+
+def canonical_idx_hash(
+    row_index: Any,
+    *,
+    split_label: str = "",
+    symbol: str = "",
+    base_universe_hash: str = "",
+) -> str:
+    """idx/plan canonical sha256（禁 Python hash()；禁可撞 ``|`` 串接）。
+
+    逐欄獨立 sha256 再串接後外層 sha256，使 ``a|b,c`` ≠ ``a,b|c``。
+    """
+    # 逐欄獨立 digest 再串 — 不可用 b"|".join（delimiter 可撞）
+    concatenated = b"".join(
+        [
+            _field_sha256(_canonical_row_index_bytes(row_index)),
+            _field_sha256(str(split_label).encode()),
+            _field_sha256(str(symbol).encode()),
+            _field_sha256(str(base_universe_hash).encode()),
+        ]
+    )
+    return hashlib.sha256(concatenated).hexdigest()
+
+
+def canonical_split_plan_hash(plan: "SplitPlan") -> str:
+    """SplitPlan → split_plan_hash（含 label/symbol/universe 防撞）。"""
+    return canonical_idx_hash(
+        plan.row_index,
+        split_label=str(plan.split_label),
+        symbol=str(plan.symbol or ""),
+        base_universe_hash=str(plan.base_universe_hash),
+    )
+
+
+def model_artifact_digest(model_artifact: bytes) -> str:
+    """model_artifact_digest = sha256(artifact bytes)。"""
+    if not isinstance(model_artifact, (bytes, bytearray)):
+        raise TypeError("model_artifact must be bytes")
+    return hashlib.sha256(bytes(model_artifact)).hexdigest()
+
+
+def _canonical_json_bytes(obj: Any) -> bytes:
+    """canonical JSON bytes：sort_keys + compact separators。"""
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+
+
+def envelope_digest_for(
+    receipt_kind: Literal["oof", "oot", "calibrator"],
+    fields_dict: Dict[str, Any],
+    *,
+    version: int = RECEIPT_ENVELOPE_VERSION,
+) -> str:
+    """envelope_digest = sha256(canonical-JSON({kind,version,fields}))。"""
+    payload = {
+        "receipt_kind": receipt_kind,
+        "version": int(version),
+        "fields": fields_dict,
+    }
+    return hashlib.sha256(_canonical_json_bytes(payload)).hexdigest()
+
+
+def build_receipt_envelope(
+    receipt_kind: Literal["oof", "oot", "calibrator"],
+    receipt: Any,
+    *,
+    version: int = RECEIPT_ENVELOPE_VERSION,
+) -> Dict[str, Any]:
+    """serialization envelope（API/service 一律用此結構）。"""
+    fields_dict = asdict(receipt)
+    digest = envelope_digest_for(receipt_kind, fields_dict, version=version)
+    return {
+        "receipt_kind": receipt_kind,
+        "version": int(version),
+        "fields": fields_dict,
+        "envelope_digest": digest,
+    }
+
+
+@dataclass(frozen=True)
+class OofReceipt:
+    """OOF fold receipt（§0.6-A）。"""
+
+    split_plan_hash: str
+    fold_id: int
+    fit_idx_hash: str
+    eval_idx_hash: str
+    model_artifact_digest: str
+    trusted_issuer: str
+
+
+@dataclass(frozen=True)
+class OotReceipt:
+    """OOT receipt（§0.6-A；PatternOotReceipt 別名）。"""
+
+    split_plan_hash: str
+    fit_label_end: int
+    eval_start: int
+    horizon: int
+    embargo: int
+    model_artifact_digest: str
+    trusted_issuer: str
+
+
+# Task 3.2 晉升用同一結構
+PatternOotReceipt = OotReceipt
+
+
+@dataclass(frozen=True)
+class CalibratorReceipt:
+    """Calibrator receipt（無 fold/eval_idx；calib∩train=∅）。"""
+
+    split_plan_hash: str
+    calib_idx_hash: str
+    train_idx_hash: str
+    model_artifact_digest: str
+    trusted_issuer: str
+
+
+def _assert_trusted_issuer(issuer: str) -> None:
+    if issuer not in TRUSTED_RECEIPT_ISSUERS:
+        raise ReceiptVerificationError(
+            f"trusted_issuer {issuer!r} not in server allowlist"
+        )
+
+
+def _verify_envelope_step(
+    *,
+    receipt: Any,
+    receipt_kind: Literal["oof", "oot", "calibrator"],
+    envelope: Optional[Dict[str, Any]],
+) -> None:
+    """第④步：envelope 必填；比對 receipt_kind + version + fields（digest 涵蓋三者）。"""
+    if envelope is None:
+        raise ReceiptVerificationError(
+            f"{receipt_kind} envelope is required (None not allowed; step ④ fail-closed)"
+        )
+    if not isinstance(envelope, dict):
+        raise ReceiptVerificationError(f"{receipt_kind} envelope must be a dict")
+
+    if envelope.get("receipt_kind") != receipt_kind:
+        raise ReceiptVerificationError(
+            f"{receipt_kind} envelope receipt_kind mismatch: "
+            f"got {envelope.get('receipt_kind')!r}"
+        )
+    if int(envelope.get("version", -1)) != int(RECEIPT_ENVELOPE_VERSION):
+        raise ReceiptVerificationError(
+            f"{receipt_kind} envelope version mismatch: "
+            f"got {envelope.get('version')!r}, expected {RECEIPT_ENVELOPE_VERSION}"
+        )
+
+    fields_dict = asdict(receipt)
+    env_fields = envelope.get("fields")
+    if env_fields is None:
+        raise ReceiptVerificationError(f"{receipt_kind} envelope.fields is required")
+    if env_fields != fields_dict:
+        raise ReceiptVerificationError(
+            f"{receipt_kind} envelope.fields does not match receipt asdict"
+        )
+
+    expected = envelope_digest_for(
+        receipt_kind, fields_dict, version=int(envelope.get("version"))
+    )
+    if envelope.get("envelope_digest") != expected:
+        raise ReceiptVerificationError(f"{receipt_kind} envelope_digest mismatch")
+
+
+def verify_oof_receipt(
+    receipt: OofReceipt,
+    plan: "SplitPlan",
+    fit_idx: Any,
+    eval_idx: Any,
+    model_artifact: bytes,
+    *,
+    envelope: Optional[Dict[str, Any]] = None,
+) -> None:
+    """四步重算：artifact digest + idx/plan hash + fit∩eval=∅ + envelope（必填）。"""
+    _assert_trusted_issuer(receipt.trusted_issuer)
+
+    # ① artifact digest
+    expected_art = model_artifact_digest(model_artifact)
+    if receipt.model_artifact_digest != expected_art:
+        raise ReceiptVerificationError("OofReceipt model_artifact_digest mismatch")
+
+    # ② plan / idx hash 重算
+    plan_hash = canonical_split_plan_hash(plan)
+    if receipt.split_plan_hash != plan_hash:
+        raise ReceiptVerificationError("OofReceipt split_plan_hash mismatch")
+
+    fit_hash = canonical_idx_hash(
+        fit_idx,
+        split_label=str(plan.split_label),
+        symbol=str(plan.symbol or ""),
+        base_universe_hash=str(plan.base_universe_hash),
+    )
+    eval_hash = canonical_idx_hash(
+        eval_idx,
+        split_label=str(plan.split_label),
+        symbol=str(plan.symbol or ""),
+        base_universe_hash=str(plan.base_universe_hash),
+    )
+    if receipt.fit_idx_hash != fit_hash:
+        raise ReceiptVerificationError("OofReceipt fit_idx_hash mismatch")
+    if receipt.eval_idx_hash != eval_hash:
+        raise ReceiptVerificationError("OofReceipt eval_idx_hash mismatch")
+
+    # ③ disjointness
+    fit_set = set(_require_1d_row_index(fit_idx, where="fit_idx").astype(int).tolist())
+    eval_set = set(_require_1d_row_index(eval_idx, where="eval_idx").astype(int).tolist())
+    if fit_set & eval_set:
+        raise ReceiptVerificationError("OofReceipt fit_idx ∩ eval_idx must be empty")
+
+    # ④ envelope 必填：kind + version + fields + digest
+    _verify_envelope_step(receipt=receipt, receipt_kind="oof", envelope=envelope)
+
+
+def verify_oot_receipt(
+    receipt: OotReceipt,
+    train_plan: "SplitPlan",
+    eval_plan: "SplitPlan",
+    horizon: int,
+    model_artifact: bytes,
+    *,
+    envelope: Optional[Dict[str, Any]] = None,
+    bar_duration: Optional[Any] = None,
+    ts: Optional[np.ndarray] = None,
+) -> None:
+    """四步重算：artifact + plan hash + horizon 嚴格 < + envelope（必填）。
+
+    另經 ``validate_oot_label_horizon``：跨 symbol→CrossSymbolLeakageError；
+    train→eval time_bounds gap→TimestampDiscontinuityError（B2-05）。
+    """
+    _assert_trusted_issuer(receipt.trusted_issuer)
+
+    # ① artifact
+    expected_art = model_artifact_digest(model_artifact)
+    if receipt.model_artifact_digest != expected_art:
+        raise ReceiptVerificationError("OotReceipt model_artifact_digest mismatch")
+
+    # ② plan hash（train plan）
+    plan_hash = canonical_split_plan_hash(train_plan)
+    if receipt.split_plan_hash != plan_hash:
+        raise ReceiptVerificationError("OotReceipt split_plan_hash mismatch")
+
+    if int(receipt.horizon) != int(horizon):
+        raise ReceiptVerificationError("OotReceipt horizon mismatch")
+
+    train_rows = _require_1d_row_index(train_plan.row_index, where="train_plan.row_index")
+    eval_rows = _require_1d_row_index(eval_plan.row_index, where="eval_plan.row_index")
+    if train_rows.size == 0 or eval_rows.size == 0:
+        raise ReceiptVerificationError("OotReceipt train/eval row_index must be non-empty")
+
+    fit_label_end = int(train_rows.max()) + int(horizon)
+    eval_start = int(eval_rows.min())
+    embargo = int(receipt.embargo)
+    if receipt.fit_label_end != fit_label_end:
+        raise ReceiptVerificationError("OotReceipt fit_label_end mismatch")
+    if receipt.eval_start != eval_start:
+        raise ReceiptVerificationError("OotReceipt eval_start mismatch")
+
+    # ③ horizon 嚴格 <（+ disjointness of row sets as safety）
+    if not (fit_label_end + embargo < eval_start):
+        raise ReceiptVerificationError(
+            f"OotReceipt horizon boundary failed: "
+            f"fit_label_end({fit_label_end})+embargo({embargo}) < eval_start({eval_start}) is False"
+        )
+    if set(train_rows.astype(int).tolist()) & set(eval_rows.astype(int).tolist()):
+        raise ReceiptVerificationError("OotReceipt train∩eval row_index must be empty")
+
+    # also re-run public horizon validator for timestamp branch consistency
+    validate_oot_label_horizon(
+        train_plan,
+        eval_plan,
+        horizon,
+        bar_duration=bar_duration,
+        ts=ts,
+        embargo=embargo,
+    )
+
+    # ④ envelope 必填
+    _verify_envelope_step(receipt=receipt, receipt_kind="oot", envelope=envelope)
+
+
+def verify_calibrator_receipt(
+    receipt: CalibratorReceipt,
+    train_plan: "SplitPlan",
+    calib_idx: Any,
+    model_artifact: bytes,
+    *,
+    envelope: Optional[Dict[str, Any]] = None,
+) -> None:
+    """四步重算：artifact + hashes + calib∩train=∅ + envelope（必填）。"""
+    _assert_trusted_issuer(receipt.trusted_issuer)
+
+    # ① artifact
+    expected_art = model_artifact_digest(model_artifact)
+    if receipt.model_artifact_digest != expected_art:
+        raise ReceiptVerificationError("CalibratorReceipt model_artifact_digest mismatch")
+
+    # ② plan / idx hashes
+    plan_hash = canonical_split_plan_hash(train_plan)
+    if receipt.split_plan_hash != plan_hash:
+        raise ReceiptVerificationError("CalibratorReceipt split_plan_hash mismatch")
+
+    train_hash = canonical_idx_hash(
+        train_plan.row_index,
+        split_label=str(train_plan.split_label),
+        symbol=str(train_plan.symbol or ""),
+        base_universe_hash=str(train_plan.base_universe_hash),
+    )
+    calib_hash = canonical_idx_hash(
+        calib_idx,
+        split_label="calib",
+        symbol=str(train_plan.symbol or ""),
+        base_universe_hash=str(train_plan.base_universe_hash),
+    )
+    if receipt.train_idx_hash != train_hash:
+        raise ReceiptVerificationError("CalibratorReceipt train_idx_hash mismatch")
+    if receipt.calib_idx_hash != calib_hash:
+        raise ReceiptVerificationError("CalibratorReceipt calib_idx_hash mismatch")
+
+    # ③ disjointness
+    train_set = set(
+        _require_1d_row_index(train_plan.row_index, where="train_plan.row_index")
+        .astype(int)
+        .tolist()
+    )
+    calib_set = set(_require_1d_row_index(calib_idx, where="calib_idx").astype(int).tolist())
+    if train_set & calib_set:
+        raise ReceiptVerificationError(
+            "CalibratorReceipt calib_idx ∩ train_plan.row_index must be empty"
+        )
+
+    # ④ envelope 必填
+    _verify_envelope_step(receipt=receipt, receipt_kind="calibrator", envelope=envelope)
+
+
+def _assert_oot_train_eval_same_symbol(
+    train_plan: "SplitPlan",
+    eval_plan: "SplitPlan",
+) -> None:
+    """OOT train/eval 必須同 symbol；跨 symbol → CrossSymbolLeakageError。"""
+    t_sym = train_plan.symbol
+    e_sym = eval_plan.symbol
+    if t_sym is None and e_sym is None:
+        return
+    if t_sym is None or e_sym is None:
+        raise CrossSymbolLeakageError(
+            "train/eval SplitPlan symbols must both be set or both None"
+        )
+    if _normalize_symbol_value(t_sym) != _normalize_symbol_value(e_sym):
+        raise CrossSymbolLeakageError(
+            "train/eval SplitPlan symbols must match (cross-symbol OOT blocked)"
+        )
+
+
+def _is_datetime_time_bound(value: Any) -> bool:
+    """time_bounds 元素是否為可解析的 datetime（非純數值 ordinal）。"""
+    if value is None:
+        return False
+    if isinstance(value, (pd.Timestamp, np.datetime64)):
+        return True
+    if isinstance(value, datetime):
+        return True
+    if isinstance(value, str):
+        try:
+            return not pd.isna(pd.Timestamp(value))
+        except (TypeError, ValueError, pd.errors.OutOfBoundsDatetime):
+            return False
+    return False
+
+
+def _assert_oot_train_eval_time_bounds_continuity(
+    train_plan: "SplitPlan",
+    eval_plan: "SplitPlan",
+    train_rows: np.ndarray,
+    eval_rows: np.ndarray,
+) -> None:
+    """即使 row 空間 strict < 成立，train 尾→eval 首 time_bounds 不連續/跨界仍 raise。
+
+    使用 SplitPlan.time_bounds + expected_freq 對照 row_gap：
+    - datetime bounds：actual Δt 必須 ≈ row_gap * expected_freq
+    - 數值 ordinal bounds：bound_gap 必須 == row_gap
+    time_bounds 缺端點則跳過（相容舊 synthetic plan）。
+    """
+    tb_t = train_plan.time_bounds
+    tb_e = eval_plan.time_bounds
+    if tb_t is None or tb_e is None:
+        return
+    if len(tb_t) < 2 or len(tb_e) < 2:
+        return
+    train_end, eval_start = tb_t[1], tb_e[0]
+    if train_end is None or eval_start is None:
+        return
+
+    row_gap = int(eval_rows.min()) - int(train_rows.max())
+
+    if _is_datetime_time_bound(train_end) or _is_datetime_time_bound(eval_start):
+        try:
+            te = pd.Timestamp(train_end)
+            es = pd.Timestamp(eval_start)
+        except (TypeError, ValueError, pd.errors.OutOfBoundsDatetime) as exc:
+            raise TimestampDiscontinuityError(
+                "OOT time_bounds train_end/eval_start not parseable as timestamps"
+            ) from exc
+        if pd.isna(te) or pd.isna(es):
+            raise TimestampDiscontinuityError("OOT time_bounds contain NaT")
+        if es <= te:
+            raise TimestampDiscontinuityError(
+                "OOT time_bounds: eval_start must be after train_end"
+            )
+        freq = train_plan.expected_freq or eval_plan.expected_freq
+        if freq is None:
+            raise TimestampDiscontinuityError(
+                "OOT time_bounds datetime gap check requires expected_freq"
+            )
+        if row_gap <= 0:
+            raise TimestampDiscontinuityError(
+                "OOT time_bounds/row_index inconsistent (non-positive row gap)"
+            )
+        expected_delta = row_gap * pd.Timedelta(freq)
+        actual_delta = es - te
+        tol = max(pd.Timedelta(freq) * 0.05, pd.Timedelta(nanoseconds=1))
+        if abs(actual_delta - expected_delta) > tol:
+            raise TimestampDiscontinuityError(
+                "train→eval timestamp gap discontinuous/cross-boundary: "
+                f"actual={actual_delta}, expected_from_rows≈{expected_delta} "
+                f"(row_gap={row_gap}, freq={freq})"
+            )
+        return
+
+    # 數值 ordinal bounds（build_train_oot_split_plans 等）
+    try:
+        te_n = float(train_end)
+        es_n = float(eval_start)
+    except (TypeError, ValueError):
+        return
+    bound_gap = es_n - te_n
+    if abs(bound_gap - float(row_gap)) > 1e-9:
+        raise TimestampDiscontinuityError(
+            f"train→eval time_bounds gap ({bound_gap}) != row gap ({row_gap})"
+        )
+
+
+def validate_oot_label_horizon(
+    train_plan: "SplitPlan",
+    eval_plan: "SplitPlan",
+    horizon: int,
+    bar_duration: Optional[Any] = None,
+    ts: Optional[np.ndarray] = None,
+    *,
+    embargo: Optional[int] = None,
+) -> None:
+    """horizon-aware OOT 邊界（嚴格 <）。
+
+    row 空間：fit_label_end(=max(train.row_index)+horizon)+embargo < min(eval.row_index)
+    timestamp 分支：max(fit_ts)+(horizon+embargo)*bar_duration < min(eval_ts)；
+    缺 bar_duration / expected_freq / gap(discontinuity) → raise（禁 fallback row）。
+
+    另（B2-05）：
+    - train_plan.symbol != eval_plan.symbol → CrossSymbolLeakageError
+    - train 尾→eval 首 time_bounds 不連續/跨界（即使 strict <）→ TimestampDiscontinuityError
+    """
+    if int(horizon) < 0:
+        raise SplitPairLeakageError("horizon must be non-negative")
+
+    train_rows = np.asarray(train_plan.row_index, dtype=int)
+    eval_rows = np.asarray(eval_plan.row_index, dtype=int)
+    if train_rows.size == 0 or eval_rows.size == 0:
+        raise SplitPairLeakageError("train/eval row_index must be non-empty for OOT horizon")
+
+    # B2-05：跨 symbol 一律擋（先於 horizon，fail-closed）
+    _assert_oot_train_eval_same_symbol(train_plan, eval_plan)
+
+    emb = int(embargo if embargo is not None else max(int(eval_plan.embargo), 0))
+    fit_label_end = int(train_rows.max()) + int(horizon)
+    eval_start = int(eval_rows.min())
+
+    index_kind = str(train_plan.index_kind)
+    if index_kind == "timestamp":
+        # hard-fail (U8): 缺 bar_duration / expected_freq / ts → raise
+        if bar_duration is None:
+            raise SplitPairLeakageError(
+                "timestamp OOT requires bar_duration (no fallback to row check)"
+            )
+        if train_plan.expected_freq is None and eval_plan.expected_freq is None:
+            raise SplitPairLeakageError(
+                "timestamp OOT requires expected_freq on train or eval plan"
+            )
+        if ts is None:
+            raise SplitPairLeakageError(
+                "timestamp OOT requires ts array for discontinuity check"
+            )
+        ts_arr = _coerce_timestamp_array(ts)
+        if np.any(train_rows < 0) or np.any(train_rows >= len(ts_arr)):
+            raise IndexError("train_plan.row_index outside ts")
+        if np.any(eval_rows < 0) or np.any(eval_rows >= len(ts_arr)):
+            raise IndexError("eval_plan.row_index outside ts")
+        fit_ts = ts_arr[train_rows]
+        eval_ts = ts_arr[eval_rows]
+        if fit_ts.size > 1:
+            diffs = np.diff(fit_ts)
+            if np.any(diffs <= np.timedelta64(0, "ns")):
+                raise TimestampDiscontinuityError(
+                    "timestamp OOT: fit timestamps not strictly increasing"
+                )
+            expected_delta = pd.Timedelta(
+                train_plan.expected_freq or eval_plan.expected_freq
+            )
+            max_gap = pd.Timedelta(np.max(diffs))
+            if max_gap > expected_delta * 1.05:
+                raise TimestampDiscontinuityError(
+                    "timestamp OOT: discontinuity/gap exceeds expected_freq"
+                )
+        # bar_duration: accept Timedelta / str / numeric seconds
+        if isinstance(bar_duration, (int, float, np.integer, np.floating)):
+            bd = pd.Timedelta(seconds=float(bar_duration))
+        else:
+            bd = pd.Timedelta(bar_duration)
+        fit_end_ts = pd.Timestamp(fit_ts.max()) + (int(horizon) + emb) * bd
+        eval_start_ts = pd.Timestamp(eval_ts.min())
+        if not (fit_end_ts < eval_start_ts):
+            raise SplitPairLeakageError(
+                f"timestamp OOT boundary failed: "
+                f"max(fit_ts)+(horizon+embargo)*bar_duration={fit_end_ts} "
+                f"< min(eval_ts)={eval_start_ts} is False"
+            )
+        # B2-05：time_bounds 跨界/gap（即使 ts[rows] strict < 已過）
+        _assert_oot_train_eval_time_bounds_continuity(
+            train_plan, eval_plan, train_rows, eval_rows
+        )
+        return
+
+    # row / positional / row_id 空間：嚴格 <
+    if not (fit_label_end + emb < eval_start):
+        raise SplitPairLeakageError(
+            f"OOT label-horizon boundary failed: "
+            f"fit_label_end({fit_label_end})+embargo({emb}) < eval_start({eval_start}) "
+            f"is False (strict <; equality is leakage)"
+        )
+    # B2-05：time_bounds gap（即使 strict < 成立）
+    _assert_oot_train_eval_time_bounds_continuity(
+        train_plan, eval_plan, train_rows, eval_rows
+    )
+
+
+def make_oot_receipt(
+    train_plan: "SplitPlan",
+    eval_plan: "SplitPlan",
+    horizon: int,
+    model_artifact: bytes,
+    *,
+    trusted_issuer: str,
+    embargo: Optional[int] = None,
+) -> OotReceipt:
+    """產 OotReceipt（先 validate_oot_label_horizon；row_index 必須 1-D）。"""
+    _require_1d_row_index(train_plan.row_index, where="train_plan.row_index")
+    _require_1d_row_index(eval_plan.row_index, where="eval_plan.row_index")
+    emb = int(embargo if embargo is not None else max(int(eval_plan.embargo), 0))
+    validate_oot_label_horizon(train_plan, eval_plan, horizon, embargo=emb)
+    train_rows = np.asarray(train_plan.row_index, dtype=int)
+    eval_rows = np.asarray(eval_plan.row_index, dtype=int)
+    return OotReceipt(
+        split_plan_hash=canonical_split_plan_hash(train_plan),
+        fit_label_end=int(train_rows.max()) + int(horizon),
+        eval_start=int(eval_rows.min()),
+        horizon=int(horizon),
+        embargo=emb,
+        model_artifact_digest=model_artifact_digest(model_artifact),
+        trusted_issuer=trusted_issuer,
+    )
+
+
+def make_oof_receipt(
+    plan: "SplitPlan",
+    fold_id: int,
+    fit_idx: Any,
+    eval_idx: Any,
+    model_artifact: bytes,
+    *,
+    trusted_issuer: str,
+) -> OofReceipt:
+    """產 OofReceipt（fit∩eval 必須空；2-D idx → raise，禁 reshape 繞過）。"""
+    fit_arr = _require_1d_row_index(fit_idx, where="fit_idx").astype(int)
+    eval_arr = _require_1d_row_index(eval_idx, where="eval_idx").astype(int)
+    if set(fit_arr.tolist()) & set(eval_arr.tolist()):
+        raise ReceiptVerificationError("cannot make OofReceipt with overlapping fit/eval")
+    return OofReceipt(
+        split_plan_hash=canonical_split_plan_hash(plan),
+        fold_id=int(fold_id),
+        fit_idx_hash=canonical_idx_hash(
+            fit_arr,
+            split_label=str(plan.split_label),
+            symbol=str(plan.symbol or ""),
+            base_universe_hash=str(plan.base_universe_hash),
+        ),
+        eval_idx_hash=canonical_idx_hash(
+            eval_arr,
+            split_label=str(plan.split_label),
+            symbol=str(plan.symbol or ""),
+            base_universe_hash=str(plan.base_universe_hash),
+        ),
+        model_artifact_digest=model_artifact_digest(model_artifact),
+        trusted_issuer=trusted_issuer,
+    )
+
+
+def make_calibrator_receipt(
+    train_plan: "SplitPlan",
+    calib_idx: Any,
+    model_artifact: bytes,
+    *,
+    trusted_issuer: str,
+) -> CalibratorReceipt:
+    """產 CalibratorReceipt（calib∩train 必須空；2-D idx → raise）。"""
+    train_arr = _require_1d_row_index(train_plan.row_index, where="train_plan.row_index")
+    train_set = set(train_arr.astype(int).tolist())
+    calib_arr = _require_1d_row_index(calib_idx, where="calib_idx").astype(int)
+    if train_set & set(calib_arr.tolist()):
+        raise ReceiptVerificationError(
+            "cannot make CalibratorReceipt with calib∩train overlap"
+        )
+    return CalibratorReceipt(
+        split_plan_hash=canonical_split_plan_hash(train_plan),
+        calib_idx_hash=canonical_idx_hash(
+            calib_arr,
+            split_label="calib",
+            symbol=str(train_plan.symbol or ""),
+            base_universe_hash=str(train_plan.base_universe_hash),
+        ),
+        train_idx_hash=canonical_idx_hash(
+            train_plan.row_index,
+            split_label=str(train_plan.split_label),
+            symbol=str(train_plan.symbol or ""),
+            base_universe_hash=str(train_plan.base_universe_hash),
+        ),
+        model_artifact_digest=model_artifact_digest(model_artifact),
+        trusted_issuer=trusted_issuer,
+    )
+
+
+def build_train_oot_split_plans(
+    n_samples: int,
+    *,
+    oot_ratio: float = 0.2,
+    horizon: int = 1,
+    embargo: int = 0,
+    purge_gap: int = 0,
+    symbol: Optional[str] = None,
+    base_universe_hash: str = "service_run",
+    index_kind: Literal["timestamp", "positional", "row_id"] = "positional",
+    expected_freq: Optional[str] = None,
+    min_oot_samples: int = 10,
+    min_train_samples: int = 20,
+) -> Optional[Tuple["SplitPlan", "SplitPlan"]]:
+    """依時間序切 train/OOT SplitPlan（嚴格 horizon 邊界）。
+
+    有足夠 held-out 時回傳 (train_plan, oot_plan)；不足則 None（caller OMIT）。
+    eval 起點 = train_end + horizon + embargo + 1（保證 fit_label_end+embargo < eval_start）。
+    """
+    if n_samples <= 0 or oot_ratio <= 0.0 or oot_ratio >= 1.0:
+        return None
+    n_oot_target = max(int(np.floor(n_samples * float(oot_ratio))), int(min_oot_samples))
+    if n_oot_target >= n_samples:
+        return None
+    # 預留 horizon+embargo gap 於 train 與 oot 之間
+    gap = int(horizon) + int(embargo) + 1
+    # oot 起於 n_samples - n_oot；train 終於 oot_start - gap
+    oot_start = n_samples - n_oot_target
+    train_end_exclusive = oot_start - gap + 1  # train rows [0, train_end_exclusive)
+    # max(train)=train_end_exclusive-1; fit_label_end=(train_end-1)+horizon
+    # 需 fit_label_end + embargo < oot_start
+    # → train_end_exclusive - 1 + horizon + embargo < oot_start
+    # → train_end_exclusive <= oot_start - horizon - embargo
+    # with gap = h+e+1: train_end = oot_start - gap + 1 = oot_start - h - e
+    # max train = oot_start - h - e - 1; fit_end+emb = oot_start - 1 < oot_start ✓
+    if train_end_exclusive < int(min_train_samples):
+        return None
+    if oot_start >= n_samples or train_end_exclusive <= 0:
+        return None
+
+    train_rows = np.arange(0, train_end_exclusive, dtype=int)
+    oot_rows = np.arange(oot_start, n_samples, dtype=int)
+    if train_rows.size < int(min_train_samples) or oot_rows.size < int(min_oot_samples):
+        return None
+
+    universe = base_universe_hash or "service_run"
+    train_plan = SplitPlan(
+        split_label="train",
+        index_kind=index_kind,
+        row_index=train_rows,
+        time_bounds=(int(train_rows.min()), int(train_rows.max())),
+        purge_gap=int(purge_gap),
+        embargo=int(embargo),
+        purge_semantic="rows",
+        expected_freq=expected_freq,
+        base_universe_hash=universe,
+        symbol=symbol,
+    )
+    oot_plan = SplitPlan(
+        split_label="test",
+        index_kind=index_kind,
+        row_index=oot_rows,
+        time_bounds=(int(oot_rows.min()), int(oot_rows.max())),
+        purge_gap=int(purge_gap),
+        embargo=int(embargo),
+        purge_semantic="rows",
+        expected_freq=expected_freq,
+        base_universe_hash=universe,
+        symbol=symbol,
+    )
+    # 預先驗證；失敗則視為無可用 OOT
+    try:
+        validate_oot_label_horizon(train_plan, oot_plan, horizon, embargo=embargo)
+    except (
+        SplitPairLeakageError,
+        CrossSymbolLeakageError,
+        TimestampDiscontinuityError,
+        ValueError,
+        IndexError,
+    ):
+        return None
+    return train_plan, oot_plan
+
+
+# ── Factor discriminated union（B2 建型別；B3 接線）──────────────────────────
+
+
+@dataclass(frozen=True)
+class OrthogonalizationPayload:
+    method: str
+    orthogonalized_hash: str
+    summary: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ExposurePayload:
+    proxy_kind: Literal["trailing_close_ret"]
+    exposure_hash: str
+    summary: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class FactorModuleResult:
+    """C-3 loud factor result（discriminated union）。"""
+
+    module: Literal["orthogonalization", "exposure"]
+    oos_guarantees: Literal[False]
+    fit_scope: Literal["full_sample"]
+    payload: Union[OrthogonalizationPayload, ExposurePayload]
+
+    def __post_init__(self) -> None:
+        if self.oos_guarantees is not False:
+            raise ValueError("FactorModuleResult.oos_guarantees must be False")
+        if self.fit_scope != "full_sample":
+            raise ValueError("FactorModuleResult.fit_scope must be 'full_sample'")
+        if self.module == "orthogonalization" and not isinstance(
+            self.payload, OrthogonalizationPayload
+        ):
+            raise ValueError("module=orthogonalization requires OrthogonalizationPayload")
+        if self.module == "exposure" and not isinstance(self.payload, ExposurePayload):
+            raise ValueError("module=exposure requires ExposurePayload")
+
+
+def deny_factor_in_ok_oos(report: Dict[str, Any]) -> None:
+    """root analysis_status==ok_oos 且 factor/diagnostic loud 存在 → raise。
+
+    B3 consumer/export/persist 出口呼叫；B2 只建型別與 verifier。
+    亦掃 nested ``diagnostic_only`` / ``signal_use_denied``（U18 adversarial）。
+    """
+    if not isinstance(report, dict):
+        return
+    root_status = report.get("analysis_status")
+    if root_status != "ok_oos":
+        return
+
+    def _walk(node: Any, *, is_root: bool = False) -> None:
+        if isinstance(node, FactorModuleResult):
+            raise ValueError(
+                "deny_factor_in_ok_oos: FactorModuleResult present under ok_oos"
+            )
+        if isinstance(node, dict):
+            # nested diagnostic_only / signal_use_denied under ok_oos → deny signal
+            if not is_root and (
+                node.get("signal_use_denied") is True
+                or node.get("diagnostic_only") is True
+                or node.get("analysis_status") == "diagnostic_only"
+            ):
+                raise ValueError(
+                    "deny_factor_in_ok_oos: diagnostic_only/signal_use_denied under ok_oos"
+                )
+            # raw dict 亦 deny（掃 oos_guarantees 鍵 / module factor）
+            if (
+                "oos_guarantees" in node
+                and node.get("oos_guarantees") is False
+                and node.get("fit_scope") == "full_sample"
+                and node.get("module") in {"orthogonalization", "exposure"}
+            ):
+                raise ValueError(
+                    "deny_factor_in_ok_oos: factor loud dict present under ok_oos"
+                )
+            for value in node.values():
+                _walk(value, is_root=False)
+        elif isinstance(node, (list, tuple)):
+            for item in node:
+                _walk(item, is_root=False)
+
+    _walk(report, is_root=True)
+
+
+def build_eval_scope_map(keys: Optional[Iterable[str]] = None) -> Dict[str, str]:
+    """回傳欄位→eval_scope 對照（供 model_performance 掛 eval_scope）。
+
+    B2-06：keys 中任一不在 §0.6-C 28-path 閉集 → fail-closed raise（禁靜默省略）。
+    """
+    if keys is None:
+        return dict(MODEL_PERFORMANCE_EVAL_SCOPE)
+    out: Dict[str, str] = {}
+    unknown: List[str] = []
+    for k in keys:
+        key = str(k)
+        if key not in MODEL_PERFORMANCE_EVAL_SCOPE:
+            unknown.append(key)
+            continue
+        out[key] = MODEL_PERFORMANCE_EVAL_SCOPE[key]
+    if unknown:
+        raise ValueError(
+            "unknown eval_scope metric(s) not in 28-path canonical set: "
+            + ", ".join(unknown)
+        )
+    return out
+
+
+def tag_model_performance_scopes(performance: Dict[str, Any]) -> Dict[str, Any]:
+    """為 model_performance dict 掛 eval_scope 子表 + consumer_deny 清單。
+
+    eval_scope 只含 28-path 閉集；若呼叫端把 unlisted metric 塞進既有
+    ``eval_scope`` 子表 → fail-closed（B2-06 service 不得保留 unlisted field）。
+    """
+    out = dict(performance)
+    # B2-06：既有 eval_scope 若含非 canonical field → raise（禁靜默保留）
+    prior_scope = out.get("eval_scope")
+    if isinstance(prior_scope, dict):
+        unknown_prior = [
+            str(k) for k in prior_scope.keys() if str(k) not in MODEL_PERFORMANCE_EVAL_SCOPE
+        ]
+        if unknown_prior:
+            raise ValueError(
+                "unknown eval_scope metric(s) not in 28-path canonical set: "
+                + ", ".join(unknown_prior)
+            )
+    present = [k for k in out.keys() if k in MODEL_PERFORMANCE_EVAL_SCOPE]
+    # nested predictions
+    preds = out.get("predictions")
+    if isinstance(preds, dict):
+        for sub in ("train", "oot"):
+            path = f"predictions/{sub}"
+            if sub in preds and path in MODEL_PERFORMANCE_EVAL_SCOPE:
+                present.append(path)
+    out["eval_scope"] = {k: MODEL_PERFORMANCE_EVAL_SCOPE[k] for k in present}
+    out["consumer_deny"] = sorted(
+        k for k in present if k in EVAL_SCOPE_CONSUMER_DENY or (
+            k in MODEL_PERFORMANCE_EVAL_SCOPE
+            and MODEL_PERFORMANCE_EVAL_SCOPE[k] == "in_sample_research_only"
+        )
+    )
+    return out

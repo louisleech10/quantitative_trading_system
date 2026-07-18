@@ -50,7 +50,21 @@ def test_pattern_extraction():
     analyzer = XGBoostAnalyzer()
     analyzer.train_model(X, y)
     
-    # 提取規則
+    # 提取規則（LA-2 B3：必填 train SplitPlan）
+    from momentum.core.contracts import SplitPlan
+
+    train_plan = SplitPlan(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.arange(0, int(0.8 * n_samples), dtype=int),
+        time_bounds=(None, None),
+        purge_gap=0,
+        embargo=0,
+        purge_semantic="rows",
+        expected_freq=None,
+        base_universe_hash="test_pattern_extractor",
+        symbol="TEST",
+    )
     extractor = PatternExtractor()
     rules = extractor.extract_decision_rules(
         model=analyzer.model,
@@ -58,7 +72,8 @@ def test_pattern_extraction():
         y=y,
         feature_names=X.columns.tolist(),
         top_n=10,
-        min_support=10
+        min_support=10,
+        split=train_plan,
     )
     
     logger.info(f"提取到 {len(rules)} 條規則")

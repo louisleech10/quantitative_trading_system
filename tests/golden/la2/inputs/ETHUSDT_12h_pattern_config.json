@@ -1,0 +1,6 @@
+{
+  "caller": "PatternExtractor.extract_decision_rules",
+  "face": "pattern",
+  "note": "legacy full-sample quantiles + y[mask].mean confidence",
+  "split": null
+}
