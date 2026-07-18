@@ -344,12 +344,12 @@ def test_wash_mutation_rejects(wash_case: str, allowlist: dict) -> None:
 
 
 def test_la2_skeleton_nodeid_contract() -> None:
-    """B0-F5：EXPECTED_NODEIDS 恰 12；module 內 test_* == 契約（非人工 --collect-only）。"""
+    """B0-F5：EXPECTED_NODEIDS 恰 N（B42=13）；module 內 test_* == 契約（非人工 --collect-only）。"""
     import tests.momentum.test_la2_lookahead as skel
 
-    assert skel.EXPECTED_NODEID_COUNT == 12
-    assert len(skel.EXPECTED_NODEIDS) == 12
-    assert len(set(skel.EXPECTED_NODEIDS)) == 12
+    assert skel.EXPECTED_NODEID_COUNT == 13
+    assert len(skel.EXPECTED_NODEIDS) == 13
+    assert len(set(skel.EXPECTED_NODEIDS)) == 13
     declared = sorted(
         n
         for n in dir(skel)

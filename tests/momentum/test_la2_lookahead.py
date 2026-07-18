@@ -1,14 +1,15 @@
-"""LA-2 M-lookahead 測試（B0 骨架 12 nodeid；B1–B4 mutation 全套）。
+"""LA-2 M-lookahead 測試（B0 骨架 + B1–B4 mutation + B42 DOUBT-1）。
 
 SPEC: docs/IC_LA2_SPEC.md
 TODO: docs/IC_LA2_TODO.md Task 0.3 / 1–3.* / 4.1
 
-collect == 12（0 skip / 0 xfail）:
+collect == 13（0 skip / 0 xfail）:
   - test_winsorized_disabled          ← B1 C-1 raise（非 flip）
   - test_model_oot_contract           ← B2 軌2 provenance（OOT 嚴格 < / OOF digest）
   - test_model_service_oot            ← B2/B4 全矩陣 scope + cross_symbol deny
   - test_config_theater               ← B2
   - test_calibrator_receipt           ← B2
+  - test_verify_oot_receipt_equality_boundary  ← B42 DOUBT-1 等號邊界
   - test_pattern_train_mask           ← B3/B4 C-2 early flip 改前>0 改後=0
   - test_pattern_promotion_guard      ← B3 C-2 晉升 provenance
   - test_plan_identity_mismatch       ← B3
@@ -40,14 +41,15 @@ from momentum.FeatureEngineering.labels.label_generator import (
 )
 from momentum.factories import create_label_generator
 
-# 契約：恰 12 nodeid（--collect-only 驗收）
-EXPECTED_NODEID_COUNT = 12
+# 契約：恰 13 nodeid（--collect-only 驗收；B42 +1 equality boundary）
+EXPECTED_NODEID_COUNT = 13
 EXPECTED_NODEIDS = (
     "test_winsorized_disabled",
     "test_model_oot_contract",
     "test_model_service_oot",
     "test_config_theater",
     "test_calibrator_receipt",
+    "test_verify_oot_receipt_equality_boundary",
     "test_pattern_train_mask",
     "test_pattern_promotion_guard",
     "test_plan_identity_mismatch",
@@ -517,6 +519,66 @@ def test_model_oot_contract() -> None:
     assert lperf.eval_scope is not None
     assert lperf.eval_scope.get("brier_score") == "cv_oof"
     assert lperf.oot_status == "OMITTED"
+
+
+def test_verify_oot_receipt_equality_boundary() -> None:
+    """B42 DOUBT-1：verify_oot_receipt 等號邊界必須 ReceiptVerificationError。
+
+    構造合法欄位 OotReceipt，但 fit_label_end+embargo == eval_start
+    （row-set disjoint、label 空間重疊 1 根）。必須 raise ReceiptVerificationError
+    （match horizon boundary）——不可只靠 validate_oot_label_horizon 的
+    SplitPairLeakageError，否則 contracts.py:1474 ``<``→``<=`` 後本測仍綠。
+
+    可證偽：mutate 1474 ``<``→``<=`` → 本測 FAIL；restore 後 PASS。
+    """
+    from momentum.core.contracts import (
+        OotReceipt,
+        ReceiptVerificationError,
+        build_receipt_envelope,
+        canonical_split_plan_hash,
+        model_artifact_digest,
+        verify_oot_receipt,
+    )
+
+    # train max=96 + h=5 → fit_label_end=101；eval_start=101；embargo=0
+    # row-set disjoint（0..96 vs 101..119）但 label 等號邊界
+    train = _make_split_plan(np.arange(0, 97), label="train", embargo=0)
+    eval_eq = _make_split_plan(np.arange(101, 120), label="test", embargo=0)
+    horizon = 5
+    embargo = 0
+    artifact = b"oot-eq-boundary-artifact-v1"
+    fit_label_end = int(np.asarray(train.row_index).max()) + horizon  # 101
+    eval_start = int(np.asarray(eval_eq.row_index).min())  # 101
+    assert fit_label_end + embargo == eval_start, (
+        f"counterexample must be equality: "
+        f"{fit_label_end}+{embargo}=={eval_start}"
+    )
+    train_set = set(np.asarray(train.row_index, dtype=int).tolist())
+    eval_set = set(np.asarray(eval_eq.row_index, dtype=int).tolist())
+    assert not (train_set & eval_set), "row-sets must be disjoint (label-only overlap)"
+
+    # 合法欄位（hash/digest 對齊）但等號邊界——繞過 make_oot_receipt（factory 先擋）
+    receipt = OotReceipt(
+        split_plan_hash=canonical_split_plan_hash(train),
+        fit_label_end=fit_label_end,
+        eval_start=eval_start,
+        horizon=horizon,
+        embargo=embargo,
+        model_artifact_digest=model_artifact_digest(artifact),
+        trusted_issuer="xgboost_task_service",
+    )
+    env = build_receipt_envelope("oot", receipt)
+
+    # 必須是 ReceiptVerificationError@1474，非 SplitPairLeakageError@validate
+    with pytest.raises(ReceiptVerificationError, match="horizon boundary"):
+        verify_oot_receipt(
+            receipt,
+            train,
+            eval_eq,
+            horizon=horizon,
+            model_artifact=artifact,
+            envelope=env,
+        )
 
 
 def test_model_service_oot() -> None:
