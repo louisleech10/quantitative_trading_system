@@ -724,7 +724,7 @@ class XGBoostBatchService:
             )
             
             self.logger.info(
-                f"模型訓練完成 - Train AUC: {performance.train_auc:.4f}, "
+                f"模型訓練完成 - in_sample_train_auc: {performance.in_sample_train_auc:.4f}, "
                 f"CV AUC: {performance.cv_auc_mean:.4f}"
             )
             
@@ -795,66 +795,97 @@ class XGBoostBatchService:
                     },
                 }
 
-            # Precision@K 與推薦 K
-            precision_at_k_result = await asyncio.to_thread(
-                analyzer.calculate_precision_at_k,
-                X, y
-            )
-            recommended = analyzer.recommend_k(
-                y_true=y,
-                y_pred_proba=y_pred_proba,
-                target_precision=0.75
-            )
-            if hasattr(precision_at_k_result, 'to_dict'):
-                precision_at_k = {
-                    **precision_at_k_result.to_dict(),
-                    "recommended_k": recommended.get("recommended_k"),
-                    "recommended_threshold": recommended.get("threshold"),
-                    "recommended_precision": recommended.get("precision")
-                }
-            else:
-                precision_at_k = {
-                    "precision_at_k": {int(item.k): float(item.precision) for item in precision_at_k_result},
-                    "threshold_at_k": {},
-                    "sample_count_at_k": {int(item.k): int(item.n_total) for item in precision_at_k_result},
-                    "recommended_k": recommended.get("recommended_k"),
-                    "recommended_threshold": recommended.get("threshold"),
-                    "recommended_precision": recommended.get("precision")
-                }
+            # LA-2 B2 F3/F8：train/OOT SplitPlan + 僅 held-out 算 OOT 指標
+            import pickle
+            from momentum.Analysis.eval_scope_utils import build_service_oot_bundle
 
-            # 期望值估算（若案例包含 price_change）
+            try:
+                model_artifact = pickle.dumps(analyzer.model)
+            except Exception:  # noqa: BLE001
+                model_artifact = b"xgb-batch-artifact"
+            oot_bundle = build_service_oot_bundle(
+                n_samples=len(y),
+                model_artifact=model_artifact,
+                trusted_issuer="xgboost_batch_service",
+                oot_ratio=0.2,
+                horizon=1,
+                embargo=int(embargo_pct or 0) if embargo_pct else 0,
+                purge_gap=int(purge_gap or 0) if purge_gap else 0,
+                symbol=",".join(symbols) if symbols else None,
+                base_universe_hash=f"xgb_batch:{timeframe}:{len(y)}",
+            )
+            has_oot_held_out = bool(oot_bundle["has_oot_held_out"])
+            oot_receipt = oot_bundle["oot_receipt"]
+            oot_idx = oot_bundle["oot_idx"]
+
+            precision_at_k = None
             expectancy = None
+            bootstrap_ci = None
             price_changes = self._resolve_case_price_changes(valid_cases)
-            if price_changes is not None:
-                threshold = recommended.get("threshold") or 0.6
-                trade_returns = price_changes[y_pred_proba >= float(threshold)]
-                expectancy_result = self.expectancy_calculator.estimate_expectancy(
-                    price_changes=price_changes,
-                    predicted_proba=y_pred_proba,
-                    threshold=float(threshold)
-                )
-                sharpe_proxy = self.expectancy_calculator.calculate_sharpe_proxy(
-                    trade_returns if len(trade_returns) > 0 else np.array([])
-                )
-                expectancy = {
-                    **expectancy_result.to_dict(),
-                    "sharpe_proxy": float(sharpe_proxy) if sharpe_proxy is not None else None
-                }
+            if has_oot_held_out and oot_idx is not None and len(oot_idx) > 0:
+                if isinstance(X, pd.DataFrame):
+                    X_oot = X.iloc[oot_idx]
+                else:
+                    X_oot = X[oot_idx]
+                y_oot = np.asarray(y)[oot_idx]
+                y_pred_oot = np.asarray(y_pred_proba)[oot_idx]
 
-            # Bootstrap 信賴區間
-            bootstrap_ci = {}
-            for metric in ["auc", "pr_auc"]:
-                try:
-                    ci_result = self.bootstrap_estimator.bootstrap_confidence_interval(
-                        y_true=y,
-                        y_pred_proba=y_pred_proba,
-                        metric=metric,
-                        n_bootstrap=200,
-                        confidence=0.9
+                precision_at_k_result = await asyncio.to_thread(
+                    analyzer.calculate_precision_at_k,
+                    X_oot, y_oot
+                )
+                recommended = analyzer.recommend_k(
+                    y_true=y_oot,
+                    y_pred_proba=y_pred_oot,
+                    target_precision=0.75
+                )
+                if hasattr(precision_at_k_result, 'to_dict'):
+                    precision_at_k = {
+                        **precision_at_k_result.to_dict(),
+                        "recommended_k": recommended.get("recommended_k"),
+                        "recommended_threshold": recommended.get("threshold"),
+                        "recommended_precision": recommended.get("precision")
+                    }
+                else:
+                    precision_at_k = {
+                        "precision_at_k": {int(item.k): float(item.precision) for item in precision_at_k_result},
+                        "threshold_at_k": {},
+                        "sample_count_at_k": {int(item.k): int(item.n_total) for item in precision_at_k_result},
+                        "recommended_k": recommended.get("recommended_k"),
+                        "recommended_threshold": recommended.get("threshold"),
+                        "recommended_precision": recommended.get("precision")
+                    }
+
+                if price_changes is not None:
+                    pc_oot = np.asarray(price_changes)[oot_idx]
+                    threshold = recommended.get("threshold") or 0.6
+                    trade_returns = pc_oot[y_pred_oot >= float(threshold)]
+                    expectancy_result = self.expectancy_calculator.estimate_expectancy(
+                        price_changes=pc_oot,
+                        predicted_proba=y_pred_oot,
+                        threshold=float(threshold)
                     )
-                    bootstrap_ci[metric] = ci_result.to_dict()
-                except Exception as e:
-                    self.logger.warning(f"Bootstrap {metric} 計算失敗: {str(e)}")
+                    sharpe_proxy = self.expectancy_calculator.calculate_sharpe_proxy(
+                        trade_returns if len(trade_returns) > 0 else np.array([])
+                    )
+                    expectancy = {
+                        **expectancy_result.to_dict(),
+                        "sharpe_proxy": float(sharpe_proxy) if sharpe_proxy is not None else None
+                    }
+
+                bootstrap_ci = {}
+                for metric in ["auc", "pr_auc"]:
+                    try:
+                        ci_result = self.bootstrap_estimator.bootstrap_confidence_interval(
+                            y_true=y_oot,
+                            y_pred_proba=y_pred_oot,
+                            metric=metric,
+                            n_bootstrap=200,
+                            confidence=0.9
+                        )
+                        bootstrap_ci[metric] = ci_result.to_dict()
+                    except Exception as e:
+                        self.logger.warning(f"Bootstrap {metric} 計算失敗: {str(e)}")
 
             # Permutation Importance
             permutation_importance = await asyncio.to_thread(
@@ -973,6 +1004,12 @@ class XGBoostBatchService:
                 "actual_returns": price_changes.tolist() if price_changes is not None else None
             }
 
+            from momentum.Analysis.eval_scope_utils import (
+                apply_service_matrix_scopes,
+                performance_to_scoped_dict,
+            )
+
+            # LA-2 B2 F3：has_oot_held_out 動態；有 OOT 才寫 oot_receipt
             result = {
                 'symbols': symbols,  # 改為 symbols 列表
                 'engine': analysis_engine,
@@ -984,7 +1021,7 @@ class XGBoostBatchService:
                 'negative_cases': int(negative_count),
                 'features_generated': len(feature_names),
                 'feature_names': feature_names,
-                'model_performance': performance.__dict__,
+                'model_performance': performance_to_scoped_dict(performance),
                 'feature_importance': [fi.__dict__ for fi in feature_importance],
                 'feature_importance_all': {
                     key: [fi.__dict__ for fi in values]
@@ -1008,9 +1045,12 @@ class XGBoostBatchService:
                 'pr_curve': getattr(analyzer, 'last_pr_curve', None),
                 'regime_analysis': regime_analysis,
                 'model_saved': True,
-                'model_path': model_path
+                'model_path': model_path,
+                'oot_receipt': oot_receipt,
+                'oof_receipts': list(getattr(analyzer, 'last_oof_receipts', []) or []),
             }
-            
+            result = apply_service_matrix_scopes(result, has_oot_held_out=has_oot_held_out)
+
             # 清理 result 中的 numpy 類型，防止 JSON 序列化錯誤
             result = sanitize_for_json(result)
             

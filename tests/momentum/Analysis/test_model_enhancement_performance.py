@@ -43,7 +43,9 @@ def test_phase5_performance_targets():
         n = 10_000
         y_true = rng.integers(0, 2, n)
         y_pred = np.clip(y_true * 0.7 + rng.normal(0, 0.2, n), 0.01, 0.99)
-        create_probability_calibrator().fit_from_predictions(y_true=y_true, y_pred_proba=y_pred, method="auto")
+        create_probability_calibrator().fit_from_predictions(
+            y_true=y_true, y_pred_proba=y_pred, method="auto", require_receipt=False
+        )
 
     _bench("M1 ProbabilityCalibrator", 30.0, run_m1)
 

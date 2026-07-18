@@ -151,7 +151,7 @@ function AnalysisResultView({ result }: { result: AnalysisResult }) {
         <CardHeader className="pb-3"><CardTitle className="text-lg text-slate-100 flex items-center gap-2"><TrendingUp className="w-5 h-5" />模型性能</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <SimpleMetric label="Train AUC" value={result.model_performance.train_auc} percent />
+            <SimpleMetric label="In-sample Train AUC" value={result.model_performance.in_sample_train_auc} percent />
             <SimpleMetric label="CV AUC" value={result.model_performance.cv_auc_mean} percent />
             <SimpleMetric label="Precision" value={result.model_performance.precision} percent />
             <SimpleMetric label="Recall" value={result.model_performance.recall} percent />
@@ -421,7 +421,7 @@ function XGBoostAnalysisContent() {
           precision: result.model_performance.precision || 0,
           recall: result.model_performance.recall || 0,
           f1_score: result.model_performance.f1_score || 0,
-          train_auc: result.model_performance.train_auc || 0,
+          in_sample_train_auc: result.model_performance.in_sample_train_auc || 0,
           cv_auc_mean: result.model_performance.cv_auc_mean || 0,
           cv_auc_std: result.model_performance.cv_auc_std || 0,
           overfitting_score: result.model_performance.overfitting_score || 0

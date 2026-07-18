@@ -141,14 +141,14 @@ class PatternValidator:
         # 組 1: 傳統 ML 指標
         has_traditional = all(k in metrics for k in ['precision', 'recall', 'f1_score'])
         # 組 2: XGBoost 指標
-        has_xgboost = 'cv_auc_mean' in metrics or 'train_auc' in metrics
+        has_xgboost = 'cv_auc_mean' in metrics or 'in_sample_train_auc' in metrics
         
         if not has_traditional and not has_xgboost:
-            errors.append("必須包含效能指標（precision/recall/f1_score 或 train_auc/cv_auc_mean）")
+            errors.append("必須包含效能指標（precision/recall/f1_score 或 in_sample_train_auc/cv_auc_mean）")
             return errors
         
         # 驗證存在的指標範圍
-        range_check_metrics = ['precision', 'recall', 'f1_score', 'train_auc', 'cv_auc_mean', 'accuracy']
+        range_check_metrics = ['precision', 'recall', 'f1_score', 'in_sample_train_auc', 'cv_auc_mean', 'accuracy']
         
         for metric in range_check_metrics:
             if metric in metrics:

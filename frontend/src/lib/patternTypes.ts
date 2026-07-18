@@ -30,7 +30,7 @@ export interface Pattern {
     precision: number;
     recall: number;
     f1_score: number;
-    train_auc?: number;
+    in_sample_train_auc?: number;
     cv_auc_mean?: number;
     cv_auc_std?: number;
     overfitting_score?: number;
@@ -162,7 +162,8 @@ export interface ModelPerformance {
   test_recall?: number;
   test_f1?: number;
   test_auc?: number;
-  train_auc: number;
+  /** LA-2 B2: renamed from train_auc (no coexistence) */
+  in_sample_train_auc: number;
   cv_auc_mean: number;
   cv_auc_std: number;
   precision: number;
@@ -174,6 +175,10 @@ export interface ModelPerformance {
   calibration_quality?: string;
   pr_auc?: number;
   positive_rate?: number;
+  fit_pool_auc?: number | null;
+  eval_scope?: Record<string, string>;
+  oot_status?: string | null;
+  oot_auc?: number | null;
 }
 
 export interface PrecisionAtKResult {
@@ -286,7 +291,8 @@ export interface BatchAnalysisRequest {
 
 export interface ModelPerformanceResponse {
   engine_type?: string;
-  train_auc: number;
+  /** LA-2 B2: renamed from train_auc */
+  in_sample_train_auc: number;
   cv_auc_mean: number;
   cv_auc_std: number;
   precision: number;
@@ -300,6 +306,9 @@ export interface ModelPerformanceResponse {
   pr_auc?: number | null;
   positive_rate?: number | null;
   training_time_seconds?: number | null;
+  fit_pool_auc?: number | null;
+  eval_scope?: Record<string, string>;
+  oot_status?: string | null;
 }
 
 export interface ComparisonReportResponse {

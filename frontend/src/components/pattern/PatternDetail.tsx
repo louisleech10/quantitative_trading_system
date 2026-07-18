@@ -187,12 +187,12 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
                 </div>
               )}
               
-              {/* Train AUC (XGBoost) */}
-              {pattern.performance_metrics.train_auc !== undefined && (
+              {/* In-sample Train AUC (XGBoost; LA-2 B2 rename) */}
+              {pattern.performance_metrics.in_sample_train_auc !== undefined && (
                 <div className="text-center p-4 bg-white/5 border border-white/10 rounded">
-                  <p className="text-sm text-slate-400 font-medium mb-1">Train AUC</p>
+                  <p className="text-sm text-slate-400 font-medium mb-1">In-sample Train AUC</p>
                   <p className="text-2xl font-semibold text-blue-300">
-                    {(pattern.performance_metrics.train_auc * 100).toFixed(1)}%
+                    {(pattern.performance_metrics.in_sample_train_auc * 100).toFixed(1)}%
                   </p>
                 </div>
               )}

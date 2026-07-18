@@ -117,7 +117,7 @@ class LightGBMAnalyzer:
         y: np.ndarray,
         eval_size: float,
         timestamps: Optional[List[int]],
-    ) -> Tuple[Any, Any, np.ndarray, np.ndarray]:
+    ) -> Tuple[Any, Any, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         if eval_size <= 0:
             raise ValueError("eval_size 必須 > 0")
         if eval_size >= 1:
@@ -134,18 +134,20 @@ class LightGBMAnalyzer:
         if split_idx < 1 or split_idx >= len(y_sorted):
             raise ValueError("時間序列切分比例不合理，請調整 eval_size")
 
+        train_idx = order[:split_idx]
+        val_idx = order[split_idx:]
         X_train = X_sorted[:split_idx]
         X_val = X_sorted[split_idx:]
         y_train = y_sorted[:split_idx]
         y_val = y_sorted[split_idx:]
-        return X_train, X_val, y_train, y_val
+        return X_train, X_val, y_train, y_val, train_idx, val_idx
 
     def _stratified_holdout_split(
         self,
         X: Union[pd.DataFrame, np.ndarray],
         y: np.ndarray,
         eval_size: float,
-    ) -> Tuple[Any, Any, np.ndarray, np.ndarray]:
+    ) -> Tuple[Any, Any, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """使用穩定的索引切分，避免 pandas/sklearn 在特定環境下索引異常。"""
         X_array = X.to_numpy(dtype=float, copy=False) if isinstance(X, pd.DataFrame) else np.asarray(X, dtype=float)
         y_array = np.asarray(y)
@@ -179,7 +181,7 @@ class LightGBMAnalyzer:
 
         y_train = y_array[train_idx]
         y_val = y_array[val_idx]
-        return X_train, X_val, y_train, y_val
+        return X_train, X_val, y_train, y_val, train_idx, val_idx
 
     def train_model(
         self,
@@ -215,9 +217,19 @@ class LightGBMAnalyzer:
         self.logger.info(f"標籤分佈: {label_dist}")
 
         if time_series_split:
-            X_train, X_val, y_train, y_val = self._time_series_split(X_input, y_input, eval_size, timestamps)
+            X_train, X_val, y_train, y_val, train_idx, val_idx = self._time_series_split(
+                X_input, y_input, eval_size, timestamps
+            )
         else:
-            X_train, X_val, y_train, y_val = self._stratified_holdout_split(X_input, y_input, eval_size)
+            X_train, X_val, y_train, y_val, train_idx, val_idx = self._stratified_holdout_split(
+                X_input, y_input, eval_size
+            )
+
+        # LA-2 B2：ES fit pool（train∪val）
+        self._train_only_idx = np.asarray(train_idx, dtype=int)
+        self._fit_pool_idx = np.concatenate(
+            [np.asarray(train_idx, dtype=int), np.asarray(val_idx, dtype=int)]
+        )
 
         self.logger.info(f"訓練集: {len(X_train)} 樣本, 驗證集: {len(X_val)} 樣本")
 
@@ -253,7 +265,7 @@ class LightGBMAnalyzer:
         performance.training_time_seconds = self._last_training_time
         performance.n_estimators_actual = int(getattr(self.model, "n_estimators_", self.params.get("n_estimators", 0)))
         self.logger.info(
-            f"訓練完成 - Train AUC: {performance.train_auc:.4f}, "
+            f"訓練完成 - in_sample_train_auc: {performance.in_sample_train_auc:.4f}, "
             f"CV AUC: {performance.cv_auc_mean:.4f} ± {performance.cv_auc_std:.4f}"
         )
         return performance
@@ -323,6 +335,15 @@ class LightGBMAnalyzer:
         cv_precision_scores: List[float] = []
         cv_recall_scores: List[float] = []
         cv_f1_scores: List[float] = []
+        # LA-2 B2：OOF 預測 → cal/PR/Brier/ECE = cv_oof；per-fold OofReceipt
+        oof_pred = np.full(len(y_ordered), np.nan, dtype=float)
+        oof_receipts: List[Dict[str, Any]] = []
+        try:
+            import pickle
+
+            _cv_artifact = pickle.dumps(self.model) if self.model is not None else b"lgb-cv"
+        except Exception:  # noqa: BLE001
+            _cv_artifact = b"lgb-cv-fallback"
 
         for fold_idx, (train_idx, val_idx) in enumerate(split_iter, start=1):
             X_train = X_ordered[train_idx]
@@ -335,6 +356,38 @@ class LightGBMAnalyzer:
 
             y_pred_proba = fold_model.predict_proba(X_val)[:, 1]
             y_pred = (y_pred_proba >= 0.5).astype(int)
+            oof_pred[val_idx] = y_pred_proba
+
+            # F7：per-fold make_oof_receipt
+            try:
+                from momentum.core.contracts import (
+                    SplitPlan,
+                    build_receipt_envelope,
+                    make_oof_receipt,
+                )
+
+                fold_plan = SplitPlan(
+                    split_label="train",
+                    index_kind="positional",
+                    row_index=np.arange(len(y_ordered), dtype=int),
+                    time_bounds=(0, max(len(y_ordered) - 1, 0)),
+                    purge_gap=int(purge_gap or 0),
+                    embargo=0,
+                    purge_semantic="rows",
+                    base_universe_hash="lgb_cv_universe",
+                    symbol=None,
+                )
+                oof_r = make_oof_receipt(
+                    fold_plan,
+                    fold_id=fold_idx - 1,
+                    fit_idx=np.asarray(train_idx, dtype=int),
+                    eval_idx=np.asarray(val_idx, dtype=int),
+                    model_artifact=_cv_artifact,
+                    trusted_issuer="lightgbm_analyzer",
+                )
+                oof_receipts.append(build_receipt_envelope("oof", oof_r))
+            except Exception as oof_exc:  # noqa: BLE001
+                self.logger.warning(f"OofReceipt fold {fold_idx} 略過: {oof_exc}")
 
             if len(np.unique(y_val)) < 2:
                 auc_value = np.nan
@@ -355,68 +408,156 @@ class LightGBMAnalyzer:
                 f"AUC: {auc_value:.4f}, Precision: {precision_value:.4f}, "
                 f"Recall: {recall_value:.4f}, F1: {f1_value:.4f}"
             )
+        self.last_oof_receipts = oof_receipts
 
-        y_train_pred = self.model.predict_proba(X_ordered)[:, 1]
-        train_auc = float(roc_auc_score(y_ordered, y_train_pred)) if len(np.unique(y_ordered)) > 1 else np.nan
+        y_is_pred = self.model.predict_proba(X_ordered)[:, 1]
+        in_sample_train_auc = (
+            float(roc_auc_score(y_ordered, y_is_pred))
+            if len(np.unique(y_ordered)) > 1
+            else np.nan
+        )
+
+        fit_pool_auc: Optional[float] = None
+        fit_pool_idx = getattr(self, "_fit_pool_idx", None)
+        if fit_pool_idx is not None and len(fit_pool_idx) > 0:
+            pool_idx = np.asarray(fit_pool_idx, dtype=int)
+            y_pool = y_input[pool_idx]
+            if len(np.unique(y_pool)) >= 2:
+                fit_pool_auc = float(
+                    roc_auc_score(y_pool, self.model.predict_proba(X_input[pool_idx])[:, 1])
+                )
 
         valid_auc = [value for value in cv_auc_scores if not np.isnan(value)]
         cv_auc_mean = float(np.mean(valid_auc)) if valid_auc else np.nan
         cv_auc_std = float(np.std(valid_auc)) if valid_auc else np.nan
-        overfitting_score = float(train_auc - cv_auc_mean) if not (np.isnan(train_auc) or np.isnan(cv_auc_mean)) else np.nan
-
-        calibration = self.calibration_analyzer.calculate_metrics(y_ordered, y_train_pred)
-        pr = self.calculate_pr_metrics(X_ordered, y_ordered)
-        self.last_calibration_curve = calibration.curve_data
-        self.last_pr_curve = {
-            "precision": pr.precision_curve,
-            "recall": pr.recall_curve,
-            "thresholds": pr.thresholds,
-            "pr_auc": pr.pr_auc,
-        }
-
-        self.logger.info(
-            f"校準指標 - Brier: {calibration.brier_score:.4f}, ECE: {calibration.ece:.4f}, "
-            f"品質: {calibration.calibration_quality}"
+        overfitting_score = (
+            float(in_sample_train_auc - cv_auc_mean)
+            if not (np.isnan(in_sample_train_auc) or np.isnan(cv_auc_mean))
+            else np.nan
         )
-        if calibration.calibration_quality == "poor":
-            self.logger.warning("校準品質偏低，建議重新調整模型或做機率校準")
 
-        if not np.isnan(cv_auc_mean) and not np.isnan(pr.pr_auc):
-            roc_pr_gap = cv_auc_mean - pr.pr_auc
+        oof_mask = ~np.isnan(oof_pred)
+        oof_sufficient = (
+            oof_mask.sum() >= 2 and len(np.unique(y_ordered[oof_mask])) >= 2
+        )
+        metrics_omitted: List[str] = []
+        if oof_sufficient:
+            calibration = self.calibration_analyzer.calculate_metrics(
+                y_ordered[oof_mask], oof_pred[oof_mask]
+            )
+            precision_c, recall_c, thresholds_c = precision_recall_curve(
+                y_ordered[oof_mask], oof_pred[oof_mask]
+            )
+            pr_auc_val = float(auc(recall_c, precision_c))
+            brier_val = float(calibration.brier_score)
+            ece_val = float(calibration.ece)
+            cal_quality = calibration.calibration_quality
+            self.last_calibration_curve = calibration.curve_data
+            self.last_pr_curve = {
+                "precision": precision_c.tolist(),
+                "recall": recall_c.tolist(),
+                "thresholds": thresholds_c.tolist(),
+                "pr_auc": pr_auc_val,
+                "eval_scope": "cv_oof",
+            }
+            self.logger.info(
+                f"校準指標(cv_oof) - Brier: {brier_val:.4f}, ECE: {ece_val:.4f}, "
+                f"品質: {cal_quality}"
+            )
+            if cal_quality == "poor":
+                self.logger.warning("校準品質偏低，建議重新調整模型或做機率校準")
+        else:
+            # F5：OOF 不足 → OMIT+deny（禁 in-sample 冒充 cv_oof）
+            pr_auc_val = float("nan")
+            brier_val = None
+            ece_val = None
+            cal_quality = "OMITTED"
+            self.last_calibration_curve = None
+            self.last_pr_curve = {
+                "status": "OMITTED",
+                "reason": "insufficient_oof",
+                "eval_scope": "cv_oof",
+                "consumer": "deny",
+            }
+            metrics_omitted.extend(
+                ["brier_score", "ece", "pr_auc", "calibration_curve", "pr_curve"]
+            )
+
+        if (
+            oof_sufficient
+            and not np.isnan(cv_auc_mean)
+            and not np.isnan(pr_auc_val)
+        ):
+            roc_pr_gap = cv_auc_mean - pr_auc_val
             if roc_pr_gap > 0.15:
                 self.logger.warning(
                     f"ROC AUC 與 PR AUC 差距較大 ({roc_pr_gap:.4f})，ROC AUC 可能過度樂觀"
                 )
 
         self.logger.info(
-            f"交叉驗證完成 - Train AUC: {train_auc:.4f}, "
+            f"交叉驗證完成 - in_sample_train_auc: {in_sample_train_auc:.4f}, "
             f"CV AUC: {cv_auc_mean:.4f} ± {cv_auc_std:.4f}, "
             f"Overfitting: {overfitting_score:.4f}"
         )
 
-        return ModelPerformance(
-            train_auc=float(train_auc),
+        from momentum.core.contracts import build_eval_scope_map
+
+        scope_keys = [
+            "in_sample_train_auc",
+            "fit_pool_auc",
+            "overfitting_score",
+            "precision",
+            "recall",
+            "f1_score",
+            "cv_auc_mean",
+            "cv_auc_std",
+            "oot_auc",
+        ]
+        if oof_sufficient:
+            scope_keys.extend(
+                ["brier_score", "ece", "pr_auc", "calibration_curve", "pr_curve"]
+            )
+        eval_scope = build_eval_scope_map(scope_keys)
+        self.last_metrics_omitted = metrics_omitted
+
+        perf = ModelPerformance(
+            in_sample_train_auc=float(in_sample_train_auc),
             cv_auc_mean=float(cv_auc_mean),
             cv_auc_std=float(cv_auc_std),
             precision=float(np.mean(cv_precision_scores)),
             recall=float(np.mean(cv_recall_scores)),
             f1_score=float(np.mean(cv_f1_scores)),
             overfitting_score=float(overfitting_score),
-            brier_score=float(calibration.brier_score),
-            ece=float(calibration.ece),
-            calibration_quality=calibration.calibration_quality,
-            pr_auc=float(pr.pr_auc),
+            brier_score=brier_val,
+            ece=ece_val,
+            calibration_quality=cal_quality,
+            pr_auc=float(pr_auc_val) if oof_sufficient else None,
             positive_rate=float(np.mean(y_ordered)),
             engine_type="lightgbm",
             training_time_seconds=self._last_training_time,
             n_estimators_actual=int(getattr(self.model, "n_estimators_", self.params.get("n_estimators", 0))),
+            fit_pool_auc=fit_pool_auc,
+            eval_scope=eval_scope,
+            oot_auc=None,
+            oot_status="OMITTED",
         )
+        if hasattr(perf, "__dict__"):
+            perf.__dict__["oof_receipts"] = list(getattr(self, "last_oof_receipts", []) or [])
+            perf.__dict__["metrics_omitted"] = list(metrics_omitted)
+        return perf
 
     def validate_oot(
         self,
         X_oot: Union[pd.DataFrame, np.ndarray],
         y_oot: np.ndarray,
         cv_auc_mean: Optional[float] = None,
+        *,
+        train_plan: Optional[Any] = None,
+        eval_plan: Optional[Any] = None,
+        horizon: Optional[int] = None,
+        bar_duration: Optional[Any] = None,
+        ts: Optional[np.ndarray] = None,
+        embargo: Optional[int] = None,
     ) -> OOTValidationResult:
         if self.model is None:
             raise ValueError("模型尚未訓練")
@@ -424,6 +565,19 @@ class LightGBMAnalyzer:
             raise ValueError("OOT 資料為空")
         if len(X_oot) != len(y_oot):
             raise ValueError("OOT 標籤長度不匹配")
+
+        # F6：有 SplitPlan 時強制 horizon 嚴格 <
+        if train_plan is not None and eval_plan is not None and horizon is not None:
+            from momentum.core.contracts import validate_oot_label_horizon
+
+            validate_oot_label_horizon(
+                train_plan,
+                eval_plan,
+                int(horizon),
+                bar_duration=bar_duration,
+                ts=ts,
+                embargo=embargo,
+            )
 
         n_samples = len(y_oot)
         if n_samples < 50:

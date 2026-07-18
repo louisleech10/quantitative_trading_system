@@ -458,7 +458,7 @@ def apply_wash_mutation(
         # 把 in-sample 樂觀值偽造成 oot 已修
         diffs = [
             {
-                "path": "model.model_performance.train_auc",
+                "path": "model.model_performance.in_sample_train_auc",
                 "index": "BTCUSDT/1h",
                 "old": 0.99,
                 "new": 0.55,

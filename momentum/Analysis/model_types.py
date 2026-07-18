@@ -25,15 +25,20 @@ __all__ = [
 
 @dataclass
 class ModelPerformance:
-    """模型效能指標（LightGBM 和 XGBoost 共用）"""
+    """模型效能指標（LightGBM 和 XGBoost 共用）
 
-    train_auc: float
+    LA-2 B2：train_auc → in_sample_train_auc（不並存）；
+    fit_pool_auc = ES train∪val 池化 AUC（in_sample_research_only）；
+    cal/PR/Brier/ECE scope = cv_oof（OOF 預測，非 in-sample）。
+    """
+
+    in_sample_train_auc: float
     cv_auc_mean: float
     cv_auc_std: float
     precision: float
     recall: float
     f1_score: float
-    overfitting_score: float
+    overfitting_score: float  # in_sample_train_auc - cv_auc_mean
     brier_score: Optional[float] = None
     ece: Optional[float] = None
     calibration_quality: Optional[str] = None
@@ -42,6 +47,12 @@ class ModelPerformance:
     engine_type: Optional[str] = None
     training_time_seconds: Optional[float] = None
     n_estimators_actual: Optional[int] = None
+    fit_pool_auc: Optional[float] = None
+    # 欄位級 eval_scope（§0.6-C）；序列化時一併輸出
+    eval_scope: Optional[Dict[str, str]] = None
+    # 缺 held-out 時 OOT 相關欄位標記 OMITTED
+    oot_auc: Optional[float] = None
+    oot_status: Optional[str] = None  # "ok" | "OMITTED" | None
 
 
 @dataclass

@@ -55,7 +55,7 @@ def test_model_train_start_and_get_performance(monkeypatch):
                 "engine": "lightgbm",
                 "performance": {
                     "engine_type": "lightgbm",
-                    "train_auc": 0.81,
+                    "in_sample_train_auc": 0.81,
                     "cv_auc_mean": 0.79,
                     "cv_auc_std": 0.02,
                     "precision": 0.7,
@@ -97,7 +97,7 @@ def test_model_comparison_and_lightgbm_results(monkeypatch):
                 "engine": "lightgbm",
                 "performance": {
                     "engine_type": "lightgbm",
-                    "train_auc": 0.81,
+                    "in_sample_train_auc": 0.81,
                     "cv_auc_mean": 0.79,
                     "cv_auc_std": 0.02,
                     "precision": 0.7,
@@ -110,7 +110,7 @@ def test_model_comparison_and_lightgbm_results(monkeypatch):
                     "engine_performances": {
                         "lightgbm": {
                             "engine_type": "lightgbm",
-                            "train_auc": 0.81,
+                            "in_sample_train_auc": 0.81,
                             "cv_auc_mean": 0.79,
                             "cv_auc_std": 0.02,
                             "precision": 0.7,
@@ -120,7 +120,7 @@ def test_model_comparison_and_lightgbm_results(monkeypatch):
                         },
                         "xgboost": {
                             "engine_type": "xgboost",
-                            "train_auc": 0.8,
+                            "in_sample_train_auc": 0.8,
                             "cv_auc_mean": 0.78,
                             "cv_auc_std": 0.02,
                             "precision": 0.69,

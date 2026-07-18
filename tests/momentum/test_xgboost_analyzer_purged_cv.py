@@ -39,5 +39,5 @@ def test_train_with_purged_cv():
         embargo_pct=0.1
     )
 
-    assert 0.0 <= performance.train_auc <= 1.0
+    assert 0.0 <= performance.in_sample_train_auc <= 1.0
     assert 0.0 <= performance.cv_auc_mean <= 1.0

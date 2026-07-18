@@ -50,7 +50,7 @@ try:
         eval_size=0.2
     )
     print(f"✅ 測試 1 通過")
-    print(f"   Train AUC: {performance1.train_auc:.4f}")
+    print(f"   Train AUC: {performance1.in_sample_train_auc:.4f}")
     print(f"   CV AUC: {performance1.cv_auc_mean:.4f}")
     print(f"   特徵名稱已儲存: {analyzer1.feature_names}")
 except Exception as e:
@@ -73,7 +73,7 @@ try:
         eval_size=0.2
     )
     print(f"✅ 測試 2 通過")
-    print(f"   Train AUC: {performance2.train_auc:.4f}")
+    print(f"   Train AUC: {performance2.in_sample_train_auc:.4f}")
     print(f"   CV AUC: {performance2.cv_auc_mean:.4f}")
     print(f"   特徵名稱已儲存: {analyzer2.feature_names}")
 except Exception as e:

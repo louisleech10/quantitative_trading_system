@@ -13,7 +13,15 @@ from pydantic import BaseModel, Field
 
 from momentum.Analysis.calibration_analyzer import CalibrationAnalyzer
 from momentum.core.logging import get_logger
-from momentum.core.contracts import SkippedResult
+from momentum.core.contracts import (
+    CalibratorReceipt,
+    ReceiptVerificationError,
+    SkippedResult,
+    SplitPlan,
+    build_receipt_envelope,
+    model_artifact_digest,
+    verify_calibrator_receipt,
+)
 
 
 class ProbabilityCalibratorConfig(BaseModel):
@@ -26,7 +34,11 @@ class ProbabilityCalibratorConfig(BaseModel):
 
 
 class ProbabilityCalibrator:
-    """機率校準修正引擎。"""
+    """機率校準修正引擎。
+
+    LA-2 B2：fit / fit_from_predictions 共用 verify_calibrator_receipt；
+    signal-facing 缺 receipt → fail-closed。
+    """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = ProbabilityCalibratorConfig(**(config or {}))
@@ -39,6 +51,41 @@ class ProbabilityCalibrator:
         self._comparison: Dict[str, Any] = {}
         self._venn_margin: float = 0.03
         self._transformer: Optional[Callable[[np.ndarray], np.ndarray]] = None
+        self.last_calibrator_receipt: Optional[Dict[str, Any]] = None
+
+    def _require_and_verify_receipt(
+        self,
+        *,
+        train_plan: Optional[SplitPlan],
+        calib_idx: Optional[Any],
+        model_artifact: Optional[bytes],
+        receipt: Optional[CalibratorReceipt],
+        require_receipt: bool,
+    ) -> Optional[Dict[str, Any]]:
+        """signal-facing 缺 receipt → raise；有則四步 verify。"""
+        if not require_receipt:
+            return None
+        if train_plan is None or calib_idx is None or model_artifact is None:
+            raise ReceiptVerificationError(
+                "CalibratorReceipt required: pass train_plan, calib_idx, model_artifact "
+                "(signal-facing fail-closed)"
+            )
+        # F4：require_receipt=True 時 receipt 必須外部傳入，禁止 calibrator 自簽
+        if receipt is None:
+            raise ReceiptVerificationError(
+                "CalibratorReceipt required: receipt must be supplied by trusted caller "
+                "(calibrator does not self-issue under require_receipt=True)"
+            )
+        envelope = build_receipt_envelope("calibrator", receipt)
+        verify_calibrator_receipt(
+            receipt,
+            train_plan,
+            calib_idx,
+            model_artifact,
+            envelope=envelope,
+        )
+        self.last_calibrator_receipt = envelope
+        return envelope
 
     def fit(
         self,
@@ -47,6 +94,12 @@ class ProbabilityCalibrator:
         y_cal: np.ndarray,
         method: str = "auto",
         cv: Optional[int] = None,
+        *,
+        train_plan: Optional[SplitPlan] = None,
+        calib_idx: Optional[Any] = None,
+        model_artifact: Optional[bytes] = None,
+        receipt: Optional[CalibratorReceipt] = None,
+        require_receipt: bool = True,
     ) -> Dict[str, Any]:
         if not hasattr(model, "predict_proba"):
             raise ValueError("model 必須支援 predict_proba")
@@ -59,7 +112,31 @@ class ProbabilityCalibrator:
         self._model = model
         self._expected_n_features = int(X_array.shape[1])
 
-        return self.fit_from_predictions(y_true=np.asarray(y_cal), y_pred_proba=y_pred, method=method, cv=cv)
+        if model_artifact is None and require_receipt:
+            # 以 model pickle 位元作 artifact；失敗則用 params digest 字節
+            import pickle
+
+            try:
+                model_artifact = pickle.dumps(model)
+            except Exception as exc:  # noqa: BLE001
+                raise ReceiptVerificationError(
+                    f"cannot serialize model for CalibratorReceipt: {exc}"
+                ) from exc
+
+        if calib_idx is None and require_receipt:
+            calib_idx = np.arange(len(y_cal), dtype=int)
+
+        return self.fit_from_predictions(
+            y_true=np.asarray(y_cal),
+            y_pred_proba=y_pred,
+            method=method,
+            cv=cv,
+            train_plan=train_plan,
+            calib_idx=calib_idx,
+            model_artifact=model_artifact,
+            receipt=receipt,
+            require_receipt=require_receipt,
+        )
 
     def fit_from_predictions(
         self,
@@ -67,7 +144,22 @@ class ProbabilityCalibrator:
         y_pred_proba: np.ndarray,
         method: str = "auto",
         cv: Optional[int] = None,
+        *,
+        train_plan: Optional[SplitPlan] = None,
+        calib_idx: Optional[Any] = None,
+        model_artifact: Optional[bytes] = None,
+        receipt: Optional[CalibratorReceipt] = None,
+        require_receipt: bool = True,
     ) -> Dict[str, Any]:
+        # LA-2 B2：兩分支共用 verify（缺 → fail-closed）
+        receipt_envelope = self._require_and_verify_receipt(
+            train_plan=train_plan,
+            calib_idx=calib_idx,
+            model_artifact=model_artifact,
+            receipt=receipt,
+            require_receipt=require_receipt,
+        )
+
         y_true = np.asarray(y_true).astype(int)
         y_pred_proba = np.asarray(y_pred_proba, dtype=float)
 
@@ -136,7 +228,7 @@ class ProbabilityCalibrator:
 
         improvement = (baseline["ece"] - comparisons.get(best_method, baseline)["ece"]) / max(baseline["ece"], 1e-12) * 100
 
-        return {
+        result: Dict[str, Any] = {
             "probability_calibration": {
                 "method": best_method,
                 "comparison": comparisons,
@@ -148,6 +240,9 @@ class ProbabilityCalibrator:
                 "cv_folds": int(effective_cv),
             }
         }
+        if receipt_envelope is not None:
+            result["calibrator_receipt"] = receipt_envelope
+        return result
 
     def predict_calibrated(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
         if not self._fitted:

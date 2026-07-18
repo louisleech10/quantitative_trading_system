@@ -1091,8 +1091,15 @@ def _run_model_face(
         "service_matrix": service_matrix,
         "performance_value_sha256": _hash_float_array(
             [
-                perf_json.get("train_auc")
-                if perf_json.get("train_auc") is not None
+                (
+                    perf_json.get("in_sample_train_auc")
+                    if perf_json.get("in_sample_train_auc") is not None
+                    else perf_json.get("train_auc")  # frozen B0 baseline legacy key
+                )
+                if (
+                    perf_json.get("in_sample_train_auc") is not None
+                    or perf_json.get("train_auc") is not None
+                )
                 else float("nan"),
                 perf_json.get("cv_auc_mean")
                 if perf_json.get("cv_auc_mean") is not None

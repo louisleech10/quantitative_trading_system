@@ -29,5 +29,5 @@ def test_train_model_time_series_split():
         timestamps=timestamps
     )
 
-    assert 0.0 <= performance.train_auc <= 1.0
+    assert 0.0 <= performance.in_sample_train_auc <= 1.0
     assert 0.0 <= performance.cv_auc_mean <= 1.0

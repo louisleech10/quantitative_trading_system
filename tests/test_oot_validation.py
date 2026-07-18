@@ -549,7 +549,7 @@ class TestOOTIntegration:
         print(f"  正樣本率: {split_result.oot_period.positive_rate:.2%}")
         print()
         print(f"模型效能:")
-        print(f"  Train AUC: {performance.train_auc:.4f}")
+        print(f"  Train AUC: {performance.in_sample_train_auc:.4f}")
         print(f"  CV AUC: {performance.cv_auc_mean:.4f} ± {performance.cv_auc_std:.4f}")
         print(f"  OOT AUC: {oot_result.oot_auc:.4f}")
         print()

@@ -69,6 +69,157 @@
       "class": "P2-1-disable",
       "behavior": "raises",
       "reason_code": "LOOKAHEAD_LABEL_UNSUPPORTED"
+    },
+    {
+      "path": "/model_performance/train_auc",
+      "index": "field_rename",
+      "old": "train_auc",
+      "new": "in_sample_train_auc",
+      "class": "P2-2-oot",
+      "behavior": "rename",
+      "note": "train_auc→in_sample_train_auc no coexistence"
+    },
+    {
+      "path": "/model_performance/fit_pool_auc",
+      "index": "new_field",
+      "old": null,
+      "new": "fit_pool_auc",
+      "class": "P2-2-oot",
+      "behavior": "add_field",
+      "note": "ES train∪val pool AUC (in_sample_research_only)"
+    },
+    {
+      "path": "/model_performance/oot_auc",
+      "index": "no_held_out",
+      "old": "silent_full_sample_or_missing",
+      "new": "OMITTED",
+      "class": "P2-2-oot",
+      "behavior": "omit_without_held_out",
+      "note": "缺 held-out → OMITTED+deny 非 silent 全樣本"
+    },
+    {
+      "path": "task_result/oot_receipt",
+      "index": "write_chain",
+      "old": null,
+      "new": "OotReceipt|null",
+      "class": "P2-2-oot",
+      "behavior": "receipt_chain",
+      "note": "xgboost_task/batch/model_task 同鏈；無 receipt=不可晉升"
+    },
+    {
+      "path": "task_result/calibrator_receipt",
+      "index": "verify_fail_closed",
+      "old": "warn_or_missing",
+      "new": "CalibratorReceipt envelope required",
+      "class": "P2-2-oot",
+      "behavior": "fail_closed",
+      "note": "fit+fit_from_predictions 共用 verify_calibrator_receipt"
+    },
+    {
+      "path": "/model_performance/calibration_curve",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/brier_score",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/ece",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/pr_curve",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/pr_auc",
+      "index": "eval_scope",
+      "old": "unscoped_or_full_sample",
+      "new": "cv_oof",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/recommend_k",
+      "index": "eval_scope",
+      "old": "full_sample",
+      "new": "oot",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/precision_at_k",
+      "index": "eval_scope",
+      "old": "full_sample",
+      "new": "oot",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag"
+    },
+    {
+      "path": "/model_performance/feature_importance",
+      "index": "eval_scope",
+      "old": "unscoped",
+      "new": "in_sample_research_only",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag_deny"
+    },
+    {
+      "path": "/model_performance/shap_sample",
+      "index": "eval_scope",
+      "old": "unscoped",
+      "new": "in_sample_research_only",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag_deny"
+    },
+    {
+      "path": "/model_performance/cross_symbol_validation",
+      "index": "eval_scope",
+      "old": "unscoped",
+      "new": "in_sample_research_only",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag_deny"
+    },
+    {
+      "path": "/model_performance/regime_analysis",
+      "index": "eval_scope",
+      "old": "unscoped",
+      "new": "in_sample_research_only",
+      "class": "P2-2-scope-tag",
+      "behavior": "scope_tag_deny"
+    },
+    {
+      "path": "config/model_config.yaml::probability_calibration",
+      "index": "wired",
+      "old": "enabled_true_silent",
+      "new": "wired=false",
+      "class": "P2-2-scope-tag",
+      "behavior": "config_theater",
+      "note": "Task 2.3 config theater marker"
+    },
+    {
+      "path": "config/model_config.yaml::sample_weight",
+      "index": "wired",
+      "old": "enabled_true_silent",
+      "new": "wired=false",
+      "class": "P2-2-scope-tag",
+      "behavior": "config_theater",
+      "note": "Task 2.3 config theater marker"
     }
   ],
   "eval_scope_field_map": {

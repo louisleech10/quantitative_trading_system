@@ -82,13 +82,46 @@ class ModelTaskService:
                 **training_kwargs,
             )
 
+            from momentum.Analysis.eval_scope_utils import (
+                apply_service_matrix_scopes,
+                build_service_oot_bundle,
+                performance_to_scoped_dict,
+            )
+            import pickle
+
+            # LA-2 B2 F3：動態 OOT SplitPlan + oot_receipt 寫入鏈
+            try:
+                model_obj = getattr(trainer, "model", None) or getattr(
+                    getattr(trainer, "analyzer", None), "model", None
+                )
+                model_artifact = pickle.dumps(model_obj) if model_obj is not None else b"model-task"
+            except Exception:  # noqa: BLE001
+                model_artifact = b"model-task-artifact"
+            oot_bundle = build_service_oot_bundle(
+                n_samples=len(y),
+                model_artifact=model_artifact,
+                trusted_issuer="model_task_service",
+                oot_ratio=0.2,
+                horizon=1,
+                embargo=0,
+                base_universe_hash=f"model_task:{engine}:{len(y)}",
+            )
+            has_oot_held_out = bool(oot_bundle["has_oot_held_out"])
             result: Dict[str, Any] = {
                 "engine": trainer.get_model_type(),
-                "performance": self._to_dict(performance),
+                "performance": performance_to_scoped_dict(performance),
+                "model_performance": performance_to_scoped_dict(performance),
                 "feature_importance": self._normalize_feature_importance(
                     trainer.get_feature_importance(method="gain", top_n=20)
                 ),
+                "oot_receipt": oot_bundle["oot_receipt"],
+                "oof_receipts": list(
+                    getattr(trainer, "last_oof_receipts", None)
+                    or getattr(getattr(trainer, "analyzer", None), "last_oof_receipts", [])
+                    or []
+                ),
             }
+            result = apply_service_matrix_scopes(result, has_oot_held_out=has_oot_held_out)
 
             if run_comparison:
                 comparison = create_model_comparison()
