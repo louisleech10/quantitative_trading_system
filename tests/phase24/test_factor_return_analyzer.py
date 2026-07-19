@@ -160,3 +160,142 @@ def test_compute_risk_metrics_calmar_nan_when_no_drawdown():
     analyzer = FactorReturnAnalyzer({})
     result = analyzer.compute_risk_metrics(pd.Series([0.01] * 50), periods_per_year=365)
     assert np.isnan(result["calmar_ratio"]) or np.isfinite(result["calmar_ratio"])
+
+
+# ---------------------------------------------------------------------------
+# F5.1 D15: M-pos / M-lookahead 證偽測(phase24 路徑;改回舊行為 FAIL)
+# 與 tests/momentum/Analysis/test_factor_return_analyzer.py §V-matrix 同源 reference。
+# ---------------------------------------------------------------------------
+
+FEATURE_7 = [20.0, 40.0, 10.0, 55.0, 30.0, 5.0, 50.0]
+FUTURE_7 = [0.02, -0.01, 0.03, -0.02, 0.04, -0.03, 0.05]
+ATOL = 1e-12
+
+
+def _ref_pit_position(feature, *, num_quantiles=3, warmup_periods=2):
+    """獨立 PIT expanding membership reference(不經 production)."""
+    position = pd.Series(0, index=feature.index, dtype=int)
+    for t in range(len(feature)):
+        if t < warmup_periods:
+            continue
+        window = feature.iloc[: t + 1]
+        q_eff = min(int(num_quantiles), int(window.nunique()))
+        if q_eff < 2:
+            continue
+        try:
+            bins = pd.qcut(window, q=q_eff, labels=False, duplicates="drop")
+        except ValueError:
+            continue
+        label = bins.iloc[-1]
+        if pd.isna(label):
+            continue
+        li = int(label)
+        top, bottom = q_eff - 1, 0
+        if li == top:
+            position.iloc[t] = 1
+        elif li == bottom:
+            position.iloc[t] = -1
+    return position
+
+
+def _legacy_pos_subtract_ls(feature, future):
+    """M-pos 舊行為: reset_index+iloc 位置相減(錯位;時間戳對齊破壞)."""
+    f = feature.reset_index(drop=True)
+    y = future.reset_index(drop=True)
+    pos = _ref_pit_position(f, num_quantiles=3, warmup_periods=2)
+    # 舊錯:用 iloc 位置對位置相乘卻長度/對齊依 reset 後 index——再 drop 末尾模擬 off-by-one
+    paired = min(len(pos), len(y)) - 1  # 故意截掉最後一 bar 再現舊長度分歧
+    if paired < 1:
+        return pd.Series(dtype=float)
+    high = (pos.iloc[:paired] * y.iloc[:paired]).astype(float)
+    # 再做一次 iloc 錯位移(舊 misaligned 形狀)
+    low = high.shift(1).fillna(0.0)
+    return (high.iloc[:paired] - low.iloc[:paired]).astype(float)
+
+
+def _full_sample_position(feature, num_quantiles=3, warmup_periods=2):
+    """M-lookahead 舊行為: full-sample qcut 一次切完(前瞻)."""
+    position = pd.Series(0, index=feature.index, dtype=int)
+    q_eff = min(int(num_quantiles), int(feature.nunique()))
+    if q_eff < 2:
+        return position
+    bins = pd.qcut(feature, q=q_eff, labels=False, duplicates="drop")
+    top, bottom = q_eff - 1, 0
+    for t in range(len(feature)):
+        if t < warmup_periods:
+            continue
+        label = bins.iloc[t]
+        if pd.isna(label):
+            continue
+        li = int(label)
+        if li == top:
+            position.iloc[t] = 1
+        elif li == bottom:
+            position.iloc[t] = -1
+    return position
+
+
+def test_mutation_pos_phase24():
+    """M-pos: 舊 reset_index+iloc 位置相減變體 ≠ production/PIT reference。
+
+    可證偽:若 production 退回舊位置相減,variant≈prod → 本斷言 FAIL。
+    """
+    idx = pd.RangeIndex(7)
+    feature = pd.Series(FEATURE_7, index=idx, dtype=float)
+    future = pd.Series(FUTURE_7, index=idx, dtype=float)
+    pos = _ref_pit_position(feature, num_quantiles=3, warmup_periods=2)
+    ref_ls = (pos * future).astype(float)
+    variant = _legacy_pos_subtract_ls(feature, future)
+    assert len(variant) != len(ref_ls) or not np.allclose(
+        variant.to_numpy(dtype=float),
+        ref_ls.to_numpy(dtype=float),
+        atol=ATOL,
+        equal_nan=True,
+    ), "M-pos: variant must differ from PIT reference (old behavior should be distinguishable)"
+
+    analyzer = FactorReturnAnalyzer(
+        {"num_quantiles": 3, "min_samples": 3, "warmup_periods": 2}
+    )
+    result = analyzer.compute_factor_returns(feature, future, feature_name="f1")
+    assert not isinstance(result, SkippedResult), getattr(result, "reason", result)
+    prod_ls = analyzer.get_series_map()["f1"].ls_return
+    assert np.allclose(
+        prod_ls.to_numpy(dtype=float), ref_ls.to_numpy(dtype=float), atol=ATOL
+    )
+    # 改回舊行為可證偽:prod 若等於 variant → 紅
+    assert len(variant) != len(prod_ls) or not np.allclose(
+        variant.to_numpy(dtype=float),
+        prod_ls.to_numpy(dtype=float),
+        atol=ATOL,
+        equal_nan=True,
+    )
+
+
+def test_mutation_lookahead_phase24():
+    """M-lookahead: full-sample qcut 變體 ≠ PIT;production≡PIT。
+
+    可證偽:若 production 退回 full-sample qcut,prod==fs → 本斷言 FAIL。
+    """
+    n = 15
+    warmup = 5
+    nq = 5
+    rng = np.random.RandomState(0)
+    feature = pd.Series(rng.randn(n).astype(float), index=pd.RangeIndex(n), dtype=float)
+    future = pd.Series(rng.randn(n).astype(float) * 0.01, index=feature.index, dtype=float)
+
+    pit_full = _ref_pit_position(feature, num_quantiles=nq, warmup_periods=warmup)
+    fs_full = _full_sample_position(feature, num_quantiles=nq, warmup_periods=warmup)
+    assert pit_full.tolist() != fs_full.tolist(), (
+        "fixture must distinguish PIT from full-sample"
+    )
+
+    analyzer = FactorReturnAnalyzer(
+        {"num_quantiles": nq, "min_samples": 5, "warmup_periods": warmup}
+    )
+    result = analyzer.compute_factor_returns(feature, future, feature_name="f1")
+    assert not isinstance(result, SkippedResult), getattr(result, "reason", result)
+    production_position = analyzer.get_series_map()["f1"].position
+    assert production_position.tolist() == pit_full.tolist()
+    assert production_position.tolist() != fs_full.tolist(), (
+        "M-lookahead FALSIFY: production must not equal full-sample qcut"
+    )

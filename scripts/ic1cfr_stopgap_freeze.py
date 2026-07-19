@@ -1021,8 +1021,10 @@ def freeze_after_default() -> int:
 
 
 def freeze_after_explicit() -> int:
-    """§G after-explicit: force_modules 含 factor_returns → §U union + summary unavailable.
+    """§G after-explicit(F5.1): force_modules 含 factor_returns → §U ok + summary completed.
 
+    舊(stopgap): expected unavailable + null value + misaligned reason。
+    舊為何錯: F0+F1+F2 後 force 真算 ok union;再凍 unavailable 會把 FULL 真值當回歸。
     另做 §G 非 FR 逐 path exact vs before.json。
     """
     from datetime import datetime, timezone
@@ -1032,24 +1034,32 @@ def freeze_after_explicit() -> int:
     module_summary = report_dict.get("module_summary") or {}
     fr_status = module_summary.get("factor_returns")
     fr_body = (report_dict.get("results") or {}).get("factor_returns")
-    if fr_status != "unavailable":
+    if fr_status != "completed":
         raise SystemExit(
             f"FAIL after-explicit: module_summary.factor_returns={fr_status!r} "
-            "expected 'unavailable'"
+            "expected 'completed'"
         )
     if not isinstance(fr_body, dict):
         raise SystemExit("FAIL after-explicit: results.factor_returns missing or not dict")
-    if fr_body.get("status") != "unavailable":
+    if fr_body.get("status") != "ok":
         raise SystemExit(
-            f"FAIL after-explicit: union status={fr_body.get('status')!r} expected unavailable"
+            f"FAIL after-explicit: union status={fr_body.get('status')!r} expected ok"
         )
-    if fr_body.get("value") is not None:
-        raise SystemExit("FAIL after-explicit: union value must be null")
+    value = fr_body.get("value")
+    if not isinstance(value, dict):
+        raise SystemExit("FAIL after-explicit: union value must be ok dict")
+    if value.get("schema_version") != "fr_full_v1":
+        raise SystemExit(
+            f"FAIL after-explicit: schema_version={value.get('schema_version')!r} "
+            "expected fr_full_v1"
+        )
+    if fr_body.get("reason") is not None:
+        raise SystemExit(
+            f"FAIL after-explicit: ok path reason must be null, got {fr_body.get('reason')!r}"
+        )
     reason = str(fr_body.get("reason") or "")
-    if UNAVAILABLE_REASON not in reason and "ls_returns_timestamp_misaligned" not in reason:
-        raise SystemExit(f"FAIL after-explicit: unexpected reason={reason!r}")
-    if _has_finite_numeric_leaf(fr_body):
-        raise SystemExit("FAIL after-explicit: factor_returns still has finite numeric leaf")
+    if "ls_returns_timestamp_misaligned" in reason or "legacy_misaligned" in reason:
+        raise SystemExit(f"FAIL after-explicit: ok path must not carry stopgap reason={reason!r}")
 
     errors = report_dict.get("deep_analysis_errors") or []
     for err in errors:
@@ -1085,8 +1095,8 @@ def freeze_after_explicit() -> int:
     print(f"raw_sha256={raw_digest}")
     print(f"canonical_sha256={canon}")
     print(f"module_summary.factor_returns={fr_status}")
-    print("factor_returns_union=unavailable")
-    print("factor_returns_finite_leaves=no")
+    print("factor_returns_union=ok")
+    print(f"schema_version={value.get('schema_version')}")
     print("non_fr_exact_vs_before=pass")
     return 0
 
@@ -1248,10 +1258,11 @@ def freeze_profile_before_full(*, out: str | None = None, fixture: str | None = 
 
 
 def freeze_profile_after_full(*, out: str | None = None, fixture: str | None = None) -> int:
-    """1c-FR-FULL after-full:同結構骨架;F0 後期望 ok union,本批僅旗標/骨架.
+    """1c-FR-FULL after-full(F5.1):硬性要求 §U ok union(F0 後真值)。
 
-    現況(pre-F0)FR 仍可能 unavailable——仍寫 JSON+sha256 供管線可跑;
-    F0 gate 重凍時若 status==ok 則記錄 schema_version 等。
+    舊(B0 scaffold):未達 ok 仍寫 JSON+pre-F0 note。
+    舊為何錯:F0-F4 全綠後 after-full 必須是 canonical ok 形狀;再允許 unavailable
+    會把 stopgap 假值當基線。
     """
     _assert_fixture_name(fixture)
     out_path = _resolve_out_path("after-full", out)
@@ -1264,24 +1275,49 @@ def freeze_profile_after_full(*, out: str | None = None, fixture: str | None = N
     if not isinstance(results, dict) or not results:
         raise SystemExit("FAIL after-full: report.results missing or empty")
 
+    if fr_status != "completed":
+        raise SystemExit(
+            f"FAIL after-full: module_summary.factor_returns={fr_status!r} "
+            "expected 'completed' (F0+ 真值;pre-F0 scaffold 已廢)"
+        )
+    if not isinstance(fr_body, dict):
+        raise SystemExit("FAIL after-full: results.factor_returns missing or not dict")
+    if fr_body.get("status") != "ok":
+        raise SystemExit(
+            f"FAIL after-full: union status={fr_body.get('status')!r} expected ok"
+        )
+    value = fr_body.get("value")
+    if not isinstance(value, dict):
+        raise SystemExit("FAIL after-full: ok union value must be dict")
+    if value.get("schema_version") != "fr_full_v1":
+        raise SystemExit(
+            f"FAIL after-full: schema_version={value.get('schema_version')!r} "
+            "expected fr_full_v1"
+        )
+    if value.get("semantics") != "single_asset_factor_timing_ls":
+        raise SystemExit(
+            f"FAIL after-full: semantics={value.get('semantics')!r} "
+            "expected single_asset_factor_timing_ls"
+        )
+    if fr_body.get("reason") is not None:
+        raise SystemExit(
+            f"FAIL after-full: ok path reason must be null, got {fr_body.get('reason')!r}"
+        )
+
     payload = _build_full_profile_payload("after-full", report_dict)
-    # F0 後:ok union 形狀註記(骨架已支援;未達 ok 不硬 fail——本批 B0 僅骨架)
-    if isinstance(fr_body, dict) and fr_body.get("status") == "ok":
-        value = fr_body.get("value") or {}
-        if isinstance(value, dict):
-            payload["after_full_notes"] = {
-                "factor_returns_status": "ok",
-                "schema_version": value.get("schema_version"),
-                "semantics": value.get("semantics"),
-            }
-    else:
-        payload["after_full_notes"] = {
-            "factor_returns_status": fr_status,
-            "note": (
-                "pre-F0 scaffold: FR not yet ok union; re-freeze after F0 for "
-                "canonical after_full hashes"
-            ),
-        }
+    payload["after_full_notes"] = {
+        "factor_returns_status": "ok",
+        "module_summary": fr_status,
+        "schema_version": value.get("schema_version"),
+        "semantics": value.get("semantics"),
+        "quantile_fit": value.get("quantile_fit"),
+        "note": "F5.1 re-freeze after F0-F4: canonical ok union (pre-F0 scaffold retired)",
+    }
+
+    # AST allowlist 重凍(F5.1;line 位移後刷新;與 --before 同寫檔)
+    allowlist_text = freeze_factory_allowlist()
+    FACTORY_ALLOWLIST.parent.mkdir(parents=True, exist_ok=True)
+    FACTORY_ALLOWLIST.write_text(allowlist_text, encoding="utf-8")
 
     raw_digest = _write_json(out_path, payload)
     canon = canonical_sha256(payload)
@@ -1295,6 +1331,10 @@ def freeze_profile_after_full(*, out: str | None = None, fixture: str | None = N
     print(f"canonical_sha256={canon}")
     print(f"module_summary.factor_returns={fr_status}")
     print(f"after_full_notes={payload.get('after_full_notes')}")
+    print(
+        f"factory_allowlist={FACTORY_ALLOWLIST.relative_to(REPO_ROOT).as_posix()} "
+        f"bytes={len(allowlist_text)}"
+    )
     print(f"sha256sum {rel} = {raw_digest}")
     return 0
 

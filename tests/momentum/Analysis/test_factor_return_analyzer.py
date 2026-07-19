@@ -807,11 +807,15 @@ def test_cache_hit_owner_consistency() -> None:
 
 
 def test_tier_truth_table() -> None:
-    """F1.2 D13: 四 tier × enabled 矩陣；mock enabled=True 時 foundation 仍不含。"""
+    """F1.2/F5.1 D13: 四 tier × enabled 矩陣；顯式 True/False 不依賴 schema 預設。
+
+    F5.1 改寫:舊支路硬斷言 ``ICConfig().factor_return.enabled is False``——F5.2 flip
+    後會假紅。改為顯式覆寫 enabled 測 tier 行為。
+    """
     from momentum.Analysis.ic_config_schema import ICConfig
     from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
 
-    # --- enabled=True mock：foundation 仍 False；其餘 True ---
+    # --- enabled=True：foundation 仍 False；其餘 True ---
     for preset, expect_enabled in (
         ("foundation", False),
         ("intermediate", True),
@@ -819,7 +823,7 @@ def test_tier_truth_table() -> None:
         ("custom", True),
     ):
         raw = ICConfig().model_dump(by_alias=True)
-        raw["factor_return"]["enabled"] = True  # mock F5.2 後
+        raw["factor_return"]["enabled"] = True
         raw["feature_tiers"]["active_preset"] = preset
         if preset == "custom":
             raw["feature_tiers"]["custom_overrides"] = {
@@ -830,20 +834,19 @@ def test_tier_truth_table() -> None:
         orch = ICFilterOrchestrator(cfg)
         applied = orch._apply_tier_config(cfg)
         assert applied.factor_return.enabled is expect_enabled, (
-            f"tier={preset} enabled=True mock → got {applied.factor_return.enabled}, "
+            f"tier={preset} enabled=True → got {applied.factor_return.enabled}, "
             f"want {expect_enabled}"
         )
 
-    # --- enabled=False（F1.2~F4 現況）：四 tier 皆不開 FR ---
+    # --- 顯式 enabled=False：四 tier 皆不開 FR ---
     for preset in ("foundation", "intermediate", "advanced", "custom"):
         raw = ICConfig().model_dump(by_alias=True)
-        assert raw["factor_return"]["enabled"] is False
+        raw["factor_return"]["enabled"] = False
         raw["feature_tiers"]["active_preset"] = preset
         if preset == "custom":
-            # custom 未覆寫 module → 保持 schema False
             raw["feature_tiers"]["custom_overrides"] = {
                 "stage_overrides": {},
-                "module_overrides": {},
+                "module_overrides": {"factor_return": False},
             }
         cfg = ICConfig.model_validate(raw)
         orch = ICFilterOrchestrator(cfg)
@@ -853,9 +856,72 @@ def test_tier_truth_table() -> None:
         )
 
 
-def test_tier_f12_enabled_still_false() -> None:
-    """F1.2 機械鎖：FactorReturnConfig / ICConfig 預設 enabled 仍 False。"""
-    from momentum.Analysis.ic_config_schema import FactorReturnConfig, ICConfig
+def test_trend_dimension_consistent() -> None:
+    """F5.1 codex R2-9 / SPEC §N: TrendAnalyzer factor_return dimension=N/A 接線。
 
-    assert FactorReturnConfig().enabled is False
-    assert ICConfig().factor_return.enabled is False
+    鎖定決策:保留 config ``dimensions`` 含 ``factor_return``(宣告能力面),
+    但 orchestrator ``_run_trend_analysis`` 不注入 P1 cumulative → payload 無
+    ``factor_return_trend``。二者一致=不宣稱已接卻無輸出。
+    """
+    from momentum.Analysis.ic_config_schema import ICConfig, TrendAnalysisConfig
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    # ① config 預設 dimensions 含 factor_return(能力面宣告;§N N/A 接線)
+    dims = list(TrendAnalysisConfig().dimensions)
+    assert "factor_return" in dims, (
+        "locked choice: keep factor_return in dimensions list; do not silently drop"
+    )
+
+    # ② deep run 後 trend payload 無 factor_return_trend
+    raw = ICConfig().model_dump(by_alias=True)
+    raw["factor_return"]["enabled"] = True
+    raw["trend_analysis"]["enabled"] = True
+    raw["feature_tiers"]["active_preset"] = "intermediate"
+    cfg = ICConfig.model_validate(raw)
+    orch = ICFilterOrchestrator(cfg)
+
+    n = 80
+    index = pd.date_range("2024-01-01", periods=n, freq="12h")
+    rng = np.random.default_rng(11)
+    features = pd.DataFrame(
+        {"feat_a": rng.normal(size=n), "feat_b": rng.normal(size=n)},
+        index=index,
+        dtype=float,
+    )
+    labels = pd.Series(rng.normal(scale=0.01, size=n), index=index, dtype=float)
+    orch._ic_cache = {
+        "features_df": features,
+        "label_series": labels,
+        "metadata": {},
+        "icir": {name: {"icir": 0.1, "ic_mean": 0.02} for name in features.columns},
+        "rolling_ic": {
+            name: {"30": (0.01 * features[name].rolling(10, min_periods=1).mean()).tolist()}
+            for name in features.columns
+        },
+        "ic_decay": {},
+        "grouped_ic": {},
+        "event_info": {},
+        "stage0_log": {},
+        "preproc_log": {},
+    }
+    orch._monotonicity_cache = {name: {} for name in features.columns}
+    orch._filtered_features_df = features.copy()
+    orch._report = {
+        "summary_table": [{"feature_name": n, "ic_mean": 0.03} for n in features.columns],
+        "turnover_analysis": {
+            n: {"quantile_turnover": 0.2} for n in features.columns
+        },
+    }
+
+    report = orch.run_deep_analysis(
+        force_modules=["factor_returns", "trend_analysis"],
+    )
+    trend = report.results.get("trend_analysis")
+    assert isinstance(trend, dict), f"trend_analysis missing: {report.results.keys()}"
+    # 每個 feature 節不得出現 factor_return_trend(N/A 未接)
+    for feat_name, payload in trend.items():
+        if not isinstance(payload, dict):
+            continue
+        assert "factor_return_trend" not in payload, (
+            f"§N N/A 接線違約: {feat_name} 出現 factor_return_trend={payload.get('factor_return_trend')!r}"
+        )

@@ -10,6 +10,7 @@ factory_caller|tests/momentum/Analysis/test_factor_return_analyzer.py
 factory_caller|tests/phase26/test_deep_analysis_factories.py
 # section: direct_consumers
 direct_consumer|momentum/factories.py:456:11
+direct_consumer|scripts/phase29_perf_validation_tmp.py:41:0
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:19:15
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:35:15
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:45:15
@@ -21,3 +22,5 @@ direct_consumer|tests/phase24/test_factor_return_analyzer.py:129:15
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:142:15
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:148:15
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:160:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:256:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:292:15
