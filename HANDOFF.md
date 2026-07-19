@@ -1,5 +1,5 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-19 | **Branch**: **feat/ic-1cfr-full-impl** | **狀態**: ✅ **1c-FR-FULL 完工(三方 DATA-CORRECT 全 PASS;待 push/merge)**
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-19 | **Branch**: **main** | **狀態**: ✅ **1c-FR-FULL 完工並合併 main(merge ca872d5,已 push;branch feat/ic-1cfr-full-impl 可刪)**
 
 ## ✅ 1c-FR-FULL 完工(branch feat/ic-1cfr-full-impl)
 - **SPEC v0.6.2 + TODO FROZEN**(winsorize REMOVE 四方一致/EXPANDING FINAL/pit_stats 手刻;TODO R1→R3.1 四輪 adversarial,三家 RECONCILE-STAMP PASS)。
