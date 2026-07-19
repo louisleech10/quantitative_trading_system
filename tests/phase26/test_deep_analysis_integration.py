@@ -93,10 +93,13 @@ def test_run_deep_analysis_generates_report_and_progress():
     assert isinstance(report, DeepAnalysisReport)
     assert report.total_modules == 10
     assert report.completed_count >= 1
-    # 舊斷言為何錯: `"factor_returns" in report.results` 假設預設會跑 FR;
-    # IC1C-FR-STOPGAP default-off → not_run 且無 results 節。
-    assert report.module_summary.get("factor_returns") == "not_run"
-    assert "factor_returns" not in report.results
+    # 舊(stopgap): default-off → not_run 且無 results。
+    # 舊為何錯: F5.2 flip 後 intermediate 預設 enabled=True → FR 真算 completed+§U ok。
+    assert report.module_summary.get("factor_returns") == "completed"
+    fr = report.results.get("factor_returns")
+    assert isinstance(fr, dict)
+    assert fr.get("status") == "ok"
+    assert (fr.get("value") or {}).get("schema_version") == "fr_full_v1"
     assert len(progress_events) > 0
     assert all("module_name" in event for event in progress_events)
 
@@ -111,9 +114,10 @@ def test_module_failure_is_isolated(monkeypatch):
 
     report = orchestrator.run_deep_analysis(force_modules=["trend_analysis", "factor_returns"])
 
-    # 舊斷言為何錯: force→`completed` 假設 compute_batch 仍可跑;
-    # IC1C-FR-STOPGAP 顯式開 → unavailable(非 completed),且不入 deep_analysis_errors。
-    assert report.module_summary["factor_returns"] == "unavailable"
+    # 舊(stopgap): force FR → unavailable。
+    # 舊為何錯: F0+F2 後 force 真算 ok/completed;trend 失敗仍隔離。
+    assert report.module_summary["factor_returns"] == "completed"
+    assert report.results["factor_returns"]["status"] == "ok"
     assert report.module_summary["trend_analysis"] == "skipped"
     assert any(err.module_name == "trend_analysis" for err in report.deep_analysis_errors)
     assert "factor_returns" not in [e.module_name for e in report.deep_analysis_errors]
@@ -139,6 +143,14 @@ def test_cache_hit_and_force_modules_recompute(monkeypatch):
 
 def test_refilter_clears_deep_analysis_cache(monkeypatch):
     orchestrator = _build_orchestrator()
+    # LA-0 / pit_stats 契約:refilter 讀 metadata.pit_stats_version + fit_mode
+    from momentum.Analysis.pit_stats import PIT_STATS_VERSION
+
+    orchestrator._ic_cache["metadata"] = {
+        "pit_stats_version": PIT_STATS_VERSION,
+        "fit_mode": "full",
+    }
+    orchestrator._active_fit_mode = "full"
     orchestrator._deep_analysis_cache["dummy"] = DeepAnalysisReport()
 
     monkeypatch.setattr(
@@ -182,8 +194,10 @@ def test_partial_failure_continues(monkeypatch):
         force_modules=["factor_returns", "factor_centrality", "trend_analysis"]
     )
 
-    # 舊斷言為何錯: force→`completed`;STOPGAP 顯式開→unavailable。
-    assert report.module_summary["factor_returns"] == "unavailable"
+    # 舊(stopgap): force FR → unavailable。
+    # 舊為何錯: FULL 後 force FR → completed/ok;centrality 失敗隔離不拖垮 FR/trend。
+    assert report.module_summary["factor_returns"] == "completed"
+    assert report.results["factor_returns"]["status"] == "ok"
     assert report.module_summary["factor_centrality"] == "skipped"
     assert report.module_summary["trend_analysis"] == "completed"
     assert report.module_summary["rolling_oos"] == "not_run"
@@ -213,15 +227,14 @@ def test_all_modules_skip(monkeypatch):
 
     report = orchestrator.run_deep_analysis(force_modules=all_modules)
 
-    # 舊斷言為何錯: skipped_count==10 假設 FR 亦走 skipped;
-    # IC1C-FR-STOPGAP 出口 sanitizer 將 results.factor_returns 換 §U →
-    # module_summary=unavailable, unavailable 不計 skipped → skipped_count=9。
+    # FULL 後:FR runner 例外仍先寫 skipped dict,但出口 sanitizer 對非 ok 形狀
+    # 一律收斂為 unavailable(legacy 擋),故 FR 不計 skipped → skipped_count=9。
+    # (與 stopgap 出口語意同;差別在「真算成功」路徑才是 ok/completed。)
     assert report.completed_count == 0
     assert report.skipped_count == 9
     assert report.module_summary["factor_returns"] == "unavailable"
     assert report.results["factor_returns"]["status"] == "unavailable"
     assert len(report.results) == 10
-    # runner 層仍可能把 FR 寫入 deep_analysis_errors;sanitizer 不剝 errors 列表
     assert len(report.deep_analysis_errors) == 10
 
 
