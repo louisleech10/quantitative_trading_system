@@ -1,16 +1,15 @@
-"""IC1C-FR-STOPGAP: factor_returns 輸出邊界 sanitizer(momentum-side 純函式).
+"""IC1C-FR-FULL F2: factor_returns 輸出邊界 sanitizer(momentum-side 純函式).
 
-遞迴把任意 payload 中的 ``factor_returns`` 節換成 §U union 佔位,
-summary 三欄(factor_return_ls_mean / factor_return_sharpe /
-factor_return_max_drawdown)→ null。冪等;禁 import api。
+§U discriminator:
+- ok union(有 status==\"ok\" + value.schema_version)→放行(冪等)
+- unavailable union → 放行/正規化(冪等)
+- 無 status 裸 legacy map → 擋,reason=`legacy_misaligned_factor_return_shape`
+- module_summary 與 results 狀態同步(ok→completed;unavailable→unavailable)
+- summary 三欄(factor_return_ls_mean / factor_return_sharpe /
+  factor_return_max_drawdown)→ null(由 reporter unwrap 重算)
+- completed_count / skipped_count 依 module_summary 重算
 
-狀態一致性(B1 退修):
-- results 風格 factor_returns → §U unavailable 佔位
-- module_summary.factor_returns 字串若為 legacy completed/非 not_run 終態
-  → 轉 unavailable(not_run 保留)
-- module_statuses 清單形態中 factor_returns 條目同規則
-- completed_count / skipped_count / deep_analysis_summary.completed|skipped
-  依 module_summary / module_statuses 重算(unavailable 不計 completed/skipped)
+禁 import api。
 """
 
 from __future__ import annotations
@@ -18,15 +17,20 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-UNAVAILABLE_REASON = "ls_returns_timestamp_misaligned (1c-FR-FULL)"
+# §C L54⑬: legacy 擋用新 reason;ok 路徑禁 ls_returns_timestamp_misaligned
+LEGACY_MISALIGNED_REASON = "legacy_misaligned_factor_return_shape"
+# 舊 stopgap reason 保留別名,僅供文件/對照;新 placeholder 用 LEGACY_MISALIGNED_REASON
+UNAVAILABLE_REASON = LEGACY_MISALIGNED_REASON
+
+FR_SCHEMA_VERSION = "fr_full_v1"
 
 FACTOR_RETURNS_PLACEHOLDER: dict[str, Any] = {
     "status": "unavailable",
     "value": None,
-    "reason": UNAVAILABLE_REASON,
+    "reason": LEGACY_MISALIGNED_REASON,
 }
 
-# reporter summary CSV / export 三欄
+# reporter summary CSV / export 三欄(sanitize 時清掉,由 unwrap 重填)
 _SUMMARY_NULL_KEYS: frozenset[str] = frozenset(
     {
         "factor_return_ls_mean",
@@ -37,43 +41,102 @@ _SUMMARY_NULL_KEYS: frozenset[str] = frozenset(
 
 _FACTOR_RETURNS_KEY = "factor_returns"
 
-# module_summary 狀態字串:not_run 為 default-off 合法終態,不改;
-# 其餘(含 legacy completed)在 results 已下架時改 unavailable
-_PRESERVE_SUMMARY_STATUSES: frozenset[str] = frozenset({"not_run", "unavailable"})
+# module_summary 狀態字串:not_run / unavailable / completed 在 discriminator 下可保留;
+# 最終以 _sync_module_summary_with_results 對齊 results.factor_returns.status
+_PRESERVE_SUMMARY_STATUSES: frozenset[str] = frozenset(
+    {"not_run", "unavailable", "completed"}
+)
+
+
+def is_ok_factor_returns_union(value: Any) -> bool:
+    """§U ok: status==ok 且 value.schema_version 存在."""
+    if not isinstance(value, dict):
+        return False
+    if value.get("status") != "ok":
+        return False
+    inner = value.get("value")
+    if not isinstance(inner, dict):
+        return False
+    return "schema_version" in inner
+
+
+def is_unavailable_factor_returns_union(value: Any) -> bool:
+    return isinstance(value, dict) and value.get("status") == "unavailable"
+
+
+def unwrap_factor_returns_features(payload: Any) -> dict[str, Any] | None:
+    """ok union → ``value.features``;否則 None(unavailable/legacy/缺欄)."""
+    if not is_ok_factor_returns_union(payload):
+        return None
+    inner = payload.get("value")
+    if not isinstance(inner, dict):
+        return None
+    features = inner.get("features")
+    if not isinstance(features, dict):
+        return None
+    return features
 
 
 def sanitize_factor_returns(payload: Any) -> Any:
-    """遞迴 sanitize factor_returns 有限值洩漏;冪等 pure function。
+    """遞迴 sanitize factor_returns;冪等 pure function。
 
-    - dict 鍵 ``factor_returns`` results 節 → §U 佔位
-    - module_summary.factor_returns 字串 → unavailable(除非 not_run)
-    - module_statuses 清單 entry → 同上
-    - dict 鍵屬 summary 三欄 → None
-    - completed_count / skipped_count / deep_analysis_summary 計數重算
-    - list/tuple 遞迴;其他葉值原樣
+    - ok §U union → 原樣放行
+    - unavailable §U union → 正規化佔位(冪等)
+    - 無 status 裸 map → legacy 佔位
+    - module_summary 與 results 同步
+    - summary 三欄 → None
+    - completed_count / skipped_count 重算
     """
     cleaned = _sanitize_node(payload)
+    cleaned = _sync_module_summary_with_results(cleaned)
     return _recompute_status_counts(cleaned)
 
 
 def _is_results_style_factor_returns(value: Any) -> bool:
-    """判斷 factor_returns 值是否為 results 節(需換佔位),而非 module_summary 字串狀態."""
+    """判斷 factor_returns 值是否為 results 節(非 module_summary 字串狀態)."""
     if isinstance(value, str):
-        # module_summary.factor_returns = "not_run"|"unavailable"|...
         return False
     if value is None:
         return False
-    # dict/list 等皆視為 results 節或 legacy 有限 payload
     return True
 
 
+def _discriminate_factor_returns_value(value: Any) -> Any:
+    """對 results 風格 factor_returns 套 discriminator;回傳替換後的值."""
+    if not _is_results_style_factor_returns(value):
+        return value
+    # ok union → 放行(含有限葉)
+    if is_ok_factor_returns_union(value):
+        # 保證 reason is None(ok 路徑禁舊 misaligned reason)
+        out = dict(value)
+        out["status"] = "ok"
+        if out.get("reason") is not None:
+            out["reason"] = None
+        return out
+    # 已是 unavailable union → 冪等正規化
+    if is_unavailable_factor_returns_union(value):
+        reason = value.get("reason")
+        if not isinstance(reason, str) or not reason:
+            reason = LEGACY_MISALIGNED_REASON
+        return {
+            "status": "unavailable",
+            "value": None,
+            "reason": reason,
+        }
+    # status 存在但非 ok/unavailable(畸形)或無 status 裸 map → 擋
+    return dict(FACTOR_RETURNS_PLACEHOLDER)
+
+
 def _normalize_summary_status(status: Any) -> Any:
-    """module_summary / module_statuses 的 factor_returns 狀態正規化."""
+    """module_summary / module_statuses 的 factor_returns 狀態初步正規化.
+
+    completed 暫保留,最終由 _sync_module_summary_with_results 對齊 results。
+    """
     if not isinstance(status, str):
         return status
     if status in _PRESERVE_SUMMARY_STATUSES:
         return status
-    # legacy completed / failed / skipped 等 → unavailable(下架語意)
+    # failed / skipped 等 → unavailable
     return "unavailable"
 
 
@@ -91,19 +154,15 @@ def _sanitize_module_status_entry(entry: Any) -> Any:
 def _sanitize_node(node: Any) -> Any:
     if isinstance(node, dict):
         out: dict[str, Any] = {}
-        # module_summary 特殊處理:factor_returns 字串狀態正規化
         is_module_summary = (
             "factor_returns" in node
             and isinstance(node.get("factor_returns"), str)
-            and all(
-                isinstance(v, str) or v is None
-                for v in node.values()
-            )
-            and not any(k in node for k in ("results", "module_summary", "deep_analysis_summary"))
-            and not any(k in _SUMMARY_NULL_KEYS for k in node)
+            and all(isinstance(v, str) or v is None for v in node.values())
             and not any(
-                isinstance(v, (dict, list)) for v in node.values()
+                k in node for k in ("results", "module_summary", "deep_analysis_summary")
             )
+            and not any(k in _SUMMARY_NULL_KEYS for k in node)
+            and not any(isinstance(v, (dict, list)) for v in node.values())
         )
         for key, value in node.items():
             key_str = str(key)
@@ -116,17 +175,23 @@ def _sanitize_node(node: Any) -> Any:
                     mk_str = str(mk)
                     if mk_str == _FACTOR_RETURNS_KEY and isinstance(mv, str):
                         ms[mk_str] = _normalize_summary_status(mv)
-                    elif mk_str == _FACTOR_RETURNS_KEY and _is_results_style_factor_returns(mv):
-                        ms[mk_str] = "unavailable"
+                    elif mk_str == _FACTOR_RETURNS_KEY and _is_results_style_factor_returns(
+                        mv
+                    ):
+                        # 誤把 results 塞進 summary → 走 discriminator 後若 ok 則 completed
+                        disc = _discriminate_factor_returns_value(mv)
+                        if is_ok_factor_returns_union(disc):
+                            ms[mk_str] = "completed"
+                        else:
+                            ms[mk_str] = "unavailable"
                     else:
                         ms[mk_str] = _sanitize_node(mv)
                 out[key_str] = ms
                 continue
             if key_str == _FACTOR_RETURNS_KEY:
                 if _is_results_style_factor_returns(value):
-                    out[key_str] = dict(FACTOR_RETURNS_PLACEHOLDER)
+                    out[key_str] = _discriminate_factor_returns_value(value)
                 elif isinstance(value, str):
-                    # 裸 module_summary 風格或誤嵌字串:正規化狀態
                     if is_module_summary or key_str == _FACTOR_RETURNS_KEY:
                         out[key_str] = _normalize_summary_status(value)
                     else:
@@ -140,18 +205,55 @@ def _sanitize_node(node: Any) -> Any:
             out[key_str] = _sanitize_node(value)
         return out
     if isinstance(node, list):
-        # 可能是 module_statuses 清單(在父層已處理);一般 list 遞迴
         return [_sanitize_node(item) for item in node]
     if isinstance(node, tuple):
         return tuple(_sanitize_node(item) for item in node)
-    # 葉:原樣(含 None/str/bool/number);不 deepcopy 不可變葉
     if isinstance(node, (str, int, float, bool, type(None))):
         return node
-    # 其餘(numpy scalar 等)淺拷即可;避免對未知物件 deepcopy 失敗
     try:
         return deepcopy(node)
     except Exception:  # noqa: BLE001
         return node
+
+
+def _sync_module_summary_with_results(node: Any) -> Any:
+    """對齊 module_summary.factor_returns 與 results.factor_returns.status.
+
+    - results ok → summary completed
+    - results unavailable → summary unavailable(不覆寫 not_run 若 results 無 FR 節)
+    """
+    if isinstance(node, list):
+        return [_sync_module_summary_with_results(x) for x in node]
+    if isinstance(node, tuple):
+        return tuple(_sync_module_summary_with_results(x) for x in node)
+    if not isinstance(node, dict):
+        return node
+
+    out: dict[str, Any] = {
+        str(k): _sync_module_summary_with_results(v) for k, v in node.items()
+    }
+
+    results = out.get("results")
+    ms = out.get("module_summary")
+    if isinstance(results, dict) and isinstance(ms, dict):
+        fr = results.get(_FACTOR_RETURNS_KEY)
+        if isinstance(fr, dict) and "status" in fr:
+            ms2 = dict(ms)
+            st = fr.get("status")
+            if st == "ok":
+                ms2[_FACTOR_RETURNS_KEY] = "completed"
+            elif st == "unavailable":
+                # 有 results 節則不得殘 completed
+                ms2[_FACTOR_RETURNS_KEY] = "unavailable"
+            out["module_summary"] = ms2
+        # results 無 factor_returns → 保留既有 not_run / 缺省
+
+    # 頂層 deep report 亦可能 results 嵌在 deep_analysis_report
+    deep = out.get("deep_analysis_report")
+    if isinstance(deep, dict):
+        out["deep_analysis_report"] = _sync_module_summary_with_results(deep)
+
+    return out
 
 
 def _statuses_from_payload(node: Any) -> dict[str, str] | None:
@@ -231,7 +333,6 @@ def has_finite_numeric_leaf(obj: Any) -> bool:
         import math
 
         return math.isfinite(float(obj))
-    # numpy scalar
     try:
         import numpy as np
 
@@ -245,15 +346,17 @@ def has_finite_numeric_leaf(obj: Any) -> bool:
 
 
 def assert_no_finite_in_factor_returns_subtree(payload: Any) -> None:
-    """遞迴掃描 payload 內所有 factor_returns 子樹,禁任何有限 numeric leaf.
+    """遞迴掃描 payload 內 factor_returns 子樹,禁有限 numeric leaf.
 
-    用於 AI/Markdown/export oracle;比字面禁字更強,防 size/samples 等 meta 假綠。
+    F2 ⑮:ok §U union **豁免**(僅 legacy 裸 map / unavailable 畸形斷言)。
     """
     if isinstance(payload, dict):
         for key, value in payload.items():
             if str(key) == _FACTOR_RETURNS_KEY:
                 if isinstance(value, str):
-                    # status 字串無 numeric leaf
+                    continue
+                # ok union 放行有限葉
+                if is_ok_factor_returns_union(value):
                     continue
                 if has_finite_numeric_leaf(value):
                     raise AssertionError(

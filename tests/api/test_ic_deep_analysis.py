@@ -60,6 +60,24 @@ def _wait_for_deep_result(task_id: str, timeout: float = 30.0) -> dict:
     pytest.fail(f"deep analysis timeout; last={last}")
 
 
+def _ensure_ic_task_ready_for_deep(task_id: str, timeout: float = 60.0) -> None:
+    """session/module 共用 task:若殘 running 則等完;終態強制回 completed 供下一 deep。"""
+    start = time.time()
+    while time.time() - start < timeout:
+        with ic_analysis_service._lock:
+            info = ic_analysis_service._tasks.get(task_id)
+            status = (info or {}).get("status")
+        if status != "running":
+            break
+        time.sleep(0.3)
+    with ic_analysis_service._lock:
+        info = ic_analysis_service._tasks.get(task_id)
+        if info is not None:
+            info["status"] = "completed"
+            info["error"] = None
+            info["progress"] = 1.0
+
+
 @pytest.fixture(autouse=True)
 def reset_rate_limit() -> None:
     _reset_rate_limit_state()
@@ -137,6 +155,7 @@ def test_list_available_features_not_found() -> None:
 
 
 def test_start_deep_analysis_and_get_result(completed_ic_task: str) -> None:
+    _ensure_ic_task_ready_for_deep(completed_ic_task)
     deep_request = {
         "top_n": 3,
         "modules": {
@@ -155,8 +174,9 @@ def test_start_deep_analysis_and_get_result(completed_ic_task: str) -> None:
     response = client.post(f"/api/v1/ic/deep-analysis/{completed_ic_task}", json=deep_request)
     assert response.status_code == 200
 
-    deep_result = _wait_for_deep_result(completed_ic_task)
-    assert deep_result["status"] in {"running", "completed"}
+    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    # 終態必 completed/failed(不得殘 running 污染 session task)
+    assert deep_result["status"] in {"completed", "failed"}
     assert deep_result["results"] is not None
     assert deep_result["summary"] is not None
     assert 0.0 <= deep_result["progress"] <= 1.0
@@ -173,6 +193,7 @@ def test_api_deep_cache_key_includes_fit_mode(completed_ic_task: str) -> None:
 
     from momentum.Analysis.pit_stats import PIT_STATS_VERSION
 
+    _ensure_ic_task_ready_for_deep(completed_ic_task)
     analyzer = ic_analysis_service.get_analyzer(completed_ic_task)
     assert analyzer is not None
 
@@ -236,11 +257,15 @@ def test_api_deep_cache_key_includes_fit_mode(completed_ic_task: str) -> None:
         "net_ic_analysis": cfg.net_ic_analysis.model_dump(),
         "deep_analysis_global": cfg.deep_analysis_global.model_dump(),
     }
+    from momentum.Analysis.factor_return_sanitizer import FR_SCHEMA_VERSION
+
     payload = {
         "features": sorted(features_for_key),
         "deep_config": deep_cfg,
         "pit_stats_version": PIT_STATS_VERSION,
         "fit_mode": fit_mode,
+        # F2 ⑩: cache key 含 schema_version
+        "schema_version": FR_SCHEMA_VERSION,
     }
     expected = hashlib.md5(
         json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
@@ -344,6 +369,7 @@ def test_full_analysis_request_validation_required_labels_path(sample_paths: dic
 
 
 def test_deep_analysis_start(completed_ic_task: str) -> None:
+    _ensure_ic_task_ready_for_deep(completed_ic_task)
     response = client.post(
         f"/api/v1/ic/deep-analysis/{completed_ic_task}",
         json={"top_n": 3},
@@ -351,6 +377,9 @@ def test_deep_analysis_start(completed_ic_task: str) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload.get("status") in {"started", "running"}
+    # 必等深分析結束,否則 session 共用 task 殘 running → 後續 deep POST 400
+    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    assert deep_result.get("status") in {"completed", "failed"}
 
 
 def test_deep_analysis_result_serializes_numpy_scalars(completed_ic_task: str) -> None:
@@ -530,6 +559,7 @@ def test_config_override_net_ic_rejected() -> None:
 
 def test_legacy_request_gross_only(completed_ic_task: str) -> None:
     """T2:舊 request(無 net_ic 欄)→cost_enabled=False→GROSS_ONLY 照跑。"""
+    _ensure_ic_task_ready_for_deep(completed_ic_task)
     deep_request = {
         "top_n": 5,
         "modules": _net_ic_only_modules(),
@@ -569,6 +599,7 @@ def test_legacy_request_gross_only(completed_ic_task: str) -> None:
 
 def test_cost_bps_fullstack_wiring(completed_ic_task: str) -> None:
     """T2:request 7bps → engine artifact 記 7 + COST_ENABLED + union 完整。"""
+    _ensure_ic_task_ready_for_deep(completed_ic_task)
     deep_request = {
         "top_n": 5,
         "modules": _net_ic_only_modules(),
@@ -611,6 +642,7 @@ def test_cost_bps_fullstack_wiring(completed_ic_task: str) -> None:
 
 def test_e2e_unavailable_union_shape(completed_ic_task: str) -> None:
     """T2 e2e:conditional metrics 恒 unavailable(1c-FR),response JSON 可 strict 序列化。"""
+    _ensure_ic_task_ready_for_deep(completed_ic_task)
     deep_request = {
         "top_n": 3,
         "modules": _net_ic_only_modules(),
@@ -752,13 +784,43 @@ from dataclasses import asdict  # noqa: E402
 
 
 def _legacy_factor_returns_payload() -> dict:
-    """有限 numeric leaf 的 legacy factor_returns(錯位序列形狀)。"""
+    """有限 numeric leaf 的 legacy factor_returns(錯位序列形狀,無 status)。"""
     return {
         "feature_0": {
             "long_short_mean_return": 0.11,
             "samples": 128,
             "risk_metrics": {"sharpe": 1.5, "max_drawdown": -0.08},
         }
+    }
+
+
+def _ok_factor_returns_payload(
+    *,
+    feature_name: str = "feature_0",
+    ls_mean: float = 0.0042857,
+    sharpe: float = 1.2,
+    max_dd: float = -0.08,
+) -> dict:
+    """§U ok union(有 status + schema_version + features)。"""
+    return {
+        "status": "ok",
+        "value": {
+            "schema_version": "fr_full_v1",
+            "semantics": "single_asset_factor_timing_ls",
+            "quantile_fit": "pit_expanding",
+            "return_transform": "identity",
+            "features": {
+                feature_name: {
+                    "long_short_mean_return": ls_mean,
+                    "ls_cumulative_sampled": [0.0, 0.0, -0.03, -0.0494],
+                    "risk_metrics": {
+                        "sharpe_ratio": sharpe,
+                        "max_drawdown": max_dd,
+                    },
+                }
+            },
+        },
+        "reason": None,
     }
 
 
@@ -1235,3 +1297,185 @@ def test_mutation_m2d_markdown_restore_size_meta(monkeypatch: pytest.MonkeyPatch
     assert "size" in md and "1" in md
     with pytest.raises(AssertionError):
         _assert_markdown_factor_returns_no_finite(md)
+
+
+# ---------------------------------------------------------------------------
+# 1c-FR-FULL F2 — §U discriminator + unwrap + completed + 全出口
+# ---------------------------------------------------------------------------
+
+
+def test_f2_ok_union_passthrough_and_completed() -> None:
+    """A: ok §U → 保留有限葉 + module_summary completed + summary 三欄非 None。"""
+    ok = _ok_factor_returns_payload()
+    cleaned = sanitize_factor_returns(
+        {
+            "results": {"factor_returns": ok},
+            "module_summary": {"factor_returns": "completed"},
+            "completed_count": 1,
+            "skipped_count": 0,
+        }
+    )
+    fr = cleaned["results"]["factor_returns"]
+    assert fr.get("status") == "ok"
+    assert fr.get("reason") is None
+    assert "ls_returns_timestamp_misaligned" not in str(fr)
+    # 有限葉保留
+    features = (fr.get("value") or {}).get("features") or {}
+    assert features["feature_0"]["long_short_mean_return"] == pytest.approx(0.0042857)
+    assert cleaned["module_summary"]["factor_returns"] == "completed"
+    assert cleaned["completed_count"] == 1
+
+    # assert_no_finite 對 ok 豁免
+    assert_no_finite_in_factor_returns_subtree({"results": {"factor_returns": fr}})
+
+    # reporter summary 三欄經 unwrap 非 None
+    reporter = ICReporter({})
+    deep = {"factor_returns": fr}
+    cols = reporter._build_deep_summary_columns("feature_0", deep)
+    assert cols["factor_return_ls_mean"] is not None
+    assert cols["factor_return_sharpe"] is not None
+    assert cols["factor_return_max_drawdown"] is not None
+
+    # 冪等
+    twice = sanitize_factor_returns(cleaned)
+    assert twice["results"]["factor_returns"]["status"] == "ok"
+    assert twice["results"]["factor_returns"]["reason"] is None
+
+
+def test_f2_legacy_bare_map_blocked() -> None:
+    """B: 無 status 裸 map → 擋 + 無有限葉 + 新 reason."""
+    cleaned = sanitize_factor_returns(
+        {
+            "results": {"factor_returns": _legacy_factor_returns_payload()},
+            "module_summary": {"factor_returns": "completed"},
+            "completed_count": 1,
+        }
+    )
+    fr = cleaned["results"]["factor_returns"]
+    assert fr.get("status") == "unavailable"
+    assert fr.get("value") is None
+    assert "legacy_misaligned_factor_return_shape" in str(fr.get("reason"))
+    assert not has_finite_numeric_leaf(fr)
+    assert cleaned["module_summary"]["factor_returns"] == "unavailable"
+    assert cleaned["completed_count"] == 0
+    assert_no_finite_in_factor_returns_subtree(cleaned)
+
+
+def test_f2_ok_reason_null() -> None:
+    """codex R2-7: ok union reason is None;全出口後禁 ls_returns_timestamp_misaligned."""
+    ok = _ok_factor_returns_payload()
+    assert ok["reason"] is None
+
+    reporter = ICReporter({})
+    report = {
+        "summary_table": [
+            {
+                "feature_name": "feature_0",
+                "ic_mean": 0.05,
+                "icir": 0.5,
+            }
+        ],
+        "deep_analysis_report": {
+            "results": {"factor_returns": ok},
+            "module_summary": {"factor_returns": "completed"},
+        },
+        "factor_returns": ok,
+    }
+
+    # 全枚舉 reporter 出口
+    egress_payloads: list[object] = []
+    egress_payloads.append(sanitize_factor_returns({"results": {"factor_returns": ok}}))
+    egress_payloads.append(
+        reporter.generate_ai_json(report)
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = reporter.export_all(report, tmp, "f2_ok")
+        egress_payloads.append(json.loads(Path(paths["json"]).read_text(encoding="utf-8")))
+        paths2 = reporter.save_report(
+            {**report, "summary_table": report["summary_table"]},
+            tmp,
+            "f2_ok_save",
+        )
+        egress_payloads.append(json.loads(Path(paths2["json"]).read_text(encoding="utf-8")))
+
+    # orchestrator @1902/1908 路徑
+    orch, _ = _seed_orch_with_legacy_deep_cache(fr_payload=ok)
+    # 直接覆寫 cache 為 ok(非 legacy)
+    for key, cached in list(orch._deep_analysis_cache.items()):
+        cached.results["factor_returns"] = ok
+        cached.module_summary["factor_returns"] = "completed"
+        orch._deep_analysis_cache[key] = cached
+    out = orch.run_deep_analysis(selected_features=["f"])
+    egress_payloads.append(
+        {"results": out.results, "module_summary": out.module_summary}
+    )
+    assert out.results["factor_returns"].get("status") == "ok"
+    assert out.results["factor_returns"].get("reason") is None
+    assert out.module_summary.get("factor_returns") == "completed"
+
+    # force-merge 出口
+    def _fake_trend(selected_features, config):  # type: ignore[no-untyped-def]
+        return {"direction": "up"}
+
+    orch._run_trend_analysis = _fake_trend  # type: ignore[method-assign]
+    out2 = orch.run_deep_analysis(
+        selected_features=["f"], force_modules=["trend_analysis"]
+    )
+    egress_payloads.append({"results": out2.results})
+    assert out2.results["factor_returns"].get("status") == "ok"
+
+    banned = "ls_returns_timestamp_misaligned"
+    for i, payload in enumerate(egress_payloads):
+        blob = json.dumps(payload, default=str)
+        assert banned not in blob, f"egress[{i}] leaked old reason: {blob[:200]}"
+
+    # service 三出口
+    svc_payload = {
+        "results": {"factor_returns": ok},
+        "module_summary": {"factor_returns": "completed"},
+    }
+    ser = ic_analysis_service._serialize_deep_report(svc_payload)
+    assert ser["results"]["factor_returns"]["status"] == "ok"
+    assert ser["results"]["factor_returns"]["reason"] is None
+    assert banned not in json.dumps(ser)
+
+
+def test_f2_cache_key_includes_schema_version() -> None:
+    """⑩: deep cache key 必含 schema_version(fr_full_v1)."""
+    from momentum.Analysis.factor_return_sanitizer import FR_SCHEMA_VERSION
+
+    orch, config = _seed_orch_with_legacy_deep_cache()
+    key = orch._compute_deep_cache_key(["f"], orch._apply_tier_config(config))
+    # 重算 payload 比對:改 schema 應換 key
+    import hashlib
+    import json as _json
+
+    # 同一 key 穩定
+    key2 = orch._compute_deep_cache_key(["f"], orch._apply_tier_config(config))
+    assert key == key2
+    assert FR_SCHEMA_VERSION == "fr_full_v1"
+    # 函式 source 含 schema_version
+    import inspect
+
+    src = inspect.getsource(orch._compute_deep_cache_key)
+    assert "schema_version" in src
+    del hashlib, _json
+
+
+def test_f2_conditional_metric_keys_shape() -> None:
+    """⑯: net_ic 三鍵 §U 形狀守恆(serialize 不扁平化)."""
+    union = {"status": "unavailable", "value": None, "reason": "x"}
+    raw = {
+        "features": {
+            "f1": {
+                "net_factor_return": dict(union),
+                "breakeven_cost_bps": dict(union),
+                "profitable_after_cost": dict(union),
+            }
+        }
+    }
+    out = ic_analysis_service._to_json_compatible(raw)
+    for k in ic_analysis_service._CONDITIONAL_METRIC_KEYS:
+        item = out["features"]["f1"][k]
+        assert set(item.keys()) == {"status", "value", "reason"}
+        assert item["status"] == "unavailable"

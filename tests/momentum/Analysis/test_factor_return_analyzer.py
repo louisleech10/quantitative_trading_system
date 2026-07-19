@@ -233,7 +233,7 @@ def test_index_subset() -> None:
 
 
 def test_reporter_sharpe_key_aligned() -> None:
-    """D9: analyzer 鍵 sharpe_ratio == reporter 讀取鍵."""
+    """D9: analyzer 鍵 sharpe_ratio == reporter 讀取鍵(經 §U unwrap)."""
     idx = pd.RangeIndex(7)
     feature = pd.Series(FEATURE_7, index=idx, name="f1", dtype=float)
     future = pd.Series(FUTURE_7, index=idx, name="y", dtype=float)
@@ -245,9 +245,18 @@ def test_reporter_sharpe_key_aligned() -> None:
     assert "sharpe_ratio" in payload["risk_metrics"]
     assert "sharpe" not in payload["risk_metrics"]
 
-    # 模擬 deep_payload 為 per-feature map(reporter 在 unwrap 前/legacy 讀路徑)
-    deep_payload = {"factor_returns": {"f1": payload}}
-    # ICReporter 需 config;用空 dict 即可走 _build_deep_summary_columns
+    # F2: deep_payload 為 §U ok union;reporter 經 _unwrap_factor_returns 讀 features
+    deep_payload = {
+        "factor_returns": {
+            "status": "ok",
+            "value": {
+                "schema_version": "fr_full_v1",
+                "semantics": "single_asset_factor_timing_ls",
+                "features": {"f1": payload},
+            },
+            "reason": None,
+        }
+    }
     reporter = ICReporter(config={})
     cols = reporter._build_deep_summary_columns("f1", deep_payload)
     sharpe_from_reporter = cols["factor_return_sharpe"]
@@ -267,6 +276,64 @@ def test_reporter_sharpe_key_aligned() -> None:
     # 舊讀取鍵 "sharpe" 不得作為 risk_metrics 欄位名殘留
     assert 'None,\n                "sharpe",' not in src
     assert 'None, "sharpe"' not in src
+
+
+def test_mutation_unwrap() -> None:
+    """M-unwrap: reporter 不 unwrap .value.features → summary 三欄 null."""
+    payload = {
+        "long_short_mean_return": 0.01,
+        "risk_metrics": {"sharpe_ratio": 1.2, "max_drawdown": -0.05},
+    }
+    deep_payload = {
+        "factor_returns": {
+            "status": "ok",
+            "value": {
+                "schema_version": "fr_full_v1",
+                "features": {"f1": payload},
+            },
+            "reason": None,
+        }
+    }
+    reporter = ICReporter(config={})
+    # 正常路徑:有值
+    cols_ok = reporter._build_deep_summary_columns("f1", deep_payload)
+    assert cols_ok["factor_return_ls_mean"] is not None
+    assert cols_ok["factor_return_sharpe"] is not None
+
+    # mutation:繞過 unwrap,直接把頂層 union 當 feature map
+    def _no_unwrap(self, p):  # type: ignore[no-untyped-def]
+        return None
+
+    reporter._unwrap_factor_returns = _no_unwrap.__get__(reporter, ICReporter)  # type: ignore[method-assign]
+    cols_bad = reporter._build_deep_summary_columns("f1", deep_payload)
+    assert cols_bad["factor_return_ls_mean"] is None
+    assert cols_bad["factor_return_sharpe"] is None
+    assert cols_bad["factor_return_max_drawdown"] is None
+
+
+def test_mutation_key() -> None:
+    """M-key: reporter 讀 sharpe 舊鍵 → summary sharpe null."""
+    payload = {
+        "long_short_mean_return": 0.01,
+        "risk_metrics": {"sharpe_ratio": 1.2, "max_drawdown": -0.05},
+    }
+    deep_payload = {
+        "factor_returns": {
+            "status": "ok",
+            "value": {
+                "schema_version": "fr_full_v1",
+                "features": {"f1": payload},
+            },
+            "reason": None,
+        }
+    }
+    reporter = ICReporter(config={})
+    # 模擬讀錯鍵:手動走 risk_metrics 但取 sharpe
+    features = reporter._unwrap_factor_returns(deep_payload["factor_returns"])
+    assert features is not None
+    rm = (features.get("f1") or {}).get("risk_metrics") or {}
+    assert rm.get("sharpe") is None  # 舊鍵不存在 → null
+    assert rm.get("sharpe_ratio") is not None
 
 
 def test_compute_batch_ok_union_schema() -> None:
@@ -657,15 +724,17 @@ def test_series_owner_reachable() -> None:
     # 全序列有限（非只挑一個 finite 過關）
     assert np.isfinite(art.ls_return.to_numpy(dtype=float)).all()
 
-    # force_modules 路徑亦寫入 owner（不經 sanitizer 斷言 completed——D16/F2）
+    # force_modules 路徑亦寫入 owner;F2 出口放行 ok + completed(D16)
     orch2 = _build_orch_for_f1()
     report = orch2.run_deep_analysis(force_modules=["factor_returns"])
     assert "feat_a" in orch2._factor_return_series
     assert isinstance(orch2._factor_return_series["feat_a"].ls_return, pd.Series)
-    # 出口暫經 sanitizer → external 仍 unavailable；F1 不斷言 completed
     fr = report.results.get("factor_returns")
     assert isinstance(fr, dict)
-    assert fr.get("status") == "unavailable"
+    assert fr.get("status") == "ok"
+    assert fr.get("reason") is None
+    assert "ls_returns_timestamp_misaligned" not in str(fr.get("reason"))
+    assert report.module_summary.get("factor_returns") == "completed"
 
 
 def test_cache_hit_owner_consistency() -> None:

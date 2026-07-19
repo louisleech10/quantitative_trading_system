@@ -81,8 +81,20 @@ def _assert_union_unavailable(body: Any) -> None:
     assert body.get("status") == "unavailable"
     assert body.get("value") is None
     reason = str(body.get("reason") or "")
-    assert "ls_returns_timestamp_misaligned" in reason
+    assert "legacy_misaligned_factor_return_shape" in reason or (
+        "ls_returns_timestamp_misaligned" in reason
+    )
     assert not has_finite_numeric_leaf(body)
+
+
+def _assert_union_ok(body: Any) -> None:
+    assert isinstance(body, dict)
+    assert body.get("status") == "ok"
+    assert body.get("reason") is None
+    value = body.get("value") or {}
+    assert isinstance(value, dict)
+    assert value.get("schema_version") == "fr_full_v1"
+    assert "ls_returns_timestamp_misaligned" not in str(body.get("reason"))
 
 
 # ---------------------------------------------------------------------------
@@ -109,13 +121,13 @@ def test_pure_tier_not_run(preset: str) -> None:
     assert "factor_returns" not in report.results
 
 
-def test_explicit_enable_unavailable() -> None:
-    """force + override 兩路徑 → §U union + summary unavailable + 不入 errors。"""
+def test_explicit_enable_completed() -> None:
+    """F2: force + override 兩路徑 → §U ok + summary completed + 不入 errors。"""
     # path A: force_modules
     orch_force = _build_orchestrator()
     report_force = orch_force.run_deep_analysis(force_modules=["factor_returns"])
-    assert report_force.module_summary.get("factor_returns") == "unavailable"
-    _assert_union_unavailable(report_force.results.get("factor_returns"))
+    assert report_force.module_summary.get("factor_returns") == "completed"
+    _assert_union_ok(report_force.results.get("factor_returns"))
     assert "factor_returns" not in [e.module_name for e in report_force.deep_analysis_errors]
 
     # path B: config_override modules enabled=true
@@ -123,8 +135,8 @@ def test_explicit_enable_unavailable() -> None:
     report_ov = orch_ov.run_deep_analysis(
         config_override={"factor_return": {"enabled": True}},
     )
-    assert report_ov.module_summary.get("factor_returns") == "unavailable"
-    _assert_union_unavailable(report_ov.results.get("factor_returns"))
+    assert report_ov.module_summary.get("factor_returns") == "completed"
+    _assert_union_ok(report_ov.results.get("factor_returns"))
     assert "factor_returns" not in [e.module_name for e in report_ov.deep_analysis_errors]
 
 
@@ -137,7 +149,7 @@ def test_deep_off_not_run() -> None:
 
 
 def test_runner_returns_ok_union_internal() -> None:
-    """F1.1: runner 真計算回 §U ok union;出口 sanitizer 仍把 deep report 壓成 unavailable。"""
+    """F1.1+F2: runner 真計算回 §U ok union;出口 sanitizer 放行 ok。"""
     orch = _build_orchestrator()
     # test-config: 降 min_samples 使 120-bar fixture 可過 production 預設 30 門檻即可
     result = orch._run_factor_return(["feat_a"], orch._config)
@@ -259,11 +271,10 @@ def test_consumer_guard_catches_multi_ctor_same_line(tmp_path: Path) -> None:
 
 
 def test_mutation_m1_restore_compute_batch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """M1:runner 恢復直出有限值 + 繞出口 sanitizer → explicit 斷言紅。
+    """M1:runner 直出 legacy 裸 map + 繞出口 sanitizer → explicit ok 斷言紅。
 
-    出口 sanitizer 為第二道防線(含 force-merge 統一收斂):僅恢復 runner 時
-    sanitize 仍會把有限 FR 收成 §U,探針會假綠。必須同時拆除兩層才再現
-    「有限 FR 直出」回歸,證 runner 下架契約仍有牙。
+    出口 sanitizer 為第二道防線:僅假 runner 時 sanitize 仍會擋裸 map。
+    必須同時拆除兩層才再現「legacy 有限 FR 直出」回歸。
     """
 
     def fake_run(self, selected_features, config):  # type: ignore[no-untyped-def]
@@ -284,7 +295,7 @@ def test_mutation_m1_restore_compute_batch(monkeypatch: pytest.MonkeyPatch) -> N
         staticmethod(passthrough_sanitize),
     )
     with pytest.raises(AssertionError):
-        test_explicit_enable_unavailable()
+        test_explicit_enable_completed()
 
 
 def test_mutation_m1b_drop_tier_exclusion(monkeypatch: pytest.MonkeyPatch) -> None:

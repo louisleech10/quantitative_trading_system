@@ -401,7 +401,7 @@ class ICReporter:
 
         summary_table = report.get("summary_table", []) if isinstance(report, dict) else []
         deep_payload = deep_report or self._resolve_deep_report(report)
-        # IC1C-FR-STOPGAP: summary 三欄讀 factor_returns 前必過 sanitizer
+        # F2: sanitizer discriminator(legacy 擋 / ok 放行)+summary 經 unwrap 讀 features
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 
         if isinstance(deep_payload, dict):
@@ -491,7 +491,7 @@ class ICReporter:
             raise ValueError("module_name is required")
 
         deep_payload = self._resolve_deep_report(report)
-        # IC1C-FR-STOPGAP: detailed CSV 出口必過 sanitizer
+        # F2: sanitizer discriminator + factor_returns detailed 經 unwrap features
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 
         if isinstance(deep_payload, dict):
@@ -510,6 +510,12 @@ class ICReporter:
         module_data = deep_payload.get(resolved_module) if isinstance(deep_payload, dict) else None
         if module_data is None:
             raise ValueError(f"module not found: {module_name}")
+
+        # ok §U → flatten features map;unavailable 仍 flatten union 佔位
+        if resolved_module == "factor_returns":
+            unwrapped = self._unwrap_factor_returns(module_data)
+            if unwrapped is not None:
+                module_data = unwrapped
 
         rows = self._flatten_module_rows(resolved_module, module_data)
         headers = sorted({key for row in rows for key in row.keys()})
@@ -542,7 +548,7 @@ class ICReporter:
         risk_warnings = self._generate_risk_warnings(report, top_features)
         recommendations = self._generate_recommendations(risk_warnings)
         deep_payload = deep_report or self._resolve_deep_report(report)
-        # IC1C-FR-STOPGAP: AI JSON 出口必過 sanitizer
+        # F2: AI JSON 出口 sanitizer(ok 放行 / legacy 擋)
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 
         if isinstance(deep_payload, dict):
@@ -622,7 +628,7 @@ class ICReporter:
             reverse=True,
         )[:10]
         deep_payload = deep_report or self._resolve_deep_report(report)
-        # IC1C-FR-STOPGAP: Markdown 出口必過 sanitizer
+        # F2: Markdown 出口 sanitizer(ok 放行 / legacy 擋)
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 
         if isinstance(deep_payload, dict):
@@ -679,7 +685,7 @@ class ICReporter:
 
             deny_factor_in_ok_oos(report)
 
-        # IC1C-FR-STOPGAP: export_all raw dump 必過 sanitizer
+        # F2: export_all raw dump sanitizer(ok 放行 / legacy 擋)
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 
         safe_report = (
@@ -781,7 +787,7 @@ class ICReporter:
     def save_report(self, report: dict, output_dir: str, case_id: str) -> dict[str, str]:
         """持久化所有報告產出。
 
-        IC1C-FR-STOPGAP: 落檔前必過 sanitizer,禁 legacy 有限 factor_returns 葉洩漏。
+        F2: 落檔前 sanitizer(ok §U 放行;legacy 裸 map 擋)。
         LA-2 B3：root ok_oos + factor loud → deny。
         """
 
@@ -919,6 +925,15 @@ class ICReporter:
 
         return sampled
 
+    def _unwrap_factor_returns(self, payload: Any) -> dict[str, Any] | None:
+        """§U ok union → ``value.features``;reporter 全出口統一 unwrap。
+
+        M-unwrap:若不呼叫此法而直接讀頂層,summary 三欄必 null。
+        """
+        from momentum.Analysis.factor_return_sanitizer import unwrap_factor_returns_features
+
+        return unwrap_factor_returns_features(payload)
+
     def _safe_nested(self, payload: Any, key: str | None, field: str) -> Any:
         if not isinstance(payload, dict):
             return None
@@ -976,15 +991,19 @@ class ICReporter:
         return payload
 
     def _build_deep_summary_columns(self, feature_name: str | None, deep_payload: dict) -> dict[str, Any]:
+        # F2: 必經 _unwrap_factor_returns 讀 .value.features(M-unwrap 護網)
+        fr_features = self._unwrap_factor_returns(deep_payload.get("factor_returns"))
         return {
-            "factor_return_ls_mean": self._safe_nested(deep_payload.get("factor_returns"), feature_name, "long_short_mean_return"),
+            "factor_return_ls_mean": self._safe_nested(
+                fr_features, feature_name, "long_short_mean_return"
+            ),
             "factor_return_sharpe": self._safe_nested(
-                self._safe_nested(deep_payload.get("factor_returns"), feature_name, "risk_metrics"),
+                self._safe_nested(fr_features, feature_name, "risk_metrics"),
                 None,
                 "sharpe_ratio",
             ),
             "factor_return_max_drawdown": self._safe_nested(
-                self._safe_nested(deep_payload.get("factor_returns"), feature_name, "risk_metrics"),
+                self._safe_nested(fr_features, feature_name, "risk_metrics"),
                 None,
                 "max_drawdown",
             ),
@@ -1111,11 +1130,19 @@ class ICReporter:
         for key, value in deep_payload.items():
             if not isinstance(value, dict):
                 continue
-            # IC1C-FR-STOPGAP: factor_returns 佔位勿展成 keys/size 有限 meta
+            # F2: factor_returns unavailable → 無有限 meta;ok → unwrap features 摘要
             if key == "factor_returns" and value.get("status") == "unavailable":
                 summaries[key] = {
                     "status": "unavailable",
                     "reason": value.get("reason"),
+                }
+                continue
+            if key == "factor_returns" and value.get("status") == "ok":
+                features = self._unwrap_factor_returns(value) or {}
+                summaries[key] = {
+                    "status": "ok",
+                    "keys": list(features.keys())[:5],
+                    "size": len(features),
                 }
                 continue
             if "summary" in value and isinstance(value["summary"], dict):
@@ -1183,7 +1210,7 @@ class ICReporter:
             if isinstance(results, dict) and module_name in results:
                 output[key] = results[module_name]
 
-        # IC1C-FR-STOPGAP: inject/serialize 出口禁有限 factor_returns 葉
+        # F2: inject/serialize 出口 sanitizer(ok 放行 / legacy 擋)
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 
         return sanitize_factor_returns(output)

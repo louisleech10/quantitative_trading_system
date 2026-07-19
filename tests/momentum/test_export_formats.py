@@ -52,10 +52,21 @@ def _sample_report(deep_enabled: bool = True) -> dict:
         report["deep_analysis_report"] = {
             "results": {
                 "factor_returns": {
-                    "feature_a": {
-                        "long_short_mean_return": 0.11,
-                        "risk_metrics": {"sharpe": 1.5, "max_drawdown": -0.08},
-                    }
+                    "status": "ok",
+                    "value": {
+                        "schema_version": "fr_full_v1",
+                        "semantics": "single_asset_factor_timing_ls",
+                        "features": {
+                            "feature_a": {
+                                "long_short_mean_return": 0.11,
+                                "risk_metrics": {
+                                    "sharpe_ratio": 1.5,
+                                    "max_drawdown": -0.08,
+                                },
+                            }
+                        },
+                    },
+                    "reason": None,
                 },
                 "trend_analysis": {
                     "feature_a": {"combined_signal": {"recommendation": "持有"}}
@@ -151,10 +162,10 @@ def test_detailed_csv_factor_return_format() -> None:
     reporter = ICReporter({})
     csv_text = reporter.generate_detailed_csv(_sample_report(), "factor_returns")
     assert csv_text.startswith("\ufeff")
-    # 舊斷言為何錯: 含 `long_short_mean_return` 有限值固化錯位序列 CSV 形狀;
-    # IC1C-FR-STOPGAP sanitizer → 佔位,無有限報酬數值(0.11 等)。
-    assert "0.11" not in csv_text
-    assert "unavailable" in csv_text or "status" in csv_text
+    # F2: ok §U → unwrap features → CSV 含有限 long_short_mean_return
+    assert "0.11" in csv_text
+    assert "long_short_mean_return" in csv_text
+    assert "ls_returns_timestamp_misaligned" not in csv_text
 
 
 def test_detailed_csv_all_modules() -> None:

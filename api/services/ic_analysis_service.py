@@ -497,7 +497,7 @@ class ICAnalysisService:
             payload_for_export.setdefault("deep_analysis_report", deep_report)
 
         if normalized_format == "json":
-            # IC1C-FR-STOPGAP: raw JSON 出口必過 sanitizer(legacy 有限 factor_returns)
+            # F2: raw JSON 出口 sanitizer(ok §U 放行 / legacy 裸 map 擋)
             safe_report = (
                 sanitize_factor_returns(report) if isinstance(report, dict) else report
             )
@@ -785,7 +785,7 @@ class ICAnalysisService:
 
         normalized = self._to_json_compatible(deep_result)
         if isinstance(normalized, dict):
-            # IC1C-FR-STOPGAP: 讀出端再 sanitize(legacy task_info 有限值)
+            # F2: 讀出端 sanitize(ok 放行 / legacy 擋)
             return sanitize_factor_returns(normalized)
         return {"raw": normalized}
 
@@ -1330,7 +1330,7 @@ class ICAnalysisService:
 
         normalized = self._to_json_compatible(raw)
         if isinstance(normalized, dict):
-            # IC1C-FR-STOPGAP: serializer + task storage 出口必過 sanitizer
+            # F2: serializer + task storage 出口 sanitizer(ok 放行 / legacy 擋)
             return sanitize_factor_returns(normalized)
         return {"raw": normalized}
 
@@ -1354,7 +1354,7 @@ class ICAnalysisService:
 
         return deep_payload
 
-    # conditional metric 三鍵(T-F16):序列化時原樣保留,禁扁平化為裸 number/null
+    # conditional metric 三鍵(T-F16 / F2 ⑯):§U 形狀守恆,序列化時原樣保留禁扁平化
     _CONDITIONAL_METRIC_KEYS: frozenset[str] = frozenset(
         {"net_factor_return", "breakeven_cost_bps", "profitable_after_cost"}
     )

@@ -89,32 +89,80 @@ def export_task(
             task_info = ic_analysis_service._tasks.get(task_id)
             if task_info is not None:
                 original = copy.deepcopy(task_info)
-                # API serialization stub：export seam 所需容器。
-                # 舊斷言為何錯: 注入 finite long_short_mean_return 固化錯位 CSV 形狀;
-                # STOPGAP sanitizer 下架 → detailed CSV 無有限報酬葉(見 test_export_csv_detailed_factor_return)。
+                # F2: 注入 §U ok union;detailed CSV 應含有限 long_short_mean_return(unwrap)。
                 task_info["deep_analysis_result"] = {
                     "results": {
                         "factor_returns": {
-                            "feature_0": {
-                                "long_short_mean_return": 0.03,
-                                "risk_metrics": {"sharpe": 1.2, "max_drawdown": -0.1},
-                            }
+                            "status": "ok",
+                            "value": {
+                                "schema_version": "fr_full_v1",
+                                "semantics": "single_asset_factor_timing_ls",
+                                "features": {
+                                    "feature_0": {
+                                        "long_short_mean_return": 0.03,
+                                        "risk_metrics": {
+                                            "sharpe_ratio": 1.2,
+                                            "max_drawdown": -0.1,
+                                        },
+                                    }
+                                },
+                            },
+                            "reason": None,
                         }
-                    }
+                    },
+                    "module_summary": {"factor_returns": "completed"},
                 }
 
         result = client.get(f"/api/v1/ic/result/{task_id}")
         assert result.status_code == 200
-        metadata = result.json().get("metadata", {})
+        result_body = result.json()
+        metadata = result_body.get("metadata", {})
 
-        filtered_path = _export_fixture_filtered_path(metadata)
+        # export service 硬路徑 data_cache/features/(非 redirect);attrs 對齊 freshness
+        symbol = (metadata or {}).get("symbol")
+        timeframe = (metadata or {}).get("timeframe")
+        name = (
+            f"{symbol}_{timeframe}_filtered.h5"
+            if symbol and timeframe
+            else "filtered_features.h5"
+        )
+        filtered_path = Path("data_cache/features") / name
         filtered_path.parent.mkdir(parents=True, exist_ok=True)
+        expected_gen = (
+            (metadata or {}).get("filtered_generated_at")
+            or result_body.get("generated_at")
+        )
         with h5py.File(filtered_path, "w") as file:
             group = file.create_group("filtered")
             group.create_dataset(
                 "features",
                 data=ic_api_real_kline["features"].iloc[:1, :2].to_numpy(dtype=np.float64),
             )
+            if expected_gen is not None:
+                gen_s = str(expected_gen)
+                group.attrs["source_generated_at"] = gen_s
+                file.attrs["source_generated_at"] = gen_s
+            task_attr = (metadata or {}).get("filtered_source_task_id") or task_id
+            group.attrs["source_task_id"] = str(task_attr)
+            file.attrs["source_task_id"] = str(task_attr)
+        # 亦寫 redirect 路徑(setup 期間 active),避免 spy/後續讀不一致
+        redirect_path = _export_fixture_filtered_path(metadata)
+        if redirect_path.resolve() != filtered_path.resolve():
+            redirect_path.parent.mkdir(parents=True, exist_ok=True)
+            with h5py.File(redirect_path, "w") as file:
+                group = file.create_group("filtered")
+                group.create_dataset(
+                    "features",
+                    data=ic_api_real_kline["features"]
+                    .iloc[:1, :2]
+                    .to_numpy(dtype=np.float64),
+                )
+                if expected_gen is not None:
+                    gen_s = str(expected_gen)
+                    group.attrs["source_generated_at"] = gen_s
+                    file.attrs["source_generated_at"] = gen_s
+                group.attrs["source_task_id"] = str(task_attr)
+                file.attrs["source_task_id"] = str(task_attr)
         assert not redirect_ctx.spy.violations
     finally:
         # setup 結束即釋放;session-scoped yield 不得跨測持有 redirect
@@ -140,9 +188,11 @@ def test_export_csv_detailed_factor_return(export_task: dict) -> None:
     )
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
-    # IC1C-FR-STOPGAP: CSV 不得洩漏注入的有限 long_short_mean_return(0.03)
+    # F2: ok §U unwrap 後 CSV 應含有限 long_short_mean_return(0.03)
     body = response.content.decode("utf-8")
-    assert "0.03" not in body
+    assert "0.03" in body
+    assert "long_short_mean_return" in body
+    assert "ls_returns_timestamp_misaligned" not in body
 
 
 def test_export_ai_json_200(export_task: dict) -> None:

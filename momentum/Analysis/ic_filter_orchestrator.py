@@ -1941,11 +1941,15 @@ class ICFilterOrchestrator:
             fit_mode = meta.get("fit_mode") or preproc.get("fit_mode")
         if fit_mode is None:
             fit_mode = getattr(config.preprocessing, "fit_mode", "unset")
+        # F2 ⑩: schema_version 入 cache key,防命中 stopgap 舊 unavailable 快取
+        from momentum.Analysis.factor_return_sanitizer import FR_SCHEMA_VERSION
+
         payload = {
             "features": sorted(selected_features),
             "deep_config": deep_cfg,
             "pit_stats_version": PIT_STATS_VERSION,
             "fit_mode": fit_mode,
+            "schema_version": FR_SCHEMA_VERSION,
         }
         dump = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return hashlib.md5(dump.encode("utf-8")).hexdigest()
@@ -2002,8 +2006,7 @@ class ICFilterOrchestrator:
     def _run_factor_return(self, selected_features: list[str], config: ICConfig) -> dict:
         """1c-FR-FULL F1.1：factory + compute_batch → §U ok union + series owner。
 
-        出口暫經既有 sanitizer（F2 才放行 ok union）；本函式只負責真計算與
-        ``self._factor_return_series`` 寫入。completed 斷言屬 F2。
+        F2 sanitizer 放行 ok union;module_summary 同步 completed。
         """
         from momentum.factories import create_factor_return_analyzer
 
@@ -2022,7 +2025,7 @@ class ICFilterOrchestrator:
 
     @staticmethod
     def _sanitize_deep_report_factor_returns(report: DeepAnalysisReport) -> DeepAnalysisReport:
-        """對 DeepAnalysisReport 的 results/module_summary/計數套 factor_return sanitizer。"""
+        """對 DeepAnalysisReport 套 §U discriminator(ok 放行 / legacy 擋;codex R2-3)。"""
         from momentum.Analysis.factor_return_sanitizer import sanitize_factor_returns
 
         envelope = {
