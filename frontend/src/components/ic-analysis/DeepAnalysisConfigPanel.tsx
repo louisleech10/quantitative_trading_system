@@ -20,7 +20,7 @@ interface DeepAnalysisConfigPanelProps {
 }
 
 const moduleMeta: Array<{ key: keyof DeepAnalysisModules; label: string; tip: string }> = [
-  { key: 'factor_return', label: 'Factor Return', tip: '分位收益與風險指標' },
+  { key: 'factor_return', label: '單標的因子擇時多空', tip: '單標的因子擇時多空累積報酬與風險指標' },
   { key: 'factor_centrality', label: 'Factor Centrality', tip: 'PCA 與擁擠度分析' },
   { key: 'trend_analysis', label: 'Trend Analysis', tip: 'IC/中心性趨勢訊號' },
   { key: 'parameter_sensitivity', label: 'Parameter Sensitivity', tip: '參數家族穩健性' },

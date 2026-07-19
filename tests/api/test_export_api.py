@@ -24,6 +24,7 @@ pytestmark = [
 
 
 def _export_fixture_filtered_path(metadata: dict) -> Path:
+    """redirect/tmp 路徑 only;active redirect 缺失時 raise(禁 fallback production)."""
     symbol = metadata.get("symbol") if metadata else None
     timeframe = metadata.get("timeframe") if metadata else None
     name = (
@@ -32,8 +33,12 @@ def _export_fixture_filtered_path(metadata: dict) -> Path:
         else "filtered_features.h5"
     )
     active_root = get_active_redirect_root()
-    base = active_root / "features" if active_root is not None else Path("data_cache/features")
-    return base / name
+    if active_root is None:
+        raise RuntimeError(
+            "export fixture requires active ic_persist_redirect; "
+            "refusing to write production data_cache/features"
+        )
+    return active_root / "features" / name
 
 
 def _wait_for_task(task_id: str, timeout: float = 20.0) -> None:
@@ -89,43 +94,86 @@ def export_task(
             task_info = ic_analysis_service._tasks.get(task_id)
             if task_info is not None:
                 original = copy.deepcopy(task_info)
-                # API serialization stub：export seam 所需容器。
-                # 舊斷言為何錯: 注入 finite long_short_mean_return 固化錯位 CSV 形狀;
-                # STOPGAP sanitizer 下架 → detailed CSV 無有限報酬葉(見 test_export_csv_detailed_factor_return)。
+                # F2: 注入 §U ok union;detailed CSV 應含有限 long_short_mean_return(unwrap)。
                 task_info["deep_analysis_result"] = {
                     "results": {
                         "factor_returns": {
-                            "feature_0": {
-                                "long_short_mean_return": 0.03,
-                                "risk_metrics": {"sharpe": 1.2, "max_drawdown": -0.1},
-                            }
+                            "status": "ok",
+                            "value": {
+                                "schema_version": "fr_full_v1",
+                                "semantics": "single_asset_factor_timing_ls",
+                                "features": {
+                                    "feature_0": {
+                                        "long_short_mean_return": 0.03,
+                                        "risk_metrics": {
+                                            "sharpe_ratio": 1.2,
+                                            "max_drawdown": -0.1,
+                                        },
+                                    }
+                                },
+                            },
+                            "reason": None,
                         }
-                    }
+                    },
+                    "module_summary": {"factor_returns": "completed"},
                 }
 
         result = client.get(f"/api/v1/ic/result/{task_id}")
         assert result.status_code == 200
-        metadata = result.json().get("metadata", {})
+        result_body = result.json()
+        metadata = result_body.get("metadata", {})
 
-        filtered_path = _export_fixture_filtered_path(metadata)
-        filtered_path.parent.mkdir(parents=True, exist_ok=True)
-        with h5py.File(filtered_path, "w") as file:
+        # 僅寫 redirect/tmp 路徑;禁寫 production data_cache/features
+        expected_gen = (
+            (metadata or {}).get("filtered_generated_at")
+            or result_body.get("generated_at")
+        )
+        task_attr = (metadata or {}).get("filtered_source_task_id") or task_id
+        redirect_path = _export_fixture_filtered_path(metadata)
+        redirect_path.parent.mkdir(parents=True, exist_ok=True)
+        with h5py.File(redirect_path, "w") as file:
             group = file.create_group("filtered")
             group.create_dataset(
                 "features",
-                data=ic_api_real_kline["features"].iloc[:1, :2].to_numpy(dtype=np.float64),
+                data=ic_api_real_kline["features"]
+                .iloc[:1, :2]
+                .to_numpy(dtype=np.float64),
             )
+            if expected_gen is not None:
+                gen_s = str(expected_gen)
+                group.attrs["source_generated_at"] = gen_s
+                file.attrs["source_generated_at"] = gen_s
+            group.attrs["source_task_id"] = str(task_attr)
+            file.attrs["source_task_id"] = str(task_attr)
         assert not redirect_ctx.spy.violations
+        # 必須落在 redirect root,不得寫 production data_cache
+        resolved = redirect_path.resolve()
+        root_resolved = redirect_root_session.resolve()
+        assert str(resolved).startswith(str(root_resolved)), (
+            f"filtered h5 escaped redirect: {resolved} not under {root_resolved}"
+        )
     finally:
         # setup 結束即釋放;session-scoped yield 不得跨測持有 redirect
         redirect_patch_set.deactivate(redirect_ctx)
 
     try:
-        yield {"task_id": task_id, "module": "factor_returns"}
+        yield {
+            "task_id": task_id,
+            "module": "factor_returns",
+            "redirect_root": redirect_root_session,
+        }
     finally:
         if original is not None:
             with ic_analysis_service._lock:
                 ic_analysis_service._tasks[task_id] = original
+        # teardown: 清 redirect 產物(tmp 由 pytest 回收;顯式 unlink 防殘留)
+        features_dir = redirect_root_session / "features"
+        if features_dir.is_dir():
+            for p in features_dir.glob("*_filtered.h5"):
+                try:
+                    p.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
 
 def test_export_csv_summary_200(export_task: dict) -> None:
@@ -140,9 +188,11 @@ def test_export_csv_detailed_factor_return(export_task: dict) -> None:
     )
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
-    # IC1C-FR-STOPGAP: CSV 不得洩漏注入的有限 long_short_mean_return(0.03)
+    # F2: ok §U unwrap 後 CSV 應含有限 long_short_mean_return(0.03)
     body = response.content.decode("utf-8")
-    assert "0.03" not in body
+    assert "0.03" in body
+    assert "long_short_mean_return" in body
+    assert "ls_returns_timestamp_misaligned" not in body
 
 
 def test_export_ai_json_200(export_task: dict) -> None:
@@ -158,9 +208,18 @@ def test_export_markdown_200(export_task: dict) -> None:
     assert response.headers["content-type"].startswith("text/markdown")
 
 
-def test_export_hdf5_200(export_task: dict) -> None:
-    response = client.get(f"/api/v1/ic/export/{export_task['task_id']}/hdf5")
-    assert response.status_code == 200
+def test_export_hdf5_200(
+    export_task: dict,
+    redirect_patch_set,
+) -> None:
+    # hdf5 落在 redirect/tmp;本測短暫 re-activate 以免寫/讀 production data_cache
+    root = export_task["redirect_root"]
+    ctx = redirect_patch_set.activate(root, owner="test_export_hdf5_200")
+    try:
+        response = client.get(f"/api/v1/ic/export/{export_task['task_id']}/hdf5")
+        assert response.status_code == 200
+    finally:
+        redirect_patch_set.deactivate(ctx)
 
 
 def test_export_unknown_task_404() -> None:

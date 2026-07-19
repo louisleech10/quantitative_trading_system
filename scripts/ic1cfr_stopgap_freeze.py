@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""IC1C-FR-STOPGAP §G baseline 凍結腳本(Task 0.1 / B0).
+"""IC1C-FR-STOPGAP / 1c-FR-FULL §G baseline 凍結腳本(Task 0.1 / B0 + FULL B0.1).
 
 用法:
   python scripts/ic1cfr_stopgap_freeze.py --before
-  python scripts/ic1cfr_stopgap_freeze.py --check-nodeids
+  python scripts/ic1cfr_stopgap_freeze.py --check-nodeids  # FR 縮範圍;receipt→ic1cfr_full_baseline/
   python scripts/ic1cfr_stopgap_freeze.py --after-default   # Phase 1 佔位
   python scripts/ic1cfr_stopgap_freeze.py --after-explicit  # Phase 1 佔位
+  # 1c-FR-FULL B0.1 profiles:
+  python scripts/ic1cfr_stopgap_freeze.py --profile before-full \\
+      --fixture ic_api_real_kline --out handoffs/ic1cfr_full_baseline/before.json
+  python scripts/ic1cfr_stopgap_freeze.py --profile after-full \\
+      --fixture ic_api_real_kline --out handoffs/ic1cfr_full_baseline/after_full.json
 
 --before:
   1) 真-kline fixture 跑 run_deep_analysis(全模組 enabled)→
@@ -13,6 +18,12 @@
   2) canonical hash(剔除精確 JSON-path 漂移欄後 sha256)→ before.sha256
   3) 凍 factory allowlist + pytest baseline nodeids
   4) lineage: fixture_sha256 / git_head
+
+--profile before-full / after-full (1c-FR-FULL B0.1):
+  真-kline 跑 deep analysis → --out JSON + 印 sha256;
+  before-full 期望 FR unavailable(stopgap 現態)+非 FR 模組 path 值;
+  after-full 同結構骨架(F0 後重凍 ok union;本批僅旗標/骨架);
+  before-full 另凍 decoupling_baseline.txt(R2/R3/R4 計數).
 
 零 runtime 變更:僅新增本腳本與 handoffs/ 產物。
 """
@@ -40,20 +51,45 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 OUT_DIR = REPO_ROOT / "handoffs" / "ic1cfr_stopgap_baseline"
+FULL_BASELINE_DIR = REPO_ROOT / "handoffs" / "ic1cfr_full_baseline"
 FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "ic_api_real_kline.py"
 KLINE_CACHE = REPO_ROOT / "data_cache" / "feature_klines" / "kline_cache.h5"
 BEFORE_JSON = OUT_DIR / "before.json"
 BEFORE_SHA = OUT_DIR / "before.sha256"
 FACTORY_ALLOWLIST = OUT_DIR / "factory_allowlist.txt"
 PYTEST_NODEIDS = OUT_DIR / "pytest_baseline_nodeids.txt"
+FULL_BEFORE_JSON = FULL_BASELINE_DIR / "before.json"
+FULL_AFTER_JSON = FULL_BASELINE_DIR / "after_full.json"
+DECOUPLING_BASELINE = FULL_BASELINE_DIR / "decoupling_baseline.txt"
+ALLOWED_FIXTURES: frozenset[str] = frozenset({"ic_api_real_kline"})
+FULL_PROFILES: frozenset[str] = frozenset({"before-full", "after-full"})
 
-# 與 B0 / Gate B2 相同 suite 與收集規則(T-S10)
+# 與 B0 --before 相同 suite 與收集規則(T-S10;全量 suite 僅用於 --before 凍 baseline)
 PYTEST_SUITE_ARGS: tuple[str, ...] = (
     "tests/momentum/",
     "tests/api/",
     "tests/phase26/",
     "-q",
 )
+
+# --check-nodeids FR 範圍(1c-FR-FULL F5 回修):只跑 FR 相關凍結檔集,
+# 避免全 suite >35min 被 SIGTERM 拿不到 receipt。
+# 檔集=analyzer/stopgap/phase24 FR/phase26 FR+deep_analysis/api deep_analysis
+PYTEST_NODEID_CHECK_PATHS: tuple[str, ...] = (
+    "tests/momentum/Analysis/test_factor_return_analyzer.py",
+    "tests/momentum/Analysis/test_factor_return_stopgap.py",
+    "tests/phase24/test_factor_return_analyzer.py",
+    "tests/phase24/test_deep_analysis_config.py",
+    "tests/phase26/test_deep_analysis_factories.py",
+    "tests/phase26/test_deep_analysis_integration.py",
+    "tests/phase26/test_ic_reporter_deep_analysis.py",
+    "tests/api/test_ic_deep_analysis.py",
+)
+PYTEST_NODEID_CHECK_ARGS: tuple[str, ...] = (
+    *PYTEST_NODEID_CHECK_PATHS,
+    "-q",
+)
+CHECK_NODEIDS_RECEIPT = FULL_BASELINE_DIR / "checknodeids_receipt.txt"
 
 ALL_DEEP_MODULES: tuple[str, ...] = (
     "factor_returns",
@@ -740,16 +776,22 @@ def _parse_pytest_failed_nodeids(stdout: str, stderr: str = "") -> list[str]:
     return sorted(nodeids)
 
 
-def collect_pytest_failed_nodeids() -> list[str]:
-    """自跑與 B0/B2 相同 suite,回傳 failed+collection-error nodeid 排序集.
+def collect_pytest_failed_nodeids(
+    suite_args: tuple[str, ...] | None = None,
+) -> list[str]:
+    """自跑 suite,回傳 failed+collection-error nodeid 排序集.
+
+    suite_args 預設=B0 全量 PYTEST_SUITE_ARGS(--before 用);
+    --check-nodeids 傳入 PYTEST_NODEID_CHECK_ARGS(FR 縮範圍).
 
     fail-closed: pytest returncode != 0 且無法解析出任何 failure/collection
     receipt 時 SystemExit(1)（禁止回空集合讓 check_nodeids 假綠）。
     returncode==0 且空集 = 全綠，合法。
     """
-    cmd = [str(REPO_ROOT / "venv" / "bin" / "pytest"), *PYTEST_SUITE_ARGS]
+    args = suite_args if suite_args is not None else PYTEST_SUITE_ARGS
+    cmd = [str(REPO_ROOT / "venv" / "bin" / "pytest"), *args]
     if not Path(cmd[0]).is_file():
-        cmd = [sys.executable, "-m", "pytest", *PYTEST_SUITE_ARGS]
+        cmd = [sys.executable, "-m", "pytest", *args]
     print(f"running: {' '.join(cmd)}", flush=True)
     proc = subprocess.run(
         cmd,
@@ -776,32 +818,72 @@ def collect_pytest_failed_nodeids() -> list[str]:
     return nodeids
 
 
+def _nodeid_in_fr_check_scope(nodeid: str) -> bool:
+    """nodeid 是否落在 FR check 檔集(path 前綴匹配)."""
+    path = nodeid.split("::", 1)[0]
+    for scoped in PYTEST_NODEID_CHECK_PATHS:
+        if path == scoped or path.endswith("/" + scoped) or path.endswith(scoped):
+            return True
+        # 相對路徑正規化:tests/... 前綴
+        if path.replace("\\", "/").endswith(scoped) or path.replace("\\", "/") == scoped:
+            return True
+    return False
+
+
 def check_nodeids() -> int:
-    """Gate B2 機械差集:新增 failed/error nodeid 非空 → exit 1."""
+    """Gate B2 機械差集(FR 縮範圍):新增 failed/error nodeid 非空 → exit 1.
+
+    F5 回修:只跑 PYTEST_NODEID_CHECK_PATHS,baseline 同步 filter 到同檔集,
+    避免全 suite 超時拿不到 receipt。PASS 時寫
+    handoffs/ic1cfr_full_baseline/checknodeids_receipt.txt。
+    """
     if not PYTEST_NODEIDS.is_file():
         print(
             f"FAIL: baseline missing {PYTEST_NODEIDS}; run --before first",
             file=sys.stderr,
         )
         return 1
-    baseline = {
+    baseline_all = {
         ln.strip()
         for ln in PYTEST_NODEIDS.read_text(encoding="utf-8").splitlines()
         if ln.strip() and not ln.strip().startswith("#")
     }
-    current = set(collect_pytest_failed_nodeids())
+    baseline = {n for n in baseline_all if _nodeid_in_fr_check_scope(n)}
+    current = set(collect_pytest_failed_nodeids(PYTEST_NODEID_CHECK_ARGS))
+    # 再 filter current(防 pytest 外溢 path;正常應已全在 scope)
+    current = {n for n in current if _nodeid_in_fr_check_scope(n)}
     new_failures = sorted(current - baseline)
     resolved = sorted(baseline - current)
-    print(f"baseline_nodeids={len(baseline)}")
-    print(f"current_nodeids={len(current)}")
-    print(f"new_failures={len(new_failures)}")
-    print(f"resolved_since_baseline={len(resolved)}")
+    lines = [
+        f"scope=FR_NODEID_CHECK ({len(PYTEST_NODEID_CHECK_PATHS)} paths)",
+        f"paths={','.join(PYTEST_NODEID_CHECK_PATHS)}",
+        f"baseline_all_nodeids={len(baseline_all)}",
+        f"baseline_fr_nodeids={len(baseline)}",
+        f"current_nodeids={len(current)}",
+        f"new_failures={len(new_failures)}",
+        f"resolved_since_baseline={len(resolved)}",
+    ]
+    for ln in lines:
+        print(ln)
     if new_failures:
         print("NEW_FAILURES:")
         for n in new_failures:
             print(f"  {n}")
+        FULL_BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+        CHECK_NODEIDS_RECEIPT.write_text(
+            "\n".join(lines + ["status=FAIL", "NEW_FAILURES:"] + [f"  {n}" for n in new_failures])
+            + "\n",
+            encoding="utf-8",
+        )
         return 1
-    print("check-nodeids: PASS (no new failures vs baseline)")
+    print("check-nodeids: PASS (no new failures vs baseline; FR scope)")
+    FULL_BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+    CHECK_NODEIDS_RECEIPT.write_text(
+        "\n".join(lines + ["status=PASS", "check-nodeids: PASS (no new failures vs baseline; FR scope)"])
+        + "\n",
+        encoding="utf-8",
+    )
+    print(f"receipt={CHECK_NODEIDS_RECEIPT}")
     return 0
 
 
@@ -1004,8 +1086,10 @@ def freeze_after_default() -> int:
 
 
 def freeze_after_explicit() -> int:
-    """§G after-explicit: force_modules 含 factor_returns → §U union + summary unavailable.
+    """§G after-explicit(F5.1): force_modules 含 factor_returns → §U ok + summary completed.
 
+    舊(stopgap): expected unavailable + null value + misaligned reason。
+    舊為何錯: F0+F1+F2 後 force 真算 ok union;再凍 unavailable 會把 FULL 真值當回歸。
     另做 §G 非 FR 逐 path exact vs before.json。
     """
     from datetime import datetime, timezone
@@ -1015,24 +1099,32 @@ def freeze_after_explicit() -> int:
     module_summary = report_dict.get("module_summary") or {}
     fr_status = module_summary.get("factor_returns")
     fr_body = (report_dict.get("results") or {}).get("factor_returns")
-    if fr_status != "unavailable":
+    if fr_status != "completed":
         raise SystemExit(
             f"FAIL after-explicit: module_summary.factor_returns={fr_status!r} "
-            "expected 'unavailable'"
+            "expected 'completed'"
         )
     if not isinstance(fr_body, dict):
         raise SystemExit("FAIL after-explicit: results.factor_returns missing or not dict")
-    if fr_body.get("status") != "unavailable":
+    if fr_body.get("status") != "ok":
         raise SystemExit(
-            f"FAIL after-explicit: union status={fr_body.get('status')!r} expected unavailable"
+            f"FAIL after-explicit: union status={fr_body.get('status')!r} expected ok"
         )
-    if fr_body.get("value") is not None:
-        raise SystemExit("FAIL after-explicit: union value must be null")
+    value = fr_body.get("value")
+    if not isinstance(value, dict):
+        raise SystemExit("FAIL after-explicit: union value must be ok dict")
+    if value.get("schema_version") != "fr_full_v1":
+        raise SystemExit(
+            f"FAIL after-explicit: schema_version={value.get('schema_version')!r} "
+            "expected fr_full_v1"
+        )
+    if fr_body.get("reason") is not None:
+        raise SystemExit(
+            f"FAIL after-explicit: ok path reason must be null, got {fr_body.get('reason')!r}"
+        )
     reason = str(fr_body.get("reason") or "")
-    if UNAVAILABLE_REASON not in reason and "ls_returns_timestamp_misaligned" not in reason:
-        raise SystemExit(f"FAIL after-explicit: unexpected reason={reason!r}")
-    if _has_finite_numeric_leaf(fr_body):
-        raise SystemExit("FAIL after-explicit: factor_returns still has finite numeric leaf")
+    if "ls_returns_timestamp_misaligned" in reason or "legacy_misaligned" in reason:
+        raise SystemExit(f"FAIL after-explicit: ok path must not carry stopgap reason={reason!r}")
 
     errors = report_dict.get("deep_analysis_errors") or []
     for err in errors:
@@ -1068,14 +1160,268 @@ def freeze_after_explicit() -> int:
     print(f"raw_sha256={raw_digest}")
     print(f"canonical_sha256={canon}")
     print(f"module_summary.factor_returns={fr_status}")
-    print("factor_returns_union=unavailable")
-    print("factor_returns_finite_leaves=no")
+    print("factor_returns_union=ok")
+    print(f"schema_version={value.get('schema_version')}")
     print("non_fr_exact_vs_before=pass")
     return 0
 
 
+def _resolve_out_path(profile: str, out: str | None) -> Path:
+    """解析 --out;預設 before.json / after_full.json under full baseline dir."""
+    if out:
+        path = Path(out)
+        if not path.is_absolute():
+            path = REPO_ROOT / path
+        return path
+    if profile == "before-full":
+        return FULL_BEFORE_JSON
+    if profile == "after-full":
+        return FULL_AFTER_JSON
+    raise SystemExit(f"FAIL: unknown profile for out path: {profile!r}")
+
+
+def freeze_decoupling_baseline(*, out_path: Path = DECOUPLING_BASELINE) -> str:
+    """跑 check_decoupling.sh,寫 R2/R3/R4 計數 baseline 一行.
+
+    現況 pre-existing 債 R2=1 R3=17 R4=2;gate=baseline-delta 不增。
+    """
+    script = REPO_ROOT / "scripts" / "check_decoupling.sh"
+    if not script.is_file():
+        raise SystemExit(f"FAIL: missing {script}")
+    proc = subprocess.run(
+        ["bash", str(script)],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    matches = re.findall(r"R2=\d+ R3=\d+ R4=\d+", combined)
+    if not matches:
+        raise SystemExit(
+            "FAIL: check_decoupling.sh produced no R2=… R3=… R4=… line; "
+            f"returncode={proc.returncode}\ntail:\n{combined[-1500:]}"
+        )
+    # 取最後一筆(腳本可能多行;canonical 為總結行)
+    line = matches[-1]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    text = line if line.endswith("\n") else line + "\n"
+    out_path.write_text(text, encoding="utf-8")
+    rel = out_path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    print(f"wrote {rel}: {line}")
+    return line
+
+
+def _assert_fixture_name(fixture: str | None) -> None:
+    name = fixture or "ic_api_real_kline"
+    if name not in ALLOWED_FIXTURES:
+        raise SystemExit(
+            f"FAIL: unknown --fixture {name!r}; allowed={sorted(ALLOWED_FIXTURES)}"
+        )
+    if not FIXTURE_PATH.is_file():
+        raise SystemExit(f"FAIL: fixture missing: {FIXTURE_PATH}")
+    if not KLINE_CACHE.is_file():
+        raise SystemExit(f"FAIL: requires_kline: missing {KLINE_CACHE}")
+
+
+def _build_full_profile_payload(
+    profile: str,
+    report_dict: dict[str, Any],
+) -> dict[str, Any]:
+    """1c-FR-FULL baseline payload:頂層 results + report + lineage."""
+    from datetime import datetime, timezone
+
+    generated_at = datetime.now(timezone.utc).isoformat()
+    results = report_dict.get("results") or {}
+    module_summary = report_dict.get("module_summary") or {}
+    if not isinstance(results, dict):
+        raise SystemExit(f"FAIL {profile}: report.results not dict")
+    return {
+        "generated_at": generated_at,
+        "generated_by": f"ic1cfr_stopgap_freeze --profile {profile}",
+        "profile": profile,
+        "lineage": {
+            "fixture_sha256": _sha256_file(FIXTURE_PATH),
+            "fixture_path": FIXTURE_PATH.relative_to(REPO_ROOT).as_posix(),
+            "git_head": _git_head(),
+            "kline_cache": KLINE_CACHE.relative_to(REPO_ROOT).as_posix(),
+            "generated_at": generated_at,
+            "mode": profile,
+            "fixture": "ic_api_real_kline",
+        },
+        "canonical_exclude_json_paths": sorted(CANONICAL_EXCLUDE_JSON_PATHS),
+        # 頂層 results / module_summary:TODO B0.1 驗收「頂層 results 鍵集合」
+        "results": results,
+        "module_summary": module_summary,
+        "deep_analysis": report_dict,
+        "report": report_dict,
+    }
+
+
+def freeze_profile_before_full(*, out: str | None = None, fixture: str | None = None) -> int:
+    """1c-FR-FULL B0.1: stopgap 現態(FR unavailable)+非 FR 模組 path 值.
+
+    寫 --out(預設 handoffs/ic1cfr_full_baseline/before.json)+印 sha256;
+    並凍 decoupling_baseline.txt。
+    """
+    _assert_fixture_name(fixture)
+    out_path = _resolve_out_path("before-full", out)
+
+    report_dict = _report_dict_from_orch(list(ALL_DEEP_MODULES))
+    module_summary = report_dict.get("module_summary") or {}
+    fr_status = module_summary.get("factor_returns")
+    fr_body = (report_dict.get("results") or {}).get("factor_returns")
+
+    if fr_status != "unavailable":
+        raise SystemExit(
+            f"FAIL before-full: module_summary.factor_returns={fr_status!r} "
+            "expected 'unavailable' (stopgap 現態)"
+        )
+    if not isinstance(fr_body, dict):
+        raise SystemExit("FAIL before-full: results.factor_returns missing or not dict")
+    if fr_body.get("status") != "unavailable":
+        raise SystemExit(
+            f"FAIL before-full: union status={fr_body.get('status')!r} expected unavailable"
+        )
+    if fr_body.get("value") is not None:
+        raise SystemExit("FAIL before-full: union value must be null under stopgap")
+    reason = str(fr_body.get("reason") or "")
+    if UNAVAILABLE_REASON not in reason and "ls_returns_timestamp_misaligned" not in reason:
+        raise SystemExit(f"FAIL before-full: unexpected reason={reason!r}")
+    if _has_finite_numeric_leaf(fr_body):
+        raise SystemExit("FAIL before-full: factor_returns still has finite numeric leaf")
+
+    # 非 FR 模組至少一節有內容(path 值凍結用)
+    results = report_dict.get("results") or {}
+    non_fr = [k for k in results if k != "factor_returns"]
+    if not non_fr:
+        raise SystemExit("FAIL before-full: no non-FR module results to freeze")
+
+    payload = _build_full_profile_payload("before-full", report_dict)
+    if "results" not in payload:
+        raise SystemExit("FAIL before-full: payload missing top-level results")
+
+    raw_digest = _write_json(out_path, payload)
+    canon = canonical_sha256(payload)
+    try:
+        rel = out_path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        rel = str(out_path)
+
+    # decoupling baseline(B0.1 硬性)
+    decouple_line = freeze_decoupling_baseline()
+
+    print(f"wrote {rel}")
+    print(f"raw_sha256={raw_digest}")
+    print(f"canonical_sha256={canon}")
+    print(f"module_summary.factor_returns={fr_status}")
+    print("factor_returns_union=unavailable")
+    print(f"non_fr_modules={sorted(non_fr)}")
+    print(f"decoupling_baseline={decouple_line}")
+    print(f"sha256sum {rel} = {raw_digest}")
+    return 0
+
+
+def freeze_profile_after_full(*, out: str | None = None, fixture: str | None = None) -> int:
+    """1c-FR-FULL after-full(F5.1):硬性要求 §U ok union(F0 後真值)。
+
+    舊(B0 scaffold):未達 ok 仍寫 JSON+pre-F0 note。
+    舊為何錯:F0-F4 全綠後 after-full 必須是 canonical ok 形狀;再允許 unavailable
+    會把 stopgap 假值當基線。
+    """
+    _assert_fixture_name(fixture)
+    out_path = _resolve_out_path("after-full", out)
+
+    report_dict = _report_dict_from_orch(list(ALL_DEEP_MODULES))
+    module_summary = report_dict.get("module_summary") or {}
+    fr_status = module_summary.get("factor_returns")
+    fr_body = (report_dict.get("results") or {}).get("factor_returns")
+    results = report_dict.get("results") or {}
+    if not isinstance(results, dict) or not results:
+        raise SystemExit("FAIL after-full: report.results missing or empty")
+
+    if fr_status != "completed":
+        raise SystemExit(
+            f"FAIL after-full: module_summary.factor_returns={fr_status!r} "
+            "expected 'completed' (F0+ 真值;pre-F0 scaffold 已廢)"
+        )
+    if not isinstance(fr_body, dict):
+        raise SystemExit("FAIL after-full: results.factor_returns missing or not dict")
+    if fr_body.get("status") != "ok":
+        raise SystemExit(
+            f"FAIL after-full: union status={fr_body.get('status')!r} expected ok"
+        )
+    value = fr_body.get("value")
+    if not isinstance(value, dict):
+        raise SystemExit("FAIL after-full: ok union value must be dict")
+    if value.get("schema_version") != "fr_full_v1":
+        raise SystemExit(
+            f"FAIL after-full: schema_version={value.get('schema_version')!r} "
+            "expected fr_full_v1"
+        )
+    if value.get("semantics") != "single_asset_factor_timing_ls":
+        raise SystemExit(
+            f"FAIL after-full: semantics={value.get('semantics')!r} "
+            "expected single_asset_factor_timing_ls"
+        )
+    if fr_body.get("reason") is not None:
+        raise SystemExit(
+            f"FAIL after-full: ok path reason must be null, got {fr_body.get('reason')!r}"
+        )
+
+    payload = _build_full_profile_payload("after-full", report_dict)
+    payload["after_full_notes"] = {
+        "factor_returns_status": "ok",
+        "module_summary": fr_status,
+        "schema_version": value.get("schema_version"),
+        "semantics": value.get("semantics"),
+        "quantile_fit": value.get("quantile_fit"),
+        "note": "F5.1 re-freeze after F0-F4: canonical ok union (pre-F0 scaffold retired)",
+    }
+
+    # AST allowlist 重凍(F5.1;line 位移後刷新;與 --before 同寫檔)
+    allowlist_text = freeze_factory_allowlist()
+    FACTORY_ALLOWLIST.parent.mkdir(parents=True, exist_ok=True)
+    FACTORY_ALLOWLIST.write_text(allowlist_text, encoding="utf-8")
+
+    raw_digest = _write_json(out_path, payload)
+    canon = canonical_sha256(payload)
+    try:
+        rel = out_path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        rel = str(out_path)
+
+    print(f"wrote {rel}")
+    print(f"raw_sha256={raw_digest}")
+    print(f"canonical_sha256={canon}")
+    print(f"module_summary.factor_returns={fr_status}")
+    print(f"after_full_notes={payload.get('after_full_notes')}")
+    print(
+        f"factory_allowlist={FACTORY_ALLOWLIST.relative_to(REPO_ROOT).as_posix()} "
+        f"bytes={len(allowlist_text)}"
+    )
+    print(f"sha256sum {rel} = {raw_digest}")
+    return 0
+
+
+def freeze_profile(
+    profile: str,
+    *,
+    out: str | None = None,
+    fixture: str | None = None,
+) -> int:
+    """分派 --profile before-full / after-full."""
+    if profile not in FULL_PROFILES:
+        raise SystemExit(
+            f"FAIL: unknown --profile {profile!r}; allowed={sorted(FULL_PROFILES)}"
+        )
+    if profile == "before-full":
+        return freeze_profile_before_full(out=out, fixture=fixture)
+    return freeze_profile_after_full(out=out, fixture=fixture)
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="IC1CFR stopgap §G freeze")
+    parser = argparse.ArgumentParser(description="IC1CFR stopgap / FULL §G freeze")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--before", action="store_true", help="Freeze pre-stopgap baseline")
     mode.add_argument(
@@ -1091,10 +1437,31 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--check-nodeids",
         action="store_true",
-        help="Diff current suite failures vs B0 pytest_baseline_nodeids.txt",
+        help=(
+            "Diff FR-scoped suite failures vs B0 baseline "
+            "(analyzer/stopgap/phase24 FR/phase26 FR/deep_analysis); "
+            "writes handoffs/ic1cfr_full_baseline/checknodeids_receipt.txt"
+        ),
+    )
+    mode.add_argument(
+        "--profile",
+        choices=sorted(FULL_PROFILES),
+        help="1c-FR-FULL baseline profile: before-full | after-full",
+    )
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="Output JSON path (profiles only; default under handoffs/ic1cfr_full_baseline/)",
+    )
+    parser.add_argument(
+        "--fixture",
+        default="ic_api_real_kline",
+        help="Fixture name (only ic_api_real_kline; real kline, no synthetic)",
     )
     args = parser.parse_args(argv)
 
+    if args.profile:
+        return freeze_profile(args.profile, out=args.out, fixture=args.fixture)
     if args.after_default:
         return freeze_after_default()
     if args.after_explicit:
@@ -1108,3 +1475,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -280,3 +280,126 @@ describe('NetICChart / cost wiring (T4)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// F4.2 — NetICChart 三鍵接線(breakeven / profitable / net_factor_return)
+// ---------------------------------------------------------------------------
+
+describe('NetICChart / F4 breakeven wiring', () => {
+  beforeEach(() => {
+    // recharts ResponsiveContainer 需要尺寸
+    if (!(globalThis as unknown as { ResizeObserver?: unknown }).ResizeObserver) {
+      (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+    }
+    Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        width: 400,
+        height: 260,
+        top: 0,
+        left: 0,
+        bottom: 260,
+        right: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+  });
+
+  it('renders_breakeven_ok: 三鍵 ok → 顯示 breakeven 值 + profitable 標記', () => {
+    const data: NetICAnalysisData = {
+      features: {
+        f1: {
+          gross_ic: 0.05,
+          turnover: 0.5,
+          turnover_semantics: 'membership_change_both_legs_per_bar',
+          capacity: {
+            estimated_capacity_usd: null,
+            capacity_tier: 'unknown',
+            calibration: 'uncalibrated',
+          },
+          net_factor_return: { status: 'ok', value: 0.0005, reason: null },
+          cost_bps: 10,
+          cost_semantics: 'per_rebalance_not_annualized',
+          cost_drag_return: 0.0005,
+          cost_sensitivity: [
+            { cost_bps: 5, cost_drag_return: 0.00025 },
+            { cost_bps: 10, cost_drag_return: 0.0005 },
+          ],
+          breakeven_cost_bps: { status: 'ok', value: 20.0, reason: null },
+          profitable_after_cost: { status: 'ok', value: true, reason: null },
+        },
+      },
+      summary: {
+        total_analyzed: 1,
+        evaluable_count: 1,
+        profitable_count: 1,
+        avg_cost_drag_return: 0.0005,
+      },
+    };
+    render(<NetICChart data={data} />);
+    expect(screen.getByTestId('netic-breakeven-panel')).toBeTruthy();
+    expect(screen.getByTestId('netic-breakeven-list')).toBeTruthy();
+    const bps = screen.getByTestId('netic-breakeven-bps-f1');
+    expect(bps.textContent).toMatch(/20/);
+    expect(bps.textContent).toMatch(/bps/);
+    expect(screen.getByTestId('netic-profitable-f1').textContent).toMatch(/profitable/);
+    expect(screen.getByTestId('netic-net-factor-return-f1').textContent).toMatch(/0\.0005/);
+    expect(screen.queryByTestId('netic-breakeven-empty')).toBeNull();
+  });
+
+  it('breakeven_unavailable_empty_state: turnover=0 → 空態,禁代入 0', () => {
+    const data: NetICAnalysisData = {
+      features: {
+        f1: {
+          gross_ic: 0.05,
+          turnover: 0.0,
+          turnover_semantics: 'membership_change_both_legs_per_bar',
+          capacity: {
+            estimated_capacity_usd: null,
+            capacity_tier: 'unknown',
+            calibration: 'uncalibrated',
+          },
+          net_factor_return: {
+            status: 'ok',
+            value: 0.01,
+            reason: null,
+          },
+          cost_bps: 10,
+          cost_semantics: 'per_rebalance_not_annualized',
+          cost_drag_return: 0.0,
+          cost_sensitivity: [{ cost_bps: 10, cost_drag_return: 0.0 }],
+          breakeven_cost_bps: {
+            status: 'unavailable',
+            value: null,
+            reason: 'zero_mean_turnover',
+          },
+          profitable_after_cost: {
+            status: 'ok',
+            value: true,
+            reason: null,
+          },
+        },
+      },
+      summary: {
+        total_analyzed: 1,
+        evaluable_count: 1,
+        profitable_count: 1,
+        avg_cost_drag_return: 0.0,
+      },
+    };
+    render(<NetICChart data={data} />);
+    const empty = screen.getByTestId('netic-breakeven-empty');
+    expect(empty.textContent).toMatch(/不可用|turnover/i);
+    // 禁代入 0 當 breakeven
+    expect(screen.queryByTestId('netic-breakeven-bps-f1')).toBeNull();
+    expect(screen.queryByTestId('netic-breakeven-list')).toBeNull();
+    // 空態非 spinner
+    expect(screen.queryByTestId('netic-loading')).toBeNull();
+  });
+});

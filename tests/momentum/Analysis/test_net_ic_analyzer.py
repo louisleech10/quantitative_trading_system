@@ -267,16 +267,17 @@ def test_diff_allowlist_rejects_bogus_unapproved_field() -> None:
     self_test_allowlist_rejects_bogus()
 
 
-def test_factor_returns_ignored() -> None:
-    """注入 factor_returns 仍 unavailable(1c-FR)。"""
+def test_factor_returns_bare_series_ignored() -> None:
+    """裸 Series 注入非 FactorTimingReturnSeries 形狀 → 仍 unavailable(禁 scalar/裸序列)。"""
     analyzer = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
     series = pd.Series(np.linspace(0.01, 0.02, 20))
     out = analyzer.batch_analyze(
         {"f1": {"gross_ic": 0.03}},
         {"f1": 0.3},
-        factor_returns={"f1": series},
+        factor_return_series={"f1": series},  # 缺 position
     )
     _assert_union_unavailable(out["features"]["f1"]["net_factor_return"])
+    _assert_union_unavailable(out["features"]["f1"]["breakeven_cost_bps"])
 
 
 def test_capacity_tiers_unchanged() -> None:
@@ -363,8 +364,8 @@ def test_mutation_m3_ic_numerator_backfill(monkeypatch: pytest.MonkeyPatch) -> N
     """M3:以 IC 回填 net_factor_return/breakeven → union 斷言紅。"""
     real_batch = NetICAnalyzer.batch_analyze
 
-    def polluted(self, ic_summary, turnover_data, factor_returns=None):  # type: ignore[no-untyped-def]
-        out = real_batch(self, ic_summary, turnover_data, factor_returns)
+    def polluted(self, ic_summary, turnover_data, factor_return_series=None):  # type: ignore[no-untyped-def]
+        out = real_batch(self, ic_summary, turnover_data, factor_return_series)
         for feat in out.get("features", {}).values():
             if feat.get("skipped"):
                 continue
@@ -404,8 +405,8 @@ def test_mutation_m6_ic_vs_ic_rankcorr(monkeypatch: pytest.MonkeyPatch) -> None:
     """M6:恢復 rank_correlation_gross_vs_net summary 欄 → 契約紅。"""
     real_batch = NetICAnalyzer.batch_analyze
 
-    def with_rankcorr(self, ic_summary, turnover_data, factor_returns=None):  # type: ignore[no-untyped-def]
-        out = real_batch(self, ic_summary, turnover_data, factor_returns)
+    def with_rankcorr(self, ic_summary, turnover_data, factor_return_series=None):  # type: ignore[no-untyped-def]
+        out = real_batch(self, ic_summary, turnover_data, factor_return_series)
         out["summary"]["rank_correlation_gross_vs_net"] = 0.99
         out["summary"]["avg_ic_loss_pct"] = 12.0
         return out
@@ -422,8 +423,8 @@ def test_mutation_m9_bare_null_placeholder(monkeypatch: pytest.MonkeyPatch) -> N
     """M9:conditional metric 改裸 null → union 形狀紅。"""
     real_batch = NetICAnalyzer.batch_analyze
 
-    def bare_null(self, ic_summary, turnover_data, factor_returns=None):  # type: ignore[no-untyped-def]
-        out = real_batch(self, ic_summary, turnover_data, factor_returns)
+    def bare_null(self, ic_summary, turnover_data, factor_return_series=None):  # type: ignore[no-untyped-def]
+        out = real_batch(self, ic_summary, turnover_data, factor_return_series)
         for feat in out.get("features", {}).values():
             if feat.get("skipped"):
                 continue
@@ -457,12 +458,12 @@ def test_mutation_m11_restore_clamp(monkeypatch: pytest.MonkeyPatch) -> None:
     """M11:恢復 max(0,·) 對負 turnover 靜默 clamp → negative_turnover 紅。"""
     real_batch = NetICAnalyzer.batch_analyze
 
-    def clamp_batch(self, ic_summary, turnover_data, factor_returns=None):  # type: ignore[no-untyped-def]
+    def clamp_batch(self, ic_summary, turnover_data, factor_return_series=None):  # type: ignore[no-untyped-def]
         clamped = {
             k: max(0.0, float(v)) if v is not None and math.isfinite(float(v)) else v
             for k, v in turnover_data.items()
         }
-        return real_batch(self, ic_summary, clamped, factor_returns)
+        return real_batch(self, ic_summary, clamped, factor_return_series)
 
     monkeypatch.setattr(NetICAnalyzer, "batch_analyze", clamp_batch)
     analyzer = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
@@ -470,3 +471,144 @@ def test_mutation_m11_restore_clamp(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(AssertionError):
         assert out["features"]["f1"].get("reason") == "negative_turnover"
         assert set(out["features"]["f1"].keys()) == SCHEMA_SKIPPED
+
+
+# ---------------------------------------------------------------------------
+# F4 — series 回填 breakeven / profitable / turnover first-bar
+# ---------------------------------------------------------------------------
+
+
+def _make_timing_series(
+    gross: list[float],
+    position: list[float],
+    name: str = "f1",
+) -> Any:
+    """建構 duck-typed FactorTimingReturnSeries(ls_return+position)。"""
+    from momentum.Analysis.factor_return_analyzer import FactorTimingReturnSeries
+
+    idx = pd.date_range("2024-01-01", periods=len(gross), freq="D")
+    return FactorTimingReturnSeries(
+        feature=name,
+        ls_return=pd.Series(gross, index=idx, dtype=float),
+        position=pd.Series(position, index=idx, dtype=float),
+        index_policy="frame_dropna_intersection",
+    )
+
+
+def test_breakeven_hand_calc_20bps() -> None:
+    """合成 gross_mean=0.001 / turnover_mean=0.5 → breakeven_cost_bps==20.0(±1e-9)。
+
+    position 序列使 |Δp| mean = 0.5;gross 全 0.001 → mean(gross)/mean(to)*1e4 = 20.
+    position e.g. [0, 0.5, 0, 0.5, 0, 0.5, 0, 0.5] → diffs abs mean?
+    更直接:固定 turnover via position 設計.
+    n=4: position [0, 0.5, 0, 0.5] → diff [nan,0.5,-0.5,0.5] → [0,0.5,0.5,0.5] mean=0.375
+    n=2: position [0, 1] → [0, 1] mean=0.5; gross [0.001, 0.001] mean=0.001 → 20.0
+    """
+    art = _make_timing_series(
+        gross=[0.001, 0.001],
+        position=[0.0, 1.0],
+        name="f1",
+    )
+    # 手算護欄
+    from momentum.Analysis.net_ic_analyzer import position_to_turnover_series
+
+    to = position_to_turnover_series(art.position)
+    assert float(to.mean()) == pytest.approx(0.5)
+    assert float(art.ls_return.mean()) == pytest.approx(0.001)
+
+    analyzer = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
+    out = analyzer.batch_analyze(
+        {"f1": {"gross_ic": 0.05}},
+        {"f1": 0.3},  # scalar 僅 capacity/cost_drag;breakeven 用 series
+        factor_return_series={"f1": art},
+    )
+    feat = out["features"]["f1"]
+    be = feat["breakeven_cost_bps"]
+    assert be["status"] == "ok"
+    assert be["reason"] is None
+    assert be["value"] == pytest.approx(20.0, abs=1e-9)
+
+    nfr = feat["net_factor_return"]
+    assert nfr["status"] == "ok"
+    assert isinstance(nfr["value"], float) and math.isfinite(nfr["value"])
+
+    prof = feat["profitable_after_cost"]
+    assert prof["status"] == "ok"
+    assert isinstance(prof["value"], bool)
+
+    assert out["summary"]["evaluable_count"] > 0
+
+
+def test_turnover_first_bar_zero() -> None:
+    """D6: position [0,0,-1,1] → turnover [0,0,1,2](首 bar=0 非 NaN-drop)。"""
+    from momentum.Analysis.net_ic_analyzer import position_to_turnover_series
+
+    pos = pd.Series([0.0, 0.0, -1.0, 1.0])
+    to = position_to_turnover_series(pos)
+    assert to.tolist() == pytest.approx([0.0, 0.0, 1.0, 2.0])
+    assert not to.isna().any()
+
+
+def test_zero_mean_turnover_breakeven_unavailable() -> None:
+    """turnover.mean()==0 → breakeven unavailable;不得代填 0。"""
+    # flat position → all turnover 0
+    art = _make_timing_series(
+        gross=[0.01, 0.02, -0.01],
+        position=[0.0, 0.0, 0.0],
+        name="f1",
+    )
+    analyzer = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
+    out = analyzer.batch_analyze(
+        {"f1": {"gross_ic": 0.05}},
+        {"f1": 0.0},
+        factor_return_series={"f1": art},
+    )
+    feat = out["features"]["f1"]
+    be = feat["breakeven_cost_bps"]
+    _assert_union_unavailable(be)
+    assert be["value"] is None
+    assert "zero" in be["reason"] or "turnover" in be["reason"]
+    # net 仍可算(cost*0=0)
+    assert feat["net_factor_return"]["status"] == "ok"
+
+
+def test_run_net_ic_with_series_owner() -> None:
+    """orchestrator 有 series owner → 三鍵 ok + evaluable>0。"""
+    config = ICConfig()
+    # enable cost for three keys
+    config.net_ic_analysis.cost_enabled = True
+    config.net_ic_analysis.cost_bps = 10.0
+    orch = ICFilterOrchestrator(config)
+    orch._report = {
+        "summary_table": [{"feature_name": "f1", "ic_mean": 0.05}],
+        "turnover_analysis": {"f1": {"quantile_turnover": 0.3}},
+    }
+    art = _make_timing_series(
+        gross=[0.001, 0.001],
+        position=[0.0, 1.0],
+        name="f1",
+    )
+    orch._factor_return_series = {"f1": art}
+    out = orch._run_net_ic(["f1"], config)
+    feat = out["features"]["f1"]
+    assert feat["breakeven_cost_bps"]["status"] == "ok"
+    assert feat["breakeven_cost_bps"]["value"] == pytest.approx(20.0, abs=1e-9)
+    assert feat["net_factor_return"]["status"] == "ok"
+    assert feat["profitable_after_cost"]["status"] == "ok"
+    assert out["summary"]["evaluable_count"] > 0
+
+
+def test_cache_hit_no_owner_net_ic_not_crash() -> None:
+    """cache-hit 無 owner → net_ic unavailable 不崩(F1 護欄一致)。"""
+    config = ICConfig()
+    orch = ICFilterOrchestrator(config)
+    orch._report = {
+        "summary_table": [{"feature_name": "f1", "ic_mean": 0.05}],
+        "turnover_analysis": {"f1": {"quantile_turnover": 0.3}},
+    }
+    orch._factor_return_series = {}
+    out = orch._run_net_ic(["f1"], config)
+    # 無 series → nested unavailable,非崩;payload 不宣稱 ok evaluable
+    assert "features" in out
+    _assert_union_unavailable(out["features"]["f1"]["net_factor_return"])
+    assert out["summary"]["evaluable_count"] == 0

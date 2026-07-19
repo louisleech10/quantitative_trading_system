@@ -30,9 +30,9 @@ def test_deep_analysis_types_instantiation():
 
 def test_ic_config_contains_deep_analysis_sections():
     config = ICConfig()
-    # 舊斷言為何錯: `factor_return.enabled is True` 固化錯位序列預設開啟;
-    # IC1C-FR-STOPGAP default-off → enabled is False(止血)。
-    assert config.factor_return.enabled is False
+    # 舊 stopgap 斷言 `enabled is False` 為何錯: F5.2 已 flip enabled=True
+    # (PIT 乾淨後恢復預設 ON;stopgap 止血結束)。
+    assert config.factor_return.enabled is True
     assert config.factor_centrality.enabled is True
     assert config.trend_analysis.enabled is True
     assert config.parameter_sensitivity.enabled is True

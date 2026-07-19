@@ -1,23 +1,26 @@
 # IC1CFR-STOPGAP B0 factory allowlist (frozen)
-# scanner: rg -n 'create_factor_return_analyzer' + rg -n 'FactorReturnAnalyzer\\('
+# scanner: AST Call of 'create_factor_return_analyzer' + 'FactorReturnAnalyzer'
 # rules: factory definition (momentum/factories.py) excluded from factory_callers;
-#        direct_consumers keep file:line including factories.py definition body;
-#        scanner self (scripts/ic1cfr_stopgap_freeze.py) excluded.
-# format: factory_caller|<relpath> OR direct_consumer|<relpath>:<lineno>
+#        direct_consumers keep path:line:col (multi-ctor on same line not deduped);
+#        scanner self (scripts/ic1cfr_stopgap_freeze.py) excluded; import aliases tracked.
+# format: factory_caller|<relpath> OR direct_consumer|<relpath>:<lineno>:<col>
 # section: factory_callers
+factory_caller|momentum/Analysis/ic_filter_orchestrator.py
+factory_caller|tests/momentum/Analysis/test_factor_return_analyzer.py
 factory_caller|tests/phase26/test_deep_analysis_factories.py
 # section: direct_consumers
-direct_consumer|momentum/Analysis/ic_filter_orchestrator.py:1784
-direct_consumer|momentum/factories.py:454
-direct_consumer|scripts/phase29_perf_validation_tmp.py:30
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:101
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:112
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:118
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:130
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:18
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:30
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:40
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:50
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:70
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:81
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:90
+direct_consumer|momentum/factories.py:456:11
+direct_consumer|scripts/phase29_perf_validation_tmp.py:41:0
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:19:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:35:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:45:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:59:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:87:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:105:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:114:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:129:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:142:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:148:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:160:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:302:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:347:15
