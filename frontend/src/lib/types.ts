@@ -2263,12 +2263,12 @@ export type FactorReturnLegacyFeaturePayload = FactorReturnFeaturePayload;
 /** @deprecated 裸 feature map(無 status);sanitizer 擋,前端不繪 */
 export type FactorReturnLegacyMap = Record<string, FactorReturnFeaturePayload>;
 
-/** §U ok value: metadata 與 features 分層(SPEC §U / F3.1)。 */
+/** §U ok value: metadata 與 features 分層(SPEC §U / F3.1)。literal 鎖死,禁 `| string` 放寬。 */
 export type FactorReturnDataOkValue = {
-  schema_version: 'fr_full_v1' | string;
-  semantics: 'single_asset_factor_timing_ls' | string;
-  quantile_fit: 'pit_expanding' | string;
-  return_transform: 'identity' | string;
+  schema_version: 'fr_full_v1';
+  semantics: 'single_asset_factor_timing_ls';
+  quantile_fit: 'pit_expanding';
+  return_transform: 'identity';
   turnover_semantics?: string;
   warmup_periods?: number;
   features: Record<string, FactorReturnFeaturePayload>;

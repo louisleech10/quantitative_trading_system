@@ -1,13 +1,60 @@
 /**
- * IC1C-FR-FULL F3.1 — FactorReturnChart ok 上架 + 正名
+ * IC1C-FR-FULL F3.1 / F3-FIX — FactorReturnChart ok 上架 + 正名 + discriminator fail-closed
  *
- * 具名三 test(SPEC §P F3):
+ * 具名 test(SPEC §P F3 + 雙審回修):
  *   renders_ok_series / legacy_finite_payload_rejected / equity_stays_unavailable
+ *   + malformed-union 不繪 / 真 Line dataKey wiring(非 hidden mirror)
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import React from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+/** recharts props 擷取(production 不留 hidden mirror;測試斷言真 Line/LineChart props) */
+const rechartsCapture = vi.hoisted(() => ({
+  lineDataKeys: [] as string[],
+  chartData: [] as unknown[],
+  reset() {
+    this.lineDataKeys = [];
+    this.chartData = [];
+  },
+}));
+
+vi.mock('recharts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('recharts')>();
+  // 完整 stub Line/LineChart 以暴露 props(包一層 actual 會破壞 recharts children 軸辨識)
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children?: React.ReactNode }) =>
+      React.createElement('div', { className: 'recharts-responsive-container', 'data-testid': 'recharts-rc' }, children),
+    LineChart: ({ data, children }: { data?: unknown; children?: React.ReactNode }) => {
+      rechartsCapture.chartData.push(data);
+      return React.createElement(
+        'div',
+        { 'data-testid': 'recharts-linechart-probe', className: 'recharts-wrapper' },
+        children
+      );
+    },
+    Line: ({ dataKey }: { dataKey?: string | number }) => {
+      if (typeof dataKey === 'string') {
+        rechartsCapture.lineDataKeys.push(dataKey);
+      }
+      return React.createElement('div', {
+        'data-testid': 'recharts-line-probe',
+        className: 'recharts-line',
+        'data-datakey': String(dataKey ?? ''),
+      });
+    },
+    // 軸/裝飾不影響 wiring 斷言
+    XAxis: () => null,
+    YAxis: () => null,
+    CartesianGrid: () => null,
+    Tooltip: () => null,
+    Legend: () => null,
+  };
+});
+
 import FactorReturnChart, {
   FACTOR_RETURN_CHART_TITLE,
   FACTOR_RETURN_LEGACY_REJECTED_NOTICE,
@@ -61,9 +108,15 @@ beforeAll(() => {
   };
 });
 
+beforeEach(() => {
+  rechartsCapture.reset();
+});
+
 afterEach(() => {
   cleanup();
 });
+
+const LS_CUMULATIVE = [0, 0, -0.03, -0.0494, -0.0494, -0.020882, 0.0280739];
 
 /** SPEC §P F3 L99 寫死 ok union fixture(含 return_transform:"identity") */
 const okUnionFixture: FactorReturnData = {
@@ -76,7 +129,7 @@ const okUnionFixture: FactorReturnData = {
     features: {
       f1: {
         long_short_mean_return: 0.0042857,
-        ls_cumulative_sampled: [0, 0, -0.03, -0.0494, -0.0494, -0.020882, 0.0280739],
+        ls_cumulative_sampled: LS_CUMULATIVE,
         risk_metrics: { sharpe_ratio: 1.2 },
       },
     },
@@ -99,32 +152,96 @@ const legacyFinitePayload = {
   },
 };
 
-describe('FactorReturnChart (IC1CFR F3.1)', () => {
-  it('renders_ok_series: ok union → 繪 7 點 + title 含「單標的擇時」', () => {
+/** 以 ok fixture 為底,覆寫 value 一鍵(malformed-union 用) */
+function withValueOverride(
+  override: Partial<FactorReturnData['value'] extends infer V ? (V extends null ? never : V) : never> &
+    Record<string, unknown>
+): unknown {
+  return {
+    status: 'ok',
+    reason: null,
+    value: {
+      schema_version: 'fr_full_v1',
+      semantics: 'single_asset_factor_timing_ls',
+      quantile_fit: 'pit_expanding',
+      return_transform: 'identity',
+      features: {
+        f1: { ls_cumulative_sampled: LS_CUMULATIVE },
+      },
+      ...override,
+    },
+  };
+}
+
+describe('FactorReturnChart (IC1CFR F3.1 / F3-FIX)', () => {
+  it('renders_ok_series: ok union → 繪 7 點 + title 含「單標的擇時」+ 真 Line wiring', () => {
     expect(isFactorReturnOkUnion(okUnionFixture)).toBe(true);
     const points = extractFactorReturnChartPoints(okUnionFixture);
     expect(points).toHaveLength(7);
-    expect(points.map((p) => p.f1)).toEqual([
-      0, 0, -0.03, -0.0494, -0.0494, -0.020882, 0.0280739,
-    ]);
+    // 點值來自 ls_cumulative_sampled(非假 wiring)
+    expect(points.map((p) => p.f1)).toEqual(LS_CUMULATIVE);
 
     const { container } = render(<FactorReturnChart data={okUnionFixture} />);
     // title 含「單標的擇時」(正名)
     expect(container.textContent).toContain('單標的擇時');
     expect(container.textContent).toContain(FACTOR_RETURN_CHART_TITLE);
     expect(screen.getByTestId('factor-return-chart')).toBeTruthy();
-    // production payload: 7 點(來自 ls_cumulative_sampled)
-    const payloadEl = screen.getByTestId('factor-return-chart-payload');
-    const chartPayload = JSON.parse(payloadEl.getAttribute('data-chart') || '[]') as Array<{
-      index: number;
-      f1?: number | null;
-    }>;
-    expect(chartPayload).toHaveLength(7);
-    expect(chartPayload.map((p) => p.f1)).toEqual([
-      0, 0, -0.03, -0.0494, -0.0494, -0.020882, 0.0280739,
-    ]);
+    // production 禁 hidden mirror / test-only payload DOM
+    expect(screen.queryByTestId('factor-return-chart-payload')).toBeNull();
+    expect(container.querySelector('[hidden]')).toBeNull();
     expect(container.querySelector('.recharts-responsive-container')).toBeTruthy();
     expect(screen.queryByTestId('factor-return-unavailable')).toBeNull();
+
+    // 真 <Line dataKey> 繫到 feature 名;LineChart data 值 = ls_cumulative_sampled
+    expect(rechartsCapture.lineDataKeys).toEqual(['f1']);
+    expect(rechartsCapture.chartData.length).toBeGreaterThanOrEqual(1);
+    const chartRows = rechartsCapture.chartData[0] as Array<{ index: number; f1?: number | null }>;
+    expect(chartRows).toHaveLength(7);
+    expect(chartRows.map((r) => r.f1)).toEqual(LS_CUMULATIVE);
+  });
+
+  it('malformed_union_rejected: 缺任一 required metadata → 不繪(legacy/空態)', () => {
+    const cases: Array<{ label: string; payload: unknown }> = [
+      { label: 'missing_schema_version', payload: withValueOverride({ schema_version: undefined }) },
+      { label: 'wrong_schema_version', payload: withValueOverride({ schema_version: 'legacy_v0' }) },
+      { label: 'missing_semantics', payload: withValueOverride({ semantics: undefined }) },
+      {
+        label: 'wrong_semantics',
+        payload: withValueOverride({ semantics: 'cross_section_ls' }),
+      },
+      { label: 'missing_quantile_fit', payload: withValueOverride({ quantile_fit: undefined }) },
+      {
+        label: 'wrong_quantile_fit',
+        payload: withValueOverride({ quantile_fit: 'full_sample' }),
+      },
+      {
+        label: 'missing_return_transform',
+        payload: withValueOverride({ return_transform: undefined }),
+      },
+      {
+        label: 'wrong_return_transform',
+        payload: withValueOverride({ return_transform: 'log' }),
+      },
+      { label: 'empty_features', payload: withValueOverride({ features: {} }) },
+      { label: 'missing_features', payload: withValueOverride({ features: undefined }) },
+    ];
+
+    for (const { label, payload } of cases) {
+      rechartsCapture.reset();
+      expect(isFactorReturnOkUnion(payload), label).toBe(false);
+      expect(extractFactorReturnChartPoints(payload), label).toEqual([]);
+      expect(shouldShowFactorReturnUnavailableNotice(payload), label).toBe(true);
+
+      const { container, unmount } = render(
+        <FactorReturnChart data={payload as FactorReturnData} />
+      );
+      expect(screen.getByTestId('factor-return-unavailable'), label).toBeTruthy();
+      expect(container.querySelector('.recharts-line'), label).toBeNull();
+      expect(container.querySelector('.recharts-responsive-container'), label).toBeNull();
+      expect(rechartsCapture.lineDataKeys, label).toEqual([]);
+      unmount();
+      cleanup();
+    }
   });
 
   it('legacy_finite_payload_rejected: 裸 map → 空態警示不繪', () => {
@@ -187,7 +304,7 @@ describe('FactorReturnChart (IC1CFR F3.1)', () => {
     expect(screen.getByTestId('factor-return-error').textContent).toContain('deep failed');
   });
 
-  it('types: FactorReturnData 為 §U(源碼守衛 status/value/reason + schema_version)', () => {
+  it('types: FactorReturnData 為 §U + literal 鎖死(無 | string 放寬)', () => {
     const typesPath = resolve(__dirname, '../../lib/types.ts');
     const src = readFileSync(typesPath, 'utf8');
     expect(src).toMatch(
@@ -195,18 +312,28 @@ describe('FactorReturnChart (IC1CFR F3.1)', () => {
     );
     expect(src).toMatch(/status:\s*'unavailable'/);
     expect(src).toMatch(/value:\s*null/);
-    expect(src).toMatch(/schema_version/);
-    expect(src).toMatch(/return_transform/);
-    expect(src).toMatch(/single_asset_factor_timing_ls/);
+    expect(src).toMatch(/schema_version:\s*'fr_full_v1'/);
+    expect(src).toMatch(/semantics:\s*'single_asset_factor_timing_ls'/);
+    expect(src).toMatch(/quantile_fit:\s*'pit_expanding'/);
+    expect(src).toMatch(/return_transform:\s*'identity'/);
+    // 禁 `| string` 放寬(composer-4)
+    expect(src).not.toMatch(/schema_version:\s*'fr_full_v1'\s*\|\s*string/);
+    expect(src).not.toMatch(/semantics:\s*'single_asset_factor_timing_ls'\s*\|\s*string/);
+    expect(src).not.toMatch(/quantile_fit:\s*'pit_expanding'\s*\|\s*string/);
+    expect(src).not.toMatch(/return_transform:\s*'identity'\s*\|\s*string/);
     expect(isFactorReturnUnavailableUnion(unavailableUnion)).toBe(true);
   });
 
-  it('grep 錨點: 元件源碼含 1c-FR + 正名 title', () => {
+  it('grep 錨點: 元件源碼含 1c-FR + 正名 title + 無 production hidden mirror', () => {
     const chartPath = resolve(__dirname, './FactorReturnChart.tsx');
     const src = readFileSync(chartPath, 'utf8');
     const matches = src.match(/1c-FR/g) || [];
     expect(matches.length).toBeGreaterThanOrEqual(1);
     expect(src).toContain('單標的因子擇時多空');
+    // production 禁 test-only hidden mirror
+    expect(src).not.toMatch(/factor-return-chart-payload/);
+    expect(src).not.toMatch(/data-chart=\{/);
+    expect(src).not.toMatch(/\bhidden\b/);
     // user-facing 禁舊文案(字串拆寫以免 deny-list rg 誤命中 test 本體)
     const bannedA = ['C13 Fact', 'or Ret', 'urn'].join('');
     const bannedB = ['分', '位收', '益'].join('');

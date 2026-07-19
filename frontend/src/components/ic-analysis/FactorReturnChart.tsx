@@ -50,8 +50,15 @@ export function isFactorReturnUnavailableUnion(data: unknown): boolean {
   return obj.status === 'unavailable' && obj.value === null;
 }
 
+/** §U ok value 五個 required metadata(fail-closed;缺任一 → 非 ok)。 */
+export const FACTOR_RETURN_OK_SCHEMA_VERSION = 'fr_full_v1' as const;
+export const FACTOR_RETURN_OK_SEMANTICS = 'single_asset_factor_timing_ls' as const;
+export const FACTOR_RETURN_OK_QUANTILE_FIT = 'pit_expanding' as const;
+export const FACTOR_RETURN_OK_RETURN_TRANSFORM = 'identity' as const;
+
 /**
- * 是否為 §U ok union(status===ok + value.schema_version + value.features)。
+ * 是否為 §U ok union。
+ * fail-closed 驗五鍵: schema_version / semantics / quantile_fit / return_transform / features(非空)。
  */
 export function isFactorReturnOkUnion(data: unknown): data is FactorReturnDataOk {
   if (data == null || typeof data !== 'object' || Array.isArray(data)) {
@@ -66,10 +73,24 @@ export function isFactorReturnOkUnion(data: unknown): data is FactorReturnDataOk
     return false;
   }
   const v = value as Record<string, unknown>;
-  if (typeof v.schema_version !== 'string' || v.schema_version.length === 0) {
+  // 五個 required metadata — 字面量嚴格相等,禁任意 string 放寬
+  if (v.schema_version !== FACTOR_RETURN_OK_SCHEMA_VERSION) {
+    return false;
+  }
+  if (v.semantics !== FACTOR_RETURN_OK_SEMANTICS) {
+    return false;
+  }
+  if (v.quantile_fit !== FACTOR_RETURN_OK_QUANTILE_FIT) {
+    return false;
+  }
+  if (v.return_transform !== FACTOR_RETURN_OK_RETURN_TRANSFORM) {
     return false;
   }
   if (v.features == null || typeof v.features !== 'object' || Array.isArray(v.features)) {
+    return false;
+  }
+  // features 非空
+  if (Object.keys(v.features as Record<string, unknown>).length === 0) {
     return false;
   }
   return true;
@@ -275,14 +296,6 @@ export default function FactorReturnChart({
       }
     >
       <div data-testid="factor-return-chart" className="w-full">
-        {/* 暴露 production chartPoints 供 vitest DOM 斷言(禁測試內複製 mapping) */}
-        <div
-          data-testid="factor-return-chart-payload"
-          data-chart={JSON.stringify(chartPoints)}
-          data-series={JSON.stringify(seriesNames)}
-          hidden
-          aria-hidden
-        />
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={chartPoints} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-white/10" />
