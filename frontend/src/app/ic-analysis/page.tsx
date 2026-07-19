@@ -805,7 +805,7 @@ function ICAnalysisPageContent() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <ChartErrorBoundary title="C13 Factor Return">
+                      <ChartErrorBoundary title="單標的因子擇時多空">
                         <FactorReturnChart
                           data={deepAnalysisReport?.factor_returns}
                           loading={isDeepRunning || deepAnalysisStatus === 'running'}

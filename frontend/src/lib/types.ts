@@ -2234,26 +2234,49 @@ export interface SkippedResult {
 }
 
 /**
- * IC1C-FR-STOPGAP: results.factor_returns 實際形狀 = §U discriminated union(T-S4)。
- * 非 per-feature map;legacy 有限 map 僅 runtime 可能殘留,型別不收納為合法形狀。
- * ok → value 為 feature map + reason=null; unavailable → value=null + reason 非空。
+ * IC1C-FR-FULL §U: results.factor_returns = discriminated union。
+ * ok → value 含 metadata + features(非裸 feature map); unavailable → value=null + reason。
+ * legacy 裸 map 僅 runtime 可能殘留,型別不收納為合法形狀。
  */
-export type FactorReturnLegacyFeaturePayload = {
-  quantile_returns_summary?: Record<string, number>;
+/** 單特徵 payload(ok union value.features 葉)。 */
+export type FactorReturnFeaturePayload = {
   long_short_mean_return?: number;
-  risk_metrics?: Record<string, number>;
-  cumulative_returns_sampled?: Record<string, number[]>;
   ls_cumulative_sampled?: number[];
+  risk_metrics?: {
+    sharpe_ratio?: number;
+    [key: string]: number | undefined;
+  };
+  active_bar_count?: number;
+  turnover?: number | number[];
+  quantile_summary?: Record<string, unknown>;
   num_quantiles_used?: number;
+  /** legacy 欄位保留型別可讀性;ok 路徑不依賴 */
+  quantile_returns_summary?: Record<string, number>;
+  cumulative_returns_sampled?: Record<string, number[]>;
   skipped?: boolean;
   reason?: string;
 };
 
-export type FactorReturnLegacyMap = Record<string, FactorReturnLegacyFeaturePayload>;
+/** @deprecated 僅供 runtime legacy 辨識;ok 路徑不用此形狀 */
+export type FactorReturnLegacyFeaturePayload = FactorReturnFeaturePayload;
+
+/** @deprecated 裸 feature map(無 status);sanitizer 擋,前端不繪 */
+export type FactorReturnLegacyMap = Record<string, FactorReturnFeaturePayload>;
+
+/** §U ok value: metadata 與 features 分層(SPEC §U / F3.1)。 */
+export type FactorReturnDataOkValue = {
+  schema_version: 'fr_full_v1' | string;
+  semantics: 'single_asset_factor_timing_ls' | string;
+  quantile_fit: 'pit_expanding' | string;
+  return_transform: 'identity' | string;
+  turnover_semantics?: string;
+  warmup_periods?: number;
+  features: Record<string, FactorReturnFeaturePayload>;
+};
 
 export type FactorReturnDataOk = {
   status: 'ok';
-  value: FactorReturnLegacyMap;
+  value: FactorReturnDataOkValue;
   reason: null;
 };
 

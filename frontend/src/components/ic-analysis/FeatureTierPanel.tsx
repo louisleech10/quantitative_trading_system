@@ -30,7 +30,7 @@ const TOGGLES: Array<{ key: string; label: string; tier: 'L1' | 'L2' | 'L3'; tip
   { key: 'event_filtering', label: 'Event Filtering', tier: 'L2', tip: '依事件條件篩選樣本' },
   { key: 'redundancy_method_selection', label: '去重方法選擇', tier: 'L2', tip: 'greedy/hierarchical/vif' },
   { key: 'turnover_analysis', label: 'Turnover Analysis', tier: 'L2', tip: '換手率統計' },
-  { key: 'factor_return', label: 'Factor Return (Module 1)', tier: 'L2', tip: '分位收益與風險指標' },
+  { key: 'factor_return', label: '單標的因子擇時多空 (Module 1)', tier: 'L2', tip: '單標的因子擇時多空累積報酬與風險指標' },
   { key: 'trend_analysis', label: 'Trend Analysis (Module 3)', tier: 'L2', tip: '趨勢分析與綜合訊號' },
   { key: 'parameter_sensitivity', label: 'Parameter Sensitivity (Module 4)', tier: 'L2', tip: '參數穩健性分析' },
   { key: 'rolling_oos', label: 'Rolling OOS (Module 5)', tier: 'L2', tip: '滾動樣本外驗證' },
