@@ -9,7 +9,10 @@ import time
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+if TYPE_CHECKING:
+    from momentum.Analysis.factor_return_analyzer import FactorTimingReturnSeries
 
 import h5py
 import numpy as np
@@ -849,8 +852,8 @@ class ICFilterOrchestrator:
         # LA-1 B3：fallback 內層 analyze 禁 persist（G-C）；唯一寫出在 wrapper 加 root 後
         self._suppress_persist: bool = False
         # 1c-FR-FULL F1.1：PIT 因子擇時序列 in-memory owner（F1 寫、F4 讀）
-        # cache hit 無 series → net_ic 走 unavailable，不得崩
-        self._factor_return_series: dict[str, Any] = {}
+        # cache hit 無 series → 依賴 owner 的 net_ic 走 unavailable，不得崩
+        self._factor_return_series: dict[str, FactorTimingReturnSeries] = {}
 
         self._progress_callback: Optional[Callable] = None
 
@@ -1912,7 +1915,9 @@ class ICFilterOrchestrator:
 
         # 單一收斂點:cache-hit / force-merge / 全量重算 最終 return 前必過 sanitizer
         # (冪等;cache-hit 路徑此為唯一 sanitize,force 路徑為雙重保險)
-        return self._sanitize_deep_report_factor_returns(base_report)
+        # F1 雙審:owner 空時不得服務依賴 series 的 stale net_ic ok
+        sanitized = self._sanitize_deep_report_factor_returns(base_report)
+        return self._ensure_net_ic_owner_consistency(sanitized)
 
     def _compute_deep_cache_key(self, selected_features: list[str], config: ICConfig) -> str:
         deep_cfg = {
@@ -2278,7 +2283,11 @@ class ICFilterOrchestrator:
         return analyzer.run_full_diagnostics(features_df, rolling_ic_dict=rolling_ic_dict)
 
     def _run_net_ic(self, selected_features: list[str], config: ICConfig) -> dict:
-        """Net IC runner(B-strict):兩參 batch_analyze,不傳 factor_returns。"""
+        """Net IC runner(B-strict):兩參 batch_analyze,不傳 factor_returns。
+
+        F1 契約:series owner 空時不得回傳依賴 owner 的 ok/evaluable payload
+        （F4 接線後讀 ``self._factor_return_series``；本函式先做 owner 護欄）。
+        """
         from momentum.Analysis.net_ic_analyzer import NetICAnalyzer
 
         analyzer = NetICAnalyzer(config.net_ic_analysis.model_dump())
@@ -2293,7 +2302,85 @@ class ICFilterOrchestrator:
             if name in selected_features
         }
         # 明確兩參:1c 內不傳 factor_returns(canonical series 屬票 1c-FR)
-        return analyzer.batch_analyze(summary, turnover_data)
+        result = analyzer.batch_analyze(summary, turnover_data)
+        if (
+            not self._factor_return_series
+            and self._net_ic_payload_depends_on_series_owner(result)
+        ):
+            return {
+                "status": "unavailable",
+                "value": None,
+                "reason": "factor_return_series_unavailable_on_cache_hit",
+            }
+        return result
+
+    @staticmethod
+    def _net_ic_payload_depends_on_series_owner(payload: Any) -> bool:
+        """True 若 net_ic payload 宣稱 series-derived 可評估（ok / evaluable>0）。
+
+        現行 gross-only 路徑（evaluable_count=0、nested unavailable）回 False，
+        不誤傷 cache-hit 的合法 gross net_ic。
+        """
+        if not isinstance(payload, dict):
+            return False
+        if payload.get("status") == "ok":
+            return True
+        summary = payload.get("summary")
+        if isinstance(summary, dict):
+            try:
+                if int(summary.get("evaluable_count") or 0) > 0:
+                    return True
+            except (TypeError, ValueError):
+                pass
+        features = payload.get("features")
+        if not isinstance(features, dict):
+            value = payload.get("value")
+            if isinstance(value, dict):
+                return ICFilterOrchestrator._net_ic_payload_depends_on_series_owner(value)
+            return False
+        for feat in features.values():
+            if not isinstance(feat, dict):
+                continue
+            if feat.get("status") == "ok":
+                return True
+            for key in ("net_factor_return", "breakeven_cost_bps", "profitable_after_cost"):
+                sub = feat.get(key)
+                if isinstance(sub, dict) and sub.get("status") == "ok":
+                    return True
+                if key == "breakeven_cost_bps" and isinstance(sub, (int, float)):
+                    if np.isfinite(float(sub)):
+                        return True
+                if key == "profitable_after_cost" and isinstance(sub, bool):
+                    return True
+        return False
+
+    def _ensure_net_ic_owner_consistency(
+        self, report: DeepAnalysisReport
+    ) -> DeepAnalysisReport:
+        """cache-hit/force-merge 缺 owner 時,降級依賴 series 的 stale net_ic ok。
+
+        不得服務 owner=[] 卻 net_ic status:ok 依賴 series 的不一致狀態。
+        """
+        if self._factor_return_series:
+            return report
+        results = report.results if isinstance(report.results, dict) else None
+        if results is None:
+            return report
+        net = results.get("net_ic_analysis")
+        if not self._net_ic_payload_depends_on_series_owner(net):
+            return report
+        results["net_ic_analysis"] = {
+            "status": "unavailable",
+            "value": None,
+            "reason": "factor_return_series_unavailable_on_cache_hit",
+        }
+        summary = report.module_summary
+        if isinstance(summary, dict) and summary.get("net_ic_analysis") == "completed":
+            summary["net_ic_analysis"] = "unavailable"
+            report.completed_count = sum(
+                1 for status in summary.values() if status == "completed"
+            )
+        return report
 
     def _emit_deep_progress(self, callback: Optional[Callable], payload: dict) -> None:
         if callback is None:

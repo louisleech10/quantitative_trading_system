@@ -654,7 +654,8 @@ def test_series_owner_reachable() -> None:
     assert isinstance(art.ls_return, pd.Series)
     assert isinstance(art.ls_return.index, pd.DatetimeIndex)
     assert len(art.ls_return) > 0
-    assert np.isfinite(art.ls_return.to_numpy(dtype=float)).any()
+    # 全序列有限（非只挑一個 finite 過關）
+    assert np.isfinite(art.ls_return.to_numpy(dtype=float)).all()
 
     # force_modules 路徑亦寫入 owner（不經 sanitizer 斷言 completed——D16/F2）
     orch2 = _build_orch_for_f1()
@@ -665,6 +666,75 @@ def test_series_owner_reachable() -> None:
     fr = report.results.get("factor_returns")
     assert isinstance(fr, dict)
     assert fr.get("status") == "unavailable"
+
+
+def test_cache_hit_owner_consistency() -> None:
+    """F1 雙審 codex-1：cache-hit/force-merge 缺 owner 時不得服務 series-dependent net_ic ok。
+
+    契約：owner=[] 後，依賴 series 的 net_ic 必須 unavailable（或 owner 已重建）；
+    不得 owner=[] 卻 net_ic status:ok / evaluable_count>0。
+    """
+    orch = _build_orch_for_f1()
+    orch.run_deep_analysis(force_modules=["factor_returns"])
+    assert orch._factor_return_series, "force run 應寫入 series owner"
+    assert len(orch._deep_analysis_cache) >= 1
+    key = next(iter(orch._deep_analysis_cache))
+    # 注入 series-dependent stale net_ic（模擬 F4 接線後 cache 殘留）
+    orch._deep_analysis_cache[key].results["net_ic_analysis"] = {
+        "features": {
+            "feat_a": {"status": "ok", "breakeven_cost_bps": 12.5},
+        },
+        "summary": {"evaluable_count": 1},
+    }
+    orch._deep_analysis_cache[key].module_summary["net_ic_analysis"] = "completed"
+
+    # --- cache-hit：owner 清空，不得回傳 stale ok ---
+    second = orch.run_deep_analysis()
+    owner_keys = list(orch._factor_return_series.keys())
+    net = second.results.get("net_ic_analysis")
+    if not owner_keys:
+        assert isinstance(net, dict), f"expected dict net_ic, got {net!r}"
+        assert net.get("status") == "unavailable", (
+            f"cache-hit owner=[] 卻 net_ic 非 unavailable: {net!r}"
+        )
+        assert net.get("reason") == "factor_return_series_unavailable_on_cache_hit"
+        # 不得殘留 status:ok / evaluable>0
+        assert net.get("status") != "ok"
+        features = net.get("features") or {}
+        for feat in features.values():
+            if isinstance(feat, dict):
+                assert feat.get("status") != "ok"
+    else:
+        # 允許重建 owner：則 net_ic 可保留；但不得空 owner 配 ok
+        assert "feat_a" in owner_keys or "feat_b" in owner_keys
+
+    # --- force-merge（只 force 非 FR 模組）：owner 仍空，cached series-ok 仍須降級 ---
+    orch3 = _build_orch_for_f1()
+    orch3.run_deep_analysis(force_modules=["factor_returns"])
+    key3 = next(iter(orch3._deep_analysis_cache))
+    orch3._deep_analysis_cache[key3].results["net_ic_analysis"] = {
+        "features": {
+            "feat_a": {
+                "status": "ok",
+                "net_factor_return": {"status": "ok", "value": 0.01},
+                "breakeven_cost_bps": 12.5,
+            },
+        },
+        "summary": {"evaluable_count": 1},
+    }
+    orch3._deep_analysis_cache[key3].module_summary["net_ic_analysis"] = "completed"
+    # force 非 FR、非 net_ic → merge 保留 cache 的 net_ic + owner 入口清空
+    third = orch3.run_deep_analysis(force_modules=["trend_analysis"])
+    owner3 = list(orch3._factor_return_series.keys())
+    net3 = third.results.get("net_ic_analysis")
+    if not owner3:
+        assert isinstance(net3, dict)
+        assert net3.get("status") == "unavailable", (
+            f"force-merge owner=[] 卻 net_ic 非 unavailable: {net3!r}"
+        )
+        assert net3.get("reason") == "factor_return_series_unavailable_on_cache_hit"
+    else:
+        assert any(k in owner3 for k in ("feat_a", "feat_b"))
 
 
 def test_tier_truth_table() -> None:
