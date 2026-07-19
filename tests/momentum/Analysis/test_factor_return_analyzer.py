@@ -17,10 +17,10 @@ import pytest
 
 from momentum.Analysis.factor_return_analyzer import (
     INDEX_POLICY_FRAME_DROPNA,
-    FactorReturnAnalyzer,
     FactorTimingReturnSeries,
 )
 from momentum.Analysis.ic_reporter import ICReporter
+from momentum.factories import create_factor_return_analyzer
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +91,8 @@ def _ref_series(
     return pos, ls, cum
 
 
-def _make_test_analyzer(**overrides: Any) -> FactorReturnAnalyzer:
+def _make_test_analyzer(**overrides: Any):
+    """經 factory 建 analyzer(Rule 3;不直建 FactorReturnAnalyzer)。"""
     cfg = {
         "min_samples": 2,
         "warmup_periods": 2,
@@ -99,7 +100,7 @@ def _make_test_analyzer(**overrides: Any) -> FactorReturnAnalyzer:
         "risk_free_rate": 0.0,
     }
     cfg.update(overrides)
-    return FactorReturnAnalyzer(cfg)
+    return create_factor_return_analyzer(cfg)
 
 
 def _series_hash(s: pd.Series) -> str:
@@ -358,42 +359,50 @@ def _full_sample_position(
 
 
 def test_mutation_lookahead() -> None:
-    """M-lookahead: 截未來 bar 後 full-sample 變體早期 position 變、PIT 不變."""
-    idx = pd.RangeIndex(7)
-    feature = pd.Series(FEATURE_7, index=idx, dtype=float)
-    # 完整序列
-    pit_full = _ref_pit_position(feature, num_quantiles=3, warmup_periods=2)
-    fs_full = _full_sample_position(feature, num_quantiles=3, warmup_periods=2)
-    # 截掉最後 2 bar
-    feature_trunc = feature.iloc[:-2]
-    pit_trunc = _ref_pit_position(feature_trunc, num_quantiles=3, warmup_periods=2)
-    fs_trunc = _full_sample_position(feature_trunc, num_quantiles=3, warmup_periods=2)
+    """M-lookahead: PIT≠full-sample 判別 fixture;production≡PIT 且 ≠full-sample.
 
-    early = 4  # 前 4 根(含 warmup)
-    # PIT: 早期不變
+    7-bar FEATURE_7 上 PIT≡full-sample,舊 tautological `or` 護網會在回歸 full-sample
+    qcut 時仍綠。改用 seed=0 的 15-bar 使 `_ref_pit != _full_sample`,硬斷言。
+    """
+    n = 15
+    warmup = 5
+    nq = 5
+    rng = np.random.RandomState(0)
+    feature = pd.Series(rng.randn(n).astype(float), index=pd.RangeIndex(n), dtype=float)
+    future = pd.Series(rng.randn(n).astype(float) * 0.01, index=feature.index, dtype=float)
+
+    pit_full = _ref_pit_position(feature, num_quantiles=nq, warmup_periods=warmup)
+    fs_full = _full_sample_position(feature, num_quantiles=nq, warmup_periods=warmup)
+    # 硬判別:fixture 本身必須 PIT≠full-sample(無 tautological or fallback)
+    assert pit_full.tolist() != fs_full.tolist(), (
+        "fixture must distinguish PIT from full-sample; regenerate seed"
+    )
+
+    # 截掉最後 3 bar → PIT 早期不變
+    early = 10
+    feature_trunc = feature.iloc[:-3]
+    pit_trunc = _ref_pit_position(
+        feature_trunc, num_quantiles=nq, warmup_periods=warmup
+    )
     assert pit_full.iloc[:early].tolist() == pit_trunc.iloc[:early].tolist()
-    # full-sample 變體: 截未來後早期應可改變(若碰巧不變則用整段差異備援)
-    early_changed = pit_full.iloc[:early].tolist() != fs_trunc.iloc[:early].tolist() or (
-        fs_full.iloc[:early].tolist() != fs_trunc.iloc[:early].tolist()
-    )
-    # 至少 full-sample 與 PIT 在完整序列上可區分,或截斷改變 full-sample
-    distinguishable = (
-        pit_full.tolist() != fs_full.tolist()
-        or early_changed
-        or fs_full.tolist() != fs_trunc.reindex(fs_full.index, fill_value=0).tolist()
-    )
-    assert distinguishable, "M-lookahead oracle cannot distinguish full-sample from PIT"
 
-    # production = PIT
-    analyzer = _make_test_analyzer()
-    analyzer.compute_factor_returns(
-        feature, pd.Series(FUTURE_7, index=idx, dtype=float), feature_name="f1"
+    # production = PIT 且 ≠ full-sample(截未來不變式 + 前瞻回歸護網)
+    analyzer = _make_test_analyzer(
+        min_samples=5, warmup_periods=warmup, num_quantiles=nq
     )
-    assert analyzer.get_series_map()["f1"].position.tolist() == pit_full.tolist()
+    result = analyzer.compute_factor_returns(feature, future, feature_name="f1")
+    from momentum.Analysis.deep_analysis_types import SkippedResult
 
-    # 截未來後 production 早期不變
-    analyzer2 = _make_test_analyzer()
-    fut_trunc = pd.Series(FUTURE_7[:-2], index=feature_trunc.index, dtype=float)
+    assert not isinstance(result, SkippedResult), getattr(result, "reason", result)
+    production_position = analyzer.get_series_map()["f1"].position
+    assert production_position.tolist() == pit_full.tolist()
+    assert production_position.tolist() != fs_full.tolist()
+
+    # 截未來後 production 早期仍 = PIT full 早期
+    analyzer2 = _make_test_analyzer(
+        min_samples=5, warmup_periods=warmup, num_quantiles=nq
+    )
+    fut_trunc = future.iloc[:-3]
     analyzer2.compute_factor_returns(feature_trunc, fut_trunc, feature_name="f1")
     assert (
         analyzer2.get_series_map()["f1"].position.iloc[:early].tolist()
@@ -430,8 +439,8 @@ def test_mutation_winsorize_regress() -> None:
     hash_w = _series_hash(ls_w)
     assert hash_raw != hash_w, "winsorize variant must change ls_return hash on real-kline"
 
-    # production analyzer 對齊 raw(非 winsorize)
-    analyzer = FactorReturnAnalyzer(
+    # production analyzer 對齊 raw(非 winsorize);經 factory(Rule 3)
+    analyzer = create_factor_return_analyzer(
         {"min_samples": 30, "warmup_periods": 20, "num_quantiles": 5}
     )
     result = analyzer.compute_factor_returns(
@@ -498,3 +507,71 @@ def test_no_full_sample_helper_name() -> None:
     src = Path("momentum/Analysis/factor_return_analyzer.py").read_text(encoding="utf-8")
     assert "_assign_quantiles_with_fallback" not in src
     assert "_winsorize_series" not in src
+
+
+def test_inf_rejected() -> None:
+    """F0-codex-2: feature/future 含 inf → 不得進 ls/risk;明確 drop 或 INVALID_DATA."""
+    idx = pd.RangeIndex(12)
+    feature = pd.Series(
+        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
+        index=idx,
+        dtype=float,
+    )
+    future = pd.Series(
+        [0.01, 0.02, np.inf, -0.01, 0.03, 0.0, -0.02, 0.04, 0.01, -0.03, 0.02, 0.01],
+        index=idx,
+        dtype=float,
+    )
+    analyzer = _make_test_analyzer(min_samples=5, warmup_periods=2, num_quantiles=3)
+    result = analyzer.compute_factor_returns(feature, future, feature_name="f_inf")
+    from momentum.Analysis.deep_analysis_types import SkippedResult
+
+    if isinstance(result, SkippedResult):
+        assert result.error_type in {"INVALID_DATA", "INSUFFICIENT_DATA"}
+        assert "f_inf" not in analyzer.get_series_map()
+        return
+
+    art = analyzer.get_series_map()["f_inf"]
+    assert np.isfinite(art.ls_return.to_numpy(dtype=float)).all()
+    assert np.isfinite(art.position.to_numpy(dtype=float)).all()
+    for k, v in result["risk_metrics"].items():
+        assert v is None or (isinstance(v, (int, float)) and (np.isnan(v) or np.isfinite(v))), (
+            f"risk_metrics[{k}] not finite-or-nan: {v!r}"
+        )
+    # 全 inf 輸入 → INVALID_DATA
+    all_inf_y = pd.Series([np.inf] * 12, index=idx, dtype=float)
+    skip = analyzer.compute_factor_returns(feature, all_inf_y, feature_name="f_all_inf")
+    assert isinstance(skip, SkippedResult)
+    assert skip.error_type == "INVALID_DATA"
+    assert "f_all_inf" not in analyzer.get_series_map()
+
+    # overflow finite-garbage: mean≈5 → (1+5)^365 仍 finite 但 abs>1e6 → nan
+    huge = analyzer.compute_risk_metrics(pd.Series([5.0] * 10), periods_per_year=365)
+    assert np.isnan(huge["annualized_return"])
+    assert np.isnan(huge["calmar_ratio"])
+
+
+def test_skipped_no_stale_series() -> None:
+    """F0-codex-3: early SkippedResult 後同名 feature 不得殘留 series_map."""
+    idx = pd.RangeIndex(7)
+    feature = pd.Series(FEATURE_7, index=idx, name="f1", dtype=float)
+    future = pd.Series(FUTURE_7, index=idx, dtype=float)
+    analyzer = _make_test_analyzer()
+    ok = analyzer.compute_factor_returns(feature, future, feature_name="f1")
+    from momentum.Analysis.deep_analysis_types import SkippedResult
+
+    assert not isinstance(ok, SkippedResult)
+    assert "f1" in analyzer.get_series_map()
+
+    # 同名 constant → skip,series_map 必須清掉
+    const = pd.Series([1.0] * 7, index=idx, dtype=float)
+    skip = analyzer.compute_factor_returns(const, future, feature_name="f1")
+    assert isinstance(skip, SkippedResult)
+    assert "f1" not in analyzer.get_series_map()
+
+    # 再 skip insufficient,亦不得寫入
+    short_f = pd.Series([1.0, 2.0], index=pd.RangeIndex(2), dtype=float)
+    short_y = pd.Series([0.01, 0.02], index=pd.RangeIndex(2), dtype=float)
+    skip2 = analyzer.compute_factor_returns(short_f, short_y, feature_name="f_short")
+    assert isinstance(skip2, SkippedResult)
+    assert "f_short" not in analyzer.get_series_map()

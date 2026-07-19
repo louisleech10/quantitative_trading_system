@@ -61,32 +61,59 @@ class FactorReturnAnalyzer:
           - position_t = PIT expanding qcut 邊分位 membership(+1 top / -1 bottom / 0 else)
           - ls_return_full = position * returns_w
         """
+        name = feature_name
+        if name is None:
+            name = str(feature.name) if feature.name is not None else "feature"
+
+        def _skip(reason: str, error_type: str) -> SkippedResult:
+            # SkippedResult 路徑不得留下同名 stale series(F0-codex-3)
+            if name in self._series_map:
+                del self._series_map[name]
+            return SkippedResult(
+                module_name="factor_return",
+                reason=reason,
+                error_type=error_type,
+            )
+
         frame = pd.concat(
             [feature.rename("feature"), future_returns.rename("y")],
             axis=1,
         ).dropna()
 
+        # NaN/inf gate: 非有限值明確剔除(鐵律,不得 silent 進 ls/risk)
+        if not frame.empty:
+            feat_f = frame["feature"].astype(float)
+            y_f = frame["y"].astype(float)
+            finite_mask = np.isfinite(feat_f.to_numpy(dtype=float)) & np.isfinite(
+                y_f.to_numpy(dtype=float)
+            )
+            if not bool(finite_mask.all()):
+                # 若整段皆非有限 → INVALID_DATA;部分 → drop 該列
+                if not bool(finite_mask.any()):
+                    return _skip(
+                        "non-finite feature/future_returns (all inf/nan after dropna)",
+                        "INVALID_DATA",
+                    )
+                frame = frame.loc[finite_mask].copy()
+
         if len(frame) < self._min_samples:
-            return SkippedResult(
-                module_name="factor_return",
-                reason=f"insufficient samples: {len(frame)} < {self._min_samples}",
-                error_type="INSUFFICIENT_DATA",
+            return _skip(
+                f"insufficient samples: {len(frame)} < {self._min_samples}",
+                "INSUFFICIENT_DATA",
             )
 
         if frame["feature"].nunique(dropna=True) <= 1:
-            return SkippedResult(
-                module_name="factor_return",
-                reason="constant feature",
-                error_type="INSUFFICIENT_DATA",
-            )
+            return _skip("constant feature", "INSUFFICIENT_DATA")
 
         # 全期 nanstd 僅作 skip 守衛(不入報酬值;SPEC §C 保留)
-        if np.nanstd(frame["y"].values.astype(float)) == 0.0:
-            return SkippedResult(
-                module_name="factor_return",
-                reason="zero variance future_returns",
-                error_type="INSUFFICIENT_DATA",
-            )
+        y_vals = frame["y"].values.astype(float)
+        if not np.isfinite(y_vals).all() or float(np.nanstd(y_vals)) == 0.0:
+            if not np.isfinite(y_vals).all():
+                return _skip(
+                    "non-finite future_returns after finite filter",
+                    "INVALID_DATA",
+                )
+            return _skip("zero variance future_returns", "INSUFFICIENT_DATA")
 
         returns_w = frame["y"].astype(float)  # raw identity(v0.6 winsorize 移除)
         quantiles = int(num_quantiles or self._num_quantiles)
@@ -98,13 +125,16 @@ class FactorReturnAnalyzer:
 
         # post-warmup 全程無 ±1 → 整段 skip
         if int((position != 0).sum()) == 0:
-            return SkippedResult(
-                module_name="factor_return",
-                reason="no active edge quantiles after warmup",
-                error_type="INSUFFICIENT_DATA",
+            return _skip(
+                "no active edge quantiles after warmup",
+                "INSUFFICIENT_DATA",
             )
 
         ls_return_full = (position * returns_w).astype(float)
+        # 雙重保險: artifact 不得含非有限
+        if not np.isfinite(ls_return_full.to_numpy(dtype=float)).all():
+            return _skip("non-finite ls_return produced", "INVALID_DATA")
+
         ls_cumulative = (1.0 + ls_return_full).cumprod() - 1.0
         active_bar_count = int((position != 0).sum())
         turnover_series = position.astype(float).diff().abs().fillna(0.0)
@@ -122,10 +152,6 @@ class FactorReturnAnalyzer:
             returns_w,
             quantiles,
         )
-
-        name = feature_name
-        if name is None:
-            name = str(feature.name) if feature.name is not None else "feature"
 
         if store_series:
             self._series_map[name] = FactorTimingReturnSeries(
@@ -152,7 +178,9 @@ class FactorReturnAnalyzer:
         risk_free_rate: float = 0.0,
         periods_per_year: Optional[int] = None,
     ) -> dict:
-        clean = pd.Series(returns, dtype=float).dropna()
+        # 非有限輸入全轉 nan 後剔除(F0-codex-2);禁止 inf 出口
+        raw = pd.Series(returns, dtype=float)
+        clean = raw[np.isfinite(raw.to_numpy(dtype=float))]
         if clean.empty:
             return {
                 "sharpe_ratio": np.nan,
@@ -167,47 +195,76 @@ class FactorReturnAnalyzer:
         periods = int(periods_per_year or 365)
         mean_return = float(clean.mean())
         std_return = float(clean.std(ddof=1))
+        if not np.isfinite(mean_return):
+            mean_return = np.nan
+        if not np.isfinite(std_return):
+            std_return = np.nan
 
-        # crypto 高頻 + 大 mean 時 (1+r)^periods 可能 overflow → nan(不假造)
+        # crypto 高頻 + 大 mean 時 (1+r)^periods 可能 overflow / 不合理大數 → nan
+        # 合理界 abs>1e6 視為 garbage(F0-composer-2)
         try:
             annualized_return = float((1.0 + mean_return) ** periods - 1.0)
-            if not np.isfinite(annualized_return):
+            if (not np.isfinite(annualized_return)) or abs(annualized_return) > 1e6:
                 annualized_return = np.nan
         except (OverflowError, FloatingPointError, ValueError):
             annualized_return = np.nan
-        annualized_volatility = float(std_return * np.sqrt(periods)) if std_return > 0 else np.nan
+
+        if np.isfinite(std_return) and std_return > 0:
+            annualized_volatility = float(std_return * np.sqrt(periods))
+            if not np.isfinite(annualized_volatility):
+                annualized_volatility = np.nan
+        else:
+            annualized_volatility = np.nan
 
         rf_period = risk_free_rate / periods
         sharpe = (
             float((mean_return - rf_period) / std_return * np.sqrt(periods))
-            if std_return > 0
+            if np.isfinite(std_return) and std_return > 0 and np.isfinite(mean_return)
             else np.nan
         )
+        if not np.isfinite(sharpe):
+            sharpe = np.nan
 
         downside = clean[clean < 0.0]
         downside_std = float(downside.std(ddof=1)) if len(downside) >= 2 else np.nan
         sortino = (
             float((mean_return - rf_period) / downside_std * np.sqrt(periods))
-            if np.isfinite(downside_std) and downside_std > 0
+            if np.isfinite(downside_std)
+            and downside_std > 0
+            and np.isfinite(mean_return)
             else np.nan
         )
+        if not np.isfinite(sortino):
+            sortino = np.nan
 
         equity = (1.0 + clean).cumprod()
         rolling_peak = equity.cummax()
-        drawdown = equity / rolling_peak - 1.0
+        # 避免 0/0 或 inf equity 污染 drawdown
+        with np.errstate(divide="ignore", invalid="ignore"):
+            drawdown = equity / rolling_peak - 1.0
         max_drawdown = float(drawdown.min()) if not drawdown.empty else np.nan
+        if not np.isfinite(max_drawdown):
+            max_drawdown = np.nan
         calmar = (
             float(annualized_return / abs(max_drawdown))
-            if np.isfinite(max_drawdown) and max_drawdown < 0
+            if np.isfinite(annualized_return)
+            and np.isfinite(max_drawdown)
+            and max_drawdown < 0
             else np.nan
         )
+        if not np.isfinite(calmar):
+            calmar = np.nan
+
+        win_rate = float((clean > 0).mean())
+        if not np.isfinite(win_rate):
+            win_rate = np.nan
 
         return {
             "sharpe_ratio": sharpe,
             "sortino_ratio": sortino,
             "calmar_ratio": calmar,
             "max_drawdown": max_drawdown,
-            "win_rate": float((clean > 0).mean()),
+            "win_rate": win_rate,
             "annualized_return": annualized_return,
             "annualized_volatility": annualized_volatility,
         }
