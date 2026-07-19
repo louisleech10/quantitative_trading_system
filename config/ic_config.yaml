@@ -116,10 +116,10 @@ performance:
   n_jobs: -1  # CPU 併行數
 
 # --- Phase 2.4 深度分析 Config ---
-# F1.2: enabled 維持 false(批次順序鎖);F5.2 flip true
+# F5.2: enabled=true 最終 flip(F0-F4 全綠後;§R 回退=revert F5.2 commit)
 # tier truth: foundation 不含; intermediate/advanced/custom 含(且 enabled=true 才入 run)
 factor_return:
-  enabled: false
+  enabled: true
   num_quantiles: 5
   calculate_risk_metrics: true
   risk_free_rate: 0.0

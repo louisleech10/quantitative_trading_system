@@ -185,10 +185,9 @@ class FeatureFilterSchema(BaseModel):
 
 
 class FactorReturnConfig(BaseModel):
-    # F1.2: enabled 維持 False(批次順序機械鎖);F5.2 單一 commit flip True
-    # tier truth(D13): foundation=false; intermediate/advanced/custom=true
-    # （tier 選中且 enabled=True 才入 run;本批 enabled=False 故實跑仍 stopgap）
-    enabled: bool = False
+    # F5.2: enabled=True 最終 flip(F0-F4 全綠後;§R 回退=revert 本 commit)
+    # tier truth(D13): foundation 仍不含(deep_enabled=False); intermediate/advanced/custom 入 run
+    enabled: bool = True
     num_quantiles: int = Field(default=5, ge=2, le=20)
     calculate_risk_metrics: bool = True
     risk_free_rate: float = Field(default=0.0, ge=-1.0, le=1.0)

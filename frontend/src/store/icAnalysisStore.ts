@@ -78,7 +78,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     event_filtering: false,
     redundancy_method_selection: false,
     turnover_analysis: false,
-    // F1.2 tier truth: foundation 不含 factor_return
+    // F5.2 tier truth: foundation 不含 factor_return(仍 false)
     factor_return: false,
     trend_analysis: false,
     parameter_sensitivity: false,
@@ -105,7 +105,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     event_filtering: true,
     redundancy_method_selection: true,
     turnover_analysis: true,
-    // F1.2 tier truth: intermediate 含 factor_return（schema enabled 仍 False 至 F5.2）
+    // F5.2 tier truth: intermediate 含 factor_return(schema enabled=True)
     factor_return: true,
     trend_analysis: true,
     parameter_sensitivity: true,
@@ -132,7 +132,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     event_filtering: true,
     redundancy_method_selection: true,
     turnover_analysis: true,
-    // F1.2 tier truth: advanced 含 factor_return（schema enabled 仍 False 至 F5.2）
+    // F5.2 tier truth: advanced 含 factor_return(schema enabled=True)
     factor_return: true,
     trend_analysis: true,
     parameter_sensitivity: true,
@@ -151,7 +151,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
 const LOCKED_TOGGLES = new Set(['ic_calculation', 'monotonicity_test', 'ai_summary']);
 
 const defaultDeepAnalysisModules: DeepAnalysisConfig['modules'] = {
-  // F1.2 tier truth: custom/default 含 factor_return（schema enabled 仍 False 至 F5.2）
+  // F5.2 tier truth: custom/default 含 factor_return(schema enabled=True)
   factor_return: true,
   factor_centrality: true,
   trend_analysis: true,

@@ -19,9 +19,9 @@ class FeatureFilterConfig(BaseModel):
 
 
 class DeepAnalysisModules(BaseModel):
-    # F1.2: 單數 factor_return 預設 False(與 schema enabled 機械鎖一致;F5.2 flip)
+    # F5.2: 單數 factor_return 預設 True(與 schema enabled flip 對齊)
     # tier 意圖見 frontend PRESET_TOGGLES(foundation=false;其餘 true)
-    factor_return: bool = False
+    factor_return: bool = True
     factor_centrality: bool = True
     trend_analysis: bool = True
     parameter_sensitivity: bool = True
