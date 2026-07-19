@@ -1,12 +1,15 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-19 | **Branch**: **feat/ic-1cfr-full-impl** | **狀態**: 🔄 **1c-FR-FULL 實作中(TODO 凍結;B0✅ F0✅ 進 F1)**
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-19 | **Branch**: **feat/ic-1cfr-full-impl** | **狀態**: ✅ **1c-FR-FULL 完工(三方 DATA-CORRECT 全 PASS;待 push/merge)**
 
-## 🔄 1c-FR-FULL 實作進度(branch feat/ic-1cfr-full-impl,未 push)
-- **SPEC v0.6.2 FROZEN**(winsorize REMOVE 四方一致/EXPANDING FINAL/pit_stats 手刻);**TODO FROZEN**(R1→R3.1 四輪 adversarial,三家 RECONCILE-STAMP PASS)。docs/IC1CFR_FULL_{SPEC,TODO}.md;reconcile handoffs/1cFRFULL-*。
-- **B0**(commit 5bafd45):before-full baseline + decoupling baseline(R2=1 R3=17 R4=2)凍結。
-- **F0**(commit e72e26d+3163c1f):PIT expanding 分位重建(手刻 `_pit_expanding_position` 非複用 pit_stats)+序列 artifact `FactorTimingReturnSeries`/`get_series_map()`+7-bar golden+§V-matrix mutation。**雙審抓 6 洞**(M-lookahead 空護網/inf/series_map/phase24/allowlist/overflow)→回修→**閉合**(codex monkeypatch FALSIFY_OK)。23 passed。
-- **下一批 F1**:runner `_run_factor_return@1990` 接線+series owner `self._factor_return_series`+tier truth table(enabled 維持 False,flip 延 F5.2)。之後 F2(sanitizer §U)→F3(前端)→F4(net_ic+NetICChart)→F5(測試/freeze/enabled flip)→三方 DATA-CORRECT。分工=Grok 實作/Codex+Composer 雙審(實作者不自審)。
-- **踩坑**:派工勿加 `&`(detach harness 通知,已犯數次;用 run_in_background:true);每批 Claude 獨立驗 diff+跑驗收+mutation 可證偽,再雙審閉合。
+## ✅ 1c-FR-FULL 完工(branch feat/ic-1cfr-full-impl)
+- **SPEC v0.6.2 + TODO FROZEN**(winsorize REMOVE 四方一致/EXPANDING FINAL/pit_stats 手刻;TODO R1→R3.1 四輪 adversarial,三家 RECONCILE-STAMP PASS)。
+- **7 批全完成雙審閉合**:B0(5bafd45 baseline)/F0(e72e26d+3163c1f PIT 計算根,雙審抓6洞回修)/F1(c8bd4dc+7b035db runner+series owner,抓cache-hit一致性)/F2(beaa024+5089c9f sanitizer §U+全出口,codex抓4洞含假綠+data_cache污染)/F3(9964452+4150f73 前端+正名,抓假wiring)/F4(ea61359 net_ic breakeven+NetICChart,一次過)/F5(34f2341+a1a8e7d+48db0b8+daf78d7 測試改寫+enabled=True flip,抓check-nodeids假receipt+M-pos oracle)。
+- **✅ 三方 DATA-CORRECT 全 PASS**(Claude+Codex〔adversarial〕+Composer;handoffs/ic1cfr_full_baseline/DATACORRECT-*):①PIT 無前瞻真kline實證 ②value hash 逐元素 ③跨symbol/TF隔離(ETH/BTC/4h) ④正名無冒充。final gate 94 passed 0 skip/xfail+net_ic 36;check-nodeids REAL_EXIT=0;decoupling R2=1 R3=17 R4=2。
+- **功能已 enabled=True 上線**;canonical=單標的逐因子擇時多空(PIT expanding,winsorize 移除)。
+- **待辦**:push branch;merge main(比照 LA-2);ROADMAP 標 1c-FR-FULL DONE。
+- **踩坑**:派工勿加 `&`(detach harness);`pytest|tee`/`|tail` 遮蔽 exit code(Claude 一度誤報 check-nodeids exit0,codex 抓到);每批 Claude 獨立驗+雙審閉合。
+
+## (歷史)下一站候選:1d attribution / 1f 空圖(見 ROADMAP P1 尾巴)
 
 ## (歷史)✅ LA-2(P2)完工並合併 main
 
