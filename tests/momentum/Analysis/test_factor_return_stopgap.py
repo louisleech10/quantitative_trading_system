@@ -16,7 +16,6 @@ import pytest
 from momentum.Analysis.factor_return_sanitizer import has_finite_numeric_leaf
 from momentum.Analysis.ic_config_schema import ICConfig
 from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
-from momentum.core.exceptions import ModuleUnavailableError
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FACTORY_ALLOWLIST_PATH = (
@@ -137,11 +136,16 @@ def test_deep_off_not_run() -> None:
     assert "factor_returns" not in report.results
 
 
-def test_runner_raises_module_unavailable() -> None:
+def test_runner_returns_ok_union_internal() -> None:
+    """F1.1: runner 真計算回 §U ok union;出口 sanitizer 仍把 deep report 壓成 unavailable。"""
     orch = _build_orchestrator()
-    with pytest.raises(ModuleUnavailableError) as excinfo:
-        orch._run_factor_return(["feat_a"], orch._config)
-    assert "ls_returns_timestamp_misaligned" in str(excinfo.value)
+    # test-config: 降 min_samples 使 120-bar fixture 可過 production 預設 30 門檻即可
+    result = orch._run_factor_return(["feat_a"], orch._config)
+    assert isinstance(result, dict)
+    assert result.get("status") == "ok"
+    assert (result.get("value") or {}).get("schema_version") == "fr_full_v1"
+    assert "feat_a" in orch._factor_return_series
+    assert isinstance(orch._factor_return_series["feat_a"].ls_return, pd.Series)
 
 
 # ---------------------------------------------------------------------------

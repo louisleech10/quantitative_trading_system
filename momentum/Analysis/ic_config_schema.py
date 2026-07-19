@@ -185,8 +185,9 @@ class FeatureFilterSchema(BaseModel):
 
 
 class FactorReturnConfig(BaseModel):
-    # IC1C-FR-STOPGAP: default-off(ls_returns 時間錯位止血;修復歸 1c-FR-FULL)
-    # enabled flip 延到 F5.2(F0+F2+F3+F4 全綠後)
+    # F1.2: enabled 維持 False(批次順序機械鎖);F5.2 單一 commit flip True
+    # tier truth(D13): foundation=false; intermediate/advanced/custom=true
+    # （tier 選中且 enabled=True 才入 run;本批 enabled=False 故實跑仍 stopgap）
     enabled: bool = False
     num_quantiles: int = Field(default=5, ge=2, le=20)
     calculate_risk_metrics: bool = True

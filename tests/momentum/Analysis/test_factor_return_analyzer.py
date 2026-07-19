@@ -575,3 +575,148 @@ def test_skipped_no_stale_series() -> None:
     skip2 = analyzer.compute_factor_returns(short_f, short_y, feature_name="f_short")
     assert isinstance(skip2, SkippedResult)
     assert "f_short" not in analyzer.get_series_map()
+
+
+# ---------------------------------------------------------------------------
+# F1.1 / F1.2 — orchestrator series owner + tier truth table
+# ---------------------------------------------------------------------------
+
+
+def _build_orch_for_f1(*, preset: str = "intermediate"):
+    """最小 orchestrator fixture（有 ic_cache；不跑全 pipeline）。"""
+    from momentum.Analysis.ic_config_schema import ICConfig
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    raw = ICConfig().model_dump(by_alias=True)
+    raw["feature_tiers"]["active_preset"] = preset
+    # test-config：降 min_samples/warmup 以小 fixture 可算
+    raw["factor_return"]["min_samples"] = 5
+    raw["factor_return"]["warmup_periods"] = 2
+    raw["factor_return"]["num_quantiles"] = 3
+    config = ICConfig.model_validate(raw)
+    orch = ICFilterOrchestrator(config)
+
+    n = 40
+    index = pd.date_range("2024-01-01", periods=n, freq="12h")
+    rng = np.random.default_rng(11)
+    features = pd.DataFrame(
+        {
+            "feat_a": rng.normal(size=n),
+            "feat_b": rng.normal(size=n),
+        },
+        index=index,
+        dtype=float,
+    )
+    labels = pd.Series(
+        0.02 * features["feat_a"] + rng.normal(scale=0.01, size=n),
+        index=index,
+        name="future_return",
+        dtype=float,
+    )
+    orch._ic_cache = {
+        "features_df": features,
+        "label_series": labels,
+        "metadata": {},
+        "icir": {name: {"icir": 0.1, "ic_mean": 0.02} for name in features.columns},
+        "rolling_ic": {},
+        "ic_decay": {},
+        "grouped_ic": {},
+        "event_info": {},
+        "stage0_log": {},
+        "preproc_log": {},
+    }
+    orch._filtered_features_df = features.copy()
+    orch._report = {
+        "summary_table": [
+            {"feature_name": "feat_a", "ic_mean": 0.04},
+            {"feature_name": "feat_b", "ic_mean": 0.02},
+        ],
+        "turnover_analysis": {},
+    }
+    return orch
+
+
+def test_series_owner_reachable() -> None:
+    """F1.1: force/_run_factor_return → series owner 有 pd.Series ls_return。"""
+    orch = _build_orch_for_f1()
+    result = orch._run_factor_return(["feat_a"], orch._config)
+
+    assert isinstance(result, dict)
+    assert result.get("status") == "ok"
+    value = result.get("value") or {}
+    assert value.get("schema_version") == "fr_full_v1"
+    features = value.get("features") or {}
+    assert "feat_a" in features
+
+    series_map = orch._factor_return_series
+    assert "feat_a" in series_map
+    art = series_map["feat_a"]
+    assert isinstance(art.ls_return, pd.Series)
+    assert isinstance(art.ls_return.index, pd.DatetimeIndex)
+    assert len(art.ls_return) > 0
+    assert np.isfinite(art.ls_return.to_numpy(dtype=float)).any()
+
+    # force_modules 路徑亦寫入 owner（不經 sanitizer 斷言 completed——D16/F2）
+    orch2 = _build_orch_for_f1()
+    report = orch2.run_deep_analysis(force_modules=["factor_returns"])
+    assert "feat_a" in orch2._factor_return_series
+    assert isinstance(orch2._factor_return_series["feat_a"].ls_return, pd.Series)
+    # 出口暫經 sanitizer → external 仍 unavailable；F1 不斷言 completed
+    fr = report.results.get("factor_returns")
+    assert isinstance(fr, dict)
+    assert fr.get("status") == "unavailable"
+
+
+def test_tier_truth_table() -> None:
+    """F1.2 D13: 四 tier × enabled 矩陣；mock enabled=True 時 foundation 仍不含。"""
+    from momentum.Analysis.ic_config_schema import ICConfig
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    # --- enabled=True mock：foundation 仍 False；其餘 True ---
+    for preset, expect_enabled in (
+        ("foundation", False),
+        ("intermediate", True),
+        ("advanced", True),
+        ("custom", True),
+    ):
+        raw = ICConfig().model_dump(by_alias=True)
+        raw["factor_return"]["enabled"] = True  # mock F5.2 後
+        raw["feature_tiers"]["active_preset"] = preset
+        if preset == "custom":
+            raw["feature_tiers"]["custom_overrides"] = {
+                "stage_overrides": {},
+                "module_overrides": {"factor_return": True},
+            }
+        cfg = ICConfig.model_validate(raw)
+        orch = ICFilterOrchestrator(cfg)
+        applied = orch._apply_tier_config(cfg)
+        assert applied.factor_return.enabled is expect_enabled, (
+            f"tier={preset} enabled=True mock → got {applied.factor_return.enabled}, "
+            f"want {expect_enabled}"
+        )
+
+    # --- enabled=False（F1.2~F4 現況）：四 tier 皆不開 FR ---
+    for preset in ("foundation", "intermediate", "advanced", "custom"):
+        raw = ICConfig().model_dump(by_alias=True)
+        assert raw["factor_return"]["enabled"] is False
+        raw["feature_tiers"]["active_preset"] = preset
+        if preset == "custom":
+            # custom 未覆寫 module → 保持 schema False
+            raw["feature_tiers"]["custom_overrides"] = {
+                "stage_overrides": {},
+                "module_overrides": {},
+            }
+        cfg = ICConfig.model_validate(raw)
+        orch = ICFilterOrchestrator(cfg)
+        applied = orch._apply_tier_config(cfg)
+        assert applied.factor_return.enabled is False, (
+            f"tier={preset} enabled=False → got {applied.factor_return.enabled}"
+        )
+
+
+def test_tier_f12_enabled_still_false() -> None:
+    """F1.2 機械鎖：FactorReturnConfig / ICConfig 預設 enabled 仍 False。"""
+    from momentum.Analysis.ic_config_schema import FactorReturnConfig, ICConfig
+
+    assert FactorReturnConfig().enabled is False
+    assert ICConfig().factor_return.enabled is False

@@ -5,6 +5,7 @@
 #        scanner self (scripts/ic1cfr_stopgap_freeze.py) excluded; import aliases tracked.
 # format: factory_caller|<relpath> OR direct_consumer|<relpath>:<lineno>:<col>
 # section: factory_callers
+factory_caller|momentum/Analysis/ic_filter_orchestrator.py
 factory_caller|tests/momentum/Analysis/test_factor_return_analyzer.py
 factory_caller|tests/phase26/test_deep_analysis_factories.py
 # section: direct_consumers

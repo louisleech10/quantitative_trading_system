@@ -848,6 +848,9 @@ class ICFilterOrchestrator:
         self._active_fit_mode: Optional[str] = None
         # LA-1 B3：fallback 內層 analyze 禁 persist（G-C）；唯一寫出在 wrapper 加 root 後
         self._suppress_persist: bool = False
+        # 1c-FR-FULL F1.1：PIT 因子擇時序列 in-memory owner（F1 寫、F4 讀）
+        # cache hit 無 series → net_ic 走 unavailable，不得崩
+        self._factor_return_series: dict[str, Any] = {}
 
         self._progress_callback: Optional[Callable] = None
 
@@ -1774,6 +1777,9 @@ class ICFilterOrchestrator:
 
         config = self._apply_tier_config(self._apply_config_override(config_override))
 
+        # F1.1：每次 deep run 先 invalidate series owner（cache hit 路徑亦不殘留 stale）
+        self._factor_return_series = {}
+
         if not self._is_deep_analysis_enabled(config):
             report = DeepAnalysisReport()
             report.module_summary = {
@@ -1805,6 +1811,7 @@ class ICFilterOrchestrator:
 
         if cache_hit_only:
             base_report = deepcopy(self._deep_analysis_cache[cache_key])
+            # cache hit：series owner 已於上方清空；F4 讀不到 → net_ic unavailable（契約）
             logger.info("Deep analysis cache hit: key=%s", cache_key)
         else:
             base_report = DeepAnalysisReport()
@@ -1988,11 +1995,25 @@ class ICFilterOrchestrator:
         )
 
     def _run_factor_return(self, selected_features: list[str], config: ICConfig) -> dict:
-        # IC1C-FR-STOPGAP: ls_returns 時間錯位,fail-close 下架;計算修復歸 1c-FR-FULL
-        # 不呼叫 FactorReturnAnalyzer.compute_batch
-        raise ModuleUnavailableError(
-            "ls_returns_timestamp_misaligned (1c-FR-FULL)"
+        """1c-FR-FULL F1.1：factory + compute_batch → §U ok union + series owner。
+
+        出口暫經既有 sanitizer（F2 才放行 ok union）；本函式只負責真計算與
+        ``self._factor_return_series`` 寫入。completed 斷言屬 F2。
+        """
+        from momentum.factories import create_factor_return_analyzer
+
+        if self._ic_cache is None:
+            raise InvalidInputError("IC cache is empty, run analyze() first")
+
+        features_df = self._ic_cache["features_df"][selected_features]
+        labels = self._ic_cache["label_series"]
+        analyzer = create_factor_return_analyzer(config.factor_return.model_dump())
+        result = analyzer.compute_batch(
+            features_df, labels, top_n=len(selected_features) if selected_features else 1
         )
+        # series owner：唯一 API = analyzer.get_series_map()（F0 鎖）
+        self._factor_return_series = analyzer.get_series_map()
+        return result
 
     @staticmethod
     def _sanitize_deep_report_factor_returns(report: DeepAnalysisReport) -> DeepAnalysisReport:
@@ -3790,7 +3811,11 @@ class ICFilterOrchestrator:
                         data[section][field] = False
             else:
                 for section, field in MODULE_ENABLED_PATHS.values():
-                    # IC1C-FR-STOPGAP: tier 不強制開啟 factor_return(default-off 三態)
+                    # F1.2 tier truth table(D13)：不強制覆寫 factor_return.enabled。
+                    # foundation 走 deep_enabled=False 分支 → 全模組 False。
+                    # intermediate/advanced：保留 schema/request 的 enabled 值
+                    # （F1.2~F4 預設 False 仍 stopgap;F5.2 flip True 後自然入 run）。
+                    # custom 走 module_overrides 分支。
                     if section == "factor_return":
                         continue
                     if isinstance(data.get(section), dict):
