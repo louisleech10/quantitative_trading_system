@@ -22,5 +22,5 @@ direct_consumer|tests/phase24/test_factor_return_analyzer.py:129:15
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:142:15
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:148:15
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:160:15
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:256:15
-direct_consumer|tests/phase24/test_factor_return_analyzer.py:292:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:302:15
+direct_consumer|tests/phase24/test_factor_return_analyzer.py:347:15

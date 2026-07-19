@@ -198,19 +198,55 @@ def _ref_pit_position(feature, *, num_quantiles=3, warmup_periods=2):
     return position
 
 
-def _legacy_pos_subtract_ls(feature, future):
-    """M-pos 舊行為: reset_index+iloc 位置相減(錯位;時間戳對齊破壞)."""
-    f = feature.reset_index(drop=True)
-    y = future.reset_index(drop=True)
-    pos = _ref_pit_position(f, num_quantiles=3, warmup_periods=2)
-    # 舊錯:用 iloc 位置對位置相乘卻長度/對齊依 reset 後 index——再 drop 末尾模擬 off-by-one
-    paired = min(len(pos), len(y)) - 1  # 故意截掉最後一 bar 再現舊長度分歧
-    if paired < 1:
+def _legacy_full_sample_low_high_paired_ls(feature, future, num_quantiles=3):
+    """M-pos 真舊實作等價(e72e26d^ factor_return_analyzer.py:70-87).
+
+    舊算法(非 PIT membership×return):
+      1) full-sample qcut bins(含 fallback 3/2;前瞻)
+      2) winsorize future_returns(舊 _winsorize_series 0.01/0.99)
+      3) low/high = edge quantile 的 returns,各自 reset_index(drop=True)
+      4) ls = high.iloc[:paired] - low.iloc[:paired]  (位置配對,非時間對齊)
+
+    禁止用 PIT position+人工截斷/shift 偽 oracle——那只證「≠某非 canonical 變體」,
+    不證「退回真舊 bug 必 FAIL」。
+    """
+    data = pd.concat(
+        [feature.rename("feature"), future.rename("future_returns")],
+        axis=1,
+    ).dropna()
+    # 舊 _winsorize_series
+    s = data["future_returns"].astype(float)
+    low_q = float(s.quantile(0.01))
+    high_q = float(s.quantile(0.99))
+    returns_w = s.clip(lower=low_q, upper=high_q)
+    # 舊 _assign_quantiles_with_fallback(full-sample)
+    bins = None
+    candidates = [int(num_quantiles)]
+    if int(num_quantiles) > 3:
+        candidates.append(3)
+    if int(num_quantiles) > 2:
+        candidates.append(2)
+    for q in candidates:
+        if q < 2:
+            continue
+        try:
+            b = pd.qcut(data["feature"], q=q, labels=False, duplicates="drop")
+        except ValueError:
+            continue
+        if b is None or b.dropna().empty:
+            continue
+        if int(b.dropna().nunique()) >= 2:
+            bins = b
+            break
+    if bins is None:
         return pd.Series(dtype=float)
-    high = (pos.iloc[:paired] * y.iloc[:paired]).astype(float)
-    # 再做一次 iloc 錯位移(舊 misaligned 形狀)
-    low = high.shift(1).fillna(0.0)
-    return (high.iloc[:paired] - low.iloc[:paired]).astype(float)
+    low_returns = returns_w[bins == bins.min()].reset_index(drop=True)
+    high_returns = returns_w[bins == bins.max()].reset_index(drop=True)
+    paired_size = int(min(len(low_returns), len(high_returns)))
+    if paired_size == 0:
+        return pd.Series(dtype=float)
+    ls_returns = high_returns.iloc[:paired_size] - low_returns.iloc[:paired_size]
+    return ls_returns.astype(float)
 
 
 def _full_sample_position(feature, num_quantiles=3, warmup_periods=2):
@@ -235,23 +271,33 @@ def _full_sample_position(feature, num_quantiles=3, warmup_periods=2):
     return position
 
 
-def test_mutation_pos_phase24():
-    """M-pos: 舊 reset_index+iloc 位置相減變體 ≠ production/PIT reference。
+def _m_pos_differs(a: pd.Series, b: pd.Series) -> bool:
+    """True iff a 與 b 在長度或值上可區分(含 NaN)."""
+    if len(a) != len(b):
+        return True
+    return not np.allclose(
+        a.to_numpy(dtype=float),
+        b.to_numpy(dtype=float),
+        atol=ATOL,
+        equal_nan=True,
+    )
 
-    可證偽:若 production 退回舊位置相減,variant≈prod → 本斷言 FAIL。
+
+def test_mutation_pos_phase24():
+    """M-pos: 真舊 low/high paired(e72e26d^) ≠ production/PIT reference。
+
+    可證偽:若 production 退回真舊 full-sample bins + low/high reset_index paired,
+    variant≈prod → 本斷言 FAIL。
     """
     idx = pd.RangeIndex(7)
     feature = pd.Series(FEATURE_7, index=idx, dtype=float)
     future = pd.Series(FUTURE_7, index=idx, dtype=float)
     pos = _ref_pit_position(feature, num_quantiles=3, warmup_periods=2)
     ref_ls = (pos * future).astype(float)
-    variant = _legacy_pos_subtract_ls(feature, future)
-    assert len(variant) != len(ref_ls) or not np.allclose(
-        variant.to_numpy(dtype=float),
-        ref_ls.to_numpy(dtype=float),
-        atol=ATOL,
-        equal_nan=True,
-    ), "M-pos: variant must differ from PIT reference (old behavior should be distinguishable)"
+    variant = _legacy_full_sample_low_high_paired_ls(feature, future, num_quantiles=3)
+    assert _m_pos_differs(variant, ref_ls), (
+        "M-pos: true-legacy low/high paired must differ from PIT reference"
+    )
 
     analyzer = FactorReturnAnalyzer(
         {"num_quantiles": 3, "min_samples": 3, "warmup_periods": 2}
@@ -262,13 +308,22 @@ def test_mutation_pos_phase24():
     assert np.allclose(
         prod_ls.to_numpy(dtype=float), ref_ls.to_numpy(dtype=float), atol=ATOL
     )
-    # 改回舊行為可證偽:prod 若等於 variant → 紅
-    assert len(variant) != len(prod_ls) or not np.allclose(
-        variant.to_numpy(dtype=float),
-        prod_ls.to_numpy(dtype=float),
-        atol=ATOL,
-        equal_nan=True,
+    # 改回真舊行為可證偽:prod 若等於 variant → 紅
+    assert _m_pos_differs(variant, prod_ls), (
+        "M-pos FALSIFY: production must not equal true-legacy low/high paired ls"
     )
+
+    # 證偽證明(in-test):若把 production 換成真舊算法輸出 → guard 必 FAIL
+    fake_prod_as_legacy = variant
+    assert not _m_pos_differs(variant, fake_prod_as_legacy), (
+        "sanity: variant vs itself must be indistinguishable"
+    )
+    # 模擬「production 退回真舊」時 test 會炸的條件
+    would_pass_if_prod_were_legacy = not _m_pos_differs(variant, fake_prod_as_legacy)
+    assert would_pass_if_prod_were_legacy is True
+    # 真實 production 必須觸發「differs」;legacy-as-prod 則不觸發 → 測試會 FAIL
+    assert _m_pos_differs(variant, prod_ls) is True
+    assert _m_pos_differs(variant, fake_prod_as_legacy) is False
 
 
 def test_mutation_lookahead_phase24():

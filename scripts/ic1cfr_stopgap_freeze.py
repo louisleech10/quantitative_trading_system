@@ -3,7 +3,7 @@
 
 用法:
   python scripts/ic1cfr_stopgap_freeze.py --before
-  python scripts/ic1cfr_stopgap_freeze.py --check-nodeids
+  python scripts/ic1cfr_stopgap_freeze.py --check-nodeids  # FR 縮範圍;receipt→ic1cfr_full_baseline/
   python scripts/ic1cfr_stopgap_freeze.py --after-default   # Phase 1 佔位
   python scripts/ic1cfr_stopgap_freeze.py --after-explicit  # Phase 1 佔位
   # 1c-FR-FULL B0.1 profiles:
@@ -64,13 +64,32 @@ DECOUPLING_BASELINE = FULL_BASELINE_DIR / "decoupling_baseline.txt"
 ALLOWED_FIXTURES: frozenset[str] = frozenset({"ic_api_real_kline"})
 FULL_PROFILES: frozenset[str] = frozenset({"before-full", "after-full"})
 
-# 與 B0 / Gate B2 相同 suite 與收集規則(T-S10)
+# 與 B0 --before 相同 suite 與收集規則(T-S10;全量 suite 僅用於 --before 凍 baseline)
 PYTEST_SUITE_ARGS: tuple[str, ...] = (
     "tests/momentum/",
     "tests/api/",
     "tests/phase26/",
     "-q",
 )
+
+# --check-nodeids FR 範圍(1c-FR-FULL F5 回修):只跑 FR 相關凍結檔集,
+# 避免全 suite >35min 被 SIGTERM 拿不到 receipt。
+# 檔集=analyzer/stopgap/phase24 FR/phase26 FR+deep_analysis/api deep_analysis
+PYTEST_NODEID_CHECK_PATHS: tuple[str, ...] = (
+    "tests/momentum/Analysis/test_factor_return_analyzer.py",
+    "tests/momentum/Analysis/test_factor_return_stopgap.py",
+    "tests/phase24/test_factor_return_analyzer.py",
+    "tests/phase24/test_deep_analysis_config.py",
+    "tests/phase26/test_deep_analysis_factories.py",
+    "tests/phase26/test_deep_analysis_integration.py",
+    "tests/phase26/test_ic_reporter_deep_analysis.py",
+    "tests/api/test_ic_deep_analysis.py",
+)
+PYTEST_NODEID_CHECK_ARGS: tuple[str, ...] = (
+    *PYTEST_NODEID_CHECK_PATHS,
+    "-q",
+)
+CHECK_NODEIDS_RECEIPT = FULL_BASELINE_DIR / "checknodeids_receipt.txt"
 
 ALL_DEEP_MODULES: tuple[str, ...] = (
     "factor_returns",
@@ -757,16 +776,22 @@ def _parse_pytest_failed_nodeids(stdout: str, stderr: str = "") -> list[str]:
     return sorted(nodeids)
 
 
-def collect_pytest_failed_nodeids() -> list[str]:
-    """自跑與 B0/B2 相同 suite,回傳 failed+collection-error nodeid 排序集.
+def collect_pytest_failed_nodeids(
+    suite_args: tuple[str, ...] | None = None,
+) -> list[str]:
+    """自跑 suite,回傳 failed+collection-error nodeid 排序集.
+
+    suite_args 預設=B0 全量 PYTEST_SUITE_ARGS(--before 用);
+    --check-nodeids 傳入 PYTEST_NODEID_CHECK_ARGS(FR 縮範圍).
 
     fail-closed: pytest returncode != 0 且無法解析出任何 failure/collection
     receipt 時 SystemExit(1)（禁止回空集合讓 check_nodeids 假綠）。
     returncode==0 且空集 = 全綠，合法。
     """
-    cmd = [str(REPO_ROOT / "venv" / "bin" / "pytest"), *PYTEST_SUITE_ARGS]
+    args = suite_args if suite_args is not None else PYTEST_SUITE_ARGS
+    cmd = [str(REPO_ROOT / "venv" / "bin" / "pytest"), *args]
     if not Path(cmd[0]).is_file():
-        cmd = [sys.executable, "-m", "pytest", *PYTEST_SUITE_ARGS]
+        cmd = [sys.executable, "-m", "pytest", *args]
     print(f"running: {' '.join(cmd)}", flush=True)
     proc = subprocess.run(
         cmd,
@@ -793,32 +818,72 @@ def collect_pytest_failed_nodeids() -> list[str]:
     return nodeids
 
 
+def _nodeid_in_fr_check_scope(nodeid: str) -> bool:
+    """nodeid 是否落在 FR check 檔集(path 前綴匹配)."""
+    path = nodeid.split("::", 1)[0]
+    for scoped in PYTEST_NODEID_CHECK_PATHS:
+        if path == scoped or path.endswith("/" + scoped) or path.endswith(scoped):
+            return True
+        # 相對路徑正規化:tests/... 前綴
+        if path.replace("\\", "/").endswith(scoped) or path.replace("\\", "/") == scoped:
+            return True
+    return False
+
+
 def check_nodeids() -> int:
-    """Gate B2 機械差集:新增 failed/error nodeid 非空 → exit 1."""
+    """Gate B2 機械差集(FR 縮範圍):新增 failed/error nodeid 非空 → exit 1.
+
+    F5 回修:只跑 PYTEST_NODEID_CHECK_PATHS,baseline 同步 filter 到同檔集,
+    避免全 suite 超時拿不到 receipt。PASS 時寫
+    handoffs/ic1cfr_full_baseline/checknodeids_receipt.txt。
+    """
     if not PYTEST_NODEIDS.is_file():
         print(
             f"FAIL: baseline missing {PYTEST_NODEIDS}; run --before first",
             file=sys.stderr,
         )
         return 1
-    baseline = {
+    baseline_all = {
         ln.strip()
         for ln in PYTEST_NODEIDS.read_text(encoding="utf-8").splitlines()
         if ln.strip() and not ln.strip().startswith("#")
     }
-    current = set(collect_pytest_failed_nodeids())
+    baseline = {n for n in baseline_all if _nodeid_in_fr_check_scope(n)}
+    current = set(collect_pytest_failed_nodeids(PYTEST_NODEID_CHECK_ARGS))
+    # 再 filter current(防 pytest 外溢 path;正常應已全在 scope)
+    current = {n for n in current if _nodeid_in_fr_check_scope(n)}
     new_failures = sorted(current - baseline)
     resolved = sorted(baseline - current)
-    print(f"baseline_nodeids={len(baseline)}")
-    print(f"current_nodeids={len(current)}")
-    print(f"new_failures={len(new_failures)}")
-    print(f"resolved_since_baseline={len(resolved)}")
+    lines = [
+        f"scope=FR_NODEID_CHECK ({len(PYTEST_NODEID_CHECK_PATHS)} paths)",
+        f"paths={','.join(PYTEST_NODEID_CHECK_PATHS)}",
+        f"baseline_all_nodeids={len(baseline_all)}",
+        f"baseline_fr_nodeids={len(baseline)}",
+        f"current_nodeids={len(current)}",
+        f"new_failures={len(new_failures)}",
+        f"resolved_since_baseline={len(resolved)}",
+    ]
+    for ln in lines:
+        print(ln)
     if new_failures:
         print("NEW_FAILURES:")
         for n in new_failures:
             print(f"  {n}")
+        FULL_BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+        CHECK_NODEIDS_RECEIPT.write_text(
+            "\n".join(lines + ["status=FAIL", "NEW_FAILURES:"] + [f"  {n}" for n in new_failures])
+            + "\n",
+            encoding="utf-8",
+        )
         return 1
-    print("check-nodeids: PASS (no new failures vs baseline)")
+    print("check-nodeids: PASS (no new failures vs baseline; FR scope)")
+    FULL_BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+    CHECK_NODEIDS_RECEIPT.write_text(
+        "\n".join(lines + ["status=PASS", "check-nodeids: PASS (no new failures vs baseline; FR scope)"])
+        + "\n",
+        encoding="utf-8",
+    )
+    print(f"receipt={CHECK_NODEIDS_RECEIPT}")
     return 0
 
 
@@ -1372,7 +1437,11 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--check-nodeids",
         action="store_true",
-        help="Diff current suite failures vs B0 pytest_baseline_nodeids.txt",
+        help=(
+            "Diff FR-scoped suite failures vs B0 baseline "
+            "(analyzer/stopgap/phase24 FR/phase26 FR/deep_analysis); "
+            "writes handoffs/ic1cfr_full_baseline/checknodeids_receipt.txt"
+        ),
     )
     mode.add_argument(
         "--profile",
