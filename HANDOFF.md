@@ -1,5 +1,14 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-18 | **Branch**: **main** | **狀態**: ✅ **LA-2(P2)完工並合併 main**
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-19 | **Branch**: **feat/ic-1cfr-full-impl** | **狀態**: 🔄 **1c-FR-FULL 實作中(TODO 凍結;B0✅ F0✅ 進 F1)**
+
+## 🔄 1c-FR-FULL 實作進度(branch feat/ic-1cfr-full-impl,未 push)
+- **SPEC v0.6.2 FROZEN**(winsorize REMOVE 四方一致/EXPANDING FINAL/pit_stats 手刻);**TODO FROZEN**(R1→R3.1 四輪 adversarial,三家 RECONCILE-STAMP PASS)。docs/IC1CFR_FULL_{SPEC,TODO}.md;reconcile handoffs/1cFRFULL-*。
+- **B0**(commit 5bafd45):before-full baseline + decoupling baseline(R2=1 R3=17 R4=2)凍結。
+- **F0**(commit e72e26d+3163c1f):PIT expanding 分位重建(手刻 `_pit_expanding_position` 非複用 pit_stats)+序列 artifact `FactorTimingReturnSeries`/`get_series_map()`+7-bar golden+§V-matrix mutation。**雙審抓 6 洞**(M-lookahead 空護網/inf/series_map/phase24/allowlist/overflow)→回修→**閉合**(codex monkeypatch FALSIFY_OK)。23 passed。
+- **下一批 F1**:runner `_run_factor_return@1990` 接線+series owner `self._factor_return_series`+tier truth table(enabled 維持 False,flip 延 F5.2)。之後 F2(sanitizer §U)→F3(前端)→F4(net_ic+NetICChart)→F5(測試/freeze/enabled flip)→三方 DATA-CORRECT。分工=Grok 實作/Codex+Composer 雙審(實作者不自審)。
+- **踩坑**:派工勿加 `&`(detach harness 通知,已犯數次;用 run_in_background:true);每批 Claude 獨立驗 diff+跑驗收+mutation 可證偽,再雙審閉合。
+
+## (歷史)✅ LA-2(P2)完工並合併 main
 
 ## ✅ LA-2(P2)look-ahead 整治完工並合併 main(merge commit,branch feat/ic-la2-p2-impl 可刪)
 六 commit(463bfb5→38ec882→24376dd→8bf67ac→185a259→7b4be86):
