@@ -1628,3 +1628,60 @@ def test_f2_conditional_metric_keys_shape() -> None:
         item = out["features"]["f1"][k]
         assert set(item.keys()) == {"status", "value", "reason"}
         assert item["status"] == "unavailable"
+
+
+def test_mutation_turnover() -> None:
+    """M-turnover(§V-matrix): top-only turnover 變體 breakeven > 雙邊版(偏樂觀)。
+
+    雙邊: |Δp| 含 long↔short 全腿;top-only 只計 top membership 變化 → mean(to) 偏小
+    → breakeven=mean(gross)/mean(to)*1e4 偏大(樂觀)。in-test 變體對照,非改 production。
+    """
+    import pandas as pd
+    from momentum.Analysis.factor_return_analyzer import FactorTimingReturnSeries
+    from momentum.Analysis.net_ic_analyzer import (
+        NetICAnalyzer,
+        compute_breakeven_and_net,
+        position_to_turnover_series,
+    )
+
+    idx = pd.date_range("2024-01-01", periods=6, freq="D")
+    # 雙邊換手: 0→1→-1→1 → |Δp| = [0,1,2,2,...]
+    position = pd.Series([0.0, 1.0, -1.0, 1.0, -1.0, 1.0], index=idx)
+    gross = pd.Series([0.001] * 6, index=idx)
+    art = FactorTimingReturnSeries(
+        feature="f1",
+        ls_return=gross,
+        position=position,
+        index_policy="frame_dropna_intersection",
+    )
+
+    # production 雙邊
+    bilateral_to = position_to_turnover_series(position)
+    bi = compute_breakeven_and_net(gross, bilateral_to, cost_bps=10.0)
+    assert bi["breakeven_cost_bps"] is not None
+
+    # in-test top-only 變體: 只對 top_mask(+1) 做 diff(模擬 turnover_analyzer top-only)
+    top_mask = (position == 1.0).astype(float)
+    top_only_to = top_mask.diff().abs().fillna(0.0)
+    top = compute_breakeven_and_net(gross, top_only_to, cost_bps=10.0)
+    assert top["breakeven_cost_bps"] is not None
+    # 偏樂觀: top-only mean(to) 更小 → breakeven 更大
+    assert float(top["breakeven_cost_bps"]) > float(bi["breakeven_cost_bps"])
+
+    # 經 batch_analyze 雙邊路徑仍可復現 bi
+    analyzer = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
+    out = analyzer.batch_analyze(
+        {"f1": {"gross_ic": 0.05}},
+        {"f1": 0.5},
+        factor_return_series={"f1": art},
+    )
+    be = out["features"]["f1"]["breakeven_cost_bps"]
+    assert be["status"] == "ok"
+    assert be["value"] == pytest.approx(float(bi["breakeven_cost_bps"]), abs=1e-9)
+
+    # serializer 三鍵 ok 形狀不扁平
+    serialized = ic_analysis_service._to_json_compatible(out)
+    for ukey in ("net_factor_return", "breakeven_cost_bps", "profitable_after_cost"):
+        u = serialized["features"]["f1"][ukey]
+        assert set(u.keys()) == {"status", "value", "reason"}
+        assert u["status"] == "ok"

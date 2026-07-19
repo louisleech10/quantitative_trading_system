@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Scatter, ScatterChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ZAxis, ReferenceLine } from 'recharts';
 import {
+  ConditionalMetricUnion,
   NetICAnalysisData,
   NetICFeatureCostEnabled,
   NetICFeatureResult,
@@ -21,6 +22,10 @@ export const NET_IC_COST_SEMANTICS = 'per_rebalance_not_annualized' as const;
 export const NET_IC_COST_SEMANTICS_NOTE =
   '成本為每次再平衡(per-rebalance),未年化;不同 timeframe 間不可直接比較';
 
+/** F4.2: breakeven 空態(turnover=0 / unavailable)——禁代入 0。 */
+export const NET_IC_BREAKEVEN_EMPTY_NOTE =
+  '損益平衡點不可用(turnover=0 或序列未就緒)';
+
 interface NetICChartProps {
   data?: NetICAnalysisData;
   /** loading 態(由父層傳) */
@@ -28,6 +33,13 @@ interface NetICChartProps {
   /** error 態文案 */
   error?: string | null;
 }
+
+export type BreakevenRow = {
+  feature: string;
+  breakeven_cost_bps: number;
+  profitable_after_cost: boolean;
+  net_factor_return: number;
+};
 
 function isSkippedFeature(
   feat: NetICFeatureResult
@@ -53,10 +65,56 @@ function hasFiniteGrossIc(feat: NetICFeatureResult): boolean {
   return typeof feat.gross_ic === 'number' && Number.isFinite(feat.gross_ic);
 }
 
+function isOkMetric(
+  m: ConditionalMetricUnion | undefined
+): m is Extract<ConditionalMetricUnion, { status: 'ok' }> {
+  return (
+    m != null &&
+    typeof m === 'object' &&
+    m.status === 'ok' &&
+    m.reason === null &&
+    m.value !== null &&
+    m.value !== undefined
+  );
+}
+
+/**
+ * 從 cost-enabled features 抽取 §U 三鍵 ok 列。
+ * 任一鍵 unavailable → 該 feature 不入表(禁代入 0)。
+ */
+export function extractBreakevenRows(
+  features: Record<string, NetICFeatureResult>
+): BreakevenRow[] {
+  const rows: BreakevenRow[] = [];
+  for (const [feature, feat] of Object.entries(features)) {
+    if (isSkippedFeature(feat) || !isCostEnabledFeature(feat)) continue;
+    const be = feat.breakeven_cost_bps;
+    const prof = feat.profitable_after_cost;
+    const nfr = feat.net_factor_return;
+    if (!isOkMetric(be) || !isOkMetric(prof) || !isOkMetric(nfr)) continue;
+    if (typeof be.value !== 'number' || !Number.isFinite(be.value)) continue;
+    if (typeof nfr.value !== 'number' || !Number.isFinite(nfr.value)) continue;
+    if (typeof prof.value !== 'boolean') continue;
+    rows.push({
+      feature,
+      breakeven_cost_bps: be.value,
+      profitable_after_cost: prof.value,
+      net_factor_return: nfr.value,
+    });
+  }
+  return rows;
+}
+
 export default function NetICChart({ data, loading = false, error = null }: NetICChartProps) {
   const features =
     data && !data.skipped && data.features ? data.features : ({} as Record<string, NetICFeatureResult>);
   const entries = Object.entries(features);
+
+  // F4.2: §U 三鍵 breakeven/profitable/net_factor_return 實接
+  const breakevenRows = useMemo(() => extractBreakevenRows(features), [features]);
+  const hasCostProfileFeatures = entries.some(
+    ([, feat]) => !isSkippedFeature(feat) && isCostEnabledFeature(feat)
+  );
 
   // scenario 選項只從後端 cost_sensitivity 讀,禁硬編 [1,3,5,10,20]
   const scenarioOptions = useMemo(() => {
@@ -235,7 +293,49 @@ export default function NetICChart({ data, loading = false, error = null }: NetI
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* F4.2: breakeven_cost_bps / profitable_after_cost / net_factor_return 三鍵面板 */}
+        {hasCostProfileFeatures && (
+          <div data-testid="netic-breakeven-panel">
+            {breakevenRows.length > 0 ? (
+              <ul className="space-y-2" data-testid="netic-breakeven-list">
+                {breakevenRows.map((row) => (
+                  <li
+                    key={row.feature}
+                    data-testid={`netic-breakeven-row-${row.feature}`}
+                    className="flex flex-wrap items-center gap-3 rounded border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200"
+                  >
+                    <span className="font-medium text-slate-100">{row.feature}</span>
+                    <span data-testid={`netic-breakeven-bps-${row.feature}`}>
+                      breakeven: {row.breakeven_cost_bps.toFixed(2)} bps
+                    </span>
+                    <span data-testid={`netic-net-factor-return-${row.feature}`}>
+                      net_factor_return: {row.net_factor_return.toFixed(6)}
+                    </span>
+                    <span
+                      data-testid={`netic-profitable-${row.feature}`}
+                      className={
+                        row.profitable_after_cost
+                          ? 'rounded bg-emerald-500/20 px-1.5 py-0.5 text-emerald-300'
+                          : 'rounded bg-rose-500/20 px-1.5 py-0.5 text-rose-300'
+                      }
+                    >
+                      {row.profitable_after_cost ? 'profitable' : 'unprofitable'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div
+                data-testid="netic-breakeven-empty"
+                className="h-[80px] flex items-center justify-center text-slate-400 text-sm"
+              >
+                {NET_IC_BREAKEVEN_EMPTY_NOTE}
+              </div>
+            )}
+          </div>
+        )}
+
         <ResponsiveContainer width="100%" height={260}>
           <ScatterChart>
             <XAxis dataKey="gross_ic" name="Gross IC" type="number" />

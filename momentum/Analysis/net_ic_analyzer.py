@@ -16,11 +16,19 @@ logger = get_logger(__name__)
 _TURNOVER_SEMANTICS = "membership_change_both_legs_per_bar"
 _COST_SEMANTICS = "per_rebalance_not_annualized"
 _UNAVAILABLE_REASON = "canonical_factor_return_series_not_built (1c-FR)"
+_ZERO_TURNOVER_REASON = "zero_mean_turnover"
+_INSUFFICIENT_ALIGNED_REASON = "insufficient_aligned_series"
+_SERIES_SHAPE_REASON = "factor_return_series_missing_or_invalid"
 
 
 def _unavailable(reason: str = _UNAVAILABLE_REASON) -> dict[str, Any]:
     """§U conditional metric unavailable 形狀。"""
     return {"status": "unavailable", "value": None, "reason": reason}
+
+
+def _ok(value: float | bool) -> dict[str, Any]:
+    """§U conditional metric ok 形狀(reason=null)。"""
+    return {"status": "ok", "value": value, "reason": None}
 
 
 def _finite_or_null(value: Any) -> float | None:
@@ -35,6 +43,102 @@ def _finite_or_null(value: Any) -> float | None:
         return None
     return fv
 
+
+def position_to_turnover_series(position: pd.Series) -> pd.Series:
+    """D6: turnover_t = |position_t − position_{t−1}|;首 bar=0(fillna,非 NaN-drop)。
+
+    雙邊尺度 ∈ {0,1,2};與 top-only membership turnover 不同。
+    """
+    return position.astype(float).diff().abs().fillna(0.0)
+
+
+def _extract_gross_position(
+    series_obj: Any,
+) -> tuple[pd.Series, pd.Series] | None:
+    """從 FactorTimingReturnSeries / duck-typed 物件取 gross=ls_return、position。
+
+    裸 pd.Series 或缺欄 → None(禁 scalar 廣播/忽略舊 factor_returns 注入)。
+    """
+    if series_obj is None:
+        return None
+    ls = getattr(series_obj, "ls_return", None)
+    pos = getattr(series_obj, "position", None)
+    if ls is None and isinstance(series_obj, dict):
+        ls = series_obj.get("ls_return")
+        pos = series_obj.get("position")
+    if not isinstance(ls, pd.Series) or not isinstance(pos, pd.Series):
+        return None
+    if ls.empty or pos.empty:
+        return None
+    return ls, pos
+
+
+def compute_breakeven_and_net(
+    gross: pd.Series,
+    turnover: pd.Series,
+    cost_bps: float | None,
+) -> dict[str, Any]:
+    """對齊 dropna 後算 net_mean / breakeven_cost_bps / profitable。
+
+    breakeven = mean(gross)/mean(turnover)*10000;mean(turnover)==0 → unavailable。
+    net_t = gross_t − (cost_bps/10000)*turnover_t;cost_bps=None 視為 0。
+    """
+    aligned = pd.concat(
+        [gross.rename("gross"), turnover.rename("turnover")],
+        axis=1,
+    ).dropna()
+    if aligned.empty:
+        return {
+            "evaluable": False,
+            "reason": _INSUFFICIENT_ALIGNED_REASON,
+            "gross_mean": None,
+            "turnover_mean": None,
+            "net_mean": None,
+            "breakeven_cost_bps": None,
+            "profitable_after_cost": None,
+        }
+
+    gross_mean = float(aligned["gross"].astype(float).mean())
+    to_mean = float(aligned["turnover"].astype(float).mean())
+    use_cost = float(cost_bps) if cost_bps is not None else 0.0
+    cost_term = (use_cost / 10000.0) * aligned["turnover"].astype(float)
+    net_series = aligned["gross"].astype(float) - cost_term
+    net_mean = float(net_series.mean())
+
+    if not math.isfinite(to_mean) or to_mean == 0.0:
+        return {
+            "evaluable": True,
+            "reason": _ZERO_TURNOVER_REASON,
+            "gross_mean": gross_mean if math.isfinite(gross_mean) else None,
+            "turnover_mean": to_mean if math.isfinite(to_mean) else 0.0,
+            "net_mean": net_mean if math.isfinite(net_mean) else None,
+            "breakeven_cost_bps": None,
+            "profitable_after_cost": (
+                bool(net_mean > 0.0) if math.isfinite(net_mean) else None
+            ),
+        }
+
+    if not math.isfinite(gross_mean) or not math.isfinite(net_mean):
+        return {
+            "evaluable": False,
+            "reason": _INSUFFICIENT_ALIGNED_REASON,
+            "gross_mean": None,
+            "turnover_mean": to_mean,
+            "net_mean": None,
+            "breakeven_cost_bps": None,
+            "profitable_after_cost": None,
+        }
+
+    breakeven = (gross_mean / to_mean) * 10000.0
+    return {
+        "evaluable": True,
+        "reason": None,
+        "gross_mean": gross_mean,
+        "turnover_mean": to_mean,
+        "net_mean": net_mean,
+        "breakeven_cost_bps": float(breakeven),
+        "profitable_after_cost": bool(net_mean > 0.0),
+    }
 
 def _validate_cost_params(cost_enabled: bool, cost_bps: float | None) -> None:
     """三層統一 validator 偽碼:非 None 一律驗域;enabled 另驗非 None。"""
@@ -180,14 +284,77 @@ class NetICAnalyzer:
             "calibration": "uncalibrated",
         }
 
+    def _series_conditional_metrics(
+        self,
+        series_obj: Any,
+        *,
+        cost_bps: float | None,
+        include_cost_keys: bool,
+    ) -> tuple[dict[str, Any], bool, bool]:
+        """由 PIT series 回填 net/breakeven/profitable。
+
+        Returns:
+            metrics: 要 merge 進 feature dict 的 conditional keys
+            is_evaluable: 對齊後可評估(含 zero-turnover 但 net 可算)
+            is_profitable: profitable_after_cost value is True
+        """
+        extracted = _extract_gross_position(series_obj)
+        if extracted is None:
+            metrics: dict[str, Any] = {
+                "net_factor_return": _unavailable(_SERIES_SHAPE_REASON if series_obj is not None else _UNAVAILABLE_REASON),
+            }
+            if include_cost_keys:
+                metrics["breakeven_cost_bps"] = _unavailable(
+                    _SERIES_SHAPE_REASON if series_obj is not None else _UNAVAILABLE_REASON
+                )
+                metrics["profitable_after_cost"] = _unavailable(
+                    _SERIES_SHAPE_REASON if series_obj is not None else _UNAVAILABLE_REASON
+                )
+            return metrics, False, False
+
+        gross, position = extracted
+        turnover_s = position_to_turnover_series(position)
+        stats = compute_breakeven_and_net(gross, turnover_s, cost_bps=cost_bps)
+
+        if not stats["evaluable"] or stats["net_mean"] is None:
+            reason = str(stats.get("reason") or _INSUFFICIENT_ALIGNED_REASON)
+            metrics = {"net_factor_return": _unavailable(reason)}
+            if include_cost_keys:
+                metrics["breakeven_cost_bps"] = _unavailable(reason)
+                metrics["profitable_after_cost"] = _unavailable(reason)
+            return metrics, False, False
+
+        net_mean = float(stats["net_mean"])
+        metrics = {"net_factor_return": _ok(net_mean)}
+        is_profitable = bool(net_mean > 0.0)
+
+        if include_cost_keys:
+            be = stats.get("breakeven_cost_bps")
+            if be is None or not math.isfinite(float(be)):
+                metrics["breakeven_cost_bps"] = _unavailable(
+                    str(stats.get("reason") or _ZERO_TURNOVER_REASON)
+                )
+            else:
+                metrics["breakeven_cost_bps"] = _ok(float(be))
+            metrics["profitable_after_cost"] = _ok(is_profitable)
+
+        return metrics, True, is_profitable
+
     def batch_analyze(
         self,
         ic_summary: dict[str, dict],
         turnover_data: dict[str, float],
-        factor_returns: Optional[dict[str, pd.Series]] = None,
+        factor_return_series: Optional[dict[str, Any]] = None,
     ) -> dict:
-        """依 cost_enabled 輸出 §U 三 profile;忽略 factor_returns 注入。"""
-        del factor_returns  # 1c 內不使用;1c-FR 前恒 unavailable
+        """依 cost_enabled 輸出 §U 三 profile;series owner 回填 net/breakeven/profitable。
+
+        Args:
+            ic_summary: feature → {gross_ic|ic_mean, ...}
+            turnover_data: feature → scalar quantile turnover(容量/cost_drag 用)
+            factor_return_series: feature → FactorTimingReturnSeries(ls_return+position);
+                缺/無效 → conditional metrics unavailable(禁 scalar 廣播)。
+        """
+        series_map = factor_return_series or {}
 
         if not turnover_data:
             return {
@@ -203,6 +370,8 @@ class NetICAnalyzer:
 
         feature_results: dict[str, dict] = {}
         cost_drags: list[float] = []
+        evaluable_count = 0
+        profitable_count = 0
 
         for feature_name, metric in ic_summary.items():
             if feature_name not in turnover_data:
@@ -262,14 +431,23 @@ class NetICAnalyzer:
                 avg_daily_volume_usd=float(volume) if volume is not None else None,
             )
 
+            series_obj = series_map.get(feature_name)
+
             if not self._cost_enabled:
-                # SCHEMA_GROSS_ONLY
+                # SCHEMA_GROSS_ONLY(無 breakeven/profitable 鍵)
+                cond, is_eval, _is_prof = self._series_conditional_metrics(
+                    series_obj,
+                    cost_bps=None,
+                    include_cost_keys=False,
+                )
+                if is_eval:
+                    evaluable_count += 1
                 feature_results[feature_name] = {
                     "gross_ic": gross_f,
                     "turnover": turnover_f,
                     "turnover_semantics": _TURNOVER_SEMANTICS,
                     "capacity": capacity,
-                    "net_factor_return": _unavailable(),
+                    **cond,
                 }
                 continue
 
@@ -278,28 +456,34 @@ class NetICAnalyzer:
             cost_bps = float(self._cost_bps)
             drag = self.compute_cost_drag(cost_bps, turnover_f)
             cost_drags.append(drag)
+            cond, is_eval, is_prof = self._series_conditional_metrics(
+                series_obj,
+                cost_bps=cost_bps,
+                include_cost_keys=True,
+            )
+            if is_eval:
+                evaluable_count += 1
+                if is_prof:
+                    profitable_count += 1
             feature_results[feature_name] = {
                 "gross_ic": gross_f,
                 "turnover": turnover_f,
                 "turnover_semantics": _TURNOVER_SEMANTICS,
                 "capacity": capacity,
-                "net_factor_return": _unavailable(),
                 "cost_bps": cost_bps,
                 "cost_semantics": _COST_SEMANTICS,
                 "cost_drag_return": drag,
                 "cost_sensitivity": self.cost_sensitivity_analysis(cost_bps, turnover_f),
-                "breakeven_cost_bps": _unavailable(),
-                "profitable_after_cost": _unavailable(),
+                **cond,
             }
 
         total_analyzed = sum(
             1 for value in feature_results.values() if not value.get("skipped")
         )
-        # 1c:evaluable_count 恒 0(無 canonical 報酬序列);profitable 只計 evaluable
         summary: dict[str, Any] = {
             "total_analyzed": int(total_analyzed),
-            "evaluable_count": 0,
-            "profitable_count": 0,
+            "evaluable_count": int(evaluable_count),
+            "profitable_count": int(profitable_count),
         }
         if self._cost_enabled:
             summary["avg_cost_drag_return"] = (

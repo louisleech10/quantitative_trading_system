@@ -2286,10 +2286,11 @@ class ICFilterOrchestrator:
         return analyzer.run_full_diagnostics(features_df, rolling_ic_dict=rolling_ic_dict)
 
     def _run_net_ic(self, selected_features: list[str], config: ICConfig) -> dict:
-        """Net IC runner(B-strict):兩參 batch_analyze,不傳 factor_returns。
+        """Net IC runner(B-strict):交接 PIT series owner → breakeven/profitable。
 
-        F1 契約:series owner 空時不得回傳依賴 owner 的 ok/evaluable payload
-        （F4 接線後讀 ``self._factor_return_series``；本函式先做 owner 護欄）。
+        F4:從 ``self._factor_return_series[name]`` 取 gross=ls_return、position;
+        turnover series 於 analyzer 內 ``position.diff().abs().fillna(0)``(D6 首 bar=0)。
+        cache-hit 無 owner → 不得回傳 series-dependent ok/evaluable(F1 護欄)。
         """
         from momentum.Analysis.net_ic_analyzer import NetICAnalyzer
 
@@ -2304,8 +2305,17 @@ class ICFilterOrchestrator:
             for name, data in (self._report or {}).get("turnover_analysis", {}).items()
             if name in selected_features
         }
-        # 明確兩參:1c 內不傳 factor_returns(canonical series 屬票 1c-FR)
-        result = analyzer.batch_analyze(summary, turnover_data)
+        # F4.1: 只傳 owner 內已有 series 的 selected features(缺→analyzer unavailable)
+        series_for_batch = {
+            name: self._factor_return_series[name]
+            for name in selected_features
+            if name in self._factor_return_series
+        }
+        result = analyzer.batch_analyze(
+            summary,
+            turnover_data,
+            factor_return_series=series_for_batch,
+        )
         if (
             not self._factor_return_series
             and self._net_ic_payload_depends_on_series_owner(result)
