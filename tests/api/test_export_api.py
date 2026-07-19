@@ -24,6 +24,7 @@ pytestmark = [
 
 
 def _export_fixture_filtered_path(metadata: dict) -> Path:
+    """redirect/tmp 路徑 only;active redirect 缺失時 raise(禁 fallback production)."""
     symbol = metadata.get("symbol") if metadata else None
     timeframe = metadata.get("timeframe") if metadata else None
     name = (
@@ -32,8 +33,12 @@ def _export_fixture_filtered_path(metadata: dict) -> Path:
         else "filtered_features.h5"
     )
     active_root = get_active_redirect_root()
-    base = active_root / "features" if active_root is not None else Path("data_cache/features")
-    return base / name
+    if active_root is None:
+        raise RuntimeError(
+            "export fixture requires active ic_persist_redirect; "
+            "refusing to write production data_cache/features"
+        )
+    return active_root / "features" / name
 
 
 def _wait_for_task(task_id: str, timeout: float = 20.0) -> None:
@@ -118,62 +123,57 @@ def export_task(
         result_body = result.json()
         metadata = result_body.get("metadata", {})
 
-        # export service 硬路徑 data_cache/features/(非 redirect);attrs 對齊 freshness
-        symbol = (metadata or {}).get("symbol")
-        timeframe = (metadata or {}).get("timeframe")
-        name = (
-            f"{symbol}_{timeframe}_filtered.h5"
-            if symbol and timeframe
-            else "filtered_features.h5"
-        )
-        filtered_path = Path("data_cache/features") / name
-        filtered_path.parent.mkdir(parents=True, exist_ok=True)
+        # 僅寫 redirect/tmp 路徑;禁寫 production data_cache/features
         expected_gen = (
             (metadata or {}).get("filtered_generated_at")
             or result_body.get("generated_at")
         )
-        with h5py.File(filtered_path, "w") as file:
+        task_attr = (metadata or {}).get("filtered_source_task_id") or task_id
+        redirect_path = _export_fixture_filtered_path(metadata)
+        redirect_path.parent.mkdir(parents=True, exist_ok=True)
+        with h5py.File(redirect_path, "w") as file:
             group = file.create_group("filtered")
             group.create_dataset(
                 "features",
-                data=ic_api_real_kline["features"].iloc[:1, :2].to_numpy(dtype=np.float64),
+                data=ic_api_real_kline["features"]
+                .iloc[:1, :2]
+                .to_numpy(dtype=np.float64),
             )
             if expected_gen is not None:
                 gen_s = str(expected_gen)
                 group.attrs["source_generated_at"] = gen_s
                 file.attrs["source_generated_at"] = gen_s
-            task_attr = (metadata or {}).get("filtered_source_task_id") or task_id
             group.attrs["source_task_id"] = str(task_attr)
             file.attrs["source_task_id"] = str(task_attr)
-        # 亦寫 redirect 路徑(setup 期間 active),避免 spy/後續讀不一致
-        redirect_path = _export_fixture_filtered_path(metadata)
-        if redirect_path.resolve() != filtered_path.resolve():
-            redirect_path.parent.mkdir(parents=True, exist_ok=True)
-            with h5py.File(redirect_path, "w") as file:
-                group = file.create_group("filtered")
-                group.create_dataset(
-                    "features",
-                    data=ic_api_real_kline["features"]
-                    .iloc[:1, :2]
-                    .to_numpy(dtype=np.float64),
-                )
-                if expected_gen is not None:
-                    gen_s = str(expected_gen)
-                    group.attrs["source_generated_at"] = gen_s
-                    file.attrs["source_generated_at"] = gen_s
-                group.attrs["source_task_id"] = str(task_attr)
-                file.attrs["source_task_id"] = str(task_attr)
         assert not redirect_ctx.spy.violations
+        # 必須落在 redirect root,不得寫 production data_cache
+        resolved = redirect_path.resolve()
+        root_resolved = redirect_root_session.resolve()
+        assert str(resolved).startswith(str(root_resolved)), (
+            f"filtered h5 escaped redirect: {resolved} not under {root_resolved}"
+        )
     finally:
         # setup 結束即釋放;session-scoped yield 不得跨測持有 redirect
         redirect_patch_set.deactivate(redirect_ctx)
 
     try:
-        yield {"task_id": task_id, "module": "factor_returns"}
+        yield {
+            "task_id": task_id,
+            "module": "factor_returns",
+            "redirect_root": redirect_root_session,
+        }
     finally:
         if original is not None:
             with ic_analysis_service._lock:
                 ic_analysis_service._tasks[task_id] = original
+        # teardown: 清 redirect 產物(tmp 由 pytest 回收;顯式 unlink 防殘留)
+        features_dir = redirect_root_session / "features"
+        if features_dir.is_dir():
+            for p in features_dir.glob("*_filtered.h5"):
+                try:
+                    p.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
 
 def test_export_csv_summary_200(export_task: dict) -> None:
@@ -208,9 +208,18 @@ def test_export_markdown_200(export_task: dict) -> None:
     assert response.headers["content-type"].startswith("text/markdown")
 
 
-def test_export_hdf5_200(export_task: dict) -> None:
-    response = client.get(f"/api/v1/ic/export/{export_task['task_id']}/hdf5")
-    assert response.status_code == 200
+def test_export_hdf5_200(
+    export_task: dict,
+    redirect_patch_set,
+) -> None:
+    # hdf5 落在 redirect/tmp;本測短暫 re-activate 以免寫/讀 production data_cache
+    root = export_task["redirect_root"]
+    ctx = redirect_patch_set.activate(root, owner="test_export_hdf5_200")
+    try:
+        response = client.get(f"/api/v1/ic/export/{export_task['task_id']}/hdf5")
+        assert response.status_code == 200
+    finally:
+        redirect_patch_set.deactivate(ctx)
 
 
 def test_export_unknown_task_404() -> None:

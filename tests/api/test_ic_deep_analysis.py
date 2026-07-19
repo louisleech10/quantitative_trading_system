@@ -61,21 +61,27 @@ def _wait_for_deep_result(task_id: str, timeout: float = 30.0) -> dict:
 
 
 def _ensure_ic_task_ready_for_deep(task_id: str, timeout: float = 60.0) -> None:
-    """session/module 共用 task:若殘 running 則等完;終態強制回 completed 供下一 deep。"""
+    """session/module 共用 task:輪詢至真實 completed;failed/timeout 則 fail。
+
+    禁把 failed 或逾時 running 強制改 completed(假綠)。
+    """
     start = time.time()
+    last_status: str | None = None
+    last_error: object = None
     while time.time() - start < timeout:
         with ic_analysis_service._lock:
             info = ic_analysis_service._tasks.get(task_id)
             status = (info or {}).get("status")
-        if status != "running":
-            break
+            last_status = status if isinstance(status, str) else None
+            last_error = (info or {}).get("error") if info else None
+        if status == "completed":
+            return
+        if status == "failed":
+            pytest.fail(f"ic task failed, cannot start deep: {last_error}")
         time.sleep(0.3)
-    with ic_analysis_service._lock:
-        info = ic_analysis_service._tasks.get(task_id)
-        if info is not None:
-            info["status"] = "completed"
-            info["error"] = None
-            info["progress"] = 1.0
+    pytest.fail(
+        f"ic task not ready for deep (timeout={timeout}s); last_status={last_status}"
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -1304,6 +1310,109 @@ def test_mutation_m2d_markdown_restore_size_meta(monkeypatch: pytest.MonkeyPatch
 # ---------------------------------------------------------------------------
 
 
+def test_export_envelope_unwrapped() -> None:
+    """codex-1: API export envelope `{results,module_summary}` → summary 三欄非空.
+
+    修前:reporter 只讀頂層 factor_returns → ok 報酬靜默空欄。
+    修後:先定位 results.factor_returns / flatten envelope。
+    """
+    ok = _ok_factor_returns_payload(ls_mean=0.03, sharpe=1.2, max_dd=-0.1)
+    envelope = {
+        "results": {"factor_returns": ok},
+        "module_summary": {"factor_returns": "completed"},
+        "completed_count": 1,
+    }
+    report = {
+        "summary_table": [
+            {
+                "rank": 1,
+                "feature_name": "feature_0",
+                "ic_mean": 0.05,
+                "icir": 0.5,
+            }
+        ],
+    }
+    reporter = ICReporter({})
+
+    # BEFORE-shape probe: 未 flatten 時直讀頂層必空(對照)
+    assert envelope.get("factor_returns") is None
+    assert (envelope.get("results") or {}).get("factor_returns") is not None
+
+    csv_text = reporter.generate_summary_csv(report, deep_report=envelope)
+    assert "0.03" in csv_text
+    assert "1.2" in csv_text or "1.20" in csv_text
+    # 列不得全空 deep 欄
+    data_line = [ln for ln in csv_text.splitlines() if "feature_0" in ln][0]
+    assert "0.03" in data_line
+
+    ai = reporter.generate_ai_json(report, deep_report=envelope)
+    fr_sum = (ai.get("module_summaries") or {}).get("factor_returns")
+    assert isinstance(fr_sum, dict)
+    assert fr_sum.get("status") == "ok"
+    assert fr_sum.get("size", 0) >= 1
+    assert "feature_0" in (fr_sum.get("keys") or [])
+
+    md = reporter.generate_enhanced_markdown(report, deep_report=envelope)
+    assert "factor_returns" in md
+    assert "ok" in md
+
+
+def test_legacy_module_statuses_not_completed() -> None:
+    """codex-2: legacy 裸 map 降 unavailable 時 module_statuses 不得殘 completed."""
+    from types import SimpleNamespace
+
+    legacy = _legacy_factor_returns_payload()
+    deep = SimpleNamespace(
+        results={"factor_returns": legacy},
+        module_summary={"factor_returns": "completed"},
+        deep_analysis_errors=[],
+        total_modules=10,
+        completed_count=1,
+        skipped_count=0,
+        failed_count=0,
+    )
+    reporter = ICReporter({})
+    ser = reporter._serialize_deep_analysis(deep)
+    fr = ser.get("factor_returns")
+    assert isinstance(fr, dict)
+    assert fr.get("status") == "unavailable"
+    statuses = {
+        item.get("module_name"): item.get("status")
+        for item in (ser.get("module_statuses") or [])
+        if isinstance(item, dict)
+    }
+    assert statuses.get("factor_returns") == "unavailable"
+    assert statuses.get("factor_returns") != "completed"
+    summary = ser.get("deep_analysis_summary") or {}
+    assert summary.get("completed") == 0
+
+
+def test_readiness_helper_does_not_force_completed() -> None:
+    """codex-3: readiness 禁把 failed 改 completed(假綠)."""
+    task_id = "readiness-force-green-probe"
+    with ic_analysis_service._lock:
+        original = ic_analysis_service._tasks.get(task_id)
+        ic_analysis_service._tasks[task_id] = {
+            "status": "failed",
+            "error": "injected_failure",
+            "progress": 0.5,
+        }
+    try:
+        with pytest.raises(pytest.fail.Exception, match="failed"):
+            _ensure_ic_task_ready_for_deep(task_id, timeout=1.0)
+        with ic_analysis_service._lock:
+            info = ic_analysis_service._tasks[task_id]
+            assert info["status"] == "failed"
+            assert info["error"] == "injected_failure"
+            assert info["progress"] == 0.5
+    finally:
+        with ic_analysis_service._lock:
+            if original is None:
+                ic_analysis_service._tasks.pop(task_id, None)
+            else:
+                ic_analysis_service._tasks[task_id] = original
+
+
 def test_f2_ok_union_passthrough_and_completed() -> None:
     """A: ok §U → 保留有限葉 + module_summary completed + summary 三欄非 None。"""
     ok = _ok_factor_returns_payload()
@@ -1429,7 +1538,7 @@ def test_f2_ok_reason_null() -> None:
         blob = json.dumps(payload, default=str)
         assert banned not in blob, f"egress[{i}] leaked old reason: {blob[:200]}"
 
-    # service 三出口
+    # service 三出口(composer-2:含 get_deep_analysis_result + raw JSON export)
     svc_payload = {
         "results": {"factor_returns": ok},
         "module_summary": {"factor_returns": "completed"},
@@ -1438,6 +1547,46 @@ def test_f2_ok_reason_null() -> None:
     assert ser["results"]["factor_returns"]["status"] == "ok"
     assert ser["results"]["factor_returns"]["reason"] is None
     assert banned not in json.dumps(ser)
+
+    # get_deep_analysis_result 出口(ic_analysis_service.py sanitize 路徑)
+    probe_task = "f2-ok-reason-service-probe"
+    with ic_analysis_service._lock:
+        orig_probe = ic_analysis_service._tasks.get(probe_task)
+        ic_analysis_service._tasks[probe_task] = {
+            "status": "completed",
+            "result": {"summary_table": []},
+            "deep_analysis_result": svc_payload,
+        }
+    try:
+        got = ic_analysis_service.get_deep_analysis_result(probe_task)
+        got_fr = None
+        if isinstance(got, dict):
+            results = got.get("results")
+            if isinstance(results, dict):
+                if isinstance(results.get("results"), dict):
+                    got_fr = results["results"].get("factor_returns")
+                else:
+                    got_fr = results.get("factor_returns")
+            if got_fr is None:
+                got_fr = got.get("factor_returns")
+        assert isinstance(got_fr, dict), f"unexpected get_deep shape: {got!r}"
+        assert got_fr.get("status") == "ok"
+        assert got_fr.get("reason") is None
+        assert banned not in json.dumps(got, default=str)
+
+        # raw JSON export(export_analysis json 路徑)
+        exported = ic_analysis_service.export_analysis(probe_task, "json")
+        raw = exported["content"].getvalue().decode("utf-8")
+        assert banned not in raw
+        body = json.loads(raw)
+        # report 本身可能無 FR;若 deep 嵌在 result 則一併掃
+        assert banned not in json.dumps(body, default=str)
+    finally:
+        with ic_analysis_service._lock:
+            if orig_probe is None:
+                ic_analysis_service._tasks.pop(probe_task, None)
+            else:
+                ic_analysis_service._tasks[probe_task] = orig_probe
 
 
 def test_f2_cache_key_includes_schema_version() -> None:

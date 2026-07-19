@@ -216,11 +216,35 @@ def _sanitize_node(node: Any) -> Any:
         return node
 
 
-def _sync_module_summary_with_results(node: Any) -> Any:
-    """對齊 module_summary.factor_returns 與 results.factor_returns.status.
+def _fr_status_to_module_status(fr_status: Any) -> str | None:
+    """results/top-level factor_returns.status → module_summary/statuses 字串."""
+    if fr_status == "ok":
+        return "completed"
+    if fr_status == "unavailable":
+        return "unavailable"
+    return None
 
-    - results ok → summary completed
-    - results unavailable → summary unavailable(不覆寫 not_run 若 results 無 FR 節)
+
+def _locate_factor_returns_node(node: dict[str, Any]) -> dict[str, Any] | None:
+    """自 envelope(results.*) 或 flat 頂層取出 factor_returns dict."""
+    results = node.get("results")
+    if isinstance(results, dict):
+        fr = results.get(_FACTOR_RETURNS_KEY)
+        if isinstance(fr, dict) and "status" in fr:
+            return fr
+    top = node.get(_FACTOR_RETURNS_KEY)
+    if isinstance(top, dict) and "status" in top:
+        return top
+    return None
+
+
+def _sync_module_summary_with_results(node: Any) -> Any:
+    """對齊 module_summary / module_statuses 與 factor_returns.status.
+
+    - ok → completed
+    - unavailable → unavailable(禁 ghost completed)
+    - 支援 envelope(``results.factor_returns``)與 flat(頂層 ``factor_returns``)
+    - results 無 FR 節 → 保留既有 not_run / 缺省
     """
     if isinstance(node, list):
         return [_sync_module_summary_with_results(x) for x in node]
@@ -233,20 +257,31 @@ def _sync_module_summary_with_results(node: Any) -> Any:
         str(k): _sync_module_summary_with_results(v) for k, v in node.items()
     }
 
-    results = out.get("results")
-    ms = out.get("module_summary")
-    if isinstance(results, dict) and isinstance(ms, dict):
-        fr = results.get(_FACTOR_RETURNS_KEY)
-        if isinstance(fr, dict) and "status" in fr:
-            ms2 = dict(ms)
-            st = fr.get("status")
-            if st == "ok":
-                ms2[_FACTOR_RETURNS_KEY] = "completed"
-            elif st == "unavailable":
-                # 有 results 節則不得殘 completed
-                ms2[_FACTOR_RETURNS_KEY] = "unavailable"
-            out["module_summary"] = ms2
-        # results 無 factor_returns → 保留既有 not_run / 缺省
+    fr = _locate_factor_returns_node(out)
+    if fr is not None:
+        mapped = _fr_status_to_module_status(fr.get("status"))
+        if mapped is not None:
+            ms = out.get("module_summary")
+            if isinstance(ms, dict):
+                ms2 = dict(ms)
+                ms2[_FACTOR_RETURNS_KEY] = mapped
+                out["module_summary"] = ms2
+
+            # flat serialize 路徑用 module_statuses 清單,不得殘 completed
+            statuses = out.get("module_statuses")
+            if isinstance(statuses, list):
+                synced: list[Any] = []
+                for item in statuses:
+                    if (
+                        isinstance(item, dict)
+                        and item.get("module_name") == _FACTOR_RETURNS_KEY
+                    ):
+                        item2 = dict(item)
+                        item2["status"] = mapped
+                        synced.append(item2)
+                    else:
+                        synced.append(item)
+                out["module_statuses"] = synced
 
     # 頂層 deep report 亦可能 results 嵌在 deep_analysis_report
     deep = out.get("deep_analysis_report")
