@@ -32,7 +32,17 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 | 1 | 規劃 / SPEC / 驗收 + **小任務實作** | **Claude (Opus)** | 依本節 §1 現行分工行 |
 | 2 | 執行端（實作） | **`cursor-agent`** / **`codex exec`** 等 | 依本節 §1 現行分工行 |
 | 3 | code review | 另一方執行端 | 中/大必派，實作者不自審 |
+| 3i | **code review 實習（advisory，非表決）** | **`agy -p`**（Gemini 3.6 Flash High） | 額外 adversarial 獵手；**不算 quorum、findings 不直接 gate**（見下「實習」節） |
 | — | 規劃委員會 read-only | **`agy -p`**（Gemini） | 諮詢用,不得寫入 |
+
+##### code review 實習（agy Gemini 3.6 Flash High；2026-07-22 三家評測後定）
+**背景**：agy 3.6 三家評測 35–38.5/50——**獵漏 9–9.5/10**（1d B0 抓到 3 個 Claude+Codex+Composer 雙審+閉合全漏的真 bug），但 **BLOCKING 紀律 5/10**（不對照 SPEC/凍結合約意圖，把 SPEC 明允許的 int/float 容差、已凍結另票的 all-NaN carrier 誤升 BLOCKING）。∴ 取其獵漏、隔離其誤升級。
+**護欄（定死）**：
+- **不算雙家族 quorum**：`review_quorum_check.sh` 仍要 2 個正式非實作者家族（Codex+Composer/Grok）；agy 是**額外第三隻眼**。
+- **findings 不直接 gate/否決**：agy 的 BLOCKING 一律先由 Claude 或正式委員**對照 SPEC/凍結合約三分**（真 BLOCKING／另票／SPEC 意圖內）後才生效；未三分的 agy finding 不得阻塞 merge 或派工。
+- **唯讀**：不派實作/寫 code（延續 [[feedback_gemini_research_only]]）。
+- **調用**：`agy -p "..." --model gemini-3.6-flash-high --effort high`（agy 自身 settings 需 `read_file(*)`/`command(*)`；`.claude/settings.json` `autoMode.allow` 需放行；禁 `--dangerously-skip-permissions`）。
+- **畢業條件（升正式表決委員）**：連續 N 次 review 中，BLOCKING 先對照 SPEC/TODO 分級的準確率達標 + 無產物尾端 agent 雜訊 → 再議。
 
 #### code review brief 固定必問（2026-07-20 制度案；三家裁決 `handoffs/GOV-NECESSITY-REVIEW-*`）
 

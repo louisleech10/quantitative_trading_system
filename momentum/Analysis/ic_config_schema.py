@@ -251,6 +251,8 @@ class FactorExposureConfig(BaseModel):
     max_single_exposure: float = Field(default=0.4, ge=0.0, le=1.0)
     neutralization_mode: Literal["none", "beta_neutral", "vol_neutral"] = "none"
     neutralization_lookback: int = Field(default=63, ge=5, le=5000)
+    # OLS 歸因最少樣本列數（D-7；預設 10 沿用現行語義，不得擅自調低）
+    attribution_min_rows: int = Field(default=10, ge=2)
 
 
 class LongShortAnalysisConfig(BaseModel):

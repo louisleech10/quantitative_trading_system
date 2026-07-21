@@ -10,7 +10,10 @@ interface FactorExposureRadarProps {
 }
 
 export default function FactorExposureRadar({ data }: FactorExposureRadarProps) {
-  const activeExposure = data?.neutralized_portfolio_exposure || data?.portfolio_exposure || data?.factor_attribution?.factor_betas;
+  // B5：exposure 僅 portfolio_exposure / neutralized，不讀幽靈 factor_attribution.factor_betas。
+  // factor_attribution 三態：unavailable | ok | legacy；無 exposure 時空態。
+  const activeExposure =
+    data?.neutralized_portfolio_exposure || data?.portfolio_exposure;
 
   const chartData = useMemo(() => {
     return Object.entries(activeExposure || {}).map(([factor, value]) => ({
@@ -18,6 +21,14 @@ export default function FactorExposureRadar({ data }: FactorExposureRadarProps) 
       exposure: Math.abs(value),
     }));
   }, [activeExposure]);
+
+  const fa = data?.factor_attribution;
+  const isAttributionUnavailable =
+    fa !== undefined && fa !== null && 'status' in fa && fa.status === 'unavailable';
+  // unavailable 專屬文案（測試以 /因子歸因不可用/ 唯一斷言；通用空態不得含此字串）
+  const emptyNotice = isAttributionUnavailable
+    ? '因子歸因不可用，暫無曝險資料'
+    : '暫無曝險資料';
 
   return (
     <Card>
@@ -35,15 +46,26 @@ export default function FactorExposureRadar({ data }: FactorExposureRadarProps) 
       </CardHeader>
       <CardContent>
         {chartData.length === 0 ? (
-          <div className="h-[240px] flex items-center justify-center text-slate-400">暫無曝險資料</div>
+          <div
+            className="h-[240px] flex items-center justify-center text-slate-400"
+            data-testid="factor-exposure-radar-empty"
+          >
+            {emptyNotice}
+          </div>
         ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <RadarChart data={chartData}>
-              <PolarGrid />
-              <PolarAngleAxis dataKey="factor" />
-              <Radar dataKey="exposure" stroke="#60a5fa" fill="#60a5fa55" />
-            </RadarChart>
-          </ResponsiveContainer>
+          <div
+            data-testid="factor-exposure-radar-chart"
+            data-exposure-source="portfolio_or_neutralized"
+            data-active-factors={chartData.map((d) => d.factor).join('|')}
+          >
+            <ResponsiveContainer width="100%" height={240}>
+              <RadarChart data={chartData}>
+                <PolarGrid />
+                <PolarAngleAxis dataKey="factor" />
+                <Radar dataKey="exposure" stroke="#60a5fa" fill="#60a5fa55" />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </CardContent>
     </Card>

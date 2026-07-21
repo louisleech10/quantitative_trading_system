@@ -1851,7 +1851,17 @@ class ICFilterOrchestrator:
                 try:
                     result = runner(selected, config)
                     base_report.results[module_name] = result
-                    base_report.module_summary[module_name] = "completed"
+                    # D-4：factor_exposure 巢狀 factor_attribution.status==unavailable
+                    # → completed_partial（非 completed）；他模組不變
+                    if (
+                        module_name == "factor_exposure"
+                        and isinstance(result, dict)
+                        and isinstance(result.get("factor_attribution"), dict)
+                        and result["factor_attribution"].get("status") == "unavailable"
+                    ):
+                        base_report.module_summary[module_name] = "completed_partial"
+                    else:
+                        base_report.module_summary[module_name] = "completed"
                     logger.info(
                         "Deep module completed: %s in %.2fs",
                         module_name,
@@ -1900,8 +1910,11 @@ class ICFilterOrchestrator:
             for module_name in all_module_names:
                 base_report.module_summary.setdefault(module_name, "not_run")
 
+            # D-12：completed_partial 計入 completed（exposure 本體有效，僅子項不可用）
             base_report.completed_count = sum(
-                1 for status in base_report.module_summary.values() if status == "completed"
+                1
+                for status in base_report.module_summary.values()
+                if status in ("completed", "completed_partial")
             )
             base_report.skipped_count = sum(
                 1 for status in base_report.module_summary.values() if status == "skipped"
@@ -2183,7 +2196,10 @@ class ICFilterOrchestrator:
         )
         # lag≥1：pct_change().shift(1) → bar t 只用 close[t-1]/close[t-2]
         market_proxy = close_aligned.pct_change().shift(1)
-        positions = pd.Series(1.0 / max(1, len(factor_values)), index=factor_values.index)
+        # 時間軸等權（len=列數非標的數），非交易持倉
+        equal_time_weights = pd.Series(
+            1.0 / max(1, len(factor_values)), index=factor_values.index
+        )
 
         neutralization_mode = str(config.factor_exposure.neutralization_mode)
         neutralized_values = analyzer.neutralize_factor_matrix(
@@ -2193,8 +2209,10 @@ class ICFilterOrchestrator:
             lookback=config.factor_exposure.neutralization_lookback,
         )
 
-        exposure = analyzer.calculate_portfolio_exposure(positions, factor_values)
-        neutralized_exposure = analyzer.calculate_portfolio_exposure(positions, neutralized_values)
+        exposure = analyzer.calculate_portfolio_exposure(equal_time_weights, factor_values)
+        neutralized_exposure = analyzer.calculate_portfolio_exposure(
+            equal_time_weights, neutralized_values
+        )
         concentration = analyzer.monitor_exposure_concentration(
             exposure,
             max_single_exposure=config.factor_exposure.max_single_exposure,
@@ -2210,20 +2228,21 @@ class ICFilterOrchestrator:
         if isinstance(original_hhi, (int, float)) and isinstance(neutralized_hhi, (int, float)):
             delta_hhi = float(original_hhi) - float(neutralized_hhi)
 
+        # B3 幽靈契約隔離：巢狀 factor_attribution 顯式 unavailable（恰三鍵）；
+        # 移除頂層鏡像 alpha/r_squared/attribution/unexplained/factor_betas。
+        # 禁接真迴歸；reason 禁寫「系統沒有 PnL」。
+        _ATTR_NOT_WIRED_REASON = (
+            "attribution_not_wired_to_canonical_contract"
+            "（單標的 canonical FR 下迴歸 ill-posed；"
+            "接真需另定 portfolio_returns 與 RHS 契約，見 ROADMAP 票A/票B）"
+        )
         summary = {
             "portfolio_exposure": exposure.to_dict(),
-            "factor_betas": exposure.to_dict(),
             "factor_attribution": {
-                "factor_betas": exposure.to_dict(),
-                "alpha": np.nan,
-                "r_squared": np.nan,
-                "attribution": {},
-                "unexplained": np.nan,
+                "status": "unavailable",
+                "value": None,
+                "reason": _ATTR_NOT_WIRED_REASON,
             },
-            "alpha": np.nan,
-            "r_squared": np.nan,
-            "attribution": {},
-            "unexplained": np.nan,
             "concentration": concentration,
             "neutralization_mode": neutralization_mode,
             "neutralization_lookback": int(config.factor_exposure.neutralization_lookback),
@@ -2390,8 +2409,11 @@ class ICFilterOrchestrator:
         summary = report.module_summary
         if isinstance(summary, dict) and summary.get("net_ic_analysis") == "completed":
             summary["net_ic_analysis"] = "unavailable"
+            # D-12：completed_partial 計入 completed
             report.completed_count = sum(
-                1 for status in summary.values() if status == "completed"
+                1
+                for status in summary.values()
+                if status in ("completed", "completed_partial")
             )
         return report
 

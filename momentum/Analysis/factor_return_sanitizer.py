@@ -319,6 +319,15 @@ def _statuses_from_payload(node: Any) -> dict[str, str] | None:
 
 
 def _count_status(statuses: dict[str, str], target: str) -> int:
+    """計 module_summary 狀態數.
+
+    D-12：target==\"completed\" 時 completed_partial 一併計入
+   （模組本體有效、僅 attribution 子項不可用；勿動 _PRESERVE_SUMMARY_STATUSES）。
+    """
+    if target == "completed":
+        return sum(
+            1 for s in statuses.values() if s in ("completed", "completed_partial")
+        )
     return sum(1 for s in statuses.values() if s == target)
 
 
@@ -326,6 +335,7 @@ def _recompute_status_counts(node: Any) -> Any:
     """重算 completed_count/skipped_count 與 deep_analysis_summary 對應欄.
 
     unavailable / not_run 均不計 completed/skipped(與 orchestrator 尾端計數一致).
+    completed_partial 計入 completed（D-12）。
     """
     if not isinstance(node, dict):
         if isinstance(node, list):

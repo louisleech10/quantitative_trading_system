@@ -36,7 +36,7 @@
   | Phase | 內容 | 狀態 |
   |---|---|---|
   | **0 止血+正確性硬閘** | crash/時間軸/feature-guard/空圖/大尺度 cap | ✅ 完成(`11507f5`) |
-  | **1 正確性 kernel + contract(能信)** | 1-contract/1a 切分+接線/1-align 前瞻閘/1e HAC+1b FDR/1c Net IC+1c-FR/1d attribution/1f 空圖;**+前瞻整治 LA-0(P0)✅/LA-1(P1)✅/LA-2(P2)✅** | 🔵 **進行中**(尾巴=1d 實作+1f;**1d SPEC v0.5.2+TODO v0.3 已 FROZEN 2026-07-21**,body sha256:4109a47b,三家戳記+provenance;下一步逐批實作 B0) |
+  | **1 正確性 kernel + contract(能信)** | 1-contract/1a 切分+接線/1-align 前瞻閘/1e HAC+1b FDR/1c Net IC+1c-FR/1d attribution/1f 空圖;**+前瞻整治 LA-0(P0)✅/LA-1(P1)✅/LA-2(P2)✅** | 🔵 **進行中**(尾巴=1f;**1d attribution 六批 B0-B5 全完工 2026-07-22**:清債落地=intercept 正名/NaN·inf·輸出溢位·index fail-closed(unavailable 三鍵)/幽靈 factor_attribution 顯式 unavailable+completed_partial 外顯;每批 Grok 實作+Codex+Composer 雙審+agy 實習+閉合+quorum+Gate;三方 DATA-CORRECT 經 scope reconcile 一致 IN-SCOPE-PASS。**未 commit(待使用者)**。follow-up 另票:exposure 家族 fillna fail-closed 化(§N 他票)、cache close all-NaN carrier index 對齊(production-hardening)) |
   | **2A 事件 case-control 語義 kernel(主戰場,小尺度先驗)** | 事件清單 ingestion+事件前窗對齊+AUC/t-stat+正反 matching(同波動/regime)+事件 OOS(purged CV)+FDR+波動調整 | ❌ 未啟動(大,需設計;依賴 P0 前置+P1 子集) |
   | **3 串流承載(430K×百 symbol)** | direct L7+chunk iterator+row mask+metric sink+candidate set+**staged screening(=粗/精篩 funnel)+redundancy cap**+cross-sectional 串流;**IC-PERF/feature 上限保護在此** | ❌ 未啟動(大,基礎軌;依賴 P1 contract) |
   | **2B 事件 case-control 大尺度整合** | event mask×streaming chunks+artifact+全 430K universe 篩選 | ❌ 未啟動(依賴 2A+3) |
@@ -44,6 +44,9 @@
   | **5 Agent 顧問層(V2)** | 結構化可機讀輸出+嚴謹度指標+Agent 委員會式解讀 | ❌ 未啟動(依賴 P1+P4) |
   - **funnel/IC-PERF 定位**:非獨立 deferred 項,=Phase 3(staged screening/redundancy cap)+Phase 4(多因子);「等整張 map 完成才做」≡「等 P1 收完進 P3/4」(memory `project_ic_feature_selection_funnel`)。
   - **regime IC 驗證定位**:Phase 4 進階層,**獨立票、條件觸發**(只有要讓 regime-conditional IC 當決策級才做;現只進報告非 gate,不做也不出錯)。2026-07-17 使用者提出。
+  - **1d 收尾 follow-up 兩票(2026-07-22 三方 DATA-CORRECT scope reconcile 一致 IN-SCOPE-PASS 後登記;證據=`handoffs/1d-DATACORRECT-SCOPE-RECONCILE.md`)**:Codex adversarial 揪出、經三家證實非 1d 引入之 pre-existing 資料債,**明列防丟**:
+    - **FU-1 exposure 家族 fillna fail-closed 化**:`factor_exposure_analyzer.py` 的 `neutralize_factor_matrix`/`calculate_portfolio_exposure`/`monitor_exposure_concentration`(:111-307)壞值靜默 `fillna(0.0)`。**嚴重度=中**(FactorExposureConfig `enabled=False` 預設關;portfolio_exposure 只餵 Radar 診斷、非交易決策)。修法=比照 1d B2 把 attribution fail-closed 的模式套到 exposure 家族。**階段=1f 之後的 fail-closed sweep 或獨立票**;§N「exposure 家族 NaN 靜默=他票」已凍結。
+    - **FU-2 cache close all-NaN carrier index 對齊**:kline `RangeIndex` vs features `DatetimeIndex` 對不齊 → carrier 全 NaN(`cache_close_finite=0/512`)。**硬前置=票A/票B(接真 attribution)**:接真歸因**必須**先修此(全 NaN carrier 上無法接真),故自然被票A/票B 閘門擋;**保證機制**=1d golden 已外顯 `cache_close_finite`,comparator 會偵測未來變化,藏不住。SPEC §P B0 errata「production-hardening 另票」。
   - **attribution 後續兩票定位(2026-07-20 四方可行性挑戰收斂裁決;綜合=`handoffs/1d-FEASIBILITY-SYNTHESIS.md`)**:1d 本票只清債(正名+NaN fail-closed+幽靈顯式 unavailable),**接真 attribution 拆兩張條件票,皆不插隊 Phase 1**(委員 2:1;composer 主張 P1 尾票之前提「依賴已存在」已被 cumsum 事實推翻)。**勿再合稱「1d-WIRE」**——兩票前置條件完全不同:
     - **票 A — 策略 timing-overlap / clone score 診斷**:回答「ML 是否只是在做簡單因子規則」。**階段=Phase 4 或移出 IC 的 ML/回測評估新 epic**(canonical owner 應在 ML/Strategy evaluation,IC 只接 typed adapter;codex)。**開票前置=先修 equity curve 契約**:`prediction_analyzer.py:163` 欄位 `strategy_returns` 實裝 `np.cumsum`(非逐期報酬)、`:152` 只有 long/flat 無做空、`api/routes/pattern_analysis.py:1050` 缺值 `fillna(0)`。**IC→ML 橋非本票普遍前置**(僅 equity 版需要;position-only 版不需)。
     - **票 B — 真·多標的橫截面 attribution**:**階段=Phase 4**(貼 Phase 3 多 symbol 承載之後)。**條件觸發:只有宇宙變多標的才成立**。前置=CS factor-return 管線(現`factor_return_analyzer.py:272-287` 只收單一 `future_returns: pd.Series`,無 symbol/holdings/權重)+持倉權重 canonical 定義+xsec 與 deep 棧整合(`analyze_cross_sectional` 現完全繞過 deep)。

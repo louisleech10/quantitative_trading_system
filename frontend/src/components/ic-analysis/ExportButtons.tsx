@@ -24,7 +24,11 @@ export default function ExportButtons({ taskId, report, summaryTable, targetId }
       return [];
     }
     return report.module_statuses
-      .filter((item) => item.status === 'completed')
+      .filter((item) =>
+        (['completed', 'completed_partial'] as const).includes(
+          item.status as 'completed' | 'completed_partial'
+        )
+      )
       .map((item) => item.module_name);
   }, [report?.module_statuses]);
 

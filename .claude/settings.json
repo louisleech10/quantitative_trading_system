@@ -53,7 +53,13 @@
       "Bash(git restore *)",
       "Bash(git branch -D*)"
     ],
-    "defaultMode": "auto"
+    "defaultMode": "auto",
+    "autoMode": {
+      "allow": [
+        "$defaults",
+        "Running the 'agy' CLI (Gemini committee model) for read-only code review, analysis, or evaluation of this repo — including the --sandbox flag — is an approved committee-evaluation tool and should be allowed. This does NOT extend to --dangerously-skip-permissions, which remains blocked."
+      ]
+    }
   },
   "hooks": {
     "PreToolUse": [

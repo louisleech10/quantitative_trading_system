@@ -1,7 +1,10 @@
+# MUTATION-PROBE: n/a — analyzer mutations 在 momentum 孿生檔
 import numpy as np
 import pandas as pd
 
 from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
+
+_UNAVAILABLE_KEYS = {"status", "value", "reason"}
 
 
 def test_single_asset_mode():
@@ -30,11 +33,16 @@ def test_unnormalized_weights():
 
 
 def test_nan_factor_returns_exposure():
+    """B4 去固化：含 NaN → unavailable 三鍵 + nan_rows_dropped（禁 factor_betas）。"""
     analyzer = FactorExposureAnalyzer(config={})
     portfolio = pd.Series([0.01, 0.02, np.nan, 0.01, -0.01])
     factors = pd.DataFrame({"f1": [0.01, np.nan, 0.02, 0.0, -0.01], "f2": [0.02, 0.01, 0.0, np.nan, -0.02]})
     result = analyzer.calculate_factor_attribution(portfolio, factors)
-    assert "factor_betas" in result
+    assert set(result.keys()) == _UNAVAILABLE_KEYS
+    assert result["status"] == "unavailable"
+    assert result["value"] is None
+    assert "nan_rows_dropped:" in str(result["reason"])
+    assert "factor_betas" not in result
 
 
 def test_zero_r_squared():
@@ -62,11 +70,48 @@ def test_zero_absolute_weights_returns_zero_exposure():
 
 
 def test_factor_attribution_insufficient_rows():
+    """B4 去固化：樣本不足 → unavailable 三鍵 + insufficient_rows（禁 r_squared/factor_betas）。"""
     analyzer = FactorExposureAnalyzer(config={})
     portfolio = pd.Series(np.random.randn(5))
     factors = pd.DataFrame(np.random.randn(5, 2), columns=["f1", "f2"])
     result = analyzer.calculate_factor_attribution(portfolio, factors)
-    assert np.isnan(result["r_squared"])
+    assert set(result.keys()) == _UNAVAILABLE_KEYS
+    assert result["status"] == "unavailable"
+    assert result["value"] is None
+    assert "insufficient_rows:" in str(result["reason"])
+    assert "r_squared" not in result
+    assert "factor_betas" not in result
+
+
+def test_factor_attribution_insufficient_factors():
+    """B4/phase25 對稱：單因子 → unavailable 三鍵 + insufficient_factors:1<2。"""
+    analyzer = FactorExposureAnalyzer(config={})
+    rng = np.random.default_rng(11)
+    portfolio = pd.Series(rng.normal(0.0, 0.01, 40))
+    factors = pd.DataFrame({"f1": rng.normal(0.0, 0.01, 40)})
+    result = analyzer.calculate_factor_attribution(portfolio, factors)
+    assert set(result.keys()) == _UNAVAILABLE_KEYS
+    assert result["status"] == "unavailable"
+    assert result["value"] is None
+    assert "insufficient_factors:1<2" in str(result["reason"])
+    assert "factor_betas" not in result
+
+
+def test_factor_attribution_inf_non_finite():
+    """B4/phase25 對稱：含 inf → unavailable + non_finite_values:，不 raise。"""
+    analyzer = FactorExposureAnalyzer(config={})
+    rng = np.random.default_rng(2)
+    portfolio = pd.Series(rng.normal(0.0, 0.01, 40))
+    factors = pd.DataFrame(
+        rng.normal(0.0, 0.01, (40, 3)), columns=["f1", "f2", "f3"]
+    )
+    factors.iloc[3, 0] = np.inf
+    result = analyzer.calculate_factor_attribution(portfolio, factors)
+    assert set(result.keys()) == _UNAVAILABLE_KEYS
+    assert result["status"] == "unavailable"
+    assert result["value"] is None
+    assert "non_finite_values:" in str(result["reason"])
+    assert "factor_betas" not in result
 
 
 def test_monitor_near_zero_exposures_warning():

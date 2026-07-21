@@ -21,6 +21,10 @@ class SkippedResult:
 class DeepAnalysisReport:
     results: dict[str, Any] = field(default_factory=dict)
     deep_analysis_errors: list[SkippedResult] = field(default_factory=list)
+    # module_summary 值合法枚舉（scalar str）：
+    # completed / completed_partial / skipped / unavailable / not_run
+    # completed_partial：模組本體有效（如 exposure/concentration），子項不可用
+    # （如 factor_attribution unavailable）；計入 completed_count（D-12）。
     module_summary: dict[str, str] = field(default_factory=dict)
     total_modules: int = 10
     completed_count: int = 0

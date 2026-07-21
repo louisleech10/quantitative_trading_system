@@ -207,7 +207,12 @@ function ICAnalysisPageContent() {
     const crossModuleStatus = (deepAnalysisReport?.module_statuses || []).find((item) =>
       item.module_name === 'cross_symbol_validation' || item.module_name === 'cross_symbol_validator'
     );
-    if (crossModuleStatus && crossModuleStatus.status !== 'completed') {
+    // module_summary：completed_partial 視為可消費（非 skipped）
+    if (
+      crossModuleStatus &&
+      crossModuleStatus.status !== 'completed' &&
+      crossModuleStatus.status !== 'completed_partial'
+    ) {
       const skipDetail = (deepAnalysisReport?.deep_analysis_errors || []).find((item) =>
         item.module_name === crossModuleStatus.module_name
       );

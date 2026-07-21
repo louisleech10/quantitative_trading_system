@@ -47,7 +47,7 @@ const TOGGLES: Array<{ key: string; label: string; tier: 'L1' | 'L2' | 'L3'; tip
   { key: 'vif_filter', label: 'VIF 篩選', tier: 'L3', tip: '高階共線性過濾' },
   { key: 'factor_centrality', label: 'Factor Centrality/PCA (Module 2)', tier: 'L3', tip: 'PCA 因子中心性' },
   { key: 'factor_orthogonalization', label: 'Factor Orthogonalization (Module 6)', tier: 'L3', tip: '因子正交化' },
-  { key: 'factor_exposure', label: 'Factor Exposure (Module 7)', tier: 'L3', tip: '因子曝險歸因' },
+  { key: 'factor_exposure', label: 'Factor Exposure (Module 7)', tier: 'L3', tip: '因子曝險(單標的position重疊,非橫截面歸因)' },
 ];
 
 /** 分模式誠實 FDR tip：xsec 無門檻行為（D-H），不得寫「關閉時用 raw p 閘」。 */

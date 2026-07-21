@@ -1193,6 +1193,31 @@ class ICReporter:
                 summaries[key] = value["summary"]
             else:
                 summaries[key] = {"keys": list(value.keys())[:5], "size": len(value)}
+            # D-4：factor_exposure 附帶 factor_attribution 子狀態（可讀）
+            if key == "factor_exposure":
+                fa = value.get("factor_attribution")
+                if not isinstance(fa, dict):
+                    payload = value.get("payload")
+                    summary_node = None
+                    if isinstance(payload, dict):
+                        summary_node = payload.get("summary")
+                    elif payload is not None and hasattr(payload, "summary"):
+                        summary_node = getattr(payload, "summary", None)
+                    if isinstance(summary_node, dict):
+                        fa = summary_node.get("factor_attribution")
+                if isinstance(fa, dict) and "status" in fa:
+                    base = summaries[key]
+                    if not isinstance(base, dict):
+                        base = {"value": base}
+                        summaries[key] = base
+                    else:
+                        base = dict(base)
+                        summaries[key] = base
+                    base["factor_attribution"] = {
+                        "status": fa.get("status"),
+                        "value": fa.get("value"),
+                        "reason": fa.get("reason"),
+                    }
         return summaries
 
     def _fmt(self, value: Any) -> str:

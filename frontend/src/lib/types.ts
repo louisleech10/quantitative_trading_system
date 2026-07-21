@@ -2180,9 +2180,17 @@ export interface DeepAnalysisConfig {
   net_ic?: NetICAnalysisRequest;
 }
 
+/** deep module_summary 合法 scalar 狀態（D-4 completed_partial；closed union，禁 `| string` 逃生） */
+export type ModuleSummaryStatus =
+  | 'completed'
+  | 'completed_partial'
+  | 'skipped'
+  | 'unavailable'
+  | 'not_run';
+
 export interface ModuleStatus {
   module_name: string;
-  status: string;
+  status: ModuleSummaryStatus;
   reason?: string;
   error_type?: string;
 }
@@ -2429,19 +2437,71 @@ export interface FactorOrthogonalizationData {
   residual_variance_ratio?: Record<string, number>;
 }
 
+/**
+ * B3/B5 幽靈契約：factor_attribution 三態 discriminated union。
+ * - unavailable：§U 三鍵（未接真 OLS）
+ * - ok：B1+ 新形（必有 status:'ok' + intercept + 非 null 數值）
+ * - legacy：真 p0 舊 stub 形（無 status、數值可 null、無 intercept）
+ * 反例 `{factor_betas:{x:1}}` 不得被當成 unavailable（須靠 status 判別）。
+ */
+export type FactorAttributionUnavailable = {
+  status: 'unavailable';
+  value: null;
+  reason: string;
+  /** 禁幽靈數值欄與 unavailable 共存 */
+  factor_betas?: never;
+  alpha?: never;
+  r_squared?: never;
+  intercept?: never;
+  unexplained?: never;
+  attribution?: never;
+};
+
+/** B1+ 接真 OLS 形：status 必為 'ok'，數值非 null，含 intercept */
+export type FactorAttributionOk = {
+  status: 'ok';
+  alpha: number;
+  r_squared: number;
+  intercept: number;
+  unexplained: number;
+  factor_betas: Record<string, number>;
+  attribution: Record<string, number>;
+  value?: never;
+  reason?: never;
+};
+
+/**
+ * 真實 p0 legacy 舊 stub 形（handoffs/ic1d_baseline/p0_before.json）：
+ * 無 status、無 intercept、alpha/r_squared/unexplained 可 null、可有 factor_betas。
+ * 使 typed consumer 消費真 p0 legacy 不需 unsafe cast。
+ */
+export type FactorAttributionLegacy = {
+  /** 無 status 欄；禁止寫入 status 以免與 ok/unavailable 混淆 */
+  status?: never;
+  alpha: number | null;
+  r_squared: number | null;
+  unexplained: number | null;
+  /** intercept 為 B1 才加，legacy 可缺 */
+  intercept?: number;
+  factor_betas?: Record<string, number>;
+  attribution?: Record<string, number>;
+  value?: never;
+  reason?: never;
+};
+
+/** FactorExposureData.factor_attribution = unavailable | ok | legacy */
+export type FactorAttributionData =
+  | FactorAttributionUnavailable
+  | FactorAttributionOk
+  | FactorAttributionLegacy;
+
 export interface FactorExposureData {
   portfolio_exposure?: Record<string, number>;
   neutralized_portfolio_exposure?: Record<string, number>;
   neutralization_mode?: 'none' | 'beta_neutral' | 'vol_neutral' | string;
   neutralization_lookback?: number;
   neutralization_delta_hhi?: number | null;
-  factor_attribution?: {
-    factor_betas?: Record<string, number>;
-    alpha?: number;
-    r_squared?: number;
-    attribution?: Record<string, number>;
-    unexplained?: number;
-  };
+  factor_attribution?: FactorAttributionData;
   concentration?: {
     max_exposure_factor?: string | null;
     max_exposure_value?: number;
