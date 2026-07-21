@@ -23,6 +23,8 @@
 - 目標：全錨點 + receipt。
 - **驗證**：`bash scripts/template_check.sh spec tests/gate_fixtures/spec_good_full.md; echo $?` → 0。
 - **邊界**：含嚴格已確認 + FACT-RECEIPT。
+- **存活至**：Phase 1 完工後保留（合規範例）。
+- **覆蓋風險**：無。
 - 不可做：不得刪 §G。
 
 ## §V

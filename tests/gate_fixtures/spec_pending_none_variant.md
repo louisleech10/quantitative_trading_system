@@ -18,6 +18,8 @@
 **Task 1.1**
 - **驗證**：`bash scripts/template_check.sh spec tests/gate_fixtures/spec_pending_none_variant.md; echo $?` → 修前 1、修後 0。
 - **邊界**：措辭含「使用者」字樣。
+- **存活至**：Phase 1 保留。
+- **覆蓋風險**：無。
 - 不可做：不得改寫成「待確認：無」以外未教學寫法。
 
 ## §V

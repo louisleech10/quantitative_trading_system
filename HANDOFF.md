@@ -1,24 +1,25 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-19 | **Branch**: **main** | **狀態**: ✅ **1c-FR-FULL 完工並合併 main;下一站=1d attribution**
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-21 | **Branch**: **main** | **狀態**: ✅ **1d SPEC v0.5.2 + TODO v0.3 FROZEN;下一步=逐批實作 B0**
 
-## ✅ 1c-FR-FULL 完工並合併 main(merge ca872d5,已 push;branch feat/ic-1cfr-full-impl 可刪)
-- canonical=單標的逐因子擇時多空(PIT expanding,winsorize 四方一致移除);功能 enabled=True 上線。
-- TODO R1→R3.1 四輪 adversarial 凍結 → 7 批 B0-F5(Grok 實作/Codex+Composer 雙審,每批 Claude 獨立驗) → **三方 DATA-CORRECT 全 PASS**(Claude+Codex adversarial+Composer;PIT無前瞻+跨symbol隔離+hash+正名)。
-- final gate 94 passed 0 skip/xfail + net_ic 36;check-nodeids REAL_EXIT=0;decoupling R2=1 R3=17 R4=2。
-- 產物:`momentum/Analysis/factor_return_analyzer.py`(手刻 `_pit_expanding_position`+`FactorTimingReturnSeries`+`get_series_map()`)、series owner `orchestrator._factor_return_series`、`FactorReturnChart`/`NetICChart`。審計 handoffs/1cFRFULL-*+ic1cfr_full_baseline/(gitignored 本地;json/txt 已 commit)。
-- 踩坑:派工勿加 `&`(detach harness,用 run_in_background:true);`pytest|tee`/`|tail` 遮蔽 exit code(Claude 一度誤報 check-nodeids exit0,codex 抓到→驗 gate 用真實 `echo $?` 不經管線)。
+## ▶ 立即續作:逐批實作 B0(壓縮後從這裡接)
+依 `docs/IC1D_ATTRIBUTION_TODO.md` v0.3 FROZEN,批次 B0-B5(依 Phase 依賴)。**B0 = baseline + comparator**:
+1. 新建 `scripts/ic1d_baseline_freeze.py`(類比 `ic1cfr_stopgap_freeze.py`;支援 `--profile {p0,p1,p3}`;輸出 `handoffs/ic1d_baseline/`)。
+2. 新建 `scripts/ic1d_compare.py`(CLI subtree 語意;atol=1e-12/rtol=1e-9;NaN↔NaN 相等;禁 brace,15 條字面路徑)。
+3. 新建 `tests/momentum/Analysis/test_ic1d_baseline.py`(module_summary!=skipped + **同源斷言**:close carrier 經 production `:2913-2930` 注入非 ad-hoc + analyzer real-OLS oracle → `analyzer_oracle.json`)。
+4. dump `p0_before.json`。**close 一律有效**(非 all-NaN;C3 errata:all-NaN raise 屬 production-hardening 另票)。
+- **分工**:Grok 實作/Codex+Composer 雙審/Claude 獨立驗(mutation 可證偽)/批間 Gate(pytest exit=0)。**派工 brief task_id 逐字元列死+用 Edit 核對非盲 replace**(本 session 血淚)。
 
-## ▶ 下一站=1d attribution(偵察已完成,四方 CONVERGED;handoffs/1d-RECON-*)
-**scope(使用者 2026-07-15 定)**: 正名 + NaN fail-closed + **幽靈接線修復**;真 residual IC 歸 Phase 2B(1d 不做)。
-- **幽靈接線**:`factor_exposure_analyzer.py:104-148 calculate_factor_attribution` 全 production path **未接**(只有定義+測試呼叫);`_run_factor_exposure:1924-1977` 回寫死 stub;orchestrator `:1959-1970` 巢狀+頂層雙層鏡像 `factor_betas/alpha/r_squared/unexplained`(頂層 `factor_betas`=曝險錯標)。
-- **🔑 接真方法本卡 1c-FR-FULL(現已解鎖)**:`_run_factor_exposure` 手上只有 feature 水準值+label+等權 positions,**無 factor_returns 序列**;硬接會誤把 feature 當因子報酬迴歸(新事故)。**1c-FR-FULL 已提供 `get_series_map()` PIT 序列**→ 評估是否用它接真 attribution,或維持正名+fail-closed 為主。
-- **正名**:`unexplained`(:147)= `beta[0]` = 與 alpha 同值(非殘差);另 `factor_betas`(=曝險)、UI `FeatureTierPanel.tsx:50`「因子曝險歸因」混用。
-- **NaN fail-closed(1d 核心)**:`:112` dropna 靜默丟列 + `:114-121` 樣本不足(<10列)靜默回全 NaN/空 dict;雙檔測試 `test_nan_factor_returns_exposure`/`test_factor_attribution_insufficient_rows`(momentum+phase25 孿生)固化靜默→須去固化。
-- **默認他票**(改 Radar 主圖,非 attribution):`:36/44/54/59/64/73`(neutralize)、`:84`(vol)、`:94/101`(portfolio exposure)、`:155`(concentration)。
-- **開工**:大任務管線=開場稽核 HANDOFF/ROADMAP vs repo→SPEC(Claude 起草)→三家 adversarial→凍結→TODO→逐批 Grok 實作+Codex+Composer 雙審→三方 DATA-CORRECT。範本=handoffs/1cFRFULL-*+LA2-* 全套。**先聯合偵察複核**(1d-RECON 是 2026-07-15,開工前抽驗行號是否漂移)。
+## ✅ 1d SPEC v0.5.2 + TODO v0.3 FROZEN(body sha256:4109a47b;三家戳記+provenance)
+- **交付定義**:幽靈契約隔離(explicitly not wired),caller 仍為 0。單標的宇宙 OLS 只識別 position 重疊→接真拆票A/票B(Phase 4/ML epic)。
+- **6 批 B0-B5**:B0 baseline/B1 正名(pure analyzer,deep no-op)/B2 fail-closed(NaN+inf+輸出溢位+index)/B3 stub→unavailable+completed_partial 外顯(20 路徑白名單)/B4 測試去固化+**7 支 mutation 探針**(analyzer 5+整合 2,2 檔)/B5 前端(TS+Radar+ExportButtons)。
+- **13 §D + §D-MAP**。收斂:SPEC BLOCKING 9→0(6輪 adversarial+多輪戳記);TODO 三家 adversarial(codex+composer v0.1 + Grok v0.2)+ closure。
+- **C3 委員分歧 Grok HYBRID 裁決**:不擴 scope 改 production(Composer)+ 須 errata 戳記(Codex)+ 專輪非六輪(中間態)。SPEC v0.5.2 errata:C3/N1/N2/N4 措辭對齊。
 
-## 📌 慣例/環境(沿用)
-- 派工走 `scripts/cx_run.sh <codex|grok|composer> <brief> <output> [effort]`(絕對路徑+固定 template)。Grok=實作者;reviewer=Codex+Composer;gate.sh dispatch/artifact 開 token+register-output;RECONCILE-STAMP 機檢(reconcile_stamps_check.sh)。
-- 每批 Claude 獨立驗 diff+跑驗收+mutation 可證偽(monkeypatch→FAIL 才算有牙),再雙審閉合(原提出方 re-verify)。
-- 委員 /tmp workdir 收尾清理(留 claude-501);`tests/golden/l65/test_inventory.txt` 勿 commit(collect 副作用)。
-- pre-existing:decoupling baseline R2=1 R3=17 R4=2(另票);IC 跑 feature_filter 別全量(OOM)。
+## ⚠️ 本 session 血淚(GOV-XREF-SYNC 票要機械化的)
+- **交叉引用不同步 11 次**(改決策漏同步引用);戳記卡多輪根因=**我 brief 列死 task_id 從沒更新**(盲 s.replace 全 no-op),codex 一直忠實照抄。記憶:`feedback_dispatch_blocked_investigate_cause`(委員反覆錯先查我的 brief)、`feedback_cross_reference_sync`、`feedback_gate_script_full_attack_surface`。
+- **reconcile 舊 task_id 是委員抄錯源**→已脫敏;**改文字用 Edit 核對非盲 replace**;grep/機檢驗證勿截斷(犯 3 次)。
+- agy(Gemini 3.5 Flash High)能力測試=半對等(結構審尚可,深度弱+不查證下 finding);記憶 `feedback_gemini_research_only`。
+
+## 📌 pre-existing 債(非本票)
+Rule 4 `pattern_management_service.py:78`、`ModuleUnavailableError` 死碼、`prediction_analyzer.py:163` cumsum 命名說謊、`analyze_cross_sectional` 繞過 deep 棧、ROADMAP residual IC 表/敘事不一致。
+commit 待決:`handoffs/` 本機排除,審計鏈+含戳記 reconcile 需明確 `git add`(問過未回)。

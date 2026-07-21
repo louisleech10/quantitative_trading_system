@@ -2,3 +2,5 @@ A-1|sed -i.bak 's/FACT-RECEIPT:/FACT-RECEIPTX:/' scripts/template_check.sh
 A-3|sed -i.bak 's/RISK-HIT:/RISK-HITX:/' scripts/template_check.sh
 A-4|sed -i.bak 's/### Task/### TaskX/' scripts/template_check.sh
 A-5|sed -i.bak 's/RECEIPTS=/RECEIPTSX=/' scripts/template_check.sh
+A-6|sed -i.bak 's/存活至/存活至X/g' scripts/template_check.sh
+A-7|sed -i.bak 's/覆蓋風險/覆蓋風險X/g' scripts/template_check.sh

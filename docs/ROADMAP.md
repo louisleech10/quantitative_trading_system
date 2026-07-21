@@ -36,7 +36,7 @@
   | Phase | 內容 | 狀態 |
   |---|---|---|
   | **0 止血+正確性硬閘** | crash/時間軸/feature-guard/空圖/大尺度 cap | ✅ 完成(`11507f5`) |
-  | **1 正確性 kernel + contract(能信)** | 1-contract/1a 切分+接線/1-align 前瞻閘/1e HAC+1b FDR/1c Net IC+1c-FR/1d attribution/1f 空圖;**+前瞻整治 LA-0(P0)✅/LA-1(P1)✅/LA-2(P2)✅** | 🔵 **進行中**(尾巴=1c-FR-FULL+1d+1f) |
+  | **1 正確性 kernel + contract(能信)** | 1-contract/1a 切分+接線/1-align 前瞻閘/1e HAC+1b FDR/1c Net IC+1c-FR/1d attribution/1f 空圖;**+前瞻整治 LA-0(P0)✅/LA-1(P1)✅/LA-2(P2)✅** | 🔵 **進行中**(尾巴=1d 實作+1f;**1d SPEC v0.5.2+TODO v0.3 已 FROZEN 2026-07-21**,body sha256:4109a47b,三家戳記+provenance;下一步逐批實作 B0) |
   | **2A 事件 case-control 語義 kernel(主戰場,小尺度先驗)** | 事件清單 ingestion+事件前窗對齊+AUC/t-stat+正反 matching(同波動/regime)+事件 OOS(purged CV)+FDR+波動調整 | ❌ 未啟動(大,需設計;依賴 P0 前置+P1 子集) |
   | **3 串流承載(430K×百 symbol)** | direct L7+chunk iterator+row mask+metric sink+candidate set+**staged screening(=粗/精篩 funnel)+redundancy cap**+cross-sectional 串流;**IC-PERF/feature 上限保護在此** | ❌ 未啟動(大,基礎軌;依賴 P1 contract) |
   | **2B 事件 case-control 大尺度整合** | event mask×streaming chunks+artifact+全 430K universe 篩選 | ❌ 未啟動(依賴 2A+3) |
@@ -44,6 +44,12 @@
   | **5 Agent 顧問層(V2)** | 結構化可機讀輸出+嚴謹度指標+Agent 委員會式解讀 | ❌ 未啟動(依賴 P1+P4) |
   - **funnel/IC-PERF 定位**:非獨立 deferred 項,=Phase 3(staged screening/redundancy cap)+Phase 4(多因子);「等整張 map 完成才做」≡「等 P1 收完進 P3/4」(memory `project_ic_feature_selection_funnel`)。
   - **regime IC 驗證定位**:Phase 4 進階層,**獨立票、條件觸發**(只有要讓 regime-conditional IC 當決策級才做;現只進報告非 gate,不做也不出錯)。2026-07-17 使用者提出。
+  - **attribution 後續兩票定位(2026-07-20 四方可行性挑戰收斂裁決;綜合=`handoffs/1d-FEASIBILITY-SYNTHESIS.md`)**:1d 本票只清債(正名+NaN fail-closed+幽靈顯式 unavailable),**接真 attribution 拆兩張條件票,皆不插隊 Phase 1**(委員 2:1;composer 主張 P1 尾票之前提「依賴已存在」已被 cumsum 事實推翻)。**勿再合稱「1d-WIRE」**——兩票前置條件完全不同:
+    - **票 A — 策略 timing-overlap / clone score 診斷**:回答「ML 是否只是在做簡單因子規則」。**階段=Phase 4 或移出 IC 的 ML/回測評估新 epic**(canonical owner 應在 ML/Strategy evaluation,IC 只接 typed adapter;codex)。**開票前置=先修 equity curve 契約**:`prediction_analyzer.py:163` 欄位 `strategy_returns` 實裝 `np.cumsum`(非逐期報酬)、`:152` 只有 long/flat 無做空、`api/routes/pattern_analysis.py:1050` 缺值 `fillna(0)`。**IC→ML 橋非本票普遍前置**(僅 equity 版需要;position-only 版不需)。
+    - **票 B — 真·多標的橫截面 attribution**:**階段=Phase 4**(貼 Phase 3 多 symbol 承載之後)。**條件觸發:只有宇宙變多標的才成立**。前置=CS factor-return 管線(現`factor_return_analyzer.py:272-287` 只收單一 `future_returns: pd.Series`,無 symbol/holdings/權重)+持倉權重 canonical 定義+xsec 與 deep 棧整合(`analyze_cross_sectional` 現完全繞過 deep)。
+    - **根因備忘(防未來重撞)**:單標的下 `ls_returnᵢ=positionᵢ⊙r`、組合報酬=`position_p⊙r`,兩邊共用同一 `r` → OLS 只識別 **position 重疊度**,非風險曝險(codex toy:`q=p1`→β=[≈0,1,≈0],R²=1,殘差1.1e-16)。β 可誠實命名 timing-overlap,**禁冒充 Barra attribution**。與 1c-FR P1 canonical 同源限制(memory `project_1cfr_full_p1_canonical`)。
+    - **優先序**:1d 清債 > 1f > Phase 2A/3 主線 >> 票 A >> 票 B。
+  - **⚠️ 本檔既存不一致(2026-07-20 grok 抓,待另票修)**:上方 Phase 表(L43)將 **residual/邊際 IC 列 Phase 4**,但下方 L55 敘事寫「真 residual IC 歸 **Phase 2B**」。以 **Phase 表為準**(canonical);且 residual IC 與上述 attribution 兩票**是不同議題,勿混**。
   - **✅ 資源分配已決(2026-07-17 使用者)=全力收 Phase 1**(不與 Phase 2A 並進;P1 尾巴 LA-2→1c-FR-FULL→1d→1f 收完才啟 2A)。walk-forward/CPCV 已決=複用 ML 孤島(下方)。
 - **決策**:walk-forward/CPCV **复用 ML 孤島**非重寫;contract-first 不硬接舊全 DataFrame 路徑。
 - **狀態(2026-06-26)**:
@@ -68,6 +74,19 @@
 ### P0.5 — IC 效能 + grouped_ic 崩潰止血(已盤點,可立即動)
 - **為何**:使用者實測選 run 跑 analyze 卡死+崩潰;三方 reconcile 完成。
 - **Epic**:`handoffs/20260624-ic-grouped-crash-perf-ANALYSIS.md`(IC-CRASH/IC-FEATURE-GUARD/IC-UX-ERR=P0;IC-PERF=P1)。**狀態**:grouped_ic 崩潰止血已完成(Phase 0 11507f5);其餘(IC-PERF 等)未啟動(2026-07-11 校正,原「實作未啟動」與 L42 矛盾)。
+
+### ✅ 制度改進案落地（2026-07-20/21；三家 GOV-NECESSITY-REVIEW 裁決 + GOV-IMPL-STAMP 四輪把關）
+- **源起**：使用者一句「`unexplained` 需不需要存在」揭露 1d SPEC 六輪 adversarial 未抓的白工 → 三家判定「必要性盲點」系統性問題。
+- **落地五處**：①SPEC/TODO 範本每 Task 加 `存活至`/`覆蓋風險` 欄（`template_check.sh` 機檢，legacy manifest 豁免既有檔）②adversarial §1 10→11 類（必要性/短命工）③ORCH 加 code review 效率題（≥10× 門檻 + hot path 觸發式）④症狀 C 分案=下方 GOV-XREF-SYNC ⑤`GOV-IMPL-STAMP` codex 四輪抓 7 個繞過洞全堵（啟發式規避/basename 碰撞/heading 變體/零 Task/fixture 矩陣等）。
+- **審計**：`handoffs/GOV-NECESSITY-REVIEW-*`、`handoffs/GOV-IMPL-STAMP-*`。
+
+### P2 — GOV-XREF-SYNC：跨文件交叉引用同步機械化（2026-07-20 三家裁決分案，`handoffs/GOV-NECESSITY-REVIEW-*`）
+- **本 session 累計實證 11 次**（原 6 次 + 戳記輪 5 次）；且戳記卡多輪的另一根因=brief 列死 task_id 未更新 + reconcile 舊 task_id 成抄錯源 → 落地應含「凍結前殘留掃描 + reconcile 脫敏 + brief task_id 機械生成」。
+- **出生事故**：1d SPEC 過程「改了裁決卻未同步其交叉引用」**同類錯 6 次**（composer-v3B1／grok-v3B2／grok-v4B1＋composer-v4B1／composer-v5B1／codex v0.5 戳記輪 REJECTED），每次都由委員擋下並多耗一輪三家複審。
+- **已試過但不足**：v0.4.2 新增 §D-MAP 裁決↔落地對照表，**只覆蓋 SPEC 內部**，不含 reconcile／ROADMAP／HANDOFF → 第 6 次仍漏。
+- **三家一致：與必要性/效率案（症狀 A/B）分案**，理由=A/B 是「價值判斷缺席」靠人審，C 是「機械同步缺席」靠 grep；**混寫會讓 agent 用價值題敷衍 xref**（composer 語）。
+- **建議落地**（未啟動）：① 凍結前 `grep` 已作廢措辭清單殘留數=0（舊 Phase 名、已刪 allow-add 鍵、舊版本號）② 擴 §D-MAP 為「SPEC 內 + 固定外部檔清單（reconcile／HANDOFF／ROADMAP 錨點段）」③ 可考慮併入既有 docdrift 機制。
+- **優先序**：不擋 1d/1f；建議於 Phase 1 收尾後、或下次遇到同類錯時啟動。
 
 ### P2 — FF preset 移除盤點（2026-07-03 使用者排入,IC 正確性紅線之後做）
 - **為何**:使用者從未用過/測過 professional_full 等 preset（2026-06-29 明示想移除）;現行測試/生成一律 base/full 全特徵不綁 preset,preset 定義成死碼+誤用風險。

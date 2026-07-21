@@ -34,6 +34,20 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 | 3 | code review | 另一方執行端 | 中/大必派，實作者不自審 |
 | — | 規劃委員會 read-only | **`agy -p`**（Gemini） | 諮詢用,不得寫入 |
 
+#### code review brief 固定必問（2026-07-20 制度案；三家裁決 `handoffs/GOV-NECESSITY-REVIEW-*`）
+
+**每份 code review 派工 brief 皆須含下列一題**（實測前 10 份 brief **0/10** 問過效率/簡潔，火力全在「對不對、可不可證偽、有無假綠」）：
+
+> **「有無明顯不必要的複雜或緩慢——足以影響可讀性或執行時間約一個數量級（≥10×）者？沒有請答『無』。」**
+
+**觸發式加嚴**（僅在 diff 命中下列任一時，改問具體複雜度與是否已向量化，並要求附量測依據）：
+`momentum/FeatureEngineering/` ／ `ic_engine` ／ 回測 hot loop ／ 新增巢狀迴圈或 hot path 中的 `for` ／ diff 自身宣稱效能改善。
+
+**刻意的邊界（三家一致，勿擴張）**：
+- **不得**要求「必須提出至少一個優化建議」——會製造假 findings。
+- **不得**因效率題改變正確性 gate 的判定；與 `CLAUDE.md` 優化優先序一致（**執行速度排第 4**，前三為跨層可重現／多標的穩定／資料品質）。
+- 常態題**預設答「無」即可**通過，避免 bikeshedding 與注意力稀釋。
+
 **現行分工(2026-07-14 使用者三調):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Grok(gpt 額度依當下指示動態,備援=Codex)**;**code review/adversarial=Codex+Composer 雙家**(實作者不自審;SPEC/TODO 對抗審維持三家 codex+composer+grok——起草後審查不得漏 grok 鐵律不變,惟 grok 轉實作者時其實作之審查=Codex+Composer);委員會審查=三家;簽核 quorum=Claude+Codex+Composer 不變;小=Claude 自做。** 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-07-12 五調全文見 git log〕
 
 誠實邊界：A/B 顯示 codex≈cursor 正確性對等(標準題天花板),選層差異在**人體工學/成本與高風險嚴謹度紀錄**,非 coding 能力;cursor review codex 擋推理/結構盲點,**擋不了共享錯前提/缺使用者事實**(C3)→ facts-first 仍最優先。06-03 定層歷史見 `docs/SCAR_LEDGER.md`。

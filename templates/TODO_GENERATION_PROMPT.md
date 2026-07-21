@@ -3,7 +3,13 @@ TODO 生成 Prompt V13 — Compliance-First（取代 V12 的 1030 行版）
 為何重寫：V12 過長 → 實際使用時被 grep 一下就改寫成扁平 checklist（compliance 失敗，2026-06 事故）。
 本版蒸餾保留 V12 高槓桿機制（100% SPEC ID 覆蓋追溯=防漏、per-Task 防敷衍深度、依賴批次、全棧跨層/空殼偵測），
 把 5 輪 pass 收斂成一輪聚焦自檢，並讓產出 TODO 帶 gate 可 grep 的必填錨點。
-產出 TODO 必含錨點（gate 檢查 todo）：`## §0`、`## §B`、每 `### Task` 內含「驗證」「邊界」「不可做」。
+產出 TODO 必含錨點（gate 檢查 todo）：`## §0`、`## §B`、每 `### Task` 內含「驗證」「邊界」「**存活至**」「**覆蓋風險**」「不可做」。
+
+**「存活至」「覆蓋風險」兩欄**（2026-07-20 制度案；三家裁決 `handoffs/GOV-NECESSITY-REVIEW-*`；機檢 `template_check.sh` 對**不在** `scripts/template_lifecycle_legacy.txt` 的新文件強制）：
+- **存活至**：本 Task 產出最終保留到哪個 Phase/狀態（例「Phase 5 完工後仍保留」）。
+- **覆蓋風險**：後續 Phase 是否會刪除/覆蓋本產出？**會** → 列理由或說明為何不合併 Phase；**不會** → 寫「無」。
+- **出生事故**：1d SPEC 走六輪 adversarial（BLOCKING 9→0）未發現「Phase 1 產出被 Phase 3 刪除」＝白工，由使用者一句提問揭露。機檢**只驗欄位存在**，語義正確性由 adversarial §1 第 11 類負責。
+- 來源 SPEC 已有對應欄位者，TODO 應**繼承並細化到批次層**，不得留空或抄「N/A」。
 用法：填 {{SPEC_FILE}}/{{TODO_FILE}}，把「Prompt 開始→結束」送給生成 agent（或 Claude 自己跑）。
 -->
 

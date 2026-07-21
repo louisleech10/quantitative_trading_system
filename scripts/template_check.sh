@@ -9,6 +9,14 @@
 # 但「結構在」是必要條件——擋掉我那種扁平 checklist / 漏 §G 的文件。
 
 set -u
+# SCRIPT_DIR:供 legacy manifest 查找(2026-07-20 制度案新增;本腳本原無此變數,set -u 下未定義會中止)
+SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# _lc_repo_rel:把任意路徑正規化為 repo-relative(canonical);repo 外的檔回傳絕對路徑(必不在 manifest→強制)
+_lc_repo_rel() {
+  _p="$(cd "$(dirname "${1}")" 2>/dev/null && pwd)/$(basename "${1}")" || _p="${1}"
+  case "${_p}" in "${REPO_ROOT}/"*) printf '%s' "${_p#${REPO_ROOT}/}" ;; *) printf '%s' "${_p}" ;; esac
+}
 kind="${1:-}"; file="${2:-}"
 [ -n "${kind}" ] && [ -n "${file}" ] || { echo "用法: template_check.sh spec|todo|result <file>"; exit 1; }
 [ -f "${file}" ] || { echo "ERROR: 檔不存在: ${file}"; exit 1; }
@@ -85,6 +93,56 @@ case "${kind}" in
     need "## §V"    "驗證策略與邊界"
     need "## §R"    "回退"
     need "## §N"    "N/A 登記"
+
+    # per-Task 生命週期欄檢查（2026-07-20 制度改進案 GOV-NECESSITY-REVIEW-*）
+    # SPEC §P 的 Task 格式為 **Task N.x — ...**（粗體），與 TODO 的 ### Task 不同，故獨立一段。
+    # 機檢**只驗欄位存在**，語義正確性交 adversarial（gate metadata 無法證明答案內容）。
+    # 追溯性豁免(2026-07-20 制度案;v2 改用明確 legacy manifest)
+    # 判準=檔名**不在** scripts/template_lifecycle_legacy.txt → 視為新文件 → 兩欄強制。
+    # v1 曾用「檔內有無『存活至』」啟發式,經 codex(gov-impl-stamp 輪 REJECTED)指出**可被新文件完全不寫該欄整體規避**,已廢。
+    # 改 allowlist 後:新檔預設落入強制範圍;規避需手動把自己加進 manifest(留痕可稽核)。
+    # v3:改 repo-relative path 比對(v2 basename 可被「同名不同路徑」規避,codex 實證)
+    _lc_rel="$(_lc_repo_rel "${file}")"
+    _lc_legacy=0
+    if [ -f "${SCRIPT_DIR}/template_lifecycle_legacy.txt" ] \
+       && grep -qxF "${_lc_rel}" "${SCRIPT_DIR}/template_lifecycle_legacy.txt" 2>/dev/null; then
+      _lc_legacy=1
+    fi
+    if [ "${_lc_legacy}" -eq 0 ]; then
+    spec_task_missing="$(awk '
+      BEGIN { in_task=0; title=""; ntask=0 }
+      # v3:heading 廣義化(codex 實證 `**Task` 以外變體可使檢查零 Task 而誤判合規)
+      # 涵蓋行首 **Task 與 ##+ Task;**刻意不含** `- **Task` 項目符號形式——
+      # 內文常有「- **Task 3.1 驗收須含…**」這類交叉引用,誤判會把區塊切斷(Claude 實測)
+      /^(\*\*Task[ .0-9]|##+[[:space:]]*Task[ .0-9])/ {
+        if (in_task) check_block()
+        in_task=1; title=$0; has_s=0; has_o=0; has_v=0; has_b=0; has_x=0; ntask++
+        next
+      }
+      /^### Phase|^## / { if (in_task) { check_block(); in_task=0 } }
+      in_task {
+        if ($0 ~ /存活至/) has_s=1
+        if ($0 ~ /覆蓋風險/) has_o=1
+        if ($0 ~ /驗證/) has_v=1
+        if ($0 ~ /邊界/) has_b=1
+        if ($0 ~ /不可做/) has_x=1
+      }
+      END {
+        if (in_task) check_block()
+        if (ntask == 0) printf "  · §P 偵測到 0 個 Task(heading 須為行首 `**Task N.x — …**` 或 `## Task`);零 Task 不得視為合規\n"
+      }
+      function check_block() {
+        if (!has_s) printf "  · Task 缺欄「存活至」(產出最終保留到哪個 Phase): %s\n", title
+        if (!has_o) printf "  · Task 缺欄「覆蓋風險」(後續 Phase 會否刪/覆蓋;不會寫「無」): %s\n", title
+        if (!has_v) printf "  · Task 缺欄「驗證」: %s\n", title
+        if (!has_b) printf "  · Task 缺欄「邊界」: %s\n", title
+        if (!has_x) printf "  · Task 缺欄「不可做」: %s\n", title
+      }
+    ' "${file}")"
+    if [ -n "${spec_task_missing}" ]; then
+      missing="${missing}${spec_task_missing}\n"
+    fi
+    fi
 
     # §RISK RISK-HIT 宣告制（Task 2.2 [A-3]）
     sec_risk="$(awk '/^## §RISK/{f=1; print; next} f&&/^## /{f=0} f{print}' "${file}")"
@@ -226,26 +284,37 @@ EOF
     need "## §0" "全域規則與約束"
     need "## §B" "批次執行策略"
     need "### Task" "至少一個 Task 區塊"
+    # 追溯性豁免同 spec 側(v2:legacy manifest;啟發式版可被整體規避已廢)
+    _lc_rel="$(_lc_repo_rel "${file}")"
+    todo_adopted=1
+    if [ -f "${SCRIPT_DIR}/template_lifecycle_legacy.txt" ] \
+       && grep -qxF "${_lc_rel}" "${SCRIPT_DIR}/template_lifecycle_legacy.txt" 2>/dev/null; then
+      todo_adopted=0
+    fi
     # Task 2.3 [A-4] per-Task 三欄分段檢查
-    task_missing="$(awk '
+    task_missing="$(awk -v adopted="${todo_adopted}" '
       BEGIN { in_task=0; title="" }
       /^### Task/ {
         if (in_task) check_block()
         in_task=1
         title=$0
-        has_v=0; has_b=0; has_x=0
+        has_v=0; has_b=0; has_x=0; has_s=0; has_o=0
         next
       }
       in_task {
         if ($0 ~ /驗證/) has_v=1
         if ($0 ~ /邊界/) has_b=1
         if ($0 ~ /不可做/) has_x=1
+        if ($0 ~ /存活至/) has_s=1
+        if ($0 ~ /覆蓋風險/) has_o=1
       }
       END { if (in_task) check_block() }
       function check_block() {
         if (!has_v) printf "  · Task 缺欄「驗證」: %s\\n", title
         if (!has_b) printf "  · Task 缺欄「邊界」: %s\\n", title
         if (!has_x) printf "  · Task 缺欄「不可做」: %s\\n", title
+        if (adopted && !has_s) printf "  · Task 缺欄「存活至」(2026-07-20 制度案;產出最終保留到哪個 Phase): %s\\n", title
+        if (adopted && !has_o) printf "  · Task 缺欄「覆蓋風險」(2026-07-20 制度案;後續 Phase 會否刪/覆蓋,不會寫「無」): %s\\n", title
       }
     ' "${file}")"
     if [ -n "${task_missing}" ]; then

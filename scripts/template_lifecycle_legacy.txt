@@ -1,0 +1,66 @@
+# template_lifecycle_legacy.txt — 制度案(2026-07-20)前既有的 SPEC/TODO 清單
+# 格式:**repo-relative path**(非 basename)。v2 曾用 basename,經 codex 實證可規避:
+#   「新檔改名為清單內 basename、置於清單外路徑」→ 被誤判 legacy 而 PASS(receipt 見 GOV-IMPL-STAMP-codex.md)。
+# 用途:`存活至`/`覆蓋風險` 兩欄僅對**不在本清單**的文件豁免;新檔預設落入強制範圍。
+# 規避需手動把自己加進本清單(留痕可稽核),須於 commit 說明理由並經 review。
+docs/B7_L65_PARALLEL_SPEC.md
+docs/B7_L65_PARALLEL_TODO.md
+docs/DECOUPLE_ALLOWLIST_SPEC.md
+docs/DECOUPLE_ALLOWLIST_TODO.md
+docs/DECOUPLE_FIX4_SPEC.md
+docs/DECOUPLE_FIX4_TODO.md
+docs/DECOUPLE_P3_SPEC.md
+docs/DECOUPLE_P3_TODO.md
+docs/DECOUPLE_SCAN2_SPEC.md
+docs/DECOUPLE_SCAN2_TODO.md
+docs/DOCSIMPLIFY_BATCHA_SPEC.md
+docs/DOCSIMPLIFY_BATCHB_SPEC.md
+docs/DOCSIMPLIFY_BATCHB_TODO.md
+docs/FF_DEEPAUDIT_P0_SPEC.md
+docs/FF_DEEPAUDIT_P0_TODO.md
+docs/FRACDIFF_MAXLAG_SPEC.md
+docs/FRACDIFF_MAXLAG_TODO.md
+docs/GOV_O3EXT_R7_SPEC.md
+docs/GOV_O3EXT_R7_TODO.md
+docs/IC1CFR_FULL_SPEC.md
+docs/IC1CFR_FULL_TODO.md
+docs/IC1CFR_STOPGAP_SPEC.md
+docs/IC1CFR_STOPGAP_TODO.md
+docs/IC1C_NETIC_SPEC.md
+docs/IC1C_NETIC_TODO.md
+docs/IC_LA0_SPEC.md
+docs/IC_LA0_TODO.md
+docs/IC_LA1_SPEC.md
+docs/IC_LA1_TODO.md
+docs/IC_LA2_SPEC.md
+docs/IC_LA2_TODO.md
+docs/IC_PHASE0_SPEC.md
+docs/IC_PHASE0_TODO.md
+docs/IC_PHASE1_1A_ALIGN_SPEC.md
+docs/IC_PHASE1_1A_ALIGN_TODO.md
+docs/IC_PHASE1_1E1B_SIGNIF_SPEC.md
+docs/IC_PHASE1_1E1B_SIGNIF_TODO.md
+docs/IC_PHASE1_1a_CUT1_SPEC.md
+docs/IC_PHASE1_1a_CUT1_TODO.md
+docs/IC_PHASE1_1a_CUT2_ROWINDEX_SPEC.md
+docs/IC_PHASE1_1a_CUT2_ROWINDEX_TODO.md
+docs/IC_PHASE1_1a_CUT2_XSECTIONAL_SPEC.md
+docs/IC_PHASE1_1a_CUT2_XSECTIONAL_TODO.md
+docs/IC_PHASE1_CONTRACT_SPEC.md
+docs/IC_PHASE1_CONTRACT_TODO.md
+docs/IC_RUN_SELECTOR_SPEC.md
+docs/IC_RUN_SELECTOR_TODO.md
+docs/INSTREV_PHASEA_SPEC.md
+docs/INSTREV_PHASEA_TODO.md
+docs/INSTREV_PHASEB_SPEC.md
+docs/INSTREV_PHASEB_TODO.md
+docs/P2DEBT_T1_GOVFIX_SPEC.md
+docs/P2DEBT_T1_GOVFIX_TODO.md
+docs/P2DEBT_T2_DCREDIRECT_SPEC.md
+docs/P2DEBT_T2_DCREDIRECT_TODO.md
+docs/P2DEBT_T3_TSCFIX_SPEC.md
+docs/P2DEBT_T3_TSCFIX_TODO.md
+docs/TEMPLATE_GATE_FIX_SPEC.md
+docs/TEMPLATE_GATE_FIX_TODO.md
+docs/VERIFY_GATE_SPEC.md
+docs/VERIFY_GATE_TODO.md

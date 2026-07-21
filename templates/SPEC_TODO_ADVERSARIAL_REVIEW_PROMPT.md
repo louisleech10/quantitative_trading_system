@@ -24,7 +24,7 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 - 若你是多 reviewer 之一：別只附和作者框架（相同框架 → 相關性錯誤）。獨立重判前提是否成立。
 - **§A 實核義務**：可低成本核實的宣稱必實跑，附 `VERIFY:` 命令+stdout 摘要；finding 須含 `RECHECK:` 可重跑步驟。無 shell 者標「未經覆核」且相關 finding ≥MAJOR，不得 reconcile 降級為 NON-BLOCKING。
 
-### §1 必查（10 類，每類無問題標「無」）
+### §1 必查（11 類，每類無問題標「無」）
 1. **矛盾/互斥**：PLAN/SPEC/TODO 結論不一致；同功能不同 API/預設/Phase 順序；Task A 輸出 vs Task B 輸入。
 2. **漏項/端到端**：決策是否完整落到 SPEC→TODO；缺 API contract/前端串接/後端/storage/config/測試；resume/retry/checkpoint。
 3. **不可測驗收**：每需求有無 明確輸入輸出 + 可量化通過條件 + 可執行驗證命令 + golden 來源/精度。「確認正確/提升效能/避免 OOM」無數值=問題。
@@ -35,6 +35,8 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 8. **API/型別/相容**：backward compat；Pydantic↔TS 一致；Python 版本；新參數有預設+migration；flag off 回舊行為。
 9. **測試品質**：只驗 smoke 不驗核心；edge（空/全NaN/inf/單值/中斷/cache corrupt）；效能有 baseline/tier/規模；multi-symbol 真驗 isolation；regression 保護舊行為。
 10. **Agent 可執行性**：每 Task 精確到檔案+函式；足夠偽碼；列不可做+驗證；Phase Gate 可執行；無「自行判斷/適當處理/優化一下」模糊指令。
+11. **必要性/短命工**（2026-07-20 制度案新增）：**列出實作後會被後續 Phase 刪除或覆蓋的工作；沒有請答「無」。** 逐 Task 對照其 `存活至` / `覆蓋風險` 欄位是否屬實（欄位由 `template_check.sh` 機檢存在，**語義正確性是本題的責任**）。若某 Task 產出在最終狀態不存在 → 質疑該工作是否應**刪除或與後續 Phase 合併**。
+    - **出生事故**：1d SPEC 走六輪 adversarial（BLOCKING 9→0）未發現「Phase 1 在 orchestrator 加的鍵會被 Phase 3 整棵刪除」＝白工，由**使用者**一句「這欄位需不需要存在」揭露；三家事後複核全數 SIMPLIFY-YES。**前十類全在問「對不對」，無一類問「值不值得」。**
 
 ### §2 範本錨點落實 + 獵空殼（本版新增，配合 gate；**作者模型不可自審此節**）
 - SPEC 有無 §RISK/§A/§C/§G/§P/§V/§R/§N？高風險(a/d)是否真有 §G Golden（可證偽通過條件 + 容差分尺度），還是只有口號？

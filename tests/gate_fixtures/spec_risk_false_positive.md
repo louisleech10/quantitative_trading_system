@@ -24,6 +24,8 @@
 **Task 1.1**
 - **驗證**：`bash scripts/template_check.sh spec tests/gate_fixtures/spec_risk_false_positive.md; echo $?` → 0。
 - **邊界**：干擾句在 §RISK 內；宣告為 none。
+- **存活至**：Phase 1 完工後保留（合規範例）。
+- **覆蓋風險**：無。
 - 不可做：不得改 RISK-HIT 為 a/d。
 
 ## §V

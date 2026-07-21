@@ -15,4 +15,6 @@
 - 目標：per-Task 三欄齊全。
 - **驗證**：`bash scripts/template_check.sh todo tests/gate_fixtures/todo_good_full.md; echo $?` → 0
 - **邊界**：單 Task 亦須三欄
+- **存活至**：批次 B2 完工後保留。
+- **覆蓋風險**：無。
 - 不可做：不得刪 §0/§B
