@@ -24877,3 +24877,383 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+=== 2026-07-22 21:54:15 | dispatch ===
+  ts=2026-07-22 21:54:15
+  kind=dispatch
+  intent=收斂 reconcile 正式 RECONCILE-STAMP(codex):自算 body-hash 蓋 APPROVED 戳記
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  review_role=reconcile stamper, codex family
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 21:54:15 | dispatch ===
+  ts=2026-07-22 21:54:15
+  kind=dispatch
+  intent=收斂 reconcile 正式 RECONCILE-STAMP(composer):自算 body-hash 蓋 APPROVED 戳記
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  review_role=reconcile stamper, composer family
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 21:54:15 | dispatch ===
+  ts=2026-07-22 21:54:15
+  kind=dispatch
+  intent=收斂 reconcile 正式 RECONCILE-STAMP(grok):自算 body-hash 蓋 APPROVED 戳記
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  review_role=reconcile stamper, grok family
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "eb03360292937f9922733a562809de4bce3ba3dbc89da6d7eec651a712a95480", "task_id": "20260722-conv-recstamp-codex", "ts": "2026-07-22T14:19:37Z"}
+=== 2026-07-22 22:19:37 | dispatch ===
+  ts=2026-07-22 22:19:37
+  kind=dispatch
+  intent=reconcile 正式戳記(codex):自算 body-hash 蓋 APPROVED
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md, body-hash 自算
+  review_role=reconcile stamper, codex
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "eb03360292937f9922733a562809de4bce3ba3dbc89da6d7eec651a712a95480", "task_id": "20260722-conv-recstamp-composer", "ts": "2026-07-22T14:19:37Z"}
+=== 2026-07-22 22:19:37 | dispatch ===
+  ts=2026-07-22 22:19:37
+  kind=dispatch
+  intent=reconcile 正式戳記(composer):自算 body-hash 蓋 APPROVED
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md, body-hash 自算
+  review_role=reconcile stamper, composer
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "eb03360292937f9922733a562809de4bce3ba3dbc89da6d7eec651a712a95480", "task_id": "20260722-conv-recstamp-grok", "ts": "2026-07-22T14:19:37Z"}
+=== 2026-07-22 22:19:37 | dispatch ===
+  ts=2026-07-22 22:19:37
+  kind=dispatch
+  intent=reconcile 正式戳記(grok):自算 body-hash 蓋 APPROVED
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md, body-hash 自算
+  review_role=reconcile stamper, grok
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "dd409afbfc7ae814598c3b69fde5f9a38a33dfae9b95cdffe0e491a3dc146d10", "task_id": "20260722-conv-recstamp-codex", "ts": "2026-07-22T14:30:02Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "dd409afbfc7ae814598c3b69fde5f9a38a33dfae9b95cdffe0e491a3dc146d10", "task_id": "20260722-conv-recstamp-composer", "ts": "2026-07-22T14:30:02Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "dd409afbfc7ae814598c3b69fde5f9a38a33dfae9b95cdffe0e491a3dc146d10", "task_id": "20260722-conv-recstamp-grok", "ts": "2026-07-22T14:30:02Z"}
+=== 2026-07-22 22:30:33 | artifact ===
+  ts=2026-07-22 22:30:33
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/CONVERGENCE_METHOD_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=filled(解耦N/A引用+防假綠+禁bypass); §B=filled(6批次 B1-B6 依賴拓撲); 每Task=filled(SPEC ref+實作要點≥3+修改檔到函式+邊界≥2+存活至+覆蓋風險+不可做+驗證對應M1-M9/oracle); 追溯=100% SPEC 9 Task+M1-M9+5 oracle+R1-R6/C1-C17
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 22:34:29 | dispatch ===
+  ts=2026-07-22 22:34:29
+  kind=dispatch
+  intent=收斂方法 TODO 三家對抗審(codex):100% SPEC 覆蓋+冷啟動深度+mutation先紅+範圍紀律
+  risk=low
+  facts_asked=TODO=docs/CONVERGENCE_METHOD_TODO.md, SPEC=docs/CONVERGENCE_METHOD_SPEC.md
+  review_role=adversarial TODO reviewer(non-implementer), codex
+  template=n/a:review 審既有 TODO
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 22:34:29 | dispatch ===
+  ts=2026-07-22 22:34:29
+  kind=dispatch
+  intent=收斂方法 TODO 三家對抗審(composer):100% SPEC 覆蓋+冷啟動深度+mutation先紅+範圍紀律
+  risk=low
+  facts_asked=TODO=docs/CONVERGENCE_METHOD_TODO.md, SPEC=docs/CONVERGENCE_METHOD_SPEC.md
+  review_role=adversarial TODO reviewer(non-implementer), composer
+  template=n/a:review 審既有 TODO
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 22:34:29 | dispatch ===
+  ts=2026-07-22 22:34:29
+  kind=dispatch
+  intent=收斂方法 TODO 三家對抗審(grok):100% SPEC 覆蓋+冷啟動深度+mutation先紅+範圍紀律
+  risk=low
+  facts_asked=TODO=docs/CONVERGENCE_METHOD_TODO.md, SPEC=docs/CONVERGENCE_METHOD_SPEC.md
+  review_role=adversarial TODO reviewer(non-implementer), grok
+  template=n/a:review 審既有 TODO
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 22:46:29 | artifact ===
+  ts=2026-07-22 22:46:29
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/CONVERGENCE_METHOD_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=v2 收口 TODO 三家審 26 群集 TC1-TC26; §0=filled(bash錯誤分類+解耦相關+gate_check caller+retrofit例外); §B=filled(6批+每批派工prompt+預期綠紅nodeid+B1紅gate不轉綠); 每Task=filled(偽碼+真實函式名extract_heading_ids+函式簽名+邊界+存活至+覆蓋風險+nodeid); 矩陣內嵌Task1.1; oracle 1:1 nodeid+committee_accepted_ids schema; DEGRADED exit3
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 22:51:18 | dispatch ===
+  ts=2026-07-22 22:51:18
+  kind=dispatch
+  intent=收斂 TODO v2 §B8 閉合複驗(codex):確認上輪 findings 關閉+無新P0
+  risk=low
+  facts_asked=TODO v2=docs/CONVERGENCE_METHOD_TODO.md, 上輪=…-todo-review-codex.md, reconcile=…-todo-review-RECONCILE.md
+  review_role=TODO closure re-verifier, codex
+  template=n/a:閉合複驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 22:51:18 | dispatch ===
+  ts=2026-07-22 22:51:18
+  kind=dispatch
+  intent=收斂 TODO v2 §B8 閉合複驗(composer):確認上輪 findings 關閉+無新P0
+  risk=low
+  facts_asked=TODO v2=docs/CONVERGENCE_METHOD_TODO.md, 上輪=…-todo-review-composer.md, reconcile=…-todo-review-RECONCILE.md
+  review_role=TODO closure re-verifier, composer
+  template=n/a:閉合複驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 22:51:18 | dispatch ===
+  ts=2026-07-22 22:51:18
+  kind=dispatch
+  intent=收斂 TODO v2 §B8 閉合複驗(grok):確認上輪 findings 關閉+無新P0
+  risk=low
+  facts_asked=TODO v2=docs/CONVERGENCE_METHOD_TODO.md, 上輪=…-todo-review-grok.md, reconcile=…-todo-review-RECONCILE.md
+  review_role=TODO closure re-verifier, grok
+  template=n/a:閉合複驗
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 23:02:40 | dispatch ===
+  ts=2026-07-22 23:02:40
+  kind=dispatch
+  intent=收斂 TODO v3 閉合複驗2(codex):確認 v2 殘留7項關閉+無新P0
+  risk=low
+  facts_asked=TODO v3=docs/CONVERGENCE_METHOD_TODO.md, 上輪closure=…-todo-closure-codex.md
+  review_role=TODO closure re-verifier round2, codex
+  template=n/a:閉合複驗2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 23:02:40 | dispatch ===
+  ts=2026-07-22 23:02:40
+  kind=dispatch
+  intent=收斂 TODO v3 閉合複驗2(composer):確認 v2 殘留7項關閉+無新P0
+  risk=low
+  facts_asked=TODO v3=docs/CONVERGENCE_METHOD_TODO.md, 上輪closure=…-todo-closure-composer.md
+  review_role=TODO closure re-verifier round2, composer
+  template=n/a:閉合複驗2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-22 23:02:40 | dispatch ===
+  ts=2026-07-22 23:02:40
+  kind=dispatch
+  intent=收斂 TODO v3 閉合複驗2(grok):確認 v2 殘留7項關閉+無新P0
+  risk=low
+  facts_asked=TODO v3=docs/CONVERGENCE_METHOD_TODO.md, 上輪closure=…-todo-closure-grok.md
+  review_role=TODO closure re-verifier round2, grok
+  template=n/a:閉合複驗2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-23 06:23:58 | dispatch ===
+  ts=2026-07-23 06:23:58
+  kind=dispatch
+  intent=收斂 TODO v3-final 確認輪(codex):確認 M3/全紅 用字一致性殘留關閉→APPROVED
+  risk=low
+  facts_asked=TODO v3=docs/CONVERGENCE_METHOD_TODO.md(殘句已改齊)
+  review_role=TODO final closure confirm, codex
+  template=n/a:確認輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-23 06:23:58 | dispatch ===
+  ts=2026-07-23 06:23:58
+  kind=dispatch
+  intent=收斂 TODO v3-final 確認輪(composer):確認 M3/全紅 用字一致性殘留關閉→APPROVED
+  risk=low
+  facts_asked=TODO v3=docs/CONVERGENCE_METHOD_TODO.md(殘句已改齊)
+  review_role=TODO final closure confirm, composer
+  template=n/a:確認輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-23 06:23:58 | dispatch ===
+  ts=2026-07-23 06:23:58
+  kind=dispatch
+  intent=收斂 TODO v3-final 確認輪(grok):確認 M3/全紅 用字一致性殘留關閉→APPROVED
+  risk=low
+  facts_asked=TODO v3=docs/CONVERGENCE_METHOD_TODO.md(殘句已改齊)
+  review_role=TODO final closure confirm, grok
+  template=n/a:確認輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-todo-review-RECONCILE.md", "output_sha256": "1d617f1ce6aef0546a9da5e79e1ed02842a3993eba3fc4d53894915e323488e3", "task_id": "20260722-conv-todo-recstamp-codex", "ts": "2026-07-22T22:43:45Z"}
+=== 2026-07-23 06:43:45 | dispatch ===
+  ts=2026-07-23 06:43:45
+  kind=dispatch
+  intent=TODO reconcile 正式戳記(codex)
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-todo-review-RECONCILE.md
+  review_role=todo reconcile stamper, codex
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-todo-review-RECONCILE.md", "output_sha256": "1d617f1ce6aef0546a9da5e79e1ed02842a3993eba3fc4d53894915e323488e3", "task_id": "20260722-conv-todo-recstamp-composer", "ts": "2026-07-22T22:43:45Z"}
+=== 2026-07-23 06:43:45 | dispatch ===
+  ts=2026-07-23 06:43:45
+  kind=dispatch
+  intent=TODO reconcile 正式戳記(composer)
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-todo-review-RECONCILE.md
+  review_role=todo reconcile stamper, composer
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-todo-review-RECONCILE.md", "output_sha256": "1d617f1ce6aef0546a9da5e79e1ed02842a3993eba3fc4d53894915e323488e3", "task_id": "20260722-conv-todo-recstamp-grok", "ts": "2026-07-22T22:43:45Z"}
+=== 2026-07-23 06:43:45 | dispatch ===
+  ts=2026-07-23 06:43:45
+  kind=dispatch
+  intent=TODO reconcile 正式戳記(grok)
+  risk=low
+  facts_asked=reconcile=handoffs/20260722-convergence-todo-review-RECONCILE.md
+  review_role=todo reconcile stamper, grok
+  template=n/a:戳記
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260722-convergence-todo-review-RECONCILE.md", "output_sha256": "681e952656405ce9f093c03f717ec2f3b75a144b097e7bfa08e490f6e973e96e", "task_id": "20260722-conv-todo-recstamp-codex", "ts": "2026-07-22T22:43:45Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260722-convergence-todo-review-RECONCILE.md", "output_sha256": "681e952656405ce9f093c03f717ec2f3b75a144b097e7bfa08e490f6e973e96e", "task_id": "20260722-conv-todo-recstamp-composer", "ts": "2026-07-22T22:43:45Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260722-convergence-todo-review-RECONCILE.md", "output_sha256": "681e952656405ce9f093c03f717ec2f3b75a144b097e7bfa08e490f6e973e96e", "task_id": "20260722-conv-todo-recstamp-grok", "ts": "2026-07-22T22:43:45Z"}
