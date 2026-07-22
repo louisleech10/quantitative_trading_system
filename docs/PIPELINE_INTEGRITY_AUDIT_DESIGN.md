@@ -16,12 +16,14 @@
 | 4 | SPEC 起草(Claude) | — | 🟢 gate.sh artifact(PreToolUse gate_check) | 檔名不含 SPEC 可閃?(gate_check 認 docs/*SPEC*) |
 | 5 | SPEC 委員審(**現行 3 家** codex+composer+grok;Claude 起草非實作者) | 是 | 🟢 review_quorum_check.sh(機檢 floor=2 非實作者家族) | 審**完整性/深度**無驗(可淺審蓋章);grok 為正式委員不得漏 |
 | 6 | **SPEC-review reconcile(Claude 綜合審意見)** | 是 | 🟡 stamp(有 hash)但… | **同 #3 病**:Claude 收審意見時**手抄掉 finding**;stamp 證「委員簽了此 body」但不證「Claude 收齊了委員的 finding」 |
-| 7 | TODO 起草 + 審 | 是 | 🟢 artifact + quorum | 同 #4/#5 |
+| 7 | TODO 起草(Claude) + 委員審(**3 家** codex+composer+grok;Claude 起草非實作者) | 是 | 🟢 artifact + review_quorum_check | 同 #5;審完整性/深度無驗 |
 | 8 | 實作派工(逐批) | 是 | 🟢 gate.sh dispatch --spec/--todo + 前批 quorum | 較嚴 |
-| 9 | 實作 code review(**現行 3 家**;實作者不自審,其餘非實作者家族審) | 是 | 🟢 review_quorum_check(floor=2) | 審完整性無驗;agy 實習不算 quorum |
+| 9 | 實作 code review(**2 家**;實作者=1 CLI 家族**不自審**→僅另 2 家非實作者審) | 是 | 🟢 review_quorum_check(floor=2) | 審完整性無驗;agy 實習不算 quorum |
 | 10 | **Finding 閉合複驗(原提出方重跑反例)** | 是 | 🔴**無機檢**(合約+memory) | 可「宣稱已修」不真重跑;假綠 |
 | 11 | 接回 diff 防假綠(Claude 讀 diff+測試) | — | 🟡紀律 | 可不 diff 既有測試斷言 |
 | 12 | 完工回報 + HANDOFF/ROADMAP 更新 | — | 🟡紀律 | 漏記(HANDOFF 屢犯) |
+
+> **審查家數規則**:= 正式家族總數(codex+composer+grok=3) − 實作者(不自審)。Claude 起草的 artifact(SPEC/TODO,#5/#7)→ 3 家 CLI 全審;CLI 家族實作的 code(#9)→ 實作者排除 → 2 家審。agy 實習 advisory 不計入 quorum。
 
 ## 二、核心洞察:同一個病灶在**多個節點**復發
 **「Claude 手抄合併多方產物」不是 discovery 獨有**——它出現在 **#3 discovery reconcile、#6 SPEC-review reconcile、SPEC-review 之外任何 Claude 收攏委員意見的地方**。每處都有相同掉項/降級風險。
