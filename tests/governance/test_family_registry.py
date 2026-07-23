@@ -140,26 +140,36 @@ _CONSUMER_FILES = [
 ]
 
 
-def test_no_unpinned_family_list_line() -> None:
-    """反 whack-a-mole:任何功能性家族清單行(非註解/非訊息,≥3 家族 token)都須被 _DRIFT locate 釘到。
+# 已知 doc 行(訊息/usage 範例;非功能碼)——**明確**白名單,非靜默 substring 排除(委員 codex round3)。
+# 只有這幾行 doc 免 SoT-pin;任何**功能行**(含帶 echo/--roster 者)未 pin 一律紅。
+_DOC_ALLOW = [
+    "非實作者家族 code review",          # review_quorum echo 訊息
+    "--roster codex,composer,grok",      # write_sources_lock usage 範例
+    "cx_run.sh <codex|grok|composer>",   # cx_run usage 訊息
+]
 
-    未釘 → 紅(逼加入 _DRIFT),不再靠委員一輪輪找漏(事故:codex 連兩輪抓出 913/1029/1103 等)。
+
+def test_no_unpinned_family_list_line() -> None:
+    """反 whack-a-mole:除 #註解 與 _DOC_ALLOW 明列 doc 外,任何 ≥3 家族 token 的行都須被 _DRIFT 釘到。
+
+    委員 codex round3:移除粗 substring 排除(echo/--roster/bash),否則功能行含這些字會被誤排漏網。
+    未釘 → 紅(逼加入 _DRIFT 或 _DOC_ALLOW)。不再靠委員一輪輪找漏。
     """
     locates = [loc for _, loc, _, _ in _DRIFT]
     unpinned: list[str] = []
     for fname in _CONSUMER_FILES:
         for i, ln in enumerate((SCRIPTS / fname).read_text(encoding="utf-8").splitlines(), 1):
-            s = ln.strip()
-            if s.startswith("#"):  # 註解(doc,不強制釘)
-                continue
-            if "echo" in ln or "用法:" in ln or "usage" in ln.lower():  # 訊息/usage(doc)
-                continue
-            if "bash scripts/" in ln or "--roster" in ln:  # 命令 usage 範例(doc)
+            if ln.lstrip().startswith("#"):  # 純註解 auto-skip(doc)
                 continue
             fams = {u for u in _UNIVERSE if re.search(rf"(?<![a-z-]){re.escape(u)}(?![a-z-])", ln.lower())}
-            if len(fams) >= 3 and not any(loc in ln for loc in locates):
-                unpinned.append(f"{fname}:{i}: {s[:72]}")
-    assert not unpinned, "未釘 family 清單行(須加入 _DRIFT):\n" + "\n".join(unpinned)
+            if len(fams) < 3:
+                continue
+            if any(loc in ln for loc in locates):  # 已 pin
+                continue
+            if any(d in ln for d in _DOC_ALLOW):  # 明列 doc
+                continue
+            unpinned.append(f"{fname}:{i}: {ln.strip()[:72]}")
+    assert not unpinned, "未釘 family 清單行(加入 _DRIFT 或明列 _DOC_ALLOW):\n" + "\n".join(unpinned)
 
 
 @pytest.mark.parametrize("fname,locate,key,exclude", _DRIFT)
