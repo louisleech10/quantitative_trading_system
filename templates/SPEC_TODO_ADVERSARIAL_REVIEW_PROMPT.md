@@ -51,10 +51,32 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 ### §3 不可違反原則（與其矛盾即 Blocking）
 跨 tier 重複穩定 / 多 symbol 不 OOM / 最高數據品質（禁 fake·污染·弱化 NaN·inf gate）/ 不假最佳化（禁刪特徵·縮窗·跳檢查換速度）。
 
-### 輸出格式
+### 輸出格式（canonical 四欄 finding — 見 `templates/COMMITTEE_FINDING_TEMPLATE.md`）
+每個 finding 必須用 **canonical heading ID + 四欄**，供 `scripts/completeness_check.sh` 機械抽取：
+
+- **ID 正則**：`## <FAMILY>-R<n>-P[0-3]-<NN>`（例 `## CODEX-R1-P0-01`）
+- **FAMILY allowlist**：`CODEX` | `COMPOSER` | `GROK` | `CLAUDE` | `AGY`
+- **四欄**（heading 後至下一個 heading 之間必備）：
+  1. `**斷言**`：一句可證偽主張
+  2. `**碼證**`：章節 / 路徑:行 / 命令+stdout 摘要
+  3. `**來源摘要**`：`<src_path>#sha256[:12]`（機器欄；P0/P1 缺則 FAIL）
+  4. 正文：會怎麼失敗 / 修法 / 信心度
+- **禁止**：`## GROK-01`、`ADV-CODEX-1` 等缺 ROUND/SEVERITY 短 ID；跨檔重複同一 ID
+- **DEGRADE**（合法缺席，不進 union）：`## DEGRADE-<FAMILY>-<NN>`（見範本）
+
 ```
 ## Verdict：{{可派工 / 需修補後派工 / 有根本缺陷需重作}}
-## Findings（每條：ID: ADV-CODEX-<n> 或 ADV-COMPOSER-<n> + [BLOCKING|MAJOR|MINOR] + 信心度 + 證據(章節/原文短句) + RECHECK: + 會怎麼失敗 + 修法）
+
+## CODEX-R1-P0-01
+
+**斷言**: <可證偽主張>
+
+**碼證**: <章節/原文短句 + RECHECK 步驟>
+
+**來源摘要**: path/to/spec.md#a1b2c3d4e5f6
+
+[BLOCKING|MAJOR|MINOR] 信心度=…；會怎麼失敗；修法。
+
 （無問題的類別標「無」。挑戰前提的 finding 放最前。）
 ## 被當成事實的未驗證假設（§0，逐一列；無則「無」）
 STATUS: DONE

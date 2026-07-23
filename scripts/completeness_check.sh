@@ -8,22 +8,21 @@
 # 用法:
 #   bash scripts/completeness_check.sh <綜合檔> <來源檔1> [來源檔2 ...]
 #   STRICT=1          → 來源無 ID 時 FAIL(預設 1; STRICT=0 才 WARN+續跑)。
-#   ALLOW_BARE_IDS=1  → 允許裸 F/L/C/N/NE 短 ID(預設關;易與章節/行號撞)。
+#   ALLOW_BARE_IDS=1  → 除錯用(B2 後仍拒非 canonical;保留旗標相容,正式路徑禁)。
 #   ALLOW_ID_PATTERN_OVERRIDE=1 + ID_PATTERN=... → 除錯覆寫(gate/CI 禁止)。
 #
-# 誠實邊界(三家對抗審查 + grok 紅隊 2026-07-22):
-#   ✅ 擋:來源【有 ## heading canonical ID 的 finding】未進綜合(dropped-ID class)。
-#   ❌ 不擋:語意降級(ID 在但描述/severity 被改弱)——需委員全項忠實度覆議。
-#   ❌ 不擋:錯併(ID 進了但併錯底層問題)——需委員複驗。
-#   ❌ 不擋:來源本身沒 heading ID 的 prose/list finding——須來源端遵守慣例。
-#   ❌ 不擋:呼叫端縮減來源清單(argv 信任邊界)——須 gate 從 dispatch manifest 注入來源。
-#   ❌ 不擋:跨來源共用同一 bare/短 ID 致「ID 在但不同義 finding 被吞」。
-#   ∴ 本腳本是「聚合完整性(B)」一層,非「語意忠實(C)」;分層防禦,非封印。
+# B2 (Task 2.1) 升級:
+#   - canonical ID: ^([A-Z]+)-(R[0-9]+)-(P[0-3])-([0-9]{2,})$
+#   - FAMILY allowlist: CODEX|COMPOSER|GROK|CLAUDE|AGY
+#   - body 機檢: 每 ## ID 後須同時含 **斷言** 與 **碼證**
+#   - P0/P1 須 **來源摘要**: path#sha256[:12] 或 harness source_digest:
+#   - DEGRADE-* 第二命名空間:不進 union、不當 invalid
+#   - 同檔/跨源 duplicate ID → FAIL
+#   - severity 全級(P0-P3) missing → FAIL(只排序不免檢)
 #
-# canonical finding ID 慣例(委員派工 prompt 應要求):
-#   以 markdown heading 呈現: `## <ID>` 或 `### <ID>`(ID 為標題首 token;至少 ##)。
-#   推薦獨立命名空間: <FAM>-<n> 或 <FAM>-<ROUND>-<n>(如 CODEX-01 / GROK-R1-01)。
-#   亦支援: FACTS-<n> / MISSING-NODES-<n> / ESCAPE-... / HARDEN-... / EP-<X>。
+# 誠實邊界:
+#   ✅ 擋:dropped-ID / invalid ID / empty shell / 缺 digest(P0/P1) / dup ID
+#   ❌ 不擋:語意降級、錯併、argv 縮減來源(B3 lock)、body 竄改但 digest 對(M4b OOS)
 set -u
 
 SYNTH="${1:-}"
@@ -32,58 +31,228 @@ shift || true
 [ -f "${SYNTH}" ] || { echo "COMPLETENESS FAIL: 綜合檔不存在: ${SYNTH}"; exit 2; }
 [ "$#" -ge 1 ] || { echo "用法: 至少一個來源檔"; exit 2; }
 
-# 預設 STRICT=1:無 ID 來源不得假 PASS(紅隊 A5/A12 vacuous PASS)。
 STRICT="${STRICT:-1}"
 ALLOW_BARE_IDS="${ALLOW_BARE_IDS:-0}"
 
-# 至少 ## (h2+)。單一 # 會把 markdown 註解「# CODEX-02 deferred」誤當 heading(紅隊 A2)。
+# 至少 ## (h2+)。單一 # 會把 markdown 註解誤當 heading。
 HEADING_LINE_RE='^[[:space:]]*#{2,6}[[:space:]][[:space:]]*'
 
-# 預設只收命名空間 ID;裸 F1/L47 需 ALLOW_BARE_IDS=1(紅隊 A4/A8)。
-# 注意:ERE 不用 (?:) — macOS BSD sed/grep 不穩。
-NS_ID_RE='^(FACTS-[0-9]+|MISSING-NODES-[0-9]+|ESCAPE-[A-Z0-9-]+|HARDEN-[A-Za-z0-9_-]+|EP-[A-Z]+|[A-Z]{2,10}(-[A-Z0-9]+)*-[0-9]+)$'
-BARE_ID_RE='^(FACTS-[0-9]+|MISSING-NODES-[0-9]+|ESCAPE-[A-Z0-9-]+|HARDEN-[A-Za-z0-9_-]+|EP-[A-Z]+|[A-Z]{2,10}(-[A-Z0-9]+)*-[0-9]+|F[0-9]+|NE[0-9]+|L[0-9]+|[CN][0-9]+)$'
-if [ "${ALLOW_BARE_IDS}" = "1" ]; then
-  CANONICAL_ID_RE="${BARE_ID_RE}"
-else
-  CANONICAL_ID_RE="${NS_ID_RE}"
-fi
+# B2 canonical: FAM-Rn-Pn-NN
+CANONICAL_ID_RE='^([A-Z]+)-(R[0-9]+)-(P[0-3])-([0-9]{2,})$'
+# FAMILY allowlist (exact)
+FAMILY_ALLOW_RE='^(CODEX|COMPOSER|GROK|CLAUDE|AGY)$'
+# DEGRADE 第二命名空間(整行 heading;不進 union、不當 invalid)
+DEGRADE_HEADING_RE='^[[:space:]]*#{2,6}[[:space:]]+DEGRADE-[A-Z]+-[0-9]{2,}[[:space:]]*$'
+DEGRADE_TOKEN_RE='^DEGRADE-[A-Z]+-[0-9]{2,}$'
+# 看起來像 finding ID 候選(有 hyphen 段)但未過 full schema → invalid
+CANDIDATE_ID_RE='^[A-Z]+(-[A-Z0-9]+)+$'
 
 if [ -n "${ID_PATTERN:-}" ]; then
   if [ "${ALLOW_ID_PATTERN_OVERRIDE:-}" != "1" ]; then
     echo "COMPLETENESS FAIL: ID_PATTERN 覆寫已禁用(紅隊 F-c/A6)。除錯請設 ALLOW_ID_PATTERN_OVERRIDE=1, gate/CI 禁止。"
     exit 1
   fi
-  # 覆寫時改走全文 grep -oE(除錯用);正式路徑仍是 heading extract。
   USE_PATTERN_OVERRIDE=1
 else
   USE_PATTERN_OVERRIDE=0
 fi
 
+# ---------------------------------------------------------------------------
+# extract_heading_ids — 輸出合法 canonical ID(每行一個;保留同檔重複以便 dup 偵測)
+# 副作用: 發現 invalid candidate → 印 stderr 並 return 1
+# DEGRADE-* 排除(不進 union、不當 invalid)
+# ---------------------------------------------------------------------------
 extract_heading_ids() {
   local file="$1"
+  local rc=0
   if [ "${USE_PATTERN_OVERRIDE}" = "1" ]; then
-    grep -oE "${ID_PATTERN}" "${file}" 2>/dev/null | sort -u
+    grep -oE "${ID_PATTERN}" "${file}" 2>/dev/null || true
     return 0
   fi
-  # 抽 h2+ 行首 token,剝尾部標點,再套 canonical filter。
-  grep -E "${HEADING_LINE_RE}" "${file}" 2>/dev/null \
-    | sed -E "s/${HEADING_LINE_RE}//" \
-    | awk '{print $1}' \
-    | sed -E 's/[^A-Za-z0-9_-].*$//' \
-    | grep -E "${CANONICAL_ID_RE}" \
-    | sort -u
+
+  # shellcheck disable=SC2016
+  awk -v heading_re="${HEADING_LINE_RE}" '
+    BEGIN {
+      # family allowlist
+      fam["CODEX"]=1; fam["COMPOSER"]=1; fam["GROK"]=1; fam["CLAUDE"]=1; fam["AGY"]=1
+    }
+    # DEGRADE 整行 heading → skip entirely
+    /^[[:space:]]*#{2,6}[[:space:]]+DEGRADE-[A-Z]+-[0-9]{2,}[[:space:]]*$/ { next }
+    # h2+ heading
+    /^[[:space:]]*#{2,6}[[:space:]]/ {
+      line=$0
+      sub(/^[[:space:]]*#{2,6}[[:space:]]+/, "", line)
+      # anchored:trim 尾空白後,整行須完全等於 canonical/DEGRADE(拒尾隨文字/尾標點, CODEX-B2-P1-01)
+      sub(/[[:space:]]+$/, "", line)
+      if (line == "") next
+      # DEGRADE full-line (anchored)
+      if (line ~ /^DEGRADE-[A-Z]+-[0-9]{2,}$/) next
+      # full canonical FAM-Rn-Pn-NN(整行 anchored)
+      if (line ~ /^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$/) {
+        split(line, segs, "-")
+        family=segs[1]
+        if (!(family in fam)) {
+          print "COMPLETENESS FAIL: invalid family in ID: " line " (file=" FILENAME ")" > "/dev/stderr"
+          bad=1
+          next
+        }
+        print line
+        next
+      }
+      # 非整行匹配:取首 token 判是否「像 ID」(含 canonical+尾隨文字、缺欄變體 M5)→ invalid
+      n=split(line, parts, /[[:space:]]+/)
+      tok=parts[1]
+      sub(/[^A-Za-z0-9_-].*$/, "", tok)
+      if (tok ~ /^[A-Z]+(-[A-Z0-9]+)+$/) {
+        print "COMPLETENESS FAIL: invalid finding ID (schema/trailing): " line " (file=" FILENAME ")" > "/dev/stderr"
+        bad=1
+        next
+      }
+      # prose heading → ignore
+      next
+    }
+    END { if (bad) exit 1 }
+  ' "${file}"
+  rc=$?
+  return "${rc}"
 }
 
-synth_ids="$(extract_heading_ids "${SYNTH}")"
+# ---------------------------------------------------------------------------
+# _validate_finding_body — 每 ## canonical ID 後至下個 heading 須同時含 **斷言**+**碼證**
+# P0/P1 另須 digest(**來源摘要**: ...#sha12 或 source_digest:)
+# ---------------------------------------------------------------------------
+_validate_finding_body() {
+  local file="$1"
+  # shellcheck disable=SC2016
+  awk '
+    BEGIN {
+      id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0; bad=0
+    }
+    function flush(    need_digest) {
+      if (id == "") return
+      if (!(seen_assert && seen_code)) {
+        print "COMPLETENESS FAIL: empty-shell finding (缺 **斷言**/**碼證**): " id " (file=" FILENAME ")" > "/dev/stderr"
+        bad=1
+      }
+      # P0/P1 require digest
+      if (sev == "P0" || sev == "P1") {
+        if (!seen_digest) {
+          print "COMPLETENESS FAIL: P0/P1 missing source digest (**來源摘要** or source_digest:): " id " (file=" FILENAME ")" > "/dev/stderr"
+          bad=1
+        }
+      }
+    }
+    # next heading of interest (canonical or any ##)
+    /^[[:space:]]*#{2,6}[[:space:]]/ {
+      # DEGRADE headings: flush previous finding, do not start new finding body
+      if ($0 ~ /^[[:space:]]*#{2,6}[[:space:]]+DEGRADE-[A-Z]+-[0-9]{2,}[[:space:]]*$/) {
+        flush()
+        id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0
+        next
+      }
+      line=$0
+      sub(/^[[:space:]]*#{2,6}[[:space:]]+/, "", line)
+      n=split(line, parts, /[[:space:]]+/)
+      tok=(n >= 1 ? parts[1] : "")
+      sub(/[^A-Za-z0-9_-].*$/, "", tok)
+      if (tok ~ /^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$/) {
+        flush()
+        id=tok
+        # extract severity Pn
+        split(tok, segs, "-")
+        sev=segs[3]
+        seen_assert=0; seen_code=0; seen_digest=0
+        next
+      }
+      # other heading ends previous finding body
+      if (id != "") {
+        flush()
+        id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0
+      }
+      next
+    }
+    id != "" {
+      if ($0 ~ /\*\*斷言\*\*/) seen_assert=1
+      if ($0 ~ /\*\*碼證\*\*/) seen_code=1
+      # **來源摘要**: path#sha256[:12]
+      if ($0 ~ /\*\*來源摘要\*\*/ && $0 ~ /#[0-9a-fA-F]{12}/) seen_digest=1
+      # harness injection
+      if ($0 ~ /source_digest:[[:space:]]*[0-9a-fA-F]{12,}/) seen_digest=1
+    }
+    END {
+      flush()
+      if (bad) exit 1
+    }
+  ' "${file}"
+}
 
+# ---------------------------------------------------------------------------
+# _check_same_file_dups — 同檔重複 ID → FAIL
+# ---------------------------------------------------------------------------
+_check_same_file_dups() {
+  local file="$1"
+  local ids="$2"
+  local dups
+  dups="$(printf '%s\n' "${ids}" | sed '/^$/d' | sort | uniq -d)"
+  if [ -n "${dups}" ]; then
+    echo "COMPLETENESS FAIL: same-file duplicate ID(s) in ${file}:" >&2
+    while IFS= read -r d; do
+      [ -n "${d}" ] && printf '  · %s\n' "${d}" >&2
+    done <<< "${dups}"
+    return 1
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 overall=0
 sources_with_ids=0
+
+# Accumulate valid IDs across sources for cross-source dup (id -> count of files)
+# Use temp files for portability
+tmp_union="$(mktemp -t completeness_union.XXXXXX)"
+tmp_cross="$(mktemp -t completeness_cross.XXXXXX)"
+trap 'rm -f "${tmp_union}" "${tmp_cross}"' EXIT
+
+# Validate + extract synth first
+if ! synth_ids_raw="$(extract_heading_ids "${SYNTH}")"; then
+  overall=1
+  synth_ids_raw=""
+fi
+if ! _validate_finding_body "${SYNTH}"; then
+  overall=1
+fi
+if ! _check_same_file_dups "${SYNTH}" "${synth_ids_raw}"; then
+  overall=1
+fi
+# unique sorted for comm
+synth_ids="$(printf '%s\n' "${synth_ids_raw}" | sed '/^$/d' | sort -u)"
+
 for src in "$@"; do
   if [ ! -f "${src}" ]; then
-    echo "COMPLETENESS FAIL: 來源檔不存在: ${src}"; overall=1; continue
+    echo "COMPLETENESS FAIL: 來源檔不存在: ${src}"
+    overall=1
+    continue
   fi
-  src_ids="$(extract_heading_ids "${src}")"
+
+  src_ids_raw=""
+  if ! src_ids_raw="$(extract_heading_ids "${src}")"; then
+    overall=1
+    # still try body? skip if invalid IDs already fail
+  fi
+
+  if ! _validate_finding_body "${src}"; then
+    overall=1
+  fi
+
+  if ! _check_same_file_dups "${src}" "${src_ids_raw}"; then
+    overall=1
+  fi
+
+  src_ids="$(printf '%s\n' "${src_ids_raw}" | sed '/^$/d' | sort -u)"
+
   if [ -z "${src_ids}" ]; then
     echo "COMPLETENESS WARN: ${src} 抽不到任何 heading ID(來源未用 ## <ID>?) → 本腳本無法保護,須人工/覆議"
     if [ "${STRICT}" = "1" ]; then
@@ -92,13 +261,19 @@ for src in "$@"; do
     continue
   fi
   sources_with_ids=$((sources_with_ids + 1))
-  # comm 需 sorted;printf 保一行一 ID。
+
+  # cross-source: record each unique id once per file
+  while IFS= read -r iid; do
+    [ -z "${iid}" ] && continue
+    printf '%s\n' "${iid}" >> "${tmp_cross}"
+  done <<< "${src_ids}"
+
+  # dropped-ID: source IDs must appear in synth (all severities P0-P3; 只排序不免檢)
   missing="$(comm -23 <(printf '%s\n' "${src_ids}") <(printf '%s\n' "${synth_ids}"))"
-  n_src="$(printf '%s\n' "${src_ids}" | grep -c .)"
+  n_src="$(printf '%s\n' "${src_ids}" | grep -c . || true)"
   if [ -n "${missing}" ]; then
-    n_miss="$(printf '%s\n' "${missing}" | grep -c .)"
+    n_miss="$(printf '%s\n' "${missing}" | grep -c . || true)"
     echo "COMPLETENESS FAIL: ${src} — ${n_miss}/${n_src} 個 ID 未出現在綜合檔:"
-    # 引號保護,避免 HARDEN-a*b 等 metachar 被 shell glob 展開(紅隊 A13/CLEAN-M)。
     while IFS= read -r mid; do
       [ -n "${mid}" ] && printf '  · %s\n' "${mid}"
     done <<< "${missing}"
@@ -108,15 +283,27 @@ for src in "$@"; do
   fi
 done
 
-# 全滅 vacuous PASS:所有來源都無 ID 時不得 exit 0(紅隊 A5/A12/CLEAN-K)。
+# cross-source duplicate IDs (same ID in ≥2 source files)
+if [ -s "${tmp_cross}" ]; then
+  cross_dups="$(sort "${tmp_cross}" | uniq -d)"
+  if [ -n "${cross_dups}" ]; then
+    echo "COMPLETENESS FAIL: cross-source duplicate ID(s):" >&2
+    while IFS= read -r d; do
+      [ -n "${d}" ] && printf '  · %s\n' "${d}" >&2
+    done <<< "${cross_dups}"
+    overall=1
+  fi
+fi
+
+# 全滅 vacuous PASS
 if [ "${sources_with_ids}" -eq 0 ]; then
   echo "COMPLETENESS FAIL: 無任何來源抽出 heading ID(vacuous;可能 prose-only 或未遵守 ## <ID> 慣例)。"
   exit 1
 fi
 
 if [ "${overall}" -ne 0 ]; then
-  echo "COMPLETENESS FAIL: 有來源 finding ID 未進綜合(手抄掉項?)。補齊後重跑。"
+  echo "COMPLETENESS FAIL: 完整性檢查未過(invalid ID / empty shell / 缺 digest / dup / dropped-ID)。補齊後重跑。"
   exit 1
 fi
-echo "COMPLETENESS PASS(dropped-ID 層): 全來源 heading ID 皆在綜合。注意:仍不保證語意忠實/無錯併/來源清單完整(須委員覆議+dispatch 注入來源)。"
+echo "COMPLETENESS PASS(dropped-ID+schema 層): 全來源 heading ID 皆在綜合且 body/digest 合法。注意:仍不保證語意忠實/無錯併/來源清單完整(須委員覆議+dispatch 注入來源)。"
 exit 0

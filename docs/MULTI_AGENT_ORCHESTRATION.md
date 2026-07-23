@@ -220,6 +220,8 @@ codex exec review   # 或在 prompt 帶 SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md �
 ```
 讓沒有 Claude 盲點的模型挑 blocking findings，比自審有效。修補後才 freeze。
 
+**Finding 輸出格式（機械可抽）**：委員每條 finding 須用 canonical 四欄格式（ID=`## <FAMILY>-R<n>-P[0-3]-<NN>` + `**斷言**`/`**碼證**`/`**來源摘要**` + 正文）。範本=`templates/COMMITTEE_FINDING_TEMPLATE.md`；對抗 prompt 已內嵌同規則（`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`）。`scripts/completeness_check.sh` 對 P0/P1 缺 digest、空殼 heading、malformed ID、跨源/同檔 dup 一律 FAIL。
+
 ---
 
 ## 3. 查進度

@@ -25312,3 +25312,74 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-impl-b2-grok", "ts": "2026-07-22T23:35:24Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-conv-impl-b2-RESULT.md", "output_sha256": "pending", "task_id": "conv-impl-b2-grok", "ts": "2026-07-22T23:35:25Z"}
+=== 2026-07-23 07:35:25 | dispatch ===
+  ts=2026-07-23 07:35:25
+  kind=dispatch
+  intent=收斂 B2 實作:Task2.1 canonical ID+digest+DEGRADE命名空間+範本+M4a body機檢
+  risk=high
+  facts_asked=TODO=docs/CONVERGENCE_METHOD_TODO.md §B2/Task2.1
+  review_role=Grok 實作;Codex+Composer 雙家 code review
+  template=n/a:impl 非產SPEC
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-b2-review-codex.md", "output_sha256": "pending", "task_id": "conv-impl-b2-review-codex", "ts": "2026-07-22T23:44:16Z"}
+=== 2026-07-23 07:44:16 | dispatch ===
+  ts=2026-07-23 07:44:16
+  kind=dispatch
+  intent=收斂 B2 code review(codex):ID正則+M4a body+digest+防假綠先紅守住
+  risk=low
+  facts_asked=碼=scripts/completeness_check.sh+tests, 契約=TODO B2
+  review_role=B2 code reviewer(non-implementer), codex
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-b2-review-composer.md", "output_sha256": "pending", "task_id": "conv-impl-b2-review-composer", "ts": "2026-07-22T23:44:16Z"}
+=== 2026-07-23 07:44:17 | dispatch ===
+  ts=2026-07-23 07:44:17
+  kind=dispatch
+  intent=收斂 B2 code review(composer):ID正則+M4a body+digest+防假綠先紅守住
+  risk=low
+  facts_asked=碼=scripts/completeness_check.sh+tests, 契約=TODO B2
+  review_role=B2 code reviewer(non-implementer), composer
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-23T00:31:01Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T00:31:01Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-b2fix-closure-codex.md", "output_sha256": "pending", "task_id": "conv-b2fix-closure-codex", "ts": "2026-07-23T00:34:40Z"}
+=== 2026-07-23 08:34:40 | dispatch ===
+  ts=2026-07-23 08:34:40
+  kind=dispatch
+  intent=codex 複驗 CODEX-B2-P1-01 閉合:ID 正則整行 anchored 拒尾隨文字
+  risk=low
+  facts_asked=fix=scripts/completeness_check.sh anchored regex + test_trailing_text_heading_fails
+  review_role=closure re-verifier(original proposer), codex
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

@@ -168,9 +168,26 @@ def receipt_entry(
 
 
 # 供測試 import 的共用 finding body 片段
-def finding_block(fid: str, assert_text: str = "assert body", code_text: str = "code proof") -> str:
-    """合法 finding 區塊（含 **斷言** / **碼證**）。"""
-    return f"## {fid}\n\n**斷言**: {assert_text}\n\n**碼證**: {code_text}\n"
+def finding_block(
+    fid: str,
+    assert_text: str = "assert body",
+    code_text: str = "code proof",
+    *,
+    src_path: str = "sources/review.md",
+    digest: str | None = None,
+    include_digest: bool = True,
+) -> str:
+    """合法 finding 區塊（含 **斷言** / **碼證** / **來源摘要**）。
+
+    B2 起 P0/P1 缺 digest → completeness FAIL；預設 include_digest=True
+    使 M1/M2/M7/M8/M9 等「非 B2 owner」案在 body 層仍可 rc==0（先紅守住）。
+    """
+    if digest is None:
+        digest = _sha256_text(f"{fid}|{assert_text}|{code_text}")[:12]
+    parts = [f"## {fid}\n", f"**斷言**: {assert_text}\n", f"**碼證**: {code_text}\n"]
+    if include_digest:
+        parts.append(f"**來源摘要**: {src_path}#{digest}\n")
+    return "\n".join(parts) + "\n"
 
 
 @pytest.fixture
