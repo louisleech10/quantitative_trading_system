@@ -28,6 +28,11 @@ _ADV_FAMS_RE="$(families_get_upper review_families '|')" || {
   exit 1
 }
 [ -n "${_ADV_FAMS_RE}" ] || { echo "GATE FAIL: SoT review_families 空(fail-closed)" >&2; exit 1; }
+# 委員 codex A:families key 亦須在啟動驗(否則 families 壞但 review_families 好時,family 推導失敗卻仍發 token)。
+families_get families >/dev/null || {
+  echo "GATE FAIL: 治理家族 SoT families key 讀取失敗(fail-closed),拒發 token。" >&2
+  exit 1
+}
 # GATE_DIR_OVERRIDE:governance 測試隔離用(token/audit 寫進 tmp,不汙染真實信任工件)
 GATE_DIR="${GATE_DIR_OVERRIDE:-.claude/gate}"; AUDIT="${GATE_DIR}/audit.log"; mkdir -p "${GATE_DIR}"
 
@@ -217,10 +222,13 @@ _append_committee_dispatch_any() {
     esac
   done
   if [ "${_matched}" -eq 0 ]; then
-    # review_role:僅**唯一**家族命中才採;多家並列/子字串誤配(如 codex-and-grok)→ 保持 unknown,不亂標(委員 C)。
+    # review_role:僅**唯一**家族命中才採。**詞界匹配**(邊界=非字母):擋 codexx 誤判 codex(委員 codex C),
+    # 但允許 hyphen 分隔(codex-review→codex);多家並列(codex-and-grok)→ _n≥2 → 保持 unknown。
     _hit=""; _n=0
     for _f in ${_fams}; do
-      case "${review_role}" in *"${_f}"*) _hit="${_f}"; _n=$((_n + 1)) ;; esac
+      if printf '%s' "${review_role}" | grep -qiE "(^|[^a-z])${_f}([^a-z]|$)"; then
+        _hit="${_f}"; _n=$((_n + 1))
+      fi
     done
     [ "${_n}" -eq 1 ] && family="${_hit}"
   fi

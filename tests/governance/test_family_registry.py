@@ -100,23 +100,31 @@ import pytest  # noqa: E402
 _UNIVERSE = {"codex", "composer", "grok", "claude", "agy", "cursor-agent"}
 
 
-def _fams_in_line(fname: str, locate: str) -> set[str]:
-    """定位含 locate 的行,回該行出現的 family token 集合(與 _UNIVERSE 取交集,穩健)。
+def _fams_in_lines(fname: str, locate: str) -> list[set[str]]:
+    """回**所有**含 locate 的行各自的 family token 集合(涵蓋重複 site,如 completeness 105/678)。
 
-    找不到該行(pattern 被重構)→ AssertionError(逼更新 drift 測試,非靜默漏)。
+    找不到任何行(pattern 被重構)→ AssertionError(逼更新 drift 測試,非靜默漏)。
     """
     text = (SCRIPTS / fname).read_text(encoding="utf-8")
-    line = next((ln for ln in text.splitlines() if locate in ln), None)
-    assert line is not None, f"{fname}: 找不到含 '{locate}' 的家族清單行(refactor?→須更新 drift 測試)"
-    low = line.lower()
-    return {u for u in _UNIVERSE if re.search(rf"(?<![a-z-]){re.escape(u)}(?![a-z-])", low)}
+    lines = [ln for ln in text.splitlines() if locate in ln]
+    assert lines, f"{fname}: 找不到含 '{locate}' 的家族清單行(refactor?→須更新 drift 測試)"
+    out = []
+    for ln in lines:
+        low = ln.lower()
+        out.append({u for u in _UNIVERSE if re.search(rf"(?<![a-z-]){re.escape(u)}(?![a-z-])", low)})
+    return out
 
 
-# (檔, 定位子字串, SoT key, 排除):寫死清單須 == SoT[key]-排除。加/減家族未同步 → 紅。
+# (檔, 定位子字串, SoT key, 排除):寫死清單**每個 site** 須 == SoT[key]-排除。加/減家族未同步 → 紅。
 # gate_check 同行含 `claude -p` 特例(非 executor_clis)→ 排除 claude。
+# completeness_check 有 6 個 site(委員 codex B:單釘一行不夠)→ 全涵蓋。
 _DRIFT = [
     ("gate_check.sh", "grok|agy)[", "executor_clis", {"claude"}),
     ("completeness_check.sh", "FAMILY_ALLOW_RE=", "families", set()),
+    ("completeness_check.sh", "FAMILY_FILE_RE=", "families", set()),
+    ("completeness_check.sh", 'fam["CODEX"]', "families", set()),
+    ("completeness_check.sh", "allow = {", "families", set()),
+    ("completeness_check.sh", 're.match(r"^.+-(codex', "families", set()),
     ("review_quorum_check.sh", "codex|composer|grok) :", "review_families", set()),
     ("write_sources_lock.sh", "allow = {", "families", set()),
     ("cx_run.sh", "family 須為", "review_families", set()),
@@ -127,8 +135,10 @@ _DRIFT = [
 @pytest.mark.parametrize("fname,locate,key,exclude", _DRIFT)
 def test_consumer_family_list_matches_sot(fname: str, locate: str, key: str, exclude: set) -> None:
     expected = set(json.loads(SOT.read_text(encoding="utf-8"))[key])
-    got = _fams_in_line(fname, locate) - exclude
-    assert got == expected, f"{fname} 家族清單 {got} != SoT {key} {expected}(漂移;改 SoT 須同步或反之)"
+    for got in _fams_in_lines(fname, locate):
+        assert (got - exclude) == expected, (
+            f"{fname} 家族清單 {got - exclude} != SoT {key} {expected}(漂移;改 SoT 須同步或反之)"
+        )
 
 
 # ---- fail-closed 邊界(委員 A/D):SoT 缺/壞 → 拒,不 fallback ----
@@ -159,6 +169,37 @@ def test_provenance_failclosed_on_sot_import(tmp_path: Path) -> None:
         cwd=REPO, capture_output=True, text=True, check=False,
     )
     assert p.returncode != 0 and "fail-closed" in p.stderr
+
+
+def test_review_role_substring_no_false_positive(tmp_path: Path) -> None:
+    """`stamp:codexx` 不得誤判 codex(詞界);→ unknown(委員 codex C)。"""
+    gate_dir = tmp_path / "g"
+    out = REPO / "handoffs" / "frtest-cxx.md"
+    out.write_text("x\n", encoding="utf-8")
+    try:
+        _bash(
+            f"GATE_DIR_OVERRIDE={gate_dir} bash scripts/gate.sh dispatch "
+            f"--task-id frtest-cxx --output handoffs/frtest-cxx.md --intent t --risk low "
+            f"--facts-asked none-needed:t --review-role stamp:codexx --template n/a:t"
+        )
+        audit = (gate_dir / "audit.log").read_text(encoding="utf-8")
+        fams = [json.loads(l)["family"] for l in audit.splitlines()
+                if l.strip() and '"frtest-cxx"' in l]
+        assert fams and all(f == "unknown" for f in fams), f"codexx 誤判: {fams}"
+    finally:
+        out.unlink(missing_ok=True)
+
+
+def test_getter_failclosed_partial_families_key(tmp_path: Path) -> None:
+    """families key null/壞但 review_families 好 → families_get families 仍 fail-closed(委員 codex A)。"""
+    (tmp_path / "governance_families.sh").write_text(
+        (SCRIPTS / "governance_families.sh").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (tmp_path / "governance_families.json").write_text(
+        '{"families": null, "review_families": ["codex","composer","grok"]}', encoding="utf-8"
+    )
+    p = _bash(f". {tmp_path}/governance_families.sh && families_get families")
+    assert p.returncode != 0
 
 
 def test_gate_unknown_family_is_unknown_not_composer(tmp_path: Path) -> None:
