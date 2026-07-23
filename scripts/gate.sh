@@ -346,12 +346,22 @@ _run_completeness_gate() {
   local completeness_bin="${COMPLETENESS_CHECK_OVERRIDE:-${SCRIPT_DIR}/completeness_check.sh}"
   local sessdir lock_path rc
 
-  # 結構性 engagement(BC2 primary)：completeness 閘為 convergence 內容合併專用,
-  #   僅對 handoffs/reconcile/<session>/ 下的 reconcile 生效。epic 自身的 meta-reconcile
-  #   (handoffs/*-RECONCILE.md,非 content-merge)→ 略過(非「lock 缺→略過」,是結構判定,不可靠刪 lock 繞)。
+  # 2026-07-24 強制化(使用者定;事故=Claude 手做 SPEC reconcile 漏記委員 finding):
+  #   凡拿 reconcile 當**實作依據**(本函式只在 --spec 實作派工路徑被呼叫),一律須走 session 流程,
+  #   否則無法機械驗 0 掉項。classic handoffs/*-RECONCILE.md 由「靜默略過」改「拒發+遷移指引」。
+  #   **不設 waiver 逃生口**(委員警示:waiver 會變成新旁路;且「選配=Claude 會跳過」已實證)。
   case "${reconcile_file}" in
     */handoffs/reconcile/*|handoffs/reconcile/*) : ;;
-    *) return 0 ;;
+    *)
+      echo "GATE 拒發 token — reconcile 未走 session 流程,無法機械驗「0 掉項」:" >&2
+      echo "  ${reconcile_file}" >&2
+      echo "  病灶:手做多方 reconcile 會靜默掉項(2026-07-23 實例:漏記委員 finding 卻不自知)。" >&2
+      echo "  修法(用既有工具,勿手做):" >&2
+      echo "   1) 委員產出用 canonical ID(## FAMILY-R<n>-P<0-3>-<NN>;見 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md)" >&2
+      echo "   2) 放 handoffs/reconcile/<session>/sources/ → bash scripts/write_sources_lock.sh --session <dir> --roster <fams> --mode review" >&2
+      echo "   3) synth.md 含逐字 union + 你的分箱 → bash scripts/completeness_check.sh --lock <dir>/sources.lock 須 exit 0" >&2
+      return 1
+      ;;
   esac
 
   if [ ! -f "${completeness_bin}" ]; then
