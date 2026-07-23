@@ -400,6 +400,10 @@ except ValueError:
   fi
 
   # 正式路徑：僅 --lock，禁 argv 覆寫來源
+  # ⚠️ carry-forward(委員 codex D,P1):completeness 驗的是 ${sessdir}/synth.md(預設),
+  #   與 --reconcile 指向的實際檔**未綁定**(同 session 內可宣告 foo.md 卻驗 synth.md)。
+  #   已驗:直接傳 --synth "${reconcile_file}" 會與既有慣例衝突(fixture 用 reconcile.md ≠ synth.md)。
+  #   正解需先定「session 內唯一合法 reconcile 目標=synth.md」慣例,屬獨立決策,不在本輪。
   bash "${completeness_bin}" --lock "${lock_path}"
   rc=$?
   if [ "${rc}" -eq 0 ]; then
@@ -443,8 +447,9 @@ if [ "${kind}" = "dispatch" ]; then
     #   防「Claude 自產 reconcile 無人複核就派實作」。adversarial-review 派工本身(--template n/a:)不受此限。
     #   新語義:--reconcile 提供時檢 reconcile 單檔;未提供時對 --adversarial foreach(舊式 reconcile 內嵌戳記)。
     #   戳記檢查：H1-H7 通用 waived 語義不變（waived 略過 stamp）。
-    #   Completeness（BC2）：convergence session 不受 waived 跳過——呼叫在 case 外；
-    #     _run_completeness_gate 內部以 handoffs/reconcile/<session>/ 結構判定，非 convergence → 略過。
+    #   Completeness（BC2 + 2026-07-24 強制）：呼叫在 case 外，不受 waived 跳過；
+    #     _run_completeness_gate 以 handoffs/reconcile/<session>/ 結構判定，
+    #     **非 session 路徑一律拒發**（原為「略過」，2026-07-24 改；見該函式註解）。
     if [ -n "${spec}" ]; then
       case "${adversarial}" in
         ""|waived:*|stamped-waived:*) : ;;
@@ -464,24 +469,42 @@ if [ "${kind}" = "dispatch" ]; then
           fi
           ;;
       esac
-      # Task 3.2 / BC2：spec dispatch 一律嘗試 completeness（路徑/結構閘在函式內）
-      # 即使 --adversarial waived: 也須對 convergence session 跑完整性
-      _comp_src=""
+      # Task 3.2 / BC2 / 2026-07-24 強制(委員 codex+composer P0):
+      #   --spec **實作**派工須有可機械驗 0 掉項的 reconcile 來源。
+      #   委員 A:雙 waived(reconcile+adversarial 皆 waived)原使 _comp_src 空 → completeness 完全不跑仍發 token。
+      #   委員 B:逗號多檔原只取 ${adversarial%%,*} 首檔 → 後續 session 未驗。改 _foreach_adversarial 逐檔。
+      _comp_ran=0
       if [ -n "${reconcile}" ]; then
         case "${reconcile}" in
           waived:*|stamped-waived:*) : ;;
-          *) _comp_src="${reconcile}" ;;
+          *)
+            _run_completeness_gate "${reconcile}" \
+              || { echo "ERROR: completeness gate 未過（見上），拒發實作 token。"; exit 1; }
+            _comp_ran=1
+            ;;
         esac
       fi
-      if [ -z "${_comp_src}" ] && [ -n "${adversarial}" ]; then
+      if [ "${_comp_ran}" -eq 0 ] && [ -n "${adversarial}" ]; then
         case "${adversarial}" in
           waived:*|stamped-waived:*|"") : ;;
-          *) _comp_src="${adversarial%%,*}" ;;
+          *)
+            _foreach_adversarial "${adversarial}" _run_completeness_gate \
+              || { echo "ERROR: completeness gate 未過（見上），拒發實作 token。"; exit 1; }
+            _comp_ran=1
+            ;;
         esac
       fi
-      if [ -n "${_comp_src}" ]; then
-        _run_completeness_gate "${_comp_src}" \
-          || { echo "ERROR: completeness gate 未過（見上），拒發實作 token。"; exit 1; }
+      if [ "${_comp_ran}" -eq 0 ]; then
+        # 無任何可驗來源。review/adversarial 派工本身(--template n/a:)本就無 reconcile → 放行(避免誤擋);
+        # 實作派工(非 n/a)雙 waived → 拒發(否則本強制形同虛設)。
+        case "${template}" in
+          n/a:*|N/A:*) : ;;
+          *)
+            echo "GATE 拒發 token — --spec 實作派工但無可機械驗的 reconcile/adversarial 來源(雙 waived?)。" >&2
+            echo "  無法證明 0 掉項。修:提供走 session 流程的 --reconcile handoffs/reconcile/<session>/synth.md。" >&2
+            exit 1
+            ;;
+        esac
       fi
     fi
     # 高風險「對 SPEC 派工」必須附 --spec 且機檢合規（template 漏結構=擋）

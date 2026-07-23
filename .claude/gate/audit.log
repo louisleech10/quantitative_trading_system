@@ -26236,3 +26236,26 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-07-23T22:56:33Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-07-23T23:10:14Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-07-23T23:10:14Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "reconcile-enforce-review", "ts": "2026-07-23T23:11:18Z"}
+=== 2026-07-24 07:11:18 | dispatch ===
+  ts=2026-07-24 07:11:18
+  kind=dispatch
+  intent=兩家 code review 強制 reconcile 機械驗改動(繞法/誤擋/測試可證偽)
+  risk=low
+  facts_asked=none-needed:code review 鐵律
+  review_role=adversary:codex+composer 非實作者
+  template=n/a:review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-23T23:27:57Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T23:27:57Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T23:30:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T23:30:36Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T23:45:19Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T23:45:20Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
