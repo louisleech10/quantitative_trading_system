@@ -125,11 +125,41 @@ _DRIFT = [
     ("completeness_check.sh", 'fam["CODEX"]', "families", set()),
     ("completeness_check.sh", "allow = {", "families", set()),
     ("completeness_check.sh", 're.match(r"^.+-(codex', "families", set()),
+    ("completeness_check.sh", "FAM = {", "families", set()),  # 913/1029/1103(委員 codex round2)
+    ("completeness_check.sh", "allowlist 外家族", "families", set()),  # 557 訊息
     ("review_quorum_check.sh", "codex|composer|grok) :", "review_families", set()),
     ("write_sources_lock.sh", "allow = {", "families", set()),
+    ("write_sources_lock.sh", "family_re = ", "families", set()),
     ("cx_run.sh", "family 須為", "review_families", set()),
     ("write_committee_accepted.sh", "FAM = {", "families", set()),
 ]
+
+_CONSUMER_FILES = [
+    "gate_check.sh", "completeness_check.sh", "review_quorum_check.sh",
+    "write_sources_lock.sh", "cx_run.sh", "write_committee_accepted.sh",
+]
+
+
+def test_no_unpinned_family_list_line() -> None:
+    """反 whack-a-mole:任何功能性家族清單行(非註解/非訊息,≥3 家族 token)都須被 _DRIFT locate 釘到。
+
+    未釘 → 紅(逼加入 _DRIFT),不再靠委員一輪輪找漏(事故:codex 連兩輪抓出 913/1029/1103 等)。
+    """
+    locates = [loc for _, loc, _, _ in _DRIFT]
+    unpinned: list[str] = []
+    for fname in _CONSUMER_FILES:
+        for i, ln in enumerate((SCRIPTS / fname).read_text(encoding="utf-8").splitlines(), 1):
+            s = ln.strip()
+            if s.startswith("#"):  # 註解(doc,不強制釘)
+                continue
+            if "echo" in ln or "用法:" in ln or "usage" in ln.lower():  # 訊息/usage(doc)
+                continue
+            if "bash scripts/" in ln or "--roster" in ln:  # 命令 usage 範例(doc)
+                continue
+            fams = {u for u in _UNIVERSE if re.search(rf"(?<![a-z-]){re.escape(u)}(?![a-z-])", ln.lower())}
+            if len(fams) >= 3 and not any(loc in ln for loc in locates):
+                unpinned.append(f"{fname}:{i}: {s[:72]}")
+    assert not unpinned, "未釘 family 清單行(須加入 _DRIFT):\n" + "\n".join(unpinned)
 
 
 @pytest.mark.parametrize("fname,locate,key,exclude", _DRIFT)
