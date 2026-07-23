@@ -25734,3 +25734,90 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"event":"gate_deny","ts":"2026-07-23T03:55:08Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-07-23T03:55:09Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-impl-b6-grok", "ts": "2026-07-23T03:56:13Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-conv-impl-b6-RESULT.md", "output_sha256": "pending", "task_id": "conv-impl-b6-grok", "ts": "2026-07-23T03:56:13Z"}
+=== 2026-07-23 11:56:13 | dispatch ===
+  ts=2026-07-23 11:56:13
+  kind=dispatch
+  intent=收斂 B6 收官:Task7.1 語意審 charter+committee_accepted producer+行為oracle+移除 norecursedirs 收編 mutation_red 入主 suite
+  risk=high
+  facts_asked=TODO=docs/CONVERGENCE_METHOD_TODO.md §B6/Task7.1
+  review_role=Grok 實作;Codex+Composer 雙家 code review
+  template=n/a:impl 非產SPEC
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-b6-review-codex.md", "output_sha256": "pending", "task_id": "conv-impl-b6-review-codex", "ts": "2026-07-23T04:07:48Z"}
+=== 2026-07-23 12:07:48 | dispatch ===
+  ts=2026-07-23 12:07:48
+  kind=dispatch
+  intent=收斂 B6 code review codex:語意charter+行為oracle順序+收編mutation_red xfail=0+防假綠
+  risk=low
+  facts_asked=碼=templates+scripts+tests+pytest.ini, 契約=TODO B6
+  review_role=B6 code reviewer non-implementer codex
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-b6-review-composer.md", "output_sha256": "pending", "task_id": "conv-impl-b6-review-composer", "ts": "2026-07-23T04:07:48Z"}
+=== 2026-07-23 12:07:48 | dispatch ===
+  ts=2026-07-23 12:07:48
+  kind=dispatch
+  intent=收斂 B6 code review composer:語意charter+行為oracle順序+收編mutation_red xfail=0+防假綠
+  risk=low
+  facts_asked=碼=templates+scripts+tests+pytest.ini, 契約=TODO B6
+  review_role=B6 code reviewer non-implementer composer
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-b6fix-grok", "ts": "2026-07-23T04:23:48Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b6fix-RESULT.md", "output_sha256": "pending", "task_id": "conv-b6fix-grok", "ts": "2026-07-23T04:23:49Z"}
+=== 2026-07-23 12:23:49 | dispatch ===
+  ts=2026-07-23 12:23:49
+  kind=dispatch
+  intent=收斂 B6 fix CODEX-B6-P1-01:producer 結構化 charter parser+拒裸ID清單冒充語意審
+  risk=high
+  facts_asked=finding=handoffs/20260722-convergence-b6-review-codex.md CODEX-B6-P1-01
+  review_role=Grok 修;codex 複驗閉合
+  template=n/a:impl fix
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b6fix-closure-codex.md", "output_sha256": "pending", "task_id": "conv-b6fix-closure-codex", "ts": "2026-07-23T04:33:00Z"}
+=== 2026-07-23 12:33:00 | dispatch ===
+  ts=2026-07-23 12:33:00
+  kind=dispatch
+  intent=codex 複驗 B6 fix CODEX-B6-P1-01:producer 結構化 charter parser 拒裸ID冒充 閉合
+  risk=low
+  facts_asked=fix=write_committee_accepted.sh 結構化parser+2反例測試(215 passed)
+  review_role=closure re-verifier codex
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
