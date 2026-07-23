@@ -88,6 +88,42 @@ def test_m2_body_tamper(tmp_path: Path) -> None:
     assert result.returncode != 0, "M2 應被機械擋（body 竄改）"
 
 
+def test_m2b_nested_tail_body_hash(tmp_path: Path) -> None:
+    """B5C3 nested-tail：### Evidence 前同、其後 TAIL 改寫 → body-hash 不符 rc≠0。
+
+    可證偽反例：若 body 邊界誤用任意 #{2,6}，### 後內容不進 hash → 本測假綠。
+    """
+    fid = "GROK-R1-P0-01"
+    digest = "nestedtail01"
+
+    def _block(tail: str) -> str:
+        return (
+            f"## {fid}\n\n"
+            f"**斷言**: nested-tail boundary must include ### body\n\n"
+            f"**碼證**: scripts/completeness_check.sh:_check_body_hashes\n\n"
+            f"**來源摘要**: sources/review-grok.md#{digest}\n\n"
+            f"### Evidence\n\n"
+            f"{tail}\n"
+        )
+
+    sources = {"review-grok.md": _block("ORIGINAL_NESTED_TAIL_EVIDENCE")}
+    synth = _block("TAMPERED_NESTED_TAIL_EVIDENCE")
+    session = _make_session(tmp_path, sources, synth, ["grok"])
+    result = run_completeness(session)
+    entry = receipt_entry(
+        name="M2b-nested-tail",
+        session=session,
+        result=result,
+        is_mechanical=True,
+    )
+    _write_receipt(session, entry)
+    out = (result.stdout or "") + (result.stderr or "")
+    assert result.returncode != 0, f"nested-tail 竄改應 FAIL; out={out!r}"
+    assert "body-hash" in out.lower() or "body hash" in out.lower(), (
+        f"須報告 body-hash 不符; out={out!r}"
+    )
+
+
 def test_m4a_empty_shell(tmp_path: Path) -> None:
     """M4a 空殼 heading：有 ## ID 但無 **斷言** → v0 只比 ID → rc==0。"""
     sources = {

@@ -25628,3 +25628,109 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-impl-b5-grok", "ts": "2026-07-23T02:54:46Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-conv-impl-b5-RESULT.md", "output_sha256": "pending", "task_id": "conv-impl-b5-grok", "ts": "2026-07-23T02:54:47Z"}
+=== 2026-07-23 10:54:47 | dispatch ===
+  ts=2026-07-23 10:54:47
+  kind=dispatch
+  intent=收斂 B5:Task6.1 5 oracle 1:1 nodeid+committee_accepted schema+retrofit 2檔+90%水位(m2 body-hash 轉綠)
+  risk=high
+  facts_asked=TODO=docs/CONVERGENCE_METHOD_TODO.md §B5/Task6.1
+  review_role=Grok 實作;Codex+Composer 雙家 code review
+  template=n/a:impl 非產SPEC
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-b5-review-codex.md", "output_sha256": "pending", "task_id": "conv-impl-b5-review-codex", "ts": "2026-07-23T03:06:01Z"}
+=== 2026-07-23 11:06:01 | dispatch ===
+  ts=2026-07-23 11:06:01
+  kind=dispatch
+  intent=收斂 B5 code review codex:m2轉綠真實+replay coverage非circular+5oracle+防假綠
+  risk=low
+  facts_asked=碼=completeness_check.sh+replay+oracle tests, 契約=TODO B5
+  review_role=B5 code reviewer non-implementer codex
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-b5-review-composer.md", "output_sha256": "pending", "task_id": "conv-impl-b5-review-composer", "ts": "2026-07-23T03:06:01Z"}
+=== 2026-07-23 11:06:01 | dispatch ===
+  ts=2026-07-23 11:06:01
+  kind=dispatch
+  intent=收斂 B5 code review composer:m2轉綠真實+replay coverage非circular+5oracle+防假綠
+  risk=low
+  facts_asked=碼=completeness_check.sh+replay+oracle tests, 契約=TODO B5
+  review_role=B5 code reviewer non-implementer composer
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-b5fix-grok", "ts": "2026-07-23T03:24:54Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b5fix-RESULT.md", "output_sha256": "pending", "task_id": "conv-b5fix-grok", "ts": "2026-07-23T03:24:55Z"}
+=== 2026-07-23 11:24:55 | dispatch ===
+  ts=2026-07-23 11:24:55
+  kind=dispatch
+  intent=收斂 B5 fix:coverage 去循環(獨立union)+replay冪等去dup+body-hash涵蓋nested+coverage.json列missing_ids
+  risk=high
+  facts_asked=findings=handoffs/20260722-convergence-b5-review-{codex,composer}.md 4群集
+  review_role=Grok 修;codex+composer 複驗
+  template=n/a:impl fix
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b5fix-closure-codex.md", "output_sha256": "pending", "task_id": "conv-b5fix-closure-codex", "ts": "2026-07-23T03:39:34Z"}
+=== 2026-07-23 11:39:34 | dispatch ===
+  ts=2026-07-23 11:39:34
+  kind=dispatch
+  intent=codex 複驗 B5 fix:非循環coverage/冪等/nested-tail/missing_ids 閉合+WHOLEMAP污染判定
+  risk=low
+  facts_asked=fix=replay 獨立union+copy冪等+##邊界+missing_ids;測試 test_replay_independent_coverage_drop_synth_id/missing_ids_always_listed(198 passed)
+  review_role=closure re-verifier codex
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-conv-b5fix-closure-composer.md", "output_sha256": "pending", "task_id": "conv-b5fix-closure-composer", "ts": "2026-07-23T03:39:34Z"}
+=== 2026-07-23 11:39:34 | dispatch ===
+  ts=2026-07-23 11:39:34
+  kind=dispatch
+  intent=composer 複驗 B5 fix:非循環coverage(P0-01)/冪等(P1-01) 閉合
+  risk=low
+  facts_asked=fix=replay 獨立union dogfood 32/32+drop-ID 0.96875
+  review_role=closure re-verifier composer
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-23T03:55:08Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T03:55:09Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}

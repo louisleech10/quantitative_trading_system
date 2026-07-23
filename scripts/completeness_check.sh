@@ -21,6 +21,7 @@
 # B3: sources.lock / roster / 拒收 symlink·子目錄·root外·late·非md·非family / 拒 ADVISORY_ONLY
 # B4 Task4.1: --self-check advisory + write-once first_draft receipt
 # B4 Task5.1: DEGRADED_PENDING 狀態機（合法降級 exit 3；禁 waived:/skip 字串灰態）
+# B5 Task6.1: body-hash 機械對比(Oracle④/M2) + unknown ID + P0/P1 不稀釋 + committee residual(Oracle⑤)
 #
 # exit: 0=PASS/ADVISORY_MISSING(self-check); 1=FAIL/非法/檔缺; 3=DEGRADED_PENDING
 set -u
@@ -744,6 +745,14 @@ _run_id_layer() {
       while IFS= read -r mid; do
         [ -n "${mid}" ] && printf '  · %s\n' "${mid}"
       done <<< "${missing}"
+      # Oracle①b / R6：P0/P1 missing 獨立 hard gate（不被比例稀釋）
+      p0p1="$(printf '%s\n' "${missing}" | grep -E -- '-P[01]-' || true)"
+      if [ -n "${p0p1}" ]; then
+        echo "COMPLETENESS FAIL: p0p1_missing (hard gate, not diluted by coverage ratio):" >&2
+        while IFS= read -r mid; do
+          [ -n "${mid}" ] && printf '  · %s\n' "${mid}" >&2
+        done <<< "${p0p1}"
+      fi
       overall=1
     else
       echo "COMPLETENESS PASS: ${src} — ${n_src}/${n_src} 個 ID 全在綜合檔。"
@@ -767,12 +776,242 @@ _run_id_layer() {
     return 1
   fi
 
+  # Oracle②：synth 出現 union 外 unknown ID → 拒收
+  if ! _check_unknown_synth_ids "${synth}" "${tmp_cross}" "${synth_ids}"; then
+    overall=1
+  fi
+
+  # Oracle④ / M2：per-ID body-hash 機械對比（strip heading 後正規化換行再 sha256）
+  if ! _check_body_hashes "${synth}" "$@"; then
+    overall=1
+  fi
+
   if [ "${overall}" -ne 0 ]; then
-    echo "COMPLETENESS FAIL: 完整性檢查未過(invalid ID / empty shell / 缺 digest / dup / dropped-ID)。補齊後重跑。" >&2
+    echo "COMPLETENESS FAIL: 完整性檢查未過(invalid ID / empty shell / 缺 digest / dup / dropped-ID / body-hash / unknown)。補齊後重跑。" >&2
     return 1
   fi
-  echo "COMPLETENESS PASS(dropped-ID+schema+lock 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。"
+  echo "COMPLETENESS PASS(dropped-ID+schema+lock+body-hash 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。"
   return 0
+}
+
+# ---------------------------------------------------------------------------
+# _check_unknown_synth_ids — synth IDs 不在 union → unknown 拒收（Oracle②）
+# tmp_cross = 跨源全部 source IDs（可含 dup 列）；synth_ids = 唯一 synth set
+# ---------------------------------------------------------------------------
+_check_unknown_synth_ids() {
+  local synth="$1"
+  local tmp_cross="$2"
+  local synth_ids="$3"
+  local union_ids unknown
+  if [ ! -s "${tmp_cross}" ]; then
+    union_ids=""
+  else
+    union_ids="$(sort -u "${tmp_cross}")"
+  fi
+  unknown="$(comm -13 <(printf '%s\n' "${union_ids}" | sed '/^$/d' | sort -u) <(printf '%s\n' "${synth_ids}" | sed '/^$/d' | sort -u))"
+  if [ -n "${unknown}" ]; then
+    echo "COMPLETENESS FAIL: unknown ID(s) in synth (not in any source union): ${synth}" >&2
+    while IFS= read -r u; do
+      [ -n "${u}" ] && printf '  · %s\n' "${u}" >&2
+    done <<< "${unknown}"
+    return 1
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# _check_body_hashes — Oracle④ 純 byte 級 body-hash（不含語意；不依賴 Phase7）
+# 每個 union ID：source body（strip heading 行 + 正規化換行）sha256 須 == synth body
+#
+# B5C3：finding body 邊界對齊 **恰 ##**（canonical finding heading / DEGRADE），
+# 非任意 #{2,6}。nested ### 內容納入 body-hash（防 nested-tail 假綠）。
+# ---------------------------------------------------------------------------
+_check_body_hashes() {
+  local synth="$1"
+  shift
+  python3 - "${synth}" "$@" <<'PY'
+import hashlib, re, sys
+from pathlib import Path
+
+# 恰 ##（h2），不含 ### 及以上 — B5C3 body 邊界
+H2_LINE_RE = re.compile(r"^\s*##(?!#)\s+")
+H2_TOKEN_RE = re.compile(r"^\s*##(?!#)\s+(\S+)")
+CANON = re.compile(r"^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$")
+DEGRADE = re.compile(r"^DEGRADE-[A-Z]+-[0-9]{2,}$")
+FAM = {"CODEX", "COMPOSER", "GROK", "CLAUDE", "AGY"}
+
+
+def normalize_newlines(text: str) -> str:
+    t = text.replace("\r\n", "\n").replace("\r", "\n")
+    # 正規化：去行尾空白、壓縮檔尾至單一換行（避免 editor 差異）
+    lines = [ln.rstrip() for ln in t.split("\n")]
+    while lines and lines[-1] == "":
+        lines.pop()
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def finding_bodies(path):
+    """id -> body sha256：## ID 行後至下一個 ## heading（含 nested ### 正文）。
+
+    邊界對齊 canonical ## finding heading，**不**在 ###/#### 處切斷。
+    """
+    try:
+        raw = Path(path).read_text(encoding="utf-8")
+    except OSError as e:
+        print("COMPLETENESS FAIL: 無法讀檔做 body-hash: %s: %s" % (path, e), file=sys.stderr)
+        return {}
+    lines = raw.splitlines(keepends=True)
+    bodies = {}
+    cur = None
+    buf = []
+    for line in lines:
+        if H2_LINE_RE.match(line):
+            if cur is not None:
+                bodies[cur] = buf
+            tok_m = H2_TOKEN_RE.match(line.rstrip("\n"))
+            tok = tok_m.group(1) if tok_m else ""
+            tok = re.split(r"\s+", tok, maxsplit=1)[0]
+            tok = re.sub(r"[^A-Za-z0-9_-].*$", "", tok)
+            if DEGRADE.match(tok):
+                cur = None
+                buf = []
+                continue
+            if CANON.match(tok) and tok.split("-", 1)[0] in FAM:
+                cur = tok
+                buf = []
+            else:
+                # 非 ID 的 ## 也結束前一 finding（section 邊界）
+                cur = None
+                buf = []
+            continue
+        if cur is not None:
+            # nested ### / 正文 一律納入 body
+            buf.append(line)
+    if cur is not None:
+        bodies[cur] = buf
+
+    out = {}
+    for fid, blines in bodies.items():
+        body = normalize_newlines("".join(blines))
+        out[fid] = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return out
+
+
+synth = sys.argv[1]
+sources = sys.argv[2:]
+synth_h = finding_bodies(synth)
+src_h = {}
+src_owner = {}
+bad = 0
+for sp in sources:
+    for fid, h in finding_bodies(sp).items():
+        if fid in src_h and src_h[fid] != h:
+            print(
+                "COMPLETENESS FAIL: body-hash 跨源衝突 ID=%s (%s vs %s)"
+                % (fid, src_owner[fid], sp),
+                file=sys.stderr,
+            )
+            bad = 1
+        src_h[fid] = h
+        src_owner[fid] = sp
+
+for fid, sh in sorted(src_h.items()):
+    th = synth_h.get(fid)
+    if th is None:
+        continue
+    if th != sh:
+        print(
+            "COMPLETENESS FAIL: body-hash 不符 ID=%s (source=%s vs synth)"
+            % (fid, src_owner.get(fid)),
+            file=sys.stderr,
+        )
+        print("  source_sha256=%s" % sh, file=sys.stderr)
+        print("  synth_sha256=%s" % th, file=sys.stderr)
+        bad = 1
+
+sys.exit(bad)
+PY
+}
+
+# ---------------------------------------------------------------------------
+# _check_committee_residual — Oracle⑤ residual = |union \ accepted_ids|
+# 僅當 session/committee_accepted.json 存在時強制（B5 fixture；B6 charter 產出）
+# schema: {"accepted_ids":[...]}
+# ---------------------------------------------------------------------------
+_check_committee_residual() {
+  local sess_dir="$1"
+  local synth="$2"
+  shift 2
+  # remaining = source paths
+  local accepted_path="${sess_dir}/committee_accepted.json"
+  if [ ! -f "${accepted_path}" ]; then
+    return 0
+  fi
+  python3 - "${accepted_path}" "${synth}" "$@" <<'PY'
+import json, re, sys
+from pathlib import Path
+
+HEADING_RE = re.compile(r"^\s*#{2,6}\s+(\S+)")
+CANON = re.compile(r"^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$")
+DEGRADE = re.compile(r"^DEGRADE-[A-Z]+-[0-9]{2,}$")
+FAM = {"CODEX", "COMPOSER", "GROK", "CLAUDE", "AGY"}
+
+
+def ids_of(path):
+    out = set()
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return out
+    for line in text.splitlines():
+        m = HEADING_RE.match(line)
+        if not m:
+            continue
+        tok = re.sub(r"[^A-Za-z0-9_-].*$", "", m.group(1))
+        if DEGRADE.match(tok):
+            continue
+        if CANON.match(tok) and tok.split("-", 1)[0] in FAM:
+            out.add(tok)
+    return out
+
+
+acc_path = Path(sys.argv[1])
+try:
+    data = json.loads(acc_path.read_text(encoding="utf-8"))
+except Exception as e:
+    print("COMPLETENESS FAIL: committee_accepted.json 無法解析: %s" % e, file=sys.stderr)
+    sys.exit(1)
+
+if not isinstance(data, dict) or "accepted_ids" not in data:
+    print("COMPLETENESS FAIL: committee_accepted.json schema 須含 accepted_ids:[]", file=sys.stderr)
+    sys.exit(1)
+if not isinstance(data["accepted_ids"], list):
+    print("COMPLETENESS FAIL: accepted_ids 須為 list", file=sys.stderr)
+    sys.exit(1)
+
+accepted = set(str(x) for x in data["accepted_ids"])
+union = set()
+for sp in sys.argv[3:]:
+    union |= ids_of(sp)
+
+residual = sorted(union - accepted)
+print(
+    "COMPLETENESS residual=%d union_size=%d accepted_size=%d"
+    % (len(residual), len(union), len(accepted)),
+    file=sys.stderr,
+)
+if residual:
+    print(
+        "COMPLETENESS FAIL: post-review residual>0 (%d IDs not in committee_accepted.accepted_ids):"
+        % len(residual),
+        file=sys.stderr,
+    )
+    for r in residual:
+        print("  · %s" % r, file=sys.stderr)
+    sys.exit(1)
+print("COMPLETENESS PASS: post-review residual=0", file=sys.stderr)
+sys.exit(0)
+PY
 }
 
 # ---------------------------------------------------------------------------
@@ -1159,6 +1398,10 @@ if [ -n "${LOCK_ARG}" ]; then
     if ! _run_id_layer "${SYNTH_ARG}" "${SRC_PATHS[@]}" >&2; then
       exit 1
     fi
+    # Oracle⑤ residual（若 committee_accepted.json 存在）
+    if ! _check_committee_residual "${SESS_DIR}" "${SYNTH_ARG}" "${SRC_PATHS[@]}" >&2; then
+      exit 1
+    fi
     # 主輸出乾淨：僅一行 token（不與 COMPLETENESS PASS 混）
     printf '%s\n' "DEGRADED_PENDING"
     if [ "${DEGRADE_ESCALATE}" = "1" ]; then
@@ -1168,6 +1411,10 @@ if [ -n "${LOCK_ARG}" ]; then
   fi
 
   if ! _run_id_layer "${SYNTH_ARG}" "${SRC_PATHS[@]}"; then
+    exit 1
+  fi
+  # Oracle⑤：committee_accepted.json 存在時 residual 必須 0
+  if ! _check_committee_residual "${SESS_DIR}" "${SYNTH_ARG}" "${SRC_PATHS[@]}"; then
     exit 1
   fi
   exit 0
