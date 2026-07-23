@@ -25506,3 +25506,125 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-impl-b4-grok", "ts": "2026-07-23T01:54:19Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-conv-impl-b4-RESULT.md", "output_sha256": "pending", "task_id": "conv-impl-b4-grok", "ts": "2026-07-23T01:54:20Z"}
+=== 2026-07-23 09:54:20 | dispatch ===
+  ts=2026-07-23 09:54:20
+  kind=dispatch
+  intent=收斂 B4:Task4.1 self-check advisory+write-once receipt 序列先; Task5.1 DEGRADED_PENDING exit3 狀態機 序列後
+  risk=high
+  facts_asked=TODO=docs/CONVERGENCE_METHOD_TODO.md §B4/Task4.1/5.1
+  review_role=Grok 實作;Codex+Composer 雙家 code review
+  template=n/a:impl 非產SPEC
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-b4-review-codex.md", "output_sha256": "pending", "task_id": "conv-impl-b4-review-codex", "ts": "2026-07-23T02:04:42Z"}
+=== 2026-07-23 10:04:42 | dispatch ===
+  ts=2026-07-23 10:04:42
+  kind=dispatch
+  intent=收斂 B4 code review codex:selfcheck極性+write-once+degrade exit3+反bypass+防假綠
+  risk=low
+  facts_asked=碼=completeness_check.sh diff+新測試, 契約=TODO B4
+  review_role=B4 code reviewer non-implementer codex
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-b4-review-composer.md", "output_sha256": "pending", "task_id": "conv-impl-b4-review-composer", "ts": "2026-07-23T02:04:42Z"}
+=== 2026-07-23 10:04:42 | dispatch ===
+  ts=2026-07-23 10:04:42
+  kind=dispatch
+  intent=收斂 B4 code review composer:selfcheck極性+write-once+degrade exit3+反bypass+防假綠
+  risk=low
+  facts_asked=碼=completeness_check.sh diff+新測試, 契約=TODO B4
+  review_role=B4 code reviewer non-implementer composer
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-b4fix-grok", "ts": "2026-07-23T02:16:34Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b4fix-RESULT.md", "output_sha256": "pending", "task_id": "conv-b4fix-grok", "ts": "2026-07-23T02:16:35Z"}
+=== 2026-07-23 10:16:35 | dispatch ===
+  ts=2026-07-23 10:16:35
+  kind=dispatch
+  intent=收斂 B4 fix:write-once atomic+degrade roster全查+stdout唯一token+expiry真解析+self-check反映降級+deleted-receipt非tautological
+  risk=high
+  facts_asked=findings=handoffs/20260722-convergence-b4-review-codex.md 6 P1
+  review_role=Grok 修;codex 複驗閉合
+  template=n/a:impl fix
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b4fix-closure-codex.md", "output_sha256": "pending", "task_id": "conv-b4fix-closure-codex", "ts": "2026-07-23T02:26:12Z"}
+=== 2026-07-23 10:26:12 | dispatch ===
+  ts=2026-07-23 10:26:12
+  kind=dispatch
+  intent=codex 複驗 B4 fix 6 P1 閉合:write-once atomic/degrade roster/stdout token/expiry/self-check/deleted-receipt
+  risk=low
+  facts_asked=fix=completeness_check.sh+7新測試(184 passed)
+  review_role=closure re-verifier codex
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-b4fix2-grok", "ts": "2026-07-23T02:40:34Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b4fix2-RESULT.md", "output_sha256": "pending", "task_id": "conv-b4fix2-grok", "ts": "2026-07-23T02:40:35Z"}
+=== 2026-07-23 10:40:35 | dispatch ===
+  ts=2026-07-23 10:40:35
+  kind=dispatch
+  intent=收斂 B4 fix2:roster 唯一性/allowlist 驗證 + coverage.json 也 write-once(O_EXCL)
+  risk=high
+  facts_asked=codex 新2洞=handoffs/20260722-conv-b4fix-closure-codex.md New-07/New-08
+  review_role=Grok 修;codex 複驗
+  template=n/a:impl fix
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b4fix2-closure-codex.md", "output_sha256": "pending", "task_id": "conv-b4fix2-closure-codex", "ts": "2026-07-23T02:47:40Z"}
+=== 2026-07-23 10:47:40 | dispatch ===
+  ts=2026-07-23 10:47:40
+  kind=dispatch
+  intent=codex 複驗 B4 fix2:roster 唯一性/allowlist + coverage.json write-once 閉合
+  risk=low
+  facts_asked=fix=completeness_check.sh roster驗證+coverage O_EXCL+3測試(187 passed)
+  review_role=closure re-verifier codex
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

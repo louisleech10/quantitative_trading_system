@@ -19,9 +19,15 @@
 #
 # B2: canonical ID / body 機檢 / digest / DEGRADE 命名空間 / dup
 # B3: sources.lock / roster / 拒收 symlink·子目錄·root外·late·非md·非family / 拒 ADVISORY_ONLY
+# B4 Task4.1: --self-check advisory + write-once first_draft receipt
+# B4 Task5.1: DEGRADED_PENDING 狀態機（合法降級 exit 3；禁 waived:/skip 字串灰態）
 #
-# exit: 0=PASS; 1=FAIL/非法; 3=DEGRADED_PENDING(B4;本檔 B3 不產)
+# exit: 0=PASS/ADVISORY_MISSING(self-check); 1=FAIL/非法/檔缺; 3=DEGRADED_PENDING
 set -u
+
+# 全域：合法降級時由 _check_roster 置位；主路徑結束 exit 3
+DEGRADED_MODE=0
+DEGRADE_ESCALATE=0
 
 # ---------------------------------------------------------------------------
 # BC1 反 bypass：COMPLETENESS_ALLOW_ARGV_SOURCES 僅 GOVERNANCE_TEST_HARNESS=1 才認
@@ -242,11 +248,168 @@ _load_lock() {
 }
 
 # ---------------------------------------------------------------------------
-# _check_roster — roster 缺檔 ∧ 無合法 DEGRADED_PENDING → exit 1（B3 無 degrade 第三態）
+# _check_degrade_event — 合法降級前提：DEGRADE heading + degrade.json + min_families≥2
+# 成功 → 設 DEGRADED_MODE=1（與可選 DEGRADE_ESCALATE）；失敗 → return 1
+# ---------------------------------------------------------------------------
+_check_degrade_event() {
+  local lock_path="$1"
+  local missing_csv="$2"   # comma-separated lower-case families
+  local synth="${3:-}"
+  local sess_dir
+  sess_dir="$(python3 -c 'import os,sys; print(os.path.realpath(os.path.dirname(sys.argv[1])))' "${lock_path}")"
+  local degrade_json="${sess_dir}/degrade.json"
+
+  if [ -z "${synth}" ]; then
+    synth="${sess_dir}/synth.md"
+  fi
+
+  # 禁 waived:/skip 字串（任何 degrade 資料面；非灰態逃生口）
+  if [ -f "${degrade_json}" ]; then
+    if grep -Eiq 'waived:|/skip\b|\bskip\b|ALLOWLIST|ADVISORY_ONLY' "${degrade_json}" 2>/dev/null; then
+      echo "COMPLETENESS FAIL: degrade.json 含禁用語(waived:/skip/ALLOWLIST/ADVISORY_ONLY)；P0/P1 不得 waiver" >&2
+      return 1
+    fi
+  fi
+
+  # min_families：present families from lock.sources
+  local present_n
+  present_n="$(python3 - "${lock_path}" <<'PY'
+import json, sys
+lock = json.load(open(sys.argv[1], encoding="utf-8"))
+fams = {str(s.get("family", "")).lower() for s in (lock.get("sources") or []) if s.get("family")}
+print(len(fams))
+PY
+)"
+  if [ "${present_n}" -lt 2 ]; then
+    echo "COMPLETENESS FAIL: min_families<2 硬停（present=${present_n}；不得以降級繞過）" >&2
+    return 1
+  fi
+
+  if [ ! -f "${degrade_json}" ]; then
+    echo "COMPLETENESS FAIL: roster 缺席但無 degrade.json（無合法 DEGRADED_PENDING）" >&2
+    return 1
+  fi
+
+  if [ ! -f "${synth}" ]; then
+    echo "COMPLETENESS FAIL: synth 不存在，無法驗證 DEGRADE 事件: ${synth}" >&2
+    return 1
+  fi
+
+  # 逐缺席家族：須 ## DEGRADE-<FAM>-01（FAM 大寫）
+  local fam up_fam heading
+  IFS=',' read -r -a _miss_arr <<< "${missing_csv}"
+  for fam in "${_miss_arr[@]}"; do
+    [ -z "${fam}" ] && continue
+    up_fam="$(printf '%s' "${fam}" | tr '[:lower:]' '[:upper:]')"
+    heading="DEGRADE-${up_fam}-01"
+    if ! grep -Eiq "^[[:space:]]*#{2,6}[[:space:]]+${heading}[[:space:]]*$" "${synth}"; then
+      echo "COMPLETENESS FAIL: 缺席家族 ${fam} 無顯式 ## ${heading}（synth）" >&2
+      return 1
+    fi
+  done
+
+  # degrade.json schema + 與缺席家族對齊 + P0/P1 不得 waiver
+  local deg_report
+  deg_report="$(python3 - "${degrade_json}" "${missing_csv}" <<'PY'
+import json, re, sys
+from datetime import datetime
+
+path, missing_csv = sys.argv[1], sys.argv[2]
+missing = [m for m in missing_csv.split(",") if m]
+try:
+    d = json.load(open(path, encoding="utf-8"))
+except Exception as e:
+    print("BAD_JSON " + str(e))
+    sys.exit(0)
+
+required = ["absent_family", "reason", "approver", "expiry", "remediation_owner", "round"]
+for k in required:
+    if k not in d or d[k] is None or d[k] == "":
+        print("MISSING_FIELD " + k)
+        sys.exit(0)
+
+# 禁 waived/skip 字串（欄位值）
+blob = json.dumps(d, ensure_ascii=False)
+if re.search(r"waived\s*:|/skip\b|\bskip\b|ALLOWLIST|ADVISORY_ONLY", blob, re.I):
+    print("FORBIDDEN_WAIVER_STRING")
+    sys.exit(0)
+
+# P0/P1 不得 waiver：reason/approver 若明示 waiver P0/P1 → 拒
+if re.search(r"\bP[01]\b.*waiv|\bwaiv.*\bP[01]\b", blob, re.I):
+    print("P0_P1_WAIVER")
+    sys.exit(0)
+
+af = str(d.get("absent_family", "")).lower().strip()
+if af not in missing:
+    print("ABSENT_MISMATCH want_one_of=" + ",".join(missing) + " got=" + af)
+    sys.exit(0)
+
+# multi-absent: schema 單數；僅允許恰好一個缺席家族走合法降級
+if len(missing) != 1:
+    print("MULTI_ABSENT_UNSUPPORTED count=" + str(len(missing)))
+    sys.exit(0)
+
+try:
+    round_n = int(d["round"])
+except Exception:
+    print("BAD_ROUND")
+    sys.exit(0)
+if round_n < 1:
+    print("BAD_ROUND")
+    sys.exit(0)
+
+expiry = str(d["expiry"])
+# BF4: 真 ISO8601 解析；非法格式 / 過期 → FAIL（不可建 DEGRADED_PENDING）
+from datetime import datetime, timezone
+try:
+    exp_s = expiry.strip()
+    if exp_s.endswith("Z"):
+        exp_dt = datetime.fromisoformat(exp_s[:-1] + "+00:00")
+    else:
+        exp_dt = datetime.fromisoformat(exp_s)
+    if exp_dt.tzinfo is None:
+        exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+except Exception:
+    print("BAD_EXPIRY")
+    sys.exit(0)
+now = datetime.now(timezone.utc)
+if exp_dt < now:
+    print("EXPIRED_EXPIRY")
+    sys.exit(0)
+
+print("OK round=" + str(round_n) + " family=" + af)
+PY
+)"
+
+  if echo "${deg_report}" | grep -q '^FORBIDDEN_WAIVER_STRING\|^P0_P1_WAIVER'; then
+    echo "COMPLETENESS FAIL: P0/P1 不得 waiver；degrade 禁 waived:/skip 字串（${deg_report}）" >&2
+    return 1
+  fi
+  if ! echo "${deg_report}" | grep -q '^OK '; then
+    echo "COMPLETENESS FAIL: degrade.json 非法或不對齊缺席家族: ${deg_report}" >&2
+    return 1
+  fi
+
+  local round_n
+  round_n="$(echo "${deg_report}" | awk '/^OK /{for(i=1;i<=NF;i++) if($i ~ /^round=/){sub(/^round=/,"",$i); print $i}}')"
+  if [ -n "${round_n}" ] && [ "${round_n}" -ge 2 ] 2>/dev/null; then
+    DEGRADE_ESCALATE=1
+    echo "DEGRADE_ESCALATE: family=$(echo "${deg_report}" | awk '{for(i=1;i<=NF;i++) if($i ~ /^family=/){sub(/^family=/,"",$i); print $i}}') round=${round_n}（連續≥2 輪同家族 → 升級使用者/主委端 AskUserQuestion）" >&2
+  fi
+
+  DEGRADED_MODE=1
+  echo "COMPLETENESS INFO: 合法降級路徑就緒（absent=${missing_csv} present_families=${present_n}）" >&2
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# _check_roster — roster 缺檔 ∧ 無合法 DEGRADED_PENDING → exit 1
+# 合法降級（Task 5.1）→ 置 DEGRADED_MODE=1 後繼續（最終 exit 3）
 # 另: 每 roster 家族恰 1 檔；多餘同家族=跨 round 混入(M8)
 # ---------------------------------------------------------------------------
 _check_roster() {
   local lock_path="$1"
+  local synth_for_deg="${2:-}"
   # Python: print missing families and multi-file families; exit code via stdout tags
   local report
   report="$(python3 - "${lock_path}" <<'PY'
@@ -255,14 +418,26 @@ import sys
 from collections import Counter
 
 lock = json.load(open(sys.argv[1], encoding="utf-8"))
-roster = [str(x).lower() for x in lock.get("expected_roster") or []]
+roster_raw = [str(x).lower() for x in lock.get("expected_roster") or []]
 sources = lock.get("sources") or []
+allow = {"codex", "composer", "grok", "claude", "agy"}
+
+# New-07: expected_roster 本身唯一性 + allowlist（先於 MISSING/degrade）
+roster_counts: Counter[str] = Counter(roster_raw)
+dups = sorted([f for f, n in roster_counts.items() if n > 1])
+if dups:
+    print("ROSTER_DUP " + ",".join(f"{f}:{roster_counts[f]}" for f in dups))
+unknown_roster = sorted({f for f in roster_raw if f not in allow})
+if unknown_roster:
+    print("ROSTER_UNKNOWN " + ",".join(unknown_roster))
+
+# 後續 MISSING/MULTI 用去重 roster（dup 已標 ROSTER_DUP 硬拒）
+roster = list(dict.fromkeys(roster_raw))
 fam_counts: Counter[str] = Counter()
 for s in sources:
     fam = str(s.get("family", "")).lower()
     fam_counts[fam] += 1
 
-allow = {"codex", "composer", "grok", "claude", "agy"}
 missing = []
 multi = []
 for fam in roster:
@@ -286,6 +461,9 @@ if extras:
     print("EXTRA_FAM " + ",".join(extras))
 if not roster and not sources:
     print("EMPTY_ROSTER_AND_SOURCES")
+# present count for min_families diagnostics
+present = [f for f in roster if fam_counts.get(f, 0) == 1]
+print("PRESENT_N " + str(len({str(s.get("family","")).lower() for s in sources if s.get("family")})))
 PY
 )"
 
@@ -293,12 +471,29 @@ PY
     echo "COMPLETENESS FAIL: empty roster 且無 sources（vacuous 拒收）" >&2
     return 1
   fi
+  # New-07: expected_roster 重複 / allowlist 外 → 硬 FAIL（即使有 degrade 事件也不可 rc3 放行）
+  if echo "${report}" | grep -q '^ROSTER_DUP '; then
+    local rd
+    rd="$(echo "${report}" | awk '/^ROSTER_DUP /{print $2}')"
+    echo "COMPLETENESS FAIL: expected_roster 含重複家族: ${rd}" >&2
+    return 1
+  fi
+  if echo "${report}" | grep -q '^ROSTER_UNKNOWN '; then
+    local ru
+    ru="$(echo "${report}" | awk '/^ROSTER_UNKNOWN /{print $2}')"
+    echo "COMPLETENESS FAIL: expected_roster 含 allowlist 外家族: ${ru}（允許: codex,composer,grok,claude,agy）" >&2
+    return 1
+  fi
+  # BF2: 合法降級不提前 return；MISSING 通過後仍須跑完整 MULTI/EXTRA_FAM 不變式
   if echo "${report}" | grep -q '^MISSING '; then
     local miss
     miss="$(echo "${report}" | awk '/^MISSING /{print $2}')"
-    # B3: 無合法 DEGRADED_PENDING 路徑 → 硬 FAIL（degrade 屬 B4/Task5.1）
-    echo "COMPLETENESS FAIL: roster 缺席家族(無合法 DEGRADED_PENDING): ${miss}" >&2
-    return 1
+    # Task 5.1：嘗試合法降級；失敗 → 硬 FAIL
+    if ! _check_degrade_event "${lock_path}" "${miss}" "${synth_for_deg}"; then
+      echo "COMPLETENESS FAIL: roster 缺席家族(無合法 DEGRADED_PENDING): ${miss}" >&2
+      return 1
+    fi
+    # 合法降級就緒（DEGRADED_MODE=1）— 繼續 MULTI/EXTRA_FAM
   fi
   if echo "${report}" | grep -q '^MULTI '; then
     local multi
@@ -581,10 +776,293 @@ _run_id_layer() {
 }
 
 # ---------------------------------------------------------------------------
+# _collect_union_and_missing — stdout JSON line: missing_ids + coverage stats
+# （self-check / coverage.json 用；不因漏 ID 而 return≠0）
+# ---------------------------------------------------------------------------
+_collect_union_and_missing() {
+  local synth="$1"
+  shift
+  python3 - "${synth}" "$@" <<'PY'
+import re, sys
+from pathlib import Path
+
+HEADING = re.compile(r"^#{2,6}\s+(\S+)")
+CANON = re.compile(r"^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$")
+DEGRADE = re.compile(r"^DEGRADE-[A-Z]+-[0-9]{2,}$")
+FAM = {"CODEX", "COMPOSER", "GROK", "CLAUDE", "AGY"}
+
+def ids_of(path: str) -> set[str]:
+    out: set[str] = set()
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return out
+    for line in text.splitlines():
+        m = re.match(r"^\s*#{2,6}\s+(\S+)", line)
+        if not m:
+            continue
+        tok = m.group(1)
+        if DEGRADE.match(tok):
+            continue
+        if CANON.match(tok) and tok.split("-", 1)[0] in FAM:
+            out.add(tok)
+    return out
+
+synth = sys.argv[1]
+sources = sys.argv[2:]
+union: set[str] = set()
+for s in sources:
+    union |= ids_of(s)
+synth_ids = ids_of(synth)
+missing = sorted(union - synth_ids)
+present = sorted(union & synth_ids)
+cov = (len(present) / len(union)) if union else 0.0
+import json
+print(json.dumps({
+    "missing_ids": missing,
+    "union_size": len(union),
+    "synth_hit": len(present),
+    "id_coverage": cov,
+}, ensure_ascii=False))
+PY
+}
+
+# ---------------------------------------------------------------------------
+# _write_first_draft_receipt — write-once first_draft.sha256 + coverage.json
+# BF1: O_EXCL 原子建檔 + 寫入 rc 檢查（失敗 exit1，不吞成 advisory）
+# New-08: coverage.json 同 first_draft.sha256 用 O_EXCL write-once（不可變 receipt 對）
+# ---------------------------------------------------------------------------
+_write_first_draft_receipt() {
+  local sess_dir="$1"
+  local synth="$2"
+  local coverage_json_blob="$3"   # from _collect_union_and_missing
+
+  local receipt="${sess_dir}/first_draft.sha256"
+  local cov_path="${sess_dir}/coverage.json"
+
+  # 快速路徑（非競態保證；O_EXCL 為真 write-once）— 兩檔皆不可變 receipt 對
+  if [ -e "${receipt}" ]; then
+    echo "COMPLETENESS FAIL: 初稿 receipt 已存在不可回寫（write-once）: ${receipt}" >&2
+    return 1
+  fi
+  if [ -e "${cov_path}" ]; then
+    echo "COMPLETENESS FAIL: coverage.json 已存在不可回寫（write-once）: ${cov_path}" >&2
+    return 1
+  fi
+  if [ ! -f "${synth}" ]; then
+    echo "COMPLETENESS FAIL: 初稿 synth 不存在: ${synth}" >&2
+    return 1
+  fi
+
+  local draft_sha
+  draft_sha="$(_sha256_file "${synth}")"
+  if [ -z "${draft_sha}" ]; then
+    echo "COMPLETENESS FAIL: 無法計算 synth sha256: ${synth}" >&2
+    return 1
+  fi
+
+  # 原子寫入：receipt + coverage 皆 O_EXCL write-once（SPEC L107-110 不可變 receipt 對）
+  # rc: 0=ok, 2=write-once 衝突, 1=寫入/IO 失敗
+  local py_rc=0
+  python3 - "${receipt}" "${cov_path}" "${draft_sha}" "${coverage_json_blob}" <<'PY'
+import json
+import os
+import sys
+
+receipt_path, cov_path, draft_sha, blob = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+
+try:
+    data = json.loads(blob)
+except Exception as e:
+    print(f"COVERAGE_PARSE_ERROR: {e}", file=sys.stderr)
+    sys.exit(1)
+
+out = {
+    "missing_ids": data.get("missing_ids") or [],
+    "draft_sha256": draft_sha,
+    "id_coverage": float(data.get("id_coverage") or 0.0),
+}
+
+flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+
+def _unlink_quiet(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+try:
+    fd = os.open(receipt_path, flags, 0o644)
+except FileExistsError:
+    print("RECEIPT_EXISTS", file=sys.stderr)
+    sys.exit(2)
+except OSError as e:
+    print(f"RECEIPT_WRITE_ERROR: {e}", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(draft_sha + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+except Exception as e:
+    print(f"RECEIPT_WRITE_ERROR: {e}", file=sys.stderr)
+    _unlink_quiet(receipt_path)
+    sys.exit(1)
+
+# New-08: coverage.json 同 O_EXCL；pre-existing 不得 os.replace 覆寫
+try:
+    fd_c = os.open(cov_path, flags, 0o644)
+except FileExistsError:
+    print("COVERAGE_EXISTS", file=sys.stderr)
+    # 半寫：撤銷 receipt，避免 write-once 死鎖
+    _unlink_quiet(receipt_path)
+    sys.exit(2)
+except OSError as e:
+    print(f"COVERAGE_WRITE_ERROR: {e}", file=sys.stderr)
+    _unlink_quiet(receipt_path)
+    sys.exit(1)
+
+try:
+    with os.fdopen(fd_c, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+        f.flush()
+        os.fsync(f.fileno())
+except Exception as e:
+    print(f"COVERAGE_WRITE_ERROR: {e}", file=sys.stderr)
+    _unlink_quiet(cov_path)
+    _unlink_quiet(receipt_path)
+    sys.exit(1)
+
+sys.exit(0)
+PY
+  py_rc=$?
+  if [ "${py_rc}" -eq 2 ]; then
+    echo "COMPLETENESS FAIL: 初稿 receipt/coverage 已存在不可回寫（write-once）: ${receipt} / ${cov_path}" >&2
+    return 1
+  fi
+  if [ "${py_rc}" -ne 0 ]; then
+    echo "COMPLETENESS FAIL: 初稿 receipt/coverage 寫入失敗（rc=${py_rc}；不吞成 advisory）" >&2
+    return 1
+  fi
+  if [ ! -f "${receipt}" ] || [ ! -f "${cov_path}" ]; then
+    echo "COMPLETENESS FAIL: 初稿 receipt/coverage 寫入後仍缺檔" >&2
+    return 1
+  fi
+  echo "COMPLETENESS INFO: write-once 初稿 receipt → ${receipt}" >&2
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# _self_check — Task 4.1：列漏 ID → ADVISORY_MISSING exit0；輸入/執行錯 → exit1
+# ---------------------------------------------------------------------------
+_self_check() {
+  local lock_path="$1"
+  local synth="$2"
+
+  _load_lock "${lock_path}"
+
+  if [ -z "${synth}" ]; then
+    synth="${SESS_DIR}/synth.md"
+  fi
+
+  # 輸入錯誤極性：檔缺 / lock 壞 → exit 1（不吞成 advisory）
+  if [ ! -f "${synth}" ]; then
+    echo "COMPLETENESS FAIL: self-check 輸入錯誤 — synth 不存在: ${synth}" >&2
+    return 1
+  fi
+  if [ ! -d "${SOURCES_ROOT}" ]; then
+    echo "COMPLETENESS FAIL: self-check 輸入錯誤 — sources/ 不存在: ${SOURCES_ROOT}" >&2
+    return 1
+  fi
+
+  # roster/來源完整性仍硬（缺席家族不是 advisory）
+  if ! _check_roster "${LOCK_PATH}" "${synth}"; then
+    return 1
+  fi
+  # 合法降級在 self-check 也不當 PASS 省委員：self-check 遇 DEGRADED_MODE 仍可寫 receipt 但標 INFO
+  if ! _validate_sources "${LOCK_PATH}"; then
+    return 1
+  fi
+
+  SRC_PATHS=()
+  while IFS= read -r _sp; do
+    [ -n "${_sp}" ] && SRC_PATHS+=("${_sp}")
+  done < <(_lock_source_paths "${LOCK_PATH}")
+  if [ "${#SRC_PATHS[@]}" -eq 0 ]; then
+    echo "COMPLETENESS FAIL: self-check 輸入錯誤 — lock.sources 為空" >&2
+    return 1
+  fi
+
+  # body/schema 硬錯誤（非法 ID / empty shell）→ exit 1，不當 advisory
+  local src
+  if ! extract_heading_ids "${synth}" >/dev/null; then
+    echo "COMPLETENESS FAIL: self-check — synth ID schema 非法" >&2
+    return 1
+  fi
+  if ! _validate_finding_body "${synth}"; then
+    return 1
+  fi
+  for src in "${SRC_PATHS[@]}"; do
+    if [ ! -f "${src}" ]; then
+      echo "COMPLETENESS FAIL: self-check 輸入錯誤 — 來源不存在: ${src}" >&2
+      return 1
+    fi
+    if ! extract_heading_ids "${src}" >/dev/null; then
+      echo "COMPLETENESS FAIL: self-check — 來源 ID schema 非法: ${src}" >&2
+      return 1
+    fi
+    if ! _validate_finding_body "${src}"; then
+      return 1
+    fi
+  done
+
+  local cov_blob
+  cov_blob="$(_collect_union_and_missing "${synth}" "${SRC_PATHS[@]}")" || {
+    echo "COMPLETENESS FAIL: self-check 無法計算 coverage" >&2
+    return 1
+  }
+
+  if ! _write_first_draft_receipt "${SESS_DIR}" "${synth}" "${cov_blob}"; then
+    return 1
+  fi
+
+  # BF5: 合法降級不得 rc0 灰態掩蓋 — 標 DEGRADED_PENDING 並 return 3
+  if [ "${DEGRADED_MODE}" = "1" ]; then
+    echo "DEGRADED_PENDING"
+    echo "COMPLETENESS INFO: self-check 合法降級（DEGRADED_PENDING；不得當 advisory PASS）" >&2
+    if [ "${DEGRADE_ESCALATE}" = "1" ]; then
+      echo "COMPLETENESS INFO: DEGRADED_PENDING + ESCALATE（round≥2）" >&2
+    fi
+    return 3
+  fi
+
+  local missing_n
+  missing_n="$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1]).get("missing_ids") or []))' "${cov_blob}")"
+  if [ "${missing_n}" -gt 0 ]; then
+    echo "ADVISORY_MISSING"
+    python3 -c '
+import json,sys
+d=json.loads(sys.argv[1])
+for mid in d.get("missing_ids") or []:
+    print("  · " + mid)
+print("id_coverage=%.4f" % float(d.get("id_coverage") or 0.0))
+' "${cov_blob}"
+    echo "COMPLETENESS ADVISORY: self-check 列漏 ID（不阻塞；最終稿須獨立出口重跑）" >&2
+    return 0
+  fi
+
+  echo "COMPLETENESS ADVISORY: self-check 無漏 ID（仍不得跳過委員語意審；receipt 已 write-once）"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 LOCK_ARG=""
 SYNTH_ARG=""
+SELF_CHECK=0
 POSITIONAL=()
 
 while [ "$#" -gt 0 ]; do
@@ -599,10 +1077,19 @@ while [ "$#" -gt 0 ]; do
       SYNTH_ARG="$2"
       shift 2
       ;;
+    --self-check)
+      SELF_CHECK=1
+      shift
+      ;;
     --)
       shift
       while [ "$#" -gt 0 ]; do POSITIONAL+=("$1"); shift; done
       break
+      ;;
+    # 反 bypass：明確拒任何 skip/waiver 類選項（不新增逃生口）
+    --skip|--skip-completeness|--advisory-only)
+      echo "COMPLETENESS FAIL: 禁 --skip/--skip-completeness/--advisory-only 逃生口" >&2
+      exit 1
       ;;
     -*)
       echo "COMPLETENESS FAIL: 未知選項: $1" >&2
@@ -627,13 +1114,30 @@ if [ -n "${LOCK_ARG}" ]; then
     exit 1
   fi
 
+  if [ "${SELF_CHECK}" = "1" ]; then
+    _load_lock "${LOCK_ARG}"  # warm SESS_DIR for default synth（_self_check 內會再 load）
+    if [ -z "${SYNTH_ARG}" ]; then
+      SYNTH_ARG="${SESS_DIR}/synth.md"
+    fi
+    # BF5: 傳播 return 3（DEGRADED_PENDING），勿把非 0 一律壓成 exit 1 / 勿 exit 0 掩蓋
+    _self_check "${LOCK_PATH}" "${SYNTH_ARG}"
+    sc_rc=$?
+    if [ "${sc_rc}" -eq 3 ]; then
+      exit 3
+    fi
+    if [ "${sc_rc}" -ne 0 ]; then
+      exit 1
+    fi
+    exit 0
+  fi
+
   _load_lock "${LOCK_ARG}"
 
   if [ -z "${SYNTH_ARG}" ]; then
     SYNTH_ARG="${SESS_DIR}/synth.md"
   fi
 
-  if ! _check_roster "${LOCK_PATH}"; then
+  if ! _check_roster "${LOCK_PATH}" "${SYNTH_ARG}"; then
     exit 1
   fi
   if ! _validate_sources "${LOCK_PATH}"; then
@@ -650,6 +1154,19 @@ if [ -n "${LOCK_ARG}" ]; then
     exit 1
   fi
 
+  # Task 5.1 + BF3: 合法降級 → ID 層細節走 stderr；stdout 唯一 DEGRADED_PENDING
+  if [ "${DEGRADED_MODE}" = "1" ]; then
+    if ! _run_id_layer "${SYNTH_ARG}" "${SRC_PATHS[@]}" >&2; then
+      exit 1
+    fi
+    # 主輸出乾淨：僅一行 token（不與 COMPLETENESS PASS 混）
+    printf '%s\n' "DEGRADED_PENDING"
+    if [ "${DEGRADE_ESCALATE}" = "1" ]; then
+      echo "COMPLETENESS INFO: DEGRADED_PENDING + ESCALATE（round≥2）" >&2
+    fi
+    exit 3
+  fi
+
   if ! _run_id_layer "${SYNTH_ARG}" "${SRC_PATHS[@]}"; then
     exit 1
   fi
@@ -657,13 +1174,18 @@ if [ -n "${LOCK_ARG}" ]; then
 fi
 
 # ---- 非 lock：僅測試隔離允許 argv ----
+if [ "${SELF_CHECK}" = "1" ]; then
+  echo "COMPLETENESS FAIL: --self-check 必須搭配 --lock <sources.lock>" >&2
+  exit 1
+fi
+
 if [ "${COMPLETENESS_ALLOW_ARGV_SOURCES:-}" != "1" ]; then
   echo "COMPLETENESS FAIL: 正式入口必須 --lock <sources.lock>（argv 來源僅 tests 隔離 COMPLETENESS_ALLOW_ARGV_SOURCES=1）" >&2
   exit 1
 fi
 
 if [ "${#POSITIONAL[@]}" -lt 2 ]; then
-  echo "用法: bash scripts/completeness_check.sh --lock <sources.lock> [--synth path]" >&2
+  echo "用法: bash scripts/completeness_check.sh --lock <sources.lock> [--synth path] [--self-check]" >&2
   echo "  或: COMPLETENESS_ALLOW_ARGV_SOURCES=1 bash scripts/completeness_check.sh <綜合檔> <來源...>" >&2
   exit 2
 fi
