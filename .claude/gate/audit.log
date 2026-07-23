@@ -25821,3 +25821,191 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/sources/gate-audit-codex.md", "output_sha256": "pending", "task_id": "gateaudit-recon-codex", "ts": "2026-07-23T05:21:48Z"}
+=== 2026-07-23 13:21:48 | dispatch ===
+  ts=2026-07-23 13:21:48
+  kind=dispatch
+  intent=gate 逃脫點重稽核(codex):C1-C27+N vs 今天repo 開/已修/過時+補新洞,canonical格式
+  risk=low
+  facts_asked=seed=handoffs/20260722-pipeline-design-review-UNION.md, 現況碼=scripts/gate*.sh/reconcile_stamps_check.sh/verify_task_provenance.py
+  review_role=gate-audit recon codex family
+  template=n/a:recon 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/sources/gate-audit-composer.md", "output_sha256": "pending", "task_id": "gateaudit-recon-composer", "ts": "2026-07-23T05:21:48Z"}
+=== 2026-07-23 13:21:48 | dispatch ===
+  ts=2026-07-23 13:21:48
+  kind=dispatch
+  intent=gate 逃脫點重稽核(composer):C1-C27+N vs 今天repo 開/已修/過時+補新洞,canonical格式
+  risk=low
+  facts_asked=seed=handoffs/20260722-pipeline-design-review-UNION.md, 現況碼=scripts/gate*.sh/reconcile_stamps_check.sh/verify_task_provenance.py
+  review_role=gate-audit recon composer family
+  template=n/a:recon 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/sources/gate-audit-grok.md", "output_sha256": "pending", "task_id": "gateaudit-recon-grok", "ts": "2026-07-23T05:21:48Z"}
+=== 2026-07-23 13:21:48 | dispatch ===
+  ts=2026-07-23 13:21:48
+  kind=dispatch
+  intent=gate 逃脫點重稽核(grok):C1-C27+N vs 今天repo 開/已修/過時+補新洞,canonical格式
+  risk=low
+  facts_asked=seed=handoffs/20260722-pipeline-design-review-UNION.md, 現況碼=scripts/gate*.sh/reconcile_stamps_check.sh/verify_task_provenance.py
+  review_role=gate-audit recon grok family
+  template=n/a:recon 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260723-digest-fix-review-codex.md", "output_sha256": "pending", "task_id": "digestfix-consult-codex", "ts": "2026-07-23T07:07:29Z"}
+=== 2026-07-23 15:07:29 | dispatch ===
+  ts=2026-07-23 15:07:29
+  kind=dispatch
+  intent=digest 適用邊界修法諮詢(codex):Option A(--lock放寬digest)對抗審+反例
+  risk=low
+  facts_asked=consult=handoffs/20260723-DIGEST-FIX-CONSULT.md, 碼=scripts/completeness_check.sh _validate_finding_body
+  review_role=digest fix adversarial codex
+  template=n/a:consult
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260723-digest-fix-review-composer.md", "output_sha256": "pending", "task_id": "digestfix-consult-composer", "ts": "2026-07-23T07:07:29Z"}
+=== 2026-07-23 15:07:29 | dispatch ===
+  ts=2026-07-23 15:07:29
+  kind=dispatch
+  intent=digest 適用邊界修法諮詢(composer):Option A(--lock放寬digest)對抗審+反例
+  risk=low
+  facts_asked=consult=handoffs/20260723-DIGEST-FIX-CONSULT.md, 碼=scripts/completeness_check.sh _validate_finding_body
+  review_role=digest fix adversarial composer
+  template=n/a:consult
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260723-digest-fix-review-grok.md", "output_sha256": "pending", "task_id": "digestfix-consult-grok", "ts": "2026-07-23T07:07:29Z"}
+=== 2026-07-23 15:07:29 | dispatch ===
+  ts=2026-07-23 15:07:29
+  kind=dispatch
+  intent=digest 適用邊界修法諮詢(grok):Option A(--lock放寬digest)對抗審+反例
+  risk=low
+  facts_asked=consult=handoffs/20260723-DIGEST-FIX-CONSULT.md, 碼=scripts/completeness_check.sh _validate_finding_body
+  review_role=digest fix adversarial grok
+  template=n/a:consult
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "digestfix-impl-grok", "ts": "2026-07-23T07:16:36Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260723-digest-fix-RESULT.md", "output_sha256": "pending", "task_id": "digestfix-impl-grok", "ts": "2026-07-23T07:16:37Z"}
+=== 2026-07-23 15:16:38 | dispatch ===
+  ts=2026-07-23 15:16:38
+  kind=dispatch
+  intent=digest 修法實作 A+C+family-binding:lock mode欄+discovery免digest+family前綴綁定
+  risk=high
+  facts_asked=定案=handoffs/20260723-DIGEST-FIX-IMPL.md(三家諮詢收斂)
+  review_role=Grok 實作;Codex+Composer 雙家 code review
+  template=n/a:impl fix
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260723-digestfix-review2-codex.md", "output_sha256": "pending", "task_id": "digestfix-impl-review-codex", "ts": "2026-07-23T07:24:28Z"}
+=== 2026-07-23 15:24:28 | dispatch ===
+  ts=2026-07-23 15:24:28
+  kind=dispatch
+  intent=digest-fix 實作 review codex:A+C+family-binding符合設計+fail-closed+不弱化核心
+  risk=low
+  facts_asked=碼=completeness_check.sh+write_sources_lock.sh diff+5測試, 設計=DIGEST-FIX-IMPL.md
+  review_role=digest-fix impl reviewer codex
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260723-digestfix-review2-composer.md", "output_sha256": "pending", "task_id": "digestfix-impl-review-composer", "ts": "2026-07-23T07:24:28Z"}
+=== 2026-07-23 15:24:28 | dispatch ===
+  ts=2026-07-23 15:24:28
+  kind=dispatch
+  intent=digest-fix 實作 review composer:A+C+family-binding符合+fail-closed+不弱化
+  risk=low
+  facts_asked=碼=completeness_check.sh+write_sources_lock.sh diff+5測試, 設計=DIGEST-FIX-IMPL.md
+  review_role=digest-fix impl reviewer composer
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260723-digestfix-review2-codex.md", "output_sha256": "pending", "task_id": "digestfix-impl-review-codex", "ts": "2026-07-23T07:28:00Z"}
+=== 2026-07-23 15:28:00 | dispatch ===
+  ts=2026-07-23 15:28:00
+  kind=dispatch
+  intent=digest-fix 實作 review codex 重派(前次capacity失敗)
+  risk=low
+  facts_asked=碼=completeness_check.sh+write_sources_lock.sh diff+5測試
+  review_role=digest-fix impl reviewer codex
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260723-digestfix-p2-closure-codex.md", "output_sha256": "pending", "task_id": "digestfix-p2-closure-codex", "ts": "2026-07-23T07:41:42Z"}
+=== 2026-07-23 15:41:42 | dispatch ===
+  ts=2026-07-23 15:41:42
+  kind=dispatch
+  intent=codex 複驗 CODEX-R1-P2-01 閉合:mode null/empty→exit1 非默認review
+  risk=low
+  facts_asked=fix=completeness_check.sh:297 只認缺席為MISSING+test_lock_empty_mode_fails(223 passed)
+  review_role=closure re-verifier codex
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

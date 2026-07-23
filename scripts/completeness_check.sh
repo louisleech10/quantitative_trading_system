@@ -29,6 +29,9 @@ set -u
 # 全域：合法降級時由 _check_roster 置位；主路徑結束 exit 3
 DEGRADED_MODE=0
 DEGRADE_ESCALATE=0
+# lock.mode：discovery|review；argv 路徑與缺欄預設 review（fail-closed 嚴格強制 digest）
+# 禁 argv/env 覆寫 mode（只從 lock JSON 讀；_load_lock 設定）
+LOCK_MODE="review"
 
 # ---------------------------------------------------------------------------
 # BC1 反 bypass：COMPLETENESS_ALLOW_ARGV_SOURCES 僅 GOVERNANCE_TEST_HARNESS=1 才認
@@ -92,18 +95,44 @@ _sha256_file() {
 }
 
 # ---------------------------------------------------------------------------
+# _file_family_from_name — 檔名 *-<family>.md → 大寫 FAMILY；否則空
+# ---------------------------------------------------------------------------
+_file_family_from_name() {
+  local base
+  base="$(basename "$1")"
+  python3 -c '
+import re,sys
+m=re.match(r"^.+-(codex|composer|grok|claude|agy)\.md$", sys.argv[1], re.I)
+print(m.group(1).upper() if m else "")
+' "${base}"
+}
+
+# ---------------------------------------------------------------------------
 # extract_heading_ids — 輸出合法 canonical ID(每行一個;保留同檔重複以便 dup 偵測)
+# family-binding: 若檔名為 *-<family>.md（或第二參 expected_family 大寫），
+#   每個 heading 的 FAMILY 前綴必須 == 來源檔家族；冒充（codex 檔含 GROK-）→ exit1
+# synth.md 等無 family 後綴之檔 → 不強制 binding（綜合可跨家族）
 # ---------------------------------------------------------------------------
 extract_heading_ids() {
   local file="$1"
+  local expected_fam="${2:-}"
   local rc=0
   if [ "${USE_PATTERN_OVERRIDE}" = "1" ]; then
     grep -oE "${ID_PATTERN}" "${file}" 2>/dev/null || true
     return 0
   fi
 
+  # 未顯式傳入時由檔名推 family（* - <family>.md）
+  if [ -z "${expected_fam}" ]; then
+    expected_fam="$(_file_family_from_name "${file}")"
+  fi
+  # 正規化大寫
+  if [ -n "${expected_fam}" ]; then
+    expected_fam="$(printf '%s' "${expected_fam}" | tr '[:lower:]' '[:upper:]')"
+  fi
+
   # shellcheck disable=SC2016
-  awk -v heading_re="${HEADING_LINE_RE}" '
+  awk -v heading_re="${HEADING_LINE_RE}" -v expected_fam="${expected_fam}" '
     BEGIN {
       fam["CODEX"]=1; fam["COMPOSER"]=1; fam["GROK"]=1; fam["CLAUDE"]=1; fam["AGY"]=1
     }
@@ -119,6 +148,12 @@ extract_heading_ids() {
         family=segs[1]
         if (!(family in fam)) {
           print "COMPLETENESS FAIL: invalid family in ID: " line " (file=" FILENAME ")" > "/dev/stderr"
+          bad=1
+          next
+        }
+        # family-binding：來源檔家族 vs heading FAMILY 前綴（堵冒充）
+        if (expected_fam != "" && family != expected_fam) {
+          print "COMPLETENESS FAIL: family-binding mismatch: heading " line " family=" family " ≠ file family=" expected_fam " (file=" FILENAME ")" > "/dev/stderr"
           bad=1
           next
         }
@@ -142,14 +177,19 @@ extract_heading_ids() {
 }
 
 # ---------------------------------------------------------------------------
-# _validate_finding_body — 每 ## canonical ID 後須 **斷言**+**碼證**；P0/P1 另須 digest
+# _validate_finding_body — 每 ## canonical ID 後須 **斷言**+**碼證**；
+# P0/P1 digest：LOCK_MODE=review（預設/缺欄/argv）強制；discovery 免 digest
+# （斷言+碼證始終強制；ID-completeness 核心不弱化）
 # ---------------------------------------------------------------------------
 _validate_finding_body() {
   local file="$1"
+  # LOCK_MODE 只從全域讀（_load_lock 設；argv 路徑維持 review）；禁 env 覆寫
+  local mode="${LOCK_MODE:-review}"
   # shellcheck disable=SC2016
-  awk '
+  awk -v lock_mode="${mode}" '
     BEGIN {
       id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0; bad=0
+      require_digest = (lock_mode != "discovery")
     }
     function flush() {
       if (id == "") return
@@ -157,7 +197,7 @@ _validate_finding_body() {
         print "COMPLETENESS FAIL: empty-shell finding (缺 **斷言**/**碼證**): " id " (file=" FILENAME ")" > "/dev/stderr"
         bad=1
       }
-      if (sev == "P0" || sev == "P1") {
+      if (require_digest && (sev == "P0" || sev == "P1")) {
         if (!seen_digest) {
           print "COMPLETENESS FAIL: P0/P1 missing source digest (**來源摘要** or source_digest:): " id " (file=" FILENAME ")" > "/dev/stderr"
           bad=1
@@ -219,7 +259,8 @@ _check_same_file_dups() {
 
 # ---------------------------------------------------------------------------
 # _load_lock — 讀 sources.lock；version 不符 / 缺檔 → exit 1
-# 設定全域: LOCK_PATH, SESS_DIR, SOURCES_ROOT, LOCK_JSON 相關透過 temp 檔
+# 設定全域: LOCK_PATH, SESS_DIR, SOURCES_ROOT, LOCK_MODE
+# mode: 缺欄→review(fail-closed 嚴格); 未知值→exit1; 禁 argv/env 覆寫
 # ---------------------------------------------------------------------------
 _load_lock() {
   local lock_path="$1"
@@ -245,6 +286,37 @@ _load_lock() {
   if [ "${state}" != "FROZEN" ]; then
     echo "COMPLETENESS FAIL: sources.lock closure_state 須為 FROZEN(得 ${state:-missing})" >&2
     exit 1
+  fi
+
+  # mode：只從 lock JSON 讀；禁 argv/env 覆寫（不認 COMPLETENESS_MODE / LOCK_MODE env）
+  # 缺欄 → review（fail-closed 最嚴格，不需 migration）
+  local mode_raw
+  mode_raw="$(python3 -c '
+import json,sys
+d=json.load(open(sys.argv[1], encoding="utf-8"))
+# 僅「欄位缺席」→ __MISSING__(→review 嚴格);present-but-null/empty 視為未知值→落 case→exit1(CODEX-R1-P2-01)
+if "mode" not in d:
+    print("__MISSING__")
+else:
+    v=d.get("mode")
+    print("__EMPTY__" if v is None or (isinstance(v,str) and v.strip()=="") else str(v).strip())
+' "${LOCK_PATH}" 2>/dev/null || echo "__ERR__")"
+  if [ "${mode_raw}" = "__ERR__" ]; then
+    echo "COMPLETENESS FAIL: sources.lock mode 讀取失敗" >&2
+    exit 1
+  fi
+  if [ "${mode_raw}" = "__MISSING__" ]; then
+    LOCK_MODE="review"
+  else
+    case "${mode_raw}" in
+      discovery|review)
+        LOCK_MODE="${mode_raw}"
+        ;;
+      *)
+        echo "COMPLETENESS FAIL: sources.lock mode 未知值 '${mode_raw}'（允許: discovery|review）" >&2
+        exit 1
+        ;;
+    esac
   fi
 }
 
