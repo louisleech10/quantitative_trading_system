@@ -1,5 +1,6 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-22 | **Branch**: **main** | **狀態**: **委員文件收斂方法 epic 進行中**——地基已修(151/0綠 commit 574efba),★下一步=起草實作 SPEC(見下方分支線)。〔IC全棧健檢 Step1 完工/pipeline活洞H1-H7 皆暫緩分支〕
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-23 | **Branch**: **main** | **狀態**: ✅**委員文件收斂方法 epic 完工上線**(commit 27b499d;215→223 passed)→▶**Gate/派工逃脫點 epic 進行中**:Step1 recon 收齊 178 findings+digest 修法完工(ded74bc)+收斂工具首戰吃 178 成功;★**下一步(下個 session)=Claude 做 reconcile 綜合**(178→~30-50真洞,見「Gate 逃脫點 epic」節)。**epic 排序=Gate 逃脫點(reconcile→SPEC→分批修)全完 → 才 IC 全棧健檢 Step2-4**。
+> ⚠️**白話審閱閘**(2026-07-23 使用者定,見 memory feedback_plain_review_gate_reconcile_spec):**reconcile 最終結論** + **SPEC 最終結論** 兩處都須**白話解釋給使用者審閱、由使用者決定是否進下一階段**,別把委員 APPROVED 當可自動續走。
 
 ## ▶ IC 全棧健檢 epic — Step 1 完工,下一站 Step 2
 **定案交付物**:`handoffs/20260722-ic-map-WHOLEMAP-v2.md`(取代 06-24 v1;**已過三家完整性複驗+closure 親簽 APPROVED**)。joint recon=Claude+codex+composer+grok 三正式家族 + agy 實習;四家獨立版=`…-ic-discovery-{claude,codex,composer,grok}.md`;brief=`…-BRIEF.md`;複驗=`…-reconcile-verify-*.md`;戳記=`…-reconcile-stamp-*.md`。
@@ -34,8 +35,15 @@
 **✅ 地基已修(commit 574efba push)**:governance suite 146→**151 passed/0紅**(CLAUDE.md去寫死家數→pointer/gitignore run_receipts/b5 fixture補Task);`scripts/completeness_check.sh` 紅隊加固版入repo(STRICT=1/heading錨定;只擋dropped-ID非語意)。**地基剩(c)變異測試先寫紅**=併入實作SPEC。
 **制度教訓已入記憶** `feedback_reconcile_committee_stamp`:Claude多方綜合須原提出方完整性複驗+逐字全讀勿grep抄捷徑。
 
-## 🕳 另一分支 backlog:Gate 現行活洞 H1-H7(對碼證實,獨立於上;暫緩)
-設計檔`docs/PIPELINE_INTEGRITY_AUDIT_DESIGN.md`(push GitHub)+`handoffs/…-UNION.md`(A-G,~24節點/C1-C27/N1-N24)。H1 `gate_check.sh:47`無grok+cx_run/timeout全繞;H2 stamp預設codex,composer不含grok;H3 risk=low/waived旁路;H4無jq fail-open;H5 token kind級;H6 grok不在ADV provenance;+codex R2加P8-P12(touch造token/偽stamp/postflight size-only)。**未動工,待收斂方法後再排**。
+## ▶ Gate/派工流程逃脫點 epic — 開工(2026-07-23;大任務;收斂工具首場實戰)
+**緣起**:舊盤點`handoffs/20260722-pipeline-design-review-UNION.md`(C1-C27+N1-N24)是**手抄亂+機械grep會漏+已過時**;正是催生收斂 epic 的事故本體。現用收斂工具正確重做。**「H1-H7」是舊 HANDOFF 有損簡寫,真清單=C1-C27+N**。
+**Step 1 joint recon 進行中**:Claude 自產版已落地(`…/sources/gate-audit-claude.md`);三家 canonical 重稽核背景跑(codex `bl1075xhb`/composer `bsvwddo04`/grok `b9x9t7e7i`;brief=`20260723-GATE-AUDIT-RECON-BRIEF.md`;產物→`handoffs/reconcile/pipeline-gate-audit-r1/sources/gate-audit-{fam}.md`)。
+**Claude 稽核已抓**(vs 今天 repo):✅已閉合=C6(completeness_check上線)/E(治理215 passed);⚠️部分=C1(gate_check.sh:47 補了cursor-agent/agy+剝env但**仍無grok**);🔴仍開=C3(reconcile_stamps預設codex,composer)/C8(ADV_PATH_RE只CODEX|COMPOSER)/C12(無jq fail-open)/C2·C13(quorum只掛impl-bN,SPEC/TODO審無機檢)/C25通用串接(completeness只護convergence session)。
+**Step 1 recon 收齊**:四家 canonical findings 178 條(claude 7/codex 56/composer 57/grok 58)進 `handoffs/reconcile/pipeline-gate-audit-r1/sources/`;分佈證會收斂(每洞 3-5 家指到,非發散)。
+**⚠️ 工具首戰揭 digest 適用邊界**:completeness_check 的 per-finding digest 是為審查 reconcile 設計,discovery(finding 本身即源、無上游可雜湊)水土不服;四家 digest 格式各異。使用者點破「靠種子檔雜湊不通用(未來從零討論照爆)」→交委員會。**三家諮詢定案=A+C+family-binding**(codex+grok:A+C;composer 純A少數;fail-closed 勝):lock 加 `mode:discovery|review`(缺欄→review 嚴格/禁 argv覆寫)+discovery 免 digest+heading FAMILY前綴綁來源檔家族。**Grok 實作中**(`b3rrdq8yn`;定案=`20260723-DIGEST-FIX-IMPL.md`;諮詢=`20260723-digest-fix-review-{fam}.md`)。
+**✅ digest 修法完工+commit(`ded74bc`)**:三家 A+C+family-binding;lock `mode:discovery|review`(缺欄→review嚴格/null·empty→exit1/未知→exit1/禁覆寫)+discovery 免digest+family前綴綁來源檔;223 passed;composer APPROVE+codex CLOSED(P2-01 fix)。**通用工具層修法**(非種子檔 hack,未來從零 discovery 都適用)。
+**✅ 收斂工具首場真實實戰**:`--mode discovery` 重凍 lock→completeness 吃 178 findings 機械報完整 union(7+56+57+58);空 synth 全 missing=正確(待綜合)。防掉項機制真實戰場運作。
+**★下一步(接續點;下個 session 起手)**:**Claude 做 reconcile 綜合**——(a)機器抽全 178 ID(extract_heading_ids,先抽全集)→(b)分箱成 ~30-50 真洞(數據證收斂:每洞3-5家指到)→(c)跑 completeness 到 0 missing(工具擋掉項)→(d)committee 複查語意(錯併/講水)→(e)RECONCILE-STAMP→**🛑白話閘1:reconcile 最終結論白話解釋給使用者審閱、待拍板**→(f)SPEC(大任務全管線 雙家族)→**🛑白話閘2:SPEC 最終結論白話解釋、待拍板**→(g)分批修 gate。**已知洞主題=grok 到處缺席**(C1 gate_check:47無grok/C3 reconcile_stamps預設無grok/C8 ADV_PATH_RE無grok)。⚠️(b)是大任務(178→分箱),與收斂 epic 同規模在後。session=pipeline-gate-audit-r1;種子=`20260722-pipeline-design-review-UNION.md`+`docs/PIPELINE_INTEGRITY_AUDIT_DESIGN.md`。
 
 ## ✅ 1d attribution 六批完工(2026-07-22;commit f2de34f push main)
 清債:B1 intercept 正名/B2 NaN·inf·溢位·index fail-closed(unavailable 三鍵)/B3 幽靈 factor_attribution 顯式 unavailable+completed_partial 外顯+D-12 三計數。B0 golden 工具/B4 7 探針+機械 gate/B5 前端三態 union。每批 Grok 實作+Codex+Composer 雙審+agy 實習+Claude 獨立驗+閉合+quorum+Gate;三方 DATA-CORRECT scope reconcile 一致 IN-SCOPE-PASS。receipt 見 handoffs/1d-DATACORRECT-*。
