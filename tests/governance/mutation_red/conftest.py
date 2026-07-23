@@ -101,14 +101,13 @@ def list_family_sources(session: Path) -> list[Path]:
 
 
 def run_completeness(session: Path) -> subprocess.CompletedProcess[str]:
-    """以 v0 介面跑 completeness_check.sh：synth + 既有 family 來源檔。
+    """B3 起：正式 --lock 入口跑 completeness（禁 argv 來源覆寫）。
 
-    不傳 lock、不傳缺失 roster 槽、不傳非 family 檔——此為 v0 信任邊界，
-    使 M1/M7/M8/M9 在 v0 下 rc==0（先紅）。
+    B1/B2 時代曾用 argv 只傳 family 檔以製造先紅；B3 lock/roster 轉綠後
+    改讀 session/sources.lock。
     """
-    synth = session / "synth.md"
-    srcs = list_family_sources(session)
-    cmd = ["bash", str(COMPLETENESS_SH), str(synth), *[str(s) for s in srcs]]
+    lock = session / "sources.lock"
+    cmd = ["bash", str(COMPLETENESS_SH), "--lock", str(lock)]
     return subprocess.run(
         cmd,
         cwd=str(REPO_ROOT),
@@ -120,9 +119,8 @@ def run_completeness(session: Path) -> subprocess.CompletedProcess[str]:
 
 def completeness_cmd(session: Path) -> list[str]:
     """回傳 run_completeness 使用的命令列（供 receipt）。"""
-    synth = session / "synth.md"
-    srcs = list_family_sources(session)
-    return ["bash", str(COMPLETENESS_SH), str(synth), *[str(s) for s in srcs]]
+    lock = session / "sources.lock"
+    return ["bash", str(COMPLETENESS_SH), "--lock", str(lock)]
 
 
 def git_commit_short() -> str:

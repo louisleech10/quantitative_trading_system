@@ -25383,3 +25383,126 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-impl-b3-grok", "ts": "2026-07-23T00:52:28Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-conv-impl-b3-RESULT.md", "output_sha256": "pending", "task_id": "conv-impl-b3-grok", "ts": "2026-07-23T00:52:29Z"}
+=== 2026-07-23 08:52:29 | dispatch ===
+  ts=2026-07-23 08:52:29
+  kind=dispatch
+  intent=收斂 B3 實作:Task3.1 lock/roster/拒收/拒advisory + Task3.2 gate.sh 派實作閘掛 completeness
+  risk=high
+  facts_asked=TODO=docs/CONVERGENCE_METHOD_TODO.md §B3/Task3.1/3.2
+  review_role=Grok 實作;Codex+Composer 雙家 code review
+  template=n/a:impl 非產SPEC
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-b3-review-codex.md", "output_sha256": "pending", "task_id": "conv-impl-b3-review-codex", "ts": "2026-07-23T01:06:22Z"}
+=== 2026-07-23 09:06:22 | dispatch ===
+  ts=2026-07-23 09:06:22
+  kind=dispatch
+  intent=收斂 B3 code review codex:lock/roster/gate掛載+反bypass env嚴查+防假綠
+  risk=low
+  facts_asked=碼=scripts/completeness_check.sh+gate.sh+write_sources_lock.sh, 契約=TODO B3
+  review_role=B3 code reviewer non-implementer codex
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-convergence-b3-review-composer.md", "output_sha256": "pending", "task_id": "conv-impl-b3-review-composer", "ts": "2026-07-23T01:06:29Z"}
+=== 2026-07-23 09:06:29 | dispatch ===
+  ts=2026-07-23 09:06:29
+  kind=dispatch
+  intent=收斂 B3 code review composer:lock/roster/gate掛載+反bypass env嚴查+防假綠
+  risk=low
+  facts_asked=碼=scripts/completeness_check.sh+gate.sh+write_sources_lock.sh, 契約=TODO B3
+  review_role=B3 code reviewer non-implementer composer
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "/tmp/nonexist.md", "output_sha256": "pending", "task_id": "test-bypass", "ts": "2026-07-23T01:08:55Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-b3fix-grok", "ts": "2026-07-23T01:21:15Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-convergence-spec-review-RECONCILE.md", "output_sha256": "4bcd13a7ac90246f302f12f7b3d128f948c48faadc2964f62213a1d44a67035a", "task_id": "conv-b3fix-grok", "ts": "2026-07-23T01:23:35Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b3fix-RESULT.md", "output_sha256": "pending", "task_id": "conv-b3fix-grok", "ts": "2026-07-23T01:23:36Z"}
+=== 2026-07-23 09:23:36 | dispatch ===
+  ts=2026-07-23 09:23:36
+  kind=dispatch
+  intent=收斂 B3 fix 4群集
+  risk=high
+  facts_asked=findings=b3-review-{codex,composer}
+  review_role=Grok 修;codex+composer 複驗
+  template=n/a:impl fix
+  adversarial=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  reconcile=handoffs/20260722-convergence-spec-review-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/CONVERGENCE_METHOD_SPEC.md
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b3fix-closure-codex.md", "output_sha256": "pending", "task_id": "conv-b3fix-closure-codex", "ts": "2026-07-23T01:32:47Z"}
+=== 2026-07-23 09:32:47 | dispatch ===
+  ts=2026-07-23 09:32:47
+  kind=dispatch
+  intent=codex 複驗 B3 fix:BC1 env守衛/BC2 waived/BC4 路徑 閉合
+  risk=low
+  facts_asked=fix=scripts/gate.sh+completeness_check.sh+write_sources_lock.sh+tests
+  review_role=closure re-verifier codex
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260722-conv-b3fix-closure-composer.md", "output_sha256": "pending", "task_id": "conv-b3fix-closure-composer", "ts": "2026-07-23T01:32:47Z"}
+=== 2026-07-23 09:32:47 | dispatch ===
+  ts=2026-07-23 09:32:47
+  kind=dispatch
+  intent=composer 複驗 B3 fix:BC1 env bypass/BC3 gate測試假綠 閉合
+  risk=low
+  facts_asked=fix=scripts/gate.sh+tests/governance/test_gate_impl_dispatch.py
+  review_role=closure re-verifier composer
+  template=n/a:closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260722-conv-b3fix-closure2-codex.md", "output_sha256": "pending", "task_id": "conv-b3fix-closure2-codex", "ts": "2026-07-23T01:47:11Z"}
+=== 2026-07-23 09:47:11 | dispatch ===
+  ts=2026-07-23 09:47:11
+  kind=dispatch
+  intent=codex 複驗2:P0-03 ID_PATTERN 守衛/P2-01 --force 守衛 閉合+P1-04 scope 裁定
+  risk=low
+  facts_asked=fix=completeness_check.sh ID_PATTERN 綁harness+write_sources_lock --force 綁harness+2測試
+  review_role=closure re-verifier codex
+  template=n/a:closure2
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

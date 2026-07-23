@@ -22,6 +22,19 @@ VENV_PY="${REPO_ROOT}/venv/bin/python"
 # GATE_DIR_OVERRIDE:governance 測試隔離用(token/audit 寫進 tmp,不汙染真實信任工件)
 GATE_DIR="${GATE_DIR_OVERRIDE:-.claude/gate}"; AUDIT="${GATE_DIR}/audit.log"; mkdir -p "${GATE_DIR}"
 
+# ---------------------------------------------------------------------------
+# BC1 反 bypass：腳本覆寫 env 僅 GOVERNANCE_TEST_HARNESS=1 才認；否則 fail-closed
+# （正式/生產路徑不得靜默替換 reconcile_stamps / completeness）
+# ---------------------------------------------------------------------------
+if [ -n "${RECONCILE_STAMPS_CHECK_OVERRIDE:-}" ] && [ "${GOVERNANCE_TEST_HARNESS:-}" != "1" ]; then
+  echo "ERROR: RECONCILE_STAMPS_CHECK_OVERRIDE 僅允許 GOVERNANCE_TEST_HARNESS=1（正式路徑 fail-closed 拒覆寫）" >&2
+  exit 1
+fi
+if [ -n "${COMPLETENESS_CHECK_OVERRIDE:-}" ] && [ "${GOVERNANCE_TEST_HARNESS:-}" != "1" ]; then
+  echo "ERROR: COMPLETENESS_CHECK_OVERRIDE 僅允許 GOVERNANCE_TEST_HARNESS=1（正式路徑 fail-closed 拒覆寫）" >&2
+  exit 1
+fi
+
 _print_usage() {
   cat <<'EOF'
 用法範例：
@@ -285,7 +298,9 @@ _process_one_adversarial_file() {
         || { echo "ERROR: adversarial provenance 檢查失敗（見上），拒發 token。"; return 1; }
       ;;
     *)
-      bash "${SCRIPT_DIR}/reconcile_stamps_check.sh" "${adv_file}" \
+      # 與 _run_reconcile_stamp_check_adv 一致：測試 harness 可覆寫 stamps bin
+      local _adv_stamp_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
+      bash "${_adv_stamp_bin}" "${adv_file}" \
         || { echo "ERROR: --adversarial 既非 ADV 命名亦未獲 reconcile 戳記核可（見上），拒發 token。"; return 1; }
       ;;
   esac
@@ -293,7 +308,75 @@ _process_one_adversarial_file() {
 }
 
 _run_reconcile_stamp_check_adv() {
-  bash "${SCRIPT_DIR}/reconcile_stamps_check.sh" "$1"
+  # 測試隔離可覆寫（非正式逃生口）
+  local stamps_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
+  bash "${stamps_bin}" "$1"
+}
+
+# ---------------------------------------------------------------------------
+# _run_completeness_gate — Task 3.2：reconcile 核可後、發 token 前掛 completeness
+# 解析 session sources.lock；rc==1 → 拒發；rc==3(DEGRADED_PENDING) → 拒 final；腳本缺 → 拒發
+# ---------------------------------------------------------------------------
+_run_completeness_gate() {
+  local reconcile_file="$1"
+  local completeness_bin="${COMPLETENESS_CHECK_OVERRIDE:-${SCRIPT_DIR}/completeness_check.sh}"
+  local sessdir lock_path rc
+
+  # 結構性 engagement(BC2 primary)：completeness 閘為 convergence 內容合併專用,
+  #   僅對 handoffs/reconcile/<session>/ 下的 reconcile 生效。epic 自身的 meta-reconcile
+  #   (handoffs/*-RECONCILE.md,非 content-merge)→ 略過(非「lock 缺→略過」,是結構判定,不可靠刪 lock 繞)。
+  case "${reconcile_file}" in
+    */handoffs/reconcile/*|handoffs/reconcile/*) : ;;
+    *) return 0 ;;
+  esac
+
+  if [ ! -f "${completeness_bin}" ]; then
+    echo "ERROR: completeness_check 腳本不存在(fail-closed): ${completeness_bin}" >&2
+    return 1
+  fi
+
+  # session 推導：handoffs/reconcile/<session>/…
+  case "${reconcile_file}" in
+    */handoffs/reconcile/*|handoffs/reconcile/*)
+      # handoffs/reconcile/<session>/...
+      sessdir="$(python3 -c '
+import os,sys
+p=os.path.abspath(sys.argv[1])
+parts=p.replace("\\\\","/").split("/")
+try:
+    i=parts.index("reconcile")
+    # handoffs/reconcile/<session>
+    if i+1 < len(parts):
+        print("/".join(parts[:i+2]))
+    else:
+        print(os.path.dirname(p))
+except ValueError:
+    print(os.path.dirname(p))
+' "${reconcile_file}")"
+      ;;
+    *)
+      sessdir="$(cd "$(dirname "${reconcile_file}")" && pwd)"
+      ;;
+  esac
+
+  lock_path="${sessdir}/sources.lock"
+  if [ ! -f "${lock_path}" ]; then
+    echo "ERROR: sources.lock 不存在(fail-closed completeness): ${lock_path}（session=${sessdir}）" >&2
+    return 1
+  fi
+
+  # 正式路徑：僅 --lock，禁 argv 覆寫來源
+  bash "${completeness_bin}" --lock "${lock_path}"
+  rc=$?
+  if [ "${rc}" -eq 0 ]; then
+    return 0
+  fi
+  if [ "${rc}" -eq 3 ]; then
+    echo "ERROR: completeness DEGRADED_PENDING(rc=3) — 合法降級不可發 final/實作 token。" >&2
+    return 1
+  fi
+  echo "ERROR: completeness 未過(rc=${rc})，拒發實作 token。" >&2
+  return 1
 }
 
 if [ "${kind}" = "dispatch" ]; then
@@ -325,6 +408,9 @@ if [ "${kind}" = "dispatch" ]; then
     # reconcile 核可閘:對 SPEC 派「實作」(--spec 存在)時,reconcile 須獲委員戳記
     #   防「Claude 自產 reconcile 無人複核就派實作」。adversarial-review 派工本身(--template n/a:)不受此限。
     #   新語義:--reconcile 提供時檢 reconcile 單檔;未提供時對 --adversarial foreach(舊式 reconcile 內嵌戳記)。
+    #   戳記檢查：H1-H7 通用 waived 語義不變（waived 略過 stamp）。
+    #   Completeness（BC2）：convergence session 不受 waived 跳過——呼叫在 case 外；
+    #     _run_completeness_gate 內部以 handoffs/reconcile/<session>/ 結構判定，非 convergence → 略過。
     if [ -n "${spec}" ]; then
       case "${adversarial}" in
         ""|waived:*|stamped-waived:*) : ;;
@@ -332,8 +418,11 @@ if [ "${kind}" = "dispatch" ]; then
           if [ -n "${reconcile}" ]; then
             case "${reconcile}" in
               waived:*|stamped-waived:*) : ;;
-              *) bash "${SCRIPT_DIR}/reconcile_stamps_check.sh" "${reconcile}" \
-                   || { echo "ERROR: reconcile 未獲委員核可（見上），拒發實作 token。委員須在 reconcile append RECONCILE-STAMP APPROVED。"; exit 1; } ;;
+              *)
+                _stamp_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
+                bash "${_stamp_bin}" "${reconcile}" \
+                  || { echo "ERROR: reconcile 未獲委員核可（見上），拒發實作 token。委員須在 reconcile append RECONCILE-STAMP APPROVED。"; exit 1; }
+                ;;
             esac
           else
             _foreach_adversarial "${adversarial}" _run_reconcile_stamp_check_adv \
@@ -341,6 +430,25 @@ if [ "${kind}" = "dispatch" ]; then
           fi
           ;;
       esac
+      # Task 3.2 / BC2：spec dispatch 一律嘗試 completeness（路徑/結構閘在函式內）
+      # 即使 --adversarial waived: 也須對 convergence session 跑完整性
+      _comp_src=""
+      if [ -n "${reconcile}" ]; then
+        case "${reconcile}" in
+          waived:*|stamped-waived:*) : ;;
+          *) _comp_src="${reconcile}" ;;
+        esac
+      fi
+      if [ -z "${_comp_src}" ] && [ -n "${adversarial}" ]; then
+        case "${adversarial}" in
+          waived:*|stamped-waived:*|"") : ;;
+          *) _comp_src="${adversarial%%,*}" ;;
+        esac
+      fi
+      if [ -n "${_comp_src}" ]; then
+        _run_completeness_gate "${_comp_src}" \
+          || { echo "ERROR: completeness gate 未過（見上），拒發實作 token。"; exit 1; }
+      fi
     fi
     # 高風險「對 SPEC 派工」必須附 --spec 且機檢合規（template 漏結構=擋）
     case "${template}" in

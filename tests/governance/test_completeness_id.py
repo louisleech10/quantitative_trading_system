@@ -21,13 +21,23 @@ def _sha12(text: str) -> str:
 
 
 def _run(synth: Path, *sources: Path) -> subprocess.CompletedProcess[str]:
+    """B2 ID 層單元測試：隔離 env 允許 argv 來源（正式入口必須 --lock）。"""
+    import os
+
     cmd = ["bash", str(COMPLETENESS_SH), str(synth), *[str(s) for s in sources]]
+    env = os.environ.copy()
+    # BC1：argv 來源繞過僅 GOVERNANCE_TEST_HARNESS=1 才認
+    env["GOVERNANCE_TEST_HARNESS"] = "1"
+    env["COMPLETENESS_ALLOW_ARGV_SOURCES"] = "1"
+    # 確保測試不帶 advisory 旗標
+    env.pop("COMPLETENESS_ADVISORY_ONLY", None)
     return subprocess.run(
         cmd,
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
         check=False,
+        env=env,
     )
 
 
