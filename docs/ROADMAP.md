@@ -85,6 +85,12 @@
 - **落地五處**：①SPEC/TODO 範本每 Task 加 `存活至`/`覆蓋風險` 欄（`template_check.sh` 機檢，legacy manifest 豁免既有檔）②adversarial §1 10→11 類（必要性/短命工）③ORCH 加 code review 效率題（≥10× 門檻 + hot path 觸發式）④症狀 C 分案=下方 GOV-XREF-SYNC ⑤`GOV-IMPL-STAMP` codex 四輪抓 7 個繞過洞全堵（啟發式規避/basename 碰撞/heading 變體/零 Task/fixture 矩陣等）。
 - **審計**：`handoffs/GOV-NECESSITY-REVIEW-*`、`handoffs/GOV-IMPL-STAMP-*`。
 
+### 🔵 進行中 — Gate/派工逃脫點 epic（2026-07-23；收斂工具首場實戰；`handoffs/reconcile/pipeline-gate-audit-r1/`）
+- **源起**：舊 UNION 手抄盤點過時+會漏 → 用收斂工具正確重做。四家 canonical 獨立稽核 178 findings。
+- **✅ reconcile 全鏈落地 (a)-(e)**：178 raw → **8 主題/51 仍開真洞 + ledger**；`completeness_check.sh --lock` exit 0（0 掉項/body-hash/lock）；三家語意複查 REQUEST-CHANGES 全納 v2；**RECONCILE-STAMP codex+composer+grok APPROVED**（body sha256:5501dc49）；🛑白話閘1 使用者拍板方向對。定案=`synth.md`。
+- **工具流程真洞（待併 SPEC）**：過早凍結捕獲不合規源檔；重凍 FROZEN lock 只能靠 harness 旗標（正式路徑 fail-closed）。
+- **★下一步**：(f) SPEC 修 51 洞（碼債優先 grok-gate/token-kind/waiver-bypass/jq-failopen/gatedir-override/completeness-scope；family-registry 為 root cause）→🛑白話閘2→(g) 分批修。
+
 ### P2 — GOV-XREF-SYNC：跨文件交叉引用同步機械化（2026-07-20 三家裁決分案，`handoffs/GOV-NECESSITY-REVIEW-*`）
 - **本 session 累計實證 11 次**（原 6 次 + 戳記輪 5 次）；且戳記卡多輪的另一根因=brief 列死 task_id 未更新 + reconcile 舊 task_id 成抄錯源 → 落地應含「凍結前殘留掃描 + reconcile 脫敏 + brief task_id 機械生成」。
 - **出生事故**：1d SPEC 過程「改了裁決卻未同步其交叉引用」**同類錯 6 次**（composer-v3B1／grok-v3B2／grok-v4B1＋composer-v4B1／composer-v5B1／codex v0.5 戳記輪 REJECTED），每次都由委員擋下並多耗一輪三家複審。

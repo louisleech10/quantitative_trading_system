@@ -26009,3 +26009,94 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "gate-audit-srcfix", "ts": "2026-07-23T09:27:58Z"}
+=== 2026-07-23 17:27:58 | dispatch ===
+  ts=2026-07-23 17:27:58
+  kind=dispatch
+  intent=派回 composer+grok 修各自偵查源檔的純格式瑕疵(斷言marker/section標題),零語意
+  risk=low
+  facts_asked=none-needed:使用者已於本 session 選定「派回 composer+grok 自己修」
+  review_role=single-executor:各修自己產物,無對抗
+  template=n/a:純格式修非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "gate-audit-recon-review", "ts": "2026-07-23T10:21:12Z"}
+=== 2026-07-23 18:21:12 | dispatch ===
+  ts=2026-07-23 18:21:12
+  kind=dispatch
+  intent=委員語意複查 reconcile 分箱層(codex+composer+grok 三家平行,審錯併/講水/漏箱/粒度)
+  risk=low
+  facts_asked=none-needed:reconcile 委員複查為鐵律步驟
+  review_role=adversary:三家非實作者對抗式挑戰 Claude 分箱
+  template=n/a:review 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260723-gate-audit-recstamp-codex.md", "output_sha256": "pending", "task_id": "codex-recstamp", "ts": "2026-07-23T11:53:51Z"}
+=== 2026-07-23 19:53:51 | dispatch ===
+  ts=2026-07-23 19:53:51
+  kind=dispatch
+  intent=closure複驗+RECONCILE-STAMP:codex 確認自己R1 REQUEST-CHANGES在v2閉合
+  risk=low
+  facts_asked=none-needed:closure+stamp 為鐵律步驟
+  review_role=stamp:codex 原提出方 closure 複驗
+  template=n/a:stamp 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260723-gate-audit-recstamp-composer.md", "output_sha256": "pending", "task_id": "composer-recstamp", "ts": "2026-07-23T11:53:51Z"}
+=== 2026-07-23 19:53:51 | dispatch ===
+  ts=2026-07-23 19:53:51
+  kind=dispatch
+  intent=closure複驗+RECONCILE-STAMP:composer 確認自己R1 REQUEST-CHANGES在v2閉合
+  risk=low
+  facts_asked=none-needed:closure+stamp 為鐵律步驟
+  review_role=stamp:composer 原提出方 closure 複驗
+  template=n/a:stamp 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260723-gate-audit-recstamp-grok.md", "output_sha256": "pending", "task_id": "grok-recstamp", "ts": "2026-07-23T11:53:51Z"}
+=== 2026-07-23 19:53:51 | dispatch ===
+  ts=2026-07-23 19:53:51
+  kind=dispatch
+  intent=closure複驗+RECONCILE-STAMP:grok 確認自己R1 REQUEST-CHANGES在v2閉合
+  risk=low
+  facts_asked=none-needed:closure+stamp 為鐵律步驟
+  review_role=stamp:grok 原提出方 closure 複驗
+  template=n/a:stamp 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260723-gate-audit-recstamp-codex.md", "output_sha256": "ea02a7bdbf92f437ffe6c4fbb35976c07434e1df350fdc4d6a3bfb8e47d7b4c1", "task_id": "codex-recstamp", "ts": "2026-07-23T11:59:49Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260723-gate-audit-recstamp-composer.md", "output_sha256": "f61a169df904f82cffe1b7f08d265b7a06a384f2d0deb15ed95dfed33d28f017", "task_id": "composer-recstamp", "ts": "2026-07-23T11:59:50Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260723-gate-audit-recstamp-grok.md", "output_sha256": "21ea736b43f1a7ec0396b2da99cc9ad2c9340a4cb319c9624066b39b2424c8c2", "task_id": "grok-recstamp", "ts": "2026-07-23T11:59:50Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/synth.md", "output_sha256": "52750955bd59d48768be70ca94a8508b2bb26c8fdf517135211546e8e0359ddd", "task_id": "codex-recstamp", "ts": "2026-07-23T12:32:05Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/synth.md", "output_sha256": "52750955bd59d48768be70ca94a8508b2bb26c8fdf517135211546e8e0359ddd", "task_id": "composer-recstamp", "ts": "2026-07-23T12:32:05Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/synth.md", "output_sha256": "52750955bd59d48768be70ca94a8508b2bb26c8fdf517135211546e8e0359ddd", "task_id": "grok-recstamp", "ts": "2026-07-23T12:32:06Z"}
