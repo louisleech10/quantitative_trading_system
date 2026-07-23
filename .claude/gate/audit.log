@@ -26100,3 +26100,64 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/synth.md", "output_sha256": "52750955bd59d48768be70ca94a8508b2bb26c8fdf517135211546e8e0359ddd", "task_id": "codex-recstamp", "ts": "2026-07-23T12:32:05Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/synth.md", "output_sha256": "52750955bd59d48768be70ca94a8508b2bb26c8fdf517135211546e8e0359ddd", "task_id": "composer-recstamp", "ts": "2026-07-23T12:32:05Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/pipeline-gate-audit-r1/synth.md", "output_sha256": "52750955bd59d48768be70ca94a8508b2bb26c8fdf517135211546e8e0359ddd", "task_id": "grok-recstamp", "ts": "2026-07-23T12:32:06Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "gate-escape-t1-spec-adv", "ts": "2026-07-23T13:04:36Z"}
+=== 2026-07-23 21:04:36 | dispatch ===
+  ts=2026-07-23 21:04:36
+  kind=dispatch
+  intent=三家 adversarial 審 Gate 逃脫點 tranche-1 SPEC(scope/正確性/回歸/測試/依賴)
+  risk=low
+  facts_asked=none-needed:SPEC adversarial 為大任務鐵律
+  review_role=adversary:三家非起草者對抗挑戰 scope+修法+回歸
+  template=n/a:review 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-23T15:22:38Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T15:22:38Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T15:25:51Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T15:25:51Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T15:29:05Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T15:29:05Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "grok-fix-verify", "ts": "2026-07-23T15:30:14Z"}
+=== 2026-07-23 23:30:14 | dispatch ===
+  ts=2026-07-23 23:30:14
+  kind=dispatch
+  intent=獨立驗 grok 全鏈修正完整性(有無漏接點/SoT正確/回歸/測試可證偽);Claude實作,codex+composer審
+  risk=low
+  facts_asked=none-needed:code review 為鐵律
+  review_role=adversary:codex+composer 非實作者掃漏
+  template=n/a:review 非產SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/perf-test.md", "output_sha256": "pending", "task_id": "perf-test", "ts": "2026-07-23T15:31:51Z"}
+=== 2026-07-23 23:31:51 | dispatch ===
+  ts=2026-07-23 23:31:51
+  kind=dispatch
+  intent=t
+  risk=low
+  facts_asked=none-needed:t
+  review_role=stamp:composer
+  template=n/a:t
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-23T16:09:19Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T16:09:19Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T16:11:47Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-23T16:11:47Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}

@@ -19,6 +19,15 @@ SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_PY="${REPO_ROOT}/venv/bin/python"
 [ -x "${VENV_PY}" ] || VENV_PY="python"
+# 治理家族 SoT:ADV/family 推導一律讀此,禁散落寫死。事故:grok 散在 4 檔 11 處缺漏(2026-07-23)。
+# shellcheck source=scripts/governance_families.sh
+. "${SCRIPT_DIR}/governance_families.sh"
+# fail-closed(委員 A):SoT 讀不到 → 拒發,不 fallback(fallback=fail-open,SoT 精神破功)。SoT 為 committed 檔,正常不會缺。
+_ADV_FAMS_RE="$(families_get_upper review_families '|')" || {
+  echo "GATE FAIL: 治理家族 SoT 讀取失敗(fail-closed),拒發 token。修:確認 scripts/governance_families.json 存在且合法。" >&2
+  exit 1
+}
+[ -n "${_ADV_FAMS_RE}" ] || { echo "GATE FAIL: SoT review_families 空(fail-closed)" >&2; exit 1; }
 # GATE_DIR_OVERRIDE:governance 測試隔離用(token/audit 寫進 tmp,不汙染真實信任工件)
 GATE_DIR="${GATE_DIR_OVERRIDE:-.claude/gate}"; AUDIT="${GATE_DIR}/audit.log"; mkdir -p "${GATE_DIR}"
 
@@ -192,20 +201,29 @@ _append_committee_dispatch_any() {
   local adv_path="$1"
   local tid="$2"
   [ -n "${tid}" ] || return 0
-  local out_rel family output_sha256
+  local out_rel family output_sha256 _f _fu _matched
   out_rel=""
   [ -n "${adv_path}" ] && out_rel="$(_norm_output_path "${adv_path}")"
-  family="composer"
-  case "${out_rel}" in
-    *-ADV-CODEX*|*-adv-codex*) family="codex" ;;
-    *-ADV-COMPOSER*|*-adv-composer*) family="composer" ;;
-    *)
-      case "${review_role}" in
-        *codex*|*CODEX*) family="codex" ;;
-        *composer*|*COMPOSER*) family="composer" ;;
-      esac
-      ;;
-  esac
+  # family 推導:讀 SoT families 資料驅動(含 grok+未來家族),禁散落寫死。
+  # 事故:寫死只認 codex/composer→grok 誤記 composer 污染 audit provenance(2026-07-23)。
+  # 判定序:①路徑 *-ADV-<FAM>*/檔名 *-<fam>.md 後綴 ②review_role **唯一**命中 ③未知→"unknown"(誠實,不誤記 composer;委員 C)。
+  local _fams _hit _n
+  _fams="$(families_get families ' ')" || { echo "GATE FAIL: family SoT 讀取失敗(fail-closed)" >&2; return 1; }
+  family="unknown"; _matched=0
+  for _f in ${_fams}; do
+    _fu="$(printf '%s' "${_f}" | tr '[:lower:]' '[:upper:]')"
+    case "${out_rel}" in
+      *-ADV-${_fu}*|*-adv-${_f}*|*-"${_f}".md) family="${_f}"; _matched=1; break ;;
+    esac
+  done
+  if [ "${_matched}" -eq 0 ]; then
+    # review_role:僅**唯一**家族命中才採;多家並列/子字串誤配(如 codex-and-grok)→ 保持 unknown,不亂標(委員 C)。
+    _hit=""; _n=0
+    for _f in ${_fams}; do
+      case "${review_role}" in *"${_f}"*) _hit="${_f}"; _n=$((_n + 1)) ;; esac
+    done
+    [ "${_n}" -eq 1 ] && family="${_hit}"
+  fi
   if [ -n "${adv_path}" ] && [ -f "${adv_path}" ]; then
     output_sha256="$(_sha256_file "${adv_path}")"
   else
@@ -222,9 +240,9 @@ _check_adversarial_quality() {
     return 1
   fi
   local ids has_blocking=0 has_id_finding=0
-  ids="$(grep -oE 'ADV-(CODEX|COMPOSER)-[0-9]+' "${adv_file}" 2>/dev/null | sort -u || true)"
+  ids="$(grep -oE "ADV-(${_ADV_FAMS_RE})-[0-9]+" "${adv_file}" 2>/dev/null | sort -u || true)"
   grep -q '\[BLOCKING\]' "${adv_file}" && has_blocking=1
-  grep -qE 'ID:[[:space:]]*ADV-(CODEX|COMPOSER)-[0-9]+' "${adv_file}" && has_id_finding=1
+  grep -qE "ID:[[:space:]]*ADV-(${_ADV_FAMS_RE})-[0-9]+" "${adv_file}" && has_id_finding=1
   # 舊格式（無 BLOCKING 且無 ID: finding）→ grandfather，走現行行為
   if [ "${has_blocking}" -eq 0 ] && [ "${has_id_finding}" -eq 0 ]; then
     return 0
@@ -278,7 +296,7 @@ _warn_reconcile_without_structured_findings() {
   for adv_path in "${_adv_arr[@]}"; do
     trimmed="$(echo "${adv_path}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     [ -n "${trimmed}" ] && [ -f "${trimmed}" ] || continue
-    if grep -q '\[BLOCKING\]' "${trimmed}" || grep -qE 'ID:[[:space:]]*ADV-(CODEX|COMPOSER)-[0-9]+' "${trimmed}"; then
+    if grep -q '\[BLOCKING\]' "${trimmed}" || grep -qE "ID:[[:space:]]*ADV-(${_ADV_FAMS_RE})-[0-9]+" "${trimmed}"; then
       any=1
       break
     fi
@@ -292,18 +310,16 @@ _process_one_adversarial_file() {
   local adv_file="$1"
   [ -f "${adv_file}" ] || { echo "ERROR: --adversarial 檔不存在:${adv_file}（真實檢查失敗）"; return 1; }
   _check_adversarial_quality "${adv_file}" || return 1
-  case "${adv_file}" in
-    handoffs/*-ADV-CODEX.md|handoffs/*-ADV-COMPOSER.md|handoffs/*-adv-codex.md|handoffs/*-adv-composer.md)
-      "${VENV_PY}" "${SCRIPT_DIR}/verify_task_provenance.py" check-adversarial "${adv_file}" \
-        || { echo "ERROR: adversarial provenance 檢查失敗（見上），拒發 token。"; return 1; }
-      ;;
-    *)
-      # 與 _run_reconcile_stamp_check_adv 一致：測試 harness 可覆寫 stamps bin
-      local _adv_stamp_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
-      bash "${_adv_stamp_bin}" "${adv_file}" \
-        || { echo "ERROR: --adversarial 既非 ADV 命名亦未獲 reconcile 戳記核可（見上），拒發 token。"; return 1; }
-      ;;
-  esac
+  # ADV 命名路徑判定改 SoT 驅動(含 grok);事故:寫死 CODEX|COMPOSER 使 *-ADV-GROK.md 落入 else 不跑 provenance(2026-07-23)。
+  if printf '%s' "${adv_file}" | grep -qiE -- "^handoffs/.*-ADV-(${_ADV_FAMS_RE})\.md$"; then
+    "${VENV_PY}" "${SCRIPT_DIR}/verify_task_provenance.py" check-adversarial "${adv_file}" \
+      || { echo "ERROR: adversarial provenance 檢查失敗（見上），拒發 token。"; return 1; }
+  else
+    # 與 _run_reconcile_stamp_check_adv 一致：測試 harness 可覆寫 stamps bin
+    local _adv_stamp_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
+    bash "${_adv_stamp_bin}" "${adv_file}" \
+      || { echo "ERROR: --adversarial 既非 ADV 命名亦未獲 reconcile 戳記核可（見上），拒發 token。"; return 1; }
+  fi
   return 0
 }
 
@@ -457,7 +473,7 @@ if [ "${kind}" = "dispatch" ]; then
     esac
   fi
   # Review-quorum 閘(2026-07-15 使用者定,scar:單家 review 連錯三批):中/大實作 batch N≥1 派工前,
-  #   前一批須 ≥2 個「非實作者」家族 code review(ORCH §1「code review=Codex+Composer 雙家」)。
+  #   前一批須 ≥2 個「非實作者」家族 code review(家族池=scripts/governance_families.json review_families:codex/composer/grok 任二非實作者)。
   #   從 impl task_id 自動推導(<root>-impl-b<N>-<impl_family>),無 flag 可繞、憑印象也擋得住。
   case "${task_id}" in
     *-impl-b[0-9]*-*)
@@ -476,7 +492,7 @@ if [ "${kind}" = "dispatch" ]; then
         done
         if [ -n "${_rq_prev}" ]; then
           bash "${SCRIPT_DIR}/review_quorum_check.sh" "${_rq_prev}" "${_rq_fam}" \
-            || { echo "GATE 拒發 token — 前一批 ${_rq_prev} 未達雙家 review quorum(ORCH §1 code review=Codex+Composer);見上,補派第二家後再派本批。"; exit 1; }
+            || { echo "GATE 拒發 token — 前一批 ${_rq_prev} 未達 ≥2 非實作者家族 review quorum(codex/composer/grok 任二);見上,補派第二家後再派本批。"; exit 1; }
         fi
       fi
       ;;

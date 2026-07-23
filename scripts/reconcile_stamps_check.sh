@@ -9,7 +9,7 @@
 # 戳記格式(委員審完後各自 append 一行;v2 須帶內容雜湊 + task-id):
 #   RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<body-hash> task:<harness-task-id>
 #   RECONCILE-STAMP: <family> REJECTED <YYYY-MM-DD> — <理由>
-#   <family> ∈ {codex, composer}
+#   <family> ∈ scripts/governance_families.json review_families(codex, composer, grok)
 #   <body-hash> = sha256 of 「## 戳記」之前的全部內容(即 reconcile 本體,不含戳記區)。
 #
 # 為何要 sha256(2026-06-27 使用者抓出):光帶日期擋不住偽造——同一天可重用、且 Claude 有寫入權可自寫假戳記。
@@ -24,12 +24,19 @@
 
 set -u
 file="${1:-}"
-required="${2:-codex,composer}"
+required="${2:-}"
 [ -n "${file}" ] || { echo "用法: reconcile_stamps_check.sh <reconcile_file> [families]"; exit 1; }
 [ -f "${file}" ] || { echo "RECONCILE-STAMP FAIL: 檔不存在: ${file}"; exit 1; }
 
 # 本體雜湊用共用 canonical 腳本(委員 stamp 時與此處同法,避免換行慣例不一致致假失敗)。
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
+# 家族清單單一真相源(SoT):未顯式傳第二參 → 預設 review_families(codex,composer,grok)。
+# 事故:預設寫死 codex,composer 使 grok 永不被機檢要求(2026-07-23)。SoT 讀失敗 → fail-closed。
+# shellcheck source=scripts/governance_families.sh
+. "${SCRIPT_DIR}/governance_families.sh"
+if [ -z "${required}" ]; then
+  required="$(families_get review_families)" || { echo "RECONCILE-STAMP FAIL: 家族 SoT 讀取失敗(fail-closed)"; exit 1; }
+fi
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_PY="${REPO_ROOT}/venv/bin/python"
 [ -x "${VENV_PY}" ] || VENV_PY="python"

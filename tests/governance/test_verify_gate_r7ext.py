@@ -101,8 +101,10 @@ def _append_approved_stamps(path: Path, *, task_id: str) -> None:
 
 
 def _run_reconcile(path: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    # fixture 由 _append_approved_stamps 造 codex+composer 兩家 → 顯式傳兩家 roster。
+    # stamp 預設 2026-07-23 改 review_families(含 grok);本鏈測試驗機制非 roster,傳參宣告(非放寬 assert)。
     return subprocess.run(
-        ["bash", str(RECONCILE_CHECK), str(path)],
+        ["bash", str(RECONCILE_CHECK), str(path), "codex,composer"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

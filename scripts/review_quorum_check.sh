@@ -6,7 +6,8 @@
 #   → 依 feedback_rules_are_scar_tissue「prose 再犯→做成閘門」,做成 gate。
 #
 # 家族來源:**解析 task_id 尾碼**(Claude 控制的命名 `<prefix>-review[N]-<family>`),
-#   不信 audit.log 的 family 欄(gate.sh 推導有 bug:不認 grok、預設 composer)。
+#   不信 audit.log 的 family 欄(defense-in-depth:即使 gate.sh 推導失準亦不受影響)。
+#   註:gate.sh family 推導已於 2026-07-23 修(認 grok、未知→unknown 非 composer);此處續用 task_id 尾碼為第二層保險。
 # **排除實作者家族** → 自動作廢「實作者自審」(不計入 quorum)。
 #
 # 用法: bash scripts/review_quorum_check.sh <review-task-prefix> <implementer-family>
@@ -52,5 +53,5 @@ if [ "${count}" -ge 2 ]; then
   exit 0
 fi
 echo "REVIEW-QUORUM FAIL: batch ${prefix} 僅 ${count} 個非實作者家族 review: ${distinct:-無}(需 ≥2;implementer=${implementer} 不計)"
-echo "  → 中/大實作須 Codex+Composer 雙家 code review(ORCH §1);補派第二家後再派下一批。"
+echo "  → 中/大實作須 ≥2 非實作者家族 code review(codex/composer/grok 任二;ORCH §1);補派第二家後再派下一批。"
 exit 1

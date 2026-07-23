@@ -1,0 +1,7 @@
+{
+  "_doc": "治理家族單一真相源(SoT)。所有 gate/stamp/ADV/executor 家族清單一律讀此檔,禁散落 hardcode。改此檔即改全鏈。事故:grok 散在 4 檔 11 處缺漏,逐處手補必漏(2026-07-23)。",
+  "families": ["codex", "composer", "grok", "claude", "agy"],
+  "review_families": ["codex", "composer", "grok"],
+  "executor_clis": ["codex", "cursor-agent", "grok", "agy"],
+  "advisory_only": ["agy"]
+}

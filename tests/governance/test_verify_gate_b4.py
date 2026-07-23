@@ -388,8 +388,10 @@ def test_reconcile_passes_with_dispatch_and_hash(tmp_path: Path) -> None:
 
 def test_delib_reconcile_still_passes_allowlist() -> None:
     """Task 4.3：既有 DELIB reconcile（legacy allowlist）須仍 PASS。"""
+    # legacy 2-family reconcile(2026-07-01;grok 2026-07-12 才成正式委員)→ 顯式傳兩家 roster。
+    # stamp 預設 2026-07-23 改為 review_families(含 grok);此 legacy 案例本質兩家,傳參宣告(非放寬 assert)。
     proc = subprocess.run(
-        ["bash", str(RECONCILE_CHECK), str(DELIB_RECONCILE)],
+        ["bash", str(RECONCILE_CHECK), str(DELIB_RECONCILE), "codex,composer"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

@@ -18,7 +18,19 @@ from pathlib import Path
 COMMITTEE_AUDIT_ENV = "VERIFY_GATE_COMMITTEE_AUDIT_LOG"
 DEFAULT_COMMITTEE_AUDIT = Path(".claude/gate/audit.log")
 
-ADV_PATH_RE = re.compile(r"^handoffs/.*-ADV-(CODEX|COMPOSER)\.md$", re.IGNORECASE)
+# ADV 家族群由治理 SoT 生成(含 grok);事故:寫死 CODEX|COMPOSER 使 grok ADV 檔漏(2026-07-23)。
+_SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+try:
+    from governance_families_loader import load_upper as _load_upper
+
+    _ADV_FAMS = "|".join(_load_upper("review_families"))
+except Exception as _e:  # noqa: BLE001  fail-closed(委員 A):SoT 讀失敗 → 拋錯拒絕,不 fallback(fallback=fail-open)
+    raise RuntimeError(
+        f"verify_task_provenance: 治理家族 SoT 讀取失敗(fail-closed): {_e}"
+    ) from _e
+ADV_PATH_RE = re.compile(rf"^handoffs/.*-ADV-({_ADV_FAMS})\.md$", re.IGNORECASE)
 # task id 允許連字號(如 p0ff3-r2);不含連字號會靜默截斷導致 allowlist/審計事件永不匹配
 STAMP_TASK_RE = re.compile(r"task:([a-z0-9][a-z0-9-]*)", re.IGNORECASE)
 STAMP_FAMILY_RE = re.compile(
@@ -199,7 +211,7 @@ def check_adversarial_provenance(adversarial_path: str) -> tuple[int, str]:
     if not ADV_PATH_RE.match(rel):
         return (
             1,
-            f"ERROR: adversarial 路徑不符合命名規則 handoffs/*-ADV-(CODEX|COMPOSER).md: "
+            f"ERROR: adversarial 路徑不符合命名規則 handoffs/*-ADV-({_ADV_FAMS}).md: "
             f"{adversarial_path}",
         )
     path = Path(adversarial_path)

@@ -44,7 +44,10 @@ case "$tool_name" in
       cmd="$(printf '%s' "$cmd" | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+//')"
     done
     # executor 通道：只比對「命令位置」（行首 / 分隔符後）的 binary，避免誤擋 cat sp_codex.txt 這種檔名子字串。
-    if printf '%s' "$cmd" | grep -Eq '(^|[;&|][[:space:]]*)(codex|cursor-agent|agy)[[:space:]]|claude[^|]*(-p|--print)'; then
+    # executor 名單 = scripts/governance_families.json executor_clis(codex|cursor-agent|grok|agy)。
+    # 熱路徑(每次工具呼叫)故此處寫死避免 subprocess 開銷;governance 測試釘死此清單 == SoT(防漂移)。
+    # 事故:寫死漏 grok,主力實作 CLI 不被 PreToolUse 攔(2026-07-23)。
+    if printf '%s' "$cmd" | grep -Eq '(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]|claude[^|]*(-p|--print)'; then
       # 排除 gate 自身與唯讀勘查
       if printf '%s' "$cmd" | grep -Eq 'scripts/gate(_check)?\.sh'; then exit 0; fi
       kind="dispatch"
