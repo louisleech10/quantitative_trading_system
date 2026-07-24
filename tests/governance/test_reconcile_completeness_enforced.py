@@ -111,7 +111,10 @@ def _dispatch_raw(gate_dir: Path, extra: list[str], env_extra: dict[str, str]) -
 
 
 def test_double_waiver_rejected_for_impl_dispatch(tmp_path: Path) -> None:
-    """委員 A(codex+composer P0):雙 waived → completeness 完全不跑卻發 token。應拒。"""
+    """委員 A(codex+composer P0):雙 waived → completeness 完全不跑卻發 token。應拒。
+
+    V-C 後：impl 對 waived/空 reconcile 改走 miss reconcile（仍 fail-closed，訊息更直接）。
+    """
     proc = _dispatch_raw(
         tmp_path / "g",
         ["--adversarial", "waived:t", "--reconcile", "waived:t", "--template", "impl:real"],
@@ -119,21 +122,61 @@ def test_double_waiver_rejected_for_impl_dispatch(tmp_path: Path) -> None:
     )
     out = proc.stdout + proc.stderr
     assert proc.returncode != 0, f"雙 waived 竟發 token(應拒):\n{out}"
-    assert "無可機械驗" in out, out
+    assert (
+        "無可機械驗" in out
+        or "一律須顯式 session reconcile" in out
+        or "--reconcile" in out
+    ), out
 
 
 def test_review_dispatch_na_template_not_falsely_blocked(tmp_path: Path) -> None:
-    """誤擋防護:review/adversarial 派工本身(--template n/a:)本無 reconcile,不得被新閘擋。"""
-    proc = _dispatch_raw(
-        tmp_path / "g2",
-        ["--adversarial", "waived:t", "--reconcile", "waived:t", "--template", "n/a:review 派工"],
-        {"RECONCILE_STAMPS_CHECK_OVERRIDE": str(_stub_pass(tmp_path / "s2.sh"))},
+    """誤擋防護:review/adversarial 派工本身(無 --spec、--template n/a:)本無 reconcile,不得被 V-C 擋。
+
+    V-C 後判定依 -n spec；真 review 不得帶 --spec（舊 fixture 誤帶 --spec 會被當 impl）。
+    """
+    gate_dir = tmp_path / "g2"
+    env = os.environ.copy()
+    env["GATE_DIR_OVERRIDE"] = str(gate_dir)
+    env["GOVERNANCE_TEST_HARNESS"] = "1"
+    env["RECONCILE_STAMPS_CHECK_OVERRIDE"] = str(_stub_pass(tmp_path / "s2.sh"))
+    proc = subprocess.run(
+        [
+            "bash",
+            str(GATE),
+            "dispatch",
+            "--intent",
+            "review dispatch no-spec",
+            "--risk",
+            "high",
+            "--facts-asked",
+            "none-needed:unit-test",
+            "--review-role",
+            "single-executor:n/a",
+            # 無 --spec → 非 impl，不進 V-C
+            "--adversarial",
+            "waived:t",
+            "--template",
+            "n/a:review 派工",
+            "--task-id",
+            "reconcile-enforce-review",
+            "--output",
+            "handoffs/reconcile-enforce-review.md",
+        ],
+        cwd=str(REPO),
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
     )
     assert proc.returncode == 0, f"review 派工被誤擋:\n{proc.stdout}{proc.stderr}"
 
 
 def test_comma_adversarial_每檔都驗(tmp_path: Path) -> None:
-    """委員 B(codex P0):逗號多檔原只驗首檔(${adversarial%%,*});應逐檔跑 completeness。"""
+    """impl 須顯式 --reconcile；completeness 對 reconcile 主路徑跑（V-C 淘汰 adversarial-only fallback）。
+
+    舊：無 --reconcile 時對 comma adversarial 逐檔 completeness。
+    新：impl 一律 --reconcile <synth>；此測驗 recon 主路徑 completeness 有跑 + multi-file adversarial 仍可附。
+    """
     files = []
     for name in ("s1", "s2"):
         d = tmp_path / "handoffs" / "reconcile" / name
@@ -148,14 +191,35 @@ def test_comma_adversarial_每檔都驗(tmp_path: Path) -> None:
     cc.chmod(cc.stat().st_mode | stat.S_IXUSR)
     proc = _dispatch_raw(
         tmp_path / "g3",
-        ["--adversarial", ",".join(files), "--template", "impl:real"],
+        [
+            "--adversarial",
+            ",".join(files),
+            "--reconcile",
+            files[0],  # V-C：impl 須顯式 recon
+            "--template",
+            "impl:real",
+        ],
         {
             "RECONCILE_STAMPS_CHECK_OVERRIDE": str(_stub_pass(tmp_path / "s3.sh")),
             "COMPLETENESS_CHECK_OVERRIDE": str(cc),
         },
     )
     calls = log.read_text(encoding="utf-8").count("call") if log.exists() else 0
-    assert calls == 2, f"completeness 只被呼叫 {calls} 次(應 2,逐檔);rc={proc.returncode}\n{proc.stdout}{proc.stderr}"
+    assert calls >= 1, (
+        f"completeness 應至少對 --reconcile 跑 1 次; calls={calls} "
+        f"rc={proc.returncode}\n{proc.stdout}{proc.stderr}"
+    )
+    # 另：無 --reconcile 的 impl+multi-adv 仍須被 V-C 拒（防回歸到 adversarial-only）
+    proc2 = _dispatch_raw(
+        tmp_path / "g3b",
+        ["--adversarial", ",".join(files), "--template", "impl:real"],
+        {
+            "RECONCILE_STAMPS_CHECK_OVERRIDE": str(_stub_pass(tmp_path / "s3b.sh")),
+            "COMPLETENESS_CHECK_OVERRIDE": str(cc),
+        },
+    )
+    assert proc2.returncode != 0, "impl 無 --reconcile 竟放行"
+    assert "reconcile" in (proc2.stdout + proc2.stderr).lower()
 
 
 def test_reject_message_names_the_three_step_fix(tmp_path: Path) -> None:
