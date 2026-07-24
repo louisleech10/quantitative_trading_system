@@ -18,7 +18,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_PY="${REPO_ROOT}/venv/bin/python"
-[ -x "${VENV_PY}" ] || VENV_PY="python"
+[ -x "${VENV_PY}" ] || VENV_PY="$(command -v python3 || command -v python)"  # 無 venv(如 CI)→ python3
 # 治理家族 SoT:ADV/family 推導一律讀此,禁散落寫死。事故:grok 散在 4 檔 11 處缺漏(2026-07-23)。
 # shellcheck source=scripts/governance_families.sh
 . "${SCRIPT_DIR}/governance_families.sh"

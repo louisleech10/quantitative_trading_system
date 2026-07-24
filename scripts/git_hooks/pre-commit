@@ -5,9 +5,10 @@ set -o pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
 cd "$ROOT" || exit 1
 py="venv/bin/python"
+[ -x "$py" ] || py="$(command -v python3 || command -v python)"  # 無 venv(如 CI)→ 系統 python3
 checker="scripts/verification_claim_check.py"
-if [ ! -x "$py" ] || [ ! -f "$checker" ]; then
-  echo "pre-commit: venv/bin/python 或 verification_claim_check.py 缺失" >&2
+if [ -z "$py" ] || [ ! -f "$checker" ]; then
+  echo "pre-commit: python(venv 或系統)或 verification_claim_check.py 缺失" >&2
   exit 1
 fi
 

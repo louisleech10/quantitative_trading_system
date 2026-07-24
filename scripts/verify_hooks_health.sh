@@ -41,9 +41,10 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 py="venv/bin/python"
+[ -x "$py" ] || py="$(command -v python3 || command -v python)"  # 無 venv(如 CI)→ 系統 python3
 checker="scripts/verification_claim_check.py"
-if [ ! -x "$py" ]; then
-  echo "HEALTH FAIL: $py missing or not executable" >&2
+if [ -z "$py" ]; then
+  echo "HEALTH FAIL: python (venv 或系統) missing" >&2
   fail=1
 elif [ ! -f "$checker" ]; then
   echo "HEALTH FAIL: $checker missing" >&2

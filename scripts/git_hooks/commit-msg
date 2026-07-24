@@ -9,9 +9,10 @@ if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
   exit 1
 fi
 py="venv/bin/python"
+[ -x "$py" ] || py="$(command -v python3 || command -v python)"  # 無 venv(如 CI)→ 系統 python3
 checker="scripts/verification_claim_check.py"
-if [ ! -x "$py" ] || [ ! -f "$checker" ]; then
-  echo "commit-msg: venv/bin/python 或 verification_claim_check.py 缺失" >&2
+if [ -z "$py" ] || [ ! -f "$checker" ]; then
+  echo "commit-msg: python(venv 或系統)或 verification_claim_check.py 缺失" >&2
   exit 1
 fi
 exec "$py" "$checker" --commit-msg "$msg_file"

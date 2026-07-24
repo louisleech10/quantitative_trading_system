@@ -82,8 +82,9 @@ fi
 [ -z "$new_text" ] && exit 0
 
 py="venv/bin/python"
+[ -x "$py" ] || py="$(command -v python3 || command -v python)"  # 無 venv(如 CI)→ 系統 python3
 checker="scripts/verification_claim_check.py"
-if [ ! -x "$py" ] || [ ! -f "$checker" ]; then
+if [ -z "$py" ] || [ ! -f "$checker" ]; then
   echo "[VERIFY-PRETOOLUSE] python/checker 缺失，fail-closed" >&2
   exit 2
 fi

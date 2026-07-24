@@ -39,7 +39,7 @@ if [ -z "${required}" ]; then
 fi
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_PY="${REPO_ROOT}/venv/bin/python"
-[ -x "${VENV_PY}" ] || VENV_PY="python"
+[ -x "${VENV_PY}" ] || VENV_PY="$(command -v python3 || command -v python)"  # 無 venv(如 CI)→ python3
 if ! grep -qE '^##[[:space:]]*戳記' "${file}"; then
   echo "RECONCILE-STAMP FAIL: ${file} 缺『## 戳記』區段標題(無法界定本體雜湊範圍)"; exit 1
 fi

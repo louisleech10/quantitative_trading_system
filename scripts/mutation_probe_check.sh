@@ -23,7 +23,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_PY="${REPO_ROOT}/venv/bin/python"
-[ -x "${VENV_PY}" ] || VENV_PY="python"
+[ -x "${VENV_PY}" ] || VENV_PY="$(command -v python3 || command -v python)"  # 無 venv(如 CI)→ python3
 
 fail=""
 
