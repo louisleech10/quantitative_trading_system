@@ -1,14 +1,14 @@
-"""委員派工 brief 合規閘:防「手搓 brief 漏掉範本必填條款」。
+"""委員派工 brief 合規閘(P1-1):防「手搓 brief 漏引用範本 / 漏攤前提」。
 
-兩次實證事故(同一病根,2026-07-23/24):
-1. 手搓 brief 漏 canonical finding ID 格式 → 委員產出格式不一(codex `F-01`/grok `GROK-T1-01`/
-   composer 無 ID)→ `completeness_check` 抽不到 → Claude 只能手做 reconcile → **掉項**(漏記 grok 立場)。
-2. 手搓 brief 漏範本 §0「反幻覺/挑戰前提」→ Claude 把自己的錯誤前提寫進題目當範例,
-   委員順著產出偽 finding(實例:把「送草稿 reconcile 去審」寫成合法情境)。ORCH L94 已記此傷疤
-   (「開委員會時餵相同框架給多模型 → 相關性錯誤,前提錯到使用者才抓出」)。
+病根(本 session 兩次事故,同一因):手搓 brief 未引用委員範本 →
+1. 委員不用 canonical 格式 → completeness 抽不到 → Claude 手做 reconcile → 掉項(漏 grok T1-01)。
+2. brief 未含 §0 挑戰前提 → Claude 錯誤前提被當 finding 帶回(偽 finding C2)。
 
-範本 `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` 兩條都寫好好的——問題是手搓時漏掉。
-故 `cx_run.sh`(所有委員派工統一入口)fail-closed 擋。
+治本(不重列範本條款,避免與範本漂移):cx_run.sh fail-closed 強制
+- 收集 findings 類 brief(review/consult/closure)須**引用委員範本**(單一真相源承載 canonical 格式/§0-§3/Verdict)
+- 且補**任務專屬前提宣告**(≥1 fact-verified + ≥1 assumed;範本給不了、每次須攤開)
+- impl/stamp 不產 findings → 不強制(不誤擋)
+範本↔工具相容性:COMMITTEE_FINDING_TEMPLATE 的 ID 正則與 completeness_check.sh CANONICAL_ID_RE 逐字一致(實測)。
 """
 from __future__ import annotations
 
@@ -18,8 +18,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 CX_RUN = REPO / "scripts" / "cx_run.sh"
 
-_CANON = "輸出用 ## <FAMILY>-R<n>-P[0-3]-<NN>"
-_PREMISE = "請先挑戰前提,勿只答我框好的題"
+_REF = "照 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md 全文"
+_FACT = "fact-verified: gate.sh:453 實讀 → 只在 --reconcile 觸發"
+_ASSUMED = "assumed: 送尚未驗完整的 reconcile 去審是合法情境"
 
 
 def _run(brief: Path, family: str = "codex") -> subprocess.CompletedProcess[str]:
@@ -29,53 +30,78 @@ def _run(brief: Path, family: str = "codex") -> subprocess.CompletedProcess[str]
     )
 
 
-def test_missing_brief_kind_rejected(tmp_path: Path) -> None:
+def _brief(tmp_path: Path, *lines: str) -> Path:
     b = tmp_path / "b.md"
-    b.write_text("# t\n隨便寫\n", encoding="utf-8")
-    p = _run(b)
+    b.write_text("# t\n" + "\n".join(lines) + "\n", encoding="utf-8")
+    return b
+
+
+# ---- brief-kind 宣告 ----
+def test_missing_brief_kind_rejected(tmp_path: Path) -> None:
+    p = _run(_brief(tmp_path, "隨便寫"))
     assert p.returncode != 0 and "brief-kind" in (p.stdout + p.stderr)
 
 
-def test_review_missing_canonical_id_rejected(tmp_path: Path) -> None:
-    """事故 1:缺 canonical ID → 委員產出機器讀不到。"""
-    b = tmp_path / "b.md"
-    b.write_text(f"# t\nbrief-kind: review\n{_PREMISE}\n", encoding="utf-8")
-    p = _run(b)
-    out = p.stdout + p.stderr
-    assert p.returncode != 0 and "canonical finding ID" in out
-
-
-def test_review_missing_challenge_premise_rejected(tmp_path: Path) -> None:
-    """事故 2:缺挑戰前提 → Claude 錯誤前提被當 finding 帶回。"""
-    b = tmp_path / "b.md"
-    b.write_text(f"# t\nbrief-kind: review\n{_CANON}\n", encoding="utf-8")
-    p = _run(b)
-    out = p.stdout + p.stderr
-    assert p.returncode != 0 and "挑戰前提" in out
-
-
 def test_unknown_kind_rejected(tmp_path: Path) -> None:
-    b = tmp_path / "b.md"
-    b.write_text("# t\nbrief-kind: whatever\n", encoding="utf-8")
-    p = _run(b)
+    p = _run(_brief(tmp_path, "brief-kind: whatever"))
     assert p.returncode != 0 and "未知 brief-kind" in (p.stdout + p.stderr)
 
 
+# ---- ① 強制引用範本(事故 1:委員不照 canonical 格式) ----
+def test_review_missing_template_reference_rejected(tmp_path: Path) -> None:
+    """review brief 未引用任何委員範本 → 拒(委員不會照 canonical 格式 → completeness 抽不到)。"""
+    p = _run(_brief(tmp_path, "brief-kind: review", _FACT, _ASSUMED))
+    out = p.stdout + p.stderr
+    assert p.returncode != 0 and "引用" in out and "範本" in out
+
+
+# ---- ② 前提宣告:各 ≥1(事故 2:錯誤前提被當 finding 帶回) ----
+def test_review_missing_assumed_rejected(tmp_path: Path) -> None:
+    """引用範本但無 assumed → 拒(宣稱零假設可疑,逼攤開可疑前提)。"""
+    p = _run(_brief(tmp_path, "brief-kind: review", _REF, _FACT))
+    out = p.stdout + p.stderr
+    assert p.returncode != 0 and "前提宣告" in out
+
+
+def test_review_missing_fact_verified_rejected(tmp_path: Path) -> None:
+    p = _run(_brief(tmp_path, "brief-kind: review", _REF, _ASSUMED))
+    out = p.stdout + p.stderr
+    assert p.returncode != 0 and "前提宣告" in out
+
+
+# ---- 合規 → 過 brief 閘 ----
 def test_compliant_review_brief_passes_brief_gate(tmp_path: Path) -> None:
-    """合規 brief 應通過 brief 閘(以未知 family 讓流程停在 family 檢查,證明已過 brief 檢查)。"""
-    b = tmp_path / "b.md"
-    b.write_text(f"# t\nbrief-kind: review\n{_CANON}\n{_PREMISE}\n", encoding="utf-8")
-    p = _run(b, family="notafamily")
+    """引用範本 + 各 ≥1 前提 → 過 brief 閘(以未知 family 讓流程停在 family 檢查,證明已過 brief 檢查)。"""
+    p = _run(_brief(tmp_path, "brief-kind: review", _REF, _FACT, _ASSUMED), family="notafamily")
     out = p.stdout + p.stderr
-    assert "brief-kind" not in out and "canonical finding ID" not in out and "挑戰前提" not in out
-    assert "family 須為" in out  # 停在 family 檢查 = brief 閘已放行
+    assert "brief-kind" not in out and "引用" not in out and "前提宣告" not in out
+    assert "family 須為" in out  # 停在 family 檢查 = brief 閘放行
 
 
+def test_semantic_template_reference_accepted(tmp_path: Path) -> None:
+    """引用語意審範本(另一合法範本)亦算合規。"""
+    p = _run(
+        _brief(tmp_path, "brief-kind: closure", "照 templates/COMMITTEE_SEMANTIC_REVIEW_TEMPLATE.md",
+               _FACT, _ASSUMED),
+        family="notafamily",
+    )
+    out = p.stdout + p.stderr
+    assert "family 須為" in out  # 過 brief 閘
+
+
+# ---- impl/stamp 不誤擋 ----
 def test_impl_kind_not_required_to_have_finding_clauses(tmp_path: Path) -> None:
-    """實作派工不產 findings → 不強制 canonical ID/挑戰前提(避免誤擋)。"""
-    b = tmp_path / "b.md"
-    b.write_text("# t\nbrief-kind: impl\n照 TODO 實作 B1\n", encoding="utf-8")
-    p = _run(b, family="notafamily")
+    p = _run(_brief(tmp_path, "brief-kind: impl", "照 TODO 實作 B1"), family="notafamily")
     out = p.stdout + p.stderr
-    assert "canonical finding ID" not in out and "挑戰前提" not in out
+    assert "引用" not in out and "前提宣告" not in out
     assert "family 須為" in out
+
+
+# ---- 範本↔工具相容性(實測 canonical ID 正則逐字一致) ----
+def test_template_id_regex_matches_completeness_tool() -> None:
+    """COMMITTEE_FINDING_TEMPLATE 的 ID 正則須與 completeness_check CANONICAL_ID_RE 一致(否則鏈斷)。"""
+    tmpl = (REPO / "templates" / "COMMITTEE_FINDING_TEMPLATE.md").read_text(encoding="utf-8")
+    tool = (REPO / "scripts" / "completeness_check.sh").read_text(encoding="utf-8")
+    canon = r"^([A-Z]+)-(R[0-9]+)-(P[0-3])-([0-9]{2,})$"
+    assert canon in tmpl, "範本缺 canonical ID 正則"
+    assert canon in tool, "工具缺 canonical ID 正則"

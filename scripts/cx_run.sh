@@ -20,29 +20,42 @@ fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-xhigh}"
 [ -f "${brief}" ] || { echo "ERROR: brief 檔不存在: ${brief}"; exit 2; }
 
 # ---------------------------------------------------------------------------
-# brief 合規閘(2026-07-24 使用者定;防「手搓 brief 漏掉範本必填條款」)
-# 兩次實證事故(同一病):
-#   ①漏 canonical finding ID 格式 → 委員產出機器讀不到(codex F-01/grok T1-01/composer 無ID)
-#     → completeness 抽不到 → Claude 只能手做 reconcile → 掉項(漏記 grok 立場)
-#   ②漏 §0 反幻覺/挑戰前提 → Claude 的錯誤前提被當 finding 帶回
-#     (實例:brief 自己把「送草稿去審」寫成合法情境,codex 順著產出偽 finding C2)
-#   ——範本 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md 兩條都寫得好好的,是手搓時漏掉。
-# 故:凡「收集委員 findings」類派工,brief 缺必填條款 → **拒派**(fail-closed,不讓 Claude 繞)。
+# brief 合規閘 P1-1(2026-07-24 使用者定;防「手搓 brief 漏掉範本必填條款」)
+# 兩次實證事故(同一病根):手搓 brief 未引用範本 →
+#   ①委員不知用 canonical 格式 → 產出 F-01/GROK-T1-01/無ID → completeness 抽不到
+#     → Claude 手做 reconcile → 掉項(漏 grok T1-01)
+#   ②未含 §0 挑戰前提 → Claude 的錯誤前提被當 finding 帶回(偽 finding C2)
+# 治本(P1-1):不在此重列範本條款(會與範本漂移/漏),改**強制 brief 引用範本**(單一真相源)
+#   + 補**任務專屬前提宣告**(fact-verified/assumed;範本給不了、每次必須 Claude 攤開)。
+#   格式細節(canonical ID/四欄/§0-§3/Verdict)全由範本承載;閘只驗「有沒有用範本 + 有沒有攤前提」。
+# 收集 findings 類 brief 缺 → 拒派(fail-closed)。impl/stamp 不產 findings → 不強制(不誤擋)。
+# 對應範本:review/adversarial→SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT;語意審→COMMITTEE_SEMANTIC_REVIEW_TEMPLATE;
+#   finding 格式→COMMITTEE_FINDING_TEMPLATE(三者互引,brief 引任一即涵蓋格式契約)。
 # ---------------------------------------------------------------------------
 _bk="$(grep -oE 'brief-kind:[[:space:]]*[a-z]+' "${brief}" 2>/dev/null | head -1 | sed 's/.*:[[:space:]]*//')"
 [ -n "${_bk}" ] || {
   echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp"
-  echo "  (收集 findings 類=review/consult/closure,會另檢範本必填條款)"
+  echo "  (收集 findings 類=review/consult/closure,會另檢範本引用+前提宣告)"
   exit 2
 }
 case "${_bk}" in
   review|consult|closure)
-    grep -qE '\-R<?n?[0-9]*>?-P\[?0?-?3?\]?-|FAMILY>-R|COMMITTEE_FINDING_TEMPLATE|SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT' "${brief}" \
-      || { echo "ERROR: brief-kind=${_bk} 須指明 canonical finding ID 格式(## <FAMILY>-R<n>-P[0-3]-<NN>);"
-           echo "  否則委員產出機器讀不到,completeness 無法驗 0 掉項。見 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md"; exit 2; }
-    grep -qE '挑戰前提|反幻覺|質疑.*前提' "${brief}" \
-      || { echo "ERROR: brief-kind=${_bk} 須含「挑戰前提/反幻覺」條款(範本 §0);"
-           echo "  否則 Claude 的錯誤前提會被當 finding 帶回(相關性錯誤,ORCH L94 傷疤)。"; exit 2; }
+    # ① 強制引用委員範本(單一真相源承載 canonical ID/四欄/§0-§3/Verdict)
+    grep -qE 'SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT|COMMITTEE_SEMANTIC_REVIEW_TEMPLATE|COMMITTEE_FINDING_TEMPLATE' "${brief}" \
+      || { echo "ERROR: brief-kind=${_bk} 須**引用**委員範本(brief 內寫明 templates/<範本>.md 全文照做);"
+           echo "  範本承載 canonical finding 格式+§0挑戰前提+Verdict,不引用委員不會照格式 → completeness 抽不到。"
+           echo "  review/adversarial→SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT;語意審→COMMITTEE_SEMANTIC_REVIEW_TEMPLATE。"; exit 2; }
+    # ② 任務專屬前提宣告(範本給不了):至少各一條 fact-verified / assumed
+    #    逼 Claude 在寫 brief 當下攤開假設 → 錯誤前提死在筆下,不燒一輪委員(事故 C2)。
+    # grep -c 未命中時 stdout=0 但 rc=1;用 || true 吞 rc(勿再 echo 0,否則變多行 "0\n0" 致 [ 炸)。
+    _n_fact="$(grep -cE 'fact-verified:' "${brief}" 2>/dev/null || true)"
+    _n_assumed="$(grep -cE 'assumed:' "${brief}" 2>/dev/null || true)"
+    if [ "${_n_fact}" -lt 1 ] || [ "${_n_assumed}" -lt 1 ]; then
+      echo "ERROR: brief-kind=${_bk} 須含任務專屬**前提宣告**(範本 §0):逐條標 'fact-verified: <前提> → <查證>' 或 'assumed: <前提>'。"
+      echo "  現況:fact-verified=${_n_fact} assumed=${_n_assumed};**至少各 1 條**。"
+      echo "  '至少一條 assumed':宣稱零假設本身可疑(沒有 brief 真的零假設);逼你攤開可疑前提,否則錯前提被當 finding 帶回(C2)。"
+      exit 2
+    fi
     ;;
   impl|stamp) : ;;
   *) echo "ERROR: 未知 brief-kind: ${_bk}(允許 review|consult|closure|impl|stamp)"; exit 2 ;;
