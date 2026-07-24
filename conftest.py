@@ -7,7 +7,15 @@ Pytest configuration file
 import sys
 import importlib.util
 from pathlib import Path
-from api.models.training_window_config import TrainingWindowConfig
+
+# P1-5(2026-07-24):治理守衛測試(tests/governance)自足,不需 api/numpy/momentum 等重依賴。
+# 為讓 CI 能用輕量環境(僅 pytest+pyyaml)跑治理測試,頂部重 import 缺依賴時容錯跳過:
+#   本機(全依賴)→ 正常載入,行為不變;CI(輕量)→ 跳過,治理測試照跑不炸。
+# training_window fixture 若在無依賴環境被真正使用才會 raise(治理測試不用它)。
+try:
+    from api.models.training_window_config import TrainingWindowConfig
+except ModuleNotFoundError:
+    TrainingWindowConfig = None  # type: ignore[assignment,misc]
 
 # 將專案根目錄加入 Python 路徑
 project_root = Path(__file__).parent.absolute()
@@ -81,8 +89,12 @@ def _patch_numpy_dtypes_compatibility() -> None:
         np.dtypes.Float64DType = float64_dtype_type
 
 
-_patch_numpy_reload_compatibility()
-_patch_numpy_dtypes_compatibility()
+# 缺 numpy(CI 輕量環境)→ 跳過 patch(治理測試不碰 numpy);本機有 numpy → 正常 patch。
+try:
+    _patch_numpy_reload_compatibility()
+    _patch_numpy_dtypes_compatibility()
+except ModuleNotFoundError:
+    pass
 
 
 import pytest

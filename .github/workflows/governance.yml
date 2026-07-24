@@ -1,0 +1,42 @@
+name: Governance
+
+# P1-5(2026-07-24 使用者定):把 tests/governance 的守衛測試接進 CI,
+# 從「等 Claude 記得手動跑」→「每次 push/PR 自動跑」。
+# 這些測試驗證各治理閘門(gate/completeness/stamp/brief/family-registry)真的擋得住,
+# 含 mutation_red(證明「改壞守衛→測試轉紅」,防廉價綠燈)。
+# 誠實邊界:此 job 能否**擋住 merge** 取決於 GitHub branch protection(僅 repo owner 能設)。
+#   未設 protection 前,本 job 只提供「每次 push 自動報綠/紅」,不阻止合併。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  governance-tests:
+    name: Governance guard tests (tests/governance)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 守衛測試自足:僅需 pytest + pyyaml(治理測試無 numpy/pandas/TA-Lib 重依賴);
+      # 外部工具 jq/bash/sha256sum ubuntu runner 內建。
+      - name: Install test deps (lightweight; no requirements.txt)
+        run: python -m pip install --quiet pytest pyyaml
+
+      - name: Verify tools available
+        run: command -v jq && command -v bash && command -v sha256sum
+
+      - name: Run governance guard tests
+        # 無 continue-on-error:守衛測試紅 → 本 job 紅(必須真實反映)。
+        run: pytest tests/governance -q
