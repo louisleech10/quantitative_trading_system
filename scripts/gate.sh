@@ -444,6 +444,17 @@ if [ "${kind}" = "dispatch" ]; then
   case "${reconcile}" in
     ""|waived:*|stamped-waived:*) : ;;
     *)
+      # V-B：--reconcile 目標須 realpath == session/synth.md（防 target 指 dropped、completeness 卻驗 synth）
+      # 僅置於本主呼叫點；不改 _run_completeness_gate 本體（adversarial fallback 不受影響）。
+      # 僅在「target 與 synth 皆可 resolve 且不相等」時於此拒——classic/缺檔仍交 _run_completeness_gate
+      # （保留「未走 session 流程」/「不存在」訊息）；V-B 攻擊面=同 session 有完整 synth 卻指 dropped。
+      _rp_target="$(realpath "${reconcile}" 2>/dev/null)"
+      _sess="$(dirname "${reconcile}")"
+      _rp_synth="$(realpath "${_sess}/synth.md" 2>/dev/null)"
+      if [ -n "${_rp_target}" ] && [ -n "${_rp_synth}" ] && [ "${_rp_target}" != "${_rp_synth}" ]; then
+        echo "ERROR: --reconcile 目標須為 session synth.md（防 target/synth 未綁定掉項）: ${reconcile}" >&2
+        exit 1
+      fi
       _run_completeness_gate "${reconcile}" \
         || { echo "ERROR: 引用的委員綜合未過完整性機械驗（見上），拒發 token。"; exit 1; }
       _comp_ran=1

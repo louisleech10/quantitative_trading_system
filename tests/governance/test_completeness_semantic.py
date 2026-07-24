@@ -333,11 +333,8 @@ def test_semantic_stamp_after_completeness(tmp_path: Path) -> None:
     if prod.returncode == 0:
         assert (session / "committee_accepted.json").is_file()
 
-    recon = session / "reconcile.md"
-    recon.write_text(
-        "# Reconcile\n\nVerdict: APPROVED\n\n## 戳記\n\nbody ok\n",
-        encoding="utf-8",
-    )
+    # V-B：--reconcile 指既有 synth.md（禁建 reconcile.md 覆蓋 synth union）
+    recon = session / "synth.md"
     adv = tmp_path / "adv.md"
     adv.write_text("# ADV\n\nVerdict: APPROVED\n", encoding="utf-8")
 
@@ -449,11 +446,8 @@ def test_fresh_none_allows_final_stamp(tmp_path: Path) -> None:
     ok2 = _run_producer(session, review, force=True)
     assert ok2.returncode == 0, f"合法 force 重寫應 PASS: {ok2.stderr!r}"
 
-    recon = session / "reconcile.md"
-    recon.write_text(
-        "# Reconcile\n\nVerdict: APPROVED\n\n## 戳記\n\nbody ok\n",
-        encoding="utf-8",
-    )
+    # V-B：--reconcile 指既有 synth.md（禁建 reconcile.md 覆蓋 synth union）
+    recon = session / "synth.md"
     adv = tmp_path / "adv.md"
     adv.write_text("# ADV\n\nVerdict: APPROVED\n", encoding="utf-8")
 

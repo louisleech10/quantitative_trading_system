@@ -535,21 +535,8 @@ def test_degraded_cannot_final_stamp(tmp_path: Path) -> None:
         f"rc={direct.returncode} stdout={direct.stdout!r} stderr={direct.stderr!r}"
     )
 
-    recon_file = recon_root / "reconcile.md"
-    recon_file.write_text(
-        textwrap.dedent(
-            """\
-            # Reconcile
-
-            ## 戳記
-
-            Verdict: APPROVED
-
-            body ok
-            """
-        ),
-        encoding="utf-8",
-    )
+    # V-B：--reconcile 指既有 synth.md（禁建 reconcile.md 覆蓋 synth union）
+    recon_file = recon_root / "synth.md"
     adv = tmp_path / "adv.md"
     adv.write_text("# ADV\n\nVerdict: APPROVED\n", encoding="utf-8")
 

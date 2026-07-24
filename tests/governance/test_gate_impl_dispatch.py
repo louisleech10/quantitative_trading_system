@@ -87,12 +87,8 @@ def _write_session_incomplete(base: Path) -> Path:
     (session / "sources.lock").write_text(
         json.dumps(lock, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    recon = session / "reconcile.md"
-    recon.write_text(
-        "# reconcile incomplete\n\nVerdict: CONDITIONAL\n\n## 戳記\n",
-        encoding="utf-8",
-    )
-    return recon
+    # V-B：gate --reconcile 目標須為 synth.md（既有 synth 保留，不覆蓋）
+    return session / "synth.md"
 
 
 def _write_session_single_ok(base: Path, name: str = "session_ok") -> Path:
@@ -120,9 +116,8 @@ def _write_session_single_ok(base: Path, name: str = "session_ok") -> Path:
     (session / "sources.lock").write_text(
         json.dumps(lock, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    recon = session / "reconcile.md"
-    recon.write_text("# recon\n\nVerdict: APPROVED\n\n## 戳記\n", encoding="utf-8")
-    return recon
+    # V-B：gate --reconcile 目標須為 synth.md（既有 synth 保留，不覆蓋）
+    return session / "synth.md"
 
 
 def _stub_pass(path: Path) -> Path:
