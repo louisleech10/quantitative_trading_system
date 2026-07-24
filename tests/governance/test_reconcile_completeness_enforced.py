@@ -170,3 +170,25 @@ def test_reject_message_names_the_three_step_fix(tmp_path: Path) -> None:
     )
     for token in ("canonical", "write_sources_lock.sh", "completeness_check.sh"):
         assert token in out, f"拒發訊息缺 {token}:\n{out}"
+
+
+def test_nonexistent_reconcile_target_rejected(tmp_path: Path) -> None:
+    """委員 codex C4:原不驗宣告檔是否存在 → 可指向 session 內不存在的 target 仍過。"""
+    sess = tmp_path / "handoffs" / "reconcile" / "sess"
+    (sess / "sources").mkdir(parents=True)
+    (sess / "sources.lock").write_text("{}", encoding="utf-8")
+    gate_dir = tmp_path / "gx"
+    env = os.environ.copy()
+    env["GATE_DIR_OVERRIDE"] = str(gate_dir)
+    proc = subprocess.run(
+        [
+            "bash", str(GATE), "dispatch", "--task-id", "c4-unit",
+            "--intent", "t", "--risk", "low", "--facts-asked", "none-needed:t",
+            "--review-role", "r", "--template", "n/a:t",
+            "--reconcile", str(sess / "NOPE.md"),
+        ],
+        cwd=str(REPO), capture_output=True, text=True, check=False, env=env,
+    )
+    assert proc.returncode != 0, "指向不存在的綜合檔竟放行"
+    assert "不存在" in (proc.stdout + proc.stderr)
+    assert not (gate_dir / "dispatch.token").exists()

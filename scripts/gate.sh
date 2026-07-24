@@ -346,6 +346,12 @@ _run_completeness_gate() {
   local completeness_bin="${COMPLETENESS_CHECK_OVERRIDE:-${SCRIPT_DIR}/completeness_check.sh}"
   local sessdir lock_path rc
 
+  # 委員 codex C4:原不驗宣告的檔是否存在 → 可指向 session 內不存在的 target 仍過(控制流 smoke rc=0)。
+  if [ ! -f "${reconcile_file}" ]; then
+    echo "ERROR: 宣告的委員綜合檔不存在(fail-closed): ${reconcile_file}" >&2
+    return 1
+  fi
+
   # 2026-07-24 強制化(使用者定;事故=Claude 手做 SPEC reconcile 漏記委員 finding):
   #   凡拿 reconcile 當**實作依據**(本函式只在 --spec 實作派工路徑被呼叫),一律須走 session 流程,
   #   否則無法機械驗 0 掉項。classic handoffs/*-RECONCILE.md 由「靜默略過」改「拒發+遷移指引」。
