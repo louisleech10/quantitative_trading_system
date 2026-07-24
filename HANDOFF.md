@@ -52,7 +52,15 @@
 **✅ 三家 SPEC adversarial 全 REQUEST-CHANGES(無否決骨架)**,reconcile 14 群集(`…-SPEC-ADV-RECONCILE.md`)全納 **v2**:+dispatch-notask 進 T1(Task3.5)、family-registry 消費者補全 7 消費者矩陣、1.4 補 gate.sh ADV-ID 全鏈、**3.4 採 grok alt-B**(classic 改 audit 可視+放行=零摩擦,棄 waiver/拒/遷移,解 78 份 classic 摩擦+B3 回歸)、jq/gatedir 政策精確化、§V per-Task Oracle 矩陣+三態 mutation、§N-DEFER 靜默類觸發改 audit/探針/首次事故。v2 TEMPLATE PASS(3 Phase/12 Task)。
 **⚠️ SPEC v2 暫停(使用者抓包 reconcile 品質)**:SPEC-ADV-RECONCILE 是**手做**(沒套 completeness 工具),漏記 grok T1-01;委員 review ID 格式不一工具讀不到。病灶=**SPEC/TODO/review reconcile 沒接完整性工具(=completeness-scope 洞活體),沒閘門就手做掉項**。判定=**重做不重驗**。
 **✅ 插隊完成:grok 全鏈修正 family-registry SoT(commits `32fd863`/`e6e1ee9`/`7cb2b69`/`e9037df` push)**:機械掃 grok 散 4 檔 11 處(含我 SPEC 都漏的 gate.sh:296)→建 `scripts/governance_families.json`(SoT)+雙語 loader,gate_check/reconcile_stamps/verify_task_provenance/gate.sh 全接。**做徹底(使用者定)**:A fail-closed(SoT缺/壞/families-key拒發)/C 2 bug(未知→unknown 堵腐蝕源+review_role 詞界擋 codexx)/B drift-test 釘全部消費者家族 site==SoT+**反 whack-a-mole meta-test**(掃 6 檔任何未釘功能家族行→紅,終結逐輪找漏)/D 邊界測試/E doc。**250 passed**,每修 mutation 證偽。**composer APPROVED;codex A/C/B-site CLOSED+unknown ACCEPTED(3輪)**;round4 純 confirmation 撞 codex infra error,**使用者拍板收了當完成**(meta-test 硬化已 mutation 客觀證明達 codex round3 要求)。副作用記:分類器加 grok 後 commit 訊息行首「codex」會誤攔(wrapper-strip 類啟發式限制,DEFERRED)。
-## ▶ 委員綜合完整性強制 epic(2026-07-24;使用者最初訴求「不准我抄近路」的本體)
+## ★★ GOVERNANCE HARNESS 待辦全清單(2026-07-24 使用者定:governance 先收斂,主線 IC/SPEC 排最後)
+> 理由:主委收集整理不可信前做主線=更多重工+更多輪+更燒token。詳細+來源=`handoffs/20260724-GOVERNANCE-HARNESS-PLAN.md`。此清單防漏做,勿壓縮掉項。
+> **PART1 核心(現在做)**:P1-1 brief閘硬化(前提逐條fact-verified/assumed+反空殼,非只grep關鍵字)/P1-2「驗守衛測試必附常駐mutation」機械強制(治本)/P1-3 本session手動mutation補常駐(全蒸發)/P1-4 brief閘自身mutation(我漏了)/P1-5 CI加pytest governance job/P1-6 B opt-in便宜版(特定派工強制帶--reconcile;完整版未結案債狀態機=專輪)/P1-7 C3 waiver不得跳stamp檢查/P1-8 C4後半target-synth綁定(先定慣例)/P1-9 template_check補mutation(天天用沒證偽)/P1-10 戳記檢查補mutation/P1-11 artifact路徑無completeness/P1-12 C5測試覆蓋+計數。
+> **PART2 誠實邊界**:純對話綜合機器攔不到(靠P1-6間接逼);brief閘擋「沒寫」不擋「沒照做」(completeness兜底);CI防繞過需branch protection(僅使用者能設,已定先不動觀察)。
+> **PART3 屬51洞SPEC那塊(不混入)**:節點6 facts-asked=C24/節點7 diff-assert=C19+mutation咽喉=N10/節點8獨立驗收=N24;~40 DEFERRED洞;wrapper-strip副作用(commit訊息行首codex誤攔);convergence backlog(producer hardening)。
+> **PART4 主線(governance收斂後)**:51洞SPEC重做(v2不可信,手做reconcile漏grok T1-01)/IC全棧健檢Step2-4/。
+> **執行序**:P1-5→P1-1→(P1-3+4+9+10 一批)→P1-2→P1-6便宜版→P1-7→P1-12→P1-8/11。每項:改+常駐測試+mutation證偽→批做完委員審一輪。
+
+## ✅ 委員綜合完整性強制 epic(2026-07-24;已上線部分,見上清單為續);使用者最初訴求「不准我抄近路」的本體
 **根因(使用者連續追問揭出,同一病)**:機制/範本都在,**我手搓繞過**——①手搓 brief 漏 canonical ID → 委員產出機器讀不到 → 我手做 reconcile **掉項**(漏 grok T1-01);②手搓 brief 漏範本 §0 挑戰前提 → **我的錯誤前提被當 finding 帶回**(偽 finding C2;ORCH L94 早記此傷疤);③completeness 只在我主動宣告時跑。
 **✅ 已上線(commits `ec8dfab`→`0905d36` push;263 passed;每項 mutation 證偽)**:
 - **A1 brief 合規閘**(`cx_run.sh`,委員派工唯一入口):brief 須宣告 `brief-kind`;收集 findings 類(review/consult/closure)須含 **canonical ID 格式** + **挑戰前提**條款,缺 → **拒派**。實證:本 session 那份手搓 brief 被擋。impl/stamp 不強制(不誤擋)。
