@@ -338,6 +338,35 @@ _run_reconcile_stamp_check_adv() {
 }
 
 # ---------------------------------------------------------------------------
+# _reconcile_sessdir — session-root 推導（V-B 綁定與 completeness 共用，防漂移）
+# handoffs/reconcile/<第一層>/… → 回傳該 <第一層> 絕對路徑；其餘 → dirname(abs)。
+# 事故(CODEX-R1-P0-01):V-B 用 dirname、completeness 用 session-root → nested/synth 繞過。
+# ---------------------------------------------------------------------------
+_reconcile_sessdir() {
+  local reconcile_file="$1"
+  case "${reconcile_file}" in
+    */handoffs/reconcile/*|handoffs/reconcile/*)
+      python3 -c '
+import os,sys
+p=os.path.abspath(sys.argv[1])
+parts=p.replace("\\\\","/").split("/")
+try:
+    i=parts.index("reconcile")
+    # handoffs/reconcile/<session>
+    if i+1 < len(parts):
+        print("/".join(parts[:i+2]))
+    else:
+        print(os.path.dirname(p))
+except ValueError:
+    print(os.path.dirname(p))
+' "${reconcile_file}"
+      ;;
+    *)
+      (cd "$(dirname "${reconcile_file}")" && pwd)
+      ;;
+  esac
+}
+
 # _run_completeness_gate — Task 3.2：reconcile 核可後、發 token 前掛 completeness
 # 解析 session sources.lock；rc==1 → 拒發；rc==3(DEGRADED_PENDING) → 拒 final；腳本缺 → 拒發
 # ---------------------------------------------------------------------------
@@ -375,29 +404,8 @@ _run_completeness_gate() {
     return 1
   fi
 
-  # session 推導：handoffs/reconcile/<session>/…
-  case "${reconcile_file}" in
-    */handoffs/reconcile/*|handoffs/reconcile/*)
-      # handoffs/reconcile/<session>/...
-      sessdir="$(python3 -c '
-import os,sys
-p=os.path.abspath(sys.argv[1])
-parts=p.replace("\\\\","/").split("/")
-try:
-    i=parts.index("reconcile")
-    # handoffs/reconcile/<session>
-    if i+1 < len(parts):
-        print("/".join(parts[:i+2]))
-    else:
-        print(os.path.dirname(p))
-except ValueError:
-    print(os.path.dirname(p))
-' "${reconcile_file}")"
-      ;;
-    *)
-      sessdir="$(cd "$(dirname "${reconcile_file}")" && pwd)"
-      ;;
-  esac
+  # session 推導：與 V-B realpath 綁定共用 _reconcile_sessdir（handoffs/reconcile/<第一層>）
+  sessdir="$(_reconcile_sessdir "${reconcile_file}")"
 
   lock_path="${sessdir}/sources.lock"
   if [ ! -f "${lock_path}" ]; then
@@ -410,6 +418,7 @@ except ValueError:
   #   與 --reconcile 指向的實際檔**未綁定**(同 session 內可宣告 foo.md 卻驗 synth.md)。
   #   已驗:直接傳 --synth "${reconcile_file}" 會與既有慣例衝突(fixture 用 reconcile.md ≠ synth.md)。
   #   正解需先定「session 內唯一合法 reconcile 目標=synth.md」慣例,屬獨立決策,不在本輪。
+  #   V-B 已在 dispatch 主呼叫點以 realpath(target)==realpath(sessdir/synth.md) 綁定（含 nested 拒）。
   bash "${completeness_bin}" --lock "${lock_path}"
   rc=$?
   if [ "${rc}" -eq 0 ]; then
@@ -444,12 +453,13 @@ if [ "${kind}" = "dispatch" ]; then
   case "${reconcile}" in
     ""|waived:*|stamped-waived:*) : ;;
     *)
-      # V-B：--reconcile 目標須 realpath == session/synth.md（防 target 指 dropped、completeness 卻驗 synth）
-      # 僅置於本主呼叫點；不改 _run_completeness_gate 本體（adversarial fallback 不受影響）。
-      # 僅在「target 與 synth 皆可 resolve 且不相等」時於此拒——classic/缺檔仍交 _run_completeness_gate
-      # （保留「未走 session 流程」/「不存在」訊息）；V-B 攻擊面=同 session 有完整 synth 卻指 dropped。
+      # V-B：--reconcile 目標須 realpath == <session-root>/synth.md
+      # session-root 與 _run_completeness_gate 共用 _reconcile_sessdir（handoffs/reconcile/<第一層>），
+      # 禁 dirname：否則 --reconcile <sess>/nested/synth.md 會比對 nested 自己而不拒，completeness 卻驗根 synth。
+      # 僅置於本主呼叫點。僅在「target 與 synth 皆可 resolve 且不相等」時於此拒——
+      # classic/缺檔仍交 _run_completeness_gate（保留「未走 session 流程」/「不存在」訊息）。
       _rp_target="$(realpath "${reconcile}" 2>/dev/null)"
-      _sess="$(dirname "${reconcile}")"
+      _sess="$(_reconcile_sessdir "${reconcile}")"
       _rp_synth="$(realpath "${_sess}/synth.md" 2>/dev/null)"
       if [ -n "${_rp_target}" ] && [ -n "${_rp_synth}" ] && [ "${_rp_target}" != "${_rp_synth}" ]; then
         echo "ERROR: --reconcile 目標須為 session synth.md（防 target/synth 未綁定掉項）: ${reconcile}" >&2

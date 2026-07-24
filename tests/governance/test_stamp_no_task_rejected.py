@@ -3,9 +3,11 @@
 nodeid:
   test_no_task_stamp_rejected
   test_with_task_allowlist_still_passes
+  test_mutation_allow_missing_task_breaks_guard
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 import subprocess
 from pathlib import Path
@@ -15,6 +17,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RECONCILE_CHECK = REPO_ROOT / "scripts" / "reconcile_stamps_check.sh"
 BODY_HASH_SH = REPO_ROOT / "scripts" / "reconcile_body_hash.sh"
+PROVENANCE_PY = REPO_ROOT / "scripts" / "verify_task_provenance.py"
 DELIB_RECONCILE = REPO_ROOT / "handoffs" / "20260701-VERIFYGATE-DELIB-RECONCILE.md"
 COMMITTEE_AUDIT_ENV = "VERIFY_GATE_COMMITTEE_AUDIT_LOG"
 
@@ -86,3 +89,36 @@ def test_with_task_allowlist_still_passes() -> None:
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "RECONCILE-STAMP PASS" in proc.stdout
+
+
+def _load_provenance():
+    spec = importlib.util.spec_from_file_location(
+        "verify_task_provenance_va_mut", PROVENANCE_PY
+    )
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_mutation_allow_missing_task_breaks_guard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """mutation：缺 task 改回 return 0 → 防護斷言 rc!=0 轉紅（證 test_no_task 有牙齒）。"""
+    mod = _load_provenance()
+    original = mod.check_stamp_provenance
+
+    def _buggy_allow_missing(stamp_line: str, reconcile_file: str = "") -> tuple[int, str]:
+        # 舊洞：無 task 直接放行
+        task_match = mod.STAMP_TASK_RE.search(stamp_line)
+        if not task_match:
+            return 0, ""
+        return original(stamp_line, reconcile_file)
+
+    monkeypatch.setattr(mod, "check_stamp_provenance", _buggy_allow_missing)
+    rc, _msg = mod.check_stamp_provenance(
+        "RECONCILE-STAMP: codex APPROVED 2099-01-01 "
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    )
+    with pytest.raises(AssertionError):
+        assert rc != 0, "缺 task 應 FAIL"

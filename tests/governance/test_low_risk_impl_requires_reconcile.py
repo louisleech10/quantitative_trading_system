@@ -5,12 +5,14 @@ nodeid:
   test_low_spec_waived_reconcile_rejected
   test_low_spec_full_synth_passes
   test_make_impl_passing_session_rc0
+  test_mutation_impl_reconcile_only_on_high_allows_low
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import textwrap
@@ -265,3 +267,72 @@ def test_make_impl_passing_session_rc0(tmp_path: Path) -> None:
         with_spec=True,
     )
     assert result.returncode == 0, (result.stdout or "") + (result.stderr or "")
+
+
+def test_mutation_impl_reconcile_only_on_high_allows_low(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mutation：V-C hoisted 區塊包回 risk=high → low+spec 無 reconcile 穿透。"""
+    if not SPEC.is_file():
+        pytest.skip("SPEC missing")
+
+    src = GATE_SH.read_text(encoding="utf-8")
+    # 把 miss reconcile 改成只在 high 才 miss（舊 V-C 洞：low 不擋）
+    bad = src.replace(
+        'miss reconcile "impl 派工(--spec)一律須顯式 session reconcile（不論 risk）"',
+        'if [ "${risk}" = "high" ]; then miss reconcile "impl high only (mutated)"; fi',
+        1,
+    )
+    assert bad != src, "expected V-C miss reconcile site"
+
+    mut_gate = REPO_ROOT / "scripts" / f".gate_mut_vc_{os.getpid()}.sh"
+    try:
+        mut_gate.write_text(bad, encoding="utf-8")
+        mut_gate.chmod(mut_gate.stat().st_mode | stat.S_IXUSR)
+        monkeypatch.setattr(
+            "tests.governance.test_low_risk_impl_requires_reconcile.GATE_SH",
+            mut_gate,
+        )
+
+        gate_dir = tmp_path / "gate"
+        gate_dir.mkdir()
+        env = os.environ.copy()
+        env["GATE_DIR_OVERRIDE"] = str(gate_dir)
+        env.pop("GOVERNANCE_TEST_HARNESS", None)
+        cmd = [
+            "bash",
+            str(mut_gate),
+            "dispatch",
+            "--intent",
+            "V-C mutation low no reconcile",
+            "--risk",
+            "low",
+            "--facts-asked",
+            "none-needed:unit-test",
+            "--review-role",
+            "single-executor:n/a",
+            "--template",
+            "n/a:V-C mutation",
+            "--spec",
+            str(SPEC),
+            "--task-id",
+            "vc-mut-low",
+            "--output",
+            "handoffs/vc-mut-low.md",
+        ]
+        result = subprocess.run(
+            cmd,
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        # 變異後 low 不再被 miss reconcile 擋 → 防護斷言 rc!=0 會失敗
+        with pytest.raises(AssertionError):
+            assert result.returncode != 0, (
+                f"low+spec 無 reconcile 應拒; got rc={result.returncode} "
+                f"out={(result.stdout or '') + (result.stderr or '')!r}"
+            )
+    finally:
+        mut_gate.unlink(missing_ok=True)
