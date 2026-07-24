@@ -235,10 +235,17 @@ def check_adversarial_provenance(adversarial_path: str) -> tuple[int, str]:
 
 
 def check_stamp_provenance(stamp_line: str, reconcile_file: str = "") -> tuple[int, str]:
-    """W2：戳記 task:<id> 須有派工事件且輸出 hash 匹配（legacy allowlist 相容）。"""
+    """W2：戳記 task:<id> 須有派工事件且輸出 hash 匹配（legacy allowlist 相容）。
+
+    V-A（2026-07-24）：缺 task:<id> 一律 FAIL（無 grandfather）。
+    legacy allowlist 條目皆帶 task，故不需為無 task 開例外。
+    """
     task_match = STAMP_TASK_RE.search(stamp_line)
     if not task_match:
-        return 0, ""
+        return (
+            1,
+            "ERROR: 戳記缺 task:<id>，無 provenance 不予採信（legacy 除外）",
+        )
 
     task_id = task_match.group(1)
 
