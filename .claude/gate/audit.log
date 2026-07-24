@@ -26259,3 +26259,22 @@ ts=2026-07-22 06:43:07 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-07-23T23:30:36Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-07-23T23:45:19Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-07-23T23:45:20Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "reconcile-enforce-closure", "ts": "2026-07-23T23:47:01Z"}
+=== 2026-07-24 07:47:01 | dispatch ===
+  ts=2026-07-24 07:47:01
+  kind=dispatch
+  intent=兩家 closure 複驗強制 reconcile 機械驗 P0 閉合
+  risk=low
+  facts_asked=none-needed:closure
+  review_role=adversary:原提出方
+  template=n/a:review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-24T01:35:01Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-24T01:35:01Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}

@@ -61,6 +61,35 @@ def test_classic_reconcile_rejected_for_impl_dispatch(tmp_path: Path) -> None:
     assert "未走 session 流程" in out, f"缺遷移指引訊息:\n{out}"
 
 
+def test_low_risk_and_no_spec_also_enforced(tmp_path: Path) -> None:
+    """通則(2026-07-24 使用者定):引用委員綜合即須驗,**不看 risk、不看 --spec**。
+
+    修前:completeness 巢狀在 risk=high + --spec 內 → 自標 low 或不帶 --spec 即可繞。
+    mutation:把通則區塊搬回 risk=high 內 → 本測試轉綠(失去保護)。
+    """
+    classic = tmp_path / "20260724-LOW-RECONCILE.md"
+    classic.write_text("body\nVerdict: APPROVED\n## 戳記\n", encoding="utf-8")
+    gate_dir = tmp_path / "gl"
+    env = os.environ.copy()
+    env["GATE_DIR_OVERRIDE"] = str(gate_dir)
+    proc = subprocess.run(
+        [
+            "bash", str(GATE), "dispatch",
+            "--task-id", "low-enforce-unit",
+            "--intent", "low risk citing a reconcile",
+            "--risk", "low",  # 低風險
+            "--facts-asked", "none-needed:unit-test",
+            "--review-role", "single-executor:n/a",
+            "--template", "n/a:unit test",  # 無 --spec
+            "--reconcile", str(classic),
+        ],
+        cwd=str(REPO), capture_output=True, text=True, check=False, env=env,
+    )
+    out = proc.stdout + proc.stderr
+    assert proc.returncode != 0, f"low-risk 引用未驗 reconcile 竟放行:\n{out}"
+    assert not (gate_dir / "dispatch.token").exists(), "竟發出 token"
+
+
 def _dispatch_raw(gate_dir: Path, extra: list[str], env_extra: dict[str, str]) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["GATE_DIR_OVERRIDE"] = str(gate_dir)

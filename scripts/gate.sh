@@ -423,6 +423,27 @@ if [ "${kind}" = "dispatch" ]; then
   [ -n "${facts_asked}" ] || miss facts-asked "code/log 推不出、已向使用者確認的事實（或 none-needed:理由）"
   [ -n "${review_role}" ] || miss review-role "委員會角色指派：誰挑戰前提/adversary（單一執行者填 single-executor:n/a）"
   [ -n "${template}" ]    || miss template    "對 SPEC/TODO 派工:template 跟過/N-A 說明（非 spec 派工填 n/a:理由）"
+
+  # ---------------------------------------------------------------------------
+  # 通則(2026-07-24 使用者定):**凡引用委員綜合(--reconcile)一律先機械驗 0 掉項**,
+  #   不看 risk、不看 --spec。
+  # 理由:①「收集委員結論是否完整」與任務風險等級無關——既然花 token 問了 N 家,
+  #        收不完整就是浪費;②先驗完整再送委員審可省好幾輪(委員只審語意,
+  #        不必再花一輪抓「你漏了我第 N 條」)。
+  # 涵蓋 ORCH 十類收集節點:諮詢/規劃委員會、SPEC-TODO 對抗審、code review(含 agy 實習)、
+  #   委員會裁決、三方簽核、reconcile 複核、closure 複驗、章程/SPEC 回送驗證、joint recon。
+  # 事故:Claude 手做 SPEC reconcile 漏記委員 finding;先前修法誤縮在 risk=high+--spec 內。
+  # ---------------------------------------------------------------------------
+  _comp_ran=0
+  case "${reconcile}" in
+    ""|waived:*|stamped-waived:*) : ;;
+    *)
+      _run_completeness_gate "${reconcile}" \
+        || { echo "ERROR: 引用的委員綜合未過完整性機械驗（見上），拒發 token。"; exit 1; }
+      _comp_ran=1
+      ;;
+  esac
+
   if [ "${risk}" = "high" ]; then
     [ -n "${adversarial}" ] || miss adversarial "高風險必填 adversarial review 輸出路徑（或 waived:理由）"
     case "${adversarial}" in
@@ -473,17 +494,8 @@ if [ "${kind}" = "dispatch" ]; then
       #   --spec **實作**派工須有可機械驗 0 掉項的 reconcile 來源。
       #   委員 A:雙 waived(reconcile+adversarial 皆 waived)原使 _comp_src 空 → completeness 完全不跑仍發 token。
       #   委員 B:逗號多檔原只取 ${adversarial%%,*} 首檔 → 後續 session 未驗。改 _foreach_adversarial 逐檔。
-      _comp_ran=0
-      if [ -n "${reconcile}" ]; then
-        case "${reconcile}" in
-          waived:*|stamped-waived:*) : ;;
-          *)
-            _run_completeness_gate "${reconcile}" \
-              || { echo "ERROR: completeness gate 未過（見上），拒發實作 token。"; exit 1; }
-            _comp_ran=1
-            ;;
-        esac
-      fi
+      # 註:--reconcile 的 completeness 已由上方**通則**跑過(不看 risk/spec),此處只補 adversarial fallback
+      #    與「無任何可驗來源」的雙 waiver 拒發。
       if [ "${_comp_ran}" -eq 0 ] && [ -n "${adversarial}" ]; then
         case "${adversarial}" in
           waived:*|stamped-waived:*|"") : ;;
