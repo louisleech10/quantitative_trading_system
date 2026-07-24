@@ -18,6 +18,35 @@ fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-xhigh}"
 [ -n "${fam}" ] && [ -n "${brief}" ] && [ -n "${out}" ] || {
   echo "用法: bash scripts/cx_run.sh <codex|grok|composer> <brief_path> <output_path> [effort]"; exit 2; }
 [ -f "${brief}" ] || { echo "ERROR: brief 檔不存在: ${brief}"; exit 2; }
+
+# ---------------------------------------------------------------------------
+# brief 合規閘(2026-07-24 使用者定;防「手搓 brief 漏掉範本必填條款」)
+# 兩次實證事故(同一病):
+#   ①漏 canonical finding ID 格式 → 委員產出機器讀不到(codex F-01/grok T1-01/composer 無ID)
+#     → completeness 抽不到 → Claude 只能手做 reconcile → 掉項(漏記 grok 立場)
+#   ②漏 §0 反幻覺/挑戰前提 → Claude 的錯誤前提被當 finding 帶回
+#     (實例:brief 自己把「送草稿去審」寫成合法情境,codex 順著產出偽 finding C2)
+#   ——範本 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md 兩條都寫得好好的,是手搓時漏掉。
+# 故:凡「收集委員 findings」類派工,brief 缺必填條款 → **拒派**(fail-closed,不讓 Claude 繞)。
+# ---------------------------------------------------------------------------
+_bk="$(grep -oE 'brief-kind:[[:space:]]*[a-z]+' "${brief}" 2>/dev/null | head -1 | sed 's/.*:[[:space:]]*//')"
+[ -n "${_bk}" ] || {
+  echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp"
+  echo "  (收集 findings 類=review/consult/closure,會另檢範本必填條款)"
+  exit 2
+}
+case "${_bk}" in
+  review|consult|closure)
+    grep -qE '\-R<?n?[0-9]*>?-P\[?0?-?3?\]?-|FAMILY>-R|COMMITTEE_FINDING_TEMPLATE|SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT' "${brief}" \
+      || { echo "ERROR: brief-kind=${_bk} 須指明 canonical finding ID 格式(## <FAMILY>-R<n>-P[0-3]-<NN>);"
+           echo "  否則委員產出機器讀不到,completeness 無法驗 0 掉項。見 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md"; exit 2; }
+    grep -qE '挑戰前提|反幻覺|質疑.*前提' "${brief}" \
+      || { echo "ERROR: brief-kind=${_bk} 須含「挑戰前提/反幻覺」條款(範本 §0);"
+           echo "  否則 Claude 的錯誤前提會被當 finding 帶回(相關性錯誤,ORCH L94 傷疤)。"; exit 2; }
+    ;;
+  impl|stamp) : ;;
+  *) echo "ERROR: 未知 brief-kind: ${_bk}(允許 review|consult|closure|impl|stamp)"; exit 2 ;;
+esac
 case "${out}" in handoffs/*) : ;; *) echo "ERROR: output 須在 handoffs/: ${out}"; exit 2 ;; esac
 
 CODEX="/opt/homebrew/bin/codex"
