@@ -15,7 +15,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUN_WITH_RECEIPT = REPO_ROOT / "scripts" / "run_with_receipt.py"
 CLAIM_CHECK = REPO_ROOT / "scripts" / "verification_claim_check.py"
-PYTHON = REPO_ROOT / "venv" / "bin" / "python"
+from tests.governance._pyenv import PYTHON  # CI 無 venv → fallback sys.executable
 RECEIPTS_DIR_ENV = "VERIFY_GATE_RECEIPTS_DIR"
 AUDIT_LOG_ENV = "VERIFY_GATE_AUDIT_LOG"
 PENDING_LEDGER_ENV = "VERIFY_GATE_PENDING_LEDGER"

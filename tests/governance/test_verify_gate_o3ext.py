@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PYTHON = REPO_ROOT / "venv" / "bin" / "python"
+from tests.governance._pyenv import PYTHON  # CI 無 venv → fallback sys.executable
 CLAIM_CHECK = REPO_ROOT / "scripts" / "verification_claim_check.py"
 LEGACY_REGISTER = REPO_ROOT / "scripts" / "register_legacy_committee_files.sh"
 

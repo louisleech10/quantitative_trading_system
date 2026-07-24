@@ -5,12 +5,13 @@ import os
 import shutil
 import stat
 import subprocess
+from tests.governance._pyenv import link_python_env  # CI 無 venv 相容
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PYTHON = REPO_ROOT / "venv" / "bin" / "python"
+from tests.governance._pyenv import PYTHON  # CI 無 venv → fallback sys.executable
 PRE_COMMIT = REPO_ROOT / "scripts" / "git_hooks" / "pre-commit"
 CLAIM_CHECK = REPO_ROOT / "scripts" / "verification_claim_check.py"
 INSTALL_HOOKS = REPO_ROOT / "scripts" / "install_verify_hooks.sh"
@@ -44,7 +45,7 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     for name in ("verification_claim_check.py", "install_verify_hooks.sh"):
         (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
-    (repo / "venv").symlink_to(REPO_ROOT / "venv", target_is_directory=True)
+    link_python_env(repo)
 
     (repo / "README.md").write_text("# temp\n", encoding="utf-8")
     subprocess.run(["git", "add", "README.md"], cwd=repo, check=True, capture_output=True)

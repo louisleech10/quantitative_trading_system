@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+from tests.governance._pyenv import link_python_env  # CI 無 venv 相容
 from pathlib import Path
 
 import pytest
@@ -58,7 +59,7 @@ def _setup_dispatch_repo(tmp_path: Path) -> Path:
         if src.is_file():
             shutil.copy2(src, scripts / name)
     (repo / "handoffs").mkdir()
-    (repo / "venv").symlink_to(REPO_ROOT / "venv", target_is_directory=True)
+    link_python_env(repo)
     return repo
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PYTHON = REPO_ROOT / "venv" / "bin" / "python"
+from tests.governance._pyenv import PYTHON  # CI 無 venv → fallback sys.executable
 GATE_CHECK = REPO_ROOT / "scripts" / "gate_check.sh"
 GATE_SH = REPO_ROOT / "scripts" / "gate.sh"
 PRETOOLUSE = REPO_ROOT / "scripts" / "verify_pretooluse.sh"

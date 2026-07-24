@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PYTHON = REPO_ROOT / "venv" / "bin" / "python"
+from tests.governance._pyenv import PYTHON  # CI 無 venv → fallback sys.executable
 CLAIM_CHECK = REPO_ROOT / "scripts" / "verification_claim_check.py"
 RECEIPTS_DIR_ENV = "VERIFY_GATE_RECEIPTS_DIR"
 AUDIT_LOG_ENV = "VERIFY_GATE_AUDIT_LOG"

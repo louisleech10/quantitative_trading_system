@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PYTHON = REPO_ROOT / "venv" / "bin" / "python"
+from tests.governance._pyenv import PYTHON  # CI 無 venv → fallback sys.executable
 MUTATION_PROBE = REPO_ROOT / "scripts" / "mutation_probe_check.sh"
 GATE_SH = REPO_ROOT / "scripts" / "gate.sh"
 RECONCILE_CHECK = REPO_ROOT / "scripts" / "reconcile_stamps_check.sh"
