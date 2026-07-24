@@ -67,7 +67,11 @@ esac
 token="$GATE_DIR/${kind}.token"
 deny_reason="no_fresh_token"
 if [ -f "$token" ]; then
-  now="$(date +%s)"; mtime="$(stat -f %m "$token" 2>/dev/null || stat -c %Y "$token" 2>/dev/null || echo 0)"
+  # mtime 跨平台:linux `stat -c %Y` 前置(linux 上 `stat -f %m` 會失敗且把檔案系統資訊印到 stdout,
+  #   混進 mtime 致算術 exit 1;此為本機 macOS 抓不到、僅 CI/linux 現形的事故,2026-07-24)。
+  #   各平台第一個 stat 即乾淨成功,第二個不執行。再加數字守衛防非數字。
+  now="$(date +%s)"; mtime="$(stat -c %Y "$token" 2>/dev/null || stat -f %m "$token" 2>/dev/null || echo 0)"
+  case "$mtime" in ''|*[!0-9]*) mtime=0 ;; esac
   if [ $(( now - mtime )) -le "$TTL_SECONDS" ]; then
     exit 0   # fresh token → 放行
   fi
