@@ -52,6 +52,18 @@
 **✅ 三家 SPEC adversarial 全 REQUEST-CHANGES(無否決骨架)**,reconcile 14 群集(`…-SPEC-ADV-RECONCILE.md`)全納 **v2**:+dispatch-notask 進 T1(Task3.5)、family-registry 消費者補全 7 消費者矩陣、1.4 補 gate.sh ADV-ID 全鏈、**3.4 採 grok alt-B**(classic 改 audit 可視+放行=零摩擦,棄 waiver/拒/遷移,解 78 份 classic 摩擦+B3 回歸)、jq/gatedir 政策精確化、§V per-Task Oracle 矩陣+三態 mutation、§N-DEFER 靜默類觸發改 audit/探針/首次事故。v2 TEMPLATE PASS(3 Phase/12 Task)。
 **⚠️ SPEC v2 暫停(使用者抓包 reconcile 品質)**:SPEC-ADV-RECONCILE 是**手做**(沒套 completeness 工具),漏記 grok T1-01;委員 review ID 格式不一工具讀不到。病灶=**SPEC/TODO/review reconcile 沒接完整性工具(=completeness-scope 洞活體),沒閘門就手做掉項**。判定=**重做不重驗**。
 **✅ 插隊完成:grok 全鏈修正 family-registry SoT(commits `32fd863`/`e6e1ee9`/`7cb2b69`/`e9037df` push)**:機械掃 grok 散 4 檔 11 處(含我 SPEC 都漏的 gate.sh:296)→建 `scripts/governance_families.json`(SoT)+雙語 loader,gate_check/reconcile_stamps/verify_task_provenance/gate.sh 全接。**做徹底(使用者定)**:A fail-closed(SoT缺/壞/families-key拒發)/C 2 bug(未知→unknown 堵腐蝕源+review_role 詞界擋 codexx)/B drift-test 釘全部消費者家族 site==SoT+**反 whack-a-mole meta-test**(掃 6 檔任何未釘功能家族行→紅,終結逐輪找漏)/D 邊界測試/E doc。**250 passed**,每修 mutation 證偽。**composer APPROVED;codex A/C/B-site CLOSED+unknown ACCEPTED(3輪)**;round4 純 confirmation 撞 codex infra error,**使用者拍板收了當完成**(meta-test 硬化已 mutation 客觀證明達 codex round3 要求)。副作用記:分類器加 grok 後 commit 訊息行首「codex」會誤攔(wrapper-strip 類啟發式限制,DEFERRED)。
+## ▶ 委員綜合完整性強制 epic(2026-07-24;使用者最初訴求「不准我抄近路」的本體)
+**根因(使用者連續追問揭出,同一病)**:機制/範本都在,**我手搓繞過**——①手搓 brief 漏 canonical ID → 委員產出機器讀不到 → 我手做 reconcile **掉項**(漏 grok T1-01);②手搓 brief 漏範本 §0 挑戰前提 → **我的錯誤前提被當 finding 帶回**(偽 finding C2;ORCH L94 早記此傷疤);③completeness 只在我主動宣告時跑。
+**✅ 已上線(commits `ec8dfab`→`0905d36` push;263 passed;每項 mutation 證偽)**:
+- **A1 brief 合規閘**(`cx_run.sh`,委員派工唯一入口):brief 須宣告 `brief-kind`;收集 findings 類(review/consult/closure)須含 **canonical ID 格式** + **挑戰前提**條款,缺 → **拒派**。實證:本 session 那份手搓 brief 被擋。impl/stamp 不強制(不誤擋)。
+- **通則 completeness**:凡引用 `--reconcile`(非 waived)一律先驗 0 掉項,**不看 risk、不看 --spec**(修前巢狀在 risk=high+--spec 內,自標 low 即繞)。
+- classic 路徑拒發+三步遷移指引(不設 waiver 逃生口)/雙 waiver 拒/逗號多檔逐檔驗/宣告檔須存在。
+- **委員兩輪**:composer APPROVED;codex 逐輪抓出 A(雙waiver)B(逗號)C(註解)C4(檔存在)全修。
+**⚠️ 殘留(誠實邊界,勿宣稱全覆蓋)**:
+- **B(最大;opt-in 缺口)**:上述僅在**我主動宣告** `--reconcile` 時生效;我不宣告/用 `--adversarial`/純對話綜合 → 不驗。**修法=用 audit 既有 `committee_dispatch`/`committee_output` 判定「這輪派了 N 家」形成未結案債,債未清(無該輪完整性 receipt)則後續 gated 動作拒**——依據是客觀留痕非我的宣告。屬新一大塊(動 audit 狀態機/round 識別/receipt 事件),建議專輪做。
+- **純對話綜合**機器永遠攔不到(只能靠未結案債間接逼補驗)。
+- C4 後半 target/synth 綁定;C3 waiver 語義;artifact 路徑無 completeness。
+
 **★接續(回到主線)**:**SPEC 重做**(那份手做 reconcile 漏 grok T1-01 不可信;review 改用 canonical `## FAMILY-R#-P#-##`+套既有 completeness_check union+lock 驗 0 掉項,**禁手做**)→白話閘2。**通則待立(使用者最初訴求)**:任何 Claude 多方 reconcile/共識一律機械驗 0 掉項+蓋章齊,不准手做(=completeness-scope 洞真修法,範圍是所有 reconcile 非三節點)。session=pipeline-gate-audit-r1。
 
 ## ✅ 1d attribution 六批完工(2026-07-22;commit f2de34f push main)
