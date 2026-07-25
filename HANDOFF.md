@@ -1,6 +1,27 @@
 # Handoff
 **Agent**: Claude(Opus 4.8) | **Time**: 2026-07-24 | **Branch**: **main** | **狀態**: ▶**Governance harness 紅隊→P0 修補進行中**(見下「🔴 2026-07-24 紅隊」節);往下歷史狀態保留。
 
+## 📋 待辦整合清單(2026-07-25;取代散落多份;新 session 總覽看這節)
+> 上線項標 commit(非宣稱);待辦項為前瞻計畫。細節出處見各 REF 檔。
+
+**已上 main(commit)**:
+- P0 紅隊 4 洞 V-A/B/C/M(蓋章偽造/掉項/小修免驗/跳蓋章)— commit b05e900;規格 `docs/GOVERNANCE_HARNESS_P0_{SPEC,TODO}.md`。
+- 治理 P1-1(brief 閘)、P1-5(CI);工具 `reconcile_build.sh`、`completeness_check.sh`、family-registry。
+
+**待辦 ① 紅隊剩餘洞**(REF `handoffs/20260724-REDTEAM-RECONCILE.md`;12 洞修了 4):
+- MAJOR ×6:V-D cx_run 繞 token / V-E brief-kind 自報跳 P1-1 / V-F P1-1 只 grep 範本名 / V-G gate_check 無 jq fail-open / V-H roster 漏放某家 / V-I register-output 不驗格式。
+- MINOR ×3:V-J brief 閘無常駐探針 / V-K branch protection(你設) / V-L family meta-test 只掃 6 檔。
+
+**待辦 ② 治理 harness plan 剩餘**(REF `handoffs/20260724-GOVERNANCE-HARNESS-PLAN.md`):P1-2/3/4/6/7/8/9/10/11/12(部分與紅隊 V-x 重疊,實作前先去重)。
+
+**待辦 ③ 主線產品**(延後久,實際價值):IC 全棧健檢 Step 2-4(見下節)/51 洞 SPEC 重做。
+
+**凍結(別自行動,見 memory `project_classification_mechanism_frozen`)**:任務分類/路由/絆線/oracle-enforcement(PostToolUse hook)meta 層。
+
+**建議下一步**:見下「▶▶ 下一步」節(待辦①的精實做法 或 待辦③回主線)。**做法鐵律**:小 diff 高風險走精實流程(真碼+自跑 oracle+2 家審真 diff+查 CI),不走偽碼管線;push 後必查 CI(跨平台盲區靠 CI 兜底)。
+
+---
+
 ## 🔴 2026-07-24 紅隊攻破 harness → 修 4 P0(大任務,完整管線進行中)
 **紅隊**(composer+grok 派工;codex xhigh 32min 未產檔已停):三家推翻核心宣稱「元件加起來=0掉項+蓋章不漏」。26 findings 機械抽取 union → 12 獨立漏洞。彙整=`handoffs/20260724-REDTEAM-RECONCILE.md`;源=`…redteam-{composer,grok}.md`。**根因=harness opt-in+信任主委自報**。
 - **4 P0**(選定修):V-A 蓋章偽造(戳記無`task:`→provenance跳過,**已親手復現**)/V-B 掉項(--reconcile target 與 completeness 驗的 synth.md 未綁定)/V-C opt-in(risk=low+impl 不帶--reconcile→completeness/stamp 都不跑)/V-M(--adversarial waived 連 stamp 一起跳過)。
