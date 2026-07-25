@@ -358,17 +358,11 @@ def test_mutation_remove_realpath_allows_dropped(
     """mutation：刪除 V-B realpath 綁定區塊 → dropped target 穿透（rc=0）。"""
 
     def mutator(src: str) -> str:
-        # 移除 _rp_target … fi 綁定區塊（保留 _run_completeness_gate）
-        pat = re.compile(
-            r"\n\s*_rp_target=\"\$\(realpath \"\$\{reconcile\}\" 2>/dev/null\)\".*?"
-            r"if \[ -n \"\$\{_rp_target\}\" \] && \[ -n \"\$\{_rp_synth\}\" \] && "
-            r"\[ \"\$\{_rp_target\}\" != \"\$\{_rp_synth\}\" \]; then\n"
-            r".*?exit 1\n\s*fi\n",
-            re.DOTALL,
-        )
-        out, n = pat.subn("\n", src, count=1)
-        assert n == 1, "expected to strip exactly one V-B realpath block"
-        return out
+        # 神經化 V-B 綁定：內層不等比較改永假 → dropped target 穿透。
+        # 不依賴精確區塊格式（跨平台修正加了 `[ -e ]` 外層 if 後，舊正則會漂）。
+        old = 'if [ "${_rp_target}" != "${_rp_synth}" ]; then'
+        assert old in src, "V-B 內層比較行不在（結構已改？）"
+        return src.replace(old, "if false; then", 1)
 
     mut_gate = REPO_ROOT / "scripts" / f".gate_mut_norb_{os.getpid()}.sh"
     try:
