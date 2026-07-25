@@ -1,26 +1,66 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-24 | **Branch**: **main** | **狀態**: ▶**Governance harness 紅隊→P0 修補進行中**(見下「🔴 2026-07-24 紅隊」節);往下歷史狀態保留。
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-25 | **Branch**: **main** | **狀態**: P0 4 洞 + 工具鏈已上 main(CI job success);**★下一步＝P1-6 未結案債狀態機(根因)**。**新 session 先讀下面「📋 待辦整合清單」一節即可**(其餘為歷史脈絡)。
 
-## 📋 待辦整合清單(2026-07-25;取代散落多份;新 session 總覽看這節)
-> 上線項標 commit(非宣稱);待辦項為前瞻計畫。細節出處見各 REF 檔。
+## 📋 待辦整合清單(2026-07-25 去重版;取代散落多份;新 session 總覽只看這節)
+> **三份舊清單(P1-x plan / 紅隊 V-x / 51 洞)是同一套 harness 的三次盤點,大量重疊**——下表已逐項去重併標同義詞。
+> 上線項標 commit;待辦項為前瞻計畫。細節 REF:`handoffs/20260724-{GOVERNANCE-HARNESS-PLAN,REDTEAM-RECONCILE}.md`、`handoffs/reconcile/pipeline-gate-audit-r1/synth.md`(51 洞)。
 
-**已上 main(commit)**:
-- P0 紅隊 4 洞 V-A/B/C/M(蓋章偽造/掉項/小修免驗/跳蓋章)— commit b05e900;規格 `docs/GOVERNANCE_HARNESS_P0_{SPEC,TODO}.md`。
-- 治理 P1-1(brief 閘)、P1-5(CI);工具 `reconcile_build.sh`、`completeness_check.sh`、family-registry。
+### ✅ 已上 main(不必重做)
+| 項目 | 同義詞(舊清單編號) | commit |
+|---|---|---|
+| 蓋章偽造 fail-open | V-A＝51洞 stamp-notask | 0745b62 |
+| reconcile target↔synth 綁定(含 nested) | V-B＝P1-8＝51洞 C4後半 | d8dab44 / b2d476c |
+| impl 派工一律驗(不看 risk) | V-C＝P1-6**便宜版**＝51洞 waiver-bypass 之 impl 面 | b3b2582 |
+| stamp 脫鉤 adversarial-waived | V-M＝P1-7＝51洞 C3 | b3b2582 |
+| brief 合規閘 | P1-1 | d26c0f5 |
+| CI governance job | P1-5 | (P1-5 輪) |
+| family SoT 單一真相源 | 51洞主題1(stamp-roster/adv-grok/family-registry) | 32fd863 等 |
+| 派工/收集/自檢工具鏈 5 支 + 派工規範 | (本輪新增) | ef872cf |
 
-**待辦 ① 紅隊剩餘洞**(REF `handoffs/20260724-REDTEAM-RECONCILE.md`;12 洞修了 4):
-- MAJOR ×6:V-D cx_run 繞 token / V-E brief-kind 自報跳 P1-1 / V-F P1-1 只 grep 範本名 / V-G gate_check 無 jq fail-open / V-H roster 漏放某家 / V-I register-output 不驗格式。
-- MINOR ×3:V-J brief 閘無常駐探針 / V-K branch protection(你設) / V-L family meta-test 只掃 6 檔。
+### ★ 下一步(最高價值,根因)
+**P1-6 完整版:未結案債狀態機** — 用 audit 客觀事件(`committee_dispatch`)判定「這輪派了 N 家 → 欠一張 completeness 收據 → 債未清則後續 gated 動作拒」。
+**為何最高**:本 epic 根因＝「我每次 reconcile/總結可能亂做掉項」;目前**只有 impl 節點被鎖**(V-C),其餘收集節點(SPEC審/TODO審/closure/紅隊)**全靠我自律**。這件事把「我自願跑 reconcile_build」變成「不跑就過不去」。
+**不在凍結內**(2026-07-25 使用者界定:只凍任務分類/路由/絆線規則)。**誠實邊界**:純對話綜合(完全不派工不碰 gate)機器仍攔不到。
 
-**工具鏈(2026-07-25 上線;派工/收集/自檢一條龍,見 `docs/COMMITTEE_DISPATCH_GUIDE.md`)**:
-`new_brief.sh`(產合規 brief 骨架)→`committee_run.sh`(開 gate+平行派 **N 家**,家族對 SoT 驗證不寫死)→`reconcile_build.sh`(建 session+逐字 synth+驗 0 掉項)→`verify_mutation.sh`(改壞→須紅→保證還原)→`gov_check.sh`(語法+守衛測試+探針;`--fast`/`--no-probe`)→ pre-push hook 委派 gov_check → push 後 `ci_check_after_push` 自動回報 **Verify Claim + Governance** 兩個 CI。
-**新發現的既有債**:`test_verify_gate{,_b3,_b4}.py` 探針「空心/偽自證」(沒碰待測系統),已在 gov_check 具名排除→歸待辦②P1-2/P1-3。
+### 待辦 ①:紅隊剩餘洞(去重後)
+| 洞 | 白話 | 同義詞 | 我的必要性判斷 |
+|---|---|---|---|
+| V-G jq fail-open | 沒裝 jq 時 gate 直接放行 | 51洞 jq-failopen/C12 | ⭐**便宜必修**(改 fail-closed) |
+| V-I register-output 不驗格式 | 可登記非 canonical 產物污染 provenance | — | ⭐ 便宜 |
+| V-J brief 閘無常駐探針 | 我的 brief 閘自己可能假綠 | ＝**P1-4** | ⭐ 便宜(用新 `verify_mutation.sh`) |
+| V-L family meta-test 只掃 6 檔 | 新增消費者可能靜默漂移 | 51洞 family-registry 殘留 | 🤔 邊緣 |
+| V-E brief-kind 自報跳閘 | 標 impl 即跳過 P1-1 兩檢查 | — | 🤔 邊緣(有 completeness 兜底) |
+| V-F P1-1 只 grep 範本名 | 引用了範本但沒照做 | — | 🤔 邊緣(同上兜底) |
+| V-D cx_run 不需 token | 可繞 gate 直接派委員 | ＝51洞 cx-run-entry | 🤔 碰強制機器,做前先講 |
+| V-H roster 可漏放某家 | lock 不放某家→union 不含它 | ＝51洞 discovery-roster/N4 | ⭐ 中(與 P1-6 同源,可併做) |
+| V-K branch protection | CI 擋不住 merge | ＝51洞 ci-required/C5 | **卡住**:私有 repo+免費方案不支援(見下「已知阻塞」) |
 
-**待辦 ② 治理 harness plan 剩餘**(REF `handoffs/20260724-GOVERNANCE-HARNESS-PLAN.md`):P1-2/3/4/6/7/8/9/10/11/12(部分與紅隊 V-x 重疊,實作前先去重)。
+### 待辦 ②:P1-x 剩餘(扣掉已上線/已去重)
+- **P1-2** 「驗守衛的測試必附**有效**常駐探針」機械強制 — ⭐ 治本(現況:靠我自律)
+- **P1-3** 補常駐探針 — 部分已做(4 個 P0 檔有);**殘留＝3 個既有債檔**(見下)
+- **P1-9** `template_check` 自身補探針 / **P1-10** 戳記檢查補探針 — ⭐ 便宜(天天用卻沒證偽過)
+- **P1-11** `gate.sh artifact` 路徑無 completeness — 🤔 中
+- **P1-12** 測試覆蓋+計數準確 — 小
+- (P1-4＝V-J;P1-6 見「下一步」;P1-1/5/7/8 已上線)
 
-**待辦 ③ 主線產品**(延後久,實際價值):IC 全棧健檢 Step 2-4(見下節)/51 洞 SPEC 重做。
+### 待辦 ③:主線產品(延後久,實際價值)
+- **IC 全棧健檢 Step 2-4**(見下「IC 全棧健檢 epic」節):現況表 vs 業界缺口 / typed 契約 SoT + wiring 閘門 / 跑閘門確認閉合
+- **51 洞 SPEC 重做**:舊草稿 `handoffs/20260723-GATE-ESCAPE-T1-SPEC-draft.md` **不可信**(當初手做 reconcile 漏 grok T1-01);重做須用 canonical ID + `reconcile_build.sh`,禁手做
+- **1d follow-up 兩票**:FU-1 exposure fillna fail-closed 化 / FU-2 cache all-NaN carrier index 對齊(ROADMAP 已列)
 
-**凍結(只凍這個;2026-07-25 使用者界定,見 memory `project_classification_mechanism_frozen`)**:**僅「任務分類/路由/尺寸絆線」規則**(怎麼判任務大小/路由)。**其餘 governance 不在凍結內**——尤其 **P1-6 未結案債狀態機(逼我每個收集節點跑 completeness)=本 epic 根因修法,可做、最高價值**。
+### 🐞 已知債/阻塞(非本輪造成,但要記著)
+- **3 個既有測試檔探針空心**:`test_verify_gate{,_b3,_b4}.py` 探針沒碰待測系統(＝假綠);已在 `gov_check.sh` 具名排除,修法歸 P1-2/P1-3
+- **`l65_benchmark` CI 長期紅**(0s 即失敗):我 push 前就在紅,與治理無關,未診斷
+- **branch protection 不可用**:私有 repo+免費方案 → GitHub 顯示 `Not enforced`。**替代已上線**:pre-push hook(擋粗心,`--no-verify` 可繞)。要真硬閘需升 GitHub Pro(**使用者決定**)
+- **工作區 3 個既有檔未處理**(非我改):`docs/API_SPECIFICATION.md`、`tests/golden/l65/test_inventory.txt`、`docs/workflow_diagram.png` — **使用者決定**要不要 commit
+- **解耦 scanner 半套**:`check_decoupling.sh` 實跑 R2/R3/R4 有紅,P2 triage 待辦(見 memory `project_decoupling_scanner_partial`)
+- **pre-existing**:Rule 4 `pattern_management:78`、`ModuleUnavailableError` 死碼、convergence backlog(producer hardening)、wrapper-strip 副作用(commit 訊息行首 codex 會被誤攔)
+
+### 🧊 凍結(只凍這個)
+**僅「任務分類/路由/尺寸絆線」規則**(怎麼判任務大小/怎麼路由)。2026-07-25 使用者界定,見 memory `project_classification_mechanism_frozen`。**其餘 governance 皆不在凍結內**。
+
+### 🔧 做法鐵律(本 session 血淚)
+小 diff 高風險 → **直接寫真碼 + 自跑 oracle(`gov_check.sh` / `verify_mutation.sh`) + 2 家審真實 diff + push 後看 CI**;**不走偽碼 SPEC/TODO 管線**(審偽碼會爆輪數,見 dogfood log)。派工用 `docs/COMMITTEE_DISPATCH_GUIDE.md` 的一條龍。
 
 **建議下一步**:見下「▶▶ 下一步」節(待辦①的精實做法 或 待辦③回主線)。**做法鐵律**:小 diff 高風險走精實流程(真碼+自跑 oracle+2 家審真 diff+查 CI),不走偽碼管線;push 後必查 CI(跨平台盲區靠 CI 兜底)。
 
@@ -37,11 +77,7 @@
 - **接續**:收兩家 closure→APPROVE 則🛑**白話閘**(使用者要求「SPEC完成後白話解釋」)→委員戳記→TODO→**派 grok 實作**→codex+composer 雙家code review。
 - **✅ SPEC v3 + TODO v2.2 完成(使用者要求「寫完TODO先停」2026-07-24)**:SPEC 兩輪審 APPROVE;TODO 走 4 輪(審+closure×3)兩家「可 Frozen 派 Grok」,残 2 P2 已修。**⚠️ 停在派實作前**。**使用者重要回饋**:多輪關卡根因=**Claude 起草連續出真bug**(改名覆蓋synth→刪半截破語法→無條件跑stamp),非流程/委員問題;委員只照範本填很快。教訓=起草gate.sh類控制流改造應**先自己模擬+bash-n**(round3才做,本該round1)。dogfood數據因被我的錯誤污染而**無從分析流程優劣**。TODO=`docs/GOVERNANCE_HARNESS_P0_TODO.md`(v2.2;3批B1/B2/B3;hoist最終控制流已bash-n驗證rc=0)。
 - **✅✅ P0 4修法收尾,🛑狀態=可push,等使用者拍板(2026-07-25)** SIGNOFF:codex-composer:p0-fix-closure（closure證據=本地 handoffs/20260725-p0-fix-closure-*.md,gitignored）：實作=Grok 4 commits `0745b62`/`d8dab44`/`b3b2582`/`b2d476c`(未push)。2家審真碼codex抓1真BLOCKING(composer+Claude漏):V-B巢狀synth繞過(realpath用dirname≠completeness用session-root)→Grok抽`_reconcile_sessdir`共用函式根治;codex原提出方重跑nested PoC複驗;F1/F2/F3全CLOSED,兩家verdict可push。**待使用者push決定(對外動作,先不push);SPEC/TODO/reconcile/dogfood檔未commit待使用者定。** dogfood(本地 HARNESS-DOGFOOD-LOG.md,gitignored)=真碼快(Grok實作21分1次+fix9分每輪抓真bug),偽碼文件~10輪多清幻覺;瓶頸=偽碼流程+起草錯非實作;`reconcile_build.sh`首戰1秒收2家。
-- **▶▶ 下一步(新 session 開工先讀)**:P0 4洞(V-A/B/C/M)已上 main、Governance CI job=success、l65_benchmark 紅是既有非本次。**剩餘工作**:
-  1. **紅隊剩 6 MAJOR(V-D~I)未修**(見 `handoffs/20260724-REDTEAM-RECONCILE.md`):V-D cx_run 不需 token 繞 gate / V-E brief-kind 自報 impl 跳 P1-1 / V-F P1-1 只 grep 範本名 / V-G gate_check 無 jq fail-open / V-H roster 可漏放某家 / V-I register-output 不驗格式。
-  2. **建議做法**:用本 session 驗證出的**精實流程**(直接寫真碼 + 自跑 oracle(bash-n/pytest) + 2家審真 diff + 查 CI;**不走偽碼 SPEC/TODO 管線**——見 dogfood 結論)。先挑**純 fail-closed、不碰凍結的 enforcement-meta 層**者:V-G/V-F/V-I。**V-D(繞 gate token)碰強制機器,屬凍結區鄰近,先問使用者**。
-  3. **替代**:回主線 IC 全棧健檢 Step 2-4(見下「IC 全棧健檢 epic」節)——實際產品價值,已延後久。
-  4. **禁**:分類/路由/絆線/oracle-enforcement(PostToolUse hook)那套 meta 層**凍結中**,別自行改造(見 memory `project_classification_mechanism_frozen`)。**push 後必查 CI**(本 session 教訓:本機綠≠CI綠,跨平台盲區靠 CI 兜底)。
+- **▶▶ 下一步**:**已整併至檔頭「📋 待辦整合清單」**(去重版,含 P1-6 根因/待辦①②③/已知債阻塞/凍結範圍/做法鐵律)。本節不再重複,避免兩處漂移。
 - **踩坑記**:①派委員首次被自己P1-1閘擋(前提寫粗體`**assumed**:`打斷token)=P1-1生效;②誤派實作者grok當審查者已改codex;③codex首輪STAMP-BLOCKED(誤把紅隊reconcile當gating檔)→brief補說明重派;④codex報stamp checker>60s hang=codex自身infra非腳本bug(本機<10s正常FAIL)。
 
 <!-- 以下為歷史狀態,保留追蹤 -->
