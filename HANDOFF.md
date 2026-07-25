@@ -1,4 +1,20 @@
 # Handoff
+**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-24 | **Branch**: **main** | **狀態**: ▶**Governance harness 紅隊→P0 修補進行中**(見下「🔴 2026-07-24 紅隊」節);往下歷史狀態保留。
+
+## 🔴 2026-07-24 紅隊攻破 harness → 修 4 P0(大任務,完整管線進行中)
+**紅隊**(composer+grok 派工;codex xhigh 32min 未產檔已停):三家推翻核心宣稱「元件加起來=0掉項+蓋章不漏」。26 findings 機械抽取 union → 12 獨立漏洞。彙整=`handoffs/20260724-REDTEAM-RECONCILE.md`;源=`…redteam-{composer,grok}.md`。**根因=harness opt-in+信任主委自報**。
+- **4 P0**(選定修):V-A 蓋章偽造(戳記無`task:`→provenance跳過,**已親手復現**)/V-B 掉項(--reconcile target 與 completeness 驗的 synth.md 未綁定)/V-C opt-in(risk=low+impl 不帶--reconcile→completeness/stamp 都不跑)/V-M(--adversarial waived 連 stamp 一起跳過)。
+- **6 MAJOR**(暫緩):V-D cx_run 不需token繞gate/V-E brief-kind自報impl跳P1-1/V-F P1-1只grep範本名/V-G gate_check無jq fail-open/V-H lock可漏放某家/V-I register-output不驗格式。
+- **MINOR/邊界**:V-J brief閘無常駐mutation/V-K CI無branch protection(使用者任務)/V-L family meta-test只掃6檔。
+- **分工(使用者定/當下指示為準)**:**實作=Grok**;審查=Codex+Composer(非實作者;實作者不自審)。
+- **進度**(VERIFY-EXEMPT:doc-summary:p0spec-v2):✅SPEC v2 template_check PASS=`docs/GOVERNANCE_HARNESS_P0_SPEC.md`。✅**SPEC adversarial 審(codex+composer)完成**→都「需修後再審」;9 findings **completeness 機械 reconcile 0 掉項**(`handoffs/reconcile/p0spec-review-r1/`;PASS 0.29s)→群集 M1-M5 收進 v2。▶**closure 複驗背景跑**(codex `bamgalrrd`/composer `bjhs5pq69`;brief=`…-P0SPEC-CLOSURE-BRIEF.md`)。
+- **v2 收的 M1-M5**:M1 V-C↔V-M 正向fixture需真audit+3戳記;M2 adversarial-only fallback僅review保留(§C矩陣);M3 枚舉V-B fixture遷移;M4 V-A無grandfather(SPEC §A FACT-RECEIPT M4:29歷史無task戳記grep 0引用/legacy全帶task);M5 §A closure scope+§R Phase3+4同commit+§V stamp stub oracle。
+- **接續**:收兩家 closure→APPROVE 則🛑**白話閘**(使用者要求「SPEC完成後白話解釋」)→委員戳記→TODO→**派 grok 實作**→codex+composer 雙家code review。
+- **✅ SPEC v3 + TODO v2.2 完成(使用者要求「寫完TODO先停」2026-07-24)**:SPEC 兩輪審 APPROVE;TODO 走 4 輪(審+closure×3)兩家「可 Frozen 派 Grok」,残 2 P2 已修。**⚠️ 停在派實作前**。**使用者重要回饋**:多輪關卡根因=**Claude 起草連續出真bug**(改名覆蓋synth→刪半截破語法→無條件跑stamp),非流程/委員問題;委員只照範本填很快。教訓=起草gate.sh類控制流改造應**先自己模擬+bash-n**(round3才做,本該round1)。dogfood數據因被我的錯誤污染而**無從分析流程優劣**。TODO=`docs/GOVERNANCE_HARNESS_P0_TODO.md`(v2.2;3批B1/B2/B3;hoist最終控制流已bash-n驗證rc=0)。
+- **✅✅ P0 4修法收尾,🛑狀態=可push,等使用者拍板(2026-07-25)** SIGNOFF:codex-composer:p0-fix-closure REF:handoffs/20260725-p0-fix-closure-codex.md：實作=Grok 4 commits `0745b62`/`d8dab44`/`b3b2582`/`b2d476c`(未push)。2家審真碼codex抓1真BLOCKING(composer+Claude漏):V-B巢狀synth繞過(realpath用dirname≠completeness用session-root)→Grok抽`_reconcile_sessdir`共用函式根治;codex原提出方重跑nested PoC複驗;F1/F2/F3全CLOSED,兩家verdict可push。**待使用者push決定(對外動作,先不push);SPEC/TODO/reconcile/dogfood檔未commit待使用者定。** REF:handoffs/20260724-HARNESS-DOGFOOD-LOG.md dogfood=真碼快(Grok實作21分1次+fix9分每輪抓真bug),偽碼文件~10輪多清幻覺;瓶頸=偽碼流程+起草錯非實作;`reconcile_build.sh`首戰1秒收2家。
+- **踩坑記**:①派委員首次被自己P1-1閘擋(前提寫粗體`**assumed**:`打斷token)=P1-1生效;②誤派實作者grok當審查者已改codex;③codex首輪STAMP-BLOCKED(誤把紅隊reconcile當gating檔)→brief補說明重派;④codex報stamp checker>60s hang=codex自身infra非腳本bug(本機<10s正常FAIL)。
+
+<!-- 以下為歷史狀態,保留追蹤 -->
 **Agent**: Claude(Opus 4.8) | **Time**: 2026-07-23 | **Branch**: **main** | **狀態**: ✅**委員文件收斂方法 epic 完工上線**(commit 27b499d;215→223 passed)→▶**Gate/派工逃脫點 epic 進行中**:recon 178 findings+digest 修法(ded74bc);**reconcile epic (a)-(e) 全鏈落地**(178→8主題/51開洞+ledger;completeness exit 0;三家語意複查納入v2;RECONCILE-STAMP 三家 APPROVED;🛑白話閘1 使用者拍板方向對);★**下一步=(f)SPEC 修 51 洞**(見「Gate 逃脫點 epic」節)。**epic 排序=Gate 逃脫點(reconcile→SPEC→分批修)全完 → 才 IC 全棧健檢 Step2-4**。
 > ⚠️**白話審閱閘**(2026-07-23 使用者定,見 memory feedback_plain_review_gate_reconcile_spec):**reconcile 最終結論** + **SPEC 最終結論** 兩處都須**白話解釋給使用者審閱、由使用者決定是否進下一階段**,別把委員 APPROVED 當可自動續走。
 
