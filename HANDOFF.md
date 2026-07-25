@@ -16,7 +16,7 @@
 
 **待辦 ③ 主線產品**(延後久,實際價值):IC 全棧健檢 Step 2-4(見下節)/51 洞 SPEC 重做。
 
-**凍結(別自行動,見 memory `project_classification_mechanism_frozen`)**:任務分類/路由/絆線/oracle-enforcement(PostToolUse hook)meta 層。
+**凍結(只凍這個;2026-07-25 使用者界定,見 memory `project_classification_mechanism_frozen`)**:**僅「任務分類/路由/尺寸絆線」規則**(怎麼判任務大小/路由)。**其餘 governance 不在凍結內**——尤其 **P1-6 未結案債狀態機(逼我每個收集節點跑 completeness)=本 epic 根因修法,可做、最高價值**。
 
 **建議下一步**:見下「▶▶ 下一步」節(待辦①的精實做法 或 待辦③回主線)。**做法鐵律**:小 diff 高風險走精實流程(真碼+自跑 oracle+2 家審真 diff+查 CI),不走偽碼管線;push 後必查 CI(跨平台盲區靠 CI 兜底)。
 

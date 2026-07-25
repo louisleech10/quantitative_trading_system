@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# pre-push — push 前跑 governance 守衛測試 + shell 語法檢查，未過拒絕 push。
+#
+# 為什麼在這裡：branch protection 在「私有 repo + 免費方案」不生效（GitHub 顯示 Not enforced），
+#   CI 只能「push 後亮紅」擋不住 main。本 hook 把守衛測試前移到 push 之前 = 壞的推不上去。
+# 誠實邊界：`git push --no-verify` 可繞過 → **擋粗心不防蓄意**（符合本 repo 既定威脅模型：擋意外 90-95%）。
+#   CI 仍是跨環境（Linux）唯一 oracle，push 後仍須查 CI（本機綠≠CI綠，見 BSD/GNU realpath 事故）。
+set -u
+set -o pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+cd "$ROOT" || exit 1
+
+# 逃生口（明示且留痕；緊急時用）
+if [ "${GOVERNANCE_SKIP_PREPUSH:-}" = "1" ]; then
+  echo "pre-push: GOVERNANCE_SKIP_PREPUSH=1 → 略過守衛（緊急逃生口；請自行確認 CI）" >&2
+  exit 0
+fi
+
+py="venv/bin/python"
+[ -x "$py" ] || py="$(command -v python3 || command -v python)"
+if [ -z "$py" ]; then
+  echo "pre-push: 找不到 python（venv 或系統）→ fail-closed 拒 push" >&2
+  exit 1
+fi
+
+echo "pre-push: 跑 shell 語法檢查 (bash -n scripts/*.sh)…"
+_syntax_bad=0
+for f in scripts/*.sh scripts/git_hooks/*; do
+  [ -f "$f" ] || continue
+  case "$f" in *.py|*.json|*.txt|*.md) continue ;; esac
+  head -1 "$f" | grep -q 'bash\|sh' || continue
+  bash -n "$f" 2>/dev/null || { echo "  ✗ 語法錯: $f" >&2; _syntax_bad=1; }
+done
+if [ "$_syntax_bad" -ne 0 ]; then
+  echo "pre-push: shell 語法檢查未過 → 拒 push（修好再推）" >&2
+  exit 1
+fi
+
+if [ ! -d tests/governance ]; then
+  echo "pre-push: 無 tests/governance → 跳過守衛測試" >&2
+  exit 0
+fi
+
+echo "pre-push: 跑 governance 守衛測試 (pytest tests/governance)…"
+if ! "$py" -m pytest tests/governance -q --tb=short; then
+  echo "" >&2
+  echo "pre-push: ✗ governance 守衛測試未過 → 拒 push。" >&2
+  echo "  修好再推；確有必要時 GOVERNANCE_SKIP_PREPUSH=1 git push（並自行確認 CI）。" >&2
+  exit 1
+fi
+
+echo "pre-push: ✓ 守衛測試通過，放行 push（push 後仍請查 CI：跨平台盲區只有 CI 抓得到）"
+exit 0
