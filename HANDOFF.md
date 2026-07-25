@@ -12,6 +12,11 @@
 - **接續**:收兩家 closure→APPROVE 則🛑**白話閘**(使用者要求「SPEC完成後白話解釋」)→委員戳記→TODO→**派 grok 實作**→codex+composer 雙家code review。
 - **✅ SPEC v3 + TODO v2.2 完成(使用者要求「寫完TODO先停」2026-07-24)**:SPEC 兩輪審 APPROVE;TODO 走 4 輪(審+closure×3)兩家「可 Frozen 派 Grok」,残 2 P2 已修。**⚠️ 停在派實作前**。**使用者重要回饋**:多輪關卡根因=**Claude 起草連續出真bug**(改名覆蓋synth→刪半截破語法→無條件跑stamp),非流程/委員問題;委員只照範本填很快。教訓=起草gate.sh類控制流改造應**先自己模擬+bash-n**(round3才做,本該round1)。dogfood數據因被我的錯誤污染而**無從分析流程優劣**。TODO=`docs/GOVERNANCE_HARNESS_P0_TODO.md`(v2.2;3批B1/B2/B3;hoist最終控制流已bash-n驗證rc=0)。
 - **✅✅ P0 4修法收尾,🛑狀態=可push,等使用者拍板(2026-07-25)** SIGNOFF:codex-composer:p0-fix-closure（closure證據=本地 handoffs/20260725-p0-fix-closure-*.md,gitignored）：實作=Grok 4 commits `0745b62`/`d8dab44`/`b3b2582`/`b2d476c`(未push)。2家審真碼codex抓1真BLOCKING(composer+Claude漏):V-B巢狀synth繞過(realpath用dirname≠completeness用session-root)→Grok抽`_reconcile_sessdir`共用函式根治;codex原提出方重跑nested PoC複驗;F1/F2/F3全CLOSED,兩家verdict可push。**待使用者push決定(對外動作,先不push);SPEC/TODO/reconcile/dogfood檔未commit待使用者定。** dogfood(本地 HARNESS-DOGFOOD-LOG.md,gitignored)=真碼快(Grok實作21分1次+fix9分每輪抓真bug),偽碼文件~10輪多清幻覺;瓶頸=偽碼流程+起草錯非實作;`reconcile_build.sh`首戰1秒收2家。
+- **▶▶ 下一步(新 session 開工先讀)**:P0 4洞(V-A/B/C/M)已上 main、Governance CI job=success、l65_benchmark 紅是既有非本次。**剩餘工作**:
+  1. **紅隊剩 6 MAJOR(V-D~I)未修**(見 `handoffs/20260724-REDTEAM-RECONCILE.md`):V-D cx_run 不需 token 繞 gate / V-E brief-kind 自報 impl 跳 P1-1 / V-F P1-1 只 grep 範本名 / V-G gate_check 無 jq fail-open / V-H roster 可漏放某家 / V-I register-output 不驗格式。
+  2. **建議做法**:用本 session 驗證出的**精實流程**(直接寫真碼 + 自跑 oracle(bash-n/pytest) + 2家審真 diff + 查 CI;**不走偽碼 SPEC/TODO 管線**——見 dogfood 結論)。先挑**純 fail-closed、不碰凍結的 enforcement-meta 層**者:V-G/V-F/V-I。**V-D(繞 gate token)碰強制機器,屬凍結區鄰近,先問使用者**。
+  3. **替代**:回主線 IC 全棧健檢 Step 2-4(見下「IC 全棧健檢 epic」節)——實際產品價值,已延後久。
+  4. **禁**:分類/路由/絆線/oracle-enforcement(PostToolUse hook)那套 meta 層**凍結中**,別自行改造(見 memory `project_classification_mechanism_frozen`)。**push 後必查 CI**(本 session 教訓:本機綠≠CI綠,跨平台盲區靠 CI 兜底)。
 - **踩坑記**:①派委員首次被自己P1-1閘擋(前提寫粗體`**assumed**:`打斷token)=P1-1生效;②誤派實作者grok當審查者已改codex;③codex首輪STAMP-BLOCKED(誤把紅隊reconcile當gating檔)→brief補說明重派;④codex報stamp checker>60s hang=codex自身infra非腳本bug(本機<10s正常FAIL)。
 
 <!-- 以下為歷史狀態,保留追蹤 -->
