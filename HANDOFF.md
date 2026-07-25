@@ -12,6 +12,10 @@
 - MAJOR ×6:V-D cx_run 繞 token / V-E brief-kind 自報跳 P1-1 / V-F P1-1 只 grep 範本名 / V-G gate_check 無 jq fail-open / V-H roster 漏放某家 / V-I register-output 不驗格式。
 - MINOR ×3:V-J brief 閘無常駐探針 / V-K branch protection(你設) / V-L family meta-test 只掃 6 檔。
 
+**工具鏈(2026-07-25 上線;派工/收集/自檢一條龍,見 `docs/COMMITTEE_DISPATCH_GUIDE.md`)**:
+`new_brief.sh`(產合規 brief 骨架)→`committee_run.sh`(開 gate+平行派 **N 家**,家族對 SoT 驗證不寫死)→`reconcile_build.sh`(建 session+逐字 synth+驗 0 掉項)→`verify_mutation.sh`(改壞→須紅→保證還原)→`gov_check.sh`(語法+守衛測試+探針;`--fast`/`--no-probe`)→ pre-push hook 委派 gov_check → push 後 `ci_check_after_push` 自動回報 **Verify Claim + Governance** 兩個 CI。
+**新發現的既有債**:`test_verify_gate{,_b3,_b4}.py` 探針「空心/偽自證」(沒碰待測系統),已在 gov_check 具名排除→歸待辦②P1-2/P1-3。
+
 **待辦 ② 治理 harness plan 剩餘**(REF `handoffs/20260724-GOVERNANCE-HARNESS-PLAN.md`):P1-2/3/4/6/7/8/9/10/11/12(部分與紅隊 V-x 重疊,實作前先去重)。
 
 **待辦 ③ 主線產品**(延後久,實際價值):IC 全棧健檢 Step 2-4(見下節)/51 洞 SPEC 重做。
