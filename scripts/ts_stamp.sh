@@ -90,7 +90,11 @@ else
     secs="$(python3 -c "print(f'{$delta_ms/1000:.2f}')" 2>/dev/null || echo "?")"
     msg="⏱ T-OUT ${now_hms}｜call 內耗時 ${secs}s"
     # 超過門檻 → 大聲喊，並記下當時的指令，供事後判斷它是否走了分類器那條路
-    if [ "$delta_ms" -gt $(( WARN_A * 1000 )) ]; then
+    # 已知本來就慢的指令（真的在做事，非分類器掛住）→ 不報 A 類，避免誤判淹沒真訊號。
+    # git push 會觸發 pre-push 跑 287 個治理測試(~80s)；pytest/委員派工同理。
+    known_slow=0
+    printf '%s' "$snippet" | grep -Eq '(git (push|pull|fetch|clone))|pytest|cx_run|committee_run|gov_check|npm (run |install)|pip install' && known_slow=1
+    if [ "$known_slow" = "0" ] && [ "$delta_ms" -gt $(( WARN_A * 1000 )) ]; then
       msg="🐌🐌 **A 類卡頓** call 內耗時 ${secs} 秒（門檻 ${WARN_A}s）｜指令: ${snippet}｜此為 T-IN→T-OUT 之間，非 Claude 生成時間"
       ALERT="【A 類卡頓】本次工具呼叫在 call 內耗時 ${secs} 秒（正常 0.08s，分類器 2.3s）。指令: ${snippet}。這是權限分類器路徑掛住的徵兆——請檢查該指令是否觸發三條件之一（未命中 allow／執行任意程式碼／路徑在專案外，見 CLAUDE.md Gotchas），並在本回合結尾主動告知使用者。"
       printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "SLOW-A" "${secs}s" "${snippet}" >> "${LOG}.slow" 2>/dev/null || true

@@ -103,6 +103,10 @@ pytest                                           # all tests
 3. **瑣事別用 `python3 -c`** —— 改 `awk`/`sed`/`jq`/shell 內建，或寫檔後 `bash scripts/x.sh`（已在 allow）
 4. 複合／多行指令**不是**問題——只要每個成分都合規就快（實測 0.10s）
 
+**B 類（Claude 端慢）已實測的成因：大輸出回灌**
+- `git push` 會觸發 pre-push 跑 287 測試，**整份 30KB 輸出回灌 Claude context** → 實測 Claude 端多花 **89.9 秒**才發出下一個動作。
+- **避法**：輸出量大的指令一律導檔再取尾，例如 `git push -q origin main > /tmp/push.log 2>&1; tail -3 /tmp/push.log`。`pytest` 全套同理。
+
 **哨兵**：`scripts/ts_stamp.sh`（掛 Pre/PostToolUse on `Bash|Edit|Write` + `UserPromptSubmit`）。
 - **A 類**（call 內 >10s）＝分類器路徑掛住 → 🐌 警告
 - **B 類**（call 之間 >60s，且**期間使用者未輸入**）＝結果回傳＋Claude 生成慢 → 🐌 警告
