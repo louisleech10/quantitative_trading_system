@@ -31,9 +31,24 @@
 # 移除方式：從 .claude/settings.json 的 hooks 拿掉這兩筆，並刪本檔與 log。
 
 LABEL="${1:-?}"
+
+# USER 模式：由 UserPromptSubmit hook 呼叫，只記下「使用者剛送出訊息」的時刻。
+# 用途：讓 B 類判定能排除「使用者讀訊息+打字」的時間，只在**真的是 Claude 慢**時才報警。
+if [ "$LABEL" = "USER" ]; then
+  _um="${TS_STAMP_USER_MARK:-.claude/gate/.ts_stamp_user}"
+  mkdir -p "$(dirname "$_um")" 2>/dev/null || true
+  python3 -c 'import time;print(int(time.time()*1000))' > "$_um" 2>/dev/null || true
+  exit 0
+fi
 LOG="${TS_STAMP_LOG:-.claude/gate/ts_stamp.log}"
 STATE="${TS_STAMP_STATE:-.claude/gate/.ts_stamp_in}"
-WARN="${TS_STAMP_WARN_SEC:-10}"
+LAST_OUT="${TS_STAMP_LAST_OUT:-.claude/gate/.ts_stamp_out}"
+USER_MARK="${TS_STAMP_USER_MARK:-.claude/gate/.ts_stamp_user}"   # UserPromptSubmit hook 寫入
+# A 類=call 內（正常 0.08s，分類器 2.3s）→ 門檻 10s
+# B 類=call 之間（結果回到 Claude + Claude 生成；可能夾使用者輸入）→ 門檻 60s
+WARN_A="${TS_STAMP_WARN_A_SEC:-10}"
+WARN_B="${TS_STAMP_WARN_B_SEC:-60}"
+ALERT=""   # 非空 → 同時注入 Claude context，讓 Claude 自己知道要查
 
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
 
@@ -47,6 +62,25 @@ snippet="$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/
 msg="⏱ T-${LABEL} ${now_hms}"
 
 if [ "$LABEL" = "IN" ]; then
+  # B 類偵測：距「上一個工具呼叫結束」多久 = 結果回到 Claude + Claude 生成（可能夾使用者輸入）
+  last_out="$(cat "$LAST_OUT" 2>/dev/null || echo 0)"
+  case "$last_out" in ''|*[!0-9]*) last_out=0 ;; esac
+  if [ "$last_out" -gt 0 ] && [ "$now_ms" -gt 0 ]; then
+    gap_ms=$(( now_ms - last_out ))
+    gsec="$(python3 -c "print(f'{$gap_ms/1000:.1f}')" 2>/dev/null || echo "?")"
+    # 若這段期間使用者送出過訊息 → 間隔含「使用者讀+打字」，不是 Claude 慢 → 不報警
+    user_ms="$(cat "$USER_MARK" 2>/dev/null || echo 0)"
+    case "$user_ms" in ''|*[!0-9]*) user_ms=0 ;; esac
+    if [ "$user_ms" -gt "$last_out" ]; then
+      msg="⏱ T-IN ${now_hms}｜距上次 ${gsec}s（含使用者輸入，不計）"
+    elif [ "$gap_ms" -gt $(( WARN_B * 1000 )) ]; then
+      msg="⏱ T-IN ${now_hms}｜🐌 **B 類卡頓** 距上次工具結束 ${gsec}s，且**期間使用者未輸入**＝Claude 端慢"
+      ALERT="【B 類卡頓・已排除使用者輸入】距上一個工具呼叫結束 ${gsec} 秒才發出本次呼叫，且這段期間使用者**沒有**送出任何訊息——所以這是「結果回到 Claude + Claude 生成」這一段真的慢。請在本回合結尾主動告知使用者實際秒數，並查 ${LOG}.slow。"
+      printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "GAP-B" "${gsec}s" "${snippet}" >> "${LOG}.slow" 2>/dev/null || true
+    else
+      msg="⏱ T-IN ${now_hms}｜距上次 ${gsec}s"
+    fi
+  fi
   printf '%s' "$now_ms" > "$STATE" 2>/dev/null || true
 else
   start_ms="$(cat "$STATE" 2>/dev/null || echo 0)"
@@ -56,16 +90,25 @@ else
     secs="$(python3 -c "print(f'{$delta_ms/1000:.2f}')" 2>/dev/null || echo "?")"
     msg="⏱ T-OUT ${now_hms}｜call 內耗時 ${secs}s"
     # 超過門檻 → 大聲喊，並記下當時的指令，供事後判斷它是否走了分類器那條路
-    if [ "$delta_ms" -gt $(( WARN * 1000 )) ]; then
-      msg="🐌🐌 **卡頓偵測** call 內耗時 ${secs} 秒（門檻 ${WARN}s）｜指令: ${snippet}｜此為 T-IN→T-OUT 之間，非 Claude 生成時間。詳見 ${LOG}"
-      printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "SLOW" "${secs}s" "${snippet}" >> "${LOG}.slow" 2>/dev/null || true
+    if [ "$delta_ms" -gt $(( WARN_A * 1000 )) ]; then
+      msg="🐌🐌 **A 類卡頓** call 內耗時 ${secs} 秒（門檻 ${WARN_A}s）｜指令: ${snippet}｜此為 T-IN→T-OUT 之間，非 Claude 生成時間"
+      ALERT="【A 類卡頓】本次工具呼叫在 call 內耗時 ${secs} 秒（正常 0.08s，分類器 2.3s）。指令: ${snippet}。這是權限分類器路徑掛住的徵兆——請檢查該指令是否觸發三條件之一（未命中 allow／執行任意程式碼／路徑在專案外，見 CLAUDE.md Gotchas），並在本回合結尾主動告知使用者。"
+      printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "SLOW-A" "${secs}s" "${snippet}" >> "${LOG}.slow" 2>/dev/null || true
     fi
   fi
 fi
 
+[ "$LABEL" = "OUT" ] && { printf '%s' "$now_ms" > "$LAST_OUT" 2>/dev/null || true; }
 printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d')" "${LABEL} ${now_hms}" "${snippet}" >> "$LOG" 2>/dev/null || true
 
-# jq 負責安全逸出（訊息含引號/中文也不會壞 JSON）；jq 不在就不輸出，同樣不阻擋
-printf '%s' "$msg" | jq -Rs '{systemMessage: .}' 2>/dev/null || true
+# jq 負責安全逸出（訊息含引號/中文也不會壞 JSON）；jq 不在就不輸出，同樣不阻擋。
+# 慢事件才把 additionalContext 注入 Claude context——正常呼叫不注入，避免每次都佔 context。
+if [ -n "$ALERT" ]; then
+  ev="PostToolUse"; [ "$LABEL" = "IN" ] && ev="PreToolUse"
+  jq -n --arg m "$msg" --arg a "$ALERT" --arg e "$ev" \
+     '{systemMessage:$m, hookSpecificOutput:{hookEventName:$e, additionalContext:$a}}' 2>/dev/null || true
+else
+  printf '%s' "$msg" | jq -Rs '{systemMessage: .}' 2>/dev/null || true
+fi
 
 exit 0

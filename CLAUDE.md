@@ -81,7 +81,12 @@ pytest                                           # all tests
 
 **⏱ 工具呼叫多分鐘卡頓 — 根因與避法（2026-07-26 受控實驗，24+ 樣本）**
 
-`settings.json` 設 `defaultMode:"auto"` → **權限分類器（LLM 呼叫）**。每次 **2.3–3.0 秒**，且**偶爾掛住 ~600 秒**（實測 1 次 602.96s；600s 是典型硬 timeout，逾時後預設放行，故指令仍正常執行、只是乾等）。
+`settings.json` 設 `defaultMode:"auto"` → **權限分類器（LLM 呼叫）**。每次 **2.3–3.0 秒**，且**有機率整個掛住 600 秒**。
+
+> **⚠️ 600 秒卡頓已重現 2 次（n=2，非推測）**：`602.96s`（`cd` 前綴 + jq）與 `603.18s`（`python3 - <<'PY'` heredoc）。
+> **不同指令、不同觸發條件，卻都精準落在 ~603 秒 → 確認是 600 秒硬性 timeout**（逾時後預設放行，故指令仍正常執行，使用者只看到乾等）。
+> 粗估發生率 **~7%**（約 30 次分類器呼叫中 2 次）。**每次走分類器都是在賭**——所以避法不是「少走」，是「不走」。
+> 第 2 次是 Claude 寫完本節後**立刻違反自己的規則**（用 `python3 - <<'PY'` 改 settings.json）造成的，代價是使用者乾等 10 分鐘。
 
 **三個觸發條件，任一成立就走分類器**（各有對照組實證）：
 | 觸發 | 快 | 慢 |
@@ -98,7 +103,11 @@ pytest                                           # all tests
 3. **瑣事別用 `python3 -c`** —— 改 `awk`/`sed`/`jq`/shell 內建，或寫檔後 `bash scripts/x.sh`（已在 allow）
 4. 複合／多行指令**不是**問題——只要每個成分都合規就快（實測 0.10s）
 
-**哨兵**：`scripts/ts_stamp.sh`（掛 Pre/PostToolUse）。call 內 >10s 自動跳 🐌 警告並寫 `.claude/gate/ts_stamp.log.slow`。**不必人工讀時間戳**。移除法見腳本檔頭。
+**哨兵**：`scripts/ts_stamp.sh`（掛 Pre/PostToolUse on `Bash|Edit|Write` + `UserPromptSubmit`）。
+- **A 類**（call 內 >10s）＝分類器路徑掛住 → 🐌 警告
+- **B 類**（call 之間 >60s，且**期間使用者未輸入**）＝結果回傳＋Claude 生成慢 → 🐌 警告
+- 兩類都**自動注入 Claude context**（非只顯示給使用者），Claude 會主動回報；並寫 `.claude/gate/ts_stamp.log.slow`
+- **使用者不必盯螢幕、不必算時間、不必回報**。移除法見腳本檔頭。
 
 **測試與 CI**
 - `pytest tests/governance -q` 要 **110 秒**（287 tests）。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套，且**丟背景**，否則看起來像當機。
