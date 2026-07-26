@@ -79,6 +79,27 @@ pytest                                           # all tests
 - `cmd | tail; echo rc=$?` 讀到的是 **tail 的 rc**，不是 cmd 的。rc 一律**直接取**，禁經 pipe。此坑 Claude 與委員都犯過。
 - `gate_check.sh` 只驗 token 的 **mtime 新鮮度**，**不比對內容**：一個 token 900 秒內授權任意 task-id／任意 intent；固定檔名 `.claude/gate/dispatch.token` 無 session 區隔，跨 session 會互相**延長**有效期（fail-open）。代號 `GATE-TOKEN-BINDING`。
 
+**⏱ 工具呼叫多分鐘卡頓 — 根因與避法（2026-07-26 受控實驗，24+ 樣本）**
+
+`settings.json` 設 `defaultMode:"auto"` → **權限分類器（LLM 呼叫）**。每次 **2.3–3.0 秒**，且**偶爾掛住 ~600 秒**（實測 1 次 602.96s；600s 是典型硬 timeout，逾時後預設放行，故指令仍正常執行、只是乾等）。
+
+**三個觸發條件，任一成立就走分類器**（各有對照組實證）：
+| 觸發 | 快 | 慢 |
+|---|---|---|
+| ① 未命中 `permissions.allow` | `awk`（加清單後）0.054s | `awk`（加清單前）2.37s ／ `cd` 前綴 2.63s |
+| ② 執行**任意程式碼** | `python3 --version` 0.08s | `python3 -c "..."` 2.95s（**同一條 allow 規則，繞不掉**） |
+| ③ 路徑在**專案目錄外** | `ls -lt .claude/` 0.08s | `ls -lt /Users/louis/.claude/` 2.51s |
+
+**三條都不犯 → 17+ 樣本全 ~0.08s，零離群值。**
+
+**避法（照做即可，不必記時間）**：
+1. **絕不寫 `cd <專案路徑>` 前綴** —— cwd 本來就在專案根，這前綴讓**每個**指令都走分類器（歷史上「常常卡住」的主因）
+2. **用專案相對路徑**；專案內絕對路徑也快，但 `/Users/<user>/` 底下一律慢
+3. **瑣事別用 `python3 -c`** —— 改 `awk`/`sed`/`jq`/shell 內建，或寫檔後 `bash scripts/x.sh`（已在 allow）
+4. 複合／多行指令**不是**問題——只要每個成分都合規就快（實測 0.10s）
+
+**哨兵**：`scripts/ts_stamp.sh`（掛 Pre/PostToolUse）。call 內 >10s 自動跳 🐌 警告並寫 `.claude/gate/ts_stamp.log.slow`。**不必人工讀時間戳**。移除法見腳本檔頭。
+
 **測試與 CI**
 - `pytest tests/governance -q` 要 **110 秒**（287 tests）。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套，且**丟背景**，否則看起來像當機。
 - 跑完測試須 `bash scripts/restore_golden_inventory.sh` 還原 golden inventory 的副作用（否則 `tests/golden/l65/test_inventory.txt` 會髒）。

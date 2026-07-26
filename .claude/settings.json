@@ -26,6 +26,24 @@
       "Bash(tail *)",
       "Bash(wc *)",
       "Bash(sort *)",
+      "Bash(awk *)",
+      "Bash(sed *)",
+      "Bash(rg *)",
+      "Bash(diff *)",
+      "Bash(printf *)",
+      "Bash(echo *)",
+      "Bash(date *)",
+      "Bash(du *)",
+      "Bash(stat *)",
+      "Bash(basename *)",
+      "Bash(dirname *)",
+      "Bash(realpath *)",
+      "Bash(tr *)",
+      "Bash(uniq *)",
+      "Bash(shasum *)",
+      "Bash(python3 *)",
+      "Bash(bash -n *)",
+      "Bash(bash scripts/*)",
       "Bash(jq *)",
       "Bash(mkdir *)",
       "Bash(cp *)",
@@ -80,6 +98,15 @@
             "command": "bash scripts/verify_pretooluse.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/ts_stamp.sh IN"
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -116,6 +143,10 @@
       {
         "matcher": "Bash",
         "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/ts_stamp.sh OUT"
+          },
           {
             "type": "command",
             "command": "bash scripts/ci_check_after_push.sh"

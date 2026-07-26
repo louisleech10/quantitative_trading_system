@@ -181,3 +181,10 @@ handoffs/ic1eb_baseline_v3_superseded/
 # B5 新路徑 freeze reports(G-2 腳本可重產;manifest 摘要見 IC1EB-GOLDEN-DIFF.md)
 handoffs/ic1eb_newpath_freeze/
 handoffs/ic1eb_newpath_freeze.bak.*/
+
+# 時間戳診斷 log(2026-07-26 加,診斷完可連同 hook 一起移除)
+.claude/gate/ts_stamp.log
+
+# 時間戳哨兵狀態檔/慢呼叫記錄(診斷用)
+.claude/gate/.ts_stamp_in
+.claude/gate/ts_stamp.log.slow

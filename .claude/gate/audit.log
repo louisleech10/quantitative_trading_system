@@ -27082,3 +27082,10 @@ ts=2026-07-26 15:18:42 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/p16-v11rev-r12/synth.md", "output_sha256": "6fdad1e389689219a1de935079587c2d40eff19bebb5b631011fa593afc76089", "task_id": "p16-stamp-r12", "ts": "2026-07-26T08:23:56Z"}
+{"event":"gate_deny","ts":"2026-07-26T09:47:09Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T09:47:09Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T12:34:48Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T12:34:48Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T12:48:00Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T12:48:00Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T13:54:16Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
