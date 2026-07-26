@@ -16,7 +16,7 @@
 - **已確認（讀碼實證,附來源）**：
   - `scripts/gate_check.sh` matcher 僅 `Task|Bash|Write`,不掃 HANDOFF 內容、不管 commit-msg（grep matcher 行）;jq 缺失 fail-open（L18 附近 exit 0）。FACT-RECEIPT: grep -n 'Task)' scripts/gate_check.sh → 印出 37:  Task)（Composer 實跑 2026-07-11）
   - `.git/hooks/` 無自訂 hook（僅 `.sample`;`ls` 確認）。
-  - `.github/workflows/` 存在（`l65_benchmark.yml`）→ CI 可用作 enforcement 後盾。
+  - `.github/workflows/` 存在（`governance.yml` / `verify_claim.yml`）→ CI 可用作 enforcement 後盾。（原舉例的 `l65_benchmark.yml` 已於 2026-07-26 刪除。）
   - `scripts/reconcile_stamps_check.sh` 以 grep 戳記行為主,不驗戳記來源（自承 tamper-evident 非防偽造）。
   - `scripts/mutation_probe_check.sh` 規則 3 跑 `pytest -k test_mutation_`,結尾 echo PASS/FAIL,現無 receipt 輸出。FACT-RECEIPT: grep -n '^echo "→ 跑 mutation 探針: pytest -k test_mutation_' scripts/mutation_probe_check.sh → 印出 74:echo "→ 跑 mutation 探針: pytest -k test_mutation_ $*"（Composer 實跑 2026-07-11）
 - **待確認：無**。

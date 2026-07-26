@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "docs": {
+    "purpose": "治理流程工具的單一真相源(SoT)。回答『這個節點該用哪些腳本』。由 governance_tools_check.sh 機械強制:scripts/*.sh 全部必須分類,新增腳本未分類即紅——根治『Claude 憑印象列工具清單』(2026-07-26 使用者抓包:我在 SPEC 裁決 7 憑印象列 7 支,而當日已因憑印象列豁免檔錯過一次 3-vs-7)。",
+    "mandatory": "true=該節點一律呼叫,不得手搓等效替代(SPEC §A 裁決 7)。false=情境性,由判斷決定。",
+    "non_process": "一次性/專案分析/library/hook 自動觸發,不屬『我該主動呼叫』的流程工具。"
+  },
+  "tools": {
+    "gov_check.sh": {
+      "node": "0-開工/commit前",
+      "mandatory": true,
+      "why": "本機一鍵治理檢查(pre-push hook 亦呼叫);開工稽核與 commit 前都該跑",
+      "cmd": "bash scripts/gov_check.sh"
+    },
+    "new_brief.sh": {
+      "node": "1-派工前",
+      "mandatory": true,
+      "why": "產必過 P1-1 合規閘的 brief 骨架。**手寫必被自己的閘擋**(2026-07-25 一次、2026-07-26 又一次)",
+      "cmd": "bash scripts/new_brief.sh <kind> <出路> \"標題\""
+    },
+    "agent_preflight.sh": {
+      "node": "1-派工前",
+      "mandatory": true,
+      "why": "派工前快照(data_cache 等),搭配 postflight 抓執行端副作用",
+      "cmd": "bash scripts/agent_preflight.sh"
+    },
+    "gate.sh": {
+      "node": "1-派工前",
+      "mandatory": true,
+      "why": "開 dispatch/artifact token;fail-closed,無 token 不得派工/建治理文件",
+      "cmd": "bash scripts/gate.sh dispatch --intent … --task-id … --risk …"
+    },
+    "committee_run.sh": {
+      "node": "2-派工",
+      "mandatory": true,
+      "why": "一命令派 N 家(開 token→平行派→等齊→回報)。P1-6 後為唯一開債入口",
+      "cmd": "bash scripts/committee_run.sh …"
+    },
+    "cx_run.sh": {
+      "node": "2-派工",
+      "mandatory": true,
+      "why": "單家派工安全模板。**禁手搓 codex/grok/cursor-agent 命令列**(反引號/PATH/`&` 三反覆錯)",
+      "cmd": "bash scripts/cx_run.sh <family> <brief> <out> [effort]"
+    },
+    "dispatch.sh": {
+      "node": "2-派工",
+      "mandatory": false,
+      "why": "gate.sh 薄 wrapper(自動補 --task-id/--output)",
+      "cmd": "bash scripts/dispatch.sh --intent …"
+    },
+    "agent_postflight.sh": {
+      "node": "3-派工後",
+      "mandatory": true,
+      "why": "派工後安全檢查;PASS 才驗收",
+      "cmd": "bash scripts/agent_postflight.sh"
+    },
+    "reconcile_build.sh": {
+      "node": "4-收集合併",
+      "mandatory": true,
+      "why": "機械合併委員產物(session/lock/逐字synth/completeness 一次跑完)。**禁手抄**",
+      "cmd": "bash scripts/reconcile_build.sh <session> <委員檔...>"
+    },
+    "completeness_check.sh": {
+      "node": "4-收集合併",
+      "mandatory": true,
+      "why": "驗 0 掉項 oracle。reconcile_build 內含,獨立複驗亦用它",
+      "cmd": "bash scripts/completeness_check.sh --lock <sources.lock>"
+    },
+    "write_sources_lock.sh": {
+      "node": "4-收集合併",
+      "mandatory": false,
+      "why": "單獨寫 sources.lock(reconcile_build 已內含)",
+      "cmd": "bash scripts/write_sources_lock.sh …"
+    },
+    "reconcile_body_hash.sh": {
+      "node": "4-收集合併",
+      "mandatory": true,
+      "why": "算 reconcile 本體 canonical sha256(戳記用)",
+      "cmd": "bash scripts/reconcile_body_hash.sh <synth.md>"
+    },
+    "reconcile_stamps_check.sh": {
+      "node": "4-收集合併",
+      "mandatory": true,
+      "why": "機器強制:reconcile 須委員戳記核可才可派實作",
+      "cmd": "bash scripts/reconcile_stamps_check.sh <synth.md> <families>"
+    },
+    "write_committee_accepted.sh": {
+      "node": "4-收集合併",
+      "mandatory": false,
+      "why": "委員語意審後產 committee_accepted.json",
+      "cmd": "bash scripts/write_committee_accepted.sh …"
+    },
+    "replay_convergence_coverage.sh": {
+      "node": "4-收集合併",
+      "mandatory": false,
+      "why": "收斂水位量測",
+      "cmd": "bash scripts/replay_convergence_coverage.sh …"
+    },
+    "template_check.sh": {
+      "node": "5-文件產出",
+      "mandatory": true,
+      "why": "驗 SPEC/TODO 含 canonical 範本必填錨點 + 反空殼",
+      "cmd": "bash scripts/template_check.sh spec|todo <檔>"
+    },
+    "coverage_check.sh": {
+      "node": "5-文件產出",
+      "mandatory": true,
+      "why": "驗『大綱/reconcile 每一項』都落進 SPEC/TODO。**根治重生成隨機掉項**",
+      "cmd": "bash scripts/coverage_check.sh <manifest> <目標文件>"
+    },
+    "check_doc_anchors.sh": {
+      "node": "5-文件產出",
+      "mandatory": false,
+      "why": "文件錨點檢查",
+      "cmd": "bash scripts/check_doc_anchors.sh"
+    },
+    "verify_mutation.sh": {
+      "node": "6-驗收證偽",
+      "mandatory": true,
+      "why": "改壞→須紅→**trap 保證還原**→須綠。**禁手搓 mutation loop**(手做漏還原會髒工作區)",
+      "cmd": "bash scripts/verify_mutation.sh <檔> <原> <變異> <pytest目標>"
+    },
+    "mutation_probe_check.sh": {
+      "node": "6-驗收證偽",
+      "mandatory": true,
+      "why": "驗『聲稱正確性的測試』是否真有牙齒(章程 §B1)",
+      "cmd": "bash scripts/mutation_probe_check.sh <test_path...>"
+    },
+    "review_quorum_check.sh": {
+      "node": "6-驗收證偽",
+      "mandatory": true,
+      "why": "機器強制:中/大實作須 ≥2 非實作者家族 code review",
+      "cmd": "bash scripts/review_quorum_check.sh <task-id>"
+    },
+    "audit_events_check.sh": {
+      "node": "6-驗收證偽",
+      "mandatory": true,
+      "why": "P1-6 事件真相源一致性守衛(C1-C12)",
+      "cmd": "bash scripts/audit_events_check.sh"
+    },
+    "verify_hooks_health.sh": {
+      "node": "6-驗收證偽",
+      "mandatory": true,
+      "why": "偵測驗收防偽閘本身是否壞掉(fail-closed)",
+      "cmd": "bash scripts/verify_hooks_health.sh"
+    },
+    "test_template_check.sh": {
+      "node": "6-驗收證偽",
+      "mandatory": false,
+      "why": "template_check 自身 fixture 矩陣",
+      "cmd": "bash scripts/test_template_check.sh"
+    },
+    "check_decoupling.sh": {
+      "node": "7-commit前",
+      "mandatory": true,
+      "why": "完整 7 條解耦掃描(phase4 是窄版,會誤報全綠)",
+      "cmd": "bash scripts/check_decoupling.sh"
+    },
+    "check_decoupling_phase4.sh": {
+      "node": "7-commit前",
+      "mandatory": false,
+      "why": "窄版解耦(Rule 1/2/3/6);**不查 R4**,勿當完整",
+      "cmd": "bash scripts/check_decoupling_phase4.sh"
+    },
+    "check_agent_contract_sync.sh": {
+      "node": "7-commit前",
+      "mandatory": true,
+      "why": "四源規則同步(CLAUDE/AGENTS/.cursorrules/HANDOFF)",
+      "cmd": "bash scripts/check_agent_contract_sync.sh"
+    },
+    "gate_check.sh": {
+      "node": "H-hook自動",
+      "mandatory": false,
+      "why": "PreToolUse backstop",
+      "cmd": "(hook)"
+    },
+    "verify_pretooluse.sh": {
+      "node": "H-hook自動",
+      "mandatory": false,
+      "why": "PreToolUse coarse-guard",
+      "cmd": "(hook)"
+    },
+    "ci_check_after_push.sh": {
+      "node": "H-hook自動",
+      "mandatory": false,
+      "why": "PostToolUse:push 後自動查 CI",
+      "cmd": "(hook)"
+    },
+    "governance_families.sh": {
+      "node": "L-library",
+      "mandatory": false,
+      "why": "family SoT bash getter(source 用)",
+      "cmd": "(source)"
+    },
+    "install_verify_hooks.sh": {
+      "node": "L-一次性",
+      "mandatory": false,
+      "why": "設定 core.hooksPath",
+      "cmd": "bash scripts/install_verify_hooks.sh"
+    },
+    "register_legacy_committee_files.sh": {
+      "node": "L-一次性",
+      "mandatory": false,
+      "why": "legacy 委員檔登記",
+      "cmd": "(一次性)"
+    },
+    "restore_golden_inventory.sh": {
+      "node": "N-非流程",
+      "mandatory": false,
+      "why": "測試副作用還原(golden inventory)",
+      "cmd": "bash scripts/restore_golden_inventory.sh"
+    },
+    "archive_signal_density.sh": {
+      "node": "N-非流程",
+      "mandatory": false,
+      "why": "專案分析",
+      "cmd": ""
+    },
+    "dev_stack.sh": {
+      "node": "N-非流程",
+      "mandatory": false,
+      "why": "開發環境啟動",
+      "cmd": ""
+    },
+    "rerun_phase3_tests.sh": {
+      "node": "N-非流程",
+      "mandatory": false,
+      "why": "專案測試重跑",
+      "cmd": ""
+    },
+    "run_ic_persist_hermetic.sh": {
+      "node": "N-非流程",
+      "mandatory": false,
+      "why": "IC 持久化 hermetic 測試",
+      "cmd": ""
+    },
+    "governance_tools_check.sh": {
+      "node": "6-驗收證偽",
+      "mandatory": true,
+      "why": "工具盤點守衛:scripts/*.sh 全部須分類,新增未登記即紅。根治「Claude 憑印象列工具清單」(同一錯 2026-07-26 一日三犯)",
+      "cmd": "bash scripts/governance_tools_check.sh"
+    }
+  }
+}

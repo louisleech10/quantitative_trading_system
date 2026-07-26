@@ -65,8 +65,35 @@ All code must support this evolution via clean decoupling.
 source venv/bin/activate && python run_api.py   # backend :8000
 cd frontend && npm run dev                       # frontend :3000
 pytest                                           # all tests
-./scripts/check_decoupling_phase4.sh             # Rule 1/2/3/6
+./scripts/check_decoupling.sh                    # 完整 7 條（phase4 是窄版,見 Gotchas）
 ```
+
+---
+
+## ⚠️ Codebase Gotchas（踩過的坑；**不是規則，是地雷位置**）
+
+> 本節放「不知道會浪費時間或做出錯誤結論」的事實。規則在別節，這裡只放坑。
+
+**檢查工具會騙你**
+- `check_decoupling_phase4.sh` 是**窄版**（只查 R1/R2/R3/R6，**不查 R4**）→ 會誤報全綠。完整掃描用 `check_decoupling.sh`；實跑 R2/R3/R4 目前有紅（P2 triage 待辦）。
+- `cmd | tail; echo rc=$?` 讀到的是 **tail 的 rc**，不是 cmd 的。rc 一律**直接取**，禁經 pipe。此坑 Claude 與委員都犯過。
+- `gate_check.sh` 只驗 token 的 **mtime 新鮮度**，**不比對內容**：一個 token 900 秒內授權任意 task-id／任意 intent；固定檔名 `.claude/gate/dispatch.token` 無 session 區隔，跨 session 會互相**延長**有效期（fail-open）。代號 `GATE-TOKEN-BINDING`。
+
+**測試與 CI**
+- `pytest tests/governance -q` 要 **110 秒**（287 tests）。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套，且**丟背景**，否則看起來像當機。
+- 跑完測試須 `bash scripts/restore_golden_inventory.sh` 還原 golden inventory 的副作用（否則 `tests/golden/l65/test_inventory.txt` 會髒）。
+- CI 只剩 `governance.yml` + `verify_claim.yml`。`l65_benchmark.yml` 已於 2026-07-26 **刪除**（連續 startup failure、0 秒無 log、從未真的跑過＝零保護純噪音）。`scripts/benchmark_l65.py` **保留**，要測效能請本機跑——共用 runner 測效能回歸本來就低訊號。
+- 3 個既有測試檔探針空心（`test_verify_gate{,_b3,_b4}.py`）＝假綠，已在 `gov_check.sh` 具名排除。
+
+**資料與數值**
+- `data_cache/*.h5` **絕不 commit、絕不造假**。Feature Factory 驗證一律用真實 kline `data_cache/feature_klines/kline_cache.h5`，**禁合成 fixture**。
+- 特徵含**擬合/累積/schema 參數**者（d\*、ADF、特徵清單、OBV/AD）**必須持久化才能上線**，否則 train/serve 偏移。gaussian/VWAP 已確認安全。
+- fracdiff `d*` 跨窗**不穩**（Jaccard 0.2–0.43）→ 單一 run 內自洽可用，**但不可跨窗比 IC**。
+- 多 symbol 切片**禁用 positional index**（ML 孤島舊法）→ 會跨 symbol 洩漏；`SplitPlan` 須 per-symbol。
+
+**平台**
+- macOS 抓不到、只在 CI/linux 現形的坑：`stat -f %m` 在 linux 會失敗並把檔案系統資訊印到 stdout。跨平台取 mtime 須 `stat -c %Y` 前置（見 `gate_check.sh:70-74`）。
+- 反引號、`$`、`&` 手搓進 CLI 命令列會被 shell 吃掉 → 派委員一律走 `cx_run.sh`，brief 用 `new_brief.sh` 產骨架。
 
 ---
 

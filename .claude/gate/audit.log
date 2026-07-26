@@ -26657,3 +26657,428 @@ ts=2026-07-25 07:32:16 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 ts=2026-07-25 08:44:59 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T004459Z-mutation-test_reconcile_target_bound_to_synth.json
 {"event":"gate_deny","ts":"2026-07-25T00:46:17Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-07-25T00:46:17Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T03:50:24Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T03:50:24Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T04:02:04Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T04:02:04Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T04:04:32Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T04:04:32Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T04:53:16Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T04:53:16Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-07-25 12:53:35 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045335Z-mutation-multi.json
+{"event":"gate_deny","ts":"2026-07-25T04:55:26Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T04:55:26Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-07-25 12:55:49 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045549Z-mutation-multi.json
+ts=2026-07-25 12:56:09 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045609Z-mutation-test_verify_gate.json
+ts=2026-07-25 12:56:16 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045615Z-mutation-test_reconcile_target_bound_to_synth.json
+ts=2026-07-25 12:56:23 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045622Z-mutation-test_low_risk_impl_requires_reconcile.json
+ts=2026-07-25 12:56:29 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045629Z-mutation-test_verify_gate_b3.json
+ts=2026-07-25 12:56:35 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045635Z-mutation-test_stamp_no_task_rejected.json
+ts=2026-07-25 12:56:40 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045640Z-mutation-test_waived_adversarial_still_stamps.json
+ts=2026-07-25 12:56:49 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045649Z-mutation-test_verify_gate_b4.json
+ts=2026-07-25 12:57:05 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T045705Z-mutation-test_verify_gate.json
+{"event":"gate_deny","ts":"2026-07-25T04:59:57Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T04:59:57Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-07-25 13:00:18 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050018Z-mutation-test_low_risk_impl_requires_reconcile.json
+ts=2026-07-25 13:00:27 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050027Z-mutation-test_reconcile_target_bound_to_synth.json
+ts=2026-07-25 13:00:34 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050034Z-mutation-test_stamp_no_task_rejected.json
+ts=2026-07-25 13:00:46 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050045Z-mutation-test_verify_gate.json
+ts=2026-07-25 13:00:52 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050052Z-mutation-test_verify_gate_b3.json
+ts=2026-07-25 13:01:03 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050103Z-mutation-test_verify_gate_b4.json
+ts=2026-07-25 13:01:10 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050110Z-mutation-test_waived_adversarial_still_stamps.json
+{"event":"gate_deny","ts":"2026-07-25T05:02:55Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T05:02:55Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-07-25 13:03:16 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050316Z-mutation-test_low_risk_impl_requires_reconcile.json
+{"event":"gate_deny","ts":"2026-07-25T05:05:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T05:05:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-07-25 13:06:07 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050607Z-mutation-multi.json
+ts=2026-07-25 13:06:16 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050616Z-mutation-test_low_risk_impl_requires_reconcile.json
+ts=2026-07-25 13:06:26 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050626Z-mutation-test_reconcile_target_bound_to_synth.json
+ts=2026-07-25 13:06:35 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050635Z-mutation-test_stamp_no_task_rejected.json
+ts=2026-07-25 13:06:49 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050649Z-mutation-test_verify_gate.json
+ts=2026-07-25 13:06:58 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050658Z-mutation-test_verify_gate_b3.json
+ts=2026-07-25 13:07:11 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050711Z-mutation-test_verify_gate_b4.json
+ts=2026-07-25 13:07:19 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T050719Z-mutation-test_waived_adversarial_still_stamps.json
+{"event":"gate_deny","ts":"2026-07-25T05:09:44Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T05:09:44Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-07-25 13:10:10 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260725T051010Z-mutation-multi.json
+{"event":"gate_deny","ts":"2026-07-25T05:22:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T05:22:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T07:59:00Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T07:59:00Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T08:27:25Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T08:27:25Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T08:56:06Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T08:56:06Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-recon-r1", "ts": "2026-07-25T09:33:21Z"}
+=== 2026-07-25 17:33:21 | dispatch ===
+  ts=2026-07-25 17:33:21
+  kind=dispatch
+  intent=P1-6 未結案債狀態機:三家獨立聯合偵察(讀碼產現況+缺口+攻擊面)
+  risk=low
+  facts_asked=none-needed:現況事實全由委員自行讀碼/實跑取得,無須使用者提供
+  review_role=codex/composer/grok 三家各自獨立偵察並挑戰 brief §2 的 assumed 條目(尤其 audit 無 per-family 留痕那條)
+  template=n/a:非 SPEC 派工,指示全在 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p16-recon-r1-codex-retry", "ts": "2026-07-25T09:38:05Z"}
+=== 2026-07-25 17:38:05 | dispatch ===
+  ts=2026-07-25 17:38:05
+  kind=dispatch
+  intent=P1-6 聯合偵察 codex 重派(首輪撞 OpenAI 503 infra,非腳本問題)
+  risk=low
+  facts_asked=none-needed:現況事實由委員自行讀碼取得
+  review_role=codex 獨立偵察,挑戰 brief §2 assumed
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p16-recon-r1-codex-retry3", "ts": "2026-07-25T09:43:51Z"}
+=== 2026-07-25 17:43:51 | dispatch ===
+  ts=2026-07-25 17:43:51
+  kind=dispatch
+  intent=P1-6 聯合偵察 codex 第3次重派(前兩次撞 OpenAI 503 circuit_open,非腳本問題)
+  risk=low
+  facts_asked=none-needed:現況事實由委員自行讀碼取得
+  review_role=codex 獨立偵察,挑戰 brief §2 assumed
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-recon-r1-srcfix-grok", "ts": "2026-07-25T10:06:47Z"}
+=== 2026-07-25 18:06:47 | dispatch ===
+  ts=2026-07-25 18:06:47
+  kind=dispatch
+  intent=grok 自修自己 recon 源檔的 4 處碼證格式變體(純格式零語意;completeness 判空殼)
+  risk=low
+  facts_asked=none-needed:失敗清單來自我方實跑 reconcile_build 輸出,已附 brief
+  review_role=single-executor:n/a(源檔作者自修,依前例不由主委代改委員產物)
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-b123-r2", "ts": "2026-07-25T11:21:22Z"}
+=== 2026-07-25 19:21:22 | dispatch ===
+  ts=2026-07-25 19:21:22
+  kind=dispatch
+  intent=P1-6 設計對抗:專攻 B1 自報旁路修法/B2 round 邊界/B3 grok 留痕驗證
+  risk=high
+  facts_asked=none-needed:前提已在 brief §2 逐條列出並附查證方式
+  review_role=codex/composer/grok 三家獨立對抗;指定攻擊目標=brief §2 第一條 assumed(產出特徵反查修法)
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=waived:本輪即為 adversarial 設計對抗本體,無上游 adversarial 檔可引
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-25 19:21:42 | artifact ===
+  ts=2026-07-25 19:21:42
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/P16_COMMITTEE_DEBT_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK(大;RISK-HIT b,c) §A(前提+FACT-RECEIPT,含待委員 B1-B3) §C(約束:不動已通過紅隊複驗的 V-B/V-C 控制流) §G(N/A→§N:不碰數值/ML,RISK-HIT 無 a/d) §P(4 Phase:留痕→開債→銷帳→擋門+硬化) §V(8 類 mutation+287 回歸+防假綠) §R(每 Phase 獨立 commit 可 revert) §N(§G N/A 理由)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p16-b123-r2-codex-retry", "ts": "2026-07-25T11:25:35Z"}
+=== 2026-07-25 19:25:35 | dispatch ===
+  ts=2026-07-25 19:25:35
+  kind=dispatch
+  intent=P1-6 B1/B2/B3 設計對抗 codex 重派(前一次撞 OpenAI 503,今日第4次故障)
+  risk=high
+  facts_asked=none-needed:前提已在 brief §2 列出
+  review_role=codex 獨立對抗;指定攻擊目標=產出特徵反查修法
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=waived:本輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p16-b123-r2-codex-retry3", "ts": "2026-07-25T11:30:15Z"}
+=== 2026-07-25 19:30:15 | dispatch ===
+  ts=2026-07-25 19:30:15
+  kind=dispatch
+  intent=P1-6 B1/B2/B3 codex 第3次重派(已實測比對:同一調用路徑曾成功,錯誤來自 OpenAI 服務端斷路器)
+  risk=high
+  facts_asked=none-needed:前提在 brief §2
+  review_role=codex 獨立對抗;攻擊目標=產出特徵反查修法
+  template=n/a:非 SPEC 派工
+  adversarial=waived:本輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-specadv-r3", "ts": "2026-07-25T11:47:40Z"}
+=== 2026-07-25 19:47:40 | dispatch ===
+  ts=2026-07-25 19:47:40
+  kind=dispatch
+  intent=P1-6 SPEC v0.2 三家對抗審(codex 若仍 503 則兩家先行,恢復後補)
+  risk=high
+  facts_asked=none-needed:前提已在 brief §2 逐條列出並附查證
+  review_role=codex/composer/grok 三家獨立對抗審 SPEC v0.2;指定攻擊目標=Task 2.1 執行例外三條件 + audit schema 不可回收性
+  template=n/a:審 SPEC 但非產 SPEC,指示在 brief
+  adversarial=waived:本輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-25T12:08:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-specclose-r4", "ts": "2026-07-25T12:25:18Z"}
+=== 2026-07-25 20:25:18 | dispatch ===
+  ts=2026-07-25 20:25:18
+  kind=dispatch
+  intent=P1-6 SPEC v0.3 閉合複驗:原提出方重跑自己 R3 反例 + 攻 v0.3 新引入的三個出口
+  risk=high
+  facts_asked=none-needed:前提已在 brief §2 逐條列出並附查證
+  review_role=codex/composer/grok 各自複驗自己 R3 findings(原提出方重跑鐵律);指定攻擊目標=v0.3 新增的三個出口與 incoming/outgoing 分類拆分
+  template=n/a:審 SPEC 但非產 SPEC,指示在 brief
+  adversarial=waived:closure 輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-v04rev-r5", "ts": "2026-07-25T12:48:06Z"}
+=== 2026-07-25 20:48:06 | dispatch ===
+  ts=2026-07-25 20:48:06
+  kind=dispatch
+  intent=P1-6 SPEC v0.4 複審(架構轉向為兩扇門後);重點=R4 BLOCKING 是否真消解 + 全新 Phase 5 執行通道是否成新旁路
+  risk=high
+  facts_asked=none-needed:前提已在 brief §2 逐條列出並附查證
+  review_role=codex/composer/grok 三家獨立複審;指定攻擊目標=Phase 5 執行通道(全新未審) + Task 1.3 retry 五條件 + Task 4.2 token epoch
+  template=n/a:審 SPEC 但非產 SPEC,指示在 brief
+  adversarial=waived:本輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-25T13:06:27Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T13:07:46Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-famcount-r6", "ts": "2026-07-25T13:38:38Z"}
+=== 2026-07-25 21:38:38 | dispatch ===
+  ts=2026-07-25 21:38:38
+  kind=dispatch
+  intent=P1-6 專攻「家族數即分類」提案(使用者提;不可自報信號);重點=拆分攻擊/單家邊界/是否又換位置長回來
+  risk=high
+  facts_asked=none-needed:前提與真實資料已在 brief §3-§4 列出並附查證
+  review_role=codex/composer/grok 三家獨立對抗;指定攻擊目標=L1 家族數不可自報性 + brief_sha256 綁定是否堵得住拆分攻擊
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=waived:本輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-v05rev-r7", "ts": "2026-07-25T14:06:10Z"}
+=== 2026-07-25 22:06:10 | dispatch ===
+  ts=2026-07-25 22:06:10
+  kind=dispatch
+  intent=P1-6 SPEC v0.5 複審(一扇門定案);重點=R5 C3-C7 與 R6 三條是否真閉合 + 一扇門是否又把洞換位
+  risk=high
+  facts_asked=none-needed:前提與自檢結果已在 brief §3 列出並附查證
+  review_role=codex/composer/grok 三家各自複驗自己 R5/R6 findings;指定攻擊目標=一扇門是否換位長回來 + Task 4.2 預mint 120秒窗 + 誠實邊界反向檢查
+  template=n/a:審 SPEC 但非產 SPEC,指示在 brief
+  adversarial=waived:closure 輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-25T14:22:38Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-25T14:23:22Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-v06rev-r8", "ts": "2026-07-25T15:16:30Z"}
+=== 2026-07-25 23:16:30 | dispatch ===
+  ts=2026-07-25 23:16:30
+  kind=dispatch
+  intent=P1-6 SPEC v0.6 閉合複驗(R8);重點=A1-A4 是否真閉合 + format_failed 三態/format_failure 出口/epoch 豁免/legacy sequence 四個新機制是否成新旁路
+  risk=high
+  facts_asked=none-needed:前提與自檢結果已在 brief §3 列出並附查證
+  review_role=codex/composer/grok 三家各自重跑自己 R7 反例;指定攻擊目標=v0.6 新增的四個機制 + effective roster 全鏈一致性 grep 驗證
+  template=n/a:審 SPEC 但非產 SPEC,指示在 brief
+  adversarial=waived:closure 輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "p16-v06rev-r8-codex-retry", "ts": "2026-07-25T16:03:52Z"}
+=== 2026-07-26 00:03:52 | dispatch ===
+  ts=2026-07-26 00:03:52
+  kind=dispatch
+  intent=P1-6 SPEC v0.6 閉合複驗 codex 重派(前次 infra hang 40 分無產出)
+  risk=high
+  facts_asked=none-needed:前提已在 brief §3 列出
+  review_role=codex 獨立複驗自己 R7 findings + 攻 v0.6 四個新機制
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=waived:closure 輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-v07rev-r9", "ts": "2026-07-25T17:01:34Z"}
+=== 2026-07-26 01:01:34 | dispatch ===
+  ts=2026-07-26 01:01:34
+  kind=dispatch
+  intent=P1-6 SPEC v0.7 確認輪(R9,窄範圍);重跑 R8 反例 + 攻 v0.7 新增(沿用既有parser/Task 3.4 DEGRADE/cutoff fail-closed 是否誤殺)
+  risk=high
+  facts_asked=none-needed:前提與自檢已在 brief §4 列出
+  review_role=codex/composer/grok 各自重跑 R8 反例;指定攻擊目標=Task 3.4 全新未審 + C4 是否誤殺現存 180 筆
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=waived:closure 輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-v08rev-r10", "ts": "2026-07-25T17:56:28Z"}
+=== 2026-07-26 01:56:28 | dispatch ===
+  ts=2026-07-26 01:56:28
+  kind=dispatch
+  intent=P1-6 SPEC v0.8 確認輪(R10,窄);重跑 R9 反例 + 攻 all_degraded 新出口/固定 review 是否誤殺 discovery 輪
+  risk=high
+  facts_asked=none-needed:前提在 brief §3
+  review_role=三家各自重跑 R9 反例;指定攻擊=clear_kind=all_degraded 全新出口 + 固定 review 等級對 discovery 輪的影響
+  template=n/a:非 SPEC 派工
+  adversarial=waived:closure 輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-25T18:12:04Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+=== 2026-07-26 08:28:27 | artifact ===
+  ts=2026-07-26 08:28:27
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/P16_COMMITTEE_DEBT_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK(大;RISK-HIT b,c) §A(FACT-RECEIPT+使用者裁決4項+誠實邊界9條) §C(不改V-A/B/C/M;反bypass紅線;家族讀SoT) §G(N/A→§N) §P(4 Phase/15 Task;事件定義一律 pointer scripts/audit_events.json) §V(33類mutation+287逐檔矩陣) §R(Phase4可revert;schema不可回退) §N(§G N/A + 誤開/誤abandon成本)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-v10rev-r11", "ts": "2026-07-26T01:13:49Z"}
+=== 2026-07-26 09:13:49 | dispatch ===
+  ts=2026-07-26 09:13:49
+  kind=dispatch
+  intent=P1-6 SPEC v1.0 乾淨重寫版審查(R11);重點=掉件機械 diff + 全新 audit_events.json registry 設計 + R10 五條閉合
+  risk=high
+  facts_asked=none-needed:前提在 brief §4
+  review_role=三家獨立審;指定=(A)機械 diff v0.8 vs v1.0 掉件 (B)攻全新 registry (C)重跑自己 R10 反例
+  template=n/a:非 SPEC 派工,指示在 brief
+  adversarial=waived:本輪即 adversarial 本體
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-26T03:38:28Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T03:38:28Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-v11rev-r12", "ts": "2026-07-26T03:51:08Z"}
+=== 2026-07-26 11:51:08 | dispatch ===
+  ts=2026-07-26 11:51:08
+  kind=dispatch
+  intent=P1-6 SPEC v1.1 + audit_events_check.sh 守衛實體 R12 三家審查(唯讀)
+  risk=low
+  facts_asked=none-needed: 本輪標的皆為 repo 內可讀檔案(SPEC v1.1/registry v2/守衛腳本),無需使用者提供 code 推不出的事實
+  review_role=三家平行 adversarial:codex/composer/grok 各自獨立攻擊守衛本體;Claude 為實作者不自審;brief §3(A) 已自曝四個弱點要求委員給可執行反例而非確認
+  template=n/a: review 派工,無 SPEC/TODO 產出
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-07-26T04:07:21Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T04:16:03Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T04:16:03Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T06:12:26Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T06:12:26Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T07:18:31Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-26T07:18:31Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-07-26 15:18:42 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260726T071842Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "p16-stamp-r12", "ts": "2026-07-26T08:07:22Z"}
+=== 2026-07-26 16:07:22 | dispatch ===
+  ts=2026-07-26 16:07:22
+  kind=dispatch
+  intent=P1-6 SPEC v1.2 + R12 reconcile 三家 RECONCILE-STAMP(唯讀,僅追加戳記行)
+  risk=low
+  facts_asked=none-needed: 標的皆為 repo 內可讀檔案(綜合檔/SPEC/registry),無需使用者提供 code 推不出的事實
+  review_role=三家平行 stamp:codex/composer/grok 各自獨立判定 Claude 處置是否忠實;Claude 為綜合者不自簽;brief §0.A 已列 2 條 assumed 供挑戰
+  template=n/a: stamp 派工,無 SPEC/TODO 產出
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/p16-v11rev-r12/synth.md", "output_sha256": "6fdad1e389689219a1de935079587c2d40eff19bebb5b631011fa593afc76089", "task_id": "p16-stamp-r12", "ts": "2026-07-26T08:23:56Z"}

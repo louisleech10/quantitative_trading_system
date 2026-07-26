@@ -7,7 +7,7 @@
 #   事故:governance.yml(287 守衛測試)紅了 hook 卻不報,我得手動 gh run list 才發現
 #   跨平台(BSD/GNU realpath)bug——最該自動回饋的 workflow 反而沒被監看。
 #   **新增 workflow 只需在 WATCHED_WORKFLOWS 加一行**(格式 <file>|<顯示名>)。
-#   刻意不含 l65_benchmark.yml(既有長期紅、與治理無關,加了只會製造雜訊)。
+#   (l65_benchmark.yml 曾因長期 startup failure 被刻意排除;該 workflow 已於 2026-07-26 刪除。)
 # 誠實邊界:gh/token 不可用時輸出明確警告(非靜默跳過);逾時只提示不阻塞。
 set -u
 

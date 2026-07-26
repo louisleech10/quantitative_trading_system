@@ -1,5 +1,32 @@
 # Handoff
-**Agent**: Claude(Opus 4.8) | **Time**: 2026-07-25 | **Branch**: **main** | **狀態**: P0 4 洞 + 工具鏈已上 main(CI job success);**★下一步＝P1-6 未結案債狀態機(根因)**。**新 session 先讀下面「📋 待辦整合清單」一節即可**(其餘為歷史脈絡)。
+**Agent**: Claude(Opus 5) | **Time**: 2026-07-26 | **Branch**: **main** | **狀態**: **★P1-6 SPEC v1.2 已定版 + 三家戳記 APPROVED(機器 rc=0);實作 0/16,全部未 commit**。**下一步＝Claude blog context-engineering 系統性評估(使用者插入,在 TODO 之前)**。📄 **完整交接 → `handoffs/20260726-SESSION-HANDOFF-P16.md`**；本檔只看「🔥 P1-6 現況」+「📋 待辦整合清單」。
+
+## 🔥 P1-6 現況（2026-07-26；**未 commit**）
+
+> **📄 完整交接在 `handoffs/20260726-SESSION-HANDOFF-P16.md`（9 節）。本節只放摘要，細節勿在此重複。**
+
+**一句話**：做一台機器，逼 Claude 每次問完委員必須把意見完整收好才能再問下一輪，由 audit 客觀事件強制、不靠自律。
+
+**狀態**：**SPEC v1.2 已定版 + 三家 RECONCILE-STAMP 全 APPROVED + 機器檢查 PASS**。實作 **0/16**。
+- `reconcile_stamps_check.sh … codex,composer,grok` → **rc=0**（body sha `31fc2c1e…6875`）
+- `template_check spec` → PASS；`completeness --lock p16-v11rev-r12` → rc=0（21/21）
+- `gov_check` → rc=0；`pytest tests/governance -q` → **287 passed**
+- R1–R12 共 12 輪、四家約 290 findings，**每輪 completeness rc=0**
+
+**🛑 使用者裁定：Claude 在 SPEC 階段寫程式＝越權，已退回**
+根因＝codex 用「守衛不存在」當 BLOCKING 碼證，我誤當 SPEC 缺陷而動手實作；但那本就是 Task 0.1 未實作的正常狀態。
+同時違反：膨脹升級 5 訊號／實作者不自審／未宣告任務大小。
+→ 兩支守衛退回 `handoffs/p16-phase0-reference/`（非規格、不得直接複製當交付；實測未接線，退回無影響）。
+→ `scripts/` 只留資料檔 `audit_events.json`、`governance_tools.json`（後者 `mandatory` 欄位**未經委員裁決**）。
+
+**▶ 下一步（使用者 2026-07-26 定，插在 TODO 之前）**：
+**系統性研究評估** — Claude blog《The New Rules of Context Engineering for Claude 5 Generation Models》對本專案是否有用。
+事實盤點／兩個必守前提／治理限制**全在交接檔第八節**。走大任務管線：Claude 自產完整版 → 三家互審 → 白話報告 → 使用者決定開不開票。
+**之後**：TODO → 派實作（**執行端寫，Claude 不自己寫**）→ 雙家非實作者 code review → 閉合 → commit。
+
+**⚠️ 反覆犯的錯（下個 session 別重蹈）**：憑印象列清單（今日 3 次）／把推測講成事實（2 次）／`cmd | tail; echo rc=$?` 讀到 tail 的 rc（2 次）／字串啟發式誤判（今日 10 個，4 個當場現寫）。詳見交接檔第四節。
+
+**觀察日誌**：`handoffs/20260724-HARNESS-DOGFOOD-LOG.md`（優缺點 + 時間去向統計）。
 
 ## 📋 待辦整合清單(2026-07-25 去重版;取代散落多份;新 session 總覽只看這節)
 > **三份舊清單(P1-x plan / 紅隊 V-x / 51 洞)是同一套 harness 的三次盤點,大量重疊**——下表已逐項去重併標同義詞。
@@ -50,10 +77,14 @@
 
 ### 🐞 已知債/阻塞(非本輪造成,但要記著)
 - **3 個既有測試檔探針空心**:`test_verify_gate{,_b3,_b4}.py` 探針沒碰待測系統(＝假綠);已在 `gov_check.sh` 具名排除,修法歸 P1-2/P1-3
-- **`l65_benchmark` CI 長期紅**(0s 即失敗):我 push 前就在紅,與治理無關,未診斷
+- ~~`l65_benchmark` CI 長期紅~~ → **2026-07-26 已診斷並刪除**:實測 `run_started_at == updated_at`、無 log ＝ startup failure,**從未真的執行過**(零保護純噪音)。workflow 已 `git rm`;`scripts/benchmark_l65.py` 保留供本機跑。
 - **branch protection 不可用**:私有 repo+免費方案 → GitHub 顯示 `Not enforced`。**替代已上線**:pre-push hook(擋粗心,`--no-verify` 可繞)。要真硬閘需升 GitHub Pro(**使用者決定**)
 - **工作區 3 個既有檔未處理**(非我改):`docs/API_SPECIFICATION.md`、`tests/golden/l65/test_inventory.txt`、`docs/workflow_diagram.png` — **使用者決定**要不要 commit
 - **解耦 scanner 半套**:`check_decoupling.sh` 實跑 R2/R3/R4 有紅,P2 triage 待辦(見 memory `project_decoupling_scanner_partial`)
+- **🆕 GATE-TOKEN-BINDING（2026-07-26 實測新發現，非宣稱）**：`gate_check.sh:75-76` **只驗 token 的 mtime 新鮮度就 `exit 0`，完全不比對內容**（`grep -rn 'dispatch.token' scripts/` → 除文件字串外 0 處比對）。兩個後果：
+  **(a) token 不綁 task（單 session 內就成立、較嚴重）**：一個 dispatch token 在 900 秒內授權**任意數量、任意 task-id、任意 intent** 的派工。為 task A 開的門可直接拿去派 task B。實證：`.claude/gate/dispatch.token` 內容有 `intent`/`risk`/`review_role`，**連 `task_id` 都沒記**（我傳了 `--task-id` 但它只進 audit.log）。
+  **(b) 跨 session 互蓋（fail-open 方向）**：token 路徑 `gate.sh:579` = `${GATE_DIR}/${kind}.token` **固定檔名，無 session/PID 區隔**（實測只有 `dispatch.token`/`artifact.token` 兩個檔）。session B 開門會覆寫並**更新 mtime** → session A 已過期的 token **復活成 fresh**。
+  **關聯**：P1-6 **Task 4.2「token ↔ round handoff 與 `debt_epoch`」正好處理這一塊**，應併入該 Task 或至少在 TODO 標明。
 - **pre-existing**:Rule 4 `pattern_management:78`、`ModuleUnavailableError` 死碼、convergence backlog(producer hardening)、wrapper-strip 副作用(commit 訊息行首 codex 會被誤攔)
 
 ### 🧊 凍結(只凍這個)
