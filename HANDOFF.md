@@ -1,7 +1,7 @@
 # Handoff
-**Agent**: Claude(Opus 5) | **Time**: 2026-07-26 | **Branch**: **main** | **狀態**: **★P1-6 SPEC v1.2 已定版 + 三家戳記 APPROVED(機器 rc=0);實作 0/16,全部未 commit**。**下一步＝Claude blog context-engineering 系統性評估(使用者插入,在 TODO 之前)**。📄 **完整交接 → `handoffs/20260726-SESSION-HANDOFF-P16.md`**；本檔只看「🔥 P1-6 現況」+「📋 待辦整合清單」。
+**Agent**: Claude(Opus 5) | **Time**: 2026-07-26 | **Branch**: **main** | **狀態**: **★P1-6 SPEC v1.2 已定版 + 三家戳記 APPROVED(機器 rc=0);實作 0/16**。SPEC 階段**已 commit+push `c87689a`**。**下一步＝寫 TODO**(blog 評估已結案,不必再做)。📄 **完整交接 → `handoffs/20260726-SESSION-HANDOFF-P16.md`**；本檔只看「🔥 P1-6 現況」+「📋 待辦整合清單」。
 
-## 🔥 P1-6 現況（2026-07-26；**未 commit**）
+## 🔥 P1-6 現況（2026-07-26；SPEC 階段已 commit+push `c87689a`）
 
 > **📄 完整交接在 `handoffs/20260726-SESSION-HANDOFF-P16.md`（9 節）。本節只放摘要，細節勿在此重複。**
 
@@ -19,10 +19,13 @@
 → 兩支守衛退回 `handoffs/p16-phase0-reference/`（非規格、不得直接複製當交付；實測未接線，退回無影響）。
 → `scripts/` 只留資料檔 `audit_events.json`、`governance_tools.json`（後者 `mandatory` 欄位**未經委員裁決**）。
 
-**▶ 下一步（使用者 2026-07-26 定，插在 TODO 之前）**：
-**系統性研究評估** — Claude blog《The New Rules of Context Engineering for Claude 5 Generation Models》對本專案是否有用。
-事實盤點／兩個必守前提／治理限制**全在交接檔第八節**。走大任務管線：Claude 自產完整版 → 三家互審 → 白話報告 → 使用者決定開不開票。
-**之後**：TODO → 派實作（**執行端寫，Claude 不自己寫**）→ 雙家非實作者 code review → 閉合 → commit。
+**▶ 下一步＝寫 TODO** → 派實作（**執行端寫，Claude 不自己寫**）→ 雙家非實作者 code review → 閉合 → commit。
+
+**✅ Claude blog context-engineering 評估：已結案（2026-07-26），不必再做。**
+結論＝**幫助很小**（六條主張裡：一條可用、兩條我們早知道、兩條做不了、一條經實測是錯的）。
+兩個可用點**當天已直接做掉並 commit**：①CLAUDE.md 補 Codebase Gotchas ②SPEC 範本加「新資料結構用 JSON 當 SoT」+「SPEC 階段禁寫實作」。
+**未派委員互審**（使用者決定不值得為此燒一輪）。評估全文存查 `handoffs/20260726-CONTEXT-ENGINEERING-ASSESSMENT-claude.md`。
+**唯一實質收穫**＝實測揪出 `GATE-TOKEN-BINDING` 真洞（見下方已知債）。
 
 **⚠️ 反覆犯的錯（下個 session 別重蹈）**：憑印象列清單（今日 3 次）／把推測講成事實（2 次）／`cmd | tail; echo rc=$?` 讀到 tail 的 rc（2 次）／字串啟發式誤判（今日 10 個，4 個當場現寫）。詳見交接檔第四節。
 
