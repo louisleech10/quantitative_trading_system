@@ -188,3 +188,5 @@ handoffs/ic1eb_newpath_freeze.bak.*/
 # 時間戳哨兵狀態檔/慢呼叫記錄(診斷用)
 .claude/gate/.ts_stamp_in
 .claude/gate/ts_stamp.log.slow
+.claude/gate/.ts_stamp_out
+.claude/gate/.ts_stamp_user

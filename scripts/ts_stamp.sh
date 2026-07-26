@@ -57,7 +57,8 @@ now_hms="$(python3 -c 'import datetime;print(datetime.datetime.now().strftime("%
           || date '+%H:%M:%S' 2>/dev/null || echo '')"
 
 payload="$(cat 2>/dev/null || true)"
-snippet="$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null | head -c 60 | tr '\n' ' ' || true)"
+full_cmd="$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null | tr '\n' ' ' || true)"
+snippet="$(printf '%s' "$full_cmd" | head -c 60 || true)"
 
 msg="⏱ T-${LABEL} ${now_hms}"
 
@@ -92,8 +93,11 @@ else
     # 超過門檻 → 大聲喊，並記下當時的指令，供事後判斷它是否走了分類器那條路
     # 已知本來就慢的指令（真的在做事，非分類器掛住）→ 不報 A 類，避免誤判淹沒真訊號。
     # git push 會觸發 pre-push 跑 287 個治理測試(~80s)；pytest/委員派工同理。
+    # ⚠️ 必須比對**完整指令**，不可用截斷的 snippet：
+    #    2026-07-26 實測 bug——`git add ... && git commit ... && git push` 的 push 落在
+    #    60 字之後，用 snippet 比對就漏掉，導致正當的 80 秒被誤報成卡頓。
     known_slow=0
-    printf '%s' "$snippet" | grep -Eq '(git (push|pull|fetch|clone))|pytest|cx_run|committee_run|gov_check|npm (run |install)|pip install' && known_slow=1
+    printf '%s' "$full_cmd" | grep -Eq '(git (push|pull|fetch|clone))|pytest|cx_run|committee_run|gov_check|npm (run |install)|pip install' && known_slow=1
     if [ "$known_slow" = "0" ] && [ "$delta_ms" -gt $(( WARN_A * 1000 )) ]; then
       msg="🐌🐌 **A 類卡頓** call 內耗時 ${secs} 秒（門檻 ${WARN_A}s）｜指令: ${snippet}｜此為 T-IN→T-OUT 之間，非 Claude 生成時間"
       ALERT="【A 類卡頓】本次工具呼叫在 call 內耗時 ${secs} 秒（正常 0.08s，分類器 2.3s）。指令: ${snippet}。這是權限分類器路徑掛住的徵兆——請檢查該指令是否觸發三條件之一（未命中 allow／執行任意程式碼／路徑在專案外，見 CLAUDE.md Gotchas），並在本回合結尾主動告知使用者。"
