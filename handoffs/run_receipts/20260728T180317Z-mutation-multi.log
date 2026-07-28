@@ -1,0 +1,21 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 32 items / 21 deselected / 11 selected
+
+tests/governance/test_low_risk_impl_requires_reconcile.py::test_mutation_impl_reconcile_only_on_high_allows_low PASSED [  9%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_dirname_sess_allows_nested_bypass PASSED [ 18%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_remove_realpath_allows_dropped PASSED [ 27%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_review_requires_exactly_one_audit PASSED [ 36%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_exactly_one_audit PASSED [ 45%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_open_round PASSED [ 54%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_is_one_way PASSED [ 63%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_rejects_external_round_id PASSED [ 72%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_discovery_does_not_recheck_audit PASSED [ 81%]
+tests/governance/test_stamp_no_task_rejected.py::test_mutation_allow_missing_task_breaks_guard PASSED [ 90%]
+tests/governance/test_waived_adversarial_still_stamps.py::test_mutation_waived_adv_skips_stamp_breaks_guard PASSED [100%]
+
+====================== 11 passed, 21 deselected in 4.12s =======================

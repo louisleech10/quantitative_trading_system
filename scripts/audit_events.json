@@ -3,32 +3,27 @@
   "schema_version": 1,
   "cutoff_ts": "2026-07-23T00:00:00Z",
   "docs": {
-    "_note": "所有說明文字集中於本物件。**其餘任何容器內不得出現 _ 前綴鍵或說明字串**(R11 codex P0-03:metadata 混進資料容器會讓消費端 iterate 拿到字串)。audit_events_check.sh 機械強制。",
-    "purpose": "P1-6 委員未結案債狀態機 — audit 事件單一真相源(SoT)。白名單/枚舉/欄位/常數一律由本檔導出,禁止在 SPEC/TODO/腳本任何處重複列舉。規範見 docs/P16_COMMITTEE_DEBT_SPEC.md。",
-    "cutoff_ts": "碼內常數。cutoff 之前的事件一律 legacy;僅 GOVERNANCE_TEST_HARNESS=1 可覆寫。",
-    "debt_event_required_fields": "僅適用 debt_events。legacy 事件(non_debt_legacy_events)結構上就沒有 sequence/producer,不得套用此必填集(R11 codex P0-03)。",
-    "event_id": "uuid,全域唯一;重複 → fail-closed 拒寫",
-    "sequence": "由 audit_append.sh 以 mkdir 原子鎖分配的單調遞增整數(SPEC v2.2:禁用 flock,實測該環境不存在);白名單事件的 gap/duplicate → ledger fail-closed",
-    "producer": "寫入管線,恆為 audit_append.sh(ledger 的 provenance 判準用此欄);由 audit_append.sh 強制填入,呼叫端不得指定",
-    "origin_script": "邏輯來源,須 ∈ allowed_origin_scripts",
-    "actor": "自填字串,不可驗證(誠實邊界)",
-    "lock_mode": "該 round 的 completeness lock 模式。result_state 判定與 Task 3.1 清帳必須使用同一值(R11 3/3 家族:v1.0 只寫在 SPEC 散文,registry 無此欄 → 實作者無來源可讀)。",
-    "brief_sha256_norm_algo": "sha256( unify_newline(content) 後,逐行 strip 行尾空白,再以 \\n 連接 )。unify_newline: CRLF/CR → LF。**僅供 retry 的 byte-integrity 容錯**,不承擔主題判定。(R11 grok P1-01:v0.8 已凍結此演算法,v1.0 重寫時整段掉件 → 實作者會做出互不相容的 norm)",
-    "result_state": "success=產出含至少一條 completeness_check.sh 可接受的合格 finding(判定用該 round 的 lock_mode);failed=cli_rc!=0 或 output 空;format_failed=其餘。success 不得重派,另兩態可。",
-    "clear_kind": "與 clear_kind_event_map 一一對應。full/family_degrade 走 committee_debt_clear;format_failure 與 all_degraded 各有專屬事件型別。",
-    "supersede_direction": "僅允許收緊向(CLOSED→OPEN)。放寬必須走完整 clear 條件。",
-    "renew_once": "每 (round_id, family) 至多一次(R11 grok P0-02:v1.0 誤寫成「每 round 全域一次」,≥2 家族同時 failed+attempt 滿+degrade 逾期時只能救 1 家,其餘仍死鎖)。須附 **renew_of** 指向【同 round 同 family 且已逾期】的 degrade 事件。**(SPEC v1.2.1 / Q-9 裁決)** 續期指標的 SoT 是 committee_family_degrade.fields 的 renew_of;本說明原誤寫 supersedes,已更正。supersedes 專屬 committee_debt_supersede 的 clear 更正事件,兩者語意不同,禁混名。",
-    "pending_deadline": "**canonical key = pending_deadline_seconds**(SPEC v1.2.1 / Q-8 裁決新增)。**它是條件式必填(conditionally-required),不是恆存鍵**:B2 量測前**整個鍵不存在**(合法中間態);B2 量測後**必須存在且為正整數**。守衛契約(Task 0.1 C7):『鍵不存在 → 通過;鍵存在但非正整數(含 null/0/負數/字串) → rc≠0』——**禁止用 null 當佔位**(R4 三家實證:null 會撞 C7 的 constants 正整數契約,B1 首日即 fail-closed 自咬)。Task 4.2 的 mint_ts + N 消費端則要求該鍵**必須存在**,不存在即 fail-closed。量測法:workload=committee_run 派 3 家 × 20 次,取 p99,deadline = clamp(ceil(p99*3), pending_deadline_min_seconds, pending_deadline_max_seconds);若 ceil(p99*3) > max → 不得部署固定時間窗,改用原子 handoff。量測結果須寫入 TODO 驗收 receipt。**pending_deadline_seconds_provisional 保留為歷史值,消費端一律禁止讀取**(audit_events_check.sh 須機械強制:任何腳本讀 _provisional → rc≠0)。",
-    "unknown_event_policy": "post-cutoff 出現於 p16_namespace_prefixes 但不在 debt_events 的事件 → **fail-closed 拒認**(非告警)。此為 R10 all_degraded 漏列白名單的根治(R11 3/3 家族:v1.0 只寫告警=fail-open)。",
-    "family_valued_fields": "列於 family_valued_fields 的欄位,其值必須 ∈ scripts/governance_families.json 的 families。audit_events_check.sh 交叉驗證(R11 codex P1-04)。",
-    "spec_non_event_tokens": "C10 專用。落在 p16_namespace_prefixes 內但**不是事件名**的概念/容器 token(SPEC 會以 backtick 提及)。明列而非放寬前綴,以免 C10 漏掉真正的事件改名漂移。",
-    "event_object_allowed_keys": "C2 白名單(codex R12-P0-03 v10:只擋 _ 前綴,任意 description 鍵仍過)。event 物件只允許這些鍵。",
-    "required_fields_per_event": "C8(codex v13:只檢查 lock_mode,移除 round_id 仍綠)。每事件的必要欄位,fields 須為其超集。",
-    "generic_clear_kinds": "C4 語義(codex v11:交換 full<->all_degraded 映射值,集合相等仍綠)。列於此的 kind 必須映射到 generic_clear_event;其餘 kind 必須映射到名稱以該 kind 結尾的事件。",
-    "family_field_name_patterns": "C6 完整性(grok R12-P1-01:清空 family_valued_fields 仍綠=vacuous truth)。凡 debt_event 宣告的欄位名含這些片段者,**必須**出現在 family_valued_fields;守衛比對兩者相等,新增 family 欄位漏登即紅。",
-    "audit_log_path": "C12(codex v15:audit 含未知 P16 事件仍綠——SPEC 宣稱 fail-closed 但守衛從未讀過 audit)。",
-    "fragment_scan_prefixes": "C9b 專用,比 p16_namespace_prefixes 更寬(含裸 'committee_')。composer R12-P0-02 的繞過是 `P=committee_; S=family_dispatch`,窄前綴抓不到。",
-    "fragment_scan_allow_tokens": "C9b 誤判豁免:落在 fragment_scan_prefixes 內但確定不是事件名的既有識別字(腳本自身檔名、JSON 欄位名)。受 C11 守衛(須真的出現在 scripts/ 內),不得憑空新增。"
+    "_note": "本物件是 P1-6 audit 事件、欄位、枚舉與常數的唯一真相源；其餘資料容器不放說明文字。",
+    "purpose": "P1-6 委員未結案債狀態機的 audit 契約。",
+    "cutoff_ts": "cutoff 之前的事件視為 legacy；測試覆寫必須綁 GOVERNANCE_TEST_HARNESS=1。",
+    "debt_event_required_fields": "只適用 debt_events；non_debt_legacy_events 不套用 sequence/producer。",
+    "event_id": "uuid，全域唯一；重複時 fail-closed 拒寫。",
+    "sequence": "由 audit_append.sh 以 mkdir 原子鎖分配；白名單事件的 gap/duplicate 由 ledger fail-closed。",
+    "producer": "由 audit_append.sh 強制填入，呼叫端不得指定。",
+    "origin_script": "邏輯來源，須屬於 allowed_origin_scripts。",
+    "actor": "呼叫端提供的留痕字串。",
+    "lock_mode": "sources.lock 的模式；review 才能進入正常銷帳。",
+    "brief_sha256_norm_algo": "sha256(unify_newline(content) 後逐行移除行尾空白，再以 LF 連接)。",
+    "result_state": "success 代表 CLI 成功且產出非空；其餘狀態為 failed。",
+    "unknown_event_policy": "post-cutoff 出現於 P16 命名空間但未登記的事件，fail-closed 拒認。",
+    "family_valued_fields": "列於 family_valued_fields 的欄位值必須來自 governance_families.json。",
+    "spec_non_event_tokens": "SPEC 會提及但不是事件名的 P16 token。",
+    "event_object_allowed_keys": "debt event 物件只允許此白名單中的鍵。",
+    "required_fields_per_event": "每事件的必要欄位；fields 必須是其超集。",
+    "family_field_name_patterns": "用於檢查新增 family 欄位是否登記到 family_valued_fields。",
+    "audit_log_path": "audit append-only log 的 repo 相對路徑。",
+    "fragment_scan_prefixes": "命名空間片段掃描前綴。",
+    "fragment_scan_allow_tokens": "已知不是事件名的既有腳本識別字。"
   },
   "allowed_origin_scripts": [
     "committee_run.sh",
@@ -52,18 +47,11 @@
     "actor",
     "ts"
   ],
-  "debt_event_optional_fields": [
-    "supersedes",
-    "renew_of"
-  ],
+  "debt_event_optional_fields": [],
   "family_valued_fields": [
     "participants",
     "quorum_eligible",
     "family",
-    "absent_family",
-    "added_families",
-    "quorum_eligible_delta",
-    "advisory_delta",
     "roster"
   ],
   "debt_events": {
@@ -83,55 +71,13 @@
         "participants",
         "quorum_eligible",
         "expected_outputs",
-        "parent_round_id",
-        "expires_at"
-      ]
-    },
-    "round_open_failed": {
-      "origin_script": "committee_run.sh",
-      "opens_debt": false,
-      "in_debt_epoch": false,
-      "closes_debt": false,
-      "terminal": false,
-      "fields": [
-        "round_id",
-        "reason"
-      ]
-    },
-    "committee_round_amendment": {
-      "origin_script": "committee_run.sh",
-      "opens_debt": false,
-      "in_debt_epoch": true,
-      "closes_debt": false,
-      "terminal": false,
-      "fields": [
-        "round_id",
-        "added_families",
-        "expected_outputs_delta",
-        "quorum_eligible_delta",
-        "advisory_delta",
-        "reason"
-      ]
-    },
-    "committee_family_dispatch": {
-      "origin_script": "cx_run.sh",
-      "opens_debt": false,
-      "in_debt_epoch": false,
-      "closes_debt": false,
-      "terminal": false,
-      "fields": [
-        "round_id",
-        "family",
-        "attempt_id",
-        "brief_path",
-        "brief_sha256_norm",
-        "expected_output_path"
+        "session_name"
       ]
     },
     "committee_family_result": {
       "origin_script": "cx_run.sh",
       "opens_debt": false,
-      "in_debt_epoch": false,
+      "in_debt_epoch": true,
       "closes_debt": false,
       "terminal": false,
       "fields": [
@@ -144,23 +90,6 @@
         "result_state"
       ]
     },
-    "committee_family_degrade": {
-      "origin_script": "debt_clear.sh",
-      "opens_debt": false,
-      "in_debt_epoch": true,
-      "closes_debt": false,
-      "terminal": false,
-      "fields": [
-        "round_id",
-        "absent_family",
-        "reason",
-        "approver",
-        "expiry",
-        "remediation_owner",
-        "result_state_at_degrade",
-        "renew_of"
-      ]
-    },
     "committee_debt_clear": {
       "origin_script": "debt_clear.sh",
       "opens_debt": false,
@@ -169,53 +98,11 @@
       "terminal": false,
       "fields": [
         "round_id",
-        "clear_kind",
         "session_id",
         "lock_sha256",
         "synth_sha256",
         "roster",
         "completeness_rc"
-      ]
-    },
-    "committee_debt_clear_format_failure": {
-      "origin_script": "debt_clear.sh",
-      "opens_debt": false,
-      "in_debt_epoch": true,
-      "closes_debt": true,
-      "terminal": false,
-      "fields": [
-        "round_id",
-        "reason",
-        "approver",
-        "attempts_exhausted",
-        "result_state_snapshot"
-      ]
-    },
-    "committee_debt_clear_all_degraded": {
-      "origin_script": "debt_clear.sh",
-      "opens_debt": false,
-      "in_debt_epoch": true,
-      "closes_debt": true,
-      "terminal": false,
-      "fields": [
-        "round_id",
-        "reason",
-        "approver",
-        "degrade_event_ids"
-      ]
-    },
-    "committee_debt_supersede": {
-      "origin_script": "debt_clear.sh",
-      "opens_debt": false,
-      "in_debt_epoch": true,
-      "closes_debt": false,
-      "terminal": false,
-      "fields": [
-        "round_id",
-        "supersedes",
-        "reason",
-        "approver",
-        "direction"
       ]
     },
     "debt_abandon": {
@@ -228,7 +115,7 @@
         "round_id",
         "reason",
         "approver",
-        "remediation_owner"
+        "abandon_kind"
       ]
     }
   },
@@ -266,52 +153,27 @@
       "committee_output"
     ]
   },
-  "clear_kind_event_map": {
-    "full": "committee_debt_clear",
-    "family_degrade": "committee_debt_clear",
-    "format_failure": "committee_debt_clear_format_failure",
-    "all_degraded": "committee_debt_clear_all_degraded"
-  },
   "enums": {
     "result_state": [
       "success",
-      "failed",
-      "format_failed"
-    ],
-    "clear_kind": [
-      "full",
-      "family_degrade",
-      "format_failure",
-      "all_degraded"
-    ],
-    "supersede_direction": [
-      "tighten"
+      "failed"
     ],
     "round_state": [
-      "PENDING",
       "OPEN",
-      "PARTIAL",
-      "EXPIRED_OPEN",
       "CLOSED",
       "ABANDONED"
     ],
     "lock_mode": [
       "discovery",
       "review"
+    ],
+    "abandon_kind": [
+      "no-findings-expected",
+      "collection-failed"
     ]
   },
   "constants": {
-    "ttl_days": 7,
-    "attempt_cap": 5,
-    "reason_min_chars": 20,
-    "renew_once_per_round_family": 1,
-    "pending_deadline_seconds_provisional": 30,
-    "pending_deadline_min_seconds": 5,
-    "pending_deadline_max_seconds": 60,
-    "pending_deadline_headroom_multiplier": 3,
-    "latency_probe_families": 3,
-    "latency_probe_runs": 20,
-    "latency_percentile": 99
+    "reason_min_chars": 20
   },
   "spec_non_event_tokens": [
     "debt_events",
@@ -329,11 +191,6 @@
     "terminal",
     "fields"
   ],
-  "generic_clear_event": "committee_debt_clear",
-  "generic_clear_kinds": [
-    "full",
-    "family_degrade"
-  ],
   "family_field_name_patterns": [
     "particip",
     "famil",
@@ -346,74 +203,36 @@
     "committee_round_open": [
       "round_id",
       "task_id",
+      "brief_path",
+      "brief_sha256",
       "brief_sha256_norm",
       "lock_mode",
       "participants",
-      "expected_outputs"
-    ],
-    "round_open_failed": [
-      "round_id",
-      "reason"
-    ],
-    "committee_round_amendment": [
-      "round_id",
-      "added_families",
-      "reason"
-    ],
-    "committee_family_dispatch": [
-      "round_id",
-      "family",
-      "attempt_id",
-      "expected_output_path"
+      "expected_outputs",
+      "session_name"
     ],
     "committee_family_result": [
       "round_id",
       "family",
       "attempt_id",
       "cli_rc",
+      "output_path",
+      "output_sha256",
       "result_state"
-    ],
-    "committee_family_degrade": [
-      "round_id",
-      "absent_family",
-      "reason",
-      "approver",
-      "expiry",
-      "remediation_owner"
     ],
     "committee_debt_clear": [
       "round_id",
-      "clear_kind",
       "session_id",
       "lock_sha256",
       "synth_sha256",
       "roster",
       "completeness_rc"
     ],
-    "committee_debt_clear_format_failure": [
-      "round_id",
-      "reason",
-      "approver",
-      "attempts_exhausted"
-    ],
-    "committee_debt_clear_all_degraded": [
-      "round_id",
-      "reason",
-      "approver",
-      "degrade_event_ids"
-    ],
-    "committee_debt_supersede": [
-      "round_id",
-      "supersedes",
-      "reason",
-      "approver",
-      "direction"
-    ],
     "debt_abandon": [
       "round_id",
       "reason",
       "approver",
-      "remediation_owner"
+      "abandon_kind"
     ]
   },
   "fragment_scan_prefixes": [

@@ -27556,3 +27556,220 @@ ts=2026-07-27 15:36:52 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-TODO-STAMP", "ts": "2026-07-28T16:03:37Z"}
+=== 2026-07-29 00:03:37 | dispatch ===
+  ts=2026-07-29 00:03:37
+  kind=dispatch
+  intent=P1-6 TODO v1.2 三家 RECONCILE-STAMP 戳記輪(派 B1 前置)
+  risk=low
+  facts_asked=none-needed
+  review_role=三家獨立複驗;簽前須自跑前置條件並貼 rc
+  template=n/a:stamp-round
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/p16-todov11-r2/synth.md", "output_sha256": "826e0f01892a2073dad86000f1a0d91970b2dc7362bb5968e6bf82f174c7a27e", "task_id": "P16-TODO-STAMP", "ts": "2026-07-28T16:27:45Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/p16-todov11-r2/synth.md", "output_sha256": "826e0f01892a2073dad86000f1a0d91970b2dc7362bb5968e6bf82f174c7a27e", "task_id": "P16-B1-IMPL", "ts": "2026-07-28T16:27:52Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260729-p16-todostamp-codex.md", "output_sha256": "ec445a7bba66c3168e19d66d96816cf3df202ca388a1707d927031ea9656f686", "task_id": "P16-TODO-STAMP", "ts": "2026-07-28T16:27:56Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260728-p16-todov11-r2-codex.md", "output_sha256": "4a66e76b3edb536816c50155ea53775efd5c54372babf24b8215231aaf536363", "task_id": "P16-B1-IMPL", "ts": "2026-07-28T16:28:27Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260729-p16-todostamp-codex.md", "output_sha256": "765281691d7280390d5d8f3fb8fc9ba77fd187d10db393bdcd6466b1b0b0e51d", "task_id": "P16-TODO-STAMP", "ts": "2026-07-28T16:28:36Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260729-p16-todostamp-codex.md", "output_sha256": "34ddd3eeb2b9a567f85b9a604c7962ec7fe249465925a943df992d871ac02bea", "task_id": "P16-TODO-STAMP", "ts": "2026-07-28T16:29:32Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-TODO-STAMP2", "ts": "2026-07-28T16:30:52Z"}
+=== 2026-07-29 00:30:52 | dispatch ===
+  ts=2026-07-29 00:30:52
+  kind=dispatch
+  intent=P1-6 TODO v1.2 reconcile 重簽輪(body 補 canonical Verdict 行後)
+  risk=low
+  facts_asked=none-needed
+  review_role=三家獨立複驗;簽前須自跑前置條件並貼 rc
+  template=n/a:stamp-round
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260729-p16-todostamp-codex.md", "output_sha256": "8080cb0794db9eaee381d47933d1ca69f5017b861d532c4c7709c65a71e7b065", "task_id": "P16-TODO-STAMP", "ts": "2026-07-28T16:32:32Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/p16-todov11-r2/synth.md", "output_sha256": "7f160fb4b2746bd91ba87d092c53f6ee39d3ea9c61de498b0d48a1e15327cc37", "task_id": "P16-TODO-STAMP2", "ts": "2026-07-28T16:35:56Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/p16-todov11-r2/synth.md", "output_sha256": "7f160fb4b2746bd91ba87d092c53f6ee39d3ea9c61de498b0d48a1e15327cc37", "task_id": "P16-TODO-STAMP2", "ts": "2026-07-28T16:36:48Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/p16-todov11-r2/synth.md", "output_sha256": "7f160fb4b2746bd91ba87d092c53f6ee39d3ea9c61de498b0d48a1e15327cc37", "task_id": "P16-B1-IMPL", "ts": "2026-07-28T16:36:56Z"}
+=== 2026-07-29 00:36:56 | dispatch ===
+  ts=2026-07-29 00:36:56
+  kind=dispatch
+  intent=派 codex 實作 P1-6 B1(Task 0.1: registry v2 契約 + reconcile_build --mode/--rebuild + write_sources_lock round_id)
+  risk=high
+  facts_asked=none-needed:SPEC v2.8 三家戳記+TODO v1.2 reconcile 三家戳記,事實已定
+  review_role=實作=codex;code review=composer+grok(非實作者兩家)
+  template=n/a:impl 非產 SPEC
+  adversarial=handoffs/reconcile/p16-todov11-r2/synth.md
+  reconcile=handoffs/reconcile/p16-todov11-r2/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/P16_COMMITTEE_DEBT_SPEC.md
+  todo=docs/P16_COMMITTEE_DEBT_TODO.md
+  manifest=
+{"event":"gate_deny","ts":"2026-07-28T16:58:28Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-28T16:58:28Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-07-29 00:58:38 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T165838Z-mutation-multi.json
+{"event":"gate_deny","ts":"2026-07-28T17:04:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-B1-REVIEW", "ts": "2026-07-28T17:04:39Z"}
+=== 2026-07-29 01:04:39 | dispatch ===
+  ts=2026-07-29 01:04:39
+  kind=dispatch
+  intent=P1-6 B1 code review 派 composer+grok 兩家非實作者
+  risk=low
+  facts_asked=none-needed:diff 與獨立驗收 receipt 已附 brief
+  review_role=composer+grok 皆 adversary;實作者 codex 不自審
+  template=n/a:code review 非產 SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-B1-REVIEW", "ts": "2026-07-28T17:04:48Z"}
+=== 2026-07-29 01:04:48 | dispatch ===
+  ts=2026-07-29 01:04:48
+  kind=dispatch
+  intent=P1-6 B1 code review(兩家非實作者)
+  risk=low
+  facts_asked=none-needed
+  review_role=composer+grok 皆 adversary;codex 不自審
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "P16-B1-BOOTSTRAP-RULING", "ts": "2026-07-28T17:15:34Z"}
+=== 2026-07-29 01:15:34 | dispatch ===
+  ts=2026-07-29 01:15:34
+  kind=dispatch
+  intent=P1-6 B1 bootstrap 階段依賴缺陷裁決 + 兩條 P1 修法確認,派三家
+  risk=low
+  facts_asked=none-needed:實測 receipt 已附 brief
+  review_role=三家皆 adversary;codex 就 SPEC 設計發言,不自我背書其實作
+  template=n/a:裁決輪非產 SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-B1-BOOTSTRAP-RULING", "ts": "2026-07-28T17:15:46Z"}
+=== 2026-07-29 01:15:46 | dispatch ===
+  ts=2026-07-29 01:15:46
+  kind=dispatch
+  intent=B1 bootstrap 缺陷裁決
+  risk=low
+  facts_asked=none-needed
+  review_role=三家皆 adversary
+  template=n/a:裁決輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/p16-todov11-r2/synth.md", "output_sha256": "7f160fb4b2746bd91ba87d092c53f6ee39d3ea9c61de498b0d48a1e15327cc37", "task_id": "P16-B1-FIX", "ts": "2026-07-28T17:24:27Z"}
+=== 2026-07-29 01:24:28 | dispatch ===
+  ts=2026-07-29 01:24:28
+  kind=dispatch
+  intent=派 codex 修 B1 三家裁決的 F1(bootstrap P0)+F2(writer 任意 round_id)+F3(所有 review writer 路徑)+F4(真 mutation oracle)
+  risk=high
+  facts_asked=none-needed:三家裁決 receipt 已附 brief
+  review_role=實作=codex;後續 code review=composer+grok
+  template=n/a:impl 非產 SPEC
+  adversarial=handoffs/reconcile/p16-todov11-r2/synth.md
+  reconcile=handoffs/reconcile/p16-todov11-r2/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/P16_COMMITTEE_DEBT_SPEC.md
+  todo=docs/P16_COMMITTEE_DEBT_TODO.md
+  manifest=
+ts=2026-07-29 01:34:55 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T173455Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 01:36:50 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T173650Z-mutation-multi.json
+ts=2026-07-29 01:37:26 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T173725Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 01:39:04 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T173904Z-mutation-multi.json
+{"event":"gate_deny","ts":"2026-07-28T17:40:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-28T17:40:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-28T17:43:04Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+=== 2026-07-29 01:43:29 | dispatch ===
+  ts=2026-07-29 01:43:29
+  kind=dispatch
+  intent=完成 P16 B1-FIX，驗證治理測試並寫 codex 交接
+  risk=high
+  facts_asked=none-needed:brief、SPEC、TODO與現有測試已讀
+  review_role=single-executor:n/a
+  template=跟過:docs/P16_COMMITTEE_DEBT_SPEC.md、docs/P16_COMMITTEE_DEBT_TODO.md
+  adversarial=waived:本回合為單一執行者，已由 gov_check 與 mutation probe 實測驗證
+  reconcile=handoffs/reconcile/p16-v26close-r7/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/P16_COMMITTEE_DEBT_SPEC.md
+  todo=
+  manifest=
+ts=2026-07-29 01:45:29 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T174529Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 01:46:57 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T174657Z-mutation-multi.json
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-B1FIX-REVIEW", "ts": "2026-07-28T17:51:06Z"}
+=== 2026-07-29 01:51:06 | dispatch ===
+  ts=2026-07-29 01:51:06
+  kind=dispatch
+  intent=P1-6 B1-FIX code review 派 composer+grok 兩家非實作者
+  risk=low
+  facts_asked=none-needed:主委獨立驗收 receipt 已附 brief
+  review_role=composer+grok 皆 adversary;實作者 codex 不自審
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-B1FIX-REVIEW", "ts": "2026-07-28T17:52:10Z"}
+=== 2026-07-29 01:52:10 | dispatch ===
+  ts=2026-07-29 01:52:10
+  kind=dispatch
+  intent=P1-6 B1-FIX code review(兩家非實作者)
+  risk=low
+  facts_asked=none-needed
+  review_role=composer+grok 皆 adversary
+  template=n/a:code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-29 01:52:35 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T175235Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 01:52:48 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T175248Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 01:52:59 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T175259Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 01:54:42 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T175442Z-mutation-multi.json
+ts=2026-07-29 01:56:17 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T175617Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 01:58:16 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T175816Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 02:01:20 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T180120Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 02:01:52 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T180152Z-mutation-test_registry_v2_shape.json
+ts=2026-07-29 02:03:17 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260728T180317Z-mutation-multi.json

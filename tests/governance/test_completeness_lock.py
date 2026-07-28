@@ -231,6 +231,8 @@ def test_valid_lock_passes(tmp_path: Path) -> None:
             str(session),
             "--roster",
             "grok",
+            "--mode",
+            "discovery",
         ],
         cwd=str(REPO_ROOT),
         capture_output=True,

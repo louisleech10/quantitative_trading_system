@@ -8,7 +8,8 @@
 # 純便利加速：不改也不繞任何閘門——產出的 lock/synth/completeness 與手工版一模一樣，只是一個 call。
 #
 # 用法：
-#   bash scripts/reconcile_build.sh <session-name> <委員檔1> <委員檔2> [...]
+#   bash scripts/reconcile_build.sh <session-name> [--mode review|discovery] <委員檔1> <委員檔2> [...]
+#   bash scripts/reconcile_build.sh <session-name> --mode review --rebuild
 # 例：
 #   bash scripts/reconcile_build.sh p0todo-closure-r4 \
 #       handoffs/20260724-p0todo-closure3-codex.md \
@@ -19,25 +20,219 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 REPO="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REGISTRY="${SCRIPT_DIR}/audit_events.json"
 
-sess_name="${1:-}"
-shift || true
-[ -n "${sess_name}" ] && [ "$#" -ge 1 ] || {
-  echo "用法: bash scripts/reconcile_build.sh <session-name> <委員檔1> <委員檔2> [...]" >&2
-  exit 2
+usage() {
+  cat <<'EOF'
+用法:
+  bash scripts/reconcile_build.sh <session-name> [--mode review|discovery] <委員檔1> <委員檔2> [...]
+  bash scripts/reconcile_build.sh <session-name> --mode review --rebuild
+
+選項:
+  --mode review|discovery  lock 模式（預設 discovery；旗標位置無關）
+  --rebuild                同名就地由 discovery 升級至 review；需 audit OPEN 且 round_id 恰一筆
+  -h, --help               顯示本說明
+EOF
 }
 
-SESS="${REPO}/handoffs/reconcile/${sess_name}"
-if [ -e "${SESS}" ]; then
-  echo "ERROR: session 已存在，拒覆寫（每輪用新名字，勿踩上一輪）: ${SESS}" >&2
-  exit 2
+_lookup_round_id() {
+  python3 - "${REGISTRY}" "${REPO}" "$1" <<'PY'
+import json
+import os
+import sys
+
+registry_path, repo, session_name = sys.argv[1:]
+try:
+    with open(registry_path, encoding="utf-8") as fh:
+        registry = json.load(fh)
+    audit_path = os.path.join(repo, registry["audit_log_path"])
+    with open(audit_path, encoding="utf-8") as fh:
+        lines = fh.readlines()
+except Exception as exc:
+    print(f"ERROR: audit 讀取失敗(fail-closed): {exc}", file=sys.stderr)
+    sys.exit(1)
+
+events = registry.get("debt_events", {})
+open_events = [name for name, spec in events.items() if spec.get("opens_debt")]
+if len(open_events) != 1:
+    print("ERROR: registry 的 opens_debt 事件不是恰一筆", file=sys.stderr)
+    sys.exit(1)
+open_event = open_events[0]
+hits = []
+for line_no, raw in enumerate(lines, 1):
+    line = raw.strip()
+    if not line or not line.startswith("{"):
+        continue
+    try:
+        record = json.loads(line)
+    except Exception as exc:
+        print(f"ERROR: audit 第 {line_no} 行 JSON 無法解析(fail-closed): {exc}", file=sys.stderr)
+        sys.exit(1)
+    if record.get("event") == open_event and record.get("session_name") == session_name:
+        hits.append(record)
+
+if len(hits) != 1:
+    print(f"ERROR: session_name 命中 {len(hits)} 筆(需恰 1): {session_name}", file=sys.stderr)
+    sys.exit(1)
+round_id = hits[0].get("round_id")
+if not isinstance(round_id, str) or not round_id:
+    print("ERROR: committee_round_open 缺非空 round_id", file=sys.stderr)
+    sys.exit(1)
+print(round_id)
+PY
+}
+
+_assert_round_open() {
+  python3 - "${REGISTRY}" "${REPO}" "$1" <<'PY'
+import json
+import os
+import sys
+
+registry_path, repo, round_id = sys.argv[1:]
+try:
+    with open(registry_path, encoding="utf-8") as fh:
+        registry = json.load(fh)
+    audit_path = os.path.join(repo, registry["audit_log_path"])
+    with open(audit_path, encoding="utf-8") as fh:
+        lines = fh.readlines()
+except Exception as exc:
+    print(f"ERROR: audit 讀取失敗(fail-closed): {exc}", file=sys.stderr)
+    sys.exit(1)
+
+events = registry.get("debt_events", {})
+open_events = [name for name, spec in events.items() if spec.get("opens_debt")]
+close_events = {name for name, spec in events.items() if spec.get("closes_debt")}
+terminal_events = {name for name, spec in events.items() if spec.get("terminal")}
+if len(open_events) != 1 or len(close_events) != 1 or len(terminal_events) != 1:
+    print("ERROR: registry 狀態事件契約不完整", file=sys.stderr)
+    sys.exit(1)
+
+open_count = 0
+closed = False
+for line_no, raw in enumerate(lines, 1):
+    line = raw.strip()
+    if not line or not line.startswith("{"):
+        continue
+    try:
+        record = json.loads(line)
+    except Exception as exc:
+        print(f"ERROR: audit 第 {line_no} 行 JSON 無法解析(fail-closed): {exc}", file=sys.stderr)
+        sys.exit(1)
+    if record.get("round_id") != round_id:
+        continue
+    if record.get("event") == open_events[0]:
+        open_count += 1
+    elif record.get("event") in close_events or record.get("event") in terminal_events:
+        closed = True
+
+if open_count != 1 or closed:
+    print(
+        f"ERROR: round_id 非 OPEN(開債={open_count}, terminal_or_clear={str(closed).lower()})",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PY
+}
+
+_rebuild_guards() {
+  local session_lock="$1"
+  local session_name="$2"
+  local target_mode="$3"
+  [ -f "${session_lock}" ] || {
+    echo "ERROR: --rebuild 需既有 sources.lock: ${session_lock}" >&2
+    return 1
+  }
+  [ "${target_mode}" = "review" ] || {
+    echo "ERROR: --rebuild 僅允許目標 mode=review" >&2
+    return 1
+  }
+  local existing_mode
+  existing_mode="$(python3 - "${session_lock}" <<'PY'
+import json
+import sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        lock = json.load(fh)
+except Exception:
+    sys.exit(1)
+print(lock.get("mode", ""))
+PY
+  )" || {
+    echo "ERROR: 既有 sources.lock 無法解析(fail-closed)" >&2
+    return 1
+  }
+  [ "${existing_mode}" = "discovery" ] || {
+    echo "ERROR: --rebuild 只允許 discovery → review；現有 mode=${existing_mode:-missing}" >&2
+    return 1
+  }
+  local round_id
+  round_id="$(_lookup_round_id "${session_name}")" || return 1
+  _assert_round_open "${round_id}" || return 1
+}
+
+mode="discovery"
+rebuild=0
+sess_name=""
+declare -a input_files=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --mode)
+      [ "$#" -ge 2 ] || { echo "ERROR: --mode 需要值 review|discovery" >&2; exit 2; }
+      mode="$2"
+      shift 2
+      ;;
+    --rebuild)
+      rebuild=1
+      shift
+      ;;
+    --)
+      shift
+      while [ "$#" -gt 0 ]; do input_files+=("$1"); shift; done
+      ;;
+    *)
+      if [ -z "${sess_name}" ]; then sess_name="$1"; else input_files+=("$1"); fi
+      shift
+      ;;
+  esac
+done
+
+[ -n "${sess_name}" ] || { usage >&2; exit 2; }
+case "${mode}" in
+  discovery|review) ;;
+  *) echo "ERROR: --mode 非法值 '${mode}'（允許: discovery|review）" >&2; exit 2 ;;
+esac
+if [ "${rebuild}" = "1" ]; then
+  [ "${#input_files[@]}" -eq 0 ] || {
+    echo "ERROR: --rebuild 不接受委員檔；既有 sources.lock 內容必須保持不變" >&2
+    exit 2
+  }
+else
+  [ "${#input_files[@]}" -ge 1 ] || {
+    echo "ERROR: fresh 建立至少需要一個委員檔" >&2
+    exit 2
+  }
 fi
 
-# --- 推家族 + 驗檔存在 ---
+SESS="${REPO}/handoffs/reconcile/${sess_name}"
+if [ "${rebuild}" = "1" ]; then
+  session_lock="${SESS}/sources.lock"
+  _rebuild_guards "${session_lock}" "${sess_name}" "${mode}" || exit 1
+  bash "${SCRIPT_DIR}/write_sources_lock.sh" \
+    --session "${SESS}" --mode "${mode}" --rebuild \
+    || { echo "ERROR: --rebuild lock 就地升級失敗" >&2; exit 1; }
+  echo "[reconcile_build] ✅ ${sess_name} 已由 discovery 就地升級為 review"
+  exit 0
+fi
+
+# --- 推家族 + 驗檔存在（先做完所有輸入檢查，不留下半套 session）---
 _valid_fam="codex composer grok claude agy"
 declare -a copied=()
 declare -a fams=()
-for f in "$@"; do
+for f in "${input_files[@]}"; do
   [ -f "${f}" ] || { echo "ERROR: 委員檔不存在: ${f}" >&2; exit 2; }
   base="$(basename "${f}")"
   fam="$(printf '%s' "${base}" | sed -nE 's/.*-([a-z0-9]+)\.md$/\1/p')"
@@ -49,22 +244,35 @@ for f in "$@"; do
   copied+=("${base}")
 done
 
+# 只有 review lock 才需要 provenance identity；discovery 是 bootstrap 路徑，
+# 不需 round_id，也不得因尚未有 committee_round_open 而鎖死施工流程。
+round_id=""
+if [ "${mode}" = "review" ]; then
+  round_id="$(_lookup_round_id "${sess_name}")" || exit 1
+fi
+
 # roster CSV（去重、排序）
 roster="$(printf '%s\n' "${fams[@]}" | sort -u | paste -sd, -)"
 
+[ ! -e "${SESS}" ] || {
+  echo "ERROR: session 已存在，未帶 --rebuild 時拒覆寫: ${SESS}" >&2
+  exit 2
+}
+
 # --- 建 session + cp ---
 mkdir -p "${SESS}/sources"
-for f in "$@"; do
+for f in "${input_files[@]}"; do
   cp "${f}" "${SESS}/sources/$(basename "${f}")"
 done
-echo "[reconcile_build] session=${SESS}  roster=${roster}  sources=${#copied[@]}"
+echo "[reconcile_build] session=${SESS}  roster=${roster}  sources=${#copied[@]} round_id=${round_id:-unbound} mode=${mode}"
 
-# --- 寫 lock（fresh，不需 harness）---
-bash "${SCRIPT_DIR}/write_sources_lock.sh" --session "${SESS}" --roster "${roster}" --mode discovery \
+# --- 寫 lock（fresh；review 的 round_id 由 writer 從 audit 反查取得）---
+bash "${SCRIPT_DIR}/write_sources_lock.sh" --session "${SESS}" --roster "${roster}" \
+  --mode "${mode}" \
   || { echo "ERROR: write_sources_lock 失敗" >&2; exit 1; }
 
 # --- 組 byte-faithful synth 骨架（④a；正文逐字，與 completeness body-hash 定義一致）---
-python3 - "${SESS}" "${sess_name}" "${roster}" "$@" <<'PY'
+python3 - "${SESS}" "${sess_name}" "${roster}" "${input_files[@]}" <<'PY'
 import re, sys
 from pathlib import Path
 

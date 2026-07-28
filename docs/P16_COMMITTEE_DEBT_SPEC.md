@@ -1,6 +1,25 @@
 # P1-6 委員未結案債狀態機 — SPEC
 
-> **版本 v2.8**（R1 34 ＋ R2 17 ＋ R3 12 ＋ R4 9 ＋ R5 7 ＋ R6 7 ＋ R7 8 ＋ R8 2 findings 全數收口）　|　日期：2026-07-28
+> **版本 v2.9**（R1–R8 共 96 findings ＋ **B1 實作階段三家裁決** 全數收口）　|　日期：2026-07-29
+>
+> ## 🔴 v2.9＝**實作階段打回來的 SPEC 缺陷修正**（三家一致裁 P0，非設計爭議）
+>
+> **B1（Task 0.1）實作完成後，兩家非實作者 code review 各自獨立抓到同型缺陷，主委複核後實測證實：**
+> ```
+> $ grep -c 'committee_round_open' .claude/gate/audit.log   →  0
+> $ bash scripts/reconcile_build.sh <新session> <檔...>      →  rc=1
+> ERROR: session_name 命中 0 筆(需恰 1)
+> ```
+> **因果**：v2.8 Task 0.1 改法⑨② 要求「**建立 session 時**無條件從 audit 反查 `round_id`，命中 0 筆即 fail-closed」，但寫入 `committee_round_open` 的是 **Task 1.2（B3）**。⇒ Phase 0 完成到 Phase 1 完成之間，`reconcile_build` 對**所有**新 session 一律拒建；**而 B2／B3 自己的 code review 就需要建 session** ⇒ **本 epic 會鎖死自己的施工過程**。
+> **這不是實作 bug**——實作端忠實照 SPEC 做了。**是 SPEC 的階段依賴缺陷。**
+>
+> **修法（三家一致）**：反查的觸發條件由「建立 session 時」**收窄為「產生 `review` mode 的 lock 時」**（詳見 Task 0.1 改法⑨的表）。
+> **⚠️ 主委原提案不足，由 codex 補正**：只收窄 `reconcile_build.sh` 仍留下旁路——**公開的 `write_sources_lock.sh` 能直接建 `review` lock 並塞任意 round**，主委宣稱的不變式「任何 review lock 的 round_id 都來自 audit」**根本不成立**。故修法**必須擴及所有 lock writer 路徑**。
+> **另兩條 P1**（兩家獨立同型，主委複核成立；其中一條**主委自己的獨立驗收漏掉**）：
+> ①`write_sources_lock.sh --rebuild` 未設 harness 時**接受任意 `--round-id` 且完全不查 audit** → 綁定可偽造，打穿 Task 2.2④。**裁決＝(甲)**：拒收呼叫端的 round，由 writer 自 audit 導出；**(乙)「只准 `reconcile_build` 呼叫」被否決**——shell 無法可靠證明呼叫者身分，env internal marker 又違反反 bypass 紅線。
+> ②B1 新增的 4 條測試**閹割守衛後仍全綠**＝非真 oracle，須改為「閹割→轉紅、復原→轉綠」逐條附 receipt。
+>
+> **新增誠實邊界第 11 條**（見 §A）：`discovery` session 完全不受 identity binding 保護，這是本次收窄的直接代價。
 >
 > **R8＝戳記輪。composer／grok 簽 APPROVED，codex 不簽並提 2 條，皆採納：**
 > ①**`CODEX-R8-P0-01`（真缺口）**：v2.7 寫「唯一性掃描須與 append 共用 Task 1.1 的鎖」，但**那把鎖在 `audit_append.sh` 裡面**——呼叫端持鎖再呼叫它會**自鎖**，先放鎖再 append 則 **TOCTOU 回歸**，所以這句話**不可執行**。修法＝把判定搬進持鎖者：**Task 1.1 改法⑥ 新增 `audit_append.sh --require-absent-session <name>`**（鎖內一次完成判定＋寫入），Task 1.2 改為只能呼叫它、**明文禁止**自行 check-then-append 或自行取鎖，且**不提供 reentrant 鎖／鎖交接 API**（兩者都製造新可繞面）。§V 增 **M34**。
@@ -118,6 +137,9 @@
 8. **不驗 brief 品質**：主委可蓄意寫爛 brief 讓委員交不出東西，然後走逃生口。**機器擋不住 brief 品質。**
 9. **`abandon_kind` 是主委自報，機器不辨真假**：我可以把一次「真的收不齊」填成 `no-findings-expected` 混進實作那堆數字裡。**機器只保證兩種都留痕**；分辨真偽靠使用者看兩個數字的趨勢，是社會性摩擦，非機械強制。
 10. **重派無次數上限，可用來無限拖延**：某家族一直失敗時，我可以一直重派而不清帳也不放棄，機器不擋。**v2.0 原稱「拖延期間新派工被擋＝自我懲罰」，此宣稱過強已刪**（codex R1-P1-02）：本 SPEC 同時保留 `cx_run` 可直呼（第 2 條），故拖延者**未必**被有效懲罰。真正的約束只有「不能開**新一輪**」。
+11. **`discovery` session 完全不受 identity binding 保護**（v2.9 收窄的直接代價，三家裁決接受）：任何人可自由建立 `discovery` session，機器不查 audit、不綁 round。**擋得住的只有「拿它去銷帳」**（Task 2.2③ 要求 `mode=review`，而升到 review 必經 audit 反查）。
+    **出生事故（實測，非推測）**：v2.8 原文要求「**建立 session 時**無條件反查 audit」，但寫入 `committee_round_open` 的是 Task 1.2（B3）。B1 合併後實測 `reconcile_build <新session>` → `rc=1 session_name 命中 0 筆`，**而 B2/B3 自己的 code review 就需要建 session** ⇒ **這台機器會鎖死自己的施工過程**。三家一致判 **P0**。修法即本條收窄。
+    **誠實邊界**：本條讓「未經開債就開一輪討論並產出 discovery session」變成完全不留痕的動作——**這本來就在第 3 條（純對話綜合永遠攔不到）的射程內**，非新增漏洞，但**射程確實變大了**（現在連跑了收集工具也不必然留痕）。
 
 ## §C 約束
 - 只動 `scripts/` 治理層與 `tests/governance/`；解耦 7 條不受影響。
@@ -154,6 +176,16 @@
   ⑦**所有平行容器須與砍後的 4 事件同步**（R2 codex P0-03／grok P1-02）：`required_fields_per_event`／`clear_kind_event_map`／`family_valued_fields`／`hardcode_scan_exemptions`／`event_object_allowed_keys` 等任何以事件名為鍵或值的結構，**殘留指向已刪事件的項目即 fail-closed**。`debt_abandon` 的既有必填欄須與 v2 契約對齊（移除 `remediation_owner` 等 v1 專屬欄，加入 `abandon_kind`）。
   ⑧**`committee_round_open.fields` 增 `session_name`**（Task 1.2⑦ 寫入、Task 2.2④ 讀取的 identity binding 真相源）。
   ⑨**lock 工具鏈支援 identity binding**：`reconcile_build.sh` 須①接受 **`--mode review|discovery`**（具名旗標、位置無關；**預設維持 `discovery`** 以免破壞既有呼叫）②建立 session 時**從 audit 查 `session_name` 對應的 `committee_round_open`，將其 `round_id` 寫入 `sources.lock`**，查不到即 fail-closed 拒建。`write_sources_lock.sh` 對應支援寫入 `round_id` 欄。
+     ⚠️**反查的觸發條件＝「產生 `review` mode 的 lock 時」，不是「建立 session 時」**（v2.9 依 B1 三家裁決收窄；v2.8 原文寫「建立 session 時」無條件反查，**實測會鎖死本 epic 自己的施工過程**——見下方 §A 誠實邊界 11）：
+
+     | 路徑 | audit 反查 | 額外守衛 |
+     |---|---|---|
+     | fresh `--mode discovery`（**預設**） | **不做**（不需 `round_id`） | 無 |
+     | fresh `--mode review` | **必做**：`session_name` 對應的 `committee_round_open` **恰一筆** | — |
+     | `--rebuild`（`discovery → review`） | **必做**：**恰一筆** | 該輪須 `OPEN`；只准 `discovery → review` 單向 |
+
+     **為何這樣收窄仍然安全**：綁定的目的（Task 2.2④）是防「**銷帳端**自己產生綁定值」，而綁定**只在銷帳時有意義**；Task 2.2③ 已規定 `mode` 必須是 `review` 才能銷帳。故 `discovery` session 不需 `round_id`，而**任何 `review` lock 的 `round_id` 必來自 audit 反查**。
+     ⚠️**此不變式須涵蓋所有 lock writer 路徑，不得只修 `reconcile_build.sh`**（B1 codex 指出主委原提案的漏洞）：`write_sources_lock.sh` 是**公開**入口，若它仍能直接建立 `review` lock 並塞入呼叫端給的 round，不變式即不成立。**所有 review-mode 的建立／升級一律由 writer 以 session 對應的 audit 自行導出 identity，不接受呼叫端傳入的 round**（或移除 public writer 的 review 建立路徑，改由單一受驗證 owner 寫入）。
      ③**接受 `--rebuild`，實作 Task 2.2 1b 的同名 `discovery → review` 就地升級**。此旗標**必須在本 Task 落地**（`reconcile_build.sh` 由本 Task 擁有），且須明確處理既有兩道拒絕牆：
         - **`reconcile_build.sh` 現行「session 已存在即 `exit 2`」**（`scripts/reconcile_build.sh:31-34`）：`--rebuild` 且 1b 三道守衛全過時**跳過此拒絕**；未帶 `--rebuild` 時行為不變（仍 `exit 2`）。
         - **`write_sources_lock.sh` 現行「`closure_state=FROZEN` 非 `--force` 不得覆寫」**：`--rebuild` 路徑下允許**就地改寫既有 lock 的 `mode` 欄（僅 `discovery → review`）並自 audit 重填 `round_id`**，其餘欄位（來源清單／各來源 hash／`expected_roster`）**一律保持不變**。
