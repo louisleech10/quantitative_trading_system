@@ -1,5 +1,62 @@
 # Handoff
-**Agent**: Claude(Opus 5) | **Time**: 2026-07-26 | **Branch**: **main** | **狀態**: **★P1-6 SPEC v1.2 已定版 + 三家戳記 APPROVED(機器 rc=0);實作 0/16**。SPEC 階段**已 commit+push `c87689a`**。**下一步＝寫 TODO**(blog 評估已結案,不必再做)。📄 **完整交接 → `handoffs/20260726-SESSION-HANDOFF-P16.md`**；本檔只看「🔥 P1-6 現況」+「📋 待辦整合清單」。
+**Agent**: Claude(Opus 5) | **Time**: 2026-07-28 | **Branch**: **main**(＝origin/main `79d1611`) | **狀態**: **★P1-6 SPEC v2.8 定版 + 三家 RECONCILE-STAMP 全 APPROVED + 機器驗證 rc=0;九輪委員 34→17→12→9→7→7→8→2→0 findings 全收口。🛑 卡在白話閘,等使用者放行才進 TODO**。實作 0/8;**本 session 全部產物尚未 commit**。
+
+> ## 🛑 當前阻塞點:白話閘(制度硬性,Claude 不得自行跳過)
+> **SPEC 已定版**:`docs/P16_COMMITTEE_DEBT_SPEC.md` **v2.8**(355 行,sha 前 20=`3578b4ae76590584fef7`)。
+> **三道機器驗證全綠**:`reconcile_stamps_check.sh … codex,composer,grok` **rc=0**(body sha=`908abb3cba9c…f752`,三家全 APPROVED)／`completeness_check --lock` **rc=0**／`template_check spec` **rc=0**。
+> **戳記 provenance 踩坑**:首驗 rc=1「輸出 hash 仍為 pending」→ 補 `gate.sh register-output P16-V28-RESTAMP handoffs/reconcile/p16-v26close-r7/synth.md` 後 rc=0(memory `reference_reconcile_stamp_provenance` 已記,又踩一次)。
+> **使用者放行後的順序**:重寫 TODO(現行 987 行 v0.5 是作廢的 v1.2.2 契約) → 三家審 TODO → 派 B1 實作 → 雙家非實作者 code review。
+
+> ## ★ 2026-07-27/28 現行狀態(P1-6 SPEC v2.x;以下取代下方 v1.2.2 段落)
+> **SPEC 已大砍重寫**:v1.2.2(360 行/16 Task)封存至 `handoffs/p16-spec-archive/P16_SPEC_v1.2.2_BEFORE_SCOPE_CUT.md`;現行 `docs/P16_COMMITTEE_DEBT_SPEC.md` **v2.7**(343 行,sha 前 20=`eee6e70754fe0b0d850e`)＝**4 事件 / 3 狀態 / 8 Task / M1-M33 mutation / 13 條誠實邊界**。
+> **收斂軌跡**:R1 34(P0 9)→R2 17(5)→R3 12(3)→R4 9(3)→R5 7(3)→R6 7(2)→R7 8(3,實質共識 P0 僅 1)→**R8 戳記輪 2(codex 拒簽)**→**R9 重簽輪 0,三家全 APPROVED**。**R4 起零設計問題、零設計翻案**。
+> **R8/R9 產物**:brief=`handoffs/20260728-P16-V27-STAMP-BRIEF.md`(R8)／`…-V28-RESTAMP-BRIEF.md`(R9);報告=`handoffs/20260728-p16-v2{7stamp,8restamp}-{codex,composer,grok}.md`;戳記在 `handoffs/reconcile/p16-v26close-r7/synth.md` 的 `## 戳記` 區。
+> **🔴 R8 的重要教訓(戳記輪自身被打臉)**:`completeness_check` 在整個 R8 期間是**紅的**(我 append 戳記區多打一個 `---`,併進最後一條 finding 的 body → hash 不符)。**只有 codex 查前置條件並拒簽;composer 與 grok 在紅燈下簽了 APPROVED**——本 epic 要治的病出現在戳記輪自己身上。**修法＝R9 brief 硬性要求「簽前自跑前置條件並貼 rc,紅燈不准簽」,三家照做**。
+> **R8 codex 兩條(全採納)**:①**P0 真缺口**:v2.7 寫「唯一性掃描須與 append 共用 Task 1.1 的鎖」**不可執行**——鎖在 `audit_append.sh` 內,呼叫端持鎖再呼叫會**自鎖**,先放鎖再 append 則 **TOCTOU 回歸**。修法＝把判定搬進持鎖者:**Task 1.1 改法⑥ `audit_append.sh --require-absent-session <name>`**(鎖內一次做完判定+寫入)+3 條驗收,Task 1.2 只能呼叫它,**禁 reentrant 鎖/鎖交接**(皆製造新可繞面),§V 增 **M34** ②**P1 誠實性**:`spec_fourway_check.sh` 只是固定 `grep -c`、第④項自印「人工比對」,稱「四向檢查」屬誇大 → **降級為 smoke check**(檔頭+輸出都改,寫明擋不住同義句/錯 Task/空泛 happy path,**PASS 不等於已收斂**)。
+> **🚨 停損線已觸發(條數 7→8)並完成重評**:重評結論**不是砍規模、不是重寫**——R7 的 P0 **不是設計問題,是文件傳播缺口**(修 F1 時把 `--rebuild` 加在 Task 2.2,卻沒動**擁有 `reconcile_build.sh` 的 Task 0.1** 改法段,還留著三句「不提供事後重凍」的絕對句)。**與 R4/R6-F3 同型,第 7 次同型**。其餘三個量在 R7 皆改善:**首次有家族簽 APPROVED**(composer;前六輪無任何一家說過可簽)／P0 實質共識點 2→1／零設計翻案。**故改為:修完 → 跑四向檢查 → 直接進戳記輪,不再開同型 adversarial 輪**(戳記輪本身即三家複驗,漏傳播會被機器閘門擋)。
+> **紀律改動(逐輪演進)**:兩類複掃 → 9 類 → 加語意 → 加責任落點 → R6「改法+驗證雙落點」→ **R7 證明仍不夠**(改法有落點,但落在**錯的 Task**)→ **v2.7 起「四向擁有權」**:①落在**擁有該腳本的 Task** 的改法段 ②該 Task 驗證段 ③§V 有 mutation ④全檔無矛盾絕對句。
+> **⚠️ 但 `scripts/spec_fourway_check.sh` 只是 smoke check,不是保證**(R8 codex 指正後降級):只做固定字串比對,**不解析 Task 邊界、不驗語意**,PASS 不等於已收斂。**刻意不做語意解析版、不做通用 map 驅動閘門、不接 `gov_check.sh`**——2026-07-27 通用版(`doc_consistency_check.sh`+map.tsv)已由使用者裁定撤除,不重蓋。定位＝回歸 smoke(防「改完忘了同步某處」),實戰有效:Task 1.2→1.1 擁有權搬移時它立刻轉紅。
+> **v2.7 收的 R7 五群(8 條全採納,0 條不採納,三家皆無「加新機制」提案)**:G1 `--rebuild` 落地寫進 Task 0.1 改法⑨③(含跳過 session-exists 拒、就地改 lock `mode`、自 audit 重填 `round_id`、其餘欄位不變、明禁 `--force`+harness)／G2 開債唯一性併入 Task 1.1 臨界區(關 TOCTOU)／G3 Task 1.2 驗證補重複+並行 oracle／G4 Task 2.2 驗證補 `--rebuild` happy path+5 條負例(含「未設 harness 也能完成」)／G5 檔頭收斂表補 R6/R7 兩列。
+> **⚠️ TODO 檔仍是作廢的 v1.2.2 契約**(987 行/v0.5),對應舊 16-task,**刻意延後到 SPEC 定案後重寫**——避免重演「上游動、下游追」漂移。
+> **待辦鏈**:R7 收齊 → reconcile → (若收斂)三家 RECONCILE-STAMP → 🛑**白話閘給使用者** → 重寫 TODO → 派 B1 實作。
+> **🔒 已加機械防護**:`.claude/settings.json` 新增 `deny` 清單擋 `Bash(rm *)`／`Bash(python3 - *)`／`Bash(python - *)`／`Bash(cd /Users/*)`——這四樣是我反覆犯、每次卡 600 秒的來源;實測改為**立即 Permission denied**。另加 10 條治理腳本進 allow(61→71)。
+> **✅ 已回答「為何這次才漂移」(實證兩層)**:①`handoffs/` 底下 **82 份舊 RECONCILE 檔 canonical ID 全為 0**——以前 findings 從未被機械清點,「以前沒漂移」有一半是**量測假象** ②舊版 R5-R12 八輪卡 20-25 未收斂即定版,根因是 **scope accretion**(規格階段每次修訂新增機制)vs **抄寫漂移**(TODO 階段,972 行+7 張鏡像索引表→改上游一字要動下游 2-4 處)。兩病要分開診斷。
+>
+> ## 🔴 2026-07-27 使用者三項裁定(裁定①②已執行完畢;③已由上方 v2.x 取代)
+> **裁定①「工具選 C」＝ `doc_consistency_check.sh` 已撤除**:三個新檔已刪、`gov_check.sh` 已還原(`git diff` 空)、完整 `gov_check` rc=0 全綠、**未留任何豁免**。治理測試回到 287。撤除理由＝實測只抓 3/16 漂移、又製造探針閘門衝突、且治不了真正的病(規模)。
+> **裁定②「P1-6 砍規模」**:只留 **開債 ＋ 一條銷帳路徑 ＋ 擋門** 三件事;**「要完全擋下的成本太高,就盡可能降低可繞過的機率就好」**(使用者原話)——此句直接讓最貴的 Task 4.2(token↔round epoch 那整套)可簡化為「gate_check 每次重查一次帳本」。
+> **裁定③ 待答**:Claude 已提出砍法(16 工項→6),**使用者尚未拍板是否開工砍**。
+>
+> ### 砍法草案(等使用者點頭才動)
+> **保留 6**:開債／記每家結果／統一寫入點(編號連續)／帳本／一條銷帳路徑(機械驗 0 掉項)／擋門 ＋ **一條逃生口**(人工放棄,附理由+簽核者,留痕)。
+> **⚠️ 逃生口不可砍**:否則「某家交回格式不合→機械驗永遠不過→債永遠清不掉→連重派那一家都被擋」＝**第一次遇到爛產出就整個停擺**。
+> **砍掉 8**:補派 amendment／格式失敗出口／全體降級出口／單家退出+續期／清錯帳更正／brief 範本閘(本就是獨立的洞,另立票)／事件真相源+12 守衛(事件剩 4 種用不著)／token 時序整套(改最簡版)。
+> **誠實邊界(最小版必寫)**:那條逃生口 **Claude 隨時可用**,機器只保證留痕+理由+簽核者,**不保證不濫用**;降低濫用靠「每 session 開頭稽核報有幾筆放棄」＝社會性摩擦,非機械強制。
+> **落地方式**:不是丟掉重寫——現有 6 個保留項已審過多輪、4 個真 BLOCKING 已修,內容可用。做法＝**刪減+降版 → SPEC v2.0 大砍版 → 三家重審 → 重戳**。文件預估 972→~1/3 行,**這本身就治不收斂**(鏡像表變少)。
+>
+> ### 為何要砍(實測根因,非感覺)
+> **P16 從 R5 到 R12 連續八輪卡在 20-25 findings、P0 卡 6-9,完全沒收斂就定版了**。讀晚期 P0 原文發現:**規格階段不收斂的原因是「每次修訂都新增機制」**(v0.8 加 all_degraded→該輪 P0 全打它;v1.0 大改寫→P0 是「v0.8 凍結的演算法整段消失」;v1.1 加守衛→P0 全打新守衛)＝**scope accretion,不是抄寫漂移**。TODO 階段才是抄寫漂移(R4 19 條裡 16 條是上輪修訂造成)。**兩階段兩種病,勿混談。**
+> **Claude 的流程失誤**:八輪卡在同一數字時就該停下來報「不收斂,做法要換」,而不是磨到定版再進 TODO 再磨五輪。兩輪斷路器只套用在單一 bug,沒套用在**整個 epic 的收斂趨勢**上。
+>
+> ### 🛑 已作廢(上方裁定取代):等使用者決定 A/B/C:`bash scripts/gov_check.sh` **rc=1**——**唯一紅的是步驟 3 探針健檢**(語法/文件同步/301 測試全綠)。成因＝`scripts/mutation_probe_static.py` 的判準是「須 monkeypatch/setattr 或引用 momentum/api 符號」＝**為 Python 受測系統設計**;我的受測系統是 **shell 腳本**,再強的探針也長不出 monkeypatch 呼叫。**可用一行假 monkeypatch 騙過,但那正是該閘要防的,不做。** 三選項:**A** 立中任務擴充 `mutation_probe_static.py` 認 shell 受測(走完整管線;期間 gov_check 保持紅) **B** 先把新檔加進 `gov_check.sh` 的 `LEGACY_PROBE_DEBT` 具名排除+理由+owner,另立票修(gov_check 立刻綠,但＝自己給自己開豁免,須使用者點頭) **C** 撤回工具(尚未 commit,可全丟)。**Claude 傾向 B+立票,但開豁免給自己不該自裁。**
+> **⚠️ 我在 R5 被實測推翻的兩個誇大宣稱(勿再犯)**:①宣稱「2 支 mutation 探針證明真 oracle」——只跑 pytest 沒跑 `mutation_probe_check.sh`(實測 rc=1,判偽自證) ②宣稱「三類檢查涵蓋 19 條裡的 16 條」——codex 逐條對照表實證**16 條漂移只抓到 3 條**(+1 條只抓版號不抓 sha)。**兩者都是「沒跑完該跑的驗證就宣稱」。**
+> **R5 已修**:C3 anchor 0=0 假綠(codex P0-02 真 bug,加三道 anchor 命中檢查+新探針,15 passed)／探針改為**就地變異真腳本**(try/finally+內容比對驗還原)／composer 抓的兩處新漂移(§0 R-9 十三條、S-7 287 passed)／codex P1-07 SPEC §N 40 類→41／P1-08 Task 1.5 placeholder→完整契約/P1-09 §Q 標題改「歷史裁決紀錄(全部已閉合)」。
+> **R5 未修(等 A/B/C 決定後續)**:C1「多數字標題略過」可被故意利用(P1-05)／C1「4 行內第一張表」誤報(P1-06,codex 附 fixture)／C2 missing-version 降級被判 fail-open(P0-03,codex 主張改具名限期 allowlist)／`delta+reason` 是後門(P1-04)／工具未進 CI(P1-10)／我報的清點數字 33/67 錯(實際 **35 SPEC + 34 TODO,skip=68**,P2-11)。
+> **🆕 新工具 `scripts/doc_consistency_check.sh`(使用者裁定「先寫檢查再送 R5」)**:機械擋「改一處漏多處」。C1 標題數字==表列數／C2 跨檔版本 pointer／C3 TODO 索引表==SPEC 節項數(差額須宣告理由)。配 `scripts/doc_consistency_map.tsv`(宣告式,加一列即多保護一個 epic)+`tests/governance/test_doc_consistency.py`(14 測試含 **2 支 mutation 探針**:閹割守衛後同輸入從紅轉綠)。已掛 `gov_check.sh` 步驟 1b。**首跑即抓到真漂移**(TODO 寫 SPEC v1.2.1 但實際 v1.2.2)。
+> **⚠️ 該工具誠實邊界(勿高估)**:①**目前實際只保護 P16 一個配對**——實測全 repo 35 SPEC+33 TODO 只有 P16 用「標題 N 條+緊接表格」慣例 ②**抓不到語意漂移**(數字全對但句意講反,如 R2 那次 sed 改壞引文) ③「pointer 目標無版本行」刻意降為**可見 skip** 而非 fail(舊 epic 會讓 gov_check 永遠紅→訓練大家忽略)。
+> **根因分析(回答使用者「為何以前沒這麼嚴重」)**:①漂移**一直都有**(P16 自己 SPEC 12 輪:specclose-r4=11 條、v07rev-r9=11、v11rev-r12=9 同型) ②變的是**比例**(早期 ~5% → 末期 ~50-60%,設計問題抓乾淨後抄寫錯誤成主體) ③**真正差異＝repo 內 35 份 SPEC 只有 P16 是「定版蓋章後又開刀」**(其餘 33 份無版本行=寫完凍結直接實作),而 P16 的 TODO 有 **7 張鏡射 SPEC 各節的索引表** → 改上游一字,下游機械上要動 2-4 處。**不是變粗心,是結構扇出**。
+> **機檢現況(rc 直接取)**:`template_check spec` rc=0／`template_check todo` rc=0／`gov_check` rc=0／`audit_events.json` JSON 合法。四輪 reconcile `completeness --lock` 全 rc=0(29/29、23/23、12/12、19/19)。
+> **R4 的教訓(第 8 次同型)**:19 條裡 **16 條是「改一處漏多處」**——我在 v1.2.1 動 SPEC 4 處/TODO 3 處/registry 3 處,沒有每改完立刻 grep 全檔複掃,導致條數(13vs14)、mutation 分母(40vs41)、版本 pointer、Q-9 落地、極性用語全漂移。**v1.2.2 已附「修完後機械複掃表」逐條驗數字**(見 `handoffs/reconcile/p16-v121rev-r4/synth.md` 文末)。
+> **R4 唯一真設計 bug**:`pending_deadline_seconds: null` 會撞 Task 0.1 的 C7「constants 須正整數」契約 → Phase 0 首日 fail-closed 自咬(兩家 BLOCKING)。**改法＝該鍵條件式必填**:B2 量測前**鍵不存在**(合法),量測後必須存在且為正整數;**禁用 null 佔位**。📄 **完整交接 → `handoffs/20260726-SESSION-HANDOFF-P16.md`**；本檔只看「🔥 P1-6 現況」+「📋 待辦整合清單」。
+> **2026-07-27 開工稽核**(rc 直接取):`template_check spec`／`reconcile_stamps_check`／`completeness --lock r12`／`gov_check` **全 rc=0**;`pytest tests/governance -q` **287 passed in 71.85s**。
+> **產物鏈**:TODO=`docs/P16_COMMITTEE_DEBT_TODO.md`(**v0.3 DRAFT;Q-11 未裁+SPEC v1.2.1 未重戳前不得派實作**)。R1:brief=`…-P16-TODO-ADV-BRIEF.md`／產出`…-p16-todoadv-{fam}.md`(29 findings)／reconcile=`handoffs/reconcile/p16-todoadv-r1/`(29→19 群集,rc=0)。R2:brief=`…-P16-TODO-CLOSURE-BRIEF.md`／產出`…-p16-todoclose-{fam}.md`(23 findings)／reconcile=`handoffs/reconcile/p16-todoclose-r2/`(23→15 群集,rc=0)。R3(Q-11):brief=`…-P16-Q11-CONSTITUTION-BRIEF.md`／task-id=`20260727-p16-q11-r3`／產出→`…-p16-q11-{fam}.md`。
+> **🛑 使用者裁定(2026-07-27)**:①**SPEC 開 v1.2.1 微修 + 三家重戳** ②**Q-11 交委員會單獨一輪,使用者只看結論**。
+> **✅ Q-11 已由三家憲法解釋輪(R3)裁決,已落地 SPEC v1.2.1**:三家各自回查 R1-R12 原文,**史實一致**——當初禁用「brief 是否引用範本」的 harm model 是「**省略**字串+自報 impl → 偽裝實作 → 逃債逃檢」(`p16-v04rev-r5/synth.md:33-36`),**11 輪中不存在「引用範本以逃檢」的攻擊**。裁決＝裁決 2 拆 **2a 債務/路由層(五訊號全禁)** + **2b 檢查契約層(只准單向加嚴,三條可操作條件)**;Task 1.5 改採 **單一 validator + 加法義務**(採 codex 形狀,無分類器故無需豁免;行為與測試不變,約 20 行重整)。**「方向取嚴」單獨不構成豁免**(三家一致,codex 形式論成立)。
+> **v1.2.1 修了四項**:Q-8 新增 `constants.pending_deadline_seconds`(廢 `_provisional` 消費路徑)／Q-9 續期指標定為 **`renew_of`**(`supersedes` 專留 clear 更正)／Q-10 FACT-RECEIPT 改 **6 檔 10 處** + 誠實邊界#4 jq 改「已閉合」／Q-11 如上。**新增誠實邊界#14**:`impl`+不引用範本仍跳 P1-1(R5 C2)未關,禁宣稱 Q-11 關掉它。
+> **⚠️ v1.2 的三家戳記不自動延續 → v1.2.1 必須重審+重戳才可派實作。**
+> **⚠️ 我這輪犯的錯(委員全抓,勿重蹈)**:①v0.1 宣稱「`GATE_DIR_OVERRIDE` 旁路是 SPEC 未涵蓋」**不實**(SPEC:217 早已裁定要綁 harness)②v0.1 §Q-5「缺欄 token 放行」是 fail-open,三家推翻③v0.2 稱「grok 判定 Task 1.5 合規」**引用過寬**(grok 親自指正)④**改一處漏多處**(§B 改了序言沒改／要點⑥加了①沒改)=memory `feedback_cross_reference_sync` **再犯** ⑤盲目 `sed -g` 誤改到引述原文處。**①②③同型＝把推測/證據講得比實際強**。
+> **機械複核(勿採信任一家自報)**:`grep -rn "pop.*GOVERNANCE_TEST_HARNESS" tests/governance` → **6 檔 10 處**。codex 報「7 檔」錯、composer 報「9 處」錯、**SPEC 原值「6 檔 9 處」也錯**(併 v1.2.1 更正)。
+> **踩坑**:`completeness_check` 會把委員檔內 `### Q-8/Q-9/Q-10 裁決` 這種標題誤判非法 canonical ID → 整份 reconcile FAIL。修法＝**派回原家自修標題**(純格式零語意),勿自己動委員產物。
 
 ## 🔥 P1-6 現況（2026-07-26；SPEC 階段已 commit+push `c87689a`）
 
@@ -82,7 +139,7 @@
 - **3 個既有測試檔探針空心**:`test_verify_gate{,_b3,_b4}.py` 探針沒碰待測系統(＝假綠);已在 `gov_check.sh` 具名排除,修法歸 P1-2/P1-3
 - ~~`l65_benchmark` CI 長期紅~~ → **2026-07-26 已診斷並刪除**:實測 `run_started_at == updated_at`、無 log ＝ startup failure,**從未真的執行過**(零保護純噪音)。workflow 已 `git rm`;`scripts/benchmark_l65.py` 保留供本機跑。
 - **branch protection 不可用**:私有 repo+免費方案 → GitHub 顯示 `Not enforced`。**替代已上線**:pre-push hook(擋粗心,`--no-verify` 可繞)。要真硬閘需升 GitHub Pro(**使用者決定**)
-- **工作區 3 個既有檔未處理**(非我改):`docs/API_SPECIFICATION.md`、`tests/golden/l65/test_inventory.txt`、`docs/workflow_diagram.png` — **使用者決定**要不要 commit
+- **工作區未追蹤檔**(2026-07-27 實查更新;原記的 `docs/API_SPECIFICATION.md`、`tests/golden/l65/test_inventory.txt` **已乾淨**):只剩 `docs/workflow_diagram.png` + `handoffs/run_receipts/*-mutation-multi.{json,log}` 2 組 — **使用者決定**要不要 commit
 - **解耦 scanner 半套**:`check_decoupling.sh` 實跑 R2/R3/R4 有紅,P2 triage 待辦(見 memory `project_decoupling_scanner_partial`)
 - **🆕 GATE-TOKEN-BINDING（2026-07-26 實測新發現，非宣稱）**：`gate_check.sh:75-76` **只驗 token 的 mtime 新鮮度就 `exit 0`，完全不比對內容**（`grep -rn 'dispatch.token' scripts/` → 除文件字串外 0 處比對）。兩個後果：
   **(a) token 不綁 task（單 session 內就成立、較嚴重）**：一個 dispatch token 在 900 秒內授權**任意數量、任意 task-id、任意 intent** 的派工。為 task A 開的門可直接拿去派 task B。實證：`.claude/gate/dispatch.token` 內容有 `intent`/`risk`/`review_role`，**連 `task_id` 都沒記**（我傳了 `--task-id` 但它只進 audit.log）。

@@ -8,7 +8,7 @@
     "cutoff_ts": "碼內常數。cutoff 之前的事件一律 legacy;僅 GOVERNANCE_TEST_HARNESS=1 可覆寫。",
     "debt_event_required_fields": "僅適用 debt_events。legacy 事件(non_debt_legacy_events)結構上就沒有 sequence/producer,不得套用此必填集(R11 codex P0-03)。",
     "event_id": "uuid,全域唯一;重複 → fail-closed 拒寫",
-    "sequence": "由 audit_append.sh 以 flock 分配的單調遞增整數;白名單事件的 gap/duplicate → ledger fail-closed",
+    "sequence": "由 audit_append.sh 以 mkdir 原子鎖分配的單調遞增整數(SPEC v2.2:禁用 flock,實測該環境不存在);白名單事件的 gap/duplicate → ledger fail-closed",
     "producer": "寫入管線,恆為 audit_append.sh(ledger 的 provenance 判準用此欄);由 audit_append.sh 強制填入,呼叫端不得指定",
     "origin_script": "邏輯來源,須 ∈ allowed_origin_scripts",
     "actor": "自填字串,不可驗證(誠實邊界)",
@@ -17,8 +17,8 @@
     "result_state": "success=產出含至少一條 completeness_check.sh 可接受的合格 finding(判定用該 round 的 lock_mode);failed=cli_rc!=0 或 output 空;format_failed=其餘。success 不得重派,另兩態可。",
     "clear_kind": "與 clear_kind_event_map 一一對應。full/family_degrade 走 committee_debt_clear;format_failure 與 all_degraded 各有專屬事件型別。",
     "supersede_direction": "僅允許收緊向(CLOSED→OPEN)。放寬必須走完整 clear 條件。",
-    "renew_once": "每 (round_id, family) 至多一次(R11 grok P0-02:v1.0 誤寫成「每 round 全域一次」,≥2 家族同時 failed+attempt 滿+degrade 逾期時只能救 1 家,其餘仍死鎖)。須附 supersedes 指向【同 round 同 family 且已逾期】的 degrade 事件。",
-    "pending_deadline": "registry 現值為暫定。Phase 1 必須量測 admission→append latency(workload=committee_run 派 3 家 × 20 次,取 p99),deadline = clamp(ceil(p99*3), pending_deadline_min_seconds, pending_deadline_max_seconds);若 ceil(p99*3) > max → 不得部署固定時間窗,改用原子 handoff。量測結果須寫入 TODO 驗收 receipt。",
+    "renew_once": "每 (round_id, family) 至多一次(R11 grok P0-02:v1.0 誤寫成「每 round 全域一次」,≥2 家族同時 failed+attempt 滿+degrade 逾期時只能救 1 家,其餘仍死鎖)。須附 **renew_of** 指向【同 round 同 family 且已逾期】的 degrade 事件。**(SPEC v1.2.1 / Q-9 裁決)** 續期指標的 SoT 是 committee_family_degrade.fields 的 renew_of;本說明原誤寫 supersedes,已更正。supersedes 專屬 committee_debt_supersede 的 clear 更正事件,兩者語意不同,禁混名。",
+    "pending_deadline": "**canonical key = pending_deadline_seconds**(SPEC v1.2.1 / Q-8 裁決新增)。**它是條件式必填(conditionally-required),不是恆存鍵**:B2 量測前**整個鍵不存在**(合法中間態);B2 量測後**必須存在且為正整數**。守衛契約(Task 0.1 C7):『鍵不存在 → 通過;鍵存在但非正整數(含 null/0/負數/字串) → rc≠0』——**禁止用 null 當佔位**(R4 三家實證:null 會撞 C7 的 constants 正整數契約,B1 首日即 fail-closed 自咬)。Task 4.2 的 mint_ts + N 消費端則要求該鍵**必須存在**,不存在即 fail-closed。量測法:workload=committee_run 派 3 家 × 20 次,取 p99,deadline = clamp(ceil(p99*3), pending_deadline_min_seconds, pending_deadline_max_seconds);若 ceil(p99*3) > max → 不得部署固定時間窗,改用原子 handoff。量測結果須寫入 TODO 驗收 receipt。**pending_deadline_seconds_provisional 保留為歷史值,消費端一律禁止讀取**(audit_events_check.sh 須機械強制:任何腳本讀 _provisional → rc≠0)。",
     "unknown_event_policy": "post-cutoff 出現於 p16_namespace_prefixes 但不在 debt_events 的事件 → **fail-closed 拒認**(非告警)。此為 R10 all_degraded 漏列白名單的根治(R11 3/3 家族:v1.0 只寫告警=fail-open)。",
     "family_valued_fields": "列於 family_valued_fields 的欄位,其值必須 ∈ scripts/governance_families.json 的 families。audit_events_check.sh 交叉驗證(R11 codex P1-04)。",
     "spec_non_event_tokens": "C10 專用。落在 p16_namespace_prefixes 內但**不是事件名**的概念/容器 token(SPEC 會以 backtick 提及)。明列而非放寬前綴,以免 C10 漏掉真正的事件改名漂移。",
@@ -53,7 +53,8 @@
     "ts"
   ],
   "debt_event_optional_fields": [
-    "supersedes"
+    "supersedes",
+    "renew_of"
   ],
   "family_valued_fields": [
     "participants",

@@ -56,6 +56,16 @@
       "Bash(bash scripts/coverage_check.sh:*)",
       "Bash(bash scripts/agent_preflight.sh:*)",
       "Bash(bash scripts/agent_postflight.sh:*)",
+      "Bash(bash scripts/reconcile_build.sh:*)",
+      "Bash(bash scripts/completeness_check.sh:*)",
+      "Bash(bash scripts/reconcile_stamps_check.sh:*)",
+      "Bash(bash scripts/new_brief.sh:*)",
+      "Bash(bash scripts/gov_check.sh:*)",
+      "Bash(bash scripts/committee_run.sh:*)",
+      "Bash(bash scripts/cx_run.sh:*)",
+      "Bash(bash scripts/debt_ledger.sh:*)",
+      "Bash(bash scripts/debt_clear.sh:*)",
+      "Bash(bash scripts/audit_append.sh:*)",
       "Bash(which *)",
       "Bash(open *)",
       "Bash(agy *)",
@@ -63,8 +73,13 @@
       "Bash(time grok -p 'Read TASK.md in this directory and implement the solution exactly as specified in solution.py, then write DONE.txt as instructed.' -m grok-4.5 --cwd . --sandbox workspace --always-approve --output-format plain)",
       "Bash(time cursor-agent -p \"Read REVIEW_TASK.md in this directory and follow it exactly.\" --force --model composer-2.5)"
     ],
-    "ask": [
+    "deny": [
       "Bash(rm *)",
+      "Bash(python3 - *)",
+      "Bash(python - *)",
+      "Bash(cd /Users/*)"
+    ],
+    "ask": [
       "Bash(git reset*)",
       "Bash(git rebase*)",
       "Bash(git checkout -- *)",

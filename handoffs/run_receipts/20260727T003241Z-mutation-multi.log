@@ -1,0 +1,15 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 21 items / 16 deselected / 5 selected
+
+tests/governance/test_low_risk_impl_requires_reconcile.py::test_mutation_impl_reconcile_only_on_high_allows_low PASSED [ 20%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_dirname_sess_allows_nested_bypass PASSED [ 40%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_remove_realpath_allows_dropped PASSED [ 60%]
+tests/governance/test_stamp_no_task_rejected.py::test_mutation_allow_missing_task_breaks_guard PASSED [ 80%]
+tests/governance/test_waived_adversarial_still_stamps.py::test_mutation_waived_adv_skips_stamp_breaks_guard PASSED [100%]
+
+======================= 5 passed, 16 deselected in 2.18s =======================
