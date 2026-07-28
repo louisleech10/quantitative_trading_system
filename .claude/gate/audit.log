@@ -27503,3 +27503,56 @@ ts=2026-07-27 15:36:52 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260728-p16-v28restamp-codex.md", "output_sha256": "099bb5e954af13b656da8b7fb08556d4b0723ccb79542583e3649220bade206c", "task_id": "P16-V28-RESTAMP", "ts": "2026-07-28T14:46:50Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/p16-v26close-r7/synth.md", "output_sha256": "c76d9d754e5d2be06730976abe27a052e4669fd5481e508dae52561530484468", "task_id": "P16-V28-RESTAMP", "ts": "2026-07-28T14:46:50Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260728-p16-v28restamp-codex.md", "output_sha256": "0af2bf9ea1ec73ce84638294e9a90f7b3d2219dc3d2abf7e5189c988b2a4e5ee", "task_id": "P16-V28-RESTAMP", "ts": "2026-07-28T14:47:38Z"}
+{"event":"gate_deny","ts":"2026-07-28T15:03:24Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-28T15:03:24Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-07-28T15:19:27Z","tool":"Write","kind":"artifact","reason":"token_expired"}
+=== 2026-07-28 23:19:34 | artifact ===
+  ts=2026-07-28 23:19:34
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/P16_COMMITTEE_DEBT_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=filled; §B=filled(5批B1-B5); Phase0-3 八Task皆含 實作要點/修改檔案到函式名/不可做/邊界/風險緩解/驗證/存活至/覆蓋風險=filled; §T 覆蓋追溯=filled; §G Golden=N/A:SPEC §G 已標 N/A(RISK-HIT 無 a/d),本 epic 只動治理層 shell 腳本無數值產出
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-TODO-V1-ADV", "ts": "2026-07-28T15:23:59Z"}
+=== 2026-07-28 23:23:59 | dispatch ===
+  ts=2026-07-28 23:23:59
+  kind=dispatch
+  intent=P1-6 TODO v1.0 三家 adversarial 審查
+  risk=low
+  facts_asked=none-needed
+  review_role=三家皆 adversary;起草者不自審
+  template=n/a:TODO 審查非產 SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "P16-TODO-V11-CLOSURE", "ts": "2026-07-28T15:44:40Z"}
+=== 2026-07-28 23:44:40 | dispatch ===
+  ts=2026-07-28 23:44:40
+  kind=dispatch
+  intent=P1-6 TODO v1.1 三家閉合複驗(R2)
+  risk=low
+  facts_asked=none-needed
+  review_role=三家皆 adversary;另裁定 SPEC sha 處置(a)/(b)
+  template=n/a:TODO closure
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
