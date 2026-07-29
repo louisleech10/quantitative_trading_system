@@ -37,8 +37,10 @@ if [ -n "$w" ]; then
     printf '│ ⏳ 死亡偵測器監看中(%s)  目標: %s\n' "$et" "$tgt"
   done < <(printf '%s\n' "$w")
 else
-  echo "│ ⚪ 無背景監看(若上方有 CLI 在跑卻無監看,代表我會漏接完成通知)"
-end_marker=1
+  # 用 Bash run_in_background:true 直接跑 cx_run.sh 時,harness 本身即追蹤該程序,
+  # 完成/死亡都會通知,**不需要**額外監看。只有舊的 nohup+& 孤兒式啟動才需要。
+  # (2026-07-29:nohup 已被 settings.json deny 封死,故正常情況這裡不需要監看)
+  echo "│ ℹ️ 無額外監看 — 若上方 CLI 是用 run_in_background 啟動,harness 會自動通知(正常)"
 fi
 
 # ── 3. 本 epic 戳記進度 ──────────────────────────────────────
@@ -52,6 +54,20 @@ if [ -f "$SY" ]; then
   done
   printf '│ 🖋 戳記 %s/3  已簽: %s\n' "$n" "${who:-無}"
   [ -n "$miss" ] && printf '│      尚缺: %s\n' "$miss"
+fi
+
+# ── 衛生：呆滯程序 + repo 內 probe 殘留（使用者 2026-07-29 要求維持乾淨）──
+_stale=0
+while IFS= read -r l; do
+  [ -z "$l" ] && continue
+  et=$(printf '%s' "$l" | awk '{print $2}')
+  s=$(printf '%s' "$et" | awk -F'[-:]' '{if(NF==4)print ($1*86400)+($2*3600)+($3*60)+$4; else if(NF==3)print ($1*3600)+($2*60)+$3; else print ($1*60)+$2}')
+  [ "$s" -gt 1800 ] && _stale=$((_stale+1))
+done < <(ps -eo pid,etime,args | grep -iE 'cx_run\.sh|committee_run\.sh|cursor-agent|/grok |codex exec' | grep -v grep)
+_probes=$(ls -d handoffs/_probe_* handoffs/_narrowprobe_* 2>/dev/null | grep -c . || true)
+if [ "${_stale}" -gt 0 ] || [ "${_probes:-0}" -gt 0 ]; then
+  printf '│ 🧹 衛生：呆滯程序 %s 個、probe 殘留 %s 個 → bash scripts/cleanup_stale_dispatch.sh --kill\n' \
+         "${_stale}" "${_probes:-0}"
 fi
 
 echo "└──────────────────────────────────────────────────────────"

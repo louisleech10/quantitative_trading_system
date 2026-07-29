@@ -72,9 +72,10 @@ except Exception as exc:
     print(f"ERROR: audit 讀取失敗(fail-closed): {exc}", file=sys.stderr)
     sys.exit(1)
 
+# 嚴格布林：僅 JSON true；字串/數字/null 不算
 open_events = [
     name for name, spec in registry.get("debt_events", {}).items()
-    if spec.get("opens_debt")
+    if spec.get("opens_debt") is True
 ]
 if len(open_events) != 1:
     print("ERROR: registry 的 opens_debt 事件不是恰一筆", file=sys.stderr)
@@ -122,9 +123,16 @@ except Exception as exc:
     sys.exit(1)
 
 events = registry.get("debt_events", {})
-open_events = [name for name, spec in events.items() if spec.get("opens_debt")]
-close_events = {name for name, spec in events.items() if spec.get("closes_debt")}
-terminal_events = {name for name, spec in events.items() if spec.get("terminal")}
+# 嚴格布林：僅 JSON true；字串/數字/null 不算
+open_events = [
+    name for name, spec in events.items() if spec.get("opens_debt") is True
+]
+close_events = {
+    name for name, spec in events.items() if spec.get("closes_debt") is True
+}
+terminal_events = {
+    name for name, spec in events.items() if spec.get("terminal") is True
+}
 if len(open_events) != 1 or len(close_events) != 1 or len(terminal_events) != 1:
     print("ERROR: registry 狀態事件契約不完整", file=sys.stderr)
     sys.exit(1)
