@@ -1,0 +1,33 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 121 items / 98 deselected / 23 selected
+
+tests/governance/test_debt_emit.py::test_mutation_producer_forced PASSED [  4%]
+tests/governance/test_debt_emit.py::test_mutation_absent_session_must_use_lock PASSED [  8%]
+tests/governance/test_debt_emit.py::test_mutation_scan_errors_fail_closed PASSED [ 13%]
+tests/governance/test_debt_emit.py::test_mutation_shift_guard PASSED     [ 17%]
+tests/governance/test_debt_emit.py::test_mutation_empty_require_absent_guard PASSED [ 21%]
+tests/governance/test_debt_emit.py::test_mutation_rc_propagation PASSED  [ 26%]
+tests/governance/test_debt_emit.py::test_mutation_rs_reject_guard PASSED [ 30%]
+tests/governance/test_debt_emit.py::test_mutation_splitlines_fullset_reject PASSED [ 34%]
+tests/governance/test_debt_emit.py::test_mutation_json_recursive_string_guard PASSED [ 39%]
+tests/governance/test_debt_emit.py::test_mutation_registry_value_guard PASSED [ 43%]
+tests/governance/test_debt_emit.py::test_mutation_scan_derives_open_event_from_registry PASSED [ 47%]
+tests/governance/test_debt_emit.py::test_mutation_opens_debt_must_be_strict_true PASSED [ 52%]
+tests/governance/test_low_risk_impl_requires_reconcile.py::test_mutation_impl_reconcile_only_on_high_allows_low PASSED [ 56%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_dirname_sess_allows_nested_bypass PASSED [ 60%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_remove_realpath_allows_dropped PASSED [ 65%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_review_requires_exactly_one_audit PASSED [ 69%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_exactly_one_audit PASSED [ 73%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_open_round PASSED [ 78%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_is_one_way PASSED [ 82%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_rejects_external_round_id PASSED [ 86%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_discovery_does_not_recheck_audit PASSED [ 91%]
+tests/governance/test_stamp_no_task_rejected.py::test_mutation_allow_missing_task_breaks_guard PASSED [ 95%]
+tests/governance/test_waived_adversarial_still_stamps.py::test_mutation_waived_adv_skips_stamp_breaks_guard PASSED [100%]
+
+====================== 23 passed, 98 deselected in 11.12s ======================

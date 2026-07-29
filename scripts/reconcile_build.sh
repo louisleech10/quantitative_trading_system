@@ -325,6 +325,16 @@ header = (
     "<!-- ④b 判斷（Claude 手填）：把下方 findings 群集成修訂項、逐條標處置與對應 ID。\n"
     "     此段不含 ## <ID> heading，不影響 body-hash。填完刪本註解。 -->\n\n"
     "## 群集 / 處置（待 Claude 填）\n\n"
+    # ⚠️ Verdict 行是**機器解析**的:gate.sh 的 D-1 檢查以 `grep -qE 'Verdict[[:space:]]*[:：]'`
+    #    驗 --adversarial 檔。兩次事故:
+    #    ①2026-07-29 主委手寫成「Verdict（綜合）：…」→ Verdict 與冒號間插了字 → 正則不中
+    #      → 拒發 token;而修 body 會讓已取得的三家戳記 sha 全失效,得整輪重簽。
+    #    ②為修①而在此加「**Verdict: （待填…）**」佔位行 → **該佔位行命中正則**
+    #      ⇒ 沒填結論的 synth 也能拿到 token(CODEX-R2-P1-13,端到端實跑 GATE PASS rc=0)。
+    #    ⇒ 本行**刻意不含**「Verdict+冒號」形態:未填時 gate 照舊拒發(正確),
+    #      同時把required 形狀寫給填寫者看,不讓人憑印象手打。
+    "**Verdict** ← 未填。填寫時整行改寫為「Verdict」＋半形冒號＋結論"
+    "（可合併／需修補後合併／不可合併）\n\n"
     "（待填）\n\n"
     "---\n\n"
     "## 附錄：findings 逐字保留（byte-faithful；勿改動下方任一 ## 區塊）\n\n"

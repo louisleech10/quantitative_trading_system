@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# committee_run.sh — 一次完成「開 gate token → 平行派 N 家委員 → 等全部完成 → 逐家回報」。
+# committee_run.sh — 一次完成「開 gate token → 開債 → 平行派 N 家委員 → 等全部完成 → 逐家回報」。
 #
 # 為何存在(2026-07-25):每輪派工原需 gate.sh + cx_run×N + 逐檔讀 = 4~6 個動作;
 #   本 session 跑了 ~10 輪。收斂成單一命令,且**家族數完全動態**(2/3/4…N 家皆可)。
@@ -8,11 +8,17 @@
 #   未來在 SoT 加一家,本腳本一字不用改。
 #   (誠實邊界:新家族仍須在 cx_run.sh 補該 CLI 的呼叫配方——各 CLI 參數不同,無法通用化。)
 #
+# P1-6 Task 1.2：gate 成功後、cx_run 前寫 committee_round_open（audit_append
+#   --require-absent-session）；round_id 由本腳本 mint，主委不得指定。
+#
 # 用法:
-#   bash scripts/committee_run.sh <brief> <out前綴> <fam1,fam2,...> -- <gate.sh dispatch 的 flags...>
+#   bash scripts/committee_run.sh --session <name> <brief> <out前綴> <fam1,fam2,...> -- <gate.sh dispatch 的 flags...>
+#   （--session 必須在 -- 之前；-- 之後整段透傳 gate.sh，須含 --task-id）
 # 例:
-#   bash scripts/committee_run.sh handoffs/X-BRIEF.md handoffs/20260725-xreview codex,composer,grok -- \
-#     --intent "..." --risk low --facts-asked "..." --review-role "..." --template "n/a: 用 brief"
+#   bash scripts/committee_run.sh --session 20260729-p16-b3 \
+#     handoffs/X-BRIEF.md handoffs/20260725-xreview codex,composer,grok -- \
+#     --intent "..." --risk low --facts-asked "..." --review-role "..." \
+#     --template "n/a: 用 brief" --task-id "P16-B3-R1"
 #
 # 產出:<out前綴>-<family>.md(檔名帶家族後綴 → reconcile_build.sh 可直接吃)
 #      <out前綴>-<family>.runlog(該家執行 log;失敗時自動印 tail)
@@ -23,17 +29,79 @@ SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" || exit 2
 
 usage() {
-  echo "用法: bash scripts/committee_run.sh <brief> <out前綴> <fam1,fam2,...> -- <gate dispatch flags...>" >&2
+  echo "用法: bash scripts/committee_run.sh --session <name> <brief> <out前綴> <fam1,fam2,...> -- <gate dispatch flags...>" >&2
+  echo "  --session  必填；之後 reconcile_build.sh <name> 使用的 session 名（寫入 committee_round_open）" >&2
+  echo "  -- 之後須含 gate 的 --task-id（本腳本不另發明同名旗標）" >&2
 }
 
-brief="${1:-}"; out_prefix="${2:-}"; fams_csv="${3:-}"
+die() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
+
+# ── 參數：--session 可在 -- 之前任意位置；三個位置參數 + gate flags ──
+session=""
+brief=""
+out_prefix=""
+fams_csv=""
+gate_args=()
+pos_count=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --session)
+      [ "$#" -ge 2 ] || { echo "ERROR: --session 需要參數" >&2; usage; exit 2; }
+      session="${2}"
+      shift 2
+      ;;
+    --)
+      shift
+      while [ "$#" -gt 0 ]; do
+        gate_args+=("$1")
+        shift
+      done
+      break
+      ;;
+    -*)
+      echo "ERROR: 未知旗標: $1（--session 須在 -- 之前；gate flags 須在 -- 之後）" >&2
+      usage
+      exit 2
+      ;;
+    *)
+      pos_count=$((pos_count + 1))
+      case "${pos_count}" in
+        1) brief="$1" ;;
+        2) out_prefix="$1" ;;
+        3) fams_csv="$1" ;;
+        *)
+          echo "ERROR: 多餘位置參數: $1" >&2
+          usage
+          exit 2
+          ;;
+      esac
+      shift
+      ;;
+  esac
+done
+
+[ -n "${session}" ] || { echo "ERROR: 缺必填 --session <name>" >&2; usage; exit 2; }
 [ -n "${brief}" ] && [ -n "${out_prefix}" ] && [ -n "${fams_csv}" ] || { usage; exit 2; }
-shift 3
-if [ "${1:-}" = "--" ]; then shift; fi
-[ "$#" -ge 1 ] || { echo "ERROR: 缺 gate.sh dispatch flags(-- 之後)" >&2; usage; exit 2; }
+[ "${#gate_args[@]}" -ge 1 ] || { echo "ERROR: 缺 gate.sh dispatch flags(-- 之後)" >&2; usage; exit 2; }
 
 [ -f "${brief}" ] || { echo "ERROR: brief 不存在: ${brief}" >&2; exit 2; }
 case "${out_prefix}" in handoffs/*) : ;; *) echo "ERROR: out前綴須在 handoffs/: ${out_prefix}" >&2; exit 2 ;; esac
+
+# task_id 從透傳 gate argv 解析 --task-id（不另發明同名旗標）
+task_id=""
+_prev=""
+for _a in "${gate_args[@]}"; do
+  if [ "${_prev}" = "--task-id" ]; then
+    task_id="${_a}"
+    break
+  fi
+  _prev="${_a}"
+done
+[ -n "${task_id}" ] || { echo "ERROR: gate flags 缺 --task-id（開債必填；請在 -- 之後加上 --task-id <id>）" >&2; exit 2; }
 
 # --- 家族驗證(對 SoT,非硬編) ---
 # shellcheck source=/dev/null
@@ -55,21 +123,114 @@ for f in ${fams}; do
 done
 [ "${n_fams}" -ge 1 ] || { echo "ERROR: 家族清單為空" >&2; exit 2; }
 
-echo "[committee_run] brief=${brief}  families=${fams_csv}(${n_fams} 家)  out=${out_prefix}-<family>.md"
+echo "[committee_run] session=${session} brief=${brief}  families=${fams_csv}(${n_fams} 家)  out=${out_prefix}-<family>.md"
 
-# --- 1) 開 gate token(fail-closed:沒過就不派) ---
+# --- helpers（Task 1.2）---
+_mint_round_id() {
+  python3 -c 'import uuid; print(uuid.uuid4())'
+}
+
+# raw sha256 of brief file bytes
+_brief_sha256() {
+  local path="$1"
+  shasum -a 256 "${path}" | awk '{print $1}'
+}
+
+# registry brief_sha256_norm_algo：unify_newline 後逐行 rstrip 行尾空白，LF 連接再 sha256
+_brief_sha256_norm() {
+  python3 - "$1" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+raw = Path(sys.argv[1]).read_bytes()
+text = raw.decode("utf-8", errors="surrogateescape")
+text = text.replace("\r\n", "\n").replace("\r", "\n")
+lines = [ln.rstrip(" \t") for ln in text.split("\n")]
+norm = "\n".join(lines)
+print(hashlib.sha256(norm.encode("utf-8", errors="surrogateescape")).hexdigest())
+PY
+}
+
+# 組 participants / quorum_eligible / expected_outputs JSON（欄位名對齊 registry）
+_build_open_json_fields() {
+  # stdout: 三行 = participants_json / quorum_json / outputs_json
+  # advisory 名單經 env COMMITTEE_ADVISORY（空白分隔）傳入
+  python3 - "$out_prefix" $fams <<'PY'
+import json
+import os
+import sys
+
+prefix = sys.argv[1]
+fams = sys.argv[2:]
+advisory = {x for x in os.environ.get("COMMITTEE_ADVISORY", "").split() if x}
+participants = list(fams)
+quorum = [f for f in participants if f not in advisory]
+outputs = {f: f"{prefix}-{f}.md" for f in participants}
+print(json.dumps(participants, ensure_ascii=False))
+print(json.dumps(quorum, ensure_ascii=False))
+print(json.dumps(outputs, ensure_ascii=False))
+PY
+}
+
+_open_debt() {
+  # 唯一容許形態：audit_append --require-absent-session（鎖內判定+寫入）
+  # 本函式不得自行掃 audit 再 append，也不得自行取鎖。
+  local round_id="$1"
+  local brief_sha brief_sha_n
+  local participants_json quorum_json outputs_json
+  local tmp
+
+  brief_sha="$(_brief_sha256 "${brief}")" || return 1
+  brief_sha_n="$(_brief_sha256_norm "${brief}")" || return 1
+
+  COMMITTEE_ADVISORY="${advisory}" \
+  tmp="$(_build_open_json_fields)" || return 1
+  participants_json="$(printf '%s\n' "${tmp}" | sed -n '1p')"
+  quorum_json="$(printf '%s\n' "${tmp}" | sed -n '2p')"
+  outputs_json="$(printf '%s\n' "${tmp}" | sed -n '3p')"
+
+  # 不得在開債時建立 session 目錄
+  bash "${SCRIPT_DIR}/audit_append.sh" \
+    --require-absent-session "${session}" \
+    --event committee_round_open \
+    --field "round_id=${round_id}" \
+    --field "task_id=${task_id}" \
+    --field "brief_path=${brief}" \
+    --field "brief_sha256=${brief_sha}" \
+    --field "brief_sha256_norm=${brief_sha_n}" \
+    --field "lock_mode=discovery" \
+    --field "participants=@${participants_json}" \
+    --field "quorum_eligible=@${quorum_json}" \
+    --field "expected_outputs=@${outputs_json}" \
+    --field "session_name=${session}" \
+    --field "actor=committee_run" \
+    --field "origin_script=committee_run.sh"
+}
+
+# --- 1) 開 gate token(fail-closed:沒過就不派、不開債) ---
 echo "[committee_run] === gate.sh dispatch ==="
-bash "${SCRIPT_DIR}/gate.sh" dispatch "$@" || {
-  echo "ERROR: gate 未放行 → 不派工(fail-closed)" >&2; exit 1; }
+bash "${SCRIPT_DIR}/gate.sh" dispatch "${gate_args[@]}" || {
+  echo "ERROR: gate 未放行 → 不開債、不派工(fail-closed)" >&2; exit 1; }
+
+# --- 1b) 開債（gate 成功之後、cx_run 之前；失敗不得啟動任何 cx_run）---
+round_id="$(_mint_round_id)" || die "mint round_id 失敗"
+echo "[committee_run] === open debt round_id=${round_id} session=${session} ==="
+if ! _open_debt "${round_id}"; then
+  echo "ERROR: 開債失敗（session 重複或 audit 寫入失敗）→ 不啟動 cx_run" >&2
+  exit 1
+fi
+echo "[committee_run] 開債完成 round_id=${round_id}"
 
 # --- 2) 平行派 N 家(索引陣列配對 pid↔family;bash 3.2 相容) ---
+# ROUND_ID 以 env 傳給每家 cx_run（Task 1.2 改法⑤）
 PIDS=()
 FAMS=()
 for f in ${fams}; do
   out="${out_prefix}-${f}.md"
   log="${out_prefix}-${f}.runlog"
   echo "[committee_run] → 派 ${f}(out=${out})"
-  bash "${SCRIPT_DIR}/cx_run.sh" "${f}" "${brief}" "${out}" >"${log}" 2>&1 &
+  ROUND_ID="${round_id}" bash "${SCRIPT_DIR}/cx_run.sh" "${f}" "${brief}" "${out}" >"${log}" 2>&1 &
   PIDS+=("$!")
   FAMS+=("${f}")
 done
@@ -98,7 +259,8 @@ done
 
 if [ "${rc_all}" -eq 0 ]; then
   echo "[committee_run] ✅ ${n_fams} 家全數完成。接著:bash scripts/reconcile_build.sh <session> ${out_prefix}-*.md"
+  echo "[committee_run] round_id=${round_id} session=${session}"
 else
-  echo "[committee_run] ⚠️ 有家族未正常完成 — 勿當作已收齊(見上)" >&2
+  echo "[committee_run] ⚠️ 有家族未正常完成 — 勿當作已收齊(見上) round_id=${round_id}" >&2
 fi
 exit "${rc_all}"

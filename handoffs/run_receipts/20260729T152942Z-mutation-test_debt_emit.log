@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 89 items / 77 deselected / 12 selected
+
+tests/governance/test_debt_emit.py::test_mutation_producer_forced PASSED [  8%]
+tests/governance/test_debt_emit.py::test_mutation_absent_session_must_use_lock PASSED [ 16%]
+tests/governance/test_debt_emit.py::test_mutation_scan_errors_fail_closed PASSED [ 25%]
+tests/governance/test_debt_emit.py::test_mutation_shift_guard PASSED     [ 33%]
+tests/governance/test_debt_emit.py::test_mutation_empty_require_absent_guard PASSED [ 41%]
+tests/governance/test_debt_emit.py::test_mutation_rc_propagation PASSED  [ 50%]
+tests/governance/test_debt_emit.py::test_mutation_rs_reject_guard PASSED [ 58%]
+tests/governance/test_debt_emit.py::test_mutation_splitlines_fullset_reject PASSED [ 66%]
+tests/governance/test_debt_emit.py::test_mutation_json_recursive_string_guard PASSED [ 75%]
+tests/governance/test_debt_emit.py::test_mutation_registry_value_guard PASSED [ 83%]
+tests/governance/test_debt_emit.py::test_mutation_scan_derives_open_event_from_registry PASSED [ 91%]
+tests/governance/test_debt_emit.py::test_mutation_opens_debt_must_be_strict_true PASSED [100%]
+
+====================== 12 passed, 77 deselected in 7.38s =======================

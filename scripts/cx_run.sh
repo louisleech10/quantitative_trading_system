@@ -3,16 +3,23 @@
 # 根除三反覆錯:①反引號被 shell 當命令替換 ②`&` detach 掉 harness 通知 ③PATH 127。
 #
 # 用法(Claude 一律經此派委員,勿再手搓 codex/grok/cursor-agent 命令列):
-#   bash scripts/cx_run.sh <family> <brief_path> <output_path> [effort]
+#   ROUND_ID=<uuid> bash scripts/cx_run.sh <family> <brief_path> <output_path> [effort]
 #   family ∈ {codex, grok, composer}
 #   brief_path : repo 內指示檔(prompt 全文放這;可自由用反引號,它被讀非 shell 插值)
 #   output_path: 委員產出寫到這(handoffs/*.md)
 #   effort     : codex only, 預設 xhigh
+#   ROUND_ID   : 必填（由 committee_run.sh 開債後注入）；直呼亦須帶合法 round
 #
 # 設計:命令列給委員的 prompt 是**固定極簡模板**「讀 <brief> 照做, 家族名=X, 產出寫 <out>」——
 #   無反引號/無 $/無特殊字元 → 引號陷阱不可能發生。絕對路徑寫死。腳本本身不加 `&`;
 #   Claude 用 Bash run_in_background:true 背景執行本腳本即可(勿在呼叫本腳本時加 `&`)。
+#
+# P1-6 Task 1.3：CLI 前後做 round 六道 fail-closed 前置；結束後寫 committee_family_result。
+#   不得把 CLI 執行放進 audit 鎖臨界區。
 set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
+REPO="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-xhigh}"
 [ -n "${fam}" ] && [ -n "${brief}" ] && [ -n "${out}" ] || {
@@ -120,24 +127,300 @@ fi
 
 case "${out}" in handoffs/*) : ;; *) echo "ERROR: output 須在 handoffs/: ${out}"; exit 2 ;; esac
 
+# ---------------------------------------------------------------------------
+# Task 1.3 — 六道 fail-closed 前置（僅合法家族在 dispatch 前執行）
+# ① ROUND_ID 已設
+# ② audit 有對應 committee_round_open
+# ③ 該家族在該輪 participants
+# ④ 產出路徑與 expected_outputs 登記一致
+# ⑤ 本次 brief sha256 == 開債時 brief_sha256
+# ⑥ 該 (round, family) 最新 result_state 不是 success
+# ---------------------------------------------------------------------------
+_resolve_debt_audit() {
+  # 與 audit_append.sh 同契約：DEBT_AUDIT_OVERRIDE 須綁 harness
+  if [ -n "${DEBT_AUDIT_OVERRIDE:-}" ]; then
+    if [ "${GOVERNANCE_TEST_HARNESS:-}" != "1" ]; then
+      echo "ERROR: DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1" >&2
+      return 1
+    fi
+    printf '%s\n' "${DEBT_AUDIT_OVERRIDE}"
+    return 0
+  fi
+  python3 - "${SCRIPT_DIR}/audit_events.json" "${REPO}" <<'PY'
+import json, os, sys
+reg_path, repo = sys.argv[1], sys.argv[2]
+try:
+    with open(reg_path, encoding="utf-8") as fh:
+        reg = json.load(fh)
+except Exception as exc:
+    print(f"ERROR: registry 讀取失敗: {exc}", file=sys.stderr)
+    sys.exit(1)
+rel = reg.get("audit_log_path")
+if not isinstance(rel, str) or not rel:
+    print("ERROR: registry 缺 audit_log_path", file=sys.stderr)
+    sys.exit(1)
+print(os.path.join(repo, rel))
+PY
+}
+
+_assert_round_preconditions() {
+  # 家族名由 $1 直取（呼叫端傳 fam），不得從路徑推導
+  local family="$1"
+  local brief_path="$2"
+  local output_path="$3"
+
+  if [ -z "${ROUND_ID:-}" ]; then
+    echo "ERROR: ROUND_ID 未設（須由 committee_run 開債後注入，或直呼時帶合法 round）" >&2
+    return 1
+  fi
+
+  local audit_path
+  audit_path="$(_resolve_debt_audit)" || return 1
+
+  # 讀 audit、驗六道；audit 不存在 → 建立空檔（邊界：建立而非崩潰），再判 round 不存在
+  ROUND_ID="${ROUND_ID}" \
+  BRIEF_PATH="${brief_path}" \
+  OUTPUT_PATH="${output_path}" \
+  FAMILY="${family}" \
+  AUDIT_PATH="${audit_path}" \
+  python3 <<'PY'
+import hashlib
+import json
+import os
+import sys
+from pathlib import Path
+
+round_id = os.environ["ROUND_ID"]
+family = os.environ["FAMILY"]
+brief_path = os.environ["BRIEF_PATH"]
+output_path = os.environ["OUTPUT_PATH"]
+audit_path = Path(os.environ["AUDIT_PATH"])
+
+# 邊界：audit 不存在 → 建立而非崩潰
+audit_path.parent.mkdir(parents=True, exist_ok=True)
+if not audit_path.exists():
+    audit_path.touch()
+
+def iter_events():
+    try:
+        raw = audit_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"ERROR: 讀 audit 失敗: {exc}", file=sys.stderr)
+        sys.exit(1)
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s.startswith("{"):
+            continue
+        try:
+            rec = json.loads(s)
+        except json.JSONDecodeError:
+            # 與 audit_append.sh 一致：以 { 開頭但壞 JSON → fail-closed（不得 skip）
+            # 必須在 CLI 啟動前擋下，否則會留下 output 卻永遠寫不進 result
+            print("ERROR: audit 含無法解析的 JSON 行", file=sys.stderr)
+            sys.exit(1)
+        if isinstance(rec, dict):
+            yield rec
+
+opens = [r for r in iter_events() if r.get("event") == "committee_round_open" and r.get("round_id") == round_id]
+if not opens:
+    print(f"ERROR: audit 無對應 committee_round_open（round_id={round_id}）", file=sys.stderr)
+    sys.exit(1)
+if len(opens) > 1:
+    # 不隱含選取；開債端應保證唯一，此處 fail-closed
+    print(f"ERROR: round_id 對應多筆 committee_round_open（round_id={round_id}）", file=sys.stderr)
+    sys.exit(1)
+open_ev = opens[0]
+
+participants = open_ev.get("participants") or []
+if not isinstance(participants, list) or family not in participants:
+    print(f"ERROR: 家族 '{family}' 不在該輪名單 participants={participants!r}", file=sys.stderr)
+    sys.exit(1)
+
+expected = open_ev.get("expected_outputs") or {}
+if not isinstance(expected, dict):
+    print("ERROR: committee_round_open.expected_outputs 非 object", file=sys.stderr)
+    sys.exit(1)
+reg_out = expected.get(family)
+if reg_out is None:
+    print(f"ERROR: expected_outputs 未登記家族 '{family}'", file=sys.stderr)
+    sys.exit(1)
+if str(reg_out) != str(output_path):
+    print(
+        f"ERROR: 產出路徑與開債登記不一致: got={output_path!r} expected={reg_out!r}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+# brief sha256（raw file bytes，對齊開債端 _brief_sha256）
+try:
+    brief_bytes = Path(brief_path).read_bytes()
+except OSError as exc:
+    print(f"ERROR: 讀 brief 失敗: {exc}", file=sys.stderr)
+    sys.exit(1)
+brief_sha = hashlib.sha256(brief_bytes).hexdigest()
+recorded = open_ev.get("brief_sha256") or ""
+if brief_sha != recorded:
+    print(
+        f"ERROR: brief_sha256 與開債記錄不符（換 brief 掛既有 round 已拒）",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+# 最新 (round, family) result：取 sequence 最大；無 sequence 則取最後出現
+results = [
+    r
+    for r in iter_events()
+    if r.get("event") == "committee_family_result"
+    and r.get("round_id") == round_id
+    and r.get("family") == family
+]
+if results:
+    def seq_key(r):
+        s = r.get("sequence")
+        if isinstance(s, int) and not isinstance(s, bool):
+            return s
+        if isinstance(s, str) and s.isdigit():
+            return int(s)
+        return -1
+    latest = max(results, key=seq_key)
+    if latest.get("result_state") == "success":
+        print(
+            f"ERROR: 家族 '{family}' 在 round {round_id} 最新結果已是 success，拒重派",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+sys.exit(0)
+PY
+}
+
+_compute_output_sha() {
+  # success 時呼叫；檔必須存在且非空
+  shasum -a 256 "$1" | awk '{print $1}'
+}
+
+_emit_family_result() {
+  # $1=cli_rc；家族名直取 $fam；不得從路徑推導
+  local cli_rc="$1"
+  local result_state="failed"
+  local out_sha=""
+  local attempt_id
+
+  if [ "${cli_rc}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
+    result_state="success"
+    out_sha="$(_compute_output_sha "${out}")" || return 1
+  else
+    # failed：output_sha256 填空字串（與 success 互斥）
+    result_state="failed"
+    out_sha=""
+  fi
+
+  attempt_id="$(python3 -c 'import uuid; print(uuid.uuid4())')" || return 1
+
+  # 寫入在 CLI 之後；audit_append 自己取鎖——CLI 不在鎖內
+  bash "${SCRIPT_DIR}/audit_append.sh" \
+    --event committee_family_result \
+    --field "round_id=${ROUND_ID}" \
+    --field "family=${fam}" \
+    --field "attempt_id=${attempt_id}" \
+    --field "cli_rc=${cli_rc}" \
+    --field "output_path=${out}" \
+    --field "output_sha256=${out_sha}" \
+    --field "result_state=${result_state}" \
+    --field "actor=cx_run" \
+    --field "origin_script=cx_run.sh"
+}
+
 CODEX="/opt/homebrew/bin/codex"
 GROK="/Users/louis/.grok/bin/grok"
 
 # 固定極簡 prompt(無反引號/特殊字元)
 prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。"
 
+# 測試 stub（反 bypass：CX_STUB_MODE 必須綁 GOVERNANCE_TEST_HARNESS=1）
+# success=寫非空產出 rc0；fail_rc=CLI 非0 無產出；fail_empty=rc0 但空檔
+if [ -n "${CX_STUB_MODE:-}" ] && [ "${GOVERNANCE_TEST_HARNESS:-}" != "1" ]; then
+  echo "ERROR: CX_STUB_MODE 須綁 GOVERNANCE_TEST_HARNESS=1" >&2
+  exit 1
+fi
+
+_run_cli_and_emit() {
+  # 前置已過；執行 CLI（或 stub）後寫 result。CLI 不在 audit 鎖內。
+  # 契約（SPEC Task 1.3 改法④）：CLI launch failure 仍須寫 failed result 帶 cli_rc，不得靜默 exit。
+  local cli_rc=0
+  if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ] && [ -n "${CX_STUB_MODE:-}" ]; then
+    case "${CX_STUB_MODE}" in
+      success)
+        printf 'stub-ok family=%s\n' "${fam}" > "${out}"
+        cli_rc=0
+        ;;
+      fail_rc)
+        cli_rc="${CX_STUB_RC:-1}"
+        ;;
+      fail_empty)
+        : > "${out}"
+        cli_rc=0
+        ;;
+      *)
+        echo "ERROR: 未知 CX_STUB_MODE=${CX_STUB_MODE}" >&2
+        cli_rc=2
+        _emit_family_result "${cli_rc}" || {
+          echo "ERROR: 寫入 committee_family_result 失敗" >&2
+          exit 1
+        }
+        exit "${cli_rc}"
+        ;;
+    esac
+  else
+    case "${fam}" in
+      codex)
+        if [ ! -x "${CODEX}" ]; then
+          echo "ERROR: codex 不存在: ${CODEX}" >&2
+          cli_rc=2
+        else
+          "${CODEX}" exec -s workspace-write -m gpt-5.6-luna -c model_reasoning_effort="${effort}" "${prompt}" </dev/null
+          cli_rc=$?
+        fi
+        ;;
+      grok)
+        if [ ! -x "${GROK}" ]; then
+          echo "ERROR: grok 不存在: ${GROK}" >&2
+          cli_rc=2
+        else
+          "${GROK}" -m grok-4.5 --sandbox workspace --always-approve --output-format plain -p "${prompt}"
+          cli_rc=$?
+        fi
+        ;;
+      composer)
+        if ! command -v cursor-agent >/dev/null 2>&1; then
+          echo "ERROR: cursor-agent 不存在（composer CLI）" >&2
+          cli_rc=2
+        else
+          cursor-agent -p --force --output-format text --model composer-2.5 "${prompt}"
+          cli_rc=$?
+        fi
+        ;;
+    esac
+  fi
+  _emit_family_result "${cli_rc}" || {
+    echo "ERROR: 寫入 committee_family_result 失敗" >&2
+    exit 1
+  }
+  echo "[cx_run] ${fam} done rc=${cli_rc} out=${out}"
+  exit "${cli_rc}"
+}
+
 case "${fam}" in
   codex)
-    [ -x "${CODEX}" ] || { echo "ERROR: codex 不存在: ${CODEX}"; exit 2; }
-    "${CODEX}" exec -s workspace-write -m gpt-5.6-luna -c model_reasoning_effort="${effort}" "${prompt}" </dev/null
+    _assert_round_preconditions "${fam}" "${brief}" "${out}" || exit $?
+    _run_cli_and_emit
     ;;
   grok)
-    [ -x "${GROK}" ] || { echo "ERROR: grok 不存在: ${GROK}"; exit 2; }
-    "${GROK}" -m grok-4.5 --sandbox workspace --always-approve --output-format plain -p "${prompt}"
+    _assert_round_preconditions "${fam}" "${brief}" "${out}" || exit $?
+    _run_cli_and_emit
     ;;
   composer)
-    cursor-agent -p --force --output-format text --model composer-2.5 "${prompt}"
+    _assert_round_preconditions "${fam}" "${brief}" "${out}" || exit $?
+    _run_cli_and_emit
     ;;
   *) echo "ERROR: family 須為 codex|grok|composer, 得到: ${fam}"; exit 2 ;;
 esac
-echo "[cx_run] ${fam} done rc=$? out=${out}"

@@ -2272,3 +2272,1242 @@ def test_mutation_opens_debt_must_be_strict_true(
     r1 = _run(*args1, env=env, cwd=root)
     assert r1.returncode == 2, r1.stdout + r1.stderr
     assert audit.read_text(encoding="utf-8") == ""
+# =============================================================================
+# P1-6 B3 — Task 1.2 (committee_run 開債) + Task 1.3 (cx_run 記結果)
+# =============================================================================
+
+import hashlib
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+
+from tests.governance import _debt_probe_helper as _dph
+
+
+COMMITTEE_RUN_SH = REPO_ROOT / "scripts" / "committee_run.sh"
+CX_RUN_SH = REPO_ROOT / "scripts" / "cx_run.sh"
+GATE_SH = REPO_ROOT / "scripts" / "gate.sh"
+
+
+def _b3_harness(tmp_path: Path) -> dict:
+    """隔離 repo：scripts 副本 + 空 audit + handoffs + gate dir。
+
+    回傳 dict: root, audit, gate_dir, scripts, brief, env
+    """
+    root = tmp_path / "repo"
+    scripts = root / "scripts"
+    scripts.mkdir(parents=True)
+    handoffs = root / "handoffs"
+    handoffs.mkdir()
+    gate_dir = root / ".claude" / "gate"
+    gate_dir.mkdir(parents=True)
+    audit = gate_dir / "audit.log"
+    audit.write_text("", encoding="utf-8")
+
+    for name in (
+        "committee_run.sh",
+        "cx_run.sh",
+        "audit_append.sh",
+        "gate.sh",
+        "audit_events.json",
+        "governance_families.sh",
+        "governance_families.json",
+        "governance_roles.json",
+    ):
+        src = REPO_ROOT / "scripts" / name
+        if src.is_file():
+            shutil.copy2(src, scripts / name)
+            if name.endswith(".sh"):
+                (scripts / name).chmod(0o755)
+
+    # gate.sh 依賴多支工具；低風險 dispatch 最小路徑通常只寫 token。
+    # 為避免缺依賴，提供 always-pass / always-fail stub gate（仍經 committee_run 呼叫）。
+    (scripts / "gate_pass.sh").write_text(
+        "#!/usr/bin/env bash\n"
+        "echo GATE PASS stub\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    (scripts / "gate_pass.sh").chmod(0o755)
+    (scripts / "gate_fail.sh").write_text(
+        "#!/usr/bin/env bash\n"
+        "echo GATE DENY stub >&2\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    (scripts / "gate_fail.sh").chmod(0o755)
+
+    brief = handoffs / "b3-brief.md"
+    # stamp：角色閘不限家族（impl 會被 SoT implementer=grok 擋）
+    brief.write_text(
+        "brief-kind: stamp\n\n"
+        "B3 stub brief for debt emit tests.\n",
+        encoding="utf-8",
+    )
+
+    env = {
+        "GOVERNANCE_TEST_HARNESS": "1",
+        "DEBT_AUDIT_OVERRIDE": str(audit),
+        "GATE_DIR_OVERRIDE": str(gate_dir),
+        "CX_STUB_MODE": "success",
+        "PATH": os.environ.get("PATH", ""),
+        "HOME": os.environ.get("HOME", ""),
+    }
+    return {
+        "root": root,
+        "audit": audit,
+        "gate_dir": gate_dir,
+        "scripts": scripts,
+        "brief": brief,
+        "env": env,
+        "handoffs": handoffs,
+    }
+
+
+def _patch_committee_gate(scripts: Path, which: str = "pass") -> None:
+    """把 committee_run 內的 gate.sh 呼叫改成 stub（pass/fail）。"""
+    path = scripts / "committee_run.sh"
+    text = path.read_text(encoding="utf-8")
+    old = 'bash "${SCRIPT_DIR}/gate.sh" dispatch "${gate_args[@]}"'
+    new = f'bash "${{SCRIPT_DIR}}/gate_{which}.sh" dispatch "${{gate_args[@]}}"'
+    assert old in text, "gate call anchor missing in committee_run"
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+    path.chmod(path.stat().st_mode | 0o111)
+
+
+def _run_committee(
+    h: dict,
+    *,
+    session: str = "sess-b3",
+    fams: str = "codex,composer,grok",
+    out_prefix: str = "handoffs/b3-out",
+    task_id: str = "P16-B3-T1",
+    extra_args: list[str] | None = None,
+    env_overlay: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    env = dict(h["env"])
+    if env_overlay:
+        env.update(env_overlay)
+    args = [
+        "--session",
+        session,
+        str(h["brief"].relative_to(h["root"]))
+        if str(h["brief"]).startswith(str(h["root"]))
+        else "handoffs/b3-brief.md",
+        out_prefix,
+        fams,
+        "--",
+        "--intent",
+        "b3-test",
+        "--risk",
+        "low",
+        "--facts-asked",
+        "none-needed:unit",
+        "--review-role",
+        "advisory",
+        "--template",
+        "n/a:stub",
+        "--task-id",
+        task_id,
+    ]
+    if extra_args:
+        args = extra_args
+    # helper 常數 seam（Task 3.2 改法②）：mutation 可 monkeypatch COMMITTEE_RUN_TARGET。
+    # 未 patch 時若 harness 有副本 → 用隔離副本；已 patch → 一律走常數。
+    harness_cr = h["scripts"] / "committee_run.sh"
+    default_cr = _dph.REPO_ROOT / "scripts" / "committee_run.sh"
+    target = _dph.COMMITTEE_RUN_TARGET
+    if target.resolve() == default_cr.resolve() and harness_cr.is_file():
+        script = harness_cr
+    else:
+        script = target
+    return _dph.run_cmd(script, *args, env=env, cwd=h["root"])
+
+
+def _open_via_append(
+    h: dict,
+    *,
+    round_id: str,
+    session: str,
+    fams: list[str],
+    out_prefix: str,
+    brief_path: str,
+    brief_sha: str | None = None,
+) -> str:
+    """直接用 audit_append 開債（給 cx_run 單測用）；回傳 round_id。"""
+    if brief_sha is None:
+        brief_sha = hashlib.sha256(h["brief"].read_bytes()).hexdigest()
+    brief_norm = brief_sha  # 測試可共用
+    participants = json.dumps(fams)
+    outputs = json.dumps({f: f"{out_prefix}-{f}.md" for f in fams})
+    r = _dph.run_cmd(
+        h["scripts"] / "audit_append.sh",
+        "--require-absent-session",
+        session,
+        "--event",
+        "committee_round_open",
+        "--field",
+        f"round_id={round_id}",
+        "--field",
+        "task_id=P16-B3-T1",
+        "--field",
+        f"brief_path={brief_path}",
+        "--field",
+        f"brief_sha256={brief_sha}",
+        "--field",
+        f"brief_sha256_norm={brief_norm}",
+        "--field",
+        "lock_mode=discovery",
+        "--field",
+        f"participants=@{participants}",
+        "--field",
+        f"expected_outputs=@{outputs}",
+        "--field",
+        f"session_name={session}",
+        "--field",
+        "actor=test",
+        "--field",
+        "origin_script=committee_run.sh",
+        env=h["env"],
+        cwd=h["root"],
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    return round_id
+
+
+def _events(audit: Path, name: str | None = None) -> list[dict]:
+    rows = _read_json_lines(audit)
+    if name is None:
+        return rows
+    return [r for r in rows if r.get("event") == name]
+
+
+# ── Task 1.2 ──────────────────────────────────────────────
+
+
+def test_b3_open_three_families_one_round_open(tmp_path: Path) -> None:
+    """派 3 家 → 恰 1 筆 committee_round_open 且 participants 長度 3。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+    r = _run_committee(h, fams="codex,composer,grok")
+    assert r.returncode == 0, r.stdout + r.stderr
+    opens = _events(h["audit"], "committee_round_open")
+    assert len(opens) == 1, opens
+    assert len(opens[0]["participants"]) == 3
+    assert set(opens[0]["participants"]) == {"codex", "composer", "grok"}
+    assert opens[0].get("session_name")
+    assert opens[0].get("brief_sha256")
+    assert opens[0].get("round_id")
+    # 每家一筆 result
+    results = _events(h["audit"], "committee_family_result")
+    assert len(results) == 3
+    assert all(x.get("family") != "unknown" for x in results)
+
+
+def test_b3_open_one_family_still_writes(tmp_path: Path) -> None:
+    """派 1 家也必須寫 committee_round_open。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+    r = _run_committee(h, fams="codex", session="sess-one")
+    assert r.returncode == 0, r.stdout + r.stderr
+    opens = _events(h["audit"], "committee_round_open")
+    assert len(opens) == 1
+    assert opens[0]["participants"] == ["codex"]
+    assert len(_events(h["audit"], "committee_family_result")) == 1
+
+
+def test_b3_missing_session_rc_nonzero(tmp_path: Path) -> None:
+    """缺 --session → rc≠0。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+    r = _dph.run_cmd(
+        h["scripts"] / "committee_run.sh",
+        "handoffs/b3-brief.md",
+        "handoffs/b3-out",
+        "codex",
+        "--",
+        "--task-id",
+        "T",
+        env=h["env"],
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    assert "session" in (r.stdout + r.stderr).lower()
+    assert _events(h["audit"], "committee_round_open") == []
+
+
+def test_b3_missing_task_id_rc_nonzero(tmp_path: Path) -> None:
+    """gate flags 缺 --task-id → rc≠0。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+    r = _dph.run_cmd(
+        h["scripts"] / "committee_run.sh",
+        "--session",
+        "s1",
+        "handoffs/b3-brief.md",
+        "handoffs/b3-out",
+        "codex",
+        "--",
+        "--intent",
+        "x",
+        env=h["env"],
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    assert "task-id" in (r.stdout + r.stderr).lower()
+
+
+def test_b3_gate_deny_zero_new_debt_events(tmp_path: Path) -> None:
+    """gate 拒發 token → audit 零新增 debt 事件。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "fail")
+    before = h["audit"].read_text(encoding="utf-8")
+    r = _run_committee(h, session="sess-deny")
+    assert r.returncode != 0
+    assert h["audit"].read_text(encoding="utf-8") == before
+    assert _events(h["audit"], "committee_round_open") == []
+
+
+def test_b3_open_does_not_create_session_dir(tmp_path: Path) -> None:
+    """開債後 handoffs/reconcile/<name>/ 仍不存在。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+    name = "sess-nosessdir"
+    r = _run_committee(h, session=name, fams="codex")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not (h["root"] / "handoffs" / "reconcile" / name).exists()
+
+
+def test_b3_duplicate_session_rejected(tmp_path: Path) -> None:
+    """第二次同一 --session → rc≠0 且 audit 事件數不增長。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+    r1 = _run_committee(h, session="sess-dup", fams="codex")
+    assert r1.returncode == 0, r1.stdout + r1.stderr
+    n1 = len(_read_json_lines(h["audit"]))
+    r2 = _run_committee(h, session="sess-dup", fams="codex", task_id="P16-B3-T2")
+    assert r2.returncode != 0
+    n2 = len(_read_json_lines(h["audit"]))
+    assert n2 == n1
+    assert len(_events(h["audit"], "committee_round_open")) == 1
+
+
+def test_b3_parallel_same_session_one_wins(tmp_path: Path) -> None:
+    """兩程序並行同 session → 恰一筆成功、audit 該 session 恆一筆。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+
+    def once(i: int) -> int:
+        # 每程序獨立 out 前綴避免檔衝突；session 相同
+        env = dict(h["env"])
+        return _dph.run_cmd(
+            h["scripts"] / "committee_run.sh",
+            "--session",
+            "sess-par",
+            "handoffs/b3-brief.md",
+            f"handoffs/b3-par{i}",
+            "codex",
+            "--",
+            "--task-id",
+            f"P16-B3-PAR{i}",
+            env=env,
+            cwd=h["root"],
+        ).returncode
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        rcs = list(ex.map(once, [1, 2]))
+    assert sorted(rcs).count(0) == 1, rcs
+    assert sorted(rcs).count(0) + sum(1 for x in rcs if x != 0) == 2
+    opens = _events(h["audit"], "committee_round_open")
+    sess = [o for o in opens if o.get("session_name") == "sess-par"]
+    assert len(sess) == 1
+
+
+def test_b3_open_fail_does_not_start_cx_run(tmp_path: Path) -> None:
+    """寫入失敗 → 不啟動 cx_run（無 runlog / 無 result）。"""
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+    # 先佔用 session
+    assert _run_committee(h, session="sess-block", fams="codex").returncode == 0
+    # 清掉 runlog 計數基準
+    runlogs_before = list(h["handoffs"].glob("*.runlog"))
+    # 再開同 session → 開債失敗，不得新派
+    r = _run_committee(
+        h,
+        session="sess-block",
+        fams="codex",
+        out_prefix="handoffs/b3-should-not-run",
+        task_id="P16-B3-BLOCK",
+    )
+    assert r.returncode != 0
+    assert "不啟動" in (r.stdout + r.stderr) or "開債失敗" in (r.stdout + r.stderr)
+    assert not (h["handoffs"] / "b3-should-not-run-codex.runlog").exists()
+    assert not (h["handoffs"] / "b3-should-not-run-codex.md").exists()
+    # result 筆數不因第二次而增加（仍只有第一輪 1 家）
+    assert len(_events(h["audit"], "committee_family_result")) == 1
+
+
+# ── Task 1.3 ──────────────────────────────────────────────
+
+
+def test_b3_family_field_not_unknown(tmp_path: Path) -> None:
+    """合法呼叫後 family 欄為實際家族名（非 unknown）。"""
+    h = _b3_harness(tmp_path)
+    rid = "11111111-1111-4111-8111-111111111111"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-fam",
+        fams=["codex"],
+        out_prefix="handoffs/b3f",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/b3f-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    rows = _events(h["audit"], "committee_family_result")
+    assert len(rows) == 1
+    assert rows[0]["family"] == "codex"
+    assert rows[0]["family"] != "unknown"
+
+
+def test_b3_round_id_missing_rejected(tmp_path: Path) -> None:
+    """ROUND_ID 未設 → rc≠0。"""
+    h = _b3_harness(tmp_path)
+    env = dict(h["env"])
+    env.pop("ROUND_ID", None)
+    # 確保未設
+    env["CX_STUB_MODE"] = "success"
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/out-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    assert "ROUND_ID" in (r.stdout + r.stderr)
+
+
+def test_b3_round_id_unknown_zero_new(tmp_path: Path) -> None:
+    """ROUND_ID=不存在的值 → rc≠0 且 audit 零新增 result。"""
+    h = _b3_harness(tmp_path)
+    before = len(_read_json_lines(h["audit"]))
+    env = dict(h["env"])
+    env["ROUND_ID"] = "00000000-0000-4000-8000-000000000000"
+    env["CX_STUB_MODE"] = "success"
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/out-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    assert len(_read_json_lines(h["audit"])) == before
+    assert _events(h["audit"], "committee_family_result") == []
+
+
+def test_b3_family_not_in_roster_rejected(tmp_path: Path) -> None:
+    """家族不在該輪名單 → rc≠0。"""
+    h = _b3_harness(tmp_path)
+    rid = "22222222-2222-4222-8222-222222222222"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-roster",
+        fams=["codex"],
+        out_prefix="handoffs/b3r",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+    # 登記 expected 只有 codex；派 composer 且 path 也對 composer 會先被 roster 擋
+    # 需先有 expected_outputs 含 composer 才測得到 roster——故用 codex open 派 grok
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "grok",
+        "handoffs/b3-brief.md",
+        "handoffs/b3r-grok.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    assert "不在該輪名單" in (r.stdout + r.stderr) or "名單" in (r.stdout + r.stderr)
+
+
+def test_b3_brief_sha_mismatch_rejected(tmp_path: Path) -> None:
+    """換一份 brief 掛在既有 round → rc≠0（第 5 道前置）。"""
+    h = _b3_harness(tmp_path)
+    rid = "33333333-3333-4333-8333-333333333333"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-brief",
+        fams=["codex"],
+        out_prefix="handoffs/b3b",
+        brief_path="handoffs/b3-brief.md",
+    )
+    other = h["handoffs"] / "other-brief.md"
+    other.write_text("brief-kind: stamp\n\nDIFFERENT\n", encoding="utf-8")
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/other-brief.md",
+        "handoffs/b3b-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    assert "brief_sha256" in (r.stdout + r.stderr) or "brief" in (r.stdout + r.stderr).lower()
+    assert _events(h["audit"], "committee_family_result") == []
+
+
+def test_b3_cli_nonzero_still_writes_failed(tmp_path: Path) -> None:
+    """CLI 回非 0 → 仍寫一筆 result 且帶 cli_rc；output_sha256 空字串。"""
+    h = _b3_harness(tmp_path)
+    rid = "44444444-4444-4444-8444-444444444444"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-fail",
+        fams=["codex"],
+        out_prefix="handoffs/b3e",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "fail_rc"
+    env["CX_STUB_RC"] = "7"
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/b3e-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    rows = _events(h["audit"], "committee_family_result")
+    assert len(rows) == 1
+    assert rows[0]["result_state"] == "failed"
+    assert str(rows[0]["cli_rc"]) == "7"
+    assert rows[0]["output_sha256"] == ""
+
+
+def test_b3_success_output_sha_matches_file(tmp_path: Path) -> None:
+    """success 的 result 含非空 output_sha256 且等於產出檔。"""
+    h = _b3_harness(tmp_path)
+    rid = "55555555-5555-4555-8555-555555555555"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-ok",
+        fams=["codex"],
+        out_prefix="handoffs/b3ok",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+    out_rel = "handoffs/b3ok-codex.md"
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        out_rel,
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    out_path = h["root"] / out_rel
+    assert out_path.is_file() and out_path.stat().st_size > 0
+    want = hashlib.sha256(out_path.read_bytes()).hexdigest()
+    rows = _events(h["audit"], "committee_family_result")
+    assert len(rows) == 1
+    assert rows[0]["result_state"] == "success"
+    assert rows[0]["output_sha256"]
+    assert rows[0]["output_sha256"] == want
+
+
+def test_b3_reject_redispatch_after_success(tmp_path: Path) -> None:
+    """對最新已 success 的家族重派 → rc≠0 且 audit 零新增。"""
+    h = _b3_harness(tmp_path)
+    rid = "66666666-6666-4666-8666-666666666666"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-redisp",
+        fams=["codex"],
+        out_prefix="handoffs/b3rd",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+    r1 = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/b3rd-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r1.returncode == 0, r1.stdout + r1.stderr
+    n1 = len(_read_json_lines(h["audit"]))
+    r2 = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/b3rd-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r2.returncode != 0
+    assert "success" in (r2.stdout + r2.stderr).lower() or "拒重派" in (r2.stdout + r2.stderr)
+    assert len(_read_json_lines(h["audit"])) == n1
+
+
+def test_b3_retry_after_failed_allowed(tmp_path: Path) -> None:
+    """failed 後可重派（append-only 第二筆）。"""
+    h = _b3_harness(tmp_path)
+    rid = "77777777-7777-4777-8777-777777777777"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-retry",
+        fams=["codex"],
+        out_prefix="handoffs/b3rt",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "fail_rc"
+    env["CX_STUB_RC"] = "1"
+    r1 = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/b3rt-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r1.returncode != 0
+    env["CX_STUB_MODE"] = "success"
+    env.pop("CX_STUB_RC", None)
+    r2 = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/b3rt-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r2.returncode == 0, r2.stdout + r2.stderr
+    rows = _events(h["audit"], "committee_family_result")
+    assert len(rows) == 2
+    assert rows[0]["result_state"] == "failed"
+    assert rows[1]["result_state"] == "success"
+
+
+def test_b3_concurrent_three_families(tmp_path: Path) -> None:
+    """並發 3 家 → 3 筆完整不交錯。"""
+    h = _b3_harness(tmp_path)
+    rid = "88888888-8888-4888-8888-888888888888"
+    fams = ["codex", "composer", "grok"]
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-conc",
+        fams=fams,
+        out_prefix="handoffs/b3c",
+        brief_path="handoffs/b3-brief.md",
+    )
+
+    def one(fam: str) -> int:
+        env = dict(h["env"])
+        env["ROUND_ID"] = rid
+        env["CX_STUB_MODE"] = "success"
+        return _dph.run_cmd(
+            h["scripts"] / "cx_run.sh",
+            fam,
+            "handoffs/b3-brief.md",
+            f"handoffs/b3c-{fam}.md",
+            env=env,
+            cwd=h["root"],
+        ).returncode
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        rcs = list(ex.map(one, fams))
+    assert rcs == [0, 0, 0], rcs
+    rows = _events(h["audit"], "committee_family_result")
+    assert len(rows) == 3
+    assert {r["family"] for r in rows} == set(fams)
+    # 每行可獨立 json 解析（不交錯）— _read_json_lines 已保證
+    for r in rows:
+        assert r.get("result_state") == "success"
+        assert r.get("output_sha256")
+
+
+def test_b3_audit_missing_creates_not_crash(tmp_path: Path) -> None:
+    """audit 檔不存在 → 建立而非崩潰（前置會 touch 後判 round 不存在）。"""
+    h = _b3_harness(tmp_path)
+    h["audit"].unlink()
+    assert not h["audit"].exists()
+    env = dict(h["env"])
+    env["ROUND_ID"] = "99999999-9999-4999-8999-999999999999"
+    env["CX_STUB_MODE"] = "success"
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/out-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0  # round 不存在
+    assert h["audit"].exists()  # 已建立
+
+
+def test_b3_cx_stub_requires_harness(tmp_path: Path) -> None:
+    """CX_STUB_MODE 未綁 harness → 專屬訊息 fail-closed（不得先被其他守衛擋住）。
+
+    其他條件全滿足／移除：只留 CX_STUB 守衛可擋，並比對專屬錯誤訊息。
+    """
+    h = _b3_harness(tmp_path)
+    env = dict(h["env"])
+    env["CX_STUB_MODE"] = "success"
+    env.pop("GOVERNANCE_TEST_HARNESS", None)
+    # 移除 DEBT_AUDIT_OVERRIDE，避免（若順序變動）被 harness-override 守衛先擋
+    env.pop("DEBT_AUDIT_OVERRIDE", None)
+    env.pop("GATE_DIR_OVERRIDE", None)
+    # CX_STUB 檢查在前置之前；不需 open round 即可打到該守衛
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        "handoffs/b3h-codex.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    combined = r.stdout + r.stderr
+    assert "CX_STUB_MODE 須綁 GOVERNANCE_TEST_HARNESS=1" in combined, combined
+    # 不得只被其他守衛擋住
+    assert "DEBT_AUDIT_OVERRIDE" not in combined
+
+
+def test_b3_expected_outputs_family_unregistered(tmp_path: Path) -> None:
+    """guard④ 子路徑：家族在 participants 但未登記於 expected_outputs → 專屬拒。"""
+    h = _b3_harness(tmp_path)
+    rid = "a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0"
+    brief_sha = hashlib.sha256(h["brief"].read_bytes()).hexdigest()
+    # participants 含 codex+composer；expected_outputs 只登記 codex
+    r_open = _dph.run_cmd(
+        h["scripts"] / "audit_append.sh",
+        "--require-absent-session",
+        "s-exp-miss",
+        "--event",
+        "committee_round_open",
+        "--field",
+        f"round_id={rid}",
+        "--field",
+        "task_id=P16-B3-T1",
+        "--field",
+        "brief_path=handoffs/b3-brief.md",
+        "--field",
+        f"brief_sha256={brief_sha}",
+        "--field",
+        f"brief_sha256_norm={brief_sha}",
+        "--field",
+        "lock_mode=discovery",
+        "--field",
+        'participants=@["codex","composer"]',
+        "--field",
+        'expected_outputs=@{"codex":"handoffs/b3ex-codex.md"}',
+        "--field",
+        "session_name=s-exp-miss",
+        "--field",
+        "actor=test",
+        "--field",
+        "origin_script=committee_run.sh",
+        env=h["env"],
+        cwd=h["root"],
+    )
+    assert r_open.returncode == 0, r_open.stdout + r_open.stderr
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "composer",
+        "handoffs/b3-brief.md",
+        "handoffs/b3ex-composer.md",
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    combined = r.stdout + r.stderr
+    assert "expected_outputs 未登記家族" in combined, combined
+    assert _events(h["audit"], "committee_family_result") == []
+
+
+def test_b3_cli_binary_absent_still_writes_failed(tmp_path: Path) -> None:
+    """CLI binary 不存在 → 仍寫 failed result 帶 cli_rc（SPEC 1.3 改法④）。"""
+    h = _b3_harness(tmp_path)
+    rid = "b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-miss-bin",
+        fams=["codex"],
+        out_prefix="handoffs/b3mb",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    # 不用 stub → 走真 CLI 路徑；把 cx_run 內 CODEX 路徑改成不存在
+    env.pop("CX_STUB_MODE", None)
+    script = h["scripts"] / "cx_run.sh"
+    text = script.read_text(encoding="utf-8")
+    broken = text.replace(
+        'CODEX="/opt/homebrew/bin/codex"',
+        'CODEX="/definitely/missing/codex"',
+        1,
+    )
+    assert broken != text
+    script.write_text(broken, encoding="utf-8")
+    script.chmod(0o755)
+    out_rel = "handoffs/b3mb-codex.md"
+    r = _dph.run_cmd(
+        script,
+        "codex",
+        "handoffs/b3-brief.md",
+        out_rel,
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert "不存在" in (r.stdout + r.stderr)
+    rows = _events(h["audit"], "committee_family_result")
+    assert len(rows) == 1, f"result_count 須為 1，得 {len(rows)}"
+    assert rows[0]["result_state"] == "failed"
+    assert str(rows[0]["cli_rc"]) != ""
+    assert int(rows[0]["cli_rc"]) != 0
+    # CLI 未啟動 → 產出不應由 stub 寫入（binary 缺時也不會寫）
+    assert not (h["root"] / out_rel).exists() or (h["root"] / out_rel).stat().st_size == 0
+
+
+def test_b3_malformed_audit_rejected_before_cli(tmp_path: Path) -> None:
+    """audit 含無法解析 JSON 行 → CLI 前 fail-closed，無 result、無產出。"""
+    h = _b3_harness(tmp_path)
+    rid = "c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-corrupt",
+        fams=["codex"],
+        out_prefix="handoffs/b3cr",
+        brief_path="handoffs/b3-brief.md",
+    )
+    # 追加 malformed 行（與 audit_append reject 同一類）
+    with h["audit"].open("a", encoding="utf-8") as fh:
+        fh.write("{not-json\n")
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+    out_rel = "handoffs/b3cr-codex.md"
+    before = len(_events(h["audit"], "committee_family_result"))
+    r = _dph.run_cmd(
+        h["scripts"] / "cx_run.sh",
+        "codex",
+        "handoffs/b3-brief.md",
+        out_rel,
+        env=env,
+        cwd=h["root"],
+    )
+    assert r.returncode != 0
+    combined = r.stdout + r.stderr
+    assert "無法解析的 JSON 行" in combined, combined
+    assert len(_events(h["audit"], "committee_family_result")) == before
+    assert not (h["root"] / out_rel).exists()
+
+
+# ── Mutation probes（閹割守衛 → 轉紅；復原 → 轉綠）────────
+# 一律經 helper 模組常數 seam + monkeypatch；三態：baseline 綠 → mutant 紅訊號 → restore 綠
+
+
+def test_b3_mutation_round_id_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """M：閹割 ROUND_ID 檢查 → 無 ROUND_ID 可進入 stub；復原轉紅。
+
+    三態 + 守衛專屬訊號（rc + ROUND_ID 未設訊息）。
+    """
+    h = _b3_harness(tmp_path)
+    script = h["scripts"] / "cx_run.sh"
+    monkeypatch.setattr(_dph, "CX_RUN_TARGET", script)
+    original = script.read_text(encoding="utf-8")
+    rid = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-mut-rid",
+        fams=["codex"],
+        out_prefix="handoffs/b3m1",
+        brief_path="handoffs/b3-brief.md",
+    )
+
+    env = dict(h["env"])
+    env.pop("ROUND_ID", None)
+    env["CX_STUB_MODE"] = "success"
+
+    # baseline：拒 + 專屬訊息
+    base = _dph.run_cx_run(
+        "codex", "handoffs/b3-brief.md", "handoffs/b3m1-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert base.returncode != 0, "baseline must reject missing ROUND_ID"
+    assert "ROUND_ID 未設" in (base.stdout + base.stderr)
+
+    # 閹割：ROUND_ID 未設時改注入已知 rid
+    broken = original.replace(
+        'if [ -z "${ROUND_ID:-}" ]; then\n'
+        '    echo "ERROR: ROUND_ID 未設（須由 committee_run 開債後注入，或直呼時帶合法 round）" >&2\n'
+        "    return 1\n"
+        "  fi\n",
+        '  if [ -z "${ROUND_ID:-}" ]; then\n'
+        f'    ROUND_ID="{rid}"  # MUTATED: inject instead of reject\n'
+        "    export ROUND_ID\n"
+        "  fi\n",
+        1,
+    )
+    assert broken != original
+    script.write_text(broken, encoding="utf-8")
+    script.chmod(0o755)
+
+    mut = _dph.run_cx_run(
+        "codex", "handoffs/b3-brief.md", "handoffs/b3m1-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert mut.returncode == 0, (
+        f"mutated must allow missing ROUND_ID: {mut.stdout}{mut.stderr}"
+    )
+    assert len(_events(h["audit"], "committee_family_result")) == 1
+
+    script.write_text(original, encoding="utf-8")
+    script.chmod(0o755)
+    h["audit"].write_text("", encoding="utf-8")
+    rid2 = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    _open_via_append(
+        h,
+        round_id=rid2,
+        session="s-mut-rid2",
+        fams=["codex"],
+        out_prefix="handoffs/b3m1b",
+        brief_path="handoffs/b3-brief.md",
+    )
+    restored = _dph.run_cx_run(
+        "codex", "handoffs/b3-brief.md", "handoffs/b3m1b-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert restored.returncode != 0
+    assert "ROUND_ID 未設" in (restored.stdout + restored.stderr)
+
+
+def test_b3_mutation_brief_sha_guard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M：閹割 brief_sha 比對 → 換 brief 可掛既有 round；復原轉紅。"""
+    h = _b3_harness(tmp_path)
+    script = h["scripts"] / "cx_run.sh"
+    monkeypatch.setattr(_dph, "CX_RUN_TARGET", script)
+    original = script.read_text(encoding="utf-8")
+    rid = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-mut-brief",
+        fams=["codex"],
+        out_prefix="handoffs/b3m2",
+        brief_path="handoffs/b3-brief.md",
+    )
+    other = h["handoffs"] / "mut-brief.md"
+    other.write_text("brief-kind: stamp\n\nMUT\n", encoding="utf-8")
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+
+    base = _dph.run_cx_run(
+        "codex", "handoffs/mut-brief.md", "handoffs/b3m2-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert base.returncode != 0
+    assert "brief_sha256" in (base.stdout + base.stderr) or "brief" in (
+        base.stdout + base.stderr
+    ).lower()
+
+    anchor = "if brief_sha != recorded:"
+    assert anchor in original
+    broken = original.replace(
+        anchor,
+        "if False and brief_sha != recorded:  # MUTATED",
+        1,
+    )
+    script.write_text(broken, encoding="utf-8")
+    script.chmod(0o755)
+    mut = _dph.run_cx_run(
+        "codex", "handoffs/mut-brief.md", "handoffs/b3m2-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert mut.returncode == 0, mut.stdout + mut.stderr
+
+    script.write_text(original, encoding="utf-8")
+    script.chmod(0o755)
+    h["audit"].write_text("", encoding="utf-8")
+    rid2 = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+    _open_via_append(
+        h,
+        round_id=rid2,
+        session="s-mut-brief2",
+        fams=["codex"],
+        out_prefix="handoffs/b3m2b",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env["ROUND_ID"] = rid2
+    restored = _dph.run_cx_run(
+        "codex", "handoffs/mut-brief.md", "handoffs/b3m2b-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert restored.returncode != 0
+
+
+def test_b3_mutation_success_block_guard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M：閹割「已 success 拒重派」→ 可重派；復原轉紅。"""
+    h = _b3_harness(tmp_path)
+    script = h["scripts"] / "cx_run.sh"
+    monkeypatch.setattr(_dph, "CX_RUN_TARGET", script)
+    original = script.read_text(encoding="utf-8")
+    rid = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+    _open_via_append(
+        h,
+        round_id=rid,
+        session="s-mut-suc",
+        fams=["codex"],
+        out_prefix="handoffs/b3m3",
+        brief_path="handoffs/b3-brief.md",
+    )
+    env = dict(h["env"])
+    env["ROUND_ID"] = rid
+    env["CX_STUB_MODE"] = "success"
+    assert (
+        _dph.run_cx_run(
+            "codex", "handoffs/b3-brief.md", "handoffs/b3m3-codex.md",
+            env=env, cwd=h["root"],
+        ).returncode
+        == 0
+    )
+    base = _dph.run_cx_run(
+        "codex", "handoffs/b3-brief.md", "handoffs/b3m3-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert base.returncode != 0
+    assert "success" in (base.stdout + base.stderr).lower() or "拒重派" in (
+        base.stdout + base.stderr
+    )
+    n1 = len(_events(h["audit"], "committee_family_result"))
+
+    broken = original.replace(
+        'if latest.get("result_state") == "success":',
+        'if False and latest.get("result_state") == "success":  # MUTATED',
+        1,
+    )
+    assert broken != original
+    script.write_text(broken, encoding="utf-8")
+    script.chmod(0o755)
+    mut = _dph.run_cx_run(
+        "codex", "handoffs/b3-brief.md", "handoffs/b3m3-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert mut.returncode == 0, mut.stdout + mut.stderr
+    assert len(_events(h["audit"], "committee_family_result")) == n1 + 1
+
+    script.write_text(original, encoding="utf-8")
+    script.chmod(0o755)
+    restored = _dph.run_cx_run(
+        "codex", "handoffs/b3-brief.md", "handoffs/b3m3-codex.md",
+        env=env, cwd=h["root"],
+    )
+    assert restored.returncode != 0
+    assert "success" in (restored.stdout + restored.stderr).lower() or "拒重派" in (
+        restored.stdout + restored.stderr
+    )
+
+
+def test_b3_mutation_committee_skips_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M：committee_run 跳過開債 → 無 open；mutant 仍派工但 cx_run 失敗（可觀察訊號）。
+
+    三態：baseline 綠（有 open+rc0）→ mutant 紅（rc≠0 + 無 open + 無 result
+    + runlog 含 round_open 缺失）→ restore 綠。
+    """
+    h = _b3_harness(tmp_path)
+    _patch_committee_gate(h["scripts"], "pass")
+    script = h["scripts"] / "committee_run.sh"
+    monkeypatch.setattr(_dph, "COMMITTEE_RUN_TARGET", script)
+    original = script.read_text(encoding="utf-8")
+
+    r0 = _run_committee(h, session="s-mut-open0", fams="codex", out_prefix="handoffs/b3mo0")
+    assert r0.returncode == 0, r0.stdout + r0.stderr
+    assert len(_events(h["audit"], "committee_round_open")) >= 1
+    assert len(_events(h["audit"], "committee_family_result")) >= 1
+
+    h["audit"].write_text("", encoding="utf-8")
+    broken = original.replace(
+        'if ! _open_debt "${round_id}"; then',
+        'if ! true; then  # MUTATED skip open',
+        1,
+    )
+    assert broken != original
+    script.write_text(broken, encoding="utf-8")
+    script.chmod(0o755)
+    r1 = _run_committee(h, session="s-mut-open1", fams="codex", out_prefix="handoffs/b3mo1")
+    # mutant 必須可觀察地紅：rc≠0 + 無 open + 無 family result
+    assert r1.returncode != 0, (
+        f"mutant must fail overall (not silent skip): {r1.stdout}{r1.stderr}"
+    )
+    assert len(_events(h["audit"], "committee_round_open")) == 0
+    assert len(_events(h["audit"], "committee_family_result")) == 0
+    # 專屬訊號：派工有嘗試、且因無 open 被擋（寫在 runlog）
+    runlog = h["root"] / "handoffs/b3mo1-codex.runlog"
+    assert runlog.is_file(), "cx_run 應被啟動並寫 runlog"
+    log_txt = runlog.read_text(encoding="utf-8")
+    assert "committee_round_open" in log_txt or "ROUND_ID" in log_txt, log_txt
+
+    script.write_text(original, encoding="utf-8")
+    script.chmod(0o755)
+    r2 = _run_committee(h, session="s-mut-open2", fams="codex", out_prefix="handoffs/b3mo2")
+    assert r2.returncode == 0, r2.stdout + r2.stderr
+    assert len(_events(h["audit"], "committee_round_open")) == 1
+    assert len(_events(h["audit"], "committee_family_result")) == 1
+
+
+def test_b3_empty_output_sha256_failed_contract(tmp_path: Path) -> None:
+    """契約：failed 可寫空 output_sha256；success 空字串仍拒。"""
+    h = _b3_harness(tmp_path)
+    # failed ok
+    r = _dph.run_cmd(
+        h["scripts"] / "audit_append.sh",
+        "--event",
+        "committee_family_result",
+        "--field",
+        "round_id=r-empty",
+        "--field",
+        "family=codex",
+        "--field",
+        "attempt_id=a1",
+        "--field",
+        "cli_rc=1",
+        "--field",
+        "output_path=handoffs/x.md",
+        "--field",
+        "output_sha256=",
+        "--field",
+        "result_state=failed",
+        "--field",
+        "actor=t",
+        "--field",
+        "origin_script=cx_run.sh",
+        env=h["env"],
+        cwd=h["root"],
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    row = _events(h["audit"], "committee_family_result")[0]
+    assert row["output_sha256"] == ""
+    # success + empty 拒
+    r2 = _dph.run_cmd(
+        h["scripts"] / "audit_append.sh",
+        "--event",
+        "committee_family_result",
+        "--field",
+        "round_id=r-empty2",
+        "--field",
+        "family=codex",
+        "--field",
+        "attempt_id=a2",
+        "--field",
+        "cli_rc=0",
+        "--field",
+        "output_path=handoffs/x.md",
+        "--field",
+        "output_sha256=",
+        "--field",
+        "result_state=success",
+        "--field",
+        "actor=t",
+        "--field",
+        "origin_script=cx_run.sh",
+        env=h["env"],
+        cwd=h["root"],
+    )
+    assert r2.returncode != 0
+
+
+def test_b3_carveout_narrowed_other_event_rejects_empty_sha(tmp_path: Path) -> None:
+    """群集 D：carve-out 僅限 committee_family_result+failed+output_sha256。
+
+    其他事件即使 required 含 output_sha256 且 result_state=failed，空字串仍 rc≠0。
+    """
+    h = _b3_harness(tmp_path)
+    # 在 harness registry 副本把 output_sha256 加進 debt_abandon required
+    reg_path = h["scripts"] / "audit_events.json"
+    reg = json.loads(reg_path.read_text(encoding="utf-8"))
+    req = reg["required_fields_per_event"]["debt_abandon"]
+    if "output_sha256" not in req:
+        req.append("output_sha256")
+    if "result_state" not in req:
+        req.append("result_state")
+    reg_path.write_text(json.dumps(reg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    r = _dph.run_cmd(
+        h["scripts"] / "audit_append.sh",
+        "--event",
+        "debt_abandon",
+        "--field",
+        "round_id=r-other",
+        "--field",
+        "reason=probe-other-event-carveout-narrowing-xx",
+        "--field",
+        "approver=t",
+        "--field",
+        "abandon_kind=collection-failed",
+        "--field",
+        "output_sha256=",
+        "--field",
+        "result_state=failed",
+        "--field",
+        "actor=t",
+        "--field",
+        "origin_script=debt_clear.sh",
+        env=h["env"],
+        cwd=h["root"],
+    )
+    assert r.returncode != 0, (
+        f"other event must reject empty output_sha256: {r.stdout}{r.stderr}"
+    )
+    assert "output_sha256" in (r.stdout + r.stderr) or "缺必填" in (r.stdout + r.stderr)

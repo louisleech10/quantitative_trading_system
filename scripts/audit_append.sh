@@ -518,7 +518,23 @@ if is_debt:
         if key not in fields or fields[key] in (None, ""):
             missing.append(key)
     for key in required_per:
-        if key not in fields or fields[key] in (None, ""):
+        # 必填＝鍵必須存在。空字串預設視為缺欄；
+        # 唯一契約例外（收窄至三者同時成立，P16-B3-FIX 群集 D）：
+        #   event == committee_family_result
+        #   AND result_state == failed
+        #   AND key == output_sha256
+        # 理由：避免未來其他事件若也宣告 required output_sha256 時誤吃同一例外。
+        # （與 success 的非空 sha 互斥；銷帳只比對 success）。
+        if key not in fields or fields[key] is None:
+            missing.append(key)
+            continue
+        if fields[key] == "":
+            if (
+                event_name == "committee_family_result"
+                and key == "output_sha256"
+                and fields.get("result_state") == "failed"
+            ):
+                continue
             missing.append(key)
     # 去重保序
     seen = set()
