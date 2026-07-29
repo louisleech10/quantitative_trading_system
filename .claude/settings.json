@@ -77,7 +77,8 @@
       "Bash(rm *)",
       "Bash(python3 - *)",
       "Bash(python - *)",
-      "Bash(cd /Users/*)"
+      "Bash(cd /Users/*)",
+      "Bash(nohup *)"
     ],
     "ask": [
       "Bash(git reset*)",

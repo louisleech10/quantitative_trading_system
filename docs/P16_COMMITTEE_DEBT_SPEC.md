@@ -140,6 +140,20 @@
 11. **`discovery` session 完全不受 identity binding 保護**（v2.9 收窄的直接代價，三家裁決接受）：任何人可自由建立 `discovery` session，機器不查 audit、不綁 round。**擋得住的只有「拿它去銷帳」**（Task 2.2③ 要求 `mode=review`，而升到 review 必經 audit 反查）。
     **出生事故（實測，非推測）**：v2.8 原文要求「**建立 session 時**無條件反查 audit」，但寫入 `committee_round_open` 的是 Task 1.2（B3）。B1 合併後實測 `reconcile_build <新session>` → `rc=1 session_name 命中 0 筆`，**而 B2/B3 自己的 code review 就需要建 session** ⇒ **這台機器會鎖死自己的施工過程**。三家一致判 **P0**。修法即本條收窄。
     **誠實邊界**：本條讓「未經開債就開一輪討論並產出 discovery session」變成完全不留痕的動作——**這本來就在第 3 條（純對話綜合永遠攔不到）的射程內**，非新增漏洞，但**射程確實變大了**（現在連跑了收集工具也不必然留痕）。
+12. **文件與行為的一致性無法用字串比對保證**（2026-07-29 兩輪實證後定案）：起草者曾寫 `scripts/verify_narrowing_consistency.sh` 想機械保證「SPEC/TODO 的 fail-closed 驗收斷言都各自限定 `--mode review`」。**codex 連兩輪用可重現 mutation 打穿**：v1 按整行判定被同行另一斷言的 token 掩護；v2 逐段判定仍被 **半形 `;`／半形 `,`／斷言跨行／`review 之外的情況`（字串在但語意否定）** 四種形式繞過。
+    **裁決（使用者 2026-07-29 定）＝不追求 100%，但要擋掉大部分，上線後持續追蹤逃脫點**（與本 epic 開案時「能擋大部分就先上線，之後逐步修正」同一原則）。
+    **已擋**：codex 的 4 種攻法全部封掉並做成常駐 mutation——半形 `;`／半形 `,`／斷言跨行／`review 之外`否定語境；連同原本 2 種，`scripts/verify_narrowing_oracle_selftest.sh` **共 6 種 mutation 逐一證明「改壞轉紅、復原轉綠」**。
+    **現行保證分級**：
+    　·**實跑段＝真 oracle**：實際跑 `reconcile_build.sh` 兩次，以「是否出現 `session_name 命中` 拒絕訊息 + session 目錄是否建成」判定（discovery 應 0/1、review 應 1）。
+    　·**文件對帳段＝已擋 6 種已知形式，非 100%**。散文形式空間無界，**必然還有未列舉的寫法**；通過**不等於**文件必然正確。
+    **逃脫點追蹤（上線後持續維護，發現一種補一種）**：日後若再有形式繞過，**在此逐條登記並補進 selftest**，不得只修腳本不留紀錄。
+    　**目前已登記並封閉（selftest 共 20 種 mutation 逐一證明改壞轉紅／復原轉綠）**：
+    　`前綴否定`（R10；`非 review 模式`／`不限 review`／`排除 review 的情形`——否定詞在 `review` **之前**，原本只擋後綴否定）／
+    　`全形冒號 ：`（R9）／`全形驚嘆號 ！`／`全形問號 ？`／`半形冒號 :`／`半形分隔 |`（markdown 表格常見）／
+    　`整行判定被同行 token 掩護`（R6）／`半形 ;`／`半形 ,`／`斷言跨行`／`review 之外否定語境`（以上 R7 四攻法）／**`全形逗號 ，`（R8；codex 判為「中文文件最常見且易誤觸的子句分隔」，據此擋下 B2 直到修好）**／`全形句號 。`／`半形句號 .`。
+    　**⚠️ 一個被自己 selftest 推翻的判斷（記錄下來免得再犯）**：主委一度認為「**過度切分是安全方向**」而改成「整類標點全切」，**selftest 當場證明是錯的**——把 `（review 之外的情況）` 的括號也切開後，斷言碎成「有 `reconcile_build` 沒 `rc≠0`」＋「有 `rc≠0` 沒 `reconcile_build`」兩段，兩段都過不了「這是不是斷言」的判定而被跳過，**攻法④ 從轉紅退回假綠**。正解＝**只切子句分隔符，不切括號／引號等成組符號**。
+    　**登記紀律實證有效**：R8 這一輪就是「委員找到新繞法 → 登記 → 補 selftest → 修腳本」跑完整流程的第一個案例。
+    **兜底不變**：SPEC 驗收條文若與真實行為不符，仍會在**實作階段**被跑出來（B1 的 bootstrap P0 正是這樣現形的）。
 
 ## §C 約束
 - 只動 `scripts/` 治理層與 `tests/governance/`；解耦 7 條不受影響。
@@ -149,6 +163,19 @@
 - **工具優先**：不得重造已存在工具的等效邏輯（合併／完整性驗一律呼叫 `scripts/reconcile_build.sh`／`scripts/completeness_check.sh`）。
 - **不得改寫既有守衛 V-A/V-B/V-C/V-M 內部**；只可旁側新增呼叫。
 - 下游消費者 `scripts/review_quorum_check.sh` 解析 `committee_dispatch.task_id`；新事件不得破壞其解析。
+- **驗收斷言文法（2026-07-29 使用者定；殺掉散文歧義的整個問題類）**：
+  **凡「行為隨模式／狀態而異」的驗收斷言，一律寫成單行固定文法，不得用散文描述**：
+  ```
+  ASSERT <命令> WHEN <key>=<value> ... THEN rc=<n>|rc!=<n> [AND <key>=<value> ...]
+  ```
+  · 關鍵字只有 `ASSERT` `WHEN` `THEN` `AND`；條件與後置條件一律 `key=value`；結果一律 `rc=` 或 `rc!=`。
+  · **後置條件（`AND` 之後）用來表達「除了 rc，還要驗什麼狀態」**——例如升級後 lock 的哪些欄位該變、哪些必須逐欄不變。**不得改用散文描述**（`CODEX-R12-P1-02`：散文後置條件無法機械驗）。
+  · **同一 `ASSERT` 內不得重複鍵**（`mode=review mode=discovery` 自相矛盾）；條件鍵須在詞彙表內（防打錯字靜默通過）。
+  · **一行一斷言**，不得跨行、不得用標點串接多個斷言。
+  · **條件不得用自然語言否定**（無 `非`／`不帶`／`除了`…）——要表達「非 review」就寫 `mode=discovery`。
+  **機檢規則（一句話）**：驗收段裡**每一次**提到受管命令（現為 `reconcile_build`），**都必須**在 `ASSERT` 行內；出現在散文中即 `exit 1`。由 `scripts/verify_narrowing_consistency.sh` 強制。
+  **出生事故**：v2.9 收窄後，散文驗收條文與真實行為相反，起草者寫檢查腳本想機械對帳，**被 codex 連六輪用不同散文形式打穿**（全形／半形標點各 6 種、斷言跨行、前綴／後綴否定共 8 種）。**根因是拿字串比對去 parse 無界的散文形式空間**。改用固定文法後，**逃脫點從「無限」降為「零」**——不需切段、不需判否定、不需處理標點。
+  **範圍**：只約束**條件式**斷言；非條件式驗收（如 `pytest … 全綠`、`grep -c … == 0`）維持散文，不受此限。
 - **事件型別上限 4 種**（見 §P）。**新增第 5 種即屬範圍膨脹，須回頭改本 SPEC 並重戳**，不得在實作階段自行增加。
 
 ## §G Golden / Baseline
@@ -175,7 +202,7 @@
   ⑥`non_debt_legacy_events`（`committee_dispatch`／`committee_output`／`gate_deny`）**保留不動**——既有腳本仍在寫，砍掉會破壞現有 provenance。
   ⑦**所有平行容器須與砍後的 4 事件同步**（R2 codex P0-03／grok P1-02）：`required_fields_per_event`／`clear_kind_event_map`／`family_valued_fields`／`hardcode_scan_exemptions`／`event_object_allowed_keys` 等任何以事件名為鍵或值的結構，**殘留指向已刪事件的項目即 fail-closed**。`debt_abandon` 的既有必填欄須與 v2 契約對齊（移除 `remediation_owner` 等 v1 專屬欄，加入 `abandon_kind`）。
   ⑧**`committee_round_open.fields` 增 `session_name`**（Task 1.2⑦ 寫入、Task 2.2④ 讀取的 identity binding 真相源）。
-  ⑨**lock 工具鏈支援 identity binding**：`reconcile_build.sh` 須①接受 **`--mode review|discovery`**（具名旗標、位置無關；**預設維持 `discovery`** 以免破壞既有呼叫）②建立 session 時**從 audit 查 `session_name` 對應的 `committee_round_open`，將其 `round_id` 寫入 `sources.lock`**，查不到即 fail-closed 拒建。`write_sources_lock.sh` 對應支援寫入 `round_id` 欄。
+  ⑨**lock 工具鏈支援 identity binding**：`reconcile_build.sh` 須①接受 **`--mode review|discovery`**（具名旗標、位置無關；**預設維持 `discovery`** 以免破壞既有呼叫）②**產生 `review` mode 的 lock 時**（**不是**建立 session 時——見下方收窄表，此為 v2.9 依三家裁決的唯一契約）**從 audit 查 `session_name` 對應的 `committee_round_open`，將其 `round_id` 寫入 `sources.lock`**，命中 0 筆或 ≥2 筆即 fail-closed 拒建。`write_sources_lock.sh` 對應支援寫入 `round_id` 欄。
      ⚠️**反查的觸發條件＝「產生 `review` mode 的 lock 時」，不是「建立 session 時」**（v2.9 依 B1 三家裁決收窄；v2.8 原文寫「建立 session 時」無條件反查，**實測會鎖死本 epic 自己的施工過程**——見下方 §A 誠實邊界 11）：
 
      | 路徑 | audit 反查 | 額外守衛 |
@@ -191,7 +218,13 @@
         - **`write_sources_lock.sh` 現行「`closure_state=FROZEN` 非 `--force` 不得覆寫」**：`--rebuild` 路徑下允許**就地改寫既有 lock 的 `mode` 欄（僅 `discovery → review`）並自 audit 重填 `round_id`**，其餘欄位（來源清單／各來源 hash／`expected_roster`）**一律保持不變**。
         - **明文禁止**以 `write_sources_lock.sh --force` 或設 `GOVERNANCE_TEST_HARNESS=1` 達成此升級——正式路徑必須自給自足。
      **本 SPEC 不提供 `--force` 重凍，也不提供任何「重綁 identity」的路徑**；`mode` 誤用的唯一補救是具名 `--rebuild` 的**單向**升級（見 Task 2.2 1b）。
-- **驗證（可證偽）**：`python3 -m json.tool scripts/audit_events.json` rc=0；實跑印出 `debt_events` 長度 **== 4**；`enums.abandon_kind` **== 兩值**；`enums.round_state` **== 三值**；`enums.result_state` **== 二值**；`debt_abandon.fields` 含 `abandon_kind`；`committee_family_result.fields` 含 `output_sha256`；`grep -c attempt_cap scripts/audit_events.json` **== 0**；**任何以事件名為鍵或值的容器（`required_fields_per_event`／`clear_kind_event_map`／`family_valued_fields`／`hardcode_scan_exemptions`／`event_object_allowed_keys` 等）中，不得殘留指向已刪事件的項目——逐容器實跑清點並印出 0**（改法⑦的驗收，v2.2 漏列）；**`committee_round_open.fields` 含 `session_name`**（改法⑧）；**`bash scripts/reconcile_build.sh --help`（或無參數）印出 `--mode` 與 `--rebuild`**（改法⑨）；**以 audit 中不存在的 session 名跑 `reconcile_build` → rc≠0**、**以重複的 session 名跑 → rc≠0**（改法⑨的兩道 fail-closed）；`bash scripts/gov_check.sh` rc=0（既有 287 測試不得因本改動轉紅）
+- **驗證（可證偽）**：`python3 -m json.tool scripts/audit_events.json` rc=0；實跑印出 `debt_events` 長度 **== 4**；`enums.abandon_kind` **== 兩值**；`enums.round_state` **== 三值**；`enums.result_state` **== 二值**；`debt_abandon.fields` 含 `abandon_kind`；`committee_family_result.fields` 含 `output_sha256`；`grep -c attempt_cap scripts/audit_events.json` **== 0**；**任何以事件名為鍵或值的容器（`required_fields_per_event`／`clear_kind_event_map`／`family_valued_fields`／`hardcode_scan_exemptions`／`event_object_allowed_keys` 等）中，不得殘留指向已刪事件的項目——逐容器實跑清點並印出 0**（改法⑦的驗收，v2.2 漏列）；**`committee_round_open.fields` 含 `session_name`**（改法⑧）；**`bash scripts/reconcile_build.sh --help`（或無參數）**印出旗標名 `--mode` 與 `--rebuild`**（改法⑨；**非條件式驗收**——只驗 help 輸出含這兩個字串，不涉行為分支，故依 §C 範圍不需 ASSERT 文法）；**條件式斷言（固定文法，見 §C「驗收斷言文法」）**：
+  ```
+  ASSERT reconcile_build WHEN session=absent    mode=review    THEN rc!=0
+  ASSERT reconcile_build WHEN session=duplicate mode=review    THEN rc!=0
+  ASSERT reconcile_build WHEN session=absent    mode=discovery THEN rc=0
+  ```
+  （前兩條＝改法⑨的兩道 fail-closed；第三條＝v2.9 收窄的**正向**驗收，**不驗它就等於沒驗收窄，bootstrap P0 會靜默復活**）；`bash scripts/gov_check.sh` rc=0（既有 287 測試不得因本改動轉紅）
 - **邊界（≥2）**：①砍除的事件名若仍被任何 `scripts/*.sh` 引用 → 先修引用再砍，不得留懸空引用 ②`non_debt_legacy_events` 誤砍 → 既有 `verify_task_provenance` 等消費端會壞，須實跑既有測試確認
 - **存活至**：永久保留　**覆蓋風險**：無
 - 不可做：不得在 SPEC 正文重列 registry 的欄位表／枚舉值（會回到漂移）；不得為了通過而保留 v1 事件
@@ -260,7 +293,7 @@
      ③ **lock 的 `mode` 必須是 `review`**：`completeness_check.sh` 在 `discovery` 模式下不強制 P0/P1 附來源摘要，故「0 掉項」可在委員完全沒附佐證時通過＝**本機器的核心價值失效**。**建立 session 當下即以 `--mode review` 產生**（見 1b）；誤用 `discovery` 時**不提供 `--force` 重凍，僅允許具名 `--rebuild` 的單向就地升級**（見 1b 與 Task 0.1 改法⑨③）。
      ④ **identity binding，且綁定值不得由銷帳端產生**：
         - `committee_run.sh` 開債時把 **`session_name`** 記入 `committee_round_open` 事件（Task 1.2⑦）。**綁定的真相源是 append-only 的 audit 紀錄，不是任何額外檔案。**
-        - `reconcile_build.sh <name>` 建立 session 時，**從 audit 查出 `session_name == <name>` 的 `committee_round_open`，取其 `round_id` 寫入 `sources.lock` 的 `round_id` 欄**。**命中 0 筆或 ≥2 筆一律 fail-closed 拒建**——不得做「取最新」「取第一筆」等隱含選擇（唯一性由 Task 1.2⑦ 在開債端保證，此處為第二道防線）。
+        - `reconcile_build.sh <name>` **產生 `review` mode 的 lock 時**（v2.9 收窄；**不是**建立 session 時，見 Task 0.1 改法⑨的表），**從 audit 查出 `session_name == <name>` 的 `committee_round_open`，取其 `round_id` 寫入 `sources.lock` 的 `round_id` 欄**。**命中 0 筆或 ≥2 筆一律 fail-closed 拒建**——不得做「取最新」「取第一筆」等隱含選擇（唯一性由 Task 1.2⑦ 在開債端保證，此處為第二道防線）。
         - `debt_clear.sh` 銷帳時驗 **`lock.round_id` == `--round-id` 傳入值**，且 **對 `sources.lock` 一律只讀，不得建立或修改任何欄位**。
         - 附加檢查：**`sources.lock` 的 `expected_roster` 集合 == `committee_round_open` 的家族名單欄位集合**（兩側欄位名不同，實作端勿比錯欄位；`committee_round_open` 側的實際欄位名以 registry 為準）。**僅為附加，不可單獨作為綁定**——本專案每輪都派同樣三家，roster 集合永遠相同，零鑑別力。
   1b. **session 建立即定 mode（不提供 `--force` 重凍；僅具名 `--rebuild` 單向升級）**：
@@ -283,8 +316,19 @@
      | `collection-failed` | 真的收不齊（委員交不出合格產出、格式損毀等） | **這才是該警覺的訊號**，須與上者分開計數 |
      **⚠️ 放棄的是「證明收齊」這項義務，不是委員產出**：已交件家族的產出檔一律保留，仍可使用；`debt_abandon` 不刪除任何 `committee_family_result` 或產出。
      **⚠️ 逃生口的讀取路徑必須抗帳本故障（V1 三家一致的死鎖修法）**：「該輪須存在」的判定**只做該 `round_id` 的單筆掃描，不跑全域序號連續性檢查**（見 Task 2.1 改法⑦）。否則序號缺號時 `--abandon` 會與擋門一起 fail-closed → **不能派、不能銷、也不能放棄**。
-- **驗證（可證偽）**：`pytest tests/governance/test_debt_clear.py -q` 全綠；拿 A 輪 lock 銷 B 輪 → rc≠0；lock roster 與該輪家族集合不相等 → rc≠0；**lock `mode=discovery` → rc≠0**（A5 的具名 oracle）；`completeness` rc≠0 → 拒銷；**某家產出檔在交件後被改動（sha 不符）→ rc≠0**；重複銷帳 → 冪等 no-op；`--abandon` 缺 `reason`／`approver`／`kind` → rc≠0；**`--abandon` 在 `OPEN` 未逾任何期限時 → rc=0**（證偽「必須逾期才能放棄」的舊設計）；**audit 存在序號缺號時：`--has-open` rc=2 但 `--abandon` 仍 rc=0**（死鎖修法的具名 oracle）；`ABANDONED` 後再銷 → rc≠0
-  **1b `--rebuild` 的行為驗收（v2.6 只有 M33 名稱、無可執行 oracle，v2.7 補）**：**discovery 建成的 session ＋ 該輪 `OPEN` ＋ audit 恰一筆 → `reconcile_build <同名> --mode review --rebuild` rc=0 且 `sources.lock` 的 `mode` 轉為 `review`、`round_id` 非空、來源清單與各來源 hash 與升級前逐欄相同**（happy path，證偽「旗標存在但沒真的升級」）；**同一情境不帶 `--rebuild` → 仍 rc≠0**（證偽「`--rebuild` 把既有拒絕牆整個拆掉」）；**`review → discovery` 反向 → rc≠0**；**該輪已非 `OPEN` → rc≠0**；**audit 命中 0 筆或 ≥2 筆 → rc≠0**；**整條升級路徑在 `GOVERNANCE_TEST_HARNESS` 未設時可完成**（證偽「正式路徑不可達」——此為 R5/R6 兩度復發的病灶）
+- **驗證（可證偽）**：`pytest tests/governance/test_debt_clear.py -q` 全綠；拿 A 輪 lock 銷 B 輪 → rc≠0；lock roster 與該輪家族集合不相等 → rc≠0；**`ASSERT debt_clear WHEN lock.mode=discovery THEN rc!=0`**（A5 的具名 oracle；依 §C 文法）；`completeness` rc≠0 → 拒銷；**某家產出檔在交件後被改動（sha 不符）→ rc≠0**；重複銷帳 → 冪等 no-op；`--abandon` 缺 `reason`／`approver`／`kind` → rc≠0；**`--abandon` 在 `OPEN` 未逾任何期限時 → rc=0**（證偽「必須逾期才能放棄」的舊設計）；**audit 存在序號缺號時：`--has-open` rc=2 但 `--abandon` 仍 rc=0**（死鎖修法的具名 oracle）；`ABANDONED` 後再銷 → rc≠0
+  **1b `--rebuild` 的行為驗收（固定文法，見 §C）**：
+  ```
+  ASSERT reconcile_build WHEN from=discovery to=review round=open audit=one rebuild=yes harness=unset THEN rc=0 AND lock.mode=review AND lock.round_id=nonempty AND lock.sources=unchanged AND lock.hashes=unchanged AND lock.roster=unchanged
+  ASSERT reconcile_build WHEN from=discovery to=review round=open audit=one rebuild=no              THEN rc!=0
+  ASSERT reconcile_build WHEN from=review    to=discovery                   rebuild=yes             THEN rc!=0
+  ASSERT reconcile_build WHEN from=discovery to=review round=closed         rebuild=yes             THEN rc!=0
+  ASSERT reconcile_build WHEN from=discovery to=review audit=zero           rebuild=yes             THEN rc!=0
+  ASSERT reconcile_build WHEN from=discovery to=review audit=many           rebuild=yes             THEN rc!=0
+  ```
+  · 第 1 條＝happy path，**且須另驗**：升級後 `sources.lock` 的 `mode` 轉為 `review`、`round_id` 非空、**來源清單與各來源 hash 與升級前逐欄相同**（證偽「旗標存在但沒真的升級」）。
+  · 第 1 條的 `harness=unset` **是關鍵**：證偽「正式路徑不可達」——**此為 R5／R6 兩度復發的病灶**。
+  · 第 2 條證偽「`--rebuild` 把既有拒絕牆整個拆掉」。
 - **邊界（≥2）**：①`committee_round_open` 不存在 → 拒 ②lock 的 `round_id` 與 `--round-id` 不符 → 拒（**R2 更正**:v2.1 原寫「lock 被竄改 sha 不符→拒」,與「⑥只事後記錄不預存」自相矛盾,無可比對基準） ③`completeness` 回 DEGRADED（rc=3）→ 不得銷帳
 - **存活至**：永久保留　**覆蓋風險**：無
 - 不可做：不得接受 `waived:` 字串當銷帳；不得讓任何旗標繞過銷帳的六項綁定或放棄的四項必填；**不得自動放棄**（放棄一律人工且留痕）

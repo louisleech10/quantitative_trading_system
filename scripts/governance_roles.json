@@ -1,0 +1,32 @@
+{
+  "_purpose": "執行端角色分派的機器可讀 SoT。cx_run.sh 在派工前比對此檔,不符即 fail-closed 拒派。",
+  "_authority": "只有使用者可改本檔(或由使用者明確指示 Claude 執行 scripts/set_roles.sh)。Claude 不得自行變更 implementer。使用者依各 agent 額度調配。",
+  "_why": "2026-07-24 與 2026-07-29 連續兩次,Claude 憑腦中模型選家族而非讀 SoT,把實作派給 reviewer、把 implementer 排進 review。ORCH §1 與記憶檔當時都寫對了——散文規則擋不住,故做成閘門。",
+  "_prose_sot": "docs/MULTI_AGENT_ORCHESTRATION.md §1 現行分工行(散文版,人讀);本檔為機器版,兩者須一致",
+  "updated": "2026-07-14",
+  "updated_by": "user",
+  "implementer": "grok",
+  "implementer_backup": "codex",
+  "reviewers": [
+    "codex",
+    "composer"
+  ],
+  "eligible": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "_eligible_why": "正式委員三家。**不得**從 scripts/governance_families.json 推導——該檔還含 agy(唯讀研究,禁實作/禁寫入)與 claude(編排端);set_roles.sh 首版誤用它,實測把 reviewers 寫成 agy/claude/composer/grok,已改為讀本欄。",
+  "_rules": {
+    "impl": "brief-kind: impl → 目標家族必須 == implementer。**implementer_backup 不自動放行**(僅供錯誤訊息提示);切換實作端一律由使用者改本檔,不是 Claude 選備援。",
+    "review": "brief-kind: review → 目標家族【不得】是 implementer(實作者不自審)",
+    "closure": "brief-kind: closure/stamp → 不限制(戳記/閉合輪本來就三家全員)"
+  },
+  "_how_to_switch": "使用者說『改成 codex 實作』→ bash scripts/set_roles.sh codex(自動同步 reviewers = 三家扣掉 implementer,並跑角色閘 oracle 自我驗證)。bash scripts/set_roles.sh --show 看現況。",
+  "history": [
+    "(驗證)grok -> codex",
+    "(驗證)codex -> grok  ※來回切換測試,非真實變更",
+    "grok -> codex",
+    "codex -> grok"
+  ]
+}

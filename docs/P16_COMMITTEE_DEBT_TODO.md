@@ -1,6 +1,12 @@
 # P1-6 委員未結案債狀態機 — TODO
 
-> **版本 v1.2 — Internal Frozen，B1 可派**（收 R1 27 findings ＋ R2 10 findings）　|　**基於 SPEC** `docs/P16_COMMITTEE_DEBT_SPEC.md` **v2.8**　|　日期：2026-07-28
+> **版本 v1.3 — Internal Frozen，B2 可派**（收 R1 27 ＋ R2 10 findings ＋ **B1 實作階段三家裁決**）　|　**基於 SPEC** `docs/P16_COMMITTEE_DEBT_SPEC.md` **v2.9**　|　日期：2026-07-29
+>
+> ### 📌 v1.3 收的是「SPEC 被實作階段打回後、TODO 沒跟上」（`CODEX-R4-P1-02`）
+> B1 實作揭露 SPEC 的 bootstrap **P0**，SPEC 升 v2.9，但 TODO 仍宣稱基於 v2.8、§A 條數過時、Task 0.1 未落 v2.9 的 writer 契約 ⇒ **TODO 不再是 v2.9 的一致執行契約**。本版同步：
+> - **Task 0.1 實作要點**加入 v2.9 的**收窄表**與「**所有 review-mode writer 路徑**都須由 audit 導出 identity、拒收 caller `--round-id`」
+> - §0.4／§T 的 §A 誠實邊界條數 **13 → 14**（v2.9 新增第 11 條：`discovery` session 完全不受 identity binding 保護）
+> - B1 狀態改為**已完工並 push**（`8a12c36`），批次 Gate 基準 `pytest tests/governance -q` **287 → 298 passed**
 >
 > **R2 結果**：27 → **10 findings、零 P0**。**composer 與 grok 皆判「B1 可派」**；codex 判需修補（7 條 P1，**全部採納並已修**）。
 > **R2 codex 七條（皆為 bash 語意／契約落點的真缺陷，照 v1.1 偽碼實作必中）**：
@@ -67,7 +73,7 @@
 - 完整清單見 SPEC §C（8 條），本節為執行端高頻項摘錄，**衝突時以 SPEC §C 為準**。
 
 ### 0.2 防假綠（本 epic 的核心風險）
-- **不得放寬既有測試斷言**。本 epic 動的是治理層，`pytest tests/governance -q` 現況 **287 passed**，任一 Task 完成後這個數字只可增不可減。
+- **不得放寬既有測試斷言**。本 epic 動的是治理層，`pytest tests/governance -q` 現況 **298 passed**(B1 完工後基準;287 是 B1 前)，任一 Task 完成後這個數字只可增不可減。
 - **每個新守衛必須有「改壞會轉紅」的證明**：SPEC §V 列了 31 條 mutation（M1–M34，編號有跳號）。Task 3.2 負責讓它們真的存在且真的會紅。
 - **驗收命令的 rc 一律直接取，禁經 pipe**（`cmd | tail; echo rc=$?` 讀到的是 `tail` 的 rc——此坑 Claude 與委員都犯過）。
 
@@ -77,7 +83,7 @@
 - 三個既有測試檔探針空心（`test_verify_gate{,_b3,_b4}.py`）已在 `gov_check.sh` 具名排除，**本 epic 不處理，也不得順手改**。
 
 ### 0.4 §A manifest 引用（不整段複製）
-執行端如需知道「機器擋不住什麼」，讀 SPEC §A 誠實邊界 13 條。**實作時不得寫出與該節矛盾的註解或錯誤訊息**（例：不得在錯誤訊息裡宣稱「已保證唯一」，SPEC 寫的是 fail-closed 而非無競態）。
+執行端如需知道「機器擋不住什麼」，讀 SPEC §A 誠實邊界 **14 條**(v2.9 新增第 11 條)。**實作時不得寫出與該節矛盾的註解或錯誤訊息**（例：不得在錯誤訊息裡宣稱「已保證唯一」，SPEC 寫的是 fail-closed 而非無競態）。
 
 ---
 
@@ -98,7 +104,7 @@
 **批次間 Gate（每批完成後、派下一批前必跑，rc 直接取）**：
 ```
 bash scripts/gov_check.sh                    # 須 rc=0
-pytest tests/governance -q                   # 須 >=287 passed，且不得有既有測試轉紅
+pytest tests/governance -q                   # 須 >=298 passed，且不得有既有測試轉紅
 bash scripts/restore_golden_inventory.sh     # 跑完測試後還原 golden inventory 副作用
 ```
 
@@ -144,6 +150,15 @@ bash scripts/restore_golden_inventory.sh     # 跑完測試後還原 golden inve
      }
      ```
      **不得做「取最新／取第一筆」等隱含選擇**——這是 R6 兩家共同要求。
+     ⚠️**v2.9 收窄（B1 實作階段打回的 bootstrap P0，三家一致）——反查的觸發條件是「產生 `review` lock 時」，不是「建立 session 時」**：
+
+     | 路徑 | audit 反查 | 額外守衛 |
+     |---|---|---|
+     | fresh `--mode discovery`（**預設**） | **不做**（不需 `round_id`） | 無 |
+     | fresh `--mode review` | **必做**：恰一筆 | — |
+     | `--rebuild`（`discovery → review`） | **必做**：恰一筆 | 該輪須 `OPEN`；只准單向 |
+
+     ⚠️**且此不變式須涵蓋【所有】review-mode lock writer 路徑，不得只修 `reconcile_build.sh`**：`write_sources_lock.sh` 是**公開**入口，**一律拒收呼叫端傳入的 `--round-id`**，identity 由 writer 自 audit 導出（以 session basename ＝ `session_name` 為鍵）。只修一支會留下旁路，不變式不成立（**這是主委原提案的漏洞，由 codex 抓出**）。
   4. **`--rebuild` 就地升級**（改法⑨③，**R7/R8 連兩輪的 P0 出處，最容易做錯**）：
      ```
      if [ "$rebuild" = 1 ]; then
@@ -167,7 +182,7 @@ bash scripts/restore_golden_inventory.sh     # 跑完測試後還原 golden inve
 - **邊界**：①砍除的事件名若仍被任何 `scripts/*.sh` 引用 → **先修引用再砍**，不得留懸空引用 ②`non_debt_legacy_events` 誤砍 → 既有 `verify_task_provenance` 消費端會壞，須實跑既有測試確認 ③既有 reconcile session（`handoffs/reconcile/*/sources.lock`）無 `round_id` 欄 → **僅 `completeness_check.sh` 等既有唯讀消費端**須容忍缺欄不崩潰；**`debt_clear.sh` 一律 fail-closed**（缺 `round_id` 即拒銷帳）。
   > ⚠️ **這條邊界是起草者自行新增、SPEC 沒有的**（`CODEX-R1-P1-06` 指出未限定適用端會與「銷帳必須 `lock.round_id == --round-id`」的 fail-closed 契約產生歧義）。已限縮如上；**若實作端發現此限縮仍與 SPEC 衝突，停手回報，不得自行放寬。**
 - **風險緩解**：SPEC §RISK（b 跨模組共用路徑）
-- **驗證**：測試檔 `tests/governance/test_registry_v2_shape.py`；通過條件**見 SPEC Task 0.1 驗證段**（12 項實跑清單，含逐容器清點印 0、`--help` 印出 `--mode`／`--rebuild`、不存在／重複 session 名兩道 fail-closed）
+- **驗證**：測試檔 `tests/governance/test_registry_v2_shape.py`；通過條件**見 SPEC Task 0.1 驗證段**（12 項實跑清單，含逐容器清點印 0、`--help` 印出 `--mode`／`--rebuild`；**不存在／重複 session 名兩道 fail-closed 僅適用 `--mode review`**，同一組名稱在**預設 `discovery`** 下須 **rc=0**——v2.9 收窄的正向驗收，**不驗這條等於沒驗收窄，bootstrap P0 會靜默復活**）
 - **存活至**：永久保留　**覆蓋風險**：無
 
 ---
@@ -472,7 +487,7 @@ bash scripts/restore_golden_inventory.sh     # 跑完測試後還原 golden inve
 | Task ID | **8** | Task 0.1／1.1／1.2／1.3／2.1／2.2／3.1／3.2 — **8/8 一一對應，無合併無拆分** |
 | Phase | **4** | Phase 0／1／2／3 — 4/4 |
 | §V mutation | **31**（M1–M34，編號跳號） | Task 3.2 統一負責；M32/M33/M34 另分別由 Task 1.2／2.2／1.1 的驗證段直接覆蓋 |
-| §A 誠實邊界 | **13** | §0.4 指向 SPEC，**不複製**；實作端只需遵守「不得寫出與該節矛盾的訊息」 |
+ | §A 誠實邊界 | **14** | §0.4 指向 SPEC，**不複製**；實作端只需遵守「不得寫出與該節矛盾的訊息」 |
 | §C 約束 | **8** | §0.1 摘錄高頻項，**衝突以 SPEC §C 為準** |
 | §RISK 命中 | **b、c**（SPEC RISK-HIT 原文，**無 d**） | 各 Task「風險緩解」欄 |
 | 環境變數 | `ROUND_ID`／`DEBT_AUDIT_OVERRIDE`／`GOVERNANCE_TEST_HARNESS` | Task 1.2⑤／3.1③／§0.1 反 bypass 紅線 |
