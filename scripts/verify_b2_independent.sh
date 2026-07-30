@@ -87,10 +87,9 @@ else
   ok "唯一性守衛未用「值非空」代替「旗標出現」"
 fi
 
-echo "=== 7. 範圍：不得越界做 B3–B5 ==="
-for f in scripts/debt_ledger.sh scripts/debt_clear.sh; do
-  [ -f "$f" ] && bad "越界新增 $f（屬 B4）" || ok "未新增 $(basename "$f")"
-done
+echo "=== 7. 範圍：不得越界動 gate.sh（B5 標的；永久有效）==="
+# 原 §7 另含「不得新增 debt_ledger/debt_clear」——那是 B2 批次 scope，B4 合法建檔後永久假紅。
+# 批次 scope 已拆至 scripts/verify_b4_independent.sh；此處只保留永久斷言。
 git diff --name-only -- scripts/gate.sh | grep -q . && bad "動了 gate.sh（屬 B5）" || ok "未動 gate.sh"
 
 echo "=== 8. 防假綠：既有測試斷言未被刪 ==="

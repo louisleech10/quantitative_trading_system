@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 44 items / 37 deselected / 7 selected
+
+tests/governance/test_debt_clear.py::test_mutation_mode_review_guard PASSED [ 14%]
+tests/governance/test_debt_clear.py::test_mutation_open_guard PASSED     [ 28%]
+tests/governance/test_debt_clear.py::test_mutation_completeness_guard PASSED [ 42%]
+tests/governance/test_debt_clear.py::test_mutation_identity_binding_guard PASSED [ 57%]
+tests/governance/test_debt_clear.py::test_mutation_roster_equals_guard PASSED [ 71%]
+tests/governance/test_debt_clear.py::test_mutation_family_sha_guard PASSED [ 85%]
+tests/governance/test_debt_ledger.py::test_mutation_malformed_json_guard PASSED [100%]
+
+================= 7 passed, 37 deselected in 76.21s (0:01:16) ==================

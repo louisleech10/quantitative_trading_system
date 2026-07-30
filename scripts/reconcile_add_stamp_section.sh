@@ -28,7 +28,9 @@ if [ -f "$LOCK" ]; then
   bash scripts/completeness_check.sh --lock "$LOCK" >/dev/null 2>&1
   rc=$?
   if [ "$rc" -ne 0 ]; then
-    echo "ERROR: 附加前 completeness_check --lock 就是 rc=$rc，先修好再加戳記區"
+    # ⚠️ ${rc}：全形『，』(U+FF0C, EF BC 8C) 緊接 $rc 會被 bash 併進變數名 → set -u 崩潰。
+    #    本行在錯誤分支,故潛伏未被觸發;同型坑 2026-07-30 已在 verify_b2_independent.sh 實際炸過。
+    echo "ERROR: 附加前 completeness_check --lock 就是 rc=${rc}，先修好再加戳記區"
     exit 1
   fi
 fi

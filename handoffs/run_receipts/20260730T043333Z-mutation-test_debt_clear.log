@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 25 items / 19 deselected / 6 selected
+
+tests/governance/test_debt_clear.py::test_mutation_mode_review_guard FAILED [ 16%]
+tests/governance/test_debt_clear.py::test_mutation_open_guard PASSED     [ 33%]
+tests/governance/test_debt_clear.py::test_mutation_completeness_guard PASSED [ 50%]
+tests/governance/test_debt_clear.py::test_mutation_identity_binding_guard PASSED [ 66%]
+tests/governance/test_debt_clear.py::test_mutation_roster_equals_guard PASSED [ 83%]
+tests/governance/test_debt_clear.py::test_mutation_family_sha_guard PASSED [100%]
+
+=================================== FAILURES ===================================
+_______________________ test_mutation_mode_review_guard ________________________
+tests/governance/test_debt_clear.py:661: in test_mutation_mode_review_guard
+    assert old in original
+E   assert '_assert_lock_mode_is_review() {\n  local lock="$1"' in '#!/usr/bin/env bash\n# debt_clear.sh — P1-6 Task 2.2：唯一銷帳路徑 + 逃生口 --abandon\n#\n# 銷帳:\n#   bash scripts/debt_clear.sh --round-id <id> --session <name> [--lock <path>]\n#\n# 逃生口（不受期限限制；讀取路徑走 debt_ledger._round_exists_single）:\n#   bash scripts/debt_clear.sh --abandon --round-id <id> \\\n#     --kind <abandon_kind> --reason <text> --approver <who>\n#\n# 憲法: bash 3.2；每道守衛 || return（不假設 set -e）；rc 直接取禁經 pipe；\n#       sources.lock 一律只讀；完整性呼叫 completeness_check.sh 禁自寫等效。\n#\nset -u\n\nSCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"\nREPO="$(cd "${SCRIPT_DIR}/.." && pwd)"\nREGISTRY="${SCRIPT_DIR}/audit_events.json"\nAUDIT_APPEND="${SCRIPT_DIR}/audit_append.sh"\nCOMPLETENESS="${SCRIPT_DIR}/completeness_check.sh"\nDEBT_LEDGER="${SCRIPT_DIR}/debt_ledger.sh"\n\n# source ledger helpers（_round_exists_single 等）\n# 判定 sourced 僅靠 debt_ledger 內 BASH_SOURCE（禁 env marker）\n# shellcheck source=debt_ledger.sh\n. "${DEBT_LEDGER}"\n\ndie() {\n  echo "ERROR: $*" >&2\n  exit 1\n}\n\nusage() {\n  cat <<\'EOF\'\n用法:\n  bash scripts/debt_clear.sh --round-id <id> --session <name> [--lock <path>]\n  bash scripts/debt_clear.sh --abandon --round-id <id> \\\n    --kind <no-findings-expected|collection-failed> \\...可判定→當未 abandon 讓 emit 走\n        continue\n    if rec.get("event") == "debt_abandon" and rec.get("round_id") == rid:\n        sys.exit(0)\nsys.exit(1)\nPY\n}\n\n# ── main ────────────────────────────────────────────────\nif [ "${DO_ABANDON}" = "1" ]; then\n  _cmd_abandon "${ROUND_ID}" "${KIND}" "${REASON}" "${APPROVER}"\n  exit $?\nfi\n\n[ -n "${SESSION}" ] || {\n  usage\n  die "銷帳缺 --session"\n}\n\nif [ -z "${LOCK_PATH}" ]; then\n  LOCK_PATH="${REPO}/handoffs/reconcile/${SESSION}/sources.lock"\nelse\n  # 顯式 --lock 必須與 --session 綁定一致（禁把錯 session_id 寫入 clear audit）\n  lock_sid="$(python3 -c \'\nimport json, sys\ntry:\n    d = json.load(open(sys.argv[1], encoding="utf-8"))\nexcept Exception as exc:\n    print(f"ERROR: sources.lock 無法解析: {exc}", file=sys.stderr)\n    sys.exit(1)\nv = d.get("session_id")\nprint(v if isinstance(v, str) else "")\n\' "${LOCK_PATH}")" || die "顯式 --lock 無法讀 session_id"\n  if [ -z "${lock_sid}" ]; then\n    die "顯式 --lock 缺 session_id（identity binding fail-closed）"\n  fi\n  if [ "${lock_sid}" != "${SESSION}" ]; then\n    die "lock.session_id=${lock_sid} 與 --session=${SESSION} 不一致"\n  fi\nfi\n\n_cmd_clear "${ROUND_ID}" "${SESSION}" "${LOCK_PATH}"\nexit $?\n'
+=========================== short test summary info ============================
+FAILED tests/governance/test_debt_clear.py::test_mutation_mode_review_guard
+================= 1 failed, 5 passed, 19 deselected in 38.40s ==================

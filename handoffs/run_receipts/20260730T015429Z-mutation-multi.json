@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260730T015429Z-mutation-multi",
+  "claim_id": "mutation-multi",
+  "command": [
+    "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python",
+    "-W",
+    "ignore",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "test_mutation_",
+    "tests/governance/test_debt_clear.py",
+    "tests/governance/test_debt_ledger.py"
+  ],
+  "command_sha256": "bc2f86766b066cbcf34a3ae13e70bfb7b7099daa84fae2c41cede91c6e78a35c",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "f98862ce78a00ddfb6c725bb11d8238c27c9dc03",
+  "tree_dirty": true,
+  "started_at": "2026-07-30T01:54:18Z",
+  "ended_at": "2026-07-30T01:54:29Z",
+  "duration_seconds": 10.62798,
+  "exit_code": 0,
+  "runtime_class": "mutation_runtime",
+  "requested_class": null,
+  "pytest_summary": "======================= 2 passed, 26 deselected in 5.50s =======================",
+  "selected_node_ids": [
+    "tests/governance/test_debt_clear.py::test_mutation_mode_review_guard",
+    "tests/governance/test_debt_ledger.py::test_mutation_malformed_json_guard"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 2,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "45332793cb682dbf7225bd08457b3d0f60fe18d07504e2e06bc37b177e5b7cca",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "45332793cb682dbf7225bd08457b3d0f60fe18d07504e2e06bc37b177e5b7cca",
+  "log_path": "handoffs/run_receipts/20260730T015429Z-mutation-multi.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 28 items / 26 deselected / 2 selected",
+    "",
+    "tests/governance/test_debt_clear.py::test_mutation_mode_review_guard PASSED [ 50%]",
+    "tests/governance/test_debt_ledger.py::test_mutation_malformed_json_guard PASSED [100%]",
+    "",
+    "======================= 2 passed, 26 deselected in 5.50s ======================="
+  ]
+}

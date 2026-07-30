@@ -16,6 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 COMMITTEE_RUN_TARGET = REPO_ROOT / "scripts" / "committee_run.sh"
 CX_RUN_TARGET = REPO_ROOT / "scripts" / "cx_run.sh"
 AUDIT_APPEND_TARGET = REPO_ROOT / "scripts" / "audit_append.sh"
+DEBT_LEDGER_TARGET = REPO_ROOT / "scripts" / "debt_ledger.sh"
+DEBT_CLEAR_TARGET = REPO_ROOT / "scripts" / "debt_clear.sh"
 GATE_TARGET = REPO_ROOT / "scripts" / "gate.sh"
 
 
@@ -74,3 +76,19 @@ def run_audit_append(
     cwd: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return run_cmd(AUDIT_APPEND_TARGET, *args, env=env, cwd=cwd)
+
+
+def run_debt_ledger(
+    *args: str,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    return run_cmd(DEBT_LEDGER_TARGET, *args, env=env, cwd=cwd)
+
+
+def run_debt_clear(
+    *args: str,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    return run_cmd(DEBT_CLEAR_TARGET, *args, env=env, cwd=cwd)

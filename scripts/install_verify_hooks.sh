@@ -18,7 +18,8 @@ if [ "${1:-}" = "--uninstall" ]; then
     git config --unset core.hooksPath
     echo "install_verify_hooks: 已還原 core.hooksPath"
   else
-    echo "install_verify_hooks: core.hooksPath=${current:-<unset>}，非 $HOOKS_REL，跳過還原"
+    # ⚠️ ${HOOKS_REL}：全形『，』緊接 $HOOKS_REL 會被 bash 併進變數名 → set -u 崩潰（潛伏於錯誤分支）
+    echo "install_verify_hooks: core.hooksPath=${current:-<unset>}，非 ${HOOKS_REL}，跳過還原"
   fi
   exit 0
 fi

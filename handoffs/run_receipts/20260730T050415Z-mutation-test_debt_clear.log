@@ -1,0 +1,48 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 25 items / 19 deselected / 6 selected
+
+tests/governance/test_debt_clear.py::test_mutation_mode_review_guard FAILED [ 16%]
+tests/governance/test_debt_clear.py::test_mutation_open_guard FAILED     [ 33%]
+tests/governance/test_debt_clear.py::test_mutation_completeness_guard FAILED [ 50%]
+tests/governance/test_debt_clear.py::test_mutation_identity_binding_guard FAILED [ 66%]
+tests/governance/test_debt_clear.py::test_mutation_roster_equals_guard FAILED [ 83%]
+tests/governance/test_debt_clear.py::test_mutation_family_sha_guard FAILED [100%]
+
+=================================== FAILURES ===================================
+_______________________ test_mutation_mode_review_guard ________________________
+tests/governance/test_debt_clear.py:661: in test_mutation_mode_review_guard
+    assert old in original
+E   assert '_assert_lock_mode_is_review() {\n  local lock="$1"' in ''
+___________________________ test_mutation_open_guard ___________________________
+tests/governance/test_debt_clear.py:724: in test_mutation_open_guard
+    assert old in original
+E   assert '_assert_round_is_OPEN() {\n  local rid="$1"' in ''
+_______________________ test_mutation_completeness_guard _______________________
+tests/governance/test_debt_clear.py:825: in test_mutation_completeness_guard
+    assert old in original
+E   assert '_run_completeness() {\n  local lock="$1"' in ''
+_____________________ test_mutation_identity_binding_guard _____________________
+tests/governance/test_debt_clear.py:872: in test_mutation_identity_binding_guard
+    assert old in original
+E   assert '_assert_identity_binding() {\n  local lock="$1"\n  local rid="$2"' in ''
+______________________ test_mutation_roster_equals_guard _______________________
+tests/governance/test_debt_clear.py:916: in test_mutation_roster_equals_guard
+    assert old in original
+E   assert '_assert_roster_equals() {\n  local lock="$1"\n  local rid="$2"' in ''
+________________________ test_mutation_family_sha_guard ________________________
+tests/governance/test_debt_clear.py:970: in test_mutation_family_sha_guard
+    assert old in original
+E   assert '_assert_all_families_success_and_sha_match() {\n  local rid="$1"' in ''
+=========================== short test summary info ============================
+FAILED tests/governance/test_debt_clear.py::test_mutation_mode_review_guard
+FAILED tests/governance/test_debt_clear.py::test_mutation_open_guard - assert...
+FAILED tests/governance/test_debt_clear.py::test_mutation_completeness_guard
+FAILED tests/governance/test_debt_clear.py::test_mutation_identity_binding_guard
+FAILED tests/governance/test_debt_clear.py::test_mutation_roster_equals_guard
+FAILED tests/governance/test_debt_clear.py::test_mutation_family_sha_guard - ...
+======================= 6 failed, 19 deselected in 0.45s =======================

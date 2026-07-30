@@ -17,7 +17,9 @@
 - **狀態（2026-07-05）＝Phase A（憲法重構＋合約補齊）✅ 完成待 commit**：走完整大任務管線——SPEC/TODO（`docs/INSTREV_PHASEA_{SPEC,TODO}.md`，三道機檢過）→ 雙家族 adversarial（Codex 3+Composer 12 findings，含 2 BLOCKING）→ reconcile R2 雙戳記 APPROVED（sha256:6a14a0f6…）→ Composer 2.5 實作 → Codex code review 抓 2 BLOCKING（ORCH §6/§7 殘留 Codex 主力、三方鐵律過度壓縮掉義務）→ Composer 修 → Codex 閉合重驗雙 CLOSED。**成果**：copilot 739→8 行 pointer；CLAUDE.md 216→128 行（敘事移新檔 `docs/SCAR_LEDGER.md`，規則零刪減 grep 驗）；任務分派決策表單一化；執行端選層 ORCH §1 單一「現行分工行」（動態，現行=Composer 實作+Codex review）；合約補齊 5 項制度（兩輪斷路器/register-output/VERIFY claim/STAMP-BLOCKED/產物非指令）；輪詢統一 10 分鐘、debug 統一 2 輪（含 BOOTSTRAP 第 5 分叉源）；ARCH/DEV banner。**待辦**：無（Phase C 之 U-13 已完成；U-20/21 裁決本身=先別做，屬長期觀察項）。read-only 審查輪 reconcile=`handoffs/20260705-INSTREV-RECONCILE.md`（sha256:ee8c9fab…，含 U-3 errata）。
 - **★ 狀態（2026-07-28 更新）＝P1-6 委員未結案債狀態機：SPEC v2.8 定版、待實作**。目標＝派委員即自動開債、債未清擋所有新派工、跑機械合併驗 0 掉項才銷帳（根因＝主委手動合併委員意見**必掉項**，歷史事故漏 grok T1-01 害整份 SPEC 作廢）。
   **⚠️ 2026-07-27 使用者裁定大砍規模**：只留「開債 ＋ 一條銷帳路徑 ＋ 擋門」＋一條逃生口；**「要完全擋下的成本太高，就盡可能降低可繞過的機率就好」**（使用者原話）。舊 **v1.2.2**（16 Task／11 事件／6 狀態／360 行）已封存至 `handoffs/p16-spec-archive/`，重寫為 **v2.8**（**8 Task／4 事件／3 狀態／355 行**／M1–M34 mutation／13 條誠實邊界）。
-  **審查歷程**：舊版 R1–R12 十二輪 + 新版 **R1–R9 九輪**，findings `34→17→12→9→7→7→8→2→0`；**R4 起零設計問題、零設計翻案**。三家 **RECONCILE-STAMP 全 APPROVED**（`reconcile_stamps_check.sh` rc=0，body sha `908abb3c…`；`completeness_check --lock` rc=0；`template_check` rc=0）。**🛑 白話閘已由使用者放行（2026-07-28）**。**實作 0/8**。
+  **審查歷程**：舊版 R1–R12 十二輪 + 新版 **R1–R9 九輪**，findings `34→17→12→9→7→7→8→2→0`；**R4 起零設計問題、零設計翻案**。三家 **RECONCILE-STAMP 全 APPROVED**（`reconcile_stamps_check.sh` rc=0，body sha `908abb3c…`；`completeness_check --lock` rc=0；`template_check` rc=0）。**🛑 白話閘已由使用者放行（2026-07-28）**。
+  **實作進度 6/8（2026-07-30 更新）**：**B1**（Task 0.1 registry v2 契約＋lock 工具鏈 identity binding，`8a12c36`）／**B2**（Task 1.1 `audit_append.sh` 唯一寫入點＋原子 predicate+append，`9bfcb58`）／**B3**（Task 1.2 `committee_run.sh` 開債＋Task 1.3 `cx_run.sh` 記每家結果，`f98862c`）／**B4**（Task 2.1 `debt_ledger.sh` 只讀帳本＋Task 2.2 `debt_clear.sh` 唯一銷帳路徑）皆已 push。`pytest tests/governance -q` **287→431 passed**。**剩 B5＝Task 3.1 `gate.sh` 債務閘＋Task 3.2 mutation 探針回歸**，另背一個 B3 遺留必做項 `P16-GATE-D1-STRUCTURED-VERDICT`（`gate.sh:246` 的 Verdict 正則過鬆，骨架佔位行即可命中，本 session 曾據此實際做出 fail-open）。
+  **B4 實作教訓**：①**新造的驗收工具必須與產品碼同輪受審**——B4 的 `verify_b4_independent.sh` 自己假綠（只驗存在性、綁錯測試），是主委在 brief 點名才抓到，**制度原無此條** ②**委員探針一律用隔離副本**，禁直接變異 repo 內 `scripts/*.sh`／`tests/**`（本批 `debt_clear.sh` 曾被並行探針清成 0 bytes，untracked git 救不回）③**凡變異產品檔或跑同一套驗證工具的輪次一律序列派工**（並行時委員會讀到他家探針中間態而拒絕背書）④**零 finding 的審查輪須補 `P3-00` sentinel**，禁 `debt_abandon`、禁手寫 `committee_debt_clear`（三家裁決 A′；殘留風險＝機檢仍接受空殼 P3-00，由 `GOV-NOFINDINGS-SENTINEL`／`GOV-VERIFY-RECEIPT-RUNNER` 承接）。
   **收斂教訓**（本 epic 最大產出，非機制）：①舊版連八輪卡 20–25 findings 未收斂即定版，根因是 **scope accretion**（每次修訂新增機制）；TODO 階段則是**抄寫漂移** —— 兩病要分開診斷 ②`handoffs/` 底下 **82 份舊 RECONCILE 檔 canonical ID 全為 0**，以前 findings 從未被機械清點，「以前沒漂移」有一半是**量測假象** ③新版第七輪條數不降反升觸發停損線，重評結論＝卡住的**不是設計，是改文件時的傳播缺口**（同型犯 7 次）→ 自檢演進為「**四向擁有權**」（改法落在**擁有該腳本的 Task**／該 Task 驗證段／§V mutation／全檔無矛盾絕對句）④**戳記輪自身被打臉**：`completeness` 紅燈期間 composer/grok 仍簽 APPROVED，只有 codex 查前置條件並拒簽 → 重簽輪硬性要求「簽前自跑前置條件貼 rc，紅燈不准簽」。憲法級裁決：一扇門（所有委員派工走 `committee_run.sh` 一律開債）／不得用任何主委可自報的信號當分類器（5 種全被三家打穿）／債未清擋所有新派工含實作／TTL 7 日禁自動 clear。**制度傷疤（本輪新增）**：①SPEC 定義新資料結構一律建 JSON/schema 當 SoT（markdown 無型別系統，P1-6 連三輪漏同步）②SPEC 階段禁止寫實作（委員以「腳本不存在」作碼證時應寫成驗收條件）——兩條已入 `templates/SPEC_TEMPLATE.md`。**新發現債 `GATE-TOKEN-BINDING`**：`gate_check.sh` 只驗 token mtime 不比對內容 → 一 token 900s 內授權任意 task-id；固定檔名跨 session 互相延長（fail-open），應併入 Task 4.2。
 - **狀態（2026-07-06）＝Phase C（U-13 批次戳記慣例）✅ 完成**：批次戳記（一次派工審多檔逐檔 append）+同檔並發序列化+不可自我認證原則不動，寫進 `docs/MULTI_AGENT_ORCHESTRATION.md` §戳記後（第二階段「包單一命令」暫緩）。**U-20**（共用路徑 hook 警示）/**U-21**（Codex vs Composer 長期主力）裁決＝先別做、累積證據 → 長期觀察項。**∴ 制度層 epic 可實作項全完成（A 憲法＋B 腳本＋U-13）；實質下一站＝IC Analysis（P0，FF 測試資料已就緒，見下）。**
 - **🔧 委員文件收斂方法 epic（2026-07-22 立案；IC reconcile 手抄事故衍生）**：病灶＝Claude 主委手動 merge 委員產物**必掉項**（IC reconcile 漏 ~15 項）。目標＝機械可證的文件收斂，**擋意外 90-95% 不防蓄意**（使用者定死），不碰 gate 活洞 H1-H7。**地基 ✅ 完成（commit 574efba）**：governance suite 151/0 綠 + `completeness_check.sh` 紅隊加固版入 repo。**SPEC ✅ 三家審+閉合全 APPROVED（2026-07-22，v3，commit 08eb7fe）**：`docs/CONVERGENCE_METHOD_SPEC.md`（7 Phase/9 Task；R1-R6+C1-C17 全落地）；SPEC reconcile 戳記 PASS（body sha256:03cf9083）。**TODO ✅ 三家審+閉合全 APPROVED（2026-07-23，v3）**：`docs/CONVERGENCE_METHOD_TODO.md`（§0/§B 6 批次+9 Task+內嵌 polarity 矩陣+偽碼+真實函式名）；審查鏈=v1 三家（codex REJECT 4P0/grok+composer CONDITIONAL）→reconcile 48 findings→26 群集 0 掉項→v2→§B8 閉合（各抓 v2 改字新洞）→v3 精修 7 殘留→最終確認輪三家 APPROVED；TODO reconcile 戳記 PASS（body sha256:8dd8df24）。**✅ 實作 6 批次 B1-B6 全完工（2026-07-23，commits 9dac863→27b499d）**：B1 變異先紅→B2 canonical ID+digest+空殼機檢→B3 目錄鎖+gate 掛載+反bypass硬化（5 env override 全綁 GOVERNANCE_TEST_HARNESS）→B4 self-check+DEGRADED_PENDING 狀態機→B5 5 oracle+非循環 90%水位（dogfood 機器驗證「32 findings 0 掉項」）→B6 語意 charter+收編 mutation_red 入主 suite。`pytest tests/governance -q → 215 passed/xfail=0`。每批 Grok 實作/Codex+Composer 雙家 review/Claude 獨立驗+finding closure；codex 逐批深度對抗（並發競態/env bypass/循環 coverage/裸 ID 冒充）全修閉合。**工具上線**：`scripts/completeness_check.sh`（--lock 正式入口）+`replay_convergence_coverage.sh`+`write_committee_accepted.sh`+`templates/COMMITTEE_{FINDING,SEMANTIC_REVIEW}_TEMPLATE.md`。**殘留 backlog（非阻擋）**：composer B6-P1-01/P2 producer hardening、B1 receipt 位置（P2/P3 carry-forward）。審計 handoffs/20260722-convergence-*。
@@ -94,6 +96,36 @@
 - **✅ reconcile 全鏈落地 (a)-(e)**：178 raw → **8 主題/51 仍開真洞 + ledger**；`completeness_check.sh --lock` exit 0（0 掉項/body-hash/lock）；三家語意複查 REQUEST-CHANGES 全納 v2；**RECONCILE-STAMP codex+composer+grok APPROVED**（body sha256:5501dc49）；🛑白話閘1 使用者拍板方向對。定案=`synth.md`。
 - **工具流程真洞（待併 SPEC）**：過早凍結捕獲不合規源檔；重凍 FROZEN lock 只能靠 harness 旗標（正式路徑 fail-closed）。
 - **★下一步**：(f) SPEC 修 51 洞（碼債優先 grok-gate/token-kind/waiver-bypass/jq-failopen/gatedir-override/completeness-scope；family-registry 為 root cause）→🛑白話閘2→(g) 分批修。
+
+### P1 — GOV-FORMAT-SSOT：格式契約單一真相源（2026-07-30 立案，使用者定「**P1-6 B5 完工後**才做，不塞進 B5」）
+
+- **共同根因**：**格式的定義在檢查器裡，但產出格式的人靠記憶**。契約有兩個真相源必漂移。
+- **症狀 A（主委端）＝機器解析字串手寫**。本 session 實證 3 次，代價各不同：
+  ① `RECONCILE-STAMP` 格式手寫錯（缺日期、前綴寫成 `body-sha256:`）→ 兩家白簽一輪、重派
+  ② synth 的 `Verdict（綜合）：` 與 `gate.sh` 正則 `Verdict[[:space:]]*[:：]` 不符 → 拒發 token；
+     **修該行必須動 body → 三家戳記 sha 全失效 → 整輪重簽**
+  ③ 為修 ② 而在 `reconcile_build.sh` 骨架加佔位行，**該佔位行命中正則** → **fail-open**（沒填結論也能拿 token，
+     codex 端到端實跑 `GATE PASS rc=0`）→ 又一輪裁定
+- **症狀 B（委員端）＝格式檢查點在消費端而非產出端**。P1-6 B4 實證**吃掉 5 輪**（該批共 13 輪，佔 38%）：
+  ```
+  委員交件 → cx_run 只看「檔案存在且非空且 CLI rc=0」→ 記 success
+           → 主委合併時才跑 completeness → 才發現缺「來源摘要」/ID 重複 → 判紅
+           → 想叫同一家重寫 → Task 1.3 守衛⑥ 擋（最新已 success，拒重派）→ 只能開新輪
+  ```
+  守衛⑥ 本意防「一直重跑到拿到想要的答案」，但它把**「產出根本不合格」**與**「產出合格但主委不滿意」**當同一件事。
+  實際犯例：composer 缺來源摘要 ×1／codex 缺來源摘要 ×1／codex `## ` 標題誤用 `COMPOSER-` 前綴致跨檔重複 ID ×1。
+- **建議落地**（未啟動，待走完整管線）：
+  1. **症狀 B 主修**：把 `completeness_check` 的**單檔格式檢查**前移到 `cx_run.sh` 判定 `result_state` 的那一刻
+     ——不合格即 `failed`（同輪重派本來就允許）⇒ **B4 那 5 輪有 4 輪可省**。
+  2. **症狀 A 主修**：凡需人寫的機器格式，一律由工具**從檢查器導出**（如 `reconcile_add_stamp_section.sh` 的作法）；
+     骨架佔位**不得命中該格式的正則**（症狀 A③ 的教訓）。
+  3. **併入 `GOV-ID-NAMESPACE-CHECK`**（B4 新增）：`## ` 標題的家族前綴須等於該檔產出家族。
+     現況錯誤訊息指向**被冒用的家族**而非冒用者，主委因此誤判過一次。
+- **免費止血（已即刻採用，不待本票）**：要寫機器格式前**先跑一次檢查器，抄它錯誤訊息印出的格式**
+  （檢查器本來就會印必填形狀，症狀 A① 純粹是憑印象寫）。
+- **⚠️ 為何不塞進 B5**：ROADMAP 已載舊版 SPEC 連八輪不收斂的根因＝**scope accretion（每次修訂新增機制）**；
+  B5 已背一個 B3 遺留的必做項。**⚠️ 為何不插隊在 B5 前**：本票動 `cx_run.sh`（共用控制流）屬大任務，
+  自身要走 4–8 輪完整管線，**高於它在 B5 內能省的 3–6 輪**；真正回報在後續每個 epic。
 
 ### P2 — GOV-XREF-SYNC：跨文件交叉引用同步機械化（2026-07-20 三家裁決分案，`handoffs/GOV-NECESSITY-REVIEW-*`）
 - **本 session 累計實證 11 次**（原 6 次 + 戳記輪 5 次）；且戳記卡多輪的另一根因=brief 列死 task_id 未更新 + reconcile 舊 task_id 成抄錯源 → 落地應含「凍結前殘留掃描 + reconcile 脫敏 + brief task_id 機械生成」。

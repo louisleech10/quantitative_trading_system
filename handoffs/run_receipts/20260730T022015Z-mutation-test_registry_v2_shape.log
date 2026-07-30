@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 11 items / 5 deselected / 6 selected
+
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_review_requires_exactly_one_audit PASSED [ 16%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_exactly_one_audit PASSED [ 33%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_open_round PASSED [ 50%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_is_one_way PASSED [ 66%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_rejects_external_round_id PASSED [ 83%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_discovery_does_not_recheck_audit PASSED [100%]
+
+======================= 6 passed, 5 deselected in 2.95s ========================

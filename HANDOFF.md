@@ -1,57 +1,57 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-07-29 | **Branch**: **main**(＝origin/main `9bfcb58`) | **狀態**: **P1-6 實作中 — 8 Task 完成 2（B1 Task 0.1、B2 Task 1.1），皆已 push。下一步＝B3。**
+**Agent**: Claude(Opus 5) | **Time**: 2026-07-30 | **Branch**: **main** | **狀態**: **P1-6 — 8 Task 完成 6（B1–B4 全部已 push：Task 0.1/1.1/1.2/1.3/2.1/2.2）；剩 B5＝Task 3.1+3.2。**
 
 ## ▶ 下一步（新 session 第一件事）
 
-**派 B3 給 Grok**：Task 1.2（`committee_run.sh` 開債）→ Task 1.3（`cx_run.sh` 記每家結果）。
-**批內順序不可顛倒**：1.3 的六道 fail-closed 前置全要比對 1.2 寫入的欄位（含 `brief_sha256`），先做 1.3 無契約可依。
-分工＝**實作 Grok／review Codex+Composer**（`scripts/governance_roles.json` 機械強制，切換用 `bash scripts/set_roles.sh <family>`）。
-剩餘：B3（1.2、1.3）→ B4（2.1、2.2）→ B5（3.1、3.2）。
+**開 B5**（完整管線：SPEC + TODO + 雙家族 adversarial，不得跳步）：
+1. Task 3.1 `gate.sh` 債務閘（派工前先驗 `debt_ledger.sh --has-open`）→ Task 3.2 mutation 探針＋回歸
+2. **B5 必做項（B3 遺留，非可選）：`P16-GATE-D1-STRUCTURED-VERDICT`**
+   ——現行 `gate.sh:246` 只 `grep -qE 'Verdict[[:space:]]*[:：]'`，骨架佔位行即可命中（本 session 曾據此做出 fail-open）
+3. B5 完工後才處理 `GOV-FORMAT-SSOT`（使用者定序）
 
-## 現況（皆已 commit+push）
+**⚠️ B5 動的是 `gate.sh`**——它是所有派工的擋門，改壞會讓整套治理 fail-open。
+`verify_b2_independent.sh` §7 有「未動 gate.sh」的永久斷言，**B5 開工時須同步鬆綁該行**，否則自己擋自己。
+
+## 現況
 
 | 項 | 狀態 |
 |---|---|
-| SPEC | `docs/P16_COMMITTEE_DEBT_SPEC.md` **v2.9**，三家 RECONCILE-STAMP 全 APPROVED（`reconcile_stamps_check` rc=0） |
-| TODO | `docs/P16_COMMITTEE_DEBT_TODO.md` **v1.3**，Internal Frozen |
-| B1 | Task 0.1 registry v2 + lock 工具鏈 identity binding（`8a12c36`） |
-| B2 | Task 1.1 `audit_append.sh`（`9bfcb58`），八輪收斂、兩家判可合併 |
-| 測試 | `pytest tests/governance -q` **357 passed**（session 起始 287，**+70 全新增，既有斷言 0 行被刪**） |
-| 機檢 | `gov_check` / `verify_b1_independent` / `verify_b1fix_independent` / `verify_b2_independent` / `verify_role_gate` / `verify_narrowing_consistency` 全 rc=0 |
+| B1/B2/B3/**B4** | ✅ 全部已 push |
+| **B4 內容** | Task 2.1 `debt_ledger.sh`＋Task 2.2 `debt_clear.sh`；產品行為 8 條閉合（含 P0：`DEBT_LEDGER_SOURCED` env bypass→`BASH_SOURCE`）；驗收器 **11 道全為真 oracle**；兩家**序列**複審皆 `可合併` 0 finding；戳記 3/3（body sha `2b95b74a`）|
+| 測試 | `pytest tests/governance -q` **431 passed**，兩殼（有/無 `ROUND_ID`）一致；session 起始為 287 |
+| B4 輪數 | **26 輪派工** |
+| Codex 模型 | 使用者 2026-07-30 改 `~/.codex/config.toml` → `gpt-5.6-sol`/`low`。**但 `cx_run.sh:380` 寫死 `-m gpt-5.6-luna` 且 effort 預設 `xhigh`，委員派工不受該設定影響**——待使用者決定是否改 `cx_run.sh` |
 
-## 本 session 新增的機制（都是機器強制，非承諾）
+## 本 session 定死的新紀律（機器或流程）
 
-- **`scripts/governance_roles.json`** 角色 SoT（只有使用者可改）＋ `cx_run.sh` 角色閘：`impl` 須==implementer、`review` 不得是 implementer、SoT 缺檔 fail-closed。oracle `verify_role_gate.sh` 7 案。
-- **`settings.json` deny**：`rm` / `python3 - <<heredoc` / `cd /Users/*` / **`nohup *`**（後者是「使用者看不到任務在跑」的根因——派工必須用 `run_in_background: true` 直呼 `cx_run.sh`，正確用法就寫在該腳本檔頭）
-- **`scripts/block_busywait.sh`**（PreToolUse hook）：擋 busy-wait 等待迴圈（曾寫出 `X>X` 恆假的 `until`，空轉 3 小時）
-- **`scripts/wait_for_dispatch.sh`**：偵測執行端死亡（不再無限空等），三態回報
-- **`scripts/dispatch_status.sh`**：狀態板（哪個 CLI 在跑／有無監看／戳記進度／衛生）——**每則回覆結尾貼它的實際輸出**
-- **`scripts/cleanup_stale_dispatch.sh`**：呆滯程序／空轉 shell／probe 殘留，`--kill` 才動手
-- **驗收斷言固定文法**（SPEC §C）：`ASSERT <cmd> WHEN k=v ... THEN rc=n [AND k=v]`；散文寫法被連六輪打穿後改用文法，逃脫點降為零。檢查＝`verify_narrowing_consistency.sh`（含**實測行為 vs 文件宣稱交叉對照**）
-- **文件分層原則**（`templates/SPEC_TEMPLATE.md` 檔頭＋ORCH 新節）：工作文件要嚴謹精確**不得散文化**；白話說明是定案後另寫給使用者的**兩份產物**
+1. **序列派工**：凡委員會**變異產品檔**或**跑同一套驗證工具**（含戳記輪）的輪次，**一律一次派一家**。
+   實證：並行時 codex 看到 `8814e6e9…`（他家探針中間態）拒絕背書；戳記並行時 codex `completeness_check`
+   三次拿不到 rc 而拒簽，單獨序列後即 APPROVED（主委單跑同命令 rc=0/0.98s）。
+2. **探針一律隔離副本**，禁止直接變異 repo 內 `scripts/*.sh`／`tests/**`（三家已接受）。
+3. **零 finding 的審查輪須補 `P3-00` sentinel**（`NO-FINDINGS: true` ＋非空 `SCOPE:` ＋逐項 check ＋來源摘要），
+   **禁 `debt_abandon`、禁手寫 `committee_debt_clear`**（三家裁決 A′，戳記 3/3 body sha `8c41e804`）。
+   ⚠️ **殘留風險未解**：現行 `completeness` 仍接受**空殼** P3-00（codex 四行 probe 實證 rc=0）。
+4. **回覆狀態四標示**（使用者定）：【進行中】(有程序此刻在跑+同回合實跑證據)／【停住】(沒東西在跑，下一步我動手)／
+   【等待中】(等外部條件+附「怎麼知道還沒到」的輸出)／【詢問】(等使用者)。**本 session 誤用 3 次。**
+5. **要寫機器解析格式前先跑檢查器、抄它錯誤訊息印的形狀**（免費止血，勿憑印象）。
 
-## 使用者定死的紀律（本 session）
+## 本 session 的主委錯誤（勿重蹈）
 
-1. **回覆結尾必標【進行中】或【詢問】**，且寫「進行中」前**同回合須有查證輸出**（`pgrep` / 狀態板），不得只寫意圖
-2. **實作端由使用者指定**，Claude 只遵守不得變更（依額度調配）
-3. **不追求 100% 防護**：擋掉大部分即可，上線後持續追蹤逃脫點並登記（SPEC §A 誠實邊界第 12 條有逃脫點登記表）
-4. **有問題或久無回應的程序就砍掉**，維持派工與背景乾淨
-5. **已知錯誤要做成機制**，不要重複犯又重複解釋根源（浪費 token）
+- **驗收訊號涵蓋面比待驗行為窄——第 7 次**：①全形變數坑宣稱「已無殘留」(實際只掃 9 字元＋`scripts/*.sh`)
+  ②「新骨架 grep=0」(實際全檔=2) ③B4 合併清單多列 3 個已落地檔、漏列 `_debt_probe_helper.py`
+- **手寫機器解析字串**致三家戳記重簽 ×1、gate 拒發 ×1、**做出 fail-open** ×1 → 票 `GOV-FORMAT-SSOT`
+- **新造的驗收工具必須同輪受審**——B4 的 verifier 自己假綠，是主委在 brief 點名才抓到；**制度無此條**
+- **呆滯門檻誤判**：`cleanup_stale_dispatch.sh` 寫死 30 分鐘，差點砍掉仍在推進的 composer
+  （該輪工作量下限本就 ≈66 分鐘，是主委開規格時未估算）
 
-## 委員行為觀察（影響派工設計）
+## 待辦票（全部已登記，ROADMAP 有 `GOV-FORMAT-SSOT` 全文）
 
-- **codex 每輪都抓到另兩家沒抓到的東西**，且一律附可重現 probe；拒簽紀錄至今全部成立
-- **composer 曾因「過度信任主委的 `verify_b2_independent.sh` PASS」而漏判憲法違反** → brief 加入「**不得引用主委檢查結果當通過證據，一律自跑反例**」後，它獨立抓到 `k=@json` 那條。此紀律要沿用。
-- **主委的驗收腳本已被抓到 5 次「訊號比待驗行為更寬」**（只掃 `*_OVERRIDE` 命名／未剝註解／只看 rc 不看錯誤訊息／`grep -c` 加 `|| echo 0`）——**寫驗收時務必：讓其他必填條件全滿足 + 比對該守衛專屬的錯誤訊息**
+`GOV-FORMAT-SSOT`(P1,**使用者定 B5 完工後**)／`GOV-NOFINDINGS-SENTINEL`(A′ validator)／
+`GOV-VERIFY-RECEIPT-RUNNER`(A′′,載 codex「文字 parser 無法證明執行」論證)／`GOV-UNTRACKED-PRODUCT-GUARD`
+(含呆滯門檻按任務類型、判呆滯前先看是否在寫檔)／`GOV-ID-NAMESPACE-CHECK`／`GOV-FULLWIDTH-VAR-SCAN`／
+`GOV-FIXTURE-PARALLEL`／**`P16-GATE-D1-STRUCTURED-VERDICT`(B5 必做項)**／`P16-DEBT-NULLABLE-REQUIRED`／安全 serializer
 
-## 待辦（已登記，非遺漏）
-
-- **安全 serializer**：`ensure_ascii=False` 改為值一律 JSON 編碼——兩家裁定「本批不改 schema，列後續票」，**尚未立票**
-- `usage()` 說明字串未跟 SoT 同步（B2 殘留 P2，兩家皆判不擋合併）
-- 舊有債見下方歷史區（解耦 scanner 半套、`GATE-TOKEN-BINDING`、3 個探針空心測試檔等）
-
----
 
 ## 🔥 P1-6 現況（2026-07-26；SPEC 階段已 commit+push `c87689a`）
 
