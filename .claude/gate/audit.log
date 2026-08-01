@@ -30954,3 +30954,5 @@ ts=2026-08-01 15:53:25 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260801-gov-amend-r7/synth.md", "output_sha256": "44273fa722f59b0595b93553b8ff5079abb0b051741e26d3c24213e87a093304", "task_id": "P16-GOVAMEND-R7-STAMP-CODEX", "ts": "2026-08-01T15:23:31Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260801-gov-amend-r7/synth.md", "output_sha256": "44273fa722f59b0595b93553b8ff5079abb0b051741e26d3c24213e87a093304", "task_id": "P16-GOVAMEND-R7-STAMP-COMPOSER", "ts": "2026-08-01T15:23:31Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260801-gov-amend-r7/synth.md", "output_sha256": "44273fa722f59b0595b93553b8ff5079abb0b051741e26d3c24213e87a093304", "task_id": "P16-GOVAMEND-R7-STAMP-GROK", "ts": "2026-08-01T15:23:31Z"}
+{"event":"gate_deny","ts":"2026-08-01T16:14:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-01T16:14:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
