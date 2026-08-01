@@ -40,7 +40,7 @@ def _setup_repo(tmp_path: Path) -> tuple[Path, Path]:
     root = tmp_path / "repo"
     scripts = root / "scripts"
     scripts.mkdir(parents=True)
-    for name in ("debt_ledger.sh", "audit_append.sh", "audit_events.json"):
+    for name in ("debt_ledger.sh", "_debt_ledger_core.py", "audit_append.sh", "audit_events.json"):
         src = REPO_ROOT / "scripts" / name
         shutil.copy2(src, scripts / name)
         if name.endswith(".sh"):
@@ -318,6 +318,24 @@ def test_malformed_json_line_fail_closed(tmp_path: Path) -> None:
     assert "JSON" in (r.stderr or "") or "解析" in (r.stderr or "")
 
 
+def test_malformed_json_no_debt_marker_fail_closed(tmp_path: Path) -> None:
+    """無 debt-marker 的壞 JSON（以 { 開頭且以 } 結尾）→ rc=2。
+
+    迴歸 CODEX-R2-P1-01：marker prefilter 曾把 `{not-json}` 當「不像帳目」跳過，
+    導致 --has-open 假報「無債」(rc=0) 並讓 gate dispatch fail-open。
+    壞行本身不含任何 debt 事件關鍵字——這正是 prefilter 會漏的形態。
+    """
+    root, audit = _setup_repo(tmp_path)
+    # 關鍵：以 } 結尾 + 無 debt-marker（舊 prefilter 會 continue）
+    audit.write_text("{not-json}\n", encoding="utf-8")
+    r = _ledger(root, audit, "--has-open")
+    assert r.returncode == 2, (
+        f"無 marker 壞 JSON 須 fail-closed rc=2, got {r.returncode}; "
+        f"err={r.stderr!r} out={r.stdout!r}"
+    )
+    assert "JSON" in (r.stderr or "") or "解析" in (r.stderr or ""), r.stderr
+
+
 def test_sequence_gap_fail_closed(tmp_path: Path) -> None:
     """序號缺號 → fail-closed。"""
     root, audit = _setup_repo(tmp_path)
@@ -551,27 +569,32 @@ def test_mutation_malformed_json_guard(tmp_path: Path, monkeypatch: pytest.Monke
     """mutation 三態：略過壞 JSON → 假綠；restore 後再紅。
 
     探針經 monkeypatch 把 helper.DEBT_LEDGER_TARGET 指到隔離副本（真碰到待測系統）。
+    同時覆蓋「無 debt-marker 的 `{not-json}`」（P1-01 形態）。
     """
     root, audit = _setup_repo(tmp_path)
+    # 核心已抽至 _debt_ledger_core.py；探針變異隔離副本的核心（debt_ledger.sh 只轉調）
+    core = root / "scripts" / "_debt_ledger_core.py"
     script = root / "scripts" / "debt_ledger.sh"
     monkeypatch.setattr(helper, "DEBT_LEDGER_TARGET", script)
-    original = script.read_text(encoding="utf-8")
+    original = core.read_text(encoding="utf-8")
+    # anchor：json.loads 失敗 → sys.exit(2)（所有 { 行共用）
     old = (
-        '        print(\n'
-        '            f"ERROR: audit 第 {line_no} 行 JSON 無法解析(fail-closed): {exc}",\n'
-        '            file=sys.stderr,\n'
-        '        )\n'
-        '        sys.exit(2)'
+        '                print(\n'
+        '                    f"ERROR: audit 第 {line_no} 行 JSON 無法解析(fail-closed): {exc}",\n'
+        '                    file=sys.stderr,\n'
+        '                )\n'
+        '                sys.exit(2)'
     )
     new = (
-        '        print(\n'
-        '            f"ERROR: audit 第 {line_no} 行 JSON 無法解析(fail-closed): {exc}",\n'
-        '            file=sys.stderr,\n'
-        '        )\n'
-        '        continue  # MUTANT: swallow malformed'
+        '                print(\n'
+        '                    f"ERROR: audit 第 {line_no} 行 JSON 無法解析(fail-closed): {exc}",\n'
+        '                    file=sys.stderr,\n'
+        '                )\n'
+        '                continue  # MUTANT: swallow malformed'
     )
     assert old in original, "mutation anchor missing"
-    audit.write_text("{bad\n", encoding="utf-8")
+    # P1-01 形態：無 debt-marker + 以 } 結尾的壞 JSON
+    audit.write_text("{not-json}\n", encoding="utf-8")
 
     def _run_ledger() -> int:
         r = helper.run_debt_ledger(
@@ -582,9 +605,7 @@ def test_mutation_malformed_json_guard(tmp_path: Path, monkeypatch: pytest.Monke
         return r.returncode
 
     assert _run_ledger() == 2
-    script.write_text(original.replace(old, new, 1), encoding="utf-8")
-    script.chmod(0o755)
+    core.write_text(original.replace(old, new, 1), encoding="utf-8")
     assert _run_ledger() == 0, "mutant 應靜默略過壞 JSON 變假綠"
-    script.write_text(original, encoding="utf-8")
-    script.chmod(0o755)
+    core.write_text(original, encoding="utf-8")
     assert _run_ledger() == 2

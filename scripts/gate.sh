@@ -432,12 +432,49 @@ _run_completeness_gate() {
   return 1
 }
 
+# ---------------------------------------------------------------------------
+# _check_open_debt — P1-6 Task 3.1：有 OPEN 債則拒發 dispatch token（含實作）
+# 唯一呼叫點＝dispatch 必填欄位檢查之後、completeness 閘之前。
+# audit 來源由 debt_ledger 解析（registry 路徑；DEBT_AUDIT_OVERRIDE 須綁 harness）。
+# 不得讀未綁 harness 的 GATE_DIR_OVERRIDE；不得發明 --audit 旗標。
+# 主擋門是 gate.sh 本函式；gate_check 的重查只是次要補強（見 SPEC §A 誠實邊界 1）。
+# ---------------------------------------------------------------------------
+_check_open_debt() {
+  local debt_bin ledger_rc
+  debt_bin="${SCRIPT_DIR}/debt_ledger.sh"
+  if [ ! -f "${debt_bin}" ]; then
+    echo "ERROR: debt_ledger 缺失（fail-closed），拒發 dispatch token。" >&2
+    return 1
+  fi
+  # rc 直接取，禁經 pipe（cmd | tail; echo rc=$? 會讀到 tail 的 rc）
+  bash "${debt_bin}" --has-open
+  ledger_rc=$?
+  case "${ledger_rc}" in
+    0)
+      return 0
+      ;;
+    1)
+      echo "ERROR: 存在未清委員會債（OPEN），拒發 dispatch token（含實作派工；不分討論/實作）。" >&2
+      echo "ERROR: 請先銷帳（debt_clear）或 abandon；下列為帳本 --list：" >&2
+      bash "${debt_bin}" --list >&2 || true
+      return 1
+      ;;
+    *)
+      echo "ERROR: 債務帳本不可信（debt_ledger --has-open rc=${ledger_rc}，fail-closed），拒發 token。" >&2
+      return 1
+      ;;
+  esac
+}
+
 if [ "${kind}" = "dispatch" ]; then
   [ -n "${intent}" ]      || miss intent      "派什麼給誰（一句）"
   [ -n "${risk}" ]        || miss risk        "low|high（命中 a/b/c/d 任一即 high）"
   [ -n "${facts_asked}" ] || miss facts-asked "code/log 推不出、已向使用者確認的事實（或 none-needed:理由）"
   [ -n "${review_role}" ] || miss review-role "委員會角色指派：誰挑戰前提/adversary（單一執行者填 single-executor:n/a）"
   [ -n "${template}" ]    || miss template    "對 SPEC/TODO 派工:template 跟過/N-A 說明（非 spec 派工填 n/a:理由）"
+
+  # Task 3.1：債務閘（唯一呼叫點；在 completeness 之前）
+  _check_open_debt || exit 1
 
   # ---------------------------------------------------------------------------
   # 通則(2026-07-24 使用者定):**凡引用委員綜合(--reconcile)一律先機械驗 0 掉項**,

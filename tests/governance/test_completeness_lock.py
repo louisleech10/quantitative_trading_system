@@ -87,6 +87,9 @@ def _run_lock(
     env.pop("COMPLETENESS_ALLOW_ARGV_SOURCES", None)
     if env_extra:
         env.update(env_extra)
+        # 空字串 = 明確關閉 conftest 注入的 harness（反 bypass 測例）
+        if env.get("GOVERNANCE_TEST_HARNESS") == "":
+            env.pop("GOVERNANCE_TEST_HARNESS", None)
     lock = session / "sources.lock"
     return subprocess.run(
         ["bash", str(COMPLETENESS_SH), "--lock", str(lock)],
@@ -280,7 +283,11 @@ def test_id_pattern_override_rejected_without_harness(tmp_path: Path) -> None:
     # 設 ID_PATTERN 過濾 finding 但不設 harness → 應 exit1
     bad = _run_lock(
         session,
-        env_extra={"ID_PATTERN": "GROK-R1-P0-01", "ALLOW_ID_PATTERN_OVERRIDE": "1"},
+        env_extra={
+            "ID_PATTERN": "GROK-R1-P0-01",
+            "ALLOW_ID_PATTERN_OVERRIDE": "1",
+            "GOVERNANCE_TEST_HARNESS": "",  # 清掉 conftest 債務隔離用的 harness
+        },
     )
     assert bad.returncode != 0, (
         f"ID_PATTERN 覆寫無 harness 應 fail-closed; rc={bad.returncode} {bad.stdout!r} {bad.stderr!r}"

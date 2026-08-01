@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260730T160323Z-mutation-test_debt_gate",
+  "claim_id": "mutation-test_debt_gate",
+  "command": [
+    "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python",
+    "-W",
+    "ignore",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "test_mutation_",
+    "tests/governance/test_debt_gate.py"
+  ],
+  "command_sha256": "3ccb71b255b5f64e6c00c58fdf6e2a7736984883349d6c52ad79a8213a5142e3",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "9d6e598e42bb60bde57e16268c75a547d481c417",
+  "tree_dirty": true,
+  "started_at": "2026-07-30T16:03:17Z",
+  "ended_at": "2026-07-30T16:03:23Z",
+  "duration_seconds": 6.113869,
+  "exit_code": 0,
+  "runtime_class": "mutation_runtime",
+  "requested_class": null,
+  "pytest_summary": "======================= 2 passed, 11 deselected in 1.99s =======================",
+  "selected_node_ids": [
+    "tests/governance/test_debt_gate.py::test_mutation_check_open_debt_always_zero_turns_red",
+    "tests/governance/test_debt_gate.py::test_mutation_skip_debt_call_site_turns_red"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 2,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "c9559f1ccef6aa56596e5de8b0c1670eefc6b013869fa4d8404d781a467e21f3",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "c9559f1ccef6aa56596e5de8b0c1670eefc6b013869fa4d8404d781a467e21f3",
+  "log_path": "handoffs/run_receipts/20260730T160323Z-mutation-test_debt_gate.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 13 items / 11 deselected / 2 selected",
+    "",
+    "tests/governance/test_debt_gate.py::test_mutation_check_open_debt_always_zero_turns_red PASSED [ 50%]",
+    "tests/governance/test_debt_gate.py::test_mutation_skip_debt_call_site_turns_red PASSED [100%]",
+    "",
+    "======================= 2 passed, 11 deselected in 1.99s ======================="
+  ]
+}

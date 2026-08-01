@@ -160,12 +160,16 @@ def _run_gate_high_risk(
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["GATE_DIR_OVERRIDE"] = str(gate_dir)
-    # 清除可能從外部洩入的 harness/override
-    env.pop("GOVERNANCE_TEST_HARNESS", None)
+    # 清除可能從外部洩入的 script override；保留 conftest 的債務隔離
+    # （DEBT_AUDIT_OVERRIDE + GOVERNANCE_TEST_HARNESS=1）。bypass 測例在 env_extra
+    # 明確清空 harness。
     env.pop("RECONCILE_STAMPS_CHECK_OVERRIDE", None)
     env.pop("COMPLETENESS_CHECK_OVERRIDE", None)
     if env_extra:
         env.update(env_extra)
+        # 允許 env_extra 以空字串關閉 harness（反 bypass 測例）
+        if env.get("GOVERNANCE_TEST_HARNESS") == "":
+            env.pop("GOVERNANCE_TEST_HARNESS", None)
     # 避開 review-quorum（非 *-impl-bN-*）
     cmd = [
         "bash",
@@ -294,7 +298,8 @@ def test_env_override_rejected_without_harness(tmp_path: Path) -> None:
         reconcile=recon,
         adversarial=adv,
         env_extra={
-            # 刻意不設 GOVERNANCE_TEST_HARNESS
+            # 刻意關閉 harness（含清掉 conftest 隔離用的 harness）
+            "GOVERNANCE_TEST_HARNESS": "",
             "COMPLETENESS_CHECK_OVERRIDE": "/bin/true",
         },
     )
@@ -311,6 +316,7 @@ def test_env_override_rejected_without_harness(tmp_path: Path) -> None:
         reconcile=recon,
         adversarial=adv,
         env_extra={
+            "GOVERNANCE_TEST_HARNESS": "",
             "RECONCILE_STAMPS_CHECK_OVERRIDE": "/bin/true",
         },
     )

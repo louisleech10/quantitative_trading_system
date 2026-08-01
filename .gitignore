@@ -190,3 +190,6 @@ handoffs/ic1eb_newpath_freeze.bak.*/
 .claude/gate/ts_stamp.log.slow
 .claude/gate/.ts_stamp_out
 .claude/gate/.ts_stamp_user
+
+# Claude session 暫存輸出（勿 commit）
+.claude/tmp/

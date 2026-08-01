@@ -104,11 +104,13 @@ def _run_gate_high_risk(
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["GATE_DIR_OVERRIDE"] = str(gate_dir)
-    env.pop("GOVERNANCE_TEST_HARNESS", None)
+    # 保留 conftest 債務隔離；只清 script override
     env.pop("RECONCILE_STAMPS_CHECK_OVERRIDE", None)
     env.pop("COMPLETENESS_CHECK_OVERRIDE", None)
     if env_extra:
         env.update(env_extra)
+        if env.get("GOVERNANCE_TEST_HARNESS") == "":
+            env.pop("GOVERNANCE_TEST_HARNESS", None)
     cmd = [
         "bash",
         str(GATE_SH),

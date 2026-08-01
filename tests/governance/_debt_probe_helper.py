@@ -19,6 +19,7 @@ AUDIT_APPEND_TARGET = REPO_ROOT / "scripts" / "audit_append.sh"
 DEBT_LEDGER_TARGET = REPO_ROOT / "scripts" / "debt_ledger.sh"
 DEBT_CLEAR_TARGET = REPO_ROOT / "scripts" / "debt_clear.sh"
 GATE_TARGET = REPO_ROOT / "scripts" / "gate.sh"
+GATE_CHECK_TARGET = REPO_ROOT / "scripts" / "gate_check.sh"
 
 
 def run_cmd(

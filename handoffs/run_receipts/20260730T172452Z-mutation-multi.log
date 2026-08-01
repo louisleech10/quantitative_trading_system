@@ -1,0 +1,90 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 180 items / 148 deselected / 32 selected
+
+tests/governance/test_debt_clear.py::test_mutation_mode_review_guard PASSED [  3%]
+tests/governance/test_debt_clear.py::test_mutation_open_guard PASSED     [  6%]
+tests/governance/test_debt_clear.py::test_mutation_completeness_guard PASSED [  9%]
+tests/governance/test_debt_clear.py::test_mutation_identity_binding_guard FAILED [ 12%]
+tests/governance/test_debt_clear.py::test_mutation_roster_equals_guard FAILED [ 15%]
+tests/governance/test_debt_clear.py::test_mutation_family_sha_guard FAILED [ 18%]
+tests/governance/test_debt_emit.py::test_mutation_producer_forced PASSED [ 21%]
+tests/governance/test_debt_emit.py::test_mutation_absent_session_must_use_lock PASSED [ 25%]
+tests/governance/test_debt_emit.py::test_mutation_scan_errors_fail_closed PASSED [ 28%]
+tests/governance/test_debt_emit.py::test_mutation_shift_guard PASSED     [ 31%]
+tests/governance/test_debt_emit.py::test_mutation_empty_require_absent_guard PASSED [ 34%]
+tests/governance/test_debt_emit.py::test_mutation_rc_propagation PASSED  [ 37%]
+tests/governance/test_debt_emit.py::test_mutation_rs_reject_guard PASSED [ 40%]
+tests/governance/test_debt_emit.py::test_mutation_splitlines_fullset_reject PASSED [ 43%]
+tests/governance/test_debt_emit.py::test_mutation_json_recursive_string_guard PASSED [ 46%]
+tests/governance/test_debt_emit.py::test_mutation_registry_value_guard PASSED [ 50%]
+tests/governance/test_debt_emit.py::test_mutation_scan_derives_open_event_from_registry PASSED [ 53%]
+tests/governance/test_debt_emit.py::test_mutation_opens_debt_must_be_strict_true PASSED [ 56%]
+tests/governance/test_debt_gate.py::test_mutation_check_open_debt_always_zero_turns_red PASSED [ 59%]
+tests/governance/test_debt_gate.py::test_mutation_skip_debt_call_site_turns_red PASSED [ 62%]
+tests/governance/test_debt_ledger.py::test_mutation_malformed_json_guard FAILED [ 65%]
+tests/governance/test_low_risk_impl_requires_reconcile.py::test_mutation_impl_reconcile_only_on_high_allows_low PASSED [ 68%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_dirname_sess_allows_nested_bypass PASSED [ 71%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_remove_realpath_allows_dropped PASSED [ 75%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_review_requires_exactly_one_audit PASSED [ 78%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_exactly_one_audit PASSED [ 81%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_open_round PASSED [ 84%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_is_one_way PASSED [ 87%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_rejects_external_round_id PASSED [ 90%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_discovery_does_not_recheck_audit PASSED [ 93%]
+tests/governance/test_stamp_no_task_rejected.py::test_mutation_allow_missing_task_breaks_guard PASSED [ 96%]
+tests/governance/test_waived_adversarial_still_stamps.py::test_mutation_waived_adv_skips_stamp_breaks_guard PASSED [100%]
+
+=================================== FAILURES ===================================
+_____________________ test_mutation_identity_binding_guard _____________________
+tests/governance/test_debt_clear.py:894: in test_mutation_identity_binding_guard
+    assert mut.returncode == 0, f"mutant 應假綠: {mut.stderr}"
+E   AssertionError: mutant 應假綠: ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_identity_binding0/repo/scripts/_debt_ledger_core.py
+E     ERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 30aa104f-f571-48c4-8275-d256c87c51fe
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['bash', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_identity_binding0/repo/scripts/debt_clear.sh', '--round-id', '30aa104f-f571-48c4-8275-d256c87c51fe', '--session', 'mut-id-a2', '--lock', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_identity_binding0/repo/handoffs/reconcile/mut-id-a2/sources.lock'], returncode=1, stdout='', stderr='ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_identity_binding0/repo/scripts/_debt_ledger_core.py\nERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 30aa104f-f571-48c4-8275-d256c87c51fe\n').returncode
+______________________ test_mutation_roster_equals_guard _______________________
+tests/governance/test_debt_clear.py:949: in test_mutation_roster_equals_guard
+    assert mut.returncode == 0, f"mutant 應假綠: {mut.stderr}"
+E   AssertionError: mutant 應假綠: ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_roster_equals_gu0/repo/scripts/_debt_ledger_core.py
+E     ERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 3d1297b5-7ebc-4fa7-b101-083ea652e5d9
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['bash', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_roster_equals_gu0/repo/scripts/debt_clear.sh', '--round-id', '3d1297b5-7ebc-4fa7-b101-083ea652e5d9', '--session', 'mut-rost2', '--lock', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_roster_equals_gu0/repo/handoffs/reconcile/mut-rost2/sources.lock'], returncode=1, stdout='', stderr='ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_roster_equals_gu0/repo/scripts/_debt_ledger_core.py\nERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 3d1297b5-7ebc-4fa7-b101-083ea652e5d9\n').returncode
+________________________ test_mutation_family_sha_guard ________________________
+tests/governance/test_debt_clear.py:995: in test_mutation_family_sha_guard
+    assert mut.returncode == 0, f"mutant 應假綠: {mut.stderr}"
+E   AssertionError: mutant 應假綠: ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_family_sha_guard0/repo/scripts/_debt_ledger_core.py
+E     ERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 22ed6824-eac5-4842-9b13-0b3929f84ae3
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['bash', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_family_sha_guard0/repo/scripts/debt_clear.sh', '--round-id', '22ed6824-eac5-4842-9b13-0b3929f84ae3', '--session', 'mut-sha2', '--lock', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_family_sha_guard0/repo/handoffs/reconcile/mut-sha2/sources.lock'], returncode=1, stdout='', stderr='ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_family_sha_guard0/repo/scripts/_debt_ledger_core.py\nERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 22ed6824-eac5-4842-9b13-0b3929f84ae3\n').returncode
+______________________ test_mutation_malformed_json_guard ______________________
+tests/governance/test_debt_ledger.py:573: in test_mutation_malformed_json_guard
+    '        continue  # MUTANT: swallow malformed'
+E   AssertionError: mutation anchor missing
+E   assert '        print(\n            f"ERROR: audit 第 {line_no} 行 JSON 無法解析(fail-closed): {exc}",\n            file=sys.stderr,\n        )\n        sys.exit(2)' in '#!/usr/bin/env bash\n# debt_ledger.sh — P1-6 Task 2.1：只讀 audit 推導未結案債（不另存狀態檔）\n#\n# 子命令:\n#   --list                 列出 cutoff 後各輪狀態（含 OPEN/CLOSED/ABANDONED）\n#   --has-open             rc 0=無 OPEN 債／1=有 OPEN 債／2=fail-closed\n#   --abandoned-count      依 abandon_kind 分開輸出兩個數字\n#   --round-exists-single <round_id>\n#                          只做該 round 存在性掃描（不跑全域序號連續性）\n#                          rc 0=存在／1=不存在／2=fail-closed（缺檔/壞 JSON）\n#   --round-state <round_id>\n#                          印 OPEN|CLOSED|ABANDONED（含序號連續性；不存在→rc=1）\n#\n# 環境:\n#   DEBT_AUDIT_OVERRIDE    測試隔離 audit 路徑；必須 GOVERNANCE_TEST_HARNESS=1\n#   DEBT_CUTOFF_OVERRIDE   覆寫 registry cutoff_ts；必須 GOVERNANCE_TEST_HARNESS=1\n#\n# 憲法: bash 3.2；禁 declare -A／flock；rc 直接取禁經 pipe；不另存狀態檔。\n#\nset -u\n\nSCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"\nREPO="$(cd "${SCRIPT_DIR}/.." && pwd)"\nREGISTRY="${SCRIPT_DIR}/audit_events.json"\n\ndie() {\n  echo "ERROR: $*" >&2\n  exit 1\n}\n\nusage() {\n  cat <<\'EOF\'\n用法:\n  bash scripts/debt_ledger.sh --list\n  bash scripts/debt_ledger.sh --has-open\n  bash scripts/debt_ledger.sh --abandoned-count\n  bash scripts/debt_ledger.sh --round-exists-single <round_id>\n  bash scripts/debt_...\n_cmd_abandoned_count() {\n  _ledger_core abandoned_count\n}\n\n# ── CLI 入口 ────────────────────────────────────────────\n_debt_ledger_main() {\n  if [ $# -lt 1 ]; then\n    usage\n    exit 2\n  fi\n  case "$1" in\n    -h | --help)\n      usage\n      exit 0\n      ;;\n    --list)\n      _cmd_list\n      exit $?\n      ;;\n    --has-open)\n      _cmd_has_open\n      exit $?\n      ;;\n    --abandoned-count)\n      _cmd_abandoned_count\n      exit $?\n      ;;\n    --round-exists-single)\n      [ $# -ge 2 ] || die "--round-exists-single 需要 <round_id>"\n      _round_exists_single "$2"\n      exit $?\n      ;;\n    --round-state)\n      [ $# -ge 2 ] || die "--round-state 需要 <round_id>"\n      _round_state "$2"\n      exit $?\n      ;;\n    --dump-json)\n      # 內部／測試用\n      _ledger_core dump_json\n      exit $?\n      ;;\n    *)\n      echo "ERROR: 未知參數: $1" >&2\n      usage\n      exit 2\n      ;;\n  esac\n}\n\n# 被 source 時不跑 CLI（debt_clear 會 source 本檔）。\n# 判定 sourced **只可用 BASH_SOURCE**（bash 自身提供、呼叫端無法偽造）。\n# 禁止任何外部 marker（含 DEBT_LEDGER_SOURCED）——env 當「內部呼叫」標記違反反 bypass 紅線。\nif [ "${BASH_SOURCE[0]-}" = "${0}" ] || [ -z "${BASH_SOURCE[0]-}" ]; then\n  _debt_ledger_main "$@"\nfi\n'
+=========================== short test summary info ============================
+FAILED tests/governance/test_debt_clear.py::test_mutation_identity_binding_guard - AssertionError: mutant 應假綠: ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_identity_binding0/repo/scripts/_debt_ledger_core.py
+  ERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 30aa104f-f571-48c4-8275-d256c87c51fe
+  
+assert 1 == 0
+ +  where 1 = CompletedProcess(args=['bash', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_identity_binding0/repo/scripts/debt_clear.sh', '--round-id', '30aa104f-f571-48c4-8275-d256c87c51fe', '--session', 'mut-id-a2', '--lock', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_identity_binding0/repo/handoffs/reconcile/mut-id-a2/sources.lock'], returncode=1, stdout='', stderr='ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_identity_binding0/repo/scripts/_debt_ledger_core.py\nERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 30aa104f-f571-48c4-8275-d256c87c51fe\n').returncode
+FAILED tests/governance/test_debt_clear.py::test_mutation_roster_equals_guard - AssertionError: mutant 應假綠: ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_roster_equals_gu0/repo/scripts/_debt_ledger_core.py
+  ERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 3d1297b5-7ebc-4fa7-b101-083ea652e5d9
+  
+assert 1 == 0
+ +  where 1 = CompletedProcess(args=['bash', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_roster_equals_gu0/repo/scripts/debt_clear.sh', '--round-id', '3d1297b5-7ebc-4fa7-b101-083ea652e5d9', '--session', 'mut-rost2', '--lock', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_roster_equals_gu0/repo/handoffs/reconcile/mut-rost2/sources.lock'], returncode=1, stdout='', stderr='ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_roster_equals_gu0/repo/scripts/_debt_ledger_core.py\nERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 3d1297b5-7ebc-4fa7-b101-083ea652e5d9\n').returncode
+FAILED tests/governance/test_debt_clear.py::test_mutation_family_sha_guard - AssertionError: mutant 應假綠: ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_family_sha_guard0/repo/scripts/_debt_ledger_core.py
+  ERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 22ed6824-eac5-4842-9b13-0b3929f84ae3
+  
+assert 1 == 0
+ +  where 1 = CompletedProcess(args=['bash', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_family_sha_guard0/repo/scripts/debt_clear.sh', '--round-id', '22ed6824-eac5-4842-9b13-0b3929f84ae3', '--session', 'mut-sha2', '--lock', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_family_sha_guard0/repo/handoffs/reconcile/mut-sha2/sources.lock'], returncode=1, stdout='', stderr='ERROR: debt_ledger 核心缺失: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-4144/test_mutation_family_sha_guard0/repo/scripts/_debt_ledger_core.py\nERROR: 無法判定 round 狀態（不存在或帳本 fail-closed）: 22ed6824-eac5-4842-9b13-0b3929f84ae3\n').returncode
+FAILED tests/governance/test_debt_ledger.py::test_mutation_malformed_json_guard - AssertionError: mutation anchor missing
+assert '        print(\n            f"ERROR: audit 第 {line_no} 行 JSON 無法解析(fail-closed): {exc}",\n            file=sys.stderr,\n        )\n        sys.exit(2)' in '#!/usr/bin/env bash\n# debt_ledger.sh — P1-6 Task 2.1：只讀 audit 推導未結案債（不另存狀態檔）\n#\n# 子命令:\n#   --list                 列出 cutoff 後各輪狀態（含 OPEN/CLOSED/ABANDONED）\n#   --has-open             rc 0=無 OPEN 債／1=有 OPEN 債／2=fail-closed\n#   --abandoned-count      依 abandon_kind 分開輸出兩個數字\n#   --round-exists-single <round_id>\n#                          只做該 round 存在性掃描（不跑全域序號連續性）\n#                          rc 0=存在／1=不存在／2=fail-closed（缺檔/壞 JSON）\n#   --round-state <round_id>\n#                          印 OPEN|CLOSED|ABANDONED（含序號連續性；不存在→rc=1）\n#\n# 環境:\n#   DEBT_AUDIT_OVERRIDE    測試隔離 audit 路徑；必須 GOVERNANCE_TEST_HARNESS=1\n#   DEBT_CUTOFF_OVERRIDE   覆寫 registry cutoff_ts；必須 GOVERNANCE_TEST_HARNESS=1\n#\n# 憲法: bash 3.2；禁 declare -A／flock；rc 直接取禁經 pipe；不另存狀態檔。\n#\nset -u\n\nSCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"\nREPO="$(cd "${SCRIPT_DIR}/.." && pwd)"\nREGISTRY="${SCRIPT_DIR}/audit_events.json"\n\ndie() {\n  echo "ERROR: $*" >&2\n  exit 1\n}\n\nusage() {\n  cat <<\'EOF\'\n用法:\n  bash scripts/debt_ledger.sh --list\n  bash scripts/debt_ledger.sh --has-open\n  bash scripts/debt_ledger.sh --abandoned-count\n  bash scripts/debt_ledger.sh --round-exists-single <round_id>\n  bash scripts/debt_...\n_cmd_abandoned_count() {\n  _ledger_core abandoned_count\n}\n\n# ── CLI 入口 ────────────────────────────────────────────\n_debt_ledger_main() {\n  if [ $# -lt 1 ]; then\n    usage\n    exit 2\n  fi\n  case "$1" in\n    -h | --help)\n      usage\n      exit 0\n      ;;\n    --list)\n      _cmd_list\n      exit $?\n      ;;\n    --has-open)\n      _cmd_has_open\n      exit $?\n      ;;\n    --abandoned-count)\n      _cmd_abandoned_count\n      exit $?\n      ;;\n    --round-exists-single)\n      [ $# -ge 2 ] || die "--round-exists-single 需要 <round_id>"\n      _round_exists_single "$2"\n      exit $?\n      ;;\n    --round-state)\n      [ $# -ge 2 ] || die "--round-state 需要 <round_id>"\n      _round_state "$2"\n      exit $?\n      ;;\n    --dump-json)\n      # 內部／測試用\n      _ledger_core dump_json\n      exit $?\n      ;;\n    *)\n      echo "ERROR: 未知參數: $1" >&2\n      usage\n      exit 2\n      ;;\n  esac\n}\n\n# 被 source 時不跑 CLI（debt_clear 會 source 本檔）。\n# 判定 sourced **只可用 BASH_SOURCE**（bash 自身提供、呼叫端無法偽造）。\n# 禁止任何外部 marker（含 DEBT_LEDGER_SOURCED）——env 當「內部呼叫」標記違反反 bypass 紅線。\nif [ "${BASH_SOURCE[0]-}" = "${0}" ] || [ -z "${BASH_SOURCE[0]-}" ]; then\n  _debt_ledger_main "$@"\nfi\n'
+================ 4 failed, 28 passed, 148 deselected in 29.98s =================

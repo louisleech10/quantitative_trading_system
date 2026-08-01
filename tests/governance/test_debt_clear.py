@@ -59,6 +59,7 @@ def _setup(tmp_path: Path) -> tuple[Path, Path]:
     for name in (
         "debt_clear.sh",
         "debt_ledger.sh",
+        "_debt_ledger_core.py",
         "audit_append.sh",
         "audit_events.json",
         "completeness_check.sh",
