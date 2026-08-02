@@ -243,8 +243,62 @@ _append_committee_dispatch_any() {
 # D-1/D-2：adversarial 品質輕檢（字串級；語義真偽交人工＋二期 scope-out）
 _check_adversarial_quality() {
   local adv_file="$1"
-  if ! grep -qE 'Verdict[[:space:]]*[:：]' "${adv_file}"; then
-    echo "ERROR: --adversarial 檔缺 Verdict 行:${adv_file}（D-1 拒發）"
+  # ── D-1 Verdict 結構檢查（P16-GATE-D1-STRUCTURED-VERDICT，2026-08-02）──
+  #
+  # 舊判準＝`grep -qE 'Verdict[[:space:]]*[:：]'`，兩次實證事故：
+  #   ①`Verdict（綜合）：結論` — Verdict 與冒號間插字 → 正則不中 → **誤拒**（改 body 會讓
+  #     已取得的三家戳記 sha 全失效，得整輪重簽，代價極高）
+  #   ②`**Verdict: （待填…）**` 佔位行 → **命中** ⇒ 沒填結論也拿得到 token
+  #     （`CODEX-R2-P1-13`，端到端實跑 GATE PASS rc=0）＝**真 fail-open**
+  #
+  # ⚠️ 舊判準的破口比原記載更大（2026-08-02 實測 `handoffs/` 全體）：
+  #   canonical 範本自己那行 `## Verdict：{{可派工 / 需修補後派工 / 有根本缺陷需重作}}`
+  #   出現 **88 次**且**命中舊正則** ⇒ 複製範本未填即可過閘。
+  #   ⇒ 這不只是「骨架佔位」，是**範本本身**就是 fail-open 向量。
+  #
+  # 新判準（三條同時成立才算有 Verdict）：
+  #   (a) 行首錨定：`Verdict` 須出現在行首（允許 `#`／`*`／空白等 markdown 修飾前綴），
+  #       避免散文中順口提到「…的 Verdict: …」被當成裁決行。
+  #   (b) 容許 `Verdict` 與冒號之間有括號補充（修事故①的誤拒），但**不得跨越冒號**。
+  #   (c) 冒號後必須有**非佔位**的實質結論：至少 2 個非空白字元，且不得是
+  #       `{{…}}`／待填／TBD／xxx／`…`／`（待填）`／`← 未填` 這類樣板殘留。
+  # 誠實邊界：只驗「有沒有填」與「填的形狀」，**不驗結論真偽**（語意交人工＋二期）；
+  #   也不驗結論屬於哪個枚舉——實測顯示合法詞彙橫跨 派工／合併／commit／APPROVE／PASS 等多族，
+  #   硬套枚舉會製造大量誤拒（見 `docs/ROADMAP.md` B-13 記錄）。
+  if ! awk '
+      # 去掉行首 markdown 修飾（# * 空白），再要求以 Verdict 開頭
+      {
+        line = $0
+        sub(/^[[:space:]]*[#*[:space:]]*/, "", line)
+        if (line !~ /^Verdict/) next
+        # 取冒號後內容；容許 Verdict 與冒號間有括號補充（如「Verdict（綜合）：」）
+        if (match(line, /[:：]/) == 0) next
+        prefix = substr(line, 1, RSTART - 1)
+        # 冒號前除了 Verdict 只允許括號補充與粗體記號，不允許其他實質文字
+        gsub(/[[:space:]]|\*/, "", prefix)
+        if (prefix !~ /^Verdict(\(.*\)|（.*）)?$/) next
+        rest = substr(line, RSTART + RLENGTH)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", rest)
+        gsub(/\*/, "", rest)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", rest)
+        if (rest == "") next
+        # 樣板殘留 → 不算已填
+        if (rest ~ /\{\{/) next
+        if (rest ~ /^[(（][[:space:]]*(待填|TBD|xxx|XXX|填此)/) next
+        if (rest ~ /^(待填|TBD|tbd|xxx|XXX|填此|未填)/) next
+        if (rest ~ /←[[:space:]]*未填/) next
+        if (rest ~ /^\.\.\.$/ || rest ~ /^…$/) next
+        # ⚠️ **刻意不設「結論最短長度」**：兩次事故（{{}} 範本佔位、散文誤判）都與長度無關，
+        #    沒有任何事故支撐長度規則；而加了它會誤拒 `Verdict: OK`／`Verdict: 過` 這類合法短結論。
+        #    另有實作陷阱：BSD awk 的 length() 以**位元組**計，中文單字＝3 bytes，
+        #    規則本身在 CJK 上也不成立。⇒ 依「規則＝傷疤，非偏好」，無事故即不立規則。
+        found = 1
+        exit
+      }
+      END { exit(found ? 0 : 1) }' "${adv_file}"; then
+    echo "ERROR: --adversarial 檔缺**已填實的** Verdict 行:${adv_file}（D-1 拒發）"
+    echo "  需要:行首 'Verdict'（可帶括號補充）+ 冒號 + 實質結論；"
+    echo "  不接受:{{…}} 範本佔位／（待填）／← 未填／空結論。"
     return 1
   fi
   local ids has_blocking=0 has_id_finding=0
