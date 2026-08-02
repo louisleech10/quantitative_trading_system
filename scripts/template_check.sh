@@ -2,7 +2,7 @@
 # template_check.sh — 機器驗證 SPEC/TODO 是否含 canonical 範本的必填錨點。
 # 這是把「有沒有照範本」從『Claude 聲稱』變成『機器可驗』的關鍵；由 gate.sh 在派工/freeze 前呼叫。
 #
-# 用法：bash scripts/template_check.sh spec|todo|result <file>
+# 用法：bash scripts/template_check.sh spec|todo|result|dext <file>
 # 退出：0=合規；1=缺錨點(列出缺什麼)/檔不存在/用法錯。
 #
 # 誠實邊界：只驗「結構錨點存在」，不驗每段內容充實（那是 adversarial review 的事）。
@@ -18,7 +18,7 @@ _lc_repo_rel() {
   case "${_p}" in "${REPO_ROOT}/"*) printf '%s' "${_p#${REPO_ROOT}/}" ;; *) printf '%s' "${_p}" ;; esac
 }
 kind="${1:-}"; file="${2:-}"
-[ -n "${kind}" ] && [ -n "${file}" ] || { echo "用法: template_check.sh spec|todo|result <file>"; exit 1; }
+[ -n "${kind}" ] && [ -n "${file}" ] || { echo "用法: template_check.sh spec|todo|result|dext <file>"; exit 1; }
 [ -f "${file}" ] || { echo "ERROR: 檔不存在: ${file}"; exit 1; }
 
 missing=""
@@ -321,7 +321,41 @@ EOF
       missing="${missing}${task_missing}"
     fi
     ;;
-  *) echo "ERROR: kind 必須是 spec|todo|result"; exit 1 ;;
+  dext)
+    # 凍結文件「D 延伸」檔（docs/<原檔 basename>.D-<NNN>.md）。
+    # 錨點逐字取自 docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md §2「延伸檔必填」——
+    # 該節是 canonical 單一真相源，本處只做機器驗證，**不重列規則**（重列會漂移）。
+    # 出生理由（GOV-DEXT-TEMPLATE-KIND）：D-001 實戰時 `gate.sh dispatch --spec <D延伸檔>`
+    #   走 `spec` kind → 要求完整 SPEC 錨點 → **永遠拒發 token**，只能改傳底本繞過。
+    need "BASE:" "§2：原檔路徑 @ commit-sha"
+    need "PREDECESSOR:" "§2：前一份生效中的延伸檔路徑，或 none（不得省略）"
+    need "改什麼:" "§2：一句話"
+    need "為什麼:" "§2：一句話，或指向 reconcile 路徑"
+    need "## 觸及面宣告" "§2：給審查者對讀原檔用"
+    need "新增:" "§2 觸及面宣告：原檔中實際存在的 heading 逐字，或 none"
+    need "覆寫:" "§2 觸及面宣告：同上，或 none"
+    need "依賴:" "§2 觸及面宣告：同上，或 none"
+    need "## 內容" "§2：實際的修訂內容"
+    need "## 戳記" "§2：GROK-R7-P1-01 — 缺此標題時 reconcile_stamps_check.sh 直接 FAIL"
+    # 觸及面宣告三欄**不得留空**（§2 逐字：「無則寫 none，不得留空」）。
+    # 只驗「冒號後有非空白字元」；是否為原檔實際 heading 屬語意，交審查者對讀。
+    dext_blank="$(awk '
+      /^[[:space:]]*(新增|覆寫|依賴):/ {
+        v = $0
+        sub(/^[[:space:]]*(新增|覆寫|依賴):[[:space:]]*/, "", v)
+        gsub(/[[:space:]]+$/, "", v)
+        if (v == "") { split($0, a, ":"); printf "  · 觸及面宣告欄留空: %s（§2 逐字「無則寫 none，不得留空」）\\n", a[1] }
+      }' "${file}")"
+    if [ -n "${dext_blank}" ]; then
+      missing="${missing}${dext_blank}"
+    fi
+    # BASE 須帶 commit-sha（§2：「用 git rev-parse HEAD 取，寫下當時的值」）。
+    # 只驗「有一段 ≥7 位 hex」——不驗該 sha 是否可解析（那需要 git，且延伸檔可能先於 commit 寫成）。
+    if ! grep -qE '^[[:space:]]*BASE:.*[0-9a-f]{7,}' "${file}"; then
+      missing="${missing}  · BASE 缺 commit-sha（§2：git rev-parse HEAD 取，須寫下當時的值；格式 <原檔路徑> @ <sha>）\n"
+    fi
+    ;;
+  *) echo "ERROR: kind 必須是 spec|todo|result|dext"; exit 1 ;;
 esac
 
 # ---- 反空殼掃描（grep 錨點驗不到「標題在但內容空」；這層抓使用者遇過的「只寫表頭/驗證字樣、內容空」）----
@@ -343,8 +377,24 @@ if awk '
 fi
 
 # 3) 驗證欄不可證偽：bullet 行含「驗證」卻無任何可證偽 token
-if awk '
-    /^[[:space:]]*[-*].*驗證/ {
+#
+# ⚠️ kind=dext 收窄為「『驗證』出現在 bullet **開頭當標籤**」才檢查；spec/todo/result 維持原判準不變。
+#    理由（實測，非推測）：本檢查針對 SPEC/TODO 的結構化「驗證欄」而設，判準是「bullet 行含『驗證』」。
+#    D 延伸檔的 `## 內容` 是自由散文，敘述「改了什麼／不改什麼」時會自然提到「驗證」二字。
+#    首個真實案例 docs/P16_COMMITTEE_DEBT_SPEC.D-001.md:192
+#      「- 不改 `gate.sh register-output` 本身的任何驗證」
+#    ——那是一條「明文不做」宣告，不是驗證欄，卻被判空殼。
+#    **這是為新 kind 定範圍，不是放寬既有 kind**：spec/todo/result 走的分支逐位元組未動，
+#    且 dext 仍保留「真的寫成驗證欄」時的檢查（`- 驗證…` / `- **驗證**…`）。
+#    誠實邊界：dext 的 `## 內容` 若把空話驗證寫在句中而非行首標籤，本層抓不到 → 交 adversarial。
+_hollow3_re='^[[:space:]]*[-*].*驗證'
+if [ "${kind}" = "dext" ]; then
+  # 用 [*][*] 而非 \*\*：動態正則字串裡的反斜線會先被 awk 當字串跳脫處理（gawk 會警告），
+  # 中括號類別不含反斜線，跨 awk 實作行為一致。
+  _hollow3_re='^[[:space:]]*[-*][[:space:]]*([*][*])?驗證'
+fi
+if awk -v re="${_hollow3_re}" '
+    $0 ~ re {
       if ($0 !~ /[0-9]|pytest|assert|==|<=|>=|!=|atol|rtol|sha256|grep|exit|\.py|\.json|\.h5|\.csv|\.parquet|npm|jest|vitest|expect|toHaveBeen|\.ts|\.tsx/) { found=1 }
     }
     END { exit(found?0:1) }' "${file}"; then
@@ -363,6 +413,11 @@ if [ -n "${missing}" ] || [ -n "${hollow}" ]; then
   tpl="${spec_tpl}"
   if [ "${kind}" = "todo" ]; then tpl="${todo_tpl}"; fi
   if [ "${kind}" = "result" ]; then tpl="${result_tpl}"; fi
+  if [ "${kind}" = "dext" ]; then
+    # dext 的範本不在 templates/，在凍結程序文件本身（canonical 單一真相源）
+    echo "  → 依 docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md §2「延伸檔必填」補齊結構與內容。"
+    exit 1
+  fi
   echo "  → 依 templates/${tpl} 補齊結構與內容。"
   exit 1
 fi

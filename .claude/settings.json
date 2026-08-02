@@ -187,6 +187,15 @@
             "command": "bash scripts/ci_check_after_push.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/doc_format_precheck.sh"
+          }
+        ]
       }
     ]
   },

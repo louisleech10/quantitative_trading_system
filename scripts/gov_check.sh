@@ -35,6 +35,74 @@ for f in scripts/*.sh scripts/git_hooks/*; do
 done
 if [ "${_bad}" -ne 0 ]; then echo "[gov_check] ✗ shell 語法未過" >&2; rc_all=1; else echo "[gov_check] ✓ shell 語法 OK"; fi
 
+# --- 1b) 治理文件格式全庫掃描（GOV-DOC-CHECK-AT-WRITE / CODEX-R1-P1-03）---
+# 為何除了 PostToolUse hook 還要這道：hook 的 matcher 只有 `Edit|Write`，
+#   **經 Bash 寫出的檔、外部編輯器改的檔、hook 上線前就存在的檔一律漏掉**。
+#   codex 指出「只對 Edit|Write 成立」＝強制性有缺口，此掃描補的就是那個缺口：
+#   不論誰寫的、何時寫的，跑 gov_check（pre-push hook 也呼叫）就一定會被看到。
+# ⚠️ **只掃「本次改動」的檔，不掃全庫**（實測依據，非保守）：
+#   全庫掃描實跑 744 檔 → **24 個既有檔未過**，且絕大多數是誤報——
+#   `docs/Archived/*`（範本上路前的舊檔）與 `docs/VERIFY_GATE_SPEC_PLAIN*.md`
+#   （白話版，本來就不該有 SPEC 範本錨點）。硬擋這些＝pre-push 對所有人壞掉，
+#   那是噪音不是強制，且會逼人加 `--no-verify`，反而把整條防線關掉。
+#   diff 範圍剛好對應本機制的目的：「**不管誰寫的**，只要這次動到就要合規」。
+# **不靜默吞**：legacy 積欠數字照印（下方 backlog 行），避免看起來像「全庫都乾淨」。
+echo "[gov_check] 1b/3 治理文件格式 (doc_format_precheck，範圍=本次改動)…"
+_docbad=0
+_docn=0
+_base="$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD 2>/dev/null || echo "")"
+# ⚠️ 依賴缺檔一律 **fail-closed**（CODEX-R2-P1-01）：第一版寫成 `[ -f ] && ...`，
+#   檔案不在就**靜默跳過整段且 rc=0** ⇒ 刪掉 doc_format_precheck.sh 就能讓格式檢查假綠。
+#   pre-push 只呼叫 gov_check，所以那是真的 fail-open。缺工具＝檢查沒跑＝不得回報通過。
+for _dep in scripts/doc_format_precheck.sh scripts/template_check.sh scripts/brief_conformance_check.sh; do
+  [ -f "${_dep}" ] || {
+    echo "[gov_check] ✗ 缺依賴 ${_dep} → fail-closed（不得靜默跳過格式檢查）" >&2
+    rc_all=1
+  }
+done
+if [ -z "${_base}" ]; then
+  echo "[gov_check] ✗ 無法解析 git base（merge-base/rev-parse 皆失敗）→ fail-closed" >&2
+  rc_all=1
+fi
+if [ -f scripts/doc_format_precheck.sh ] && [ -n "${_base}" ]; then
+  while IFS= read -r f; do
+    [ -n "${f}" ] || continue
+    [ -f "${f}" ] || continue          # 已刪除的檔不檢查
+    # 只收 docs/*.md：`handoffs/*` 在 .git/info/exclude 被整包排除（設計如此，
+    #   委員產出與 brief 不進版控），故任何 git 導向的掃描都**看不到 brief**。
+    #   brief 的強制點在 committee_run.sh／cx_run.sh 的 brief_conformance_check
+    #   （本輪已修為**開債前**就跑完整檢查，見 CODEX-R1-P1-01），不靠這條掃描。
+    case "${f}" in docs/*.md) : ;; *) continue ;; esac
+    _docn=$((_docn + 1))
+    bash scripts/doc_format_precheck.sh "${f}" 2>/dev/null || {
+      echo "  ✗ 格式未過: ${f}（詳情跑 bash scripts/doc_format_precheck.sh ${f}）" >&2
+      _docbad=$((_docbad + 1))
+    }
+  done <<EOF
+$( { git diff --name-only "${_base}" -- docs 2>/dev/null
+     git diff --name-only --cached -- docs 2>/dev/null
+     git ls-files --others --exclude-standard -- docs 2>/dev/null; } | sort -u )
+EOF
+fi
+if [ "${_docbad}" -ne 0 ]; then
+  echo "[gov_check] ✗ 治理文件格式：${_docbad} 個未過（本次改動 ${_docn} 個）" >&2
+  rc_all=1
+else
+  echo "[gov_check] ✓ 治理文件格式 OK（本次改動 ${_docn} 個）"
+fi
+# legacy backlog：全庫尚有多少既有檔不合規。**只報數不擋**，避免「看起來全庫乾淨」的假象。
+# 這條刻意不進 rc_all——擋既有債會讓所有人 --no-verify，等於關掉整條防線。
+if [ -f scripts/doc_format_precheck.sh ]; then
+  _blog=0
+  while IFS= read -r f; do
+    [ -f "${f}" ] || continue
+    bash scripts/doc_format_precheck.sh "${f}" >/dev/null 2>&1 || _blog=$((_blog + 1))
+  done <<EOF
+$(git ls-files 'docs/*.md' 2>/dev/null)
+EOF
+  [ "${_blog}" -gt 0 ] && echo "[gov_check] ℹ 既有未合規 backlog：${_blog} 個 docs/*.md（不擋 push；多為 Archived 與白話版誤報，待 T7 清）"
+fi
+
 if [ "${fast}" -eq 1 ]; then
   [ "${rc_all}" -eq 0 ] && echo "[gov_check] --fast 完成(未跑測試)" || echo "[gov_check] --fast 未過" >&2
   exit "${rc_all}"

@@ -184,9 +184,46 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         "install_verify_hooks.sh",
         "verify_hooks_health.sh",
         "verify_pretooluse.sh",
+        # GOV-DOC-CHECK-AT-WRITE（2026-08-02，CODEX-R2-P1-01）：治理文件格式檢查鏈
+        # 已納入 verify_hooks_health.sh 的 health gate（缺任一支＝格式防線有洞）。
+        # mini_repo 少了它們，health 會如實報 FAIL —— 那是**檢查正確**，不是測試該放寬，
+        # 故補進 fixture 而非弱化檢查。
+        "doc_format_precheck.sh",
+        "template_check.sh",
+        "brief_conformance_check.sh",
     ):
         (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
     link_python_env(repo)
+
+    # CODEX-R3-P1-01：health gate 現在**強制**驗證 `.claude/settings.json` 於 PostToolUse
+    # 的 `Edit|Write` matcher 下掛了 doc_format_precheck（缺設定檔／掛錯 matcher 皆 FAIL）。
+    # 舊 fixture 沒有這個檔 ⇒ 新契約完全沒被測到（codex 指出「補 symlink 正確但不完整」）。
+    # 這裡放**最小且合法**的設定，讓契約真的走過一次；不是為了讓測試變綠而放寬檢查。
+    settings_dir = repo / ".claude"
+    settings_dir.mkdir(exist_ok=True)
+    (settings_dir / "settings.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PostToolUse": [
+                        {
+                            "matcher": "Edit|Write",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "bash scripts/doc_format_precheck.sh",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     (repo / "README.md").write_text("# temp\n", encoding="utf-8")
     subprocess.run(["git", "add", "README.md"], cwd=repo, check=True, capture_output=True)

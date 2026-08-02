@@ -97,50 +97,16 @@ case "${out_prefix}" in handoffs/*) : ;; *) echo "ERROR: out前綴須在 handoff
 # 缺 brief-kind:／未知 brief-kind 一律 exit 2（與 cx_run.sh:53-79 對齊，防 γ 陷阱）。
 # stamp 另驗 stamp-target；其餘 kind 不強制 stamp-target。
 # ---------------------------------------------------------------------------
-# 完整擷取宣告值（行首 brief-kind: → 行尾，trim 尾隨空白），再整值比對白名單。
-# 禁止 grep -oE '...[a-z]+' 前綴擷取：stamp-evil 會被截成 stamp（CR2 群 E / V19）。
-_cr_bk_all="$(grep -E '^brief-kind:' "${brief}" 2>/dev/null | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
-_cr_bk_n="$(printf '%s\n' "${_cr_bk_all}" | grep -c '[^[:space:]]' || true)"
-if [ "${_cr_bk_n}" -gt 1 ]; then
-  echo "ERROR: brief 有多個【不一致】的行首 'brief-kind:' 宣告" >&2
-  exit 2
-fi
-_cr_bk="$(printf '%s\n' "${_cr_bk_all}" | head -1)"
-[ -n "${_cr_bk}" ] || {
-  echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp" >&2
-  exit 2
-}
-case "${_cr_bk}" in
-  review|consult|closure|impl|stamp) : ;;
-  *)
-    echo "ERROR: 未知 brief-kind: ${_cr_bk}(允許 review|consult|closure|impl|stamp)" >&2
-    exit 2
-    ;;
-esac
-if [ "${_cr_bk}" = "stamp" ]; then
-  _cr_st_all="$(grep -E '^stamp-target:' "${brief}" 2>/dev/null | sed 's/^stamp-target:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
-  _cr_st_n="$(printf '%s\n' "${_cr_st_all}" | grep -c '.' || true)"
-  if [ "${_cr_st_n}" -eq 0 ]; then
-    echo "ERROR: brief-kind=stamp 缺 stamp-target: 欄" >&2
-    exit 2
-  fi
-  if [ "${_cr_st_n}" -gt 1 ]; then
-    echo "ERROR: stamp-target 有多個【不一致】宣告: $(printf '%s' "${_cr_st_all}" | tr '\n' ' ')" >&2
-    exit 2
-  fi
-  _cr_st="$(printf '%s\n' "${_cr_st_all}" | head -1)"
-  case "${_cr_st}" in
-    handoffs/*) : ;;
-    *) echo "ERROR: stamp-target 須 handoffs/ 前綴: ${_cr_st}" >&2; exit 2 ;;
-  esac
-  case "${_cr_st}" in
-    *"/../"*|"../"*|*".."*)
-      echo "ERROR: stamp-target 不得含 ..: ${_cr_st}" >&2
-      exit 2
-      ;;
-  esac
-  [ -f "${_cr_st}" ] || { echo "ERROR: stamp-target 檔不存在: ${_cr_st}" >&2; exit 2; }
-fi
+# ⚠️ **本處不得自行 parse brief**（CODEX-R1-P1-01，2026-08-02 實證）：
+#   舊版在此有第二份 parser（`_cr_bk_all`／`_cr_st_all`），與 cx_run 那份**各驗一半**——
+#   本處只驗「brief-kind 存不存在／值合不合法」，而「範本引用 + fact-verified/assumed 前提宣告」
+#   只有 cx_run 那份驗。但 cx_run 在**開債之後**才跑 ⇒ 不完整的 brief 會先留下 OPEN debt 再被拒派。
+#   **這不是理論**：本 repo audit sequence 367 就是這樣來的
+#   （「閉合輪首次派工：brief 合規閘拒派（brief-kind=closure 須引用委員範本，主委漏寫）」→ 只能 abandon）。
+# 修法＝在此呼叫**同一個** checker 做**完整**檢查，且仍在 gate.sh dispatch 之前 → 失敗時 audit 真正零新增。
+# 本處只需「通過/不通過」，不需解析值（舊 parser 的 _cr_bk/_cr_st 後續從未被使用），
+# 故不傳 --emit：少一個暫存檔、少一個 EXIT trap（trap 是覆寫非疊加，多一個就是坑）。
+bash "${SCRIPT_DIR}/brief_conformance_check.sh" "${brief}" || exit $?
 
 # task_id 從透傳 gate argv 解析 --task-id（不另發明同名旗標）
 task_id=""

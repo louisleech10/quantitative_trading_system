@@ -582,7 +582,24 @@ if [ "${kind}" = "dispatch" ]; then
   esac
   # 範本錨點機檢（提供即驗，不合規拒發 token）—— 把「有沒有照範本」變機器可驗
   if [ -n "${spec}" ]; then
-    bash scripts/template_check.sh spec "${spec}" || { echo "ERROR: SPEC 未過範本機檢（見上），拒發 token。"; exit 1; }
+    # D 延伸檔（docs/<basename>.D-<NNN>.md）走 dext kind，不走 spec（GOV-DEXT-TEMPLATE-KIND）。
+    # 事故：D-001 實戰時 `--spec <D延伸檔>` 走 spec kind → 要求完整 SPEC 錨點（§G/§0.A…）
+    #   → **永遠拒發 token**，當時只能改傳底本繞過，等於這條路徑對延伸檔完全不可用。
+    # ⚠️ 判 basename，且限 docs/ 正下方一層（CODEX-R1-P2-04）：
+    #   shell 的 `*` 會跨 `/`，`docs/sub/x.D-001.md`／`handoffs/x.D-001.md` 都會誤命中，
+    #   而凍結程序 §2 規定的是 `docs/<原檔 basename>.D-<NNN>.md`。
+    #   誤判＝拿較窄的 dext 檢查取代該跑的 spec 檢查。
+    _spec_kind="spec"
+    case "${spec}" in
+      docs/*/*) : ;;
+      docs/*)
+        case "${spec#docs/}" in
+          *.D-[0-9][0-9][0-9].md) _spec_kind="dext" ;;
+        esac
+        ;;
+    esac
+    bash scripts/template_check.sh "${_spec_kind}" "${spec}" || { echo "ERROR: SPEC 未過範本機檢（見上），拒發 token。"; exit 1; }
+    # coverage_check 比對 manifest 項是否都在文件裡，與 kind 無關，兩種都跑
     [ -n "${manifest}" ] && { bash scripts/coverage_check.sh "${manifest}" "${spec}" || { echo "ERROR: SPEC 漏 manifest 項（見上），拒發 token。"; exit 1; }; }
   fi
   if [ -n "${todo}" ]; then

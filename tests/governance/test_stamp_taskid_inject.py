@@ -40,6 +40,9 @@ _SCRIPT_NAMES = (
     "reconcile_body_hash.sh",
     "debt_ledger.sh",
     "_debt_ledger_core.py",
+    # GOV-DOC-CHECK-AT-WRITE（2026-08-02）：cx_run.sh 的 brief 合規閘 + stamp-target 驗證
+    # 已抽成獨立腳本（一份實作、兩個呼叫點）。隔離 repo 少了它 → cx_run rc=127。
+    "brief_conformance_check.sh",
 )
 
 
@@ -1277,6 +1280,16 @@ def _mutate_cx(h: dict, transform) -> None:
     path.write_text(new, encoding="utf-8")
 
 
+def _mutate_brief_conformance(h: dict, transform) -> None:
+    """變異 brief_conformance_check.sh（GOV-DOC-CHECK-AT-WRITE 後 brief-kind／
+    stamp-target 判定的實作位置；抽出前在 cx_run.sh 內）。"""
+    path = h["scripts"] / "brief_conformance_check.sh"
+    text = path.read_text(encoding="utf-8")
+    new = transform(text)
+    assert new != text, "mutation transform 未改變腳本"
+    path.write_text(new, encoding="utf-8")
+
+
 def _mutate_committee(h: dict, transform) -> None:
     path = h["scripts"] / "committee_run.sh"
     text = path.read_text(encoding="utf-8")
@@ -1553,6 +1566,64 @@ def test_mutation_v2_v3_shared_taskid_precheck_turns_red(
     assert _audit_bytes(h4["audit"]) == before4
 
 
+def test_incomplete_review_brief_rejected_before_debt_opens(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CODEX-R1-P1-01 迴歸：不完整的 review brief 必須在**開債前**被拒，audit 零成長。
+
+    出生事故（實測，非推測）：本 repo audit sequence 367 —
+      「閉合輪首次派工：brief 合規閘拒派（brief-kind=closure 須引用委員範本，主委漏寫）」。
+    成因＝committee_run.sh 當時有**自己的**簡化 parser（只驗 kind 存不存在），
+      而「範本引用 + fact-verified/assumed」只有 cx_run 驗，且 cx_run 在**開債之後**才跑
+      ⇒ 債先開了才發現 brief 不合規，只能 --abandon。
+    修法＝committee_run 改呼叫同一個 brief_conformance_check，且仍在 gate dispatch 之前。
+    """
+    h = _harness(tmp_path)
+    monkeypatch.setattr(_dph, "COMMITTEE_RUN_TARGET", h["scripts"] / "committee_run.sh")
+    # 合法 kind、但缺範本引用與前提宣告 → 舊版會先開債，新版必須在開債前就擋掉
+    (h["handoffs"] / "brief.md").write_text(
+        "# 不完整 review brief\n\nbrief-kind: review\n\n沒有引用範本，也沒有前提宣告。\n",
+        encoding="utf-8",
+    )
+    before = _audit_bytes(h["audit"])
+    r = _run_mut_committee(h, monkeypatch)
+    assert r.returncode == 2, f"不完整 brief 應被拒派；rc={r.returncode} {r.stderr}"
+    assert _audit_bytes(h["audit"]) == before, "開債前被拒 ⇒ audit 必須逐位元組不變"
+    assert _events(h["audit"], "committee_round_open") == [], "不得留下孤兒 OPEN 債"
+
+
+def test_mutation_committee_partial_check_reopens_orphan_debt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """把 committee_run 的完整檢查換回「只驗 kind」→ 孤兒 OPEN 債重現。
+
+    這條是上面那條迴歸測試的**可證偽性證明**：若不做這個變異就無法讓它轉紅，
+    代表那條測試在測空氣。變異內容＝重現修法前的 committee_run 行為
+    （自己 parse、只驗 brief-kind 存不存在，不驗範本引用／前提宣告）。
+    """
+    h = _harness(tmp_path)
+    monkeypatch.setattr(_dph, "COMMITTEE_RUN_TARGET", h["scripts"] / "committee_run.sh")
+
+    def partial_check(text: str) -> str:
+        old = 'bash "${SCRIPT_DIR}/brief_conformance_check.sh" "${brief}" || exit $?'
+        assert old in text, "committee_run 未呼叫 brief_conformance_check（錨點不存在）"
+        # 修法前的等效行為：只驗有沒有 brief-kind 行
+        return text.replace(
+            old,
+            'grep -qE \'^brief-kind:\' "${brief}" || exit 2  # MUTATED: 只驗 kind',
+            1,
+        )
+
+    _mutate_committee(h, partial_check)
+    (h["handoffs"] / "brief.md").write_text(
+        "# 不完整 review brief\n\nbrief-kind: review\n\n沒有引用範本，也沒有前提宣告。\n",
+        encoding="utf-8",
+    )
+    _run_mut_committee(h, monkeypatch)
+    opens = _events(h["audit"], "committee_round_open")
+    assert len(opens) >= 1, "變異後應重現孤兒 OPEN 債；若仍為 0 表示該測試無保護力"
+
+
 def test_mutation_v4_move_after_gate_adds_audit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1591,15 +1662,15 @@ def test_mutation_v5_skip_multi_target_turns_red(
 
     def neuter_multi(text: str) -> str:
         old = (
-            '  if [ "${_cr_st_n}" -gt 1 ]; then\n'
-            '    echo "ERROR: stamp-target 有多個【不一致】宣告: $(printf \'%s\' "${_cr_st_all}" | tr \'\\n\' \' \')" >&2\n'
+            '  if [ "${_st_n}" -gt 1 ]; then\n'
+            '    echo "ERROR: stamp-target 有多個【不一致】宣告: $(printf \'%s\' "${_st_all}" | tr \'\\n\' \' \')" >&2\n'
             "    exit 2\n"
             "  fi\n"
         )
         assert old in text, "V5 multi-target anchor missing"
         return text.replace(old, "  # MUTATED: multi-target check removed\n", 1)
 
-    _mutate_committee(h, neuter_multi)
+    _mutate_brief_conformance(h, neuter_multi)
     (h["handoffs"] / "a.md").write_text("a\n", encoding="utf-8")
     (h["handoffs"] / "b.md").write_text("b\n", encoding="utf-8")
     _write_brief(
@@ -1636,15 +1707,15 @@ def test_mutation_v6_skip_path_guard_turns_red(
 
     def neuter_prefix(text: str) -> str:
         old = (
-            '  case "${_cr_st}" in\n'
+            '  case "${stamp_target}" in\n'
             "    handoffs/*) : ;;\n"
-            '    *) echo "ERROR: stamp-target 須 handoffs/ 前綴: ${_cr_st}" >&2; exit 2 ;;\n'
+            '    *) echo "ERROR: stamp-target 須 handoffs/ 前綴: ${stamp_target}" >&2; exit 2 ;;\n'
             "  esac\n"
         )
         assert old in text, "V6 handoffs prefix anchor missing"
         return text.replace(old, "  # MUTATED: handoffs prefix check removed\n", 1)
 
-    _mutate_committee(h, neuter_prefix)
+    _mutate_brief_conformance(h, neuter_prefix)
     outside = h["root"] / "outside.md"
     outside.write_text("x\n", encoding="utf-8")
     _write_brief(h, stamp_target="outside.md", name="brief.md")
@@ -1966,7 +2037,10 @@ def test_mutation_v12_force_stamp_target_all_kinds_turns_red(
             old, 'if true; then  # MUTATED: all kinds need stamp-target', 1
         )
 
-    _mutate_cx(h, force_all)
+    # GOV-DOC-CHECK-AT-WRITE（2026-08-02）：此判定已從 cx_run.sh 抽到
+    # brief_conformance_check.sh，探針隨之改指新位置。**變異語意未變**——
+    # 仍是「非 stamp kind 也強制 stamp-target」，仍預期 impl brief 被誤擋。
+    _mutate_brief_conformance(h, force_all)
     roles = json.loads(
         (h["scripts"] / "governance_roles.json").read_text(encoding="utf-8")
     )
@@ -2274,27 +2348,20 @@ def test_mutation_v18_skip_missing_kind_turns_red(
 
     def drop_kind_guards(text: str) -> str:
         old1 = (
-            '[ -n "${_cr_bk}" ] || {\n'
-            "  echo \"ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp\" >&2\n"
+            '[ -n "${_bk}" ] || {\n'
+            "  echo \"ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp\"\n"
+            '  echo "  (收集 findings 類=review/consult/closure,會另檢範本引用+前提宣告)"\n'
             "  exit 2\n"
             "}\n"
         )
-        old2 = (
-            'case "${_cr_bk}" in\n'
-            "  review|consult|closure|impl|stamp) : ;;\n"
-            "  *)\n"
-            '    echo "ERROR: 未知 brief-kind: ${_cr_bk}(允許 review|consult|closure|impl|stamp)" >&2\n'
-            "    exit 2\n"
-            "    ;;\n"
-            "esac\n"
-        )
+        old2 = _CR_BK_UNKNOWN_CASE
         assert old1 in text, "V18 missing brief-kind anchor missing"
         assert old2 in text, "V18 unknown-kind anchor missing"
         t = text.replace(old1, "  # MUTATED missing kind\n", 1)
         t = t.replace(old2, "  # MUTATED kind case\n", 1)
         return t
 
-    _mutate_committee(h, drop_kind_guards)
+    _mutate_brief_conformance(h, drop_kind_guards)
     (h["handoffs"] / "brief.md").write_text(
         "stamp-target: handoffs/target.md\n\nstub missing kind\n",
         encoding="utf-8",
@@ -2317,22 +2384,24 @@ def test_mutation_v18_skip_missing_kind_turns_red(
 
 
 # 完整擷取（修後）vs 前綴擷取（病根）錨點 — V19 mutation 用
+# ⚠️ 錨點已從 committee_run.sh 移到 brief_conformance_check.sh（CODEX-R1-P1-01，2026-08-02）。
+#   committee_run.sh 原本有**第二份** brief-kind／stamp-target parser，與 cx_run 那份各驗一半：
+#   它只驗「kind 存不存在／值合不合法」，範本引用與前提宣告只有 cx_run 驗，而 cx_run 在**開債之後**跑
+#   ⇒ 不完整 brief 會先留下 OPEN debt（本 repo audit sequence 367 即此例）。
+#   修法＝committee_run 改呼叫同一個 checker，仍在 gate dispatch 之前。
+#   **這些探針的變異語意完全不變**，只是守衛的實體位置換了檔，故改用 _mutate_brief_conformance。
+#   常數名保留 `_CR_` 前綴以免大量無謂改名；其值已指向新檔內容。
 _CR_BK_FULL_EXTRACT = (
-    '_cr_bk_all="$(grep -E \'^brief-kind:\' "${brief}" 2>/dev/null '
+    '_bk_all="$(grep -E \'^brief-kind:\' "${brief}" 2>/dev/null '
     "| sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)\""
 )
 _CR_BK_PREFIX_EXTRACT = (
-    '_cr_bk_all="$(grep -oE \'^brief-kind:[[:space:]]*[a-z]+\' "${brief}" 2>/dev/null '
+    '_bk_all="$(grep -oE \'^brief-kind:[[:space:]]*[a-z]+\' "${brief}" 2>/dev/null '
     "| sed 's/.*:[[:space:]]*//' | sort -u)\""
 )
 _CR_BK_UNKNOWN_CASE = (
-    'case "${_cr_bk}" in\n'
-    "  review|consult|closure|impl|stamp) : ;;\n"
-    "  *)\n"
-    '    echo "ERROR: 未知 brief-kind: ${_cr_bk}(允許 review|consult|closure|impl|stamp)" >&2\n'
-    "    exit 2\n"
-    "    ;;\n"
-    "esac\n"
+    '  *) echo "ERROR: 未知 brief-kind: ${_bk}'
+    '(允許 review|consult|closure|impl|stamp)"; exit 2 ;;\n'
 )
 
 
@@ -2347,7 +2416,7 @@ def test_mutation_v19_prefix_extract_turns_red(
         assert _CR_BK_FULL_EXTRACT in text, "V19 full-extract anchor missing"
         return text.replace(_CR_BK_FULL_EXTRACT, _CR_BK_PREFIX_EXTRACT, 1)
 
-    _mutate_committee(h, reintroduce_prefix)
+    _mutate_brief_conformance(h, reintroduce_prefix)
     (h["handoffs"] / "brief.md").write_text(
         "brief-kind: stamp-evil\nstamp-target: handoffs/target.md\n\nstub\n",
         encoding="utf-8",
@@ -2383,7 +2452,7 @@ def test_mutation_v20_drop_unknown_case_turns_red(
         assert _CR_BK_UNKNOWN_CASE in text, "V20 unknown-case anchor missing"
         return text.replace(_CR_BK_UNKNOWN_CASE, "  # MUTATED unknown case\n", 1)
 
-    _mutate_committee(h, drop_unknown)
+    _mutate_brief_conformance(h, drop_unknown)
     (h["handoffs"] / "brief.md").write_text(
         "brief-kind: evilstamp\nstamp-target: handoffs/target.md\n\nstub\n",
         encoding="utf-8",
@@ -2419,7 +2488,7 @@ def test_mutation_v21_drop_unknown_case_turns_red(
         assert _CR_BK_UNKNOWN_CASE in text, "V21 unknown-case anchor missing"
         return text.replace(_CR_BK_UNKNOWN_CASE, "  # MUTATED unknown case\n", 1)
 
-    _mutate_committee(h, drop_unknown)
+    _mutate_brief_conformance(h, drop_unknown)
     (h["handoffs"] / "brief.md").write_text(
         "brief-kind: bogus\nstamp-target: handoffs/target.md\n\nstub\n",
         encoding="utf-8",
@@ -2486,7 +2555,7 @@ def test_mutation_group_h_prefix_extract_matrix_turns_red(
     # ── 閹割 ──
     h = _harness(tmp_path / "mut-h")
     monkeypatch.setattr(_dph, "COMMITTEE_RUN_TARGET", h["scripts"] / "committee_run.sh")
-    _mutate_committee(h, _group_h_prefix_mutant_transform)
+    _mutate_brief_conformance(h, _group_h_prefix_mutant_transform)
 
     # stamp-evil → 必須 fail-open（截成 stamp 並開債）
     r_evil = _group_h_mut_reject_case(
@@ -2503,7 +2572,7 @@ def test_mutation_group_h_prefix_extract_matrix_turns_red(
     monkeypatch.setattr(
         _dph, "COMMITTEE_RUN_TARGET", h_sx["scripts"] / "committee_run.sh"
     )
-    _mutate_committee(h_sx, _group_h_prefix_mutant_transform)
+    _mutate_brief_conformance(h_sx, _group_h_prefix_mutant_transform)
     before_sx = _audit_bytes(h_sx["audit"])
     r_sx = _group_h_mut_reject_case(
         h_sx, monkeypatch, "brief-kind: stampx", session="mut-h-sx"
@@ -2520,7 +2589,7 @@ def test_mutation_group_h_prefix_extract_matrix_turns_red(
     monkeypatch.setattr(
         _dph, "COMMITTEE_RUN_TARGET", h_es["scripts"] / "committee_run.sh"
     )
-    _mutate_committee(h_es, _group_h_prefix_mutant_transform)
+    _mutate_brief_conformance(h_es, _group_h_prefix_mutant_transform)
     before_es = _audit_bytes(h_es["audit"])
     r_es = _group_h_mut_reject_case(
         h_es, monkeypatch, "brief-kind: evilstamp", session="mut-h-es"
