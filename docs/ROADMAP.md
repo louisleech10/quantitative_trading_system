@@ -48,6 +48,38 @@
   `GOV-DEXT-TEMPLATE-KIND`（`template_check.sh` 無 D 延伸檔 kind ⇒ `--spec <D延伸檔>` 永遠拒發 token）。
   兩者皆 fail-closed 未誤放行，各燒一輪派工。
 
+  **✅ 票 `GOV-DOC-CHECK-AT-WRITE` ＋ `GOV-DEXT-TEMPLATE-KIND` 完工（2026-08-02，`901a8d9`）**：
+  病根＝**治理文件的格式檢查點在消費端（派工/freeze）不在產出端（寫檔當下）**，
+  代價是「寫完→派工被擋→重寫→重派」，每次燒一整輪委員（本 session 4 輪、B4 批次 5 輪＝該批 38%）。
+  改法五處：`template_check.sh` 新增 **`dext` kind**（錨點取自 `FROZEN_DOC_AMENDMENT_PROCEDURE` §2）／
+  **`brief_conformance_check.sh`（新）**＝brief 合規閘唯一實作，`cx_run.sh` 與 `committee_run.sh` 皆改呼叫／
+  **`doc_format_precheck.sh`（新）**掛 PostToolUse `Edit|Write`，寫檔當下即檢查、exit 2 回灌 context／
+  `gate.sh` 對 `--spec <*.D-NNN.md>` 路由 dext／`gov_check.sh` 新增 1b 段對本次改動的 `docs/*.md` 全掃。
+  **測試 512 → 563 passed（+51）**，新增兩檔各附 mutation 探針證明可證偽。
+  3 輪 code review ＋ 1 輪 consult，findings 全數由**原提出方**確認真關閉：
+  `R1-P1-01`（`committee_run.sh` 另有第二份 parser 且開債早於完整檢查 ＝ audit `sequence 367` 孤兒債的真成因）／
+  `R1-P2-04`（`docs/*.D-NNN.md` 的 glob **跨 `/`**，巢狀路徑誤判 dext）／
+  `R2-P1-01`＋`R3-P1-01`（**兩次同型 fail-open**：`[ -f dep ] && …` 缺檔即靜默跳過並回報通過）。
+  **主委原提的結構性修法被 codex 實跑否決**（60 支 shell／命中 5／**真陽性 0**／且漏抓 `gate_check.sh:66`）→
+  改採委員版本，另立票見下 B-11／B-12。
+
+  **新票 B-11 `GOV-FAILCLOSED-DEP-GUARD`**（2026-08-02 三家裁定，**不阻塞 T1**）：
+  病根一句話（composer）＝「**治理檢查器把『依賴缺席』當成『檢查不適用』而非『檢查失敗』**」。
+  ⚠️ **主委原案（靜態探針當硬 gate ＋ `# OPTIONAL-DEP:` 註記豁免）已被實跑否決**——
+  誤判率 100% 且會漏抓真陽性；單純註記三家一致判為橡皮圖章。
+  **採委員改寫版**：靜態探針**降級為可解釋 tripwire 警告**／**隔離 runtime mutation 當硬 gate**／
+  豁免改為**可過期 registry**（`task-id`＋`owner`＋`expiry`＋理由＋對應 mutation test，每檔上限 2 條、
+  `gov_check` 印出清單、定期審計）／提供 `require` helper（僅在裸條件式被機械禁止時才有價值）。
+  範圍收窄為 `gov_check`／`gate`／`verify_hooks_health` 閉包，**非全 `scripts/*.sh`**。
+  優先序（composer）：**探針（強制）> helper（好寫）> 紀律（禁止）**。
+  已知未修的真陽性：`gate_check.sh:66` 的 `jq` fail-open。
+
+  **新票 B-12 `GOV-TESTHARNESS-SCRIPTLIST-SSOT`**：「隔離 repo 需要哪些腳本」的清單**散在至少 4 份 fixture**
+  （`test_stamp_taskid_inject._SCRIPT_NAMES`／`test_debt_emit` inline tuple／
+  `test_verify_gate_b3._setup_temp_git_repo` symlink 清單／`test_debt_clear`、`test_debt_gate` 各自的），
+  新增一支腳本要人肉改四處且**無任何機制提醒漏了哪份**——本 session 因此紅了 4 次（39／23／7／2 條）。
+  與 `GOV-FORMAT-SSOT` 同型（第 N 真相源），標的不同。
+
   **使用者 2026-08-01 定死三條**：①測試可質疑規則但**不准用統計手法或量測技巧充當達標**（中位數／去離群／取最小／放寬倍率皆不接受），認為規則錯就走委員會改 SPEC ②做不到就提案改 SPEC/TODO，不得硬幹繞路 ③**修訂凍結文件走延伸檔**（引用＋註明來龍去脈），避免同一份 SPEC 翻來覆去（就地改需重審 936 行 vs 延伸檔約 70 行）。
   **新發現治理債**：`verify_spec_stamp_delta.sh` 常數停在 v2.8（SPEC 已合法升 v2.9）→ 實跑 rc=1，而 TODO 檔頭仍以現在式宣稱該腳本證明「無其他未交代改動」＝**文件宣稱的護欄已腐爛**（票 `P16-SPEC-STAMP-DELTA-STALE`）；`todo_spec_crosscheck.sh`／`spec_fourway_check.sh` 自述僅為煙測，PASS 不等於已收斂。
   **B4 實作教訓**：①**新造的驗收工具必須與產品碼同輪受審**——B4 的 `verify_b4_independent.sh` 自己假綠（只驗存在性、綁錯測試），是主委在 brief 點名才抓到，**制度原無此條** ②**委員探針一律用隔離副本**，禁直接變異 repo 內 `scripts/*.sh`／`tests/**`（本批 `debt_clear.sh` 曾被並行探針清成 0 bytes，untracked git 救不回）③**凡變異產品檔或跑同一套驗證工具的輪次一律序列派工**（並行時委員會讀到他家探針中間態而拒絕背書）④**零 finding 的審查輪須補 `P3-00` sentinel**，禁 `debt_abandon`、禁手寫 `committee_debt_clear`（三家裁決 A′；殘留風險＝機檢仍接受空殼 P3-00，由 `GOV-NOFINDINGS-SENTINEL`／`GOV-VERIFY-RECEIPT-RUNNER` 承接）。
