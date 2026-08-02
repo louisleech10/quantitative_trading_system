@@ -448,6 +448,45 @@ _run_cli_and_emit() {
   }
   # 改法⑨：emit 之後才嘗試 register-output（不回捲 family_result）
   _maybe_register_stamp_output "${cli_rc}"
+
+  # ---------------------------------------------------------------------------
+  # GOV-FORMAT-SSOT 症狀 B（2026-08-02）：委員產出格式**交件當下**就檢查。
+  #
+  # 病根＝格式檢查在 reconcile 收集時才跑，交件端無任何機制擋下。
+  #   實證：本 session 最近 4 輪委員派工，**3 輪因格式缺陷無法正常銷帳**——
+  #   線 C 輪（composer `來源摘要` 非 hex digest）／fail-open consult 輪（composer 戳記寫成
+  #   `## RECONCILE-STAMP` 標題）／T2 review 輪（codex heading 帶尾綴文字＋composer 同前）。
+  #   每次的代價＝整輪只能 `--abandon --kind collection-failed`。
+  #
+  # ⚠️ **此處刻意不改 `result_state`**：SPEC:265 改法② 逐字定義
+  #   `success`＝「產出存在且非空且 `cli_rc==0`」。把「格式合規」加進 success 條件
+  #   是**收窄凍結契約**，須走 `FROZEN_DOC_AMENDMENT_PROCEDURE` 的 D 延伸（草案 D-003），
+  #   不得在此就地改。故本處只做**立即現形**：診斷寫 stderr、rc 反映不合格。
+  #   ⇒ 主委在交件當下就知道，不必等到 reconcile 才發現整輪要重來。
+  # 誠實邊界：`result_state` 未收窄前，守衛⑥（最新 success 拒重派）仍會把
+  #   「產出不合格」與「產出合格但主委不滿意」當同一件事 ⇒ 同輪重派仍受限，
+  #   完整解在 D-003。**此處不假裝已完全解決。**
+  # ---------------------------------------------------------------------------
+  # ⚠️ **只對「產 findings 的 brief-kind」檢查**（review／consult／closure）。
+  #    `impl`／`stamp` 產出依契約本來就沒有 canonical finding ID，
+  #    無條件檢查會把它們全判不合規（實測：44 條既有測試因此轉紅）。
+  #    判準與 `brief_conformance_check.sh` 的分類**同源**（同一組 kind 白名單）。
+  _fmt_rc=0
+  case "${_bk}" in
+    review|consult|closure)
+      if [ "${cli_rc}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
+        bash "${SCRIPT_DIR}/completeness_check.sh" --single "${out}" --family "${fam}" >&2 || _fmt_rc=$?
+      fi
+      ;;
+  esac
+  if [ "${_fmt_rc}" -ne 0 ]; then
+    echo "[cx_run] ⚠️ ${fam} 產出**格式不合規**（見上）：${out}" >&2
+    echo "[cx_run]    這會使 reconcile 收集時 completeness 拒銷、整輪只能 --abandon。" >&2
+    echo "[cx_run]    請於此時修正或重派，勿等到收集節點才發現。" >&2
+    echo "[cx_run] ${fam} done rc=${cli_rc} out=${out}（格式不合規）"
+    exit 3
+  fi
+
   echo "[cx_run] ${fam} done rc=${cli_rc} out=${out}"
   exit "${cli_rc}"
 }

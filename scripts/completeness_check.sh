@@ -1374,6 +1374,8 @@ print("id_coverage=%.4f" % float(d.get("id_coverage") or 0.0))
 LOCK_ARG=""
 SYNTH_ARG=""
 SELF_CHECK=0
+SINGLE_ARG=""
+SINGLE_FAMILY=""
 POSITIONAL=()
 
 while [ "$#" -gt 0 ]; do
@@ -1391,6 +1393,27 @@ while [ "$#" -gt 0 ]; do
     --self-check)
       SELF_CHECK=1
       shift
+      ;;
+    # ---------------------------------------------------------------------
+    # GOV-FORMAT-SSOT 症狀 B 主修（2026-08-02）：單檔格式檢查入口。
+    # 病根＝格式檢查在**委員交件之後**（reconcile 收集時）才跑，交件端無任何機制擋下。
+    #   實證：本 session 最近 4 輪委員派工，**3 輪因格式缺陷無法正常銷帳**
+    #   （線 C 輪 composer digest 非 hex／consult 輪 composer 戳記標題／T2 輪 codex 尾綴+composer 戳記）。
+    #   ⇒ 由 `cx_run.sh` 在判定 result_state 的那一刻呼叫本模式，不合格即當場現形。
+    # ⚠️ **本模式不新增任何規則**，只是換一個入口去跑既有的三個單檔驗證函式
+    #   （`extract_heading_ids` 含 family-binding＝`GOV-ID-NAMESPACE-CHECK`、
+    #    `_validate_finding_body`、`_check_same_file_dups`）。
+    #   新增規則＝第二真相源，正是本票要消滅的東西。
+    # 誠實邊界：**不驗跨檔完整性**（那需要 synth 與 lock，交件當下還不存在）。
+    --single)
+      [ "$#" -ge 2 ] || { echo "用法: --single <file> [--family <fam>]" >&2; exit 2; }
+      SINGLE_ARG="$2"
+      shift 2
+      ;;
+    --family)
+      [ "$#" -ge 2 ] || { echo "用法: --family <fam>" >&2; exit 2; }
+      SINGLE_FAMILY="$2"
+      shift 2
       ;;
     --)
       shift
@@ -1412,6 +1435,31 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+# ---- 單檔格式檢查（GOV-FORMAT-SSOT 症狀 B）----
+# 只跑既有的單檔驗證函式；不碰 lock／synth／跨檔完整性。
+if [ -n "${SINGLE_ARG}" ]; then
+  if [ -n "${LOCK_ARG}" ] || [ -n "${SYNTH_ARG}" ] || [ "${#POSITIONAL[@]}" -gt 0 ]; then
+    echo "COMPLETENESS FAIL: --single 不得與 --lock/--synth/argv 來源併用" >&2
+    exit 2
+  fi
+  [ -f "${SINGLE_ARG}" ] || { echo "COMPLETENESS FAIL: 檔不存在: ${SINGLE_ARG}" >&2; exit 1; }
+  _single_rc=0
+  # ① canonical ID schema + family-binding（GOV-ID-NAMESPACE-CHECK）
+  _single_ids="$(extract_heading_ids "${SINGLE_ARG}" "${SINGLE_FAMILY}")" || _single_rc=1
+  # ② 同檔重複 ID
+  _check_same_file_dups "${SINGLE_ARG}" "${_single_ids}" || _single_rc=1
+  # ③ 空殼 finding（缺 **斷言**/**碼證**）+ P0/P1 來源摘要 digest
+  _validate_finding_body "${SINGLE_ARG}" || _single_rc=1
+  if [ "${_single_rc}" -ne 0 ]; then
+    echo "COMPLETENESS FAIL(single): ${SINGLE_ARG} 格式不合規（見上）。" >&2
+    echo "  這是**交件當下**的檢查：現在修比等到 reconcile 收集時才發現省一整輪。" >&2
+    exit 1
+  fi
+  _single_n="$(printf '%s\n' "${_single_ids}" | grep -c '[^[:space:]]' || true)"
+  echo "COMPLETENESS PASS(single): ${SINGLE_ARG} — ${_single_n} 個 canonical ID，格式合規。"
+  exit 0
+fi
 
 if [ -n "${LOCK_ARG}" ]; then
   # ---- 正式 lock 路徑：禁 argv 來源覆寫 ----

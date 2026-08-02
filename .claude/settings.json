@@ -144,6 +144,16 @@
         ]
       }
     ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/status_marker_check.sh"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [

@@ -43,6 +43,12 @@ _SCRIPT_NAMES = (
     # GOV-DOC-CHECK-AT-WRITE（2026-08-02）：cx_run.sh 的 brief 合規閘 + stamp-target 驗證
     # 已抽成獨立腳本（一份實作、兩個呼叫點）。隔離 repo 少了它 → cx_run rc=127。
     "brief_conformance_check.sh",
+    # GOV-FORMAT-SSOT 症狀 B（2026-08-02）：cx_run.sh 交件當下呼叫 --single 檢查產出格式。
+    # 缺檔時 cx_run 會判「格式不合規」rc=3 —— 那是**檢查正確**（缺工具＝檢查沒跑），
+    # 不是測試該放寬，故補進清單。
+    # ⚠️ 本 session 第 5 次「新增依賴 → 某份 fixture 清單漏了它」＝票 GOV-TESTHARNESS-SCRIPTLIST-SSOT。
+    "completeness_check.sh",
+    "governance_families.sh",
 )
 
 
