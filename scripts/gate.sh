@@ -278,12 +278,21 @@ _check_adversarial_quality() {
   if ! awk '
       {
         line = $0
-        # 逐層剝除行首結構前綴（含巢狀，如「  - **Verdict**: X」）
+        # 逐層剝除行首結構前綴（含巢狀，如「  - **Verdict**: X」）。
+        # 終止性：每輪至少刪一個行首字元、字串嚴格變短，否則 line==before 離開（codex 已證）。
+        #
+        # ⚠️ 依**標準 markdown 語義**分辨「結構標記」與「一串符號」（`CODEX-R2-P2-01`）：
+        #   list marker／heading **必須後接空白**才算標記——`- Verdict`、`## Verdict`、`4. Verdict` 是；
+        #   `--- Verdict: X` 不是（`-` 後面是 `-`）。第一版寫成 `sub(/^[#*+-]+/…)` 貪吃整串，
+        #   使分隔線殘留 `--- Verdict: APPROVE` 被當成合法填實 Verdict。
+        #   emphasis（`*`/`**`）則**不要求**後接空白，故單獨處理。
         do {
           before = line
           sub(/^[[:space:]]+/, "", line)
-          sub(/^[#*+-]+/, "", line)
-          sub(/^[0-9]+[.)]/, "", line)
+          sub(/^[#]+[[:space:]]+/, "", line)      # heading：# 後須空白
+          sub(/^[-+*][[:space:]]+/, "", line)     # 無序清單：單一 marker + 空白
+          sub(/^[0-9]+[.)][[:space:]]+/, "", line) # 有序清單：N. / N) + 空白
+          sub(/^\*+/, "", line)                    # emphasis：**Verdict** 之類，無空白要求
         } while (line != before)
         if (line !~ /^Verdict/) next
         # 取冒號後內容；容許 Verdict 與冒號間有括號補充（如「Verdict（綜合）：」）

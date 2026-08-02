@@ -31706,3 +31706,27 @@ ts=2026-08-02 11:00:29 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-02T12:53:03Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-02T14:00:24Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-02T14:00:24Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-02T14:14:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-02T14:14:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "T2-R2-RECHECK", "ts": "2026-08-02T14:17:57Z"}
+=== 2026-08-02 22:17:57 | dispatch ===
+  ts=2026-08-02 22:17:57
+  kind=dispatch
+  intent=章程B8閉合:CODEX-R1-P1-01(list前綴誤拒)是否真關閉;另審逐層剝除有無過度剝除/無窮迴圈、排除blockquote是否正確、全語料diff有無新誤拒
+  risk=low
+  facts_asked=governance 589 passed 0 failed;verdict 測試 17→26 passed;gov_check --fast rc=0;health rc=0;新增放行案例含你舉的兩個反例,新增拒發案例含 blockquote/表格/散文黏貼
+  review_role=閉合複驗(原提出方)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260802-T2-R2-RECHECK-BRIEF.md", "brief_sha256": "a2ebb2ce58b7ac1a2ef753552f68611f1edfa067f77b7fdb33f8992d1d15678f", "brief_sha256_norm": "a2ebb2ce58b7ac1a2ef753552f68611f1edfa067f77b7fdb33f8992d1d15678f", "event": "committee_round_open", "event_id": "e96c97aa-474c-496e-ba03-16dbcda6c029", "expected_outputs": {"codex": "handoffs/20260802-t2-r2-recheck-codex.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex"], "producer": "audit_append.sh", "quorum_eligible": ["codex"], "round_id": "b9ecfa49-6658-49c3-bda3-bf57e223b548", "schema_version": 1, "sequence": 397, "session_name": "20260802-t2-r2-recheck", "task_id": "T2-R2-RECHECK", "ts": "2026-08-02T14:17:57Z"}
+{"actor": "cx_run", "attempt_id": "a1d31f60-3d15-4c79-8660-40a99885abe5", "cli_rc": "0", "event": "committee_family_result", "event_id": "ea12e5ba-203b-4ba9-874b-01e27118dfe2", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260802-t2-r2-recheck-codex.md", "output_sha256": "6dbdaaa6e9a59182939b1119d52c48836062d2367ae3c0d381bce5ec16d68a1b", "producer": "audit_append.sh", "result_state": "success", "round_id": "b9ecfa49-6658-49c3-bda3-bf57e223b548", "schema_version": 1, "sequence": 398, "ts": "2026-08-02T14:43:29Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "6f9aa583-b55b-4983-a0ef-430a719c9b6c", "lock_sha256": "48302485d9149b6557aaaea5cfc6059c4528870ec349070d6309f6c17ab4cc79", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex"], "round_id": "b9ecfa49-6658-49c3-bda3-bf57e223b548", "schema_version": 1, "sequence": 399, "session_id": "20260802-t2-r2-recheck", "synth_sha256": "efc54182cb805512e6128ceb7d4ba2d8d6e2eb9775c97d6f3d0fb75d9d1a4616", "ts": "2026-08-02T14:45:41Z"}
+{"event":"gate_deny","ts":"2026-08-02T14:48:45Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-02T14:48:45Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}

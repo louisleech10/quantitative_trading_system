@@ -113,6 +113,13 @@ def adv_factory():
         ("blockquote 前綴不得放行", "> 當時的 Verdict: 可派工（僅為引述歷史）"),
         ("表格列不得放行", "| 項目 | Verdict: 可合併 |"),
         ("散文行末黏貼 heading", "如前所述## Verdict：可合併"),
+        # CODEX-R2-P2-02：前三條都不是**精確** quote 形，未來放寬 marker 時擋不住重開散文洞
+        ("精確 blockquote", "> Verdict: APPROVE"),
+        ("精確 blockquote + 粗體", "> **Verdict**: 可合併"),
+        # CODEX-R2-P2-01：`[#*+-]+` 貪吃整串使分隔線殘留被當合法填實
+        ("分隔線殘留（---）", "--- Verdict: APPROVE"),
+        ("分隔線殘留（----）", "---- Verdict: APPROVE"),
+        ("marker 後無空白不算清單", "-Verdict: APPROVE"),
         # 註：**刻意不測「結論太短」**。兩次事故皆與長度無關，無事故支撐即不立規則；
         #     且長度規則會誤拒 `Verdict: OK`／`Verdict: 過`（見 gate.sh 該處註解）。
     ],
