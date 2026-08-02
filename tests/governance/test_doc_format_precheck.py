@@ -30,6 +30,10 @@ _NEEDED = (
     "brief_conformance_check.sh",
     "doc_format_precheck.sh",
     "coverage_check.sh",
+    # 2026-08-03：synth 分支呼叫它。缺檔時「已填」案例會被判成「未填」，
+    # 而「未填」案例仍 rc=2 ⇒ **拒發案例紅對了但原因是錯的**。
+    # 本 session 第 6 次撞上「新增依賴→某份 fixture 清單漏了它」＝票 GOV-TESTHARNESS-SCRIPTLIST-SSOT。
+    "verdict_filled_check.sh",
 )
 
 _VALID_DEXT = """# 某凍結檔 延伸 D-001
@@ -493,10 +497,102 @@ def test_mutation_nested_glob_restored_turns_red(tmp_path: Path) -> None:
     assert r.returncode == 0, "變異後巢狀檔應被誤判 dext 而放行"
 
 
-def test_mutation_precheck_exit_code_swallowed_turns_red(tmp_path: Path) -> None:
-    """把 rc 吞掉 → hook 永遠不報，等於沒掛。"""
+# ───────── 收斂檔 synth.md：Verdict 在**寫檔當下**就檢查（2026-08-03）─────────
+#
+# 病根＝檢查放在消費端：原本 `doc_format_precheck.sh` 有一行
+# `handoffs/reconcile/*) exit 0`（主委自己加的，理由「走 completeness 那條線」），
+# 但那條線在 `debt_clear` **銷帳時**才跑 ⇒ 填完 synth 到銷帳之間全程無紅燈。
+# T2 的 fail-open 事故起因正是 synth 的 Verdict 行放了佔位符。
+
+
+def _synth(root: Path, verdict_line: str) -> str:
+    d = root / "handoffs" / "reconcile" / "sess"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "synth.md").write_text(
+        f"# Reconcile — sess\n\n## 群集 / 處置\n\n{verdict_line}\n", encoding="utf-8"
+    )
+    return "handoffs/reconcile/sess/synth.md"
+
+
+@pytest.mark.parametrize(
+    ("label", "line"),
+    [
+        ("骨架未填行", "**Verdict** ← 未填。填寫時整行改寫為「Verdict」＋半形冒號＋結論"),
+        ("範本佔位", "## Verdict：{{可派工 / 需修補後派工 / 有根本缺陷需重作}}"),
+        ("待填佔位", "**Verdict: （待填…）**"),
+        ("只有標題無冒號", "## Verdict"),
+    ],
+)
+def test_synth_unfilled_verdict_rejected_at_write(
+    tmp_path: Path, label: str, line: str
+) -> None:
     root = _iso(tmp_path)
-    _mutate(root, "doc_format_precheck.sh", "exit 2\n", "exit 0\n  # MUTATED\n")
+    rel = _synth(root, line)
+    r = _run(root, "scripts/doc_format_precheck.sh", rel)
+    assert r.returncode == 2, f"[{label}] 未填的 Verdict 在寫檔當下應被擋\n{r.stdout}{r.stderr}"
+    assert "判定型別：synth" in r.stderr, f"[{label}] 未走 synth 路由"
+
+
+@pytest.mark.parametrize(
+    ("label", "line"),
+    [
+        ("粗體 + 冒號", "**Verdict**: 可合併"),
+        ("heading 全形冒號", "## Verdict：需修補後合併"),
+        ("括號補充", "Verdict（綜合）：不可合併"),
+    ],
+)
+def test_synth_filled_verdict_accepted_at_write(
+    tmp_path: Path, label: str, line: str
+) -> None:
+    root = _iso(tmp_path)
+    rel = _synth(root, line)
+    r = _run(root, "scripts/doc_format_precheck.sh", rel)
+    assert r.returncode == 0, f"[{label}] 已填的 Verdict 被誤擋\n{r.stdout}{r.stderr}"
+
+
+def test_reconcile_sources_not_checked(tmp_path: Path) -> None:
+    """收斂目錄下的**逐字副本**不由本腳本管（byte-faithful 保護區）。"""
+    root = _iso(tmp_path)
+    d = root / "handoffs" / "reconcile" / "sess" / "sources"
+    d.mkdir(parents=True)
+    (d / "x-codex.md").write_text("# 委員產出\n\n沒有 Verdict\n", encoding="utf-8")
+    r = _run(root, "scripts/doc_format_precheck.sh", "handoffs/reconcile/sess/sources/x-codex.md")
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_mutation_synth_route_placed_after_early_exit_turns_red(tmp_path: Path) -> None:
+    """把 synth 路由移回「判不出型別即放行」之後 → 檢查形同未掛。
+
+    這是實際踩過的 bug：`synth.md` 沒有 `brief-kind:`，kind 為空就提早 exit 0。
+    當時兩個反例**都 rc=0**——若只測「未填會不會擋」而沒測「已填會不會過」，
+    這個 bug 會被誤當成功。
+    """
+    root = _iso(tmp_path)
+    _mutate(
+        root,
+        "doc_format_precheck.sh",
+        '    handoffs/reconcile/*/synth.md) kind="synth" ;;\n',
+        "    # MUTATED: synth 路由移除\n",
+    )
+    rel = _synth(root, "**Verdict** ← 未填")
+    r = _run(root, "scripts/doc_format_precheck.sh", rel)
+    assert r.returncode == 0, "變異後未填的 synth 應被誤放行（重現當時的 bug）"
+
+
+def test_mutation_precheck_exit_code_swallowed_turns_red(tmp_path: Path) -> None:
+    """把 rc 吞掉 → hook 永遠不報，等於沒掛。
+
+    ⚠️ 錨點必須**唯一**：2026-08-03 新增 synth 分支後檔內出現第二個 `exit 2`，
+    原本以裸 `exit 2` 當錨點會變異到 synth 那個，測不到本檔要測的最終出口
+    （實測全套時此條轉紅才發現）。故改用「最終錯誤區塊 + exit 2」整段當錨點。
+    """
+    root = _iso(tmp_path)
+    _mutate(
+        root,
+        "doc_format_precheck.sh",
+        '} >&2\nexit 2\n',
+        '} >&2\nexit 0  # MUTATED\n',
+    )
     (root / "docs" / "X.D-006.md").write_text("# 壞\n\n改什麼: 無\n", encoding="utf-8")
     r = _run(root, "scripts/doc_format_precheck.sh", "docs/X.D-006.md")
     assert r.returncode == 0, "變異後應誤放行"

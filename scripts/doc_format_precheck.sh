@@ -88,6 +88,16 @@ if [ -z "${kind}" ]; then
   esac
 fi
 
+# ⚠️ 收斂檔路由**必須在「判不出型別即放行」之前**。
+#   第一版把它放在那行之後 ⇒ `synth.md` 沒有 `brief-kind:` ⇒ kind 為空 ⇒ 提早 exit 0，
+#   整段收斂檔檢查形同未掛（實測兩個反例皆 rc=0 才發現）。
+if [ -z "${kind}" ]; then
+  case "${rel}" in
+    handoffs/reconcile/*/synth.md) kind="synth" ;;
+    handoffs/reconcile/*)          exit 0 ;;   # sources/ 逐字副本、sources.lock 不由本腳本管
+  esac
+fi
+
 # brief：不看檔名看內容（brief 檔名無固定樣式），行首 brief-kind: 是唯一可靠標記
 if [ -z "${kind}" ]; then
   case "${rel}" in
@@ -102,10 +112,35 @@ fi
 # 判不出型別 → 不適用，放行
 [ -n "${kind}" ] || exit 0
 
-# 收斂檔（synth.md）與委員產出走 completeness/stamps 那條線，不是本腳本的事
-case "${rel}" in
-  handoffs/reconcile/*) exit 0 ;;
-esac
+# ⚠️ **不得再排除收斂檔**（2026-08-03 使用者定位「檢驗審查放在錯誤的地方」）。
+#
+# 初版此處寫 `handoffs/reconcile/*) exit 0`，理由是「走 completeness 那條線」。
+#   但那條線在 **`debt_clear` 銷帳時**才跑 ⇒ 主委填完 `synth.md` 到銷帳之間，
+#   Verdict 未填／格式錯誤**全程無紅燈**。這正是「檢查放在消費端」的實例，而且是主委親手加的。
+#   T2 的 fail-open 事故起因即為 synth 的 Verdict 行放了佔位符（`CODEX-R2-P1-13`）。
+# ⇒ 改為：收斂檔在**寫檔當下**即檢查其 Verdict 是否已填實（與 `gate.sh` D-1 同判準，見下）。
+#   跨檔完整性（來源 ID 是否全在綜合）仍由 `completeness_check --lock` 負責——
+#   那需要 lock 與全部來源，寫單一檔時本來就無法判定，屬**合理**的消費端檢查。
+# （實際路由已上移至「判不出型別即放行」之前，見上方。）
+
+# 收斂檔：寫檔當下只驗「Verdict 已填實」（與 gate.sh D-1 **同一份實作**）。
+# 跨檔完整性交 completeness_check --lock —— 那需要 lock 與全部來源，寫單一檔時無法判定。
+# ⚠️ 這段刻意放在 `$( )` **外面**：把多行 echo 塞進命令替換會踩到引號解析問題
+#    （實測 runtime 報 `syntax error near unexpected token`，而 `bash -n` 抓不到）。
+if [ "${kind}" = "synth" ]; then
+  if bash "${SCRIPT_DIR}/verdict_filled_check.sh" "${target}"; then
+    exit 0
+  fi
+  {
+    echo "【文件格式產出端檢查未過】${rel}（判定型別：synth）"
+    echo "收斂檔的 Verdict 未填實，或格式不符 gate.sh D-1 判準。"
+    echo "  需要：行首 Verdict（可帶括號補充）+ 冒號 + 實質結論"
+    echo "  不接受：範本佔位、待填、未填、空結論、散文中順口提及"
+    echo "---"
+    echo "未填實會在 debt_clear 銷帳時被擋 —— 現在補比那時省一輪。"
+  } >&2
+  exit 2
+fi
 
 out="$(
   if [ "${kind}" = "brief" ]; then

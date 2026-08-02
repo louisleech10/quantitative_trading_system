@@ -275,51 +275,10 @@ _check_adversarial_quality() {
   #   也不驗結論屬於哪個枚舉——實測顯示合法詞彙橫跨 派工／合併／commit／APPROVE／PASS 等多族，
   #   硬套枚舉會製造大量誤拒。**亦不做 markdown fence 解析**：
   #   fenced code block 內的 `Verdict: X` 仍會被接受（`CODEX-R1-P2-02`，已知且明示，非疏漏）。
-  if ! awk '
-      {
-        line = $0
-        # 逐層剝除行首結構前綴（含巢狀，如「  - **Verdict**: X」）。
-        # 終止性：每輪至少刪一個行首字元、字串嚴格變短，否則 line==before 離開（codex 已證）。
-        #
-        # ⚠️ 依**標準 markdown 語義**分辨「結構標記」與「一串符號」（`CODEX-R2-P2-01`）：
-        #   list marker／heading **必須後接空白**才算標記——`- Verdict`、`## Verdict`、`4. Verdict` 是；
-        #   `--- Verdict: X` 不是（`-` 後面是 `-`）。第一版寫成 `sub(/^[#*+-]+/…)` 貪吃整串，
-        #   使分隔線殘留 `--- Verdict: APPROVE` 被當成合法填實 Verdict。
-        #   emphasis（`*`/`**`）則**不要求**後接空白，故單獨處理。
-        do {
-          before = line
-          sub(/^[[:space:]]+/, "", line)
-          sub(/^[#]+[[:space:]]+/, "", line)      # heading：# 後須空白
-          sub(/^[-+*][[:space:]]+/, "", line)     # 無序清單：單一 marker + 空白
-          sub(/^[0-9]+[.)][[:space:]]+/, "", line) # 有序清單：N. / N) + 空白
-          sub(/^\*+/, "", line)                    # emphasis：**Verdict** 之類，無空白要求
-        } while (line != before)
-        if (line !~ /^Verdict/) next
-        # 取冒號後內容；容許 Verdict 與冒號間有括號補充（如「Verdict（綜合）：」）
-        if (match(line, /[:：]/) == 0) next
-        prefix = substr(line, 1, RSTART - 1)
-        # 冒號前除了 Verdict 只允許括號補充與粗體記號，不允許其他實質文字
-        gsub(/[[:space:]]|\*/, "", prefix)
-        if (prefix !~ /^Verdict(\(.*\)|（.*）)?$/) next
-        rest = substr(line, RSTART + RLENGTH)
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", rest)
-        gsub(/\*/, "", rest)
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", rest)
-        if (rest == "") next
-        # 樣板殘留 → 不算已填
-        if (rest ~ /\{\{/) next
-        if (rest ~ /^[(（][[:space:]]*(待填|TBD|xxx|XXX|填此)/) next
-        if (rest ~ /^(待填|TBD|tbd|xxx|XXX|填此|未填)/) next
-        if (rest ~ /←[[:space:]]*未填/) next
-        if (rest ~ /^\.\.\.$/ || rest ~ /^…$/) next
-        # ⚠️ **刻意不設「結論最短長度」**：兩次事故（{{}} 範本佔位、散文誤判）都與長度無關，
-        #    沒有任何事故支撐長度規則；而加了它會誤拒 `Verdict: OK`／`Verdict: 過` 這類合法短結論。
-        #    另有實作陷阱：BSD awk 的 length() 以**位元組**計，中文單字＝3 bytes，
-        #    規則本身在 CJK 上也不成立。⇒ 依「規則＝傷疤，非偏好」，無事故即不立規則。
-        found = 1
-        exit
-      }
-      END { exit(found ? 0 : 1) }' "${adv_file}"; then
+  # ⚠️ 判準本體已抽到 `scripts/verdict_filled_check.sh`（2026-08-03）——**唯一實作**。
+  #   同一判準有兩個消費點：本處（派工前 D-1）與 `doc_format_precheck.sh`（收斂檔寫檔當下）。
+  #   複製一份到第二個呼叫點＝第二真相源，必然漂移。判準細節與事故出處見該腳本檔頭。
+  if ! bash "${SCRIPT_DIR}/verdict_filled_check.sh" "${adv_file}"; then
     echo "ERROR: --adversarial 檔缺**已填實的** Verdict 行:${adv_file}（D-1 拒發）"
     echo "  需要:行首 'Verdict'（可帶括號補充）+ 冒號 + 實質結論；"
     echo "  不接受:{{…}} 範本佔位／（待填）／← 未填／空結論。"

@@ -196,16 +196,16 @@ def test_mutation_restore_loose_regex_turns_red(tmp_path: Path, adv_factory) -> 
             shutil.copy2(src, dst)
             if src.suffix == ".sh":
                 dst.chmod(0o755)
-    gate = iso / "scripts" / "gate.sh"
-    text = gate.read_text(encoding="utf-8")
-    start = text.find("  if ! awk '")
-    end = text.find('    return 1\n  fi\n', start)
-    assert start != -1 and end != -1 and start < end, "Verdict 檢查區塊錨點不存在"
-    loose = (
-        "  if ! grep -qE 'Verdict[[:space:]]*[:：]' \"${adv_file}\"; then\n"
-        '    echo "ERROR: MUTATED loose verdict check"\n'
-    )
-    gate.write_text(text[:start] + loose + text[end:], encoding="utf-8")
+    # 判準本體已抽到 verdict_filled_check.sh（2026-08-03，唯一實作）。
+    # 變異目標隨之改為**那支腳本**——變異 gate.sh 的呼叫行只會讓它找不到檔（rc≠0），
+    # 那是「紅錯原因」，測不到判準本身。
+    gate = iso / "scripts" / "gate.sh"   # 仍跑隔離副本的 gate.sh，它會呼叫被變異的 checker
+    vfc = iso / "scripts" / "verdict_filled_check.sh"
+    text = vfc.read_text(encoding="utf-8")
+    start = text.find("awk '\n")
+    assert start != -1, "verdict_filled_check.sh 的 awk 判準錨點不存在"
+    loose = 'grep -qE \'Verdict[[:space:]]*[:：]\' "${f}"\n'
+    vfc.write_text(text[:start] + loose, encoding="utf-8")
 
     adv = adv_factory("## Verdict：{{可派工 / 需修補後派工 / 有根本缺陷需重作}}", "mut")
     gate_tmp = tmp_path / "gate_dir"   # 走 tmp_path，pytest 自行回收（CODEX-R1-P2-03）
