@@ -42,8 +42,10 @@ fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-xhigh}"
 # ⚠️ 必須【錨定行首】+【拒收多筆不一致宣告】(CODEX-R5-P0-01,2026-07-29 實跑 probe 證實):
 #    未錨定時,brief 內任何一行註解如 `# brief-kind: review` 會被 head -1 取到而蓋掉真宣告
 #    → 角色閘被繞過(非 implementer 可跑 impl)。此解析是角色閘的判定依據,故 fail-closed。
-_bk_all="$(grep -oE '^brief-kind:[[:space:]]*[a-z]+' "${brief}" 2>/dev/null | sed 's/.*:[[:space:]]*//' | sort -u)"
-_bk_n="$(printf '%s\n' "${_bk_all}" | grep -c '[a-z]' || true)"
+# 完整擷取宣告值（行首 brief-kind: → 行尾，trim 尾隨空白），再整值比對白名單。
+# 禁止 grep -oE '...[a-z]+' 前綴擷取：stamp-evil 會被截成 stamp（與 committee_run 同步，CR2 群 E）。
+_bk_all="$(grep -E '^brief-kind:' "${brief}" 2>/dev/null | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
+_bk_n="$(printf '%s\n' "${_bk_all}" | grep -c '[^[:space:]]' || true)"
 if [ "${_bk_n}" -gt 1 ]; then
   echo "ERROR: brief 有多個【不一致】的行首 'brief-kind:' 宣告: $(printf '%s' "${_bk_all}" | tr '\n' ' ')"
   echo "  (角色閘與 brief 合規閘都依此判定,歧義一律 fail-closed)"
@@ -77,6 +79,37 @@ case "${_bk}" in
   impl|stamp) : ;;
   *) echo "ERROR: 未知 brief-kind: ${_bk}(允許 review|consult|closure|impl|stamp)"; exit 2 ;;
 esac
+
+# ---------------------------------------------------------------------------
+# GOV-STAMP-TASKID-INJECT / D-001 §D3 defense-in-depth：brief-kind=stamp 驗證 stamp-target
+# 與 committee_run.sh 同判準；涵蓋直呼 cx_run 路徑（不經 committee_run）。
+# 失敗 rc=2；其餘 brief-kind 不解析、不強制。
+# ---------------------------------------------------------------------------
+stamp_target=""
+if [ "${_bk}" = "stamp" ]; then
+  _st_all="$(grep -E '^stamp-target:' "${brief}" 2>/dev/null | sed 's/^stamp-target:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
+  _st_n="$(printf '%s\n' "${_st_all}" | grep -c '.' || true)"
+  if [ "${_st_n}" -eq 0 ]; then
+    echo "ERROR: brief-kind=stamp 缺 stamp-target: 欄" >&2
+    exit 2
+  fi
+  if [ "${_st_n}" -gt 1 ]; then
+    echo "ERROR: stamp-target 有多個【不一致】宣告: $(printf '%s' "${_st_all}" | tr '\n' ' ')" >&2
+    exit 2
+  fi
+  stamp_target="$(printf '%s\n' "${_st_all}" | head -1)"
+  case "${stamp_target}" in
+    handoffs/*) : ;;
+    *) echo "ERROR: stamp-target 須 handoffs/ 前綴: ${stamp_target}" >&2; exit 2 ;;
+  esac
+  case "${stamp_target}" in
+    *"/../"*|"../"*|*".."*)
+      echo "ERROR: stamp-target 不得含 ..: ${stamp_target}" >&2
+      exit 2
+      ;;
+  esac
+  [ -f "${stamp_target}" ] || { echo "ERROR: stamp-target 檔不存在: ${stamp_target}" >&2; exit 2; }
+fi
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # 角色閘(2026-07-29 使用者定;防「Claude 憑腦中模型選家族」)
@@ -187,6 +220,7 @@ _assert_round_preconditions() {
 import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -289,6 +323,24 @@ if results:
             file=sys.stderr,
         )
         sys.exit(1)
+
+# 第⑦道前置：open_ev.task_id 必填且非空（GOV-STAMP-TASKID-INJECT / D-001 §D2）
+# 錯誤一律 stderr；stdout 僅在成功時輸出單一 task_id（不得混入錯誤訊息）
+task_id = open_ev.get("task_id")
+if task_id is None or (isinstance(task_id, str) and task_id == ""):
+    print("ERROR: open_ev 缺 task_id 或為空字串（第⑦道前置，拒派）", file=sys.stderr)
+    sys.exit(1)
+if not isinstance(task_id, str):
+    print(f"ERROR: open_ev.task_id 型別非法: {type(task_id).__name__}", file=sys.stderr)
+    sys.exit(1)
+# 白名單：擋 ERE 來源污染；`.` 等仍合法者於 grep 內插前再逐字跳脫
+if re.fullmatch(r"[A-Za-z0-9._-]+", task_id) is None:
+    print(
+        f"ERROR: open_ev.task_id 不符合白名單 ^[A-Za-z0-9._-]+$（第⑦道前置，拒派）: {task_id!r}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+print(task_id)
 sys.exit(0)
 PY
 }
@@ -333,8 +385,10 @@ _emit_family_result() {
 CODEX="/opt/homebrew/bin/codex"
 GROK="/Users/louis/.grok/bin/grok"
 
-# 固定極簡 prompt(無反引號/特殊字元)
-prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。"
+# prompt 延後至前置成功並捕獲 task_id 後組建（D-001 §D2 / TODO Task 1.1 改法④）。
+# :337 原字串錨點僅標示模板語意，非執行順序；task_id 不得從 env 讀。
+prompt=""
+task_id=""
 
 # 測試 stub（反 bypass：CX_STUB_MODE 必須綁 GOVERNANCE_TEST_HARNESS=1）
 # success=寫非空產出 rc0；fail_rc=CLI 非0 無產出；fail_empty=rc0 但空檔
@@ -343,10 +397,62 @@ if [ -n "${CX_STUB_MODE:-}" ] && [ "${GOVERNANCE_TEST_HARNESS:-}" != "1" ]; then
   exit 1
 fi
 
+# harness-only prompt capture（V1 CLI spy）：僅 GOVERNANCE_TEST_HARNESS=1 時生效
+_capture_prompt_if_harness() {
+  if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ] && [ -n "${CX_PROMPT_CAPTURE:-}" ]; then
+    printf '%s' "${prompt}" > "${CX_PROMPT_CAPTURE}"
+  fi
+}
+
+# GOV-STAMP-TASKID-INJECT / D-001 §D3 改法⑨：brief-kind=stamp 且三條件成立才 register-output
+# 合法 no-op vs 註冊失敗必須機械可分（V13）；皆不改 cx_run rc、不回捲 family_result。
+_maybe_register_stamp_output() {
+  local cli_rc="$1"
+  # 僅 stamp kind
+  [ "${_bk}" = "stamp" ] || return 0
+  [ -n "${stamp_target}" ] || return 0
+  [ -n "${task_id}" ] || return 0
+
+  # 條件①：result_state=success（cli_rc=0 且產出非空）
+  if [ "${cli_rc}" -ne 0 ] 2>/dev/null || [ ! -s "${out}" ]; then
+    return 0
+  fi
+
+  # 條件②：單行同時含 fam / APPROVED / 日期 / task:<task_id> / sha256:<body_hash>
+  # reconcile_body_hash.sh rc≠0（缺 ## 戳記 等）→ 條件②不成立 → 合法 no-op
+  # stderr 吞掉，不得逸出成 cx_run 錯誤輸出；不得以空字串當 hash 繼續比對
+  local body_hash
+  body_hash="$(bash "${SCRIPT_DIR}/reconcile_body_hash.sh" "${stamp_target}" 2>/dev/null)" || return 0
+  [ -n "${body_hash}" ] || return 0
+
+  # 內插前逐字跳脫 ERE metachar（白名單擋非法來源；跳脫擋白名單內仍合法的 .）
+  # 跳脫字元：. * + ? [ ] ( ) { } | ^ $ \
+  # fam（SoT）／body_hash（sha256 hex）同樣內插 → 一併跳脫
+  local fam_e task_e hash_e
+  fam_e="$(printf '%s' "${fam}" | sed -e 's/[][\\.^$*+?(){}|]/\\&/g')"
+  task_e="$(printf '%s' "${task_id}" | sed -e 's/[][\\.^$*+?(){}|]/\\&/g')"
+  hash_e="$(printf '%s' "${body_hash}" | sed -e 's/[][\\.^$*+?(){}|]/\\&/g')"
+
+  # 單一 grep -E 對同一行一次匹配（明文禁止兩次獨立 grep 取交集）
+  # 順序無關：同一行同時錨定 sha256:<hash> 與 task:<id>（兩種合法順序）
+  # 採用 alternation 而非兩次檔案級 grep，避免跨行誤配
+  if ! grep -qE "^RECONCILE-STAMP:[[:space:]]+${fam_e}[[:space:]]+APPROVED[[:space:]]+[0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]+(sha256:${hash_e}[[:space:]]+task:${task_e}|task:${task_e}[[:space:]]+sha256:${hash_e})([[:space:]]|$)" "${stamp_target}"; then
+    return 0
+  fi
+
+  # 條件③：家族名取 ${fam}（$1 直取），已用上方 ${fam}
+  if ! bash "${SCRIPT_DIR}/gate.sh" register-output "${task_id}" "${stamp_target}"; then
+    # 註冊失敗（與合法 no-op 機械可分）：可辨識錯誤字串、rc 不變、不回捲 family_result
+    echo "ERROR: register-output 失敗（待人工補記）task=${task_id} path=${stamp_target}" >&2
+  fi
+  return 0
+}
+
 _run_cli_and_emit() {
   # 前置已過；執行 CLI（或 stub）後寫 result。CLI 不在 audit 鎖內。
   # 契約（SPEC Task 1.3 改法④）：CLI launch failure 仍須寫 failed result 帶 cli_rc，不得靜默 exit。
   local cli_rc=0
+  _capture_prompt_if_harness
   if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ] && [ -n "${CX_STUB_MODE:-}" ]; then
     case "${CX_STUB_MODE}" in
       success)
@@ -405,22 +511,35 @@ _run_cli_and_emit() {
     echo "ERROR: 寫入 committee_family_result 失敗" >&2
     exit 1
   }
+  # 改法⑨：emit 之後才嘗試 register-output（不回捲 family_result）
+  _maybe_register_stamp_output "${cli_rc}"
   echo "[cx_run] ${fam} done rc=${cli_rc} out=${out}"
   exit "${cli_rc}"
 }
 
+# 前置成功後捕獲 task_id（stdout），再組 prompt，再跑 CLI
+_prepare_and_run() {
+  # 捕獲 stdout 為 task_id；錯誤訊息在 stderr，不得混入。
+  # 用檔案重導（非 $( )）以免子 shell 吃掉函式內 export 等副作用
+  # （test_b3_mutation_round_id_guard 依賴此行為；D-001 §D2 仍以 stdout 回傳 task_id）
+  _taskid_file="$(mktemp)"
+  trap 'rm -f "${_taskid_file}"' EXIT
+  _assert_round_preconditions "${fam}" "${brief}" "${out}" > "${_taskid_file}" || exit $?
+  task_id="$(cat "${_taskid_file}")"
+  # 固定極簡 prompt + task-id 注入句（逐字，D-001 §D2）
+  prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。"
+  _run_cli_and_emit
+}
+
 case "${fam}" in
   codex)
-    _assert_round_preconditions "${fam}" "${brief}" "${out}" || exit $?
-    _run_cli_and_emit
+    _prepare_and_run
     ;;
   grok)
-    _assert_round_preconditions "${fam}" "${brief}" "${out}" || exit $?
-    _run_cli_and_emit
+    _prepare_and_run
     ;;
   composer)
-    _assert_round_preconditions "${fam}" "${brief}" "${out}" || exit $?
-    _run_cli_and_emit
+    _prepare_and_run
     ;;
   *) echo "ERROR: family 須為 codex|grok|composer, 得到: ${fam}"; exit 2 ;;
 esac

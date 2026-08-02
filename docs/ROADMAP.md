@@ -20,14 +20,33 @@
   **審查歷程**：舊版 R1–R12 十二輪 + 新版 **R1–R9 九輪**，findings `34→17→12→9→7→7→8→2→0`；**R4 起零設計問題、零設計翻案**。三家 **RECONCILE-STAMP 全 APPROVED**（`reconcile_stamps_check.sh` rc=0，body sha `908abb3c…`；`completeness_check --lock` rc=0；`template_check` rc=0）。**🛑 白話閘已由使用者放行（2026-07-28）**。
   **實作進度 6/8（2026-07-30 更新）**：**B1**（Task 0.1 registry v2 契約＋lock 工具鏈 identity binding，`8a12c36`）／**B2**（Task 1.1 `audit_append.sh` 唯一寫入點＋原子 predicate+append，`9bfcb58`）／**B3**（Task 1.2 `committee_run.sh` 開債＋Task 1.3 `cx_run.sh` 記每家結果，`f98862c`）／**B4**（Task 2.1 `debt_ledger.sh` 只讀帳本＋Task 2.2 `debt_clear.sh` 唯一銷帳路徑）皆已 push。`pytest tests/governance -q` **287→431 passed**。**B5 進行中（2026-08-01）**：Task 3.1 `gate.sh` 債務閘已上線並**實際擋下主委派工**（首次生效）；雙家族序列審查抓出 10 條 findings／5 群集／3 個 BLOCKING，其中**兩個 fail-open 由 codex 隔離重現**（快取鍵缺語意輸入→stale allow；sidecar 可預置毒化）。修補採「整個移除快取」一刀解三洞。閉合複驗再抓 3 條，故 B5 拆三線：**線 A**（壞行被 prefilter 吞掉、違反 B4 已簽核 fail-closed ＋ `verify_b2` §7 語意面盲）已修並經主委獨立變異複驗；**線 B** 凍結文件修訂程序 **✅ 已定案入 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md`（2026-08-01，三家戳記 `a36725a55cd3`）**；**線 C** 債務事件分檔。**B5 完工判定綁在線 C（composer 裁定），線 C 閉合前一律 NOT-CLOSED。** 之後才是 Task 3.2 與 B3 遺留必做項 `P16-GATE-D1-STRUCTURED-VERDICT`（`gate.sh:246` Verdict 正則過鬆，骨架佔位行即可命中，曾據此實際做出 fail-open）。
   **B5 關鍵發現（實查，前人未提）**：`.claude/gate/audit.log` 30,232 行中**債務紀錄僅 176 行（0.58%）**，92.6% 是與債無關的舊式散文 gate 派工紀錄 ⇒ 效能問題根因是**債務事件與其他紀錄共用同一個檔**，非掃描演算法；分檔後掃描量降至 176 行，prefilter 不再需要，連帶消滅其副作用。
+  **🔴 上述效能立論已於 2026-08-02 被實測推翻**：`debt_ledger --has-open` 對 30,960 行實跑 **46–64ms**
+  （SPEC 本就要求 <100ms，早已達標）；30,960 行中真正被解析的 JSON 僅 2,448 行，其餘非 `{` 開頭只做一次字首判斷即跳過。
+  且 92% 散文**仍在持續產生**（`gate.sh:616-625` 每次發 token 寫 15 行）、**且不可刪**——內含 `intent`／`risk`／
+  `facts_asked`／`review_role`／`adversarial`／`spec`／`todo` 等欄，而 `committee_dispatch` JSON 只有 6 欄。
+  `gate_deny` 僅 366 行（1.2%），單搬它收益趨近於零。
+  ⇒ **線 C 不得以效能立論**；唯一站得住的版本＝把 15 行散文壓成 1 行 JSON（欄位一字不減）＋歸檔既有散文，
+  **只買到衛生與成長率，不買效能也不買正確性**，屬 cleanup 非 fix。草案見
+  `handoffs/20260802-LINEC-AUDIT-SPLIT-SPEC-DRAFT.md`，**開工前須使用者裁定是否值得花這個工**。
   **線 B 定案記錄（2026-08-01）**：v1.0 極簡版 147 行，**範圍＝只擋意外不防蓄意、零新增檢查器**；
   v0.1–v0.6 六版草案全部作廢。**最大產出是失控機制的定性**：主委把「修訂約定」做成「防蓄意繞過系統」，
   致對抗審成無限迴圈（寫防護→找洞→補洞→找新洞）——**委員每輪都對，問題在題目沒邊界**。
   使用者定「沒 100% 解就先解 95%、殘留具名記錄、再犯再說」後，R2–R6 全判「不可實作」的同一批委員，
   **R7 一致給出「文字修補即可定案」**。成本：7 輪、33 次派工、約 50% 為純程序開銷（戳記／provenance 補正／格式補件）。
   新增 `scripts/draft_selfcheck.sh`（起草缺陷五條檢查，**ADVISORY 不得掛 gate**，R4 收斂裁定）。
-  **新票 `GOV-STAMP-TASKID-INJECT`**：`cx_run.sh` 已注入 `ROUND_ID` 卻未注入 `TASK_ID`，
-  致委員手抄 task-id 與 provenance pending，本 session 因此多花 5 輪補正。
+  **✅ 票 `GOV-STAMP-TASKID-INJECT` 完工（2026-08-02）**：原病＝`cx_run.sh` 已注入 `ROUND_ID` 卻未注入 `TASK_ID`，
+  致委員手抄 task-id 與 provenance pending。**修法走 `FROZEN_DOC_AMENDMENT_PROCEDURE.md` 的 D 延伸**
+  （`docs/P16_COMMITTEE_DEBT_SPEC.D-001.md`，該程序**首個實戰案例**）：`task_id` 由 audit 的 `committee_round_open`
+  導出並注入 prompt（**明文否決 env 通道**，避免與 audit SSOT 分叉）；`brief-kind=stamp` 於戳記落地後自動
+  `register-output`；`stamp-target` 驗證上移至 `committee_run.sh` **`gate.sh dispatch` 之前**（audit 逐位元組零新增）。
+  `pytest tests/governance -q` **469→512 passed**、`gov_check.sh` rc=0、新檔 65 tests＋21 mutation probes。
+  流程＝D-001（R1 對抗審 9 findings→R2 codex REJECTED→R3 三家 APPROVED）＋TODO（5 findings→三家 APPROVED）
+  ＋實作 7 輪＋code review 3 輪（CR1 7 條含 regex fail-open／CR2 1 條 P1／CR3 零活缺陷）＋閉合輪三家判可 commit；
+  **五份收斂檔 `reconcile_stamps_check.sh` 全數 rc=0**。
+  **本票暴露的兩條制度缺陷（新票，見 backlog B-9/B-10）**：`GOV-DOCS-STAMP-PROVENANCE`（`docs/` 內延伸檔
+  拿不到可過機檢的戳記，因 `register-output` 只收 `handoffs/`；程序 §3.2 與 §3.1／§2 自相矛盾，修法須走 §5 的 R）、
+  `GOV-DEXT-TEMPLATE-KIND`（`template_check.sh` 無 D 延伸檔 kind ⇒ `--spec <D延伸檔>` 永遠拒發 token）。
+  兩者皆 fail-closed 未誤放行，各燒一輪派工。
 
   **使用者 2026-08-01 定死三條**：①測試可質疑規則但**不准用統計手法或量測技巧充當達標**（中位數／去離群／取最小／放寬倍率皆不接受），認為規則錯就走委員會改 SPEC ②做不到就提案改 SPEC/TODO，不得硬幹繞路 ③**修訂凍結文件走延伸檔**（引用＋註明來龍去脈），避免同一份 SPEC 翻來覆去（就地改需重審 936 行 vs 延伸檔約 70 行）。
   **新發現治理債**：`verify_spec_stamp_delta.sh` 常數停在 v2.8（SPEC 已合法升 v2.9）→ 實跑 rc=1，而 TODO 檔頭仍以現在式宣稱該腳本證明「無其他未交代改動」＝**文件宣稱的護欄已腐爛**（票 `P16-SPEC-STAMP-DELTA-STALE`）；`todo_spec_crosscheck.sh`／`spec_fourway_check.sh` 自述僅為煙測，PASS 不等於已收斂。

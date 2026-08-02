@@ -91,6 +91,57 @@ done
 [ -f "${brief}" ] || { echo "ERROR: brief 不存在: ${brief}" >&2; exit 2; }
 case "${out_prefix}" in handoffs/*) : ;; *) echo "ERROR: out前綴須在 handoffs/: ${out_prefix}" >&2; exit 2 ;; esac
 
+# ---------------------------------------------------------------------------
+# GOV-STAMP-TASKID-INJECT / D-001 §D3：brief-kind 與 stamp-target 驗證
+# 必須在 gate.sh dispatch 之前 → 失敗時 audit 真正零新增。
+# 缺 brief-kind:／未知 brief-kind 一律 exit 2（與 cx_run.sh:53-79 對齊，防 γ 陷阱）。
+# stamp 另驗 stamp-target；其餘 kind 不強制 stamp-target。
+# ---------------------------------------------------------------------------
+# 完整擷取宣告值（行首 brief-kind: → 行尾，trim 尾隨空白），再整值比對白名單。
+# 禁止 grep -oE '...[a-z]+' 前綴擷取：stamp-evil 會被截成 stamp（CR2 群 E / V19）。
+_cr_bk_all="$(grep -E '^brief-kind:' "${brief}" 2>/dev/null | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
+_cr_bk_n="$(printf '%s\n' "${_cr_bk_all}" | grep -c '[^[:space:]]' || true)"
+if [ "${_cr_bk_n}" -gt 1 ]; then
+  echo "ERROR: brief 有多個【不一致】的行首 'brief-kind:' 宣告" >&2
+  exit 2
+fi
+_cr_bk="$(printf '%s\n' "${_cr_bk_all}" | head -1)"
+[ -n "${_cr_bk}" ] || {
+  echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp" >&2
+  exit 2
+}
+case "${_cr_bk}" in
+  review|consult|closure|impl|stamp) : ;;
+  *)
+    echo "ERROR: 未知 brief-kind: ${_cr_bk}(允許 review|consult|closure|impl|stamp)" >&2
+    exit 2
+    ;;
+esac
+if [ "${_cr_bk}" = "stamp" ]; then
+  _cr_st_all="$(grep -E '^stamp-target:' "${brief}" 2>/dev/null | sed 's/^stamp-target:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
+  _cr_st_n="$(printf '%s\n' "${_cr_st_all}" | grep -c '.' || true)"
+  if [ "${_cr_st_n}" -eq 0 ]; then
+    echo "ERROR: brief-kind=stamp 缺 stamp-target: 欄" >&2
+    exit 2
+  fi
+  if [ "${_cr_st_n}" -gt 1 ]; then
+    echo "ERROR: stamp-target 有多個【不一致】宣告: $(printf '%s' "${_cr_st_all}" | tr '\n' ' ')" >&2
+    exit 2
+  fi
+  _cr_st="$(printf '%s\n' "${_cr_st_all}" | head -1)"
+  case "${_cr_st}" in
+    handoffs/*) : ;;
+    *) echo "ERROR: stamp-target 須 handoffs/ 前綴: ${_cr_st}" >&2; exit 2 ;;
+  esac
+  case "${_cr_st}" in
+    *"/../"*|"../"*|*".."*)
+      echo "ERROR: stamp-target 不得含 ..: ${_cr_st}" >&2
+      exit 2
+      ;;
+  esac
+  [ -f "${_cr_st}" ] || { echo "ERROR: stamp-target 檔不存在: ${_cr_st}" >&2; exit 2; }
+fi
+
 # task_id 從透傳 gate argv 解析 --task-id（不另發明同名旗標）
 task_id=""
 _prev=""

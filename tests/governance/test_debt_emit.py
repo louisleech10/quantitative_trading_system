@@ -2336,10 +2336,15 @@ def _b3_harness(tmp_path: Path) -> dict:
     )
     (scripts / "gate_fail.sh").chmod(0o755)
 
+    # stamp-target 檔（D-001 契約：brief-kind=stamp 必填且檔須存在）
+    stamp_target = handoffs / "b3-stamp-target.md"
+    stamp_target.write_text("## 戳記\n", encoding="utf-8")
+
     brief = handoffs / "b3-brief.md"
     # stamp：角色閘不限家族（impl 會被 SoT implementer=grok 擋）
     brief.write_text(
-        "brief-kind: stamp\n\n"
+        "brief-kind: stamp\n"
+        "stamp-target: handoffs/b3-stamp-target.md\n\n"
         "B3 stub brief for debt emit tests.\n",
         encoding="utf-8",
     )
@@ -2760,7 +2765,12 @@ def test_b3_brief_sha_mismatch_rejected(tmp_path: Path) -> None:
         brief_path="handoffs/b3-brief.md",
     )
     other = h["handoffs"] / "other-brief.md"
-    other.write_text("brief-kind: stamp\n\nDIFFERENT\n", encoding="utf-8")
+    other.write_text(
+        "brief-kind: stamp\n"
+        "stamp-target: handoffs/b3-stamp-target.md\n\n"
+        "DIFFERENT\n",
+        encoding="utf-8",
+    )
     env = dict(h["env"])
     env["ROUND_ID"] = rid
     env["CX_STUB_MODE"] = "success"
@@ -3245,7 +3255,12 @@ def test_b3_mutation_brief_sha_guard(
         brief_path="handoffs/b3-brief.md",
     )
     other = h["handoffs"] / "mut-brief.md"
-    other.write_text("brief-kind: stamp\n\nMUT\n", encoding="utf-8")
+    other.write_text(
+        "brief-kind: stamp\n"
+        "stamp-target: handoffs/b3-stamp-target.md\n\n"
+        "MUT\n",
+        encoding="utf-8",
+    )
     env = dict(h["env"])
     env["ROUND_ID"] = rid
     env["CX_STUB_MODE"] = "success"
