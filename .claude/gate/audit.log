@@ -31677,3 +31677,27 @@ ts=2026-08-02 11:00:29 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-02T11:45:13Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-02T12:06:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-02T12:06:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-02T12:10:47Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-02T12:10:47Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "claude", "output_path": "", "output_sha256": "pending", "task_id": "T2-VERDICT-REVIEW", "ts": "2026-08-02T12:12:11Z"}
+=== 2026-08-02 20:12:11 | dispatch ===
+  ts=2026-08-02 20:12:11
+  kind=dispatch
+  intent=T2 P16-GATE-D1-STRUCTURED-VERDICT 實作 code review:awk 判準跨平台(BSD vs GNU)、對 handoffs 全語料的新舊判準 diff、判準可繞過形狀、測試設計是否規避
+  risk=low
+  facts_asked=governance 580 passed 0 failed(本票前563);範本{{}}樣態出現88次且命中舊正則;正則單一實作點 gate.sh:246;測試第一版紅錯原因已修為斷言 Verdict 訊息
+  review_role=實作 code review(雙非實作者家族;實作端=Claude 主委,使用者明示豁免)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260802-T2-VERDICT-REVIEW-BRIEF.md", "brief_sha256": "a9bdfb0807e57ba0f550b9e5927f6e575978be0169e2f77b6032b1cc7599d351", "brief_sha256_norm": "a9bdfb0807e57ba0f550b9e5927f6e575978be0169e2f77b6032b1cc7599d351", "event": "committee_round_open", "event_id": "cb87a1bb-5f2e-4159-b7f5-0f36afcfb664", "expected_outputs": {"codex": "handoffs/20260802-t2-verdict-review-codex.md", "composer": "handoffs/20260802-t2-verdict-review-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "9a8529f7-3843-4264-b4a4-3bddf73367cf", "schema_version": 1, "sequence": 393, "session_name": "20260802-t2-verdict-review", "task_id": "T2-VERDICT-REVIEW", "ts": "2026-08-02T12:12:11Z"}
+{"actor": "cx_run", "attempt_id": "cbe513ac-af3f-4dba-96af-ab01f8494737", "cli_rc": "0", "event": "committee_family_result", "event_id": "f8598e75-c81a-43c9-8335-ac7b6547dacf", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260802-t2-verdict-review-composer.md", "output_sha256": "81ba311f22506ee835bfdb2a705c0fe4565a19eaad33980034275a9b220a84a8", "producer": "audit_append.sh", "result_state": "success", "round_id": "9a8529f7-3843-4264-b4a4-3bddf73367cf", "schema_version": 1, "sequence": 394, "ts": "2026-08-02T12:15:35Z"}
+{"actor": "cx_run", "attempt_id": "e8b2a91f-bf77-495d-8a95-96408f31c87b", "cli_rc": "0", "event": "committee_family_result", "event_id": "76797620-0308-4669-ae5b-fc945edc34be", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260802-t2-verdict-review-codex.md", "output_sha256": "8f0eaf464f3c25e659555fbeb08f84c04925cb52c0cf060bde311fefc46b3083", "producer": "audit_append.sh", "result_state": "success", "round_id": "9a8529f7-3843-4264-b4a4-3bddf73367cf", "schema_version": 1, "sequence": 395, "ts": "2026-08-02T12:42:26Z"}
+{"event":"gate_deny","ts":"2026-08-02T12:48:00Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-02T12:48:00Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}

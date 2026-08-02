@@ -257,19 +257,34 @@ _check_adversarial_quality() {
   #   ⇒ 這不只是「骨架佔位」，是**範本本身**就是 fail-open 向量。
   #
   # 新判準（三條同時成立才算有 Verdict）：
-  #   (a) 行首錨定：`Verdict` 須出現在行首（允許 `#`／`*`／空白等 markdown 修飾前綴），
+  #   (a) 行首錨定：`Verdict` 須出現在行首（允許 markdown 結構前綴，見下），
   #       避免散文中順口提到「…的 Verdict: …」被當成裁決行。
   #   (b) 容許 `Verdict` 與冒號之間有括號補充（修事故①的誤拒），但**不得跨越冒號**。
-  #   (c) 冒號後必須有**非佔位**的實質結論：至少 2 個非空白字元，且不得是
+  #   (c) 冒號後必須有**非佔位**的實質結論：不得是
   #       `{{…}}`／待填／TBD／xxx／`…`／`（待填）`／`← 未填` 這類樣板殘留。
+  #
+  # 允許的行首前綴（`CODEX-R1-P1-01`，2026-08-02 實跑全語料）：
+  #   空白／`#`（heading）／`*`（粗體或 bullet）／`-`／`+`（bullet）／`N.`／`N)`（ordered list）
+  #   ——第一版只剝 `#*` 與空白，導致 `- Verdict: APPROVE`／`4. Verdict: APPROVE` **被誤拒**；
+  #     全語料實測有 25 個 bullet 形、3 個 ordered 形。誤拒代價＝整輪重簽戳記，比誤放更痛。
+  # **不允許 `>`（blockquote）**：全語料中 `>` 開頭含 Verdict 的行**全部是散文提及**
+  #   （composer 實跑確認），允許它等於把剛堵上的散文誤判洞重新打開。
+  #   若未來範本要用 blockquote 承載裁決，須先改範本並補測試，不得直接放寬此處。
+  #
   # 誠實邊界：只驗「有沒有填」與「填的形狀」，**不驗結論真偽**（語意交人工＋二期）；
   #   也不驗結論屬於哪個枚舉——實測顯示合法詞彙橫跨 派工／合併／commit／APPROVE／PASS 等多族，
-  #   硬套枚舉會製造大量誤拒（見 `docs/ROADMAP.md` B-13 記錄）。
+  #   硬套枚舉會製造大量誤拒。**亦不做 markdown fence 解析**：
+  #   fenced code block 內的 `Verdict: X` 仍會被接受（`CODEX-R1-P2-02`，已知且明示，非疏漏）。
   if ! awk '
-      # 去掉行首 markdown 修飾（# * 空白），再要求以 Verdict 開頭
       {
         line = $0
-        sub(/^[[:space:]]*[#*[:space:]]*/, "", line)
+        # 逐層剝除行首結構前綴（含巢狀，如「  - **Verdict**: X」）
+        do {
+          before = line
+          sub(/^[[:space:]]+/, "", line)
+          sub(/^[#*+-]+/, "", line)
+          sub(/^[0-9]+[.)]/, "", line)
+        } while (line != before)
         if (line !~ /^Verdict/) next
         # 取冒號後內容；容許 Verdict 與冒號間有括號補充（如「Verdict（綜合）：」）
         if (match(line, /[:：]/) == 0) next

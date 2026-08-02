@@ -27,8 +27,16 @@ GATE_SH = REPO_ROOT / "scripts" / "gate.sh"
 
 
 def _run_gate(adversarial: str) -> subprocess.CompletedProcess[str]:
-    """高風險 dispatch + --adversarial；token/audit 落隔離目錄，不汙染真實 gate dir。"""
-    gate_tmp = tempfile.mkdtemp(prefix="gate_verdict_test_")
+    """高風險 dispatch + --adversarial；token/audit 落隔離目錄，不汙染真實 gate dir。
+
+    ⚠️ 用 `TemporaryDirectory` 而非 `mkdtemp`（`CODEX-R1-P2-03`）：
+       `mkdtemp` 不自動清除，跑一次全套會在系統 tmp 留下數十個目錄。
+    """
+    with tempfile.TemporaryDirectory(prefix="gate_verdict_test_") as gate_tmp:
+        return _dispatch(adversarial, gate_tmp)
+
+
+def _dispatch(adversarial: str, gate_tmp: str) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ, GATE_DIR_OVERRIDE=gate_tmp)
     argv = [
         "bash",
@@ -100,6 +108,11 @@ def adv_factory():
         ("冒號後空白", "## Verdict："),
         ("冒號後只有省略號", "## Verdict：…"),
         ("冒號後 TBD", "Verdict: TBD"),
+        # 放寬 list 前綴（CODEX-R1-P1-01）後的迴歸護欄：不得順手把散文的洞打開。
+        # `>` 刻意**不列入**允許前綴——全語料中 `>` 開頭含 Verdict 的行全是散文提及。
+        ("blockquote 前綴不得放行", "> 當時的 Verdict: 可派工（僅為引述歷史）"),
+        ("表格列不得放行", "| 項目 | Verdict: 可合併 |"),
+        ("散文行末黏貼 heading", "如前所述## Verdict：可合併"),
         # 註：**刻意不測「結論太短」**。兩次事故皆與長度無關，無事故支撐即不立規則；
         #     且長度規則會誤拒 `Verdict: OK`／`Verdict: 過`（見 gate.sh 該處註解）。
     ],
@@ -129,6 +142,15 @@ def test_unfilled_verdict_rejected(adv_factory, label: str, line: str) -> None:
         ("事故①:括號補充(半形)", "Verdict(綜合): 可合併"),
         ("結論帶括號補充", "## Verdict：需修補後派工（極輕量）"),
         ("英文結論", "**Verdict: CLOSED**"),
+        # CODEX-R1-P1-01：第一版只剝 `#*` 與空白 ⇒ list 前綴的實填 Verdict 被誤拒。
+        # 全語料實測有 25 個 bullet 形、3 個 ordered 形。誤拒代價＝整輪重簽戳記。
+        ("bullet 前綴（-）", "- Verdict: APPROVE"),
+        ("bullet 前綴（+）", "+ Verdict: 可合併"),
+        ("ordered 前綴（N.）", "4. Verdict: APPROVE"),
+        ("ordered 前綴（N)）", "4) Verdict: 可派工"),
+        ("巢狀縮排 bullet + 粗體", "  - **Verdict**: 需修補後派工"),
+        # codex 實跑確認：first-colon 規則不會截斷含冒號的結論
+        ("結論內含冒號", "Verdict: 說明（含冒號：的內容）"),
     ],
 )
 def test_filled_verdict_accepted(adv_factory, label: str, line: str) -> None:
@@ -179,8 +201,9 @@ def test_mutation_restore_loose_regex_turns_red(tmp_path: Path, adv_factory) -> 
     gate.write_text(text[:start] + loose + text[end:], encoding="utf-8")
 
     adv = adv_factory("## Verdict：{{可派工 / 需修補後派工 / 有根本缺陷需重作}}", "mut")
-    gate_tmp = tempfile.mkdtemp(prefix="gate_verdict_mut_")
-    env = dict(os.environ, GATE_DIR_OVERRIDE=gate_tmp)
+    gate_tmp = tmp_path / "gate_dir"   # 走 tmp_path，pytest 自行回收（CODEX-R1-P2-03）
+    gate_tmp.mkdir()
+    env = dict(os.environ, GATE_DIR_OVERRIDE=str(gate_tmp))
     r = subprocess.run(
         [
             "bash", str(gate), "dispatch",
