@@ -74,6 +74,37 @@
   優先序（composer）：**探針（強制）> helper（好寫）> 紀律（禁止）**。
   已知未修的真陽性：`gate_check.sh:66` 的 `jq` fail-open。
 
+  **✅ 票 `P16-GATE-D1-STRUCTURED-VERDICT` 完工（2026-08-02，`ae7e2de`+`f522bc2`+`11029e8`）**：
+  `gate.sh` D-1 舊判準 `grep -qE 'Verdict[[:space:]]*[:：]'` **兩個方向都錯**——
+  ①`Verdict（綜合）：結論` 中間插字 → 誤拒（改 body 會使三家戳記 sha 全失效）
+  ②`**Verdict: （待填…）**` 佔位行 → 命中 ⇒ 真 fail-open。
+  實測揭破口更大：canonical 範本自己那行 `## Verdict：{{…}}` 在 `handoffs/` 出現 **88 次**且命中舊正則。
+  新判準＝行首錨定（依標準 markdown 語義，list marker／heading 須後接空白；`>` 不放行）＋容許括號補充＋冒號後須非佔位。
+  **刻意不設「結論最短長度」**（無事故支撐，且 BSD awk `length()` 按位元組計，CJK 上不成立）。
+  codex 三輪複驗確認真關閉，戳記 APPROVED。
+
+  **✅ 票 `GOV-FORMAT-SSOT` 委員端第一段完工（2026-08-02，`8193582`）**：
+  `completeness_check.sh` 新增 `--single` 入口（**不新增任何規則**，只換入口跑既有三個單檔驗證函式，
+  含 family-binding ＝ `GOV-ID-NAMESPACE-CHECK`），由 `cx_run.sh` 在交件當下呼叫。
+  對真實語料實測：**4 個實際造成 abandon 的檔全數抓到，2 個合規檔放行**。
+  上線後**連續 4 輪正常銷帳、零 abandon**（此前最近 4 輪有 3 輪只能 `--abandon`）。
+  同 commit 另加 `status_marker_check.sh`（Stop hook）機械強制狀態標記誠實性。
+  ⚠️ **第二段（`result_state` 收窄）未做**：會收窄凍結 SPEC:265，草案 `D-003` 因與 `D-002` 觸及面重疊而停止推進。
+
+  **✅ 全流程「檢查點錯位」盤點完成（2026-08-03，`1787986`）**：
+  使用者定位「不要有派工發現格式有問題、退回去重跑一輪的情況——**這就是檢驗審查放在錯誤的地方**」。
+  盤點「檢查器 × 觸發點 × 產物生成點」後，唯一真缺口＝**收斂檔 `synth.md` 的 Verdict**
+  （主委自己在 `doc_format_precheck.sh` 加的 `handoffs/reconcile/*) exit 0`，而 completeness 那條線在**銷帳時**才跑）。
+  修法：Verdict 判準抽成 `scripts/verdict_filled_check.sh` **唯一實作**，`gate.sh` 與 `doc_format_precheck.sh` 共用。
+  ⇒ **問題 B（退回重跑）四節點全部收斂**（brief／SPEC·TODO／委員產出／收斂檔）。
+
+  **🔵 凍結程序修訂（問題 A）方向定案，未實作**（2026-08-03，`handoffs/reconcile/20260803-proba-direction/synth.md`）：
+  目標函數＝使用者定「**最無痛、最有效率、最低成本地修改 SPEC 或相關文檔**」。
+  三家一致：**D 分節簽名（分階段）＋ C 窄版同期（須同輪改 §6）；A 不做；B 原案不做維持 default-R**。
+  🔴 **主委核心推論被三家打穿**：「分節後 R 變便宜 ⇒ A/B 可省」**不成立**——分節只讓**重簽的機械成本**變小，
+  對抗審勞動／分類爭議／跨節依賴／provenance 不會自動變成單節成本。**簽名的粒度 ≠ 審查的粒度**。
+  下一步只准起草**設計稿**，不得直接進工具實作；工具面涉 8 支腳本，輪次估 **3–5**。
+
   **新票 B-12 `GOV-TESTHARNESS-SCRIPTLIST-SSOT`**：「隔離 repo 需要哪些腳本」的清單**散在至少 4 份 fixture**
   （`test_stamp_taskid_inject._SCRIPT_NAMES`／`test_debt_emit` inline tuple／
   `test_verify_gate_b3._setup_temp_git_repo` symlink 清單／`test_debt_clear`、`test_debt_gate` 各自的），
