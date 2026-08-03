@@ -31959,3 +31959,5 @@ ts=2026-08-02 11:00:29 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "d1c528ea-9574-44a5-994f-3f041edcd101", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "戳記輪依設計不產生 canonical findings;三家皆 APPROVED 且 reconcile_stamps_check rc=0,條文 sha256 176c58e0 與綁定值相符;三家非阻斷觀察已讀取並記錄於本輪產出檔", "round_id": "8aacbb0d-7493-4b62-8111-e23c09bde090", "schema_version": 1, "sequence": 443, "ts": "2026-08-03T03:05:51Z"}
 {"event":"gate_deny","ts":"2026-08-03T03:10:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-03T03:10:36Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-03T03:14:56Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-03T03:14:56Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}

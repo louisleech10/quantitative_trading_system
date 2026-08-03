@@ -57,6 +57,7 @@
 | `GOV-COMPLETENESS-IDLIKE-FP` | `completeness_check` 把「首 token 形如 `XX-NN`」的 heading 誤判為畸形 finding ID（codex 因此整輪卡死）。判準應收窄為「含 `-R<digit>-` 節段或以已知家族名起始」。**須先盤攻擊面＋連動測試矩陣** |
 | **重啟 `D-003`（`result_state` 收窄）** | 格式不合規但 `cli_rc=0`＋產出非空 ⇒ 記為 `success` ⇒ 守衛⑥拒絕重派 ⇒ **家族在該輪永久卡死**。已有具體事故（R4）。改法＝`success` 須加「產出端格式檢查通過」 |
 | `GOV-ROLEGATE-PREDISPATCH` | `brief-kind` 與角色 SoT 的相容性只在 `cx_run` 派工當下才驗，此時債已開、其他家已跑完 ⇒ 半失敗輪。應前移到 `committee_run` **開債前**逐家驗 |
+| 🔴 **`GOV-CLAIMCHECK-VS-VERBATIM`**（**新，2026-08-03 實測**） | **兩個治理機制互相打架，導致治理稽核軌跡永遠進不了版控**。`completeness_check` 要求委員 findings **逐字保留**；`verification_claim_check`（pre-commit）要求 operational claim 附 `VERIFY/REF/SIGNOFF`。委員 findings 本質上就是 operational claim（`[MAJOR] 信心度=High。…`）且不帶 REF token ⇒ **收斂檔永遠無法 commit**。實測本 epic 8 處被擋，**7 處落在逐字附錄區**（改＝偽造委員產出）。checker 雖有 `_is_committee_process_exempt`，但只認**已註冊路徑**：`reconcile/*/sources/` 是副本（路徑不同、未註冊）、`synth.md` 根本不是委員產出。**第三層**：設計稿補完 REF 後（`--files` 掃描 0 flagged）仍被 pre-commit 擋，改報 `claim_fingerprint 衝突：曾有 FAIL/紅燈紀錄，舊 VERIFY 綠 claim 未標 SUPERSEDED`——因為設計稿 rev1→rev6 期間同一 assumed 從「否決」翻成「已驗關閉」。⇒ **三個獨立機制各自合理，疊起來使治理稽核軌跡永遠無法進版控**。修法須擴充豁免至 `handoffs/reconcile/**`＋設計稿類，或讓 `reconcile_build` 複製時一併註冊。**已停止硬闖**（依「擋意外不撞牆」＋「95% 就收」），本票具名記錄 |
 
 ## ⚠️ 主委在本 epic 的錯誤（供稽核，設計稿 §D14 有完整版）
 
