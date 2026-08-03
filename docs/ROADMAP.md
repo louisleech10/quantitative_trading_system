@@ -308,6 +308,16 @@
 
 ---
 
+## ✅ 近期已完成（2026-08）
+
+- **問題 B（產出端格式退回重跑）收斂（2026-08-02/03）**：病根＝格式檢查在**消費端**（派工／freeze）而非**產出端**（寫檔當下），實證代價為多輪純程序開銷。四個節點全部前移：brief（派工＋寫檔時）／SPEC·TODO（freeze＋寫檔時）`901a8d9`／委員產出（**交件當下** `completeness_check --single`）`8193582`／收斂檔 Verdict（**寫檔當下**，判準抽成 `scripts/verdict_filled_check.sh` 唯一實作）`1787986`。**上線後連續 4 輪正常銷帳、零 abandon**（此前最近 4 輪有 3 輪只能 abandon）。另附狀態標記 Stop hook `scripts/status_marker_check.sh`。
+- **凍結文件修訂程序 v2.0 — 設計稿收斂（2026-08-03，R1–R5）**：解「問題 A＝改凍結文件的成本」。方向＝**分節簽名分階段 ＋ 提案 C 窄版同期；A 不做（維持 R→全量作廢延伸）；B 原案不做（維持爭議預設 R）**。
+  - **findings 收斂曲線 26 → 28 → 25 → 16 → 6**；R5 三家中 composer 判「可派工、可進條文」，grok 判「不需再一輪架構 R」。
+  - **關鍵轉折**：R2 確診 rev2 為**加機制型**修訂（新增 baseline registry／`expires` 三段式／length-prefix 編碼，三者被三家全數打穿），改採**刪機制**方針 ⇒ **累計刪除 5 個元件、新增 0 個**。
+  - 產物：`handoffs/20260803-FROZEN-PROC-V2-DESIGN.md`（rev6）＋ `handoffs/reconcile/20260803-frozen-proc-v2-r{1..5}/`。
+  - **下一步＝寫 v2.0 條文（階段 0 收尾）**，順序見設計稿 §D17.2；條文合併進 `docs/` 前**不得**進階段 1 工具實作。
+  - 新票：`GOV-COMPLETENESS-IDLIKE-FP`、**重啟 `D-003`（`result_state` 收窄，已有具體事故）**、`GOV-ROLEGATE-PREDISPATCH`。
+
 ## ✅ 近期已完成（2026-06 / 2026-07）
 - **TEMPLATE_GATE_FIX epic（2026-07-05）**:派工品質防線修補——四方委員會(Claude+Codex+Composer+Gemini)審 template/機檢,實證 2 BLOCKING 繞過(FACT-RECEIPT/§G 逃逸)+多處範本↔機檢漂移;修=§A 段級狀態機+RISK-HIT 宣告制+per-Task 分段檢+RESULT 交叉規則+gate --reconcile 閉合鏈+adversarial 實核義務+TODO prompt 憲法瘦身(省每次 ~5,100 行)。驗收=14 fixture 矩陣+4 mutation+5 gate fixture+Codex 總 review 戳記。文件=docs/TEMPLATE_GATE_FIX_{BRIEF,SPEC,TODO,MANIFEST,GRANDFATHER}.md;現役文件 grandfather(僅新文件適用)。**新寫 SPEC 須帶 RISK-HIT: 宣告與 FACT-RECEIPT**。
 - **FF 一致性整併**:Q5/B1/B2/B3/B5/B6/B4/B8(觀測性 + 批次日期修復 + warmup-then-trim + 批次刪除/保留 UX)。每項走完整管線。

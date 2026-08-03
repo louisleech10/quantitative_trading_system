@@ -31808,3 +31808,124 @@ ts=2026-08-02 11:00:29 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-02T17:28:22Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
 {"actor": "cx_run", "attempt_id": "07b56bc7-83dd-4a7f-a6e1-b9b16fa43b25", "cli_rc": "0", "event": "committee_family_result", "event_id": "7e67912c-e93f-44f7-af56-472efd80c808", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-proba-direction-codex.md", "output_sha256": "aa036bde265606b9812fc9a990d40fc5783c7be751fd4508c5d05e8907f6733f", "producer": "audit_append.sh", "result_state": "success", "round_id": "60d7e04e-9fc0-48fa-a148-6eb1f974d75d", "schema_version": 1, "sequence": 413, "ts": "2026-08-02T17:29:15Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "8e1d437f-1fb3-4485-90c1-48d52b1d4f08", "lock_sha256": "90daf7bf8175dd913b5f960d24ef44025152ec524c8bc74238c283fcfc51a3fd", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "60d7e04e-9fc0-48fa-a148-6eb1f974d75d", "schema_version": 1, "sequence": 414, "session_id": "20260803-proba-direction", "synth_sha256": "89cd96b67f66bdbe1ced899f6b5b57598615fd4a9e600eda5952fefcdcd5e6b9", "ts": "2026-08-02T22:39:33Z"}
+{"event":"gate_deny","ts":"2026-08-02T22:44:54Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-02T22:44:54Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "FROZENPROC-V2-R1", "ts": "2026-08-02T23:03:01Z"}
+=== 2026-08-03 07:03:01 | dispatch ===
+  ts=2026-08-03 07:03:01
+  kind=dispatch
+  intent=凍結文件修訂程序 v2.0 設計稿 R 審：分節簽名 schema、審查粒度機械綁定、T6 硬前置二選一、C 窄版定案
+  risk=low
+  facts_asked=register-output 只收 handoffs/；67 份 synth 全未進 git；P16 SPEC 缺 D-001 索引行且機檢全綠
+  review_role=非實作者對抗審；攻 §D4 changed_set 機制與 §D5 前置方案選擇
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-FROZEN-PROC-V2-R1-BRIEF.md", "brief_sha256": "fc5c56868f3592ce3e1e4c897ee76abe975c6514a4ffbad91f68ae9188477011", "brief_sha256_norm": "fc5c56868f3592ce3e1e4c897ee76abe975c6514a4ffbad91f68ae9188477011", "event": "committee_round_open", "event_id": "eaeb33c5-4ff7-48e1-b2e4-0189002b550f", "expected_outputs": {"codex": "handoffs/20260803-frozen-proc-v2-r1-codex.md", "composer": "handoffs/20260803-frozen-proc-v2-r1-composer.md", "grok": "handoffs/20260803-frozen-proc-v2-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "27d5f073-e84c-41c1-9e40-c7e2f7d611a2", "schema_version": 1, "sequence": 415, "session_name": "20260803-frozen-proc-v2-r1", "task_id": "FROZENPROC-V2-R1", "ts": "2026-08-02T23:03:01Z"}
+{"actor": "cx_run", "attempt_id": "fe2ff7c2-ec9d-444c-bd8a-2e4ca277e1a2", "cli_rc": "0", "event": "committee_family_result", "event_id": "8b9441f5-8727-4a12-854a-4ce84e18e9c0", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r1-composer.md", "output_sha256": "9b40abe85c69cd113ef7e3eca62896f0709027151fe6e8a9e2041a6e642a92c4", "producer": "audit_append.sh", "result_state": "success", "round_id": "27d5f073-e84c-41c1-9e40-c7e2f7d611a2", "schema_version": 1, "sequence": 416, "ts": "2026-08-02T23:06:17Z"}
+{"event":"gate_deny","ts":"2026-08-02T23:12:59Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-02T23:13:25Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-02T23:13:48Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "c62102b9-6ba9-402e-96b6-ad19b1ce358f", "cli_rc": "0", "event": "committee_family_result", "event_id": "4354702e-222e-4343-b385-2471beb4462b", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r1-codex.md", "output_sha256": "687e39e92c0bae11bbe4d07ec93a92baca6103ac8707e3cf4a04e3e20b0f765b", "producer": "audit_append.sh", "result_state": "success", "round_id": "27d5f073-e84c-41c1-9e40-c7e2f7d611a2", "schema_version": 1, "sequence": 417, "ts": "2026-08-02T23:15:21Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "22c9d1d7-c714-479a-9bb5-66b48277f911", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "grok 因 brief-kind=review 撞角色 SoT(implementer 不得任 code review)不可派,roster 不齊;codex/composer 26 findings 已完整收斂於 handoffs/reconcile/20260803-frozen-proc-v2-r1/synth.md 且 completeness rc=0,無遺失;改以 consult brief 重派三家審修訂後設計稿", "round_id": "27d5f073-e84c-41c1-9e40-c7e2f7d611a2", "schema_version": 1, "sequence": 418, "ts": "2026-08-02T23:21:56Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "FROZENPROC-V2-R2", "ts": "2026-08-02T23:27:20Z"}
+=== 2026-08-03 07:27:20 | dispatch ===
+  ts=2026-08-03 07:27:20
+  kind=dispatch
+  intent=凍結程序 v2.0 設計稿 rev2 對抗審：baseline 補洞是否關閉、schema 四修補、強度分層、expires 三段式、D5 雙案並行
+  risk=low
+  facts_asked=程序檔 ## 戳記 在 fenced 內(L66)；stamp_legacy_registry.json 不存在；§錨點 P16=43 且 DEPENDS-ON=0；synth 67 份全未進 git
+  review_role=設計稿對抗審；最優先攻 B-1 baseline 污染與 §D14 採納走樣
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-FROZEN-PROC-V2-R2-BRIEF.md", "brief_sha256": "30edcfb8286ea56ee2f5fc89d2d4d17f02a4ea2a3a242fb7e66d3bab22299b8f", "brief_sha256_norm": "30edcfb8286ea56ee2f5fc89d2d4d17f02a4ea2a3a242fb7e66d3bab22299b8f", "event": "committee_round_open", "event_id": "e3c8997d-98a3-4995-ab35-7a86f52923db", "expected_outputs": {"codex": "handoffs/20260803-frozen-proc-v2-r2-codex.md", "composer": "handoffs/20260803-frozen-proc-v2-r2-composer.md", "grok": "handoffs/20260803-frozen-proc-v2-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "92ac645d-a7ef-457e-9784-411839dd7701", "schema_version": 1, "sequence": 419, "session_name": "20260803-frozen-proc-v2-r2", "task_id": "FROZENPROC-V2-R2", "ts": "2026-08-02T23:27:21Z"}
+{"actor": "cx_run", "attempt_id": "12afe452-26bd-4471-91ca-b4bd2e11f355", "cli_rc": "0", "event": "committee_family_result", "event_id": "27f25e3a-2af9-4b13-8b8e-efbc34fd673e", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r2-composer.md", "output_sha256": "b32b6cb1d8a4a5c25fb7ed34db1baeb780db6e3f21c788d5de628c0951c3005b", "producer": "audit_append.sh", "result_state": "success", "round_id": "92ac645d-a7ef-457e-9784-411839dd7701", "schema_version": 1, "sequence": 420, "ts": "2026-08-02T23:29:55Z"}
+{"actor": "cx_run", "attempt_id": "ff9ff4fd-70bb-437a-97eb-4b823dd5edb5", "cli_rc": "0", "event": "committee_family_result", "event_id": "df8ef9de-c8c4-4b52-acb9-0b36910ecd31", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r2-grok.md", "output_sha256": "53a3304bd8e0dea4fece82f21c3cfe023bfffbff84ff17451a1af2e8151171d2", "producer": "audit_append.sh", "result_state": "success", "round_id": "92ac645d-a7ef-457e-9784-411839dd7701", "schema_version": 1, "sequence": 421, "ts": "2026-08-02T23:34:15Z"}
+{"actor": "cx_run", "attempt_id": "6692afc6-21e2-42b0-84fe-812532d00706", "cli_rc": "0", "event": "committee_family_result", "event_id": "4d3ce57d-86d6-462e-b936-2b0f90df4ed9", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r2-codex.md", "output_sha256": "4b40ddf704a1a0c5076c561af25278bcebbcc7510ab1aba992c482ae36715fab", "producer": "audit_append.sh", "result_state": "success", "round_id": "92ac645d-a7ef-457e-9784-411839dd7701", "schema_version": 1, "sequence": 422, "ts": "2026-08-02T23:37:02Z"}
+{"event":"gate_deny","ts":"2026-08-02T23:37:10Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "2df1dc85-498c-429e-bd27-9a0150e2e1f3", "lock_sha256": "ce2489c0db5381b86807de693fbecc6902c129e507f29ec2b9e699100e283dae", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "92ac645d-a7ef-457e-9784-411839dd7701", "schema_version": 1, "sequence": 423, "session_id": "20260803-frozen-proc-v2-r2", "synth_sha256": "0772daf92d8c100a9688a3502c78d7b7ad2345bb7ced7aecd0bc1f51b9c179a9", "ts": "2026-08-02T23:50:12Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "FROZENPROC-V2-R3", "ts": "2026-08-02T23:55:18Z"}
+=== 2026-08-03 07:55:18 | dispatch ===
+  ts=2026-08-03 07:55:18
+  kind=dispatch
+  intent=凍結程序 v2.0 設計稿 rev3 刪機制版對抗審：三處刪除是否安全、git baseline 成本與語意、hex id 可讀性、inbound 強度切分
+  risk=low
+  facts_asked=DEPENDS-ON 全 repo=0；三支新腳本皆不存在；程序檔 ## 戳記 在 fenced 內；synth 68 份全未進 git
+  review_role=設計稿對抗審；最優先攻 C-1 baseline 成本(須實測)與刪除是否有隱性消費者
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-FROZEN-PROC-V2-R3-BRIEF.md", "brief_sha256": "15c249520fafe11eec7acbb646ff95000db0d3413edc2e9b8b4de5d9fa4db6f3", "brief_sha256_norm": "15c249520fafe11eec7acbb646ff95000db0d3413edc2e9b8b4de5d9fa4db6f3", "event": "committee_round_open", "event_id": "ad6fb9fa-8fb3-4a0f-b692-b86e4216f495", "expected_outputs": {"codex": "handoffs/20260803-frozen-proc-v2-r3-codex.md", "composer": "handoffs/20260803-frozen-proc-v2-r3-composer.md", "grok": "handoffs/20260803-frozen-proc-v2-r3-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "272f03c5-a0f1-4307-b1ac-2c7d416b2452", "schema_version": 1, "sequence": 424, "session_name": "20260803-frozen-proc-v2-r3", "task_id": "FROZENPROC-V2-R3", "ts": "2026-08-02T23:55:19Z"}
+{"actor": "cx_run", "attempt_id": "7e8a2694-f706-4838-871a-39ae6123f1ef", "cli_rc": "0", "event": "committee_family_result", "event_id": "fd4f5b79-fb4c-4cda-a1d8-48b6eedd2fd6", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r3-composer.md", "output_sha256": "a8b0f1b367c8e0abd9ca7a11e6c0e2024cfa15b89aa0b91872a9e930b54bfb2c", "producer": "audit_append.sh", "result_state": "success", "round_id": "272f03c5-a0f1-4307-b1ac-2c7d416b2452", "schema_version": 1, "sequence": 425, "ts": "2026-08-02T23:59:17Z"}
+{"actor": "cx_run", "attempt_id": "5f7d67ba-58a6-49a1-8953-8755f77043bc", "cli_rc": "0", "event": "committee_family_result", "event_id": "25fa61db-1dbf-4df8-8c22-35a5f04ecdec", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r3-grok.md", "output_sha256": "5a834022f8e90aed268d4925846769db250ef01f27badc3d4895a80349ceeabf", "producer": "audit_append.sh", "result_state": "success", "round_id": "272f03c5-a0f1-4307-b1ac-2c7d416b2452", "schema_version": 1, "sequence": 426, "ts": "2026-08-03T00:03:49Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260803-frozen-proc-v2-r3-codex.md", "output_sha256": "78e36611b8d1d7bee110ef11f4073d25f86b88a04c4dedb09535bb23227d11e2", "task_id": "FROZENPROC-V2-R3", "ts": "2026-08-03T00:09:59Z"}
+{"event":"gate_deny","ts":"2026-08-03T00:10:17Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "d7f11511-61ca-4411-a00f-498d65d24657", "cli_rc": "0", "event": "committee_family_result", "event_id": "fb4cc539-99ad-414f-84fb-858ba1f3868f", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r3-codex.md", "output_sha256": "78e36611b8d1d7bee110ef11f4073d25f86b88a04c4dedb09535bb23227d11e2", "producer": "audit_append.sh", "result_state": "success", "round_id": "272f03c5-a0f1-4307-b1ac-2c7d416b2452", "schema_version": 1, "sequence": 427, "ts": "2026-08-03T00:11:38Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "659c7218-ecf7-4d0d-ad26-889ec04def5f", "lock_sha256": "4586d5065b89d9f95a73b79c27b214b0ac8995f5ea1b37d3d4f00d7d69d09895", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "272f03c5-a0f1-4307-b1ac-2c7d416b2452", "schema_version": 1, "sequence": 428, "session_id": "20260803-frozen-proc-v2-r3", "synth_sha256": "5b3c98569b8c78aadb81ca2139f8aa1855941c1a7a44642960d179d77c76724b", "ts": "2026-08-03T00:15:20Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "FROZENPROC-V2-R4", "ts": "2026-08-03T00:21:30Z"}
+=== 2026-08-03 08:21:30 | dispatch ===
+  ts=2026-08-03 08:21:30
+  kind=dispatch
+  intent=凍結程序 v2.0 設計稿 rev4 收斂輪：resolve() 唯一性逐檔實測、刪 DEPENDS-ON 是否安全、write-once 強制手段、可否進條文
+  risk=low
+  facts_asked=docs 含戳記行 31 份(非 2)；DEPENDS-ON 全 repo=0；provenance 讀 live audit 無 commit 參數；baseline 成本已實測
+  review_role=收斂輪對抗審；最優先攻 E-1 resolve() 唯一性(須逐檔實測)與 E-2 刪除是否放棄了記錄管道
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-FROZEN-PROC-V2-R4-BRIEF.md", "brief_sha256": "210adb9d660922d26a6b6fae229322a8ebf655dd8c39a5300932aa6e255f3beb", "brief_sha256_norm": "210adb9d660922d26a6b6fae229322a8ebf655dd8c39a5300932aa6e255f3beb", "event": "committee_round_open", "event_id": "c3bc98ba-ef10-4b9b-915f-9ec3bd078d4b", "expected_outputs": {"codex": "handoffs/20260803-frozen-proc-v2-r4-codex.md", "composer": "handoffs/20260803-frozen-proc-v2-r4-composer.md", "grok": "handoffs/20260803-frozen-proc-v2-r4-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "7268d4ff-d73d-4921-a94b-97a4edd85415", "schema_version": 1, "sequence": 429, "session_name": "20260803-frozen-proc-v2-r4", "task_id": "FROZENPROC-V2-R4", "ts": "2026-08-03T00:21:30Z"}
+{"actor": "cx_run", "attempt_id": "26209e02-1a7a-44cd-b2ab-3a4a655bb8b3", "cli_rc": "0", "event": "committee_family_result", "event_id": "6ad74355-bf6d-499f-ba72-d967cbfab612", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r4-composer.md", "output_sha256": "3e8b9aae0930abfebb28ad5deb6d65a6240389891e22532b157044cee7baa3ee", "producer": "audit_append.sh", "result_state": "success", "round_id": "7268d4ff-d73d-4921-a94b-97a4edd85415", "schema_version": 1, "sequence": 430, "ts": "2026-08-03T00:23:41Z"}
+{"actor": "cx_run", "attempt_id": "13e0716d-12dd-4eb8-b151-a79be541167c", "cli_rc": "0", "event": "committee_family_result", "event_id": "3fec2f85-465a-4d0e-bf99-afa28227c67f", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r4-grok.md", "output_sha256": "9b34e4e9e0da08615943366650bd8d422b55bae88b4d1284e0264fbfb4e0ef68", "producer": "audit_append.sh", "result_state": "success", "round_id": "7268d4ff-d73d-4921-a94b-97a4edd85415", "schema_version": 1, "sequence": 431, "ts": "2026-08-03T00:26:04Z"}
+{"event":"gate_deny","ts":"2026-08-03T00:32:35Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "8d638f3b-598a-4424-85b6-209b9ed03c3c", "cli_rc": "0", "event": "committee_family_result", "event_id": "c4b0bb5a-7367-4b42-b786-d986d109936f", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r4-codex.md", "output_sha256": "9cd7bda772f6df9a770921f0fa9c9ef85cb23d460144c962f7e8fa5afa5625df", "producer": "audit_append.sh", "result_state": "success", "round_id": "7268d4ff-d73d-4921-a94b-97a4edd85415", "schema_version": 1, "sequence": 432, "ts": "2026-08-03T00:34:09Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "d0140a59-d61f-43d6-bf59-408f1ebe9a40", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "codex 產出被 completeness ID-like heading 誤報擋下(### E-1~E-7 逐條 Verdict 首 token 判成畸形 finding ID),自修兩輪未過;同輪重派被守衛拒(result_state 已記 success,因 cli_rc=0 且產出非空),故 roster 不齊。composer+grok 11 findings 已完整收斂 completeness rc=0,codex 5 findings 逐條記錄於 synth 群 7 未遺失", "round_id": "7268d4ff-d73d-4921-a94b-97a4edd85415", "schema_version": 1, "sequence": 433, "ts": "2026-08-03T00:39:13Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "FROZENPROC-V2-R5", "ts": "2026-08-03T00:45:48Z"}
+=== 2026-08-03 08:45:48 | dispatch ===
+  ts=2026-08-03 08:45:48
+  kind=dispatch
+  intent=凍結程序 v2.0 設計稿 rev5 驗證輪：六項修補是否關閉 R4 findings；codex 專項複核主委手抄摘要忠實度；可否進條文
+  risk=low
+  facts_asked=P16 舊詞界 2 歧義新詞界全唯一；canonical in-file stamp row=0；DEPENDS-ON=0；codex 重派因 result_state=success 被拒
+  review_role=驗證輪；codex 須專項複核 synth 群 7 手抄摘要是否忠實(lock 缺口清理)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-FROZEN-PROC-V2-R5-BRIEF.md", "brief_sha256": "f4c41bbc2fb6e6a6ec2853af99cbbf87694c40d54e26f2609e6bf9062d792b9f", "brief_sha256_norm": "f4c41bbc2fb6e6a6ec2853af99cbbf87694c40d54e26f2609e6bf9062d792b9f", "event": "committee_round_open", "event_id": "b4495faa-3acf-4b06-bfcd-3cfb30eb60aa", "expected_outputs": {"codex": "handoffs/20260803-frozen-proc-v2-r5-codex.md", "composer": "handoffs/20260803-frozen-proc-v2-r5-composer.md", "grok": "handoffs/20260803-frozen-proc-v2-r5-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "9445ed54-3feb-4e6a-a5cf-38acc35386b4", "schema_version": 1, "sequence": 434, "session_name": "20260803-frozen-proc-v2-r5", "task_id": "FROZENPROC-V2-R5", "ts": "2026-08-03T00:45:48Z"}
+{"actor": "cx_run", "attempt_id": "64c1ef1b-8213-4b72-a5ba-42e6285711b2", "cli_rc": "0", "event": "committee_family_result", "event_id": "4b8c306a-43e1-4753-b16c-fe0164cf8d7a", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r5-composer.md", "output_sha256": "d6e18d716bb31a1a8437aa180bb5c4bd22711f210cf8f4a2c0b1ee866244563c", "producer": "audit_append.sh", "result_state": "success", "round_id": "9445ed54-3feb-4e6a-a5cf-38acc35386b4", "schema_version": 1, "sequence": 435, "ts": "2026-08-03T00:47:56Z"}
+{"actor": "cx_run", "attempt_id": "44d99e1d-d80d-4820-ab7b-61ee25bf628c", "cli_rc": "0", "event": "committee_family_result", "event_id": "70660aee-4afc-47e6-bd41-4ae7908e8cee", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r5-grok.md", "output_sha256": "3bca09a697159549227fa6fe30397b465d60bfd27c55a708cca5a700bb02a236", "producer": "audit_append.sh", "result_state": "success", "round_id": "9445ed54-3feb-4e6a-a5cf-38acc35386b4", "schema_version": 1, "sequence": 436, "ts": "2026-08-03T00:50:09Z"}
+{"event":"gate_deny","ts":"2026-08-03T00:55:03Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T00:55:57Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "935cc8a2-b08d-487e-a3d7-fc22298a6648", "cli_rc": "0", "event": "committee_family_result", "event_id": "12c6836d-28c9-4168-9e84-c76506a8601f", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-frozen-proc-v2-r5-codex.md", "output_sha256": "8b98f624b6f1996bae1a3be28149a3ecee651e48543e61f56dd7133b87ef269d", "producer": "audit_append.sh", "result_state": "success", "round_id": "9445ed54-3feb-4e6a-a5cf-38acc35386b4", "schema_version": 1, "sequence": 437, "ts": "2026-08-03T00:58:10Z"}
+{"event":"gate_deny","ts":"2026-08-03T00:58:17Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "24596622-2c96-411b-a5d4-1f110811376c", "lock_sha256": "76d7b8091e719d020aa712749e2e9c4bb968732029affec22ce60ec6010af1d6", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "9445ed54-3feb-4e6a-a5cf-38acc35386b4", "schema_version": 1, "sequence": 438, "session_id": "20260803-frozen-proc-v2-r5", "synth_sha256": "6d59d62a71b31d35007eda85f1869c0d859eadc9f0864cf6f167166a3c3904be", "ts": "2026-08-03T01:01:34Z"}

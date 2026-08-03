@@ -1,101 +1,78 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-03 | **Branch**: **main**（同步，`1787986`） | **狀態**: **問題 B 已收斂；問題 A 方向已定案（三家一致）；下一步＝起草修訂版設計稿**
+**Agent**: Claude(Opus 5) | **Time**: 2026-08-03 | **Branch**: **main** | **狀態**: **凍結程序 v2.0 設計稿已收斂（R1–R5）；下一步＝寫 v2.0 條文**
 
 ## 🔴 使用者定死（最高優先）
 
 1. **不能 100% 擋下 → 解決 95%，出問題再記錄**
 2. **擋意外，不要在「阻擋蓄意」上撞牆**
 3. **寫出來的工具就是要有強制使用的機制——不准靠紀律和記憶**
-4. **狀態回報**：寫【進行中】必須同時滿足其一——(a) 同一則回覆有實際工具呼叫；(b) 附可查的背景任務 ID。
-   兩者皆無 → 寫【停住】。**已做成機械強制**：`scripts/status_marker_check.sh` 掛 Stop hook。
-5. 🔴 **問題 A 的目標函數（2026-08-03 逐字）**：
+4. **狀態回報**：寫【進行中】必須 (a) 同回覆有工具呼叫 或 (b) 附背景任務 ID；否則寫【停住】。
+   已機械強制：`scripts/status_marker_check.sh`（Stop hook）
+5. 🔴 **問題 A 的目標函數（逐字）**：
    > 「如何修改程序或流程，可以**最無痛且有效率且最低成本地修改 SPEC 或相關文檔**，然後繼續執行延伸或修改的任務。」
-   「最少輪次」指**整條流程長期**，**不是**單一任務內；以「本輪要多跑幾輪」否決長期解**不符**目標。
-6. **檢查放在產出端**：「不要有派工發現格式有問題、退回去重跑一輪的情況——**這就是檢驗審查放在錯誤的地方**。」
+   「最少輪次」指**整條流程長期**，不是單一任務內。
+6. **檢查放在產出端**——不得等派工才退回重跑
+7. **治理投資看「所有 epic 完成後對整條流程的合計貢獻」，不以單一輪次的 findings 數評斷**（2026-08-03 使用者糾正主委的停損建議）
 
-## 🔴 兩個問題必須分開（使用者 2026-08-03 糾正主委的混淆）
+## ▶ 當前任務：凍結文件修訂程序 v2.0
 
-| | 問題 A：改文件成本 | 問題 B：退回重跑 |
+**設計稿**：`handoffs/20260803-FROZEN-PROC-V2-DESIGN.md`（**rev6**）
+**收斂**：`handoffs/reconcile/20260803-frozen-proc-v2-r{1,2,3,4,5}/synth.md`
+
+| 輪 | findings | 關鍵結論 |
 |---|---|---|
-| 觸發 | ①分類爭議 ②兩份 D 觸及面重疊 ③設計被證偽 | 格式錯到消費端才發現 → 整輪 abandon |
-| 對策 | 凍結程序修訂（D/C；A/B 不做） | 檢查移到產出端 |
-| 狀態 | **方向定案，未實作** | ✅ **已收斂** |
+| R1 | 26 | 兩個 BLOCKING 打穿核心機制（baseline 無錨點、刪節不算改動） |
+| R2 | 28 | 確診 rev2 是**加機制型**修訂，三個新元件全被打穿 |
+| R3 | 25 | 三家一致「刪機制方向正確，剩餘是**規格文字非架構**」 |
+| R4 | 16 | 兩家「差兩句話、95% 可收」；codex 被格式閘擋在 lock 外 |
+| **R5** | **6** | **composer 判「可派工、可進條文」**；grok「不需再一輪架構 R」；**codex 專項確認 R4 手抄摘要忠實，lock 缺口關閉** |
 
-**主委曾把兩者混為一談**（宣稱「A/B/C/D 沒處理退回來源」）——**錯**：R 的觸發條件無一是格式寫錯。
+**累計刪掉 5 個元件、新增 0 個**：baseline registry／`expires` 三段式／raw-byte escaping／`DEPENDS-ON`＋環檢／bounded inventory 承諾。
 
-## ✅ 問題 B：已收斂（四節點全在產出端）
+### 下一步：寫 v2.0 條文（階段 0 收尾）
 
-| 產物 | 檢查點 | commit |
-|---|---|---|
-| brief | 派工時 ＋ **寫檔時** | `901a8d9`（T1） |
-| SPEC／TODO | freeze 時 ＋ **寫檔時** | `901a8d9`（T1） |
-| 委員產出 | **交件時**（`completeness_check --single`） | `8193582`（T5 第一段） |
-| 收斂檔 `synth.md` Verdict | **寫檔時**（`verdict_filled_check.sh` 唯一實作） | `1787986` |
+**順序（三家交集，見設計稿 §D17.2）**：
+① **§D5（T6）裁決**——`register-output` 白名單 ＋ synth authority 分工（三家一致列第一）
+② §D0 目標＋四分解 inventory ＋ §D1 核心決策 → ③ §D2 schema／VALID 雙述詞／roster 時點
+→ ④ §D3 mode／grandfather write-once → ⑤ §D4 resolve／closure 誠實邊界
+→ ⑥ **§D6 C ＋ §D7 §6′ 同輪** → ⑦ §D8 → §D9 manifest → **§D10 oracle 全表收口**
 
-⚠️ **殘留（窄）**：`RECONCILE-STAMP` 的**真戳記缺陷**（hash 錯／缺家族／provenance 斷）仍只在 gate 消費端發現。
-`cx_run.sh:374` **不是 fail-closed**（`GROK-R2-P0-02`）；malformed stamp row 是 no-op、`stamp-target` 只驗路徑、
-外部/人工 append 不進產出端 hook（`CODEX-R2-P1-04`）。**主委兩度誤判此項**（先憑印象列缺口、再憑不完整實測刪除）。
+**階段 0 程序檔自身維持 `whole-body`**（雞生蛋）；section-map schema 可放 v2.0 附錄節。
+**條文合併進 `docs/` 前不得進階段 1 工具實作**（三家一致）。
 
-## ▶ 問題 A：方向定案（`handoffs/reconcile/20260803-proba-direction/synth.md`）
+## 🔴 本 epic 產生的新票
 
-| 項 | 裁定 |
+| 票 | 內容 |
 |---|---|
-| **D 分節簽名** | 修改後採用，**分階段** |
-| **C 窄版**（觸及面機檢） | 同期採用；**須同輪改 §6「本程序不新增任何檢查器」** |
-| **A**（R 範圍收窄） | **不做**；grandfather 期靠 C 擋誤觸發 |
-| **B**（爭議預設） | **原案不做，維持現行 §1 default-R**（＝不改安全閥，非刪除） |
+| `GOV-COMPLETENESS-IDLIKE-FP` | `completeness_check` 把「首 token 形如 `XX-NN`」的 heading 誤判為畸形 finding ID（codex 因此整輪卡死）。判準應收窄為「含 `-R<digit>-` 節段或以已知家族名起始」。**須先盤攻擊面＋連動測試矩陣** |
+| **重啟 `D-003`（`result_state` 收窄）** | 格式不合規但 `cli_rc=0`＋產出非空 ⇒ 記為 `success` ⇒ 守衛⑥拒絕重派 ⇒ **家族在該輪永久卡死**。已有具體事故（R4）。改法＝`success` 須加「產出端格式檢查通過」 |
+| `GOV-ROLEGATE-PREDISPATCH` | `brief-kind` 與角色 SoT 的相容性只在 `cx_run` 派工當下才驗，此時債已開、其他家已跑完 ⇒ 半失敗輪。應前移到 `committee_run` **開債前**逐家驗 |
 
-🔴 **主委核心推論已被三家打穿、作廢**：「分節後 R 變便宜 ⇒ A/B 可省」**不成立**——
-分節只讓**重簽的機械成本**變小，**對抗審勞動／分類爭議／跨節依賴／provenance 不會自動變成單節成本**。
-除非 **R 的定義同步改成「節級重審＋依賴閉包」且 brief／gate 機械綁定 scope**，否則審查仍逼近全檔。
-⇒ **簽名的粒度 ≠ 審查的粒度**。
+## ⚠️ 主委在本 epic 的錯誤（供稽核，設計稿 §D14 有完整版）
 
-### 下一步（**只起草設計稿，不進工具實作**——三家一致）
-
-設計稿須先鎖定：D schema／mode／legacy registry／section inventory／C 誠實邊界／pilot gate。
-
-- **工具清單**（比主委設想長）：`reconcile_body_hash.sh`／`reconcile_stamps_check.sh`／`verify_task_provenance.py`／
-  `cx_run.sh`／`completeness_check.sh`／`reconcile_build.sh`／`reconcile_add_stamp_section.sh`／`reconcile_clear_stamps.sh`；
-  `verify_spec_stamp_delta.sh` 須明定 **legacy-only 或退場**
-- **輪次**：codex＝1A 程序 R 審＋戳記／1B 工具實作＋獨立驗證／1C pilot；grok＝**3–5 操作輪**
-- **pilot**：codex 建議 `DECOUPLE_SCAN2_SPEC.md` ＋ paired TODO
-- **紅線**：檔級 mode 標誌 ＋ **dual-read fail-closed**（legacy whole-body **XOR** section-map）；
-  **禁止「算得出任一 hash 就算過」**；缺節／重排／heading 改名／map 不一致／schema fallback **一律 FAIL**
-- **C 誠實邊界**：硬 gate 只涵蓋 anchor 存在/重複、`PREDECESSOR`/`BASE` 鏈、生效 D 宣告覆寫相交、index binding；
-  「正文引用 ⊃ 宣告」**只能 advisory**，**不得宣稱能抓 D-002 型宣告不實**
-
-## ▶ 其他待辦
-
-| # | 任務 | 狀態 |
-|---|---|---|
-| **T3** | 線 C ＝ **D-002 已修完六項 P1 ＋ 補上申報不實的 `§P` 觸及面**，過 `dext` rc=0，`handoffs/20260802-D002-DRAFT.md`（218 行） | **待送三家戳記** |
-| **T4** | `Task 3.2` → B5 完工 → P1-6 epic 結案 | 未動 |
-| **T6** | `GOV-DOCS-STAMP-PROVENANCE` | 未動 |
-| **T7** | 清尾小票 | 未動 |
-
-**D-003（`result_state` 收窄）已停止推進**：與 D-002 觸及面重疊（同覆寫 `## §P`），依 §3.3 不得平行生效。
-草案留 `handoffs/20260802-D003-DRAFT.md`，待 D 分節簽名落地後成本結構會改變，屆時重估。
-
-## T7 清單
-
-- `GOV-FAILCLOSED-DEP-GUARD`：主委原案（靜態探針硬 gate + `OPTIONAL-DEP` 註記）**經 codex 實跑否決**
-  （60 支 shell／命中 5／**真陽性 0**／漏抓 `gate_check.sh:66`）。採委員版：tripwire 警告 ＋ 隔離 runtime mutation 硬 gate ＋ 可過期豁免 registry ＋ `require` helper
-- `GOV-TESTHARNESS-SCRIPTLIST-SSOT`：隔離 repo 腳本清單散在 **4 份 fixture**，本 session 因此紅了 **6 次**。
-  ⚠️ 最新一次失效形態值得記：**拒發案例「紅對了但原因是錯的」**（缺檢查器→非零→判成未填），靠放行案例才抓出
-- `docs/` 既有 **24 檔**格式 backlog（多為 `Archived/*` 與 `*_SPEC_PLAIN*` 誤報）
-- `P16-SPEC-STAMP-DELTA-STALE`／`GOV-XREF-SYNC`／B-6／B-8／`GOV-VERIFY-RECEIPT-RUNNER`／`P16-DEBT-ROSTER-BINDING`
-
-## 委員品質觀察（T5 動機證據）
-
-composer 本 session 三次同型缺陷（格式／嚴格度寬鬆）。
-**T5 上線後已連續 4 輪正常銷帳、零 abandon**（此前最近 4 輪有 3 輪只能 abandon）。
+1. 「分節後 R 變便宜 ⇒ A/B 可省」——前輪三家打穿
+2. rev2 用**加機制**補洞，三個新元件全被打穿
+3. 手寫閉包「12 支／15 檔」，算術與定義皆錯
+4. **戳記檔數錯三次**：報「2」→ 更正「31」→ **兩者都不是**；正解＝canonical in-file row **0** 份（因 T6 全外置）
+5. rev5 改詞界**未同步同節舊定義**（`GROK-R5-P1-01`）——已改用 grep 機械掃描修正
 
 ## 📌 開工前必做
 
 1. 稽核本檔／ROADMAP vs repo 實況
 2. `bash scripts/agent_preflight.sh`
-3. 派工一律 `committee_run.sh`；收集節點用 `reconcile_build.sh`
-4. **`git push` 會跑整套 governance（約 180s）→ 一律丟背景**，否則被 2 分鐘 timeout 砍
+3. 派工一律 `committee_run.sh`；收集用 `reconcile_build.sh`
+4. **`git push` 會跑整套 governance（約 180s）→ 一律丟背景**
 5. **不要對 `docs/*.D-NNN.md` 跑 `reconcile_stamps_check.sh`**（必 rc=1，＝T6）
-6. **禁用專案外絕對路徑**（`/private/tmp/...`）——本 session 因此觸發 600 秒 A 類卡頓
+6. **禁用專案外絕對路徑**（觸發 600 秒 A 類卡頓）
+7. 🔴 **brief 內的假設標籤不得命名為 `X-N` 形態**（`E-1` 等會撞 `completeness_check` 的 ID 誤報，見上票）
+8. 🔴 **`handoffs/*` 被 `.git/info/exclude` 排除**——本 epic 產物須 `git add -f` 才進版控
+
+## ▶ 其他待辦
+
+| # | 任務 |
+|---|---|
+| T3 | D-002 送三家戳記（`handoffs/20260802-D002-DRAFT.md`，218 行，過 dext rc=0） |
+| T4 | `Task 3.2` → B5 完工 → P1-6 epic 結案 |
+| T6 | `GOV-DOCS-STAMP-PROVENANCE`——**已升為 v2.0 階段 1 硬前置**（設計稿 §D5） |
+| T7 | `GOV-FAILCLOSED-DEP-GUARD`／`GOV-TESTHARNESS-SCRIPTLIST-SSOT`／docs 24 檔 backlog／`P16-SPEC-STAMP-DELTA-STALE`／`GOV-XREF-SYNC`／B-6／B-8／`GOV-VERIFY-RECEIPT-RUNNER`／`P16-DEBT-ROSTER-BINDING` |
