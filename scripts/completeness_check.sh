@@ -132,6 +132,12 @@ extract_heading_ids() {
   fi
 
   # shellcheck disable=SC2016
+  # Task 1.1 四步程序（GOV_DISPATCH_FLOW_FIX / GOV-COMPLETENESS-IDLIKE-FP）：
+  #   (1) 整行命中 canonical → family-binding
+  #   (2) 【完整 heading 文字】∈ ALLOWLIST → 放行（鍵=完整 heading，非首 token）
+  #   (3) 其餘 id-like（首 token 命中 ^[A-Z]+(-[A-Z0-9]+)+$）→ 判畸形
+  #   (4) 不命中 id-like → 放行
+  # ALLOWLIST 唯一元素（逐字）："E-1～E-7 逐條 Verdict"
   awk -v heading_re="${HEADING_LINE_RE}" -v expected_fam="${expected_fam}" '
     BEGIN {
       fam["CODEX"]=1; fam["COMPOSER"]=1; fam["GROK"]=1; fam["CLAUDE"]=1; fam["AGY"]=1
@@ -143,6 +149,7 @@ extract_heading_ids() {
       sub(/[[:space:]]+$/, "", line)
       if (line == "") next
       if (line ~ /^DEGRADE-[A-Z]+-[0-9]{2,}$/) next
+      # (1) 整行命中 canonical → family-binding
       if (line ~ /^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$/) {
         split(line, segs, "-")
         family=segs[1]
@@ -160,6 +167,11 @@ extract_heading_ids() {
         print line
         next
       }
+      # (2) 【完整 heading 文字】∈ ALLOWLIST → 放行（鍵必須是完整 heading，不是首 token）
+      if (line == "E-1～E-7 逐條 Verdict") {
+        next
+      }
+      # (3) 其餘 id-like → 判畸形；(4) 不命中 → 放行
       n=split(line, parts, /[[:space:]]+/)
       tok=parts[1]
       sub(/[^A-Za-z0-9_-].*$/, "", tok)

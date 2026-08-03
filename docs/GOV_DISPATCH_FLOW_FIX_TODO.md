@@ -36,7 +36,7 @@ R6 實際結果為**三家一致無 P0**（codex「TODO：GO」／grok 0 finding
 
    | Phase | TODO 表機械展開 | SPEC rev6 寫 | 判定 |
    |---|---|---|---|
-   | 1 | **22**（`T1-U1..U18` 展開 18 ＋ M1／B1／B2／R1 共 4） | 19 | ✗ 照 SPEC 漏 3 |
+   | 1 | **25**（`T1-U1..U18` 展開 18 ＋ M1／B1／B2／R1／I1／S1／S2 共 7；I1＝B1 硬前置；S1／S2＝phases==0 例外收窄） | 19 | ✗ 照 SPEC 漏 6 |
    | 2 | **9** | 6 | ✗ 照 SPEC 漏 3 |
    | 3 | **9**（拆 `T3-U4`／`T3-U5` 後 9 列 ⇒ 9 case） | 8 | ✗ 照 SPEC 漏 1 |
    | 4 | **11** | 6 ＋ 5 ＝ 11 | ✓ 一致 |
@@ -106,7 +106,10 @@ R6 實際結果為**三家一致無 P0**（codex「TODO：GO」／grok 0 finding
 > Task：1.1（`extract_heading_ids` 判準）。
 > 驗證：`venv/bin/python -m pytest tests/governance/test_completeness_idlike_fp.py -q` rc==0，
 > 且 collected 數 **== Phase 1 測試表機械展開列數**（`T1-U1..U18` 為 18 個參數化 case，
-> 另加 `T1-M1`／`T1-B1`／`T1-B2`／`T1-R1`）。**禁在此寫死數字**，以
+> 另加 `T1-M1`／`T1-B1`／`T1-B2`／`T1-R1`／`T1-I1`／`T1-S1`／`T1-S2`）。
+> 🔴 **B1 硬前置**：`T1-I1`（G-MANIFEST production-path）必須存在且通過；
+> `--gmanifest-gate 1` 須**實際執行** T1-I1（非僅字串存在），且 phases==0 例外僅具名
+> `tests/governance/test_govflow_manifest.py`（見 T1-S1／T1-S2）。**禁在此寫死數字**，以
 > `pytest --collect-only -q tests/governance/test_completeness_idlike_fp.py | wc -l` 對照。
 
 ### B2 派工 prompt
@@ -393,9 +396,12 @@ Task 0.1 淪為裝飾品，且 §R 「Phase 1/2/3 依賴 Phase 0」的耦合宣�
 | T1-B1 | 邊界 | 全形／`～` 截斷 |
 | T1-B2 | 邊界 | 空 heading |
 | T1-R1 | 回歸 | 表外 20 個 token 無漏網 |
+| **T1-I1** | 整合 | 🔴 **G-MANIFEST production-path**（B1 硬前置）：缺 Phase 1 列／壞 SHA／壞 ISO8601／欄數!=3 ⇒ rc!=0；有效列 ⇒ rc==0。真實 consumer＝`tests/governance/test_completeness_idlike_fp.py` 的 `run_gmanifest_gate`（CLI `--gmanifest-gate <N>`）。Gate 內須**實際執行**本測並要求通過（非僅 `def test_t1_i1_` 字串存在） |
+| **T1-S1** | 契約 | 🔴 **phases==0 例外收窄**（`CODEX-R5-P1-01`）：Phase 1 允許集合含具名 `tests/governance/test_govflow_manifest.py`，**不含** `scripts/gen_govflow_manifest.sh`；非例外路徑 phases 欄必須含 `1` |
+| **T1-S2** | 否定 | 🔴 **隔離證偽**：Phase 1 只動 `scripts/gen_govflow_manifest.sh` ⇒ G-MANIFEST scope 外洩 rc!=0；只動具名例外檔 ⇒ rc==0 |
 
 **Phase Gate**：T1-* 全綠 ＋ `pytest tests/governance -q` 全綠（既有測試不得因本 Task 轉紅）
-＋ 🔴 **G-MANIFEST（N=1）**。
+＋ 🔴 **G-MANIFEST（N=1）**（須機械確認 `T1-I1` **存在且通過**——實際 pytest 執行，非字串存在）。
 
 ---
 
@@ -661,8 +667,8 @@ Task 0.1 淪為裝飾品，且 §R 「Phase 1/2/3 依賴 Phase 0」的耦合宣�
   抽取其中的 ID 樣板並對 `CANONICAL_ID_RE` 驗證。
   ⇒ 產出端檢查目前**只擋委員的產出，不擋主委在 brief 下的錯誤指令**——強制點裝在消費端。
 - 🔴 **`GOV-SPEC-REV6-STALE-COUNTS`**（R2 具名開票，**不阻塞 B0**）：
-  SPEC rev6 驗證欄的 `19/6/8 passed`（Phase 1／2／3）與 TODO 機械展開數 `22/9/9` 不符
-  ——照 SPEC 當 gate 會分別漏測 3／3／1 個 case。Phase 4 的 `6+5=11` 一致。
+  SPEC rev6 驗證欄的 `19/6/8 passed`（Phase 1／2／3）與 TODO 機械展開數 `25/9/9` 不符
+  ——照 SPEC 當 gate 會分別漏測 6／3／1 個 case。Phase 4 的 `6+5=11` 一致。
   SPEC rev6 **已凍結**，依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` 走延伸檔修訂，
   **不就地改**。實作端一律以 §0 第 5 條的對照表為準。
 - 🔴 **`GOV-MANIFEST-INFLATION-RESIDUAL`**（STAMP4 具名開票，**不阻塞 B0**）：

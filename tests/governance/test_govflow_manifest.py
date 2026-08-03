@@ -550,8 +550,9 @@ def test_t0_c4_nodeid_contract() -> None:
         f"T0-C4: present .py 的 nodeid 應為 path，得 {p_parts[2]!r}"
     )
 
-    # C 類尚未建立的測試檔（Phase 1+）
-    missing_c = "tests/governance/test_completeness_idlike_fp.py"
+    # C 類尚未建立的測試檔（B1 已交付 test_completeness_idlike_fp.py ⇒
+    # 探針改指仍 MISSING 的 Phase 2 檔；契約不變：MISSING C ⇒ nodeid == '-'）
+    missing_c = "tests/governance/test_result_state_format_failed.py"
     assert missing_c in by_path, f"manifest 缺 MISSING C 項: {missing_c}"
     m_parts = by_path[missing_c]
     assert len(m_parts) == 4, m_parts
