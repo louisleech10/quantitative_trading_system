@@ -323,8 +323,9 @@ EOF
     ;;
   dext)
     # 凍結文件「D 延伸」檔（docs/<原檔 basename>.D-<NNN>.md）。
-    # 錨點逐字取自 docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md §2「延伸檔必填」——
+    # 錨點逐字取自 docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md §2.2「延伸檔必填」——
     # 該節是 canonical 單一真相源，本處只做機器驗證，**不重列規則**（重列會漂移）。
+    # （2026-08-03：v1.0 §2 已被 v2.0 §2.2 取代，模板內容不變；v1.0 檔頭有節號對照表。）
     # 出生理由（GOV-DEXT-TEMPLATE-KIND）：D-001 實戰時 `gate.sh dispatch --spec <D延伸檔>`
     #   走 `spec` kind → 要求完整 SPEC 錨點 → **永遠拒發 token**，只能改傳底本繞過。
     need "BASE:" "§2：原檔路徑 @ commit-sha"
@@ -415,7 +416,7 @@ if [ -n "${missing}" ] || [ -n "${hollow}" ]; then
   if [ "${kind}" = "result" ]; then tpl="${result_tpl}"; fi
   if [ "${kind}" = "dext" ]; then
     # dext 的範本不在 templates/，在凍結程序文件本身（canonical 單一真相源）
-    echo "  → 依 docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md §2「延伸檔必填」補齊結構與內容。"
+    echo "  → 依 docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md §2.2「延伸檔必填」補齊結構與內容。"
     exit 1
   fi
   echo "  → 依 templates/${tpl} 補齊結構與內容。"

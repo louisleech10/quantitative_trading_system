@@ -315,7 +315,16 @@
   - **findings 收斂曲線 26 → 28 → 25 → 16 → 6**；R5 三家中 composer 判「可派工、可進條文」，grok 判「不需再一輪架構 R」。
   - **關鍵轉折**：R2 確診 rev2 為**加機制型**修訂（新增 baseline registry／`expires` 三段式／length-prefix 編碼，三者被三家全數打穿），改採**刪機制**方針 ⇒ **累計刪除 5 個元件、新增 0 個**。
   - 產物：`handoffs/20260803-FROZEN-PROC-V2-DESIGN.md`（rev6）＋ `handoffs/reconcile/20260803-frozen-proc-v2-r{1..5}/`。
-  - **下一步＝寫 v2.0 條文（階段 0 收尾）**，順序見設計稿 §D17.2；條文合併進 `docs/` 前**不得**進階段 1 工具實作。
+- **凍結文件修訂程序 v2.0 — 條文已定案生效（2026-08-03）**：
+  **`docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md`**（495 行）取得**三家 `RECONCILE-STAMP` 全數 APPROVED**，
+  機檢 `reconcile_stamps_check.sh handoffs/reconcile/20260803-frozen-proc-v2-text/synth.md` **rc=0**。
+  - **戳記改為傳遞綁定條文本身**：戳記標的檔內寫入條文 sha256 `176c58e0…`，條文改動即戳記作廢
+    （v1.0 的戳記只綁收斂檔本體，條文改動不會失效——此為 v2.0 的改進）。
+  - `docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md`（v1.0）**已標記 SUPERSEDED**，檔頭附 v1.0→v2.0 節號對照表。
+  - 活引用同步：`scripts/template_check.sh` 的 dext 錨點來源改指 v2.0 §2.2。
+    `handoffs/**` 為歷史紀錄，**不改寫**；`docs/P16_COMMITTEE_DEBT_SPEC.D-001.md` 的引用在 v2.0 §2 語意下仍成立，
+    且它是已戳記產物，**刻意不動**（讀者循 v1.0 檔頭對照表即可）。
+  - **階段 1（工具實作）尚未開始**；硬前置＝`GOV-DOCS-STAMP-PROVENANCE`（條文 §6.3 已裁決）。
   - 新票：`GOV-COMPLETENESS-IDLIKE-FP`、**重啟 `D-003`（`result_state` 收窄，已有具體事故）**、`GOV-ROLEGATE-PREDISPATCH`。
 
 ## ✅ 近期已完成（2026-06 / 2026-07）

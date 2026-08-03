@@ -1,6 +1,15 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-03 | **Branch**: **main** | **狀態**: **凍結程序 v2.0 設計稿已收斂（R1–R5）；下一步＝寫 v2.0 條文**
+**Agent**: Claude(Opus 5) | **Time**: 2026-08-03 | **Branch**: **main** | **狀態**: 🔴 **凍結程序 v2.0 條文已定案生效（三家戳記 rc=0）；階段 1 工具實作尚未開始**
+
+## 🔴 現行有效程序＝`docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md`
+
+| 項 | 值 |
+|---|---|
+| 條文 sha256 | `176c58e0c914153dce33f08710f3a08994b5ac98bf40b74745c9c511e4192a40`（**戳記綁定此值，改動即作廢**） |
+| 戳記 | `handoffs/reconcile/20260803-frozen-proc-v2-text/synth.md`；`reconcile_stamps_check.sh` **rc=0** |
+| v1.0 | `docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md` **已標 SUPERSEDED**，檔頭附 v1.0→v2.0 節號對照表 |
+| 下一步 | **階段 1 工具實作**；硬前置＝`GOV-DOCS-STAMP-PROVENANCE`（條文 §6.3 已裁決主案＋輔案） |
 
 ## 🔴 使用者定死（最高優先）
 
