@@ -286,11 +286,27 @@ R6 實際結果為**三家一致無 P0**（codex「TODO：GO」／grok 0 finding
 | **T0-N4** | 否定 | 🔴 **D 類分類優先於 A**：把 `scripts/audit_events.json` 從 `PHASE_MAP` 拿掉 ⇒ 非零離開，**不得**降級為 `phases=-` 旁觀者 |
 | **T0-N5** | 否定 | 🔴 **錨點完整性**（codex STAMP4 實驗直接重現）：於隔離副本刪掉任一 Task 的「不可做」bullet ⇒ **生成器非零離開**。⚠️ 現行守衛在此情境下 `D ∖ PHASE_MAP` **仍為 0 而靜默放行**——本測試就是要讓它紅 |
 | **T0-N6** | 否定 | 🔴 **PHASE_MAP 反向收斂**：於隔離副本把一個純 A 類旁觀者檔（如 `scripts/audit_append.sh`）從 `-` 改映射成 `2` ⇒ **非零離開**（該 path 不在 B∪C∪D） |
-| **T0-C3** | 契約 | **`handoffs/govflow_phase_base.tsv`**（🔴 全路徑，`GROK-R2-P1-01`：本列原寫短檔名 `phase_base.tsv`，與 G-MANIFEST 正文不一致，會讓測試與真實 Gate 各鎖各的路徑）缺 Phase N 的列 ⇒ G-MANIFEST（N）**FAIL**，不得跳過該 Gate |
+| **T0-C3** | 契約 | **`handoffs/govflow_phase_base.tsv`**（🔴 全路徑，`GROK-R2-P1-01`：本列原寫短檔名 `phase_base.tsv`，與 G-MANIFEST 正文不一致，會讓測試與真實 Gate 各鎖各的路徑）缺 Phase N 的列 ⇒ G-MANIFEST（N）**FAIL**，不得跳過該 Gate。🔴 **精確 schema oracle**（`CODEX-B0R-P1-02` 修補）：三欄 TSV、40-hex HEAD、ISO8601Z timestamp；壞 timestamp／壞 SHA／欄數錯 ⇒ lookup FAIL；有效列 ⇒ 取得到 base。<br>🔴 **定位＝reference/schema unit oracle，非 production-path integration**（`CODEX-R3-P1-01`）：本測呼叫測試檔內自建的 `_gmanifest_base_lookup()`，**因為 B0 當下 repo 內尚不存在可被呼叫的 production G-MANIFEST consumer**（G-MANIFEST 是 Phase 1–4 的 Gate 條款，屬 B1–B4）。⚠️ **同源風險具名**：測試把 lookup 語意重寫在測試內，故**不能證偽真實 consumer 的行為**，只能證偽 schema。**整合測試見下方 B1 硬前置。** |
+| **T0-C4** | 契約 | 🔴 **nodeid 欄契約**（`CODEX-B0R-P1-01` 修補）：至少一個 present `tests/**/*.py` 的 `nodeid` == path，且至少一個 MISSING C 項 `nodeid` == `-`。`nodeid_of()` 退化為全 `-` 時本測必須轉紅 |
+| **T0-N7** | 否定 | 🔴 **D 類抽取全毀**（composer P2-01）：隔離副本破壞 `awk`/`grep` 抽取 pattern 使 `tmp_d` 為空 ⇒ **生成器非零離開**（與 T0-N5 錨點計數失衡正交） |
 
-**Phase Gate**：🔴 **T0-N1／T0-N2／T0-N3／T0-N4／T0-N5／T0-N6／T0-B2 全綠**（可證偽 oracle，缺一不可）
-＋ T0-U1／T0-B1／T0-C1／T0-C2／T0-C3 全綠。
+**Phase Gate**：🔴 **T0-N1／T0-N2／T0-N3／T0-N4／T0-N5／T0-N6／T0-N7／T0-B2 全綠**（可證偽 oracle，缺一不可）
+＋ T0-U1／T0-B1／T0-C1／T0-C2／T0-C3／T0-C4 全綠。
 **不得**以「輸出列數與手動聯集相等」作為 Gate——該比對與生成器同源，pattern 寫錯時兩邊一起錯（見 Task 0.1 §驗證第 3 點）。
+
+🔴 **B1 硬前置（`CODEX-R3-P1-01`，非建議、不得省略）**：
+B1 是 **G-MANIFEST 首次真正執行**的 Phase，故 B1 **必須**交付
+**`T1-I1` production-path integration test**——以 repo 內**真實**的 G-MANIFEST consumer
+（B1 須將 Gate 條款落成可執行元件）對 `handoffs/govflow_phase_base.tsv` 端到端驗證：
+缺 Phase 1 列 ⇒ Gate rc!=0；有效列 ⇒ 取得 base 且 rc==0。
+須附 mutation 證明（壞 SHA／壞 ISO8601／欄數 !=3 各一 ⇒ rc!=0）。
+🔴 **且須機械強制，不得只留文字約束**〔`CODEX-R4-P3-01`：實跑
+`rg -n 'G-MANIFEST|T1-I1|govflow_phase_base' scripts` **僅命中生成器**，
+`gate.sh`／`committee_run.sh` 仍是 generic dispatch，**現無任何檢查把 `T1-I1` 綁定 Phase 1 通過**〕：
+B1 須在 `G-MANIFEST（N=1）` Gate 內機械檢查 `T1-I1` **存在且通過**，
+並驗缺列／壞 SHA／壞 ISO8601／欄數錯**均非零**。
+**理由**：`T0-C3` 只能證偽 schema，**證偽不了真實 consumer**——兩者是不同的 oracle，
+不得以前者充當後者。⚠️ **B1 若未交付 `T1-I1`，Phase 1 Gate 不得判通過。**
 
 ### 🔴 G-MANIFEST — Phase 1／2／3／4 共用 Gate 條款（Phase 0 的下游消費者）
 
@@ -635,6 +651,15 @@ Task 0.1 淪為裝飾品，且 §R 「Phase 1/2/3 依賴 Phase 0」的耦合宣�
 - `GOV-CLAIMCHECK-VS-VERBATIM` 的 claim ledger fingerprint 分支
 - `GOV-RECONCILE-LOCK-IMMUTABLE-DEADLOCK`（lock 寫入後無法修正）
 - `.git/info/exclude` 收窄（屬凍結程序 v2.0 §6.3 輔案，歸 v2.0 階段 1）
+- 🔴 **`GOV-BRIEF-IDPATTERN-UNVALIDATED`**（B0 review 輪具名開票，**不阻塞**）：
+  brief 內指定給委員的 finding ID 格式**沒有任何機制驗證它是否符合** `completeness_check.sh`
+  的 `CANONICAL_ID_RE='^([A-Z]+)-(R[0-9]+)-(P[0-3])-([0-9]{2,})$'`。
+  **實證事故**：主委在 B0 review brief 指定 `<FAMILY>-B0R-P<0-3>-<NN>`，`B0R` 不合 `R[0-9]+`
+  ⇒ codex 照指示產出後被交件檢查判不合規、整輪只能 `--abandon`；composer 則自行退回
+  `COMPOSER-R1-*`（格式合法但與 TODO R1 輪撞號）。**是主委下錯指令，非委員之過。**
+  修法方向：`doc_format_precheck.sh` 對 `brief-kind ∈ {review, consult}` 的 brief，
+  抽取其中的 ID 樣板並對 `CANONICAL_ID_RE` 驗證。
+  ⇒ 產出端檢查目前**只擋委員的產出，不擋主委在 brief 下的錯誤指令**——強制點裝在消費端。
 - 🔴 **`GOV-SPEC-REV6-STALE-COUNTS`**（R2 具名開票，**不阻塞 B0**）：
   SPEC rev6 驗證欄的 `19/6/8 passed`（Phase 1／2／3）與 TODO 機械展開數 `22/9/9` 不符
   ——照 SPEC 當 gate 會分別漏測 3／3／1 個 case。Phase 4 的 `6+5=11` 一致。
