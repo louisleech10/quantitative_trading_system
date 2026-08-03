@@ -31961,3 +31961,502 @@ ts=2026-08-02 11:00:29 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-03T03:10:36Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-03T03:14:56Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-03T03:14:56Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+=== 2026-08-03 11:32:40 | artifact ===
+  ts=2026-08-03 11:32:40
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GOV_DISPATCH_FLOW_FIX_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(RISK-HIT: b); §A=filled(含 FACT-RECEIPT 四項實跑); §C=filled(共用派工控制流 caller 面); §G=N/A:本任務不碰數值/特徵/ML/回測,無 baseline 可凍結,已登記於 §N; §P=filled(4 Phase); §V=filled(含 mutation 設計與防假綠); §R=filled(每 Phase 獨立 commit 可 revert); §N=filled(§G 之 N/A 理由)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-FIX-R1", "ts": "2026-08-03T03:38:29Z"}
+=== 2026-08-03 11:38:29 | dispatch ===
+  ts=2026-08-03 11:38:29
+  kind=dispatch
+  intent=派工控制流缺陷修補 SPEC 對抗審：四項 fail-wrong 缺陷的修法、三個待裁決、攻擊面盤點
+  risk=low
+  facts_asked=四項皆實戰事故:heading 誤報/result_state 過寬/角色檢查太晚/claim checker 撞逐字保留;五輪中 2 輪被迫 abandon
+  review_role=SPEC 對抗審；最優先攻三個待裁決與「修誤報是否順手放過真陽性」
+  template=n/a: 用 brief，標的 SPEC 路徑寫在 brief 內
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-FIX-R1-BRIEF.md", "brief_sha256": "fa5ca1dfdc92f236a421574d635676833563a0f0d90615ca1fd13b99e7cc41cb", "brief_sha256_norm": "fa5ca1dfdc92f236a421574d635676833563a0f0d90615ca1fd13b99e7cc41cb", "event": "committee_round_open", "event_id": "72a8dc4c-83b2-46ea-928f-0d283fc72bc0", "expected_outputs": {"codex": "handoffs/20260803-govflow-fix-r1-codex.md", "composer": "handoffs/20260803-govflow-fix-r1-composer.md", "grok": "handoffs/20260803-govflow-fix-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "4fa57202-1d8a-42fc-a124-64c6ceee7a7b", "schema_version": 1, "sequence": 444, "session_name": "20260803-govflow-fix-r1", "task_id": "GOVFLOW-FIX-R1", "ts": "2026-08-03T03:38:30Z"}
+{"event":"gate_deny","ts":"2026-08-03T03:41:06Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "2d3d0952-1fdb-426c-b767-d7654d8bed2b", "cli_rc": "0", "event": "committee_family_result", "event_id": "d4aa3a95-f6e6-4290-9199-a8b94cbc725a", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r1-composer.md", "output_sha256": "966b4a0d2a40d9017919743417f05701ab68b1726ac5794f64b5900f0d587776", "producer": "audit_append.sh", "result_state": "success", "round_id": "4fa57202-1d8a-42fc-a124-64c6ceee7a7b", "schema_version": 1, "sequence": 445, "ts": "2026-08-03T03:41:28Z"}
+{"actor": "cx_run", "attempt_id": "e9a25582-ba62-4fb6-8806-6c8e8fca6f0d", "cli_rc": "0", "event": "committee_family_result", "event_id": "a0e642d9-57cf-421f-ab8d-989079c5a42a", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r1-grok.md", "output_sha256": "3a0455ac429ec6b02a10c1296029896520c6d224a05acea55af327e8ac306538", "producer": "audit_append.sh", "result_state": "success", "round_id": "4fa57202-1d8a-42fc-a124-64c6ceee7a7b", "schema_version": 1, "sequence": 446, "ts": "2026-08-03T03:46:04Z"}
+{"event":"gate_deny","ts":"2026-08-03T03:47:46Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T03:48:02Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "64a3fa7a-84f9-42bd-b11d-98a26dd0af69", "cli_rc": "0", "event": "committee_family_result", "event_id": "137e9c7f-123a-41ae-96e5-e067ccacadc0", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r1-codex.md", "output_sha256": "f640dbd469a6bb20aa410bc6f726d4987bc87c1a18124b930d047acacaaff048", "producer": "audit_append.sh", "result_state": "success", "round_id": "4fa57202-1d8a-42fc-a124-64c6ceee7a7b", "schema_version": 1, "sequence": 447, "ts": "2026-08-03T03:49:29Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "54ceaa9d-c443-4c5b-a916-f6f763184755", "lock_sha256": "eb7f9cb3d9cf34d336c083452021688662916996c66cc8d76aa32de68356b836", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "4fa57202-1d8a-42fc-a124-64c6ceee7a7b", "schema_version": 1, "sequence": 448, "session_id": "20260803-govflow-fix-r1", "synth_sha256": "5fcafeb50d2e30684d677f001c992a573e04df5df494a3a8f7b1a25b7e9fd842", "ts": "2026-08-03T03:52:21Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-FIX-R2", "ts": "2026-08-03T04:25:10Z"}
+=== 2026-08-03 12:25:10 | dispatch ===
+  ts=2026-08-03 12:25:10
+  kind=dispatch
+  intent=派工控制流 SPEC rev2 窄聚焦對抗審：七項修補是否關閉 R1 findings、行為表可否被單一規則滿足
+  risk=low
+  facts_asked=R2-P0-01 現行 rc=0；RECONCILE-STAMP 現行 rc=1；cx_run emit 先於格式檢查；gate.sh 無路徑唯一性檢查
+  review_role=窄聚焦驗證輪；最優先攻 Task 1.1 行為表可滿足性與 Task 2.1 分支完整性
+  template=n/a: 用 brief，標的 SPEC 路徑寫在 brief 內
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-FIX-R2-BRIEF.md", "brief_sha256": "7b1e852e5edeae5818c4b018d40d1159b399c99654f48b44a8f82ea5a628aed6", "brief_sha256_norm": "7b1e852e5edeae5818c4b018d40d1159b399c99654f48b44a8f82ea5a628aed6", "event": "committee_round_open", "event_id": "44a31b2d-c6c0-4afa-83a7-efb2440b22d2", "expected_outputs": {"codex": "handoffs/20260803-govflow-fix-r2-codex.md", "composer": "handoffs/20260803-govflow-fix-r2-composer.md", "grok": "handoffs/20260803-govflow-fix-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "c9c102ce-e51f-40c0-9ae0-2a7cd5ea1858", "schema_version": 1, "sequence": 449, "session_name": "20260803-govflow-fix-r2", "task_id": "GOVFLOW-FIX-R2", "ts": "2026-08-03T04:25:11Z"}
+{"event":"gate_deny","ts":"2026-08-03T04:27:13Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T04:27:29Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T04:27:38Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "f55a8f36-fe3c-439c-9088-f86e1a737fe8", "cli_rc": "0", "event": "committee_family_result", "event_id": "192b3207-ff0a-40d6-86e4-628f34eb0a74", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r2-composer.md", "output_sha256": "ab52c54f4ef9f5dc85490590d99b88bdb26b90e992f9621ceec0de861fcd8a07", "producer": "audit_append.sh", "result_state": "success", "round_id": "c9c102ce-e51f-40c0-9ae0-2a7cd5ea1858", "schema_version": 1, "sequence": 450, "ts": "2026-08-03T04:28:02Z"}
+{"actor": "cx_run", "attempt_id": "3979c546-31bb-4159-a65a-6976fa7e08dd", "cli_rc": "0", "event": "committee_family_result", "event_id": "772c207e-65fa-498d-afe3-74d5b23703e4", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r2-codex.md", "output_sha256": "24bc5e4ae64d26e75227426b2cc9e714e945a456349c98691b98dc360899e50a", "producer": "audit_append.sh", "result_state": "success", "round_id": "c9c102ce-e51f-40c0-9ae0-2a7cd5ea1858", "schema_version": 1, "sequence": 451, "ts": "2026-08-03T04:30:39Z"}
+{"actor": "cx_run", "attempt_id": "2c8287a3-947c-4590-ad68-4cdf471cda70", "cli_rc": "0", "event": "committee_family_result", "event_id": "f41f502d-5860-45dd-b4e2-d84477eff944", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r2-grok.md", "output_sha256": "330acecd0798382690cb800c865c052e2b1e7749d48d2883014fc0c29b3fdcb5", "producer": "audit_append.sh", "result_state": "success", "round_id": "c9c102ce-e51f-40c0-9ae0-2a7cd5ea1858", "schema_version": 1, "sequence": 452, "ts": "2026-08-03T04:30:59Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "69718d61-b9fd-40a2-ac57-e7c801859308", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "codex 依 AGENTS.md 第12條 STAMP-BLOCKED 正確拒審(所依 R1 收斂檔無戳記區,reconcile_stamps_check rc=1),roster 不齊;此為主委流程缺失非委員之過。composer+grok 13 findings 已完整收斂 completeness rc=0,codex 的 BLOCKED 判斷記於 synth 群5未遺失", "round_id": "c9c102ce-e51f-40c0-9ae0-2a7cd5ea1858", "schema_version": 1, "sequence": 453, "ts": "2026-08-03T04:34:19Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-R2-STAMP", "ts": "2026-08-03T04:40:12Z"}
+=== 2026-08-03 12:40:12 | dispatch ===
+  ts=2026-08-03 12:40:12
+  kind=dispatch
+  intent=R2 收斂檔戳記輪：補正主委未為所依 reconcile 跑戳記輪的流程缺失
+  risk=low
+  facts_asked=R1 收斂檔 reconcile_stamps_check rc=1 且戳記區段數 0；codex 依 AGENTS.md 第12條正確拒審
+  review_role=戳記核對；codex 另須確認群5對其 BLOCKED 的記述忠實
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-R2-STAMP-BRIEF.md", "brief_sha256": "9519416bf31f9683d1b0346e77ae05075a5d7b84b93a6696c7ba39a065a270fc", "brief_sha256_norm": "9519416bf31f9683d1b0346e77ae05075a5d7b84b93a6696c7ba39a065a270fc", "event": "committee_round_open", "event_id": "c3843d4c-2339-42c9-b989-535a8056bf8b", "expected_outputs": {"codex": "handoffs/20260803-govflow-r2-stamp-codex.md", "composer": "handoffs/20260803-govflow-r2-stamp-composer.md", "grok": "handoffs/20260803-govflow-r2-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "7e1ef9dc-5710-468c-abc5-7eb72c582709", "schema_version": 1, "sequence": 454, "session_name": "20260803-govflow-r2-stamp", "task_id": "GOVFLOW-R2-STAMP", "ts": "2026-08-03T04:40:13Z"}
+{"actor": "cx_run", "attempt_id": "4240310e-800d-43a4-b5aa-54d0df058d36", "cli_rc": "0", "event": "committee_family_result", "event_id": "e5d6d591-8f12-4f2c-8595-29064f7f0350", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r2-stamp-composer.md", "output_sha256": "4cd964f4a77cc5ccf483dd32438c188e11fb47aa35f2e0e8ad91181adeff7cc4", "producer": "audit_append.sh", "result_state": "success", "round_id": "7e1ef9dc-5710-468c-abc5-7eb72c582709", "schema_version": 1, "sequence": 455, "ts": "2026-08-03T04:41:16Z"}
+{"actor": "cx_run", "attempt_id": "afd8af14-015c-4f67-aaf6-c09b57b0aa9d", "cli_rc": "0", "event": "committee_family_result", "event_id": "ca4eeb1b-73ba-4671-83c4-8101be273536", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r2-stamp-grok.md", "output_sha256": "f46781fa2b50f4b3acc7c7423cc1a98f2c096e1bfec53d81ae5167569c793fe1", "producer": "audit_append.sh", "result_state": "success", "round_id": "7e1ef9dc-5710-468c-abc5-7eb72c582709", "schema_version": 1, "sequence": 456, "ts": "2026-08-03T04:41:38Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r2/synth.md", "output_sha256": "644b9b109be39d603ca4028c9ef3d3119b00b3050e84bff2442ece059f3e32ee", "task_id": "GOVFLOW-R2-STAMP", "ts": "2026-08-03T04:41:38Z"}
+{"event":"gate_deny","ts":"2026-08-03T04:43:16Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T04:43:26Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "499e49b3-b2d9-4d64-a711-9316a8b4a6fa", "cli_rc": "0", "event": "committee_family_result", "event_id": "0573f73c-3570-4ece-9505-852fe458e35b", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r2-stamp-codex.md", "output_sha256": "bd664f4cce1815d38b58df9f7b88db20ffe223eb0a15ded108ecb7462697f7ea", "producer": "audit_append.sh", "result_state": "success", "round_id": "7e1ef9dc-5710-468c-abc5-7eb72c582709", "schema_version": 1, "sequence": 457, "ts": "2026-08-03T04:44:25Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r2/synth.md", "output_sha256": "3f7006536cbda280f1c769ce4ae40a5157c3169a4411d01658059844be7944a6", "task_id": "GOVFLOW-R2-STAMP", "ts": "2026-08-03T04:44:25Z"}
+{"event":"gate_deny","ts":"2026-08-03T04:44:59Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T04:45:12Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "4ee73e10-6e73-4575-bcd1-e66a3753ef2c", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp round produces no canonical findings by design; all three APPROVED and stamps_check rc=0 with matching body hash", "round_id": "7e1ef9dc-5710-468c-abc5-7eb72c582709", "schema_version": 1, "sequence": 458, "ts": "2026-08-03T04:45:32Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-FIX-R3", "ts": "2026-08-03T05:17:51Z"}
+=== 2026-08-03 13:17:51 | dispatch ===
+  ts=2026-08-03 13:17:51
+  kind=dispatch
+  intent=派工控制流 SPEC rev3 窄聚焦對抗審：六項修補是否關閉 R2 findings、五步決策程序實跑驗證
+  risk=low
+  facts_asked=R2 收斂檔已戳記 rc=0 body 95a79051；rev2 方向2 與行為表第10列互斥；stub 無 canonical finding
+  review_role=窄聚焦驗證輪；最優先實跑驗證五步決策程序是否滿足 10 列行為表
+  template=n/a: 用 brief，標的 SPEC 路徑寫在 brief 內
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-FIX-R3-BRIEF.md", "brief_sha256": "66359ac3655cae101fb9be1fd47680dd0249d25f8d7a67705a84d50ad97c1a8f", "brief_sha256_norm": "66359ac3655cae101fb9be1fd47680dd0249d25f8d7a67705a84d50ad97c1a8f", "event": "committee_round_open", "event_id": "2386c54b-4fea-4911-b2db-3a58e4fd2d5d", "expected_outputs": {"codex": "handoffs/20260803-govflow-fix-r3-codex.md", "composer": "handoffs/20260803-govflow-fix-r3-composer.md", "grok": "handoffs/20260803-govflow-fix-r3-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "d2f66520-73c0-4908-88c7-cfb170b0da7e", "schema_version": 1, "sequence": 459, "session_name": "20260803-govflow-fix-r3", "task_id": "GOVFLOW-FIX-R3", "ts": "2026-08-03T05:17:51Z"}
+{"actor": "cx_run", "attempt_id": "db0f06b1-18e6-4ab4-81f6-a327a1a92639", "cli_rc": "0", "event": "committee_family_result", "event_id": "c3bcbb73-b3ef-42f6-af2a-5e2292ccde5a", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r3-composer.md", "output_sha256": "1328d17513eb80859a4346b1e189e06ed6b88312e45bfd31f81b1d248eced8e7", "producer": "audit_append.sh", "result_state": "success", "round_id": "d2f66520-73c0-4908-88c7-cfb170b0da7e", "schema_version": 1, "sequence": 460, "ts": "2026-08-03T05:21:19Z"}
+{"actor": "cx_run", "attempt_id": "1c78d559-404b-44c4-94e6-9e64bf297e59", "cli_rc": "0", "event": "committee_family_result", "event_id": "ad2386fa-716b-4936-99a4-c91ba44156d1", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r3-grok.md", "output_sha256": "a18f82c46cd44a021185b8775cae36bd14083a24b9e92f23ce93c22c37cd0ddd", "producer": "audit_append.sh", "result_state": "success", "round_id": "d2f66520-73c0-4908-88c7-cfb170b0da7e", "schema_version": 1, "sequence": 461, "ts": "2026-08-03T05:24:26Z"}
+{"actor": "cx_run", "attempt_id": "971c75be-3212-434a-84ef-9730374097ec", "cli_rc": "0", "event": "committee_family_result", "event_id": "6f16b279-1b8c-4f92-8b7f-c363aa52dbf5", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r3-codex.md", "output_sha256": "766274924326e2d18a849b467ed09e871647afb6b4ce2a4cfde0cf9c5288dddc", "producer": "audit_append.sh", "result_state": "success", "round_id": "d2f66520-73c0-4908-88c7-cfb170b0da7e", "schema_version": 1, "sequence": 462, "ts": "2026-08-03T05:29:54Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "14bd6534-567f-4201-8aea-fa0326753145", "lock_sha256": "5a48b48f65e8a4f7bc97c634c41d5cce4926b55c37056c82fe7b469c666e51ed", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "d2f66520-73c0-4908-88c7-cfb170b0da7e", "schema_version": 1, "sequence": 463, "session_id": "20260803-govflow-fix-r3", "synth_sha256": "d338ba5b43802c3ed515d0fcd18094af73cec74b6be09de35881459821f81805", "ts": "2026-08-03T05:32:07Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-R3-STAMP", "ts": "2026-08-03T05:36:34Z"}
+=== 2026-08-03 13:36:34 | dispatch ===
+  ts=2026-08-03 13:36:34
+  kind=dispatch
+  intent=R3 收斂檔戳記輪：核對七群集與 rev4 六項最小集是否忠實反映各家 findings
+  risk=low
+  facts_asked=五步程序放行 A-1/U-01/Z-999 但現行 rc=1；review_families 與 executor_clis 交集不含 composer
+  review_role=戳記核對；併核對群1『推翻完整性而非正確性』的定性是否公允
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-R3-STAMP-BRIEF.md", "brief_sha256": "f4dae42cb6772d2f33d1694d9ace62a0f61db8862c8b5903f6f5289b159266c7", "brief_sha256_norm": "f4dae42cb6772d2f33d1694d9ace62a0f61db8862c8b5903f6f5289b159266c7", "event": "committee_round_open", "event_id": "e94fc313-84ba-4d02-bdb6-b3b9b6f2bb09", "expected_outputs": {"codex": "handoffs/20260803-govflow-r3-stamp-codex.md", "composer": "handoffs/20260803-govflow-r3-stamp-composer.md", "grok": "handoffs/20260803-govflow-r3-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "75adb770-3a7f-49b1-a62e-3726f0552c5c", "schema_version": 1, "sequence": 464, "session_name": "20260803-govflow-r3-stamp", "task_id": "GOVFLOW-R3-STAMP", "ts": "2026-08-03T05:36:34Z"}
+{"actor": "cx_run", "attempt_id": "75fd2edf-755a-40a4-b547-bdb913be7f3b", "cli_rc": "0", "event": "committee_family_result", "event_id": "68780cd1-b0bc-4350-838d-c5f30c91c9f2", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r3-stamp-grok.md", "output_sha256": "9cd69f611b9243d94822cda75dee53f449ef143f075236c39b6f26e1f6d890c1", "producer": "audit_append.sh", "result_state": "success", "round_id": "75adb770-3a7f-49b1-a62e-3726f0552c5c", "schema_version": 1, "sequence": 465, "ts": "2026-08-03T05:37:54Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r3/synth.md", "output_sha256": "77d7de9a9dffc121ac8f6a2639bd68c7101d4bc9cb845e8c34557e84102f7600", "task_id": "GOVFLOW-R3-STAMP", "ts": "2026-08-03T05:37:55Z"}
+{"actor": "cx_run", "attempt_id": "a0102d5d-db34-413d-a338-84e223c887cb", "cli_rc": "0", "event": "committee_family_result", "event_id": "36967976-0099-4f47-a732-50b300546082", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r3-stamp-composer.md", "output_sha256": "9775fa4b4b462e053ff068b8b71c786eadf16dbd4cbccd8aff984da3a281b489", "producer": "audit_append.sh", "result_state": "success", "round_id": "75adb770-3a7f-49b1-a62e-3726f0552c5c", "schema_version": 1, "sequence": 466, "ts": "2026-08-03T05:37:57Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r3/synth.md", "output_sha256": "77d7de9a9dffc121ac8f6a2639bd68c7101d4bc9cb845e8c34557e84102f7600", "task_id": "GOVFLOW-R3-STAMP", "ts": "2026-08-03T05:37:57Z"}
+{"event":"gate_deny","ts":"2026-08-03T05:38:30Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "931642e8-050d-4173-919d-acc6a03897ed", "cli_rc": "0", "event": "committee_family_result", "event_id": "ca69959e-8d4a-45ac-b207-eeffd5cf3160", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r3-stamp-codex.md", "output_sha256": "c2af7837a57606c9a7278199b37107226aeeec0519004b7c22accc9a5a705cac", "producer": "audit_append.sh", "result_state": "success", "round_id": "75adb770-3a7f-49b1-a62e-3726f0552c5c", "schema_version": 1, "sequence": 467, "ts": "2026-08-03T05:40:11Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r3/synth.md", "output_sha256": "f44ea15659f293fe188d0ca8bcc91d11d6b7d936a9baac87eb73e00c86497ba1", "task_id": "GOVFLOW-R3-STAMP", "ts": "2026-08-03T05:40:12Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "79390207-6d22-47f9-9365-c0507fd1c326", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp round produces no canonical findings by design; all three APPROVED, stamps_check rc=0, body hash 2ebf564f matches with no placeholder", "round_id": "75adb770-3a7f-49b1-a62e-3726f0552c5c", "schema_version": 1, "sequence": 468, "ts": "2026-08-03T05:40:23Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-FIX-R4", "ts": "2026-08-03T05:40:42Z"}
+=== 2026-08-03 13:40:42 | dispatch ===
+  ts=2026-08-03 13:40:42
+  kind=dispatch
+  intent=派工控制流 SPEC rev4 窄聚焦對抗審：六項修補是否關閉 R3 兩個 BLOCKING 與四項 MAJOR
+  risk=low
+  facts_asked=R3 收斂檔已戳記 rc=0 body 2ebf564f；五步程序放行 A-1/U-01/Z-999；交集不含 composer
+  review_role=窄聚焦驗證輪；最優先實跑攻擊有限 allowlist 是否封住真陽性邊界
+  template=n/a: 用 brief，標的 SPEC 路徑寫在 brief 內
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-FIX-R4-BRIEF.md", "brief_sha256": "472e5089d131019752dfc2c5d9680468d4db3b22d6ad90a8983cfe10547b5aea", "brief_sha256_norm": "472e5089d131019752dfc2c5d9680468d4db3b22d6ad90a8983cfe10547b5aea", "event": "committee_round_open", "event_id": "7da1edfe-6d28-464d-9d01-d436700e06b0", "expected_outputs": {"codex": "handoffs/20260803-govflow-fix-r4-codex.md", "composer": "handoffs/20260803-govflow-fix-r4-composer.md", "grok": "handoffs/20260803-govflow-fix-r4-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "5041416c-fb45-4bd5-b383-b881e0c67a8b", "schema_version": 1, "sequence": 469, "session_name": "20260803-govflow-fix-r4", "task_id": "GOVFLOW-FIX-R4", "ts": "2026-08-03T05:40:42Z"}
+{"actor": "cx_run", "attempt_id": "36cdaa69-fcef-4e66-8919-8d231f9dcd13", "cli_rc": "0", "event": "committee_family_result", "event_id": "c81e2b5c-a756-410d-991a-33bb008deba1", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r4-composer.md", "output_sha256": "9a28003946fa17ad293829973e04f67f09aae76d16669617acd8a6da1466658c", "producer": "audit_append.sh", "result_state": "success", "round_id": "5041416c-fb45-4bd5-b383-b881e0c67a8b", "schema_version": 1, "sequence": 470, "ts": "2026-08-03T05:44:53Z"}
+{"actor": "cx_run", "attempt_id": "68df0d6c-055a-4cce-85bd-2de97b7406f4", "cli_rc": "0", "event": "committee_family_result", "event_id": "bbd1be12-6b2c-4068-bfc8-e49dc52e4e4c", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r4-grok.md", "output_sha256": "9a3a3ea80562043c969f7508460a7ff1f69b6702b654fe49a8aa04122ae24c5c", "producer": "audit_append.sh", "result_state": "success", "round_id": "5041416c-fb45-4bd5-b383-b881e0c67a8b", "schema_version": 1, "sequence": 471, "ts": "2026-08-03T05:48:03Z"}
+{"event":"gate_deny","ts":"2026-08-03T05:51:18Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "aa5135b5-ea11-409a-9325-029d2d38686a", "cli_rc": "0", "event": "committee_family_result", "event_id": "38db43f2-51e9-490c-80e9-ddfa6f7aa687", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r4-codex.md", "output_sha256": "d65cd2606f23419ee2e2fbb3b35937fbc3717cf49289e044b696d578541afe8d", "producer": "audit_append.sh", "result_state": "success", "round_id": "5041416c-fb45-4bd5-b383-b881e0c67a8b", "schema_version": 1, "sequence": 472, "ts": "2026-08-03T05:52:28Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "82e59817-29af-4125-bc7e-d03edd02359d", "lock_sha256": "0f1a834139e17db4a0c7406a48047b0b34755a8d218caa06921c0aa10ab123f2", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "5041416c-fb45-4bd5-b383-b881e0c67a8b", "schema_version": 1, "sequence": 473, "session_id": "20260803-govflow-fix-r4", "synth_sha256": "f06898767c7acf4f82b6f60c672286167253d315f458bf57112434efeaa23555", "ts": "2026-08-03T05:54:26Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-R4-STAMP", "ts": "2026-08-03T05:56:57Z"}
+=== 2026-08-03 13:56:57 | dispatch ===
+  ts=2026-08-03 13:56:57
+  kind=dispatch
+  intent=R4 收斂檔戳記輪：核對四群集與 rev5 三項最小集是否忠實
+  risk=low
+  facts_asked=第3步無界放行17個現行rc=1的token；rg不在PATH改grep -rlE 33命中；食譜疊加vs取代歧義
+  review_role=戳記核對；併確認刪除第3步而非再收窄是否為認可的修法
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-R4-STAMP-BRIEF.md", "brief_sha256": "59cb86e7062b8f3f38790c6d0175b0a31632982bcde3186733865129fe7310d0", "brief_sha256_norm": "59cb86e7062b8f3f38790c6d0175b0a31632982bcde3186733865129fe7310d0", "event": "committee_round_open", "event_id": "487076ba-3e01-427c-8b71-080e387b7c45", "expected_outputs": {"codex": "handoffs/20260803-govflow-r4-stamp-codex.md", "composer": "handoffs/20260803-govflow-r4-stamp-composer.md", "grok": "handoffs/20260803-govflow-r4-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "6f878283-8da7-4e59-8b00-c692e190f6d4", "schema_version": 1, "sequence": 474, "session_name": "20260803-govflow-r4-stamp", "task_id": "GOVFLOW-R4-STAMP", "ts": "2026-08-03T05:56:57Z"}
+{"actor": "cx_run", "attempt_id": "d9cf0420-0356-4053-9c10-bbc61cbbeb31", "cli_rc": "0", "event": "committee_family_result", "event_id": "f28e7d12-7820-4cba-9007-bbe80c80b036", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r4-stamp-composer.md", "output_sha256": "6f8bed438a8cb169ebeac6f071f06404b42681203c23a345621a48c8dfb629ed", "producer": "audit_append.sh", "result_state": "success", "round_id": "6f878283-8da7-4e59-8b00-c692e190f6d4", "schema_version": 1, "sequence": 475, "ts": "2026-08-03T05:58:19Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r4/synth.md", "output_sha256": "764e1545f52634785956f4d975cca66ab9b5b59b9715acb022bab9121dbc4aeb", "task_id": "GOVFLOW-R4-STAMP", "ts": "2026-08-03T05:58:19Z"}
+{"actor": "cx_run", "attempt_id": "b426bad6-832c-40c5-84fa-3ae79ce8192d", "cli_rc": "0", "event": "committee_family_result", "event_id": "6f4a8d75-5f80-4763-a466-59ce230749c7", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r4-stamp-grok.md", "output_sha256": "00d3899b49ec42494e5296e9f18d1efb40c5574628e146f2b4e4632dd497a1a4", "producer": "audit_append.sh", "result_state": "success", "round_id": "6f878283-8da7-4e59-8b00-c692e190f6d4", "schema_version": 1, "sequence": 476, "ts": "2026-08-03T05:58:53Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r4/synth.md", "output_sha256": "4d72d735624393b84c75280f3ed06d005c44bbc7d1946353162772696078c833", "task_id": "GOVFLOW-R4-STAMP", "ts": "2026-08-03T05:58:53Z"}
+{"actor": "cx_run", "attempt_id": "54cd8b1e-cc61-4602-8f28-40949294ac7c", "cli_rc": "0", "event": "committee_family_result", "event_id": "ce8d3bc2-1691-4423-abb9-a780b37b8e06", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r4-stamp-codex.md", "output_sha256": "f3c18052dba0b31afb5970bca92169f39d9f44b8898058a0dce0302b2aa4eca6", "producer": "audit_append.sh", "result_state": "success", "round_id": "6f878283-8da7-4e59-8b00-c692e190f6d4", "schema_version": 1, "sequence": 477, "ts": "2026-08-03T06:05:39Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r4/synth.md", "output_sha256": "4d72d735624393b84c75280f3ed06d005c44bbc7d1946353162772696078c833", "task_id": "GOVFLOW-R4-STAMP", "ts": "2026-08-03T06:05:40Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "e0420a8b-793c-418c-94e0-8b10d9fde693", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp round produces no canonical findings by design; all three APPROVED, stamps_check rc=0, body hash 6dc14c01 matches", "round_id": "6f878283-8da7-4e59-8b00-c692e190f6d4", "schema_version": 1, "sequence": 478, "ts": "2026-08-03T06:05:49Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-FIX-R5", "ts": "2026-08-03T06:06:38Z"}
+=== 2026-08-03 14:06:38 | dispatch ===
+  ts=2026-08-03 14:06:38
+  kind=dispatch
+  intent=派工控制流 SPEC rev5 收斂輪：刪除第3步後行為表是否等於真陽性邊界
+  risk=low
+  facts_asked=R4 收斂檔已戳記 rc=0 body 6dc14c01；第3步放行17個現行rc=1 token；grep -rlE 33 命中
+  review_role=收斂輪；最優先實跑攻擊四步程序的真陽性邊界(連三輪被攻破)
+  template=n/a: 用 brief，標的 SPEC 路徑寫在 brief 內
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-FIX-R5-BRIEF.md", "brief_sha256": "4440baf8c7c1e8d281f9c8b747565a7865d79e31e3145ca0fffd0bbdacd4e082", "brief_sha256_norm": "4440baf8c7c1e8d281f9c8b747565a7865d79e31e3145ca0fffd0bbdacd4e082", "event": "committee_round_open", "event_id": "b7298489-bf92-441b-91b1-6101e4eba2c9", "expected_outputs": {"codex": "handoffs/20260803-govflow-fix-r5-codex.md", "composer": "handoffs/20260803-govflow-fix-r5-composer.md", "grok": "handoffs/20260803-govflow-fix-r5-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "ac653067-c57c-4e9c-b18a-918c3fe95fdb", "schema_version": 1, "sequence": 479, "session_name": "20260803-govflow-fix-r5", "task_id": "GOVFLOW-FIX-R5", "ts": "2026-08-03T06:06:38Z"}
+{"actor": "cx_run", "attempt_id": "5667e0c6-4963-4b65-8040-cd931ad8b4fc", "cli_rc": "0", "event": "committee_family_result", "event_id": "1db9b043-17e1-4ae3-988e-52945c99d732", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r5-composer.md", "output_sha256": "cce121976af25c5e1208119b1af555c9c67f552b3136b3c546e99617bb591c43", "producer": "audit_append.sh", "result_state": "success", "round_id": "ac653067-c57c-4e9c-b18a-918c3fe95fdb", "schema_version": 1, "sequence": 480, "ts": "2026-08-03T06:11:45Z"}
+{"actor": "cx_run", "attempt_id": "0381de2e-882f-4bdd-8d38-5d672aa2423b", "cli_rc": "0", "event": "committee_family_result", "event_id": "de733a41-05de-4570-b428-c660a13d0d61", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r5-grok.md", "output_sha256": "418f6a6ad20b457c1fa676e38c0128f8afb5a2532fb948bc7fd50d6a3312e43e", "producer": "audit_append.sh", "result_state": "success", "round_id": "ac653067-c57c-4e9c-b18a-918c3fe95fdb", "schema_version": 1, "sequence": 481, "ts": "2026-08-03T06:13:41Z"}
+{"actor": "cx_run", "attempt_id": "f4afee17-ba20-4163-9dfd-811ba42aa044", "cli_rc": "0", "event": "committee_family_result", "event_id": "6245b9bb-f13c-459d-b3e6-e72a35c90ddb", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r5-codex.md", "output_sha256": "245011985835b95e7bce17fdc394218bc20a7f859941aa334e16b3148eb4c159", "producer": "audit_append.sh", "result_state": "success", "round_id": "ac653067-c57c-4e9c-b18a-918c3fe95fdb", "schema_version": 1, "sequence": 482, "ts": "2026-08-03T06:21:26Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "aaec936e-824c-45e6-ab0d-0065b33111b2", "lock_sha256": "3a48996244965917b6937ea316f61691b2a9a8cb50af9d901d7ef8d35f5c0af7", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "ac653067-c57c-4e9c-b18a-918c3fe95fdb", "schema_version": 1, "sequence": 483, "session_id": "20260803-govflow-fix-r5", "synth_sha256": "8c8945c878eba8f910cb1a3bbec65a0c6ced7f06a4a9638945ac9dfcd42d6ab5", "ts": "2026-08-03T06:23:14Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-R5-STAMP", "ts": "2026-08-03T06:25:26Z"}
+=== 2026-08-03 14:25:26 | dispatch ===
+  ts=2026-08-03 14:25:26
+  kind=dispatch
+  intent=R5 收斂檔戳記輪：核對四群集與 rev6 三項最小集是否忠實
+  risk=low
+  facts_asked=三家同時抓到 17 列 vs 13 列算術錯；## E-1 裸標題漏網；rg receipt 為單一環境觀察
+  review_role=戳記核對；併確認 allowlist 改鍵在完整 heading(而非 composer 建議的首 token)之裁定是否公允
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-R5-STAMP-BRIEF.md", "brief_sha256": "a8260c67e6607a37e0849ed14551abea716179aa953c629d8b23883de728339e", "brief_sha256_norm": "a8260c67e6607a37e0849ed14551abea716179aa953c629d8b23883de728339e", "event": "committee_round_open", "event_id": "ee746359-9def-4fa4-898b-eca7e6132862", "expected_outputs": {"codex": "handoffs/20260803-govflow-r5-stamp-codex.md", "composer": "handoffs/20260803-govflow-r5-stamp-composer.md", "grok": "handoffs/20260803-govflow-r5-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "877a1761-8b54-48d0-9797-0972f3251afa", "schema_version": 1, "sequence": 484, "session_name": "20260803-govflow-r5-stamp", "task_id": "GOVFLOW-R5-STAMP", "ts": "2026-08-03T06:25:26Z"}
+{"event":"gate_deny","ts":"2026-08-03T06:27:05Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "2d709aa9-ddb6-470d-8fa2-15d65c491013", "cli_rc": "0", "event": "committee_family_result", "event_id": "89792112-8531-462f-b56c-e1c1c00aa35d", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r5-stamp-grok.md", "output_sha256": "902dff751cabe5875c76b79a795e49958f74c4ee76257edab9c08e3d6a55244e", "producer": "audit_append.sh", "result_state": "success", "round_id": "877a1761-8b54-48d0-9797-0972f3251afa", "schema_version": 1, "sequence": 485, "ts": "2026-08-03T06:27:10Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r5/synth.md", "output_sha256": "023c86e38f0cbbe8b92584bcc16d89052aa1b8e0a7d602882cf5d96f6633c6f3", "task_id": "GOVFLOW-R5-STAMP", "ts": "2026-08-03T06:27:10Z"}
+{"actor": "cx_run", "attempt_id": "5cc41946-b027-44d5-85c9-52e045d4ff7a", "cli_rc": "0", "event": "committee_family_result", "event_id": "96b2bede-607d-4da5-9d46-6c121be3211d", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r5-stamp-composer.md", "output_sha256": "4e2af16f96f304dad7cecf277c3fa9bcb5fd864bb822c16862d9c01517692ed0", "producer": "audit_append.sh", "result_state": "success", "round_id": "877a1761-8b54-48d0-9797-0972f3251afa", "schema_version": 1, "sequence": 486, "ts": "2026-08-03T06:27:25Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r5/synth.md", "output_sha256": "023c86e38f0cbbe8b92584bcc16d89052aa1b8e0a7d602882cf5d96f6633c6f3", "task_id": "GOVFLOW-R5-STAMP", "ts": "2026-08-03T06:27:25Z"}
+{"actor": "cx_run", "attempt_id": "c0e316a1-0121-4b60-bb3e-53fe46e9d8e4", "cli_rc": "0", "event": "committee_family_result", "event_id": "40f48785-3de4-4584-8b30-3afc92d82ae3", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r5-stamp-codex.md", "output_sha256": "a8a6518bb15c7cc62e0778c64315e979d285ea22155f0fb3a75f4e7212d49ab5", "producer": "audit_append.sh", "result_state": "success", "round_id": "877a1761-8b54-48d0-9797-0972f3251afa", "schema_version": 1, "sequence": 487, "ts": "2026-08-03T06:29:25Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "bb2ca030-bc04-451e-98e5-5ef28485dae5", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "codex correctly REJECTED: synth cited a non-existent finding ID and mis-referenced another by one position; body fixed and hash changed so all stamps invalidated and cleared; re-running stamp round with corrected content", "round_id": "877a1761-8b54-48d0-9797-0972f3251afa", "schema_version": 1, "sequence": 488, "ts": "2026-08-03T06:31:09Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-R5-STAMP2", "ts": "2026-08-03T06:31:49Z"}
+=== 2026-08-03 14:31:49 | dispatch ===
+  ts=2026-08-03 14:31:49
+  kind=dispatch
+  intent=R5 收斂檔戳記輪第二次：修正兩處 finding ID 錯位後重跑
+  risk=low
+  facts_asked=codex 首輪正確 REJECTED;兩處引用各錯位一格;修正後 body hash 改為 cd533bb8;舊戳記已清除
+  review_role=戳記核對；併自行機械複查全檔 ID 引用是否還有錯位
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-R5-STAMP2-BRIEF.md", "brief_sha256": "b56e82b32327f7ce6808db61ceadae6be79b9067c22270ba48e3dcc2a7392dcf", "brief_sha256_norm": "b56e82b32327f7ce6808db61ceadae6be79b9067c22270ba48e3dcc2a7392dcf", "event": "committee_round_open", "event_id": "6e29b34b-64d2-4298-9c84-2112b58e836d", "expected_outputs": {"codex": "handoffs/20260803-govflow-r5-stamp2-codex.md", "composer": "handoffs/20260803-govflow-r5-stamp2-composer.md", "grok": "handoffs/20260803-govflow-r5-stamp2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "dcb63c1c-0dae-478f-9d09-8ea0382daece", "schema_version": 1, "sequence": 489, "session_name": "20260803-govflow-r5-stamp2", "task_id": "GOVFLOW-R5-STAMP2", "ts": "2026-08-03T06:31:50Z"}
+{"actor": "cx_run", "attempt_id": "19d0abcc-edf7-45d1-beae-21d634f4893d", "cli_rc": "0", "event": "committee_family_result", "event_id": "96e1ea4b-20ed-4b6e-9ee9-2c12237b7e4d", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r5-stamp2-composer.md", "output_sha256": "074fc44d703c0df79634f4866b359cd4f32a0fe4e403b1778cc9fd1d476acbaa", "producer": "audit_append.sh", "result_state": "success", "round_id": "dcb63c1c-0dae-478f-9d09-8ea0382daece", "schema_version": 1, "sequence": 490, "ts": "2026-08-03T06:33:27Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r5/synth.md", "output_sha256": "b7509b66507027faf8e7e62f9d5ddbbb2a4a944e24dc2df9cc3b4cae6f295d2b", "task_id": "GOVFLOW-R5-STAMP2", "ts": "2026-08-03T06:33:27Z"}
+{"actor": "cx_run", "attempt_id": "ca666252-6c37-4964-862e-e09e093790b3", "cli_rc": "0", "event": "committee_family_result", "event_id": "5a7e5c91-3c66-40c5-94c6-01e2b6d3c864", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r5-stamp2-grok.md", "output_sha256": "e50acdf2bfd40ca4b189e94018779a8f35bd355a156447089c56c56611a78ed8", "producer": "audit_append.sh", "result_state": "success", "round_id": "dcb63c1c-0dae-478f-9d09-8ea0382daece", "schema_version": 1, "sequence": 491, "ts": "2026-08-03T06:33:36Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r5/synth.md", "output_sha256": "b7509b66507027faf8e7e62f9d5ddbbb2a4a944e24dc2df9cc3b4cae6f295d2b", "task_id": "GOVFLOW-R5-STAMP2", "ts": "2026-08-03T06:33:36Z"}
+{"actor": "cx_run", "attempt_id": "1d570359-94be-48df-a0d2-775e97b91edc", "cli_rc": "0", "event": "committee_family_result", "event_id": "6e43103e-33f1-4e5a-bc55-3d6d262e3a24", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-r5-stamp2-codex.md", "output_sha256": "f05799ba43d2b78e13914db18ddb3f67cd6ade0d9113b732750f8ae8ffc16d0f", "producer": "audit_append.sh", "result_state": "success", "round_id": "dcb63c1c-0dae-478f-9d09-8ea0382daece", "schema_version": 1, "sequence": 492, "ts": "2026-08-03T06:36:00Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-fix-r5/synth.md", "output_sha256": "c270eb1eaf370d9dea688f641cfe5edefd07e33ca483045e1bad6584dda8fc35", "task_id": "GOVFLOW-R5-STAMP2", "ts": "2026-08-03T06:36:01Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "043d2dea-56de-440c-a8dc-10e05af4ad8f", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp round produces no canonical findings by design; all three APPROVED after ID correction, stamps_check rc=0, body hash cd533bb8 matches", "round_id": "dcb63c1c-0dae-478f-9d09-8ea0382daece", "schema_version": 1, "sequence": 493, "ts": "2026-08-03T06:36:15Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-FIX-R6", "ts": "2026-08-03T06:37:00Z"}
+=== 2026-08-03 14:37:00 | dispatch ===
+  ts=2026-08-03 14:37:00
+  kind=dispatch
+  intent=派工控制流 SPEC rev6 收斂輪：完整 heading allowlist 是否封住真陽性邊界
+  risk=low
+  facts_asked=R5 收斂檔已戳記 rc=0 body cd533bb8；行為表 awk 計數 18 列；## E-1 現行 rc=1
+  review_role=收斂輪；最優先實跑攻擊真陽性邊界(連四輪被攻破)；並自行機械數表列
+  template=n/a: 用 brief，標的 SPEC 路徑寫在 brief 內
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-FIX-R6-BRIEF.md", "brief_sha256": "4d3f74a235315e5672ba7e23ea702ef46c8041296975df7faf0d14e4723d43fb", "brief_sha256_norm": "4d3f74a235315e5672ba7e23ea702ef46c8041296975df7faf0d14e4723d43fb", "event": "committee_round_open", "event_id": "279df2dc-20c5-4795-9260-82069fb222a4", "expected_outputs": {"codex": "handoffs/20260803-govflow-fix-r6-codex.md", "composer": "handoffs/20260803-govflow-fix-r6-composer.md", "grok": "handoffs/20260803-govflow-fix-r6-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "7c95bf37-2bfd-48cd-b11d-13ac9b8b225d", "schema_version": 1, "sequence": 494, "session_name": "20260803-govflow-fix-r6", "task_id": "GOVFLOW-FIX-R6", "ts": "2026-08-03T06:37:00Z"}
+{"actor": "cx_run", "attempt_id": "ade062b3-6027-43d3-9410-39805f1a4bac", "cli_rc": "0", "event": "committee_family_result", "event_id": "b2c5e0b6-220d-439c-9e9e-66634a2a28cd", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r6-composer.md", "output_sha256": "6009ee8d1a85bcb31f0822cf4069fcc4fd06cfb9c05edb181fb70dfd17019b94", "producer": "audit_append.sh", "result_state": "success", "round_id": "7c95bf37-2bfd-48cd-b11d-13ac9b8b225d", "schema_version": 1, "sequence": 495, "ts": "2026-08-03T06:41:45Z"}
+{"actor": "cx_run", "attempt_id": "36fe5360-5f55-4423-99fc-e9cda80dae71", "cli_rc": "0", "event": "committee_family_result", "event_id": "864d7507-61f4-4e86-83e7-582220f36594", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r6-grok.md", "output_sha256": "750147320174db487e4afaba75e722b3fe799402506e1e88febdcf8d8291a314", "producer": "audit_append.sh", "result_state": "success", "round_id": "7c95bf37-2bfd-48cd-b11d-13ac9b8b225d", "schema_version": 1, "sequence": 496, "ts": "2026-08-03T06:42:37Z"}
+{"event":"gate_deny","ts":"2026-08-03T06:44:27Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "6bfb0fe7-fabf-4c2a-ac04-3d2d783369a2", "cli_rc": "0", "event": "committee_family_result", "event_id": "59f1abc6-c9b7-443e-ad12-ae773c496f8f", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-fix-r6-codex.md", "output_sha256": "220ced68b0b0a825ba1523cb512d34b314d99b829d052a2d1008411af377ddcb", "producer": "audit_append.sh", "result_state": "success", "round_id": "7c95bf37-2bfd-48cd-b11d-13ac9b8b225d", "schema_version": 1, "sequence": 497, "ts": "2026-08-03T06:45:28Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "c0154bd9-b07d-4fa3-a74a-24d449d27e59", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "grok delivered 183 lines with full verdict but deliberately emitted no P3-00 sentinel so completeness cannot extract IDs; roster incomplete; all three families said GO and grok conclusions recorded verbatim in synth group 5 with the mechanical-protection gap disclosed", "round_id": "7c95bf37-2bfd-48cd-b11d-13ac9b8b225d", "schema_version": 1, "sequence": 498, "ts": "2026-08-03T06:48:01Z"}
+=== 2026-08-03 15:19:12 | artifact ===
+  ts=2026-08-03 15:19:12
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GOV_DISPATCH_FLOW_FIX_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0 全域規則=filled(引用 SPEC §A manifest ID + 防假綠三條); §B 批次執行策略=filled(4 Batch 依賴拓撲+派工 prompt); Phase 1-4 Task=filled(每 Task 含 SPEC ref/輸入輸出/實作要點≥3含偽碼/修改檔案到函式名/不可做/邊界≥2/風險/驗證含可證偽條件); Phase 測試+Gate=filled(引用 Test ID); §G Golden=N/A:本任務不碰數值/特徵/ML/回測,SPEC §N 已登記
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-TODO-R1", "ts": "2026-08-03T07:25:19Z"}
+=== 2026-08-03 15:25:19 | dispatch ===
+  ts=2026-08-03 15:25:19
+  kind=dispatch
+  intent=派工控制流 TODO v1 對抗審：SPEC rev6 覆蓋追溯、深度紅線、語義衝突、數量一致性、批次拓撲
+  risk=low
+  facts_asked=R5 收斂檔已戳記 rc=0 body cd533bb8；R6 三家一致無 P0；TODO 通過 template_check todo rc=0
+  review_role=TODO 首輪對抗審；最優先做 SPEC→TODO 100% 覆蓋追溯並自行機械數所有數字
+  template=n/a: 用 brief，標的 TODO 路徑寫在 brief 內
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-TODO-R1-BRIEF.md", "brief_sha256": "493292d42a9015962f7bf8546bb3310ec6734201083baecca95ab9088b820631", "brief_sha256_norm": "493292d42a9015962f7bf8546bb3310ec6734201083baecca95ab9088b820631", "event": "committee_round_open", "event_id": "bc7444cc-b0f1-489f-a493-ba5e73ba2379", "expected_outputs": {"codex": "handoffs/20260803-govflow-todo-r1-codex.md", "composer": "handoffs/20260803-govflow-todo-r1-composer.md", "grok": "handoffs/20260803-govflow-todo-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "768f7b94-1f82-4795-a676-2a0febb850c5", "schema_version": 1, "sequence": 499, "session_name": "20260803-govflow-todo-r1", "task_id": "GOVFLOW-TODO-R1", "ts": "2026-08-03T07:25:20Z"}
+{"actor": "cx_run", "attempt_id": "d57d365c-b35e-43af-9c55-0e78c6a88002", "cli_rc": "0", "event": "committee_family_result", "event_id": "78954d0c-519a-437b-82b4-238123471752", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-composer.md", "output_sha256": "37c88612d4cc0e60d2db826bd880b0e93fb925908ad3c617fe23045237e346b7", "producer": "audit_append.sh", "result_state": "success", "round_id": "768f7b94-1f82-4795-a676-2a0febb850c5", "schema_version": 1, "sequence": 500, "ts": "2026-08-03T07:30:04Z"}
+{"actor": "cx_run", "attempt_id": "601973c7-5b7f-4351-a781-6709b029fb93", "cli_rc": "0", "event": "committee_family_result", "event_id": "a340ff73-a447-43ea-be21-b6c6b0f4e15d", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-grok.md", "output_sha256": "59d5a679a71bd166306c917e56146dda84117a7efcec8d20edbdeb5f63a12a16", "producer": "audit_append.sh", "result_state": "success", "round_id": "768f7b94-1f82-4795-a676-2a0febb850c5", "schema_version": 1, "sequence": 501, "ts": "2026-08-03T07:31:14Z"}
+{"event":"gate_deny","ts":"2026-08-03T07:35:14Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "e38021dd-1618-463d-a9b8-fbd80a8912d4", "cli_rc": "0", "event": "committee_family_result", "event_id": "0df9316c-2ab4-4511-985f-7f431a32ea98", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-codex.md", "output_sha256": "685a735fdd3eef00b62bf0b4c8376395f8f517885a5f50392e68c9888b58e547", "producer": "audit_append.sh", "result_state": "success", "round_id": "768f7b94-1f82-4795-a676-2a0febb850c5", "schema_version": 1, "sequence": 502, "ts": "2026-08-03T07:37:04Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "d8b158bd-c3e0-4062-8300-75cd02143dfc", "lock_sha256": "1a8922df7ebfc054106a9ea723fb64f3eb3b02bd593e52a586e9f3273aff83c6", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "768f7b94-1f82-4795-a676-2a0febb850c5", "schema_version": 1, "sequence": 503, "session_id": "20260803-govflow-todo-r1", "synth_sha256": "e8a9ec5b178f9acb7170a3d2ead37511f9d5e410ac23f411bd9d03835fb92ea9", "ts": "2026-08-03T07:39:21Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-TODO-R1-STAMP", "ts": "2026-08-03T08:16:12Z"}
+=== 2026-08-03 16:16:12 | dispatch ===
+  ts=2026-08-03 16:16:12
+  kind=dispatch
+  intent=TODO R1 收斂檔戳記輪：核對七群集與 TODO v2 六項最小集是否忠實
+  risk=low
+  facts_asked=B2/B3 皆改 cx_run.sh 實跑 grep -c=5；check_file 不存在只有 check_files/check_unit；Phase2 表 7 列而文字寫 6
+  review_role=戳記核對；併確認「刪除數字改機械對照」的處置是否足夠、群5是否漏記 _scan_file_content
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-TODO-R1-STAMP-BRIEF.md", "brief_sha256": "24c6505be8b96809b6a3c770fbc978dd3ca8bb4af83c1a308e6bc9d5bcea9b4e", "brief_sha256_norm": "24c6505be8b96809b6a3c770fbc978dd3ca8bb4af83c1a308e6bc9d5bcea9b4e", "event": "committee_round_open", "event_id": "aa378d23-2bd4-4091-bbca-65bc6493c3c6", "expected_outputs": {"codex": "handoffs/20260803-govflow-todo-r1-stamp-codex.md", "composer": "handoffs/20260803-govflow-todo-r1-stamp-composer.md", "grok": "handoffs/20260803-govflow-todo-r1-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "1c4eaac7-1e8c-4d48-a748-cbef7a66d59b", "schema_version": 1, "sequence": 504, "session_name": "20260803-govflow-todo-r1-stamp", "task_id": "GOVFLOW-TODO-R1-STAMP", "ts": "2026-08-03T08:16:12Z"}
+{"actor": "cx_run", "attempt_id": "e183e4c5-225e-432b-82e2-f48797c7c237", "cli_rc": "0", "event": "committee_family_result", "event_id": "39686c9d-c251-4536-b60e-143c742143fb", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp-grok.md", "output_sha256": "c2a6503b5ae32ed2e98534a44e75dccb8b42839d7572bc46645871a9d69f5155", "producer": "audit_append.sh", "result_state": "success", "round_id": "1c4eaac7-1e8c-4d48-a748-cbef7a66d59b", "schema_version": 1, "sequence": 505, "ts": "2026-08-03T08:19:05Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "8fe32713c32d1bb6d35f2e6b6586626081801492614bd8af9e480a700272c8c6", "task_id": "GOVFLOW-TODO-R1-STAMP", "ts": "2026-08-03T08:19:06Z"}
+{"actor": "cx_run", "attempt_id": "9a621dca-8be9-41a6-b597-9be538bd3dcd", "cli_rc": "0", "event": "committee_family_result", "event_id": "13755714-fd0b-4dce-abb8-25311cf0b9a5", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp-composer.md", "output_sha256": "d8159687dc48535c081ef17ffe5c4bcf3fef48a668f9df62d32e45ffe6255348", "producer": "audit_append.sh", "result_state": "success", "round_id": "1c4eaac7-1e8c-4d48-a748-cbef7a66d59b", "schema_version": 1, "sequence": 506, "ts": "2026-08-03T08:19:18Z"}
+{"actor": "cx_run", "attempt_id": "a1ab0863-80cd-42e9-9a98-1c34a2a39e20", "cli_rc": "0", "event": "committee_family_result", "event_id": "102bb2c8-969f-4318-8f61-28b993658d95", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp-codex.md", "output_sha256": "9e5cf270d832ff607c6f7e481aff33c7ded1f2181b2aa0a9335ed83b950fd7a3", "producer": "audit_append.sh", "result_state": "success", "round_id": "1c4eaac7-1e8c-4d48-a748-cbef7a66d59b", "schema_version": 1, "sequence": 507, "ts": "2026-08-03T08:26:39Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-orchestrator", "event": "debt_abandon", "event_id": "fa32ebdb-2b2c-425d-ae69-8252d538e109", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "codex and composer correctly REJECTED: synth cited only 2 of 17 finding IDs verbatim including an unfilled placeholder, omitted a mount point, and claimed full adoption while one finding had no disposition; content fixed and hash changed so stamps cleared and round re-run", "round_id": "1c4eaac7-1e8c-4d48-a748-cbef7a66d59b", "schema_version": 1, "sequence": 508, "ts": "2026-08-03T08:29:56Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-TODO-R1-STAMP2", "ts": "2026-08-03T08:30:38Z"}
+=== 2026-08-03 16:30:38 | dispatch ===
+  ts=2026-08-03 16:30:38
+  kind=dispatch
+  intent=TODO R1 收斂檔戳記輪第二次：補齊 17 個 finding 的逐條 ID 處置後重跑
+  risk=low
+  facts_asked=首版只逐字引用 2/17 個 ID 含未填佔位符；漏 _scan_file_content；COMPOSER-R1-P1-04 無處置卻宣稱全採納
+  review_role=戳記核對；請自行機械比對自己每條 finding 是否都有處置且 ID 正確
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-TODO-R1-STAMP2-BRIEF.md", "brief_sha256": "7b6f9c936e99b936adcd6994b43a7a95b1f11eeba3a3165c1ec14c7ce466f4ab", "brief_sha256_norm": "7b6f9c936e99b936adcd6994b43a7a95b1f11eeba3a3165c1ec14c7ce466f4ab", "event": "committee_round_open", "event_id": "6d879647-bae7-4672-9226-9296cb4b126f", "expected_outputs": {"codex": "handoffs/20260803-govflow-todo-r1-stamp2-codex.md", "composer": "handoffs/20260803-govflow-todo-r1-stamp2-composer.md", "grok": "handoffs/20260803-govflow-todo-r1-stamp2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "ef2887a5-c297-49bb-be87-d01f8b84d61f", "schema_version": 1, "sequence": 509, "session_name": "20260803-govflow-todo-r1-stamp2", "task_id": "GOVFLOW-TODO-R1-STAMP2", "ts": "2026-08-03T08:30:38Z"}
+{"actor": "cx_run", "attempt_id": "a711aaae-6a06-471c-8ef9-6a4c1f7fd112", "cli_rc": "0", "event": "committee_family_result", "event_id": "3a2b9ed3-9cf9-41eb-a7a1-0f0cb0979e2f", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp2-grok.md", "output_sha256": "ffe678c683ba9fc40095b7bece71b244c26a40c85b7a0cb50ac1b82afa3d72b5", "producer": "audit_append.sh", "result_state": "success", "round_id": "ef2887a5-c297-49bb-be87-d01f8b84d61f", "schema_version": 1, "sequence": 510, "ts": "2026-08-03T08:33:23Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "8016478cb5a11579c41a7edac2c9277f2cf5c312f83aa52d1588a84893940508", "task_id": "GOVFLOW-TODO-R1-STAMP2", "ts": "2026-08-03T08:33:23Z"}
+{"actor": "cx_run", "attempt_id": "35a59a30-2daf-4bb8-bf74-f844d04b2cd3", "cli_rc": "0", "event": "committee_family_result", "event_id": "5d3effe1-cf1e-4826-ac60-5ef6c342f000", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp2-composer.md", "output_sha256": "e2fc120363e03ea5863a6645f2591205606afbdad9b951388831c839af8cd259", "producer": "audit_append.sh", "result_state": "success", "round_id": "ef2887a5-c297-49bb-be87-d01f8b84d61f", "schema_version": 1, "sequence": 511, "ts": "2026-08-03T08:33:28Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "8016478cb5a11579c41a7edac2c9277f2cf5c312f83aa52d1588a84893940508", "task_id": "GOVFLOW-TODO-R1-STAMP2", "ts": "2026-08-03T08:33:28Z"}
+{"event":"gate_deny","ts":"2026-08-03T08:35:13Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T08:35:37Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "15a8c49f-1c00-4e10-89d8-51c545a67a77", "cli_rc": "0", "event": "committee_family_result", "event_id": "051d21d9-fe31-4904-b96e-8400a27d6a2b", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp2-codex.md", "output_sha256": "462f711a3d19c978375fd3002dbe3b98ee3e03026708b7d129f29502aeb4df26", "producer": "audit_append.sh", "result_state": "success", "round_id": "ef2887a5-c297-49bb-be87-d01f8b84d61f", "schema_version": 1, "sequence": 512, "ts": "2026-08-03T08:37:30Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "ca76d564-36b5-418a-bb1e-7249bbdec98b", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp2 round concluded: codex REJECTED with three valid findings, all fixed in TODO v2 and synth", "round_id": "ef2887a5-c297-49bb-be87-d01f8b84d61f", "schema_version": 1, "sequence": 513, "ts": "2026-08-03T08:45:33Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-TODO-R1-STAMP3", "ts": "2026-08-03T08:46:26Z"}
+=== 2026-08-03 16:46:26 | dispatch ===
+  ts=2026-08-03 16:46:26
+  kind=dispatch
+  intent=TODO R1 收斂檔戳記輪第三次：修補 codex STAMP2 三項 REJECTED 理由後重跑
+  risk=low
+  facts_asked=STAMP2 codex 抓到最小集①§R同步完全沒做、B3前置矛盾、Task 0.1 缺 PHASE_MAP 且驗收加總可假綠
+  review_role=戳記核對；codex 請實跑確認自己三項是否關閉，composer/grok 請確認無回歸
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-TODO-R1-STAMP3-BRIEF.md", "brief_sha256": "9e6a2c06345c552370884a5ce21396991ba649deb4d4f2c81e8d4bb192d8c7d5", "brief_sha256_norm": "9e6a2c06345c552370884a5ce21396991ba649deb4d4f2c81e8d4bb192d8c7d5", "event": "committee_round_open", "event_id": "3f22f88f-b40a-4bd6-9026-355c516a56fa", "expected_outputs": {"codex": "handoffs/20260803-govflow-todo-r1-stamp3-codex.md", "composer": "handoffs/20260803-govflow-todo-r1-stamp3-composer.md", "grok": "handoffs/20260803-govflow-todo-r1-stamp3-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "5b6826a6-52be-4bf7-8c94-fdeb768cd3db", "schema_version": 1, "sequence": 514, "session_name": "20260803-govflow-todo-r1-stamp3", "task_id": "GOVFLOW-TODO-R1-STAMP3", "ts": "2026-08-03T08:46:26Z"}
+{"actor": "cx_run", "attempt_id": "eee575e5-5dd7-4c21-9c8e-4757c861c891", "cli_rc": "0", "event": "committee_family_result", "event_id": "c8afde3f-4535-4ccd-9c69-941f1bac162c", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp3-grok.md", "output_sha256": "37408cc30b26aeefad0a563ef79e057998fc8ff720231e9836037b7435bb9013", "producer": "audit_append.sh", "result_state": "success", "round_id": "5b6826a6-52be-4bf7-8c94-fdeb768cd3db", "schema_version": 1, "sequence": 515, "ts": "2026-08-03T08:49:07Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "f6a08ab39e19a08bded1a249bd36f67889a967b8f02e33d3c89b635a656cfdc3", "task_id": "GOVFLOW-TODO-R1-STAMP3", "ts": "2026-08-03T08:49:07Z"}
+{"actor": "cx_run", "attempt_id": "7b50f14f-cad4-46c3-a3d6-71e440ec713f", "cli_rc": "0", "event": "committee_family_result", "event_id": "70c22e13-4c3d-490e-a50f-efe5fc8c8c1a", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp3-composer.md", "output_sha256": "1b00c0dcb070611140281860bfc20e779b4954c8a757c0f08025689aea8f01e7", "producer": "audit_append.sh", "result_state": "success", "round_id": "5b6826a6-52be-4bf7-8c94-fdeb768cd3db", "schema_version": 1, "sequence": 516, "ts": "2026-08-03T08:51:38Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "2de6ba33983b2c5c2ce3b0ca32ad2b96353685e7ec5719696c0c3063f0618ea2", "task_id": "GOVFLOW-TODO-R1-STAMP3", "ts": "2026-08-03T08:51:38Z"}
+{"actor": "cx_run", "attempt_id": "e3cfe8a0-01e2-49ab-92f5-f265bef81170", "cli_rc": "0", "event": "committee_family_result", "event_id": "6edc93f2-389c-46ea-8490-1c4c75de70d8", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp3-codex.md", "output_sha256": "97ae156cb8522ece347ae8a02b2e4c7a79464f241c6b3fd4e2f86362a00b0119", "producer": "audit_append.sh", "result_state": "success", "round_id": "5b6826a6-52be-4bf7-8c94-fdeb768cd3db", "schema_version": 1, "sequence": 517, "ts": "2026-08-03T08:52:55Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "40b973d2-0d29-4fbc-90d0-360945db0a39", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp3 round concluded: codex REJECTED with two valid findings, fixed via G-MANIFEST clause and D-class extraction", "round_id": "5b6826a6-52be-4bf7-8c94-fdeb768cd3db", "schema_version": 1, "sequence": 518, "ts": "2026-08-03T08:58:35Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-TODO-R1-STAMP4", "ts": "2026-08-03T08:59:30Z"}
+=== 2026-08-03 16:59:30 | dispatch ===
+  ts=2026-08-03 16:59:30
+  kind=dispatch
+  intent=TODO R1 收斂檔戳記輪第四次：修補 codex STAMP3 兩項(G-MANIFEST 條款 + D 類機械抽取)後重跑
+  risk=low
+  facts_asked=STAMP3 codex 抓到 §R manifest 依賴宣稱是捏造的、PHASE_MAP 漏列;主委自查再抓出 5 個漏列共 7 個
+  review_role=戳記核對；codex 請實跑確認兩項是否關閉並攻 G-MANIFEST 假綠口，composer/grok 確認無回歸
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-TODO-R1-STAMP4-BRIEF.md", "brief_sha256": "454943c53dff52115ce345ac9908cc3b7e65ba674553b8b6c1a96da40a6d273b", "brief_sha256_norm": "454943c53dff52115ce345ac9908cc3b7e65ba674553b8b6c1a96da40a6d273b", "event": "committee_round_open", "event_id": "31e440e6-09ca-4844-b1e9-3544e1d51a54", "expected_outputs": {"codex": "handoffs/20260803-govflow-todo-r1-stamp4-codex.md", "composer": "handoffs/20260803-govflow-todo-r1-stamp4-composer.md", "grok": "handoffs/20260803-govflow-todo-r1-stamp4-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "6953e71b-acd9-4f8d-a175-44587c4cad3a", "schema_version": 1, "sequence": 519, "session_name": "20260803-govflow-todo-r1-stamp4", "task_id": "GOVFLOW-TODO-R1-STAMP4", "ts": "2026-08-03T08:59:30Z"}
+{"actor": "cx_run", "attempt_id": "30316b3c-702c-4b7a-8b28-a18d519cf3b0", "cli_rc": "0", "event": "committee_family_result", "event_id": "ec9620dd-6343-49d7-add5-fbfde92b79cc", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp4-composer.md", "output_sha256": "d97ecc2072213d459496efdd5d4d0db07f343993f042140b0b17aae7bb53ec9d", "producer": "audit_append.sh", "result_state": "success", "round_id": "6953e71b-acd9-4f8d-a175-44587c4cad3a", "schema_version": 1, "sequence": 520, "ts": "2026-08-03T09:01:55Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "b9972898385cd055284f301a3c198a26848c2057603d9dea83f095229f5c26f0", "task_id": "GOVFLOW-TODO-R1-STAMP4", "ts": "2026-08-03T09:01:55Z"}
+{"actor": "cx_run", "attempt_id": "fbeaa57d-05ed-45a7-b121-ccae40dc7e0d", "cli_rc": "0", "event": "committee_family_result", "event_id": "32d488de-5167-4f9d-a8c4-0f8a82160e35", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp4-grok.md", "output_sha256": "0c0c7a1a6a9afd48c68ed5841dc484f1d94cc8737315a2b7c07da1282f1ebf0f", "producer": "audit_append.sh", "result_state": "success", "round_id": "6953e71b-acd9-4f8d-a175-44587c4cad3a", "schema_version": 1, "sequence": 521, "ts": "2026-08-03T09:03:02Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "c0f36411d8e18ded1aa2e7d87964d0a33e61838c494f0585dc7620fb1dbc1d5a", "task_id": "GOVFLOW-TODO-R1-STAMP4", "ts": "2026-08-03T09:03:02Z"}
+{"event":"gate_deny","ts":"2026-08-03T09:07:12Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "e6f0775a-3724-4ac6-b71c-0b4e51c92252", "cli_rc": "0", "event": "committee_family_result", "event_id": "646f0478-aceb-4920-8cca-843ea60a6339", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp4-codex.md", "output_sha256": "7a7db4983a93f09bcd627c958603b48b16785ebaec7a6b3d475413c6fd5abc4e", "producer": "audit_append.sh", "result_state": "success", "round_id": "6953e71b-acd9-4f8d-a175-44587c4cad3a", "schema_version": 1, "sequence": 522, "ts": "2026-08-03T09:07:54Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "c90e1032-4453-435c-9496-e64006f788bb", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp4 round concluded: three findings closed mechanically, fourth named as residual ticket per 95 percent rule", "round_id": "6953e71b-acd9-4f8d-a175-44587c4cad3a", "schema_version": 1, "sequence": 523, "ts": "2026-08-03T09:12:04Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-TODO-R1-STAMP5", "ts": "2026-08-03T09:13:01Z"}
+=== 2026-08-03 17:13:01 | dispatch ===
+  ts=2026-08-03 17:13:01
+  kind=dispatch
+  intent=TODO R1 收斂檔戳記輪第五次(收斂輪)：codex STAMP4 三項機械關閉,第四項蓄意軸具名開票不受理
+  risk=low
+  facts_asked=codex 實驗證明刪不可做錨點會讓守衛靜默放行;phase-base 無自證;PHASE_MAP 可膨脹;第四項純蓄意軸依 95% 條款收斂
+  review_role=戳記核對；codex 請重跑自己的變異實驗確認守衛已紅，並審殘留票描述是否誠實
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-TODO-R1-STAMP5-BRIEF.md", "brief_sha256": "46e2d3c39b9195c69876ebe82e5770919abfb514fecc29a147f578103eef4233", "brief_sha256_norm": "46e2d3c39b9195c69876ebe82e5770919abfb514fecc29a147f578103eef4233", "event": "committee_round_open", "event_id": "f5bf5bb8-7a9b-40e7-9c1c-26a3c69c5651", "expected_outputs": {"codex": "handoffs/20260803-govflow-todo-r1-stamp5-codex.md", "composer": "handoffs/20260803-govflow-todo-r1-stamp5-composer.md", "grok": "handoffs/20260803-govflow-todo-r1-stamp5-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8f1151b6-6edb-4a48-b59a-a7d5337d5efd", "schema_version": 1, "sequence": 524, "session_name": "20260803-govflow-todo-r1-stamp5", "task_id": "GOVFLOW-TODO-R1-STAMP5", "ts": "2026-08-03T09:13:01Z"}
+{"actor": "cx_run", "attempt_id": "74ff4bc1-cd1d-45f6-84ae-b54cab31d7eb", "cli_rc": "0", "event": "committee_family_result", "event_id": "413a5aad-646d-449d-af2b-c1dbcb1db387", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp5-composer.md", "output_sha256": "ddbf20f24094ba23219daf31a6d28821e4f1ea1c78627e36f84c96deb3f9b634", "producer": "audit_append.sh", "result_state": "success", "round_id": "8f1151b6-6edb-4a48-b59a-a7d5337d5efd", "schema_version": 1, "sequence": 525, "ts": "2026-08-03T09:17:34Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "680f2cab6caf027eac1cc57c17ba02f478e8fb82595f9e087c54cc9030b253a9", "task_id": "GOVFLOW-TODO-R1-STAMP5", "ts": "2026-08-03T09:17:34Z"}
+{"actor": "cx_run", "attempt_id": "75a50d01-899e-4286-a508-e9ef267175a8", "cli_rc": "0", "event": "committee_family_result", "event_id": "b51eb929-4774-45e8-90f1-4baa644d9c51", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp5-grok.md", "output_sha256": "b737dcf85da287c9e94d966f9f2b82130d6752d61468e1cac9862ded34bc9db7", "producer": "audit_append.sh", "result_state": "success", "round_id": "8f1151b6-6edb-4a48-b59a-a7d5337d5efd", "schema_version": 1, "sequence": 526, "ts": "2026-08-03T09:18:08Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "680f2cab6caf027eac1cc57c17ba02f478e8fb82595f9e087c54cc9030b253a9", "task_id": "GOVFLOW-TODO-R1-STAMP5", "ts": "2026-08-03T09:18:08Z"}
+{"event":"gate_deny","ts":"2026-08-03T09:21:51Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T09:21:59Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"event":"gate_deny","ts":"2026-08-03T09:23:01Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "b82717e8-584f-4c04-b760-008f360bc9fd", "cli_rc": "0", "event": "committee_family_result", "event_id": "b0de0b6f-e3c7-4b9c-ba1c-13199e69c4bc", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r1-stamp5-codex.md", "output_sha256": "731f6043ce9dcee9660519f8e6d78695147d972768cf93295a3ff5011ba95007", "producer": "audit_append.sh", "result_state": "success", "round_id": "8f1151b6-6edb-4a48-b59a-a7d5337d5efd", "schema_version": 1, "sequence": 527, "ts": "2026-08-03T09:23:55Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r1/synth.md", "output_sha256": "86988adc7cd1d34311f1ef77214c2fec5986e0181b9200ed0ce0eac75b391b03", "task_id": "GOVFLOW-TODO-R1-STAMP5", "ts": "2026-08-03T09:23:55Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "a2adf52c-5182-435e-b65a-f25d93f1e788", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp5 concluded: all three families APPROVED, stamps_check rc=0, reconcile finalized", "round_id": "8f1151b6-6edb-4a48-b59a-a7d5337d5efd", "schema_version": 1, "sequence": 528, "ts": "2026-08-03T09:24:56Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-TODO-R2", "ts": "2026-08-03T09:25:49Z"}
+=== 2026-08-03 17:25:49 | dispatch ===
+  ts=2026-08-03 17:25:49
+  kind=dispatch
+  intent=TODO R2 窄聚焦審：驗 R1 六項最小集完整落地 + 戳記輪新增守衛自洽 + 數字交叉引用 + B0 go/no-go
+  risk=low
+  facts_asked=戳記輪三次抓到最小集半落地;主委手寫數量錯6次交叉引用未同步3次捏造ID3次;蓄意軸依95%條款不受理
+  review_role=窄聚焦對抗審；請機械比對勿信主委宣稱，並給明確 B0 go/no-go
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-TODO-R2-BRIEF.md", "brief_sha256": "88560cf166c6eba5da620147dc1ee4ccd2702fe9934a43045ecaeabf8ff05b6a", "brief_sha256_norm": "88560cf166c6eba5da620147dc1ee4ccd2702fe9934a43045ecaeabf8ff05b6a", "event": "committee_round_open", "event_id": "de6a9725-ed1c-45b6-a3a7-6de500c2432c", "expected_outputs": {"codex": "handoffs/20260803-govflow-todo-r2-codex.md", "composer": "handoffs/20260803-govflow-todo-r2-composer.md", "grok": "handoffs/20260803-govflow-todo-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "662e9aff-8f09-4a6b-8191-37ca2d6ee185", "schema_version": 1, "sequence": 529, "session_name": "20260803-govflow-todo-r2", "task_id": "GOVFLOW-TODO-R2", "ts": "2026-08-03T09:25:50Z"}
+{"actor": "cx_run", "attempt_id": "2e857ae2-082a-44ee-a2cf-574b5dedb1c1", "cli_rc": "0", "event": "committee_family_result", "event_id": "9ba7cd5e-0ccf-453c-b481-ef1374c73549", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r2-grok.md", "output_sha256": "931e9dc0bf0d1b2398d5065d2772d67053eec7a3ec73063ce543e0f69b68b64a", "producer": "audit_append.sh", "result_state": "success", "round_id": "662e9aff-8f09-4a6b-8191-37ca2d6ee185", "schema_version": 1, "sequence": 530, "ts": "2026-08-03T09:30:30Z"}
+{"event":"gate_deny","ts":"2026-08-03T09:30:57Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "e0626c32-7b4d-40c4-8aa7-5b36cf583a41", "cli_rc": "0", "event": "committee_family_result", "event_id": "b9202ac4-cfd9-4b85-be0a-5b701639f9da", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r2-codex.md", "output_sha256": "f3d6be68eed16f33b3a62449d2bf8e7b846b95196b3a38b6790bfd29b454b856", "producer": "audit_append.sh", "result_state": "success", "round_id": "662e9aff-8f09-4a6b-8191-37ca2d6ee185", "schema_version": 1, "sequence": 531, "ts": "2026-08-03T09:45:27Z"}
+{"event":"gate_deny","ts":"2026-08-03T11:50:47Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"actor": "cx_run", "attempt_id": "9914989d-2384-409a-a3a9-6b61d930e729", "cli_rc": "0", "event": "committee_family_result", "event_id": "5185311c-4248-406b-b14d-30d58bd02e29", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r2-composer.md", "output_sha256": "aafb11f1fc45d3ebf2432056d46810e3bfdc973f7931e49e1ec6da0bdd93fb4d", "producer": "audit_append.sh", "result_state": "success", "round_id": "662e9aff-8f09-4a6b-8191-37ca2d6ee185", "schema_version": 1, "sequence": 532, "ts": "2026-08-03T11:52:31Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "ff9a8646-f69b-4df8-bd5e-e58991152875", "lock_sha256": "10818f9cd992eaeca2ba0255c5c43b09f07da38571d1a48935fedf8c85610109", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "662e9aff-8f09-4a6b-8191-37ca2d6ee185", "schema_version": 1, "sequence": 533, "session_id": "20260803-govflow-todo-r2", "synth_sha256": "b05f67d8fddcec8943bdbe5563dee1d9114d71868dc085b5145872e9afd987ac", "ts": "2026-08-03T11:59:55Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVFLOW-TODO-R2-STAMP", "ts": "2026-08-03T12:00:49Z"}
+=== 2026-08-03 20:00:49 | dispatch ===
+  ts=2026-08-03 20:00:49
+  kind=dispatch
+  intent=TODO R2 收斂檔戳記輪：12 findings 全數採納且已修完,含三家同時命中的 BLOCKING
+  risk=low
+  facts_asked=STAMP4 新增的邊界4 讓現行 PHASE_MAP 自己違反,B0 照做必失敗;主委已修並加 §0 第10條機械化
+  review_role=戳記核對；請實跑邊界④ 確認 BLOCKING 已關閉，並機械比對自己每條 finding 的處置
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260803-GOVFLOW-TODO-R2-STAMP-BRIEF.md", "brief_sha256": "59e4f4506f222db3670f0ed178745915fb9202aac6d3bfe54b38bf447debd804", "brief_sha256_norm": "59e4f4506f222db3670f0ed178745915fb9202aac6d3bfe54b38bf447debd804", "event": "committee_round_open", "event_id": "4b4ddbf5-b280-47dc-b295-c05d7fe99fac", "expected_outputs": {"codex": "handoffs/20260803-govflow-todo-r2-stamp-codex.md", "composer": "handoffs/20260803-govflow-todo-r2-stamp-composer.md", "grok": "handoffs/20260803-govflow-todo-r2-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "b3886a11-df0f-425c-96f2-1b771f7ecee8", "schema_version": 1, "sequence": 534, "session_name": "20260803-govflow-todo-r2-stamp", "task_id": "GOVFLOW-TODO-R2-STAMP", "ts": "2026-08-03T12:00:49Z"}
+{"actor": "cx_run", "attempt_id": "cd05787b-d7ab-4024-9ba9-55aebde1b7be", "cli_rc": "0", "event": "committee_family_result", "event_id": "fc1093dd-e67d-451f-a906-5bf15e1471e6", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r2-stamp-composer.md", "output_sha256": "3a227828cc62199cb0cb4ef252b2d478ba95ea02e75ad30c51a5a4a0fd1c3d42", "producer": "audit_append.sh", "result_state": "success", "round_id": "b3886a11-df0f-425c-96f2-1b771f7ecee8", "schema_version": 1, "sequence": 535, "ts": "2026-08-03T12:03:07Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r2/synth.md", "output_sha256": "cd5d6e392f5630445b93f19be2224a25b244266f81770c8ae6e1b6ff2081109a", "task_id": "GOVFLOW-TODO-R2-STAMP", "ts": "2026-08-03T12:03:07Z"}
+{"actor": "cx_run", "attempt_id": "cc3d0f2e-9cb3-4bcf-baaf-79c8c0e2b774", "cli_rc": "0", "event": "committee_family_result", "event_id": "246cd649-9961-477a-88ad-645a44fb8940", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r2-stamp-grok.md", "output_sha256": "a38fdec4a5a8acd43555722e5be995c9568e6c7726b03e9e21a22bb1c226a6da", "producer": "audit_append.sh", "result_state": "success", "round_id": "b3886a11-df0f-425c-96f2-1b771f7ecee8", "schema_version": 1, "sequence": 536, "ts": "2026-08-03T12:04:01Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r2/synth.md", "output_sha256": "cd5d6e392f5630445b93f19be2224a25b244266f81770c8ae6e1b6ff2081109a", "task_id": "GOVFLOW-TODO-R2-STAMP", "ts": "2026-08-03T12:04:01Z"}
+{"event":"gate_deny","ts":"2026-08-03T12:06:42Z","tool":"Bash","kind":"dispatch","reason":"open_debt"}
+{"actor": "cx_run", "attempt_id": "f786e441-963b-460b-b1e2-e3704ccaee8d", "cli_rc": "0", "event": "committee_family_result", "event_id": "537a7a8d-5b66-4221-b833-97102c9cccfa", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260803-govflow-todo-r2-stamp-codex.md", "output_sha256": "f47eeadc43dda9a5ccdcf43c56145375ffb1b12bff81e37ae377e2ec760366b0", "producer": "audit_append.sh", "result_state": "success", "round_id": "b3886a11-df0f-425c-96f2-1b771f7ecee8", "schema_version": 1, "sequence": 537, "ts": "2026-08-03T12:07:33Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260803-govflow-todo-r2/synth.md", "output_sha256": "76357ddc9fa23e0ab5a1af9558c88e23ca800e66fd9508db4df24760091aca6e", "task_id": "GOVFLOW-TODO-R2-STAMP", "ts": "2026-08-03T12:07:33Z"}

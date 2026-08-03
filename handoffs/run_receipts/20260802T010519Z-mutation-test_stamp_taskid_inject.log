@@ -1,0 +1,27 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 39 items / 22 deselected / 17 selected
+
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v1_without_inject_turns_red PASSED [  5%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v2_v3_shared_taskid_precheck_turns_red PASSED [ 11%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v4_move_after_gate_adds_audit PASSED [ 17%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v5_skip_multi_target_turns_red PASSED [ 23%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v6_skip_path_guard_turns_red PASSED [ 29%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v7_skip_register_turns_red PASSED [ 35%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v8_ignore_fam_turns_red PASSED [ 41%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v9_skip_task_anchor_turns_red PASSED [ 47%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v10_accept_rejected_turns_red PASSED [ 52%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v11_register_on_cli_fail_turns_red PASSED [ 58%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v12_force_stamp_target_all_kinds_turns_red PASSED [ 64%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v13_silent_register_fail_turns_red PASSED [ 70%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v14_dual_grep_turns_red PASSED [ 76%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v15_skip_sha_anchor_turns_red PASSED [ 82%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v16_unescaped_task_id_turns_red PASSED [ 88%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v17_order_sensitive_only_turns_red PASSED [ 94%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v18_skip_missing_kind_turns_red PASSED [100%]
+
+====================== 17 passed, 22 deselected in 13.36s ======================

@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 22 items / 19 deselected / 3 selected
+
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v1_without_inject_turns_red PASSED [ 33%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v14_dual_grep_turns_red PASSED [ 66%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v4_move_after_gate_adds_audit PASSED [100%]
+
+======================= 3 passed, 19 deselected in 2.17s =======================
