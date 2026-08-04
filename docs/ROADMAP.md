@@ -346,7 +346,7 @@
     **12 個非 M code mutation 未逐一執行**。
   - **本 epic 內 TODO §0 數字對照表漂了四次**（四格曾錯三格：`25/9/13/14` → `25/13/20/26`）
     ⇒ 佐證 `票 B-17`（機器依賴表格改資料檔＋自動生成）：只要它還是手寫的就會再漂。
-  - 全部票登記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md`（`B-1`～`B-33`，**唯一票登記處**）；
+  - 全部票登記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md`（`B-1`～`B-34`，**唯一票登記處**）；
     白話版 `handoffs/20260804-BACKLOG-白話總覽.md`（主表一票一列，53 項舊表降為附錄；兩份已機械對帳）。
 
 - **🔵 治理 backlog — 排序 v3.1（2026-08-04 全量重排＋當日新增 3 張，唯一有效）＝當前施工序**：
@@ -358,6 +358,11 @@
   第2批 地基        B-27                    另排              B-9 → B-28
   第3批 殺手寫漂移  B-17 → B-13 → B-26
   ```
+  🔴 **`B-34` `GOV-STAMP-ROSTER-VS-ROLEGATE`（2026-08-05 戳記輪現場撞出）**：
+  角色閘把 implementer（grok）排除在 `brief-kind: review` 之外，
+  但 `reconcile_stamps_check.sh` 要求 `review_families` **全員**蓋章
+  ⇒ 任何 review 輪的收斂檔，結構上都不可能由實際參與者蓋滿；被迫產出語意為空的形式簽核。
+  因 implementer 恆為 review_families 成員，**這是必然而非偶發**。嚴重度與修法待委員裁定。
   🔴 **`B-33` `GOV-LOCALE-GUARD-DRIFT`（2026-08-04 SPEC 審查 R1 兩家一致裁定開票，MAJOR，排第 1 批之後）**：
   `LC_ALL=C` 下 `gate.sh` 的 Verdict 守衛與 `doc_format_precheck.sh` 雙雙 **fail-open**（實測 2 例），
   `template_check.sh spec` 則誤報（1 例）。委員 CLI 與 CI runner 的 locale 不在主委控制範圍

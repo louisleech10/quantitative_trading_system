@@ -1173,6 +1173,50 @@ composer **連續兩次** `result_state=format-failed`，兩次都是同一個 `
 
 **2026-08-04 開票，未實作。排第 1 批之後**（兩家一致：本批不併入，但不可無票放置）。
 
+## B-34 票 `GOV-STAMP-ROSTER-VS-ROLEGATE`
+
+**角色閘把 implementer 排除在 review 之外，戳記檢查卻要求「全部 review_families」蓋章
+⇒ 任何 review 輪的收斂檔，結構上都不可能由「實際參與者」蓋滿。**
+
+### 碼證（2026-08-05 實測，`GOVB0-SPEC-R1` 現場）
+
+- `scripts/governance_families.json`：`review_families = ["codex","composer","grok"]`
+- `scripts/governance_roles.json`：`implementer = "grok"`；`_rules.review` ＝「目標家族**不得**是 implementer」
+- ⇒ `bash scripts/committee_run.sh … codex,composer,grok -- …`（`brief-kind: review`）**被角色閘整批拒派**：
+  `ERROR: grok 是現行 implementer,不得擔任 code review(實作者不自審)`
+- 改派 `codex,composer` 成功，收斂檔 `handoffs/reconcile/20260804-govb0-spec-r1/synth.md` 完成（19/19，rc=0）
+- 但 `bash scripts/reconcile_stamps_check.sh <該檔>` 要求**三家**：
+  `· codex: 缺 APPROVED 戳記` `· grok: 缺 APPROVED 戳記`
+- ⇒ **grok 必須為一份它從未參與審查的收斂檔蓋章。**
+
+### 為何是制度缺陷而非操作失誤
+
+1. `implementer` 恆為 `review_families` 的成員（現行 SoT 即如此），所以**這不是偶發組合，是必然**。
+2. 戳記的語意是「**我確認我的 findings 被忠實歸戶**」（見 `templates/` 與既有 stamp brief 慣例）。
+   非參與者沒有 findings 可確認 ⇒ 它的戳記**語意為空**，只是形式蓋章。
+   這與「機器強制」的初衷相反：閘門仍在，但被迫產出無意義的簽核。
+3. 替代解讀（「第三方獨立複核」）也說不通：若真要第三方複核，
+   brief 內容應為「複核歸戶正確性」而非「確認你自己的 findings」，兩者驗收條件不同。
+
+### 修法方向（未定案，**嚴重度待委員裁定**）
+
+- ① `reconcile_stamps_check.sh` 的必要 roster 改為**該輪的實際參與者**（從 audit 的
+  `committee_round_open.participants` 取，而非 `review_families` 全集）；
+- ② 或角色閘對 `brief-kind: review` 放寬為「implementer 不得審**自己實作的產出**」，
+  而 SPEC 審查階段尚無實作 ⇒ 不構成自審（**此解需要區分 SPEC review 與 code review，現行 kind 不分**）；
+- ③ 或新增 `brief-kind: spec-review`，與 `code-review` 分離。
+  🔴 ①最小；②③觸及角色語意，須雙家族專審。
+
+### 與既有票的關係
+
+- **`B-31`（format-failed 無便宜修正路徑）**：同族——角色/kind 分類過粗導致無路可走。
+- **`B-21`（哪份檔案由哪支檢查器把關）**：本票是「兩支檢查器對同一件事有不同 roster 定義」的實例。
+
+### 狀態
+
+**2026-08-05 開票，未實作。嚴重度與修法待委員裁定**（已列入第 0 批 SPEC R2 審查輪的必答題）。
+權宜作法：`brief-kind: stamp` 不受角色限制，故補派 grok 單獨蓋章可通過機檢，但語意問題仍在。
+
 ---
 
 ## 📌 `票 B-24` 的拆分裁決（2026-08-04，SPEC 審查 R1 後）

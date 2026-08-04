@@ -18,10 +18,26 @@ stamp-target: handoffs/reconcile/20260804-govb0-spec-r1/synth.md
    若你不同意該裁決，**不要蓋章**，寫明理由。
 3. **D-1 的主委獨立驗證表**（`.claude/tmp/b15probe3.sh` 原型①／②對照）你可自行重跑核對。
 
+### 🔴 本輪為第二次戳記輪（第一次已作廢，原因如下）
+
+第一輪 `GOVB0-R1-STAMP`：composer 已蓋章，**codex 依本 brief 規定拒章**並指出一個真實錯誤——
+D-7（timeout）誤引 `CODEX-R1-P0-07`，但該 ID 是 locale fail-open，timeout 主張實為 `CODEX-R1-P1-06`。
+**該歸戶錯誤已修正**（D-7 現引 `CODEX-R1-P1-06`（timeout 主張部分）；D-13 續引 `CODEX-R1-P1-06`，
+與 codex 自述的「P1-06 → D-7 的 timeout 主張及 D-13 的依賴摘要」一致）。
+body hash 因此由 `1088062c…` 變更為 `25e1241f…`，composer 前一枚戳記自動失效並已移除。
+**本輪三家（含 grok）重新蓋章。**
+
+🔴 **grok 為何在本輪**：`reconcile_stamps_check.sh` 要求 `review_families` 全員（codex／composer／grok），
+但 grok 是現行 implementer，**被角色閘擋在 R1 review 之外**，故未參與該輪審查。
+此不一致已開 `票 B-34 GOV-STAMP-ROSTER-VS-ROLEGATE`。
+⇒ **grok 請以「第三方獨立複核」立場審**：不是確認「我的 findings 有沒有被歸戶」（你沒有 findings），
+而是確認「**群集表對附錄逐字 findings 的歸戶是否正確、處置是否忠實**」。
+若你發現任何歸戶錯誤（如 codex 上一輪抓到的那種），**不要蓋章**。
+
 ### 戳記格式（**逐字**，單獨一行，**不是 `## ` 標題**）
 
 ```
-RECONCILE-STAMP: <你的家族名> APPROVED 2026-08-04 sha256:1088062c7da80a7ea23978675f6a19d433b90d7523c21d5b75eb72470b581d7d task:<派工注入給你的 task-id>
+RECONCILE-STAMP: <你的家族名> APPROVED 2026-08-04 sha256:25e1241fda047b7d186df360d43da7234ef7b6f232973b4286a1c63848af0d0c task:<派工注入給你的 task-id>
 ```
 
 - `<你的家族名>` 換成 `codex` 或 `composer`（以派工注入的家族名為準）。

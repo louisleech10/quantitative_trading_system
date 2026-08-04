@@ -21,7 +21,7 @@ Verdict: 需修補後合併 — 兩家皆判「需修補後派工，不可進 TO
 | D-4 | **§V 核心驗收不可證偽**：`--single` 接受截斷檔；Task 2.5 exact-delta 無 immutable corpus／baseline | `CODEX-R1-P0-04`／`COMPOSER-R1-P1-01` | **ACCEPT-BLOCKING** |
 | D-5 | **Phase 1 unknown `brief-kind` 邊界自相矛盾**（fail-closed vs 視同不需戳記＋警示） | `CODEX-R1-P1-09` | **ACCEPT-BLOCKING** |
 | D-6 | **Phase 4（`B-24` checker）應獨立 pipeline**；現行 rollout scope 不足 | `CODEX-R1-P0-01` vs `COMPOSER-R1-P1-02`／`COMPOSER-R1-P1-04` | **SPLIT — 見下裁決** |
-| D-7 | `OPEN-1` timeout 區間＝CLI process-group launch→return/kill；值須以 Task 3.1 真實 duration 定稿 | `CODEX-R1-P0-07`（部分）／composer Q1 | **PARTIAL — 暫定值見下** |
+| D-7 | `OPEN-1` timeout 區間＝CLI process-group launch→return/kill；值須以 Task 3.1 真實 duration 定稿 | `CODEX-R1-P1-06`（timeout 主張部分）／composer Q1 | **PARTIAL — 暫定值見下** |
 | D-8 | `OPEN-2` locale fail-open **必須開票登記**，本批不併入 | `CODEX-R1-P0-07`／`COMPOSER-R1-P1-03` | **ACCEPT** — 開 `票 B-33` |
 | D-9 | `OPEN-3` FP-2 以「Phase 0 後補查」結案、**不除役**；但須定樣本門檻／期限／除役條件 | `CODEX-R1-P1-08`／`COMPOSER-R1-P2-03` | **ACCEPT** — 補條件 |
 | D-10 | Task 4.1 grandfather 須具名 owner／UTC 到期日／到期後狀態 | `CODEX-R1-P0-01`（部分）／`COMPOSER-R1-P1-04` | **ACCEPT** — 隨 D-6 移出 |
@@ -298,5 +298,5 @@ STATUS: DONE
 
 ## 戳記
 
-RECONCILE-STAMP: composer APPROVED 2026-08-04 sha256:1088062c7da80a7ea23978675f6a19d433b90d7523c21d5b75eb72470b581d7d task:GOVB0-R1-STAMP
+RECONCILE-STAMP: codex APPROVED 2026-08-04 sha256:25e1241fda047b7d186df360d43da7234ef7b6f232973b4286a1c63848af0d0c task:GOVB0-R1-STAMP2
 
