@@ -38,7 +38,7 @@ R6 實際結果為**三家一致無 P0**（codex「TODO：GO」／grok 0 finding
    |---|---|---|---|
    | 1 | **25**（`T1-U1..U18` 展開 18 ＋ M1／B1／B2／R1／I1／S1／S2 共 7；I1＝B1 硬前置；S1／S2＝phases==0 例外收窄） | 19 | ✗ 照 SPEC 漏 6 |
    | 2 | **9** | 6 | ✗ 照 SPEC 漏 3 |
-   | 3 | **9**（拆 `T3-U4`／`T3-U5` 後 9 列 ⇒ 9 case） | 8 | ✗ 照 SPEC 漏 1 |
+   | 3 | **13**（T3-U1..U6／B1／B2／C1＝9 ＋ task_id 對稱 2 ＋ mutation 2；B3 實作擴表） | 8 | ✗ 照 SPEC 漏；以 TODO 機械計數為準 |
    | 4 | **11** | 6 ＋ 5 ＝ 11 | ✓ 一致 |
 
    🔴 **SPEC rev6 已凍結，不就地改**——依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md`
@@ -531,7 +531,15 @@ Task 0.1 淪為裝飾品，且 §R 「Phase 1/2/3 依賴 Phase 0」的耦合宣�
   6. **暫存檔契約**：`_role_gate.sh` **內部自行** `mktemp` ＋ `trap` 清理，`committee_run.sh` 只呼叫
      ——避免與 `cx_run.sh:39-44` 的「單一 EXIT trap」約束衝突（trap 是覆寫非疊加）。
 - **修改檔案**：新建 `scripts/_role_gate.sh`；`scripts/committee_run.sh`（`gate.sh dispatch` **之前**插入）；
-  `scripts/cx_run.sh:72-94`（改為呼叫共用函式）。
+  `scripts/cx_run.sh:72-94`（改為呼叫共用函式）；
+  新建 `tests/governance/test_rolegate_predispatch.py`；
+  🔴 **依賴清單同步**（新 SSOT 腳本進隔離 harness 的 copy list，禁漏→rc=127）：
+  `tests/governance/test_stamp_taskid_inject.py`、
+  `tests/governance/test_debt_emit.py`、
+  `tests/governance/test_result_state_format_failed.py`、
+  `tests/governance/test_govflow_manifest.py`（T0-B1 C 類缺檔探針改鎖仍缺的 Phase 4 檔）；
+  `docs/GOV_DISPATCH_FLOW_FIX_TODO.md`（僅 Phase 3 測試表列／Gate oracle／本 bullet 機械可抽 path）；
+  `scripts/gen_govflow_manifest.sh`（PHASE_MAP 擴 phase 3 允許集，配合上列 path）。
 - **不可做**：不得移除 `cx_run.sh` 的角色閘（前移是早退，不是取代）；不得用第三份 inline awk/sed。
 - **邊界（≥2）**：① `governance_roles.json` 讀取失敗／JSON 壞 ⇒ fail-closed
   ② 三家中僅一家不相容 ⇒ **整批拒絕**（不得只派相容的兩家）。
@@ -557,6 +565,17 @@ Task 0.1 淪為裝飾品，且 §R 「Phase 1/2/3 依賴 Phase 0」的耦合宣�
 | T3-B2 | 邊界 | 三家中一家不相容 ⇒ 整批拒 |
 | T3-C1 | 契約 | `cx_run.sh` 既有角色閘通過同一組用例（共用後不漂移） |
 | **T3-U6** | 單元 | 🔴 **`brief-kind=impl` ＋ 非 implementer ⇒ rc!=0、零副作用**（SPEC Task 3.1 明列；v1 漏） |
+| T3-T1 | 契約 | 🔴 **`task_id` 白名單前移**：`committee_run` 非法非空 task-id ⇒ rc=2、audit 零新增（R8 移交） |
+| T3-T2 | 契約 | 🔴 **白名單 regex 單一來源**（僅 `_role_gate.sh` 一處定義） |
+| T3-U7 | 單元 | 🔴 **未知 family**（不在 `governance_families.json`）⇒ 明確拒派、非零離開、零副作用（B3-FIX／`CODEX-R10-P1-02`） |
+| T3-B3 | 邊界 | 🔴 **完整 incompatibility list**：兩家不相容 ⇒ 輸出**同時含兩者**（TODO Task 3.1 要點 5；B3-FIX） |
+| T3-T3 | 契約 | 🔴 **行為層委派**：隔離副本於 `committee_run` 內嵌不同 inline regex（允 `#`）⇒ 與 SSOT 漂移轉紅（B3-FIX／`COMPOSER-R10-P1-01`） |
+| T3-T4 | 契約 | 🔴 **行為層 SSOT 同步**：放寬 `_role_gate.sh` 白名單 ⇒ `committee_run` 與 `cx_run` 兩端同步改變（B3-FIX／`CODEX-R10-P1-01`） |
+| T3-M1 | mutation | 前移破壞（角色檢查移到 gate 副作用後）⇒「audit 零新增」轉紅 |
+| T3-M2 | mutation | raw set intersection ⇒ `composer` 被誤拒（轉紅） |
+| T3-M3 | mutation | 🔴 **只印第一個**不相容 ⇒ 完整清單契約轉紅（B3-FIX） |
+| T3-M4 | mutation | 🔴 **canonical T3-U1** 閹割 pre-gate 角色守衛 ⇒ 零副作用轉紅；復原轉綠（B3-FIX） |
+| T3-M5 | mutation | 🔴 **committee 內嵌不同 task_id regex** ⇒ 與 SSOT 漂移轉紅（B3-FIX 行為層委派探針） |
 
 **Phase Gate**：T3-* 全綠 ＋ `pytest tests/governance -q` 全綠 ＋ 🔴 **G-MANIFEST（N=3）**。
 

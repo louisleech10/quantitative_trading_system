@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260804T004201Z-mutation-test_rolegate_predispatch",
+  "claim_id": "mutation-test_rolegate_predispatch",
+  "command": [
+    "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python",
+    "-W",
+    "ignore",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "test_mutation_",
+    "tests/governance/test_rolegate_predispatch.py"
+  ],
+  "command_sha256": "88d021f13ffb7f0e703ef436d6265cd2c8c3bcd78c0cb1224fff030053d822ea",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "c0a70047ffb30bbfd675939c9376c924cbd57a7b",
+  "tree_dirty": true,
+  "started_at": "2026-08-04T00:41:58Z",
+  "ended_at": "2026-08-04T00:42:01Z",
+  "duration_seconds": 3.382453,
+  "exit_code": 0,
+  "runtime_class": "mutation_runtime",
+  "requested_class": null,
+  "pytest_summary": "======================= 2 passed, 11 deselected in 1.13s =======================",
+  "selected_node_ids": [
+    "tests/governance/test_rolegate_predispatch.py::test_mutation_preflight_after_gate_turns_red",
+    "tests/governance/test_rolegate_predispatch.py::test_mutation_raw_intersection_rejects_composer"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 2,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "fb06b4d2926b040488d3fe3c554c409a370637f2b107268d512e6ca066a505d3",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "fb06b4d2926b040488d3fe3c554c409a370637f2b107268d512e6ca066a505d3",
+  "log_path": "handoffs/run_receipts/20260804T004201Z-mutation-test_rolegate_predispatch.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 13 items / 11 deselected / 2 selected",
+    "",
+    "tests/governance/test_rolegate_predispatch.py::test_mutation_preflight_after_gate_turns_red PASSED [ 50%]",
+    "tests/governance/test_rolegate_predispatch.py::test_mutation_raw_intersection_rejects_composer PASSED [100%]",
+    "",
+    "======================= 2 passed, 11 deselected in 1.13s ======================="
+  ]
+}
