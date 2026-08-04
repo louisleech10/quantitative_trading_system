@@ -33,7 +33,9 @@ R2 收斂＝`handoffs/reconcile/20260805-govb0-spec-r2/synth.md`（17 findings�
 
 - **FACT-RECEIPT 格式**：`FACT-RECEIPT: <命令> → 印出 <stdout 摘要>（<who> 實跑 <date>）`
 
-**已驗證事實（9 條，每條附實跑 stdout 摘要）**：
+**已驗證事實（**10 條**，每條附實跑 stdout 摘要；本數字導出命令＝`grep -c '^- FACT-RECEIPT:' docs/GOVB0_FRICTION_SPEC.md`）**：
+🔴 R4 曾寫 9 而實為 10（`CODEX-R4-P1-03`）——**本 SPEC 內第三次計數漂移**（Task 總數／契約項數／本條），
+與 `票 B-17` 同型。R4 已定紀律「凡可由 `grep -c` 導出的數字須同行註明導出命令」，本行即為落實。
 
 - FACT-RECEIPT: `grep -o '"reason":"[^"]*"' .claude/gate/audit.log | sort | uniq -c` → 印出 `493 token_expired` / `106 open_debt`，全檔 599 筆僅此兩值，**無指令欄位**（Claude 實跑 2026-08-04）
 - FACT-RECEIPT: `LC_ALL=C grep -ac 'closure review' .claude/gate/ts_stamp.log` → 印出 `0`；`LC_ALL=C grep -ac 'hmsg.txt'` → 印出 `2`（Claude 實跑 2026-08-04）⇒ 被擋指令零紀錄、成功重試有紀錄
@@ -188,6 +190,13 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   9. **跳脫引號**（`"a\"b"`、`'a"b'`）→ 跳脫字元**不終止引號 span**；掃描器若無法確定 span 邊界 ⇒ **fail-closed（視為未剝除）**；
   10. **heredoc**（`cat <<EOF; codex exec x`）→ **heredoc 本體視為引號 span**（不作分隔符、不掃描），**heredoc 之外照常判定**；
       R2 原型②在此**誤擋**（`COMPOSER-R2-P1-02`）。
+      🔴 **可機械執行的 span 界定規則（R5 補上；R4 只寫「視為引號 span」不可實作 — `COMPOSER-R4-P1-03`）**：
+      ①**起點**＝匹配 `<<[-]?[[:space:]]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1` 之後的**下一個換行**；
+      ②**delimiter**＝上式捕捉到的識別字（**去除引號**；`<<'X'`／`<<"X"`／`<<X` 的 delimiter 皆為 `X`）；
+      ③**終點**＝**行首**恰為該 delimiter 的那一行（`<<-` 形式允許行首 tab 縮排，其餘形式不允許任何前導空白）；
+      ④**多個 heredoc 併存**（`cat <<A <<B`）：**依出現順序依序消耗**，第 n 個 heredoc 的 body 起於第 n−1 個 body 結束之後；
+      ⑤**delimiter 未出現到字串結尾** ⇒ **fail-closed**（視為未剝除，同契約第 6 項）。
+      **驗收語料**（納入語料 B，各 1 條 TP＋1 條 TN）：`<<EOF`／`<<'X'`／`<<-EOF`（縮排）／`cat <<A <<B`（雙 heredoc）／未閉合 heredoc。
   🔴 **上列 7–10 的判定結果在 R4 定死**（R3 只列項目未定結果，`CODEX-R3-P0-02`）。
   🔴 **契約共 11 項**（`1`／`1b`／`2`–`10`）——本行數字須與本 Task「改法」下的條目數相等；
   R3 曾寫「10 項」而實為 11（`COMPOSER-R3-P2-01`），與 §V 的 Task 數漂移同型（`票 B-17`），
@@ -227,7 +236,7 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
     ②`git commit -m "<多行訊息，第 2 行以 grok 開頭>"` → **ALLOW**
     ③`echo start` 換行 `codex exec -s workspace-write "p"`（**真多行指令**）→ **BLOCK**
     ④`set -e` 換行 `grok -m grok-4.5 -p "x"`（**真多行指令**）→ **BLOCK**
-    🔴 四條全部納入語料 B。**只實作原型③（不含 1b）者，①②會誤擋 ⇒ 本 Task 不通過**（`COMPOSER-R3-P1-01`）。
+    🔴 四條全部納入語料 B。**只實作原型③（不含 1b）者，①②會誤擋 ⇒ 本 Task 不通過**（`COMPOSER-R3-P1-02`）。
   - mutation：移除 `-c`／`eval` 遞迴 → 對應語料轉為 ALLOW；縮回 R2 的命令位置定義（僅 `^ ; & |`）→ 上述五條 `E-3` 語料轉回 ALLOW；
     把跨行剝引號換成 `sed` 行內替換 → 上述①②轉為 BLOCK（**這是 1b 的守護測試**）。
 - **邊界（≥2）**：①未閉合引號 → fail-closed ②巢狀／跳脫引號 → 依 Task 2.0 契約 ③`bash -c` 引數不加引號（`bash -c codex`）→ 依契約定義並測試。
@@ -348,17 +357,38 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
     - **ownership**：lock 綁 attempt id，內容含 pid 與起始時間戳（UTC epoch）。
     - **release**：`_emit_family_result` 寫入後**必定釋放**（無論 `success`／`failed`／`format-failed`），
       **不依賴 publish 是否成功**——否則失敗路徑會永久鎖死該 `<out>`。
+      🔴 **owner-safe release（R5 補 — `CODEX-R4-P0-02`）**：釋放前**必須比對 lock 內的 attempt id 與自己相同**；
+      不同即**不得釋放**（代表該 lock 已被 stale takeover 交給新 attempt）。
+      ⇒ 防「舊 attempt 收尾時解掉新 attempt 的鎖」造成兩個 CLI 並存。
+    - 🔴 **wrapper 本身被殺（`CODEX-R4-P0-02`）**：若 `cx_run.sh` 在 CLI 返回後、`_emit_family_result` 前被 SIGKILL，
+      lock 與 attempt 檔皆殘留且**無 `result_state`**。此路徑**依賴 stale 判定回收**（pid 已死 ⇒ 可接管），
+      **不得**因為「lock 存在」而永久拒絕重派。驗收須含此情境。
+    - 🔴 **外層 timeout 觸發時（`CODEX-R4-P0-02`）**：`committee_run.sh` 的安全閥殺掉 `cx_run.sh` 後，
+      **由 stale 判定負責回收 lock**（外層不直接刪 lock，避免 owner 不符的誤釋放）。
+    - 🔴 **跨裝置 rename 失敗時**：publish 失敗 ⇒ 仍走 `_emit_family_result`（記 `failed`）⇒ **lock 照常 owner-safe 釋放**。
     - **stale lock**：lock 的 pid 已不存在，**或**起始時間戳距今 > (該家族 timeout ＋ 外層安全閥) ⇒ **視為 stale，可強制接管**並記 audit。
+    - 🔴 **lock 檔被外部刪除但 attempt 進程仍存活**（`COMPOSER-R4-P2-02`）：**「存活中」的判準不得只看 lock 檔存在**，
+      須為「lock 檔存在 **且** 其 pid 存活」**或**「該 `<out>` 的 attempt 進程存活」二者取聯集。
+      實作上：啟動前除檢查 lock 檔外，**另查該 `<out>` 是否有存活的 attempt 進程**（以 attempt id 標記於進程參數或另存 registry）；
+      任一為真即拒絕啟動。⇒ **刪 lock 檔不足以繞過序列化。**
     - **逾時後重派**：`failed` 的 attempt 其 lock 已釋放 ⇒ **同 `<out>` 重派正常放行**（不得誤拒）。
     - **被拒 attempt 的狀態**：**不寫 `result_state`**（該 attempt 從未啟動 CLI），只記一筆 audit 拒絕事件。
       🔴 理由：`result_state` 三值是 CLI 執行結果的語意；未啟動者寫入會**污染 Task 3.1 的 duration 統計**，
       進而影響 Task 3.3 的 timeout 定稿。
   - 狀態斷言（**並發 — R3 改設計**）：同一 `<out>` 已有**存活中**的 attempt 時，第二次派工**直接拒絕啟動**（rc≠0）並記 audit；
     第一個 attempt 不受影響、正常 publish。
-  - 狀態斷言（**防誤拒／防鎖死**）：①`failed` 收尾後同 `<out>` 重派 → **放行**且成功完成
+  - 狀態斷言（**防誤拒／防鎖死**，`CODEX-R4-P0-02` 要求逐路徑覆蓋）：
+    ①`failed` 收尾後同 `<out>` 重派 → **放行**且成功完成
     ②pid 已死的 stale lock 存在時重派 → **放行**且 audit 有接管紀錄
     ③被拒的 attempt 在 audit 中**無 `committee_family_result`**（只有拒絕事件），
-    且 Task 3.1 的 duration 統計筆數**不因被拒而增加**。
+      且 Task 3.1 的 duration 統計筆數**不因被拒而增加**
+    ④**owner-safe release**：構造「舊 attempt 的 lock 已被 stale takeover 給新 attempt」後，
+      令舊 attempt 走 `_emit_family_result` → **lock 不得被釋放**，新 attempt 仍持有
+    ⑤**wrapper 在 CLI 返回後被 SIGKILL**：lock 與 attempt 檔殘留、無 `result_state` ⇒
+      經 stale 判定後重派 **放行**（不得永久拒絕）
+    ⑥**外層 timeout 殺掉 `cx_run.sh`**：lock 由 stale 判定回收，**外層不直接刪 lock**
+    ⑦**lock 檔被外部刪除但 attempt 進程存活** → 第二次派工仍 **拒絕**（見上「存活中」判準取聯集）
+    ⑧**跨裝置 rename 失敗** → `result_state=failed` 且 lock 已 owner-safe 釋放。
     🔴 演進紀錄：R1 寫「後者覆蓋前者」（`CODEX-R1-P0-03` 指出會丟失成功產出）→ R2 改「兩者皆須保留可追溯」
     （`CODEX-R2-P0-02` 指出與單一 final `<out>` 的資料模型不相容，無可執行取勝規則）→ **R3 改為序列化拒絕**。
     理由：委員派工本就不應對同一產出路徑並發；**拒絕比仲裁簡單，且不丟資料**。
@@ -384,7 +414,7 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
      ①**定稿門檻**：Task 3.1 上線後，**每家族累積 ≥50 筆** `committee_family_result` 且 `result_state=success`、含 duration 三欄，
        **且該 50 筆跨 ≥3 個不同 session／UTC 日期**（避免單日單批取樣偏差）；
        🔴 **R3 誤寫 ≥20**，與 R2 收斂 `E-10` 的裁決不符（該裁決已採 codex 較嚴者），**R4 依收斂裁決更正**
-       （`CODEX-R3-P1-04`／`COMPOSER-R3-P1-02`）。另一家主張的 ≥20 僅作**中途 sanity check**，非定稿門檻。
+       （`CODEX-R3-P1-04`／`COMPOSER-R3-P1-01`）。另一家主張的 ≥20 僅作**中途 sanity check**，非定稿門檻。
      ②取各家族 `max(duration)` 與 `P99(duration)`（**單調時鐘欄位，非 runlog proxy**）；
      ③`timeout_family = ceil(max(max, P99 × 1.25))`；外層 `= max(family_timeouts) + 15m`；
      ④**未達定稿門檻時（含 R3 未定義的 10–19 區間，`CODEX-R3-P1-04`）**：
@@ -401,6 +431,11 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   - 狀態斷言：CLI 在 timeout 內正常結束且格式合格 → `result_state=success`、`<out>` 存在。
   - 狀態斷言（**孤兒檢查**）：逾時後查不到該 CLI 的殘留子進程（以 process group 為單位斷言）。
   - 狀態斷言（**值來源**）：TODO 中的 timeout 值與 Task 3.1 產出的 duration manifest 一致（**禁硬編未經重算的暫定值**）。
+  - 狀態斷言（**`E-10` 取捨的可證偽化，R5 補 — `COMPOSER-R4-P2-01`**）：
+    未達定稿門檻（任一家族 <50 筆或未跨 ≥3 session／UTC 日）時，
+    ①TODO §0 與 duration manifest **含 `PROVISIONAL` 字樣**；②Task 3.3 在 TODO 中**標記為未完工**；
+    ③`票 B-14` 票面狀態**含「未定稿」**。三者**任一缺失即 FAIL**。
+    ⇒ 使「機制上線但不宣稱完工」這個取捨**可機械驗證**，而非只寫在改法散文裡。
   - mutation：移除 timeout → 掛住情境測試逾時失敗（測試自身須有上限）。
 - **邊界（≥2）**：①CLI 在 timeout 邊界正常結束（競態）→ 不得寫兩筆 `result_state` ②timeout 值為 0 或負 → 拒絕啟動並報錯 ③三家並行時其中一家逾時 → 其餘兩家不受影響。
 - **存活至**：永久。
@@ -452,6 +487,14 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   | **`B-34` 語意閉合**（stamp roster vs 角色閘） | `CODEX-R2-P0-06`／`COMPOSER-R2-P1-03` | **`票 B-34`**；本批僅用權宜第三方戳記並明文標註 |
   | **`B-24` 機械強制面** | `COMPOSER-R2-P2-02` | R1 `D-6` 已裁 SPLIT；**TODO §0 須強制標「`B-24` 部分完成」**，code review 不得宣稱 `B-24` 全綠 |
   | **`B-15` FP-2 定位** | R1 `OPEN-3` | 已定補查條件（Phase 0 後 ≥200 筆 `gate_deny` 或 ≥30 日） |
+
+  🔴 **另一項具名殘留（`F-7` 要求寫入 SPEC，R4 漏記，R5 補 — `COMPOSER-R4-P1-02`）**：
+  `票 B-36`（收斂工具群集表盲點）已裁定併入 `票 B-13`、修法在**產出端**（`reconcile_build.sh` 生成骨架時預列全部 ID）。
+  **但產出端修法只能擋「漏」，擋不了「錯位」**——ID 是預列的，錯的是「哪一列配哪個主張」。
+  實證：本 SPEC 制定過程中，主委在群集表／SPEC 內文共犯 **6 次** ID 歸錯或對調，
+  `completeness_check --lock`、主委逐 ID 自檢、`B-36` 的產出端修法**三者對「錯位」皆無感**，
+  僅委員語意複核抓得到（其中 3 次為三家各自獨立指出）。
+  ⇒ **「ID 錯位」目前無任何機械防線**，屬本批**具名接受的殘留**，須隨 `B-36` 併入 `B-13` 時一併記載。
   | **locale 相依守衛** | R1 `D-8`／`COMPOSER-R1-P1-03`／`CODEX-R1-P0-07` | **`票 B-33`**；TODO §0 須列為已知 MAJOR 債 |
 
   🔴 **後續審查輪處置規則**：委員若再提上述任一議題，請標 `OUT-OF-SCOPE` 並附「不做會怎樣」的具體失效場景，
