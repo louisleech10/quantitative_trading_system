@@ -88,7 +88,18 @@ Task 3.1 要跑多少次真實派工才夠？本 SPEC 沒說。請給可執行�
 
 逐 Task 檢查「驗證」欄：是否**每一條**都斷言執行後狀態，而非腳本 rc？列出任何仍是 rc 斷言者。
 
-### Q6 — 可以進 TODO 生成嗎？
+### Q6 — `票 B-34 GOV-STAMP-ROSTER-VS-ROLEGATE` 的嚴重度與修法（本輪新增，主委不自裁）
+
+戳記輪現場撞出：`scripts/governance_roles.json` 規定 `brief-kind: review` 的目標家族**不得**是 implementer（現行 = grok），
+但 `scripts/reconcile_stamps_check.sh` 要求 `review_families`（codex／composer／grok）**全員**蓋章。
+因 implementer 恆為 `review_families` 成員 ⇒ **任何 review 輪的收斂檔，結構上都不可能由實際參與者蓋滿**，
+第三家被迫為它未參與的審查蓋章（語意為空）。
+本輪權宜作法：`brief-kind: stamp` 不受角色限制，故補派 grok 以「第三方複核歸戶正確性」立場蓋章。
+
+請裁定：①嚴重度 ②修法（票面列了三個方向：改 stamps roster 取實際參與者／區分 SPEC review 與 code review／新增 kind）
+③是否納入第 0 批（主委預設**不納入**，理由同 `B-33`：避免 scope 膨脹）。
+
+### Q7 — 可以進 TODO 生成嗎？
 
 若仍為「需修補」，請**明列 BLOCKING 清單**（編號 ＋ 具體修法方向），不要只給結論。
 
