@@ -33,11 +33,32 @@ claim checker 判群集表的「已修」是 operational claim 需 backing；已
 **處置選項**：①查 `scripts/verification_claim_check.py` 的 exempt token 正確語法後補對 ②或以
 `git commit --no-verify` 明確繞過並在 commit 訊息載明理由 ③或請委員裁定。**勿再盲試格式**。
 
-**3. 使用者 2026-08-05 的三項裁示（已執行 1、2）**
+**2.5 🔴 第 0 批完工後的下一個＝第 0.5 批：P1-6 線 C（債務事件分檔）**
+使用者 2026-08-05 拍板。**不是 B-x 票**，屬 P1-6 epic 的 B5（`docs/ROADMAP.md` 有完整狀態表）。
+草案 `handoffs/20260802-LINEC-AUDIT-SPLIT-SPEC-DRAFT.md`（方案 B 為主委建議）。
+**開工前必做**：確認第 0 批 Phase 0 定案的 `gate_deny` schema（`scripts/audit_events.json`）——
+線 C 的歸檔規則以它為輸入，**順序反了要重做**。
+**正當理由（勿再誤述）**：不是效能（效能立論 2026-08-02 已被實測推翻）；
+真問題是**資料壽命混裝**——債務事件序號 fail-closed 永不可刪（289 筆），其餘 30,671 行本可輪替卻同檔。
+**實證**：`audit.log` 34,000 行、`debt_ledger --list` 吐 182 個 round（ABANDONED 80%），
+主委 2026-08-05 實際讀錯一次。**線 C 閉合 → B5 完工 → P1-6 epic 結案。**
+
+**3. 使用者 2026-08-05 的裁示（已全部執行）**
 - ✅ `git reset` 已加進 `.claude/settings.json` 的 `permissions.allow`（`HEAD*`／`-q HEAD*`／`--soft*`／`--mixed*`；
   `--hard` 保留在 `ask`），另補 `git show`／`git rev-parse`。**`jq -e` 驗過 JSON 合法。**
 - ✅ 不受理四項**使用者已核可**（「你們委員決定不受理，那我接受，就先記著就好」），已寫入 SPEC §N。
+- ✅ **線 C 排入第 0.5 批**（第 0 批完工後立即），ROADMAP／白話總覽／本檔皆已同步。
+- ✅ **文件瘦身（使用者定「只留最新狀態和待辦，過期／推翻的移除封存」）**：
+  `docs/ROADMAP.md` **393→125 行**（P1-6 敘事 332 行 → `docs/Archived/ROADMAP_P16_NARRATIVE_20260805.md`）；
+  `handoffs/20260804-BACKLOG-白話總覽.md` **529→92 行**（舊視圖 451 行 → `handoffs/Archived/…-舊視圖.md`）。
+  **兩份皆逐字保留可追溯，非刪除。** 瘦身當場抓到第 8 次計數漂移（ROADMAP 寫 32 張、實際 36）。
 - ⏳ compact 後繼續跑 R5。
+
+🔴 **文件維護紀律（使用者 2026-08-05 定死，本檔起適用）**：
+ROADMAP／白話總覽／HANDOFF 這類**狀態文件**，**只留最新狀態與待辦**；
+過期／被推翻的內容**移除並封存到 `Archived/`**，**不得用「附加更正註記」的方式堆疊**。
+出生事故：主委先前用附加註記處理，使 ROADMAP 的 P1-6 節膨脹到 322 行（佔全檔 82%），
+**導致使用者誤讀「線 C 已完成」並據以往後推進**。
 
 ## 第 0 批現況
 
