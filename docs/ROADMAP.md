@@ -331,6 +331,24 @@
   - **階段 1（工具實作）尚未開始**；硬前置＝`GOV-DOCS-STAMP-PROVENANCE`（條文 §6.3 已裁決）。
   - 新票：`GOV-COMPLETENESS-IDLIKE-FP`、**重啟 `D-003`（`result_state` 收窄，已有具體事故）**、`GOV-ROLEGATE-PREDISPATCH`。
 
+- **✅ GOVFLOW epic — 派工控制流四缺陷 A-1..A-4 全數完工（2026-08-04）**：
+  B0 manifest 生成器 `0d0f3a0`／B1 heading 誤報＋四步程序 `d36d76b`／
+  B2 `result_state` 三值＋emit 順序＋P16 v3.0（R 重開）`c0a7004`／
+  B3 角色檢查前移＋`scripts/_role_gate.sh` `2696e77`／
+  **B4 claim checker 委員逐字豁免 `6a06f0c`**。`pytest tests/governance` **617 → 701 passed**。
+  - **B4 走 6 輪**（實作→NO-GO 7 條→修補一→複核→修補二→複核→收窄→複核）。
+    輪 5 的修法把豁免擴到**一般原檔與 format-failed 產出**（實測同一原檔 rc 由 1 變 0），
+    由 `CODEX-R15-P1-01` 抓出；輪 6 收窄為「`committee_family_result` 只供 `sources/` 回退
+    ＋須 `result_state=success`」。輪 6 由**主委自實作**（使用者核准），雙家族仍為非實作者。
+  - **實測回歸**：85 份真實收斂檔違規 **26→16 條、18→12 檔**。
+  - 🔴 **殘留（是未完成，勿當已解）**：**A-4 全域未解**——主委摘要／群集段無 backing 的 claim
+    仍不能 commit ⇒ **12 檔仍有違規**，缺口＝摘要段需 backing 或更窄豁免（另案）；
+    **12 個非 M code mutation 未逐一執行**。
+  - **本 epic 內 TODO §0 數字對照表漂了四次**（四格曾錯三格：`25/9/13/14` → `25/13/20/26`）
+    ⇒ 佐證 `票 B-17`（機器依賴表格改資料檔＋自動生成）：只要它還是手寫的就會再漂。
+  - 全部票登記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md`（`B-1`～`B-28`，**唯一票登記處**）；
+    白話版 `handoffs/20260804-BACKLOG-白話總覽.md`（52 項 checklist）。
+
 ## ✅ 近期已完成（2026-06 / 2026-07）
 - **TEMPLATE_GATE_FIX epic（2026-07-05）**:派工品質防線修補——四方委員會(Claude+Codex+Composer+Gemini)審 template/機檢,實證 2 BLOCKING 繞過(FACT-RECEIPT/§G 逃逸)+多處範本↔機檢漂移;修=§A 段級狀態機+RISK-HIT 宣告制+per-Task 分段檢+RESULT 交叉規則+gate --reconcile 閉合鏈+adversarial 實核義務+TODO prompt 憲法瘦身(省每次 ~5,100 行)。驗收=14 fixture 矩陣+4 mutation+5 gate fixture+Codex 總 review 戳記。文件=docs/TEMPLATE_GATE_FIX_{BRIEF,SPEC,TODO,MANIFEST,GRANDFATHER}.md;現役文件 grandfather(僅新文件適用)。**新寫 SPEC 須帶 RISK-HIT: 宣告與 FACT-RECEIPT**。
 - **FF 一致性整併**:Q5/B1/B2/B3/B5/B6/B4/B8(觀測性 + 批次日期修復 + warmup-then-trim + 批次刪除/保留 UX)。每項走完整管線。
