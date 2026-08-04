@@ -2,7 +2,11 @@
 
 > 來源 PLAN/診斷：`handoffs/reconcile/govb0-recon-r1/synth.md`（R1 偵察，21 findings，rc=0）　|　日期：2026-08-04　|　對應 TODO：`docs/GOVB0_FRICTION_TODO.md`（待生成）
 
-**版本 R2**（依 `handoffs/reconcile/20260804-govb0-spec-r1/synth.md` 的 D-1～D-13 全數修訂；R1 兩家皆判「需修補後派工」）。
+**版本 R3**（R1 的 D-1～D-13 ＋ R2 的 E-1～E-12 全數修訂；R1／R2 兩輪兩家皆判「需修補後派工」）。
+R1 收斂＝`handoffs/reconcile/20260804-govb0-spec-r1/synth.md`（三家戳記 APPROVED，body sha `25e1241f…`）。
+R2 收斂＝`handoffs/reconcile/20260805-govb0-spec-r2/synth.md`（17 findings，`completeness --lock` rc=0）。
+🔴 **R3 起本 SPEC 帶「明確不受理範圍」**（見 §N 末段），依使用者定死「95% 解法就收、殘留具名記錄」，
+以中止 R1→R2 觀察到的 scope-accretion（P0 數未下降）。
 
 **涵蓋票**：`B-15`（gate 判定：2 個誤擋機制 ＋ 2 個 fail-open）／`B-14`（委員不退出）／`B-30`（委員覆蓋自己產出）／`B-32`（stamp prompt 無條件注入）／`B-24`**僅紀律面**。
 **唯一票登記處**：`handoffs/20260801-GOV-AMEND-BACKLOG.md`。
@@ -97,8 +101,16 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   1. **先判定、後記錄**：命中後才以 `grep -Eo` 取命中片段。**取片段的結果不得回饋進判定**。
   2. `match_rule` 的封閉 enum 與 `gate_deny` 的 `required_fields` 寫入 `scripts/audit_events.json`；`gate_check.sh` 只引用，不自列。未知值依該檔既有 `unknown_event_policy` 處理。
   3. **命令欄截斷規則**：存全文 `sha256` ＋ 前 512 位元組。理由：委員 prompt 可達數十 KB；`sha256` 使同一指令可被歸併計數。
-  4. **不變式（`D-3` 收窄後的精確定義）**：**判定行為不變** ＝ 對同一批輸入，改前與改後的 `(rc, kind)` 序列**逐項相等**。
+  4. **不變式（`D-3` 收窄 ＋ `E-7`／`E-8` 分離 baseline）**：**判定行為不變** ＝ 對**語料 A**，Phase 0 改前與改後的 `(rc, kind)` 序列**逐項相等**。
      🔴 **audit 內容本來就會增加欄位，不在本不變式範圍內**（R1 原文「行為逐位元組不變」有歧義，已修正）。
+     🔴 **兩個 baseline 必須分離**（`CODEX-R2-P0-03`／`CODEX-R2-P1-10`：R2 未區分，同一份 snapshot 使兩個驗收互斥）：
+     - **語料 A**（Phase 0 專用，`tests/governance/fixtures/gate_invariance_corpus.txt`）：判定**應完全相同**，比較基準＝Phase 0 改動前後。
+     - **語料 B**（Phase 2 專用，`tests/governance/fixtures/gate_decision_corpus.txt`，見 Task 2.5）：判定**應該改變**，比較基準＝Phase 2 動工前的 `gate_check.sh` 固定 sha snapshot。
+     - 兩份語料檔與兩份 snapshot **各自獨立、不得共用**；測試須斷言兩份語料檔的 sha256 不同且各自入版控。
+  5. **event object contract（`CODEX-R2-P0-03`）**：`scripts/audit_events.json` 須新增
+     `gate_deny` 的 `required_fields_per_event` 條目、`match_rule` 的封閉值集合、以及該欄位在
+     `event_object_allowed_keys` 中的登記。**SPEC 不列舉值**（範本規定），但 TODO 須逐 key 列出待新增項，
+     使實作者不必猜測。驗收＝以 `jq` 從該檔讀出的 key 集合與 `gate_check.sh` 實際寫出的欄位集合**相等**。
 - **驗證（可證偽）**：下列每條皆須落為 `pytest tests/governance/` 斷言，含狀態斷言與 mutation 自證（rc 直接取）
   - `ASSERT bash scripts/gate_check.sh WHEN input=blocked_cmd THEN rc!=0`
   - `ASSERT bash scripts/gate_check.sh WHEN input=allowed_cmd THEN rc=0`
@@ -127,8 +139,11 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   - `ASSERT bash scripts/cx_run.sh WHEN brief_kind=consult THEN rc=0`（且 prompt 不含字串 `RECONCILE-STAMP`）
   - `ASSERT bash scripts/cx_run.sh WHEN brief_kind=stamp THEN rc=0`（且 prompt 含該字串與格式說明）
   - `ASSERT bash scripts/cx_run.sh WHEN brief_kind=unknown THEN rc!=0`
+  - 狀態斷言（**`E-2`：R2 此處只有 rc，缺無副作用證明**）：`brief_kind=unknown` 被拒後，
+    ①**未發 token**（`.claude/gate/` 內無新 token 檔或 mtime 未更新）②**audit 零新增**（該次呼叫前後 `.claude/gate/audit.log` 行數相等）
+    ③**未開債**（`bash scripts/debt_ledger.sh --has-open` 的狀態與呼叫前相同）④**未產生任何 `handoffs/` 檔案**。
   - 狀態斷言：prompt 中的格式說明字串與 `cx_run.sh:345` 正則所接受的樣本**互為可解析**（以一個合法戳記樣本同時通過兩者）。
-  - mutation：還原無條件注入 → `brief_kind=consult` 斷言轉紅；移除 unknown 分支 → 第三條轉紅。
+  - mutation：還原無條件注入 → `brief_kind=consult` 斷言轉紅；移除 unknown 分支 → 第三條與四項無副作用斷言轉紅。
 - **邊界（≥2）**：①`brief-kind` 解析失敗／缺欄 → fail-closed，維持現行拒派行為 ②`brief-kind` 為未知值 → fail-closed（同上，**不再有第三種行為**）。
 - **存活至**：永久。
 - **覆蓋風險**：無。
@@ -145,13 +160,24 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   檔案：`scripts/gate_check.sh`（契約以註解形式寫在判定段上方，並由測試釘死）。
 - 改法：契約須明確定義下列每一項的判定結果，**且每一項都要有對應測試**：
   1. 引號內的 `;` `&` `|` **不作分隔符**；
-  2. `(bash|sh|zsh) -c <引號引數>` 的**引數內容須遞迴套用同一判定**（不得因剝引號而消失）；
-  3. 帶引號的路徑（`"/my dir/codex" exec`）；
-  4. 路徑正規化（`./scripts/cx_run.sh`、`scripts//cx_run.sh`、`scripts/../scripts/cx_run.sh`）；
-  5. 未閉合引號 → **fail-closed**（視為未剝除）。
+  2. **「命令位置」的完整定義**（R3 依 `E-3` 擴充；R2 只列 `^ ; & |`，實測不足）＝
+     行首／`;`／`&`／`|`／`(`／`` ` ``／`$(`／`&&`／`||`／`eval` 之後／`xargs` 之後；
+  3. `(bash|sh|zsh) -c <引號引數>` **與 `eval <引號引數>`** 的引數內容須**遞迴套用同一判定**（不得因剝引號而消失）；
+  4. 帶引號的路徑（`"/my dir/codex" exec`）；
+  5. 路徑正規化（`./scripts/cx_run.sh`、`scripts//cx_run.sh`、`scripts/../scripts/cx_run.sh`）；
+  6. 未閉合引號 → **fail-closed**（視為未剝除）；
+  7. **unquoted `-c` 引數**（`bash -c codex`）→ 依契約定義並測試（`CODEX-R2-P0-04`）；
+  8. **遞迴深度上限**（`bash -c "bash -c 'codex exec x'"`）→ 有上限，**逾限 fail-closed**；
+  9. **跳脫引號**（`"a\"b"`、`'a"b'`）→ 不得因剝除錯誤而放行真派工；
+  10. **heredoc ＋ 引號外分號組合**（`cat <<EOF; codex exec x`）→ 須定義；R2 原型②在此**誤擋**（`COMPOSER-R2-P1-02`）。
+- **參考實作＝原型③**（`handoffs/govb0_probes/b15probe5.sh`，主委實跑 **26/26 全對**）。
+  它已涵蓋第 2、3 項；第 4、5、7、8、9、10 項**尚未在原型中實作**，實作者須補齊並補測試。
+  🔴 **禁止照抄原型即宣稱完成**（`COMPOSER-R2-P1-01`：原型與契約有落差）。
 - **驗證（可證偽）**：下列每條皆須落為 `pytest tests/governance/` 斷言，含狀態斷言與 mutation 自證（rc 直接取）
-  - 狀態斷言：契約 5 項各至少 1 條 TP 與 1 條 TN，**共 ≥10 條**，全部進入 Task 2.5 的 immutable corpus。
-- **邊界（≥2）**：①巢狀 `bash -c "bash -c 'codex exec x'"` → 遞迴深度須有上限且逾限 fail-closed ②跳脫引號（`"a\"b"`）→ 不得因剝除錯誤而放行。
+  - 狀態斷言：契約 **10 項**各至少 1 條 TP 與 1 條 TN，**共 ≥20 條**，全部進入 Task 2.5 的 immutable corpus（語料 B）。
+  - 狀態斷言：對 `handoffs/govb0_probes/b15probe5.sh` 的 26 條既有語料，新實作的判定結果與原型③**逐條相同**（差異須具名說明）。
+  - mutation：契約每一項各自 revert → 對應語料轉為錯誤方向（**10 項各一個 mutation**）。
+- **邊界（≥2）**：見上述契約第 6、8、9、10 項，各自即為邊界情境並已要求測試。
 - **存活至**：永久。
 - **覆蓋風險**：無。
 - 不可做：不得在四個 Task 中各寫一份剝引號邏輯。
@@ -161,12 +187,16 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
 - 目標：引號**內**的分隔符不生效；但 `(bash|sh|zsh) -c` 的引數仍受檢。
   檔案：`scripts/gate_check.sh:86` 判定段（新增前處理）。
 - 改法：依 Task 2.0 契約實作。**純 shell/`sed`，禁 subprocess 呼叫 python**（熱路徑）。
-  參考原型＝`.claude/tmp/b15probe3.sh` 的原型②（主委實跑 9/9 全對）。
+  參考原型＝`handoffs/govb0_probes/b15probe5.sh`（原型③，主委實跑 26/26 全對）。
 - **驗證（可證偽）**：下列每條皆須落為 `pytest tests/governance/` 斷言，含狀態斷言與 mutation 自證（rc 直接取）
   - 狀態斷言：`pgrep -fl 'codex exec|cursor-agent|grok '`、`git commit -m "…; codex closure review…"` 由 BLOCK 轉 ALLOW。
-  - 狀態斷言：`bash -c "codex exec x"`、`sh -c 'grok -m grok-4.5 -p x'`、`bash -c "claude -p x"` **三條皆維持/轉為 BLOCK**。
+  - 狀態斷言（**`E-3`：現行 gate 即已 fail-open，本 Task 一併修**）：
+    `eval "codex exec x"`、`out=$(codex exec x)`、`` out=`codex exec x` ``、`(codex exec x)`、`eval 'grok -m grok-4.5 -p x'`
+    **五條全部由 ALLOW 轉 BLOCK**。
+  - 狀態斷言：`bash -c "codex exec x"`、`sh -c 'grok -m grok-4.5 -p x'`、`bash -c "claude -p x"`、
+    `true && codex exec x`、`false || grok -m x -p y`、`echo x | xargs codex exec` **六條皆 BLOCK**。
   - 狀態斷言：`echo start; grok -m grok-4.5 -p "x"`（引號**外**的分號）維持 BLOCK。
-  - mutation：移除 `-c` 遞迴 → 上述三條 `-c` 語料轉為 ALLOW（**這是 `D-1` 的守護測試**）。
+  - mutation：移除 `-c`／`eval` 遞迴 → 對應語料轉為 ALLOW；縮回 R2 的命令位置定義（僅 `^ ; & |`）→ 上述五條 `E-3` 語料轉回 ALLOW。
 - **邊界（≥2）**：①未閉合引號 → fail-closed ②巢狀／跳脫引號 → 依 Task 2.0 契約 ③`bash -c` 引數不加引號（`bash -c codex`）→ 依契約定義並測試。
 - **存活至**：永久。
 - **覆蓋風險**：無。
@@ -181,7 +211,11 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   - 狀態斷言：`head -3 /private/tmp/claude-501/x.output; git rev-parse --short HEAD`、`cat .claude/tmp/x.txt; git rev-parse HEAD`、`ls /private/tmp/claude-501/; git status --porcelain`、`find .claude/tmp -name "*.md" -print` **四條全由 BLOCK 轉 ALLOW**。
   - 狀態斷言：`claude -p "x"`、`claude --print "x"` 維持 BLOCK。
   - 狀態斷言（**修 fail-open**）：`cat x | claude -p "y"` 由 **ALLOW 轉 BLOCK**。
-  - mutation：還原子字串比對 → 前四條轉回 BLOCK、fail-open 條轉回 ALLOW。
+  - 狀態斷言（🔴 **防 R2 設計造成的回歸**）：`v=$(claude -p "hi")` 與 `/usr/local/bin/claude --print "x"` **兩條須 BLOCK**。
+    R2 把 `claude` 收窄到命令位置後，命令替換形態**由 BLOCK 退化為 ALLOW**（現行 gate 靠子字串偶然擋住）——
+    此為 `E-3` 實測發現，須由 Task 2.0 契約第 2 項（命令位置含 `$(`）承接。
+  - mutation：還原子字串比對 → 前四條轉回 BLOCK、fail-open 條轉回 ALLOW；
+    自命令位置定義中移除 `$(` → 回歸守護條轉為 ALLOW。
 - **邊界（≥2）**：①`claude` 在檔名中段（`my-claude-notes.md`）→ ALLOW ②絕對路徑（`/usr/local/bin/claude -p x`）→ BLOCK ③`-p` 為他人旗標（`grep -p`）且無 `claude` → ALLOW。
 - **存活至**：永久。
 - **覆蓋風險**：無。
@@ -266,6 +300,10 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   3. **啟動前檢查**：確認 final path 的 marker 不存在；若存在 stale `<out>` → **拒絕啟動或明確標記為 stale**，不得沿用（`CODEX-R1-P0-03`：舊 `<out>` 會被誤當本輪 terminal marker）。
   4. **publish 條件**：CLI 返回 rc=0 → 先 flush/fsync → 跑格式檢查 → 通過才原子 publish（rename）。**不通過則保留 attempt 檔並記 `format-failed`**（產出不消失，供人工檢視）。
   5. **terminal marker ≠ 檔案存在**：marker 為「本 attempt 的 publish 已完成」，須可由 audit 與檔案系統雙向確認（attempt id 綁定）。
+     🔴 **明確不受理（`E-SCOPE`／`CODEX-R2-P0-01`）**：本 marker **不保證內容完整**——
+     一份中途截斷但恰好最後一條 finding 格式完整的產出，仍會通過格式檢查並被 publish。
+     可靠的截斷偵測需委員端產生 expected manifest（**跨越本批元件邊界**），已開 `票 B-35 GOV-OUTPUT-TRUNCATION-ORACLE`。
+     本 Task 解掉的是 stale `<out>` 誤判、委員覆蓋自產（`B-30`）、未完成即上架**三種**失效模式；截斷是第四種，本批不解。
   6. **`B-30` 回歸**：委員若誤寫 attempt 檔，最終以 publish 為準；另加**大小回歸偵測**（曾非空後歸零 → 記警示）。
 - **驗證（可證偽）**：下列每條皆須落為 `pytest tests/governance/` 斷言，含狀態斷言與 mutation 自證（rc 直接取）
   - 狀態斷言：CLI 執行期間 `<out>` **不存在**、attempt 檔存在；正常結束後 `<out>` 存在且 attempt 檔已清除。
@@ -273,8 +311,14 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   - 狀態斷言（**stale 防護**）：預先放置一個舊 `<out>`，CLI 逾時未 publish ⇒ **不得**判 `success`；audit 須顯示該 `<out>` 非本 attempt。
   - 狀態斷言（**`B-30` 回歸**）：以「寫入 → 清空 → 重寫」序列模擬 codex 事故，最終 `<out>` 等於最後一次寫入，且警示已記入 audit。
   - 狀態斷言（**prompt 對齊**）：`cx_run.sh` 產生的 prompt 內產出路徑 == wrapper 實際期待的 attempt 路徑（**同一來源，測試比對兩者字串相等**）。
-  - 狀態斷言（**並發**）：同一 `<out>` 併發兩次派工 ⇒ 兩個 attempt 各自獨立，**成功產出不得遺失**；audit 兩筆皆在。
-    🔴 R1 原文以「後者覆蓋前者」為通過條件，`CODEX-R1-P0-03` 指出會丟失成功產出 ⇒ **已改為兩者皆須保留可追溯**。
+  - 狀態斷言（**並發 — R3 改設計**）：同一 `<out>` 已有進行中的 attempt 時，第二次派工**直接拒絕啟動**（rc≠0）並記 audit；
+    第一個 attempt 不受影響、正常 publish。
+    🔴 演進紀錄：R1 寫「後者覆蓋前者」（`CODEX-R1-P0-03` 指出會丟失成功產出）→ R2 改「兩者皆須保留可追溯」
+    （`CODEX-R2-P0-02` 指出與單一 final `<out>` 的資料模型不相容，無可執行取勝規則）→ **R3 改為序列化拒絕**。
+    理由：委員派工本就不應對同一產出路徑並發；**拒絕比仲裁簡單，且不丟資料**。
+  - 狀態斷言（**publish 與 timeout 的順序契約，`E-9`／`CODEX-R2-P1-08`**）：
+    `format check` 與 `publish` **均在 CLI wait 返回之後**由 wrapper 執行；**timeout 只涵蓋 CLI process-group 區間，不涵蓋 publish 階段**。
+    ⇒ CLI 已返回但 publish 進行中時**不得**被 timeout 判 `failed`；`result_state` 每個 attempt **恰寫一筆**（測試須斷言 audit 中該 attempt id 的 `committee_family_result` 計數 == 1）。
   - mutation：移除 publish 改為直接寫 `<out>` → 前三條轉紅；移除 prompt 對齊 → prompt 對齊斷言轉紅。
 - **邊界（≥2）**：①CLI 被 SIGKILL → attempt 檔殘留、`<out>` 不存在 ⇒ 判 `failed`，**不得因 attempt 檔格式合格而 publish** ②跨裝置 rename 失敗 → fail-closed 並明確報錯 ③attempt 檔在 publish 瞬間被外部刪除 → fail-closed。
 - **存活至**：永久。
@@ -289,7 +333,14 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   1. **主 timeout 在 `cx_run.sh`**：涵蓋區間＝**CLI process-group launch → return/kill**（兩家一致），逾時終止該進程群組（避免孤兒）。
   2. **外層安全閥在 `committee_run.sh`**：上限略大於主 timeout；只在主 timeout 失效時作用。
   3. **逾時後判定**：本 attempt 已 publish → 依格式檢查落 `success`／`format-failed`；未 publish → **`failed`**。**不新增第四個 `result_state` 值**（SoT 見 `scripts/audit_events.json`）。
-  4. **值**：暫定 codex 50m／grok 70m／composer 75m、外層 90m（§A `OPEN-1`）。**TODO 生成前須以 Task 3.1 的真實 duration 重算並定稿**；須可由環境變數覆寫以利測試。
+  4. **值與定稿門檻（`E-10`，R3 補上；R2 只說「須重算」未給可執行門檻）**：
+     暫定 codex 50m／grok 70m／composer 75m、外層 90m（§A `OPEN-1`）。定稿規則＝
+     ①Task 3.1 上線後，**每家族累積 ≥20 筆** `committee_family_result` 且 `result_state=success`、含 duration 三欄；
+     ②取各家族 `max(duration)` 與 `P99(duration)`（**單調時鐘欄位，非 runlog proxy**）；
+     ③`timeout_family = ceil(max(max, P99 × 1.25))`；外層 `= max(family_timeouts) + 15m`；
+     ④**任一家族 <10 筆 ⇒ TODO 只能沿用暫定值並逐行標 `PROVISIONAL`**；
+     ⑤歷史 runlog proxy（n=462）僅作 sanity check，**不可替代** Task 3.1 欄位。
+     須可由環境變數覆寫以利測試。
 - **驗證（可證偽）**：下列每條皆須落為 `pytest tests/governance/` 斷言，含狀態斷言與 mutation 自證（rc 直接取）
   - `ASSERT bash scripts/cx_run.sh WHEN cli=hang timeout_sec=1 THEN rc!=0`
   - 狀態斷言：上述情境 audit 的 `result_state` 為 `failed`，且 `<out>` 不存在、attempt 檔存在。
@@ -304,11 +355,16 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
 
 ## §V 驗證策略與邊界測試目錄
 
-- **mutation 條件**：RISK-HIT 為 `b,c`；全部 10 個 Task 皆宣稱「驗證判定正確性」 ⇒ **mutation 必附**，逐 Task 已列出，全部落為 `pytest tests/governance/` 斷言。設計依 `docs/TEST_DESIGN_CHARTER.md`。
+- **mutation 條件**：RISK-HIT 為 `b,c`；**全部 11 個 Task**（`0.1`／`1.1`／`2.0`／`2.1`／`2.2`／`2.3`／`2.4`／`2.5`／`3.1`／`3.2`／`3.3`）皆宣稱「驗證判定正確性」 ⇒ **mutation 必附**，逐 Task 已列出，全部落為 `pytest tests/governance/` 斷言。設計依 `docs/TEST_DESIGN_CHARTER.md`。
+  🔴 **本行數字須與 `grep -c '^\*\*Task ' docs/GOVB0_FRICTION_SPEC.md` 相等**；R2 曾寫 10 而實為 11（`CODEX-R2-P0-05` 抓出），與 `票 B-17`「手寫的機器依賴表必漂」同型。**code review 須機械核對本行。**
 - **測試層級**：單元（正則判定／prompt 生成）＋整合（`cx_run.sh` 端到端一次真實派工）＋邊界。全部可 `pytest tests/governance/...` 獨立跑，不需 `run_api.py`。
 - **`票 B-24` 紀律面（本批交付物之一，零新增元件）**：
-  **本 SPEC 每個 Task 的「驗證」欄皆已寫成狀態斷言**（斷言的是**執行後的狀態**：檔案存在/不存在、序列相等、集合包含、欄位值屬 SoT 集合、sha256 一致），**而非「某腳本 rc=0」**。
-  本批 TODO 須逐條沿用；code review 須逐條檢查是否有退化為 rc 斷言者。
+  **規範性驗收（normative acceptance）一律為執行後狀態斷言**——檔案存在/不存在、序列逐項相等、集合包含關係、欄位值屬 SoT 集合、sha256 一致。
+  **`rc` 只能作為輔助護欄（process guard），不得單獨構成驗收。**
+  🔴 **R2 曾寫「每一條驗證皆非腳本 rc」，該敘述不實**（`CODEX-R2-P1-09`／`COMPOSER-R2-P2-01` 具名 `Task 0.1`／`1.1`／`2.5`／`3.3` 仍有 `ASSERT … rc`）。
+  現行規則：`ASSERT … THEN rc=…` 為**範本規定的固定文法**（見 `templates/SPEC_TEMPLATE.md:26-34`），保留；
+  但**每一條 `ASSERT … rc` 都必須有同 Task 內的對應狀態斷言**，否則不成立。
+  本批 TODO 須逐條沿用；**code review 須逐條檢查「有 rc 斷言但無對應狀態斷言」者**。
 - **防假綠**：
   - 禁改檢查器或加排除清單換綠；禁恆真斷言；禁弱化既有斷言。
   - **每個新測試須 mutation 自證**：revert 修法 → 該測試轉紅，並貼實跑 rc。
@@ -331,4 +387,19 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
 - **§G Golden / Baseline：N/A** — 本批不碰數值正確性、特徵計算、ML 或回測路徑。RISK-HIT 為 `b,c`，不含 (a)／(d)。
   **替代保證**＝Phase 0 的判定行為不變證明（`(rc, kind)` 序列逐項相等）＋ Task 2.5 綁 sha256 的 immutable corpus 差集報表——兩者共同扮演本批的 baseline。
 - **§A 待使用者確認：無** — 使用者 2026-08-04 明示技術取捨交委員裁決。三項 `OPEN` 已由 R1 審查裁定，裁定內容與條件已寫入 §A。
+- 🔴 **本批明確不受理範圍（R3 新增；依使用者定死「沒 100% 解就做 95% 那版現在收，殘留具名記錄不當阻塞」）**
+  收斂趨勢警訊：R1 19 條（5 P0）→ R2 17 條（7 P0），**P0 未下降**，命中 `docs/SCAR_LEDGER.md` 記載的
+  P16 scope-accretion 失敗模式（每輪修訂新增機制，審查者在新機制上再找缺口，八輪卡在 20-25 findings）。
+  故本批**逐項宣告不受理**，並各自具名殘留：
+
+  | 不受理項 | 來源 finding | 殘留處置 |
+  |---|---|---|
+  | **產出截斷偵測 oracle**（expected manifest／record count／byte digest） | `CODEX-R2-P0-01`／`CODEX-R1-P0-04`／`GROK-R1-P1-01` | **`票 B-35 GOV-OUTPUT-TRUNCATION-ORACLE`**；`票 B-14` 須標「截斷偵測未解」 |
+  | **`B-34` 語意閉合**（stamp roster vs 角色閘） | `CODEX-R2-P0-06`／`COMPOSER-R2-P1-03` | **`票 B-34`**；本批僅用權宜第三方戳記並明文標註 |
+  | **`B-24` 機械強制面** | `COMPOSER-R2-P2-02` | R1 `D-6` 已裁 SPLIT；**TODO §0 須強制標「`B-24` 部分完成」**，code review 不得宣稱 `B-24` 全綠 |
+  | **`B-15` FP-2 定位** | R1 `OPEN-3` | 已定補查條件（Phase 0 後 ≥200 筆 `gate_deny` 或 ≥30 日） |
+  | **locale 相依守衛** | R1 `D-8`／`COMPOSER-R1-P1-03`／`CODEX-R1-P0-07` | **`票 B-33`**；TODO §0 須列為已知 MAJOR 債 |
+
+  🔴 **後續審查輪處置規則**：委員若再提上述任一議題，請標 `OUT-OF-SCOPE` 並附「不做會怎樣」的具體失效場景，
+  **不作為 BLOCKING**。**例外**：若能證明不做會使**本批交付物本身失效**（而非只是不夠完美），仍可 BLOCKING，但須寫明失效路徑。
 - **原 Phase 4（`B-24` 機械強制面）：移出本批** — 依 `D-6` SPLIT 裁決，理由與 grandfather 三要件（具名 owner／UTC 到期日／到期後 fail-closed 行為）已記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md` 的「`票 B-24` 的拆分裁決」節，不隨拆分遺失。

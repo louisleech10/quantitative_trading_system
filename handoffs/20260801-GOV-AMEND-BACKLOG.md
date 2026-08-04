@@ -356,6 +356,13 @@ grok 17:29／composer 17:31／codex 17:44——**審查 18 分鐘內全部完成
 ②之後任一處出現 `-p` 子字串（`rev-parse`／`--porcelain`／`-print`，**不必是旗標**）③兩者間無 `|`。
 現場事故（2026-08-04 22:5x，主委查 push 結果）：
 `head -3 "/private/tmp/claude-501/…/x.output"; git rev-parse --short origin/main` → **BLOCKED**。
+
+🔴 **2026-08-05 00:21 第二次現場事故——觸發點是「目錄名」**：
+`mkdir -p handoffs/govb0-probes; cp .claude/tmp/b15probe.sh … handoffs/govb0-probes/` → **BLOCKED**。
+命中路徑＝`.claude`（scratchpad 路徑）＋ `govb0-`**`p`**`robes` 這個**目錄名裡的 `-p`**。
+改成底線 `govb0_probes` 後同一條指令立即通過。
+⇒ **連「取什麼檔名」都會影響指令會不會被擋**，且沒有任何提示指出真正原因。
+本 session 至此 `B-15` 已咬 **6 次**（主委 5 次＋委員探針 1 次）。
 ⇒ **凡碰治理目錄的唯讀指令都在擲骰子**；「加管線就過」使它看似隨機，長期被誤判為環境問題。
 🔴 **洞 B 同時是 fail-open**：`[^|]` 不跨管線 ⇒ `cat brief.md | claude -p "…"` **不會被擋**。
 
@@ -1172,6 +1179,46 @@ composer **連續兩次** `result_state=format-failed`，兩次都是同一個 `
 ### 狀態
 
 **2026-08-04 開票，未實作。排第 1 批之後**（兩家一致：本批不併入，但不可無票放置）。
+
+## B-35 票 `GOV-OUTPUT-TRUNCATION-ORACLE`
+
+**沒有任何機制能判斷委員產出是否「寫完整了」——只能判斷「格式合不合規」。
+一份中途被截斷、但恰好最後一條 finding 格式完整的檔案，會通過所有現有檢查。**
+
+**開票依據**：第 0 批 SPEC 審查 `CODEX-R2-P0-01`（BLOCKING）＋ R1 `CODEX-R1-P0-04`／`GROK-R1-P1-01`。
+**本批明文不受理**（見 `handoffs/reconcile/20260805-govb0-spec-r2/synth.md` 的 `E-SCOPE`），理由與殘留如下。
+
+### 碼證
+
+`scripts/completeness_check.sh:1459-1472` 的 `--single` 只驗 canonical ID、同檔重複 ID、finding body、
+P0/P1 digest；**不驗** producer 是否正常結束、EOF／terminal marker、預期 finding 數、attempt identity。
+codex R1 實跑：把真實 handoff 截成 6 行、保留一個完整 finding body ⇒ `COMPLETENESS PASS(single)`、`CHECK_RC=0`。
+
+### 為何本批不受理（不是不重要，是邊界問題）
+
+1. 可靠的截斷偵測需要**委員端在寫檔時產生 expected manifest**（預期 finding 數／record count／byte digest），
+   **跨越第 0 批的元件邊界**（第 0 批只改 harness 端）。
+2. `票 B-14` 的原始病是「**寫完了但不退出**」。第 0 批的 attempt-scoped publish 已解掉
+   stale `<out>` 誤判、委員覆蓋自產（`B-30`）、未完成即上架三種失效模式；**截斷是第四種，且至今未曾實際致害**。
+3. 依使用者定死「沒 100% 解就做 95% 那版現在收，殘留具名記錄」。
+
+### 修法方向（未定案）
+
+- ① 委員端在 prompt 中被要求先宣告預期 finding 數，harness 交件時比對；
+- ② producer 寫完後產生 sidecar（byte count ＋ sha256），publish 前比對；
+- ③ 以 `STATUS: DONE` 之類的終止標記為必要條件（**現行部分委員已自發輸出，但無強制**）。
+  🔴 ③最便宜但可被截斷後偽造（若 `STATUS: DONE` 恰好在保留段內），須與 ①②併用。
+
+### 與既有票的關係
+
+- **`B-14`**：本票是其未解殘留；`B-14` 票面須標「**截斷偵測未解，見 B-35**」。
+- **`B-31`**（format-failed 無便宜修正路徑）：同族——交件品質判定的粒度不足。
+
+### 狀態
+
+**2026-08-05 開票，未實作。第 0 批明文不受理，排 `B-14` 完工後。**
+
+---
 
 ## B-34 票 `GOV-STAMP-ROSTER-VS-ROLEGATE`
 
