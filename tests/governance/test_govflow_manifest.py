@@ -137,9 +137,11 @@ def test_t0_b1_c_missing_listed() -> None:
     proc = _run_gen(REPO_ROOT)
     assert proc.returncode == 0, proc.stderr
     rows = _manifest_rows(proc.stdout)
-    # _role_gate.sh 尚未建立（Phase 3）→ 必須列出且 MISSING
-    hit = [r for r in rows if r.startswith("scripts/_role_gate.sh|")]
-    assert len(hit) == 1, f"C 類 _role_gate.sh 必須列出: {hit}"
+    # C 類缺檔探針：Phase 4 的 test_claimcheck_verbatim_exempt.py 尚未建立 → MISSING。
+    # （舊契約鎖 scripts/_role_gate.sh MISSING；B3 已建立該檔，改鎖仍缺的 C 類檔。
+    #   語意不變＝「C 類缺檔標 MISSING 而非跳過」。）
+    hit = [r for r in rows if r.startswith("tests/governance/test_claimcheck_verbatim_exempt.py|")]
+    assert len(hit) == 1, f"C 類 claimcheck 測試必須列出: {hit}"
     parts = hit[0].split("|")
     assert parts[3] == "MISSING", f"缺檔應標 MISSING，得 {parts[3]}"
 
@@ -550,10 +552,10 @@ def test_t0_c4_nodeid_contract() -> None:
         f"T0-C4: present .py 的 nodeid 應為 path，得 {p_parts[2]!r}"
     )
 
-    # C 類尚未建立的測試檔（B2 已交付 test_result_state_format_failed.py ⇒
-    # 探針改指仍 MISSING 的 Phase 3 檔；契約不變：MISSING C ⇒ nodeid == '-'）
+    # C 類尚未建立的測試檔（B3 已交付 test_rolegate_predispatch.py ⇒
+    # 探針改指仍 MISSING 的 Phase 4 檔；契約不變：MISSING C ⇒ nodeid == '-'）
     # 非放寬斷言——仍鎖「至少一個 MISSING C 的 nodeid == '-'」。
-    missing_c = "tests/governance/test_rolegate_predispatch.py"
+    missing_c = "tests/governance/test_claimcheck_verbatim_exempt.py"
     assert missing_c in by_path, f"manifest 缺 MISSING C 項: {missing_c}"
     m_parts = by_path[missing_c]
     assert len(m_parts) == 4, m_parts

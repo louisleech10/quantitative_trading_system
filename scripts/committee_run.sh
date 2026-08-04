@@ -120,6 +120,14 @@ for _a in "${gate_args[@]}"; do
 done
 [ -n "${task_id}" ] || { echo "ERROR: gate flags 缺 --task-id（開債必填；請在 -- 之後加上 --task-id <id>）" >&2; exit 2; }
 
+# ---------------------------------------------------------------------------
+# GOVFLOW Task 3.1 / R8 移交：task_id 白名單須在 gate.sh dispatch **之前**
+# （與 cx_run 第⑦道同一 regex；SSOT＝scripts/_role_gate.sh）。
+# 非法非空 task_id 若過 gate 再開債 → 留下無 family result 的 OPEN 債 → 全域阻塞。
+# 不通過 ⇒ exit 2，不發 token、不開債、不派工，audit 真正零新增。
+# ---------------------------------------------------------------------------
+bash "${SCRIPT_DIR}/_role_gate.sh" check-task-id "${task_id}" || exit 2
+
 # --- 家族驗證(對 SoT,非硬編) ---
 # shellcheck source=/dev/null
 . "${SCRIPT_DIR}/governance_families.sh" || { echo "ERROR: 無法載入 family SoT(fail-closed)" >&2; exit 1; }
@@ -139,6 +147,16 @@ for f in ${fams}; do
   n_fams=$((n_fams + 1))
 done
 [ "${n_fams}" -ge 1 ] || { echo "ERROR: 家族清單為空" >&2; exit 2; }
+
+# ---------------------------------------------------------------------------
+# GOVFLOW Task 3.1 / A-3：角色 preflight 前移到 gate.sh dispatch **之前**
+# 呼叫共用 _role_gate.sh（與 cx_run 同一份）；任一家族不相容 ⇒ 整批拒、audit 零新增。
+# ---------------------------------------------------------------------------
+echo "[committee_run] === role gate preflight (before gate.sh dispatch) ==="
+bash "${SCRIPT_DIR}/_role_gate.sh" check-families "${brief}" "${fams_csv}" || {
+  echo "ERROR: 角色閘拒派 → 不發 token、不開債、不派工(fail-closed；audit 零新增)" >&2
+  exit 2
+}
 
 echo "[committee_run] session=${session} brief=${brief}  families=${fams_csv}(${n_fams} 家)  out=${out_prefix}-<family>.md"
 

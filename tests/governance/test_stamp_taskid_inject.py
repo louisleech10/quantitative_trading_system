@@ -49,6 +49,8 @@ _SCRIPT_NAMES = (
     # ⚠️ 本 session 第 5 次「新增依賴 → 某份 fixture 清單漏了它」＝票 GOV-TESTHARNESS-SCRIPTLIST-SSOT。
     "completeness_check.sh",
     "governance_families.sh",
+    # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT（cx_run / committee_run 共用）
+    "_role_gate.sh",
 )
 
 
@@ -1435,7 +1437,12 @@ def test_mutation_v1_without_inject_turns_red(
 
 
 def _neuter_taskid_precheck(text: str) -> str:
-    """V2/V3 共用：閹割第⑦道 task_id 缺/空/白名單前置。"""
+    """V2/V3 共用：閹割第⑦道 task_id 缺/空前置。
+
+    GOVFLOW-B3：字元白名單已抽到 ``_role_gate.sh``（SSOT）；本錨點只涵蓋
+    Python 內缺/空/型別檢查。白名單另由 ``check-task-id`` 在捕獲後執行，
+    合法 fallback 可通過白名單，故本 mutation 仍只證「缺/空被放行」。
+    """
     old = (
         'task_id = open_ev.get("task_id")\n'
         'if task_id is None or (isinstance(task_id, str) and task_id == ""):\n'
@@ -1443,13 +1450,6 @@ def _neuter_taskid_precheck(text: str) -> str:
         "    sys.exit(1)\n"
         "if not isinstance(task_id, str):\n"
         '    print(f"ERROR: open_ev.task_id 型別非法: {type(task_id).__name__}", file=sys.stderr)\n'
-        "    sys.exit(1)\n"
-        "# 白名單：擋 ERE 來源污染；`.` 等仍合法者於 grep 內插前再逐字跳脫\n"
-        'if re.fullmatch(r"[A-Za-z0-9._-]+", task_id) is None:\n'
-        "    print(\n"
-        '        f"ERROR: open_ev.task_id 不符合白名單 ^[A-Za-z0-9._-]+$（第⑦道前置，拒派）: {task_id!r}",\n'
-        "        file=sys.stderr,\n"
-        "    )\n"
         "    sys.exit(1)\n"
         "print(task_id)\n"
     )
@@ -1614,11 +1614,21 @@ def test_mutation_committee_partial_check_reopens_orphan_debt(
         old = 'bash "${SCRIPT_DIR}/brief_conformance_check.sh" "${brief}" || exit $?'
         assert old in text, "committee_run 未呼叫 brief_conformance_check（錨點不存在）"
         # 修法前的等效行為：只驗有沒有 brief-kind 行
-        return text.replace(
+        t = text.replace(
             old,
             'grep -qE \'^brief-kind:\' "${brief}" || exit 2  # MUTATED: 只驗 kind',
             1,
         )
+        # GOVFLOW-B3：_role_gate 會再跑完整 brief_conformance --emit，須一併跳過
+        # 才能重現「只驗 kind → 孤兒 OPEN 債」的歷史病根。
+        rg = (
+            'bash "${SCRIPT_DIR}/_role_gate.sh" check-families "${brief}" "${fams_csv}" || {\n'
+            '  echo "ERROR: 角色閘拒派 → 不發 token、不開債、不派工(fail-closed；audit 零新增)" >&2\n'
+            "  exit 2\n"
+            "}"
+        )
+        assert rg in t, "role gate preflight anchor missing（B3）"
+        return t.replace(rg, "true  # MUTATED: skip role gate for partial-check proof", 1)
 
     _mutate_committee(h, partial_check)
     (h["handoffs"] / "brief.md").write_text(
@@ -1643,7 +1653,20 @@ def test_mutation_v4_move_after_gate_adds_audit(
         )
         end = text.find("# task_id 從透傳 gate argv 解析")
         assert start != -1 and end != -1 and start < end, "V4 committee anchor missing"
-        return text[:start] + text[end:]
+        t = text[:start] + text[end:]
+        # GOVFLOW-B3：角色閘與 task_id 白名單亦在 gate 前；V4 語意＝刪光 gate 前檢查
+        rg = (
+            'bash "${SCRIPT_DIR}/_role_gate.sh" check-families "${brief}" "${fams_csv}" || {\n'
+            '  echo "ERROR: 角色閘拒派 → 不發 token、不開債、不派工(fail-closed；audit 零新增)" >&2\n'
+            "  exit 2\n"
+            "}"
+        )
+        if rg in t:
+            t = t.replace(rg, "true  # MUTATED V4: skip role gate", 1)
+        tid = 'bash "${SCRIPT_DIR}/_role_gate.sh" check-task-id "${task_id}" || exit 2'
+        if tid in t:
+            t = t.replace(tid, "true  # MUTATED V4: skip task-id whitelist", 1)
+        return t
 
     _mutate_committee(h, strip_pre_gate)
     _write_brief(h, stamp_target=None, name="brief.md")
@@ -2368,6 +2391,19 @@ def test_mutation_v18_skip_missing_kind_turns_red(
         return t
 
     _mutate_brief_conformance(h, drop_kind_guards)
+
+    def skip_role_gate_for_v18(text: str) -> str:
+        # B3：role gate 對空 kind fail-closed；本 MUT 只證 brief_conformance 缺欄守衛
+        rg = (
+            'bash "${SCRIPT_DIR}/_role_gate.sh" check-families "${brief}" "${fams_csv}" || {\n'
+            '  echo "ERROR: 角色閘拒派 → 不發 token、不開債、不派工(fail-closed；audit 零新增)" >&2\n'
+            "  exit 2\n"
+            "}"
+        )
+        assert rg in text, "V18 role gate anchor missing"
+        return text.replace(rg, "true  # MUTATED V18: skip role gate", 1)
+
+    _mutate_committee(h, skip_role_gate_for_v18)
     (h["handoffs"] / "brief.md").write_text(
         "stamp-target: handoffs/target.md\n\nstub missing kind\n",
         encoding="utf-8",
@@ -2459,6 +2495,19 @@ def test_mutation_v20_drop_unknown_case_turns_red(
         return text.replace(_CR_BK_UNKNOWN_CASE, "  # MUTATED unknown case\n", 1)
 
     _mutate_brief_conformance(h, drop_unknown)
+
+    def skip_role_gate_for_v20(text: str) -> str:
+        # B3：未知 kind 亦被 role gate fail-closed；本 MUT 只證 brief_conformance unknown case
+        rg = (
+            'bash "${SCRIPT_DIR}/_role_gate.sh" check-families "${brief}" "${fams_csv}" || {\n'
+            '  echo "ERROR: 角色閘拒派 → 不發 token、不開債、不派工(fail-closed；audit 零新增)" >&2\n'
+            "  exit 2\n"
+            "}"
+        )
+        assert rg in text, "V20 role gate anchor missing"
+        return text.replace(rg, "true  # MUTATED V20: skip role gate", 1)
+
+    _mutate_committee(h, skip_role_gate_for_v20)
     (h["handoffs"] / "brief.md").write_text(
         "brief-kind: evilstamp\nstamp-target: handoffs/target.md\n\nstub\n",
         encoding="utf-8",
@@ -2495,6 +2544,18 @@ def test_mutation_v21_drop_unknown_case_turns_red(
         return text.replace(_CR_BK_UNKNOWN_CASE, "  # MUTATED unknown case\n", 1)
 
     _mutate_brief_conformance(h, drop_unknown)
+
+    def skip_role_gate_for_v21(text: str) -> str:
+        rg = (
+            'bash "${SCRIPT_DIR}/_role_gate.sh" check-families "${brief}" "${fams_csv}" || {\n'
+            '  echo "ERROR: 角色閘拒派 → 不發 token、不開債、不派工(fail-closed；audit 零新增)" >&2\n'
+            "  exit 2\n"
+            "}"
+        )
+        assert rg in text, "V21 role gate anchor missing"
+        return text.replace(rg, "true  # MUTATED V21: skip role gate", 1)
+
+    _mutate_committee(h, skip_role_gate_for_v21)
     (h["handoffs"] / "brief.md").write_text(
         "brief-kind: bogus\nstamp-target: handoffs/target.md\n\nstub\n",
         encoding="utf-8",

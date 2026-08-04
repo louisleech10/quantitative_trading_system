@@ -79,6 +79,8 @@ def _harness(tmp_path: Path, *, kind: str = "review") -> dict:
         "debt_clear.sh",
         "debt_ledger.sh",
         "_debt_ledger_core.py",
+        # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT
+        "_role_gate.sh",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():

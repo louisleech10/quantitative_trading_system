@@ -51,47 +51,13 @@ stamp_target="$(sed -n '2p' "${_bc_kv}")"
 # 事故:2026-07-24 與 2026-07-29 連續兩次,把實作派給 reviewer、把 implementer 排進
 #   code review(違反實作者不自審)。**兩次 ORCH §1 與記憶檔都寫對了**——散文規則擋不住,
 #   故做成閘門。角色 SoT = scripts/governance_roles.json,**只有使用者可改**。
-# 規則:impl → 家族須 == implementer。**implementer_backup 不自動放行**(僅供錯誤訊息提示);
-#      切換實作端一律由使用者改 SoT(bash scripts/set_roles.sh <family>),不是 Claude 選備援。
-#      (CODEX-R5-P1-02:本註解原寫「或 implementer_backup」,與下方程式碼及 SoT 相反)
-#      review → 家族【不得】是 implementer(實作者不自審);closure/stamp/consult 不限(三家全員)
-# fail-closed:SoT 缺檔/壞 JSON/缺鍵 → 拒派。
+#
+# GOVFLOW Task 3.1：實作抽到 scripts/_role_gate.sh（與 committee_run 共用同一份）。
+# 🔴 **前移是早退，不是搬走**——本處呼叫必須保留（直呼 cx_run 仍拒派）。
+# 以 subprocess 呼叫（非 source），避免覆寫本檔檔頭唯一 EXIT trap。
+# 未知家族（非 review_families）由 _role_gate known_only 模式跳過 → 交給檔尾 dispatch。
 # ---------------------------------------------------------------------------
-_ROLES="$(dirname "$0")/governance_roles.json"
-# ⚠️ 家族不在 SoT 時【跳過角色閘】,交給檔尾 dispatch case 的 `*)` 分支去報錯。
-#    理由(2026-07-29 實測):角色閘若搶先判非法家族,會把 `notafamily` 報成「角色不符」——
-#    既誤導,又弄壞 test_impl_kind_not_required_to_have_finding_clauses。
-#    另:**不得**在此另寫一份家族清單(憲法禁寫死;且會搶走 test_consumer_family_list_matches_sot
-#    釘選的那一行,導致抽出空集合誤判漂移)。故用 SoT 函式庫判定,不列清單。
-#    ⚠️ 連【註解】都不可出現該測試釘選的字樣——起草者已因此踩坑兩次(訊息一次、註解一次)。
-. "$(dirname "$0")/governance_families.sh" 2>/dev/null || true
-_KNOWN_FAM="$(families_get review_families '|' 2>/dev/null || echo '')"
-_fam_known=0
-[ -n "${_KNOWN_FAM}" ] && printf '%s' "${fam}" | grep -qE "^(${_KNOWN_FAM})$" && _fam_known=1
-
-if [ "${_fam_known}" = "1" ] && { [ "${_bk}" = "impl" ] || [ "${_bk}" = "review" ]; }; then
-  [ -f "${_ROLES}" ] || { echo "ERROR: 角色 SoT 缺檔: ${_ROLES}(fail-closed)"; exit 2; }
-  _impl="$(python3 -c "import json,sys;d=json.load(open('${_ROLES}'));print(d['implementer'])" 2>/dev/null)"
-  _bkup="$(python3 -c "import json,sys;d=json.load(open('${_ROLES}'));print(d.get('implementer_backup',''))" 2>/dev/null)"
-  _revs="$(python3 -c "import json,sys;d=json.load(open('${_ROLES}'));print(' '.join(d['reviewers']))" 2>/dev/null)"
-  [ -n "${_impl}" ] && [ -n "${_revs}" ] || { echo "ERROR: 角色 SoT 解析失敗或缺鍵(fail-closed): ${_ROLES}"; exit 2; }
-
-  # ⚠️ implementer_backup 【不】自動放行(僅供錯誤訊息提示)。
-  #    使用者原話:「Grok 或 Codex 實作是我指定,你只能遵守,不能變更,我會根據額度調配」
-  #    ⇒ 切換實作端 = 使用者改 SoT 的 implementer 欄,不是由 Claude 選備援。
-  #    (本 oracle 首跑即抓到:若允許 backup,等同放行 2026-07-29 我犯的那個錯)
-  if [ "${_bk}" = "impl" ] && [ "${fam}" != "${_impl}" ]; then
-    echo "ERROR: 角色不符 — brief-kind=impl 的實作端須為 '${_impl}',但收到 '${fam}'。"
-    echo "  角色 SoT: ${_ROLES}(**只有使用者可改**;Claude 不得自行變更,備援 '${_bkup}' 亦不自動放行)"
-    echo "  若使用者本次指定改由 '${fam}' 實作,請【請使用者先更新該檔的 implementer 欄】再派工。"
-    exit 2
-  fi
-  if [ "${_bk}" = "review" ] && [ "${fam}" = "${_impl}" ]; then
-    echo "ERROR: 角色不符 — '${fam}' 是現行 implementer,不得擔任 code review(實作者不自審)。"
-    echo "  現行 reviewers: ${_revs}　角色 SoT: ${_ROLES}"
-    exit 2
-  fi
-fi
+bash "${SCRIPT_DIR}/_role_gate.sh" check-family "${brief}" "${fam}" --kind "${_bk}" || exit $?
 
 case "${out}" in handoffs/*) : ;; *) echo "ERROR: output 須在 handoffs/: ${out}"; exit 2 ;; esac
 
@@ -261,19 +227,14 @@ if results:
 
 # 第⑦道前置：open_ev.task_id 必填且非空（GOV-STAMP-TASKID-INJECT / D-001 §D2）
 # 錯誤一律 stderr；stdout 僅在成功時輸出單一 task_id（不得混入錯誤訊息）
+# 白名單 regex 已抽到 scripts/_role_gate.sh（SSOT）；本段只驗缺/空/型別，
+# 字元白名單由呼叫端在捕獲 task_id 後以 check-task-id 執行（禁兩處各寫一份）。
 task_id = open_ev.get("task_id")
 if task_id is None or (isinstance(task_id, str) and task_id == ""):
     print("ERROR: open_ev 缺 task_id 或為空字串（第⑦道前置，拒派）", file=sys.stderr)
     sys.exit(1)
 if not isinstance(task_id, str):
     print(f"ERROR: open_ev.task_id 型別非法: {type(task_id).__name__}", file=sys.stderr)
-    sys.exit(1)
-# 白名單：擋 ERE 來源污染；`.` 等仍合法者於 grep 內插前再逐字跳脫
-if re.fullmatch(r"[A-Za-z0-9._-]+", task_id) is None:
-    print(
-        f"ERROR: open_ev.task_id 不符合白名單 ^[A-Za-z0-9._-]+$（第⑦道前置，拒派）: {task_id!r}",
-        file=sys.stderr,
-    )
     sys.exit(1)
 print(task_id)
 sys.exit(0)
@@ -545,6 +506,8 @@ _prepare_and_run() {
   # 不在此設 trap：檔頭那個唯一的 EXIT trap 已涵蓋 _taskid_file（trap 是覆寫非疊加）
   _assert_round_preconditions "${fam}" "${brief}" "${out}" > "${_taskid_file}" || exit $?
   task_id="$(cat "${_taskid_file}")"
+  # 白名單 SSOT＝_role_gate.sh（與 committee_run 共用；禁本檔再寫一份 regex）
+  bash "${SCRIPT_DIR}/_role_gate.sh" check-task-id "${task_id}" || exit 2
   # 固定極簡 prompt + task-id 注入句（逐字，D-001 §D2）
   prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。"
   _run_cli_and_emit

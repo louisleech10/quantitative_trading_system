@@ -2315,6 +2315,8 @@ def _b3_harness(tmp_path: Path) -> dict:
         # GOV-DOC-CHECK-AT-WRITE（2026-08-02）：cx_run.sh 的 brief 合規閘 + stamp-target
         # 驗證抽成獨立腳本（一份實作、兩個呼叫點）。隔離 repo 少了它 → cx_run rc=127。
         "brief_conformance_check.sh",
+        # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT
+        "_role_gate.sh",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():

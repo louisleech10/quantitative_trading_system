@@ -67,11 +67,12 @@ fi
 # ---------------------------------------------------------------------------
 phase_of() {
   case "$1" in
-    scripts/gen_govflow_manifest.sh)                 echo "0" ;;
+    scripts/gen_govflow_manifest.sh)                 echo "0,3" ;;  # B3：PHASE_MAP 擴 phase3 允許集
     scripts/completeness_check.sh)                   echo "1" ;;
     scripts/cx_run.sh)                               echo "2,3" ;;
     scripts/audit_events.json)                       echo "2" ;;
     docs/P16_COMMITTEE_DEBT_SPEC.md)                 echo "2" ;;
+    docs/GOV_DISPATCH_FLOW_FIX_TODO.md)              echo "3" ;;  # B3：Phase 3 測試表／修改檔案 bullet
     scripts/committee_run.sh)                        echo "3" ;;
     scripts/gate.sh)                                 echo "-" ;;
     scripts/_role_gate.sh)                           echo "3" ;;
@@ -80,14 +81,14 @@ phase_of() {
     scripts/brief_conformance_check.sh)              echo "2" ;;
     scripts/verdict_filled_check.sh)                 echo "2" ;;
     scripts/gov_check.sh)                            echo "2" ;;
-    tests/governance/test_govflow_manifest.py)       echo "0" ;;
+    tests/governance/test_govflow_manifest.py)       echo "0,3" ;;  # B3：T0-B1 C 類探針改鎖
     tests/governance/test_completeness_idlike_fp.py) echo "1" ;;
-    tests/governance/test_result_state_format_failed.py) echo "2" ;;
+    tests/governance/test_result_state_format_failed.py) echo "2,3" ;;  # B3：harness copy list
     tests/governance/test_registry_v2_shape.py)      echo "2" ;;
     tests/governance/test_rolegate_predispatch.py)   echo "3" ;;
     tests/governance/test_claimcheck_verbatim_exempt.py) echo "4" ;;
-    tests/governance/test_debt_emit.py)              echo "2" ;;
-    tests/governance/test_stamp_taskid_inject.py)    echo "2" ;;
+    tests/governance/test_debt_emit.py)              echo "2,3" ;;  # B3：harness copy list
+    tests/governance/test_stamp_taskid_inject.py)    echo "2,3" ;;  # B3：harness copy list + 白名單錨點
     scripts/git_hooks/pre-commit)                    echo "4" ;;
     *) echo "" ;;  # 空字串＝未映射
   esac
@@ -101,6 +102,7 @@ scripts/completeness_check.sh
 scripts/cx_run.sh
 scripts/audit_events.json
 docs/P16_COMMITTEE_DEBT_SPEC.md
+docs/GOV_DISPATCH_FLOW_FIX_TODO.md
 scripts/committee_run.sh
 scripts/gate.sh
 scripts/_role_gate.sh
