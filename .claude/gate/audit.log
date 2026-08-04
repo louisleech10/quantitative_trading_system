@@ -33693,3 +33693,49 @@ ts=2026-08-04 16:57:51 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "c5a735b7-49c5-4b6c-928b-a1358fee19f7", "cli_rc": "0", "event": "committee_family_result", "event_id": "e1661347-de09-4b87-91af-2f880d1b6d13", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260804-govb0-recon-codex.md", "output_sha256": "415422d3239336b56b4c46868b1ce6192f6a20e706097a6b558e210114ca36e5", "producer": "audit_append.sh", "result_state": "success", "round_id": "b9fa85cb-b6a2-4a07-a3aa-aab42b958ee3", "schema_version": 1, "sequence": 651, "ts": "2026-08-04T14:44:21Z"}
 {"actor": "cx_run", "attempt_id": "8274c621-d3ad-4b46-83b7-74795c8e97cc", "cli_rc": "0", "event": "committee_family_result", "event_id": "e28ad693-1da1-4f2d-8d7b-d303e085c9d3", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260804-govb0-recon-composer.md", "output_sha256": "d186dca7e05aa0eaaeccd26fa0f6bc425784c01f8ca4f6924ffa283592693542", "producer": "audit_append.sh", "result_state": "format-failed", "round_id": "b9fa85cb-b6a2-4a07-a3aa-aab42b958ee3", "schema_version": 1, "sequence": 652, "ts": "2026-08-04T14:55:43Z"}
 {"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "b410c1c2-339e-4aae-b6f2-3068ae19b592", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "composer 連兩次 format-failed，根因為 cx_run.sh:512 無條件注入 RECONCILE-STAMP 指示（票 B-32），同 brief 重跑不可能解決。codex/grok/claude 三家已合格，涵蓋全部六題，composer 內容經逐條比對為重複（多一筆 267/300 數據，已另記）。", "round_id": "b9fa85cb-b6a2-4a07-a3aa-aab42b958ee3", "schema_version": 1, "sequence": 653, "ts": "2026-08-04T14:59:28Z"}
+{"event":"gate_deny","ts":"2026-08-04T15:04:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-04T15:04:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-04T15:09:05Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-04T15:09:05Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260804T151015Z-mutation-multi.json
+{"event":"gate_deny","ts":"2026-08-04T15:13:12Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-04T15:13:41Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-04T15:13:41Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+=== 2026-08-04 23:19:20 | artifact ===
+  ts=2026-08-04 23:19:20
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GOVB0_FRICTION_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(大, RISK-HIT b,c); §A=filled(FACT-RECEIPT x5, 待確認：無); §C=filled; §G=N/A 見§N(不碰數值/ML); §P=filled(5 Phase 11 Task); §V=filled(mutation 必填); §R=filled; §N=filled(§G N/A 理由)
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVB0-SPEC-R1", "ts": "2026-08-04T15:26:52Z"}
+=== 2026-08-04 23:26:52 | dispatch ===
+  ts=2026-08-04 23:26:52
+  kind=dispatch
+  intent=第 0 批 SPEC 對抗審查 R1 - 五票合一管線的可行性與 Phase 2 疊加風險
+  risk=high
+  facts_asked=timeout 量測基準與值裁定, locale 相依守衛是否納入本批, FP-2 是否除役, B-24 限縮是否可交付, 驗收可證偽性, 未宣告依賴
+  review_role=adversarial 審查 SPEC, 禁改碼, 兩個非實作者家族
+  template=n/a: 用 brief
+  adversarial=waived: 本輪即為 adversarial 首輪
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260804-GOVB0-SPEC-R1-BRIEF.md", "brief_sha256": "6a85d350afc88f54adc5d5b90527d84f50367ab2182183475bf93a20a3b6af2b", "brief_sha256_norm": "6a85d350afc88f54adc5d5b90527d84f50367ab2182183475bf93a20a3b6af2b", "event": "committee_round_open", "event_id": "33f7262d-f51b-4838-8373-387b960394fa", "expected_outputs": {"codex": "handoffs/20260804-govb0-spec-r1-codex.md", "composer": "handoffs/20260804-govb0-spec-r1-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "8176c78a-45f7-4e79-8f6c-a27008ae82a2", "schema_version": 1, "sequence": 654, "session_name": "20260804-govb0-spec-r1", "task_id": "GOVB0-SPEC-R1", "ts": "2026-08-04T15:26:52Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260804-govb0-recon-codex.md", "output_sha256": "415422d3239336b56b4c46868b1ce6192f6a20e706097a6b558e210114ca36e5", "task_id": "GOVB0-RECON-R1", "ts": "2026-08-04T15:27:56Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260804-govb0-recon-grok.md", "output_sha256": "964de555ce895ad8b7caad89351eb9f0abf91b22588c7796034254255c5b7aaf", "task_id": "GOVB0-RECON-R1", "ts": "2026-08-04T15:27:56Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260804-govb0-recon-claude.md", "output_sha256": "714f808e37dd3cb224dbd47854d69d823c912c4bca1ab1c20eac0c484c382f66", "task_id": "GOVB0-RECON-R1", "ts": "2026-08-04T15:27:57Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260804-govb0-recon-composer.md", "output_sha256": "d186dca7e05aa0eaaeccd26fa0f6bc425784c01f8ca4f6924ffa283592693542", "task_id": "GOVB0-RECON-R1", "ts": "2026-08-04T15:27:57Z"}

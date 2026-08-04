@@ -341,9 +341,59 @@ grok 17:29／composer 17:31／codex 17:44——**審查 18 分鐘內全部完成
 - `for f in codex composer grok; do ... done` 讀產出檔 → 同上
 - `completeness_check.sh --lock <reconcile 路徑>` → 同上
 
-**根因**：判定僅比對指令字串是否含家族名／派工關鍵字，**不區分讀寫**。
+**根因**：🔴 **2026-08-04 已讀碼＋實跑更正，勿用下方舊句。**
+原記「判定僅比對指令字串是否含家族名／派工關鍵字，不區分讀寫」是**錯的**——
+`gate_check.sh:86` 的家族名段只比對**命令位置**，註解明寫已避開 `cat sp_codex.txt` 這類子字串。
+實際有**兩個彼此獨立**的洞（各自實跑重現，見 `handoffs/20260804-govb0-recon-{claude,codex,grok}.md`）：
 
-**修法選項**：①白名單純讀取動詞（`pgrep`／`ps`／`grep`／`sed -n`／`ls`／`cat`）在無寫入重導向時放行
+**洞 A — 家族名段不理解引號**（`(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]`）
+引號**內**的 `;` `&` `|` 被當成命令分隔符。實例：
+`pgrep -fl 'codex exec|cursor-agent|grok '` → 命中 `|grok `；
+`git commit -m "…no review file; codex closure review…"` → 命中 `; codex `（本 session 三次）。
+
+**洞 B — `claude` 段比對子字串**（`claude[^|]*(-p|--print)`）**嚴重性更高**
+觸發＝①指令含字串 `claude`（**`.claude/` 治理目錄與 `/private/tmp/claude-501/` scratchpad 皆命中**）
+②之後任一處出現 `-p` 子字串（`rev-parse`／`--porcelain`／`-print`，**不必是旗標**）③兩者間無 `|`。
+現場事故（2026-08-04 22:5x，主委查 push 結果）：
+`head -3 "/private/tmp/claude-501/…/x.output"; git rev-parse --short origin/main` → **BLOCKED**。
+⇒ **凡碰治理目錄的唯讀指令都在擲骰子**；「加管線就過」使它看似隨機，長期被誤判為環境問題。
+🔴 **洞 B 同時是 fail-open**：`[^|]` 不跨管線 ⇒ `cat brief.md | claude -p "…"` **不會被擋**。
+
+**票上原記的三例 FP，機制分屬兩洞**：例 1（`pgrep`）＝洞 A；
+例 3（`completeness --lock`）＝**洞 B**（重建時缺 `claude` 或缺 `-p` 才會重現不出來——
+三家委員與主委首輪皆誤判為「不可重現」，2026-08-04 現場事故後才定位）；
+例 2（`for` 迴圈）**仍未定位**，須待 `CLAUDE-R1-P0-01` 的 deny 紀錄上線後才有辦法查。
+
+**另兩個既有 fail-open（本輪偵察查出，票上原無）**：
+① **帶路徑前綴的家族 CLI 完全不擋**：`/opt/homebrew/bin/codex exec` → ALLOW，
+而 `cx_run.sh:291-292` 的 `CODEX`／`GROK` 正是絕對路徑值 ⇒ 真實派工形態不在守備範圍。
+② **直接 `bash scripts/cx_run.sh …` ＝ 無 token 派工**：`cx_run.sh` 與 `_role_gate.sh`
+提及 `token` 各 **0 行**，而該命令列不含命令位置的家族名 ⇒ PreToolUse 放行。
+
+**前置阻塞（`CLAUDE-R1-P0-01`）**：被擋下的指令**全系統零紀錄**——
+`gate_check.sh:28` 的 `gate_deny` 只寫 `event/ts/tool/kind/reason`（全檔 599 筆 reason 僅
+`token_expired` 493／`open_debt` 106），`ts_stamp.log` 因 hook 排序在 gate 之後而不執行
+（實測：已知被擋的 commit 0 筆、成功重試 2 筆）。
+⇒ **誤擋率無法量測、改完無法驗證、`票 B-29` 對本票做不出差集。修法須先補紀錄。**
+
+**修法方向（2026-08-04 偵察輪三家＋主委實測後改寫；下方「原修法選項」保留為歷史）**
+
+四家一致：**方案②（改判準為「是否呼叫 `cx_run.sh`／`committee_run.sh`／`gate.sh dispatch`」）單獨採用＝fail-open**，
+實測 TP 漏網 grok 10/13、codex 4/6、composer 7/8（手搓家族 CLI 全漏）。**明文否決單獨採用。**
+
+採 **方案③疊加**，四個部位：
+1. **引號感知**（解洞 A）：先剝除單／雙引號 span，再套命令位置判定。
+2. **`claude` 段收窄**（解洞 B）：`claude` 比照家族名限定命令位置
+   `(^|[;&|][[:space:]]*)(\S*/)?claude[[:space:]]`，且 `-p`／`--print` 須為**獨立引數**（詞界），禁子字串。
+3. **basename 化**（解既有 fail-open ①）：命令位置改 `(\S*/)?(codex|cursor-agent|grok|agy)[[:space:]]`。
+4. **呼叫點補強**（解既有 fail-open ②）：`bash scripts/cx_run.sh`／`committee_run.sh` 亦視為派工；
+   `gate.sh` 自身維持排除（否則無法 bootstrap）。
+
+🔴 **前置**：先補 `gate_deny` 紀錄（指令＋命中的 alternation），否則改完無從驗收（見上「前置阻塞」）。
+🔴 **驗收須附前後行為差集**（`票 B-29` 的典型案例，但 `B-29` 尚未實作 ⇒ 本批手動附）。
+🔴 **mutation 必含**：四個部位各自 revert 後，對應的 TP 須轉為漏網（可證偽）。
+
+**原修法選項（2026-08-03 記，已被上方取代，保留供追溯）**：①白名單純讀取動詞（`pgrep`／`ps`／`grep`／`sed -n`／`ls`／`cat`）在無寫入重導向時放行
 ②改以「是否呼叫 `cx_run.sh`／`committee_run.sh`／`gate.sh dispatch`」為判準，而非家族名出現。
 🔴 **屬機檢腳本變更，須先盤攻擊面**——放寬判定有讓真派工漏網的風險，
 **必須附 mutation**：真派工指令在新判準下**仍須被擋**。

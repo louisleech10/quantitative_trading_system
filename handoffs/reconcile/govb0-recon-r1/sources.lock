@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "session_id": "govb0-recon-r1",
+  "expected_roster": [
+    "claude",
+    "codex",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/govb0-recon-r1/sources/20260804-govb0-recon-claude.md",
+      "sha256": "714f808e37dd3cb224dbd47854d69d823c912c4bca1ab1c20eac0c484c382f66",
+      "family": "claude"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/govb0-recon-r1/sources/20260804-govb0-recon-codex.md",
+      "sha256": "415422d3239336b56b4c46868b1ce6192f6a20e706097a6b558e210114ca36e5",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/govb0-recon-r1/sources/20260804-govb0-recon-grok.md",
+      "sha256": "964de555ce895ad8b7caad89351eb9f0abf91b22588c7796034254255c5b7aaf",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-08-04T15:17:04Z",
+  "closure_state": "FROZEN",
+  "mode": "discovery"
+}
