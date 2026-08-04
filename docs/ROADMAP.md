@@ -346,7 +346,7 @@
     **12 個非 M code mutation 未逐一執行**。
   - **本 epic 內 TODO §0 數字對照表漂了四次**（四格曾錯三格：`25/9/13/14` → `25/13/20/26`）
     ⇒ 佐證 `票 B-17`（機器依賴表格改資料檔＋自動生成）：只要它還是手寫的就會再漂。
-  - 全部票登記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md`（`B-1`～`B-32`，**唯一票登記處**）；
+  - 全部票登記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md`（`B-1`～`B-33`，**唯一票登記處**）；
     白話版 `handoffs/20260804-BACKLOG-白話總覽.md`（主表一票一列，53 項舊表降為附錄；兩份已機械對帳）。
 
 - **🔵 治理 backlog — 排序 v3.1（2026-08-04 全量重排＋當日新增 3 張，唯一有效）＝當前施工序**：
@@ -358,6 +358,12 @@
   第2批 地基        B-27                    另排              B-9 → B-28
   第3批 殺手寫漂移  B-17 → B-13 → B-26
   ```
+  🔴 **`B-33` `GOV-LOCALE-GUARD-DRIFT`（2026-08-04 SPEC 審查 R1 兩家一致裁定開票，MAJOR，排第 1 批之後）**：
+  `LC_ALL=C` 下 `gate.sh` 的 Verdict 守衛與 `doc_format_precheck.sh` 雙雙 **fail-open**（實測 2 例），
+  `template_check.sh spec` 則誤報（1 例）。委員 CLI 與 CI runner 的 locale 不在主委控制範圍
+  ⇒ 非 UTF-8 環境會**靜默失去**這兩道守衛。**本批不併入**（兩家一致，避免 scope 膨脹）。
+  🔴 **`票 B-24` 拆分（SPEC 審查 R1 後主委裁 SPLIT）**：紀律面（驗收欄寫狀態斷言，零新增元件）留第 0 批；
+  機械強制面（`acceptance_state_check.sh`＋grandfather SoT＋具名 owner／UTC 到期／到期後 fail-closed）移出獨立排期。
   🔴 **`B-30`／`B-31`／`B-32` 於 2026-08-04 第 0 批**偵察輪**當場撞出**（單輪 6 次摩擦、4 次無票）：
   `B-30`＝委員可覆蓋自己已寫好的產出（codex 因此多花 28 分）；
   `B-31`＝`format-failed` 後只能整份重跑，且擋住債務銷帳進而擋住所有派工；
