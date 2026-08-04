@@ -487,6 +487,10 @@ Task 0.1 淪為裝飾品，且 §R 「Phase 1/2/3 依賴 Phase 0」的耦合宣�
 | T2-C1 | 契約 | `debt_clear` 對 `format-failed` **仍拒銷帳** |
 | **T2-C2** | 契約 | 🔴 **`brief-kind=impl` ⇒ 判準與行為皆不變**（SPEC Task 2.1 驗收第六項；v1 漏） |
 | **T2-C3** | 契約 | 🔴 **`format-failed` 雙軌**：audit 記 `format-failed` **且** cx_run process rc==3（v1 實作要點有寫、無測試 node） |
+| **T2-M35** | mutation | 🔴 **M35**：emit 順序還原（`_emit_family_result` 早於格式檢查）⇒ orphan-success 復發；不套用綠／套用紅 |
+| **T2-M36** | mutation | 🔴 **M36**：`format-failed` 降級記 `success` ⇒ 三態／format-failed 斷言轉紅；不套用綠／套用紅 |
+| **T2-M37** | mutation | 🔴 **M37**：checker 不存在 fail-open 記 `success` ⇒ fail-closed 斷言轉紅；不套用綠／套用紅 |
+| **T2-M38** | mutation | 🔴 **M38**：`format-failed` 時 process rc 改 0 ⇒ exit 3 斷言轉紅；不套用綠／套用紅 |
 
 **Phase Gate**：T2-* 全綠 ＋ `pytest tests/governance -q` 全綠（轉紅的既有測試須逐條標契約擴張）
 ＋ 🔴 **G-MANIFEST（N=2）**。

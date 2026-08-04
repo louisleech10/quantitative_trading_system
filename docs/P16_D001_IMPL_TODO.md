@@ -1,9 +1,19 @@
 # P16 D-001 實作 TODO — 票 `GOV-STAMP-TASKID-INJECT`
 
-**SPEC（唯一權威）**：`docs/P16_COMMITTEE_DEBT_SPEC.D-001.md`（三家 APPROVED，
-body sha256 `6eda520250473f4b0d00875589e89ab73f7ad83f5a41876401234092387c76c0`，
-`reconcile_stamps_check.sh` rc=0）。
-**本 TODO 不重述 SPEC 條文**；凡本檔與 D-001 衝突，**一律以 D-001 為準**。
+> ## 🔴 授權來源已變更（2026-08-04，R 重開）
+>
+> **舊授權** `docs/P16_COMMITTEE_DEBT_SPEC.D-001.md` 已標 **`SUPERSEDED-BY-R`**——
+> 依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1，R 重開使**原檔所有延伸檔一併失效**，
+> **其戳記一併作廢**，不得再作為任何派工的授權來源。
+>
+> 🔴 **新授權＝`docs/P16_COMMITTEE_DEBT_SPEC.md` v3.0（R 重開）** ——
+> D-001 **§D2／§D3／§D4／§D5／§D6／§D7** 內容**已逐條併回**該檔 Task 1.3 改法⑧⑨、其驗證欄 **V1–V16**、
+> 以及 §A 誠實邊界 #13–#22。**凡本檔與 P16 v3.0 衝突，一律以 P16 v3.0 為準。**
+>
+> 〔`COMPOSER-R8-P1-02`＋`GROK-R8-P1-01` 兩家獨立命中：本檔原宣告 D-001 為「唯一權威」
+> 且「衝突一律以 D-001 為準」，與 R 的作廢效力**直接衝突**；R 連帶作廢未清到下游實作 TODO。〕
+
+**本 TODO 不重述 SPEC 條文**；凡本檔與 **P16 v3.0** 衝突，**一律以 P16 v3.0 為準**。
 
 **TODO 對抗審**：codex＋composer，5 findings → 4 群，**全部採納 0 不採納**；
 收斂 `handoffs/reconcile/20260802-p16-d001-todo-r1-recon/synth.md`，completeness rc=0。
@@ -53,7 +63,11 @@ body sha256 `6eda520250473f4b0d00875589e89ab73f7ad83f5a41876401234092387c76c0`�
 
 交件前必須全批綠，**不得分次交件**。
 
-## Phase 1 — cx_run／committee_run 增訂（依賴：D-001 生效）
+## Phase 1 — cx_run／committee_run 增訂（依賴：**P16 v3.0 Task 1.3 改法⑧⑨生效**）
+
+> 🔴 **2026-08-04 更正**〔`CODEX-R9-P0-02`〕：本行原寫「依賴：**D-001 生效**」。
+> D-001 已標 `SUPERSEDED-BY-R`，**不得再作為生效依賴**；依賴改指併回後的 P16 v3.0。
+> ⚠️ 主委上一輪只改了本檔**檔頭**授權宣告，**漏改本行**——「改一條漏多條」同族錯誤。
 
 ### Task 1.1 — `cx_run.sh`：從 audit 導出 `task_id` 並注入 prompt
 
@@ -70,8 +84,8 @@ body sha256 `6eda520250473f4b0d00875589e89ab73f7ad83f5a41876401234092387c76c0`�
      但 `_assert_round_preconditions` 要到 `:414/418/422` 才呼叫；照字面做會在 `set -u` 下
      讀未定義變數、或送出無 task-id 的 prompt、或誘使實作者從 env 偷讀（違 §D2 紅線）。
      ⇒ **prompt 必須在「前置成功並捕獲 stdout」之後、`_run_cli_and_emit` 使用它之前組建**
-     （延後組建或以參數傳入皆可）。**D-001 §D2 的「落點 `:337`」是字串錨點，非執行順序約束**
-     （兩家一致認定，故 D-001 無須修改）
+     （延後組建或以參數傳入皆可）。**P16 v3.0 Task 1.3 改法⑧（原 D-001 §D2）的「落點 `:337`」是字串錨點，非執行順序約束**
+     （兩家一致認定，故該條文無須修改；當時的載體為 D-001，現為 P16 v3.0）
   ⑤ prompt 追加的句子，**逐字**：
      `你的 task-id=<注入值>。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。`
 - **驗證（可證偽）**：`pytest tests/governance/test_stamp_taskid_inject.py -q -k "v1 or v2 or v3"` 全綠；
@@ -155,7 +169,10 @@ body sha256 `6eda520250473f4b0d00875589e89ab73f7ad83f5a41876401234092387c76c0`�
 ### Task 1.5 — 測試 `tests/governance/test_stamp_taskid_inject.py`
 
 - 目標：讓 V1–V15 每條都是能證偽的 oracle。　檔案：新增 `tests/governance/test_stamp_taskid_inject.py`
-- 改法：逐條實作 D-001 §D5 的 **V1–V15**（該表為權威，本檔不重抄）。
+- 改法：逐條實作 **`docs/P16_COMMITTEE_DEBT_SPEC.md` v3.0 Task 1.3 驗證欄的 V1–V16**
+  （該表為權威，本檔不重抄）。
+  🔴 **2026-08-04 更正**〔`GROK-R9-P2-03`〕：本行原寫「D-001 §D5 的 V1–V15」。
+  D-001 已 `SUPERSEDED-BY-R`，其 V1–V15 **已逐列併回** P16 v3.0，另增 **V16**（`format-failed` ⇒ 零 `committee_output`）。
   **每條須通過 mutation：閹割對應守衛 → 該條轉紅；復原 → 轉綠，逐條附 receipt。**
 
   🔴 **V1 特別規定**〔`CODEX-R1-P1-02`〕：`CX_STUB_MODE=success` 的 stub 只寫
@@ -176,12 +193,12 @@ body sha256 `6eda520250473f4b0d00875589e89ab73f7ad83f5a41876401234092387c76c0`�
 - **邊界（≥2）**：①隔離 audit，不得污染真實 `.claude/gate/audit.log`
   ②不得變異 repo 內 `scripts/*.sh`（審查已確認可在 tmp 隔離副本補拷既有 helper）
 - **存活至**：永久保留（常駐回歸）
-- **覆蓋風險**：無；V11／V14 被 D-001 指定為常駐 mutation oracle，後續不得刪
+- **覆蓋風險**：無；V11／V14 被 **P16 v3.0 Task 1.3 驗證欄**（原 D-001 §D5）指定為常駐 mutation oracle，後續不得刪
 - **不可做**：不得以 static grep 充當 V1；不得留下閹割後仍綠的測試；不得跳過任一條 V
 
 ## §T 覆蓋追溯（只列 ID 對應，不列內容）
 
-| D-001 條文 | 實作 Task | 驗收 |
+| P16 v3.0 條文（原 D-001） | 實作 Task | 驗收 |
 |---|---|---|
 | §D2 改法⑧ | Task 1.1 | V1、V2、V3 |
 | §D3 驗證位置（`gate` 之前） | Task 1.2 | V4、V5、V6 |

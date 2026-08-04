@@ -1,6 +1,40 @@
 # P1-6 委員未結案債狀態機 — SPEC
 
-> **版本 v2.9**（R1–R8 共 96 findings ＋ **B1 實作階段三家裁決** 全數收口）　|　日期：2026-07-29
+> **版本 v3.0（R 重開）**　|　日期：2026-08-04　|　前版 v2.9（2026-07-29，R1–R8 共 96 findings ＋ B1 實作階段三家裁決）
+>
+> ## 🔴 v3.0＝**R 重開**（非 D 延伸），依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1
+>
+> **為何是 R 而非 D**：`result_state` 的 `success` 語意被 **R4 事故證偽並收窄**
+> ——格式不合規的產出原本仍記 `success`，使守衛⑥永久擋住該家族、整輪只能 abandon
+> （本 epic 實際發生 **3 次**）。這是**既有設計被證偽**，不是錯字級補充。
+> TODO Task 2.2 明令「預設走 R」「**實作者不得自行選較輕路徑**」；使用者未裁定 D ⇒ **走 R**。
+>
+> **本次 R 的三項變更**：
+> ① `enums.result_state` 二值 → **三值**（`success`／`failed`／`format-failed`），各值定義見 Task 1.3 改法②
+> ② 新增硬性順序契約：**格式檢查必須在 audit append 之前**（append-only，`success` 一旦寫入不可變）
+> ③ **併回 D-001 §D2／§D3／§D4／§D5／§D6／§D7**——改法⑧⑨、攻擊面 S1–S7、驗證 V1–V15、
+> 誠實邊界 #13–#22、明文不做四項。
+>
+> 🔴 **逐節落點表（併回完整性的唯一憑據；不得以關鍵字 grep 代替）**：
+>
+> | D-001 節 | 落點 | 狀態 |
+> |---|---|---|
+> | §D1 事故事實（A1 戳記抄範例 task-id／A2 provenance pending） | **具名不併** | 屬**動機敘事**非可執行契約；併入會讓凍結 SPEC 混入歷史事故記述。追溯循 D-001 本檔〔`COMPOSER-R9-P2-01` 判定「不影響可執行契約」〕 |
+> | §D2 改法⑧ | Task 1.3 改法⑧ | 已併（三家 R8 P3 正面確認忠實） |
+> | §D3 改法⑨ | Task 1.3 改法⑨（含 `register-output` 執行契約） | 已併 |
+> | §D4 攻擊面 S1–S7 | Task 1.3 改法⑨ 末段 | 已併 |
+> | §D5 驗證 V1–V15 | Task 1.3 驗證欄（另增 **V16**＝`format-failed`） | 已併 |
+> | §D6 誠實邊界 12–21 | §A **#13–#22**（撞號故順延） | 已併 |
+> | §D7 明文不做 | Task 1.3 改法⑨「明文不做」段 | 已併 |
+>
+> ⚠️ **本表為 R9 補建**：主委首版與 R8 補併**兩次**都宣稱「已完整併回」卻各漏一批
+> （首版漏 §D3 執行契約／§D5／§D6；R8 補併漏 §D4／§D7／V13–V15，並發明撞號的 V13 與 M24–M27）。
+> **成因皆為「以關鍵字 grep 當完整性驗證」**——`^\| *V[0-9]` 匹配不到 `| **V13** |` 這種粗體列，
+> 於是數到 12 就宣稱完整。🔴 **完整性宣稱一律以本表為準，逐節對照，不得以 grep 命中數代替。**
+>
+> 🔴 **R 的連帶效力（v2.0 §2.1 不可收窄的安全閥）**：**原戳記作廢**，
+> **本檔所有延伸檔一併失效**——`docs/P16_COMMITTEE_DEBT_SPEC.D-001.md` 已標 `SUPERSEDED-BY-R`。
+> 其內容已併回本體（見上 ③），故無契約遺失；該檔僅供追溯，**不得再作為授權來源**。
 >
 > ## 🔴 v2.9＝**實作階段打回來的 SPEC 缺陷修正**（三家一致裁 P0，非設計爭議）
 >
@@ -96,7 +130,9 @@
 ## §A 假設與待使用者確認
 
 ### FACT-RECEIPT（逐條附實跑命令與輸出）
-- FACT-RECEIPT: `python -m pytest tests/governance -q` → `287 passed`（Claude 實跑 2026-07-27）
+- FACT-RECEIPT: `python -m pytest tests/governance -q` → **`651 passed`（Claude 實跑 2026-08-03，B2 後）**
+  〔`COMPOSER-R8-P2-01`＋`GROK-R8-P2-01` 兩家獨立命中：原寫 `287 passed`（2026-07-27）
+  屬**過時事實當現況陳述**，削弱 §0「挑戰前提」可信度。歷史值保留於此括號內供追溯。〕
 - FACT-RECEIPT: `grep -n "audit\|AUDIT" scripts/cx_run.sh` → 0 命中（`cx_run.sh` 現況 85 行完全無 audit 寫入）
 - FACT-RECEIPT: `rg -n 'gate|token|GATE' scripts/reconcile_build.sh` → **0 命中** → **清帳路徑不經 dispatch 閘，故「有債萬事停」不是死鎖**
 - FACT-RECEIPT: `nl -ba scripts/gate_check.sh | sed -n '67,76p'` → fresh token 直接 `exit 0`，**不重讀 audit**（＝§A 誠實邊界第 1 條的成因）
@@ -155,6 +191,41 @@
     　**登記紀律實證有效**：R8 這一輪就是「委員找到新繞法 → 登記 → 補 selftest → 修腳本」跑完整流程的第一個案例。
     **兜底不變**：SPEC 驗收條文若與真實行為不符，仍會在**實作階段**被跑出來（B1 的 bootstrap P0 正是這樣現形的）。
 
+> 🔴 **以下 13–22 逐字併自 D-001 §D6**（原編號 12–21，因與本體 #12 撞號而順延）。
+> R 全量作廢 D-001，故其誠實邊界**必須併回本體**，否則「無契約遺失」不成立
+> 〔`COMPOSER-R8-P0-02`＋`GROK-R8-P0-02` 兩家獨立命中主委首版漏併〕。
+
+13. **委員仍可寫錯戳記內容**：改法⑧只保證 task-id **被送到委員眼前**，不保證委員採用。
+    採用與否由改法⑨的註冊條件**事後**擋，**不會自動修正戳記文字**。
+    ⚠️ **「不相符則不註冊」的涵蓋範圍須逐項讀，不得整句外推**〔`CODEX-R1-P1-01` 指出原文過強〕：
+    擋得住的＝家族不符／`REJECTED`／`task:` 不符／`sha256:` 不符／跨行組合／CLI 失敗（V8–V11）。
+    **擋不住的**＝戳記格式與 hash 全對但語意造假（見 #15）、戳記寫在 `stamp-target` 以外的檔（見 #14）。
+14. **改法⑨只覆蓋 `stamp-target` 單一檔**：委員若把戳記寫進其他檔，機器不知情，退回人工。
+15. **不防蓄意**：委員可寫出格式相符但語意造假的戳記行。列為記錄，不在本契約解決。
+16. **直呼 `cx_run` 且該輪 `committee_round_open` 缺 `task_id`** ⇒ 一律拒派。
+    正常路徑（`committee_run.sh` 無條件寫入該欄）不受影響；受影響者僅手工偽造的 round。
+17. **「合法 no-op」與「註冊失敗」是兩類，不得共用一條規則**〔`CODEX-R1-P1-04`〕：
+    前者（未簽／`REJECTED`／不相符）＝**預期結果**，靜默不註冊即可；
+    後者（三條件已成立但 `register-output` rc≠0）＝**系統故障**，須印可辨識錯誤字串並具名為**待人工補記**。
+    兩者皆不改 `cx_run` rc，但**輸出必須機械可分**。
+    ⇒ 誠實邊界：本契約**不保證** provenance 一定登記成功，只保證**失敗時不會偽裝成成功**。
+18. **既有 18 份 `brief-kind: stamp` 歷史 brief 全數缺 `stamp-target:`**〔`CODEX-R1-P2-06` 實跑 18/18〕，
+    生效後**不可原樣重跑**。這是已知遷移成本，非缺陷。
+19. **V2／V3 的兩個分支沒有各自獨立的 mutation oracle**〔`CODEX-R3-P1-01`，實作階段實測〕：
+    兩者由**同一個 guard block** 保護；單獨閹割其中一支時，下游型別檢查與白名單 regex **仍會拒派**，
+    故該分支**無法被單獨證偽**。現行測試以**整段 neuter** 同時覆蓋兩情境。
+    ⇒ **不宣稱**「兩分支各自可證偽」。**不為了製造可證偽性而弱化 defense-in-depth。**
+20. **`brief-kind` 值的兩項刻意行為**〔`COMPOSER-R3-P3-00`〕，記錄以免日後誤判為缺陷：
+    ①尾隨空白經 trim 後視為合法（`brief-kind: stamp ` ＝ `stamp`）
+    ②多行**完全相同**的宣告經 `sort -u` 去重後接受；只有**不一致**的多值才 `exit 2`
+21. **E 類邊界的永久回歸矩陣**〔`CODEX-R3-P2-02`〕：`stampx`／尾空白／大寫／空值
+    以及 `committee_run` 與直呼 `cx_run` 的 parity——**行為已實測正確**（rc=2、audit 零新增），
+    但在補上矩陣測試前**無永久回歸保護**。
+22. **#21 已閉合**〔閉合輪 `CODEX-R1-P3-00`，三家確認〕：已補上 **9 列 × 兩入口**的永久邊界矩陣
+    （`test_group_h_e_boundary_matrix_committee` 與直呼 parity 各 9/9 PASSED）。
+    主委獨立證偽：把前綴擷取改回 → **5 failed**，復原 → 65 passed。
+    ⇒ **#21 保留為歷史敘述**（記錄該缺口曾存在），現況已有回歸保護。
+
 ## §C 約束
 - 只動 `scripts/` 治理層與 `tests/governance/`；解耦 7 條不受影響。
 - bash 3.2 相容（macOS 預設），**禁 `declare -A`**。
@@ -195,7 +266,7 @@
 - **不做會怎樣（V1 實證的失敗鏈）**：實作端忠實讀 SoT → `enums.abandon_kind` 不存在 → `--abandon --kind …` 永遠 rc≠0 → 而實作型派工結構上又只能走逃生口（見 §A FACT-RECEIPT）→ **整台機器一啟用即死鎖**。
 - 改法：
   ①**事件砍至四種**：`committee_round_open`／`committee_family_result`／`committee_debt_clear`／`debt_abandon`。**事件名一律採 registry 現有字串，不新造、不強加前綴**——三個 `committee_*` ＋ 一個 `debt_abandon`（它本來就沒有前綴，保留原名）。SPEC 正文與 registry 必須同一字串。刪除 `committee_round_amendment`／`committee_family_dispatch`／`committee_family_degrade`／`committee_debt_clear_format_failure`／`committee_debt_clear_all_degraded`／`committee_debt_supersede`／`round_open_failed`。
-  ②`enums.round_state` 砍為 `OPEN|CLOSED|ABANDONED`；`enums.result_state` 砍為 `success|failed`。
+  ②`enums.round_state` 砍為 `OPEN|CLOSED|ABANDONED`；`enums.result_state` 為 `success|failed|format-failed`（**R 修訂／GOVFLOW Task 2.2**：`success` 語意收窄，新增 `format-failed`——CLI 成功且產出非空但 findings 格式不合規；空 sha 例外仍僅 `failed`）。
   ③**新增 `enums.abandon_kind` ＝ `no-findings-expected|collection-failed`**；`debt_abandon.fields` 增 `abandon_kind`。
   ④`committee_family_result.fields` 須含 `output_sha256`（Task 2.2 銷帳要比對）。
   ⑤刪除已無消費者的 v1 幽靈常數（`attempt_cap`／`ttl_days`／`renew_once_per_round_family`／`clear_kind` 與其映射／`pending_deadline*` 等）與對應 `docs` 說明。
@@ -218,7 +289,7 @@
         - **`write_sources_lock.sh` 現行「`closure_state=FROZEN` 非 `--force` 不得覆寫」**：`--rebuild` 路徑下允許**就地改寫既有 lock 的 `mode` 欄（僅 `discovery → review`）並自 audit 重填 `round_id`**，其餘欄位（來源清單／各來源 hash／`expected_roster`）**一律保持不變**。
         - **明文禁止**以 `write_sources_lock.sh --force` 或設 `GOVERNANCE_TEST_HARNESS=1` 達成此升級——正式路徑必須自給自足。
      **本 SPEC 不提供 `--force` 重凍，也不提供任何「重綁 identity」的路徑**；`mode` 誤用的唯一補救是具名 `--rebuild` 的**單向**升級（見 Task 2.2 1b）。
-- **驗證（可證偽）**：`python3 -m json.tool scripts/audit_events.json` rc=0；實跑印出 `debt_events` 長度 **== 4**；`enums.abandon_kind` **== 兩值**；`enums.round_state` **== 三值**；`enums.result_state` **== 二值**；`debt_abandon.fields` 含 `abandon_kind`；`committee_family_result.fields` 含 `output_sha256`；`grep -c attempt_cap scripts/audit_events.json` **== 0**；**任何以事件名為鍵或值的容器（`required_fields_per_event`／`clear_kind_event_map`／`family_valued_fields`／`hardcode_scan_exemptions`／`event_object_allowed_keys` 等）中，不得殘留指向已刪事件的項目——逐容器實跑清點並印出 0**（改法⑦的驗收，v2.2 漏列）；**`committee_round_open.fields` 含 `session_name`**（改法⑧）；**`bash scripts/reconcile_build.sh --help`（或無參數）**印出旗標名 `--mode` 與 `--rebuild`**（改法⑨；**非條件式驗收**——只驗 help 輸出含這兩個字串，不涉行為分支，故依 §C 範圍不需 ASSERT 文法）；**條件式斷言（固定文法，見 §C「驗收斷言文法」）**：
+- **驗證（可證偽）**：`python3 -m json.tool scripts/audit_events.json` rc=0；實跑印出 `debt_events` 長度 **== 4**；`enums.abandon_kind` **== 兩值**；`enums.round_state` **== 三值**；`enums.result_state` **== 三值**（`success|failed|format-failed`；**R 修訂／GOVFLOW Task 2.2 契約擴張**）；`debt_abandon.fields` 含 `abandon_kind`；`committee_family_result.fields` 含 `output_sha256`；`grep -c attempt_cap scripts/audit_events.json` **== 0**；**任何以事件名為鍵或值的容器（`required_fields_per_event`／`clear_kind_event_map`／`family_valued_fields`／`hardcode_scan_exemptions`／`event_object_allowed_keys` 等）中，不得殘留指向已刪事件的項目——逐容器實跑清點並印出 0**（改法⑦的驗收，v2.2 漏列）；**`committee_round_open.fields` 含 `session_name`**（改法⑧）；**`bash scripts/reconcile_build.sh --help`（或無參數）**印出旗標名 `--mode` 與 `--rebuild`**（改法⑨；**非條件式驗收**——只驗 help 輸出含這兩個字串，不涉行為分支，故依 §C 範圍不需 ASSERT 文法）；**條件式斷言（固定文法，見 §C「驗收斷言文法」）**：
   ```
   ASSERT reconcile_build WHEN session=absent    mode=review    THEN rc!=0
   ASSERT reconcile_build WHEN session=duplicate mode=review    THEN rc!=0
@@ -262,11 +333,106 @@
 
 **Task 1.3 — `cx_run.sh` 記每家結果**
 - 目標：每家交件與否留痕；並限制直呼危害。　檔案：`scripts/cx_run.sh`
-- 改法：①CLI 結束後寫 `committee_family_result`（家族名由 `$1` 直取，**不得從路徑或 review_role 推導**）②`result_state` 二值：`success`＝產出存在且非空且 `cli_rc==0`；其餘 `failed` ③**fail-closed 前置**：`ROUND_ID` 已設、audit 有對應 `committee_round_open`、該家族在該輪名單內、產出路徑與 `committee_round_open` 登記一致、**本次 brief 的 sha256 == `committee_round_open` 記錄的 brief sha256**(R2 codex P0-02:v2.1 前置漏此條,可換 brief 掛既有 round,與 §A#2 宣稱矛盾)、**該 `(round,family)` 最新 `result_state` 不是 `success`** ④CLI 失敗仍寫 result 帶 `cli_rc`，不得靜默
-  ⑤**同輪重派明確允許（限尚未成功者）**：家族本來就在該輪名單內且最新結果非 `success`，以同一 `ROUND_ID` 再跑一次即可，**不需開新輪、不需任何補派機制**（與裁決 6「不支援中途補派」不衝突——補派是加**新**家族，重派是同一家族再試）。每次重派各寫一筆，**append-only 不覆蓋**。
-  ⑥**產出指紋**：`committee_family_result` 須記 `output_sha256`;**`result_state=failed`(CLI 失敗或無產出檔)時填空字串**,銷帳條件⑤只對 `success` 家族比對(R2 codex P1-04:v2.1 同時要求「失敗仍寫 result」與「每筆須有非空 sha」,互斥)（Task 2.2 銷帳時比對，防「交件後替換內容再銷帳」——V1 codex R1-P1-04）。
+- 改法：①CLI 結束後寫 `committee_family_result`（家族名由 `$1` 直取，**不得從路徑或 review_role 推導**）②`result_state` **三值**（**R 修訂／GOVFLOW Task 2.1–2.2**；R4 事故證偽「cli_rc==0 且產出非空 ⇒ success」）：
+     - `success`＝產出存在且非空且 `cli_rc==0`，**且**（brief-kind ∈ {review,consult,closure} 時）`completeness_check --single` 格式合規
+     - `format-failed`＝`cli_rc==0` 且產出非空，但 findings-kind 格式檢查失敗（含 checker 不存在／不可執行的 fail-closed）；**非空** `output_sha256`；process **exit 3**；守衛⑥**允許**同輪重派；守衛⑤**拒**銷帳
+     - `failed`＝`cli_rc!=0` 或產出空
+     🔴 **格式檢查必須在 audit append 之前**（append-only；success 一旦寫入不可變）。`impl`／`stamp` 判準與行為皆不變。
+  ③**fail-closed 前置**：`ROUND_ID` 已設、audit 有對應 `committee_round_open`、該家族在該輪名單內、產出路徑與 `committee_round_open` 登記一致、**本次 brief 的 sha256 == `committee_round_open` 記錄的 brief sha256**(R2 codex P0-02:v2.1 前置漏此條,可換 brief 掛既有 round,與 §A#2 宣稱矛盾)、**該 `(round,family)` 最新 `result_state` 不是 `success`** ④CLI 失敗仍寫 result 帶 `cli_rc`，不得靜默
+  ⑤**同輪重派明確允許（限尚未 success 者）**：家族本來就在該輪名單內且最新結果非 `success`（含 `failed`／`format-failed`），以同一 `ROUND_ID` 再跑一次即可，**不需開新輪、不需任何補派機制**（與裁決 6「不支援中途補派」不衝突——補派是加**新**家族，重派是同一家族再試）。每次重派各寫一筆，**append-only 不覆蓋**。**不得**讓 `format-failed` 自動觸發重派。
+  ⑥**產出指紋**：`committee_family_result` 須記 `output_sha256`；**`result_state=failed`（CLI 失敗或無產出檔）時填空字串**；**`success` 與 `format-failed` 皆須非空 sha**（空 sha 例外僅 `failed`）；銷帳條件⑤只對 `success` 家族比對(R2 codex P1-04:v2.1 同時要求「失敗仍寫 result」與「每筆須有非空 sha」,互斥)（Task 2.2 銷帳時比對，防「交件後替換內容再銷帳」——V1 codex R1-P1-04）。
   ⑦**不設重派次數上限**（舊版 attempt_cap 一併砍除）。誠實邊界見 §A（**v2.0 原寫「拖延＝自我懲罰」過強，已修正**）。
-- **驗證（可證偽）**：`pytest tests/governance/test_debt_emit.py -q` 全綠；合法呼叫後 `family` 欄位為實際家族名（**非 `unknown`**）；`ROUND_ID=不存在的值` → rc≠0 且 audit 零新增；家族不在該輪名單 → rc≠0；CLI 回非 0 → 仍寫一筆 result；**對最新已 `success` 的家族重派 → rc≠0 且 audit 零新增**；**`success` 的 result 含非空 `output_sha256` 且等於當時產出檔的 sha256；`failed` 的 result `output_sha256` 為空字串**（兩態分別驗，不得混為一條）
+  ⑧**`task_id` 由 audit 導出並注入 prompt（取代手抄）**〔**併自 D-001 §D2**；R 使該延伸失效，內容併回本體〕：
+     來源＝`committee_round_open.task_id`（Task 1.2 改法⑥已列為必記欄位）。
+     🔴 **不新增 env 通道**——明文否決「`committee_run.sh` 以 `TASK_ID` env 傳給 `cx_run.sh`」：
+     audit 事件已是 SSOT，env 會製造第二真相源，且直呼 `cx_run` 時 env 可由呼叫端任填，
+     與改法③「前置一律對 audit 驗證」的紅線相衝。
+     **取值時機**＝`_assert_round_preconditions` 內（該函式已讀入同一筆 `open_ev`），以其 stdout 回傳，
+     **不得另開第二次 audit 掃描**（避免 TOCTOU 讀到不同事件）。
+     **落點**＝固定 prompt 追加一句，逐字為：
+     `你的 task-id=<注入值>。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。`
+     **fail-closed（第⑦道前置）**：`open_ev` 缺 `task_id` 欄或其值為空字串 → **拒派，rc≠0，audit 零新增**。
+  ⑨**`brief-kind=stamp` 自動 `register-output`**〔**併自 D-001 §D3**〕：
+     **brief 新增必填欄 `stamp-target:`**，值為戳記標的檔路徑。解析沿用 `brief-kind:` 既有配方——
+     行首錨定 `^stamp-target:`、取全部宣告去重、**多個不一致宣告 ⇒ fail-closed rc=2**；
+     `brief-kind=stamp` 而缺此欄 ⇒ 拒派 rc=2。**其餘 brief-kind 不強制、不解析**（不誤擋）。
+     🔴 **驗證位置＝`committee_run.sh`，且必須在 `gate.sh dispatch` 之前**〔`CODEX-R1-P1-03` ＋ R2 codex 具名更正〕：
+     放在 `cx_run` 會使打字錯誤留下**無 family result 的 OPEN 債** ⇒ `gate.sh` 拒發 token ⇒ **全域治理阻塞**；
+     放在 gate 之後則 `gate.sh:240` 已 append `committee_dispatch` ⇒ **「audit 零新增」不可能成立**。
+     ⇒ 存在性／多值一致性／路徑合法性一律由 `committee_run.sh` 在既有 brief 驗證處完成；
+     不通過 ⇒ `exit 2`，**不發 token、不開債、不派工，audit 真正零新增**。
+     `cx_run.sh` 仍保留同一組驗證作為 defense-in-depth（涵蓋直呼路徑）。
+     ⚠️ 本項觸及面擴及 Task 1.2 的 `committee_run.sh`。
+     **路徑驗證**：須 `handoffs/` 前綴、不得含 `..`、檔案須存在。任一不成立 ⇒ rc=2。
+     **執行時機**：CLI 結束、`_emit_family_result` 寫入**之後**。
+     🔴 **註冊條件（三者同時成立才呼叫 `register-output`）**：
+       1. `_emit_family_result` 判定 **`result_state=success`**
+          〔`CODEX-R1-P1-02`：原文未限定 CLI rc，與 §D5 V11「rc≠0 時零 `committee_output`」**直接互斥**〕
+          ⚠️ **三值後語意收窄**：僅 `success` 觸發；**`format-failed` 與 `failed` 皆不註冊**。
+       2. `stamp-target` 檔含**單一一行**同時滿足：家族 `<fam>`、`APPROVED`、`YYYY-MM-DD`、
+          `task:<注入的 task_id>`、**`sha256:<該檔當下的 body_hash>`**
+          〔`CODEX-R1-P1-01`＋`COMPOSER-R1-P2-01`：原文不含 body hash，錯 hash 仍會註冊，
+          使 audit 狀態與 `reconcile_stamps_check` 狀態分叉〕
+       3. 家族名取 `${fam}`（`$1` 直取），**不得從路徑推導**（沿用 v2.9 紅線）
+     🔴 **predicate 實作契約**〔`CODEX-R1-P2-05`＋`COMPOSER-R1-P2-02`，兩家各自 probe 實證〕：
+     **必須以單一 regex 對同一行做一次匹配**；**明文禁止**以兩個以上獨立 `grep` 的交集代替
+     ——兩家實跑證明「A 家族的 `APPROVED` 行」與「B 家族那行的 `task:`」會被 naive 兩次 grep 誤組成 true。
+     **不符時（合法 no-op）**：**不註冊**、印明確訊息、**不改變 `cx_run` 的 exit code**。
+     理由：`REJECTED`／拒簽／未簽是**合法結果**，不得誤判為執行失敗。
+     **註冊失敗（與上者機械可分）**〔`CODEX-R1-P1-04`＋`COMPOSER-R1-P2-03`〕：
+     三條件皆成立、已呼叫 `register-output` 但其 rc≠0 ⇒ **印可辨識的錯誤字串**、
+     **不回捲**已寫入的 `committee_family_result`（append-only）、rc 不變，並具名為**待人工補記**。
+     🔴 **這兩類不得共用同一條「rc 不變」規則帶過**（見 §A 誠實邊界 #16）。
+     **既有 brief 遷移**〔`CODEX-R1-P2-06`，實跑 18/18 缺欄〕：新欄**僅對本契約生效後的新派工強制**；
+     既有 18 份 `brief-kind: stamp` 歷史 brief **明示不再重跑**，確需重跑者須先補 `stamp-target:` 欄。
+     **冪等**：同一 `(task_id, path)` 重複執行會多寫一筆 `committee_output`；append-only 語意下無害。
+     🔴 **明文不做（防 scope accretion；併自 D-001 §D7）**：
+     不改 `gate.sh register-output` 本身的任何驗證／不改 `verify_task_provenance.py`／
+     **不做 `committee_output` 去重或 provenance 快取**（屬線 C）／
+     **不對 brief 內的 task-id 文字做任何字面檢查**（無界字串空間，線 B 已實證此路不可行）。
+     🔴 **攻擊面盤點（併自 D-001 §D4，S1–S7）**：
+     **S1** `cx_run` 取得寫 `committee_output` 的權限＝新增權限面 ⇒ 受限於「brief 宣告的單一 `stamp-target`」＋
+     「該家族戳記已落地且 task 相符」，**嚴於現行人工路徑**；
+     **S2** `stamp-target` 可指任意 `handoffs/` 檔 ⇒ **未擴大既有能力**（主委本就能直呼 `register-output`）；
+     **S3** 委員仍可自行改寫戳記內容 ⇒ 屬蓄意繞過，**不在受理範圍**，記入 §A 誠實邊界 #15；
+     **S4** `stamp-target` 多值歧義 ⇒ 沿用 `brief-kind` 同型 fail-closed；
+     **S5** 改法⑨在 emit 之後執行且 `register-output` 失敗 ⇒ **不得回捲**、印可辨識錯誤、rc 不變（**V13** 驗）；
+     **S6** 實作漂移：以兩次檔案級 `grep` 交集代替單行匹配 ⇒ **非蓄意面**（抄既有寫法即會踩到），
+     predicate 契約明文禁止，**V14 為其常駐 mutation oracle**；
+     **S7** 開債後拒派留下無 family result 的 OPEN 債 ⇒ 驗證上移至 `committee_run.sh` 開債前，V4–V6 增驗。
+- **驗證（可證偽）**：`pytest tests/governance/test_debt_emit.py -q` 全綠；`pytest tests/governance/test_result_state_format_failed.py -q` 全綠；合法呼叫後 `family` 欄位為實際家族名（**非 `unknown`**）；`ROUND_ID=不存在的值` → rc≠0 且 audit 零新增；家族不在該輪名單 → rc≠0；CLI 回非 0 → 仍寫一筆 result；**對最新已 `success` 的家族重派 → rc≠0 且 audit 零新增**；**`format-failed` 後同輪重派 → 允許**；**`success` 的 result 含非空 `output_sha256` 且等於當時產出檔的 sha256；`failed` 的 result `output_sha256` 為空字串；`format-failed` 的 result 含非空 sha**（三態分別驗，不得混為一條）；**orphan-success 否定 oracle：格式紅時 audit 最新不得為 `success`**；
+  **改法⑧⑨ 的驗收契約＝下表 V1–V16**〔VERIFY-EXEMPT:doc-example:v-table-contract　本表為
+  **驗收契約**（規定「須通過什麼」），非宣稱已實跑；實跑 receipt 由執行端於 Phase Gate 提交〕
+  （**V1–V15 逐字併自 D-001 §D5，V16 為三值後新增**；測試檔
+  `tests/governance/test_stamp_taskid_inject.py`）。🔴 **每條斷言須通過 mutation 檢查：
+  閹割對應守衛 ⇒ 該條轉紅；復原 ⇒ 轉綠，逐條附 receipt**（v2.9 B1 三家裁決要求）。
+  🔴 **不得以「該測試檔存在且全綠」代替本表**——那會把驗收契約稀釋為「測檔存在」。
+
+| # | 斷言 | 通過條件 |
+|---|---|---|
+| V1 | 合法輪次、`CX_STUB_MODE=success` | prompt 含 `你的 task-id=<open_ev.task_id>` 逐字 |
+| V2 | `open_ev` 缺 `task_id` | rc≠0 且 audit **零新增** |
+| V3 | `open_ev` 的 `task_id` 為空字串 | rc≠0 且 audit 零新增 |
+| V4 | `brief-kind=stamp` 缺 `stamp-target:` | rc=2，未啟動 CLI，**且 audit 逐位元組零新增**（含**無** `committee_dispatch`、**無**散文區塊、**無** `committee_round_open`）、**未發 token** |
+| V5 | `stamp-target` 兩個不一致宣告 | 同 V4 全部條件 |
+| V6 | `stamp-target` 指 `handoffs/` 外／含 `..`／檔不存在 | 同 V4 全部條件（**三態分別驗，不得合併為一條**） |
+| V7 | stub 成功且目標檔含**相符**戳記行 | 產生恰一筆 `committee_output`，`output_path`＝`stamp-target`，`output_sha256`≠`pending` |
+| V8 | stub 成功但目標檔**無**該家族戳記 | **零** `committee_output`；`cx_run` rc 與無此改法時相同 |
+| V9 | 目標檔有該家族 `APPROVED` 但 `task:` 是**別的 id** | 零 `committee_output`（本改法的核心防線） |
+| V10 | 目標檔為該家族 `REJECTED` | 零 `committee_output`；rc 不變 |
+| V11 | CLI rc≠0 | 零 `committee_output`；`committee_family_result` 仍寫且 `result_state=failed` |
+| V12 | `brief-kind` ∈ {review, consult, closure, impl} 且 brief 無 `stamp-target:` | 行為與本契約生效前**逐位元組相同**（不誤擋回歸） |
+| **V13** | 三條件皆成立、但 `register-output` 本身 rc≠0（例：該 task 無先行 `committee_dispatch`） | 印**可辨識錯誤字串**；`committee_family_result` 仍為 `success`；零 `committee_output`；**且此態與 V8/V10 的合法 no-op 機械可分** |
+| **V14** | 目標檔含**兩行**戳記：A 家族 `APPROVED`＋錯 task／B 家族正確 task | **零** `committee_output`。🔴 **本條為「單一 regex predicate」的常駐 mutation oracle**：把 predicate 改成兩次獨立 `grep` 取交集 ⇒ **本條必須轉紅**〔`CODEX-R1-P2-05`＋`COMPOSER-R1-P2-02`〕 |
+| **V15** | 家族／`APPROVED`／日期／`task:` 全相符，但 `sha256:` **非**該檔當下 body hash | **零** `committee_output`〔`CODEX-R1-P1-01`＋`COMPOSER-R1-P2-01`〕 |
+| **V16** | **CLI rc=0、產出非空，但 findings-kind 格式檢查失敗**（`result_state=format-failed`） | **零** `committee_output`（**三值後新增**；註冊條件 1 僅 `success`） |
+
+🔴 **V13–V15 為 R9 補漏**〔`GROK-R9`／`CODEX-R9` 命中〕：主委首版只併 V1–V12，
+**漏掉 V13／V14／V15**。成因＝主委的抽取式寫成 `^\| *V[0-9]`，**匹配不到 `| **V13** |` 這種粗體列**
+——**機械檢查本身寫錯，卻據以宣稱「V1–V12 逐列併回」**。實際 D-001 §D5 為 **15 列**。
+⚠️ **V14 是本節最關鍵的一條**：它是「禁止兩次 grep 交集」那條 predicate 契約的**唯一 oracle**；
+只併禁令而漏掉 oracle，等於留下一條無法證偽的約束。
+⚠️ 主委另**自行發明**一個 V13（format-failed），與 D-001 真實 V13 撞號，已改編為 **V16**。
 - **邊界（≥2）**：①`ROUND_ID` 未設 → 拒派 ②並發 3 家 → 3 筆完整不交錯 ③audit 檔不存在 → 建立而非崩潰
 - **存活至**：永久保留　**覆蓋風險**：無
 - 不可做：不得從產出路徑推導家族；不得把 CLI 執行放進鎖的臨界區
@@ -381,6 +547,17 @@
   | M21 | 銷帳接受 `mode=discovery` 的 lock（P0/P1 缺來源摘要仍可銷帳） | `test_clear_requires_review_mode_lock` |
   | M22 | 帳本序號缺號時 `--abandon` 也被 fail-closed（死鎖復現） | `test_abandon_survives_sequence_gap` |
   | M23 | 以 `{` 開頭但 JSON 解析失敗的行被靜默忽略 | `test_corrupt_json_line_fail_closed` |
+  | **M35** | 🔴 **emit 順序被還原**（`_emit_family_result` 早於格式檢查）⇒ **orphan-success 復發** | `test_result_state_format_failed.py`（orphan-success 否定 oracle） |
+  | **M36** | `format-failed` 被降級記成 `success`（三值退回二值） | 同上檔的三態 `output_sha256` 斷言 |
+  | **M37** | 格式 checker 不存在／不可執行時 **fail-open** 記 `success` | 同上檔的 checker-missing fail-closed 斷言 |
+  | **M38** | `format-failed` 時 process rc 被改成 0（整輪看似全綠）〔VERIFY-EXEMPT:doc-example:m38-mutation　本欄描述「改壞後應轉紅」的假設情境，非宣稱已實跑〕 | 同上檔的 exit 3 斷言 |
+
+  🔴 **M35–M38 為 R 重開（v3.0）新增**〔`COMPOSER-R8-P2-02`＋`GROK-R8-P2-02` 兩家獨立命中：
+  §V 自稱「類別清單以本節為唯一來源」，卻**未登記** `format-failed`／orphan-success／emit 順序探針〕。
+  承載檔為 `tests/governance/test_result_state_format_failed.py`。
+  ⚠️ **本組原編為 M24–M27，與既有 M24／M25／M26／M27 撞號**〔`GROK-R9-P0-01`〕
+  ——主委**未先盤點 ID 空間就直接追加表列**。§V 既有 ID 為 **M1–M34**（含 M12b／M12c），故改編 M35–M38。
+  🔴 **新增本表列前必須先跑**：`grep -oE '^\s*\| \*{0,2}M[0-9]+[a-z]?' <本檔> | sort -u` 確認不撞號。
   | M24 | 銷帳不比對 `output_sha256`（交件後替換內容仍可銷帳） | `test_clear_detects_stale_output` |
   | M25 | 對最新已 `success` 的家族允許重派（可自咬卡住銷帳） | `test_reject_redispatch_of_success_family` |
   > **刻意不設 mutation 的項目**：`dispatch → committee_round_open` 之間的窗口（§A 誠實邊界 2b）**已依裁決 4 明文接受為誠實邊界**，故**不為它設 mutation**。設了等於要求測試擋住一件 SPEC 自己宣告不擋的事，屬自相矛盾。

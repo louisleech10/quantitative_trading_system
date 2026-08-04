@@ -293,11 +293,22 @@ bash scripts/restore_golden_inventory.sh     # 跑完測試後還原 golden inve
 - **輸入**：`ROUND_ID`（Task 1.2 傳入）　**輸出**：`scripts/cx_run.sh` 改造
 - **實作要點**：
   1. **家族名由 `$1` 直取**，**不得從路徑或 review_role 推導**（推導錯會記成 `unknown`，整本帳報廢）。
-  2. `result_state` **二值**：`success`＝產出存在且非空且 `cli_rc==0`；其餘一律 `failed`。**CLI 失敗仍要寫一筆並帶 `cli_rc`，不得靜默。**
+  2. 🔴 **`result_state` 三值**（**R 修訂／P16 v3.0，2026-08-04**；本條原為二值，已作廢）
+     〔`COMPOSER-R8-P1-01`＋`GROK-R8-P1-03`＋`CODEX-R8-P1-04` 三家獨立命中：
+     本 TODO 仍鎖二值，與 v3.0 凍結契約及已上線 runtime 矛盾，**若仍被當派工 SoT 會重現 R4 orphan-success 語意**〕：
+     - `success`＝產出存在且非空且 `cli_rc==0`，**且**（brief-kind ∈ {review,consult,closure} 時）格式合規
+     - `format-failed`＝`cli_rc==0` 且產出非空但格式檢查失敗（含 checker 缺席的 fail-closed）；**非空** `output_sha256`；process **exit 3**
+     - `failed`＝`cli_rc!=0` 或產出空；`output_sha256` 空字串
+     🔴 **格式檢查必須在 audit append 之前**。**CLI 失敗仍要寫一筆並帶 `cli_rc`，不得靜默。**
+     **權威定義見** `docs/P16_COMMITTEE_DEBT_SPEC.md` v3.0 Task 1.3 改法②。
   3. **六道 fail-closed 前置**（缺一不可）：`ROUND_ID` 已設／audit 有對應 `committee_round_open`／該家族在該輪名單內／產出路徑與登記一致／**本次 brief 的 sha256 == 開債時記錄的 brief sha256**／**該 `(round,family)` 最新 `result_state` 不是 `success`**。
      > 第 5 道是 R2 codex 的 P0：沒有它可以**換一份 brief 掛在既有輪次上**。
      > 第 6 道防「一直重跑到拿到想要的答案」。
-  4. **產出指紋 `output_sha256`**：`success` 填實際 sha256，**`failed` 填空字串**（R2 codex P1-04：v2.1 曾同時要求「失敗仍寫」與「每筆須有非空 sha」，兩者互斥）。
+  4. **產出指紋 `output_sha256`**（🔴 **三態，R 修訂／P16 v3.0**〔`COMPOSER-R9-P2-02`：本欄原只寫兩態，
+     與同檔已更新的三值正文殘留漂移——**主委改了正文卻漏改驗證欄**〕）：
+     `success` 填實際 sha256／**`format-failed` 亦填非空 sha256**（產出存在，只是格式不合規）／
+     **`failed` 填空字串**（R2 codex P1-04：v2.1 曾同時要求「失敗仍寫」與「每筆須有非空 sha」，兩者互斥）。
+     **空 sha 例外僅 `failed`**，三態分別驗，不得混為一條。
   5. **同輪重派明確允許（限尚未成功者）**，不需開新輪、不需補派機制；每次重派**各寫一筆，append-only 不覆蓋**。**不設重派次數上限。**
 - **修改檔案（到函式名）**：`scripts/cx_run.sh` — 新增 `_assert_round_preconditions()`（六道）、`_compute_output_sha()`、`_emit_family_result()`；既有 CLI 呼叫收尾處
 - **既有 caller**：`scripts/committee_run.sh`（Task 1.2）；**可被直呼**（SPEC §A 誠實邊界 2 已列，本版以 membership 檢查限制危害但擋不住）

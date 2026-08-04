@@ -55,7 +55,14 @@ def test_registry_is_v2_shape() -> None:
         "collection-failed",
     ]
     assert registry["enums"]["round_state"] == ["OPEN", "CLOSED", "ABANDONED"]
-    assert registry["enums"]["result_state"] == ["success", "failed"]
+    # 契約擴張（GOVFLOW Task 2.2 / D-003）：二值 → 三值。
+    # 非弱化——新增 format-failed 收窄 success 語意；failed 保留；
+    # 空 sha 例外仍僅 failed。舊 assert 鎖的是「僅 success|failed」舊契約。
+    assert registry["enums"]["result_state"] == [
+        "success",
+        "failed",
+        "format-failed",
+    ]
     assert "abandon_kind" in registry["debt_events"]["debt_abandon"]["fields"]
     assert "remediation_owner" not in registry["debt_events"]["debt_abandon"]["fields"]
     assert "output_sha256" in registry["debt_events"]["committee_family_result"]["fields"]

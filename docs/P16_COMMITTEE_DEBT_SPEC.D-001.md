@@ -1,5 +1,24 @@
 # P1-6 委員未結案債狀態機 — SPEC 延伸 D-001
 
+> ## 🔴 本檔已因 R 重開而失效（SUPERSEDED-BY-R，2026-08-04）
+>
+> **失效依據**：`docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1
+> ——「**R 重開**：既有設計被證偽 ⇒ 原檔重跑完整對抗審，**原戳記作廢，該原檔的所有延伸檔一併失效**」。
+> v2.0 明列此為**不可收窄的安全閥**：「R 仍**全量作廢**延伸檔，不做『只作廢重疊者』」。
+>
+> **觸發本次 R 的修訂**：GOVFLOW Task 2.2——`result_state` 由二值擴為三值
+> （`success`／`failed`／`format-failed`），且 `success` 語意被 R4 事故**證偽並收窄**。
+> 依 TODO Task 2.2「預設走 R」「實作者不得自行選較輕路徑」，使用者未裁定 D ⇒ 走 R。
+>
+> 🔴 **本檔內容未被丟棄**：§D2（改法⑧ `task_id` 注入）與 §D3（改法⑨ `stamp-target` 前置驗證）
+> **已逐字併回** `docs/P16_COMMITTEE_DEBT_SPEC.md` 的 **Task 1.3 改法⑧⑨**，
+> §D5 驗證併入該 Task 的「驗證（可證偽）」欄。**相關行為已上線且有測試**
+> （`tests/governance/test_stamp_taskid_inject.py`），故不得只作廢不併回——
+> 否則會出現「行為在跑但無契約」。
+>
+> **本檔戳記一併作廢**，不得再作為任何派工的授權來源。
+> 保留本檔僅供追溯；**新的授權來源＝R 後的 P16 本體與其新戳記**。
+
 BASE: docs/P16_COMMITTEE_DEBT_SPEC.md @ 416f196212cdcde5acb99b536741a834f6d7a3cb
 PREDECESSOR: none
 改什麼: Task 1.3 增訂 `cx_run.sh` 兩項行為——⑧ `task_id` 由 audit 導出並注入 prompt；⑨ `brief-kind=stamp` 於戳記落地後自動 `register-output`

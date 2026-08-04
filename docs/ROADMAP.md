@@ -322,8 +322,12 @@
     （v1.0 的戳記只綁收斂檔本體，條文改動不會失效——此為 v2.0 的改進）。
   - `docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md`（v1.0）**已標記 SUPERSEDED**，檔頭附 v1.0→v2.0 節號對照表。
   - 活引用同步：`scripts/template_check.sh` 的 dext 錨點來源改指 v2.0 §2.2。
-    `handoffs/**` 為歷史紀錄，**不改寫**；`docs/P16_COMMITTEE_DEBT_SPEC.D-001.md` 的引用在 v2.0 §2 語意下仍成立，
-    且它是已戳記產物，**刻意不動**（讀者循 v1.0 檔頭對照表即可）。
+    `handoffs/**` 為歷史紀錄，**不改寫**。
+    🔴 **2026-08-04 更正**：本行原稱「`docs/P16_COMMITTEE_DEBT_SPEC.D-001.md` 的引用……**仍成立**，
+    且它是已戳記產物，刻意不動」——**該敘述已失效**。GOVFLOW Task 2.2 使 P16 走 **R 重開**（v3.0），
+    依 v2.0 §2.1「R 使該原檔的**所有延伸檔一併失效**、原戳記作廢」，D-001 已標 `SUPERSEDED-BY-R`，
+    **不再是任何派工的授權來源**；其內容已併回 P16 v3.0。
+    〔`CODEX-R8-P0-03`：repo 仍有可執行者讀到的 D-001 active authority，**且 ROADMAP 明示該引用仍成立**。〕
   - **階段 1（工具實作）尚未開始**；硬前置＝`GOV-DOCS-STAMP-PROVENANCE`（條文 §6.3 已裁決）。
   - 新票：`GOV-COMPLETENESS-IDLIKE-FP`、**重啟 `D-003`（`result_state` 收窄，已有具體事故）**、`GOV-ROLEGATE-PREDISPATCH`。
 

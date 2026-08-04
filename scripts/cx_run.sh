@@ -286,17 +286,27 @@ _compute_output_sha() {
 }
 
 _emit_family_result() {
-  # $1=cli_rc；家族名直取 $fam；不得從路徑推導
+  # $1=cli_rc  $2=fmt_rc（可選，預設 0）
+  # 家族名直取 $fam；不得從路徑推導。
+  # 契約（GOVFLOW Task 2.1 / D-003）：格式檢查須在本函式之前完成；
+  #   cli_rc==0 且產出非空 且 fmt_rc!=0 → format-failed + 非空 sha
+  #   cli_rc==0 且產出非空 且 fmt_rc==0 → success + 非空 sha
+  #   其餘 → failed + 空 sha（audit_append 空 sha 例外僅 failed）
   local cli_rc="$1"
+  local fmt_rc="${2:-0}"
   local result_state="failed"
   local out_sha=""
   local attempt_id
 
   if [ "${cli_rc}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
-    result_state="success"
     out_sha="$(_compute_output_sha "${out}")" || return 1
+    if [ "${fmt_rc}" -ne 0 ] 2>/dev/null; then
+      result_state="format-failed"
+    else
+      result_state="success"
+    fi
   else
-    # failed：output_sha256 填空字串（與 success 互斥）
+    # failed：output_sha256 填空字串（與 success／format-failed 互斥）
     result_state="failed"
     out_sha=""
   fi
@@ -383,15 +393,64 @@ _maybe_register_stamp_output() {
   return 0
 }
 
+_write_stub_success_output() {
+  # CX_STUB_MODE=success：findings-kind 寫最小合法四欄 finding（裁定採①）；
+  # impl/stamp 維持 stub-ok（不誤觸 format 檢查）。
+  # 禁止 GOVERNANCE_TEST_HARNESS=1 時跳過格式檢查（SPEC 硬約束）。
+  case "${_bk}" in
+    review|consult|closure)
+      local fam_u
+      fam_u="$(printf '%s' "${fam}" | tr '[:lower:]' '[:upper:]')"
+      {
+        printf '## %s-R1-P2-01\n\n' "${fam_u}"
+        printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\n\n'
+        printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\n\n'
+        printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\n\n' "${fam}"
+        printf 'stub harness body\n'
+      } > "${out}"
+      ;;
+    *)
+      printf 'stub-ok family=%s\n' "${fam}" > "${out}"
+      ;;
+  esac
+}
+
+_run_format_check_if_needed() {
+  # $1=cli_rc → stdout 印 fmt_rc（0=合規／跳過；非 0=不合規或 checker 不可用）
+  # 只對 findings-kind 且 cli 成功且產出非空跑格式檢查。
+  # 🔴 順序契約：本函式必須在 _emit_family_result 之前呼叫。
+  # 不用全域／local 跨函式寫回——bash local 對子函式不可見。
+  local _cli="$1"
+  local _rc=0
+  case "${_bk}" in
+    review|consult|closure)
+      if [ "${_cli}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
+        local _cc="${SCRIPT_DIR}/completeness_check.sh"
+        # fail-closed：checker 不存在／不可讀／bash 無法執行 → 不得記 success
+        if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then
+          echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2
+          _rc=127
+        else
+          bash "${_cc}" --single "${out}" --family "${fam}" >&2 || _rc=$?
+        fi
+      fi
+      ;;
+  esac
+  printf '%s' "${_rc}"
+}
+
 _run_cli_and_emit() {
   # 前置已過；執行 CLI（或 stub）後寫 result。CLI 不在 audit 鎖內。
   # 契約（SPEC Task 1.3 改法④）：CLI launch failure 仍須寫 failed result 帶 cli_rc，不得靜默 exit。
+  # 契約（GOVFLOW Task 2.1）：格式檢查 → emit（含 format-failed）→ 再 exit。
+  #   順序是規則本身——audit append-only，success 一旦寫入不可變。
   local cli_rc=0
+  local _fmt_rc=0
   _capture_prompt_if_harness
   if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ] && [ -n "${CX_STUB_MODE:-}" ]; then
     case "${CX_STUB_MODE}" in
       success)
-        printf 'stub-ok family=%s\n' "${fam}" > "${out}"
+        _write_stub_success_output
         cli_rc=0
         ;;
       fail_rc)
@@ -402,9 +461,11 @@ _run_cli_and_emit() {
         cli_rc=0
         ;;
       *)
+        # 未知 stub：仍遵守「格式檢查（此處跳過）→ emit → exit」同一順序
         echo "ERROR: 未知 CX_STUB_MODE=${CX_STUB_MODE}" >&2
         cli_rc=2
-        _emit_family_result "${cli_rc}" || {
+        _fmt_rc="$(_run_format_check_if_needed "${cli_rc}")"
+        _emit_family_result "${cli_rc}" "${_fmt_rc}" || {
           echo "ERROR: 寫入 committee_family_result 失敗" >&2
           exit 1
         }
@@ -442,48 +503,32 @@ _run_cli_and_emit() {
         ;;
     esac
   fi
-  _emit_family_result "${cli_rc}" || {
+
+  # ---------------------------------------------------------------------------
+  # GOVFLOW-B2 / D-003：格式檢查**必須**在 audit append 之前。
+  #
+  # 病根：舊順序 = emit success → 再 completeness_check → exit 3，
+  #   audit append-only ⇒ success 不可變 ⇒ 守衛⑥永久拒重派 ⇒ 只能 abandon。
+  # 本 session 主委實踩三次（B0 review／B1 review／R6 grok）。
+  #
+  # 只對「產 findings 的 brief-kind」檢查（review／consult／closure）。
+  # impl／stamp 產出依契約無 canonical finding ID，判準與行為皆不變。
+  # 禁止 GOVERNANCE_TEST_HARNESS=1 時跳過格式檢查。
+  # ---------------------------------------------------------------------------
+  _fmt_rc="$(_run_format_check_if_needed "${cli_rc}")"
+  _emit_family_result "${cli_rc}" "${_fmt_rc}" || {
     echo "ERROR: 寫入 committee_family_result 失敗" >&2
     exit 1
   }
   # 改法⑨：emit 之後才嘗試 register-output（不回捲 family_result）
+  # stamp kind 不跑格式檢查；format-failed 不會出現在 stamp 路徑
   _maybe_register_stamp_output "${cli_rc}"
 
-  # ---------------------------------------------------------------------------
-  # GOV-FORMAT-SSOT 症狀 B（2026-08-02）：委員產出格式**交件當下**就檢查。
-  #
-  # 病根＝格式檢查在 reconcile 收集時才跑，交件端無任何機制擋下。
-  #   實證：本 session 最近 4 輪委員派工，**3 輪因格式缺陷無法正常銷帳**——
-  #   線 C 輪（composer `來源摘要` 非 hex digest）／fail-open consult 輪（composer 戳記寫成
-  #   `## RECONCILE-STAMP` 標題）／T2 review 輪（codex heading 帶尾綴文字＋composer 同前）。
-  #   每次的代價＝整輪只能 `--abandon --kind collection-failed`。
-  #
-  # ⚠️ **此處刻意不改 `result_state`**：SPEC:265 改法② 逐字定義
-  #   `success`＝「產出存在且非空且 `cli_rc==0`」。把「格式合規」加進 success 條件
-  #   是**收窄凍結契約**，須走 `FROZEN_DOC_AMENDMENT_PROCEDURE` 的 D 延伸（草案 D-003），
-  #   不得在此就地改。故本處只做**立即現形**：診斷寫 stderr、rc 反映不合格。
-  #   ⇒ 主委在交件當下就知道，不必等到 reconcile 才發現整輪要重來。
-  # 誠實邊界：`result_state` 未收窄前，守衛⑥（最新 success 拒重派）仍會把
-  #   「產出不合格」與「產出合格但主委不滿意」當同一件事 ⇒ 同輪重派仍受限，
-  #   完整解在 D-003。**此處不假裝已完全解決。**
-  # ---------------------------------------------------------------------------
-  # ⚠️ **只對「產 findings 的 brief-kind」檢查**（review／consult／closure）。
-  #    `impl`／`stamp` 產出依契約本來就沒有 canonical finding ID，
-  #    無條件檢查會把它們全判不合規（實測：44 條既有測試因此轉紅）。
-  #    判準與 `brief_conformance_check.sh` 的分類**同源**（同一組 kind 白名單）。
-  _fmt_rc=0
-  case "${_bk}" in
-    review|consult|closure)
-      if [ "${cli_rc}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
-        bash "${SCRIPT_DIR}/completeness_check.sh" --single "${out}" --family "${fam}" >&2 || _fmt_rc=$?
-      fi
-      ;;
-  esac
   if [ "${_fmt_rc}" -ne 0 ]; then
     echo "[cx_run] ⚠️ ${fam} 產出**格式不合規**（見上）：${out}" >&2
-    echo "[cx_run]    這會使 reconcile 收集時 completeness 拒銷、整輪只能 --abandon。" >&2
+    echo "[cx_run]    audit 已記 result_state=format-failed（可同輪重派；debt_clear 仍拒銷帳）。" >&2
     echo "[cx_run]    請於此時修正或重派，勿等到收集節點才發現。" >&2
-    echo "[cx_run] ${fam} done rc=${cli_rc} out=${out}（格式不合規）"
+    echo "[cx_run] ${fam} done rc=${cli_rc} out=${out}（格式不合規 → exit 3）"
     exit 3
   fi
 

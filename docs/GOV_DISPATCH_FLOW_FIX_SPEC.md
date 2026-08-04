@@ -242,7 +242,10 @@ RISK-HIT: b
 
 **Task 2.2 — P16 凍結契約同步（依賴：Task 2.1）**
 - 目標：`result_state` 的擴張同步到凍結契約，避免三方漂移。
-  檔案：`docs/P16_COMMITTEE_DEBT_SPEC.md`（`enums.result_state` 相關 heading，現寫二值）。
+  檔案：`docs/P16_COMMITTEE_DEBT_SPEC.md`（`enums.result_state` 相關 heading）。
+  🔴 **2026-08-04 狀態更新**：本 Task 已執行，P16 走 **R 重開 → v3.0**，該檔現為**三值**；
+  D-001 已標 `SUPERSEDED-BY-R` 並將內容併回本體。本行原寫「現寫二值」為**執行前的現況描述**，
+  已過時〔`COMPOSER-R8-P2-03`＋`GROK-R8-P2-03`：交叉引用殘留〕。
 - 🔴 **改法：預設 R**（rev2 寫「合併為單一 D 延伸」，R2 兩家皆判**不可默認**）
   〔`GROK-R2-P1-03`：`success` 語意被 R4 事故**證偽**並收窄，不是錯字級補充，
   依 v2.0 §2.1「爭議一律預設 R」；`COMPOSER-R2-P1-04`：建議 D 但**不可無裁定默認 D**〕：
@@ -372,7 +375,7 @@ RISK-HIT: b
 | `reconcile_add_stamp_section.sh`／`reconcile_clear_stamps.sh` | completeness | 1 | 既有測試 |
 | `gov_check.sh`／`doc_format_precheck.sh`／`draft_selfcheck.sh` | completeness／claim | 1, 4 | 既有測試 |
 | `verify_task_provenance.py` | stamp provenance | 4 | `test_stamp_taskid_inject.py` |
-| `docs/P16_COMMITTEE_DEBT_SPEC.md` | 凍結契約（二值） | 2 | Task 2.2 的戳記機檢 |
+| `docs/P16_COMMITTEE_DEBT_SPEC.md` | 凍結契約（**v3.0 三值**，R 重開後） | 2 | Task 2.2 的戳記機檢 |
 | `scripts/debt_ledger.sh` | 包裝 ledger／clear 路徑 | 2 | `test_debt_clear.py` |
 | `scripts/set_roles.sh` | 寫角色 SoT | 3 | `test_rolegate_predispatch.py` |
 | `scripts/verify_role_gate.sh` | 角色閘 oracle | 3 | 同上 |

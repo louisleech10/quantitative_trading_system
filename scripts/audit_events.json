@@ -14,7 +14,7 @@
     "actor": "呼叫端提供的留痕字串。",
     "lock_mode": "sources.lock 的模式；review 才能進入正常銷帳。",
     "brief_sha256_norm_algo": "sha256(unify_newline(content) 後逐行移除行尾空白，再以 LF 連接)。",
-    "result_state": "success 代表 CLI 成功且產出非空；其餘狀態為 failed。",
+    "result_state": "三值：success＝CLI 成功且產出非空且（findings-kind 時）格式合規；format-failed＝CLI 成功且產出非空但格式不合規（非空 output_sha256，可同輪重派，不可銷帳）；failed＝CLI 失敗或產出空（output_sha256 空字串）。",
     "unknown_event_policy": "post-cutoff 出現於 P16 命名空間但未登記的事件，fail-closed 拒認。",
     "family_valued_fields": "列於 family_valued_fields 的欄位值必須來自 governance_families.json。",
     "spec_non_event_tokens": "SPEC 會提及但不是事件名的 P16 token。",
@@ -156,7 +156,8 @@
   "enums": {
     "result_state": [
       "success",
-      "failed"
+      "failed",
+      "format-failed"
     ],
     "round_state": [
       "OPEN",

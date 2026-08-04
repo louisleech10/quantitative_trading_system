@@ -1,0 +1,14 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 13 items / 9 deselected / 4 selected
+
+tests/governance/test_result_state_format_failed.py::test_mutation_t2_m35_emit_order_orphan_success PASSED [ 25%]
+tests/governance/test_result_state_format_failed.py::test_mutation_t2_m36_degrade_format_failed_to_success PASSED [ 50%]
+tests/governance/test_result_state_format_failed.py::test_mutation_t2_m37_checker_missing_fail_open PASSED [ 75%]
+tests/governance/test_result_state_format_failed.py::test_mutation_t2_m38_format_failed_exit_zero PASSED [100%]
+
+======================= 4 passed, 9 deselected in 4.68s ========================
