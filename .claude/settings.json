@@ -18,6 +18,12 @@
       "Bash(git branch*)",
       "Bash(git stash*)",
       "Bash(git fetch*)",
+      "Bash(git show *)",
+      "Bash(git rev-parse*)",
+      "Bash(git reset HEAD*)",
+      "Bash(git reset -q HEAD*)",
+      "Bash(git reset --soft*)",
+      "Bash(git reset --mixed*)",
       "Bash(find . *)",
       "Bash(grep *)",
       "Bash(ls *)",
@@ -81,7 +87,7 @@
       "Bash(nohup *)"
     ],
     "ask": [
-      "Bash(git reset*)",
+      "Bash(git reset --hard*)",
       "Bash(git rebase*)",
       "Bash(git checkout -- *)",
       "Bash(git restore *)",
