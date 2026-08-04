@@ -33904,3 +33904,26 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r2-stamp2-codex.md", "output_sha256": "8c2d5f99643a055bcf68bb282091b886eb09b0a286d8a61d0d6e7ea49ecddbf7", "task_id": "GOVB0-R2-STAMP2", "ts": "2026-08-04T16:44:56Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r2-stamp2-composer.md", "output_sha256": "7ee6cdb4141010404433cfd5e48467db6880a365aa3a7381036c09f34ff9cdf0", "task_id": "GOVB0-R2-STAMP2", "ts": "2026-08-04T16:44:56Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r2-stamp2-grok.md", "output_sha256": "e6da6470c7badeecdb87cc5c5e1e30fc0c89d78e7f52b671dae65a26da7d19c0", "task_id": "GOVB0-R2-STAMP2", "ts": "2026-08-04T16:44:56Z"}
+{"actor": "cx_run", "attempt_id": "774424cc-50db-4b40-b610-3fb20887c993", "cli_rc": "0", "event": "committee_family_result", "event_id": "aab4e671-dbea-4afc-a3e3-04dc1cae88b3", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-spec-r3-composer.md", "output_sha256": "7cd8c5eee312793b7044c09deab4c7a1b46603fbd3f4a5930b006fd840bf437a", "producer": "audit_append.sh", "result_state": "success", "round_id": "f636f7db-96fa-418e-95af-04f5e3dca3df", "schema_version": 1, "sequence": 682, "ts": "2026-08-04T16:50:38Z"}
+{"actor": "cx_run", "attempt_id": "eaf33a3e-04cd-4164-8253-e7cdf09b515e", "cli_rc": "0", "event": "committee_family_result", "event_id": "ef66634d-0187-429b-9593-1ff82de09b96", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-spec-r3-codex.md", "output_sha256": "249421b4ab430afbbd0487450082317405310dacdf21fd1cb12a5abc1de9d6d5", "producer": "audit_append.sh", "result_state": "success", "round_id": "f636f7db-96fa-418e-95af-04f5e3dca3df", "schema_version": 1, "sequence": 683, "ts": "2026-08-04T16:52:54Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "dad15ea1-97d2-49ad-a4b5-28919c3926fa", "lock_sha256": "f1a4ddca780ac444214746e587539ccc259a7129c6cdba521c0dbe3cc2e6f812", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "f636f7db-96fa-418e-95af-04f5e3dca3df", "schema_version": 1, "sequence": 684, "session_id": "20260805-govb0-spec-r3", "synth_sha256": "f4c7dac69c464a0718efa2d072d5b50e4870480b90fb1677105b5599ee8d70f7", "ts": "2026-08-04T16:58:45Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVB0-R3-STAMP", "ts": "2026-08-04T17:01:49Z"}
+=== 2026-08-05 01:01:49 | dispatch ===
+  ts=2026-08-05 01:01:49
+  kind=dispatch
+  intent=第 0 批 SPEC R3 收斂戳記 - 逐條核對歸戶並對三組裁決表態
+  risk=low
+  facts_asked=歸戶是否正確, 三組裁決是否接受, accretion 是否真的中止
+  review_role=戳記複核
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-R3-STAMP-BRIEF.md", "brief_sha256": "b0273c5b5cf38e0cb7ca0c930154d7aec9076ac6749da13036723ddb0371bbbc", "brief_sha256_norm": "b0273c5b5cf38e0cb7ca0c930154d7aec9076ac6749da13036723ddb0371bbbc", "event": "committee_round_open", "event_id": "55382027-e7fb-46be-9b2c-5647f5a7f95d", "expected_outputs": {"codex": "handoffs/20260805-govb0-r3-stamp-codex.md", "composer": "handoffs/20260805-govb0-r3-stamp-composer.md", "grok": "handoffs/20260805-govb0-r3-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "dc3717e4-64c7-462d-aa5b-34084af230c3", "schema_version": 1, "sequence": 685, "session_name": "20260805-govb0-r3-stamp", "task_id": "GOVB0-R3-STAMP", "ts": "2026-08-04T17:01:49Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-spec-r3-codex.md", "output_sha256": "249421b4ab430afbbd0487450082317405310dacdf21fd1cb12a5abc1de9d6d5", "task_id": "GOVB0-SPEC-R3", "ts": "2026-08-04T17:01:59Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-spec-r3-composer.md", "output_sha256": "7cd8c5eee312793b7044c09deab4c7a1b46603fbd3f4a5930b006fd840bf437a", "task_id": "GOVB0-SPEC-R3", "ts": "2026-08-04T17:01:59Z"}
