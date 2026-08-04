@@ -32,6 +32,13 @@ Verdict: 需修補後合併 — 17 條全部歸戶，**無未分群 ID**。
 | E-10 | Task 3.1「一次真實派工」不足以定稿 timeout；缺樣本門檻 | `CODEX-R2-P1-07`／`COMPOSER-R2-P1-04` | **ACCEPT** — 採 composer Q4 門檻 |
 | E-11 | `票 B-34` 以權宜第三方戳記通過機檢，**非語意閉合** | `CODEX-R2-P0-06`／`COMPOSER-R2-P1-03` | **ACCEPT（明文化）** — 已開票，本批不解 |
 | E-12 | `B-24` 僅交付紀律面，TODO 未強制標「部分完成」 | `COMPOSER-R2-P2-02` | **ACCEPT** — TODO §0 強制標註 |
+| E-13 | **原型與契約有落差**：R2 要求契約第 3–5 項有測試，但主委原型②未實作多數項；實作者照抄原型會與 Task 2.0 驗收衝突 | `COMPOSER-R2-P1-01` | **ACCEPT** — Task 2.0 明文「禁止照抄原型即宣稱完成」，並逐項標示原型③已涵蓋／未涵蓋 |
+
+🔴 **E-13 是主委在第一版群集表**漏掉**的（`COMPOSER-R2-P1-01` 未列入任何 E 群）**，由 codex 與 composer
+在戳記輪**各自獨立**指出而拒章（`MISMATCH_1`）。
+⚠️ **這暴露 `completeness_check` 的一個盲點**：它驗「ID 是否出現在綜合檔」，附錄逐字保留使該 ID 必然存在
+⇒ **「ID 在檔案裡」rc=0，但「ID 進了群集表」沒有任何機器檢查**。
+本次是**委員抓到檢查器抓不到的東西**。已記為候選新票（見 `E-SCOPE` 下方「本輪新發現的檢查器盲點」）。
 
 **E-3 主委獨立驗證與解法（不採信執行端報告）**
 
@@ -67,13 +74,23 @@ R2 要求「並發時兩個成功產出皆不得遺失」，但資料模型只�
 - event object contract：`gate_deny` 的 `required_fields_per_event` 與 `match_rule` enum **完整寫入 `scripts/audit_events.json`**，
   R3 明列該檔須新增哪些 key（但**不在 SPEC 散文中列舉值**，符合範本規定）。
 
-**E-10 採用 composer Q4 的可執行門檻**
+**E-10 定稿門檻（🔴 主委首版弱化了 codex 主張，經戳記輪 `MISMATCH_2` 指出後改採較嚴者）**
 
-①Task 3.1 上線後每家族累積 **≥20 筆** `result_state=success` 且含 duration 三欄；
-②取各家族 `max(duration)` 與 `P99(duration)`（單調時鐘欄位，非 runlog proxy）；
-③`timeout_family = ceil(max(max, P99×1.25))`，外層 `= max(family_timeouts) + 15m`；
-④任一家族 <10 筆 ⇒ TODO 只能用暫定值並標 `PROVISIONAL`；
-⑤歷史 runlog proxy 僅作 sanity check，不可替代。
+兩家原始主張：composer Q4 ＝每家族 ≥20 筆、<10 筆時可用暫定值；
+`CODEX-R2-P1-07` ＝每家族 **≥50 筆**、**≥3 個不同 session／UTC 日期**、**未達門檻不得用暫定值**。
+主委首版只寫 composer 的 ≥20／<10 ⇒ **實質弱化 codex 主張**，且未標示分歧。**已改為：**
+
+①**定稿門檻（採 codex 較嚴者）**：每家族累積 **≥50 筆** `result_state=success` 且含 duration 三欄，
+  **且跨 ≥3 個不同 session／UTC 日期**（避免單日單批的取樣偏差）；composer 的 ≥20 僅作**中途 sanity check**。
+②取各家族 `max(duration)` 與 `P99(duration)`（**單調時鐘欄位，非 runlog proxy**）。
+③`timeout_family = ceil(max(max, P99 × 1.25))`；外層 `= max(family_timeouts) + 15m`。
+④**未達定稿門檻時的處置（主委裁決，兩家主張不同，此處明示取捨）**：
+  timeout **機制照常上線並以暫定值運作**，但 Task 3.3 **不得宣稱完工**，值須逐行標 `PROVISIONAL`，
+  且 `票 B-14` 保持「未定稿」狀態直到門檻達成。
+  🔴 **與 codex「未達門檻不得用暫定值」的差異與理由**：若嚴格照 codex，未達 50 筆前 timeout 不能上線，
+  但**無 timeout 正是 `B-14` 事故的成因**（空等 2h20m）。「有暫定 timeout」嚴格優於「無 timeout」，
+  故取「上線但不宣稱完工」。**若委員不同意此取捨，請於本輪拒章並寫明。**
+⑤歷史 runlog proxy（n=462）僅作 sanity check，**不可替代** Task 3.1 欄位。
 
 **E-SCOPE — 本批明確不受理範圍（依使用者定死「95% 解法就收」；R3 brief 須逐字宣告）**
 
@@ -87,6 +104,20 @@ R2 要求「並發時兩個成功產出皆不得遺失」，但資料模型只�
 🔴 **R3 brief 須逐字宣告**：上述四項**不受理**，委員若再提同一議題，請標為 `OUT-OF-SCOPE` 並附「若不做會怎樣」的
 具體失效場景即可，**不作為 BLOCKING**。
 🔴 **若委員認為某項不受理會導致本批交付物本身失效**（而非只是不夠完美），**該條仍可 BLOCKING**，但須寫明失效路徑。
+
+**E-SCOPE 的委員表態（第一次戳記輪，三家皆已回覆）**：
+codex 逐項確認四項**皆不使本批交付物本身失效**（`E-SCOPE_1`～`E-SCOPE_4`）；
+composer 與 grok 未就 `E-SCOPE` 提出反對。⇒ **不受理範圍已獲委員接受**，非主委單方宣告。
+
+**本輪新發現的檢查器盲點（候選新票，待 R3 輪裁定嚴重度）**
+
+`scripts/completeness_check.sh --lock` 只驗「來源 finding ID 是否出現在綜合檔」。
+由於綜合檔的**附錄逐字保留全部來源 findings**，任一 ID **必然存在** ⇒
+**「該 ID 有沒有被寫進群集／處置表」完全沒有機器檢查**。
+本輪實證：`COMPOSER-R2-P1-01` 未進群集表，`completeness --lock` 仍 **rc=0**；
+由 codex 與 composer 在戳記輪各自獨立指出才被發現。
+⇒ 收斂工具的「零掉項」保證，**只涵蓋檔案層，不涵蓋判斷層**。
+候選修法：`completeness_check` 增加「群集段須逐一引用每個來源 ID」的檢查（群集段＝`## 戳記` 之前、附錄之前的區段）。
 
 ---
 
