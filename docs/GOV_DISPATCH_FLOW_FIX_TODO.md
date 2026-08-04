@@ -37,9 +37,29 @@ R6 實際結果為**三家一致無 P0**（codex「TODO：GO」／grok 0 finding
    | Phase | TODO 表機械展開 | SPEC rev6 寫 | 判定 |
    |---|---|---|---|
    | 1 | **25**（`T1-U1..U18` 展開 18 ＋ M1／B1／B2／R1／I1／S1／S2 共 7；I1＝B1 硬前置；S1／S2＝phases==0 例外收窄） | 19 | ✗ 照 SPEC 漏 6 |
-   | 2 | **9** | 6 | ✗ 照 SPEC 漏 3 |
-   | 3 | **13**（T3-U1..U6／B1／B2／C1＝9 ＋ task_id 對稱 2 ＋ mutation 2；B3 實作擴表） | 8 | ✗ 照 SPEC 漏；以 TODO 機械計數為準 |
-   | 4 | **11** | 6 ＋ 5 ＝ 11 | ✓ 一致 |
+   | 2 | **13**（原記 9；`T2-C2`／`C3`／`M35`–`M38` 加列後未同步） | 6 | ✗ 照 SPEC 漏 7 |
+   | 3 | **20**（原記 13；`T3-U7`／`T3-T1`–`T4`／`M1`–`M5` 等加列後未同步） | 8 | ✗ 照 SPEC 漏 12 |
+   | 4 | **26**（11 ＋B4 `B3/M1/M2`＝14 ＋B4-FIX `N7/N8/N9/C2/N10/N11`＝20 ＋B4-FIX2 `U3/N12/N13/M3`＝24 ＋B4-FIX3 `N14/N15`＝26） | 6 ＋ 5 ＝ 11 | 表已擴；以 TODO 機械計數為準 |
+
+   🔴 **四格現值 `25/13/20/26`，全部已機械複驗**
+   （唯一合法 oracle ＝ `--collect-only`，**不是數表格列數**）：
+   `test_completeness_idlike_fp.py` → **25**（Phase 1）／
+   `test_result_state_format_failed.py` → **13**（Phase 2）／
+   `test_rolegate_predispatch.py` → **20**（Phase 3）／
+   `test_claimcheck_verbatim_exempt.py` → **26**（Phase 4）。
+   ⚠️ **表列數不可當 oracle**：Phase 1–3 用 `T1-U1..U18` 展開記法
+   （實測 `^\| T2-` 只有 7 列但 collect 13），**只有 Phase 4 是 1:1**。
+
+   ⚠️ **本表自身的漂移史（2026-08-04）**——**改正前四格是 `25/9/13/14`，四格錯三格**：
+   Phase 4 在 B4-FIX／B4-FIX2 兩輪加列後未同步（停在 `14`，當時實際 20→24）；
+   Phase 2／3 更早就漂（`9` vs 13、`13` vs 20）。
+   由 `CODEX-R15-P1-02`／`COMPOSER-R15-P1-01` 兩家獨立驗出，主委機械對照後改正；
+   B4-FIX3 加列 `N14/N15` 後 Phase 4 再由 24 → **26**。
+   🔴 **同一節的敘事段落又漏改一次**（表格改了、這段還寫 24）——
+   由 `COMPOSER-R16-P3-01` 抓到。**這已經是本表第四次漂移。**
+   **本條規則要求機械對照，而本表自己反覆漂**——
+   這正是 `票 B-17`（機器依賴表格改資料檔＋自動生成）要解的病：
+   **只要它還是手寫的，就會再漂。**
 
    🔴 **SPEC rev6 已凍結，不就地改**——依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md`
    走延伸檔。本 TODO **不阻塞於此**：實作端一律以上表機械數為準，
@@ -643,6 +663,21 @@ Task 0.1 淪為裝飾品，且 §R 「Phase 1/2/3 依賴 Phase 0」的耦合宣�
 | T4-B1 | 邊界 | 兩個 `## 附錄` ⇒ 行為具名 |
 | T4-B2 | 邊界 | 原註冊檔已刪／`sources.lock` 缺失 ⇒ 不豁免 |
 | T4-N6 | 否定 | `docs/` 一般文件無 backing 的 claim ⇒ **仍 FAIL** |
+| T4-B3 | 邊界 | 附錄後又現 `## 群集`（順序顛倒）⇒ 群集段仍不豁免（B4 加列） |
+| T4-M1 | mutation | `_appendix_exempt_line_numbers` 恒空 ⇒ 附錄 claim 轉紅（B4 加列） |
+| T4-M2 | mutation | `_is_committee_process_exempt` 恒 False ⇒ sources 副本轉紅（B4 加列） |
+| T4-N7 | 否定 | sources path 直註冊、無 lock ⇒ 不豁免（B4-FIX／P0-01） |
+| T4-N8 | 否定 | lock 指向同 basename 別檔 ⇒ 不豁免（B4-FIX／P0-02） |
+| T4-N9 | 否定 | sources 父目錄 symlink ⇒ 不豁免（B4-FIX／P0-03） |
+| T4-C2 | 契約 | staged lock ≠ worktree lock ⇒ 以 staged 為準（B4-FIX／P0-04） |
+| T4-N10 | 否定 | 附錄／群集 H2 無空行跨段 ⇒ 群集不豁免（B4-FIX／P1-05） |
+| T4-N11 | 否定 | synth 直註冊 ⇒ 群集段仍不整檔豁免（B4-FIX／P1-06） |
+| T4-U3 | 單元 | `committee_family_result` 登錄原檔 ⇒ sources 副本可豁免（B4-FIX2） |
+| T4-N12 | 否定 | family_result 登錄但副本 sha 不符 ⇒ 不豁免（B4-FIX2 對照） |
+| T4-N13 | 否定 | family_result 的 sha 為 `pending`／空 ⇒ 不豁免（B4-FIX2） |
+| T4-N14 | 否定 | 一般 `handoffs/<name>.md` 原檔僅有 family_result ⇒ **不**豁免（B4-FIX3／`CODEX-R15-P1-01`） |
+| T4-N15 | 否定 | `result_state=format-failed` 的 family_result ⇒ 不入 registry（B4-FIX3／`CODEX-R15-P1-01`） |
+| T4-M3 | mutation | 白名單移除 `committee_family_result` ⇒ 副本轉紅（B4-FIX2） |
 
 **Phase Gate**：T4-* 全綠（collected 數 **== 本表列數**，`--collect-only` 對照，🔴 **禁寫死數字**）
 ＋ 🔴 **隔離 clone 確認 commit 仍可進行** ＋

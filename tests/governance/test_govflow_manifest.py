@@ -133,17 +133,30 @@ def test_t0_u1_generator_rc0_nonempty() -> None:
 # T0-B1 — C 類缺檔時標 MISSING 而非跳過
 # ---------------------------------------------------------------------------
 def test_t0_b1_c_missing_listed() -> None:
-    """T0-B1: C 類缺檔時標 MISSING 而非跳過。"""
-    proc = _run_gen(REPO_ROOT)
-    assert proc.returncode == 0, proc.stderr
-    rows = _manifest_rows(proc.stdout)
-    # C 類缺檔探針：Phase 4 的 test_claimcheck_verbatim_exempt.py 尚未建立 → MISSING。
-    # （舊契約鎖 scripts/_role_gate.sh MISSING；B3 已建立該檔，改鎖仍缺的 C 類檔。
-    #   語意不變＝「C 類缺檔標 MISSING 而非跳過」。）
-    hit = [r for r in rows if r.startswith("tests/governance/test_claimcheck_verbatim_exempt.py|")]
-    assert len(hit) == 1, f"C 類 claimcheck 測試必須列出: {hit}"
-    parts = hit[0].split("|")
-    assert parts[3] == "MISSING", f"缺檔應標 MISSING，得 {parts[3]}"
+    """T0-B1: C 類缺檔時標 MISSING 而非跳過。
+
+    B4 已建立 test_claimcheck_verbatim_exempt.py ⇒ 主樹全 C 皆 present。
+    語意不變＝「C 類缺檔標 MISSING 而非跳過」：隔離樹刪除該 C 檔後仍須列出並標 MISSING
+    （B0→B3 慣例：前批落地後改鎖下一缺檔；全落地後改隔離刪檔探針）。
+    """
+    iso = _iso_tree("b1-missing-c")
+    try:
+        probe = iso / "tests" / "governance" / "test_claimcheck_verbatim_exempt.py"
+        assert probe.is_file(), "隔離樹應含 B4 已交付的 C 檔以便刪除探針"
+        probe.unlink()
+        proc = _run_gen(iso)
+        assert proc.returncode == 0, proc.stderr
+        rows = _manifest_rows(proc.stdout)
+        hit = [
+            r
+            for r in rows
+            if r.startswith("tests/governance/test_claimcheck_verbatim_exempt.py|")
+        ]
+        assert len(hit) == 1, f"C 類 claimcheck 測試必須列出: {hit}"
+        parts = hit[0].split("|")
+        assert parts[3] == "MISSING", f"缺檔應標 MISSING，得 {parts[3]}"
+    finally:
+        shutil.rmtree(iso, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -535,9 +548,12 @@ def test_t0_c4_nodeid_contract() -> None:
     """T0-C4: 獨立 expected-nodeid assertion。
 
     - 至少一個 present ``tests/**/*.py`` → nodeid == path
-    - 至少一個 MISSING C 項（尚未存在的測試檔）→ nodeid == ``-``
+    - 至少一個 MISSING C 項 → nodeid == ``-``
     ``nodeid_of()`` 若退化為全 ``-``，本測必須轉紅。
+
+    B4 後全 C 皆 present：MISSING 支改在隔離樹刪除 C 檔後驗證（語意不變）。
     """
+    # present 支：主樹
     proc = _run_gen(REPO_ROOT)
     assert proc.returncode == 0, proc.stderr
     rows = _manifest_rows(proc.stdout)
@@ -552,17 +568,25 @@ def test_t0_c4_nodeid_contract() -> None:
         f"T0-C4: present .py 的 nodeid 應為 path，得 {p_parts[2]!r}"
     )
 
-    # C 類尚未建立的測試檔（B3 已交付 test_rolegate_predispatch.py ⇒
-    # 探針改指仍 MISSING 的 Phase 4 檔；契約不變：MISSING C ⇒ nodeid == '-'）
-    # 非放寬斷言——仍鎖「至少一個 MISSING C 的 nodeid == '-'」。
-    missing_c = "tests/governance/test_claimcheck_verbatim_exempt.py"
-    assert missing_c in by_path, f"manifest 缺 MISSING C 項: {missing_c}"
-    m_parts = by_path[missing_c]
-    assert len(m_parts) == 4, m_parts
-    assert m_parts[3] == "MISSING", m_parts
-    assert m_parts[2] == "-", (
-        f"T0-C4: MISSING C 項 nodeid 應為 '-'，得 {m_parts[2]!r}"
-    )
+    # MISSING 支：隔離刪 B4 已交付的 C 檔
+    iso = _iso_tree("c4-missing-c")
+    try:
+        missing_c = "tests/governance/test_claimcheck_verbatim_exempt.py"
+        probe = iso / missing_c
+        assert probe.is_file(), "隔離樹應含 claimcheck 測試以便刪除"
+        probe.unlink()
+        proc_m = _run_gen(iso)
+        assert proc_m.returncode == 0, proc_m.stderr
+        by_m = {r.split("|")[0]: r.split("|") for r in _manifest_rows(proc_m.stdout)}
+        assert missing_c in by_m, f"manifest 缺 MISSING C 項: {missing_c}"
+        m_parts = by_m[missing_c]
+        assert len(m_parts) == 4, m_parts
+        assert m_parts[3] == "MISSING", m_parts
+        assert m_parts[2] == "-", (
+            f"T0-C4: MISSING C 項 nodeid 應為 '-'，得 {m_parts[2]!r}"
+        )
+    finally:
+        shutil.rmtree(iso, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------

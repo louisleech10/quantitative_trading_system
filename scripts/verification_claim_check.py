@@ -27,6 +27,19 @@ AUDIT_LOG_ENV = "VERIFY_GATE_AUDIT_LOG"
 COMMITTEE_AUDIT_ENV = "VERIFY_GATE_COMMITTEE_AUDIT_LOG"
 PENDING_LEDGER_ENV = "VERIFY_GATE_PENDING_LEDGER"
 
+# 委員會 audit 事件白名單（mutation 可 monkeypatch）。**兩組，語意不同**：
+#   committee_output       = 主委顯式 register-output（人為確認）
+#   committee_family_result = cx_run 委員完成當下自動寫入（harness，無人為確認）
+#
+# 🔴 `CODEX-R15-P1-01`：family_result 若進**全域** registry，
+#    則一般 `handoffs/<name>.md` 原檔也取得豁免（實測同一原檔 rc 1→0），
+#    範圍遠超 Task 4.1 所需。故 family_result **只**供 `sources/` 副本回退比對，
+#    一般 direct 分支維持原本兩個事件。
+_COMMITTEE_DIRECT_REGISTRY_EVENTS = frozenset({"committee_dispatch", "committee_output"})
+_COMMITTEE_SOURCES_REGISTRY_EVENTS = frozenset(
+    {"committee_dispatch", "committee_output", "committee_family_result"}
+)
+
 ZWSP_CHARS = "\u200b\u200c\u200d\ufeff"
 HYPHEN_CHARS = "\u2010\u2011\u2012\u2013\u2014\u2015\u2212"
 
@@ -381,8 +394,23 @@ def _committee_audit_path() -> Path:
     return Path(override) if override else DEFAULT_COMMITTEE_AUDIT_LOG_PATH
 
 
+# reconcile sources/ 副本：handoffs/reconcile/<session>/sources/<name>.md（單層 session/name，禁 ..）
+_SOURCES_COPY_RE = re.compile(
+    r"^handoffs/reconcile/([^./][^/]*)/sources/([^./][^/]*\.md)$"
+)
+# reconcile 收斂檔：handoffs/reconcile/<session>/synth.md
+_RECONCILE_SYNTH_RE = re.compile(r"^handoffs/reconcile/([^./][^/]*)/synth\.md$")
+_APPENDIX_H2_RE = re.compile(r"^## 附錄")
+_CLUSTER_H2_RE = re.compile(r"^## 群集")
+_H2_RE = re.compile(r"^## ")
+
+
 def _committee_output_rel(path: str) -> str:
-    """正規化 committee output path 到 handoffs/ 相對段。"""
+    """正規化 committee output path 到 handoffs/ 相對段。
+
+    對 `handoffs/reconcile/<session>/sources/<name>.md` **不**在此回退——
+    回退僅供豁免判定（見 `_committee_sources_fallback_rel`），避免污染 audit 登錄鍵。
+    """
     norm = path.replace("\\", "/")
     marker = "handoffs/"
     idx = norm.find(marker)
@@ -391,8 +419,196 @@ def _committee_output_rel(path: str) -> str:
     return norm
 
 
-def _committee_registered_files() -> dict[str, set[str]]:
-    """讀 committee audit log，回傳 {output_path: raw_sha256集合}。"""
+def _committee_sources_fallback_rel(norm: str) -> tuple[str, str, str] | None:
+    """若 path 為 reconcile sources 副本，回傳 (session, name, handoffs/<name>)。
+
+    精確形態：`handoffs/reconcile/<session>/sources/<name>.md`。
+    session／name 禁 `.`/`..` 前綴與內嵌 `/`（由 regex 保證）。
+    """
+    m = _SOURCES_COPY_RE.fullmatch(norm)
+    if not m:
+        return None
+    session, name = m.group(1), m.group(2)
+    return session, name, f"handoffs/{name}"
+
+
+def _is_reconcile_synth_rel(norm: str) -> bool:
+    """是否為 `handoffs/reconcile/<session>/synth.md`（附錄 unit 級豁免僅限此路徑）。"""
+    return _RECONCILE_SYNTH_RE.fullmatch(norm) is not None
+
+
+def _session_sources_lock_path(source_path: Path, session: str) -> Path:
+    """由副本檔推 session 的 sources.lock 路徑（與 source 同 session 目錄）。"""
+    # .../handoffs/reconcile/<session>/sources/<name>.md → .../handoffs/reconcile/<session>/sources.lock
+    sources_dir = source_path.parent
+    session_dir = sources_dir.parent
+    lock = session_dir / "sources.lock"
+    # 防 symlink／錯置：session 目錄名須與 path 段一致
+    if session_dir.name != session:
+        return session_dir / "sources.lock"  # 仍回傳，後續 is_file 會擋
+    return lock
+
+
+def _path_to_handoffs_rel(path: Path) -> str:
+    """把路徑正規化為以 handoffs/ 起的相對段（若無則 as_posix）。"""
+    norm = path.as_posix().replace("\\", "/")
+    marker = "handoffs/"
+    idx = norm.find(marker)
+    if idx >= 0:
+        return norm[idx:]
+    return norm
+
+
+def _any_symlink_in_norm_suffix(source_path: Path, norm: str) -> bool:
+    """路徑上對應 `norm` 的每一段是否含 symlink（不只 leaf；fail-closed）。
+
+    只檢查 `norm` 深度內的 suffix（如 handoffs/reconcile/<sess>/sources/<name>），
+    避免 macOS `/var` → `/private/var` 這類系統層 symlink 誤殺。
+    """
+    n_parts = len(Path(norm).parts)
+    if n_parts <= 0:
+        return True
+    try:
+        cur = source_path
+        for _ in range(n_parts):
+            if cur.is_symlink():
+                return True
+            parent = cur.parent
+            if parent == cur:
+                break
+            cur = parent
+        return False
+    except OSError:
+        return True
+
+
+def _read_sources_lock_text(
+    lock_path: Path,
+    *,
+    lock_text: str | None = None,
+    prefer_staged_lock: bool = False,
+) -> str | None:
+    """讀 sources.lock 文字。
+
+    - lock_text 若給定則直接用（測試／顯式注入）。
+    - prefer_staged_lock（--staged）：**只**從 index blob 取，**不**回退 worktree。
+    - 否則讀 worktree；symlink／缺檔 ⇒ None。
+    """
+    if lock_text is not None:
+        return lock_text
+    if prefer_staged_lock:
+        lock_rel = _path_to_handoffs_rel(lock_path)
+        return _git_staged_blob(lock_rel)
+    try:
+        if lock_path.is_symlink() or not lock_path.is_file():
+            return None
+        return lock_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _sources_lock_authorizes(
+    lock_path: Path,
+    source_path: Path,
+    name: str,
+    content_sha256: str,
+    *,
+    source_rel: str | None = None,
+    lock_text: str | None = None,
+    prefer_staged_lock: bool = False,
+) -> bool:
+    """sources.lock 是否授權**該副本自身**（handoffs-rel 路徑綁定，非僅 basename）。
+
+    - 以 entry.realpath 的 `handoffs/...` 段對齊 source 的 handoffs-rel
+      （擋 duplicate basename：lock 指到另一個同名檔不授權）
+    - 同 basename 多筆 entry ⇒ fail-closed（不豁免）
+    - entry.sha256 若存在須與 content 相符
+    - 不用絕對 realpath 互比（隔離 clone／不同 checkout 根仍可對齊同一 handoffs 段）
+    """
+    text = _read_sources_lock_text(
+        lock_path, lock_text=lock_text, prefer_staged_lock=prefer_staged_lock
+    )
+    if text is None:
+        return False
+    try:
+        data = json.loads(text)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    sources = data.get("sources")
+    if not isinstance(sources, list):
+        return False
+
+    # 目標 source 的 handoffs-rel（優先 caller 傳入的 norm，否則從 path 抽）
+    if source_rel is None:
+        source_rel = _path_to_handoffs_rel(source_path)
+    source_rel = source_rel.replace("\\", "/")
+    if not source_rel.startswith("handoffs/"):
+        return False
+
+    basename_hits = 0
+    path_matched = False
+    for entry in sources:
+        if not isinstance(entry, dict):
+            continue
+        realpath = str(entry.get("realpath", "")).replace("\\", "/")
+        if not realpath:
+            continue
+        entry_name = Path(realpath).name
+        if entry_name == name:
+            basename_hits += 1
+        entry_rel = _path_to_handoffs_rel(Path(realpath))
+        # entry 必須能抽出 handoffs/ 段且與 source 的 handoffs-rel **完全相同**
+        if not entry_rel.startswith("handoffs/") or entry_rel != source_rel:
+            continue
+        entry_sha = str(entry.get("sha256", ""))
+        if entry_sha and entry_sha != content_sha256:
+            return False
+        path_matched = True
+    # duplicate basename（多筆同名 entry）⇒ 不豁免
+    if basename_hits > 1:
+        return False
+    return path_matched
+
+
+# 向後相容別名（舊測試／呼叫若仍引用）
+def _sources_lock_lists_name(
+    lock_path: Path,
+    name: str,
+    content_sha256: str,
+    *,
+    source_path: Path | None = None,
+    source_rel: str | None = None,
+    lock_text: str | None = None,
+    prefer_staged_lock: bool = False,
+) -> bool:
+    """Deprecated wrapper：無 source_path 時無法做路徑綁定 ⇒ 一律 False。"""
+    if source_path is None:
+        return False
+    return _sources_lock_authorizes(
+        lock_path,
+        source_path,
+        name,
+        content_sha256,
+        source_rel=source_rel,
+        lock_text=lock_text,
+        prefer_staged_lock=prefer_staged_lock,
+    )
+
+
+def _committee_registered_files(
+    events: frozenset[str] | None = None,
+) -> dict[str, set[str]]:
+    """讀 committee audit log，回傳 {output_path: raw_sha256集合}。
+
+    events 未給則用 `_COMMITTEE_DIRECT_REGISTRY_EVENTS`（**不含** family_result）。
+    `sources/` 回退另傳 `_COMMITTEE_SOURCES_REGISTRY_EVENTS`——見
+    `_is_committee_process_exempt` 的分支與 `CODEX-R15-P1-01`。
+
+    🔴 events 一律**在函式內**解析 module 全域（非預設引數綁定），
+    否則 mutation 探針 monkeypatch 該全域會失效（假綠）。
+    """
+    if events is None:
+        events = _COMMITTEE_DIRECT_REGISTRY_EVENTS
     audit_log = _committee_audit_path()
     if not audit_log.is_file():
         return {}
@@ -405,7 +621,14 @@ def _committee_registered_files() -> dict[str, set[str]]:
             event = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if event.get("event") not in {"committee_dispatch", "committee_output"}:
+        event_name = str(event.get("event", ""))
+        if event_name not in events:
+            continue
+        # committee_family_result 由 harness 自動寫入，且 format-failed 也帶非空 sha
+        # （`cx_run.sh:253`）⇒ 只收 result_state=success，格式檢查失敗的產出不入 registry。
+        if event_name == "committee_family_result" and (
+            str(event.get("result_state", "")) != "success"
+        ):
             continue
         output_path = _committee_output_rel(str(event.get("output_path", "")))
         output_sha256 = str(event.get("output_sha256", ""))
@@ -417,8 +640,40 @@ def _committee_registered_files() -> dict[str, set[str]]:
     return registered
 
 
-def _is_committee_process_exempt(rel: str, source_path: Path) -> bool:
-    """已註冊且 raw bytes hash 相符的 handoffs 委員會過程檔可豁免 prose claim。"""
+def _content_sha256(source_path: Path, content_bytes: bytes | None) -> str | None:
+    """對豁免判定取 hash：優先用掃描同一份 bytes（staged blob），否則 worktree raw。"""
+    if content_bytes is not None:
+        return hashlib.sha256(content_bytes).hexdigest()
+    if not source_path.is_file():
+        return None
+    try:
+        return hashlib.sha256(source_path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _is_committee_process_exempt(
+    rel: str,
+    source_path: Path,
+    content_bytes: bytes | None = None,
+    *,
+    lock_text: str | None = None,
+    prefer_staged_lock: bool = False,
+) -> bool:
+    """已註冊且 raw bytes hash 相符的 handoffs 委員會過程檔可豁免 prose claim。
+
+    Task 4.1：`handoffs/reconcile/<session>/sources/<name>.md` **一律**走 lock 綁定：
+    (a) 同 session `sources.lock` 綁定**該副本 realpath**（非僅 basename）、且
+    (b) raw-byte hash ∈ 原註冊 `handoffs/<name>.md` 的 hash 集合
+    才豁免。**不得**因 direct path 命中 registry 而短路（P0-01）。
+    symlink（含父目錄段）／session 外／duplicate basename／lock 缺失／hash 不符 ⇒ 不豁免。
+
+    Task 4.2：`synth.md` **永不**整檔豁免（即使 path 被 registry 直註冊）；
+    僅 unit 級附錄行可豁免（P1-06）。
+
+    content_bytes：與掃描同源的 bytes（staged 時為 index blob）；未給則讀 worktree。
+    prefer_staged_lock：與 source 同源，lock 亦取 staged blob（P0-04）。
+    """
     if os.environ.get("VERIFY_GATE_O3_FILECLASS", "1") == "0":
         return False
     norm = _committee_output_rel(rel)
@@ -426,11 +681,97 @@ def _is_committee_process_exempt(rel: str, source_path: Path) -> bool:
         return False
     if Path(norm).name == "HANDOFF.md":
         return False
-    hashes = _committee_registered_files().get(norm, set())
-    if not hashes or not source_path.is_file():
+
+    # synth.md：永不整檔豁免（unit 級附錄規則在 _scan_file_content）
+    if _is_reconcile_synth_rel(norm):
         return False
-    actual = hashlib.sha256(source_path.read_bytes()).hexdigest()
-    return actual in hashes
+
+    actual = _content_sha256(source_path, content_bytes)
+    if actual is None:
+        return False
+
+    # Task 4.1：sources/ 形態 → **必須** lock 綁定，禁止 direct registry 短路
+    fallback = _committee_sources_fallback_rel(norm)
+    if fallback is not None:
+        # 路徑每一段 symlink（含父目錄）⇒ 不豁免
+        if _any_symlink_in_norm_suffix(source_path, norm):
+            return False
+        session, name, origin_rel = fallback
+        lock_path = _session_sources_lock_path(source_path, session)
+        if not _sources_lock_authorizes(
+            lock_path,
+            source_path,
+            name,
+            actual,
+            source_rel=norm,
+            lock_text=lock_text,
+            prefer_staged_lock=prefer_staged_lock,
+        ):
+            return False
+        # 🔴 只有這條分支收 committee_family_result（CODEX-R15-P1-01）
+        sources_registry = _committee_registered_files(
+            _COMMITTEE_SOURCES_REGISTRY_EVENTS
+        )
+        origin_hashes = sources_registry.get(origin_rel, set())
+        if not origin_hashes:
+            return False
+        return actual in origin_hashes
+
+    # 非 sources/：leaf symlink 不豁免；path 本身已註冊且 hash 相符才豁免
+    # 🔴 registry 用 direct 集合（**不含** family_result）——維持 B4 之前的信任面。
+    try:
+        if source_path.is_symlink():
+            return False
+    except OSError:
+        return False
+    direct_hashes = _committee_registered_files(_COMMITTEE_DIRECT_REGISTRY_EVENTS).get(
+        norm, set()
+    )
+    if direct_hashes and actual in direct_hashes:
+        return True
+    return False
+
+
+def _appendix_exempt_line_numbers(rel: str, content: str) -> set[int]:
+    """synth.md 附錄區 1-based 行號集合（unit 級豁免用）。
+
+    僅 `handoffs/reconcile/<session>/synth.md`。
+    具名行為（T4-B1／邊界①／實戰 e2e）：
+    - 進入：行匹配 `^## 附錄`（前綴，非精準等於）
+    - 維持：附錄態下其後 finding H2（`## <ID>`）與 H3/H4 **保持**附錄豁免
+      （實戰附錄標題自承「下方任一 ## 區塊」；若「僅至下一任意 H2」則 findings 全不豁免，
+      違反 A-4 與 e2e）
+    - 結束／永不豁免：`^## 群集` 起進入群集態，該段及其 H3/H4 **永不**豁免
+    - 兩個 `## 附錄`：皆進入附錄態（皆豁免）
+    - 順序顛倒（附錄後又現群集）：群集段仍不豁免
+    """
+    norm = _committee_output_rel(rel)
+    if not _is_reconcile_synth_rel(norm):
+        return set()
+    exempt: set[int] = set()
+    state: str | None = None  # None | "appendix" | "cluster"
+    for idx, raw in enumerate(content.splitlines(), start=1):
+        line = raw.rstrip("\n")
+        if _CLUSTER_H2_RE.match(line):
+            state = "cluster"
+        elif _APPENDIX_H2_RE.match(line):
+            state = "appendix"
+        # 其他 H2：sticky 維持 state（finding ID 留在 appendix；群集後 H2 仍 cluster 直到 附錄）
+        if state == "appendix":
+            exempt.add(idx)
+    return exempt
+
+
+def _unit_in_appendix_exempt(unit: Unit, appendix_lines: set[int]) -> bool:
+    """單位**全部行**皆落在附錄豁免集合內才豁免。
+
+    只用起始行會讓「附錄 finding H2 與後續群集 H2 無空行」的跨段 unit
+    整段沿用附錄豁免（P1-05）。span 交集：任一非附錄行 ⇒ 不豁免（fail-closed）。
+    """
+    if not appendix_lines:
+        return False
+    span_end = unit.source_line + unit.text.count("\n")
+    return all(ln in appendix_lines for ln in range(unit.source_line, span_end + 1))
 
 
 def _is_docs_operational_unit(unit: Unit) -> bool:
@@ -1248,7 +1589,12 @@ def check_unit(
     file_verify_exempt: bool = False,
     committee_process_exempt: bool = False,
 ) -> list[Violation]:
-    """檢查單一文字單位，回傳違規清單。"""
+    """檢查單一文字單位，回傳違規清單。
+
+    committee_process_exempt（Task 4.2）：**本 unit** 的豁免旗標，非整檔 bool。
+    由 `_scan_file_content` 依檔級註冊豁免 ∨ 附錄行集合逐 unit 傳入；
+    群集段 unit 必須傳 False（永不豁免）。
+    """
     violations: list[Violation] = []
     claim = extract_claim(unit)
     mode = classify_mode(unit, claim)
@@ -1380,23 +1726,45 @@ def _scan_file_content(
     all_units_claims: list[tuple[Unit, ClaimObject]],
     *,
     added_lines: set[int] | None = None,
+    content_bytes: bytes | None = None,
+    lock_text: str | None = None,
+    prefer_staged_lock: bool = False,
 ) -> list[Violation]:
-    """掃描單檔文字內容，累積 claim units 並回傳違規。"""
+    """掃描單檔文字內容，累積 claim units 並回傳違規。
+
+    Task 4.1：content_bytes 與掃描同源（staged blob 或 worktree raw），供豁免 hash；
+    lock 在 prefer_staged_lock 時亦取 staged blob（與 source 同源）。
+    Task 4.2：committee_process_exempt 改 **unit 級**——檔級豁免 ∨ 附錄行豁免；
+    群集段永不因附錄規則豁免（見 `_appendix_exempt_line_numbers`）。
+    """
     violations: list[Violation] = []
     file_verify_exempt = _file_verify_exempt_allowed(rel, content)
-    committee_process_exempt = _is_committee_process_exempt(rel, source_path)
+    if content_bytes is None:
+        content_bytes = content.encode("utf-8")
+    file_committee_exempt = _is_committee_process_exempt(
+        rel,
+        source_path,
+        content_bytes=content_bytes,
+        lock_text=lock_text,
+        prefer_staged_lock=prefer_staged_lock,
+    )
+    appendix_lines = _appendix_exempt_line_numbers(rel, content)
     for unit in split_units(content, rel):
         if added_lines is not None and not _unit_touches_added_lines(unit, added_lines):
             continue
         _unknown_polarity_warn(unit)
         claim = extract_claim(unit)
         all_units_claims.append((unit, claim))
+        # unit 級：檔級豁免或附錄區；附錄規則已排除群集行；跨段 unit 需全行在附錄
+        unit_committee_exempt = file_committee_exempt or _unit_in_appendix_exempt(
+            unit, appendix_lines
+        )
         violations.extend(
             check_unit(
                 unit,
                 open_pending,
                 file_verify_exempt=file_verify_exempt,
-                committee_process_exempt=committee_process_exempt,
+                committee_process_exempt=unit_committee_exempt,
             )
         )
     if _is_result_file(rel) and added_lines is None:
@@ -1409,11 +1777,15 @@ def check_files(
     *,
     content_map: dict[str, str] | None = None,
     added_lines_map: dict[str, set[int]] | None = None,
+    lock_text_map: dict[str, str] | None = None,
+    prefer_staged_lock: bool = False,
 ) -> list[Violation]:
     """掃描多檔，回傳全部違規。
 
     content_map 若提供，以 map 內容取代 working tree read_text（供 --staged index blob）。
     added_lines_map 若提供，僅掃描各檔 staged 相對 HEAD 的新增行（--staged 增量模式）。
+    lock_text_map：可選，key＝`handoffs/reconcile/<session>/sources.lock` 的 lock 正文。
+    prefer_staged_lock：True 時 sources.lock 只讀 index blob（與 --staged 同源）。
     """
     violations: list[Violation] = []
     open_pending = load_open_pending()
@@ -1421,13 +1793,17 @@ def check_files(
     for path in paths:
         raw = path.as_posix()
         rel = _scannable_rel_path(raw) if _is_scannable_path(raw) else raw
+        content_bytes: bytes | None = None
         if content_map is not None and rel in content_map:
             content = content_map[rel]
+            # staged blob 與掃描同源：以 UTF-8 往返還原 raw bytes 供豁免 hash
+            content_bytes = content.encode("utf-8")
         else:
             if not path.is_file():
                 continue
             try:
-                content = path.read_text(encoding="utf-8")
+                content_bytes = path.read_bytes()
+                content = content_bytes.decode("utf-8")
             except UnicodeDecodeError as exc:
                 raise FileReadError(rel, f"not valid UTF-8: {exc}") from exc
             except OSError as exc:
@@ -1435,6 +1811,13 @@ def check_files(
         added_lines = added_lines_map.get(rel) if added_lines_map is not None else None
         if added_lines_map is not None and not added_lines:
             continue
+        lock_text: str | None = None
+        if lock_text_map is not None:
+            fb = _committee_sources_fallback_rel(_committee_output_rel(rel))
+            if fb is not None:
+                session_id, _name, _origin = fb
+                lock_rel = f"handoffs/reconcile/{session_id}/sources.lock"
+                lock_text = lock_text_map.get(lock_rel)
         violations.extend(
             _scan_file_content(
                 rel,
@@ -1443,6 +1826,9 @@ def check_files(
                 open_pending,
                 all_units_claims,
                 added_lines=added_lines,
+                content_bytes=content_bytes,
+                lock_text=lock_text,
+                prefer_staged_lock=prefer_staged_lock,
             )
         )
     violations.extend(check_fingerprint_conflicts(all_units_claims))
@@ -1700,6 +2086,7 @@ def main(argv: list[str] | None = None) -> int:
             unique_paths,
             content_map=content_map,
             added_lines_map=added_lines_map,
+            prefer_staged_lock=bool(args.staged),
         )
     except FileReadError as exc:
         print(
