@@ -346,8 +346,27 @@
     **12 個非 M code mutation 未逐一執行**。
   - **本 epic 內 TODO §0 數字對照表漂了四次**（四格曾錯三格：`25/9/13/14` → `25/13/20/26`）
     ⇒ 佐證 `票 B-17`（機器依賴表格改資料檔＋自動生成）：只要它還是手寫的就會再漂。
-  - 全部票登記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md`（`B-1`～`B-28`，**唯一票登記處**）；
-    白話版 `handoffs/20260804-BACKLOG-白話總覽.md`（52 項 checklist）。
+  - 全部票登記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md`（`B-1`～`B-32`，**唯一票登記處**）；
+    白話版 `handoffs/20260804-BACKLOG-白話總覽.md`（主表一票一列，53 項舊表降為附錄；兩份已機械對帳）。
+
+- **🔵 治理 backlog — 排序 v3.1（2026-08-04 全量重排＋當日新增 3 張，唯一有效）＝當前施工序**：
+  32 張中 ✅2（`B-7`／`B-10`）｜🗑3（`B-1`～`B-3`）｜🔗2（`B-18`→`B-13`、`B-25`→`GOV-XREF-SYNC`）｜**待辦 25**。
+  ```
+  第0批 摩擦止血    B-24 → B-15 → B-14      第4批 散文與標記  B-16 → B-23
+                    → B-30 → B-32           第5批 fail-open   B-11 → B-6 → B-5 → B-4 → B-8
+  第1批 機制        B-19 → B-29 → B-31      第6批 完整性監看  B-20 → B-21 → B-12 → B-22
+  第2批 地基        B-27                    另排              B-9 → B-28
+  第3批 殺手寫漂移  B-17 → B-13 → B-26
+  ```
+  🔴 **`B-30`／`B-31`／`B-32` 於 2026-08-04 第 0 批**偵察輪**當場撞出**（單輪 6 次摩擦、4 次無票）：
+  `B-30`＝委員可覆蓋自己已寫好的產出（codex 因此多花 28 分）；
+  `B-31`＝`format-failed` 後只能整份重跑，且擋住債務銷帳進而擋住所有派工；
+  `B-32`＝`cx_run.sh:512` 無條件注入 RECONCILE-STAMP 指示，誘發 `completeness_check` 判違規
+  ⇒ composer **連兩次** format-failed，**重跑不可能解決**。`B-32` 併入第 0 批（它正擋著第 0 批自己）。
+  **批次化非一票一管線**：22 張各走完整管線 ≈66 輪；7 批＋1 另排 ≈24–30 輪。
+  **2026-08-04 使用者裁決：治理優先於產品線**——「治理相關的沒做好，繼續專案開發只剩耗時間和 token
+  在摩擦上」。8/1 起 `momentum/`／`api/`／`frontend/` 動 0 檔，此為已知且經同意。
+  **進行中＝第 0 批**（`B-24`＋`B-15`＋`B-14` 合一批次，走完整大任務管線）。
 
 ## ✅ 近期已完成（2026-06 / 2026-07）
 - **TEMPLATE_GATE_FIX epic（2026-07-05）**:派工品質防線修補——四方委員會(Claude+Codex+Composer+Gemini)審 template/機檢,實證 2 BLOCKING 繞過(FACT-RECEIPT/§G 逃逸)+多處範本↔機檢漂移;修=§A 段級狀態機+RISK-HIT 宣告制+per-Task 分段檢+RESULT 交叉規則+gate --reconcile 閉合鏈+adversarial 實核義務+TODO prompt 憲法瘦身(省每次 ~5,100 行)。驗收=14 fixture 矩陣+4 mutation+5 gate fixture+Codex 總 review 戳記。文件=docs/TEMPLATE_GATE_FIX_{BRIEF,SPEC,TODO,MANIFEST,GRANDFATHER}.md;現役文件 grandfather(僅新文件適用)。**新寫 SPEC 須帶 RISK-HIT: 宣告與 FACT-RECEIPT**。

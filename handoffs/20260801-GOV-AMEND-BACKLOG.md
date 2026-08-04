@@ -932,3 +932,161 @@ backlog 既有 28 張票中（**不含本票**），**17 張**是在改「判定
 ### 狀態
 
 **2026-08-04 開票，未實作。** 使用者已同意排入。
+
+---
+
+# 🔴 2026-08-04 第 0 批偵察輪當場撞出的新票（`B-30`～`B-31`）
+
+**背景**：`GOVB0-RECON-R1`（第 0 批開工偵察，三家＋主委）**單一輪**內撞了 6 次摩擦，
+其中 **4 次無既有票涵蓋**。四次分屬兩個病，開兩張票。
+**開票前已依 `B-19` 紀律盤點既有 29 張票，確認無涵蓋**（掃 `覆蓋`／`覆寫`／`overwrite`／
+`format-failed`／`銷帳`／`角色閘`／`brief_sha` 七組語意詞）。
+
+## B-30 票 `GOV-COMMITTEE-OUTPUT-SELF-OVERWRITE`
+
+**委員可以把自己已經寫好的產出檔覆蓋掉，系統無任何保護，且主委只會看到「這家跑很久」。**
+
+### 事故（2026-08-04，`GOVB0-RECON-R1`，實測）
+
+codex 耗時 **43 分 26 秒**，超出它自己的歷史 max（43.1m）。
+主委讀 runlog 尾端才查出原因——codex 自述：
+
+> 我發現報告路徑與合約要求的 handoff 路徑同名，剛才建立 handoff 時**覆蓋了報告**；
+> 這是我這邊的檔案路徑失誤。現在恢復完整報告到使用者指定路徑…
+
+同輪對照：grok ~5 分、composer ~15 分。⇒ **約 28 分鐘（65%）花在重寫被自己蓋掉的檔**。
+
+### 為什麼是系統缺陷而非委員個人失誤
+
+1. `cx_run.sh` 把產出路徑當**純參數**傳給委員，**不保護該路徑**——委員可任意重寫、清空、改名。
+2. 委員自行建立其他檔案時**沒有機制檢查是否撞到自己的產出路徑**。
+3. 主委端**看不到**：`committee_run.sh` 緩衝輸出，中途只有檔案大小可觀察，而
+   「大小歸零後重新長回來」與「持續寫入中」外觀相同（**壞掉的量測與正常外觀相同**，同
+   `CLAUDE.md` Gotchas 的 zsh 斷詞／locale 兩例）。
+4. 若覆蓋發生在**接近逾時**時，`B-14` 的「產出完整即成功」判準會拿到一份**被截斷的新檔**。
+   ⇒ **本票與 `B-14` 直接耦合，須同批考慮。**
+
+### 修法方向（未定案，SPEC 前須先實測）
+
+- ① `cx_run.sh` 於 CLI 返回後比對產出檔的 **inode／大小／sha 變化軌跡**，偵測「曾非空後歸零」；
+- ② brief 骨架（`new_brief.sh`）明文標示產出路徑**專用、禁挪作他用**，並列出委員自建檔的命名空間；
+- ③ 產出路徑加 `.part` → 完成才 rename（atomic close），順帶給 `B-14` 一個真正的 terminal marker。
+  🔴 ③ 與 `B-14` 的「terminal marker」需求是**同一個機制**，勿各做一份。
+
+### 與既有票的關係
+
+- **`B-14`（委員寫完不退出）**：同為委員生命週期，且 ③ 的 atomic close 同時解兩票 ⇒ **強烈建議同批**
+- **`B-24`（驗收看狀態非 rc）**：本票是「狀態悄悄變壞而無人察覺」的具體案例
+- **`B-20`／`B-22`（完整性監看）**：可能是掛點，實作前須確認不重複造輪子
+
+### 狀態
+
+**2026-08-04 開票，未實作。**
+
+## B-31 票 `GOV-FORMATFAIL-NO-CHEAP-FIX`
+
+**委員交件格式不合規（`result_state=format-failed`）之後，唯一可行路徑是「整份重跑」；
+且該輪債務無法銷帳，因而擋住所有後續派工。**
+
+### 事故（2026-08-04，`GOVB0-RECON-R1`，實測）
+
+composer 的 R1 產出**內容完整、6 條 findings 齊全**，只有兩處格式瑕疵：
+① 多了一個 `## RECONCILE-STAMP` 標題（本輪 `brief-kind=consult` 根本不需戳記）
+② `COMPOSER-R1-P1-01` 的 `**來源摘要**` 寫成 `scripts/completeness_check.sh#（:1459-1472 行為）`，
+`#` 後不是 hex digest。
+
+修這兩處**是分鐘級的工作**。主委嘗試派一份「只修格式」的小 brief，**連撞三道牆**：
+
+| # | 阻擋 | 出處 | 為什麼擋 |
+|---|---|---|---|
+| 1 | `brief-kind: impl` → 角色閘拒派 composer | `scripts/governance_roles.json` `_rules.impl` | `impl` 只准 implementer（grok）。**沒有「產出方修正自己交付物」這個 kind** |
+| 2 | 改用 `brief-kind: closure` 後 → `ERROR: brief_sha256 與開債記錄不符（換 brief 掛既有 round 已拒）` | 同輪重派的 round 綁定 | 同輪重派**只接受原 brief**，送不了小 brief |
+| 3 | 正規銷帳 `debt_clear.sh --round-id --session` 會跑 `completeness_check`，一家不合規即失敗 | `scripts/debt_clear.sh` | ⇒ 債務維持 OPEN ⇒ **擋住所有後續派工**（`gate_deny reason=open_debt`，audit 內已 106 筆） |
+
+**結果**：為了修兩行格式，只能讓 composer **重跑整份 15 分鐘的分析**。
+逃生口 `--abandon` 存在，但其兩個 kind（`no-findings-expected`／`collection-failed`）
+都不誠實描述「三家合格、一家格式瑕疵」，且用它等於繞過閘門。
+
+### 為什麼不是「照設計運作」
+
+`cx_run.sh` 自己的訊息寫著「**可同輪重派**」，暗示存在低成本修正路徑；
+實測**不存在**——同輪重派＝用原 brief 重跑全部，成本與首次相同。
+`format-failed` 這個狀態值因此**沒有兌現它的設計意圖**（三值契約中它與 `failed` 分離，
+本意就是「產出有救，別當失敗」）。
+
+### 修法方向（未定案）
+
+- ① 新增 `brief-kind: fixup`（或等價），角色規則＝**只准原產出方**，且只准改自己那一個檔；
+- ② 同輪重派允許「附掛 brief」：round 綁定改為「原 brief sha ＋ 附掛 brief sha 的有序對」，
+  審計記兩者，**不破壞 provenance**；
+- ③ 或反向：`debt_clear` 允許在**其餘家族全合格**時，以具名理由對單一 format-failed 家族降級，
+  但須寫入 audit 且 reconcile 的 union 分母顯示「該家族缺席」。
+  🔴 ③ 觸及 fail-closed 邊界，**須雙家族 adversarial 專審**，勿主委自裁。
+
+### 與既有票的關係
+
+- **`B-19`（brief precheck 擴充）**：①的掛點
+- **`B-24`（驗收看狀態非 rc）**：本票暴露「`format-failed` 這個狀態值沒有對應的處理路徑」
+- **`B-30`**：兩票都源自「委員產出的生命週期沒有被完整建模」，但可各自獨立實作
+
+### 狀態
+
+**2026-08-04 開票，未實作。**
+
+## B-32 票 `GOV-CXRUN-STAMP-PROMPT-UNCONDITIONAL`
+
+**`cx_run.sh` 對「每一次派工」都注入 RECONCILE-STAMP 指示，不分 `brief-kind`；
+而 `completeness_check` 會把委員照做寫出的 `## RECONCILE-STAMP` 判為格式違規。
+⇒ 系統自己誘發交件失敗。**
+
+### 碼證（2026-08-04 實測）
+
+- `scripts/cx_run.sh:512`（**無條件，無 brief-kind 分支**）：
+  `prompt="讀 ${brief} 照其指示做。…你的 task-id=${task_id}。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。"`
+- `scripts/completeness_check.sh:179`：任何 `## ` 標題不符
+  `^([A-Z]+)-(R[0-9]+)-(P[0-3])-([0-9]{2,})$` 即 `COMPLETENESS FAIL: invalid finding ID`。
+- 合法戳記其實是**一整行**（`cx_run.sh:345` 的正則）：
+  `RECONCILE-STAMP: <family> APPROVED <date> sha256:<hash> task:<id>`，**不是 `## ` 標題**。
+  注入句**沒有說明這件事**，也沒說「consult 輪不需要戳記」。
+
+### 事故成本（`GOVB0-RECON-R1`）
+
+composer **連續兩次** `result_state=format-failed`，兩次都是同一個 `## RECONCILE-STAMP`：
+
+| 次 | 缺陷 | 成本 |
+|---|---|---|
+| 1 | `## RECONCILE-STAMP` ＋ `P1-01` 來源摘要非 hex | 首輪 ~15 分 |
+| 2（同 brief 重跑） | `## RECONCILE-STAMP`（digest 已自行修正） | 再 ~15 分 |
+
+⇒ **重跑不可能解決**，因為每次重跑都會重新注入同一句誘導。
+連帶：該輪債務無法正規銷帳（見 `票 B-31`），擋住所有後續派工。
+
+🔴 **codex／grok 未觸發，純屬運氣**——同一句注入對它們也送出了，只是它們沒寫成標題。
+**這是潛伏 trap，不是 composer 的個別問題。**
+
+### 修法方向（未定案）
+
+- ① 注入句**依 `brief-kind` 分支**：只有 `stamp`／`closure` 輪才提 RECONCILE-STAMP；
+- ② 若仍要提，**必須連格式一起講**（「是一整行 `RECONCILE-STAMP: …`，不是 `## ` 標題」）；
+- ③ 或 `completeness_check` 對 `## RECONCILE-STAMP` 給**專屬錯誤訊息**並指出正確寫法
+  （現在的訊息 `invalid finding ID` 完全看不出該怎麼修）。
+  🔴 ①②③ 不互斥；至少 ① 必做，否則 consult／review 輪永遠帶著一句無意義的誘導。
+
+### 與既有票的關係
+
+- **`B-31`（format-failed 無便宜修正路徑）**：本票是**觸發源**、`B-31` 是**放大器**。
+  兩票獨立存在意義：即使修好本票，其他成因的 format-failed 仍無便宜修正路徑。
+- **`B-16`（機器依賴長在散文裡）**：注入句是散文，卻是機器行為的一部分 ⇒ 同族
+
+### 狀態
+
+**2026-08-04 開票，未實作。建議併入第 0 批**（它正在阻擋第 0 批自己的偵察輪）。
+
+---
+
+## 📌 同輪另兩次摩擦（已有票，此處只記為新證據，不重複開票）
+
+| 摩擦 | 歸屬 |
+|---|---|
+| 主委 commit 訊息含 `; codex closure review` 被 gate 擋（本 session 第 3 次） | `B-15` |
+| **composer 執行自己的探針時被 `gate_check` 反覆卡住**（委員自述於 runlog） | `B-15` — **首次證實此洞會咬委員，不只咬主委**，代價是該家族兩個背景探針失敗 |
