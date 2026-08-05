@@ -36,6 +36,13 @@
 
 - `[OPEN-1]` timeout 暫定值（codex 50m／grok 70m／composer 75m／外層 90m）——依 0.1 第 3 條處理。
 - `[OPEN-3]` `B-15` FP-2 定位——已列 `E-SCOPE` 不受理，補查條件＝Phase 0 後 ≥200 筆 `gate_deny` 或 ≥30 日。
+- 🔴 `[OPEN-2]`／`[D-8]` **locale 相依守衛＝已知 MAJOR 債**（`票 B-33`；`COMPOSER-TODO-P1-01` 指出主委初版漏列）：
+  `LC_ALL=C` 下 `gate.sh` 的 Verdict 守衛與 `doc_format_precheck.sh` **雙雙 fail-open**（實測 2 例），
+  `template_check.sh spec` 則**誤報**（1 例）。委員 CLI 與 CI runner 的 locale 不在主委控制範圍
+  ⇒ **非 UTF-8 環境會靜默失去這兩道守衛**。
+  **本批不修**（SPEC R1 兩家一致裁定避免 scope 膨脹，排第 1 批之後）。
+  ⇒ **實作者須知**：本批新增的任何守衛，**若依賴中文字串比對，在非 UTF-8 環境同樣會失效**；
+  請優先用 ASCII 錨點（正則、rc、數字），避免加深此債。
 - SPEC §A 共 **10 條** FACT-RECEIPT（導出命令 `grep -c '^- FACT-RECEIPT:' docs/GOVB0_FRICTION_SPEC.md`），本 TODO 不重抄，需要時回查。
 
 ### 0.3 憲法約束（本任務相關者）
@@ -69,9 +76,10 @@
 
 | Batch | 含 Task | 依賴 | 合併理由 | 規模 |
 |---|---|---|---|---|
+| **B0** | （無 Task，**純前置步驟**） | 無 | 🔴 **凍結 `gate_check.sh` 的 pre-Phase2 snapshot 並 commit**（`CODEX-TODO-P0-03` 修正）。主委初版把此步驟寫在 Task 2.5 內、卻把 B5 排在 B3/B4 之後 ⇒ **自相矛盾**：若 B3 已改 `gate_check.sh` 才複製 snapshot，Task 2.5 差集的「舊版」已含新修法，**merge gate 失去 oracle**。故獨立為 B0，**必須在 B3 動工前完成**。產出＝`tests/governance/fixtures/gate_check_pre_phase2.sh.snapshot`（含其 sha256 寫入同目錄 `.sha256` 檔） | 小 |
 | **B1** | `0.1` | 無 | Phase 0 單 Task；**Phase 2 驗收完全依賴它**，須最先落地並可獨立 merge（純觀測，判定行為不變） | 中 |
 | **B2** | `1.1` | 無 | Phase 1 單 Task；與 B1 完全獨立，可並行；**Task 3.2 依賴其 prompt 路徑對齊** | 小 |
-| **B3** | `2.0`／`2.1` | B1 | `2.0` 是詞法契約（純文件＋測試語料），`2.1` 是其第一個實作點；分開派會讓契約無驗證載體 | 大 |
+| **B3** | `2.0`／`2.1` | B1, **B0** | `2.0` 是詞法契約（純文件＋測試語料），`2.1` 是其第一個實作點；分開派會讓契約無驗證載體 | 大 |
 | **B4** | `2.2`／`2.3`／`2.4` | B3 | 三者同改 `gate_check.sh:86` 判定段的不同 alternation，**同檔同段，分派必衝突** | 中 |
 | **B5** | `2.5` | B3, B4 | 差集報表須在所有判定改動落地後才有意義；語料 B snapshot 須在 Phase 2 動工前凍結（見 Task 2.5 實作要點 2） | 中 |
 | **B6** | `3.1`／`3.2` | B2 | `3.2` 的 lock／publish 與 `3.1` 的 duration 欄位同改 `_emit_family_result`，**同函式** | 大 |
@@ -79,6 +87,9 @@
 
 **批次間 Gate**（引用具體 Test ID ＋ 可執行驗證命令，皆為 `pytest tests/governance/` 或 `bash scripts/*.sh` 且 rc == 0）：
 
+- **B0 → B3**（🔴 **硬前置**）：`tests/governance/fixtures/gate_check_pre_phase2.sh.snapshot` **已存在且已 commit**
+  （`git ls-files --error-unmatch <該檔>` rc=0），且其 sha256 與同目錄 `.sha256` 檔內容**相等**。
+  **未過此 Gate 不得動工 B3**——否則 Task 2.5 的差集 oracle 失效。
 - **B1 → B3**：`pytest tests/governance/test_gate_deny_fields.py -q` rc=0
   且 `TEST-0.1-INVARIANCE`（語料 A decision trace diff 為空）通過。
 - **B2 → B6**：`pytest tests/governance/test_cxrun_stamp_prompt.py -q` rc=0，含 `TEST-1.1-UNKNOWN-NOSIDEEFFECT` 四項無副作用斷言。
@@ -176,13 +187,20 @@
 ### Task 1.1 — `cx_run.sh` prompt 依 `brief-kind` 分支
 
 - **SPEC ref**：Task 1.1　**目標**：只有需要戳記的輪次才在 prompt 中提及 RECONCILE-STAMP。
-- **輸入 / 輸出**：輸入＝`brief_conformance_check.sh` 經 `_bc_kv` 回傳的 `brief-kind`；輸出＝分支後的 prompt 字串 ＋ `tests/governance/test_cxrun_stamp_prompt.py`。
+- **輸入 / 輸出**：輸入＝**既有變數 `${_bk}`**（`cx_run.sh:46`，見下）；輸出＝分支後的 prompt 字串 ＋ `tests/governance/test_cxrun_stamp_prompt.py`。
 - **實作要點**：
-  1. **沿用既有 parser**：`brief-kind` 取自 `brief_conformance_check.sh` 的 `_bc_kv`，**禁再寫一份 parser**。
-     出生事故：`committee_run.sh` 曾有第二份 parser，造成孤兒債。
+  1. **沿用既有 parser，禁再寫一份**（出生事故：`committee_run.sh` 曾有第二份 parser，造成孤兒債）。
+     🔴 **既有機制的實際樣貌（`CODEX-TODO-P0-02` 修正；主委初版誤把 `_bc_kv` 當成 helper 函式，
+     實測 `grep -n '_bc_kv' scripts/cx_run.sh` 顯示它是 `mktemp` 的暫存檔路徑變數，非函式）**：
      ```
-     kind="$(_bc_kv "$brief" 'brief-kind')" || { echo "ERROR: brief-kind 解析失敗" >&2; exit 1; }
-     case "$kind" in
+     # cx_run.sh:39  _bc_kv="$(mktemp)"                         ← 暫存檔路徑
+     # cx_run.sh:45  bash brief_conformance_check.sh "$brief" --emit "${_bc_kv}" || exit $?
+     # cx_run.sh:46  _bk="$(sed -n '1p' "${_bc_kv}")"           ← brief-kind 已在此可用
+     # cx_run.sh:47  stamp_target="$(sed -n '2p' "${_bc_kv}")"
+     ```
+     ⇒ **本 Task 直接使用既有的 `${_bk}`，不新增任何解析步驟。**
+     ```
+     case "${_bk}" in
        stamp|closure) prompt="${prompt}${_STAMP_INSTRUCTION}" ;;
        consult|review|impl|dext) : ;;                 # 完全不提 RECONCILE-STAMP
        *) echo "ERROR: unknown brief-kind=$kind（fail-closed）" >&2; exit 1 ;;
@@ -193,7 +211,11 @@
      🔴 **格式的單一真相源＝`cx_run.sh:345` 的正則**；測試須斷言 prompt 說明與該正則機械一致
      （同一個合法戳記樣本同時通過兩者）。
   3. **unknown `brief-kind` → fail-closed 拒派**（`D-5`：R1 原文「視同不需戳記＋audit 警示」與 fail-closed 互斥，已改為單一行為）。
-- **修改檔案**：`scripts/cx_run.sh:512`（prompt 組裝處）。**既有 caller**：同檔 `_run_cli_and_emit`（`:513`）。
+- **修改檔案**：`scripts/cx_run.sh` 的 **`_prepare_and_run()`（`:501-513`，prompt 組裝在此）**。
+  🔴 **`CODEX-TODO-P0-02` 修正**：主委初版誤寫「caller ＝ `_run_cli_and_emit`」，方向相反——
+  實測 `grep -n '_prepare_and_run\|_run_cli_and_emit' scripts/cx_run.sh` 顯示
+  `_prepare_and_run`（`:501`）**呼叫** `_run_cli_and_emit`（`:513`），非被它呼叫。
+  **既有 caller**：`cx_run.sh:518`／`:521`／`:524` **三處**呼叫 `_prepare_and_run`（分支入口，不需改）。
 - **不可做**：不改 `completeness_check.sh` 的 ID schema（`票 B-32` 修法③，本批不做）；不改既有戳記格式。
 - **邊界**（≥2）：
   1. `brief-kind` 解析失敗／缺欄 → fail-closed，維持現行拒派行為（rc≠0）。
@@ -387,7 +409,8 @@
      語料變更須另行 commit 並重跑，**不得在同一次驗收中修改語料**。
   2. **舊版判定來源＝Phase 2 動工前的 `gate_check.sh` 副本**，以固定 sha 存於 `tests/governance/fixtures/`，
      **非 `HEAD`**（`D-13`：舊版 snapshot 為 forward dependency，用 `HEAD` 會隨改動漂移）。
-     🔴 **此 snapshot 必須在 B3 動工前先凍結並 commit**，否則 B5 無基準。
+     🔴 **此 snapshot 由 B0 產出並 commit，必須在 B3 動工前完成**（`CODEX-TODO-P0-03`）。
+     本 Task 只**消費**該 snapshot，不負責產生；若檔案缺失或 sha256 與 `.sha256` 檔不符 ⇒ **fail-closed（rc≠0）**。
   3. 每條語料**標明出處**（哪次事故／哪個 Task 的驗證項），**禁憑空造**。
 - **修改檔案**：新增 `scripts/gate_decision_delta.sh`；新增 `tests/governance/fixtures/gate_decision_corpus.txt`
   與 `tests/governance/fixtures/gate_check_pre_phase2.sh.snapshot`。**既有 caller**：無（一次性腳本）。
@@ -407,6 +430,11 @@
     ⇒ 永遠 FAIL 或被悄悄放寬。**已改為「列舉項為必要子集 ＋ 附加項須人工標註」。**
   - `TEST-2.5-CORPUS-SHA`（狀態）：語料檔 sha256 與報表標頭**一致**（**防止「改語料換綠燈」**）。
   - `TEST-2.5-EMPTY`（邊界）：空語料 → rc≠0 且 stderr 含明確錯誤訊息（非「無差異」）。
+  - `TEST-2.5-MUT`（mutation，**`COMPOSER-TODO-P2-01` 指出主委初版漏列，違反 SPEC §V「全部 11 Task 皆須 mutation」**）：
+    ①移除「語料 sha256 與報表標頭一致」的守衛 ⇒ 改語料後仍 rc=0（`TEST-2.5-CORPUS-SHA` 轉紅）；
+    ②移除「附加項須人工標註」的守衛 ⇒ 注入一個未標註的附加項時仍 rc=0（`TEST-2.5-EXTRA` 轉紅）；
+    ③把空語料的 fail-closed 改為靜默輸出「無差異」⇒ `TEST-2.5-EMPTY` 轉紅。
+    **三個 mutation 各須貼實跑 rc。**
 - **存活至**：永久（`票 B-29` 實作時取代）。
 - **覆蓋風險**：`票 B-29`（第 1 批）可能以更通用機制取代 ⇒ **屆時應取代而非並存**，理由已註記於本行。
 
@@ -436,6 +464,29 @@
      _t1=$(date -u +%s); _dur=$(( _t1 - _t0 ))
      ```
   3. 欄位加入 `scripts/audit_events.json` 的 `required_fields_per_event.committee_family_result`。
+  4. 🔴 **duration manifest 定義（`CODEX-TODO-P1-04` 修正；主委初版只說「manifest」未定路徑與 schema ⇒ 不可解析）**：
+     - **產出路徑**：`handoffs/duration_manifest.json`（進版控）。
+     - **producer**：新增 `scripts/duration_manifest.sh`，由 `audit.log` 的 `committee_family_result` 事件導出，**不另存狀態**。
+     - **schema**（逐 key 列出，實作者不必猜）：
+       ```
+       {
+         "generated_at": "<UTC ISO8601>",
+         "source_event_count": <int>,          # 納入統計的事件總數
+         "families": {
+           "<family>": {
+             "sample_count": <int>,            # 該家族 result_state=success 且含三欄的筆數
+             "distinct_sessions": <int>,       # 跨幾個不同 session / UTC 日期
+             "max_duration_sec": <int>,
+             "p99_duration_sec": <int>,
+             "timeout_sec": <int>,
+             "status": "PROVISIONAL" | "FINAL"  # sample_count>=50 且 distinct_sessions>=3 才可為 FINAL
+           }
+         },
+         "outer_timeout_sec": <int>,
+         "status": "PROVISIONAL" | "FINAL"     # 任一家族為 PROVISIONAL 則整體 PROVISIONAL
+       }
+       ```
+     - **`status` 的判定為純函式**（由 `sample_count` 與 `distinct_sessions` 導出），**不得手填**。
 - **修改檔案**：`scripts/cx_run.sh` 的 `_run_cli_and_emit` 與 `_emit_family_result`（`:250-288`）。
   **既有 caller**：`committee_run.sh` 呼叫 `cx_run.sh`（不需改，欄位為附加）。
 - **不可做**：**不新增 audit 事件型別**。
@@ -447,6 +498,11 @@
   - `TEST-3.1-SCHEMA`（狀態）：欄位名與 `jq -r '.required_fields_per_event.committee_family_result[]' scripts/audit_events.json`
     **一致**（以該檔為斷言來源）。
   - `TEST-3.1-NONNEG`（邊界）：binary 不存在時 `duration_sec >= 0`。
+  - `TEST-3.1-MANIFEST`（狀態，`CODEX-TODO-P1-04`）：`bash scripts/duration_manifest.sh` 產出的
+    `handoffs/duration_manifest.json` 可被 `jq -e .` 解析；其
+    `.families[].status` **由 `sample_count>=50 and distinct_sessions>=3` 純函式導出**
+    （測試以構造資料驗兩個方向：49 筆 → `PROVISIONAL`；50 筆跨 3 session → `FINAL`）。
+  - `TEST-3.1-MANIFEST-MUT`（mutation）：把 `status` 改成手填常數 `FINAL` ⇒ 上條的 49 筆案例**必須 FAIL**。
   - `TEST-3.1-MUT`（mutation）：移除欄位 → `TEST-3.1-FIELDS` 轉紅（貼實跑 rc）。
 - **存活至**：永久。
 - **覆蓋風險**：無。
@@ -519,6 +575,19 @@
   - `TEST-3.2-LOCK-⑩`（狀態）：`mkdir`／`O_EXCL` 因權限或 I/O 失敗（非 EEXIST）⇒ **拒絕啟動**，不得視為「無鎖」放行。
   - `TEST-3.2-LOCK-⑪`（狀態）：注入 process-discovery `EIO`／權限錯誤 ⇒ **rc≠0、CLI 不啟動、不寫 `result_state`、只記拒絕 audit**。
     **反向 mutation**：改為「當作無存活進程」放行 ⇒ 本斷言**必須 FAIL**。
+  - `TEST-3.2-E9-ORDER`（狀態，**publish 與 timeout 的順序契約**；`E-9`／`CODEX-R2-P1-08`；
+    `COMPOSER-TODO-P1-02` 指出主委初版完全漏列此 Test ID）：
+    ①**先 CLI wait 返回，才做格式檢查與 publish**（不得在 CLI 仍執行時 publish）；
+    ②audit 中該 **attempt id** 的 `committee_family_result` **計數 == 1**（`grep -c` 導出，**恰一筆，不多不少**）；
+    ③timeout 觸發與正常返回**競態時**仍維持②（邊界①的同一情境）。
+    **反向 mutation**：把 publish 移到 CLI wait 之前 ⇒ ①轉紅；移除「每 attempt 恰一筆」的守衛 ⇒ ②轉紅。
+  - `TEST-3.2-LOCK-⑬`（狀態，**③→④ crash 的 reclaim 孤兒**；`CODEX-TODO-P1-04` 要求補）：
+    以 deterministic probe 在協定步驟③完成後、④之前 **SIGKILL** 持有者 ⇒ 斷言
+    ①`<out>.reclaim.lockdir` **仍存在**（孤兒）②主 lock **存在且屬新 attempt**
+    ③後續第三個 dispatcher 於步驟① **EEXIST 拒絕**（rc≠0、CLI 未啟動、不寫 `result_state`）。
+    🔴 **本測試的目的是「把已知殘留釘成可重現的既定行為」，不是宣稱已修**——
+    §0 第 2 條的「需人工清理」宣告即以本測試為證據。**實作者若選了修法 (a)/(b)/(c) 其中之一，
+    須把本測試的斷言③改為「可自動回收」並附對應 mutation；未改則 §0 宣告不得移除。**
   - `TEST-3.2-LOCK-⑫`（狀態，**stale takeover 序列化**）：A、B 皆判同一 lock 為 stale，以 deterministic barrier 同步後各自嘗試接管
     ⇒ **`STALE_TAKEOVER_STARTS == 1`**，且 audit 中該 `<out>` 的 lock attempt id 序列**恰 1 次**變更。
     **反向 mutation**：移除 `<out>.reclaim.lockdir` 回收權**或**移除「重讀比對 observed owner」⇒ 本斷言**必須 FAIL**（2 個 `START`）。
@@ -563,10 +632,22 @@
   - `TEST-3.3-ORPHAN`（狀態）：逾時後查不到該 CLI 的殘留子進程（**以 process group 為單位斷言**，`pgrep -g <pgid>` 無輸出）。
   - `TEST-3.3-VALUE-SRC`（狀態）：TODO 中的 timeout 值與 Task 3.1 產出的 duration manifest **一致**
     （**禁硬編未經重算的暫定值**）。
-  - `TEST-3.3-PROVISIONAL`（狀態，**`E-10` 取捨的可證偽化**）：未達定稿門檻（任一家族 <50 筆或未跨 ≥3 session／UTC 日）時，
-    ①本 TODO §0 與 duration manifest **含 `PROVISIONAL` 字樣**（出現次數 ≥1）
-    ②Task 3.3 在本 TODO 中**標記為未完工** ③`票 B-14` 票面狀態**含「未定稿」**。
-    **三者任一缺失即 FAIL。**
+  - `TEST-3.3-PROVISIONAL`（狀態，**`E-10` 取捨的可證偽化**；`CODEX-TODO-P1-04` 修正為**可解析來源**）：
+    未達定稿門檻（`handoffs/duration_manifest.json` 的 `.status == "PROVISIONAL"`）時，三條件**任一缺失即 FAIL**——
+    ①`grep -c PROVISIONAL docs/GOVB0_FRICTION_TODO.md` **≥1**
+      **且** `jq -r .status handoffs/duration_manifest.json` **== `PROVISIONAL`**；
+    ②`grep -c '本 Task 於本 TODO 產出時標記為「未完工」' docs/GOVB0_FRICTION_TODO.md` **== 1**；
+    ③**`票 B-14` 的 bounded section 內含「未定稿」**——
+      擷取範圍＝`handoffs/20260801-GOV-AMEND-BACKLOG.md` 中 `^## B-14 ` 起至下一個 `^## B-` 前一行，
+      於該區間內 `grep -c 未定稿` **≥1**。
+      🔴 **主委已於本次修補同步在 `票 B-14` 票面補上「未定稿」狀態行**——
+      實測修補前 `LC_ALL=C grep -c 未定稿 handoffs/20260801-GOV-AMEND-BACKLOG.md` **== 0**
+      （`CODEX-TODO-P1-04` 實跑抓出），即本條件原本**恆為 FAIL**。
+  - `TEST-3.3-B24-PARTIAL`（狀態，`CODEX-TODO-P1-04`）：`票 B-24` 的 bounded section 內
+    含「部分完成」且**不含**「全綠」；`grep -c` 導出。
+  - `TEST-3.3-H2-RESIDUAL`（狀態，`CODEX-TODO-P1-04`）：本 TODO §0 第 2 條的
+    「reclaim 孤兒回收未實作 ⇒ 需人工清理」字樣存在（`grep -c` **≥1**），
+    且 `票 B-14`／實作產出文件皆未出現「lock 機制全綠」字樣（`grep -c` **== 0**）。
   - `TEST-3.3-MUT`（mutation）：移除 timeout → 掛住情境測試逾時失敗（**測試自身須有上限**，避免測試本身掛住）。
 - **存活至**：永久。
 - **覆蓋風險**：無。

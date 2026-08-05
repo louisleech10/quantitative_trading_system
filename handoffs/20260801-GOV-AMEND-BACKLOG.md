@@ -332,6 +332,20 @@ grok 17:29／composer 17:31／codex 17:44——**審查 18 分鐘內全部完成
 **繞法（本票未解前）**：派工後**每 10 分鐘輪詢進程樹＋產出檔**，
 不要只等 harness 通知（`committee_run` 是緩衝輸出，中途看不到進度）。
 
+### 狀態（2026-08-05）
+
+🔴 **timeout 值＝未定稿（`PROVISIONAL`）。**
+第 0 批 SPEC Task 3.3 已定死定稿門檻：每家族累積 **≥50 筆** `committee_family_result`
+（`result_state=success` 且含 duration 三欄）**且跨 ≥3 個不同 session／UTC 日期**。
+現況：Task 3.1（duration 紀錄）尚未上線 ⇒ 三家族累積筆數皆為 **0** ⇒ **未達門檻**。
+⇒ 機制照常以暫定值上線（codex 50m／grok 70m／composer 75m／外層 90m），
+但**本票在門檻達成前一律維持「未定稿」**，`docs/GOVB0_FRICTION_TODO.md` 的 Task 3.3 同步標記未完工。
+
+**本狀態行為機器可讀**：`TEST-3.3-PROVISIONAL` 條件③會擷取本票 bounded section
+（`^## B-14 ` 至下一個 `^## B-` 前）並 `grep -c 未定稿`，須 **≥1**。
+出生事故：`CODEX-TODO-P1-04` 實跑 `grep -c 未定稿` 得 **0**，證明該測試條件原本恆為 FAIL——
+主委寫測試時引用了不存在的字串。本段即為修補。
+
 ## B-15 票 `GOV-GATECHECK-READONLY-PGREP-FP`
 
 **`gate_check.sh` 把唯讀查詢誤判為派工。**

@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T033432Z-todo-r8-fixes-verified",
+  "claim_id": "todo-r8-fixes-verified",
+  "command": [
+    "bash",
+    "scripts/template_check.sh",
+    "todo",
+    "docs/GOVB0_FRICTION_TODO.md"
+  ],
+  "command_sha256": "05f8efd291821dfb8b766ee9ff3336cb5942b331771302d4a9516899ab8cb98a",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "39c6373a065bb0e0bf9690b8c9e4b27ee2ae047d",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T03:34:32Z",
+  "ended_at": "2026-08-05T03:34:32Z",
+  "duration_seconds": 0.0358,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "c6de6064a6a25a0c269fcb6fc854b0a6778d47e1396078d511ff5f0e8ce241bc",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "c6de6064a6a25a0c269fcb6fc854b0a6778d47e1396078d511ff5f0e8ce241bc",
+  "log_path": "handoffs/run_receipts/20260805T033432Z-todo-r8-fixes-verified.log",
+  "tail_excerpt": [
+    "TEMPLATE PASS (todo): docs/GOVB0_FRICTION_TODO.md 含全部必填錨點，且無明顯空殼。"
+  ]
+}
