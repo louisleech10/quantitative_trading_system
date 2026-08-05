@@ -509,7 +509,27 @@ _prepare_and_run() {
   # 白名單 SSOT＝_role_gate.sh（與 committee_run 共用；禁本檔再寫一份 regex）
   bash "${SCRIPT_DIR}/_role_gate.sh" check-task-id "${task_id}" || exit 2
   # 固定極簡 prompt + task-id 注入句（逐字，D-001 §D2）
+  # 預設列含 RECONCILE-STAMP 注入句（stamp|closure 使用）；字面須與
+  # tests/governance/test_stamp_taskid_inject.py 的 _PROMPT_WITH_INJECT 錨點一致。
   prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。"
+  # Task 1.1 / B-32：prompt 依既有 ${_bk}（brief_conformance --emit 第 1 行）分支。
+  # 禁再寫一份 brief-kind parser（committee_run 第二份 parser 曾造孤兒債）。
+  # stamp|closure → 保留注入句並補格式說明（格式 SSOT＝本檔 RECONCILE-STAMP 正則）。
+  # consult|review|impl|dext → 完全不提 RECONCILE-STAMP。
+  # 其餘 → fail-closed 拒派（無第三種行為）。
+  case "${_bk}" in
+    stamp|closure)
+      # 格式說明與下方 grep -qE RECONCILE-STAMP 正則機械一致（同一合法樣本須同時通過兩者）
+      prompt="${prompt} 戳記須為單獨一行（非 ## 標題），格式：RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<hash> task:<id>（sha256 與 task 兩欄可對調順序）。"
+      ;;
+    consult|review|impl|dext)
+      prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。"
+      ;;
+    *)
+      echo "ERROR: unknown brief-kind=${_bk}（fail-closed）" >&2
+      exit 1
+      ;;
+  esac
   _run_cli_and_emit
 }
 

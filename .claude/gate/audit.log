@@ -34349,3 +34349,23 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-05T07:09:50Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
 {"event":"gate_deny","ts":"2026-08-05T07:13:53Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"aa29c3376629c3aac750a1a938ea1f79588c39627ab6022d24f6eec2632af29b","cmd_head":"cp scripts/plain_docs_sync_check.sh .claude/tmp/pds_t2.sh; OLD=$(git log --format=%H -1 -- handoffs/20260801-GOV-AMEND-BACKLOG.md); echo \"backlog 最後改動 commit: ${OLD:0:8}\"; PREV=$(git rev-parse \"${OLD}^\"); sed -i '' \"s|^  synced=\\\"\\$(LC_ALL=C grep -m1 '\\^SYNCED-AT: ' \\\"\\${f}\\\" | awk '{print \\$2}')\\\"|  synced=\\\"\\$(LC_ALL=C grep -m1 '^SYNCED-AT: ' \\\"\\${f}\\\" \\| awk '{print \\$2}')\\\"; [ \\\"\\${name}\\\" = \\\"治理待辦總覽.md\\\" ] \\&\\& synced=\\\"${PREV}\\\"|\" .claude/tmp/pds_t2.sh; bash -n .claude/tmp/pds_t2.s"}
 {"event":"gate_deny","ts":"2026-08-05T07:14:05Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"4ece653abb1760123bc90fc307a0afec9c002f6453224ad858f346877b76cf83","cmd_head":"git log --format=%H -1 -- handoffs/20260801-GOV-AMEND-BACKLOG.md > .claude/tmp/oldsha.txt; PREV=$(git rev-parse \"$(cat .claude/tmp/oldsha.txt)^\"); echo \"$PREV\" > .claude/tmp/prevsha.txt; echo \"將把 治理待辦總覽 的標記倒回: ${PREV:0:8}\"; echo \"該 commit 之後 backlog 改動數: $(git log --oneline ${PREV}..HEAD -- handoffs/20260801-GOV-AMEND-BACKLOG.md | wc -l | tr -d ' ')\""}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-todo-r9/synth.md", "output_sha256": "d983a3a274bf24b0c5817c79035f5669bfe1bc672322153299972e7d8e272880", "task_id": "GOVB0-IMPL-B2", "ts": "2026-08-05T07:45:01Z"}
+=== 2026-08-05 15:45:02 | dispatch ===
+  ts=2026-08-05 15:45:02
+  kind=dispatch
+  intent=第 0 批 B0/B1 兩條 review finding 補修 ＋ B2 Task 1.1 prompt 條件化
+  risk=high
+  facts_asked=語料 A 擴充後覆蓋證明、兩條值相等斷言實跑、TEST-1.1 四項無副作用斷言、mutation 實跑 rc、pytest 總數、golden inventory 狀態
+  review_role=implementer，依 Internal Frozen 的 TODO 逐條實作，範圍限補修+B2
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  reconcile=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/GOVB0_FRICTION_SPEC.md
+  todo=docs/GOVB0_FRICTION_TODO.md
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-IMPL-B2-BRIEF.md", "brief_sha256": "7e035aed37269298e3563de093bee80072f21e078d39a0afdd6f0411e1c2c557", "brief_sha256_norm": "7e035aed37269298e3563de093bee80072f21e078d39a0afdd6f0411e1c2c557", "event": "committee_round_open", "event_id": "75bd18b2-1313-446c-b2f5-e5c3691ef425", "expected_outputs": {"grok": "handoffs/20260805-govb0-impl-b2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["grok"], "producer": "audit_append.sh", "quorum_eligible": ["grok"], "round_id": "35fb7448-7a9f-4fb6-b384-57f95c211cc3", "schema_version": 1, "sequence": 748, "session_name": "20260805-govb0-impl-b2", "task_id": "GOVB0-IMPL-B2", "ts": "2026-08-05T07:45:02Z"}
+{"actor": "cx_run", "attempt_id": "c9791921-ee77-4556-b20a-a61e4d9f16c1", "cli_rc": "0", "event": "committee_family_result", "event_id": "8772b3e7-3774-48d7-953b-9fe5d27acf9b", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-impl-b2-grok.md", "output_sha256": "43770097cba883b81114285194022ad5992e79843ce5fa74e60ed86b60d7dcb4", "producer": "audit_append.sh", "result_state": "success", "round_id": "35fb7448-7a9f-4fb6-b384-57f95c211cc3", "schema_version": 1, "sequence": 749, "ts": "2026-08-05T08:00:32Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-impl-b2-grok.md", "output_sha256": "43770097cba883b81114285194022ad5992e79843ce5fa74e60ed86b60d7dcb4", "task_id": "GOVB0-IMPL-B2", "ts": "2026-08-05T08:02:43Z"}

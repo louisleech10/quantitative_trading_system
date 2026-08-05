@@ -1,7 +1,22 @@
 # 語料 A — Phase 0 判定不變式（decision trace = (rc, kind)）
 # 格式：每行一筆 stdin JSON（給 gate_check.sh）；# 開頭為註解。
+# 可選 setup 指令（緊貼下一筆 JSON 生效，僅測試 harness 解讀，不入判定）：
+#   # @setup token=<kind>:<fresh|expired> [debt=<none|open>]
 # 基準＝Phase 0 改動前；改後 (rc, kind) 序列須逐項相等。
 # 本檔與語料 B（gate_decision_corpus.txt）獨立，sha256 必須不同。
+#
+# --- 出處索引（每條標明 gate_check.sh 分支）---
+# allow / 非 gated：Read／非 executor Bash → kind 空 → exit 0（:186）
+# Task 無 token → kind=dispatch（:157-158）deny no_fresh_token → match_rule=unknown
+# Bash family_cli（:170-174）→ kind=dispatch
+# Bash claude_agent（:170）→ kind=dispatch
+# Bash gate 自身排除（:173）→ exit 0
+# Write 非治理新檔／既有檔 → kind 空 → exit 0（:177-182）
+# Write 新 docs/*SPEC*.md → kind=artifact（:177-182）
+# @setup token expired → deny_reason=token_expired（:213）match_rule=token_expired
+# @setup token fresh debt=none → recheck 放行 exit 0（:196-199）
+# @setup token fresh debt=open → deny_reason=open_debt（:201）match_rule=open_debt
+#
 {"tool_name":"Read"}
 {"tool_name":"Bash","tool_input":{"command":"cat handoffs/foo.md"}}
 {"tool_name":"Bash","tool_input":{"command":"ls -la scripts/"}}
@@ -22,3 +37,26 @@
 {"tool_name":"Bash","tool_input":{"command":"cat handoffs/sp_codex.txt"}}
 {"tool_name":"Write","tool_input":{"file_path":"README.md","content":"x"}}
 {"tool_name":"Bash","tool_input":{"command":"git status --short"}}
+# Write gated artifact 分支（gate_check.sh:177-182）：新檔 docs/*SPEC*.md → kind=artifact
+{"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_INVARIANCE_SPEC.md","content":"x"}}
+# Write 既有治理檔：file 已存在 → 不設 kind → exit 0（同段 :181 `[ -f "$fp" ] ||`）
+{"tool_name":"Write","tool_input":{"file_path":"docs/GOVB0_FRICTION_SPEC.md","content":"x"}}
+# Write 新 docs/*TODO*.md → kind=artifact
+{"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_INVARIANCE_TODO.md","content":"x"}}
+# Write 新 docs/*PLAN*.md → kind=artifact
+{"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_INVARIANCE_PLAN.md","content":"x"}}
+# token_expired（gate_check.sh:213）：過期 dispatch.token + Task
+# @setup token=dispatch:expired
+{"tool_name":"Task"}
+# fresh token + OPEN 債 → open_debt（gate_check.sh:201）match_rule=open_debt
+# 註：fresh+debt=none 放行路徑不進語料 A——B0 snapshot 的 SCRIPT_DIR=fixtures/
+# 找不到 _debt_ledger_core.py，recheck 一律 fail-closed，與現行腳本在
+# DEBT_AUDIT_OVERRIDE 下的放行不可比（會弄紅 INVARIANCE）。放行另由單測覆蓋。
+# @setup token=dispatch:fresh debt=open
+{"tool_name":"Task"}
+# fresh artifact token + open debt + Write 新 SPEC → open_debt / kind=artifact
+# @setup token=artifact:fresh debt=open
+{"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_OPENDEBT_SPEC.md","content":"x"}}
+# Bash family_cli + expired token → token_expired（match_rule 優先 token_expired）
+# @setup token=dispatch:expired
+{"tool_name":"Bash","tool_input":{"command":"codex exec hi"}}
