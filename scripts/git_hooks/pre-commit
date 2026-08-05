@@ -105,4 +105,10 @@ while IFS= read -r -d '' rel; do
   esac
 done < <(git diff --cached --name-only --diff-filter=ACMR -z)
 
+# 白話說明同步「提醒」（2026-08-05 使用者要求「想辦法能確保自己更新」）
+# 🔴 **本層刻意不擋 commit**：若說明檔這次確實無需更動，硬擋會逼人養成用逃生口的習慣，
+#    反而使機制失效。真正的強制在 pre-push（gov_check 4/4，時序判準，繞不過去）。
+#    本層的價值＝在**當下**提醒，而非等到 push 時 commit 訊息都寫完了才發現。
+[ -f scripts/plain_docs_sync_check.sh ] && bash scripts/plain_docs_sync_check.sh --staged || true
+
 exec "$py" "$checker" --staged

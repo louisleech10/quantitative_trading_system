@@ -45,6 +45,52 @@ _watched_for() {
   esac
 }
 
+# ── --staged 模式（pre-commit 用）───────────────────────
+# 判準：本次 staged 檔案若命中某受管檔的 WATCHED，該受管檔**必須也在同一次 staged**。
+# 為何要有這層（2026-08-05 使用者要求「想辦法能確保自己更新」）：
+#   只掛 pre-push 的話，要等到 push 才發現，那時 commit 訊息都寫完了 ⇒ 回饋太晚。
+#   pre-commit 在**當下**擋住，且語意更嚴（要求同 commit，而非「之後補」）。
+if [ "${1:-}" = "--staged" ]; then
+  staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+  [ -n "${staged}" ] || { echo "[plain_docs_sync] (staged) 無 staged 檔，略過"; exit 0; }
+
+  src=0
+  for name in ${MANAGED}; do
+    f="${DIR}/${name}"
+    watched="$(_watched_for "${name}")"
+    [ -n "${watched}" ] || continue
+
+    hit=0
+    for w in ${watched}; do
+      case "${staged}" in
+        *"${w}"*) hit=1; break ;;
+      esac
+    done
+    [ "${hit}" -eq 1 ] || continue
+
+    case "${staged}" in
+      *"${f}"*) continue ;;
+    esac
+
+    src=1
+    echo "[plain_docs_sync] ✗ (staged) ${f} 未一併更新" >&2
+    echo "    本次 staged 命中其 WATCHED（${watched}），但該說明檔不在 staged 內。" >&2
+  done
+
+  if [ "${src}" -ne 0 ]; then
+    echo "  ⇒ 現在更新該說明檔並 git add 最省事；否則 push 時會被硬擋。" >&2
+    echo "  出處：使用者 2026-08-05「想辦法能確保自己更新白話說明的文檔」。" >&2
+    echo "" >&2
+    echo "  🔴 **本層是提醒，不擋 commit**（刻意設計）：若說明檔這次確實無需更動，" >&2
+    echo "     硬擋會逼人養成用逃生口的習慣，反而使機制失效。" >&2
+    echo "     真正的強制在 pre-push（gov_check 4/4）——**時序判準，繞不過去**：" >&2
+    echo "     說明檔的最後更新不得早於其 WATCHED 的最後改動。" >&2
+    exit 0
+  fi
+  echo "[plain_docs_sync] ✓ (staged) 白話說明 與本次改動同步"
+  exit 0
+fi
+
 rc=0
 stale_n=0
 n_managed=0
