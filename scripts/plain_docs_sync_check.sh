@@ -51,7 +51,11 @@ _watched_for() {
 #   只掛 pre-push 的話，要等到 push 才發現，那時 commit 訊息都寫完了 ⇒ 回饋太晚。
 #   pre-commit 在**當下**擋住，且語意更嚴（要求同 commit，而非「之後補」）。
 if [ "${1:-}" = "--staged" ]; then
-  staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+  # 🔴 必須 -c core.quotepath=false：否則中文路徑被逃脫成 "\347\231\275…"，
+  #    比對永遠失敗 ⇒ 每次都誤報「說明檔沒帶到」，訓練使用者忽略提醒（比不報更糟）。
+  #    出生事故：2026-08-05 本檔上線首次 commit 即誤報；同型 quotepath 陷阱當日第 3 次
+  #    （另兩次：誤判遠端無重複檔、grep 中文檔名無效）。
+  staged="$(git -c core.quotepath=false diff --cached --name-only --diff-filter=ACMR)"
   [ -n "${staged}" ] || { echo "[plain_docs_sync] (staged) 無 staged 檔，略過"; exit 0; }
 
   src=0
