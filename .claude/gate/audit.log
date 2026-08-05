@@ -34033,3 +34033,22 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r4-stamp-codex.md", "output_sha256": "4c7ec7796031b8a7f80bfa542a54abbe4ac10e4e47e7d27eeadc63f585acb439", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:40:07Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r4-stamp-composer.md", "output_sha256": "a03c3db29c932947a62eac3ae5794afa61d00189e00b69a0b6d5062c6701bcc3", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:40:07Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r4-stamp-grok.md", "output_sha256": "2b7983216977439b637d31176cbaba5c71f93858a9255112438b50443e67a670", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:40:07Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-spec-r4/synth.md", "output_sha256": "d925b789b568bab770b082dc7fcc7a4d829cf4ac55025383edb1763c9dbd03d5", "task_id": "GOVB0-SPEC-R5", "ts": "2026-08-05T00:44:20Z"}
+=== 2026-08-05 08:44:20 | dispatch ===
+  ts=2026-08-05 08:44:20
+  kind=dispatch
+  intent=第 0 批 SPEC R5 確認輪，逐條確認 R4 八條是否真的關閉且可機械驗收
+  risk=high
+  facts_asked=G-1 heredoc 五條規則是否足以機械執行、G-2 八條狀態斷言是否覆蓋全部失效路徑、四條 receipt 證明力是否足夠、是否需要 R6
+  review_role=adversarial 確認輪，禁改碼，不重開已裁決事項
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260805-govb0-spec-r4/synth.md
+  reconcile=handoffs/reconcile/20260805-govb0-spec-r4/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-SPEC-R5-BRIEF.md", "brief_sha256": "21111444c1ff37eb05afcfa8b96b2ff3eca48be3af5d18d61be7a5b1d08b8e27", "brief_sha256_norm": "21111444c1ff37eb05afcfa8b96b2ff3eca48be3af5d18d61be7a5b1d08b8e27", "event": "committee_round_open", "event_id": "c677bf13-4649-4cb6-9331-d7806b7da537", "expected_outputs": {"codex": "handoffs/20260805-govb0-spec-r5-codex.md", "composer": "handoffs/20260805-govb0-spec-r5-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "a50b7e6c-ee31-4e07-ac34-701e4613102a", "schema_version": 1, "sequence": 704, "session_name": "20260805-govb0-spec-r5", "task_id": "GOVB0-SPEC-R5", "ts": "2026-08-05T00:44:20Z"}
+{"actor": "cx_run", "attempt_id": "9d56001d-d8bb-4879-964f-fafb640a16db", "cli_rc": "0", "event": "committee_family_result", "event_id": "6d88b893-ff8c-4d0b-a2e3-44ecc28f0747", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-spec-r5-composer.md", "output_sha256": "475f43738173aa6c395171e0d3d7d3de8a564b98c34821177980adb42b4187e7", "producer": "audit_append.sh", "result_state": "format-failed", "round_id": "a50b7e6c-ee31-4e07-ac34-701e4613102a", "schema_version": 1, "sequence": 705, "ts": "2026-08-05T00:47:14Z"}
