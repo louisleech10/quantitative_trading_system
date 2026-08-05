@@ -34292,3 +34292,24 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r9-stamp-grok.md", "output_sha256": "7187720d18a4209a6eb945bdc8b058ca613300cbb6fd2cee8241c922c4f06d06", "task_id": "GOVB0-R9-STAMP", "ts": "2026-08-05T06:00:47Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-todo-r9/synth.md", "output_sha256": "d983a3a274bf24b0c5817c79035f5669bfe1bc672322153299972e7d8e272880", "task_id": "GOVB0-R9-STAMP", "ts": "2026-08-05T06:00:47Z"}
 {"event":"gate_deny","ts":"2026-08-05T06:01:10Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-todo-r9/synth.md", "output_sha256": "d983a3a274bf24b0c5817c79035f5669bfe1bc672322153299972e7d8e272880", "task_id": "GOVB0-IMPL-B0B1", "ts": "2026-08-05T06:02:41Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-todo-r9/synth.md", "output_sha256": "d983a3a274bf24b0c5817c79035f5669bfe1bc672322153299972e7d8e272880", "task_id": "GOVB0-IMPL-B0B1", "ts": "2026-08-05T06:03:19Z"}
+=== 2026-08-05 14:03:19 | dispatch ===
+  ts=2026-08-05 14:03:19
+  kind=dispatch
+  intent=第 0 批實作 B0 凍結 snapshot ＋ B1 Task 0.1 gate_deny 欄位
+  risk=high
+  facts_asked=B0 兩檔 sha256 實跑、TEST-0.1 各條實跑結果、mutation 實跑 rc、pytest 總數、golden inventory 狀態
+  review_role=implementer，依 Internal Frozen 的 TODO 逐條實作，範圍限 B0+B1
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  reconcile=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/GOVB0_FRICTION_SPEC.md
+  todo=docs/GOVB0_FRICTION_TODO.md
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-IMPL-B0B1-BRIEF.md", "brief_sha256": "a846e3e2dc55c5e00b370603fa3030369846935b9b7bcc9973435443f4897b5b", "brief_sha256_norm": "a846e3e2dc55c5e00b370603fa3030369846935b9b7bcc9973435443f4897b5b", "event": "committee_round_open", "event_id": "4349f8e2-ef24-4c48-8f9f-2d39bf0ec6b6", "expected_outputs": {"grok": "handoffs/20260805-govb0-impl-b0b1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["grok"], "producer": "audit_append.sh", "quorum_eligible": ["grok"], "round_id": "79b719a2-6d48-48a2-bce0-314796778828", "schema_version": 1, "sequence": 741, "session_name": "20260805-govb0-impl-b0b1", "task_id": "GOVB0-IMPL-B0B1", "ts": "2026-08-05T06:03:20Z"}
+{"actor": "cx_run", "attempt_id": "46085110-3f23-47a3-bab6-9ab58fbab679", "cli_rc": "0", "event": "committee_family_result", "event_id": "13ebd94e-3fa7-4844-bb87-9769197d4c2d", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-impl-b0b1-grok.md", "output_sha256": "e41bc353af885598feefd0f263fe67c6766f318c003b60294e53e0300ad85e71", "producer": "audit_append.sh", "result_state": "success", "round_id": "79b719a2-6d48-48a2-bce0-314796778828", "schema_version": 1, "sequence": 742, "ts": "2026-08-05T06:16:19Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-impl-b0b1-grok.md", "output_sha256": "e41bc353af885598feefd0f263fe67c6766f318c003b60294e53e0300ad85e71", "task_id": "GOVB0-IMPL-B0B1", "ts": "2026-08-05T06:18:47Z"}

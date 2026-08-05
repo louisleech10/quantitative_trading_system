@@ -171,6 +171,15 @@
     "abandon_kind": [
       "no-findings-expected",
       "collection-failed"
+    ],
+    "match_rule": [
+      "family_cli",
+      "claude_agent",
+      "outer_script",
+      "token_expired",
+      "open_debt",
+      "role_gate",
+      "unknown"
     ]
   },
   "constants": {
@@ -184,14 +193,26 @@
     "committee_round_id",
     "debt_ledger"
   ],
-  "event_object_allowed_keys": [
-    "origin_script",
-    "opens_debt",
-    "in_debt_epoch",
-    "closes_debt",
-    "terminal",
-    "fields"
-  ],
+  "event_object_allowed_keys": {
+    "_debt_event_definition": [
+      "origin_script",
+      "opens_debt",
+      "in_debt_epoch",
+      "closes_debt",
+      "terminal",
+      "fields"
+    ],
+    "gate_deny": [
+      "event",
+      "ts",
+      "tool",
+      "kind",
+      "reason",
+      "match_rule",
+      "cmd_sha256",
+      "cmd_head"
+    ]
+  },
   "family_field_name_patterns": [
     "particip",
     "famil",
@@ -234,6 +255,16 @@
       "reason",
       "approver",
       "abandon_kind"
+    ],
+    "gate_deny": [
+      "event",
+      "ts",
+      "tool",
+      "kind",
+      "reason",
+      "match_rule",
+      "cmd_sha256",
+      "cmd_head"
     ]
   },
   "fragment_scan_prefixes": [

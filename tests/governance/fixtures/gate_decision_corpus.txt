@@ -1,0 +1,4 @@
+# 語料 B — Phase 2 判定差集（placeholder for Task 2.0）
+# Phase 0 只建立占位以使 CORPUS-DISTINCT 可驗；完整 22+ 條契約語料由 Task 2.0 覆寫並附 .sha256 sidecar。
+# 本檔與語料 A（gate_invariance_corpus.txt）獨立，sha256 必須不同。
+{"tool_name":"Bash","tool_input":{"command":"PLACEHOLDER_FOR_TASK_2_0_decision_corpus_not_invariance"}}

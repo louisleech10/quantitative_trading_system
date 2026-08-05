@@ -1,0 +1,24 @@
+# 語料 A — Phase 0 判定不變式（decision trace = (rc, kind)）
+# 格式：每行一筆 stdin JSON（給 gate_check.sh）；# 開頭為註解。
+# 基準＝Phase 0 改動前；改後 (rc, kind) 序列須逐項相等。
+# 本檔與語料 B（gate_decision_corpus.txt）獨立，sha256 必須不同。
+{"tool_name":"Read"}
+{"tool_name":"Bash","tool_input":{"command":"cat handoffs/foo.md"}}
+{"tool_name":"Bash","tool_input":{"command":"ls -la scripts/"}}
+{"tool_name":"Bash","tool_input":{"command":"grep -rn grok docs/MULTI_AGENT_ORCHESTRATION.md"}}
+{"tool_name":"Task"}
+{"tool_name":"Bash","tool_input":{"command":"codex exec -s workspace-write -o out.md prompt"}}
+{"tool_name":"Bash","tool_input":{"command":"cursor-agent -p --force prompt"}}
+{"tool_name":"Bash","tool_input":{"command":"grok -m grok-4.5 -p prompt"}}
+{"tool_name":"Bash","tool_input":{"command":"agy run something"}}
+{"tool_name":"Bash","tool_input":{"command":"claude -p do something"}}
+{"tool_name":"Bash","tool_input":{"command":"claude --print do something"}}
+{"tool_name":"Bash","tool_input":{"command":"GATE_DIR_OVERRIDE=/tmp codex exec -s workspace-write prompt"}}
+{"tool_name":"Bash","tool_input":{"command":"echo start; grok -m grok-4.5 -p prompt"}}
+{"tool_name":"Bash","tool_input":{"command":"cat brief.md | codex exec -s workspace-write prompt"}}
+{"tool_name":"Bash","tool_input":{"command":"bash scripts/gate_check.sh"}}
+{"tool_name":"Bash","tool_input":{"command":"bash scripts/gate.sh dispatch"}}
+{"tool_name":"Bash","tool_input":{"command":"pgrep -fl 'codex exec|cursor-agent|grok '"}}
+{"tool_name":"Bash","tool_input":{"command":"cat handoffs/sp_codex.txt"}}
+{"tool_name":"Write","tool_input":{"file_path":"README.md","content":"x"}}
+{"tool_name":"Bash","tool_input":{"command":"git status --short"}}

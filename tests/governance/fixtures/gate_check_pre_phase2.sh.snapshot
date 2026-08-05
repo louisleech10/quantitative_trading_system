@@ -18,98 +18,15 @@ GATE_DIR=".claude/gate"
 [ -n "${GATE_DIR_OVERRIDE:-}" ] && GATE_DIR="${GATE_DIR_OVERRIDE}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
-# 命令欄：全文 sha256 ＋ 前 512 位元組（stdout: <sha256>\t<head512>）。
-# 僅在 deny 路徑呼叫；結果不得回饋進判定（D-12）。
-_gate_deny_cmd_fields() {
-  local cmd="${1-}"
-  local sha head
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha="$(printf '%s' "$cmd" | sha256sum | awk '{print $1}')"
-  elif command -v shasum >/dev/null 2>&1; then
-    sha="$(printf '%s' "$cmd" | shasum -a 256 | awk '{print $1}')"
-  else
-    sha="$(printf '%s' "$cmd" | openssl dgst -sha256 2>/dev/null | awk '{print $NF}')"
-  fi
-  # head -c：取前 512 位元組（非字元）；空命令 → 空 head
-  head="$(printf '%s' "$cmd" | head -c 512 2>/dev/null || true)"
-  printf '%s\t%s\n' "${sha:-}" "${head}"
-}
-
-# 僅 deny 路徑：由已定案的 deny_reason + cmd 推 match_rule，並取命中片段。
-# 🔴 grep -Eo 只在此發生，結果不得回饋判定。
-# stdout: <match_rule>\t<frag>
-_gate_deny_match_info() {
-  local deny_reason="${1-}"
-  local cmd="${2-}"
-  local mr="unknown"
-  local frag=""
-  case "$deny_reason" in
-    open_debt) mr="open_debt" ;;
-    token_expired) mr="token_expired" ;;
-    *)
-      if [ -n "$cmd" ]; then
-        if printf '%s' "$cmd" | grep -Eq '(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]'; then
-          mr="family_cli"
-          frag="$(printf '%s' "$cmd" | LC_ALL=C grep -Eo '(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]' 2>/dev/null | head -1)" || frag=""
-        elif printf '%s' "$cmd" | grep -Eq 'claude[^|]*(-p|--print)'; then
-          mr="claude_agent"
-          frag="$(printf '%s' "$cmd" | LC_ALL=C grep -Eo 'claude[^|]*(-p|--print)' 2>/dev/null | head -1)" || frag=""
-        fi
-      fi
-      ;;
-  esac
-  printf '%s\t%s\n' "$mr" "$frag"
-}
-
-# $1=reason $2=tool $3=kind $4=cmd(可空) $5=match_rule
-# 既有 tool/kind 保留（test_gate_deny_audit 基線）；新增 match_rule/cmd_sha256/cmd_head。
 _append_gate_deny_audit() {
   local reason="$1"
   local tool="$2"
   local kind="$3"
-  local cmd="${4-}"
-  local match_rule="${5:-unknown}"
-  local ts fields cmd_sha cmd_head line
+  local ts
   ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date '+%Y-%m-%dT%H:%M:%SZ')"
   mkdir -p "${GATE_DIR}" 2>/dev/null || true
-
-  fields="$(_gate_deny_cmd_fields "$cmd")"
-  cmd_sha="${fields%%	*}"
-  cmd_head="${fields#*	}"
-
-  # jq 組 JSON（換行／控制字元安全）；失敗時降級為無 cmd_head 的最小行
-  line="$(jq -nc \
-    --arg ts "$ts" \
-    --arg tool "$tool" \
-    --arg kind "$kind" \
-    --arg reason "$reason" \
-    --arg match_rule "$match_rule" \
-    --arg cmd_sha256 "$cmd_sha" \
-    --arg cmd_head "$cmd_head" \
-    '{event:"gate_deny",ts:$ts,tool:$tool,kind:$kind,reason:$reason,match_rule:$match_rule,cmd_sha256:$cmd_sha256,cmd_head:$cmd_head}' 2>/dev/null)" || line=""
-
-  if [ -z "$line" ]; then
-    line="$(printf '{"event":"gate_deny","ts":"%s","tool":"%s","kind":"%s","reason":"%s","match_rule":"%s","cmd_sha256":"%s","cmd_head":""}' \
-      "$ts" "$tool" "$kind" "$reason" "$match_rule" "$cmd_sha")"
-  fi
-
-  # 邊界③：單行 ≤1 KB；超長則縮 cmd_head 重組
-  if [ "${#line}" -gt 1024 ]; then
-    cmd_head=""
-    line="$(jq -nc \
-      --arg ts "$ts" \
-      --arg tool "$tool" \
-      --arg kind "$kind" \
-      --arg reason "$reason" \
-      --arg match_rule "$match_rule" \
-      --arg cmd_sha256 "$cmd_sha" \
-      --arg cmd_head "$cmd_head" \
-      '{event:"gate_deny",ts:$ts,tool:$tool,kind:$kind,reason:$reason,match_rule:$match_rule,cmd_sha256:$cmd_sha256,cmd_head:$cmd_head}' 2>/dev/null)" \
-      || line="$(printf '{"event":"gate_deny","ts":"%s","tool":"%s","kind":"%s","reason":"%s","match_rule":"%s","cmd_sha256":"%s","cmd_head":""}' \
-        "$ts" "$tool" "$kind" "$reason" "$match_rule" "$cmd_sha")"
-  fi
-
-  { printf '%s\n' "$line"; } >> "${GATE_DIR}/audit.log" 2>/dev/null || true
+  { printf '{"event":"gate_deny","ts":"%s","tool":"%s","kind":"%s","reason":"%s"}\n' \
+      "$ts" "$tool" "$kind" "$reason"; } >> "${GATE_DIR}/audit.log" 2>/dev/null || true
 }
 
 # fresh token 重查帳本（次要補強）。**不使用 sidecar 快取**：
@@ -152,7 +69,6 @@ tool_name="$(jq -r '.tool_name // empty' <<<"$INPUT" 2>/dev/null)" || exit 0
 [ -z "$tool_name" ] && exit 0
 
 kind=""
-cmd=""   # Bash 才填；缺失時 audit 寫空字串（不得缺欄）
 case "$tool_name" in
   Task)
     kind="dispatch"   # Agent 工具：全涵蓋，零列舉
@@ -167,7 +83,6 @@ case "$tool_name" in
     # executor 名單 = scripts/governance_families.json executor_clis(codex|cursor-agent|grok|agy)。
     # 熱路徑(每次工具呼叫)故此處寫死避免 subprocess 開銷;governance 測試釘死此清單 == SoT(防漂移)。
     # 事故:寫死漏 grok,主力實作 CLI 不被 PreToolUse 攔(2026-07-23)。
-    # 🔴 判定段：只做 grep -Eq，禁止 grep -Eo（D-12：取片段不得入判定）。
     if printf '%s' "$cmd" | grep -Eq '(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]|claude[^|]*(-p|--print)'; then
       # 排除 gate 自身與唯讀勘查
       if printf '%s' "$cmd" | grep -Eq 'scripts/gate(_check)?\.sh'; then exit 0; fi
@@ -199,10 +114,7 @@ if [ -f "$token" ]; then
       exit 0
     fi
     deny_reason="open_debt"
-    # 先判定、後記錄：match_info 的 grep -Eo 只在 deny 路徑執行
-    _mi="$(_gate_deny_match_info "$deny_reason" "$cmd")"
-    _mr="${_mi%%	*}"
-    _append_gate_deny_audit "$deny_reason" "$tool_name" "$kind" "$cmd" "$_mr"
+    _append_gate_deny_audit "$deny_reason" "$tool_name" "$kind"
     cat >&2 <<EOF
 [GATE BLOCKED] kind=${kind} 有 fresh token，但債務帳本重查未通過（OPEN 債或帳本不可信）。
 主擋門是 gate.sh 的 _check_open_debt；本重查為次要補強。
@@ -213,10 +125,7 @@ EOF
   deny_reason="token_expired"
 fi
 
-# 先判定、後記錄：取片段／match_rule 不入判定主路徑
-_mi="$(_gate_deny_match_info "$deny_reason" "$cmd")"
-_mr="${_mi%%	*}"
-_append_gate_deny_audit "$deny_reason" "$tool_name" "$kind" "$cmd" "$_mr"
+_append_gate_deny_audit "$deny_reason" "$tool_name" "$kind"
 
 # fail-closed：擋下，告訴 Claude 怎麼開門
 cat >&2 <<EOF
