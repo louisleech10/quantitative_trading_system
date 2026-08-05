@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T011330Z-r6-p0-2-atomic-lock",
+  "claim_id": "r6-p0-2-atomic-lock",
+  "command": [
+    "grep",
+    "-cE",
+    "O_EXCL|lockdir|原子 exclusive claim",
+    "docs/GOVB0_FRICTION_SPEC.md"
+  ],
+  "command_sha256": "317e1abbda224ac6742f3a0013cc90334a42ec4585907bb5850cbbda4a4ff6e5",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "4270e0b1ee46951ba63c0dc7cc045e788940f46f",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T01:13:30Z",
+  "ended_at": "2026-08-05T01:13:30Z",
+  "duration_seconds": 0.004457,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "06e9d52c1720fca412803e3b07c4b228ff113e303f4c7ab94665319d832bbfb7",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "06e9d52c1720fca412803e3b07c4b228ff113e303f4c7ab94665319d832bbfb7",
+  "log_path": "handoffs/run_receipts/20260805T011330Z-r6-p0-2-atomic-lock.log",
+  "tail_excerpt": [
+    "6"
+  ]
+}

@@ -1440,6 +1440,56 @@ codex R1 實跑：把真實 handoff 截成 6 行、保留一個完整 finding bo
 
 ---
 
+## B-38 票 `GOV-ZERO-FINDINGS-BLOCKS-CLOSURE`
+
+**委員合法回報「0 findings」時，`completeness_check` 抽不到 heading ID ⇒ 判 WARN 並使整體 FAIL
+⇒ 該輪正規銷帳結構上不可達，只能走 `--abandon` 逃生口。**
+
+### 碼證（2026-08-05 實測，`GOVB0-SPEC-R6`）
+
+```
+[reconcile_build] synth.md 已建；每檔抽到 findings：
+    20260805-govb0-spec-r6-codex.md: 3
+    20260805-govb0-spec-r6-composer.md: 0
+COMPLETENESS PASS: …-codex.md — 3/3 個 ID 全在綜合檔。
+COMPLETENESS WARN: …-composer.md 抽不到任何 heading ID(來源未用 ## <ID>?) → 本腳本無法保護,須人工/覆議
+COMPLETENESS FAIL: 完整性檢查未過(…)。補齊後重跑。
+[reconcile_build] completeness rc=1
+```
+
+composer 的報告**格式完全合規**，判定為「兩項皆 CLOSED、可進 TODO 生成」——
+**「沒有 finding」正是它的結論**，不是缺漏。
+
+### 為何是制度缺陷
+
+1. 檢查器把「抽不到 ID」一律當**可疑**（原意是防「委員沒用 canonical 格式」），
+   但**無法區分**「格式錯誤導致抽不到」與「真的沒有 findings」。
+2. 後果不對稱：**愈是乾淨的審查輪（全部通過、零 finding）愈無法正規銷帳**，
+   反而必須用逃生口 ⇒ 直接推高 `--abandon` 比率（現況 182 輪中 146 輪 ABANDONED）。
+3. 與 `票 B-24`「驗收＝狀態不是 rc」同族：狀態「0 findings」是**合法終局狀態**，卻無對應處理路徑。
+
+### 修法方向（未定案）
+
+- ① 委員報告增一個**明示欄位**（如 `FINDINGS_COUNT: 0`）；
+  `completeness_check` 見此欄即視為**合法零 findings**，PASS；缺此欄才維持 WARN/FAIL。
+  🔴 此解最小且**可證偽**：委員必須主動宣告，無法靠「剛好抽不到」矇混。
+- ② 或由 `reconcile_build` 在 roster 內某家 0 findings 時要求主委具名確認，寫入 audit。
+- ③ 反對「直接把 WARN 降級為 PASS」——那會讓真正的格式錯誤靜默通過（與 `票 B-31` ④ 同型張力）。
+
+### 與既有票的關係
+
+- **`B-31`**（format-failed 無便宜修正路徑）：同族，皆為「委員產出生命週期未完整建模」。
+- **`B-35`**（截斷 oracle）：①的 `FINDINGS_COUNT` 宣告**同時也是截斷偵測的材料**（宣告數 vs 實際數）。
+  🔴 **兩票應合併評估**——同一個欄位可同時解兩題。
+- **P1-6 線 C**：本票直接推高 ABANDONED 比率，是帳本髒污的來源之一。
+
+### 狀態
+
+**2026-08-05 開票，未實作。** 排期建議：與 `B-31`／`B-35` 同批（第 1 批）。
+🔴 本日已因此走一次 `--abandon`（round `002839f3`），理由已具名載入 audit。
+
+---
+
 ## 📌 `票 B-24` 的拆分裁決（2026-08-04，SPEC 審查 R1 後）
 
 `B-24` 原修法欄寫「併入各票驗收欄，不另建檢查器」。R1 偵察三家一致判定**不滿足使用者定死

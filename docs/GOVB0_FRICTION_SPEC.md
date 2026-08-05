@@ -196,7 +196,47 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
       ③**終點**＝**行首**恰為該 delimiter 的那一行（`<<-` 形式允許行首 tab 縮排，其餘形式不允許任何前導空白）；
       ④**多個 heredoc 併存**（`cat <<A <<B`）：**依出現順序依序消耗**，第 n 個 heredoc 的 body 起於第 n−1 個 body 結束之後；
       ⑤**delimiter 未出現到字串結尾** ⇒ **fail-closed**（視為未剝除，同契約第 6 項）。
-      **驗收語料**（納入語料 B，各 1 條 TP＋1 條 TN）：`<<EOF`／`<<'X'`／`<<-EOF`（縮排）／`cat <<A <<B`（雙 heredoc）／未閉合 heredoc。
+      🔴 ⑥**delimiter 文法＝允許清單，不是識別字、也不是「排除清單」**
+      （R6 修；`CODEX-R5-P0-01` 提出、`CODEX-R6-P0-01` 二次收緊，兩家一致）：
+      起點改為 `<<[-]?[[:space:]]*` 後接下列**三者之一**——
+      (a) `'([^']*)'`　(b) `"([^"]*)"`　(c) `([A-Za-z0-9_.:+=,%@^-]+)`（**允許清單**）；
+      且 (c) **必須完整 token**：其後須緊接 `[[:space:]]`、換行或字串結尾（**禁前綴匹配**）。
+      delimiter ＝捕捉群去引號後的字面值。
+      ⇒ `EOF-1`／`EOF.1`／`E0F`／`_EOF` 等**皆為合法 shell delimiter，必須正確開 span**。
+      🔴 **為何用允許清單而非排除清單**：`票 B-23` 已定「列舉禁止符號永遠列不完 ⇒ 反轉為允許清單」。
+      R6 初版寫成排除清單 `([^[:space:]|&;()<>]+)`，**當場被證偽**（見下事故二）。
+      🔴 ⑦**`<<` 無法依⑥解析 ⇒ 整個掃描 fail-closed（BLOCK）**，
+      **不得略過該 `<<` 繼續掃描**。⑥的允許清單與⑦是**互補且不重疊**的：
+      凡不落在 (a)(b)(c) 三形式者一律走⑦，**不得有「⑥接受但⑦說要拒絕」的重疊區**。
+
+      **事故二（`CODEX-R6-P0-01`，實跑證偽 — R6 初版的⑥自身有缺陷）**：
+      初版⑥用排除清單 `([^[:space:]|&;()<>]+)`，造成兩個問題：
+      **(i) 與⑦矛盾**——`grep -Eq '^([^[:space:]|&;()<>]+)$'` 對 `E'O'F`／`E"O"F`／`$'EOF'` **皆回 yes**，
+      即⑥**接受**了⑦明文要求拒絕的混合引號／ANSI-C quote。
+      **(ii) 前綴匹配漏掃**——`E\ F` 被解析成 delimiter `E\`（在空白處停），
+      與 shell 實際的 `E F` 不符 ⇒ span 界定錯誤；codex 實跑 `bash -c` 輸出 `ESCAPED_ATTACK_EXECUTED`，
+      而依初版契約的掃描器回 `ALLOW`。同理 `EOF$(` 被解析成 `EOF$`。
+      ⇒ 改為**允許清單＋完整 token 邊界**後，上述五個向量（`E'O'F`／`E"O"F`／`$'EOF'`／`E\ F`／`EOF$(`）
+      **全部落入⑦ fail-closed**。
+
+      **⑥⑦ 的出生事故（實跑反例，勿弱化）**：R5 版起點 regex 為
+      `<<[-]?[[:space:]]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1`，**只吃識別字**。
+      攻擊鏈：delimiter 用合法的 `EOF-1` ⇒ 不匹配 ⇒ **不開 span** ⇒ 掃描器改在 body 內的
+      `<<INNER`（識別字）**開錯位置的 span** ⇒ 一路吞到行首為 `INNER` 的行，
+      **把 `EOF-1` 終止行與其後的真實外部派工整段吃掉** ⇒ **fail-open**。
+      codex 實跑：`bash -c` 輸出含 `ATTACK_EXECUTED`（`HEREDOC_SHELL_RC=0`），
+      而依 R5 契約寫的最小掃描器回 `CONTRACT_SHAPE_SCAN=ALLOW`。
+      ⚠️ **只補⑦不補⑥並不足夠**：那會把 `EOF-1` 這類**合法且常見**的用法變成誤擋，
+      與本批「止血摩擦」的目標相反。**⑥⑦ 必須同時實作。**
+
+      **驗收語料**（納入語料 B，各 1 條 TP＋1 條 TN）：
+      `<<EOF`／`<<'X'`／`<<-EOF`（縮排）／`cat <<A <<B`（雙 heredoc）／未閉合 heredoc／
+      🔴 `<<EOF-1`（非識別字 delimiter）／`<<'EOF-1'`（引號包非識別字）／
+      **body 內含假 marker 且 delimiter 後接真派工**（即上述攻擊鏈，TP 必須 BLOCK）／
+      🔴 **⑦ fail-closed 五向量（事故二，各須 TP）**：`<<E'O'F`／`<<E"O"F`／`<<$'EOF'`／
+      `<<E\ F`（含跳脫空白，**禁前綴匹配成 `E\`**）／`<<EOF$(`（**禁前綴匹配成 `EOF$`**）。
+      **mutation（可證偽性證明）**：把⑥的允許清單改回排除清單 `([^[:space:]|&;()<>]+)`
+      或移除「完整 token 邊界」要求 ⇒ 上述五向量**必須有至少一條轉為 ALLOW**（斷言 FAIL）。
   🔴 **上列 7–10 的判定結果在 R4 定死**（R3 只列項目未定結果，`CODEX-R3-P0-02`）。
   🔴 **契約共 11 項**（`1`／`1b`／`2`–`10`）——本行數字須與本 Task「改法」下的條目數相等；
   R3 曾寫「10 項」而實為 11（`COMPOSER-R3-P2-01`），與 §V 的 Task 數漂移同型（`票 B-17`），
@@ -355,6 +395,39 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
   - 狀態斷言（**prompt 對齊**）：`cx_run.sh` 產生的 prompt 內產出路徑 == wrapper 實際期待的 attempt 路徑（**同一來源，測試比對兩者字串相等**）。
   - **lock 生命週期（`F-3`：R3 只寫「拒絕」未定義生命週期，R4 定死 — `CODEX-R3-P0-03`／`COMPOSER-R3-P1-03`）**：
     - **ownership**：lock 綁 attempt id，內容含 pid 與起始時間戳（UTC epoch）。
+    - 🔴 **acquire 必須是原子 exclusive claim（R6 補 — `CODEX-R5-P0-02`，兩家一致）**：
+      取得 lock **不得**用「先檢查、再建立」兩步；須以**單一原子操作**取得 ownership，二選一：
+      (a) `mkdir <out>.lockdir`（POSIX 保證同名目錄僅一個建立者成功），或
+      (b) `O_CREAT|O_EXCL` 開檔（`set -o noclobber` 下的 `> file` 等價）。
+      **取得成功者**才寫入 attempt id／pid／時間戳並啟動 CLI。
+      **取得失敗者**重讀 lock 判定 stale：非 stale ⇒ 拒絕啟動（**不寫 `result_state`**，只記拒絕事件）；
+      stale ⇒ **須先取得回收權再接管**（見下「stale takeover 協定」），**不得直接覆寫、亦不得裸刪重建**。
+
+      🔴 **stale takeover 協定（R7 補 — `CODEX-R6-P0-02`，R6 初版的裸「刪除+重建」已被實跑證偽）**：
+      ①以 `mkdir <out>.reclaim.lockdir` 的**原子操作**取得**回收權**；EEXIST ⇒ **直接拒絕啟動**，
+      **不得再碰主 lock**（他人正在接管中）。
+      ②取得回收權後**重讀主 lock**，確認其 attempt id **仍等於**先前判定 stale 時觀察到的那一個；
+      **不相等 ⇒ 已被他人接管，不得刪除，直接拒絕**。
+      ③相等才可刪除主 lock，並以⑥同款原子操作建立新 lock；建立失敗 EEXIST ⇒ **拒絕，不得再刪**。
+      ④無論成敗，最後**釋放回收權**（`rmdir <out>.reclaim.lockdir`），且釋放前須確認回收權仍為自己所有。
+
+      **事故三（`CODEX-R6-P0-02`，實跑證偽 — R6 初版的接管路徑有缺陷）**：
+      初版寫「stale ⇒ 先原子刪除再原子建立」，**但刪除未綁定 observed owner**。
+      競態：A、B 皆判定同一 lock 為 stale ⇒ B 先刪除、建立、啟動 CLI ⇒
+      **A 接著把 B 剛建立的 live lock 刪掉**、建立自己的、也啟動 CLI ⇒ **兩個 CLI 並存**。
+      codex deterministic ordering probe：`STALE_TAKEOVER_LOG=B:START,A:START`、`STALE_TAKEOVER_STARTS=2`。
+      ⇒ **「取得是原子的」不等於「接管是原子的」**：接管是「讀 owner → 刪 → 建」三步，
+      必須另有一把鎖把這三步序列化，否則原子 `mkdir` 只保證單步互斥。
+      🔴 **`lock-create` 或 process-discovery 任一發生錯誤 ⇒ fail-closed（拒絕啟動）**，不得當作「無鎖」放行。
+
+      **出生事故（實跑反例，勿弱化）**：R5 版只寫 ownership 綁 attempt id 與 release 比對 owner，
+      **全文無 `O_EXCL`／`flock`／`mkdir`／`TOCTOU`**（`rg -n 'O_EXCL|flock|TOCTOU|exclusive' docs/GOVB0_FRICTION_SPEC.md` rc=1）。
+      owner-safe release 只能防「**舊** owner 釋放**新** lock」，
+      **擋不住兩個 dispatcher 在 precheck 都看到「無存活 lock」之後各自啟動 CLI**。
+      codex barrier 模擬：A／B 兩者 precheck 皆通過，stdout 出現
+      `A:START`、`B:START`、`TOCTOU_SIM_BOTH_PRECHECKS_PASSED=yes`。
+      ⚠️ **「存活中」判準的聯集（見下）是「讀取面」的修補，不能取代「取得面」的原子性**——
+      兩個 dispatcher 可以同時讀到正確的「無存活 attempt」，問題出在讀完到寫入之間的窗口。
     - **release**：`_emit_family_result` 寫入後**必定釋放**（無論 `success`／`failed`／`format-failed`），
       **不依賴 publish 是否成功**——否則失敗路徑會永久鎖死該 `<out>`。
       🔴 **owner-safe release（R5 補 — `CODEX-R4-P0-02`）**：釋放前**必須比對 lock 內的 attempt id 與自己相同**；
@@ -389,6 +462,24 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
     ⑥**外層 timeout 殺掉 `cx_run.sh`**：lock 由 stale 判定回收，**外層不直接刪 lock**
     ⑦**lock 檔被外部刪除但 attempt 進程存活** → 第二次派工仍 **拒絕**（見上「存活中」判準取聯集）
     ⑧**跨裝置 rename 失敗** → `result_state=failed` 且 lock 已 owner-safe 釋放。
+    🔴 ⑨**原子取得（barrier race，R6 補 — `CODEX-R5-P0-02`）**：兩個 dispatcher 對同一 `<out>`
+      在 precheck 之後以 **barrier 同步**（不得用 `sleep` 競速，須 deterministic），
+      **恰有一個** CLI 啟動、另一個 rc≠0；loser **不寫 `result_state`**，只記拒絕事件。
+      **反向 mutation**：把原子 `mkdir`／`O_EXCL` 換回「先檢查再建立」兩步 ⇒ 本斷言**必須 FAIL**
+      （出現兩個 `START`）。此 mutation 是本條可證偽性的證明，不得省略。
+    🔴 ⑩**lock-create 錯誤 fail-closed**：令 `mkdir`／`O_EXCL` 因權限或 I/O 失敗（非 EEXIST）⇒
+      **拒絕啟動**，不得視為「無鎖」而放行。
+      🔴 ⑪**process-discovery 錯誤 fail-closed（R7 補 — `CODEX-R6-P1-03`）**：
+      注入 process-discovery 的 `EIO`／權限錯誤 ⇒ **rc≠0、CLI 不啟動、不寫 `result_state`、只記拒絕 audit**。
+      🔴 SPEC 內文（`acquire` 條款）已要求「`lock-create` **或** process-discovery 任一錯誤 ⇒ fail-closed」，
+      但 R6 初版只有 `lock-create` 有可執行斷言 ⇒ **後半不可證偽**。⑪即補此缺。
+      **兩者各須反向 mutation**：把該錯誤路徑改為「當作無鎖／無存活進程」放行 ⇒ 對應斷言**必須 FAIL**。
+    🔴 ⑫**stale takeover 序列化（R7 補 — `CODEX-R6-P0-02`）**：A、B 皆判定同一 lock 為 stale，
+      以 deterministic barrier 同步後各自嘗試接管 ⇒ **恰有一個** CLI 啟動；
+      **且不得出現「A 刪除 B 已建立的 live lock」**——斷言 `STALE_TAKEOVER_STARTS == 1`，
+      且 audit 中該 `<out>` 的 lock attempt id 序列**恰 1 次**變更（`grep -c` 導出）。
+      **反向 mutation**：移除 `<out>.reclaim.lockdir` 回收權或移除「重讀比對 observed owner」⇒
+      本斷言**必須 FAIL**（出現 2 個 `START`）。
     🔴 演進紀錄：R1 寫「後者覆蓋前者」（`CODEX-R1-P0-03` 指出會丟失成功產出）→ R2 改「兩者皆須保留可追溯」
     （`CODEX-R2-P0-02` 指出與單一 final `<out>` 的資料模型不相容，無可執行取勝規則）→ **R3 改為序列化拒絕**。
     理由：委員派工本就不應對同一產出路徑並發；**拒絕比仲裁簡單，且不丟資料**。
