@@ -193,3 +193,4 @@ handoffs/ic1eb_newpath_freeze.bak.*/
 
 # Claude session 暫存輸出（勿 commit）
 .claude/tmp/
+.claude/gate/audit.log.bak-*
