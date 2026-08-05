@@ -1,6 +1,14 @@
 # 第 0 批摩擦止血 TODO
 
-**狀態**: DRAFT（未過外部 adversarial review 前不得標 Frozen）
+**狀態**: **Internal Frozen**（2026-08-05；R9 兩家一致判 `blocks-implementation = 0`、可標 Frozen）
+
+TODO-STATUS: INTERNAL-FROZEN
+
+> **審查軌跡**：R8 前輪 9 條 → 修 → R8 **6 條**（全為修補引入的新缺口）→ 修 → R9 **5 條、0 blocks-implementation**。
+> R9 為 TODO **最後一輪**（brief 明文終止條件）。5 條 `named-residual` **主委已全部就地修完並實跑驗證**
+> （見 `handoffs/reconcile/20260805-govb0-todo-r9/synth.md` 的 J-1～J-4）。
+> 🔴 **Internal Frozen ≠ 已驗證可執行**——實作階段若發現本 TODO 有誤，
+> 依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE.md` 走延伸檔修訂，**不得就地改**。
 **基於 SPEC**: `docs/GOVB0_FRICTION_SPEC.md`（R7 版，七輪收斂，`handoffs/reconcile/20260805-govb0-spec-r7/synth.md` 三家 `RECONCILE-STAMP APPROVED`，sha `b502bac9…0f82fa4bd`）
 **日期**: 2026-08-05
 **涵蓋票**: `B-15`／`B-14`／`B-30`／`B-32` ＋ `B-24`（**僅紀律面**）
@@ -99,7 +107,7 @@ RESIDUAL: reclaim-orphan-manual-cleanup
 - **B3 → B4**：`pytest tests/governance/test_gate_lexical_contract.py -q` rc=0，契約 **11 項** 各 ≥1 TP＋1 TN（共 ≥22 條）。
 - **B4 → B5**：`pytest tests/governance/test_gate_decision.py -q` rc=0。
 - **B5 → 合併 Phase 2**：`bash scripts/gate_decision_delta.sh` rc=0 且報表內「非預期」項數 == 0。
-- **B6 → B7**：`pytest tests/governance/test_atomic_publish.py -q` rc=0，含 `TEST-3.2-LOCK-⑨`～`⑫` 四條並發斷言。
+- **B6 → B7**：`pytest tests/governance/test_atomic_publish.py -q` rc=0，含 `TEST-3.2-LOCK-⑨`～`⑬` **五條**並發／錯誤路徑斷言（含 `TEST-3.2-E9-ORDER`）。
 - **B7 → 完工**：`pytest tests/governance -q` 總數 ≥701 且無既有測試轉紅。
 
 **每 Batch 派工 prompt 骨架**（可直接複製，`<>` 內替換）：
@@ -256,7 +264,12 @@ RESIDUAL: reclaim-orphan-manual-cleanup
 
 - **SPEC ref**：Task 2.0　**目標**：先把「什麼算命令位置／什麼算引號 span」定死成可機械驗收的契約，再實作。
 - **輸入 / 輸出**：輸入＝SPEC Task 2.0 契約 **11 項**（`1`／`1b`／`2`–`10`）；
-  輸出＝`tests/governance/fixtures/gate_decision_corpus.txt` 語料 B ＋ `tests/governance/test_gate_lexical_contract.py`。
+  輸出＝`tests/governance/fixtures/gate_decision_corpus.txt`（語料 B）
+  ＋ 🔴 **其 `.sha256` sidecar `tests/governance/fixtures/gate_decision_corpus.txt.sha256`**
+  ＋ `tests/governance/test_gate_lexical_contract.py`。
+  🔴 **sidecar 的 producer ＝本 Task，且必須與語料同一次 commit**（`CODEX-R9-P1-02`／`COMPOSER-R9-P1-01`
+  兩家獨立指出：`TEST-2.5-CORPUS-SHA` 要求該檔已 commit，但初版無任何 Task 負責產出 ⇒ 實作者會卡住）。
+  內容＝`sha256sum gate_decision_corpus.txt` 的雜湊值單行。**語料變更時必須同一 commit 更新 sidecar。**
 - **實作要點**：
   1. **契約 11 項逐項實作**，每項各 ≥1 TP ＋ ≥1 TN，**共 ≥22 條**，全部進語料 B。
   2. **參考實作＝原型③** `handoffs/govb0_probes/b15probe5.sh`（主委實跑 26/26）。
@@ -281,7 +294,8 @@ RESIDUAL: reclaim-orphan-manual-cleanup
      🔴 **允許清單為何不必列完**（使用者 2026-08-05 定框架，見 SPEC §N）：
      漏項的後果是 **fail-closed／誤擋**（可見、會被抱怨、可補），不是 fail-open／漏放（不可見）。
      ⇒ 允許清單**可收斂**，補一次少一次。**收斂循環的前提是誤擋看得見 ⇒ Phase 0 為硬前置。**
-- **修改檔案**：新增 `tests/governance/test_gate_lexical_contract.py`；新增語料 B `tests/governance/fixtures/gate_decision_corpus.txt`。
+- **修改檔案**：新增 `tests/governance/test_gate_lexical_contract.py`；
+  新增語料 B `tests/governance/fixtures/gate_decision_corpus.txt` **及其 `.sha256` sidecar**（同一 commit）。
   **既有 caller**：無（本 Task 只產契約與語料，實作點在 2.1–2.4）。
 - **不可做**：**不得在四個 Task 中各寫一份剝引號邏輯**（須單一實作供 2.1–2.4 共用）。
 - **邊界**（≥2）：見契約第 6、8、9、10 項——未閉合引號／遞迴逾 3 層／跳脫字元邊界不明／heredoc 未閉合，
@@ -662,9 +676,15 @@ TASK-STATUS: INCOMPLETE
     使該詞 `grep -c` 由 0 變 4，**又把自己的測試弄壞**。
     ⇒ **結論：散文關鍵字比對本質脆弱**（任何討論該詞的句子都污染計數，且無法區分「宣稱」與「否定宣稱」）。
     **本批全面改用單一機器標記行**（`TICKET-STATUS:` ／ `TASK-STATUS:`），語意明確、不受行文影響。
-  - `TEST-3.3-B24-PARTIAL`（狀態）：`票 B-24` 的 bounded section 內
-    **含且僅含一行** `TICKET-STATUS: PARTIAL`（`grep -c '^TICKET-STATUS: PARTIAL'` **== 1**），
-    且**不得**出現 `TICKET-STATUS: DONE`（`grep -c` **== 0**）。
+  - `TEST-3.3-B24-PARTIAL`（狀態；`CODEX-R9-P1-01` 要求把 bounded 擷取寫成可執行命令，勿留自然語言）：
+    **擷取命令（逐字，實作者照抄）**——
+    ```
+    awk '/^## B-24 /{p=1} p && /^## B-/ && !/^## B-24 /{exit} p' handoffs/20260801-GOV-AMEND-BACKLOG.md
+    ```
+    對其輸出斷言：`grep -c '^TICKET-STATUS: PARTIAL'` **== 1**
+    且 `grep -c '^TICKET-STATUS: DONE'` **== 0**。
+    🔴 **`TEST-3.3-PROVISIONAL` 條件③的 `票 B-14` 擷取同法**（把 `B-24` 換成 `B-14`），
+    斷言 `grep -c '^TICKET-STATUS: PROVISIONAL'` **== 1**。
   - `TEST-3.3-H2-RESIDUAL`（狀態）：本 TODO §0 第 2 條含**行首錨定**的機器標記——
     `grep -c '^RESIDUAL: reclaim-orphan-manual-cleanup' docs/GOVB0_FRICTION_TODO.md` **== 1**；
     且實作產出文件中 `grep -c '^LOCK-STATUS: COMPLETE'` **== 0**。
@@ -679,7 +699,7 @@ TASK-STATUS: INCOMPLETE
 
 - 單元：lock 協定各分支　邊界：並發／SIGKILL／跨裝置／timeout 邊界　整合：一次真實三家派工。
 - **Phase 3 Gate**：`pytest tests/governance/test_atomic_publish.py tests/governance/test_family_timeout.py -q` rc=0，
-  含 `TEST-3.2-LOCK-⑨`～`⑫` 四條並發斷言與其反向 mutation。
+  含 `TEST-3.2-LOCK-⑨`～`⑬` **五條**並發／錯誤路徑斷言（含 `TEST-3.2-E9-ORDER`）與其反向 mutation。
 
 ---
 
@@ -711,6 +731,15 @@ TASK-STATUS: INCOMPLETE
 | Task 2.3 | Phase 2 / Task 2.3 | `H-2` reclaim 孤兒 | §0.1 第 2 條 ＋ Task 3.2 要點 8 |
 | Task 2.4 | Phase 2 / Task 2.4 | `B-24` 紀律面 | §0.1 第 1 條 ＋ §0.5 |
 | Task 2.5 | Phase 2 / Task 2.5 | `E-10` PROVISIONAL | §0.1 第 3 條 ＋ Task 3.3 |
+| `D-4` 差集 immutable corpus | Task 2.5 實作要點 1–3 | `D-6` `B-24` SPLIT | §0.1 第 1 條 |
+| `D-12` 取片段不入判定 | Task 0.1 實作要點 1 | `D-13` snapshot 非 HEAD | **B0** ＋ Task 2.5 要點 2 |
+| `E-2` unknown 無副作用 | `TEST-1.1-UNKNOWN-NOSIDEEFFECT` | `E-3` 命令替換 fail-open | `TEST-2.1-E3`／`TEST-2.2-REGRESS` |
+| `E-7`／`E-8` 兩份 baseline 分離 | Task 0.1 實作要點 4 | `E-9` publish 順序契約 | `TEST-3.2-E9-ORDER` |
+| `F-1` 不變式非 audit diff | Task 0.1 `TEST-0.1-INVARIANCE` | `F-3` lock 生命週期 | Task 3.2 要點 7–10 |
+| `F-6` 契約 1b 具名語料 | `TEST-2.1-1B` | `D-1`／`D-2`／`D-3`／`D-5`／`D-11` | Task 2.1／3.2／0.1／1.1 各要點 |
+
+🔴 **上表下半部為 R9 補列**（`CODEX-R9-P2-03`）：`D-4`／`D-6`／`F-1`／`F-3` 等具名 ID
+**內容已分散落實但無 literal ID 落點** ⇒ 下游以 §T 為索引時會誤判為漏。已逐條補上對應位置。
 
 **SPEC Task 總數 11**（導出命令 `grep -c '^\*\*Task ' docs/GOVB0_FRICTION_SPEC.md`）
 **== 本 TODO Task 總數 11**（導出命令 `grep -c '^### Task ' docs/GOVB0_FRICTION_TODO.md`）。

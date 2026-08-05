@@ -24,6 +24,8 @@
       "Bash(git reset -q HEAD*)",
       "Bash(git reset --soft*)",
       "Bash(git reset --mixed*)",
+      "Bash(git checkout -- *)",
+      "Bash(git checkout HEAD -- *)",
       "Bash(find . *)",
       "Bash(grep *)",
       "Bash(ls *)",
@@ -86,13 +88,7 @@
       "Bash(cd /Users/*)",
       "Bash(nohup *)"
     ],
-    "ask": [
-      "Bash(git reset --hard*)",
-      "Bash(git rebase*)",
-      "Bash(git checkout -- *)",
-      "Bash(git restore *)",
-      "Bash(git branch -D*)"
-    ],
+    "ask": [],
     "defaultMode": "auto",
     "autoMode": {
       "allow": [

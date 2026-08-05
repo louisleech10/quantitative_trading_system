@@ -34228,3 +34228,31 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-todo-r8-composer.md", "output_sha256": "b3f3d436cc3ebe7b3860b22121d89ac80e7833c7170cb7321c98ee37bf1fe238", "task_id": "GOVB0-TODO-R8", "ts": "2026-08-05T04:39:31Z"}
 {"event":"gate_deny","ts":"2026-08-05T04:46:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-05T04:46:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-05T04:58:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-05T04:58:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-spec-r7/synth.md", "output_sha256": "150b4c43da87fa23612eeff9dc593e457042ff5730fc70ea5d2c01810b5f1cd0", "task_id": "GOVB0-TODO-R9", "ts": "2026-08-05T05:10:49Z"}
+=== 2026-08-05 13:10:50 | dispatch ===
+  ts=2026-08-05 13:10:50
+  kind=dispatch
+  intent=第 0 批 TODO 最後一輪 R9，確認 R8 六條關閉且未引入第三輪缺口
+  risk=high
+  facts_asked=六條是否真的關閉、機器標記方案是否有新漏洞、全量 SPEC 具名 ID 追溯是否完整、冷啟動實作者能否照此動工
+  review_role=adversarial 最後一輪，禁改碼，新缺口須分類 blocks-implementation 或 named-residual
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260805-govb0-spec-r7/synth.md
+  reconcile=handoffs/reconcile/20260805-govb0-spec-r7/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-TODO-R9-BRIEF.md", "brief_sha256": "f80954ba37f91e3b0ff5da865d26814f4bc552397fab809e39143f9e23108ac5", "brief_sha256_norm": "f80954ba37f91e3b0ff5da865d26814f4bc552397fab809e39143f9e23108ac5", "event": "committee_round_open", "event_id": "54eac25a-2d89-4f56-b3b4-91e7db6e83ae", "expected_outputs": {"codex": "handoffs/20260805-govb0-todo-r9-codex.md", "composer": "handoffs/20260805-govb0-todo-r9-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "2beee6bb-0f9c-4b0b-a60a-c237d598cb3c", "schema_version": 1, "sequence": 732, "session_name": "20260805-govb0-todo-r9", "task_id": "GOVB0-TODO-R9", "ts": "2026-08-05T05:10:50Z"}
+{"actor": "cx_run", "attempt_id": "fa17e6b6-04b1-468b-86ab-9c14a3bb00da", "cli_rc": "0", "event": "committee_family_result", "event_id": "729d2b14-705a-4bf2-93ec-b13b3b92194a", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-todo-r9-composer.md", "output_sha256": "0897c6a1bdbf2ee58f7df675ff85e5429bda8f0e764d65c5ecd2b671fc3e2bb4", "producer": "audit_append.sh", "result_state": "success", "round_id": "2beee6bb-0f9c-4b0b-a60a-c237d598cb3c", "schema_version": 1, "sequence": 733, "ts": "2026-08-05T05:14:05Z"}
+{"event":"gate_deny","ts":"2026-08-05T05:27:25Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-todo-r9-codex.md", "output_sha256": "3832d53f9170264c0a3235e4547843681b2ef65a8ab82ff8aabf0e7fcf4f1ab8", "task_id": "GOVB0-TODO-R9", "ts": "2026-08-05T05:28:46Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-todo-r9-codex.md", "output_sha256": "826ce3397a4a05fc802202c6e283ad3faa1f6e1823a3b5957e7f11a5dd36a0b8", "task_id": "GOVB0-TODO-R9", "ts": "2026-08-05T05:29:21Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-todo-r9-codex.md", "output_sha256": "826ce3397a4a05fc802202c6e283ad3faa1f6e1823a3b5957e7f11a5dd36a0b8", "task_id": "GOVB0-TODO-R9", "ts": "2026-08-05T05:29:25Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-todo-r9-composer.md", "output_sha256": "0897c6a1bdbf2ee58f7df675ff85e5429bda8f0e764d65c5ecd2b671fc3e2bb4", "task_id": "GOVB0-TODO-R9", "ts": "2026-08-05T05:29:26Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "6179335e-c7e0-4646-ab4a-5e95395378ad", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "本批要修的 bug 在本批自己的審查輪活體重現：codex 產出完整（9739 bytes、STATUS: DONE、自行跑過 register-output rc=0、runlog 顯示全部驗收命令實跑），composer 亦正常，但 audit 內只有 composer 的 committee_family_result，codex 的完全缺失 ⇒ debt_clear 正規路徑報 家族 codex 無 committee_family_result 而拒絕。此即票 B-14／B-30 的失效模式——產出存在且完整，但缺 terminal marker，系統無法區分完成與未完成。SPEC Task 3.2 的 attempt-scoped atomic publish 與 terminal marker 正是為此設計。實質未損失：兩家報告皆已讀，一致判 TODO 可標 Internal Frozen、blocks-implementation 為 0，5 條 named-residual 已全部就地修完並實跑驗證，收斂檔已填 J-1 至 J-4。", "round_id": "2beee6bb-0f9c-4b0b-a60a-c237d598cb3c", "schema_version": 1, "sequence": 734, "ts": "2026-08-05T05:30:16Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-todo-r9-codex.md", "output_sha256": "28f9d033f1ccc0f8e26edebb5f56cd7b08f3bb8d148d1ff848598af7c10c8794", "task_id": "GOVB0-TODO-R9", "ts": "2026-08-05T05:31:05Z"}
