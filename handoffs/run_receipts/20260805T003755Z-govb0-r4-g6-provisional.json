@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T003755Z-govb0-r4-g6-provisional",
+  "claim_id": "govb0-r4-g6-provisional",
+  "command": [
+    "grep",
+    "-n",
+    "PROVISIONAL",
+    "docs/GOVB0_FRICTION_SPEC.md"
+  ],
+  "command_sha256": "926db71516c899aec809ec34dae5798ac5f9a442e48d2dbd9a8ae4af6ebfc841",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "445e32ee2b7e0af24ca0c6c46ded3f9ba7c01976",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T00:37:55Z",
+  "ended_at": "2026-08-05T00:37:55Z",
+  "duration_seconds": 0.003896,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "2651f142ab4a689d7f5b9caf2b615c6372e80111f94a2c81a7c9738be5651505",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "2651f142ab4a689d7f5b9caf2b615c6372e80111f94a2c81a7c9738be5651505",
+  "log_path": "handoffs/run_receipts/20260805T003755Z-govb0-r4-g6-provisional.log",
+  "tail_excerpt": [
+    "421:       timeout **機制照常上線並以暫定值運作**，值須**逐行標 `PROVISIONAL`**，",
+    "436:    ①TODO §0 與 duration manifest **含 `PROVISIONAL` 字樣**；②Task 3.3 在 TODO 中**標記為未完工**；"
+  ]
+}

@@ -1,0 +1,2 @@
+RECONCILE-STAMP PASS: handoffs/reconcile/20260805-govb0-spec-r4/synth.md 已獲 codex,composer,grok 全數 APPROVED 且本體雜湊相符(sha256:ae304eeb2dd9b22d24070ce12d8dedf1f2dd574e522a7ca8d942ec9ddf88b3fa)。
+  使用者反偽造稽核:核對各戳記 task:<id> 對應的 harness 輸出確為該委員真跑真 APPROVED。

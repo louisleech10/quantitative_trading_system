@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T004034Z-govb0-r4-stamps-approved",
+  "claim_id": "govb0-r4-stamps-approved",
+  "command": [
+    "bash",
+    "scripts/reconcile_stamps_check.sh",
+    "handoffs/reconcile/20260805-govb0-spec-r4/synth.md"
+  ],
+  "command_sha256": "c820e86e008dea7ea057d294580a831fd4d1f764212c4cbfbbd23bd644d3546c",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "445e32ee2b7e0af24ca0c6c46ded3f9ba7c01976",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T00:40:34Z",
+  "ended_at": "2026-08-05T00:40:34Z",
+  "duration_seconds": 0.256688,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "6039b01ec0267ceda28e22f94c35953eddfbd294d4bab13c3a6b7f5d394fe255",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "6039b01ec0267ceda28e22f94c35953eddfbd294d4bab13c3a6b7f5d394fe255",
+  "log_path": "handoffs/run_receipts/20260805T004034Z-govb0-r4-stamps-approved.log",
+  "tail_excerpt": [
+    "RECONCILE-STAMP PASS: handoffs/reconcile/20260805-govb0-spec-r4/synth.md 已獲 codex,composer,grok 全數 APPROVED 且本體雜湊相符(sha256:ae304eeb2dd9b22d24070ce12d8dedf1f2dd574e522a7ca8d942ec9ddf88b3fa)。",
+    "  使用者反偽造稽核:核對各戳記 task:<id> 對應的 harness 輸出確為該委員真跑真 APPROVED。"
+  ]
+}

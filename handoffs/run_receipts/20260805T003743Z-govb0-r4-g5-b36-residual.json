@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T003743Z-govb0-r4-g5-b36-residual",
+  "claim_id": "govb0-r4-g5-b36-residual",
+  "command": [
+    "grep",
+    "-n",
+    "B-36",
+    "docs/GOVB0_FRICTION_SPEC.md"
+  ],
+  "command_sha256": "d31c42081a279511effc3acb22ef99b77ea7da5fbd997aab029a8353ea8bd777",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "445e32ee2b7e0af24ca0c6c46ded3f9ba7c01976",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T00:37:43Z",
+  "ended_at": "2026-08-05T00:37:43Z",
+  "duration_seconds": 0.004425,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "35282c6bbee3537f51bd13c1111e27db9bd8979c36202ef0f175810e73bb9fab",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "35282c6bbee3537f51bd13c1111e27db9bd8979c36202ef0f175810e73bb9fab",
+  "log_path": "handoffs/run_receipts/20260805T003743Z-govb0-r4-g5-b36-residual.log",
+  "tail_excerpt": [
+    "492:  `票 B-36`（收斂工具群集表盲點）已裁定併入 `票 B-13`、修法在**產出端**（`reconcile_build.sh` 生成骨架時預列全部 ID）。",
+    "495:  `completeness_check --lock`、主委逐 ID 自檢、`B-36` 的產出端修法**三者對「錯位」皆無感**，",
+    "497:  ⇒ **「ID 錯位」目前無任何機械防線**，屬本批**具名接受的殘留**，須隨 `B-36` 併入 `B-13` 時一併記載。"
+  ]
+}

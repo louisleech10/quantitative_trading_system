@@ -34004,3 +34004,32 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-04T23:28:59Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-04T23:58:32Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
 {"event":"gate_deny","ts":"2026-08-04T23:58:32Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:32:16Z"}
+=== 2026-08-05 08:32:16 | dispatch ===
+  ts=2026-08-05 08:32:16
+  kind=dispatch
+  intent=R4 收斂檔戳記輪，複核 G-1 至 G-6 歸戶正確性與主委交件後的三類修改
+  risk=low
+  facts_asked=群集表歸戶是否與附錄逐字 findings 一致、假豁免移除與真 receipt 替代是否有掩飾成分、是否還需要 R5 確認輪
+  review_role=adversarial 第三方複核，禁改碼，只准 append 戳記區
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-R4-STAMP-BRIEF.md", "brief_sha256": "c03c229beb3cd1cd70363df8370771c707771c92015e3d9e11dea56c67b8c25f", "brief_sha256_norm": "c03c229beb3cd1cd70363df8370771c707771c92015e3d9e11dea56c67b8c25f", "event": "committee_round_open", "event_id": "fd75b09b-1b73-46d1-b789-5f87975e2a37", "expected_outputs": {"codex": "handoffs/20260805-govb0-r4-stamp-codex.md", "composer": "handoffs/20260805-govb0-r4-stamp-composer.md", "grok": "handoffs/20260805-govb0-r4-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "cb3c6ca4-04bc-442a-bfc9-9192f03642e4", "schema_version": 1, "sequence": 699, "session_name": "20260805-govb0-r4-stamp", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:32:16Z"}
+{"actor": "cx_run", "attempt_id": "bdeed128-f1fa-4cfc-8c3c-413bb70982e8", "cli_rc": "0", "event": "committee_family_result", "event_id": "60afc674-cd38-4b3e-a5cb-e3099b2c7014", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-r4-stamp-composer.md", "output_sha256": "a03c3db29c932947a62eac3ae5794afa61d00189e00b69a0b6d5062c6701bcc3", "producer": "audit_append.sh", "result_state": "success", "round_id": "cb3c6ca4-04bc-442a-bfc9-9192f03642e4", "schema_version": 1, "sequence": 700, "ts": "2026-08-05T00:33:57Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-spec-r4/synth.md", "output_sha256": "e0385db93a2be7cc72005f81c8887e7cf17a96c0a66d67fa90a157c6dd455eea", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:33:57Z"}
+{"actor": "cx_run", "attempt_id": "1e6ce215-c07c-473f-b92e-f3041d5bd603", "cli_rc": "0", "event": "committee_family_result", "event_id": "8a842e46-938d-465f-9531-56428779d958", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-r4-stamp-grok.md", "output_sha256": "2b7983216977439b637d31176cbaba5c71f93858a9255112438b50443e67a670", "producer": "audit_append.sh", "result_state": "success", "round_id": "cb3c6ca4-04bc-442a-bfc9-9192f03642e4", "schema_version": 1, "sequence": 701, "ts": "2026-08-05T00:35:28Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-spec-r4/synth.md", "output_sha256": "d925b789b568bab770b082dc7fcc7a4d829cf4ac55025383edb1763c9dbd03d5", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:35:28Z"}
+{"actor": "cx_run", "attempt_id": "31849e34-3095-4076-905f-8ea60de54179", "cli_rc": "0", "event": "committee_family_result", "event_id": "7e370b5d-3451-4063-9922-6de607fe910c", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-r4-stamp-codex.md", "output_sha256": "4c7ec7796031b8a7f80bfa542a54abbe4ac10e4e47e7d27eeadc63f585acb439", "producer": "audit_append.sh", "result_state": "success", "round_id": "cb3c6ca4-04bc-442a-bfc9-9192f03642e4", "schema_version": 1, "sequence": 702, "ts": "2026-08-05T00:37:30Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-spec-r4/synth.md", "output_sha256": "d925b789b568bab770b082dc7fcc7a4d829cf4ac55025383edb1763c9dbd03d5", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:37:30Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "8db544fd-e742-4f14-9146-31c9f2da2ea3", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "戳記輪不產 findings。三家 codex／composer／grok 皆 APPROVED，stamps_check rc=0、completeness --lock rc=0、claim_check rc=0。三家一致表態 (a) R5 確認輪有必要（含 composer 撤回其 R4 的可省 R5 立場）。composer 與 grok 另指出 G-5／G-6 可現做便宜 receipt，主委已於本輪後補產 govb0-r4-g5-b36-residual 與 govb0-r4-g6-provisional，將帶入 R5 brief，無遺留。", "round_id": "cb3c6ca4-04bc-442a-bfc9-9192f03642e4", "schema_version": 1, "sequence": 703, "ts": "2026-08-05T00:39:10Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-spec-r4/synth.md", "output_sha256": "d925b789b568bab770b082dc7fcc7a4d829cf4ac55025383edb1763c9dbd03d5", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:39:17Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r4-stamp-codex.md", "output_sha256": "4c7ec7796031b8a7f80bfa542a54abbe4ac10e4e47e7d27eeadc63f585acb439", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:40:07Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r4-stamp-composer.md", "output_sha256": "a03c3db29c932947a62eac3ae5794afa61d00189e00b69a0b6d5062c6701bcc3", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:40:07Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-r4-stamp-grok.md", "output_sha256": "2b7983216977439b637d31176cbaba5c71f93858a9255112438b50443e67a670", "task_id": "GOVB0-R4-STAMP", "ts": "2026-08-05T00:40:07Z"}
