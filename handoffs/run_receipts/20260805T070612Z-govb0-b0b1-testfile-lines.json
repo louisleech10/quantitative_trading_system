@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T070612Z-govb0-b0b1-testfile-lines",
+  "claim_id": "govb0-b0b1-testfile-lines",
+  "command": [
+    "wc",
+    "-l",
+    "tests/governance/test_gate_deny_fields.py"
+  ],
+  "command_sha256": "62b5c3b2e77544215579c5421efd4eb2e47711728de9f46ad537fbc28f966ea7",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "a27ed696064bdbc9e69cf9d4e39c1e9dff35f56d",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T07:06:12Z",
+  "ended_at": "2026-08-05T07:06:12Z",
+  "duration_seconds": 0.004901,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "f19133fe93b2f19be4ba1d49b60de370889654704fa8e41e62c8d6ded26b730c",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "f19133fe93b2f19be4ba1d49b60de370889654704fa8e41e62c8d6ded26b730c",
+  "log_path": "handoffs/run_receipts/20260805T070612Z-govb0-b0b1-testfile-lines.log",
+  "tail_excerpt": [
+    "     356 tests/governance/test_gate_deny_fields.py"
+  ]
+}

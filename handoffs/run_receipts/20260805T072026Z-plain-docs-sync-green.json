@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T072026Z-plain-docs-sync-green",
+  "claim_id": "plain-docs-sync-green",
+  "command": [
+    "bash",
+    "scripts/plain_docs_sync_check.sh"
+  ],
+  "command_sha256": "098c0767529f34a10306a3f71a7021d864bccdb49f222aab9bad412b4fc14f71",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "a27ed696064bdbc9e69cf9d4e39c1e9dff35f56d",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T07:20:26Z",
+  "ended_at": "2026-08-05T07:20:26Z",
+  "duration_seconds": 0.190331,
+  "exit_code": 1,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "f4952b11fd444fef6b4e744919417154506f805482c78cf48e60d98e5cccf27a",
+  "log_sha256": "f4952b11fd444fef6b4e744919417154506f805482c78cf48e60d98e5cccf27a",
+  "log_path": "handoffs/run_receipts/20260805T072026Z-plain-docs-sync-green.log",
+  "tail_excerpt": [
+    "[plain_docs_sync] ✗ 過期: 白話說明/第0批-施工清單.md",
+    "    其 WATCHED（scripts/ docs/GOVB0_ tests/governance/）最後改動 29e30660，晚於本檔最後更新 4b6cc09f",
+    "    WATCHED 的該次改動：",
+    "      29e3066 feat(governance): 白話說明過期偵測（產出端強制）",
+    "  ⇒ 1 個檔過期。修：更新該檔內容並與實作同 commit（或之後）提交。",
+    "  出處：使用者 2026-08-05「其他檔案也不一定會記得」「忘記也是沒有」。"
+  ]
+}

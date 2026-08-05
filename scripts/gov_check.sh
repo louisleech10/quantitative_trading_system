@@ -157,6 +157,22 @@ else
   echo "[gov_check] 3/3 略過(無 mutation_probe_check.sh)"
 fi
 
+# ── 4/4 白話說明過期偵測 ────────────────────────────────
+# 為何在此(2026-08-05 使用者指出):白話說明的更新原本只靠主委記得,
+#   且 plain_docs_sync_check.sh 本身也要「記得跑」才有用 ⇒ 仍是紀律不是機制。
+#   接進 gov_check(pre-push 唯一委派點)後,忘記更新 = 推不上去。
+if [ -f scripts/plain_docs_sync_check.sh ]; then
+  echo "[gov_check] 4/4 白話說明過期偵測…"
+  if bash scripts/plain_docs_sync_check.sh; then
+    echo "[gov_check] ✓ 白話說明 同步 OK"
+  else
+    echo "[gov_check] ✗ 白話說明已過期(見上;更新後推進各檔 SYNCED-AT)" >&2
+    rc_all=1
+  fi
+else
+  echo "[gov_check] 4/4 略過(無 plain_docs_sync_check.sh)"
+fi
+
 if [ "${rc_all}" -eq 0 ]; then
   echo "[gov_check] ✅ 全數通過(注意:本機綠≠CI綠,push 後仍看 CI)"
 else
