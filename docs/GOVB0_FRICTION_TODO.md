@@ -18,6 +18,9 @@
    ⇒ **code review 不得宣稱 `B-24` 全綠**；票面須維持「部分完成」。
 
 2. **`reclaim` 孤兒回收未實作 ⇒ 需人工清理。**（R7 具名殘留 `H-2`，見 SPEC §N）
+
+RESIDUAL: reclaim-orphan-manual-cleanup
+
    stale takeover 持有者若在協定步驟③（刪主 lock＋建新 lock）之後、④（釋放回收權）之前 crash，
    `<out>.reclaim.lockdir` 會殘留 ⇒ 後續 takeover 於步驟①即 `EEXIST` 拒絕 ⇒ **該 `<out>` 路徑鎖死至人工清理**。
    codex 實跑證據：`CRASH_CHILD_RC=137`／`MAIN_LOCK_AFTER_CRASH=present`／`RECLAIM_LOCK_AFTER_CRASH=present`／`NEXT_DISPATCH=REJECT_EEXIST`。
@@ -412,8 +415,13 @@
      🔴 **此 snapshot 由 B0 產出並 commit，必須在 B3 動工前完成**（`CODEX-TODO-P0-03`）。
      本 Task 只**消費**該 snapshot，不負責產生；若檔案缺失或 sha256 與 `.sha256` 檔不符 ⇒ **fail-closed（rc≠0）**。
   3. 每條語料**標明出處**（哪次事故／哪個 Task 的驗證項），**禁憑空造**。
-- **修改檔案**：新增 `scripts/gate_decision_delta.sh`；新增 `tests/governance/fixtures/gate_decision_corpus.txt`
-  與 `tests/governance/fixtures/gate_check_pre_phase2.sh.snapshot`。**既有 caller**：無（一次性腳本）。
+- **修改檔案**：新增 `scripts/gate_decision_delta.sh`。
+  🔴 **本 Task 不產生任何 fixture**（`CODEX-R8-P1-02` 修正：主委初版把 snapshot 同時列為 B0 產出與本 Task 產出，
+  實作者可能在 B5 重產 ⇒ 差集 oracle 會含 Phase 2 改動）。
+  **唯讀輸入**（由 **B0** 產出並持有 sha ownership，本 Task 只讀不寫）：
+  `tests/governance/fixtures/gate_check_pre_phase2.sh.snapshot` ＋ 其 `.sha256` sidecar；
+  `tests/governance/fixtures/gate_decision_corpus.txt`（語料 B，由 Task 2.0 產出）＋ 其 `.sha256` sidecar。
+  **既有 caller**：無（一次性腳本）。
 - **不可做**：**不掛 hook、不進 CI**（一次性驗收工具）。
 - **邊界**（≥2）：
   1. 語料為空 → **rc≠0 並明確報錯**，**不得靜默輸出「無差異」**。
@@ -428,10 +436,16 @@
     標註結果寫入報表；**存在任一「非預期」⇒ rc≠0**。
     🔴 R1 原文要求「每一項都須在 SPEC 中被預期」，`COMPOSER-R1-P1-01` 指出 Phase 0 真實語料上線後必然產生 SPEC 未列舉項
     ⇒ 永遠 FAIL 或被悄悄放寬。**已改為「列舉項為必要子集 ＋ 附加項須人工標註」。**
-  - `TEST-2.5-CORPUS-SHA`（狀態）：語料檔 sha256 與報表標頭**一致**（**防止「改語料換綠燈」**）。
+  - `TEST-2.5-CORPUS-SHA`（狀態，**`CODEX-R8-P1-03` 修正**）：報表標頭的 sha256
+    須同時等於 ①**當前語料檔實算的 sha256** ②**已 commit 的 `.sha256` sidecar 內容**。
+    🔴 **兩者缺一不可**。主委初版只比對①⇒ 改了語料重跑後標頭會**跟著重算並相等**，
+    「同一次驗收不得修改語料」根本無法證偽（假綠）。sidecar 是**獨立 SoT**，
+    改語料**必須另行 commit 更新 sidecar**，該 commit 即為稽核痕跡。
   - `TEST-2.5-EMPTY`（邊界）：空語料 → rc≠0 且 stderr 含明確錯誤訊息（非「無差異」）。
   - `TEST-2.5-MUT`（mutation，**`COMPOSER-TODO-P2-01` 指出主委初版漏列，違反 SPEC §V「全部 11 Task 皆須 mutation」**）：
-    ①移除「語料 sha256 與報表標頭一致」的守衛 ⇒ 改語料後仍 rc=0（`TEST-2.5-CORPUS-SHA` 轉紅）；
+    ①移除「與已 commit 的 `.sha256` sidecar 比對」這一半守衛 ⇒ **改語料並重跑後仍 rc=0**
+      （`TEST-2.5-CORPUS-SHA` 轉紅）。🔴 **只移除「與當前語料實算值比對」那一半不算數**——
+      那一半本來就擋不住改語料，mutation 必須針對 sidecar 那一半；
     ②移除「附加項須人工標註」的守衛 ⇒ 注入一個未標註的附加項時仍 rc=0（`TEST-2.5-EXTRA` 轉紅）；
     ③把空語料的 fail-closed 改為靜默輸出「無差異」⇒ `TEST-2.5-EMPTY` 轉紅。
     **三個 mutation 各須貼實跑 rc。**
@@ -597,7 +611,10 @@
 ### Task 3.3 — per-family timeout 與逾時後的 `result_state`
 
 - **SPEC ref**：Task 3.3　**目標**：委員掛住時自動收斂，且不誤判成功。**值的定稿依賴 Task 3.1。**
-- **🔴 本 Task 於本 TODO 產出時標記為「未完工」**（依 §0 第 3 條，Task 3.1 尚未上線、三家族累積筆數為 0）。
+TASK-STATUS: INCOMPLETE
+
+- **🔴 本 Task 未完工**（依 §0 第 3 條，Task 3.1 尚未上線、三家族累積筆數為 0）。
+  狀態以上方**機器標記行**為準，**不以散文敘述為準**（見下方驗證段的三次出生事故）。
 - **輸入 / 輸出**：輸入＝Task 3.1 的 duration manifest；輸出＝`cx_run.sh` 主 timeout ＋ `committee_run.sh:280` 外層安全閥 ＋ 測試。
 - **實作要點**：
   1. **主 timeout 在 `cx_run.sh`**：涵蓋區間＝**CLI process-group launch → return/kill**，逾時終止該**進程群組**（避免孤兒）。
@@ -634,20 +651,26 @@
     （**禁硬編未經重算的暫定值**）。
   - `TEST-3.3-PROVISIONAL`（狀態，**`E-10` 取捨的可證偽化**；`CODEX-TODO-P1-04` 修正為**可解析來源**）：
     未達定稿門檻（`handoffs/duration_manifest.json` 的 `.status == "PROVISIONAL"`）時，三條件**任一缺失即 FAIL**——
-    ①`grep -c PROVISIONAL docs/GOVB0_FRICTION_TODO.md` **≥1**
-      **且** `jq -r .status handoffs/duration_manifest.json` **== `PROVISIONAL`**；
-    ②`grep -c '本 Task 於本 TODO 產出時標記為「未完工」' docs/GOVB0_FRICTION_TODO.md` **== 1**；
-    ③**`票 B-14` 的 bounded section 內含「未定稿」**——
-      擷取範圍＝`handoffs/20260801-GOV-AMEND-BACKLOG.md` 中 `^## B-14 ` 起至下一個 `^## B-` 前一行，
-      於該區間內 `grep -c 未定稿` **≥1**。
-      🔴 **主委已於本次修補同步在 `票 B-14` 票面補上「未定稿」狀態行**——
-      實測修補前 `LC_ALL=C grep -c 未定稿 handoffs/20260801-GOV-AMEND-BACKLOG.md` **== 0**
-      （`CODEX-TODO-P1-04` 實跑抓出），即本條件原本**恆為 FAIL**。
-  - `TEST-3.3-B24-PARTIAL`（狀態，`CODEX-TODO-P1-04`）：`票 B-24` 的 bounded section 內
-    含「部分完成」且**不含**「全綠」；`grep -c` 導出。
-  - `TEST-3.3-H2-RESIDUAL`（狀態，`CODEX-TODO-P1-04`）：本 TODO §0 第 2 條的
-    「reclaim 孤兒回收未實作 ⇒ 需人工清理」字樣存在（`grep -c` **≥1**），
-    且 `票 B-14`／實作產出文件皆未出現「lock 機制全綠」字樣（`grep -c` **== 0**）。
+    ①`jq -r .status handoffs/duration_manifest.json` **== `PROVISIONAL`**；
+    ②本 TODO 的 Task 3.3 段落**含機器標記行** `TASK-STATUS: INCOMPLETE`（見本 Task 標頭，`grep -c '^TASK-STATUS: INCOMPLETE'` **== 1**）；
+    ③`票 B-14` 的 bounded section（`^## B-14 ` 起至下一個 `^## B-` 前）**含且僅含一行** `TICKET-STATUS: PROVISIONAL`。
+    🔴 **本條的三次出生事故（同型錯誤，記為 `票 B-16`／`B-17` 佐證）**：
+    **(i)** 主委初版寫「`票 B-14` 票面含『未定稿』」，實測 `grep -c` **== 0** ⇒ 條件恆為 FAIL（`CODEX-TODO-P1-04`）。
+    **(ii)** 主委補寫狀態段後，條件②的 `grep -c '…未完工…' == 1` **實測為 2**——
+    **測試定義本身就含該字串，自我引用**（`CODEX-R8`／`COMPOSER-R8` 兩家獨立指出）。
+    **(iii)** 主委為 `票 B-24` 補狀態段時，在否定敘述中提到被禁的關鍵字，
+    使該詞 `grep -c` 由 0 變 4，**又把自己的測試弄壞**。
+    ⇒ **結論：散文關鍵字比對本質脆弱**（任何討論該詞的句子都污染計數，且無法區分「宣稱」與「否定宣稱」）。
+    **本批全面改用單一機器標記行**（`TICKET-STATUS:` ／ `TASK-STATUS:`），語意明確、不受行文影響。
+  - `TEST-3.3-B24-PARTIAL`（狀態）：`票 B-24` 的 bounded section 內
+    **含且僅含一行** `TICKET-STATUS: PARTIAL`（`grep -c '^TICKET-STATUS: PARTIAL'` **== 1**），
+    且**不得**出現 `TICKET-STATUS: DONE`（`grep -c` **== 0**）。
+  - `TEST-3.3-H2-RESIDUAL`（狀態）：本 TODO §0 第 2 條含**行首錨定**的機器標記——
+    `grep -c '^RESIDUAL: reclaim-orphan-manual-cleanup' docs/GOVB0_FRICTION_TODO.md` **== 1**；
+    且實作產出文件中 `grep -c '^LOCK-STATUS: COMPLETE'` **== 0**。
+    🔴 **所有標記斷言一律行首錨定 `^`**——這是本日同型陷阱第五次的通解：
+    未錨定時，**測試定義自身提到該標記就會被計進去**（實測 `RESIDUAL` 未錨定為 2、錨定後為 1）。
+    ⇒ **機器標記必須寫在行首、斷言必須帶 `^`**，兩者缺一即自我污染。
   - `TEST-3.3-MUT`（mutation）：移除 timeout → 掛住情境測試逾時失敗（**測試自身須有上限**，避免測試本身掛住）。
 - **存活至**：永久。
 - **覆蓋風險**：無。
@@ -660,7 +683,23 @@
 
 ---
 
-## §T 追溯表（SPEC ID → TODO 位置；100% 覆蓋）
+## §T 追溯表（**本批 in-scope Task 覆蓋 ＋ 明列排除清單**）
+
+🔴 **標題已由「100% 覆蓋」改為現名**（`CODEX-R8-P1-04`）：主委初版宣稱 100% 覆蓋，
+但 SPEC 的具名殘留 `F-7`／`票 B-36`（ID 錯位無機械防線）**沒有任何 TODO 落點**——
+下游若把 §T 當完整追溯索引就會漏掉。**本表現在明確區分「有落點」與「具名排除」兩類。**
+
+### 具名排除（**不在本批施工範圍，但必須被看見**）
+
+| SPEC 具名項 | 為何排除 | 後續落點 |
+|---|---|---|
+| `F-7`／`票 B-36` **ID 錯位無機械防線** | 產出端修法只能擋「漏」不能擋「錯位」；本批無機械解 | 已裁定併入 `票 B-13`（第 3 批） |
+| `E-SCOPE` 四項 | R2 起三家＋使用者雙重核可 | `B-35`／`B-34`／`B-24` 機械強制面／`B-15` FP-2 |
+| `H-1` 允許清單枚舉不完整 | 方向為 fail-closed（誤擋），可隨 Phase 0 資料收斂 | 補查條件同 `B-15` FP-2 |
+| `H-2` reclaim 孤兒 | 已具名接受，修法落 TODO 運維項 | §0.1 第 2 條 ＋ Task 3.2 要點 8 |
+| `OPEN-2`／`D-8` locale 守衛 | 與本批無關聯，硬塞會撐爆範圍 | `票 B-33`（第 1.5 批） |
+
+### In-scope 覆蓋表
 
 | SPEC ID | TODO 位置 | SPEC ID | TODO 位置 |
 |---|---|---|---|

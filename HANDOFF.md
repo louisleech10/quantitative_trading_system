@@ -1,53 +1,61 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-05 10:0x | **Branch**: main（`1e60553`）
-**狀態**: 🟢 **第 0 批規格階段收斂完成（R7 三家戳記 APPROVED）→ 下一步＝TODO 生成**
+**Agent**: Claude(Opus 5) | **Time**: 2026-08-05 12:0x | **Branch**: main
+**狀態**: 🔵 **第 0 批 TODO 已修完 R8 六條 → 待決定是否派 R9 確認輪**
 
-## ▶ 立即接手：生成 TODO
+## ▶ 立即接手
 
-SPEC `docs/GOVB0_FRICTION_SPEC.md` 已凍結可用（`template_check` rc=0、Task 11、FACT-RECEIPT 10）。
-收斂檔 `handoffs/reconcile/20260805-govb0-spec-r7/synth.md` 三家 APPROVED，
-sha `b502bac9…0f82fa4bd`。**無 OPEN 債**。
+**唯一待決策**：R8 的 6 條已全部修畢，**是否再派一輪確認**。
+主委建議 **派**——理由不是規格難，而是**連續三輪主委的修補都引入新缺口**（見下失誤模式），
+在 `票 B-16` 擴充上線前，委員實跑是唯一防線。使用者尚未裁決。
 
-**TODO 生成用** `templates/TODO_GENERATION_PROMPT.md`。🔴 **§0 必須明文載入下列三項**，否則失真：
+R9 若派：brief 用 `handoffs/20260805-GOVB0-TODO-R8-BRIEF.md` 為樣板，
+**finding heading 一律照 `scripts/completeness_check.sh:153` 的正則** `^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$`。
 
-1. **`B-24` 部分完成** —— 紀律面隨本批交付、機械強制面已 SPLIT 移出，code review 不得宣稱 `B-24` 全綠。
-2. **reclaim 孤兒回收未實作 ⇒ 需人工清理**（R7 殘留 `H-2`），不得宣稱 lock 機制全綠。
-   修法三擇一由實作者定：(a) 清 orphan 運維腳本 (b) reclaim lock 加 TTL／lease＋受保護 CAS (c) 改用 `flock`。
-3. **timeout 未達定稿門檻時標 `PROVISIONAL`**（每家族 ≥50 筆＋≥3 個不同 session／UTC 日期），
-   且 Task 3.3 不得宣稱完工、`票 B-14` 不得標定稿。
+之後：TODO 標 Internal Frozen → 實作（Grok，見 ORCH §1 現行分工行）→ **雙家族 code review**。
 
-之後：實作（Grok，見 ORCH §1 現行分工行）→ **雙家族 code review**（非實作者兩家）。
+## 現況
 
-## 七輪收斂軌跡（規格階段已結束，勿重開）
+- SPEC `docs/GOVB0_FRICTION_SPEC.md`：**R7 版**，七輪收斂，收斂檔三家戳記 sha `b502bac9…0f82fa4bd`。
+- TODO `docs/GOVB0_FRICTION_TODO.md`：**已修 9+6 條**，`template_check todo` rc=0，SPEC 11 Task == TODO 11 Task。
+- 白話版 `handoffs/20260805-第0批-白話版.md`（使用者要求，已 push）。
+- 收斂檔 `handoffs/reconcile/20260805-govb0-todo-r8/synth.md`（I-1～I-6，**已正規銷帳**）。
+- **無 OPEN 債。** 票數 **38**、待辦 **30**，三份文件同步、雙向對帳差集空。
 
-`R1 19(5 P0) → R2 17(7 P0) → R3 11(3 P0) → R4 8(2 P0) → R5 2(2 P0) → R6 3(2 P0) → R7 4(0 P0)`
+## 🔴 主委失誤模式（本 session 最重要的發現，已入 `票 B-16`）
 
-R7 為 P0-1／P0-2 的**最後一輪**（brief 明文終止條件）。兩家在互不相見下收斂到同樣兩條殘留。
-🔴 **`E-SCOPE` 四項＋`B-36` ID 錯位＋R7 兩條殘留（`H-1`／`H-2`）皆已具名寫入 SPEC §N，不得在實作階段重開。**
+TODO 兩輪審查共 15 條 findings，**全部屬實、無一誤報**，且**幾乎全是主委造成，非技術難度**：
 
-## 🔴 本日票異動
+| 模式 | 案例 | 次數 |
+|---|---|---|
+| **沒對照就寫**（違反實測>假設） | 引用不存在的 `_bc_kv`「函式」（實為 `mktemp` 路徑變數）／caller 方向寫反／測試引用 backlog 內不存在的字串 | 4 |
+| **自我引用未察** | 測試與被測內容同檔，未行首錨定 ⇒ `grep -c` 把測試定義自己算進去；**主委在修補過程中又犯 2 次** | 5 |
+| **內部矛盾** | B5 依賴 B3/B4 卻要求 snapshot 在 B3 前凍結／snapshot 同時列為 B0 與 Task 2.5 產出 | 3 |
+| **過度宣稱** | §T 寫「100% 覆蓋」但 `F-7`／`B-36` 無落點 | 1 |
 
-`B-37`（新，0.9 批）票的優先順序無數據依據；硬前置＝Phase 0。
-`B-38`（新，第 1 批）委員回報 0 findings 反而無法正規銷帳 ⇒ 推高 ABANDONED 比率；
-　　　修法建議的 `FINDINGS_COUNT` 欄位**同時能解 `B-35`**（截斷偵測）⇒ 兩票應合併評估。
-`B-31`（嚴重度上調）連兩輪 format-failed 且 **prompt 層警告實測無效**；追加修法 ④⑤。
-票數 **38**、待辦 **30**；三份文件同步，票號雙向對帳差集空。
+**通解（已寫入 TODO 與 backlog）**：**禁散文關鍵字比對，改用行首錨定的機器標記**——
+`^TICKET-STATUS:`／`^TASK-STATUS:`／`^RESIDUAL:`。**標記寫行首、斷言帶 `^`，兩者缺一即自我污染。**
+
+**使用者 2026-08-05 裁定**：合併進 `票 B-16`（同一強制點 `doc_format_precheck.sh`、同一病族），
+**擴充 A**＝文件內可執行斷言寫檔當下實跑比對；**擴充 B**＝引用的函式名／檔名存在性檢查。
+兩者**提前至第 1 批**，`B-16` 原條文維持第 4 批。
+🔴 **擴充 B 的誠實邊界**：擋不了「呼叫方向寫反」（兩個識別字都存在時無法判斷），**具名殘留**。
 
 ## ⚠️ 坑（照做省時間）
 
-- **`##` 只准是 canonical finding ID**；brief **不可同時要求「canonical `##`」與「逐條各一段」**（會誘導違規）。
-  有效作法＝**明列本輪允許的 `##` 清單＋要求用表格**（移除誘因，非警告誘因；R6/R7 實測有效）。
-- 委員若零 findings，請要求其明寫 `FINDINGS_COUNT: 0`（否則 completeness 判 FAIL，見 `B-38`）。
+- **brief 內的機器格式一律引用檢查器正則本身，禁手寫**——本日三次 brief 誘導格式失敗，每次錯處不同。
+- **`##` 只准是 canonical finding ID**；brief 不可同時要求「canonical `##`」與「逐條各一段」。
+  有效作法＝**明列本輪允許的 `##` 清單＋要求用表格**。
+- 委員零 findings 時要求其明寫 `FINDINGS_COUNT: 0`（`票 B-38`）。
 - **brief 改了就不能同輪重派**（`brief_sha256` 不符）⇒ 只能棄輪重開。
-- **commit 訊息零豁免**：operational claim 須 `VERIFY:<receipt-id>` ＋ 可解析 scope
-  （`_extract_scope` 只認 node-id／`test_*`／`tests/**.py`）**或**寫明 runtime 類別（`static`／`讀碼`）。
+- 正規銷帳需 `sources.lock` 為 review mode：`reconcile_build.sh <session> --mode review [--rebuild]`（`--rebuild` 不接受委員檔參數）。
+- **commit 訊息零豁免**：operational claim 須 `VERIFY:<receipt-id>` ＋ 可解析 scope 或寫明 runtime 類別（`static`／`讀碼`）。
 - `VERIFY-EXEMPT` 合法類別**只有 6 個**：`typo`／`doc-example`／`migration-note`／`template-drift`／`tooling-blocked`／`spec-ambiguity`。
 - 委員產出交件後一律 `bash scripts/gate.sh register-output <task-id> <path>`。
-- 正規銷帳需 `sources.lock` 為 **review mode**：`reconcile_build.sh <session> --mode review --rebuild`（不接受委員檔參數）。
+- 創建 `docs/*{SPEC,TODO,PLAN}*.md` 需 `bash scripts/gate.sh artifact --file … --template-opened … --sections …`。
 - **`rc` 禁經 pipe**；**禁 `python3 -c`**；`ts_stamp.log` 須 `LC_ALL=C grep -a`（**禁 export**）。
-- 狀態文件**只留最新狀態與待辦**，過期的封存 `Archived/`，**不得用附加註記堆疊**。
 
 ## 後續順序
 
-第 0 批（TODO → 實作 → 雙家族 review）→ **第 0.5 批 P1-6 線 C** → 0.9 批 `B-37` → 第 1 批（`B-19`／`B-29`／`B-31`／`B-38`）。
+第 0 批（R9? → Frozen → 實作 → 雙家族 review）→ **第 0.5 批 P1-6 線 C** → 0.9 批 `B-37`
+→ 第 1 批（`B-19`／`B-29`／`B-31`／`B-38`／**`B-16` 擴充 A/B**）。

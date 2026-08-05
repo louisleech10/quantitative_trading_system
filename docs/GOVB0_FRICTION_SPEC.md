@@ -2,7 +2,10 @@
 
 > 來源 PLAN/診斷：`handoffs/reconcile/govb0-recon-r1/synth.md`（R1 偵察，21 findings，rc=0）　|　日期：2026-08-04　|　對應 TODO：`docs/GOVB0_FRICTION_TODO.md`（待生成）
 
-**版本 R4**（R1 的 D-1～D-13 ＋ R2 的 E-1～E-13 ＋ R3 的 F-1～F-7 全數修訂）。
+**版本 R7**（R1 的 `D-1`～`D-13` ＋ R2 的 `E-1`～`E-13` ＋ R3 的 `F-1`～`F-7` ＋ R4 的 `G-1`～`G-6`
+＋ R5／R6 的兩個 P0 ＋ R7 的 `H-1`／`H-2` 全數修訂或具名接受）。
+🔴 **本行曾停在 R4 未隨版更新**（`CODEX-R8-P1-04` 指出 SPEC:5 與 TODO:4 的 provenance 漂移），
+與 `票 B-17`「手寫的機器依賴資訊必漂」同型，本 session 內同型漂移已第 9 次。
 **收斂趨勢**：R1 19 findings（5 P0）→ R2 17（**7 P0**）→ R3 **11**（3 P0）。
 R3 的 11 條**大多是主委自身的漏改與計數漂移**（收斂裁決未同步進 SPEC、契約加項未改計數、引用 ID 錯位），
 非新機制缺口 ⇒ **scope accretion 已中止**，`E-SCOPE` 生效（codex 明確標示四項為 `OUT-OF-SCOPE`，未再列 BLOCKING）。

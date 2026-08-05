@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "session_id": "20260805-govb0-todo-r8",
+  "expected_roster": [
+    "codex",
+    "composer"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260805-govb0-todo-r8/sources/20260805-govb0-todo-r8-codex.md",
+      "sha256": "6d645370e794328078bf665f3ab06dc4a4384018d1491e2503e84adbaaf193a5",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260805-govb0-todo-r8/sources/20260805-govb0-todo-r8-composer.md",
+      "sha256": "b3f3d436cc3ebe7b3860b22121d89ac80e7833c7170cb7321c98ee37bf1fe238",
+      "family": "composer"
+    }
+  ],
+  "freeze_ts": "2026-08-05T04:37:46Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "2060120a-11dc-4c38-999f-09311ea72c3d"
+}
