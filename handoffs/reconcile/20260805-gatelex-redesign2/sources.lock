@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "session_id": "20260805-gatelex-redesign2",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260805-gatelex-redesign2/sources/20260805-gatelex-redesign2-codex.md",
+      "sha256": "44c5d42a880af4431f93bc703cbc0ceb919506696a9079b70ad0543090f2c173",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260805-gatelex-redesign2/sources/20260805-gatelex-redesign2-composer.md",
+      "sha256": "d4afcdfa57d55585658973d62700fb846cc71d2f60b3927bb64cbeaa20d5e847",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260805-gatelex-redesign2/sources/20260805-gatelex-redesign2-grok.md",
+      "sha256": "571c6fa242f4f6e580b5c4f34fc7a332d605d9289e23d51fea8c563c62ee8db7",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-08-05T15:49:52Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "2588a95a-9139-4938-853a-179930877b5b"
+}

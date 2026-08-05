@@ -31,6 +31,7 @@ print(d.get("transcript_path") or "")
 
 python3 - "${tp}" <<'PY'
 import json, re, sys
+from pathlib import Path
 
 path = sys.argv[1]
 last_text, last_has_tool = None, False
@@ -66,9 +67,51 @@ except OSError:
 if not last_text or "【進行中】" not in last_text:
     raise SystemExit(0)
 
-# 可查的背景任務 handle（Bash run_in_background 產生的 ID 形狀）
-if last_has_tool or re.search(r"\b[a-z][a-z0-9]{8}\b", last_text):
+if last_has_tool:
     raise SystemExit(0)
+
+# 可查的背景任務 handle。
+# 2026-08-06 修：原正則 `\b[a-z][a-z0-9]{8}\b` 匹配**任何 9 字元小寫詞**，
+#   與本檔開頭載明的「`b` + 8 位英數」不符 ⇒ 實作沒照自己的規格。
+#   事故：回覆中的 `redesign2`（9 字元）被當成任務 ID，哨兵放行，
+#   使用者等了 6 小時才發現主委其實停住了。
+# 現行判準（兩層，皆機械可驗）：
+#   ① 形狀須為 `b` + 8 位英數（照文件）
+#   ② 該 ID 須**真的存在**於本 session 的 tasks 目錄（純形狀不夠——
+#      任何以 b 開頭的 9 字元英文字仍可能誤命中）
+# tasks 目錄無法定位時退回只驗 ①（仍嚴於舊版），並於 stderr 註明。
+cands = re.findall(r"\bb[a-z0-9]{8}\b", last_text)
+
+tasks_dir = None
+try:
+    p = Path(path)
+    session_id = p.stem
+    proj = p.parent.name
+    for base in (Path("/private/tmp"), Path("/tmp")):
+        for owner in base.glob("claude-*"):
+            cand = owner / proj / session_id / "tasks"
+            if cand.is_dir():
+                tasks_dir = cand
+                break
+        if tasks_dir:
+            break
+except Exception:
+    tasks_dir = None
+
+if cands:
+    if tasks_dir is None:
+        sys.stderr.write(
+            "[status_marker] 註：找不到 tasks 目錄，僅以 ID 形狀放行（未驗證任務是否真存在）\n"
+        )
+        raise SystemExit(0)
+    for cid in cands:
+        if (tasks_dir / f"{cid}.output").exists():
+            raise SystemExit(0)
+    sys.stderr.write(
+        f"【狀態標記不誠實】文中的 {cands!r} 形狀像背景任務 ID，"
+        f"但 {tasks_dir} 下找不到對應的 .output ⇒ 不是真的背景任務。\n"
+    )
+    raise SystemExit(2)
 
 sys.stderr.write(
     "【狀態標記不誠實】本則回覆寫了「【進行中】」，但既沒有工具呼叫，"

@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T135713Z-c4-not-true-mutation-confirmed",
+  "claim_id": "c4-not-true-mutation-confirmed",
+  "command": [
+    "bash",
+    ".claude/tmp/probe_c4.sh"
+  ],
+  "command_sha256": "35715301b67448fbb98dfb37fe9649a9a269ce53e40d9194a0add810a8190cc7",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "9e91aef9be4acee286853f9b09022d6ba034694e",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T13:57:07Z",
+  "ended_at": "2026-08-05T13:57:13Z",
+  "duration_seconds": 5.760849,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": "============================== 1 passed in 0.13s ===============================",
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 1,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "d022643e265af8be19be118f63c5a8dbba1688da90f63907428f2188829a8d97",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "d022643e265af8be19be118f63c5a8dbba1688da90f63907428f2188829a8d97",
+  "log_path": "handoffs/run_receipts/20260805T135713Z-c4-not-true-mutation-confirmed.log",
+  "tail_excerpt": [
+    "--- 原檔（未突變） ---",
+    "============================== 1 passed in 0.04s ===============================",
+    "--- 副本（移除注入斷言段） ---",
+    "============================== 1 passed in 0.13s ===============================",
+    "orig_rc=0  mut_rc=0",
+    "CONFIRMED: 移除注入斷言後仍 PASS ⇒ C4 測試非真 mutation（CODEX-R14-P2-03 成立）"
+  ]
+}

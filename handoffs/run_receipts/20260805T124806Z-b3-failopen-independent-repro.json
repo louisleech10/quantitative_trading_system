@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T124806Z-b3-failopen-independent-repro",
+  "claim_id": "b3-failopen-independent-repro",
+  "command": [
+    "bash",
+    ".claude/tmp/probe_b3.sh"
+  ],
+  "command_sha256": "4807cba33eecb14dbab446f90b0d0935de08b91937471de729c0b8ec32f5d297",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "9e91aef9be4acee286853f9b09022d6ba034694e",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T12:48:05Z",
+  "ended_at": "2026-08-05T12:48:06Z",
+  "duration_seconds": 1.070087,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "f9515462313032dd372beddd5910db8538de0548a6ad393c8e4295f807cb98e5",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "f9515462313032dd372beddd5910db8538de0548a6ad393c8e4295f807cb98e5",
+  "log_path": "handoffs/run_receipts/20260805T124806Z-b3-failopen-independent-repro.log",
+  "tail_excerpt": [
+    "rc: 2=BLOCK(擋下)  0=ALLOW(放行)",
+    "---",
+    "基準:裸派工             舊=2 新=2  ",
+    "P1-01 引號內命令替換  舊=0 新=0  ",
+    "P1-02 引號 env 前綴      舊=2 新=0  ← FAIL-OPEN 重現",
+    "P1-03 8KiB 後綴            舊=2 新=0  ← FAIL-OPEN 重現"
+  ]
+}

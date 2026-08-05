@@ -110,7 +110,9 @@ pytest                                           # all tests
 
 **哨兵**：`scripts/ts_stamp.sh`（掛 Pre/PostToolUse on `Bash|Edit|Write` + `UserPromptSubmit`）。
 - **A 類**（call 內 >10s）＝分類器路徑掛住 → 🐌 警告
-- **B 類**（call 之間 >60s，且**期間使用者未輸入**）＝結果回傳＋Claude 生成慢 → 🐌 警告
+- **B 類**（call 之間 **>120s**，且**期間使用者未輸入**）＝結果回傳＋Claude 生成慢 → 🐌 警告
+  （2026-08-05 使用者由 60→120：60s 常被正常長段生成觸發，訊噪比太低。
+  代價＝`git push` 全輸出回灌那類（實測 89.9s）不再報警；要抓回設 `TS_STAMP_WARN_B_SEC=60`）
 - 兩類都**自動注入 Claude context**（非只顯示給使用者），Claude 會主動回報；並寫 `.claude/gate/ts_stamp.log.slow`
 - **使用者不必盯螢幕、不必算時間、不必回報**。移除法見腳本檔頭。
 

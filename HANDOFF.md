@@ -1,91 +1,74 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-05 20:0x | **Branch**: main
-**狀態**: 🔵 **B3 已完成但未過 review** —— compact 後第一件事＝派 B3 的雙家族 code review
+**Agent**: Claude(Opus 5) | **Time**: 2026-08-06 03:xx | **Branch**: main
+**狀態**: 🛑 **B3 斷路器觸發，設計已重審定案** → 下一步＝寫 **B3.5 SPEC**
 
-## ▶ compact 後立即接手（照這個順序）
+## ▶ 接手第一件事：寫 B3.5 SPEC
 
-**1. 派 B3 code review**（brief 已寫好且兩支檢查器皆 rc=0）
+**依據**（三家戳記 APPROVED，`sha256:862f7bee…`）：
+`handoffs/reconcile/20260805-gatelex-redesign2/synth.md`
+
+B3.5＝詞法層重寫，**獨立批**，五步：
+①訂 lexer 輸出契約並**逐條對照 11 契約** ②`/tmp` 原型 ③差分驗證 ④TP/TN＋parity＋mutation＋時限 ⑤通過才寫入 repo。
+
+🔴 **差分基準已定死**：凍結 snapshot ＋ `phase2_expected_flips` 合成不可變 old/expected 矩陣，
+**非預期差集為零**。禁用工作區現況當 oracle（它自己帶缺陷）。
+
+**B4 必須等 B3.5 過關**；三家一致「禁在 B3 內再補一刀後併 B4」。
+
+## 🔴 工作區有未 commit 的 B3 修補（**不要 commit**）
+
+`scripts/_gate_lex.sh`／`gate_check.sh`／`extract_phase2_expected_flips.py`／
+`tests/governance/*`／fixtures／`docs/GOVB0_FRICTION_TODO_AMENDMENTS.md`
+
+**保留**是兩害相權（全回退會重開三條原始 fail-open），但**風險未經證明**：
+仍帶 E-1 換行繞道（fail-open）與 E-2 大輸入 O(n²)（500K→30s）。
+⚠️ **不得宣稱現況安全**——主委原稱「10K→0.09s 故非即時風險」已被 codex 推翻並撤回。
+
+## 這一輪發生什麼（B3 三次修補都沒過）
 
 ```
-bash scripts/committee_run.sh --session 20260805-govb0-b3-review \
-  handoffs/20260805-GOVB0-B3-CODEREVIEW-BRIEF.md handoffs/20260805-govb0-b3-review codex,composer -- \
-  --intent "B3 雙家族 code review，Phase 2 首批" --risk high \
-  --facts-asked "…" --review-role "adversarial code review，實作者不自審，禁改碼" \
-  --template "n/a: 用 brief" \
-  --adversarial handoffs/reconcile/20260805-govb0-todo-r9/synth.md \
-  --reconcile  handoffs/reconcile/20260805-govb0-todo-r9/synth.md --task-id "GOVB0-B3-REVIEW"
+B3 → 審查 3 洞 → 修補R1 → 審查 2 洞(1新引入) → 修補R2 → 審查 2 洞(1新引入)
+→ 🛑 斷路器（連續兩輪修補引入新缺口）→ 三家設計重審 → B3.5
 ```
 
-🔴 **前一次派這個失敗過**，原因是主委當時把 `audit.log` 截斷、
-`committee_dispatch` 事件被搬走 ⇒ 戳記 provenance 檢查失敗。
-**已還原，該問題應已消失**；若仍失敗，先查 `audit.log` 是否完整（應 ≥34,501 行）。
+> <!-- claim-context: discussion -->
+> **主委三項判斷被推翻**（轉述三家委員判定，非主委實跑；出處＝上方戳記收斂檔）：
+> 1. 「E-1 根因＝轉換＋grep 架構」→ 真因是 `_gate_cmd_is_self_gate` 用**字面 `\n`** 比對，早退 `exit 0`
+> 2. 「E-1／E-2 同根因」→ 根因獨立
+> 3. 「latency 改 min-of-N」→ 冷路徑真退化時仍高機率全綠 ⇒ **統計手法達標**，撤回
 
-**2. review 過關後** → B4（Task 2.2／2.3／2.4，修三個 fail-open，同改 `gate_check.sh:86` 故同批）
-→ B5（差集報表，Phase 2 合併關卡）→ B6（3.1＋3.2）→ B7（3.3）→ 第 0.5 批線 C。
+## latency 結論（使用者提問，已定案）
 
-## 🔴 主委今日最後一個錯誤（已撤回，但要知道經過）
+**三家一致：維持現狀，不用花力氣。** 100ms **有出處**（`docs/P16_COMMITTEE_DEBT_SPEC.md:507`）；
+抖動根因＝**CPU 競爭**（併 8 負載→144ms 紅／靜止→74.9ms 綠）；
+該測試走 Task 通道**不經 lexer**，與重寫無關。**偶發紅請重跑，勿據單次下結論。**
 
-**錯誤**：`test_gate_check_latency_under_100ms` 紅過一次（287ms），
-主委**未重跑**就斷定「根因＝`audit.log` 34,479 行」，寫了 `audit_archive_legacy.sh` 把
-33,716 行封存、只留 763 行 debt 白名單，並 commit + push（`c2a351f`）。
+## 本日重複犯的錯（同一型）
 
-**後果**：下一次派工立刻失敗——戳記 provenance 需要 `committee_dispatch` 事件，
-它**不在** debt 白名單，被搬走了。
+**「驗了 A 就當作 B 也成立」——本日 5 次**：封存只驗 1/20 個消費者／看 C5 測試當 C4 也真突變／
+小輸入量測宣稱整體安全／composer 亦犯（跑無引號路徑當引號路徑）。
 
-**真相**（codex 實測 + 主委獨立連跑 3 次）：**在完整未動的 34,501 行檔案上，latency 全部通過**（79ms）。
-那次 287ms 是**單次冷啟抖動**，不是結構性問題。
+**ID 錯位 9 次**（第 8 次自檢抓到、第 9 次 codex＋grok REJECTED）。
+`completeness_check` **對「歸錯群」無感** ⇒ 已列待開票：群集須附斷言摘句 + 腳本比對。
 
-**已撤回**：`audit.log` 還原為完整、封存檔刪除、`audit_archive_legacy.sh` 刪除、
-白話說明的不實敘述已加更正段（原文保留不刪）。
+## 已修的機制
 
-⚠️ **`c2a351f` 已推上 GitHub**，本次撤回為新 commit（不改寫歷史）。
+- `status_marker_check.sh`：正則 `[a-z][a-z0-9]{8}` 會誤判任何 9 字元詞（`redesign2` 中招）
+  ⇒ 改為 `b`+8 位英數 **且** 任務檔須真存在；用原始漏網訊息做 mutation 測試（4/4 過）
+- `plain_docs_sync_check.sh`：日誌納入受管；新增「進度單一出處」守衛（rc=2 fail-closed）
+- `ts_stamp.sh`：B 類門檻 60→120s（使用者定）
 
-## 現況（皆已實測）
+## 待開票（未進 backlog）
 
-| 項目 | 值 |
-|---|---|
-| 測試 | **750 passed**（起始 701）；latency 已綠 |
-| `audit.log` | **34,501 行**（完整，未截斷） |
-| 委員債務 | 無 OPEN |
-| 實作進度 | 8 批做完 **4 批**：B0 ✅ B1 ✅ B2 ✅ B3 ✅（B3 待 review） |
-| SPEC | `docs/GOVB0_FRICTION_SPEC.md` R7，七輪收斂，三家戳記 |
-| TODO | `docs/GOVB0_FRICTION_TODO.md` **Internal Frozen**，三輪收斂 |
-| B3 收斂依據 | `handoffs/reconcile/20260805-govb0-todo-r9/synth.md`（三家戳記 sha `bb0090a6…`） |
+1. **`票 B-38` 應提前**——本日撞 8 次，已從儀式成本升級為**擋住斷路器紀錄／擋住派工**
+2. 收斂檔群集須附**斷言摘句**並機械比對（治 ID 錯位）
+3. 戳記機檢要三家但 roster 只兩家 → 漏派 grok 多一輪
+4. `reconcile_build` 預設 discovery、銷帳要 review → 第一次必失敗
+5. **`票 B-32` 覆蓋缺口**：B2 只修產生器，**未涵蓋主委手寫 brief**（本日害整輪三家作廢）
 
-## 🔴 使用者定死的三條（本 session 新增）
+## 坑（沿用）
 
-1. **面向未來，不溯及既往**——修正只考慮以後；不管舊文件與舊資料格式，
-   除非該檔**未來還要被機器讀**且格式改不掉。遇舊資料不合新規**預設封存非遷移**。
-   ⚠️ 但「未來還要被機器讀」的判定**必須窮舉消費者**（主委就是漏查而弄壞 provenance）。
-2. **排程由 Claude 與委員共識決定，不問使用者。**
-3. **技術問題自己修，不要停下來等使用者**（使用者不懂技術細節）。
-
-## 白話說明維護（使用者定死，已機械強制）
-
-給使用者看的文件放 **repo 根目錄 `白話說明/`**，**禁放 `handoffs/`**。
-`scripts/plain_docs_sync_check.sh` 兩層：**commit 時提醒**（不擋）／**push 時硬擋**（時序判準）。
-接在 `gov_check.sh` 4/4。**本 session 已真實擋下主委兩次**（`e243776`／`18cfdd2`）。
-一份任務整批完工 → `git mv` 說明檔到 `白話說明/Archived/`，README 只留當前任務。
-
-## ⚠️ 坑（照做省時間）
-
-- **派 brief 前先跑兩支檢查器**，不要逐行試：
-  `bash scripts/doc_format_precheck.sh <brief>` ＋ `python3 scripts/verification_claim_check.py --files <brief>`。
-  本 session 曾逐行修三次才想到一次列出全部。
-- **commit 訊息零豁免**：operational claim 須 `VERIFY:<receipt-id>` ＋ 可解析 scope
-  或寫明 runtime 類別（`static`／`讀碼`／`真跑`）。receipt 的 `runtime_class` 必須對得上宣稱。
-- 「**廉價綠燈**」四字會觸發 claim checker，改寫成「測試品質：依範本 §1 第 9 類舉證」。
-- **中文路徑一律 `git -c core.quotepath=false`**——否則逃脫成 `\347\231\275…` 比對永遠失敗（本日踩 3 次）。
-- **`rm` 在 deny 清單**，刪檔用 `git rm`。
-- **`票 B-15` 本 session 咬 13 次**：commit 訊息某行以家族名開頭、指令引號內含 `|` 皆會誤判為派工。
-  權宜＝`git commit -F <訊息檔>`、指令改寫成腳本檔再 `bash`。
-- **pre-commit 會剝除 staged 內容的行尾空白但不動工作區** ⇒ commit 後工作區看似「多出空白」。
-  這是早上「檔案莫名漂移」之謎的根因，非委員產出失真。
-- **`rc` 禁經 pipe**；**禁 `python3 -c`**；`ts_stamp.log` 須 `LC_ALL=C grep -a`（**禁 export**）。
-
-## 票
-
-`handoffs/20260801-GOV-AMEND-BACKLOG.md`（**38 張，唯一登記處**）。
-本日新增 `B-37`（優先序無數據依據，0.9 批）、`B-38`（0 findings 無法正規銷帳，第 1 批）；
-`B-31` 嚴重度上調；`B-16` 擴充 A／B 合併並提前至第 1 批。
+`rc` 禁經 pipe（本日又犯）｜禁 `cd <專案路徑>` 前綴（本日又犯）｜中文路徑 `git -c core.quotepath=false`｜
+`rm` 在 deny 用 `git rm`｜commit 訊息用 `-F 檔案`｜brief 用兩支檢查器一次驗｜
+**brief 必寫 `##` 標題白名單**，否則委員照抄小節代號 → 整輪作廢

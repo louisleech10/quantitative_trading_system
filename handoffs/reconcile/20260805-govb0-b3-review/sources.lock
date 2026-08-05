@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "session_id": "20260805-govb0-b3-review",
+  "expected_roster": [
+    "codex",
+    "composer"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260805-govb0-b3-review/sources/20260805-govb0-b3-review-codex.md",
+      "sha256": "210688d3160ba6a51fba3a096326c4518e8ab8feea35d0bdbb055ab2a3051474",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260805-govb0-b3-review/sources/20260805-govb0-b3-review-composer.md",
+      "sha256": "02822c9e6686feb7194d98fc40bfccbfd46ed46f9ae9bfd2977f5a865b0644ce",
+      "family": "composer"
+    }
+  ],
+  "freeze_ts": "2026-08-05T12:47:19Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "6a2d5a0a-f739-4d13-ad40-4f2d81c06b51"
+}

@@ -45,9 +45,13 @@ STATE="${TS_STAMP_STATE:-.claude/gate/.ts_stamp_in}"
 LAST_OUT="${TS_STAMP_LAST_OUT:-.claude/gate/.ts_stamp_out}"
 USER_MARK="${TS_STAMP_USER_MARK:-.claude/gate/.ts_stamp_user}"   # UserPromptSubmit hook 寫入
 # A 類=call 內（正常 0.08s，分類器 2.3s）→ 門檻 10s
-# B 類=call 之間（結果回到 Claude + Claude 生成；可能夾使用者輸入）→ 門檻 60s
+# B 類=call 之間（結果回到 Claude + Claude 生成；可能夾使用者輸入）→ 門檻 120s
+#   2026-08-05 使用者放寬 60→120：60s 在「大輸出回灌 + 長回覆生成」時常態觸發
+#   （實測 67.0s 一次即報警，但該次僅是正常的長段生成），訊噪比太低。
+#   ⚠️ 誠實邊界：歷史上 git push 全輸出回灌實測 89.9s，**在新門檻下不再報警**。
+#   換來的是不再被正常長生成洗版；要抓回那類請設 TS_STAMP_WARN_B_SEC=60。
 WARN_A="${TS_STAMP_WARN_A_SEC:-10}"
-WARN_B="${TS_STAMP_WARN_B_SEC:-60}"
+WARN_B="${TS_STAMP_WARN_B_SEC:-120}"
 ALERT=""   # 非空 → 同時注入 Claude context，讓 Claude 自己知道要查
 
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
