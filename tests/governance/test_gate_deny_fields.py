@@ -52,6 +52,12 @@ CORPUS_A = (
 CORPUS_B = (
     REPO_ROOT / "tests" / "governance" / "fixtures" / "gate_decision_corpus.txt"
 )
+# Phase 2 預期轉向清單（自 TODO 機械抽取；禁手挑／禁硬編於測試）
+PHASE2_FLIPS = (
+    REPO_ROOT / "tests" / "governance" / "fixtures" / "phase2_expected_flips.txt"
+)
+PHASE2_FLIPS_SHA = Path(str(PHASE2_FLIPS) + ".sha256")
+EXTRACT_FLIPS = REPO_ROOT / "scripts" / "extract_phase2_expected_flips.py"
 
 
 def _run_gate(
@@ -320,25 +326,234 @@ def test_01_rc_allow_cat(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 2 expected flips（機械抽取；供 INVARIANCE 排除）
+# ---------------------------------------------------------------------------
+
+
+def _payload_command(payload: str) -> str | None:
+    """自 gate stdin JSON 取 Bash command；非 Bash 或無 command → None。"""
+    try:
+        obj = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+    if obj.get("tool_name") != "Bash":
+        return None
+    ti = obj.get("tool_input") or {}
+    cmd = ti.get("command")
+    return str(cmd) if cmd is not None else None
+
+
+def _norm_cmd(s: str) -> str:
+    return s.replace("…", "...").replace("\u2026", "...").strip()
+
+
+def _cmd_match(actual: str, pattern: str) -> bool:
+    """pattern 可含 '...' 省略號；以 re 錨定非省略首尾。"""
+    a = _norm_cmd(actual)
+    p = _norm_cmd(pattern)
+    if "..." not in p:
+        return a == p
+    parts = p.split("...")
+    body = ".*".join(re.escape(part) for part in parts)
+    if not p.startswith("..."):
+        body = "^" + body
+    if not p.endswith("..."):
+        body = body + "$"
+    return re.search(body, a) is not None
+
+def _load_phase2_flips(
+    path: Path = PHASE2_FLIPS,
+) -> list[dict[str, str]]:
+    """載入 phase2_expected_flips.txt → [{kind,test_id,from,to,command}, ...]。"""
+    assert path.is_file(), f"phase2 flips fixture 缺失: {path}"
+    rows: list[dict[str, str]] = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        assert len(parts) >= 5, f"bad flip line: {raw!r}"
+        rows.append(
+            {
+                "kind": parts[0],
+                "test_id": parts[1],
+                "from": parts[2],
+                "to": parts[3],
+                "command": "\t".join(parts[4:]),
+            }
+        )
+    assert rows, "phase2 flips fixture empty"
+    return rows
+
+
+def _flip_matches_command(cmd: str, flips: list[dict[str, str]], *, kind: str = "flip") -> dict[str, str] | None:
+    for fr in flips:
+        if kind and fr["kind"] != kind:
+            continue
+        if _cmd_match(cmd, fr["command"]):
+            return fr
+    return None
+
+
+def _corpus_b_commands(path: Path = CORPUS_B) -> list[str]:
+    cmds: list[str] = []
+    for _setup, payload in _load_corpus_entries(path):
+        c = _payload_command(payload)
+        if c is not None:
+            cmds.append(c)
+    return cmds
+
+
+def _rc_to_decision(rc: int) -> str:
+    return "ALLOW" if rc == 0 else "BLOCK"
+
+
+def _decision_for_cmd(
+    script: Path,
+    cmd: str,
+    base: Path,
+) -> str:
+    payload = json.dumps(
+        {"tool_name": "Bash", "tool_input": {"command": cmd}},
+        ensure_ascii=False,
+    )
+    gate_dir = base / "g"
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    proc = _run_gate(payload, gate_dir=gate_dir, script=script)
+    return _rc_to_decision(proc.returncode)
+
+
+# ---------------------------------------------------------------------------
 # TEST-0.1-INVARIANCE
 # ---------------------------------------------------------------------------
 
 
+def test_01_phase2_flips_fixture_matches_todo() -> None:
+    """phase2_expected_flips.txt 須可由 extract 腳本自 TODO 重現（禁手編漂移）。"""
+    assert EXTRACT_FLIPS.is_file(), "extract_phase2_expected_flips.py 缺失"
+    assert PHASE2_FLIPS.is_file()
+    assert PHASE2_FLIPS_SHA.is_file()
+    proc = subprocess.run(
+        ["python3", str(EXTRACT_FLIPS), "--check"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, (
+        f"flips fixture 與 TODO 抽取不一致 rc={proc.returncode}\n"
+        f"stdout={proc.stdout}\nstderr={proc.stderr}"
+    )
+    actual = _file_sha256(PHASE2_FLIPS)
+    side = PHASE2_FLIPS_SHA.read_text(encoding="utf-8").strip().split()[0]
+    assert actual == side, f"flips sha256 不符 sidecar: {actual} != {side}"
+
+
 def test_01_invariance_decision_trace(tmp_path: Path) -> None:
-    """TEST-0.1-INVARIANCE：語料 A 上 snapshot vs 現行 (rc, kind) 逐項相等。"""
+    """TEST-0.1-INVARIANCE：語料 A 排除 Phase2 預期翻轉後，snapshot vs 現行 (rc, kind) 逐項相等。
+
+    反向斷言：
+      1) 每個被排除的條目必須能在預期翻轉清單中找到對應（禁靜默排除）
+      2) 預期翻轉清單中每一條 flip：若命中語料 A 或語料 B，必須在語料 B 有對應且確實翻轉
+         （未進語料 B 的未來 Task 翻轉列為 residual，見產出說明；禁用其靜默排除 A）
+    """
     assert SNAPSHOT.is_file(), "B0 snapshot 缺失"
     entries = _load_corpus_entries(CORPUS_A)
-    before = _decision_trace(SNAPSHOT, entries, tmp_path / "before")
-    after = _decision_trace(GATE_CHECK, entries, tmp_path / "after")
+    corpus_a_n = len(entries)
+    flips = _load_phase2_flips()
+    flip_only = [f for f in flips if f["kind"] == "flip"]
+
+    keep: list[tuple[dict[str, str], str]] = []
+    excluded: list[tuple[dict[str, str], str, dict[str, str]]] = []
+    for setup, payload in entries:
+        cmd = _payload_command(payload)
+        hit = _flip_matches_command(cmd, flip_only) if cmd else None
+        if hit is not None:
+            excluded.append((setup, payload, hit))
+        else:
+            keep.append((setup, payload))
+
+    # --- 反向斷言 1：每個被排除的條目必須在預期翻轉清單 ---
+    for setup, payload, hit in excluded:
+        cmd = _payload_command(payload)
+        assert hit is not None
+        assert cmd is not None
+        assert _cmd_match(cmd, hit["command"]), (
+            f"靜默排除：語料 A 命令不在翻轉清單: {cmd!r}"
+        )
+        assert hit["kind"] == "flip"
+
+    # --- 反向斷言 2：翻轉清單覆蓋（A 或 B 命中者必須在 B 且確實翻轉）---
+    b_cmds = _corpus_b_commands()
+    residuals: list[str] = []
+    for fr in flip_only:
+        in_a = any(
+            (c := _payload_command(p)) is not None and _cmd_match(c, fr["command"])
+            for _, p in entries
+        )
+        b_match = next((c for c in b_cmds if _cmd_match(c, fr["command"])), None)
+        if in_a:
+            assert b_match is not None, (
+                f"反向2：語料 A 排除所依翻轉不在語料 B: {fr['test_id']} {fr['command']!r}"
+            )
+        if b_match is None:
+            # 未來 Task（尚未進語料 B）— 不得用於排除 A（in_a 已 assert）
+            residuals.append(f"{fr['test_id']}:{fr['command'][:60]}")
+            continue
+        # 在 B → 必須確實翻轉
+        tag = hashlib.sha256(b_match.encode("utf-8")).hexdigest()[:12]
+        before_d = _decision_for_cmd(SNAPSHOT, b_match, tmp_path / "r2b" / tag)
+        after_d = _decision_for_cmd(GATE_CHECK, b_match, tmp_path / "r2a" / tag)
+        assert before_d == fr["from"] and after_d == fr["to"], (
+            f"反向2：語料 B 對應未依預期翻轉: {fr['test_id']} cmd={b_match!r} "
+            f"want {fr['from']}->{fr['to']} got {before_d}->{after_d}"
+        )
+    # 主斷言：排除後 decision trace 相等
+    before = _decision_trace(SNAPSHOT, keep, tmp_path / "before")
+    after = _decision_trace(GATE_CHECK, keep, tmp_path / "after")
     assert before == after, (
-        "decision trace diff 非空（只應比 (rc, kind)）:\n"
+        "decision trace diff 非空（排除預期翻轉後只應比 (rc, kind)）:\n"
+        f"  excluded={[ _payload_command(p) for _, p, _ in excluded ]}\n"
+        f"  residuals_not_in_B={residuals}\n"
         f"  before={before}\n  after={after}"
     )
-    # 差分行數 == 0（具名）
     diff_lines = [f"{b}!={a}" for b, a in zip(before, after) if b != a]
     if len(before) != len(after):
         diff_lines.append(f"len {len(before)}!={len(after)}")
     assert len(diff_lines) == 0
+
+    # 語料 A 條數不得因本機制減少（排除只影響比對，不刪檔）
+    assert len(_load_corpus_entries(CORPUS_A)) == corpus_a_n
+    assert corpus_a_n == 30, f"語料 A 條數異常: {corpus_a_n}（基線 30）"
+
+
+def test_01_invariance_exclude_nonflip_mutation(tmp_path: Path) -> None:
+    """mutation：把不在預期翻轉清單的語料 A 條目也排除 → 反向斷言 1 必須轉紅。"""
+    entries = _load_corpus_entries(CORPUS_A)
+    flips = _load_phase2_flips()
+    flip_only = [f for f in flips if f["kind"] == "flip"]
+
+    # 挑一條「不在 flip 清單」的 Bash 命令
+    victim: tuple[dict[str, str], str] | None = None
+    for setup, payload in entries:
+        cmd = _payload_command(payload)
+        if cmd is None:
+            continue
+        if _flip_matches_command(cmd, flip_only) is None:
+            victim = (setup, payload)
+            break
+    assert victim is not None, "找不到可作 mutation 的非 flip 語料 A 條目"
+
+    # 模擬錯誤排除：把 victim 塞進 excluded，且找不到 flip 對應
+    _setup, payload = victim
+    cmd = _payload_command(payload)
+    assert cmd is not None
+    hit = _flip_matches_command(cmd, flip_only)
+    # 反向斷言 1 的等價檢查（必須失敗）
+    reverse1_ok = hit is not None and _cmd_match(cmd, hit["command"])
+    assert not reverse1_ok, (
+        f"MUTATION 未使反向斷言1 轉紅：非 flip 命令竟命中清單 cmd={cmd!r} hit={hit}"
+    )
 
 
 def _emittable_match_rules_from_gate_check() -> set[str]:

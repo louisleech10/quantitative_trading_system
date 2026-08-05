@@ -49,6 +49,7 @@ def _setup_repo(tmp_path: Path) -> tuple[Path, Path, Path]:
     for name in (
         "gate.sh",
         "gate_check.sh",
+        "_gate_lex.sh",  # GOVB0 Task 2.1：Bash 路徑 source 的詞法模組
         "debt_ledger.sh",
         "_debt_ledger_core.py",
         "audit_append.sh",

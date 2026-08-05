@@ -1,4 +1,278 @@
-# 語料 B — Phase 2 判定差集（placeholder for Task 2.0）
-# Phase 0 只建立占位以使 CORPUS-DISTINCT 可驗；完整 22+ 條契約語料由 Task 2.0 覆寫並附 .sha256 sidecar。
-# 本檔與語料 A（gate_invariance_corpus.txt）獨立，sha256 必須不同。
-{"tool_name":"Bash","tool_input":{"command":"PLACEHOLDER_FOR_TASK_2_0_decision_corpus_not_invariance"}}
+# 語料 B — Phase 2 判定差集（Task 2.0 契約 11 項 + Task 2.1 轉向）
+# 格式：# @contract <id>  /  # @want ALLOW|BLOCK  /  # @case TP|TN  /  # @id <name>
+# 後接一行 stdin JSON（給 gate_check.sh）。無 token → BLOCK 意即 rc=2 kind=dispatch；ALLOW 意即 rc=0。
+# 與語料 A 獨立；sha256 必須不同。sidecar = gate_decision_corpus.txt.sha256（同 commit 更新）。
+#
+# --- 契約 1：引號內 ; & | 不作分隔符 ---
+# @contract 1
+# @want ALLOW
+# @case TN
+# @id c1-tn-pgrep-pipe-in-quotes
+{"tool_name":"Bash","tool_input":{"command":"pgrep -fl 'codex exec|cursor-agent|grok '"}}
+# @contract 1
+# @want ALLOW
+# @case TN
+# @id c1-tn-commit-semi-in-quotes
+{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fix: x; codex closure done\""}}
+# @contract 1
+# @want BLOCK
+# @case TP
+# @id c1-tp-semi-outside
+{"tool_name":"Bash","tool_input":{"command":"echo start; grok -m grok-4.5 -p \"x\""}}
+#
+# --- 契約 1b：跨行剝引號狀態機 ---
+# @contract 1b
+# @want ALLOW
+# @case TN
+# @id c1b-tn-commit-multiline-codex
+{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fix: something\ncodex 並獨立重跑探針確認\ndone\""}}
+# @contract 1b
+# @want ALLOW
+# @case TN
+# @id c1b-tn-commit-multiline-grok
+{"tool_name":"Bash","tool_input":{"command":"git commit -m \"line1\ngrok 那邊已複核\nline3\""}}
+# @contract 1b
+# @want BLOCK
+# @case TP
+# @id c1b-tp-real-multiline-codex
+{"tool_name":"Bash","tool_input":{"command":"echo start\ncodex exec -s workspace-write \"p\""}}
+# @contract 1b
+# @want BLOCK
+# @case TP
+# @id c1b-tp-real-multiline-grok
+{"tool_name":"Bash","tool_input":{"command":"set -e\ngrok -m grok-4.5 -p \"x\""}}
+#
+# --- 契約 2：命令位置（^ ; & | ( ` $( && || eval xargs）---
+# @contract 2
+# @want BLOCK
+# @case TP
+# @id c2-tp-cmdsub
+{"tool_name":"Bash","tool_input":{"command":"out=$(codex exec x)"}}
+# @contract 2
+# @want BLOCK
+# @case TP
+# @id c2-tp-backtick
+{"tool_name":"Bash","tool_input":{"command":"out=`codex exec x`"}}
+# @contract 2
+# @want BLOCK
+# @case TP
+# @id c2-tp-subshell
+{"tool_name":"Bash","tool_input":{"command":"(codex exec x)"}}
+# @contract 2
+# @want BLOCK
+# @case TP
+# @id c2-tp-and
+{"tool_name":"Bash","tool_input":{"command":"true && codex exec x"}}
+# @contract 2
+# @want BLOCK
+# @case TP
+# @id c2-tp-or
+{"tool_name":"Bash","tool_input":{"command":"false || grok -m x -p y"}}
+# @contract 2
+# @want BLOCK
+# @case TP
+# @id c2-tp-xargs
+{"tool_name":"Bash","tool_input":{"command":"echo x | xargs codex exec"}}
+# @contract 2
+# @want ALLOW
+# @case TN
+# @id c2-tn-filename-substring
+{"tool_name":"Bash","tool_input":{"command":"cat sp_codex.txt"}}
+# @contract 2
+# @want ALLOW
+# @case TN
+# @id c2-tn-grep-family-name
+{"tool_name":"Bash","tool_input":{"command":"grep -rn 'grok' docs/ORCH.md"}}
+#
+# --- 契約 3：bash|sh|zsh -c 與 eval 遞迴 ---
+# @contract 3
+# @want BLOCK
+# @case TP
+# @id c3-tp-bash-c
+{"tool_name":"Bash","tool_input":{"command":"bash -c \"codex exec x\""}}
+# @contract 3
+# @want BLOCK
+# @case TP
+# @id c3-tp-sh-c
+{"tool_name":"Bash","tool_input":{"command":"sh -c 'grok -m grok-4.5 -p x'"}}
+# @contract 3
+# @want BLOCK
+# @case TP
+# @id c3-tp-eval
+{"tool_name":"Bash","tool_input":{"command":"eval \"codex exec x\""}}
+# @contract 3
+# @want ALLOW
+# @case TN
+# @id c3-tn-bash-c-readonly
+{"tool_name":"Bash","tool_input":{"command":"bash -c 'echo hello'"}}
+#
+# --- 契約 4：帶引號路徑 ---
+# @contract 4
+# @want BLOCK
+# @case TP
+# @id c4-tp-quoted-path-codex
+{"tool_name":"Bash","tool_input":{"command":"\"/my dir/codex\" exec x"}}
+# @contract 4
+# @want ALLOW
+# @case TN
+# @id c4-tn-quoted-path-other
+{"tool_name":"Bash","tool_input":{"command":"\"/my dir/otherbin\" exec x"}}
+#
+# --- 契約 5：路徑正規化（2.4 完整；此處釘契約形狀：非家族路徑 ALLOW）---
+# @contract 5
+# @want ALLOW
+# @case TN
+# @id c5-tn-dot-slash-not-family
+{"tool_name":"Bash","tool_input":{"command":"./scripts/cx_run.sh --help"}}
+# @contract 5
+# @want BLOCK
+# @case TP
+# @id c5-tp-abs-path-family
+{"tool_name":"Bash","tool_input":{"command":"/opt/homebrew/bin/codex exec hi"}}
+#
+# --- 契約 6：未閉合引號 → fail-closed ---
+# @contract 6
+# @want BLOCK
+# @case TP
+# @id c6-tp-unclosed-dq
+{"tool_name":"Bash","tool_input":{"command":"echo \"codex exec x"}}
+# @contract 6
+# @want ALLOW
+# @case TN
+# @id c6-tn-balanced
+{"tool_name":"Bash","tool_input":{"command":"echo \"hello world\""}}
+#
+# --- 契約 7：unquoted -c ---
+# @contract 7
+# @want BLOCK
+# @case TP
+# @id c7-tp-bash-c-unquoted
+{"tool_name":"Bash","tool_input":{"command":"bash -c codex"}}
+# @contract 7
+# @want ALLOW
+# @case TN
+# @id c7-tn-bash-c-unquoted-echo
+{"tool_name":"Bash","tool_input":{"command":"bash -c echo"}}
+#
+# --- 契約 8：遞迴深度上限 3；逾限 fail-closed ---
+# @contract 8
+# @want BLOCK
+# @case TP
+# @id c8-tp-depth2
+{"tool_name":"Bash","tool_input":{"command":"bash -c \"bash -c 'codex exec x'\""}}
+# @contract 8
+# @want BLOCK
+# @case TP
+# @id c8-tp-depth-over
+{"tool_name":"Bash","tool_input":{"command":"bash -c \"bash -c \\\"bash -c 'bash -c \\\\\\\"codex exec x\\\\\\\"'\\\"\""}}
+# @contract 8
+# @want ALLOW
+# @case TN
+# @id c8-tn-depth2-echo
+{"tool_name":"Bash","tool_input":{"command":"bash -c \"bash -c 'echo hi'\""}}
+#
+# --- 契約 9：跳脫引號不終止 span；無法確定 → fail-closed ---
+# @contract 9
+# @want ALLOW
+# @case TN
+# @id c9-tn-escaped-quote-no-dispatch
+{"tool_name":"Bash","tool_input":{"command":"echo \"a\\\"b\"; true"}}
+# @contract 9
+# @want BLOCK
+# @case TP
+# @id c9-tp-trailing-backslash-unclosed
+{"tool_name":"Bash","tool_input":{"command":"echo \"codex exec x\\"}}
+#
+# --- 契約 10：heredoc ---
+# @contract 10
+# @want ALLOW
+# @case TN
+# @id c10-tn-body-not-scanned
+{"tool_name":"Bash","tool_input":{"command":"cat <<EOF\ncodex exec x\nEOF\ntrue"}}
+# @contract 10
+# @want BLOCK
+# @case TP
+# @id c10-tp-after-heredoc
+{"tool_name":"Bash","tool_input":{"command":"cat <<EOF\nhello\nEOF\ncodex exec x"}}
+# @contract 10
+# @want ALLOW
+# @case TN
+# @id c10-tn-quoted-delim
+{"tool_name":"Bash","tool_input":{"command":"cat <<'X'\ncodex exec\nX\ntrue"}}
+# @contract 10
+# @want ALLOW
+# @case TN
+# @id c10-tn-dash-indent
+{"tool_name":"Bash","tool_input":{"command":"cat <<-EOF\n\tcodex exec\nEOF\ntrue"}}
+# @contract 10
+# @want ALLOW
+# @case TN
+# @id c10-tn-double-heredoc
+{"tool_name":"Bash","tool_input":{"command":"cat <<A <<B\nbodyA\nA\nbodyB\nB\ntrue"}}
+# @contract 10
+# @want BLOCK
+# @case TP
+# @id c10-tp-unclosed
+{"tool_name":"Bash","tool_input":{"command":"cat <<EOF\ncodex exec\n"}}
+# @contract 10
+# @want ALLOW
+# @case TN
+# @id c10-tn-allowlist-hyphen
+{"tool_name":"Bash","tool_input":{"command":"cat <<EOF-1\ncodex exec\nEOF-1\ntrue"}}
+# @contract 10
+# @want ALLOW
+# @case TN
+# @id c10-tn-allowlist-tilde
+{"tool_name":"Bash","tool_input":{"command":"cat <<EOF~1\nx\nEOF~1\ntrue"}}
+# @contract 10
+# @want BLOCK
+# @case TP
+# @id c10-tp-nest-attack
+{"tool_name":"Bash","tool_input":{"command":"cat <<EOF-1\n<<INNER\nfoo\nINNER\nEOF-1\ncodex exec x"}}
+# @contract 10
+# @want BLOCK
+# @case TP
+# @id c10-tp-fc-mixed-sq
+{"tool_name":"Bash","tool_input":{"command":"cat <<E'O'F\nx\nE'O'F"}}
+# @contract 10
+# @want BLOCK
+# @case TP
+# @id c10-tp-fc-mixed-dq
+{"tool_name":"Bash","tool_input":{"command":"cat <<E\"O\"F\nx\nE\"O\"F"}}
+# @contract 10
+# @want BLOCK
+# @case TP
+# @id c10-tp-fc-ansic
+{"tool_name":"Bash","tool_input":{"command":"cat <<$'EOF'\nx\nEOF"}}
+# @contract 10
+# @want BLOCK
+# @case TP
+# @id c10-tp-fc-escaped-space
+{"tool_name":"Bash","tool_input":{"command":"cat <<E\\ F\nx"}}
+# @contract 10
+# @want BLOCK
+# @case TP
+# @id c10-tp-fc-prefix-cmdsub
+{"tool_name":"Bash","tool_input":{"command":"cat <<EOF$(\n"}}
+#
+# --- Task 2.1 具名轉向（E-3／RECURSE／FP／OUTSIDE）---
+# @contract 2.1
+# @want BLOCK
+# @case TP
+# @id t21-e3-eval-grok
+{"tool_name":"Bash","tool_input":{"command":"eval 'grok -m grok-4.5 -p x'"}}
+# @contract 2.1
+# @want BLOCK
+# @case TP
+# @id t21-recurse-claude-c
+{"tool_name":"Bash","tool_input":{"command":"bash -c \"claude -p x\""}}
+# @contract 2.1
+# @want BLOCK
+# @case TP
+# @id t21-outside-semi
+{"tool_name":"Bash","tool_input":{"command":"echo start; grok -m grok-4.5 -p \"x\""}}
+# @contract 2.1
+# @want ALLOW
+# @case TN
+# @id t21-fp-commit-review
+{"tool_name":"Bash","tool_input":{"command":"git commit -m \"…; codex closure review…\""}}

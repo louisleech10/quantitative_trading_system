@@ -120,6 +120,7 @@ def _fams_in_lines(fname: str, locate: str) -> list[set[str]]:
 # completeness_check 有 6 個 site(委員 codex B:單釘一行不夠)→ 全涵蓋。
 _DRIFT = [
     ("gate_check.sh", "grok|agy)[", "executor_clis", {"claude"}),
+    ("_gate_lex.sh", "grok|agy)[", "executor_clis", {"claude"}),  # GOVB0 Task 2.1 詞法判定
     ("completeness_check.sh", "FAMILY_ALLOW_RE=", "families", set()),
     ("completeness_check.sh", "FAMILY_FILE_RE=", "families", set()),
     ("completeness_check.sh", 'fam["CODEX"]', "families", set()),
@@ -135,7 +136,7 @@ _DRIFT = [
 ]
 
 _CONSUMER_FILES = [
-    "gate_check.sh", "completeness_check.sh", "review_quorum_check.sh",
+    "gate_check.sh", "_gate_lex.sh", "completeness_check.sh", "review_quorum_check.sh",
     "write_sources_lock.sh", "cx_run.sh", "write_committee_accepted.sh",
 ]
 

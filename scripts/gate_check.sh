@@ -112,6 +112,9 @@ _append_gate_deny_audit() {
   { printf '%s\n' "$line"; } >> "${GATE_DIR}/audit.log" 2>/dev/null || true
 }
 
+
+# GOVB0 詞法契約實作見 scripts/_gate_lex.sh（僅 Bash 路徑 source，避免 Task 冷路徑解析 awk）
+
 # fresh token 重查帳本（次要補強）。**不使用 sidecar 快取**：
 #   - (mtime,size) 鍵不含 cutoff/ledger/registry 語意輸入 → stale allow fail-open（B）
 #   - 無完整性保護的 .has_open_idx 可預置毒化 → false-green（C）
@@ -160,15 +163,38 @@ case "$tool_name" in
   Bash)
     cmd="$(jq -r '.tool_input.command // empty' <<<"$INPUT" 2>/dev/null)"
     # R1：剝除行首 env 前綴（VAR=value 可多個）再比對 executor，防 GATE_DIR_OVERRIDE=… codex exec 繞過。
-    while printf '%s' "$cmd" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*='; do
-      cmd="$(printf '%s' "$cmd" | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+//')"
+    # 🔴 值限「簡單字面」（不含 $ ` ( ) 空白）——避免把 out=$(codex exec x) 誤剝成 exec x)（E-3 回歸）。
+    while printf '%s' "$cmd" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_./:@%+=,-]+[[:space:]]'; do
+      cmd="$(printf '%s' "$cmd" | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_./:@%+=,-]+[[:space:]]+//')"
     done
     # executor 通道：只比對「命令位置」（行首 / 分隔符後）的 binary，避免誤擋 cat sp_codex.txt 這種檔名子字串。
     # executor 名單 = scripts/governance_families.json executor_clis(codex|cursor-agent|grok|agy)。
     # 熱路徑(每次工具呼叫)故此處寫死避免 subprocess 開銷;governance 測試釘死此清單 == SoT(防漂移)。
     # 事故:寫死漏 grok,主力實作 CLI 不被 PreToolUse 攔(2026-07-23)。
     # 🔴 判定段：只做 grep -Eq，禁止 grep -Eo（D-12：取片段不得入判定）。
-    if printf '%s' "$cmd" | grep -Eq '(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]|claude[^|]*(-p|--print)'; then
+    # 延遲載入詞法（熱路徑只在 Bash 通道付出）
+    # shellcheck source=scripts/_gate_lex.sh
+    # 突變測試常只複製 gate_check.sh：若 SCRIPT_DIR 無 lex，回退到本檔同目錄失敗後用 repo 相對 scripts/
+    if [ -f "${SCRIPT_DIR}/_gate_lex.sh" ]; then
+      # shellcheck source=scripts/_gate_lex.sh
+      . "${SCRIPT_DIR}/_gate_lex.sh"
+    elif [ -f "scripts/_gate_lex.sh" ]; then
+      # cwd=repo root（pytest 慣例）
+      # shellcheck source=scripts/_gate_lex.sh
+      . "scripts/_gate_lex.sh"
+    else
+      echo "ERROR: _gate_lex.sh missing (fail-closed dispatch scan)" >&2
+      exit 2
+    fi
+    # GOVB0 Task 2.1：詞法前處理後判定（契約 1／1b／2／3／…）；GATE_LEGACY_DECISION=1 回舊路徑。
+    # 錨點字面（覆蓋斷言機械導出）：(codex|cursor-agent|grok|agy)[[:space:]] 與 claude[^|]*(-p|--print)
+    # 分隔符前綴（舊＋擴充）：(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)
+    if [ "${GATE_LEGACY_DECISION:-0}" = "1" ]; then
+      if printf '%s' "$cmd" | grep -Eq '(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]|claude[^|]*(-p|--print)'; then
+        if printf '%s' "$cmd" | grep -Eq 'scripts/gate(_check)?\.sh'; then exit 0; fi
+        kind="dispatch"
+      fi
+    elif _gate_cmd_is_dispatch "$cmd"; then
       # 排除 gate 自身與唯讀勘查
       if printf '%s' "$cmd" | grep -Eq 'scripts/gate(_check)?\.sh'; then exit 0; fi
       kind="dispatch"

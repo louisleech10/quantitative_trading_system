@@ -1,0 +1,34 @@
+# phase2_expected_flips.txt — 機械抽取自 docs/GOVB0_FRICTION_TODO.md
+# 重跑: python3 scripts/extract_phase2_expected_flips.py
+# 格式: kind\ttest_id\tfrom\tto\tcommand
+# kind=flip|maintain；mutation「轉回」不入此檔
+# 禁手編；改 TODO 後重跑本腳本並更新 .sha256
+flip	TEST-2.1-FP	BLOCK	ALLOW	pgrep -fl 'codex exec|cursor-agent|grok '
+flip	TEST-2.1-FP	BLOCK	ALLOW	git commit -m "...; codex closure review..."
+flip	TEST-2.1-E3	ALLOW	BLOCK	eval "codex exec x"
+flip	TEST-2.1-E3	ALLOW	BLOCK	out=$(codex exec x)
+flip	TEST-2.1-E3	ALLOW	BLOCK	out=`codex exec x`
+flip	TEST-2.1-E3	ALLOW	BLOCK	(codex exec x)
+flip	TEST-2.1-E3	ALLOW	BLOCK	eval 'grok -m grok-4.5 -p x'
+maintain	TEST-2.1-OUTSIDE	BLOCK	BLOCK	echo start; grok -m grok-4.5 -p "x"
+flip	TEST-2.2-FP4	BLOCK	ALLOW	head -3 /private/tmp/claude-501/x.output; git rev-parse --short HEAD
+flip	TEST-2.2-FP4	BLOCK	ALLOW	cat .claude/tmp/x.txt; git rev-parse HEAD
+flip	TEST-2.2-FP4	BLOCK	ALLOW	ls /private/tmp/claude-501/; git status --porcelain
+flip	TEST-2.2-FP4	BLOCK	ALLOW	find .claude/tmp -name "*.md" -print
+maintain	TEST-2.2-TP	BLOCK	BLOCK	claude -p "x"
+maintain	TEST-2.2-TP	BLOCK	BLOCK	claude --print "x"
+flip	TEST-2.2-PIPE	ALLOW	BLOCK	cat x | claude -p "y"
+flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	/opt/homebrew/bin/codex exec hi
+flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	/Users/.../.grok/bin/grok -m x -p y
+flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	venv/bin/codex exec hi
+flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	./scripts/../codex exec hi
+flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	"/my dir/codex" exec hi
+maintain	TEST-2.3-FN	ALLOW	ALLOW	cat sp_codex.txt
+flip	TEST-2.4-DIRECT	ALLOW	BLOCK	ROUND_ID=x bash scripts/cx_run.sh composer b.md o.md
+flip	TEST-2.4-DIRECT	ALLOW	BLOCK	bash ./scripts/cx_run.sh ...
+flip	TEST-2.4-DIRECT	ALLOW	BLOCK	bash scripts//cx_run.sh ...
+flip	TEST-2.4-COMMITTEE	ALLOW	BLOCK	bash scripts/committee_run.sh --session s b.md o codex -- --task-id T
+maintain	TEST-2.4-GATE-OK	ALLOW	ALLOW	bash scripts/gate.sh dispatch --intent x ...
+maintain	TEST-2.4-NOFP	ALLOW	ALLOW	sed -n '1,40p' scripts/cx_run.sh
+maintain	TEST-2.4-NOFP	ALLOW	ALLOW	grep -n timeout scripts/cx_run.sh
+maintain	TEST-2.4-NOFP	ALLOW	ALLOW	wc -l scripts/committee_run.sh

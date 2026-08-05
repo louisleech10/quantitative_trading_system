@@ -34423,3 +34423,51 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-05T08:51:54Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
 {"event":"gate_deny","ts":"2026-08-05T08:57:25Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
 {"event":"gate_deny","ts":"2026-08-05T08:57:25Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event":"gate_deny","ts":"2026-08-05T09:06:25Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event":"gate_deny","ts":"2026-08-05T09:06:25Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-todo-r9/synth.md", "output_sha256": "d983a3a274bf24b0c5817c79035f5669bfe1bc672322153299972e7d8e272880", "task_id": "GOVB0-IMPL-B3", "ts": "2026-08-05T09:06:52Z"}
+=== 2026-08-05 17:06:53 | dispatch ===
+  ts=2026-08-05 17:06:53
+  kind=dispatch
+  intent=第 0 批 B3 實作：Task 2.0 詞法契約 ＋ Task 2.1 引號感知，Phase 2 首批
+  risk=high
+  facts_asked=契約 11 項對語料 B 對照表、語料 A 仍全綠證明、原型 26 條逐條比對、分支對照表同步更新、11 個 mutation 實跑 rc、pytest 總數
+  review_role=implementer，範圍限 Task 2.0 與 2.1，判定會改故須證明只改該改的
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  reconcile=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/GOVB0_FRICTION_SPEC.md
+  todo=docs/GOVB0_FRICTION_TODO.md
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-IMPL-B3-BRIEF.md", "brief_sha256": "3ea5b882aac129c2802b3f2984785edb7a2b3e628ba03390aebb5d5466d75c9a", "brief_sha256_norm": "3ea5b882aac129c2802b3f2984785edb7a2b3e628ba03390aebb5d5466d75c9a", "event": "committee_round_open", "event_id": "3d4366d9-28ac-4aae-908d-4dc0b036cda0", "expected_outputs": {"grok": "handoffs/20260805-govb0-impl-b3-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["grok"], "producer": "audit_append.sh", "quorum_eligible": ["grok"], "round_id": "accdb2b7-0a85-4ded-b7ac-e11d82d14bf3", "schema_version": 1, "sequence": 758, "session_name": "20260805-govb0-impl-b3", "task_id": "GOVB0-IMPL-B3", "ts": "2026-08-05T09:06:53Z"}
+{"event":"gate_deny","ts":"2026-08-05T09:46:31Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event":"gate_deny","ts":"2026-08-05T09:46:31Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"actor": "cx_run", "attempt_id": "c3883cec-ff1b-4345-be4d-9b785f16e0cc", "cli_rc": "0", "event": "committee_family_result", "event_id": "46afd05b-5083-476c-9218-b8b26ca563b7", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-impl-b3-grok.md", "output_sha256": "9a16cddae9f6a369de4e45fa62fcadca7dcbc470a18253dc9a3e360378e39698", "producer": "audit_append.sh", "result_state": "success", "round_id": "accdb2b7-0a85-4ded-b7ac-e11d82d14bf3", "schema_version": 1, "sequence": 759, "ts": "2026-08-05T09:55:19Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-impl-b3-grok.md", "output_sha256": "9a16cddae9f6a369de4e45fa62fcadca7dcbc470a18253dc9a3e360378e39698", "task_id": "GOVB0-IMPL-B3", "ts": "2026-08-05T09:57:51Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "42dcb220-3fea-4cbd-9b05-2ccb003caa4a", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "實作輪產出為程式碼與測試，結構上無 findings 可收集。本輪實作者正確地標為 BLOCKED 並停下回報：語料 A 的 pgrep 條目在 Task 2.1 後翻轉，而 brief 明文禁止為使語料 A 變綠而修改語料 A。主委查證後確認此為主委自身的設計矛盾——語料 A 第 58 行的指令與 TODO 第 331 至 332 行明文要求由 BLOCK 轉 ALLOW 的是同一條，即把應改變者放進不得改變的語料。實作者處置完全正確、未自行擴大範圍。另兩個非綠項經查皆非本批回歸：latency 門檻失敗在 snapshot 同環境亦超標、根因為 audit.log 三萬四千行對應第 0.5 批線 C；unpinned 項實作者已修但全套跑在修之前。已另開解阻塞派工，要求排除清單自 TODO 機械導出並附兩條反向斷言。", "round_id": "accdb2b7-0a85-4ded-b7ac-e11d82d14bf3", "schema_version": 1, "sequence": 760, "ts": "2026-08-05T09:57:53Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-todo-r9/synth.md", "output_sha256": "d983a3a274bf24b0c5817c79035f5669bfe1bc672322153299972e7d8e272880", "task_id": "GOVB0-B3-UNBLOCK", "ts": "2026-08-05T09:58:08Z"}
+=== 2026-08-05 17:58:11 | dispatch ===
+  ts=2026-08-05 17:58:11
+  kind=dispatch
+  intent=B3 解阻塞：修主委的語料 A 設計矛盾，排除清單須自 TODO 機械導出
+  risk=high
+  facts_asked=抽取邏輯與產出檔、兩條反向斷言實跑、排除清單 mutation rc、語料 A 條數未減證明、兩個既有失敗逐條說明
+  review_role=implementer，範圍限解阻塞，禁刪語料 A 條目、禁手挑排除清單、禁放寬 latency 門檻
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  reconcile=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/GOVB0_FRICTION_SPEC.md
+  todo=docs/GOVB0_FRICTION_TODO.md
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-B3-UNBLOCK-BRIEF.md", "brief_sha256": "db06a2b9186f9fc79fb1a40cac10f6a1bb5e1602b60102189a09dc8664b4fa07", "brief_sha256_norm": "db06a2b9186f9fc79fb1a40cac10f6a1bb5e1602b60102189a09dc8664b4fa07", "event": "committee_round_open", "event_id": "b30b1cc5-1504-4ba2-aa96-105f580824d2", "expected_outputs": {"grok": "handoffs/20260805-govb0-b3-unblock-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["grok"], "producer": "audit_append.sh", "quorum_eligible": ["grok"], "round_id": "9cc81ed2-e743-4035-9fd9-5b0b7c180f82", "schema_version": 1, "sequence": 761, "session_name": "20260805-govb0-b3-unblock", "task_id": "GOVB0-B3-UNBLOCK", "ts": "2026-08-05T09:58:13Z"}
+{"event":"gate_deny","ts":"2026-08-05T10:24:41Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event":"gate_deny","ts":"2026-08-05T10:24:41Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"actor": "cx_run", "attempt_id": "eab50987-77ea-493b-9007-4b00234f4327", "cli_rc": "0", "event": "committee_family_result", "event_id": "54acf681-53e3-4797-9e46-8ab1d4306b0a", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-b3-unblock-grok.md", "output_sha256": "c7fabe5fc9984ae9377c0de7f3bd6655687a9dec6b6b60c1f67c0c860271a0ee", "producer": "audit_append.sh", "result_state": "success", "round_id": "9cc81ed2-e743-4035-9fd9-5b0b7c180f82", "schema_version": 1, "sequence": 762, "ts": "2026-08-05T10:26:32Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-b3-unblock-grok.md", "output_sha256": "c7fabe5fc9984ae9377c0de7f3bd6655687a9dec6b6b60c1f67c0c860271a0ee", "task_id": "GOVB0-B3-UNBLOCK", "ts": "2026-08-05T10:28:52Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "243ba4d6-e9a2-4c3c-b1ee-bf7be9c76438", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "實作輪產出為程式碼與測試，無 findings 可收集。B3 解阻塞完成：排除清單由 scripts/extract_phase2_expected_flips.py 自 TODO 機械抽取，產出 fixture 加 sha256 sidecar；INVARIANCE 改為排除預期翻轉後比對，並含兩條反向斷言（被排除者必須在清單中找到對應、清單中每條必須在語料 B 確實翻轉）；實作者另自行加上 test_01_phase2_flips_fixture_matches_todo，驗證清單可由抽取腳本自 TODO 重現以防手改漂移，此條主委未要求。主委獨立驗證：語料 A 條數仍為 30 未減、相關測試 24 passed、排除機制 mutation 亦 passed。全套 750 passed 1 failed，該 failed 為既有 latency 門檻，根因 audit.log 三萬四千行，對應第 0.5 批線 C，本批依 brief 明文未放寬門檻。", "round_id": "9cc81ed2-e743-4035-9fd9-5b0b7c180f82", "schema_version": 1, "sequence": 763, "ts": "2026-08-05T10:28:53Z"}
