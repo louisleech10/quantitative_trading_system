@@ -100,3 +100,9 @@ VERIFY: bounded 擷取命令實跑 → `票 B-24` 內 `^TICKET-STATUS:` **1**、
 
 [MINOR] 信心度=High；分類=**named-residual**。全檔 `pytest tests/governance/test_atomic_publish.py` 仍會跑到 ⑬，Gate 文案漏列不致漏測。修法：§B B6→B7 與 Phase 3 Gate 改為「⑨～⑬」或明列 ⑬ 為 reclaim 孤兒釘扎測試。
 
+
+## 戳記
+
+RECONCILE-STAMP: composer APPROVED 2026-08-05 sha256:bb0090a6f0ed753ad5a9f57b95dc65701c34505539b882d293a095c2f4a9223b task:GOVB0-R9-STAMP
+RECONCILE-STAMP: grok APPROVED 2026-08-05 sha256:bb0090a6f0ed753ad5a9f57b95dc65701c34505539b882d293a095c2f4a9223b task:GOVB0-R9-STAMP
+RECONCILE-STAMP: codex APPROVED 2026-08-05 sha256:bb0090a6f0ed753ad5a9f57b95dc65701c34505539b882d293a095c2f4a9223b task:GOVB0-R9-STAMP
