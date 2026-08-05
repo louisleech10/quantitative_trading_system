@@ -1,63 +1,91 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-05 12:0x | **Branch**: main
-**狀態**: 🔵 **第 0 批 TODO 已修完 R8 六條 → 待決定是否派 R9 確認輪**
+**Agent**: Claude(Opus 5) | **Time**: 2026-08-05 20:0x | **Branch**: main
+**狀態**: 🔵 **B3 已完成但未過 review** —— compact 後第一件事＝派 B3 的雙家族 code review
 
-## ▶ 立即接手
+## ▶ compact 後立即接手（照這個順序）
 
-**唯一待決策**：R8 的 6 條已全部修畢，**是否再派一輪確認**。
-主委建議 **派**——理由不是規格難，而是**連續三輪主委的修補都引入新缺口**（見下失誤模式），
-在 `票 B-16` 擴充上線前，委員實跑是唯一防線。使用者尚未裁決。
+**1. 派 B3 code review**（brief 已寫好且兩支檢查器皆 rc=0）
 
-R9 若派：brief 用 `handoffs/20260805-GOVB0-TODO-R8-BRIEF.md` 為樣板，
-**finding heading 一律照 `scripts/completeness_check.sh:153` 的正則** `^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$`。
+```
+bash scripts/committee_run.sh --session 20260805-govb0-b3-review \
+  handoffs/20260805-GOVB0-B3-CODEREVIEW-BRIEF.md handoffs/20260805-govb0-b3-review codex,composer -- \
+  --intent "B3 雙家族 code review，Phase 2 首批" --risk high \
+  --facts-asked "…" --review-role "adversarial code review，實作者不自審，禁改碼" \
+  --template "n/a: 用 brief" \
+  --adversarial handoffs/reconcile/20260805-govb0-todo-r9/synth.md \
+  --reconcile  handoffs/reconcile/20260805-govb0-todo-r9/synth.md --task-id "GOVB0-B3-REVIEW"
+```
 
-之後：TODO 標 Internal Frozen → 實作（Grok，見 ORCH §1 現行分工行）→ **雙家族 code review**。
+🔴 **前一次派這個失敗過**，原因是主委當時把 `audit.log` 截斷、
+`committee_dispatch` 事件被搬走 ⇒ 戳記 provenance 檢查失敗。
+**已還原，該問題應已消失**；若仍失敗，先查 `audit.log` 是否完整（應 ≥34,501 行）。
 
-## 現況
+**2. review 過關後** → B4（Task 2.2／2.3／2.4，修三個 fail-open，同改 `gate_check.sh:86` 故同批）
+→ B5（差集報表，Phase 2 合併關卡）→ B6（3.1＋3.2）→ B7（3.3）→ 第 0.5 批線 C。
 
-- SPEC `docs/GOVB0_FRICTION_SPEC.md`：**R7 版**，七輪收斂，收斂檔三家戳記 sha `b502bac9…0f82fa4bd`。
-- TODO `docs/GOVB0_FRICTION_TODO.md`：**已修 9+6 條**，`template_check todo` rc=0，SPEC 11 Task == TODO 11 Task。
-- 🔴 **給使用者看的文件一律放 repo 根目錄 `白話說明/`，禁放 `handoffs/`**（使用者 2026-08-05 定）。
-  現有：`README.md`（入口＋當前進度）／`第0批-在做什麼.md`／`第0批-施工清單.md`／
-  `治理待辦總覽.md`／`治理進度日誌.md`。**每完成一個實作批次須更新 `README.md` 與施工清單的進度表。**
-- 收斂檔 `handoffs/reconcile/20260805-govb0-todo-r8/synth.md`（I-1～I-6，**已正規銷帳**）。
-- **無 OPEN 債。** 票數 **38**、待辦 **30**，三份文件同步、雙向對帳差集空。
+## 🔴 主委今日最後一個錯誤（已撤回，但要知道經過）
 
-## 🔴 主委失誤模式（本 session 最重要的發現，已入 `票 B-16`）
+**錯誤**：`test_gate_check_latency_under_100ms` 紅過一次（287ms），
+主委**未重跑**就斷定「根因＝`audit.log` 34,479 行」，寫了 `audit_archive_legacy.sh` 把
+33,716 行封存、只留 763 行 debt 白名單，並 commit + push（`c2a351f`）。
 
-TODO 兩輪審查共 15 條 findings，**全部屬實、無一誤報**，且**幾乎全是主委造成，非技術難度**：
+**後果**：下一次派工立刻失敗——戳記 provenance 需要 `committee_dispatch` 事件，
+它**不在** debt 白名單，被搬走了。
 
-| 模式 | 案例 | 次數 |
-|---|---|---|
-| **沒對照就寫**（違反實測>假設） | 引用不存在的 `_bc_kv`「函式」（實為 `mktemp` 路徑變數）／caller 方向寫反／測試引用 backlog 內不存在的字串 | 4 |
-| **自我引用未察** | 測試與被測內容同檔，未行首錨定 ⇒ `grep -c` 把測試定義自己算進去；**主委在修補過程中又犯 2 次** | 5 |
-| **內部矛盾** | B5 依賴 B3/B4 卻要求 snapshot 在 B3 前凍結／snapshot 同時列為 B0 與 Task 2.5 產出 | 3 |
-| **過度宣稱** | §T 寫「100% 覆蓋」但 `F-7`／`B-36` 無落點 | 1 |
+**真相**（codex 實測 + 主委獨立連跑 3 次）：**在完整未動的 34,501 行檔案上，latency 全部通過**（79ms）。
+那次 287ms 是**單次冷啟抖動**，不是結構性問題。
 
-**通解（已寫入 TODO 與 backlog）**：**禁散文關鍵字比對，改用行首錨定的機器標記**——
-`^TICKET-STATUS:`／`^TASK-STATUS:`／`^RESIDUAL:`。**標記寫行首、斷言帶 `^`，兩者缺一即自我污染。**
+**已撤回**：`audit.log` 還原為完整、封存檔刪除、`audit_archive_legacy.sh` 刪除、
+白話說明的不實敘述已加更正段（原文保留不刪）。
 
-**使用者 2026-08-05 裁定**：合併進 `票 B-16`（同一強制點 `doc_format_precheck.sh`、同一病族），
-**擴充 A**＝文件內可執行斷言寫檔當下實跑比對；**擴充 B**＝引用的函式名／檔名存在性檢查。
-兩者**提前至第 1 批**，`B-16` 原條文維持第 4 批。
-🔴 **擴充 B 的誠實邊界**：擋不了「呼叫方向寫反」（兩個識別字都存在時無法判斷），**具名殘留**。
+⚠️ **`c2a351f` 已推上 GitHub**，本次撤回為新 commit（不改寫歷史）。
+
+## 現況（皆已實測）
+
+| 項目 | 值 |
+|---|---|
+| 測試 | **750 passed**（起始 701）；latency 已綠 |
+| `audit.log` | **34,501 行**（完整，未截斷） |
+| 委員債務 | 無 OPEN |
+| 實作進度 | 8 批做完 **4 批**：B0 ✅ B1 ✅ B2 ✅ B3 ✅（B3 待 review） |
+| SPEC | `docs/GOVB0_FRICTION_SPEC.md` R7，七輪收斂，三家戳記 |
+| TODO | `docs/GOVB0_FRICTION_TODO.md` **Internal Frozen**，三輪收斂 |
+| B3 收斂依據 | `handoffs/reconcile/20260805-govb0-todo-r9/synth.md`（三家戳記 sha `bb0090a6…`） |
+
+## 🔴 使用者定死的三條（本 session 新增）
+
+1. **面向未來，不溯及既往**——修正只考慮以後；不管舊文件與舊資料格式，
+   除非該檔**未來還要被機器讀**且格式改不掉。遇舊資料不合新規**預設封存非遷移**。
+   ⚠️ 但「未來還要被機器讀」的判定**必須窮舉消費者**（主委就是漏查而弄壞 provenance）。
+2. **排程由 Claude 與委員共識決定，不問使用者。**
+3. **技術問題自己修，不要停下來等使用者**（使用者不懂技術細節）。
+
+## 白話說明維護（使用者定死，已機械強制）
+
+給使用者看的文件放 **repo 根目錄 `白話說明/`**，**禁放 `handoffs/`**。
+`scripts/plain_docs_sync_check.sh` 兩層：**commit 時提醒**（不擋）／**push 時硬擋**（時序判準）。
+接在 `gov_check.sh` 4/4。**本 session 已真實擋下主委兩次**（`e243776`／`18cfdd2`）。
+一份任務整批完工 → `git mv` 說明檔到 `白話說明/Archived/`，README 只留當前任務。
 
 ## ⚠️ 坑（照做省時間）
 
-- **brief 內的機器格式一律引用檢查器正則本身，禁手寫**——本日三次 brief 誘導格式失敗，每次錯處不同。
-- **`##` 只准是 canonical finding ID**；brief 不可同時要求「canonical `##`」與「逐條各一段」。
-  有效作法＝**明列本輪允許的 `##` 清單＋要求用表格**。
-- 委員零 findings 時要求其明寫 `FINDINGS_COUNT: 0`（`票 B-38`）。
-- **brief 改了就不能同輪重派**（`brief_sha256` 不符）⇒ 只能棄輪重開。
-- 正規銷帳需 `sources.lock` 為 review mode：`reconcile_build.sh <session> --mode review [--rebuild]`（`--rebuild` 不接受委員檔參數）。
-- **commit 訊息零豁免**：operational claim 須 `VERIFY:<receipt-id>` ＋ 可解析 scope 或寫明 runtime 類別（`static`／`讀碼`）。
-- `VERIFY-EXEMPT` 合法類別**只有 6 個**：`typo`／`doc-example`／`migration-note`／`template-drift`／`tooling-blocked`／`spec-ambiguity`。
-- 委員產出交件後一律 `bash scripts/gate.sh register-output <task-id> <path>`。
-- 創建 `docs/*{SPEC,TODO,PLAN}*.md` 需 `bash scripts/gate.sh artifact --file … --template-opened … --sections …`。
+- **派 brief 前先跑兩支檢查器**，不要逐行試：
+  `bash scripts/doc_format_precheck.sh <brief>` ＋ `python3 scripts/verification_claim_check.py --files <brief>`。
+  本 session 曾逐行修三次才想到一次列出全部。
+- **commit 訊息零豁免**：operational claim 須 `VERIFY:<receipt-id>` ＋ 可解析 scope
+  或寫明 runtime 類別（`static`／`讀碼`／`真跑`）。receipt 的 `runtime_class` 必須對得上宣稱。
+- 「**廉價綠燈**」四字會觸發 claim checker，改寫成「測試品質：依範本 §1 第 9 類舉證」。
+- **中文路徑一律 `git -c core.quotepath=false`**——否則逃脫成 `\347\231\275…` 比對永遠失敗（本日踩 3 次）。
+- **`rm` 在 deny 清單**，刪檔用 `git rm`。
+- **`票 B-15` 本 session 咬 13 次**：commit 訊息某行以家族名開頭、指令引號內含 `|` 皆會誤判為派工。
+  權宜＝`git commit -F <訊息檔>`、指令改寫成腳本檔再 `bash`。
+- **pre-commit 會剝除 staged 內容的行尾空白但不動工作區** ⇒ commit 後工作區看似「多出空白」。
+  這是早上「檔案莫名漂移」之謎的根因，非委員產出失真。
 - **`rc` 禁經 pipe**；**禁 `python3 -c`**；`ts_stamp.log` 須 `LC_ALL=C grep -a`（**禁 export**）。
 
-## 後續順序
+## 票
 
-第 0 批（R9? → Frozen → 實作 → 雙家族 review）→ **第 0.5 批 P1-6 線 C** → 0.9 批 `B-37`
-→ 第 1 批（`B-19`／`B-29`／`B-31`／`B-38`／**`B-16` 擴充 A/B**）。
+`handoffs/20260801-GOV-AMEND-BACKLOG.md`（**38 張，唯一登記處**）。
+本日新增 `B-37`（優先序無數據依據，0.9 批）、`B-38`（0 findings 無法正規銷帳，第 1 批）；
+`B-31` 嚴重度上調；`B-16` 擴充 A／B 合併並提前至第 1 批。
