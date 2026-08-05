@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 26 items / 23 deselected / 3 selected
+
+tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_appendix_lines_always_empty_turns_red PASSED [ 33%]
+tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_sources_exempt_always_false_turns_red PASSED [ 66%]
+tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_family_result_removed_from_whitelist_turns_red PASSED [100%]
+
+======================= 3 passed, 23 deselected in 0.05s =======================

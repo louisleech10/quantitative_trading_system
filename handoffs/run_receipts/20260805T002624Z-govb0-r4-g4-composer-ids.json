@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T002624Z-govb0-r4-g4-composer-ids",
+  "claim_id": "govb0-r4-g4-composer-ids",
+  "command": [
+    "grep",
+    "-n",
+    "COMPOSER-R3-P1-0",
+    "docs/GOVB0_FRICTION_SPEC.md"
+  ],
+  "command_sha256": "00c1a24fb2fd404a9e0addd54f1c32a0437c62ab81bc3a0cb153ad5e97075bd8",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "d5ca92650ed97e019f3dbf13535629d7cea01c41",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T00:26:24Z",
+  "ended_at": "2026-08-05T00:26:24Z",
+  "duration_seconds": 0.003749,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "fd62fd89778240778ef09525378099e31c98c23f9c18d875859720075c2471c5",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "fd62fd89778240778ef09525378099e31c98c23f9c18d875859720075c2471c5",
+  "log_path": "handoffs/run_receipts/20260805T002624Z-govb0-r4-g4-composer-ids.log",
+  "tail_excerpt": [
+    "239:    🔴 四條全部納入語料 B。**只實作原型③（不含 1b）者，①②會誤擋 ⇒ 本 Task 不通過**（`COMPOSER-R3-P1-02`）。",
+    "356:  - **lock 生命週期（`F-3`：R3 只寫「拒絕」未定義生命週期，R4 定死 — `CODEX-R3-P0-03`／`COMPOSER-R3-P1-03`）**：",
+    "417:       （`CODEX-R3-P1-04`／`COMPOSER-R3-P1-01`）。另一家主張的 ≥20 僅作**中途 sanity check**，非定稿門檻。"
+  ]
+}

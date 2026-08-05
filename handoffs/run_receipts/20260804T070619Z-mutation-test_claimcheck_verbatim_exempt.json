@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260804T070619Z-mutation-test_claimcheck_verbatim_exempt",
+  "claim_id": "mutation-test_claimcheck_verbatim_exempt",
+  "command": [
+    "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python",
+    "-W",
+    "ignore",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "test_mutation_",
+    "tests/governance/test_claimcheck_verbatim_exempt.py"
+  ],
+  "command_sha256": "94b2ca558cc112bb55b558c38cc3355636e41ba64b517b2409653ac0b33fe508",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "2696e77938d99759edaffdea78c8e953fbe5f2f5",
+  "tree_dirty": true,
+  "started_at": "2026-08-04T07:06:17Z",
+  "ended_at": "2026-08-04T07:06:19Z",
+  "duration_seconds": 2.358606,
+  "exit_code": 0,
+  "runtime_class": "mutation_runtime",
+  "requested_class": null,
+  "pytest_summary": "======================= 2 passed, 18 deselected in 0.07s =======================",
+  "selected_node_ids": [
+    "tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_appendix_lines_always_empty_turns_red",
+    "tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_sources_exempt_always_false_turns_red"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 2,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "3e53abd2f7c60717cf27058304be48bb0abf72255a6270b05a7a7f642e08abc9",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "3e53abd2f7c60717cf27058304be48bb0abf72255a6270b05a7a7f642e08abc9",
+  "log_path": "handoffs/run_receipts/20260804T070619Z-mutation-test_claimcheck_verbatim_exempt.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 20 items / 18 deselected / 2 selected",
+    "",
+    "tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_appendix_lines_always_empty_turns_red PASSED [ 50%]",
+    "tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_sources_exempt_always_false_turns_red PASSED [100%]",
+    "",
+    "======================= 2 passed, 18 deselected in 0.07s ======================="
+  ]
+}
