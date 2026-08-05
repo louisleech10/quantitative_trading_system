@@ -199,7 +199,12 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
       🔴 ⑥**delimiter 文法＝允許清單，不是識別字、也不是「排除清單」**
       （R6 修；`CODEX-R5-P0-01` 提出、`CODEX-R6-P0-01` 二次收緊，兩家一致）：
       起點改為 `<<[-]?[[:space:]]*` 後接下列**三者之一**——
-      (a) `'([^']*)'`　(b) `"([^"]*)"`　(c) `([A-Za-z0-9_.:+=,%@^-]+)`（**允許清單**）；
+      (a) `'([^']*)'`　(b) `"([^"]*)"`　(c) `([A-Za-z0-9_.:+=,%@^~{}\[\]!*?-]+)`（**允許清單**）；
+      🔴 **`~{}[]!*?` 八字元為 R7 補入**（`CODEX-R7-P1-01`／`COMPOSER-R7-P2-01`，兩家獨立提出）：
+      codex 實跑 `BASH_UNQUOTED[~|{|}|[|]|!|*|?] rc=0` 證實 bash **皆接受**為合法 delimiter。
+      未補前這些會落入⑦ ⇒ **誤擋合法 heredoc**，與本批「止血摩擦」目標自相矛盾。
+      ⚠️ 這些字元在 delimiter 位置**只做 quote removal、不做展開**（無 glob／brace／tilde expansion），
+      故納入允許清單**不會**造成掃描器與 shell 的判定分歧。
       且 (c) **必須完整 token**：其後須緊接 `[[:space:]]`、換行或字串結尾（**禁前綴匹配**）。
       delimiter ＝捕捉群去引號後的字面值。
       ⇒ `EOF-1`／`EOF.1`／`E0F`／`_EOF` 等**皆為合法 shell delimiter，必須正確開 span**。
@@ -594,4 +599,34 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
 
   🔴 **後續審查輪處置規則**：委員若再提上述任一議題，請標 `OUT-OF-SCOPE` 並附「不做會怎樣」的具體失效場景，
   **不作為 BLOCKING**。**例外**：若能證明不做會使**本批交付物本身失效**（而非只是不夠完美），仍可 BLOCKING，但須寫明失效路徑。
+
+  ---
+
+  🔴 **R7 具名殘留（兩家獨立提出同兩條，皆判 named-residual、非 deliverable-invalidating）**
+
+  R7 為 P0-1／P0-2 的**最後一輪**（依「95% 解法就收・殘留先記錄」定死終止條件）。
+  兩家 `FINDINGS_COUNT: 2`、deliverable-invalidating **0**、一致判**可進 TODO 生成**。
+
+  | 殘留 | 來源 finding | 方向 | 處置 |
+  |---|---|---|---|
+  | **⑥允許清單仍非完整 shell-word grammar** | `CODEX-R7-P1-01`／`COMPOSER-R7-P2-01` | **fail-closed（誤擋）** | R7 已補入 codex 實跑驗證的 8 字元 `~{}[]!*?`；**未列字元一律走⑦ BLOCK** |
+  | **reclaim lock 孤兒** | `CODEX-R7-P1-02`／`COMPOSER-R7-P2-02` | **fail-closed（可用性）** | 見下 |
+
+  **殘留一（允許清單不完整）— 已部分修，殘留具名接受**：
+  R7 補入 `~{}[]!*?` 八字元後，兩家點名的向量已解。
+  **但允許清單本質上是「已知安全字元」的枚舉，不等於完整 shell-word grammar** ⇒ 仍可能有未列的合法字元。
+  🔴 **殘留的方向是安全的**：未列字元 ⇒ ⑦ fail-closed ⇒ **過擋而非漏放**，不會使 gate 失效。
+  **補查條件**（與 `B-15` FP-2 同機制）：Phase 0 上線後以 `gate_deny` 反查 heredoc 誤擋；
+  命中則擴允許清單或開 `票 B-15` 子項。**本批不再擴。**
+
+  **殘留二（reclaim lock 孤兒）— 具名接受，修法寫入 TODO 運維項**：
+  stale takeover 協定的持有者若在步驟③（刪主 lock＋建新 lock）之後、④（釋放回收權）之前 crash，
+  `<out>.reclaim.lockdir` 會殘留 ⇒ 後續 takeover 在步驟①即 EEXIST 拒絕 ⇒ **該 `<out>` 路徑鎖死至人工清理**。
+  codex 實跑：`CRASH_CHILD_RC=137`、`MAIN_LOCK_AFTER_CRASH=present`、
+  `RECLAIM_LOCK_AFTER_CRASH=present`、`NEXT_DISPATCH=REJECT_EEXIST`。
+  🔴 **最壞後果＝單一 `<out>` 路徑暫時不可用，不會雙 CLI 並存、不會漏放真派工** ⇒ 非 deliverable-invalidating。
+  **TODO 須落為運維項**（擇一，實作者定）：(a) 清 orphan reclaim 的運維腳本；
+  (b) reclaim lock 加 TTL／lease（owner token＋pid＋時間戳）＋受保護的 stale-reclaim CAS；
+  (c) 改用 crash 時自動釋放的 `flock`。
+  **TODO §0 須明文標「reclaim 孤兒回收未實作 ⇒ 需人工清理」**，不得宣稱 lock 機制全綠。
 - **原 Phase 4（`B-24` 機械強制面）：移出本批** — 依 `D-6` SPLIT 裁決，理由與 grandfather 三要件（具名 owner／UTC 到期日／到期後 fail-closed 行為）已記於 `handoffs/20260801-GOV-AMEND-BACKLOG.md` 的「`票 B-24` 的拆分裁決」節，不隨拆分遺失。
