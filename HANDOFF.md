@@ -1,53 +1,53 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-05 09:0x | **Branch**: main（`ee71585` 已 push）
-**狀態**: 🔵 **第 0 批 SPEC R5 已收斂 → 主委須修兩個 P0 → 開 R6（窄確認輪）**
+**Agent**: Claude(Opus 5) | **Time**: 2026-08-05 10:0x | **Branch**: main（`1e60553`）
+**狀態**: 🟢 **第 0 批規格階段收斂完成（R7 三家戳記 APPROVED）→ 下一步＝TODO 生成**
 
-## ▶ 立即接手：修 SPEC 的兩個 P0，然後開 R6
+## ▶ 立即接手：生成 TODO
 
-**R5 兩家獨立實跑後結論一致**（codex 先提，composer 補派輪改判同意）：
-`G-3`～`G-6` **CLOSED**（四條皆有 receipt）；`G-1`／`G-2` **NOT-CLOSED**，各一個 P0 機制缺口。
-出場判準「findings ≤5 且新 P0 <2」→ findings=2 ✓、P0=2 ✗ ⇒ **開 R6**。
+SPEC `docs/GOVB0_FRICTION_SPEC.md` 已凍結可用（`template_check` rc=0、Task 11、FACT-RECEIPT 10）。
+收斂檔 `handoffs/reconcile/20260805-govb0-spec-r7/synth.md` 三家 APPROVED，
+sha `b502bac9…0f82fa4bd`。**無 OPEN 債**。
 
-**P0-1（Task 2.0 契約第 10 項）**：起點 regex `<<[-]?[[:space:]]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1`
-只吃識別字，但 **`EOF-1` 是合法 shell delimiter**。不匹配 ⇒ 不開 span ⇒ 掃描器改在 body 內的
-`<<INNER` 開 span ⇒ **吞掉 `EOF-1` 終止行與其後的真派工**。codex 實跑 `ATTACK_EXECUTED` 而掃描器 `ALLOW`。
-**修法**：補「合法 `<<` 但 delimiter 無法按契約解析 ⇒ 整段 fail-closed」，或把 grammar 擴至 shell word＋quote removal；
-語料補 `EOF-1`／quoted `EOF-1`／body 內假 marker／delimiter 後外部派工的 TP/TN。
+**TODO 生成用** `templates/TODO_GENERATION_PROMPT.md`。🔴 **§0 必須明文載入下列三項**，否則失真：
 
-**P0-2（Task 3.2 lock）**：SPEC 全文無 `O_EXCL`／`flock`／`mkdir`／`TOCTOU`（`rg` rc=1）。
-owner-safe release 只防「舊 owner 解新鎖」，**擋不住兩個 dispatcher 同時通過空檢查**。
-codex barrier 模擬 `A:START`＋`B:START` 皆啟動。
-**修法**：launch 前以每個 `<out>` 的原子 exclusive create（`mkdir` lock dir 或 `O_CREAT|O_EXCL`）取得 ownership，
-失敗者重讀 lock 後拒絕；加 deterministic barrier race test；process-discovery／lock-create 任一錯誤 fail-closed。
+1. **`B-24` 部分完成** —— 紀律面隨本批交付、機械強制面已 SPLIT 移出，code review 不得宣稱 `B-24` 全綠。
+2. **reclaim 孤兒回收未實作 ⇒ 需人工清理**（R7 殘留 `H-2`），不得宣稱 lock 機制全綠。
+   修法三擇一由實作者定：(a) 清 orphan 運維腳本 (b) reclaim lock 加 TTL／lease＋受保護 CAS (c) 改用 `flock`。
+3. **timeout 未達定稿門檻時標 `PROVISIONAL`**（每家族 ≥50 筆＋≥3 個不同 session／UTC 日期），
+   且 Task 3.3 不得宣稱完工、`票 B-14` 不得標定稿。
 
-**R6 範圍（窄）**：只確認上述兩個缺口已補入 SPEC 並附 heredoc bypass ＋ barrier race 兩組測試。
-**不重開** `E-SCOPE`／措辭／命名／已接受殘留。
+之後：實作（Grok，見 ORCH §1 現行分工行）→ **雙家族 code review**（非實作者兩家）。
 
-## 產出位置
+## 七輪收斂軌跡（規格階段已結束，勿重開）
 
-- SPEC `docs/GOVB0_FRICTION_SPEC.md`（R5 版，`template_check` rc=0、Task 11、FACT-RECEIPT 10）
-- R5 報告 `handoffs/20260805-govb0-spec-r5-{codex,composer}.md`（composer 那份 **format-failed 但內容完整**）
-- R4 收斂 `handoffs/reconcile/20260805-govb0-spec-r4/synth.md`（三家 APPROVED，sha `ae304eeb…f88b3fa`）
-- 白話日誌 `handoffs/20260804-治理進度-白話日誌.md`｜票 `handoffs/20260801-GOV-AMEND-BACKLOG.md`（37 張）
+`R1 19(5 P0) → R2 17(7 P0) → R3 11(3 P0) → R4 8(2 P0) → R5 2(2 P0) → R6 3(2 P0) → R7 4(0 P0)`
 
-## 🔴 本日新增／升級的票
+R7 為 P0-1／P0-2 的**最後一輪**（brief 明文終止條件）。兩家在互不相見下收斂到同樣兩條殘留。
+🔴 **`E-SCOPE` 四項＋`B-36` ID 錯位＋R7 兩條殘留（`H-1`／`H-2`）皆已具名寫入 SPEC §N，不得在實作階段重開。**
 
-`B-37`（新，0.9 批）票的優先順序無數據依據；硬前置＝第 0 批 Phase 0。
-`B-31`（**嚴重度上調**）連兩輪 format-failed 且 **prompt 層警告實測無效**；追加修法 ④⑤，建議第 1 批與 `B-19` 同批。
+## 🔴 本日票異動
+
+`B-37`（新，0.9 批）票的優先順序無數據依據；硬前置＝Phase 0。
+`B-38`（新，第 1 批）委員回報 0 findings 反而無法正規銷帳 ⇒ 推高 ABANDONED 比率；
+　　　修法建議的 `FINDINGS_COUNT` 欄位**同時能解 `B-35`**（截斷偵測）⇒ 兩票應合併評估。
+`B-31`（嚴重度上調）連兩輪 format-failed 且 **prompt 層警告實測無效**；追加修法 ④⑤。
+票數 **38**、待辦 **30**；三份文件同步，票號雙向對帳差集空。
 
 ## ⚠️ 坑（照做省時間）
 
-- **`##` 只准是 canonical finding ID**。`completeness_check` 把每個 `##` 當 finding 候選，不符即整份 format-failed。
-  **brief 不可同時要求「canonical `##`」與「逐條各一段」**——會誘導委員違規（本日踩 2 次，`B-31`／`B-32`）。
+- **`##` 只准是 canonical finding ID**；brief **不可同時要求「canonical `##`」與「逐條各一段」**（會誘導違規）。
+  有效作法＝**明列本輪允許的 `##` 清單＋要求用表格**（移除誘因，非警告誘因；R6/R7 實測有效）。
+- 委員若零 findings，請要求其明寫 `FINDINGS_COUNT: 0`（否則 completeness 判 FAIL，見 `B-38`）。
 - **brief 改了就不能同輪重派**（`brief_sha256` 不符）⇒ 只能棄輪重開。
-- **commit 訊息是零豁免路徑**：operational claim 須 `VERIFY:<receipt-id>` ＋ **可解析 scope**
-  （`_extract_scope` 只認 node-id／`test_*`／`tests/**.py`；markdown 路徑不算）或寫明 runtime 類別（`static`／`讀碼`）。
+- **commit 訊息零豁免**：operational claim 須 `VERIFY:<receipt-id>` ＋ 可解析 scope
+  （`_extract_scope` 只認 node-id／`test_*`／`tests/**.py`）**或**寫明 runtime 類別（`static`／`讀碼`）。
 - `VERIFY-EXEMPT` 合法類別**只有 6 個**：`typo`／`doc-example`／`migration-note`／`template-drift`／`tooling-blocked`／`spec-ambiguity`。
-- 委員產出交件後一律 `bash scripts/gate.sh register-output <task-id> <path>`，否則 claim checker 擋 commit。
-- **`rc` 禁經 pipe**；**禁 `python3 -c`**；`ts_stamp.log` 須 `LC_ALL=C grep -a`（且**禁 export**）。
-- 文件維護紀律：狀態文件**只留最新狀態與待辦**，過期的移除並封存 `Archived/`，**不得用附加註記堆疊**。
+- 委員產出交件後一律 `bash scripts/gate.sh register-output <task-id> <path>`。
+- 正規銷帳需 `sources.lock` 為 **review mode**：`reconcile_build.sh <session> --mode review --rebuild`（不接受委員檔參數）。
+- **`rc` 禁經 pipe**；**禁 `python3 -c`**；`ts_stamp.log` 須 `LC_ALL=C grep -a`（**禁 export**）。
+- 狀態文件**只留最新狀態與待辦**，過期的封存 `Archived/`，**不得用附加註記堆疊**。
 
 ## 後續順序
 
-第 0 批（R6 → TODO → 實作 Grok → 雙家族 review）→ **第 0.5 批 P1-6 線 C** → 0.9 批 `B-37` → 第 1 批。
+第 0 批（TODO → 實作 → 雙家族 review）→ **第 0.5 批 P1-6 線 C** → 0.9 批 `B-37` → 第 1 批（`B-19`／`B-29`／`B-31`／`B-38`）。
