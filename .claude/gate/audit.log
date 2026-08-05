@@ -34158,3 +34158,22 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-spec-r7-codex.md", "output_sha256": "7639d0454a3818981d3d4929750e809d02817bc94df85f7855927e7f04dabb35", "task_id": "GOVB0-SPEC-R7", "ts": "2026-08-05T02:07:21Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-spec-r7-composer.md", "output_sha256": "c3b7b903fc30d75bc21c51ed7753bab99ecb89db511eda37e054646dde8cc327", "task_id": "GOVB0-SPEC-R7", "ts": "2026-08-05T02:07:21Z"}
 {"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "d12823f7-5089-4fb9-9013-c817395bc7d0", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "戳記輪不產 findings。三家 codex／composer／grok 皆 APPROVED，stamps_check rc=0、completeness --lock rc=0、template_check rc=0。本輪額外價值：codex 實跑驗證主委對允許清單八字元的判斷——各字元 stdout 為 VALUE 與 AFTER、rc=0，證實 delimiter 位置不做 tilde／brace／glob／history 展開，補入不引入 fail-open；且未加引號的 # 實跑為 syntax error rc=2，故主委不納入 # 被判保守正確。規格階段至此結束，下一步進 TODO 生成。", "round_id": "4205c6aa-c510-4ade-80ea-db1f4883e936", "schema_version": 1, "sequence": 723, "ts": "2026-08-05T02:07:31Z"}
+{"event":"gate_deny","ts":"2026-08-05T02:16:20Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-05T02:16:21Z","tool":"Bash","kind":"dispatch","reason":"token_expired"}
+{"event":"gate_deny","ts":"2026-08-05T02:24:28Z","tool":"Write","kind":"artifact","reason":"token_expired"}
+=== 2026-08-05 10:24:42 | artifact ===
+  ts=2026-08-05 10:24:42
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GOVB0_FRICTION_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0 全域規則與約束=filled（含三項必讀狀態宣告：B-24 部分完成／reclaim 孤兒需人工清理／timeout PROVISIONAL）; §B 批次執行策略=filled（B1-B7 七批含依賴與 Gate 命令）; 每 Task 驗證/邊界/存活至/覆蓋風險/不可做=filled（11 個 Task 全覆蓋）; §T 追溯表=filled（SPEC 11 Task 對 TODO 11 Task，附導出命令）; §R 回退=filled; §G Golden 狀態=N/A: 本批只動 scripts/ 治理腳本，不觸及 data_cache 或 golden 資料，無 golden 產物
+  spec=
+  todo=
+  manifest=
