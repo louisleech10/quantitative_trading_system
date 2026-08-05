@@ -18,7 +18,9 @@ R9 若派：brief 用 `handoffs/20260805-GOVB0-TODO-R8-BRIEF.md` 為樣板，
 
 - SPEC `docs/GOVB0_FRICTION_SPEC.md`：**R7 版**，七輪收斂，收斂檔三家戳記 sha `b502bac9…0f82fa4bd`。
 - TODO `docs/GOVB0_FRICTION_TODO.md`：**已修 9+6 條**，`template_check todo` rc=0，SPEC 11 Task == TODO 11 Task。
-- 白話版 `handoffs/20260805-第0批-白話版.md`（使用者要求，已 push）。
+- 🔴 **給使用者看的文件一律放 repo 根目錄 `白話說明/`，禁放 `handoffs/`**（使用者 2026-08-05 定）。
+  現有：`README.md`（入口＋當前進度）／`第0批-在做什麼.md`／`第0批-施工清單.md`／
+  `治理待辦總覽.md`／`治理進度日誌.md`。**每完成一個實作批次須更新 `README.md` 與施工清單的進度表。**
 - 收斂檔 `handoffs/reconcile/20260805-govb0-todo-r8/synth.md`（I-1～I-6，**已正規銷帳**）。
 - **無 OPEN 債。** 票數 **38**、待辦 **30**，三份文件同步、雙向對帳差集空。
 
