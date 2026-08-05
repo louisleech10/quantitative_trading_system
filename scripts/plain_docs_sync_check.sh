@@ -33,7 +33,14 @@ DIR="白話說明"
 [ -d "${DIR}" ] || { echo "[plain_docs_sync] 略過（無 ${DIR}/）"; exit 0; }
 
 # 受管檔（不含 Archived/；已封存者不再要求同步）
-MANAGED="README.md 第0批-施工清單.md 治理待辦總覽.md 第0批-在做什麼.md"
+#
+# 2026-08-05 晚間追加 治理進度日誌.md：
+#   初版刻意把它排除，理由是使用者說過「日誌我不會去看」。
+#   **兩天後它就真的斷了**——日誌停在規格 R4，其間走完 R5–R7＋TODO 三輪＋B0–B3，
+#   而本腳本一路回報全綠（因為它根本不在受管清單裡）。
+#   使用者主動察覺並質問「日誌和總覽你有沒打算要更新」⇒ 靠人眼補上了機器該擋的洞。
+#   「使用者不看」是**閱讀習慣**，不是「可以不維護」——兩者被初版混為一談。
+MANAGED="README.md 第0批-施工清單.md 治理待辦總覽.md 第0批-在做什麼.md 治理進度日誌.md"
 
 _watched_for() {
   # bash 3.2 無 declare -A ⇒ case 分派
@@ -41,6 +48,7 @@ _watched_for() {
     "README.md"|"第0批-施工清單.md") echo "scripts/ docs/GOVB0_ tests/governance/" ;;
     "治理待辦總覽.md")               echo "handoffs/20260801-GOV-AMEND-BACKLOG.md" ;;
     "第0批-在做什麼.md")             echo "docs/GOVB0_FRICTION_SPEC.md" ;;
+    "治理進度日誌.md")               echo "scripts/ docs/GOVB0_ tests/governance/" ;;
     *)                                echo "" ;;
   esac
 }
@@ -99,6 +107,31 @@ rc=0
 stale_n=0
 n_managed=0
 
+# ── 進度單一出處（2026-08-05 使用者：「有些更新有些又沒有，搞不清楚你在做什麼」）──
+# 事故：第0批-在做什麼.md 內含「現在進度」表，寫著「實作 ⬜ 還沒開始」時實際已完成 4 批。
+#   本腳本抓不到，因為該檔 WATCHED=規格（凍結後永不變動）。
+#   ⇒ 錯在「把會變的進度，塞進監看不會變之來源的檔」。
+# 不變式：**只有 WATCHED 含 scripts/ 的受管檔可以寫批次進度**（它們才會隨實作過期）。
+#   其餘受管檔出現進度表 ⇒ 該進度必然無人看管 ⇒ fail-closed。
+_has_progress_markers() {
+  grep -nE '批做完|^\| *實作 *\||^\| *驗收 *\|' "$1" 2>/dev/null
+}
+
+for name in ${MANAGED}; do
+  f="${DIR}/${name}"
+  [ -f "${f}" ] || continue
+  case "$(_watched_for "${name}")" in
+    *scripts/*) continue ;;                 # 進度合法持有者
+  esac
+  hits="$(_has_progress_markers "${f}")"
+  if [ -n "${hits}" ]; then
+    echo "ERROR: ${f} 含批次進度，但其 WATCHED 不含 scripts/ ⇒ 進度會過期且無人看管" >&2
+    echo "${hits}" | sed 's/^/    /' >&2
+    echo "    修：把進度移回 README.md／第0批-施工清單.md，本檔只留指標連結。" >&2
+    rc=2
+  fi
+done
+
 for name in ${MANAGED}; do
   f="${DIR}/${name}"
   n_managed=$((n_managed + 1))
@@ -134,7 +167,7 @@ for name in ${MANAGED}; do
   fi
 
   stale_n=$((stale_n + 1))
-  rc=1
+  [ "${rc}" -eq 2 ] || rc=1               # 硬錯（rc=2）不得被「過期」降級
   echo "[plain_docs_sync] ✗ 過期: ${f}" >&2
   echo "    其 WATCHED（${watched}）最後改動 ${last_w:0:8}，晚於本檔最後更新 ${last_f:0:8}" >&2
   echo "    WATCHED 的該次改動：" >&2

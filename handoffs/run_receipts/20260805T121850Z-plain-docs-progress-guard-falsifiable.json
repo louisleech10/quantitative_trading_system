@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260805T121850Z-plain-docs-progress-guard-falsifiable",
+  "claim_id": "plain-docs-progress-guard-falsifiable",
+  "command": [
+    "bash",
+    "scripts/plain_docs_guard_selftest.sh"
+  ],
+  "command_sha256": "c7625058063856c7f2b95f32c45a76c62de5e1a2c8e48c84561e7306a13a2859",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "fd6dc771f3e50afb8e000138219d5bbc4660a2e9",
+  "tree_dirty": true,
+  "started_at": "2026-08-05T12:18:49Z",
+  "ended_at": "2026-08-05T12:18:50Z",
+  "duration_seconds": 0.733472,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "bc6cf4722f9d8fc04208444046f1d88037b321cd2ccf8a78489de7fc9c24fc56",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "bc6cf4722f9d8fc04208444046f1d88037b321cd2ccf8a78489de7fc9c24fc56",
+  "log_path": "handoffs/run_receipts/20260805T121850Z-plain-docs-progress-guard-falsifiable.log",
+  "tail_excerpt": [
+    "PASS: 進度單一出處守衛可證偽（注入 rc=2／還原 rc=1）"
+  ]
+}
