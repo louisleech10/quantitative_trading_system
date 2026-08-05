@@ -34398,3 +34398,24 @@ ts=2026-08-04 23:10:15 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-b2-review-codex.md", "output_sha256": "6ce3fd3f510390af03a3d25e7f6a15068589886ea7713d33220ab2a6d852f287", "task_id": "GOVB0-B2-REVIEW", "ts": "2026-08-05T08:22:15Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-b2-review-composer.md", "output_sha256": "bbd929adb1051245b8dba38d740be11e3b10726a72a1d8e8f7a2ea4c69a6ab40", "task_id": "GOVB0-B2-REVIEW", "ts": "2026-08-05T08:22:15Z"}
 {"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "0f0ca691-7823-439c-9170-a3334ec062a9", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "code review 輪產出為審查意見；codex 2 條、composer 1 條，皆非阻塞、BLOCKING 為 0，B2 驗收通過可進 B3。本輪關鍵成果：兩家獨立推翻主委的假設三（替代測試等價於 snapshot 比對）——codex 明寫該假設不成立，理由為替代測試只驗現行程式行為、不驗改前改後一致，而後者才是本批核心保證。codex 另獨立復跑全套得 727 passed（264.28s，非採信實作者的 235.69s）並驗證語料 A 對現行 match_rule 的覆蓋宣稱屬實。三條 finding 皆排入 B3 之前修：快照缺依賴致 fresh-token 路徑無法比對（兩家同提，且 B5 差異報表即用該快照，為 Phase 2 合併關卡）、closure 分支與 prompt 格式對正則的綁定缺可證偽 mutation（廉價綠燈）。", "round_id": "aea9ccf2-934b-464c-9239-c0a510c97f55", "schema_version": 1, "sequence": 754, "ts": "2026-08-05T08:22:33Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260805-govb0-todo-r9/synth.md", "output_sha256": "d983a3a274bf24b0c5817c79035f5669bfe1bc672322153299972e7d8e272880", "task_id": "GOVB0-FIX-ORACLE", "ts": "2026-08-05T08:31:26Z"}
+=== 2026-08-05 16:31:27 | dispatch ===
+  ts=2026-08-05 16:31:27
+  kind=dispatch
+  intent=修 B2 review 三條 finding，把驗收 oracle 補到不缺東西
+  risk=high
+  facts_asked=分支對照表窮舉、snapshot 修法與 sha 證明、語料 A 全覆蓋斷言、三個 mutation 實跑 rc、pytest 總數
+  review_role=implementer，範圍限修 oracle，不得動 B3 以後 Task
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  reconcile=handoffs/reconcile/20260805-govb0-todo-r9/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/GOVB0_FRICTION_SPEC.md
+  todo=docs/GOVB0_FRICTION_TODO.md
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260805-GOVB0-FIX-ORACLE-BRIEF.md", "brief_sha256": "72bc49b594a6380259b7e87aabe504c3dcbc898920427dee7c2d7b72b4860f35", "brief_sha256_norm": "72bc49b594a6380259b7e87aabe504c3dcbc898920427dee7c2d7b72b4860f35", "event": "committee_round_open", "event_id": "f0291329-5c18-4e3f-b5b9-b963737fa5fa", "expected_outputs": {"grok": "handoffs/20260805-govb0-fix-oracle-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["grok"], "producer": "audit_append.sh", "quorum_eligible": ["grok"], "round_id": "e34cb104-42ba-4a2f-9d15-b60a464e018e", "schema_version": 1, "sequence": 755, "session_name": "20260805-govb0-fix-oracle", "task_id": "GOVB0-FIX-ORACLE", "ts": "2026-08-05T08:31:27Z"}
+{"actor": "cx_run", "attempt_id": "a4eaa726-2710-4ff7-9e0c-ba89dc98f4b5", "cli_rc": "0", "event": "committee_family_result", "event_id": "410bd96c-1bb6-4872-b52a-e67e1c1cbaad", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260805-govb0-fix-oracle-grok.md", "output_sha256": "e7d8785a7101229c58fdbbde00df40362678b12410a073491f36a7674d4e48b7", "producer": "audit_append.sh", "result_state": "success", "round_id": "e34cb104-42ba-4a2f-9d15-b60a464e018e", "schema_version": 1, "sequence": 756, "ts": "2026-08-05T08:45:20Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260805-govb0-fix-oracle-grok.md", "output_sha256": "e7d8785a7101229c58fdbbde00df40362678b12410a073491f36a7674d4e48b7", "task_id": "GOVB0-FIX-ORACLE", "ts": "2026-08-05T08:47:06Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "85ab59a2-b61e-4229-8b7a-1c542323cde8", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "實作輪產出為程式碼與測試，結構上無 findings 可收集。實質完整：三條 review finding 全數修畢。修 1 快照改為目錄 bundle 含 4 檔各自 sha256 sidecar，主委獨立算出 bundle 內 gate_check.sh 的 sha256 等於 596fcb4 上一版之值 871258c9…1606a，pre-Phase2 狀態成立；實作者另主動釘住 audit_events.json 舊版，理由為舊 gate 配新 registry 為錯誤比較，此點主委原未想到。修 2 產出 13 分支對照表，語料 A 由 28 增至 30，覆蓋斷言自 gate_check 機械導出且含反向檢查防止標記假分支充數，INVARIANCE 未轉紅代表 B1 與 B2 未改判定。修 3 三個 mutation 全數實跑通過。測試 727 至 734 passed。兩個具名缺口已明列：需拔 jq 環境的 parse fail-open 路徑、以及 outer_script 與 role_gate 兩枚舉值尚未賦值屬 Phase 2 預留。", "round_id": "e34cb104-42ba-4a2f-9d15-b60a464e018e", "schema_version": 1, "sequence": 757, "ts": "2026-08-05T08:47:06Z"}

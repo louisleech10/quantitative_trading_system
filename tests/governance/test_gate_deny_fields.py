@@ -18,12 +18,32 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GATE_CHECK = REPO_ROOT / "scripts" / "gate_check.sh"
-SNAPSHOT = (
+# B0 snapshot 目錄（option a）：gate_check.sh ＋ 執行期依賴，各檔各自 .sha256
+SNAPSHOT_DIR = (
+    REPO_ROOT
+    / "tests"
+    / "governance"
+    / "fixtures"
+    / "gate_check_pre_phase2"
+)
+SNAPSHOT = SNAPSHOT_DIR / "gate_check.sh"
+# 舊路徑（單檔）仍保留 byte-identical 副本，供 B5 / TODO 路徑相容
+SNAPSHOT_LEGACY = (
     REPO_ROOT
     / "tests"
     / "governance"
     / "fixtures"
     / "gate_check_pre_phase2.sh.snapshot"
+)
+# Phase 2 動工前 gate_check.sh 的已知 sha（596fcb4^；不可變）
+PRE_PHASE2_GATE_CHECK_SHA256 = (
+    "871258c9ea2e6817b0110e7efedcca6847ba196e9ffb3f7151f57adabe01606a"
+)
+SNAPSHOT_BUNDLE_FILES = (
+    "gate_check.sh",
+    "_debt_ledger_core.py",
+    "debt_ledger.sh",
+    "audit_events.json",
 )
 REGISTRY = REPO_ROOT / "scripts" / "audit_events.json"
 CORPUS_A = (
@@ -87,10 +107,26 @@ def _parse_setup_directive(raw: str) -> dict[str, str] | None:
     return out or None
 
 
+def _parse_branch_directive(raw: str) -> str | None:
+    """解析 `# @branch allow_fresh_no_debt` → id。"""
+    s = raw.strip()
+    if not s.startswith("#"):
+        return None
+    body = s.lstrip("#").strip()
+    if not body.startswith("@branch"):
+        return None
+    bid = body[len("@branch") :].strip().split()[0] if body[len("@branch") :].strip() else ""
+    return bid or None
+
+
 def _load_corpus_entries(path: Path) -> list[tuple[dict[str, str], str]]:
-    """回傳 [(setup_dict, payload_json), ...]；setup 可為空 dict。"""
+    """回傳 [(setup_dict, payload_json), ...]；setup 可為空 dict。
+
+    setup 可含鍵 ``_branch``（來自 ``# @branch``），不影響 gate 子程序。
+    """
     out: list[tuple[dict[str, str], str]] = []
     pending: dict[str, str] = {}
+    pending_branch: str | None = None
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line:
@@ -99,10 +135,18 @@ def _load_corpus_entries(path: Path) -> list[tuple[dict[str, str], str]]:
             setup = _parse_setup_directive(line)
             if setup is not None:
                 pending = setup
+                continue
+            branch = _parse_branch_directive(line)
+            if branch is not None:
+                pending_branch = branch
             continue
         json.loads(line)  # 語料必須是合法 JSON
-        out.append((dict(pending), line))
+        meta = dict(pending)
+        if pending_branch is not None:
+            meta["_branch"] = pending_branch
+        out.append((meta, line))
         pending = {}
+        pending_branch = None
     assert out, f"corpus empty: {path}"
     return out
 
@@ -149,7 +193,10 @@ def _plant_open_debt(audit: Path) -> None:
 
 
 def _apply_setup(gate_dir: Path, setup: dict[str, str], debt_dir: Path) -> dict[str, str]:
-    """依 @setup 種 token／debt；回傳需併入 gate 子程序的 env。"""
+    """依 @setup 種 token／debt；回傳需併入 gate 子程序的 env。
+
+    忽略 ``_branch`` 等 harness 元資料鍵（不傳入 gate）。
+    """
     env_extra: dict[str, str] = {}
     token_spec = setup.get("token", "")
     debt_spec = setup.get("debt", "")
@@ -311,6 +358,178 @@ def _emittable_match_rules_from_gate_check() -> set[str]:
     return vals
 
 
+def _decision_branches_from_gate_check(path: Path = GATE_CHECK) -> dict[str, int]:
+    """自 gate_check.sh **結構**機械導出會產生 (rc, kind) 差異的判定分支。
+
+    禁硬編分支清單：每個 id 必須在源碼中有可定位錨點；錨點漂移 → 本函式 assert 失敗。
+    搜尋範圍限主判定段（``INPUT="$(cat)"`` 之後），避免命中 deny 後的 match_info 鏡像正則。
+    回傳 ``{branch_id: 1-based line_no}``。
+    """
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    marker = 'INPUT="$(cat)"'
+    assert marker in text, "gate_check 主判定段錨點 INPUT= 漂移"
+    main_off = text.index(marker)
+    main = text[main_off:]
+    found: dict[str, int] = {}
+
+    def _first_line(pattern: str, *, flags: int = 0) -> int:
+        m = re.search(pattern, main, flags)
+        assert m, f"gate_check 判定錨點漂移: {pattern!r}"
+        # 絕對行號 = marker 之前行數 + main 內相對行
+        return text[: main_off].count("\n") + main[: m.start()].count("\n") + 1
+
+    # kind 指派 / 通道
+    found["deny_task_no_token"] = _first_line(
+        r'case "\$tool_name" in\s+Task\)\s+kind="dispatch"',
+        flags=re.DOTALL,
+    )
+    # 源碼字面： (codex|cursor-agent|grok|agy)[[:space:]]
+    found["deny_bash_family_cli"] = _first_line(
+        r"\(codex\|cursor-agent\|grok\|agy\)\[\[:space:\]\]"
+    )
+    # 源碼字面： claude[^|]*(-p|--print)（判定段 executor 正則內）
+    found["deny_bash_claude_agent"] = _first_line(
+        r"claude\[\^\|\]\*\(-p\|--print\)"
+    )
+    # 源碼字面： scripts/gate(_check)?\.sh
+    found["allow_gate_self"] = _first_line(r"scripts/gate\(_check\)\?\\.sh")
+    found["deny_env_strip_family"] = _first_line(
+        r"\^\[A-Za-z_\]\[A-Za-z0-9_\]\*="
+    )
+    # 分隔符後 executor：與 family_cli 同條判定正則的 command-position 前綴
+    found["deny_sep_family"] = _first_line(
+        r"\(\^\|\[;&\|\]\[\[:space:\]\]\*\)\(codex\|cursor-agent\|grok\|agy\)"
+    )
+    found["deny_write_artifact"] = _first_line(r'kind="artifact"')
+    found["allow_write_existing"] = _first_line(
+        r'\[ -f "\$fp" \] \|\| kind="artifact"'
+    )
+    # filename false-positive：註解錨「避免誤擋」
+    found["allow_filename_fp"] = _first_line(r"避免誤擋")
+    # kind 空放行
+    found["allow_nongated"] = _first_line(r'\[ -z "\$kind" \] && exit 0')
+    # token / recheck
+    found["allow_fresh_no_debt"] = _first_line(
+        r"if _gate_check_recheck_debt; then\s+exit 0",
+        flags=re.DOTALL,
+    )
+    found["deny_open_debt"] = _first_line(r'deny_reason="open_debt"')
+    found["deny_token_expired"] = _first_line(r'deny_reason="token_expired"')
+
+    n = len(lines)
+    for bid, ln in found.items():
+        assert 1 <= ln <= n, f"branch {bid} line {ln} out of range 1..{n}"
+    return found
+
+
+def _corpus_a_branch_ids(path: Path = CORPUS_A) -> set[str]:
+    """語料 A 中所有 ``# @branch`` 標籤集合。"""
+    ids: set[str] = set()
+    for setup, _payload in _load_corpus_entries(path):
+        bid = setup.get("_branch")
+        if bid:
+            ids.add(bid)
+    return ids
+
+
+def test_01_snapshot_bundle_integrity() -> None:
+    """B0 snapshot 目錄含 gate_check + debt 依賴，各 .sha256 吻合；gate_check 仍為 pre-Phase2。"""
+    assert SNAPSHOT_DIR.is_dir(), f"snapshot 目錄缺失: {SNAPSHOT_DIR}"
+    assert SNAPSHOT.is_file(), f"snapshot gate_check 缺失: {SNAPSHOT}"
+    for name in SNAPSHOT_BUNDLE_FILES:
+        body = SNAPSHOT_DIR / name
+        side = SNAPSHOT_DIR / f"{name}.sha256"
+        assert body.is_file(), f"bundle 缺檔: {name}"
+        assert side.is_file(), f"bundle 缺 sha256: {name}.sha256"
+        actual = _file_sha256(body)
+        expected = side.read_text(encoding="utf-8").strip().split()[0]
+        assert actual == expected, f"{name} sha256 不符 sidecar: {actual} != {expected}"
+    # gate_check 不可變：必須等於 Phase 2 動工前狀態
+    gate_sha = _file_sha256(SNAPSHOT)
+    assert gate_sha == PRE_PHASE2_GATE_CHECK_SHA256, (
+        f"snapshot gate_check sha 漂移: {gate_sha} != {PRE_PHASE2_GATE_CHECK_SHA256}"
+    )
+    # 舊路徑 byte-identical（B5 / TODO 路徑相容）
+    assert SNAPSHOT_LEGACY.is_file(), "legacy snapshot 路徑缺失"
+    assert _file_sha256(SNAPSHOT_LEGACY) == PRE_PHASE2_GATE_CHECK_SHA256
+    legacy_side = Path(str(SNAPSHOT_LEGACY) + ".sha256")
+    assert legacy_side.is_file()
+    assert legacy_side.read_text(encoding="utf-8").strip().split()[0] == PRE_PHASE2_GATE_CHECK_SHA256
+
+
+def test_01_snapshot_fresh_no_debt_allow(tmp_path: Path) -> None:
+    """修 1 核心：bundled snapshot 在 fresh+no-debt 下可真正放行（非 fail-closed）。"""
+    gate_dir = tmp_path / "g"
+    gate_dir.mkdir()
+    token = gate_dir / "dispatch.token"
+    token.write_text("fresh\n", encoding="utf-8")
+    debt_audit = tmp_path / "debt_audit.log"
+    debt_audit.write_text("", encoding="utf-8")
+    env_extra = {
+        "GOVERNANCE_TEST_HARNESS": "1",
+        "DEBT_AUDIT_OVERRIDE": str(debt_audit),
+    }
+    proc = _run_gate(
+        '{"tool_name":"Task"}',
+        gate_dir=gate_dir,
+        script=SNAPSHOT,
+        env_extra=env_extra,
+    )
+    assert proc.returncode == 0, (
+        f"bundled snapshot 應放行 fresh+no-debt，got rc={proc.returncode}\n"
+        f"stderr={proc.stderr}"
+    )
+
+
+def test_01_mut_snapshot_missing_debt_dep_turns_fresh_allow_red(tmp_path: Path) -> None:
+    """修 1 mutation：抽掉 _debt_ledger_core.py（與 debt_ledger.sh）→ fresh+no-debt 轉紅。"""
+    mut_dir = tmp_path / "snap_mut"
+    shutil.copytree(SNAPSHOT_DIR, mut_dir)
+    (mut_dir / "_debt_ledger_core.py").unlink()
+    (mut_dir / "debt_ledger.sh").unlink()
+    mut_script = mut_dir / "gate_check.sh"
+    mut_script.chmod(mut_script.stat().st_mode | 0o111)
+
+    gate_dir = tmp_path / "g"
+    gate_dir.mkdir()
+    (gate_dir / "dispatch.token").write_text("fresh\n", encoding="utf-8")
+    debt_audit = tmp_path / "debt_audit.log"
+    debt_audit.write_text("", encoding="utf-8")
+    env_extra = {
+        "GOVERNANCE_TEST_HARNESS": "1",
+        "DEBT_AUDIT_OVERRIDE": str(debt_audit),
+    }
+    proc = _run_gate(
+        '{"tool_name":"Task"}',
+        gate_dir=gate_dir,
+        script=mut_script,
+        env_extra=env_extra,
+    )
+    # 缺依賴 → fail-closed rc!=0；與「應放行」對立 → 斷言轉紅語意
+    allow_oracle_green = proc.returncode == 0
+    assert not allow_oracle_green, (
+        "MUTATION 未使 fresh+no-debt 放行斷言轉紅：缺依賴後仍 rc=0"
+    )
+
+
+def test_01_corpus_a_covers_decision_branches() -> None:
+    """修 2：語料 A 覆蓋 gate_check 機械導出的每一個判定分支至少一條。
+
+    分支清單自 gate_check.sh 結構導出（非硬編）；語料以 ``# @branch`` 標籤對應。
+    """
+    catalog = _decision_branches_from_gate_check(GATE_CHECK)
+    tagged = _corpus_a_branch_ids(CORPUS_A)
+    missing = set(catalog) - tagged
+    assert not missing, (
+        f"語料 A 未覆蓋判定分支: {sorted(missing)}; "
+        f"catalog={sorted(catalog)}; tagged={sorted(tagged)}"
+    )
+    # 反向：語料標籤不得憑空發明（防拼錯）
+    extra = tagged - set(catalog)
+    assert not extra, f"語料 A @branch 不在 gate_check 導出集合: {sorted(extra)}"
+
+
 def test_01_corpus_a_covers_match_rule_closed_set(tmp_path: Path) -> None:
     """語料 A 覆蓋 match_rule 封閉集合中每一個**現行可發出**值至少一次。
 
@@ -408,7 +627,7 @@ def test_01_cmd_fields_value_equal_full_command(tmp_path: Path) -> None:
 def test_01_fresh_token_allow_when_no_open_debt(tmp_path: Path) -> None:
     """fresh token + 無 OPEN 債 → 放行（gate_check.sh:196-199）。
 
-    不進語料 A（snapshot SCRIPT_DIR 無法載入 debt core，見 corpus 註解）。
+    現行腳本路徑煙霧；完整改前改後由語料 A ``allow_fresh_no_debt`` + INVARIANCE 覆蓋。
     """
     gate_dir = tmp_path / "g"
     gate_dir.mkdir()

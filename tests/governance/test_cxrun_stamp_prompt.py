@@ -285,6 +285,40 @@ def test_11_stamp_prompt_has_stamp_and_format(tmp_path: Path) -> None:
     assert f"你的 task-id={task_id}" in prompt
 
 
+def test_11_closure_prompt_has_stamp_and_format(tmp_path: Path) -> None:
+    """CODEX-R11-P1-02：brief_kind=closure → 與 stamp 同屬注入分支，prompt 含 RECONCILE-STAMP 與格式說明。"""
+    h = _harness(tmp_path)
+    task_id = "GOVB0-T11-CLOSURE"
+    brief_rel = "handoffs/brief.md"
+    _write_brief(h, kind="closure")
+    rid = "c2222222-2222-4222-8222-2222222222aa"
+    _open_round(
+        h,
+        round_id=rid,
+        session="s-t11-closure",
+        fams=["codex"],
+        out_prefix="handoffs/t11cl",
+        brief_rel=brief_rel,
+        task_id=task_id,
+    )
+    capture = h["root"] / "prompt.capture"
+    r = _run_cx(
+        h,
+        "codex",
+        brief_rel,
+        "handoffs/t11cl-codex.md",
+        round_id=rid,
+        env_overlay={"CX_PROMPT_CAPTURE": str(capture)},
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    prompt = capture.read_text(encoding="utf-8")
+    assert "RECONCILE-STAMP" in prompt
+    assert "RECONCILE-STAMP 的 task:" in prompt
+    assert "非 ## 標題" in prompt or "非 ##" in prompt
+    assert "sha256:" in prompt and "task:" in prompt
+    assert f"你的 task-id={task_id}" in prompt
+
+
 def test_11_unknown_rc_nonzero(tmp_path: Path) -> None:
     """TEST-1.1-UNKNOWN：brief_kind=unknown → rc!=0。"""
     h = _harness(tmp_path)
@@ -392,11 +426,45 @@ def test_11_unknown_cx_case_defense(tmp_path: Path) -> None:
     assert "unknown brief-kind" in out or "bogus" in out, out
 
 
+def _stamp_py_regex_from_cx(cx_text: str, *, fam: str, body_hash: str, task_id: str) -> str:
+    """把 cx_run.sh 的 RECONCILE-STAMP ERE 轉成 Python re 字串（已代入 fam/hash/task）。"""
+    raw_re = _extract_stamp_regex_from_cx(cx_text)
+    bash_re = raw_re
+    for var, val in (
+        ("${fam_e}", re.escape(fam)),
+        ("${hash_e}", re.escape(body_hash)),
+        ("${task_e}", re.escape(task_id)),
+    ):
+        bash_re = bash_re.replace(var, val)
+    return bash_re.replace("[[:space:]]", r"\s")
+
+
+def _format_bound_samples(fam: str, body_hash: str, task_id: str) -> list[str]:
+    """依 prompt 格式說明構造的合法樣本（兩種欄位序）＋一個正則必拒的壞樣本。"""
+    ok_sha_first = (
+        f"RECONCILE-STAMP: {fam} APPROVED 2026-08-05 "
+        f"sha256:{body_hash} task:{task_id}"
+    )
+    ok_task_first = (
+        f"RECONCILE-STAMP: {fam} APPROVED 2026-08-05 "
+        f"task:{task_id} sha256:{body_hash}"
+    )
+    # 正則不接受：缺冒號後空白／缺 sha256: 前綴
+    bad = f"RECONCILE-STAMP {fam} APPROVED 2026-08-05 hash={body_hash} tid={task_id}"
+    return [ok_sha_first, ok_task_first, bad]
+
+
 def test_11_format_ssot(tmp_path: Path) -> None:
-    """TEST-1.1-FORMAT-SSOT：合法戳記樣本同時通過 prompt 格式說明與 cx_run.sh 正則。"""
+    """TEST-1.1-FORMAT-SSOT：合法戳記樣本同時通過 prompt 格式說明與 cx_run.sh 正則。
+
+    綁定（非僅「兩者都存在」）：
+    - 依格式說明構造的兩種欄位序樣本 → 正則必須接受
+    - 故意違反正則的壞樣本 → 正則必須拒絕
+    """
     h = _harness(tmp_path)
     task_id = "GOVB0-T11-FORMAT"
     body_hash = "a" * 64
+    fam = "codex"
     (h["handoffs"] / "target.md").write_text("body\n\n## 戳記\n\n", encoding="utf-8")
     brief_rel = "handoffs/brief.md"
     _write_brief(h, kind="stamp", stamp_target="handoffs/target.md")
@@ -405,7 +473,7 @@ def test_11_format_ssot(tmp_path: Path) -> None:
         h,
         round_id=rid,
         session="s-t11-fmt",
-        fams=["codex"],
+        fams=[fam],
         out_prefix="handoffs/t11f",
         brief_rel=brief_rel,
         task_id=task_id,
@@ -413,7 +481,7 @@ def test_11_format_ssot(tmp_path: Path) -> None:
     capture = h["root"] / "prompt.capture"
     r = _run_cx(
         h,
-        "codex",
+        fam,
         brief_rel,
         "handoffs/t11f-codex.md",
         round_id=rid,
@@ -421,38 +489,26 @@ def test_11_format_ssot(tmp_path: Path) -> None:
     )
     assert r.returncode == 0, r.stdout + r.stderr
     prompt = capture.read_text(encoding="utf-8")
-    # prompt 格式說明要點
+    # prompt 格式說明要點（與 cx_run 注入句機械對齊）
     assert "RECONCILE-STAMP:" in prompt
     assert "APPROVED" in prompt
     assert "sha256:" in prompt
     assert "task:" in prompt
     assert "非 ##" in prompt
+    # 格式說明必須描述「可對調」——否則兩序樣本綁定不成立
+    assert "可對調" in prompt or "對調順序" in prompt
 
-    sample = (
-        f"RECONCILE-STAMP: codex APPROVED 2026-08-05 "
-        f"sha256:{body_hash} task:{task_id}"
-    )
-    # 與 prompt 說明機械一致：樣本含說明中的欄位序
-    assert "RECONCILE-STAMP:" in sample and "APPROVED" in sample
-    assert f"sha256:{body_hash}" in sample and f"task:{task_id}" in sample
+    ok_a, ok_b, bad = _format_bound_samples(fam, body_hash, task_id)
+    # 樣本自身符合格式說明中的欄位
+    for sample in (ok_a, ok_b):
+        assert "RECONCILE-STAMP:" in sample and "APPROVED" in sample
+        assert f"sha256:{body_hash}" in sample and f"task:{task_id}" in sample
 
     cx_text = (h["scripts"] / "cx_run.sh").read_text(encoding="utf-8")
-    raw_re = _extract_stamp_regex_from_cx(cx_text)
-    # 將 bash 變數占位換成字面（與 _maybe_register_stamp_output 執行時相同）
-    fam_e = re.escape("codex")
-    hash_e = re.escape(body_hash)
-    task_e = re.escape(task_id)
-    # 源碼正則含 ${fam_e} 等；抽出的是字面 ${fam_e}
-    bash_re = raw_re
-    for var, val in (
-        ("${fam_e}", fam_e),
-        ("${hash_e}", hash_e),
-        ("${task_e}", task_e),
-    ):
-        bash_re = bash_re.replace(var, val)
-    # bash ERE → python：[[:space:]] 保留（Python re 不認）；改寫
-    py_re = bash_re.replace("[[:space:]]", r"\s")
-    assert re.search(py_re, sample), f"樣本未通過 cx_run 正則:\n  re={py_re}\n  sample={sample}"
+    py_re = _stamp_py_regex_from_cx(cx_text, fam=fam, body_hash=body_hash, task_id=task_id)
+    assert re.search(py_re, ok_a), f"sha-first 樣本未通過 cx_run 正則:\n  re={py_re}\n  sample={ok_a}"
+    assert re.search(py_re, ok_b), f"task-first 樣本未通過 cx_run 正則:\n  re={py_re}\n  sample={ok_b}"
+    assert not re.search(py_re, bad), f"壞樣本不應通過正則:\n  re={py_re}\n  sample={bad}"
 
 
 # ---------------------------------------------------------------------------
@@ -502,6 +558,128 @@ def test_11_mut_unconditional_inject_turns_consult_red(tmp_path: Path) -> None:
     consult_oracle_green = prompt.count("RECONCILE-STAMP") == 0
     assert not consult_oracle_green, (
         "MUTATION 未使 CONSULT 轉紅：無條件注入後 prompt 仍無 RECONCILE-STAMP"
+    )
+
+
+def test_11_mut_remove_closure_from_inject_turns_red(tmp_path: Path) -> None:
+    """CODEX-R11-P1-02 mutation：把 closure 自 stamp|closure 注入分支移除 → closure 正向斷言轉紅。"""
+    h = _harness(tmp_path)
+    cx = h["scripts"] / "cx_run.sh"
+    text = cx.read_text(encoding="utf-8")
+    anchor = "    stamp|closure)"
+    assert anchor in text, "stamp|closure 注入分支錨點漂移"
+    # 僅 stamp 保留注入；closure 落入 unknown → 或改為走 consult 無 stamp
+    # 更精準：case 改 stamp-only，並讓 closure 走「完全不提 RECONCILE-STAMP」組
+    mutated = text.replace(anchor, "    stamp)", 1)
+    # 把 closure 併入 consult 無 stamp 組，避免 unknown fail-closed 阻斷 rc
+    consult_anchor = "    consult|review|impl|dext)"
+    assert consult_anchor in mutated, "consult 組錨點漂移"
+    mutated = mutated.replace(
+        consult_anchor, "    consult|review|impl|dext|closure)", 1
+    )
+    assert mutated != text
+    cx.write_text(mutated, encoding="utf-8")
+
+    task_id = "GOVB0-T11-MUT-CLOSURE"
+    brief_rel = "handoffs/brief.md"
+    _write_brief(h, kind="closure")
+    rid = "c7777777-7777-4777-8777-7777777777aa"
+    _open_round(
+        h,
+        round_id=rid,
+        session="s-t11-mut-cl",
+        fams=["codex"],
+        out_prefix="handoffs/t11mcl",
+        brief_rel=brief_rel,
+        task_id=task_id,
+    )
+    capture = h["root"] / "prompt.capture"
+    r = _run_cx(
+        h,
+        "codex",
+        brief_rel,
+        "handoffs/t11mcl-codex.md",
+        round_id=rid,
+        env_overlay={"CX_PROMPT_CAPTURE": str(capture)},
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    prompt = capture.read_text(encoding="utf-8")
+    # closure 正向斷言應轉紅：不再同時含 RECONCILE-STAMP 與格式說明
+    closure_oracle_green = (
+        "RECONCILE-STAMP" in prompt
+        and ("非 ## 標題" in prompt or "非 ##" in prompt)
+        and "sha256:" in prompt
+        and "task:" in prompt
+    )
+    assert not closure_oracle_green, (
+        "MUTATION 未使 closure 正向斷言轉紅：移除 closure 注入後 prompt 仍含格式說明"
+    )
+
+
+def test_11_mut_format_desc_incompatible_with_regex_turns_red(tmp_path: Path) -> None:
+    """CODEX-R11-P1-02 mutation：把 prompt 格式說明改成正則不接受的樣本 → 一致性斷言轉紅。"""
+    h = _harness(tmp_path)
+    cx = h["scripts"] / "cx_run.sh"
+    text = cx.read_text(encoding="utf-8")
+    # 錨點：格式說明整句（與 stamp|closure 分支）
+    old_fmt = (
+        'prompt="${prompt} 戳記須為單獨一行（非 ## 標題），格式：RECONCILE-STAMP: '
+        "<family> APPROVED <YYYY-MM-DD> sha256:<hash> task:<id>"
+        '（sha256 與 task 兩欄可對調順序）。"'
+    )
+    # 改成正則必拒的格式（無冒號、hash=/tid= 前綴）
+    new_fmt = (
+        'prompt="${prompt} 戳記須為單獨一行（非 ## 標題），格式：RECONCILE-STAMP '
+        "<family> APPROVED <YYYY-MM-DD> hash=<hash> tid=<id>"
+        '（不可對調）。"'
+    )
+    assert old_fmt in text, "格式說明錨點漂移"
+    cx.write_text(text.replace(old_fmt, new_fmt, 1), encoding="utf-8")
+
+    task_id = "GOVB0-T11-MUT-FMT"
+    body_hash = "b" * 64
+    fam = "codex"
+    (h["handoffs"] / "target.md").write_text("body\n\n## 戳記\n\n", encoding="utf-8")
+    brief_rel = "handoffs/brief.md"
+    _write_brief(h, kind="stamp", stamp_target="handoffs/target.md")
+    rid = "c6666666-6666-4666-8666-6666666666aa"
+    _open_round(
+        h,
+        round_id=rid,
+        session="s-t11-mut-fmt",
+        fams=[fam],
+        out_prefix="handoffs/t11mf",
+        brief_rel=brief_rel,
+        task_id=task_id,
+    )
+    capture = h["root"] / "prompt.capture"
+    r = _run_cx(
+        h,
+        fam,
+        brief_rel,
+        "handoffs/t11mf-codex.md",
+        round_id=rid,
+        env_overlay={"CX_PROMPT_CAPTURE": str(capture)},
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    prompt = capture.read_text(encoding="utf-8")
+    # 依**突變後**格式說明構造「說明合規」樣本
+    desc_sample = (
+        f"RECONCILE-STAMP {fam} APPROVED 2026-08-05 "
+        f"hash={body_hash} tid={task_id}"
+    )
+    # 說明合規：prompt 描述的關鍵 token 都在樣本裡
+    assert "hash=" in prompt and "tid=" in prompt
+    assert "hash=" in desc_sample and "tid=" in desc_sample
+
+    cx_text = cx.read_text(encoding="utf-8")
+    py_re = _stamp_py_regex_from_cx(
+        cx_text, fam=fam, body_hash=body_hash, task_id=task_id
+    )
+    # 一致性斷言：格式說明導出的樣本必須通過正則——mutation 後應為 False → 轉紅
+    binding_green = re.search(py_re, desc_sample) is not None
+    assert not binding_green, (
+        "MUTATION 未使格式說明↔正則綁定轉紅：壞格式說明導出的樣本仍通過正則"
     )
 
 

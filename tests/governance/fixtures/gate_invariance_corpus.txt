@@ -2,61 +2,89 @@
 # 格式：每行一筆 stdin JSON（給 gate_check.sh）；# 開頭為註解。
 # 可選 setup 指令（緊貼下一筆 JSON 生效，僅測試 harness 解讀，不入判定）：
 #   # @setup token=<kind>:<fresh|expired> [debt=<none|open>]
+# 可選 branch 標籤（緊貼下一筆 JSON；覆蓋度斷言讀取）：
+#   # @branch <id>
 # 基準＝Phase 0 改動前；改後 (rc, kind) 序列須逐項相等。
 # 本檔與語料 B（gate_decision_corpus.txt）獨立，sha256 必須不同。
 #
-# --- 出處索引（每條標明 gate_check.sh 分支）---
-# allow / 非 gated：Read／非 executor Bash → kind 空 → exit 0（:186）
-# Task 無 token → kind=dispatch（:157-158）deny no_fresh_token → match_rule=unknown
-# Bash family_cli（:170-174）→ kind=dispatch
-# Bash claude_agent（:170）→ kind=dispatch
-# Bash gate 自身排除（:173）→ exit 0
-# Write 非治理新檔／既有檔 → kind 空 → exit 0（:177-182）
-# Write 新 docs/*SPEC*.md → kind=artifact（:177-182）
-# @setup token expired → deny_reason=token_expired（:213）match_rule=token_expired
-# @setup token fresh debt=none → recheck 放行 exit 0（:196-199）
-# @setup token fresh debt=open → deny_reason=open_debt（:201）match_rule=open_debt
+# --- 出處索引（分支 id → gate_check.sh 結構錨點；行號以現行 scripts/gate_check.sh 為準）---
+# allow_nongated          :186  kind 空 → exit 0
+# deny_task_no_token      :157-158 Task → kind=dispatch；:189 no_fresh_token
+# deny_bash_family_cli    :170-174 executor → kind=dispatch
+# deny_bash_claude_agent  :170-171 claude -p/--print → kind=dispatch
+# allow_gate_self         :173 gate(_check)?.sh 排除 → exit 0
+# allow_filename_fp       :166-167 檔名子字串不設 kind → exit 0
+# deny_env_strip_family   :162-165 剝 env 後仍命中 executor
+# deny_sep_family         :171 分隔符後 executor
+# deny_write_artifact     :177-182 新 docs/*{SPEC,TODO,PLAN}*.md → kind=artifact
+# allow_write_existing    :181 既有檔不設 kind → exit 0
+# deny_token_expired      :213 deny_reason=token_expired
+# allow_fresh_no_debt     :196-199 recheck 通過 → exit 0
+# deny_open_debt          :201 deny_reason=open_debt
 #
+# @branch allow_nongated
 {"tool_name":"Read"}
+# @branch allow_nongated
 {"tool_name":"Bash","tool_input":{"command":"cat handoffs/foo.md"}}
+# @branch allow_nongated
 {"tool_name":"Bash","tool_input":{"command":"ls -la scripts/"}}
+# @branch allow_nongated
 {"tool_name":"Bash","tool_input":{"command":"grep -rn grok docs/MULTI_AGENT_ORCHESTRATION.md"}}
+# @branch deny_task_no_token
 {"tool_name":"Task"}
+# @branch deny_bash_family_cli
 {"tool_name":"Bash","tool_input":{"command":"codex exec -s workspace-write -o out.md prompt"}}
+# @branch deny_bash_family_cli
 {"tool_name":"Bash","tool_input":{"command":"cursor-agent -p --force prompt"}}
+# @branch deny_bash_family_cli
 {"tool_name":"Bash","tool_input":{"command":"grok -m grok-4.5 -p prompt"}}
+# @branch deny_bash_family_cli
 {"tool_name":"Bash","tool_input":{"command":"agy run something"}}
+# @branch deny_bash_claude_agent
 {"tool_name":"Bash","tool_input":{"command":"claude -p do something"}}
+# @branch deny_bash_claude_agent
 {"tool_name":"Bash","tool_input":{"command":"claude --print do something"}}
+# @branch deny_env_strip_family
 {"tool_name":"Bash","tool_input":{"command":"GATE_DIR_OVERRIDE=/tmp codex exec -s workspace-write prompt"}}
+# @branch deny_sep_family
 {"tool_name":"Bash","tool_input":{"command":"echo start; grok -m grok-4.5 -p prompt"}}
+# @branch deny_sep_family
 {"tool_name":"Bash","tool_input":{"command":"cat brief.md | codex exec -s workspace-write prompt"}}
+# @branch allow_gate_self
 {"tool_name":"Bash","tool_input":{"command":"bash scripts/gate_check.sh"}}
+# @branch allow_gate_self
 {"tool_name":"Bash","tool_input":{"command":"bash scripts/gate.sh dispatch"}}
+# @branch allow_nongated
 {"tool_name":"Bash","tool_input":{"command":"pgrep -fl 'codex exec|cursor-agent|grok '"}}
+# @branch allow_filename_fp
 {"tool_name":"Bash","tool_input":{"command":"cat handoffs/sp_codex.txt"}}
+# @branch allow_nongated
 {"tool_name":"Write","tool_input":{"file_path":"README.md","content":"x"}}
+# @branch allow_nongated
 {"tool_name":"Bash","tool_input":{"command":"git status --short"}}
-# Write gated artifact 分支（gate_check.sh:177-182）：新檔 docs/*SPEC*.md → kind=artifact
+# @branch deny_write_artifact
 {"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_INVARIANCE_SPEC.md","content":"x"}}
-# Write 既有治理檔：file 已存在 → 不設 kind → exit 0（同段 :181 `[ -f "$fp" ] ||`）
+# @branch allow_write_existing
 {"tool_name":"Write","tool_input":{"file_path":"docs/GOVB0_FRICTION_SPEC.md","content":"x"}}
-# Write 新 docs/*TODO*.md → kind=artifact
+# @branch deny_write_artifact
 {"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_INVARIANCE_TODO.md","content":"x"}}
-# Write 新 docs/*PLAN*.md → kind=artifact
+# @branch deny_write_artifact
 {"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_INVARIANCE_PLAN.md","content":"x"}}
-# token_expired（gate_check.sh:213）：過期 dispatch.token + Task
+# @branch deny_token_expired
 # @setup token=dispatch:expired
 {"tool_name":"Task"}
-# fresh token + OPEN 債 → open_debt（gate_check.sh:201）match_rule=open_debt
-# 註：fresh+debt=none 放行路徑不進語料 A——B0 snapshot 的 SCRIPT_DIR=fixtures/
-# 找不到 _debt_ledger_core.py，recheck 一律 fail-closed，與現行腳本在
-# DEBT_AUDIT_OVERRIDE 下的放行不可比（會弄紅 INVARIANCE）。放行另由單測覆蓋。
+# @branch allow_fresh_no_debt
+# @setup token=dispatch:fresh debt=none
+{"tool_name":"Task"}
+# @branch allow_fresh_no_debt
+# @setup token=artifact:fresh debt=none
+{"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_FRESH_NONE_SPEC.md","content":"x"}}
+# @branch deny_open_debt
 # @setup token=dispatch:fresh debt=open
 {"tool_name":"Task"}
-# fresh artifact token + open debt + Write 新 SPEC → open_debt / kind=artifact
+# @branch deny_open_debt
 # @setup token=artifact:fresh debt=open
 {"tool_name":"Write","tool_input":{"file_path":"docs/NO_SUCH_CORPUS_A_OPENDEBT_SPEC.md","content":"x"}}
-# Bash family_cli + expired token → token_expired（match_rule 優先 token_expired）
+# @branch deny_token_expired
 # @setup token=dispatch:expired
 {"tool_name":"Bash","tool_input":{"command":"codex exec hi"}}
