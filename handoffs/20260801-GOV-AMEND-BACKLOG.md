@@ -1805,6 +1805,37 @@ composer 的報告**格式完全合規**，判定為「兩項皆 CLOSED、可進
 它每次發作都強制一輪 abandon（該輪產出無法正規銷帳），且**與 `B-31` 的誠實性要求直接衝突**
 ——不修它，`B-31` 的警告等於把委員推進「誠實則卡住、捏造則通過」的兩難。
 
+### 🔴 開工前偵察發現：本票與 `GOV-NOFINDINGS-SENTINEL` 是同一件事的兩面（2026-08-07）
+
+**不得各自實作**——否則會造出第四種「0 findings」表達方式。
+
+| 票 | 管什麼 | 狀態 |
+|---|---|---|
+| **B-38**（本票） | 0 findings **無法正規銷帳**（收斂端） | OPEN |
+| `GOV-NOFINDINGS-SENTINEL` | sentinel 機制**存在但未被機器驗證**（`completeness` 接受空殼 `P3-00`，codex 四行 probe 實證 `DIRECT_RC=0`） | OPEN（見本檔 `:155`、`:612`） |
+
+**實測現況**：`grep -rn 'P3-00' templates/ scripts/` → **命中 0**
+⇒ sentinel 慣例**只寫在個別 brief 裡靠主委每次手寫**，未進模板、無機器強制。
+
+🔴 **主委已製造第三種格式（2026-08-06，`票 B-31`）**：
+`cx_run.sh` 的 prompt 現在教委員寫「本輪 0 findings」，**與既有 `P3-00` sentinel 慣例不一致**。
+今日 composer 照著寫了 `## 本輪 0 findings — 推理保留` ⇒ 收斂端不認得。
+
+**現存三種「0 findings」表達**：
+1. `P3-00` sentinel（舊慣例，手寫在 brief，未機器強制）
+2. 「本輪 0 findings」散文（主委 2026-08-06 寫進 prompt 模板）
+3. 什麼都不寫（多數情況）⇒ 直接 vacuous FAIL
+
+⇒ **本票的修法須先統一表達方式，再談收斂端如何接受**。
+建議 scope：**B-38 ＋ `GOV-NOFINDINGS-SENTINEL` 合併為單一票**，一併定契約（欄位／位置／驗證方式），
+並同步修 `cx_run.sh` prompt 與 `templates/`。
+🔴 **同時檢查是否連帶解 `票 B-35`**（報告截斷偵測）——若契約含「宣告 findings 數」，
+宣告值與實際抽出數不符即可偵測截斷，兩票可能一併關閉。
+
+⚠️ **既有測試契約**：`tests/governance/test_completeness_oracles.py:603`
+`assert cov["union_size"] > 0, "union 空 → vacuous 守衛，不算 PASS"`
+⇒ 修法**必然撞到這條**，須在設計階段決定如何處置（不得逕行改斷言）。
+
 ### 為何是制度缺陷
 
 1. 檢查器把「抽不到 ID」一律當**可疑**（原意是防「委員沒用 canonical 格式」），
