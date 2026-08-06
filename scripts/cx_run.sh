@@ -530,6 +530,31 @@ _prepare_and_run() {
       exit 1
       ;;
   esac
+  # 票 B-31：對「會跑格式檢查的 kind」追加交件前自檢指示。
+  # kind 集合須與 _run_format_check_if_needed 一致（review|consult|closure）——
+  # impl／stamp／dext 依契約無 canonical finding ID，加了會誤導委員去跑必然 vacuous 的檢查。
+  #
+  # 為何進 prompt 模板而非每份 brief 手寫（使用者定死「工具必須自帶強制機制，
+  # 不准靠紀律和記憶」）：2026-08-06 GOVB39-B1-CONSULT R1 兩家皆 format-failed
+  # （composer 缺 source_digest、grok 觸發 heading 誤判），主委在 R2 brief **手寫**
+  # 同一指示後兩家一次全過。手寫版靠主委每次記得，本層讓它恆常生效。
+  #
+  # 淨摩擦：新增成本＝委員每輪多跑一次秒級唯讀檢查；
+  # 省下＝一次 format-failed 的整份重跑（實測 composer 約 15 分鐘，見票 B-31 事故欄）。
+  # --family 必須帶：交件檢查是 `--single "${out}" --family "${fam}"`（見 _run_format_check_if_needed）。
+  # 不帶時 extract_heading_ids 改由檔名推 family，慣例路徑 handoffs/*-<family>.md 下行為等價，
+  # 但產出路徑不含家族後綴時自檢會**弱於**交件（自檢過、交件仍 format-failed）
+  # ⇒ 破壞「先跑等於預跑」的前提。〔COMPOSER-R1-P2-02 實測：無 --family rc=0、帶 --family rc=1〕
+  #
+  # 🔴 措辭不得寫成「與交件檢查等價」：--single 與收斂路徑對「0 findings」判定不同
+  #    （--single 回 PASS，_run_id_layer 對 sources_with_ids=0 回 FAIL ⇒ 自檢假綠）。
+  #    〔CODEX-R1-P1-01 實測 BLOCKING〕該落差屬票 B-38 範圍，本票不修，但**必須明示**，
+  #    否則委員會以為自檢綠燈即安全（＝主委原措辭的過度宣稱，本輪被抓）。
+  case "${_bk}" in
+    review|consult|closure)
+      prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，該檢查會回 PASS 但收斂階段仍會判失敗（既有缺陷，票 B-38），請在產出中明確寫出「本輪 0 findings」並保留完整推理，勿為了湊數而捏造 finding。"
+      ;;
+  esac
   _run_cli_and_emit
 }
 

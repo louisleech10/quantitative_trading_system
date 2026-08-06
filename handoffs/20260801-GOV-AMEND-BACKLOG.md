@@ -1344,6 +1344,28 @@ codex 耗時 **43 分 26 秒**，超出它自己的歷史 max（43.1m）。
 **委員交件格式不合規（`result_state=format-failed`）之後，唯一可行路徑是「整份重跑」；
 且該輪債務無法銷帳，因而擋住所有後續派工。**
 
+### 🟡 2026-08-06 部分完成：**預防層**已落地（三家戳記核可）
+
+新增第四個修法方向（原票只列 ①fixup ②附掛 brief ③`debt_clear` 降級，皆為**事後補救**）：
+**④ 預防——交件前自檢進 `cx_run.sh` prompt 模板**（`review|consult|closure`）。
+
+- 產出：prompt 追加 `bash scripts/completeness_check.sh --single ${out} --family ${fam}`，
+  並**明示 0-findings 落差**（`--single` 回 PASS 但收斂仍 FAIL，屬 `票 B-38`）
+  ＋警告「勿為湊數捏造 finding」。
+- 測試：`tests/governance/test_cxrun_selfcheck_prompt.py`（**7 tests**），含
+  期望集合斷言、`closure` runtime case、真實 format-failed 形態 fixture（正反對照）、反向 mutation。
+- 收斂：`handoffs/reconcile/20260806-govb31-b1-review-r1/synth.md`
+  （9 findings → 4 群集，三家 APPROVED，sha256 `837188bc`）。
+- 實跑：`pytest tests/governance -q` → **789 passed**（改動前 782）。
+
+🔴 **證據強度具名（兩家 P1 一致）**：效果證據為 **n=1**（2026-08-06 一輪兩家）。
+**不宣稱 format-failed 發生率下降**，只宣稱「消除一個已知可重現的失敗模式」。
+可終結的後續量測（落地後 30 天從 audit 抽 `result_state=format-failed` 計數比對）
+⇒ **併入 `票 B-37`**，本票不做。
+
+🔴 **①②③ 三個事後補救方向仍保留**（三家一致）：預防層不涵蓋「已經 format-failed 之後怎麼便宜修」。
+codex 裁定優先序＝①fixup／②附掛 brief 優先，③`debt_clear` 降級最後且須雙家族 adversarial。
+
 ### 事故（2026-08-04，`GOVB0-RECON-R1`，實測）
 
 composer 的 R1 產出**內容完整、6 條 findings 齊全**，只有兩處格式瑕疵：
