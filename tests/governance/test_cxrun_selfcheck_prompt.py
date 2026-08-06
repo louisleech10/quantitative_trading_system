@@ -144,10 +144,18 @@ def test_selfcheck_instruction_reaches_prompt(tmp_path: Path, kind: str) -> None
     # 🔴 --family 必須帶（COMPOSER-R1-P2-02）：不帶時 extract_heading_ids 改由檔名推 family，
     #    產出路徑不含家族後綴時自檢會弱於交件 ⇒ 破壞「先跑等於預跑」。
     assert "--family codex" in prompt, f"自檢指令缺 --family，與交件檢查不同形:\n{prompt}"
-    # 🔴 0-findings 落差必須明示（CODEX-R1-P1-01）：--single 對 0 findings 回 PASS，
-    #    但收斂路徑仍 FAIL ⇒ 自檢假綠。不明示等於主委原措辭的過度宣稱。
-    assert "0 個 finding" in prompt, f"prompt 未明示 0-findings 的自檢假綠落差:\n{prompt}"
-    assert "捏造 finding" in prompt, "未警告委員勿為湊數而捏造 finding"
+    # 🔴 0-findings 必須有**可正規收斂的出路**（票 B-38）：
+    #    舊版只叫委員寫散文「本輪 0 findings」⇒ 收斂端抽不到 heading ID ⇒ vacuous FAIL
+    #    ⇒ 誠實則卡住、捏造則通過（2026-08-07 實際發生）。
+    #    解法＝P3-00 sentinel（合法 canonical ID，抽得到；空殼仍被 body 檢查擋）。
+    assert "0 個 finding" in prompt, f"prompt 未處理 0-findings 情況:\n{prompt}"
+    assert "P3-00" in prompt, f"prompt 未給出 sentinel 格式 ⇒ 誠實回報者無正規出路:\n{prompt}"
+    assert "sentinel" in prompt, "prompt 未說明這是 sentinel 機制"
+    assert "捏造" in prompt, "未警告委員勿為湊數而捏造實質 finding"
+    # 🔴 防退回散文版：只叫委員「寫出 0 findings」而不給 sentinel 格式，即為 B-38 的病
+    assert not ("明確寫出「本輪 0 findings」" in prompt and "P3-00" not in prompt), (
+        "prompt 退回散文版（無 sentinel 格式）⇒ 收斂端仍會 vacuous FAIL"
+    )
 
 
 def test_selfcheck_absent_for_impl(tmp_path: Path) -> None:

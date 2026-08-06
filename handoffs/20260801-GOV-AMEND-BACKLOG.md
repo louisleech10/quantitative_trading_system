@@ -1805,6 +1805,34 @@ composer 的報告**格式完全合規**，判定為「兩項皆 CLOSED、可進
 它每次發作都強制一輪 abandon（該輪產出無法正規銷帳），且**與 `B-31` 的誠實性要求直接衝突**
 ——不修它，`B-31` 的警告等於把委員推進「誠實則卡住、捏造則通過」的兩難。
 
+### 🟡 2026-08-07 部分完成：sentinel 出路已通，**核心殘留未解，本票維持 OPEN**
+
+**修法（檢查器零改動）**：`cx_run.sh` prompt 改為要求 0 findings 時寫
+`## <家族>-R<輪次>-P3-00` sentinel（body 照常填三欄），取代原散文版。
+`P3-00` 是合法 canonical ID ⇒ 抽得到 ⇒ 不觸發 vacuous；空殼仍被 body validator 擋。
+
+**實跑**：實質 sentinel 收斂 rc=0 ／ 空殼 rc=1 ／ 散文版反向對照 rc=1 ／
+`pytest tests/governance -q` → **795 passed**（改動前 789）。
+測試：`tests/governance/test_zero_findings_sentinel.py`（6 tests）。
+收斂：`handoffs/reconcile/20260807-govb38-b1-review-r1/synth.md`（6 findings → 3 群集）。
+
+🔴 **本票不得宣稱關閉——核心殘留**〔`CODEX-R1-P1-02`〕：
+修法只在**委員照做時**有效。未讀 prompt／prompt 截斷／模型未遵循 ⇒
+`cx_run` 交件層仍接受 prose-only（`--single` 對 0 canonical ID 直接 PASS）
+⇒ 病只是從「主委忘記寫」變成「委員沒有遵循」。
+**修補需先解「如何機械識別應有 findings 的產出」**——主委初測「對 0-ID 產出改判 FAIL」
+影響 **1073/1418** 檔（76%），但樣本含 `impl`／`stamp`／runlog（本無 canonical ID）
+⇒ **誤擋率未證，不得逕行改判**。
+
+🔴 **主委測試假綠（codex mutation 證明，已修）**：原 `test_hollow_sentinel_rejected`
+的 hollow source 與 synth body 不同，**實際由 body-hash 不一致擋下**；
+把 source validator 改成 `if false` 後該測試**仍 passed**。
+已修為 body 逐字相同＋新增 `test_hollow_rejection_is_not_body_hash_artifact`
+斷言 stderr 須含 `empty-shell`。
+
+**其他具名殘留**：語意空洞 sentinel 可過（四入口全 rc=0，屬舊病換型非本修法引入）；
+sentinel 計入 union 分母（`票 B-37` 統計須扣除）；契約未進 `templates/`。
+
 ### 🔴 開工前偵察發現：本票與 `GOV-NOFINDINGS-SENTINEL` 是同一件事的兩面（2026-08-07）
 
 **不得各自實作**——否則會造出第四種「0 findings」表達方式。

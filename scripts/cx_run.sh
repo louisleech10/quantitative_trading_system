@@ -548,11 +548,20 @@ _prepare_and_run() {
   #
   # 🔴 措辭不得寫成「與交件檢查等價」：--single 與收斂路徑對「0 findings」判定不同
   #    （--single 回 PASS，_run_id_layer 對 sources_with_ids=0 回 FAIL ⇒ 自檢假綠）。
-  #    〔CODEX-R1-P1-01 實測 BLOCKING〕該落差屬票 B-38 範圍，本票不修，但**必須明示**，
-  #    否則委員會以為自檢綠燈即安全（＝主委原措辭的過度宣稱，本輪被抓）。
+  #    〔CODEX-R1-P1-01 實測 BLOCKING〕
+  #
+  # 票 B-38（2026-08-07）：給誠實回報 0 findings 者一條**能正規收斂**的出路。
+  #   舊版只說「明確寫出『本輪 0 findings』」⇒ 那是散文，收斂端抽不到 heading ID
+  #   ⇒ sources_with_ids 不增 ⇒ vacuous FAIL ⇒ **誠實則卡住、捏造則通過**（08-07 實際發生）。
+  #   解法＝沿用既有 P3-00 sentinel 慣例：它是合法 canonical ID（P[0-3] ＋ [0-9]{2,}），
+  #   抽得到就不觸發 vacuous，且空殼會被 _validate_finding_body 擋。**檢查器零改動。**
+  #   實測（2026-08-07，.claude/tmp/b38/）：
+  #     實質 sentinel 收斂 → rc=0 ；source 端空殼 sentinel → rc=1 ；--single 空殼 → rc=1
+  #   ⚠️ 本句同時取代主委 08-06 誤造的第三種格式（散文「本輪 0 findings」），
+  #     避免與舊 P3-00 慣例並存造成三種寫法。
   case "${_bk}" in
     review|consult|closure)
-      prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，該檢查會回 PASS 但收斂階段仍會判失敗（既有缺陷，票 B-38），請在產出中明確寫出「本輪 0 findings」並保留完整推理，勿為了湊數而捏造 finding。"
+      prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
       ;;
   esac
   _run_cli_and_emit
