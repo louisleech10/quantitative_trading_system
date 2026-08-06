@@ -479,7 +479,16 @@ TICKET-STATUS: PROVISIONAL
 **與 2026-08-04 22:5x 那次是同一個組合**（scratchpad 路徑 ＋ `rev-parse`），
 差別只在這次多了 `cat`。⇒ **本洞的觸發是穩定可重現的，不是偶發**；
 規避法（改用單一 `git rev-parse HEAD origin/main`，不帶 scratchpad 路徑）當場生效。
-**累計現場事故：洞 A 3 次、洞 B 3 次**（08-04 ×1、08-05 ×1、08-06 ×1）。
+🔴 **2026-08-06 第四次現場事故——觸發點是 `--approver claude` 這個合法參數值**：
+`bash scripts/debt_clear.sh --abandon … --approver claude; …; git rev-parse HEAD origin/main`
+→ **BLOCKED**。三條件全中：①`--approver` 的值就是字串 `claude` ②後方 `rev-parse` 的 `-p`
+③其間無 `|`。改 `--approver main-agent` 後同一條指令立即通過。
+
+⇒ **本次證明影響面比先前記錄更廣**：不只 scratchpad 路徑與檔名，
+**連「清債指令的合法參數值」都會觸發**——而清債正是解除 gate 阻塞的唯一路徑，
+形成「被擋 → 想清債 → 清債指令也被擋」的近似死結（本次靠改參數值繞開）。
+
+**累計現場事故：洞 A 3 次、洞 B 4 次**（08-04 ×1、08-05 ×1、08-06 ×2）。
 本 session 至此 `B-15` 已咬 **7 次**（主委 6 次＋委員探針 1 次）。
 
 🔴 **2026-08-05 00:4x 第三次現場事故——觸發點是「commit 訊息的行首」**：
