@@ -171,15 +171,32 @@ _MUTATION_OLD = """\
       if (line == "E-1～E-7 逐條 Verdict") {
         next
       }
-      # (3) 其餘 id-like → 判畸形；(4) 不命中 → 放行
       n=split(line, parts, /[[:space:]]+/)
       tok=parts[1]
       sub(/[^A-Za-z0-9_-].*$/, "", tok)
-      if (tok ~ /^[A-Z]+(-[A-Z0-9]+)+$/) {
+      # (3a) near-canonical 守衛 — 首 token 已是 finding ID 形狀（含位數錯／尾綴）
+      if (tok ~ /^[A-Z]+-R[0-9]+-P/) {
         print "COMPLETENESS FAIL: invalid finding ID (schema/trailing): " line " (file=" FILENAME ")" > "/dev/stderr"
         bad=1
         next
       }
+      # (3a2) 首 token 內含合法家族名 → 判畸形（不論 arity）
+      for (f in fam) {
+        if (index(tok, f) > 0) {
+          print "COMPLETENESS FAIL: invalid finding ID (schema/trailing): " line " (file=" FILENAME ")" > "/dev/stderr"
+          bad=1
+          next
+        }
+      }
+      # (3b) 跨 brief 固定段名 → 結構標題放行
+      if (tok in struct_ok) next
+      # (3c) arity — 裸 id-like 視為誤寫的 finding ID；帶尾綴視為結構標題
+      if (tok ~ /^[A-Z]+(-[A-Z0-9]+)+$/ && n == 1) {
+        print "COMPLETENESS FAIL: invalid finding ID (schema/trailing): " line " (file=" FILENAME ")" > "/dev/stderr"
+        bad=1
+        next
+      }
+      # (4) 不命中 → 放行
       next
 """
 
@@ -287,9 +304,10 @@ def test_t1_m1_mutation_three_directions_turns_adv_red() -> None:
 def test_t1_b1_fullwidth_tilde_truncation() -> None:
     """T1-B1: heading 含全形字元或 ～ 時，截斷點須與行為表一致。
 
-    - 完整 allowlist 句（含 ～）→ rc==0
-    - 僅首 token ``E-1``（～ 被截斷後的假象）裸標題 → rc==1
-    - 半形 tilde 變體不在 allowlist → 不得誤放
+    - 完整 allowlist 句（含 ～）→ rc==0（全行 allowlist）
+    - 僅首 token ``E-1``（～ 被截斷後的假象）裸標題 → rc==1（arity n==1）
+    - 半形 tilde 變體 → rc==0（**2026-08-06 B-39 E2b 更新**：由 arity n>1 放行，
+      不再經 allowlist；理由與保護未減弱的實測見下方斷言處的註解）
     """
     full = _run_single("### E-1～E-7 逐條 Verdict")
     assert full.returncode == 0, f"完整 allowlist 應 rc==0: {full.stderr!r}"
@@ -297,11 +315,25 @@ def test_t1_b1_fullwidth_tilde_truncation() -> None:
     bare = _run_single("## E-1")
     assert bare.returncode == 1, f"裸 E-1 應 rc==1: {bare.stderr!r}"
 
-    # 半形 ~ 不得吃 allowlist（鍵是完整 heading 逐字）
+    # 🔴 2026-08-06 B-39 E2b 契約更新（主委改動，已列為 code review 首要攻擊標的）
+    #
+    # 原斷言：半形 `~` 變體不在 ALLOWLIST ⇒ 應 rc==1。
+    # 該斷言的前提是「allowlist 是唯一放行途徑」，故防的是「用相似字元冒充 allowlist 鍵」。
+    # E2b 之後前提不再成立：帶尾綴（n>1）的 heading 由 arity 規則放行，
+    # **不需要也不經過 allowlist** ⇒ 「冒充 allowlist」這條攻擊路徑本身消失。
+    #
+    # 保護是否減弱？實測否：
+    #   - 帶尾綴的 finding ID `## CODEX-R4-P0-01 附加標題` → (3a) near-canonical 守衛，rc==1
+    #     （行為表第 146 列，`test_t1_u_behavior_row` 逐列比對，2026-08-06 實跑 23 passed）
+    #   - 裸 id-like（`## A-1`／`## E-1`／`## RECONCILE-STAMP` 等）→ (3c) arity n==1，rc==1
+    #   ⇒ 放行「帶尾綴的非 finding 形狀」不會讓任何 finding ID 逃脫。
+    #
+    # 🔴 若 review 認定此更新是「改斷言取綠燈」，本行應退回並改為擋下半形變體；
+    #    屆時須同時說明 `### G-1 extra` 這類帶尾綴結構標題要如何放行。
     half = _run_single("### E-1~E-7 逐條 Verdict")
-    assert half.returncode == 1, (
-        f"半形 tilde 變體不在 ALLOWLIST，應 rc==1，got {half.returncode}; "
-        f"stderr={half.stderr!r}"
+    assert half.returncode == 0, (
+        f"半形 tilde 變體為帶尾綴結構標題，E2b 下應由 arity 放行（rc==0），"
+        f"got {half.returncode}; stderr={half.stderr!r}"
     )
 
 

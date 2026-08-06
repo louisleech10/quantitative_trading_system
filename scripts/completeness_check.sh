@@ -132,15 +132,32 @@ extract_heading_ids() {
   fi
 
   # shellcheck disable=SC2016
-  # Task 1.1 四步程序（GOV_DISPATCH_FLOW_FIX / GOV-COMPLETENESS-IDLIKE-FP）：
+  # heading 路由（GOV_DISPATCH_FLOW_FIX / GOV-COMPLETENESS-IDLIKE-FP ＋ 票 B-39 E2b）：
   #   (1) 整行命中 canonical → family-binding
   #   (2) 【完整 heading 文字】∈ ALLOWLIST → 放行（鍵=完整 heading，非首 token）
-  #   (3) 其餘 id-like（首 token 命中 ^[A-Z]+(-[A-Z0-9]+)+$）→ 判畸形
-  #   (4) 不命中 id-like → 放行
-  # ALLOWLIST 唯一元素（逐字）："E-1～E-7 逐條 Verdict"
+  #   —— 以下為 B-39 E2b 四層（2026-08-06 三家零分歧裁定；
+  #      收斂檔 handoffs/reconcile/20260806-govb39-b1-consult-r2/synth.md）——
+  #   (3a) near-canonical 守衛：首 token 命中 ^[A-Z]+-R[0-9]+-P → 判畸形
+  #        🔴 必要層：純 arity 會漏收 `## CODEX-R4-P0-01 附加標題`（多 token 但仍是 finding ID）
+  #   (3a2) 首 token 內含合法家族名 → 判畸形（不論 arity）
+  #        堵舊格式 finding ID 帶尾綴逃脫：`## ADV-CODEX-1 討論`／`## CODEX-BAD 追加說明`
+  #        〔CODEX-R1-P1-01 於 B-39 code review 抓出，純 arity 會放行〕
+  #        有界性：家族名取自既有 fam SoT，非逐字打地鼠（票 B-23 紀律）。
+  #        誤擋率：全量掃描 334 個命中者全為 `ADV-<FAMILY>-<n>` 舊格式 finding ID，
+  #        結構標題命中數 0 ⇒ 本層不誤擋；放行面實測零損傷。
+  #   (3b) 首 token ∈ STRUCT_TOKEN_ALLOWLIST → 放行（跨 brief 固定段名，全量掃描導出）
+  #   (3c) arity：其餘 id-like 且 heading 僅單 token → 判畸形；帶尾綴（n>1）→ 結構標題放行
+  #   (4)  不命中 id-like → 放行
+  #
+  # 舊判準（單層 ^[A-Z]+(-[A-Z0-9]+)+$ 一律判畸形）誤擋結構標題，實證 3 輪委員派工作廢。
+  # 全量掃描 18574 個 heading：舊判準攔 1236 個非 canonical，E2b 放行其中 944 個（-76.4%），
+  # 292 個單 token 全數維持既有行為表契約。
+  # STRUCT_TOKEN_ALLOWLIST 初始集合由語料導出（票 B-23 紀律，禁憑想像列舉）；
+  # `RECONCILE-STAMP` 刻意不收——47 個 synth 全用 `## 戳記`、0 個用該形式 ⇒ 語料中 8 處為委員誤用。
   awk -v heading_re="${HEADING_LINE_RE}" -v expected_fam="${expected_fam}" '
     BEGIN {
       fam["CODEX"]=1; fam["COMPOSER"]=1; fam["GROK"]=1; fam["CLAUDE"]=1; fam["AGY"]=1
+      struct_ok["OUT-OF-SCOPE"]=1; struct_ok["NON-BLOCKING"]=1; struct_ok["FACT-RECEIPT"]=1
     }
     /^[[:space:]]*#{2,6}[[:space:]]+DEGRADE-[A-Z]+-[0-9]{2,}[[:space:]]*$/ { next }
     /^[[:space:]]*#{2,6}[[:space:]]/ {
@@ -171,15 +188,32 @@ extract_heading_ids() {
       if (line == "E-1～E-7 逐條 Verdict") {
         next
       }
-      # (3) 其餘 id-like → 判畸形；(4) 不命中 → 放行
       n=split(line, parts, /[[:space:]]+/)
       tok=parts[1]
       sub(/[^A-Za-z0-9_-].*$/, "", tok)
-      if (tok ~ /^[A-Z]+(-[A-Z0-9]+)+$/) {
+      # (3a) near-canonical 守衛 — 首 token 已是 finding ID 形狀（含位數錯／尾綴）
+      if (tok ~ /^[A-Z]+-R[0-9]+-P/) {
         print "COMPLETENESS FAIL: invalid finding ID (schema/trailing): " line " (file=" FILENAME ")" > "/dev/stderr"
         bad=1
         next
       }
+      # (3a2) 首 token 內含合法家族名 → 判畸形（不論 arity）
+      for (f in fam) {
+        if (index(tok, f) > 0) {
+          print "COMPLETENESS FAIL: invalid finding ID (schema/trailing): " line " (file=" FILENAME ")" > "/dev/stderr"
+          bad=1
+          next
+        }
+      }
+      # (3b) 跨 brief 固定段名 → 結構標題放行
+      if (tok in struct_ok) next
+      # (3c) arity — 裸 id-like 視為誤寫的 finding ID；帶尾綴視為結構標題
+      if (tok ~ /^[A-Z]+(-[A-Z0-9]+)+$/ && n == 1) {
+        print "COMPLETENESS FAIL: invalid finding ID (schema/trailing): " line " (file=" FILENAME ")" > "/dev/stderr"
+        bad=1
+        next
+      }
+      # (4) 不命中 → 放行
       next
     }
     END { if (bad) exit 1 }
