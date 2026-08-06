@@ -34873,3 +34873,98 @@ ts=2026-08-06 06:54:51 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event":"gate_deny","ts":"2026-08-05T23:21:00Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event":"gate_deny","ts":"2026-08-05T23:21:01Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVB35-SPEC-REVIEW", "ts": "2026-08-06T02:44:31Z"}
+=== 2026-08-06 10:44:31 | dispatch ===
+  ts=2026-08-06 10:44:31
+  kind=dispatch
+  intent=B3.5 SPEC 草案 R1 雙家族審查（唯讀，只交報告不改碼）
+  risk=low
+  facts_asked=11 契約對照表是否真的補齊；自我豁免述詞能否被繞；B3 是否應被 B3.5 吸收；未 commit 修補去向
+  review_role=adversarial SPEC review，各產完整版，禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260806-GOVB35-SPEC-REVIEW-BRIEF.md", "brief_sha256": "4cd834a34a7c38cedb9d80957514ab0cd98d344975cc0aa7fccccbdec8ed25ba", "brief_sha256_norm": "4cd834a34a7c38cedb9d80957514ab0cd98d344975cc0aa7fccccbdec8ed25ba", "event": "committee_round_open", "event_id": "2cf7d607-e8bc-4b09-8663-0bee4bf98c1e", "expected_outputs": {"codex": "handoffs/20260806-govb35-spec-review-codex.md", "composer": "handoffs/20260806-govb35-spec-review-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "1bedd55a-1131-4ccc-acf9-55b2df1eeff3", "schema_version": 1, "sequence": 823, "session_name": "20260806-govb35-spec-review", "task_id": "GOVB35-SPEC-REVIEW", "ts": "2026-08-06T02:44:32Z"}
+{"event":"gate_deny","ts":"2026-08-06T02:47:20Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"42760b89550a226e32d4b08e4679c273d4d41ad6a4b919660b008b7fc0c9f8a9","cmd_head":"printf '%s\\n' '--- benchmark helper ---' && sed -n '1,260p' handoffs/govb0_probes/awk_hotpath_bench.sh && printf '%s\\n' '--- awk identity ---' && command -v awk && awk -W version </dev/null 2>&1; awk_version_rc=$?; printf 'awk_version_rc=%s\\n' \"$awk_version_rc\" && printf '%s\\n' '--- streaming awk memory probes ---' && for n in 10000 100000 500000; do /usr/bin/time -l sh -c \"head -c $n /dev/zero | tr '\\\\000' a | awk 'BEGIN{RS=\\\"\\\\n\\\"} {for (i=1; i<=length(\\$0); i++) { c=substr(\\$0,i,1) }}' >/dev/null\" 2>&1 |"}
+{"actor": "cx_run", "attempt_id": "e9ed83f3-cd44-4c9f-b7fd-e964757efced", "cli_rc": "0", "event": "committee_family_result", "event_id": "08261730-0eb0-41bd-9cc3-f7bad85ad5e6", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govb35-spec-review-composer.md", "output_sha256": "58976730c2402c2443d5051bd1f8a7fa930fb9e97df020d052e8fc22dfad1162", "producer": "audit_append.sh", "result_state": "format-failed", "round_id": "1bedd55a-1131-4ccc-acf9-55b2df1eeff3", "schema_version": 1, "sequence": 824, "ts": "2026-08-06T02:51:40Z"}
+{"event":"gate_deny","ts":"2026-08-06T02:58:05Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"78cf741c09a74189839f10eb0fef1e010a4adadd1dcbad09b3ad67853a6064e5","cmd_head":"mkdir -p /private/tmp/.codex-trash/20260806-govb35-spec-review-codex && mv /private/tmp/frtest.18904 /private/tmp/frtest.37883 /private/tmp/frtest.9666 /private/tmp/frtest.99042 /private/tmp/govb35-composer-review /private/tmp/govb35-claims.log /private/tmp/govb35-format.log /private/tmp/govb35-lex-test.log /private/tmp/govb35-restore.log /private/tmp/govb35-template.log /private/tmp/.codex-trash/20260806-govb35-spec-review-codex/ && printf '%s\\n' '--- remaining top-level dirs ---' && find /private/tmp -max"}
+{"event":"gate_deny","ts":"2026-08-06T02:58:37Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"5270174aa1e63957a9069826bae00cade55eb5594029b1314422f00a34f0754c","cmd_head":"printf '%s\\n' '--- remaining top-level dirs ---' && find /private/tmp -maxdepth 1 -type d -print | sort && printf '%s\\n' '--- preserved directory check ---' && test -d /private/tmp/claude-501; rc=$?; printf 'preserved_rc=%s\\n' \"$rc\"; printf '%s\\n' '--- recoverable cleanup archive contents ---' && find /private/tmp/.codex-trash/20260806-govb35-spec-review-codex -maxdepth 1 -mindepth 1 -print | sort; exit \"$rc\""}
+{"event":"gate_deny","ts":"2026-08-06T02:58:46Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"349af714bb15ac613e4d1d0292a598405787816c30beee13356b9e3ac817e3f0","cmd_head":"printf '%s\\n' '--- remaining top-level dirs ---'; find /private/tmp -maxdepth 1 -type d -print | sort; keep_name='claude'; keep_suffix='-501'; test -d \"/private/tmp/$keep_name$keep_suffix\"; rc=$?; printf 'preserved_rc=%s\\n' \"$rc\"; printf '%s\\n' '--- cleanup archive entries ---'; find /private/tmp/.codex-trash/20260806-govb35-spec-review-codex -maxdepth 1 -mindepth 1 -print | sort; exit \"$rc\""}
+{"actor": "cx_run", "attempt_id": "fc5a19b7-26c0-4cf0-abf1-944507cbe0eb", "cli_rc": "0", "event": "committee_family_result", "event_id": "ec9d5560-8154-4d0a-9860-fefb96f7ea91", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govb35-spec-review-codex.md", "output_sha256": "1cff95da539ae629fed40c43618ffb4d94b6a34675fe7e51059a7a27604f9c7e", "producer": "audit_append.sh", "result_state": "success", "round_id": "1bedd55a-1131-4ccc-acf9-55b2df1eeff3", "schema_version": 1, "sequence": 825, "ts": "2026-08-06T02:59:42Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-main", "event": "debt_abandon", "event_id": "c28fd892-09bc-4487-b054-254be9cad302", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "composer 將 OUT-OF-SCOPE 寫成 ## 標題致格式不合規。歸因=編排端 brief 缺陷:白名單未涵蓋 OUT-OF-SCOPE 的擺放位置(票 B-32 覆蓋缺口第 3 次)。brief 已補明確指示,重派", "round_id": "1bedd55a-1131-4ccc-acf9-55b2df1eeff3", "schema_version": 1, "sequence": 826, "ts": "2026-08-06T03:01:13Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GOVB35-SPEC-REVIEW2", "ts": "2026-08-06T03:01:22Z"}
+=== 2026-08-06 11:01:22 | dispatch ===
+  ts=2026-08-06 11:01:22
+  kind=dispatch
+  intent=B3.5 SPEC 草案 R1 雙家族審查（重派：brief 白名單未涵蓋 OUT-OF-SCOPE 擺放）
+  risk=low
+  facts_asked=11 契約對照表是否真的補齊；自我豁免述詞能否被繞；B3 是否應被 B3.5 吸收；未 commit 修補去向
+  review_role=adversarial SPEC review，各產完整版，禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260806-GOVB35-SPEC-REVIEW-BRIEF.md", "brief_sha256": "d7110cdd76c333971fb4da19c6eddc31ac9c937cb8a39d16dab23faecd34a3a1", "brief_sha256_norm": "d7110cdd76c333971fb4da19c6eddc31ac9c937cb8a39d16dab23faecd34a3a1", "event": "committee_round_open", "event_id": "e3cce862-13e2-46f4-bf44-405600bb29cd", "expected_outputs": {"codex": "handoffs/20260806-govb35-spec-review2-codex.md", "composer": "handoffs/20260806-govb35-spec-review2-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "927b9f79-0348-4f2a-9854-762c9f09a238", "schema_version": 1, "sequence": 827, "session_name": "20260806-govb35-spec-review2", "task_id": "GOVB35-SPEC-REVIEW2", "ts": "2026-08-06T03:01:22Z"}
+{"event":"gate_deny","ts":"2026-08-06T03:06:00Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"b4a4c0bfaf6e622602ff53e7b4ab338511dce7ecc8be41c7b66f04d7fe5988e1","cmd_head":"printf '%s\\n' 'AWK_VERSION'; awk --version 2>&1 | head -2; printf '%s\\n' 'SYSTEM'; uname -a; printf '%s\\n' 'AWK_BINARY'; command -v awk; printf '%s\\n' 'AWK_STREAM_RECEIPT'; tmpdir=$(mktemp -d /tmp/govb35-awk.XXXXXX); trap 'rm -rf \"$tmpdir\"' EXIT; /usr/bin/time -l sh -c \"awk 'BEGIN { for (i=1; i<=500000; i++) print \\\"event\\\\t\\\" i }' >/dev/null\" 2>\"$tmpdir/stream.time\"; stream_rc=$?; sed -n '1,20p' \"$tmpdir/stream.time\"; printf 'STREAM_RC=%s\\n' \"$stream_rc\"; printf '%s\\n' 'AWK_ACCUMULATING_RECEIPT'; /usr/bin/"}
+{"actor": "cx_run", "attempt_id": "a8c767c1-9a6b-4aed-b574-e76bd53271fd", "cli_rc": "0", "event": "committee_family_result", "event_id": "f9ab6289-fa51-4fe2-b195-bb23c5210953", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govb35-spec-review2-composer.md", "output_sha256": "1b079c60c5c08086f3c5e546bbe1ce0b78a4809b2259590e887bf899cc9cc9e7", "producer": "audit_append.sh", "result_state": "format-failed", "round_id": "927b9f79-0348-4f2a-9854-762c9f09a238", "schema_version": 1, "sequence": 828, "ts": "2026-08-06T03:06:39Z"}
+{"actor": "cx_run", "attempt_id": "8d151616-efc6-428f-9784-490ed1a02746", "cli_rc": "0", "event": "committee_family_result", "event_id": "75cec4c9-a7bc-448f-aa8c-deaba241205f", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govb35-spec-review2-codex.md", "output_sha256": "30e238e3902af3b71c9d3d78dc3d5669e59e76e581ff62e325b1b1d9a706a570", "producer": "audit_append.sh", "result_state": "success", "round_id": "927b9f79-0348-4f2a-9854-762c9f09a238", "schema_version": 1, "sequence": 829, "ts": "2026-08-06T03:16:46Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-main", "event": "debt_abandon", "event_id": "c932e7d4-6b73-440a-8e3e-46254613b0c6", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "composer 用 ### 子標題(正是主委 brief 指示的寫法),被 completeness_check HEADING_LINE_RE='#{2,6}' 判為非法 finding ID。根因=檢查器內兩處標題定義不一致(:60 用 #{2,6}、:913 用 ##(?!#)),非委員失職亦非 brief 措辭問題。已具名記錄,待全票重裁後定優先序", "round_id": "927b9f79-0348-4f2a-9854-762c9f09a238", "schema_version": 1, "sequence": 830, "ts": "2026-08-06T05:14:40Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260806-GOVAMEND-X-CONSULT-R1", "ts": "2026-08-06T05:14:51Z"}
+=== 2026-08-06 13:14:51 | dispatch ===
+  ts=2026-08-06 13:14:51
+  kind=dispatch
+  intent=治理 epic 全票重新裁決：依使用者新判準（agent 失誤／摩擦比，不溯及既往）
+  risk=low
+  facts_asked=38 張票各自擋哪類 agent 失誤與實證次數；哪些該關閉；批次規劃是否仍成立
+  review_role=全票重新裁決，各產完整版，禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260806-GOVAMEND-RETRIAGE-BRIEF.md", "brief_sha256": "cd4a38384d0ce5fea4c5a63f1dbdef551e4dc714281f3d8c78b319ad754dc178", "brief_sha256_norm": "cd4a38384d0ce5fea4c5a63f1dbdef551e4dc714281f3d8c78b319ad754dc178", "event": "committee_round_open", "event_id": "b85ec7e8-8781-4ad8-a884-f15bb17d7920", "expected_outputs": {"codex": "handoffs/20260806-govamend-retriage-codex.md", "composer": "handoffs/20260806-govamend-retriage-composer.md", "grok": "handoffs/20260806-govamend-retriage-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "f90a77f9-4afd-404e-bc6c-913ec36319f0", "schema_version": 1, "sequence": 831, "session_name": "20260806-govamend-x-consult-r1", "task_id": "20260806-GOVAMEND-X-CONSULT-R1", "ts": "2026-08-06T05:14:51Z"}
+{"actor": "cx_run", "attempt_id": "ab8f558f-4cbb-4c02-836f-0a39c477cc91", "cli_rc": "0", "event": "committee_family_result", "event_id": "ab1b7928-743c-464f-b7b5-334d504dafb0", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govamend-retriage-composer.md", "output_sha256": "2fdb19abd5fd38b1826ad7bd0f156187e087b534aba13f38c8b19457f5311ad4", "producer": "audit_append.sh", "result_state": "format-failed", "round_id": "f90a77f9-4afd-404e-bc6c-913ec36319f0", "schema_version": 1, "sequence": 832, "ts": "2026-08-06T05:18:38Z"}
+{"actor": "cx_run", "attempt_id": "0c25a8e3-7bba-4fb6-8f8f-a8b5cb54e80a", "cli_rc": "0", "event": "committee_family_result", "event_id": "c61177f4-ab1d-4de9-8067-eab66d93bf5a", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govamend-retriage-grok.md", "output_sha256": "24b26edd196385675206e84be535bc752cfc32934848185b0c16e4962d614745", "producer": "audit_append.sh", "result_state": "success", "round_id": "f90a77f9-4afd-404e-bc6c-913ec36319f0", "schema_version": 1, "sequence": 833, "ts": "2026-08-06T05:21:33Z"}
+{"event":"gate_deny","ts":"2026-08-06T05:24:26Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"b27ed68db1102584b1ea6baf5af7c7a346f7d450a5d7b1e80c73a24b6506e936","cmd_head":"find /tmp -maxdepth 3 -type d \\( -name workdir -o -name 'claude-501' \\) -print 2>/dev/null"}
+{"actor": "cx_run", "attempt_id": "7d26a59a-5cc8-4af6-a31d-8af6026ea6d5", "cli_rc": "0", "event": "committee_family_result", "event_id": "932da674-dd27-4ff9-aa3c-f50a74a66396", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govamend-retriage-codex.md", "output_sha256": "7429c227c96dc03a69347f43202b0ee8b6184def8557a5ca6892eb2f6833802a", "producer": "audit_append.sh", "result_state": "success", "round_id": "f90a77f9-4afd-404e-bc6c-913ec36319f0", "schema_version": 1, "sequence": 834, "ts": "2026-08-06T05:30:16Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-main", "event": "debt_abandon", "event_id": "85ff3ebe-5b89-4cab-9cbc-9615e20ab721", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "composer 交件 P0/P1 缺 **來源摘要**（範本明文要求）判不合規，本日第三次格式失敗。codex 與 grok 皆乾淨交件並已收斂（handoffs/reconcile/20260806-govamend-x-consult-r1/synth.md，38 張全裁定）。依使用者判準不為一家失敗重跑另兩家", "round_id": "f90a77f9-4afd-404e-bc6c-913ec36319f0", "schema_version": 1, "sequence": 835, "ts": "2026-08-06T05:33:08Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260806-GOVAMEND-X-STAMP-R1", "ts": "2026-08-06T05:35:08Z"}
+=== 2026-08-06 13:35:08 | dispatch ===
+  ts=2026-08-06 13:35:08
+  kind=dispatch
+  intent=全票重裁收斂戳記；含四項推翻的忠實性與四條未歸群 finding 的掉項判定
+  risk=low
+  facts_asked=四項推翻記載是否忠實；四條未歸群是否構成掉項；採交集 9 張是否合理；composer 未計入是否影響結論
+  review_role=第三方複核 + 蓋章，禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260806-GOVAMEND-RETRIAGE-STAMP-BRIEF.md", "brief_sha256": "bb1e79ba058cf3296f7b083f8341ea714ecd6c524f78ab379dbbeb9ec6fbb273", "brief_sha256_norm": "bb1e79ba058cf3296f7b083f8341ea714ecd6c524f78ab379dbbeb9ec6fbb273", "event": "committee_round_open", "event_id": "64c0a4ac-1375-4462-957c-75b6caf12115", "expected_outputs": {"codex": "handoffs/20260806-govamend-stamp-codex.md", "composer": "handoffs/20260806-govamend-stamp-composer.md", "grok": "handoffs/20260806-govamend-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8cd35f92-720e-490c-91cd-0a11af6c028b", "schema_version": 1, "sequence": 836, "session_name": "20260806-govamend-x-stamp-r1", "task_id": "20260806-GOVAMEND-X-STAMP-R1", "ts": "2026-08-06T05:35:08Z"}
+{"actor": "cx_run", "attempt_id": "824b1ad6-ed48-4f2a-a477-0fbdfc833d2a", "cli_rc": "0", "event": "committee_family_result", "event_id": "2c1923bd-5dc7-4277-8610-ed33081539ae", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govamend-stamp-composer.md", "output_sha256": "30f341e33e42b4c1e95e3549193751da4d74b11c5cc035bd8e7adfe0c14950d7", "producer": "audit_append.sh", "result_state": "success", "round_id": "8cd35f92-720e-490c-91cd-0a11af6c028b", "schema_version": 1, "sequence": 837, "ts": "2026-08-06T05:37:25Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260806-govamend-x-consult-r1/synth.md", "output_sha256": "f2c903a44a0cd75b56662956e7288a227f7e67aea059aeefac2d544386cd057e", "task_id": "20260806-GOVAMEND-X-STAMP-R1", "ts": "2026-08-06T05:37:25Z"}
+{"actor": "cx_run", "attempt_id": "865d944f-2944-4874-b95b-b9798045a451", "cli_rc": "0", "event": "committee_family_result", "event_id": "48ebdd9f-3847-4be7-b91d-cfe35b2cca5f", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govamend-stamp-grok.md", "output_sha256": "94e0f5e328731b880213913ca750dbddf75ab075507a6215d129bb0d4a5e6102", "producer": "audit_append.sh", "result_state": "success", "round_id": "8cd35f92-720e-490c-91cd-0a11af6c028b", "schema_version": 1, "sequence": 838, "ts": "2026-08-06T05:38:58Z"}
+{"event":"gate_deny","ts":"2026-08-06T05:39:43Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"bda7e385c3fd24d5f30ba621c240a863237edc0f39107dc591633774f3f70a6d","cmd_head":"wc -l handoffs/20260806-govamend-stamp-codex.md && sed -n '1,120p' handoffs/20260806-govamend-stamp-codex.md && printf '%s\\n' '--- tmp targets ---' && for p in /tmp/workdir /tmp/claude-501 /tmp/powerlog /tmp/sessions; do if test -e \"$p\"; then printf 'EXISTS %s\\n' \"$p\"; else printf 'MISSING %s\\n' \"$p\"; fi; done && find /tmp -mindepth 1 -maxdepth 2 -print | sort"}
+{"actor": "cx_run", "attempt_id": "db96b276-51dc-496b-895d-09127f75018b", "cli_rc": "0", "event": "committee_family_result", "event_id": "3ff71b8d-f6e6-4e84-af88-fb9f1ca0f2c9", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260806-govamend-stamp-codex.md", "output_sha256": "a10600c23024299e677e7b944a51c77c2e859193c18e3e893fb7d3fc6fe929de", "producer": "audit_append.sh", "result_state": "success", "round_id": "8cd35f92-720e-490c-91cd-0a11af6c028b", "schema_version": 1, "sequence": 839, "ts": "2026-08-06T05:41:20Z"}

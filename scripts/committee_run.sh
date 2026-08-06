@@ -128,6 +128,16 @@ done
 # ---------------------------------------------------------------------------
 bash "${SCRIPT_DIR}/_role_gate.sh" check-task-id "${task_id}" || exit 2
 
+# ---------------------------------------------------------------------------
+# 命名規約（2026-08-06 使用者：「任務名長很像，到時候每個人都混亂」）
+# 同樣須在 gate.sh dispatch **之前** ⇒ 不合規時 audit 零新增。
+# 規約與理由見 scripts/session_name_check.sh 檔頭；**只適用新輪次，舊 session 不溯及既往**。
+# ---------------------------------------------------------------------------
+bash "${SCRIPT_DIR}/session_name_check.sh" --session "${session}" --task-id "${task_id}" || {
+  echo "ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)" >&2
+  exit 2
+}
+
 # --- 家族驗證(對 SoT,非硬編) ---
 # shellcheck source=/dev/null
 . "${SCRIPT_DIR}/governance_families.sh" || { echo "ERROR: 無法載入 family SoT(fail-closed)" >&2; exit 1; }

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "session_id": "20260806-govamend-x-consult-r1",
+  "expected_roster": [
+    "codex",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260806-govamend-x-consult-r1/sources/20260806-govamend-retriage-codex.md",
+      "sha256": "7429c227c96dc03a69347f43202b0ee8b6184def8557a5ca6892eb2f6833802a",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260806-govamend-x-consult-r1/sources/20260806-govamend-retriage-grok.md",
+      "sha256": "24b26edd196385675206e84be535bc752cfc32934848185b0c16e4962d614745",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-08-06T05:30:58Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "f90a77f9-4afd-404e-bc6c-913ec36319f0"
+}
