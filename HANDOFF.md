@@ -75,6 +75,7 @@
 | **`票 B-15` 洞 B** | 連 `--approver claude` 這種合法參數值都觸發（第 5 次）⇒ 用 `main-agent`；路徑含 `claude` 也會 ⇒ 改用 Write 工具建檔 |
 | **reconcile mode** | 建 review 收斂須帶 `--mode review`，否則 `debt_clear` 拒銷 |
 | **`grep -c` 疊 `\|\| echo 0`** | grep 找不到已輸出 `0`，再疊會變 `0\n0` ⇒ 數值比較炸 |
+| **委員會在 repo 內留殘留檔** | 2026-08-07 codex 做 mutation 後留下 `tests/governance/test_zero_findings_sentinel.py.bak_mut`。**交件後務必 `git status --short` 比對 HANDOFF 清單**，多一個就查清（本次即靠此抓到） |
 
 ## 派工前置（每次必跑，單獨跑並讀輸出）
 
