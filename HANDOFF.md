@@ -27,10 +27,17 @@
 
 ## 🔴 工作區有未 commit 的 B3 修補（**不要 commit**）
 
-`scripts/_gate_lex.sh`／`gate_check.sh`／`extract_phase2_expected_flips.py`／
-`tests/governance/*`／fixtures／`docs/GOVB0_FRICTION_AMENDMENTS.md`／`docs/GOVB0_B35_LEXER_SPEC.md`
+**已追蹤（9 個 `M`）**：`scripts/_gate_lex.sh`／`gate_check.sh`／`extract_phase2_expected_flips.py`／
+`tests/governance/test_gate_{decision,deny_fields,lexical_contract}.py`／
+`tests/governance/fixtures/{gate_decision_corpus,phase2_expected_flips}.txt(+.sha256)`
 
-保留至 B3R。**風險未經證明**：仍帶 E-1 換行繞道與 E-2 大輸入 O(n²)。
+**未追蹤（1 個 `??`）**：`docs/GOVB0_FRICTION_AMENDMENTS.md`（C5 決策的延伸檔）
+
+保留至 B3R。**風險未經證明**：仍帶 E-1 換行繞道與 E-2 大輸入 O(n²)（500K→30s）。
+⚠️ **不得宣稱現況安全**——「10K→0.09s 故非即時風險」已被 codex 推翻並撤回。
+
+🔴 **接手時的第一個動作**：`git status --short` 應**恰好**是上述 9 `M` + 1 `??`
+（外加 `.claude/gate/*.log` 的正常追加）。**多出任何檔案代表有人動過，先查清再繼續。**
 
 ## 使用者 2026-08-06 定的判準（治理 epic 全域適用）
 
@@ -63,6 +70,30 @@
 照工具訊息字面轉述未複驗。**其中 6 次由委員抓到。**
 
 ⇒ 對策已落地：`reconcile_cluster_attribution_check.sh` 首次使用即抓到 2 條掉項。
+
+## ▶ 派工前的固定前置（本日踩過才寫下）
+
+```
+1. bash scripts/debt_ledger.sh --has-open        # 單獨跑並讀輸出，勿塞進背景指令
+2. bash scripts/session_name_check.sh --session <名> --task-id <大寫同名>
+3. bash scripts/doc_format_precheck.sh <brief>
+4. python3 scripts/verification_claim_check.py --files <brief>
+5. 上游收斂檔須已三家 APPROVED（否則委員依 Rule 12 拒絕作業）
+```
+
+**第 5 條本日被 codex 擋過一次**：拿未核可的收斂檔當下一輪的開票依據。
+
+## 收斂檔的固定收尾
+
+```
+1. bash scripts/reconcile_cluster_attribution_check.sh <synth.md>   # 掉項/錯位自檢
+2. bash scripts/completeness_check.sh --lock <sources.lock>
+3. python3 scripts/verification_claim_check.py --files <synth.md>
+4. bash scripts/reconcile_body_hash.sh <synth.md>                   # 供戳記 brief
+5. 戳記過後：bash scripts/gate.sh register-output <task-id> <synth.md>
+```
+
+**第 1 條是本日新增**，首次使用即抓到 2 條掉項；**第 5 條本日漏做過一次**（provenance pending）。
 
 ## 坑（沿用）
 
