@@ -50,9 +50,38 @@ IFS=',' read -ra fams <<< "${required}"
 for fam in "${fams[@]}"; do
   fam_trim="$(echo "${fam}" | tr -d '[:space:]')"
   [ -z "${fam_trim}" ] && continue
-  # 真戳記:行首 ^RECONCILE-STAMP:(排除 checklist '- [ ]'、-RESOLVED);REJECTED 立即擋。
-  if grep -qiE "^RECONCILE-STAMP:[[:space:]]*${fam_trim}[[:space:]]+REJECTED" "${file}"; then
-    fail="${fail}  · ${fam_trim}: REJECTED(reconcile 未獲核可,須修後重審)\n"
+  # 真戳記:行首 ^RECONCILE-STAMP:(排除 checklist '- [ ]'、-RESOLVED)。
+  #
+  # 🔴 2026-08-06 修（使用者裁定選項 A）：**每個家族取最後一筆戳記**，最新的蓋掉舊的。
+  #
+  # 原實作：`grep -q ... REJECTED` ⇒ **全檔任意一行命中就永久擋**，
+  #   而同一支腳本的 APPROVED 判定卻用 `tail -1`（取最新）——**同檔前後不一致**。
+  # 後果（實測）：`20260806-govamend-x-consult-r1` 的 grok 於 R1 REJECTED、
+  #   主委修正後 R2／R3 皆 APPROVED 且雜湊相符，**檢查器仍報 grok REJECTED**。
+  #   ⇒ **任何收斂檔一旦被退過就再也不可能通過**，除非竄改委員寫的那行（明文禁止）。
+  # 另一半成因：官方 REJECTED 格式（本檔頭第 11 行）**不含 sha 欄位**，
+  #   故無法判斷該退件針對哪一版——委員照格式寫，沒有做錯。
+  #
+  # 使用者原話：
+  #   「為何最新的不是蓋掉舊的，檢查器不就是要抓錯，改正到正確就放行，
+  #     這時候還去查以前的錯誤幹嘛？」
+  #
+  # 判準（與 APPROVED 那半一致）：取該家族**最後一筆** RECONCILE-STAMP；
+  #   最後一筆是 REJECTED ⇒ 擋；是 APPROVED ⇒ 續往下驗日期／雜湊／provenance。
+  # 保護未減弱：最後一筆為 REJECTED 仍擋、無任何戳記仍擋、雜湊不符仍擋。
+  last_stamp="$(grep -iE "^RECONCILE-STAMP:[[:space:]]*${fam_trim}[[:space:]]+(APPROVED|REJECTED)[[:space:]]" "${file}" | tail -1)"
+  # 🔴 狀態詞混用 ⇒ fail-closed（`CODEX-R26-P0-01`，2026-08-06）
+  #   同一行同時出現 APPROVED 與 REJECTED 時，位置錨定會走 APPROVED 分支而放行。
+  #   **此洞舊版同樣存在**（舊碼亦把狀態詞錨定在家族名之後）⇒ 非本次回歸；
+  #   但主委原宣稱「保護未減弱」屬**把「沒變差」講成「沒有洞」**，codex 判該宣稱不成立。
+  #   ⇒ 一併補上：狀態詞不唯一即視為畸形戳記，拒收（保守方向）。
+  if printf '%s' "${last_stamp}" | grep -qiE "APPROVED" \
+     && printf '%s' "${last_stamp}" | grep -qiE "REJECTED"; then
+    fail="${fail}  · ${fam_trim}: 戳記同時含 APPROVED 與 REJECTED(畸形,fail-closed)\n"
+    continue
+  fi
+  if printf '%s' "${last_stamp}" | grep -qiE "^RECONCILE-STAMP:[[:space:]]*${fam_trim}[[:space:]]+REJECTED"; then
+    fail="${fail}  · ${fam_trim}: 最新戳記為 REJECTED(reconcile 未獲核可,須修後重審)\n"
     continue
   fi
   # APPROVED 行須帶日期 + 正確 body sha256。

@@ -368,4 +368,18 @@ if [ "${rc}" -ne 0 ]; then
   echo "[reconcile_build] ⚠️ completeness 未過——多半是某來源檔有非法 ID / 空殼 finding；看上面訊息指的檔+heading。" >&2
   exit "${rc}"
 fi
+# ── 群集歸戶自檢（2026-08-06 新增；非阻擋，提示用）──────────────────
+# 為何存在：`completeness_check` 只驗「ID 有沒有出現在綜合檔」，
+#   **對「歸到哪一群」完全無感**——主委本 session 因此 ID 錯位 9 次，
+#   每次都要靠委員語意複核抓，一次一輪。
+# 本檢查把「群集表引用的 ID」對回「附錄的斷言首句」，讓錯位與掉項在建檔當下可見。
+# 誠實邊界：**目前只印不擋**。升為硬閘併入 `票 B-26`（ID 空間配置閘）一起做，
+#   不另立票（使用者 2026-08-06：「票永遠開不完，除非有一勞永逸的解決方式」）。
+if [ -x "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" ]; then
+  echo "[reconcile_build] === 群集歸戶自檢（提示，不擋）==="
+  bash "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" "${SESS}/synth.md" 2>/dev/null \
+    | grep -B2 "未被任何群集引用" || echo "  （建檔當下群集段尚未手填，填完請自行重跑本檢查）"
+  echo "[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh ${SESS}/synth.md"
+fi
+
 echo "[reconcile_build] ✅ 完成。接著：手填 ${SESS}/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。"
