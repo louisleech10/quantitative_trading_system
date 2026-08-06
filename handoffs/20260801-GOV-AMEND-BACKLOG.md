@@ -471,6 +471,15 @@ TICKET-STATUS: PROVISIONAL
 命中路徑＝`.claude`（scratchpad 路徑）＋ `govb0-`**`p`**`robes` 這個**目錄名裡的 `-p`**。
 改成底線 `govb0_probes` 後同一條指令立即通過。
 ⇒ **連「取什麼檔名」都會影響指令會不會被擋**，且沒有任何提示指出真正原因。
+
+🔴 **2026-08-06 第三次現場事故——洞 B 原樣重現，三條件全中**：
+主委查背景 push 結果時執行
+`cat /private/tmp/claude-501/…/tasks/<id>.output; git log --oneline -1; git rev-parse HEAD origin/main`
+→ **BLOCKED**。命中＝①scratchpad 路徑含 `claude` ②後方 `rev-parse` 的 `-p` ③兩者間無 `|`。
+**與 2026-08-04 22:5x 那次是同一個組合**（scratchpad 路徑 ＋ `rev-parse`），
+差別只在這次多了 `cat`。⇒ **本洞的觸發是穩定可重現的，不是偶發**；
+規避法（改用單一 `git rev-parse HEAD origin/main`，不帶 scratchpad 路徑）當場生效。
+**累計現場事故：洞 A 3 次、洞 B 3 次**（08-04 ×1、08-05 ×1、08-06 ×1）。
 本 session 至此 `B-15` 已咬 **7 次**（主委 6 次＋委員探針 1 次）。
 
 🔴 **2026-08-05 00:4x 第三次現場事故——觸發點是「commit 訊息的行首」**：

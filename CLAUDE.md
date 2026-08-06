@@ -105,8 +105,10 @@ pytest                                           # all tests
 4. 複合／多行指令**不是**問題——只要每個成分都合規就快（實測 0.10s）
 
 **B 類（Claude 端慢）已實測的成因：大輸出回灌**
-- `git push` 會觸發 pre-push 跑 287 測試，**整份 30KB 輸出回灌 Claude context** → 實測 Claude 端多花 **89.9 秒**才發出下一個動作。
+- `git push` 會觸發 pre-push 跑全套測試，**整份 30KB 輸出回灌 Claude context** → 實測 Claude 端多花 **89.9 秒**才發出下一個動作。
 - **避法**：輸出量大的指令一律導檔再取尾，例如 `git push -q origin main > /tmp/push.log 2>&1; tail -3 /tmp/push.log`。`pytest` 全套同理。
+- 🔴 **`git push` 必須丟背景**（2026-08-06 實測）：pre-push 全套 **267 秒** > Bash 前景上限 **120 秒** ⇒ **前景一定 timeout**。
+  導檔取尾**擋不住這個**（那治的是輸出量，不是時長）。用 `run_in_background`。
 
 **哨兵**：`scripts/ts_stamp.sh`（掛 Pre/PostToolUse on `Bash|Edit|Write` + `UserPromptSubmit`）。
 - **A 類**（call 內 >10s）＝分類器路徑掛住 → 🐌 警告
@@ -117,7 +119,7 @@ pytest                                           # all tests
 - **使用者不必盯螢幕、不必算時間、不必回報**。移除法見腳本檔頭。
 
 **測試與 CI**
-- `pytest tests/governance -q` 要 **110 秒**（287 tests）。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套，且**丟背景**，否則看起來像當機。
+- `pytest tests/governance -q` 要 **267 秒**（**766 tests**；2026-08-06 實跑 `766 passed in 267.20s`。舊記「110 秒 / 287 tests」已過期，害本日 push 撞 120 秒前景上限）。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套，且**丟背景**，否則看起來像當機。
 - 跑完測試須 `bash scripts/restore_golden_inventory.sh` 還原 golden inventory 的副作用（否則 `tests/golden/l65/test_inventory.txt` 會髒）。
 - CI 只剩 `governance.yml` + `verify_claim.yml`。`l65_benchmark.yml` 已於 2026-07-26 **刪除**（連續 startup failure、0 秒無 log、從未真的跑過＝零保護純噪音）。`scripts/benchmark_l65.py` **保留**，要測效能請本機跑——共用 runner 測效能回歸本來就低訊號。
 - 3 個既有測試檔探針空心（`test_verify_gate{,_b3,_b4}.py`）＝假綠，已在 `gov_check.sh` 具名排除。
