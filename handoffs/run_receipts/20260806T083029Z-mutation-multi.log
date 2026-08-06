@@ -1,0 +1,189 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 396 items / 320 deselected / 76 selected
+
+tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_appendix_lines_always_empty_turns_red PASSED [  1%]
+tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_sources_exempt_always_false_turns_red PASSED [  2%]
+tests/governance/test_claimcheck_verbatim_exempt.py::test_mutation_family_result_removed_from_whitelist_turns_red PASSED [  3%]
+tests/governance/test_debt_clear.py::test_mutation_mode_review_guard PASSED [  5%]
+tests/governance/test_debt_clear.py::test_mutation_open_guard PASSED     [  6%]
+tests/governance/test_debt_clear.py::test_mutation_completeness_guard PASSED [  7%]
+tests/governance/test_debt_clear.py::test_mutation_identity_binding_guard PASSED [  9%]
+tests/governance/test_debt_clear.py::test_mutation_roster_equals_guard PASSED [ 10%]
+tests/governance/test_debt_clear.py::test_mutation_family_sha_guard PASSED [ 11%]
+tests/governance/test_debt_emit.py::test_mutation_producer_forced PASSED [ 13%]
+tests/governance/test_debt_emit.py::test_mutation_absent_session_must_use_lock PASSED [ 14%]
+tests/governance/test_debt_emit.py::test_mutation_scan_errors_fail_closed PASSED [ 15%]
+tests/governance/test_debt_emit.py::test_mutation_shift_guard PASSED     [ 17%]
+tests/governance/test_debt_emit.py::test_mutation_empty_require_absent_guard PASSED [ 18%]
+tests/governance/test_debt_emit.py::test_mutation_rc_propagation PASSED  [ 19%]
+tests/governance/test_debt_emit.py::test_mutation_rs_reject_guard PASSED [ 21%]
+tests/governance/test_debt_emit.py::test_mutation_splitlines_fullset_reject PASSED [ 22%]
+tests/governance/test_debt_emit.py::test_mutation_json_recursive_string_guard PASSED [ 23%]
+tests/governance/test_debt_emit.py::test_mutation_registry_value_guard PASSED [ 25%]
+tests/governance/test_debt_emit.py::test_mutation_scan_derives_open_event_from_registry PASSED [ 26%]
+tests/governance/test_debt_emit.py::test_mutation_opens_debt_must_be_strict_true PASSED [ 27%]
+tests/governance/test_debt_gate.py::test_mutation_check_open_debt_always_zero_turns_red PASSED [ 28%]
+tests/governance/test_debt_gate.py::test_mutation_skip_debt_call_site_turns_red PASSED [ 30%]
+tests/governance/test_debt_ledger.py::test_mutation_malformed_json_guard PASSED [ 31%]
+tests/governance/test_doc_format_precheck.py::test_mutation_dext_anchor_check_removed_turns_red PASSED [ 32%]
+tests/governance/test_doc_format_precheck.py::test_mutation_blank_touch_check_removed_turns_red PASSED [ 34%]
+tests/governance/test_doc_format_precheck.py::test_mutation_hollow3_narrowing_leaks_to_spec_turns_red PASSED [ 35%]
+tests/governance/test_doc_format_precheck.py::test_mutation_precheck_routing_removed_turns_red PASSED [ 36%]
+tests/governance/test_doc_format_precheck.py::test_mutation_nested_glob_restored_turns_red PASSED [ 38%]
+tests/governance/test_doc_format_precheck.py::test_mutation_synth_route_placed_after_early_exit_turns_red PASSED [ 39%]
+tests/governance/test_doc_format_precheck.py::test_mutation_precheck_exit_code_swallowed_turns_red PASSED [ 40%]
+tests/governance/test_gate_structured_verdict.py::test_mutation_restore_loose_regex_turns_red PASSED [ 42%]
+tests/governance/test_gov_check_dep_failclosed.py::test_mutation_restore_conditional_mount_check_turns_red PASSED [ 43%]
+tests/governance/test_gov_check_dep_failclosed.py::test_mutation_restore_conditional_skip_turns_red PASSED [ 44%]
+tests/governance/test_low_risk_impl_requires_reconcile.py::test_mutation_impl_reconcile_only_on_high_allows_low PASSED [ 46%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_dirname_sess_allows_nested_bypass PASSED [ 47%]
+tests/governance/test_reconcile_target_bound_to_synth.py::test_mutation_remove_realpath_allows_dropped PASSED [ 48%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_review_requires_exactly_one_audit PASSED [ 50%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_exactly_one_audit PASSED [ 51%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_requires_open_round PASSED [ 52%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_is_one_way PASSED [ 53%]
+tests/governance/test_registry_v2_shape.py::test_mutation_rebuild_rejects_external_round_id PASSED [ 55%]
+tests/governance/test_registry_v2_shape.py::test_mutation_fresh_discovery_does_not_recheck_audit PASSED [ 56%]
+tests/governance/test_result_state_format_failed.py::test_mutation_t2_m35_emit_order_orphan_success PASSED [ 57%]
+tests/governance/test_result_state_format_failed.py::test_mutation_t2_m36_degrade_format_failed_to_success PASSED [ 59%]
+tests/governance/test_result_state_format_failed.py::test_mutation_t2_m37_checker_missing_fail_open PASSED [ 60%]
+tests/governance/test_result_state_format_failed.py::test_mutation_t2_m38_format_failed_exit_zero PASSED [ 61%]
+tests/governance/test_rolegate_predispatch.py::test_mutation_preflight_after_gate_turns_red FAILED [ 63%]
+tests/governance/test_rolegate_predispatch.py::test_mutation_raw_intersection_rejects_composer PASSED [ 64%]
+tests/governance/test_rolegate_predispatch.py::test_mutation_incompat_list_first_only_turns_red FAILED [ 65%]
+tests/governance/test_rolegate_predispatch.py::test_mutation_canonical_role_gate_skip_turns_red FAILED [ 67%]
+tests/governance/test_rolegate_predispatch.py::test_mutation_task_id_inline_committee_turns_red FAILED [ 68%]
+tests/governance/test_stamp_no_task_rejected.py::test_mutation_allow_missing_task_breaks_guard PASSED [ 69%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v1_without_inject_turns_red PASSED [ 71%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v2_v3_shared_taskid_precheck_turns_red PASSED [ 72%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_committee_partial_check_reopens_orphan_debt FAILED [ 73%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v4_move_after_gate_adds_audit FAILED [ 75%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v5_skip_multi_target_turns_red FAILED [ 76%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v6_skip_path_guard_turns_red FAILED [ 77%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v7_skip_register_turns_red PASSED [ 78%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v8_ignore_fam_turns_red PASSED [ 80%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v9_skip_task_anchor_turns_red PASSED [ 81%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v10_accept_rejected_turns_red PASSED [ 82%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v11_register_on_cli_fail_turns_red PASSED [ 84%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v12_force_stamp_target_all_kinds_turns_red PASSED [ 85%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v13_silent_register_fail_turns_red PASSED [ 86%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v14_dual_grep_turns_red PASSED [ 88%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v15_skip_sha_anchor_turns_red PASSED [ 89%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v16_unescaped_task_id_turns_red PASSED [ 90%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v17_order_sensitive_only_turns_red PASSED [ 92%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v18_skip_missing_kind_turns_red FAILED [ 93%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v19_prefix_extract_turns_red FAILED [ 94%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v20_drop_unknown_case_turns_red FAILED [ 96%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_v21_drop_unknown_case_turns_red FAILED [ 97%]
+tests/governance/test_stamp_taskid_inject.py::test_mutation_group_h_prefix_extract_matrix_turns_red FAILED [ 98%]
+tests/governance/test_waived_adversarial_still_stamps.py::test_mutation_waived_adv_skips_stamp_breaks_guard PASSED [100%]
+
+=================================== FAILURES ===================================
+_________________ test_mutation_preflight_after_gate_turns_red _________________
+tests/governance/test_rolegate_predispatch.py:805: in test_mutation_preflight_after_gate_turns_red
+    assert after_m != before_m, "mutation 必須使 audit 零新增失敗"
+E   AssertionError: mutation 必須使 audit 零新增失敗
+E   assert b'' != b''
+_______________ test_mutation_incompat_list_first_only_turns_red _______________
+tests/governance/test_rolegate_predispatch.py:895: in test_mutation_incompat_list_first_only_turns_red
+    assert non[0] in c0 and non[1] in c0
+E   AssertionError: assert ('codex' in 'bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_incompat_list_fi0/repo/scripts/session_name_check.sh: No such file or directory\nERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)\n')
+_______________ test_mutation_canonical_role_gate_skip_turns_red _______________
+tests/governance/test_rolegate_predispatch.py:986: in test_mutation_canonical_role_gate_skip_turns_red
+    assert side_effect, (
+E   AssertionError: canonical mutation 後須破壞零副作用/拒派；rc=2 audit_same=True out='' err='bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_canonical_role_g0/mut/repo/scripts/session_name_check.sh: No such file or directory\nERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)\n'
+E   assert False
+_______________ test_mutation_task_id_inline_committee_turns_red _______________
+tests/governance/test_rolegate_predispatch.py:1056: in test_mutation_task_id_inline_committee_turns_red
+    assert r_ssot.returncode != 0 and (opened or after_m != before_m), (
+E   AssertionError: inline mutation 須造成漂移（開債 vs SSOT 拒）; committee_rc=2 ssot_rc=2 opened=False
+E   assert (2 != 0 and (False or b'' != b''))
+E    +  where 2 = CompletedProcess(args=['bash', '/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_task_id_inline_c0/mut/repo/scripts/_role_gate.sh', 'check-task-id', 'GOV#MUT'], returncode=2, stdout='', stderr='ERROR: task_id 不符合白名單 ^[A-Za-z0-9._-]+$（第⑦道／committee 前移）: GOV#MUT\n').returncode
+__________ test_mutation_committee_partial_check_reopens_orphan_debt ___________
+tests/governance/test_stamp_taskid_inject.py:1640: in test_mutation_committee_partial_check_reopens_orphan_debt
+    assert len(opens) >= 1, "變異後應重現孤兒 OPEN 債；若仍為 0 表示該測試無保護力"
+E   AssertionError: 變異後應重現孤兒 OPEN 債；若仍為 0 表示該測試無保護力
+E   assert 0 >= 1
+E    +  where 0 = len([])
+_________________ test_mutation_v4_move_after_gate_adds_audit __________________
+tests/governance/test_stamp_taskid_inject.py:1675: in test_mutation_v4_move_after_gate_adds_audit
+    assert len(opens) >= 1, f"刪除 gate 前檢查後應已開債；rc={r.returncode}"
+E   AssertionError: 刪除 gate 前檢查後應已開債；rc=2
+E   assert 0 >= 1
+E    +  where 0 = len([])
+_________________ test_mutation_v5_skip_multi_target_turns_red _________________
+tests/governance/test_stamp_taskid_inject.py:1713: in test_mutation_v5_skip_multi_target_turns_red
+    assert len(opens) >= 1, f"V5 閹割後應開債；rc={r.returncode} {r.stderr}"
+E   AssertionError: V5 閹割後應開債；rc=2 bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_v5_skip_multi_ta0/repo/scripts/session_name_check.sh: No such file or directory
+E     ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)
+E     
+E   assert 0 >= 1
+E    +  where 0 = len([])
+__________________ test_mutation_v6_skip_path_guard_turns_red __________________
+tests/governance/test_stamp_taskid_inject.py:1753: in test_mutation_v6_skip_path_guard_turns_red
+    assert len(opens) >= 1, f"V6 閹割後應開債；rc={r.returncode} {r.stderr}"
+E   AssertionError: V6 閹割後應開債；rc=2 bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_v6_skip_path_gua0/repo/scripts/session_name_check.sh: No such file or directory
+E     ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)
+E     
+E   assert 0 >= 1
+E    +  where 0 = len([])
+________________ test_mutation_v18_skip_missing_kind_turns_red _________________
+tests/governance/test_stamp_taskid_inject.py:2414: in test_mutation_v18_skip_missing_kind_turns_red
+    assert len(opens) >= 1, f"V18 閹割後應開債；rc={r.returncode} {r.stderr}"
+E   AssertionError: V18 閹割後應開債；rc=2 bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_v18_skip_missing0/repo/scripts/session_name_check.sh: No such file or directory
+E     ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)
+E     
+E   assert 0 >= 1
+E    +  where 0 = len([])
+__________________ test_mutation_v19_prefix_extract_turns_red __________________
+tests/governance/test_stamp_taskid_inject.py:2469: in test_mutation_v19_prefix_extract_turns_red
+    assert len(opens) >= 1, (
+E   AssertionError: V19 前綴擷取閹割後 stamp-evil 應開債；rc=2 bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_v19_prefix_extra0/repo/scripts/session_name_check.sh: No such file or directory
+E     ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)
+E     
+E   assert 0 >= 1
+E    +  where 0 = len([])
+________________ test_mutation_v20_drop_unknown_case_turns_red _________________
+tests/governance/test_stamp_taskid_inject.py:2518: in test_mutation_v20_drop_unknown_case_turns_red
+    assert len(opens) >= 1, (
+E   AssertionError: V20 閹割後 evilstamp 應開債；rc=2 bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_v20_drop_unknown0/repo/scripts/session_name_check.sh: No such file or directory
+E     ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)
+E     
+E   assert 0 >= 1
+E    +  where 0 = len([])
+________________ test_mutation_v21_drop_unknown_case_turns_red _________________
+tests/governance/test_stamp_taskid_inject.py:2566: in test_mutation_v21_drop_unknown_case_turns_red
+    assert len(opens) >= 1, (
+E   AssertionError: V21 閹割後 bogus 應開債；rc=2 bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_v21_drop_unknown0/repo/scripts/session_name_check.sh: No such file or directory
+E     ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)
+E     
+E   assert 0 >= 1
+E    +  where 0 = len([])
+____________ test_mutation_group_h_prefix_extract_matrix_turns_red _____________
+tests/governance/test_stamp_taskid_inject.py:2632: in test_mutation_group_h_prefix_extract_matrix_turns_red
+    assert len(opens_evil) >= 1, (
+E   AssertionError: 群H 前綴擷取後 stamp-evil 應開債轉紅；rc=2 bash: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-1160/test_mutation_group_h_prefix_e0/mut-h/repo/scripts/session_name_check.sh: No such file or directory
+E     ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)
+E     
+E   assert 0 >= 1
+E    +  where 0 = len([])
+=========================== short test summary info ============================
+FAILED tests/governance/test_rolegate_predispatch.py::test_mutation_preflight_after_gate_turns_red
+FAILED tests/governance/test_rolegate_predispatch.py::test_mutation_incompat_list_first_only_turns_red
+FAILED tests/governance/test_rolegate_predispatch.py::test_mutation_canonical_role_gate_skip_turns_red
+FAILED tests/governance/test_rolegate_predispatch.py::test_mutation_task_id_inline_committee_turns_red
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_committee_partial_check_reopens_orphan_debt
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_v4_move_after_gate_adds_audit
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_v5_skip_multi_target_turns_red
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_v6_skip_path_guard_turns_red
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_v18_skip_missing_kind_turns_red
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_v19_prefix_extract_turns_red
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_v20_drop_unknown_case_turns_red
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_v21_drop_unknown_case_turns_red
+FAILED tests/governance/test_stamp_taskid_inject.py::test_mutation_group_h_prefix_extract_matrix_turns_red
+================ 13 failed, 63 passed, 320 deselected in 48.84s ================
