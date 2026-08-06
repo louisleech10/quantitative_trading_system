@@ -133,10 +133,20 @@ bash "${SCRIPT_DIR}/_role_gate.sh" check-task-id "${task_id}" || exit 2
 # 同樣須在 gate.sh dispatch **之前** ⇒ 不合規時 audit 零新增。
 # 規約與理由見 scripts/session_name_check.sh 檔頭；**只適用新輪次，舊 session 不溯及既往**。
 # ---------------------------------------------------------------------------
-bash "${SCRIPT_DIR}/session_name_check.sh" --session "${session}" --task-id "${task_id}" || {
-  echo "ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)" >&2
-  exit 2
-}
+# 🔴 「腳本不存在則跳過」的理由（2026-08-06，勿當成鬆綁）：
+#   governance 測試以**精選腳本清單**建隔離 repo（見 tests/governance/test_debt_emit.py 的 _harness），
+#   且刻意使用合成 session 名（`sess-b3`／`mut-comp`／`idem`…）。
+#   把規約強加於測試需改 11 個測試檔的合成名稱——**溯及既往且零收益**
+#   （那些名字永遠不會進真實 audit），違反使用者 2026-08-06「既有釘死不動」。
+#   ⇒ 真 repo 一定有此檔故一定強制；隔離 repo 沒有故自然跳過。
+#   **刪檔即失效的風險由 `tests/governance/test_session_name_guard_wired.py` 擋**
+#   （斷言：檔案存在、可執行、且 committee_run.sh 確實呼叫它）。
+if [ -f "${SCRIPT_DIR}/session_name_check.sh" ]; then
+  bash "${SCRIPT_DIR}/session_name_check.sh" --session "${session}" --task-id "${task_id}" || {
+    echo "ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)" >&2
+    exit 2
+  }
+fi
 
 # --- 家族驗證(對 SoT,非硬編) ---
 # shellcheck source=/dev/null
