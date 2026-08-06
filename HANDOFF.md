@@ -27,9 +27,20 @@
 
 ## 🔴 工作區有未 commit 的 B3 修補（**不要 commit**）
 
-**已追蹤（9 個 `M`）**：`scripts/_gate_lex.sh`／`gate_check.sh`／`extract_phase2_expected_flips.py`／
-`tests/governance/test_gate_{decision,deny_fields,lexical_contract}.py`／
-`tests/governance/fixtures/{gate_decision_corpus,phase2_expected_flips}.txt(+.sha256)`
+**已追蹤（10 個 `M`）**：
+
+```
+scripts/_gate_lex.sh
+scripts/extract_phase2_expected_flips.py
+scripts/gate_check.sh
+tests/governance/fixtures/gate_decision_corpus.txt
+tests/governance/fixtures/gate_decision_corpus.txt.sha256
+tests/governance/fixtures/phase2_expected_flips.txt
+tests/governance/fixtures/phase2_expected_flips.txt.sha256
+tests/governance/test_gate_decision.py
+tests/governance/test_gate_deny_fields.py
+tests/governance/test_gate_lexical_contract.py
+```
 
 **未追蹤（1 個 `??`）**：`docs/GOVB0_FRICTION_AMENDMENTS.md`（C5 決策的延伸檔）
 
