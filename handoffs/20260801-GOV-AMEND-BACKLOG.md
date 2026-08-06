@@ -1622,6 +1622,23 @@ codex R1 實跑：把真實 handoff 截成 6 行、保留一個完整 finding bo
   `· codex: 缺 APPROVED 戳記` `· grok: 缺 APPROVED 戳記`
 - ⇒ **grok 必須為一份它從未參與審查的收斂檔蓋章。**
 
+### 🔴 第二次現場發作（2026-08-06，`GOVB39-B2-REVIEW-R1`）
+
+與上述形態**逐點相同**，證實「必然而非偶發」：
+
+- 依 ORCH §1 現行分工派 `codex,composer` 做 code review（`brief-kind: review`）⇒ 角色閘放行、兩家完成
+- 收斂檔 `handoffs/reconcile/20260806-govb39-b2-review-r1/synth.md` 完成
+  （6 findings 歸 3 群集，`reconcile_cluster_attribution_check.sh` rc=0）
+- 兩家 append `APPROVED` 後 `bash scripts/reconcile_stamps_check.sh <該檔>` → **rc=1**：
+  `· grok: 缺 APPROVED 戳記`
+- ⇒ 主委被迫補派 `20260806-GOVB39-B2-STAMP-R2` 單獨向 grok 求一個**它未參與該輪審查**的戳記。
+
+**累計現場發作：2 次**（2026-08-05 `GOVB0-SPEC-R1`／2026-08-06 `GOVB39-B2-REVIEW-R1`）。
+**每次成本＝額外一輪派工**（開債／派工／戳記／銷帳），且該輪產出的戳記**語意為空**。
+
+⇒ 依使用者 2026-08-06 淨摩擦判準：新增每次成本＝1 輪派工 × 每個 review 輪；
+省下的重工＝0（它不防任何錯誤）⇒ **淨摩擦為正**，屬應優先修掉的那類。
+
 ### 為何是制度缺陷而非操作失誤
 
 1. `implementer` 恆為 `review_families` 的成員（現行 SoT 即如此），所以**這不是偶發組合，是必然**。

@@ -1,125 +1,81 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-06 | **Branch**: main（`af12438`，本地＝遠端）
-**狀態**: ✅ 38 張票裁定定版（三家戳記 `df82cd54`）→ 下一步＝**`票 B-39`**
+**Agent**: Claude(Opus 5) | **Time**: 2026-08-06 深夜 | **Branch**: main（`84e7479`，本地＝遠端）
+**狀態**: ✅ `票 B-39` 實作完成並 push（782 passed）→ 待 grok 補戳記 → 下一步＝**第 1 批**
 
-## ▶ 接手第一件事：`票 B-39`（id-like heading 誤判）
+## ▶ 接手第一件事
 
-**它排第一是委員兩家一致的裁定**——擋著所有委員輪，本日已作廢 4 輪。
+1. `git rev-parse HEAD origin/main` — **兩值必須相同**（今日踩過：push exit code 0 但實際被拒）
+2. `bash scripts/debt_ledger.sh --has-open` — 應 rc=0
+3. 若 `handoffs/reconcile/20260806-govb39-b2-review-r1/synth.md` 缺 grok 戳記，
+   跑 `bash scripts/reconcile_stamps_check.sh <該檔>` 確認，缺就補派（見下 `票 B-34`）
 
-- 票：`handoffs/20260801-GOV-AMEND-BACKLOG.md` 的 `## B-39`
-- SPEC 草案：`docs/GOVB39_IDLIKE_HEADING_SPEC.md`（三支檢查器 rc=0，**未經審查**）
-- 根因：`completeness_check.sh:60` `HEADING_LINE_RE='#{2,6}'` 把 id-like 子標題送進 finding 通道；
-  同檔 `:913` body-hash 用 `##(?!#)` ⇒ **同檔兩處定義不一致**
-- 🔴 **不得寫成「禁 `###`」**（主委犯過；那是把摩擦轉嫁給每位委員卻不修根因）
-
-## 執行順序（三家戳記定版）
+## 執行順序
 
 ```
-1. 票 B-39  id-like heading 誤判      ← 現在這裡
-2. 阻塞鏈   B-38 / B-15 / B-19 / B-31   （B-32 已 DONE，勿沿用）
-   ＝「第 1 批」，同批含 B-29 與 B-16 擴充 A/B/C
-3. 群集 ID 登記（併 B-26）＋ 探針 owner（併 B-13/B-36）
-4. B3R      詞法層重寫（規格 → 原型 → 差分 → 落地）
+1. 票 B-39   ✅ 完成（commit 1515827＋84e7479）
+2. 第 1 批    ← 現在這裡。偵察已完成：handoffs/20260806-BATCH1-RECON.md
+              B-19 → B-31 → B-38 → B-15 → B-29 → B-16 擴充 A/B/C
+3. 群集 ID 登記（併 B-26）
+4. B3R       詞法層重寫
 5. B4 → B5 → B6 → B7
 ```
 
-**B3 不再獨立驗收，由 B3R 吸收**（codex 裁定）。
+## 第 1 批：偵察已做完，開工可直接用
 
-## 🆕 2026-08-06 追加：`票 B-16` 擴充 C（使用者裁定合併，不開新票）
+**`handoffs/20260806-BATCH1-RECON.md`** — 五張票的目標檔全部存在、既有測試已定位、
+機制現況已實跑確認、依賴順序已初判。**開工前必讀**（B-39 就是漏了這步繞掉 90 分鐘）。
 
-**病**：宣稱的量詞範圍 > 實際驗證的覆蓋範圍（「驗了子集就寫成全集」）。
-主委同型錯誤本日 **11 次**，其中 **7 次可定位**、4 次靠委員推翻。
+兩個已定位的低成本切入點：
+- **B-31**：把「交件前自跑 `completeness_check --single`」從 brief 手寫移進 `cx_run.sh` prompt 模板。
+  今日 R2 實驗證實有效（R1 兩家 format-failed → R2 一次全過）。**淨摩擦顯著為負。**
+- **B-19**：`brief_conformance_check.sh` 實測只有 **6 個條件分支**，擴充項可用主委今日的 4 個 brief 錯誤當實證來源。
 
-- **既有票只蓋兩塊**：`B-29`＝程式行為域、`B-16` 擴充 A＝文件斷言域；**「子集→全集」原本無票**
-- **`verification_claim_check.py` 放行此類**——檔頭自陳「不判斷『人對結果的詮釋是否正確』」
-- **修法**：全稱／否定量詞句須帶 `COVERAGE: <實跑數>/<母體數> <母體定義>`；缺欄或兩數與量詞矛盾 ⇒ rc=1
-- **吸收 `票 B-40`**（自造規則掛使用者名下＝該病一個實例）。使用者：「票永遠開不完，除非有一勞永逸的解法」
-- 🔴 **誠實邊界**：母體數由作者宣告 ⇒ **擋不住謊報**（擋意外不防蓄意，同 `B-23` 紀律）
+## 🔴 今日新增的坑（會再咬人）
+
+| 坑 | 內容 |
+|---|---|
+| **push 假成功** | `git push` exit code 0 不代表推上去。**一律 `git rev-parse HEAD origin/main` 比對兩值** |
+| **code block 不安全** | `extract_heading_ids()` 無 code-fence 狀態機 ⇒ code block 內行首 `#` 一樣被當 heading。**brief 的引用指示一律用行內反引號** |
+| **`VERIFY:` 格式** | 冒號後**不得有空格**，接 `[A-Za-z0-9_.\-:]+`；用 finding ID 當 receipt id 會 fail。exempt 類別只有 `typo\|doc-example\|migration-note\|template-drift\|tooling-blocked\|spec-ambiguity` |
+| **`票 B-34` 必然發作** | review 是雙家族，但 `reconcile_stamps_check` 要三家 ⇒ 每個 review 輪都要多派一輪求 grok 空戳記。今日第 2 次，已追加事故計數 |
+| **戳記區的 `---`** | append `## 戳記` 時**不要**帶 `---` 分隔線，它會落進最後一個 finding 的 body 使 hash 不符 |
 
 ## 🔴 工作區有未 commit 的 B3 修補（**不要 commit**）
 
-**已追蹤（10 個 `M`）**：
+10 個 `M`（`scripts/_gate_lex.sh`、`scripts/extract_phase2_expected_flips.py`、
+`scripts/gate_check.sh`、`tests/governance/fixtures/*` ×4、`tests/governance/test_gate_*.py` ×3）
+＋ 1 個 `??`（`docs/GOVB0_FRICTION_AMENDMENTS.md`）。保留至 B3R。
+
+## 使用者判準（全域）
 
 ```
-scripts/_gate_lex.sh
-scripts/extract_phase2_expected_flips.py
-scripts/gate_check.sh
-tests/governance/fixtures/gate_decision_corpus.txt
-tests/governance/fixtures/gate_decision_corpus.txt.sha256
-tests/governance/fixtures/phase2_expected_flips.txt
-tests/governance/fixtures/phase2_expected_flips.txt.sha256
-tests/governance/test_gate_decision.py
-tests/governance/test_gate_deny_fields.py
-tests/governance/test_gate_lexical_contract.py
+淨摩擦 = 新增每次成本 × 發生次數 − 省下重工 × 避免次數     為負才做
 ```
+以前和現在的**釘死不動**（forward-only）｜優先找通則，別逐洞開票｜
+可讀性不是驗收標準｜有信心自己做完的就做，不需詰問的不必 call 委員｜
+**鐵律直接做不包成問題**（雙家 review／三方戳記／閉合再驗證／gate 前置）
 
-**未追蹤（1 個 `??`）**：`docs/GOVB0_FRICTION_AMENDMENTS.md`（C5 決策的延伸檔）
+## 本日主委錯誤：同型 16 次
 
-保留至 B3R。**風險未經證明**：仍帶 E-1 換行繞道與 E-2 大輸入 O(n²)（500K→30s）。
-⚠️ **不得宣稱現況安全**——「10K→0.09s 故非即時風險」已被 codex 推翻並撤回。
+「驗了 A 就當作 B 也成立」。最嚴重的第 16 次：把**自己多寫一條 `---`** 造成的 hash 不符
+歸因為「兩個工具定義不一致」，並據此廢掉一整輪委員債。
+⇒ 對策已開票：**`票 B-16` 擴充 C**（宣稱的量詞範圍 > 實際驗證範圍 ⇒ 須帶 `COVERAGE:` 欄），
+排在第 1 批，落地後這類會在寫檔當下被擋。
 
-🔴 **接手時的第一個動作**：`git status --short` 應**恰好**是上述 9 `M` + 1 `??`
-（外加 `.claude/gate/*.log` 的正常追加）。**多出任何檔案代表有人動過，先查清再繼續。**
-
-## 使用者 2026-08-06 定的判準（治理 epic 全域適用）
+## 派工前置（每次必跑，單獨跑並讀輸出）
 
 ```
-淨摩擦 = 新增的每次成本 × 發生次數 − 省下的重工成本 × 避免的次數
-```
-
-- **不只用來選票，也是「每張票怎麼修」的約束**（否則發散）
-- **可讀性不是驗收標準**；**溯及既往預設關閉**
-- **優先找通則，別為每種失誤各開一張票**（`B-40` 即因此當天收掉）
-- 使用者授權：**有信心自己做完的就自己做完，不需互相詰問的不必 call 委員**
-
-## 本日新增／修正的機制
-
-| 檔 | 做什麼 |
-|---|---|
-| `session_name_check.sh` | session／task-id 命名規約；接進 `committee_run.sh`（**檔案不存在則跳過**，理由見檔內） |
-| `test_session_name_guard_wired.py` | 擋「刪檔即失效」；斷言存在＋可執行＋確實被呼叫 |
-| `reconcile_cluster_attribution_check.sh` | 群集引用 ID 對回附錄斷言；接進 `reconcile_build.sh`（只印不擋） |
-| `reconcile_stamps_check.sh` | **每家族取最後一筆戳記**（最新蓋掉舊的）＋ 同行混用狀態詞 fail-closed |
-| `status_marker_check.sh` | 任務 ID 須 `b`+8 位英數**且檔案真存在** |
-| `plain_docs_sync_check.sh` | 日誌納管＋進度單一出處守衛 |
-
-⚠️ **說明檔的更新必須是最後一個 commit**——先提交說明檔再改腳本會被時序判準判過期。
-
-## 本日主委錯誤（同型 9 次，供下個 session 警惕）
-
-**「驗了 A 就當作 B 也成立」**：封存只驗 1/20 消費者／看 C5 當 C4／小輸入宣稱整體安全／
-關鍵字計數當事故證據／一個案例失敗當全體失敗／codex 說關就當兩家都說關／
-照工具訊息字面轉述未複驗。**其中 6 次由委員抓到。**
-
-⇒ 對策已落地：`reconcile_cluster_attribution_check.sh` 首次使用即抓到 2 條掉項。
-
-## ▶ 派工前的固定前置（本日踩過才寫下）
-
-```
-1. bash scripts/debt_ledger.sh --has-open        # 單獨跑並讀輸出，勿塞進背景指令
+1. bash scripts/debt_ledger.sh --has-open
 2. bash scripts/session_name_check.sh --session <名> --task-id <大寫同名>
 3. bash scripts/doc_format_precheck.sh <brief>
 4. python3 scripts/verification_claim_check.py --files <brief>
-5. 上游收斂檔須已三家 APPROVED（否則委員依 Rule 12 拒絕作業）
+5. 上游收斂檔須三家 APPROVED
+6. 🔴 **grep 既有測試與規格**（B-39 的教訓，本條今日新增）
 ```
-
-**第 5 條本日被 codex 擋過一次**：拿未核可的收斂檔當下一輪的開票依據。
-
-## 收斂檔的固定收尾
-
-```
-1. bash scripts/reconcile_cluster_attribution_check.sh <synth.md>   # 掉項/錯位自檢
-2. bash scripts/completeness_check.sh --lock <sources.lock>
-3. python3 scripts/verification_claim_check.py --files <synth.md>
-4. bash scripts/reconcile_body_hash.sh <synth.md>                   # 供戳記 brief
-5. 戳記過後：bash scripts/gate.sh register-output <task-id> <synth.md>
-```
-
-**第 1 條是本日新增**，首次使用即抓到 2 條掉項；**第 5 條本日漏做過一次**（provenance pending）。
 
 ## 坑（沿用）
 
 `rc` 禁經 pipe｜禁 `cd <專案路徑>` 前綴｜中文路徑 `git -c core.quotepath=false`｜
-`rm` 在 deny 用 `git rm`｜commit 訊息用 `-F 檔案`｜brief 兩支檢查器一次驗｜
-**前置檢查要單獨跑並讀到輸出**（塞進背景指令會看不到結果，本日踩過）
+`rm`／`git clean` 在 deny，用 `mv` 移到 `.claude/tmp/`｜commit 訊息用 `-F 檔案`｜
+`pytest tests/governance` 要 **267 秒**（782 tests），`git push` 必須 `run_in_background`（前景上限 120 秒）
