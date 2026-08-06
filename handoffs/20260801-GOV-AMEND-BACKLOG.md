@@ -1779,6 +1779,32 @@ COMPLETENESS FAIL: 完整性檢查未過(…)。補齊後重跑。
 composer 的報告**格式完全合規**，判定為「兩項皆 CLOSED、可進 TODO 生成」——
 **「沒有 finding」正是它的結論**，不是缺漏。
 
+### 🔴 第二次現場發作（2026-08-07 `GOVB19-X-CONSULT-R1`）——**優先序決定性證據**
+
+**這次是被 `票 B-31` 的修法直接誘發出來的，形態比第一次更明確**：
+
+1. 2026-08-06 `票 B-31` 落地，在 `cx_run.sh` prompt 加入
+   「若結論確為 0 finding，請明確寫出並保留完整推理，**勿為湊數捏造 finding**」。
+2. 本輪 composer 的產出第 171 行即為 `## 本輪 0 findings — 推理保留`
+   ⇒ **委員完全照做，誠實回報而非捏造**。
+3. `bash scripts/completeness_check.sh --single <該檔> --family composer` → **rc=0（PASS）**
+4. `bash scripts/reconcile_build.sh …` → `COMPLETENESS WARN: 抽不到任何 heading ID` ＋
+   `COMPLETENESS FAIL` ⇒ **rc=1，收斂無法建立，該輪只能 abandon**。
+
+⇒ **制度在同一輪內自相矛盾**：一支檢查說「0 findings 合法」，另一支說「0 findings 即失敗」。
+⇒ **誠實回報反而受罰**：若 composer 當時捏造一條 finding，本輪就能正規收斂。
+   `票 B-31` 的警告擋住了捏造，但**沒有給誠實者出路**。
+
+**這在 B-31 的 code review 中已被預言**〔`CODEX-R1-P1-01`，2026-08-06〕：
+「自檢假綠，收斂時才失敗」——**24 小時內原樣重現**。
+
+**累計現場發作：2 次**（08-05 `GOVB0-SPEC-R6`／08-07 `GOVB19-X-CONSULT-R1`），
+且第二次**擋住了另一張票（`B-19`）的裁定收斂**。
+
+⇒ 🔴 **優先序：本票應排在第 1 批之首。** 依淨摩擦判準：
+它每次發作都強制一輪 abandon（該輪產出無法正規銷帳），且**與 `B-31` 的誠實性要求直接衝突**
+——不修它，`B-31` 的警告等於把委員推進「誠實則卡住、捏造則通過」的兩難。
+
 ### 為何是制度缺陷
 
 1. 檢查器把「抽不到 ID」一律當**可疑**（原意是防「委員沒用 canonical 格式」），
