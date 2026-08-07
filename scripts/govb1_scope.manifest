@@ -1,6 +1,19 @@
 # GOVB1 scope manifest — pure data; deny wins over allow
 # Generated for Task 0.1; hash-locked via govb1_frozen_hashes.txt
-# Verbs: allow | deny | consumer | meta (consumer must be allow subset; meta = 治理簿記，非產品 scope)
+# Verbs: allow | deny | consumer | meta
+#   consumer ⊆ allow − deny
+#   meta = 精確凍結集合（expected-set 寫死於 scripts/govb1_final_gate.sh 之 _g7_policy；
+#          本檔不得自證合法）。三層 membership 判準（為何是這 6 項；閘仍是 expected-set）：
+#     Tier A（簿記）：HANDOFF.md／CLAUDE.md／handoffs/20260801-GOV-AMEND-BACKLOG.md／白話說明/
+#       → manifest 字面值／目錄前綴
+#     Tier B（W′ 權威資料）：scripts/govb1_task_tickets.tsv
+#       → consult 裁定（b2-consult-r1）
+#     Tier C（W′ 讀取端，恰一支）：scripts/govb1_single_source_check.sh
+#       → 同時滿足：①於 base_commit 已存在 ②匹配 scripts/govb1_*.sh
+#         ③不在任一 Task「修改∪新建」欄 ④本 epic 內修改它僅因 W′ 改讀 TSV
+#   禁止擴張：Tier C 不得擴至非 govb1_*.sh、非 base 前既存、或可放入 allow 之產品路徑；
+#   新增任何 meta 列須先改 _g7_policy expected-set 並取得委員裁定，非靜默旁路。
+#   「不在 Task 欄」只能解釋為不能用 allow，不能自動產生 meta（T-0.1-F5 只比 allow）。
 
 deny scripts/govb1_baseline_dirty.txt
 
@@ -40,11 +53,11 @@ consumer scripts/gen_govb1_contract_matrix.sh
 consumer scripts/gen_fact_key_blocks.sh
 consumer scripts/findings_kind_classify.sh
 
-# meta：治理簿記（非產品 scope）；集合封閉、寫死、隨 hash 凍結
+# meta：精確凍結 6 項（expected-set 見 _g7_policy；見檔頭 Tier A/B/C）
 meta HANDOFF.md
 meta CLAUDE.md
 meta handoffs/20260801-GOV-AMEND-BACKLOG.md
 meta 白話說明/
 meta scripts/govb1_task_tickets.tsv
-# W′ 讀取端：改讀 TSV 後須入 decl；不在任何 Task「修改∪新建」⇒ 禁 allow（F5），故 meta
+# Tier C：W′ 讀取端（恰此一支）；禁 allow（F5）故 meta
 meta scripts/govb1_single_source_check.sh

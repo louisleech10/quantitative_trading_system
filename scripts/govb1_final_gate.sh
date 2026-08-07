@@ -82,6 +82,39 @@ _g7_policy() {   # stdout: 本批 scope 白名單（一行一筆；目錄以 `/`
   )"
   [ -z "${_form_err}" ] \
     || { printf 'G-7 FAIL: scope manifest 路徑形態不支援（fail-closed）:\n%s\n' "${_form_err}" >&2; return 1; }
+  # meta expected-set〔CODEX-R1-P0-01／b2-review-r1〕：精確凍結 6 項，寫死於實作端。
+  # 不得改由 manifest 自身宣告（自證＝無檢查）。多一／少一／改字皆立即非零。
+  # 「不在 Task 欄」只能解釋為不能用 allow，不能自動產生 meta。
+  _meta_want="$(printf '%s\n' \
+    'HANDOFF.md' \
+    'CLAUDE.md' \
+    'handoffs/20260801-GOV-AMEND-BACKLOG.md' \
+    '白話說明/' \
+    'scripts/govb1_task_tickets.tsv' \
+    'scripts/govb1_single_source_check.sh' | LC_ALL=C sort -u)"
+  _meta_got="$(
+    awk '
+      function mpath(   p) {
+        p = $0
+        sub(/^[ \t]+/, "", p)
+        if (p == "" || p ~ /^#/) return ""
+        if (!match(p, /^meta[ \t]/)) return ""
+        return substr(p, RSTART + RLENGTH)
+      }
+      $1 == "meta" {
+        p = mpath()
+        if (p != "") print p
+      }
+    ' "${GOVB1_SCOPE_MANIFEST}" | LC_ALL=C sort -u
+  )"
+  if [ "${_meta_got}" != "${_meta_want}" ]; then
+    echo "G-7 FAIL: meta expected-set 不符（精確凍結集合；多一/少一/改字皆拒）" >&2
+    echo "  expected:" >&2
+    printf '%s\n' "${_meta_want}" | sed 's/^/    /' >&2
+    echo "  got:" >&2
+    printf '%s\n' "${_meta_got}" | sed 's/^/    /' >&2
+    return 1
+  fi
   # manifest 為純資料：allow | deny | consumer | meta；decl = (allow ∪ meta) − deny；deny 優先
   # 🔴 path = 動詞後整段（含空白／"）；禁 $2 截斷〔CODEX-R4-P1-01〕
   # 🔴 raw 抽取：動詞後恰好一個空白/tab，不再 sub 吃掉路徑自身前後空白〔CODEX-R5-P1-01〕

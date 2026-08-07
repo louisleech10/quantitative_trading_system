@@ -599,7 +599,8 @@ if [ "${kind}" = "dispatch" ]; then
           || { echo "ERROR: Task ${_gb1_task} 歸屬票未具名 → 拒發 impl token。"; exit 1; }
       else
         bash "${_gb1_ss}" >/dev/null 2>&1 \
-          || { echo "ERROR: GOVB1 §0.1a 對應表結構未過 → 拒發 impl token。"
+          || { echo "ERROR: GOVB1 歸屬 TSV 結構未過 → 拒發 impl token。"
+               echo "  歸屬事實之權威為 scripts/govb1_task_tickets.tsv；docs/GOVB1_INPUT_QUALITY_TODO.md 不可寫（W′ 禁手改）。"
                echo "  重跑看細節：bash scripts/govb1_single_source_check.sh"; exit 1; }
       fi
       ;;

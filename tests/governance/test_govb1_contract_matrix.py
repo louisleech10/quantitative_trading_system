@@ -437,6 +437,20 @@ def _rehash_scope_manifest() -> None:
     )
 
 
+# meta 精確凍結集合（與 _g7_policy expected-set 字面一致；合成 manifest 須附齊）
+_META_FROZEN_LINES = (
+    "meta HANDOFF.md\n"
+    "meta CLAUDE.md\n"
+    "meta handoffs/20260801-GOV-AMEND-BACKLOG.md\n"
+    "meta 白話說明/\n"
+    "meta scripts/govb1_task_tickets.tsv\n"
+    "meta scripts/govb1_single_source_check.sh\n"
+)
+_META_FROZEN_SET = frozenset(
+    ln[5:] for ln in _META_FROZEN_LINES.splitlines() if ln.startswith("meta ")
+)
+
+
 def _call_g7_policy() -> subprocess.CompletedProcess[str]:
     """呼叫 production `_g7_policy`（含 hash／未知動詞守衛）。"""
     return _run(
@@ -472,7 +486,7 @@ _g7_covered "$1" "$2"
 
 
 def test_meta_t1_paths_covered_by_g7_policy() -> None:
-    """T1：`meta` 路徑被 `_g7_policy` 涵蓋；移除該列 ⇒ uncovered。"""
+    """T1：`meta` 路徑被 `_g7_policy` 涵蓋；移除該列 ⇒ expected-set 非零。"""
     # 正例：六條 meta 皆在 decl（W′ 增 TSV + single_source_check 讀取端）
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
@@ -490,7 +504,7 @@ def test_meta_t1_paths_covered_by_g7_policy() -> None:
             p.endswith("/") and _g7_covered_rc("白話說明/README.md", "\n".join(sorted(decl_lines))) == 0
         )
 
-    # 反例：移除 HANDOFF.md 之 meta 列 ⇒ 該路徑 uncovered 且 policy 仍綠
+    # 反例（b2-r2 B3）：移除 HANDOFF.md 之 meta 列 ⇒ expected-set 拒收（非零）
     orig_m = MANIFEST.read_text(encoding="utf-8")
     orig_f = FROZEN.read_text(encoding="utf-8")
     try:
@@ -503,20 +517,22 @@ def test_meta_t1_paths_covered_by_g7_policy() -> None:
         MANIFEST.write_text(mutated, encoding="utf-8")
         _rehash_scope_manifest()
         proc2 = _call_g7_policy()
-        assert proc2.returncode == 0, proc2.stderr + proc2.stdout
-        decl2 = {ln for ln in proc2.stdout.splitlines() if ln.strip()}
-        assert "HANDOFF.md" not in decl2
-        assert _g7_covered_rc("HANDOFF.md", "\n".join(sorted(decl2))) != 0
+        assert proc2.returncode != 0, "移除 meta 列應使 expected-set 非零"
+        combined = proc2.stderr + proc2.stdout
+        assert "expected-set" in combined, combined
     finally:
         MANIFEST.write_text(orig_m, encoding="utf-8")
         FROZEN.write_text(orig_f, encoding="utf-8")
+    # 還原後回綠
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
 
 
 def test_meta_t2_undeclared_path_still_fails_g7() -> None:
     """T2：偵測力不減——既不在 allow 也不在 meta 的路徑 ⇒ g7 差集仍 FAIL。
 
     正向：模擬 actual 含 `scripts/evil.sh` ⇒ extra 非空（≡ g7 FAIL）。
-    反例對照：同一路徑若寫入 `meta` ⇒ covered，extra 空。
+    反例對照（b2-r2）：同一路徑若寫入 `meta` ⇒ expected-set 拒收（不可旁路）。
     """
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
@@ -550,7 +566,7 @@ printf 'EXTRA:%s' "${extra}"
     assert sim.returncode == 0, sim.stderr + sim.stdout
     assert "scripts/evil.sh" in sim.stdout
 
-    # 反例：把 evil 寫進 meta 後 covered ⇒ 差集空（偵測對「已宣告」仍綠）
+    # 反例（B2）：把 evil 寫進 meta + rehash ⇒ expected-set 非零（不得旁路進 decl）
     orig_m = MANIFEST.read_text(encoding="utf-8")
     orig_f = FROZEN.read_text(encoding="utf-8")
     try:
@@ -563,23 +579,17 @@ printf 'EXTRA:%s' "${extra}"
                 r"""
 set -u
 eval "$(sed -n '/^_g7_policy()/,/^}/p' scripts/govb1_final_gate.sh)"
-eval "$(sed -n '/^_g7_covered()/,/^}/p' scripts/govb1_final_gate.sh)"
-decl="$(_g7_policy)" || exit 2
-extra=""
-while IFS= read -r p; do
-  [ -n "${p}" ] || continue
-  _g7_covered "${p}" "${decl}" || extra="${extra}${p}"$'\n'
-done <<'EOF'
-scripts/evil.sh
-EOF
-[ -z "${extra}" ] || { echo "T2 FAIL: meta 後 evil 不應在 extra" >&2; exit 1; }
+_g7_policy
 """,
             ]
         )
-        assert sim2.returncode == 0, sim2.stderr + sim2.stdout
+        assert sim2.returncode != 0, "任意 meta 旁路應使 expected-set 非零"
+        assert "expected-set" in (sim2.stderr + sim2.stdout)
     finally:
         MANIFEST.write_text(orig_m, encoding="utf-8")
         FROZEN.write_text(orig_f, encoding="utf-8")
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
 
 
 def test_meta_t3_unknown_verb_fail_closed() -> None:
@@ -606,27 +616,28 @@ def test_meta_t3_unknown_verb_fail_closed() -> None:
 
 
 def test_meta_t4_deny_wins_over_meta() -> None:
-    """T4：同路徑同時 meta 與 deny ⇒ 不得出現在 decl；僅 meta 則在 decl。"""
-    probe = "scripts/meta_deny_probe_only.sh"
+    """T4：同路徑同時 meta 與 deny ⇒ 不得出現在 decl；僅 meta 則在 decl。
+
+    b2-r2：不得再以任意 probe 擴 meta（expected-set）；改以凍結集合內路徑驗 deny 優先。
+    """
+    frozen = "HANDOFF.md"
+    # 僅 meta（現行）⇒ 在 decl
+    only = _call_g7_policy()
+    assert only.returncode == 0, only.stderr + only.stdout
+    assert frozen in {ln.strip() for ln in only.stdout.splitlines()}
+
     orig_m = MANIFEST.read_text(encoding="utf-8")
     orig_f = FROZEN.read_text(encoding="utf-8")
     try:
-        # 僅 meta ⇒ 在 decl
-        MANIFEST.write_text(orig_m + f"\nmeta {probe}\n", encoding="utf-8")
-        _rehash_scope_manifest()
-        only = _call_g7_policy()
-        assert only.returncode == 0, only.stderr + only.stdout
-        assert probe in {ln.strip() for ln in only.stdout.splitlines()}
-
-        # meta + deny ⇒ 不在 decl
+        # meta（凍結集合）+ deny 同路徑 ⇒ 不在 decl；policy 仍綠（meta 集合未變）
         MANIFEST.write_text(
-            orig_m + f"\nmeta {probe}\ndeny {probe}\n",
+            orig_m.rstrip("\n") + f"\ndeny {frozen}\n",
             encoding="utf-8",
         )
         _rehash_scope_manifest()
         both = _call_g7_policy()
         assert both.returncode == 0, both.stderr + both.stdout
-        assert probe not in {ln.strip() for ln in both.stdout.splitlines()}
+        assert frozen not in {ln.strip() for ln in both.stdout.splitlines()}
     finally:
         MANIFEST.write_text(orig_m, encoding="utf-8")
         FROZEN.write_text(orig_f, encoding="utf-8")
@@ -678,11 +689,16 @@ def _policy_decl_from_manifest_text(manifest_body: str) -> set[str]:
     """以 production `_g7_policy` 解析任意 manifest 文字 → decl 集合。
 
     透過暫存檔 + 暫時重寫 frozen hash-lock；呼叫端負責還原主樹。
+    合成 body 若未含 meta，自動附齊精確凍結 6 項（expected-set 硬性要求）。
     """
+    body = manifest_body if manifest_body.endswith("\n") else manifest_body + "\n"
+    # 已有 meta 列者（例如以 production 為底）不重複附加
+    if not any(ln.startswith("meta ") for ln in body.splitlines()):
+        body = body + _META_FROZEN_LINES
     orig_m = MANIFEST.read_text(encoding="utf-8")
     orig_f = FROZEN.read_text(encoding="utf-8")
     try:
-        MANIFEST.write_text(manifest_body, encoding="utf-8")
+        MANIFEST.write_text(body, encoding="utf-8")
         _rehash_scope_manifest()
         proc = _call_g7_policy()
         assert proc.returncode == 0, proc.stderr + proc.stdout
@@ -1241,7 +1257,7 @@ def test_wprime_a5_meta_tickets_in_decl_count_36() -> None:
 
 
 def test_wprime_a5_counterexample_remove_meta_uncovers_tsv() -> None:
-    """A5 反：移除 TSV meta 列 + rehash ⇒ TSV 路徑 uncovered。"""
+    """A5 反／B3：移除 TSV meta 列 + rehash ⇒ expected-set 非零。"""
     orig_m = MANIFEST.read_text(encoding="utf-8")
     orig_f = FROZEN.read_text(encoding="utf-8")
     try:
@@ -1257,18 +1273,17 @@ def test_wprime_a5_counterexample_remove_meta_uncovers_tsv() -> None:
         MANIFEST.write_text(mutated, encoding="utf-8")
         _rehash_scope_manifest()
         proc = _call_g7_policy()
-        assert proc.returncode == 0, proc.stderr + proc.stdout
-        decl = {ln for ln in proc.stdout.splitlines() if ln.strip()}
-        assert "scripts/govb1_task_tickets.tsv" not in decl
-        assert _g7_covered_rc("scripts/govb1_task_tickets.tsv", "\n".join(sorted(decl))) != 0
-        assert len(decl) == 35  # 仍含 single_source meta
+        assert proc.returncode != 0, "移除凍結 meta 應 expected-set 非零"
+        assert "expected-set" in (proc.stderr + proc.stdout)
     finally:
         MANIFEST.write_text(orig_m, encoding="utf-8")
         FROZEN.write_text(orig_f, encoding="utf-8")
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
 
 
 def test_wprime_a6_undeclared_path_still_blocked() -> None:
-    """A6：未宣告路徑仍被擋（假綠回歸保護）。"""
+    """A6／B5：未宣告路徑仍被擋；B2：寫入 meta 旁路 ⇒ expected-set 非零。"""
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = proc.stdout
@@ -1282,11 +1297,47 @@ def test_wprime_a6_undeclared_path_still_blocked() -> None:
         MANIFEST.write_text(orig_m.rstrip("\n") + f"\nmeta {evil}\n", encoding="utf-8")
         _rehash_scope_manifest()
         proc2 = _call_g7_policy()
-        assert proc2.returncode == 0, proc2.stderr + proc2.stdout
-        assert _g7_covered_rc(evil, proc2.stdout) == 0
+        assert proc2.returncode != 0, "任意 meta 旁路應 expected-set 非零"
+        assert "expected-set" in (proc2.stderr + proc2.stdout)
     finally:
         MANIFEST.write_text(orig_m, encoding="utf-8")
         FROZEN.write_text(orig_f, encoding="utf-8")
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
+
+
+def test_b2r2_b4_meta_path_rename_rejected() -> None:
+    """B4：將某 meta 路徑改字 + rehash ⇒ 非零；還原 ⇒ rc=0。"""
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        mutated = orig_m.replace(
+            "meta scripts/govb1_task_tickets.tsv",
+            "meta scripts/govb1_task_tickets_renamed.tsv",
+            1,
+        )
+        assert mutated != orig_m
+        MANIFEST.write_text(mutated, encoding="utf-8")
+        _rehash_scope_manifest()
+        bad = _call_g7_policy()
+        assert bad.returncode != 0, "改字 meta 應 expected-set 非零"
+        assert "expected-set" in (bad.stderr + bad.stdout)
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
+
+
+def test_b2r2_b6_gate_msg_points_to_tsv_not_01a() -> None:
+    """B6：gate.sh 失敗訊息含 govb1_task_tickets.tsv，不含 §0.1a 字面。"""
+    text = (REPO / "scripts" / "gate.sh").read_text(encoding="utf-8")
+    # 全檔不得殘留 0.1a（歷史說明亦禁；本輪一次改齊）
+    assert "0.1a" not in text, "gate.sh 仍含 0.1a 字面"
+    assert "§0.1a" not in text
+    # 失敗訊息指向 TSV
+    assert "govb1_task_tickets.tsv" in text
+    assert "歸屬" in text and "TSV" in text
 
 
 def test_wprime_a7_existing_suite_still_present() -> None:
