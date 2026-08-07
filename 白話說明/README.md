@@ -322,3 +322,5 @@ B3 是第一批真的改判斷邏輯的。中間卡住一次，根因是我把�
 <!-- r5-meta-sync: 2026-08-08 G-7 quotepath + meta 動詞落地後 plain-docs 時序同步 -->
 
 <!-- r6-nulsafe-sync: 2026-08-08 G-7 NUL-safe path parse 後 plain-docs 時序同步 -->
+
+<!-- r7-grammar-sync: 2026-08-08 G-7 manifest grammar fail-closed 後 plain-docs 時序同步 -->
