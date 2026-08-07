@@ -17,10 +17,31 @@ REF:handoffs/reconcile/20260807-govb1-x-consult-r10/synth.md
 
 **數字一律現跑；本檔不記數字。**
 
-## ✅ 批 1 已收案（`GATE-B1` 通過，兩家 APPROVED 零 finding）
+## ✅ 批 1 已收案並收尾（`GATE-B1` 通過；收尾亦兩家 APPROVED 零 finding）
 
-`base=62787fe` → `ae68bc3`(r1) → `b92aff6`(r2) → `d56b07e`(r3) → `fd7f0f1`(r4, HEAD)
-裁定＝`handoffs/reconcile/20260807-govb1-b1-review-r3/synth.md`（含四項殘留表）。
+`base=62787fe` → `ae68bc3`(r1) → `b92aff6`(r2) → `d56b07e`(r3) → `fd7f0f1`(r4)
+→ `1768232`／`98101e9`／`ddbc24d`／`0ea95d2`(r5) → `947e0b2`／`277ed5f`(r6)
+→ `bac3d13`／`9de1694`(r7, HEAD)
+
+**主委自跑之權威值**：`bash scripts/govb1_final_gate.sh` → **rc=0**（`g0_tests`／`g0_syntax`／`g1`–`g8` 全 PASS）。
+🔴 codex 該輪回報 rc=1，根因為**其沙箱 `.git` lock 建不起 worktree**，codex 自陳不得稱綠；
+composer 同命令 rc=0。依「執行端 rc ＝該沙箱內 rc」以主委自跑為準。
+
+**裁定鏈**（皆無戳記工作輸入）：
+`…/b1-review-r3/synth.md`（`GATE-B1` 收案）→ `…/b1-consult-r1/synth.md`（簿記 vs `G-7` 互斥，採方案 B）
+→ `…/b1-review-r4`（`CODEX-R4-P1-01`）→ `…/b1-review-r5`（`CODEX-R5-P1-01`，改採有界解）
+→ `…/b1-review-r6/synth.md`（**最終收案，含五項殘留表**）。
+
+### 收尾期間之三項設計變更（皆經三家或雙家裁定）
+
+1. **manifest 增 `meta` 動詞**（封閉四項：`HANDOFF.md`／`CLAUDE.md`／backlog／`白話說明/`）
+   ——解「治理簿記檔 commit 即違反 `G-7`」vs「不 commit 則 pre-push 擋」之互斥。
+   `_g7_policy` decl ＝ `(allow ∪ meta) − deny`；🔴 **`T-0.1-F5` 維持只比 `allow`**。
+2. **`_g7` 路徑處理 NUL-safe**：manifest path ＝動詞後整段（禁 `$2` 截斷）；
+   actual ＝ `git -c core.quotepath=false diff --name-only -z`。
+3. **manifest grammar fail-closed**：路徑之 `leading-whitespace`／`trailing-whitespace`／`control-char`
+   ⇒ 顯式拒絕並印 `form=<名>`。**設計即「不支援者顯式拒絕」，非缺陷**——
+   後續同類形態變體一律不受理（`…/b1-review-r5/synth.md` 收斂裁定）。
 
 ## ▶ 下一步：批 2（Task 1.1 lifecycle matrix）
 
@@ -32,7 +53,7 @@ REF:handoffs/reconcile/20260807-govb1-x-consult-r10/synth.md
 解鎖＝派 consult 輪（不帶 `--todo`）請三家裁定 → 於 Task 標題宣告 → 更新 TODO `§0.1a`。
 **主委不得自行推測**（內文第一個票號常為交叉引用）。
 
-## 🔴 批 1 之具名殘留（四項，**不得宣稱已閉合**）
+## 🔴 批 1 之具名殘留（**五項，不得宣稱已閉合**）
 
 | # | 殘留 | 機械綁定 |
 |---|---|---|
@@ -40,6 +61,7 @@ REF:handoffs/reconcile/20260807-govb1-x-consult-r10/synth.md
 | R-2 | TODO §B 三處偽碼不可執行（`票 B-43`） | ❌ **無**——照抄得假綠，無檢查會擋 |
 | R-3 | `single_source_check` 為正向斷言，擋不住「有 pointer 但旁邊另寫互斥判準」 | ❌ 併 `票 B-25` |
 | R-4 | 「引用已廢判準只寫階號」為寫作紀律 | ❌ 併 `票 B-25` |
+| R-5 | **兩份 `_g7_policy` 分叉**：production 含 `meta`＋`mpath()`；`_f5_shell()` 內嵌僅 `allow`＋`$2` | ❌ 無——修法方向＝共用單一 manifest parser（`CODEX-R4-P2-02`，兩家判 MINOR、未證明已假綠） |
 
 **R-1 到期時**：放寬 `_g7` 與更新到期測試**須配對**；只改測試不改守衛＝假綠。
 
