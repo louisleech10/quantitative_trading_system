@@ -1,6 +1,6 @@
 # GOVB1 scope manifest — pure data; deny wins over allow
 # Generated for Task 0.1; hash-locked via govb1_frozen_hashes.txt
-# Verbs: allow | deny | consumer (consumer must be allow subset)
+# Verbs: allow | deny | consumer | meta (consumer must be allow subset; meta = 治理簿記，非產品 scope)
 
 deny scripts/govb1_baseline_dirty.txt
 
@@ -39,3 +39,9 @@ consumer scripts/govb1_final_gate.sh
 consumer scripts/gen_govb1_contract_matrix.sh
 consumer scripts/gen_fact_key_blocks.sh
 consumer scripts/findings_kind_classify.sh
+
+# meta：治理簿記（非產品 scope）；集合封閉、寫死、隨 hash 凍結
+meta HANDOFF.md
+meta CLAUDE.md
+meta handoffs/20260801-GOV-AMEND-BACKLOG.md
+meta 白話說明/

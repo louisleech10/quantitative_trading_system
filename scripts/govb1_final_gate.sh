@@ -15,8 +15,12 @@ _g2_consumers() {   # stdout: consumer 檔清單（一行一檔）；禁人手�
     && { echo "G-2 FAIL: plan 有檢查函式不存在（非 consumer closure，見 B.4#6）" >&2; return 1; }
   : "${GOVB1_SCOPE_MANIFEST:=scripts/govb1_scope.manifest}"
   _cons="$(awk '$1=="consumer"{print $2}' "${GOVB1_SCOPE_MANIFEST}" | LC_ALL=C sort -u)"
-  _allow="$(_g7_policy)" || return 1
-  # consumer 必為 allow 之子集；否則 manifest 自相矛盾 ⇒ fail-closed
+  # schema／hash 守衛（未知動詞 fail-closed 等）
+  _g7_policy >/dev/null || return 1
+  # consumer ⊆ allow−deny（不含 meta；meta 非產品 scope）
+  _allow="$(awk '$1=="deny"{d[$2]=1} $1=="allow"{a[$2]=1}
+                 END{ for (p in a) if (!(p in d)) print p }' \
+            "${GOVB1_SCOPE_MANIFEST}" | LC_ALL=C sort -u)"
   _bad="$(comm -23 <(printf '%s\n' "${_cons}") <(printf '%s\n' "${_allow}"))"
   [ -z "${_bad}" ] || { printf 'G-2 FAIL: consumer 不在 allow 內:\n%s\n' "${_bad}" >&2; return 1; }
   printf '%s\n' "${_cons}"
@@ -36,8 +40,15 @@ _g7_policy() {   # stdout: 本批 scope 白名單（一行一筆；目錄以 `/`
   _got="$(shasum -a 256 "${GOVB1_SCOPE_MANIFEST}" | cut -c1-12)"
   [ -n "${_want}" ] && [ "${_want}" = "${_got}" ] \
     || { echo "G-7 FAIL: scope manifest 雜湊不符（want=${_want} got=${_got}）" >&2; return 1; }
-  # manifest 為純資料：allow / deny；deny 優先
-  awk '$1=="deny"{d[$2]=1} $1=="allow"{a[$2]=1}
+  # 未知動詞 fail-closed〔CODEX-R1-P0-01〕：打錯字被靜默忽略 ≡ 該列不存在
+  _unk="$(awk 'NF && $1 !~ /^#/ && $1 != "allow" && $1 != "deny" && $1 != "consumer" && $1 != "meta" {
+                 print $1
+               }' "${GOVB1_SCOPE_MANIFEST}")"
+  [ -z "${_unk}" ] \
+    || { printf 'G-7 FAIL: scope manifest 含未知動詞（fail-closed）:\n%s\n' "${_unk}" >&2; return 1; }
+  # manifest 為純資料：allow | deny | consumer | meta；decl = (allow ∪ meta) − deny；deny 優先
+  awk '$1=="deny"{d[$2]=1}
+       $1=="allow"||$1=="meta"{a[$2]=1}
        END{ for (p in a) if (!(p in d)) print p }' "${GOVB1_SCOPE_MANIFEST}" | LC_ALL=C sort -u
 }
 _nonempty() { [ -n "$2" ] || { echo "$1 FAIL: 抽取結果為空（pattern 失效）" >&2; return 1; }; }

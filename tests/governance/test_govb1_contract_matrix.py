@@ -421,6 +421,254 @@ def test_t01_f5_mutation_extra_allow_fails() -> None:
         MANIFEST.write_text(original, encoding="utf-8")
 
 
+# ── 方案 B：manifest `meta` 動詞（r5）──────────────────────────────────
+
+
+def _rehash_scope_manifest() -> None:
+    """重算 scope_manifest hash-lock；base_commit 不變。"""
+    base = _base_commit()
+    h = _run(
+        ["bash", "-c", "shasum -a 256 scripts/govb1_scope.manifest | cut -c1-12"]
+    )
+    assert h.returncode == 0 and h.stdout.strip(), h.stderr
+    FROZEN.write_text(
+        f"base_commit: {base}\nscope_manifest: {h.stdout.strip()}\n",
+        encoding="utf-8",
+    )
+
+
+def _call_g7_policy() -> subprocess.CompletedProcess[str]:
+    """呼叫 production `_g7_policy`（含 hash／未知動詞守衛）。"""
+    return _run(
+        [
+            "bash",
+            "-c",
+            r"""
+set -u
+eval "$(sed -n '/^_g7_policy()/,/^}/p' scripts/govb1_final_gate.sh)"
+_g7_policy
+""",
+        ]
+    )
+
+
+def _g7_covered_rc(path: str, decl: str) -> int:
+    """production `_g7_covered`：$path 是否被 $decl 涵蓋 → rc 0/1。"""
+    proc = _run(
+        [
+            "bash",
+            "-c",
+            r"""
+set -u
+eval "$(sed -n '/^_g7_covered()/,/^}/p' scripts/govb1_final_gate.sh)"
+_g7_covered "$1" "$2"
+""",
+            "_",
+            path,
+            decl,
+        ]
+    )
+    return proc.returncode
+
+
+def test_meta_t1_paths_covered_by_g7_policy() -> None:
+    """T1：`meta` 路徑被 `_g7_policy` 涵蓋；移除該列 ⇒ uncovered。"""
+    # 正例：四條 meta 皆在 decl
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl_lines = {ln for ln in proc.stdout.splitlines() if ln.strip()}
+    for p in (
+        "HANDOFF.md",
+        "CLAUDE.md",
+        "handoffs/20260801-GOV-AMEND-BACKLOG.md",
+        "白話說明/",
+    ):
+        assert p in decl_lines, f"meta 路徑應在 decl: {p}"
+        assert _g7_covered_rc(p.rstrip("/"), "\n".join(sorted(decl_lines))) == 0 or (
+            p.endswith("/") and _g7_covered_rc("白話說明/README.md", "\n".join(sorted(decl_lines))) == 0
+        )
+
+    # 反例：移除 HANDOFF.md 之 meta 列 ⇒ 該路徑 uncovered 且 policy 仍綠
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        mutated = "\n".join(
+            ln
+            for ln in orig_m.splitlines()
+            if ln.strip() != "meta HANDOFF.md"
+        ) + "\n"
+        assert mutated != orig_m
+        MANIFEST.write_text(mutated, encoding="utf-8")
+        _rehash_scope_manifest()
+        proc2 = _call_g7_policy()
+        assert proc2.returncode == 0, proc2.stderr + proc2.stdout
+        decl2 = {ln for ln in proc2.stdout.splitlines() if ln.strip()}
+        assert "HANDOFF.md" not in decl2
+        assert _g7_covered_rc("HANDOFF.md", "\n".join(sorted(decl2))) != 0
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+
+
+def test_meta_t2_undeclared_path_still_fails_g7() -> None:
+    """T2：偵測力不減——既不在 allow 也不在 meta 的路徑 ⇒ g7 差集仍 FAIL。
+
+    正向：模擬 actual 含 `scripts/evil.sh` ⇒ extra 非空（≡ g7 FAIL）。
+    反例對照：同一路徑若寫入 `meta` ⇒ covered，extra 空。
+    """
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl = proc.stdout
+    evil = "scripts/evil.sh"
+    assert evil not in {ln.strip() for ln in decl.splitlines() if ln.strip()}
+    assert _g7_covered_rc(evil, decl) != 0, "evil 不得被現行 decl 涵蓋"
+
+    # 與 production `_g7` 同一差集語意：未涵蓋 ⇒ extra 非空 ⇒ 應 FAIL
+    sim = _run(
+        [
+            "bash",
+            "-c",
+            r"""
+set -u
+eval "$(sed -n '/^_g7_policy()/,/^}/p' scripts/govb1_final_gate.sh)"
+eval "$(sed -n '/^_g7_covered()/,/^}/p' scripts/govb1_final_gate.sh)"
+decl="$(_g7_policy)" || exit 2
+extra=""
+while IFS= read -r p; do
+  [ -n "${p}" ] || continue
+  _g7_covered "${p}" "${decl}" || extra="${extra}${p}"$'\n'
+done <<'EOF'
+scripts/evil.sh
+EOF
+[ -n "${extra}" ] || { echo "T2 FAIL: evil 應使 extra 非空" >&2; exit 1; }
+printf 'EXTRA:%s' "${extra}"
+""",
+        ]
+    )
+    assert sim.returncode == 0, sim.stderr + sim.stdout
+    assert "scripts/evil.sh" in sim.stdout
+
+    # 反例：把 evil 寫進 meta 後 covered ⇒ 差集空（偵測對「已宣告」仍綠）
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        MANIFEST.write_text(orig_m + f"\nmeta {evil}\n", encoding="utf-8")
+        _rehash_scope_manifest()
+        sim2 = _run(
+            [
+                "bash",
+                "-c",
+                r"""
+set -u
+eval "$(sed -n '/^_g7_policy()/,/^}/p' scripts/govb1_final_gate.sh)"
+eval "$(sed -n '/^_g7_covered()/,/^}/p' scripts/govb1_final_gate.sh)"
+decl="$(_g7_policy)" || exit 2
+extra=""
+while IFS= read -r p; do
+  [ -n "${p}" ] || continue
+  _g7_covered "${p}" "${decl}" || extra="${extra}${p}"$'\n'
+done <<'EOF'
+scripts/evil.sh
+EOF
+[ -z "${extra}" ] || { echo "T2 FAIL: meta 後 evil 不應在 extra" >&2; exit 1; }
+""",
+            ]
+        )
+        assert sim2.returncode == 0, sim2.stderr + sim2.stdout
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+
+
+def test_meta_t3_unknown_verb_fail_closed() -> None:
+    """T3：未知動詞 ⇒ `_g7_policy` 非零；合法動詞集合下 rc=0。"""
+    # 正例：現行 manifest 全綠
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
+
+    # 反例：allowx foo
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        MANIFEST.write_text(orig_m + "\nallowx foo\n", encoding="utf-8")
+        _rehash_scope_manifest()
+        bad = _call_g7_policy()
+        assert bad.returncode != 0, "未知動詞應使 _g7_policy 非零"
+        assert "未知動詞" in (bad.stderr + bad.stdout)
+        # --only g7 亦應紅
+        g7 = _run(["bash", str(GATE), "--only", "g7"])
+        assert g7.returncode != 0, "未知動詞應使 g7 FAIL"
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+
+
+def test_meta_t4_deny_wins_over_meta() -> None:
+    """T4：同路徑同時 meta 與 deny ⇒ 不得出現在 decl；僅 meta 則在 decl。"""
+    probe = "scripts/meta_deny_probe_only.sh"
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        # 僅 meta ⇒ 在 decl
+        MANIFEST.write_text(orig_m + f"\nmeta {probe}\n", encoding="utf-8")
+        _rehash_scope_manifest()
+        only = _call_g7_policy()
+        assert only.returncode == 0, only.stderr + only.stdout
+        assert probe in {ln.strip() for ln in only.stdout.splitlines()}
+
+        # meta + deny ⇒ 不在 decl
+        MANIFEST.write_text(
+            orig_m + f"\nmeta {probe}\ndeny {probe}\n",
+            encoding="utf-8",
+        )
+        _rehash_scope_manifest()
+        both = _call_g7_policy()
+        assert both.returncode == 0, both.stderr + both.stdout
+        assert probe not in {ln.strip() for ln in both.stdout.splitlines()}
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+
+
+def test_meta_t5_f5_still_allow_only() -> None:
+    """T5：`T-0.1-F5` 仍只比 allow（meta 不混入）；既有 F5 不斷言轉紅。"""
+    # 正例：F5 與 production policy 並存——F5 只讀 allow，現行應 PASS
+    f5 = _run(["bash", "-c", _f5_shell()])
+    assert f5.returncode == 0, f5.stderr + f5.stdout
+
+    # meta 在 production decl 中，但 F5 內嵌 _g7_policy 不含 meta
+    prod = _call_g7_policy()
+    assert prod.returncode == 0, prod.stderr + prod.stdout
+    assert "HANDOFF.md" in prod.stdout
+    f5_policy = _run(
+        [
+            "bash",
+            "-c",
+            r"""
+set -u
+: "${GOVB1_SCOPE_MANIFEST:=scripts/govb1_scope.manifest}"
+awk '$1=="deny"{d[$2]=1} $1=="allow"{a[$2]=1}
+     END{ for (p in a) if (!(p in d)) print p }' "${GOVB1_SCOPE_MANIFEST}" | LC_ALL=C sort -u
+""",
+        ]
+    )
+    assert f5_policy.returncode == 0
+    assert "HANDOFF.md" not in f5_policy.stdout
+    assert "白話說明/" not in f5_policy.stdout
+
+    # 反例方向：多餘 allow 仍使 F5 轉紅（既有 mutation 契約）
+    original = MANIFEST.read_text(encoding="utf-8")
+    try:
+        MANIFEST.write_text(
+            original + "\nallow scripts/not_in_any_task_column.sh\n",
+            encoding="utf-8",
+        )
+        proc = _run(["bash", "-c", _f5_shell()])
+        assert proc.returncode != 0, "多餘 allow 應使 F5 lint FAIL"
+    finally:
+        MANIFEST.write_text(original, encoding="utf-8")
+
+
 # ── ASSERT 列 + CLI 契約 ──────────────────────────────────────────────
 
 
