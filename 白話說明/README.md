@@ -324,3 +324,5 @@ B3 是第一批真的改判斷邏輯的。中間卡住一次，根因是我把�
 <!-- r6-nulsafe-sync: 2026-08-08 G-7 NUL-safe path parse 後 plain-docs 時序同步 -->
 
 <!-- r7-grammar-sync: 2026-08-08 G-7 manifest grammar fail-closed 後 plain-docs 時序同步 -->
+
+<!-- b2-wprime-sync: 2026-08-08 GOVB1 批2 W′ 歸屬 TSV 後 plain-docs 時序同步 -->
