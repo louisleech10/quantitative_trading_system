@@ -47,9 +47,32 @@ _g7_policy() {   # stdout: 本批 scope 白名單（一行一筆；目錄以 `/`
   [ -z "${_unk}" ] \
     || { printf 'G-7 FAIL: scope manifest 含未知動詞（fail-closed）:\n%s\n' "${_unk}" >&2; return 1; }
   # manifest 為純資料：allow | deny | consumer | meta；decl = (allow ∪ meta) − deny；deny 優先
-  awk '$1=="deny"{d[$2]=1}
-       $1=="allow"||$1=="meta"{a[$2]=1}
-       END{ for (p in a) if (!(p in d)) print p }' "${GOVB1_SCOPE_MANIFEST}" | LC_ALL=C sort -u
+  # 🔴 path = 動詞後整段（含空白／"）；禁 $2 截斷〔CODEX-R4-P1-01〕
+  awk '
+    function mpath(   p) {
+      p = $0
+      sub(/^[ \t]+/, "", p)
+      if (p == "" || p ~ /^#/) return ""
+      if (!match(p, /^[^ \t]+[ \t]+/)) return ""
+      p = substr(p, RSTART + RLENGTH)
+      sub(/[ \t]+$/, "", p)
+      return p
+    }
+    $1 == "deny" {
+      p = mpath()
+      if (p != "") d[p] = 1
+      next
+    }
+    $1 == "allow" || $1 == "meta" {
+      p = mpath()
+      if (p != "") a[p] = 1
+      next
+    }
+    END {
+      for (p in a)
+        if (!(p in d)) print p
+    }
+  ' "${GOVB1_SCOPE_MANIFEST}" | LC_ALL=C sort -u
 }
 _nonempty() { [ -n "$2" ] || { echo "$1 FAIL: 抽取結果為空（pattern 失效）" >&2; return 1; }; }
 
@@ -131,15 +154,12 @@ _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
           || { echo "G-7 FAIL: base_commit 非 HEAD 祖先（range 無意義）" >&2; return 1; }
         # core.quotepath=false：非 ASCII 路徑（如 白話說明/）不得被 C-quote，
         # 否則與 manifest meta 前綴比對永遠 miss（方案 B 簿記目錄會假紅）。
-        actual="$(git -c core.quotepath=false diff --name-only --diff-filter=ACMRD "$(_base)" HEAD | LC_ALL=C sort -u)"
-        # 引號保留：含空白路徑不得斷詞（COMPOSER-R8-P2-01）
+        # -z：含空白／" 之路徑不得被行式 name-only 的 C-quote 或空白截斷〔CODEX-R4-P1-01〕
         extra=""
-        while IFS= read -r p; do
+        while IFS= read -r -d '' p; do
           [ -n "${p}" ] || continue
           _g7_covered "${p}" "${decl}" || extra="${extra}${p}"$'\n'
-        done <<EOF
-$(printf '%s\n' "${actual}")
-EOF
+        done < <(git -c core.quotepath=false diff --name-only -z --diff-filter=ACMRD "$(_base)" HEAD)
         [ -z "${extra}" ] || { printf 'G-7 FAIL: 未宣告即修改:\n%s\n' "${extra}" >&2; return 1; }; }
 _g8() { bash scripts/reconcile_stamps_check.sh handoffs/reconcile/20260807-govb1-x-consult-r1/synth.md >/dev/null; }
 

@@ -669,6 +669,223 @@ awk '$1=="deny"{d[$2]=1} $1=="allow"{a[$2]=1}
         MANIFEST.write_text(original, encoding="utf-8")
 
 
+# ── CODEX-R4-P1-01：空白／雙引號路徑 NUL-safe（r6）────────────────────
+
+
+def _policy_decl_from_manifest_text(manifest_body: str) -> set[str]:
+    """以 production `_g7_policy` 解析任意 manifest 文字 → decl 集合。
+
+    透過暫存檔 + 暫時重寫 frozen hash-lock；呼叫端負責還原主樹。
+    """
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        MANIFEST.write_text(manifest_body, encoding="utf-8")
+        _rehash_scope_manifest()
+        proc = _call_g7_policy()
+        assert proc.returncode == 0, proc.stderr + proc.stdout
+        return {ln for ln in proc.stdout.splitlines() if ln.strip()}
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+
+
+def _legacy_awk_decl(manifest_body: str) -> set[str]:
+    """舊版 `$2` 截斷 parser（r6 修法前）— 供反例方向證假紅根因。"""
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", suffix=".manifest", delete=False
+    ) as fh:
+        fh.write(manifest_body)
+        path = fh.name
+    try:
+        proc = _run(
+            [
+                "bash",
+                "-c",
+                r"""
+set -u
+awk '$1=="deny"{d[$2]=1}
+     $1=="allow"||$1=="meta"{a[$2]=1}
+     END{ for (p in a) if (!(p in d)) print p }' "$1" | LC_ALL=C sort -u
+""",
+                "_",
+                path,
+            ]
+        )
+        assert proc.returncode == 0, proc.stderr
+        return {ln for ln in proc.stdout.splitlines() if ln.strip()}
+    finally:
+        Path(path).unlink(missing_ok=True)
+
+
+def test_r6_u1_space_path_declared_in_policy() -> None:
+    """U1：已宣告含空白路徑 ⇒ production policy 完整輸出；舊 `$2` 截斷。"""
+    body = (
+        "allow scripts/foo.sh\n"
+        "allow scripts/space probe.sh\n"
+    )
+    decl = _policy_decl_from_manifest_text(body)
+    assert "scripts/space probe.sh" in decl
+    assert "scripts/space" not in decl
+    # 反例：舊 parser 截斷 ⇒ 假路徑在 decl、真路徑不在
+    legacy = _legacy_awk_decl(body)
+    assert "scripts/space" in legacy
+    assert "scripts/space probe.sh" not in legacy
+
+
+def test_r6_u2_quote_path_declared_in_policy() -> None:
+    """U2：已宣告含雙引號路徑 ⇒ production policy 完整輸出。"""
+    body = 'allow scripts/foo.sh\nallow scripts/quote"probe.sh\n'
+    decl = _policy_decl_from_manifest_text(body)
+    assert 'scripts/quote"probe.sh' in decl
+    legacy = _legacy_awk_decl(body)
+    # `$2` 對無空白的 quote 路徑通常仍完整（截斷問題在空白）；仍須在 production 保留
+    assert 'scripts/quote"probe.sh' in legacy
+
+
+def test_r6_u3_cjk_path_still_in_policy() -> None:
+    """U3：CJK meta 路徑回歸——仍完整出現於 decl。"""
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl = {ln for ln in proc.stdout.splitlines() if ln.strip()}
+    assert "白話說明/" in decl
+    assert _g7_covered_rc("白話說明/README.md", "\n".join(sorted(decl))) == 0
+
+
+def test_r6_u4_undeclared_space_path_not_covered() -> None:
+    """U4：未宣告含空白路徑不得被涵蓋（修假紅不得變假綠）。"""
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl = proc.stdout
+    evil = "scripts/evil probe.sh"
+    assert evil not in {ln.strip() for ln in decl.splitlines() if ln.strip()}
+    assert _g7_covered_rc(evil, decl) != 0
+    # 對照：寫入 allow 後 rehash ⇒ covered
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        MANIFEST.write_text(orig_m + f"\nallow {evil}\n", encoding="utf-8")
+        _rehash_scope_manifest()
+        proc2 = _call_g7_policy()
+        assert proc2.returncode == 0, proc2.stderr + proc2.stdout
+        assert evil in {ln.strip() for ln in proc2.stdout.splitlines()}
+        assert _g7_covered_rc(evil, proc2.stdout) == 0
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+
+
+def test_r6_u1u2u4_g7_worktree_space_quote_paths() -> None:
+    """U1/U2/U4 整合：臨時 worktree 真實 commit 空白／引號路徑；主樹無殘留。
+
+    - 已宣告 space／quote ⇒ --only g7 rc=0
+    - 未宣告 evil space ⇒ --only g7 rc≠0
+    """
+    import shutil
+    import uuid
+
+    wt = Path(tempfile.mkdtemp(prefix="govb1-r6-wt-", dir="/tmp"))
+    branch = f"govb1-r6-probe-{uuid.uuid4().hex[:8]}"
+    before_porcelain = _run(["bash", "-c", "git status --porcelain | wc -l"])
+    n_before = int(before_porcelain.stdout.strip())
+    try:
+        add = _run(["git", "worktree", "add", "-b", branch, str(wt), "HEAD"])
+        assert add.returncode == 0, add.stderr + add.stdout
+
+        def wt_run(args: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                args,
+                cwd=str(wt),
+                capture_output=True,
+                text=True,
+                check=False,
+                **kw,  # type: ignore[arg-type]
+            )
+
+        # worktree 自 HEAD 長出；覆寫為工作區現行 gate（含本輪 NUL-safe 修法）
+        shutil.copy2(GATE, wt / "scripts" / "govb1_final_gate.sh")
+
+        # 三條 probe 檔（含空白、雙引號、evil 空白）
+        space_rel = "scripts/space probe.sh"
+        quote_rel = 'scripts/quote"probe.sh'
+        evil_rel = "scripts/evil probe.sh"
+        for rel, body in (
+            (space_rel, "#!/bin/sh\necho space\n"),
+            (quote_rel, "#!/bin/sh\necho quote\n"),
+            (evil_rel, "#!/bin/sh\necho evil\n"),
+        ):
+            p = wt / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(body, encoding="utf-8")
+
+        man = (wt / "scripts" / "govb1_scope.manifest").read_text(encoding="utf-8")
+        # 只宣告 space + quote；evil 未宣告
+        man2 = man + f"\nallow {space_rel}\nallow {quote_rel}\n"
+        (wt / "scripts" / "govb1_scope.manifest").write_text(man2, encoding="utf-8")
+        h = wt_run(
+            ["bash", "-c", "shasum -a 256 scripts/govb1_scope.manifest | cut -c1-12"]
+        )
+        assert h.returncode == 0 and h.stdout.strip(), h.stderr
+        base = _base_commit()
+        (wt / "scripts" / "govb1_frozen_hashes.txt").write_text(
+            f"base_commit: {base}\nscope_manifest: {h.stdout.strip()}\n",
+            encoding="utf-8",
+        )
+
+        # commit 1：已宣告之 space + quote（+ manifest/hash + 覆寫之 gate）
+        # 註：gate 覆寫僅供本 worktree 執行；若 uncommitted 則交付守衛可能擋——
+        # 故將 gate 一併 commit 進 probe 分支（拋棄用，不進 main）。
+        add1 = wt_run(
+            [
+                "git",
+                "add",
+                "--",
+                space_rel,
+                quote_rel,
+                "scripts/govb1_scope.manifest",
+                "scripts/govb1_frozen_hashes.txt",
+                "scripts/govb1_final_gate.sh",
+            ]
+        )
+        assert add1.returncode == 0, add1.stderr
+        c1 = wt_run(
+            ["git", "commit", "-m", "test: r6 probe declared space+quote paths"]
+        )
+        assert c1.returncode == 0, c1.stderr + c1.stdout
+
+        g7_ok = wt_run(["bash", "scripts/govb1_final_gate.sh", "--only", "g7"])
+        assert g7_ok.returncode == 0, (
+            f"U1/U2 已宣告 space/quote 應 g7 綠\n"
+            f"stdout={g7_ok.stdout}\nstderr={g7_ok.stderr}"
+        )
+
+        # commit 2：未宣告 evil space ⇒ 須紅
+        add2 = wt_run(["git", "add", "--", evil_rel])
+        assert add2.returncode == 0, add2.stderr
+        c2 = wt_run(["git", "commit", "-m", "test: r6 probe undeclared evil space"])
+        assert c2.returncode == 0, c2.stderr + c2.stdout
+
+        g7_bad = wt_run(["bash", "scripts/govb1_final_gate.sh", "--only", "g7"])
+        assert g7_bad.returncode != 0, "U4 未宣告 evil space 應 g7 紅"
+        combined = g7_bad.stderr + g7_bad.stdout
+        assert "evil probe.sh" in combined or "未宣告" in combined, combined
+    finally:
+        # 拆除 worktree + 分支；主樹不得殘留 probe
+        _run(["git", "worktree", "remove", "-f", str(wt)])
+        _run(["git", "branch", "-D", branch])
+        shutil.rmtree(wt, ignore_errors=True)
+        after = _run(["bash", "-c", "git status --porcelain | wc -l"])
+        n_after = int(after.stdout.strip())
+        assert n_after == n_before, f"worktree 汙染主樹 dirty: {n_before}→{n_after}"
+        # 主樹不得出現 probe 檔
+        for rel in (
+            "scripts/space probe.sh",
+            'scripts/quote"probe.sh',
+            "scripts/evil probe.sh",
+        ):
+            assert not (REPO / rel).exists(), f"主樹殘留 probe: {rel}"
+
+
 # ── ASSERT 列 + CLI 契約 ──────────────────────────────────────────────
 
 
