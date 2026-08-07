@@ -1,0 +1,23 @@
+# govb1_task_tickets.tsv — 票↔Task 歸屬事實之機械權威唯一來源
+#
+# 本檔為歸屬事實之機械權威唯一來源（W′）。
+# docs/GOVB1_INPUT_QUALITY_TODO.md §0.1a 自此為待生成之投影；🔴 過渡期禁止手改。
+# 裁定出處：handoffs/reconcile/20260808-govb1-b2-consult-r1/synth.md
+# B-6（票 B-25 fact-key）落地後，§0.1a 應由生成器產出。
+#
+# 欄位：batch, task, ticket, basis（tab 分隔）
+# ticket「—」＝確實不對應單一票之合法值（不得寫空白／未標註／待確認）
+batch	task	ticket	basis
+2	1.1	—	跨票宿主：govflow_lifecycle.json 供 1.3／4.2；B-19 三段已由 1.2③ 與 1.4 佔滿
+3	1.2	B-19	標題已宣告（B-19 ③ ID 樣板驗證）
+3	1.4	B-19	SPEC:275 標題逐字「票 B-19 補強：fact-verified:」
+4	1.3	B-29	標題已宣告（EXPECTED-DELTA:）
+5	1.5	B-16	標題已宣告（B-16 擴充 A/B/C）
+6	2.1	B-25	SPEC:314 Phase 2；內文 B-23 於「不可做」欄係交叉引用
+6	2.2	B-25	同 Phase 2；內文 B-29 係交叉引用
+7	3.1	B-15	SPEC:361 Phase 3；內文 B-6 已明列不可做，係交叉引用
+7	3.2	B-15	洞 B（claude 段子字串）即 B-15 之病；B-38 為零 findings
+8	4.1	—	無單一歸屬票（分類判準基礎設施）
+9	4.2	B-38	Phase 4 零 findings 契約；B-31 屬 4.3
+10	4.3	B-31	標題已宣告（B-31 補救層）
+1	0.1	—	契約基線，不對單一票

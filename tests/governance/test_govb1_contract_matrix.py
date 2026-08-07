@@ -473,7 +473,7 @@ _g7_covered "$1" "$2"
 
 def test_meta_t1_paths_covered_by_g7_policy() -> None:
     """T1：`meta` 路徑被 `_g7_policy` 涵蓋；移除該列 ⇒ uncovered。"""
-    # 正例：四條 meta 皆在 decl
+    # 正例：六條 meta 皆在 decl（W′ 增 TSV + single_source_check 讀取端）
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl_lines = {ln for ln in proc.stdout.splitlines() if ln.strip()}
@@ -482,6 +482,8 @@ def test_meta_t1_paths_covered_by_g7_policy() -> None:
         "CLAUDE.md",
         "handoffs/20260801-GOV-AMEND-BACKLOG.md",
         "白話說明/",
+        "scripts/govb1_task_tickets.tsv",
+        "scripts/govb1_single_source_check.sh",
     ):
         assert p in decl_lines, f"meta 路徑應在 decl: {p}"
         assert _g7_covered_rc(p.rstrip("/"), "\n".join(sorted(decl_lines))) == 0 or (
@@ -909,23 +911,27 @@ def _r7_mutate_manifest_line(extra_line: str) -> tuple[str, str]:
 
 
 def test_r7_v1_current_manifest_decl_34_stable() -> None:
-    """V1：現行 manifest ⇒ policy rc=0 且 decl 恰 34 條、集合封閉。
+    """V1：現行 manifest ⇒ policy rc=0 且 decl 恰 36 條、集合封閉。
 
+    W′：meta 由 4→6（+TSV ＋ single_source 讀取端）⇒ decl 34→36。
+    single_source 不在任何 Task 欄 ⇒ 禁 allow（F5），故 meta。
     反例方向：若 grammar 誤拒任一合法列 ⇒ rc≠0 或條數變動即 FAIL。
     """
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 34, f"V1 期望 34 條 decl，得 {len(decl)}"
+    assert len(decl) == 36, f"V1 期望 36 條 decl，得 {len(decl)}"
     # 與第二次現跑逐字相同（穩定；非快取）
     again = _r7_baseline_decl()
     assert decl == again
-    # 四 meta + 30 allow（deny 一條不進 decl）
+    # 六 meta + 30 allow（deny 一條不進 decl）
     for p in (
         "HANDOFF.md",
         "CLAUDE.md",
         "handoffs/20260801-GOV-AMEND-BACKLOG.md",
         "白話說明/",
+        "scripts/govb1_task_tickets.tsv",
+        "scripts/govb1_single_source_check.sh",
         "scripts/govb1_final_gate.sh",
         "scripts/govb1_scope.manifest",
     ):
@@ -950,7 +956,7 @@ def test_r7_v2_leading_whitespace_path_rejected() -> None:
     # 反例方向：移除該列 ⇒ 回 rc=0
     ok = _call_g7_policy()
     assert ok.returncode == 0, ok.stderr + ok.stdout
-    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 34
+    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 36
 
 
 def test_r7_v3_trailing_whitespace_path_rejected() -> None:
@@ -1084,6 +1090,227 @@ def test_r7_v6_r6_and_meta_suite_still_importable() -> None:
         "test_t01_f3_print_plan_nonempty",
     ):
         assert hasattr(mod, name), f"V6 既有測試不得刪除: {name}"
+        assert inspect.isfunction(getattr(mod, name))
+
+
+# ── W′ 歸屬 TSV（批 2 前置；A1–A7 雙向）─────────────────────────────
+
+SS = REPO / "scripts" / "govb1_single_source_check.sh"
+TICKETS = REPO / "scripts" / "govb1_task_tickets.tsv"
+
+_W_PRIME_TASKS = (
+    "0.1",
+    "1.1",
+    "1.2",
+    "1.3",
+    "1.4",
+    "1.5",
+    "2.1",
+    "2.2",
+    "3.1",
+    "3.2",
+    "4.1",
+    "4.2",
+    "4.3",
+)
+
+
+def _ss(*extra: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    e = dict(os.environ)
+    if env:
+        e.update(env)
+    return subprocess.run(
+        ["bash", str(SS), *extra],
+        cwd=str(REPO),
+        capture_output=True,
+        text=True,
+        check=False,
+        env=e,
+    )
+
+
+def _todo_task_ids() -> list[str]:
+    text = TODO.read_text(encoding="utf-8")
+    found = re.findall(r"^### Task ([0-9]+\.[0-9]+)", text, re.M)
+    return sorted(set(found))
+
+
+def test_wprime_a1_all_thirteen_tasks_pass_task_mode() -> None:
+    """A1 正：13 個 Task 之 --task 皆 rc=0。"""
+    for t in _W_PRIME_TASKS:
+        proc = _ss("--task", t)
+        assert proc.returncode == 0, f"Task {t} 應 PASS:\n{proc.stderr}{proc.stdout}"
+    assert set(_W_PRIME_TASKS) == set(_todo_task_ids())
+
+
+def test_wprime_a1_counterexample_pending_ticket_fails() -> None:
+    """A1 反：TSV 某列 ticket 改為「待確認」⇒ 該 Task 轉紅；還原後回綠。"""
+    orig = TICKETS.read_text(encoding="utf-8")
+    try:
+        mutated = re.sub(
+            r"^(2\t1\.1\t)—\t",
+            r"\1待確認\t",
+            orig,
+            count=1,
+            flags=re.M,
+        )
+        assert mutated != orig, "突變未生效"
+        TICKETS.write_text(mutated, encoding="utf-8")
+        bad = _ss("--task", "1.1")
+        assert bad.returncode != 0, "待確認 應使 Task 1.1 轉紅"
+        assert "待確認" in (bad.stderr + bad.stdout) or "未標註" in (bad.stderr + bad.stdout)
+        assert _ss("--task", "1.2").returncode == 0
+    finally:
+        TICKETS.write_text(orig, encoding="utf-8")
+    assert _ss("--task", "1.1").returncode == 0
+
+
+def test_wprime_a2_missing_task_row_fails_full_mode() -> None:
+    """A2：TSV 缺某 Task ⇒ 全表 rc≠0 且訊息指名；補回 ⇒ rc=0。"""
+    orig = TICKETS.read_text(encoding="utf-8")
+    try:
+        lines = [ln for ln in orig.splitlines() if not re.match(r"^[0-9]+\t3\.2\t", ln)]
+        mutated = "\n".join(lines) + "\n"
+        assert mutated != orig
+        TICKETS.write_text(mutated, encoding="utf-8")
+        bad = _ss()
+        assert bad.returncode != 0, "缺 Task 3.2 應使全表轉紅"
+        assert "3.2" in (bad.stderr + bad.stdout)
+    finally:
+        TICKETS.write_text(orig, encoding="utf-8")
+    assert _ss().returncode == 0
+
+
+def test_wprime_a3_em_dash_ticket_is_pass() -> None:
+    """A3 正：ticket 為 — ⇒ PASS。"""
+    for t in ("0.1", "1.1", "4.1"):
+        assert _ss("--task", t).returncode == 0, f"Task {t} (—) 應 PASS"
+
+
+def test_wprime_a3_counterexample_empty_ticket_fails() -> None:
+    """A3 反：ticket 改為空字串 ⇒ 轉紅；還原後回綠。"""
+    orig = TICKETS.read_text(encoding="utf-8")
+    try:
+        mutated = re.sub(
+            r"^(2\t1\.1\t)—\t",
+            r"\1\t",
+            orig,
+            count=1,
+            flags=re.M,
+        )
+        assert mutated != orig
+        TICKETS.write_text(mutated, encoding="utf-8")
+        bad = _ss("--task", "1.1")
+        assert bad.returncode != 0, "空 ticket 應轉紅"
+    finally:
+        TICKETS.write_text(orig, encoding="utf-8")
+    assert _ss("--task", "1.1").returncode == 0
+
+
+def test_wprime_a4_no_longer_reads_section_01a() -> None:
+    """A4：GOVB1_TODO 指向無 §0.1a 之暫存副本，--task 仍能運作。"""
+    text = TODO.read_text(encoding="utf-8")
+    stripped = re.sub(
+        r"^### 0\.1a .*?(?=^### )",
+        "",
+        text,
+        count=1,
+        flags=re.M | re.S,
+    )
+    assert "### 0.1a " not in stripped
+    assert "### 0.1b " in stripped
+    with tempfile.TemporaryDirectory() as td:
+        tmp_todo = Path(td) / "todo_no_01a.md"
+        tmp_todo.write_text(stripped, encoding="utf-8")
+        env = {"GOVB1_TODO": str(tmp_todo)}
+        for t in ("1.1", "0.1", "4.2"):
+            proc = _ss("--task", t, env=env)
+            assert proc.returncode == 0, (
+                f"無 §0.1a 時 Task {t} 仍應 PASS:\n{proc.stderr}{proc.stdout}"
+            )
+
+
+def test_wprime_a5_meta_tickets_in_decl_count_36() -> None:
+    """A5 正：meta TSV（及 single_source 讀取端）在 decl；decl 恰 36 條。"""
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    assert "scripts/govb1_task_tickets.tsv" in decl
+    assert "scripts/govb1_single_source_check.sh" in decl
+    assert len(decl) == 36, f"期望 decl 36，得 {len(decl)}"
+
+
+def test_wprime_a5_counterexample_remove_meta_uncovers_tsv() -> None:
+    """A5 反：移除 TSV meta 列 + rehash ⇒ TSV 路徑 uncovered。"""
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        mutated = (
+            "\n".join(
+                ln
+                for ln in orig_m.splitlines()
+                if ln.strip() != "meta scripts/govb1_task_tickets.tsv"
+            )
+            + "\n"
+        )
+        assert mutated != orig_m
+        MANIFEST.write_text(mutated, encoding="utf-8")
+        _rehash_scope_manifest()
+        proc = _call_g7_policy()
+        assert proc.returncode == 0, proc.stderr + proc.stdout
+        decl = {ln for ln in proc.stdout.splitlines() if ln.strip()}
+        assert "scripts/govb1_task_tickets.tsv" not in decl
+        assert _g7_covered_rc("scripts/govb1_task_tickets.tsv", "\n".join(sorted(decl))) != 0
+        assert len(decl) == 35  # 仍含 single_source meta
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+
+
+def test_wprime_a6_undeclared_path_still_blocked() -> None:
+    """A6：未宣告路徑仍被擋（假綠回歸保護）。"""
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl = proc.stdout
+    evil = "scripts/govb1_a6_evil_undeclared.sh"
+    assert evil not in {ln.strip() for ln in decl.splitlines() if ln.strip()}
+    assert _g7_covered_rc(evil, decl) != 0, "未宣告 evil 不得被涵蓋"
+
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        MANIFEST.write_text(orig_m.rstrip("\n") + f"\nmeta {evil}\n", encoding="utf-8")
+        _rehash_scope_manifest()
+        proc2 = _call_g7_policy()
+        assert proc2.returncode == 0, proc2.stderr + proc2.stdout
+        assert _g7_covered_rc(evil, proc2.stdout) == 0
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+
+
+def test_wprime_a7_existing_suite_still_present() -> None:
+    """A7：既有 meta/r6/r7/f5/f3 測試函式仍在（全套 pytest 另驗通過）。"""
+    import inspect
+    import sys
+
+    mod = sys.modules[__name__]
+    for name in (
+        "test_meta_t1_paths_covered_by_g7_policy",
+        "test_meta_t2_undeclared_path_still_fails_g7",
+        "test_meta_t3_unknown_verb_fail_closed",
+        "test_meta_t4_deny_wins_over_meta",
+        "test_meta_t5_f5_still_allow_only",
+        "test_r6_u1_space_path_declared_in_policy",
+        "test_r6_u2_quote_path_declared_in_policy",
+        "test_r6_u3_cjk_path_still_in_policy",
+        "test_r6_u4_undeclared_space_path_not_covered",
+        "test_r7_v1_current_manifest_decl_34_stable",
+        "test_r7_v5_undeclared_space_quote_still_fails_g7",
+        "test_t01_f5_manifest_matches_task_decl",
+        "test_t01_f3_g7_when_committed",
+    ):
+        assert hasattr(mod, name), f"A7 既有測試不得刪除: {name}"
         assert inspect.isfunction(getattr(mod, name))
 
 

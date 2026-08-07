@@ -16,8 +16,14 @@
 #   本檢查擋不住「有 pointer 但旁邊又寫了一段互斥判準」。
 #   完整解＝把判準移出 markdown 進資料檔並以 generated block ＋ diff 強制
 #   （與 `票 B-25` 之 fact-key 同型），**屬後續票，不在本批**。
+#
+# ── 票↔Task 歸屬（W′，2026-08-08）────────────────────────────
+# 機械權威唯一來源＝`scripts/govb1_task_tickets.tsv`（`meta` 宣告）。
+# 🔴 **不再讀 TODO §0.1a** 作歸屬判定（否則仍是兩份權威）。
+# §0.1a 為待生成之投影；過渡期禁止手改（見 TSV 檔頭註解）。
 set -u
 TODO="${GOVB1_TODO:-docs/GOVB1_INPUT_QUALITY_TODO.md}"
+TICKETS="${GOVB1_TASK_TICKETS:-scripts/govb1_task_tickets.tsv}"
 rc=0
 
 # §0.1b 必須存在
@@ -39,32 +45,52 @@ _g2fn="$(awk '/^_g2_consumers\(\)/{f=1} f{print} f&&/^}/{exit}' "${TODO}")"
 printf '%s\n' "${_g2fn}" | grep -q "${_pointer_re}" \
   || { echo "FAIL: _g2_consumers() 未指向 §0.1b" >&2; rc=1; }
 
-# ── 票↔Task 歸屬完整性（`§0.1a`）─────────────────────────────
-# 使用者 2026-08-07：「你只是用說的就代表不會做或一直做錯」——
-#   主委原本寫的是「由實作端開工時具名補上」＝**一句沒有強制力的散文**。
-#   改為機械閘：**歸屬票仍為「未標註／待確認」之 Task，其批次不得派工**。
-#   判定集合封閉（Task 集合由 §0.1a 表現讀導出），不需要列舉任何關鍵字。
+# ── 票↔Task 歸屬完整性（TSV 機械權威）────────────────────────
+# 用法：`--task <N.M>` 只驗該 Task；不帶則驗 TSV 涵蓋 TODO 全部 Task。
+# 誠實邊界：只驗「有沒有填合法值」，**不驗「填得對不對」**（那要讀 Task 意圖，屬審查）。
 #
-# 用法：`--task <N.M>` 只驗該 Task；不帶則驗全表結構存在性。
-# 誠實邊界：只驗「有沒有填」，**不驗「填得對不對」**（那要讀 Task 意圖，屬審查）。
-_task_ticket_row() {   # $1=Task 編號 → 印該列
-  awk -F'|' -v t=" ${1} " '
-    /^\| 批 [0-9]+ \|/ { if ($3 == t) { print; exit } }
-  ' "${TODO}"
+# ticket 合法值：`—`（確實不對應單一票）或 `B-NN` 等具名票。
+# 非法值：空、`未標註`、`待確認`。
+[ -f "${TICKETS}" ] \
+  || { echo "FAIL: 缺歸屬 TSV ${TICKETS}（fail-closed）" >&2; exit 1; }
+
+_task_ticket_from_tsv() {   # $1=Task 編號 → stdout: ticket 欄；無列則空
+  # 跳過 # 註解與表頭；tab 分隔；$2=task $3=ticket
+  awk -F'\t' -v t="${1}" '
+    /^#/ || /^[ \t]*$/ { next }
+    $1=="batch" && $2=="task" { next }
+    $2 == t { print $3; exit }
+  ' "${TICKETS}"
 }
+
 _check_task_ticket() {
   _t="$1"
-  _row="$(_task_ticket_row "${_t}")"
-  [ -n "${_row}" ] || { echo "FAIL: §0.1a 無 Task ${_t} 之列（表未涵蓋全部 Task）" >&2; return 1; }
-  case "${_row}" in
-    *未標註*|*待確認*)
+  _ticket="$(_task_ticket_from_tsv "${_t}")"
+  if [ -z "${_ticket}" ]; then
+    # 區分「列不存在」vs「ticket 欄為空」：再查 task 欄是否出現
+    if ! awk -F'\t' -v t="${_t}" '
+          /^#/ || /^[ \t]*$/ { next }
+          $1=="batch" && $2=="task" { next }
+          $2 == t { found=1; exit }
+          END { exit !found }
+        ' "${TICKETS}"; then
+      echo "FAIL: 歸屬 TSV 無 Task ${_t} 之列（表未涵蓋該 Task）" >&2
+      echo "  TSV=${TICKETS}" >&2
+      return 1
+    fi
+    echo "FAIL: Task ${_t} 之歸屬票為空 ⇒ 不得派工。" >&2
+    echo "  合法值：—（不對應單一票）或 B-NN；不得寫空白／未標註／待確認。" >&2
+    return 1
+  fi
+  case "${_ticket}" in
+    未標註|待確認|*未標註*|*待確認*)
       echo "FAIL: Task ${_t} 之歸屬票仍為「未標註／待確認」⇒ 不得派工。" >&2
       echo "  理由：無歸屬票 ⇒ 無法機械證明「本批 N 張票被 M 個 Task 完全覆蓋」，" >&2
       echo "        既可能有票沒人修，也可能有 Task 做了沒票要求的事（scope 膨脹）。" >&2
       echo "" >&2
       echo "  🔴 解鎖路徑（**不是死鎖**，本閘只擋 impl 派工）：" >&2
       echo "   1. 派一輪 consult（**不帶 --todo，本閘不擋**）請三家依 Task 意圖裁定歸屬票" >&2
-      echo "   2. 依裁定於該 Task 標題宣告 \`票 B-NN\`，並更新 §0.1a 該列" >&2
+      echo "   2. 依裁定更新 scripts/govb1_task_tickets.tsv 該列（§0.1a 為投影，過渡期禁手改）" >&2
       echo "   3. 重跑本檢查應轉 PASS" >&2
       echo "  🔴 **主委不得自行推測**：內文第一個出現的票號常為交叉引用而非歸屬" >&2
       echo "     （如 Task 2.1 之 \`票 B-23\`、Task 3.1 之 \`票 B-6\` 皆不在本批八張內）。" >&2
@@ -72,28 +98,42 @@ _check_task_ticket() {
       echo "  📌 本閘**不擋**其他批次之 Task；歸屬票已具名者照常放行（如 Task 0.1）。" >&2
       return 1 ;;
   esac
+  # 「—」與 B-NN 等具名值皆 PASS
   return 0
 }
 
 if [ "${1:-}" = "--task" ]; then
   [ -n "${2:-}" ] || { echo "FAIL: --task 需帶 Task 編號（如 0.1）" >&2; exit 2; }
   _check_task_ticket "${2}" || rc=1
-  [ "${rc}" -eq 0 ] && echo "PASS: Task ${2} 之歸屬票已具名"
+  [ "${rc}" -eq 0 ] && echo "PASS: Task ${2} 之歸屬票已具名（TSV）"
   exit "${rc}"
 fi
 
-# 全表模式：§0.1a 必須存在且涵蓋所有 Task
-grep -q '^### 0\.1a ' "${TODO}" \
-  || { echo "FAIL: 找不到 §0.1a（票↔Task 對應表）" >&2; exit 1; }
+# 全表模式：TSV 必須涵蓋 TODO 內全部 ^### Task N.M（現讀導出，禁寫死清單）
 _all_tasks="$(grep -ohE '^### Task [0-9]+\.[0-9]+' "${TODO}" | sed 's/^### Task //' | LC_ALL=C sort -u)"
 _missing=""
 while IFS= read -r t; do
   [ -n "${t}" ] || continue
-  [ -n "$(_task_ticket_row "${t}")" ] || _missing="${_missing} ${t}"
+  if ! awk -F'\t' -v tt="${t}" '
+        /^#/ || /^[ \t]*$/ { next }
+        $1=="batch" && $2=="task" { next }
+        $2 == tt { found=1; exit }
+        END { exit !found }
+      ' "${TICKETS}"; then
+    _missing="${_missing} ${t}"
+  fi
 done <<EOF
 ${_all_tasks}
 EOF
-[ -z "${_missing}" ] || { echo "FAIL: §0.1a 未涵蓋 Task:${_missing}" >&2; rc=1; }
+[ -z "${_missing}" ] || { echo "FAIL: 歸屬 TSV 未涵蓋 Task:${_missing}" >&2; rc=1; }
 
-[ "${rc}" -eq 0 ] && echo "PASS: 判準消費點皆指向 §0.1b；§0.1a 涵蓋全部 Task"
+# 全表亦驗每列 ticket 值合法（空／未標註／待確認 ⇒ FAIL）
+while IFS= read -r t; do
+  [ -n "${t}" ] || continue
+  _check_task_ticket "${t}" || rc=1
+done <<EOF
+${_all_tasks}
+EOF
+
+[ "${rc}" -eq 0 ] && echo "PASS: 判準消費點皆指向 §0.1b；歸屬 TSV 涵蓋全部 Task"
 exit "${rc}"

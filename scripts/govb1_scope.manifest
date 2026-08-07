@@ -45,3 +45,6 @@ meta HANDOFF.md
 meta CLAUDE.md
 meta handoffs/20260801-GOV-AMEND-BACKLOG.md
 meta 白話說明/
+meta scripts/govb1_task_tickets.tsv
+# W′ 讀取端：改讀 TSV 後須入 decl；不在任何 Task「修改∪新建」⇒ 禁 allow（F5），故 meta
+meta scripts/govb1_single_source_check.sh
