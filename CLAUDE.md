@@ -119,7 +119,9 @@ pytest                                           # all tests
 - **使用者不必盯螢幕、不必算時間、不必回報**。移除法見腳本檔頭。
 
 **測試與 CI**
-- `pytest tests/governance -q` 要 **267 秒**（**766 tests**；2026-08-06 實跑 `766 passed in 267.20s`。舊記「110 秒 / 287 tests」已過期，害本日 push 撞 120 秒前景上限）。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套，且**丟背景**，否則看起來像當機。
+- `pytest tests/governance -q` 要 **~280 秒**（**828 tests**；2026-08-07 實跑 `828 passed in 275.63s`。舊記「766 / 267s」「110 秒 / 287 tests」皆已過期）。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套，且**丟背景**，否則看起來像當機。
+- `scripts/govb1_final_gate.sh` 全跑**內含 `_g0_tests`（全套 pytest）** ⇒ 實測 300–370 秒，**前景必 timeout，一律丟背景**。只驗單條用 `--only <name>`（`g0_syntax`／`g1`…`g8`），秒級完成。
+- 🔴 **執行端跑驗收時，主控端不得動檔**：`test_t01_f3_g7_when_committed` 類斷言會比對「工作區 dirty 數前後不變」，主控端同時寫檔會使其 flaky；亦不得並行跑兩份會就地 mutate 檔案再還原的 pytest（會互相污染）。2026-08-07 實際踩到。
 - 跑完測試須 `bash scripts/restore_golden_inventory.sh` 還原 golden inventory 的副作用（否則 `tests/golden/l65/test_inventory.txt` 會髒）。
 - CI 只剩 `governance.yml` + `verify_claim.yml`。`l65_benchmark.yml` 已於 2026-07-26 **刪除**（連續 startup failure、0 秒無 log、從未真的跑過＝零保護純噪音）。`scripts/benchmark_l65.py` **保留**，要測效能請本機跑——共用 runner 測效能回歸本來就低訊號。
 - 3 個既有測試檔探針空心（`test_verify_gate{,_b3,_b4}.py`）＝假綠，已在 `gov_check.sh` 具名排除。

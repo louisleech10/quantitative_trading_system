@@ -2376,3 +2376,58 @@ placeholder／凍結分母）**在語意上是 TODO 通用的**，非 GOVB1 專�
 ⇒ **往後新生成的 TODO 天生具備歸屬宣告**，舊 38 份不回頭改。
 待新 TODO 累積到一定數量後，glob 泛化之誤擋率才可能降到可上線水準——
 **該重測為本票之前置，不得在無 receipt 下泛化。**
+
+---
+
+## B-43 票 `GOV-TODO-PSEUDOCODE-UNEXECUTABLE`
+
+**凍結施工清單的偽碼不可執行，且與實作分叉——後批照抄即得假綠。**
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據（非主委自行擴張）**：2026-08-07 批 1 code review，**codex 與 composer 兩家獨立**
+判定此三處為真缺陷且**各自明文指示「走延伸檔／另票，本輪不改 TODO」**
+（`CODEX-R1-P1-05`、`COMPOSER-R1-P2-01`；收斂檔 `handoffs/reconcile/20260807-govb1-b1-review-r1/synth.md` 群集 E）。
+
+### 病
+
+`docs/GOVB1_INPUT_QUALITY_TODO.md` §B／Task 0.1 之三處偽碼**對真實輸入零命中或取到空**：
+
+| # | 位置 | 錯 | 後果 |
+|---|---|---|---|
+| 1 | §B `_frozen_hits` | `grep -nE "…"` 無檔案參數 | 讀 stdin 恆空 ⇒ **G-2 假綠** |
+| 2 | Task 0.1 要點 4 `_fixture_names` | `sed -n '/fixture 清單/,/^```$/p'` 於 opening fence 即截斷 | 抽出 **0 名** ⇒ `T-0.1-F1` 空對空恆綠 |
+| 3 | §B 執行段 | `awk … '{print $4}'` 對**三欄**表 | 取到空 ⇒ 永遠找不到檢查函式 |
+
+**實作端（`b92aff6`）已自行修正三處**，故批 1 交付正確；**但 TODO 仍留錯版本**。
+偽碼是給後批照抄的——**分叉即假綠來源**。
+
+### 🔴 為何本 epic 內無法修（主委實查，非推測）
+
+```
+awk '$1=="allow"{print $2}' scripts/govb1_scope.manifest | grep -c '^docs/'   → 0
+```
+
+凍結 scope manifest **不含任何 `docs/` 路徑**，且 TODO 於各 Task 皆列**只讀**欄。
+⇒ 把 TODO 改進 `base..HEAD` 即 `G-7`「未宣告即修改」違規。
+把 `docs/` 加進 `allow` 亦不可——那正是 `G-7` 所禁之「以只讀／allow 標註規避 scope」，
+且會使 `T-0.1-F5`（allow 集合 == 各 Task 修改∪新建欄）轉紅。
+**要改 TODO 就得先改 TODO 自己的「修改檔案」欄 ⇒ 循環。**
+
+### 出生事故（主委錯誤，具名）
+
+主委於 r3 判定「TODO 檔頭為 `v1 DRAFT` 故非凍結文件，可就地改」，**覆蓋了兩家委員的「另票」裁定**。
+該判讀**對一半**（TODO 確非凍結文件），但**漏查 scope manifest** ——
+兩者是**獨立**的兩道限制。結果：`d56b07e` 使 `--only g7` rc=1、全套 `2 failed, 826 passed`，
+於 `fd7f0f1`（r4）撤回。**教訓：委員說「不在本輪」時，主委要推翻須先窮舉所有相關閘，不能只查一道。**
+
+### 修法方向（不在本 epic）
+
+1. GOVB1 epic 全部批次完工、manifest 解凍後，一次修正三處偽碼；或
+2. 若中途必須修，須以**新 base commit ＋ 新 manifest**（含 `docs/` 宣告）重開 scope，
+   並同步更新各 Task 之「修改檔案」欄——成本高於價值，**預設採 1**。
+
+### 誠實邊界
+
+**本票無機械綁定**——不像 `票 B-13` 之 R-1 有到期閘。
+若後批有人照抄 TODO 偽碼，**沒有任何檢查會擋**。這是已知且具名接受的暴露面。
