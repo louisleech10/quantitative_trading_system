@@ -199,7 +199,9 @@ _g2_consumers() {   # stdout: consumer 檔清單（一行一檔）；禁人手�
 }
 _G2_UNITS='份|列|個 fixture|個 Task'   # 量詞集合唯一定義處；本 TODO 正文不重貼此 regex
 # 字面量分母＝數字緊鄰量詞。分母**必須**來自 $( ) / wc / 現讀抽取函式，不得寫死。
-_frozen_hits() { grep -nE "[0-9]+[[:space:]]*(${_G2_UNITS})"; }
+# 〔r3 依 CODEX-R1-P1-05＋COMPOSER-R1-P2-01 修正；原偽碼不可執行〕
+# 🔴 必須傳 "$@"——原偽碼無檔案參數 ⇒ 讀 stdin 恆空 ⇒ G-2 假綠（見 b92aff6 實作）
+_frozen_hits() { grep -nE "[0-9]+[[:space:]]*(${_G2_UNITS})" "$@"; }
 
 _behavior_rows() { awk '/^[[:space:]]*\| `.*` \| (\*\*)?rc==/ { print }'; }   # 與 Task 0.1 同一 pattern
 _g6_func()       { awk '/^_maybe_register_stamp_output\(\)/ { f=1 } f { print } f && /^}/ { exit }'; }
@@ -372,7 +374,9 @@ _plan | grep -q '^UNRESOLVED' && { _plan | grep '^UNRESOLVED' >&2; exit 2; }
 rc=0; ran=0
 for g in $(_names); do
   [ -z "${sel}" ] || [ "${g}" = "${sel}" ] || continue
-  fn="$(_rows | awk -F'|' -v n="${g}" '$1==n{print $4}')"
+  # 〔r3 依 CODEX-R1-P1-05＋COMPOSER-R1-P2-01 修正；原偽碼不可執行〕
+  # 三欄表 name|files|fn ⇒ fn 為 $3（原 $4 取到空；見 b92aff6 實作）
+  fn="$(_rows | awk -F'|' -v n="${g}" '$1==n{print $3}')"
   ran=$(( ran + 1 ))
   if "${fn}"; then echo "PASS ${g}"; else echo "FAIL ${g}" >&2; rc=1; fi
 done
@@ -515,12 +519,62 @@ grok 與**主委自跑皆 rc=0**。⇒ 差異來自**執行端沙箱**，非 rep
      🔴 **清單由 SPEC §V-ASSERT 現讀，禁寫死數量**〔`GROK-R7-P1-01`＋`CODEX-R7-P1-05`：
      主委三處寫死「14」，SPEC 實列 **16**，加 Task 1.5 的 2 個 ⇒ 實需 **≥18**〕：
      ```sh
+     # 〔r3 依 CODEX-R1-P1-05＋COMPOSER-R1-P2-01 修正；原偽碼不可執行〕
+     # 原 sed '/fixture 清單/,/^```$/p' 在 opening fence 即截斷 ⇒ 0 名。
+     # 現行＝path 錨點 fence 下界 ＋ heading 抽取 ＋ supplemental（見
+     # scripts/gen_govb1_contract_matrix.sh 之 _fixture_fence_items／_fixture_floor／_fixture_names）
+     _fixture_supplemental() {
+       printf '%s\n' 'spec_assert_pending.md' 'spec_func_missing.md'
+     }
+     # 下界用 path 錨點導出 fence 內文——不依賴「fixture 清單」標題
+     _fixture_fence_items() {
+       awk '
+         /^```/ {
+           if (in_f) { if (tgt) exit; in_f=0; tgt=0; seen=0; next }
+           in_f=1; tgt=0; seen=0; next
+         }
+         in_f {
+           if (!seen && $0 ~ /^[[:space:]]*$/) next
+           if (!seen) {
+             seen=1
+             if ($0 ~ /^tests\/governance\/fixtures\/govb1\/?$/) { tgt=1; next }
+             next
+           }
+           if (tgt) print
+         }
+       ' docs/GOVB1_INPUT_QUALITY_SPEC.md \
+         | grep -oE '[a-z0-9_]+\.(md|json)|factkey_[a-z]+/' | LC_ALL=C sort -u
+     }
+     _fixture_heading_items() {
+       awk 'BEGIN{c=0} /fixture 清單/{want=1} want && /^```$/{c++; next} c==1{print} c>=2{exit}' \
+         docs/GOVB1_INPUT_QUALITY_SPEC.md \
+         | grep -oE '[a-z0-9_]+\.(md|json)|factkey_[a-z]+/' | LC_ALL=C sort -u
+     }
+     # 現算下界 = fence 內項數 + supplemental；fence 0 項 ⇒ 錨點失效 fail-closed
+     _fixture_floor() {
+       local fence_n supp_n
+       fence_n="$( _fixture_fence_items | grep -c . || true )"
+       if [ "${fence_n:-0}" -eq 0 ]; then
+         echo "ERROR: SPEC fixture fence 現算 0 項，path 錨點已失效" >&2
+         return 1
+       fi
+       supp_n="$( _fixture_supplemental | grep -c . || true )"
+       echo $(( fence_n + supp_n ))
+     }
      _fixture_names() {
-       sed -n '/fixture 清單/,/^```$/p' docs/GOVB1_INPUT_QUALITY_SPEC.md \
-         | grep -oE '[a-z0-9_]+\.(md|json)|factkey_[a-z]+/' | sort -u
+       local names n floor
+       names="$(
+         { _fixture_heading_items; _fixture_supplemental; } | LC_ALL=C sort -u
+       )"
+       floor="$(_fixture_floor)" || return 1
+       n="$(printf '%s\n' "${names}" | grep -c . || true)"
+       if [ "${n:-0}" -lt "${floor}" ]; then
+         echo "ERROR: fixture 清單僅 ${n} 項，低於現算下界 ${floor}" >&2
+         return 1
+       fi
+       printf '%s\n' "${names}"
      }
      ```
-     再併入 Task 1.5 需要的 `spec_assert_pending.md`／`spec_func_missing.md`。
      內容須**足以驅動對應斷言**（例：`brief_id_b0r.md` 須含 `brief-kind:` 行 ＋ `<FAMILY>-B0R-P1-01` 樣板）。
   5. 🔴 **動工前基準（本 Task 的第一個動作，先於任何寫檔）**：依 §B「動工前基準」表產出
      `scripts/govb1_frozen_hashes.txt`（**僅此一檔**；`baseline_dirty` 已廢除，見 §B）。

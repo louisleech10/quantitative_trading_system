@@ -481,18 +481,20 @@ def _batch3_started(base: str) -> bool:
     }
 
 
+# 批 3 開工時，**放寬 `_g7` 與更新到期測試須配對**；
+# **只改測試不改守衛＝假綠。** 到期不變式由 `_g7_narrow_expiry_holds` ＋ 模擬測試護住。
 def _g7_narrow_expiry_holds(*, batch3_started: bool, narrow_guard: bool) -> bool:
     """斷言 NOT (批3已開工 AND 窄守衛仍在)。"""
     return not (batch3_started and narrow_guard)
 
 
+# 批 3 開工時，**放寬 `_g7` 與更新到期測試須配對**；
+# **只改測試不改守衛＝假綠。** 到期不變式由 `_g7_narrow_expiry_holds` ＋ 模擬測試護住。
 def test_g7_narrow_guard_expiry_live_pass() -> None:
-    """現況：批 3 未開工 ⇒ 到期閘 PASS（窄守衛可具名殘留）。"""
+    """不變式：NOT (批3已開工 AND 窄守衛仍在)；三種狀態皆由本斷言＋模擬測試護住。"""
     base = _base_commit()
     started = _batch3_started(base)
     narrow = _is_narrow_g7_status_case(GATE.read_text(encoding="utf-8"))
-    assert not started, "批 3 尚未開工（precondition）"
-    assert narrow, "批 1 窄守衛仍在（precondition；具名殘留）"
     assert _g7_narrow_expiry_holds(batch3_started=started, narrow_guard=narrow)
 
 
