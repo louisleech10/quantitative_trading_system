@@ -566,6 +566,45 @@ if [ "${kind}" = "dispatch" ]; then
     esac
   fi
 
+  # -------------------------------------------------------------------------
+  # GOVB1 深度自檢閘（2026-08-07，三家裁定 U-7；收斂檔
+  #   handoffs/reconcile/20260807-govb1-x-consult-r5/synth.md）
+  #
+  # 為何**只對本批 TODO 精確匹配**而非泛化到所有 docs/*TODO*.md：
+  #   grok 實測——五類 per-Task 檢查若無條件泛化進 doc_format_precheck 的 kind=todo 分支，
+  #   對既有語料**誤擋率 97.1%（33/34）**，違反票 B-23（放寬/收緊須附誤擋率 receipt）。
+  #   ⇒ 候選 A（掛 doc_format_precheck）**否決**；本批採候選 C（派 impl 前，檔名精確匹配）。
+  #   泛化為通用 todo_depth_check.sh **另立票**，前置＝對全部既有 TODO 產出誤擋率 receipt。
+  #
+  # 誠實邊界：本閘只擋「引用該 TODO 的 impl 派工」；主委仍可不經 gate 手動改該檔。
+  #   屬「擋意外不防蓄意」，與本 repo 其餘閘門同一威脅模型。
+  # -------------------------------------------------------------------------
+  case "${todo}" in
+    docs/GOVB1_INPUT_QUALITY_TODO.md)
+      _gb1_bin="${GOVB1_SELFCHECK_OVERRIDE:-${SCRIPT_DIR}/govb1_selfcheck.sh}"
+      [ -x "${_gb1_bin}" ] || [ -f "${_gb1_bin}" ] || {
+        echo "ERROR: 缺 ${_gb1_bin} → fail-closed 拒發 token"; exit 1; }
+      bash "${_gb1_bin}" >/dev/null 2>&1 \
+        || { echo "ERROR: GOVB1 TODO 深度自檢未過 → 拒發 impl token。"
+             echo "  重跑看細節：bash scripts/govb1_selfcheck.sh"; exit 1; }
+      # 🔴 票↔Task 歸屬閘（2026-08-07）：歸屬票仍為「未標註／待確認」之 Task 不得派工。
+      #   出處：使用者「你只是用說的就代表不會做或一直做錯」——原修法是散文
+      #   「由實作端開工時具名補上」＝無強制力，改為機械擋。
+      #   `--intent` 內若含 `Task N.M` 即取該 Task 逐一驗；未指明則只驗全表結構。
+      _gb1_ss="${GOVB1_SINGLE_SOURCE_OVERRIDE:-${SCRIPT_DIR}/govb1_single_source_check.sh}"
+      [ -f "${_gb1_ss}" ] || { echo "ERROR: 缺 ${_gb1_ss} → fail-closed 拒發 token"; exit 1; }
+      _gb1_task="$(printf '%s' "${intent}" | grep -ohE 'Task [0-9]+\.[0-9]+' | head -1 | sed 's/Task //')"
+      if [ -n "${_gb1_task}" ]; then
+        bash "${_gb1_ss}" --task "${_gb1_task}" \
+          || { echo "ERROR: Task ${_gb1_task} 歸屬票未具名 → 拒發 impl token。"; exit 1; }
+      else
+        bash "${_gb1_ss}" >/dev/null 2>&1 \
+          || { echo "ERROR: GOVB1 §0.1a 對應表結構未過 → 拒發 impl token。"
+               echo "  重跑看細節：bash scripts/govb1_single_source_check.sh"; exit 1; }
+      fi
+      ;;
+  esac
+
   if [ "${risk}" = "high" ]; then
     [ -n "${adversarial}" ] || miss adversarial "高風險必填 adversarial review 輸出路徑（或 waived:理由）"
     case "${adversarial}" in

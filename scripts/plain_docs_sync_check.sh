@@ -40,15 +40,33 @@ DIR="白話說明"
 #   而本腳本一路回報全綠（因為它根本不在受管清單裡）。
 #   使用者主動察覺並質問「日誌和總覽你有沒打算要更新」⇒ 靠人眼補上了機器該擋的洞。
 #   「使用者不看」是**閱讀習慣**，不是「可以不維護」——兩者被初版混為一談。
-MANAGED="README.md 第0批-施工清單.md 治理待辦總覽.md 第0批-在做什麼.md 治理進度日誌.md"
+# 🔴 受管清單改為**現讀導出**，不再人手列舉（2026-08-07）
+#   出生事故：第 1 批新增 `第1批-在做什麼.md`／`第1批-施工清單.md` 兩檔，
+#   舊版是硬編字串 ⇒ **新檔天生不受管**，而我在摩擦記錄裡寫的修法是「得記得手動加」——
+#   **那正是本批在治的病，出現在治它的工具上**。
+#   改為：資料夾內所有 `.md` 皆受管（Archived/ 除外）。新增批次不需要有人記得回來加一行。
+_managed_list() {
+  ( cd "${PLAIN_DIR:-白話說明}" 2>/dev/null && ls *.md 2>/dev/null | LC_ALL=C sort )
+}
+MANAGED="$(_managed_list)"
+[ -n "${MANAGED}" ] || { echo "ERROR: 白話說明/ 無任何 .md（fail-closed）" >&2; exit 1; }
 
 _watched_for() {
   # bash 3.2 無 declare -A ⇒ case 分派
   case "$1" in
-    "README.md"|"第0批-施工清單.md") echo "scripts/ docs/GOVB0_ tests/governance/" ;;
+    # 🔴 前綴由 `docs/GOVB0_` 放寬為 `docs/GOV`（2026-08-07）：
+    #    原設定只看第 0 批之 `GOVB0_*`，**第 1 批之 `docs/GOVB1_*` 完全不在監看範圍**
+    #    ⇒ 整個第 1 批（SPEC／TODO 定版、設計與實作收斂）期間本守衛皆 rc=0，
+    #    使用者打開白話說明看到的仍是數輪之前的狀態。**機制存在但沒接到現在的批次上。**
+    #    修法用**前綴**而非逐批列舉——第 2、3 批之 `GOVB2_`／`GOVB3_` 自動涵蓋，
+    #    不需要有人記得回來加一行（列舉永遠列不完）。
     "治理待辦總覽.md")               echo "handoffs/20260801-GOV-AMEND-BACKLOG.md" ;;
     "第0批-在做什麼.md")             echo "docs/GOVB0_FRICTION_SPEC.md" ;;
-    "治理進度日誌.md")               echo "scripts/ docs/GOVB0_ tests/governance/" ;;
+    # 🔴 樣式分派（非逐檔列舉）：`第N批-*.md` 與其餘治理說明檔一律看同一組路徑。
+    #    新增批次之說明檔自動取得 WATCHED，不需要有人記得回來加一行。
+    第*批-*.md)                       echo "scripts/ docs/GOV tests/governance/" ;;
+    "README.md"|"治理進度日誌.md"|"流程摩擦記錄.md")
+                                      echo "scripts/ docs/GOV tests/governance/" ;;
     *)                                echo "" ;;
   esac
 }
