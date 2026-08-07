@@ -1,0 +1,41 @@
+# GOVB1 scope manifest — pure data; deny wins over allow
+# Generated for Task 0.1; hash-locked via govb1_frozen_hashes.txt
+# Verbs: allow | deny | consumer (consumer must be allow subset)
+
+deny scripts/govb1_baseline_dirty.txt
+
+allow scripts/brief_conformance_check.sh
+allow scripts/committee_run.sh
+allow scripts/completeness_check.sh
+allow scripts/cx_run.sh
+allow scripts/fact_keys.json
+allow scripts/findings_kind_classify.sh
+allow scripts/gate.sh
+allow scripts/gate_check.sh
+allow scripts/gen_fact_key_blocks.sh
+allow scripts/gen_govb1_contract_matrix.sh
+allow scripts/gov_check.sh
+allow scripts/govb1_final_gate.sh
+allow scripts/govb1_frozen_hashes.txt
+allow scripts/govb1_scope.manifest
+allow scripts/govflow_lifecycle.json
+allow scripts/template_check.sh
+allow templates/COMMITTEE_FINDING_TEMPLATE.md
+allow tests/governance/fixtures/govb1/
+allow tests/governance/test_govb1_b31_recovery.py
+allow tests/governance/test_govb1_brief_id_pattern.py
+allow tests/governance/test_govb1_contract_matrix.py
+allow tests/governance/test_govb1_expected_delta.py
+allow tests/governance/test_govb1_factkey_gen.py
+allow tests/governance/test_govb1_factkey_hook.py
+allow tests/governance/test_govb1_factverified.py
+allow tests/governance/test_govb1_findings_kind.py
+allow tests/governance/test_govb1_lifecycle_matrix.py
+allow tests/governance/test_govb1_template_check_ext.py
+allow tests/governance/test_govb1_zero_findings.py
+allow tests/governance/test_govb1_zeroid_no_regression.py
+
+consumer scripts/govb1_final_gate.sh
+consumer scripts/gen_govb1_contract_matrix.sh
+consumer scripts/gen_fact_key_blocks.sh
+consumer scripts/findings_kind_classify.sh
