@@ -129,7 +129,9 @@ _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
         # ancestor 驗證：base 須為 HEAD 之祖先
         git merge-base --is-ancestor "$(_base)" HEAD \
           || { echo "G-7 FAIL: base_commit 非 HEAD 祖先（range 無意義）" >&2; return 1; }
-        actual="$(git diff --name-only --diff-filter=ACMRD "$(_base)" HEAD | LC_ALL=C sort -u)"
+        # core.quotepath=false：非 ASCII 路徑（如 白話說明/）不得被 C-quote，
+        # 否則與 manifest meta 前綴比對永遠 miss（方案 B 簿記目錄會假紅）。
+        actual="$(git -c core.quotepath=false diff --name-only --diff-filter=ACMRD "$(_base)" HEAD | LC_ALL=C sort -u)"
         # 引號保留：含空白路徑不得斷詞（COMPOSER-R8-P2-01）
         extra=""
         while IFS= read -r p; do
