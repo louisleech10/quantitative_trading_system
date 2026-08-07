@@ -36,16 +36,27 @@ def _run(args: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _docs_ref_count() -> int:
+def _docs_ref_paths() -> set[str]:
+    """現跑 grep 導出的 docs/ path 集合（與 gen 同一關鍵字）。"""
     proc = _run(
         [
             "bash",
             "-c",
-            "grep -rln 'doc_format_precheck\\|completeness_check\\|cx_run' docs/*.md | wc -l",
+            "grep -rln 'doc_format_precheck\\|completeness_check\\|cx_run' docs/*.md | LC_ALL=C sort",
         ]
     )
     assert proc.returncode == 0, proc.stderr
-    return int(proc.stdout.strip())
+    return {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
+
+
+def _contract_lines_live(path: str) -> int:
+    """單檔現算 contract_lines（與 gen 同一關鍵字）。"""
+    proc = _run(
+        ["grep", "-cE", "doc_format_precheck|completeness_check|cx_run", path]
+    )
+    # grep -c：無命中 rc=1 仍 stdout=0
+    text = (proc.stdout or "").strip() or "0"
+    return int(text.splitlines()[-1])
 
 
 def _behavior_rows_from_file(text: str) -> list[str]:
@@ -55,39 +66,146 @@ def _behavior_rows_from_file(text: str) -> list[str]:
     return [ln for ln in text.splitlines() if pat.match(ln)]
 
 
-def _parse_expected_rc(row: str) -> str:
-    """取行為表「修後必須」欄的 rc 值（第三個 rc==N）。"""
-    # 列形態：| `heading` | rc==X | **rc==Y** | 理由 |
-    m = re.findall(r"rc==(\d+)", row)
-    assert m, f"列無 rc==N：{row!r}"
-    # 修後欄為最後一個 rc（或倒數第二若理由無）；表固定：現行、修後
-    return m[-1] if len(m) == 1 else m[1] if len(m) >= 2 else m[0]
+def _base_commit() -> str:
+    text = FROZEN.read_text(encoding="utf-8")
+    m = re.search(r"^base_commit: ([0-9a-f]{40})$", text, re.M)
+    assert m, "frozen_hashes 缺 base_commit"
+    return m.group(1)
+
+
+def _is_narrow_g7_status_case(gate_src: str) -> bool:
+    """機械判定：_g7 內 status case 僅匹配 ?? / A*（不含 M 類）。
+
+    抽取 `_g7()` 函式體中 `case "${_st}" in ... esac` 的 pattern 臂；
+    若所有 pattern 皆為 untracked/added 變體且無 M 字元 ⇒ 窄守衛。
+    """
+    # 取 _g7() { ... } 至頂層閉合（下一頂層函式或檔尾）
+    m = re.search(r"^_g7\(\)\s*\{", gate_src, re.M)
+    if not m:
+        return False
+    rest = gate_src[m.end() :]
+    # 下一頂層定義（行首 _name() 或 _name() {）
+    nxt = re.search(r"\n_[a-zA-Z0-9]+\(\)", rest)
+    body = rest[: nxt.start()] if nxt else rest
+    cm = re.search(
+        r'case\s+"\$\{_st\}"\s+in\s*(.*?)\s*esac',
+        body,
+        re.S,
+    )
+    if not cm:
+        return False
+    case_body = cm.group(1)
+    # 取 pattern 臂：行內 `pat)` 在 `;;` 前
+    patterns: list[str] = []
+    for arm in re.finditer(r"(?m)^\s*([^\n]+?)\)\s*$", case_body):
+        pat = arm.group(1).strip()
+        # 跳過通配 catch-all 若有
+        patterns.append(pat)
+    if not patterns:
+        return False
+    # 窄＝每個 pattern 只含 ?? 與 A* 變體，且整體無 M
+    joined = "|".join(patterns)
+    if "M" in joined:
+        return False
+    # 必須實際覆蓋 ?? 與 A（否則不是「已知窄守衛」而是別的東西）
+    has_untracked = any("?" in p for p in patterns)
+    has_added = any("A" in p for p in patterns)
+    return has_untracked and has_added
 
 
 # ── T-0.1-C* ──────────────────────────────────────────────────────────
 
 
 def test_t01_c1_docs_count_matches_live_grep() -> None:
-    """T-0.1-C1：矩陣 docs/ 列數 == 現跑 grep 列數（兩者同時現跑）。"""
+    """T-0.1-C1：矩陣 docs/ 集合 == 現跑 grep 集合；四欄 schema；contract_lines 現算。"""
     proc = _run(["bash", str(GEN)])
     assert proc.returncode == 0, proc.stderr
-    matrix_n = sum(1 for ln in proc.stdout.splitlines() if ln.startswith("docs/"))
-    ref_n = _docs_ref_count()
-    assert matrix_n == ref_n, f"matrix={matrix_n} ref={ref_n}"
+    matrix_paths: set[str] = set()
+    for ln in proc.stdout.splitlines():
+        if not ln.startswith("docs/"):
+            continue
+        parts = ln.split("|")
+        assert len(parts) == 4, f"四欄 schema 不符: {ln!r}"
+        path, contract_lines, _touched, _evidence = parts
+        assert path.startswith("docs/"), path
+        assert contract_lines.isdigit(), contract_lines
+        live_n = _contract_lines_live(path)
+        assert int(contract_lines) == live_n, (
+            f"{path}: matrix contract_lines={contract_lines} live={live_n}"
+        )
+        matrix_paths.add(path)
+    ref_paths = _docs_ref_paths()
+    assert matrix_paths == ref_paths, (
+        f"path 集合不一致 only_matrix={sorted(matrix_paths - ref_paths)} "
+        f"only_ref={sorted(ref_paths - matrix_paths)}"
+    )
+
+
+def test_t01_c1_mutation_fake_path_fails() -> None:
+    """mutation D：每列 path 換成 docs/fake ⇒ C1 轉紅（非只比列數）。"""
+    original = GEN.read_text(encoding="utf-8")
+    # 把 printf path 換成固定 docs/fake（保留四欄與 lines 數以維持列數）
+    old = 'printf \'%s|%s|%s|%s\\n\' "${f}" "${lines}" "0" "keyword-hit"'
+    new = 'printf \'%s|%s|%s|%s\\n\' "docs/fake" "${lines}" "0" "keyword-hit"'
+    assert old in original, "mutation 錨點未找到"
+    try:
+        GEN.write_text(original.replace(old, new, 1), encoding="utf-8")
+        proc = _run(["bash", str(GEN)])
+        assert proc.returncode == 0, proc.stderr
+        matrix_paths = {
+            ln.split("|", 1)[0]
+            for ln in proc.stdout.splitlines()
+            if ln.startswith("docs/")
+        }
+        ref_paths = _docs_ref_paths()
+        # 列數可仍相等，但集合必須不等
+        assert matrix_paths != ref_paths, "docs/fake mutation 應使 path 集合不一致"
+        assert "docs/fake" in matrix_paths
+    finally:
+        GEN.write_text(original, encoding="utf-8")
 
 
 def test_t01_c2_behavior_expected_rc_matches_live() -> None:
-    """T-0.1-C2：行為表每一列 expected_rc 與現讀值逐列相符。"""
+    """T-0.1-C2：行為表與 base oracle（git show ${base}:）逐列相符——自身可證偽。"""
+    base = _base_commit()
     proc = _run(["bash", str(GEN), "--behavior-only"])
     assert proc.returncode == 0, proc.stderr
     from_gen = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    assert from_gen, "行為表不得為空"
+    # 獨立 oracle：base 樹上的行為表（非自 row 反解析）
+    show = _run(["git", "show", f"{base}:docs/GOV_DISPATCH_FLOW_FIX_SPEC.md"])
+    assert show.returncode == 0, show.stderr
+    from_base = _behavior_rows_from_file(show.stdout)
+    assert from_base, "base oracle 行為表不得為空"
+    assert from_gen == from_base, (
+        "生成器行為表與 base oracle 不一致 "
+        f"(gen={len(from_gen)} base={len(from_base)})"
+    )
+    # 工作樹現讀亦須一致（漂移由本斷言與 _g5 雙重捕捉）
     from_file = _behavior_rows_from_file(BEHAVIOR_SPEC.read_text(encoding="utf-8"))
     assert from_gen == from_file, "生成器行為表與現讀檔不一致"
-    assert from_gen, "行為表不得為空"
-    for row in from_gen:
-        # 自身一致性：解析出的 expected 再對同一列 regex 覆核
-        exp = _parse_expected_rc(row)
-        assert re.search(rf"rc=={re.escape(exp)}", row), row
+
+
+def test_t01_c2_mutation_row_rc_fails() -> None:
+    """mutation B：改行為表任一列 rc==N ⇒ C2 對 base oracle 轉紅。"""
+    base = _base_commit()
+    original = BEHAVIOR_SPEC.read_text(encoding="utf-8")
+    rows = _behavior_rows_from_file(original)
+    assert rows, "行為表空，無法 mutation"
+    # 將第一列修後欄 rc 改成不可能的 999
+    first = rows[0]
+    mut_row = re.sub(r"rc==(\d+)", "rc==999", first, count=2)
+    assert mut_row != first, "mutation 未改到 rc"
+    try:
+        BEHAVIOR_SPEC.write_text(original.replace(first, mut_row, 1), encoding="utf-8")
+        proc = _run(["bash", str(GEN), "--behavior-only"])
+        assert proc.returncode == 0, proc.stderr
+        from_gen = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+        show = _run(["git", "show", f"{base}:docs/GOV_DISPATCH_FLOW_FIX_SPEC.md"])
+        from_base = _behavior_rows_from_file(show.stdout)
+        assert from_gen != from_base, "改 rc 後 gen 應與 base oracle 不一致（C2 轉紅）"
+    finally:
+        BEHAVIOR_SPEC.write_text(original, encoding="utf-8")
 
 
 def test_t01_c3_behavior_rows_nonempty() -> None:
@@ -134,6 +252,42 @@ def test_t01_f1_each_fixture_exists_by_name() -> None:
     assert names, "fixture 清單不得為空"
     missing = [n for n in names if not (FIXTURE_ROOT / n).exists()]
     assert not missing, f"缺 fixture: {missing}"
+
+
+def test_t01_f1_fixture_floor_holds_live() -> None:
+    """群集 A 正例：heading 正常時 --list-fixtures／--check-fixtures 皆 rc=0。"""
+    listed = _run(["bash", str(GEN), "--list-fixtures"])
+    assert listed.returncode == 0, listed.stderr + listed.stdout
+    n = sum(1 for ln in listed.stdout.splitlines() if ln.strip())
+    assert n > 0
+    chk = _run(["bash", str(GEN), "--check-fixtures"])
+    assert chk.returncode == 0, chk.stderr + chk.stdout
+
+
+def test_t01_f1_mutation_heading_mismatch_fails() -> None:
+    """mutation A（composer RECHECK）：改 SPEC 標題使 awk 不匹配 ⇒ 下界守衛 FAIL。
+
+    path 錨點下界仍 ≥ fence 現算項數；heading 失配只剩 supplemental ⇒ n < floor ⇒ 非零。
+    """
+    original = SPEC.read_text(encoding="utf-8")
+    # 標題「fixture 清單」→ 使 /fixture 清單/ 失配；path 錨點 fence 不動
+    assert "fixture 清單" in original
+    mutated = original.replace("fixture 清單", "fixture inventory", 1)
+    assert mutated != original
+    try:
+        SPEC.write_text(mutated, encoding="utf-8")
+        listed = _run(["bash", str(GEN), "--list-fixtures"])
+        assert listed.returncode != 0, (
+            "heading 失配時 --list-fixtures 應因下界守衛非零，"
+            f"stdout={listed.stdout!r} stderr={listed.stderr!r}"
+        )
+        assert "低於現算下界" in (listed.stderr + listed.stdout) or (
+            "path 錨點已失效" in (listed.stderr + listed.stdout)
+        )
+        chk = _run(["bash", str(GEN), "--check-fixtures"])
+        assert chk.returncode != 0, "heading 失配時 --check-fixtures 亦應非零"
+    finally:
+        SPEC.write_text(original, encoding="utf-8")
 
 
 # ── T-0.1-F2 動工前基準 ───────────────────────────────────────────────
@@ -313,3 +467,55 @@ def test_mutation_g5_g6_empty_extract_fails() -> None:
 def test_check_fixtures_rc0() -> None:
     proc = _run(["bash", str(GEN), "--check-fixtures"])
     assert proc.returncode == 0, proc.stderr
+
+
+# ── 群集 C：_g7 窄守衛到期閘 ─────────────────────────────────────────
+
+
+def _batch3_started(base: str) -> bool:
+    """批3已開工 := base..HEAD 含 scripts/brief_conformance_check.sh。"""
+    proc = _run(["git", "diff", "--name-only", f"{base}..HEAD"])
+    assert proc.returncode == 0, proc.stderr
+    return "scripts/brief_conformance_check.sh" in {
+        ln.strip() for ln in proc.stdout.splitlines() if ln.strip()
+    }
+
+
+def _g7_narrow_expiry_holds(*, batch3_started: bool, narrow_guard: bool) -> bool:
+    """斷言 NOT (批3已開工 AND 窄守衛仍在)。"""
+    return not (batch3_started and narrow_guard)
+
+
+def test_g7_narrow_guard_expiry_live_pass() -> None:
+    """現況：批 3 未開工 ⇒ 到期閘 PASS（窄守衛可具名殘留）。"""
+    base = _base_commit()
+    started = _batch3_started(base)
+    narrow = _is_narrow_g7_status_case(GATE.read_text(encoding="utf-8"))
+    assert not started, "批 3 尚未開工（precondition）"
+    assert narrow, "批 1 窄守衛仍在（precondition；具名殘留）"
+    assert _g7_narrow_expiry_holds(batch3_started=started, narrow_guard=narrow)
+
+
+def test_g7_narrow_guard_expiry_simulated_batch3_fails() -> None:
+    """模擬批 3 已開工且窄守衛仍在 ⇒ 到期閘 FAIL（兩個方向皆須可證）。"""
+    gate_src = GATE.read_text(encoding="utf-8")
+    narrow = _is_narrow_g7_status_case(gate_src)
+    assert narrow, "窄守衛偵測須為 True 才有模擬意義"
+    # 模擬：diff 集合強行含批 3 標的檔
+    assert not _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=True)
+    # 對照：批 3 開工但已放寬守衛（含 M）⇒ 到期閘應放行
+    wide_src = gate_src.replace(
+        r"\?\?|A\ |A?|A*)",
+        r"\?\?|A\ |A?|A*| M|M |M?)",
+        1,
+    )
+    # 若 replace 未命中（跳脫差異），改插 M 進 case 臂字串
+    if wide_src == gate_src:
+        wide_src = gate_src.replace(
+            r"\?\?|A\ |A?|A*",
+            r"\?\?|A\ |A?|A*| M|MM",
+            1,
+        )
+    assert wide_src != gate_src, "寬守衛 mutation 未改到 case pattern"
+    assert not _is_narrow_g7_status_case(wide_src), "含 M 後不得判為窄守衛"
+    assert _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=False)

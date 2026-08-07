@@ -77,11 +77,20 @@ $2
 EOF
   return 1
 }
+# ── G-7 窄守衛已知殘留（批 1 具名接受；批 3 開工前必修）────────────────
+# 裁定出處：handoffs/reconcile/20260807-govb1-b1-review-r1/synth.md 群集 C
+# 現況：status case 僅匹配 ?? / A*，未 commit 之 M 可逃檢（epic-wide allow 下）。
+# 到期條件（機械；pytest test_g7_narrow_guard_expiry_* 強制）：
+#   批3已開工 := git diff --name-only <base>..HEAD 含 scripts/brief_conformance_check.sh
+#   窄守衛仍在 := _g7 之 status case 僅匹配 ?? / A*
+#   斷言      := NOT (批3已開工 AND 窄守衛仍在)
+# 替代解（兩家交集）：改為 Task-scoped decl（只對當前 Task 修改∪新建欄之 M/??/A*）。
 _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
         # 交付形態守衛〔CODEX-R17-P0-01〕：本批新建檔未 commit ⇒ FAIL。
         # 只盯 untracked／added（?? / A*）：ambient M（例：B3 十檔）即使落在
         # 後續 Task 的 allow 內，也不進 base..HEAD actual，不得當成「本批未交付」。
         # 完整 epic allow 於 Task 0.1 凍結（F5／hash-lock），與 ambient dirty 並存。
+        # ⚠ 窄守衛＝上列已知殘留；批 3 前須收斂（見函式上方具名註解）。
         _uc="${TMPD:-/tmp}/g7_uncommitted.$$"
         : > "${_uc}"
         while IFS= read -r -d '' rec; do

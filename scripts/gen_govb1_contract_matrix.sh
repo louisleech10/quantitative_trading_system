@@ -47,17 +47,68 @@ $(_docs_list)
 EOF
 }
 
-# fixture 清單由 SPEC §V-ASSERT 現讀（TODO 原 sed 在 opening fence 即截斷，改為取 fence 內文）
-# 併入 Task 1.5 之 spec_assert_pending.md／spec_func_missing.md
-_fixture_names() {
-  awk 'BEGIN{c=0} /fixture 清單/{want=1} want && /^```$/{c++; next} c==1{print} c>=2{exit}' \
-    docs/GOVB1_INPUT_QUALITY_SPEC.md \
-    | grep -oE '[a-z0-9_]+\.(md|json)|factkey_[a-z]+/' | LC_ALL=C sort -u
+# fixture 補充項（Task 1.5；不在 §V-ASSERT fence 內）
+_fixture_supplemental() {
   printf '%s\n' 'spec_assert_pending.md' 'spec_func_missing.md'
 }
 
+# 下界用 path 錨點導出 fence 內文——不依賴「fixture 清單」標題（失配時標題 pattern 與下界不可同崩）
+_fixture_fence_items() {
+  awk '
+    /^```/ {
+      if (in_f) { if (tgt) exit; in_f=0; tgt=0; seen=0; next }
+      in_f=1; tgt=0; seen=0; next
+    }
+    in_f {
+      if (!seen && $0 ~ /^[[:space:]]*$/) next
+      if (!seen) {
+        seen=1
+        if ($0 ~ /^tests\/governance\/fixtures\/govb1\/?$/) { tgt=1; next }
+        next
+      }
+      if (tgt) print
+    }
+  ' docs/GOVB1_INPUT_QUALITY_SPEC.md \
+    | grep -oE '[a-z0-9_]+\.(md|json)|factkey_[a-z]+/' | LC_ALL=C sort -u
+}
+
+# 標題 pattern 抽取（與下界獨立；失配時只剩 supplemental，由下界守衛 fail-closed）
+_fixture_heading_items() {
+  awk 'BEGIN{c=0} /fixture 清單/{want=1} want && /^```$/{c++; next} c==1{print} c>=2{exit}' \
+    docs/GOVB1_INPUT_QUALITY_SPEC.md \
+    | grep -oE '[a-z0-9_]+\.(md|json)|factkey_[a-z]+/' | LC_ALL=C sort -u
+}
+
+# 現算下界 = fence 內項數 + supplemental 項數；fence 0 項 ⇒ 錨點失效，立即非零
+_fixture_floor() {
+  local fence_n supp_n
+  fence_n="$( _fixture_fence_items | grep -c . || true )"
+  if [ "${fence_n:-0}" -eq 0 ]; then
+    echo "ERROR: SPEC fixture fence 現算 0 項，path 錨點已失效" >&2
+    return 1
+  fi
+  supp_n="$( _fixture_supplemental | grep -c . || true )"
+  echo $(( fence_n + supp_n ))
+}
+
+# fixture 清單由 SPEC §V-ASSERT 現讀 + supplemental；出口加現算下界（與 emit_behavior_rows 對稱）
+_fixture_names() {
+  local names n floor
+  names="$(
+    { _fixture_heading_items; _fixture_supplemental; } | LC_ALL=C sort -u
+  )"
+  floor="$(_fixture_floor)" || return 1
+  n="$(printf '%s\n' "${names}" | grep -c . || true)"
+  if [ "${n:-0}" -lt "${floor}" ]; then
+    echo "ERROR: fixture 清單僅 ${n} 項，低於現算下界 ${floor}（heading pattern 可能已失效）" >&2
+    return 1
+  fi
+  printf '%s\n' "${names}"
+}
+
 check_fixtures() {
-  local base="tests/governance/fixtures/govb1" n rc=0
+  local base="tests/governance/fixtures/govb1" n rc=0 names
+  names="$(_fixture_names)" || return 1
   while IFS= read -r n; do
     [ -n "${n}" ] || continue
     if [ ! -e "${base}/${n}" ]; then
@@ -65,7 +116,7 @@ check_fixtures() {
       rc=1
     fi
   done <<EOF
-$(_fixture_names | LC_ALL=C sort -u)
+$(printf '%s\n' "${names}" | LC_ALL=C sort -u)
 EOF
   return "${rc}"
 }
@@ -81,7 +132,9 @@ main() {
       return $?
       ;;
     --list-fixtures)
-      _fixture_names | LC_ALL=C sort -u
+      # 禁經 pipe 取 rc：_fixture_names 下界失敗須直傳
+      _lf_names="$(_fixture_names)" || return 1
+      printf '%s\n' "${_lf_names}" | LC_ALL=C sort -u
       return 0
       ;;
     "")
