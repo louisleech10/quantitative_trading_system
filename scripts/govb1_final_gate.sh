@@ -46,17 +46,53 @@ _g7_policy() {   # stdout: 本批 scope 白名單（一行一筆；目錄以 `/`
                }' "${GOVB1_SCOPE_MANIFEST}")"
   [ -z "${_unk}" ] \
     || { printf 'G-7 FAIL: scope manifest 含未知動詞（fail-closed）:\n%s\n' "${_unk}" >&2; return 1; }
+  # 路徑形態守衛〔CODEX-R5-P1-01〕：凍結 manifest grammar。
+  # 在「未知動詞」之後、產出 decl 之前：先取 raw 段（動詞後恰好一個分隔空白/tab），
+  # 再判形態，最後才決定是否採用。不得先 sub() 吃掉前導/尾端空白再事後判斷。
+  # 為何這就算收（類別封閉，不再逐變體追逐）：
+  #   - 宣告端：路徑要嘛正確解析、要嘛被顯式拒絕 ⇒ 不可能靜默誤判
+  #   - 未宣告端：任何形態皆落在 actual−decl 差集 ⇒ 恆被擋（fail-closed 不變）
+  # 不支援：路徑前導/尾端空白或 tab、路徑含控制字元（C0 除 tab；tab 中段仍允）。
+  # 不「支援」那些形態——只做顯式拒絕。
+  # LC_ALL=C：逐 byte 判 C0，避免 UTF-8 locale 下 towc 對 CJK 路徑炸掉
+  _form_err="$(
+    LC_ALL=C awk '
+      function form_of(raw,   i, c) {
+        if (raw ~ /^[ \t]/) return "leading-whitespace"
+        if (raw ~ /[ \t]$/) return "trailing-whitespace"
+        for (i = 1; i <= length(raw); i++) {
+          c = substr(raw, i, 1)
+          if (c == "\t") continue
+          # C0 控制字元（0x00-0x1F）除 tab；含 \\n/\\r 與其他 C0
+          if (c ~ /[\001-\010\012-\037]/) return "control-char"
+        }
+        return ""
+      }
+      NF && $1 !~ /^#/ && ($1 == "allow" || $1 == "deny" || $1 == "consumer" || $1 == "meta") {
+        line = $0
+        sub(/^[ \t]+/, "", line)
+        if (!match(line, /^(allow|deny|consumer|meta)[ \t]/)) next
+        raw = substr(line, RSTART + RLENGTH)
+        f = form_of(raw)
+        if (f != "") {
+          printf "form=%s line=%s\n", f, $0
+        }
+      }
+    ' "${GOVB1_SCOPE_MANIFEST}"
+  )"
+  [ -z "${_form_err}" ] \
+    || { printf 'G-7 FAIL: scope manifest 路徑形態不支援（fail-closed）:\n%s\n' "${_form_err}" >&2; return 1; }
   # manifest 為純資料：allow | deny | consumer | meta；decl = (allow ∪ meta) − deny；deny 優先
   # 🔴 path = 動詞後整段（含空白／"）；禁 $2 截斷〔CODEX-R4-P1-01〕
+  # 🔴 raw 抽取：動詞後恰好一個空白/tab，不再 sub 吃掉路徑自身前後空白〔CODEX-R5-P1-01〕
+  #    （上段 form 守衛已拒不支援形態；此處合法列與守衛同一抽取規則 ⇒ decl 一致）
   awk '
     function mpath(   p) {
       p = $0
       sub(/^[ \t]+/, "", p)
       if (p == "" || p ~ /^#/) return ""
-      if (!match(p, /^[^ \t]+[ \t]+/)) return ""
-      p = substr(p, RSTART + RLENGTH)
-      sub(/[ \t]+$/, "", p)
-      return p
+      if (!match(p, /^(allow|deny|consumer|meta)[ \t]/)) return ""
+      return substr(p, RSTART + RLENGTH)
     }
     $1 == "deny" {
       p = mpath()

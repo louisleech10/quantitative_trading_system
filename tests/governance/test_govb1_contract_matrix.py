@@ -886,6 +886,207 @@ def test_r6_u1u2u4_g7_worktree_space_quote_paths() -> None:
             assert not (REPO / rel).exists(), f"主樹殘留 probe: {rel}"
 
 
+# ── CODEX-R5-P1-01：manifest grammar fail-closed（r7）──────────────────
+# 有界解：不支援前導/尾端空白與控制字元路徑 ⇒ 顯式拒絕（非靜默誤判）。
+# 不得「支援」那些形態；合法 34 條 decl 須逐字不變。
+
+
+def _r7_baseline_decl() -> list[str]:
+    """修法前／後皆應不變之 34 條 decl（現跑 production policy）。"""
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    return [ln for ln in proc.stdout.splitlines() if ln.strip()]
+
+
+def _r7_mutate_manifest_line(extra_line: str) -> tuple[str, str]:
+    """暫加一列並 rehash；回傳 (orig_m, orig_f)。呼叫端必須 finally 還原。"""
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    body = orig_m if orig_m.endswith("\n") else orig_m + "\n"
+    MANIFEST.write_text(body + extra_line + ("\n" if not extra_line.endswith("\n") else ""), encoding="utf-8")
+    _rehash_scope_manifest()
+    return orig_m, orig_f
+
+
+def test_r7_v1_current_manifest_decl_34_stable() -> None:
+    """V1：現行 manifest ⇒ policy rc=0 且 decl 恰 34 條、集合封閉。
+
+    反例方向：若 grammar 誤拒任一合法列 ⇒ rc≠0 或條數變動即 FAIL。
+    """
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    assert len(decl) == 34, f"V1 期望 34 條 decl，得 {len(decl)}"
+    # 與第二次現跑逐字相同（穩定；非快取）
+    again = _r7_baseline_decl()
+    assert decl == again
+    # 四 meta + 30 allow（deny 一條不進 decl）
+    for p in (
+        "HANDOFF.md",
+        "CLAUDE.md",
+        "handoffs/20260801-GOV-AMEND-BACKLOG.md",
+        "白話說明/",
+        "scripts/govb1_final_gate.sh",
+        "scripts/govb1_scope.manifest",
+    ):
+        assert p in decl, f"V1 合法路徑須在 decl: {p}"
+    # deny 路徑不得出現
+    assert "scripts/govb1_baseline_dirty.txt" not in decl
+
+
+def test_r7_v2_leading_whitespace_path_rejected() -> None:
+    """V2：路徑前導空白 ⇒ policy 非零且訊息含 leading-whitespace；移除後回 rc=0。"""
+    # 正例（反紅）：兩空白分隔 ≡ 恰好一 sep 後 raw 仍以空白起始
+    orig_m, orig_f = _r7_mutate_manifest_line("allow  scripts/leading-space-probe.sh")
+    try:
+        bad = _call_g7_policy()
+        assert bad.returncode != 0, "前導空白路徑應使 _g7_policy 非零"
+        combined = bad.stderr + bad.stdout
+        assert "leading-whitespace" in combined, combined
+        assert "路徑形態不支援" in combined or "fail-closed" in combined, combined
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+    # 反例方向：移除該列 ⇒ 回 rc=0
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
+    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 34
+
+
+def test_r7_v3_trailing_whitespace_path_rejected() -> None:
+    """V3：路徑尾端空白 ⇒ policy 非零且訊息含 trailing-whitespace；移除後回 rc=0。"""
+    orig_m, orig_f = _r7_mutate_manifest_line("allow scripts/trailing-space-probe.sh ")
+    try:
+        bad = _call_g7_policy()
+        assert bad.returncode != 0, "尾端空白路徑應使 _g7_policy 非零"
+        combined = bad.stderr + bad.stdout
+        assert "trailing-whitespace" in combined, combined
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
+
+
+def test_r7_v4_control_char_path_rejected() -> None:
+    """V4：路徑含控制字元（C0 除 tab）⇒ policy 非零且訊息含 control-char；移除後回 rc=0。"""
+    # BEL (0x07) 嵌入路徑
+    orig_m, orig_f = _r7_mutate_manifest_line("allow scripts/ctrl\x07probe.sh")
+    try:
+        bad = _call_g7_policy()
+        assert bad.returncode != 0, "控制字元路徑應使 _g7_policy 非零"
+        combined = bad.stderr + bad.stdout
+        assert "control-char" in combined, combined
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
+
+
+def test_r7_v5_undeclared_space_quote_still_fails_g7() -> None:
+    """V5：未宣告含空白／引號路徑進 base..HEAD ⇒ --only g7 仍 rc≠0（假綠回歸保護）。
+
+    臨時 worktree 實 commit；主樹無 probe 殘留。
+    """
+    import shutil
+    import uuid
+
+    wt = Path(tempfile.mkdtemp(prefix="govb1-r7-wt-", dir="/tmp"))
+    branch = f"govb1-r7-probe-{uuid.uuid4().hex[:8]}"
+    before_porcelain = _run(["bash", "-c", "git status --porcelain | wc -l"])
+    n_before = int(before_porcelain.stdout.strip())
+    try:
+        add = _run(["git", "worktree", "add", "-b", branch, str(wt), "HEAD"])
+        assert add.returncode == 0, add.stderr + add.stdout
+
+        def wt_run(args: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                args,
+                cwd=str(wt),
+                capture_output=True,
+                text=True,
+                check=False,
+                **kw,  # type: ignore[arg-type]
+            )
+
+        # 覆寫為工作區現行 gate（含 r7 grammar 守衛）
+        shutil.copy2(GATE, wt / "scripts" / "govb1_final_gate.sh")
+
+        evil_space = "scripts/r7 evil space.sh"
+        evil_quote = 'scripts/r7evil"quote.sh'
+        for rel, body in (
+            (evil_space, "#!/bin/sh\necho r7-evil-space\n"),
+            (evil_quote, "#!/bin/sh\necho r7-evil-quote\n"),
+        ):
+            p = wt / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(body, encoding="utf-8")
+
+        # 不宣告 evil；僅 commit gate 覆寫 + 兩個 evil 檔
+        add1 = wt_run(
+            [
+                "git",
+                "add",
+                "--",
+                evil_space,
+                evil_quote,
+                "scripts/govb1_final_gate.sh",
+            ]
+        )
+        assert add1.returncode == 0, add1.stderr
+        c1 = wt_run(["git", "commit", "-m", "test: r7 probe undeclared space+quote"])
+        assert c1.returncode == 0, c1.stderr + c1.stdout
+
+        g7_bad = wt_run(["bash", "scripts/govb1_final_gate.sh", "--only", "g7"])
+        assert g7_bad.returncode != 0, (
+            "V5 未宣告 space/quote 應 g7 紅（不得因 grammar 守衛假綠）\n"
+            f"stdout={g7_bad.stdout}\nstderr={g7_bad.stderr}"
+        )
+        combined = g7_bad.stderr + g7_bad.stdout
+        assert (
+            "r7 evil space.sh" in combined
+            or 'r7evil"quote.sh' in combined
+            or "未宣告" in combined
+        ), combined
+    finally:
+        _run(["git", "worktree", "remove", "-f", str(wt)])
+        _run(["git", "branch", "-D", branch])
+        shutil.rmtree(wt, ignore_errors=True)
+        after = _run(["bash", "-c", "git status --porcelain | wc -l"])
+        n_after = int(after.stdout.strip())
+        assert n_after == n_before, f"worktree 汙染主樹 dirty: {n_before}→{n_after}"
+        for rel in (
+            "scripts/r7 evil space.sh",
+            'scripts/r7evil"quote.sh',
+        ):
+            assert not (REPO / rel).exists(), f"主樹殘留 probe: {rel}"
+
+
+def test_r7_v6_r6_and_meta_suite_still_importable() -> None:
+    """V6 錨點：r6 u1–u4 與 meta t1–t5 函式仍存在（全綠由全套 pytest 承擔）。"""
+    import inspect
+    import sys
+
+    mod = sys.modules[__name__]
+    for name in (
+        "test_r6_u1_space_path_declared_in_policy",
+        "test_r6_u2_quote_path_declared_in_policy",
+        "test_r6_u3_cjk_path_still_in_policy",
+        "test_r6_u4_undeclared_space_path_not_covered",
+        "test_meta_t1_paths_covered_by_g7_policy",
+        "test_meta_t2_undeclared_path_still_fails_g7",
+        "test_meta_t3_unknown_verb_fail_closed",
+        "test_meta_t4_deny_wins_over_meta",
+        "test_meta_t5_f5_still_allow_only",
+        "test_t01_f5_manifest_matches_task_decl",
+        "test_t01_f3_g7_when_committed",
+        "test_t01_f3_print_plan_nonempty",
+    ):
+        assert hasattr(mod, name), f"V6 既有測試不得刪除: {name}"
+        assert inspect.isfunction(getattr(mod, name))
+
+
 # ── ASSERT 列 + CLI 契約 ──────────────────────────────────────────────
 
 
