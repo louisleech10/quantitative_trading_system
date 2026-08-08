@@ -68,9 +68,28 @@ REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
 
 **主委傾向 2**（爆炸半徑本來就跨批次，硬塞進 B4 是 scope 錯配）。
 
-## ▶ 下一步：**B5（Task 1.5 — `票 B-16` 擴充 A/B/C）**
+## ▶ 下一步：**B5（Task 1.5）— 偵察已完成，四項待定案**
 
-B4 階段 1 已收案且穩定；階段 2 依上表待決策，**不阻塞 B5**。
+**偵察收斂檔**：`handoffs/reconcile/20260809-govb1-b5-consult-r1/synth.md`（**尚未戳記**）
+三方獨立（codex／composer／主委），`grok` 因額度封鎖缺席。
+
+### 🔴 開工前必定案四項
+
+| # | 事項 |
+|---|---|
+| `P0` | 🔴🔴 **第六次結構性死鎖**：`gate.sh:697,702` 對 `--spec`／`--todo` **必跑** `template_check.sh` 且失敗即拒發 token；Task 1.5 之 **C** 要加進該腳本且套用範圍涵蓋**本 epic 自己唯讀凍結的 SPEC/TODO** ⇒ **C 一落地，所有帶 `--spec` 之派工全部拒發，無人能修**。修法（兩家一致）＝C **禁掃自然語言 occurrence**，只解析**明示結構化欄位**（如 `SCOPE-CLAIM:`）。🔴 **三方計數不一致（主委 16/22、codex 9/6 與 17/16、composer 4/11）本身即為發現：判準未定義。** |
+| `P0` | **`A` 之 `pending` 是無判準的 fail-open**：不存在腳本 `rc=127` 也會被吞成 pending。須限縮為封閉條件（命令與依賴可解析 ＋ Task 明示新建之路徑恰為 `ENOENT`），其餘非零保留失敗。可參照 `scripts/verify_narrowing_consistency.sh:16-20,103-116` 之嚴格文法 |
+| `P0` | **`_func_exists` 偽碼雙向缺陷**（`票 B-43` **第六例**）：`function foo {`（無括號）**漏接**；`${1}` 未跳脫使 `f.oo` 誤命中 `fXoo`、`f*` 誤命中 `f`。須依語言形態分支 ＋ literal 化 |
+| `P0` | 三掛點（`_run_assert_lines`／`_func_exists`／`_check_scope_claim`）與 `test_govb1_template_check_ext.py` **皆不存在**，須先建再接線。🔴 **但都已在 manifest allow 清單內 ⇒ scope 無阻礙**（與 B4 階段 2 不同） |
+
+**已澄清**：只讀 fixture `spec_assert_pending.md`／`spec_func_missing.md` **實測存在**（T-4 成立）；
+註解問題**非** `B-43` 第六例（`^` 錨點已擋；採 codex 碼證），
+但 impl brief 須明寫「邊界②之剝除要求已由 `^` 錨點滿足」避免實作端照抄困惑。
+
+### 接手照序做
+
+1. 派該收斂檔之戳記輪（`grok` 封鎖 ⇒ 只能 2/3，比照 `R-14` 具名記錄）
+2. 定案四項後派 B5 impl
 
 ## 🔴 具名殘留（**不得宣稱已閉合**）
 
