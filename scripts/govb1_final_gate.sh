@@ -192,21 +192,87 @@ $2
 EOF
   return 1
 }
-# ── G-7 窄守衛已知殘留（批 1 具名接受；批 3 開工前必修）────────────────
-# 裁定出處：handoffs/reconcile/20260807-govb1-b1-review-r1/synth.md 群集 C
-# 現況：status case 僅匹配 ?? / A*，未 commit 之 M 可逃檢（epic-wide allow 下）。
-# 到期條件（機械；pytest test_g7_narrow_guard_expiry_* 強制）：
-#   批3已開工 := base..HEAD 含 test_govb1_brief_id_pattern.py 或 test_govb1_factverified.py
-#     （不得用 brief_conformance_check.sh：批2 Task 1.1 亦改該檔，會誤觸到期閘）
-#   窄守衛仍在 := _g7 之 status case 僅匹配 ?? / A*
-#   斷言      := NOT (批3已開工 AND 窄守衛仍在)
-# 替代解（兩家交集）：改為 Task-scoped decl（只對當前 Task 修改∪新建欄之 M/??/A*）。
+# ── G-7 交付形態守衛（批 3：task-scoped 放寬 M）────────────────────────
+# 裁定：handoffs/reconcile/20260808-govb1-b3-consult-r1/synth.md 群集 3
+#   批3已開工 := base..HEAD 含 Task 1.2／1.4「新建」欄 proxy（由凍結 TODO 導出）
+#   窄守衛仍在 := status case 僅匹配 ?? / A*（無 M）
+#   不變式    := NOT (批3已開工 AND 窄守衛仍在)
+# 放寬（task-scoped，禁 epic-wide allow 匹配 M）：
+#   - 全量 allow 之 ??|A* 交付形態檢查維持不變
+#   - 批3開工後，僅對 Task 1.2／1.4「修改∪新建」路徑另匹配 M /MM
+#   - ambient M（例：scripts/gate_check.sh 在 allow 且現為 M）不得誤紅
+# 路徑集合來源＝凍結 TODO（與 tests/_todo_new_paths 同源；禁 govb1_batch_markers.tsv）
+
+_GOVB1_TODO="${GOVB1_TODO:-docs/GOVB1_INPUT_QUALITY_TODO.md}"
+
+# $1=task_id → stdout：該 Task 區段（### Task <id> … 下一 ### Task／EOF）
+_todo_task_section() {
+  awk -v t="$1" '
+    BEGIN { p = 0 }
+    $0 ~ ("^### Task " t "( |$)") { p = 1; print; next }
+    p && /^### Task / { exit }
+    p { print }
+  ' "${_GOVB1_TODO}"
+}
+
+# stdin → 只保留 repo 路徑形態之 backtick 內容
+_todo_path_tokens() {
+  grep -oE '`(scripts|tests|templates|docs)/[A-Za-z0-9_./-]+`' | tr -d '`'
+}
+
+# $1=task_id → stdout：新建欄路徑
+_todo_new_paths() {
+  _todo_task_section "$1" | awk '
+    /\*\*新建\*\*：/ { n = 1 }
+    n && /\*\*只讀\*\*/ { exit }
+    n { print }
+  ' | _todo_path_tokens
+}
+
+# $1=task_id → stdout：修改欄路徑（至新建／只讀）
+_todo_mod_paths() {
+  _todo_task_section "$1" | awk '
+    /\*\*修改\*\*：/ { m = 1 }
+    m && /\*\*新建\*\*：/ { exit }
+    m && /\*\*只讀\*\*/ { exit }
+    m { print }
+  ' | _todo_path_tokens
+}
+
+# 批 3 proxy＝Task 1.2／1.4 新建欄（= _BATCH3_PROXY_PATHS）
+_g7_batch3_proxy_paths() {
+  { _todo_new_paths 1.2; _todo_new_paths 1.4; } | LC_ALL=C sort -u
+}
+
+# 批 3 標的＝Task 1.2／1.4 修改∪新建（task-scoped M 僅對此集合）
+_g7_batch3_target_paths() {
+  {
+    _todo_mod_paths 1.2
+    _todo_new_paths 1.2
+    _todo_mod_paths 1.4
+    _todo_new_paths 1.4
+  } | LC_ALL=C sort -u
+}
+
+# rc=0 ⇔ base..HEAD 含任一 proxy
+_g7_batch3_started() {
+  _prox="$(_g7_batch3_proxy_paths)"
+  [ -n "${_prox}" ] || return 1
+  while IFS= read -r -d '' p; do
+    [ -n "${p}" ] || continue
+    printf '%s\n' "${_prox}" | grep -qxF "${p}" && return 0
+  done < <(git -c core.quotepath=false diff --name-only -z --diff-filter=ACMRD "$(_base)" HEAD 2>/dev/null)
+  return 1
+}
+
 _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
-        # 交付形態守衛〔CODEX-R17-P0-01〕：本批新建檔未 commit ⇒ FAIL。
-        # 只盯 untracked／added（?? / A*）：ambient M（例：B3 十檔）即使落在
-        # 後續 Task 的 allow 內，也不進 base..HEAD actual，不得當成「本批未交付」。
-        # 完整 epic allow 於 Task 0.1 凍結（F5／hash-lock），與 ambient dirty 並存。
-        # ⚠ 窄守衛＝上列已知殘留；批 3 前須收斂（見函式上方具名註解）。
+        # 交付形態守衛〔CODEX-R17-P0-01〕＋批 3 task-scoped M：
+        #   1) 全量 allow：?? / A* 未 commit ⇒ FAIL（新建未交付）
+        #   2) 批3開工後：僅批 3 標的路徑之 M/MM 未 commit ⇒ FAIL
+        #   3) 非標的 ambient M（gate_check.sh 等）不觸發
+        _b3_targets="$(_g7_batch3_target_paths)"
+        _b3_on=0
+        _g7_batch3_started && _b3_on=1
         _uc="${TMPD:-/tmp}/g7_uncommitted.$$"
         : > "${_uc}"
         while IFS= read -r -d '' rec; do
@@ -218,6 +284,14 @@ _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
           case "${_st}" in
             \?\?|A\ |A?|A*)
               if _g7_covered "${p}" "${decl}"; then
+                echo "UNCOMMITTED:${p}" >> "${_uc}"
+                break
+              fi
+              ;;
+            \ M|M\ |MM)
+              # task-scoped M：批3開工 且 路徑 ∈ 批3標的
+              if [ "${_b3_on}" -eq 1 ] \
+                && printf '%s\n' "${_b3_targets}" | grep -qxF "${p}"; then
                 echo "UNCOMMITTED:${p}" >> "${_uc}"
                 break
               fi
@@ -243,6 +317,54 @@ _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
           _g7_covered "${p}" "${decl}" || extra="${extra}${p}"$'\n'
         done < <(git -c core.quotepath=false diff --name-only -z --diff-filter=ACMRD "$(_base)" HEAD)
         [ -z "${extra}" ] || { printf 'G-7 FAIL: 未宣告即修改:\n%s\n' "${extra}" >&2; return 1; }; }
+
+# GATE-B3：同檔序列 1.2→1.4（brief_conformance_check.sh）＋雙 proxy 時強制
+# 驗收時點＝B3 收案當下（兩 proxy 皆在 base..HEAD）；未開工 ⇒ 跳過。
+# 拒：合併單一 commit／逆序（1.4 先於 1.2）；「不防蓄意」誠實邊界保留。
+_gate_b3() {
+  _prox="$(_g7_batch3_proxy_paths)"
+  _n_prox=0
+  _n_hit=0
+  while IFS= read -r p; do
+    [ -n "${p}" ] || continue
+    _n_prox=$((_n_prox + 1))
+    git -c core.quotepath=false diff --name-only --diff-filter=ACMRD "$(_base)" HEAD \
+      | grep -qxF "${p}" && _n_hit=$((_n_hit + 1))
+  done <<EOF
+${_prox}
+EOF
+  # 未齊 → 不強制（批 3 進行中或未開工）
+  [ "${_n_prox}" -gt 0 ] && [ "${_n_hit}" -eq "${_n_prox}" ] || return 0
+
+  _bc="scripts/brief_conformance_check.sh"
+  # 兩獨立 commit 觸及 brief_conformance（合併 ⇒ 僅 1）
+  _n_bc="$(git log --oneline "$(_base)"..HEAD -- "${_bc}" | wc -l | tr -d ' ')"
+  [ "${_n_bc}" -ge 2 ] \
+    || { echo "GATE-B3 FAIL: ${_bc} 在 base..HEAD 須 ≥2 獨立 commit（現 ${_n_bc}；禁合併 1.2+1.4）" >&2; return 1; }
+
+  # 序：_check_id_pattern 首次出現之 commit 須為 _check_fact_verified 之祖先
+  _first_id=""
+  _first_fv=""
+  while IFS= read -r c; do
+    [ -n "${c}" ] || continue
+    _blob="$(git show "${c}:${_bc}" 2>/dev/null)" || continue
+    printf '%s' "${_blob}" | grep -q '_check_id_pattern' \
+      && [ -z "${_first_id}" ] && _first_id="${c}"
+    printf '%s' "${_blob}" | grep -q '_check_fact_verified' \
+      && [ -z "${_first_fv}" ] && _first_fv="${c}"
+  done < <(git log --reverse --format='%H' "$(_base)"..HEAD -- "${_bc}")
+
+  [ -n "${_first_id}" ] \
+    || { echo "GATE-B3 FAIL: base..HEAD 未見 _check_id_pattern 引入" >&2; return 1; }
+  [ -n "${_first_fv}" ] \
+    || { echo "GATE-B3 FAIL: base..HEAD 未見 _check_fact_verified 引入" >&2; return 1; }
+  [ "${_first_id}" != "${_first_fv}" ] \
+    || { echo "GATE-B3 FAIL: 1.2 與 1.4 併於同一 commit（禁合併）" >&2; return 1; }
+  git merge-base --is-ancestor "${_first_id}" "${_first_fv}" \
+    || { echo "GATE-B3 FAIL: 逆序——_check_fact_verified 先於 _check_id_pattern" >&2; return 1; }
+  return 0
+}
+
 _g8() { bash scripts/reconcile_stamps_check.sh handoffs/reconcile/20260807-govb1-x-consult-r1/synth.md >/dev/null; }
 
 # ── lifecycle embed ≡ 權威 JSON（Task 1.1 修補案 C2；關 R-8 假綠）──────────
@@ -312,6 +434,7 @@ g4|scripts/gen_govflow_manifest.sh|_g4
 g5|docs/GOV_DISPATCH_FLOW_FIX_SPEC.md|_g5
 g6|scripts/cx_run.sh|_g6
 g7|scripts/govb1_scope.manifest scripts/govb1_frozen_hashes.txt|_g7
+gate_b3|scripts/brief_conformance_check.sh docs/GOVB1_INPUT_QUALITY_TODO.md|_gate_b3
 g8|handoffs/reconcile/20260807-govb1-x-consult-r1/synth.md|_g8
 lifecycle_embed|scripts/govflow_lifecycle.json scripts/brief_conformance_check.sh scripts/cx_run.sh|_lifecycle_embed
 '

@@ -1622,7 +1622,84 @@ def test_batch3_proxy_anti_drift_new_column_mutation_turns_red() -> None:
 
 
 # 批 3 開工時，**放寬 `_g7` 與更新到期測試須配對**；
-# **只改測試不改守衛＝假綠。** 到期不變式由 `_g7_narrow_expiry_holds` ＋ 真實 range 測試護住。
+# **只改守衛不改測試、或只改測試不改守衛，皆為假綠。**
+# 五例：no-proxy｜proxy+narrow ⇒ 不變式 false｜proxy+wide ⇒ 放行｜
+#       target ` M` ⇒ 轉紅｜僅 ambient ` M gate_check.sh` ⇒ 不紅
+
+def _shell_batch3_proxy_paths() -> set[str]:
+    """與 production `_g7_batch3_proxy_paths` 同源（凍結 TODO 新建欄）。
+
+    不得 source govb1_final_gate.sh（會跑 main／_g0_tests 遞迴）。
+    """
+    snippet = r"""
+set -u
+_GOVB1_TODO=docs/GOVB1_INPUT_QUALITY_TODO.md
+_todo_task_section() {
+  awk -v t="$1" '
+    BEGIN { p = 0 }
+    $0 ~ ("^### Task " t "( |$)") { p = 1; print; next }
+    p && /^### Task / { exit }
+    p { print }
+  ' "${_GOVB1_TODO}"
+}
+_todo_path_tokens() {
+  grep -oE '`(scripts|tests|templates|docs)/[A-Za-z0-9_./-]+`' | tr -d '`'
+}
+_todo_new_paths() {
+  _todo_task_section "$1" | awk '
+    /\*\*新建\*\*：/ { n = 1 }
+    n && /\*\*只讀\*\*/ { exit }
+    n { print }
+  ' | _todo_path_tokens
+}
+{ _todo_new_paths 1.2; _todo_new_paths 1.4; } | LC_ALL=C sort -u
+"""
+    proc = _run(["bash", "-c", snippet])
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    return {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
+
+
+def _shell_batch3_target_paths() -> set[str]:
+    """與 production `_g7_batch3_target_paths` 同源（修改∪新建）。"""
+    snippet = r"""
+set -u
+_GOVB1_TODO=docs/GOVB1_INPUT_QUALITY_TODO.md
+_todo_task_section() {
+  awk -v t="$1" '
+    BEGIN { p = 0 }
+    $0 ~ ("^### Task " t "( |$)") { p = 1; print; next }
+    p && /^### Task / { exit }
+    p { print }
+  ' "${_GOVB1_TODO}"
+}
+_todo_path_tokens() {
+  grep -oE '`(scripts|tests|templates|docs)/[A-Za-z0-9_./-]+`' | tr -d '`'
+}
+_todo_new_paths() {
+  _todo_task_section "$1" | awk '
+    /\*\*新建\*\*：/ { n = 1 }
+    n && /\*\*只讀\*\*/ { exit }
+    n { print }
+  ' | _todo_path_tokens
+}
+_todo_mod_paths() {
+  _todo_task_section "$1" | awk '
+    /\*\*修改\*\*：/ { m = 1 }
+    m && /\*\*新建\*\*：/ { exit }
+    m && /\*\*只讀\*\*/ { exit }
+    m { print }
+  ' | _todo_path_tokens
+}
+{
+  _todo_mod_paths 1.2; _todo_new_paths 1.2
+  _todo_mod_paths 1.4; _todo_new_paths 1.4
+} | LC_ALL=C sort -u
+"""
+    proc = _run(["bash", "-c", snippet])
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    return {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
+
+
 def test_g7_narrow_guard_expiry_live_pass() -> None:
     """不變式：NOT (批3已開工 AND 窄守衛仍在)；live range 現況須通過。"""
     base = _base_commit()
@@ -1631,19 +1708,26 @@ def test_g7_narrow_guard_expiry_live_pass() -> None:
     assert _g7_narrow_expiry_holds(batch3_started=started, narrow_guard=narrow)
 
 
-def test_g7_narrow_guard_expiry_real_range_both_directions(tmp_path: Path) -> None:
-    """C3-b：真實 temp git range 兩向——無 proxy ⇒ false；含 proxy commit ⇒ true。"""
-    # ① 現況 production range ⇒ _batch3_started false（批 3 尚未開工）
-    base = _base_commit()
-    assert not _batch3_started(base), (
-        "production base..HEAD 不應已含批 3 proxy（否則到期閘誤觸）"
-    )
+def test_g7_task_scoped_widen_paired_with_expiry() -> None:
+    """放寬後 production 不得再判為窄守衛；與 batch3_started 配對不變式仍綠。"""
     gate_src = GATE.read_text(encoding="utf-8")
     narrow = _is_narrow_g7_status_case(gate_src)
-    assert narrow, "窄守衛偵測須為 True（本輪不放寬 _g7）"
-    assert _g7_narrow_expiry_holds(batch3_started=False, narrow_guard=True)
+    # 批 3 已 task-scoped 放寬：case 臂含 M
+    assert not narrow, "B3 放寬後 _g7 status case 須含 M（不得仍為窄守衛）"
+    assert "\\ M|M\\ |MM" in gate_src or r"\ M|M\ |MM" in gate_src, (
+        "production _g7 須含 task-scoped M 臂"
+    )
+    base = _base_commit()
+    started = _batch3_started(base)
+    assert _g7_narrow_expiry_holds(batch3_started=started, narrow_guard=narrow)
 
-    # ② 真實 temp repo：base commit 無 proxy → 再 commit 含 proxy 檔 → range true
+
+def test_g7_narrow_guard_expiry_five_cases(tmp_path: Path) -> None:
+    """五例：no-proxy｜proxy+narrow｜proxy+wide｜（range 真偽）＋不變式兩向。"""
+    gate_src = GATE.read_text(encoding="utf-8")
+    # ① no-proxy ⇒ started=false
+    base = _base_commit()
+    # production 在 commit ② 前 started=false；之後 true——以 temp range 證 no-proxy
     repo = tmp_path / "batch3_range"
     repo.mkdir()
     env = {
@@ -1653,6 +1737,7 @@ def test_g7_narrow_guard_expiry_real_range_both_directions(tmp_path: Path) -> No
         "GIT_COMMITTER_NAME": "govb1-test",
         "GIT_COMMITTER_EMAIL": "govb1-test@example.invalid",
     }
+
     def g(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["git", *args],
@@ -1663,11 +1748,9 @@ def test_g7_narrow_guard_expiry_real_range_both_directions(tmp_path: Path) -> No
             env=env,
         )
 
-    # 固定 sha1，避免 object-format=sha256 環境下 hex 長度 64 誤紅（修4）
     assert g("init", "--object-format=sha1").returncode == 0
     assert g("config", "user.name", "govb1-test").returncode == 0
     assert g("config", "user.email", "govb1-test@example.invalid").returncode == 0
-    # 部分 git 預設 branch 名 main；明確指定
     g("checkout", "-b", "main")
     (repo / "README").write_text("base\n", encoding="utf-8")
     assert g("add", "README").returncode == 0
@@ -1675,23 +1758,171 @@ def test_g7_narrow_guard_expiry_real_range_both_directions(tmp_path: Path) -> No
     rp = g("rev-parse", "--verify", "HEAD")
     assert rp.returncode == 0, rp.stderr
     base_sha = rp.stdout.strip()
-    assert base_sha, "rev-parse HEAD 須非空"
-    assert not _batch3_started(base_sha, cwd=repo), "空 range 不得判批 3 開工"
+    # ① no-proxy
+    assert not _batch3_started(base_sha, cwd=repo), "no-proxy ⇒ started=false"
 
+    # ② proxy + narrow ⇒ 不變式 false
     proxy = repo / _BATCH3_PROXY_PATHS[0]
     proxy.parent.mkdir(parents=True, exist_ok=True)
     proxy.write_text("# batch3 proxy stub\n", encoding="utf-8")
     assert g("add", _BATCH3_PROXY_PATHS[0]).returncode == 0
     assert g("commit", "-m", "add batch3 proxy").returncode == 0
-    assert _batch3_started(base_sha, cwd=repo), "含 proxy 之真實 range 須 true"
-
-    # 純函式兩向（可證偽；與真實 range 結果銜接）
-    assert not _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=True)
-    wide_src = gate_src.replace(
-        r"\?\?|A\ |A?|A*",
-        r"\?\?|A\ |A?|A*| M|MM",
-        1,
+    assert _batch3_started(base_sha, cwd=repo), "proxy ⇒ started=true"
+    assert not _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=True), (
+        "proxy+narrow ⇒ 不變式 false"
     )
-    assert wide_src != gate_src, "寬守衛 mutation 未改到 case pattern"
-    assert not _is_narrow_g7_status_case(wide_src), "含 M 後不得判為窄守衛"
+
+    # ③ proxy + wide ⇒ 放行（production 已放寬）
+    assert not _is_narrow_g7_status_case(gate_src), "production 為 wide"
+    assert _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=False), (
+        "proxy+wide ⇒ 放行"
+    )
+
+    # ④ 構造窄／寬 case：proxy+narrow 不變式 false；wide 放行
+    fake_narrow = """
+_g7() {
+  case "${_st}" in
+    \\?\\?|A\\ |A?|A*)
+      : ;;
+  esac
+}
+"""
+    assert _is_narrow_g7_status_case(fake_narrow), "構造之窄守衛須被偵測"
+    assert not _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=True)
+
+    fake_wide = """
+_g7() {
+  case "${_st}" in
+    \\?\\?|A\\ |A?|A*)
+      : ;;
+    \\ M|M\\ |MM)
+      : ;;
+  esac
+}
+"""
+    assert not _is_narrow_g7_status_case(fake_wide), "含 M 不得判窄"
     assert _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=False)
+
+
+def test_g7_ambient_m_gate_check_not_red() -> None:
+    """僅 ambient ` M scripts/gate_check.sh` ⇒ 不紅（task-scoped；禁 epic-wide）。"""
+    st = _run(["git", "status", "--porcelain", "--", "scripts/gate_check.sh"])
+    # 現況可為 M 或乾淨；若為 M，g7 必須仍綠
+    proc = _run(["bash", "scripts/govb1_final_gate.sh", "--only", "g7"])
+    assert proc.returncode == 0, (
+        f"ambient M 不得使 g7 轉紅（task-scoped）\n"
+        f"status={st.stdout!r}\n{proc.stdout}\n{proc.stderr}"
+    )
+    # 機械：gate_check 在 allow 且不在批 3 標的
+    targets = _shell_batch3_target_paths()
+    assert "scripts/gate_check.sh" not in targets
+    allow = {
+        ln.split(None, 1)[1]
+        for ln in MANIFEST.read_text(encoding="utf-8").splitlines()
+        if ln.startswith("allow ")
+    }
+    assert "scripts/gate_check.sh" in allow
+
+
+def test_g7_target_m_turns_red_when_batch3_started() -> None:
+    """批3開工後，標的路徑 ` M` ⇒ G-7 轉紅（與 ambient 對照）。"""
+    base = _base_commit()
+    if not _batch3_started(base):
+        pytest.skip("批 3 proxy 尚未進 range；target-M 轉紅待 proxy 交付後驗")
+    target = REPO / "scripts" / "brief_conformance_check.sh"
+    original = target.read_text(encoding="utf-8")
+    try:
+        target.write_text(original + "\n# g7-target-m-probe\n", encoding="utf-8")
+        proc = _run(["bash", "scripts/govb1_final_gate.sh", "--only", "g7"])
+        assert proc.returncode != 0, "標的 M 於批3開工後須使 g7 轉紅"
+        blob = (proc.stdout or "") + (proc.stderr or "")
+        assert "UNCOMMITTED" in blob or "brief_conformance" in blob
+    finally:
+        target.write_text(original, encoding="utf-8")
+
+
+def test_batch3_shell_export_anti_drift_triple() -> None:
+    """三方 anti-drift：shell 導出 ≡ _BATCH3_PROXY_PATHS ≡ TODO 新建欄。"""
+    shell_set = _shell_batch3_proxy_paths()
+    py_set = set(_BATCH3_PROXY_PATHS)
+    todo_set = _todo_new_paths("1.2") | _todo_new_paths("1.4")
+    assert shell_set == py_set == todo_set, (
+        f"anti-drift 失敗 shell={shell_set} py={py_set} todo={todo_set}"
+    )
+    # 標的集合須含 brief_conformance + 兩 proxy
+    targets = _shell_batch3_target_paths()
+    assert "scripts/brief_conformance_check.sh" in targets
+    assert targets >= py_set
+
+
+# ── WAIVER-B45-B3-IMPL 機械邊界 ──────────────────────────────────────
+# 凍結：B3 開工前 kind case 區塊 hash（不得因 B3 改 membership）
+_B3_KIND_CASE_SHA256 = (
+    "62714abffa416968b8b00085ee344e6e86a9d166defc49902457f86c2d0b883f"
+)
+_B45_HARNESS = (
+    "tests/governance/test_cxrun_stamp_prompt.py",
+    "tests/governance/test_stamp_taskid_inject.py",
+    "tests/governance/test_rolegate_predispatch.py",
+    "tests/governance/test_result_state_format_failed.py",
+    "tests/governance/test_completeness_idlike_fp.py",
+)
+_B45_FORBIDDEN_PREFIXES = (
+    "scripts/govb1_scope.manifest",
+    "scripts/govb1_frozen_hashes.txt",
+    "docs/GOVB1_",
+    "scripts/cx_run.sh",
+    "scripts/govflow_lifecycle.json",
+)
+
+
+def _kind_case_block(src: str) -> str:
+    m = re.search(r'case "\$\{_bk\}" in\n.*?\nesac', src, re.S)
+    assert m, "brief_conformance 缺 kind case 區塊"
+    return m.group(0)
+
+
+def _kind_case_sha256(src: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(_kind_case_block(src).encode()).hexdigest()
+
+
+def test_waiver_b45_kind_case_block_hash_frozen() -> None:
+    """waiver 邊界：kind case membership 區塊 hash 不變。"""
+    src = (REPO / "scripts" / "brief_conformance_check.sh").read_text(encoding="utf-8")
+    got = _kind_case_sha256(src)
+    assert got == _B3_KIND_CASE_SHA256, (
+        f"kind case block hash 漂移（B-45 禁改 membership）want={_B3_KIND_CASE_SHA256} got={got}"
+    )
+
+
+def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
+    """B3 commit range 不得觸及 B-45 禁改清單（harness／manifest／SPEC／embed）。"""
+    base = _base_commit()
+    proc = _run(
+        ["git", "diff", "--name-only", f"{base}..HEAD"],
+    )
+    assert proc.returncode == 0, proc.stderr
+    names = {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
+    # 僅在 B3 已開工（有 proxy）時強制；否則 range 可能含批2 合法檔
+    if not (names & set(_BATCH3_PROXY_PATHS)):
+        pytest.skip("批 3 proxy 尚未進 range；waiver range 檢查待 B3 交付後生效")
+    hit_harness = names & set(_B45_HARNESS)
+    assert not hit_harness, f"B3 range 觸及 B-45 harness: {hit_harness}"
+    for pref in _B45_FORBIDDEN_PREFIXES:
+        bad = {n for n in names if n == pref or n.startswith(pref)}
+        assert not bad, f"B3 range 觸及禁改前綴 {pref}: {bad}"
+    # embed 常數不得被改（比對 base 與 HEAD 的 _LIFECYCLE_EMBED_B64）
+    for rel in ("scripts/brief_conformance_check.sh", "scripts/cx_run.sh"):
+        if rel not in names:
+            continue
+        b = _run(["git", "show", f"{base}:{rel}"])
+        h = _run(["git", "show", f"HEAD:{rel}"])
+        if b.returncode != 0 or h.returncode != 0:
+            continue
+        def _embed(s: str) -> str:
+            m = re.search(r"^_LIFECYCLE_EMBED_B64='(.*)'$", s, re.M)
+            return m.group(1) if m else ""
+
+        assert _embed(b.stdout) == _embed(h.stdout), f"{rel} embed 被改（B-45 禁）"
