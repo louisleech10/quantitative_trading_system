@@ -1340,6 +1340,127 @@ def test_b2r2_b6_gate_msg_points_to_tsv_not_01a() -> None:
     assert "歸屬" in text and "TSV" in text
 
 
+def test_b2r3_c1_current_manifest_meta_count_6() -> None:
+    """C1：現行 manifest ⇒ `_g7_policy` rc=0；meta 列數 6；decl 36。"""
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    assert len(decl) == 36, f"decl 應恰 36，got {len(decl)}"
+    meta_n = sum(
+        1
+        for ln in MANIFEST.read_text(encoding="utf-8").splitlines()
+        if ln.strip().startswith("meta ")
+    )
+    assert meta_n == 6, f"meta 列數應恰 6，got {meta_n}"
+
+
+def test_b2r3_c2_duplicate_meta_rejected() -> None:
+    """C2：重複 meta HANDOFF.md（列數 7）+ rehash ⇒ rc≠0，訊息指出重複路徑；移除 ⇒ rc=0。"""
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    try:
+        MANIFEST.write_text(
+            orig_m.rstrip("\n") + "\nmeta HANDOFF.md\n",
+            encoding="utf-8",
+        )
+        _rehash_scope_manifest()
+        bad = _call_g7_policy()
+        assert bad.returncode != 0, "重複 meta 列應非零"
+        combined = bad.stderr + bad.stdout
+        assert "HANDOFF.md" in combined, combined
+        assert "重複" in combined or "duplicate" in combined.lower(), combined
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
+
+
+def test_b2r3_c3_meta_order_independent() -> None:
+    """C3：順序反轉 6 列 + rehash ⇒ rc=0（集合語義，不得拒絕）。"""
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    meta_lines = [
+        ln for ln in orig_m.splitlines() if ln.strip().startswith("meta ")
+    ]
+    assert len(meta_lines) == 6
+    reversed_meta = list(reversed(meta_lines))
+    assert reversed_meta != meta_lines
+    try:
+        non_meta = [
+            ln for ln in orig_m.splitlines() if not ln.strip().startswith("meta ")
+        ]
+        # 保留檔頭註解與 allow/deny；meta 區塊改為反序
+        rebuilt = "\n".join(non_meta).rstrip("\n") + "\n" + "\n".join(reversed_meta) + "\n"
+        MANIFEST.write_text(rebuilt, encoding="utf-8")
+        _rehash_scope_manifest()
+        ok = _call_g7_policy()
+        assert ok.returncode == 0, (
+            "順序反轉 6 列應 rc=0（集合語義）\n" + ok.stderr + ok.stdout
+        )
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+    ok2 = _call_g7_policy()
+    assert ok2.returncode == 0, ok2.stderr + ok2.stdout
+
+
+def test_b2r3_c4_meta_deviations_still_rejected() -> None:
+    """C4：多一項／少一項／改一字／大小寫 ⇒ 各 rc≠0；還原 ⇒ rc=0。"""
+    orig_m = MANIFEST.read_text(encoding="utf-8")
+    orig_f = FROZEN.read_text(encoding="utf-8")
+    cases: list[tuple[str, str]] = [
+        ("extra", orig_m.rstrip("\n") + "\nmeta scripts/govb1_extra_probe.sh\n"),
+        (
+            "missing",
+            "\n".join(
+                ln
+                for ln in orig_m.splitlines()
+                if ln.strip() != "meta CLAUDE.md"
+            )
+            + "\n",
+        ),
+        (
+            "typo",
+            orig_m.replace("meta HANDOFF.md", "meta HANDOFF.MD", 1),
+        ),
+        (
+            "case",
+            orig_m.replace("meta CLAUDE.md", "meta claude.md", 1),
+        ),
+    ]
+    try:
+        for name, mutated in cases:
+            assert mutated != orig_m, name
+            MANIFEST.write_text(mutated, encoding="utf-8")
+            _rehash_scope_manifest()
+            bad = _call_g7_policy()
+            assert bad.returncode != 0, f"{name} 應 expected-set 非零"
+            combined = bad.stderr + bad.stdout
+            # 多一項也可能走 expected-set；重複路徑訊息另案
+            assert (
+                "expected-set" in combined
+                or "重複" in combined
+            ), f"{name}: {combined}"
+            MANIFEST.write_text(orig_m, encoding="utf-8")
+            FROZEN.write_text(orig_f, encoding="utf-8")
+    finally:
+        MANIFEST.write_text(orig_m, encoding="utf-8")
+        FROZEN.write_text(orig_f, encoding="utf-8")
+    ok = _call_g7_policy()
+    assert ok.returncode == 0, ok.stderr + ok.stdout
+
+
+def test_b2r3_c5_undeclared_path_still_blocked() -> None:
+    """C5：未宣告路徑仍被擋（假綠回歸保護）。"""
+    proc = _call_g7_policy()
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    decl = proc.stdout
+    evil = "scripts/govb1_b2r3_c5_evil_undeclared.sh"
+    assert evil not in {ln.strip() for ln in decl.splitlines() if ln.strip()}
+    assert _g7_covered_rc(evil, decl) != 0, "未宣告 evil 不得被涵蓋"
+
+
 def test_wprime_a7_existing_suite_still_present() -> None:
     """A7：既有 meta/r6/r7/f5/f3 測試函式仍在（全套 pytest 另驗通過）。"""
     import inspect

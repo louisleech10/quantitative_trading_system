@@ -82,8 +82,11 @@ _g7_policy() {   # stdout: 本批 scope 白名單（一行一筆；目錄以 `/`
   )"
   [ -z "${_form_err}" ] \
     || { printf 'G-7 FAIL: scope manifest 路徑形態不支援（fail-closed）:\n%s\n' "${_form_err}" >&2; return 1; }
-  # meta expected-set〔CODEX-R1-P0-01／b2-review-r1〕：精確凍結 6 項，寫死於實作端。
-  # 不得改由 manifest 自身宣告（自證＝無檢查）。多一／少一／改字皆立即非零。
+  # meta expected-set〔CODEX-R1-P0-01／b2-review-r1／CODEX-R2-P0-02〕：
+  # 精確凍結 6 項（列數＋multiset），寫死於實作端。
+  # 集合語義：順序無關（兩側 sort 後比；不 -u，保留重複以便列數契約生效）。
+  # 重複列 ⇒ 列數≠6，訊息指出重複路徑。多一／少一／改字皆立即非零。
+  # 不得改由 manifest 自身宣告（自證＝無檢查）。
   # 「不在 Task 欄」只能解釋為不能用 allow，不能自動產生 meta。
   _meta_want="$(printf '%s\n' \
     'HANDOFF.md' \
@@ -91,22 +94,31 @@ _g7_policy() {   # stdout: 本批 scope 白名單（一行一筆；目錄以 `/`
     'handoffs/20260801-GOV-AMEND-BACKLOG.md' \
     '白話說明/' \
     'scripts/govb1_task_tickets.tsv' \
-    'scripts/govb1_single_source_check.sh' | LC_ALL=C sort -u)"
-  _meta_got="$(
+    'scripts/govb1_single_source_check.sh' | LC_ALL=C sort)"
+  _meta_got_raw="$(
     awk '
       function mpath(   p) {
         p = $0
         sub(/^[ \t]+/, "", p)
         if (p == "" || p ~ /^#/) return ""
-        if (!match(p, /^meta[ \t]/)) return ""
+        if (!match(p, /^meta[ \t]+/)) return ""
         return substr(p, RSTART + RLENGTH)
       }
       $1 == "meta" {
         p = mpath()
         if (p != "") print p
       }
-    ' "${GOVB1_SCOPE_MANIFEST}" | LC_ALL=C sort -u
+    ' "${GOVB1_SCOPE_MANIFEST}"
   )"
+  # 列數契約：重複路徑先拒並具名〔CODEX-R2-P0-02／COMPOSER-R2-P0-02〕
+  # 兩側皆不用 sort -u：只改一側會使比對永遠不等。順序無關＝集合語義（正確行為）。
+  _meta_dups="$(printf '%s\n' "${_meta_got_raw}" | LC_ALL=C sort | uniq -d)"
+  if [ -n "${_meta_dups}" ]; then
+    echo "G-7 FAIL: meta 重複路徑（列數契約；精確凍結 6 項，禁重複列）:" >&2
+    printf '%s\n' "${_meta_dups}" | sed 's/^/    /' >&2
+    return 1
+  fi
+  _meta_got="$(printf '%s\n' "${_meta_got_raw}" | LC_ALL=C sort)"
   if [ "${_meta_got}" != "${_meta_want}" ]; then
     echo "G-7 FAIL: meta expected-set 不符（精確凍結集合；多一/少一/改字皆拒）" >&2
     echo "  expected:" >&2
