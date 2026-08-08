@@ -2,6 +2,7 @@
 # govb1_final_gate.sh — GOVB1 GATE-FINAL（§0.2 G-1～G-8 ＋ _g0_tests／_g0_syntax）
 # 判準唯一來源＝docs/GOVB1_INPUT_QUALITY_TODO.md §0.1b；本檔只實作。
 # 用法：bash scripts/govb1_final_gate.sh [--only <檢查名>] | --print-plan
+#        | --print-batch3-paths | --print-batch3-targets
 set -u
 
 _base() { grep -m1 '^base_commit:' scripts/govb1_frozen_hashes.txt | awk '{print $2}'; }
@@ -362,6 +363,37 @@ EOF
     || { echo "GATE-B3 FAIL: 1.2 與 1.4 併於同一 commit（禁合併）" >&2; return 1; }
   git merge-base --is-ancestor "${_first_id}" "${_first_fv}" \
     || { echo "GATE-B3 FAIL: 逆序——_check_fact_verified 先於 _check_id_pattern" >&2; return 1; }
+
+  # 誤擋率 receipt（TODO §0.2 GATE-B3：T-1.2／T-1.4 全綠 ＋ 兩份 receipt）
+  # fail-closed：缺檔／空檔／缺母體／缺 95% CI／上界>5%／缺非實作者複核狀態 ⇒ 非零
+  # 誠實邊界：handoffs/* ∈ .git/info/exclude ⇒ 僅驗工作樹，無版控
+  _rcp_dir="handoffs/receipts"
+  _rcp_ok=0
+  _rcp_ids=""
+  shopt -s nullglob
+  for _rcp in "${_rcp_dir}"/govb1-fp-*.md; do
+    [ -s "${_rcp}" ] || continue
+    grep -q '母體定義' "${_rcp}" || continue
+    # 非實作者複核狀態（待複核／已複核皆可；必須有欄位標記）
+    grep -qE '非實作者' "${_rcp}" || continue
+    grep -qE '複核' "${_rcp}" || continue
+    _ci_line="$(grep -oE '95% CI \[[0-9.]+%, [0-9.]+%\]' "${_rcp}" | head -1)"
+    [ -n "${_ci_line}" ] || continue
+    _ub="$(printf '%s' "${_ci_line}" | sed -nE 's/.*\[([0-9.]+)%, ([0-9.]+)%\].*/\2/p')"
+    [ -n "${_ub}" ] || continue
+    awk -v u="${_ub}" 'BEGIN{ if ((u+0)>5) exit 1; exit 0 }' || continue
+    _tid="$(basename "${_rcp}" .md)"
+    _tid="${_tid#govb1-fp-}"
+    # 不同 TASK_ID
+    case " ${_rcp_ids} " in
+      *" ${_tid} "*) continue ;;
+    esac
+    _rcp_ids="${_rcp_ids}${_tid} "
+    _rcp_ok=$((_rcp_ok + 1))
+  done
+  shopt -u nullglob
+  [ "${_rcp_ok}" -ge 2 ] \
+    || { echo "GATE-B3 FAIL: 須至少兩個不同 TASK_ID 之誤擋率 receipt（現 ${_rcp_ok}；dir=${_rcp_dir}/govb1-fp-*.md；須含母體定義／95% CI 上界≤5%／非實作者複核狀態）" >&2; return 1; }
   return 0
 }
 
@@ -453,6 +485,9 @@ _plan() {   # stdout: FILE\t<path> 或 UNRESOLVED\t<name>\t<reason>
     done
   done
 }
+# 唯讀 probe：anti-drift 測試必須呼叫 production exporter，禁複製 parser（CODEX-R1-P1-04）
+if [ "${1:-}" = "--print-batch3-paths" ]; then _g7_batch3_proxy_paths; exit 0; fi
+if [ "${1:-}" = "--print-batch3-targets" ]; then _g7_batch3_target_paths; exit 0; fi
 if [ "${1:-}" = "--print-plan" ]; then _plan; exit 0; fi
 
 _names() { _rows | cut -d'|' -f1; }

@@ -291,9 +291,10 @@ EOF
 # 規則②：rc 會被派工改變之指令集合有界——debt_ledger --has-open、gate_check token 新鮮度
 #         須標「派工後預期值」
 # ---------------------------------------------------------------------------
-_extract_cmd() {
-  # $1=含 count: 之列 → stdout=反引號內指令（無則空）
-  printf '%s' "$1" | sed -n 's/.*count:.*`\([^`]*\)`.*/\1/p'
+_extract_cmds() {
+  # $1=含 count: 之列 → stdout=所有反引號內指令（一行一則；無則空）
+  # 🔴 必須逐一抽取：舊 _extract_cmd 以 greedy sed 只取末組 ⇒ 較早截斷指令可繞過
+  printf '%s' "$1" | grep -oE '`[^`]*`' | sed 's/^`//;s/`$//'
 }
 
 _has_trunc() {
@@ -323,16 +324,19 @@ _check_fact_verified() {
   _bad=0
   while IFS= read -r _line || [ -n "${_line}" ]; do
     [ -n "${_line}" ] || continue
-    # 規則①：僅明示 count: 標記
+    # 規則①：僅明示 count: 標記；任一反引號指令命中截斷 ⇒ 非零
     if printf '%s' "${_line}" | grep -q 'count:'; then
-      _cmd="$(_extract_cmd "${_line}")"
-      if [ -n "${_cmd}" ] && _has_trunc "${_cmd}"; then
-        echo "ERROR: fact-verified 計數宣稱含截斷運算子（head/tail/-mN）"
-        echo "  違規列: ${_line}"
-        echo "  抽出指令: ${_cmd}"
-        echo "  修法: 改用不截斷指令重算 count，或去掉 count: 標記（改為非計數宣稱）"
-        _bad=1
-      fi
+      while IFS= read -r _cmd || [ -n "${_cmd}" ]; do
+        [ -n "${_cmd}" ] || continue
+        if _has_trunc "${_cmd}"; then
+          echo "ERROR: fact-verified 計數宣稱含截斷運算子（head/tail/-mN）"
+          echo "  違規列: ${_line}"
+          echo "  抽出指令: ${_cmd}"
+          echo "  修法: 改用不截斷指令重算 count，或去掉 count: 標記（改為非計數宣稱）"
+          _bad=1
+          break
+        fi
+      done < <(_extract_cmds "${_line}")
     fi
     # 規則②：有界集合——派工會改 rc 者須標「派工後預期值」
     if printf '%s' "${_line}" | grep -qE 'debt_ledger.*--has-open|gate_check.*token|token.*新鮮'; then

@@ -73,6 +73,14 @@ def _base_commit() -> str:
     return m.group(1)
 
 
+def _b3_start() -> str:
+    """主委錨點 b3_start（只讀；實作端不得寫入 govb1_frozen_hashes.txt）。"""
+    text = FROZEN.read_text(encoding="utf-8")
+    m = re.search(r"^b3_start: ([0-9a-f]{40})$", text, re.M)
+    assert m, "frozen_hashes 缺 b3_start（主委錨點）"
+    return m.group(1)
+
+
 def _is_narrow_g7_status_case(gate_src: str) -> bool:
     """機械判定：_g7 內 status case 僅匹配 ?? / A*（不含 M 類）。
 
@@ -1627,75 +1635,19 @@ def test_batch3_proxy_anti_drift_new_column_mutation_turns_red() -> None:
 #       target ` M` ⇒ 轉紅｜僅 ambient ` M gate_check.sh` ⇒ 不紅
 
 def _shell_batch3_proxy_paths() -> set[str]:
-    """與 production `_g7_batch3_proxy_paths` 同源（凍結 TODO 新建欄）。
+    """呼叫 production `_g7_batch3_proxy_paths`（--print-batch3-paths）。
 
+    禁複製 parser：複製版在 production 漂移時仍綠（CODEX-R1-P1-04／R-5 同型）。
     不得 source govb1_final_gate.sh（會跑 main／_g0_tests 遞迴）。
     """
-    snippet = r"""
-set -u
-_GOVB1_TODO=docs/GOVB1_INPUT_QUALITY_TODO.md
-_todo_task_section() {
-  awk -v t="$1" '
-    BEGIN { p = 0 }
-    $0 ~ ("^### Task " t "( |$)") { p = 1; print; next }
-    p && /^### Task / { exit }
-    p { print }
-  ' "${_GOVB1_TODO}"
-}
-_todo_path_tokens() {
-  grep -oE '`(scripts|tests|templates|docs)/[A-Za-z0-9_./-]+`' | tr -d '`'
-}
-_todo_new_paths() {
-  _todo_task_section "$1" | awk '
-    /\*\*新建\*\*：/ { n = 1 }
-    n && /\*\*只讀\*\*/ { exit }
-    n { print }
-  ' | _todo_path_tokens
-}
-{ _todo_new_paths 1.2; _todo_new_paths 1.4; } | LC_ALL=C sort -u
-"""
-    proc = _run(["bash", "-c", snippet])
+    proc = _run(["bash", "scripts/govb1_final_gate.sh", "--print-batch3-paths"])
     assert proc.returncode == 0, proc.stderr + proc.stdout
     return {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
 
 
 def _shell_batch3_target_paths() -> set[str]:
-    """與 production `_g7_batch3_target_paths` 同源（修改∪新建）。"""
-    snippet = r"""
-set -u
-_GOVB1_TODO=docs/GOVB1_INPUT_QUALITY_TODO.md
-_todo_task_section() {
-  awk -v t="$1" '
-    BEGIN { p = 0 }
-    $0 ~ ("^### Task " t "( |$)") { p = 1; print; next }
-    p && /^### Task / { exit }
-    p { print }
-  ' "${_GOVB1_TODO}"
-}
-_todo_path_tokens() {
-  grep -oE '`(scripts|tests|templates|docs)/[A-Za-z0-9_./-]+`' | tr -d '`'
-}
-_todo_new_paths() {
-  _todo_task_section "$1" | awk '
-    /\*\*新建\*\*：/ { n = 1 }
-    n && /\*\*只讀\*\*/ { exit }
-    n { print }
-  ' | _todo_path_tokens
-}
-_todo_mod_paths() {
-  _todo_task_section "$1" | awk '
-    /\*\*修改\*\*：/ { m = 1 }
-    m && /\*\*新建\*\*：/ { exit }
-    m && /\*\*只讀\*\*/ { exit }
-    m { print }
-  ' | _todo_path_tokens
-}
-{
-  _todo_mod_paths 1.2; _todo_new_paths 1.2
-  _todo_mod_paths 1.4; _todo_new_paths 1.4
-} | LC_ALL=C sort -u
-"""
-    proc = _run(["bash", "-c", snippet])
+    """呼叫 production `_g7_batch3_target_paths`（--print-batch3-targets）。"""
+    proc = _run(["bash", "scripts/govb1_final_gate.sh", "--print-batch3-targets"])
     assert proc.returncode == 0, proc.stderr + proc.stdout
     return {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
 
@@ -1898,11 +1850,24 @@ def test_waiver_b45_kind_case_block_hash_frozen() -> None:
 
 
 def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
-    """B3 commit range 不得觸及 B-45 禁改清單（harness／manifest／SPEC／embed）。
+    """B3 range 不得觸及 B-45 禁改清單（harness／manifest／SPEC／embed）。
 
-    範圍＝訊息含「GOVB1 B3」之 commit 聯集（非整 epic base..HEAD——後者含批2 合法改 manifest）。
+    範圍＝git diff --name-only b3_start..HEAD（禁 --grep 圈定；CODEX-R1-P0-01）。
+    frozen_hashes 僅驗 base_commit／scope_manifest 兩行於 base..HEAD byte-identical；
+    b3_start 行允許差異（主委錨點 14fbe69）。
+    具名殘留：移動 b3_start 本身仍屬票 B-44（repo 內無解）。
     """
     base = _base_commit()
+    b3 = _b3_start()
+
+    # 三條 b3_start 健全性
+    rp = _run(["git", "rev-parse", "--verify", f"{b3}^{{commit}}"])
+    assert rp.returncode == 0, f"b3_start 非合法 commit: {b3}\n{rp.stderr}"
+    anc_h = _run(["git", "merge-base", "--is-ancestor", b3, "HEAD"])
+    assert anc_h.returncode == 0, "b3_start 須為 HEAD 之祖先"
+    anc_b = _run(["git", "merge-base", "--is-ancestor", base, b3])
+    assert anc_b.returncode == 0, "base_commit 須為 b3_start 之祖先（順序正確）"
+
     # 批3 開工 proxy 須已在 epic range
     epic = _run(["git", "diff", "--name-only", f"{base}..HEAD"])
     assert epic.returncode == 0, epic.stderr
@@ -1910,37 +1875,40 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
     if not (epic_names & set(_BATCH3_PROXY_PATHS)):
         pytest.skip("批 3 proxy 尚未進 range；waiver range 檢查待 B3 交付後生效")
 
-    log = _run(
-        [
-            "git",
-            "log",
-            "--format=%H",
-            f"{base}..HEAD",
-            "--grep=GOVB1 B3",
-        ]
-    )
-    assert log.returncode == 0, log.stderr
-    commits = [ln.strip() for ln in log.stdout.splitlines() if ln.strip()]
-    assert commits, "須有訊息含『GOVB1 B3』之 commit"
-    names: set[str] = set()
-    for c in commits:
-        sh = _run(["git", "show", "--pretty=", "--name-only", c])
-        assert sh.returncode == 0, sh.stderr
-        names |= {ln.strip() for ln in sh.stdout.splitlines() if ln.strip()}
+    # 完整 B3 range（外部錨點；非 commit message）
+    diff = _run(["git", "diff", "--name-only", f"{b3}..HEAD"])
+    assert diff.returncode == 0, diff.stderr
+    names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
+    assert names, "b3_start..HEAD 應有 B3 改動"
 
     hit_harness = names & set(_B45_HARNESS)
     assert not hit_harness, f"B3 range 觸及 B-45 harness: {hit_harness}"
     for pref in _B45_FORBIDDEN_PREFIXES:
+        if pref == "scripts/govb1_frozen_hashes.txt":
+            # 收窄：整檔可因主委新增 b3_start 而進 range；只驗兩關鍵行
+            continue
         bad = {n for n in names if n == pref or n.startswith(pref)}
         assert not bad, f"B3 range 觸及禁改前綴 {pref}: {bad}"
-    # embed 常數：B3 觸及 brief_conformance 時，與 B3 前一父比對
+
+    # base_commit: 與 scope_manifest: 於 B3 range 須 byte-identical
+    # （epic base 可能尚無 frozen 檔；錨＝b3_start 樹 vs HEAD；b3_start 行允許差）
+    def _frozen_key_lines(rev: str) -> str:
+        sh = _run(["git", "show", f"{rev}:scripts/govb1_frozen_hashes.txt"])
+        assert sh.returncode == 0, sh.stderr
+        out: list[str] = []
+        for ln in sh.stdout.splitlines():
+            if ln.startswith("base_commit:") or ln.startswith("scope_manifest:"):
+                out.append(ln)
+        return "\n".join(out)
+
+    assert _frozen_key_lines(b3) == _frozen_key_lines("HEAD"), (
+        "base_commit:/scope_manifest: 於 b3_start..HEAD 不得變"
+        f"\nb3_start:\n{_frozen_key_lines(b3)}\nHEAD:\n{_frozen_key_lines('HEAD')}"
+    )
+
+    # embed 常數：B3 觸及 brief_conformance 時，與 b3_start 樹比對
     if "scripts/brief_conformance_check.sh" in names:
-        # 取最早 B3 commit 的父作為 embed 錨
-        oldest = commits[-1]  # log 預設新→舊；最後一個＝最早
-        parent = _run(["git", "rev-parse", f"{oldest}^"])
-        assert parent.returncode == 0
-        anchor = parent.stdout.strip()
-        b = _run(["git", "show", f"{anchor}:scripts/brief_conformance_check.sh"])
+        b = _run(["git", "show", f"{b3}:scripts/brief_conformance_check.sh"])
         h = _run(["git", "show", "HEAD:scripts/brief_conformance_check.sh"])
         assert b.returncode == 0 and h.returncode == 0
 
@@ -1951,5 +1919,4 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
         assert _embed(b.stdout) == _embed(h.stdout), (
             "brief_conformance embed 被改（B-45 禁）"
         )
-    # cx_run 不得出現在 B3 commits
     assert "scripts/cx_run.sh" not in names

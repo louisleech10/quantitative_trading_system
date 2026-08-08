@@ -61,6 +61,32 @@ def test_t14_u2_ok_fixture_rc_zero() -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+def test_t14_multi_backtick_early_trunc_rc_nonzero() -> None:
+    """雙反引號：首組 head 截斷、末組無害 ⇒ 須擋（CODEX-R1-P1-03）。
+
+    舊 _extract_cmd 只取末組 ⇒ 修前假綠；修後須 rc≠0。
+    """
+    proc = _check(FIXTURE / "brief_factverified_multi_trunc.md")
+    assert proc.returncode != 0, (
+        "multi-trunc fixture 須轉紅（首組 head 不得被末組 echo 掩蓋）\n"
+        + proc.stdout
+        + proc.stderr
+    )
+    out = proc.stdout + proc.stderr
+    assert "截斷" in out or "head" in out
+
+
+def test_t14_multi_backtick_both_clean_rc_zero(tmp_path: Path) -> None:
+    """雙反引號：兩組皆無截斷 ⇒ 綠（防 over-block）。"""
+    p = _write_consult(
+        tmp_path,
+        "multi_ok.md",
+        "fact-verified: count: 2 — `wc -l some.log`；`echo stable`",
+    )
+    proc = _check(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 def test_t14_neg_python_m_pytest_not_blocked(tmp_path: Path) -> None:
     """負向：python -m pytest 不得誤擋（即使在 count: 內）。"""
     p = _write_consult(
