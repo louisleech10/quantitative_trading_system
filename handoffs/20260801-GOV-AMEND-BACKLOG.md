@@ -2555,3 +2555,40 @@ P2。僅於 `TMPDIR` 權限異常或 `rm` 暫時失敗時發生：temp 檔累積
 ### 誠實邊界
 
 本票**無機械綁定**。殘留代號 `R-9`。
+
+---
+
+## B-47 票 `GOV-FACTVERIFIED-ASSUMED-BYPASS`
+
+**`assumed:` 列之計數宣稱完全不受規則① 檢查——第四條逃逸路。**
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：2026-08-08 `review-r4`，`COMPOSER-R4-P1-02`（活體探針
+`assumed: count: 2 — 偶數巢狀` ⇒ **rc=0**；同列置於 `fact-verified:` ⇒ rc=2）。
+裁定＝`handoffs/reconcile/20260808-govb1-b3-review-r4/synth.md`（三家 APPROVED）。
+
+### 病
+
+TODO `Task 1.4` 規則① **逐字限於**「`fact-verified:` 若宣稱計數」。
+⇒ 把計數宣稱寫進 `assumed:` 行即完全不進 `_extract_cmds`，
+可置入劣構反引號／截斷指令而不被擋。
+
+🔴 **非蓄意亦可觸發**：前提宣告契約要求 `fact-verified:` 與 `assumed:` 各至少一條，
+但**未規定計數宣稱只能寫在哪一種**；寫作者未必知道兩者受不同待遇。
+
+### 為何本 epic 內修不掉
+
+擴及 `assumed:` **超出 TODO Task 1.4 之宣告範圍** ⇒ 須改 `docs/GOVB1_*`，
+而該路徑**全程不可寫**（`consult-r2` 三家戳記裁定）。
+⇒ **與 `票 B-45` 同型：做不到不是因為難，是因為凍結範圍。**
+
+### 閉合條件
+
+須 SPEC／TODO 修訂（走延伸檔或另立 epic）後，擇一：
+① 對 `^\s*assumed:` 列若含計數標記套用同一管線；
+② 明訂計數宣稱禁止出現在 `assumed:`（並於 `doc_format_precheck` 擋下）。
+
+### 誠實邊界
+
+本票**無機械綁定**。殘留代號 `R-10`。

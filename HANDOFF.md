@@ -1,15 +1,15 @@
 # Handoff
 
+REF:handoffs/reconcile/20260808-govb1-b3-review-r4/synth.md
+REF:handoffs/reconcile/20260808-govb1-b3-review-r3/synth.md
+REF:handoffs/reconcile/20260808-govb1-b3-consult-r1/synth.md
 REF:handoffs/reconcile/20260808-govb1-b2-review-r7/synth.md
-REF:handoffs/reconcile/20260808-govb1-b2-review-r6/synth.md
-REF:handoffs/reconcile/20260808-govb1-b2-consult-r2/synth.md
-REF:handoffs/reconcile/20260807-govb1-x-consult-r10/synth.md
-REF:handoffs/reconcile/20260807-govb1-x-consult-r7/synth.md
 
-🔴 **`REF:` 只准列「已戳記」之 reconcile——所有列，不只第一列。**
-上列**五份皆已三家 APPROVED**（派工前一律 `bash scripts/reconcile_stamps_check.sh <檔>` 驗 rc=0）。
-其餘 `b1-review-r6`／`b2-review-r3`／`b2-review-r5` 等**皆無戳記**，列入即使執行端依
-`AGENTS.md` STAMP-BLOCKED 回 `BLOCKED`、整輪作廢（2026-08-07、08-08 各一次，皆主委違反自己寫的規矩）。
+🔴 **`REF:` 只准列「已戳記」之 reconcile——所有列。** 派工前一律
+`bash scripts/reconcile_stamps_check.sh <檔>` 驗 rc=0。
+⚠️ **`handoffs/reconcile/20260808-govb1-b3-review-r5/synth.md` 尚未戳記**
+（工作輸入，**非授權依據**，故不列於上）——戳記輪未派。
+（主委 2026-08-08 曾把它寫進 `REF:`，被 `verify_pretooluse` 當場擋下。**規則是機械的，註解不能豁免。**）
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-08 | **Branch**: main
 
@@ -18,88 +18,88 @@ REF:handoffs/reconcile/20260807-govb1-x-consult-r7/synth.md
 ```
 1. git rev-parse HEAD origin/main             # 不同＝有未 push
 2. bash scripts/debt_ledger.sh --has-open     # 期望 rc=0
-3. bash scripts/govb1_final_gate.sh           # 期望 rc=0，🔴 約 330s，**必丟背景**
-4. bash scripts/govb1_single_source_check.sh  # 期望 rc=0（全表）
-5. bash scripts/plain_docs_sync_check.sh      # 期望 rc=0
+3. bash scripts/govb1_final_gate.sh           # 期望 rc=0，🔴 約 340s，**必丟背景**
+4. bash scripts/plain_docs_sync_check.sh      # 期望 rc=0
 ```
 
 **數字一律現跑；本檔不記數字。**
 
-## 🔴 使用者定義：「第 1 批」＝ GOVB1 的 **B1–B10 全部**，不是批次 B1
+## ▶ 進度：第 1 批＝**B1–B10 全部**
 
-離線期間一律不停不問，取捨交委員共識決。
+| 批 | 狀態 |
+|---|---|
+| **B1** | ✅ 收案並 push（`0b4b576`） |
+| **B2** | ✅ **部分完成**收案並 push（`349626c`）；殘留 `票 B-45`／`B-46` |
+| **B3** | 🔄 實作已到 `67c86e0`；`review-r5` 判 **2 項 `REGRESSION`** 未修 |
+| B4–B10 | ⬜ `B4(1.3) → B5(1.5) → B6(2.1→2.2) → B7(3.1→3.2) → B8(4.1) → B9(4.2) → B10(4.3)` |
 
-## ▶ 進度
+## ▶ 下一步（**照序**）
 
-| 批 | 內容 | 狀態 |
+1. **派 `b3-review-r5` 收斂檔之戳記輪**（三家；body sha256 現跑）
+   —— `gate.sh` 對 `--adversarial` 機器強制要戳記，未戳記派不出修補輪
+2. 戳記後**派 B3 修補輪 5**，兩項 `REGRESSION`：
+   - 行首錨定漏接 `1.`／`>`／`**…**`／`+` ⇒ 擴**有界**前綴集合（**禁開放式**）
+   - `_strip_code_fences` 未閉合 fence 吞至 EOF、縮排閉合不辨識 ⇒ **fail-closed**
+   🔴 **禁動 `_extract_cmds`**（兩家已確認閉合）；**禁以放寬解析器補償選列變窄**
+3. review → 戳記 → B3 收案 → 更新 `白話說明/` → commit + push
+
+## 🔴 B3 收斂軌跡（供判斷是否該收）
+
+```
+review-r1: 4（守衛不生效） → r2: 4（邊界繞過） → r3: 1 → r4: 1+殘留 → r5: 2（皆 REGRESSION）
+```
+
+**停損條件（`review-r2` 三家戳記定死）**：同一批元件再現**同類更刁鑽變體** ⇒ 轉具名殘留，不開新輪。
+🔴 **但 `REGRESSION` 無例外，一律須修。** 委員 findings **必標**
+`NEW-CLASS`／`SAME-CLASS-VARIANT`／`REGRESSION`，未標者當變體。
+
+🔴 **防滑坡界線（`STAMP-R7` 三家共答）**：
+「必修群集內併入變體 OK；**群集外一律轉殘留＋立票**」；
+**若第三次連續『同函式順帶』而 brief 未預先寫入限縮 ⇒ 視為滑坡，預設轉殘留**。
+
+## 🔴 具名殘留（**十項，不得宣稱已閉合**）
+
+| # | 殘留 | 追蹤 |
 |---|---|---|
-| **B1** | Task 0.1 契約基線＋fixture | ✅ 收案並 push（`0b4b576`） |
-| **B2** | Task 1.1 lifecycle matrix | ✅ **部分完成收案**（`b03595b`＋`5112aa9`），三家戳記；**未 push** |
-| B3–B10 | 見下執行序 | ⬜ |
-
-**執行序**：`B3(1.2→1.4) → B4(1.3) → B5(1.5) → B6(2.1→2.2) → B7(3.1→3.2) → B8(4.1) → B9(4.2) → B10(4.3)`
-
-## ▶ 下一步：B3（Task 1.2 → 1.4）
-
-🔴 **B3 之 impl 派工阻塞於 `票 B-45` 或明確 waiver**；**consult／SPEC 層可平行**
-REF:handoffs/reconcile/20260808-govb1-b2-consult-r2/synth.md
-（`consult-r2` 群集 5，碼證＝TODO `:151` `GATE-B3` 綁 `T-1.2-*`／`T-1.4-*`，不依 Task 1.1 全綠）。
-⇒ **接手者先決定：走 waiver 還是先解 `票 B-45`。** 兩者皆須委員裁定，不得主委獨斷。
-
-同檔 `brief_conformance_check.sh`，Task 1.2 → 1.4 **須依序、禁併同一 commit**。
-
-## 🔴 具名殘留（**九項，不得宣稱已閉合**）
-
-| # | 殘留 | 機械綁定 |
-|---|---|---|
-| R-1 | `_g7` 交付守衛僅攔 `??`/`A*` | ✅ 到期閘（批 3 標的進 range 而守衛仍窄 ⇒ 轉紅）；已加 anti-drift ＋ 真實 git range |
-| R-2 | TODO §B 三處偽碼不可執行 | ❌ `票 B-43` |
-| R-3 | `single_source_check` 擋不住「有 pointer 但旁邊互斥」 | ❌ 併 `票 B-25` |
-| R-4 | 「引用已廢判準只寫階號」為寫作紀律 | ❌ 併 `票 B-25` |
-| R-5 | 兩份 `_g7_policy` 分叉（production 含 `meta`＋`mpath()`；F5 內嵌僅 `allow`＋`$2`） | ❌ 無 |
-| R-6 | `§0.1a` 人讀過期（`1.1=票 B-19`、`1.4=票 B-29` 兩處已判定為錯，TODO 不可寫） | ❌ 待 B-6 生成器投影 |
-| R-7 | 治理守衛可自我授權 | ❌ `票 B-44`——repo 內無解，須外部信任錨 |
-| ~~R-8~~ | ~~embed 與 production 漂移~~ | ✅ **已閉合**：`lifecycle_embed` 閘（byte-identical ＋ mutation） |
-| **R-9** | `_lifecycle_cleanup_if_temp` rc 被吞（`rm` 失敗 ⇒ temp 殘留且 rc=0） | ❌ `票 B-46` |
-
-## 🔴 `票 B-45` / `票 B-46` 之禁區（三家戳記確認，勿重議）
-
-- **`B-45`**：`P0-01` case data-drive ＋ 五 harness 同步 JSON。**本 epic 凍結 scope 內不可執行**
-  （五檔 `in_allow=0 in_meta=0`；加 `allow` 撞 `T-0.1-F5`；改 F5 期望＝自我授權）。**先解 `B-44`。**
-- **`B-46`**：🔴 **禁採「cleanup 失敗即回非零」**——會使派工鏈路在 temp 刪不掉時 fail-closed 且不可自救。
-  codex 已明確接受此拒絕。偏好修法＝每輪私有 temp 目錄 ＋ stderr 告警 ＋ **保留派工 rc** ＋ rm-failure 回歸測試。
+| R-1 | `_g7` 窄守衛 | ✅ B3 已放寬為 task-scoped（到期閘＋五例） |
+| R-2 | TODO §B 偽碼不可執行（**四處**） | `票 B-43` |
+| R-3／R-4 | single_source 正向斷言／寫作紀律 | 併 `票 B-25` |
+| R-5 | 兩份 `_g7_policy` 分叉 | ❌ 無 |
+| R-6 | `§0.1a` 人讀過期 | 待 B-6 生成器投影 |
+| R-7 | 治理守衛可自我授權 | `票 B-44`（repo 內無解） |
+| ~~R-8~~ | ~~embed 漂移~~ | ✅ 已閉合（`lifecycle_embed` 閘） |
+| R-9 | cleanup rc 被吞 | `票 B-46`（🔴 **禁採「失敗即回非零」**） |
+| **R-10** | `assumed:` 列之計數宣稱不受檢 | **`票 B-47`**（超出 TODO Task 1.4 範圍） |
+| 另 | receipt 無版控（`handoffs/*` 在 exclude）／semantic-fake receipt（防蓄意） | 具名接受 |
 
 ## 🔴 硬規矩
 
-1. **執行端跑驗收時，主控端不得動 tracked 檔**（dirty 數斷言會 flaky）；亦不得並行跑兩份會就地 mutate 的 pytest。
-2. **推翻委員裁定前，須窮舉所有相關閘**。
-3. 🔴 **採信委員修法前，亦須窮舉相關閘**——2026-08-08：codex 之 `P0-01`/`P0-02` 修法需改 5 個不在 `allow` 的檔，
-   照字面派出必 `G-7` 紅。**規矩雙向適用。**
-4. **執行端須先 commit 再跑 `GATE-FINAL`**；**見 commit 出現 ≠ 該輪結束**。
-5. `govb1_final_gate.sh` 全跑約 330s ⇒ **必丟背景**。
-6. **codex 沙箱之 `g0_tests`／`restore_golden_inventory` rc≠0 已五次為環境問題**（`.git/*.lock`）——
-   判定前須有**其他獨立來源** rc=0；**主委須自跑複驗**。
-7. **composer 可能 `resource_exhausted`** ⇒ `ROUND_ID=<id> bash scripts/cx_run.sh composer <brief> <out>` 同輪重試。
-8. 🔴 **`REF:` 所有列皆須已戳記**（見檔頭）。
-9. 🔴 **兩家分歧看碼證不看票數**；純標籤分歧且無單向碼證 ⇒ **採較嚴版**（`review-r7` 群集 2 反向亦適用：
-   委員修法若引入更大風險，得**拒修法但接受 finding**，轉具名殘留——須於戳記輪指名該家表態）。
-10. 🔴 **`--adversarial` 之 reconcile 必須先戳記**，否則 `gate.sh` 拒發 impl token（2026-08-08 實際被擋）。
-11. **收斂檔改內容 ⇒ 舊戳記失效**：改標 `VOID-STAMP` 保留為稽核軌跡，依新 hash 重蓋。
-12. **戳記須三家**（`review_families` SoT＝codex/composer/grok），**一次派齊**，勿先派兩家再補。
+1. **執行端跑驗收時，主控端不得動 tracked 檔**；勿並行跑兩份會 mutate 的 pytest。
+2. **推翻委員裁定前**、**採信委員修法前**，**皆須窮舉相關閘**（雙向適用）。
+3. **`--adversarial` 之 reconcile 必須先戳記**，否則 `gate.sh` 拒發 impl token。
+4. **收斂檔改內容 ⇒ 舊戳記失效**：改標 `VOID-STAMP` 保留，依新 hash 重蓋。
+5. **戳記須三家**（`review_families` SoT），**一次派齊**。
+6. 🔴 **`STAMP-BLOCKED` 不適用於 stamp-target 本身**（`AGENTS.md:40` 之「所依」指 `REF:` 授權依據）
+   —— codex 曾因此誤判造成**循環死結**，brief 須明寫。
+7. **codex 沙箱 `g0_tests`／`restore_golden_inventory` rc≠0 已七次為環境問題**（`.git/*.lock`）；
+   須有其他獨立來源 rc=0，且**主委自跑複驗**。
+8. **兩家分歧看碼證不看票數**；純標籤分歧無單向碼證 ⇒ 採較嚴版。
+9. 🔴 **收窄型修法之反向風險＝「該擋的從此不受檢」**（`review-r5` 通則）：
+   review brief 必須要求 ① 既有反例逐項不退化 ② 合法樣式**列舉清單**漏接測試 ③ 收窄機制自身之退化態。
 
 ## 委員債務慣例
 
-impl／stamp 輪交件非 findings 文件 ⇒ `debt_clear.sh --abandon --kind no-findings-expected --approver main-agent`。
-review／consult 輪走 `reconcile_build --mode review` ＋ `debt_clear --lock`。
+impl／stamp 輪 ⇒ `debt_clear.sh --abandon --kind no-findings-expected --approver main-agent`。
+review／consult 輪 ⇒ `reconcile_build --mode review` ＋ `debt_clear --lock`。
 
 ## 坑（沿用）
 
 `rc` 禁經 pipe｜禁 `cd <專案路徑>` 前綴｜`--approver claude` 用 `main-agent`｜
 `rm`／`git clean` 在 deny，用 `mv` 到 `.claude/tmp/`｜commit 訊息用 `-F 檔案`｜
-`git push` 必須 `run_in_background`｜**session 名與 task-id 須為大小寫對應**（`session_name_check`）｜
-macOS bare `mktemp` **忽略 `TMPDIR`**，須給 template｜
-**gate 誤判**：含 `claude` 之路徑 ＋ 任何 `-p` 子字串（如 `mkdir -p`）⇒ 被判 dispatch（`票 B-15`）｜
-戳記 provenance 須 `gate.sh register-output <task-id> <reconcile 檔本身>`
+`git push` 必須 `run_in_background`｜**session 名與 task-id 須大小寫對應**｜
+macOS bare `mktemp` **忽略 `TMPDIR`**｜**gate 誤判**：含 `claude` 之路徑＋任何 `-p` 子字串（如 `mkdir -p`）｜
+戳記 provenance 須 `gate.sh register-output <task-id> <reconcile 檔本身>`｜
+🔴 **`b3_start` 錨點（`scripts/govb1_frozen_hashes.txt`）為主委專屬，執行端只讀不寫**
 
 ## 工作區
 
