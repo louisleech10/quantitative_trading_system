@@ -39,14 +39,38 @@ REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
 | **B4 階段 2** | ⬜ **下一步**：啟用 (d) fail-closed（見下） |
 | B5–B10 | ⬜ `B5(1.5) → B6(2.1→2.2) → B7(3.1→3.2) → B8(4.1) → B9(4.2) → B10(4.3)` |
 
-## ▶ 下一步：**B4 階段 2 — (d) fail-closed**
+## 🔴 B4 階段 2 — **已嘗試，被批次 scope 擋下，已撤回**（`ed8a6dc` → `eaef2db`）
 
-階段 1 已在生產實測多輪（`committee_run` 每次派工皆 append `--brief`，全部通過）。
-階段 2 只做一件事：**impl 判準之派工缺 `--brief` ⇒ 拒發 token**。
+**做法**：因觸發條件**禁用 `--spec` 為代理**（audit：31 筆 impl round 中 8 筆無 `--spec`＝25.8% 繞過），
+唯一非代理的表述是「**所有 dispatch 皆須 `--brief`**」。實作後：
+缺 `--brief` rc=1 且歸因正確、帶 `--brief` rc=0 發 token、mutation 兩測轉紅——**功能本身正確**。
 
-🔴 **觸發條件禁用 `--spec` 為代理**（codex audit：31 筆 impl round 中 8 筆無 `--spec`＝25.8% 完全繞過）。
-須用 `--brief` 之 kind==impl 或角色閘 family==implementer。
-🔴 落地後**同時關閉 `R-11`／`R-12`**（`dispatch.sh` 不 append `--brief` 之繞過）。
+🔴 **但波及面超出批次 scope**：全套 `pytest tests/governance` **31 failed**，
+橫跨 **10 個測試檔**（`test_debt_gate`／`test_dispatch_wrapper`／`test_family_registry`／
+`test_verify_gate_r7ext`／`test_reconcile_target_bound_to_synth`／`test_low_risk_impl_requires_reconcile`／
+`test_waived_adversarial_still_stamps`／`test_completeness_semantic`／`test_reconcile_completeness_enforced`／
+`test_verify_gate_b4`／`test_verify_gate_redteam`）——它們直接呼叫 `gate.sh dispatch` 而不帶 `--brief`。
+
+**這些檔全部不在 `scripts/govb1_scope.manifest`** ⇒ G-7 會擋「未宣告即修改」。
+而擴充 manifest 會被 **我自己在 §0 立的 B4 窗守衛**擋下
+（`scripts/govb1_scope.manifest` 在 `_B4_FORBIDDEN_PREFIXES`）
+⇒ **那正是「被約束方自解約束」，不得對自己網開一面。**
+
+🔴 **這是本 epic 第五次結構性死鎖。**
+
+### 恢復階段 2 需要的**明確決策**（不得由主委單方擴大 scope）
+
+擇一，皆須經委員裁定：
+1. **擴充批次 scope**：把上列 10 檔納入 `govb1_scope.manifest`，並同步放寬 B4 窗守衛
+   ——須說明為何這不算 scope accretion。
+2. **另立票**：`(d)` 移出 B4，獨立為一張「派工鏈路全域改造」票，其 scope 自帶那 10 檔。
+3. **改設計**：找出既非 `--spec` 代理、又不需改那 10 檔的觸發條件（目前未找到）。
+
+**主委傾向 2**（爆炸半徑本來就跨批次，硬塞進 B4 是 scope 錯配）。
+
+## ▶ 下一步：**B5（Task 1.5 — `票 B-16` 擴充 A/B/C）**
+
+B4 階段 1 已收案且穩定；階段 2 依上表待決策，**不阻塞 B5**。
 
 ## 🔴 具名殘留（**不得宣稱已閉合**）
 
