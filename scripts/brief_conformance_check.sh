@@ -249,10 +249,14 @@ _active_id_tokens() {
 
 _check_id_pattern() {
   # $1=brief_path → rc 0=ok；非 0=不合規（訊息走 stdout，與既有 ERROR 同通道）
+  # 無 active token 時不讀 completeness_check.sh（隔離 fixture 常不拷該檔；邊界①）
   _brief_p="$1"
   _bk_val="$(grep -E '^brief-kind:' "${_brief_p}" 2>/dev/null | head -1 \
     | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//')"
   _is_findings_kind "${_bk_val}" || return 0
+
+  _toks="$(_active_id_tokens "${_brief_p}")"
+  [ -n "${_toks}" ] || return 0
 
   _re="$(_canon_re)"
   [ -n "${_re}" ] || {
@@ -274,7 +278,9 @@ _check_id_pattern() {
       echo "  修法:       把 ${_mid} 改為 R<數字>（例：B0R → R1；須符合 R[0-9]+）"
       _bad=1
     fi
-  done < <(_active_id_tokens "${_brief_p}")
+  done <<EOF
+${_toks}
+EOF
 
   [ "${_bad}" -eq 0 ]
 }
