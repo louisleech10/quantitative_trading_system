@@ -66,26 +66,34 @@ def _behavior_rows_from_file(text: str) -> list[str]:
     return [ln for ln in text.splitlines() if pat.match(ln)]
 
 
-# 凍結檔封閉 key 集合〔CODEX-R2-P1-03〕：僅允許三 key，禁重複／未知／額外行
-# HEAD／工作樹：三 key 全齊；歷史 b3_start 錨點樹可能尚無 b3_start 行（主委後掛）
-_FROZEN_CLOSED_KEYS = frozenset({"base_commit", "scope_manifest", "b3_start"})
+# 凍結檔封閉 key 集合〔CODEX-R2-P1-03〕：禁重複／未知／額外行
+# 〔20260808-GOVB1-B4-STAMP-R2 三家 APPROVED〕封閉集由三 key 擴為**恰四 key**：
+#   必備＝base_commit／scope_manifest／b3_start（HEAD／工作樹）
+#   可選＝b4_start（B4 開工後由主委後掛；**缺席時行為與擴充前逐字相同**）
+# HEAD／工作樹：三必備全齊；歷史 b3_start 錨點樹可能尚無 b3_start 行（主委後掛）
+_FROZEN_REQUIRED_KEYS = frozenset({"base_commit", "scope_manifest", "b3_start"})
+_FROZEN_OPTIONAL_KEYS = frozenset({"b4_start"})
+_FROZEN_CLOSED_KEYS = _FROZEN_REQUIRED_KEYS | _FROZEN_OPTIONAL_KEYS
+# 40-hex commit 值之 key（其餘＝scope_manifest 為 12-hex 摘要）
+_FROZEN_SHA40_KEYS = frozenset({"base_commit", "b3_start", "b4_start"})
 
 
 def _parse_frozen_hashes(text: str, *, require_b3_start: bool = True) -> dict[str, str]:
     """解析 govb1_frozen_hashes.txt：封閉 key 集合，各 key 至多一行。
 
-    重複 b3_start／新增 third:／非法值 ⇒ AssertionError（測試轉紅）。
-    require_b3_start=True（HEAD／工作樹）：恰三 key。
+    重複 key／未知 key（third:／b5_start: 等）／非法值 ⇒ AssertionError（測試轉紅）。
+    require_b3_start=True（HEAD／工作樹）：三必備 key 全齊；b4_start 可有可無。
     require_b3_start=False（歷史錨點樹）：base+scope 必備，b3_start 可缺。
+    錨鏈 fail-closed：有 b4_start 卻無 b3_start ⇒ 拒（錨鏈斷裂）。
     """
     lines = [ln for ln in text.splitlines() if ln.strip() != ""]
     seen: dict[str, str] = {}
     for ln in lines:
-        m = re.match(r"^(base_commit|scope_manifest|b3_start): (.+)$", ln)
+        m = re.match(r"^(base_commit|scope_manifest|b3_start|b4_start): (.+)$", ln)
         assert m, f"frozen_hashes 未知/非法行（closed key set 拒額外 key）: {ln!r}"
         key, val = m.group(1), m.group(2)
         assert key not in seen, f"frozen_hashes 重複 key: {key}"
-        if key in ("base_commit", "b3_start"):
+        if key in _FROZEN_SHA40_KEYS:
             assert re.fullmatch(r"[0-9a-f]{40}", val), (
                 f"frozen_hashes {key} 須為 40 hex，got {val!r}"
             )
@@ -98,16 +106,18 @@ def _parse_frozen_hashes(text: str, *, require_b3_start: bool = True) -> dict[st
         f"frozen_hashes 缺 base_commit／scope_manifest: {set(seen)}"
     )
     assert set(seen) <= _FROZEN_CLOSED_KEYS
+    assert not ("b4_start" in seen and "b3_start" not in seen), (
+        f"frozen_hashes 有 b4_start 但缺 b3_start（錨鏈斷裂，fail-closed）: {set(seen)}"
+    )
     if require_b3_start:
-        assert set(seen) == _FROZEN_CLOSED_KEYS, (
-            f"frozen_hashes 須恰好三 key（closed），got {set(seen)}:\n{text}"
+        assert _FROZEN_REQUIRED_KEYS <= set(seen), (
+            f"frozen_hashes 須含三必備 key（closed），got {set(seen)}:\n{text}"
         )
-        assert len(lines) == 3, (
-            f"frozen_hashes 須恰好 3 行（closed key set），got {len(lines)}:\n{text}"
-        )
-    else:
-        # 歷史：不得多於三行、不得有未知 key（已由上保證）
-        assert len(lines) == len(seen)
+    # 行數 ≡ key 數：非空之每一行皆須為恰一個已知 key（重複／未知已於上拒）
+    assert len(lines) == len(seen), (
+        f"frozen_hashes 行數與 key 數不符（closed key set），"
+        f"lines={len(lines)} keys={len(seen)}:\n{text}"
+    )
     return seen
 
 
@@ -123,6 +133,18 @@ def _b3_start() -> str:
     """
     text = FROZEN.read_text(encoding="utf-8")
     return _parse_frozen_hashes(text)["b3_start"]
+
+
+def _b4_start() -> str | None:
+    """主委錨點 b4_start（只讀；實作端不得寫入 govb1_frozen_hashes.txt）。
+
+    缺席 ⇒ None（B4 尚未開工；此時 B3 waiver 仍以開放區間 b3_start..HEAD 全程看守，
+    **無保護真空**）。存在 ⇒ B3 waiver 上界收斂為 b4_start，b4_start..HEAD 改由
+    test_waiver_b4_range_does_not_touch_forbidden 接手看守。
+    〔20260808-GOVB1-B4-STAMP-R2 三家 APPROVED〕
+    """
+    text = FROZEN.read_text(encoding="utf-8")
+    return _parse_frozen_hashes(text).get("b4_start")
 
 
 def _is_narrow_g7_status_case(gate_src: str) -> bool:
@@ -1900,6 +1922,16 @@ _B45_FORBIDDEN_PREFIXES = (
     "scripts/govflow_lifecycle.json",
 )
 
+# B4 窗（b4_start..HEAD）之禁改前綴〔20260808-GOVB1-B4-STAMP-R2 三家 APPROVED〕。
+# **由 _B45_FORBIDDEN_PREFIXES 機械導出**，僅移除下列二項必要共變檔
+# （Task 1.3 須令 embed ≡ JSON，二檔皆為授權變更）；
+# harness 五檔／scope.manifest／docs/GOVB1_／frozen 封閉集比對 **一項不得少**
+# 〔grok STAMP-R2 前提 3〕。以推導而非手抄，杜絕「順手多移一項」。
+_B4_ALLOWED_COVARIANT = ("scripts/cx_run.sh", "scripts/govflow_lifecycle.json")
+_B4_FORBIDDEN_PREFIXES = tuple(
+    p for p in _B45_FORBIDDEN_PREFIXES if p not in _B4_ALLOWED_COVARIANT
+)
+
 
 def _kind_case_block(src: str) -> str:
     m = re.search(r'case "\$\{_bk\}" in\n.*?\nesac', src, re.S)
@@ -1925,13 +1957,21 @@ def test_waiver_b45_kind_case_block_hash_frozen() -> None:
 def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
     """B3 range 不得觸及 B-45 禁改清單（harness／manifest／SPEC／embed）。
 
-    範圍＝git diff --name-only b3_start..HEAD（禁 --grep 圈定；CODEX-R1-P0-01）。
-    frozen_hashes 封閉 key 集合（base_commit／scope_manifest／b3_start 恰各一行）；
-    b3_start..HEAD 僅允許 b3_start 值差，禁重複／未知／額外行〔CODEX-R2-P1-03〕。
+    範圍＝git diff --name-only b3_start..<上界>（禁 --grep 圈定；CODEX-R1-P0-01）。
+    🔴 上界〔20260808-GOVB1-B4-STAMP-R2 三家 APPROVED〕：
+      b4_start 存在 ⇒ 收斂為 b3_start..b4_start（B3 只看守自己的交付窗）；
+      b4_start 缺席 ⇒ 維持 b3_start..HEAD（**與收斂前逐字相同**）。
+    收斂之反向風險（硬規矩 9「該擋的從此不受檢」）由
+    test_waiver_b4_range_does_not_touch_forbidden 接手，且由
+    test_waiver_b4_active_when_b4_start_anchored 機械強制「不得 skip」。
+    frozen_hashes 封閉 key 集合（base_commit／scope_manifest／b3_start 必備、b4_start 可選）；
+    範圍內僅允許 b3_start／b4_start 值差，禁重複／未知／額外行〔CODEX-R2-P1-03〕。
     具名殘留：移動 b3_start 本身仍屬票 B-44（repo 內無解）。
     """
     base = _base_commit()
     b3 = _b3_start()
+    b4 = _b4_start()
+    upper = b4 if b4 is not None else "HEAD"
 
     # 三條 b3_start 健全性
     rp = _run(["git", "rev-parse", "--verify", f"{b3}^{{commit}}"])
@@ -1941,6 +1981,15 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
     anc_b = _run(["git", "merge-base", "--is-ancestor", base, b3])
     assert anc_b.returncode == 0, "base_commit 須為 b3_start 之祖先（順序正確）"
 
+    # b4_start 存在時之錨鏈健全性：須為合法 commit、b3_start 之後代、HEAD 之祖先
+    if b4 is not None:
+        rp4 = _run(["git", "rev-parse", "--verify", f"{b4}^{{commit}}"])
+        assert rp4.returncode == 0, f"b4_start 非合法 commit: {b4}\n{rp4.stderr}"
+        anc_34 = _run(["git", "merge-base", "--is-ancestor", b3, b4])
+        assert anc_34.returncode == 0, "b3_start 須為 b4_start 之祖先（錨鏈順序）"
+        anc_4h = _run(["git", "merge-base", "--is-ancestor", b4, "HEAD"])
+        assert anc_4h.returncode == 0, "b4_start 須為 HEAD 之祖先"
+
     # 批3 開工 proxy 須已在 epic range
     epic = _run(["git", "diff", "--name-only", f"{base}..HEAD"])
     assert epic.returncode == 0, epic.stderr
@@ -1948,11 +1997,11 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
     if not (epic_names & set(_BATCH3_PROXY_PATHS)):
         pytest.skip("批 3 proxy 尚未進 range；waiver range 檢查待 B3 交付後生效")
 
-    # 完整 B3 range（外部錨點；非 commit message）
-    diff = _run(["git", "diff", "--name-only", f"{b3}..HEAD"])
+    # 完整 B3 range（外部錨點；非 commit message）；上界依 b4_start 收斂
+    diff = _run(["git", "diff", "--name-only", f"{b3}..{upper}"])
     assert diff.returncode == 0, diff.stderr
     names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
-    assert names, "b3_start..HEAD 應有 B3 改動"
+    assert names, f"b3_start..{upper} 應有 B3 改動"
 
     hit_harness = names & set(_B45_HARNESS)
     assert not hit_harness, f"B3 range 觸及 B-45 harness: {hit_harness}"
@@ -1971,19 +2020,19 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
         return _parse_frozen_hashes(sh.stdout, require_b3_start=require_b3_start)
 
     fb = _frozen_at(b3, require_b3_start=False)
-    fh = _frozen_at("HEAD", require_b3_start=True)
+    fh = _frozen_at(upper, require_b3_start=True)
     assert fb["base_commit"] == fh["base_commit"], (
-        "base_commit: 於 b3_start..HEAD 不得變"
+        f"base_commit: 於 b3_start..{upper} 不得變"
     )
     assert fb["scope_manifest"] == fh["scope_manifest"], (
-        "scope_manifest: 於 b3_start..HEAD 不得變"
+        f"scope_manifest: 於 b3_start..{upper} 不得變"
     )
-    # b3_start 值允許差；key 集合已由 parser 保證無 third:/重複
+    # b3_start／b4_start 值允許差；key 集合已由 parser 保證無未知 key／重複
 
     # embed 常數：B3 觸及 brief_conformance 時，與 b3_start 樹比對
     if "scripts/brief_conformance_check.sh" in names:
         b = _run(["git", "show", f"{b3}:scripts/brief_conformance_check.sh"])
-        h = _run(["git", "show", "HEAD:scripts/brief_conformance_check.sh"])
+        h = _run(["git", "show", f"{upper}:scripts/brief_conformance_check.sh"])
         assert b.returncode == 0 and h.returncode == 0
 
         def _embed(s: str) -> str:
@@ -1994,6 +2043,78 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
             "brief_conformance embed 被改（B-45 禁）"
         )
     assert "scripts/cx_run.sh" not in names
+
+
+def test_b4_forbidden_prefixes_removes_exactly_two() -> None:
+    """B4 清單＝B-45 清單「僅移除二項必要共變」〔grok STAMP-R2 前提 3〕。
+
+    機械斷言，杜絕日後順手多移一項而靜默失去保護。
+    mutation：把 _B4_ALLOWED_COVARIANT 多加一項 ⇒ 本測轉紅。
+    """
+    removed = set(_B45_FORBIDDEN_PREFIXES) - set(_B4_FORBIDDEN_PREFIXES)
+    assert removed == set(_B4_ALLOWED_COVARIANT), (
+        f"B4 清單僅得移除 {set(_B4_ALLOWED_COVARIANT)}，實際移除 {removed}"
+    )
+    assert set(_B4_FORBIDDEN_PREFIXES) < set(_B45_FORBIDDEN_PREFIXES)
+    # harness 清單於 B4 窗一項不得少（B4 直接沿用同一常數）
+    assert len(_B45_HARNESS) == 5
+
+
+def test_waiver_b4_range_does_not_touch_forbidden() -> None:
+    """B4 窗（b4_start..HEAD）不得觸及禁改清單。
+
+    B3 waiver 上界收斂為 b4_start 後，b4_start..HEAD 由本測接手看守
+    ——硬規矩 9：收窄型修法不得使「該擋的從此不受檢」
+    〔20260808-GOVB1-B4-STAMP-R2 三家 APPROVED〕。
+    b4_start 缺席 ⇒ skip 是安全的：此時 B3 waiver 仍以開放區間 b3_start..HEAD
+    全程看守，**無保護真空**；一旦錨定，
+    test_waiver_b4_active_when_b4_start_anchored 機械強制本測不得 skip。
+    """
+    b4 = _b4_start()
+    if b4 is None:
+        pytest.skip("b4_start 尚未錨定；B3 waiver 之開放區間仍全程看守（無保護真空）")
+
+    diff = _run(["git", "diff", "--name-only", f"{b4}..HEAD"])
+    assert diff.returncode == 0, diff.stderr
+    names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
+
+    hit_harness = names & set(_B45_HARNESS)
+    assert not hit_harness, f"B4 range 觸及 B-45 harness: {hit_harness}"
+    for pref in _B4_FORBIDDEN_PREFIXES:
+        if pref == "scripts/govb1_frozen_hashes.txt":
+            # 允許檔進 range（主委 b4_start 錨點）；內容走封閉集合比對（見下）
+            continue
+        bad = {n for n in names if n == pref or n.startswith(pref)}
+        assert not bad, f"B4 range 觸及禁改前綴 {pref}: {bad}"
+
+    # 封閉 key 集合：b4_start..HEAD 內三既有錨值皆不得變
+    def _frozen_at(rev: str) -> dict[str, str]:
+        sh = _run(["git", "show", f"{rev}:scripts/govb1_frozen_hashes.txt"])
+        assert sh.returncode == 0, sh.stderr
+        return _parse_frozen_hashes(sh.stdout)
+
+    f4 = _frozen_at(b4)
+    fh = _frozen_at("HEAD")
+    for key in ("base_commit", "scope_manifest", "b3_start"):
+        assert f4[key] == fh[key], f"{key}: 於 b4_start..HEAD 不得變"
+    # 具名殘留：移動 b4_start 本身仍屬票 B-44（repo 內無可信存放處）
+
+
+def test_waiver_b4_active_when_b4_start_anchored() -> None:
+    """耦合 fail-closed〔codex STAMP-R2：「B4 waiver 路徑須缺席即 fail-closed」〕。
+
+    b4_start 一旦錨定 ⇒ B3 waiver 上界已收斂 ⇒ b4_start..HEAD 必須由 B4 waiver
+    **實跑**看守。若 B4 waiver 因任何理由 skip，本測轉紅（保護真空 fail-closed）。
+    mutation：於 B4 waiver 首行插入無條件 pytest.skip ⇒ 本測須轉紅。
+    """
+    if _b4_start() is None:
+        pytest.skip("b4_start 尚未錨定；B3 waiver 仍以開放區間 b3_start..HEAD 全程看守")
+    try:
+        test_waiver_b4_range_does_not_touch_forbidden()
+    except pytest.skip.Exception as exc:
+        raise AssertionError(
+            f"b4_start 已錨定但 B4 waiver 仍 skip ⇒ b4_start..HEAD 保護真空: {exc}"
+        ) from exc
 
 
 def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
@@ -2014,3 +2135,45 @@ def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
         raise AssertionError("third: 行應被拒")
     except AssertionError as e:
         assert "未知" in str(e) or "恰好 3" in str(e) or "非法" in str(e), e
+
+    # ── 封閉集擴為四 key 後之新用例〔20260808-GOVB1-B4-STAMP-R2〕 ──
+    sha_a = "a" * 40
+
+    # 正向：b4_start 為合法可選 key ⇒ 通過
+    with_b4 = good.rstrip("\n") + "\nb4_start: " + sha_a + "\n"
+    parsed = _parse_frozen_hashes(with_b4)
+    assert parsed["b4_start"] == sha_a
+
+    # 反向 1：b5_start 仍屬未知 key（封閉集不因擴充而變成開放式）
+    fifth = with_b4.rstrip("\n") + "\nb5_start: " + sha_a + "\n"
+    try:
+        _parse_frozen_hashes(fifth)
+        raise AssertionError("b5_start: 行應被拒（封閉集仍封閉）")
+    except AssertionError as e:
+        assert "未知" in str(e) or "非法" in str(e), e
+
+    # 反向 2：重複 b4_start
+    dup4 = with_b4.rstrip("\n") + "\nb4_start: " + ("b" * 40) + "\n"
+    try:
+        _parse_frozen_hashes(dup4)
+        raise AssertionError("重複 b4_start 應被拒")
+    except AssertionError as e:
+        assert "重複" in str(e), e
+
+    # 反向 3：錨鏈斷裂——有 b4_start 卻無 b3_start（歷史樹情境亦須 fail-closed）
+    no_b3 = "\n".join(
+        ln for ln in with_b4.splitlines() if not ln.startswith("b3_start: ")
+    ) + "\n"
+    try:
+        _parse_frozen_hashes(no_b3, require_b3_start=False)
+        raise AssertionError("b4_start 無 b3_start 應被拒（錨鏈斷裂）")
+    except AssertionError as e:
+        assert "錨鏈斷裂" in str(e), e
+
+    # 反向 4：b4_start 值須為 40 hex
+    bad_len = good.rstrip("\n") + "\nb4_start: deadbeef\n"
+    try:
+        _parse_frozen_hashes(bad_len)
+        raise AssertionError("b4_start 非 40 hex 應被拒")
+    except AssertionError as e:
+        assert "40 hex" in str(e), e
