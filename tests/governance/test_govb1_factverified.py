@@ -10,6 +10,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 BRIEF_CONF = REPO / "scripts" / "brief_conformance_check.sh"
 COMPLETENESS = REPO / "scripts" / "completeness_check.sh"
@@ -371,6 +373,118 @@ def test_t14_decl_good_count_still_green(tmp_path: Path) -> None:
         tmp_path,
         "good.md",
         "fact-verified: count: 1 — `wc -l some.log` → 3",
+    )
+    proc = _check(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# ── review-r5 REGRESSION：有界前綴擴充 ＋ fence fail-closed ────────
+
+
+def _prefix_decl_line(prefix: str) -> str:
+    """prefix 接到 fact-verified 計數＋head 截斷列。"""
+    if prefix == "**":
+        return "**fact-verified:** count: 1 — `head -5 some.log` → 5"
+    return f"{prefix}fact-verified: count: 1 — `head -5 some.log` → 5"
+
+
+@pytest.mark.parametrize(
+    "prefix,label",
+    [
+        ("1. ", "ordered_dot"),
+        ("2) ", "ordered_paren"),
+        ("> ", "blockquote"),
+        ("**", "bold"),
+        ("+ ", "plus"),
+        ("- ", "dash_control"),
+        ("* ", "star_control"),
+        ("> - ", "stacked_bq_dash"),
+    ],
+)
+def test_t14_prefix_styles_head_blocked(
+    tmp_path: Path, prefix: str, label: str
+) -> None:
+    """有界前綴集合：1./N)/>/**/+/−/* 及可堆疊 ⇒ 含 head 須 rc=2。
+
+    review-r5 REGRESSION：父版僅 [-*]? 漏接 1./ >/ **/ +（修前 rc=0 假綠）。
+    """
+    p = tmp_path / f"prefix_{label}.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        f"{_prefix_decl_line(prefix)}\n"
+        "assumed: test\n",
+        encoding="utf-8",
+    )
+    proc = _check(p)
+    assert proc.returncode == 2, (
+        f"prefix={label!r} 須擋截斷（期望 rc=2）\n"
+        + proc.stdout
+        + proc.stderr
+    )
+    out = proc.stdout + proc.stderr
+    assert "截斷" in out or "head" in out
+
+
+def test_t14_unclosed_fence_fail_closed() -> None:
+    """未閉合 fence ⇒ fail-closed rc≠0（禁吞至 EOF 靜默放行）。"""
+    proc = _check(FIXTURE / "brief_factverified_unclosed_fence.md")
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    out = proc.stdout + proc.stderr
+    assert "unclosed" in out.lower() or "fail-closed" in out.lower() or "fence" in out.lower()
+
+
+def test_t14_unclosed_fence_inline_fail_closed(tmp_path: Path) -> None:
+    """inline 未閉合 fence 後仍有 active head 宣告 ⇒ rc≠0。"""
+    p = tmp_path / "unclosed.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        "```\n"
+        "orphan fence body\n"
+        "fact-verified: count: 1 — `head -5 some.log` → 5\n"
+        "assumed: test\n",
+        encoding="utf-8",
+    )
+    proc = _check(p)
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+
+
+def test_t14_indent_fence_close_then_head_blocked() -> None:
+    """縮排閉合 ``` 後之 active 宣告含 head ⇒ rc=2。"""
+    proc = _check(FIXTURE / "brief_factverified_indent_fence_close.md")
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    out = proc.stdout + proc.stderr
+    assert "截斷" in out or "head" in out
+
+
+def test_t14_indent_fence_close_inline(tmp_path: Path) -> None:
+    """inline：兩個空白＋``` 閉合後 head 宣告 ⇒ rc=2。"""
+    p = tmp_path / "indent_close.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        "```\n"
+        "code\n"
+        "  ```\n"
+        "fact-verified: count: 1 — `head -5 some.log` → 5\n"
+        "assumed: test\n",
+        encoding="utf-8",
+    )
+    proc = _check(p)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+
+
+def test_t14_open_prefix_not_accepted(tmp_path: Path) -> None:
+    """開放式前綴（@ 等非有界集合）不得被選列；含 count+head 仍 rc=0。"""
+    p = tmp_path / "open_prefix.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        "fact-verified: smoke → ok\n"
+        "assumed: test\n\n"
+        "@ fact-verified: count: 1 — `head -5 some.log` → 5\n",
+        encoding="utf-8",
     )
     proc = _check(p)
     assert proc.returncode == 0, proc.stdout + proc.stderr

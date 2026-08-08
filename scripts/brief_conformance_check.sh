@@ -209,10 +209,27 @@ _is_findings_kind() {
 
 _strip_code_fences() {
   # stdin → stdout：去掉 ``` … ``` 區塊（邊界②：fence 內不掃）
+  # 閉合標記允許前置空白（/^[[:space:]]*```/）；未閉合 → exit 2（fail-closed，禁吞至 EOF）
+  # 策略 (a)：未閉合即視為格式錯，呼叫端須 rc≠0 並輸出可辨識訊息（不得靜默放行）
   awk '
-    /^```/ { fence = !fence; next }
+    BEGIN { fence = 0 }
+    /^[[:space:]]*```/ { fence = !fence; next }
     !fence { print }
+    END {
+      if (fence) exit 2
+    }
   '
+}
+
+_strip_code_fences_file() {
+  # $1=src_path $2=dst_path → rc 0=ok；2=未閉合 fence（stdout 已寫 ERROR）
+  if ! _strip_code_fences < "$1" > "$2"; then
+    echo "ERROR: unclosed code fence (\`\`\`) — fail-closed"
+    echo "  說明: 未閉合 fence 不得吞掉其後所有 active 宣告（禁吞至 EOF）"
+    echo "  修法: 補上閉合 \`\`\`（閉合列允許前置空白），或刪除未閉合的起始 fence"
+    return 2
+  fi
+  return 0
 }
 
 _is_placeholder_token() {
@@ -226,9 +243,16 @@ _is_placeholder_token() {
 
 # 自 brief 抽出「active」ID-like token（去 fence；反引號內 ＋ 行首 ## 標題）
 # 樣板族：FAMILY-SEG-P[0-3]-NN（SEG 可為 B0R／R1 等，後續再套 canonical）
+# 未閉合 fence → rc=2（與 _select_fact_verified_decl_lines 同 fail-closed）
 _active_id_tokens() {
-  # $1=brief_path
-  _strip_code_fences < "$1" | awk '
+  # $1=brief_path → stdout=tokens；rc 0=ok；2=未閉合 fence
+  _src="$1"
+  _tmp="$(mktemp "${TMPDIR:-/tmp}/bcc_id.XXXXXX")"
+  if ! _strip_code_fences_file "${_src}" "${_tmp}"; then
+    rm -f "${_tmp}"
+    return 2
+  fi
+  awk '
     # 反引號內 token
     {
       line = $0
@@ -244,7 +268,9 @@ _active_id_tokens() {
         print substr($0, RSTART, RLENGTH)
       }
     }
-  '
+  ' "${_tmp}"
+  rm -f "${_tmp}"
+  return 0
 }
 
 _check_id_pattern() {
@@ -255,7 +281,11 @@ _check_id_pattern() {
     | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//')"
   _is_findings_kind "${_bk_val}" || return 0
 
-  _toks="$(_active_id_tokens "${_brief_p}")"
+  if ! _toks="$(_active_id_tokens "${_brief_p}")"; then
+    # 未閉合 fence：ERROR 可能被 command substitution 吸入 _toks — 轉出 stdout
+    [ -n "${_toks}" ] && printf '%s\n' "${_toks}"
+    return 1
+  fi
   [ -n "${_toks}" ] || return 0
 
   _re="$(_canon_re)"
@@ -367,17 +397,27 @@ _has_trunc() {
   return 1
 }
 
-# 選列判準（review-r4 NEW-CLASS）——決定哪些列進解析器；**不得**改動 _extract_cmds。
-# ① 先剝 fenced code（```…```）
-# ② 錨定行首宣告：^[[:space:]]*[-*]?[[:space:]]*fact-verified:
-#    （允許前置空白／-／*；不允許行內任意位置；反引號內提及不匹配行首）
+# 選列判準（review-r4 NEW-CLASS ＋ review-r5 REGRESSION 修）——決定哪些列進解析器；**不得**改動 _extract_cmds。
+# ① 先剝 fenced code（```…```；閉合可前置空白；未閉合 fail-closed）
+# ② 錨定行首宣告：前置符號為**有界集合**（可重複、可夾空白；禁開放式「任意非字母」）
+#    集合：- / * / + / > ／ 有序清單 N. ／ N) ／ 粗體 ** ／ 前置空白
 # ③ count: 觸發改獨立 token（禁子字串誤匹配 max_count:／foo_count: 等）
-_FACT_VERIFIED_DECL_RE='^[[:space:]]*[-*]?[[:space:]]*fact-verified:'
+# ERE：(([-*+>]|[0-9]+[.)]|\*\*)[[:space:]]*)*  — 有界，非「任意非字母」
+_FACT_VERIFIED_DECL_RE='^[[:space:]]*(([-*+>]|[0-9]+[.)]|\*\*)[[:space:]]*)*fact-verified:'
 _COUNT_TOKEN_RE='(^|[^[:alnum:]_])count:'
 
 _select_fact_verified_decl_lines() {
   # $1=brief_path → stdout=active 宣告列（已去 fence、已錨定行首）
-  _strip_code_fences < "$1" | grep -E "${_FACT_VERIFIED_DECL_RE}" || true
+  # rc 0=ok；2=未閉合 fence（ERROR 已寫 stdout）
+  _src="$1"
+  _tmp="$(mktemp "${TMPDIR:-/tmp}/bcc_fv.XXXXXX")"
+  if ! _strip_code_fences_file "${_src}" "${_tmp}"; then
+    rm -f "${_tmp}"
+    return 2
+  fi
+  grep -E "${_FACT_VERIFIED_DECL_RE}" "${_tmp}" || true
+  rm -f "${_tmp}"
+  return 0
 }
 
 _line_has_count_token() {
@@ -389,6 +429,13 @@ _check_fact_verified() {
   # $1=brief_path → rc 0=ok
   _brief_p="$1"
   _bad=0
+  _lines_tmp="$(mktemp "${TMPDIR:-/tmp}/bcc_sel.XXXXXX")"
+  if ! _select_fact_verified_decl_lines "${_brief_p}" > "${_lines_tmp}"; then
+    # 未閉合 fence：ERROR 被重導進 _lines_tmp — 轉出 stdout（fail-closed）
+    cat "${_lines_tmp}"
+    rm -f "${_lines_tmp}"
+    return 1
+  fi
   while IFS= read -r _line || [ -n "${_line}" ]; do
     [ -n "${_line}" ] || continue
     # 規則①：僅明示 count: 標記（獨立 token，非子字串）
@@ -425,7 +472,8 @@ EOF
         _bad=1
       fi
     fi
-  done < <(_select_fact_verified_decl_lines "${_brief_p}")
+  done < "${_lines_tmp}"
+  rm -f "${_lines_tmp}"
 
   [ "${_bad}" -eq 0 ]
 }
