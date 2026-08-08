@@ -45,12 +45,9 @@ _cx_lifecycle_resolve() {
     rm -f "${_tmp}"
     return 1
   fi
-  if cp "${_tmp}" "${_LIFECYCLE_JSON}" 2>/dev/null; then
-    rm -f "${_tmp}"
-    printf '%s\n' "${_LIFECYCLE_JSON}"
-  else
-    printf '%s\n' "${_tmp}"
-  fi
+  # 缺檔：只回傳 temp 路徑（唯讀物化）。禁止 cp 回 repo／隔離目錄（靜默寫檔＝假綠源）。
+  # 「缺 JSON fail-closed」落在 govb1_final_gate lifecycle_embed 閘，不在此執行期。
+  printf '%s\n' "${_tmp}"
   return 0
 }
 

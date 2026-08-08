@@ -26,9 +26,9 @@ FIXTURE_ROOT = REPO / "tests" / "governance" / "fixtures" / "govb1"
 
 
 def _run(args: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
+    kw.setdefault("cwd", str(REPO))
     return subprocess.run(
         args,
-        cwd=str(REPO),
         capture_output=True,
         text=True,
         check=False,
@@ -1537,57 +1537,127 @@ def test_check_fixtures_rc0() -> None:
 # ── 群集 C：_g7 窄守衛到期閘 ─────────────────────────────────────────
 
 
-def _batch3_started(base: str) -> bool:
+# 批 3 開工 proxy 檔名（literal；須與凍結 TODO Task 1.2／1.4「新建」欄逐字相符——anti-drift）
+_BATCH3_PROXY_PATHS = (
+    "tests/governance/test_govb1_brief_id_pattern.py",
+    "tests/governance/test_govb1_factverified.py",
+)
+
+
+def _batch3_started(base: str, *, cwd: Path | None = None, head: str = "HEAD") -> bool:
     """批3已開工 := base..HEAD 含 Task 1.2／1.4 具名新建測試（批2 Task 1.1 亦改 brief_conformance，不可用該檔作 proxy）。"""
-    proc = _run(["git", "diff", "--name-only", f"{base}..HEAD"])
+    proc = _run(
+        ["git", "diff", "--name-only", f"{base}..{head}"],
+        cwd=str(cwd) if cwd is not None else str(REPO),
+    )
     assert proc.returncode == 0, proc.stderr
     names = {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
-    return bool(
-        names
-        & {
-            "tests/governance/test_govb1_brief_id_pattern.py",
-            "tests/governance/test_govb1_factverified.py",
-        }
-    )
+    return bool(names & set(_BATCH3_PROXY_PATHS))
 
 
 # 批 3 開工時，**放寬 `_g7` 與更新到期測試須配對**；
-# **只改測試不改守衛＝假綠。** 到期不變式由 `_g7_narrow_expiry_holds` ＋ 模擬測試護住。
+# **只改測試不改守衛＝假綠。** 到期不變式由 `_g7_narrow_expiry_holds` ＋ 真實 range 測試護住。
+# C3-c 設計骨架（本輪不放寬 _g7）：批 3 開工後 uncommitted 檢查應只對批 3 標的路徑
+# 匹配 ` M|MM`，不得對 epic 全量 allow 匹配 M（gate_check.sh 等 ambient M 會誤紅）。
 def _g7_narrow_expiry_holds(*, batch3_started: bool, narrow_guard: bool) -> bool:
     """斷言 NOT (批3已開工 AND 窄守衛仍在)。"""
     return not (batch3_started and narrow_guard)
 
 
+def _todo_task_section(task_id: str) -> str:
+    """截取凍結 TODO 中 `### Task <id>` 至下一 `### Task`／檔尾。"""
+    text = TODO.read_text(encoding="utf-8")
+    pat = re.compile(
+        rf"^### Task {re.escape(task_id)}\b.*?(?=^### Task |\Z)",
+        re.M | re.S,
+    )
+    m = pat.search(text)
+    assert m, f"TODO 缺 ### Task {task_id}"
+    return m.group(0)
+
+
+def test_batch3_proxy_literals_anti_drift_in_todo() -> None:
+    """C3-a：_batch3_started 兩個 proxy 字串須逐字出現於 TODO Task 1.2／1.4「新建」欄。"""
+    s12 = _todo_task_section("1.2")
+    s14 = _todo_task_section("1.4")
+    assert "新建" in s12 and _BATCH3_PROXY_PATHS[0] in s12, (
+        f"Task 1.2 新建欄須含 {_BATCH3_PROXY_PATHS[0]}"
+    )
+    assert "新建" in s14 and _BATCH3_PROXY_PATHS[1] in s14, (
+        f"Task 1.4 新建欄須含 {_BATCH3_PROXY_PATHS[1]}"
+    )
+    # 字串亦須為 _batch3_started 所引用（rename protection：改一側即紅）
+    src = Path(__file__).read_text(encoding="utf-8")
+    for p in _BATCH3_PROXY_PATHS:
+        assert p in src
+
+
 # 批 3 開工時，**放寬 `_g7` 與更新到期測試須配對**；
-# **只改測試不改守衛＝假綠。** 到期不變式由 `_g7_narrow_expiry_holds` ＋ 模擬測試護住。
+# **只改測試不改守衛＝假綠。** 到期不變式由 `_g7_narrow_expiry_holds` ＋ 真實 range 測試護住。
 def test_g7_narrow_guard_expiry_live_pass() -> None:
-    """不變式：NOT (批3已開工 AND 窄守衛仍在)；三種狀態皆由本斷言＋模擬測試護住。"""
+    """不變式：NOT (批3已開工 AND 窄守衛仍在)；live range 現況須通過。"""
     base = _base_commit()
     started = _batch3_started(base)
     narrow = _is_narrow_g7_status_case(GATE.read_text(encoding="utf-8"))
     assert _g7_narrow_expiry_holds(batch3_started=started, narrow_guard=narrow)
 
 
-def test_g7_narrow_guard_expiry_simulated_batch3_fails() -> None:
-    """模擬批 3 已開工且窄守衛仍在 ⇒ 到期閘 FAIL（兩個方向皆須可證）。"""
+def test_g7_narrow_guard_expiry_real_range_both_directions(tmp_path: Path) -> None:
+    """C3-b：真實 temp git range 兩向——無 proxy ⇒ false；含 proxy commit ⇒ true。"""
+    # ① 現況 production range ⇒ _batch3_started false（批 3 尚未開工）
+    base = _base_commit()
+    assert not _batch3_started(base), (
+        "production base..HEAD 不應已含批 3 proxy（否則到期閘誤觸）"
+    )
     gate_src = GATE.read_text(encoding="utf-8")
     narrow = _is_narrow_g7_status_case(gate_src)
-    assert narrow, "窄守衛偵測須為 True 才有模擬意義"
-    # 模擬：diff 集合強行含批 3 標的檔
+    assert narrow, "窄守衛偵測須為 True（本輪不放寬 _g7）"
+    assert _g7_narrow_expiry_holds(batch3_started=False, narrow_guard=True)
+
+    # ② 真實 temp repo：base commit 無 proxy → 再 commit 含 proxy 檔 → range true
+    repo = tmp_path / "batch3_range"
+    repo.mkdir()
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "govb1-test",
+        "GIT_AUTHOR_EMAIL": "govb1-test@example.invalid",
+        "GIT_COMMITTER_NAME": "govb1-test",
+        "GIT_COMMITTER_EMAIL": "govb1-test@example.invalid",
+    }
+    def g(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+
+    assert g("init").returncode == 0
+    # 部分 git 預設 branch 名 main；明確指定
+    g("checkout", "-b", "main")
+    (repo / "README").write_text("base\n", encoding="utf-8")
+    assert g("add", "README").returncode == 0
+    assert g("commit", "-m", "base").returncode == 0
+    base_sha = g("rev-parse", "HEAD").stdout.strip()
+    assert len(base_sha) == 40
+    assert not _batch3_started(base_sha, cwd=repo), "空 range 不得判批 3 開工"
+
+    proxy = repo / _BATCH3_PROXY_PATHS[0]
+    proxy.parent.mkdir(parents=True, exist_ok=True)
+    proxy.write_text("# batch3 proxy stub\n", encoding="utf-8")
+    assert g("add", _BATCH3_PROXY_PATHS[0]).returncode == 0
+    assert g("commit", "-m", "add batch3 proxy").returncode == 0
+    assert _batch3_started(base_sha, cwd=repo), "含 proxy 之真實 range 須 true"
+
+    # 純函式兩向（可證偽；與真實 range 結果銜接）
     assert not _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=True)
-    # 對照：批 3 開工但已放寬守衛（含 M）⇒ 到期閘應放行
     wide_src = gate_src.replace(
-        r"\?\?|A\ |A?|A*)",
-        r"\?\?|A\ |A?|A*| M|M |M?)",
+        r"\?\?|A\ |A?|A*",
+        r"\?\?|A\ |A?|A*| M|MM",
         1,
     )
-    # 若 replace 未命中（跳脫差異），改插 M 進 case 臂字串
-    if wide_src == gate_src:
-        wide_src = gate_src.replace(
-            r"\?\?|A\ |A?|A*",
-            r"\?\?|A\ |A?|A*| M|MM",
-            1,
-        )
     assert wide_src != gate_src, "寬守衛 mutation 未改到 case pattern"
     assert not _is_narrow_g7_status_case(wide_src), "含 M 後不得判為窄守衛"
     assert _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=False)

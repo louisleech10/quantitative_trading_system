@@ -7,6 +7,7 @@ brief_conformance_check.sh 與 cx_run.sh 必須集合相等，禁硬編碼 fallb
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import shutil
@@ -376,3 +377,89 @@ def test_cx_run_g6_anchor_intact() -> None:
     assert re.search(r"^_maybe_register_stamp_output\(\)", text, re.M), (
         "_maybe_register_stamp_output 函式錨點消失"
     )
+
+
+# ── 案 C：C1 禁靜默 cp ／ C2 embed≡JSON 機檢 ───────────────────────────
+
+GATE = REPO / "scripts" / "govb1_final_gate.sh"
+
+
+def test_c1_missing_json_no_silent_write(tmp_path: Path) -> None:
+    """C1：缺 govflow_lifecycle.json 時不得 cp 回 scripts/（只 temp 物化）。"""
+    iso = tmp_path / "c1"
+    scripts = iso / "scripts"
+    scripts.mkdir(parents=True)
+    handoffs = iso / "handoffs"
+    handoffs.mkdir()
+    shutil.copy2(BRIEF_CONF, scripts / "brief_conformance_check.sh")
+    (scripts / "brief_conformance_check.sh").chmod(0o755)
+    # 刻意不複製 JSON
+    assert not (scripts / "govflow_lifecycle.json").exists()
+    brief = handoffs / "impl.md"
+    brief.write_text("brief-kind: impl\n\nstub\n", encoding="utf-8")
+    r = _run(
+        ["bash", "scripts/brief_conformance_check.sh", "handoffs/impl.md"],
+        cwd=iso,
+    )
+    # 執行期仍可 embed 物化通過（fail-closed 在閘，不在此）
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert not (scripts / "govflow_lifecycle.json").exists(), (
+        "缺 JSON 時不得靜默寫出 govflow_lifecycle.json"
+    )
+
+
+def test_c2_lifecycle_embed_gate_pass() -> None:
+    """C2 正向：embed ≡ 權威 JSON ⇒ lifecycle_embed 閘 PASS。"""
+    r = _run(["bash", str(GATE), "--only", "lifecycle_embed"])
+    out = r.stdout + r.stderr
+    assert r.returncode == 0, out
+    assert "PASS lifecycle_embed" in r.stdout
+
+
+def test_c2_lifecycle_embed_mutation_turns_red() -> None:
+    """C2 mutation：改 embed 一字節 ⇒ lifecycle_embed 必須轉紅（禁只測現況綠）。"""
+    original = BRIEF_CONF.read_text(encoding="utf-8")
+    m = re.search(r"_LIFECYCLE_EMBED_B64='([A-Za-z0-9+/=]+)'", original)
+    assert m, "找不到 _LIFECYCLE_EMBED_B64"
+    emb = m.group(1)
+    raw = bytearray(base64.b64decode(emb))
+    assert len(raw) > 20
+    raw[10] ^= 0x01
+    emb2 = base64.b64encode(bytes(raw)).decode("ascii")
+    assert emb2 != emb
+    mut = original.replace(
+        f"_LIFECYCLE_EMBED_B64='{emb}'",
+        f"_LIFECYCLE_EMBED_B64='{emb2}'",
+        1,
+    )
+    assert mut != original
+    try:
+        BRIEF_CONF.write_text(mut, encoding="utf-8")
+        r = _run(["bash", str(GATE), "--only", "lifecycle_embed"])
+        out = r.stdout + r.stderr
+        assert r.returncode != 0, f"embed mutation 應使閘轉紅:\n{out}"
+        assert "lifecycle_embed" in out or "FAIL" in out
+    finally:
+        BRIEF_CONF.write_text(original, encoding="utf-8")
+
+
+def test_c2_lifecycle_json_missing_gate_fails() -> None:
+    """C2：權威 JSON 不存在 ⇒ 閘 FAIL 且訊息含檔名（repo 層 fail-closed）。"""
+    bak_dir = REPO / ".claude" / "tmp"
+    bak_dir.mkdir(parents=True, exist_ok=True)
+    bak = bak_dir / "govflow_lifecycle.json.bak-c2-missing"
+    assert LIFECYCLE.is_file()
+    # 禁 rm：用 mv 暫移
+    shutil.move(str(LIFECYCLE), str(bak))
+    try:
+        assert not LIFECYCLE.exists()
+        r = _run(["bash", str(GATE), "--only", "lifecycle_embed"])
+        out = r.stdout + r.stderr
+        assert r.returncode != 0, f"缺 JSON 應 FAIL:\n{out}"
+        assert "govflow_lifecycle.json" in out
+    finally:
+        if bak.exists() and not LIFECYCLE.exists():
+            shutil.move(str(bak), str(LIFECYCLE))
+        elif bak.exists() and LIFECYCLE.exists():
+            # 若中途被重建，丟棄 bak（不覆蓋現況）
+            shutil.move(str(bak), str(bak_dir / "govflow_lifecycle.json.bak-c2-orphan"))

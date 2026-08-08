@@ -245,6 +245,60 @@ _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
         [ -z "${extra}" ] || { printf 'G-7 FAIL: 未宣告即修改:\n%s\n' "${extra}" >&2; return 1; }; }
 _g8() { bash scripts/reconcile_stamps_check.sh handoffs/reconcile/20260807-govb1-x-consult-r1/synth.md >/dev/null; }
 
+# ── lifecycle embed ≡ 權威 JSON（Task 1.1 修補案 C2；關 R-8 假綠）──────────
+# 權威檔不存在 ⇒ FAIL（repo 層 fail-closed；執行期缺檔仍可 embed 物化，見 brief 裁定）。
+# 兩支腳本之 _LIFECYCLE_EMBED_B64 解碼後須與權威檔 jq -S 正規化後相等（禁漂移第二真相源）。
+_lifecycle_embed() {
+  _json="scripts/govflow_lifecycle.json"
+  if [ ! -f "${_json}" ]; then
+    echo "lifecycle_embed FAIL: 權威檔不存在: ${_json}" >&2
+    return 1
+  fi
+  if ! jq empty "${_json}" 2>/dev/null; then
+    echo "lifecycle_embed FAIL: 權威檔語法錯: ${_json}" >&2
+    return 1
+  fi
+  _jnorm="$(mktemp)"
+  _enorm="$(mktemp)"
+  _edec="$(mktemp)"
+  _le_rc=0
+  if ! jq -S . "${_json}" > "${_jnorm}" 2>/dev/null; then
+    echo "lifecycle_embed FAIL: jq 正規化權威檔失敗: ${_json}" >&2
+    rm -f "${_jnorm}" "${_enorm}" "${_edec}"
+    return 1
+  fi
+  for _s in scripts/brief_conformance_check.sh scripts/cx_run.sh; do
+    if [ ! -f "${_s}" ]; then
+      echo "lifecycle_embed FAIL: 腳本不存在: ${_s}" >&2
+      _le_rc=1
+      break
+    fi
+    _b64="$(sed -n "s/^_LIFECYCLE_EMBED_B64='\\(.*\\)'\$/\\1/p" "${_s}" | head -1)"
+    if [ -z "${_b64}" ]; then
+      echo "lifecycle_embed FAIL: ${_s} 缺 _LIFECYCLE_EMBED_B64" >&2
+      _le_rc=1
+      break
+    fi
+    if ! printf '%s' "${_b64}" | base64 -d > "${_edec}" 2>/dev/null; then
+      echo "lifecycle_embed FAIL: ${_s} embed base64 解碼失敗" >&2
+      _le_rc=1
+      break
+    fi
+    if ! jq -S . "${_edec}" > "${_enorm}" 2>/dev/null; then
+      echo "lifecycle_embed FAIL: ${_s} embed 解碼後非合法 JSON" >&2
+      _le_rc=1
+      break
+    fi
+    if ! diff -q "${_jnorm}" "${_enorm}" >/dev/null 2>&1; then
+      echo "lifecycle_embed FAIL: ${_s} embed ≠ ${_json}（jq -S 正規化後不等）" >&2
+      _le_rc=1
+      break
+    fi
+  done
+  rm -f "${_jnorm}" "${_enorm}" "${_edec}"
+  return "${_le_rc}"
+}
+
 # 檢查本身資料化——單一表格即唯一真相源
 # 欄位：name | files | fn（多檔以空白分隔）
 # name 與 CLI --only 對齊（無前導底線）：g0_tests / g2 / …
@@ -259,6 +313,7 @@ g5|docs/GOV_DISPATCH_FLOW_FIX_SPEC.md|_g5
 g6|scripts/cx_run.sh|_g6
 g7|scripts/govb1_scope.manifest scripts/govb1_frozen_hashes.txt|_g7
 g8|handoffs/reconcile/20260807-govb1-x-consult-r1/synth.md|_g8
+lifecycle_embed|scripts/govflow_lifecycle.json scripts/brief_conformance_check.sh scripts/cx_run.sh|_lifecycle_embed
 '
 _rows() { printf '%s\n' "${_CHECKS}" | grep -v '^[[:space:]]*$'; }
 _plan() {   # stdout: FILE\t<path> 或 UNRESOLVED\t<name>\t<reason>
