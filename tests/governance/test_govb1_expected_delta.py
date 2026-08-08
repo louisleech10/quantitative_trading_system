@@ -110,12 +110,11 @@ def test_t_b4_1_mutation_remove_nonempty_check_empty_turns_green(tmp_path: Path)
     移除後仍紅 ⇒ 寫的仍是恆真檢查（不算完成）。
     """
     src = BRIEF_CONF.read_text(encoding="utf-8")
-    # 錨定：剔除標題後再 grep 非空白的管道（整段換成 true ⇒ if ! true 永不進錯誤支）
-    anchor = (
-        "      | grep -vxF 'EXPECTED-DELTA:' \\\n"
-        "      | grep -qE '[^[:space:]]'; then"
-    )
-    mut = src.replace(anchor, "      | true; then", 1)
+    # 錨定＝awk 判定器內「非空」那一條裁決〔B4-REVIEW-R2 群集 2 改寫後之新錨點〕。
+    # 條件短路成 0 ⇒ 空區塊不再判 EMPTY ⇒ 落到 print "OK"。
+    # 🔴 錨點失配時本測 **fail-closed 轉紅**（不得靜默通過）——實作改寫後須同步更新錨點。
+    anchor = '      if (body == 0 && inline_body == 0) { print "EMPTY"; exit }'
+    mut = src.replace(anchor, '      if (0) { print "EMPTY"; exit }', 1)
     assert mut != src, "mutation 未命中非空檢查錨點"
     scripts = tmp_path / "scripts"
     scripts.mkdir()
