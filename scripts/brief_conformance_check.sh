@@ -151,6 +151,13 @@ _check_expected_delta() {
   # rc 0=ok；1=缺/空/重複（訊息 stdout，與既有 ERROR 同通道）
   _ed_brief="$1"
   _ed_kind="${2:-}"
+  # 🔴 對「空／非白名單 kind」fail-closed〔CODEX-R3-P2-03〕：
+  #    原本一律 return 0，對**傳錯 kind 的呼叫端**是 fail-open。
+  #    現行 CLI 兩條路徑皆先驗 kind，故非可利用；此為 defense-in-depth。
+  _bk_ok "${_ed_kind}" || {
+    echo "ERROR: _check_expected_delta 收到未經驗證之 brief-kind: '${_ed_kind}'（fail-closed）"
+    return 1
+  }
   [ "${_ed_kind}" = "impl" ] || return 0   # 非 impl 不適用
 
   # 判準（**封閉可導出**，勿改成開放式啟發法）
@@ -164,9 +171,16 @@ _check_expected_delta() {
   #   (3) 標題行須恰 1 條（0⇒缺、≥2⇒重複，皆 fail-closed）；
   #   (4) 區塊＝標題行之後至第一個「僅空白字元」之行（或 EOF）；
   #   (5) 非空 := 標題行冒號後有非空白 **或** 區塊內任一行含非空白。
-  _ed_verdict="$(tr -d '\r' < "${_ed_brief}" | awk '
+  # 〔20260809-GOVB1-B4-REVIEW-R3〕再補兩處漏接（兩家＋主委各自實跑）：
+  #   ⑤ fence 有界集合原只含反引號 ⇒ `~~~`／`~~~~` 圍出之標題被當真宣告（主委複驗 rc=0，
+  #      codex 命中、composer 誤判為 DUP；依碼證採 codex）。現 fence := ``` 或 ~~~（各 3 個以上）。
+  #   ⑥ 零寬／格式字元被當內容 ⇒ 語意空之區塊仍過（U+200B/200C/200D/2060/FEFF/00AD/00A0）。
+  #      以**封閉列舉**之不可見碼點於進 awk 前剔除；亦順帶消除 macOS awk 與 gawk 對
+  #      NBSP 是否屬 [[:space:]] 之平台歧異（codex 實測該歧異存在）。
+  # 🔴 具名殘留 R-13：未列舉之其他 Unicode Cf/Zs 碼點仍可能被當內容（**擋意外不防蓄意**）。
+  _ed_verdict="$(sed $'s/[ ­​‌‍⁠﻿]//g' "${_ed_brief}" | tr -d '\r' | awk '
     BEGIN { infence = 0; hdr = 0; inblock = 0; body = 0; inline_body = 0 }
-    /^[[:space:]]*```/ { infence = 1 - infence; inblock = 0; next }
+    /^[[:space:]]*(```|~~~)/ { infence = 1 - infence; inblock = 0; next }
     infence { next }
     /^EXPECTED-DELTA:/ {
       hdr = hdr + 1
@@ -385,8 +399,15 @@ _check_id_pattern() {
   # $1=brief_path → rc 0=ok；非 0=不合規（訊息走 stdout，與既有 ERROR 同通道）
   # 無 active token 時不讀 completeness_check.sh（隔離 fixture 常不拷該檔；邊界①）
   _brief_p="$1"
-  _bk_val="$(grep -E '^brief-kind:' "${_brief_p}" 2>/dev/null | head -1 \
-    | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//')"
+  # 🔴 kind 由呼叫端傳入**已驗證**值〔20260809-GOVB1-B4-REVIEW-R3／CODEX-R3-P1-02 NEW-CLASS〕
+  #    原本此處自行 `grep -E '^brief-kind:' | head -1` ＝**第二真相源**，且比 SSOT 弱：
+  #    無「多筆不一致宣告 fail-closed」判定（head -1 會被註解行蓋掉，CODEX-R5-P0-01 舊事故同型）。
+  _bk_val="${2:-}"
+  # 🔴 此處**刻意不加**「空 kind ⇒ fail-closed」守衛：
+  #    生產路徑不可達（主路徑早於 _resolve_kind_into_bk 之缺 kind 守衛 exit 2），
+  #    但加了會使 test_stamp_taskid_inject.py::test_mutation_v18_skip_missing_kind_turns_red
+  #    失效——該測靠「閹割 V18 守衛後腳本仍往下走並開債」證明 V18 是**承重**的。
+  #    多餘的深度防禦在此會遮蔽承重證明，屬淨損。實測：加了守衛 ⇒ 該 mutation 測轉紅。
   _is_findings_kind "${_bk_val}" || return 0
 
   if ! _toks="$(_active_id_tokens "${_brief_p}")"; then
@@ -592,8 +613,8 @@ if [ -n "${emit_file}" ]; then
     echo "ERROR: 無法寫入 --emit 檔: ${emit_file}" >&2; exit 2; }
 fi
 
-# Task 1.2：ID 樣板（findings-kind 限縮內）
-_check_id_pattern "${brief}" || exit 2
+# Task 1.2：ID 樣板（findings-kind 限縮內）；kind 由本檔唯一 parser 之結果傳入
+_check_id_pattern "${brief}" "${_bk}" || exit 2
 
 # Task 1.4：fact-verified 兩機械規則
 _check_fact_verified "${brief}" || exit 2
