@@ -39,14 +39,28 @@ REF:handoffs/reconcile/20260808-govb1-b2-review-r7/synth.md
 
 ### 接手照序做
 
-1. **派該收斂檔之三家戳記輪**（body sha256 現跑）
+1. **派該收斂檔之三家戳記輪** —— 🔴 **brief 已寫好待派**：
+   `handoffs/20260808-govb1-b4-stamp-r1-brief.md`（body sha256 `a372199f…`，**派前現跑確認**）
+
+   ```
+   bash scripts/committee_run.sh --session 20260808-govb1-b4-stamp-r1 \
+     handoffs/20260808-govb1-b4-stamp-r1-brief.md handoffs/20260808-govb1-b4-stamp-r1 \
+     codex,composer,grok -- --task-id 20260808-GOVB1-B4-STAMP-R1 \
+     --intent "三家戳記 B4 偵察收斂檔" --risk low \
+     --facts-asked "none-needed:body hash 現跑附於 brief" \
+     --review-role "三家共答 superset 處置是否應本輪定案" --template "n/a:stamp 非 SPEC/TODO 派工"
+   ```
+
+   **該 brief 內已含三題必答**：codex 之 `--spec` 數據是否應並列、kind SSOT 之正確重用對象、
+   superset 處置可否推遲至 impl brief。
+
 2. 戳記後**派 B4 impl**，須先定案下列 **六項**（皆已四方確認）：
 
 | # | 事項 |
 |---|---|
 | `P0` | TODO 空區塊判定**恆真**（`D-D` 被當範圍運算子 ⇒ literal `-` 未排除 ⇒ 標題行恆命中）。`票 B-43` 第五例。修法須附「移除檢查後空區塊用例轉綠」之 mutation |
 | `P0` | `brief_conformance_check.sh --only` 與 `gate.sh` `_brief_kind()` **皆不存在**（實跑各 0）——須先建掛點；🔴 **禁在 `gate.sh` 另寫第二份 kind parser** |
-| `P0` | **`--spec` 非 impl 可靠判準**（codex 更正主委）——(d) 以 `--spec` 為代理會留 bypass |
+| `P0` | **`--spec` 非 impl 可靠判準**（codex 更正主委）——(d) 以 `--spec` 為代理會留 bypass。**codex 實測 audit：31 筆 impl round 中 `spec` 有值 23、空值 8（25.8%）** ⇒ 那 8 筆完全繞過。🔴 **kind SSOT 依 codex 為 `_role_gate.sh::_resolve_brief_kind()`，非 `brief_conformance_check.sh`——戳記輪已列為必答，接手須以委員答覆為準，寫錯會造出第三份 parser** |
 | `P0` | `scripts/cx_run.sh` **為必改共變檔但未列 Task 欄**（新增 JSON 節 ⇒ 兩支 embed 皆須更新） |
 | `P0` | 🔴 **B3 waiver 測試以 `b3_start..HEAD` 開放區間持續生效，禁改 `cx_run.sh`／`govflow_lifecycle.json` ⇒ 會擋住 B4**（**第四次結構性死鎖**）。須**主委撰寫 `b4_start` 錨點**收斂區間；**禁實作端自行放寬** |
 | `P1` | 交付順序須分階段：`--brief`＋(c) 先落地 → 主委改派工慣例實測 → **最後**才啟用 (d)。同批交付會使主委派不出工 |
