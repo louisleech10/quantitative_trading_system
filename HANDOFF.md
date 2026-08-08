@@ -91,15 +91,18 @@ REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
 ### 接手照序做
 
 1. ✅ **戳記輪已完成**（2/2 可用家族 APPROVED）
-2. **寫 B5 impl brief**，須先定死兩件事：
-   - **C 之封閉文法**：`SCOPE-CLAIM:<id> <subject> DERIVE:<executable command>`
-     （欄位／分隔／`<id>` 命名空間／`DERIVE:` 執行語意與失敗處置）
-     ⇒ 正向宣告，普通散文不觸發，凍結 SPEC/TODO 內無此行故不自鎖
-   - **`A` 之 `pending` 封閉條件**：命令與依賴可解析 ＋ Task 明示新建之路徑恰為 `ENOENT`；
+2. ✅ **impl brief 已寫好並通過合規檢查**：`handoffs/20260809-govb1-b5-impl-r1-brief.md`
+   （`brief_conformance_check` rc=0、`--only expected-delta` rc=0）
+   兩個定案已在 `§0` 內逐字釘死：
+   - **C 之封閉文法** `SCOPE-CLAIM:<id> <subject> DERIVE:<executable command>`
+     （行首錨定＋`<id>` 不得重複＋fence 內不算＋CRLF 正規化；**不執行該命令**）
+   - **`A` 之 `pending` 三條件**（可解析 ＋ 恰為 `ENOENT` ＋ 路徑明示於「新建」欄），
      其餘非零一律保留失敗
-3. 🔴 impl brief 另須明列：**`template_check.sh` 只得 append 新函式，禁重排／改寫既有行**
-   （`test_doc_format_precheck.py:385-433` 以原始碼子字串做 mutation，該檔不在 B5 scope 內）
-4. 🔴 **實作端**：`grok` 封鎖期間由主委自任，review 仍 codex＋composer 雙家族
+3. **接手直接執行該 brief**。🔴 **實作端**：`grok` 封鎖期間由主委自任
+   （角色檔禁 Claude 自選備援），review 仍 codex＋composer 雙家族。
+4. 🔴 **最高優先驗收 `T-1.5-C0`**：交付後
+   `bash scripts/template_check.sh spec docs/GOVB1_INPUT_QUALITY_SPEC.md` **rc 須仍為 0**（`todo` 同）。
+   **任一非零＝做成了掃描式，第六次死鎖成真，退回重做。**
 
 ## 🔴 具名殘留（**不得宣稱已閉合**）
 
