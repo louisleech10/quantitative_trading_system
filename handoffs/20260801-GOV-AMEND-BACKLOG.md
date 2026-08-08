@@ -2431,3 +2431,52 @@ awk '$1=="allow"{print $2}' scripts/govb1_scope.manifest | grep -c '^docs/'   �
 
 **本票無機械綁定**——不像 `票 B-13` 之 R-1 有到期閘。
 若後批有人照抄 TODO 偽碼，**沒有任何檢查會擋**。這是已知且具名接受的暴露面。
+
+---
+
+## B-44 票 `GOV-GUARD-SELF-AUTHORIZABLE`
+
+**治理守衛可在同一 commit 內自我授權——repo 內無解，須外部信任錨。**
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：2026-08-08 批 2 前置，**codex 與 composer 兩家獨立判 BLOCKING**
+（`CODEX-R2-P0-01`／`COMPOSER-R2-P0-01`），經一輪範圍裁定後兩家**一致改判 (b) 具名殘留**
+（`handoffs/reconcile/20260808-govb1-b2-review-r3/synth.md`）。**不開票即為漏項。**
+
+### 病
+
+`scripts/govb1_final_gate.sh` 之 `_meta_want`（expected-set）、`scripts/govb1_scope.manifest` 之
+`meta` 列、`scripts/govb1_frozen_hashes.txt` 之 `scope_manifest` hash——**三者同屬同一可改邊界**。
+同一交付單元同時改這三處，即可讓**未經委員裁定之路徑**通過 `G-7`。
+
+**兩家實測**：隔離副本中同步三處後 `_g7_policy` rc=0、`PASS g7`。
+
+### 🔴 非純蓄意（codex 修正主委原判）
+
+主委原判「此屬防蓄意層」，**被 codex 修正**：
+> 「也可能由**非蓄意的合法同步變更**觸發」——合法新增簿記或讀取端時順手同步三處，
+> 即可**無意間**擴大授權。
+
+composer 補充：須同批改三處且經雙家族 review，屬**可見、可稽核**之協調行為，**非單鍵誤觸**
+⇒ 風險存在但不足以升級為阻斷。
+
+### 為何 repo 內無解
+
+> 任何 verifier、搬移位置或額外 hash，**若仍在 repo 內，都能被同一 commit 一併修改**。
+
+兩家皆**無法具名任何 repo 內、不需外部信任錨之閉合動作**。
+⇒ 若堅持 BLOCKING，等於「本 epic 永遠無法開工」，兩家皆不接受該後果。
+
+### 閉合條件（需 repo 外）
+
+**交付物不可修改之 trust anchor**：簽章／外部凍結基準／受保護之 CI verifier。
+
+### 閉合前已有之風險降低（**皆不提供不可自證性，不得宣稱已閉合**）
+
+`git log`／immutable commit-range 可稽核｜雙家族 review｜固定六項 expected-set｜
+hash-lock｜single-source check。
+
+### 誠實邊界
+
+本票**無機械綁定**。與 `票 B-43` 同屬「已知且具名接受之暴露面」。
