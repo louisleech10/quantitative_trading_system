@@ -1,15 +1,14 @@
 # Handoff
 
-REF:handoffs/reconcile/20260808-govb1-b3-review-r4/synth.md
-REF:handoffs/reconcile/20260808-govb1-b3-review-r3/synth.md
+REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
+REF:handoffs/reconcile/20260808-govb1-b3-review-r5/synth.md
 REF:handoffs/reconcile/20260808-govb1-b3-consult-r1/synth.md
 REF:handoffs/reconcile/20260808-govb1-b2-review-r7/synth.md
 
 🔴 **`REF:` 只准列「已戳記」之 reconcile——所有列。** 派工前一律
 `bash scripts/reconcile_stamps_check.sh <檔>` 驗 rc=0。
-⚠️ **`handoffs/reconcile/20260808-govb1-b3-review-r5/synth.md` 尚未戳記**
-（工作輸入，**非授權依據**，故不列於上）——戳記輪未派。
-（主委 2026-08-08 曾把它寫進 `REF:`，被 `verify_pretooluse` 當場擋下。**規則是機械的，註解不能豁免。**）
+（主委 2026-08-08 曾把未戳記檔寫進 `REF:` 並附註解說明，仍被 `verify_pretooluse` 當場擋下。
+**規則是機械的，註解不能豁免。**）
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-08 | **Branch**: main
 
@@ -30,24 +29,29 @@ REF:handoffs/reconcile/20260808-govb1-b2-review-r7/synth.md
 |---|---|
 | **B1** | ✅ 收案並 push（`0b4b576`） |
 | **B2** | ✅ **部分完成**收案並 push（`349626c`）；殘留 `票 B-45`／`B-46` |
-| **B3** | 🔄 實作已到 `67c86e0`；`review-r5` 判 **2 項 `REGRESSION`** 未修 |
+| **B3** | ✅ **收案**（`3e8490f`）——三家戳記；主委自跑全套閘 rc=0（12 條全 PASS） |
 | B4–B10 | ⬜ `B4(1.3) → B5(1.5) → B6(2.1→2.2) → B7(3.1→3.2) → B8(4.1) → B9(4.2) → B10(4.3)` |
 
-## ▶ 下一步（**照序**）
+## ▶ 下一步：**B4（Task 1.3 — `EXPECTED-DELTA:` 宣告）**
 
-1. **派 `b3-review-r5` 收斂檔之戳記輪**（三家；body sha256 現跑）
-   —— `gate.sh` 對 `--adversarial` 機器強制要戳記，未戳記派不出修補輪
-2. 戳記後**派 B3 修補輪 5**，兩項 `REGRESSION`：
-   - 行首錨定漏接 `1.`／`>`／`**…**`／`+` ⇒ 擴**有界**前綴集合（**禁開放式**）
-   - `_strip_code_fences` 未閉合 fence 吞至 EOF、縮排閉合不辨識 ⇒ **fail-closed**
-   🔴 **禁動 `_extract_cmds`**（兩家已確認閉合）；**禁以放寬解析器補償選列變窄**
-3. review → 戳記 → B3 收案 → 更新 `白話說明/` → commit + push
+照既定管線：**偵察（主委＋三家平行各產完整版）→ 收斂 → 三家戳記 → 實作 → 雙家族 review → 收斂 → 戳記 → 收案**。
 
-## 🔴 B3 收斂軌跡（供判斷是否該收）
+🔴 **B4 開工前必查**（B3 教訓）：
+- Task 1.3 之「修改∪新建」欄是否含 `scripts/govb1_final_gate.sh`／`test_govb1_contract_matrix.py`
+  等**共變檔**——若有共變而未列，須於 impl brief **明列為本批強制共變**（B3 之 `_g7` 即此例）
+- TODO §B 偽碼**已知四處不可執行**（`票 B-43`），brief 必附警告
+- `票 B-45` waiver **僅涵蓋 B3**；B4 若需觸及 kind case／五 harness，**須另取 waiver**
+
+## 🔴 B3 收斂軌跡（**六輪**，供 B4 起參照）
 
 ```
-review-r1: 4（守衛不生效） → r2: 4（邊界繞過） → r3: 1 → r4: 1+殘留 → r5: 2（皆 REGRESSION）
+review-r1: 4（守衛根本不生效） → r2: 4（邊界繞過；此輪定死停損條件）
+→ r3: 1（偶數巢狀） → r4: 1（討論語境誤擋）＋1 立票 → r5: 2（皆 REGRESSION）
+→ r6: 0 blocking ⇒ 收案
 ```
+
+**停損機制實際運作**：`SAME-CLASS-VARIANT` 轉殘留、`REGRESSION` 無例外須修、`NEW-CLASS` 逐案裁定
+——**未出現無限追逐**。
 
 **停損條件（`review-r2` 三家戳記定死）**：同一批元件再現**同類更刁鑽變體** ⇒ 轉具名殘留，不開新輪。
 🔴 **但 `REGRESSION` 無例外，一律須修。** 委員 findings **必標**
