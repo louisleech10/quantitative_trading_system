@@ -367,14 +367,32 @@ _has_trunc() {
   return 1
 }
 
+# 選列判準（review-r4 NEW-CLASS）——決定哪些列進解析器；**不得**改動 _extract_cmds。
+# ① 先剝 fenced code（```…```）
+# ② 錨定行首宣告：^[[:space:]]*[-*]?[[:space:]]*fact-verified:
+#    （允許前置空白／-／*；不允許行內任意位置；反引號內提及不匹配行首）
+# ③ count: 觸發改獨立 token（禁子字串誤匹配 max_count:／foo_count: 等）
+_FACT_VERIFIED_DECL_RE='^[[:space:]]*[-*]?[[:space:]]*fact-verified:'
+_COUNT_TOKEN_RE='(^|[^[:alnum:]_])count:'
+
+_select_fact_verified_decl_lines() {
+  # $1=brief_path → stdout=active 宣告列（已去 fence、已錨定行首）
+  _strip_code_fences < "$1" | grep -E "${_FACT_VERIFIED_DECL_RE}" || true
+}
+
+_line_has_count_token() {
+  # $1=line；count: 為獨立 token（前為行首或非 alnum/_）
+  printf '%s' "$1" | grep -qE "${_COUNT_TOKEN_RE}"
+}
+
 _check_fact_verified() {
   # $1=brief_path → rc 0=ok
   _brief_p="$1"
   _bad=0
   while IFS= read -r _line || [ -n "${_line}" ]; do
     [ -n "${_line}" ] || continue
-    # 規則①：僅明示 count: 標記
-    if printf '%s' "${_line}" | grep -q 'count:'; then
+    # 規則①：僅明示 count: 標記（獨立 token，非子字串）
+    if _line_has_count_token "${_line}"; then
       _cmds=""
       if ! _cmds="$(_extract_cmds "${_line}")"; then
         echo "ERROR: count: 宣稱之指令段須為成對反引號且不得為空"
@@ -407,7 +425,7 @@ EOF
         _bad=1
       fi
     fi
-  done < <(grep -E 'fact-verified:' "${_brief_p}" 2>/dev/null || true)
+  done < <(_select_fact_verified_decl_lines "${_brief_p}")
 
   [ "${_bad}" -eq 0 ]
 }

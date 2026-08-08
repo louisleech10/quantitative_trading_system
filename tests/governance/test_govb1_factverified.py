@@ -268,6 +268,114 @@ def test_t14_count_nested_even_inline_rc_2(tmp_path: Path) -> None:
     assert proc.returncode == 2, proc.stdout + proc.stderr
 
 
+# ── review-r4 NEW-CLASS：選列判準（錨定／fence／count token）────────
+
+
+def test_t14_discuss_context_not_selected_rc_zero() -> None:
+    """討論語境同時提及 fact-verified:＋count:（反引號內）⇒ 不進解析器 ⇒ rc=0。
+
+    主委事故重現：修前 rc=2 誤擋；修後須綠。
+    """
+    proc = _check(FIXTURE / "brief_factverified_discuss_context.md")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_t14_discuss_context_inline_rc_zero(tmp_path: Path) -> None:
+    """inline 討論列（非行首宣告）⇒ rc=0。"""
+    p = tmp_path / "discuss.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        "fact-verified: smoke → ok\n"
+        "assumed: test\n\n"
+        "討論語境：規則以 `fact-verified:` 與 `count:` 標記掃描整行。\n",
+        encoding="utf-8",
+    )
+    proc = _check(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_t14_fence_declaration_not_selected_rc_zero(tmp_path: Path) -> None:
+    """fence 內之 fact-verified 宣告樣式 ⇒ 不進解析器（含 head 截斷）⇒ rc=0。"""
+    p = tmp_path / "fence.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        "fact-verified: smoke → ok\n"
+        "assumed: test\n\n"
+        "```\n"
+        "fact-verified: count: 1 — `head -5 some.log` → 5\n"
+        "```\n",
+        encoding="utf-8",
+    )
+    proc = _check(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_t14_list_style_decl_still_checked(tmp_path: Path) -> None:
+    """行首 list 標記 `- fact-verified:` 仍為有效宣告；含 head ⇒ rc=2。"""
+    p = tmp_path / "list.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        "- fact-verified: count: 1 — `head -5 some.log` → 5\n"
+        "assumed: test\n",
+        encoding="utf-8",
+    )
+    proc = _check(p)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    out = proc.stdout + proc.stderr
+    assert "截斷" in out or "head" in out
+
+
+def test_t14_count_token_not_max_count_field(tmp_path: Path) -> None:
+    """max_count: 欄位名（含 head 指令）⇒ 非子字串 count: ⇒ 不進規則① ⇒ rc=0。"""
+    p = _write_consult(
+        tmp_path,
+        "max_count.md",
+        "fact-verified: max_count: 42 — `head -5 some.log` → preview only",
+    )
+    proc = _check(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_t14_count_token_not_counter_field(tmp_path: Path) -> None:
+    """counter: 欄位名（非計數語境）⇒ 不進規則① ⇒ rc=0。"""
+    p = _write_consult(
+        tmp_path,
+        "counter.md",
+        "fact-verified: counter: 7 — `head -5 some.log` → preview only",
+    )
+    proc = _check(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_t14_midline_factverified_not_selected(tmp_path: Path) -> None:
+    """行內任意位置 fact-verified:（非行首）⇒ 不選列；即使含 count:+head。"""
+    p = tmp_path / "mid.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        "fact-verified: smoke → ok\n"
+        "assumed: test\n\n"
+        "note: fact-verified: count: 1 — `head -5 x` → 5\n",
+        encoding="utf-8",
+    )
+    proc = _check(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_t14_decl_good_count_still_green(tmp_path: Path) -> None:
+    """行首正常宣告 ＋ 良構指令無截斷 ⇒ rc=0（選列收窄後不退化）。"""
+    p = _write_consult(
+        tmp_path,
+        "good.md",
+        "fact-verified: count: 1 — `wc -l some.log` → 3",
+    )
+    proc = _check(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 # ── M1 mutation ──────────────────────────────────────────────────
 
 
