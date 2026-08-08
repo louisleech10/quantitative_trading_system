@@ -191,6 +191,8 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         "doc_format_precheck.sh",
         "template_check.sh",
         "brief_conformance_check.sh",
+        # GOVB1 Task 1.1：brief-kind 白名單 SSOT（symlink 到 repo 實檔）
+        "govflow_lifecycle.json",
     ):
         (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
     link_python_env(repo)

@@ -17,10 +17,15 @@
 
 誠實邊界：本檔只驗「指示有送到委員手上」，**不驗委員真的照做**——
     後者由 `cx_run.sh` 交件當下的格式檢查（既有）把關，屬不同層。
+
+GOVB1 Task 1.1：findings-kind／selfcheck 改由 `govflow_lifecycle.json` 旗標驅動
+（`produces_findings`／`completeness_selfcheck`），不再硬編碼 `review|consult|closure` case。
+本檔改對 JSON 與 `_cx_kind_bool` 呼叫點做集合／錨點對齊，斷言強度不變。
 """
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -40,78 +45,75 @@ from test_cxrun_stamp_prompt import (  # noqa: E402  # type: ignore[import-not-f
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CX_RUN = REPO_ROOT / "scripts" / "cx_run.sh"
+LIFECYCLE = REPO_ROOT / "scripts" / "govflow_lifecycle.json"
 
 _SELFCHECK_ANCHOR = "completeness_check.sh --single"
-# 追加自檢指示的 case 分支錨點（mutation 用）。
-# 🔴 必須含下一行：`    review|consult|closure)` 在本腳本出現 **3 次**，
-#    只用該行做 replace 會改到第一個（stub 產生分支），mutation 就測不到本層。
-_SELFCHECK_CASE = (
-    "    review|consult|closure)\n"
-    '      prompt="${prompt} 寫完產出後'
+# 追加自檢指示的旗標呼叫錨點（mutation 用）。
+# 🔴 必須含下一行 prompt 擴充字串，避免誤改其他 _cx_kind_bool 呼叫。
+_SELFCHECK_CALL = (
+    '  if _cx_kind_bool "${_bk}" "completeness_selfcheck"; then\n'
+    '    prompt="${prompt} 寫完產出後'
 )
 
-# 「產 findings 的 kind」在 cx_run.sh 內有 **3 處**各自寫死的定義：
-#   ① stub 產生（CX_STUB_MODE=success 時寫最小合法 finding）
-#   ② _run_format_check_if_needed（實際跑格式檢查）
-#   ③ prompt 自檢指示（票 B-31 新增）
-# 三者語意相同：impl/stamp/dext 依契約無 canonical finding ID。
-_KIND_CASE_RE = re.compile(r'case "\$\{_bk\}" in\s*\n\s*([a-z|]+)\)')
-# 期望的契約內容（非只驗「三處相同」——三處一起改錯仍會全綠）
+# 「產 findings 的 kind」契約內容（非只驗「多處相同」——一起改錯仍會全綠）
 _EXPECTED_FINDINGS_KINDS = {"review", "consult", "closure"}
 
 
-def _all_findings_kind_sets(src: str) -> list[set[str]]:
-    """抽出所有「產 findings 的 kind」case 分支集合（排除 prompt 的 stamp|closure 分支）。"""
-    sets = [
-        set(m.group(1).split("|"))
-        for m in _KIND_CASE_RE.finditer(src)
-        if "review" in m.group(1)
-    ]
-    assert len(sets) >= 3, f"findings-kind case 錨點漂移：只找到 {len(sets)} 處，應 ≥3"
-    return sets
+def _json_kinds_with_flag(flag: str) -> set[str]:
+    data = json.loads(LIFECYCLE.read_text(encoding="utf-8"))
+    kinds = data["kinds"]
+    return {k for k, row in kinds.items() if row.get(flag) is True}
 
 
-def _kinds_getting_selfcheck(src: str) -> set[str]:
-    """從 prompt 追加段抽出「會收到自檢指示」的 kind 集合。"""
-    m = re.search(
-        r"case \"\$\{_bk\}\" in\s*\n\s*([a-z|]+)\)\s*\n\s*prompt=\"\$\{prompt\} 寫完產出後",
-        src,
+def _count_flag_calls(src: str, flag: str) -> int:
+    return len(
+        re.findall(
+            rf'_cx_kind_bool\s+"\$\{{_bk\}}"\s+"{re.escape(flag)}"',
+            src,
+        )
     )
-    assert m, "自檢指示 case 錨點漂移——須更新本測試"
-    return set(m.group(1).split("|"))
 
 
 def test_all_findings_kind_sets_agree() -> None:
-    """🔴 SSOT：「產 findings 的 kind」在腳本內的**每一處**定義必須完全相同。
+    """🔴 SSOT：「產 findings 的 kind」在 matrix 與 cx_run 消費點必須對齊。
 
     不一致的後果：
       - 自檢指示少了 → 該 kind 仍會 format-failed 後整份重跑（本票沒解到）
       - 自檢指示多了 → 叫 impl/stamp 委員跑一個對它們必然 vacuous 的檢查（製造新誤導）
       - stub 與格式檢查不一致 → 測試 harness 產出必然不合規的 stub
 
-    🔴 **本日（2026-08-06）已發生四次「同一概念多處定義不一致」**：
-    `completeness_check.sh:60` vs `:913`、`extract_heading_ids` vs `_validate_finding_body`、
-    收斂 body 邊界誤判、以及本處的三份 kind 集合。此測試把最後這組釘死。
+    Task 1.1 後三處皆讀同一 JSON 旗標；本測釘：
+      ① JSON produces_findings 集合 == 期望契約
+      ② completeness_selfcheck 集合 == produces_findings（現行五 kind 契約）
+      ③ cx_run 內 produces_findings 與 completeness_selfcheck 各有呼叫（無硬編碼 case 列表）
     """
     src = CX_RUN.read_text(encoding="utf-8")
-    sets = _all_findings_kind_sets(src)
-    assert all(s == sets[0] for s in sets), (
-        f"findings-kind 集合在腳本內漂移：{[sorted(s) for s in sets]}"
+    findings = _json_kinds_with_flag("produces_findings")
+    selfcheck = _json_kinds_with_flag("completeness_selfcheck")
+    assert findings == _EXPECTED_FINDINGS_KINDS, (
+        f"findings-kind 契約變更：期望 {sorted(_EXPECTED_FINDINGS_KINDS)}、實際 {sorted(findings)}。"
+        "若確為有意變更，請同步 govflow_lifecycle.json 與票 B-31 的處置欄。"
     )
-    assert _kinds_getting_selfcheck(src) == sets[0], "自檢指示的 kind 與其餘定義不一致"
-    # 🔴 只驗「三處相同」不夠——三處一起改錯仍全綠〔CODEX-R1-P2-03〕。
-    #    釘住期望內容：契約變更時本行必須被有意識地改，不能靜默漂移。
-    assert sets[0] == _EXPECTED_FINDINGS_KINDS, (
-        f"findings-kind 契約變更：期望 {sorted(_EXPECTED_FINDINGS_KINDS)}、實際 {sorted(sets[0])}。"
-        "若確為有意變更，請同步 _run_format_check_if_needed 的註解與票 B-31 的處置欄。"
+    assert selfcheck == findings, (
+        f"completeness_selfcheck {sorted(selfcheck)} != produces_findings {sorted(findings)}"
     )
+    n_findings = _count_flag_calls(src, "produces_findings")
+    n_self = _count_flag_calls(src, "completeness_selfcheck")
+    # stub + format_check 兩處 produces_findings；selfcheck 一處
+    assert n_findings >= 2, f"cx_run produces_findings 呼叫點過少：{n_findings}"
+    assert n_self >= 1, f"cx_run completeness_selfcheck 呼叫點過少：{n_self}"
+    # 禁殘留硬編碼 findings-kind case 列表（第二真相源）
+    assert not re.search(
+        r'case\s+"\$\{_bk\}"\s+in\s*\n\s*review\|consult\|closure\)',
+        src,
+    ), "cx_run 仍殘留硬編碼 review|consult|closure case（應改讀 matrix）"
 
 
 @pytest.mark.parametrize("kind", ["review", "consult", "closure"])
 def test_selfcheck_instruction_reaches_prompt(tmp_path: Path, kind: str) -> None:
     """會跑格式檢查的 kind，prompt 須含自檢指示（執行期驗證）。
 
-    🔴 `closure` 必須列入〔`CODEX-R1-P2-03`〕：它走 `stamp|closure` 那個 prompt 分支，
+    🔴 `closure` 必須列入〔`CODEX-R1-P2-03`〕：它走 stamp_prompt_inject 路徑，
     與 review/consult 不同路徑，只測前兩者會漏掉「STAMP 注入後自檢有沒有被覆蓋掉」。
     """
     h = _harness(tmp_path)
@@ -234,19 +236,20 @@ def test_selfcheck_catches_real_format_failure(tmp_path: Path) -> None:
 
 
 def test_mutation_removing_selfcheck_case_turns_red(tmp_path: Path) -> None:
-    """反向 mutation：把自檢 case 的 kind 集合改成恆不命中 ⇒ 指示消失。
+    """反向 mutation：把 completeness_selfcheck 呼叫改成恆不命中 ⇒ 指示消失。
 
     證明上面的斷言不是恆真——若腳本裡本來就沒這段，測試也該紅。
     """
     src = CX_RUN.read_text(encoding="utf-8")
-    assert _SELFCHECK_CASE in src, f"mutation 錨點漂移：{_SELFCHECK_CASE!r}"
-    # 只換 kind 集合、保留 prompt 行結構——否則會切掉 `prompt="` 的行頭造成語法錯，
+    assert _SELFCHECK_CALL in src, f"mutation 錨點漂移：{_SELFCHECK_CALL!r}"
+    # 只換條件、保留 prompt 行結構——否則會切掉 `prompt="` 的行頭造成語法錯，
     # 那樣測到的是「突變體壞掉」而非「本層失效」。
     mutant = tmp_path / "cx_run_mutant.sh"
     mutant.write_text(
         src.replace(
-            _SELFCHECK_CASE,
-            '    __never_matches__)\n      prompt="${prompt} 寫完產出後',
+            _SELFCHECK_CALL,
+            '  if false; then\n'
+            '    prompt="${prompt} 寫完產出後',
             1,
         ),
         encoding="utf-8",
@@ -255,5 +258,37 @@ def test_mutation_removing_selfcheck_case_turns_red(tmp_path: Path) -> None:
     assert syntax.returncode == 0, f"突變體語法錯誤: {syntax.stderr}"
 
     mutated_src = mutant.read_text(encoding="utf-8")
-    with pytest.raises(AssertionError):
-        _kinds_getting_selfcheck(mutated_src)
+    # 突變後：completeness_selfcheck 呼叫點應少於 production（被 false 取代）
+    assert _count_flag_calls(mutated_src, "completeness_selfcheck") < _count_flag_calls(
+        src, "completeness_selfcheck"
+    ), "mutation 未移除 completeness_selfcheck 呼叫"
+    # 執行期：review prompt 不再含自檢指示
+    h = _harness(tmp_path / "mut_run")
+    # 用突變體覆寫隔離副本
+    (h["scripts"] / "cx_run.sh").write_text(mutated_src, encoding="utf-8")
+    (h["scripts"] / "cx_run.sh").chmod(0o755)
+    _write_brief(h, kind="review")
+    rid = "b3133333-3333-4333-8333-333333333333"
+    _open_round(
+        h,
+        round_id=rid,
+        session="s-b31-mut",
+        fams=["codex"],
+        out_prefix="handoffs/b31m",
+        brief_rel="handoffs/brief.md",
+        task_id="GOVB31-MUT",
+    )
+    capture = h["root"] / "prompt.capture"
+    r = _run_cx(
+        h,
+        "codex",
+        "handoffs/brief.md",
+        "handoffs/b31m-codex.md",
+        round_id=rid,
+        env_overlay={"CX_PROMPT_CAPTURE": str(capture)},
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    prompt = capture.read_text(encoding="utf-8")
+    assert _SELFCHECK_ANCHOR not in prompt, (
+        "MUTATION 未轉紅：移除 selfcheck 後 prompt 仍含自檢指示"
+    )

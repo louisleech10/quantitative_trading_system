@@ -17,7 +17,46 @@
 #
 # ⚠️ 訊息輸出通道與抽出前**逐字相同**（brief-kind 段走 stdout、stamp-target 段走 stderr）。
 #    既有測試 tests/governance/test_stamp_taskid_inject.py 對兩者分別斷言，改通道＝弄紅既有測試。
+#
+# GOVB1 Task 1.1：brief-kind 白名單與 findings 前置旗標之**唯一真相源**＝
+#   scripts/govflow_lifecycle.json（禁本檔硬編碼 kind 列表或 fallback）。
 set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
+_LIFECYCLE_JSON="${SCRIPT_DIR}/govflow_lifecycle.json"
+
+# 讀 lifecycle matrix；缺檔／語法錯 ⇒ fail-closed，訊息含檔名。
+_lifecycle_json_ok() {
+  if [ ! -f "${_LIFECYCLE_JSON}" ]; then
+    echo "ERROR: lifecycle matrix 不存在: ${_LIFECYCLE_JSON}" >&2
+    return 1
+  fi
+  if ! jq empty "${_LIFECYCLE_JSON}" 2>/dev/null; then
+    echo "ERROR: lifecycle matrix JSON 語法錯: ${_LIFECYCLE_JSON}" >&2
+    return 1
+  fi
+  return 0
+}
+
+# 列出 kinds 的 key（stdout 每行一個）。JSON 不可用時 rc≠0。
+_valid_kinds() {
+  _lifecycle_json_ok || return 1
+  jq -r '.kinds | keys[]' "${_LIFECYCLE_JSON}"
+}
+
+# $1=kind → 是否為 matrix 合法 brief-kind。
+_bk_ok() {
+  _valid_kinds | grep -qx "$1"
+}
+
+# $1=kind $2=bool 欄名 → JSON 該欄 == true 時 rc=0。
+_kind_bool() {
+  _lifecycle_json_ok || return 1
+  jq -e --arg k "$1" --arg f "$2" '
+    .kinds[$k] as $row
+    | ($row | type == "object") and ($row[$f] == true)
+  ' "${_LIFECYCLE_JSON}" >/dev/null 2>&1
+}
 
 brief="${1:-}"
 emit_file=""
@@ -34,6 +73,9 @@ done
 [ -n "${brief}" ] || {
   echo "用法: bash scripts/brief_conformance_check.sh <brief_path> [--emit <kv_file>]" >&2; exit 2; }
 [ -f "${brief}" ] || { echo "ERROR: brief 檔不存在: ${brief}" >&2; exit 2; }
+
+# lifecycle 必須可讀（kind 白名單來源）；語法錯訊息含檔名。
+_lifecycle_json_ok || exit 2
 
 # ---------------------------------------------------------------------------
 # brief 合規閘 P1-1(2026-07-24 使用者定;防「手搓 brief 漏掉範本必填條款」)
@@ -61,33 +103,36 @@ if [ "${_bk_n}" -gt 1 ]; then
   exit 2
 fi
 _bk="$(printf '%s\n' "${_bk_all}" | head -1)"
+_allowed_kinds="$(_valid_kinds | paste -sd'|' -)"
 [ -n "${_bk}" ] || {
-  echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp"
-  echo "  (收集 findings 類=review/consult/closure,會另檢範本引用+前提宣告)"
+  echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ ${_allowed_kinds}"
+  echo "  (收集 findings 類=requires_template_and_premises 之 kind,會另檢範本引用+前提宣告)"
   exit 2
 }
-case "${_bk}" in
-  review|consult|closure)
-    # ① 強制引用委員範本(單一真相源承載 canonical ID/四欄/§0-§3/Verdict)
-    grep -qE 'SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT|COMMITTEE_SEMANTIC_REVIEW_TEMPLATE|COMMITTEE_FINDING_TEMPLATE' "${brief}" \
-      || { echo "ERROR: brief-kind=${_bk} 須**引用**委員範本(brief 內寫明 templates/<範本>.md 全文照做);"
-           echo "  範本承載 canonical finding 格式+§0挑戰前提+Verdict,不引用委員不會照格式 → completeness 抽不到。"
-           echo "  review/adversarial→SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT;語意審→COMMITTEE_SEMANTIC_REVIEW_TEMPLATE。"; exit 2; }
-    # ② 任務專屬前提宣告(範本給不了):至少各一條 fact-verified / assumed
-    #    逼 Claude 在寫 brief 當下攤開假設 → 錯誤前提死在筆下,不燒一輪委員(事故 C2)。
-    # grep -c 未命中時 stdout=0 但 rc=1;用 || true 吞 rc(勿再 echo 0,否則變多行 "0\n0" 致 [ 炸)。
-    _n_fact="$(grep -cE 'fact-verified:' "${brief}" 2>/dev/null || true)"
-    _n_assumed="$(grep -cE 'assumed:' "${brief}" 2>/dev/null || true)"
-    if [ "${_n_fact}" -lt 1 ] || [ "${_n_assumed}" -lt 1 ]; then
-      echo "ERROR: brief-kind=${_bk} 須含任務專屬**前提宣告**(範本 §0):逐條標 'fact-verified: <前提> → <查證>' 或 'assumed: <前提>'。"
-      echo "  現況:fact-verified=${_n_fact} assumed=${_n_assumed};**至少各 1 條**。"
-      echo "  '至少一條 assumed':宣稱零假設本身可疑(沒有 brief 真的零假設);逼你攤開可疑前提,否則錯前提被當 finding 帶回(C2)。"
-      exit 2
-    fi
-    ;;
-  impl|stamp) : ;;
-  *) echo "ERROR: 未知 brief-kind: ${_bk}(允許 review|consult|closure|impl|stamp)"; exit 2 ;;
-esac
+# kind 白名單＝govflow_lifecycle.json .kinds keys（禁硬編碼 fallback）
+if ! _bk_ok "${_bk}"; then
+  echo "ERROR: 未知 brief-kind: ${_bk}(允許 ${_allowed_kinds})"
+  exit 2
+fi
+# findings 前置（範本+前提）由 matrix 旗標 requires_template_and_premises 驅動
+if _kind_bool "${_bk}" "requires_template_and_premises"; then
+  # ① 強制引用委員範本(單一真相源承載 canonical ID/四欄/§0-§3/Verdict)
+  grep -qE 'SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT|COMMITTEE_SEMANTIC_REVIEW_TEMPLATE|COMMITTEE_FINDING_TEMPLATE' "${brief}" \
+    || { echo "ERROR: brief-kind=${_bk} 須**引用**委員範本(brief 內寫明 templates/<範本>.md 全文照做);"
+         echo "  範本承載 canonical finding 格式+§0挑戰前提+Verdict,不引用委員不會照格式 → completeness 抽不到。"
+         echo "  review/adversarial→SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT;語意審→COMMITTEE_SEMANTIC_REVIEW_TEMPLATE。"; exit 2; }
+  # ② 任務專屬前提宣告(範本給不了):至少各一條 fact-verified / assumed
+  #    逼 Claude 在寫 brief 當下攤開假設 → 錯誤前提死在筆下,不燒一輪委員(事故 C2)。
+  # grep -c 未命中時 stdout=0 但 rc=1;用 || true 吞 rc(勿再 echo 0,否則變多行 "0\n0" 致 [ 炸)。
+  _n_fact="$(grep -cE 'fact-verified:' "${brief}" 2>/dev/null || true)"
+  _n_assumed="$(grep -cE 'assumed:' "${brief}" 2>/dev/null || true)"
+  if [ "${_n_fact}" -lt 1 ] || [ "${_n_assumed}" -lt 1 ]; then
+    echo "ERROR: brief-kind=${_bk} 須含任務專屬**前提宣告**(範本 §0):逐條標 'fact-verified: <前提> → <查證>' 或 'assumed: <前提>'。"
+    echo "  現況:fact-verified=${_n_fact} assumed=${_n_assumed};**至少各 1 條**。"
+    echo "  '至少一條 assumed':宣稱零假設本身可疑(沒有 brief 真的零假設);逼你攤開可疑前提,否則錯前提被當 finding 帶回(C2)。"
+    exit 2
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # GOV-STAMP-TASKID-INJECT / D-001 §D3 defense-in-depth：brief-kind=stamp 驗證 stamp-target

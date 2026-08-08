@@ -51,6 +51,8 @@ _SCRIPT_NAMES = (
     "governance_families.sh",
     # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT（cx_run / committee_run 共用）
     "_role_gate.sh",
+    # GOVB1 Task 1.1：brief-kind 白名單 SSOT
+    "govflow_lifecycle.json",
 )
 
 
@@ -2376,10 +2378,11 @@ def test_mutation_v18_skip_missing_kind_turns_red(
     monkeypatch.setattr(_dph, "COMMITTEE_RUN_TARGET", h["scripts"] / "committee_run.sh")
 
     def drop_kind_guards(text: str) -> str:
+        # GOVB1 Task 1.1：缺 kind 訊息之允許集合改由 JSON 動態拼；unknown 改 _bk_ok 守衛。
         old1 = (
             '[ -n "${_bk}" ] || {\n'
-            "  echo \"ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp\"\n"
-            '  echo "  (收集 findings 類=review/consult/closure,會另檢範本引用+前提宣告)"\n'
+            '  echo "ERROR: brief 缺 \'brief-kind:\' 宣告。請於 brief 加一行,值 ∈ ${_allowed_kinds}"\n'
+            '  echo "  (收集 findings 類=requires_template_and_premises 之 kind,會另檢範本引用+前提宣告)"\n'
             "  exit 2\n"
             "}\n"
         )
@@ -2441,9 +2444,12 @@ _CR_BK_PREFIX_EXTRACT = (
     '_bk_all="$(grep -oE \'^brief-kind:[[:space:]]*[a-z]+\' "${brief}" 2>/dev/null '
     "| sed 's/.*:[[:space:]]*//' | sort -u)\""
 )
+# GOVB1 Task 1.1：unknown 改讀 govflow_lifecycle.json（_bk_ok），不再用 case * 硬編碼白名單。
 _CR_BK_UNKNOWN_CASE = (
-    '  *) echo "ERROR: 未知 brief-kind: ${_bk}'
-    '(允許 review|consult|closure|impl|stamp)"; exit 2 ;;\n'
+    'if ! _bk_ok "${_bk}"; then\n'
+    '  echo "ERROR: 未知 brief-kind: ${_bk}(允許 ${_allowed_kinds})"\n'
+    "  exit 2\n"
+    "fi\n"
 )
 
 

@@ -45,6 +45,8 @@ _SCRIPT_NAMES = (
     "debt_ledger.sh",
     "_debt_ledger_core.py",
     "completeness_check.sh",
+    # GOVB1 Task 1.1：brief-kind 白名單 SSOT
+    "govflow_lifecycle.json",
 )
 
 

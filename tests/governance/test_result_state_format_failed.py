@@ -81,6 +81,8 @@ def _harness(tmp_path: Path, *, kind: str = "review") -> dict:
         "_debt_ledger_core.py",
         # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT
         "_role_gate.sh",
+        # GOVB1 Task 1.1：brief-kind 白名單 SSOT
+        "govflow_lifecycle.json",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():
@@ -218,24 +220,25 @@ def _force_stub_bad_finding(scripts: Path) -> None:
     """隔離副本：findings-kind stub 改寫空殼 finding → completeness 必紅。"""
     path = scripts / "cx_run.sh"
     text = path.read_text(encoding="utf-8")
+    # Task 1.1：stub 改 if _cx_kind_bool produces_findings（縮排 4 空白，非 case 內 6）
     old = (
-        "      local fam_u\n"
-        "      fam_u=\"$(printf '%s' \"${fam}\" | tr '[:lower:]' '[:upper:]')\"\n"
-        "      {\n"
-        "        printf '## %s-R1-P2-01\\n\\n' \"${fam_u}\"\n"
-        "        printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\\n\\n'\n"
-        "        printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\\n\\n'\n"
-        "        printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\\n\\n' \"${fam}\"\n"
-        "        printf 'stub harness body\\n'\n"
-        "      } > \"${out}\"\n"
+        "    local fam_u\n"
+        "    fam_u=\"$(printf '%s' \"${fam}\" | tr '[:lower:]' '[:upper:]')\"\n"
+        "    {\n"
+        "      printf '## %s-R1-P2-01\\n\\n' \"${fam_u}\"\n"
+        "      printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\\n\\n'\n"
+        "      printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\\n\\n'\n"
+        "      printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\\n\\n' \"${fam}\"\n"
+        "      printf 'stub harness body\\n'\n"
+        "    } > \"${out}\"\n"
     )
     new = (
-        "      local fam_u\n"
-        "      fam_u=\"$(printf '%s' \"${fam}\" | tr '[:lower:]' '[:upper:]')\"\n"
-        "      {\n"
-        "        printf '## %s-R1-P0-01\\n\\n' \"${fam_u}\"\n"
-        "        printf 'empty shell — missing required fields\\n'\n"
-        "      } > \"${out}\"\n"
+        "    local fam_u\n"
+        "    fam_u=\"$(printf '%s' \"${fam}\" | tr '[:lower:]' '[:upper:]')\"\n"
+        "    {\n"
+        "      printf '## %s-R1-P0-01\\n\\n' \"${fam_u}\"\n"
+        "      printf 'empty shell — missing required fields\\n'\n"
+        "    } > \"${out}\"\n"
     )
     assert old in text, "stub success findings-kind anchor missing in isolated cx_run"
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
@@ -297,17 +300,18 @@ def _checker_missing_fail_open(scripts: Path) -> None:
     """隔離副本：checker 不存在時 fail-open（fmt_rc=0；M37）。"""
     path = scripts / "cx_run.sh"
     text = path.read_text(encoding="utf-8")
+    # Task 1.1：format check 改 if produces_findings 後縮排少 2
     old = (
-        '        if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then\n'
-        '          echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2\n'
-        "          _rc=127\n"
-        "        else\n"
+        '      if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then\n'
+        '        echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2\n'
+        "        _rc=127\n"
+        "      else\n"
     )
     new = (
-        '        if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then\n'
-        "          # MUTATED M37: fail-open when checker missing\n"
-        "          _rc=0\n"
-        "        else\n"
+        '      if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then\n'
+        "        # MUTATED M37: fail-open when checker missing\n"
+        "        _rc=0\n"
+        "      else\n"
     )
     assert old in text, "checker fail-closed anchor missing; cannot fail-open"
     path.write_text(text.replace(old, new, 1), encoding="utf-8")

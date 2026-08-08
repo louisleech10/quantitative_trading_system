@@ -20,6 +20,38 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 REPO="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# GOVB1 Task 1.1：brief-kind 集合與階段旗標之單一真相源（禁硬編碼 fallback）
+_LIFECYCLE_JSON="${SCRIPT_DIR}/govflow_lifecycle.json"
+
+_cx_lifecycle_ok() {
+  if [ ! -f "${_LIFECYCLE_JSON}" ]; then
+    echo "ERROR: lifecycle matrix 不存在: ${_LIFECYCLE_JSON}" >&2
+    return 1
+  fi
+  if ! jq empty "${_LIFECYCLE_JSON}" 2>/dev/null; then
+    echo "ERROR: lifecycle matrix JSON 語法錯: ${_LIFECYCLE_JSON}" >&2
+    return 1
+  fi
+  return 0
+}
+
+_cx_valid_kinds() {
+  _cx_lifecycle_ok || return 1
+  jq -r '.kinds | keys[]' "${_LIFECYCLE_JSON}"
+}
+
+_cx_bk_ok() {
+  _cx_valid_kinds | grep -qx "$1"
+}
+
+# $1=kind $2=bool 欄 → true 時 rc=0（findings／stamp inject／selfcheck 等）
+_cx_kind_bool() {
+  _cx_lifecycle_ok || return 1
+  jq -e --arg k "$1" --arg f "$2" '
+    .kinds[$k] as $row
+    | ($row | type == "object") and ($row[$f] == true)
+  ' "${_LIFECYCLE_JSON}" >/dev/null 2>&1
+}
 
 fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-xhigh}"
 [ -n "${fam}" ] && [ -n "${brief}" ] && [ -n "${out}" ] || {
@@ -358,22 +390,20 @@ _write_stub_success_output() {
   # CX_STUB_MODE=success：findings-kind 寫最小合法四欄 finding（裁定採①）；
   # impl/stamp 維持 stub-ok（不誤觸 format 檢查）。
   # 禁止 GOVERNANCE_TEST_HARNESS=1 時跳過格式檢查（SPEC 硬約束）。
-  case "${_bk}" in
-    review|consult|closure)
-      local fam_u
-      fam_u="$(printf '%s' "${fam}" | tr '[:lower:]' '[:upper:]')"
-      {
-        printf '## %s-R1-P2-01\n\n' "${fam_u}"
-        printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\n\n'
-        printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\n\n'
-        printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\n\n' "${fam}"
-        printf 'stub harness body\n'
-      } > "${out}"
-      ;;
-    *)
-      printf 'stub-ok family=%s\n' "${fam}" > "${out}"
-      ;;
-  esac
+  # findings-kind 判準＝govflow_lifecycle.json .kinds.*.produces_findings（禁硬編碼列舉）。
+  if _cx_kind_bool "${_bk}" "produces_findings"; then
+    local fam_u
+    fam_u="$(printf '%s' "${fam}" | tr '[:lower:]' '[:upper:]')"
+    {
+      printf '## %s-R1-P2-01\n\n' "${fam_u}"
+      printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\n\n'
+      printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\n\n'
+      printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\n\n' "${fam}"
+      printf 'stub harness body\n'
+    } > "${out}"
+  else
+    printf 'stub-ok family=%s\n' "${fam}" > "${out}"
+  fi
 }
 
 _run_format_check_if_needed() {
@@ -381,22 +411,21 @@ _run_format_check_if_needed() {
   # 只對 findings-kind 且 cli 成功且產出非空跑格式檢查。
   # 🔴 順序契約：本函式必須在 _emit_family_result 之前呼叫。
   # 不用全域／local 跨函式寫回——bash local 對子函式不可見。
+  # findings-kind 判準＝govflow_lifecycle.json .kinds.*.produces_findings。
   local _cli="$1"
   local _rc=0
-  case "${_bk}" in
-    review|consult|closure)
-      if [ "${_cli}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
-        local _cc="${SCRIPT_DIR}/completeness_check.sh"
-        # fail-closed：checker 不存在／不可讀／bash 無法執行 → 不得記 success
-        if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then
-          echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2
-          _rc=127
-        else
-          bash "${_cc}" --single "${out}" --family "${fam}" >&2 || _rc=$?
-        fi
+  if _cx_kind_bool "${_bk}" "produces_findings"; then
+    if [ "${_cli}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
+      local _cc="${SCRIPT_DIR}/completeness_check.sh"
+      # fail-closed：checker 不存在／不可讀／bash 無法執行 → 不得記 success
+      if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then
+        echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2
+        _rc=127
+      else
+        bash "${_cc}" --single "${out}" --family "${fam}" >&2 || _rc=$?
       fi
-      ;;
-  esac
+    fi
+  fi
   printf '%s' "${_rc}"
 }
 
@@ -509,30 +538,25 @@ _prepare_and_run() {
   # 白名單 SSOT＝_role_gate.sh（與 committee_run 共用；禁本檔再寫一份 regex）
   bash "${SCRIPT_DIR}/_role_gate.sh" check-task-id "${task_id}" || exit 2
   # 固定極簡 prompt + task-id 注入句（逐字，D-001 §D2）
-  # 預設列含 RECONCILE-STAMP 注入句（stamp|closure 使用）；字面須與
+  # stamp_prompt_inject=true 的 kind 含 RECONCILE-STAMP 注入句；字面須與
   # tests/governance/test_stamp_taskid_inject.py 的 _PROMPT_WITH_INJECT 錨點一致。
-  prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。"
-  # Task 1.1 / B-32：prompt 依既有 ${_bk}（brief_conformance --emit 第 1 行）分支。
-  # 禁再寫一份 brief-kind parser（committee_run 第二份 parser 曾造孤兒債）。
-  # stamp|closure → 保留注入句並補格式說明（格式 SSOT＝本檔 RECONCILE-STAMP 正則）。
-  # consult|review|impl|dext → 完全不提 RECONCILE-STAMP。
-  # 其餘 → fail-closed 拒派（無第三種行為）。
-  case "${_bk}" in
-    stamp|closure)
-      # 格式說明與下方 grep -qE RECONCILE-STAMP 正則機械一致（同一合法樣本須同時通過兩者）
-      prompt="${prompt} 戳記須為單獨一行（非 ## 標題），格式：RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<hash> task:<id>（sha256 與 task 兩欄可對調順序）。"
-      ;;
-    consult|review|impl|dext)
-      prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。"
-      ;;
-    *)
-      echo "ERROR: unknown brief-kind=${_bk}（fail-closed）" >&2
-      exit 1
-      ;;
-  esac
+  # Task 1.1 / B-32：prompt 依既有 ${_bk}（brief_conformance --emit 第 1 行）＋
+  # govflow_lifecycle.json 旗標分支。禁再寫一份 brief-kind parser；禁硬編碼 kind 白名單。
+  # 未知 kind → fail-closed（無第三種行為）。
+  if ! _cx_bk_ok "${_bk}"; then
+    echo "ERROR: unknown brief-kind=${_bk}（fail-closed）" >&2
+    exit 1
+  fi
+  if _cx_kind_bool "${_bk}" "stamp_prompt_inject"; then
+    prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。"
+    # 格式說明與下方 grep -qE RECONCILE-STAMP 正則機械一致（同一合法樣本須同時通過兩者）
+    prompt="${prompt} 戳記須為單獨一行（非 ## 標題），格式：RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<hash> task:<id>（sha256 與 task 兩欄可對調順序）。"
+  else
+    prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。"
+  fi
   # 票 B-31：對「會跑格式檢查的 kind」追加交件前自檢指示。
-  # kind 集合須與 _run_format_check_if_needed 一致（review|consult|closure）——
-  # impl／stamp／dext 依契約無 canonical finding ID，加了會誤導委員去跑必然 vacuous 的檢查。
+  # kind 集合須與 _run_format_check_if_needed 一致（matrix completeness_selfcheck /
+  # produces_findings）——非 findings-kind 依契約無 canonical finding ID，加了會誤導。
   #
   # 為何進 prompt 模板而非每份 brief 手寫（使用者定死「工具必須自帶強制機制，
   # 不准靠紀律和記憶」）：2026-08-06 GOVB39-B1-CONSULT R1 兩家皆 format-failed
@@ -559,11 +583,9 @@ _prepare_and_run() {
   #     實質 sentinel 收斂 → rc=0 ；source 端空殼 sentinel → rc=1 ；--single 空殼 → rc=1
   #   ⚠️ 本句同時取代主委 08-06 誤造的第三種格式（散文「本輪 0 findings」），
   #     避免與舊 P3-00 慣例並存造成三種寫法。
-  case "${_bk}" in
-    review|consult|closure)
-      prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
-      ;;
-  esac
+  if _cx_kind_bool "${_bk}" "completeness_selfcheck"; then
+    prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
+  fi
   _run_cli_and_emit
 }
 
