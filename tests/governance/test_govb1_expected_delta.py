@@ -87,15 +87,18 @@ def test_t_b4_2_unknown_only_name_fail_closed() -> None:
     assert "未知" in _out(proc) or "not-a-real-check" in _out(proc)
 
 
-def test_full_absent_rc_nonzero() -> None:
-    proc = _run(["bash", str(BRIEF_CONF), str(FIXTURE / "brief_impl_delta_absent.md")])
-    assert proc.returncode != 0, _out(proc)
-    assert "EXPECTED-DELTA" in _out(proc)
+def test_full_path_does_not_yet_enforce_expected_delta() -> None:
+    """階段 1：full path 暫不強制（B45 harness 死鎖）；--only／gate (c) 強制。
 
-
-def test_full_present_rc_zero() -> None:
-    proc = _run(["bash", str(BRIEF_CONF), str(FIXTURE / "brief_impl_delta_present.md")])
-    assert proc.returncode == 0, _out(proc)
+    主委擴大 scope 後應改回：absent full ⇒ rc≠0；present full ⇒ rc=0。
+    """
+    abs_p = _run(["bash", str(BRIEF_CONF), str(FIXTURE / "brief_impl_delta_absent.md")])
+    assert abs_p.returncode == 0, (
+        "階段 1 full path 不應因缺 EXPECTED-DELTA 擋 minimal impl（harness 共存）\n"
+        + _out(abs_p)
+    )
+    pres = _run(["bash", str(BRIEF_CONF), str(FIXTURE / "brief_impl_delta_present.md")])
+    assert pres.returncode == 0, _out(pres)
 
 
 # ── T-B4-1 mutation：移除非空檢查 ⇒ 空區塊轉綠 ─────────────────────

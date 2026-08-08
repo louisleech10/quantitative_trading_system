@@ -551,7 +551,12 @@ _check_id_pattern "${brief}" || exit 2
 # Task 1.4：fact-verified 兩機械規則
 _check_fact_verified "${brief}" || exit 2
 
-# Task 1.3：EXPECTED-DELTA（impl 必填非空；非 impl 跳過）
-_check_expected_delta "${brief}" || exit 2
+# Task 1.3 EXPECTED-DELTA：階段 1 **不**掛 full path。
+# 理由：full path 強制會打紅 _B45_HARNESS 四檔之 minimal impl brief，
+# 而 B4 窗禁觸 harness（test_waiver_b4_range_does_not_touch_forbidden）且
+# g7 scope 未 allow 那些檔。生產路徑強制改由：
+#   (c) gate --brief → --only expected-delta
+#   (e) committee_run 強制 append --brief
+# full path 併入待主委擴大 scope／harness 共變後（或階段後續 brief）。
 
 exit 0
