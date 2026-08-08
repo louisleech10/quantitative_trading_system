@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -408,6 +409,74 @@ def test_c1_missing_json_no_silent_write(tmp_path: Path) -> None:
     )
 
 
+def _count_tmpdir_files(td: Path) -> int:
+    return sum(1 for p in td.iterdir() if p.is_file())
+
+
+def test_c1_missing_json_no_temp_leak_brief_conf(tmp_path: Path) -> None:
+    """修3：缺 JSON 時 brief_conformance 呼叫前後 TMPDIR 檔數不變。"""
+    iso = tmp_path / "c1-leak-bc"
+    scripts = iso / "scripts"
+    scripts.mkdir(parents=True)
+    handoffs = iso / "handoffs"
+    handoffs.mkdir()
+    tdir = tmp_path / "tmpdir-bc"
+    tdir.mkdir()
+    shutil.copy2(BRIEF_CONF, scripts / "brief_conformance_check.sh")
+    (scripts / "brief_conformance_check.sh").chmod(0o755)
+    assert not (scripts / "govflow_lifecycle.json").exists()
+    (handoffs / "impl.md").write_text("brief-kind: impl\n\nstub\n", encoding="utf-8")
+    env = {**os.environ, "TMPDIR": str(tdir)}
+    before = _count_tmpdir_files(tdir)
+    r = _run(
+        ["bash", "scripts/brief_conformance_check.sh", "handoffs/impl.md"],
+        cwd=iso,
+        env=env,
+    )
+    after = _count_tmpdir_files(tdir)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert after == before, (
+        f"缺 JSON 不得洩漏 temp：before={before} after={after} "
+        f"files={list(tdir.iterdir())}"
+    )
+
+
+def test_c1_missing_json_no_temp_leak_cx_run_resolve(tmp_path: Path) -> None:
+    """修3：缺 JSON 時 cx_run lifecycle 路徑（ok／valid_kinds／bk_ok）TMPDIR 檔數不變。"""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir(parents=True)
+    tdir = tmp_path / "tmpdir-cx"
+    tdir.mkdir()
+    shutil.copy2(CX_RUN, scripts / "cx_run.sh")
+    # 完整 cx_run 需 ROUND_ID／audit；只載入 lifecycle 函式段驗證 temp 契約
+    cx_path = scripts / "cx_run.sh"
+    script = f"""
+set -u
+SCRIPT_DIR="{scripts}"
+eval "$(
+  awk '
+    /^_LIFECYCLE_JSON=/ {{keep=1}}
+    keep {{print}}
+    /^_cx_bk_ok\\(\\)/ {{inbk=1}}
+    inbk && /^}}/ {{print; exit}}
+  ' "{cx_path}"
+)"
+_cx_lifecycle_ok || exit 11
+_cx_valid_kinds >/dev/null || exit 12
+_cx_bk_ok impl || exit 13
+exit 0
+"""
+    env = {**os.environ, "TMPDIR": str(tdir)}
+    before = _count_tmpdir_files(tdir)
+    r = _run(["bash", "-c", script], env=env)
+    after = _count_tmpdir_files(tdir)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert after == before, (
+        f"cx_run lifecycle 缺 JSON 不得洩漏 temp：before={before} after={after} "
+        f"files={list(tdir.iterdir())}"
+    )
+
+
 def test_c2_lifecycle_embed_gate_pass() -> None:
     """C2 正向：embed ≡ 權威 JSON ⇒ lifecycle_embed 閘 PASS。"""
     r = _run(["bash", str(GATE), "--only", "lifecycle_embed"])
@@ -416,9 +485,26 @@ def test_c2_lifecycle_embed_gate_pass() -> None:
     assert "PASS lifecycle_embed" in r.stdout
 
 
-def test_c2_lifecycle_embed_mutation_turns_red() -> None:
-    """C2 mutation：改 embed 一字節 ⇒ lifecycle_embed 必須轉紅（禁只測現況綠）。"""
-    original = BRIEF_CONF.read_text(encoding="utf-8")
+def _iso_lifecycle_scripts(iso: Path) -> Path:
+    """副本目錄 scripts/：lifecycle_embed 所需四檔（實跑確認不需 frozen/manifest）。"""
+    scripts = iso / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    for name in (
+        "brief_conformance_check.sh",
+        "cx_run.sh",
+        "govflow_lifecycle.json",
+        "govb1_final_gate.sh",
+    ):
+        shutil.copy2(REPO / "scripts" / name, scripts / name)
+    return scripts
+
+
+def test_c2_lifecycle_embed_mutation_turns_red(tmp_path: Path) -> None:
+    """C2 mutation：改 embed 一字節 ⇒ lifecycle_embed 必須轉紅（production 零寫入）。"""
+    iso = tmp_path / "mut"
+    scripts = _iso_lifecycle_scripts(iso)
+    conf = scripts / "brief_conformance_check.sh"
+    original = conf.read_text(encoding="utf-8")
     m = re.search(r"_LIFECYCLE_EMBED_B64='([A-Za-z0-9+/=]+)'", original)
     assert m, "找不到 _LIFECYCLE_EMBED_B64"
     emb = m.group(1)
@@ -433,33 +519,30 @@ def test_c2_lifecycle_embed_mutation_turns_red() -> None:
         1,
     )
     assert mut != original
-    try:
-        BRIEF_CONF.write_text(mut, encoding="utf-8")
-        r = _run(["bash", str(GATE), "--only", "lifecycle_embed"])
-        out = r.stdout + r.stderr
-        assert r.returncode != 0, f"embed mutation 應使閘轉紅:\n{out}"
-        assert "lifecycle_embed" in out or "FAIL" in out
-    finally:
-        BRIEF_CONF.write_text(original, encoding="utf-8")
+    conf.write_text(mut, encoding="utf-8")
+    prod_before = BRIEF_CONF.read_text(encoding="utf-8")
+    r = _run(["bash", "scripts/govb1_final_gate.sh", "--only", "lifecycle_embed"], cwd=iso)
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, f"embed mutation 應使閘轉紅:\n{out}"
+    assert "lifecycle_embed" in out or "FAIL" in out
+    assert BRIEF_CONF.read_text(encoding="utf-8") == prod_before, (
+        "C2 mutation 不得改寫 production brief_conformance_check.sh"
+    )
 
 
-def test_c2_lifecycle_json_missing_gate_fails() -> None:
-    """C2：權威 JSON 不存在 ⇒ 閘 FAIL 且訊息含檔名（repo 層 fail-closed）。"""
-    bak_dir = REPO / ".claude" / "tmp"
-    bak_dir.mkdir(parents=True, exist_ok=True)
-    bak = bak_dir / "govflow_lifecycle.json.bak-c2-missing"
-    assert LIFECYCLE.is_file()
-    # 禁 rm：用 mv 暫移
-    shutil.move(str(LIFECYCLE), str(bak))
-    try:
-        assert not LIFECYCLE.exists()
-        r = _run(["bash", str(GATE), "--only", "lifecycle_embed"])
-        out = r.stdout + r.stderr
-        assert r.returncode != 0, f"缺 JSON 應 FAIL:\n{out}"
-        assert "govflow_lifecycle.json" in out
-    finally:
-        if bak.exists() and not LIFECYCLE.exists():
-            shutil.move(str(bak), str(LIFECYCLE))
-        elif bak.exists() and LIFECYCLE.exists():
-            # 若中途被重建，丟棄 bak（不覆蓋現況）
-            shutil.move(str(bak), str(bak_dir / "govflow_lifecycle.json.bak-c2-orphan"))
+def test_c2_lifecycle_json_missing_gate_fails(tmp_path: Path) -> None:
+    """C2：權威 JSON 不存在 ⇒ 閘 FAIL 且訊息含檔名（副本 mv；production 零寫入）。"""
+    iso = tmp_path / "missing"
+    scripts = _iso_lifecycle_scripts(iso)
+    json_path = scripts / "govflow_lifecycle.json"
+    assert json_path.is_file()
+    # 禁 rm：在副本目錄 mv
+    bak = tmp_path / "govflow_lifecycle.json.bak-c2-missing"
+    shutil.move(str(json_path), str(bak))
+    assert not json_path.exists()
+    assert LIFECYCLE.is_file(), "production JSON 必須仍在"
+    r = _run(["bash", "scripts/govb1_final_gate.sh", "--only", "lifecycle_embed"], cwd=iso)
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, f"缺 JSON 應 FAIL:\n{out}"
+    assert "govflow_lifecycle.json" in out
+    assert LIFECYCLE.is_file(), "production JSON 不得被移走"

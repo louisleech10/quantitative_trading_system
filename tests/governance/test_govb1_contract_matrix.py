@@ -1564,9 +1564,9 @@ def _g7_narrow_expiry_holds(*, batch3_started: bool, narrow_guard: bool) -> bool
     return not (batch3_started and narrow_guard)
 
 
-def _todo_task_section(task_id: str) -> str:
+def _todo_task_section(task_id: str, *, todo_text: str | None = None) -> str:
     """截取凍結 TODO 中 `### Task <id>` 至下一 `### Task`／檔尾。"""
-    text = TODO.read_text(encoding="utf-8")
+    text = TODO.read_text(encoding="utf-8") if todo_text is None else todo_text
     pat = re.compile(
         rf"^### Task {re.escape(task_id)}\b.*?(?=^### Task |\Z)",
         re.M | re.S,
@@ -1576,20 +1576,49 @@ def _todo_task_section(task_id: str) -> str:
     return m.group(0)
 
 
+def _todo_new_paths(task_id: str, *, section: str | None = None) -> set[str]:
+    """從 Task 區段解析「新建」欄內 backtick 路徑（機械可導出，非散文合取）。"""
+    sec = section if section is not None else _todo_task_section(task_id)
+    if "**新建**：" not in sec or "**只讀**" not in sec:
+        return set()
+    new_block = sec.split("**新建**：", 1)[1].split("**只讀**", 1)[0]
+    return {m.group(1) for m in re.finditer(r"`([^`]+)`", new_block)}
+
+
 def test_batch3_proxy_literals_anti_drift_in_todo() -> None:
-    """C3-a：_batch3_started 兩個 proxy 字串須逐字出現於 TODO Task 1.2／1.4「新建」欄。"""
-    s12 = _todo_task_section("1.2")
-    s14 = _todo_task_section("1.4")
-    assert "新建" in s12 and _BATCH3_PROXY_PATHS[0] in s12, (
+    """C3-a：_batch3_started 兩個 proxy 字串須落在 TODO Task 1.2／1.4「新建」欄。"""
+    assert _BATCH3_PROXY_PATHS[0] in _todo_new_paths("1.2"), (
         f"Task 1.2 新建欄須含 {_BATCH3_PROXY_PATHS[0]}"
     )
-    assert "新建" in s14 and _BATCH3_PROXY_PATHS[1] in s14, (
+    assert _BATCH3_PROXY_PATHS[1] in _todo_new_paths("1.4"), (
         f"Task 1.4 新建欄須含 {_BATCH3_PROXY_PATHS[1]}"
     )
     # 字串亦須為 _batch3_started 所引用（rename protection：改一側即紅）
     src = Path(__file__).read_text(encoding="utf-8")
     for p in _BATCH3_PROXY_PATHS:
         assert p in src
+
+
+def test_batch3_proxy_anti_drift_new_column_mutation_turns_red() -> None:
+    """C3-a mutation：proxy 移至「只讀」欄後 _todo_new_paths 必須轉紅（禁只測現況綠）。
+
+    舊斷言（「新建」∈section ∧ proxy∈section）在此 mutation 上仍綠——已由 review-r6 實跑。
+    """
+    proxy = _BATCH3_PROXY_PATHS[0]
+    s12 = _todo_task_section("1.2")
+    assert proxy in _todo_new_paths("1.2", section=s12)
+    head, rest = s12.split("**新建**：", 1)
+    new_b, ro = rest.split("**只讀**", 1)
+    new_b2 = new_b.replace(f"`{proxy}`", "")
+    if f"`{proxy}`" not in ro:
+        ro = f" `{proxy}`、" + ro
+    mut = head + "**新建**：" + new_b2 + "**只讀**" + ro
+    # 舊弱斷言仍綠（對照；證明必須綁「新建」欄）
+    assert "新建" in mut and proxy in mut
+    # 新強斷言必須轉紅
+    assert proxy not in _todo_new_paths("1.2", section=mut), (
+        "proxy 移出新建欄後 _todo_new_paths 仍命中＝假綠"
+    )
 
 
 # 批 3 開工時，**放寬 `_g7` 與更新到期測試須配對**；
@@ -1634,14 +1663,19 @@ def test_g7_narrow_guard_expiry_real_range_both_directions(tmp_path: Path) -> No
             env=env,
         )
 
-    assert g("init").returncode == 0
+    # 固定 sha1，避免 object-format=sha256 環境下 hex 長度 64 誤紅（修4）
+    assert g("init", "--object-format=sha1").returncode == 0
+    assert g("config", "user.name", "govb1-test").returncode == 0
+    assert g("config", "user.email", "govb1-test@example.invalid").returncode == 0
     # 部分 git 預設 branch 名 main；明確指定
     g("checkout", "-b", "main")
     (repo / "README").write_text("base\n", encoding="utf-8")
     assert g("add", "README").returncode == 0
     assert g("commit", "-m", "base").returncode == 0
-    base_sha = g("rev-parse", "HEAD").stdout.strip()
-    assert len(base_sha) == 40
+    rp = g("rev-parse", "--verify", "HEAD")
+    assert rp.returncode == 0, rp.stderr
+    base_sha = rp.stdout.strip()
+    assert base_sha, "rev-parse HEAD 須非空"
     assert not _batch3_started(base_sha, cwd=repo), "空 range 不得判批 3 開工"
 
     proxy = repo / _BATCH3_PROXY_PATHS[0]

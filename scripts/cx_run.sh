@@ -34,7 +34,8 @@ _cx_lifecycle_resolve() {
     printf '%s\n' "${_LIFECYCLE_JSON}"
     return 0
   fi
-  _tmp="$(mktemp)"
+  # 明確吃 TMPDIR（macOS bare mktemp 會忽略 TMPDIR；回歸測靠此）。
+  _tmp="$(mktemp "${TMPDIR:-/tmp}/govflow_lc.XXXXXX")"
   if ! printf '%s' "${_LIFECYCLE_EMBED_B64}" | base64 -d > "${_tmp}" 2>/dev/null; then
     echo "ERROR: lifecycle matrix 不存在: ${_LIFECYCLE_JSON}" >&2
     rm -f "${_tmp}"
@@ -47,17 +48,33 @@ _cx_lifecycle_resolve() {
   fi
   # 缺檔：只回傳 temp 路徑（唯讀物化）。禁止 cp 回 repo／隔離目錄（靜默寫檔＝假綠源）。
   # 「缺 JSON fail-closed」落在 govb1_final_gate lifecycle_embed 閘，不在此執行期。
+  # caller 必須在 jq 成功／失敗後 _cx_lifecycle_cleanup_if_temp（權威路徑 no-op）。
   printf '%s\n' "${_tmp}"
   return 0
 }
 
+# 權威檔路徑 no-op；temp 路徑一律 rm（成功與失敗路徑皆須呼叫）。
+_cx_lifecycle_cleanup_if_temp() {
+  _p="${1:-}"
+  [ -n "${_p}" ] || return 0
+  [ "${_p}" = "${_LIFECYCLE_JSON}" ] && return 0
+  rm -f "${_p}"
+}
+
 _cx_lifecycle_ok() {
-  _cx_lifecycle_resolve >/dev/null
+  _p="$(_cx_lifecycle_resolve)" || return 1
+  # resolve 已做 jq empty；此處只回收可能的 temp（勿 >/dev/null 丟 path）。
+  _cx_lifecycle_cleanup_if_temp "${_p}"
+  return 0
 }
 
 _cx_valid_kinds() {
   _p="$(_cx_lifecycle_resolve)" || return 1
-  jq -r '.kinds | keys[]' "${_p}"
+  _keys="$(jq -r '.kinds | keys[]' "${_p}")"
+  _rc=$?
+  _cx_lifecycle_cleanup_if_temp "${_p}"
+  [ "${_rc}" -eq 0 ] || return 1
+  printf '%s\n' "${_keys}"
 }
 
 _cx_bk_ok() {
