@@ -70,8 +70,10 @@ REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
 
 ## ▶ 下一步：**B5（Task 1.5）— 偵察已完成，四項待定案**
 
-**偵察收斂檔**：`handoffs/reconcile/20260809-govb1-b5-consult-r1/synth.md`（**尚未戳記**）
-三方獨立（codex／composer／主委），`grok` 因額度封鎖缺席。
+**偵察收斂檔**：`handoffs/reconcile/20260809-govb1-b5-consult-r1/synth.md`
+（body `sha256:5a2c61ac…29c5`；**codex／composer 皆 APPROVED**，
+🔴 **`grok` 因 403 額度封鎖缺席 ⇒ 只有 2/3，具名殘留 `R-14`，不得視為滿足三家**）
+三方獨立產出（codex／composer／主委平行）。
 
 ### 🔴 開工前必定案四項
 
@@ -88,8 +90,16 @@ REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
 
 ### 接手照序做
 
-1. 派該收斂檔之戳記輪（`grok` 封鎖 ⇒ 只能 2/3，比照 `R-14` 具名記錄）
-2. 定案四項後派 B5 impl
+1. ✅ **戳記輪已完成**（2/2 可用家族 APPROVED）
+2. **寫 B5 impl brief**，須先定死兩件事：
+   - **C 之封閉文法**：`SCOPE-CLAIM:<id> <subject> DERIVE:<executable command>`
+     （欄位／分隔／`<id>` 命名空間／`DERIVE:` 執行語意與失敗處置）
+     ⇒ 正向宣告，普通散文不觸發，凍結 SPEC/TODO 內無此行故不自鎖
+   - **`A` 之 `pending` 封閉條件**：命令與依賴可解析 ＋ Task 明示新建之路徑恰為 `ENOENT`；
+     其餘非零一律保留失敗
+3. 🔴 impl brief 另須明列：**`template_check.sh` 只得 append 新函式，禁重排／改寫既有行**
+   （`test_doc_format_precheck.py:385-433` 以原始碼子字串做 mutation，該檔不在 B5 scope 內）
+4. 🔴 **實作端**：`grok` 封鎖期間由主委自任，review 仍 codex＋composer 雙家族
 
 ## 🔴 具名殘留（**不得宣稱已閉合**）
 
