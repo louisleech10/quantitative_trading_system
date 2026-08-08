@@ -91,17 +91,7 @@ def test_semantic_template_reference_accepted(tmp_path: Path) -> None:
 
 # ---- impl/stamp 不誤擋 ----
 def test_impl_kind_not_required_to_have_finding_clauses(tmp_path: Path) -> None:
-    p = _run(
-        _brief(
-            tmp_path,
-            "brief-kind: impl",
-            "EXPECTED-DELTA:",
-            "- tests: brief_conformance impl path",
-            "",
-            "照 TODO 實作 B1",
-        ),
-        family="notafamily",
-    )
+    p = _run(_brief(tmp_path, "brief-kind: impl", "照 TODO 實作 B1"), family="notafamily")
     out = p.stdout + p.stderr
     assert "引用" not in out and "前提宣告" not in out
     assert "family 須為" in out
