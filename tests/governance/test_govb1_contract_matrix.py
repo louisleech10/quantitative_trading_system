@@ -2049,13 +2049,28 @@ def test_b4_forbidden_prefixes_removes_exactly_two() -> None:
     """B4 清單＝B-45 清單「僅移除二項必要共變」〔grok STAMP-R2 前提 3〕。
 
     機械斷言，杜絕日後順手多移一項而靜默失去保護。
-    mutation：把 _B4_ALLOWED_COVARIANT 多加一項 ⇒ 本測轉紅。
+    mutation：把 _B4_ALLOWED_COVARIANT 多加一項 ⇒ 本測轉紅（已實跑驗證）。
+
+    🔴 **oracle 必須是字面期望集合**：若改成
+    `removed == set(_B4_ALLOWED_COVARIANT)`，因 _B4_FORBIDDEN_PREFIXES 即由
+    _B4_ALLOWED_COVARIANT 導出，該式為**同義反覆恆真**——主委初版即犯此誤，
+    由 mutation probe 當場抓出（票 B-43 同型：檢查存在但恆真）。
     """
-    removed = set(_B45_FORBIDDEN_PREFIXES) - set(_B4_FORBIDDEN_PREFIXES)
-    assert removed == set(_B4_ALLOWED_COVARIANT), (
-        f"B4 清單僅得移除 {set(_B4_ALLOWED_COVARIANT)}，實際移除 {removed}"
+    # 字面凍結：B4 窗禁改前綴之期望值（committee STAMP-R2 定案）
+    expected_b4_forbidden = {
+        "scripts/govb1_scope.manifest",
+        "scripts/govb1_frozen_hashes.txt",
+        "docs/GOVB1_",
+    }
+    assert set(_B4_FORBIDDEN_PREFIXES) == expected_b4_forbidden, (
+        f"B4 禁改前綴漂移：want={expected_b4_forbidden} got={set(_B4_FORBIDDEN_PREFIXES)}"
     )
+    # 且必為 B-45 清單之真子集，僅少掉二項必要共變檔
     assert set(_B4_FORBIDDEN_PREFIXES) < set(_B45_FORBIDDEN_PREFIXES)
+    assert set(_B45_FORBIDDEN_PREFIXES) - set(_B4_FORBIDDEN_PREFIXES) == {
+        "scripts/cx_run.sh",
+        "scripts/govflow_lifecycle.json",
+    }
     # harness 清單於 B4 窗一項不得少（B4 直接沿用同一常數）
     assert len(_B45_HARNESS) == 5
 
@@ -2138,9 +2153,18 @@ def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
 
     # ── 封閉集擴為四 key 後之新用例〔20260808-GOVB1-B4-STAMP-R2〕 ──
     sha_a = "a" * 40
+    # 用例基底一律去掉 b4_start，使本測不受「錨點是否已寫入」影響（否則錨定後撞重複 key）
+    base3 = (
+        "\n".join(
+            ln
+            for ln in good.splitlines()
+            if ln.strip() and not ln.startswith("b4_start: ")
+        )
+        + "\n"
+    )
 
     # 正向：b4_start 為合法可選 key ⇒ 通過
-    with_b4 = good.rstrip("\n") + "\nb4_start: " + sha_a + "\n"
+    with_b4 = base3.rstrip("\n") + "\nb4_start: " + sha_a + "\n"
     parsed = _parse_frozen_hashes(with_b4)
     assert parsed["b4_start"] == sha_a
 
@@ -2171,7 +2195,7 @@ def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
         assert "錨鏈斷裂" in str(e), e
 
     # 反向 4：b4_start 值須為 40 hex
-    bad_len = good.rstrip("\n") + "\nb4_start: deadbeef\n"
+    bad_len = base3.rstrip("\n") + "\nb4_start: deadbeef\n"
     try:
         _parse_frozen_hashes(bad_len)
         raise AssertionError("b4_start 非 40 hex 應被拒")
