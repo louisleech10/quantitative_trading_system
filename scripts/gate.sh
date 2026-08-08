@@ -73,6 +73,7 @@ intent=""; risk=""; facts_asked=""; review_role=""; template=""; adversarial=""
 reconcile=""
 task_id=""; output_path=""
 file=""; template_opened=""; sections=""; spec=""; todo=""; manifest=""
+brief=""
 
 _norm_output_path() {
   "${VENV_PY}" - "$1" <<'PY'
@@ -194,6 +195,7 @@ while [ $# -gt 0 ]; do
     --spec)            spec="${2:-}"; shift 2 ;;
     --todo)            todo="${2:-}"; shift 2 ;;
     --manifest)        manifest="${2:-}"; shift 2 ;;
+    --brief)           brief="${2:-}"; shift 2 ;;
     *) echo "ERROR: 未預期參數 $1"; exit 1 ;;
   esac
 done
@@ -564,6 +566,23 @@ if [ "${kind}" = "dispatch" ]; then
           || { echo "ERROR: impl reconcile 未獲委員核可。委員須 append RECONCILE-STAMP APPROVED。"; exit 1; }
         ;;
     esac
+  fi
+
+  # -------------------------------------------------------------------------
+  # Task 1.3 (c)：--brief 有值時跑 EXPECTED-DELTA 閘（kind SSOT 在 checker 內，
+  #   與 _role_gate::_resolve_brief_kind → brief_conformance --emit 同一 SSOT 下層）。
+  # 非 impl ⇒ checker 回 0。階段 1 不強制缺 --brief（(d) 屬階段 2）。
+  # -------------------------------------------------------------------------
+  if [ -n "${brief}" ]; then
+    if [ ! -f "${brief}" ]; then
+      echo "ERROR: --brief 檔不存在: ${brief}" >&2
+      exit 1
+    fi
+    bash "${SCRIPT_DIR}/brief_conformance_check.sh" --only expected-delta "${brief}" \
+      || {
+        echo "GATE 拒發 token — brief-kind=impl 缺 EXPECTED-DELTA" >&2
+        exit 1
+      }
   fi
 
   # -------------------------------------------------------------------------

@@ -264,6 +264,9 @@ _open_debt() {
 }
 
 # --- 1) 開 gate token(fail-closed:沒過就不派、不開債) ---
+# Task 1.3 (e)：EXPECTED-DELTA 閘輸入 — 強制把 session brief 傳入 gate
+# （無此接線則 --brief 掛點空轉；票 B-29 / GROK-R13-P1-03）
+gate_args+=(--brief "${brief}")
 echo "[committee_run] === gate.sh dispatch ==="
 bash "${SCRIPT_DIR}/gate.sh" dispatch "${gate_args[@]}" || {
   echo "ERROR: gate 未放行 → 不開債、不派工(fail-closed)" >&2; exit 1; }

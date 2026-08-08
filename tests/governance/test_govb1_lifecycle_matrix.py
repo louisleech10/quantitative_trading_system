@@ -41,10 +41,35 @@ def _run(args: list[str], *, cwd: Path | None = None, **kw: object) -> subproces
     )
 
 
+# Task 1.3 超集 oracle：字面凍結常數（禁由受測 JSON keys 自導自演；票 B-43 同型）
+_LIFECYCLE_TOPLEVEL_REQUIRED = frozenset({"_doc", "kinds", "stages", "expected_delta"})
+
+
 def _json_kinds() -> set[str]:
     data = json.loads(LIFECYCLE.read_text(encoding="utf-8"))
     assert "kinds" in data and "stages" in data, "頂層須含 kinds 與 stages"
     return set(data["kinds"].keys())
+
+
+def test_toplevel_keys_superset_of_frozen_required() -> None:
+    """single-writer 超集：頂層 keys 須 ⊇ 字面凍結集合（含 expected_delta）。
+
+    mutation 契約（T-B4-5）：刪 stages ⇒ 轉紅；只新增 expected_delta ⇒ 綠（本斷言不擋超集擴張）。
+    """
+    data = json.loads(LIFECYCLE.read_text(encoding="utf-8"))
+    keys = set(data.keys())
+    missing = _LIFECYCLE_TOPLEVEL_REQUIRED - keys
+    assert not missing, f"lifecycle 頂層缺 keys: {sorted(missing)}（須 ⊇ {sorted(_LIFECYCLE_TOPLEVEL_REQUIRED)}）"
+
+
+def test_toplevel_keys_superset_mutation_delete_stages_fails(tmp_path: Path) -> None:
+    """T-B4-5：刪 stages key ⇒ 超集斷言轉紅。"""
+    data = json.loads(LIFECYCLE.read_text(encoding="utf-8"))
+    assert "stages" in data
+    del data["stages"]
+    keys = set(data.keys())
+    missing = _LIFECYCLE_TOPLEVEL_REQUIRED - keys
+    assert "stages" in missing
 
 
 def _kinds_via_jq_from_script(script: Path) -> set[str]:
@@ -85,6 +110,14 @@ def _runtime_accepted_kinds(conf: Path, lifecycle: Path, tmp: Path) -> set[str]:
             tgt = handoffs / "st-target.md"
             tgt.write_text("t\n", encoding="utf-8")
             body = f"brief-kind: stamp\nstamp-target: handoffs/st-target.md\n\nstub\n"
+        elif kind == "impl":
+            # Task 1.3：impl 須非空 EXPECTED-DELTA（否則 rc≠0，會誤從 accepted 集合剔除）
+            body = (
+                "brief-kind: impl\n\n"
+                "EXPECTED-DELTA:\n"
+                "- tests: runtime set probe\n\n"
+                "stub\n"
+            )
         else:
             body = f"brief-kind: {kind}\n\nstub\n"
         brief.write_text(body, encoding="utf-8")
@@ -285,7 +318,13 @@ def _minimal_brief(kind: str, handoffs: Path) -> Path:
             encoding="utf-8",
         )
     elif kind == "impl":
-        p.write_text("brief-kind: impl\n\nimpl smoke\n", encoding="utf-8")
+        p.write_text(
+            "brief-kind: impl\n\n"
+            "EXPECTED-DELTA:\n"
+            "- tests: u6 impl smoke\n\n"
+            "impl smoke\n",
+            encoding="utf-8",
+        )
     elif kind == "stamp":
         tgt = handoffs / "smoke-stamp-target.md"
         tgt.write_text("# target\n", encoding="utf-8")
@@ -397,7 +436,13 @@ def test_c1_missing_json_no_silent_write(tmp_path: Path) -> None:
     # 刻意不複製 JSON
     assert not (scripts / "govflow_lifecycle.json").exists()
     brief = handoffs / "impl.md"
-    brief.write_text("brief-kind: impl\n\nstub\n", encoding="utf-8")
+    brief.write_text(
+        "brief-kind: impl\n\n"
+        "EXPECTED-DELTA:\n"
+        "- tests: c1 silent-write probe\n\n"
+        "stub\n",
+        encoding="utf-8",
+    )
     r = _run(
         ["bash", "scripts/brief_conformance_check.sh", "handoffs/impl.md"],
         cwd=iso,
@@ -425,7 +470,13 @@ def test_c1_missing_json_no_temp_leak_brief_conf(tmp_path: Path) -> None:
     shutil.copy2(BRIEF_CONF, scripts / "brief_conformance_check.sh")
     (scripts / "brief_conformance_check.sh").chmod(0o755)
     assert not (scripts / "govflow_lifecycle.json").exists()
-    (handoffs / "impl.md").write_text("brief-kind: impl\n\nstub\n", encoding="utf-8")
+    (handoffs / "impl.md").write_text(
+        "brief-kind: impl\n\n"
+        "EXPECTED-DELTA:\n"
+        "- tests: c1 temp-leak probe\n\n"
+        "stub\n",
+        encoding="utf-8",
+    )
     env = {**os.environ, "TMPDIR": str(tdir)}
     before = _count_tmpdir_files(tdir)
     r = _run(

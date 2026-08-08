@@ -108,5 +108,14 @@
         "debt_clear": "見 debt_clear.preconditions"
       }
     }
+  },
+  "expected_delta": {
+    "_doc": "GOVB1 Task 1.3 — EXPECTED-DELTA: 區塊契約（票 B-29）。\n  brief-kind=impl 時 brief 須含行首 EXPECTED-DELTA: 且標題後至空行前有非空白內容。\n  非 impl 不適用（rc=0）。本節只定義存在性／非空；不實作前後對照比對（票 B-29 第 2 段）。\n  空區塊判定禁照抄 TODO 偽碼之 bracket class（D-D 範圍運算子使標題行恆命中＝票 B-43 第五例）。",
+    "header": "EXPECTED-DELTA:",
+    "required_for_kinds": [
+      "impl"
+    ],
+    "empty_body_fails": true,
+    "check_name": "expected-delta"
   }
 }

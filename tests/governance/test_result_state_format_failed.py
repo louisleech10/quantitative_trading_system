@@ -100,7 +100,12 @@ def _harness(tmp_path: Path, *, kind: str = "review") -> dict:
             "Phase 2 format-failed harness brief.\n"
         )
     elif kind == "impl":
-        brief_text = "brief-kind: impl\n\n照 TODO 實作 B2（impl 路徑行為不變）。\n"
+        brief_text = (
+            "brief-kind: impl\n\n"
+            "EXPECTED-DELTA:\n"
+            "- tests: result_state impl path\n\n"
+            "照 TODO 實作 B2（impl 路徑行為不變）。\n"
+        )
     elif kind == "stamp":
         brief_text = (
             "brief-kind: stamp\n"

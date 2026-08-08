@@ -113,7 +113,12 @@ def _harness(tmp_path: Path, *, kind: str = "review") -> dict:
             "Phase 3 role-gate harness brief.\n"
         )
     elif kind == "impl":
-        brief_text = "brief-kind: impl\n\n照 TODO 實作 B3（impl 角色閘）。\n"
+        brief_text = (
+            "brief-kind: impl\n\n"
+            "EXPECTED-DELTA:\n"
+            "- tests: rolegate impl probe\n\n"
+            "照 TODO 實作 B3（impl 角色閘）。\n"
+        )
     elif kind == "stamp":
         brief_text = (
             "brief-kind: stamp\n"

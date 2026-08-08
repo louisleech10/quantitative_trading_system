@@ -66,6 +66,8 @@ def test_t12_u3_impl_kind_skips_id_check(tmp_path: Path) -> None:
     p = tmp_path / "impl.md"
     p.write_text(
         "brief-kind: impl\n\n"
+        "EXPECTED-DELTA:\n"
+        "- tests: id pattern impl skip\n\n"
         "任務要求產出 `CODEX-B0R-P1-01`（不應擋）。\n",
         encoding="utf-8",
     )
@@ -167,7 +169,10 @@ def test_t12_m1_remove_findings_kind_gate_false_positive(tmp_path: Path) -> None
     shutil.copy2(COMPLETENESS, scripts / "completeness_check.sh")
     brief = tmp_path / "impl_b0r.md"
     brief.write_text(
-        "brief-kind: impl\n\n任務 `CODEX-B0R-P1-01`\n",
+        "brief-kind: impl\n\n"
+        "EXPECTED-DELTA:\n"
+        "- tests: id pattern mutation impl\n\n"
+        "任務 `CODEX-B0R-P1-01`\n",
         encoding="utf-8",
     )
     # production：impl 不擋

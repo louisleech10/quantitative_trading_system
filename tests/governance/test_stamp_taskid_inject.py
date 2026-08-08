@@ -203,6 +203,11 @@ def _write_brief(
         lines.append("fact-verified: unit-test → harness")
         lines.append("assumed: isolated env")
         lines.append("")
+    if kind == "impl":
+        # Task 1.3：impl 須非空 EXPECTED-DELTA
+        lines.append("EXPECTED-DELTA:")
+        lines.append("- tests: harness impl stub")
+        lines.append("")
     lines.append(extra_body or f"stub brief kind={kind}\n")
     path = h["handoffs"] / name
     path.write_text("\n".join(lines), encoding="utf-8")
