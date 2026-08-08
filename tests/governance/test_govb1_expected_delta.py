@@ -146,10 +146,17 @@ def test_t_b4_1_mutation_remove_nonempty_check_empty_turns_green(tmp_path: Path)
 
 
 def test_lifecycle_keys_include_expected_delta() -> None:
+    """頂層 keys 須 **⊇** 字面凍結集合（append-only 契約，**非** exact-equality）。
+
+    〔20260809-GOVB1-B4-REVIEW-R2 群集 4／CODEX-R2-P1-04〕
+    原版寫 `keys == [...]`：Task 4.2 新增 `zero_findings_contract` 節時**必然回歸**，
+    與 JSON 的 single-writer／append-only 契約矛盾。
+    """
+    required = {"_doc", "expected_delta", "kinds", "stages"}
     proc = _run(["jq", "-r", "keys[]", str(LIFECYCLE)])
     assert proc.returncode == 0, proc.stderr
-    keys = sorted(ln.strip() for ln in proc.stdout.splitlines() if ln.strip())
-    assert keys == ["_doc", "expected_delta", "kinds", "stages"], keys
+    keys = {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
+    assert required <= keys, f"lifecycle 頂層缺 keys: {sorted(required - keys)}"
 
 
 def test_lifecycle_embed_gate_pass() -> None:

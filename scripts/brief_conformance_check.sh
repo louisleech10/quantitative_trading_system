@@ -114,39 +114,94 @@ done
 # Task 1.3 — EXPECTED-DELTA: 存在性＋非空（票 B-29）
 # 空區塊判定：剔除標題行後再驗非空白（禁 TODO 偽碼 bracket class；票 B-43 第五例）
 # ---------------------------------------------------------------------------
-_check_expected_delta() {
-  # $1=brief_path → rc 0=ok；1=缺/空（訊息 stdout，與既有 ERROR 同通道）
-  _ed_brief="$1"
-  _ed_bk_all="$(grep -E '^brief-kind:' "${_ed_brief}" 2>/dev/null \
-    | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
-  _ed_bk_n="$(printf '%s\n' "${_ed_bk_all}" | grep -c '[^[:space:]]' || true)"
-  if [ "${_ed_bk_n}" -gt 1 ]; then
-    echo "ERROR: brief 有多個【不一致】的行首 'brief-kind:' 宣告: $(printf '%s' "${_ed_bk_all}" | tr '\n' ' ')"
+# ---------------------------------------------------------------------------
+# kind 解析（**本檔唯一 parser**）〔20260809-GOVB1-B4-REVIEW-R2 群集 1／CODEX-R2-P0-01
+#   REGRESSION：--only 捷徑原自行重解析 kind 且對缺失／未知一律回 0 放行〕
+# 設定全域 _bk；訊息走 stdout（與抽出前逐字相同，勿改通道）；rc≠0 ⇒ 呼叫端 exit 2。
+# **不用 command substitution 回傳**：否則錯誤訊息會被呼叫端吃掉。
+# 白名單驗證另由 _bk_ok（SSOT＝JSON kinds）執行——完整路徑在 kind case 區塊後驗，
+# --only 路徑於下方直接驗，兩者皆 fail-closed。
+# ---------------------------------------------------------------------------
+_resolve_kind_into_bk() {
+  _bk_all="$(grep -E '^brief-kind:' "${brief}" 2>/dev/null | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
+  _bk_n="$(printf '%s\n' "${_bk_all}" | grep -c '[^[:space:]]' || true)"
+  if [ "${_bk_n}" -gt 1 ]; then
+    echo "ERROR: brief 有多個【不一致】的行首 'brief-kind:' 宣告: $(printf '%s' "${_bk_all}" | tr '\n' ' ')"
+    echo "  (角色閘與 brief 合規閘都依此判定,歧義一律 fail-closed)"
     return 1
   fi
-  _ed_bk="$(printf '%s\n' "${_ed_bk_all}" | head -1)"
-  # 非 impl 不適用
-  [ "${_ed_bk}" = "impl" ] || return 0
-
-  if ! grep -qE '^EXPECTED-DELTA:' "${_ed_brief}"; then
-    echo "ERROR: brief-kind=impl 缺 EXPECTED-DELTA: 區塊"
+  _bk="$(printf '%s\n' "${_bk_all}" | head -1)"
+  # lifecycle 必須可解析（SSOT）；語法錯訊息含檔名
+  _lifecycle_json_ok || return 1
+  [ -n "${_bk}" ] || {
+    echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp"
+    echo "  (收集 findings 類=review/consult/closure,會另檢範本引用+前提宣告)"
     return 1
-  fi
-  # 區塊＝標題行至下一空行；剔除標題後須有非空白（勿用 [^[:space:]EXPECTED-DELTA:]）
-  if ! sed -n '/^EXPECTED-DELTA:/,/^$/p' "${_ed_brief}" \
-      | grep -vxF 'EXPECTED-DELTA:' \
-      | grep -qE '[^[:space:]]'; then
-    echo "ERROR: EXPECTED-DELTA: 區塊為空"
-    return 1
-  fi
+  }
   return 0
 }
 
+_check_expected_delta() {
+  # $1=brief_path  $2=**已通過白名單驗證**之 brief-kind
+  # 🔴 本函式不自行解析 kind（群集 1：自行重解析會繞過白名單 fail-closed）
+  # rc 0=ok；1=缺/空/重複（訊息 stdout，與既有 ERROR 同通道）
+  _ed_brief="$1"
+  _ed_kind="${2:-}"
+  [ "${_ed_kind}" = "impl" ] || return 0   # 非 impl 不適用
+
+  # 判準（**封閉可導出**，勿改成開放式啟發法）
+  # 〔群集 2／CODEX-R2-P1-02〕原判準之四個漏接：
+  #   ① CRLF：'EXPECTED-DELTA:\r' 剔不掉 ⇒ 標題行自己被當內容 ⇒ 空區塊恆過（票 B-43 同型）
+  #   ② 僅空白字元之行不終止區塊（sed 的 /^$/ 只匹配真正空行）
+  #   ③ 重複標題無判定
+  #   ④ code fence 內之標題被當成真宣告
+  # 現判準：
+  #   (1) 先 tr -d '\r' 正規化；(2) fence 行切換狀態且**終止**活動區塊，fence 內一律略過；
+  #   (3) 標題行須恰 1 條（0⇒缺、≥2⇒重複，皆 fail-closed）；
+  #   (4) 區塊＝標題行之後至第一個「僅空白字元」之行（或 EOF）；
+  #   (5) 非空 := 標題行冒號後有非空白 **或** 區塊內任一行含非空白。
+  _ed_verdict="$(tr -d '\r' < "${_ed_brief}" | awk '
+    BEGIN { infence = 0; hdr = 0; inblock = 0; body = 0; inline_body = 0 }
+    /^[[:space:]]*```/ { infence = 1 - infence; inblock = 0; next }
+    infence { next }
+    /^EXPECTED-DELTA:/ {
+      hdr = hdr + 1
+      rest = substr($0, 16)
+      gsub(/[[:space:]]/, "", rest)
+      if (rest != "") { inline_body = 1 }
+      inblock = 1
+      next
+    }
+    inblock && /^[[:space:]]*$/ { inblock = 0; next }
+    inblock { if ($0 ~ /[^[:space:]]/) { body = 1 } ; next }
+    END {
+      if (hdr == 0) { print "MISSING"; exit }
+      if (hdr > 1) { print "DUP"; exit }
+      if (body == 0 && inline_body == 0) { print "EMPTY"; exit }
+      print "OK"
+    }
+  ')"
+  case "${_ed_verdict}" in
+    OK)      return 0 ;;
+    MISSING) echo "ERROR: brief-kind=impl 缺 EXPECTED-DELTA: 區塊"; return 1 ;;
+    DUP)     echo "ERROR: EXPECTED-DELTA: 標題重複宣告(須恰 1 條,歧義一律 fail-closed)"; return 1 ;;
+    EMPTY)   echo "ERROR: EXPECTED-DELTA: 區塊為空"; return 1 ;;
+    *)       echo "ERROR: EXPECTED-DELTA: 判定器無輸出(fail-closed): ${_ed_verdict}"; return 1 ;;
+  esac
+}
+
 # --only 捷徑：只跑具名檢查（未知名 fail-closed；勿靜默跑全部）
+# 🔴 先做 kind 解析＋白名單驗證再分派〔群集 1〕：缺失／未知 kind 一律拒，
+#    否則 gate --brief 會放行非法 brief（與完整路徑判準不一致＝fail-open）。
 if [ -n "${only_check}" ]; then
+  _resolve_kind_into_bk || exit 2
+  if ! _bk_ok "${_bk}"; then
+    echo "ERROR: 未知 brief-kind: ${_bk}(允許 review|consult|closure|impl|stamp)"
+    exit 2
+  fi
   case "${only_check}" in
     expected-delta)
-      _check_expected_delta "${brief}" || exit 2
+      _check_expected_delta "${brief}" "${_bk}" || exit 2
       exit 0
       ;;
     *)
@@ -174,21 +229,9 @@ fi
 #    → 角色閘被繞過(非 implementer 可跑 impl)。此解析是角色閘的判定依據,故 fail-closed。
 # 完整擷取宣告值（行首 brief-kind: → 行尾，trim 尾隨空白），再整值比對白名單。
 # 禁止 grep -oE '...[a-z]+' 前綴擷取：stamp-evil 會被截成 stamp（與 committee_run 同步，CR2 群 E）。
-_bk_all="$(grep -E '^brief-kind:' "${brief}" 2>/dev/null | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
-_bk_n="$(printf '%s\n' "${_bk_all}" | grep -c '[^[:space:]]' || true)"
-if [ "${_bk_n}" -gt 1 ]; then
-  echo "ERROR: brief 有多個【不一致】的行首 'brief-kind:' 宣告: $(printf '%s' "${_bk_all}" | tr '\n' ' ')"
-  echo "  (角色閘與 brief 合規閘都依此判定,歧義一律 fail-closed)"
-  exit 2
-fi
-_bk="$(printf '%s\n' "${_bk_all}" | head -1)"
-# lifecycle 必須可解析（SSOT）；語法錯訊息含檔名
-_lifecycle_json_ok || exit 2
-[ -n "${_bk}" ] || {
-  echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp"
-  echo "  (收集 findings 類=review/consult/closure,會另檢範本引用+前提宣告)"
-  exit 2
-}
+# 🔴 解析改為呼叫**本檔唯一 parser** `_resolve_kind_into_bk`（見上）——
+#    與 --only 路徑共用同一實作，杜絕「兩份 kind parser 判準不一致」〔群集 1〕。
+_resolve_kind_into_bk || exit 2
 # 行為分支：findings 前置 + mutation 錨點（* 臂）。JSON SSOT 在 case 後對「命中 known arm」再驗。
 _case_known=0
 case "${_bk}" in

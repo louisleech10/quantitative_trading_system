@@ -51,25 +51,45 @@ def _json_kinds() -> set[str]:
     return set(data["kinds"].keys())
 
 
-def test_toplevel_keys_superset_of_frozen_required() -> None:
-    """single-writer 超集：頂層 keys 須 ⊇ 字面凍結集合（含 expected_delta）。
+def _assert_toplevel_superset(json_path: Path) -> None:
+    """**受測斷言本體（SUT）**：頂層 keys 須 ⊇ 字面凍結集合。
 
-    mutation 契約（T-B4-5）：刪 stages ⇒ 轉紅；只新增 expected_delta ⇒ 綠（本斷言不擋超集擴張）。
+    〔20260809-GOVB1-B4-REVIEW-R2 群集 4／CODEX-R2-P1-04〕
+    抽成函式的理由：mutation 測試必須**重跑同一個斷言**才算 production mutation；
+    原版在測試內 `del data` 後自行重算 `missing` 再斷言，等於**重算自己的公式**，
+    改壞 SUT 也不會轉紅。
     """
-    data = json.loads(LIFECYCLE.read_text(encoding="utf-8"))
-    keys = set(data.keys())
-    missing = _LIFECYCLE_TOPLEVEL_REQUIRED - keys
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    missing = _LIFECYCLE_TOPLEVEL_REQUIRED - set(data.keys())
     assert not missing, f"lifecycle 頂層缺 keys: {sorted(missing)}（須 ⊇ {sorted(_LIFECYCLE_TOPLEVEL_REQUIRED)}）"
 
 
+def test_toplevel_keys_superset_of_frozen_required() -> None:
+    """single-writer 超集：頂層 keys 須 ⊇ 字面凍結集合（含 expected_delta）。"""
+    _assert_toplevel_superset(LIFECYCLE)
+
+
 def test_toplevel_keys_superset_mutation_delete_stages_fails(tmp_path: Path) -> None:
-    """T-B4-5：刪 stages key ⇒ 超集斷言轉紅。"""
+    """T-B4-5 **真 mutation**：對隔離副本刪 stages，重跑**同一個受測斷言**須轉紅。"""
     data = json.loads(LIFECYCLE.read_text(encoding="utf-8"))
     assert "stages" in data
     del data["stages"]
-    keys = set(data.keys())
-    missing = _LIFECYCLE_TOPLEVEL_REQUIRED - keys
-    assert "stages" in missing
+    mutated = tmp_path / "govflow_lifecycle.json"
+    mutated.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    with pytest.raises(AssertionError, match="stages"):
+        _assert_toplevel_superset(mutated)
+
+
+def test_toplevel_keys_superset_allows_future_append(tmp_path: Path) -> None:
+    """append-only 契約：新增未來 Task 4.2 之 zero_findings_contract 節 ⇒ 仍須綠。
+
+    這條擋的是「把超集寫成 exact-equality」——那會在下一個 Task 新增節時必然回歸。
+    """
+    data = json.loads(LIFECYCLE.read_text(encoding="utf-8"))
+    data["zero_findings_contract"] = {"_doc": "future Task 4.2 probe（僅測試用，不寫回 production）"}
+    future = tmp_path / "govflow_lifecycle.json"
+    future.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _assert_toplevel_superset(future)
 
 
 def _kinds_via_jq_from_script(script: Path) -> set[str]:
