@@ -34,13 +34,24 @@ REF:handoffs/reconcile/20260808-govb1-b2-review-r7/synth.md
 
 ## ▶ 下一步：**B4（Task 1.3 — `EXPECTED-DELTA:` 宣告）**
 
-照既定管線：**偵察（主委＋三家平行各產完整版）→ 收斂 → 三家戳記 → 實作 → 雙家族 review → 收斂 → 戳記 → 收案**。
+**偵察已完成**（主委＋三家平行）：`handoffs/reconcile/20260808-govb1-b4-consult-r1/synth.md`
+——**尚未戳記**（工作輸入，非授權依據）。
 
-🔴 **B4 開工前必查**（B3 教訓）：
-- Task 1.3 之「修改∪新建」欄是否含 `scripts/govb1_final_gate.sh`／`test_govb1_contract_matrix.py`
-  等**共變檔**——若有共變而未列，須於 impl brief **明列為本批強制共變**（B3 之 `_g7` 即此例）
-- TODO §B 偽碼**已知四處不可執行**（`票 B-43`），brief 必附警告
-- `票 B-45` waiver **僅涵蓋 B3**；B4 若需觸及 kind case／五 harness，**須另取 waiver**
+### 接手照序做
+
+1. **派該收斂檔之三家戳記輪**（body sha256 現跑）
+2. 戳記後**派 B4 impl**，須先定案下列 **六項**（皆已四方確認）：
+
+| # | 事項 |
+|---|---|
+| `P0` | TODO 空區塊判定**恆真**（`D-D` 被當範圍運算子 ⇒ literal `-` 未排除 ⇒ 標題行恆命中）。`票 B-43` 第五例。修法須附「移除檢查後空區塊用例轉綠」之 mutation |
+| `P0` | `brief_conformance_check.sh --only` 與 `gate.sh` `_brief_kind()` **皆不存在**（實跑各 0）——須先建掛點；🔴 **禁在 `gate.sh` 另寫第二份 kind parser** |
+| `P0` | **`--spec` 非 impl 可靠判準**（codex 更正主委）——(d) 以 `--spec` 為代理會留 bypass |
+| `P0` | `scripts/cx_run.sh` **為必改共變檔但未列 Task 欄**（新增 JSON 節 ⇒ 兩支 embed 皆須更新） |
+| `P0` | 🔴 **B3 waiver 測試以 `b3_start..HEAD` 開放區間持續生效，禁改 `cx_run.sh`／`govflow_lifecycle.json` ⇒ 會擋住 B4**（**第四次結構性死鎖**）。須**主委撰寫 `b4_start` 錨點**收斂區間；**禁實作端自行放寬** |
+| `P1` | 交付順序須分階段：`--brief`＋(c) 先落地 → 主委改派工慣例實測 → **最後**才啟用 (d)。同批交付會使主委派不出工 |
+
+另 `P1`：single-writer superset **無機械強制**，B4 擇一（補強制或立票），**須明說選哪個**。
 
 ## 🔴 B3 收斂軌跡（**六輪**，供 B4 起參照）
 
