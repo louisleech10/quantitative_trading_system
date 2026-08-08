@@ -1,8 +1,8 @@
 """GOVB1 Task 1.3 — EXPECTED-DELTA: 宣告閘（票 B-29）。
 
-階段 1 覆蓋：空區塊修正、--only、gate --brief+(c)、committee_run (e)、
+階段 1：空區塊修正、--only、gate --brief+(c)、committee_run (e)、
 lifecycle expected_delta 節＋embed、superset 超集（見 lifecycle_matrix）。
-階段 2 (d) fail-closed 不在本檔（主委實測後另 commit）。
+階段 2：(d) fail-closed —— 一切 dispatch 皆須 --brief（同時關閉 R-11／R-12）。
 """
 
 from __future__ import annotations
@@ -308,13 +308,64 @@ def test_gate_accepts_brief_flag_in_parser() -> None:
     assert re.search(r"--brief\)\s+brief=", src), "gate 缺 --brief case"
 
 
-def test_stage1_does_not_enable_d_fail_closed() -> None:
-    """階段 1 禁啟 (d)：缺 --brief 的 impl(--spec) 不得因 brief 被 miss。"""
+def test_d_must_not_use_spec_as_impl_proxy() -> None:
+    """🔴 **永久規則**：(d) 之觸發條件禁以 `--spec` 為 impl 之代理。
+
+    〔`CODEX-R1-P0-03`〕audit 實測：31 筆 impl round 中 `spec` 空值 **8 筆（25.8%）**
+    ⇒ 以 `--spec` 圈定會讓那 8 筆**完全繞過**。
+
+    本測原名 `test_stage1_does_not_enable_d_fail_closed`（階段 1 禁啟 (d)）；
+    階段 2 落地後，其 regex 實際擋的是「`--spec` 代理版 (d)」——那是**永久禁令**，
+    故正名。**不是**禁止 (d) 本身。
+    """
     src = GATE.read_text(encoding="utf-8")
-    # (d) 特徵：spec 非空且 brief 空時 miss brief
     banned = re.search(
         r'\[ -n "\$\{spec\}" \].*\[ -z "\$\{brief\}" \].*miss brief',
         src,
         re.S,
     )
-    assert banned is None, "階段 1 不應含 (d) miss brief 邏輯"
+    assert banned is None, "(d) 不得以 --spec 為 impl 判準之代理（25.8% 會繞過）"
+
+
+# ── 階段 2：(d) fail-closed ──────────────────────────────────────────
+
+
+def test_t13_n1_dispatch_without_brief_is_rejected() -> None:
+    """`T-1.3-N1`：一切 dispatch 缺 `--brief` ⇒ 拒發 token，**且須歸因**。
+
+    🔴 **歸因不可省**：未知參數／缺其他必填欄同樣是非零，只斷 `rc!=0`
+    會讓「掛點根本沒跑」也算通過。故另斷輸出含 `--brief`。
+    """
+    proc = _run([
+        "bash", str(GATE), "dispatch",
+        "--task-id", "20260809-GOVB1-B4-PROBE-N1",
+        "--risk", "low", "--intent", "probe",
+        "--facts-asked", "probe", "--review-role", "probe",
+        "--template", "n/a:probe",
+    ])
+    assert proc.returncode != 0, "缺 --brief 應拒發 token\n" + _out(proc)
+    assert "--brief" in (proc.stdout + proc.stderr), (
+        "拒發須歸因於 --brief（否則證明不了是 (d) 擋的）\n" + _out(proc)
+    )
+
+
+def test_d_block_present_and_unconditional() -> None:
+    """(d) 之守衛須為**無條件**（所有 dispatch），非只在某類派工才檢查。
+
+    mutation 契約：把 `if [ -z "${brief}" ]` 改成任何帶前提之條件 ⇒ 本測轉紅。
+    """
+    src = GATE.read_text(encoding="utf-8")
+    assert re.search(r'\n  if \[ -z "\$\{brief\}" \]; then\n    miss brief ', src), (
+        "(d) 守衛須為無條件 `if [ -z \"${brief}\" ]; then miss brief`"
+    )
+
+
+def test_committee_run_still_dispatchable_under_d() -> None:
+    """🔴 **反向風險**：(d) 落地後主委仍須派得出工，否則無人能修 B4（`票 B-45` 同型）。
+
+    `committee_run.sh` 必須無條件 append `--brief`；移除該行 ⇒ 所有派工被 (d) 擋死。
+    """
+    src = COMMITTEE_RUN.read_text(encoding="utf-8")
+    assert 'gate_args+=(--brief "${brief}")' in src, (
+        "committee_run 必須 append --brief，否則 (d) 落地後主委派不出任何工"
+    )

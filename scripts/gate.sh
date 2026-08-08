@@ -551,6 +551,26 @@ if [ "${kind}" = "dispatch" ]; then
       ;;
   esac
 
+  # -------------------------------------------------------------------------
+  # Task 1.3 (d)：**階段 2 fail-closed** —— 一切 dispatch 皆須 `--brief`（票 B-29）
+  #
+  # 🔴 觸發條件**不以 `--spec` 為代理**〔CODEX-R1-P0-03；audit 實測 31 筆 impl round 中
+  #    `spec` 空值 8 筆＝25.8% 會完全繞過〕。改為「所有 dispatch 皆須 --brief」：
+  #    kind 一律由 brief 解析（SSOT＝brief_conformance_check.sh），
+  #    impl 之 EXPECTED-DELTA 由上方 (c) 掛點強制；非 impl 之 checker 回 0，不誤擋。
+  #
+  # 一併關閉具名殘留：
+  #   R-11 full path 未掛 checker —— 生產強制改由本條 ＋ (c) 承擔，不再依賴 full path
+  #   R-12 scripts/dispatch.sh 不 append `--brief` —— 該路徑現亦被本條擋下
+  #        （dispatch.sh 以 args+=("$1") 透傳未知旗標，呼叫端補 --brief 即可）
+  #
+  # 🔴 分階段交付之理由（`票 B-45` 同型）：本條若與 (c) 同批落地，
+  #    主委將因派不出工而無法修 B4 —— 故階段 1 先落地 (c)＋(e) 並實測多輪，本條才啟用。
+  # -------------------------------------------------------------------------
+  if [ -z "${brief}" ]; then
+    miss brief "所有 dispatch 皆須 --brief（brief-kind SSOT 與 EXPECTED-DELTA 閘之輸入；票 B-29 Task 1.3 (d)）"
+  fi
+
   # V-C：impl(--spec) 一律須顯式 session reconcile（不論 risk）；V-M：stamp 依 reconcile 非 waived 觸發，與 adversarial 無關
   if [ -n "${spec}" ]; then
     case "${reconcile}" in
