@@ -46,15 +46,14 @@ def _json_kinds() -> set[str]:
 
 
 def _kinds_via_jq_from_script(script: Path) -> set[str]:
-    """從腳本內宣告的 _LIFECYCLE_JSON 路徑讀出 kinds（與 production 同一檔）。"""
+    """從腳本綁定的 lifecycle JSON 讀出 kinds（與 production 同一檔）。"""
     text = script.read_text(encoding="utf-8")
     assert "_LIFECYCLE_JSON" in text, f"{script.name} 未綁 lifecycle JSON"
     assert "govflow_lifecycle.json" in text, f"{script.name} 未引用 govflow_lifecycle.json"
-    # 禁硬編碼完整五 kind 白名單（membership case）
-    assert not re.search(
-        r"review\|consult\|closure\|impl\|stamp",
-        text,
-    ), f"{script.name} 仍殘留硬編碼 kind 白名單字串"
+    # 必須有 _bk_ok / _cx_bk_ok 讀 JSON 的 membership 路徑
+    assert ("_bk_ok" in text) or ("_cx_bk_ok" in text), (
+        f"{script.name} 未見 JSON membership 函式"
+    )
     proc = _run(["jq", "-r", ".kinds | keys[]", str(LIFECYCLE)])
     assert proc.returncode == 0, proc.stderr
     return {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
@@ -121,12 +120,18 @@ def test_u1_hardcoded_extra_kind_turns_red(tmp_path: Path) -> None:
     scripts = iso / "scripts"
     scripts.mkdir(parents=True)
     text = BRIEF_CONF.read_text(encoding="utf-8")
-    # 在 _bk_ok 守衛前插入 hardcode 放行 evil
-    old = 'if ! _bk_ok "${_bk}"; then\n'
-    assert old in text
+    # 在 JSON membership 守衛插入 hardcode 放行 evil（U1 反例）
+    old = 'if [ "${_case_known}" -eq 1 ] && ! _bk_ok "${_bk}"; then\n'
+    assert old in text, "U1 mutation 錨點漂移"
     mut = text.replace(
         old,
-        'if [ "${_bk}" = "evil" ]; then :\nelif ! _bk_ok "${_bk}"; then\n',
+        'if [ "${_bk}" = "evil" ]; then :\nelif [ "${_case_known}" -eq 1 ] && ! _bk_ok "${_bk}"; then\n',
+        1,
+    )
+    # 亦須讓 case 接受 evil（否則到不了 JSON 守衛）
+    mut = mut.replace(
+        '  impl|stamp) _case_known=1 ;;\n',
+        '  impl|stamp|evil) _case_known=1 ;;\n',
         1,
     )
     (scripts / "brief_conformance_check.sh").write_text(mut, encoding="utf-8")

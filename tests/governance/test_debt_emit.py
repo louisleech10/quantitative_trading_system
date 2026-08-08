@@ -2317,8 +2317,6 @@ def _b3_harness(tmp_path: Path) -> dict:
         "brief_conformance_check.sh",
         # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT
         "_role_gate.sh",
-        # GOVB1 Task 1.1：brief-kind 白名單 SSOT
-        "govflow_lifecycle.json",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():

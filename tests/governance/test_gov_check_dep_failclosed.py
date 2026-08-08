@@ -38,7 +38,7 @@ def _iso_repo(tmp_path: Path) -> Path:
         dst = root / "scripts" / src.name
         shutil.copy2(src, dst)
         dst.chmod(0o755)
-    for extra in ("template_lifecycle_legacy.txt", "govflow_lifecycle.json"):
+    for extra in ("template_lifecycle_legacy.txt",):
         s = REPO_ROOT / "scripts" / extra
         if s.is_file():
             shutil.copy2(s, root / "scripts" / extra)

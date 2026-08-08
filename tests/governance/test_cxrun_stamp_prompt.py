@@ -42,8 +42,6 @@ _SCRIPT_NAMES = (
     "brief_conformance_check.sh",
     "completeness_check.sh",
     "_role_gate.sh",
-    # GOVB1 Task 1.1：brief-kind 白名單 SSOT；缺檔 → brief_conformance / cx_run fail-closed
-    "govflow_lifecycle.json",
 )
 
 
@@ -375,29 +373,21 @@ def test_11_unknown_nosideeffect(tmp_path: Path) -> None:
 
 
 def test_11_unknown_cx_case_defense(tmp_path: Path) -> None:
-    """defense-in-depth：brief_conformance 放行後，cx_run _cx_bk_ok 仍拒 unknown。
+    """defense-in-depth：brief_conformance 放行後，cx_run case * 仍拒 unknown。
 
-    fail-closed 在 _prepare_and_run 內、前置條件之後，故須先開債。
+    * 分支在 _prepare_and_run 內、前置條件之後，故須先開債。
     """
     h = _harness(tmp_path)
-    # 放寬 brief_conformance 白名單，讓 bogus 通過（Task 1.1：_bk_ok 讀 JSON）
+    # 放寬 brief_conformance 白名單，讓 bogus 通過
     bc = h["scripts"] / "brief_conformance_check.sh"
     text = bc.read_text(encoding="utf-8")
     m = re.search(
-        r'if ! _bk_ok "\$\{_bk\}"; then\n'
-        r'  echo "ERROR: 未知 brief-kind: \$\{_bk\}\(允許 \$\{_allowed_kinds\}\)"\n'
-        r"  exit 2\n"
-        r"fi\n",
+        r'  \*\) echo "ERROR: 未知 brief-kind:[^"]+"; exit 2 ;;',
         text,
     )
-    assert m, "brief_conformance _bk_ok 守衛錨點漂移"
+    assert m, "brief_conformance unknown case 錨點漂移"
     bc.write_text(
-        text[: m.start()]
-        + 'if [ "${_bk}" = "bogus" ] || _bk_ok "${_bk}"; then :; else\n'
-        + '  echo "ERROR: 未知 brief-kind: ${_bk}(允許 ${_allowed_kinds})"\n'
-        + "  exit 2\n"
-        + "fi\n"
-        + text[m.end() :],
+        text[: m.start()] + "  bogus) : ;;  # TEST harness allow\n" + text[m.start() :],
         encoding="utf-8",
     )
 
@@ -531,13 +521,14 @@ def test_11_mut_unconditional_inject_turns_consult_red(tmp_path: Path) -> None:
     h = _harness(tmp_path)
     cx = h["scripts"] / "cx_run.sh"
     text = cx.read_text(encoding="utf-8")
-    # Task 1.1：stamp 注入改 _cx_kind_bool stamp_prompt_inject；突變為恒真 ⇒ 全 kind 注入
-    old = '  if _cx_kind_bool "${_bk}" "stamp_prompt_inject"; then\n'
-    assert old in text, "stamp_prompt_inject 錨點漂移"
-    cx.write_text(
-        text.replace(old, "  if true; then  # MUTATED: unconditional stamp inject\n", 1),
-        encoding="utf-8",
+    # 移除 case 分支，使預設含 RECONCILE-STAMP 的 prompt 無條件生效
+    m = re.search(
+        r"  # Task 1\.1 / B-32：prompt 依既有.*?\n  case \"\$\{_bk\}\" in\n.*?\n  esac\n",
+        text,
+        flags=re.DOTALL,
     )
+    assert m, "Task 1.1 case 錨點漂移"
+    cx.write_text(text[: m.start()] + text[m.end() :], encoding="utf-8")
 
     task_id = "GOVB0-T11-MUT-CONSULT"
     brief_rel = "handoffs/brief.md"
@@ -571,14 +562,23 @@ def test_11_mut_unconditional_inject_turns_consult_red(tmp_path: Path) -> None:
 
 
 def test_11_mut_remove_closure_from_inject_turns_red(tmp_path: Path) -> None:
-    """CODEX-R11-P1-02 mutation：把 closure 的 stamp_prompt_inject 關掉 → closure 正向斷言轉紅。"""
+    """CODEX-R11-P1-02 mutation：把 closure 自 stamp|closure 注入分支移除 → closure 正向斷言轉紅。"""
     h = _harness(tmp_path)
-    # Task 1.1：注入旗標在 JSON；關 closure.stamp_prompt_inject 即可
-    life = h["scripts"] / "govflow_lifecycle.json"
-    data = json.loads(life.read_text(encoding="utf-8"))
-    assert data["kinds"]["closure"]["stamp_prompt_inject"] is True
-    data["kinds"]["closure"]["stamp_prompt_inject"] = False
-    life.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    cx = h["scripts"] / "cx_run.sh"
+    text = cx.read_text(encoding="utf-8")
+    anchor = "    stamp|closure)"
+    assert anchor in text, "stamp|closure 注入分支錨點漂移"
+    # 僅 stamp 保留注入；closure 落入 unknown → 或改為走 consult 無 stamp
+    # 更精準：case 改 stamp-only，並讓 closure 走「完全不提 RECONCILE-STAMP」組
+    mutated = text.replace(anchor, "    stamp)", 1)
+    # 把 closure 併入 consult 無 stamp 組，避免 unknown fail-closed 阻斷 rc
+    consult_anchor = "    consult|review|impl|dext)"
+    assert consult_anchor in mutated, "consult 組錨點漂移"
+    mutated = mutated.replace(
+        consult_anchor, "    consult|review|impl|dext|closure)", 1
+    )
+    assert mutated != text
+    cx.write_text(mutated, encoding="utf-8")
 
     task_id = "GOVB0-T11-MUT-CLOSURE"
     brief_rel = "handoffs/brief.md"
@@ -684,27 +684,19 @@ def test_11_mut_format_desc_incompatible_with_regex_turns_red(tmp_path: Path) ->
 
 
 def test_11_mut_remove_unknown_branch_turns_red(tmp_path: Path) -> None:
-    """TEST-1.1-MUT：移除 unknown 守衛 → UNKNOWN／無副作用斷言轉紅。"""
+    """TEST-1.1-MUT：移除 unknown 分支 → UNKNOWN／無副作用斷言轉紅。"""
     h = _harness(tmp_path)
 
     # 1) 放寬 brief_conformance + role_gate，使 bogus 抵達 _prepare_and_run
     bc = h["scripts"] / "brief_conformance_check.sh"
     text = bc.read_text(encoding="utf-8")
     m = re.search(
-        r'if ! _bk_ok "\$\{_bk\}"; then\n'
-        r'  echo "ERROR: 未知 brief-kind: \$\{_bk\}\(允許 \$\{_allowed_kinds\}\)"\n'
-        r"  exit 2\n"
-        r"fi\n",
+        r'  \*\) echo "ERROR: 未知 brief-kind:[^"]+"; exit 2 ;;',
         text,
     )
-    assert m, "brief_conformance _bk_ok 守衛錨點漂移"
+    assert m, "brief_conformance unknown case 錨點漂移"
     bc.write_text(
-        text[: m.start()]
-        + 'if [ "${_bk}" = "bogus" ] || _bk_ok "${_bk}"; then :; else\n'
-        + '  echo "ERROR: 未知 brief-kind: ${_bk}(允許 ${_allowed_kinds})"\n'
-        + "  exit 2\n"
-        + "fi\n"
-        + text[m.end() :],
+        text[: m.start()] + '  bogus) : ;;\n' + m.group(0) + text[m.end() :],
         encoding="utf-8",
     )
     rg = h["scripts"] / "_role_gate.sh"
@@ -728,20 +720,17 @@ def test_11_mut_remove_unknown_branch_turns_red(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    # 2) 移除 cx_run 的 _cx_bk_ok fail-closed（改為恒真）
+    # 2) 移除 cx_run 的 * fail-closed 分支（改為 no-op）
     cx = h["scripts"] / "cx_run.sh"
     cx_text = cx.read_text(encoding="utf-8")
     star = re.search(
-        r'\n  if ! _cx_bk_ok "\$\{_bk\}"; then\n'
-        r'    echo "ERROR: unknown brief-kind=\$\{_bk\}（fail-closed）" >&2\n'
-        r"    exit 1\n"
-        r"  fi\n",
+        r'\n    \*\)\n      echo "ERROR: unknown brief-kind=\$\{_bk\}（fail-closed）" >&2\n      exit 1\n      ;;',
         cx_text,
     )
-    assert star, "cx_run _cx_bk_ok 守衛錨點漂移"
+    assert star, "cx_run unknown 分支錨點漂移"
     cx.write_text(
         cx_text[: star.start()]
-        + "\n  true  # MUTATED: unknown no longer fail-closed\n"
+        + "\n    *) : ;;  # MUTATED: unknown no longer fail-closed"
         + cx_text[star.end() :],
         encoding="utf-8",
     )

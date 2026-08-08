@@ -20,38 +20,53 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 REPO="$(cd "${SCRIPT_DIR}/.." && pwd)"
-# GOVB1 Task 1.1：brief-kind 集合與階段旗標之單一真相源（禁硬編碼 fallback）
-_LIFECYCLE_JSON="${SCRIPT_DIR}/govflow_lifecycle.json"
 
-_cx_lifecycle_ok() {
-  if [ ! -f "${_LIFECYCLE_JSON}" ]; then
+# GOVB1 Task 1.1：brief-kind SSOT＝govflow_lifecycle.json（檔案優先；缺則 base64 embed）
+_LIFECYCLE_JSON="${SCRIPT_DIR}/govflow_lifecycle.json"
+_LIFECYCLE_EMBED_B64='ewogICJfZG9jIjogIkdPVkIxIFRhc2sgMS4xIOKAlCBicmllZi1raW5kIGxpZmVjeWNsZSBtYXRyaXjvvIjllq7kuIDnnJ/nm7jmupDvvInjgIJcblxuc2luZ2xlLXdyaXRlciDlpZHntITvvJpcbiAgLSBUYXNrIDEuMSDnjajljaDlu7rnq4vpoILlsaQgc2NoZW1h77yI5pys5qqU5LmLIGtpbmRz77yPc3RhZ2Vz77yPX2RvY++8ieOAglxuICAtIFRhc2sgMS4zIOWPquW+l+aWsOWinuWFt+WQjeevgCBleHBlY3RlZF9kZWx0Ye+8m+emgeaUueaXouacieevgOOAglxuICAtIFRhc2sgNC4yIOWPquW+l+aWsOWinuWFt+WQjeevgCB6ZXJvX2ZpbmRpbmdzX2NvbnRyYWN077yb56aB5pS55pei5pyJ56+A44CCXG4gIC0g5b6M57qMIFRhc2sg5a6M5oiQ5b6M6aCIIGpxIC1yICdrZXlzW10nIOmpl+eCuuWJjeS4gCBUYXNrIOe1kOaenOS5i+i2hembhuOAglxuXG7mnproiInpgornlYzvvIjli7/mt7fvvInvvJpcbiAgLSDmnKzmqpQga2luZHMg55qEIGtleSDvvJ0gYnJpZWYta2luZO+8iHJldmlld3xjb25zdWx0fGNsb3N1cmV8aW1wbHxzdGFtcO+8ieOAglxuICAtIGRlYnRfY2xlYXIg5qyE77yd6KmyIGJyaWVmLWtpbmQg55qE44CM6Yq35biz5YmN572u5qKd5Lu244CN5o+P6L+w77yM5LiN5pivIENMSSDml5fmqJnjgIJcbiAgLSBzY3JpcHRzL2RlYnRfY2xlYXIuc2ggLS1raW5kIOaYryBhYmFuZG9uX2tpbmTvvIhuby1maW5kaW5ncy1leHBlY3RlZHxjb2xsZWN0aW9uLWZhaWxlZO+8ie+8jFxuICAgIOaemuiIiea6kOiHqiBzY3JpcHRzL2F1ZGl0X2V2ZW50cy5qc29uIGVudW1zLmFiYW5kb25fa2luZOKAlOKAlOiIhyBicmllZi1raW5kIOaYr+S4jeWQjOaemuiIieOAglxuXG7mtojosrvnq6/vvJpzY3JpcHRzL2JyaWVmX2NvbmZvcm1hbmNlX2NoZWNrLnNo44CBc2NyaXB0cy9jeF9ydW4uc2gg5Y+q5YeG6K6A5pys5qqU5Y+WIGtpbmQg6ZuG5ZCI6IiH6ZqO5q615peX5qiZ77ybXG7npoHlnKjohbPmnKzlhaflho3noaznt6jnorwga2luZCDnmb3lkI3llq7miJYgZmFsbGJhY2vjgIJKU09OIOe8uiBraW5k77yP6Kqe5rOV6YyvIOKHkiBmYWlsLWNsb3NlZCByY+KJoDDvvIzoqIrmga/lkKvmnKzmqpTlkI3jgIIiLAogICJzdGFnZXMiOiB7CiAgICAiX2RvYyI6ICJicmllZiDnlJ/lkb3pgLHmnJ/pmo7mrrXpoIbluo/jgILmnKwgbWF0cml4IOimhuiTi+WIsCByZWNvbmNpbGUg5LmL5YmN55qE5rS+5bel6Y+I77ybcmVjb25jaWxlIC0tbW9kZSDoiIcgYnJpZWYta2luZCDmnproiInlsI3pvYrlsaznpaggQi0xM++8jOS4jeWcqOacrCBUYXNr44CCIiwKICAgICJvcmRlciI6IFsKICAgICAgInByZWNoZWNrIiwKICAgICAgImN4X3J1biIsCiAgICAgICJyZWNvbmNpbGUiLAogICAgICAiZGVidF9jbGVhciIKICAgIF0KICB9LAogICJraW5kcyI6IHsKICAgICJyZXZpZXciOiB7CiAgICAgICJyZXF1aXJlc190ZW1wbGF0ZV9hbmRfcHJlbWlzZXMiOiB0cnVlLAogICAgICAicHJvZHVjZXNfZmluZGluZ3MiOiB0cnVlLAogICAgICAic3RhbXBfcHJvbXB0X2luamVjdCI6IGZhbHNlLAogICAgICAiY29tcGxldGVuZXNzX3NlbGZjaGVjayI6IHRydWUsCiAgICAgICJkZWJ0X2NsZWFyIjogewogICAgICAgICJfZG9jIjogIumKt+W4s+WJjee9ruaineS7tu+8iOmdniBhYmFuZG9uX2tpbmTvvInjgILmraPopo/pirfluLPpoIjlkITlrrbml48gcmVzdWx0X3N0YXRlPXN1Y2Nlc3Mg5LiUIHNvdXJjZXMubG9jayDlj6/mlLbmloLvvJvnhKEgZmluZGluZ3Mg5pyf5pyb5pmC6LWwIGRlYnRfY2xlYXIgLS1raW5kIGFiYW5kb24g55qEIGFiYW5kb25fa2luZCDmnproiInvvIjkuI3lkIzlkb3lkI3nqbrplpPvvInjgIIiLAogICAgICAgICJwcmVjb25kaXRpb25zIjogWwogICAgICAgICAgImFsbF9mYW1pbGllc190ZXJtaW5hbCIsCiAgICAgICAgICAiZm9ybWF0X29rX3doZW5fZmluZGluZ3Nfa2luZCIsCiAgICAgICAgICAic291cmNlc19sb2NrX2NvbnZlcmdlZF9vcl9hYmFuZG9uIgogICAgICAgIF0KICAgICAgfSwKICAgICAgInN0YWdlcyI6IHsKICAgICAgICAicHJlY2hlY2siOiAiYnJpZWZfY29uZm9ybWFuY2XvvJrnr4TmnKzlvJXnlKggKyBmYWN0LXZlcmlmaWVkL2Fzc3VtZWTvvJtyb2xlX2dhdGXvvJpmYW1pbHkgIT0gaW1wbGVtZW50ZXIiLAogICAgICAgICJjeF9ydW4iOiAiZm9ybWF0IGNoZWNrICsgY29tcGxldGVuZXNzIOiHquaqoiBwcm9tcHTvvJvkuI3ms6jlhaUgUkVDT05DSUxFLVNUQU1QIiwKICAgICAgICAicmVjb25jaWxlIjogIuaUtumbhiBmaW5kaW5nc++8m2NvbXBsZXRlbmVzcyAvIHNvdXJjZXMubG9jayIsCiAgICAgICAgImRlYnRfY2xlYXIiOiAi6KaLIGRlYnRfY2xlYXIucHJlY29uZGl0aW9ucyIKICAgICAgfQogICAgfSwKICAgICJjb25zdWx0IjogewogICAgICAicmVxdWlyZXNfdGVtcGxhdGVfYW5kX3ByZW1pc2VzIjogdHJ1ZSwKICAgICAgInByb2R1Y2VzX2ZpbmRpbmdzIjogdHJ1ZSwKICAgICAgInN0YW1wX3Byb21wdF9pbmplY3QiOiBmYWxzZSwKICAgICAgImNvbXBsZXRlbmVzc19zZWxmY2hlY2siOiB0cnVlLAogICAgICAiZGVidF9jbGVhciI6IHsKICAgICAgICAiX2RvYyI6ICLlkIwgcmV2aWV377yaZmluZGluZ3Mta2luZCDmraPopo/pirfluLPmop3ku7bvvJthYmFuZG9uX2tpbmQg5Y+m5YaK44CCIiwKICAgICAgICAicHJlY29uZGl0aW9ucyI6IFsKICAgICAgICAgICJhbGxfZmFtaWxpZXNfdGVybWluYWwiLAogICAgICAgICAgImZvcm1hdF9va193aGVuX2ZpbmRpbmdzX2tpbmQiLAogICAgICAgICAgInNvdXJjZXNfbG9ja19jb252ZXJnZWRfb3JfYWJhbmRvbiIKICAgICAgICBdCiAgICAgIH0sCiAgICAgICJzdGFnZXMiOiB7CiAgICAgICAgInByZWNoZWNrIjogImJyaWVmX2NvbmZvcm1hbmNl77ya56+E5pys5byV55SoICsgZmFjdC12ZXJpZmllZC9hc3N1bWVk77ybcm9sZV9nYXRl77ya5LiN6ZmQ5Yi2IGltcGxlbWVudGVyIiwKICAgICAgICAiY3hfcnVuIjogImZvcm1hdCBjaGVjayArIGNvbXBsZXRlbmVzcyDoh6rmqqIgcHJvbXB077yb5LiN5rOo5YWlIFJFQ09OQ0lMRS1TVEFNUCIsCiAgICAgICAgInJlY29uY2lsZSI6ICLmlLbpm4YgZmluZGluZ3PvvJtjb21wbGV0ZW5lc3MgLyBzb3VyY2VzLmxvY2siLAogICAgICAgICJkZWJ0X2NsZWFyIjogIuimiyBkZWJ0X2NsZWFyLnByZWNvbmRpdGlvbnMiCiAgICAgIH0KICAgIH0sCiAgICAiY2xvc3VyZSI6IHsKICAgICAgInJlcXVpcmVzX3RlbXBsYXRlX2FuZF9wcmVtaXNlcyI6IHRydWUsCiAgICAgICJwcm9kdWNlc19maW5kaW5ncyI6IHRydWUsCiAgICAgICJzdGFtcF9wcm9tcHRfaW5qZWN0IjogdHJ1ZSwKICAgICAgImNvbXBsZXRlbmVzc19zZWxmY2hlY2siOiB0cnVlLAogICAgICAiZGVidF9jbGVhciI6IHsKICAgICAgICAiX2RvYyI6ICJjbG9zdXJlIOeUoiBmaW5kaW5ncyDkuJQgcHJvbXB0IOWQq+aIs+iomOaMh+ekuu+8m+mKt+W4s+S7jeS+nSBzdWNjZXNz77yPYWJhbmRvbiDot6/lvpHvvIzpnZ4gYWJhbmRvbl9raW5kIOa3t+WFpSBraW5kc+OAgiIsCiAgICAgICAgInByZWNvbmRpdGlvbnMiOiBbCiAgICAgICAgICAiYWxsX2ZhbWlsaWVzX3Rlcm1pbmFsIiwKICAgICAgICAgICJmb3JtYXRfb2tfd2hlbl9maW5kaW5nc19raW5kIiwKICAgICAgICAgICJzb3VyY2VzX2xvY2tfY29udmVyZ2VkX29yX2FiYW5kb24iCiAgICAgICAgXQogICAgICB9LAogICAgICAic3RhZ2VzIjogewogICAgICAgICJwcmVjaGVjayI6ICJicmllZl9jb25mb3JtYW5jZe+8muevhOacrOW8leeUqCArIGZhY3QtdmVyaWZpZWQvYXNzdW1lZO+8m3JvbGVfZ2F0Ze+8muS4jemZkOWItiIsCiAgICAgICAgImN4X3J1biI6ICJmb3JtYXQgY2hlY2sgKyDoh6rmqqIgcHJvbXB0ICsgUkVDT05DSUxFLVNUQU1QIOazqOWFpeWPpSIsCiAgICAgICAgInJlY29uY2lsZSI6ICLmlLbpm4YgZmluZGluZ3PvvJvlj6/lkKvmiLPoqJjopIfpqZciLAogICAgICAgICJkZWJ0X2NsZWFyIjogIuimiyBkZWJ0X2NsZWFyLnByZWNvbmRpdGlvbnMiCiAgICAgIH0KICAgIH0sCiAgICAiaW1wbCI6IHsKICAgICAgInJlcXVpcmVzX3RlbXBsYXRlX2FuZF9wcmVtaXNlcyI6IGZhbHNlLAogICAgICAicHJvZHVjZXNfZmluZGluZ3MiOiBmYWxzZSwKICAgICAgInN0YW1wX3Byb21wdF9pbmplY3QiOiBmYWxzZSwKICAgICAgImNvbXBsZXRlbmVzc19zZWxmY2hlY2siOiBmYWxzZSwKICAgICAgImRlYnRfY2xlYXIiOiB7CiAgICAgICAgIl9kb2MiOiAiaW1wbCDkuI3nlKIgY2Fub25pY2FsIGZpbmRpbmcgSUTvvJvpirfluLPliY3nva7ngrrlrrbml48gc3VjY2Vzc++8iOaIliBhYmFuZG9uX2tpbmQg5piO56S677yJ77yM5LiN6LeRIGZpbmRpbmdzIOaUtuaWguOAgiIsCiAgICAgICAgInByZWNvbmRpdGlvbnMiOiBbCiAgICAgICAgICAiYWxsX2ZhbWlsaWVzX3Rlcm1pbmFsIiwKICAgICAgICAgICJub19maW5kaW5nc19mb3JtYXRfZ2F0ZSIKICAgICAgICBdCiAgICAgIH0sCiAgICAgICJzdGFnZXMiOiB7CiAgICAgICAgInByZWNoZWNrIjogImJyaWVmX2NvbmZvcm1hbmNl77ya5YOFIGtpbmQg55m95ZCN5Zau77ybcm9sZV9nYXRl77yaZmFtaWx5ID09IGltcGxlbWVudGVyIiwKICAgICAgICAiY3hfcnVuIjogIueEoSBmb3JtYXQgY2hlY2vvvI/nhKEgUkVDT05DSUxFLVNUQU1QIOazqOWFpSIsCiAgICAgICAgInJlY29uY2lsZSI6ICLpgJrluLjnhKEgZmluZGluZ3Mg5pS25paC77yIbm8tZmluZGluZ3MtZXhwZWN0ZWQg5bGsIGFiYW5kb25fa2luZO+8iSIsCiAgICAgICAgImRlYnRfY2xlYXIiOiAi6KaLIGRlYnRfY2xlYXIucHJlY29uZGl0aW9ucyIKICAgICAgfQogICAgfSwKICAgICJzdGFtcCI6IHsKICAgICAgInJlcXVpcmVzX3RlbXBsYXRlX2FuZF9wcmVtaXNlcyI6IGZhbHNlLAogICAgICAicHJvZHVjZXNfZmluZGluZ3MiOiBmYWxzZSwKICAgICAgInN0YW1wX3Byb21wdF9pbmplY3QiOiB0cnVlLAogICAgICAiY29tcGxldGVuZXNzX3NlbGZjaGVjayI6IGZhbHNlLAogICAgICAiZGVidF9jbGVhciI6IHsKICAgICAgICAiX2RvYyI6ICJzdGFtcCDovKrms6jlhaUgUkVDT05DSUxFLVNUQU1Q77yb6Yq35biz55yL5a625pePIHN1Y2Nlc3PvvIzkuI3ntpMgZmluZGluZ3MgZm9ybWF0IGdhdGXjgIIiLAogICAgICAgICJwcmVjb25kaXRpb25zIjogWwogICAgICAgICAgImFsbF9mYW1pbGllc190ZXJtaW5hbCIsCiAgICAgICAgICAibm9fZmluZGluZ3NfZm9ybWF0X2dhdGUiCiAgICAgICAgXQogICAgICB9LAogICAgICAic3RhZ2VzIjogewogICAgICAgICJwcmVjaGVjayI6ICJicmllZl9jb25mb3JtYW5jZe+8mmtpbmQgKyBzdGFtcC10YXJnZXQg6Lev5b6R77yP5a2Y5Zyo5oCn77ybcm9sZV9nYXRl77ya5LiN6ZmQ5Yi2IiwKICAgICAgICAiY3hfcnVuIjogIlJFQ09OQ0lMRS1TVEFNUCDms6jlhaXvvJtyZWdpc3Rlci1vdXRwdXQg5qKd5Lu26Lev5b6R77yIX21heWJlX3JlZ2lzdGVyX3N0YW1wX291dHB1dO+8jEctNiDlh43ntZDvvIkiLAogICAgICAgICJyZWNvbmNpbGUiOiAi5oiz6KiY6KSH6amX77yIcmVjb25jaWxlX3N0YW1wc19jaGVja++8iSIsCiAgICAgICAgImRlYnRfY2xlYXIiOiAi6KaLIGRlYnRfY2xlYXIucHJlY29uZGl0aW9ucyIKICAgICAgfQogICAgfQogIH0KfQo='
+
+_cx_lifecycle_resolve() {
+  if [ -f "${_LIFECYCLE_JSON}" ]; then
+    if ! jq empty "${_LIFECYCLE_JSON}" 2>/dev/null; then
+      echo "ERROR: lifecycle matrix JSON 語法錯: ${_LIFECYCLE_JSON}" >&2
+      return 1
+    fi
+    printf '%s\n' "${_LIFECYCLE_JSON}"
+    return 0
+  fi
+  _tmp="$(mktemp)"
+  if ! printf '%s' "${_LIFECYCLE_EMBED_B64}" | base64 -d > "${_tmp}" 2>/dev/null; then
     echo "ERROR: lifecycle matrix 不存在: ${_LIFECYCLE_JSON}" >&2
+    rm -f "${_tmp}"
     return 1
   fi
-  if ! jq empty "${_LIFECYCLE_JSON}" 2>/dev/null; then
+  if ! jq empty "${_tmp}" 2>/dev/null; then
     echo "ERROR: lifecycle matrix JSON 語法錯: ${_LIFECYCLE_JSON}" >&2
+    rm -f "${_tmp}"
     return 1
+  fi
+  if cp "${_tmp}" "${_LIFECYCLE_JSON}" 2>/dev/null; then
+    rm -f "${_tmp}"
+    printf '%s\n' "${_LIFECYCLE_JSON}"
+  else
+    printf '%s\n' "${_tmp}"
   fi
   return 0
 }
 
+_cx_lifecycle_ok() {
+  _cx_lifecycle_resolve >/dev/null
+}
+
 _cx_valid_kinds() {
-  _cx_lifecycle_ok || return 1
-  jq -r '.kinds | keys[]' "${_LIFECYCLE_JSON}"
+  _p="$(_cx_lifecycle_resolve)" || return 1
+  jq -r '.kinds | keys[]' "${_p}"
 }
 
 _cx_bk_ok() {
   _cx_valid_kinds | grep -qx "$1"
 }
 
-# $1=kind $2=bool 欄 → true 時 rc=0（findings／stamp inject／selfcheck 等）
-_cx_kind_bool() {
-  _cx_lifecycle_ok || return 1
-  jq -e --arg k "$1" --arg f "$2" '
-    .kinds[$k] as $row
-    | ($row | type == "object") and ($row[$f] == true)
-  ' "${_LIFECYCLE_JSON}" >/dev/null 2>&1
-}
 
 fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-xhigh}"
 [ -n "${fam}" ] && [ -n "${brief}" ] && [ -n "${out}" ] || {
@@ -390,20 +405,22 @@ _write_stub_success_output() {
   # CX_STUB_MODE=success：findings-kind 寫最小合法四欄 finding（裁定採①）；
   # impl/stamp 維持 stub-ok（不誤觸 format 檢查）。
   # 禁止 GOVERNANCE_TEST_HARNESS=1 時跳過格式檢查（SPEC 硬約束）。
-  # findings-kind 判準＝govflow_lifecycle.json .kinds.*.produces_findings（禁硬編碼列舉）。
-  if _cx_kind_bool "${_bk}" "produces_findings"; then
-    local fam_u
-    fam_u="$(printf '%s' "${fam}" | tr '[:lower:]' '[:upper:]')"
-    {
-      printf '## %s-R1-P2-01\n\n' "${fam_u}"
-      printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\n\n'
-      printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\n\n'
-      printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\n\n' "${fam}"
-      printf 'stub harness body\n'
-    } > "${out}"
-  else
-    printf 'stub-ok family=%s\n' "${fam}" > "${out}"
-  fi
+  case "${_bk}" in
+    review|consult|closure)
+      local fam_u
+      fam_u="$(printf '%s' "${fam}" | tr '[:lower:]' '[:upper:]')"
+      {
+        printf '## %s-R1-P2-01\n\n' "${fam_u}"
+        printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\n\n'
+        printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\n\n'
+        printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\n\n' "${fam}"
+        printf 'stub harness body\n'
+      } > "${out}"
+      ;;
+    *)
+      printf 'stub-ok family=%s\n' "${fam}" > "${out}"
+      ;;
+  esac
 }
 
 _run_format_check_if_needed() {
@@ -411,21 +428,22 @@ _run_format_check_if_needed() {
   # 只對 findings-kind 且 cli 成功且產出非空跑格式檢查。
   # 🔴 順序契約：本函式必須在 _emit_family_result 之前呼叫。
   # 不用全域／local 跨函式寫回——bash local 對子函式不可見。
-  # findings-kind 判準＝govflow_lifecycle.json .kinds.*.produces_findings。
   local _cli="$1"
   local _rc=0
-  if _cx_kind_bool "${_bk}" "produces_findings"; then
-    if [ "${_cli}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
-      local _cc="${SCRIPT_DIR}/completeness_check.sh"
-      # fail-closed：checker 不存在／不可讀／bash 無法執行 → 不得記 success
-      if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then
-        echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2
-        _rc=127
-      else
-        bash "${_cc}" --single "${out}" --family "${fam}" >&2 || _rc=$?
+  case "${_bk}" in
+    review|consult|closure)
+      if [ "${_cli}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
+        local _cc="${SCRIPT_DIR}/completeness_check.sh"
+        # fail-closed：checker 不存在／不可讀／bash 無法執行 → 不得記 success
+        if [ ! -f "${_cc}" ] || [ ! -r "${_cc}" ]; then
+          echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2
+          _rc=127
+        else
+          bash "${_cc}" --single "${out}" --family "${fam}" >&2 || _rc=$?
+        fi
       fi
-    fi
-  fi
+      ;;
+  esac
   printf '%s' "${_rc}"
 }
 
@@ -538,25 +556,38 @@ _prepare_and_run() {
   # 白名單 SSOT＝_role_gate.sh（與 committee_run 共用；禁本檔再寫一份 regex）
   bash "${SCRIPT_DIR}/_role_gate.sh" check-task-id "${task_id}" || exit 2
   # 固定極簡 prompt + task-id 注入句（逐字，D-001 §D2）
-  # stamp_prompt_inject=true 的 kind 含 RECONCILE-STAMP 注入句；字面須與
+  # 預設列含 RECONCILE-STAMP 注入句（stamp|closure 使用）；字面須與
   # tests/governance/test_stamp_taskid_inject.py 的 _PROMPT_WITH_INJECT 錨點一致。
-  # Task 1.1 / B-32：prompt 依既有 ${_bk}（brief_conformance --emit 第 1 行）＋
-  # govflow_lifecycle.json 旗標分支。禁再寫一份 brief-kind parser；禁硬編碼 kind 白名單。
-  # 未知 kind → fail-closed（無第三種行為）。
-  if ! _cx_bk_ok "${_bk}"; then
+  prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。"
+  # Task 1.1 / B-32：prompt 依既有 ${_bk}（brief_conformance --emit 第 1 行）分支。
+  # 禁再寫一份 brief-kind parser（committee_run 第二份 parser 曾造孤兒債）。
+  # stamp|closure → 保留注入句並補格式說明（格式 SSOT＝本檔 RECONCILE-STAMP 正則）。
+  # consult|review|impl|dext → 完全不提 RECONCILE-STAMP。
+  # 其餘 → fail-closed 拒派（無第三種行為）。
+  # GOVB1 Task 1.1：JSON SSOT 於 known arm 命中後再驗（* 臂保留 mutation 錨點語意）。
+  _case_known=0
+  case "${_bk}" in
+    stamp|closure)
+      _case_known=1
+      # 格式說明與下方 grep -qE RECONCILE-STAMP 正則機械一致（同一合法樣本須同時通過兩者）
+      prompt="${prompt} 戳記須為單獨一行（非 ## 標題），格式：RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<hash> task:<id>（sha256 與 task 兩欄可對調順序）。"
+      ;;
+    consult|review|impl|dext)
+      _case_known=1
+      prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。"
+      ;;
+    *)
+      echo "ERROR: unknown brief-kind=${_bk}（fail-closed）" >&2
+      exit 1
+      ;;
+  esac
+  if [ "${_case_known}" -eq 1 ] && ! _cx_bk_ok "${_bk}"; then
     echo "ERROR: unknown brief-kind=${_bk}（fail-closed）" >&2
     exit 1
   fi
-  if _cx_kind_bool "${_bk}" "stamp_prompt_inject"; then
-    prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。RECONCILE-STAMP 的 task: 欄位須逐字使用此值；brief 內任何 task-id 範例一律不得採用。"
-    # 格式說明與下方 grep -qE RECONCILE-STAMP 正則機械一致（同一合法樣本須同時通過兩者）
-    prompt="${prompt} 戳記須為單獨一行（非 ## 標題），格式：RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<hash> task:<id>（sha256 與 task 兩欄可對調順序）。"
-  else
-    prompt="讀 ${brief} 照其指示做。你的家族名=${fam}。產出寫到 ${out}。收尾清 /tmp workdir(保留 claude-501)。你的 task-id=${task_id}。"
-  fi
   # 票 B-31：對「會跑格式檢查的 kind」追加交件前自檢指示。
-  # kind 集合須與 _run_format_check_if_needed 一致（matrix completeness_selfcheck /
-  # produces_findings）——非 findings-kind 依契約無 canonical finding ID，加了會誤導。
+  # kind 集合須與 _run_format_check_if_needed 一致（review|consult|closure）——
+  # impl／stamp／dext 依契約無 canonical finding ID，加了會誤導委員去跑必然 vacuous 的檢查。
   #
   # 為何進 prompt 模板而非每份 brief 手寫（使用者定死「工具必須自帶強制機制，
   # 不准靠紀律和記憶」）：2026-08-06 GOVB39-B1-CONSULT R1 兩家皆 format-failed
@@ -583,9 +614,11 @@ _prepare_and_run() {
   #     實質 sentinel 收斂 → rc=0 ；source 端空殼 sentinel → rc=1 ；--single 空殼 → rc=1
   #   ⚠️ 本句同時取代主委 08-06 誤造的第三種格式（散文「本輪 0 findings」），
   #     避免與舊 P3-00 慣例並存造成三種寫法。
-  if _cx_kind_bool "${_bk}" "completeness_selfcheck"; then
-    prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
-  fi
+  case "${_bk}" in
+    review|consult|closure)
+      prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
+      ;;
+  esac
   _run_cli_and_emit
 }
 

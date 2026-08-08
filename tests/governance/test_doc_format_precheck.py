@@ -34,8 +34,6 @@ _NEEDED = (
     # 而「未填」案例仍 rc=2 ⇒ **拒發案例紅對了但原因是錯的**。
     # 本 session 第 6 次撞上「新增依賴→某份 fixture 清單漏了它」＝票 GOV-TESTHARNESS-SCRIPTLIST-SSOT。
     "verdict_filled_check.sh",
-    # GOVB1 Task 1.1：brief-kind 白名單 SSOT
-    "govflow_lifecycle.json",
 )
 
 _VALID_DEXT = """# 某凍結檔 延伸 D-001
