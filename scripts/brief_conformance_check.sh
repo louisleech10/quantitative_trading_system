@@ -279,6 +279,70 @@ _check_id_pattern() {
   [ "${_bad}" -eq 0 ]
 }
 
+# ---------------------------------------------------------------------------
+# Task 1.4 — fact-verified: 兩機械規則
+# 規則①：count: 宣稱不得含截斷運算子（先抽反引號指令再 token 化；禁照抄 TODO _has_trunc）
+# 規則②：rc 會被派工改變之指令集合有界——debt_ledger --has-open、gate_check token 新鮮度
+#         須標「派工後預期值」
+# ---------------------------------------------------------------------------
+_extract_cmd() {
+  # $1=含 count: 之列 → stdout=反引號內指令（無則空）
+  printf '%s' "$1" | sed -n 's/.*count:.*`\([^`]*\)`.*/\1/p'
+}
+
+_has_trunc() {
+  # $1=已抽出之指令（非整行）。截斷 token：head｜tail｜-mN｜-m N
+  # 白名單排除：python -m｜python3 -m｜pytest -m（模組／標記，非截斷）
+  _cmd="$1"
+  [ -n "${_cmd}" ] || return 1
+  # 白名單：整段視為非截斷（先剔除再判）
+  _norm="$(printf '%s' "${_cmd}" \
+    | sed -E \
+      -e 's/(^|[[:space:]])python3?[[:space:]]+-m([[:space:]]|$)/ /g' \
+      -e 's/(^|[[:space:]])pytest[[:space:]]+-m([[:space:]]|$)/ /g')"
+  # head / tail 作為獨立 token（允許指令以 head 起頭，含 backtick 已剝）
+  if printf '%s' "${_norm}" | grep -qE '(^|[[:space:]|])(head|tail)([[:space:]|]|$)'; then
+    return 0
+  fi
+  # -mN 或 -m N（grep -m1 必須擋；空白可選）
+  if printf '%s' "${_norm}" | grep -qE '(^|[[:space:]])-m[[:space:]]*[0-9]+'; then
+    return 0
+  fi
+  return 1
+}
+
+_check_fact_verified() {
+  # $1=brief_path → rc 0=ok
+  _brief_p="$1"
+  _bad=0
+  while IFS= read -r _line || [ -n "${_line}" ]; do
+    [ -n "${_line}" ] || continue
+    # 規則①：僅明示 count: 標記
+    if printf '%s' "${_line}" | grep -q 'count:'; then
+      _cmd="$(_extract_cmd "${_line}")"
+      if [ -n "${_cmd}" ] && _has_trunc "${_cmd}"; then
+        echo "ERROR: fact-verified 計數宣稱含截斷運算子（head/tail/-mN）"
+        echo "  違規列: ${_line}"
+        echo "  抽出指令: ${_cmd}"
+        echo "  修法: 改用不截斷指令重算 count，或去掉 count: 標記（改為非計數宣稱）"
+        _bad=1
+      fi
+    fi
+    # 規則②：有界集合——派工會改 rc 者須標「派工後預期值」
+    if printf '%s' "${_line}" | grep -qE 'debt_ledger.*--has-open|gate_check.*token|token.*新鮮'; then
+      if ! printf '%s' "${_line}" | grep -q '派工後預期值'; then
+        echo "ERROR: fact-verified 引用派工會改變之 rc，須標註「派工後預期值」"
+        echo "  違規列: ${_line}"
+        echo "  判定集合（有界）: debt_ledger --has-open｜gate_check token 新鮮度"
+        echo "  修法: 在同一 fact-verified 列加上「派工後預期值: <rc 或狀態>」"
+        _bad=1
+      fi
+    fi
+  done < <(grep -E 'fact-verified:' "${_brief_p}" 2>/dev/null || true)
+
+  [ "${_bad}" -eq 0 ]
+}
+
 if [ -n "${emit_file}" ]; then
   # 兩行固定格式；第 2 行恆存在（非 stamp 為空行），呼叫端可用 sed -n '2p' 穩定取值
   printf '%s\n%s\n' "${_bk}" "${stamp_target}" > "${emit_file}" || {
@@ -287,5 +351,8 @@ fi
 
 # Task 1.2：ID 樣板（findings-kind 限縮內）
 _check_id_pattern "${brief}" || exit 2
+
+# Task 1.4：fact-verified 兩機械規則
+_check_fact_verified "${brief}" || exit 2
 
 exit 0
