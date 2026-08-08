@@ -2480,3 +2480,78 @@ hash-lock｜single-source check。
 ### 誠實邊界
 
 本票**無機械綁定**。與 `票 B-43` 同屬「已知且具名接受之暴露面」。
+
+---
+
+## B-45 票 `GOV-LIFECYCLE-CASE-DATADRIVE`
+
+**`P0-01` 全量 data-drive ＋ 五份隔離 harness 同步 JSON——受 epic 凍結 scope 阻塞。**
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：2026-08-08 `consult-r2`，codex＋composer **兩家獨立確認**
+r5 指定之 `P0-01`／`P0-02` 修法在 epic 凍結 scope 內**不可執行**；
+grok 於 `STAMP-R4` 之敵意審查亦確認「找不到只動 `allow` 內檔即可完成之路徑」。
+裁定＝`handoffs/reconcile/20260808-govb1-b2-consult-r2/synth.md`（三家 APPROVED）。
+
+### 病
+
+`scripts/cx_run.sh` 與 `scripts/brief_conformance_check.sh` 仍以 `case` 臂列舉 brief-kind
+⇒ JSON 非唯一 membership／behavior source（只在 JSON 加 `experimental` 仍 rc=2）。
+執行期缺 JSON 亦不 fail-closed（走 embed 物化）。
+
+### 為何本 epic 內修不掉
+
+修法需改下列**五份**測試檔，皆 `in_allow=0 in_meta=0`：
+
+```
+tests/governance/test_cxrun_stamp_prompt.py        ← 以 case 臂逐字字串為 mutation 錨點
+tests/governance/test_stamp_taskid_inject.py
+tests/governance/test_rolegate_predispatch.py
+tests/governance/test_result_state_format_failed.py
+tests/governance/test_completeness_idlike_fp.py
+```
+
+加入 `allow` ⇒ 撞 `T-0.1-F5`（其期望來源＝**不可寫**之 TODO）；
+改 F5 期望來源 ⇒ 守衛自我授權（`票 B-44`）。
+
+### 閉合條件
+
+先解 `票 B-44`（外部信任錨）→ 另開**單獨 manifest 修訂輪**擴張 scope → 方可實作。
+
+### 誠實邊界
+
+本票**無機械綁定**。Task 1.1 因此判「部分完成」，未閉合前不得宣稱 DONE。
+
+---
+
+## B-46 票 `GOV-LIFECYCLE-CLEANUP-RC-SWALLOWED`
+
+**`_lifecycle_cleanup_if_temp` 之 rc 未被 caller 檢查；`rm` 失敗時 temp 殘留且回 rc=0。**
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：2026-08-08 `review-r7`，`CODEX-R7-P2-01`（信心度 10/10，shim probe 實跑
+`CLEANUP_FAILURE_PROBE_RC=0 FILES_LEFT=1`）。裁定＝
+`handoffs/reconcile/20260808-govb1-b2-review-r7/synth.md`（三家 APPROVED）。
+
+### 現況風險
+
+P2。僅於 `TMPDIR` 權限異常或 `rm` 暫時失敗時發生：temp 檔累積。
+**不影響治理判定正確性**（brief 合規判定本身仍正確）。
+
+### 🔴 禁採之修法（三家戳記確認）
+
+「caller 檢查 cleanup rc，**失敗即回非零**」——會使 `brief_conformance_check.sh`
+在「temp 刪不掉」時 fail-closed ⇒ **派工鏈路整條停擺且不可自救**。
+所防損害（磁碟成本）遠小於引入之風險。codex 於 `STAMP-R6` **明確接受此拒絕**。
+
+### 候選修法（codex 於 `STAMP-R6` 精化後之偏好）
+
+**每輪私有 temp 目錄 ＋ 清理失敗時 stderr 顯式告警 ＋ 保留派工 rc**，
+並附 **rm-failure 回歸測試**。
+（單靠「改用子目錄」不足以保證不靜默；單靠告警需 regression 完整落地。）
+
+### 誠實邊界
+
+本票**無機械綁定**。殘留代號 `R-9`。
