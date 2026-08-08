@@ -1538,12 +1538,17 @@ def test_check_fixtures_rc0() -> None:
 
 
 def _batch3_started(base: str) -> bool:
-    """批3已開工 := base..HEAD 含 scripts/brief_conformance_check.sh。"""
+    """批3已開工 := base..HEAD 含 Task 1.2／1.4 具名新建測試（批2 Task 1.1 亦改 brief_conformance，不可用該檔作 proxy）。"""
     proc = _run(["git", "diff", "--name-only", f"{base}..HEAD"])
     assert proc.returncode == 0, proc.stderr
-    return "scripts/brief_conformance_check.sh" in {
-        ln.strip() for ln in proc.stdout.splitlines() if ln.strip()
-    }
+    names = {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
+    return bool(
+        names
+        & {
+            "tests/governance/test_govb1_brief_id_pattern.py",
+            "tests/governance/test_govb1_factverified.py",
+        }
+    )
 
 
 # 批 3 開工時，**放寬 `_g7` 與更新到期測試須配對**；

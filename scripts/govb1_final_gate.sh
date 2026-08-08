@@ -196,7 +196,8 @@ EOF
 # 裁定出處：handoffs/reconcile/20260807-govb1-b1-review-r1/synth.md 群集 C
 # 現況：status case 僅匹配 ?? / A*，未 commit 之 M 可逃檢（epic-wide allow 下）。
 # 到期條件（機械；pytest test_g7_narrow_guard_expiry_* 強制）：
-#   批3已開工 := git diff --name-only <base>..HEAD 含 scripts/brief_conformance_check.sh
+#   批3已開工 := base..HEAD 含 test_govb1_brief_id_pattern.py 或 test_govb1_factverified.py
+#     （不得用 brief_conformance_check.sh：批2 Task 1.1 亦改該檔，會誤觸到期閘）
 #   窄守衛仍在 := _g7 之 status case 僅匹配 ?? / A*
 #   斷言      := NOT (批3已開工 AND 窄守衛仍在)
 # 替代解（兩家交集）：改為 Task-scoped decl（只對當前 Task 修改∪新建欄之 M/??/A*）。

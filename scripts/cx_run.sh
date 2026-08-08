@@ -581,7 +581,7 @@ _prepare_and_run() {
       exit 1
       ;;
   esac
-  if [ "${_case_known}" -eq 1 ] && ! _cx_bk_ok "${_bk}"; then
+  if [ "${_case_known:-0}" -eq 1 ] && ! _cx_bk_ok "${_bk}"; then
     echo "ERROR: unknown brief-kind=${_bk}（fail-closed）" >&2
     exit 1
   fi

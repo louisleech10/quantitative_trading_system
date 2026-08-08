@@ -334,3 +334,5 @@ B3 是第一批真的改判斷邏輯的。中間卡住一次，根因是我把�
 <!-- b2-t11-lifecycle-sync: 2026-08-08 GOVB1 Task 1.1 lifecycle matrix 後 plain-docs 時序同步 -->
 
 <!-- b2-t11-lifecycle-sync2: 2026-08-08 Task 1.1 fix embed/G-7 後 plain-docs 時序同步 -->
+
+<!-- b2-t11-lifecycle-sync3: 2026-08-08 batch3 proxy + set-u 後 plain-docs 時序同步 -->
