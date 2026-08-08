@@ -1898,31 +1898,58 @@ def test_waiver_b45_kind_case_block_hash_frozen() -> None:
 
 
 def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
-    """B3 commit range 不得觸及 B-45 禁改清單（harness／manifest／SPEC／embed）。"""
+    """B3 commit range 不得觸及 B-45 禁改清單（harness／manifest／SPEC／embed）。
+
+    範圍＝訊息含「GOVB1 B3」之 commit 聯集（非整 epic base..HEAD——後者含批2 合法改 manifest）。
+    """
     base = _base_commit()
-    proc = _run(
-        ["git", "diff", "--name-only", f"{base}..HEAD"],
-    )
-    assert proc.returncode == 0, proc.stderr
-    names = {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
-    # 僅在 B3 已開工（有 proxy）時強制；否則 range 可能含批2 合法檔
-    if not (names & set(_BATCH3_PROXY_PATHS)):
+    # 批3 開工 proxy 須已在 epic range
+    epic = _run(["git", "diff", "--name-only", f"{base}..HEAD"])
+    assert epic.returncode == 0, epic.stderr
+    epic_names = {ln.strip() for ln in epic.stdout.splitlines() if ln.strip()}
+    if not (epic_names & set(_BATCH3_PROXY_PATHS)):
         pytest.skip("批 3 proxy 尚未進 range；waiver range 檢查待 B3 交付後生效")
+
+    log = _run(
+        [
+            "git",
+            "log",
+            "--format=%H",
+            f"{base}..HEAD",
+            "--grep=GOVB1 B3",
+        ]
+    )
+    assert log.returncode == 0, log.stderr
+    commits = [ln.strip() for ln in log.stdout.splitlines() if ln.strip()]
+    assert commits, "須有訊息含『GOVB1 B3』之 commit"
+    names: set[str] = set()
+    for c in commits:
+        sh = _run(["git", "show", "--pretty=", "--name-only", c])
+        assert sh.returncode == 0, sh.stderr
+        names |= {ln.strip() for ln in sh.stdout.splitlines() if ln.strip()}
+
     hit_harness = names & set(_B45_HARNESS)
     assert not hit_harness, f"B3 range 觸及 B-45 harness: {hit_harness}"
     for pref in _B45_FORBIDDEN_PREFIXES:
         bad = {n for n in names if n == pref or n.startswith(pref)}
         assert not bad, f"B3 range 觸及禁改前綴 {pref}: {bad}"
-    # embed 常數不得被改（比對 base 與 HEAD 的 _LIFECYCLE_EMBED_B64）
-    for rel in ("scripts/brief_conformance_check.sh", "scripts/cx_run.sh"):
-        if rel not in names:
-            continue
-        b = _run(["git", "show", f"{base}:{rel}"])
-        h = _run(["git", "show", f"HEAD:{rel}"])
-        if b.returncode != 0 or h.returncode != 0:
-            continue
+    # embed 常數：B3 觸及 brief_conformance 時，與 B3 前一父比對
+    if "scripts/brief_conformance_check.sh" in names:
+        # 取最早 B3 commit 的父作為 embed 錨
+        oldest = commits[-1]  # log 預設新→舊；最後一個＝最早
+        parent = _run(["git", "rev-parse", f"{oldest}^"])
+        assert parent.returncode == 0
+        anchor = parent.stdout.strip()
+        b = _run(["git", "show", f"{anchor}:scripts/brief_conformance_check.sh"])
+        h = _run(["git", "show", "HEAD:scripts/brief_conformance_check.sh"])
+        assert b.returncode == 0 and h.returncode == 0
+
         def _embed(s: str) -> str:
             m = re.search(r"^_LIFECYCLE_EMBED_B64='(.*)'$", s, re.M)
             return m.group(1) if m else ""
 
-        assert _embed(b.stdout) == _embed(h.stdout), f"{rel} embed 被改（B-45 禁）"
+        assert _embed(b.stdout) == _embed(h.stdout), (
+            "brief_conformance embed 被改（B-45 禁）"
+        )
+    # cx_run 不得出現在 B3 commits
+    assert "scripts/cx_run.sh" not in names
