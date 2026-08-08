@@ -66,30 +66,39 @@ def _behavior_rows_from_file(text: str) -> list[str]:
     return [ln for ln in text.splitlines() if pat.match(ln)]
 
 
-# 凍結檔封閉 key 集合〔CODEX-R2-P1-03〕：禁重複／未知／額外行
-# 〔20260808-GOVB1-B4-STAMP-R2 三家 APPROVED〕封閉集由三 key 擴為**恰四 key**：
-#   必備＝base_commit／scope_manifest／b3_start（HEAD／工作樹）
-#   可選＝b4_start（B4 開工後由主委後掛；**缺席時行為與擴充前逐字相同**）
-# HEAD／工作樹：三必備全齊；歷史 b3_start 錨點樹可能尚無 b3_start 行（主委後掛）
+# 凍結檔封閉 key 集合〔CODEX-R2-P1-03〕：禁重複／未知／跳號／非法值
+#
+# 〔20260808-GOVB1-B4-REVIEW-R1 · CODEX-R1-P1-03 NEW-CLASS〕
+# 初版把封閉集寫死為「恰四 key」⇒ B5 開工需要 b5_start 時會**第五次撞同一個死鎖**
+# （parser 拒新錨點 ⇒ 錨點寫不進去 ⇒ 上一窗的 waiver 收不了口）。
+# 修法＝把封閉集改成**封閉但可導出**的批次錨點列舉 b3_start…b10_start
+# （對應 GOVB1 第 1 批之 B3–B10）。仍是封閉集：b11_start／third: 一律拒。
+# 這樣 B5–B10 只需「寫錨點＋收上一窗上界」，**不必再改 parser**。
+_FROZEN_ANCHOR_KEYS = tuple(f"b{n}_start" for n in range(3, 11))  # b3_start … b10_start
 _FROZEN_REQUIRED_KEYS = frozenset({"base_commit", "scope_manifest", "b3_start"})
-_FROZEN_OPTIONAL_KEYS = frozenset({"b4_start"})
+_FROZEN_OPTIONAL_KEYS = frozenset(_FROZEN_ANCHOR_KEYS) - {"b3_start"}
 _FROZEN_CLOSED_KEYS = _FROZEN_REQUIRED_KEYS | _FROZEN_OPTIONAL_KEYS
 # 40-hex commit 值之 key（其餘＝scope_manifest 為 12-hex 摘要）
-_FROZEN_SHA40_KEYS = frozenset({"base_commit", "b3_start", "b4_start"})
+_FROZEN_SHA40_KEYS = frozenset({"base_commit"}) | frozenset(_FROZEN_ANCHOR_KEYS)
+# regex **由封閉集導出**，杜絕「集合改了但 regex 沒改」之漂移
+_FROZEN_LINE_RE = re.compile(
+    r"^(" + "|".join(sorted(_FROZEN_CLOSED_KEYS)) + r"): (.+)$"
+)
 
 
 def _parse_frozen_hashes(text: str, *, require_b3_start: bool = True) -> dict[str, str]:
     """解析 govb1_frozen_hashes.txt：封閉 key 集合，各 key 至多一行。
 
-    重複 key／未知 key（third:／b5_start: 等）／非法值 ⇒ AssertionError（測試轉紅）。
-    require_b3_start=True（HEAD／工作樹）：三必備 key 全齊；b4_start 可有可無。
+    重複 key／未知 key（third:／b11_start: 等）／非法值 ⇒ AssertionError（測試轉紅）。
+    require_b3_start=True（HEAD／工作樹）：三必備 key 全齊；b4_start… 可有可無。
     require_b3_start=False（歷史錨點樹）：base+scope 必備，b3_start 可缺。
-    錨鏈 fail-closed：有 b4_start 卻無 b3_start ⇒ 拒（錨鏈斷裂）。
+    錨鏈 fail-closed：批次錨點須**自 b3_start 起連續無跳號**
+    （例：有 b5_start 卻無 b4_start ⇒ 拒）。
     """
     lines = [ln for ln in text.splitlines() if ln.strip() != ""]
     seen: dict[str, str] = {}
     for ln in lines:
-        m = re.match(r"^(base_commit|scope_manifest|b3_start|b4_start): (.+)$", ln)
+        m = _FROZEN_LINE_RE.match(ln)
         assert m, f"frozen_hashes 未知/非法行（closed key set 拒額外 key）: {ln!r}"
         key, val = m.group(1), m.group(2)
         assert key not in seen, f"frozen_hashes 重複 key: {key}"
@@ -106,18 +115,19 @@ def _parse_frozen_hashes(text: str, *, require_b3_start: bool = True) -> dict[st
         f"frozen_hashes 缺 base_commit／scope_manifest: {set(seen)}"
     )
     assert set(seen) <= _FROZEN_CLOSED_KEYS
-    assert not ("b4_start" in seen and "b3_start" not in seen), (
-        f"frozen_hashes 有 b4_start 但缺 b3_start（錨鏈斷裂，fail-closed）: {set(seen)}"
+    # 錨鏈連續性（取代「b4 無 b3」單例檢查，並涵蓋 b5…b10 之跳號）
+    present_anchors = [k for k in _FROZEN_ANCHOR_KEYS if k in seen]
+    assert present_anchors == list(_FROZEN_ANCHOR_KEYS[: len(present_anchors)]), (
+        f"frozen_hashes 錨鏈須自 b3_start 起連續無跳號（fail-closed），got {present_anchors}"
     )
     if require_b3_start:
         assert _FROZEN_REQUIRED_KEYS <= set(seen), (
             f"frozen_hashes 須含三必備 key（closed），got {set(seen)}:\n{text}"
         )
-    # 行數 ≡ key 數：非空之每一行皆須為恰一個已知 key（重複／未知已於上拒）
-    assert len(lines) == len(seen), (
-        f"frozen_hashes 行數與 key 數不符（closed key set），"
-        f"lines={len(lines)} keys={len(seen)}:\n{text}"
-    )
+    # 〔COMPOSER-R1-P2-01 SAME-CLASS-VARIANT〕原有之
+    # `assert len(lines) == len(seen)` 已刪：迴圈內每行非「regex 不命中而轉紅」
+    # 即「重複 key 而轉紅」即「恰新增一唯一 key」⇒ 該式**恆真**，
+    # mutation 無法使其獨立失敗，屬票 B-43 同型之假綠錯覺。
     return seen
 
 
@@ -145,6 +155,30 @@ def _b4_start() -> str | None:
     """
     text = FROZEN.read_text(encoding="utf-8")
     return _parse_frozen_hashes(text).get("b4_start")
+
+
+def _assert_anchor_chain_sane() -> None:
+    """錨鏈健全性：base_commit → b3_start → b4_start → … 皆合法且祖先序正確、且為 HEAD 祖先。
+
+    〔20260808-GOVB1-B4-REVIEW-R1 · CODEX-R1-P1-02 NEW-CLASS〕
+    原本僅 B3 waiver 內聯此檢查，**B4 waiver 本體未做** ⇒ 錨點指向非祖先 commit 時，
+    B4-only 與耦合測皆仍放行（codex 造 `6e35a1f8d643` 實證）。抽為共用，兩窗各自呼叫。
+    """
+    parsed = _parse_frozen_hashes(FROZEN.read_text(encoding="utf-8"))
+    prev, prev_name = parsed["base_commit"], "base_commit"
+    rp0 = _run(["git", "rev-parse", "--verify", f"{prev}^{{commit}}"])
+    assert rp0.returncode == 0, f"base_commit 非合法 commit: {prev}\n{rp0.stderr}"
+    for name in _FROZEN_ANCHOR_KEYS:
+        cur = parsed.get(name)
+        if cur is None:
+            break  # 錨鏈連續性已由 parser 保證，故首個缺席即結尾
+        rp = _run(["git", "rev-parse", "--verify", f"{cur}^{{commit}}"])
+        assert rp.returncode == 0, f"{name} 非合法 commit: {cur}\n{rp.stderr}"
+        anc = _run(["git", "merge-base", "--is-ancestor", prev, cur])
+        assert anc.returncode == 0, f"{prev_name} 須為 {name} 之祖先（錨鏈順序）"
+        anc_h = _run(["git", "merge-base", "--is-ancestor", cur, "HEAD"])
+        assert anc_h.returncode == 0, f"{name} 須為 HEAD 之祖先"
+        prev, prev_name = cur, name
 
 
 def _is_narrow_g7_status_case(gate_src: str) -> bool:
@@ -1973,22 +2007,8 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
     b4 = _b4_start()
     upper = b4 if b4 is not None else "HEAD"
 
-    # 三條 b3_start 健全性
-    rp = _run(["git", "rev-parse", "--verify", f"{b3}^{{commit}}"])
-    assert rp.returncode == 0, f"b3_start 非合法 commit: {b3}\n{rp.stderr}"
-    anc_h = _run(["git", "merge-base", "--is-ancestor", b3, "HEAD"])
-    assert anc_h.returncode == 0, "b3_start 須為 HEAD 之祖先"
-    anc_b = _run(["git", "merge-base", "--is-ancestor", base, b3])
-    assert anc_b.returncode == 0, "base_commit 須為 b3_start 之祖先（順序正確）"
-
-    # b4_start 存在時之錨鏈健全性：須為合法 commit、b3_start 之後代、HEAD 之祖先
-    if b4 is not None:
-        rp4 = _run(["git", "rev-parse", "--verify", f"{b4}^{{commit}}"])
-        assert rp4.returncode == 0, f"b4_start 非合法 commit: {b4}\n{rp4.stderr}"
-        anc_34 = _run(["git", "merge-base", "--is-ancestor", b3, b4])
-        assert anc_34.returncode == 0, "b3_start 須為 b4_start 之祖先（錨鏈順序）"
-        anc_4h = _run(["git", "merge-base", "--is-ancestor", b4, "HEAD"])
-        assert anc_4h.returncode == 0, "b4_start 須為 HEAD 之祖先"
+    # 錨鏈健全性（合法 commit＋祖先序＋皆為 HEAD 祖先）；共用函式，B4 窗亦呼叫
+    _assert_anchor_chain_sane()
 
     # 批3 開工 proxy 須已在 epic range
     epic = _run(["git", "diff", "--name-only", f"{base}..HEAD"])
@@ -2089,6 +2109,9 @@ def test_waiver_b4_range_does_not_touch_forbidden() -> None:
     if b4 is None:
         pytest.skip("b4_start 尚未錨定；B3 waiver 之開放區間仍全程看守（無保護真空）")
 
+    # 〔CODEX-R1-P1-02〕本窗自身亦須驗錨鏈，不得倚賴 B3 窗代驗
+    _assert_anchor_chain_sane()
+
     diff = _run(["git", "diff", "--name-only", f"{b4}..HEAD"])
     assert diff.returncode == 0, diff.stderr
     names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
@@ -2133,71 +2156,74 @@ def test_waiver_b4_active_when_b4_start_anchored() -> None:
 
 
 def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
-    """CODEX-R2-P1-03：重複 b3_start／新增 third: 須被封閉集合拒絕。"""
+    """封閉 key 集合之負向用例〔CODEX-R2-P1-03；B4-REVIEW-R1 CODEX-R1-P1-01 修正〕。
+
+    🔴 **禁用 try/except AssertionError ＋ 自拋 sentinel** 的寫法：
+    該寫法會**接住自己拋的 sentinel**，守衛被移除後 sentinel 訊息仍含關鍵字
+    ⇒ 測試照樣綠（codex 於隔離 clone 實證：移除 duplicate guard 後仍 `1 passed`）。
+    一律用 `pytest.raises(AssertionError, match=...)`，讓「沒有拋例外」直接轉紅。
+    """
     good = FROZEN.read_text(encoding="utf-8")
-    _parse_frozen_hashes(good)  # 正常三行 ⇒ 通過
+    _parse_frozen_hashes(good)  # 現行檔須可解析
 
-    dup = good.rstrip("\n") + "\n" + "b3_start: " + ("a" * 40) + "\n"
-    try:
-        _parse_frozen_hashes(dup)
-        raise AssertionError("重複 b3_start 應被拒")
-    except AssertionError as e:
-        assert "重複" in str(e) or "恰好 3" in str(e), e
-
-    third = good.rstrip("\n") + "\nthird: deadbeef\n"
-    try:
-        _parse_frozen_hashes(third)
-        raise AssertionError("third: 行應被拒")
-    except AssertionError as e:
-        assert "未知" in str(e) or "恰好 3" in str(e) or "非法" in str(e), e
-
-    # ── 封閉集擴為四 key 後之新用例〔20260808-GOVB1-B4-STAMP-R2〕 ──
     sha_a = "a" * 40
-    # 用例基底一律去掉 b4_start，使本測不受「錨點是否已寫入」影響（否則錨定後撞重複 key）
+    # 用例基底一律去掉所有批次錨點（b3 除外），使本測不受「哪些錨點已寫入」影響
     base3 = (
         "\n".join(
             ln
             for ln in good.splitlines()
-            if ln.strip() and not ln.startswith("b4_start: ")
+            if ln.strip()
+            and not any(
+                ln.startswith(f"{k}: ") for k in _FROZEN_ANCHOR_KEYS if k != "b3_start"
+            )
         )
         + "\n"
     )
 
-    # 正向：b4_start 為合法可選 key ⇒ 通過
+    # 反向：重複 key
+    dup = base3.rstrip("\n") + "\nb3_start: " + sha_a + "\n"
+    with pytest.raises(AssertionError, match="重複"):
+        _parse_frozen_hashes(dup)
+
+    # 反向：未知 key（非批次錨點命名）
+    third = base3.rstrip("\n") + "\nthird: deadbeef\n"
+    with pytest.raises(AssertionError, match="未知|非法"):
+        _parse_frozen_hashes(third)
+
+    # 正向：b4_start 為合法可選錨點 ⇒ 通過
     with_b4 = base3.rstrip("\n") + "\nb4_start: " + sha_a + "\n"
-    parsed = _parse_frozen_hashes(with_b4)
-    assert parsed["b4_start"] == sha_a
+    assert _parse_frozen_hashes(with_b4)["b4_start"] == sha_a
 
-    # 反向 1：b5_start 仍屬未知 key（封閉集不因擴充而變成開放式）
-    fifth = with_b4.rstrip("\n") + "\nb5_start: " + sha_a + "\n"
-    try:
-        _parse_frozen_hashes(fifth)
-        raise AssertionError("b5_start: 行應被拒（封閉集仍封閉）")
-    except AssertionError as e:
-        assert "未知" in str(e) or "非法" in str(e), e
+    # 正向：錨鏈連續（b3→b4→b5）⇒ 通過；證明 B5 開工**不必再改 parser**
+    with_b5 = with_b4.rstrip("\n") + "\nb5_start: " + ("c" * 40) + "\n"
+    assert _parse_frozen_hashes(with_b5)["b5_start"] == "c" * 40
 
-    # 反向 2：重複 b4_start
+    # 反向：封閉集仍封閉——b11_start 超出 B3–B10 之列舉範圍
+    eleventh = with_b4.rstrip("\n") + "\nb11_start: " + sha_a + "\n"
+    with pytest.raises(AssertionError, match="未知|非法"):
+        _parse_frozen_hashes(eleventh)
+
+    # 反向：錨鏈跳號——有 b5_start 卻無 b4_start
+    gap = base3.rstrip("\n") + "\nb5_start: " + sha_a + "\n"
+    with pytest.raises(AssertionError, match="連續無跳號"):
+        _parse_frozen_hashes(gap)
+
+    # 反向：重複 b4_start
     dup4 = with_b4.rstrip("\n") + "\nb4_start: " + ("b" * 40) + "\n"
-    try:
+    with pytest.raises(AssertionError, match="重複"):
         _parse_frozen_hashes(dup4)
-        raise AssertionError("重複 b4_start 應被拒")
-    except AssertionError as e:
-        assert "重複" in str(e), e
 
-    # 反向 3：錨鏈斷裂——有 b4_start 卻無 b3_start（歷史樹情境亦須 fail-closed）
-    no_b3 = "\n".join(
-        ln for ln in with_b4.splitlines() if not ln.startswith("b3_start: ")
-    ) + "\n"
-    try:
+    # 反向：錨鏈斷裂——有 b4_start 卻無 b3_start（歷史樹情境亦須 fail-closed）
+    no_b3 = (
+        "\n".join(
+            ln for ln in with_b4.splitlines() if not ln.startswith("b3_start: ")
+        )
+        + "\n"
+    )
+    with pytest.raises(AssertionError, match="連續無跳號"):
         _parse_frozen_hashes(no_b3, require_b3_start=False)
-        raise AssertionError("b4_start 無 b3_start 應被拒（錨鏈斷裂）")
-    except AssertionError as e:
-        assert "錨鏈斷裂" in str(e), e
 
-    # 反向 4：b4_start 值須為 40 hex
+    # 反向：錨點值須為 40 hex
     bad_len = base3.rstrip("\n") + "\nb4_start: deadbeef\n"
-    try:
+    with pytest.raises(AssertionError, match="40 hex"):
         _parse_frozen_hashes(bad_len)
-        raise AssertionError("b4_start 非 40 hex 應被拒")
-    except AssertionError as e:
-        assert "40 hex" in str(e), e
