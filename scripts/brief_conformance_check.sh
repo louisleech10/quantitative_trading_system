@@ -133,11 +133,15 @@ _resolve_kind_into_bk() {
   _bk="$(printf '%s\n' "${_bk_all}" | head -1)"
   # lifecycle 必須可解析（SSOT）；語法錯訊息含檔名
   _lifecycle_json_ok || return 1
-  [ -n "${_bk}" ] || {
-    echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp"
-    echo "  (收集 findings 類=review/consult/closure,會另檢範本引用+前提宣告)"
-    return 1
-  }
+# 🔴 下列「缺 kind」守衛**逐字凍結、且不得縮排**：
+#    tests/governance/test_stamp_taskid_inject.py::test_mutation_v18_skip_missing_kind_turns_red
+#    以原始碼子字串比對此段（該檔屬 _B45_HARNESS 五檔，B4 窗禁改）。
+#    函式內用 exit 2 而非 return 1：exit 於函式中同樣結束整個腳本，行為與呼叫端 `|| exit 2` 等價。
+[ -n "${_bk}" ] || {
+  echo "ERROR: brief 缺 'brief-kind:' 宣告。請於 brief 加一行,值 ∈ review|consult|closure|impl|stamp"
+  echo "  (收集 findings 類=review/consult/closure,會另檢範本引用+前提宣告)"
+  exit 2
+}
   return 0
 }
 
