@@ -165,6 +165,62 @@ def test_t14_rule2_with_annotation_ok(tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+# ── CODEX-R2-P1-04：反引號封閉類別（未成對／巢狀／跨行／零抽取）──
+
+
+def test_t14_count_zero_backtick_rc_nonzero(tmp_path: Path) -> None:
+    """零反引號 count: ⇒ 明確拒絕（STAMP-R4 補正之退化情形）。"""
+    p = _write_consult(
+        tmp_path,
+        "zero_bt.md",
+        "fact-verified: count: 1 — no command segment",
+    )
+    proc = _check(p)
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    out = proc.stdout + proc.stderr
+    assert "成對反引號" in out or "不得為空" in out, out
+
+
+def test_t14_count_unpaired_backtick_rc_nonzero(tmp_path: Path) -> None:
+    """未成對反引號 ⇒ rc≠0。"""
+    p = _write_consult(
+        tmp_path,
+        "unpaired.md",
+        "fact-verified: count: `head -5 x",  # 無閉合
+    )
+    proc = _check(p)
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    out = proc.stdout + proc.stderr
+    assert "成對反引號" in out or "不得為空" in out or "截斷" in out, out
+
+
+def test_t14_count_cross_line_rc_nonzero(tmp_path: Path) -> None:
+    """跨行分片：count: 列無閉合反引號 ⇒ 該列拒絕。"""
+    p = tmp_path / "cross.md"
+    p.write_text(
+        "brief-kind: consult\n\n"
+        "templates/COMMITTEE_FINDING_TEMPLATE.md 全文照做\n\n"
+        "fact-verified: count: `head -5 some.log\n"
+        "x`\n"
+        "assumed: test\n",
+        encoding="utf-8",
+    )
+    proc = _check(p)
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+
+
+def test_t14_count_nested_backtick_rc_nonzero(tmp_path: Path) -> None:
+    """巢狀反引號 ⇒ 非良構（奇數或配對數不符）⇒ rc≠0。"""
+    # 3 backticks：open outer, open inner, close inner — unpaired outer
+    p = _write_consult(
+        tmp_path,
+        "nested.md",
+        "fact-verified: count: `printf `head -5` more",
+    )
+    proc = _check(p)
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+
+
 # ── M1 mutation ──────────────────────────────────────────────────
 
 

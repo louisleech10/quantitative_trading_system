@@ -66,19 +66,63 @@ def _behavior_rows_from_file(text: str) -> list[str]:
     return [ln for ln in text.splitlines() if pat.match(ln)]
 
 
+# 凍結檔封閉 key 集合〔CODEX-R2-P1-03〕：僅允許三 key，禁重複／未知／額外行
+# HEAD／工作樹：三 key 全齊；歷史 b3_start 錨點樹可能尚無 b3_start 行（主委後掛）
+_FROZEN_CLOSED_KEYS = frozenset({"base_commit", "scope_manifest", "b3_start"})
+
+
+def _parse_frozen_hashes(text: str, *, require_b3_start: bool = True) -> dict[str, str]:
+    """解析 govb1_frozen_hashes.txt：封閉 key 集合，各 key 至多一行。
+
+    重複 b3_start／新增 third:／非法值 ⇒ AssertionError（測試轉紅）。
+    require_b3_start=True（HEAD／工作樹）：恰三 key。
+    require_b3_start=False（歷史錨點樹）：base+scope 必備，b3_start 可缺。
+    """
+    lines = [ln for ln in text.splitlines() if ln.strip() != ""]
+    seen: dict[str, str] = {}
+    for ln in lines:
+        m = re.match(r"^(base_commit|scope_manifest|b3_start): (.+)$", ln)
+        assert m, f"frozen_hashes 未知/非法行（closed key set 拒額外 key）: {ln!r}"
+        key, val = m.group(1), m.group(2)
+        assert key not in seen, f"frozen_hashes 重複 key: {key}"
+        if key in ("base_commit", "b3_start"):
+            assert re.fullmatch(r"[0-9a-f]{40}", val), (
+                f"frozen_hashes {key} 須為 40 hex，got {val!r}"
+            )
+        else:
+            assert re.fullmatch(r"[0-9a-f]{12}", val), (
+                f"frozen_hashes scope_manifest 須為 12 hex，got {val!r}"
+            )
+        seen[key] = val
+    assert "base_commit" in seen and "scope_manifest" in seen, (
+        f"frozen_hashes 缺 base_commit／scope_manifest: {set(seen)}"
+    )
+    assert set(seen) <= _FROZEN_CLOSED_KEYS
+    if require_b3_start:
+        assert set(seen) == _FROZEN_CLOSED_KEYS, (
+            f"frozen_hashes 須恰好三 key（closed），got {set(seen)}:\n{text}"
+        )
+        assert len(lines) == 3, (
+            f"frozen_hashes 須恰好 3 行（closed key set），got {len(lines)}:\n{text}"
+        )
+    else:
+        # 歷史：不得多於三行、不得有未知 key（已由上保證）
+        assert len(lines) == len(seen)
+    return seen
+
+
 def _base_commit() -> str:
     text = FROZEN.read_text(encoding="utf-8")
-    m = re.search(r"^base_commit: ([0-9a-f]{40})$", text, re.M)
-    assert m, "frozen_hashes 缺 base_commit"
-    return m.group(1)
+    return _parse_frozen_hashes(text)["base_commit"]
 
 
 def _b3_start() -> str:
-    """主委錨點 b3_start（只讀；實作端不得寫入 govb1_frozen_hashes.txt）。"""
+    """主委錨點 b3_start（只讀；實作端不得寫入 govb1_frozen_hashes.txt）。
+
+    封閉格式：恰好一行 b3_start，禁重複／額外 key〔CODEX-R2-P1-03〕。
+    """
     text = FROZEN.read_text(encoding="utf-8")
-    m = re.search(r"^b3_start: ([0-9a-f]{40})$", text, re.M)
-    assert m, "frozen_hashes 缺 b3_start（主委錨點）"
-    return m.group(1)
+    return _parse_frozen_hashes(text)["b3_start"]
 
 
 def _is_narrow_g7_status_case(gate_src: str) -> bool:
@@ -305,14 +349,9 @@ def test_t01_f2_frozen_hashes_self_consistent() -> None:
     """T-0.1-F2：frozen_hashes 欄位完整 + baseline_dirty 不存在 + g7 可過。"""
     assert FROZEN.is_file() and FROZEN.stat().st_size > 0
     text = FROZEN.read_text(encoding="utf-8")
-    n_base = len(re.findall(r"^base_commit: [0-9a-f]{40}$", text, re.M))
-    n_scope = len(re.findall(r"^scope_manifest: [0-9a-f]{12}$", text, re.M))
-    assert n_base == 1, text
-    assert n_scope == 1, text
+    parsed = _parse_frozen_hashes(text)
     assert not (REPO / "scripts" / "govb1_baseline_dirty.txt").exists()
-    base = re.search(r"^base_commit: ([0-9a-f]{40})$", text, re.M)
-    assert base
-    cat = _run(["git", "cat-file", "-e", f"{base.group(1)}^{{commit}}"])
+    cat = _run(["git", "cat-file", "-e", f"{parsed['base_commit']}^{{commit}}"])
     assert cat.returncode == 0
     # g7 需本批已 commit；若尚未 commit 則 skip 由 post-commit 實跑補
     g7 = _run(["bash", str(GATE), "--only", "g7"])
@@ -1634,6 +1673,40 @@ def test_batch3_proxy_anti_drift_new_column_mutation_turns_red() -> None:
 # 五例：no-proxy｜proxy+narrow ⇒ 不變式 false｜proxy+wide ⇒ 放行｜
 #       target ` M` ⇒ 轉紅｜僅 ambient ` M gate_check.sh` ⇒ 不紅
 
+
+def test_batch3_exporter_missing_todo_fail_closed(tmp_path: Path) -> None:
+    """CODEX-R2-P0-02：缺／空／畸形 TODO ⇒ print-batch3-* 與 gate_b3 皆非零。"""
+    import os
+
+    missing = tmp_path / "no_such_todo.md"
+    empty = tmp_path / "empty_todo.md"
+    empty.write_text("", encoding="utf-8")
+    malformed = tmp_path / "malformed_todo.md"
+    malformed.write_text("# no Task 1.2 / 1.4 sections\n", encoding="utf-8")
+
+    for label, path in (
+        ("missing", missing),
+        ("empty", empty),
+        ("malformed", malformed),
+    ):
+        env = {**os.environ, "GOVB1_TODO": str(path)}
+        for flag in ("--print-batch3-paths", "--print-batch3-targets"):
+            proc = _run(
+                ["bash", "scripts/govb1_final_gate.sh", flag],
+                env=env,
+            )
+            assert proc.returncode != 0, (
+                f"{label} {flag} 須非零，got rc=0\n{proc.stdout}\n{proc.stderr}"
+            )
+        proc_g = _run(
+            ["bash", "scripts/govb1_final_gate.sh", "--only", "gate_b3"],
+            env=env,
+        )
+        assert proc_g.returncode != 0, (
+            f"{label} gate_b3 須非零，got rc=0\n{proc_g.stdout}\n{proc_g.stderr}"
+        )
+
+
 def _shell_batch3_proxy_paths() -> set[str]:
     """呼叫 production `_g7_batch3_proxy_paths`（--print-batch3-paths）。
 
@@ -1853,8 +1926,8 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
     """B3 range 不得觸及 B-45 禁改清單（harness／manifest／SPEC／embed）。
 
     範圍＝git diff --name-only b3_start..HEAD（禁 --grep 圈定；CODEX-R1-P0-01）。
-    frozen_hashes 僅驗 base_commit／scope_manifest 兩行於 base..HEAD byte-identical；
-    b3_start 行允許差異（主委錨點 14fbe69）。
+    frozen_hashes 封閉 key 集合（base_commit／scope_manifest／b3_start 恰各一行）；
+    b3_start..HEAD 僅允許 b3_start 值差，禁重複／未知／額外行〔CODEX-R2-P1-03〕。
     具名殘留：移動 b3_start 本身仍屬票 B-44（repo 內無解）。
     """
     base = _base_commit()
@@ -1885,26 +1958,27 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
     assert not hit_harness, f"B3 range 觸及 B-45 harness: {hit_harness}"
     for pref in _B45_FORBIDDEN_PREFIXES:
         if pref == "scripts/govb1_frozen_hashes.txt":
-            # 收窄：整檔可因主委新增 b3_start 而進 range；只驗兩關鍵行
+            # 允許檔進 range（主委 b3_start 錨點）；內容走封閉集合比對
             continue
         bad = {n for n in names if n == pref or n.startswith(pref)}
         assert not bad, f"B3 range 觸及禁改前綴 {pref}: {bad}"
 
-    # base_commit: 與 scope_manifest: 於 B3 range 須 byte-identical
-    # （epic base 可能尚無 frozen 檔；錨＝b3_start 樹 vs HEAD；b3_start 行允許差）
-    def _frozen_key_lines(rev: str) -> str:
+    # 封閉 key 集合：HEAD 須三 key 全齊；b3 錨點樹可缺 b3_start 行（主委後掛）
+    # 僅 b3_start 值可差；重複／third: 兩側皆拒
+    def _frozen_at(rev: str, *, require_b3_start: bool) -> dict[str, str]:
         sh = _run(["git", "show", f"{rev}:scripts/govb1_frozen_hashes.txt"])
         assert sh.returncode == 0, sh.stderr
-        out: list[str] = []
-        for ln in sh.stdout.splitlines():
-            if ln.startswith("base_commit:") or ln.startswith("scope_manifest:"):
-                out.append(ln)
-        return "\n".join(out)
+        return _parse_frozen_hashes(sh.stdout, require_b3_start=require_b3_start)
 
-    assert _frozen_key_lines(b3) == _frozen_key_lines("HEAD"), (
-        "base_commit:/scope_manifest: 於 b3_start..HEAD 不得變"
-        f"\nb3_start:\n{_frozen_key_lines(b3)}\nHEAD:\n{_frozen_key_lines('HEAD')}"
+    fb = _frozen_at(b3, require_b3_start=False)
+    fh = _frozen_at("HEAD", require_b3_start=True)
+    assert fb["base_commit"] == fh["base_commit"], (
+        "base_commit: 於 b3_start..HEAD 不得變"
     )
+    assert fb["scope_manifest"] == fh["scope_manifest"], (
+        "scope_manifest: 於 b3_start..HEAD 不得變"
+    )
+    # b3_start 值允許差；key 集合已由 parser 保證無 third:/重複
 
     # embed 常數：B3 觸及 brief_conformance 時，與 b3_start 樹比對
     if "scripts/brief_conformance_check.sh" in names:
@@ -1920,3 +1994,23 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
             "brief_conformance embed 被改（B-45 禁）"
         )
     assert "scripts/cx_run.sh" not in names
+
+
+def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
+    """CODEX-R2-P1-03：重複 b3_start／新增 third: 須被封閉集合拒絕。"""
+    good = FROZEN.read_text(encoding="utf-8")
+    _parse_frozen_hashes(good)  # 正常三行 ⇒ 通過
+
+    dup = good.rstrip("\n") + "\n" + "b3_start: " + ("a" * 40) + "\n"
+    try:
+        _parse_frozen_hashes(dup)
+        raise AssertionError("重複 b3_start 應被拒")
+    except AssertionError as e:
+        assert "重複" in str(e) or "恰好 3" in str(e), e
+
+    third = good.rstrip("\n") + "\nthird: deadbeef\n"
+    try:
+        _parse_frozen_hashes(third)
+        raise AssertionError("third: 行應被拒")
+    except AssertionError as e:
+        assert "未知" in str(e) or "恰好 3" in str(e) or "非法" in str(e), e

@@ -291,10 +291,29 @@ EOF
 # 規則②：rc 會被派工改變之指令集合有界——debt_ledger --has-open、gate_check token 新鮮度
 #         須標「派工後預期值」
 # ---------------------------------------------------------------------------
+# 🔴 二分封閉判準〔CODEX-R2-P1-04／STAMP-R4〕——禁第三種分支、禁列舉變體：
+#   A) 抽出 ≥1 個良構指令（成對、非巢狀、單行內閉合）⇒ 逐一 _has_trunc
+#   B) 其餘（未成對／巢狀／跨行／零抽取）⇒ 明確拒絕
 _extract_cmds() {
-  # $1=含 count: 之列 → stdout=所有反引號內指令（一行一則；無則空）
-  # 🔴 必須逐一抽取：舊 _extract_cmd 以 greedy sed 只取末組 ⇒ 較早截斷指令可繞過
-  printf '%s' "$1" | grep -oE '`[^`]*`' | sed 's/^`//;s/`$//'
+  # $1=含 count: 之列 → stdout=所有反引號內指令（一行一則）
+  # rc=0：良構且 ≥1；rc=2：非良構或零抽取（呼叫端須 FAIL）
+  _line="$1"
+  # 反引號個數（字節計）
+  _nbt="$(printf '%s' "${_line}" | tr -cd '`' | wc -c | tr -d ' ')"
+  if [ "${_nbt}" -eq 0 ]; then
+    return 2
+  fi
+  if [ $((_nbt % 2)) -ne 0 ]; then
+    return 2
+  fi
+  # 逐對抽取；`[^`]*` 保證單層非巢狀（巢狀會使配對錯位或奇數，已於上拒）
+  _cmds="$(printf '%s' "${_line}" | grep -oE '`[^`]*`' | sed 's/^`//;s/`$//')"
+  [ -n "${_cmds}" ] || return 2
+  # 再確認抽出組數 == nbt/2（防 grep 與計數漂移）
+  _ncmd="$(printf '%s\n' "${_cmds}" | grep -c . || true)"
+  [ "${_ncmd}" -eq $((_nbt / 2)) ] || return 2
+  printf '%s\n' "${_cmds}"
+  return 0
 }
 
 _has_trunc() {
@@ -324,19 +343,29 @@ _check_fact_verified() {
   _bad=0
   while IFS= read -r _line || [ -n "${_line}" ]; do
     [ -n "${_line}" ] || continue
-    # 規則①：僅明示 count: 標記；任一反引號指令命中截斷 ⇒ 非零
+    # 規則①：僅明示 count: 標記
     if printf '%s' "${_line}" | grep -q 'count:'; then
-      while IFS= read -r _cmd || [ -n "${_cmd}" ]; do
-        [ -n "${_cmd}" ] || continue
-        if _has_trunc "${_cmd}"; then
-          echo "ERROR: fact-verified 計數宣稱含截斷運算子（head/tail/-mN）"
-          echo "  違規列: ${_line}"
-          echo "  抽出指令: ${_cmd}"
-          echo "  修法: 改用不截斷指令重算 count，或去掉 count: 標記（改為非計數宣稱）"
-          _bad=1
-          break
-        fi
-      done < <(_extract_cmds "${_line}")
+      _cmds=""
+      if ! _cmds="$(_extract_cmds "${_line}")"; then
+        echo "ERROR: count: 宣稱之指令段須為成對反引號且不得為空"
+        echo "  違規列: ${_line}"
+        echo "  修法: 以成對反引號包住完整指令（單行、非巢狀），且至少一組"
+        _bad=1
+      else
+        while IFS= read -r _cmd || [ -n "${_cmd}" ]; do
+          [ -n "${_cmd}" ] || continue
+          if _has_trunc "${_cmd}"; then
+            echo "ERROR: fact-verified 計數宣稱含截斷運算子（head/tail/-mN）"
+            echo "  違規列: ${_line}"
+            echo "  抽出指令: ${_cmd}"
+            echo "  修法: 改用不截斷指令重算 count，或去掉 count: 標記（改為非計數宣稱）"
+            _bad=1
+            break
+          fi
+        done <<EOF
+${_cmds}
+EOF
+      fi
     fi
     # 規則②：有界集合——派工會改 rc 者須標「派工後預期值」
     if printf '%s' "${_line}" | grep -qE 'debt_ledger.*--has-open|gate_check.*token|token.*新鮮'; then

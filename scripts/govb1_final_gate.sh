@@ -206,8 +206,41 @@ EOF
 
 _GOVB1_TODO="${GOVB1_TODO:-docs/GOVB1_INPUT_QUALITY_TODO.md}"
 
+# 入口守衛：TODO readable ＋ Task 1.2／1.4 必要欄位（batch3 導出 fail-closed）
+# 缺／空／缺段 ⇒ 非零；禁吞 awk／grep 錯讓空 proxy 早退 PASS〔CODEX-R2-P0-02〕
+_govb1_todo_require_batch3() {
+  if [ ! -r "${_GOVB1_TODO}" ]; then
+    echo "batch3 FAIL: GOVB1_TODO 不可讀: ${_GOVB1_TODO}" >&2
+    return 1
+  fi
+  if [ ! -s "${_GOVB1_TODO}" ]; then
+    echo "batch3 FAIL: GOVB1_TODO 為空: ${_GOVB1_TODO}" >&2
+    return 1
+  fi
+  for _t in 1.2 1.4; do
+    if ! grep -qE "^### Task ${_t}( |$)" "${_GOVB1_TODO}"; then
+      echo "batch3 FAIL: TODO 缺 ### Task ${_t}: ${_GOVB1_TODO}" >&2
+      return 1
+    fi
+    _sec="$(_todo_task_section "${_t}")" || {
+      echo "batch3 FAIL: 讀取 Task ${_t} 區段失敗: ${_GOVB1_TODO}" >&2
+      return 1
+    }
+    [ -n "${_sec}" ] || {
+      echo "batch3 FAIL: Task ${_t} 區段空: ${_GOVB1_TODO}" >&2
+      return 1
+    }
+    printf '%s\n' "${_sec}" | grep -q '\*\*新建\*\*' \
+      || { echo "batch3 FAIL: Task ${_t} 缺 **新建** 欄: ${_GOVB1_TODO}" >&2; return 1; }
+    printf '%s\n' "${_sec}" | grep -q '\*\*修改\*\*' \
+      || { echo "batch3 FAIL: Task ${_t} 缺 **修改** 欄: ${_GOVB1_TODO}" >&2; return 1; }
+  done
+  return 0
+}
+
 # $1=task_id → stdout：該 Task 區段（### Task <id> … 下一 ### Task／EOF）
 _todo_task_section() {
+  [ -r "${_GOVB1_TODO}" ] || return 1
   awk -v t="$1" '
     BEGIN { p = 0 }
     $0 ~ ("^### Task " t "( |$)") { p = 1; print; next }
@@ -219,11 +252,14 @@ _todo_task_section() {
 # stdin → 只保留 repo 路徑形態之 backtick 內容
 _todo_path_tokens() {
   grep -oE '`(scripts|tests|templates|docs)/[A-Za-z0-9_./-]+`' | tr -d '`'
+  # grep 無匹配 ⇒ rc=1；對 caller 視為空 stdout（由上層判空 fail-closed）
+  return 0
 }
 
 # $1=task_id → stdout：新建欄路徑
 _todo_new_paths() {
-  _todo_task_section "$1" | awk '
+  _sec="$(_todo_task_section "$1")" || return 1
+  printf '%s\n' "${_sec}" | awk '
     /\*\*新建\*\*：/ { n = 1 }
     n && /\*\*只讀\*\*/ { exit }
     n { print }
@@ -232,7 +268,8 @@ _todo_new_paths() {
 
 # $1=task_id → stdout：修改欄路徑（至新建／只讀）
 _todo_mod_paths() {
-  _todo_task_section "$1" | awk '
+  _sec="$(_todo_task_section "$1")" || return 1
+  printf '%s\n' "${_sec}" | awk '
     /\*\*修改\*\*：/ { m = 1 }
     m && /\*\*新建\*\*：/ { exit }
     m && /\*\*只讀\*\*/ { exit }
@@ -241,23 +278,56 @@ _todo_mod_paths() {
 }
 
 # 批 3 proxy＝Task 1.2／1.4 新建欄（= _BATCH3_PROXY_PATHS）
+# 導出為空／TODO 異常 ⇒ 非零（fail-closed）；禁 pipe 吞 rc
 _g7_batch3_proxy_paths() {
-  { _todo_new_paths 1.2; _todo_new_paths 1.4; } | LC_ALL=C sort -u
+  _govb1_todo_require_batch3 || return 1
+  _p12="$(_todo_new_paths 1.2)" || {
+    echo "batch3 FAIL: Task 1.2 新建欄抽取失敗" >&2
+    return 1
+  }
+  _p14="$(_todo_new_paths 1.4)" || {
+    echo "batch3 FAIL: Task 1.4 新建欄抽取失敗" >&2
+    return 1
+  }
+  _out="$(printf '%s\n%s\n' "${_p12}" "${_p14}" | grep -v '^$' | LC_ALL=C sort -u)"
+  [ -n "${_out}" ] || {
+    echo "batch3 FAIL: proxy 導出為空（Task 1.2／1.4 新建欄無路徑）" >&2
+    return 1
+  }
+  printf '%s\n' "${_out}"
 }
 
 # 批 3 標的＝Task 1.2／1.4 修改∪新建（task-scoped M 僅對此集合）
 _g7_batch3_target_paths() {
-  {
-    _todo_mod_paths 1.2
-    _todo_new_paths 1.2
-    _todo_mod_paths 1.4
-    _todo_new_paths 1.4
-  } | LC_ALL=C sort -u
+  _govb1_todo_require_batch3 || return 1
+  _m12="$(_todo_mod_paths 1.2)" || {
+    echo "batch3 FAIL: Task 1.2 修改欄抽取失敗" >&2
+    return 1
+  }
+  _n12="$(_todo_new_paths 1.2)" || {
+    echo "batch3 FAIL: Task 1.2 新建欄抽取失敗" >&2
+    return 1
+  }
+  _m14="$(_todo_mod_paths 1.4)" || {
+    echo "batch3 FAIL: Task 1.4 修改欄抽取失敗" >&2
+    return 1
+  }
+  _n14="$(_todo_new_paths 1.4)" || {
+    echo "batch3 FAIL: Task 1.4 新建欄抽取失敗" >&2
+    return 1
+  }
+  _out="$(printf '%s\n%s\n%s\n%s\n' "${_m12}" "${_n12}" "${_m14}" "${_n14}" \
+    | grep -v '^$' | LC_ALL=C sort -u)"
+  [ -n "${_out}" ] || {
+    echo "batch3 FAIL: target 導出為空（Task 1.2／1.4 修改∪新建無路徑）" >&2
+    return 1
+  }
+  printf '%s\n' "${_out}"
 }
 
-# rc=0 ⇔ base..HEAD 含任一 proxy
+# rc=0 ⇔ base..HEAD 含任一 proxy；TODO 異常 ⇒ 非零（非「未開工」）
 _g7_batch3_started() {
-  _prox="$(_g7_batch3_proxy_paths)"
+  _prox="$(_g7_batch3_proxy_paths)" || return 1
   [ -n "${_prox}" ] || return 1
   while IFS= read -r -d '' p; do
     [ -n "${p}" ] || continue
@@ -271,9 +341,12 @@ _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
         #   1) 全量 allow：?? / A* 未 commit ⇒ FAIL（新建未交付）
         #   2) 批3開工後：僅批 3 標的路徑之 M/MM 未 commit ⇒ FAIL
         #   3) 非標的 ambient M（gate_check.sh 等）不觸發
-        _b3_targets="$(_g7_batch3_target_paths)"
+        # batch3 exporter fail-closed：TODO 異常不得讓 _b3_on 靜默 0
+        _b3_targets="$(_g7_batch3_target_paths)" || return 1
         _b3_on=0
-        _g7_batch3_started && _b3_on=1
+        if _g7_batch3_started; then _b3_on=1; fi
+        # _g7_batch3_started rc=1 可能是「未開工」或「TODO 異常」；
+        # 後者已在 _g7_batch3_target_paths 擋下（同一 require）
         _uc="${TMPD:-/tmp}/g7_uncommitted.$$"
         : > "${_uc}"
         while IFS= read -r -d '' rec; do
@@ -323,7 +396,8 @@ _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
 # 驗收時點＝B3 收案當下（兩 proxy 皆在 base..HEAD）；未開工 ⇒ 跳過。
 # 拒：合併單一 commit／逆序（1.4 先於 1.2）；「不防蓄意」誠實邊界保留。
 _gate_b3() {
-  _prox="$(_g7_batch3_proxy_paths)"
+  # proxy 導出失敗（缺 TODO 等）⇒ 非零，禁空 proxy 早退 PASS〔CODEX-R2-P0-02〕
+  _prox="$(_g7_batch3_proxy_paths)" || return 1
   _n_prox=0
   _n_hit=0
   while IFS= read -r p; do
@@ -334,7 +408,7 @@ _gate_b3() {
   done <<EOF
 ${_prox}
 EOF
-  # 未齊 → 不強制（批 3 進行中或未開工）
+  # 未齊 → 不強制（批 3 進行中或未開工）；_n_prox 必 >0（exporter 已非空守衛）
   [ "${_n_prox}" -gt 0 ] && [ "${_n_hit}" -eq "${_n_prox}" ] || return 0
 
   _bc="scripts/brief_conformance_check.sh"
@@ -365,35 +439,99 @@ EOF
     || { echo "GATE-B3 FAIL: 逆序——_check_fact_verified 先於 _check_id_pattern" >&2; return 1; }
 
   # 誤擋率 receipt（TODO §0.2 GATE-B3：T-1.2／T-1.4 全綠 ＋ 兩份 receipt）
-  # fail-closed：缺檔／空檔／缺母體／缺 95% CI／上界>5%／缺非實作者複核狀態 ⇒ 非零
+  # fail-closed〔CODEX-R2-P0-01〕：解析內容，禁只數檔名
+  #   唯一 T12 ＋ 唯一 T14（恰各一份，非「至少兩個」）
+  #   檔名 TASK_ID ≡ 內容 TASK_ID
+  #   母體定義欄存在；95% CI [x%, y%] 存在且上界 ≤5%
+  #   狀態＝「已完成非實作者複核」（「待複核」⇒ FAIL）
   # 誠實邊界：handoffs/* ∈ .git/info/exclude ⇒ 僅驗工作樹，無版控
   _rcp_dir="handoffs/receipts"
-  _rcp_ok=0
-  _rcp_ids=""
+  _t12_n=0
+  _t14_n=0
+  _t12_id=""
+  _t14_id=""
   shopt -s nullglob
   for _rcp in "${_rcp_dir}"/govb1-fp-*.md; do
-    [ -s "${_rcp}" ] || continue
-    grep -q '母體定義' "${_rcp}" || continue
-    # 非實作者複核狀態（待複核／已複核皆可；必須有欄位標記）
-    grep -qE '非實作者' "${_rcp}" || continue
-    grep -qE '複核' "${_rcp}" || continue
-    _ci_line="$(grep -oE '95% CI \[[0-9.]+%, [0-9.]+%\]' "${_rcp}" | head -1)"
-    [ -n "${_ci_line}" ] || continue
-    _ub="$(printf '%s' "${_ci_line}" | sed -nE 's/.*\[([0-9.]+)%, ([0-9.]+)%\].*/\2/p')"
-    [ -n "${_ub}" ] || continue
-    awk -v u="${_ub}" 'BEGIN{ if ((u+0)>5) exit 1; exit 0 }' || continue
-    _tid="$(basename "${_rcp}" .md)"
-    _tid="${_tid#govb1-fp-}"
-    # 不同 TASK_ID
-    case " ${_rcp_ids} " in
-      *" ${_tid} "*) continue ;;
+    [ -s "${_rcp}" ] || {
+      echo "GATE-B3 FAIL: receipt 空檔: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    }
+    _fn_tid="$(basename "${_rcp}" .md)"
+    _fn_tid="${_fn_tid#govb1-fp-}"
+    # 內容 TASK_ID（允許 `code` 或純文字）
+    _body_tid="$(
+      grep -E '^\s*[-*]\s*\*\*TASK_ID\*\*:' "${_rcp}" 2>/dev/null | head -1 \
+        | sed -E 's/.*TASK_ID\*\*:[[:space:]]*//;s/`//g;s/[[:space:]]*$//'
+    )"
+    [ -n "${_body_tid}" ] || {
+      echo "GATE-B3 FAIL: receipt 缺 TASK_ID 欄: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    }
+    [ "${_fn_tid}" = "${_body_tid}" ] || {
+      echo "GATE-B3 FAIL: 檔名 TASK_ID≠內容 TASK_ID（file=${_fn_tid} body=${_body_tid}）: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    }
+    # 槽位：T12（Task 1.2）／T14（Task 1.4）——後綴 -T12／-T14
+    _slot=""
+    case "${_fn_tid}" in
+      *-T12) _slot=T12 ;;
+      *-T14) _slot=T14 ;;
+      *)
+        echo "GATE-B3 FAIL: receipt TASK_ID 非 T12／T14 後綴: ${_fn_tid} (${_rcp})" >&2
+        shopt -u nullglob
+        return 1
+        ;;
     esac
-    _rcp_ids="${_rcp_ids}${_tid} "
-    _rcp_ok=$((_rcp_ok + 1))
+    grep -q '母體定義' "${_rcp}" || {
+      echo "GATE-B3 FAIL: receipt 缺母體定義: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    }
+    # 🔴「待複核」明確拒絕；須「已完成非實作者複核」
+    if grep -qE '待[^[:space:]]*複核|待非實作者' "${_rcp}"; then
+      echo "GATE-B3 FAIL: receipt 狀態為待複核（須已完成非實作者複核）: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    fi
+    grep -q '已完成非實作者複核' "${_rcp}" || {
+      echo "GATE-B3 FAIL: receipt 缺「已完成非實作者複核」狀態: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    }
+    _ci_line="$(grep -oE '95% CI \[[0-9.]+%, [0-9.]+%\]' "${_rcp}" | head -1)"
+    [ -n "${_ci_line}" ] || {
+      echo "GATE-B3 FAIL: receipt 缺 95% CI [x%, y%]: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    }
+    _ub="$(printf '%s' "${_ci_line}" | sed -nE 's/.*\[([0-9.]+)%, ([0-9.]+)%\].*/\2/p')"
+    [ -n "${_ub}" ] || {
+      echo "GATE-B3 FAIL: receipt 95% CI 上界解析失敗: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    }
+    awk -v u="${_ub}" 'BEGIN{ if ((u+0)>5) exit 1; exit 0 }' || {
+      echo "GATE-B3 FAIL: receipt 95% CI 上界>5%（${_ub}%）: ${_rcp}" >&2
+      shopt -u nullglob
+      return 1
+    }
+    if [ "${_slot}" = "T12" ]; then
+      _t12_n=$((_t12_n + 1))
+      _t12_id="${_fn_tid}"
+    else
+      _t14_n=$((_t14_n + 1))
+      _t14_id="${_fn_tid}"
+    fi
   done
   shopt -u nullglob
-  [ "${_rcp_ok}" -ge 2 ] \
-    || { echo "GATE-B3 FAIL: 須至少兩個不同 TASK_ID 之誤擋率 receipt（現 ${_rcp_ok}；dir=${_rcp_dir}/govb1-fp-*.md；須含母體定義／95% CI 上界≤5%／非實作者複核狀態）" >&2; return 1; }
+  [ "${_t12_n}" -eq 1 ] && [ "${_t14_n}" -eq 1 ] \
+    || {
+      echo "GATE-B3 FAIL: 須恰好各一份 T12＋T14 receipt（T12=${_t12_n} T14=${_t14_n}；dir=${_rcp_dir}/govb1-fp-*.md；須含母體定義／95% CI 上界≤5%／已完成非實作者複核）" >&2
+      return 1
+    }
   return 0
 }
 
@@ -486,8 +624,9 @@ _plan() {   # stdout: FILE\t<path> 或 UNRESOLVED\t<name>\t<reason>
   done
 }
 # 唯讀 probe：anti-drift 測試必須呼叫 production exporter，禁複製 parser（CODEX-R1-P1-04）
-if [ "${1:-}" = "--print-batch3-paths" ]; then _g7_batch3_proxy_paths; exit 0; fi
-if [ "${1:-}" = "--print-batch3-targets" ]; then _g7_batch3_target_paths; exit 0; fi
+# 🔴 exporter 失敗須非零（禁 exit 0 吞錯）〔CODEX-R2-P0-02〕
+if [ "${1:-}" = "--print-batch3-paths" ]; then _g7_batch3_proxy_paths; exit $?; fi
+if [ "${1:-}" = "--print-batch3-targets" ]; then _g7_batch3_target_paths; exit $?; fi
 if [ "${1:-}" = "--print-plan" ]; then _plan; exit 0; fi
 
 _names() { _rows | cut -d'|' -f1; }
