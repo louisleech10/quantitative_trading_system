@@ -330,3 +330,5 @@ B3 是第一批真的改判斷邏輯的。中間卡住一次，根因是我把�
 <!-- b2-r2-meta-freeze-sync: 2026-08-08 meta expected-set + gate TSV msg 後 plain-docs 時序同步 -->
 
 <!-- b2-r3-meta-multiset-sync: 2026-08-08 meta 列數契約拒重複列後 plain-docs 時序同步 -->
+
+<!-- b2-t11-lifecycle-sync: 2026-08-08 GOVB1 Task 1.1 lifecycle matrix 後 plain-docs 時序同步 -->
