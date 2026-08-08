@@ -291,9 +291,10 @@ EOF
 # 規則②：rc 會被派工改變之指令集合有界——debt_ledger --has-open、gate_check token 新鮮度
 #         須標「派工後預期值」
 # ---------------------------------------------------------------------------
-# 🔴 二分封閉判準〔CODEX-R2-P1-04／STAMP-R4〕——禁第三種分支、禁列舉變體：
-#   A) 抽出 ≥1 個良構指令（成對、非巢狀、單行內閉合）⇒ 逐一 _has_trunc
-#   B) 其餘（未成對／巢狀／跨行／零抽取）⇒ 明確拒絕
+# 🔴 二分封閉判準〔CODEX-R2-P1-04／STAMP-R4／review-r3 NEW-CLASS〕——禁第三種分支、禁列舉變體：
+#   A) 抽出 ≥1 個良構指令（成對、非巢狀、單行內閉合、段間僅分隔符、trim 後非空）⇒ 逐一 _has_trunc
+#   B) 其餘（未成對／巢狀／跨行／零抽取／段間含詞元／純空白段）⇒ 明確拒絕
+# 段間分隔符有界集合（禁開放式「非英數皆分隔符」）：[[:space:]] | ； | ; | 、 | ,
 _extract_cmds() {
   # $1=含 count: 之列 → stdout=所有反引號內指令（一行一則）
   # rc=0：良構且 ≥1；rc=2：非良構或零抽取（呼叫端須 FAIL）
@@ -306,10 +307,39 @@ _extract_cmds() {
   if [ $((_nbt % 2)) -ne 0 ]; then
     return 2
   fi
-  # 逐對抽取；`[^`]*` 保證單層非巢狀（巢狀會使配對錯位或奇數，已於上拒）
-  _cmds="$(printf '%s' "${_line}" | grep -oE '`[^`]*`' | sed 's/^`//;s/`$//')"
+  # 以 ` 切開：奇數欄=指令段、偶數欄(≥2)=段間文字。
+  # 段間必須為純分隔符；指令段 trim 後不得為空（關閉 `` `   ` `` 假綠）。
+  # 偶數巢狀反例 `` `echo outer `date` more` ``：段間=`date` 含詞元 ⇒ 拒。
+  _cmds="$(
+    printf '%s' "${_line}" | awk '
+      BEGIN { FS = "`" }
+      {
+        nbt = NF - 1
+        if (nbt <= 0 || nbt % 2 != 0) exit 2
+        ncmd = 0
+        out = ""
+        for (i = 2; i <= NF; i += 2) {
+          cmd = $i
+          gsub(/^[[:space:]]+/, "", cmd)
+          gsub(/[[:space:]]+$/, "", cmd)
+          if (cmd == "") exit 2
+          if (ncmd > 0) {
+            inter = $(i - 1)
+            tmp = inter
+            gsub(/[[:space:]；;、,]/, "", tmp)
+            if (tmp != "") exit 2
+          }
+          ncmd++
+          if (out != "") out = out "\n"
+          out = out $i
+        }
+        if (ncmd == 0 || ncmd != nbt / 2) exit 2
+        print out
+        exit 0
+      }
+    '
+  )" || return 2
   [ -n "${_cmds}" ] || return 2
-  # 再確認抽出組數 == nbt/2（防 grep 與計數漂移）
   _ncmd="$(printf '%s\n' "${_cmds}" | grep -c . || true)"
   [ "${_ncmd}" -eq $((_nbt / 2)) ] || return 2
   printf '%s\n' "${_cmds}"

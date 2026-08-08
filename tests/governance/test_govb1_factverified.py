@@ -221,6 +221,53 @@ def test_t14_count_nested_backtick_rc_nonzero(tmp_path: Path) -> None:
     assert proc.returncode != 0, proc.stdout + proc.stderr
 
 
+def test_t14_count_nested_even_backtick_rc_nonzero() -> None:
+    """偶數巢狀反引號（NEW-CLASS）⇒ 段間含詞元 ⇒ rc=2。
+
+    codex 活體：`` `echo outer `date` more` `` 修前 rc=0 假綠。
+    """
+    proc = _check(FIXTURE / "brief_factverified_nested_even.md")
+    assert proc.returncode == 2, (
+        "偶數巢狀反引號須明確拒絕（段間 date 非分隔符）\n"
+        + proc.stdout
+        + proc.stderr
+    )
+    out = proc.stdout + proc.stderr
+    assert "成對反引號" in out or "不得為空" in out, out
+
+
+def test_t14_count_blank_segment_rc_nonzero() -> None:
+    """純空白指令段 `` `   ` `` ⇒ 視同零抽取 ⇒ rc≠0（COMPOSER-R3-P3-00）。"""
+    proc = _check(FIXTURE / "brief_factverified_blank_seg.md")
+    assert proc.returncode != 0, (
+        "純空白指令段須明確拒絕\n" + proc.stdout + proc.stderr
+    )
+    out = proc.stdout + proc.stderr
+    assert "成對反引號" in out or "不得為空" in out, out
+
+
+def test_t14_count_blank_segment_inline_rc_nonzero(tmp_path: Path) -> None:
+    """inline 純空白段（與 fixture 等價）⇒ rc≠0。"""
+    p = _write_consult(
+        tmp_path,
+        "blank_inline.md",
+        "fact-verified: count: 1 — `   `",
+    )
+    proc = _check(p)
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+
+
+def test_t14_count_nested_even_inline_rc_2(tmp_path: Path) -> None:
+    """inline 偶數巢狀（與 fixture 等價）⇒ rc=2。"""
+    p = _write_consult(
+        tmp_path,
+        "nested_even_inline.md",
+        "fact-verified: count: 2 — `echo outer `date` more`",
+    )
+    proc = _check(p)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+
+
 # ── M1 mutation ──────────────────────────────────────────────────
 
 
