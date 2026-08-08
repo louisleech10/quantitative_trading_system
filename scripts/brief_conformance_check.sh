@@ -190,9 +190,102 @@ if [ "${_bk}" = "stamp" ]; then
   [ -f "${stamp_target}" ] || { echo "ERROR: stamp-target 檔不存在: ${stamp_target}" >&2; exit 2; }
 fi
 
+# ---------------------------------------------------------------------------
+# Task 1.2 — finding ID 樣板驗證（三限縮：findings-kind ＋ active ＋ placeholder-aware ＋ canonical）
+# CANONICAL_ID_RE 引用 completeness_check.sh，禁重寫。
+# COMPOSER-R1-P1-03：_is_active 須含任務區反引號內 FAMILY-SEG-P token（非僅宣告行）。
+# ---------------------------------------------------------------------------
+_canon_re() {
+  grep -m1 '^CANONICAL_ID_RE=' "${SCRIPT_DIR}/completeness_check.sh" | cut -d"'" -f2
+}
+
+_is_findings_kind() {
+  # $1=brief-kind 值
+  case "$1" in
+    review|consult|closure) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_strip_code_fences() {
+  # stdin → stdout：去掉 ``` … ``` 區塊（邊界②：fence 內不掃）
+  awk '
+    /^```/ { fence = !fence; next }
+    !fence { print }
+  '
+}
+
+_is_placeholder_token() {
+  # $1=token；placeholder-aware：角括號／字面 FAMILY／YOUR／xxx 等
+  case "$1" in
+    *'<'*|*'>'*|*…*|*'...'*) return 0 ;;
+    FAMILY-*|YOUR-*|*PLACEHOLDER*|*xxx*|*XXX*) return 0 ;;
+  esac
+  return 1
+}
+
+# 自 brief 抽出「active」ID-like token（去 fence；反引號內 ＋ 行首 ## 標題）
+# 樣板族：FAMILY-SEG-P[0-3]-NN（SEG 可為 B0R／R1 等，後續再套 canonical）
+_active_id_tokens() {
+  # $1=brief_path
+  _strip_code_fences < "$1" | awk '
+    # 反引號內 token
+    {
+      line = $0
+      while (match(line, /`[A-Z]+-[A-Za-z0-9]+-P[0-3]-[0-9]{2,}`/)) {
+        tok = substr(line, RSTART + 1, RLENGTH - 2)
+        print tok
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+    # 行首 ## FAMILY-… 標題（canonical finding heading）
+    /^##[[:space:]]+[A-Z]+-[A-Za-z0-9]+-P[0-3]-[0-9]{2,}([[:space:]]|$)/ {
+      if (match($0, /[A-Z]+-[A-Za-z0-9]+-P[0-3]-[0-9]{2,}/)) {
+        print substr($0, RSTART, RLENGTH)
+      }
+    }
+  '
+}
+
+_check_id_pattern() {
+  # $1=brief_path → rc 0=ok；非 0=不合規（訊息走 stdout，與既有 ERROR 同通道）
+  _brief_p="$1"
+  _bk_val="$(grep -E '^brief-kind:' "${_brief_p}" 2>/dev/null | head -1 \
+    | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//')"
+  _is_findings_kind "${_bk_val}" || return 0
+
+  _re="$(_canon_re)"
+  [ -n "${_re}" ] || {
+    echo "ERROR: 無法自 completeness_check.sh 讀取 CANONICAL_ID_RE"
+    return 1
+  }
+
+  _bad=0
+  while IFS= read -r _tok; do
+    [ -n "${_tok}" ] || continue
+    _is_placeholder_token "${_tok}" && continue
+    # canonical 全字匹配（_re 已含 ^$）
+    if ! printf '%s\n' "${_tok}" | grep -qE "${_re}"; then
+      echo "ERROR: brief 內 finding ID 樣板不合規"
+      echo "  違規 token: ${_tok}"
+      echo "  期望樣式:   ${_re}"
+      # 修法：指出中間段（第二欄）
+      _mid="$(printf '%s' "${_tok}" | awk -F- '{print $2}')"
+      echo "  修法:       把 ${_mid} 改為 R<數字>（例：B0R → R1；須符合 R[0-9]+）"
+      _bad=1
+    fi
+  done < <(_active_id_tokens "${_brief_p}")
+
+  [ "${_bad}" -eq 0 ]
+}
+
 if [ -n "${emit_file}" ]; then
   # 兩行固定格式；第 2 行恆存在（非 stamp 為空行），呼叫端可用 sed -n '2p' 穩定取值
   printf '%s\n%s\n' "${_bk}" "${stamp_target}" > "${emit_file}" || {
     echo "ERROR: 無法寫入 --emit 檔: ${emit_file}" >&2; exit 2; }
 fi
+
+# Task 1.2：ID 樣板（findings-kind 限縮內）
+_check_id_pattern "${brief}" || exit 2
+
 exit 0
