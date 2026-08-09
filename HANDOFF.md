@@ -1,5 +1,6 @@
 # Handoff
 
+REF:handoffs/reconcile/20260810-govb1-b9-review-r1/synth.md
 REF:handoffs/reconcile/20260810-govb1-b8-review-r1/synth.md
 REF:handoffs/reconcile/20260809-govb1-b7-review-r1/synth.md
 REF:handoffs/reconcile/20260809-govb1-b7-consult-r1/synth.md
@@ -9,23 +10,24 @@ REF:handoffs/reconcile/20260809-govb1-b3-review-r8/synth.md
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-10 | **Branch**: main | 實作端＝主委自任；review＝codex+composer
 
-## 🔴 接手第一件事：**B9 實作**（Task 4.2 / 零 findings 契約）
+## 🔴 接手第一件事：**B10 實作**（Task 4.3 / `票 B-31` 補救層）
 
-**路線（使用者已定，不得再開順序討論）**：**B9 → B10 → 殘留票**。
+**路線（使用者已定，不得再開順序討論）**：**B10 → 殘留票**。
 
-- **B9**＝Task 4.2。修改 `scripts/govflow_lifecycle.json`（新增 `zero_findings_contract` 節，
-  **append-only，禁改既有節**）、`scripts/completeness_check.sh`（`_validate_finding_body`）、
-  `templates/COMMITTEE_FINDING_TEMPLATE.md`；新建 `tests/governance/test_govb1_zero_findings.py`。
-  四者**皆在 manifest allow 內** ⇒ 一般 commit。
-  🔴 **唯一許可的行為變更＝hollow body 非空判定**（`--single` 對 `hollow_p300` 由 0 → 非 0）。
-  改了就**必須同步更新** `test_govb1_zeroid_no_regression.py` 的 `SINGLE_BASELINE`
-  並在收斂檔附委員裁定——那張表就是為了讓這件事不能靜默發生。
-  🔴 契約三件事缺一不可：①sentinel 形態 ②body 必填欄＋**語意非空** ③**findings 的落點**
-  （每種 `brief-kind` 的 findings 寫進哪個檔）。③ 正是 `票 B-52` 的病灶。
-- **B10**＝Task 4.3（`cx_run.sh` `format-failed` 補救層）。
-  🔴 **B10 須接手 B8 的 `cx_run` 第三欄**（兩家一致移交，見 `REF` 之 b8-review-r1 收斂檔 C5）：
-  `test_cxrun_column_is_blocked_not_passing` 是逼債條款，
-  B10 一加「保留既有輸出」的 stub 模式它就會紅，屆時須補上三輸入 × `result_state` 矩陣。
+**B10**＝Task 4.3。修改 `scripts/cx_run.sh`（`_run_format_check_if_needed()` 改寫、
+新增 `_emit_fixup_list()`）；新建 `tests/governance/test_govb1_b31_recovery.py`。兩者皆在 manifest allow 內。
+
+🔴 **B10 同時要接手三件移交**（皆有委員明確核可，見 `REF` 收斂檔）：
+
+| 移交自 | 內容 | 錨點 |
+|---|---|---|
+| B8 C5 | `cx_run` 三入口矩陣第三欄 | `test_cxrun_column_is_blocked_not_passing` 是**逼債條款**——B10 一加「保留既有輸出」的 stub 模式它就會紅，屆時**必須**補上三輸入 × `result_state` 矩陣 |
+| B9 C5 | 零 findings 契約第 ③ 件（findings 落點）的**強制點** | `govflow_lifecycle.json` 的 `findings_destination` 目前只是宣告，沒有腳本會擋 append 進 stamp-target |
+| `票 B-52` | stamp 輪 SoT 與 `debt_clear` 漂移 | `produces_findings:false` 對 stamp 輪是**錯的**；本 session 三次因此銷帳鎖死 |
+
+Task 4.3 要點：`format-failed` 時輸出**逐條可修補清單**（每條含 `檔:行`＋違規類型＋修法一行）；
+該輪帳不因格式失敗而卡住；🔴 自檢要求**擴及主委自產物**（顯式傳 `--family` 即跑）。
+🔴 **不可做**：不得放寬 `debt_clear` 只接受 `success` 的守衛（三值契約凍結）。
 
 🔴 **在 B9／B10 修好 `票 B-52` 根因之前，每一份 review／stamp brief 都必須寫入這段硬性條款**：
 findings 用 canonical `## <FAMILY>-R<n>-P<0-3>-<NN>`；0 findings 寫 sentinel `…-P3-00`
@@ -38,8 +40,20 @@ findings 用 canonical `## <FAMILY>-R<n>-P<0-3>-<NN>`；0 findings 寫 sentinel 
 |---|---|---|
 | **B7**（`claude` 段收窄；`票 B-26` 一併結清 `GOVB0 Task 2.2`） | `a5ddf05` OOE | 兩家 APPROVED（三輪）；已 push |
 | **B8**（Task 4.1 findings-kind 判準） | `52c4a1a` `4a9de37` OOE `b6a9da2` | **收案**：r1 十條全修、stamp-r1 兩家 APPROVED |
+| **B9**（Task 4.2 零 findings 單一契約） | `39037f5` `be9fda0` | **收案**：r1 六條全修、stamp-r1 兩家 APPROVED |
 
-測試 1129 → **1196**。B8 的 §V-FP receipt 已完成非實作者複核（stamp-r1，MISMATCHES=0、FP=0）。
+測試 1129 → **1222**。B8 的 §V-FP receipt 已完成非實作者複核（MISMATCHES=0、FP=0）。
+
+🔴 **`票 B-51` 已由委員給出可執行步驟**（B9 stamp-r1 收斂檔 C3）：
+唯一機械路徑會碰欄外檔時 → **停碼** → 列欄外檔＋機械必然性證據＋不改的後果 →
+開 consult／stamp brief 只問「欄外同步是否核准」（附 `git diff --numstat` 預估）→
+**等 APPROVED 或使用者裁決再動手；無裁決則 BLOCKED**。
+時程不允許時，須由**使用者**在 brief 預先寫「欄外檔 X／Y 允許同步」。
+🔴 並補：**「問了」≠「可不做」——裁決只解鎖欄外，不解鎖縮 scope。**
+
+🔴 **自我記錄不得換取通過**（B9 stamp-r1 C4，兩家一致）：
+收斂檔可記主委過失，但**戳記判準只看機械複驗結果**；
+brief **不得**以「已認錯」作為請求核可的理由。
 
 ## 🔴 本 session 主委被抓到的（不淡化，供接手者引以為戒）
 
