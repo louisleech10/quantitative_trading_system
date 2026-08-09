@@ -104,12 +104,23 @@ def test_real_fixture_still_passes() -> None:
         ("空白內容", "   ", "   ", True),
         ("單一半形標點", ".", ".", True),
         ("單一全形標點", "。", "。", True),
-        ("多個標點", "……", "———", True),
+        ("單一非 ASCII 字", "д", "д", True),
         ("僅斷言有內容", "有實質說明", "  ", True),
         ("僅碼證有內容", " ", "rc=0 實跑", True),
         ("中文實質", "斷言內容", "碼證內容", False),
         ("英數實質", "assertion body", "rc=0", False),
         ("標點夾實質", "。x。", "。1。", False),
+        # 🔴 `CODEX-R1-P1-02`：初版白名單（ASCII 英數 ∪ CJK 表意文字位元組範圍）
+        #    比 SPEC 更嚴，把下列五語系的實質內容全誤判成空殼（五例實測 rc=1）。
+        #    自己加嚴而弄壞五個語系 ⇒ 已改回 SPEC 原邊界（只擋空白／單一字元）。
+        ("西里爾", "данные проверены", "rc=0 подтверждено", False),
+        ("阿拉伯", "بيانات كاملة", "تم التحقق rc=0", False),
+        ("希臘", "Δεδομένα πλήρη", "επαληθεύτηκε", False),
+        ("日文假名", "あいうえお", "検証済み rc=0", False),
+        ("韓文諺文", "한국어 본문", "검증 완료", False),
+        # 具名殘留：SPEC 只界定「單一標點」，多個標點會通過。
+        # 再加嚴就是重蹈 P1-02 的覆轍（會連帶弄壞語系），刻意不做。
+        ("多個標點（具名殘留：會通過）", "……", "———", False),
     ],
 )
 def test_substantive_boundary(
@@ -130,11 +141,72 @@ def test_substantive_boundary(
         assert got == 0, f"{label}: 實質內容卻被誤擋 rc={got}"
 
 
-def test_substantive_rule_is_whitelist_not_blacklist() -> None:
-    """契約節必須以白名單描述判準（可導出），而非列舉標點。"""
+def test_substantive_rule_is_language_neutral() -> None:
+    """🔴 契約節須記載**語言中立**判準，不得再出現語系白名單。
+
+    初版把判準寫成「ASCII 英數 ∪ CJK 表意文字位元組範圍」，
+    那是**語系白名單**——結果誤擋五個語系（`CODEX-R1-P1-02`）。
+    正確判準只依 SPEC 邊界：空白／單一字元。
+    """
     rule = _contract()["substantive_rule"]
-    assert rule.get("allow_ascii_alnum") is True
-    assert rule.get("allow_cjk_ideograph_lead_bytes") == ["\\344", "\\351"]
+    assert rule.get("language_neutral") is True
+    assert "allow_cjk_ideograph_lead_bytes" not in rule, (
+        "語系白名單復活 ⇒ 會再次誤擋非 CJK 語系"
+    )
+
+
+def test_fenced_labels_do_not_satisfy_required_fields(tmp_path: Path) -> None:
+    """🔴 `CODEX-R1-P1-04`：程式碼區塊內的字面標籤不得滿足必填欄。
+
+    否則外層留白、fence 內寫 `**斷言**: x` 就能偽造成有內容。
+    """
+    f = tmp_path / "fence.md"
+    f.write_text(
+        "## CODEX-R1-P3-00\n**斷言**:\n**碼證**:\n\n```\n**斷言**: x\n**碼證**: y\n```\n",
+        encoding="utf-8",
+    )
+    assert _rc_single(f) != 0
+
+
+def test_duplicate_label_on_one_line_is_rejected(tmp_path: Path) -> None:
+    """🔴 `CODEX-R1-P1-04`：同一行重複同一標籤 ⇒ fail-closed。
+
+    原本 `sub(".*label", ...)` 是貪婪的（取**最後**一次之後），
+    會讓空的外層欄位「借用」內層內容而過關。
+    現改為取**第一次**出現，且同行重複即判不合格（格式畸形，解析權不該落在檢查器手上）。
+    """
+    f = tmp_path / "dup.md"
+    f.write_text(
+        "## CODEX-R1-P3-00\n**斷言**: **斷言**: x\n**碼證**: **碼證**: y\n",
+        encoding="utf-8",
+    )
+    assert _rc_single(f) != 0
+
+
+def test_strict_flag_is_not_env_controlled() -> None:
+    """🔴 `CODEX-R1-P1-03`：非空判定不得由環境變數控制。
+
+    env 可被外部 shell 汙染 ⇒ 使用者環境裡剛好有該變數就會讓 `--lock` 一併開啟，
+    把 `G-1` 明令「不得翻轉」的那一格翻掉。改用位置參數（關不掉也汙染不了）。
+    """
+    src = (REPO_ROOT / "scripts" / "completeness_check.sh").read_text(encoding="utf-8")
+    assert "BODY_SUBSTANCE_STRICT" not in src, (
+        "非空判定仍受環境變數控制 ⇒ --lock 可被 env 汙染而翻轉"
+    )
+    assert 'local strict="${2:-0}"' in src, "strict 未改為位置參數"
+
+
+def test_lock_path_unaffected_by_polluted_env(tmp_path: Path) -> None:
+    """端到端：即使 env 帶了舊變數名，`--lock` 那格仍不得翻轉。"""
+    f = tmp_path / "hollow.md"
+    f.write_text(_finding("   ", "   "), encoding="utf-8")
+    env = os.environ.copy()
+    env["BODY_SUBSTANCE_STRICT"] = "1"
+    rc = subprocess.run(
+        ["bash", str(COMPLETENESS), "--single", str(f), "--family", "codex"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=False, env=env,
+    ).returncode
+    assert rc != 0, "交件路徑本來就該擋 hollow"
 
 
 def test_mut_drop_substantive_check_regresses(tmp_path: Path) -> None:

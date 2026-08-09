@@ -237,8 +237,12 @@ _validate_finding_body() {
   #   （Task 4.2 唯一許可的行為變更），但 `--lock` 那格是 **rc 不變**。
   #   若在 `_validate_finding_body` 內無條件啟用，`--lock` 會一起翻 ⇒ 違反 G-1。
   #   （主委實測撞到：`test_entry_lock_rc_matches_baseline[hollow_p300]` 轉紅。）
-  # ⇒ 由呼叫端以 BODY_SUBSTANCE_STRICT 顯式開啟；預設關閉（既有路徑行為不變）。
-  local strict="${BODY_SUBSTANCE_STRICT:-0}"
+  # ⇒ 由呼叫端以**第二位置參數**顯式開啟；預設關閉（既有路徑行為不變）。
+  # 🔴 **不用環境變數**〔`CODEX-R1-P1-03`〕：env 可被外部 shell 汙染
+  #   ⇒ 使用者環境裡剛好有該變數就會讓 `--lock` 一併開啟，
+  #   把 `G-1` 明令「不得翻轉」的那一格翻掉。位置參數關不掉也汙染不了。
+  local strict="${2:-0}"
+  case "${strict}" in 0|1) : ;; *) strict=0 ;; esac
   # 🔴 LC_ALL=C：substantive() 以**位元組**判 CJK 前導範圍（\344–\351）。
   #   不加的話 awk 在 UTF-8 locale 下 substr() 是字元語意，
   #   單一位元組比較會切碎多位元組字元並吐出非法 UTF-8（實測 UnicodeDecodeError）。
@@ -293,22 +297,56 @@ _validate_finding_body() {
     #   全形標點（U+3000–U+303F，如 。、：「」）前導為 \343 ⇒ **不算實質**，
     #   故「內容只有一個全形句號」會被擋（SPEC 邊界 ②）。
     #   LC_ALL=C 逐位元組比較，故此範圍判定是位元組層級、與 locale 無關。
-    function substantive(s,   i, c) {
-      gsub(/[[:space:]]/, "", s)
-      if (s == "") return 0
+    # 判準（**語言中立**，逐字忠於 SPEC 邊界，不多不少）：
+    #   ① 去空白後為空 ⇒ 非實質
+    #   ② 去空白後**恰一個字元**且非 ASCII 英數 ⇒ 非實質（SPEC 邊界②「單一標點」）
+    #   ③ 其餘 ⇒ 實質
+    #
+    # 🔴 初版用「ASCII 英數 ∪ CJK 表意文字位元組範圍」當白名單，比 SPEC **更嚴**，
+    #   結果把只有西里爾／阿拉伯／希臘／日文假名／韓文諺文的實質欄位全判成空殼
+    #   〔`CODEX-R1-P1-02`，五例實測 rc=1〕。**自己加嚴而弄壞五個語系**，已改回 SPEC 原邊界。
+    # 🔴 字元數以「非 UTF-8 continuation byte（\200–\277）」計，故 LC_ALL=C 下仍是字元語意。
+    # 具名殘留：**多個**標點（如 `……`）會通過——SPEC 只界定「單一標點」，
+    #   再加嚴就是重蹈上述覆轍，不做。
+    function uchars(s,   i, c, n) {
+      n = 0
       for (i = 1; i <= length(s); i++) {
         c = substr(s, i, 1)
-        if (c ~ /[A-Za-z0-9]/) return 1
-        if (c >= "\344" && c <= "\351") return 1
+        if (c < "\200" || c > "\277") n++
       }
-      return 0
+      return n
     }
-    function field_body(line, label,   rest) {
-      rest = line
-      sub(".*\\*\\*" label "\\*\\*[：:]?", "", rest)
-      return rest
+    function substantive(s,   n) {
+      gsub(/[[:space:]]/, "", s)
+      if (s == "") return 0
+      n = uchars(s)
+      if (n == 1 && s !~ /^[A-Za-z0-9]$/) return 0
+      return 1
     }
-    id != "" {
+    # 取「**<label>**」之後的內容。
+    # 🔴 用**第一次**出現而非最後一次〔`CODEX-R1-P1-04`〕：
+    #   `sub(".*label", ...)` 是貪婪的，會取最後一次之後 ⇒
+    #   `**斷言**: **斷言**: x` 這種重複標籤會讓外層空欄位「借用」內層內容而過關。
+    function label_count(line, label,   tag, n, p) {
+      tag = "**" label "**"; n = 0
+      while ((p = index(line, tag)) > 0) { n++; line = substr(line, p + length(tag)) }
+      return n
+    }
+    function field_body(line, label, p, tag) {
+      tag = "**" label "**"
+      # 🔴 同一行重複同一標籤 ⇒ 判**不合格**〔`CODEX-R1-P1-04`〕：
+      #   格式畸形，且會讓「哪一段才是欄位內容」變成解析者的選擇。fail-closed。
+      if (label_count(line, label) > 1) return ""
+      p = index(line, tag)
+      if (p == 0) return ""
+      line = substr(line, p + length(tag))
+      sub(/^[：:]/, "", line)
+      return line
+    }
+    # 🔴 fence 追蹤〔CODEX-R1-P1-04〕：程式碼區塊內的字面標籤不得滿足必填欄，
+    #   否則外層留白、fence 內寫 `**斷言**: x` 就能偽造成有內容。
+    /^[[:space:]]*(```|~~~)/ { in_fence = !in_fence; next }
+    id != "" && !in_fence {
       if ($0 ~ /\*\*斷言\*\*/ && (!strict || substantive(field_body($0, "斷言")))) seen_assert=1
       if ($0 ~ /\*\*碼證\*\*/ && (!strict || substantive(field_body($0, "碼證")))) seen_code=1
       if ($0 ~ /\*\*來源摘要\*\*/ && $0 ~ /#[0-9a-fA-F]{12}/) seen_digest=1
@@ -1530,7 +1568,7 @@ if [ -n "${SINGLE_ARG}" ]; then
   _check_same_file_dups "${SINGLE_ARG}" "${_single_ids}" || _single_rc=1
   # ③ 空殼 finding（缺 **斷言**/**碼證**）+ P0/P1 來源摘要 digest
   # GOVB1 Task 4.2：交件路徑啟用 hollow body 非空判定（三入口矩陣中唯一許可翻轉的一格）
-  BODY_SUBSTANCE_STRICT=1 _validate_finding_body "${SINGLE_ARG}" || _single_rc=1
+  _validate_finding_body "${SINGLE_ARG}" 1 || _single_rc=1
   if [ "${_single_rc}" -ne 0 ]; then
     echo "COMPLETENESS FAIL(single): ${SINGLE_ARG} 格式不合規（見上）。" >&2
     echo "  這是**交件當下**的檢查：現在修比等到 reconcile 收集時才發現省一整輪。" >&2

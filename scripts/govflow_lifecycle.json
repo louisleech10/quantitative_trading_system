@@ -129,15 +129,11 @@
       "**碼證**"
     ],
     "substantive_rule": {
-      "_doc": "白名單判準（禁標點黑名單）：去除空白後，須含 ASCII 英數或 CJK 表意文字。\n  CJK 表意文字 U+4E00–U+9FFF 之 UTF-8 前導位元組落在 \\344–\\351；\n  全形標點 U+3000–U+303F 前導為 \\343 ⇒ 不算實質（SPEC 邊界②：單一標點須 rc≠0）。\n  實作於 completeness_check.sh 之 substantive()，逐位元組比較（LC_ALL=C），與 locale 無關。",
-      "allow_ascii_alnum": true,
-      "allow_cjk_ideograph_lead_bytes": [
-        "\\344",
-        "\\351"
-      ]
+      "_doc": "語言中立判準，逐字忠於 SPEC 邊界不多不少：\n  ① 去空白後為空 ⇒ 非實質\n  ② 去空白後恰一個字元且非 ASCII 英數 ⇒ 非實質（SPEC 邊界②「單一標點」）\n  ③ 其餘 ⇒ 實質\n🔴 初版寫成「ASCII 英數 ∪ CJK 表意文字位元組範圍」＝語系白名單，比 SPEC 更嚴，\n  誤擋西里爾／阿拉伯／希臘／假名／諺文五語系（CODEX-R1-P1-02，五例實測 rc=1）。\n  自己加嚴而弄壞五個語系 ⇒ 已改回。具名殘留：多個標點（如 ……）會通過，\n  SPEC 只界定單一標點，再加嚴就是重蹈覆轍。\n字元數以「非 UTF-8 continuation byte」計，LC_ALL=C 下仍是字元語意。",
+      "language_neutral": true
     },
     "enforced_entrypoints": {
-      "_doc": "🔴 只在交件路徑（--single）啟用。SPEC 三入口矩陣明定 --lock 那格是「rc 不變」，\n  無條件啟用會使 --lock 一併翻轉而違反 G-1 全域禁令（主委實測撞到）。",
+      "_doc": "🔴 只在交件路徑（--single）啟用。SPEC 三入口矩陣明定 --lock 那格是「rc 不變」，\n  無條件啟用會使 --lock 一併翻轉而違反 G-1 全域禁令（主委實測撞到）。\n🔴 開關用**位置參數**不用環境變數（CODEX-R1-P1-03）：env 會被外部 shell 汙染，使用者環境剛好有該變數就會讓 --lock 一併開啟而翻掉 G-1 禁止翻轉的那一格。",
       "single": true,
       "lock": false
     },
