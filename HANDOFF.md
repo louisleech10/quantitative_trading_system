@@ -1,86 +1,91 @@
 # Handoff
 
-REF:handoffs/reconcile/20260809-govb1-b3-review-r8/synth.md
+REF:handoffs/reconcile/20260809-govb1-b7-review-r1/synth.md
 REF:handoffs/reconcile/20260809-govb1-b7-consult-r1/synth.md
-REF:handoffs/reconcile/20260809-govb1-b3-review-r7/synth.md
-REF:handoffs/reconcile/20260809-govb1-b6-review-r1/synth.md
+REF:handoffs/reconcile/20260809-govb1-b3-review-r8/synth.md
 
 🔴 **`REF:` 只准列「已戳記」之 reconcile——所有列。** 派工前 `bash scripts/reconcile_stamps_check.sh <檔>` 驗 rc=0。
-（本 session 因違反此條而**整輪作廢**一次：r7 的 REF 列了未戳記檔，codex 正確 BLOCKED。）
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-09 | **Branch**: main | 實作端＝主委自任；review＝codex+composer
+**Agent**: Claude(Opus 5) | **Time**: 2026-08-10 | **Branch**: main | 實作端＝主委自任；review＝codex+composer
 
-## 🔴 接手第一件事：**B7 實作**（Task 3.2 / `票 B-15`）
+## 🔴 接手第一件事：**B8 實作**（Task 4.1 / `票 B-38`）
 
-**使用者已定路線，不得再開順序討論**（2026-08-09 原話：「順序排了就排了，改順序如果又要
-消耗一堆時間和 token 跟流程，不如趕快照現在的路線做完」）：
-**B7 → B8 → B9 → B10 → `票 B-48`／`B-49`／`B-50`**。
+**使用者已定路線，不得再開順序討論**（2026-08-09 原話：「順序排了就排了…不如趕快照現在的路線做完」）：
+**B8 → B9 → B10 → 殘留票**。B8 是 B9 的前置（4.2 消費 4.1 的判準），順序本就正確。
 
-- **B7**＝Task 3.2「`claude` 段收窄」。🔴 **改 `scripts/_gate_lex.sh`**（非 TODO 寫的
-  `gate_check.sh`——該檔 `:116` 自承詞法已移出；consult-r1 兩家裁定 (A)）。
-  現況：`_gate_lex_match_scan()` 用 `grep -Eq 'claude[^|]*(-p|--print)'` **子字串比對**。
-  修法＝`claude` 須在命令位置 ＋ `-p`／`--print` 須為獨立 token。
-  🔴 **同一件工作在 `GOVB0 Task 2.2` 也有編號**（重號，與 `票 B-26` 同型）——做之前先看該處。
-- **B8**＝Task 4.1（新建 `scripts/findings_kind_classify.sh`）
-- **B9**＝Task 4.2（改 `scripts/govflow_lifecycle.json`）
-- **B10**＝Task 4.3（改 `scripts/cx_run.sh`）
-  三者皆**不碰詞法檔**、皆在 manifest allow 內 ⇒ 一般 commit。
+- **B8**＝Task 4.1，新建 `scripts/findings_kind_classify.sh` ＋
+  `tests/governance/test_govb1_findings_kind.py` ＋ `test_govb1_zeroid_no_regression.py`。
+  三檔**都在 manifest allow 內 ⇒ 一般 commit，不必 OOE**。
+  🔴 `G-1 全域禁令`：不得使 `C-2` 表中期望 `rc==0` 之列變非 0；**改判不在本批**。
+  🔴 誤擋率 receipt 必附（分母 >100 ⇒ 抽 ≥100 ＋ Wilson CI）；mutation 必附。
+- **B9**＝Task 4.2（`govflow_lifecycle.json` 加 `zero_findings_contract` 節，append-only）
+- **B10**＝Task 4.3（`cx_run.sh` `format-failed` 補救層）
+
+🔴 **B9／B10 的優先序已實證上升**：本 session 兩輪 stamp 都因產出格式不合規而**銷帳鎖死**
+（詳見 `票 B-52`）。它們不是補強，是本 epic 自己正在踩的坑。
 
 ## ✅ 本 session 已收案
 
 | 項 | commit | 狀態 |
 |---|---|---|
-| **B6**（`票 B-25` 事實單一來源） | `11ea47a` `030c9cf` `266e6b8` `87aeb8c` | 兩家戳記 APPROVED；測試 50→56；已 push |
-| **B3R 詞法層落地**（151 行生產碼進版控） | `a1a95cc`（OOE） | r8 兩家 APPROVED；解除「本機/CI 兩套詞法」 |
-| **self-gate 換行旁路 P0** | `e7be91f`（OOE） | 9 條回歸（含承重 mutation） |
+| **B7**（`claude` 段收窄；`票 B-26` 重號一併結清 `GOVB0 Task 2.2`） | `a5ddf05`（OOE） | 兩家 APPROVED；`g7` PASS；測試 1143→**1151** |
+
+三輪收斂：review-r1（7 findings）→ stamp-r1（8 findings，codex REJECTED）→ stamp-r2（兩家 APPROVED）。
+逐條處置見收斂檔 C1–C8。**主委被抓到兩件，已具名不淡化**：
+① 初版引入真回歸（`$(printf claude) -p x`／`claude${IFS}-p x`，舊式子字串是「偶然」擋住的）
+② 宣稱勘誤層「可證偽」但當時是空的——codex 用假勘誤證明全綠；修法＝`kind` 由 `from/to` 導出。
 
 ## 🔴 未修的活缺口（**不是待辦清單，是現在就成立的洞**）
 
-`gate_check` 對下列**真派工**一律**放行**（主委實測，HEAD 與工作區判定相同 ⇒ 既有缺口非回歸）：
+`gate_check` 對下列**真派工**一律**放行**（三版對照確認皆非本次引入）：
 
 ```
-bash scripts/gate.sh <(<家族> exec hi)      >(…)          ← process substitution
-echo x | xargs -n 1 <家族> exec hi          -I{}          ← wrapper
-env FOO=bar <家族> exec hi
-FOO="$HOME" <家族> exec hi                                ← 動態賦值（靜態 FOO="bar" 會擋）
-/bin/bash -c '<家族> exec hi'                             ← 絕對路徑（相對 bash -c 會擋）
+bash scripts/gate.sh <(<家族> exec hi)  /  >(…)     ← process substitution
+echo x | xargs -n 1 <家族> exec hi  /  -I{}          ← wrapper
+env FOO=bar <家族> exec hi   /   FOO="$HOME" <家族> exec hi
+/bin/bash -c '<家族> exec hi'                        ← 絕對路徑
 ```
 
-歸屬＝**GOVB0 B4**（`Task 2.3` 家族名 basename 化／`Task 2.4` 官方外層腳本呼叫點），
-與 `Task 2.2` 同檔同段、TODO §B 明載**須同批做**。複驗腳本：`.claude/tmp/r8_p0_probe.sh`
-（🔴 只餵字串給閘判定，**不執行派工**）。
+歸屬＝**GOVB0 B4**（`Task 2.3`／`2.4`），與 `Task 2.2` 同檔同段、TODO §B 明載**須同批做**。
+複驗腳本：`.claude/tmp/r8_p0_probe.sh`（🔴 只餵字串給閘判定，**不執行派工**）。
 
-另：`CODEX-R8-P1-03` — B3R 的 **O(n) scanner 未交付**，quoted 500K `timeout 20 → rc=124`
-（SPEC C-5 要求 <5s）⇒ **不得宣稱 B3R 已達標**。歸 GOVB0。
+另 **B7 明文不受理**（`docs/GOV_B7_SCOPE_AMENDMENT.md` §7.1，兩家 APPROVED）：
+`$(printf clau)de -p x`（替換輸出串接）與 `* -p x`（glob 求值）——argv[0] 靜態不可判，
+依「擋意外不防蓄意」列為**邊界**。要擋只能執行前解析 argv[0]，是另一種機制。
+
+另：`CODEX-R8-P1-03` — B3R 的 **O(n) scanner 未交付**（quoted 500K `timeout 20 → rc=124`）
+⇒ **不得宣稱 B3R 已達標**。歸 GOVB0。
 
 ## 🔴 待辦與具名殘留
 
 | 代號 | 內容 |
 |---|---|
-| — | **B7–B10 未開工**；**B4 階段 2** scope 錯配須另立票 |
-| — | **GOVB0 B4／B5／B6／B7 未開工**（第 0 批剩餘；B4 依賴已落地的 B3R） |
-| `B-48` | `debt_clear --abandon --kind` **不查核事實**。🔴 **本 session 主委用了 3 次**（戳記輪產出無 canonical ID，正規路 vacuous）⇒ 發生率正在升 |
-| `B-49` | roles SoT 表達不了「編排端自任實作」＋ `test_stamp_taskid_inject.py:769` 靜默 skip。**修它須動 `_B45_HARNESS` ⇒ 凍結期間做不到**；🔴 解凍即紅（定時炸彈） |
-| `B-50` | 執行端曾兩次把工作區留在壞狀態且無機制通知（本 session 兩家皆正確還原） |
-| `B-29` | 🔴 **新**：`REF:` 是否已戳記**靠委員自覺去驗**（codex 驗了、composer 沒驗）⇒ 應在**發 token 前**機械驗完。歸屬經 codex 更正為 `B-29`（非 `B-38`） |
-| `B-26` | 🔴 **新**：`GOVB0 Task 2.2` 與 `GOVB1 Task 3.2` 是同一件工作的兩個編號 |
+| — | **B8–B10 未開工**；**GOVB0 B4／B5／B6／B7 未開工**（第 0 批剩餘） |
+| `B-52` | 🔴 **新**：`govflow_lifecycle.json` 說 stamp 輪 `produces_findings:false`／銷帳 `no_findings_format_gate`，但 `debt_clear.sh` **照跑該閘** ⇒ SoT 與實作漂移。本 session **連兩輪**因此銷帳鎖死，只能 `--abandon --kind collection-failed`（理由欄逐字記實情，**未**謊稱無 findings）。且「stamp 不產生 findings」本身是錯的。歸 B9＋B10 |
+| `B-51` | 🔴 **新**：OOE 偏離凍結文件**須先取得裁決才動碼**；本輪主委違反此序（兩家指出，已接受）。🔴 該規則**尚無機械強制點**，依「工具必須自帶強制機制」須另立閘，不得只寫文件 |
+| `B-48` | `debt_clear --abandon --kind` **不查核事實**（本 session 再用 2 次，皆 `collection-failed` 且理由屬實） |
+| `B-49` | roles SoT 表達不了「編排端自任實作」；修它須動 `_B45_HARNESS` ⇒ 凍結期間做不到，解凍即紅 |
+| `B-50` | 執行端曾把工作區留在壞狀態且無機制通知 |
+| `B-29` | `REF:` 是否已戳記**靠委員自覺去驗** ⇒ 應在**發 token 前**機械驗完 |
 | `R-15` | `scripts/governance_families.json` **不可 commit** ⇒ 走 ambient M |
 | — | `docs/ROADMAP.md` 不在 manifest ⇒ epic 期間更新須走 OOE；本 session 未更新 |
 | — | `.claude/gate/*.log`、`docs/GOVB0_FRICTION_AMENDMENTS.md` **不得 commit** |
 
 ## ⚠ 踩過就別再踩（本 session 新增）
 
-- 🔴 **排序原則＝淨摩擦公式**（`handoffs/20260801-GOV-AMEND-BACKLOG.md:34`），**不是批號**。
-  主委本 session 一路照批號走，被使用者當場指出。使用者已定：**現階段照現行路線做完，不再改序**。
-- `manifest` 的 `allow` ≡ **凍結 TODO 宣告集的機械鏡像**；加列＝聲稱 TODO 宣告過 ⇒ 7 條測試立刻紅。
-  凍結 TODO 沒宣告的路徑，唯一通道是 `Governance-Scope: out-of-epic`。
-- `cmd | tail; echo rc=$?` 讀到的是 **tail 的 rc**——本 session 又犯一次。
-- `cx_run.sh` **不可直呼**（缺 `ROUND_ID`）；一律走 `committee_run.sh --session … -- <gate flags>`。
-- session 名須 `<日期>-<epic>-<batch>-<kind>-r<N>`，`batch`＝`b<數字>`或`x`，
-  `kind` ∈ {impl,review,stamp,consult,fix}。寫 `b3r-close` 會被 fail-closed 擋下。
-- `reconcile_build` 的 `sources.lock` 預設 `mode=discovery`；`debt_clear` 要 `review`
-  ⇒ 先 `reconcile_build <session> --mode review --rebuild`（**不得再帶委員檔**）。
-- 收斂檔須先 `printf '\n## 戳記\n\n' >>` 才算得出 body hash；戳記後須
-  `gate.sh register-output <task> <reconcile檔>` 否則 provenance 永遠 pending。
-- 🔴 **改檔一律用 Edit/Write**；本 session 用 `cat >> …<<'EOF'` heredoc 被派工閘擋下一次。
-- `grok` 403 ⇒ `active_stampers=["codex","composer"]`，2/2 即滿足。
+- 🔴 **stamp 輪派工單必須硬性要求 canonical `## <FAMILY>-R<n>-P<0-3>-<NN>` heading
+  ＋ sentinel body 須含 `**斷言**`／`**碼證**`**。少任一項 ⇒ completeness 判 vacuous／empty-shell
+  ⇒ 銷帳鎖死。本 session 連兩輪栽在這裡（第二輪是我以為修好之後又栽的）。
+- 🔴 **收窄型修法必先做三版對照**（`pre-phase2` ／ `HEAD` ／工作區）。
+  「舊規則偶然擋住某形態」是真實現象——只看新規則對不對，會漏掉自己造成的回歸。
+  工具：`.claude/tmp/b7_regress_probe.py`（現在會以非零 rc 表達失敗）。
+- 🔴 **`grep` 在互動 shell 是 Claude Code shell-snapshot 的 function（ugrep）**，
+  但腳本經 `bash` 取到的是 `/usr/bin/grep`（BSD）。驗 gate 行為時別被 `grep --version` 誤導。
+- 🔴 **自己寫的 fail-closed 網會擋到自己**：含 `.claude/` 路徑 ＋ `$` ＋ `-p` 的指令會被判 dispatch。
+  已於 stamp-r1 收窄為「命令位置 token 含 metachar」才觸發，但仍可能撞到。
+- 🔴 **改檔一律用 Edit/Write**；本 session 又用了一次 `cat >> <<'EOF'` heredoc（違反 CLAUDE.md）。
+- `cmd | tail; echo rc=$?` 讀到的是 **tail 的 rc**。
+- `cx_run.sh` **不可直呼**；一律走 `committee_run.sh --session … -- <gate flags>`。
+- session 名須 `<日期>-<epic>-<batch>-<kind>-r<N>`，`kind` ∈ {impl,review,stamp,consult,fix}。
+- 收斂檔須先 `printf '\n## 戳記\n\n' >>` 才算得出 body hash；**被 REJECTED 者須修訂本體並重蓋新 hash**。
+- `grok` 額度封鎖 ⇒ `active_stampers=["codex","composer"]`，2/2 即滿足。
