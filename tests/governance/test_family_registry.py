@@ -256,6 +256,56 @@ def test_gate_stamp_families_uses_tristate_getter(
     assert p.stdout.strip() == want_out, f"{label}: stdout={p.stdout!r} want={want_out!r}"
 
 
+@pytest.mark.parametrize(
+    "label,active,target,env,want_rc",
+    [
+        ("grok 暫停中切 codex", ["codex", "composer"], "codex", "", 2),
+        ("grok 暫停中切 composer", ["codex", "composer"], "composer", "", 2),
+        ("三家皆可用切 codex", ["codex", "composer", "grok"], "codex", "", 0),
+        ("明示逃生口", ["codex", "composer"], "codex", "SET_ROLES_ALLOW_QUORUM_BREAK=1", 0),
+        ("缺 active_stampers 回退全員", None, "codex", "", 0),
+    ],
+)
+def test_set_roles_refuses_switch_that_breaks_review_quorum(
+    tmp_path: Path, label: str, active: object, target: str, env: str, want_rc: int
+) -> None:
+    """🔴 換實作端**不得**把可用審查者打到 2 家以下〔consult-r1 C4，兩家 APPROVED〕。
+
+    病：`set_roles.sh` 的 `reviewers = 三家 − implementer` 是**紙上名單**，不管誰能用。
+    而 `review_quorum_check.sh:49-51` 要求 ≥2 個**非實作者**家族（`:38` 排除實作者）。
+    grok 額度封鎖期間，三個 eligible 值中**唯有 grok** 能保住兩家審查者——
+    那是巧合不是設計，任何人憑直覺 `set_roles.sh codex` 都會在**下一次派 review 時**
+    才發現鐵律已破（此時已改完檔、切換不可見地生效）。
+
+    修法＝切換**前**用機器算 `|active_stampers − {新 implementer}| ≥ 2`，否則拒。
+    mutation 反例：移除該前檢 ⇒ 前兩例 rc 由 2 變 0 且 roles.json 被改寫，轉紅。
+
+    真 SoT 全程唯讀：整條鏈複製到 tmp（同 `_isolated_stamp_env` 之理由）。
+    """
+    s = tmp_path / "scripts"
+    s.mkdir(exist_ok=True)
+    for f in ("set_roles.sh", "governance_families.sh", "governance_roles.json", "verify_role_gate.sh"):
+        src = SCRIPTS / f
+        if src.exists():
+            (s / f).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    sot = _base_sot()
+    if active is not None:
+        sot["active_stampers"] = active
+    (s / "governance_families.json").write_text(json.dumps(sot, ensure_ascii=False), encoding="utf-8")
+
+    before = (s / "governance_roles.json").read_text(encoding="utf-8")
+    p = _bash(f"{env} bash {s}/set_roles.sh {target}".strip())
+    after = (s / "governance_roles.json").read_text(encoding="utf-8")
+    out = p.stdout + p.stderr
+
+    assert p.returncode == want_rc, f"{label}: rc={p.returncode} want={want_rc}\n{out}"
+    if want_rc != 0:
+        assert after == before, f"{label}: 拒絕切換卻仍改寫了 roles.json（非零副作用）"
+        assert "review_quorum_check" in out, f"{label}: 未說明被擋的機械依據\n{out}"
+    else:
+        assert after != before, f"{label}: 應放行卻沒改寫 roles.json"
+
+
 def test_adv_path_re_recognizes_grok() -> None:
     p = subprocess.run(
         ["python3", "-c",
