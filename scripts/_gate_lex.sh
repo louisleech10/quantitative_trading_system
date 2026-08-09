@@ -350,8 +350,23 @@ _gate_lex_extract_cmdsubs() {
 # 整條不得含未引號命令分隔符 ;|& 或換行（避免 `gate…; codex` 被誤當自呼叫）。
 _gate_cmd_is_self_gate() {
   local s="${1-}"
-  # 禁複合命令（分隔符／換行）——自呼叫必須是單一簡單命令
-  if printf '%s' "$s" | grep -Eq '[;&|`]|\$\(|\n'; then
+  # 🔴 控制字元（含換行、CR）必須在 grep 之外判〔CODEX-R1-P0-01，主委獨立複驗〕：
+  #   前版寫 `grep -Eq '…|\n'`，宣稱「禁換行」但**完全沒有作用**——兩個獨立原因：
+  #     ① grep 逐「行」比對，換行永遠不可能出現在一行之內；ERE 的 `\n` 也不是換行
+  #     ② 下方 `^…` 錨點同樣是逐行 ⇒ 只要**任何一行**長得像 gate 自呼叫就整條放行
+  #   合起來的後果是真旁路：`bash scripts/gate.sh` ⏎ `<家族> exec …` ⇒ gate rc=0（放行）。
+  #   對照組（無前綴／改 `;` 分隔）皆 rc=2，證明缺口專屬於換行路徑。
+  #   CR（\r）不切行且屬 [[:space:]]；**實測 bash 不把 CR 當命令分隔符**
+  #   （`printf 'echo A\recho B\n' | bash` → 單一引數），故非旁路，但一併拒以免歧義。
+  #   ⇒ 一律逐 byte 拒 C0 控制字元（保留 tab）與 DEL；非 ASCII（如中文 --intent）不受影響。
+  #   🔴 用 `wc -c` 數位元組，**不可**寫成 `[ -n "$(… tr -dc …)" ]`：
+  #   命令替換會吃掉尾端換行，而這裡殘留的唯一字元往往正是換行 ⇒ 判成空 ⇒ 放行。
+  #   （主委第一版修法就是這樣寫的，探針照樣 rc=0，改用位元組計數才真的擋住。）
+  if [ "$(printf '%s' "$s" | LC_ALL=C tr -dc '\1-\10\12-\37\177' | wc -c | tr -d ' ')" != "0" ]; then
+    return 1
+  fi
+  # 禁複合命令（分隔符）——自呼叫必須是單一簡單命令
+  if printf '%s' "$s" | grep -Eq '[;&|`]|\$\('; then
     return 1
   fi
   # 命令位置：行首可選 interpreter，後接 scripts/gate(_check)?.sh
