@@ -541,6 +541,14 @@ EOF
 #   現行：`TEMPLATE_CHECK_ALLOW_PENDING=1` 才可能 pending，且仍須三條件全成立。
 #   預設關閉 ⇒ 凍結文件路徑永不 pend；此為 fail-closed 方向。
 _TC_ASSERT_SAFE_CHARS='^[A-Za-z0-9_./=:@,+ 	-]*$'
+# 🔴 字元集合**不足以**封閉〔codex 於 B5-STAMP-R2 REJECTED 並實證〕：
+#     `ASSERT env FOO=bar /usr/bin/touch <marker> THEN rc=0` → rc=0 且 marker **真的建立**
+#     `ASSERT ../../../../usr/bin/true THEN rc=0`            → rc=0，路徑穿越成功
+#   字元集合只擋 shell 元字元／glob，**擋不住「執行任意命令」這件事本身**。
+#   ⇒ 追加兩道封閉：①首 token 須在**封閉白名單**內 ②任何 token 不得為絕對路徑或含 `..`。
+#   誠實邊界：白名單內之 `bash <repo 內腳本>` 仍會執行該腳本——那是 A 的**設計目的**
+#   （規格內檢查條件落筆即跑）；封閉的是「跑什麼」的來源，不是「不跑」。
+_TC_ASSERT_CMD_ALLOW='bash python3 pytest grep true false test'
 
 _run_assert_lines() {
   _ra_file="${1}"
@@ -569,6 +577,24 @@ _run_assert_lines() {
     # 正向字元集合：集合外字元（; & | > < ` $ ( ) 引號 等）一律判失敗，不執行
     if ! printf '%s' "${_ra_cmd}" | grep -qE "${_TC_ASSERT_SAFE_CHARS}"; then
       _ra_out="${_ra_out}  · ASSERT 命令含集合外字元（禁 shell 元字元／重導向／命令替換）: ${_ra_cmd}\n"
+      continue
+    fi
+    # ① 首 token 須在封閉白名單內（擋 env／touch／任意二進位）
+    _ra_head="$(printf '%s' "${_ra_cmd}" | awk '{print $1}')"
+    case " ${_TC_ASSERT_CMD_ALLOW} " in
+      *" ${_ra_head} "*) : ;;
+      *) _ra_out="${_ra_out}  · ASSERT 命令不在白名單（允許: ${_TC_ASSERT_CMD_ALLOW}）: ${_ra_head}\n"
+         continue ;;
+    esac
+    # ② 任何 token 不得為絕對路徑或含 `..`（擋路徑穿越與 repo 外執行）
+    _ra_bad=""
+    for _ra_tok in ${_ra_cmd}; do
+      case "${_ra_tok}" in
+        /*|*..*) _ra_bad="${_ra_tok}"; break ;;
+      esac
+    done
+    if [ -n "${_ra_bad}" ]; then
+      _ra_out="${_ra_out}  · ASSERT 含絕對路徑或 '..'（禁 repo 外／路徑穿越）: ${_ra_bad}\n"
       continue
     fi
     # 目標路徑＝命令中第一個看起來像 repo 路徑的 token

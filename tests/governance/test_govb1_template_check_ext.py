@@ -31,7 +31,7 @@ _DEPS = ("_tc_live_lines", "_tc_live_or_die", "_tc_ere_escape")
 
 
 # 函式所依賴之頂層常數（非函式，須另抽；漏抽會使受測函式在隔離 shell 下 unbound）
-_CONSTS = ("_TC_ASSERT_SAFE_CHARS",)
+_CONSTS = ("_TC_ASSERT_SAFE_CHARS", "_TC_ASSERT_CMD_ALLOW")
 
 
 def _extract(*fns: str) -> str:
@@ -264,7 +264,14 @@ def test_t15_a1_pending_requires_all_three_conditions(tmp_path: Path) -> None:
         ("分號串接", "ASSERT true; false THEN rc=0", 1),
         ("命令替換", "ASSERT echo $(id) THEN rc=0", 1),
         ("管線", "ASSERT true | false THEN rc=0", 1),
+        # 🔴 codex 於 B5-STAMP-R2 **REJECTED** 所附反例——字元集合不足以封閉「執行任意命令」
+        ("env 前綴 + 絕對路徑二進位", "ASSERT env FOO=bar /usr/bin/true THEN rc=0", 1),
+        ("../ 路徑穿越", "ASSERT ../../../../usr/bin/true THEN rc=0", 1),
+        ("絕對路徑直呼", "ASSERT /usr/bin/true THEN rc=0", 1),
+        ("白名單外命令", "ASSERT touch govb1_probe_marker THEN rc=0", 1),
+        ("變數指派前綴", "ASSERT FOO=bar true THEN rc=0", 1),
         ("合法單一命令", "ASSERT true THEN rc=0", 0),
+        ("合法 bash repo 內腳本", "ASSERT bash scripts/template_check.sh THEN rc=1", 0),
         # 🔴 CODEX-R2-P1-01：未閉合 fence 不得吞到 EOF 而靜默漏檢
         ("未閉合 fence ⇒ fail-closed", "```\nASSERT true THEN rc=0", 1),
         ("~~~ 不得收合 ``` ", "```\n~~~\nASSERT true THEN rc=0", 1),
@@ -282,13 +289,42 @@ def test_t15_a1_assert_line_grammar_and_no_eval(
     assert f"rc={want_rc}" in p.stdout, f"{label}: got {p.stdout.strip()}"
 
 
-def test_t15_a1_no_side_effect_from_redirection(tmp_path: Path) -> None:
-    """🔴 承重：帶重導向之 ASSERT **不得產生副作用**（codex 實證舊版真的建了檔）。"""
+@pytest.mark.parametrize(
+    "label,line",
+    [
+        ("重導向", "ASSERT : > {m} THEN rc=0"),
+        # 🔴 codex 於 B5-STAMP-R2 REJECTED 之反例：字元集合擋不住直接執行二進位
+        ("env + 絕對路徑 touch", "ASSERT env FOO=bar /usr/bin/touch {m} THEN rc=0"),
+        ("白名單外命令 touch", "ASSERT touch {m} THEN rc=0"),
+    ],
+)
+def test_t15_a1_no_side_effect(tmp_path: Path, label: str, line: str) -> None:
+    """🔴 **承重**：ASSERT 一律不得產生副作用。
+
+    codex 實證舊版兩種寫法都真的建立了檔案：
+      · `eval` 版 → 重導向生效
+      · 正向字元集合版 → `env FOO=bar /usr/bin/touch <marker>` **仍執行**
+    ⇒ 字元集合只擋 shell 元字元，**擋不住「執行任意命令」本身**。
+    現行封閉＝白名單首 token ＋ 禁絕對路徑／`..`。
+    """
     marker = tmp_path / "marker"
     doc = tmp_path / "s.md"
-    doc.write_text(f"ASSERT : > {marker} THEN rc=0\n", encoding="utf-8")
+    doc.write_text(line.format(m=marker) + "\n", encoding="utf-8")
     _run_fn(("_run_assert_lines",), f'_run_assert_lines {doc} >/dev/null 2>&1; echo "rc=$?"', tmp_path)
-    assert not marker.exists(), "🔴 ASSERT 之重導向產生了副作用（eval 未被移除？）"
+    assert not marker.exists(), f"🔴 {label}: ASSERT 產生了副作用"
+
+
+def test_t15_a1_cmd_allowlist_is_closed_and_frozen() -> None:
+    """白名單須為**封閉集合**且不含可執行任意程式者（`env`／`sh`／`xargs` 等）。"""
+    src = SCRIPT.read_text(encoding="utf-8")
+    m = re.search(r"^_TC_ASSERT_CMD_ALLOW='([^']*)'", src, re.M)
+    assert m, "找不到 _TC_ASSERT_CMD_ALLOW（重構?→須更新本測）"
+    allow = set(m.group(1).split())
+    assert allow == {"bash", "python3", "pytest", "grep", "true", "false", "test"}, (
+        f"白名單漂移：{allow}\n🔴 新增須經委員裁定——每加一個都是一條新的執行路徑。"
+    )
+    for danger in ("env", "sh", "zsh", "xargs", "eval", "touch", "rm", "chmod", "curl"):
+        assert danger not in allow, f"🔴 白名單含可執行任意程式／有副作用之 {danger}"
 
 
 def test_t15_a1_unparseable_assert_is_failure(tmp_path: Path) -> None:
