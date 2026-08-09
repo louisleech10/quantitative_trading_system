@@ -82,6 +82,125 @@ _cx_bk_ok() {
 }
 
 
+# GOVB1 Task 4.3（`票 B-31`）：格式不合規時輸出**逐條可修補清單**，而不是只給一個 rc。
+# $1=checker stderr 檔 → stderr 印 `檔:行\t違規類型\t修法一行`
+#
+# 出生事故：委員收到「format-failed」只知道整份不合規，不知道**哪一條、哪一行、怎麼修**
+#   ⇒ 只能整份重跑（實測 composer 約 15 分鐘）。本清單把重跑成本降到逐條修補。
+#
+# 🔴 定義位置在檔頭而非交件路徑旁：`--selfcheck` 入口（見下）在**參數解析之前**就要用它，
+#   bash 的函式須先定義後呼叫。移動的是定義，呼叫點字面不變（凍結測試錨定的是呼叫點）。
+_emit_fixup_list() {
+  local _log="${1-}" _line _kind _id _file _no
+  [ -s "${_log}" ] || return 0
+  echo "[cx_run] ── 可修補清單（逐條）──" >&2
+  while IFS= read -r _line; do
+    case "${_line}" in COMPLETENESS\ FAIL:*) : ;; *) continue ;; esac
+    # 違規類型＝訊息中「FAIL: 」之後、首個「(」或「: 」之前的字樣
+    _kind="${_line#COMPLETENESS FAIL: }"
+    _kind="${_kind%% (*}"
+    _kind="${_kind%%: *}"
+    # canonical ID（若訊息帶得出來）→ 用來在產出檔定位行號
+    _id="$(printf '%s' "${_line}" | LC_ALL=C grep -Eo '[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' | head -1)"
+    _file="${out}"
+    _no=""
+    if [ -n "${_id}" ] && [ -f "${_file}" ]; then
+      _no="$(LC_ALL=C grep -n -m1 -F "${_id}" "${_file}" 2>/dev/null | cut -d: -f1)"
+    fi
+    # 🔴 Task 4.3：每條**必含** `檔:行`〔`CODEX-R1-P1-04`〕：duplicate-ID 這類訊息不帶 canonical ID，
+    #   原本會印 `檔:?` ⇒ 委員無從定位、補救層失去意義。
+    #   退路（依序，皆為封閉規則）：①訊息自帶 `:<行號>` ②檔內第一個 canonical heading
+    #   ③檔案第一行。三者必有其一，故 `?` 不再可能出現。
+    if [ -z "${_no}" ]; then
+      _no="$(printf '%s' "${_line}" | LC_ALL=C grep -Eo ':[0-9]+' | head -1 | tr -d ':')"
+    fi
+    if [ -z "${_no}" ] && [ -f "${_file}" ]; then
+      _no="$(LC_ALL=C grep -nE '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' \
+        "${_file}" 2>/dev/null | head -1 | cut -d: -f1)"
+    fi
+    [ -n "${_no}" ] || _no=1
+    printf '  %s:%s\t%s\t%s\n' \
+      "${_file}" "${_no}" "${_kind}" \
+      "見 templates/COMMITTEE_FINDING_TEMPLATE.md（零 findings 契約：sentinel 形態／必填欄非空／落點）" >&2
+  done < "${_log}"
+  echo "[cx_run] ── 清單結束；修完可**同輪重派**，不必整份重跑 ──" >&2
+}
+
+# GOVB1 Task 4.3〔`COMPOSER-R1-P2-02`〕：**落點違規**也要給三欄清單。
+#   原實作只印一行說明就結束 ⇒ 委員拿不到 `檔:行`，與補救層契約不一致。
+#   🔴 可修補位置是 **stamp-target 內新增的那條 heading**，不是 ${out}
+#   ⇒ 另出一行而非硬塞進 _emit_fixup_list（那支固定以 ${out} 為檔，塞進去會指錯檔）。
+_emit_dest_fixup_line() {
+  local _st="${stamp_target:-}" _no
+  [ -n "${_st}" ] && [ -f "${_st}" ] || return 0
+  # 取**最後一條** canonical heading：落點違規＝本輪 append 上去的，必在檔尾側
+  _no="$(LC_ALL=C grep -nE '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' \
+    "${_st}" 2>/dev/null | tail -1 | cut -d: -f1)"
+  [ -n "${_no}" ] || _no=1
+  echo "[cx_run] ── 可修補清單（逐條）──" >&2
+  printf '  %s:%s\t%s\t%s\n' \
+    "${_st}" "${_no}" "findings 落點違規" \
+    "把該條 finding 移出 stamp-target，改寫進本輪自己的交件檔（${out}）" >&2
+  echo "[cx_run] ── 清單結束；修完可**同輪重派**，不必整份重跑 ──" >&2
+}
+
+# ---------------------------------------------------------------------------
+# GOVB1 Task 4.3 要點 3 ＋ SPEC 邊界②：**主委自產物**的自檢入口。
+#
+# 出生事故（摩擦帳事件 18）：主委自己的 `**來源摘要**` 寫行號而非 12 位雜湊，
+#   4 個 P0/P1 全 FAIL——因為 `票 B-31` 的自檢**只進了委員 prompt**（見檔尾 prompt 組建），
+#   而主委產物根本不流經派工路徑，那段 prompt 對主委無效。
+#
+# 契約：與交件路徑**同一支檢查、同一組參數、同一份逐條清單、同一個 rc**
+#   （`T-4.3-U3`：rc 與委員產出一致）。產出路徑不含家族後綴時靠顯式 `--family` 綁定。
+#
+# 🔴 誠實邊界（不誇大，`CODEX-R1-P1-03`）：本入口是**工具**，不是**強制點**。
+#   主委產物不流經 cx_run ⇒ 沒有任何機制逼主委來跑。真正的強制點須落在
+#   主委寫檔路徑（`scripts/doc_format_precheck.sh` 的 PostToolUse 路由）或
+#   pre-push（`scripts/gov_check.sh`），**兩者皆在 Task 4.3「修改檔案」欄之外**
+#   ⇒ 依 `票 B-51` 停碼送裁，見 B10 review-r2 必答。未裁決前此缺口具名保留。
+#
+# 用法：bash scripts/cx_run.sh --selfcheck <產出檔> --family <家族名>
+# rc：0=合規／3=格式不合規（與交件路徑 format-failed 同碼）／2=用法錯或檔不存在
+# ---------------------------------------------------------------------------
+if [ "${1:-}" = "--selfcheck" ]; then
+  shift
+  _sc_out=""; _sc_fam=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --family)
+        [ "$#" -ge 2 ] || { echo "ERROR: --family 缺值" >&2; exit 2; }
+        _sc_fam="$2"; shift 2 ;;
+      -*)
+        echo "ERROR: --selfcheck 未知選項: $1" >&2; exit 2 ;;
+      *)
+        [ -z "${_sc_out}" ] || { echo "ERROR: --selfcheck 只接受一個產出檔: $1" >&2; exit 2; }
+        _sc_out="$1"; shift ;;
+    esac
+  done
+  [ -n "${_sc_out}" ] && [ -n "${_sc_fam}" ] || {
+    echo "用法: bash scripts/cx_run.sh --selfcheck <產出檔> --family <家族名>" >&2
+    exit 2
+  }
+  [ -f "${_sc_out}" ] || { echo "ERROR: 產出檔不存在: ${_sc_out}" >&2; exit 2; }
+  # _emit_fixup_list 以 ${out} 為定位檔；自檢模式下即待檢檔本身。
+  out="${_sc_out}"
+  fam="${_sc_fam}"
+  _sc_log="$(mktemp)"
+  bash "${SCRIPT_DIR}/completeness_check.sh" --single "${out}" --family "${fam}" >"${_sc_log}" 2>&1
+  _sc_rc=$?
+  cat "${_sc_log}" >&2
+  if [ "${_sc_rc}" -ne 0 ]; then
+    _emit_fixup_list "${_sc_log}"
+    rm -f "${_sc_log}"
+    echo "[cx_run] 自檢未過 --family ${fam}: ${out}（格式不合規 → exit 3）" >&2
+    exit 3
+  fi
+  rm -f "${_sc_log}"
+  echo "[cx_run] 自檢通過 --family ${fam}: ${out}"
+  exit 0
+fi
+
 fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-xhigh}"
 [ -n "${fam}" ] && [ -n "${brief}" ] && [ -n "${out}" ] || {
   echo "用法: bash scripts/cx_run.sh <codex|grok|composer> <brief_path> <output_path> [effort]"; exit 2; }
@@ -437,52 +556,17 @@ _write_stub_success_output() {
   esac
 }
 
-# GOVB1 Task 4.3（`票 B-31`）：格式不合規時輸出**逐條可修補清單**，而不是只給一個 rc。
-# $1=checker stderr 檔 → stderr 印 `檔:行\t違規類型\t修法一行`
-#
-# 出生事故：委員收到「format-failed」只知道整份不合規，不知道**哪一條、哪一行、怎麼修**
-#   ⇒ 只能整份重跑（實測 composer 約 15 分鐘）。本清單把重跑成本降到逐條修補。
-_emit_fixup_list() {
-  local _log="${1-}" _line _kind _id _file _no
-  [ -s "${_log}" ] || return 0
-  echo "[cx_run] ── 可修補清單（逐條）──" >&2
-  while IFS= read -r _line; do
-    case "${_line}" in COMPLETENESS\ FAIL:*) : ;; *) continue ;; esac
-    # 違規類型＝訊息中「FAIL: 」之後、首個「(」或「: 」之前的字樣
-    _kind="${_line#COMPLETENESS FAIL: }"
-    _kind="${_kind%% (*}"
-    _kind="${_kind%%: *}"
-    # canonical ID（若訊息帶得出來）→ 用來在產出檔定位行號
-    _id="$(printf '%s' "${_line}" | LC_ALL=C grep -Eo '[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' | head -1)"
-    _file="${out}"
-    _no=""
-    if [ -n "${_id}" ] && [ -f "${_file}" ]; then
-      _no="$(LC_ALL=C grep -n -m1 -F "${_id}" "${_file}" 2>/dev/null | cut -d: -f1)"
-    fi
-    # 🔴 Task 4.3：每條**必含** `檔:行`〔`CODEX-R1-P1-04`〕：duplicate-ID 這類訊息不帶 canonical ID，
-    #   原本會印 `檔:?` ⇒ 委員無從定位、補救層失去意義。
-    #   退路（依序，皆為封閉規則）：①訊息自帶 `:<行號>` ②檔內第一個 canonical heading
-    #   ③檔案第一行。三者必有其一，故 `?` 不再可能出現。
-    if [ -z "${_no}" ]; then
-      _no="$(printf '%s' "${_line}" | LC_ALL=C grep -Eo ':[0-9]+' | head -1 | tr -d ':')"
-    fi
-    if [ -z "${_no}" ] && [ -f "${_file}" ]; then
-      _no="$(LC_ALL=C grep -nE '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' \
-        "${_file}" 2>/dev/null | head -1 | cut -d: -f1)"
-    fi
-    [ -n "${_no}" ] || _no=1
-    printf '  %s:%s\t%s\t%s\n' \
-      "${_file}" "${_no}" "${_kind}" \
-      "見 templates/COMMITTEE_FINDING_TEMPLATE.md（零 findings 契約：sentinel 形態／必填欄非空／落點）" >&2
-  done < "${_log}"
-  echo "[cx_run] ── 清單結束；修完可**同輪重派**，不必整份重跑 ──" >&2
-}
-
 # GOVB1 Task 4.3 ＋ B9 C5 移交：findings **落點**強制點。
 # stamp 輪把 findings append 進 stamp-target（而非自己的交件檔）⇒ 自身 0 heading ID ⇒ 整輪作廢。
 # 契約寫在 govflow_lifecycle.json 的 zero_findings_contract.findings_destination，
 # 但在此之前**沒有任何腳本會擋**（`CODEX-R1-P1-05`／`COMPOSER-R1-P2-01`）。
 # $1=CLI 執行前的 stamp-target canonical ID 快照檔 → rc=0 合規／1 違規
+#
+# 🔴 邊界〔`COMPOSER-R1-P2-01`〕：**stamp-target 檔不存在時走不到這裡**——
+#   `brief_conformance_check.sh` 在派工前置就以 rc=2 拒跑（`ERROR: stamp-target 檔不存在`）。
+#   本函式的 `[ -f "${stamp_target}" ] || return 0` 只涵蓋「派工中途檔被刪」這種殘餘情形。
+#   ⇒ **stamp brief 須預先建好 stamp-target**（哪怕只有 `## 戳記` 一行），這是既有契約，
+#   不是本 Task 放寬的地方；fail-closed 於前置比在此靜默跳過更正確。
 _check_findings_destination() {
   local _before="${1-}" _after
   [ -n "${stamp_target}" ] && [ -f "${stamp_target}" ] || return 0
@@ -543,6 +627,8 @@ _run_format_check_if_needed() {
   #   呼叫點 `_fmt_rc="$(_run_format_check_if_needed "${cli_rc}")"` 亦被凍結測試逐字錨定，
   #   多一個引數就會讓 mutation probe 找不到錨點而轉紅（主委實測）。
   if [ -n "${_dest_snap:-}" ] && ! _check_findings_destination "${_dest_snap}"; then
+    # Task 4.3〔`COMPOSER-R1-P2-02`〕：落點違規亦須給三欄清單（指向 stamp-target 的那一行）
+    _emit_dest_fixup_line
     [ "${_rc}" -eq 0 ] && _rc=4
   fi
   printf '%s' "${_rc}"
@@ -583,6 +669,18 @@ _run_cli_and_emit() {
         #   使「三種輸入 × cx_run 交件路徑」的矩陣**無法把輸入餵進來**
         #   ⇒ B8 的三入口矩陣第三欄在該票內不可達，只能掛逼債條款。
         #   本模式讓測試先寫好 ${out} 再跑交件路徑，第三欄從此可驗。
+        cli_rc=0
+        ;;
+      preserve_append_stamp)
+        # GOVB1 Task 4.3（B10 r2 主委自審 G2）：把 `票 B-52` 的出事情境做成**可端到端重現**的 stub。
+        # 為何需要：`preserve` 依定義不動任何檔 ⇒ 造不出「本輪把 finding append 進 stamp-target」
+        #   這個違規情境 ⇒ `_check_findings_destination`（B9 C5 移交）至今**只有源碼斷言**、
+        #   沒有任何常駐端到端測試。r1 必答 2 是靠委員當場自建探針驗的，那份探針沒留下來。
+        # 本模式＝保留 ${out}（同 preserve）＋ 精確重現「append 一條 canonical ID 進 stamp-target」。
+        if [ -n "${stamp_target:-}" ] && [ -f "${stamp_target}" ]; then
+          printf '\n## %s-R9-P0-99\n\n**斷言**: harness append into stamp-target\n\n**碼證**: cx_run stub\n\n' \
+            "$(printf '%s' "${fam}" | tr '[:lower:]' '[:upper:]')" >> "${stamp_target}"
+        fi
         cli_rc=0
         ;;
       *)
