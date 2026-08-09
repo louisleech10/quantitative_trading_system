@@ -50,10 +50,13 @@ if [ -z "${required}" ]; then
   #   這一行是**使用者手改的**，打錯是預期失敗模式。故改用三態 getter：
   #     rc=0 合法 → 用之；rc=3 缺 key → 回退 review_families；rc≠0/3 → **拒，不回退**。
   #
-  # 🔴 具名殘留（R-19 表第三列，本輪不修）：角色閘／quorum 閘（review_quorum_check.sh）
-  #   仍只讀 `review_families`，與此處的 stamp 決策脫節。目前無害，因為
-  #   `active_stampers ⊆ review_families` 已被上面的 getter 強制；但若日後允許
-  #   active 超出正式名冊，兩閘會各說各話。**擴編前必須先統一這兩個消費者。**
+  # 🔴 上一版此處的具名殘留**點錯了對象**（2026-08-09 修正）：原文說「quorum 閘
+  #   review_quorum_check.sh 只讀 review_families」——實查它**根本不讀 SoT**
+  #   （只掃 audit 的 task_id；其家族清單是寫死的，由 test_family_registry 之
+  #   `_DRIFT` 釘住）。真正與此處分裂的是 `gate.sh:_stamp_families`，
+  #   兩家委員（`CODEX-R2-P1-01`／`COMPOSER-R2-P2-01`）獨立抓出，**已於同批修**：
+  #   該函式改呼叫同一支 `families_active_stampers` 三態 getter。
+  # 具名殘留（仍在）：`review_quorum_check.sh:35` 之硬編名單屬既有漂移，非本批引入。
   required="$(families_active_stampers)"; _as_rc=$?
   case "${_as_rc}" in
     0) : ;;

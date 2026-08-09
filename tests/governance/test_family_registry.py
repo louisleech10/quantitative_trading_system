@@ -210,6 +210,52 @@ def test_active_stampers_invalid_is_failclosed(tmp_path: Path, label: str, activ
     )
 
 
+@pytest.mark.parametrize(
+    "label,active,want_rc,want_out",
+    [
+        ("合法子集", ["composer", "grok"], 0, "composer,grok"),
+        ("缺 key", None, 0, "codex,composer,grok"),   # 回退正式名冊
+        ("空 list", [], 1, ""),
+        ("打錯字", ["codexx"], 1, ""),
+        ("重複", ["codex", "codex"], 1, ""),
+    ],
+)
+def test_gate_stamp_families_uses_tristate_getter(
+    tmp_path: Path, label: str, active: object, want_rc: int, want_out: str
+) -> None:
+    """🔴 R-19 須覆蓋**所有** caller〔`CODEX-R2-P1-01` / `COMPOSER-R2-P2-01`〕。
+
+    `gate.sh:_stamp_families` 的結果是以 **explicit required**（第二參）傳給
+    `reconcile_stamps_check.sh` 的 ⇒ 它自成一套回退邏輯就等於**繞過**該腳本
+    剛修好的 fail-closed 預設。兩家委員獨立實測舊碼：
+      · `active_stampers: []`        → `codex,composer,grok`（靜默回退全員）
+      · `active_stampers: ["codexx"]` → `codexx`（未知家族成為 required ⇒ 卡死）
+
+    本測取 `gate.sh` 內 `_stamp_families` 的**函式原文**在隔離 SoT 上重跑（跑真碼）。
+    mutation 反例：改回 `families_get active_stampers || families_get review_families`
+    ⇒「空 list」「打錯字」「重複」三例的 rc 由 1 變 0，轉紅。
+    """
+    src = (SCRIPTS / "gate.sh").read_text(encoding="utf-8")
+    m = re.search(r"_stamp_families\(\) \{.*?\n\}", src, re.S)
+    assert m, "找不到 gate.sh:_stamp_families（refactor?→須更新本測）"
+
+    s = tmp_path / "scripts"
+    s.mkdir(exist_ok=True)
+    (s / "governance_families.sh").write_text(
+        (SCRIPTS / "governance_families.sh").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    sot = _base_sot()
+    if active is not None:
+        sot["active_stampers"] = active
+    (s / "governance_families.json").write_text(json.dumps(sot, ensure_ascii=False), encoding="utf-8")
+
+    p = _bash(f". {s}/governance_families.sh\n{m.group(0)}\n_stamp_families\n")
+    assert p.returncode == want_rc, (
+        f"{label}: rc={p.returncode} want={want_rc}\n{p.stdout}{p.stderr}"
+    )
+    assert p.stdout.strip() == want_out, f"{label}: stdout={p.stdout!r} want={want_out!r}"
+
+
 def test_adv_path_re_recognizes_grok() -> None:
     p = subprocess.run(
         ["python3", "-c",
