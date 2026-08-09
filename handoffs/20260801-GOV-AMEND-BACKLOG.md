@@ -2697,3 +2697,49 @@ if kind == "impl" and fam not in ("codex", "grok", "composer"):
 本票之強制＝下方定時炸彈（`test_b45_unfreeze_requires_roles_sot_closure`）：
 `_B45_HARNESS` 凍結一被解除或放寬，該測即紅。
 兩家皆判此炸彈**只防意外與遺忘，不防蓄意**（主委對該檔有寫入權，可連炸彈一併改掉）。
+
+---
+
+## B-50 票 `GOV-EXECUTOR-WORKSPACE-NOT-RESTORED`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：`handoffs/reconcile/20260809-govb1-b5-review-r2/synth.md`
+（codex + composer 兩家 `RECONCILE-STAMP APPROVED`）之「執行端把工作區留在壞狀態」節。
+
+### 病（本 epic 內發生**兩次**，形態不同）
+
+**① mutation 未還原即結束**
+codex 於 `20260809-govb1-b5-review-r1` 跑 mutation 時遭 API
+`Selected model is at capacity` 中斷，**未還原**即結束，在
+`scripts/template_check.sh` 之 `_func_exists` 留下
+`# MUTATION: remove function-name brace form`，使該函式漏接兩種合法函式形態。
+
+**② 誤對 tracked 檔 `git checkout`**
+`tests/governance/fixtures/phase2_expected_flips.txt`（B3 ambient M）被還原成 HEAD 版，
+而其 `.sha256` 與 `scripts/extract_phase2_expected_flips.py` 仍為 ambient
+⇒ 三者不一致，`test_01_phase2_flips_fixture_matches_todo` 轉紅、`g0_tests` 連帶紅。
+執行端合約（`AGENTS.md`／`.cursorrules`）**明文禁止對 tracked 檔 `git checkout`**。
+
+### 為何是機械問題
+
+兩次都**沒有任何機制通知任何人**：主委是跑測試看到紅、再逐檔 `git diff` 才查出來。
+`agent_postflight.sh` 現行不比對「派工前後之工作區狀態」。
+依「工具必須自帶強制機制」（2026-08-02 定）：合約寫了禁令但無檢查 ⇒ 等於沒有。
+
+🔴 **這是 CLAUDE.md「執行端跑驗收時主控端不得動檔」之反向面**：
+既有紀錄只防「主控端污染執行端」，**未防「執行端污染主控端」**。
+
+### 閉合條件
+
+`committee_run.sh`／`cx_run.sh` 於派工**前**記錄 `git status --porcelain` 快照，
+收尾時比對；出現下列任一即**明確回報**（不必擋，但不得靜默）：
+1. tracked 檔內容改變而該檔不在該輪允許改動清單內
+2. ambient M 檔**消失**（被還原成 HEAD）——即形態②
+3. 工作區出現含 `MUTATION` 等未還原標記之 hunk（啟發式，列為輔助）
+
+### 誠實邊界
+
+本票**尚無機械綁定**。快照比對只能偵測「有沒有變」，
+無法分辨「該輪合法交付」與「未還原之污染」——後者須靠該輪之允許清單。
+主委於本 epic 亦有一次相關疏失（未先確認腳本有副作用即執行），已具名於上述收斂檔。
