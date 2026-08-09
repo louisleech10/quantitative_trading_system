@@ -1,38 +1,45 @@
 # Handoff
 
+REF:handoffs/reconcile/20260810-govb1-b8-review-r1/synth.md
 REF:handoffs/reconcile/20260809-govb1-b7-review-r1/synth.md
 REF:handoffs/reconcile/20260809-govb1-b7-consult-r1/synth.md
 REF:handoffs/reconcile/20260809-govb1-b3-review-r8/synth.md
 
 🔴 **`REF:` 只准列「已戳記」之 reconcile——所有列。** 派工前 `bash scripts/reconcile_stamps_check.sh <檔>` 驗 rc=0。
-（`20260810-govb1-b8-review-r1/synth.md` **尚未戳記**，故不得列入 REF。）
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-10 | **Branch**: main | 實作端＝主委自任；review＝codex+composer
 
-## 🔴 接手第一件事：**B8 收尾**（stamp 輪）
+## 🔴 接手第一件事：**B9 實作**（Task 4.2 / 零 findings 契約）
 
-B8（Task 4.1）**實作與 r1 修補都已 commit**，只差**戳記輪**：
+**路線（使用者已定，不得再開順序討論）**：**B9 → B10 → 殘留票**。
 
-1. 對 `handoffs/reconcile/20260810-govb1-b8-review-r1/synth.md` 補 `## 戳記` 區、算 body hash
-   （`printf '\n## 戳記\n\n' >>` 後跑 `reconcile_body_hash.sh`）
-2. 派 stamp 輪（codex+composer），必答＝**§B8 逐條關閉複驗** ＋ **receipt r2 的非實作者複核**
-   （r1 只複核了 r2 之前的版本；r2 新增 4 個導出檔未經複核）
-3. 🔴 **stamp brief 必須硬性要求 canonical `## <FAMILY>-R<n>-P<0-3>-<NN>` heading
-   ＋ sentinel body 含 `**斷言**`／`**碼證**` 且非空**——本 session 連兩輪栽在這裡（`票 B-52`）
+- **B9**＝Task 4.2。修改 `scripts/govflow_lifecycle.json`（新增 `zero_findings_contract` 節，
+  **append-only，禁改既有節**）、`scripts/completeness_check.sh`（`_validate_finding_body`）、
+  `templates/COMMITTEE_FINDING_TEMPLATE.md`；新建 `tests/governance/test_govb1_zero_findings.py`。
+  四者**皆在 manifest allow 內** ⇒ 一般 commit。
+  🔴 **唯一許可的行為變更＝hollow body 非空判定**（`--single` 對 `hollow_p300` 由 0 → 非 0）。
+  改了就**必須同步更新** `test_govb1_zeroid_no_regression.py` 的 `SINGLE_BASELINE`
+  並在收斂檔附委員裁定——那張表就是為了讓這件事不能靜默發生。
+  🔴 契約三件事缺一不可：①sentinel 形態 ②body 必填欄＋**語意非空** ③**findings 的落點**
+  （每種 `brief-kind` 的 findings 寫進哪個檔）。③ 正是 `票 B-52` 的病灶。
+- **B10**＝Task 4.3（`cx_run.sh` `format-failed` 補救層）。
+  🔴 **B10 須接手 B8 的 `cx_run` 第三欄**（兩家一致移交，見 `REF` 之 b8-review-r1 收斂檔 C5）：
+  `test_cxrun_column_is_blocked_not_passing` 是逼債條款，
+  B10 一加「保留既有輸出」的 stub 模式它就會紅，屆時須補上三輸入 × `result_state` 矩陣。
 
-之後：**B9 → B10 → 殘留票**（使用者已定路線，不得再開順序討論）。
-🔴 **B9／B10 優先序已實證上升**：本 session 三輪 stamp／review 因產出格式不合規銷帳鎖死。
-🔴 **B10 必須接手 B8 的 `cx_run` 第三欄**（兩家一致移交）——
-`test_cxrun_column_is_blocked_not_passing` 是逼債條款，B10 一加保留輸出的 stub 模式它就會紅。
+🔴 **在 B9／B10 修好 `票 B-52` 根因之前，每一份 review／stamp brief 都必須寫入這段硬性條款**：
+findings 用 canonical `## <FAMILY>-R<n>-P<0-3>-<NN>`；0 findings 寫 sentinel `…-P3-00`
+**且 body 須含 `**斷言**` 與 `**碼證**`、內容非空**。
+少任一項 ⇒ completeness 判 vacuous／empty-shell ⇒ 銷帳鎖死，只能走 `--abandon`。
 
 ## ✅ 本 session 已收案
 
 | 項 | commit | 狀態 |
 |---|---|---|
 | **B7**（`claude` 段收窄；`票 B-26` 一併結清 `GOVB0 Task 2.2`） | `a5ddf05` OOE | 兩家 APPROVED（三輪）；已 push |
-| **B8**（Task 4.1 findings-kind 判準） | `52c4a1a` `4a9de37` OOE `b6a9da2` | r1 十條全修；**待戳記** |
+| **B8**（Task 4.1 findings-kind 判準） | `52c4a1a` `4a9de37` OOE `b6a9da2` | **收案**：r1 十條全修、stamp-r1 兩家 APPROVED |
 
-測試 1129 → **1196**。
+測試 1129 → **1196**。B8 的 §V-FP receipt 已完成非實作者複核（stamp-r1，MISMATCHES=0、FP=0）。
 
 ## 🔴 本 session 主委被抓到的（不淡化，供接手者引以為戒）
 
