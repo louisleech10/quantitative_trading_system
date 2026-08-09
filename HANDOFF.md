@@ -9,6 +9,62 @@ REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-09 | **Branch**: main
 
+## 🔴 接手第一件事：**補完三項 ＋ 一筆不實的帳**（優先於 B5）
+
+使用者定調：委員加減／任務中穿插修別的事「每週好幾次」，**必須極低摩擦**。
+兩個機制已上線可用，但 review-r1（codex＋composer）抓到 5 項，**只修了 2 項**。
+🔴 **下列四件做完才算「換委員 ＋ 穿插」真正完成。建議順序＝R-19 → R-20 → 補帳 → R-18。**
+
+### ① `R-19`（最小、最急）—— `active_stampers` 未 fail-closed
+
+**為何最急**：那是**使用者手改的一行**，打錯字是預期失敗模式不是邊緣案例。
+
+| 缺陷 | 現況 | 應為 |
+|---|---|---|
+| `active_stampers: []` | `families_get` 對「缺 key」與「空 list」都回非零 ⇒ 被當缺席而**靜默回退全員** | 空 list ⇒ **fail-closed 拒**（須與「缺 key」分辨） |
+| 家族名打錯（如 `codexx`） | 被接受為 required ⇒ 永遠等不到該家戳記 | 拒：`active_stampers` 須 ⊆ `review_families` |
+| 角色閘 | 只載 `review_families`，與 stamp 決策脫節 | 至少具名記錄此不一致 |
+
+**改哪**：`scripts/reconcile_stamps_check.sh:44-47`（**不在 manifest** ⇒ 走 out-of-epic trailer）。
+分辨 missing 與 empty 須繞過 `families_get`（它兩者同回非零）——用 `python3`／`jq` 直接讀 key 存在性。
+碼證出處：`CODEX-R1-P1-03`（`handoffs/20260809-govb1-x-review-r1-codex.md`）。
+
+### ② `R-20` —— 測試證明不了「預設沒被寫死」
+
+`test_stamp_default_no_silent_drop` 從**同一份現行 SoT** 取 expected ⇒ 把 default 改成硬編
+`required="codex,composer"`，該測**仍 1 passed**（codex 實跑證實）。
+
+🔴 **這是主委為了低摩擦弄出的假綠**：把斷言改成「與名冊無關」以免每次換委員都要改測試，
+結果連「有沒有被寫死」都測不出來。**低摩擦與保護力沒有同時拿到。**
+
+**修法**：於隔離 fixture 把 `active_stampers` 設成**另一個合法子集**（如 `["composer","grok"]`），
+確認硬編目前名單之實作**轉紅**。改哪：`tests/governance/test_family_registry.py`（**不在 manifest** ⇒ 走 trailer）。
+
+### ③ 補帳 —— review-r1 之債務標籤不實
+
+主委以 `--kind no-findings-expected` 清 `20260809-govb1-x-review-r1` 之債，
+**但該輪產出 5 個 findings**。理由欄雖寫了實情，**標籤與事實不符**。
+
+**修法**：`bash scripts/reconcile_build.sh 20260809-govb1-x-review-r1 --mode review <codex> <composer>`
+→ 手填群集 → `reconcile_cluster_attribution_check` → 該輪帳已 ABANDONED 無法重清
+⇒ **於收斂檔內具名記載「本輪帳曾以錯誤 kind 清除」**，並在 `handoffs/20260801-GOV-AMEND-BACKLOG.md` 開票追蹤。
+
+### ④ `R-18`（最難，放最後）—— trailer 用 `--grep` 可被 body 文字誘導
+
+`_g7_ooe_commits` 用 `git log --grep` ⇒ **body 中段或引用的舊訊息**內之同形字串亦得豁免。
+本專案 commit 訊息**經常引用前一則**，誤觸機率高。
+
+🔴 **正解不可單獨落地，三者缺一即破**：
+1. 改用 `%(trailers:key=Governance-Scope,valueonly)`（git 原生，只認**最後一段**）
+2. 訂慣例：trailer 須與 `Co-Authored-By` **同段**（中間不得空行）
+3. **重寫既有兩筆 out-of-epic commit 之訊息**（`d0dc682`／`28b586a` 後續 sha 已變，現跑 `git log --grep` 取）
+
+**實測依據**：主委已試過只做 ①，結果既有兩筆立刻失去豁免、`g7` 當場轉紅。
+🔴 第 3 步是改寫**非 HEAD 歷史**，本環境不支援互動式 rebase，須 `filter-branch --msg-filter`
+之類非互動手段；**做到一半失敗會讓 repo 比現在更糟** ⇒ 務必先確認可回退再動。
+
+---
+
 ## ▶ 兩個低摩擦機制（2026-08-09 上線，使用者授權）
 
 ### ① 換委員 ＝ 改一行
