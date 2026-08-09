@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -26,13 +27,21 @@ FROZEN_SPEC = REPO / "docs" / "GOVB1_INPUT_QUALITY_SPEC.md"
 FROZEN_TODO = REPO / "docs" / "GOVB1_INPUT_QUALITY_TODO.md"
 
 # 抽函式原文所需的相依（`_tc_live_lines`／`_tc_ere_escape` 為共用 helper）
-_DEPS = ("_tc_live_lines", "_tc_ere_escape")
+_DEPS = ("_tc_live_lines", "_tc_live_or_die", "_tc_ere_escape")
+
+
+# 函式所依賴之頂層常數（非函式，須另抽；漏抽會使受測函式在隔離 shell 下 unbound）
+_CONSTS = ("_TC_ASSERT_SAFE_CHARS",)
 
 
 def _extract(*fns: str) -> str:
-    """從 template_check.sh 抽出指定函式之**原始碼**（含共用 helper）。"""
+    """從 template_check.sh 抽出指定函式之**原始碼**（含共用 helper 與其依賴常數）。"""
     src = SCRIPT.read_text(encoding="utf-8")
     out = []
+    for const in _CONSTS:
+        m = re.search(rf"^{re.escape(const)}=.*$", src, re.M)
+        assert m, f"找不到常數 {const}（重構?→須更新本測）"
+        out.append(m.group(0) + "\n")
     for fn in (*_DEPS, *fns):
         marker = f"\n{fn}() {{\n"
         i = src.find(marker)
@@ -150,6 +159,11 @@ def test_t15_b1_func_exists(tmp_path: Path, name: str, want_rc: int, why: str) -
         ("fence 內不算宣告", "```\nSCOPE-CLAIM:F1 fence 內\n```", 0),
         ("CRLF 須正規化", "SCOPE-CLAIM:R1 x DERIVE:y\r", 0),
         ("普通散文提及不觸發", "本節談到 SCOPE-CLAIM: 的格式，不是行首宣告", 0),
+        # 🔴 COMPOSER-R1-P2-01：`[[:space:]]` 含 NBSP／全形空白 ⇒ 貼上來的縮排會被當行首宣告
+        ("NBSP 前綴不得視為行首", " SCOPE-CLAIM:N1 缺 DERIVE", 0),
+        ("全形空白前綴不得視為行首", "　SCOPE-CLAIM:N2 缺 DERIVE", 0),
+        ("ASCII 空白仍須視為行首", " SCOPE-CLAIM:N3 缺 DERIVE", 1),
+        ("TAB 仍須視為行首", "\tSCOPE-CLAIM:N4 缺 DERIVE", 1),
     ],
 )
 def test_t15_c1_scope_claim_grammar(
@@ -181,38 +195,100 @@ def test_t15_a1_assert_rc_compared(tmp_path: Path) -> None:
 
 
 def test_t15_a1_pending_requires_all_three_conditions(tmp_path: Path) -> None:
-    """🔴 `pending` 是 fail-open 的入口，三條件缺一即須保留失敗〔定案 2〕。
+    """🔴 `pending` 是 fail-open 的入口：**預設拒絕**，且 opt-in 後仍須三條件全成立。
 
     TODO `:846` 原文「引用尚未實作的腳本 ⇒ rc=0 並標 pending」無判準：
-    codex 實測**不存在腳本 rc=127 也會被吞**。本測釘住收窄後的行為。
+    codex 實測**不存在腳本 rc=127 也會被吞**。
+    🔴 `CODEX-R2-P1-02` 再指出：只憑「受檢檔自己寫一行 `新建：`」授權 pending，
+    等於**權威來源就是受檢物本身**。採較嚴版：`TEMPLATE_CHECK_ALLOW_PENDING=1`
+    才可能 pending ⇒ 凍結文件路徑**永不 pend**。
     """
-    # ① 標的不存在但**未**列於「新建：」⇒ 不得 pending
-    no_decl = tmp_path / "a.md"
-    no_decl.write_text("ASSERT bash scripts/never_built_xyz.sh THEN rc=0\n", encoding="utf-8")
-    p = _run_fn(("_run_assert_lines",), f'_run_assert_lines {no_decl} >/dev/null 2>&1; echo "rc=$?"', tmp_path)
-    assert "rc=1" in p.stdout, f"未列新建卻 pending（fail-open）: {p.stdout.strip()}"
+    body = '_run_assert_lines {doc} >/dev/null 2>&1; echo "rc=$?"'
 
-    # ② 標的不存在且**明示列於「新建：」** ⇒ 允許 pending
+    # ① 預設（未 opt-in）：即使列於「新建：」也不得 pending
     decl = tmp_path / "b.md"
     decl.write_text(
         "新建：`scripts/never_built_xyz.sh`\n"
         "ASSERT bash scripts/never_built_xyz.sh THEN rc=0\n",
         encoding="utf-8",
     )
-    p = _run_fn(("_run_assert_lines",), f'_run_assert_lines {decl} >/dev/null 2>&1; echo "rc=$?"', tmp_path)
-    assert "rc=0" in p.stdout, f"列於新建仍被拒: {p.stdout.strip()}"
+    p = _run_fn(("_run_assert_lines",), body.format(doc=decl), tmp_path)
+    assert "rc=1" in p.stdout, f"未 opt-in 卻 pending（fail-open）: {p.stdout.strip()}"
 
-    # ③ 標的**存在**但 rc 不符 ⇒ 一律失敗（不得因 pending 機制放行）
+    # ② opt-in ＋ 未列於「新建：」⇒ 仍拒
+    no_decl = tmp_path / "a.md"
+    no_decl.write_text("ASSERT bash scripts/never_built_xyz.sh THEN rc=0\n", encoding="utf-8")
+    p = _run_fn(
+        ("_run_assert_lines",),
+        "TEMPLATE_CHECK_ALLOW_PENDING=1; export TEMPLATE_CHECK_ALLOW_PENDING\n"
+        + body.format(doc=no_decl),
+        tmp_path,
+    )
+    assert "rc=1" in p.stdout, f"opt-in 後未列新建仍 pending: {p.stdout.strip()}"
+
+    # ③ opt-in ＋ 列於「新建：」⇒ 允許 pending
+    p = _run_fn(
+        ("_run_assert_lines",),
+        "TEMPLATE_CHECK_ALLOW_PENDING=1; export TEMPLATE_CHECK_ALLOW_PENDING\n"
+        + body.format(doc=decl),
+        tmp_path,
+    )
+    assert "rc=0" in p.stdout, f"三條件全成立仍被拒: {p.stdout.strip()}"
+
+    # ④ 標的**存在**但 rc 不符 ⇒ 一律失敗（不得因 pending 機制放行）
     real = tmp_path / "c.md"
     real.write_text(
         "新建：`scripts/template_check.sh`\n"
         "ASSERT bash scripts/template_check.sh THEN rc=0\n",
         encoding="utf-8",
     )
-    p = _run_fn(("_run_assert_lines",), f'_run_assert_lines {real} >/dev/null 2>&1; echo "rc=$?"', tmp_path)
+    p = _run_fn(
+        ("_run_assert_lines",),
+        "TEMPLATE_CHECK_ALLOW_PENDING=1; export TEMPLATE_CHECK_ALLOW_PENDING\n"
+        + body.format(doc=real),
+        tmp_path,
+    )
     assert "rc=1" in p.stdout, (
         f"標的存在時仍走了 pending 分支（缺參數應 rc=1 而非放行）: {p.stdout.strip()}"
     )
+
+
+@pytest.mark.parametrize(
+    "label,content,want_rc",
+    [
+        # 🔴 CODEX-R2-P1-03：`THEN rc=` 須恰一個且位於行尾
+        ("重複 THEN rc（畸形行）", "ASSERT false THEN rc=0 THEN rc=1", 1),
+        ("THEN rc 後有尾隨字元", "ASSERT true THEN rc=0 備註", 1),
+        # 🔴 CODEX-R2-P1-04：命令不得含 shell 元字元／重導向／命令替換
+        ("重導向", "ASSERT true > /tmp/govb1_probe_marker THEN rc=0", 1),
+        ("分號串接", "ASSERT true; false THEN rc=0", 1),
+        ("命令替換", "ASSERT echo $(id) THEN rc=0", 1),
+        ("管線", "ASSERT true | false THEN rc=0", 1),
+        ("合法單一命令", "ASSERT true THEN rc=0", 0),
+        # 🔴 CODEX-R2-P1-01：未閉合 fence 不得吞到 EOF 而靜默漏檢
+        ("未閉合 fence ⇒ fail-closed", "```\nASSERT true THEN rc=0", 1),
+        ("~~~ 不得收合 ``` ", "```\n~~~\nASSERT true THEN rc=0", 1),
+    ],
+)
+def test_t15_a1_assert_line_grammar_and_no_eval(
+    tmp_path: Path, label: str, content: str, want_rc: int
+) -> None:
+    """A 之整行封閉文法 ＋ 禁 `eval`〔`CODEX-R2-P1-03`／`P1-04`／`P1-01`〕。"""
+    doc = tmp_path / "g.md"
+    doc.write_text(content + "\n", encoding="utf-8")
+    p = _run_fn(
+        ("_run_assert_lines",), f'_run_assert_lines {doc} >/dev/null 2>&1; echo "rc=$?"', tmp_path
+    )
+    assert f"rc={want_rc}" in p.stdout, f"{label}: got {p.stdout.strip()}"
+
+
+def test_t15_a1_no_side_effect_from_redirection(tmp_path: Path) -> None:
+    """🔴 承重：帶重導向之 ASSERT **不得產生副作用**（codex 實證舊版真的建了檔）。"""
+    marker = tmp_path / "marker"
+    doc = tmp_path / "s.md"
+    doc.write_text(f"ASSERT : > {marker} THEN rc=0\n", encoding="utf-8")
+    _run_fn(("_run_assert_lines",), f'_run_assert_lines {doc} >/dev/null 2>&1; echo "rc=$?"', tmp_path)
+    assert not marker.exists(), "🔴 ASSERT 之重導向產生了副作用（eval 未被移除？）"
 
 
 def test_t15_a1_unparseable_assert_is_failure(tmp_path: Path) -> None:
