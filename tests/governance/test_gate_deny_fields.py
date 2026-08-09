@@ -449,6 +449,66 @@ def test_01_phase2_flips_fixture_matches_todo() -> None:
     assert actual == side, f"flips sha256 不符 sidecar: {actual} != {side}"
 
 
+def test_01_c5_absolute_state_recurse_in_flips() -> None:
+    """C5：TODO 絕對態（RECURSE 六條皆 BLOCK）須進 phase2 flips 為 maintain。
+
+    模擬語料 A 含 RECURSE 命令時，排除清單前提不被削弱。
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("extract_flips", EXTRACT_FLIPS)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # 真實 TODO 抽取：RECURSE 六條須在 rows 中
+    todo = (REPO_ROOT / "docs" / "GOVB0_FRICTION_TODO.md").read_text(encoding="utf-8")
+    rows = mod.extract(todo)
+    recurse = [r for r in rows if r["test_id"] == "TEST-2.1-RECURSE"]
+    assert len(recurse) == 6, f"RECURSE 應 6 條 maintain，got {len(recurse)}"
+    for r in recurse:
+        assert r["kind"] == "maintain"
+        assert r["from"] == "BLOCK" and r["to"] == "BLOCK"
+
+    # REGRESS 兩條須 BLOCK
+    regress = [r for r in rows if r["test_id"] == "TEST-2.2-REGRESS"]
+    assert len(regress) == 2, f"REGRESS 應 2 條，got {len(regress)}"
+    for r in regress:
+        assert r["kind"] == "maintain"
+        assert r["from"] == "BLOCK"
+
+    # mutation：自 _DIR_RE 移除絕對態枝 + 關掉 abs 分支 → RECURSE 不再抽出
+    src = EXTRACT_FLIPS.read_text(encoding="utf-8")
+    mut_src = src
+    for frag in (
+        '    r"|(?:[一二三四五六七八九十兩\\d]+條)?(?P<abs_all>皆)\\s*(?P<a1>BLOCK|ALLOW)"\n',
+        '    r"|(?:[一二三四五六七八九十兩\\d]+條)?(?P<abs_must>須)\\s*(?P<a2>BLOCK|ALLOW)"\n',
+    ):
+        assert frag in mut_src, f"C5 mutation 錨點漂移: {frag!r}"
+        mut_src = mut_src.replace(frag, "", 1)
+    mut_src = mut_src.replace(
+        'elif dm.group("abs_all") or dm.group("abs_must"):',
+        'elif False:  # C5 mut: abs disabled',
+        1,
+    )
+    assert mut_src != src, "C5 mutation 錨點漂移"
+    mut_path = REPO_ROOT / "tests" / "governance" / "fixtures" / "_mut_extract_c5.py"
+    try:
+        mut_path.write_text(mut_src, encoding="utf-8")
+        spec_m = importlib.util.spec_from_file_location("extract_flips_mut", mut_path)
+        assert spec_m and spec_m.loader
+        mod_m = importlib.util.module_from_spec(spec_m)
+        spec_m.loader.exec_module(mod_m)
+        rows_m = mod_m.extract(todo)
+        recurse_m = [r for r in rows_m if r["test_id"] == "TEST-2.1-RECURSE"]
+        assert len(recurse_m) == 0, (
+            f"C5 mutation 後 RECURSE 應消失以證偽；got {len(recurse_m)}"
+        )
+    finally:
+        if mut_path.is_file():
+            mut_path.unlink()
+
+
 def test_01_invariance_decision_trace(tmp_path: Path) -> None:
     """TEST-0.1-INVARIANCE：語料 A 排除 Phase2 預期翻轉後，snapshot vs 現行 (rc, kind) 逐項相等。
 
@@ -528,31 +588,93 @@ def test_01_invariance_decision_trace(tmp_path: Path) -> None:
 
 
 def test_01_invariance_exclude_nonflip_mutation(tmp_path: Path) -> None:
-    """mutation：把不在預期翻轉清單的語料 A 條目也排除 → 反向斷言 1 必須轉紅。"""
-    entries = _load_corpus_entries(CORPUS_A)
-    flips = _load_phase2_flips()
-    flip_only = [f for f in flips if f["kind"] == "flip"]
+    """C4 true mutation：隔離副本把 exclude 改為誤收 non-flip → reverse1 轉紅。
 
-    # 挑一條「不在 flip 清單」的 Bash 命令
-    victim: tuple[dict[str, str], str] | None = None
-    for setup, payload in entries:
-        cmd = _payload_command(payload)
-        if cmd is None:
-            continue
-        if _flip_matches_command(cmd, flip_only) is None:
-            victim = (setup, payload)
-            break
-    assert victim is not None, "找不到可作 mutation 的非 flip 語料 A 條目"
+    驗收（brief D-3）：未突變 subject rc=0；突變後同一 reverse1 驗收 rc≠0。
+    Subject 為磁碟副本（import 真實 helper），非測試內建 poisoned list。
+    """
+    import subprocess
+    import sys
+    import textwrap
 
-    # 模擬錯誤排除：把 victim 塞進 excluded，且找不到 flip 對應
-    _setup, payload = victim
-    cmd = _payload_command(payload)
-    assert cmd is not None
-    hit = _flip_matches_command(cmd, flip_only)
-    # 反向斷言 1 的等價檢查（必須失敗）
-    reverse1_ok = hit is not None and _cmd_match(cmd, hit["command"])
-    assert not reverse1_ok, (
-        f"MUTATION 未使反向斷言1 轉紅：非 flip 命令竟命中清單 cmd={cmd!r} hit={hit}"
+    helper_path = Path(__file__).resolve()
+    # 隔離 subject：建 excluded + reverse1（與 test_01_invariance_decision_trace 反向斷言 1 同語意）
+    subject_ok = tmp_path / "c4_subject_ok.py"
+    subject_mut = tmp_path / "c4_subject_mut.py"
+
+    body = textwrap.dedent(
+        f"""\
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        REPO = Path({str(REPO_ROOT)!r})
+        HP = Path({str(helper_path)!r})
+        spec = importlib.util.spec_from_file_location("tgdf_c4", HP)
+        assert spec and spec.loader
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+
+        MUTATE = {{MUTATE}}
+
+        entries = m._load_corpus_entries(m.CORPUS_A)
+        flips = m._load_phase2_flips()
+        flip_only = [f for f in flips if f["kind"] == "flip"]
+        excluded = []
+        for setup, payload in entries:
+            cmd = m._payload_command(payload)
+            hit = m._flip_matches_command(cmd, flip_only) if cmd else None
+            if hit is not None:
+                excluded.append((setup, payload, hit))
+            elif MUTATE and cmd is not None:
+                # 移除正確 filter：誤把 non-flip 以假 flip hit 排除
+                excluded.append((
+                    setup,
+                    payload,
+                    {{
+                        "kind": "flip",
+                        "command": "__C4_MUT_NONMATCH__",
+                        "from": "ALLOW",
+                        "to": "BLOCK",
+                        "test_id": "MUT",
+                    }},
+                ))
+
+        # reverse1（decision_trace 反向斷言 1）
+        for _s, payload, hit in excluded:
+            cmd = m._payload_command(payload)
+            assert hit is not None
+            assert cmd is not None
+            assert m._cmd_match(cmd, hit["command"]), (cmd, hit.get("command"))
+            assert hit["kind"] == "flip"
+        print("OK")
+        """
+    )
+    subject_ok.write_text(body.replace("{MUTATE}", "False"), encoding="utf-8")
+    subject_mut.write_text(body.replace("{MUTATE}", "True"), encoding="utf-8")
+
+    before = subprocess.run(
+        [sys.executable, str(subject_ok)],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert before.returncode == 0, (
+        f"C4 未突變 reverse1 應 rc=0；rc={before.returncode} "
+        f"stdout={before.stdout!r} stderr={before.stderr!r}"
+    )
+
+    after = subprocess.run(
+        [sys.executable, str(subject_mut)],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert after.returncode != 0, (
+        f"C4 mutation 後 reverse1 應 rc≠0；rc={after.returncode} "
+        f"stdout={after.stdout!r} stderr={after.stderr!r}"
     )
 
 

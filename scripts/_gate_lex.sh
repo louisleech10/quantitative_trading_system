@@ -282,15 +282,95 @@ _gate_lex_extract_inners() {
   '
 }
 
+# 抽取 $()／反引號命令替換內容（C3：雙引號內亦會執行，須遞迴判定）。
+# 單引號 span 內不抽取（字面）。stdout：每行一個 inner。
+_gate_lex_extract_cmdsubs() {
+  printf '%s' "${1-}" | LC_ALL=C awk '
+    function emit(s) { if (s != "") print s }
+    {
+      n = length($0); i = 1
+      in_sq = 0; in_dq = 0
+      while (i <= n) {
+        c = substr($0, i, 1)
+        if (in_sq) {
+          if (c == "'\''") in_sq = 0
+          i++; continue
+        }
+        if (in_dq) {
+          if (c == "\\") {
+            if (i >= n) break
+            i += 2; continue
+          }
+          if (c == "\"") { in_dq = 0; i++; continue }
+          # 雙引號內繼續偵測 $() / backtick（會執行）
+        } else {
+          if (c == "'\''") { in_sq = 1; i++; continue }
+          if (c == "\"") { in_dq = 1; i++; continue }
+        }
+        # 不在單引號內
+        if (c == "$" && i < n && substr($0, i + 1, 1) == "(") {
+          j = i + 2; depth = 1; tok = ""
+          while (j <= n && depth > 0) {
+            cc = substr($0, j, 1)
+            if (cc == "(") { depth++; tok = tok cc; j++; continue }
+            if (cc == ")") {
+              depth--
+              if (depth == 0) break
+              tok = tok cc; j++; continue
+            }
+            tok = tok cc; j++
+          }
+          if (depth == 0) emit(tok)
+          i = j + 1
+          continue
+        }
+        if (c == "`") {
+          j = i + 1; tok = ""
+          while (j <= n) {
+            cc = substr($0, j, 1)
+            if (cc == "\\") {
+              if (j < n) { tok = tok substr($0, j + 1, 1); j += 2; continue }
+              break
+            }
+            if (cc == "`") { emit(tok); break }
+            tok = tok cc; j++
+          }
+          i = j + 1
+          continue
+        }
+        i++
+      }
+    }
+  '
+}
+
+# D-1：整條是否為 gate 自呼叫（命令位置；非子字串嵌入）。
+# 命中 → rc=0（應 ALLOW）；未命中 → rc=1。
+# 形態：可選 bash|sh|zsh + 可選路徑前綴 + scripts/gate.sh|gate_check.sh + 參數；
+# 整條不得含未引號命令分隔符 ;|& 或換行（避免 `gate…; codex` 被誤當自呼叫）。
+_gate_cmd_is_self_gate() {
+  local s="${1-}"
+  # 禁複合命令（分隔符／換行）——自呼叫必須是單一簡單命令
+  if printf '%s' "$s" | grep -Eq '[;&|`]|\$\(|\n'; then
+    return 1
+  fi
+  # 命令位置：行首可選 interpreter，後接 scripts/gate(_check)?.sh
+  printf '%s' "$s" | grep -Eq \
+    '^(bash|sh|zsh)[[:space:]]+([^[:space:]]*/)?scripts/gate(_check)?\.sh([[:space:]]|$)|^([^[:space:]]*/)?scripts/gate(_check)?\.sh([[:space:]]|$)'
+}
+
 # 完整判定：cmd 是否為 dispatch 通道（命中 → rc=0）。
 # depth 從 0 起；逾 _GATE_LEX_MAX_DEPTH → fail-closed 視同命中。
+# D-2／C1：無字元長硬頂。O(n) 路徑＝
+#   (1) 無引號／heredoc／反引號時略過 awk 前處理（避免 O(n²) 拼接），直接 grep 掃 raw；
+#   (2) 有特殊字元才走 _gate_lex_preprocess（含 heredoc fail-closed）；
+#   (3) -c／eval／cmdsub 僅在結構字樣存在時抽取（避 MB 級空轉）。
+# 家族名判定只在 _gate_lex_match_scan（已 pin SoT）；此處不另寫家族清單。
+# 禁子字串型「gate 逃生口」與長度截斷 ALLOW。
 _gate_cmd_is_dispatch() {
   local cmd="${1-}"
   local depth="${2:-0}"
-  local scan inner inners raw
-  # 超大指令：awk 字串拼接 O(n²) 會卡死（4MB audit 邊界測）；只掃前 8KiB。
-  # 真實派工 CLI 旗標在前綴；尾端巨量 payload 不影響命令位置判定。
-  local _max_lex=8192
+  local scan inner inners raw cmdsubs
 
   # 契約 8：遞迴上限 3；逾限 fail-closed（BLOCK）
   if [ "$depth" -gt "$_GATE_LEX_MAX_DEPTH" ]; then
@@ -298,30 +378,49 @@ _gate_cmd_is_dispatch() {
   fi
 
   raw="$cmd"
-  if [ "${#cmd}" -gt "$_max_lex" ]; then
-    raw="$(printf '%s' "$cmd" | head -c "$_max_lex")"
-  fi
 
-  scan="$(_gate_lex_preprocess "$raw" 2>/dev/null)" || return 0
-  case "$scan" in
-    FAILCLOSED*) return 0 ;;
-  esac
+  # 引號／heredoc／反引號 → 需詞法前處理（中性化引號內分隔符；heredoc 無法解析 → FAILCLOSED）
+  if printf '%s' "$raw" | grep -Eq "['\"\`]" || printf '%s' "$raw" | grep -Fq '<<'; then
+    scan="$(_gate_lex_preprocess "$raw" 2>/dev/null)" || return 0
+    case "$scan" in
+      FAILCLOSED*) return 0 ;;
+    esac
+  else
+    scan="$raw"
+  fi
 
   if _gate_lex_match_scan "$scan"; then
     return 0
   fi
 
-  # 契約 3／7：-c 與 eval 引數遞迴（避 process substitution，bash 3.2 穩）
-  inners="$(_gate_lex_extract_inners "$raw")"
-  if [ -n "$inners" ]; then
-    while IFS= read -r inner; do
-      [ -n "$inner" ] || continue
-      if _gate_cmd_is_dispatch "$inner" "$((depth + 1))"; then
-        return 0
-      fi
-    done <<GATE_INNER_EOF_7f3a
+  # 契約 3／7：-c 與 eval 引數遞迴（僅在有 -c／eval 結構字樣時抽取）
+  if printf '%s' "$raw" | grep -Eq '(bash|sh|zsh)[[:space:]]+-c|(^|[[:space:];&|(`])eval[[:space:]]'; then
+    inners="$(_gate_lex_extract_inners "$raw")"
+    if [ -n "$inners" ]; then
+      while IFS= read -r inner; do
+        [ -n "$inner" ] || continue
+        if _gate_cmd_is_dispatch "$inner" "$((depth + 1))"; then
+          return 0
+        fi
+      done <<GATE_INNER_EOF_7f3a
 $inners
 GATE_INNER_EOF_7f3a
+    fi
+  fi
+
+  # C3：雙引號內 $()／反引號會執行 → 抽取後遞迴（僅在有 $()/` 時）
+  if printf '%s' "$raw" | grep -Eq '\$\(|`'; then
+    cmdsubs="$(_gate_lex_extract_cmdsubs "$raw")"
+    if [ -n "$cmdsubs" ]; then
+      while IFS= read -r inner; do
+        [ -n "$inner" ] || continue
+        if _gate_cmd_is_dispatch "$inner" "$((depth + 1))"; then
+          return 0
+        fi
+      done <<GATE_CMDSUB_EOF_9c2b
+$cmdsubs
+GATE_CMDSUB_EOF_9c2b
+    fi
   fi
 
   return 1

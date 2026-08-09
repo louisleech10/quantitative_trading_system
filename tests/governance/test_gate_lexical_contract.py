@@ -393,7 +393,7 @@ def test_20_mut_11_contract_reverts(tmp_path: Path) -> None:
 
     mutations.append(("c1b", m1b, pick("1b", "TN"), "BLOCK"))
 
-    # 2：縮回 R2 命令位置（僅 ^ ; & |）
+    # 2：縮回 R2 命令位置（僅 ^ ; & |）；並關 C3 cmdsub 抽取（否則 $() 仍遞迴命中）
     def m2(t: str) -> str:
         old = (
             "(^|[;&|(`]|\\$\\()[[:space:]]*((eval|xargs)[[:space:]]+)?"
@@ -405,6 +405,11 @@ def test_20_mut_11_contract_reverts(tmp_path: Path) -> None:
             # 後備：拿掉 ( ` $( eval xargs
             t2 = t.replace("[;&|(`]|\\$\\(", "[;&|]", 1)
             t2 = t2.replace("((eval|xargs)[[:space:]]+)?", "", 1)
+        t2 = t2.replace(
+            'cmdsubs="$(_gate_lex_extract_cmdsubs "$raw")"',
+            'cmdsubs=""',
+            1,
+        )
         assert t2 != t
         return t2
 

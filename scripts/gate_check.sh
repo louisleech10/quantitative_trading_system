@@ -162,10 +162,26 @@ case "$tool_name" in
     ;;
   Bash)
     cmd="$(jq -r '.tool_input.command // empty' <<<"$INPUT" 2>/dev/null)"
-    # R1：剝除行首 env 前綴（VAR=value 可多個）再比對 executor，防 GATE_DIR_OVERRIDE=… codex exec 繞過。
-    # 🔴 值限「簡單字面」（不含 $ ` ( ) 空白）——避免把 out=$(codex exec x) 誤剝成 exec x)（E-3 回歸）。
-    while printf '%s' "$cmd" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_./:@%+=,-]+[[:space:]]'; do
-      cmd="$(printf '%s' "$cmd" | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_./:@%+=,-]+[[:space:]]+//')"
+    # R1／C2：剝除行首 env 前綴（VAR=value 可多個；值可為簡單字面或引號括起）再比對 executor。
+    # 🔴 簡單字面仍不含 $ ` ( ) 空白——避免 out=$(codex exec x) 誤剝成 exec x)（E-3 回歸）。
+    # 🔴 雙引號值若含 $ 或 ` 不剝（交給詞法 C3 遞迴）；單引號值可剝（shell 不展開）。
+    _gate_strip_env_once() {
+      local s="${1-}" n
+      n="$(printf '%s' "$s" | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_./:@%+=,-]+[[:space:]]+//')"
+      if [ "$n" != "$s" ]; then printf '%s' "$n"; return 0; fi
+      # 雙引號：不含 $ ` 的字面（允許 \\ 與 \"）
+      n="$(printf '%s' "$s" | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*="([^"$`\\]|\\.)*"[[:space:]]+//')"
+      if [ "$n" != "$s" ]; then printf '%s' "$n"; return 0; fi
+      # 單引號：任意非 ' 字元
+      n="$(printf '%s' "$s" | sed -E "s/^[A-Za-z_][A-Za-z0-9_]*='[^']*'[[:space:]]+//")"
+      if [ "$n" != "$s" ]; then printf '%s' "$n"; return 0; fi
+      printf '%s' "$s"
+      return 1
+    }
+    while true; do
+      _stripped="$(_gate_strip_env_once "$cmd")" || true
+      if [ "$_stripped" = "$cmd" ]; then break; fi
+      cmd="$_stripped"
     done
     # executor 通道：只比對「命令位置」（行首 / 分隔符後）的 binary，避免誤擋 cat sp_codex.txt 這種檔名子字串。
     # executor 名單 = scripts/governance_families.json executor_clis(codex|cursor-agent|grok|agy)。
@@ -189,14 +205,17 @@ case "$tool_name" in
     # GOVB0 Task 2.1：詞法前處理後判定（契約 1／1b／2／3／…）；GATE_LEGACY_DECISION=1 回舊路徑。
     # 錨點字面（覆蓋斷言機械導出）：(codex|cursor-agent|grok|agy)[[:space:]] 與 claude[^|]*(-p|--print)
     # 分隔符前綴（舊＋擴充）：(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)
+    # allow_gate_self：scripts/gate(_check)?\.sh 僅「命令位置且整條為 gate 自呼叫」才放行。
+    # 🔴 D-1：禁整條 cmd 子字串命中即 exit 0（會讓 `codex …; echo scripts/gate.sh` 繞過）。
+    # 錨點字面（語料 A 分支機械導出）：scripts/gate(_check)?\.sh
+    if _gate_cmd_is_self_gate "$cmd"; then
+      exit 0
+    fi
     if [ "${GATE_LEGACY_DECISION:-0}" = "1" ]; then
       if printf '%s' "$cmd" | grep -Eq '(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]|claude[^|]*(-p|--print)'; then
-        if printf '%s' "$cmd" | grep -Eq 'scripts/gate(_check)?\.sh'; then exit 0; fi
         kind="dispatch"
       fi
     elif _gate_cmd_is_dispatch "$cmd"; then
-      # 排除 gate 自身與唯讀勘查
-      if printf '%s' "$cmd" | grep -Eq 'scripts/gate(_check)?\.sh'; then exit 0; fi
       kind="dispatch"
     fi
     ;;

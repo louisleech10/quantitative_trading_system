@@ -10,6 +10,12 @@ flip	TEST-2.1-E3	ALLOW	BLOCK	out=$(codex exec x)
 flip	TEST-2.1-E3	ALLOW	BLOCK	out=`codex exec x`
 flip	TEST-2.1-E3	ALLOW	BLOCK	(codex exec x)
 flip	TEST-2.1-E3	ALLOW	BLOCK	eval 'grok -m grok-4.5 -p x'
+maintain	TEST-2.1-RECURSE	BLOCK	BLOCK	bash -c "codex exec x"
+maintain	TEST-2.1-RECURSE	BLOCK	BLOCK	sh -c 'grok -m grok-4.5 -p x'
+maintain	TEST-2.1-RECURSE	BLOCK	BLOCK	bash -c "claude -p x"
+maintain	TEST-2.1-RECURSE	BLOCK	BLOCK	true && codex exec x
+maintain	TEST-2.1-RECURSE	BLOCK	BLOCK	false || grok -m x -p y
+maintain	TEST-2.1-RECURSE	BLOCK	BLOCK	echo x | xargs codex exec
 maintain	TEST-2.1-OUTSIDE	BLOCK	BLOCK	echo start; grok -m grok-4.5 -p "x"
 flip	TEST-2.2-FP4	BLOCK	ALLOW	head -3 /private/tmp/claude-501/x.output; git rev-parse --short HEAD
 flip	TEST-2.2-FP4	BLOCK	ALLOW	cat .claude/tmp/x.txt; git rev-parse HEAD
@@ -18,6 +24,8 @@ flip	TEST-2.2-FP4	BLOCK	ALLOW	find .claude/tmp -name "*.md" -print
 maintain	TEST-2.2-TP	BLOCK	BLOCK	claude -p "x"
 maintain	TEST-2.2-TP	BLOCK	BLOCK	claude --print "x"
 flip	TEST-2.2-PIPE	ALLOW	BLOCK	cat x | claude -p "y"
+maintain	TEST-2.2-REGRESS	BLOCK	BLOCK	v=$(claude -p "hi")
+maintain	TEST-2.2-REGRESS	BLOCK	BLOCK	/usr/local/bin/claude --print "x"
 flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	/opt/homebrew/bin/codex exec hi
 flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	/Users/.../.grok/bin/grok -m x -p y
 flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	venv/bin/codex exec hi

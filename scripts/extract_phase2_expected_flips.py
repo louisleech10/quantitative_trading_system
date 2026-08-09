@@ -8,6 +8,7 @@
   - 由 BLOCK 轉 ALLOW / 全由 BLOCK 轉 ALLOW / 四條全由 BLOCK 轉 ALLOW …
   - 由 ALLOW 轉 BLOCK / 全部由 ALLOW 轉 BLOCK / 三條由 ALLOW 轉 BLOCK …
   - 維持 BLOCK / 維持 ALLOW
+  - 絕對態（C5 選 (a)）：皆 BLOCK／須 BLOCK／六條皆 BLOCK／兩條須 BLOCK → maintain
 
 重跑：
   python3 scripts/extract_phase2_expected_flips.py
@@ -27,10 +28,13 @@ OUT = REPO / "tests" / "governance" / "fixtures" / "phase2_expected_flips.txt"
 OUT_SHA = Path(str(OUT) + ".sha256")
 
 # 產品轉向／維持（禁 mutation「轉回」）
+# 第三類（C5 選 (a)）：絕對態「皆 BLOCK／須 BLOCK／六條皆 BLOCK」→ maintain
 _DIR_RE = re.compile(
     r"(?P<label>"
     r"(?:全|全部|三條|四條|五條)?全?由\s*(?P<from1>BLOCK|ALLOW)\s*轉\s*(?P<to1>BLOCK|ALLOW)"
     r"|(?P<maintain>維持)\s*(?P<from2>BLOCK|ALLOW)"
+    r"|(?:[一二三四五六七八九十兩\d]+條)?(?P<abs_all>皆)\s*(?P<a1>BLOCK|ALLOW)"
+    r"|(?:[一二三四五六七八九十兩\d]+條)?(?P<abs_must>須)\s*(?P<a2>BLOCK|ALLOW)"
     r")"
 )
 
@@ -127,10 +131,15 @@ def extract(todo_text: str) -> list[dict[str, str]]:
 
         dm = _DIR_RE.search(blob)
         if not dm:
-            # 無機械可辨方向（如「六條皆 BLOCK」「兩條須 BLOCK」「4/4 通過」）— 略過
+            # 無機械可辨方向（如「4/4 通過」）— 略過
             continue
         if dm.group("maintain"):
             fr = dm.group("from2")
+            to = fr
+            kind = "maintain"
+        elif dm.group("abs_all") or dm.group("abs_must"):
+            # C5 絕對態：皆／須 X → maintain X→X
+            fr = dm.group("a1") or dm.group("a2")
             to = fr
             kind = "maintain"
         else:
