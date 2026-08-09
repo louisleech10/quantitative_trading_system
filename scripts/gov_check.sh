@@ -63,6 +63,25 @@ if [ "${_has_active}" -eq 1 ]; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
+# 0b) out-of-epic commit 清單（**不擋 push**，只確保可稽核）
+#
+# 該通道讓「epic 進行期間穿插修別的問題」不被 G-7 的 manifest 白名單擋死
+# （見 scripts/govb1_final_gate.sh 之 _g7_path_only_ooe）。
+# 代價是 G-7 對那些路徑放行 ⇒ **必須讓每一筆都看得見**，否則就成了靜默旁路。
+# ---------------------------------------------------------------------------
+if [ -f scripts/govb1_frozen_hashes.txt ]; then
+  _ooe_base="$(grep -m1 '^base_commit:' scripts/govb1_frozen_hashes.txt | awk '{print $2}')"
+  if [ -n "${_ooe_base}" ] && git rev-parse --verify -q "${_ooe_base}^{commit}" >/dev/null 2>&1; then
+    _ooe_list="$(git log --format='%h %s' --extended-regexp \
+      --grep='^Governance-Scope:[[:space:]]*out-of-epic' "${_ooe_base}..HEAD" 2>/dev/null)"
+    if [ -n "${_ooe_list}" ]; then
+      echo "[gov_check] ℹ out-of-epic commit（G-7 manifest 白名單已豁免，供稽核）:"
+      printf '%s\n' "${_ooe_list}" | sed 's/^/            /'
+    fi
+  fi
+fi
+
 # --- 1) shell 語法 ---
 echo "[gov_check] 1/3 shell 語法 (bash -n)…"
 _bad=0

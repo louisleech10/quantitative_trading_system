@@ -336,6 +336,60 @@ _g7_batch3_started() {
   return 1
 }
 
+# ---------------------------------------------------------------------------
+# out-of-epic 通道（2026-08-09，使用者授權）
+#
+# 問題：epic 進行期間，G-7 要求 base..HEAD 之**每一個**改動檔都在 manifest allow，
+#   而 manifest ≡ 凍結唯讀 TODO 之宣告集合 ⇒ **整個 repo 被凍住**。
+#   實證：今日撞牆四次（B4 階段 2／manifest 擴充／委員名冊硬編／V-C 原始碼錨定），
+#   治理設施在 epic 期間**無法演進自己**；而「任務中穿插修別的問題」是高頻需求。
+#
+# 解法：commit 訊息帶 trailer `Governance-Scope: out-of-epic <理由>`。
+#   base..HEAD 中，**僅由此類 commit 觸及**之路徑豁免 manifest allow 檢查。
+#
+# 🔴 仍然硬保護（out-of-epic **也不准碰**）＝ epic 自己的契約：
+#     docs/GOVB1_（凍結 SPEC/TODO）／govb1_scope.manifest／govb1_frozen_hashes.txt
+#   🔴 **刻意不含 _B45_HARNESS 五檔**：out-of-epic 工作正是治理 harness 之維護，
+#     而那五檔的真正守衛是 pre-push 全套 pytest（改壞即紅），
+#     檔案凍結只是「epic 內防 scope creep」，不該外溢成永久禁區。
+#
+# 稽核：gov_check 於每次 push 列出 range 內所有 out-of-epic commit（見 gov_check.sh）。
+# ---------------------------------------------------------------------------
+_G7_OOE_TRAILER='^Governance-Scope:[[:space:]]*out-of-epic'
+# 硬保護前綴（out-of-epic 亦禁）——**字面凍結**，新增須經委員裁定
+_G7_OOE_HARD_PROTECTED='docs/GOVB1_
+scripts/govb1_scope.manifest
+scripts/govb1_frozen_hashes.txt'
+
+_g7_ooe_commits() {
+  git log --format='%H' --extended-regexp --grep="${_G7_OOE_TRAILER}" "$(_base)..HEAD"
+}
+
+# $1=path；rc=0 ⇒ 該路徑在 range 內**僅**被 out-of-epic commit 觸及
+_g7_path_only_ooe() {
+  _p="$1"
+  _ooe="$(_g7_ooe_commits)" || return 1
+  [ -n "${_ooe}" ] || return 1
+  _touch="$(git log --format='%H' "$(_base)..HEAD" -- "${_p}")" || return 1
+  [ -n "${_touch}" ] || return 1
+  while IFS= read -r _c; do
+    [ -n "${_c}" ] || continue
+    printf '%s\n' "${_ooe}" | grep -qxF "${_c}" || return 1
+  done <<EOF
+${_touch}
+EOF
+  # 硬保護集：out-of-epic 也不得豁免
+  while IFS= read -r _hp; do
+    [ -n "${_hp}" ] || continue
+    case "${_p}" in
+      "${_hp}"*) return 1 ;;
+    esac
+  done <<EOF
+${_G7_OOE_HARD_PROTECTED}
+EOF
+  return 0
+}
+
 _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
         # 交付形態守衛〔CODEX-R17-P0-01〕＋批 3 task-scoped M：
         #   1) 全量 allow：?? / A* 未 commit ⇒ FAIL（新建未交付）
@@ -388,7 +442,9 @@ _g7() { decl="$(_g7_policy)" || return 1; _nonempty G-7 "${decl}" || return 1
         extra=""
         while IFS= read -r -d '' p; do
           [ -n "${p}" ] || continue
-          _g7_covered "${p}" "${decl}" || extra="${extra}${p}"$'\n'
+          # out-of-epic 豁免：僅由帶 trailer 之 commit 觸及者不受 manifest allow 約束
+          _g7_covered "${p}" "${decl}" || _g7_path_only_ooe "${p}" \
+            || extra="${extra}${p}"$'\n'
         done < <(git -c core.quotepath=false diff --name-only -z --diff-filter=ACMRD "$(_base)" HEAD)
         [ -z "${extra}" ] || { printf 'G-7 FAIL: 未宣告即修改:\n%s\n' "${extra}" >&2; return 1; }; }
 

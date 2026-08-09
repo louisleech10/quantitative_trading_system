@@ -2287,6 +2287,58 @@ def test_waiver_b5_active_when_b5_start_anchored() -> None:
         ) from exc
 
 
+# ── out-of-epic 通道（2026-08-09 使用者授權）──────────────────────────
+# 讓「epic 期間穿插修別的問題」不被 manifest 白名單擋死；代價是 G-7 對那些路徑放行，
+# 故硬保護集**必須**仍然擋得住，否則通道就成了萬能旁路。
+_G7_OOE_HARD_PROTECTED = (
+    "docs/GOVB1_",
+    "scripts/govb1_scope.manifest",
+    "scripts/govb1_frozen_hashes.txt",
+)
+
+
+def test_ooe_hard_protected_set_is_frozen() -> None:
+    """硬保護集（out-of-epic 亦禁）須與 `govb1_final_gate.sh` 逐字一致。
+
+    🔴 oracle 為**字面期望集合**；並比對 shell 端常數，兩處漂移即紅。
+    刻意**不含** `_B45_HARNESS` 五檔——out-of-epic 工作正是治理 harness 之維護，
+    那五檔的真正守衛是 pre-push 全套 pytest，檔案凍結只是 epic 內防 scope creep。
+    """
+    expected = {
+        "docs/GOVB1_",
+        "scripts/govb1_scope.manifest",
+        "scripts/govb1_frozen_hashes.txt",
+    }
+    assert set(_G7_OOE_HARD_PROTECTED) == expected
+
+    src = (REPO / "scripts" / "govb1_final_gate.sh").read_text(encoding="utf-8")
+    m = re.search(r"_G7_OOE_HARD_PROTECTED='([^']*)'", src)
+    assert m, "govb1_final_gate.sh 缺 _G7_OOE_HARD_PROTECTED 常數"
+    shell_set = {ln.strip() for ln in m.group(1).splitlines() if ln.strip()}
+    assert shell_set == expected, (
+        f"shell 端硬保護集漂移：want={expected} got={shell_set}"
+    )
+    # 五 harness 不得混入硬保護集（否則 out-of-epic 修不了治理 harness）
+    assert not (shell_set & set(_B45_HARNESS))
+
+
+def test_ooe_lane_requires_trailer_and_respects_hard_protected() -> None:
+    """通道之兩條不變式（讀碼層；行為層由 g7 實跑 mutation 驗證）。
+
+    ① 豁免須以 commit trailer 為條件——不得無條件放行
+    ② 硬保護集於 `_g7_path_only_ooe` 內仍 return 1（即不豁免）
+    """
+    src = (REPO / "scripts" / "govb1_final_gate.sh").read_text(encoding="utf-8")
+    assert "_g7_path_only_ooe" in src
+    assert re.search(
+        r"_g7_covered \"\$\{p\}\" \"\$\{decl\}\" \|\| _g7_path_only_ooe \"\$\{p\}\"", src
+    ), "G-7 豁免須為『manifest 未覆蓋 **且** 僅由 out-of-epic commit 觸及』"
+    assert "Governance-Scope:" in src, "豁免須以 commit trailer 為條件"
+    # 硬保護集比對段須在 _g7_path_only_ooe 內
+    body = src.split("_g7_path_only_ooe()", 1)[1].split("\n_g7()", 1)[0]
+    assert "_G7_OOE_HARD_PROTECTED" in body, "硬保護集比對須在豁免判定內"
+
+
 def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
     """封閉 key 集合之負向用例〔CODEX-R2-P1-03；B4-REVIEW-R1 CODEX-R1-P1-01 修正〕。
 
