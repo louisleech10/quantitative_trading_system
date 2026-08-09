@@ -2347,6 +2347,152 @@ def test_ooe_lane_requires_trailer_and_respects_hard_protected() -> None:
     assert "--name-status" in src, "rename 守衛須用 --name-status（--name-only 隱去舊名）"
 
 
+# ── R-18：trailer 須以 git 原生解析，禁 `--grep` ─────────────────────────
+# 封閉集，恰 2 筆——本通道上線當日、慣例訂立前之 commit（trailer 與 Co-Authored-By
+# 之間空了一行 ⇒ 原生解析認不得）。**不得增長**：多一筆＝再開一次 --grep 後門。
+_G7_OOE_GRANDFATHER = (
+    "d0dc68245e967380965e6b2ee18349e74a34ca5d",
+    "28b586a8224f1338b6a445f66e6e782e06c3d013",
+)
+
+
+def _gate_src() -> str:
+    return (REPO / "scripts" / "govb1_final_gate.sh").read_text(encoding="utf-8")
+
+
+def test_ooe_grandfather_set_is_frozen_and_closed() -> None:
+    """grandfather 為**字面凍結封閉集**，恰 2 筆；shell 端漂移或增長即紅。
+
+    為何存在（2026-08-09 裁定）：正解的第 ③ 步是改寫**非 HEAD** commit 訊息並
+    force-push main——不可逆，且會使已引用的 sha 全數失效。使用者鐵律
+    「面向未來不溯及既往」(2026-08-05) ⇒ 舊的兩筆以 sha 具名放行，新的一律走原生解析。
+    此測是該例外的**唯一出口管制**：多加一筆就等於重新打開 `--grep` 後門。
+    """
+    src = _gate_src()
+    m = re.search(r"_G7_OOE_GRANDFATHER='([^']*)'", src)
+    assert m, "govb1_final_gate.sh 缺 _G7_OOE_GRANDFATHER 常數"
+    shell_set = {ln.strip() for ln in m.group(1).splitlines() if ln.strip()}
+    assert shell_set == set(_G7_OOE_GRANDFATHER), (
+        f"grandfather 集漂移／增長：want={set(_G7_OOE_GRANDFATHER)} got={shell_set}\n"
+        "🔴 新增例外須經委員裁定並同步本字面集合；預設答案是『不新增，改把 trailer 寫對』。"
+    )
+    assert len(shell_set) == 2, "grandfather 恰 2 筆（封閉集）"
+    assert all(re.fullmatch(r"[0-9a-f]{40}", s) for s in shell_set), "須為完整 40 位 sha"
+
+
+def test_ooe_uses_native_trailer_parsing_not_grep() -> None:
+    """`_g7_ooe_commits` 須用 `%(trailers:...)`，**不得**用 `--grep`〔CODEX-R1-P1-02〕。"""
+    src = _gate_src()
+    m = re.search(r"_g7_ooe_commits\(\) \{.*?\n\}", src, re.S)
+    assert m, "找不到 _g7_ooe_commits（refactor?→須更新本測）"
+    body = m.group(0)
+    assert "%(trailers:key=Governance-Scope" in body, (
+        "須用 git 原生 trailer 解析（只認訊息最後一段）"
+    )
+    assert "--grep" not in body, (
+        "禁 --grep：它匹配訊息任何位置 ⇒ body 中段／引用的舊訊息亦被誤判為豁免"
+    )
+
+
+def _git(cwd: Path, *args: str) -> str:
+    p = subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", *args],
+        cwd=cwd, capture_output=True, text=True, check=True,
+    )
+    return p.stdout
+
+
+def test_ooe_body_mention_does_not_grant_exemption(tmp_path: Path) -> None:
+    """🔴 行為層可證偽：把**生產程式碼原文**跑在受控 repo 上，驗四種訊息形態之選取結果。
+
+    R-18 之洞：`--grep` 匹配訊息**任何位置**，故 body 中段、或**引用前一則 commit
+    訊息**（本專案訊息經常這麼寫）內之同形字串，都會讓該 commit 取得豁免。
+    本測建臨時 repo，取 `govb1_final_gate.sh` 內 `_g7_ooe_commits` 的**函式原文**
+    （連同兩個常數）重跑，只把 `_base` 換成臨時 repo 的 base ⇒ 驗的是真碼，不是複製品。
+
+    mutation 反例：把該函式改回 `git log --grep=...` ⇒ `body 中段` 與 `引用舊訊息`
+    兩筆會被選入，斷言的集合相等當場失敗。
+    """
+    src = _gate_src()
+    fn = re.search(r"_g7_ooe_commits\(\) \{.*?\n\}", src, re.S)
+    val = re.search(r"_G7_OOE_VALUE_RE='[^']*'", src)
+    gf = re.search(r"_G7_OOE_GRANDFATHER='[^']*'", src)
+    assert fn and val and gf, "找不到 _g7_ooe_commits／常數（refactor?→須更新本測）"
+
+    r = tmp_path / "repo"
+    r.mkdir()
+    _git(r, "init", "-q", "-b", "main")
+    (r / "a.txt").write_text("0\n", encoding="utf-8")
+    _git(r, "add", "a.txt")
+    _git(r, "commit", "-q", "-m", "base")
+    base = _git(r, "rev-parse", "HEAD").strip()
+
+    TRAILER = "Governance-Scope: out-of-epic 理由"
+    COAUTH = "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    cases = {
+        # 合法：trailer 與 Co-Authored-By 同段（本專案慣例）
+        "ok_trailer": f"subject\n\nbody\n\n{TRAILER}\n{COAUTH}\n",
+        # 🔴 洞：同形字串出現在 body 中段（後面還有別的段落）
+        "body_middle": f"subject\n\n{TRAILER}\n\nbody 後續說明\n\n{COAUTH}\n",
+        # 🔴 洞：引用前一則 commit 訊息（本專案訊息經常整段引用）。
+        #   刻意**不縮排**——縮排版兩種實作都會拒（`^` 對不上），沒有鑑別力。
+        "quoted_prev": f"subject\n\n前一則寫的是：\n{TRAILER}\n——本則並非 out-of-epic\n\n{COAUTH}\n",
+        # 值不符：結尾界線須擋掉 -extra
+        "value_extra": f"subject\n\nbody\n\nGovernance-Scope: out-of-epic-extra\n{COAUTH}\n",
+        # 無 trailer
+        "plain": f"subject\n\nbody\n\n{COAUTH}\n",
+    }
+    shas = {}
+    for name, msg in cases.items():
+        (r / "a.txt").write_text(name + "\n", encoding="utf-8")
+        _git(r, "add", "a.txt")
+        (tmp_path / "msg.txt").write_text(msg, encoding="utf-8")
+        _git(r, "commit", "-q", "-F", str(tmp_path / "msg.txt"))
+        shas[name] = _git(r, "rev-parse", "HEAD").strip()
+
+    snippet = (
+        f"{val.group(0)}\n{gf.group(0)}\n"
+        f"_base() {{ printf '%s' {base}; }}\n"
+        f"{fn.group(0)}\n_g7_ooe_commits\n"
+    )
+    p = subprocess.run(["bash", "-c", snippet], cwd=r, capture_output=True, text=True, check=False)
+    assert p.returncode == 0, f"_g7_ooe_commits 執行失敗: {p.stderr}"
+    got = {ln.strip() for ln in p.stdout.splitlines() if ln.strip()}
+    selected = {n for n, s in shas.items() if s in got}
+
+    assert selected == {"ok_trailer"}, (
+        f"選取結果錯誤：want={{'ok_trailer'}} got={selected}\n"
+        "body_middle／quoted_prev 被選中 ⇒ 退回 --grep 語意（R-18 未修）；"
+        "ok_trailer 未被選中 ⇒ 慣例（trailer 與 Co-Authored-By 同段）被破壞。\n"
+        f"stdout={p.stdout}"
+    )
+    # grandfather 恆輸出（不在此 repo 內故無害）——確認它沒被順手拿掉
+    assert set(_G7_OOE_GRANDFATHER) <= got, "grandfather 未被輸出（例外集被移除？）"
+
+
+def test_ooe_audit_list_matches_gate() -> None:
+    """`gov_check.sh` 的稽核清單須與閘的實際豁免集**同法**，否則稽核會誤導。
+
+    稽核清單若比閘寬（如沿用 `--grep`），使用者會看到「已豁免」但閘其實沒放行的
+    commit；若比閘窄，真正被豁免的 commit 就成了靜默旁路。兩個方向都不可接受。
+    """
+    gov = (REPO / "scripts" / "gov_check.sh").read_text(encoding="utf-8")
+    gate = _gate_src()
+    raw_block = gov.split("0b)", 1)[1].split("--- 1)", 1)[0]
+    # 只看功能行：註解裡本來就會提到 `--grep`（說明為何不用它）
+    ooe_block = "\n".join(
+        ln for ln in raw_block.splitlines() if not ln.lstrip().startswith("#")
+    )
+    assert "%(trailers:key=Governance-Scope" in ooe_block, "稽核清單須用原生 trailer 解析"
+    assert "--grep" not in ooe_block, "稽核清單禁 --grep（會比閘寬）"
+    # 值判準逐字一致
+    gate_re = re.search(r"_G7_OOE_VALUE_RE='([^']*)'", gate).group(1)
+    assert gate_re in ooe_block, f"gov_check 之值判準與閘不一致（閘為 {gate_re}）"
+    # grandfather 兩筆 sha 須同時出現在稽核清單側
+    for sha in _G7_OOE_GRANDFATHER:
+        assert sha in ooe_block, f"稽核清單漏列 grandfather {sha[:7]}"
+
+
 def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
     """封閉 key 集合之負向用例〔CODEX-R2-P1-03；B4-REVIEW-R1 CODEX-R1-P1-01 修正〕。
 

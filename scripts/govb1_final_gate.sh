@@ -391,25 +391,45 @@ EOF
   return "${_rc}"
 }
 
-# 🔴 用 git **原生 trailer 解析**，禁 `--grep`〔CODEX-R1-P1-02〕：
-#   `--grep` 匹配訊息任何位置 ⇒ body 中段、**引用的舊訊息**內之同名字串亦誤判為豁免。
-# 🔴 值須**恰為** `out-of-epic` 或 `out-of-epic <理由>`〔COMPOSER-R1-P1-01〕：
-#   原 regex 無行尾錨點 ⇒ `out-of-epic-extra`／`out-of-epic bypass` 亦命中。
-# 🔴 值須**恰為** `out-of-epic` 或 `out-of-epic <理由>`〔COMPOSER-R1-P1-01 已修〕：
-#   原 regex 無結尾界線 ⇒ `out-of-epic-extra` 亦誤命中。現加 `([[:space:]]|$)`。
-#   （`out-of-epic bypass` 仍命中屬**正確**：`<理由>` 本就是自由文字，composer 誤併為同一項。）
+# 🔴 R-18 已修〔CODEX-R1-P1-02〕：改用 git **原生 trailer 解析**，不再用 `--grep`。
+#   `--grep` 匹配訊息**任何位置** ⇒ body 中段、或**引用的舊 commit 訊息**內之同形字串
+#   亦被誤判為豁免。本專案 commit 訊息經常整段引用前一則 ⇒ 誤觸機率高。
+#   `%(trailers:key=...)` 只認訊息**最後一段**（git 定義之 trailer block），無此問題。
 #
-# 🔴 具名殘留 R-18〔CODEX-R1-P1-02，未修〕：此處用 `git log --grep` 而非 git 原生
-#   trailer 解析 ⇒ 訊息 **body 中段或引用的舊訊息**內之同形字串亦會被誤判為豁免。
-#   正解＝`%(trailers:key=Governance-Scope,valueonly)`，但那只認**最後一段**，
-#   而既有兩筆 out-of-epic commit 之 trailer 與 `Co-Authored-By` 間空了一行
-#   ⇒ 改用原生解析會使它們失去豁免、G-7 立刻轉紅（實測）。
-#   修法須**同時**：①改原生解析 ②訂「trailer 須與 Co-Authored-By 同段」之慣例
-#   ③重寫既有兩筆之訊息。三者缺一即破。
-_G7_OOE_TRAILER='^Governance-Scope:[[:space:]]*out-of-epic([[:space:]]|$)'
+# 🔴 **慣例（新 commit 必守）**：`Governance-Scope:` 須與 `Co-Authored-By:` **同一段**，
+#   中間不得有空行。否則 git 不視之為 trailer ⇒ 豁免不成立 ⇒ G-7 判「未宣告即修改」。
+#   （這是 fail-closed 方向：寫錯位置＝沒有豁免，不會反向放行。）
+#
+# 值須**恰為** `out-of-epic` 或 `out-of-epic <理由>`〔COMPOSER-R1-P1-01〕：
+#   結尾界線 `([[:space:]]|$)` 擋 `out-of-epic-extra`。
+#   （`out-of-epic bypass` 命中屬**正確**：`<理由>` 本就是自由文字，composer 誤併為同一項。）
+_G7_OOE_VALUE_RE='^out-of-epic([[:space:]]|$)'
+
+# 🔴 grandfather —— **字面凍結之封閉集，恰 2 筆**，且**不得增長**。
+#   這兩筆是本通道上線當日、上述慣例訂立**之前**產生的 out-of-epic commit，
+#   其 trailer 與 Co-Authored-By 之間空了一行 ⇒ 原生解析認不得（實測 valueonly 為空）。
+#
+#   為何不改寫歷史（2026-08-09 裁定，取代原「三者缺一即破」方案的第 ③ 步）：
+#     ① 使用者鐵律「面向未來不溯及既往」(2026-08-05 定死)——不把舊的不合規包回來；
+#     ② 正解須 `filter-branch --msg-filter` 改寫**非 HEAD** 訊息並 force-push main，
+#        不可逆，且會使 HANDOFF／commit 訊息／稽核紀錄中已引用的 sha 全數失效。
+#        風險遠高於收益，而收益僅止於「少兩個字面例外」。
+#   為何安全：封閉集、字面、事後不可增；不在 range 內時自然失效（fail-closed 方向）；
+#   仍受硬保護集與 rename 守衛約束（見 _g7_path_only_ooe，grandfather 不繞過那兩關）。
+#   多加一筆 ＝ 等於再開一次 `--grep` 後門 ⇒ tests/governance/test_govb1_contract_matrix.py
+#   以字面集合鎖住，新增即紅。
+_G7_OOE_GRANDFATHER='d0dc68245e967380965e6b2ee18349e74a34ca5d
+28b586a8224f1338b6a445f66e6e782e06c3d013'
 
 _g7_ooe_commits() {
-  git log --format='%H' --extended-regexp --grep="${_G7_OOE_TRAILER}" "$(_base)..HEAD"
+  _ooe_b="$(_base)"
+  [ -n "${_ooe_b}" ] || return 1
+  # rc 直接取，不經 pipe（CLAUDE.md Gotchas：`cmd | tail` 讀到的是 tail 的 rc）
+  _ooe_raw="$(git log --format='%H%x09%(trailers:key=Governance-Scope,valueonly,separator=%x2C)' \
+                "${_ooe_b}..HEAD")" || return 1
+  printf '%s\n' "${_ooe_raw}" \
+    | awk -F'\t' -v re="${_G7_OOE_VALUE_RE}" 'NF>1 && $2 ~ re {print $1}'
+  printf '%s\n' "${_G7_OOE_GRANDFATHER}"
 }
 
 # $1=path；rc=0 ⇒ 該路徑在 range 內**僅**被 out-of-epic commit 觸及

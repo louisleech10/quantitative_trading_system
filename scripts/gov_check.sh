@@ -73,11 +73,28 @@ fi
 if [ -f scripts/govb1_frozen_hashes.txt ]; then
   _ooe_base="$(grep -m1 '^base_commit:' scripts/govb1_frozen_hashes.txt | awk '{print $2}')"
   if [ -n "${_ooe_base}" ] && git rev-parse --verify -q "${_ooe_base}^{commit}" >/dev/null 2>&1; then
-    _ooe_list="$(git log --format='%h %s' --extended-regexp \
-      --grep='^Governance-Scope:[[:space:]]*out-of-epic([[:space:]]|$)' "${_ooe_base}..HEAD" 2>/dev/null)"
-    if [ -n "${_ooe_list}" ]; then
+    # 🔴 與 govb1_final_gate.sh `_g7_ooe_commits` **同法**（原生 trailer 解析 + 同一
+    #   grandfather 封閉集）。此處刻意不沿用舊的 `--grep`：稽核清單若比閘的實際豁免集**寬**，
+    #   使用者會看到「已豁免」但閘其實沒放行的 commit，反而誤導。
+    #   兩處漂移由 tests/governance/test_govb1_contract_matrix.py 之
+    #   test_ooe_audit_list_matches_gate 釘住。
+    _ooe_raw="$(git log --format='%h%x09%s%x09%(trailers:key=Governance-Scope,valueonly,separator=%x2C)' \
+      "${_ooe_base}..HEAD" 2>/dev/null)"
+    _ooe_list="$(printf '%s\n' "${_ooe_raw}" \
+      | awk -F'\t' 'NF>2 && $3 ~ /^out-of-epic([[:space:]]|$)/ {print $1 " " $2}')"
+    # grandfather（慣例訂立前之兩筆；須仍落在 base..HEAD 內才列）
+    _ooe_gf=""
+    for _s in d0dc68245e967380965e6b2ee18349e74a34ca5d \
+              28b586a8224f1338b6a445f66e6e782e06c3d013; do
+      git merge-base --is-ancestor "${_s}" HEAD 2>/dev/null || continue
+      git merge-base --is-ancestor "${_s}" "${_ooe_base}" 2>/dev/null && continue
+      _ooe_gf="${_ooe_gf}$(git log -1 --format='%h %s (grandfather)' "${_s}" 2>/dev/null)
+"
+    done
+    _ooe_all="$(printf '%s\n%s\n' "${_ooe_list}" "${_ooe_gf}" | grep -v '^[[:space:]]*$')"
+    if [ -n "${_ooe_all}" ]; then
       echo "[gov_check] ℹ out-of-epic commit（G-7 manifest 白名單已豁免，供稽核）:"
-      printf '%s\n' "${_ooe_list}" | sed 's/^/            /'
+      printf '%s\n' "${_ooe_all}" | sed 's/^/            /'
     fi
   fi
 fi
