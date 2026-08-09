@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -2378,28 +2379,74 @@ _B49_ID = "GOV-ROLES-SOT-CANNOT-EXPRESS-ORCHESTRATOR"
 
 
 def _b45_freeze_still_active() -> bool:
-    """凍結是否仍生效＝三個窗守衛是否都還在對 `_B45_HARNESS` 做拒絕比對。"""
-    src = (REPO / "tests" / "governance" / "test_govb1_contract_matrix.py").read_text(
-        encoding="utf-8"
-    )
+    """🔴 **行為層**引信：真的把窗守衛跑一次，餵它含 harness 檔的假 diff，看它拒不拒。
+
+    初版用字面比對（`"assert not hit_harness" in body`），**兩家從相反方向打穿**：
+      · `CODEX-R3-P1-01`（假綠）：保留 `_B45_HARNESS` 與該 assert，另加
+        `hit_harness = set()` ⇒ 守衛實質失效但引信報「仍凍結」⇒ 炸彈不炸。
+      · `COMPOSER-R3-P2-01`（假紅）：無辜重構（改名／`assert len(...)==0`／抽 helper）
+        ⇒ 引信誤判「已解凍」⇒ 炸彈假紅，逼人關一張其實還不能關的票。
+    兩者同根：**量的是長相，不是行為**。
+
+    現行判準（實質）：
+      ① 至少有**一道 live 守衛**，餵它「diff 含 harness 檔」時**真的拒絕**
+      ② **沒有任何 live 守衛**在同樣輸入下放行
+      ③ `_B45_HARNESS` 仍是 5 檔
+    `pytest.skip` 之守衛視為 dormant（設計上由另一窗接手），不計入①也不判②。
+    """
+    import unittest.mock as _mock
+
+    mod = sys.modules[__name__]
+    real_run = _run
+
+    def _fake_run(cmd, *a, **kw):
+        # 只攔 `git diff --name-only <range>`；其餘（anchor/frozen_hashes）走真指令
+        if list(cmd[:3]) == ["git", "diff", "--name-only"]:
+            return subprocess.CompletedProcess(list(cmd), 0, _B45_HARNESS[0] + "\n", "")
+        return real_run(cmd, *a, **kw)
+
+    rejected = 0
     for fn in _WAIVER_GUARD_FNS:
-        m = re.search(rf"^def {re.escape(fn)}\(.*?(?=\n@|\ndef |\Z)", src, re.S | re.M)
-        if not m:
-            return False
-        body = _strip_docstring_and_comments(m.group(0))
-        if "_B45_HARNESS" not in body or "assert not hit_harness" not in body:
-            return False
-    return len(_B45_HARNESS) == 5
+        guard = getattr(mod, fn, None)
+        if guard is None:
+            return False  # 守衛不見了 ⇒ 視為已解凍（保守方向＝炸）
+        with _mock.patch.object(mod, "_run", _fake_run):
+            try:
+                guard()
+            except AssertionError as exc:
+                if "harness" in str(exc):
+                    rejected += 1
+                    continue
+                return False  # 因別的原因失敗 ⇒ 引信不可信，保守判已解凍
+            except BaseException as exc:  # noqa: BLE001
+                if type(exc).__name__ == "Skipped":
+                    continue  # dormant：由另一窗看守，不作判斷依據
+                return False
+            else:
+                return False  # 🔴 餵了 harness 檔卻放行 ⇒ 凍結實質失效
+    return rejected >= 1 and len(_B45_HARNESS) == 5
+
+
+# 🔴 錨定 `## B-49 ` heading 起算〔`CODEX-R3-P1-02`〕：
+#   初版用 `text.find(_B49_ID)` 取**第一個出現處**再無界 `re.search`，
+#   於 canonical heading 之前任意處補一行同 ID + 假 `TICKET-STATUS:` 即可 spoof。
+_B49_HEADING_RE = re.compile(rf"^## B-49 票 `{re.escape(_B49_ID)}`\s*$", re.M)
 
 
 def _b49_ticket_status() -> str:
-    """回票 B-49 的 TICKET-STATUS（找不到票 → 'MISSING'）。"""
+    """回票 B-49 的 `TICKET-STATUS`（缺票／重複票 → 'MISSING'，保守方向＝炸）。"""
     text = (REPO / _B49_TICKET).read_text(encoding="utf-8")
-    idx = text.find(_B49_ID)
-    if idx < 0:
-        return "MISSING"
-    m = re.search(r"TICKET-STATUS:\s*(\S+)", text[idx:])
-    return m.group(1) if m else "MISSING"
+    heads = list(_B49_HEADING_RE.finditer(text))
+    if len(heads) != 1:
+        return "MISSING"  # 0=票沒了；>1=重複 heading，狀態有歧義 ⇒ 一律不採信
+    section = text[heads[0].end():]
+    nxt = re.search(r"^## ", section, re.M)  # 只在本票 section 內找，不跨到下一張票
+    if nxt:
+        section = section[: nxt.start()]
+    found = re.findall(r"^TICKET-STATUS:\s*(\S+)\s*$", section, re.M)
+    if len(found) != 1:
+        return "MISSING"  # 本 section 內 0 或多個狀態行 ⇒ 有歧義，不採信
+    return found[0]
 
 
 def test_b45_unfreeze_requires_roles_sot_closure() -> None:
@@ -2461,6 +2508,20 @@ def test_b45_bomb_cannot_be_defused_by_skip() -> None:
     assert "_b45_freeze_still_active()" in body, "🔴 引信被拿掉（不再偵測解凍）"
     assert 'status == "CLOSED"' in body, "🔴 解凍後的關票斷言被拿掉"
 
+    # 🔴 引信本身**不得**退回字面比對〔CODEX-R3-P1-01 假綠／COMPOSER-R3-P2-01 假紅〕
+    fm = re.search(
+        r"^def _b45_freeze_still_active\(.*?(?=\n@|\ndef |\Z)", src, re.S | re.M
+    )
+    assert fm, "引信函式不見了"
+    fuse = _strip_docstring_and_comments(fm.group(0))
+    assert "assert not hit_harness" not in fuse, (
+        "🔴 引信退回字面比對：`hit_harness = set()` 可保留字面而實質失效（假綠），"
+        "無辜重構又會誤判解凍（假紅）。引信須**實跑守衛**。"
+    )
+    assert "_fake_run" in fuse and "AssertionError" in fuse, (
+        "🔴 引信不再實跑守衛（須以假 diff 餵入並檢查是否真的拒絕）"
+    )
+
 
 def _strip_docstring_and_comments(fn_src: str) -> str:
     """去掉函式的 docstring 與 `#` 註解，只留程式碼行（供「證明缺席」類斷言用）。"""
@@ -2514,8 +2575,25 @@ def test_waiver_guards_never_parse_commit_message() -> None:
         )
 
 
-def test_ooe_comment_documents_three_independent_mechanisms() -> None:
-    """G-7 註解須說清三道機制各自獨立〔`CODEX-R1-P1-02`：舊文為誤導性文件〕。
+def test_ooe_comment_doc_smoke_not_behavior_guarantee() -> None:
+    """🔴 **文件 smoke check，非行為保證**〔`CODEX-R3-P2-05` 具名〕。
+
+    codex 判定成立：本測比對的是**註解字串**，屬「用散文測散文」——
+    把三道機制的敘述**互相錯置**但保留關鍵詞，本測仍會綠。
+    主委接受此指正，**不宣稱它是語意 oracle**，改名以反映真實效力。
+
+    真正的語意 oracle 是行為層測試，不是這一條：
+      ① 「窗守衛不讀 trailer」→ `test_waiver_guards_never_parse_commit_message`
+      ② 「G-7 排除五檔」→ `test_ooe_hard_protected_set_is_frozen`
+      ③ 「pytest 非來源保證」→ **無行為 oracle**（要證明它須比對凍結基準，
+         而那正是 `票 B-49` 解凍後才做得到的事）⇒ **具名殘留**。
+
+    本測仍保留的價值：擋住「整段誤導文字原封不動回歸」這一種**退化**。
+    更強判準（codex 建議：三個具名機制 clause 的 exact contract）**未採用**，
+    理由＝那會把散文再鎖死一層，違反使用者「文字問題用白名單機械卡、
+    別耗回合列舉」之定調；此處以誠實標示效力邊界取代。
+
+    ── 以下為原始意圖（`CODEX-R1-P1-02`：舊文為誤導性文件）──
 
     舊文寫「五檔的真正守衛是 pre-push 全套 pytest（改壞即紅）」——**為假**：
     `pre-push` → `gov_check.sh` 只對當前 checkout 跑 pytest，不比對凍結基準，
