@@ -27,36 +27,38 @@ rc_all=0
 # ---------------------------------------------------------------------------
 # 0) 委員暫停狀態提醒（**不擋 push**，只確保不被遺忘）
 #
-# 出生理由（2026-08-09）：grok 額度用罄（403 spending-limit）。當時要讓流程不卡住，
-# 唯一辦法是把 grok 從 review_families 刪掉——但那會把「它是正式委員」這件事
-# 一起刪掉，恢復時只能靠人記得加回來，正是使用者定死的「不准靠紀律和記憶」。
+# 出生理由（2026-08-09）：grok 額度用罄（403 spending-limit），而
+# reconcile_stamps_check 預設要求 review_families **全員** ⇒ 一家掛掉全線停擺。
+# 直接改 review_families 會弄紅 9 個把名冊寫死的既有斷言（3 檔，其中
+# test_rolegate_predispatch.py 屬 _B45_HARNESS 禁改）⇒ 不可行。
 #
-# 解法：roster_full（正式名冊，不因故障變動） vs review_families（本期實際要求蓋章者）。
-# 暫停某家 ⇒ 只改 review_families 一行；差集就是可稽核的「暫停中」紀錄，每次 push 印出。
+# 解法：`active_stampers`（本期實際要求蓋章者），`review_families` 維持正式名冊不動。
+# 🔴 **暫停／調換委員 ＝ 改 governance_families.json 的 active_stampers 一行。**
+# 差集即可稽核之「暫停中」紀錄，每次 push 印出 ⇒ 不靠記憶。
 # 🔴 刻意**不擋 push**：會擋就等於沒解決「不卡住流程」這個原始需求。
 # ---------------------------------------------------------------------------
 _fam_json="scripts/governance_families.json"
-# 🔴 `roster_full` 缺席 ⇒ 整段跳過（**不得**因此讓 push 失敗）。
-#    否則乾淨 clone／尚未導入 roster_full 的環境會把每一家都算成「多出家族」而擋死 push。
-_has_roster=0
+# 🔴 `active_stampers` 缺席 ⇒ 整段跳過（**不得**因此讓 push 失敗）：
+#    乾淨 clone／尚未導入該 key 的環境會把每一家都算成「多出家族」而擋死 push。
+_has_active=0
 if [ -f "${_fam_json}" ] && command -v jq >/dev/null 2>&1; then
-  jq -e 'has("roster_full")' "${_fam_json}" >/dev/null 2>&1 && _has_roster=1
+  jq -e 'has("active_stampers")' "${_fam_json}" >/dev/null 2>&1 && _has_active=1
 fi
-if [ "${_has_roster}" -eq 1 ]; then
+if [ "${_has_active}" -eq 1 ]; then
   _suspended="$(jq -r '
-      (.roster_full // []) - (.review_families // []) | .[]
+      (.review_families // []) - (.active_stampers // []) | .[]
     ' "${_fam_json}" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')"
   _extra="$(jq -r '
-      (.review_families // []) - (.roster_full // []) | .[]
+      (.active_stampers // []) - (.review_families // []) | .[]
     ' "${_fam_json}" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')"
   if [ -n "${_suspended}" ]; then
     echo "[gov_check] ⚠ 委員暫停中（未清）: ${_suspended}"
-    echo "            正式名冊 roster_full 仍含該家；恢復後請加回 review_families。"
-    echo "            出處: ${_fam_json} 之 _roster_vs_active"
+    echo "            正式名冊 review_families 仍含該家；恢復後加回 active_stampers 即可。"
+    echo "            出處: ${_fam_json} 之 _active_stampers_doc"
   fi
   if [ -n "${_extra}" ]; then
-    echo "[gov_check] ✗ review_families 含不在 roster_full 之家族: ${_extra}"
-    echo "            新增正式委員須同時進 roster_full（fail-closed，防悄悄擴編）"
+    echo "[gov_check] ✗ active_stampers 含不在 review_families 之家族: ${_extra}"
+    echo "            新增正式委員須先進 review_families（fail-closed，防悄悄擴編）"
     rc_all=1
   fi
 fi

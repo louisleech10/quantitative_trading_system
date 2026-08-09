@@ -364,16 +364,40 @@ _process_one_adversarial_file() {
   else
     # 與 _run_reconcile_stamp_check_adv 一致：測試 harness 可覆寫 stamps bin
     local _adv_stamp_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
-    bash "${_adv_stamp_bin}" "${adv_file}" \
+    bash "${_adv_stamp_bin}" "${adv_file}" "$(_stamp_families)" \
       || { echo "ERROR: --adversarial 既非 ADV 命名亦未獲 reconcile 戳記核可（見上），拒發 token。"; return 1; }
   fi
   return 0
 }
 
+# ---------------------------------------------------------------------------
+# _stamp_families — 本期**實際要求蓋章**之家族清單（SoT 導出，禁呼叫端寫死）
+#
+# 出生理由（2026-08-09）：委員家族會因額度／故障暫時不可用（grok 403 spending-limit），
+#   而 reconcile_stamps_check 預設要求 review_families **全員** ⇒ 一家掛掉全線停擺。
+#   直接改 review_families 會弄紅 9 個把名冊寫死的既有斷言（3 檔，其中
+#   test_rolegate_predispatch.py 屬 _B45_HARNESS 禁改）⇒ 不可行。
+#
+# 解法：新增 SoT key `active_stampers`（本期實際要求者），`review_families` 維持
+#   正式名冊不動。**暫停／調換委員 ＝ 改 governance_families.json 一行**。
+#   缺席 `active_stampers` ⇒ 回退 review_families（既有行為逐字不變）。
+#
+# 🔴 清單一律由 SoT 導出，**不得於呼叫端寫死**——2026-07-23 事故：
+#   預設寫死 codex,composer 使 grok 永不被機檢要求。
+# ---------------------------------------------------------------------------
+_stamp_families() {
+  local _sf
+  if _sf="$(families_get active_stampers 2>/dev/null)" && [ -n "${_sf}" ]; then
+    printf '%s' "${_sf}"
+    return 0
+  fi
+  families_get review_families
+}
+
 _run_reconcile_stamp_check_adv() {
   # 測試隔離可覆寫（非正式逃生口）
   local stamps_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
-  bash "${stamps_bin}" "$1"
+  bash "${stamps_bin}" "$1" "$(_stamp_families)"
 }
 
 # ---------------------------------------------------------------------------
@@ -562,7 +586,7 @@ if [ "${kind}" = "dispatch" ]; then
         # reconcile 非空且非 waived：completeness 已由通則跑過；此處只補 stamp
         export VERIFY_GATE_COMMITTEE_AUDIT_LOG="${AUDIT}"   # M1/R2：stamp provenance 讀正確 audit log
         _stamp_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
-        bash "${_stamp_bin}" "${reconcile}" \
+        bash "${_stamp_bin}" "${reconcile}" "$(_stamp_families)" \
           || { echo "ERROR: impl reconcile 未獲委員核可。委員須 append RECONCILE-STAMP APPROVED。"; exit 1; }
         ;;
     esac
