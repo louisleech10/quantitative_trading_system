@@ -12,6 +12,8 @@
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -34,6 +36,46 @@ INPUTS = {
     # ③hollow P3-00：sentinel 形態正確、標籤在、但標籤後**沒有內容**
     "hollow_p300": "## CODEX-R1-P3-00\n**斷言**:\n**碼證**:\n",
 }
+
+
+def _git(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args], cwd=REPO_ROOT, capture_output=True, text=True, check=False
+    )
+
+
+def _b8_range_start() -> str | None:
+    """B8 的起點＝**第一個觸及本票交付物**的 commit。
+
+    🔴 不能用 epic 的 `base_commit`：那是整個 epic 的起點，
+    `cx_run.sh`／`govflow_lifecycle.json` 在本票之前就被 Task 1.1／1.3 改過，
+    用 epic base 會把別票的改動算到 B8 頭上（實測會誤報）。
+    也不寫死 commit hash（會過期）——由交付物的 git 歷史導出。
+    """
+    out = _git(
+        ["log", "--reverse", "--format=%H", "--", "scripts/findings_kind_classify.sh"]
+    ).stdout.split()
+    return out[0] if out else None
+
+
+def _assert_untouched_since_base(paths: list[str]) -> None:
+    """🔴 `CODEX-R1-P1-05`：只看工作樹的 `git diff` 抓不到**已 commit** 的改動。
+
+    唯讀欄的看守必須涵蓋「本票已提交者」**與**工作樹（未提交者），
+    否則「先 commit 再宣稱沒改」就能靜默通過。
+    """
+    start = _b8_range_start()
+    rng = f"{start}^..HEAD" if start else "HEAD..HEAD"
+    committed = _git(["diff", "--stat", rng, "--", *paths])
+    assert committed.returncode == 0, committed.stderr
+    assert committed.stdout.strip() == "", (
+        f"本票（{rng}）已提交的改動觸及唯讀檔:\n{committed.stdout}"
+    )
+    worktree = _git(["diff", "--stat", "HEAD", "--", *paths])
+    assert worktree.returncode == 0, worktree.stderr
+    assert worktree.stdout.strip() == "", (
+        f"工作樹改動觸及唯讀檔:\n{worktree.stdout}"
+    )
 
 
 def _rc(args: list[str], *, env_extra: dict[str, str] | None = None) -> int:
@@ -101,24 +143,74 @@ def test_single_column_discriminates_between_inputs(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_lock_column_requires_real_reconcile_not_handcrafted() -> None:
-    """🔴 `--lock` 欄具名阻塞：手搓 `sources.lock` 三格都是 rc=1，**與輸入無關**。
+def _real_lock(root: Path, name: str, text: str) -> Path:
+    """造一個**schema 完整**的 review-mode lock（欄位取自真實 reconcile 產物）。
 
-    主委初版手工組 lock JSON，三種輸入全部 rc=1——不是輸入造成的差異，
-    而是 lock 本身缺 digest／body-hash 等欄位而**結構性失敗**。
-    那樣的三格是**假的看守**：即使有人把判準改壞，三格照樣全 1，測試照樣綠。
-
-    正確做法＝用 `scripts/reconcile_build.sh` 產生真實 lock 再灌三種輸入。
-    該工具會在 `handoffs/reconcile/<session>/` 建立實體目錄，
-    需要一個不汙染真實 session 空間的隔離方案 ⇒ 屬本欄未完成的具名工作。
-
-    本測**刻意只斷言阻塞成因存在**（reconcile_build 是唯一合法造 lock 途徑），
-    不假裝這一欄已經閉合。裁決請求見 docs/GOV_B8_SCOPE_AMENDMENT.md §4。
+    🔴 主委初版手搓的 lock 缺 `version`／`expected_roster`／`sha256`／`closure_state`
+    等欄，三種輸入**全部** rc=1 —— 那不是輸入造成的差異，是 lock 結構性失敗 ⇒ **假看守**
+    〔`CODEX-R1-P1-03`＋`COMPOSER-R1-P1-02` 兩家皆指出，且皆判「做得到，不接受逼債」〕。
     """
-    builder = REPO_ROOT / "scripts" / "reconcile_build.sh"
-    assert builder.is_file(), "reconcile_build.sh 不存在 ⇒ 本欄的正確做法需重新評估"
-    text = builder.read_text(encoding="utf-8", errors="replace")
-    assert "sources.lock" in text, "reconcile_build 不再產 sources.lock ⇒ 本欄前提已變"
+    sess = root / "recon"
+    (sess / "sources").mkdir(parents=True, exist_ok=True)
+    src = sess / "sources" / f"t41-{name}-codex.md"
+    src.write_text(text, encoding="utf-8")
+    synth = sess / "synth.md"
+    synth.write_text(
+        "# Reconcile — t41\n\n## 群集 / 處置\n\nVerdict：可合併\n\n"
+        "---\n\n## 附錄：findings 逐字保留\n\n" + text,
+        encoding="utf-8",
+    )
+    lock = sess / "sources.lock"
+    lock.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "session_id": f"t41-{name}",
+                "expected_roster": ["codex"],
+                "sources": [
+                    {
+                        "realpath": str(src.resolve()),
+                        "sha256": hashlib.sha256(src.read_bytes()).hexdigest(),
+                        "family": "codex",
+                    }
+                ],
+                "freeze_ts": "2026-08-10T00:00:00Z",
+                "closure_state": "FROZEN",
+                "mode": "review",
+                "round_id": "00000000-0000-0000-0000-000000000000",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return lock
+
+
+# 🔴 基準**量測**取得，不是猜的。
+LOCK_BASELINE = {
+    "single_heading_probe": 1,
+    "prose_only": 1,
+    "hollow_p300": 0,
+}
+
+
+@pytest.mark.parametrize("name", sorted(INPUTS))
+def test_entry_lock_rc_matches_baseline(name: str, tmp_path: Path) -> None:
+    lock = _real_lock(tmp_path, name, INPUTS[name])
+    got = _rc(["bash", str(COMPLETENESS), "--lock", str(lock)])
+    assert got == LOCK_BASELINE[name], (
+        f"--lock/{name} rc 由基準 {LOCK_BASELINE[name]} 變成 {got}"
+    )
+
+
+def test_lock_column_discriminates_between_inputs() -> None:
+    """🔴 反空轉：`--lock` 基準若三格全同，這一欄等於沒有看守。
+
+    初版手搓 lock 正是三格全 1（結構性失敗），本測就是為了讓那種假看守變紅。
+    """
+    assert len(set(LOCK_BASELINE.values())) >= 2, (
+        f"--lock 基準無鑑別力（全部相同）⇒ 該欄可能是結構性失敗而非真判定: {LOCK_BASELINE}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -159,15 +251,7 @@ def test_idlike_fp_test_file_is_untouched() -> None:
 
     改測試換綠即為違規（SPEC §C-2 機械驗收第 2 項）。
     """
-    got = subprocess.run(
-        ["git", "diff", "--stat", "tests/governance/test_completeness_idlike_fp.py"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert got.returncode == 0
-    assert got.stdout.strip() == "", f"禁改該測試檔，卻有 diff:\n{got.stdout}"
+    _assert_untouched_since_base(["tests/governance/test_completeness_idlike_fp.py"])
 
 
 def test_idlike_fp_suite_is_green() -> None:
@@ -190,18 +274,20 @@ def test_idlike_fp_suite_is_green() -> None:
 
 def test_task41_does_not_modify_readonly_files() -> None:
     """Task 4.1 的「只讀」欄：本批不得改動這些檔。"""
-    readonly = [
-        "scripts/completeness_check.sh",
-        "scripts/cx_run.sh",
-        "scripts/govflow_lifecycle.json",
-        "tests/governance/test_completeness_idlike_fp.py",
-    ]
-    got = subprocess.run(
-        ["git", "diff", "--stat", "--", *readonly],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
+    _assert_untouched_since_base(
+        [
+            "scripts/completeness_check.sh",
+            "scripts/cx_run.sh",
+            "scripts/govflow_lifecycle.json",
+            "tests/governance/test_completeness_idlike_fp.py",
+        ]
     )
-    assert got.returncode == 0
-    assert got.stdout.strip() == "", f"Task 4.1 只讀檔遭改動:\n{got.stdout}"
+
+
+def test_readonly_guard_is_falsifiable() -> None:
+    """🔴 上一條的判準本身要可證偽：對一個**確實被本批改過**的路徑，它必須失敗。
+
+    否則「唯讀欄沒被碰」可能只是 `git diff` 永遠回空。
+    """
+    with pytest.raises(AssertionError):
+        _assert_untouched_since_base(["scripts/findings_kind_classify.sh"])

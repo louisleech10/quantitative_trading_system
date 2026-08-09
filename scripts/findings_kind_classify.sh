@@ -36,17 +36,37 @@ _die() { echo "FINDINGS-KIND FAIL: $*" >&2; exit 2; }
 _require_deps() {
   command -v jq >/dev/null 2>&1 || _die "缺 jq（fail-closed，不猜判準）"
   [ -f "${LIFECYCLE}" ] || _die "SoT 不存在: ${LIFECYCLE}"
-  jq -e '.kinds | type == "object"' "${LIFECYCLE}" >/dev/null 2>&1 \
-    || _die "SoT 無 .kinds 物件（fail-closed）: ${LIFECYCLE}"
+  # 🔴 `.kinds` 是空物件也要擋〔CODEX-R1-P1-02〕：`{"kinds":{}}` 過得了 type 檢查，
+  #   然後每個檔都靜默回 unknown rc=0 —— 那是「看起來有判準、其實沒有」。
+  jq -e '(.kinds | type == "object") and ((.kinds | length) > 0)' "${LIFECYCLE}" >/dev/null 2>&1 \
+    || _die "SoT 無非空 .kinds 物件（fail-closed）: ${LIFECYCLE}"
 }
 
-# $1=file → stdout: findings|non-findings|unknown
+# $1=file → stdout: 該檔自帶的 brief-kind 值（無則空字串）
+# 🔴 尾端 CR 必須剝除〔CODEX-R1-P1-02〕：`brief-kind: review\r\n` 在
+#   shell 路徑 `awk '{print $2}'` 會得到 `review\r`（awk 預設 FS 不含 \r）⇒ 查 SoT 失敗判 unknown；
+#   但 awk 批次路徑的 `sub(/[[:space:]].*$/,"",k)` 會把 \r 當空白剝掉 ⇒ 判 findings。
+#   兩條路徑對同一份檔給出不同答案 ＝ `--audit` 的矩陣不代表 `--single` 的行為。
+_raw_kind_of() {
+  grep -m1 '^brief-kind:' "${1-}" 2>/dev/null \
+    | tr -d '\r' \
+    | awk '{print $2}'
+}
+
+# $1=file [$2=corpus dir] → stdout: findings|non-findings|unknown
 classify() {
-  local f="${1-}" bk v
-  [ -f "${f}" ] || { echo "unknown"; return 0; }
-  bk="$(grep -m1 '^brief-kind:' "${f}" 2>/dev/null | awk '{print $2}')"
+  local f="${1-}" corpus="${2-}" bk v
+  # 🔴 檔案不存在 ⇒ fail-closed〔CODEX-R1-P1-02〕：原本靜默回 unknown rc=0，
+  #   呼叫端分不出「這檔沒宣告」與「這檔根本不在」。
+  [ -f "${f}" ] || _die "受測檔不存在: ${f}"
+  bk="$(_raw_kind_of "${f}")"
+  if [ -z "${bk}" ] && [ -n "${corpus}" ]; then
+    # 由**該輪 brief** 導出（非猜測）：committee_run.sh 機械產生
+    # `<session>-<family>.md` 與 `<session>-brief.md`，兩者共用 session 前綴。
+    bk="$(_kind_from_sibling_brief "${f}" "${corpus}")"
+  fi
   if [ -z "${bk}" ]; then
-    echo "unknown"          # SPEC 邊界 ③：無宣告 ⇒ 不猜
+    echo "unknown"          # SPEC 邊界 ③：無宣告且導不出 ⇒ 不猜
     return 0
   fi
   # 🔴 **不得**用 `.kinds[$k].produces_findings // "unknown"`（凍結 TODO:1068 偽碼的寫法）：
@@ -67,11 +87,41 @@ classify() {
   esac
 }
 
-# $1=file → stdout: brief-kind 值（無則 "-"）
+# $1=file $2=corpus → stdout: brief-kind 值（無則 "-"）
 _brief_kind_of() {
   local bk
-  bk="$(grep -m1 '^brief-kind:' "${1-}" 2>/dev/null | awk '{print $2}')"
+  bk="$(_raw_kind_of "${1-}")"
+  [ -n "${bk}" ] && [ -n "${2-}" ] || :
+  if [ -z "${bk}" ] && [ -n "${2-}" ]; then
+    bk="$(_kind_from_sibling_brief "${1}" "${2}")"
+  fi
   [ -n "${bk}" ] && printf '%s\n' "${bk}" || printf '%s\n' "-"
+}
+
+# 由同輪 brief 導出 kind〔COMPOSER-R1-P1-01 裁定 (B)：本票內補〕。
+# $1=file $2=corpus → stdout: kind（導不出則空）
+#
+# 🔴 這是**導出**不是猜測：`scripts/committee_run.sh` 以
+#   `<out前綴>-<family>.md` 產出委員交件檔，而 `<out前綴>` 即 brief 的 session 前綴，
+#   對應的 brief 是 `<session>-brief.md`。兩者的關聯由工具機械產生，不是命名慣例。
+# 🔴 只認**最長**匹配的 session 前綴，且 brief 本身不參與導出（避免自我循環）。
+_kind_from_sibling_brief() {
+  local f="${1-}" corpus="${2-}" base best="" bestlen=0 sess len
+  base="$(basename "${f}")"
+  case "${base}" in *-brief.md) return 0 ;; esac   # brief 自身不導出
+  for b in "${corpus}"/*-brief.md; do
+    [ -f "${b}" ] || continue
+    sess="$(basename "${b}")"
+    sess="${sess%-brief.md}"
+    case "${base}" in
+      "${sess}"-*)
+        len="${#sess}"
+        if [ "${len}" -gt "${bestlen}" ]; then bestlen="${len}"; best="${b}"; fi
+        ;;
+    esac
+  done
+  [ -n "${best}" ] || return 0
+  _raw_kind_of "${best}"
 }
 
 # 決定性抽樣：djb2 雜湊路徑後排序取前 N。
@@ -130,7 +180,11 @@ _require_deps
 case "${MODE}" in
   single)
     [ -n "${SINGLE}" ] || _die "--single 需要檔案路徑"
-    classify "${SINGLE}"
+    # --corpus 可選：給了才啟用 brief↔產出導出（單檔情境沒有語料就無從導出）
+    if [ -n "${CORPUS}" ]; then
+      [ -d "${CORPUS}" ] || _die "corpus 不是目錄: ${CORPUS}"
+    fi
+    classify "${SINGLE}" "${CORPUS}"
     ;;
 
   audit)
@@ -154,21 +208,51 @@ case "${MODE}" in
       || _die "SoT kind 映射導出失敗"
     find "${CORPUS}" -maxdepth 1 -type f -name '*.md' 2>/dev/null | LC_ALL=C sort > "${_files}"
     _total="$(grep -c '' "${_files}" 2>/dev/null || echo 0)"
+    # session → kind 映射（供無自帶宣告者導出；brief 本身不參與導出）
+    _bmap="$(mktemp -t fkcb.XXXXXX)" || _die "mktemp 失敗"
+    for _b in "${CORPUS}"/*-brief.md; do
+      [ -f "${_b}" ] || continue
+      _bk="$(_raw_kind_of "${_b}")"
+      [ -n "${_bk}" ] || continue
+      _bs="$(basename "${_b}")"
+      printf '%s\t%s\n' "${_bs%-brief.md}" "${_bk}" >> "${_bmap}"
+    done
     if [ "${_total}" -gt 0 ]; then
-      LC_ALL=C awk -v mapf="${_map}" '
-        BEGIN { while ((getline line < mapf) > 0) { split(line, m, "\t"); cls[m[1]] = m[2] } }
+      LC_ALL=C awk -v mapf="${_map}" -v bmapf="${_bmap}" '
+        BEGIN {
+          while ((getline line < mapf) > 0) { split(line, m, "\t"); cls[m[1]] = m[2] }
+          nb = 0
+          while ((getline line < bmapf) > 0) {
+            split(line, b, "\t"); nb++; bs[nb] = b[1]; bk[nb] = b[2]
+          }
+        }
+        function base(p,   n, a) { n = split(p, a, "/"); return a[n] }
+        function derive(p,   i, s, best, bestlen, bn) {
+          bn = base(p); best = ""; bestlen = 0
+          if (bn ~ /-brief\.md$/) return ""        # brief 自身不導出
+          for (i = 1; i <= nb; i++) {
+            s = bs[i]
+            if (substr(bn, 1, length(s) + 1) == s "-" && length(s) > bestlen) {
+              bestlen = length(s); best = bk[i]
+            }
+          }
+          return best
+        }
         {
           path = $0; k = ""
-          # 與 classify() 同語意：取第一行 ^brief-kind: 的第一個空白分隔欄位
+          # 與 classify() 同語意：第一行 ^brief-kind: 的第一個空白分隔欄位；尾端 CR 先剝除
           while ((getline l < path) > 0) {
+            sub(/\r$/, "", l)
             if (l ~ /^brief-kind:/) {
               k = l
               sub(/^brief-kind:[[:space:]]*/, "", k)
+              gsub(/\r/, "", k)
               sub(/[[:space:]].*$/, "", k)
               break
             }
           }
           close(path)
+          if (k == "") k = derive(path)
           if (k == "") { print "-\tunknown"; next }
           print k "\t" ((k in cls) ? cls[k] : "unknown")
         }' "${_files}" > "${_tmp}"
@@ -195,7 +279,8 @@ case "${MODE}" in
     [ "${N}" -ge 1 ] || _die "--n 須 ≥1"
     _sample_paths "${CORPUS}" "${N}" "${SEED}" | while IFS= read -r f; do
       [ -n "${f}" ] || continue
-      printf '%s\t%s\t%s\n' "$(_brief_kind_of "${f}")" "$(classify "${f}")" "${f}"
+      printf '%s\t%s\t%s\n' \
+        "$(_brief_kind_of "${f}" "${CORPUS}")" "$(classify "${f}" "${CORPUS}")" "${f}"
     done
     ;;
 

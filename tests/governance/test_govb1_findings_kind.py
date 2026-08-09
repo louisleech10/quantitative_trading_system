@@ -175,7 +175,9 @@ def test_kind_whitelist_is_not_hardcoded(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "content", ["", "{}", '{"kinds": []}', "not json at all"], ids=range(4)
+    "content",
+    ["", "{}", '{"kinds": []}', '{"kinds": {}}', "not json at all"],
+    ids=range(5),
 )
 def test_broken_sot_fails_closed(tmp_path: Path, content: str) -> None:
     """SoT 缺失／壞掉／無 .kinds 物件 ⇒ rc≠0，不得靜默給答案。"""
@@ -222,39 +224,133 @@ def test_audit_denominator_is_computed_not_literal(tmp_path: Path) -> None:
     assert "=2" in _run(["--audit", "--corpus", str(corpus)]).stdout
 
 
-def test_audit_agrees_with_single_file_by_file(tmp_path: Path) -> None:
-    """🔴 `--audit` 與 `--single` 是兩條程式路徑（awk 批次 vs grep+jq 逐檔）。
+def _audit_pairs(corpus: Path) -> list[tuple[str, str]]:
+    """從 --audit 的明細區取出 (brief-kind, 分類) 逐列。"""
+    out = _run(["--audit", "--corpus", str(corpus)]).stdout
+    body = out.split("檔數", 1)[1].split("# 分類小計", 1)[0]
+    pairs: list[tuple[str, str]] = []
+    for line in body.splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and parts[-1].isdigit():
+            pairs += [(parts[0], parts[1])] * int(parts[-1])
+    return sorted(pairs)
 
-    兩者若漂移，混淆矩陣就不代表分類器的真實行為。本測逐檔比對釘死。
+
+def test_audit_agrees_with_single_file_by_file(tmp_path: Path) -> None:
+    """🔴 `--audit`（awk 批次）與 `--single`（grep+jq 逐檔）是**兩條程式路徑**。
+
+    〔`COMPOSER-R1-P2-01`：原版只比「逐檔加總 vs 小計」，
+    兩個檔互換分類而總數不變時會**假綠**。改為逐檔配對比對。〕
     """
     corpus = tmp_path / "c"
     corpus.mkdir()
-    cases = {
+    for name, kind in {
         "r.md": "review",
         "i.md": "impl",
         "s.md": "stamp",
         "c.md": "consult",
         "z.md": "not-a-kind",
-    }
-    for name, kind in cases.items():
+    }.items():
         _brief(corpus / name, kind)
     _brief(corpus / "none.md", None)
 
-    audit = _run(["--audit", "--corpus", str(corpus)]).stdout
-    for f in sorted(corpus.glob("*.md")):
-        single = _run(["--single", str(f)]).stdout.strip()
-        assert single in ("findings", "non-findings", "unknown")
-        # 小計行必須含該分類；逐檔一致性由計數等式保證
-    counts: dict[str, int] = {}
-    for f in sorted(corpus.glob("*.md")):
-        counts[_run(["--single", str(f)]).stdout.strip()] = (
-            counts.get(_run(["--single", str(f)]).stdout.strip(), 0) + 1
+    want = sorted(
+        (
+            (_run(["--single", str(f), "--corpus", str(corpus)]).stdout.strip() or "?")
+            and (
+                _brief_kind_or_dash(f),
+                _run(["--single", str(f), "--corpus", str(corpus)]).stdout.strip(),
+            )
         )
-    tail = audit.split("# 分類小計", 1)[1]
-    for cls, n in counts.items():
-        assert f"{cls:<14} {n}" in tail or f"{cls}" in tail, (cls, n, tail)
-        line = [x for x in tail.splitlines() if x.startswith(cls)]
-        assert line and line[0].split()[-1] == str(n), (cls, n, line)
+        for f in sorted(corpus.glob("*.md"))
+    )
+    assert _audit_pairs(corpus) == want
+
+
+def _brief_kind_or_dash(f: Path) -> str:
+    for line in f.read_text(encoding="utf-8").splitlines():
+        if line.startswith("brief-kind:"):
+            v = line.split(":", 1)[1].strip().split()[0] if line.split(":", 1)[1].strip() else ""
+            return v or "-"
+    return "-"
+
+
+def test_audit_and_single_agree_on_crlf(tmp_path: Path) -> None:
+    """🔴 `CODEX-R1-P1-02`：CRLF 檔在兩條路徑上曾經分歧。
+
+    `brief-kind: review\\r\\n` —— shell 路徑的 `awk '{print $2}'` 會得到 `review\\r`
+    （awk 預設 FS 不含 `\\r`）⇒ 查 SoT 失敗判 unknown；
+    awk 批次路徑的 `sub(/[[:space:]].*$/,"",k)` 卻會把 `\\r` 當空白剝掉 ⇒ 判 findings。
+    ⇒ `--audit` 的矩陣不代表 `--single` 的行為。修法＝兩條路徑都先剝 CR。
+    """
+    corpus = tmp_path / "c"
+    corpus.mkdir()
+    (corpus / "crlf.md").write_bytes(b"# t\r\nbrief-kind: review\r\n\r\nbody\r\n")
+    single = _run(["--single", str(corpus / "crlf.md")]).stdout.strip()
+    assert single == "findings", f"CRLF 檔 --single 判成 {single}"
+    assert _audit_pairs(corpus) == [("review", "findings")]
+
+
+def test_missing_file_fails_closed(tmp_path: Path) -> None:
+    """🔴 `CODEX-R1-P1-02`：受測檔不存在 ⇒ rc≠0。
+
+    原本靜默回 `unknown` rc=0，呼叫端分不出「這檔沒宣告」與「這檔根本不在」。
+    """
+    got = _run(["--single", str(tmp_path / "nope.md")])
+    assert got.returncode != 0 and "FINDINGS-KIND FAIL" in got.stderr
+
+
+# ---------------------------------------------------------------------------
+# brief↔產出 導出（COMPOSER-R1-P1-01 裁定 (B)：本票內補）
+# ---------------------------------------------------------------------------
+
+
+def test_output_inherits_kind_from_sibling_brief(tmp_path: Path) -> None:
+    """委員產出檔不帶 `brief-kind:`，但可由**同輪 brief** 導出。
+
+    `committee_run.sh` 以 `<out前綴>-<family>.md` 產出交件檔，
+    而 `<out前綴>` 即 brief 的 session 前綴 ⇒ 兩者關聯是工具**機械產生**的，
+    不是命名慣例，故此為導出而非猜測。
+    """
+    c = tmp_path / "c"
+    c.mkdir()
+    _brief(c / "20260810-x-review-r1-brief.md", "review")
+    (c / "20260810-x-review-r1-codex.md").write_text("# 報告\n無宣告\n", encoding="utf-8")
+    (c / "20260810-x-review-r1-composer.md").write_text("# 報告\n", encoding="utf-8")
+
+    for fam in ("codex", "composer"):
+        f = c / f"20260810-x-review-r1-{fam}.md"
+        assert _run(["--single", str(f)]).stdout.strip() == "unknown"  # 無語料 ⇒ 不導出
+        assert (
+            _run(["--single", str(f), "--corpus", str(c)]).stdout.strip() == "findings"
+        ), fam
+
+
+def test_derivation_prefers_longest_session_prefix(tmp_path: Path) -> None:
+    """兩個 session 前綴互為前綴時，取**最長**匹配（避免張冠李戴）。"""
+    c = tmp_path / "c"
+    c.mkdir()
+    _brief(c / "20260810-x-brief.md", "review")
+    _brief(c / "20260810-x-r2-brief.md", "impl")
+    (c / "20260810-x-r2-codex.md").write_text("# 報告\n", encoding="utf-8")
+    assert (
+        _run(["--single", str(c / "20260810-x-r2-codex.md"), "--corpus", str(c)])
+        .stdout.strip()
+        == "non-findings"
+    )
+
+
+def test_derivation_does_not_apply_to_unrelated_files(tmp_path: Path) -> None:
+    """前綴對不上的檔不得被導出（不得因為「同一個目錄」就套用）。"""
+    c = tmp_path / "c"
+    c.mkdir()
+    _brief(c / "20260810-x-review-r1-brief.md", "review")
+    (c / "完全無關的筆記.md").write_text("# n\n", encoding="utf-8")
+    assert (
+        _run(["--single", str(c / "完全無關的筆記.md"), "--corpus", str(c)])
+        .stdout.strip()
+        == "unknown"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -349,18 +445,24 @@ def test_classifier_has_no_caller_yet() -> None:
     invoke = re.compile(
         r"(?:^|[;&|`(]|\$\()\s*(?:bash|sh|\.|source)\s+\S*findings_kind_classify\.sh"
     )
-    targets = list((REPO_ROOT / "scripts").glob("*.sh"))
-    hooks = REPO_ROOT / "git_hooks"
-    if hooks.is_dir():
-        targets += [p for p in hooks.iterdir() if p.is_file()]
+    # 🔴 `CODEX-R1-P1-05`：原版只掃 `scripts/*.sh` 與**根目錄** `git_hooks/`，
+    #   漏了實際存在的 `scripts/git_hooks/` ⇒ 掛在那裡的 caller 可靜默通過。
+    #   改為遞迴掃描 scripts/ 全部檔案 ＋ 任一層的 git_hooks 目錄。
+    targets = [p for p in (REPO_ROOT / "scripts").rglob("*") if p.is_file()]
+    for hooks in (REPO_ROOT / "git_hooks", REPO_ROOT / "scripts" / "git_hooks"):
+        if hooks.is_dir():
+            targets += [p for p in hooks.rglob("*") if p.is_file()]
     hits: list[str] = []
     for p in sorted(targets):
         if p.name == CLASSIFY.name:
             continue
-        text = p.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
         for i, line in enumerate(text.splitlines(), 1):
             if invoke.search(line):
-                hits.append(f"{p.name}:{i}")
+                hits.append(f"{p.relative_to(REPO_ROOT)}:{i}")
     assert not hits, f"Task 4.1 階段不得有 caller: {hits}"
 
 
