@@ -2334,9 +2334,17 @@ def test_ooe_lane_requires_trailer_and_respects_hard_protected() -> None:
         r"_g7_covered \"\$\{p\}\" \"\$\{decl\}\" \|\| _g7_path_only_ooe \"\$\{p\}\"", src
     ), "G-7 豁免須為『manifest 未覆蓋 **且** 僅由 out-of-epic commit 觸及』"
     assert "Governance-Scope:" in src, "豁免須以 commit trailer 為條件"
-    # 硬保護集比對段須在 _g7_path_only_ooe 內
+    # 硬保護集比對須在豁免判定內（直接引用常數，或呼叫封裝之 _g7_ooe_is_protected）
     body = src.split("_g7_path_only_ooe()", 1)[1].split("\n_g7()", 1)[0]
-    assert "_G7_OOE_HARD_PROTECTED" in body, "硬保護集比對須在豁免判定內"
+    assert ("_G7_OOE_HARD_PROTECTED" in body) or ("_g7_ooe_is_protected" in body), (
+        "硬保護集比對須在豁免判定內"
+    )
+    # 🔴 rename/copy 舊名守衛亦須在豁免判定內〔CODEX-R1-P0-01〕：
+    #    git diff --name-only 隱去 rename 舊名 ⇒ 改名即可把硬保護檔搬出保護範圍
+    assert "_g7_ooe_rename_hits_protected" in body, (
+        "豁免判定須含 rename/copy 舊名守衛（否則硬保護可被改名繞過）"
+    )
+    assert "--name-status" in src, "rename 守衛須用 --name-status（--name-only 隱去舊名）"
 
 
 def test_frozen_hashes_closed_key_rejects_duplicate_and_third() -> None:
