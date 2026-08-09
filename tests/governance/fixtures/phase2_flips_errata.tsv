@@ -1,0 +1,16 @@
+# phase2_flips_errata.tsv — 凍結 TODO 之**事實勘誤層**（append-only）
+#
+# 為何存在：docs/GOVB0_FRICTION_TODO.md 為凍結唯讀，其驗證欄若記載了與實測不符的
+#   from 態，機械抽取只會忠實地把錯誤複製到 phase2_expected_flips.txt，
+#   讓所有機器消費端（抽取器、oracle、矩陣工具）繼續拿到錯的基準。
+#   人類可讀的延伸檔更正不到機器 —— 故需要本層。
+#   〔出處：20260809-GOVB1-B7-REVIEW-R1，CODEX-R1-P1-04 ＋ COMPOSER-R1-P2-02 兩家共識〕
+#
+# 🔴 本檔**不修改**凍結 TODO 原文；只在抽取時覆寫對應列的 kind/from/to。
+# 🔴 每一列都被 test_errata_rows_are_empirically_true 機械強制：
+#    以 receipt_gate 指定的 gate 版本實跑該 command，判定須等於 corrected_from。
+#    寫錯的勘誤會當場紅，無法靠寫文件過關。
+# 🔴 每一列都必須對應到 TODO 中真實存在的一列（test_errata_rows_are_not_stale）。
+#
+# 格式: test_id<TAB>command<TAB>corrected_kind<TAB>corrected_from<TAB>corrected_to<TAB>receipt_gate
+TEST-2.2-PIPE	cat x | claude -p "y"	maintain	BLOCK	BLOCK	tests/governance/fixtures/gate_check_pre_phase2/gate_check.sh

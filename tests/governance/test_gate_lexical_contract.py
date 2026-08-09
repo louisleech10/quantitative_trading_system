@@ -191,13 +191,24 @@ _PROTO5_CASES: list[tuple[str, str, str]] = [
     ("唯讀查 cx_run", 'sed -n "1,40p" scripts/cx_run.sh', "ALLOW"),
 ]
 
-# Task 2.2 才收窄 claude 子字串；B3 維持現行 claude[^|]*(-p|--print)
-# 故下列 3 條原型③=ALLOW、現行新實作仍 BLOCK——具名差異（非回歸）。
-_PROTO5_NAMED_DIFFS = {
-    "scratchpad + rev-parse": "BLOCK",
-    ".claude + porcelain": "BLOCK",
-    "find -print": "BLOCK",
-}
+# 具名差異表（原型③ 期望 vs 本實作實際）。
+# B3（Task 2.1）期間有 3 條：claude 段仍為子字串比對，故 scratchpad／.claude 路徑
+# 誤擋。GOVB0 Task 2.2（＝GOVB1 Task 3.2，票 B-26 重號）收窄 claude 段後**三條全部消除**
+# ⇒ 本表清空，26 條與原型③ 逐條相同。
+# 🔴 清空是**收緊**：期望值由 BLOCK 改回原型③ 的 ALLOW，gate 必須真的放行才過。
+_PROTO5_NAMED_DIFFS: dict[str, str] = {}
+
+
+def test_20_proto_named_diffs_empty() -> None:
+    """Task 2.2 後具名差異表須為空——26/26 與原型③ 一致。
+
+    本測是**防回填**護欄：任何人想靠往本表加列讓 test_20_proto_parity_26
+    轉綠（而非修 gate），會先在這裡紅。
+    """
+    assert _PROTO5_NAMED_DIFFS == {}, (
+        "具名差異表非空 ⇒ 有 case 靠改期望值而非改實作轉綠: "
+        f"{_PROTO5_NAMED_DIFFS}"
+    )
 
 
 def test_20_proto_parity_26(tmp_path: Path) -> None:

@@ -3,6 +3,7 @@
 # 格式: kind\ttest_id\tfrom\tto\tcommand
 # kind=flip|maintain；mutation「轉回」不入此檔
 # 禁手編；改 TODO 後重跑本腳本並更新 .sha256
+# 凍結 TODO 之事實勘誤已於抽取出口套用：tests/governance/fixtures/phase2_flips_errata.tsv
 flip	TEST-2.1-FP	BLOCK	ALLOW	pgrep -fl 'codex exec|cursor-agent|grok '
 flip	TEST-2.1-FP	BLOCK	ALLOW	git commit -m "...; codex closure review..."
 flip	TEST-2.1-E3	ALLOW	BLOCK	eval "codex exec x"
@@ -23,7 +24,7 @@ flip	TEST-2.2-FP4	BLOCK	ALLOW	ls /private/tmp/claude-501/; git status --porcelai
 flip	TEST-2.2-FP4	BLOCK	ALLOW	find .claude/tmp -name "*.md" -print
 maintain	TEST-2.2-TP	BLOCK	BLOCK	claude -p "x"
 maintain	TEST-2.2-TP	BLOCK	BLOCK	claude --print "x"
-flip	TEST-2.2-PIPE	ALLOW	BLOCK	cat x | claude -p "y"
+maintain	TEST-2.2-PIPE	BLOCK	BLOCK	cat x | claude -p "y"
 maintain	TEST-2.2-REGRESS	BLOCK	BLOCK	v=$(claude -p "hi")
 maintain	TEST-2.2-REGRESS	BLOCK	BLOCK	/usr/local/bin/claude --print "x"
 flip	TEST-2.3-PREFIX5	ALLOW	BLOCK	/opt/homebrew/bin/codex exec hi

@@ -26,6 +26,73 @@ REPO = Path(__file__).resolve().parents[1]
 TODO = REPO / "docs" / "GOVB0_FRICTION_TODO.md"
 OUT = REPO / "tests" / "governance" / "fixtures" / "phase2_expected_flips.txt"
 OUT_SHA = Path(str(OUT) + ".sha256")
+# 凍結 TODO 之事實勘誤層（凍結原文不得改；此處覆寫機械消費端拿到的狀態）
+ERRATA = REPO / "tests" / "governance" / "fixtures" / "phase2_flips_errata.tsv"
+
+
+def load_errata(path: Path = ERRATA) -> list[dict[str, str]]:
+    """讀勘誤層 → [{test_id, command, kind, from, to, receipt_gate}, ...]。
+
+    檔案不存在 ⇒ 空清單（勘誤層為選配，不得因缺檔讓抽取整個失效）。
+    """
+    if not path.is_file():
+        return []
+    rows: list[dict[str, str]] = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.rstrip("\n")
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) != 6:
+            raise ValueError(f"errata 列須為 6 欄（TAB 分隔）: {raw!r}")
+        _tid, _cmd, _kind, _from, _to, _gate = parts
+        if _from not in ("ALLOW", "BLOCK") or _to not in ("ALLOW", "BLOCK"):
+            raise ValueError(f"errata from/to 須為 ALLOW|BLOCK: {raw!r}")
+        # 🔴 kind 是**導出值**，不是宣告值〔CODEX-STAMP-R1 ERRATA_RECHECK〕：
+        #   codex 實測「from/to 皆與實跑相符、但 kind 寫成 maintain」的假勘誤能過關
+        #   —— 因為當時沒有任何斷言把 kind 綁到 from/to。改為由 from/to 導出並要求宣告值相符，
+        #   該類假勘誤在**讀檔當下**就炸，而非等某條測試恰好覆蓋到。
+        derived = "maintain" if _from == _to else "flip"
+        if _kind != derived:
+            raise ValueError(
+                f"errata kind 與 from/to 不符：宣告={_kind} 導出={derived}"
+                f"（from={_from} to={_to}）: {raw!r}"
+            )
+        rows.append(
+            {
+                "test_id": _tid,
+                "command": _normalize_ellipsis(_cmd),
+                "kind": derived,
+                "from": _from,
+                "to": _to,
+                "receipt_gate": _gate,
+            }
+        )
+    return rows
+
+
+def apply_errata(
+    rows: list[dict[str, str]], errata: list[dict[str, str]] | None = None
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """把勘誤套進抽取結果。回傳 (覆寫後的 rows, 未命中任何 row 的勘誤列)。
+
+    未命中不在此拋錯——由 tests 的 not-stale 斷言負責，避免合成 TODO 文字的
+    既有 caller 因此炸掉。
+    """
+    if errata is None:
+        errata = load_errata()
+    unmatched: list[dict[str, str]] = []
+    for e in errata:
+        hit = False
+        for r in rows:
+            if r["test_id"] == e["test_id"] and r["command"] == e["command"]:
+                r["kind"] = e["kind"]
+                r["from"] = e["from"]
+                r["to"] = e["to"]
+                hit = True
+        if not hit:
+            unmatched.append(e)
+    return rows, unmatched
 
 # 產品轉向／維持（禁 mutation「轉回」）
 # 第三類（C5 選 (a)）：絕對態「皆 BLOCK／須 BLOCK／六條皆 BLOCK」→ maintain
@@ -165,6 +232,8 @@ def extract(todo_text: str) -> list[dict[str, str]]:
                     "command": cmd,
                 }
             )
+    # 🔴 勘誤層在**抽取出口**套用 ⇒ 所有機械消費端拿到的都是實測為真的狀態。
+    rows, _unmatched = apply_errata(rows)
     return rows
 
 
@@ -175,6 +244,8 @@ def render(rows: list[dict[str, str]]) -> str:
         "# 格式: kind\\ttest_id\\tfrom\\tto\\tcommand\n"
         "# kind=flip|maintain；mutation「轉回」不入此檔\n"
         "# 禁手編；改 TODO 後重跑本腳本並更新 .sha256\n"
+        "# 凍結 TODO 之事實勘誤已於抽取出口套用："
+        "tests/governance/fixtures/phase2_flips_errata.tsv\n"
     )
     body_lines = []
     for r in rows:
