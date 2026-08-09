@@ -303,7 +303,11 @@ _gov_check_factkey() {   # -> rc
     echo "[gov_check] ✗ gen_fact_key_blocks.sh 缺失或不可執行 → fail-closed" >&2
     return 1
   }
-  bash scripts/gen_fact_key_blocks.sh --check || return 1
+  # 🔴 `env -u GOVB1_FACTKEY_ROOT`〔CODEX-R1-P1-01〕：
+  #   該變數是**測試用**的 fixture 指向鉤子。強制層若照收，任何人（或殘留在 shell
+  #   環境裡的一行 export）就能把 push 前的檢查導去乾淨 fixture ⇒ 真實宿主檔漂移照樣過。
+  #   強制點必須自己決定檢查對象，不接受呼叫端指定 ⇒ 此處一律清掉。
+  env -u GOVB1_FACTKEY_ROOT bash scripts/gen_fact_key_blocks.sh --check || return 1
 }
 if _gov_check_factkey; then
   echo "[gov_check] ✓ 事實單一來源 OK"

@@ -90,10 +90,14 @@ _fk_validate_rows() {   # $1=key
 }
 
 _fk_gen_block() {   # $1=key -> stdout（決定性）
-  printf '<!-- BEGIN GENERATED: %s -->\n' "$1"
+  # 🔴 每一步都須 `|| return 1`〔CODEX-R1-P1-03〕：
+  #   前版最後一行是 printf ⇒ **函式 rc 恆為 0**，jq／sort 失敗被吞掉。
+  #   `--check` 又只比對字串，於是「生成失敗但輸出恰好相符」＝靜默通過。
+  printf '<!-- BEGIN GENERATED: %s -->\n' "$1" || return 1
   # 🔴 LC_ALL=C 為決定性支點（見檔頭實測）；拿掉即 T-2.1-M1 轉紅
-  LC_ALL=C jq -r --arg k "$1" '.[$k].rows[] | @tsv' "${REG}" | LC_ALL=C sort
-  printf '<!-- END GENERATED: %s -->\n' "$1"
+  #   （pipefail 已於檔頭 set；此處 rc 反映 jq 或 sort 之失敗）
+  LC_ALL=C jq -r --arg k "$1" '.[$k].rows[] | @tsv' "${REG}" | LC_ALL=C sort || return 1
+  printf '<!-- END GENERATED: %s -->\n' "$1" || return 1
 }
 
 _fk_root() { printf '%s\n' "${GOVB1_FACTKEY_ROOT:-.}"; }
@@ -105,6 +109,34 @@ _fk_markers_ok() {   # $1=key $2=宿主檔路徑 $3=顯示用相對路徑
   [ "${_fkm_nb}" = "1" ] && [ "${_fkm_ne}" = "1" ] && return 0
   echo "FACTKEY MARKER: ${1} in ${3}（BEGIN=${_fkm_nb} END=${_fkm_ne}，須各恰 1）→ fail-closed" >&2
   return 1
+}
+
+# 未登記之 generated block〔CODEX-R1-P1-02〕
+# 病：宿主檔內可另貼一組 `<!-- BEGIN GENERATED: 別的key -->`，它長得像機械產物、
+#     讀者會當成權威，但註冊表根本不知道它 ⇒ 永遠不會被比對。
+# 範圍＝**已登記 target 之集合**（封閉、可由註冊表導出）。刻意不掃全庫：
+#   那是啟發式，須附誤擋率 receipt 才可上線（`票 B-23` 同紀律）。
+# 誠實邊界：生成器不知道的**其他檔**內的第三份副本仍擋不到（既有具名殘留）。
+_fk_reject_unregistered_blocks() {
+  _fkr_root="$(_fk_root)"; _fkr_rc=0
+  _fkr_keys="$(_fk_keys)" || return 1
+  while IFS= read -r _fkr_k; do
+    [ -n "${_fkr_k}" ] || continue
+    _fkr_tgt="$(_fk_target "${_fkr_k}")" || { _fkr_rc=1; continue; }
+    _fkr_path="${_fkr_root}/${_fkr_tgt}"
+    [ -f "${_fkr_path}" ] || continue      # 缺檔已由 _fk_check 具名報過，不重複
+    while IFS= read -r _fkr_found; do
+      [ -n "${_fkr_found}" ] || continue
+      printf '%s\n' "${_fkr_keys}" | grep -qxF "${_fkr_found}" && continue
+      echo "FACTKEY UNREGISTERED BLOCK: '${_fkr_found}' in ${_fkr_tgt}（不在 ${REG}）→ fail-closed" >&2
+      _fkr_rc=1
+    done <<EOF
+$(LC_ALL=C sed -n 's/^<!-- BEGIN GENERATED: \(.*\) -->$/\1/p' "${_fkr_path}")
+EOF
+  done <<EOF
+${_fkr_keys}
+EOF
+  return "${_fkr_rc}"
 }
 
 _fk_emit_all() {
@@ -130,12 +162,19 @@ _fk_check() {
       echo "FACTKEY MISSING TARGET: ${_fkc_k} → ${_fkc_path} → fail-closed" >&2
       _fkc_rc=1; continue; }
     _fk_markers_ok "${_fkc_k}" "${_fkc_path}" "${_fkc_tgt}" || { _fkc_rc=1; continue; }
+    # 🔴 生成結果先落變數並**驗 rc**，不得直接塞進 `[ = "$(...)" ]`〔CODEX-R1-P1-03〕：
+    #   命令替換內的 rc 會被丟掉 ⇒ 生成失敗卻只比字串＝靜默通過。
+    _fkc_want="$(_fk_gen_block "${_fkc_k}")" || {
+      echo "FACTKEY GEN FAILED: ${_fkc_k}（生成器自身失敗，未與宿主檔比對）→ fail-closed" >&2
+      _fkc_rc=1; continue; }
     _fkc_cur="$(sed -n "/^<!-- BEGIN GENERATED: ${_fkc_k} -->$/,/^<!-- END GENERATED: ${_fkc_k} -->$/p" \
                   "${_fkc_path}")"
-    [ "${_fkc_cur}" = "$(_fk_gen_block "${_fkc_k}")" ] || {
+    [ "${_fkc_cur}" = "${_fkc_want}" ] || {
       echo "FACTKEY DRIFT: ${_fkc_k} in ${_fkc_tgt}（宿主檔與 ${REG} 不一致；跑 --write 重生成）" >&2
       _fkc_rc=1; }
   done < <(_fk_keys)
+  # 未登記之 generated block 一律拒〔CODEX-R1-P1-02〕
+  _fk_reject_unregistered_blocks || _fkc_rc=1
   return "${_fkc_rc}"
 }
 

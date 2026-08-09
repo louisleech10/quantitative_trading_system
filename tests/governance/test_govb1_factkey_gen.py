@@ -155,7 +155,13 @@ def _sandbox(tmp_path: Path, registry: dict) -> Path:
 def _mutate(sdir: Path, old: str, new: str) -> None:
     p = sdir / GEN.name
     src = p.read_text(encoding="utf-8")
-    assert old in src, f"mutation 目標字串不存在，測試已與實作脫節: {old!r}"
+    # 🔴 訊息須指向真正的病〔COMPOSER-R1-P2-01〕：若生產檔已失去 locale 釘子，
+    #    原訊息只說「測試脫節」，委員會據此會往「測試壞了」的方向查——反了。
+    assert old in src, (
+        f"mutation 目標字串不存在: {old!r}\n"
+        "若目標是 `| LC_ALL=C sort`，代表**生產檔已失去 locale 釘子**——"
+        "那正是 T-2.1-M1 要防的回歸，不是測試脫節。"
+    )
     p.write_text(src.replace(old, new, 1), encoding="utf-8")
 
 
@@ -205,10 +211,14 @@ def test_t21_m1b_locale_pin_removal_breaks_determinism(tmp_path):
     """
     loc = _discriminating_locale()
     if loc is None:
-        pytest.skip(
-            "本機無任何與 C 排序不同的 locale ⇒ 此差分引信無鑑別力。"
-            "環境能力限制，非機制放行；同一條 mutation 另由 m1a 以環境無關方式守住。"
+        # 🔴 **不得 skip**〔CODEX-R1-P1-04／COMPOSER-R1-P2-01〕：
+        #    靜默 skip 會讓 locale 貧瘠的 runner（CI）完全不驗這條 mutation ⇒ fail-open。
+        #    退化成較弱但**仍有 oracle** 的來源檢查：釘子必須在。
+        #    m1a 只證「sort 承重」，不證「locale 已釘」——兩者不可互相頂替。
+        assert "| LC_ALL=C sort" in GEN.read_text(encoding="utf-8"), (
+            "本機無差異 locale 且生產檔已無 `| LC_ALL=C sort` ⇒ 決定性契約失守"
         )
+        return
 
     reg = {"k": {"target": "t.md", "rows": _LOCALE_PROBE_ROWS}}
     pinned = _sandbox(tmp_path / "pinned", reg)
@@ -224,6 +234,59 @@ def test_t21_m1b_locale_pin_removal_breaks_determinism(tmp_path):
     assert out(unpinned, "C") != out(unpinned, loc), (
         f"拿掉 LC_ALL=C 後輸出未隨 {loc} 改變 ⇒ 這條 mutation 是空心的"
     )
+
+
+def test_t21_m1c_generation_failure_is_not_swallowed(tmp_path):
+    """🔴 CODEX-R1-P1-03 回歸：生成器**自己失敗**時 `--check` 不得回 0。
+
+    病：`_fk_gen_block` 最後一行是 printf ⇒ 函式 rc 恆 0；`--check` 又只比字串，
+    於是「jq/sort 掛了但輸出恰好相符」＝靜默通過。
+    引信：讓副本的 `_fk_gen_block` **輸出正確 block 之後 return 1**。
+    """
+    root = tmp_path / "root"
+    (root / "docs").mkdir(parents=True)
+    reg = {"k": {"target": "docs/t.md", "rows": [["010", "a"]]}}
+    sdir = _sandbox(tmp_path, reg)
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+
+    # 先產生一份與註冊表一致的宿主檔（此時 --check 應綠）
+    (root / "docs" / "t.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n", encoding="utf-8"
+    )
+    assert _run([str(sdir / GEN.name), "--write"], env_extra=env).returncode == 0
+    assert _run([str(sdir / GEN.name), "--check"], env_extra=env).returncode == 0
+
+    _mutate(sdir, "  printf '<!-- END GENERATED: %s -->\\n' \"$1\" || return 1",
+            "  printf '<!-- END GENERATED: %s -->\\n' \"$1\"\n  return 1")
+    r = _run([str(sdir / GEN.name), "--check"], env_extra=env)
+    assert r.returncode != 0, "生成器失敗卻放行 ⇒ --check 只比字串、不驗生成成功"
+    assert "GEN FAILED" in r.stderr, r.stderr
+
+
+def test_unregistered_generated_block_is_rejected(tmp_path):
+    """🔴 CODEX-R1-P1-02 回歸：宿主檔內出現未登記的 generated block ⇒ 拒。
+
+    那種區塊長得像機械產物、讀者會當成權威，但註冊表不知道它 ⇒ 永遠不會被比對。
+    """
+    root = tmp_path / "root"
+    (root / "docs").mkdir(parents=True)
+    reg = {"k": {"target": "docs/t.md", "rows": [["010", "a"]]}}
+    sdir = _sandbox(tmp_path, reg)
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    tgt = root / "docs" / "t.md"
+    tgt.write_text("<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n", encoding="utf-8")
+    assert _run([str(sdir / GEN.name), "--write"], env_extra=env).returncode == 0
+    assert _run([str(sdir / GEN.name), "--check"], env_extra=env).returncode == 0
+
+    tgt.write_text(
+        tgt.read_text(encoding="utf-8")
+        + "\n<!-- BEGIN GENERATED: totally-made-up -->\n偽造的權威表\n"
+          "<!-- END GENERATED: totally-made-up -->\n",
+        encoding="utf-8",
+    )
+    r = _run([str(sdir / GEN.name), "--check"], env_extra=env)
+    assert r.returncode != 0, "未登記的 generated block 竟被放行"
+    assert "UNREGISTERED BLOCK" in r.stderr and "totally-made-up" in r.stderr
 
 
 # --------------------------------------------------------------------------
