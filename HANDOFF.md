@@ -22,6 +22,10 @@ review-r1 兩家皆判「需修補後派工」，**下列三項是委員明列�
 | 2 | B8 C5 承諾的第三欄只有弱源碼斷言 | 需**真正的**三輸入 × `result_state` 端到端矩陣（`CX_STUB_MODE=preserve` ＋ 隔離 harness，模式已就位）。🔴 此點主委在 brief 自承「我自己不確定」，兩家證實擔心成立 |
 | 3 | 主委 `claude` 產物自檢無強制路徑（`CODEX-R1-P1-03`） | `cx_run` 只對 `review/consult/closure` × `codex/grok/composer` 生效；主委產物**不流經 cx_run** ⇒ 強制點須另找位置 |
 
+🔴 **接手前先讀 `handoffs/reconcile/20260810-govb1-b10-review-r1/synth.md`**——
+九條 findings 的逐條處置在 C1–C6，含**為什麼**這三項被判為阻擋、以及主委已試過哪些死路。
+該檔**尚未戳記**（stamp 輪未派，故不得列入上方 `REF:`）；三項補完後連同修補一起送戳記。
+
 **已完成並經委員裁決的部分（不要重做）**：
 
 - `_emit_fixup_list()`：逐條 `檔:行`＋類型＋修法；三層封閉退路使 `?` 不可能出現（`CODEX-R1-P1-04`）
@@ -113,6 +117,11 @@ B7 **明文不受理**（延伸檔 §7.1，兩家 APPROVED）：`$(printf clau)d
 - 🔴 `grep` 在互動 shell 是 shell-snapshot 的 function（ugrep），腳本經 `bash` 取到的是
   `/usr/bin/grep`（BSD）。驗 gate 行為別被 `grep --version` 誤導。
 - 🔴 **改檔一律用 Edit/Write**；本 session 又犯一次 heredoc。
+- 🔴 **同一個檔案第二次 out-of-epic 改動時，`Governance-Scope:` trailer 極易漏掉**。
+  第一次會記得（那是「新交付」），第二次因為心理上是「補個漏掉的區塊」就忘了。
+  本 session 實際發生：補 `docs/GOV_B8_SCOPE_AMENDMENT.md` §7 的 commit 漏 trailer，
+  `g7` FAIL。**收尾前必跑 `bash scripts/govb1_final_gate.sh --only g7`**；
+  未推之前用 `git commit --amend` 補 trailer 即可。
 - `cmd | tail; echo rc=$?` 讀到的是 **tail 的 rc**。
 - `cx_run.sh` 不可直呼；走 `committee_run.sh --session … -- <gate flags>`。
 - 收斂檔**被 REJECTED 者須修訂本體並重蓋新 hash**（舊 hash 戳記自動失效）。
