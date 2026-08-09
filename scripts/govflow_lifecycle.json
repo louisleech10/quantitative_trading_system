@@ -117,5 +117,37 @@
     ],
     "empty_body_fails": true,
     "check_name": "expected-delta"
+  },
+  "zero_findings_contract": {
+    "_doc": "GOVB1 Task 4.2（票 B-38 ∪ GOV-NOFINDINGS-SENTINEL ∪ GOV-NO-FINDINGS-RECEIPT）——\n  零 findings 的**單一契約**，禁各自實作第四種表達形式。\n  本節為 Task 4.2 獨占新增（single-writer）；不得改既有節。\n\n  契約三件事，缺一不可：\n    ① sentinel 形態：<FAMILY>-R<n>-P3-00（canonical ID 文法之特例，非另一套語法）\n    ② body 必填欄 + **語意非空**：欄名存在不等於有內容\n    ③ findings 的落點：每種 brief-kind 的 findings 寫進哪個檔\n\n  ③ 的出生事故：stamp 輪 brief 未寫落點，一委員把 findings append 進 stamp-target\n  ⇒ 自身交件檔 0 heading ID ⇒ 整輪作廢。另本 session 三次因產出格式不合規銷帳鎖死（票 B-52）。",
+    "sentinel": {
+      "id_pattern": "^[A-Z]+-R[0-9]+-P3-00$",
+      "_doc_pattern": "沿用 canonical ID 文法；P3-00 是其特例而非新語法（禁第四種表達形式）。"
+    },
+    "required_fields": [
+      "**斷言**",
+      "**碼證**"
+    ],
+    "substantive_rule": {
+      "_doc": "白名單判準（禁標點黑名單）：去除空白後，須含 ASCII 英數或 CJK 表意文字。\n  CJK 表意文字 U+4E00–U+9FFF 之 UTF-8 前導位元組落在 \\344–\\351；\n  全形標點 U+3000–U+303F 前導為 \\343 ⇒ 不算實質（SPEC 邊界②：單一標點須 rc≠0）。\n  實作於 completeness_check.sh 之 substantive()，逐位元組比較（LC_ALL=C），與 locale 無關。",
+      "allow_ascii_alnum": true,
+      "allow_cjk_ideograph_lead_bytes": [
+        "\\344",
+        "\\351"
+      ]
+    },
+    "enforced_entrypoints": {
+      "_doc": "🔴 只在交件路徑（--single）啟用。SPEC 三入口矩陣明定 --lock 那格是「rc 不變」，\n  無條件啟用會使 --lock 一併翻轉而違反 G-1 全域禁令（主委實測撞到）。",
+      "single": true,
+      "lock": false
+    },
+    "findings_destination": {
+      "_doc": "③ findings 的落點：一律寫進**該家族自己的交件檔**（cx_run 的 output_path），\n  絕不 append 進 stamp-target 或他人產出。zero findings 亦同——sentinel 寫在交件檔。",
+      "default": "own_output_file",
+      "never": [
+        "stamp_target",
+        "other_family_output"
+      ]
+    }
   }
 }

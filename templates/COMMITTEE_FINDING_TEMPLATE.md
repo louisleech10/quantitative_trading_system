@@ -75,6 +75,35 @@ source_digest: a1b2c3d4e5f6
 
 `completeness_check.sh` 認 hex≥12 為 digest 在場（TC14）。
 
+## 🔴 零 findings 怎麼寫（唯一合法出路）
+
+**單一契約的權威定義在 `scripts/govflow_lifecycle.json` 的 `zero_findings_contract` 節**
+（GOVB1 Task 4.2）。本檔只做 pointer，**不得在此另寫一套**——
+`票 B-38` ∪ `GOV-NOFINDINGS-SENTINEL` ∪ `GOV-NO-FINDINGS-RECEIPT` 已合併為那一節，
+**禁新增第四種表達形式**。
+
+三件事缺一不可：
+
+1. **sentinel 形態**＝`## <FAMILY>-R<n>-P3-00`（canonical ID 文法的特例，不是另一套語法）
+2. **body 必填欄 ＋ 語意非空**：`**斷言**` 與 `**碼證**` 都要有，而且
+   **欄名存在不等於有內容**。去除空白後須含 ASCII 英數或 CJK 表意文字；
+   只有空白、或只有一個全形標點，一律判 `empty-shell` 而 rc≠0。
+3. **findings 的落點**＝**你自己的交件檔**（`cx_run` 的 output path）。
+   🔴 **絕不** append 進 stamp-target 或其他家族的產出。
+   〔出生事故：stamp 輪 brief 未寫落點，一委員把 findings 寫進 stamp-target
+   ⇒ 自身交件檔 0 heading ID ⇒ 整輪作廢〕
+
+寫錯的後果不是「被退件」而是**銷帳鎖死**：收集器抽不到 ID ⇒ `completeness` 判 vacuous
+⇒ 該輪只能走 `--abandon`。
+
+```text
+## CODEX-R3-P3-00
+
+**斷言**: 本輪未發現需阻擋收斂的 finding；sentinel body 為實質複驗摘要。
+**碼證**: `venv/bin/python -m pytest tests/governance/test_x.py -q` → 12 passed rc=0；
+          三版對照探針 9/9 OK。
+```
+
 ## 與派工的銜接
 
 - 對抗審查輸出格式見 `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（canonical 四欄段）

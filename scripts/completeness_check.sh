@@ -232,7 +232,18 @@ _validate_finding_body() {
   # LOCK_MODE 只從全域讀（_load_lock 設；argv 路徑維持 review）；禁 env 覆寫
   local mode="${LOCK_MODE:-review}"
   # shellcheck disable=SC2016
-  awk -v lock_mode="${mode}" '
+  # GOVB1 Task 4.2：hollow body 非空判定**只在 `--single` 交件路徑生效**。
+  # 🔴 SPEC 的三入口矩陣明定：hollow `P3-00` 在 `--single` **允許 0 → 非 0**
+  #   （Task 4.2 唯一許可的行為變更），但 `--lock` 那格是 **rc 不變**。
+  #   若在 `_validate_finding_body` 內無條件啟用，`--lock` 會一起翻 ⇒ 違反 G-1。
+  #   （主委實測撞到：`test_entry_lock_rc_matches_baseline[hollow_p300]` 轉紅。）
+  # ⇒ 由呼叫端以 BODY_SUBSTANCE_STRICT 顯式開啟；預設關閉（既有路徑行為不變）。
+  local strict="${BODY_SUBSTANCE_STRICT:-0}"
+  # 🔴 LC_ALL=C：substantive() 以**位元組**判 CJK 前導範圍（\344–\351）。
+  #   不加的話 awk 在 UTF-8 locale 下 substr() 是字元語意，
+  #   單一位元組比較會切碎多位元組字元並吐出非法 UTF-8（實測 UnicodeDecodeError）。
+  #   其餘既有判定皆為 ASCII 正則與位元組字面，改 locale 不影響。
+  LC_ALL=C awk -v lock_mode="${mode}" -v strict="${strict}" '
     BEGIN {
       id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0; bad=0
       require_digest = (lock_mode != "discovery")
@@ -275,9 +286,31 @@ _validate_finding_body() {
       }
       next
     }
+    # GOVB1 Task 4.2（零 findings 契約，第 ② 件）：標籤存在**不等於**有內容。
+    # 🔴 判準用**白名單**不用標點黑名單〔「文字問題用白名單機械卡」〕：
+    #   實質內容 ⇔ 含 ASCII 英數 **或** CJK 表意文字。
+    #   CJK 表意文字（U+4E00–U+9FFF）之 UTF-8 前導位元組落在 \344–\351；
+    #   全形標點（U+3000–U+303F，如 。、：「」）前導為 \343 ⇒ **不算實質**，
+    #   故「內容只有一個全形句號」會被擋（SPEC 邊界 ②）。
+    #   LC_ALL=C 逐位元組比較，故此範圍判定是位元組層級、與 locale 無關。
+    function substantive(s,   i, c) {
+      gsub(/[[:space:]]/, "", s)
+      if (s == "") return 0
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (c ~ /[A-Za-z0-9]/) return 1
+        if (c >= "\344" && c <= "\351") return 1
+      }
+      return 0
+    }
+    function field_body(line, label,   rest) {
+      rest = line
+      sub(".*\\*\\*" label "\\*\\*[：:]?", "", rest)
+      return rest
+    }
     id != "" {
-      if ($0 ~ /\*\*斷言\*\*/) seen_assert=1
-      if ($0 ~ /\*\*碼證\*\*/) seen_code=1
+      if ($0 ~ /\*\*斷言\*\*/ && (!strict || substantive(field_body($0, "斷言")))) seen_assert=1
+      if ($0 ~ /\*\*碼證\*\*/ && (!strict || substantive(field_body($0, "碼證")))) seen_code=1
       if ($0 ~ /\*\*來源摘要\*\*/ && $0 ~ /#[0-9a-fA-F]{12}/) seen_digest=1
       if ($0 ~ /source_digest:[[:space:]]*[0-9a-fA-F]{12,}/) seen_digest=1
     }
@@ -1496,7 +1529,8 @@ if [ -n "${SINGLE_ARG}" ]; then
   # ② 同檔重複 ID
   _check_same_file_dups "${SINGLE_ARG}" "${_single_ids}" || _single_rc=1
   # ③ 空殼 finding（缺 **斷言**/**碼證**）+ P0/P1 來源摘要 digest
-  _validate_finding_body "${SINGLE_ARG}" || _single_rc=1
+  # GOVB1 Task 4.2：交件路徑啟用 hollow body 非空判定（三入口矩陣中唯一許可翻轉的一格）
+  BODY_SUBSTANCE_STRICT=1 _validate_finding_body "${SINGLE_ARG}" || _single_rc=1
   if [ "${_single_rc}" -ne 0 ]; then
     echo "COMPLETENESS FAIL(single): ${SINGLE_ARG} 格式不合規（見上）。" >&2
     echo "  這是**交件當下**的檢查：現在修比等到 reconcile 收集時才發現省一整輪。" >&2

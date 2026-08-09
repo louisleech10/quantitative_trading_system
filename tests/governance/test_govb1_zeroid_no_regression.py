@@ -58,23 +58,35 @@ def _b8_range_start() -> str | None:
     return out[0] if out else None
 
 
+def _b8_range_end() -> str | None:
+    """B8 的終點＝**最後一個觸及本票交付物**的 commit。"""
+    out = _git(
+        ["log", "-1", "--format=%H", "--", "scripts/findings_kind_classify.sh"]
+    ).stdout.split()
+    return out[0] if out else None
+
+
 def _assert_untouched_since_base(paths: list[str]) -> None:
     """🔴 `CODEX-R1-P1-05`：只看工作樹的 `git diff` 抓不到**已 commit** 的改動。
 
-    唯讀欄的看守必須涵蓋「本票已提交者」**與**工作樹（未提交者），
-    否則「先 commit 再宣稱沒改」就能靜默通過。
+    範圍＝**B8 自己的 commit 區間**（第一個～最後一個觸及本票交付物的 commit）。
+
+    🔴 為何**不含工作樹**：B8 收案後，工作樹會裝著**後續票**的工作，
+    而 Task 4.2（B9）**依規格就是要修改** `completeness_check.sh`
+    ——那是它的合法交付，不是 B8 違規。把工作樹算進來會讓本測在 B9 開工當下轉紅，
+    變成「後面每一票都要先繞過前一票的 guard」（主委實測撞到）。
+    🔴 為何**不用 epic base**：`cx_run.sh`／`govflow_lifecycle.json` 在 B8 之前
+    就被 Task 1.1／1.3 改過，用 epic base 會把別票的改動算到 B8 頭上（實測誤報）。
+    ⇒ 純歷史區間是唯一同時避開這兩種誤報的界定方式。
     """
-    start = _b8_range_start()
-    rng = f"{start}^..HEAD" if start else "HEAD..HEAD"
+    start, end = _b8_range_start(), _b8_range_end()
+    if not start or not end:
+        raise AssertionError("無法由 git 歷史導出 B8 區間 ⇒ 本 guard 失去界定基礎")
+    rng = f"{start}^..{end}"
     committed = _git(["diff", "--stat", rng, "--", *paths])
     assert committed.returncode == 0, committed.stderr
     assert committed.stdout.strip() == "", (
-        f"本票（{rng}）已提交的改動觸及唯讀檔:\n{committed.stdout}"
-    )
-    worktree = _git(["diff", "--stat", "HEAD", "--", *paths])
-    assert worktree.returncode == 0, worktree.stderr
-    assert worktree.stdout.strip() == "", (
-        f"工作樹改動觸及唯讀檔:\n{worktree.stdout}"
+        f"B8 區間（{rng}）的改動觸及唯讀檔:\n{committed.stdout}"
     )
 
 
@@ -97,7 +109,13 @@ def _rc(args: list[str], *, env_extra: dict[str, str] | None = None) -> int:
 SINGLE_BASELINE = {
     "single_heading_probe": 0,
     "prose_only": 0,
-    "hollow_p300": 0,
+    # 🔴 由 0 改為 1 —— 這是 **Task 4.2（B9）唯一許可的行為變更**。
+    #   SPEC C-2 的 8 列期望 rc==0 之中**不含** hollow sentinel；
+    #   Task 4.2 明文：「唯一許可的行為變更＝hollow body 非空判定」。
+    #   本表就是為了讓這件事**不能靜默發生**：改判準必連帶改這一格，
+    #   而改這一格會出現在 diff 裡、必須在收斂檔說明並取得委員裁定。
+    #   〔B9 實作：`_validate_finding_body` 由「標籤存在」改為「標籤後有實質內容」〕
+    "hollow_p300": 1,
 }
 
 
