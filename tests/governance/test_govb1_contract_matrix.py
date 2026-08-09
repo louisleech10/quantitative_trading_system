@@ -157,6 +157,13 @@ def _b4_start() -> str | None:
     return _parse_frozen_hashes(text).get("b4_start")
 
 
+def _b5_start() -> str | None:
+    """主委錨點 `b5_start`（只讀）。存在 ⇒ B4 窗上界收斂為 `b5_start`，
+    `b5_start..HEAD` 改由 `test_waiver_b5_range_does_not_touch_forbidden` 接手。"""
+    text = FROZEN.read_text(encoding="utf-8")
+    return _parse_frozen_hashes(text).get("b5_start")
+
+
 def _assert_anchor_chain_sane() -> None:
     """錨鏈健全性：base_commit → b3_start → b4_start → … 皆合法且祖先序正確、且為 HEAD 祖先。
 
@@ -528,16 +535,24 @@ def test_t01_f5_mutation_extra_allow_fails() -> None:
 
 
 def _rehash_scope_manifest() -> None:
-    """重算 scope_manifest hash-lock；base_commit 不變。"""
-    base = _base_commit()
+    """重算 scope_manifest hash-lock；**其餘 key 逐字保留**。
+
+    🔴 原版只寫回 `base_commit` ＋ `scope_manifest` 兩行，會**抹掉批次錨點**
+    （`b3_start`／`b4_start`…）。§0 把封閉集擴為 `b3..b10` 之後，該兩行格式
+    已無法通過 `_parse_frozen_hashes(require_b3_start=True)` ⇒ 是主委 §0 埋下的地雷
+    （13 個呼叫點皆靠 `finally` 還原才沒炸）。改為**只替換 `scope_manifest` 那一行**。
+    """
     h = _run(
         ["bash", "-c", "shasum -a 256 scripts/govb1_scope.manifest | cut -c1-12"]
     )
     assert h.returncode == 0 and h.stdout.strip(), h.stderr
-    FROZEN.write_text(
-        f"base_commit: {base}\nscope_manifest: {h.stdout.strip()}\n",
-        encoding="utf-8",
-    )
+    new_hash = h.stdout.strip()
+    out = []
+    for ln in FROZEN.read_text(encoding="utf-8").splitlines():
+        out.append(
+            f"scope_manifest: {new_hash}" if ln.startswith("scope_manifest: ") else ln
+        )
+    FROZEN.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
 # meta 精確凍結集合（與 _g7_policy expected-set 字面一致；合成 manifest 須附齊）
@@ -2112,7 +2127,11 @@ def test_waiver_b4_range_does_not_touch_forbidden() -> None:
     # 〔CODEX-R1-P1-02〕本窗自身亦須驗錨鏈，不得倚賴 B3 窗代驗
     _assert_anchor_chain_sane()
 
-    diff = _run(["git", "diff", "--name-only", f"{b4}..HEAD"])
+    # 上界依 b5_start 收斂（同 B3 之於 b4_start）；缺席 ⇒ 維持 HEAD，行為逐字不變
+    b5 = _b5_start()
+    upper = b5 if b5 is not None else "HEAD"
+
+    diff = _run(["git", "diff", "--name-only", f"{b4}..{upper}"])
     assert diff.returncode == 0, diff.stderr
     names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
 
@@ -2132,9 +2151,9 @@ def test_waiver_b4_range_does_not_touch_forbidden() -> None:
         return _parse_frozen_hashes(sh.stdout)
 
     f4 = _frozen_at(b4)
-    fh = _frozen_at("HEAD")
+    fh = _frozen_at(upper)
     for key in ("base_commit", "scope_manifest", "b3_start"):
-        assert f4[key] == fh[key], f"{key}: 於 b4_start..HEAD 不得變"
+        assert f4[key] == fh[key], f"{key}: 於 b4_start..{upper} 不得變"
     # 具名殘留：移動 b4_start 本身仍屬票 B-44（repo 內無可信存放處）
 
 
@@ -2152,6 +2171,119 @@ def test_waiver_b4_active_when_b4_start_anchored() -> None:
     except pytest.skip.Exception as exc:
         raise AssertionError(
             f"b4_start 已錨定但 B4 waiver 仍 skip ⇒ b4_start..HEAD 保護真空: {exc}"
+        ) from exc
+
+
+# ── B5 窗（b5_start..HEAD）─────────────────────────────────────────────
+# 🔴 使用者 2026-08-09 **逐字授權**：把 scripts/governance_families.json 加進 manifest，
+#    以解「GOVB1 epic 期間委員名冊完全改不了」之死鎖（第七次結構性死鎖）。
+#    ⇒ B5 窗之禁改前綴由 _B4_FORBIDDEN_PREFIXES 機械導出，**僅移除 manifest 一項**。
+# 🔴 移除 ≠ 解除保護：改由 test_b5_manifest_extension_is_exactly_authorized
+#    釘死「manifest 只准新增被授權的那一行」——比「整檔禁改」**更精確**，
+#    且擋得住「順手多加幾行」這種 scope accretion。
+_B5_MANIFEST_UNLOCKED = ("scripts/govb1_scope.manifest",)
+_B5_FORBIDDEN_PREFIXES = tuple(
+    p for p in _B4_FORBIDDEN_PREFIXES if p not in _B5_MANIFEST_UNLOCKED
+)
+# 字面凍結：使用者授權新增之 manifest 條目（**只有這一行**）
+_B5_MANIFEST_AUTHORIZED_ADDITIONS = frozenset(
+    {"allow scripts/governance_families.json"}
+)
+
+
+def test_b5_forbidden_prefixes_removes_exactly_manifest() -> None:
+    """B5 清單＝B4 清單「僅移除 manifest 一項」。
+
+    🔴 oracle 為**字面期望集合**：若寫成 `removed == set(_B5_MANIFEST_UNLOCKED)`，
+    因 _B5_FORBIDDEN_PREFIXES 即由該常數導出，該式**同義反覆恆真**
+    （主委在 B4 犯過一次，由 mutation probe 抓出）。
+    """
+    expected_b5_forbidden = {
+        "scripts/govb1_frozen_hashes.txt",
+        "docs/GOVB1_",
+    }
+    assert set(_B5_FORBIDDEN_PREFIXES) == expected_b5_forbidden, (
+        f"B5 禁改前綴漂移：want={expected_b5_forbidden} got={set(_B5_FORBIDDEN_PREFIXES)}"
+    )
+    assert set(_B5_FORBIDDEN_PREFIXES) < set(_B4_FORBIDDEN_PREFIXES)
+    assert set(_B4_FORBIDDEN_PREFIXES) - set(_B5_FORBIDDEN_PREFIXES) == {
+        "scripts/govb1_scope.manifest"
+    }
+    assert len(_B45_HARNESS) == 5  # harness 於 B5 窗一項不得少
+
+
+def test_b5_manifest_extension_is_exactly_authorized() -> None:
+    """🔴 manifest 於 B5 窗**只准新增被授權之條目，且不得刪任何行**。
+
+    這是「解除整檔禁改」之替代保護：比禁改更精確——允許授權的那一行，
+    但擋住任何其他新增（scope accretion）與任何刪除（偷偷放寬既有 deny）。
+    mutation：在 _B5_MANIFEST_AUTHORIZED_ADDITIONS 之外多加一行 manifest ⇒ 本測轉紅。
+    """
+    b5 = _b5_start()
+    if b5 is None:
+        pytest.skip("b5_start 尚未錨定；manifest 仍受 B4 窗整檔禁改保護")
+
+    def _manifest_lines(rev: str) -> set[str]:
+        sh = _run(["git", "show", f"{rev}:scripts/govb1_scope.manifest"])
+        assert sh.returncode == 0, sh.stderr
+        return {
+            ln.strip()
+            for ln in sh.stdout.splitlines()
+            if ln.strip() and not ln.strip().startswith("#")
+        }
+
+    before, after = _manifest_lines(b5), _manifest_lines("HEAD")
+    added, removed = after - before, before - after
+    assert not removed, f"manifest 於 b5_start..HEAD 不得刪行: {sorted(removed)}"
+    assert added <= _B5_MANIFEST_AUTHORIZED_ADDITIONS, (
+        f"manifest 新增未經授權之條目: {sorted(added - _B5_MANIFEST_AUTHORIZED_ADDITIONS)}"
+    )
+
+
+def test_waiver_b5_range_does_not_touch_forbidden() -> None:
+    """B5 窗（b5_start..HEAD）不得觸及禁改清單。
+
+    B4 窗上界收斂為 b5_start 後，b5_start..HEAD 由本測接手看守
+    ——硬規矩 9：收窄型修法不得使「該擋的從此不受檢」。
+    """
+    b5 = _b5_start()
+    if b5 is None:
+        pytest.skip("b5_start 尚未錨定；B4 窗之開放區間仍全程看守（無保護真空）")
+
+    _assert_anchor_chain_sane()
+
+    diff = _run(["git", "diff", "--name-only", f"{b5}..HEAD"])
+    assert diff.returncode == 0, diff.stderr
+    names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
+
+    hit_harness = names & set(_B45_HARNESS)
+    assert not hit_harness, f"B5 range 觸及 B-45 harness: {hit_harness}"
+    for pref in _B5_FORBIDDEN_PREFIXES:
+        if pref == "scripts/govb1_frozen_hashes.txt":
+            continue  # 允許檔進 range（主委 b5_start 錨點）；內容走封閉集合比對
+        bad = {n for n in names if n == pref or n.startswith(pref)}
+        assert not bad, f"B5 range 觸及禁改前綴 {pref}: {bad}"
+
+    def _frozen_at(rev: str) -> dict[str, str]:
+        sh = _run(["git", "show", f"{rev}:scripts/govb1_frozen_hashes.txt"])
+        assert sh.returncode == 0, sh.stderr
+        return _parse_frozen_hashes(sh.stdout)
+
+    f5, fh = _frozen_at(b5), _frozen_at("HEAD")
+    # 🔴 scope_manifest **允許**於本窗變動（授權擴充之必然結果）；三個既有錨值不得變
+    for key in ("base_commit", "b3_start", "b4_start"):
+        assert f5[key] == fh[key], f"{key}: 於 b5_start..HEAD 不得變"
+
+
+def test_waiver_b5_active_when_b5_start_anchored() -> None:
+    """耦合 fail-closed：b5_start 一旦錨定，B5 waiver 不得 skip（否則保護真空）。"""
+    if _b5_start() is None:
+        pytest.skip("b5_start 尚未錨定；B4 窗仍以開放區間看守")
+    try:
+        test_waiver_b5_range_does_not_touch_forbidden()
+    except pytest.skip.Exception as exc:
+        raise AssertionError(
+            f"b5_start 已錨定但 B5 waiver 仍 skip ⇒ b5_start..HEAD 保護真空: {exc}"
         ) from exc
 
 
