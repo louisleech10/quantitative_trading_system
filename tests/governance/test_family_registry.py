@@ -262,8 +262,18 @@ def test_gate_stamp_families_uses_tristate_getter(
         ("grok 暫停中切 codex", ["codex", "composer"], "codex", "", 2),
         ("grok 暫停中切 composer", ["codex", "composer"], "composer", "", 2),
         ("三家皆可用切 codex", ["codex", "composer", "grok"], "codex", "", 0),
-        ("明示逃生口", ["codex", "composer"], "codex", "SET_ROLES_ALLOW_QUORUM_BREAK=1", 0),
         ("缺 active_stampers 回退全員", None, "codex", "", 0),
+        # 🔴 CODEX-R3-P1-03：fallback 失敗不得吞成空集合而跳過前檢（fail-open）
+        ("缺 active 且 review_families 壞", "__BREAK_RF__", "codex", "", 2),
+        # 🔴 CODEX-R3-P2-04：逃生口須具名理由
+        ("逃生口無理由", ["codex", "composer"], "codex", "SET_ROLES_ALLOW_QUORUM_BREAK=1", 2),
+        (
+            "逃生口有理由",
+            ["codex", "composer"],
+            "codex",
+            "SET_ROLES_ALLOW_QUORUM_BREAK=1 SET_ROLES_QUORUM_BREAK_REASON=額度已恢復",
+            0,
+        ),
     ],
 )
 def test_set_roles_refuses_switch_that_breaks_review_quorum(
@@ -289,7 +299,9 @@ def test_set_roles_refuses_switch_that_breaks_review_quorum(
         if src.exists():
             (s / f).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     sot = _base_sot()
-    if active is not None:
+    if active == "__BREAK_RF__":
+        sot["review_families"] = []          # 缺 active_stampers ＋ fallback 來源壞掉
+    elif active is not None:
         sot["active_stampers"] = active
     (s / "governance_families.json").write_text(json.dumps(sot, ensure_ascii=False), encoding="utf-8")
 
@@ -301,9 +313,15 @@ def test_set_roles_refuses_switch_that_breaks_review_quorum(
     assert p.returncode == want_rc, f"{label}: rc={p.returncode} want={want_rc}\n{out}"
     if want_rc != 0:
         assert after == before, f"{label}: 拒絕切換卻仍改寫了 roles.json（非零副作用）"
-        assert "review_quorum_check" in out, f"{label}: 未說明被擋的機械依據\n{out}"
+        # 被擋的理由須說得出機械依據（quorum 不足／fail-closed／缺理由）
+        assert any(k in out for k in ("review_quorum_check", "fail-closed", "REASON")), (
+            f"{label}: 未說明被擋的機械依據\n{out}"
+        )
     else:
         assert after != before, f"{label}: 應放行卻沒改寫 roles.json"
+        if "ALLOW_QUORUM_BREAK" in env:
+            # 🔴 破壞 quorum 須可歸因：理由寫進 history〔CODEX-R3-P2-04〕
+            assert "quorum-break" in after, f"{label}: history 未記錄破壞事由\n{after}"
 
 
 def test_adv_path_re_recognizes_grok() -> None:

@@ -70,9 +70,21 @@ _SR_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "${_SR_DIR}/governance_families.sh"
 _usable="$(families_active_stampers 2>/dev/null)"; _u_rc=$?
 if [ "${_u_rc}" -eq 3 ]; then
-  _usable="$(families_get review_families)" || _usable=""
+  # 🔴 fallback 失敗**不得**吞成空集合〔CODEX-R3-P1-03〕：
+  #   原寫法 `|| _usable=""` 會讓 `review_families` 壞掉時整個前檢被跳過（fail-open）
+  #   ——實測 `del active_stampers` + `review_families=[]` ⇒ rc=0 且 roles.json 被改寫。
+  #   這正是 R-19 修過一次的同型錯誤，主委在同一天又犯一次。
+  _usable="$(families_get review_families)" || {
+    echo "ERROR: active_stampers 缺席且 review_families 讀取失敗 ⇒ 無法評估 quorum(fail-closed)" >&2
+    exit 2
+  }
 elif [ "${_u_rc}" -ne 0 ]; then
   echo "ERROR: active_stampers 不合法 ⇒ 無法評估 quorum 可行性(fail-closed)" >&2
+  exit 2
+fi
+# 空集合亦拒：走到這裡就代表兩個來源都沒給出可用家族
+if [ -z "${_usable}" ]; then
+  echo "ERROR: 可用家族集合為空 ⇒ 無法評估 quorum 可行性(fail-closed)" >&2
   exit 2
 fi
 if [ -n "${_usable}" ]; then
@@ -84,13 +96,28 @@ if [ -n "${_usable}" ]; then
     [ "${_f}" = "${NEW}" ] && continue
     _left=$((_left + 1)); _leftlist="${_leftlist} ${_f}"
   done
-  if [ "${_left}" -lt 2 ] && [ "${SET_ROLES_ALLOW_QUORUM_BREAK:-0}" != "1" ]; then
-    echo "ERROR: 切成 implementer=${NEW} 會使可用之非實作者家族只剩 ${_left} 家(${_leftlist:- 無})" >&2
-    echo "  中/大實作須 ≥2 非實作者 code review(review_quorum_check.sh)⇒ 下一輪 review 必被擋。" >&2
-    echo "  目前可用(active_stampers)= ${_usable}" >&2
-    echo "  → 要切成 ${NEW}，須先讓另一家恢復並加回 governance_families.json 的 active_stampers。" >&2
-    echo "  → 確知自己在做什麼(例:同時恢復額度)：SET_ROLES_ALLOW_QUORUM_BREAK=1 bash scripts/set_roles.sh ${NEW}" >&2
-    exit 2
+  if [ "${_left}" -lt 2 ]; then
+    if [ "${SET_ROLES_ALLOW_QUORUM_BREAK:-0}" != "1" ]; then
+      echo "ERROR: 切成 implementer=${NEW} 會使可用之非實作者家族只剩 ${_left} 家(${_leftlist:- 無})" >&2
+      echo "  中/大實作須 ≥2 非實作者 code review(review_quorum_check.sh)⇒ 下一輪 review 必被擋。" >&2
+      echo "  目前可用(active_stampers)= ${_usable}" >&2
+      echo "  → 要切成 ${NEW}，須先讓另一家恢復並加回 governance_families.json 的 active_stampers。" >&2
+      echo "  → 確知自己在做什麼(例:同時恢復額度)：" >&2
+      echo "     SET_ROLES_ALLOW_QUORUM_BREAK=1 SET_ROLES_QUORUM_BREAK_REASON='<理由>' bash scripts/set_roles.sh ${NEW}" >&2
+      exit 2
+    fi
+    # 🔴 逃生口須具名理由並持久化〔CODEX-R3-P2-04〕：
+    #   只驗環境值 =1 ⇒ 破壞 quorum 這件事**無法歸因**（history 只寫 old -> new）。
+    #   逃生口保留（使用者可能正在恢復額度的同一分鐘切換），但必須留下可稽核的理由。
+    _reason="${SET_ROLES_QUORUM_BREAK_REASON:-}"
+    case "$(printf '%s' "${_reason}" | tr -d '[:space:]')" in
+      "") echo "ERROR: 使用 SET_ROLES_ALLOW_QUORUM_BREAK 須同時給 SET_ROLES_QUORUM_BREAK_REASON='<非空理由>'" >&2
+          echo "  破壞 review quorum 是可稽核事件，理由會寫入 governance_roles.json 的 history。" >&2
+          exit 2 ;;
+    esac
+    export SET_ROLES_HISTORY_NOTE="quorum-break(left=${_left}): ${_reason}"
+    echo "⚠ 已明示破壞 review quorum：可用非實作者僅剩 ${_left} 家(${_leftlist:- 無})" >&2
+    echo "  理由（將寫入 history）：${_reason}" >&2
   fi
 fi
 
@@ -105,7 +132,9 @@ d['implementer']=new
 d['implementer_backup']=[f for f in allf if f!=new][0]
 d['reviewers']=sorted(f for f in allf if f!=new)   # 實作者不自審
 d['updated_by']='user'
-d.setdefault('history',[]).append(f"{old} -> {new}")
+import os
+_note=os.environ.get('SET_ROLES_HISTORY_NOTE','').strip()
+d.setdefault('history',[]).append(f"{old} -> {new}" + (f"  ※{_note}" if _note else ""))
 json.dump(d,open(path,'w'),ensure_ascii=False,indent=2)
 open(path,'a').write("\n")
 print(f"已切換:implementer {old} -> {new};reviewers = {', '.join(d['reviewers'])}")
