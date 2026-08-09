@@ -25,6 +25,31 @@ esac
 rc_all=0
 
 # ---------------------------------------------------------------------------
+# 段號（唯一宣告處）— 票 B-25／Task 2.2 §2
+#
+# 出生理由：本檔原有 10 處段號，分母**全是寫死的字串**，結果自己就不一致
+#   （同時存在 `1/3`、`4/4`，另有帶字母後綴的 `1b/3`）。寫死的數字必然漂。
+# 規則：**分母＝本檔實際段數（現算）**；帶字母後綴者（如 `1b`）併入前一段、不另計；
+#   🔴 **禁在任何字串中寫死分母**（tests/governance/test_govb1_factkey_hook.py 機械釘住）。
+# 未登記的段號 ⇒ fail-closed：新增一段而忘了登記，會當場炸而不是靜默印出錯的分母。
+# ---------------------------------------------------------------------------
+_GC_SEG_IDS='1 1b 2 3 4 5'
+_gc_total() {
+  # shellcheck disable=SC2086
+  printf '%s\n' ${_GC_SEG_IDS} \
+    | sed 's/[^0-9].*$//' | grep -v '^$' | sort -u | wc -l | tr -d ' '
+}
+_GC_TOTAL="$(_gc_total)"
+_gc_seg() {   # $1=段號（須已登記） $2=標題
+  case " ${_GC_SEG_IDS} " in
+    *" $1 "*) : ;;
+    *) echo "[gov_check] ✗ 未登記的段號 '$1'（須先加入 _GC_SEG_IDS）→ fail-closed" >&2
+       exit 2 ;;
+  esac
+  echo "[gov_check] $1/${_GC_TOTAL} $2"
+}
+
+# ---------------------------------------------------------------------------
 # 0) 委員暫停狀態提醒（**不擋 push**，只確保不被遺忘）
 #
 # 出生理由（2026-08-09）：grok 額度用罄（403 spending-limit），而
@@ -111,7 +136,7 @@ if [ -f scripts/govb1_frozen_hashes.txt ]; then
 fi
 
 # --- 1) shell 語法 ---
-echo "[gov_check] 1/3 shell 語法 (bash -n)…"
+_gc_seg 1 "shell 語法 (bash -n)…"
 _bad=0
 for f in scripts/*.sh scripts/git_hooks/*; do
   [ -f "${f}" ] || continue
@@ -133,7 +158,7 @@ if [ "${_bad}" -ne 0 ]; then echo "[gov_check] ✗ shell 語法未過" >&2; rc_a
 #   那是噪音不是強制，且會逼人加 `--no-verify`，反而把整條防線關掉。
 #   diff 範圍剛好對應本機制的目的：「**不管誰寫的**，只要這次動到就要合規」。
 # **不靜默吞**：legacy 積欠數字照印（下方 backlog 行），避免看起來像「全庫都乾淨」。
-echo "[gov_check] 1b/3 治理文件格式 (doc_format_precheck，範圍=本次改動)…"
+_gc_seg 1b "治理文件格式 (doc_format_precheck，範圍=本次改動)…"
 _docbad=0
 _docn=0
 _base="$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD 2>/dev/null || echo "")"
@@ -199,21 +224,21 @@ py="venv/bin/python"; [ -x "${py}" ] || py="$(command -v python3 || command -v p
 
 # --- 2) governance 守衛測試 ---
 if [ -d tests/governance ]; then
-  echo "[gov_check] 2/3 governance 守衛測試 (pytest tests/governance)…"
+  _gc_seg 2 "governance 守衛測試 (pytest tests/governance)…"
   if "${py}" -m pytest tests/governance -q --tb=short; then
     echo "[gov_check] ✓ governance 測試通過"
   else
     echo "[gov_check] ✗ governance 測試未過" >&2; rc_all=1
   fi
 else
-  echo "[gov_check] 2/3 略過(無 tests/governance)"
+  _gc_seg 2 "略過(無 tests/governance)"
 fi
 
 # --- 3) mutation 探針健檢(守衛測試是否為真 oracle) ---
 if [ "${no_probe}" -eq 1 ]; then
-  echo "[gov_check] 3/3 略過探針健檢(--no-probe;慢變項,改由手動/守衛測試改動時跑)"
+  _gc_seg 3 "略過探針健檢(--no-probe;慢變項,改由手動/守衛測試改動時跑)"
 elif [ -x scripts/mutation_probe_check.sh ]; then
-  echo "[gov_check] 3/3 mutation 探針健檢…"
+  _gc_seg 3 "mutation 探針健檢…"
   # 只驗「**宣稱有探針**的檔」(含 test_mutation_)其探針是否真跑得過。
   # 舊檔無探針屬既有狀態(該不該補=待辦 P1-2「驗守衛的測試必附常駐 mutation」機械強制),
   # 納入只會恆亮雜訊警告 → 刻意排除,並在此註明邊界。
@@ -237,10 +262,10 @@ elif [ -x scripts/mutation_probe_check.sh ]; then
       echo "[gov_check] ✗ 探針健檢未過(非既有債檔的探針失效,須修)" >&2; rc_all=1
     fi
   else
-    echo "[gov_check] 3/3 無(非既有債的)探針檔,略過"
+    _gc_seg 3 "無(非既有債的)探針檔,略過"
   fi
 else
-  echo "[gov_check] 3/3 略過(無 mutation_probe_check.sh)"
+  _gc_seg 3 "略過(無 mutation_probe_check.sh)"
 fi
 
 # ── 4/4 白話說明過期偵測 ────────────────────────────────
@@ -248,7 +273,7 @@ fi
 #   且 plain_docs_sync_check.sh 本身也要「記得跑」才有用 ⇒ 仍是紀律不是機制。
 #   接進 gov_check(pre-push 唯一委派點)後,忘記更新 = 推不上去。
 if [ -f scripts/plain_docs_sync_check.sh ]; then
-  echo "[gov_check] 4/4 白話說明過期偵測…"
+  _gc_seg 4 "白話說明過期偵測…"
   if bash scripts/plain_docs_sync_check.sh; then
     echo "[gov_check] ✓ 白話說明 同步 OK"
   else
@@ -256,7 +281,35 @@ if [ -f scripts/plain_docs_sync_check.sh ]; then
     rc_all=1
   fi
 else
-  echo "[gov_check] 4/4 略過(無 plain_docs_sync_check.sh)"
+  _gc_seg 4 "略過(無 plain_docs_sync_check.sh)"
+fi
+
+# ── 5) 事實單一來源 fact-key（票 B-25／Task 2.2）────────────────
+# 為何掛在 pre-push 這一點，而**不是**派工當下（與 票 B-29 不矛盾的理由）：
+#   · `B-29` 管的是**派工當下的宣告**（brief 說清楚什麼會變）——那是單一動作的輸入品質。
+#   · `B-25` 管的是**文件副本一致性**——它是 repo 全域狀態，
+#     只有 push 前才有完整快照（改了 A 檔忘了跑生成器，唯有比對整棵樹才看得出來）。
+#   兩者掛點不同是因為**檢查對象的粒度不同**，不是重複強制。
+# 🔴 生成器不存在／不可執行 ⇒ fail-closed（不得靜默略過；刪掉腳本就能假綠＝沒有檢查）。
+# 🔴 不得宣稱「single-source 已完成」。具名殘留：
+#   ① 生成器不知道的新文件裡憑空手寫第三份副本 ⇒ 擋不到
+#   ② `git push --no-verify` 可繞（與本檔其餘機制同一邊界）
+# 誠實邊界：`--fast` 不跑本段（--fast 之契約＝秒級語法自檢）；push 路徑走 `--no-probe`，會跑。
+_gov_check_factkey() {   # -> rc
+  _gc_seg 5 "事實單一來源 (fact-key)…"
+  # 🔴 TODO 偽碼寫的是 `${ROOT}/scripts/...`，但本檔無 ROOT 變數且 set -u
+  #   ⇒ 逐字照抄會在執行期炸。本檔開頭已 cd 到 repo 根，故用相對路徑。
+  [ -x scripts/gen_fact_key_blocks.sh ] || {
+    echo "[gov_check] ✗ gen_fact_key_blocks.sh 缺失或不可執行 → fail-closed" >&2
+    return 1
+  }
+  bash scripts/gen_fact_key_blocks.sh --check || return 1
+}
+if _gov_check_factkey; then
+  echo "[gov_check] ✓ 事實單一來源 OK"
+else
+  echo "[gov_check] ✗ 事實單一來源漂移(見上;改 scripts/fact_keys.json 後跑 --write)" >&2
+  rc_all=1
 fi
 
 if [ "${rc_all}" -eq 0 ]; then
