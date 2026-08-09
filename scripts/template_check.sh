@@ -613,8 +613,18 @@ _run_assert_lines() {
           continue ;;
       esac
     fi
-    # 逐字 argv 執行（不經 shell 再解析）
-    ( set -f; IFS=' 	'; set -- ${_ra_cmd}; [ "$#" -gt 0 ] && "$@" ) >/dev/null 2>&1
+    # 🔴 逐字 argv 執行，並**固定 PATH／清除注入型環境變數**
+    #   〔codex 於 B5-STAMP-R3 REJECTED 並實證〕：白名單比對的是 **token 名**，
+    #   解析卻走 PATH ⇒ 把同名 `bash` 置於 PATH 前端即可執行 repo 外程式，白名單被繞過。
+    #   固定順序：系統目錄在前（`bash`/`grep`/`true` 必為系統版），
+    #   repo venv 在後僅供 `pytest`；`REPO_ROOT` 由腳本位置導出，不取自環境。
+    #   併清 `BASH_ENV`／`ENV`（bash 啟動時會 source）與 `*_PRELOAD`（動態載入注入）。
+    ( set -f; IFS=' 	'; set -- ${_ra_cmd}
+      [ "$#" -gt 0 ] || exit 1
+      PATH="/usr/bin:/bin:/usr/sbin:/sbin:${REPO_ROOT}/venv/bin"
+      export PATH
+      unset BASH_ENV ENV CDPATH LD_PRELOAD DYLD_INSERT_LIBRARIES DYLD_LIBRARY_PATH
+      exec "$@" ) >/dev/null 2>&1
     _ra_rc=$?
     [ "${_ra_rc}" = "${_ra_exp}" ] || \
       _ra_out="${_ra_out}  · ASSERT rc 不符（期望 ${_ra_exp} 實得 ${_ra_rc}）: ${_ra_cmd}\n"

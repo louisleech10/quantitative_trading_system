@@ -55,7 +55,10 @@ def _extract(*fns: str) -> str:
 def _run_fn(fns: tuple[str, ...], body: str, tmp: Path) -> subprocess.CompletedProcess[str]:
     """在隔離 shell 內載入生產原文並執行 `body`。"""
     script = tmp / "probe.sh"
-    script.write_text("set -u\n" + _extract(*fns) + "\n" + body + "\n", encoding="utf-8")
+    # REPO_ROOT：`_run_assert_lines` 固定 PATH 時會用到（生產環境由腳本位置導出）
+    script.write_text(
+        f'set -u\nREPO_ROOT="{REPO}"\n' + _extract(*fns) + "\n" + body + "\n", encoding="utf-8"
+    )
     return subprocess.run(
         ["bash", str(script)], cwd=REPO, capture_output=True, text=True, check=False
     )
@@ -312,6 +315,37 @@ def test_t15_a1_no_side_effect(tmp_path: Path, label: str, line: str) -> None:
     doc.write_text(line.format(m=marker) + "\n", encoding="utf-8")
     _run_fn(("_run_assert_lines",), f'_run_assert_lines {doc} >/dev/null 2>&1; echo "rc=$?"', tmp_path)
     assert not marker.exists(), f"🔴 {label}: ASSERT 產生了副作用"
+
+
+def test_t15_a1_path_hijack_blocked(tmp_path: Path) -> None:
+    """🔴 承重：白名單比對 **token 名**，解析卻走 PATH ⇒ 同名劫持可繞過白名單。
+
+    codex 於 `B5-STAMP-R3` REJECTED 並實證：把自製 `bash` 置於 `PATH` 前端，
+    `ASSERT bash THEN rc=0` 會執行**repo 外程式**並產生副作用。
+    現行封閉＝執行前固定 `PATH`（系統目錄在前、repo venv 僅供 pytest 在後），
+    並清除 `BASH_ENV`／`ENV`／`*_PRELOAD` 等注入型環境變數。
+    """
+    evil = tmp_path / "evil"
+    evil.mkdir()
+    marker = tmp_path / "marker"
+    fake = evil / "bash"
+    fake.write_text(f"#!/bin/sh\ntouch {marker}\nexit 0\n", encoding="utf-8")
+    fake.chmod(0o755)
+
+    doc = tmp_path / "h.md"
+    doc.write_text("ASSERT bash THEN rc=0\n", encoding="utf-8")
+    script = tmp_path / "probe.sh"
+    script.write_text(
+        "set -u\n"
+        f'REPO_ROOT="{REPO}"\n'
+        + _extract("_run_assert_lines")
+        + f'\nPATH="{evil}:$PATH" _run_assert_lines {doc} >/dev/null 2>&1; echo "rc=$?"\n',
+        encoding="utf-8",
+    )
+    subprocess.run(["bash", str(script)], cwd=REPO, capture_output=True, text=True, check=False)
+    assert not marker.exists(), (
+        "🔴 PATH 前端之同名 bash 被執行 ⇒ 白名單可繞過（未固定 PATH？）"
+    )
 
 
 def test_t15_a1_cmd_allowlist_is_closed_and_frozen() -> None:
