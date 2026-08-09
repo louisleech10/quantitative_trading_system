@@ -349,9 +349,30 @@ _g7_batch3_started() {
 #
 # 🔴 仍然硬保護（out-of-epic **也不准碰**）＝ epic 自己的契約：
 #     docs/GOVB1_（凍結 SPEC/TODO）／govb1_scope.manifest／govb1_frozen_hashes.txt
-#   🔴 **刻意不含 _B45_HARNESS 五檔**：out-of-epic 工作正是治理 harness 之維護，
-#     而那五檔的真正守衛是 pre-push 全套 pytest（改壞即紅），
-#     檔案凍結只是「epic 內防 scope creep」，不該外溢成永久禁區。
+#
+# ─── `_B45_HARNESS` 五檔：三道機制各自獨立，勿混為一談 ────────────────────
+# 〔2026-08-09 更正；出處＝handoffs/reconcile/20260809-govb1-x-consult-r1/synth.md
+#   C2，codex+composer 兩家 APPROVED。CODEX-R1-P1-02 判本段舊文為**誤導性文件**〕
+#
+#   ① **G-7 硬保護（本常數）— 排除五檔**：本閘只管 manifest **scope**，
+#      故 out-of-epic commit 在 G-7 這一關可以觸及五檔。
+#   ② **窗守衛（B3/B4/B5 waiver）— 一律禁五檔，且不讀 trailer**：
+#      tests/governance/test_govb1_contract_matrix.py 之
+#      `test_waiver_b{45_b3,4,5}_range_does_not_touch_forbidden` 對
+#      `git diff --name-only <窗>` 的**原始路徑集合**做 `& _B45_HARNESS` 即 fail，
+#      **完全不解析 commit 訊息** ⇒ **OOE trailer 在窗守衛這一關無效**。
+#      理由：那五檔是**驗證治理機器的 oracle**，而本 epic 正在改那台機器；
+#      若同一 commit 可同批改 oracle 與被測物，當輪綠燈即失去證據力。
+#      〔凍結出處：20260808-GOVB1-B4-STAMP-R2 三家 APPROVED〕
+#   ③ **pre-push pytest ≠ 來源不可變保證**：`git_hooks/pre-push` →
+#      `gov_check.sh` 只對**當前 checkout** 跑 `pytest tests/governance -q`，
+#      **不比對任何凍結基準**。故「改壞即紅」為假——同批改 harness 與被測物即全綠。
+#      它只是**行為回歸**，不得被當成「允許解除凍結」的證據。
+#
+#   ⇒ **結論：epic 進行期間，五檔實際上仍動不了**（②擋死），
+#     ①的排除只表示「G-7 不是那道鎖」，不表示五檔可改。
+#   ⇒ 另：五檔**全部**不在 `govb1_scope.manifest` allow 內〔COMPOSER-R1-P2-01〕，
+#     其保護完全依賴②。
 #
 # 稽核：gov_check 於每次 push 列出 range 內所有 out-of-epic commit（見 gov_check.sh）。
 # ---------------------------------------------------------------------------

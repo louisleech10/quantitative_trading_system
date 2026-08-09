@@ -2637,3 +2637,63 @@ TICKET-STATUS: OPEN
 本票**尚無機械綁定**；在閉合前，`no-findings-expected` 之正確性仍靠紀律。
 2026-08-09 之 `20260809-govb1-x-stamp-r1` 一輪已示範正確用法
 （戳記輪本質不產 findings，kind 與事實相符）。
+
+---
+
+## B-49 票 `GOV-ROLES-SOT-CANNOT-EXPRESS-ORCHESTRATOR`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：`handoffs/reconcile/20260809-govb1-x-consult-r1/synth.md`
+（C3／C4，codex + composer 兩家 `RECONCILE-STAMP APPROVED`）。
+
+### 病（三件，同一根）
+
+**① `roles SoT` 結構上無法表達「編排端自任實作」**
+`scripts/governance_roles.json` 之 `eligible` 僅 `[codex, composer, grok]`，
+`set_roles.sh` 亦只認這三個。grok 額度封鎖期間實際實作端＝主委（Claude），
+但 SoT 只能寫 `implementer: grok` ⇒ **名冊持續與事實不符**。
+
+**② `test_stamp_taskid_inject.py:769-770` 為 fail-open 假綠**（兩家獨立抓到，MAJOR）
+```python
+if kind == "impl" and fam not in ("codex", "grok", "composer"):
+    pytest.skip(f"unexpected implementer {fam}")   # 非 fail-closed
+```
+`implementer` 一旦改成非三家之值，impl 分支**靜默不跑**——不是紅，是綠著消失。
+同檔 `:2054-2096` 對異常 `implementer` 卻是 assert 失敗 ⇒ **同檔內不一致**；
+`eligible` 與此處硬編三元組**未機械連動**。
+
+**③ 為何 ①② 現在修不了**
+②所在檔屬 `_B45_HARNESS`，`20260809-govb1-x-consult-r1` 裁決 **(C)：窗守衛維持凍結、
+不承認 out-of-epic**。⇒ 與 `票 B-45`／`B-47` 同型：**做不到不是因為難，是因為凍結範圍。**
+
+### 閉合條件（採 codex 版，較嚴）
+
+由**非實作者** governance-harness reviewer，在**下一次 roles／派工契約變更之前**：
+1. 移除 `:769` 靜默 skip，改 invalid-role **fail-closed** assertion
+2. 修正證據須含：① invalid mutation 轉紅 ② 三個合法 `implementer` 值逐一通過
+   ③ 該檔 `skipped=0`
+3. `eligible` 與測試內家族集合須**機械連動**（禁再硬編三元組）
+4. 之後才由**使用者**更新 `governance_roles.json` 以表達編排端自任
+
+🔴 兩家皆明示：**不得以②為藉口放寬窗凍結**。
+
+### 已在本輪落地、不屬本票的部分
+
+- C2（G-7 註解誤導）已修：`govb1_final_gate.sh` 三道機制分述 ＋
+  `test_ooe_comment_documents_three_independent_mechanisms`
+- C1（窗守衛不讀 trailer）已釘：`test_waiver_guards_never_parse_commit_message`
+- C4（換實作端破 quorum 之地雷）已機械擋下：`set_roles.sh` quorum 前檢 ＋
+  `test_set_roles_refuses_switch_that_breaks_review_quorum`（5 parametrize）
+
+### 備查：日後真要放寬窗守衛時的設計基礎（composer B1–B3，本輪未採納但保留）
+
+- B1 僅當 `_g7_path_only_ooe` **等價判定**為真才從 waiver diff 扣除（**禁第二套 parser**）
+- B2 觸及 harness 之 OOE commit，trailer 須含具名票 `ticket=<ID>`（regex 機械驗）
+- B3 同一 commit 不得混合 in-epic 與 out-of-epic 語意（須加 mutation：混合觸及仍紅）
+
+### 誠實邊界
+
+本票之強制＝下方定時炸彈（`test_b45_unfreeze_requires_roles_sot_closure`）：
+`_B45_HARNESS` 凍結一被解除或放寬，該測即紅。
+兩家皆判此炸彈**只防意外與遺忘，不防蓄意**（主委對該檔有寫入權，可連炸彈一併改掉）。

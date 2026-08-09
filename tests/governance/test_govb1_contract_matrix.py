@@ -2360,6 +2360,181 @@ def _gate_src() -> str:
     return (REPO / "scripts" / "govb1_final_gate.sh").read_text(encoding="utf-8")
 
 
+# ── consult-r1 C1/C2 落地：三道機制互不相通，且文件不得再誤導 ──────────
+# 裁決出處：handoffs/reconcile/20260809-govb1-x-consult-r1/synth.md（codex+composer APPROVED）
+_WAIVER_GUARD_FNS = (
+    "test_waiver_b45_b3_range_does_not_touch_forbidden",
+    "test_waiver_b4_range_does_not_touch_forbidden",
+    "test_waiver_b5_range_does_not_touch_forbidden",
+)
+# commit 訊息解析的痕跡——窗守衛內出現任一即違反 C1 裁決
+_MSG_PARSE_MARKERS = ("--grep", "%(trailers", "Governance-Scope", "%B", "%s", "log_message")
+
+
+# ── 定時炸彈：`_B45_HARNESS` 凍結解除 ⇒ 必須同時處理票 B-49 ────────────
+# 出處：consult-r1 落地清單 §3，採 composer Q2 之強化版（字面關閉條件 + 耦合測試）。
+_B49_TICKET = "handoffs/20260801-GOV-AMEND-BACKLOG.md"
+_B49_ID = "GOV-ROLES-SOT-CANNOT-EXPRESS-ORCHESTRATOR"
+
+
+def _b45_freeze_still_active() -> bool:
+    """凍結是否仍生效＝三個窗守衛是否都還在對 `_B45_HARNESS` 做拒絕比對。"""
+    src = (REPO / "tests" / "governance" / "test_govb1_contract_matrix.py").read_text(
+        encoding="utf-8"
+    )
+    for fn in _WAIVER_GUARD_FNS:
+        m = re.search(rf"^def {re.escape(fn)}\(.*?(?=\n@|\ndef |\Z)", src, re.S | re.M)
+        if not m:
+            return False
+        body = _strip_docstring_and_comments(m.group(0))
+        if "_B45_HARNESS" not in body or "assert not hit_harness" not in body:
+            return False
+    return len(_B45_HARNESS) == 5
+
+
+def _b49_ticket_status() -> str:
+    """回票 B-49 的 TICKET-STATUS（找不到票 → 'MISSING'）。"""
+    text = (REPO / _B49_TICKET).read_text(encoding="utf-8")
+    idx = text.find(_B49_ID)
+    if idx < 0:
+        return "MISSING"
+    m = re.search(r"TICKET-STATUS:\s*(\S+)", text[idx:])
+    return m.group(1) if m else "MISSING"
+
+
+def test_b45_unfreeze_requires_roles_sot_closure() -> None:
+    """🔴 定時炸彈：`_B45_HARNESS` 凍結一被解除／放寬，本測即紅。
+
+    為什麼要炸彈：`票 B-49`（roles SoT 無法表達編排端自任、`:769` fail-open 假綠）
+    **本 epic 內修不掉**——修它要動 `test_stamp_taskid_inject.py`，而該檔在
+    `_B45_HARNESS` 內，`20260809-govb1-x-consult-r1` 裁決 (C) 維持凍結。
+    若只寫進 HANDOFF／backlog，就是**靠記憶**，使用者 2026-08-02 已定死不准。
+
+    引信＝凍結本身。凍結仍在 ⇒ 本測通過（時候未到）；
+    凍結一解除／放寬 ⇒ 除非票 B-49 已 CLOSED，否則**紅**，pre-push 當場擋。
+
+    🔴 **字面關閉條件**（composer Q2 要求，缺一不可）：
+      ① `test_stamp_taskid_inject.py:769` 之 `pytest.skip` 改為 fail-closed
+      ② invalid mutation 轉紅 ＋ 三個合法 implementer 值通過 ＋ 該檔 `skipped=0`
+      ③ `eligible` 與測試內家族集合機械連動
+      ④ 票 B-49 之 `TICKET-STATUS` 改為 `CLOSED`
+    ⇒ 本測只機械驗 ④（前三項是 ④ 的前提，由該票之非實作者覆核把關）。
+
+    誠實邊界：兩家委員皆判此炸彈**只防意外與遺忘，不防蓄意**——
+    主委對本檔有寫入權，可連炸彈一併改掉。與任何 waiver 測試同型。
+    """
+    status = _b49_ticket_status()
+    assert status != "MISSING", (
+        f"票 {_B49_ID} 不在 {_B49_TICKET} ⇒ 炸彈失去標的（票被刪或改名？）"
+    )
+    if _b45_freeze_still_active():
+        assert status == "OPEN", (
+            f"凍結仍生效但票已 {status}——B-49 之修法須動 _B45_HARNESS，"
+            "不可能在凍結期間真正完成。請確認不是提早關票。"
+        )
+        return
+    assert status == "CLOSED", (
+        f"🔴 `_B45_HARNESS` 凍結已解除／放寬，但票 {_B49_ID} 仍為 {status}。\n"
+        "解凍是 B-49 唯一的施工窗口——現在不做就沒有下一個引信了。\n"
+        "關閉條件（缺一不可）：① :769 改 fail-closed ② mutation 轉紅 + skipped=0\n"
+        "③ eligible 與測試家族集合機械連動 ④ 本票 TICKET-STATUS 改 CLOSED"
+    )
+
+
+def test_b45_bomb_cannot_be_defused_by_skip() -> None:
+    """耦合：炸彈**不得**用 skip 拆除〔比照 `test_waiver_b5_active_when_b5_start_anchored`〕。
+
+    composer Q2：「否則只是延後爆炸、可被 skip 拆掉」。
+    本測直接讀炸彈函式原文，確認它沒有任何 `pytest.skip`／`return` 早退以外的
+    逃生路徑，且**引信與斷言都還在**。
+    """
+    src = (REPO / "tests" / "governance" / "test_govb1_contract_matrix.py").read_text(
+        encoding="utf-8"
+    )
+    m = re.search(
+        r"^def test_b45_unfreeze_requires_roles_sot_closure\(.*?(?=\n@|\ndef |\Z)",
+        src, re.S | re.M,
+    )
+    assert m, "炸彈函式不見了（被拆？）"
+    body = _strip_docstring_and_comments(m.group(0))
+    assert "pytest.skip" not in body, "🔴 炸彈被 skip 拆除（skip 是 fail-open）"
+    assert "_b45_freeze_still_active()" in body, "🔴 引信被拿掉（不再偵測解凍）"
+    assert 'status == "CLOSED"' in body, "🔴 解凍後的關票斷言被拿掉"
+
+
+def _strip_docstring_and_comments(fn_src: str) -> str:
+    """去掉函式的 docstring 與 `#` 註解，只留程式碼行（供「證明缺席」類斷言用）。"""
+    out, in_doc = [], False
+    for ln in fn_src.splitlines():
+        s = ln.strip()
+        if in_doc:
+            if s.endswith('"""') or s.endswith("'''"):
+                in_doc = False
+            continue
+        if s.startswith('"""') or s.startswith("'''"):
+            # 單行 docstring（開頭結尾同一行且長度>3）⇒ 不進入多行模式
+            if not (len(s) > 5 and (s.endswith('"""') or s.endswith("'''"))):
+                in_doc = True
+            continue
+        if s.startswith("#"):
+            continue
+        out.append(ln)
+    return "\n".join(out)
+
+
+def test_waiver_guards_never_parse_commit_message() -> None:
+    """🔴 窗守衛**不得**解析 commit 訊息 ⇒ OOE trailer 在此**無效**〔C1 裁決〕。
+
+    codex `CODEX-R1-P0-01` [BLOCKING]：G-7 的 scope 豁免與窗守衛的 oracle 凍結
+    目的不同。若用一行自宣告 trailer 統一兩者，同一 commit 就能同批改
+    **驗證治理機器的 oracle** 與**被驗的機器本身**，當輪綠燈即失去證據力。
+
+    本測釘住「不讀訊息」這個**不變式本身**——不是釘實作長相：
+    三個窗守衛函式內出現任何 commit-message 解析痕跡即紅。
+    這是「證明缺席」，源碼層是正確的 oracle（行為層無法窮舉證明不存在）。
+    """
+    src = (REPO / "tests" / "governance" / "test_govb1_contract_matrix.py").read_text(
+        encoding="utf-8"
+    )
+    for fn in _WAIVER_GUARD_FNS:
+        m = re.search(rf"^def {re.escape(fn)}\(.*?(?=\n@|\ndef |\Z)", src, re.S | re.M)
+        assert m, f"找不到窗守衛 {fn}（refactor?→須更新本測）"
+        # 🔴 只掃**程式碼行**：docstring 與註解本來就會寫「禁 --grep」之類的字樣，
+        #   連文件一起掃會把「說明不准用」誤判成「用了」（與 gov_check 那次同型）。
+        body = _strip_docstring_and_comments(m.group(0))
+        hits = [k for k in _MSG_PARSE_MARKERS if k in body]
+        assert not hits, (
+            f"{fn} 出現 commit 訊息解析痕跡 {hits}\n"
+            "🔴 窗守衛認 OOE trailer ＝ 主委可單方面解除三家蓋章之凍結"
+            "（20260808-GOVB1-B4-STAMP-R2）。要放寬須先取得新裁決。"
+        )
+        # 正向：仍以原始 path diff 為判準
+        assert "--name-only" in body and "_B45_HARNESS" in body, (
+            f"{fn} 已不再以原始 path diff 比對 _B45_HARNESS（保護真空？）"
+        )
+
+
+def test_ooe_comment_documents_three_independent_mechanisms() -> None:
+    """G-7 註解須說清三道機制各自獨立〔`CODEX-R1-P1-02`：舊文為誤導性文件〕。
+
+    舊文寫「五檔的真正守衛是 pre-push 全套 pytest（改壞即紅）」——**為假**：
+    `pre-push` → `gov_check.sh` 只對當前 checkout 跑 pytest，不比對凍結基準，
+    同批改 harness 與被測物即全綠。該錯誤前提正是主委當初把五檔排除
+    G-7 硬保護的**唯一理由**，也是 composer 主張放寬窗守衛的依據①。
+    """
+    src = _gate_src()
+    seg = src.split("out-of-epic 通道", 1)[1].split("_G7_OOE_HARD_PROTECTED=", 1)[0]
+    assert "不讀 trailer" in seg or "不解析 commit 訊息" in seg, (
+        "註解須明說窗守衛不讀 trailer（否則維護者會以為兩閘同語意）"
+    )
+    assert "不比對任何凍結基準" in seg or "≠ 來源不可變保證" in seg, (
+        "註解須明說 pre-push pytest 不是來源不可變保證"
+    )
+    assert "改壞即紅" not in seg or "為假" in seg, (
+        "🔴 註解仍宣稱「改壞即紅」而未標為假 ⇒ 誤導性文件回歸"
+    )
+
+
 def test_ooe_grandfather_set_is_frozen_and_closed() -> None:
     """grandfather 為**字面凍結封閉集**，恰 2 筆；shell 端漂移或增長即紅。
 
