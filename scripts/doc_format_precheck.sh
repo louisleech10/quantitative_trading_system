@@ -109,8 +109,56 @@ if [ -z "${kind}" ]; then
   esac
 fi
 
+# findings 檔：handoffs/ 下沒有 brief-kind:、但**含 canonical finding heading** 的 .md
+#
+# 〔GOVB1 Task 4.3 要點 3；B10 review-r2 必答 1，codex＋composer **兩家核准 (A)**〕
+# 病根（摩擦帳事件 18）：主委自己的 `**來源摘要**` 寫行號而非 12 位雜湊，4 個 P0/P1 全 FAIL。
+#   `票 B-31` 的自檢只進了**委員 prompt**，而主委產物**不流經 cx_run 派工路徑**
+#   ⇒ 本腳本原本對這類檔判不出型別、走下面那行**靜默 exit 0**。那個靜默放行就是機械根因。
+#
+# ⚠️ 順序：必須在「判不出型別即放行」**之前**（與收斂檔路由同一個坑，見上方註解）。
+#   `handoffs/reconcile/*` 已於上方分流（synth 走 verdict 檢查、sources/ 放行），不會落到這裡。
+if [ -z "${kind}" ]; then
+  case "${rel}" in
+    handoffs/*.md)
+      if LC_ALL=C grep -qE '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' "${target}" 2>/dev/null; then
+        kind="findings"
+      fi
+      ;;
+  esac
+fi
+
 # 判不出型別 → 不適用，放行
 [ -n "${kind}" ] || exit 0
+
+# findings：走**與委員交件完全同一支**檢查（cx_run.sh --selfcheck → completeness_check --single）。
+#
+# 家族名由**檔內第一條 canonical heading 的前綴**導出（封閉規則，非猜測）。
+#   🔴 誠實限制：家族名這樣導出後，`--family` 的 family-binding 檢查對本路徑**恆真**
+#   ——本路徑的價值不在 binding，而在空殼欄位／必填欄／sentinel 形態／重複 ID／
+#   **P0/P1 來源摘要須為 12 位雜湊**（`completeness_check.sh:263,352`）這些檢查，
+#   而事件 18 正是最後那一項。改用檔名後綴導出會對 `*-BACKLOG.md` 這種非家族後綴誤判，
+#   為了一個恆真的 binding 換來偽陽性，不划算。
+#
+# 誠實邊界（與檔頭第 1、2 點一致，不誇大）：PostToolUse 在寫入**之後**跑 ⇒ 早期警告非硬閘；
+#   經 Bash 重導寫出的檔不觸發。codex（`CODEX-R2-P1-01`）要求的 fail-closed 強制路徑**另立票**。
+if [ "${kind}" = "findings" ]; then
+  fam="$(LC_ALL=C grep -oE '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' "${target}" 2>/dev/null \
+    | head -1 | sed -E 's/^#+[[:space:]]+([A-Z]+)-R.*$/\1/' | tr '[:upper:]' '[:lower:]')"
+  # 導不出家族 ⇒ 放行（與本腳本「判不出即放行」一致，不亂擋）
+  [ -n "${fam}" ] || exit 0
+  sc_out="$(bash "${SCRIPT_DIR}/cx_run.sh" --selfcheck "${target}" --family "${fam}" 2>&1)"
+  sc_rc=$?
+  [ "${sc_rc}" -eq 0 ] && exit 0
+  {
+    echo "【文件格式產出端檢查未過】${rel}（判定型別：findings，家族=${fam}）"
+    echo "${sc_out}"
+    echo "---"
+    echo "這是**寫檔當下**的早期警告：檔案已寫入，續寫即可；"
+    echo "但**收斂/銷帳時會硬擋**，且與委員交件跑的是同一支檢查同一組參數，現在補可省一整輪。"
+  } >&2
+  exit 2
+fi
 
 # ⚠️ **不得再排除收斂檔**（2026-08-03 使用者定位「檢驗審查放在錯誤的地方」）。
 #
