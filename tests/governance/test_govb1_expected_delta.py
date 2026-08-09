@@ -165,19 +165,59 @@ def test_lifecycle_embed_gate_pass() -> None:
 
 
 def test_cx_run_only_embed_line_covariant() -> None:
-    """cx_run.sh 共變面：相對 HEAD 若有 diff，僅允許 _LIFECYCLE_EMBED_B64 行。"""
+    """cx_run.sh 共變面：**Task 1.3 的**改動僅允許 `_LIFECYCLE_EMBED_B64` 行。
+
+    🔴 斷言範圍已由「相對 HEAD 的全部 diff」收窄為「非 Task 4.3 授權範圍的 diff」
+    〔`20260810-GOVB1-B10-REVIEW-R1` 必答 1，codex＋composer 兩家裁 **(A)** 核准〕。
+
+    原因：`docs/GOVB1_INPUT_QUALITY_TODO.md` 的 **Task 4.3 修改檔案欄明文授權改
+    `scripts/cx_run.sh`**（改寫 `_run_format_check_if_needed()`、新增 `_emit_fixup_list()`），
+    與本測原本的「只准動 embed 行」**字面互斥**：不改測試 ⇒ 全套永紅；
+    不改 `cx_run.sh` ⇒ Task 4.3 無交付。
+
+    🔴 **收窄不等於放行**：本測仍擋住「非授權」的改動——
+    判準＝改動必須落在 Task 4.3 具名交付的函式內，或是 embed 行。
+    〔委員原話：「不得為綠而刪 Task 4.3 交付」〕
+    """
     proc = _run(["git", "diff", "HEAD", "--", str(CX_RUN.relative_to(REPO))])
     assert proc.returncode == 0
     diff = proc.stdout or ""
     if not diff.strip():
         return  # 已 commit 或無差
-    content_lines = [
-        ln
-        for ln in diff.splitlines()
-        if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---"))
-    ]
-    for ln in content_lines:
-        assert "_LIFECYCLE_EMBED_B64" in ln, f"cx_run 非 embed 行被改: {ln[:120]}"
+    # Task 4.3 具名授權的識別字（出自 TODO 修改檔案欄與其實作要點）
+    task43_markers = (
+        "_emit_fixup_list",
+        "_check_findings_destination",
+        "_run_format_check_if_needed",
+        "_dest_snap",
+        "preserve)",
+        "Task 4.3",
+        "B8 C5",
+        "B9 C5",
+    )
+    # 🔴 以 **hunk** 為判斷單位，不以「行」。授權函式**內部**的行本來就不帶識別字，
+    #   逐行判會把合法交付判成違規（主委實測撞到）。
+    hunks: list[list[str]] = []
+    for ln in diff.splitlines():
+        if ln.startswith("@@"):
+            hunks.append([])
+        elif hunks:
+            hunks[-1].append(ln)
+    for hunk in hunks:
+        changed = [
+            ln for ln in hunk
+            if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---"))
+        ]
+        if not changed:
+            continue
+        blob = "\n".join(hunk)  # 含 context 行，故授權函式名找得到
+        if "_LIFECYCLE_EMBED_B64" in blob:
+            continue
+        if any(m in blob for m in task43_markers):
+            continue
+        raise AssertionError(
+            "cx_run 有**非 Task 4.3 授權**的 hunk 被改:\n" + "\n".join(changed[:6])
+        )
 
 
 # ── gate --brief 掛點 ────────────────────────────────────────────────

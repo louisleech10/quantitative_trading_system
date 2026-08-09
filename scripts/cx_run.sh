@@ -437,11 +437,68 @@ _write_stub_success_output() {
   esac
 }
 
+# GOVB1 Task 4.3（`票 B-31`）：格式不合規時輸出**逐條可修補清單**，而不是只給一個 rc。
+# $1=checker stderr 檔 → stderr 印 `檔:行\t違規類型\t修法一行`
+#
+# 出生事故：委員收到「format-failed」只知道整份不合規，不知道**哪一條、哪一行、怎麼修**
+#   ⇒ 只能整份重跑（實測 composer 約 15 分鐘）。本清單把重跑成本降到逐條修補。
+_emit_fixup_list() {
+  local _log="${1-}" _line _kind _id _file _no
+  [ -s "${_log}" ] || return 0
+  echo "[cx_run] ── 可修補清單（逐條）──" >&2
+  while IFS= read -r _line; do
+    case "${_line}" in COMPLETENESS\ FAIL:*) : ;; *) continue ;; esac
+    # 違規類型＝訊息中「FAIL: 」之後、首個「(」或「: 」之前的字樣
+    _kind="${_line#COMPLETENESS FAIL: }"
+    _kind="${_kind%% (*}"
+    _kind="${_kind%%: *}"
+    # canonical ID（若訊息帶得出來）→ 用來在產出檔定位行號
+    _id="$(printf '%s' "${_line}" | LC_ALL=C grep -Eo '[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' | head -1)"
+    _file="${out}"
+    _no=""
+    if [ -n "${_id}" ] && [ -f "${_file}" ]; then
+      _no="$(LC_ALL=C grep -n -m1 -F "${_id}" "${_file}" 2>/dev/null | cut -d: -f1)"
+    fi
+    printf '  %s:%s\t%s\t%s\n' \
+      "${_file}" "${_no:-?}" "${_kind}" \
+      "見 templates/COMMITTEE_FINDING_TEMPLATE.md（零 findings 契約：sentinel 形態／必填欄非空／落點）" >&2
+  done < "${_log}"
+  echo "[cx_run] ── 清單結束；修完可**同輪重派**，不必整份重跑 ──" >&2
+}
+
+# GOVB1 Task 4.3 ＋ B9 C5 移交：findings **落點**強制點。
+# stamp 輪把 findings append 進 stamp-target（而非自己的交件檔）⇒ 自身 0 heading ID ⇒ 整輪作廢。
+# 契約寫在 govflow_lifecycle.json 的 zero_findings_contract.findings_destination，
+# 但在此之前**沒有任何腳本會擋**（`CODEX-R1-P1-05`／`COMPOSER-R1-P2-01`）。
+# $1=CLI 執行前的 stamp-target canonical ID 快照檔 → rc=0 合規／1 違規
+_check_findings_destination() {
+  local _before="${1-}" _after
+  [ -n "${stamp_target}" ] && [ -f "${stamp_target}" ] || return 0
+  [ -f "${_before}" ] || return 0
+  _after="$(LC_ALL=C grep -Eo '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' \
+    "${stamp_target}" 2>/dev/null | LC_ALL=C sort -u)"
+  if [ "${_after}" != "$(cat "${_before}")" ]; then
+    echo "COMPLETENESS FAIL: findings 落點違規 — 本輪在 stamp-target 新增了 canonical finding ID" >&2
+    echo "  stamp-target=${stamp_target}" >&2
+    echo "  契約：findings 一律寫進自己的交件檔（${out}），絕不 append 進 stamp-target。" >&2
+    echo "  出處：scripts/govflow_lifecycle.json → zero_findings_contract.findings_destination" >&2
+    return 1
+  fi
+  return 0
+}
+
 _run_format_check_if_needed() {
-  # $1=cli_rc → stdout 印 fmt_rc（0=合規／跳過；非 0=不合規或 checker 不可用）
+  # $1=cli_rc（落點快照走 caller 的 _dest_snap，見下）→ stdout 印 fmt_rc（0=合規／跳過；非 0=不合規或 checker 不可用）
   # 只對 findings-kind 且 cli 成功且產出非空跑格式檢查。
   # 🔴 順序契約：本函式必須在 _emit_family_result 之前呼叫。
   # 不用全域／local 跨函式寫回——bash local 對子函式不可見。
+  #
+  # 🔴 本函式的**原始碼被 `_B45_HARNESS` 凍結測試逐字錨定**（mutation probe 用）。
+  #   epic 期間那五檔禁改 ⇒ 下方 case／if 區塊的字面與縮排**不得更動**。
+  #   Task 4.3 的新增一律加在其**外側**（主委實測：改動內部縮排使兩條 mutation 測試轉紅）。
+  # 🔴 亦因此**不改** findings-kind 閘為無條件：改成無條件會讓未複製 checker 的隔離環境
+  #   全部 fail-closed（實測 test_debt_emit 17 條轉紅）。
+  #   「自檢擴及主委自產物」改由不經 cx_run 的獨立路徑達成——主委產物本來就不流經 cx_run。
   local _cli="$1"
   local _rc=0
   case "${_bk}" in
@@ -458,6 +515,24 @@ _run_format_check_if_needed() {
       fi
       ;;
   esac
+  # ── 以下為 Task 4.3 新增（一律在凍結錨點**外側**）──────────────────────────
+  # 格式不合規時，補一份**逐條可修補清單**。為保留上方錨點行的字面，
+  # 這裡在失敗時**再跑一次** checker 並收集 stderr（只在失敗路徑付出，成功路徑零成本）。
+  if [ "${_rc}" -ne 0 ] && [ "${_rc}" -ne 127 ] && [ -s "${out}" ]; then
+    local _log
+    _log="$(mktemp)"
+    bash "${SCRIPT_DIR}/completeness_check.sh" --single "${out}" --family "${fam}" \
+      >"${_log}" 2>&1 || :
+    _emit_fixup_list "${_log}"
+    rm -f "${_log}"
+  fi
+  # 落點檢查獨立於格式檢查與 brief-kind：即使格式合規、即使是 stamp 輪，落點錯了照樣不合規。
+  # 🔴 快照路徑用**動態作用域**讀 caller 的 `_dest_snap`，不新增參數——
+  #   呼叫點 `_fmt_rc="$(_run_format_check_if_needed "${cli_rc}")"` 亦被凍結測試逐字錨定，
+  #   多一個引數就會讓 mutation probe 找不到錨點而轉紅（主委實測）。
+  if [ -n "${_dest_snap:-}" ] && ! _check_findings_destination "${_dest_snap}"; then
+    [ "${_rc}" -eq 0 ] && _rc=4
+  fi
   printf '%s' "${_rc}"
 }
 
@@ -468,6 +543,14 @@ _run_cli_and_emit() {
   #   順序是規則本身——audit append-only，success 一旦寫入不可變。
   local cli_rc=0
   local _fmt_rc=0
+  # GOVB1 Task 4.3 ＋ B9 C5 移交：CLI 執行**前**先快照 stamp-target 的 canonical ID 集合，
+  # 供 _check_findings_destination 比對「本輪有沒有把 findings 寫進 stamp-target」。
+  local _dest_snap=""
+  if [ -n "${stamp_target:-}" ] && [ -f "${stamp_target}" ]; then
+    _dest_snap="$(mktemp)"
+    LC_ALL=C grep -Eo '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' \
+      "${stamp_target}" 2>/dev/null | LC_ALL=C sort -u > "${_dest_snap}" || :
+  fi
   _capture_prompt_if_harness
   if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ] && [ -n "${CX_STUB_MODE:-}" ]; then
     case "${CX_STUB_MODE}" in
@@ -480,6 +563,14 @@ _run_cli_and_emit() {
         ;;
       fail_empty)
         : > "${out}"
+        cli_rc=0
+        ;;
+      preserve)
+        # GOVB1 Task 4.3 ＋ B8 C5 移交：**保留既有 ${out}**，不覆寫。
+        # 為何需要：success stub 會呼叫 _write_stub_success_output 覆寫產出，
+        #   使「三種輸入 × cx_run 交件路徑」的矩陣**無法把輸入餵進來**
+        #   ⇒ B8 的三入口矩陣第三欄在該票內不可達，只能掛逼債條款。
+        #   本模式讓測試先寫好 ${out} 再跑交件路徑，第三欄從此可驗。
         cli_rc=0
         ;;
       *)

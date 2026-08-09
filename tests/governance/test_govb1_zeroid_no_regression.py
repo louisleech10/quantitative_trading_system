@@ -4,11 +4,9 @@
 
 > 禁止任何使 `C-2` 表中 8 列之 `rc` 由 `0` 變為非 `0` 的改動，**不論實作於哪一層**。
 
-🔴 **本檔目前只閉合到兩欄，第三欄具名阻塞——不做假綠。**
-第三欄（`cx_run` 交件路徑）在 Task 4.1 的檔案限制下**做不到**，成因與裁決請求見
-`docs/GOV_B8_SCOPE_AMENDMENT.md` §4。本檔以 `test_cxrun_column_is_blocked_not_passing`
-把該阻塞釘成**可見的斷言**：阻塞成因一旦消失（`cx_run.sh` 具備保留既有輸出的 stub 模式），
-那條測試就會紅，逼下一手把第三欄補上，而不是讓它靜靜地不存在。
+本檔閉合 `--single` 與 `--lock` 兩欄。**第三欄（`cx_run` 交件路徑）已移交 B10**
+並在該票完成——移交過程即逼債條款的完整生命週期，見下方註解與
+`tests/governance/test_govb1_b31_recovery.py`。
 """
 from __future__ import annotations
 
@@ -236,27 +234,12 @@ def test_lock_column_discriminates_between_inputs() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_cxrun_column_is_blocked_not_passing() -> None:
-    """🔴 第三欄做不到的**成因**，釘成可見斷言。
-
-    SPEC 要求對三種輸入各驗 `cx_run` 交件路徑的 `result_state`。
-    但 `CX_STUB_MODE=success` 會呼叫 `_write_stub_success_output` **覆寫** `${out}`
-    ⇒ 三種輸入根本傳不進交件路徑；而 `cx_run.sh` 在 Task 4.1 的檔案欄是
-    **只讀（本 Task 不改）**，故無法新增「保留既有輸出」的 stub 模式。
-
-    ⇒ 這一欄在本票的檔案限制下**不可達**，不是「忘了寫」。
-
-    🔴 本測是**逼債條款**：一旦 `cx_run.sh` 具備保留既有輸出的 stub 模式
-    （B10 的 `format-failed` 補救層很可能會加），本測即紅，
-    逼下一手把第三欄真正補上，而不是讓缺口靜靜消失。
-    """
-    text = CX_RUN.read_text(encoding="utf-8", errors="replace")
-    assert "_write_stub_success_output" in text, "stub 覆寫函式已改名 ⇒ 本阻塞成因須重新確認"
-    preserving_modes = [m for m in ("preserve", "keep_output", "as_is") if m in text]
-    assert not preserving_modes, (
-        f"cx_run 已具備保留既有輸出的 stub 模式 {preserving_modes} ⇒ "
-        "第三欄的阻塞成因消失，請立即補上三輸入 × result_state 矩陣"
-    )
+# 🔴 B8 的逼債條款 `test_cxrun_column_is_blocked_not_passing` 已於 **B10（Task 4.3）退場**。
+#   當時 `cx_run.sh` 在 Task 4.1 是唯讀，`CX_STUB_MODE=success` 又會覆寫 `${out}`
+#   ⇒ 三入口矩陣第三欄在該票內**不可達**，只能掛一條「阻塞成因一消失就變紅」的逼債條款。
+#   B10 得以改 `cx_run.sh` 後新增 `preserve` stub 模式 ⇒ 阻塞成因消失、該測轉紅、任務移交完成。
+#   第三欄現由 `tests/governance/test_govb1_b31_recovery.py` 承接。
+#   ⇒ **逼債條款的完整生命週期在此收束**：掛上 → 阻塞成因消失 → 轉紅 → 逼下一手接手 → 退場。
 
 
 # ---------------------------------------------------------------------------
