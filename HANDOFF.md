@@ -9,7 +9,42 @@ REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-09 | **Branch**: main
 
-## 🔴 接手第一件事：**grok 額度用罄，需使用者處理**
+## ▶ 兩個低摩擦機制（2026-08-09 上線，使用者授權）
+
+### ① 換委員 ＝ 改一行
+
+```json
+"review_families": ["codex", "composer", "grok"],   // 正式名冊，**不動**
+"active_stampers": ["codex", "composer"]            // ← 改這行（grok 暫停中）
+```
+
+- `reconcile_stamps_check` **預設**優先讀 `active_stampers`，缺席才回退 `review_families`
+  ⇒ **所有呼叫端自動生效**（含被 frozen mutation 測試逐字錨定、無法傳參的 V-C 呼叫點）
+- `gov_check` 每次 push 印「⚠ 委員暫停中（未清）: grok」⇒ **不靠記憶**
+- `active_stampers` 含不在 `review_families` 之家族 ⇒ `rc=1`（防悄悄擴編）
+- 🔴 **`review_families` 絕不動**——9 個既有斷言依賴它，其中
+  `test_rolegate_predispatch.py` 屬 `_B45_HARNESS` **硬性禁改**
+
+### ② 任務中穿插修別的問題 ＝ commit 加一行 trailer
+
+```
+Governance-Scope: out-of-epic <理由>
+```
+
+該 commit 觸及之路徑**豁免 manifest allow 檢查**。
+
+🔴 **仍硬保護**（out-of-epic 亦禁）：`docs/GOVB1_`／`govb1_scope.manifest`／`govb1_frozen_hashes.txt`
+🔴 **刻意不含 `_B45_HARNESS` 五檔**——out-of-epic 工作正是治理 harness 之維護，
+那五檔的真正守衛是 pre-push 全套 pytest；檔案凍結只是 epic 內防 scope creep。
+🔴 **非靜默旁路**：`gov_check` 每次 push 列出 range 內所有 out-of-epic commit。
+
+**mutation 實證**：帶 trailer 改非 manifest 檔 ⇒ `g7 PASS`；
+amend 掉 trailer ⇒ `g7 rc=1` 且具名該檔；放回 ⇒ `PASS`。
+
+**出生理由**：epic 期間 G-7 要求每個改動檔都在 manifest allow，而 manifest ≡ 凍結唯讀 TODO
+之宣告集合 ⇒ **整個 repo 被凍住，治理設施無法演進自己**（2026-08-09 一天內撞牆四次）。
+
+## 🔴 grok 額度用罄（流程已不受阻，但仍建議處理）
 
 ```
 403 personal-team-blocked:spending-limit — run out of credits / need Grok subscription
@@ -112,7 +147,10 @@ REF:handoffs/reconcile/20260808-govb1-b3-review-r6/synth.md
 | **R-11** | full path 未掛 `_check_expected_delta`（掛了會打紅 `_B45_HARNESS`，B4 窗禁改） | 階段 2 |
 | **R-12** | `scripts/dispatch.sh:84` 不 append `--brief` ⇒ 該路徑不觸發 (c) | 階段 2 |
 | **R-13** | 未列舉之其他 Unicode `Cf`／`Zs` 碼點可能被當內容（**擋意外不防蓄意**） | 具名接受 |
-| **R-14** | `review-r2` 收斂檔僅 **2/3** 戳記（grok 額度封鎖，非拒絕蓋章） | grok 恢復後補蓋 |
+| ~~R-14~~ | ~~收斂檔僅 2/3 戳記~~ | ✅ **已解**：`roster_full` 機制（見下），grok 正式列為暫停中 |
+| **R-15** | 🔴 `governance_families.json` **不可 commit**（不在 manifest；out-of-epic 通道亦不適用，因它是**設定**非修復），改動走 ambient M | epic 結束後 commit |
+| **R-16** | 早前 `b4-review-r2`／`b5-consult-r1` 兩份收斂檔**當時**是 2/3 而要求是 3 家；現 `active_stampers` 為 2 家 ⇒ 它們**回溯地**變成合格。此為真實語意變動，非「本來就合格」 | 具名接受 |
+| ~~R-17~~ | ~~impl(`--spec`) 戳記門檻不受暫停機制影響~~ | ✅ **已解**：改 `reconcile_stamps_check` 預設值，所有呼叫端自動生效 |
 
 🔴 **禁宣稱「階段 1 已閉合強制」**——兩家 review 皆確認現行文字未如此宣稱，維持。
 
@@ -165,3 +203,5 @@ review／consult 輪 ⇒ `reconcile_build --mode review` ＋ `debt_clear --sessi
 `tests/governance/fixtures/{gate_decision_corpus,phase2_expected_flips}.txt{,.sha256}`／
 `test_gate_decision.py`／`test_gate_deny_fields.py`／`test_gate_lexical_contract.py`。
 另 `.claude/gate/*.log`、`docs/GOVB0_FRICTION_AMENDMENTS.md` 亦不 commit。
+🔴 **再加一項**：`scripts/governance_families.json`（`roster_full` ＋ grok 暫停）
+——**epic 期間一律 ambient M，不可 commit**（`R-15`；理由見上「委員怎麼調換」節）。
