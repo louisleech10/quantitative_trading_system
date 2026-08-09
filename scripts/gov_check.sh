@@ -24,6 +24,43 @@ esac
 
 rc_all=0
 
+# ---------------------------------------------------------------------------
+# 0) 委員暫停狀態提醒（**不擋 push**，只確保不被遺忘）
+#
+# 出生理由（2026-08-09）：grok 額度用罄（403 spending-limit）。當時要讓流程不卡住，
+# 唯一辦法是把 grok 從 review_families 刪掉——但那會把「它是正式委員」這件事
+# 一起刪掉，恢復時只能靠人記得加回來，正是使用者定死的「不准靠紀律和記憶」。
+#
+# 解法：roster_full（正式名冊，不因故障變動） vs review_families（本期實際要求蓋章者）。
+# 暫停某家 ⇒ 只改 review_families 一行；差集就是可稽核的「暫停中」紀錄，每次 push 印出。
+# 🔴 刻意**不擋 push**：會擋就等於沒解決「不卡住流程」這個原始需求。
+# ---------------------------------------------------------------------------
+_fam_json="scripts/governance_families.json"
+# 🔴 `roster_full` 缺席 ⇒ 整段跳過（**不得**因此讓 push 失敗）。
+#    否則乾淨 clone／尚未導入 roster_full 的環境會把每一家都算成「多出家族」而擋死 push。
+_has_roster=0
+if [ -f "${_fam_json}" ] && command -v jq >/dev/null 2>&1; then
+  jq -e 'has("roster_full")' "${_fam_json}" >/dev/null 2>&1 && _has_roster=1
+fi
+if [ "${_has_roster}" -eq 1 ]; then
+  _suspended="$(jq -r '
+      (.roster_full // []) - (.review_families // []) | .[]
+    ' "${_fam_json}" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')"
+  _extra="$(jq -r '
+      (.review_families // []) - (.roster_full // []) | .[]
+    ' "${_fam_json}" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')"
+  if [ -n "${_suspended}" ]; then
+    echo "[gov_check] ⚠ 委員暫停中（未清）: ${_suspended}"
+    echo "            正式名冊 roster_full 仍含該家；恢復後請加回 review_families。"
+    echo "            出處: ${_fam_json} 之 _roster_vs_active"
+  fi
+  if [ -n "${_extra}" ]; then
+    echo "[gov_check] ✗ review_families 含不在 roster_full 之家族: ${_extra}"
+    echo "            新增正式委員須同時進 roster_full（fail-closed，防悄悄擴編）"
+    rc_all=1
+  fi
+fi
+
 # --- 1) shell 語法 ---
 echo "[gov_check] 1/3 shell 語法 (bash -n)…"
 _bad=0
