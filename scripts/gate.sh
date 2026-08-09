@@ -586,7 +586,13 @@ if [ "${kind}" = "dispatch" ]; then
         # reconcile 非空且非 waived：completeness 已由通則跑過；此處只補 stamp
         export VERIFY_GATE_COMMITTEE_AUDIT_LOG="${AUDIT}"   # M1/R2：stamp provenance 讀正確 audit log
         _stamp_bin="${RECONCILE_STAMPS_CHECK_OVERRIDE:-${SCRIPT_DIR}/reconcile_stamps_check.sh}"
-        bash "${_stamp_bin}" "${reconcile}" "$(_stamp_families)" \
+        # 🔴 下列呼叫**逐字凍結、不得加參數**：
+        #   tests/governance/test_waived_adversarial_still_stamps.py
+        #   ::test_mutation_waived_adv_skips_stamp_breaks_guard 以**原始碼 regex**
+        #   錨定此三行（含 `"${reconcile}"` 之後直接換行）。該檔不在 manifest allow ⇒ 改不了。
+        #   ⇒ 本呼叫點**無法**傳 active_stampers，仍要求 review_families 全員。
+        #   具名殘留 R-17：impl 派工（--spec）之戳記門檻不受委員暫停機制影響。
+        bash "${_stamp_bin}" "${reconcile}" \
           || { echo "ERROR: impl reconcile 未獲委員核可。委員須 append RECONCILE-STAMP APPROVED。"; exit 1; }
         ;;
     esac
