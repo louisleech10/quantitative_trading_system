@@ -41,10 +41,28 @@ if [ -z "${required}" ]; then
   #   test_rolegate_predispatch.py 屬 _B45_HARNESS 禁改）。
   #   ⇒ **暫停/調換委員 = 改 governance_families.json 的 active_stampers 一行。**
   #   缺 active_stampers ⇒ 行為與本次改動前逐字相同（乾淨 clone / CI 安全）。
-  required="$(families_get active_stampers 2>/dev/null)" || required=""
-  if [ -z "${required}" ]; then
-    required="$(families_get review_families)" || { echo "RECONCILE-STAMP FAIL: 家族 SoT 讀取失敗(fail-closed)"; exit 1; }
-  fi
+  #
+  # 🔴 R-19 fail-closed（`CODEX-R1-P1-03`，2026-08-09 修）：
+  #   原實作 `families_get active_stampers || required=""` **把三種情況併成一種**——
+  #   「缺 key」「空 list」「含未知家族名」全部落到同一個回退分支。後果：
+  #     · `active_stampers: []` → 被當缺席而**靜默回退全員**（使用者以為停了全部）
+  #     · `active_stampers: ["codexx"]`（打錯字）→ 被接受為 required，永遠等不到該家戳記
+  #   這一行是**使用者手改的**，打錯是預期失敗模式。故改用三態 getter：
+  #     rc=0 合法 → 用之；rc=3 缺 key → 回退 review_families；rc≠0/3 → **拒，不回退**。
+  #
+  # 🔴 具名殘留（R-19 表第三列，本輪不修）：角色閘／quorum 閘（review_quorum_check.sh）
+  #   仍只讀 `review_families`，與此處的 stamp 決策脫節。目前無害，因為
+  #   `active_stampers ⊆ review_families` 已被上面的 getter 強制；但若日後允許
+  #   active 超出正式名冊，兩閘會各說各話。**擴編前必須先統一這兩個消費者。**
+  required="$(families_active_stampers)"; _as_rc=$?
+  case "${_as_rc}" in
+    0) : ;;
+    3) required="$(families_get review_families)" \
+         || { echo "RECONCILE-STAMP FAIL: 家族 SoT 讀取失敗(fail-closed)"; exit 1; } ;;
+    *) echo "RECONCILE-STAMP FAIL: active_stampers 不合法 ⇒ 拒發（fail-closed；原因見上方 stderr）";
+       echo "  → 修 scripts/governance_families.json 的 active_stampers；要停用本機制請刪掉該 key。";
+       exit 1 ;;
+  esac
 fi
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_PY="${REPO_ROOT}/venv/bin/python"

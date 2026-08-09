@@ -12,6 +12,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO / "scripts"
 SOT = SCRIPTS / "governance_families.json"
@@ -63,6 +65,12 @@ def test_stamp_default_no_silent_drop(tmp_path: Path) -> None:
     🔴 **原意圖逐字保留**：2026-07-23 事故＝預設寫死 `codex,composer` 使 `grok`
     **永不被機檢要求**。本測改為「預設 ≡ SoT 宣告」——名冊換誰都擋得住靜默少要求，
     而不是只擋 grok 這一個名字。
+
+    🔴 **本測不具 mutation 偵測力，勿單獨倚賴**（R-20 / `CODEX-R1-P1-04`）：
+    expected 取自**同一份現行 SoT**，故把預設改成硬編現行名單時本測**仍會綠**
+    （codex 實跑證實）。真正把「預設有沒有被寫死」釘住的是下方
+    `test_stamp_default_reads_sot_not_hardcoded`（隔離 fixture 用**另一個**合法子集）。
+    本測留著只補一件事：對**真實 SoT** 驗「蓋不齊即 FAIL 且點名缺席者」。
     """
     fams = json.loads(SOT.read_text(encoding="utf-8"))
     expected = fams.get("active_stampers") or fams["review_families"]
@@ -80,6 +88,125 @@ def test_stamp_default_no_silent_drop(tmp_path: Path) -> None:
     assert p.returncode != 0, f"缺 {missing} 之戳記竟通過（靜默少要求）\n{p.stdout}{p.stderr}"
     assert missing in (p.stdout + p.stderr), (
         f"FAIL 訊息未點名缺席家族 {missing}\n{p.stdout}{p.stderr}"
+    )
+
+
+# ---- active_stampers：隔離 fixture(R-19 / R-20) ----
+# 為何要隔離：直接改真 SoT 再還原會與並行 pytest 互相污染（CLAUDE.md Gotchas 已記載
+# 「不得並行跑兩份會就地 mutate 檔案再還原的 pytest」）。故複製腳本到 tmp，
+# 讓 `SCRIPT_DIR` 指向 tmp，SoT 也在 tmp——真 SoT 全程唯讀。
+_STAMP_ENV_SCRIPTS = (
+    "reconcile_stamps_check.sh",
+    "governance_families.sh",
+    "reconcile_body_hash.sh",
+)
+
+
+def _isolated_stamp_env(tmp_path: Path, sot: dict) -> tuple[Path, Path]:
+    """複製 stamp 檢查鏈到 tmp + 指定 SoT 內容。回 (腳本路徑, 空戳記之 reconcile 檔)。"""
+    s = tmp_path / "scripts"
+    s.mkdir(exist_ok=True)
+    for f in _STAMP_ENV_SCRIPTS:
+        (s / f).write_text((SCRIPTS / f).read_text(encoding="utf-8"), encoding="utf-8")
+    (s / "governance_families.json").write_text(
+        json.dumps(sot, ensure_ascii=False), encoding="utf-8"
+    )
+    r = tmp_path / "r.md"  # 檔名刻意不含任何家族名（否則污染「未被點名」斷言）
+    r.write_text("body\n## 戳記\n", encoding="utf-8")
+    return s / "reconcile_stamps_check.sh", r
+
+
+def _named_families(out: str) -> set[str]:
+    """從 FAIL 訊息抽出被點名『缺戳記』的家族集合（行首 '  · <family>: ...'）。"""
+    return {
+        ln.split("·", 1)[1].split(":", 1)[0].strip()
+        for ln in out.splitlines()
+        if "·" in ln
+    }
+
+
+def _base_sot() -> dict:
+    real = json.loads(SOT.read_text(encoding="utf-8"))
+    return {"families": real["families"], "review_families": real["review_families"]}
+
+
+# fixture 用「另一個合法子集」——刻意**不含 codex**，才能抓出硬編現行名單。
+_R20_FIXTURE_ACTIVE = ["composer", "grok"]
+
+
+def test_stamp_default_reads_sot_not_hardcoded(tmp_path: Path) -> None:
+    """🔴 mutation 可證偽：把預設改成硬編現行名單 ⇒ 本測**必紅**。
+
+    R-20（`CODEX-R1-P1-04`）：上面那個 `test_stamp_default_no_silent_drop` 從
+    **同一份現行 SoT** 取 expected，故 codex 實跑把
+    `reconcile_stamps_check.sh` 的預設改成硬編 `required="codex,composer"` 後，
+    該測**仍 1 passed**——主委為了「換委員不用改測試」把斷言改成與名冊無關，
+    結果連「有沒有被寫死」都測不出來。**低摩擦與保護力沒有同時拿到。**
+
+    修法＝隔離 fixture 給**另一個**合法子集 `composer,grok`（不含 codex），
+    再斷言被要求的家族集合**恰等於**它。硬編 `codex,composer` 會同時
+    ①少了 grok ②多了 codex ⇒ 集合相等當場失敗。
+    """
+    real = json.loads(SOT.read_text(encoding="utf-8"))
+    assert set(_R20_FIXTURE_ACTIVE) <= set(real["review_families"]), "fixture 子集須合法"
+    current = set(real.get("active_stampers") or real["review_families"])
+    assert set(_R20_FIXTURE_ACTIVE) != current, (
+        f"fixture 子集與現行 SoT 相同({current}) ⇒ 本測失去 mutation 偵測力，須換一個子集"
+    )
+
+    sot = _base_sot() | {"active_stampers": _R20_FIXTURE_ACTIVE}
+    script, r = _isolated_stamp_env(tmp_path, sot)
+    p = _bash(f"bash {script} {r}")
+    out = p.stdout + p.stderr
+    assert p.returncode != 0, f"零戳記竟通過\n{out}"
+    assert _named_families(out) == set(_R20_FIXTURE_ACTIVE), (
+        f"被要求的家族 != SoT active_stampers（預設被寫死或未讀 SoT）\n{out}"
+    )
+
+
+def test_active_stampers_missing_key_falls_back_to_review_families(tmp_path: Path) -> None:
+    """R-19：**缺 key**（非空值）才回退正式名冊——乾淨 clone／CI 行為須逐字不變。"""
+    script, r = _isolated_stamp_env(tmp_path, _base_sot())
+    p = _bash(f"bash {script} {r}")
+    out = p.stdout + p.stderr
+    assert p.returncode != 0
+    assert _named_families(out) == set(_base_sot()["review_families"]), out
+
+
+@pytest.mark.parametrize(
+    "label,active",
+    [
+        ("空 list", []),
+        ("打錯字", ["codexx"]),
+        ("重複", ["codex", "codex"]),
+        ("非 list", "codex"),
+        ("含空字串", ["codex", "  "]),
+        ("非字串元素", ["codex", 3]),
+        ("未進正式名冊即擴編", ["codex", "claude"]),
+    ],
+)
+def test_active_stampers_invalid_is_failclosed(tmp_path: Path, label: str, active: object) -> None:
+    """R-19（`CODEX-R1-P1-03`）：`active_stampers` 不合法 ⇒ **拒，不得靜默回退全員**。
+
+    原實作 `families_get active_stampers || required=""` 把「缺 key」「空 list」
+    「未知家族」併成同一個回退分支：`[]` 被當缺席（使用者以為停了全部，實際要求全員）、
+    `["codexx"]` 被當成合法 required（永遠等不到戳記而卡死）。
+    這一行是**使用者手改的**，打錯是預期失敗模式而非邊緣案例。
+
+    mutation 反例：把 `reconcile_stamps_check.sh` 的三態 `case` 改回
+    「非零一律回退 review_families」⇒ 下列各例會變成「要求全員」的一般 FAIL，
+    訊息不再含 `fail-closed`，本測轉紅。
+    """
+    script, r = _isolated_stamp_env(tmp_path, _base_sot() | {"active_stampers": active})
+    p = _bash(f"bash {script} {r}")
+    out = p.stdout + p.stderr
+    assert p.returncode != 0, f"{label}: 竟放行\n{out}"
+    # 🔴 下面兩條**不可只留上面那條**：mutation B 實跑證實 `"fail-closed" in out`
+    #   會被 getter 自己寫到 stderr 的同一字串騙過（rc≠0 仍回退全員時，訊息裡照樣有它）。
+    #   真正承重的是「**沒有**進入逐家族檢查」——回退分支必然點名家族，拒發分支必然不點名。
+    assert "fail-closed" in out, f"{label}: 訊息未說明 fail-closed\n{out}"
+    assert not _named_families(out), (
+        f"{label}: 竟仍進入逐家族檢查（表示走了回退分支，非拒發）\n{out}"
     )
 
 
@@ -113,8 +240,6 @@ def test_gate_family_derivation_labels_grok(tmp_path: Path) -> None:
 
 
 # ---- 防漂移:所有寫死家族清單的消費者 == SoT(委員 B;取代脆弱 regex group 抽取,委員 RC-6) ----
-import pytest  # noqa: E402
-
 _UNIVERSE = {"codex", "composer", "grok", "claude", "agy", "cursor-agent"}
 
 
