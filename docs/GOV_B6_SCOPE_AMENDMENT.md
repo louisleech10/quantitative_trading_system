@@ -73,6 +73,29 @@ RULE: 凍結文件不就地改；修訂走延伸檔（使用者 2026-08-01 定�
 | 把 target 改指某個已在 allow 內的檔 | 違反 F2；漂移事故發生在該宿主檔，換靶＝不治病 |
 | 放寬 `--check`：宿主檔缺標記時回 0 | 違反 F4，且正是「缺標記＝沒保護」那個 fail-open |
 
+## 4b. 第二項偏離：Task 2.2 兩條 ASSERT 的**驗證機制**（非其意圖）
+
+TODO Task 2.2 驗證欄兩條 ASSERT 以 `GOVB1_FACTKEY_ROOT=<fixture>` 傳入檢查根：
+
+```
+ASSERT bash scripts/gov_check.sh --no-probe WHEN GOVB1_FACTKEY_ROOT=...factkey_drifted THEN rc!=0
+ASSERT bash scripts/gov_check.sh --no-probe WHEN GOVB1_FACTKEY_ROOT=...factkey_clean  THEN rc=0
+```
+
+🔴 **codex 實證此設計本身是 fail-open**〔`CODEX-R1-P1-01`〕：強制層若照收該 env，
+shell 裡殘留一行 `export GOVB1_FACTKEY_ROOT=<乾淨 fixture>`，
+**push 前檢查就會靜默改看 fixture、放行真實宿主檔的漂移**。這是意外可達的路徑，
+不是蓄意繞過，故落在本 epic 的威脅模型內。
+
+**處置**：`_gov_check_factkey` 以 `env -u GOVB1_FACTKEY_ROOT` 呼叫生成器
+（強制點自己決定檢查對象，不接受呼叫端指定）；正反對照改為**把 fixture 宿主檔
+安裝到 tmp repo 的真實路徑**。⇒ 兩條 ASSERT 的**意圖**（clean⇒rc=0、drifted⇒rc≠0）
+逐字保留並有測試釘住，**機制**改變。
+
+**未違反任何機檢**：凍結 TODO 內行首 `ASSERT` 命中數為 **0**
+（`grep -c '^ASSERT ' docs/GOVB1_INPUT_QUALITY_TODO.md` → 0；B5 錨定後之既有事實），
+故那兩行是文件而非被執行的判準。
+
 ## 5. 本修訂**不**主張的事
 
 - 不主張 SPEC/TODO 其餘任何條文變更。
@@ -90,9 +113,16 @@ RULE: 凍結文件不就地改；修訂走延伸檔（使用者 2026-08-01 定�
    不拆成兩個 commit 就得讓一個 commit 同時帶 epic 內外路徑並掛 out-of-epic 標籤，
    那會讓稽核清單更失真——兩害相權取其輕，具名於此。
 
-## 7. 委員裁決欄（請兩家各填一列）
+## 7. 委員裁決（`20260809-GOVB1-B6-REVIEW-R1`，兩家一致）
 
-| 家族 | 裁決 | 理由／要求之替代作法 |
+STATUS 更新：**PROPOSED → RULED (A) 同意 out-of-epic**
+
+| 家族 | 裁決 | 理由（逐字節錄自交件） |
 |---|---|---|
-| codex | | |
-| composer | | |
+| codex | **(A)** | 「SPEC/TODO 的 frozen read-only 與 manifest gate 使原 host route 機械上不可行，接受 `11ea47a` 的明示 OOE host block + amendment；此決策**不把原 scope 矛盾視為消失**。」 |
+| composer | **(A)** | 「F9 機械關閉 manifest 路線；凍結 SPEC/TODO 禁就地改宣告；F10 顯示該檔不在硬保護集。**語意 laundering 疑慮成立**，但第三條可執行路（不違 F5、不違凍結、不 fail-open）不存在；`gov_check` 0b 每次 push 列 out-of-epic ⇒ 稽核門可見，優於靜默 manifest 假宣告。」 |
+
+🔴 主委之語意保留意見（§4）**不撤回**：兩家都承認 laundering 疑慮成立，
+只是判定沒有更好的可執行路。此處記錄為「已知代價」，非「已解決」。
+
+收斂檔：`handoffs/reconcile/20260809-govb1-b6-review-r1/synth.md`
