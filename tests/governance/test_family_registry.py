@@ -53,16 +53,34 @@ def test_gate_check_gates_grok() -> None:
     assert p.returncode == 2
 
 
-def test_stamp_default_requires_grok(tmp_path: Path) -> None:
-    """不傳 roster → 預設含 grok;只有兩家戳記 → FAIL 缺 grok。"""
+def test_stamp_default_no_silent_drop(tmp_path: Path) -> None:
+    """不傳 roster → 預設須等於 **SoT 宣告之家族集合**，且缺任一家即 FAIL。
+
+    原名 `test_stamp_default_requires_grok`，把 `grok` 寫死在斷言裡。
+    2026-08-09 委員暫停機制上線後（`active_stampers` 優先、缺席回退 `review_families`），
+    名冊會**每週因模型能力／額度而加減**，寫死家族名等於每次換委員都紅。
+
+    🔴 **原意圖逐字保留**：2026-07-23 事故＝預設寫死 `codex,composer` 使 `grok`
+    **永不被機檢要求**。本測改為「預設 ≡ SoT 宣告」——名冊換誰都擋得住靜默少要求，
+    而不是只擋 grok 這一個名字。
+    """
+    fams = json.loads(SOT.read_text(encoding="utf-8"))
+    expected = fams.get("active_stampers") or fams["review_families"]
+    assert len(expected) >= 2, f"SoT 宣告之蓋章家族少於 2 家: {expected}"
+
+    # 蓋齊「除最後一家以外」的所有家族 ⇒ 必 FAIL，且訊息須點名缺席那家
+    stamped, missing = expected[:-1], expected[-1]
     f = tmp_path / "r.md"
     f.write_text("body\n## 戳記\n", encoding="utf-8")
     h = _bash(f"bash scripts/reconcile_body_hash.sh {f}").stdout.strip()
     with f.open("a", encoding="utf-8") as fh:
-        fh.write(f"RECONCILE-STAMP: codex APPROVED 2026-07-23 sha256:{h} task:x\n")
-        fh.write(f"RECONCILE-STAMP: composer APPROVED 2026-07-23 sha256:{h} task:x\n")
+        for fam in stamped:
+            fh.write(f"RECONCILE-STAMP: {fam} APPROVED 2026-07-23 sha256:{h} task:x\n")
     p = _bash(f"bash scripts/reconcile_stamps_check.sh {f}")
-    assert p.returncode != 0 and "grok" in (p.stdout + p.stderr)
+    assert p.returncode != 0, f"缺 {missing} 之戳記竟通過（靜默少要求）\n{p.stdout}{p.stderr}"
+    assert missing in (p.stdout + p.stderr), (
+        f"FAIL 訊息未點名缺席家族 {missing}\n{p.stdout}{p.stderr}"
+    )
 
 
 def test_adv_path_re_recognizes_grok() -> None:
