@@ -151,6 +151,9 @@ amend 掉 trailer ⇒ `g7 rc=1` 且具名該檔；放回 ⇒ `PASS`。
 | **R-15** | 🔴 `governance_families.json` **不可 commit**（不在 manifest；out-of-epic 通道亦不適用，因它是**設定**非修復），改動走 ambient M | epic 結束後 commit |
 | **R-16** | 早前 `b4-review-r2`／`b5-consult-r1` 兩份收斂檔**當時**是 2/3 而要求是 3 家；現 `active_stampers` 為 2 家 ⇒ 它們**回溯地**變成合格。此為真實語意變動，非「本來就合格」 | 具名接受 |
 | ~~R-17~~ | ~~impl(`--spec`) 戳記門檻不受暫停機制影響~~ | ✅ **已解**：改 `reconcile_stamps_check` 預設值，所有呼叫端自動生效 |
+| 🔴 **R-18** | out-of-epic trailer 用 `git log --grep` 而非原生解析 ⇒ **body 中段／引用舊訊息**內之同形字串亦得豁免（`CODEX-R1-P1-02`） | **下輪必修**（見下） |
+| 🔴 **R-19** | `active_stampers=[]` 被當「缺席」而 fallback；未強制 `active ⊆ review_families`；未知家族名可成為 required（`CODEX-R1-P1-03`） | **下輪必修** |
+| 🔴 **R-20** | `test_stamp_default_no_silent_drop` **證明不了 default 沒寫死**——把 default 改成硬編 `codex,composer` 該測仍綠（`CODEX-R1-P1-04` 實跑） | **下輪必修** |
 
 🔴 **禁宣稱「階段 1 已閉合強制」**——兩家 review 皆確認現行文字未如此宣稱，維持。
 

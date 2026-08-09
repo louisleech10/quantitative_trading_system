@@ -74,7 +74,7 @@ if [ -f scripts/govb1_frozen_hashes.txt ]; then
   _ooe_base="$(grep -m1 '^base_commit:' scripts/govb1_frozen_hashes.txt | awk '{print $2}')"
   if [ -n "${_ooe_base}" ] && git rev-parse --verify -q "${_ooe_base}^{commit}" >/dev/null 2>&1; then
     _ooe_list="$(git log --format='%h %s' --extended-regexp \
-      --grep='^Governance-Scope:[[:space:]]*out-of-epic' "${_ooe_base}..HEAD" 2>/dev/null)"
+      --grep='^Governance-Scope:[[:space:]]*out-of-epic([[:space:]]|$)' "${_ooe_base}..HEAD" 2>/dev/null)"
     if [ -n "${_ooe_list}" ]; then
       echo "[gov_check] ℹ out-of-epic commit（G-7 manifest 白名單已豁免，供稽核）:"
       printf '%s\n' "${_ooe_list}" | sed 's/^/            /'

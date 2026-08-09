@@ -355,11 +355,58 @@ _g7_batch3_started() {
 #
 # 稽核：gov_check 於每次 push 列出 range 內所有 out-of-epic commit（見 gov_check.sh）。
 # ---------------------------------------------------------------------------
-_G7_OOE_TRAILER='^Governance-Scope:[[:space:]]*out-of-epic'
 # 硬保護前綴（out-of-epic 亦禁）——**字面凍結**，新增須經委員裁定
 _G7_OOE_HARD_PROTECTED='docs/GOVB1_
 scripts/govb1_scope.manifest
 scripts/govb1_frozen_hashes.txt'
+
+_g7_ooe_is_protected() {   # $1=path → rc=0 表示屬硬保護
+  while IFS= read -r _hp; do
+    [ -n "${_hp}" ] || continue
+    case "$1" in "${_hp}"*) return 0 ;; esac
+  done <<EOF
+${_G7_OOE_HARD_PROTECTED}
+EOF
+  return 1
+}
+
+# 🔴 rename/copy 舊名守衛〔CODEX-R1-P0-01 BLOCKING〕
+#   `git diff --name-only` **隱去 rename 舊名** ⇒ 於 out-of-epic commit 內
+#   `git mv docs/GOVB1_...md other.txt`，diff 只顯示 other.txt（非硬保護）⇒ 豁免通過，
+#   凍結 SPEC 就被改名搬走。修法＝range 內只要有任一 rename/copy 之**任一端**屬硬保護，
+#   **整條 out-of-epic 豁免一律關閉**（粗但 fail-closed）。
+_g7_ooe_rename_hits_protected() {
+  _rc=1
+  while IFS= read -r _l; do
+    [ -n "${_l}" ] || continue
+    _old="$(printf '%s' "${_l}" | awk '{print $2}')"
+    _new="$(printf '%s' "${_l}" | awk '{print $3}')"
+    if _g7_ooe_is_protected "${_old}" || _g7_ooe_is_protected "${_new}"; then
+      _rc=0
+      break
+    fi
+  done <<EOF
+$(git -c core.quotepath=false diff --name-status -M -C "$(_base)" HEAD | awk '$1 ~ /^[RC]/')
+EOF
+  return "${_rc}"
+}
+
+# 🔴 用 git **原生 trailer 解析**，禁 `--grep`〔CODEX-R1-P1-02〕：
+#   `--grep` 匹配訊息任何位置 ⇒ body 中段、**引用的舊訊息**內之同名字串亦誤判為豁免。
+# 🔴 值須**恰為** `out-of-epic` 或 `out-of-epic <理由>`〔COMPOSER-R1-P1-01〕：
+#   原 regex 無行尾錨點 ⇒ `out-of-epic-extra`／`out-of-epic bypass` 亦命中。
+# 🔴 值須**恰為** `out-of-epic` 或 `out-of-epic <理由>`〔COMPOSER-R1-P1-01 已修〕：
+#   原 regex 無結尾界線 ⇒ `out-of-epic-extra` 亦誤命中。現加 `([[:space:]]|$)`。
+#   （`out-of-epic bypass` 仍命中屬**正確**：`<理由>` 本就是自由文字，composer 誤併為同一項。）
+#
+# 🔴 具名殘留 R-18〔CODEX-R1-P1-02，未修〕：此處用 `git log --grep` 而非 git 原生
+#   trailer 解析 ⇒ 訊息 **body 中段或引用的舊訊息**內之同形字串亦會被誤判為豁免。
+#   正解＝`%(trailers:key=Governance-Scope,valueonly)`，但那只認**最後一段**，
+#   而既有兩筆 out-of-epic commit 之 trailer 與 `Co-Authored-By` 間空了一行
+#   ⇒ 改用原生解析會使它們失去豁免、G-7 立刻轉紅（實測）。
+#   修法須**同時**：①改原生解析 ②訂「trailer 須與 Co-Authored-By 同段」之慣例
+#   ③重寫既有兩筆之訊息。三者缺一即破。
+_G7_OOE_TRAILER='^Governance-Scope:[[:space:]]*out-of-epic([[:space:]]|$)'
 
 _g7_ooe_commits() {
   git log --format='%H' --extended-regexp --grep="${_G7_OOE_TRAILER}" "$(_base)..HEAD"
@@ -379,14 +426,9 @@ _g7_path_only_ooe() {
 ${_touch}
 EOF
   # 硬保護集：out-of-epic 也不得豁免
-  while IFS= read -r _hp; do
-    [ -n "${_hp}" ] || continue
-    case "${_p}" in
-      "${_hp}"*) return 1 ;;
-    esac
-  done <<EOF
-${_G7_OOE_HARD_PROTECTED}
-EOF
+  _g7_ooe_is_protected "${_p}" && return 1
+  # rename/copy 舊名守衛：range 內任一 rename 觸及硬保護 ⇒ 全面關閉豁免
+  _g7_ooe_rename_hits_protected && return 1
   return 0
 }
 
