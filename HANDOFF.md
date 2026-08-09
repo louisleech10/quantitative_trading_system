@@ -10,24 +10,34 @@ REF:handoffs/reconcile/20260809-govb1-b3-review-r8/synth.md
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-10 | **Branch**: main | 實作端＝主委自任；review＝codex+composer
 
-## 🔴 接手第一件事：**B10 實作**（Task 4.3 / `票 B-31` 補救層）
+## 🔴 接手第一件事：**B10 補完 review-r1 的三項阻擋**（Task 4.3）
 
-**路線（使用者已定，不得再開順序討論）**：**B10 → 殘留票**。
+B10 本體與兩件移交已 commit（見 `git log` 之 `feat(governance): B10 …` 與
+`fix(governance): B10 補救清單…`，數字證據在該兩則 commit 訊息內）。
+review-r1 兩家皆判「需修補後派工」，**下列三項是委員明列的阻擋收案項，尚未完成**：
 
-**B10**＝Task 4.3。修改 `scripts/cx_run.sh`（`_run_format_check_if_needed()` 改寫、
-新增 `_emit_fixup_list()`）；新建 `tests/governance/test_govb1_b31_recovery.py`。兩者皆在 manifest allow 內。
-
-🔴 **B10 同時要接手三件移交**（皆有委員明確核可，見 `REF` 收斂檔）：
-
-| 移交自 | 內容 | 錨點 |
+| # | 阻擋項 | 要做什麼 |
 |---|---|---|
-| B8 C5 | `cx_run` 三入口矩陣第三欄 | `test_cxrun_column_is_blocked_not_passing` 是**逼債條款**——B10 一加「保留既有輸出」的 stub 模式它就會紅，屆時**必須**補上三輸入 × `result_state` 矩陣 |
-| B9 C5 | 零 findings 契約第 ③ 件（findings 落點）的**強制點** | `govflow_lifecycle.json` 的 `findings_destination` 目前只是宣告，沒有腳本會擋 append 進 stamp-target |
-| `票 B-52` | stamp 輪 SoT 與 `debt_clear` 漂移 | `produces_findings:false` 對 stamp 輪是**錯的**；本 session 三次因此銷帳鎖死 |
+| 1 | `T-4.3-U1..U3` 端到端驗收未寫進測試 | TODO 明示三條：hollow fixture 走交件路徑須記 `format-failed`（**非** `failed`）／stderr 含逐條清單且至少一條有 `檔:行`／主委自產物走同一支檢查 |
+| 2 | B8 C5 承諾的第三欄只有弱源碼斷言 | 需**真正的**三輸入 × `result_state` 端到端矩陣（`CX_STUB_MODE=preserve` ＋ 隔離 harness，模式已就位）。🔴 此點主委在 brief 自承「我自己不確定」，兩家證實擔心成立 |
+| 3 | 主委 `claude` 產物自檢無強制路徑（`CODEX-R1-P1-03`） | `cx_run` 只對 `review/consult/closure` × `codex/grok/composer` 生效；主委產物**不流經 cx_run** ⇒ 強制點須另找位置 |
 
-Task 4.3 要點：`format-failed` 時輸出**逐條可修補清單**（每條含 `檔:行`＋違規類型＋修法一行）；
-該輪帳不因格式失敗而卡住；🔴 自檢要求**擴及主委自產物**（顯式傳 `--family` 即跑）。
-🔴 **不可做**：不得放寬 `debt_clear` 只接受 `success` 的守衛（三值契約凍結）。
+**已完成並經委員裁決的部分（不要重做）**：
+
+- `_emit_fixup_list()`：逐條 `檔:行`＋類型＋修法；三層封閉退路使 `?` 不可能出現（`CODEX-R1-P1-04`）
+- `_check_findings_destination()`：CLI 前快照 stamp-target 的 canonical ID，新增即判違規（B9 C5 移交）
+- `preserve` stub 模式：B8 逼債條款因此轉紅並**退場**，生命週期收束
+- `test_cx_run_only_embed_line_covariant` 斷言範圍收窄——**兩家裁 (A) 核准後才動手**；
+  🔴 主委此次依 `票 B-51` 停碼送裁，兩家皆判**停手恰當**、非 B8「少做一半」同案
+- TODO 要點 3「自檢一律跑」**已還原**為 findings-kind 閘（委員裁 (A) 還原正確）——
+  改成無條件會讓未複製 checker 的隔離環境全部 fail-closed
+
+🔴 **改 `cx_run.sh` 前必讀**：該檔原始碼被 `_B45_HARNESS` 凍結測試**逐字錨定**
+（函式本體、`bash "${_cc}" --single …` 那行、連呼叫點 `_fmt_rc="$(...)"` 都是），
+epic 期間那五檔禁改 ⇒ **新增一律加在錨點外側**，需要傳值就走 bash **動態作用域**。
+`test_frozen_anchors_in_cx_run_are_intact` 會先擋下你，別等別票的凍結測試紅了才知道踩到什麼。
+
+之後：**殘留票 `B-48`／`B-49`／`B-50`／`B-51`／`B-52`**。
 
 🔴 **在 B9／B10 修好 `票 B-52` 根因之前，每一份 review／stamp brief 都必須寫入這段硬性條款**：
 findings 用 canonical `## <FAMILY>-R<n>-P<0-3>-<NN>`；0 findings 寫 sentinel `…-P3-00`
