@@ -2592,3 +2592,48 @@ TODO `Task 1.4` 規則① **逐字限於**「`fact-verified:` 若宣稱計數」
 ### 誠實邊界
 
 本票**無機械綁定**。殘留代號 `R-10`。
+
+---
+
+## B-48 票 `GOV-DEBTCLEAR-KIND-UNVERIFIED`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：2026-08-09 主委自陳之實例。`.claude/gate/audit.log` sequence 1334
+（`round_id 006da42d-105e-4345-923f-078728e1367a`、`session 20260809-govb1-x-review-r1`）：
+
+```
+"abandon_kind": "no-findings-expected"
+"reason": "review 輪已收 5 findings；1 個 P0 與 1 個 P1 已修，其餘三項具名為
+           R-18/19/20 待下輪；本輪不建 reconcile 因主委 context 將盡"
+```
+
+### 病
+
+`abandon_kind` 宣告「預期零 findings」，該輪卻實收 **5 個 findings（含 1 個 BLOCKING P0）**。
+理由欄寫了實情，**但機器讀的是 kind 欄**——任何以 kind 統計「零 findings 輪次」
+的查詢都會把這一輪算進去，且該輪自此無法再以正規路徑清帳（已 ABANDONED）。
+
+🔴 **根因＝`debt_clear.sh` 不驗證 kind 與事實是否相符**：
+`--kind` 只比對 `audit_events.json` 的 `enums.abandon_kind` 白名單（`debt_clear.sh:416-419`），
+不看該 round 的委員產出裡到底有沒有 findings。**逃生口沒有事實查核。**
+
+### 為何是機械問題而非紀律問題
+
+依「工具必須自帶強制機制」（2026-08-02 定）：`--abandon` 是逃生口，
+逃生口若無事實綁定，就等於「填什麼算什麼」。本次是主委在 context 將盡時
+選了最省事的 kind——**這正是逃生口在壓力下的預期用法**，不是異常。
+
+### 閉合條件
+
+`debt_clear.sh --abandon --kind no-findings-expected` 須先確認該 round 之
+`committee_family_result` 所指向的輸出檔**確實不含任何 canonical finding ID**
+（或僅含 `P3-00` sentinel，見 `票 B-38`）；含 findings ⇒ **拒發**，
+要求走正規 `--round-id/--session` 銷帳路徑（附 reconcile）。
+`collection-failed` 另議（該 kind 的事實查核條件不同）。
+
+### 誠實邊界
+
+本票**尚無機械綁定**；在閉合前，`no-findings-expected` 之正確性仍靠紀律。
+2026-08-09 之 `20260809-govb1-x-stamp-r1` 一輪已示範正確用法
+（戳記輪本質不產 findings，kind 與事實相符）。
