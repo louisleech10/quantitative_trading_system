@@ -35,7 +35,16 @@ SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 # shellcheck source=scripts/governance_families.sh
 . "${SCRIPT_DIR}/governance_families.sh"
 if [ -z "${required}" ]; then
-  required="$(families_get review_families)" || { echo "RECONCILE-STAMP FAIL: 家族 SoT 讀取失敗(fail-closed)"; exit 1; }
+  # 🔴 預設優先讀 active_stampers（本期實際要求蓋章者），缺席才回退 review_families。
+  #   出生理由(2026-08-09)：委員會因模型能力/額度而頻繁加減，一家不可用即全線停擺。
+  #   review_families 維持「正式名冊」不動（9 個既有斷言依賴它，其中
+  #   test_rolegate_predispatch.py 屬 _B45_HARNESS 禁改）。
+  #   ⇒ **暫停/調換委員 = 改 governance_families.json 的 active_stampers 一行。**
+  #   缺 active_stampers ⇒ 行為與本次改動前逐字相同（乾淨 clone / CI 安全）。
+  required="$(families_get active_stampers 2>/dev/null)" || required=""
+  if [ -z "${required}" ]; then
+    required="$(families_get review_families)" || { echo "RECONCILE-STAMP FAIL: 家族 SoT 讀取失敗(fail-closed)"; exit 1; }
+  fi
 fi
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_PY="${REPO_ROOT}/venv/bin/python"
