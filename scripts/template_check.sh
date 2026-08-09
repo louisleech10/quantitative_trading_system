@@ -404,6 +404,159 @@ fi
 
 # 註：非表格的「空段」未做機械檢查（易誤擋 inline 內容/子段）→ 交 coverage_check（缺項）+ adversarial（不同模型讀實際內容）。
 
+# ===========================================================================
+# 票 B-16 擴充 A/B/C（GOVB1 Task 1.5）—— **一律 append，禁重排既有行**
+#   test_doc_format_precheck.py 以替換原始碼子字串做 mutation，重排會使其轉紅（B4 踩過）。
+#
+# 🔴 三個判準全部**行首錨定 + 排除 code fence**，不掃自然語言。
+#   出處：handoffs/20260809-govb1-b5-impl-r1-brief.md §0 定案 1（防第六次結構性死鎖）。
+#   實測依據（2026-08-09 現跑，非推測）：
+#     `^[[:space:]]*ASSERT[[:space:]]` / `^[[:space:]]*函式：` / `^[[:space:]]*檔案：`
+#     / `^[[:space:]]*SCOPE-CLAIM:` 對凍結之 GOVB1 SPEC 與 TODO **皆 0 命中** ⇒ 不自鎖。
+#     反例：**未錨定**的 `ASSERT ` 在 TODO 有 **33 個命中**，其中一條是
+#     `ASSERT bash scripts/gate.sh dispatch …` ⇒ 照 TODO 偽碼直譯會在**每次
+#     template_check 時真的發 token、寫稽核日誌**。錨定是承重的，不是風格。
+# ===========================================================================
+
+# _tc_live_lines <file> — 正規化 CRLF + 去除 code fence 區塊後的內容（供三個判準共用）
+#   fence 有界集合＝``` 或 ~~~（各 3 個以上），比照 B4 之 fence 規則。
+_tc_live_lines() {
+  tr -d '\r' < "${1}" | awk '
+    /^[[:space:]]*(```|~~~)/ { infence = !infence; next }
+    !infence { print }'
+}
+
+# _tc_ere_escape — 把任意字串轉為 ERE 字面量
+#   TODO 偽碼把 `${1}` 直接嵌進 regex ⇒ `f.oo` 誤命中 `fXoo`、`f*` 誤命中 `f`（三方實測）。
+_tc_ere_escape() {
+  printf '%s' "${1}" | sed -e 's/[\\^$.[|()*+?{]/\\&/g' -e 's/\]/\\]/g'
+}
+
+# _func_exists <name> <file> — 檔內是否**定義**了該函式（四種合法形態全命中）
+#   TODO 偽碼 `^[[:space:]]*(def |function )?${1}[[:space:]]*\(` 漏接
+#   `function foo {`（POSIX 無括號形），三方逐字實跑一致。
+#   邊界②「須先剝除 `#` 起始行」**已由 `^` 錨點滿足**（codex 實測兩種註解皆 rc=1）⇒ 不另加剝除。
+_func_exists() {
+  _fe_n="$(_tc_ere_escape "${1}")"
+  _fe_f="${2}"
+  [ -f "${_fe_f}" ] || return 1
+  grep -qE "^[[:space:]]*def[[:space:]]+${_fe_n}[[:space:]]*\(" "${_fe_f}" && return 0
+  grep -qE "^[[:space:]]*${_fe_n}[[:space:]]*\([[:space:]]*\)[[:space:]]*\{" "${_fe_f}" && return 0
+  grep -qE "^[[:space:]]*function[[:space:]]+${_fe_n}([[:space:]]*\([[:space:]]*\))?[[:space:]]*\{" "${_fe_f}" && return 0
+  return 1
+}
+
+# _check_scope_claim <file> — C：封閉文法之宣告完整性（**不執行** DERIVE 命令）
+#   文法：SCOPE-CLAIM:<id> <subject> DERIVE:<executable command>
+_check_scope_claim() {
+  _sc_out=""
+  _sc_seen=""
+  while IFS= read -r _sc_l; do
+    case "${_sc_l}" in
+      *SCOPE-CLAIM:*) : ;;
+      *) continue ;;
+    esac
+    printf '%s' "${_sc_l}" | grep -qE '^[[:space:]]*SCOPE-CLAIM:' || continue
+    _sc_body="$(printf '%s' "${_sc_l}" | sed -e 's/^[[:space:]]*SCOPE-CLAIM:[[:space:]]*//')"
+    _sc_id="$(printf '%s' "${_sc_body}" | awk '{print $1}')"
+    if ! printf '%s' "${_sc_id}" | grep -qE '^[A-Za-z0-9_-]+$'; then
+      _sc_out="${_sc_out}  · SCOPE-CLAIM <id> 不合文法（須 [A-Za-z0-9_-]+）: ${_sc_id:-<空>}\n"
+      continue
+    fi
+    case " ${_sc_seen} " in
+      *" ${_sc_id} "*) _sc_out="${_sc_out}  · SCOPE-CLAIM <id> 重複: ${_sc_id}\n"; continue ;;
+    esac
+    _sc_seen="${_sc_seen} ${_sc_id}"
+    _sc_rest="$(printf '%s' "${_sc_body}" | sed -e 's/^[A-Za-z0-9_-]*[[:space:]]*//')"
+    _sc_n="$(printf '%s\n' "${_sc_rest}" | grep -oE 'DERIVE:' | wc -l | tr -d '[:space:]')"
+    if [ "${_sc_n}" != "1" ]; then
+      _sc_out="${_sc_out}  · SCOPE-CLAIM ${_sc_id}: DERIVE: 須恰一個（實得 ${_sc_n}）\n"
+      continue
+    fi
+    _sc_sub="$(printf '%s' "${_sc_rest}" | sed -e 's/DERIVE:.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    _sc_cmd="$(printf '%s' "${_sc_rest}" | sed -e 's/^.*DERIVE://' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [ -n "${_sc_sub}" ] || _sc_out="${_sc_out}  · SCOPE-CLAIM ${_sc_id}: <subject> 為空\n"
+    [ -n "${_sc_cmd}" ] || _sc_out="${_sc_out}  · SCOPE-CLAIM ${_sc_id}: DERIVE 命令為空\n"
+  done <<EOF
+$(_tc_live_lines "${1}")
+EOF
+  [ -z "${_sc_out}" ] && return 0
+  printf '%b' "${_sc_out}"
+  return 1
+}
+
+# _run_assert_lines <file> — A：抽 `^ASSERT <cmd> THEN rc=<n>` 行並**執行**，比對 rc
+#   🔴 pending 僅在三條件**全部**成立時允許（定案 2；缺一即保留原 rc）：
+#     ① 行可解析為命令＋目標路徑 ② 該路徑恰為 ENOENT ③ 該路徑明示列於本檔 `新建：` 宣告
+#   其餘一切非零一律保留為失敗（含 127／126／執行期非零）。
+#   ③ 之來源刻意取**受檢檔自身**而非外部 TODO：template_check 是通用工具，
+#     綁定特定 epic 的 TODO 會使它在別的 SPEC 上行為不一致。
+_run_assert_lines() {
+  _ra_file="${1}"
+  _ra_out=""
+  _ra_new="$(_tc_live_lines "${_ra_file}" \
+    | grep -E '^[[:space:]]*新建：' | grep -oE '`[^`]+`' | tr -d '`')"
+  while IFS= read -r _ra_l; do
+    printf '%s' "${_ra_l}" | grep -qE '^[[:space:]]*ASSERT[[:space:]]' || continue
+    _ra_cmd="$(printf '%s' "${_ra_l}" | sed -e 's/^[[:space:]]*ASSERT[[:space:]]*//' -e 's/[[:space:]]*THEN[[:space:]]*rc.*$//')"
+    _ra_exp="$(printf '%s' "${_ra_l}" | sed -n 's/.*THEN[[:space:]]*rc=\([0-9][0-9]*\).*/\1/p')"
+    if [ -z "${_ra_cmd}" ] || [ -z "${_ra_exp}" ]; then
+      _ra_out="${_ra_out}  · ASSERT 行無法解析（須 'ASSERT <cmd> THEN rc=<n>'）: ${_ra_l}\n"
+      continue
+    fi
+    # 目標路徑＝命令中第一個看起來像 repo 路徑的 token
+    _ra_tgt="$(printf '%s' "${_ra_cmd}" | tr ' ' '\n' | grep -E '^[A-Za-z0-9_./-]+\.(sh|py)$' | head -1)"
+    if [ -n "${_ra_tgt}" ] && [ ! -e "${_ra_tgt}" ]; then
+      # ENOENT：唯有同時列於本檔「新建：」才允許 pending
+      case " $(printf '%s' "${_ra_new}" | tr '\n' ' ') " in
+        *" ${_ra_tgt} "*)
+          echo "  · ASSERT pending（標的列於本檔「新建：」且尚未建立）: ${_ra_tgt}"
+          continue ;;
+        *)
+          _ra_out="${_ra_out}  · ASSERT 標的不存在且**未列於本檔「新建：」**⇒ 不得 pending: ${_ra_tgt}\n"
+          continue ;;
+      esac
+    fi
+    ( eval "${_ra_cmd}" ) >/dev/null 2>&1
+    _ra_rc=$?
+    [ "${_ra_rc}" = "${_ra_exp}" ] || \
+      _ra_out="${_ra_out}  · ASSERT rc 不符（期望 ${_ra_exp} 實得 ${_ra_rc}）: ${_ra_cmd}\n"
+  done <<EOF
+$(_tc_live_lines "${_ra_file}")
+EOF
+  [ -z "${_ra_out}" ] && return 0
+  printf '%b' "${_ra_out}"
+  return 1
+}
+
+# ---- 接線：只對 docs/*SPEC*.md｜docs/*TODO*.md 套用（handoffs/ 委員產出一律不套，Task 1.2 教訓）
+#   TEMPLATE_CHECK_EXT_SCOPE=force 供測試強制啟用——它**只會擴大**受檢範圍，
+#   不可能弱化任何既有檢查，故非逃生口。
+_tc_rel="$(_lc_repo_rel "${file}")"
+_tc_ext=0
+case "${_tc_rel}" in
+  docs/*SPEC*.md|docs/*TODO*.md) _tc_ext=1 ;;
+esac
+[ "${TEMPLATE_CHECK_EXT_SCOPE:-}" = "force" ] && _tc_ext=1
+if [ "${_tc_ext}" -eq 1 ] && { [ "${kind}" = "spec" ] || [ "${kind}" = "todo" ]; }; then
+  _tc_msg="$(_check_scope_claim "${file}")" || missing="${missing}${_tc_msg}\n"
+  _tc_msg="$(_run_assert_lines "${file}")" || missing="${missing}${_tc_msg}\n"
+  while IFS= read -r _tc_fn; do
+    [ -n "${_tc_fn}" ] || continue
+    _tc_name="$(printf '%s' "${_tc_fn}" | sed -e 's/^[[:space:]]*函式：[[:space:]]*//' -e 's/[[:space:]].*$//' -e 's/`//g' -e 's/()$//')"
+    [ -n "${_tc_name}" ] || continue
+    _tc_hit=0
+    for _tc_src in scripts/*.sh scripts/*.py; do
+      [ -e "${_tc_src}" ] || continue
+      if _func_exists "${_tc_name}" "${_tc_src}"; then _tc_hit=1; break; fi
+    done
+    [ "${_tc_hit}" -eq 1 ] || \
+      missing="${missing}  · 宣告之函式不存在於 scripts/: ${_tc_name}\n"
+  done <<EOF
+$(_tc_live_lines "${file}" | grep -E '^[[:space:]]*函式：')
+EOF
+fi
+
 if [ -n "${missing}" ] || [ -n "${hollow}" ]; then
   echo "TEMPLATE FAIL (${kind}): ${file}"
   [ -n "${missing}" ] && { echo "【缺必填錨點】"; printf "%b" "${missing}"; }
