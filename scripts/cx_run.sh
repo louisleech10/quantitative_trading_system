@@ -459,8 +459,20 @@ _emit_fixup_list() {
     if [ -n "${_id}" ] && [ -f "${_file}" ]; then
       _no="$(LC_ALL=C grep -n -m1 -F "${_id}" "${_file}" 2>/dev/null | cut -d: -f1)"
     fi
+    # 🔴 Task 4.3：每條**必含** `檔:行`〔`CODEX-R1-P1-04`〕：duplicate-ID 這類訊息不帶 canonical ID，
+    #   原本會印 `檔:?` ⇒ 委員無從定位、補救層失去意義。
+    #   退路（依序，皆為封閉規則）：①訊息自帶 `:<行號>` ②檔內第一個 canonical heading
+    #   ③檔案第一行。三者必有其一，故 `?` 不再可能出現。
+    if [ -z "${_no}" ]; then
+      _no="$(printf '%s' "${_line}" | LC_ALL=C grep -Eo ':[0-9]+' | head -1 | tr -d ':')"
+    fi
+    if [ -z "${_no}" ] && [ -f "${_file}" ]; then
+      _no="$(LC_ALL=C grep -nE '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' \
+        "${_file}" 2>/dev/null | head -1 | cut -d: -f1)"
+    fi
+    [ -n "${_no}" ] || _no=1
     printf '  %s:%s\t%s\t%s\n' \
-      "${_file}" "${_no:-?}" "${_kind}" \
+      "${_file}" "${_no}" "${_kind}" \
       "見 templates/COMMITTEE_FINDING_TEMPLATE.md（零 findings 契約：sentinel 形態／必填欄非空／落點）" >&2
   done < "${_log}"
   echo "[cx_run] ── 清單結束；修完可**同輪重派**，不必整份重跑 ──" >&2

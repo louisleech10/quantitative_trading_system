@@ -58,6 +58,21 @@ def test_fixup_list_is_invoked_only_on_failure() -> None:
     assert '[ "${_rc}" -ne 127 ]' in guard, "checker 不可用時不應再跑一次"
 
 
+def test_fixup_list_always_has_a_line_number() -> None:
+    """🔴 `CODEX-R1-P1-04`：每條**必含** `檔:行`，不得印 `檔:?`。
+
+    duplicate-ID 這類訊息不帶 canonical ID ⇒ 原實作退回 `?`，
+    委員無從定位 ⇒ 補救層失去意義（那正是 `票 B-31` 要解的病）。
+    退路為三層封閉規則：①訊息自帶 `:<行號>` ②檔內第一個 canonical heading ③第 1 行。
+    """
+    s = _src()
+    assert "${_no:-?}" not in s, "仍有 `?` 退路 ⇒ 可能印出無法定位的條目"
+    assert '[ -n "${_no}" ] || _no=1' in s, "缺最終退路 ⇒ 仍可能印空行號"
+    # 三層退路都要在
+    assert "grep -Eo ':[0-9]+'" in s
+    assert "grep -nE '^#{2,6}" in s
+
+
 def test_format_failed_does_not_become_failed() -> None:
     """SPEC 邊界①：格式失敗但產出實質完整 ⇒ 標 `format-failed`，**不得**標 `failed`。"""
     s = _src()
