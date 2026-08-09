@@ -421,14 +421,27 @@ _G7_OOE_VALUE_RE='^out-of-epic([[:space:]]|$)'
 _G7_OOE_GRANDFATHER='d0dc68245e967380965e6b2ee18349e74a34ca5d
 28b586a8224f1338b6a445f66e6e782e06c3d013'
 
+# 🔴 重複 key 一律拒〔CODEX-R2-P1-02，2026-08-09〕：
+#   前版用 `separator=%x2C` 串接多個 Governance-Scope 值後只比對**首項**
+#   ⇒ 同一 commit 可同時宣告 `out-of-epic` 與另一個矛盾 scope 而仍取得豁免。
+#   修法＝改用 US（0x1F，`%x1F`）當分隔；值內出現該碼點在實務上不存在，
+#   故「串接結果含 0x1F」⇔「trailer 出現不只一次」。拒之（fail-closed）。
+#   誠實邊界：若某人真的把 0x1F 寫進 commit 訊息，結果是**被拒**而非被放行。
+_G7_OOE_MULTI_SEP=$'\037'
+
 _g7_ooe_commits() {
   _ooe_b="$(_base)"
   [ -n "${_ooe_b}" ] || return 1
   # rc 直接取，不經 pipe（CLAUDE.md Gotchas：`cmd | tail` 讀到的是 tail 的 rc）
-  _ooe_raw="$(git log --format='%H%x09%(trailers:key=Governance-Scope,valueonly,separator=%x2C)' \
+  _ooe_raw="$(git log --format='%H%x09%(trailers:key=Governance-Scope,valueonly,separator=%x1F)' \
                 "${_ooe_b}..HEAD")" || return 1
+  # 🔴 不用 `-F'\t'`：trailer **值**可含 tab，會把欄位切斷而漏掉重複偵測。
+  #   sha 不可能含 tab ⇒ 以**第一個** tab 為界，其餘整段（含 tab）視為值。
   printf '%s\n' "${_ooe_raw}" \
-    | awk -F'\t' -v re="${_G7_OOE_VALUE_RE}" 'NF>1 && $2 ~ re {print $1}'
+    | awk -v re="${_G7_OOE_VALUE_RE}" -v sep="${_G7_OOE_MULTI_SEP}" '
+        { i = index($0, "\t"); if (i == 0) next
+          sha = substr($0, 1, i - 1); val = substr($0, i + 1)
+          if (val ~ re && index(val, sep) == 0) print sha }'
   printf '%s\n' "${_G7_OOE_GRANDFATHER}"
 }
 

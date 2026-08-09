@@ -385,13 +385,22 @@ _process_one_adversarial_file() {
 # 🔴 清單一律由 SoT 導出，**不得於呼叫端寫死**——2026-07-23 事故：
 #   預設寫死 codex,composer 使 grok 永不被機檢要求。
 # ---------------------------------------------------------------------------
+# 🔴 R-19 覆蓋所有 caller〔CODEX-R2-P1-01 / COMPOSER-R2-P2-01，2026-08-09〕：
+#   原本此處自成一套「非零或空 ⇒ 回退」邏輯，與 reconcile_stamps_check.sh 的
+#   fail-closed 分裂——而本函式的結果是以 **explicit required** 傳給該腳本的，
+#   等於**繞過**它剛修好的預設檢查。兩家委員獨立實測：
+#     · active_stampers: []        → 舊碼回 `codex,composer,grok`（靜默回退全員）
+#     · active_stampers: ["codexx"] → 舊碼回 `codexx`（未知家族成為 required ⇒ 卡死）
+#   ⇒ 改用同一支三態 getter，兩條路徑語意一致。
 _stamp_families() {
-  local _sf
-  if _sf="$(families_get active_stampers 2>/dev/null)" && [ -n "${_sf}" ]; then
-    printf '%s' "${_sf}"
-    return 0
-  fi
-  families_get review_families
+  local _sf _rc
+  _sf="$(families_active_stampers)"; _rc=$?
+  case "${_rc}" in
+    0) printf '%s' "${_sf}"; return 0 ;;
+    3) families_get review_families; return $? ;;   # 缺 key ⇒ 回退正式名冊
+    *) echo "gate: active_stampers 不合法 ⇒ 拒發（fail-closed；原因見上方 stderr）" >&2
+       return 1 ;;
+  esac
 }
 
 _run_reconcile_stamp_check_adv() {
@@ -589,9 +598,11 @@ if [ "${kind}" = "dispatch" ]; then
         # 🔴 下列呼叫**逐字凍結、不得加參數**：
         #   tests/governance/test_waived_adversarial_still_stamps.py
         #   ::test_mutation_waived_adv_skips_stamp_breaks_guard 以**原始碼 regex**
-        #   錨定此三行（含 `"${reconcile}"` 之後直接換行）。該檔不在 manifest allow ⇒ 改不了。
-        #   ⇒ 本呼叫點**無法**傳 active_stampers，仍要求 review_families 全員。
-        #   具名殘留 R-17：impl 派工（--spec）之戳記門檻不受委員暫停機制影響。
+        #   錨定此兩行（含 `"${reconcile}"` 之後直接換行）。該檔不在 manifest allow ⇒ 改不了。
+        #   ⇒ 本呼叫點**無法傳第二參**。
+        # 🔴 但這不再是 R-17 那個殘留：`reconcile_stamps_check.sh` 的**預設路徑**
+        #   自 d0dc682 起即優先讀 `active_stampers`（缺 key 才回退 review_families），
+        #   故不傳參 ⇒ 自動吃到委員暫停設定。R-17 已由「改預設而非改呼叫端」解掉。
         bash "${_stamp_bin}" "${reconcile}" \
           || { echo "ERROR: impl reconcile 未獲委員核可。委員須 append RECONCILE-STAMP APPROVED。"; exit 1; }
         ;;

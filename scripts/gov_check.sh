@@ -78,10 +78,21 @@ if [ -f scripts/govb1_frozen_hashes.txt ]; then
     #   使用者會看到「已豁免」但閘其實沒放行的 commit，反而誤導。
     #   兩處漂移由 tests/governance/test_govb1_contract_matrix.py 之
     #   test_ooe_audit_list_matches_gate 釘住。
-    _ooe_raw="$(git log --format='%h%x09%s%x09%(trailers:key=Governance-Scope,valueonly,separator=%x2C)' \
+    # 🔴 欄位順序＝sha, trailer, subject〔CODEX-R2-P2-03〕：
+    #   前版把自由文字的 `%s` 放中間再取 `$3`，**subject 含 tab 的 commit 會整筆漏列**
+    #   （codex 實測：gate 選入、稽核清單沒有）⇒ 已豁免路徑變成看不見的旁路。
+    #   把 subject 移到最後，並以「前兩個 tab」定界，subject 內含 tab 也不影響判定。
+    # 🔴 重複 key 以 0x1F 分隔偵測並拒（與閘同法，見 _G7_OOE_MULTI_SEP）。
+    _ooe_raw="$(git log --format='%h%x09%(trailers:key=Governance-Scope,valueonly,separator=%x1F)%x09%s' \
       "${_ooe_base}..HEAD" 2>/dev/null)"
     _ooe_list="$(printf '%s\n' "${_ooe_raw}" \
-      | awk -F'\t' 'NF>2 && $3 ~ /^out-of-epic([[:space:]]|$)/ {print $1 " " $2}')"
+      | awk '
+          { i = index($0, "\t"); if (i == 0) next
+            sha = substr($0, 1, i - 1); rest = substr($0, i + 1)
+            j = index(rest, "\t"); if (j == 0) next
+            val = substr(rest, 1, j - 1); subj = substr(rest, j + 1)
+            if (val ~ /^out-of-epic([[:space:]]|$)/ && index(val, "\037") == 0)
+              print sha " " subj }')"
     # grandfather（慣例訂立前之兩筆；須仍落在 base..HEAD 內才列）
     _ooe_gf=""
     for _s in d0dc68245e967380965e6b2ee18349e74a34ca5d \

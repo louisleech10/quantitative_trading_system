@@ -2417,8 +2417,34 @@ def test_ooe_body_mention_does_not_grant_exemption(tmp_path: Path) -> None:
     fn = re.search(r"_g7_ooe_commits\(\) \{.*?\n\}", src, re.S)
     val = re.search(r"_G7_OOE_VALUE_RE='[^']*'", src)
     gf = re.search(r"_G7_OOE_GRANDFATHER='[^']*'", src)
-    assert fn and val and gf, "找不到 _g7_ooe_commits／常數（refactor?→須更新本測）"
+    sep = re.search(r"_G7_OOE_MULTI_SEP=\$'[^']*'", src)
+    assert fn and val and gf and sep, "找不到 _g7_ooe_commits／常數（refactor?→須更新本測）"
 
+    r, base, shas = _build_ooe_probe_repo(tmp_path)
+
+    snippet = (
+        f"{val.group(0)}\n{gf.group(0)}\n{sep.group(0)}\n"
+        f"_base() {{ printf '%s' {base}; }}\n"
+        f"{fn.group(0)}\n_g7_ooe_commits\n"
+    )
+    p = subprocess.run(["bash", "-c", snippet], cwd=r, capture_output=True, text=True, check=False)
+    assert p.returncode == 0, f"_g7_ooe_commits 執行失敗: {p.stderr}"
+    got = {ln.strip() for ln in p.stdout.splitlines() if ln.strip()}
+    selected = {n for n, s in shas.items() if s in got}
+
+    assert selected == {"ok_trailer", "tab_subject"}, (
+        f"選取結果錯誤：want={{'ok_trailer','tab_subject'}} got={selected}\n"
+        "body_middle／quoted_prev 被選中 ⇒ 退回 --grep 語意（R-18 未修）；\n"
+        "dup_valid_first 被選中 ⇒ 重複 key 未拒（CODEX-R2-P1-02 未修）；\n"
+        "ok_trailer 未被選中 ⇒ 慣例（trailer 與 Co-Authored-By 同段）被破壞。\n"
+        f"stdout={p.stdout}"
+    )
+    # grandfather 恆輸出（不在此 repo 內故無害）——確認它沒被順手拿掉
+    assert set(_G7_OOE_GRANDFATHER) <= got, "grandfather 未被輸出（例外集被移除？）"
+
+
+def _build_ooe_probe_repo(tmp_path: Path) -> tuple[Path, str, dict[str, str]]:
+    """建臨時 repo，每種 commit 訊息形態各一筆。回 (repo, base_sha, {形態: sha})。"""
     r = tmp_path / "repo"
     r.mkdir()
     _git(r, "init", "-q", "-b", "main")
@@ -2439,6 +2465,13 @@ def test_ooe_body_mention_does_not_grant_exemption(tmp_path: Path) -> None:
         "quoted_prev": f"subject\n\n前一則寫的是：\n{TRAILER}\n——本則並非 out-of-epic\n\n{COAUTH}\n",
         # 值不符：結尾界線須擋掉 -extra
         "value_extra": f"subject\n\nbody\n\nGovernance-Scope: out-of-epic-extra\n{COAUTH}\n",
+        # 🔴 重複 key，**首項合法**〔CODEX-R2-P1-02〕：同一 commit 同時宣告
+        #   out-of-epic 與另一矛盾 scope。前版只比對串接後的首項 ⇒ 誤放行。
+        "dup_valid_first": f"subject\n\nbody\n\n{TRAILER}\nGovernance-Scope: b3-task\n{COAUTH}\n",
+        # 重複 key，首項不合法 ⇒ 兩版皆拒（列出以示對稱，非鑑別用例）
+        "dup_invalid_first": f"subject\n\nbody\n\nGovernance-Scope: b3-task\n{TRAILER}\n{COAUTH}\n",
+        # subject 含 tab（稽核清單解析用；此處確認不影響閘的選取）
+        "tab_subject": f"subject\twith\ttab\n\nbody\n\n{TRAILER}\n{COAUTH}\n",
         # 無 trailer
         "plain": f"subject\n\nbody\n\n{COAUTH}\n",
     }
@@ -2449,25 +2482,58 @@ def test_ooe_body_mention_does_not_grant_exemption(tmp_path: Path) -> None:
         (tmp_path / "msg.txt").write_text(msg, encoding="utf-8")
         _git(r, "commit", "-q", "-F", str(tmp_path / "msg.txt"))
         shas[name] = _git(r, "rev-parse", "HEAD").strip()
+    return r, base, shas
 
-    snippet = (
-        f"{val.group(0)}\n{gf.group(0)}\n"
-        f"_base() {{ printf '%s' {base}; }}\n"
-        f"{fn.group(0)}\n_g7_ooe_commits\n"
-    )
-    p = subprocess.run(["bash", "-c", snippet], cwd=r, capture_output=True, text=True, check=False)
-    assert p.returncode == 0, f"_g7_ooe_commits 執行失敗: {p.stderr}"
-    got = {ln.strip() for ln in p.stdout.splitlines() if ln.strip()}
-    selected = {n for n, s in shas.items() if s in got}
 
-    assert selected == {"ok_trailer"}, (
-        f"選取結果錯誤：want={{'ok_trailer'}} got={selected}\n"
-        "body_middle／quoted_prev 被選中 ⇒ 退回 --grep 語意（R-18 未修）；"
-        "ok_trailer 未被選中 ⇒ 慣例（trailer 與 Co-Authored-By 同段）被破壞。\n"
-        f"stdout={p.stdout}"
+def test_ooe_audit_list_behavioral_parity_with_gate(tmp_path: Path) -> None:
+    """🔴 行為層等價〔CODEX-R2-P2-03〕：稽核清單選出的 commit 集合須**恰等於**閘的。
+
+    源碼比對（`test_ooe_audit_list_matches_gate`）擋不住這一類：前版
+    `gov_check.sh` 把自由文字的 `%s` 放在 trailer **之前**再取 `$3`，
+    subject 含 tab 的 commit 便整筆漏列——閘放行、稽核看不見，正好是
+    「非靜默旁路」這個設計目標的反面。codex 實測 `tab_subject` 出現此落差。
+
+    本測把兩邊的解析**原文**各自跑在同一個受控 repo 上，比對選出的 sha 集合。
+    mutation 反例：把 gov_check 的 format 改回 `%h\\t%s\\t<trailers>` 並取 `$3`
+    ⇒ `tab_subject` 只出現在閘側，集合不等 ⇒ 紅。
+    """
+    r, base, shas = _build_ooe_probe_repo(tmp_path)
+
+    gate = _gate_src()
+    fn = re.search(r"_g7_ooe_commits\(\) \{.*?\n\}", gate, re.S)
+    val = re.search(r"_G7_OOE_VALUE_RE='[^']*'", gate)
+    sep = re.search(r"_G7_OOE_MULTI_SEP=\$'[^']*'", gate)
+    assert fn and val and sep, "找不到閘側解析原文（refactor?→須更新本測）"
+    gate_snippet = (
+        f"{val.group(0)}\n{sep.group(0)}\n_G7_OOE_GRANDFATHER=''\n"
+        f"_base() {{ printf '%s' {base}; }}\n{fn.group(0)}\n_g7_ooe_commits\n"
     )
-    # grandfather 恆輸出（不在此 repo 內故無害）——確認它沒被順手拿掉
-    assert set(_G7_OOE_GRANDFATHER) <= got, "grandfather 未被輸出（例外集被移除？）"
+    gp = subprocess.run(["bash", "-c", gate_snippet], cwd=r, capture_output=True, text=True, check=False)
+    assert gp.returncode == 0, f"閘側執行失敗: {gp.stderr}"
+    gate_sel = {n for n, s in shas.items() if s in gp.stdout.split()}
+
+    # 稽核側：抽 gov_check.sh 的 `_ooe_raw=`／`_ooe_list=` 兩段賦值原文
+    gov = (REPO / "scripts" / "gov_check.sh").read_text(encoding="utf-8")
+    raw = re.search(r"_ooe_raw=\"\$\(git log --format=.*?\)\"", gov, re.S)
+    lst = re.search(r"_ooe_list=\"\$\(printf.*?\)\"\n", gov, re.S)
+    assert raw and lst, "找不到稽核側解析原文（refactor?→須更新本測）"
+    gov_snippet = (
+        f'_ooe_base={base}\n'
+        + raw.group(0).replace('"${_ooe_base}..HEAD"', f'{base}..HEAD')
+        + "\n" + lst.group(0)
+        + 'printf "%s\\n" "${_ooe_list}"\n'
+    )
+    vp = subprocess.run(["bash", "-c", gov_snippet], cwd=r, capture_output=True, text=True, check=False)
+    assert vp.returncode == 0, f"稽核側執行失敗: {vp.stderr}\n{gov_snippet}"
+    short = {n: s[:7] for n, s in shas.items()}
+    gov_sel = {n for n, s in short.items() if any(ln.startswith(s) for ln in vp.stdout.splitlines())}
+
+    assert gate_sel == gov_sel, (
+        f"稽核清單與閘不等價：gate={gate_sel} audit={gov_sel}\n"
+        "差集在 audit 側 ⇒ 已豁免路徑看不見（靜默旁路）；在 gate 側 ⇒ 稽核誤報。\n"
+        f"gate_stdout={gp.stdout}\naudit_stdout={vp.stdout}"
+    )
+    assert gate_sel == {"ok_trailer", "tab_subject"}, f"基準錯：{gate_sel}"
 
 
 def test_ooe_audit_list_matches_gate() -> None:
