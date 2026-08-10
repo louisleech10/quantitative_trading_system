@@ -1243,9 +1243,33 @@ ID 樣式清單須具名有界，**不得無界**。**驗收依 `票 B-24`：須
 
 🔴 **「改一項漏多項」的直接解——本票為 2026-08-04 使用者追問時才發現的缺口，前 22 張票皆未涵蓋。**
 
-### 🔴 2026-08-10 scope 缺口：**已落地的機制只涵蓋一個 key，「狀態事實」零涵蓋**
+### ✅ 2026-08-10 站 2.5 交付完成（兩家 `RECONCILE-STAMP APPROVED`）
 
-`scripts/fact_keys.json` 現況**恰有一個 fact-key**：`governance-execution-order`。
+- 收斂檔：`handoffs/reconcile/20260810-govb25-x-review-r6/synth.md`
+  （body sha `d85d8ff9…5b49`；`reconcile_stamps_check` rc=0）
+- 規格：`docs/GOVB25_STATUS_FACTKEY_SPEC.md`（r5）／`_TODO.md`／`docs/GOV_B25_SCOPE_AMENDMENT.md`
+- 審查量：SPEC 5 輪 27 條 ＋ TODO 1 輪 3 條 ＋ code review 1 輪 3 條 ＝ **7 輪 33 條，全數處置**
+- 交付：`target` 多宿主＋projection oracle／`_schema` 四項封閉集合／
+  `governance-batch-status`＋`governance-ticket-closure` 兩個狀態 key／手寫狀態偵測器／
+  拆除 21 行字面副本／延伸檔＋三條集合相等斷言
+- 驗收：`pytest tests/governance -q` **1326 passed**；`--check` rc=0；`--only g7` PASS；
+  誤擋率 `6/1031 ≈ 0.582%`（Wilson 95% CI 上界 1.26%）≤ 5%，兩家**受理**
+
+🔴 **仍具名殘留（不得宣稱本票已完全閉合）**：
+1. 不在 §E3 union 之票不入 key ⇒ 其狀態仍只存在於本檔散文。
+2. `status_scope_grandfathered` 7 檔（歷史日誌）維持手寫；清單以集合相等鎖死。
+3. `docs/` 前綴除已登記 target 外不納入掃描。
+4. 識別碼與狀態值分處兩行之手寫副本偵測不到。
+5. 被 `.gitignore` 忽略之檔不掃。
+6. **「判準資料化」（2026-08-07 併入項）未做**——需兩欄表格型 schema，其前置 `x-consult-r12 J-1` 仍成立。
+7. 誤擋率量測之**分母口徑混用**（pre-C2 命中清單 vs 現況行數），composer 指出，結論不變但下次須先固定 snapshot。
+8. 票號抽取器**內嵌於測試檔**（新增 `scripts/` 檔會撞 G-7），見延伸檔 §4。
+
+---
+
+### 🔴 2026-08-10 scope 缺口（**已由站 2.5 修復，保留為出生事故紀錄**）
+
+`scripts/fact_keys.json` 當時**恰有一個 fact-key**：`governance-execution-order`。
 「哪個批次做完了／哪張票關了」**沒有任何 key、沒有生成區塊、沒有機器檢查**
 （實測：`grep -ciE "progress|status|進度|狀態|batch" scripts/fact_keys.json` → **0**）。
 

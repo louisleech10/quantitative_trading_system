@@ -23,7 +23,19 @@ REF:handoffs/reconcile/20260810-govb1-b8-review-r1/synth.md
 
 🔴 **上述 block 一律不得手改**：改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`。
 
-## 🔴 接手第一件事：**站 2.5 的 C2 批**（Phase 2，單一 commit）
+## 🔴 接手第一件事：**站 2.6**（`票 B-37` 摩擦統計唯讀最小版）
+
+🔴 **動工前必先處理**：`gate_deny` 的 JSON 間距與其他事件不同（`"event":"gate_deny"` **無空格**，
+其餘為 `"event": "…"`）⇒ 以 `"event": "` 掃描會**靜默漏掉整類攔截紀錄**。細節與 receipt 見 `B-37` 票。
+排序理由與範圍見 `docs/GOVERNANCE_EXECUTION_ORDER.md` 序 `034`。
+
+### ✅ 站 2.5 已收案（2026-08-10，兩家 `RECONCILE-STAMP APPROVED`）
+
+收斂檔 `handoffs/reconcile/20260810-govb25-x-review-r6/synth.md`（body sha `d85d8ff9…5b49`，
+`reconcile_stamps_check` rc=0）。7 輪 33 條全數處置。**八條具名殘留見 backlog `B-25` 節**——
+其中「判準資料化」未做，故**不得宣稱 `票 B-25` 已完全閉合**。
+
+## ~~接手第一件事~~：站 2.5 的 C2 批（**已完成，本節留作紀錄**）
 
 規格＝`docs/GOVB25_STATUS_FACTKEY_SPEC.md`（r5 定案）＋`docs/GOVB25_STATUS_FACTKEY_TODO.md`。
 五輪審查之處置見 `handoffs/reconcile/20260810-govb25-x-review-r{1..5}/synth.md`（12＋7＋4＋1＋3 條）。
