@@ -15,19 +15,31 @@ REF:handoffs/reconcile/20260809-govb1-b7-review-r1/synth.md
 本 session 收案：B7 `a5ddf05`／B8 `52c4a1a`+`b6a9da2`／B9 `39037f5`+`be9fda0`／
 B10 `f674cb73`+`53d83dbf`(OOE)+`9e35f159`。四票皆兩家 `RECONCILE-STAMP APPROVED`。
 
-## 🔴 接手第一件事：**`票 B-50` 的 r3 審查**（r2 修補未經審查）
+## ✅ `票 B-50` **實作面收案**（四輪 9→3→1→0，兩家 APPROVED）｜🔴 **票仍 OPEN**
 
-`票 B-50`（執行端工作區污染偵測）**進行中，不得宣稱完成**。r2 三條已修但**未複驗**。
+`reconcile_stamps_check.sh handoffs/reconcile/20260810-govb1-x-review-r2/synth.md` rc=0
+（sha `8b285aee…9eec`）。偵測層 22 tests。
 
 | 面向 | 狀態 |
 |---|---|
-| 實作 形態②③ | r2 三條全修（換行路徑碰撞漏報／rename 假紅燈／標示），20 tests |
-| 流程面 | 🔴 **永久標記為跳步**（`CODEX-R2-P1-01` 裁 (C)：事後 TODO 只能記錄，不能關閉） |
-| 形態① 逸出允許清單 | 未閉合（brief 無該欄位，與 `票 B-51` 同源） |
-| 形態④ 執行端 commit | **新發現已入票、未實作**（見下方事故） |
+| 形態②③／checker receipt／訊噪比 | ✅ 閉合（含含空白·中文·**含換行**路徑、**rename 裸路徑**不誤報） |
+| **流程面** | 🔴 **永久標記為跳步**——**任何文件不得宣稱流程閉合**（`CODEX-R2-P1-01` 裁 (C)） |
+| 形態① 逸出允許清單 | 🔴 未做（需 `票 B-51` 的 brief 允許清單欄位） |
+| 形態④ 執行端 commit | 🔴 已入票、閉合條件已寫、**未實作** |
+| porcelain v2 | 🔴 非本實作輸入；改用 v2 須重驗裸路徑判定 |
 
-🔴 **接手前必讀** `handoffs/reconcile/20260810-govb1-x-review-r2/synth.md` C0–C4，
-特別是 C0（**兩家分歧時看碼證不數人頭**的實例）與 C4（自陳疑慮不得附帶自己的嚴重度判定）。
+🔴 **戳記行由主委逐字轉錄**（兩家寫在自己產出檔未 append），`diff` 比對 IDENTICAL，
+留痕在標的檔 `## 戳記` 區註解；provenance 以 `gate.sh register-output` 補記。
+
+🔴 **本票換來的可援引判準**（stamp-r2 兩家核可）：
+> **只有在固定 producer contract 與輸入字母表下機械不可達，才可稱「上界」；
+> 任何可跑 harness 反例均屬缺陷。**
+
+主委在本票內**兩次**把可重現的真缺陷寫成「宣告上界」，第二次被 hex 收據打回。
+
+🔴 **接手前必讀** `20260810-govb1-x-review-r2/synth.md` C0–C4
+（C0＝兩家分歧看碼證不數人頭的實例；C4＝自陳疑慮不得附帶自己的嚴重度判定）
+與 `20260810-govb1-x-stamp-r2/synth.md` C2（裸路徑位置語意的窮盡性實跑）。
 
 ## 🔴 2026-08-10 事故：**執行端 commit 進版控**（形態④，本票原本沒有這一類）
 
