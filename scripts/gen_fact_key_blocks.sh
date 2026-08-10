@@ -239,6 +239,139 @@ _fk_emit_all() {
   return "${_fke_rc}"
 }
 
+# 票 B-25 站 2.5 Task 2.1：手寫狀態偵測器。
+#
+# 範圍＝`_schema.status_scope` 宣告之 path/prefix 展開 **減去** `status_scope_grandfathered`。
+# 🔴 列舉器必含未追蹤檔（r2 CODEX-R2-P1-01／COMPOSER-R2-P1-03 實跑證明 `git ls-files`
+#    不含未追蹤路徑 ⇒ 首次 `git add` 前可手寫狀態而 --check 仍為 0）。
+# 🔴 不得把 status_scope 字串原樣當 git pathspec（r3 CODEX-R3-P1-02：
+#    `白話說明/第`→0 筆、`白話說明/第*`→4 筆、`白話說明/`→9 筆，三種寫法三種集合）
+#    ⇒ 先列舉全樹，再在腳本內依 exact／directory-prefix 兩種編碼過濾。
+# 🔴 非 git 樹 ⇒ fail-closed，不得靜默退回「只掃 target」。
+_fk_scope_files() {   # stdout: 範圍內檔案（相對 root），一行一筆
+  _fks_root="$(_fk_root)"
+  git -C "${_fks_root}" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+    echo "FACTKEY SCAN: ${_fks_root} 非 git 工作樹 ⇒ fail-closed（不得靜默退回只掃 target）" >&2
+    return 1; }
+  _fks_scope="$(LC_ALL=C jq -r '._schema.status_scope[]' "${REG}")" || return 1
+  _fks_gf="$(LC_ALL=C jq -r '._schema.status_scope_grandfathered[]' "${REG}")" || return 1
+  _fks_all="$(git -C "${_fks_root}" -c core.quotePath=false \
+                ls-files --cached --others --exclude-standard)" || return 1
+  # 🔴 多行值經**檔案**餵入 awk，不走 -v：BSD awk 的 -v 值不接受換行
+  #    （實測 macOS：`awk: newline in string ... at source line 1`）。此為平台事實，
+  #    與 `_fk_write` 的 blkfile 同一坑；主委 2026-08-10 在本檔內再犯一次。
+  _fks_sf="${TMPDIR:-/tmp}/.factkey-scope.$$"; _fks_gff="${TMPDIR:-/tmp}/.factkey-gf.$$"
+  printf '%s\n' "${_fks_scope}" > "${_fks_sf}"
+  printf '%s\n' "${_fks_gf}"    > "${_fks_gff}"
+  printf '%s\n' "${_fks_all}" | LC_ALL=C awk -v sf="${_fks_sf}" -v gff="${_fks_gff}" '
+    BEGIN {
+      n = 0
+      while ((getline line < sf) > 0) if (line != "") S[++n] = line
+      close(sf)
+      while ((getline line < gff) > 0) if (line != "") EX[line] = 1
+      close(gff)
+    }
+    {
+      if ($0 == "" || ($0 in EX)) next
+      hit = 0
+      for (i = 1; i <= n; i++) {
+        p = S[i]; if (p == "") continue
+        if (p ~ /\/$/) { if (index($0, p) == 1) hit = 1 }   # directory prefix（必以 / 結尾）
+        else          { if ($0 == p)            hit = 1 }   # exact path
+      }
+      if (hit) print
+    }'
+  _fks_rc=$?
+  rm -f "${_fks_sf}" "${_fks_gff}"
+  return "${_fks_rc}"
+}
+
+# 識別碼集合＝`_schema.status_keys` 所列 key 之 rows 第 2 欄（封閉、可由註冊表導出）。
+# 刻意排除 governance-execution-order：其第 2 欄為站名，併入會放大誤擋。
+_fk_status_ids() {
+  LC_ALL=C jq -r '. as $r | ._schema.status_keys[] as $k | $r[$k].rows[][1]' "${REG}" \
+    | LC_ALL=C sort -u
+}
+
+_fk_reject_handwritten_status() {
+  # 🔴 與 `_fk_validate_schema_sets` 同一語義（r5 CODEX-R5-P1-02）：
+  #    無任何 fact-key ⇒ 無事可做、rc=0；既有「空註冊表 rc=0」契約不變。
+  _fkh_keys="$(_fk_keys)" || return 1
+  [ -n "${_fkh_keys}" ] || return 0
+  _fkh_root="$(_fk_root)"
+  _fkh_files="$(_fk_scope_files)" || return 1
+  [ -n "${_fkh_files}" ] || return 0
+  _fkh_rc=0
+  # 非 regular file 一律 fail-closed（不遞迴、不略過）：一人遞迴另一人拒絕即集合不一致
+  while IFS= read -r _fkh_f; do
+    [ -n "${_fkh_f}" ] || continue
+    _fkh_p="${_fkh_root}/${_fkh_f}"
+    if [ -L "${_fkh_p}" ]; then
+      echo "FACTKEY SCAN: ${_fkh_f} 為 symlink ⇒ fail-closed" >&2; _fkh_rc=1; continue
+    fi
+    [ -f "${_fkh_p}" ] || {
+      echo "FACTKEY SCAN: ${_fkh_f} 非 regular file（submodule／缺檔）⇒ fail-closed" >&2
+      _fkh_rc=1; }
+  done <<EOF
+${_fkh_files}
+EOF
+  [ "${_fkh_rc}" = "0" ] || return 1
+
+  # 🔴 同上：多行值走檔案，不走 -v（BSD awk 限制）
+  _fkh_idf="${TMPDIR:-/tmp}/.factkey-ids.$$"; _fkh_ef="${TMPDIR:-/tmp}/.factkey-enum.$$"
+  _fk_status_ids > "${_fkh_idf}" || { rm -f "${_fkh_idf}"; return 1; }
+  LC_ALL=C jq -r '._schema.status_enum[]' "${REG}" > "${_fkh_ef}" || {
+    rm -f "${_fkh_idf}" "${_fkh_ef}"; return 1; }
+  _fkh_out="$(
+    while IFS= read -r _fkh_f; do
+      [ -n "${_fkh_f}" ] || continue
+      LC_ALL=C awk -v idf="${_fkh_idf}" -v ef="${_fkh_ef}" -v rel="${_fkh_f}" '
+        # 🔴 邊界判定用「原始行 ＋ 絕對位置」，不得切片後重判
+        #    （r4 CODEX-R4-P1-01：切片會丟失左側前文，B3RB3R 誤抽）
+        function has_token(s, t,   off, rest, p, st, pre, post) {
+          off = 0; rest = s
+          while ((p = index(rest, t)) > 0) {
+            st   = off + p
+            pre  = (st == 1) ? "" : substr(s, st - 1, 1)
+            post = substr(s, st + length(t), 1)
+            if (pre !~ /[0-9A-Za-z_-]/ && post !~ /[0-9A-Za-z_-]/) return 1
+            off  = st + length(t) - 1
+            rest = substr(s, off + 1)
+          }
+          return 0
+        }
+        BEGIN {
+          ni = 0; ne = 0
+          while ((getline line < idf) > 0) if (line != "") I[++ni] = line
+          close(idf)
+          while ((getline line < ef) > 0) if (line != "") E[++ne] = line
+          close(ef)
+        }
+        /^<!-- BEGIN GENERATED: .* -->$/ { inblk = 1; next }
+        /^<!-- END GENERATED: .* -->$/   { inblk = 0; next }
+        inblk { next }
+        {
+          ehit = ""
+          for (j = 1; j <= ne; j++) if (E[j] != "" && index($0, E[j])) { ehit = E[j]; break }
+          if (ehit == "") next
+          ihit = ""
+          for (j = 1; j <= ni; j++) if (I[j] != "" && has_token($0, I[j])) { ihit = I[j]; break }
+          if (ihit == "") next
+          printf "FACTKEY HANDWRITTEN STATUS: %s:%d 識別碼=%s 狀態=%s\n", rel, FNR, ihit, ehit
+        }
+      ' "${_fkh_root}/${_fkh_f}"
+    done <<EOF2
+${_fkh_files}
+EOF2
+  )" || { rm -f "${_fkh_idf}" "${_fkh_ef}"; return 1; }
+  rm -f "${_fkh_idf}" "${_fkh_ef}"
+  [ -z "${_fkh_out}" ] || {
+    printf '%s\n' "${_fkh_out}" >&2
+    echo "FACTKEY: 生成區塊外偵測到手寫狀態（改資料檔＋--write，或改為指向區塊之指標）→ fail-closed" >&2
+    return 1; }
+  return 0
+}
+
 _fk_check() {
   _fk_validate_keys || return 1
   _fk_validate_schema_sets || return 1
@@ -272,6 +405,8 @@ EOF
   done < <(_fk_keys)
   # 未登記之 generated block 一律拒〔CODEX-R1-P1-02〕
   _fk_reject_unregistered_blocks || _fkc_rc=1
+  # 生成區塊外之手寫狀態一律拒（票 B-25 站 2.5 Task 2.1）
+  _fk_reject_handwritten_status || _fkc_rc=1
   return "${_fkc_rc}"
 }
 

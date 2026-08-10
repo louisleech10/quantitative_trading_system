@@ -228,6 +228,20 @@ def _sandbox(tmp_path: Path, registry: dict, *, inject_schema: bool = True) -> P
     return sdir
 
 
+def _mkroot(tmp_path: Path, name: str = "root") -> Path:
+    """建立一個 tmp 宿主根，並 `git init`。
+
+    🔴 票 B-25 站 2.5 Task 2.1 邊界⑥：偵測器要求 root 為 git 工作樹，否則 fail-closed
+    （不得靜默退回「只掃 target」）。三個候選解中採 (a)——在 helper 內 git init，
+    保留 fail-closed 契約；(b) 空 status_scope 與 Task 1.2 衝突、(c) 依環境變數跳過＝靜默旁路。
+    非 git 樹之 fail-closed 另有專測 `test_t21_non_git_root_is_fail_closed`。
+    """
+    root = tmp_path / name
+    (root / "docs").mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q"], cwd=str(root), check=True, capture_output=True)
+    return root
+
+
 def _mutate(sdir: Path, old: str, new: str) -> None:
     p = sdir / GEN.name
     src = p.read_text(encoding="utf-8")
@@ -319,8 +333,7 @@ def test_t21_m1c_generation_failure_is_not_swallowed(tmp_path):
     於是「jq/sort 掛了但輸出恰好相符」＝靜默通過。
     引信：讓副本的 `_fk_gen_block` **輸出正確 block 之後 return 1**。
     """
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     reg = {"k": {"target": "docs/t.md", "rows": [["010", "a"]]}}
     sdir = _sandbox(tmp_path, reg)
     env = {"GOVB1_FACTKEY_ROOT": str(root)}
@@ -344,8 +357,7 @@ def test_unregistered_generated_block_is_rejected(tmp_path):
 
     那種區塊長得像機械產物、讀者會當成權威，但註冊表不知道它 ⇒ 永遠不會被比對。
     """
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     reg = {"k": {"target": "docs/t.md", "rows": [["010", "a"]]}}
     sdir = _sandbox(tmp_path, reg)
     env = {"GOVB1_FACTKEY_ROOT": str(root)}
@@ -441,8 +453,7 @@ def test_missing_target_file_is_fail_closed(tmp_path):
 
 def test_no_marker_is_fail_closed_not_silent_pass(tmp_path):
     """🔴 TODO 邊界②：宿主檔缺邊界標記 ⇒ rc≠0（本條若失守，機制形同關閉）。"""
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     (root / "docs" / "t.md").write_text("沒有任何標記\n", encoding="utf-8")
     sdir = _sandbox(tmp_path, {"k": {"target": "docs/t.md", "rows": [["1", "a"]]}})
     r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
@@ -451,8 +462,7 @@ def test_no_marker_is_fail_closed_not_silent_pass(tmp_path):
 
 
 def test_duplicate_markers_are_fail_closed(tmp_path):
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     (root / "docs" / "t.md").write_text(
         "<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n"
         "<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n",
@@ -465,8 +475,7 @@ def test_duplicate_markers_are_fail_closed(tmp_path):
 
 def test_write_refuses_when_markers_absent(tmp_path):
     """--write 不得憑空追加：位置不明的寫入比不寫更危險。"""
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     tgt = root / "docs" / "t.md"
     tgt.write_text("原文\n", encoding="utf-8")
     sdir = _sandbox(tmp_path, {"k": {"target": "docs/t.md", "rows": [["1", "a"]]}})
@@ -476,8 +485,7 @@ def test_write_refuses_when_markers_absent(tmp_path):
 
 
 def test_write_then_check_round_trip(tmp_path):
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     tgt = root / "docs" / "t.md"
     tgt.write_text(
         "前言\n<!-- BEGIN GENERATED: k -->\n舊內容\n<!-- END GENERATED: k -->\n後記\n",
@@ -564,8 +572,7 @@ def _rows(key: str) -> list[list[str]]:
 def _multi_root(tmp_path: Path, a_body: str, b_body: str) -> tuple[Path, Path]:
     reg = {"k": {"target": ["docs/a.md", "docs/b.md"], "rows": [["010", "x"]]}}
     sdir = _sandbox(tmp_path, reg)
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     (root / "docs" / "a.md").write_text(a_body, encoding="utf-8")
     (root / "docs" / "b.md").write_text(b_body, encoding="utf-8")
     return sdir, root
@@ -605,8 +612,7 @@ def test_t11_projection_oracle_two_hosts_self_consistent_but_different(tmp_path)
 def test_t11_target_array_edge_cases_are_fail_closed(tmp_path, bad_target):
     reg = {"k": {"target": bad_target, "rows": [["010", "x"]]}}
     sdir = _sandbox(tmp_path, reg)
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     (root / "docs" / "a.md").write_text(_BLK_OK, encoding="utf-8")
     r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
     assert r.returncode != 0, f"target={bad_target} 應 fail-closed"
@@ -625,8 +631,7 @@ def test_t12_schema_set_absent_is_fail_closed(tmp_path, drop):
     }
     del reg["_schema"][drop]
     sdir = _sandbox(tmp_path, reg, inject_schema=False)
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     (root / "docs" / "a.md").write_text(_BLK_OK, encoding="utf-8")
     r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
     assert r.returncode != 0, f"_schema.{drop} 缺席卻通過 ⇒ fail-open"
@@ -641,8 +646,7 @@ def test_t12_status_keys_containing_unregistered_key_is_fail_closed(tmp_path):
         "k": {"target": "docs/a.md", "rows": [["010", "x"]]},
     }
     sdir = _sandbox(tmp_path, reg, inject_schema=False)
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     (root / "docs" / "a.md").write_text(_BLK_OK, encoding="utf-8")
     r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
     assert r.returncode != 0
@@ -658,8 +662,7 @@ def test_t12_status_scope_wildcard_is_fail_closed(tmp_path, scope):
         "k": {"target": "docs/a.md", "rows": [["010", "x"]]},
     }
     sdir = _sandbox(tmp_path, reg, inject_schema=False)
-    root = tmp_path / "root"
-    (root / "docs").mkdir(parents=True)
+    root = _mkroot(tmp_path)
     (root / "docs" / "a.md").write_text(_BLK_OK, encoding="utf-8")
     r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
     assert r.returncode != 0, f"status_scope={scope} 含 wildcard 卻通過"
@@ -730,3 +733,118 @@ def test_status_values_are_all_in_status_enum():
 def test_ticket_token_boundary_matrix(text, expected):
     """r3 CODEX-R3-P1-01 ＋ r4 CODEX-R4-P1-01：末兩列為 sliced-context 反例。"""
     assert _tok(text) == expected, f"輸入 {text!r}"
+
+
+# --- Task 2.1 手寫狀態偵測器 --------------------------------------------
+
+def _detector_case(tmp_path: Path, *, body: str, other_name: str = "other.md",
+                   track: bool = True, grandfathered=None):
+    reg = {"k": {"target": "docs/a.md", "rows": [["010", "ZZID"]]}}
+    if grandfathered is not None:
+        reg = {
+            "_schema": {"status_enum": ["✅"], "status_keys": ["k"],
+                        "status_scope": ["docs/"],
+                        "status_scope_grandfathered": grandfathered},
+            **reg,
+        }
+        sdir = _sandbox(tmp_path, reg, inject_schema=False)
+    else:
+        sdir = _sandbox(tmp_path, reg)
+    root = _mkroot(tmp_path)
+    (root / "docs" / "a.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n010\tZZID\n<!-- END GENERATED: k -->\n",
+        encoding="utf-8")
+    (root / "docs" / other_name).write_text(body, encoding="utf-8")
+    if track:
+        subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    return _run([str(sdir / GEN.name), "--check"],
+                env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+
+
+def test_t21_handwritten_status_in_tracked_file_is_rejected(tmp_path):
+    """ASSERT --check WHEN 範圍內已追蹤檔於區塊外手寫一行狀態 THEN rc!=0"""
+    r = _detector_case(tmp_path, body="批次 ZZID 目前 ✅ 了\n")
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert "HANDWRITTEN" in r.stderr and "ZZID" in r.stderr
+
+
+def test_t21_handwritten_status_in_untracked_file_is_rejected(tmp_path):
+    """ASSERT --check WHEN 範圍內**未追蹤**檔於區塊外手寫一行狀態 THEN rc!=0
+
+    🔴 r2 CODEX-R2-P1-01／COMPOSER-R2-P1-03 之承重測試：
+    列舉器若只用 `git ls-files`（不帶 --others），本測試轉綠 ⇒ 旁路重開。
+    """
+    r = _detector_case(tmp_path, body="批次 ZZID 目前 ✅ 了\n", track=False)
+    assert r.returncode != 0, "未追蹤檔的手寫狀態未被偵測 ⇒ r2 旁路重現"
+    assert "ZZID" in r.stderr
+
+
+def test_t21_same_line_inside_generated_block_is_ok(tmp_path):
+    """ASSERT --check WHEN 同一行改置於生成區塊內 THEN rc=0
+
+    證明鑑別力來源是「在不在區塊外」，不是「檔案裡有沒有這些字」。
+    """
+    r = _detector_case(
+        tmp_path,
+        body="<!-- BEGIN GENERATED: zz -->\n批次 ZZID 目前 ✅ 了\n<!-- END GENERATED: zz -->\n",
+        other_name="b.md")
+    # 未登記 block 會另行拒絕；此處只驗「不是被手寫狀態偵測器擋的」
+    assert "HANDWRITTEN" not in r.stderr, r.stderr
+
+
+def test_t21_identifier_and_status_on_separate_lines_not_triggered(tmp_path):
+    """具名偵測邊界（SPEC Task 2.1 邊界①）：兩者分處兩行 ⇒ 不觸發。"""
+    r = _detector_case(tmp_path, body="批次 ZZID\n目前 ✅ 了\n")
+    assert "HANDWRITTEN" not in r.stderr, r.stderr
+
+
+def test_t21_grandfathered_list_is_locked_by_set_equality():
+    """🔴 豁免清單以集合相等鎖死 ⇒ 新增檔案無法靜默加入豁免。
+
+    本測試即該「集合相等」之機械載體：改 registry 的豁免清單而不改本表即轉紅。
+    """
+    expected = {
+        "白話說明/README.md",
+        "白話說明/流程摩擦記錄.md",
+        "白話說明/治理進度日誌.md",
+        "白話說明/第0批-在做什麼.md",
+        "白話說明/第0批-施工清單.md",
+        "白話說明/第1批-在做什麼.md",
+        "白話說明/第1批-施工清單.md",
+    }
+    got = set(json.loads(REG.read_text(encoding="utf-8"))
+              ["_schema"]["status_scope_grandfathered"])
+    assert got == expected, (
+        f"豁免清單與本表不相等：多={sorted(got - expected)} 少={sorted(expected - got)}。"
+        "新增豁免須同時修訂本表並經審查——這正是「不得靜默加入豁免」的機械強制點。"
+    )
+
+
+def test_t21_non_git_root_is_fail_closed(tmp_path):
+    """SPEC Task 2.1 邊界⑥：非 git 樹 ⇒ fail-closed，不得靜默退回只掃 target。"""
+    reg = {"k": {"target": "docs/a.md", "rows": [["010", "ZZID"]]}}
+    sdir = _sandbox(tmp_path, reg)
+    root = tmp_path / "nogit"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "a.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n010\tZZID\n<!-- END GENERATED: k -->\n",
+        encoding="utf-8")
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+    assert r.returncode != 0, "非 git 樹卻通過 ⇒ 靜默退回，fail-open"
+    assert "非 git 工作樹" in r.stderr
+
+
+def test_t21_symlink_in_scope_is_fail_closed(tmp_path):
+    """SPEC Task 2.1：symlink／gitlink 一律 fail-closed（不遞迴、不略過）。"""
+    reg = {"k": {"target": "docs/a.md", "rows": [["010", "ZZID"]]}}
+    sdir = _sandbox(tmp_path, reg)
+    root = _mkroot(tmp_path)
+    (root / "docs" / "a.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n010\tZZID\n<!-- END GENERATED: k -->\n",
+        encoding="utf-8")
+    (root / "outside.md").write_text("x\n", encoding="utf-8")
+    (root / "docs" / "link.md").symlink_to(root / "outside.md")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+    assert r.returncode != 0, "symlink 未 fail-closed"
+    assert "symlink" in r.stderr
