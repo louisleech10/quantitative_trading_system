@@ -19,6 +19,30 @@ REF:handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md
 
 🔴 **generated block 一律不得手改**：改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`。
 
+## 🔴 使用者 2026-08-11 裁定：**照順序表走，不插隊**
+
+明確答覆「就照你的順序」⇒ **站 4 → 站 5 → 站 6 → 站 7**，不為了 `R-12` 把站 7 的解凍提前。
+🔴 **不要再去問使用者要不要解凍**——已問過，答案是照順序。等真的走到站 7 再整包提出。
+
+## 🔴 地雷：`scripts/governance_roles.json` 的 `implementer: grok` **是刻意的，不是漏改**
+
+看起來「名冊與事實不符」（grok 額度封鎖、實際實作端是主委），但 `set_roles.sh:54-57`
+逐字記載了兩家 APPROVED 的裁決：
+
+```
+implementer=grok      → 非實作者池 {codex, composer} → 2 家可用 ✅
+implementer=codex     → {composer, grok} → 僅 1 家可用 ❌ quorum 當場破
+implementer=composer  → {codex, grok}    → 僅 1 家可用 ❌ quorum 當場破
+```
+
+⇒ **把實作者掛在一個不會真的被派工的家族上，是目前唯一能湊出「兩家 review」的辦法。**
+改成 codex 或 composer ⇒ 下一次 code review 只剩一家 ⇒ **全部派工當場被擋死**。
+
+🔴 **票 `B-49` 的第 4 條（使用者改名冊）是最後一步，不是第一步**：
+條文逐字為「**之後才**由使用者更新」，前三條（`:769` 改 fail-closed、mutation 證據、
+`eligible` 與測試家族集合機械連動）都要先做，而它們全在凍結的五檔內。
+⇒ **現在單獨改名冊只會把洞開著**。主委 2026-08-11 曾把這條講成「卡在使用者身上」，**措辭不準，已更正**。
+
 ## 🔴 接手第一件事：**站 4 — `B3R` 的 O(n) scanner**（序 `050`）
 
 出處：`handoffs/reconcile/20260809-govb1-b3-review-r8/synth.md:44-50`（`CODEX-R8-P1-03`）。
@@ -51,8 +75,17 @@ REF:handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md
   而 POSIX awk 沒有「從偏移量開始 match」的原語 ⇒ 這是**演算法重寫**，不是微調。
   這正是 SPEC 把它放進 Phase 2「原型與差分」而非直接實作的理由。
 
-**接手時**：原型與三支量測腳本在 `.claude/tmp/`（`bench_lex.sh`／`diff_lex.sh`／`prof_lex.sh`），
-worktree 若已被清掉，用 `git worktree add` 重建再套同一組替換即可。
+**接手時**（四支工具皆在 `.claude/tmp/`，**gitignored 但本機留存**；session scratchpad 會隨壓縮消失，故已複製出來）：
+
+| 檔 | 用途 |
+|---|---|
+| `.claude/tmp/on_rewrite.py` | 把 20 處逐字元累加機械替換成 `ACC_*`；**每條規則斷言命中次數，漏一處即拒寫檔** |
+| `.claude/tmp/bench_lex.sh` | C-5 效能樁（輸出 `gen=` 與 `lex=` 分開，避免把測具耗時算進去） |
+| `.claude/tmp/diff_lex.sh` | 舊 vs 新之差分：前處理輸出逐位元組 ＋ 判定 rc，出口＝差異 0 |
+| `.claude/tmp/prof_lex.sh` | 把 `_gate_cmd_is_dispatch` 拆四段計時，定位瓶頸落在哪一段 |
+
+原型 worktree：`.claude/tmp/probe-r11r12`（`git worktree list` 可見，detached `4b8346d6`）。
+若已被清掉：`git worktree add .claude/tmp/probe-r11r12 --detach <sha>` 後跑 `on_rewrite.py` 即可重建。
 🔴 **`bench` 的 payload 生成必須是 O(n)**（`sprintf("%*s")`＋`gsub`）——初版用逐字元累加造字串，
 量到的是測具自己，主委已踩過一次。
 
