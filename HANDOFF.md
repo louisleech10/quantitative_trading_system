@@ -23,11 +23,22 @@ REF:handoffs/reconcile/20260810-govb1-b8-review-r1/synth.md
 
 🔴 **上述 block 一律不得手改**：改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`。
 
-## 🔴 接手第一件事：**站 2.6**（`票 B-37` 摩擦統計唯讀最小版）
+## 🔴 接手第一件事：**站 2.6 的實作**（`票 B-37` 唯讀最小版）
 
-🔴 **動工前必先處理**：`gate_deny` 的 JSON 間距與其他事件不同（`"event":"gate_deny"` **無空格**，
-其餘為 `"event": "…"`）⇒ 以 `"event": "` 掃描會**靜默漏掉整類攔截紀錄**。細節與 receipt 見 `B-37` 票。
-排序理由與範圍見 `docs/GOVERNANCE_EXECUTION_ORDER.md` 序 `034`。
+SPEC **r3 定案**（`docs/GOVB37_FRICTION_TALLY_SPEC.md`）＋ TODO 已生成
+（`docs/GOVB37_FRICTION_TALLY_TODO.md`，過範本閘）。審查 2 輪 9 條全數處置
+（收斂檔 `handoffs/reconcile/20260810-govb37-x-review-r{1,2}/synth.md`）。
+**批 D1 ＝ Task 1.1–1.3 單一 commit**；Gate 六項見 TODO §B。
+
+🔴 **兩項未閉合**：
+1. `CODEX-R2-P0-01`（quote-aware 配平）之關閉**待原提出方複驗** ⇒ 併入 TODO 審查輪必答第 1 條。
+2. `票 B-37` 修法③「強制機制」**未交付**——原 Phase 2 已於 r1 被兩家實測判死
+   （非豁免命中 10 行全為 FP；反引號豁免使最主要違規行不觸發 ⇒ **判準與目標互斥**）。
+   **已證偽方向記於 SPEC §N 殘留 3，不得重試關鍵字黑名單。**
+
+🔴 **地雷（實測）**：`gate_deny` **1385 筆全部無空格**，其餘 **3955 筆全部有空格**
+⇒ 以 `"event": "` 掃描會漏掉整類攔截紀錄（約 26%）。`audit.log` 為 append-only，
+三次重跑得 3950／3953／3955 ⇒ **任何計數必附快照座標**（`lines` ＋ `sha256[0:12]`）。
 
 ### ✅ 站 2.5 已收案（2026-08-10，兩家 `RECONCILE-STAMP APPROVED`）
 

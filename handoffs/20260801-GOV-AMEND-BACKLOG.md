@@ -1918,10 +1918,14 @@ codex R1 實跑：把真實 handoff 截成 6 行、保留一個完整 finding bo
 **Phase 0 ＝ `Task 0.1 gate_deny 記錄被擋指令與命中規則` ＝ 第 0 批 `B1`，已完成並審查通過。**
 實測（2026-08-10；🔴 **不寫死筆數**——`audit.log` 每輪都在長，寫死即刻過期）：
 
-```
-grep -c '"event":"gate_deny"' .claude/gate/audit.log                        # 總數
-grep '"event":"gate_deny"' .claude/gate/audit.log | grep -c cmd_sha256      # 帶新欄位者
-```
+<!-- BEGIN FRICTION-CMD -->
+bash scripts/friction_tally.sh --by-event
+bash scripts/friction_tally.sh --field-presence
+<!-- END FRICTION-CMD -->
+
+🔴 **原文為手搓文字搜尋**（`grep -c` ＋ 管線再 `grep -c`），已於站 2.6 替換。
+該寫法對 JSON 間距敏感——`gate_deny` 全數無空格、其餘全數有空格，
+以有空格樣式掃描會**靜默漏掉整類攔截紀錄**。工具兩種間距皆計入，並附對帳恆等式。
 
 當日兩次量測相隔數小時即由 `1343/676` 變為 `1357/690`，**足以說明為何不得寫死**。
 帶新欄位者已遠超本檔 `[OPEN-3]` 所定的「Phase 0 後 ≥200 筆」補查門檻。
