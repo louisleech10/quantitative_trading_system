@@ -57,7 +57,7 @@ REF:handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md
 - `B3R` O(n) scanner 未交付（`CODEX-R8-P1-03`）⇒ 不得宣稱達標
 - `票 B-15` 誤擋在 `B7` 之後仍存在（`printf`／`find`／`ls`／`gate.sh` 自身）⇒ GOVB0 `B4` Task 2.3/2.4
 - `gate_check` 對真派工放行：process substitution／`xargs -n 1`／`env FOO=bar`／動態賦值／絕對路徑 `bash -c` ⇒ GOVB0 `B4`
-- `票 B-50` 流程面永久標記為跳步；`票 B-31` 對外只能說「產出端已有檢查點」
+- `票 B-50` 流程面永久標記為跳步；`票 B-31` 對外只能說「產出端已有檢查點」（`票 B-53` 落地前）
 - `plain_docs_sync_check.sh` catch-all 回空字串 ⇒ 新增說明檔預設不受監看
 - `R-15`：`scripts/governance_families.json` 不可 commit ⇒ ambient M
 - `.claude/gate/*.log`、`docs/GOVB0_FRICTION_AMENDMENTS.md`、`handoffs/**` 不得 commit
@@ -69,6 +69,12 @@ REF:handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md
 - 🔴 **凍結測試檔會以原始碼字面錨定生產腳本的行**（`_CR_BK_FULL_EXTRACT` 等）⇒ 那些行等於被連帶凍結，
   **改對了也會紅**。解法＝保留該行逐字、只換它的輸入。
 - 🔴 **委員戳記主委不得代寫**——sha 掉字要重派，不得自己補。
+- 🔴 **改 `scripts/fact_keys.json` 的連鎖三件事**（本 session 因精簡 HANDOFF 砍掉此條，當場踩回去）：
+  ① 跑 `--write` 重生成所有宿主檔　② **同步兩份 fixture**（`factkey_clean`／`factkey_drifted`，
+  drifted 須保留其單列竄改）　③ 生成內容**不得含任何 `20\d{2}-\d{2}-\d{2}` 形狀的字串**（防時間戳的決定性守衛）。
+- 🔴 **新開票會改變 `governance-ticket-closure` 的機械導出集合**：union＝`HANDOFF.md` 之
+  「未修的活缺口」節 ∪ backlog 之「2026-08-10 scope 缺口」節所提及的票號。
+  ⇒ 在 HANDOFF 增刪票號提及**就會**讓 `test_e3_ticket_union_matches_key_rows` 轉紅，須同步 `fact_keys.json`。
 - 🔴 **兩家 Verdict 分歧看碼證不數人頭**；附可重現反例者勝過 sentinel；不決採較嚴版。
 - 🔴 **`docs/` 與新增 `scripts/` 檔不在 manifest** ⇒ commit 須帶 `Governance-Scope: out-of-epic` trailer，
   且**trailer 必須在最後一段**（git 只解析最末段；本 session 因寫在中段而 g7 紅過一次）。收尾跑 `--only g7`。
