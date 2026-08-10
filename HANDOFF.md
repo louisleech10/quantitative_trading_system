@@ -1,91 +1,63 @@
 # Handoff
 
+REF:handoffs/reconcile/20260810-govb1-x-review-r2/synth.md
 REF:handoffs/reconcile/20260810-govb1-b10-review-r2/synth.md
 REF:handoffs/reconcile/20260810-govb1-b9-review-r1/synth.md
 REF:handoffs/reconcile/20260810-govb1-b8-review-r1/synth.md
-REF:handoffs/reconcile/20260809-govb1-b7-review-r1/synth.md
 
 🔴 **`REF:` 只准列「已戳記」之 reconcile——所有列。** 派工前 `bash scripts/reconcile_stamps_check.sh <檔>` 驗 rc=0。
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-10 | **Branch**: main | 實作端＝主委自任；review＝codex+composer
 
-## GOVB1 第 1 批（B1–B10）｜最終閘 12/12 PASS｜測試 1129 → **1283**
+## 🔴 狀態一律看唯一來源，本檔不重述
 
-🔴 **不得寫「全數收案」**（2026-08-10 三處誇大已更正）：`b1-review-r6` 內容寫「批 1 收案」
-但**無 `RECONCILE-STAMP`**；`b4-review-r4` 明寫「**階段 1 收案**」、階段 2 未開工。
-各批次狀態**唯一來源**＝`docs/GOVERNANCE_EXECUTION_ORDER.md`，本檔與白話說明**只得 pointer**。
-
-`bash scripts/govb1_final_gate.sh` → `g0_tests g0_syntax g1..g8 gate_b3 lifecycle_embed` 全 PASS。
-本 session 收案：B7 `a5ddf05`／B8 `52c4a1a`+`b6a9da2`／B9 `39037f5`+`be9fda0`／
-B10 `f674cb73`+`53d83dbf`(OOE)+`9e35f159`。四票皆兩家 `RECONCILE-STAMP APPROVED`。
-
-## ✅ `票 B-50` **實作面收案**（四輪 9→3→1→0，兩家 APPROVED）｜🔴 **票仍 OPEN**
-
-`reconcile_stamps_check.sh handoffs/reconcile/20260810-govb1-x-review-r2/synth.md` rc=0
-（sha `8b285aee…9eec`）。偵測層 22 tests。
-
-| 面向 | 狀態 |
+| 事實 | 唯一來源 |
 |---|---|
-| 形態②③／checker receipt／訊噪比 | ✅ 閉合（含含空白·中文·**含換行**路徑、**rename 裸路徑**不誤報） |
-| **流程面** | 🔴 **永久標記為跳步**——**任何文件不得宣稱流程閉合**（`CODEX-R2-P1-01` 裁 (C)） |
-| 形態① 逸出允許清單 | 🔴 未做（需 `票 B-51` 的 brief 允許清單欄位） |
-| 形態④ 執行端 commit | 🔴 已入票、閉合條件已寫、**未實作** |
-| porcelain v2 | 🔴 非本實作輸入；改用 v2 須重驗裸路徑判定 |
+| 施工順序、各站狀態 | `docs/GOVERNANCE_EXECUTION_ORDER.md` 的 **generated block**（敘述段是第二份副本，**已咬過一次**） |
+| 票的內容與狀態 | `handoffs/20260801-GOV-AMEND-BACKLOG.md`（53 張） |
+| 給使用者的現況 | `白話說明/接下來要做什麼.md` |
 
-🔴 **戳記行由主委逐字轉錄**（兩家寫在自己產出檔未 append），`diff` 比對 IDENTICAL，
-留痕在標的檔 `## 戳記` 區註解；provenance 以 `gate.sh register-output` 補記。
+🔴 **不得在本檔或白話說明寫「第 N 批全數收案」這類狀態**——該句 2026-08-10 在四份檔各有一份副本，
+逐份手改連漏三次，最後以 `grep -rn` 才找齊。**這正是 `站 2.5` 要治的病。**
 
-🔴 **本票換來的可援引判準**（stamp-r2 兩家核可）：
-> **只有在固定 producer contract 與輸入字母表下機械不可達，才可稱「上界」；
-> 任何可跑 harness 反例均屬缺陷。**
+## 🔴 接手第一件事：**站 2.5**（`票 B-25` scope 擴充：批次/票狀態入 fact-key）
 
-主委在本票內**兩次**把可重現的真缺陷寫成「宣告上界」，第二次被 hex 收據打回。
+`scripts/fact_keys.json` 現況**恰有一個 key**（執行順序），狀態事實**零涵蓋**。
+生成器（`scripts/gen_fact_key_blocks.sh`）**已存在**，只需擴充 key 與宿主檔邊界標記。
+逐條證據與閉合條件見 backlog 的 `B-25` 節「2026-08-10 scope 缺口」。
 
-🔴 **接手前必讀** `20260810-govb1-x-review-r2/synth.md` C0–C4
-（C0＝兩家分歧看碼證不數人頭的實例；C4＝自陳疑慮不得附帶自己的嚴重度判定）
-與 `20260810-govb1-x-stamp-r2/synth.md` C2（裸路徑位置語意的窮盡性實跑）。
+之後：`站 2.6`（`票 B-37` 唯讀最小版）→ `站 2.7`（`b1` 補戳記、`b4` 階段 2）→ 順序表其餘各站。
 
-## 🔴 2026-08-10 事故：**執行端 commit 進版控**（形態④，本票原本沒有這一類）
-
-r2 審查期間執行端對真實 repo 做三個 commit（`d63773a4`／`b8f5c4c2`／`7be8a11c`），
-把探針 fixture 提交進版控 ⇒ `g7` 紅、4 條測試紅。已 `git reset --mixed`（未推、不動工作區），
-污染檔 `mv` 至 `.claude/tmp/executor-pollution-20260810/`（**未刪，留供稽核**）。清理後 1281 passed。
-
-🔴 **偵測器有作動、但主委沒讀到**——輸出在 `committee_run` 日誌尾端，是測試轉紅才回頭查。
-⇒ **偵測到 ≠ 被讀到**。閉合條件已補（形態④ 比對 `HEAD`；②③④ 須進**最終摘要行**）。
-
-## 🔴 六張殘留票**無批次歸屬 ⇒ 需要一次裁定**
-
-`B-48`／`B-49`／`B-50`／`B-51`／`B-52`／`B-53` 全文在
-`handoffs/20260801-GOV-AMEND-BACKLOG.md`（**本檔只放 pointer**）。
-六張在 `docs/GOVERNANCE_EXECUTION_ORDER.md` 的 generated block **零命中 ⇒ 不會被排到**。
-🔴 主委**停碼未自行排入**：排序＝改 `scripts/fact_keys.json` 並重生成，而使用者 2026-08-09
-定案「**不得再開執行順序討論**」、該檔 `LAST-RULED` 亦為使用者 ⇒ 依 `票 B-51` 須先取得裁決。
-
-**順序唯一來源**＝該檔；下一站 **站 3 `B-26`**（編號登記，仍 ⬜）→ 站 4 `B3R` → 站 5 第 0 批 `B4`–`B7`。
+🔴 **`站 2.6` 動工前必先處理**：`gate_deny` 的 JSON 間距與其他事件不同
+（`"event":"gate_deny"` 無空格）⇒ 以 `"event": "` 掃描會漏掉該類事件。細節與 receipt 見 `B-37` 票。
 
 ## 🔴 未修的活缺口
 
-`gate_check` 對下列**真派工**放行：process substitution／`xargs -n 1`／`env FOO=bar`／
-動態賦值／絕對路徑 `bash -c` ⇒ 歸 **GOVB0 B4**。`CODEX-R8-P1-03`：B3R 的 O(n) scanner 未交付。
-`R-15`：`scripts/governance_families.json` 不可 commit ⇒ ambient M。
-`.claude/gate/*.log`、`docs/GOVB0_FRICTION_AMENDMENTS.md`、`handoffs/**` 不得 commit。
-`docs/ROADMAP.md` 不在 manifest ⇒ 更新須走 OOE；本 session 未更新。
+- `gate_check` 對真派工放行：process substitution／`xargs -n 1`／`env FOO=bar`／動態賦值／絕對路徑 `bash -c` ⇒ GOVB0 `B4`
+- `票 B-15` 誤擋在 `B7` 之後仍存在（`printf`／`find`／`ls`／`gate.sh` 自身）⇒ GOVB0 `B4` Task 2.3/2.4
+- `B3R` 的 **O(n) scanner 未交付**（`CODEX-R8-P1-03`）⇒ 不得宣稱達標
+- `票 B-50` 流程面**永久標記為跳步**；形態①④ 未做
+- `票 B-31` 對外**不得說「強制」**，只能說「產出端已有檢查點」（`票 B-53` 落地前）
+- `plain_docs_sync_check.sh` 的 catch-all 回空字串 ⇒ **新增說明檔預設不受監看**（已具名於該檔）
+- `R-15`：`scripts/governance_families.json` 不可 commit ⇒ ambient M
+- `.claude/gate/*.log`、`docs/GOVB0_FRICTION_AMENDMENTS.md`、`handoffs/**` 不得 commit
+- `docs/ROADMAP.md` 不在 manifest ⇒ 更新須走 OOE；本 session 未更新
 
-## ⚠ 踩過就別再踩
+## ⚠ 操作紀律（踩過的坑，一律照做）
 
-- 🔴 **修一條 finding ≠ 修一個類別**；**「委員當場驗過」≠「以後改壞會被抓」**（臨時探針須落成常駐測試）。
-- 🔴 **自陳未測的攻擊面時，不得附帶自己的嚴重度判定**——會誘導審查者放鬆（rename 那條實為假紅燈）。
+- 🔴 **改一個事實前先 `grep -rn` 掃全部副本**，不要一份一份修。
+- 🔴 **背景任務的 exit code ＝ 指令鏈最後一個指令的 rc**。推完一律用
+  `git rev-list --count origin/main..HEAD` **實查**。同型：`cmd | tail; echo rc=$?`。
+- 🔴 **改 `scripts/fact_keys.json` 須同步三份 generated block**：正式文件 ＋
+  `tests/governance/fixtures/govb1/factkey_{clean,drifted}/`；drifted 須保留單列竄改。
+- 🔴 **可構造出可重現反例者＝缺陷，不得寫成「上界」**（stamp-r2 兩家核可之判準）。
+- 🔴 **自陳未測的攻擊面時不得附帶自己的嚴重度判定。**
 - 🔴 **兩家分歧看碼證不數人頭**；不決則採較嚴版＋具名殘留。
 - 🔴 **`cx_run.sh` 被 `_B45_HARNESS` 逐字錨定** ⇒ 新增加**錨點外側**，傳值走 bash **動態作用域**。
-- 🔴 **同一檔第二次 OOE 改動極易漏 `Governance-Scope:` trailer** ⇒ 收尾必跑 `--only g7`。
-- 🔴 **`cmd | tail; echo rc=$?` 讀到的是 tail 的 rc**——本 session 又犯一次。
-- 🔴 **`case` 的模式尾 `)` 在 `$( )` 內會被 macOS bash 3.2 當成收尾** ⇒ 整段語法錯、功能全死，
-  而讀原始碼的斷言會是綠的。**只有真的跑一次才抓得到。**
-- 🔴 `git status --porcelain -z` 解析：**先** `tr '\n' '\001'` **再** `tr '\0' '\n'`；
-  rename 第二筆是**裸路徑**，不可一律砍 3 字元。
-- 🔴 銷帳前確認 `sources.lock` 是 **review 模式**（`--mode review --rebuild` 就地升級，
-  該路徑在 `reconcile_build.sh:238` 即 exit，**不動 synth**）。
-- 🔴 session 命名須 `<YYYYMMDD>-<epic>-<batch>-<kind>-r<N>`；未分批用 `x`。
-- 🔴 **stamp／review brief 必須硬性要求 canonical heading ＋ sentinel body 非空**，否則銷帳鎖死。
-- 收斂檔**被 REJECTED 者須修訂本體並重蓋新 hash**；`grok` 額度封鎖 ⇒ `active_stampers=["codex","composer"]`。
+- 🔴 **OOE 改動易漏 `Governance-Scope:` trailer** ⇒ 收尾必跑 `--only g7`。
+- 🔴 **`$( )` 內禁用 `case`**（macOS bash 3.2 對模式尾 `)` 的解析）⇒ 改 `grep -E` 前置過濾。
+- 🔴 **`git status --porcelain -z` 解析**：先 `tr '\n' '\001'` 再 `tr '\0' '\n'`；
+  rename 第二筆是裸路徑，須依**位置語意**判定，禁用正則猜形狀。
+- 銷帳前確認 `sources.lock` 是 **review 模式**；session 命名 `<YYYYMMDD>-<epic>-<batch>-<kind>-r<N>`，未分批用 `x`。
+- stamp 輪**交件不驗格式、收集才驗** ⇒ 有 findings 的 stamp 輪會在收集節點被擋（`票 B-52`）。
+- `grok` 額度封鎖 ⇒ `active_stampers=["codex","composer"]`。

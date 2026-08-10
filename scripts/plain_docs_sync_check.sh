@@ -65,8 +65,11 @@ _watched_for() {
     # 🔴 樣式分派（非逐檔列舉）：`第N批-*.md` 與其餘治理說明檔一律看同一組路徑。
     #    新增批次之說明檔自動取得 WATCHED，不需要有人記得回來加一行。
     第*批-*.md)                       echo "scripts/ docs/GOV tests/governance/" ;;
-    "README.md"|"治理進度日誌.md"|"流程摩擦記錄.md")
+    "README.md"|"治理進度日誌.md"|"流程摩擦記錄.md"|"接下來要做什麼.md")
                                       echo "scripts/ docs/GOV tests/governance/" ;;
+    # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
+    #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
+    #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。
     *)                                echo "" ;;
   esac
 }
