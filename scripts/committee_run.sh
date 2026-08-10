@@ -281,47 +281,86 @@ _open_debt() {
 # 🔴 誠實邊界：形態①（改動是否逸出「該輪允許改動清單」）**本層做不到**——
 #    brief 目前不攜帶該清單欄位。本層只列出變動，不判斷是否違規；具名殘留於票 B-50。
 # ---------------------------------------------------------------------------
+# 🔴 上界宣告（`CODEX-R1-P2-04`）：本層只偵測 status **集合的增／減**，
+#   **不偵測既有 dirty path 的內容增量**——已是 ` M` 的檔再被改一次，status 行不變 ⇒ 完全靜默。
+#   要覆蓋內容變動須另存 path+content hash／diff fingerprint，且需形態① 的允許清單，
+#   本輪**不自行擴 scope**。此上界一併寫入 票 B-50。
+#
+# 🔴 `-z`（NUL 分隔 records）不是可選項（`CODEX-R1-P1-02` BLOCKING）：
+#   舊版用 `git status --porcelain` 文字 + `grep -qF` 子字串比對，
+#   codex 實跑證明**前綴關係會靜默漏報**——before=` M a`，派工期還原 `a` 並新增 `a-new`，
+#   `grep -qF "a"` 在 `a-new` 上命中 ⇒ 判定「a 還在」⇒ 形態② 不報。
+#   ⇒ 一律逐筆 **exact record** 比對（`grep -qxF`），禁對整份 status 文字做子字串搜尋。
+# 🔴 `core.quotePath=false` 為**不可刪 invariant**（`COMPOSER-R1-P2-02`）：
+#   本 repo 有中文路徑（白話說明/），預設會被轉義成 \NNN 而對不上。測試釘住。
 _ws_snapshot() {
-  # core.quotePath=false：本 repo 有中文路徑（白話說明/），預設會被轉義成 \NNN 而對不上
-  git -c core.quotePath=false status --porcelain 2>/dev/null | LC_ALL=C sort
+  git -c core.quotePath=false status --porcelain -z 2>/dev/null | tr '\0' '\n' | LC_ALL=C sort
+}
+
+# git 是否可用——rc **直接取**，不經 pipe（CLAUDE.md 明列的坑）。
+# 用途：`CODEX-R1-P2-05`——git 失效時不得靜默停用偵測，須留可辨識 receipt。
+_ws_git_ok() {
+  git -c core.quotePath=false status --porcelain -z >/dev/null 2>&1
 }
 
 _report_workspace_drift() {
-  local _after _gone _newl _mut _l _p
+  local _after _after_paths _gone _newl _mut _l _p _n_new
+
+  # `CODEX-R1-P2-05`：git 不可用時**不得靜默停用偵測**——留可辨識 receipt，
+  #   讓收尾者知道「本輪沒有比對」，而不是誤以為「本輪乾淨」。
+  if [ "${_WS_BEFORE_OK:-0}" != "1" ] || ! _ws_git_ok; then
+    echo "[committee_run] ⚠️ 票 B-50：工作區比對**未完成**（git status 不可用）⇒ 本輪未偵測執行端污染。" >&2
+    return 0
+  fi
+
   _after="$(_ws_snapshot)"
   [ "${_after}" = "${_WS_BEFORE:-}" ] && return 0
 
-  echo "[committee_run] ── 🔴 工作區在本輪期間變動（票 B-50；只回報、不擋、不改 rc）──" >&2
+  # 逐筆 exact record 比對用的路徑集合（砍掉前 3 字元的 status 欄）
+  _after_paths="$(printf '%s\n' "${_after}" | LC_ALL=C sed -e 's/^...//')"
 
   # 形態②：派工前為 ambient 修改的 tracked 檔，現已**整個消失**於 status ＝ 被還原成 HEAD
   # 🔴 **不得**在此用 `case`：macOS bash 3.2 會把 case 模式尾的 `)` 當成 `$(` 的收尾
   #   ⇒ 整段語法錯、形態② 完全不作動（實測：`syntax error near unexpected token 'newline'`）。
   #   這種「有寫但不會動」只有真的跑一次才抓得到，讀原始碼的斷言永遠是綠的。
+  # 🔴 `grep -qxF`（**整行**精確比對）不得退回 `grep -qF`：見 `_ws_snapshot` 上方的前綴漏報說明。
   _gone="$(
     printf '%s\n' "${_WS_BEFORE:-}" | LC_ALL=C grep -E '^( M|M |MM| T) ' | while IFS= read -r _l; do
       _p="${_l#???}"
-      printf '%s\n' "${_after}" | LC_ALL=C grep -qF -- "${_p}" || printf '%s\n' "${_p}"
+      printf '%s\n' "${_after_paths}" | LC_ALL=C grep -qxF -- "${_p}" || printf '%s\n' "${_p}"
     done
   )"
+
+  # 形態③：工作區殘留未還原的 mutation 標記（啟發式，票 B-50 列為輔助）
+  _mut="$(git -c core.quotePath=false diff -U0 2>/dev/null | LC_ALL=C grep -c '^+.*MUTATION' || true)"
+  [ -n "${_mut}" ] || _mut=0
+
+  # ── 訊噪比收斂（`CODEX-R1-P2-03`／`COMPOSER-R1-P1-02`）─────────────────────
+  # 正常輪本來就會產生 handoffs 產出、audit append、ambient M ⇒ **每輪都印紅色告警**
+  # 會讓人養成忽略的習慣，等於沒做。故：只有形態②／③ 命中才用紅色告警並展開明細；
+  # 否則壓成**一行**低噪摘要。
+  if [ -z "${_gone}" ] && [ "${_mut}" -eq 0 ] 2>/dev/null; then
+    _n_new="$(printf '%s\n' "${_after}" | LC_ALL=C grep -c . || true)"
+    echo "[committee_run] 票 B-50：工作區有變動但**無污染跡象**（形態②③ 皆未命中；status 共 ${_n_new:-0} 筆）。" >&2
+    return 0
+  fi
+
+  echo "[committee_run] ── 🔴 票 B-50：偵測到疑似**執行端污染**（只回報、不擋、不改 rc）──" >&2
   if [ -n "${_gone}" ]; then
     echo "[committee_run] 🔴 形態②：下列 ambient 修改**消失**（疑似被還原成 HEAD）：" >&2
     printf '%s\n' "${_gone}" | sed 's/^/      /' >&2
     echo "      ⇒ 執行端合約（AGENTS.md／.cursorrules）**明文禁止**對 tracked 檔 git checkout／git stash。" >&2
     echo "      ⇒ 收斂前請先還原，否則該檔與其 .sha256／產生器會三者不一致。" >&2
   fi
+  if [ "${_mut}" -ne 0 ] 2>/dev/null; then
+    echo "[committee_run] 🔴 形態③：工作區有 ${_mut} 行新增含 MUTATION 標記（疑似 mutation 未還原）：" >&2
+    git -c core.quotePath=false diff -U0 2>/dev/null | LC_ALL=C grep '^+.*MUTATION' \
+      | head -10 | sed 's/^/      /' >&2
+  fi
 
-  # 形態③：工作區殘留未還原的 mutation 標記（啟發式，票 B-50 列為輔助）
-  _mut="$(git -c core.quotePath=false diff -U0 2>/dev/null | LC_ALL=C grep -c '^+.*MUTATION' || true)"
-  case "${_mut}" in
-    ''|0) : ;;
-    *)
-      echo "[committee_run] 🔴 形態③：工作區有 ${_mut} 行新增含 MUTATION 標記（疑似 mutation 未還原）：" >&2
-      git -c core.quotePath=false diff -U0 2>/dev/null | LC_ALL=C grep '^+.*MUTATION' \
-        | head -10 | sed 's/^/      /' >&2
-      ;;
-  esac
-
-  # 其餘變動：**含本輪合法交付**，本層不判斷是否違規（形態①做不到，見上方誠實邊界）
+  # 其餘變動：**含本輪合法交付**，本層不判斷是否違規（形態① 做不到，見上方誠實邊界）
+  # 🔴 `COMPOSER-R1-P2-01`：本層無 actor/provenance ⇒ **主控端自己動的檔也會列在這裡**，
+  #   不代表是執行端造成的。歸因須人工判讀，或待 票 B-51 的允許清單落地後合併。
   _newl="$(
     printf '%s\n' "${_after}" | while IFS= read -r _l; do
       [ -n "${_l}" ] || continue
@@ -329,7 +368,7 @@ _report_workspace_drift() {
     done
   )"
   if [ -n "${_newl}" ]; then
-    echo "[committee_run] ⚠️ 本輪期間新增/變更的工作區項目（**含合法交付**，本層不判違規）：" >&2
+    echo "[committee_run] ⚠️ 本輪期間新增/變更的工作區項目（**含合法交付、亦含主控端改動**，不判違規）：" >&2
     printf '%s\n' "${_newl}" | head -20 | sed 's/^/      /' >&2
   fi
   return 0
@@ -353,7 +392,13 @@ fi
 echo "[committee_run] 開債完成 round_id=${round_id}"
 
 # --- 1c) 票 B-50：派工**前**拍工作區快照（必須在任何 cx_run 啟動之前）---
-_WS_BEFORE="$(_ws_snapshot)"
+# `CODEX-R1-P2-05`：git 若當下不可用，記旗標而非留下空快照假裝比對過。
+if _ws_git_ok; then
+  _WS_BEFORE="$(_ws_snapshot)"; _WS_BEFORE_OK=1
+else
+  _WS_BEFORE=""; _WS_BEFORE_OK=0
+  echo "[committee_run] ⚠️ 票 B-50：派工前 git status 不可用 ⇒ 本輪無法偵測執行端污染。" >&2
+fi
 
 # --- 2) 平行派 N 家(索引陣列配對 pid↔family;bash 3.2 相容) ---
 # ROUND_ID 以 env 傳給每家 cx_run（Task 1.2 改法⑤）

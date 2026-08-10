@@ -22,10 +22,10 @@ COMMITTEE_RUN = REPO_ROOT / "scripts" / "committee_run.sh"
 
 
 def _fn_src() -> str:
-    """抽出 `_ws_snapshot` 與 `_report_workspace_drift` 兩支函式（不執行主流程）。"""
+    """抽出偵測層的三支函式（不執行主流程）。"""
     s = COMMITTEE_RUN.read_text(encoding="utf-8")
     parts = []
-    for name in ("_ws_snapshot", "_report_workspace_drift"):
+    for name in ("_ws_snapshot", "_ws_git_ok", "_report_workspace_drift"):
         start = s.index(f"{name}() {{")
         end = s.index("\n}\n", start) + len("\n}\n")
         parts.append(s[start:end])
@@ -50,12 +50,21 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _run(repo: Path, mutate: str) -> subprocess.CompletedProcess[str]:
-    """快照 → 執行 `mutate` → 比對回報。回傳 process（stderr 是本檔的 oracle）。"""
+def _run(
+    repo: Path, mutate: str, *, prelude: str = "", before_ok: str = "1"
+) -> subprocess.CompletedProcess[str]:
+    """快照 → 執行 `mutate` → 比對回報。回傳 process（stderr 是本檔的 oracle）。
+
+    `prelude` 在快照**之前**執行（用於建立既有 dirty 狀態）；
+    `before_ok` 模擬 `_WS_BEFORE_OK` 旗標（`CODEX-R1-P2-05` 的 checker-unavailable 路徑）。
+    """
     script = (
         "set -u\n"
         + _fn_src()
+        + "\n"
+        + prelude
         + '\n_WS_BEFORE="$(_ws_snapshot)"\n'
+        + f'_WS_BEFORE_OK={before_ok}\n'
         + mutate
         + "\n_report_workspace_drift\n"
         + 'echo "REPORT_RC=$?"\n'
@@ -131,8 +140,100 @@ def test_form3_does_not_fire_on_the_word_alone_in_untracked_file(tmp_path: Path)
     repo = _repo(tmp_path)
     r = _run(repo, "printf 'MUTATION 這個詞出現在未追蹤檔\\n' > note.md")
     assert "形態③" not in r.stderr, f"未追蹤檔誤觸形態③:\n{r.stderr}"
-    # 但它仍應被列進「其餘變動」——不判違規，只是不得靜默
-    assert "note.md" in r.stderr, f"新增檔完全沒被提到:\n{r.stderr}"
+    # 🔴 `CODEX-R1-P2-03`／`COMPOSER-R1-P1-02` 修補後：②③ 未命中 ⇒ 壓成一行低噪摘要，
+    #    **不再**逐項列出（每輪都紅 ⇒ 人會養成忽略的習慣 ⇒ 等於沒做）。
+    assert "無污染跡象" in r.stderr, f"未給低噪摘要:\n{r.stderr}"
+    assert "🔴" not in r.stderr, f"未命中②③ 卻用了紅色告警:\n{r.stderr}"
+
+
+# ── r1 findings 的修補驗證 ─────────────────────────────────────────────
+
+
+def test_form2_is_not_masked_by_prefix_path(tmp_path: Path) -> None:
+    """🔴 `CODEX-R1-P1-02`（BLOCKING）：前綴關係曾使形態② **靜默漏報**。
+
+    codex 的反例逐字重現：before=` M a`；派工期間還原 `a` 並新增 `a-new`。
+    舊版對整份 status 文字做 `grep -qF "a"`，會在 `a-new` 上命中 ⇒ 判定「a 還在」⇒ 不報。
+    修法＝逐筆 **exact record** 比對（`grep -qxF` 對路徑集合）。
+    """
+    repo = _repo(tmp_path)
+    (repo / "a").write_text("base\n", encoding="utf-8")
+    assert _git(repo, "add", "a").returncode == 0
+    assert _git(repo, "commit", "-q", "-m", "add a").returncode == 0
+    (repo / "a").write_text("ambient\n", encoding="utf-8")
+    r = _run(repo, "git checkout -- a\nprintf 'new\\n' > a-new")
+    assert "形態②" in r.stderr, f"前綴關係造成靜默漏報（r1 BLOCKING 復發）:\n{r.stderr}"
+    assert "\n      a\n" in r.stderr or r.stderr.count("      a\n") >= 1, (
+        f"未指出消失的是 `a`:\n{r.stderr}"
+    )
+
+
+def test_form2_handles_paths_with_space(tmp_path: Path) -> None:
+    """含空白的路徑不得因 `git status` 加引號而對不上（`-z` records 不加引號）。"""
+    repo = _repo(tmp_path)
+    (repo / "with space.txt").write_text("base\n", encoding="utf-8")
+    assert _git(repo, "add", "with space.txt").returncode == 0
+    assert _git(repo, "commit", "-q", "-m", "add spaced").returncode == 0
+    (repo / "with space.txt").write_text("ambient\n", encoding="utf-8")
+    r = _run(repo, "git checkout -- 'with space.txt'")
+    assert "形態②" in r.stderr, f"含空白路徑的形態② 漏報:\n{r.stderr}"
+    assert "with space.txt" in r.stderr, r.stderr
+
+
+def test_checker_unavailable_leaves_a_receipt(tmp_path: Path) -> None:
+    """🔴 `CODEX-R1-P2-05`：git 不可用時**不得靜默**——否則「沒告警」會被誤讀成「乾淨」。"""
+    repo = _repo(tmp_path)
+    r = _run(repo, "git checkout -- tracked.txt", before_ok="0")
+    assert "未完成" in r.stderr, f"checker 不可用卻沒留 receipt:\n{r.stderr}"
+    assert "REPORT_RC=0" in r.stdout
+
+
+def test_normal_round_stays_low_noise(tmp_path: Path) -> None:
+    """🔴 `COMPOSER-R1-P1-02`：正常輪（只產生新檔）必須是**一行**，不得紅色告警＋逐項列出。
+
+    委員實測舊版每輪固定印 banner ＋ 明細 ⇒ 訊噪比過低會被習慣性忽略。
+    """
+    repo = _repo(tmp_path)
+    r = _run(repo, "printf 'out\\n' > handoffs-out.md\nprintf 'log\\n' > run.log")
+    lines = [ln for ln in r.stderr.splitlines() if ln.strip()]
+    assert len(lines) == 1, f"正常輪不是一行低噪摘要:\n{r.stderr}"
+    assert "無污染跡象" in lines[0]
+
+
+def test_content_only_change_on_dirty_path_limit_is_declared(tmp_path: Path) -> None:
+    """🔴 `CODEX-R1-P2-04`：已是 dirty 的檔再被改一次，status 行不變 ⇒ **本層看不到**。
+
+    這是本層可及的上界，**必須明寫**而不是藏起來。本測同時驗
+    ①行為確實如此（不假裝有偵測）②上界宣告存在於原始碼。
+    """
+    repo = _repo(tmp_path)
+    r = _run(
+        repo,
+        "printf 'second change\\n' >> tracked.txt",
+        prelude="printf 'ambient\\n' >> tracked.txt",
+    )
+    assert r.stderr.strip() == "", f"本層宣稱看不到內容增量，卻印了東西:\n{r.stderr}"
+    s = COMMITTEE_RUN.read_text(encoding="utf-8")
+    assert "不偵測既有 dirty path 的內容增量" in s, "上界未明寫 ⇒ 缺口會被誤以為已覆蓋"
+
+
+def test_quotepath_false_is_a_non_removable_invariant() -> None:
+    """🔴 `COMPOSER-R1-P2-02`：`core.quotePath=false` 一旦被刪，中文路徑全部對不上。"""
+    s = COMMITTEE_RUN.read_text(encoding="utf-8")
+    start = s.index("_ws_snapshot() {")
+    body = s[start : s.index("\n}\n", start)]
+    assert "core.quotePath=false" in body, "快照命令缺 core.quotePath=false"
+    assert "--porcelain -z" in body, "未用 NUL records ⇒ 含空白/引號路徑會被轉義"
+    assert "不可刪 invariant" in s, "未標記為不可刪 invariant"
+
+
+def test_exact_record_match_is_not_downgraded() -> None:
+    """🔴 `grep -qxF` 退回 `grep -qF` 就會讓 r1 的 BLOCKING 復發——釘住這一個字元。"""
+    s = COMMITTEE_RUN.read_text(encoding="utf-8")
+    start = s.index("_gone=\"$(")
+    seg = s[start : s.index('\n  )"', start)]
+    assert "grep -qxF" in seg, "形態② 的比對退回子字串比對 ⇒ 前綴漏報會復發"
+    assert "_after_paths" in seg, "未對**路徑集合**比對，而是對整份 status 文字"
 
 
 # ── 契約：只回報，不擋 ────────────────────────────────────────────────
@@ -188,4 +289,7 @@ def test_each_form_is_independently_falsifiable(form: str, tmp_path: Path) -> No
     repo = _repo(tmp_path)
     # 只新增一個未追蹤檔：兩種形態都不該觸發
     r = _run(repo, "printf 'plain\\n' > plain.md")
-    assert form not in r.stderr, f"{form} 在不該觸發時觸發了:\n{r.stderr}"
+    # 🔴 錨定**觸發訊息**（`形態②：`／`形態③：` 帶全形冒號），不能用裸字串——
+    #   低噪摘要那行寫著「形態②③ 皆未命中」，裸字串比對會把「沒觸發」誤判成「觸發了」。
+    #   （主委初版即如此；這正是「量到的東西 ≠ 想證明的東西」，本 epic 反覆出現的那一類。）
+    assert f"{form}：" not in r.stderr, f"{form} 在不該觸發時觸發了:\n{r.stderr}"
