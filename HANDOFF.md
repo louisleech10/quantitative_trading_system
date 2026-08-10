@@ -32,6 +32,21 @@ C1（Task 1.1–1.4）**已交付**：多宿主＋projection oracle／`_schema` 
 C2 ＝ **Task 2.1 偵測器 ＋ Task 2.2 拆除 37 行字面狀態**。
 🔴 **兩者必須同一 commit**；只交 C1 判 **BLOCKED 非完成**（SPEC §R 末列）。
 🔴 Task 2.1 未附誤擋率 receipt（Wilson ≤5% ＋非實作者複核）⇒ 判 BLOCKED。
+
+### 🔴 C2 動工前必讀：偵測器與既有測試 sandbox 的衝突（主委 2026-08-10 推導，尚未實作）
+
+SPEC Task 2.1 邊界 ⑥ 要求「`git ls-files` 不可用（非 git 樹）⇒ fail-closed」。
+但既有測試（`test_govb1_factkey_gen.py` 的 `_sandbox` 系列，約 15 條）建立的 `tmp_path` root
+**不是 git 樹** ⇒ 偵測器一掛上去，那些測試會**全部因非 git 樹而轉紅**，
+且紅的原因與它們各自的標的（sort／locale／marker／target）**無關**。
+
+**三個解，主委評估如下（未定案，C2 動工時先裁）**：
+- (a) **在 root-creating helper 內 `git init -q`** ——保留 fail-closed 契約，最誠實；代價＝改多處 helper。**主委傾向此案。**
+- (b) 讓 `status_scope` 可為空並跳過偵測 —— ❌ 與 Task 1.2「空陣列 fail-closed」直接衝突。
+- (c) 只在 `GOVB1_FACTKEY_ROOT` 未設時啟用偵測 —— ❌ 靜默旁路，SPEC 明文禁止。
+
+另須注意：`factkey_{clean,drifted}` 位於 repo 內，`git -C <root> ls-files` 可用，
+其內容僅生成區塊 ⇒ 不會命中；drifted 的竄改在**區塊內**，亦不觸發偵測器。
 🔴 C2 完成後仍須 **codex＋composer 兩家 code review ＋ RECONCILE-STAMP**，本票才算收案。
 
 ## 🔴 未修的活缺口
