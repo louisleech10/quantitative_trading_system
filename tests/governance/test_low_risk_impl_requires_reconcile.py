@@ -24,6 +24,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GATE_SH = REPO_ROOT / "scripts" / "gate.sh"
 SPEC = REPO_ROOT / "docs" / "CONVERGENCE_METHOD_SPEC.md"
+IMPL_BRIEF = (
+    REPO_ROOT / "tests" / "governance" / "fixtures" / "govb1" / "brief_impl_delta_present.md"
+)
 BODY_HASH_SH = REPO_ROOT / "scripts" / "reconcile_body_hash.sh"
 WRITE_LOCK_SH = REPO_ROOT / "scripts" / "write_sources_lock.sh"
 
@@ -183,6 +186,11 @@ def _run_gate(
     ]
     if with_spec:
         cmd.extend(["--spec", str(SPEC)])
+        # Task 1.3 (d) 階段 2：impl 派工(--spec) 一律須顯式 --brief 且 brief-kind=impl
+        #   〔裁決 handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md〕。
+        #   本檔測的是 V-C（reconcile 必填），impl dispatch 只是載體 ⇒ 補合規 brief
+        #   讓載體符合新契約；**未削弱任何原有斷言**。
+        cmd.extend(["--brief", str(IMPL_BRIEF)])
     if reconcile is not None:
         cmd.extend(["--reconcile", reconcile])
     if adversarial is not None:
@@ -317,6 +325,10 @@ def test_mutation_impl_reconcile_only_on_high_allows_low(
             "n/a:V-C mutation",
             "--spec",
             str(SPEC),
+            # Task 1.3 (d) 階段 2：不補 brief 的話 `miss brief` 會把 rc 撐成非零，
+            #   本 mutation 就測不到 V-C 自身（載體遮蔽標的）。
+            "--brief",
+            str(IMPL_BRIEF),
             "--task-id",
             "vc-mut-low",
             "--output",

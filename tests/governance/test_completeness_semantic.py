@@ -27,6 +27,9 @@ GATE_SH = REPO_ROOT / "scripts" / "gate.sh"
 COMPLETENESS_SH = REPO_ROOT / "scripts" / "completeness_check.sh"
 PRODUCER_SH = REPO_ROOT / "scripts" / "write_committee_accepted.sh"
 SPEC = REPO_ROOT / "docs" / "CONVERGENCE_METHOD_SPEC.md"
+IMPL_BRIEF = (
+    REPO_ROOT / "tests" / "governance" / "fixtures" / "govb1" / "brief_impl_delta_present.md"
+)
 CHARTER = REPO_ROOT / "templates" / "COMMITTEE_SEMANTIC_REVIEW_TEMPLATE.md"
 
 
@@ -127,6 +130,11 @@ def _run_gate_high_risk(
         "n/a:impl semantic stamp unit test",
         "--spec",
         str(SPEC),
+        # Task 1.3 (d) 階段 2：impl 派工(--spec) 須顯式 --brief 且 kind=impl
+        #   〔handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md〕；本檔測 B6 語義戳記，
+        #   impl dispatch 只是載體 ⇒ 補合規 brief，未削弱原斷言。
+        "--brief",
+        str(IMPL_BRIEF),
         "--adversarial",
         str(adversarial),
         "--reconcile",

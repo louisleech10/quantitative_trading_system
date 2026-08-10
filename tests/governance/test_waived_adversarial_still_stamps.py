@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from tests.governance.test_low_risk_impl_requires_reconcile import (
+    IMPL_BRIEF,
     SPEC,
     _seed_audit,
     make_impl_passing_session,
@@ -149,6 +150,10 @@ def _run(
     ]
     if with_spec:
         cmd.extend(["--spec", str(SPEC)])
+        # Task 1.3 (d) 階段 2：impl 派工(--spec) 須顯式 --brief 且 kind=impl
+        #   〔handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md〕；本檔測 V-M stamp
+        #   call-count，impl dispatch 只是載體 ⇒ 補合規 brief，未削弱原斷言。
+        cmd.extend(["--brief", str(IMPL_BRIEF)])
     if reconcile is not None:
         cmd.extend(["--reconcile", reconcile])
     return subprocess.run(
@@ -288,6 +293,8 @@ def test_impl_full_stamp_passes(tmp_path: Path) -> None:
         "n/a:impl full stamp",
         "--spec",
         str(SPEC),
+        "--brief",  # Task 1.3 (d) 階段 2：載體補合規 impl brief（未削弱斷言）
+        str(IMPL_BRIEF),
         "--reconcile",
         str(synth),
         "--task-id",
@@ -371,6 +378,8 @@ def test_mutation_waived_adv_skips_stamp_breaks_guard(
             "n/a:impl V-M mut",
             "--spec",
             str(SPEC),
+            "--brief",  # Task 1.3 (d) 階段 2：載體補合規 impl brief（未削弱斷言）
+            str(IMPL_BRIEF),
             "--reconcile",
             str(synth),
             "--adversarial",
