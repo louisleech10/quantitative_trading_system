@@ -139,16 +139,30 @@ _resolve_kind_into_bk() {
   #   只把**輸入**換成剝除 fence 後的等價檔。
   _bk_fence_src="${brief}"
   _bk_fence_tmp="$(mktemp "${TMPDIR:-/tmp}/bk_nofence.XXXXXX")" || return 1
+  # 🔴 `END { if (infence) exit 3 }` 是 `CODEX-R2-P1-01` 的修法，**不得刪**：
+  #   初版只做成對切換、不檢查 EOF 殘留狀態 ⇒「頂層 impl ＋ 未閉合 ``` ＋ fence 內 consult」
+  #   之 malformed brief，剝除後只剩 impl ⇒ 判為 impl ⇒ 完整 gate rc=0 且**發出 token**。
+  #   🔴 舊版（`ba5489ba`）對同一輸入是 rc=2（多個不一致宣告）⇒ 那是**回歸**：
+  #      fence 修法把一條原本 fail-closed 的路徑改成了 fail-open。
+  #   未閉合 fence ⇒ 宣告範圍無法安全判定 ⇒ 一律拒，不猜。
   awk '
     BEGIN { infence = 0 }
     /^[[:space:]]*(```|~~~)/ { infence = 1 - infence; next }
     infence { next }
     { print }
-  ' "${_bk_fence_src}" > "${_bk_fence_tmp}" 2>/dev/null || {
+    END { if (infence) exit 3 }
+  ' "${_bk_fence_src}" > "${_bk_fence_tmp}" 2>/dev/null
+  _bk_fence_rc=$?
+  if [ "${_bk_fence_rc}" -eq 3 ]; then
+    rm -f "${_bk_fence_tmp}"
+    echo "ERROR: brief 有未閉合的 code fence,宣告範圍無法判定(fail-closed): ${_bk_fence_src}"
+    return 1
+  fi
+  if [ "${_bk_fence_rc}" -ne 0 ]; then
     rm -f "${_bk_fence_tmp}"
     echo "ERROR: brief fence 剝除失敗（fail-closed）: ${_bk_fence_src}"
     return 1
-  }
+  fi
   brief="${_bk_fence_tmp}"
   _bk_all="$(grep -E '^brief-kind:' "${brief}" 2>/dev/null | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
   brief="${_bk_fence_src}"

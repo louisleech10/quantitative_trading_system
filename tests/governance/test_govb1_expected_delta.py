@@ -686,6 +686,116 @@ def test_mutation_p1_01_remove_empty_spec_guard_turns_green(tmp_path: Path) -> N
     assert not _no_token(env), "缺陷復發時應發出 token（否則本 mutation 沒測到東西）"
 
 
+def test_p1_01_empty_spec_with_consult_brief_rejected(tmp_path: Path) -> None:
+    """`CODEX-R1-P1-01` 探針 2：`--spec "" --brief <consult>` ⇒ 拒且無 token。
+
+    composer 於 r2 以碼證推理「與探針 1 同路徑」；本測把該推理變成機械保證。
+    """
+    env = _d_env(tmp_path)
+    proc = _run(
+        _dispatch_specless(
+            ["--spec", "", "--brief", str(FIXTURE / "brief_consult_ok.md")]
+        ),
+        env=env,
+    )
+    assert proc.returncode != 0, _out(proc)
+    assert _no_token(env), "空 --spec ＋ consult brief 仍發 token"
+
+
+# ── `CODEX-R2-P1-01`：fence 修法自身引入之回歸 ─────────────────────
+
+
+def test_r2_p1_01_unclosed_fence_rejected() -> None:
+    """未閉合 fence ⇒ 宣告範圍無法判定 ⇒ fail-closed（不得只剩 fence 前的宣告）。"""
+    proc = _run(
+        [
+            "bash",
+            str(BRIEF_CONF),
+            "--only",
+            "impl-kind",
+            str(FIXTURE / "brief_unclosed_fence_conflict.md"),
+        ]
+    )
+    assert proc.returncode != 0, _out(proc)
+    assert "未閉合" in _out(proc), _out(proc)
+
+
+def test_r2_p1_01_unclosed_fence_mints_no_token(tmp_path: Path) -> None:
+    """行為層：該 malformed brief 走完整 gate 不得發 token（codex 原反例即此）。"""
+    env = _d_env(tmp_path)
+    _run(
+        _dispatch_impl(FIXTURE / "brief_unclosed_fence_conflict.md"), env=env
+    )
+    assert _no_token(env), "未閉合 fence 之 malformed brief 仍發 token"
+
+
+def test_r2_p1_01_matches_pre_fence_behaviour() -> None:
+    """回歸方向確認：本 fixture 在 fence 修法**之前**即為 rc≠0（多宣告歧義）。
+
+    🔴 意義：證明修法沒有把一條原本 fail-closed 的路徑放行——那才是 `CODEX-R2-P1-01`
+    的本質（新引入的回歸），不是「本來就沒擋」。
+    """
+    old = subprocess.run(
+        ["git", "show", "ba5489ba:scripts/brief_conformance_check.sh"],
+        cwd=str(REPO),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if old.returncode != 0:
+        pytest.skip("ba5489ba 不可達（淺 clone？）")
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        scripts = Path(td) / "scripts"
+        scripts.mkdir()
+        old_bc = scripts / "brief_conformance_check.sh"
+        old_bc.write_text(old.stdout, encoding="utf-8")
+        old_bc.chmod(0o755)
+        shutil.copy2(LIFECYCLE, scripts / "govflow_lifecycle.json")
+        proc = _run(
+            [
+                "bash",
+                str(old_bc),
+                "--only",
+                "impl-kind",
+                str(FIXTURE / "brief_unclosed_fence_conflict.md"),
+            ],
+            cwd=td,
+        )
+    assert proc.returncode != 0, (
+        "舊版對本 fixture 應已 fail-closed；若舊版就放行，本 finding 就不是回歸\n"
+        + _out(proc)
+    )
+
+
+def test_mutation_r2_p1_01_remove_eof_guard_turns_green(tmp_path: Path) -> None:
+    """mutation：拿掉 EOF `infence` 守衛 ⇒ 未閉合 fence fixture 由紅轉綠（回歸復發）。"""
+    src = BRIEF_CONF.read_text(encoding="utf-8")
+    anchor = "    END { if (infence) exit 3 }"
+    assert anchor in src, "mutation 錨點失配（EOF 守衛改寫後須同步）"
+    mut = src.replace(anchor, "    END { }", 1)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    bc_mut = scripts / "brief_conformance_check.sh"
+    bc_mut.write_text(mut, encoding="utf-8")
+    bc_mut.chmod(0o755)
+    shutil.copy2(LIFECYCLE, scripts / "govflow_lifecycle.json")
+    proc = _run(
+        [
+            "bash",
+            str(bc_mut),
+            "--only",
+            "impl-kind",
+            str(FIXTURE / "brief_unclosed_fence_conflict.md"),
+        ],
+        cwd=str(tmp_path),
+    )
+    assert proc.returncode == 0, (
+        "移除 EOF 守衛後應假綠（證明守衛非恆真）\n" + _out(proc)
+    )
+
+
 def test_mutation_p2_02_remove_fence_exclusion_turns_green(tmp_path: Path) -> None:
     """mutation：拿掉 kind 解析的 fence 排除 ⇒ fence-only fixture 由紅轉綠。"""
     src = BRIEF_CONF.read_text(encoding="utf-8")
