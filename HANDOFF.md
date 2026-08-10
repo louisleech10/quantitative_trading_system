@@ -9,7 +9,11 @@ REF:handoffs/reconcile/20260809-govb1-b7-review-r1/synth.md
 
 **Agent**: Claude(Opus 5) | **Time**: 2026-08-10 | **Branch**: main | 實作端＝主委自任；review＝codex+composer
 
-## ✅ GOVB1 第 1 批（B1–B10）**全數收案**；最終閘 12/12 PASS｜測試 1129 → **1281**
+## GOVB1 第 1 批（B1–B10）｜最終閘 12/12 PASS｜測試 1129 → **1283**
+
+🔴 **不得寫「全數收案」**（2026-08-10 三處誇大已更正）：`b1-review-r6` 內容寫「批 1 收案」
+但**無 `RECONCILE-STAMP`**；`b4-review-r4` 明寫「**階段 1 收案**」、階段 2 未開工。
+各批次狀態**唯一來源**＝`docs/GOVERNANCE_EXECUTION_ORDER.md`，本檔與白話說明**只得 pointer**。
 
 `bash scripts/govb1_final_gate.sh` → `g0_tests g0_syntax g1..g8 gate_b3 lifecycle_embed` 全 PASS。
 本 session 收案：B7 `a5ddf05`／B8 `52c4a1a`+`b6a9da2`／B9 `39037f5`+`be9fda0`／
