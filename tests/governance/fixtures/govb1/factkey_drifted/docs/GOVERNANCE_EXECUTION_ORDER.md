@@ -24,3 +24,33 @@
 150	批 0 剩餘	B-24 紀律面，B-14（PROVISIONAL），B-30，B-32
 160	另排	B-24 另一半，B-35，B-9 → B-28
 <!-- END GENERATED: governance-execution-order -->
+
+<!-- BEGIN GENERATED: governance-batch-status -->
+010	B0	已落地
+020	B1	已落地
+030	B2	已落地
+040	B3	停手
+045	B3R	已落地
+050	B4	未開工
+060	B5	未開工
+070	B6	未開工
+080	B7	未開工
+110	b1	部分完成
+120	b2	收案
+130	b3	收案
+140	b4	部分完成
+150	b5	收案
+160	b6	收案
+170	b7	收案
+180	b8	收案
+190	b9	收案
+200	b10	收案
+<!-- END GENERATED: governance-batch-status -->
+
+<!-- BEGIN GENERATED: governance-ticket-closure -->
+010	B-15	部分完成	不得宣稱誤擋已修復——B7 之後仍存在，GOVB0 B4 Task 2.3/2.4 未做
+020	B-31	部分完成	不得說「強制」，只能說「產出端已有檢查點」
+030	B-50	部分完成	不得宣稱已收案——流程面永久標記為跳步，形態①④ 未做
+040	B-53	未開工	無
+050	B3R	部分完成	不得宣稱達標——O(n) scanner 未交付
+<!-- END GENERATED: governance-ticket-closure -->

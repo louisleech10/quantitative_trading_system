@@ -70,15 +70,46 @@ _fk_keys() {
   done < <(_fk_raw_keys)
 }
 
-_fk_target() {   # $1=key -> stdout: repo 相對路徑
-  _fkt_t="$(LC_ALL=C jq -r --arg k "$1" '.[$k].target // empty' "${REG}")" || return 1
-  [ -n "${_fkt_t}" ] || {
-    echo "gen_fact_key_blocks: key ${1} 缺 target → fail-closed" >&2; return 1; }
-  case "${_fkt_t}" in
-    /*)   echo "gen_fact_key_blocks: key ${1} 之 target 不得為絕對路徑：${_fkt_t}" >&2; return 1 ;;
-    *..*) echo "gen_fact_key_blocks: key ${1} 之 target 不得含 ..：${_fkt_t}" >&2; return 1 ;;
+# 票 B-25 站 2.5 Task 1.1：一個 fact-key 可宣告 ≥1 個宿主檔。
+#   `target` 型別 string ⇒ 單元素序列；array of string ⇒ 逐筆；其餘型別 fail-closed。
+#   🔴 路徑檢查逐筆套用（不得只驗第一筆）；空陣列與重複路徑皆 fail-closed。
+#   🔴 projection oracle：同一 key 之所有 target 共用**同一份** `_fk_gen_block` 輸出，
+#      故各宿主區塊內容必逐位元組相同；任一宿主漂移即由 `_fk_check` 逐筆比對抓出。
+_fk_targets() {   # $1=key -> stdout: repo 相對路徑，一行一筆
+  _fkt_ty="$(LC_ALL=C jq -r --arg k "$1" '.[$k].target | type' "${REG}" 2>/dev/null)" || _fkt_ty=""
+  case "${_fkt_ty}" in
+    string)
+      _fkt_list="$(LC_ALL=C jq -r --arg k "$1" '.[$k].target // empty' "${REG}")" || return 1 ;;
+    array)
+      LC_ALL=C jq -e --arg k "$1" '.[$k].target | all(.[]; type == "string")' \
+        "${REG}" >/dev/null 2>&1 \
+        || { echo "gen_fact_key_blocks: key ${1} 之 target 陣列含非字串元素 → fail-closed" >&2
+             return 1; }
+      _fkt_list="$(LC_ALL=C jq -r --arg k "$1" '.[$k].target[]' "${REG}")" || return 1 ;;
+    *)
+      echo "gen_fact_key_blocks: key ${1} 之 target 型別不符（須 string 或 array of string）→ fail-closed" >&2
+      return 1 ;;
   esac
-  printf '%s\n' "${_fkt_t}"
+  [ -n "${_fkt_list}" ] || {
+    echo "gen_fact_key_blocks: key ${1} 缺 target 或 target 為空陣列 → fail-closed" >&2; return 1; }
+  # 重複路徑：同檔兩組標記語意未定義 ⇒ fail-closed
+  _fkt_n="$(printf '%s\n' "${_fkt_list}" | LC_ALL=C wc -l | tr -d ' ')"
+  _fkt_u="$(printf '%s\n' "${_fkt_list}" | LC_ALL=C sort -u | LC_ALL=C wc -l | tr -d ' ')"
+  [ "${_fkt_n}" = "${_fkt_u}" ] || {
+    echo "gen_fact_key_blocks: key ${1} 之 target 含重複路徑 → fail-closed" >&2; return 1; }
+  # 🔴 逐筆套用路徑檢查
+  _fkt_rc=0
+  while IFS= read -r _fkt_t; do
+    [ -n "${_fkt_t}" ] || continue
+    case "${_fkt_t}" in
+      /*)   echo "gen_fact_key_blocks: key ${1} 之 target 不得為絕對路徑：${_fkt_t}" >&2; _fkt_rc=1 ;;
+      *..*) echo "gen_fact_key_blocks: key ${1} 之 target 不得含 ..：${_fkt_t}" >&2; _fkt_rc=1 ;;
+    esac
+  done <<EOF
+${_fkt_list}
+EOF
+  [ "${_fkt_rc}" = "0" ] || return 1
+  printf '%s\n' "${_fkt_list}"
 }
 
 _fk_validate_rows() {   # $1=key
@@ -117,12 +148,28 @@ _fk_markers_ok() {   # $1=key $2=宿主檔路徑 $3=顯示用相對路徑
 # 範圍＝**已登記 target 之集合**（封閉、可由註冊表導出）。刻意不掃全庫：
 #   那是啟發式，須附誤擋率 receipt 才可上線（`票 B-23` 同紀律）。
 # 誠實邊界：生成器不知道的**其他檔**內的第三份副本仍擋不到（既有具名殘留）。
+# 全部已登記 target 之去重集合（跨 key）。同一檔宿主兩個 key 時只掃一次，避免重複報。
+_fk_all_targets() {
+  _fka_keys="$(_fk_keys)" || return 1
+  _fka_rc=0; _fka_out=""
+  while IFS= read -r _fka_k; do
+    [ -n "${_fka_k}" ] || continue
+    _fka_t="$(_fk_targets "${_fka_k}")" || { _fka_rc=1; continue; }
+    _fka_out="${_fka_out}${_fka_t}
+"
+  done <<EOF
+${_fka_keys}
+EOF
+  [ "${_fka_rc}" = "0" ] || return 1
+  printf '%s' "${_fka_out}" | LC_ALL=C sort -u
+}
+
 _fk_reject_unregistered_blocks() {
   _fkr_root="$(_fk_root)"; _fkr_rc=0
   _fkr_keys="$(_fk_keys)" || return 1
-  while IFS= read -r _fkr_k; do
-    [ -n "${_fkr_k}" ] || continue
-    _fkr_tgt="$(_fk_target "${_fkr_k}")" || { _fkr_rc=1; continue; }
+  _fkr_tgts="$(_fk_all_targets)" || return 1
+  while IFS= read -r _fkr_tgt; do
+    [ -n "${_fkr_tgt}" ] || continue
     _fkr_path="${_fkr_root}/${_fkr_tgt}"
     [ -f "${_fkr_path}" ] || continue      # 缺檔已由 _fk_check 具名報過，不重複
     while IFS= read -r _fkr_found; do
@@ -134,9 +181,51 @@ _fk_reject_unregistered_blocks() {
 $(LC_ALL=C sed -n 's/^<!-- BEGIN GENERATED: \(.*\) -->$/\1/p' "${_fkr_path}")
 EOF
   done <<EOF
-${_fkr_keys}
+${_fkr_tgts}
 EOF
   return "${_fkr_rc}"
+}
+
+# 票 B-25 站 2.5 Task 1.2：`_schema` 四項封閉集合宣告之驗證。
+# 🔴 唯一語義（r5 CODEX-R5-P1-02）：
+#   · 註冊表**無任何 fact-key** ⇒ 不套用本檢查（既有「空註冊表 rc=0」契約不變）
+#   · 註冊表**有 ≥1 fact-key** ⇒ 四欄必須存在且合法，否則 fail-closed
+# 不得刪 test_empty_registry_is_rc_zero_not_failure，也不得放寬 fail-closed。
+_FK_SCHEMA_SETS='status_enum status_keys status_scope status_scope_grandfathered'
+
+_fk_validate_schema_sets() {
+  _fkss_keys="$(_fk_keys)" || return 1
+  [ -n "${_fkss_keys}" ] || return 0        # 無 fact-key ⇒ 無事可做
+  _fkss_rc=0
+  for _fkss_f in ${_FK_SCHEMA_SETS}; do
+    LC_ALL=C jq -e --arg f "${_fkss_f}" \
+      '._schema[$f] | type == "array" and length > 0 and all(.[]; type == "string")' \
+      "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: _schema.${_fkss_f} 缺席／非陣列／為空／含非字串 → fail-closed" >&2
+           _fkss_rc=1; }
+  done
+  [ "${_fkss_rc}" = "0" ] || return 1
+  # status_keys 所列 key 須為已註冊 fact-key（自證＝無檢查）
+  while IFS= read -r _fkss_sk; do
+    [ -n "${_fkss_sk}" ] || continue
+    printf '%s\n' "${_fkss_keys}" | LC_ALL=C grep -qxF "${_fkss_sk}" || {
+      echo "gen_fact_key_blocks: _schema.status_keys 含未註冊 key '${_fkss_sk}' → fail-closed" >&2
+      _fkss_rc=1; }
+  done <<EOF
+$(LC_ALL=C jq -r '._schema.status_keys[]' "${REG}" 2>/dev/null)
+EOF
+  # status_scope 禁 wildcard（r3 CODEX-R3-P1-02：三種寫法得三種集合）
+  while IFS= read -r _fkss_sc; do
+    [ -n "${_fkss_sc}" ] || continue
+    case "${_fkss_sc}" in
+      *'*'*|*'?'*|*'['*)
+        echo "gen_fact_key_blocks: _schema.status_scope 不得含 wildcard：${_fkss_sc} → fail-closed" >&2
+        _fkss_rc=1 ;;
+    esac
+  done <<EOF
+$(LC_ALL=C jq -r '._schema.status_scope[]' "${REG}" 2>/dev/null)
+EOF
+  return "${_fkss_rc}"
 }
 
 _fk_emit_all() {
@@ -152,26 +241,34 @@ _fk_emit_all() {
 
 _fk_check() {
   _fk_validate_keys || return 1
+  _fk_validate_schema_sets || return 1
   _fkc_root="$(_fk_root)"; _fkc_rc=0
   while IFS= read -r _fkc_k; do
     [ -n "${_fkc_k}" ] || continue
     _fk_validate_rows "${_fkc_k}" || { _fkc_rc=1; continue; }
-    _fkc_tgt="$(_fk_target "${_fkc_k}")" || { _fkc_rc=1; continue; }
-    _fkc_path="${_fkc_root}/${_fkc_tgt}"
-    [ -f "${_fkc_path}" ] || {
-      echo "FACTKEY MISSING TARGET: ${_fkc_k} → ${_fkc_path} → fail-closed" >&2
-      _fkc_rc=1; continue; }
-    _fk_markers_ok "${_fkc_k}" "${_fkc_path}" "${_fkc_tgt}" || { _fkc_rc=1; continue; }
+    _fkc_tgts="$(_fk_targets "${_fkc_k}")" || { _fkc_rc=1; continue; }
     # 🔴 生成結果先落變數並**驗 rc**，不得直接塞進 `[ = "$(...)" ]`〔CODEX-R1-P1-03〕：
     #   命令替換內的 rc 會被丟掉 ⇒ 生成失敗卻只比字串＝靜默通過。
+    # 🔴 projection oracle：**只生成一次**，對每個 target 比對同一份內容
+    #   ⇒ 兩宿主各自自洽但彼此不同時，必有一方 DRIFT。
     _fkc_want="$(_fk_gen_block "${_fkc_k}")" || {
       echo "FACTKEY GEN FAILED: ${_fkc_k}（生成器自身失敗，未與宿主檔比對）→ fail-closed" >&2
       _fkc_rc=1; continue; }
-    _fkc_cur="$(sed -n "/^<!-- BEGIN GENERATED: ${_fkc_k} -->$/,/^<!-- END GENERATED: ${_fkc_k} -->$/p" \
-                  "${_fkc_path}")"
-    [ "${_fkc_cur}" = "${_fkc_want}" ] || {
-      echo "FACTKEY DRIFT: ${_fkc_k} in ${_fkc_tgt}（宿主檔與 ${REG} 不一致；跑 --write 重生成）" >&2
-      _fkc_rc=1; }
+    while IFS= read -r _fkc_tgt; do
+      [ -n "${_fkc_tgt}" ] || continue
+      _fkc_path="${_fkc_root}/${_fkc_tgt}"
+      [ -f "${_fkc_path}" ] || {
+        echo "FACTKEY MISSING TARGET: ${_fkc_k} → ${_fkc_path} → fail-closed" >&2
+        _fkc_rc=1; continue; }
+      _fk_markers_ok "${_fkc_k}" "${_fkc_path}" "${_fkc_tgt}" || { _fkc_rc=1; continue; }
+      _fkc_cur="$(sed -n "/^<!-- BEGIN GENERATED: ${_fkc_k} -->$/,/^<!-- END GENERATED: ${_fkc_k} -->$/p" \
+                    "${_fkc_path}")"
+      [ "${_fkc_cur}" = "${_fkc_want}" ] || {
+        echo "FACTKEY DRIFT: ${_fkc_k} in ${_fkc_tgt}（宿主檔與 ${REG} 不一致；跑 --write 重生成）" >&2
+        _fkc_rc=1; }
+    done <<EOF
+${_fkc_tgts}
+EOF
   done < <(_fk_keys)
   # 未登記之 generated block 一律拒〔CODEX-R1-P1-02〕
   _fk_reject_unregistered_blocks || _fkc_rc=1
@@ -180,11 +277,14 @@ _fk_check() {
 
 _fk_write() {
   _fk_validate_keys || return 1
+  _fk_validate_schema_sets || return 1
   _fkw_root="$(_fk_root)"; _fkw_rc=0
   while IFS= read -r _fkw_k; do
     [ -n "${_fkw_k}" ] || continue
     _fk_validate_rows "${_fkw_k}" || { _fkw_rc=1; continue; }
-    _fkw_tgt="$(_fk_target "${_fkw_k}")" || { _fkw_rc=1; continue; }
+    _fkw_tgts="$(_fk_targets "${_fkw_k}")" || { _fkw_rc=1; continue; }
+    while IFS= read -r _fkw_tgt; do
+    [ -n "${_fkw_tgt}" ] || continue
     _fkw_path="${_fkw_root}/${_fkw_tgt}"
     [ -f "${_fkw_path}" ] || {
       echo "FACTKEY MISSING TARGET: ${_fkw_k} → ${_fkw_path} → fail-closed" >&2
@@ -212,6 +312,9 @@ _fk_write() {
            rm -f "${_fkw_tmp}" "${_fkw_blkf}"; _fkw_rc=1; continue; }
     rm -f "${_fkw_blkf}"
     echo "FACTKEY WROTE: ${_fkw_k} → ${_fkw_tgt}"
+    done <<EOF
+${_fkw_tgts}
+EOF
   done < <(_fk_keys)
   return "${_fkw_rc}"
 }

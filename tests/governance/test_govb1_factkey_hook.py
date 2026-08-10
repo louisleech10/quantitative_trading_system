@@ -85,9 +85,21 @@ def _install_host(root: Path, fixture: Path) -> None:
     commit 的理由：gov_check 第 1b 段會對「本次改動之 docs/*.md」跑 doc_format_precheck，
     留成未追蹤檔會讓格式檢查介入，使正反對照因**無關原因**變紅。
     """
-    dst = root / TARGET_REL
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(fixture / TARGET_REL, dst)
+    # 🔴 票 B-25 站 2.5 Task 1.1（多宿主）／r5 CODEX-R5-P1-03：
+    #   本 helper 前版只安裝 TARGET_REL 一份，新增雙宿主 target 後
+    #   clean 驗證會先因新宿主缺檔而報 MISSING TARGET（與正反鑑別力無關的紅）。
+    #   ⇒ 改為**安裝 fixture 內全部檔案**（fixture 即已登記 target 之投影）。
+    #   clean/drifted 之原有斷言不得放寬——鑑別力仍來自 block 內容差異。
+    installed = 0
+    for src in sorted(fixture.rglob("*")):
+        if not src.is_file() or src.name == "README.md":
+            continue
+        rel = src.relative_to(fixture)
+        dst = root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        installed += 1
+    assert installed, f"fixture {fixture} 內無可安裝之宿主檔"
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "host")
 

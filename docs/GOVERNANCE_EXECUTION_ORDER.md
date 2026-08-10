@@ -84,6 +84,46 @@ grep -n "B3R\|新的排序\|近程序\|第 2 站" handoffs/20260801-GOV-AMEND-BA
 160	另排	B-24 另一半，B-35，B-9 → B-28
 <!-- END GENERATED: governance-execution-order -->
 
+## 批次狀態（機械產物；唯一來源＝`scripts/fact_keys.json`）
+
+> 🔴 **勿手改下列區塊**。改法＝改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`。
+> 欄位：`ord`／`批次`／`狀態`。
+
+<!-- BEGIN GENERATED: governance-batch-status -->
+010	B0	已落地
+020	B1	已落地
+030	B2	已落地
+040	B3	停手
+045	B3R	已落地
+050	B4	未開工
+060	B5	未開工
+070	B6	未開工
+080	B7	未開工
+110	b1	部分完成
+120	b2	收案
+130	b3	收案
+140	b4	部分完成
+150	b5	收案
+160	b6	收案
+170	b7	收案
+180	b8	收案
+190	b9	收案
+200	b10	收案
+<!-- END GENERATED: governance-batch-status -->
+
+## 票收案狀態與對外宣稱限制（機械產物；唯一來源同上）
+
+> 欄位：`ord`／`票`／`狀態`／`對外不得宣稱`。
+> 收錄判準＝`docs/GOVB25_STATUS_FACTKEY_SPEC.md` §E3 之 union（機械導出，非人工列舉）。
+
+<!-- BEGIN GENERATED: governance-ticket-closure -->
+010	B-15	部分完成	不得宣稱誤擋已修復——B7 之後仍存在，GOVB0 B4 Task 2.3/2.4 未做
+020	B-31	部分完成	不得說「強制」，只能說「產出端已有檢查點」
+030	B-50	部分完成	不得宣稱已收案——流程面永久標記為跳步，形態①④ 未做
+040	B-53	未開工	無
+050	B3R	部分完成	不得宣稱達標——O(n) scanner 未交付
+<!-- END GENERATED: governance-ticket-closure -->
+
 ### 站 1 — `票 B-39` ✅ 完成（2026-08-06）
 
 委員報告的標題格式判準過寬，把正常小標題判為違規 ⇒ 誤擋面 1236→292（−76%）。三家戳記核可。
