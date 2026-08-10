@@ -33,12 +33,28 @@ REF:handoffs/reconcile/20260810-govb1-b8-review-r1/synth.md
 主委只新增空的 `## 戳記` 區段標題，**本體一字未改**（兩家各自複跑 sha 驗證）。
 🔴 兩家於本輪明確確認：`b4-review-r4` **僅涵蓋階段 1**，蓋章**不等於**該批次整體完成。
 
-### 🔴 後半（未做）：`R-11`／`R-12` ＝ 階段 2 職責
+### 🔴 後半（未做）：`R-11`／`R-12` ＝ 階段 2 職責 —— **偵察已完成，但有硬阻塞**
 
-出處：`handoffs/reconcile/20260809-govb1-b4-review-r4/synth.md:50`
-（該檔具名保留 `R-11`／`R-12`（階段 2 職責）、`R-13`（未列舉 Unicode 不可見碼點）、
-`R-14`（`review-r2` 僅 2/3 戳記，grok 額度封鎖））。
-**動工前先讀該收斂檔與 `docs/GOVB1_INPUT_QUALITY_TODO.md` 之 B4 段**，確認 `R-11`／`R-12` 的確切條文。
+**確切條文出處**：`handoffs/reconcile/20260809-govb1-b4-review-r2/synth.md:95-107`
+（`review-r4:50` 只是轉列）。兩項內容：
+
+1. **`scripts/dispatch.sh:84` 是真缺口（兩家同判）**：缺 `--brief` 即應拒發 token
+   （TODO `T-1.3-N1`）。繞過面已由 composer 窮舉——mint dispatch token 之路徑**僅** `gate.sh dispatch`
+   （`dispatch.sh`／`committee_run.sh` 皆轉呼、`cx_run.sh` 不 mint），
+   故繞過面＝**直呼 `gate.sh` 或 `dispatch.sh` 而不帶 `--brief`**。
+2. **TODO `:822` 之字面驗收在現行實作下不成立**：full path 未強制 `EXPECTED-DELTA`；
+   已由 `test_full_path_does_not_yet_enforce_expected_delta` **凍結為具名行為**（非假綠）。
+
+🔴 **硬阻塞（動工前必須先解，否則必撞）**：
+階段 1 之所以不做，是因為**掛上 full path 會使 `_B45_HARNESS` 的 minimal impl brief 轉紅**
+——codex 實測 141 tests 中 6 fail、**全為 B45 harness 缺 `EXPECTED-DELTA`**；
+composer 實測 `rolegate-impl` `full_rc=0`／`only_rc=2`。
+而 **`_B45_HARNESS` 五檔於 epic 期間禁改**、`g7` scope 亦未 allow。
+⇒ **階段 2 不是純實作題**：要嘛先取得「解除 harness 凍結」之裁決，
+要嘛設計一個不動那五檔的替代強制點。**此為技術取捨，須先開 consult 輪由兩家共識決**，
+不得直接動碼（`票 B-51`：偏離凍結宣告須先取得裁決）。
+
+🔴 **禁宣稱階段 1 已閉合強制**——`review-r2` 收斂檔明載，codex 之 `ASSUMPTIONS_VERIFIED` 亦未如此宣稱。
 
 > 🔴 本節刻意不寫批次識別碼＋狀態值於同一行——**主委 2026-08-10 在此處被自己的偵測器擋下一次**
 > （`HANDOFF.md:26` 與 `:29`），該檔在 `status_scope` 內。這是機制正常運作。
