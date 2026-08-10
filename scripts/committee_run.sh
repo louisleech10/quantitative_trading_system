@@ -298,9 +298,28 @@ _open_debt() {
 #   若先把 NUL 轉成換行，含換行的路徑會被切成兩行，與另一個同名前段的路徑**碰撞**
 #   ⇒ 形態② 靜默漏報（codex 實跑：before=`line1\nline2` 還原後新增 `line1`，完全不報）。
 #   先把真換行換成 \001，再把 record 分隔的 NUL 換成換行，即無碰撞可能。
+#
+# 🔴 裸路徑（rename／copy 的第二筆）**必須依位置語意判定，不得用正則猜**
+#   （`CODEX-R1-P1-01`／stamp-r1 BLOCKING）：`-z` 格式中 `R`／`C` 記錄的**下一筆**必為原路徑。
+#   前版用 `grep -E '^..[ ]'` 猜「有沒有 status 欄」，路徑 `ab cd` 剛好命中該形狀
+#   ⇒ 合法 staged rename 仍被誤報成形態②（codex 收據 hex=`5220206e65772e74787400616220636400`）。
+#   ⇒ 本函式在**排序前**用一次線性掃描把裸路徑標上 \002；排序破壞順序，故不能事後補判。
+# 裸路徑標記字元（`_ws_snapshot` 標、`_report_workspace_drift` 讀）。
+# 用控制字元而非可見符號：路徑可以長成任何可見字串，只有控制字元才不可能碰撞。
+_WS_BARE=$'\002'
+
 _ws_snapshot() {
   git -c core.quotePath=false status --porcelain -z 2>/dev/null \
-    | tr '\n' '\001' | tr '\0' '\n' | LC_ALL=C sort
+    | tr '\n' '\001' | tr '\0' '\n' \
+    | LC_ALL=C awk '
+        BEGIN { bare = 0 }
+        {
+          if (bare) { print "\002" $0; bare = 0; next }
+          x = substr($0, 1, 1); y = substr($0, 2, 1)
+          if (x == "R" || x == "C" || y == "R" || y == "C") bare = 1
+          print
+        }' \
+    | LC_ALL=C sort
 }
 
 # git 是否可用——rc **直接取**，不經 pipe（CLAUDE.md 明列的坑）。
@@ -323,15 +342,11 @@ _report_workspace_drift() {
   [ "${_after}" = "${_WS_BEFORE:-}" ] && return 0
 
   # 逐筆 exact record 比對用的路徑集合。
-  # 🔴 rename／copy 的**第二筆是裸路徑**（`R  new\0old\0`），沒有 status 欄
-  #   ⇒ 一律砍前 3 字元會把 `old` 誤砍成 `` ⇒ 合法 staged rename 被誤報成形態②
-  #   （`CODEX-R2-P2-03` 實跑：`RAW_STATUS_HEX=5220206e6577006f6c6400`，stderr 真的印出 `形態② … old`）。
-  #   ⇒ 有 status 欄者砍 3 字元；裸路徑**原樣保留**。
-  # 🔴 具名殘留：裸路徑若恰好長得像 status 欄（例如 `ab cd`）仍會被誤砍 ⇒ 可能誤報形態②。
-  #   本層不再往下猜，屬宣告上界（與「不偵測內容增量」同級）。
+  # 裸路徑（rename／copy 第二筆）在 `_ws_snapshot` 已標 \002 ⇒ 砍 1 字元；其餘砍 3 字元的 status 欄。
+  # 🔴 前版用正則猜形狀，被 `ab cd` 打穿（stamp-r1 `CODEX-R1-P1-01`），已改為位置語意標記。
   _after_paths="$(
-    { printf '%s\n' "${_after}" | LC_ALL=C grep -E '^..[ ]' | LC_ALL=C sed -e 's/^...//'
-      printf '%s\n' "${_after}" | LC_ALL=C grep -Ev '^..[ ]'
+    { printf '%s\n' "${_after}" | LC_ALL=C grep "^${_WS_BARE}" | LC_ALL=C sed -e 's/^.//'
+      printf '%s\n' "${_after}" | LC_ALL=C grep -v "^${_WS_BARE}" | LC_ALL=C sed -e 's/^...//'
     } 2>/dev/null
   )"
 

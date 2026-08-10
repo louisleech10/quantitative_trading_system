@@ -2862,6 +2862,28 @@ B9／B10 落地後，**stamp／review brief 一律硬性要求 canonical heading
 
 **但漂移本身仍在**：SoT 說不跑，實作跑。任何人讀 SoT 推導行為都會推錯。
 
+### 🔴 2026-08-10 第四次發作 — 機制比原本描述的更精確
+
+`20260810-govb1-x-stamp-r1`：codex 的 stamp 產出含一條 **P1** finding，
+但**缺 `**來源摘要**` digest** ⇒ 收集節點 `completeness_check` 拒收 ⇒ 只能 `--abandon`。
+
+**新發現的精確機制**（原票只寫「SoT 與實作漂移」，沒指出後果）：
+
+| 節點 | stamp 輪是否驗 findings 格式 |
+|---|---|
+| 交件（`cx_run.sh` `_run_format_check_if_needed`） | **不驗**——閘只涵蓋 `review\|consult\|closure` |
+| 收集（`reconcile_build` → `completeness_check`） | **驗** |
+
+⇒ **stamp 輪只要真的產生 findings，就必然撞牆**：交件時沒有人告訴委員格式錯，
+等到收集才炸，而那時該輪已無法正常銷帳。
+
+🔴 這也解釋了為何本 session 前幾次 stamp 輪都 rc=0——**它們都是 sentinel（零 findings）**。
+`票 B-38`／`B-31` 落地後 sentinel 成為硬性要求，於是「零 findings 的 stamp 輪」不會撞牆，
+**但「有 findings 的 stamp 輪」照撞**。原票寫「症狀已顯著縮小」是**不完整的**，此處更正。
+
+**新增閉合條件**：交件路徑對 stamp 輪**至少要驗 P0/P1 的 digest 欄**，
+或收集節點對 stamp 輪放寬到與交件一致——兩者擇一，不得繼續兩邊判準不同。
+
 ### 閉合條件（兩條路，須先裁決走哪一條）
 
 - (A) 改 `debt_clear.sh` 使其遵守 SoT（🔴 注意：**不得**放寬「只接受 success」那條守衛，

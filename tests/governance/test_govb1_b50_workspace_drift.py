@@ -22,9 +22,9 @@ COMMITTEE_RUN = REPO_ROOT / "scripts" / "committee_run.sh"
 
 
 def _fn_src() -> str:
-    """抽出偵測層的三支函式（不執行主流程）。"""
+    """抽出偵測層的三支函式 ＋ 裸路徑標記常數（不執行主流程）。"""
     s = COMMITTEE_RUN.read_text(encoding="utf-8")
-    parts = []
+    parts = ["_WS_BARE=$'\\002'"]
     for name in ("_ws_snapshot", "_ws_git_ok", "_report_workspace_drift"):
         start = s.index(f"{name}() {{")
         end = s.index("\n}\n", start) + len("\n}\n")
@@ -210,6 +210,45 @@ def test_rename_second_record_is_not_a_false_positive(tmp_path: Path) -> None:
     (repo / "old.txt").write_text("ambient\n", encoding="utf-8")
     r = _run(repo, "git add old.txt && git mv old.txt new.txt")
     assert "形態②：" not in r.stderr, f"合法 rename 被誤報成執行端污染:\n{r.stderr}"
+
+
+def test_rename_origin_that_looks_like_a_status_field(tmp_path: Path) -> None:
+    """🔴 stamp-r1 `CODEX-R1-P1-01`（BLOCKING）：裸路徑 `ab cd` 恰好長得像 status 欄。
+
+    codex 收據：before=` M ab cd`；`git add -- 'ab cd' && git mv -- 'ab cd' new.txt`
+    ⇒ raw=`R  new.txt\\0ab cd\\0`（hex `5220206e65772e74787400616220636400`）
+    ⇒ 前版用 `grep -E '^..[ ]'` **猜**形狀，`ab cd` 命中 ⇒ 被砍成 `cd` ⇒ 合法 rename 誤報形態②。
+
+    🔴 主委兩次把這種缺陷寫成「宣告上界」，兩次都被判**不可接受**
+    （r1 C4 已判過一次「不是把缺口藏起來」）。修法＝依 `-z` 的**位置語意**判定：
+    `R`／`C` 記錄的**下一筆**必為裸路徑，於排序**前**標記。
+    """
+    repo = _repo(tmp_path)
+    (repo / "ab cd").write_text("base\n", encoding="utf-8")
+    assert _git(repo, "add", "--", "ab cd").returncode == 0
+    assert _git(repo, "commit", "-q", "-m", "add ab cd").returncode == 0
+    (repo / "ab cd").write_text("ambient\n", encoding="utf-8")
+    r = _run(repo, "git add -- 'ab cd' && git mv -- 'ab cd' new.txt")
+    assert "形態②：" not in r.stderr, f"status-欄形狀的裸路徑仍被誤報:\n{r.stderr}"
+
+
+def test_bare_path_marking_uses_position_not_regex() -> None:
+    """🔴 釘住修法本身：判裸路徑必須靠 `-z` 的位置語意，退回正則猜形狀就會復發。"""
+    s = COMMITTEE_RUN.read_text(encoding="utf-8")
+    start = s.index("_ws_snapshot() {")
+    body = s[start : s.index("\n}\n", start)]
+    assert "awk" in body and "bare" in body, "未用線性掃描標記裸路徑"
+    assert 'x == "R" || x == "C"' in body, "未依 R/C 記錄的位置語意判定下一筆"
+    # 舊的猜形狀寫法不得復活。
+    # 🔴 只掃**可執行行**：解釋「舊做法錯在哪」的註解本來就會包含舊寫法，
+    #   用整檔字串比對會把說明誤判成復發（主委初版即如此——與本 epic
+    #   「寫『舊的錯在哪』會製造一份新副本」是同一個坑）。
+    code = [ln for ln in s.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    assert not any("grep -E '^..[ ]'" in ln for ln in code), (
+        "退回正則猜形狀 ⇒ `ab cd` 假紅燈會復發"
+    )
+    # 路徑集合必須靠標記字元分流
+    assert '${_WS_BARE}' in s, "未使用裸路徑標記字元分流"
 
 
 def test_checker_unavailable_leaves_a_receipt(tmp_path: Path) -> None:
