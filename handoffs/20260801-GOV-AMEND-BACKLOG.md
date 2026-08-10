@@ -1892,7 +1892,15 @@ codex R1 實跑：把真實 handoff 截成 6 行、保留一個完整 finding bo
 ### 🔴 2026-08-10 更新：硬前置**已滿足**，且排序已提前
 
 **Phase 0 ＝ `Task 0.1 gate_deny 記錄被擋指令與命中規則` ＝ 第 0 批 `B1`，已完成並審查通過。**
-實測：`gate_deny` **1343 筆**，其中 **676 筆**已帶 `match_rule`／`cmd_sha256`／`cmd_head`。
+實測（2026-08-10；🔴 **不寫死筆數**——`audit.log` 每輪都在長，寫死即刻過期）：
+
+```
+grep -c '"event":"gate_deny"' .claude/gate/audit.log                        # 總數
+grep '"event":"gate_deny"' .claude/gate/audit.log | grep -c cmd_sha256      # 帶新欄位者
+```
+
+當日兩次量測相隔數小時即由 `1343/676` 變為 `1357/690`，**足以說明為何不得寫死**。
+帶新欄位者已遠超本檔 `[OPEN-3]` 所定的「Phase 0 後 ≥200 筆」補查門檻。
 樣本：`{"event":"gate_deny","ts":"…","tool":"Bash","kind":"dispatch","reason":"token_expired",`
 `"match_rule":"token_expired","cmd_sha256":"04f20189…","cmd_head":"codex exec hello"}`
 
@@ -1906,7 +1914,7 @@ codex R1 實跑：把真實 handoff 截成 6 行、保留一個完整 finding bo
 gate_deny： "event":"gate_deny"             ← 冒號後無空格
 ```
 
-⇒ **任何以 `"event": "` 掃描的工具會靜默漏掉全部 1343 筆攔截紀錄。**
+⇒ **任何以 `"event": "` 掃描的工具會靜默漏掉這一整類的全部攔截紀錄。**
 主委 2026-08-10 即因此誤判並向使用者回報「gate 拒發完全沒進審計」，**該陳述為錯**。
 
 **這正是本票要防的病的實例**：統計工具建在一個**格式不一致且無人宣告**的資料源上。
