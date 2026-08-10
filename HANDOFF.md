@@ -51,50 +51,17 @@ implementer=composer  → {codex, grok}    → 僅 1 家可用 ❌ quorum 當場
   （`out = out c`、`src = src "\n" line`、`line = line substr(...)`）⇒ **O(n²)**。
 - **SPEC C-5 驗收**：quoted 100K **<2s**、500K **<5s**（`docs/GOVB0_B3R_LEXER_SPEC.md:142-143,209`）。
 
-### 🔴 主委 2026-08-11 已做完 Phase 2 原型與差分，**但 C-5 未達標 ⇒ 依 SPEC 不得進 repo**
+### 🔴 Phase 2 原型與差分**已於 2026-08-11 做完，但 C-5 未達標 ⇒ 依 SPEC 不得進 repo**
 
-原型與量測全在 `.claude/tmp/probe-r11r12/`（git worktree，**主樹 `scripts/_gate_lex.sh` 一字未動**）。
+**完整收據（量測、差分、profiling 結論、四支工具位置）＝`docs/GOV_B3R_PHASE2_RECEIPT.md`。**
+一句話版：`500K 29s → 11s`、95 條語料**輸出逐位元組相同**、但 C-5 要 `<5s` ⇒ **不落地**；
+profiling 已證明瓶頸是**每字元一次 awk 函式呼叫**（改 chunk 大小完全無效），真解是**批次掃描演算法重寫**。
+🔴 **主樹 `scripts/_gate_lex.sh` 一字未動**；原型在 worktree `.claude/tmp/probe-r11r12`。
 
-| 項 | 舊版 | 原型 |
-|---|---|---|
-| quoted 100K | **1s** | **0s** |
-| quoted 500K | **29s** | **11s** |
-| 差分（95 條語料：`gate_decision_corpus` ＋ `gate_invariance_corpus`） | — | `pre_diff=0 rc_diff=0`（前處理輸出**逐位元組相同**、判定 rc 全同） |
+<!-- 本節原有 46 行明細，已**逐字**搬至上述 docs 收據檔（HANDOFF 須 ≤30 行）。
+     🔴 用搬不用刪：上次精簡 HANDOFF 是直接刪，弄丟「B-53 提及」與「fixture 同步」兩條，
+     兩條都在同一天咬回來（前者害 push 被拒、後者害兩條測試轉紅）。 -->
 
-🔴 **29s 這個數字與 SPEC `E-2` 記載的 `500K→29.92s` 吻合** ⇒ 量測可信、可重跑。
-
-**原型改了什麼**：`ACC_RESET/ACC_ADD/ACC_GET` 三個 awk 函式取代所有 `out = out c`／`src = src line`／
-`line = line substr(...)`（共 20 處，以斷言命中次數的腳本機械替換，漏一處即拒寫檔）；
-`ACC_GET` 用**兩兩合併**（log 深度）而非線性串接。
-
-🔴 **為什麼 2.6× 之後就卡住（profiling 結論，別再重試同一路）**：
-`prof_lex.sh` 把 `_gate_cmd_is_dispatch` 拆三段量測 ⇒ 500K 時 `grep_pre=0 preprocess=11 match_scan=0 grep_post=0`
-——**全部時間都在 awk 前處理內**，且把 chunk 由 8192 改 128＋log 合併**完全沒有改善**（仍 11s）
-⇒ 瓶頸**不是字串累加**，是**每字元一次 awk 函式呼叫／迴圈迭代**本身（1M 次）。
-⇒ 真正的解＝**批次掃描**（一次跳到下一個特殊字元，整段 `substr` 搬移），
-  而 POSIX awk 沒有「從偏移量開始 match」的原語 ⇒ 這是**演算法重寫**，不是微調。
-  這正是 SPEC 把它放進 Phase 2「原型與差分」而非直接實作的理由。
-
-**接手時**（四支工具皆在 `.claude/tmp/`，**gitignored 但本機留存**；session scratchpad 會隨壓縮消失，故已複製出來）：
-
-| 檔 | 用途 |
-|---|---|
-| `.claude/tmp/on_rewrite.py` | 把 20 處逐字元累加機械替換成 `ACC_*`；**每條規則斷言命中次數，漏一處即拒寫檔** |
-| `.claude/tmp/bench_lex.sh` | C-5 效能樁（輸出 `gen=` 與 `lex=` 分開，避免把測具耗時算進去） |
-| `.claude/tmp/diff_lex.sh` | 舊 vs 新之差分：前處理輸出逐位元組 ＋ 判定 rc，出口＝差異 0 |
-| `.claude/tmp/prof_lex.sh` | 把 `_gate_cmd_is_dispatch` 拆四段計時，定位瓶頸落在哪一段 |
-
-原型 worktree：`.claude/tmp/probe-r11r12`（`git worktree list` 可見，detached `4b8346d6`）。
-若已被清掉：`git worktree add .claude/tmp/probe-r11r12 --detach <sha>` 後跑 `on_rewrite.py` 即可重建。
-🔴 **`bench` 的 payload 生成必須是 O(n)**（`sprintf("%*s")`＋`gsub`）——初版用逐字元累加造字串，
-量到的是測具自己，主委已踩過一次。
-
-- 🔴 **`scripts/_gate_lex.sh` 不在 `govb1_scope.manifest` allow** ⇒ commit 須帶 OOE trailer；
-  它是**共用控制流**（`gate_check.sh` 的 PreToolUse hook 每次工具呼叫都走它；命中高風險 (b)）
-  ⇒ 走完整管線，規格已存在：`docs/GOVB0_B3R_LEXER_SPEC.md`（**唯讀**）。
-- 🔴 **不得只因「比較快」就把原型落地**：SPEC Task 2.1 的出口是 C-1～C-5 **全數通過**，
-  C-5 未過 ⇒ Phase 3 不得開始。落一個「快 2.6 倍但仍不達標」的版本，
-  只會讓下一手誤以為這件事做完了——那是本 epic 一路在治的病。
 
 ## ✅ 本 session 已交付（2026-08-10～11，皆兩家 `RECONCILE-STAMP APPROVED`）
 
@@ -108,8 +75,9 @@ implementer=composer  → {codex, grok}    → 僅 1 家可用 ❌ quorum 當場
 **三票皆不得宣稱閉合。** 站 2.7 後半交付的**只有階段 2**，該批之整體狀態一律看
 `docs/GOVERNANCE_EXECUTION_ORDER.md` 的 `governance-batch-status` block，**本檔不重述**。
 
-> 🔴 本節刻意不把批次識別碼與狀態值寫在同一行——主委 2026-08-11 在此處**又被自己建的偵測器擋下一次**
-> （`HANDOFF.md:44` 與 `白話說明/治理待辦總覽.md:32`，這是第二次）。機制正常運作。
+> 🔴 本節刻意不把批次識別碼與狀態值寫在同一行——主委 2026-08-11 在本檔與
+> `白話說明/治理待辦總覽.md` 各被自己建的偵測器擋下一次（全 session 共三次）。機制正常運作。
+> **不寫行號**：行號會隨每次編輯漂掉，寫了就是下一個要對帳的假事實。
 
 ## 🔴 未修的活缺口
 
