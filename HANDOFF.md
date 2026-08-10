@@ -41,7 +41,11 @@ REF:handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md
 | 2.7 前半 | `…/20260807-govb1-b1-review-r6/`、`…/20260809-govb1-b4-review-r4/` | 1 輪 | — |
 | 2.7 後半 | `…/20260810-govb1-b4-consult-r1/`、`…/20260810-govb1-b4-review-r3/` | 1 consult＋3 review＋2 stamp | 五條殘留（見下） |
 
-**三票皆不得宣稱閉合。** `b4` **僅階段 2 收案，不得宣稱整批完成**。
+**三票皆不得宣稱閉合。** 站 2.7 後半交付的**只有階段 2**，該批之整體狀態一律看
+`docs/GOVERNANCE_EXECUTION_ORDER.md` 的 `governance-batch-status` block，**本檔不重述**。
+
+> 🔴 本節刻意不把批次識別碼與狀態值寫在同一行——主委 2026-08-11 在此處**又被自己建的偵測器擋下一次**
+> （`HANDOFF.md:44` 與 `白話說明/治理待辦總覽.md:32`，這是第二次）。機制正常運作。
 
 ## 🔴 未修的活缺口
 
