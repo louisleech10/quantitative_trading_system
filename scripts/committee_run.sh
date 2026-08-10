@@ -263,6 +263,78 @@ _open_debt() {
     --field "origin_script=committee_run.sh"
 }
 
+# ---------------------------------------------------------------------------
+# 票 B-50 `GOV-EXECUTOR-WORKSPACE-NOT-RESTORED` — 派工前後工作區快照比對
+#
+# 出生事故（本 epic 內**兩次**，形態不同；出處 20260809-govb1-b5-review-r2 收斂檔）：
+#   ① 執行端跑 mutation 遭 API `at capacity` 中斷，**未還原**即結束，
+#      在 scripts/template_check.sh 留下 `# MUTATION: ...`，使該函式漏接兩種合法形態。
+#   ② 執行端誤對 tracked 檔 `git checkout`，把 ambient M 檔還原成 HEAD
+#      ⇒ 檔案與其 .sha256／產生器三者不一致，g0_tests 連帶轉紅。
+#
+# 兩次都**沒有任何機制通知任何人**——主委是跑測試看到紅、再逐檔 `git diff` 才查出來。
+# 依「工具必須自帶強制機制」（2026-08-02 使用者定）：合約寫了禁令但無檢查 ⇒ 等於沒有。
+# 🔴 這是 CLAUDE.md「執行端跑驗收時主控端不得動檔」的**反向面**：
+#    既有紀錄只防「主控端污染執行端」，未防「執行端污染主控端」。
+#
+# 契約（票 B-50 閉合條件逐字）：**不必擋，但不得靜默** ⇒ 只回報，**不改 rc**。
+# 🔴 誠實邊界：形態①（改動是否逸出「該輪允許改動清單」）**本層做不到**——
+#    brief 目前不攜帶該清單欄位。本層只列出變動，不判斷是否違規；具名殘留於票 B-50。
+# ---------------------------------------------------------------------------
+_ws_snapshot() {
+  # core.quotePath=false：本 repo 有中文路徑（白話說明/），預設會被轉義成 \NNN 而對不上
+  git -c core.quotePath=false status --porcelain 2>/dev/null | LC_ALL=C sort
+}
+
+_report_workspace_drift() {
+  local _after _gone _newl _mut _l _p
+  _after="$(_ws_snapshot)"
+  [ "${_after}" = "${_WS_BEFORE:-}" ] && return 0
+
+  echo "[committee_run] ── 🔴 工作區在本輪期間變動（票 B-50；只回報、不擋、不改 rc）──" >&2
+
+  # 形態②：派工前為 ambient 修改的 tracked 檔，現已**整個消失**於 status ＝ 被還原成 HEAD
+  # 🔴 **不得**在此用 `case`：macOS bash 3.2 會把 case 模式尾的 `)` 當成 `$(` 的收尾
+  #   ⇒ 整段語法錯、形態② 完全不作動（實測：`syntax error near unexpected token 'newline'`）。
+  #   這種「有寫但不會動」只有真的跑一次才抓得到，讀原始碼的斷言永遠是綠的。
+  _gone="$(
+    printf '%s\n' "${_WS_BEFORE:-}" | LC_ALL=C grep -E '^( M|M |MM| T) ' | while IFS= read -r _l; do
+      _p="${_l#???}"
+      printf '%s\n' "${_after}" | LC_ALL=C grep -qF -- "${_p}" || printf '%s\n' "${_p}"
+    done
+  )"
+  if [ -n "${_gone}" ]; then
+    echo "[committee_run] 🔴 形態②：下列 ambient 修改**消失**（疑似被還原成 HEAD）：" >&2
+    printf '%s\n' "${_gone}" | sed 's/^/      /' >&2
+    echo "      ⇒ 執行端合約（AGENTS.md／.cursorrules）**明文禁止**對 tracked 檔 git checkout／git stash。" >&2
+    echo "      ⇒ 收斂前請先還原，否則該檔與其 .sha256／產生器會三者不一致。" >&2
+  fi
+
+  # 形態③：工作區殘留未還原的 mutation 標記（啟發式，票 B-50 列為輔助）
+  _mut="$(git -c core.quotePath=false diff -U0 2>/dev/null | LC_ALL=C grep -c '^+.*MUTATION' || true)"
+  case "${_mut}" in
+    ''|0) : ;;
+    *)
+      echo "[committee_run] 🔴 形態③：工作區有 ${_mut} 行新增含 MUTATION 標記（疑似 mutation 未還原）：" >&2
+      git -c core.quotePath=false diff -U0 2>/dev/null | LC_ALL=C grep '^+.*MUTATION' \
+        | head -10 | sed 's/^/      /' >&2
+      ;;
+  esac
+
+  # 其餘變動：**含本輪合法交付**，本層不判斷是否違規（形態①做不到，見上方誠實邊界）
+  _newl="$(
+    printf '%s\n' "${_after}" | while IFS= read -r _l; do
+      [ -n "${_l}" ] || continue
+      printf '%s\n' "${_WS_BEFORE:-}" | LC_ALL=C grep -qxF -- "${_l}" || printf '%s\n' "${_l}"
+    done
+  )"
+  if [ -n "${_newl}" ]; then
+    echo "[committee_run] ⚠️ 本輪期間新增/變更的工作區項目（**含合法交付**，本層不判違規）：" >&2
+    printf '%s\n' "${_newl}" | head -20 | sed 's/^/      /' >&2
+  fi
+  return 0
+}
+
 # --- 1) 開 gate token(fail-closed:沒過就不派、不開債) ---
 # Task 1.3 (e)：EXPECTED-DELTA 閘輸入 — 強制把 session brief 傳入 gate
 # （無此接線則 --brief 掛點空轉；票 B-29 / GROK-R13-P1-03）
@@ -279,6 +351,9 @@ if ! _open_debt "${round_id}"; then
   exit 1
 fi
 echo "[committee_run] 開債完成 round_id=${round_id}"
+
+# --- 1c) 票 B-50：派工**前**拍工作區快照（必須在任何 cx_run 啟動之前）---
+_WS_BEFORE="$(_ws_snapshot)"
 
 # --- 2) 平行派 N 家(索引陣列配對 pid↔family;bash 3.2 相容) ---
 # ROUND_ID 以 env 傳給每家 cx_run（Task 1.2 改法⑤）
@@ -314,6 +389,9 @@ while [ "${idx}" -lt "${#PIDS[@]}" ]; do
     rc_all=1
   fi
 done
+
+# --- 3b) 票 B-50：派工**後**比對工作區（只回報，不改 rc_all）---
+_report_workspace_drift
 
 if [ "${rc_all}" -eq 0 ]; then
   echo "[committee_run] ✅ ${n_fams} 家全數完成。接著:bash scripts/reconcile_build.sh <session> ${out_prefix}-*.md"
