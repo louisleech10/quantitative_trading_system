@@ -180,6 +180,38 @@ def test_form2_handles_paths_with_space(tmp_path: Path) -> None:
     assert "with space.txt" in r.stderr, r.stderr
 
 
+def test_form2_newline_in_path_does_not_collide(tmp_path: Path) -> None:
+    """🔴 `CODEX-R2-P1-02`（BLOCKING）：路徑含換行時與同名前段路徑**碰撞** ⇒ 形態② 靜默漏報。
+
+    codex 反例：ambient 是 `line1\\nline2`；派工期間把它還原，另外新增 `line1`。
+    舊版先把 NUL 轉成換行，`line1\\nline2` 被切成兩行，`line1` 那半剛好被新檔佔住
+    ⇒ 判定「還在」⇒ 不報。修法＝先把真換行換成 \\001，再轉 record 分隔符。
+    """
+    repo = _repo(tmp_path)
+    weird = "line1\nline2"
+    (repo / weird).write_text("base\n", encoding="utf-8")
+    assert _git(repo, "add", "--", weird).returncode == 0
+    assert _git(repo, "commit", "-q", "-m", "add newline path").returncode == 0
+    (repo / weird).write_text("ambient\n", encoding="utf-8")
+    r = _run(repo, "git checkout -- $'line1\\nline2'\nprintf 'x\\n' > line1")
+    assert "形態②：" in r.stderr, f"含換行路徑造成碰撞漏報:\n{r.stderr}"
+
+
+def test_rename_second_record_is_not_a_false_positive(tmp_path: Path) -> None:
+    """🔴 `CODEX-R2-P2-03`：rename 的第二筆是**裸路徑**，砍前 3 字元會誤報形態②。
+
+    合法的 staged rename（`R  new\\0old\\0`）不是執行端污染。**假紅燈比漏報更傷信號可信度**
+    ——它會讓人學會忽略這一層。主委在 r2 brief 裡判「只會少一個比對項」，**被反例推翻**。
+    """
+    repo = _repo(tmp_path)
+    (repo / "old.txt").write_text("base\n", encoding="utf-8")
+    assert _git(repo, "add", "old.txt").returncode == 0
+    assert _git(repo, "commit", "-q", "-m", "add old").returncode == 0
+    (repo / "old.txt").write_text("ambient\n", encoding="utf-8")
+    r = _run(repo, "git add old.txt && git mv old.txt new.txt")
+    assert "形態②：" not in r.stderr, f"合法 rename 被誤報成執行端污染:\n{r.stderr}"
+
+
 def test_checker_unavailable_leaves_a_receipt(tmp_path: Path) -> None:
     """🔴 `CODEX-R1-P2-05`：git 不可用時**不得靜默**——否則「沒告警」會被誤讀成「乾淨」。"""
     repo = _repo(tmp_path)

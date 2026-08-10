@@ -293,8 +293,14 @@ _open_debt() {
 #   ⇒ 一律逐筆 **exact record** 比對（`grep -qxF`），禁對整份 status 文字做子字串搜尋。
 # 🔴 `core.quotePath=false` 為**不可刪 invariant**（`COMPOSER-R1-P2-02`）：
 #   本 repo 有中文路徑（白話說明/），預設會被轉義成 \NNN 而對不上。測試釘住。
+# 🔴 `tr '\n' '\001'` **必須在** `tr '\0' '\n'` **之前**（`CODEX-R2-P1-02` BLOCKING）：
+#   records 由 NUL 分隔 ⇒ 記錄內出現的換行**必定**是路徑本身的一部分。
+#   若先把 NUL 轉成換行，含換行的路徑會被切成兩行，與另一個同名前段的路徑**碰撞**
+#   ⇒ 形態② 靜默漏報（codex 實跑：before=`line1\nline2` 還原後新增 `line1`，完全不報）。
+#   先把真換行換成 \001，再把 record 分隔的 NUL 換成換行，即無碰撞可能。
 _ws_snapshot() {
-  git -c core.quotePath=false status --porcelain -z 2>/dev/null | tr '\0' '\n' | LC_ALL=C sort
+  git -c core.quotePath=false status --porcelain -z 2>/dev/null \
+    | tr '\n' '\001' | tr '\0' '\n' | LC_ALL=C sort
 }
 
 # git 是否可用——rc **直接取**，不經 pipe（CLAUDE.md 明列的坑）。
@@ -316,8 +322,18 @@ _report_workspace_drift() {
   _after="$(_ws_snapshot)"
   [ "${_after}" = "${_WS_BEFORE:-}" ] && return 0
 
-  # 逐筆 exact record 比對用的路徑集合（砍掉前 3 字元的 status 欄）
-  _after_paths="$(printf '%s\n' "${_after}" | LC_ALL=C sed -e 's/^...//')"
+  # 逐筆 exact record 比對用的路徑集合。
+  # 🔴 rename／copy 的**第二筆是裸路徑**（`R  new\0old\0`），沒有 status 欄
+  #   ⇒ 一律砍前 3 字元會把 `old` 誤砍成 `` ⇒ 合法 staged rename 被誤報成形態②
+  #   （`CODEX-R2-P2-03` 實跑：`RAW_STATUS_HEX=5220206e6577006f6c6400`，stderr 真的印出 `形態② … old`）。
+  #   ⇒ 有 status 欄者砍 3 字元；裸路徑**原樣保留**。
+  # 🔴 具名殘留：裸路徑若恰好長得像 status 欄（例如 `ab cd`）仍會被誤砍 ⇒ 可能誤報形態②。
+  #   本層不再往下猜，屬宣告上界（與「不偵測內容增量」同級）。
+  _after_paths="$(
+    { printf '%s\n' "${_after}" | LC_ALL=C grep -E '^..[ ]' | LC_ALL=C sed -e 's/^...//'
+      printf '%s\n' "${_after}" | LC_ALL=C grep -Ev '^..[ ]'
+    } 2>/dev/null
+  )"
 
   # 形態②：派工前為 ambient 修改的 tracked 檔，現已**整個消失**於 status ＝ 被還原成 HEAD
   # 🔴 **不得**在此用 `case`：macOS bash 3.2 會把 case 模式尾的 `)` 當成 `$(` 的收尾

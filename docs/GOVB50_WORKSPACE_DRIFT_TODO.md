@@ -24,6 +24,18 @@ RULED-BY: `20260810-govb1-x-review-r1` 必答 1（codex ＋ composer 兩家裁 *
 **兩家亦皆裁：不撤回實作**（codex：「不必以破壞性 revert 代替流程補正」；
 composer：「**不撤回** ②③ 實作」）⇒ 本 TODO 補齊追蹤面，實作由 r2 重審。
 
+### 🔴 流程面狀態＝「**跳步已記錄、實作可另行複驗**」——**不得宣稱流程已閉合**
+
+`20260810-govb1-x-review-r2` 必答 2 **兩家分歧**：composer 裁 (A) 足夠、
+codex 裁 **(C)**「事後補的 TODO 可**記錄**但**不能關閉**原始跳步」。
+
+依離線裁決規則（**看碼證不數人頭；不決則採較嚴版＋具名殘留**）⇒ **採 codex 的 (C)**。
+codex 逐字：「流程歷史應標『跳步已記錄、實作可另行複驗』，**不得宣稱流程已閉合**；
+後續票須**在動工前**補齊規格與 review。」
+
+⇒ 本 TODO **不是**「補完就沒事了」的證明，它是**事故紀錄**。
+`票 B-50` 的流程面**永久標記為跳步**；可關閉的只有實作面。
+
 **規格來源**（本 TODO 不重述，只指回）：
 `handoffs/20260801-GOV-AMEND-BACKLOG.md` 的 `## B-50 票 GOV-EXECUTOR-WORKSPACE-NOT-RESTORED` 節
 （出自 `handoffs/reconcile/20260809-govb1-b5-review-r2/synth.md`，兩家 `RECONCILE-STAMP APPROVED`）。
