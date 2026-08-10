@@ -23,11 +23,22 @@ REF:handoffs/reconcile/20260810-govb1-b8-review-r1/synth.md
 
 🔴 **上述 block 一律不得手改**：改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`。
 
-## 🔴 接手第一件事：**站 2.7**（序 `036`；批次狀態一律見 `governance-batch-status` 生成區塊）
+## 🔴 接手第一件事：**站 2.7 後半**（序 `036`；批次狀態見 `governance-batch-status` 生成區塊）
 
-**不需新規格。** 兩件事：①第 1 批第一個批次之收斂檔缺 `RECONCILE-STAMP`（機檢對它是紅的）
-②第 1 批第四個批次之 TODO 明列兩階段，其第二階段尚未動工。
-先查該收斂檔位置與該 TODO 之階段欄位。
+### ✅ 前半已完成（2026-08-10）：兩份收斂檔補戳記
+
+`handoffs/reconcile/20260807-govb1-b1-review-r6/synth.md`（sha `50f885bf…f17a`）與
+`handoffs/reconcile/20260809-govb1-b4-review-r4/synth.md`（sha `53da7916…42fe`）
+皆取得 codex＋composer 兩家 `APPROVED`，`reconcile_stamps_check` 兩份**皆 rc=0**。
+主委只新增空的 `## 戳記` 區段標題，**本體一字未改**（兩家各自複跑 sha 驗證）。
+🔴 兩家於本輪明確確認：`b4-review-r4` **僅涵蓋階段 1**，蓋章**不等於**該批次整體完成。
+
+### 🔴 後半（未做）：`R-11`／`R-12` ＝ 階段 2 職責
+
+出處：`handoffs/reconcile/20260809-govb1-b4-review-r4/synth.md:50`
+（該檔具名保留 `R-11`／`R-12`（階段 2 職責）、`R-13`（未列舉 Unicode 不可見碼點）、
+`R-14`（`review-r2` 僅 2/3 戳記，grok 額度封鎖））。
+**動工前先讀該收斂檔與 `docs/GOVB1_INPUT_QUALITY_TODO.md` 之 B4 段**，確認 `R-11`／`R-12` 的確切條文。
 
 > 🔴 本節刻意不寫批次識別碼＋狀態值於同一行——**主委 2026-08-10 在此處被自己的偵測器擋下一次**
 > （`HANDOFF.md:26` 與 `:29`），該檔在 `status_scope` 內。這是機制正常運作。
