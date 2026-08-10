@@ -255,8 +255,13 @@ _fk_scope_files() {   # stdout: 範圍內檔案（相對 root），一行一筆
     return 1; }
   _fks_scope="$(LC_ALL=C jq -r '._schema.status_scope[]' "${REG}")" || return 1
   _fks_gf="$(LC_ALL=C jq -r '._schema.status_scope_grandfathered[]' "${REG}")" || return 1
+  # 🔴 NUL-safe（r6 CODEX-R6-P1-03：不帶 -z 時，含換行之檔名會被逐行解析切碎而漏掃，
+  #    codex 以 `docs/hidden<LF>name.md` 實跑得 rc=0 ⇒ 可構造之 fail-open）。
+  #    先把路徑內的換行編碼成 \001，再把 NUL 轉成換行；用到路徑時解碼回來。
+  #    順序不可顛倒（先轉 NUL 會使含換行的路徑碰撞）。
   _fks_all="$(git -C "${_fks_root}" -c core.quotePath=false \
-                ls-files --cached --others --exclude-standard)" || return 1
+                ls-files --cached --others --exclude-standard -z \
+              | tr '\n' '\001' | tr '\0' '\n')" || return 1
   # 🔴 多行值經**檔案**餵入 awk，不走 -v：BSD awk 的 -v 值不接受換行
   #    （實測 macOS：`awk: newline in string ... at source line 1`）。此為平台事實，
   #    與 `_fk_write` 的 blkfile 同一坑；主委 2026-08-10 在本檔內再犯一次。
@@ -305,7 +310,7 @@ _fk_reject_handwritten_status() {
   # 非 regular file 一律 fail-closed（不遞迴、不略過）：一人遞迴另一人拒絕即集合不一致
   while IFS= read -r _fkh_f; do
     [ -n "${_fkh_f}" ] || continue
-    _fkh_p="${_fkh_root}/${_fkh_f}"
+    _fkh_p="${_fkh_root}/$(printf '%s' "${_fkh_f}" | tr '\001' '\n')"
     if [ -L "${_fkh_p}" ]; then
       echo "FACTKEY SCAN: ${_fkh_f} 為 symlink ⇒ fail-closed" >&2; _fkh_rc=1; continue
     fi
@@ -325,7 +330,23 @@ EOF
   _fkh_out="$(
     while IFS= read -r _fkh_f; do
       [ -n "${_fkh_f}" ] || continue
-      LC_ALL=C awk -v idf="${_fkh_idf}" -v ef="${_fkh_ef}" -v rel="${_fkh_f}" '
+      _fkh_real="$(printf '%s' "${_fkh_f}" | tr '\001' '\n')"
+      # 🔴 合法區塊 ＝「該 key 已註冊，且本檔為該 key 之 target」（r6 CODEX-R6-P1-02）。
+      #    否則非宿主檔可貼一組**假的** BEGIN/END GENERATED 把手寫狀態藏進去，
+      #    codex 以 `docs/other.md` 內假區塊＋`ZZID ✅` 實跑得 rc=0 ⇒ 可構造之 fail-open。
+      _fkh_legal=""
+      while IFS= read -r _fkh_k; do
+        [ -n "${_fkh_k}" ] || continue
+        _fk_targets "${_fkh_k}" 2>/dev/null | LC_ALL=C grep -qxF -- "${_fkh_real}" \
+          && _fkh_legal="${_fkh_legal} ${_fkh_k}"
+      done <<EOF3
+${_fkh_keys}
+EOF3
+      # 🔴 `rel` 傳**編碼版**（換行仍為 \001）：BSD awk 的 -v 值不接受換行，
+      #    傳解碼後路徑會得 `awk: newline in string`（主委 2026-08-10 第三次踩同一坑）。
+      #    awk 內再轉成可讀標記 `<LF>`。
+      LC_ALL=C awk -v idf="${_fkh_idf}" -v ef="${_fkh_ef}" -v rel="${_fkh_f}" \
+                   -v legal="${_fkh_legal}" '
         # 🔴 邊界判定用「原始行 ＋ 絕對位置」，不得切片後重判
         #    （r4 CODEX-R4-P1-01：切片會丟失左側前文，B3RB3R 誤抽）
         function has_token(s, t,   off, rest, p, st, pre, post) {
@@ -346,9 +367,24 @@ EOF
           close(idf)
           while ((getline line < ef) > 0) if (line != "") E[++ne] = line
           close(ef)
+          nl = split(legal, L, " ")
+          for (i = 1; i <= nl; i++) if (L[i] != "") LEGAL[L[i]] = 1
+          gsub(/\001/, "<LF>", rel)
         }
-        /^<!-- BEGIN GENERATED: .* -->$/ { inblk = 1; next }
-        /^<!-- END GENERATED: .* -->$/   { inblk = 0; next }
+        # 只有「已註冊且本檔為其 target」之 key 才算合法區塊；假區塊之標記行按一般行處理
+        /^<!-- BEGIN GENERATED: .* -->$/ {
+          k = $0
+          sub(/^<!-- BEGIN GENERATED: /, "", k); sub(/ -->$/, "", k)
+          if (k in LEGAL) { inblk = 1; next }
+          printf "FACTKEY FAKE BLOCK: %s:%d 未登記或非本檔之生成標記 '\''%s'\'' → fail-closed\n", rel, FNR, k
+          next
+        }
+        /^<!-- END GENERATED: .* -->$/ {
+          k = $0
+          sub(/^<!-- END GENERATED: /, "", k); sub(/ -->$/, "", k)
+          if (k in LEGAL) { inblk = 0 }
+          next
+        }
         inblk { next }
         {
           ehit = ""
@@ -359,7 +395,7 @@ EOF
           if (ihit == "") next
           printf "FACTKEY HANDWRITTEN STATUS: %s:%d 識別碼=%s 狀態=%s\n", rel, FNR, ihit, ehit
         }
-      ' "${_fkh_root}/${_fkh_f}"
+      ' "${_fkh_root}/${_fkh_real}"
     done <<EOF2
 ${_fkh_files}
 EOF2
@@ -367,7 +403,7 @@ EOF2
   rm -f "${_fkh_idf}" "${_fkh_ef}"
   [ -z "${_fkh_out}" ] || {
     printf '%s\n' "${_fkh_out}" >&2
-    echo "FACTKEY: 生成區塊外偵測到手寫狀態（改資料檔＋--write，或改為指向區塊之指標）→ fail-closed" >&2
+    echo "FACTKEY: 區塊外手寫狀態／假生成標記（改資料檔＋--write，或改為指向區塊之指標）→ fail-closed" >&2
     return 1; }
   return 0
 }

@@ -779,17 +779,76 @@ def test_t21_handwritten_status_in_untracked_file_is_rejected(tmp_path):
     assert "ZZID" in r.stderr
 
 
-def test_t21_same_line_inside_generated_block_is_ok(tmp_path):
-    """ASSERT --check WHEN 同一行改置於生成區塊內 THEN rc=0
+def _legal_block_case(tmp_path: Path, *, outside: bool):
+    """同一段「識別碼＋狀態值」文字，置於**合法**生成區塊內 vs 區塊外之對照。
 
-    證明鑑別力來源是「在不在區塊外」，不是「檔案裡有沒有這些字」。
+    🔴 r6 CODEX-R6-P1-02 指出前版此測試只斷言「無 HANDWRITTEN」而未斷言 rc==0，
+    是空心的；且其構造用的是**未登記** key，現已改為 fake-block 而被拒。
+    本版改用 registry 自身之合法區塊內容（rows 第 3 欄即狀態值），對照組才有鑑別力。
+    """
+    reg = {"k": {"target": "docs/a.md", "rows": [["010", "ZZID", "✅"]]}}
+    sdir = _sandbox(tmp_path, reg)
+    root = _mkroot(tmp_path)
+    blk = "<!-- BEGIN GENERATED: k -->\n010\tZZID\t✅\n<!-- END GENERATED: k -->\n"
+    (root / "docs" / "a.md").write_text(blk, encoding="utf-8")
+    if outside:
+        (root / "docs" / "a.md").write_text(blk + "010\tZZID\t✅\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    return _run([str(sdir / GEN.name), "--check"],
+                env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+
+
+def test_t21_same_text_inside_legal_block_is_rc_zero():
+    """對照組上半：合法區塊**內**之同一段文字 ⇒ rc=0（見下一條的對照）。"""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        r = _legal_block_case(Path(td), outside=False)
+    assert r.returncode == 0, f"合法區塊內不應被擋，實得 {r.returncode}\n{r.stderr}"
+
+
+def test_t21_same_text_outside_block_is_rejected():
+    """對照組下半：同一段文字移到區塊**外** ⇒ rc!=0。
+
+    兩條合起來證明鑑別力來源是「在不在區塊外」，不是「檔案裡有沒有這些字」。
+    """
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        r = _legal_block_case(Path(td), outside=True)
+    assert r.returncode != 0, "區塊外之同一段文字未被擋 ⇒ 鑑別力空心"
+    assert "HANDWRITTEN" in r.stderr
+
+
+def test_t21_fake_generated_block_in_non_host_file_is_rejected(tmp_path):
+    """🔴 r6 CODEX-R6-P1-02 之承重測試：非宿主檔貼假 `BEGIN GENERATED` 藏狀態。
+
+    codex 實跑反例：`docs/other.md` 內放一組未登記之 BEGIN/END 與 `ZZID ✅`，
+    前版偵測器把任何 marker block 當成區塊內而跳過 ⇒ rc=0，可構造之 fail-open。
     """
     r = _detector_case(
         tmp_path,
         body="<!-- BEGIN GENERATED: zz -->\n批次 ZZID 目前 ✅ 了\n<!-- END GENERATED: zz -->\n",
-        other_name="b.md")
-    # 未登記 block 會另行拒絕；此處只驗「不是被手寫狀態偵測器擋的」
-    assert "HANDWRITTEN" not in r.stderr, r.stderr
+        other_name="other.md")
+    assert r.returncode != 0, "假生成區塊未被拒 ⇒ r6 旁路重現"
+    assert "FAKE BLOCK" in r.stderr or "HANDWRITTEN" in r.stderr, r.stderr
+
+
+def test_t21_newline_in_filename_does_not_evade_scan(tmp_path):
+    """🔴 r6 CODEX-R6-P1-03 之承重測試：含換行之檔名。
+
+    codex 實跑反例：`docs/hidden<LF>name.md` 內含 `ZZID ✅`，
+    前版未帶 `-z` 之逐行解析會把該路徑切碎而漏掃 ⇒ rc=0。
+    """
+    reg = {"k": {"target": "docs/a.md", "rows": [["010", "ZZID"]]}}
+    sdir = _sandbox(tmp_path, reg)
+    root = _mkroot(tmp_path)
+    (root / "docs" / "a.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n010\tZZID\n<!-- END GENERATED: k -->\n",
+        encoding="utf-8")
+    (root / "docs" / "hidden\nname.md").write_text("批次 ZZID 目前 ✅ 了\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+    assert r.returncode != 0, "含換行檔名之手寫狀態未被偵測 ⇒ r6 旁路重現"
+    assert "ZZID" in r.stderr
 
 
 def test_t21_identifier_and_status_on_separate_lines_not_triggered(tmp_path):
