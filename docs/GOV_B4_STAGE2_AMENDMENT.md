@@ -45,6 +45,33 @@
 
 ---
 
+## A′. `--spec` 值本身之 fail-closed（`CODEX-R1-P1-01`，review-r1 追加）
+
+`gate.sh dispatch` 之 impl 判準是 `[ -n "${spec}" ]`。**顯式**傳 `--spec ""` 使其為假 ⇒
+A 節①②與既有 V-C `miss reconcile` **全部不啟動**，卻仍寫出 `dispatch.token`；
+parser 為 last-wins，故 `--spec <有效值> --spec ""` 亦可抹除。codex 於 review-r1 附實跑反例。
+
+**這個判準在本輪之前就長這樣**——但本輪把它**升格為安全閘**，故不得以「既有語義」為由延後。
+
+修法（把「旗標有沒有出現」與「值是什麼」分開）：
+
+| 情形 | 行為 |
+|---|---|
+| 完全不給 `--spec` | **逐字不變**（非 impl 派工，rc=0） |
+| `--spec ""` 或全空白 | `exit 1`，訊息具名 `--spec`，**不發 token** |
+| `--spec` 重複給值 | `exit 1`，訊息含「重複」，**不發 token** |
+
+回歸護欄 `test_p1_01_no_spec_flag_unchanged` 存在的理由：沒有它，上述三條可以被
+「一律拒 `--spec`」這種過寬修法騙過去。
+
+## A″. kind 解析排除 code fence（`CODEX-R1-P2-02`，review-r1 追加）
+
+`_resolve_kind_into_bk` 原以 `grep -E '^brief-kind:'` 全檔擷取，會採信 **fence 內**的示例宣告。
+修法＝在**同一** parser 內排除 fence，判準與 `_check_expected_delta` 之 awk 同源（不另立第二套規則）。
+影響面大於 `--only impl-kind`——`--emit`／full path／`_role_gate` 都吃同一個解析結果。
+
+---
+
 ## B. `TODO:822` 第 1 條 ASSERT 仍**字面不成立**（`R-12`，具名殘留）
 
 ```
@@ -67,9 +94,14 @@ OOE 只鬆綁 `G-7`。兩家獨立覆核此結論成立。
 
 ### 安全語義是否有缺口
 
-**沒有。** 生產面能 mint token 的路徑經兩家窮舉**僅** `gate.sh dispatch`
+**限定範圍下沒有**——條件是 `--spec` **經顯式驗證為非空、非全空白、且未重複給值**（見下 §A′）。
+
+生產面能 mint token 的路徑經兩家窮舉**僅** `gate.sh dispatch`
 （`dispatch.sh:84`／`committee_run.sh:413` 皆 `exec`／轉呼；`cx_run.sh` 只 `register-output`）。
-A 節之①②已在該唯一入口收口。`R-12` 的剩餘價值＝縱深防禦 ＋ 讓 `:822` 字面成立。
+A 節之①②在該唯一入口收口。`R-12` 的剩餘價值＝縱深防禦 ＋ 讓 `:822` 字面成立。
+
+🔴 **初版此段寫的是無條件的「沒有」，那是過度宣稱**（`CODEX-R1-P2-03`）：
+當時 `--spec ""` 可使①②整組不啟動而仍發 token。宣稱與修法同輪落地，本節已改為有條件敘述。
 
 ### 機械綁定
 
