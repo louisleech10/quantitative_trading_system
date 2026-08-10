@@ -94,8 +94,14 @@ LC_ALL=C awk -v mode="${MODE}" '
   }
 
   # ---- 契約 3：root-only 鍵擷取（巢狀物件內之同名鍵不得計入）----
+  # 🔴 兩張表分離（r5 CODEX-R5-P1-01／P1-02）：
+  #   F[k] ＝ **僅**當值為 quoted string 時之字串值 ⇒ 非字串／結構值**不得**當欄值使用
+  #          （否則 `{"event":123}` 會產生假事件類別、`{"event":{}}` 會產生 `<nested>` 類別）
+  #   P[k] ＝ 該鍵於 root 出現與否（**不論值型別**）⇒ `--field-presence` 之語義是「欄位是否存在」，
+  #          值為空字串仍算 present（實測真實 log 有 12 筆 cmd_head 為空，前版誤報 absent）
   function parse_root(s,   i, n, c, depth, inq, k, v, p, key) {
     for (key in F) delete F[key]
+    for (key in P) delete P[key]
     n = length(s); depth = 0; i = 1
     while (i <= n) {
       c = substr(s, i, 1)
@@ -109,12 +115,11 @@ LC_ALL=C awk -v mode="${MODE}" '
         i++
         while (i <= n && substr(s, i, 1) ~ /[ \t]/) i++
         c = substr(s, i, 1)
+        P[k] = 1                                   # 鍵存在（不論值型別）
         if (c == "\"") { p = read_str(s, i); if (p == 0) return
                          F[k] = STRVAL; i = p + 1 }
-        else if (c == "{" || c == "[") { F[k] = "<nested>" }   # 值為結構 ⇒ 不取字串值
-        else { v = ""
-               while (i <= n && substr(s, i, 1) !~ /[,}]/) { v = v substr(s, i, 1); i++ }
-               gsub(/[ \t]+$/, "", v); F[k] = v }
+        else if (c == "{" || c == "[") { }         # 結構值 ⇒ **不進 F**，只記 presence
+        else { while (i <= n && substr(s, i, 1) !~ /[,}]/) i++ }   # 數值/布林/null ⇒ 同上
         continue
       }
       if (c == "\"") { p = read_str(s, i); if (p == 0) return; i = p + 1; continue }
@@ -139,8 +144,10 @@ LC_ALL=C awk -v mode="${MODE}" '
     else if (mode == "--field-presence") {
       # 🔴 key 必含 event（r4 CODEX-R4-P1-01）：全域與單一事件之答案不同，無 event 無法唯一對帳
       nf = split("reason,match_rule,cmd_sha256,cmd_head,tool,kind,ts", FL, ",")
+      # 🔴 用 P（鍵存在與否），不得用 F 之非空判斷（r5 CODEX-R5-P1-02：
+      #    真實 log 有 12 筆 cmd_head 為空字串，前版誤報 absent ⇒ 欄位覆蓋率靜默失真）
       for (fi = 1; fi <= nf; fi++)
-        C[ev "\t" FL[fi] "\t" ((FL[fi] in F && F[FL[fi]] != "") ? "present" : "absent")]++
+        C[ev "\t" FL[fi] "\t" ((FL[fi] in P) ? "present" : "absent")]++
     }
   }
   END {

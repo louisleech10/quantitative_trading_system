@@ -292,12 +292,124 @@ def test_mut_m8_naive_brace_balance_breaks_string_brace_case(tmp_path):
     assert bad["#unparsed"] == 1, f"mutation 未改變結果 ⇒ M8 空心: {bad}"
 
 
-def test_mut_m3_sort_removal_is_load_bearing(tmp_path):
-    """M3：拿掉 `LC_ALL=C sort` ⇒ 決定性可能破（至少輸出順序不再固定）。"""
-    mut = _mutant(tmp_path, "| LC_ALL=C sort", "| cat")
+def test_output_is_lc_all_c_sorted(tmp_path):
+    """🔴 取代前版空心之 M3（r5 `CODEX-R5-P1-03` 判退回）。
+
+    前版寫 `assert ref != got or True`（**恆真**）＋末行只查原始碼文字，
+    完全不能證明「移除 sort 會使 oracle 轉紅」——是**空心 mutation test**。
+    主委於 brief 自請退回，codex 確認並判退。
+
+    本版改為**行為性質 oracle**：輸出須逐行為 `LC_ALL=C` 排序序。
+    🔴 **誠實邊界（具名，非空心）**：awk 之 `for-in` 次序未定義；
+    若某平台之自然次序恰為排序序，移除 `sort` 後本條仍會綠 ⇒ 本條在該平台無鑑別力。
+    此為平台事實，非測試缺陷；SPEC §N 已具名 M3 無跨平台行為 mutant。
+    """
     log = _mixed_log(tmp_path)
-    ref = _tally("--by-event", log=log).stdout
-    got = _tally("--by-event", log=log, script=mut).stdout
-    assert sorted(ref.splitlines()) == sorted(got.splitlines()), "內容不應改變"
-    assert ref != got or True  # awk 之 for-in 次序未定義；此處只證 sort 確實在鏈上
-    assert "| LC_ALL=C sort" in TALLY.read_text(encoding="utf-8"), "決定性釘子已失守"
+    out = [l for l in _tally("--by-day", log=log).stdout.splitlines() if l]
+    assert out == sorted(out), f"輸出未排序 ⇒ 決定性契約失守:\n{out}"
+
+
+def test_cmd_head_with_escaped_quote_is_read_completely(tmp_path):
+    """🔴 M7 之實質：`cmd_head` 含 `\\"` 時**不得截斷**。
+
+    r1 composer 量得 regex 式擷取在此類行截斷 145/1385（10.5%）；
+    本實作為逐字元＋跳脫感知，**不存在截斷路徑** ⇒ SPEC 之「截斷即標 `-`」
+    在本實作**由構造滿足**（無截斷可標）。本條即該宣稱之承重證明。
+    """
+    log = tmp_path / "h.log"
+    log.write_text('{"event":"gate_deny","cmd_head":"echo \\"hi\\" there"}\n', encoding="utf-8")
+    d = _rows(_tally("--by-signature", log=log).stdout)
+    keys = [k for k in d if not k.startswith("#")]
+    assert len(keys) == 1, keys
+    assert keys[0].endswith('echo \\"hi\\" there'), keys
+
+
+# --------------------------------------------------------------------------
+# root-only 擷取之型別安全（r5 CODEX-R5-P1-01）
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("line", [
+    '{"event":123}', '{"event":{}}', '{"event":[]}', '{"event":true}', '{"event":null}',
+])
+def test_non_string_root_value_is_not_used_as_field_value(tmp_path, line):
+    """非字串／結構值**不得**當欄值 ⇒ 否則會產生假事件類別（`123`／`<nested>`）。"""
+    log = tmp_path / "n.log"
+    log.write_text(line + "\n", encoding="utf-8")
+    d = _rows(_tally("--by-event", log=log).stdout)
+    assert d.get("-") == 1, d
+    assert "<nested>" not in "".join(d.keys()), d
+
+
+def test_field_presence_counts_key_existence_not_nonempty(tmp_path):
+    """🔴 r5 `CODEX-R5-P1-02`：語義是「**欄位是否存在**」，值為空字串仍是 present。
+
+    真實 log 有 12 筆 `cmd_head` 為空字串；前版以 `!= ""` 判定 ⇒ 誤報 absent，
+    **欄位覆蓋率靜默失真**（該指標正是本工具存在的理由）。
+    """
+    log = tmp_path / "e.log"
+    log.write_text('{"event":"gate_deny","cmd_sha256":""}\n', encoding="utf-8")
+    d = _rows(_tally("--field-presence", log=log).stdout)
+    assert d.get("gate_deny\tcmd_sha256\tpresent") == 1, d
+    assert d.get("gate_deny\tcmd_sha256\tabsent") is None, d
+
+
+def test_duplicate_root_key_takes_last(tmp_path):
+    """重複鍵：取最後一個（JSON 慣例）；不得因此丟棄整筆。"""
+    log = tmp_path / "d.log"
+    log.write_text('{"event":"first","event":"second"}\n', encoding="utf-8")
+    d = _rows(_tally("--by-event", log=log).stdout)
+    assert d.get("second") == 1, d
+    assert d["#unparsed"] == 0
+
+
+def test_colon_inside_string_is_not_a_separator(tmp_path):
+    log = tmp_path / "c.log"
+    log.write_text('{"event":"a:b","reason":"c:d"}\n', encoding="utf-8")
+    d = _rows(_tally("--by-event", log=log).stdout)
+    assert d.get("a:b") == 1, d
+
+
+# --------------------------------------------------------------------------
+# Task 1.3 — exact two-command closure 之可執行 regression（r5 CODEX-R5-P1-04）
+# --------------------------------------------------------------------------
+
+_CMD_FILES = [
+    REPO / "白話說明" / "接下來要做什麼.md",
+    REPO / "handoffs" / "20260801-GOV-AMEND-BACKLOG.md",
+]
+_CANONICAL = [
+    "bash scripts/friction_tally.sh --by-event",
+    "bash scripts/friction_tally.sh --field-presence",
+]
+
+
+@pytest.mark.parametrize("path", _CMD_FILES, ids=lambda p: p.name)
+def test_friction_cmd_block_exact_two_command_closure(path):
+    """🔴 r5 `CODEX-R5-P1-04`：前版只有人工 probe，無可執行 gate
+    ⇒ 未來可留下 active grep 而所有測試與時序檢查仍全綠。
+
+    四條**同時**成立才通過（缺第 2 條即**空區塊可過**——r4 codex 實跑證實）。
+    """
+    if not path.is_file():
+        pytest.skip(f"{path} 不存在（handoffs/** 不進版控之情形）")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    begins = [i for i, l in enumerate(lines) if l == "<!-- BEGIN FRICTION-CMD -->"]
+    ends = [i for i, l in enumerate(lines) if l == "<!-- END FRICTION-CMD -->"]
+    assert len(begins) == 1 and len(ends) == 1, f"marker 須唯一成對: {begins} {ends}"
+    assert begins[0] < ends[0]
+    inner = [l for l in lines[begins[0] + 1:ends[0]] if l.strip()]
+    assert inner == _CANONICAL, f"區塊內須恰為兩條 canonical 命令，實得 {inner}"
+    import re as _re
+    bad = [l for l in inner if _re.search(r'"event"\s*:\s*"', l)]
+    assert not bad, f"區塊內殘留 spacing-sensitive 字面掃描: {bad}"
+
+
+@pytest.mark.parametrize("path", _CMD_FILES, ids=lambda p: p.name)
+def test_active_section_no_longer_uses_handrolled_grep(path):
+    """第 4 條：兩個 active 段已被替換（原手搓 `grep -c '"event"…'` 不再出現）。"""
+    if not path.is_file():
+        pytest.skip(f"{path} 不存在")
+    import re as _re
+    src = path.read_text(encoding="utf-8")
+    hits = [l for l in src.splitlines() if _re.search(r'grep\s+-c\s+.\s*"event"', l)]
+    assert not hits, f"active 段仍有手搓 grep: {hits}"
