@@ -2743,3 +2743,130 @@ codex 於 `20260809-govb1-b5-review-r1` 跑 mutation 時遭 API
 本票**尚無機械綁定**。快照比對只能偵測「有沒有變」，
 無法分辨「該輪合法交付」與「未還原之污染」——後者須靠該輪之允許清單。
 主委於本 epic 亦有一次相關疏失（未先確認腳本有副作用即執行），已具名於上述收斂檔。
+
+---
+
+## B-51 票 `GOV-OOE-RULING-BEFORE-CODE`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：`handoffs/reconcile/20260810-govb1-b9-review-r1/synth.md` C3
+（codex + composer 兩家 `RECONCILE-STAMP APPROVED`）。
+
+### 病
+
+修改**凍結文件宣告範圍以外**的檔案時，主委兩次都是**先改再揭露**，
+而非**先取得裁決再動碼**。codex 逐字：「事後揭露不等於先取得裁決，即使實際內容只有衍生資料。」
+
+### 委員給出的可執行步驟（已在 B10 實際套用兩次並成立）
+
+停碼 → 列欄外檔＋機械必然性證據＋不改的後果 → 開 consult／review brief **只問這件事**
+（附 `git diff --numstat` 預估）→ **等 APPROVED 或使用者裁決再動手；無裁決則 BLOCKED**。
+時程不允許時，須由**使用者**在 brief 預先寫「欄外檔 X／Y 允許同步」。
+
+🔴 **兩條補充判準**（分別由 B8／B9 事故導出）：
+- 「**先問再做**」不是「**問了就可以不做**」——裁決只解鎖欄外，**不解鎖縮 scope**。
+- 「**只有一條路可走**」不是「**可以不問**」。
+
+### 閉合條件
+
+須有**機械強制點**：目前純靠紀律。候選＝`gate.sh` 發 token 前比對
+「本輪宣告的修改檔集合」vs「工作區實際 diff 的路徑集合」，逸出即拒發。
+
+### 誠實邊界
+
+**本票尚無機械綁定。** B10 兩次停碼送裁是**主委自願遵守**，
+沒有任何機制會在主委不遵守時擋下來。
+
+---
+
+## B-52 票 `GOV-DEBTCLEAR-STAMP-FORMAT-GATE-DRIFT`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：本 epic 期間主委三次因產出格式不合規只能
+`debt_clear --abandon --kind collection-failed`（理由屬實，**未**謊稱無 findings）。
+
+### 病
+
+`scripts/govflow_lifecycle.json` 的 `kinds.stamp.debt_clear.preconditions` 明列
+`no_findings_format_gate`，但 `scripts/debt_clear.sh` **對 stamp 輪照跑 findings-format 閘**
+⇒ **SoT 與實作漂移**。
+
+### 🔴 2026-08-10 現況更新（症狀已顯著縮小，但根因未修）
+
+B9／B10 落地後，**stamp／review brief 一律硬性要求 canonical heading ＋ sentinel body 非空**
+⇒ stamp 產出必帶 sentinel ⇒ 格式閘會通過。
+**本 session 三次銷帳（B10 review-r2、B10 stamp-r1、及先前一輪）皆 `rc=0`，未觸發 `--abandon`。**
+⇒ 症狀只在「產出**完全沒有** canonical sentinel」時才出現。
+
+**但漂移本身仍在**：SoT 說不跑，實作跑。任何人讀 SoT 推導行為都會推錯。
+
+### 閉合條件（兩條路，須先裁決走哪一條）
+
+- (A) 改 `debt_clear.sh` 使其遵守 SoT（🔴 注意：**不得**放寬「只接受 success」那條守衛，
+  那是 `P16_COMMITTEE_DEBT_SPEC` 凍結的三值契約，與本票是**不同的閘**）
+- (B) 改 SoT 使其反映實作（stamp 輪確實該跑格式閘，因為 sentinel 已成硬性要求）
+
+🔴 主委傾向 **(B)**——實作行為在 B9／B10 之後才是對的，SoT 那句是舊世界的殘留。
+但**兩條路都動不了**：`debt_clear.sh` 不在 GOVB1 manifest allow；
+`govflow_lifecycle.json` 的**既有節**受 single-writer 契約凍結（只准新增具名節）。
+⇒ 須於 GOVB1 之外的 epic 處理。
+
+---
+
+## B-53 票 `GOV-CHAIR-SELFCHECK-NOT-FAIL-CLOSED`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：`handoffs/reconcile/20260810-govb1-b10-review-r2/synth.md` C2
+＋ `handoffs/reconcile/20260810-govb1-b10-stamp-r1/synth.md` C4
+（codex + composer 兩家 `RECONCILE-STAMP APPROVED`）。
+
+### 病
+
+主委自產的 findings 檔**有產出端檢查點但沒有硬閘**：
+`scripts/doc_format_precheck.sh` 的 findings 路由是 PostToolUse ⇒ **寫入之後**才跑，
+且**經 Bash 重導寫出的檔完全不觸發**。
+
+### 已交付（B10，不要重做）
+
+`cx_run.sh --selfcheck <檔> --family <家族>`（與委員交件同一支 checker／參數／清單／rc）
+＋ `doc_format_precheck.sh` 對 `handoffs/*.md` 含 canonical finding heading 者的路由。
+codex 自構「來源摘要寫行號」反例實測 rc=2 且 stderr 帶 `檔:行`。
+
+### 為何本批做不到 fail-closed（composer 逐一否決四案）
+
+| 方案 | 否決理由 |
+|---|---|
+| pre-push 掃 `handoffs/**/*.md` 全工作區 | **溯及既往**：舊非合規檔會讓每次 push 紅 |
+| pre-push 用 `git ls-files --others handoffs` | `handoffs/*` 在 `.git/info/exclude:21` ⇒ **不列** |
+| SessionStart 掃 `find -mmin` | 只擋「剛寫完又很久才 push」；session 外寫入仍漏 |
+| 維持 PostToolUse 並宣稱 fail-closed | 蓄意 Bash 重導可繞 ⇒ **不是** fail-closed |
+
+### 🔴 用語紀律（收案條件的一部分）
+
+**在本票落地前，`票 B-31` 對外一律說「產出端已有檢查點」，不得說「強制」。**
+此限制已同步寫入 `scripts/doc_format_precheck.sh` 碼註解、上述兩份收斂檔、
+commit `53d83dbf` 訊息、`白話說明/`。
+
+---
+
+## 🔴 B-48／B-49／B-50／B-51／B-52／B-53 **均無批次歸屬**
+
+`docs/GOVERNANCE_EXECUTION_ORDER.md` 的 generated block（順序唯一來源）
+**六張票零命中**——它們目前只存在於本檔與收斂檔。
+
+🔴 **這正是本專案已發生過的失效模式**：該檔「出生事故」節記載
+「`B-25` 被併進一張沒有排期的票，**實質從執行序消失**」，
+且票數導出命令 `grep -c '^## B-'` 只數有編號者，**掉件不可見**。
+本六張有編號故可被數到，但**沒有批次＝不會被排到**。
+
+**未處理原因（不是遺漏，是刻意停手）**：排入順序＝改
+`scripts/fact_keys.json` 並重生成該檔的 generated block，
+而**使用者 2026-08-09 定案「不得再開執行順序討論」**，該檔 `LAST-RULED` 亦為使用者。
+⇒ 依 `票 B-51` 判準（欄外／已裁決範圍須先取得裁決才動），**主委停碼**。
+
+**解鎖需要**：使用者或委員裁定這六張票的批次歸屬（主委建議：
+`B-52`／`B-48`／`B-50`／`B-51` 併入「站 5 第 0 批剩餘」之後的新站，
+`B-49` 標 BLOCKED-UNTIL（`_B45_HARNESS` 解凍），`B-53` 併 GOVB0）。
