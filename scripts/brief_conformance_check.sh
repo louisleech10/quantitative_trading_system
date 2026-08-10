@@ -15,7 +15,7 @@
 #     --emit <kv_file>：成功時把解析結果寫入該檔，第 1 行 = brief-kind，第 2 行 = stamp-target（非 stamp 為空行）
 #                       （**不用 stdout 回傳**：既有錯誤訊息就走 stdout，呼叫端若重導 stdout 會把訊息吃掉）
 #     --only <check>：只跑具名檢查（未知 check 名 ⇒ fail-closed rc≠0；禁靜默跑全部）
-#                     現支援：expected-delta（Task 1.3）
+#                     現支援：expected-delta（Task 1.3 (c)）、impl-kind（Task 1.3 (d) 階段 2）
 #   rc: 0=合規；2=不合規/用法錯。
 #
 # ⚠️ 訊息輸出通道與抽出前**逐字相同**（brief-kind 段走 stdout、stamp-target 段走 stderr）。
@@ -222,8 +222,22 @@ if [ -n "${only_check}" ]; then
       _check_expected_delta "${brief}" "${_bk}" || exit 2
       exit 0
       ;;
+    impl-kind)
+      # Task 1.3 (d) 階段 2〔CODEX-R1-P0-01〕：`gate.sh dispatch --spec` 之 brief-kind
+      #   須**恰為 impl**。出生理由：`(c)` 掛點之 expected-delta 對非 impl 一律 rc=0
+      #   （`_check_expected_delta:161`），故「--spec ＋ 一份合法 consult brief」
+      #   會讓 EXPECTED-DELTA 整段不驗而 token 照發（codex 附隔離環境探針：rc=0 且
+      #   dispatch.token 存在）。本檢查把 impl 判準與 kind 綁定，補上該繞過面。
+      # 🔴 不自行解析 kind：沿用上方 `_resolve_kind_into_bk` ＋ `_bk_ok`（同一 parser），
+      #   杜絕「兩份 kind 判準漂移」〔群集 1 同一紀律〕。
+      if [ "${_bk}" != "impl" ]; then
+        echo "ERROR: --spec 派工之 brief-kind 須為 impl，實得: ${_bk}"
+        exit 2
+      fi
+      exit 0
+      ;;
     *)
-      echo "ERROR: 未知 --only 檢查名: ${only_check}（允許 expected-delta）" >&2
+      echo "ERROR: 未知 --only 檢查名: ${only_check}（允許 expected-delta|impl-kind）" >&2
       exit 2
       ;;
   esac

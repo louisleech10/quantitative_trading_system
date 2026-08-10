@@ -548,6 +548,39 @@ if [ "${kind}" = "dispatch" ]; then
   # Task 3.1：債務閘（唯一呼叫點；在 completeness 之前）
   _check_open_debt || exit 1
 
+  # -------------------------------------------------------------------------
+  # Task 1.3 (d) 階段 2 — impl 派工之 brief 綁定（`T-1.3-N1`：掛點不得空轉）
+  #   裁決＝handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md（兩家 APPROVED）
+  #
+  # 兩層，缺一不可：
+  #   ① 缺 `--brief` ⇒ `miss`（累加至尾端統一拒發）
+  #      —— 關閉 `dispatch.sh:84` 之繞過面（該行為 `exec` 轉呼本處，故在此收口即傳遞覆蓋；
+  #         `dispatch.sh` 不在 manifest allow，改不了也不必改）。
+  #   ② `--brief` 之 brief-kind 須**恰為 impl** ⇒ 否則 fail-closed
+  #      —— 〔`CODEX-R1-P0-01`〕只驗①不夠：`(c)` 對非 impl kind 一律 rc=0
+  #         （`_check_expected_delta:161`），故「`--spec` ＋ 合法 consult brief」原本可讓
+  #         EXPECTED-DELTA 整段不驗、token 照發（codex 隔離探針：rc=0 且 dispatch.token 存在）。
+  #
+  # 🔴 判準沿用本檔既有 impl SSOT `[ -n "${spec}" ]`（同 V-C 之 `miss reconcile`），
+  #    不另立第二判準；kind 解析一律下放 brief_conformance_check（單一 parser）。
+  # 🔴 **不採無條件 blanket**（缺 brief 即拒，不看 --spec）：實測全套 57 failed／跨 14 檔，
+  #    其中僅 1 檔在 manifest allow ⇒ 字面實作會把 epic 炸出 scope。兩家一致否決。
+  # 🔴 **位置在 completeness／stamp 之前**：否則一份過期或未戳記的 reconcile 會先 `exit 1`，
+  #    使本閘**永遠不被執行到**——那正是「掛點空轉」的另一種形態（T-1.3-N1 之標的）。
+  #    本閘與 reconcile 健康度無關，故不得排在其後。
+  # -------------------------------------------------------------------------
+  if [ -n "${spec}" ]; then
+    if [ -z "${brief}" ]; then
+      miss brief "impl 派工(--spec)一律須顯式 --brief（T-1.3-N1：掛點不得空轉）"
+    elif [ -f "${brief}" ]; then
+      bash "${SCRIPT_DIR}/brief_conformance_check.sh" --only impl-kind "${brief}" \
+        || {
+          echo "GATE 拒發 token — impl 派工(--spec)之 brief-kind 須為 impl" >&2
+          exit 1
+        }
+    fi
+  fi
+
   # ---------------------------------------------------------------------------
   # 通則(2026-07-24 使用者定):**凡引用委員綜合(--reconcile)一律先機械驗 0 掉項**,
   #   不看 risk、不看 --spec。
@@ -612,7 +645,7 @@ if [ "${kind}" = "dispatch" ]; then
   # -------------------------------------------------------------------------
   # Task 1.3 (c)：--brief 有值時跑 EXPECTED-DELTA 閘（kind SSOT 在 checker 內，
   #   與 _role_gate::_resolve_brief_kind → brief_conformance --emit 同一 SSOT 下層）。
-  # 非 impl ⇒ checker 回 0。階段 1 不強制缺 --brief（(d) 屬階段 2）。
+  # 非 impl ⇒ checker 回 0。(d) 之缺 brief／kind 綁定已於上一段強制。
   # -------------------------------------------------------------------------
   if [ -n "${brief}" ]; then
     if [ ! -f "${brief}" ]; then

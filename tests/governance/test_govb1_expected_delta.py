@@ -226,7 +226,7 @@ def test_cx_run_only_embed_line_covariant() -> None:
 def _gate_env(tmp_path: Path) -> dict[str, str]:
     env = dict(os.environ)
     gate_dir = tmp_path / "gate"
-    gate_dir.mkdir()
+    gate_dir.mkdir(parents=True, exist_ok=True)
     audit = tmp_path / "debt_audit.log"
     audit.write_text("", encoding="utf-8")
     env["GATE_DIR_OVERRIDE"] = str(gate_dir)
@@ -348,13 +348,209 @@ def test_gate_accepts_brief_flag_in_parser() -> None:
     assert re.search(r"--brief\)\s+brief=", src), "gate 缺 --brief case"
 
 
-def test_stage1_does_not_enable_d_fail_closed() -> None:
-    """階段 1 禁啟 (d)：缺 --brief 的 impl(--spec) 不得因 brief 被 miss。"""
+def test_stage2_enables_d_fail_closed() -> None:
+    """階段 2 已啟 (d)：impl(--spec) 缺 --brief 時 gate 須 miss brief。
+
+    🔴 本測**取代**原 `test_stage1_does_not_enable_d_fail_closed`（反斷言封條）。
+    出處＝`handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md` 群集 5：
+    codex 指出「階段 1 封條達成後若保留原反斷言，等於把已完成的目標寫成禁止」。
+    """
     src = GATE.read_text(encoding="utf-8")
-    # (d) 特徵：spec 非空且 brief 空時 miss brief
-    banned = re.search(
+    hit = re.search(
         r'\[ -n "\$\{spec\}" \].*\[ -z "\$\{brief\}" \].*miss brief',
         src,
         re.S,
     )
-    assert banned is None, "階段 1 不應含 (d) miss brief 邏輯"
+    assert hit is not None, "階段 2 應含 (d) miss brief 邏輯"
+
+
+# ── Task 1.3 (d) 階段 2：impl 派工之 brief 綁定 ─────────────────────
+#
+# 裁決＝handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md（codex+composer APPROVED）。
+# 兩層各有正／負用例 ＋ mutation；`--only impl-kind` 為單一 kind parser 之下游。
+
+_D_SPEC = REPO / "docs" / "GOVB1_INPUT_QUALITY_SPEC.md"
+_D_RECONCILE = REPO / "handoffs" / "reconcile" / "20260807-govb1-x-stamp-r4" / "synth.md"
+
+
+def _dispatch_impl(brief: Path | None) -> list[str]:
+    """T-1.3-N1 之逐字形態：帶 --spec / --reconcile；brief 可缺。"""
+    cmd = [
+        "bash",
+        str(GATE),
+        "dispatch",
+        "--task-id",
+        "20260807-GOVB1-X-IMPL-R2",
+        "--risk",
+        "low",
+        "--intent",
+        "probe",
+        "--facts-asked",
+        "probe",
+        "--review-role",
+        "probe",
+        "--template",
+        "n/a:d-hook-probe",
+        "--spec",
+        str(_D_SPEC),
+        "--reconcile",
+        str(_D_RECONCILE),
+    ]
+    if brief is not None:
+        cmd.extend(["--brief", str(brief)])
+    return cmd
+
+
+def _d_env(tmp_path: Path) -> dict[str, str]:
+    """(d) 之單元隔離環境。
+
+    🔴 以 harness override 把 completeness／stamp 兩閘換成 no-op：
+    本組測的是 **(d) 自身**，不該因某份 reconcile 的戳記健康度而綠或紅
+    ——那正是本次把 (d) 移到 completeness 之前所要杜絕的耦合。
+    兩個 override 於 `gate.sh:43-50` 對非 harness 路徑 fail-closed，非旁路。
+    """
+    env = _gate_env(tmp_path)
+    stub = tmp_path / "true_stub.sh"
+    stub.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    stub.chmod(0o755)
+    env["COMPLETENESS_CHECK_OVERRIDE"] = str(stub)
+    env["RECONCILE_STAMPS_CHECK_OVERRIDE"] = str(stub)
+    return env
+
+
+def test_t13_n1_impl_without_brief_rejected(tmp_path: Path) -> None:
+    """T-1.3-N1（負向＋歸因）：`--spec` 缺 `--brief` ⇒ rc≠0 且輸出具名 `--brief`。
+
+    🔴 歸因不可只斷 rc≠0——未知參數／缺必填欄同樣非零，會讓掛點沒跑也算通過。
+    """
+    proc = _run(_dispatch_impl(None), env=_d_env(tmp_path))
+    assert proc.returncode != 0, _out(proc)
+    assert "--brief" in _out(proc), _out(proc)
+    assert "T-1.3-N1" in _out(proc), _out(proc)
+
+
+def test_t13_n1_impl_without_brief_mints_no_token(tmp_path: Path) -> None:
+    """行為層：缺 brief 不得留下 dispatch.token。"""
+    env = _d_env(tmp_path)
+    _run(_dispatch_impl(None), env=env)
+    assert not (Path(env["GATE_DIR_OVERRIDE"]) / "dispatch.token").exists()
+
+
+def test_t13_d_impl_with_valid_impl_brief_accepted(tmp_path: Path) -> None:
+    """正向：`--spec` ＋ 合規 impl brief ⇒ rc=0 且發 token（證明 (d) 不是恆拒）。"""
+    env = _d_env(tmp_path)
+    proc = _run(
+        _dispatch_impl(FIXTURE / "brief_impl_delta_present.md"), env=env
+    )
+    assert proc.returncode == 0, _out(proc)
+    assert (Path(env["GATE_DIR_OVERRIDE"]) / "dispatch.token").is_file(), _out(proc)
+
+
+def test_t13_d_impl_with_non_impl_brief_rejected(tmp_path: Path) -> None:
+    """`CODEX-R1-P0-01` 之反例：`--spec` ＋ 合法 consult brief ⇒ 須拒（原本 rc=0 且發 token）。"""
+    proc = _run(
+        _dispatch_impl(FIXTURE / "brief_consult_ok.md"), env=_d_env(tmp_path)
+    )
+    assert proc.returncode != 0, _out(proc)
+    assert "brief-kind" in _out(proc), _out(proc)
+
+
+def test_t13_d_impl_with_non_impl_brief_mints_no_token(tmp_path: Path) -> None:
+    """行為層：上述反例不得留下 dispatch.token（rc≠0 但仍發 token＝假閉合）。"""
+    env = _d_env(tmp_path)
+    _run(_dispatch_impl(FIXTURE / "brief_consult_ok.md"), env=env)
+    gate_dir = Path(env["GATE_DIR_OVERRIDE"])
+    assert not (gate_dir / "dispatch.token").exists(), (
+        f"kind 錯配仍發 token：{list(gate_dir.iterdir())}"
+    )
+
+
+def test_only_impl_kind_rejects_each_non_impl_kind(tmp_path: Path) -> None:
+    """封閉集合負向：**每一種**非 impl kind 皆須被 `--only impl-kind` 拒。
+
+    kind 集合非手抄——由 `scripts/govflow_lifecycle.json` 之 `kinds` 導出，
+    減去 `impl`。新增 kind 而未覆蓋時本測自動涵蓋。
+    """
+    kinds = set(json.loads(LIFECYCLE.read_text(encoding="utf-8"))["kinds"]) - {"impl"}
+    assert kinds, "lifecycle kinds 解析為空"
+    for kind in sorted(kinds):
+        brief = tmp_path / f"brief_{kind}.md"
+        body = f"brief-kind: {kind}\n"
+        if kind == "stamp":
+            body += "\nstamp-target: handoffs/x.md\n"
+        brief.write_text(body + "\nstub\n", encoding="utf-8")
+        proc = _run(["bash", str(BRIEF_CONF), "--only", "impl-kind", str(brief)])
+        assert proc.returncode != 0, f"kind={kind} 應被拒: {_out(proc)}"
+        assert kind in _out(proc), f"kind={kind} 訊息未具名: {_out(proc)}"
+
+
+def test_only_impl_kind_accepts_impl() -> None:
+    proc = _run(
+        [
+            "bash",
+            str(BRIEF_CONF),
+            "--only",
+            "impl-kind",
+            str(FIXTURE / "brief_impl_delta_present.md"),
+        ]
+    )
+    assert proc.returncode == 0, _out(proc)
+
+
+def _mutated_gate(tmp_path: Path, anchor: str, repl: str) -> Path:
+    """複製 gate.sh 並就地替換 anchor；錨點失配即 fail-closed 轉紅。"""
+    src = GATE.read_text(encoding="utf-8")
+    assert anchor in src, f"mutation 錨點失配（實作改寫後須同步）: {anchor[:60]!r}"
+    mut = src.replace(anchor, repl, 1)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    gate_mut = scripts / "gate.sh"
+    gate_mut.write_text(
+        mut.replace(
+            'SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"',
+            f'SCRIPT_DIR="{REPO / "scripts"}"',
+            1,
+        ),
+        encoding="utf-8",
+    )
+    gate_mut.chmod(0o755)
+    return gate_mut
+
+
+def _run_with_gate(
+    gate_path: Path, brief: Path | None, env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
+    cmd = _dispatch_impl(brief)
+    cmd[1] = str(gate_path)
+    return _run(cmd, env=env, cwd=str(REPO))
+
+
+def test_mutation_d_remove_miss_brief_turns_green(tmp_path: Path) -> None:
+    """mutation：移除 (d) 第①層 ⇒ 缺 brief 的 impl 派工由紅轉綠。
+
+    移除後仍紅 ⇒ 寫的是恆真檢查（不算完成）。
+    """
+    mut_gate = _mutated_gate(
+        tmp_path,
+        '      miss brief "impl 派工(--spec)一律須顯式 --brief（T-1.3-N1：掛點不得空轉）"',
+        "      :  # MUTATION: drop (d) layer 1",
+    )
+    proc = _run_with_gate(mut_gate, None, _d_env(tmp_path / "env1"))
+    assert proc.returncode == 0, (
+        "移除 miss brief 後應轉綠（否則錨點失準或檢查恆真）\n" + _out(proc)
+    )
+
+
+def test_mutation_d_remove_kind_binding_turns_green(tmp_path: Path) -> None:
+    """mutation：移除 (d) 第②層 ⇒ `--spec` ＋ consult brief 由紅轉綠（＝`CODEX-R1-P0-01` 復發）。"""
+    mut_gate = _mutated_gate(
+        tmp_path,
+        '      bash "${SCRIPT_DIR}/brief_conformance_check.sh" --only impl-kind "${brief}" \\\n',
+        "      true \\\n",
+    )
+    proc = _run_with_gate(
+        mut_gate, FIXTURE / "brief_consult_ok.md", _d_env(tmp_path / "env2")
+    )
+    assert proc.returncode == 0, (
+        "移除 kind binding 後應轉綠（否則錨點失準）\n" + _out(proc)
+    )
