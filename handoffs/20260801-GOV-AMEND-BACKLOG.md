@@ -1962,8 +1962,31 @@ gate_deny： "event":"gate_deny"             ← 冒號後無空格
 
 ### 狀態
 
-**2026-08-05 開票，未實作。** 硬前置（Phase 0）**已於 2026-08-07 滿足**。
-排期：**`034 站 2.6`（唯讀最小版）／`140 批 0.9`（完整版）**。
+**2026-08-05 開票。硬前置（Phase 0）2026-08-07 滿足。
+🔴 2026-08-10：站 2.6（唯讀最小版）交付並取得兩家 `RECONCILE-STAMP APPROVED`。**
+
+- 收斂檔：`handoffs/reconcile/20260810-govb37-x-review-r5/synth.md`
+  （body sha `c5ea3e2f…6980`；`reconcile_stamps_check` rc=0）
+- 規格：`docs/GOVB37_FRICTION_TALLY_SPEC.md`（r3）／`_TODO.md`
+- 審查量：SPEC 4 輪 14 條 ＋ code review 1 輪 4 條 ＝ **5 輪 18 條，全數處置**
+- 交付：`scripts/friction_tally.sh` 六視圖
+  （`--by-event`／`--by-reason`／`--by-day`／`--by-node`／`--by-signature`／`--field-presence`）
+- 驗收：`pytest tests/governance -q` **1373 passed**；本票單元 **47 passed**；
+  codex 獨立跑 **56 組 event×field 對帳全數成立**
+
+🔴 **本票未關閉**（不得宣稱閉合），具名殘留：
+1. **票級統計未交付**——`audit.log` **無票號欄位**，機械上答不出「哪張票撞幾次」。
+   修法①（票↔事件簽章對照表）留序 `140`。**本工具只答「哪個節點、什麼原因、幾次」。**
+2. **修法③「強制機制」未交付**——原 Phase 2（文件裸數字偵測）於 r1 被**兩家實測判死**：
+   非豁免命中 10 行**全為 FP**，且反引號豁免使最主要違規行**不觸發** ⇒ **判準與目標互斥**。
+   🔴 **已證偽方向記於 SPEC §N 殘留 3，不得重試關鍵字黑名單**（無界集合，必重蹈 `票 B-23`／`B-39`）。
+3. `gate_deny` **寫入端**間距不一致本身不修（屬行為改動，需動 `gate_check.sh`）；本站只讓讀取端容忍兩種。
+4. `ts_stamp.log.slow`（B 類卡頓）不在解析範圍——格式為 TSV 非 JSON。
+5. 撞擊次數**不得單獨作為排序依據**（會偏袒高頻低痛）；本站只產數據，排序設計不在本站。
+6. M3 之 mutation **無跨平台行為 oracle**（awk `for-in` 次序未定義）——
+   已改為行為性質斷言並具名；codex 於 stamp 輪裁為 **ACCEPTED NAMED RESIDUAL**。
+
+**排期**：唯讀最小版 ✅ `034`；完整版仍留 `140 批 0.9`。
 
 ---
 
