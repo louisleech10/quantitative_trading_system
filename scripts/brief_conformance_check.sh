@@ -123,7 +123,36 @@ done
 # --only 路徑於下方直接驗，兩者皆 fail-closed。
 # ---------------------------------------------------------------------------
 _resolve_kind_into_bk() {
+  # 🔴 fence 排除〔`CODEX-R1-P2-02`〕：原本直接對 `${brief}` 全檔 grep，
+  #   會把 **code fence 內**的示例宣告當成真宣告（codex 實跑：僅 fence 內寫
+  #   `brief-kind: impl` 之 brief，`--only impl-kind` 得 rc=0）。
+  #   fence 判準與 `_check_expected_delta` 之 awk **同源**（```／~~~ 行首、成對切換），
+  #   不另立第二套規則——兩份 fence 判準漂移過一次就再也對不回來。
+  #
+  # 🔴 為什麼是「先剝 fence 寫 temp、再把 brief 暫時指過去」這種寫法，而不是直接改那條擷取：
+  #   下一條 `_bk_all=...` 之**整行原始碼**被 `tests/governance/test_stamp_taskid_inject.py`
+  #   之 `_CR_BK_FULL_EXTRACT`（`:2436`）逐字錨定，供 `test_mutation_v19_prefix_extract_turns_red`
+  #   與 `test_mutation_group_h_prefix_extract_matrix_turns_red` 做 mutation。
+  #   該檔屬 `_B45_HARNESS`（B4 窗禁改）⇒ 改那行＝兩條承重 mutation 靜默失準。
+  #   （主委已實測撞到：改成 awk 版後該二測轉紅，且原因是錨點失配而非行為錯。）
+  #   本寫法讓「值的擷取語義」仍完全由那一行決定（V19 的前綴 mutation 照樣改變行為），
+  #   只把**輸入**換成剝除 fence 後的等價檔。
+  _bk_fence_src="${brief}"
+  _bk_fence_tmp="$(mktemp "${TMPDIR:-/tmp}/bk_nofence.XXXXXX")" || return 1
+  awk '
+    BEGIN { infence = 0 }
+    /^[[:space:]]*(```|~~~)/ { infence = 1 - infence; next }
+    infence { next }
+    { print }
+  ' "${_bk_fence_src}" > "${_bk_fence_tmp}" 2>/dev/null || {
+    rm -f "${_bk_fence_tmp}"
+    echo "ERROR: brief fence 剝除失敗（fail-closed）: ${_bk_fence_src}"
+    return 1
+  }
+  brief="${_bk_fence_tmp}"
   _bk_all="$(grep -E '^brief-kind:' "${brief}" 2>/dev/null | sed 's/^brief-kind:[[:space:]]*//;s/[[:space:]]*$//' | sort -u)"
+  brief="${_bk_fence_src}"
+  rm -f "${_bk_fence_tmp}"
   _bk_n="$(printf '%s\n' "${_bk_all}" | grep -c '[^[:space:]]' || true)"
   if [ "${_bk_n}" -gt 1 ]; then
     echo "ERROR: brief 有多個【不一致】的行首 'brief-kind:' 宣告: $(printf '%s' "${_bk_all}" | tr '\n' ' ')"

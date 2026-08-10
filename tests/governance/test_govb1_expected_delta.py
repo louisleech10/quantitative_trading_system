@@ -554,3 +554,160 @@ def test_mutation_d_remove_kind_binding_turns_green(tmp_path: Path) -> None:
     assert proc.returncode == 0, (
         "移除 kind binding 後應轉綠（否則錨點失準）\n" + _out(proc)
     )
+
+
+# ── review-r1 findings 之修法驗收 ────────────────────────────────────
+#
+# 出處：handoffs/reconcile/20260810-govb1-b4-review-r1/synth.md（三條全 ACCEPT）
+#   群集 1 `CODEX-R1-P1-01`：`--spec ""` 顯式空值 fail-open（P1，BLOCKING）
+#   群集 2 `CODEX-R1-P2-02`：fence 內 `brief-kind:` 被採信
+
+
+def _dispatch_specless(extra: list[str]) -> list[str]:
+    """不含 `--spec` 之最小 dispatch；`extra` 供各測附加旗標。"""
+    return [
+        "bash",
+        str(GATE),
+        "dispatch",
+        "--task-id",
+        "20260807-GOVB1-X-IMPL-R2",
+        "--risk",
+        "low",
+        "--intent",
+        "probe",
+        "--facts-asked",
+        "probe",
+        "--review-role",
+        "probe",
+        "--template",
+        "n/a:spec-value-probe",
+        *extra,
+    ]
+
+
+def _no_token(env: dict[str, str]) -> bool:
+    return not (Path(env["GATE_DIR_OVERRIDE"]) / "dispatch.token").exists()
+
+
+def test_p1_01_empty_spec_rejected_and_mints_no_token(tmp_path: Path) -> None:
+    """`CODEX-R1-P1-01` 反例：`--spec ""` ⇒ rc≠0、具名 `--spec`、且**不得**留下 token。"""
+    env = _d_env(tmp_path)
+    proc = _run(_dispatch_specless(["--spec", ""]), env=env)
+    assert proc.returncode != 0, _out(proc)
+    assert "--spec" in _out(proc), _out(proc)
+    assert _no_token(env), "空 --spec 仍發 token"
+
+
+def test_p1_01_whitespace_spec_rejected_and_mints_no_token(tmp_path: Path) -> None:
+    """全空白值同樣拒（不得只擋純空字串）。"""
+    env = _d_env(tmp_path)
+    proc = _run(_dispatch_specless(["--spec", "   "]), env=env)
+    assert proc.returncode != 0, _out(proc)
+    assert _no_token(env), "全空白 --spec 仍發 token"
+
+
+def test_p1_01_duplicate_spec_rejected(tmp_path: Path) -> None:
+    """`--spec <有效> --spec ""` 之 last-wins 抹除 ⇒ 拒（重複給值本身即拒）。"""
+    env = _d_env(tmp_path)
+    proc = _run(
+        _dispatch_specless(["--spec", str(_D_SPEC), "--spec", ""]), env=env
+    )
+    assert proc.returncode != 0, _out(proc)
+    assert "重複" in _out(proc), _out(proc)
+    assert _no_token(env), "重複 --spec 仍發 token"
+
+
+def test_p1_01_no_spec_flag_unchanged(tmp_path: Path) -> None:
+    """回歸護欄：**完全不給** `--spec`（非 impl 派工）行為逐字不變 ⇒ rc=0 且發 token。
+
+    缺這條的話，上面三條可以用「一律拒 --spec」這種過寬修法騙過去。
+    """
+    env = _d_env(tmp_path)
+    proc = _run(_dispatch_specless([]), env=env)
+    assert proc.returncode == 0, _out(proc)
+    assert not _no_token(env), _out(proc)
+
+
+def test_p2_02_fenced_only_kind_not_trusted() -> None:
+    """`CODEX-R1-P2-02` 反例：只有 fence 內寫 `brief-kind: impl` ⇒ 判為缺宣告而拒。"""
+    proc = _run(
+        [
+            "bash",
+            str(BRIEF_CONF),
+            "--only",
+            "impl-kind",
+            str(FIXTURE / "brief_fenced_kind_only.md"),
+        ]
+    )
+    assert proc.returncode != 0, _out(proc)
+    assert "缺 'brief-kind:' 宣告" in _out(proc), _out(proc)
+
+
+def test_p2_02_fenced_impl_does_not_shadow_real_consult() -> None:
+    """真實宣告 consult ＋ fence 內 impl ⇒ 解析為 consult 而被 impl-kind 拒。
+
+    🔴 同時證明**未**因排除 fence 而誤觸「多個不一致宣告」之歧義 fail-closed
+    （訊息須是 kind 不符，不是「多個宣告」）。
+    """
+    proc = _run(
+        [
+            "bash",
+            str(BRIEF_CONF),
+            "--only",
+            "impl-kind",
+            str(FIXTURE / "brief_consult_with_fenced_impl.md"),
+        ]
+    )
+    assert proc.returncode != 0, _out(proc)
+    assert "consult" in _out(proc), _out(proc)
+    assert "多個" not in _out(proc), "誤判為多宣告歧義：\n" + _out(proc)
+
+
+def test_p2_02_fenced_brief_still_passes_full_path() -> None:
+    """回歸護欄：帶 fence 之合法 consult brief 走 full path 仍 rc=0（未因修法誤擋）。"""
+    proc = _run(
+        ["bash", str(BRIEF_CONF), str(FIXTURE / "brief_consult_with_fenced_impl.md")]
+    )
+    assert proc.returncode == 0, _out(proc)
+
+
+def test_mutation_p1_01_remove_empty_spec_guard_turns_green(tmp_path: Path) -> None:
+    """mutation：移除空值守衛 ⇒ `--spec ""` 由紅轉綠且**發出 token**（＝原缺陷復發）。"""
+    mut_gate = _mutated_gate(
+        tmp_path,
+        "      *[![:space:]]*) : ;;",
+        "      *) : ;;  # MUTATION: accept any spec value",
+    )
+    env = _d_env(tmp_path / "envm1")
+    cmd = _dispatch_specless(["--spec", ""])
+    cmd[1] = str(mut_gate)
+    proc = _run(cmd, env=env, cwd=str(REPO))
+    assert proc.returncode == 0, "移除空值守衛後應轉綠\n" + _out(proc)
+    assert not _no_token(env), "缺陷復發時應發出 token（否則本 mutation 沒測到東西）"
+
+
+def test_mutation_p2_02_remove_fence_exclusion_turns_green(tmp_path: Path) -> None:
+    """mutation：拿掉 kind 解析的 fence 排除 ⇒ fence-only fixture 由紅轉綠。"""
+    src = BRIEF_CONF.read_text(encoding="utf-8")
+    anchor = '  brief="${_bk_fence_tmp}"'
+    assert anchor in src, "mutation 錨點失配（fence 排除實作改寫後須同步）"
+    mut = src.replace(anchor, '  :  # MUTATION: do not swap in fence-stripped file', 1)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    bc_mut = scripts / "brief_conformance_check.sh"
+    bc_mut.write_text(mut, encoding="utf-8")
+    bc_mut.chmod(0o755)
+    shutil.copy2(LIFECYCLE, scripts / "govflow_lifecycle.json")
+    proc = _run(
+        [
+            "bash",
+            str(bc_mut),
+            "--only",
+            "impl-kind",
+            str(FIXTURE / "brief_fenced_kind_only.md"),
+        ],
+        cwd=str(tmp_path),
+    )
+    assert proc.returncode == 0, (
+        "移除 fence 排除後 fence-only 應假綠（證明排除非恆真）\n" + _out(proc)
+    )

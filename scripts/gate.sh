@@ -73,6 +73,8 @@ intent=""; risk=""; facts_asked=""; review_role=""; template=""; adversarial=""
 reconcile=""
 task_id=""; output_path=""
 file=""; template_opened=""; sections=""; spec=""; todo=""; manifest=""
+# `--spec` 出現次數〔`CODEX-R1-P1-01`〕：只看值非空不夠，須知道旗標**有沒有被給**。
+spec_count=0
 brief=""
 
 _norm_output_path() {
@@ -192,7 +194,7 @@ while [ $# -gt 0 ]; do
     --file)            file="${2:-}"; shift 2 ;;
     --template-opened) template_opened="${2:-}"; shift 2 ;;
     --sections)        sections="${2:-}"; shift 2 ;;
-    --spec)            spec="${2:-}"; shift 2 ;;
+    --spec)            spec="${2:-}"; spec_count=$((spec_count + 1)); shift 2 ;;
     --todo)            todo="${2:-}"; shift 2 ;;
     --manifest)        manifest="${2:-}"; shift 2 ;;
     --brief)           brief="${2:-}"; shift 2 ;;
@@ -569,6 +571,33 @@ if [ "${kind}" = "dispatch" ]; then
   #    使本閘**永遠不被執行到**——那正是「掛點空轉」的另一種形態（T-1.3-N1 之標的）。
   #    本閘與 reconcile 健康度無關，故不得排在其後。
   # -------------------------------------------------------------------------
+  # -------------------------------------------------------------------------
+  # `--spec` 值本身之 fail-closed〔`CODEX-R1-P1-01`，codex 實跑反例〕
+  #
+  # 病：impl 判準是 `[ -n "${spec}" ]`。**顯式**傳 `--spec ""` 使其為假 ⇒
+  #     (d) 兩層與 V-C `miss reconcile` **全部不啟動**，卻仍寫出 dispatch.token。
+  #     parser 為 last-wins ⇒ `--spec <有效值> --spec ""` 亦可抹除。
+  # 這個判準在本輪之前就是這樣；但本輪把它**升格為安全閘**（(d) 掛其上），
+  # 故不得以「既有語義」為由延後——見
+  # handoffs/reconcile/20260810-govb1-b4-review-r1/synth.md 群集 1。
+  #
+  # 修法＝把「旗標有沒有出現」與「值是什麼」分開：出現過就必須是有意義的值。
+  # 完全不給 `--spec`（非 impl 派工）行為**逐字不變**。
+  # -------------------------------------------------------------------------
+  if [ "${spec_count}" -gt 1 ]; then
+    echo "ERROR: --spec 重複給值（parser 為 last-wins，會靜默抹除前值）" >&2
+    exit 1
+  fi
+  if [ "${spec_count}" -eq 1 ]; then
+    case "${spec}" in
+      *[![:space:]]*) : ;;
+      *)
+        echo "ERROR: --spec 之值為空或全空白（不得靜默降級為非 impl 派工）" >&2
+        exit 1
+        ;;
+    esac
+  fi
+
   if [ -n "${spec}" ]; then
     if [ -z "${brief}" ]; then
       miss brief "impl 派工(--spec)一律須顯式 --brief（T-1.3-N1：掛點不得空轉）"
