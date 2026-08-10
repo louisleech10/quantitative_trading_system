@@ -2744,6 +2744,30 @@ codex 於 `20260809-govb1-b5-review-r1` 跑 mutation 時遭 API
 無法分辨「該輪合法交付」與「未還原之污染」——後者須靠該輪之允許清單。
 主委於本 epic 亦有一次相關疏失（未先確認腳本有副作用即執行），已具名於上述收斂檔。
 
+### 🔴 2026-08-10 實作狀態：形態②③ 已閉合，形態① 具名殘留
+
+commit（out-of-epic，`Governance-Scope` trailer 已帶）：`scripts/committee_run.sh`
+於派工迴圈**之前**拍 `git status --porcelain` 快照，wait 迴圈**之後**比對。
+依本票閉合條件逐字「**不必擋，但不得靜默**」⇒ 只回報、`return 0`、**不動 `rc_all`**。
+
+| 形態 | 狀態 |
+|---|---|
+| ② ambient M 被還原成 HEAD | ✅ 閉合（含非 ASCII 路徑：`core.quotePath=false`） |
+| ③ 工作區殘留 `MUTATION` 標記 | ✅ 閉合（綁 `git diff` ⇒ 未追蹤檔提及該詞不誤報） |
+| ① 改動逸出「該輪允許清單」 | 🔴 **未閉合**——brief 不攜帶該欄位；退成「列出變動不判違規」 |
+
+測試 `tests/governance/test_govb1_b50_workspace_drift.py` **11 條**，
+含兩條反向對照（無變動須**完全安靜**／既有 ambient M 不得誤報）——
+沒有它們，「永遠都在叫」也會讓其餘每一條變綠。
+
+🔴 **實作中抓到主委自己寫的真 bug**：`case` 模式尾的 `)` 在 `$( )` 內會被
+macOS bash 3.2 當成命令替換的收尾 ⇒ **整段語法錯、形態② 完全不作動**。
+若照舊寫成讀原始碼的斷言，該測試會是綠的而功能是死的。已改用 `grep -E` 前置過濾。
+⇒ 本 epic 第三次同型實例：**只有真的跑一次才抓得到**。
+
+**收案條件**：形態① 須待 brief 具備「允許改動檔案清單」欄位（與 `票 B-51` 的機械強制點同源，
+兩票可併做）。在此之前本票 **TICKET-STATUS 維持 OPEN**。
+
 ---
 
 ## B-51 票 `GOV-OOE-RULING-BEFORE-CODE`
