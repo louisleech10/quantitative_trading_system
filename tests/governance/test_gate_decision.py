@@ -141,30 +141,31 @@ def test_21_mut_remove_recurse_and_narrow_pos(tmp_path: Path) -> None:
     assert _got('bash -c "codex exec x"', tmp_path / "ra", script=mut_a) == "ALLOW"
 
     # mut B: R2 command position only（並關掉 C3 cmdsub 抽取，否則 $() 仍被遞迴抓住）
-    old_pat = (
-        "(^|[;&|(`]|\\$\\()[[:space:]]*((eval|xargs)[[:space:]]+)?"
-        "((\\S*/)?)((codex|cursor-agent|grok|agy)[[:space:]]|(codex|cursor-agent|grok|agy)$)"
-    )
-    new_pat = "(^|[;&|][[:space:]]*)(codex|cursor-agent|grok|agy)[[:space:]]"
+    #
+    # 🔴 GOVB0 B4 之後本案例受**三層**保護，逐層剝除才會漏放：
+    #    ① 家族段正則的命令位置含 `$(`　② `_gate_lex_extract_cmdsubs` 遞迴
+    #    ③ fail-closed 網的家族條件（B4 新增；`out=$(codex exec x)` 之命令位置
+    #       token 含 `$` 且整條含家族名 ⇒ 接住）
+    #    只剝 ①② 仍 BLOCK（③ 接住）——那不是本測要證的事，故三層一起剝。
+    #    **這不是弱化**：本測要證的是「命令位置定義若縮回 R2 就會漏放」，
+    #    前提是該案例只剩那一層；③ 是後來加的另一層，必須一併移除才能還原前提。
+    # 🔴 B4 r3：命令位置定義已收斂成單一變數 `_GL_CMDPOS`。
+    #    mutation 改為把該定義縮回 R2（僅 `^ ; & |`），比替換組裝後的整串正則穩定。
+    old_pat = "_GL_CMDPOS='(^|[;&|(`]|\\$\\()[[:space:]]*'"
+    new_pat = "_GL_CMDPOS='(^|[;&|][[:space:]]*)'"
     lex_b = lex_text.replace(old_pat, new_pat, 1)
-    if lex_b == lex_text:
-        # 後備：較短錨
-        lex_b = lex_text.replace(
-            "(codex|cursor-agent|grok|agy)[[:space:]]|(codex|cursor-agent|grok|agy)$",
-            "(codex|cursor-agent|grok|agy)[[:space:]]",
-            1,
-        )
-        # 並縮命令位置前綴
-        lex_b = lex_b.replace(
-            "(^|[;&|(`]|\\$\\()[[:space:]]*((eval|xargs)[[:space:]]+)?",
-            "(^|[;&|][[:space:]]*)",
-            1,
-        )
+    assert lex_b != lex_text, "mut B 錨點漂移：_GL_CMDPOS 定義"
     lex_b = lex_b.replace(
         'cmdsubs="$(_gate_lex_extract_cmdsubs "$raw")"',
         'cmdsubs=""',
         1,
     )
+    # ③ 剝掉 fail-closed 網的家族條件（還原「只剩命令位置那一層」的前提）
+    net_family = (
+        '_famtok="claude[^|]*(-p|--print)|(^|[[:space:];&|(\\`=])${_GL_FAMS}${_GL_TOKEND}"'
+    )
+    assert net_family in lex_b, "mut B 錨點漂移：fail-closed 網之家族條件"
+    lex_b = lex_b.replace(net_family, '_famtok="claude[^|]*(-p|--print)"', 1)
     assert lex_b != lex_text
     mut_b = _write_mut_pair(tmp_path / "b", "mut_b.sh", gate_text, lex_b)
     e3 = [

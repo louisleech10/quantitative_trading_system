@@ -123,7 +123,7 @@
 # @want ALLOW
 # @case TN
 # @id c5-tn-dot-slash-not-family
-{"tool_name":"Bash","tool_input":{"command":"./scripts/cx_run.sh --help"}}
+{"tool_name":"Bash","tool_input":{"command":"./scripts/check_decoupling_phase4.sh"}}
 # @contract 5
 # @want BLOCK
 # @case TP

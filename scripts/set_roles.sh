@@ -5,9 +5,13 @@
 #      (reviewers = 三家扣掉 implementer),避免手改 JSON 產生不一致。
 #
 # 用法:
+#   bash scripts/set_roles.sh claude    # 實作=編排端自任, review=codex+composer+grok(三家全員)
 #   bash scripts/set_roles.sh grok      # 實作=grok, review=codex+composer
 #   bash scripts/set_roles.sh codex     # 實作=codex, review=composer+grok
 #   bash scripts/set_roles.sh --show    # 只看現況,不改
+#
+# 🔴 `claude` = 編排端(無 CLI 映射,永不可被派工)。填它代表「實作由主委自任、不對外派工」,
+#    此時三家委員全員都是合法審查者。出處與代價見 docs/GOV_ROLES_ORCHESTRATOR_AMENDMENT.md。
 #
 # ⚠️ 授權:本檔的 implementer 由**使用者**決定。Claude 只有在使用者明確指示時才可執行本腳本,
 #    不得自行切換。每次切換會記錄 updated/updated_by/history,可稽核。
@@ -36,11 +40,17 @@ NEW="$1"
 # 合格家族 = 三家【正式委員】,取自 roles SoT 的 eligible 欄。
 # ⚠️ 不可直接用 governance_families.json:該檔含 agy(唯讀研究,禁實作)與 claude(編排端),
 #    首版誤用它 → reviewers 被寫成 agy/claude/composer/grok(實測抓出)。
+# 🔴 缺 `eligible` 一律 fail-closed〔CODEX-R1-P1-05，20260811-govb49-x-consult-r1〕：
+#   原寫法 `d.get('eligible', ['codex','composer','grok'])` 在缺鍵時**靜默落回舊三家硬編**，
+#   使用者改了 roster 卻得到「命令成功但角色集合不照 SoT」。角色 SoT 缺鍵＝無從判定，須拒。
 ALL=$(python3 -c "
-import json
+import json,sys
 d=json.load(open('$ROLES'))
-print(' '.join(d.get('eligible', ['codex','composer','grok'])))
-")
+v=d.get('eligible')
+if not isinstance(v,list) or not v or not all(isinstance(x,str) and x.strip() for x in v):
+    sys.stderr.write('ERROR: 角色 SoT eligible 缺/壞 ⇒ 無從判定合法家族(fail-closed)\n'); sys.exit(2)
+print(' '.join(v))
+") || exit 2
 case " $ALL " in *" $NEW "*) : ;; *)
   echo "ERROR: '$NEW' 不是合法家族。合法值: $ALL"; exit 2 ;;
 esac
@@ -121,16 +131,31 @@ if [ -n "${_usable}" ]; then
   fi
 fi
 
-python3 - "$ROLES" "$NEW" "$ALL" <<'PY'
+# 🔴 reviewers 公式須交集**可派工家族**〔GROK-R1-P0-01，20260811-govb49-x-consult-r1〕：
+#   `eligible` 自 2026-08-11 起含編排端 `claude`（可當 implementer、但**無 CLI 映射、永不可派工**）。
+#   舊公式 `reviewers = eligible − implementer` ⇒ 下次切回任一 CLI 家族時
+#   reviewers 會含 claude ⇒ `_role_gate.sh check-families` strict 整批 rc=2 ⇒ 全名單派工當場死。
+#   grok 以隔離 workdir 實跑證明（implementer=codex ⇒ reviewers=[claude,composer,grok] ⇒ rc=2）。
+#   正確語義：角色值集合(eligible) ≠ 可派工集合(review_families ∩ 有 CLI 映射)。
+_RF="$(families_get review_families ' ')" || {
+  echo "ERROR: 讀 review_families 失敗 ⇒ 無從導出 reviewers(fail-closed)" >&2; exit 2; }
+
+python3 - "$ROLES" "$NEW" "$ALL" "$_RF" <<'PY'
 import json,sys
-path,new,allf=sys.argv[1],sys.argv[2],sys.argv[3].split()
+path,new,allf,rf=sys.argv[1],sys.argv[2],sys.argv[3].split(),sys.argv[4].split()
 d=json.load(open(path))
 old=d.get('implementer')
 if old==new:
     print(f"無變更:implementer 已是 {new}"); raise SystemExit(0)
+# 可派工審查者池 = eligible ∩ review_families − {implementer}；編排端永不入 reviewers
+pool=[f for f in allf if f in rf and f!=new]
+if len(pool)<2:
+    sys.stderr.write(
+        "ERROR: eligible ∩ review_families − {%s} 只剩 %d 家 ⇒ 兩家 review 鐵律當場破(fail-closed)\n"
+        % (new, len(pool))); sys.exit(2)
 d['implementer']=new
-d['implementer_backup']=[f for f in allf if f!=new][0]
-d['reviewers']=sorted(f for f in allf if f!=new)   # 實作者不自審
+d['implementer_backup']=pool[0]
+d['reviewers']=sorted(pool)   # 實作者不自審
 d['updated_by']='user'
 import os
 _note=os.environ.get('SET_ROLES_HISTORY_NOTE','').strip()

@@ -58,7 +58,12 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 - **不得**因效率題改變正確性 gate 的判定；與 `CLAUDE.md` 優化優先序一致（**執行速度排第 4**，前三為跨層可重現／多標的穩定／資料品質）。
 - 常態題**預設答「無」即可**通過，避免 bikeshedding 與注意力稀釋。
 
-**現行分工(2026-07-14 使用者三調):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Grok(gpt 額度依當下指示動態,備援=Codex)**;**code review/adversarial=Codex+Composer 雙家**(實作者不自審;SPEC/TODO 對抗審維持三家 codex+composer+grok——起草後審查不得漏 grok 鐵律不變,惟 grok 轉實作者時其實作之審查=Codex+Composer);委員會審查=三家;簽核 quorum=Claude+Codex+Composer 不變;小=Claude 自做。** 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-07-12 五調全文見 git log〕
+**現行分工(2026-08-11 使用者四調):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Claude(Opus)主委自任**;**討論/code review/adversarial=Codex+Grok+Composer 三家全員**(實作者不自審——實作端既為編排端,三家皆為合法審查者,不再有「因某家是實作者而少一家」的例外);委員會審查=三家;簽核 quorum=三家;小=Claude 自做。** 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-07-14 三調、2026-07-12 五調全文見 git log〕
+
+> 🔴 **本行是散文版,機器版才是判定依據**:`scripts/governance_roles.json`(`implementer`/`reviewers`,角色閘讀它)
+> 與 `scripts/governance_families.json`(`active_stampers`,戳記 quorum 讀它)。兩者不一致時**以機器版為準**,
+> 並立刻回頭修本行——散文規則擋不住誤派,這是 2026-07-24／07-29 兩次事故的成因。
+> 切換一律 `bash scripts/set_roles.sh <family|claude>`(自動同步 `reviewers` 並跑角色閘 oracle),禁手改 JSON 的 `implementer`。
 
 誠實邊界：A/B 顯示 codex≈cursor 正確性對等(標準題天花板),選層差異在**人體工學/成本與高風險嚴謹度紀錄**,非 coding 能力;cursor review codex 擋推理/結構盲點,**擋不了共享錯前提/缺使用者事實**(C3)→ facts-first 仍最優先。06-03 定層歷史見 `docs/SCAR_LEDGER.md`。
 
@@ -102,7 +107,7 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 
 ### reconcile 委員核可閘（防「Claude 自產 reconcile 無人複核就派實作」）
 **為何**：Claude 產 reconcile，實作者直接信 → Claude 誤寫/誤併無人擋（charter v1 即發生:外置 §E/§F、A5 誤標，回送驗證才抓到）。
-**機制**：被 reconcile 的委員審完該 reconcile 後在檔內 append `RECONCILE-STAMP: <family> APPROVED <date>`（或 `REJECTED — 理由`）。`scripts/gate.sh dispatch` 對**對 SPEC 派實作**（`--spec` 存在）時，跑 `scripts/reconcile_stamps_check.sh` 驗 `--adversarial` 指向的 reconcile 已獲 codex+composer 全數 APPROVED，否則**拒發 token**。adversarial-review 派工本身（`--template n/a:`）不受限；邊角 `--adversarial stamped-waived:理由`。
+**機制**：被 reconcile 的委員審完該 reconcile 後在檔內 append `RECONCILE-STAMP: <family> APPROVED <date>`（或 `REJECTED — 理由`）。`scripts/gate.sh dispatch` 對**對 SPEC 派實作**（`--spec` 存在）時，跑 `scripts/reconcile_stamps_check.sh` 驗 `--adversarial` 指向的 reconcile 已獲**該期 `active_stampers` 全數** APPROVED（家族清單一律讀 SoT，本行不寫死；2026-08-11 起為 codex+composer+grok），否則**拒發 token**。adversarial-review 派工本身（`--template n/a:`）不受限；邊角 `--adversarial stamped-waived:理由`。
 **實作端合約（defense-in-depth）**：看到 reconcile 未全數 APPROVED → `STATUS: BLOCKED` 不執行。
 **同理**：reconcile 後的最終章程/SPEC 本身須回送委員驗證（章程 §B5）。
 **Claude 自身不享特權（2026-06-27）**：Claude「又產獨立腿又做 reconcile」是特權位置 → **Claude 的獨立版/reconcile/SPEC/章程同須委員審+戳記,不可自我認證**。委員 `APPROVED` 語義＝「已審 **Claude 的腿** + reconcile,無錯/漏」;stamp-review 派工須明示「特別盯 Claude 的腿」（實證:FF 稽核 Composer 當場抓到 Claude 草稿誤用 test_cross_symbol_features）。

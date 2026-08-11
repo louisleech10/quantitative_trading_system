@@ -5,18 +5,21 @@
   "_prose_sot": "docs/MULTI_AGENT_ORCHESTRATION.md §1 現行分工行(散文版,人讀);本檔為機器版,兩者須一致",
   "updated": "2026-07-14",
   "updated_by": "user",
-  "implementer": "grok",
+  "implementer": "claude",
   "implementer_backup": "codex",
   "reviewers": [
-    "codex",
-    "composer"
-  ],
-  "eligible": [
     "codex",
     "composer",
     "grok"
   ],
-  "_eligible_why": "正式委員三家。**不得**從 scripts/governance_families.json 推導——該檔還含 agy(唯讀研究,禁實作/禁寫入)與 claude(編排端);set_roles.sh 首版誤用它,實測把 reviewers 寫成 agy/claude/composer/grok,已改為讀本欄。",
+  "eligible": [
+    "codex",
+    "composer",
+    "grok",
+    "claude"
+  ],
+  "_eligible_why": "正式委員三家 ＋ 編排端 claude。**不得**從 scripts/governance_families.json 推導——該檔還含 agy(唯讀研究,禁實作/禁寫入);set_roles.sh 首版誤用它,實測把 reviewers 寫成 agy/claude/composer/grok,已改為讀本欄。",
+  "_claude_eligible_why": "🔴 2026-08-11 使用者指示「實作是你 Opus,委員是 Codex+Grok+Composer」。在此之前 eligible 只有三家,roles SoT **結構上無法表達「編排端自任實作」**(＝票 B-49 病①),只能寫 implementer=grok 讓非實作者池湊滿兩家——名冊與事實長期不符。加入 claude 後 reviewers = eligible − implementer = 三家全員,與使用者指示逐字一致。claude 無 CLI 配方(不在 executor_clis)⇒ brief-kind: impl 對任何家族都不再放行,正確反映「實作由編排端自任、不對外派工」。🔴 具名殘留:票 B-49 之閉合條件 1–3 位於 _B45_HARNESS 凍結檔(test_stamp_taskid_inject.py:769 對非三家 implementer 是靜默 skip 而非 fail-closed),本次未解凍、未修,故該檔 impl 分支會 skip——見 docs/GOV_ROLES_ORCHESTRATOR_AMENDMENT.md。",
   "_rules": {
     "impl": "brief-kind: impl → 目標家族必須 == implementer。**implementer_backup 不自動放行**(僅供錯誤訊息提示);切換實作端一律由使用者改本檔,不是 Claude 選備援。",
     "review": "brief-kind: review → 目標家族【不得】是 implementer(實作者不自審)",
@@ -27,6 +30,7 @@
     "(驗證)grok -> codex",
     "(驗證)codex -> grok  ※來回切換測試,非真實變更",
     "grok -> codex",
-    "codex -> grok"
+    "codex -> grok",
+    "grok -> claude"
   ]
 }

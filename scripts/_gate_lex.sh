@@ -361,16 +361,84 @@ _gate_lex_preprocess() {
 # 命中 → rc=0；未命中 → rc=1。
 # 錨點字面保留 (codex|cursor-agent|grok|agy)[[:space:]] 供覆蓋斷言機械導出。
 # claude 段自 GOVB0 Task 2.2／GOVB1 Task 3.2 起改為命令位置判定，見該段註解。
+# ── 共用子式：**單一定義**，下方三個消費點一律引用，禁再各寫一份 ────────────
+# 🔴 為什麼要這樣〔CODEX-R2-P0-01；codex 裁「wrapper 重複不接受為長期狀態」〕：
+#    B4 初版把 wrapper 文法在「家族段」與「fail-closed 網」各寫一份，
+#    擴充家族段時漏了網那份 ⇒ 當天就漏放三條（exec/command/nohup），
+#    修完又漏第二批（`C=codex; env -u FOO $C exec hi` 等帶選項值的形態）。
+#    同一概念寫兩處 ⇒ 必有一處先漂。這裡改成一個定義、多處引用。
+# 🔴 賦值一律用**單引號**（內容含 $ 與反引號，雙引號會被 shell 解釋）；
+#    組裝時用 "${A}${B}" 純字串串接，**不會**重新掃描其內容，故安全。
+_GL_CMDPOS='(^|[;&|(`]|\$\()[[:space:]]*'
+_GL_WRAPPER='((eval|xargs|env|exec|command|nohup)[[:space:]]+(([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*|-[^[:space:];&|]*([[:space:]]+[^-[:space:];&|][^[:space:];&|]*)?|[0-9]+)[[:space:]]+)*)*'
+# 家族清單（SoT＝scripts/governance_families.json 之 executor_clis；由 family_registry _DRIFT 釘死）
+_GL_FAMS='(codex|cursor-agent|grok|agy)'
+# 🔴 家族名之**後界**〔CODEX-R2-P0-02〕：原本只認空白或行尾，於是
+#    `codex;`／`codex|cat`／`codex&`／`(codex)`／`codex<in`／`codex>out` **全部漏放**。
+#    `codex<in` 尤其嚴重——那是真的執行 codex 並從檔案餵 prompt。
+#    後界＝shell 真正會結束一個 word 的字元：空白／`;&|`／`()`／重定向 `<>`／反引號／行尾。
+# 🔴 `$` 亦為後界〔CODEX-R3-P0-01〕：`codex$IFS exec hi`／`codex${IFS}exec hi` 會被
+#    shell 的 field-splitting 拆成 argv[0]=codex 而真的執行，原後界集合不含 `$` ⇒ 漏放。
+#    claude 段早有 `claude${IFS}-p` 的 BLOCK 回歸樁，家族路徑卻沒有同等守衛——**不對稱**。
+_GL_TOKEND='([[:space:];&|()<>`$]|$)'
+# `(bash|sh|zsh) … -c` 之偵測式：允許前置旗標與合併旗標（`-ic`），`-c` 後空白可選。
+# 🔴 前置守衛與 awk 抽取器**兩處都要用它**——本輪就是因為只改了抽取器、
+#    守衛還是舊式，導致 `bash --noprofile -c "…"` 連抽取器都進不去。
+#    旗標可帶**獨立的值**（`-O extglob`）——與 wrapper 同一個病，同一種修法。
+# 🔴 前置旗標**必須排除 `-c` 本身**，否則正則會把 `-c "bash` 當成「帶值的旗標」吃掉，
+#    跳過真正的第一個 `-c`，抽到內層碎片。實測回歸：
+#      `bash -c "bash -c \"codex exec x\""`
+#        錯誤版抽出 `\"codex`（→ ALLOW，fail-open）／正確版抽出 `bash -c "codex exec x"`
+#    這條由語料 `c8-tp-depth-over`（契約 8 遞迴深度）抓到。
+#    ⇒ 前置旗標限定為：長選項 `--…`（其第二字元是 `-`，永不與 `-[a-zA-Z]*c` 混淆）
+#      或**不含 c 的短選項** `-[abd-zA-Z]+`。
+_GL_DASHC='(bash|sh|zsh)[[:space:]]+((--[^[:space:];&|]*|-[abd-zA-Z]+)([[:space:]]+[^-[:space:];&|][^[:space:];&|]*)?[[:space:]]+)*-[a-zA-Z]*c'
+
 _gate_lex_match_scan() {
   local s="${1-}"
+  local _pat _famtok
   # 命令位置：行首 / ; & | ( ` $( && || / eval後 / xargs後；可選路徑前綴（\S*/）
   # 契約 2 擴充（E-3）：含 ( ` $( && || eval xargs
   # 契約 7：家族名後允許 EOS（bash -c codex 無尾空白）——([[:space:]]|$)
   # 錨點字面（覆蓋斷言）：(codex|cursor-agent|grok|agy)[[:space:]] 仍出現於下方 alternation 左枝
   # 家族命中：路徑前綴可選；名後空白或 EOS（契約 7）。
   # 字面 (codex|cursor-agent|grok|agy)[[:space:]] 保留供 family_registry _DRIFT 釘死。
-  if printf '%s' "$s" | grep -Eq \
-    '(^|[;&|(`]|\$\()[[:space:]]*((eval|xargs)[[:space:]]+)?((\S*/)?)((codex|cursor-agent|grok|agy)[[:space:]]|(codex|cursor-agent|grok|agy)$)'; then
+  # 🔴 wrapper 前綴（B4）：`eval`／`xargs`／`env` 之後可再跟**旗標、數字、VAR=值**，
+  #    真正的家族名才出現。原式只允許 `(eval|xargs)` 緊接家族名，於是這兩條漏放：
+  #      `echo hi | xargs -n 1 codex exec`（中間夾 `-n 1`）
+  #      `env FOO=bar codex exec hi`（`env` 未列入，且中間夾賦值）
+  #    wrapper 可重複（`env FOO=1 xargs -n 1 codex …`）。
+  # 🔴 三個子式（命令位置／wrapper／家族清單／後界）皆引用上方單一定義，此處不再重寫。
+  _pat="${_GL_CMDPOS}${_GL_WRAPPER}((\\S*/)?)${_GL_FAMS}${_GL_TOKEND}"
+  if printf '%s' "$s" | grep -Eq "${_pat}"; then
+    return 0
+  fi
+  # ── GOVB0 Task 2.4：官方外層派工腳本的呼叫點 ────────────────────────────
+  # 病：`cx_run.sh`／`committee_run.sh` **本身就是派工工具**，直接執行它們
+  #     反而不需要 token ⇒ 這道閘要擋的東西，用它自己的工具就能繞過。
+  #     實測（b4_probe.sh）四條形態全部放行。
+  #
+  # 🔴 判定放在**這裡**（掃描字串）而非對原始 cmd 另外 grep：
+  #    如此可直接繼承前處理與 -c／eval／$() 遞迴，
+  #    `bash -c "bash scripts/cx_run.sh …"` 這種包一層的形態一併被涵蓋。
+  #    另寫一條 grep 就要自己重做那些，且會多一個會漂的判定點。
+  #
+  # 命令位置定義與家族名同一套；額外允許可選的直譯器前綴（腳本是 `bash X.sh` 呼叫的）。
+  # 路徑正規化變形（`./scripts/`、`scripts//`、`scripts/../scripts/`）由 (\S*/)? 涵蓋。
+  #
+  # 🔴 `gate.sh` **不得納入**——那是取 token 的唯一路徑，納入會鎖死整個流程
+  #    （它另由 _gate_cmd_is_self_gate 處理）。
+  # 🔴 引數位置不算：`sed -n '1,40p' scripts/cx_run.sh`、`grep -n x scripts/cx_run.sh`、
+  #    `echo "run cx_run.sh later"` 皆須維持 ALLOW（唯讀查看不是派工）。
+  # 🔴 wrapper 與直譯器前綴〔CODEX-R1-P0-02〕：初版只認**裸** `bash|sh|zsh`，於是
+  #    `/bin/bash scripts/cx_run.sh`、`env bash …`、`xargs -n 1 bash …`、`exec bash …`
+  #    四種形態全部漏放（委員實跑）。直譯器允許路徑前綴與旗標。
+  # ⚠️ 已知代價（fail-closed，具名）：`bash -n scripts/cx_run.sh`（只做語法檢查、不執行）
+  #    亦被擋。不支援旗標的話 `bash -x scripts/cx_run.sh`（會執行）就會漏放
+  #    ⇒ 兩害相權取「寧誤擋」。唯讀查看請用 `sed`／`grep`／`wc`（仍 ALLOW）。
+  # ✅ wrapper 子式已改為引用單一定義（`CODEX-R2-P0-01` 之修法），此處不再重寫。
+  _pat="${_GL_CMDPOS}${_GL_WRAPPER}((\\S*/)?(bash|sh|zsh)[[:space:]]+(-[^[:space:];&|]*[[:space:]]+)*)?((\\S*/)?)(cx_run|committee_run)\\.sh${_GL_TOKEND}"
+  if printf '%s' "$s" | grep -Eq "${_pat}"; then
     return 0
   fi
   # claude 段收窄 — GOVB0 Task 2.2 ＝ GOVB1 Task 3.2（同一件工作的兩個編號，票 B-26）。
@@ -398,8 +466,15 @@ _gate_lex_match_scan() {
   #     但那只在 claude 已位於命令位置時才判，屬 fail-closed 且無實際誤擋。
   #   · 長旗標 `--print`：GNU 長選項的值只能以 `=` 或另一個 token 給
   #     ⇒ 後面必須是 `=`／空白／行尾，`--printable`／`--printer` 一律不命中。
-  if printf '%s' "$s" | grep -Eq \
-    '(^|[;&|(`]|\$\()[[:space:]]*((eval|xargs)[[:space:]]+)?((\S*/)?)claude([[:space:]][^;&|]*)?[[:space:]](-p|--print([[:space:]=]|$))'; then
+  # 🔴 **第五個消費點**〔CODEX-R3-P0-02／COMPOSER-R3-P1-01，兩家獨立找到同一件事〕：
+  #    本段原本自寫命令位置與 `(eval|xargs)` wrapper，沒有跟著 r3 的收斂一起改
+  #    ⇒ `env claude -p x`／`command claude -p x`／`exec claude -p x`／`nohup claude -p x`
+  #      ／`env -u FOO claude -p x` 全部漏放。
+  #    主委在 r3 收斂檔宣稱「四個消費點全引用」——**那句話是假的**，兩家都證明了。
+  #    現改為引用同一份 `_GL_CMDPOS`／`_GL_WRAPPER`；claude 名稱與旗標尾段字面保留
+  #    （下方註解所述之長短旗標不對稱仍成立，且有既有 mutation 釘死）。
+  _pat="${_GL_CMDPOS}${_GL_WRAPPER}((\\S*/)?)claude([[:space:]][^;&|]*)?[[:space:]](-p|--print([[:space:]=]|\$))"
+  if printf '%s' "$s" | grep -Eq "${_pat}"; then
     return 0
   fi
   # 🔴 fail-closed 網 — 命令名由**展開**產生時，靜態詞法決定不了真正的 argv[0]。
@@ -419,9 +494,20 @@ _gate_lex_match_scan() {
   # metachar 集合＝可改變 argv[0] 的展開／萬用字元（封閉集合，非黑名單式列舉）：
   #   $ (參數/命令替換)　` (命令替換)　! (history)　* ? [ (glob)　~ (tilde)
   #   反斜線不在此列——它已在前處理被依 bash 語意消掉。
-  if printf '%s' "$s" | grep -Eq \
-      '(^|[;&|(`]|\$\()[[:space:]]*((eval|xargs)[[:space:]]+)?[^[:space:];&|]*[$`!*?~[]' \
-    && printf '%s' "$s" | grep -Eq 'claude[^|]*(-p|--print)'; then
+  # 🔴 B4 擴充：本網原本只保護 `claude`，家族名（codex 等）沒有對應保護
+  #    ⇒ `C=codex; $C exec hi` 之 argv[0] 由展開產生、靜態決定不了，卻被放行。
+  #    條件 (a)（命令位置 token 含展開 metachar）不變，只把條件 (b) 由
+  #    「claude…-p」擴為「claude…-p **或** 出現任一家族名」。
+  #    誤擋風險受 (a) 嚴格限制：命令位置的**第一個 token 本身**要含 metachar 才成立，
+  #    故 `cat sp_codex.txt`／`mycodex --version`／`cat /tmp/grok/notes.md`／
+  #    `pgrep -fl 'codex exec|…'` 皆不命中（它們的 argv[0] 是靜態可定的 cat/pgrep）。
+  # 🔴 wrapper 同樣引用單一定義〔CODEX-R2-P0-01〕：初版此處只吃**一個無選項的** wrapper，
+  #    於是 `C=codex; env -u FOO $C exec hi`、`C=codex; xargs -I {} $C exec hi` 漏放
+  #    ——家族段認得的 wrapper 文法，網卻不認得。
+  _pat="${_GL_CMDPOS}${_GL_WRAPPER}[^[:space:];&|]*[\$\`!*?~[]"
+  _famtok="claude[^|]*(-p|--print)|(^|[[:space:];&|(\`=])${_GL_FAMS}${_GL_TOKEND}"
+  if printf '%s' "$s" | grep -Eq "${_pat}" \
+    && printf '%s' "$s" | grep -Eq "${_famtok}"; then
     return 0
   fi
   return 1
@@ -430,14 +516,36 @@ _gate_lex_match_scan() {
 # 自原始 cmd 抽取 (bash|sh|zsh) -c 與 eval 的引數字串（契約 3／7）。
 # stdout：每行一個 inner；無則空。
 _gate_lex_extract_inners() {
-  printf '%s' "${1-}" | LC_ALL=C awk '
+  # 🔴 `-c` 偵測式由 shell 端以 -v 傳入，**與前置守衛共用同一份定義**。
+  #    不這樣做的話它就是第五個獨立副本——本輪四個 P0 有三個源自這種重複。
+  #    （awk 的 regex 字面無法引用 shell 變數，故只能用 -v；值不含換行，符合 BSD awk 限制。）
+  printf '%s' "${1-}" | LC_ALL=C awk -v dashc="${_GL_DASHC}" '
     function emit(s) { if (s != "") print s }
     {
       n = length($0); i = 1
       while (i <= n) {
         rest = substr($0, i)
-        if (match(rest, /(bash|sh|zsh)[[:space:]]+-c[[:space:]]+/)) {
-          j = i + RLENGTH
+        # 🔴 直譯器旗標與合併旗標〔CODEX-R2-P0-03〕：原式要求 `-c` 前不得有其他旗標、
+        #    且 `-c` 後必須有空白，於是下列四種**全部漏放**（委員實跑，主委複驗）：
+        #      bash --noprofile -c "…"   前置長旗標
+        #      bash -O extglob -c "…"    前置旗標帶值
+        #      bash -ic "…"              合併旗標（-i 與 -c 併寫）
+        #      bash -c"…"                引號緊貼、-c 後無空白
+        #    修法：① 允許 `-c` 前有任意數量的旗標 token
+        #          ② `-c` 可為合併形式（`-[a-zA-Z]*c`）
+        #          ③ `-c` 後的空白改為**可選**（`[[:space:]]*`）
+        #    ③ 使 `bash -c"X"` 的引號緊貼形態能被抓到；下方 ch 判斷本來就會看引號。
+        if (match(rest, dashc "[[:space:]]*")) {
+          # 🔴 必須加 RSTART-1：命中位置未必落在 rest 的開頭。
+          # 少了它 ⇒ 只有「bash -c 剛好在掃描起點」才正確；前面有任何東西就偏移。
+          # 實測（b4_rstart.sh）：`x; bash -c "…"` 舊 j=9、正確 j=12；
+          #   `/bin/bash -c "…"` 舊 j=9、正確 j=14。
+          # 後果是**真的 fail-open**：抽出來的是 `-c` 而非內層指令 ⇒ 遞迴判定失效
+          #   ⇒ `<任意前綴>bash -c "codex exec hi"` 一律放行（連開頭多一個空格都成立）。
+          # 為何 eval 分支同樣少 RSTART 卻擋得住：它錯完之後靠 `i++` 逐格重掃，
+          #   總會掃到偏移為 0 的位置而自我修正；本分支錯完是 `i = j` **跳過**該位置。
+          #   兩者都改，不留「碰巧會對」的分支。
+          j = i + RSTART - 1 + RLENGTH
           if (j > n) break
           ch = substr($0, j, 1)
           if (ch == "\"") {
@@ -474,7 +582,9 @@ _gate_lex_extract_inners() {
         }
         # eval 在命令位置（行首或分隔後）
         if (match(rest, /(^|[;&|(`[:space:]]|\$\()eval[[:space:]]+/)) {
-          j = i + RLENGTH
+          # 🔴 同上：必須加 RSTART-1。本分支原本靠逐格重掃自我修正，
+          #    看起來沒事，但那是**碰巧**——不留這種分支。
+          j = i + RSTART - 1 + RLENGTH
           if (j > n) break
           ch = substr($0, j, 1)
           if (ch == "\"") {
@@ -641,7 +751,11 @@ _gate_cmd_is_dispatch() {
   fi
 
   # 契約 3／7：-c 與 eval 引數遞迴（僅在有 -c／eval 結構字樣時抽取）
-  if printf '%s' "$raw" | grep -Eq '(bash|sh|zsh)[[:space:]]+-c|(^|[[:space:];&|(`])eval[[:space:]]'; then
+  # 🔴 這道前置守衛決定「要不要呼叫抽取器」，它與抽取器內的 match **必須同型**。
+  #    〔CODEX-R2-P0-03 之第二半〕：抽取器改成支援前置／合併旗標後，
+  #    守衛仍是舊的相鄰形式 ⇒ `bash --noprofile -c "…"` 連抽取器都進不去，修了等於沒修。
+  #    ——同一個概念的**第四個**消費點；本輪之所以一路漏，就是這個病。
+  if printf '%s' "$raw" | grep -Eq "${_GL_DASHC}|(^|[[:space:];&|(\`])eval[[:space:]]"; then
     inners="$(_gate_lex_extract_inners "$raw")"
     if [ -n "$inners" ]; then
       while IFS= read -r inner; do

@@ -2,142 +2,312 @@
 
 REF:handoffs/reconcile/20260810-govb1-b4-review-r3/synth.md
 REF:handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md
-<!-- 站 4 之收斂檔 handoffs/reconcile/20260811-govb3r-x-review-r1/synth.md 尚未取得委員戳記，
-     依上方規則**不得**列入 REF:。取得 RECONCILE-STAMP APPROVED 後再補。 -->
+<!-- 2026-08-11 之全部收斂檔（站 4 govb3r、站 5 govb0-b4、B-49 之 consult r1–r4 與 review r1–r3）
+     **皆尚未取得委員戳記**，依下方規則一律不得列入 REF:。取得 RECONCILE-STAMP APPROVED 後再補。 -->
 
 🔴 **`REF:` 只准列「已戳記」之 reconcile——所有列。** 派工前 `bash scripts/reconcile_stamps_check.sh <檔>` 驗 rc=0。
 
-**Agent**: Claude(Opus 5) | **Time**: 2026-08-11 | **Branch**: main | 實作＝主委自任；review＝codex+composer
+**Agent**: Claude(Opus 5) | **Branch**: main | 實作＝主委自任（`implementer=claude`）；
+討論／review／adversarial＝**codex+composer+grok 三家全員**（使用者 2026-08-11 定；
+出處 `docs/GOV_ROLES_ORCHESTRATOR_AMENDMENT.md`）
 
 ## 🔴 狀態一律看唯一來源，本檔不重述
 
 | 事實 | 唯一來源 |
 |---|---|
 | 施工順序／批次狀態／票收案狀態 | `docs/GOVERNANCE_EXECUTION_ORDER.md` 之三個 generated block |
-| 票的內容 | `handoffs/20260801-GOV-AMEND-BACKLOG.md`（55 張） |
+| 票的內容 | `handoffs/20260801-GOV-AMEND-BACKLOG.md` |
 | 給使用者的現況 | `白話說明/接下來要做什麼.md`／`治理待辦總覽.md` |
 | 摩擦統計現值 | `bash scripts/friction_tally.sh --by-event`／`--field-presence`（**數字不寫死**） |
+| 委員名冊與角色 | `scripts/governance_roles.json`＋`scripts/governance_families.json`（**機器版為準**，散文版 ORCH §1） |
 | `b4` 階段 2 之交付與殘留 | `docs/GOV_B4_STAGE2_AMENDMENT.md` |
 
 🔴 **generated block 一律不得手改**：改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`。
 
-## 🔴 使用者 2026-08-11 裁定：**照順序表走，不插隊**
+---
 
-明確答覆「就照你的順序」⇒ **站 4 → 站 5 → 站 6 → 站 7**，不為了 `R-12` 把站 7 的解凍提前。
-🔴 **不要再去問使用者要不要解凍**——已問過，答案是照順序。等真的走到站 7 再整包提出。
+## 🔴 現況（2026-08-11 深夜；**背景有一輪 review 在跑**）
 
-## 🔴 地雷：`scripts/governance_roles.json` 的 `implementer: grok` **是刻意的，不是漏改**
+**背景任務 `b3cxm86b9`** ＝ `20260811-govb49-x-review-r6` 三家 review，**未回**。
+🔴 **r6 是 SPEC 的最後一輪**（主委依使用者「95% 解法就收」與 epic 斷路器裁定，已寫進 brief）。
+r6 之後不論剩什麼一律轉**具名殘留**並進 TODO 施工，**不開 r7**。
+r6 brief 已明列**不受理範圍**（措辭精確度／更好的設計／防蓄意／任何新增機制），
+並要求必修條目標 `[MUST-BEFORE-IMPL]`。
 
-看起來「名冊與事實不符」（grok 額度封鎖、實際實作端是主委），但 `set_roles.sh:54-57`
-逐字記載了兩家 APPROVED 的裁決：
+回來後流程：`reconcile_build.sh <session> --mode review <三檔>` → 填群集 →
+`completeness_check.sh --lock <session>/sources.lock` →
+`debt_clear.sh --round-id <id> --session <name> --lock <lock>`。
+🔴 `reconcile_build` 預設 `mode=discovery`，**銷帳需 review** ⇒ 建時就帶 `--mode review`
+（已建成 discovery 才補救：`--mode review --rebuild`，**不得帶委員檔**）。
+🔴 `completeness_check --lock` 吃的是 **`sources.lock` 路徑**，不是 synth.md。
 
-```
-implementer=grok      → 非實作者池 {codex, composer} → 2 家可用 ✅
-implementer=codex     → {composer, grok} → 僅 1 家可用 ❌ quorum 當場破
-implementer=composer  → {codex, grok}    → 僅 1 家可用 ❌ quorum 當場破
-```
+### r4／r5 兩輪的收斂軌跡（供判斷是否該停）
 
-⇒ **把實作者掛在一個不會真的被派工的家族上，是目前唯一能湊出「兩家 review」的辦法。**
-改成 codex 或 composer ⇒ 下一次 code review 只剩一家 ⇒ **全部派工當場被擋死**。
-
-🔴 **票 `B-49` 的第 4 條（使用者改名冊）是最後一步，不是第一步**：
-條文逐字為「**之後才**由使用者更新」，前三條（`:769` 改 fail-closed、mutation 證據、
-`eligible` 與測試家族集合機械連動）都要先做，而它們全在凍結的五檔內。
-⇒ **現在單獨改名冊只會把洞開著**。主委 2026-08-11 曾把這條講成「卡在使用者身上」，**措辭不準，已更正**。
-
-## 🔴 站 4 — `B3R` 詞法層超線性修法（序 `050`）
-
-🔴 **先讀 `docs/GOV_B3R_C5_RATIONALE_AMENDMENT.md` 再談這一站**：使用者質疑後查證確認，
-C-5 的秒數門檻**沒有可驗證的威脅模型**（詞法層只收 Bash 指令字串；稽核 39,861 筆平均 75 bytes；
-gate 與 hook **都沒有逾時機制**）⇒ 不得宣稱本輪修掉 fail-open。
-且實作是 **O(n·√n)**（此路線的下界），**不是** SPEC §B.1 寫的 O(n)。
-
-> 批次／票的狀態值一律看 `docs/GOVERNANCE_EXECUTION_ORDER.md` 的 generated block，本節不重述。
-> （本節刻意不把識別碼與狀態詞寫在同一行——主委在本檔已被自己建的偵測器擋下四次。）
-
-**完整收據＝`docs/GOV_B3R_PHASE3_RECEIPT.md`**（根因實驗、修法、四組差分、mutation、效能矩陣、殘留）。
-Phase 2 收據＝`docs/GOV_B3R_PHASE2_RECEIPT.md`，其 profiling 結論**已被 Phase 3 用受控實驗推翻**。
-
-一句話版：真根因是 **BWK awk 的 `substr()` 成本正比於來源字串總長**
-（不是字串累加、也不是函式呼叫次數）⇒ 改成「視窗存取＋批次跳躍＋分段 gsub」。
-C-5 三條全過：100K 最差 0.19s（門檻 2s）、500K 最差 **1.01s**（門檻 5s，舊版 29.43s）、4MB 有界。
-行為不變之證據：95 條語料＋fuzz 短 12000＋fuzz 長 run 12000＋heredoc 20 例，**皆逐位元組全同**；
-mutation 8/8，其中對照組「**關掉快路徑輸出完全不變**」＝快路徑與逐字路徑等價之直接證明。
-
-雙家 review r1 已收：收斂檔 `handoffs/reconcile/20260811-govb3r-x-review-r1/synth.md`（委員債已銷）。
-兩家 Verdict 分歧（codex 要修／composer 放行）⇒ 依碼證採 codex 較嚴版，三條 findings 全數處置。
-新測試 `tests/governance/test_gate_lex_b3r_c5.py`（**26 passed**）；全套 **1422 passed / 0 failed**。
-🔴 fuzz 抓到 233/12000 例差異（Phase 2 的機械改寫誤改前導空行語義），**已還原**並加回歸樁。
-
-🔴 **本輪踩到、已做成機制的三個坑**（都不是知識問題，是「沒有出口」的問題）：
-① 變異版可能**無窮迴圈**（`win_at_boundary`、空字串保護）⇒ 一律硬 timeout，「卡住」＝可比對的具體回傳值。
-② `subprocess` 的 timeout **只殺直接子程序**，`awk` 孫程序會變孤兒空轉（實測 5 個各吃 70% CPU，
-   把全套由 8 分鐘拖成 27 分鐘、並使 C-6 canary 誤紅 201.5ms）⇒ 改 `start_new_session` ＋ `killpg`。
-③ 既有兩份語料是**逐行檔**，塞不下跨行 heredoc ⇒ 視窗重置守衛在 CI 永遠測不到
-   ⇒ 手寫 10 條 heredoc 案例併入 mutation 語料。
-
-
-## ✅ 本 session 已交付（2026-08-10～11，皆兩家 `RECONCILE-STAMP APPROVED`）
-
-| 站 | 收斂檔（`reconcile_stamps_check` 皆 rc=0） | 輪數 | 🔴 未閉合 |
+| 輪 | findings | 方向 BLOCKING | 機制變更 |
 |---|---|---|---|
-| 2.5 `B-25` | `…/20260810-govb25-x-review-r6/synth.md` | 7 輪 33 條 | 八條殘留，含「判準資料化」整項未做 |
-| 2.6 `B-37` | `…/20260810-govb37-x-review-r5/synth.md` | 5 輪 18 條 | 六條殘留，含票級統計與強制機制兩項未交付 |
-| 2.7 前半 | `…/20260807-govb1-b1-review-r6/`、`…/20260809-govb1-b4-review-r4/` | 1 輪 | — |
-| 2.7 後半 | `…/20260810-govb1-b4-consult-r1/`、`…/20260810-govb1-b4-review-r3/` | 1 consult＋3 review＋2 stamp | 五條殘留（見下） |
+| r3 | 14 | 0 | （commit 區間版被判不可實作） |
+| r4 | 14 | **0** | 上界 commit 區間 → **digest** ⇒ r3 之 7 條 range 系列**整類消解** |
+| r5 | 15 | **0** | digest → **git 物件身分**（`ls-tree` 三元組） |
+| r6 | 跑中 | — | `diff --quiet` → **`cat-file blob` 逐位元組**；§R 同批矛盾解除 |
 
-**三票皆不得宣稱閉合。** 站 2.7 後半交付的**只有階段 2**，該批之整體狀態一律看
-`docs/GOVERNANCE_EXECUTION_ORDER.md` 的 `governance-batch-status` block，**本檔不重述**。
+**數量沒降但嚴重度在降**：r3 是「整個方案不可實作」，r5 是「某個措辭過強」。
+方向 BLOCKING 連三輪 0 ⇒ 判尚在收斂，但**只給一輪**。
 
-> 🔴 本節刻意不把批次識別碼與狀態值寫在同一行——主委 2026-08-11 在本檔與
-> `白話說明/治理待辦總覽.md` 各被自己建的偵測器擋下一次（全 session 共三次）。機制正常運作。
-> **不寫行號**：行號會隨每次編輯漂掉，寫了就是下一個要對帳的假事實。
+### 四條紅 → 剩三條（皆凍結，仍擋 push）
+
+`test_cxrun_selfcheck_prompt.py::test_selfcheck_absent_for_impl` **已修**（不在凍結集合，7 passed）。
+另三條在 `_B45_HARNESS` 內，需 `票 B-49` 落地。
+
+### 🔴 修法形狀已由隔離實跑定案 — `docs/GOV_B49_PINSHAPE_RECEIPT.md`
+
+**那批紅是兩種病**：`test_result_state` 寫死家族名；另兩檔**已經在讀 SoT，仍然紅**
+（`claude` 無 CLI 配方）⇒ **「改成讀 SoT」對三分之二是錯的修法**。
+修法＝**釘沙箱名冊**（`tests/governance/_role_pin.py`，已落地未凍結區）。
+隔離實跑：五個 `_B45_HARNESS` 檔 **141 passed / 0 skipped**（基準線 3 failed ＋ 1 靜默 skip）。
+
+🔴 另抓到票文未列的靜默失效：`pytest.skip` 在 **for-loop 內**，一個非預期 implementer
+**連帶吃掉 review/consult/closure 三種 kind 的覆蓋**，整檔仍報綠。
+
+### SPEC 已到 r5（`docs/GOV_B49_PATH_GRANT_SPEC.md`，template_check rc=0）
+
+- **r4**：授權上界由 commit 區間改 **digest** ⇒ 三家判定 r3 之**七條 range 系列全部消解**。
+- **r5**：digest 契約定死為 **git 物件身分**（`git ls-tree HEAD` 之 `<mode> <type> <oid>`
+  ＋ `git diff --quiet HEAD` rc=0）。此一步同時消掉同源／換行正規化／symlink／mode 四個爭議。
+- r4 三家 verdict 皆 `NEEDS-WORK`，且**方向 BLOCKING ＝ 0**（斷路器未觸發，digest 方向獲保留）。
+
+### 🔴 r4 打掉三條**我已落地的**程式碼缺陷（全部已修，見收據 §7b）
+
+`reviewers` 公式錯（把無 CLI 的 `claude` 算進 review pool——**同一公式本 session 第三次咬人**）／
+SoT 來源固定讀 `REPO_ROOT` 而非傳入的 `scripts_dir`（沙箱變異看不見 ⇒ mutation 假綠）／
+`case` 分支 regex 只收兩空白縮排。修最後一條時揭出更深的問題：**區塊結尾錨點 `\nesac`
+不匹配縮排的 `esac`**，舊版**是靠兩塊縮排剛好不同才正確的**。
+承重探針 `.claude/tmp/rolepin_probe.py` **7 格全 PASS**。
+
+### 線 A 站 5：`CODEX-R3-P1-04` **已修並通過 r5 review**
+
+`tests/governance/test_gate_claude_narrow.py` 新增 **5 格**定向 mutation ⇒ **41 passed**。
+composer／grok 判 `APPROVED`；codex 判需要第五格並**附可重現反例**
+⇒ 依「看碼證不數人頭、附反例者勝、不決採較嚴版」**採 codex**，已加入 `CMDPOS_CARET`。
+🔴 但 **codex 的對照組是錯的**（主委實跑推翻）：它預期 `$(printf codex) exec hi` 維持 BLOCK，
+實測**兩條一起翻**——因為展開網之 `_pat` 自己也以 `${_GL_CMDPOS}` 起頭，行首命令同樣靠 `^`。
+正確對照＝**命令不在行首**（走 `[;&|(`]` 分支）。
+`GL_WRAPPER_DEF` 死常數已刪（`GROK-R5-P2-01`）。
+⇒ 現可誠實宣稱「**五式各自承重**」，不需 codex 提的降級措辭。
+🔴 查證發現比報告更糟：`GL_WRAPPER_DEF`／`GL_FAMS_DEF`／`GL_TOKEND_DEF` **從未被任何測試使用**，
+且 `GL_TOKEND_DEF` 字面停在 r3 修 `$IFS` **之前**——看似有錨點，實則既不承重也不正確。已接上成承重錨點。
+`CODEX-R3-P0-03` 依 r3 裁決轉 `票 B-59`，本輪不修。
+**仍欠**：章程 §B8 —— 已修兩條須由**原提出方 codex** 重跑自己的反例確認閉合。
+
+🔴 **教訓（已入紀律）**：凡宣稱「影響面就是這幾個檔」，一律以**全套實跑**為準，不得以子集掃描代替。
+出處＝r2 的 Q2 只問了五個 harness 檔，三家給了那個問題的正確答案，但沒人跑全套 ⇒ 漏掉第四條紅。
+
+---
+
+# 接手第一件事（照順序讀完這三節再動任何檔）
+
+## ① 🔴 **push 是全擋的**，而且這是已知且刻意的
+
+`implementer=claude` 使 **3 個凍結測試檔轉紅**；`pre-push` 委派 `gov_check.sh`，
+後者跑**全套** `pytest tests/governance` ⇒ **整個 repo 推不出去**，與你改了哪些檔無關。
+
+- **commit 沒有被擋**，只有 push 被擋。目前 **未推 commit ＝ 0**，工作區 **34 髒檔**
+  ⇒ 站 5 以後的所有成果**只存在於工作區**。工作區壞掉就全沒了。
+- 🔴 **不要「還原 `implementer=grok` 換綠」**——三家一致否決為長期策略；
+  codex 逐字判其「直接違反使用者已定的 `implementer=claude`，且會把名冊與事實重新錯置」。
+- `GOVERNANCE_SKIP_PREPUSH=1` 與 `git push --no-verify` 三家一致判為**緊急留痕通道、非排程方案**，
+  且**繞不過 CI**。
+
+## ② 🔴 兩條工作線都在半空中，**都不可 commit**
+
+**線 A：站 5（GOVB0 `B4`）**——三輪三家 review 完，r3 判「不可 commit」。
+未修兩條：`CODEX-R3-P0-03`（變數化路徑呼叫派工腳本）、`CODEX-R3-P1-04`（五式未證承重）。
+🔴 還欠一輪**章程 §B8**：已修的兩條須由**原提出方（codex）重跑自己的反例**確認閉合。
+
+**線 B：`票 B-49`**——見下節。它是 push 的唯一阻塞項。
+
+## ③ 🔴 委員名冊已切三家，四處定義同步完成
+
+`active_stampers` 加 grok；`eligible` 加 `claude`；`implementer=claude`；`reviewers` ＝三家；
+`_role_gate.sh` 補了「implementer 不在 `review_families` 時角色規則靜默失效」那個洞。
+**完整裁定、代價與具名殘留在 `docs/GOV_ROLES_ORCHESTRATOR_AMENDMENT.md`，本檔不重述。**
+
+⚠️ 舊敘述「grok 額度封鎖 ⇒ 委員＝兩家」**已作廢**，勿沿用。
+
+---
+
+# 🔴 線 B：`票 B-49` —— 目前的全部狀態
+
+## 已跑完的輪次（皆已建收斂檔、債全清）
+
+| 輪 | 收斂檔 | 結果 |
+|---|---|---|
+| consult r1 | `…/20260811-govb49-x-consult-r1/synth.md` | 三家 NEEDS-WORK；grok 抓到主委引入之 P0（`set_roles` reviewers 公式），已修，隔離驗證 5/5 |
+| consult r2 | `…/20260811-govb49-x-consult-r2/synth.md` | 兩家 APPROVED、最小集**三檔**；codex 被 STAMP-BLOCK（主委 brief 漏寫聲明） |
+| consult r3 | `…/20260811-govb49-x-consult-r3/synth.md` | codex **REJECTED** ⇒ r2 授權**撤回** |
+| SPEC review r1 | `…/20260811-govb49-x-review-r1/synth.md` | 12 條、3 BLOCKING |
+| SPEC review r2 | `…/20260811-govb49-x-review-r2/synth.md` | 10 條、3 BLOCKING ⇒ **斷路器命中，第一版 SPEC 依約放棄** |
+| consult r4 | `…/20260811-govb49-x-consult-r4/synth.md` | 三家定方向＝**C 案**；三家一致否決「根本不該做」 |
+| SPEC review r3 | `…/20260811-govb49-x-review-r3/synth.md` | 14 條、**方向 BLOCKING ＝ 0** ⇒ 不觸發斷路器 |
+
+## 現行 SPEC 與已放棄者
+
+- **現行**＝`docs/GOV_B49_PATH_GRANT_SPEC.md`（C 案；過 `template_check.sh spec` rc=0）
+- **已放棄**＝`docs/GOV_B49_UNFREEZE_WINDOW_SPEC.md`（第一版；保留對照，**不是基礎**）
+
+## C 案是什麼（三家共識，非主委原案）
+
+**永久三檔 path grant ＋ 炸彈狀態機 R-A ＋ 行為式閉合證據。**
+純 A（不改炸彈）與純 B（不改凍結面）皆被兩家實跑證明**結構上不可達**。
+
+🔴 **照抄既有先例，不發明新機制**：`_B5_MANIFEST_UNLOCKED` ＋
+`_B5_MANIFEST_AUTHORIZED_ADDITIONS` ＋ `test_b5_manifest_extension_is_exactly_authorized`
+已是「永久、字面、被測試釘死的授權」之範本。該處註解逐字警告：
+oracle 須為**字面期望集合**，寫成由同一常數導出之式子會**同義反覆恆真**。
+
+🔴 **最小解凍集＝三檔**（三家各自逐檔實跑，rc 表逐格相同）：
+`test_stamp_taskid_inject.py`／`test_rolegate_predispatch.py`／`test_result_state_format_failed.py`。
+`test_cxrun_stamp_prompt.py`／`test_completeness_idlike_fp.py` **rc=0，不得順手解凍**。
+
+## 🔴 SPEC r4 必須修的（review r3 之 14 條，全部接受）
+
+1. **range 演算法**：兩端點 diff 的 union **不等於**歷史路徑集合；須為每個 guard 明定
+   `lower`／`window_upper`／`upper` 之祖先關係 ＋ clamp ＋「僅開窗後」限定 ＋ rename／merge 語義
+2. **bootstrap 死結**（兩個獨立原因）：(a) `govb1_frozen_hashes.txt` 的鍵是**封閉集合**，
+   直接拒 `b49_grant_upper`；(b) 上界＝施工 commit 自身時無法自指其 hash。
+   ⇒ 採 **S2＝改用 digest** 或 **S1＝兩段提交＋明確 missing-upper 語義**，二擇一寫死
+3. **selector 對不上票文**：`rolegate`／`result_state` 兩條 selector **不覆蓋**票文 ②③
+   （② ＝ invalid implementer mutation 轉紅＋三合法值通過＋`skipped=0`；③ ＝ `eligible` 機械連動）
+   ⇒ 失敗模式是**B-49 假 CLOSED**，須逐條對應票文重寫
+4. **`grant_upper` 可滑動**：未凍結「寫後不可前移」，設太早反而變長期白名單（與原意相反）
+5. **selector 只釘名稱**：`test_v12…` 是 for-loop 跑四種 kind，移除 `impl` case 仍表面綠
+6. **rename／隔離環境未定義**：須明寫 `--no-renames` 與隔離 subprocess 之最小變數集
+7. **§R 回退條文是錯的**：已 push 後 `git revert` **不成立**（不刪 name-only 歷史）
+   ⇒ 誠實版＝**一旦 push 即不可回退**，「push 前必須確定」是硬要求
+
+## 🔴 斷路器（現行判準，勿改寬）
+
+**只由「方向問題」BLOCKING 觸發，≥2 條即退回重議方向。**
+brief 須要求每條 BLOCKING 自標「方向問題／條文問題」——review r3 已證明三家皆能區分，
+且無人濫用 BLOCKING 表達不滿。
+⚠️ review r3 字面計數為 2 條 BLOCKING，是靠**派工前**細化的判準才不觸發；備查用。
+
+---
+
+# 🔴 線 A：站 5（GOVB0 `B4`）
+
+| 檔 | 內容 |
+|---|---|
+| `scripts/_gate_lex.sh` | 判定式收斂成 5 個變數 ＋ 修掉 **7 類 fail-open** |
+| `tests/governance/test_gate_b4_wrapper_and_scripts.py` | 新檔，51 passed，含 5 條定向 mutation |
+| `tests/governance/` 另 4 檔 | mutation 錨點由「釘整串正則」改為「釘變數定義」 |
+| `tests/…/fixtures/gate_decision_corpus.txt` ＋ `.sha256` | 契約 5 之 TN 替換（**兩家裁決授權**） |
+
+收斂檔：`handoffs/reconcile/20260811-govb0-b4-review-r{1,2,3}/synth.md`（債全清）。
+
+🔴 **主委在 r2 收斂檔宣稱「四個消費點全引用」——那句話是假的**，
+兩家獨立證明還有第五個（claude 段）。已修，勿沿用該宣稱。
+
+### 這條線不會靠再修幾個樣式收斂
+
+r1／r2／r3 各四條，**每輪都在同一段判定式找到新的沒被列舉到的形態**。
+已開 **`票 B-59`（優先序高）**：判定式是黑名單，形態不可窮舉。
+**對外宣稱限制**：可說「修掉 N 個**已知**形態」；❌ 不可說「dispatch gate 已完備」。
+
+### 探針（皆在 `.claude/tmp/`，只餵字串不執行）
+
+`b4_probe.sh`／`b4_r2probe.sh`／`b4_net_wrapper.sh`／`b4_r3verify.sh`（含 HEAD 對照）／
+`b4_r3fix.sh`（23）／`b4_corpus.txt`＋`b4_verdicts.sh`（基準在 `b4_before.txt`）／
+`setroles_probe.sh`（5 格，名冊公式）／`sync_factkey_fixtures.sh`／`vrg_probe.sh`。
+
+🔴 **探針向量一律放檔內，不放指令列**——放指令列會被這道閘當成真派工擋下（實際發生過三次）。
+
+---
+
+# 🔴 委員分工：規則是「不分工」
+
+`feedback_committee_full_scope`：**每委員都要全面看整件事、各產完整版，禁分角度。**
+機制上三家收到的是**同一份 brief**。
+**唯一合法的差異**＝章程 §B8「退回修改後由**原提出方**重跑自己的反例確認閉合」。
+
+三家實績（供判斷可信度，不是貼標籤）：
+grok 復出後三次抓到另兩家沒抓到的關鍵（主委引入之 P0、SPEC 狀態機死結、`active_stampers`
+的 HEAD 基準線）；codex 每輪都附可重現反例，且是唯一讀到引信 return 條件那行的；
+composer 在 r3 起改善，並獨立命中 selector 對不上票文。
+⇒ **分歧時依「看碼證不數人頭、附可重現反例者勝過 sentinel、不決採較嚴版」。**
+
+---
+
+# 站 4 — `B3R`（**已 commit+push `e029514d`**）
+
+🔴 **先讀 `docs/GOV_B3R_C5_RATIONALE_AMENDMENT.md`**：C-5 的秒數門檻**沒有可驗證的威脅模型**
+⇒ 不得宣稱修掉 fail-open；且實作是 **O(n·√n)**，**不是** SPEC 寫的 O(n)。
+完整收據＝`docs/GOV_B3R_PHASE3_RECEIPT.md`。
+真根因＝BWK awk 的 `substr()` 成本正比於來源字串總長。
+🔴 fuzz 抓到 233/12000 例差異（Phase 2 誤改前導空行語義），已還原並加回歸樁。
+
+---
 
 ## 🔴 未修的活缺口
 
 - `R-12`：`brief_conformance_check.sh` full path 不驗 EXPECTED-DELTA；`TODO:822` 第 1 條 ASSERT 字面不成立。
-  修它須動 `_B45_HARNESS` ⇒ 觸窗守衛 ⇒ 需解凍 ⇒ `票 B-49` 須 CLOSED，而其閉合條件第 4 項**須使用者改 `governance_roles.json`**。
+  修它須動 `_B45_HARNESS` ⇒ 觸窗守衛 ⇒ 需 `票 B-49` 先落地。
   🔴 **OOE 通道救不了**：`_MSG_PARSE_MARKERS` 含 `"Governance-Scope"`，窗守衛結構上禁解析 commit 訊息。
 - `R-13` 未列舉之 Unicode 不可見碼點；`R-14` `b4-review-r2` 僅 2/3 戳記；`R-16`＝`票 B-55`（同型旗標空值不一致）
-- `票 B-54`（新開）：戳記行之 64 位 hex 由委員手抄 ⇒ 本 session 實際掉字一次
-- `B3R` 的重寫已進主樹，但雙家 review 尚未戳記 ⇒ 對外只能說「已交付、待戳記」
+- `票 B-54`：戳記行之 64 位 hex 由委員手抄 ⇒ 曾實際掉字一次
+- `B3R` 的重寫已進主樹，但三家 review 尚未戳記 ⇒ 對外只能說「已交付、待戳記」
 - `票 B-56`：`_gate_lex_extract_inners`／`_extract_cmdsubs` 仍逐字迴圈（500K 15.3s）；
   修它須先判定 `j = i + RLENGTH` 未用 RSTART 是否為缺陷 ⇒ 屬行為變更，不得夾帶進效能批
 - `票 B-57`：`parse_heredoc_delim` 的 `rest = substr(s, pos)` 全尾切 ⇒ heredoc 密集 500K **434 秒**
-  （**優先序低**：查證後「慢＝危險」的前提不成立，見 `docs/GOV_B3R_C5_RATIONALE_AMENDMENT.md` §D）
-- `票 B-58`：前導空行被丟棄（`"⏎⏎a"` 等同 `"a"`）；是否為缺陷**未判定**，
-  回歸樁釘的是「與舊版一致」而非「這行為是對的」
+  （**優先序低**：查證後「慢＝危險」的前提不成立）
+- `票 B-58`：前導空行被丟棄；是否為缺陷**未判定**，回歸樁釘的是「與舊版一致」而非「這行為是對的」
+- `票 B-59`（**優先序高**）：dispatch gate 的判定式是**黑名單列舉**，形態不可窮舉。**不得宣稱閘已完備。**
+- `票 B-60`：`review_quorum_check.sh:35` 家族清單硬編，未讀 SoT；`_DRIFT` 已釘之，
+  故**不得以該檔之測試結果作為「它讀 SoT」的證據**
+  REF:handoffs/reconcile/20260811-govb49-x-consult-r1/synth.md
+- `票 B-61`：`_role_gate.sh` 的 `known_only` 對未知家族靜默放行（`agy`＋consult）；
+  既有行為，非本輪引入 REF:handoffs/reconcile/20260811-govb49-x-consult-r1/synth.md
+- `票 B-49`：閉合條件 ④ 已執行，**①②③ 未做 ⇒ 順序是倒的**；代價＝三檔轉紅 ⇒ **push 全擋**
+  REF:handoffs/reconcile/20260811-govb49-x-consult-r1/synth.md
+- 站 5 未修殘留：`CODEX-R3-P0-03`、`CODEX-R3-P1-04`、
+  `gate_check.sh` 之 audit 分類器未同步（新形態記為 `match_rule=unknown`）、
+  `bash -n <派工腳本>` 誤擋、`$(printf echo) codex` 誤擋、`eval "$(echo cx_run.sh)"` 仍放行（既有）
 - `票 B-15` 誤擋在 `B7` 之後仍存在（`printf`／`find`／`ls`／`gate.sh` 自身）⇒ GOVB0 `B4` Task 2.3/2.4
+  🔴 新增一例：`for f in codex composer grok; do …` 這種**唯讀迴圈**會被家族名偵測誤擋
 - `gate_check` 對真派工放行：process substitution／`xargs -n 1`／`env FOO=bar`／動態賦值／絕對路徑 `bash -c` ⇒ GOVB0 `B4`
 - `票 B-50` 流程面永久標記為跳步；`票 B-31` 對外只能說「產出端已有檢查點」（`票 B-53` 落地前）
 - `plain_docs_sync_check.sh` catch-all 回空字串 ⇒ 新增說明檔預設不受監看
 - `R-15`：`scripts/governance_families.json` 不可 commit ⇒ ambient M
 - `.claude/gate/*.log`、`docs/GOVB0_FRICTION_AMENDMENTS.md`、`handoffs/**` 不得 commit
+- `template_check.sh` 之 `^[[:space:]]*[-*]` 會把 `**粗體**` 開頭的行誤判為 bullet
+  ⇒ 範本自己的欄位標籤會觸發空殼偵測（已繞開，未修）
 
 ## ⚠ 操作紀律（踩過的坑，一律照做）
 
-- 🔴 **補洞前先問「舊行為在這個輸入上是什麼」**。本 session 為修一條 P2 而開了一個 P1
-  （三版本對照 `擋 → 放行 → 擋`）。**補洞比洞更危險**。
-- 🔴 **凍結測試檔會以原始碼字面錨定生產腳本的行**（`_CR_BK_FULL_EXTRACT` 等）⇒ 那些行等於被連帶凍結，
-  **改對了也會紅**。解法＝保留該行逐字、只換它的輸入。
-- 🔴 **委員戳記主委不得代寫**——sha 掉字要重派，不得自己補。
-- 🔴 **改 `scripts/fact_keys.json` 的連鎖三件事**（本 session 因精簡 HANDOFF 砍掉此條，當場踩回去）：
-  ① 跑 `--write` 重生成所有宿主檔　② **同步兩份 fixture**（`factkey_clean`／`factkey_drifted`，
-  drifted 須保留其單列竄改）　③ 生成內容**不得含任何 `20\d{2}-\d{2}-\d{2}` 形狀的字串**（防時間戳的決定性守衛）。
-- 🔴 **新開票會改變 `governance-ticket-closure` 的機械導出集合**：union＝`HANDOFF.md` 之
-  「未修的活缺口」節 ∪ backlog 之「2026-08-10 scope 缺口」節所提及的票號。
-  ⇒ 在 HANDOFF 增刪票號提及**就會**讓 `test_e3_ticket_union_matches_key_rows` 轉紅，須同步 `fact_keys.json`。
-- 🔴 **兩家 Verdict 分歧看碼證不數人頭**；附可重現反例者勝過 sentinel；不決採較嚴版。
+- 🔴 **補洞前先問「舊行為在這個輸入上是什麼」**。**補洞比洞更危險**——本 session 發生兩次：
+  站 5 為修 P2 而開 P1；名冊改動時把 `claude` 加進 `eligible` 卻沒看誰消費它（grok 抓到）。
+- 🔴 **凍結測試檔會以原始碼字面錨定生產腳本的行** ⇒ 那些行等於被連帶凍結，**改對了也會紅**。
+- 🔴 **委員戳記主委不得代寫**——sha 掉字要重派。
+- 🔴 **改 `scripts/fact_keys.json` 的連鎖三件事**：① 跑 `--write` 重生成所有宿主檔
+  ② **同步兩份 fixture**（用 `bash .claude/tmp/sync_factkey_fixtures.sh`，drifted 須保留其單列竄改）
+  ③ 生成內容**不得含任何 `20\d{2}-\d{2}-\d{2}` 形狀的字串**。
+- 🔴 **新開票會改變 `governance-ticket-closure` 的機械導出集合**：union＝本檔「未修的活缺口」節
+  ∪ backlog 之「2026-08-10 scope 缺口」節所提及的票號 ⇒ 增刪票號提及須同步 `fact_keys.json`。
+- 🔴 **brief 的 `fact-verified` 若引用「派工會改變的 rc」，必須含字面 `派工後預期值:`**——
+  那是機檢錨點，不得為了通順而改寫（本 session 踩過）。
+- 🔴 **brief 須逐字寫「`handoffs/reconcile/**/synth.md` 為無戳記工作輸入，不得 STAMP-BLOCK」**——
+  漏寫會讓委員依合約停工，整輪零產出（本 session 發生一次，代價是補派一輪）。
+- 🔴 **session 命名規約**：`<YYYYMMDD>-<epic>-<batch>-<kind>-r<N>`，`r<N>` **只收純數字**
+  （`r2b` 會被拒）；task-id 必須是 session 的**大寫全形式**。
 - 🔴 **`docs/` 與新增 `scripts/` 檔不在 manifest** ⇒ commit 須帶 `Governance-Scope: out-of-epic` trailer，
-  且**trailer 必須在最後一段**（git 只解析最末段；本 session 因寫在中段而 g7 紅過一次）。收尾跑 `--only g7`。
-- 🔴 **`docs/GOVB1_` 前綴 OOE 亦禁**（硬保護集）⇒ 延伸檔須另取名（本次用 `docs/GOV_B4_STAGE2_AMENDMENT.md`）。
+  且**trailer 必須在最後一段**（git 只解析最末段）。收尾跑 `--only g7`。
+- 🔴 **`docs/GOVB1_` 前綴 OOE 亦禁**（硬保護集）⇒ 延伸檔須另取名。
 - 🔴 **背景任務 exit code ＝ 指令鏈最後一個的 rc**；推完用 `git rev-list --count origin/main..HEAD` 實查。
 - 🔴 **`git push` 用 harness `run_in_background`，不得用 shell `&`**。
 - 🔴 **改一個事實前先 `grep -rn` 掃全部副本**；改檔一律 Edit/Write，禁 `sed -i`／heredoc。
-- 🔴 **BSD awk `-v` 值不接受換行**；**awk 無 regex 型別**（`f($0,/re/)` 會先求值成 0/1）；`$( )` 內禁 `case`；rc 禁經 pipe。
+- 🔴 **BSD awk `-v` 值不接受換行**；**awk 無 regex 型別**；`$( )` 內禁 `case`；**rc 禁經 pipe**。
 - 🔴 **mutation 錨點須唯一且與實作同步**；錨點失配時測試須 fail-closed 轉紅。
-- 全套 `pytest tests/governance -q` **≈470 秒 / 1393 passed**（2026-08-11 實測）⇒ 丟背景，跑完 `bash scripts/restore_golden_inventory.sh`。
-- 委員跑驗收時**主控端不得動檔**；`cx_run.sh` 可能在委員 `.md` 寫出後仍未記 `committee_family_result`，
-  銷帳前先等 `ps aux | grep cx_run.sh` 歸零。
-- stamp 輪產出為散文無 canonical ID ⇒ 收集節點必失敗，走 `no-findings-expected` 銷帳（`票 B-52`，已發作九次）。
-- `grok` 額度封鎖 ⇒ 委員＝codex＋composer（使用者 2026-08-10 確認）。
+- 🔴 **不要開輪詢迴圈等背景任務**——harness 本來就會通知。本 session 因此留下三個殭屍迴圈（最久 2h43m）。
+- 全套 `pytest tests/governance -q` **≈615 秒 / 1473 passed**（2026-08-11 實測，名冊改動**前**）
+  ⇒ 丟背景，跑完 `bash scripts/restore_golden_inventory.sh`。
+- 委員跑驗收時**主控端不得動檔**；銷帳前先等 `ps aux | grep cx_run.sh` 歸零。
+- stamp 輪產出為散文無 canonical ID ⇒ 收集節點必失敗，走 `no-findings-expected` 銷帳（`票 B-52`）。

@@ -406,22 +406,27 @@ def test_20_mut_11_contract_reverts(tmp_path: Path) -> None:
 
     # 2：縮回 R2 命令位置（僅 ^ ; & |）；並關 C3 cmdsub 抽取（否則 $() 仍遞迴命中）
     def m2(t: str) -> str:
-        old = (
-            "(^|[;&|(`]|\\$\\()[[:space:]]*((eval|xargs)[[:space:]]+)?"
-            "((\\S*/)?)((codex|cursor-agent|grok|agy)[[:space:]]|(codex|cursor-agent|grok|agy)$)"
-        )
-        new = "(^|[;&|][[:space:]]*)((codex|cursor-agent|grok|agy)[[:space:]]|(codex|cursor-agent|grok|agy)$)"
+        # 🔴 GOVB0 B4 後本案例受三層保護，須逐層剝除才會漏放：
+        #    ① 家族段的命令位置定義　② cmdsub 遞迴　③ fail-closed 網的家族條件（B4 新增）
+        #    只剝 ①② 仍 BLOCK（③ 接住）⇒ 不是本 mutation 要證的事。
+        # 🔴 移除原本的「靜默後備」：錨點漂移時它會**偷偷改用一個較弱的變異**，
+        #    於是測試照樣綠，但測到的已不是原本那條規則——假綠的典型來源。
+        #    改為錨點失配即 assert 失敗。
+        # 🔴 B4 r3：命令位置已收斂成 `_GL_CMDPOS` 單一定義；mutation 改縮該定義。
+        old = "_GL_CMDPOS='(^|[;&|(`]|\\$\\()[[:space:]]*'"
+        new = "_GL_CMDPOS='(^|[;&|][[:space:]]*)'"
         t2 = t.replace(old, new, 1)
-        if t2 == t:
-            # 後備：拿掉 ( ` $( eval xargs
-            t2 = t.replace("[;&|(`]|\\$\\(", "[;&|]", 1)
-            t2 = t2.replace("((eval|xargs)[[:space:]]+)?", "", 1)
+        assert t2 != t, "c2 錨點漂移：_GL_CMDPOS 定義"
         t2 = t2.replace(
             'cmdsubs="$(_gate_lex_extract_cmdsubs "$raw")"',
             'cmdsubs=""',
             1,
         )
-        assert t2 != t
+        net_family = (
+            '_famtok="claude[^|]*(-p|--print)|(^|[[:space:];&|(\\`=])${_GL_FAMS}${_GL_TOKEND}"'
+        )
+        assert net_family in t2, "c2 錨點漂移：fail-closed 網之家族條件"
+        t2 = t2.replace(net_family, '_famtok="claude[^|]*(-p|--print)"', 1)
         return t2
 
     mutations.append(("c2", m2, pick("2", "TP"), "ALLOW"))
@@ -446,7 +451,8 @@ def test_20_mut_11_contract_reverts(tmp_path: Path) -> None:
 
     # 4：路徑前綴拿掉 + 引號內空白改 X → 引號路徑不再命中
     def m4(t: str) -> str:
-        t2 = t.replace("((\\S*/)?)((codex|cursor-agent|grok|agy)", "((codex|cursor-agent|grok|agy)", 1)
+        # B4 r3：家族段改為變數組裝，錨點隨之改為組裝行上的「可選路徑前綴」片段。
+        t2 = t.replace("((\\\\S*/)?)${_GL_FAMS}", "${_GL_FAMS}", 1)
         t2 = t2.replace(
             'if (c == " " || c == "\\t") { out = out "\\037"; i++; continue }',
             'if (c == " " || c == "\\t") { out = out "X"; i++; continue }',
@@ -459,8 +465,9 @@ def test_20_mut_11_contract_reverts(tmp_path: Path) -> None:
 
     # 5：禁用 abs path 家族（\S*/ 前綴）
     def m5(t: str) -> str:
-        t2 = t.replace("((\\S*/)?)((codex|cursor-agent|grok|agy)", "((codex|cursor-agent|grok|agy)", 1)
-        assert t2 != t
+        # B4 r3：同 m4，錨點改指組裝行上的可選路徑前綴。
+        t2 = t.replace("((\\\\S*/)?)${_GL_FAMS}", "${_GL_FAMS}", 1)
+        assert t2 != t, "c5 錨點漂移：家族段之可選路徑前綴"
         return t2
 
     mutations.append(("c5", m5, pick("5", "TP"), "ALLOW"))

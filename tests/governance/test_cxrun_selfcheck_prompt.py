@@ -37,6 +37,7 @@ from test_cxrun_stamp_prompt import (  # noqa: E402  # type: ignore[import-not-f
     _run_cx,
     _write_brief,
 )
+from tests.governance import _role_pin  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CX_RUN = REPO_ROOT / "scripts" / "cx_run.sh"
@@ -163,8 +164,11 @@ def test_selfcheck_absent_for_impl(tmp_path: Path) -> None:
 
     加了會叫委員去跑一個對它必然 vacuous 的檢查（票 B-38 的病）。
     """
-    # 家族須為 implementer（角色閘：brief-kind=impl 只准 implementer，現行 SoT ＝ grok）
     h = _harness(tmp_path)
+    # 角色閘：brief-kind=impl 只准 implementer ⇒ 在沙箱副本內釘定，與生產名冊解耦。
+    # 🔴 不可改用生產 implementer：現行值 `claude` 沒有 CLI 配方，
+    #    `cx_run.sh` 的家族白名單不收它 ⇒ 用它只會換一種紅。理由詳見 `_role_pin`。
+    fam = _role_pin.pin_implementer(h["scripts"])
     brief_rel = "handoffs/brief.md"
     _write_brief(h, kind="impl")
     rid = "b3122222-2222-4222-8222-222222222222"
@@ -172,22 +176,27 @@ def test_selfcheck_absent_for_impl(tmp_path: Path) -> None:
         h,
         round_id=rid,
         session="s-b31-impl",
-        fams=["grok"],
+        fams=[fam],
         out_prefix="handoffs/b31i",
         brief_rel=brief_rel,
         task_id="GOVB31-IMPL",
     )
     capture = h["root"] / "prompt.capture"
+    out_rel = f"handoffs/b31i-{fam}.md"
     r = _run_cx(
         h,
-        "grok",
+        fam,
         brief_rel,
-        "handoffs/b31i-grok.md",
+        out_rel,
         round_id=rid,
         env_overlay={"CX_PROMPT_CAPTURE": str(capture)},
     )
     assert r.returncode == 0, r.stdout + r.stderr
     prompt = capture.read_text(encoding="utf-8")
+    # 🔴 先證明 prompt **真的被組出來**：本測試的斷言是「不含 X」，
+    #    空字串同樣「不含 X」⇒ 捕捉檔沒寫成、或 cx_run 早退，都會偽綠。
+    assert f"你的家族名={fam}" in prompt, f"prompt 未組成（捕捉檔空/早退）⇒ 下一條斷言無意義:\n{prompt!r}"
+    assert out_rel in prompt, f"prompt 未帶產出路徑 ⇒ 非 impl 正常路徑:\n{prompt!r}"
     assert _SELFCHECK_ANCHOR not in prompt, f"impl prompt 不該含自檢指示:\n{prompt}"
 
 

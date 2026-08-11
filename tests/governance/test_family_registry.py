@@ -377,7 +377,11 @@ def _fams_in_lines(fname: str, locate: str) -> list[set[str]]:
 # completeness_check 有 6 個 site(委員 codex B:單釘一行不夠)→ 全涵蓋。
 _DRIFT = [
     ("gate_check.sh", "grok|agy)[", "executor_clis", {"claude"}),
-    ("_gate_lex.sh", "grok|agy)[", "executor_clis", {"claude"}),  # GOVB0 Task 2.1 詞法判定
+    # 🔴 GOVB0 B4 r3：家族清單在 `_gate_lex.sh` 由「散落在多條正則裡」收斂成
+    #    **單一定義** `_GL_FAMS='(codex|cursor-agent|grok|agy)'`（`CODEX-R2-P0-01` 之修法）。
+    #    錨點隨之改為釘那一行的變數名——比釘整串正則穩定得多：
+    #    正則會因每次擴充而漂，變數定義不會。
+    ("_gate_lex.sh", "_GL_FAMS=", "executor_clis", set()),
     ("completeness_check.sh", "FAMILY_ALLOW_RE=", "families", set()),
     ("completeness_check.sh", "FAMILY_FILE_RE=", "families", set()),
     ("completeness_check.sh", 'fam["CODEX"]', "families", set()),

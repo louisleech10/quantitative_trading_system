@@ -231,6 +231,19 @@ _check_families_core() {
         fi
         ;;
       *)
+        # 🔴 implementer 不在 review_families 時（＝編排端自任實作，2026-08-11 起的常態），
+        #   角色規則仍須對它生效。否則 `known_only` 會**靜默跳過**它，
+        #   「實作者不自審」在最該擋的那一格失效——與票 B-49 ② 同型的無聲覆蓋流失。
+        #   （implementer ∈ review_families 時 fam==impl 必落在上一個 case ⇒ 本段不可達
+        #    ⇒ 對 2026-08-11 之前的所有設定，行為逐字不變。）
+        if [ "${fam}" = "${impl}" ]; then
+          msg="$(_role_rule_for_family "${kind}" "${fam}" "${impl}")"
+          if [ -n "${msg}" ]; then
+            printf '  · %s: %s\n' "${fam}" "${msg}" >> "${err_file}"
+            n_err=$((n_err + 1))
+            continue
+          fi
+        fi
         if [ "${mode}" = "strict_mapping" ]; then
           map_msg="$(_mapping_ok "${fam}" "${rf}" "${ec}" 2>/dev/null)" && map_rc=0 || map_rc=$?
           if [ "${map_rc}" -ne 0 ] && [ -n "${map_msg}" ]; then

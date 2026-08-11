@@ -17,29 +17,51 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GATE_CHECK = REPO_ROOT / "scripts" / "gate_check.sh"
 GATE_LEX = REPO_ROOT / "scripts" / "_gate_lex.sh"
 FIX = REPO_ROOT / "tests" / "governance" / "fixtures" / "govb1"
 
 # _gate_lex.sh 內 claude 段正則之字面（mutation 錨點；漂移即 assert 失敗）
+# 🔴 GOVB0 B4 r3：claude 段原本自寫命令位置與 wrapper，是**第五個消費點**
+#    （`CODEX-R3-P0-02`／`COMPOSER-R3-P1-01` 兩家獨立找到）⇒ 已改為引用共用式。
+#    錨點隨之更新為組裝行全文；`$` 因在雙引號內故為 `\$`。
 CLAUDE_PAT = (
-    "(^|[;&|(`]|\\$\\()[[:space:]]*((eval|xargs)[[:space:]]+)?"
-    "((\\S*/)?)claude([[:space:]][^;&|]*)?[[:space:]](-p|--print([[:space:]=]|$))"
+    '_pat="${_GL_CMDPOS}${_GL_WRAPPER}((\\\\S*/)?)claude'
+    '([[:space:]][^;&|]*)?[[:space:]](-p|--print([[:space:]=]|\\$))"'
 )
 # 旗標尾段之字面（MUT-e 錨點）
-FLAG_TAIL = "[[:space:]](-p|--print([[:space:]=]|$))"
+FLAG_TAIL = "[[:space:]](-p|--print([[:space:]=]|\\$))"
 
 # fail-closed 網之字面（CODEX-R1-P0-01 修法；stamp-r1 收窄觸發條件）
 # NET_TRIGGER＝「命令位置 token 含展開／萬用字元 metachar」之判準（MUT-k 錨點）
-NET_TRIGGER = (
-    "'(^|[;&|(`]|\\$\\()[[:space:]]*((eval|xargs)[[:space:]]+)?"
-    "[^[:space:];&|]*[$`!*?~[]'"
+# 🔴 GOVB0 B4 r3：命令位置／wrapper／家族清單／後界四個子式已收斂成
+#    `_gate_lex.sh` 頂部的**單一定義**（`_GL_CMDPOS` 等，`CODEX-R2-P0-01` 之修法）。
+#    mutation 錨點隨之改為釘**變數定義那一行**，而不是釘組裝後的整串正則：
+#    整串正則每次擴充都會漂（本 epic 已因此改過四次錨點），變數定義不會。
+# 🔴 GOVB0 B4 r4（`CODEX-R3-P1-04`）：下列常數在 r3 被引入為「錨點」，但**從未被任何測試使用**
+#    ⇒ 死重。更糟的是 `GL_TOKEND_DEF` 的字面停在 r3 修 `CODEX-R3-P0-01`（`$IFS` 拆詞）**之前**
+#    的舊值——沒人用，所以漂了也沒人發現。**看似有錨點，實則既不承重也不正確。**
+#    r4 的處置不是刪掉它們，而是把它們接上下方 `_DIRECTED_MUTATIONS`，變成真正的承重錨點。
+# `GL_WRAPPER_DEF = "_GL_WRAPPER='"` 已刪（`GROK-R5-P2-01`）：它只是個前綴字串，
+# 既無法當取代錨點、也從未被使用；承重錨點改由下方 `GL_WRAPPER_ALT` 承擔。
+GL_WRAPPER_ALT = "(eval|xargs|env|exec|command|nohup)"
+GL_FAMS_DEF = "_GL_FAMS='(codex|cursor-agent|grok|agy)'"
+GL_TOKEND_DEF = "_GL_TOKEND='([[:space:];&|()<>`$]|$)'"  # r4 更正：補回 `$`
+GL_DASHC_TAIL = "[[:space:]]+)*-[a-zA-Z]*c'"
+# 網的家族條件（組裝點）——mutation 需單獨剝除它以還原「只剩一層保護」的前提。
+NET_FAMILY_COND = (
+    '_famtok="claude[^|]*(-p|--print)|(^|[[:space:];&|(\\`=])${_GL_FAMS}${_GL_TOKEND}"'
 )
+# 網的觸發條件（組裝點）
+NET_TRIGGER = '_pat="${_GL_CMDPOS}${_GL_WRAPPER}[^[:space:];&|]*[\\$\\`!*?~[]"'
 NET_BLOCK = (
-    "if printf '%s' \"$s\" | grep -Eq \\\n"
-    "      " + NET_TRIGGER + " \\\n"
-    "    && printf '%s' \"$s\" | grep -Eq 'claude[^|]*(-p|--print)'; then\n"
+    "  " + NET_TRIGGER + "\n"
+    "  " + NET_FAMILY_COND + "\n"
+    '  if printf \'%s\' "$s" | grep -Eq "${_pat}" \\\n'
+    '    && printf \'%s\' "$s" | grep -Eq "${_famtok}"; then\n'
     "    return 0\n"
     "  fi\n"
 )
@@ -206,7 +228,9 @@ def test_22_mut_restore_substring_reblocks_fp4(tmp_path: Path) -> None:
     這是本 Task 存在理由的可證偽證據：若實作沒真的收窄，本測的 base
     與 mut 兩側會一樣，斷言即失效。
     """
-    mut = _mut_lex(tmp_path, "muta", CLAUDE_PAT, "claude[^|]*(-p|--print)")
+    # 🔴 B4 r3：CLAUDE_PAT 現在是一整行**賦值**，替換後必須仍是合法賦值，
+    #    否則 `_pat` 未定義、grep 收到空樣式 ⇒ 測到的是「腳本壞掉」而非「還原子字串比對」。
+    mut = _mut_lex(tmp_path, "muta", CLAUDE_PAT, '_pat="claude[^|]*(-p|--print)"')
     for i, cmd in enumerate(_FP4):
         assert _got(cmd, tmp_path / f"mabase{i}") == "ALLOW", f"base {cmd}"
         assert _got(cmd, tmp_path / f"mamut{i}", script=mut) == "BLOCK", f"mut {cmd}"
@@ -226,9 +250,11 @@ def test_22_mut_drop_cmdsub_position_allows_regress(tmp_path: Path) -> None:
     TODO 原文只寫「移除 ``$(`` ⇒ 轉 ALLOW」，那是 ③ 尚不存在時的敘述。
     """
     lex_text = GATE_LEX.read_text(encoding="utf-8")
-    narrowed = CLAUDE_PAT.replace("(^|[;&|(`]|\\$\\()", "(^|[;&|`])")
-    assert narrowed != CLAUDE_PAT
-    assert CLAUDE_PAT in lex_text, "MUT-b 錨點漂移：claude 段正則"
+    # 🔴 B4 r3：命令位置定義已收斂成 `_GL_CMDPOS`，① 改為縮該定義（不再改 claude 段本身）。
+    cmdpos_def = "_GL_CMDPOS='(^|[;&|(`]|\\$\\()[[:space:]]*'"
+    cmdpos_narrow = "_GL_CMDPOS='(^|[;&|`])[[:space:]]*'"
+    assert cmdpos_def in lex_text, "MUT-b 錨點漂移：_GL_CMDPOS 定義"
+    assert CLAUDE_PAT in lex_text, "MUT-b 錨點漂移：claude 段組裝行"
     anchor_sub = 'cmdsubs="$(_gate_lex_extract_cmdsubs "$raw")"'
     assert anchor_sub in lex_text, "MUT-b 錨點漂移：cmdsubs 抽取"
     assert NET_BLOCK in lex_text, "MUT-b 錨點漂移：fail-closed 網"
@@ -242,7 +268,7 @@ def test_22_mut_drop_cmdsub_position_allows_regress(tmp_path: Path) -> None:
         (d / "_gate_lex.sh").write_text(text, encoding="utf-8")
         return gate
 
-    two_layers = lex_text.replace(CLAUDE_PAT, narrowed, 1).replace(
+    two_layers = lex_text.replace(cmdpos_def, cmdpos_narrow, 1).replace(
         anchor_sub, 'cmdsubs=""', 1
     )
     all_layers = two_layers.replace(NET_BLOCK, "", 1)
@@ -263,8 +289,9 @@ def test_22_mut_drop_path_prefix_allows_abspath(tmp_path: Path) -> None:
 
     證明路徑前綴是承重的（否則 ``/usr/local/bin/claude -p x`` 會漏放）。
     """
+    # B4 r3：claude 段改為變數組裝後，檔內字面為 `((\\S*/)?)claude`（雙引號內的跳脫）。
     mut = _mut_lex(
-        tmp_path, "mutc", "((\\S*/)?)claude", "claude"
+        tmp_path, "mutc", "((\\\\S*/)?)claude", "claude"
     )
     assert (
         _got('/usr/local/bin/claude --print "x"', tmp_path / "mcbase") == "BLOCK"
@@ -646,7 +673,9 @@ def test_22_s1_net_trigger_is_command_position_scoped(tmp_path: Path) -> None:
 
 def test_22_s1_mut_widen_net_to_whole_command_overblocks(tmp_path: Path) -> None:
     """MUT-k：網的觸發改回「整條含 `$`／反引號」→ 唯讀指令轉 BLOCK（承重）。"""
-    mut = _mut_lex(tmp_path, "mutk", NET_TRIGGER, "'[$`]'")
+    # 🔴 B4 r3：NET_TRIGGER 現在是一整行**賦值**，替換時必須仍是合法賦值，
+    #    否則 `_pat` 未定義、grep 收到空樣式 ⇒ 測到的不是「網被放寬」而是「腳本壞掉」。
+    mut = _mut_lex(tmp_path, "mutk", NET_TRIGGER, "_pat='[$`]'")
     victim = 'echo "$(cat .claude/tmp/x)"; git rev-parse HEAD'
     assert _got(victim, tmp_path / "mkb") == "ALLOW"
     assert _got(victim, tmp_path / "mkm", script=mut) == "BLOCK"
@@ -680,3 +709,96 @@ def test_22_r1_multiline_does_not_break_contract_1b(tmp_path: Path) -> None:
     ]
     for i, (cmd, want) in enumerate(cases):
         assert _got(cmd, tmp_path / f"c1b{i}") == want, repr(cmd)
+
+
+# ---------------------------------------------------------------------------
+# GOVB0 B4 r4 — 共用式之定向 mutation（`CODEX-R3-P1-04`）
+# ---------------------------------------------------------------------------
+#
+# 為何存在：r3 把判定式收斂成五個共用變數後，mutation 只釘了 `_GL_CMDPOS`（MUT-b）
+#   與 fail-closed 網，`_GL_TOKEND`／`_GL_DASHC` **沒有定向 mutation**
+#   ⇒ 測試可以全綠而不證明那兩式承重（codex 逐字：「鑑別力下降」）。
+#
+# 每格三個判準，缺一不可：
+#   ① 錨點字面存在 —— 漂移即 assert 失敗（fail-closed，不得靜默跳過）
+#   ② 該式縮窄後，**對應那條 TP** 由 BLOCK 翻 ALLOW
+#   ③ **對照 TP** 不受影響（仍 BLOCK）—— 證明 mutation 是定向的，不是整體弱化
+#
+# 🔴 `_GL_CMDPOS` 之第五格 —— 主委原判「不需要」，**被 codex 於 r5 以反例推翻**。
+#   主委原本的理由是：MUT-b 已證明「只縮 `_GL_CMDPOS` 仍 BLOCK（②③ 兩層接住）」，
+#   故不存在「只靠 CMDPOS 才 BLOCK」的 TP。該推論**錯在只試了 `$( )` 形態**——
+#   實跑佐證：`echo $(codex exec hi)` 縮窄 `_GL_CMDPOS` 後仍 BLOCK（走 metachar 網），
+#   於是主委誤以為整式都沒有直接承重面。
+#
+#   codex 指出真正的鑑別面是 **`^` 起始分支**：拿掉它，**行首**的裸派工就翻。
+#   （三家在此分歧：grok 與 composer 同意主委「不需第五格」，只有 codex 附了可重現反例。
+#    依「看碼證不數人頭、附反例者勝、不決採較嚴版」⇒ 採 codex。）
+#
+#   🔴 但 codex 提的**對照組是錯的**。它預期 `$(printf codex) exec hi` 會被展開網接住而維持
+#   BLOCK；實測**兩條一起翻**。原因：展開網的 `_pat` 自己也以 `${_GL_CMDPOS}` 起頭，
+#   行首命令同樣靠 `^` ⇒ 拿掉 `^` 連網的錨點一併失效。
+#   正確對照＝**命令不在行首**（走 `[;&|(`]` 分支），實測維持 BLOCK。
+
+_DIRECTED_MUTATIONS = [
+    # (名稱, 錨點字面, 縮窄後字面, 應翻 ALLOW 的 TP, 應維持 BLOCK 的對照 TP)
+    (
+        "TOKEND",
+        GL_TOKEND_DEF,
+        "_GL_TOKEND='([[:space:];&|()<>`]|$)'",  # ＝ r3 修 `$IFS` 之前的舊值
+        "codex$IFS exec hi",
+        "codex exec hi",
+    ),
+    (
+        "DASHC",
+        GL_DASHC_TAIL,
+        "[[:space:]]+)*-c'",
+        'bash -xc "codex exec hi"',
+        'bash -c "codex exec hi"',
+    ),
+    (
+        "WRAPPER",
+        GL_WRAPPER_ALT,
+        "(eval|xargs)",
+        "env codex exec hi",
+        "codex exec hi",
+    ),
+    (
+        "FAMS",
+        GL_FAMS_DEF,
+        "_GL_FAMS='(codex|cursor-agent|agy)'",
+        "grok -p hi",
+        "codex exec hi",
+    ),
+    (
+        # `CODEX-R5-*`：移除 `^` 起始分支 ⇒ 行首裸派工翻；非行首者不受影響。
+        "CMDPOS_CARET",
+        "_GL_CMDPOS='(^|[;&|(`]|\\$\\()[[:space:]]*'",
+        "_GL_CMDPOS='([;&|(`]|\\$\\()[[:space:]]*'",
+        "codex exec hi",
+        "echo x; codex exec hi",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "name,anchor,narrow,victim,control",
+    _DIRECTED_MUTATIONS,
+    ids=[m[0] for m in _DIRECTED_MUTATIONS],
+)
+def test_directed_mutation_each_shared_expr_bears_load(
+    tmp_path: Path, name: str, anchor: str, narrow: str, victim: str, control: str
+) -> None:
+    """五式各自承重：縮窄該式 ⇒ 對應 TP 翻 ALLOW，對照 TP 不動。"""
+    lex_text = GATE_LEX.read_text(encoding="utf-8")
+    assert anchor in lex_text, f"{name} mutation 錨點漂移：{anchor!r}"
+
+    assert _got(victim, tmp_path / f"{name}_base") == "BLOCK", f"{name} 基準線：TP 應 BLOCK"
+    assert _got(control, tmp_path / f"{name}_cbase") == "BLOCK", f"{name} 基準線：對照應 BLOCK"
+
+    gate = _mut_lex(tmp_path, f"{name}_mut", anchor, narrow)
+    assert _got(victim, tmp_path / f"{name}_mv", script=gate) == "ALLOW", (
+        f"{name} 縮窄後 TP 仍 BLOCK ⇒ 該式未承重，或另有一層在接住"
+    )
+    assert _got(control, tmp_path / f"{name}_mc", script=gate) == "BLOCK", (
+        f"{name} 縮窄後對照 TP 也翻了 ⇒ mutation 非定向，鑑別力無效"
+    )
