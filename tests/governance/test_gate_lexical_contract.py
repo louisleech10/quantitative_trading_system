@@ -525,9 +525,10 @@ def test_20_mut_11_contract_reverts(tmp_path: Path) -> None:
 
     # 10：heredoc 解析全關
     def m10(t: str) -> str:
+        # B3R Phase 3：逐字存取改走視窗 helper CH()，錨點隨之更新（mutation 語義未變）。
         return t.replace(
-            'if (c == "<" && i < n && substr(src, i+1, 1) == "<") {',
-            'if (0 && c == "<" && i < n && substr(src, i+1, 1) == "<") {',
+            'if (c == "<" && i < n && CH(i+1) == "<") {',
+            'if (0 && c == "<" && i < n && CH(i+1) == "<") {',
             1,
         )
 

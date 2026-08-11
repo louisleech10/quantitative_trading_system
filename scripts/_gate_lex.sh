@@ -42,9 +42,9 @@ _gate_lex_preprocess() {
         tok = ""
         n = length(s)
         while (i <= n) {
-          c = substr(s, i, 1)
+          c = CH(i)
           if (c == "\"") { _dend = i; _hdash = (substr(s, pos, 3) ~ /^<<-/); return tok }
-          if (c == "\\" && i < n) { tok = tok substr(s, i+1, 1); i += 2; continue }
+          if (c == "\\" && i < n) { tok = tok CH(i+1); i += 2; continue }
           tok = tok c; i++
         }
         fail()
@@ -55,14 +55,14 @@ _gate_lex_preprocess() {
         tok = ""
         n = length(s)
         while (i <= n) {
-          c = substr(s, i, 1)
+          c = CH(i)
           if (c ~ /[A-Za-z0-9_.:+=,%@^~{}[\]!*?-]/) { tok = tok c; i++; continue }
           break
         }
         if (tok == "" || !is_allow_delim(tok)) fail()
         # 完整 token 邊界：其後須為空白／換行／字串結尾
         if (i <= n) {
-          c = substr(s, i, 1)
+          c = CH(i)
           if (c != " " && c != "\t" && c != "\n" && c != "\r") fail()
         }
         _dend = i - 1
@@ -72,122 +72,287 @@ _gate_lex_preprocess() {
       fail()
     }
 
-    BEGIN {
-      # 讀入全部（保留換行）
-      src = ""
-      while ((getline line) > 0) {
-        if (src != "") src = src "\n"
-        src = src line
+    # ── O(n) 累加輔助（B3R C-5；E-2 之修法）────────────────────────────
+    # 病：`s = s c` 逐字元累加，awk 每次都重配置並複製整條字串 ⇒ O(n²)。
+    #     實測（本機）：引號內 100K → 1s、200K → 5s、500K → 逾時。
+    # 解：兩層 chunk。先累到 _cb（≤ _CHUNK），滿了推進 _parts[]；取值時才一次接起來。
+    #     單次 append 成本 O(1) 攤銷；最終 join 為 O(n · parts) 但 parts ≈ n/_CHUNK，
+    #     500K → 61 段，join 約 1500 萬字元複製，實測仍在毫秒級。
+    # 🔴 語義逐字不變：呼叫端只是把 `x = x y` 換成 `ACC_ADD(name, y)`。
+    function ACC_RESET(a) { _cb[a] = ""; _pn[a] = 0; _tl[a] = 0 }
+    function ACC_ADD(a, s) {
+      _cb[a] = _cb[a] s
+      _tl[a] += length(s)
+      if (length(_cb[a]) >= 128) { _parts[a, ++_pn[a]] = _cb[a]; _cb[a] = "" }
+    }
+    # 已累加的總長度。存在的唯一理由：讓呼叫端能問「到目前為止是不是還是空的」，
+    # 而不必先把整條字串接出來（接出來就是 O(n²)，正是要避免的事）。
+    function ACC_LEN(a) { return _tl[a] + 0 }
+    # 🔴 取值採**兩兩合併**（log 深度），不可改回線性 for 迴圈串接：
+    #    線性串接是 O(n · parts)；parts ≈ n/C 時又變成 O(n²/C)。
+    #    C 取小（128）壓低 append 的複製量，合併深度靠 log 補回來。
+    #    500K：parts ≈ 3900，深度 ≈ 12，總複製 ≈ 6M 字元（線性版是 ≈ 10 億）。
+    function ACC_GET(a,   i, m, np) {
+      np = _pn[a]
+      if (_cb[a] != "") { _parts[a, ++np] = _cb[a]; _cb[a] = ""; _pn[a] = np }
+      if (np == 0) return ""
+      while (np > 1) {
+        m = 0
+        for (i = 1; i + 1 <= np; i += 2) _parts[a, ++m] = _parts[a, i] _parts[a, i + 1]
+        if (i == np) _parts[a, ++m] = _parts[a, np]
+        np = m
       }
+      _pn[a] = 1
+      return _parts[a, 1]
+    }
+
+    # ── 視窗存取 ＋ 批次跳躍（B3R Phase 3；C-5 之修法）────────────────────
+    #
+    # 🔴 Phase 2 收據把瓶頸判成「每字元一次 awk 函式呼叫」，**本輪實測推翻**。
+    #    真正的根因是 substr 本身。決定性實驗 probe_substr.sh：
+    #      **固定 5 萬次** substr(s, i, 1)，只改來源長度
+    #        50K → 0.10s ／ 100K → 0.21s ／ 200K → 0.61s ／ 400K → 2.02s
+    #      同樣 5 萬次但改對 1KB 小視窗切 ⇒ 與來源長度**無關**
+    #    ⇒ BWK awk 的 substr() 成本正比於**來源字串總長**（內含一次 strlen）。
+    #      逐字掃一個 n 字元字串，光 substr 就是 O(n²)，與字串累加無關。
+    #      算術對得上：250K 次 × 500KB ≈ 125GB ÷ ~10GB/s ≈ 12.5s，實測 12.79s。
+    #      Phase 2 把 29s→11s 歸功於 ACC_*，其實只換掉了另一半的 O(n²)。
+    #
+    # 兩件事合起來才夠：
+    #   ① **視窗**：一次切 _wsz 位元組，其後只對小字串 substr（CH/SLICE/NEXT_OF）。
+    #      _wsz 取 ≈sqrt(n)：逐字成本 n·W 與換窗成本 n²/W 在此平衡。
+    #   ② **批次跳躍**：一次跳到「下一個真的需要逐字決策的字元」，中間整段搬移。
+    #      只有 ① 沒有 ②，全無趣的 500K 仍要跑 50 萬次迭代。
+    #
+    # 🔴 用 index() 而非 match()＋動態 regex：字面搜尋，順帶免掉 bracket 內反斜線的
+    #    跳脫層數問題（那個假設本輪已實測踩過一次）。
+    #    ⚠️ 但**單獨改成 index() 對效能毫無幫助**（對抗性語料 12.79s → 12.88s）。
+    #    主委原先猜「動態 regex 每次重編譯」，實測直接推翻——記在這裡是為了
+    #    讓下一手不要再走這條死路。
+    #
+    # 🔴 視窗綁定**全域 src**（非參數）：任何對 src 的再賦值後**必須** WIN_RESET()，
+    #    否則會讀到上一個字串的殘影。全檔只有 Pass 1→Pass 2 之交界會改 src。
+    #    （mutation `no_win_reset` 就在釘死這一條。）
+    function WIN_RESET() { _wbase = 0; _wlen = 0; _win = "" }
+    function WIN_AT(pos) {
+      if (pos < _wbase || pos >= _wbase + _wlen) {
+        _wbase = pos
+        _win = substr(src, pos, _wsz)
+        _wlen = length(_win)
+      }
+    }
+    # 取 src 的第 pos 個字元（1-based）；pos 超界回空字串，與 substr 語義一致。
+    function CH(pos) {
+      if (pos < 1 || pos > n) return ""
+      WIN_AT(pos)
+      return substr(_win, pos - _wbase + 1, 1)
+    }
+    # 取 src[from .. from+len-1]，同樣經視窗組出，避免對整條 src 做 substr。
+    # 🔴 直接寫 substr(src, from, len) 會付一次 O(n) strlen；heredoc 逐行切片
+    #    在「多行短 body」上就會退回 O(n²)。
+    # 語義恆等於 substr(src, from, len)；差別只在「短切片走視窗、不付 O(n) strlen」。
+    function SLICE(from, len,    take) {
+      if (len <= 0 || from > n) return ""
+      # 一次性大切片：直接切。單次 O(n) 不是問題——要避免的是**逐字／逐行重複付費**。
+      if (len > _wsz) return substr(src, from, len)
+      WIN_AT(from)
+      take = _wbase + _wlen - from
+      if (take >= len) return substr(_win, from - _wbase + 1, len)
+      return substr(src, from, len)   # 跨視窗邊界（每次換窗至多一次）
+    }
+    # 回傳：pos 起（含）第一個命中 c1/c2/c3 的位置；其後全無趣則回 0。c2/c3 可留空。
+    function NEXT_OF(pos, c1, c2, c3,    chunk, r, p) {
+      while (pos <= n) {
+        WIN_AT(pos)
+        chunk = substr(_win, pos - _wbase + 1)
+        r = index(chunk, c1)
+        if (c2 != "") { p = index(chunk, c2); if (p > 0 && (r == 0 || p < r)) r = p }
+        if (c3 != "") { p = index(chunk, c3); if (p > 0 && (r == 0 || p < r)) r = p }
+        if (r > 0) return pos + r - 1
+        pos = _wbase + _wlen
+        if (_wlen < _wsz) break
+      }
+      return 0
+    }
+
+    # 引號 span 內的**無狀態**字元映射——**本函式是這個映射的唯一定義**
+    # （批次快路徑餵整段、逐字分支餵單一字元，兩邊都呼叫它）：
+    #   ; & |          → 單一空白（中性化分隔符）
+    #   SP TAB LF      → US(\037)（保留「帶空白路徑」為單一 token）
+    #   其餘（含 CR）  → 原樣
+    #
+    # B7：引號內換行亦為**引數內的空白**，與空白/tab 同樣中性化為 US。
+    # 不這麼做的話 grep 逐行比對會把同一個指令拆到兩行，
+    # 使「名稱＋旗標」兩 token 規則（claude 段）漏放真派工。
+    # 🔴 順序不可對調：先做空白→US，再做 ;&|→空白。
+    #    反過來會把剛換成空白的 ;&| 再換成 US，與逐字分支不符（; 應得真空白）。
+    # 🔴 呼叫端**必須分段**餵（每段 ≤ _wsz）：實測 awk 的 gsub 是 O(m²)
+    #    （probe_gsub.sh：100K→0.12s、200K→0.5s、400K→1.6s、800K→6.4s，長度加倍耗時 4 倍）。
+    #    整段引號 span 一次做，500K 要 2.9s、4MB 會退化到分鐘級。
+    function XFORM_Q(t) {
+      gsub(/[ \t\n]/, "\037", t)
+      gsub(/[;&|]/, " ", t)
+      return t
+    }
+
+    BEGIN {
+      SQ = sprintf("%c", 39)
+      # 讀入全部（保留換行）——同樣走 chunk 累加，避免 `src = src line` 的 O(n²)
+      # 🔴 條件必須是「已累加的內容非空」，**不可**改成「不是第一行」。
+      #    HEAD 版寫的是 `if (src != "") src = src "\n"`：輸入以空行開頭時
+      #    src 一直是空的 ⇒ 前導換行會被**丟掉**。Phase 2 的機械改寫換成 _first 旗標，
+      #    等於偷偷改了語義（前導換行變成保留）。
+      #    12000 例 fuzz 差分抓到 233 例（判定 rc 全同、只有前處理文字不同）。
+      #    本批是效能重構 ⇒ 一律還原成與 HEAD 逐位元組相同；
+      #    「舊行為丟掉前導換行是否本身就該修」另立票，不在本批夾帶。
+      ACC_RESET("src")
+      while ((getline line) > 0) {
+        if (ACC_LEN("src") != 0) ACC_ADD("src", "\n")
+        ACC_ADD("src", line)
+      }
+      src = ACC_GET("src")
       # 若最後有資料但無換行，getline 已含；空輸入
       n = length(src)
       if (n == 0) { print ""; exit 0 }
+      # 視窗大小取 ≈sqrt(n)（逐字成本 n·W 與換窗成本 n²/W 的平衡點），夾在 [256, 65536]
+      _wsz = int(sqrt(n)) + 128
+      if (_wsz < 256) _wsz = 256
+      if (_wsz > 65536) _wsz = 65536
+      WIN_RESET()
 
       # Pass 1：heredoc — 把 body 換成等長空白（保留換行），無法解析 → fail-closed
-      out = ""
+      ACC_RESET("out")
       i = 1
       while (i <= n) {
-        c = substr(src, i, 1)
+        # 批次跳過：非 < 的字元在本 pass 一律走最下方的「原樣輸出並 i++」，
+        # 不分狀態、無例外 ⇒ 可整段搬移。（唯一分支條件就是 c == "<"。）
+        np = NEXT_OF(i, "<", "", "")
+        if (np == 0) { ACC_ADD("out", SLICE(i, n - i + 1)); break }
+        if (np > i) { ACC_ADD("out", SLICE(i, np - i)); i = np }
+        c = CH(i)
         # 偵測 <<（非 <<<）
-        if (c == "<" && i < n && substr(src, i+1, 1) == "<") {
+        if (c == "<" && i < n && CH(i+1) == "<") {
           # <<< 不是 heredoc
-          if (i+2 <= n && substr(src, i+2, 1) == "<") {
-            out = out "<<<"
+          if (i+2 <= n && CH(i+2) == "<") {
+            ACC_ADD("out", "<<<")
             i += 3
             continue
           }
           delim = parse_heredoc_delim(src, i)
           # 起點 = delimiter 後的下一個換行
+          # delimiter 之後、換行之前的殘餘（原樣輸出）——整段搬移，不逐字
           j = _dend + 1
-          while (j <= n && substr(src, j, 1) != "\n") {
-            out = out substr(src, j, 1)
-            j++
-          }
-          if (j > n) fail()  # 無換行 → 未閉合
-          out = out "\n"     # 保留起點換行
+          eol = NEXT_OF(j, "\n", "", "")
+          if (eol == 0) fail()  # 無換行 → 未閉合
+          if (eol > j) ACC_ADD("out", SLICE(j, eol - j))
+          j = eol
+          ACC_ADD("out", "\n")     # 保留起點換行
           j++                # body 起
           # 消耗 body 直到行首 delimiter
           body_closed = 0
           while (j <= n) {
             # 行首
             line_start = j
-            line = ""
-            while (j <= n && substr(src, j, 1) != "\n") {
-              line = line substr(src, j, 1)
-              j++
-            }
+            eol = NEXT_OF(j, "\n", "", "")
+            j = (eol == 0) ? n + 1 : eol
+            line = SLICE(line_start, j - line_start)
             # 比對 delimiter
             check = line
             if (_hdash) sub(/^\t+/, "", check)
             if (check == delim) {
               # 終點行：輸出為空白（不掃描），保留結構
-              out = out "\n"
-              if (j <= n && substr(src, j, 1) == "\n") { out = out; j++ }
+              ACC_ADD("out", "\n")
+              if (j <= n && CH(j) == "\n") { j++ }
               body_closed = 1
               break
             }
             # body 行：換成空白（保留換行）
-            for (k = 1; k <= length(line); k++) out = out " "
-            if (j <= n && substr(src, j, 1) == "\n") { out = out "\n"; j++ }
+            # body 行 → 等長空白：一次配置，不逐字（sprintf 寬度 0 得空字串）
+            if (length(line) > 0) ACC_ADD("out", sprintf("%*s", length(line), ""))
+            if (j <= n && CH(j) == "\n") { ACC_ADD("out", "\n"); j++ }
           }
           if (!body_closed) fail()
           i = j
           continue
         }
-        out = out c
+        ACC_ADD("out", c)
         i++
       }
-      src = out
+      src = ACC_GET("out")
       n = length(src)
+      # 🔴 src 換了一條字串 ⇒ 視窗必須作廢，否則 CH()/NEXT_OF() 會讀到 Pass 1 的殘影。
+      WIN_RESET()
 
       # Pass 2：跨行引號狀態機 — 剝引號、中性化引號內分隔符、空白→US
-      out = ""
+      ACC_RESET("out")
       inq = 0
       q = ""
       i = 1
       while (i <= n) {
-        c = substr(src, i, 1)
+        # ── 批次跳過本狀態下**不需逐字決策**的區段 ──────────────────────
+        # 三種狀態各自只有下列字元會改變控制流；其餘字元的處理是**無狀態映射**：
+        #   引號外  ：雙引號、單引號、反斜線（其餘一律原樣輸出並 i++）
+        #   雙引號內：雙引號、反斜線      （其餘走 XFORM_Q 的映射表）
+        #   單引號內：單引號              （同上；單引號無跳脫）
+        # ⇒ 可一次跳到下一個上述字元，中間整段搬移＋一次 gsub 映射。
+        # 🔴 下方逐字分支**一行未動**：本區塊是純新增的快路徑，
+        #    狀態機語義仍以下方分支為準（差分驗證＋fuzz 對照即在證明兩者等價）。
+        if (inq) {
+          if (q == "\"") np = NEXT_OF(i, "\"", "\\", "")
+          else           np = NEXT_OF(i, SQ, "", "")
+        } else           np = NEXT_OF(i, "\"", SQ, "\\")
+        if (np == 0) np = n + 1
+        if (np > i) {
+          # 🔴 每段 ≤ _wsz：XFORM_Q 的 gsub 是 O(m²)，整段一次做會在大 span 上退化。
+          while (i < np) {
+            seg = np - i
+            if (seg > _wsz) seg = _wsz
+            run = SLICE(i, seg)
+            if (inq) run = XFORM_Q(run)
+            ACC_ADD("out", run)
+            i += seg
+          }
+          if (i > n) break
+        }
+        c = CH(i)
         if (inq) {
           if (q == "\"") {
             if (c == "\\") {
               if (i >= n) fail()
               # 跳脫下一字：保留字面（合約 9：不終止 span）
-              nxt = substr(src, i+1, 1)
-              if (nxt == "\n") { out = out " "; i += 2; continue }  # 續行
-              if (nxt == ";" || nxt == "&" || nxt == "|") { out = out " "; i += 2; continue }
-              if (nxt == " ") { out = out "\037"; i += 2; continue }
-              out = out nxt
+              nxt = CH(i+1)
+              if (nxt == "\n") { ACC_ADD("out", " "); i += 2; continue }  # 續行
+              if (nxt == ";" || nxt == "&" || nxt == "|") { ACC_ADD("out", " "); i += 2; continue }
+              if (nxt == " ") { ACC_ADD("out", "\037"); i += 2; continue }
+              ACC_ADD("out", nxt)
               i += 2
               continue
             }
             if (c == "\"") { inq = 0; q = ""; i++; continue }
-            if (c == ";" || c == "&" || c == "|") { out = out " "; i++; continue }
-            # B7：引號內換行亦為**引數內的空白**，與空白/tab 同樣中性化為 US。
-            # 不這麼做的話 grep 逐行比對會把同一個指令拆到兩行，
-            # 使「名稱＋旗標」兩 token 規則（claude 段）漏放真派工。
-            if (c == " " || c == "\t" || c == "\n") { out = out "\037"; i++; continue }
-            out = out c; i++; continue
+            # 🔴 引號內的字元映射**只有 XFORM_Q 一個定義**，單字元也走它。
+            #   原本這裡有三行 if 與 XFORM_Q 內容重複；重複＝兩處會漂，
+            #   而且 mutation 只改一處就測不出東西（本輪 MUT-g 實際發生：
+            #   把逐字分支的 \n 拿掉，快路徑仍照常中性化 ⇒ 該 mutation 失去鑑別力）。
+            ACC_ADD("out", XFORM_Q(c)); i++; continue
           }
           # single quote：無跳脫，只靠 '\'' 終止
           if (c == "'\''") { inq = 0; q = ""; i++; continue }
-          if (c == ";" || c == "&" || c == "|") { out = out " "; i++; continue }
-          if (c == " " || c == "\t" || c == "\n") { out = out "\037"; i++; continue }
-          out = out c; i++; continue
+          ACC_ADD("out", XFORM_Q(c)); i++; continue
         }
         # not in quote
         # B7：反斜線續行 —— bash 直接移除 \<LF>（`claude \`+LF+`-p x` 等同 `claude -p x`）。
         # 保留原樣會讓兩個 token 落在不同 grep 行而漏放。
-        if (c == "\\" && i < n && substr(src, i+1, 1) == "\n") { i += 2; continue }
+        if (c == "\\" && i < n && CH(i+1) == "\n") { i += 2; continue }
         # B7〔CODEX-STAMP-R1 NEW-P0-02b〕：引號外的 \X 依 bash 語意「去掉反斜線、保留 X」。
         # 不這麼做的話 `clau\de -p x` 會逃掉——它執行起來就是 claude。
         # 代價：`echo \; codex exec x` 這種被跳脫的分隔符會被當成真分隔符 ⇒ 誤擋（fail-closed）。
-        if (c == "\\" && i < n) { out = out substr(src, i+1, 1); i += 2; continue }
+        if (c == "\\" && i < n) { ACC_ADD("out", CH(i+1)); i += 2; continue }
         if (c == "\"" || c == "'\''") { inq = 1; q = c; i++; continue }
-        out = out c
+        ACC_ADD("out", c)
         i++
       }
       if (inq) fail()
-      print out
+      print ACC_GET("out")
     }
   '
 }

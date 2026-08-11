@@ -409,13 +409,15 @@ def test_22_r1_p0_02_multiline_dispatch_blocks(tmp_path: Path) -> None:
 
 def test_22_r1_p0_02_mut_drop_quoted_newline_regresses(tmp_path: Path) -> None:
     """MUT-g：引號內換行不中性化 → 跨行引號派工轉 ALLOW（承重）。"""
+    # B3R Phase 3 起，引號內字元映射的**唯一定義**是 XFORM_Q（批次快路徑與逐字
+    # 分支都呼叫它）。錨點隨之改到該函式。
+    # 🔴 錨點改動未弱化本 mutation，反而變強：舊錨點只改逐字分支，
+    #    快路徑仍會照常中性化換行 ⇒ 該 mutation 對重寫後的碼已失去鑑別力。
     mut = _mut_lex(
         tmp_path,
         "mutg",
-        'if (c == " " || c == "\\t" || c == "\\n") { out = out "\\037"; i++; continue }\n'
-        "            out = out c; i++; continue",
-        'if (c == " " || c == "\\t") { out = out "\\037"; i++; continue }\n'
-        "            out = out c; i++; continue",
+        'gsub(/[ \\t\\n]/, "\\037", t)',
+        'gsub(/[ \\t]/, "\\037", t)',
     )
     cmd = 'claude "prompt\ntext" -p x'
     assert _got(cmd, tmp_path / "mgb") == "BLOCK"
@@ -427,7 +429,8 @@ def test_22_r1_p0_02_mut_drop_line_continuation_regresses(tmp_path: Path) -> Non
     mut = _mut_lex(
         tmp_path,
         "muth",
-        'if (c == "\\\\" && i < n && substr(src, i+1, 1) == "\\n") { i += 2; continue }\n',
+        # B3R Phase 3：逐字存取改走視窗 helper CH()，錨點隨之更新（語義未變）。
+        'if (c == "\\\\" && i < n && CH(i+1) == "\\n") { i += 2; continue }\n',
         "",
     )
     cmd = 'claude \\\n-p "x"'

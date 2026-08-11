@@ -3173,3 +3173,109 @@ TICKET-STATUS: OPEN
 ### 淨摩擦
 
 發生 0 次（尚未造成實際事故），純預防。**優先序低**，排在有實測發作的票之後。
+
+---
+
+## B-56 票 `GOV-LEX-EXTRACT-QUADRATIC`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：站 4（`B3R` Phase 3）實測，收據 `docs/GOV_B3R_PHASE3_RECEIPT.md` §5。
+
+### 病
+
+`_gate_lex_extract_inners` 與 `_gate_lex_extract_cmdsubs` 仍是逐字迴圈，
+且前者外圈每一格都做 `rest = substr($0, i)` 全尾切 ⇒ 對大輸入是 O(n²)。
+
+| 觸發形狀 | 500K 實測（Phase 3 之後） |
+|---|---|
+| `bash -c "echo <500K>"` | **15.32s** |
+| `echo "$(echo <500K>)"` | **15.24s** |
+
+**非本輪造成的回歸**：同形狀 100K 舊版 1.91s／1.92s，新版 0.74s／0.82s（新版較快）。
+
+### 🔴 為何 Phase 3 不順手修（合約衝突，不是偷懶）
+
+`_gate_lex_extract_inners` 命中後用 `j = i + RLENGTH`——**沒有用 RSTART**。
+它依賴「逐格掃到 match 剛好落在 `rest` 開頭」才正確；
+任何加大掃描粒度的最佳化都會改變其輸出。
+⇒ 修它 ＝ 修一個**既有邏輯缺陷**，而 Phase 3 的合約是「行為逐位元組不變」，
+夾帶行為變更會使該批全部差分證據失效。
+
+### 修法方向
+
+先獨立判定 `j = i + RLENGTH` 是否為缺陷（附反例），再談效能；
+效能修法沿用 Phase 3 的視窗手法（`WIN_AT`／`CH`／`SLICE`／`NEXT_OF`）。
+
+### 淨摩擦
+
+實測發作 0 次（需 >100KB 的 `-c`／`$()` 指令才明顯）。
+
+🔴 **優先序＝低**（2026-08-11 使用者核可降級，出處 `docs/GOV_B3R_C5_RATIONALE_AMENDMENT.md` §D）：
+開票時主委把「慢」當成「危險」。查證後該前提不成立——詞法層只收 Bash 指令字串，
+稽核 39,861 筆平均 75 bytes，且 gate 與 hook 皆無逾時機制 ⇒ 慢就只是慢。
+**不得以「安全風險」為由排程本票。**
+
+---
+
+## B-57 票 `GOV-LEX-HEREDOC-DELIM-QUADRATIC`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：站 4 實測，收據 `docs/GOV_B3R_PHASE3_RECEIPT.md` §5。
+
+### 病
+
+`parse_heredoc_delim` 開頭的 `rest = substr(s, pos)` 是**全尾切**，
+每個 heredoc 起點付一次 O(n)；heredoc 密集的輸入退化成 O(n²)。
+
+實測（`<<A⏎A⏎` 密集重複）：100K **17.50s**、500K **434.06s**。
+
+**非本輪造成的回歸**：同形狀 100K 舊版 18.04s、新版 17.50s（幾乎持平，新版略快）。
+
+🔴 **本票原寫「這是三條殘留裡最嚴重的一條／後果嚴重度高於 B-56」——該句作廢**
+（2026-08-11 使用者核可降級，出處 `docs/GOV_B3R_C5_RATIONALE_AMENDMENT.md` §D）。
+作廢理由：那句的依據是「慢 ⇒ 有東西不等 ⇒ 放行」，而中間那一步查無證據
+（gate 與 hook 皆無逾時機制）。慢就只是慢，不構成 fail-open。
+
+### 修法方向
+
+`rest` 只用來做**錨定於開頭**的三個 `match`，不需要整條尾巴 ⇒ 切成有界長度
+（delimiter 本身受允許清單約束，長度有實務上界）；超界即 fail-closed。
+另 `substr(s, pos, 3)` 亦應改走 `SLICE`。
+
+### 淨摩擦
+
+實測發作 0 次（需異常大量 heredoc）。**優先序＝低**，與 B-56 同級。
+
+---
+
+## B-58 票 `GOV-LEX-LEADING-BLANKLINE-DROPPED`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：站 4 的 12000 例 fuzz 差分，收據 `docs/GOV_B3R_PHASE3_RECEIPT.md` §3.1。
+
+### 病
+
+`_gate_lex_preprocess` 的讀入迴圈寫 `if (src != "") src = src "\n"`
+⇒ 輸入以空行開頭時，**前導換行被丟棄**（`"⏎⏎a"` 的前處理結果與 `"a"` 相同）。
+
+### 為何現在只開票、不修
+
+Phase 3 是效能重構，合約為「行為逐位元組不變」。
+Phase 2 的機械改寫曾**意外**把此行為改成「保留前導換行」，
+本輪 fuzz 抓到 233/12000 例差異後**還原**成與 HEAD 一致，並加回歸樁
+`test_b3r_leading_blank_lines_semantics_unchanged` 釘死。
+
+⇒ 該樁釘的是「與舊版一致」，**不是**「這個行為是對的」。
+
+### 待判定（本票的實際內容）
+
+1. 丟棄前導換行是否構成安全缺口？（12000 例 fuzz 中**判定 rc 全數未受影響**，
+   但那只是這組語料的結論，不是證明）
+2. 若判定為缺陷，修法須同步更新上述回歸樁，且走 `phase2_expected_flips` 登記為**預期翻轉**。
+
+### 淨摩擦
+
+實測發作 0 次。純正確性疑慮，優先序低，但**不得在未判定前默默改掉**。

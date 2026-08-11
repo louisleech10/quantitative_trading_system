@@ -2,6 +2,8 @@
 
 REF:handoffs/reconcile/20260810-govb1-b4-review-r3/synth.md
 REF:handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md
+<!-- 站 4 之收斂檔 handoffs/reconcile/20260811-govb3r-x-review-r1/synth.md 尚未取得委員戳記，
+     依上方規則**不得**列入 REF:。取得 RECONCILE-STAMP APPROVED 後再補。 -->
 
 🔴 **`REF:` 只准列「已戳記」之 reconcile——所有列。** 派工前 `bash scripts/reconcile_stamps_check.sh <檔>` 驗 rc=0。
 
@@ -43,24 +45,36 @@ implementer=composer  → {codex, grok}    → 僅 1 家可用 ❌ quorum 當場
 `eligible` 與測試家族集合機械連動）都要先做，而它們全在凍結的五檔內。
 ⇒ **現在單獨改名冊只會把洞開著**。主委 2026-08-11 曾把這條講成「卡在使用者身上」，**措辭不準，已更正**。
 
-## 🔴 接手第一件事：**站 4 — `B3R` 的 O(n) scanner**（序 `050`）
+## 🔴 站 4 — `B3R` 詞法層超線性修法（序 `050`）
 
-出處：`handoffs/reconcile/20260809-govb1-b3-review-r8/synth.md:44-50`（`CODEX-R8-P1-03`）。
+🔴 **先讀 `docs/GOV_B3R_C5_RATIONALE_AMENDMENT.md` 再談這一站**：使用者質疑後查證確認，
+C-5 的秒數門檻**沒有可驗證的威脅模型**（詞法層只收 Bash 指令字串；稽核 39,861 筆平均 75 bytes；
+gate 與 hook **都沒有逾時機制**）⇒ 不得宣稱本輪修掉 fail-open。
+且實作是 **O(n·√n)**（此路線的下界），**不是** SPEC §B.1 寫的 O(n)。
 
-- **病**：`scripts/_gate_lex.sh` 之 `_gate_lex_preprocess` 兩個 pass 皆逐字元累加字串
-  （`out = out c`、`src = src "\n" line`、`line = line substr(...)`）⇒ **O(n²)**。
-- **SPEC C-5 驗收**：quoted 100K **<2s**、500K **<5s**（`docs/GOVB0_B3R_LEXER_SPEC.md:142-143,209`）。
+> 批次／票的狀態值一律看 `docs/GOVERNANCE_EXECUTION_ORDER.md` 的 generated block，本節不重述。
+> （本節刻意不把識別碼與狀態詞寫在同一行——主委在本檔已被自己建的偵測器擋下四次。）
 
-### 🔴 Phase 2 原型與差分**已於 2026-08-11 做完，但 C-5 未達標 ⇒ 依 SPEC 不得進 repo**
+**完整收據＝`docs/GOV_B3R_PHASE3_RECEIPT.md`**（根因實驗、修法、四組差分、mutation、效能矩陣、殘留）。
+Phase 2 收據＝`docs/GOV_B3R_PHASE2_RECEIPT.md`，其 profiling 結論**已被 Phase 3 用受控實驗推翻**。
 
-**完整收據（量測、差分、profiling 結論、四支工具位置）＝`docs/GOV_B3R_PHASE2_RECEIPT.md`。**
-一句話版：`500K 29s → 11s`、95 條語料**輸出逐位元組相同**、但 C-5 要 `<5s` ⇒ **不落地**；
-profiling 已證明瓶頸是**每字元一次 awk 函式呼叫**（改 chunk 大小完全無效），真解是**批次掃描演算法重寫**。
-🔴 **主樹 `scripts/_gate_lex.sh` 一字未動**；原型在 worktree `.claude/tmp/probe-r11r12`。
+一句話版：真根因是 **BWK awk 的 `substr()` 成本正比於來源字串總長**
+（不是字串累加、也不是函式呼叫次數）⇒ 改成「視窗存取＋批次跳躍＋分段 gsub」。
+C-5 三條全過：100K 最差 0.19s（門檻 2s）、500K 最差 **1.01s**（門檻 5s，舊版 29.43s）、4MB 有界。
+行為不變之證據：95 條語料＋fuzz 短 12000＋fuzz 長 run 12000＋heredoc 20 例，**皆逐位元組全同**；
+mutation 8/8，其中對照組「**關掉快路徑輸出完全不變**」＝快路徑與逐字路徑等價之直接證明。
 
-<!-- 本節原有 46 行明細，已**逐字**搬至上述 docs 收據檔（HANDOFF 須 ≤30 行）。
-     🔴 用搬不用刪：上次精簡 HANDOFF 是直接刪，弄丟「B-53 提及」與「fixture 同步」兩條，
-     兩條都在同一天咬回來（前者害 push 被拒、後者害兩條測試轉紅）。 -->
+雙家 review r1 已收：收斂檔 `handoffs/reconcile/20260811-govb3r-x-review-r1/synth.md`（委員債已銷）。
+兩家 Verdict 分歧（codex 要修／composer 放行）⇒ 依碼證採 codex 較嚴版，三條 findings 全數處置。
+新測試 `tests/governance/test_gate_lex_b3r_c5.py`（**26 passed**）；全套 **1422 passed / 0 failed**。
+🔴 fuzz 抓到 233/12000 例差異（Phase 2 的機械改寫誤改前導空行語義），**已還原**並加回歸樁。
+
+🔴 **本輪踩到、已做成機制的三個坑**（都不是知識問題，是「沒有出口」的問題）：
+① 變異版可能**無窮迴圈**（`win_at_boundary`、空字串保護）⇒ 一律硬 timeout，「卡住」＝可比對的具體回傳值。
+② `subprocess` 的 timeout **只殺直接子程序**，`awk` 孫程序會變孤兒空轉（實測 5 個各吃 70% CPU，
+   把全套由 8 分鐘拖成 27 分鐘、並使 C-6 canary 誤紅 201.5ms）⇒ 改 `start_new_session` ＋ `killpg`。
+③ 既有兩份語料是**逐行檔**，塞不下跨行 heredoc ⇒ 視窗重置守衛在 CI 永遠測不到
+   ⇒ 手寫 10 條 heredoc 案例併入 mutation 語料。
 
 
 ## ✅ 本 session 已交付（2026-08-10～11，皆兩家 `RECONCILE-STAMP APPROVED`）
@@ -86,7 +100,13 @@ profiling 已證明瓶頸是**每字元一次 awk 函式呼叫**（改 chunk 大
   🔴 **OOE 通道救不了**：`_MSG_PARSE_MARKERS` 含 `"Governance-Scope"`，窗守衛結構上禁解析 commit 訊息。
 - `R-13` 未列舉之 Unicode 不可見碼點；`R-14` `b4-review-r2` 僅 2/3 戳記；`R-16`＝`票 B-55`（同型旗標空值不一致）
 - `票 B-54`（新開）：戳記行之 64 位 hex 由委員手抄 ⇒ 本 session 實際掉字一次
-- `B3R` O(n) scanner 未交付（`CODEX-R8-P1-03`）⇒ 不得宣稱達標
+- `B3R` 的重寫已進主樹，但雙家 review 尚未戳記 ⇒ 對外只能說「已交付、待戳記」
+- `票 B-56`：`_gate_lex_extract_inners`／`_extract_cmdsubs` 仍逐字迴圈（500K 15.3s）；
+  修它須先判定 `j = i + RLENGTH` 未用 RSTART 是否為缺陷 ⇒ 屬行為變更，不得夾帶進效能批
+- `票 B-57`：`parse_heredoc_delim` 的 `rest = substr(s, pos)` 全尾切 ⇒ heredoc 密集 500K **434 秒**
+  （**優先序低**：查證後「慢＝危險」的前提不成立，見 `docs/GOV_B3R_C5_RATIONALE_AMENDMENT.md` §D）
+- `票 B-58`：前導空行被丟棄（`"⏎⏎a"` 等同 `"a"`）；是否為缺陷**未判定**，
+  回歸樁釘的是「與舊版一致」而非「這行為是對的」
 - `票 B-15` 誤擋在 `B7` 之後仍存在（`printf`／`find`／`ls`／`gate.sh` 自身）⇒ GOVB0 `B4` Task 2.3/2.4
 - `gate_check` 對真派工放行：process substitution／`xargs -n 1`／`env FOO=bar`／動態賦值／絕對路徑 `bash -c` ⇒ GOVB0 `B4`
 - `票 B-50` 流程面永久標記為跳步；`票 B-31` 對外只能說「產出端已有檢查點」（`票 B-53` 落地前）
