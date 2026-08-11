@@ -28,7 +28,139 @@ REF:handoffs/reconcile/20260810-govb1-b4-consult-r1/synth.md
 
 ## 🔴 現況（2026-08-11 深夜；**背景有一輪 review 在跑**）
 
-**背景任務 `b3cxm86b9`** ＝ `20260811-govb49-x-review-r6` 三家 review，**未回**。
+## 🔴🔴 最新：commit 後全套由 4 紅變 **7 紅**——是我 commit 造成的，已定位
+
+**背景任務 `bcwu7w2mb`** ＝ `20260812-govg7-x-consult-r1`，決這件事，**未回**。
+（前一次 `b1wx84rak` 被命名規約 fail-closed 擋下：**task-id 須為 session 的大寫形式**，
+我卻用了 brief 的名字。閘的行為正確——未發 token、未開債、未派工。）
+
+`bash scripts/govb1_final_gate.sh --only g7` →
+`G-7 FAIL: 未宣告即修改: tests/governance/test_cxrun_selfcheck_prompt.py`
+
+🔴 **根因是 endpoint net-diff，而且它剛好活生生印證了我今晚寫進 §C-2 的那條**：
+
+```
+git diff --name-only <base_commit> e029514d -- tests/governance/test_cxrun_selfcheck_prompt.py  → 空
+git diff --name-only <base_commit> HEAD     -- 同檔                                              → 有
+```
+
+該檔在 range 內被兩個 **in-epic** commit 動過（`f5834c40`／`00f52b99`，**皆無** trailer），
+但到 `e029514d` 為止**淨差回到零** ⇒ G-7 的 endpoint diff 看不到它 ⇒ 一直綠。
+我的 commit 使淨差非零 ⇒ 路徑現形 ⇒ 既不在 manifest allow、又非 path-only-OOE ⇒ 紅。
+
+🔴 **我原本寫「這是既有 manifest 缺口被掀開」——那句話被 grok 推翻，是錯的。**
+`00f52b99` 標題逐字含 `restore G-7 scope`：epic 當時是**刻意**把該檔留在 scope 外
+並主動還原自身改動以維持 G-7 綠。**不是漏登記。**
+⇒ 正確表述：我打破了 epic **刻意維持**的狀態，不是揭開疏漏。
+⇒ 紅的充分條件三者同時成立：① endpoint 淨差非零 ② `path-only-OOE` 被 in-epic 歷史毒化 ③ 不在 allow。
+
+## 🔴🔴 三家一致選的 A **實作後證明做不到**，已完整還原
+
+三家 consult 一致選 A（加 manifest allow）。主委依 codex 指定順序實作：
+① `_B5_MANIFEST_AUTHORIZED_ADDITIONS` 改兩元素 ② 加 manifest 一行
+③ 重算 `scope_manifest:` 雜湊 ④ 連帶更新四處 `decl == 36` → `37`。
+**`--only g7` 確實轉 PASS，7 紅降到 3 紅。**
+
+🔴 **但撞上一道沒有人提到的牆**：
+
+```
+test_t01_f5_manifest_matches_task_decl
+→ manifest 的 allow 集合必須**逐條等於** docs/GOVB1_INPUT_QUALITY_TODO.md
+  「修改檔案」節所列的路徑集合
+```
+
+而 **`docs/GOVB1_INPUT_QUALITY_TODO.md` 是全程唯讀、禁改的凍結檔**。
+⇒ 要讓 manifest 合法多一行，就得改那個檔；不改，F5 永遠紅。
+⇒ **A 在現行約束下不可實作。** 延伸檔繞不掉——F5 的路徑是寫死的，只讀那一個檔。
+
+**已完整還原**（`manifest`／`frozen_hashes`／`contract_matrix` 三檔 `git diff` 皆空），
+回到 commit 後的狀態：**7 紅 ＝ 3 條 B-49 凍結 ＋ 4 條 G-7 群**。
+
+🔴 **這件事的教訓比結果重要**：三家一致同意的方案，在**實作第四步**才發現不可行。
+不是委員失職——**是主委的 brief 沒有給他們 F5 這個約束**（brief 只講了 B5 oracle 攻擊面）。
+⇒ 紀律：**問「這個改動合法嗎」時，必須連同「還有哪些機檢會看這個檔」一起問。**
+
+## 🔴 裁決：採 **C**（接受 G-7 紅），本輪不改碼
+
+consult r2：composer＋grok 選 C，codex 選 **D**。**主委裁 C——不是數人頭。**
+
+**D 是什麼、為什麼不採**：codex 發現 **F5 只比對 `allow` 集合**，故改用 **`meta`** 動詞
+即可不動凍結 TODO 而讓 G-7 轉綠，並給了完整最小修訂集。**技術上可行且會成功。**
+不採的理由＝使用者 2026-08-01 定死的「**禁以技術手法充當達標**」：
+`meta` 的既有語意是簿記檔（`HANDOFF.md`／`CLAUDE.md`／backlog／`白話說明/`），
+把治理**測試**檔宣告成 `meta` 的唯一目的是躲開 F5 比對 ⇒ **為過檢查而改變事實分類**。
+🔴 **但這條記為「封存」不是「否決」**——codex 是唯一指出「F5 只比對 allow」這個機械事實的一方，
+該事實對日後正式修訂 F5／TODO 有用。
+
+**不選 B**（兩家一致）：會讓已驗收的 `test_cxrun_selfcheck_prompt.py` 功能回歸
+（VERIFY:20260811T165108Z-selfcheck-7passed），與 B-49 Task 0.1 直接衝突，
+且**完全不解 F5 牆**——凍結三檔照樣撞。
+
+### 🔴 C 的代價已具名，不得淡化（grok 打掉主委的自辯）
+
+主委原本寫「push 已被擋 ⇒ 接受紅不增加損失」。grok 逐字更正：
+**對 push 布林值成立，但對 G-7 依賴測的判讀不成立**——長期單一路徑紅會讓所有
+`g7.returncode == 0` 斷言**失去區分度**（紅燈疲勞）。接受此代價，並定死判讀方式：
+
+> **現行 G-7 紅的唯一合法來源＝`tests/governance/test_cxrun_selfcheck_prompt.py`。**
+> `bash scripts/govb1_final_gate.sh --only g7` 的輸出**逐行比對**，
+> 只要出現該路徑**以外**的任何路徑，即為**新違規**，不得歸入「已知紅」。
+
+### 正解（B-49 Phase 1 一併做，不是現在）
+
+**走凍結檔正式修訂程序改 `docs/GOVB1_INPUT_QUALITY_TODO.md` 的宣告集，再走 A 四步。**
+**非** `meta` 旁路、**非**延伸檔。四個檔（selfcheck ＋ 凍結三檔）**一次解決**。
+
+## 🔴🔴 B-49 施工前置依賴 — 凍結三檔全是「幽靈路徑」
+
+**幽靈路徑 ＝** ① `base..HEAD` **endpoint 淨差為零**（G-7 現在看不到）
+② range 內被**無 trailer 的 commit** 觸及過（`path-only-OOE` 豁免已毒化、**永久失效**）
+③ 不在 manifest allow。⇒ **現在綠，一被改就立刻 G-7 紅，且 OOE trailer 救不了。**
+
+**實跑：11 條**（與 grok 獨立給出的數字相同）。
+🔴 **`_B45_HARNESS` 五檔全部在內** ⇒ B-49 動哪一檔都會撞牆。
+VERIFY:20260811T162835Z-govg7-ghostpath-b49
+
+⇒ 已做成工具，不靠紀律：**`bash scripts/govb1_ghostpath_check.sh`**（盤點用，恆 rc=0）。
+⇒ **B-49 SPEC 未寫到這件事**，已列為施工前置依賴：Phase 1 一 commit 即 G-7 紅，
+除非同批處理三檔之 manifest 歸屬（走與本次相同的授權集合路徑）。
+
+⚠️ **常駐規則**：改任一幽靈路徑前，**先跑上述工具**，再決定 allow 或接受 G-7 紅。
+完整裁決（含「逐案不批次」）見 `handoffs/reconcile/20260812-govg7-x-consult-r1/synth.md`
+（未戳記，故不列 REF:）。
+
+**新增四紅**（皆 `test_govb1_contract_matrix.py`，主委只逐條讀了其中兩條的訊息，
+另兩條**未複驗**、屬推測，已在 brief 標 assumed）：
+`test_t01_f2_frozen_hashes_self_consistent`／`test_t01_f3_g7_when_committed`／
+`test_r6_u1u2u4_g7_worktree_space_quote_paths`／`test_g7_ambient_m_gate_check_not_red`
+
+---
+
+## 已 commit 兩筆（`1f697465`、`5ea99af1`），未推送 2 筆
+
+工作區成果不再只存在於工作區。push 仍全擋（三條凍結紅 ＋ 上述四條）。
+
+🔴 **commit 時踩到的兩道閘，都不是誤擋**：
+① 提交守衛把否定句「該檔測試**通過**不代表它讀 SoT」讀成綠燈宣稱 ⇒ 擋 commit。
+   守衛不讀語意是刻意的，**代價是寫作要避開那幾個詞**；改成「不得以其測試結果作為證據」即過。
+② `plain_docs_sync` 的判準是 **commit 時序**不是 mtime ⇒ 光改檔沒用，須同 commit 提交。
+
+## B-49 SPEC **已定案，不再開審查輪**
+
+r6 三家：composer `APPROVED`、grok 1 條、codex 4 條 `[MUST-BEFORE-IMPL]`（union ＝ 5）。
+方向 BLOCKING **連續四輪 0**。5 條已當輪修畢，**其正確性由施工後的兩家 code review 承接**。
+
+🔴 **其中一條是刪掉我自己在 r6 發明的「兩段提交」**——那是為了修我自己寫出的矛盾
+（§R row 5 說綠、mutation ⑫ 說紅，講的是同一動作）而加的新機制，結果撞回 r3 的 bootstrap 死結。
+而我的 r6 brief 逐字寫著「**不收任何新增機制**」。
+⇒ 教訓入 SPEC §C-11：**消解矛盾要刪掉錯的那一端，不是再加一層。**
+⇒ 同批 rebind 與合法維護**機械上不可區分**，依 C-6 具名排除、交 code review，**不宣稱擋得住**。
+
+**下一步（r6 之後）**：產 B-49 TODO → 施工 → 兩家 code review。
+
+---
+
+**背景任務 `b3cxm86b9`** ＝ `20260811-govb49-x-review-r6` 三家 review，**已回並銷帳**。
 🔴 **r6 是 SPEC 的最後一輪**（主委依使用者「95% 解法就收」與 epic 斷路器裁定，已寫進 brief）。
 r6 之後不論剩什麼一律轉**具名殘留**並進 TODO 施工，**不開 r7**。
 r6 brief 已明列**不受理範圍**（措辭精確度／更好的設計／防蓄意／任何新增機制），

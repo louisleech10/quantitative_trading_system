@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260811T162835Z-govg7-ghostpath-b49",
+  "claim_id": "govg7-ghostpath-b49",
+  "command": [
+    "bash",
+    "scripts/govb1_ghostpath_check.sh"
+  ],
+  "command_sha256": "df6788c0f7a97e3f14149989c14e100391f13c28739b06fbf9a80c4b4fc4664f",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "5ea99af180b628c44f55372c1755e75e210a358c",
+  "tree_dirty": true,
+  "started_at": "2026-08-11T16:28:33Z",
+  "ended_at": "2026-08-11T16:28:35Z",
+  "duration_seconds": 1.999448,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "0a9f64956217a9d4906e8a941bab307051b766d7d1dac0d0d07f65c82bfeeec9",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "0a9f64956217a9d4906e8a941bab307051b766d7d1dac0d0d07f65c82bfeeec9",
+  "log_path": "handoffs/run_receipts/20260811T162835Z-govg7-ghostpath-b49.log",
+  "tail_excerpt": [
+    "  docs/GOVB1_INPUT_QUALITY_TODO.md",
+    "  tests/governance/test_brief_conformance.py",
+    "  tests/governance/test_completeness_idlike_fp.py",
+    "  tests/governance/test_cxrun_stamp_prompt.py",
+    "  tests/governance/test_debt_emit.py",
+    "  tests/governance/test_doc_format_precheck.py",
+    "  tests/governance/test_gov_check_dep_failclosed.py",
+    "  tests/governance/test_result_state_format_failed.py",
+    "  tests/governance/test_rolegate_predispatch.py",
+    "  tests/governance/test_stamp_taskid_inject.py",
+    "  tests/governance/test_verify_gate_b3.py",
+    "幽靈路徑 11 條（改動前須先決定 allow 或接受 G-7 紅）"
+  ]
+}

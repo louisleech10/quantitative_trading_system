@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260811T165108Z-selfcheck-7passed",
+  "claim_id": "selfcheck-7passed",
+  "command": [
+    "python3",
+    "-m",
+    "pytest",
+    "tests/governance/test_cxrun_selfcheck_prompt.py",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ],
+  "command_sha256": "893425eb4c48b4e4b16f046618c1646d362d55a3af78828132959e019fde842b",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "5ea99af180b628c44f55372c1755e75e210a358c",
+  "tree_dirty": true,
+  "started_at": "2026-08-11T16:51:02Z",
+  "ended_at": "2026-08-11T16:51:08Z",
+  "duration_seconds": 5.125482,
+  "exit_code": 0,
+  "runtime_class": "mutation_runtime",
+  "requested_class": null,
+  "pytest_summary": "============================== 7 passed in 2.20s ===============================",
+  "selected_node_ids": [
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_all_findings_kind_sets_agree",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_instruction_reaches_prompt[review]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_instruction_reaches_prompt[consult]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_instruction_reaches_prompt[closure]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_absent_for_impl",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_catches_real_format_failure",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_mutation_removing_selfcheck_case_turns_red"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 7,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "4dddbfcf62dd97a0e06df7fc314f919e85b42000d51ce0d74d4025d8db600267",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "4dddbfcf62dd97a0e06df7fc314f919e85b42000d51ce0d74d4025d8db600267",
+  "log_path": "handoffs/run_receipts/20260811T165108Z-selfcheck-7passed.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 7 items",
+    "",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_all_findings_kind_sets_agree PASSED [ 14%]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_instruction_reaches_prompt[review] PASSED [ 28%]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_instruction_reaches_prompt[consult] PASSED [ 42%]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_instruction_reaches_prompt[closure] PASSED [ 57%]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_absent_for_impl PASSED [ 71%]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_selfcheck_catches_real_format_failure PASSED [ 85%]",
+    "tests/governance/test_cxrun_selfcheck_prompt.py::test_mutation_removing_selfcheck_case_turns_red PASSED [100%]",
+    "",
+    "============================== 7 passed in 2.20s ==============================="
+  ]
+}

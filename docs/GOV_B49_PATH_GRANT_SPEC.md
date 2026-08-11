@@ -173,7 +173,38 @@ snapshot diff；setup／symlink 檢查／snapshot 任一不符即紅。
 - **覆蓋風險**：無
 - 不可做：不得寫 repo 的 `scripts/governance_roles.json`；不得硬編家族三元組
 
-### Phase 1 — 永久 path grant，git 物件綁定（依賴：Phase 0）
+### 🔴 Phase 1 之施工前置依賴（2026-08-12 新增；SPEC r1–r6 六輪皆漏）
+
+**凍結三檔全部是「幽靈路徑」** —— `base..HEAD` endpoint 淨差為零、range 內被
+**無 `Governance-Scope` trailer 的 in-epic commit** 觸及過、且不在 `govb1_scope.manifest` allow。
+
+⇒ **Phase 1 一 commit 即 G-7 紅**，且 **OOE trailer 救不了**（`path-only-OOE` 豁免已被毒化）。
+⇒ 施工前須先決定三檔之 manifest 歸屬。
+
+🔴 **但「加 manifest allow 行」這條路已實作過並證明走不通**（2026-08-12）：
+`test_t01_f5_manifest_matches_task_decl` 要求 manifest 之 **allow 集合逐條等於**
+`docs/GOVB1_INPUT_QUALITY_TODO.md`「修改檔案」節所列，而該檔**全程唯讀禁改**。
+延伸檔亦繞不掉（F5 之 awk 路徑寫死）。
+
+⇒ **正解＝走凍結檔正式修訂程序，先改該 TODO 的宣告集，再走四步**：
+① 擴充 `_B5_MANIFEST_AUTHORIZED_ADDITIONS`（字面集合）② 加 manifest allow 行
+③ **只**重算 `scope_manifest:` 雜湊 ④ 同步四處 `decl == 36` 計數。**順序不可顛倒。**
+
+⇒ **四個檔一次解決**（凍結三檔 ＋ `test_cxrun_selfcheck_prompt.py`）。
+
+🔴 **明列已封存之旁路，避免日後有人重新發明**：codex 指出 F5 **只比對 allow 集合**，
+故改用 `meta` 動詞可讓 G-7 轉綠而不動凍結 TODO。**技術可行，但不採**——
+`meta` 語意是簿記檔，把治理測試宣告為 `meta` 純為躲檢查，
+觸犯使用者定死之「禁以技術手法充當達標」。出處：
+`handoffs/reconcile/20260812-govg7-x-consult-r2/synth.md` 群集 2。
+
+盤點工具：`bash scripts/govb1_ghostpath_check.sh`（實跑 11 條，`_B45_HARNESS` 五檔全在內）。
+出處：`handoffs/reconcile/20260812-govg7-x-consult-r1/synth.md`（三家一致「逐案不批次」）。
+
+🔴 **這件事六輪 SPEC review 沒有任何一方提到**——包含主委。它是主委 commit 了一個
+同型路徑、把全套由 4 紅變 7 紅之後才現形的。**列此為警示：SPEC 的完備性不等於施工可行性。**
+
+### Phase 1 — 永久 path grant，git 物件綁定（依賴：Phase 0 ＋ 上述前置）
 
 **Task 1.1 — `_B49_GRANT_IDENTITY` 常數（照抄 `_B5_MANIFEST` 形狀）**
 

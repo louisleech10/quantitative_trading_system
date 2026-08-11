@@ -1,0 +1,12 @@
+  docs/GOVB1_INPUT_QUALITY_TODO.md
+  tests/governance/test_brief_conformance.py
+  tests/governance/test_completeness_idlike_fp.py
+  tests/governance/test_cxrun_stamp_prompt.py
+  tests/governance/test_debt_emit.py
+  tests/governance/test_doc_format_precheck.py
+  tests/governance/test_gov_check_dep_failclosed.py
+  tests/governance/test_result_state_format_failed.py
+  tests/governance/test_rolegate_predispatch.py
+  tests/governance/test_stamp_taskid_inject.py
+  tests/governance/test_verify_gate_b3.py
+幽靈路徑 11 條（改動前須先決定 allow 或接受 G-7 紅）
