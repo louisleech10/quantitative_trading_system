@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -49,6 +50,28 @@ def _b49_object_identity(path: str) -> str | None:
     return " ".join(meta)
 
 
+def _b49_worktree_shape_ok(fp: Path, want_mode: str) -> bool:
+    """工作樹**形狀**是否與授權 mode 相符：regular file、非 symlink、exec bit 一致。
+
+    〔`CODEX-R2-P1-02`〕原本只比對 grant 常數字串裡的 mode，**沒有看工作樹真實 mode**
+    ⇒ `chmod +x` 一個授權檔，身分三元組（來自 `ls-tree HEAD`）不變、位元組不變，
+    豁免照樣成立。SPEC 明定 `100644→100755` 須拒，故改為**兩邊都比**。
+    獨立成純函式（吃 path，不吃全域），mutation 才能用真實 `chmod`／symlink／gitlink
+    去打**同一個**判定，而不是另寫一份 assert 自證。
+    """
+    if want_mode not in ("100644", "100755"):
+        return False  # gitlink(160000)／symlink(120000)／未知 ⇒ fail-closed
+    try:
+        st = fp.lstat()
+    except OSError:
+        return False
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+        return False
+    if (fp / ".git").exists():  # gitlink/submodule 目錄形狀
+        return False
+    return bool(st.st_mode & 0o111) == (want_mode == "100755")
+
+
 def _b49_worktree_bytes_match(path: str) -> bool:
     """授權 blob 與工作樹**逐位元組**比對；不經 index ⇒ skip-worktree 打不敗。"""
     want = _B49_GRANT_IDENTITY.get(path)
@@ -58,7 +81,9 @@ def _b49_worktree_bytes_match(path: str) -> bool:
     if len(parts) != 3 or parts[1] != "blob":
         return False
     fp = REPO / path
-    if fp.is_symlink() or not fp.is_file():
+    if not _b49_worktree_shape_ok(fp, parts[0]):
+        return False
+    if not fp.is_file():
         return False
     blob = subprocess.run(
         ["git", "cat-file", "blob", parts[2]],
@@ -2580,10 +2605,16 @@ _B49_CLOSURE_SELECTORS = (
 
 
 def _assert_b49_closure_evidence() -> None:
-    """票 B-49 關票前提：六格閉合證據**實跑**全綠，且逐格具名存在。
+    """票 B-49 關票前提：六格閉合證據**逐格於實體隔離副本實跑**，各自驗 rc／passed／skipped。
 
     🔴 **不得寫成字面比對**（TODO Task 2.2「不可做」）：檔案裡有那六個函式名，
     不代表它們跑得過——`CODEX-R3-P1-01` 那型假綠正是「保留字面、實質失效」。
+
+    🔴 **也不得用整檔 receipt 代替**〔`CODEX-R2-P0-01`／`GROK-R2-P1-01`〕：
+    初版寫 `整檔 passed == 6`，而該檔加入 mutation 矩陣與 Task 3.2 後有 33 格
+    ⇒ 條件**恆不成立**，關票路徑結構上不可達——主委親手造出自己正要修的那個死結。
+    整檔 receipt 還有第二個病：**六格被替換成空測試也照樣綠**。
+    ⇒ 改為逐格具名執行，缺 selector／逾時／snapshot 失敗一律 fail-closed。
     """
     assert len(_B49_CLOSURE_SELECTORS) == 6
     sel = REPO / _B49_CLOSURE_FILE
@@ -2592,15 +2623,18 @@ def _assert_b49_closure_evidence() -> None:
     missing = [fn for fn in _B49_CLOSURE_SELECTORS if f"def {fn}(" not in src]
     assert not missing, f"閉合證據缺具名 selector（改名／刪除？）：{missing}"
 
-    p = _run(
-        [sys.executable, "-m", "pytest", _B49_CLOSURE_FILE, "-q", "--tb=short",
-         "-p", "no:cacheprovider"]
-    )
-    out = p.stdout + p.stderr
-    assert p.returncode == 0, f"閉合證據未全綠 ⇒ 票不得 CLOSED：\n{out[-3000:]}"
-    m = re.search(r"(\d+) passed", out)
-    assert m and int(m.group(1)) == 6, f"閉合證據應恰 6 格：\n{out[-1200:]}"
-    assert " skipped" not in out, f"閉合證據不得有 skip：\n{out[-1200:]}"
+    # 隔離工具的單一定義處＝證據檔本身；函式內 import 以免模組級循環相依
+    import tempfile
+
+    from tests.governance import test_govb49_path_grant as _ev
+
+    tmp = Path(tempfile.mkdtemp(prefix="b49-closure-"))
+    iso = _ev._make_iso(tmp)
+    for fn in _B49_CLOSURE_SELECTORS:
+        r = _ev._run_iso(iso, f"{_B49_CLOSURE_FILE}::{fn}")
+        assert r["rc"] == 0, f"閉合證據 {fn} 未通過 ⇒ 票不得 CLOSED：\n{r['out'][-2000:]}"
+        assert r["passed"] >= 1, f"閉合證據 {fn} 一格都沒跑到（空測試？）：\n{r['out'][-1200:]}"
+        assert r["skipped"] == 0, f"閉合證據 {fn} 不得有 skip，得 {r['skipped']}"
 
 
 def test_b45_unfreeze_requires_roles_sot_closure() -> None:

@@ -40,10 +40,29 @@ _EXPECTED_CLI_FAMILIES = ("codex", "composer", "grok")
 # ── 隔離 runner ──────────────────────────────────────────────────────
 
 
+# 🔴 snapshot 之 ignored 掃描要排除的重目錄（資料／依賴，非 repo 產物）。
+# 具名殘留：子程序若只寫這幾個目錄，本 snapshot 看不到。它們不是治理程式碼的產出面。
+_SNAPSHOT_EXCLUDE = (
+    ":!data_cache",
+    ":!venv",
+    ":!node_modules",
+    ":!frontend/node_modules",
+    ":!.git",
+)
+
+
 def _repo_snapshot() -> str:
-    """主 repo 的工作區快照（供 ④ 前後比對）。"""
+    """主 repo 的工作區快照（供 ④ 前後比對）。
+
+    〔`CODEX-R2-P1-03`〕原本只取 `git status --porcelain`：**看不到 `.gitignore` 之下的
+    副作用**（`data_cache/`、`.pytest_cache/` …）⇒ 子程序寫 ignored path 時前後相同，
+    被判定為「沒動到主 repo」。改為同時涵蓋 tracked／untracked／ignored，
+    重目錄以 pathspec 具名排除（見 `_SNAPSHOT_EXCLUDE`）。
+    取不到一律 fail-closed。
+    """
     p = subprocess.run(
-        ["git", "status", "--porcelain"],
+        ["git", "status", "--porcelain", "--untracked-files=all",
+         "--ignored=traditional", "--", *_SNAPSHOT_EXCLUDE],
         cwd=str(REPO),
         capture_output=True,
         text=True,
@@ -222,14 +241,20 @@ def test_impl_path_works_for_every_cli_family(tmp_path: Path) -> None:
     assert sorted(fams) == sorted(_EXPECTED_CLI_FAMILIES), (
         f"CLI 可派家族漂移：want={sorted(_EXPECTED_CLI_FAMILIES)} got={sorted(fams)}"
     )
-    ok = 0
+    # 🔴 逐家收 receipt，不用計數器〔`CODEX-R2-P1-05`〕：
+    #    `ok += 1` 只證明迴圈跑了三次，不證明「三個各自獨立的 subprocess pass receipt」。
+    receipts: dict[str, dict] = {}
     for fam in fams:
         _role_pin.pin_implementer(iso / "scripts", fam)
         r = _run_iso(iso, f"{STAMP_FILE}::{V12_FN}")
         assert r["rc"] == 0, f"釘 {fam} 後 impl 路徑應綠：\n{r['out'][-2000:]}"
         assert r["skipped"] == 0, f"釘 {fam} 後不得有 skip，得 {r['skipped']}"
-        ok += 1
-    assert ok == 3, f"期望恰 3 家逐一驗過，得 {ok}"
+        assert r["passed"] == 4, f"釘 {fam} 後應 4 格 per-kind receipt，得 {r['passed']}"
+        receipts[fam] = r
+    assert len(receipts) == 3, f"期望恰 3 份 receipt，得 {len(receipts)}"
+    assert set(receipts) == set(_EXPECTED_CLI_FAMILIES), (
+        f"receipt 家族集合與外部字面集合不符：{sorted(receipts)}"
+    )
 
 
 # ── 票文條件 3：名冊與實際 dispatch 分支機械連動 ────────────────────
@@ -281,21 +306,27 @@ _GUARDS = (
 )
 
 
-def _guard_verdict(monkeypatch: pytest.MonkeyPatch, names: list[str]) -> bool:
+def _guard_verdict(
+    monkeypatch: pytest.MonkeyPatch,
+    names: list[str],
+    renames: list[tuple[str, str]] | None = None,
+) -> bool:
     """餵三道守衛一組假 diff；**任一道拒絕**即回 True。
 
     只攔 `git diff --name-only`／`--name-status`；其餘（錨點、frozen_hashes）走真指令，
     否則守衛會因為別的理由失敗，判定就不可信了。
+    `renames` ＝ `[(舊名, 新名), …]`，用來建模 `--name-only` 看不到的 rename／copy。
     """
     real_run = _CM._run
     payload = "\n".join(names) + ("\n" if names else "")
+    ns_payload = "".join(f"R100\t{o}\t{n}\n" for o, n in (renames or []))
 
     def _fake(cmd, *a, **kw):
         c = list(cmd)
         if c[:3] == ["git", "diff", "--name-only"]:
             return subprocess.CompletedProcess(c, 0, payload, "")
         if c[:3] == ["git", "diff", "--name-status"]:
-            return subprocess.CompletedProcess(c, 0, "", "")
+            return subprocess.CompletedProcess(c, 0, ns_payload, "")
         return real_run(cmd, *a, **kw)
 
     monkeypatch.setattr(_CM, "_run", _fake)
@@ -398,12 +429,42 @@ def test_mut10b_skip_worktree_cannot_defeat_bytes_compare(
 
 
 def test_mut11_mode_change_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """常數側：授權 mode 與 `ls-tree` 三元組不符 ⇒ 拒。"""
     p = _granted_paths()[0]
     want = _CM._B49_GRANT_IDENTITY[p]
     mutated = dict(_CM._B49_GRANT_IDENTITY)
     mutated[p] = want.replace("100644", "100755", 1)
     monkeypatch.setattr(_CM, "_B49_GRANT_IDENTITY", mutated)
     assert not _CM._b49_granted(p), "⑪ mode 不符必須拒（身分是三元組，不只 oid）"
+
+
+@pytest.mark.parametrize("shape", ["exec_bit", "symlink", "gitlink", "missing"])
+def test_mut11b_worktree_shape_probes(tmp_path: Path, shape: str) -> None:
+    """⑪b 工作樹側：**真實** chmod／symlink／gitlink 探針，打的是生產判定
+    `_b49_worktree_shape_ok`〔`CODEX-R2-P1-02`〕。
+
+    原本只改 grant 常數字串，**沒有看工作樹真實 mode** ⇒ 對一個授權檔 `chmod +x`：
+    `ls-tree HEAD` 三元組不變、位元組不變 ⇒ 豁免照舊成立，而 SPEC 明定該情形須拒。
+    """
+    ok_file = tmp_path / "ok.txt"
+    ok_file.write_bytes(b"x")
+    assert _CM._b49_worktree_shape_ok(ok_file, "100644"), "基線：普通檔應通過"
+
+    if shape == "exec_bit":
+        ok_file.chmod(0o755)
+        assert not _CM._b49_worktree_shape_ok(ok_file, "100644"), "chmod +x 後須拒"
+        assert _CM._b49_worktree_shape_ok(ok_file, "100755"), "授權 mode 相符則應通過"
+    elif shape == "symlink":
+        link = tmp_path / "link.txt"
+        link.symlink_to(ok_file)
+        assert not _CM._b49_worktree_shape_ok(link, "100644"), "symlink 須拒"
+    elif shape == "gitlink":
+        sub = tmp_path / "sub"
+        (sub / ".git").mkdir(parents=True)
+        assert not _CM._b49_worktree_shape_ok(sub, "100644"), "gitlink/submodule 須拒"
+        assert not _CM._b49_worktree_shape_ok(ok_file, "160000"), "gitlink mode 須拒"
+    else:  # missing
+        assert not _CM._b49_worktree_shape_ok(tmp_path / "nope", "100644"), "缺檔須拒"
 
 
 # ── ⑬ 授權檔刪除／改名 ⇒ 拒 ──────────────────────────────────────────
@@ -447,9 +508,17 @@ def test_mut13b_rename_old_name_is_recovered(
             )
         return real_run(cmd, *a, **kw)
 
+    # 🔴 必須經**三道守衛**判定，不得只呼叫 helper〔`CODEX-R2-P1-04`〕：
+    #    codex 在隔離 clone 移除 `names |= _rename_old_names(...)` 三處整合後，
+    #    原寫法（直呼 helper）仍 1 passed ⇒ 那一格不承重，是假格。
+    assert not _guard_verdict(monkeypatch, [new_name]), (
+        "前提壞了：新名本身不在保護清單，不帶 rename 資訊時應放行"
+    )
+    assert _guard_verdict(monkeypatch, [new_name], renames=[(victim, new_name)]), (
+        "⑬b 改名後舊名未被守衛看見 ⇒ 改名即可把 harness 洗出保護範圍"
+    )
     monkeypatch.setattr(_CM, "_run", _fake)
-    got = _CM._rename_old_names("dummy..range")
-    assert victim in got, f"⑬b 舊名未被補回：{got}"
+    assert victim in _CM._rename_old_names("dummy..range"), "⑬b helper 本身也須補回舊名"
 
 
 def test_mut13c_rename_probe_fails_closed_on_error(
@@ -627,18 +696,26 @@ def test_mut02_missing_kind_breaks_four_receipt(tmp_path: Path) -> None:
 # ── ⑭ 隔離副本之 scripts 是 symlink ⇒ runner 直接紅 ─────────────────
 
 
-def test_mut14_symlink_scripts_rejected(tmp_path: Path) -> None:
+def test_mut14_symlink_scripts_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """runner 判準①：實體 copy。symlink 穿透會讓子程序改到主 repo。
 
-    🔴 本格呼叫 runner **真正使用的那個守衛函式** `_assert_physical_copy`；
-    若在測試裡自己寫一個 assert 再用 `pytest.raises` 包住，那是自證循環、不承重。
+    🔴 必須經 `_make_iso`（runner 真正走的入口），不得只直呼 `_assert_physical_copy`
+    〔`CODEX-R2-P1-04`〕：codex 在隔離 clone 移除 `_make_iso` 內那一行呼叫後，
+    原寫法仍 1 passed ⇒ 假格。改為把 `copytree` 換成建 symlink，
+    再要求 `_make_iso` **自己**擋下來——整合一旦被拿掉，本格立刻轉綠失敗。
     """
-    fake = tmp_path / "iso"
-    fake.mkdir(parents=True, exist_ok=True)
-    (fake / "scripts").symlink_to(REPO / "scripts")
-    assert (fake / "scripts").is_symlink(), "前提壞了：沒建成 symlink"
+
+    def _fake_copytree(src, dst, **kw):
+        Path(dst).parent.mkdir(parents=True, exist_ok=True)
+        if not Path(dst).exists():
+            Path(dst).symlink_to(Path(src))
+        return dst
+
+    monkeypatch.setattr(shutil, "copytree", _fake_copytree)
     with pytest.raises(AssertionError, match="symlink"):
-        _assert_physical_copy(fake)
+        _make_iso(tmp_path)
 
 
 # ══════════════════════════════════════════════════════════════════════
