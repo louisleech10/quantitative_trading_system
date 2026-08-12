@@ -5,7 +5,7 @@
 <!-- BEGIN GENERATED: governance-worklist -->
 | 序 | 項目 | 狀態 | 內容 |
 |---|---|---|---|
-| 010 | WL-01 | 未開工 | P0 前置：fact_keys schema 由平面列擴為兩欄表格。解鎖 WL-02／WL-03；票 B-25 殘留⑥之唯一阻塞 |
+| 010 | WL-01 | 收案 | P0 前置：fact_keys schema 由平面列擴為具名欄＋表格投影（columns／render）。三家 review＋閉合複驗＋戳記核可；票 B-25 殘留⑥之 schema 阻塞已解除 |
 | 020 | WL-02 | 未開工 | P1-a 判準資料化：同 Task 內互斥判準偵測（抽 條件→期望rc 配對，同條件不同期望即 FAIL）。前置 WL-01；票 B-25 |
 | 030 | WL-03 | 未開工 | P1-b 改法段之機制須有 FACT-RECEIPT 或標 assumed，否則 FAIL（撰寫當下攔先斷言後驗證）。前置 WL-01；票 B-25 |
 | 040 | WL-04 | 未開工 | P1-c 戳記整行由 harness 自動生成，消滅 64 位 hex 手抄。票 B-54（其樣本數1門檻已過期，須先更新）。無前置 |
