@@ -606,6 +606,33 @@ def test_mut17_hollow_selector_detected(monkeypatch: pytest.MonkeyPatch) -> None
     assert not _CM._b49_selector_is_substantive(real_src, "no_such_selector_name"), (
         "不存在的 selector 須判為無實質（fail-closed）"
     )
+    # 🔴 `CODEX-R3-P0-01` 附探針的兩條繞法，逐條釘死：
+    nested_dead = (
+        "def %s():\n"
+        "    def _never_called():\n"
+        "        assert False\n"
+        "    pass\n" % target
+    )
+    assert not _CM._b49_selector_is_substantive(nested_dead, target), (
+        "巢狀死碼裡的 assert 不得充當實質性"
+    )
+    dup_last_hollow = (
+        "def %s():\n    assert True\n\n\n"
+        'def %s():\n    """gutted"""\n    pass\n' % (target, target)
+    )
+    assert not _CM._b49_selector_is_substantive(dup_last_hollow, target), (
+        "同名重複定義須 fail-closed（Python 生效的是最後一個，取首個會被騙）"
+    )
+    nested_class = (
+        "def %s():\n"
+        "    class _C:\n"
+        "        def m(self):\n"
+        "            assert True\n"
+        "    pass\n" % target
+    )
+    assert not _CM._b49_selector_is_substantive(nested_class, target), (
+        "巢狀類別方法裡的 assert 不得充當實質性"
+    )
 
     # 整合：判定回 False 時，閉合證據必須拒（不得只在純函式層成立）
     monkeypatch.setattr(_CM, "_b49_selector_is_substantive", lambda *_a, **_k: False)

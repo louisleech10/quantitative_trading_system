@@ -28,7 +28,7 @@ TODO = REPO / "docs" / "GOVB1_INPUT_QUALITY_TODO.md"
 # 被授權路徑之 `<mode> <type> <oid>` 逐字寫死；任一位元組變動即失去豁免。
 # 🔴 誠實邊界：本機制只防**意外與遺忘**，不防具寫入權者蓄意（SPEC §C-6／§C-9-7／§C-11）。
 _B49_GRANT_IDENTITY: dict[str, str] = {
-    "docs/GOVB1_INPUT_QUALITY_TODO.md": "100644 blob 0573f19870b94496476b94a4cb89cebf0ba15e9c",
+    "docs/GOVB1_INPUT_QUALITY_TODO.md": "100644 blob f5980dacc7e1689b4a546b6fb3555417ae0941ef",
     "tests/governance/test_result_state_format_failed.py": "100644 blob 1b01812c71df498150e9391e6b7bb7b3e98e374e",
     "tests/governance/test_rolegate_predispatch.py": "100644 blob 60b3efab0eb00605b32e3dc98d0ae1137c3bb0ec",
     "tests/governance/test_stamp_taskid_inject.py": "100644 blob 62e48627323af6d58f8257d1c3eb8976528498cd",
@@ -1154,7 +1154,7 @@ def test_r7_v1_current_manifest_decl_34_stable() -> None:
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 49, f"V1 期望 49 條 decl，得 {len(decl)}"
+    assert len(decl) == 50, f"V1 期望 50 條 decl，得 {len(decl)}"
     # 與第二次現跑逐字相同（穩定；非快取）
     again = _r7_baseline_decl()
     assert decl == again
@@ -1190,7 +1190,7 @@ def test_r7_v2_leading_whitespace_path_rejected() -> None:
     # 反例方向：移除該列 ⇒ 回 rc=0
     ok = _call_g7_policy()
     assert ok.returncode == 0, ok.stderr + ok.stdout
-    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 49
+    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 50
 
 
 def test_r7_v3_trailing_whitespace_path_rejected() -> None:
@@ -1471,7 +1471,7 @@ def test_wprime_a5_meta_tickets_in_decl_count_36() -> None:
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert "scripts/govb1_task_tickets.tsv" in decl
     assert "scripts/govb1_single_source_check.sh" in decl
-    assert len(decl) == 49, f"期望 decl 49，得 {len(decl)}"
+    assert len(decl) == 50, f"期望 decl 50，得 {len(decl)}"
 
 
 def test_wprime_a5_counterexample_remove_meta_uncovers_tsv() -> None:
@@ -1563,7 +1563,7 @@ def test_b2r3_c1_current_manifest_meta_count_6() -> None:
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 49, f"decl 應恰 49，got {len(decl)}"
+    assert len(decl) == 50, f"decl 應恰 50，got {len(decl)}"
     meta_n = sum(
         1
         for ln in MANIFEST.read_text(encoding="utf-8").splitlines()
@@ -2319,6 +2319,8 @@ _B5_MANIFEST_AUTHORIZED_ADDITIONS = frozenset(
         "allow tests/governance/test_verify_gate_b3.py",
         # 票 B-49 Task 2.3 之閉合證據檔（新建）
         "allow tests/governance/test_govb49_path_grant.py",
+        # 票 B-49 as-built 差異文件（新建）——本檔未登記時 G-7 會紅，r3 由 codex 實跑抓到
+        "allow docs/GOV_B49_ASBUILT_DELTA.md",
     }
 )
 
@@ -2602,6 +2604,15 @@ _B49_CLOSURE_SELECTORS = (
     "test_dispatch_set_equals_review_families",
     "test_review_families_subset_of_eligible",
 )
+# 每格的**固定** receipt 契約（六格皆非參數化 ⇒ 各恰 1）。寫字面，不由集合長度導出。
+_B49_CLOSURE_EXPECTED = {
+    "test_v12_body_has_no_skip_escape": 1,
+    "test_v12_four_kinds_all_visited": 1,
+    "test_stamp_path_invalid_implementer_turns_red": 1,
+    "test_impl_path_works_for_every_cli_family": 1,
+    "test_dispatch_set_equals_review_families": 1,
+    "test_review_families_subset_of_eligible": 1,
+}
 
 
 def _b49_selector_is_substantive(src: str, fn: str) -> bool:
@@ -2620,20 +2631,42 @@ def _b49_selector_is_substantive(src: str, fn: str) -> bool:
         tree = ast.parse(src)
     except SyntaxError:
         return False
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == fn:
-            for sub in ast.walk(node):
-                if isinstance(sub, ast.Assert):
-                    return True
-                if isinstance(sub, ast.With):
-                    for item in sub.items:
-                        call = item.context_expr
-                        if isinstance(call, ast.Call):
-                            f = call.func
-                            name = getattr(f, "attr", None) or getattr(f, "id", None)
-                            if name == "raises":
-                                return True
-            return False
+
+    # 🔴 只認**模組層**同名定義，且須恰好一個〔`CODEX-R3-P0-01` 探針 2〕：
+    #    `ast.walk` 取到的是**第一個**，而 Python 實際生效的是**最後一個**
+    #    ⇒ 「前面放真的、後面放空的」可騙過檢查。數量不等於 1 一律 fail-closed。
+    defs = [
+        n
+        for n in tree.body
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == fn
+    ]
+    if len(defs) != 1:
+        return False
+
+    # 🔴 只看**自身可達 body**〔`CODEX-R3-P0-01` 探針 1〕：
+    #    巢狀函式／類別／lambda 內的 assert 是死碼，不得充當實質性。
+    def _own_nodes(node: ast.AST):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(
+                child,
+                (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda),
+            ):
+                continue
+            yield child
+            yield from _own_nodes(child)
+
+    for sub in _own_nodes(defs[0]):
+        if isinstance(sub, ast.Assert):
+            return True
+        if isinstance(sub, ast.With):
+            for item in sub.items:
+                call = item.context_expr
+                if isinstance(call, ast.Call):
+                    name = getattr(call.func, "attr", None) or getattr(
+                        call.func, "id", None
+                    )
+                    if name == "raises":
+                        return True
     return False
 
 
@@ -2668,7 +2701,11 @@ def _assert_b49_closure_evidence() -> None:
     for fn in _B49_CLOSURE_SELECTORS:
         r = _ev._run_iso(iso, f"{_B49_CLOSURE_FILE}::{fn}")
         assert r["rc"] == 0, f"閉合證據 {fn} 未通過 ⇒ 票不得 CLOSED：\n{r['out'][-2000:]}"
-        assert r["passed"] >= 1, f"閉合證據 {fn} 一格都沒跑到（空測試？）：\n{r['out'][-1200:]}"
+        # 🔴 固定 receipt 契約〔`CODEX-R3-P0-01`〕：`>= 1` 太鬆——多塞一格或少跑一格都看不出來。
+        want = _B49_CLOSURE_EXPECTED[fn]
+        assert r["passed"] == want, (
+            f"閉合證據 {fn} 應恰 {want} 格，得 {r['passed']}：\n{r['out'][-1200:]}"
+        )
         assert r["skipped"] == 0, f"閉合證據 {fn} 不得有 skip，得 {r['skipped']}"
 
 
