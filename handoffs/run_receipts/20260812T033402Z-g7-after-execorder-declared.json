@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260812T033402Z-g7-after-execorder-declared",
+  "claim_id": "g7-after-execorder-declared",
+  "command": [
+    "bash",
+    "scripts/govb1_final_gate.sh",
+    "--only",
+    "g7"
+  ],
+  "command_sha256": "1fc8e246b2bc5c8ebb7690b8e09eb18f53ba62ff31797672588bc93b0af83f50",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "eee9b6b525ce14f4b23faef9531cd963d2fe6b63",
+  "tree_dirty": true,
+  "started_at": "2026-08-12T03:33:56Z",
+  "ended_at": "2026-08-12T03:34:02Z",
+  "duration_seconds": 6.553762,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "cc4cc459756ce68ba7ff5e062935e16d50c438f90450bc14b63610bda93bd313",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "cc4cc459756ce68ba7ff5e062935e16d50c438f90450bc14b63610bda93bd313",
+  "log_path": "handoffs/run_receipts/20260812T033402Z-g7-after-execorder-declared.log",
+  "tail_excerpt": [
+    "PASS g7"
+  ]
+}

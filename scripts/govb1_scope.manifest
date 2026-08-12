@@ -78,3 +78,4 @@ allow tests/governance/test_stamp_taskid_inject.py
 allow tests/governance/test_verify_gate_b3.py
 allow tests/governance/test_govb49_path_grant.py
 allow docs/GOV_B49_ASBUILT_DELTA.md
+allow docs/GOVERNANCE_EXECUTION_ORDER.md

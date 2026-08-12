@@ -28,7 +28,7 @@ TODO = REPO / "docs" / "GOVB1_INPUT_QUALITY_TODO.md"
 # 被授權路徑之 `<mode> <type> <oid>` 逐字寫死；任一位元組變動即失去豁免。
 # 🔴 誠實邊界：本機制只防**意外與遺忘**，不防具寫入權者蓄意（SPEC §C-6／§C-9-7／§C-11）。
 _B49_GRANT_IDENTITY: dict[str, str] = {
-    "docs/GOVB1_INPUT_QUALITY_TODO.md": "100644 blob f5980dacc7e1689b4a546b6fb3555417ae0941ef",
+    "docs/GOVB1_INPUT_QUALITY_TODO.md": "100644 blob 045eed2794e23c92cc2bb4028a5c0c5ef165c601",
     "tests/governance/test_result_state_format_failed.py": "100644 blob 1b01812c71df498150e9391e6b7bb7b3e98e374e",
     "tests/governance/test_rolegate_predispatch.py": "100644 blob 60b3efab0eb00605b32e3dc98d0ae1137c3bb0ec",
     "tests/governance/test_stamp_taskid_inject.py": "100644 blob 62e48627323af6d58f8257d1c3eb8976528498cd",
@@ -1154,7 +1154,7 @@ def test_r7_v1_current_manifest_decl_34_stable() -> None:
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 50, f"V1 期望 50 條 decl，得 {len(decl)}"
+    assert len(decl) == 51, f"V1 期望 51 條 decl，得 {len(decl)}"
     # 與第二次現跑逐字相同（穩定；非快取）
     again = _r7_baseline_decl()
     assert decl == again
@@ -1190,7 +1190,7 @@ def test_r7_v2_leading_whitespace_path_rejected() -> None:
     # 反例方向：移除該列 ⇒ 回 rc=0
     ok = _call_g7_policy()
     assert ok.returncode == 0, ok.stderr + ok.stdout
-    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 50
+    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 51
 
 
 def test_r7_v3_trailing_whitespace_path_rejected() -> None:
@@ -1471,7 +1471,7 @@ def test_wprime_a5_meta_tickets_in_decl_count_36() -> None:
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert "scripts/govb1_task_tickets.tsv" in decl
     assert "scripts/govb1_single_source_check.sh" in decl
-    assert len(decl) == 50, f"期望 decl 50，得 {len(decl)}"
+    assert len(decl) == 51, f"期望 decl 51，得 {len(decl)}"
 
 
 def test_wprime_a5_counterexample_remove_meta_uncovers_tsv() -> None:
@@ -1563,7 +1563,7 @@ def test_b2r3_c1_current_manifest_meta_count_6() -> None:
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 50, f"decl 應恰 50，got {len(decl)}"
+    assert len(decl) == 51, f"decl 應恰 51，got {len(decl)}"
     meta_n = sum(
         1
         for ln in MANIFEST.read_text(encoding="utf-8").splitlines()
@@ -2321,6 +2321,9 @@ _B5_MANIFEST_AUTHORIZED_ADDITIONS = frozenset(
         "allow tests/governance/test_govb49_path_grant.py",
         # 票 B-49 as-built 差異文件（新建）——本檔未登記時 G-7 會紅，r3 由 codex 實跑抓到
         "allow docs/GOV_B49_ASBUILT_DELTA.md",
+        # fact-key 生成區塊之宿主檔：epic 期間每次改 fact_keys.json 都會重生成它
+        # ⇒ 早已被多個 in-epic commit 觸及，`path-only-OOE` 救不了，必須正式登記
+        "allow docs/GOVERNANCE_EXECUTION_ORDER.md",
     }
 )
 
