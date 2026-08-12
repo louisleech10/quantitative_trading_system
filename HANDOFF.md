@@ -31,7 +31,7 @@
 |---|---|---|---|
 | 010 | WL-01 | 收案 | P0 前置：fact_keys schema 由平面列擴為具名欄＋表格投影（columns／render）。三家 review＋閉合複驗＋戳記核可；票 B-25 殘留⑥之 schema 阻塞已解除 |
 | 020 | WL-02 | 收案 | P1-a 判準資料化：判準入註冊表＋三道機械檢查（狀態列舉封閉／同適用範圍同條件不得相異期望／判準宿主區塊外不得陳述期望結束狀態）。字面設計經實測為零訊號已由三家 consult 改寫；三輪委員（consult→review→closure）、三家戳記核可。🔴 語意互斥不被攔截，見 docs/GOV_CRITERIA_REGISTRY.md 殘留 1 |
-| 030 | WL-03 | 未開工 | P1-b 改法段之機制須有 FACT-RECEIPT 或標 assumed，否則 FAIL（撰寫當下攔先斷言後驗證）。前置 WL-01；票 B-25 |
+| 030 | WL-03 | 待審 | P1-b 機制證據登記。🔴 字面設計（掃改法段抽反引號）已由三家 consult 以實測否決（誤擋率 80-93%；且 setsid 不在 PATH，反而漏掉出生事故本身）。收斂後設計＝專用機制登記表＋顯式 opt-in 宿主＋receipt/assumed 只對資料列驗證，禁掃散文。設計已定、尚未實作。誠實邊界：現樹訊號近零，價值在面向未來。見 handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md |
 | 040 | WL-04 | 未開工 | P1-c 戳記整行由 harness 自動生成，消滅 64 位 hex 手抄。票 B-54（其樣本數1門檻已過期，須先更新）。無前置 |
 | 050 | WL-05 | 未開工 | P2 指令 tokenize 化：逐命令位置解 argv[0] 比對封閉 executor_clis。票 B-59（併 B-61 同型）。屬大重寫，須另立 epic |
 | 060 | WL-06 | 未開工 | P3 測試空心／假綠之機械判準。併入票 B-25，不新開票（既有：PATH劫持1條已修、test_verify_gate系列3條、未列入排除清單2條） |
@@ -163,12 +163,13 @@
 > 🔴 **本節是機器輸入**：`governance-ticket-closure` 之導出集合＝本節 ∪
 > backlog「2026-08-10 scope 缺口」節所提及之票號。增刪票號提及須同步 `scripts/fact_keys.json`。
 
-- 🔴 `票 B-25`：**判準資料化整項未做**，卡在 `fact_keys` 之 `.rows[]|@tsv` 只支援平面列
-  （＝待辦清單之 `WL-01`）。三項殘留：①正向斷言擋不住「有 pointer 但旁邊另寫互斥判準」
-  ②引用已廢判準無機械偵測 ③完整解未做。併入兩條機械檢查提案：**同 Task 內互斥判準偵測**、
-  **改法段之機制須有 FACT-RECEIPT**（對應待辦清單第二、三列）。
+- 🔴 `票 B-25`：schema 阻塞與互斥判準偵測已交付（待辦清單前兩列），
+  **機制證據登記（第三列）設計已定、尚未實作**。
+  🔴 **能力邊界（三家一致，永遠不會由本機制關閉）**：語意互斥——兩段話用**不同條件字串**
+  描述同一物理事件時鍵不相等，機械上偵測不到；出生事故那型即屬此類。
+  完整殘留清單見 `docs/GOV_CRITERIA_REGISTRY.md`。
   該票於票狀態表之列為 ord `005`（**狀態值見生成區塊，本檔不重述**）；
-  票本身另有 **8 條**具名殘留，見 backlog `B-25` 節。
+  票本身另有具名殘留，見 backlog `B-25` 節。
 - `R-12`：`brief_conformance_check.sh` full path 不驗 EXPECTED-DELTA；OOE 通道救不了
 - `R-13` Unicode 不可見碼點；`R-14` `b4-review-r2` 僅 2/3 戳記；`R-16`＝`票 B-55`
 - `票 B-49`：四條具名殘留見 `docs/GOV_B49_ASBUILT_DELTA.md` §3
