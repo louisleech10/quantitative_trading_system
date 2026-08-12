@@ -69,37 +69,42 @@ def _amendment_keys():
     assert AMENDMENT.is_file(), (
         f"缺延伸檔 {AMENDMENT}：凍結宣告之偏離無登記處 → fail-closed"
     )
-    frozen, added = [], []
+    frozen, added, criteria = [], [], []
     for line in AMENDMENT.read_text(encoding="utf-8").splitlines():
         if line.startswith("FACTKEY-FROZEN: "):
             frozen.append(line[len("FACTKEY-FROZEN: "):].strip())
         elif line.startswith("FACTKEY-ADDED: "):
             added.append(line[len("FACTKEY-ADDED: "):].strip())
+        elif line.startswith("FACTKEY-CRITERIA: "):
+            criteria.append(line[len("FACTKEY-CRITERIA: "):].strip())
     assert frozen, "延伸檔缺 FACTKEY-FROZEN 宣告 → fail-closed"
     assert added, "延伸檔缺 FACTKEY-ADDED 宣告 → fail-closed"
-    assert len(frozen) == len(set(frozen)), f"FACTKEY-FROZEN 含重複項: {frozen}"
-    assert len(added) == len(set(added)), f"FACTKEY-ADDED 含重複項: {added}"
-    assert not (set(frozen) & set(added)), "FROZEN 與 ADDED 不得交集"
-    return set(frozen), set(added)
+    assert criteria, "延伸檔缺 FACTKEY-CRITERIA 宣告 → fail-closed（WL-02 起）"
+    for name, lst in (("FROZEN", frozen), ("ADDED", added), ("CRITERIA", criteria)):
+        assert len(lst) == len(set(lst)), f"FACTKEY-{name} 含重複項: {lst}"
+    sf, sa, sc = set(frozen), set(added), set(criteria)
+    assert not (sf & sa) and not (sf & sc) and not (sa & sc), "三份宣告清單不得兩兩交集"
+    return sf, sa, sc
 
 
 def test_registry_key_set_equals_amendment_declaration():
     """票 B-25 站 2.5 Task 1.4（原 TODO 實作要點 1 之延伸；偏離登記見 docs/GOV_B25_SCOPE_AMENDMENT.md）。
 
-    🔴 三條**集合相等**（禁 issubset/>=/in）：
-      ① registry 全集 == FROZEN ∪ ADDED
+    🔴 四條**集合相等**（禁 issubset/>=/in）：
+      ① registry 全集 == FROZEN ∪ ADDED ∪ CRITERIA
       ② ADDED == _schema.status_keys（r3 CODEX-R3-P1-04：破解自我循環——
          單靠①時延伸檔漏列一個 key，三方仍互相一致而無人轉紅）
+      ②b CRITERIA == _schema.criteria_keys（WL-02 起；理由同②）
       ③ 凍結期單一 key 仍須在 FROZEN 內
     """
     data = json.loads(REG.read_text(encoding="utf-8"))
     assert isinstance(data, dict)
     fact_keys = {k for k in data if k != "_schema"}
-    frozen, added = _amendment_keys()
+    frozen, added, criteria = _amendment_keys()
 
-    assert fact_keys == frozen | added, (
+    assert fact_keys == frozen | added | criteria, (
         f"registry key 集合與延伸檔宣告不符：registry={sorted(fact_keys)} "
-        f"vs 宣告={sorted(frozen | added)}"
+        f"vs 宣告={sorted(frozen | added | criteria)}"
     )
     assert KEY in frozen, f"凍結期單一 key {KEY} 未列於 FACTKEY-FROZEN"
 
@@ -107,6 +112,11 @@ def test_registry_key_set_equals_amendment_declaration():
     assert added == status_keys, (
         "🔴 延伸檔 ADDED 與 _schema.status_keys 不相等 ⇒ 可能漏交或多交狀態 key："
         f"ADDED={sorted(added)} vs status_keys={sorted(status_keys)}"
+    )
+    criteria_keys = set(data["_schema"].get("criteria_keys", []))
+    assert criteria == criteria_keys, (
+        "🔴 延伸檔 CRITERIA 與 _schema.criteria_keys 不相等 ⇒ 判準 key 漏交或多交："
+        f"CRITERIA={sorted(criteria)} vs criteria_keys={sorted(criteria_keys)}"
     )
 
     # 每個 key 的結構仍須合法
@@ -1146,6 +1156,233 @@ def test_wl01_sort_anchor_stays_unique_in_generator():
     assert n == 1, (
         f"排序錨點 {_ROWS_SORT_ANCHOR!r} 在生產檔出現 {n} 次（須恰 1）——"
         "T-2.1-M1a／M1b 會打到第一處而非生成排序，成為空心 mutation"
+    )
+
+
+# ==========================================================================
+# 待辦清單 WL-02 — 判準資料化（票 B-25）
+#
+# 設計依據：handoffs/reconcile/20260813-govwl02-x-consult-r1/synth.md（三家 consult）。
+# 主委原提案三處落法被推翻並改寫，詳見該檔；本節只守最終落法。
+#
+# 🔴 本節**不**測「語意互斥」——三家一致認定：不同條件字串描述同一物理事件時鍵不相等，
+#    機械上偵測不到。那是具名殘留（docs/GOV_CRITERIA_REGISTRY.md 殘留 1），不是本機制的能力。
+#    若有人日後為此加測試，請先讀該殘留，別把「測不到」寫成「測過了」。
+# ==========================================================================
+
+_CRIT_ROLES = {"id": "判準ID", "scope": "適用範圍", "condition": "條件",
+               "expect": "期望rc", "status": "狀態", "oracle": "對應測試"}
+_CRIT_COLS = ["判準ID", "適用範圍", "條件", "期望rc", "狀態", "對應測試"]
+_CRIT_ENUM = ["現行", "已廢"]
+
+
+def _crit_reg(rows, *, roles=None, enum=None, cols=None, target="docs/c.md"):
+    """判準註冊表；預設一列合法資料。刻意讓 _schema 完整以免被前置檢查攔在前面。"""
+    return {
+        "_schema": {
+            "status_enum": ["✅"],
+            "status_keys": ["other"],
+            "status_scope": ["docs/"],
+            "status_scope_grandfathered": ["docs/__none__.md"],
+            "criteria_keys": ["crit"],
+            "criteria_status_enum": _CRIT_ENUM if enum is None else enum,
+            "criteria_column_roles": _CRIT_ROLES if roles is None else roles,
+        },
+        "other": {"target": "docs/o.md", "rows": [["010", "ZZ-01", "x"]]},
+        "crit": {"target": target, "columns": _CRIT_COLS if cols is None else cols,
+                 "render": "table", "rows": rows},
+    }
+
+
+_CRIT_OK = [["C-1", "s1", "cond-a", "0", "現行", "test_a"],
+            ["C-2", "s1", "cond-b", "1", "現行", "test_b"]]
+
+
+def _crit_root(tmp_path, *, body="", cname="c.md"):
+    root = _mkroot(tmp_path)
+    (root / "docs" / cname).write_text(
+        "前言\n<!-- BEGIN GENERATED: crit -->\n<!-- END GENERATED: crit -->\n" + body,
+        encoding="utf-8")
+    (root / "docs" / "o.md").write_text(
+        "<!-- BEGIN GENERATED: other -->\n<!-- END GENERATED: other -->\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    return root
+
+
+def _crit_run(tmp_path, registry, *, body="", sub="s"):
+    root = _crit_root(tmp_path / sub, body=body)
+    sdir = _sandbox(tmp_path / sub, registry)
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    _run([str(sdir / GEN.name), "--write"], env_extra=env)
+    return _run([str(sdir / GEN.name), "--check"], env_extra=env), sdir, root
+
+
+def test_wl02_clean_criteria_table_is_rc_zero(tmp_path):
+    r, _, _ = _crit_run(tmp_path, _crit_reg(_CRIT_OK))
+    assert r.returncode == 0, r.stderr
+
+
+def test_wl02_conflicting_criteria_is_fail_closed(tmp_path):
+    """WL-02 字面要求：同適用範圍同條件、狀態為現行，期望相異 ⇒ 拒。"""
+    rows = _CRIT_OK + [["C-3", "s1", "cond-a", "1", "現行", "test_c"]]
+    r, _, _ = _crit_run(tmp_path, _crit_reg(rows))
+    assert r.returncode != 0, r.stdout
+    assert "互斥判準" in r.stderr and "cond-a" in r.stderr, r.stderr
+
+
+def test_wl02_superseded_row_does_not_count_as_conflict(tmp_path):
+    """已廢列刻意不參與衝突判定 —— 否則「現行／已廢」兩欄表本身就永遠紅。
+
+    這正是 x-consult-r12 J-1 當初指出、WL-01 才解除的那種表。
+    """
+    rows = _CRIT_OK + [["C-3", "s1", "cond-a", "1", "已廢", "見 C-1"]]
+    r, _, _ = _crit_run(tmp_path, _crit_reg(rows))
+    assert r.returncode == 0, r.stderr
+
+
+def test_wl02_unknown_criteria_status_is_fail_closed(tmp_path):
+    """🔴 CODEX-R1-P1-03：未宣告封閉列舉時，未知狀態值會被當普通字串默默接受。"""
+    rows = [["C-1", "s1", "cond-a", "0", "大概吧", "test_a"]]
+    r, _, _ = _crit_run(tmp_path, _crit_reg(rows))
+    assert r.returncode != 0, r.stdout
+    assert "criteria_status_enum" in r.stderr, r.stderr
+
+
+def test_wl02_missing_role_column_is_fail_closed(tmp_path):
+    """角色欄由名稱解析，不寫死索引；欄名對不上即拒（而非默默取錯欄）。"""
+    cols = ["判準ID", "適用範圍", "條件", "期望rc", "狀態", "測試"]  # oracle 欄改名
+    rows = [["C-1", "s1", "cond-a", "0", "現行", "test_a"]]
+    r, _, _ = _crit_run(tmp_path, _crit_reg(rows, cols=cols))
+    assert r.returncode != 0, r.stdout
+    assert "缺角色欄" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("claim", [
+    "驗收：rc=0",
+    "驗收：rc = 1",
+    "此路徑 rc≠0",
+    "此路徑 rc != 0",
+    "邊界②：具名略過、rc 不變",
+    "期望 returncode == 1",
+])
+def test_wl02_rc_claim_outside_block_is_fail_closed(tmp_path, claim):
+    """🔴 COMPOSER-R1-P1-01／GROK-R1-P1-02：只釘 `rc=` 會被同義寫法繞過。
+
+    封閉白名單的每一種形態都必須被抓到；其中 `returncode ==` 是 docs/ 內**已存在**的用法。
+    """
+    r, _, _ = _crit_run(tmp_path, _crit_reg(_CRIT_OK), body=claim + "\n",
+                        sub=f"c{abs(hash(claim)) % 9973}")
+    assert r.returncode != 0, f"{claim!r} 未被攔截\n{r.stdout}"
+    assert "生成區塊外陳述期望結束狀態" in r.stderr, r.stderr
+
+
+def test_wl02_rc_claim_inside_own_block_is_allowed(tmp_path):
+    """判準表本身就在寫期望值 —— 區塊內不得被自己咬。"""
+    rows = [["C-1", "s1", "cond-a", "0", "現行", "test_a"]]
+    r, _, _ = _crit_run(tmp_path, _crit_reg(rows))
+    assert r.returncode == 0, r.stderr
+
+
+def test_wl02_rc_claim_inside_other_key_block_is_allowed(tmp_path):
+    """🔴 COMPOSER-R1-P1-03：多 key 宿主須豁免**該檔全部**合法區塊，非只判準區塊。
+
+    只豁免判準區塊時，同檔並存的其他事實表會被誤擋。
+    """
+    reg = _crit_reg(_CRIT_OK)
+    reg["other"]["target"] = "docs/c.md"          # 同檔兩個 key
+    reg["other"]["rows"] = [["010", "ZZ-01", "rc=0"]]
+    root = _mkroot(tmp_path)
+    (root / "docs" / "c.md").write_text(
+        "前言\n<!-- BEGIN GENERATED: crit -->\n<!-- END GENERATED: crit -->\n"
+        "<!-- BEGIN GENERATED: other -->\n<!-- END GENERATED: other -->\n",
+        encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    sdir = _sandbox(tmp_path, reg)
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    assert _run([str(sdir / GEN.name), "--write"], env_extra=env).returncode == 0
+    r = _run([str(sdir / GEN.name), "--check"], env_extra=env)
+    assert r.returncode == 0, f"同檔其他 key 之區塊內容被誤擋\n{r.stderr}"
+
+
+def test_wl02_non_target_file_is_not_scanned_named_residual(tmp_path):
+    """🔴 CODEX-R1-P1-02 之**具名殘留釘樁**：membership 靠登記，不靠有沒有區塊。
+
+    未登記檔即使貼一組看起來像判準表的生成標記、並在區塊外寫期望值，**也不會被掃**。
+    本測試斷言的是「現況如此」，不是「這樣才對」——它存在的目的是：
+    若哪天有人以為這條已經封住，這裡會提醒他沒有。
+    殘留全文見 docs/GOV_CRITERIA_REGISTRY.md 殘留 2。
+    """
+    root = _crit_root(tmp_path)
+    (root / "docs" / "unregistered.md").write_text(
+        "<!-- BEGIN GENERATED: crit -->\n<!-- END GENERATED: crit -->\n驗收 rc=0\n",
+        encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    sdir = _sandbox(tmp_path, _crit_reg(_CRIT_OK))
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    _run([str(sdir / GEN.name), "--write"], env_extra=env)
+    r = _run([str(sdir / GEN.name), "--check"], env_extra=env)
+    assert "生成區塊外陳述期望結束狀態" not in r.stderr, (
+        "未登記檔已被納入 rc 掃描 ⇒ 殘留 2 已關閉，請更新 "
+        "docs/GOV_CRITERIA_REGISTRY.md 與本測試，不要留著過期的殘留宣稱"
+    )
+
+
+def test_wl02_mutation_removing_conflict_check_lets_contradiction_through(tmp_path):
+    rows = _CRIT_OK + [["C-3", "s1", "cond-a", "1", "現行", "test_c"]]
+    reg = _crit_reg(rows)
+    good = _sandbox(tmp_path / "good", reg)
+    bad = _sandbox(tmp_path / "bad", reg)
+    _mutate(bad, "_fk_validate_criteria || _fkc_rc=1", ":")
+    root = _crit_root(tmp_path / "r")
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    _run([str(good / GEN.name), "--write"], env_extra=env)
+    g = _run([str(good / GEN.name), "--check"], env_extra=env)
+    b = _run([str(bad / GEN.name), "--check"], env_extra=env)
+    assert g.returncode != 0 and "互斥判準" in g.stderr, g.stderr
+    assert "互斥判準" not in b.stderr, "拿掉呼叫仍報互斥 ⇒ 這條 mutation 是空心的"
+
+
+def test_wl02_mutation_removing_rc_scan_lets_outside_claim_through(tmp_path):
+    reg = _crit_reg(_CRIT_OK)
+    good = _sandbox(tmp_path / "good", reg)
+    bad = _sandbox(tmp_path / "bad", reg)
+    _mutate(bad, "_fk_reject_rc_claims_outside_blocks || _fkc_rc=1", ":")
+    root = _crit_root(tmp_path / "r", body="驗收：rc=0\n")
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    _run([str(good / GEN.name), "--write"], env_extra=env)
+    g = _run([str(good / GEN.name), "--check"], env_extra=env)
+    b = _run([str(bad / GEN.name), "--check"], env_extra=env)
+    assert g.returncode != 0, g.stderr
+    assert b.returncode == 0, f"拿掉 rc 掃描後仍紅 ⇒ 這條 mutation 是空心的\n{b.stderr}"
+
+
+def test_wl02_live_criteria_oracle_tests_exist():
+    """🔴 CODEX-R1-P1-03 之修法：判準表不得退化成無人對照的散文目錄。
+
+    每個「現行」判準的『對應測試』欄，必須真的是 tests/ 底下存在的測試函式。
+    這條把「表」與「真正承重的東西」綁在一起 —— 表自己不承重，測試才承重。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    ckeys = data["_schema"]["criteria_keys"]
+    roles = data["_schema"]["criteria_column_roles"]
+    live = data["_schema"]["criteria_status_enum"][0]
+    src = "\n".join(
+        p.read_text(encoding="utf-8")
+        for p in sorted((REPO / "tests" / "governance").glob("*.py"))
+    )
+    missing = []
+    for k in ckeys:
+        cols = data[k]["columns"]
+        si, oi = cols.index(roles["status"]), cols.index(roles["oracle"])
+        idi = cols.index(roles["id"])
+        for row in data[k]["rows"]:
+            if row[si] != live:
+                continue
+            if f"def {row[oi]}(" not in src:
+                missing.append(f"{row[idi]} → {row[oi]}")
+    assert not missing, (
+        "判準表之『對應測試』不存在於 tests/governance/ ⇒ 該判準無人承重：\n  "
+        + "\n  ".join(missing)
     )
 
 

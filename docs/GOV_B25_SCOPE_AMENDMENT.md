@@ -26,14 +26,22 @@ FACTKEY-FROZEN: governance-execution-order
 FACTKEY-ADDED: governance-batch-status
 FACTKEY-ADDED: governance-ticket-closure
 FACTKEY-ADDED: governance-worklist
+FACTKEY-CRITERIA: governance-criteria
 ```
+
+🔴 **第三種宣告 `FACTKEY-CRITERIA`（2026-08-13，待辦清單 `WL-02` 新增）**：
+判準 key **不是**狀態 key（其第 2 欄為適用範圍而非識別碼，併入狀態偵測會大量誤擋）。
+原契約 2 要求「`FACTKEY-ADDED` 恰等於 `status_keys`」，若把判準 key 寫成 `FACTKEY-ADDED`
+會使該契約失效；改用第三種宣告，三條集合相等同時成立，反循環性質不變。
 
 🔴 `governance-worklist`（使用者指示「寫在自己一定會看到、不會漏也不會讀錯的地方」）：
 宿主＝`HANDOFF.md`（SessionStart 自動注入 ⇒ 接手必見）＋`白話說明/接下來要做什麼.md`。
 待辦項之狀態自此為**機械投影**，任何文件手寫該狀態即 `--check` 非零。
 
 **契約（測試強制，四條缺一即紅）**：
-1. `scripts/fact_keys.json` 之 fact-key 集合 **恰等於** `FACTKEY-FROZEN` ∪ `FACTKEY-ADDED`。
+1. `scripts/fact_keys.json` 之 fact-key 集合 **恰等於** `FACTKEY-FROZEN` ∪ `FACTKEY-ADDED` ∪ `FACTKEY-CRITERIA`。
+   （🔴 `WL-02` 起加入第三個聯集項；三個清單互不相交，亦以集合相等鎖死。）
+1b. `FACTKEY-CRITERIA` 集合 **恰等於** `_schema.criteria_keys`。
 2. `FACTKEY-ADDED` 集合 **恰等於** `scripts/fact_keys.json` 之 `_schema.status_keys`
    （🔴 原文寫「兩個狀態 key」，該數字於新增 `governance-worklist` 後過期；
    **不再寫死個數**——個數以 `status_keys` 為準，本檔只放指標）。

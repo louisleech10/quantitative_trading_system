@@ -516,6 +516,145 @@ EOF2
   return 0
 }
 
+# ==========================================================================
+# WL-02（票 B-25 判準資料化）— 判準表之三道檢查
+#
+# 設計出處：`handoffs/reconcile/20260813-govwl02-x-consult-r1/synth.md`（三家 consult）。
+# 主委原提案的三處落法被逐一推翻並改寫，摘要：
+#   · 掃散文抽「條件→期望」：實測零訊號（封閉抽取 146 配對、三種分組衝突皆 0）⇒ **不做**。
+#   · membership 用「有生成區塊即進管制」：不封閉——未登記檔可貼假區塊且根本不被掃
+#     〔CODEX-R1-P1-02〕⇒ 改為**只認註冊表登記之 target**。
+#   · 禁寫 pattern 用 `rc` 字面：可被同義寫法繞過，且 docs/ 內已存在該用法
+#     〔COMPOSER-R1-P1-01／GROK-R1-P1-02〕⇒ 改為**封閉白名單**。
+#
+# 🔴 具名殘留（三家一致，**不得宣稱互斥判準已封死**）：
+#   不同條件字串描述同一物理事件時鍵不相等 ⇒ 衝突偵測靜默放行。出生事故那型仍靠人。
+#   完整殘留清單見 docs/GOV_CRITERIA_REGISTRY.md。
+#
+# 期望結束狀態之陳述形態：**封閉白名單**（擴充須改本行，非無限往黑名單加）。
+# 刻意以字元類拆寫，使本行自身不構成被掃到的形態（否則本檔若成為判準宿主會自咬）。
+_FK_RC_CLAIM_RES='rc[[:space:]]*(=|==|≠|!=)|rc[[:space:]]*不變|returncode[[:space:]]*=='
+
+_fk_criteria_keys() { LC_ALL=C jq -r '._schema.criteria_keys[]? // empty' "${REG}"; }
+
+# 角色→欄索引。以 columns 名稱查位置，不寫死索引〔可換欄序而不改碼〕。
+_fk_role_idx() {   # $1=key $2=role -> stdout: 0-based 欄索引；找不到回非 0
+  LC_ALL=C jq -er --arg k "$1" --arg r "$2" '
+    (._schema.criteria_column_roles[$r]) as $name
+    | if $name == null then error("role-undeclared")
+      else (.[$k].columns | index($name)) end
+    | if . == null then error("column-missing") else . end
+  ' "${REG}" 2>/dev/null
+}
+
+_fk_validate_criteria() {   # 判準表語意檢查（狀態列舉封閉 ＋ 同範圍同條件不得相異期望）
+  _fkvc_keys="$(_fk_criteria_keys)" || return 1
+  [ -n "${_fkvc_keys}" ] || return 0
+  _fkvc_rc=0
+  LC_ALL=C jq -e '._schema.criteria_status_enum
+                  | type == "array" and length > 0 and all(.[]; type == "string")' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: 有 criteria_keys 但 _schema.criteria_status_enum 缺席／非法 → fail-closed" >&2
+         return 1; }
+  while IFS= read -r _fkvc_k; do
+    [ -n "${_fkvc_k}" ] || continue
+    printf '%s\n' "$(_fk_keys)" | LC_ALL=C grep -qxF "${_fkvc_k}" || {
+      echo "gen_fact_key_blocks: criteria_keys 含未註冊 key '${_fkvc_k}' → fail-closed" >&2
+      _fkvc_rc=1; continue; }
+    _fkvc_bad=""
+    for _fkvc_role in id scope condition expect status oracle; do
+      _fk_role_idx "${_fkvc_k}" "${_fkvc_role}" >/dev/null 2>&1 \
+        || _fkvc_bad="${_fkvc_bad} ${_fkvc_role}"
+    done
+    [ -z "${_fkvc_bad}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkvc_k} 缺角色欄（criteria_column_roles 未宣告或 columns 無該欄）:${_fkvc_bad} → fail-closed" >&2
+      _fkvc_rc=1; continue; }
+    _fkvc_si="$(_fk_role_idx "${_fkvc_k}" status)" || { _fkvc_rc=1; continue; }
+    # ① 狀態列舉封閉：未知值 fail-closed〔CODEX-R1-P1-03〕
+    # 🔴 `"${REG}"` 之後**不得**接同一行的排序管線：那串是 T-2.1-M1a／M1b 的 mutation 錨點，
+    #    多一處就會讓那兩條打到這裡而非生成排序（空心）。既有 `_fk_status_ids` 亦用換行寫法。
+    #    2026-08-13 WL-02 施工時再犯一次，由 test_wl01_sort_anchor_stays_unique_in_generator 抓到。
+    _fkvc_unknown="$(LC_ALL=C jq -r --arg k "${_fkvc_k}" --argjson si "${_fkvc_si}" '
+      (._schema.criteria_status_enum) as $e
+      | .[$k].rows[] | select((.[$si] | IN($e[]) | not)) | .[$si]' "${REG}" \
+      | LC_ALL=C sort -u)"
+    [ -z "${_fkvc_unknown}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkvc_k} 之狀態值不在 criteria_status_enum 內 → fail-closed:" >&2
+      printf '%s\n' "${_fkvc_unknown}" | sed 's/^/    /' >&2
+      _fkvc_rc=1; }
+    # ② 同適用範圍同條件不得有相異期望（只看現行者；已廢列刻意不參與）
+    _fkvc_sci="$(_fk_role_idx "${_fkvc_k}" scope)" || { _fkvc_rc=1; continue; }
+    _fkvc_ci="$(_fk_role_idx "${_fkvc_k}" condition)" || { _fkvc_rc=1; continue; }
+    _fkvc_ei="$(_fk_role_idx "${_fkvc_k}" expect)" || { _fkvc_rc=1; continue; }
+    _fkvc_conf="$(LC_ALL=C jq -r \
+      --arg k "${_fkvc_k}" --argjson sci "${_fkvc_sci}" --argjson ci "${_fkvc_ci}" \
+      --argjson ei "${_fkvc_ei}" --argjson si "${_fkvc_si}" '
+      (._schema.criteria_status_enum[0]) as $live
+      | [ .[$k].rows[] | select(.[$si] == $live) ]
+      | group_by([.[$sci], .[$ci]])
+      | map(select((map(.[$ei]) | unique | length) > 1))
+      | .[] | "  \(.[0][$sci]) ／ \(.[0][$ci]) ⇒ 期望值 " + (map(.[$ei]) | unique | join("、"))
+    ' "${REG}")" || { _fkvc_rc=1; continue; }
+    [ -z "${_fkvc_conf}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkvc_k} 有互斥判準（同適用範圍同條件、狀態為現行、期望相異）→ fail-closed:" >&2
+      printf '%s\n' "${_fkvc_conf}" >&2
+      _fkvc_rc=1; }
+  done <<EOF
+${_fkvc_keys}
+EOF
+  return "${_fkvc_rc}"
+}
+
+# ③ 判準宿主之生成區塊外不得陳述期望結束狀態。
+#   範圍＝**只有** criteria key 之 target（membership 靠登記，不靠有沒有區塊）。
+#   豁免＝該檔**全部**合法生成區塊，非只判準區塊〔COMPOSER-R1-P1-03：
+#   多 key 宿主只豁免判準區塊會誤擋並存的事實表〕。
+_fk_reject_rc_claims_outside_blocks() {
+  _fkrr_keys="$(_fk_criteria_keys)" || return 1
+  [ -n "${_fkrr_keys}" ] || return 0
+  _fkrr_root="$(_fk_root)"; _fkrr_rc=0
+  _fkrr_all="$(_fk_keys)" || return 1
+  while IFS= read -r _fkrr_k; do
+    [ -n "${_fkrr_k}" ] || continue
+    _fkrr_tgts="$(_fk_targets "${_fkrr_k}")" || { _fkrr_rc=1; continue; }
+    while IFS= read -r _fkrr_t; do
+      [ -n "${_fkrr_t}" ] || continue
+      _fkrr_p="${_fkrr_root}/${_fkrr_t}"
+      [ -f "${_fkrr_p}" ] || continue        # 缺檔已由 _fk_check 具名報過
+      _fkrr_legal=""
+      while IFS= read -r _fkrr_lk; do
+        [ -n "${_fkrr_lk}" ] || continue
+        _fk_targets "${_fkrr_lk}" 2>/dev/null | LC_ALL=C grep -qxF -- "${_fkrr_t}" \
+          && _fkrr_legal="${_fkrr_legal} ${_fkrr_lk}"
+      done <<EOF2
+${_fkrr_all}
+EOF2
+      _fkrr_hit="$(LC_ALL=C awk -v legal="${_fkrr_legal}" -v res="${_FK_RC_CLAIM_RES}" -v rel="${_fkrr_t}" '
+        BEGIN { nl = split(legal, L, " "); for (i = 1; i <= nl; i++) if (L[i] != "") LEGAL[L[i]] = 1 }
+        /^<!-- BEGIN GENERATED: .* -->$/ {
+          k = $0; sub(/^<!-- BEGIN GENERATED: /, "", k); sub(/ -->$/, "", k)
+          if (k in LEGAL) { inblk = 1 }
+          next }
+        /^<!-- END GENERATED: .* -->$/ {
+          k = $0; sub(/^<!-- END GENERATED: /, "", k); sub(/ -->$/, "", k)
+          if (k in LEGAL) { inblk = 0 }
+          next }
+        inblk { next }
+        $0 ~ res { printf "  %s:%d %s\n", rel, FNR, $0 }
+      ' "${_fkrr_p}")"
+      [ -z "${_fkrr_hit}" ] || {
+        echo "gen_fact_key_blocks: 判準宿主 ${_fkrr_t} 於生成區塊外陳述期望結束狀態（改寫為判準 ID 指標）→ fail-closed:" >&2
+        printf '%s\n' "${_fkrr_hit}" >&2
+        _fkrr_rc=1; }
+    done <<EOF
+${_fkrr_tgts}
+EOF
+  done <<EOF3
+${_fkrr_keys}
+EOF3
+  return "${_fkrr_rc}"
+}
+
 _fk_check() {
   _fk_validate_keys || return 1
   _fk_validate_schema_sets || return 1
@@ -552,6 +691,9 @@ EOF
   _fk_reject_unregistered_blocks || _fkc_rc=1
   # 生成區塊外之手寫狀態一律拒（票 B-25 站 2.5 Task 2.1）
   _fk_reject_handwritten_status || _fkc_rc=1
+  # 判準表語意 ＋ 判準宿主之區塊外期望陳述（WL-02）
+  _fk_validate_criteria || _fkc_rc=1
+  _fk_reject_rc_claims_outside_blocks || _fkc_rc=1
   return "${_fkc_rc}"
 }
 
