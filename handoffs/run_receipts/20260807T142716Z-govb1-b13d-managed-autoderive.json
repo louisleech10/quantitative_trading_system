@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260807T142716Z-govb1-b13d-managed-autoderive",
+  "claim_id": "govb1-b13d-managed-autoderive",
+  "command": [
+    "bash",
+    "-c",
+    "bash scripts/plain_docs_sync_check.sh 2>&1 | grep -q \"第1批-在做什麼.md\""
+  ],
+  "command_sha256": "df2e6fd2323fdc7cc80411c81de4808c6acb8176f82074315b236785dad7ef55",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "841af77a3188a85628d1ca352ec9f0e6529bfcb5",
+  "tree_dirty": true,
+  "started_at": "2026-08-07T14:27:16Z",
+  "ended_at": "2026-08-07T14:27:16Z",
+  "duration_seconds": 0.410638,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_path": "handoffs/run_receipts/20260807T142716Z-govb1-b13d-managed-autoderive.log",
+  "tail_excerpt": []
+}

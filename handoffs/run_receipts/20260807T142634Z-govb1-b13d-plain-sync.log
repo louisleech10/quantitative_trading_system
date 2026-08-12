@@ -1,0 +1,8 @@
+[plain_docs_sync] ✗ 過期: 白話說明/流程摩擦記錄.md
+    其 WATCHED（scripts/ docs/GOV tests/governance/）最後改動 9d40c365，晚於本檔最後更新 b8b4fe6a
+    WATCHED 的該次改動：
+      9d40c36 feat(governance): 票 B-38 — 零 findings 以 P3-00 sentinel 取得正規出路
+[plain_docs_sync] ✗ 過期: 白話說明/第1批-在做什麼.md（尚未進版控，但其 WATCHED 已有改動）
+[plain_docs_sync] ✗ 過期: 白話說明/第1批-施工清單.md（尚未進版控，但其 WATCHED 已有改動）
+  ⇒ 3 個檔過期。修：更新該檔內容並與實作同 commit（或之後）提交。
+  出處：使用者 2026-08-05「其他檔案也不一定會記得」「忘記也是沒有」。

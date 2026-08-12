@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260812T025853Z-b61-quorum-hardcoded-line35",
+  "claim_id": "b61-quorum-hardcoded-line35",
+  "command": [
+    "python3",
+    "-m",
+    "pytest",
+    "tests/governance/test_family_registry.py::test_no_unpinned_family_list_line",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ],
+  "command_sha256": "363a59c351dc84aad0dbc81b4bf27a37789477a10d66fc9ee9ceac16232f0307",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "5dc5d0cf682e2d959e96d0d0d23b03af6fa9db30",
+  "tree_dirty": true,
+  "started_at": "2026-08-12T02:58:50Z",
+  "ended_at": "2026-08-12T02:58:53Z",
+  "duration_seconds": 2.818541,
+  "exit_code": 0,
+  "runtime_class": "helper_smoke",
+  "requested_class": null,
+  "pytest_summary": "============================== 1 passed in 0.07s ===============================",
+  "selected_node_ids": [
+    "tests/governance/test_family_registry.py::test_no_unpinned_family_list_line"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 1,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "cd2245d347cdd7ae3c4deb0534c2d9e0b7ab137b4186871f3bebe705a516809c",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "cd2245d347cdd7ae3c4deb0534c2d9e0b7ab137b4186871f3bebe705a516809c",
+  "log_path": "handoffs/run_receipts/20260812T025853Z-b61-quorum-hardcoded-line35.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 1 item",
+    "",
+    "tests/governance/test_family_registry.py::test_no_unpinned_family_list_line PASSED [100%]",
+    "",
+    "============================== 1 passed in 0.07s ==============================="
+  ]
+}

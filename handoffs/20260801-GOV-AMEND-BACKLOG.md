@@ -2761,7 +2761,15 @@ TICKET-STATUS: OPEN
 
 ## B-49 票 `GOV-ROLES-SOT-CANNOT-EXPRESS-ORCHESTRATOR`
 
-TICKET-STATUS: OPEN
+TICKET-STATUS: CLOSED
+
+🔴 **關票日期**：2026-08-12。**關票證據為機械可驗，非宣稱**——
+`test_b45_unfreeze_requires_roles_sot_closure` 於票標 `CLOSED` 時會呼叫
+`_assert_b49_closure_evidence()`，逐格於**實體隔離副本**執行六個具名 selector
+並驗各自的 `rc`／`passed`／`skipped`；缺 selector／被掏空／清單漂移／逾時
+／snapshot 失敗一律 fail-closed。四條票文條件之對應 selector 見
+`docs/GOV_B49_ASBUILT_DELTA.md`；十條 as-built 落差與四條具名殘留同見該檔。
+審查：consult r1 ＋ review r2–r5（三家全員），r5 三家 `APPROVED`、零 `[MUST-FIX]`。
 
 🔴 **開票依據**：`handoffs/reconcile/20260809-govb1-x-consult-r1/synth.md`
 （C3／C4，codex + composer 兩家 `RECONCILE-STAMP APPROVED`）。
@@ -3279,3 +3287,114 @@ Phase 2 的機械改寫曾**意外**把此行為改成「保留前導換行」�
 ### 淨摩擦
 
 實測發作 0 次。純正確性疑慮，優先序低，但**不得在未判定前默默改掉**。
+
+---
+
+## B-59 票 `GOV-GATE-PATTERN-ENUMERATION-UNBOUNDED`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：站 5（GOVB0 `B4`）連續三輪對抗審查之收斂趨勢，
+出處 `handoffs/reconcile/20260811-govb0-b4-review-r{1,2}/synth.md`。
+
+### 病：這道閘用「列舉可疑樣式」判定，不是「導出封閉集合」
+
+`_gate_lex_match_scan` 與 `_gate_lex_extract_inners` 以正則列舉
+**wrapper 名稱／選項語法／分隔符／重定向／直譯器旗標／合併旗標／引號形式**，
+判定「這條指令是不是派工」。每一輪對抗審查都在同一段判定式上找到新的、
+沒被列舉到的形態：
+
+| 輪次 | 該輪新發現的漏放形態 |
+|---|---|
+| 站 5 開工探路 | `<任意前綴>bash -c`、`cx_run.sh`／`committee_run.sh` 直呼、`xargs -n 1`、`env FOO=`、動態賦值 |
+| r1（codex） | wrapper 的**選項值**（`env -u FOO`／`xargs -I {}`）、直譯器路徑前綴（`/bin/bash`）、`env bash`／`exec bash` |
+| 主委自查 | `exec`／`command`／`nohup` 未進 fail-closed 網 |
+| r2（codex） | 家族名**後界**（`codex;`／`codex\|cat`／`codex&`／`(codex)`／`codex<in`／`codex>out`）、直譯器**前置旗標**（`bash --noprofile -c`）、**合併旗標**（`bash -ic`）、**引號緊貼**（`bash -c"…"`）、旗標帶值（`bash -O extglob -c`） |
+
+🔴 **三輪都有新發現，且多為既有洞而非本批引入** ⇒ 這不是「還沒列完」，
+是**黑名單本質上列不完**。使用者 2026-08-07 定死的規則正是這條：
+「遇散文／關鍵字／區塊分類 judgment 一律改封閉可導出集合的機械閘，禁再耗回合列舉」。
+
+### 修法方向（非本批施作）
+
+真正的形態是**把指令 tokenize，逐個命令位置解出 argv[0]**，再與封閉的
+`executor_clis` 清單比對——那樣「還有沒有第 N 種寫法」這個問題才會消失，
+而不是每次審查再補一條 alternation。
+
+B3R SPEC §B 本來就設計了 `_gate_lex_scan` 事件流（`CMD.word1_decoded` 等），
+方向一致；但 B3R 只落地了效能面，判定仍走舊的正則列舉。
+
+### 🔴 對外宣稱之限制（即刻生效）
+
+- ✅ 可說：「本批修掉了 N 個**已知**漏放形態，逐條有反例與回歸樁」
+- ❌ **不可說**：「dispatch gate 已完備」「派工不可能繞過」
+- 每次新發現一個形態，只證明列舉又少一項，不證明其餘已窮舉
+
+### 淨摩擦
+
+三輪 review 共發現 12+ 個漏放形態，其中 r2 的四個為既有（HEAD 亦漏放）。
+**優先序：高**——這是唯一能讓「漏放形態」停止增生的修法方向。
+但屬大重寫，須另立 epic，不得夾帶進 `B4`。
+
+---
+
+## B-60 票 `GOV-QUORUM-FAMILY-LIST-HARDCODED`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：`handoffs/reconcile/20260811-govb49-x-consult-r1/synth.md` 群集 C
+（`CODEX-R1-P1-04` 與 `GROK-R1-P2-02` 獨立命中同一處）。
+
+### 病
+
+`scripts/review_quorum_check.sh:35` 的 `codex|composer|grok)` 是**字面硬編**，
+不是從 `scripts/governance_families.json` 的 `review_families` 導出。
+`tests/governance/test_family_registry.py` 的 `_DRIFT` 已把它釘為「已知漂移」，
+⇒ `test_no_unpinned_family_list_line` 綠燈**不代表它讀 SoT**，只代表它被登記過。
+VERIFY:20260812T025853Z-b61-quorum-hardcoded-line35
+
+### 為何現在不會出事、以後會
+
+現值恰與 SoT 三家相同 ⇒ 本輪無漏判。
+新增／替換正式委員時，`review_quorum_check` 會與 `review_families` 分裂：
+新家族的 review 不被計入 quorum ⇒ 派工被擋，且錯誤訊息指向錯誤的地方。
+
+### 修法方向
+
+改讀共用 getter（`families_get review_families`），並補 mutation：
+以**不同的合法子集**（非現行三家）證明它不是只對現行名單有效。
+
+### 淨摩擦
+
+低頻但高迷惑度（症狀是「明明審了兩家卻說 quorum 不足」）。**優先序：中。**
+
+---
+
+## B-61 票 `GOV-ROLEGATE-KNOWNONLY-UNKNOWN-FAMILY-SILENT-PASS`
+
+TICKET-STATUS: OPEN
+
+🔴 **開票依據**：`handoffs/reconcile/20260811-govb49-x-consult-r1/synth.md` 群集 F
+（`COMPOSER-R1-P2-03`，附 `AV-CF10` 實跑）。
+
+### 病
+
+`scripts/_role_gate.sh` 的 `known_only` 模式對「不在 `review_families`」之家族**靜默跳過**。
+實測：`check-family` ＋ `brief-kind:consult` ＋ `agy` → **rc=0**（放行）。
+`agy` 是唯讀研究家族，禁實作／禁寫入。
+
+### 邊界（誠實）
+
+- **既有行為**，非 2026-08-11 名冊變更引入；cx_run 下游仍會 fail-closed 拒 `agy` 的寫入型派工。
+- 2026-08-11 已修掉**同一模式**中最嚴重的一格（`fam == implementer` 不再被跳過），
+  本票是那次修法**刻意未擴張**的剩餘面。
+
+### 修法方向
+
+`known_only` 的「跳過」須改為**具名白名單**（哪些家族允許交給下游 dispatch 判定），
+而不是「不認得就放行」。與 `票 B-59` 同型（黑名單 vs 封閉集合）。
+
+### 淨摩擦
+
+**優先序：低**——目前無已知可達成的實害路徑（下游 fail-closed 仍在），
+但它是「不認得就放行」這個反模式在角色閘的最後一處。

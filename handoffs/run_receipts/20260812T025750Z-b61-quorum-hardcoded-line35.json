@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260812T025750Z-b61-quorum-hardcoded-line35",
+  "claim_id": "b61-quorum-hardcoded-line35",
+  "command": [
+    "bash",
+    "-c",
+    "sed -n '35p' scripts/review_quorum_check.sh; python3 -m pytest tests/governance/test_family_registry.py::test_no_unpinned_family_list_line -q -p no:cacheprovider 2>&1 | tail -2"
+  ],
+  "command_sha256": "61eb7bf8333748e5038711253afa49f8bdf26783bcfb020c275be52289939dec",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "5dc5d0cf682e2d959e96d0d0d23b03af6fa9db30",
+  "tree_dirty": true,
+  "started_at": "2026-08-12T02:57:45Z",
+  "ended_at": "2026-08-12T02:57:50Z",
+  "duration_seconds": 5.189312,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": "============================== 1 passed in 0.07s ===============================",
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 1,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "ea1974d21d2f6ff4b8569bb7d40fe42ff07901ef44f0a34586fe25b28fc66b7a",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "ea1974d21d2f6ff4b8569bb7d40fe42ff07901ef44f0a34586fe25b28fc66b7a",
+  "log_path": "handoffs/run_receipts/20260812T025750Z-b61-quorum-hardcoded-line35.log",
+  "tail_excerpt": [
+    "    codex|composer|grok) : ;;",
+    "",
+    "============================== 1 passed in 0.07s ==============================="
+  ]
+}

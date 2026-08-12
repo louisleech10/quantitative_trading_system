@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260812T001852Z-b49-stageC-fullchain-190",
+  "claim_id": "b49-stageC-fullchain-190",
+  "command": [
+    "bash",
+    "/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/1a18e318-d1af-469f-b6cf-34c0745130fe/scratchpad/b49_c3_measure.sh"
+  ],
+  "command_sha256": "b31f2e099d904d390eea8d8372d951e1487446f2814d6d555b1d958e56c9c52e",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "835c3d354453a8ccf1272ef05330d6c5f84c3f3b",
+  "tree_dirty": true,
+  "started_at": "2026-08-12T00:18:52Z",
+  "ended_at": "2026-08-12T00:18:52Z",
+  "duration_seconds": 0.003189,
+  "exit_code": 127,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "6c604a06493d15ec7f4b24c446fd5e4347a080b9d3c99cf54da933b56af634b1",
+  "log_sha256": "6c604a06493d15ec7f4b24c446fd5e4347a080b9d3c99cf54da933b56af634b1",
+  "log_path": "handoffs/run_receipts/20260812T001852Z-b49-stageC-fullchain-190.log",
+  "tail_excerpt": [
+    "bash: /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/1a18e318-d1af-469f-b6cf-34c0745130fe/scratchpad/b49_c3_measure.sh: No such file or directory"
+  ]
+}
