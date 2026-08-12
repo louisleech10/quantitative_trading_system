@@ -70,7 +70,7 @@ def _amendment_keys():
     assert AMENDMENT.is_file(), (
         f"缺延伸檔 {AMENDMENT}：凍結宣告之偏離無登記處 → fail-closed"
     )
-    frozen, added, criteria = [], [], []
+    frozen, added, criteria, mechanism = [], [], [], []
     for line in AMENDMENT.read_text(encoding="utf-8").splitlines():
         if line.startswith("FACTKEY-FROZEN: "):
             frozen.append(line[len("FACTKEY-FROZEN: "):].strip())
@@ -78,34 +78,44 @@ def _amendment_keys():
             added.append(line[len("FACTKEY-ADDED: "):].strip())
         elif line.startswith("FACTKEY-CRITERIA: "):
             criteria.append(line[len("FACTKEY-CRITERIA: "):].strip())
+        elif line.startswith("FACTKEY-MECHANISM: "):
+            mechanism.append(line[len("FACTKEY-MECHANISM: "):].strip())
     assert frozen, "延伸檔缺 FACTKEY-FROZEN 宣告 → fail-closed"
     assert added, "延伸檔缺 FACTKEY-ADDED 宣告 → fail-closed"
     assert criteria, "延伸檔缺 FACTKEY-CRITERIA 宣告 → fail-closed（WL-02 起）"
-    for name, lst in (("FROZEN", frozen), ("ADDED", added), ("CRITERIA", criteria)):
+    assert mechanism, "延伸檔缺 FACTKEY-MECHANISM 宣告 → fail-closed（WL-03 起）"
+    lists = (("FROZEN", frozen), ("ADDED", added),
+             ("CRITERIA", criteria), ("MECHANISM", mechanism))
+    for name, lst in lists:
         assert len(lst) == len(set(lst)), f"FACTKEY-{name} 含重複項: {lst}"
-    sf, sa, sc = set(frozen), set(added), set(criteria)
-    assert not (sf & sa) and not (sf & sc) and not (sa & sc), "三份宣告清單不得兩兩交集"
-    return sf, sa, sc
+    sets = [set(lst) for _, lst in lists]
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            assert not (sets[i] & sets[j]), (
+                f"宣告清單 {lists[i][0]} 與 {lists[j][0]} 不得交集: {sorted(sets[i] & sets[j])}"
+            )
+    return tuple(sets)
 
 
 def test_registry_key_set_equals_amendment_declaration():
     """票 B-25 站 2.5 Task 1.4（原 TODO 實作要點 1 之延伸；偏離登記見 docs/GOV_B25_SCOPE_AMENDMENT.md）。
 
-    🔴 四條**集合相等**（禁 issubset/>=/in）：
-      ① registry 全集 == FROZEN ∪ ADDED ∪ CRITERIA
+    🔴 五條**集合相等**（禁 issubset/>=/in）：
+      ① registry 全集 == FROZEN ∪ ADDED ∪ CRITERIA ∪ MECHANISM
       ② ADDED == _schema.status_keys（r3 CODEX-R3-P1-04：破解自我循環——
          單靠①時延伸檔漏列一個 key，三方仍互相一致而無人轉紅）
       ②b CRITERIA == _schema.criteria_keys（WL-02 起；理由同②）
+      ②c MECHANISM == _schema.mechanism_keys（WL-03 起；理由同②）
       ③ 凍結期單一 key 仍須在 FROZEN 內
     """
     data = json.loads(REG.read_text(encoding="utf-8"))
     assert isinstance(data, dict)
     fact_keys = {k for k in data if k != "_schema"}
-    frozen, added, criteria = _amendment_keys()
+    frozen, added, criteria, mechanism = _amendment_keys()
 
-    assert fact_keys == frozen | added | criteria, (
+    assert fact_keys == frozen | added | criteria | mechanism, (
         f"registry key 集合與延伸檔宣告不符：registry={sorted(fact_keys)} "
-        f"vs 宣告={sorted(frozen | added | criteria)}"
+        f"vs 宣告={sorted(frozen | added | criteria | mechanism)}"
     )
     assert KEY in frozen, f"凍結期單一 key {KEY} 未列於 FACTKEY-FROZEN"
 
@@ -118,6 +128,11 @@ def test_registry_key_set_equals_amendment_declaration():
     assert criteria == criteria_keys, (
         "🔴 延伸檔 CRITERIA 與 _schema.criteria_keys 不相等 ⇒ 判準 key 漏交或多交："
         f"CRITERIA={sorted(criteria)} vs criteria_keys={sorted(criteria_keys)}"
+    )
+    mechanism_keys = set(data["_schema"].get("mechanism_keys", []))
+    assert mechanism == mechanism_keys, (
+        "🔴 延伸檔 MECHANISM 與 _schema.mechanism_keys 不相等 ⇒ 機制 key 漏交或多交："
+        f"MECHANISM={sorted(mechanism)} vs mechanism_keys={sorted(mechanism_keys)}"
     )
 
     # 每個 key 的結構仍須合法
@@ -1458,7 +1473,9 @@ def test_wl02_live_criteria_oracle_tests_exist():
     data = json.loads(REG.read_text(encoding="utf-8"))
     ckeys = data["_schema"]["criteria_keys"]
     roles = data["_schema"]["criteria_column_roles"]
-    live = data["_schema"]["criteria_status_enum"][0]
+    # 🔴 讀具名欄，不取 enum[0]：後者是位置契約，GROK-R2-P2-01 已於生產碼改掉，
+    #    本測試當時漏改 ⇒ 重排 enum 即靜默改變「現行」的定義（WL-03 施工時補正）。
+    live = data["_schema"]["criteria_live_status"]
     src = "\n".join(
         p.read_text(encoding="utf-8")
         for p in sorted((REPO / "tests" / "governance").glob("*.py"))
@@ -1477,6 +1494,398 @@ def test_wl02_live_criteria_oracle_tests_exist():
         "判準表之『對應測試』不存在於 tests/governance/ ⇒ 該判準無人承重：\n  "
         + "\n  ".join(missing)
     )
+
+
+# ==========================================================================
+# WL-03（票 B-25 機制證據登記）
+#
+# 設計出處：handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md（三家 consult）。
+# 主委原提案「掃改法段抽反引號 span」被三家各自實測否決（誤擋率 80–93%）⇒ 改為
+# 「專用登記表 ＋ 顯式 opt-in 宿主 ＋ receipt/assumed 只對資料列驗證」，禁掃散文。
+#
+# 🔴 本區塊的測試同時釘住**三條刻意保留的殘留**（它們是設計決定，不是漏做）：
+#   · test_wl03_non_optin_host_is_not_scanned_named_residual        （殘留 2）
+#   · test_wl03_heading_style_gaifa_is_named_residual               （殘留 5）
+#   · test_wl03_receipt_existence_is_not_content_verification       （殘留 4）
+#   若哪天封住了其中之一，該測試會轉紅 —— 屆時請回頭更新
+#   docs/GOV_MECHANISM_REGISTRY.md 的殘留宣稱，不要只改測試。
+
+_MECH_ROLES = {"id": "機制ID", "token": "平台機制", "scope": "適用範圍",
+               "evidence": "證據", "finding": "實跑結論", "status": "狀態"}
+_MECH_COLS = ["機制ID", "平台機制", "適用範圍", "證據", "實跑結論", "狀態"]
+_MECH_TOKENS = ["setsid", "ulimit", "timeout", "flock", "nohup", "taskset"]
+_MECH_OK = [["M-1", "timeout", "s1", "receipt:docs/r.md", "可用", "現行"],
+            ["M-2", "flock", "s2", "assumed:尚未採用", "未實跑", "現行"]]
+
+
+def _mech_reg(rows, *, roles=None, cols=None, tokens=None, scope=None,
+              enum=None, live="現行", drop=()):
+    schema = {
+        "status_enum": ["✅"],
+        "status_keys": ["other"],
+        "status_scope": ["docs/"],
+        "status_scope_grandfathered": ["docs/__none__.md"],
+        "mechanism_keys": ["mech"],
+        "mechanism_status_enum": ["現行", "已廢"] if enum is None else enum,
+        "mechanism_live_status": live,
+        "mechanism_column_roles": _MECH_ROLES if roles is None else roles,
+        "mechanism_scope": ["docs/m.md", "docs/spec.md"] if scope is None else scope,
+        "mechanism_tokens": _MECH_TOKENS if tokens is None else tokens,
+    }
+    for f in drop:
+        schema.pop(f, None)
+    return {
+        "_schema": schema,
+        "other": {"target": "docs/o.md", "rows": [["010", "ZZ-01", "x"]]},
+        "mech": {"target": "docs/m.md", "columns": _MECH_COLS if cols is None else cols,
+                 "render": "table", "rows": rows},
+    }
+
+
+def _mech_root(tmp_path, *, spec_body="", receipt=True):
+    """建宿主根。receipt 檔刻意放在 **sandbox 的父層**（＝生成器眼中的 repo root）。"""
+    root = _mkroot(tmp_path)
+    (root / "docs" / "m.md").write_text(
+        "前言\n<!-- BEGIN GENERATED: mech -->\n<!-- END GENERATED: mech -->\n",
+        encoding="utf-8")
+    (root / "docs" / "o.md").write_text(
+        "<!-- BEGIN GENERATED: other -->\n<!-- END GENERATED: other -->\n", encoding="utf-8")
+    (root / "docs" / "spec.md").write_text("# spec\n" + spec_body, encoding="utf-8")
+    (root / "docs" / "outside.md").write_text("# 不在 opt-in 清單內\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    if receipt:
+        (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "docs" / "r.md").write_text("實跑記錄\n", encoding="utf-8")
+    return root
+
+
+def _mech_run(tmp_path, registry, *, spec_body="", receipt=True, mode="--check",
+              mutate=None):
+    root = _mech_root(tmp_path, spec_body=spec_body, receipt=receipt)
+    sdir = _sandbox(tmp_path, registry)
+    if mutate is not None:
+        _mutate(sdir, *mutate)
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    if mode == "--check":
+        _run([str(sdir / GEN.name), "--write"], env_extra=env)
+    args = [str(sdir / GEN.name)] + ([mode] if mode else [])
+    return _run(args, env_extra=env), sdir, root
+
+
+# `- 改法` 子樹寫法：機制在**續行**上（GROK-R1-P1-03 指出同行-only 會漏掉它）
+_GAIFA_CONTINUATION = (
+    "\n**Task 9.9** 收尾\n\n"
+    "- 改法：把每一行丟進獨立 process group，\n"
+    "  收尾以 `nohup` 脫離終端後終止整群。\n"
+    "- 驗證：見下節\n"
+)
+
+
+def test_wl03_clean_mechanism_table_is_rc_zero(tmp_path):
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK))
+    assert r.returncode == 0, r.stderr
+
+
+def test_wl03_illegal_evidence_form_is_fail_closed(tmp_path):
+    """判準 C-013：證據欄前綴為封閉集合 {receipt, assumed}，其餘一律拒。
+
+    這是本機制的核心 —— 沒有這條，作者可以寫任何看起來像證據的字串。
+    """
+    rows = [["M-1", "timeout", "s1", "probably:我覺得可以", "可用", "現行"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows))
+    assert r.returncode != 0, r.stdout
+    assert "證據" in r.stderr and "前綴" in r.stderr, r.stderr
+
+
+def test_wl03_receipt_pointing_at_missing_file_is_fail_closed(tmp_path):
+    """判準 C-014：宣稱 receipt 但檔不存在 ⇒ 拒。
+
+    🔴 出生事故的形狀就是這個：文件寫了機制、讀起來像已驗證，實際上無物可查。
+    """
+    rows = [["M-1", "timeout", "s1", "receipt:docs/NO_SUCH.md", "可用", "現行"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows))
+    assert r.returncode != 0, r.stdout
+    assert "receipt 指向不存在之檔" in r.stderr, r.stderr
+
+
+def test_wl03_receipt_existence_is_not_content_verification(tmp_path):
+    """🔴 具名殘留 4（刻意）：receipt 只驗檔案存在，不驗內容真的記載那次實跑。
+
+    指向一個存在但完全無關的檔會通過。若哪天這條被封住（改成驗內容），
+    本測試會轉紅 —— 屆時請回頭更新 docs/GOV_MECHANISM_REGISTRY.md 殘留 4 的宣稱。
+    """
+    rows = [["M-1", "timeout", "s1", "receipt:docs/r.md", "可用", "現行"]]
+    r, _, root = _mech_run(tmp_path, _mech_reg(rows))
+    # docs/r.md 的內容是「實跑記錄」四個字，與 timeout 毫無關係
+    assert r.returncode == 0, (
+        "receipt 內容驗證若已上線，殘留 4 的宣稱就過期了 —— 請更新登記表而非只改測試\n"
+        + r.stderr
+    )
+
+
+def test_wl03_assumed_evidence_is_allowed(tmp_path):
+    """assumed 是**顯式未驗標記**，允許通過 —— 本機制治的是「沒說」，不是「沒跑」。"""
+    rows = [["M-1", "setsid", "s1", "assumed:本機不確定是否存在，尚未實跑", "未驗", "現行"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows))
+    assert r.returncode == 0, r.stderr
+
+
+def test_wl03_empty_evidence_body_is_fail_closed(tmp_path):
+    """`assumed:` 後面空白 ⇒ 拒。否則「顯式標記」退化成一個字面前綴。"""
+    rows = [["M-1", "timeout", "s1", "assumed:", "未驗", "現行"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows))
+    assert r.returncode != 0, r.stdout
+    assert "缺冒號後之內容" in r.stderr, r.stderr
+
+
+def test_wl03_token_outside_closed_table_is_fail_closed(tmp_path):
+    """登記了但拼錯 ⇒ 拒。
+
+    否則作者登記 `tiemout`、掃描仍抓 `timeout` 而紅，作者卻以為自己已經登記過了。
+    """
+    rows = [["M-1", "tiemout", "s1", "receipt:docs/r.md", "可用", "現行"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows))
+    assert r.returncode != 0, r.stdout
+    assert "mechanism_tokens" in r.stderr, r.stderr
+
+
+def test_wl03_duplicate_mechanism_id_is_fail_closed(tmp_path):
+    rows = [["M-1", "timeout", "s1", "receipt:docs/r.md", "可用", "現行"],
+            ["M-1", "flock", "s2", "assumed:x", "未驗", "現行"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows))
+    assert r.returncode != 0, r.stdout
+    assert "重複機制ID" in r.stderr, r.stderr
+
+
+def test_wl03_unregistered_mechanism_in_gaifa_subtree_is_fail_closed(tmp_path):
+    """判準 C-015：opt-in 宿主的 `- 改法` 子樹用了未登記機制 ⇒ 拒。
+
+    🔴 機制在**續行**上 —— GROK-R1-P1-03 實測指出「只掃同行含改法」會漏掉它，
+    出生事故的 `ulimit -H -u` 正是寫在續行。
+    """
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=_GAIFA_CONTINUATION)
+    assert r.returncode != 0, r.stdout
+    assert "nohup" in r.stderr and "未登記為現行" in r.stderr, r.stderr
+
+
+def test_wl03_registering_the_mechanism_turns_it_green(tmp_path):
+    """同一份文字，登記之後就通過 —— 證明擋的是「未登記」而不是「出現該字串」。"""
+    rows = _MECH_OK + [["M-3", "nohup", "s3", "assumed:待實跑", "未驗", "現行"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows), spec_body=_GAIFA_CONTINUATION)
+    assert r.returncode == 0, r.stderr
+
+
+def test_wl03_superseded_mechanism_does_not_count_as_registered(tmp_path):
+    """已廢的登記列不算數 —— 否則廢掉一條就等於永久豁免。"""
+    rows = _MECH_OK + [["M-3", "nohup", "s3", "assumed:待實跑", "未驗", "已廢"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows), spec_body=_GAIFA_CONTINUATION)
+    assert r.returncode != 0, r.stdout
+    assert "nohup" in r.stderr, r.stderr
+
+
+def test_wl03_non_optin_host_is_not_scanned_named_residual(tmp_path):
+    """判準 C-016 ＋ 🔴 具名殘留 2（刻意）：不在 mechanism_scope 的檔完全不掃。
+
+    三家否決了「凡含 FACT-RECEIPT」（回掃 53 檔＝溯及既往）與「凡新建 GOV*」
+    （未封閉 glob）⇒ membership 只靠登記。若哪天改成掃全庫，本測試會轉紅，
+    屆時請回頭更新 docs/GOV_MECHANISM_REGISTRY.md 殘留 2 的宣稱。
+    """
+    root = _mech_root(tmp_path)
+    (root / "docs" / "outside.md").write_text(
+        "# 不在 opt-in 清單內\n" + _GAIFA_CONTINUATION, encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    sdir = _sandbox(tmp_path, _mech_reg(_MECH_OK))
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    _run([str(sdir / GEN.name), "--write"], env_extra=env)
+    r = _run([str(sdir / GEN.name), "--check"], env_extra=env)
+    assert r.returncode == 0, (
+        "非 opt-in 宿主若已被掃，殘留 2 的宣稱就過期了 —— 請更新登記表而非只改測試\n"
+        + r.stderr
+    )
+
+
+def test_wl03_heading_style_gaifa_is_named_residual(tmp_path):
+    """🔴 具名殘留 5（刻意）：子樹起點釘死 `- 改法`，標題式寫法不涵蓋。
+
+    本庫 `^#+.*改法` 標題僅 3 個（掃標題＝零訊號），而全檔搜「改法」二字
+    經三家實測誤擋率 80–93% ⇒ 兩端都不可取，故取中間的 bullet 形態。
+    """
+    body = "\n## 改法\n\n收尾以 `nohup` 脫離終端。\n"
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=body)
+    assert r.returncode == 0, (
+        "標題式改法若已被涵蓋，殘留 5 的宣稱就過期了 —— 請更新登記表而非只改測試\n"
+        + r.stderr
+    )
+
+
+def test_wl03_subtree_ends_at_next_bullet(tmp_path):
+    """子樹邊界：`- 驗證` 之後的機制不屬於改法子樹，不得溢出誤擋。"""
+    body = ("\n- 改法：改用 Edit 工具寫檔。\n"
+            "- 驗證：手動確認 `nohup` 這個字在驗證段裡不該被當成改法機制。\n")
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=body)
+    assert r.returncode == 0, r.stderr
+
+
+def test_wl03_mechanism_schema_fields_are_one_unit(tmp_path):
+    """🔴 WL-02 CODEX-R2-P1-02 同型：單獨刪一欄不得靜默停用全部檢查。
+
+    整組缺席＝宣稱無機制登記（合法，由延伸檔集合相等承接）；
+    部分缺席＝設定錯誤，必須 fail-closed。
+    """
+    for field in ["mechanism_keys", "mechanism_tokens", "mechanism_scope",
+                  "mechanism_live_status", "mechanism_status_enum",
+                  "mechanism_column_roles"]:
+        reg = _mech_reg(_MECH_OK, drop=(field,))
+        r, _, _ = _mech_run(tmp_path / field.replace("_", ""), reg)
+        assert r.returncode != 0, f"單獨刪 {field} 後仍 rc=0 ⇒ 檢查被靜默停用\n{r.stdout}"
+        assert field in r.stderr, r.stderr
+
+
+def test_wl03_checks_run_on_all_three_paths(tmp_path):
+    """🔴「檢查只掛在其中一條路徑上」是本 epic 一天內出現四次的形態。
+
+    emit／--check／--write 三條路徑都必須擋同一個壞資料列。
+    """
+    rows = [["M-1", "timeout", "s1", "receipt:docs/NO_SUCH.md", "可用", "現行"]]
+    for i, mode in enumerate(["", "--check", "--write"]):
+        r, _, _ = _mech_run(tmp_path / f"p{i}", _mech_reg(rows), mode=mode)
+        assert r.returncode != 0, (
+            f"路徑 {mode or 'emit'} 未擋下 receipt 缺檔 ⇒ 該路徑漏掛檢查\n{r.stdout}"
+        )
+
+
+def test_wl03_missing_optin_host_is_fail_closed(tmp_path):
+    """🔴 缺檔不得靜默略過 —— 「缺檔＝略過」正是 G-7 上一輪被 codex 抓到的 fail-open。"""
+    reg = _mech_reg(_MECH_OK, scope=["docs/m.md", "docs/spec.md", "docs/gone.md"])
+    r, _, _ = _mech_run(tmp_path, reg)
+    assert r.returncode != 0, r.stdout
+    assert "宿主不存在" in r.stderr and "gone.md" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("bad", ["docs/*.md", "docs/", "/abs/x.md", "docs/../x.md"])
+def test_wl03_scope_must_be_exact_paths(tmp_path, bad):
+    """opt-in 必須逐檔顯式：wildcard／目錄前綴／絕對路徑／`..` 一律拒。
+
+    這是與 WL-02 status_scope 的**刻意差異** —— 那邊允許目錄前綴，
+    這邊不允許，因為「顯式 opt-in」正是三家用來取代未封閉 glob 的東西。
+    """
+    reg = _mech_reg(_MECH_OK, scope=["docs/m.md", "docs/spec.md", bad])
+    r, _, _ = _mech_run(tmp_path, reg)
+    assert r.returncode != 0, r.stdout
+    assert "mechanism_scope" in r.stderr, r.stderr
+
+
+def test_wl03_role_columns_resolved_by_name_not_index(tmp_path):
+    """角色欄由名稱解析；欄名對不上即拒，而非默默取錯欄。"""
+    cols = ["機制ID", "平台機制", "適用範圍", "憑證", "實跑結論", "狀態"]  # evidence 欄改名
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK, cols=cols))
+    assert r.returncode != 0, r.stdout
+    assert "缺角色欄" in r.stderr, r.stderr
+
+
+def test_wl03_live_status_is_named_not_positional(tmp_path):
+    """🔴 GROK-R2-P2-01 同型：「現行」以具名欄宣告，不以 enum 位置承載語義。
+
+    把 enum 重排後行為不得改變 —— 若改變，代表某處又退回讀 enum[0]。
+    """
+    reg = _mech_reg(_MECH_OK + [["M-3", "nohup", "s3", "assumed:x", "未驗", "已廢"]],
+                    enum=["已廢", "現行"], live="現行")
+    r, _, _ = _mech_run(tmp_path, reg, spec_body=_GAIFA_CONTINUATION)
+    assert r.returncode != 0, "enum 重排後『已廢』被當成現行 ⇒ 又退回位置契約"
+    assert "nohup" in r.stderr, r.stderr
+
+
+def test_wl03_mutation_removing_subtree_scan_lets_unregistered_through(tmp_path):
+    """反面實證：拿掉子樹掃描後，未登記機制就通過 ⇒ 證明上面那條不是空心格。"""
+    reg = _mech_reg(_MECH_OK)
+    good, _, _ = _mech_run(tmp_path / "g", reg, spec_body=_GAIFA_CONTINUATION)
+    bad, _, _ = _mech_run(tmp_path / "b", reg, spec_body=_GAIFA_CONTINUATION,
+                          mutate=("_fk_reject_unregistered_mechanisms || _fkc_rc=1", ":"))
+    assert good.returncode != 0, good.stderr
+    assert bad.returncode == 0, (
+        f"拿掉子樹掃描後仍紅 ⇒ 這條 mutation 是空心的\n{bad.stderr}"
+    )
+
+
+def test_wl03_mutation_removing_receipt_check_lets_missing_file_through(tmp_path):
+    """反面實證：拿掉 receipt 存在性判定後，缺檔就通過。"""
+    rows = [["M-1", "timeout", "s1", "receipt:docs/NO_SUCH.md", "可用", "現行"]]
+    reg = _mech_reg(rows)
+    good, _, _ = _mech_run(tmp_path / "g", reg)
+    # 🔴 `[ -f X ] || { 報錯 }` 的反面是 `true ||`，不是 `false ||`
+    #    —— 後者反而**必定**進入報錯分支（本測試初版即打反，由紅燈抓到）
+    bad, _, _ = _mech_run(tmp_path / "b", reg,
+                          mutate=('[ -f "${_FK_REPO_ROOT}/${_fkvm_val}" ] || {', "true || {"))
+    assert good.returncode != 0, good.stderr
+    assert bad.returncode == 0, (
+        f"拿掉 receipt 存在性判定後仍紅 ⇒ 這條 mutation 是空心的\n{bad.stderr}"
+    )
+
+
+def test_wl03_token_matching_is_literal_table_not_path_probe():
+    """🔴 GROK-R1-P1-03 之修法釘子：token 比對必須是**字面表**，不得改成 PATH 探測。
+
+    本機 `setsid` 不在 PATH ⇒ 以 `command -v`／`which` 做候選會**漏掉出生事故本身**。
+    這是被實測直接證偽過的 assumed，不得回退。
+    """
+    src = GEN.read_text(encoding="utf-8")
+    body = src.split("WL-03（票 B-25 機制證據登記）", 1)[1]
+    for probe in ["command -v", "which ", "type -P"]:
+        assert probe not in body, (
+            f"WL-03 區段出現 PATH 探測 {probe!r} ⇒ setsid 不在 PATH，這會漏掉出生事故本身"
+        )
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    toks = data["_schema"]["mechanism_tokens"]
+    assert "setsid" in toks and "ulimit" in toks, (
+        "封閉表須含出生事故的兩個機制，否則這條規則對它自己的起因無感"
+    )
+
+
+def test_wl03_live_mechanism_oracle_tests_exist():
+    """機制表所引的判準（C-013–C-016）之對應測試須真的存在。
+
+    與 WL-02 同一紀律：表不承重，測試才承重。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    ckeys = data["_schema"]["criteria_keys"]
+    roles = data["_schema"]["criteria_column_roles"]
+    live = data["_schema"]["criteria_live_status"]
+    src = "\n".join(
+        p.read_text(encoding="utf-8")
+        for p in sorted((REPO / "tests" / "governance").glob("*.py"))
+    )
+    missing = []
+    for k in ckeys:
+        cols = data[k]["columns"]
+        si, oi = cols.index(roles["status"]), cols.index(roles["oracle"])
+        idi = cols.index(roles["id"])
+        for row in data[k]["rows"]:
+            if row[si] != live or not row[idi].startswith("C-01"):
+                continue
+            if f"def {row[oi]}(" not in src:
+                missing.append(f"{row[idi]} → {row[oi]}")
+    assert not missing, "WL-03 判準之對應測試不存在：\n  " + "\n  ".join(missing)
+
+
+def test_wl03_production_registry_scope_hosts_all_exist():
+    """生產註冊表的 opt-in 宿主必須都存在（否則 --check 會在真樹上恆紅）。"""
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    missing = [p for p in data["_schema"]["mechanism_scope"] if not (REPO / p).is_file()]
+    assert not missing, f"mechanism_scope 所列宿主不存在: {missing}"
+
+
+def test_wl03_production_receipts_all_exist():
+    """生產登記表的每個 receipt: 都要指向真檔 —— 這條在真樹上跑，不靠 fixture。"""
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    roles = data["_schema"]["mechanism_column_roles"]
+    bad = []
+    for k in data["_schema"]["mechanism_keys"]:
+        ei = data[k]["columns"].index(roles["evidence"])
+        for row in data[k]["rows"]:
+            ev = row[ei]
+            if ev.startswith("receipt:") and not (REPO / ev[len("receipt:"):]).is_file():
+                bad.append(ev)
+    assert not bad, f"receipt 指向不存在之檔: {bad}"
 
 
 def test_wl01_handwritten_status_detector_still_works_under_table_render(tmp_path):

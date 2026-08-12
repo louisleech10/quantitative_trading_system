@@ -19,4 +19,8 @@
 | C-010 | gen_fact_key_blocks --check | 判準宿主生成區塊外陳述期望結束狀態 | 1 | 現行 | test_wl02_rc_claim_outside_block_is_fail_closed |
 | C-011 | gen_fact_key_blocks --check | 判準狀態值不在封閉列舉內 | 1 | 現行 | test_wl02_unknown_criteria_status_is_fail_closed |
 | C-012 | gen_fact_key_blocks emit | columns 禁用字元以逐項列舉判定 | 1 | 已廢 | 見 C-004；本列為 CODEX-R1-P1-01 之前身判準，保留沿革 |
+| C-013 | gen_fact_key_blocks emit | 機制登記列之證據欄不符封閉格式 | 1 | 現行 | test_wl03_illegal_evidence_form_is_fail_closed |
+| C-014 | gen_fact_key_blocks emit | 機制登記列宣稱 receipt 但該檔不存在 | 1 | 現行 | test_wl03_receipt_pointing_at_missing_file_is_fail_closed |
+| C-015 | gen_fact_key_blocks --check | opt-in 宿主之改法子樹含未登記平台機制 | 1 | 現行 | test_wl03_unregistered_mechanism_in_gaifa_subtree_is_fail_closed |
+| C-016 | gen_fact_key_blocks --check | 非 opt-in 宿主含同樣未登記平台機制 | 0 | 現行 | test_wl03_non_optin_host_is_not_scanned_named_residual |
 <!-- END GENERATED: governance-criteria -->

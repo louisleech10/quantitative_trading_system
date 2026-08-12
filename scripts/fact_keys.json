@@ -27,6 +27,30 @@
       "oracle": "對應測試"
     },
     "criteria_note": "WL-02（票 B-25 判準資料化）。criteria_keys 所列 key 之 rows 即判準資料；欄位角色由 criteria_column_roles 對應到該 key 的 columns 名稱（不寫死索引）。三道檢查：①狀態須在 criteria_status_enum 內 ②狀態為現行者，同一 (適用範圍, 條件) 不得有相異 期望rc ③判準 key 之 target 檔，其全部合法生成區塊之外不得出現期望結束狀態之陳述（封閉白名單，見 _FK_RC_CLAIM_RES）。🔴 不得宣稱互斥判準已封死——不同條件字串描述同一物理事件時鍵不相等，機械上偵測不到（三家一致，見 docs/GOV_CRITERIA_REGISTRY.md 殘留 1）",
+    "mechanism_keys": ["governance-mechanism"],
+    "mechanism_status_enum": ["現行", "已廢"],
+    "mechanism_live_status": "現行",
+    "mechanism_column_roles": {
+      "id": "機制ID",
+      "token": "平台機制",
+      "scope": "適用範圍",
+      "evidence": "證據",
+      "finding": "實跑結論",
+      "status": "狀態"
+    },
+    "mechanism_scope": [
+      "docs/GOV_MECHANISM_REGISTRY.md",
+      "docs/GOV_GATECHAIN_SPEC.md",
+      "docs/GOVB25_STATUS_FACTKEY_SPEC.md",
+      "docs/GOVERNANCE_HARNESS_P0_SPEC.md",
+      "docs/GOV_DISPATCH_FLOW_FIX_SPEC.md"
+    ],
+    "mechanism_tokens": [
+      "setsid", "setpgid", "ulimit", "prlimit", "flock", "nohup", "disown",
+      "timeout", "ionice", "taskset", "renice", "chroot", "unshare",
+      "launchctl", "sysctl"
+    ],
+    "mechanism_note": "WL-03（票 B-25 機制證據登記）。目的＝把「改法宣稱要用某個平台機制」從散文變成可盤點的資料列，且該列必須帶實跑證據或顯式 assumed 標記。🔴 字面設計（掃改法段抽反引號）已由三家 consult 以實測否決（誤擋率 80-93%）⇒ 本落法禁掃散文，只對資料列驗證，外加一道以 `- 改法` 子樹為起點、比對 mechanism_tokens 封閉表的掃描。mechanism_scope＝顯式 opt-in 宿主（exact path，禁 wildcard、禁目錄前綴），membership 只靠登記，不靠檔名樣式——「凡含 FACT-RECEIPT」會回掃 53 檔且溯及既往、「凡新建 GOV*」是未封閉 glob，兩者皆經三家否決。🔴 誠實邊界：本規則在現樹訊號近零（五個 opt-in 宿主之改法子樹平台 token 命中＝0），價值在面向未來攔下日後寫入之未驗機制，不是清理現況。🔴 mechanism_tokens 以字面表比對，非以 PATH 探測——GROK-R1-P1-03 實跑證明本機 setsid 不在 PATH，用 PATH 探測反而會漏掉出生事故本身",
     "status_scope": ["HANDOFF.md", "docs/GOVERNANCE_EXECUTION_ORDER.md", "白話說明/"],
     "status_scope_grandfathered": [
       "白話說明/README.md",
@@ -112,7 +136,22 @@
       ["C-009", "gen_fact_key_blocks --check", "判準表同適用範圍同條件有相異期望", "1", "現行", "test_wl02_conflicting_criteria_is_fail_closed"],
       ["C-010", "gen_fact_key_blocks --check", "判準宿主生成區塊外陳述期望結束狀態", "1", "現行", "test_wl02_rc_claim_outside_block_is_fail_closed"],
       ["C-011", "gen_fact_key_blocks --check", "判準狀態值不在封閉列舉內", "1", "現行", "test_wl02_unknown_criteria_status_is_fail_closed"],
-      ["C-012", "gen_fact_key_blocks emit", "columns 禁用字元以逐項列舉判定", "1", "已廢", "見 C-004；本列為 CODEX-R1-P1-01 之前身判準，保留沿革"]
+      ["C-012", "gen_fact_key_blocks emit", "columns 禁用字元以逐項列舉判定", "1", "已廢", "見 C-004；本列為 CODEX-R1-P1-01 之前身判準，保留沿革"],
+      ["C-013", "gen_fact_key_blocks emit", "機制登記列之證據欄不符封閉格式", "1", "現行", "test_wl03_illegal_evidence_form_is_fail_closed"],
+      ["C-014", "gen_fact_key_blocks emit", "機制登記列宣稱 receipt 但該檔不存在", "1", "現行", "test_wl03_receipt_pointing_at_missing_file_is_fail_closed"],
+      ["C-015", "gen_fact_key_blocks --check", "opt-in 宿主之改法子樹含未登記平台機制", "1", "現行", "test_wl03_unregistered_mechanism_in_gaifa_subtree_is_fail_closed"],
+      ["C-016", "gen_fact_key_blocks --check", "非 opt-in 宿主含同樣未登記平台機制", "0", "現行", "test_wl03_non_optin_host_is_not_scanned_named_residual"]
+    ]
+  },
+  "governance-mechanism": {
+    "target": "docs/GOV_MECHANISM_REGISTRY.md",
+    "columns": ["機制ID", "平台機制", "適用範圍", "證據", "實跑結論", "狀態"],
+    "render": "table",
+    "rows": [
+      ["M-001", "setsid", "ASSERT 逐行執行後之程序群終止", "receipt:handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md", "本機不可用——不在 PATH（command -v 非零）；以 set -m 使背景 job 自成 pgid 取代", "現行"],
+      ["M-002", "ulimit", "fork bomb 之第二道防線（壓低 per-user 程序上限）", "receipt:handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md", "硬上限不可降——Invalid argument；只降 soft 必被子程序抬回，故不作為防線", "現行"],
+      ["M-003", "timeout", "ASSERT 逐行逾時包裹", "receipt:docs/GOV_ASSERT_PATHA_NOTE.md", "可用，已上線於寫檔路徑之零執行改法", "現行"],
+      ["M-004", "flock", "gate token 之併發互斥", "assumed:僅出現於敘事段落，尚未被任一改法採用，故未實跑", "未實跑——列此以示 assumed 是顯式標記而非省略", "現行"]
     ]
   },
   "governance-batch-status": {

@@ -337,9 +337,12 @@ EOF
 
 _fk_emit_all() {
   _fk_validate_keys || return 1
-  # 判準 schema 之語意檢查在三條路徑都要跑（emit／--check／--write）——
-  # 只掛在 --check 時，單獨刪 criteria_keys 於 emit 仍 rc=0〔WL-02 r2 自驗發現〕
+  # 判準／機制 schema 之語意檢查在三條路徑都要跑（emit／--check／--write）——
+  # 只掛在 --check 時，單獨刪 criteria_keys 於 emit 仍 rc=0〔WL-02 r2 自驗發現〕。
+  # 🔴「檢查只掛在其中一條路徑上」是本 epic 反覆出現的形態（一天內四個位置），
+  #    新增任何檢查前先問「同一種輸入有沒有第二條處理路徑」。
   _fk_validate_criteria || return 1
+  _fk_validate_mechanism || return 1
   _fke_rc=0
   while IFS= read -r _fke_k; do
     [ -n "${_fke_k}" ] || continue
@@ -557,14 +560,8 @@ _FK_RC_CLAIM_FORMS='rc-op rc-unchanged returncode-op exit-code exit-n exitcode-z
 _fk_criteria_keys() { LC_ALL=C jq -r '._schema.criteria_keys[]? // empty' "${REG}"; }
 
 # 角色→欄索引。以 columns 名稱查位置，不寫死索引〔可換欄序而不改碼〕。
-_fk_role_idx() {   # $1=key $2=role -> stdout: 0-based 欄索引；找不到回非 0
-  LC_ALL=C jq -er --arg k "$1" --arg r "$2" '
-    (._schema.criteria_column_roles[$r]) as $name
-    | if $name == null then error("role-undeclared")
-      else (.[$k].columns | index($name)) end
-    | if . == null then error("column-missing") else . end
-  ' "${REG}" 2>/dev/null
-}
+# 實作已抽為 `_fk_role_idx_of`（WL-03 起機制表共用同一支）；本函式維持既有呼叫介面。
+_fk_role_idx() { _fk_role_idx_of "$1" "$2" criteria_column_roles; }
 
 # 🔴 判準 schema 是**一整組**，不得單獨刪其中一項〔CODEX-R2-P1-02〕：
 #   原版以「有沒有 criteria_keys」決定要不要跑三道檢查 ⇒ **單獨刪掉 criteria_keys 即靜默停用**，
@@ -705,6 +702,260 @@ EOF3
   return "${_fkrr_rc}"
 }
 
+# ==========================================================================
+# WL-03（票 B-25 機制證據登記）— 機制表資料列驗證 ＋ opt-in 宿主之改法子樹掃描
+#
+# 設計出處：`handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md`（三家 consult）。
+# 主委原提案「掃改法段抽反引號 span，首 token 像可執行檔即要求 FACT-RECEIPT」
+# 被三家各自實測否決（誤擋率 80–93%；誤擋物幾乎全是文件路徑、finding ID、旗標、
+# 驗證指令）⇒ 本落法**不掃散文**，receipt／assumed 只對**登記表的資料列**驗證。
+#
+# 🔴 三處關鍵修正（皆由實測推翻主委 assumed 而來，勿改回）：
+#   ① token 用**字面封閉表**，不用 PATH 探測——本機 `setsid` 不在 PATH
+#      〔GROK-R1-P1-03／CODEX-R1-P1-03 各自實跑 PATH 查詢得非零〕，
+#      以「可執行檔名」做候選反而會**漏掉出生事故本身**。
+#      🔴 本註解刻意**不寫出**任何 PATH 查詢指令的字面——
+#      test_wl03_token_matching_is_literal_table_not_path_probe 掃的是本區段全文，
+#      連註解裡的字面都算命中（施工當下即被自己的測試抓到一次）。
+#   ② 子樹起點釘死 `- 改法`，**禁全檔搜「改法」二字**〔COMPOSER-R1-P0-01〕：
+#      本庫 `^#+.*改法` 標題僅 3 個（掃標題＝零訊號），`- 改法` 子彈列才可定位。
+#      子樹須涵蓋**續行**——只比對「同行含改法」會漏掉續行上的機制〔GROK-R1-P1-03〕。
+#   ③ 宿主 membership 靠**顯式 opt-in 清單**，不靠檔名樣式〔CODEX-R1-P1-02〕：
+#      「凡含 FACT-RECEIPT」回掃 53 檔＝溯及既往；「凡新建 GOV*」＝未封閉 glob。
+#
+# 🔴 誠實邊界（必須連同交付物一起宣告，否則就是「做了一個看起來有在防的東西」）：
+#   現樹訊號**近零**——五個 opt-in 宿主之改法子樹平台 token 命中＝0（施工前實測）。
+#   價值在**面向未來**：日後於這些宿主寫入未驗機制時當場轉紅。
+#   本規則**不清理**歷史內容，也**不對未登記檔案**有任何攔截力（具名殘留）。
+_FK_MECHANISM_SCHEMA_FIELDS='mechanism_keys mechanism_status_enum mechanism_live_status mechanism_column_roles mechanism_scope mechanism_tokens'
+
+# 證據欄封閉格式（前綴集合寫死於此，非由註冊表自證）：
+#   receipt:<repo 相對路徑>   該檔須實際存在 ⇒ 「宣稱實跑但沒有東西可查」當場紅
+#   assumed:<非空理由>        顯式未驗標記；允許，但可由生成區塊機械盤點
+_FK_EVIDENCE_FORMS='receipt assumed'
+
+# 🔴 receipt 路徑相對 **repo root**（本腳本之父目錄），不是 `_fk_root()`：
+#   receipt 是真實 repo 的資產，fixture root 底下不存在 ⇒ 用 `_fk_root()` 會使
+#   fixture 測試整批誤紅。宿主掃描則相反，走 `_fk_root()`（fixture 要能被掃）。
+_FK_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+
+_fk_mechanism_keys() { LC_ALL=C jq -r '._schema.mechanism_keys[]? // empty' "${REG}"; }
+
+# 角色→欄索引（通用）。以 columns 名稱查位置，不寫死索引。
+#   $3＝`_schema` 內的角色對應表欄名（criteria_column_roles／mechanism_column_roles）
+_fk_role_idx_of() {   # $1=key $2=role $3=roles欄名 -> stdout: 0-based 欄索引
+  LC_ALL=C jq -er --arg k "$1" --arg r "$2" --arg rf "$3" '
+    (._schema[$rf][$r]) as $name
+    | if $name == null then error("role-undeclared")
+      else (.[$k].columns | index($name)) end
+    | if . == null then error("column-missing") else . end
+  ' "${REG}" 2>/dev/null
+}
+
+_fk_mech_role_idx() { _fk_role_idx_of "$1" "$2" mechanism_column_roles; }
+
+_fk_mechanism_schema_present() {   # 0＝至少一欄存在
+  for _fkmp_f in ${_FK_MECHANISM_SCHEMA_FIELDS}; do
+    LC_ALL=C jq -e --arg f "${_fkmp_f}" '._schema | has($f)' "${REG}" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+
+# 已登記且狀態為現行之 token 集合（供宿主掃描比對）
+_fk_registered_tokens() {
+  _fkrt_keys="$(_fk_mechanism_keys)" || return 1
+  _fkrt_live="$(LC_ALL=C jq -r '._schema.mechanism_live_status // empty' "${REG}")" || return 1
+  while IFS= read -r _fkrt_k; do
+    [ -n "${_fkrt_k}" ] || continue
+    _fkrt_ti="$(_fk_mech_role_idx "${_fkrt_k}" token)" || return 1
+    _fkrt_si="$(_fk_mech_role_idx "${_fkrt_k}" status)" || return 1
+    LC_ALL=C jq -r --arg k "${_fkrt_k}" --argjson ti "${_fkrt_ti}" \
+      --argjson si "${_fkrt_si}" --arg live "${_fkrt_live}" \
+      '.[$k].rows[] | select(.[$si] == $live) | .[$ti]' "${REG}" || return 1
+  done <<EOF
+${_fkrt_keys}
+EOF
+}
+
+_fk_validate_mechanism() {   # 機制表資料列之封閉驗證（不觸宿主檔，故三條路徑皆可掛）
+  _fk_mechanism_schema_present || return 0      # 整組缺席＝無機制登記，合法
+  _fkvm_rc=0
+  # 🔴 schema 為**一整組**，不得單獨刪其中一項〔WL-02 CODEX-R2-P1-02 同型〕：
+  #   以「有沒有 mechanism_keys」決定要不要跑檢查 ⇒ 單獨刪它即靜默停用全部檢查。
+  for _fkvm_f in ${_FK_MECHANISM_SCHEMA_FIELDS}; do
+    LC_ALL=C jq -e --arg f "${_fkvm_f}" '._schema | has($f)' "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: _schema 已宣告部分機制欄，但缺 ${_fkvm_f} → fail-closed（機制 schema 為一整組，不得單獨刪）" >&2
+           _fkvm_rc=1; }
+  done
+  [ "${_fkvm_rc}" = "0" ] || return 1
+
+  for _fkvm_f in mechanism_keys mechanism_status_enum mechanism_scope mechanism_tokens; do
+    LC_ALL=C jq -e --arg f "${_fkvm_f}" \
+      '._schema[$f] | type == "array" and length > 0 and all(.[]; type == "string" and length > 0)' \
+      "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: _schema.${_fkvm_f} 非法（須非空字串陣列）→ fail-closed" >&2
+           _fkvm_rc=1; }
+  done
+  [ "${_fkvm_rc}" = "0" ] || return 1
+
+  _fkvm_live="$(LC_ALL=C jq -r '._schema.mechanism_live_status // empty' "${REG}")"
+  [ -n "${_fkvm_live}" ] || {
+    echo "gen_fact_key_blocks: _schema.mechanism_live_status 缺席或為空 → fail-closed" >&2
+    return 1; }
+  LC_ALL=C jq -e --arg l "${_fkvm_live}" '._schema.mechanism_status_enum | index($l) != null' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: mechanism_live_status='${_fkvm_live}' 不在 mechanism_status_enum 內 → fail-closed" >&2
+         return 1; }
+
+  # opt-in 宿主清單：exact path、禁 wildcard、禁目錄前綴（opt-in 必須逐檔顯式）
+  while IFS= read -r _fkvm_sc; do
+    [ -n "${_fkvm_sc}" ] || continue
+    case "${_fkvm_sc}" in
+      *'*'*|*'?'*|*'['*)
+        echo "gen_fact_key_blocks: _schema.mechanism_scope 不得含 wildcard：${_fkvm_sc} → fail-closed" >&2
+        _fkvm_rc=1 ;;
+      */)
+        echo "gen_fact_key_blocks: _schema.mechanism_scope 須為 exact path，不得為目錄前綴：${_fkvm_sc} → fail-closed（opt-in 必須逐檔顯式）" >&2
+        _fkvm_rc=1 ;;
+      /*|*..*)
+        echo "gen_fact_key_blocks: _schema.mechanism_scope 不得為絕對路徑或含 ..：${_fkvm_sc} → fail-closed" >&2
+        _fkvm_rc=1 ;;
+    esac
+  done <<EOF
+$(LC_ALL=C jq -r '._schema.mechanism_scope[]' "${REG}" 2>/dev/null)
+EOF
+
+  while IFS= read -r _fkvm_k; do
+    [ -n "${_fkvm_k}" ] || continue
+    printf '%s\n' "$(_fk_keys)" | LC_ALL=C grep -qxF "${_fkvm_k}" || {
+      echo "gen_fact_key_blocks: mechanism_keys 含未註冊 key '${_fkvm_k}' → fail-closed" >&2
+      _fkvm_rc=1; continue; }
+    _fkvm_bad=""
+    for _fkvm_role in id token scope evidence finding status; do
+      _fk_mech_role_idx "${_fkvm_k}" "${_fkvm_role}" >/dev/null 2>&1 \
+        || _fkvm_bad="${_fkvm_bad} ${_fkvm_role}"
+    done
+    [ -z "${_fkvm_bad}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkvm_k} 缺角色欄（mechanism_column_roles 未宣告或 columns 無該欄）:${_fkvm_bad} → fail-closed" >&2
+      _fkvm_rc=1; continue; }
+    _fkvm_ii="$(_fk_mech_role_idx "${_fkvm_k}" id)"       || { _fkvm_rc=1; continue; }
+    _fkvm_ti="$(_fk_mech_role_idx "${_fkvm_k}" token)"    || { _fkvm_rc=1; continue; }
+    _fkvm_ei="$(_fk_mech_role_idx "${_fkvm_k}" evidence)" || { _fkvm_rc=1; continue; }
+    _fkvm_si="$(_fk_mech_role_idx "${_fkvm_k}" status)"   || { _fkvm_rc=1; continue; }
+
+    # ① 狀態列舉封閉
+    _fkvm_unknown="$(LC_ALL=C jq -r --arg k "${_fkvm_k}" --argjson si "${_fkvm_si}" '
+      (._schema.mechanism_status_enum) as $e
+      | .[$k].rows[] | select((.[$si] | IN($e[]) | not)) | .[$si]' "${REG}" \
+      | LC_ALL=C sort -u)"
+    [ -z "${_fkvm_unknown}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkvm_k} 之狀態值不在 mechanism_status_enum 內 → fail-closed:" >&2
+      printf '%s\n' "${_fkvm_unknown}" | sed 's/^/    /' >&2
+      _fkvm_rc=1; }
+
+    # ② 機制 token 須在封閉表內（防筆誤：登記了但掃描仍紅，作者卻以為已登記）
+    _fkvm_offtab="$(LC_ALL=C jq -r --arg k "${_fkvm_k}" --argjson ti "${_fkvm_ti}" '
+      (._schema.mechanism_tokens) as $t
+      | .[$k].rows[] | select((.[$ti] | IN($t[]) | not)) | .[$ti]' "${REG}" \
+      | LC_ALL=C sort -u)"
+    [ -z "${_fkvm_offtab}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkvm_k} 之平台機制不在 _schema.mechanism_tokens 封閉表內 → fail-closed:" >&2
+      printf '%s\n' "${_fkvm_offtab}" | sed 's/^/    /' >&2
+      _fkvm_rc=1; }
+
+    # ③ 機制 ID 唯一（重複 ID ⇒ 指標語義未定義）
+    _fkvm_dup="$(LC_ALL=C jq -r --arg k "${_fkvm_k}" --argjson ii "${_fkvm_ii}" \
+      '.[$k].rows | group_by(.[$ii]) | map(select(length > 1)) | .[] | .[0][$ii]' "${REG}" \
+      | LC_ALL=C sort -u)"
+    [ -z "${_fkvm_dup}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkvm_k} 有重複機制ID → fail-closed:" >&2
+      printf '%s\n' "${_fkvm_dup}" | sed 's/^/    /' >&2
+      _fkvm_rc=1; }
+
+    # ④ 證據欄格式封閉 ＋ receipt 指向之檔須存在
+    while IFS= read -r _fkvm_ev; do
+      [ -n "${_fkvm_ev}" ] || continue
+      _fkvm_pfx="${_fkvm_ev%%:*}"; _fkvm_val="${_fkvm_ev#*:}"
+      case " ${_FK_EVIDENCE_FORMS} " in
+        *" ${_fkvm_pfx} "*) : ;;
+        *) echo "gen_fact_key_blocks: key ${_fkvm_k} 之證據 '${_fkvm_ev}' 前綴不在 {${_FK_EVIDENCE_FORMS}} → fail-closed" >&2
+           _fkvm_rc=1; continue ;;
+      esac
+      [ -n "${_fkvm_val}" ] && [ "${_fkvm_val}" != "${_fkvm_ev}" ] || {
+        echo "gen_fact_key_blocks: key ${_fkvm_k} 之證據 '${_fkvm_ev}' 缺冒號後之內容 → fail-closed" >&2
+        _fkvm_rc=1; continue; }
+      [ "${_fkvm_pfx}" = "receipt" ] || continue
+      case "${_fkvm_val}" in
+        /*|*..*)
+          echo "gen_fact_key_blocks: key ${_fkvm_k} 之 receipt 路徑不得為絕對路徑或含 ..：${_fkvm_val} → fail-closed" >&2
+          _fkvm_rc=1; continue ;;
+      esac
+      [ -f "${_FK_REPO_ROOT}/${_fkvm_val}" ] || {
+        echo "gen_fact_key_blocks: key ${_fkvm_k} 之 receipt 指向不存在之檔：${_fkvm_val} → fail-closed（宣稱實跑但無物可查）" >&2
+        _fkvm_rc=1; }
+    done <<EOF
+$(LC_ALL=C jq -r --arg k "${_fkvm_k}" --argjson ei "${_fkvm_ei}" '.[$k].rows[] | .[$ei]' "${REG}")
+EOF
+  done <<EOF
+$(_fk_mechanism_keys)
+EOF
+  return "${_fkvm_rc}"
+}
+
+# opt-in 宿主之 `- 改法` 子樹掃描：命中封閉表之 token 若未登記為現行 ⇒ fail-closed。
+# 🔴 缺檔 fail-closed，**不得靜默略過**——「缺檔＝略過」正是 G-7 上一輪被抓到的 fail-open。
+_fk_reject_unregistered_mechanisms() {
+  _fk_mechanism_schema_present || return 0
+  _fkru_root="$(_fk_root)"; _fkru_rc=0
+  _fkru_toks="$(LC_ALL=C jq -r '._schema.mechanism_tokens[]' "${REG}" | tr '\n' ' ')" || return 1
+  _fkru_reg="$(_fk_registered_tokens | LC_ALL=C sort -u | tr '\n' ' ')" || return 1
+  while IFS= read -r _fkru_f; do
+    [ -n "${_fkru_f}" ] || continue
+    _fkru_p="${_fkru_root}/${_fkru_f}"
+    [ -f "${_fkru_p}" ] || {
+      echo "gen_fact_key_blocks: mechanism_scope 所列宿主不存在：${_fkru_f} → fail-closed（缺檔不得靜默略過）" >&2
+      _fkru_rc=1; continue; }
+    _fkru_hit="$(LC_ALL=C awk -v toks="${_fkru_toks}" -v reg="${_fkru_reg}" -v rel="${_fkru_f}" '
+      # 邊界判定用原始行＋絕對位置（與 _fk_reject_handwritten_status 同一形態）
+      function has_token(s, t,   off, rest, p, st, pre, post) {
+        off = 0; rest = s
+        while ((p = index(rest, t)) > 0) {
+          st   = off + p
+          pre  = (st == 1) ? "" : substr(s, st - 1, 1)
+          post = substr(s, st + length(t), 1)
+          if (pre !~ /[0-9A-Za-z_-]/ && post !~ /[0-9A-Za-z_-]/) return 1
+          off  = st + length(t) - 1
+          rest = substr(s, off + 1)
+        }
+        return 0
+      }
+      BEGIN {
+        nt = split(toks, T, " ")
+        nr = split(reg, R, " "); for (i = 1; i <= nr; i++) if (R[i] != "") REG[R[i]] = 1
+      }
+      # 子樹起點釘死 `- 改法`；終點＝下一個同級 `- `／標題／粗體段首／空行
+      /^[[:space:]]*- 改法/ { insub = 1 }
+      insub && !/^[[:space:]]*- 改法/ {
+        if ($0 ~ /^[[:space:]]*- / || $0 ~ /^#/ || $0 ~ /^\*\*/ || $0 ~ /^[[:space:]]*$/) { insub = 0 }
+      }
+      insub {
+        for (i = 1; i <= nt; i++) {
+          if (T[i] == "" || !has_token($0, T[i])) continue
+          if (T[i] in REG) continue
+          printf "  %s:%d 平台機制 %s 未登記為現行\n", rel, FNR, T[i]
+        }
+      }
+    ' "${_fkru_p}")"
+    [ -z "${_fkru_hit}" ] || {
+      echo "gen_fact_key_blocks: opt-in 宿主 ${_fkru_f} 之改法子樹使用未登記之平台機制（登記到 governance-mechanism 並附 receipt: 或 assumed:）→ fail-closed:" >&2
+      printf '%s\n' "${_fkru_hit}" >&2
+      _fkru_rc=1; }
+  done <<EOF
+$(LC_ALL=C jq -r '._schema.mechanism_scope[]' "${REG}" 2>/dev/null)
+EOF
+  return "${_fkru_rc}"
+}
+
 _fk_check() {
   _fk_validate_keys || return 1
   _fk_validate_schema_sets || return 1
@@ -744,6 +995,9 @@ EOF
   # 判準表語意 ＋ 判準宿主之區塊外期望陳述（WL-02）
   _fk_validate_criteria || _fkc_rc=1
   _fk_reject_rc_claims_outside_blocks || _fkc_rc=1
+  # 機制表語意 ＋ opt-in 宿主之改法子樹未登記機制（WL-03）
+  _fk_validate_mechanism || _fkc_rc=1
+  _fk_reject_unregistered_mechanisms || _fkc_rc=1
   return "${_fkc_rc}"
 }
 
@@ -751,6 +1005,7 @@ _fk_write() {
   _fk_validate_keys || return 1
   _fk_validate_schema_sets || return 1
   _fk_validate_criteria || return 1
+  _fk_validate_mechanism || return 1
   _fkw_root="$(_fk_root)"; _fkw_rc=0
   while IFS= read -r _fkw_k; do
     [ -n "${_fkw_k}" ] || continue
