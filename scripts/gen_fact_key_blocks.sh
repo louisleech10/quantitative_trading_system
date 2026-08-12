@@ -337,6 +337,9 @@ EOF
 
 _fk_emit_all() {
   _fk_validate_keys || return 1
+  # 判準 schema 之語意檢查在三條路徑都要跑（emit／--check／--write）——
+  # 只掛在 --check 時，單獨刪 criteria_keys 於 emit 仍 rc=0〔WL-02 r2 自驗發現〕
+  _fk_validate_criteria || return 1
   _fke_rc=0
   while IFS= read -r _fke_k; do
     [ -n "${_fke_k}" ] || continue
@@ -532,8 +535,24 @@ EOF2
 #   完整殘留清單見 docs/GOV_CRITERIA_REGISTRY.md。
 #
 # 期望結束狀態之陳述形態：**封閉白名單**（擴充須改本行，非無限往黑名單加）。
-# 刻意以字元類拆寫，使本行自身不構成被掃到的形態（否則本檔若成為判準宿主會自咬）。
-_FK_RC_CLAIM_RES='rc[[:space:]]*(=|==|≠|!=)|rc[[:space:]]*不變|returncode[[:space:]]*=='
+#
+# 🔴 涵蓋集合是**實測導出**，不是想像列舉〔票 B-23 同紀律〕。
+#   r2 三家各自掃 docs/ 證偽了主委「六種足以涵蓋實務」之 assumed：
+#   `CODEX-R2-P1-01`（`rc 由 0 變為非 0`）／`COMPOSER-R2-P1-01`（`→ exit N`、`退出碼 N`）／
+#   `GROK-R2-P1-01`（`Exit code:` 類 ≥58 行、`退出碼` 4 行、`結束碼` 1 行、`非零退出` 1 行）。
+#   下列集合即依該三份掃描結果補齊。
+#
+# 🔴 **具名殘留（誠實邊界，不得宣稱已封閉實務同義寫法）**：
+#   本白名單只涵蓋下列具名形態。**關係型／轉換型**陳述（如「最終結束狀態與第一份一致」、
+#   「由通過變為不通過」）刻意**不**納入——那需要理解語意，一納入就變成無限黑名單。
+#   該類仍靠 review。見 docs/GOV_CRITERIA_REGISTRY.md 殘留 6。
+#
+# 涵蓋形態（與 _FK_RC_CLAIM_FORMS 一一對應，測試以集合相等鎖死）：
+#   rc 後接 = == 不等號 != : 是 為 ／ rc 不變 ／ returncode 後接 = == != 不等號 ／
+#   exit code（不分大小寫）／exit 數字 ／ 退出碼 ／ 結束碼 ／ 非零退出
+_FK_RC_CLAIM_RES='rc[[:space:]]*(=|==|≠|!=|:|是|為)|rc[[:space:]]*不變|returncode[[:space:]]*(=|==|≠|!=)|[Ee]xit[[:space:]]*[Cc]ode|exit[[:space:]]+[0-9]+|退出碼|結束碼|非零退出'
+# 供測試以集合相等鎖死涵蓋面（新增形態須同時改兩處，否則測試轉紅）
+_FK_RC_CLAIM_FORMS='rc-op rc-unchanged returncode-op exit-code exit-n exitcode-zh endcode-zh nonzero-zh'
 
 _fk_criteria_keys() { LC_ALL=C jq -r '._schema.criteria_keys[]? // empty' "${REG}"; }
 
@@ -547,14 +566,46 @@ _fk_role_idx() {   # $1=key $2=role -> stdout: 0-based 欄索引；找不到回�
   ' "${REG}" 2>/dev/null
 }
 
+# 🔴 判準 schema 是**一整組**，不得單獨刪其中一項〔CODEX-R2-P1-02〕：
+#   原版以「有沒有 criteria_keys」決定要不要跑三道檢查 ⇒ **單獨刪掉 criteria_keys 即靜默停用**，
+#   codex 實跑得 rc=0。修法＝四欄任一存在即四欄全需存在且合法（整組刪除＝該註冊表宣稱無判準，
+#   由延伸檔集合相等測試 test_registry_key_set_equals_amendment_declaration 承接）。
+_FK_CRITERIA_SCHEMA_FIELDS='criteria_keys criteria_status_enum criteria_column_roles criteria_live_status'
+
+_fk_criteria_schema_present() {   # 0＝至少一欄存在
+  for _fkcp_f in ${_FK_CRITERIA_SCHEMA_FIELDS}; do
+    LC_ALL=C jq -e --arg f "${_fkcp_f}" '._schema | has($f)' "${REG}" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+
 _fk_validate_criteria() {   # 判準表語意檢查（狀態列舉封閉 ＋ 同範圍同條件不得相異期望）
-  _fkvc_keys="$(_fk_criteria_keys)" || return 1
-  [ -n "${_fkvc_keys}" ] || return 0
+  _fk_criteria_schema_present || return 0        # 整組缺席＝無判準，合法
   _fkvc_rc=0
+  for _fkvc_f in ${_FK_CRITERIA_SCHEMA_FIELDS}; do
+    LC_ALL=C jq -e --arg f "${_fkvc_f}" '._schema | has($f)' "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: _schema 已宣告部分判準欄，但缺 ${_fkvc_f} → fail-closed（判準 schema 為一整組，不得單獨刪）" >&2
+           _fkvc_rc=1; }
+  done
+  [ "${_fkvc_rc}" = "0" ] || return 1
+  _fkvc_keys="$(_fk_criteria_keys)" || return 1
+  [ -n "${_fkvc_keys}" ] || {
+    echo "gen_fact_key_blocks: _schema.criteria_keys 為空 → fail-closed（空清單會使三道判準檢查全部靜默停用）" >&2
+    return 1; }
   LC_ALL=C jq -e '._schema.criteria_status_enum
                   | type == "array" and length > 0 and all(.[]; type == "string")' \
     "${REG}" >/dev/null 2>&1 \
-    || { echo "gen_fact_key_blocks: 有 criteria_keys 但 _schema.criteria_status_enum 缺席／非法 → fail-closed" >&2
+    || { echo "gen_fact_key_blocks: _schema.criteria_status_enum 非法 → fail-closed" >&2
+         return 1; }
+  # 🔴 「現行」以**具名欄位**宣告，不以 enum 的位置承載語義〔GROK-R2-P2-01／CODEX-R2-P1-02〕：
+  #    原版取 enum[0]，把 enum 重排即只對「已廢」列做互斥檢查，現行互斥靜默放行。
+  _fkvc_live="$(LC_ALL=C jq -r '._schema.criteria_live_status // empty' "${REG}")"
+  [ -n "${_fkvc_live}" ] || {
+    echo "gen_fact_key_blocks: _schema.criteria_live_status 缺席或為空 → fail-closed" >&2
+    return 1; }
+  LC_ALL=C jq -e --arg l "${_fkvc_live}" '._schema.criteria_status_enum | index($l) != null' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: criteria_live_status='${_fkvc_live}' 不在 criteria_status_enum 內 → fail-closed" >&2
          return 1; }
   while IFS= read -r _fkvc_k; do
     [ -n "${_fkvc_k}" ] || continue
@@ -588,9 +639,8 @@ _fk_validate_criteria() {   # 判準表語意檢查（狀態列舉封閉 ＋ 同
     _fkvc_ei="$(_fk_role_idx "${_fkvc_k}" expect)" || { _fkvc_rc=1; continue; }
     _fkvc_conf="$(LC_ALL=C jq -r \
       --arg k "${_fkvc_k}" --argjson sci "${_fkvc_sci}" --argjson ci "${_fkvc_ci}" \
-      --argjson ei "${_fkvc_ei}" --argjson si "${_fkvc_si}" '
-      (._schema.criteria_status_enum[0]) as $live
-      | [ .[$k].rows[] | select(.[$si] == $live) ]
+      --argjson ei "${_fkvc_ei}" --argjson si "${_fkvc_si}" --arg live "${_fkvc_live}" '
+      [ .[$k].rows[] | select(.[$si] == $live) ]
       | group_by([.[$sci], .[$ci]])
       | map(select((map(.[$ei]) | unique | length) > 1))
       | .[] | "  \(.[0][$sci]) ／ \(.[0][$ci]) ⇒ 期望值 " + (map(.[$ei]) | unique | join("、"))
@@ -700,6 +750,7 @@ EOF
 _fk_write() {
   _fk_validate_keys || return 1
   _fk_validate_schema_sets || return 1
+  _fk_validate_criteria || return 1
   _fkw_root="$(_fk_root)"; _fkw_rc=0
   while IFS= read -r _fkw_k; do
     [ -n "${_fkw_k}" ] || continue

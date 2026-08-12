@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -1187,6 +1188,7 @@ def _crit_reg(rows, *, roles=None, enum=None, cols=None, target="docs/c.md"):
             "criteria_keys": ["crit"],
             "criteria_status_enum": _CRIT_ENUM if enum is None else enum,
             "criteria_column_roles": _CRIT_ROLES if roles is None else roles,
+            "criteria_live_status": "現行",
         },
         "other": {"target": "docs/o.md", "rows": [["010", "ZZ-01", "x"]]},
         "crit": {"target": target, "columns": _CRIT_COLS if cols is None else cols,
@@ -1264,6 +1266,17 @@ def test_wl02_missing_role_column_is_fail_closed(tmp_path):
     "此路徑 rc != 0",
     "邊界②：具名略過、rc 不變",
     "期望 returncode == 1",
+    # 🔴 以下為 r2 三家各自掃描本庫**實測導出**之補漏（主委原六種被證偽）：
+    "Exit code: 0",                 # GROK-R2-P1-01：本庫 ≥58 行
+    "exit code 1",
+    "期望退出碼 1",                  # COMPOSER-R2-P1-01／GROK-R2-P1-01
+    "結束碼 0",
+    "非零退出",
+    "returncode != 0",              # 單等號／不等號皆須攔（原只攔 ==）
+    "returncode = 0",
+    "→ exit 1",                     # COMPOSER-R2-P1-01
+    "rc: 0",
+    "期望 rc 為 0",
 ])
 def test_wl02_rc_claim_outside_block_is_fail_closed(tmp_path, claim):
     """🔴 COMPOSER-R1-P1-01／GROK-R1-P1-02：只釘 `rc=` 會被同義寫法繞過。
@@ -1274,6 +1287,86 @@ def test_wl02_rc_claim_outside_block_is_fail_closed(tmp_path, claim):
                         sub=f"c{abs(hash(claim)) % 9973}")
     assert r.returncode != 0, f"{claim!r} 未被攔截\n{r.stdout}"
     assert "生成區塊外陳述期望結束狀態" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("claim", [
+    "最終結束狀態與第一份一致",
+    "由通過變為不通過",
+])
+def test_wl02_relational_claims_are_named_residual_not_caught(tmp_path, claim):
+    """🔴 具名殘留釘樁（`CODEX-R2-P1-01` 之關係型例）。
+
+    白名單刻意**不**涵蓋關係型／轉換型陳述——那需要理解語意，納入即退化成無限黑名單。
+    本測試斷言的是「現況不攔」，**不是「這樣才對」**：若哪天有人把它攔住了，
+    這裡會轉紅，提醒他回頭更新 docs/GOV_CRITERIA_REGISTRY.md 殘留 6，
+    而不是留著一句過期的「我們沒防這個」。
+    """
+    r, _, _ = _crit_run(tmp_path, _crit_reg(_CRIT_OK), body=claim + "\n",
+                        sub=f"rel{abs(hash(claim)) % 9973}")
+    assert r.returncode == 0, (
+        f"{claim!r} 已被攔截 ⇒ 殘留 6 的涵蓋宣稱已過期，請同步更新 "
+        f"docs/GOV_CRITERIA_REGISTRY.md 與 _FK_RC_CLAIM_FORMS\n{r.stderr}"
+    )
+
+
+def test_wl02_claim_form_list_is_frozen_named_set():
+    """白名單之涵蓋面須有具名清單，且與正則同批維護。
+
+    只有正則沒有清單時，「涵蓋哪些」只存在於一串難讀的字元類裡，
+    文件要引用就只能再抄一份 —— 那就是本註冊表要治的病。
+    """
+    src = GEN.read_text(encoding="utf-8")
+    m = re.search(r"^_FK_RC_CLAIM_FORMS='([^']*)'$", src, re.M)
+    assert m, "生產檔缺 _FK_RC_CLAIM_FORMS 具名清單"
+    forms = m.group(1).split()
+    assert forms == sorted(set(forms), key=forms.index), "具名清單不得有重複項"
+    assert set(forms) == {
+        "rc-op", "rc-unchanged", "returncode-op", "exit-code",
+        "exit-n", "exitcode-zh", "endcode-zh", "nonzero-zh",
+    }, (
+        f"白名單涵蓋面已變動（現為 {forms}）——請同時更新 "
+        "docs/GOV_CRITERIA_REGISTRY.md 殘留 6 與本測試，不得只改其一"
+    )
+
+
+def test_wl02_criteria_schema_fields_are_one_unit(tmp_path):
+    """🔴 CODEX-R2-P1-02：原版單獨刪 criteria_keys 即靜默停用三道檢查。
+
+    四欄任一存在 ⇒ 四欄全需存在；整組缺席才算「本註冊表無判準」。
+    """
+    for drop in ("criteria_keys", "criteria_status_enum",
+                 "criteria_column_roles", "criteria_live_status"):
+        reg = _crit_reg(_CRIT_OK)
+        del reg["_schema"][drop]
+        r = _emit(tmp_path, reg, sub=f"d{drop}")
+        assert r.returncode != 0, f"單獨刪 {drop} 未 fail-closed\n{r.stdout}"
+
+
+def test_wl02_empty_criteria_keys_is_fail_closed(tmp_path):
+    reg = _crit_reg(_CRIT_OK)
+    reg["_schema"]["criteria_keys"] = []
+    r = _emit(tmp_path, reg)
+    assert r.returncode != 0, r.stdout
+    assert "靜默停用" in r.stderr, r.stderr
+
+
+def test_wl02_live_status_is_named_not_positional(tmp_path):
+    """🔴 GROK-R2-P2-01：原版取 criteria_status_enum[0] 當「現行」＝位置契約。
+
+    重排 enum 不得改變語義：現行列的互斥仍須被抓到。
+    """
+    rows = _CRIT_OK + [["C-3", "s1", "cond-a", "1", "現行", "test_c"]]
+    reg = _crit_reg(rows, enum=["已廢", "現行"])       # 首元刻意不是現行
+    r, _, _ = _crit_run(tmp_path, reg)
+    assert r.returncode != 0, "enum 重排後現行互斥被漏掉 ⇒ 語義掛在位置上"
+    assert "互斥判準" in r.stderr, r.stderr
+
+
+def test_wl02_live_status_outside_enum_is_fail_closed(tmp_path):
+    reg = _crit_reg(_CRIT_OK)
+    reg["_schema"]["criteria_live_status"] = "在職"
+    r = _emit(tmp_path, reg)
+    assert r.returncode != 0, r.stdout
 
 
 def test_wl02_rc_claim_inside_own_block_is_allowed(tmp_path):
