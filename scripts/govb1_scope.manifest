@@ -76,3 +76,4 @@ allow tests/governance/test_result_state_format_failed.py
 allow tests/governance/test_rolegate_predispatch.py
 allow tests/governance/test_stamp_taskid_inject.py
 allow tests/governance/test_verify_gate_b3.py
+allow tests/governance/test_govb49_path_grant.py

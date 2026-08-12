@@ -759,45 +759,60 @@ def test_v11_cli_fail_zero_output_family_failed(tmp_path: Path) -> None:
     assert results and results[-1].get("result_state") == "failed"
 
 
-def test_v12_non_stamp_kinds_no_stamp_target_ok(tmp_path: Path) -> None:
-    """V12：review/consult/closure/impl 無 stamp-target → 不誤擋（與延伸前行為一致）。"""
-    for kind in ("review", "consult", "closure", "impl"):
-        h = _harness(tmp_path / kind)
-        # impl 須用 SoT implementer；讀 roles
-        roles = json.loads(
+@pytest.mark.parametrize("kind", ("review", "consult", "closure", "impl"))
+def test_v12_non_stamp_kinds_no_stamp_target_ok(tmp_path: Path, kind: str) -> None:
+    """V12：review/consult/closure/impl 無 stamp-target → 不誤擋（與延伸前行為一致）。
+
+    🔴 票 B-49 閉合條件 1／2（**兩處修正，缺一不可**）：
+      ① 原為 `for kind in (...)` 單一測試 ⇒ **從 receipt 看不出跑了幾個 kind**，
+         中途早退也只計一次。改參數化後每個 kind 各一格 ⇒ `passed == 4` 即 per-kind receipt。
+      ② 原有「implementer 不在三家就靜默早退」的逃生口 ⇒ 使用者把 implementer 改成
+         編排端（無 CLI 配方）時本測**假綠**。改為以 `_role_pin` 釘沙箱名冊：
+         沙箱內一定是有 CLI 配方的家族，**不需要**也**不得有**任何早退分支。
+         釘不成（名冊壞／家族清單漂移）⇒ `_role_pin` 自己 fail-closed 拋錯，不是早退。
+    """
+    h = _harness(tmp_path / kind)
+    # impl 走實作端路徑：釘沙箱名冊，與生產 implementer 解耦（票 B-49）
+    if kind == "impl":
+        fam = _role_pin.pin_implementer(h["scripts"])
+    else:
+        # 🔴 review/consult/closure 一律取**非實作者**家族。原寫死 "codex"：
+        #    只要 implementer 恰好是 codex，角色閘就以「實作者不自審」整批拒絕
+        #    ⇒ 本測與名冊耦合，換人實作即回紅。硬編家族名是本票要根除的病。
+        _impl = json.loads(
             (h["scripts"] / "governance_roles.json").read_text(encoding="utf-8")
-        )
-        fam = roles["implementer"] if kind == "impl" else "codex"
-        if kind == "impl" and fam not in ("codex", "grok", "composer"):
-            pytest.skip(f"unexpected implementer {fam}")
-        brief_rel = "handoffs/brief.md"
-        _write_brief(h, kind=kind, stamp_target=None, name="brief.md")
-        rid = f"12{kind[:4]}-0000-4000-8000-000000000001"
-        # uuid-ish
-        rid = {
-            "review": "12111111-1111-4111-8111-111111111111",
-            "consult": "12222222-2222-4222-8222-222222222222",
-            "closure": "12333333-3333-4333-8333-333333333333",
-            "impl": "12444444-4444-4444-8444-444444444444",
-        }[kind]
-        _open_round(
-            h,
-            round_id=rid,
-            session=f"s-v12-{kind}",
-            fams=[fam],
-            out_prefix=f"handoffs/v12{kind}",
-            brief_rel=brief_rel,
-            task_id=f"P16-D001-V12-{kind}",
-        )
-        r = _run_cx(
-            h,
-            fam,
-            brief_rel,
-            f"handoffs/v12{kind}-{fam}.md",
-            round_id=rid,
-        )
-        assert r.returncode == 0, f"kind={kind}: {r.stdout + r.stderr}"
-        assert _events(h["audit"], "committee_output") == []
+        )["implementer"]
+        _cands = [
+            f for f in _role_pin.cli_dispatchable_families(h["scripts"]) if f != _impl
+        ]
+        assert _cands, f"沙箱內無非實作者之 CLI 家族（implementer={_impl}）⇒ fail-closed"
+        fam = _cands[0]
+    brief_rel = "handoffs/brief.md"
+    _write_brief(h, kind=kind, stamp_target=None, name="brief.md")
+    rid = {
+        "review": "12111111-1111-4111-8111-111111111111",
+        "consult": "12222222-2222-4222-8222-222222222222",
+        "closure": "12333333-3333-4333-8333-333333333333",
+        "impl": "12444444-4444-4444-8444-444444444444",
+    }[kind]
+    _open_round(
+        h,
+        round_id=rid,
+        session=f"s-v12-{kind}",
+        fams=[fam],
+        out_prefix=f"handoffs/v12{kind}",
+        brief_rel=brief_rel,
+        task_id=f"P16-D001-V12-{kind}",
+    )
+    r = _run_cx(
+        h,
+        fam,
+        brief_rel,
+        f"handoffs/v12{kind}-{fam}.md",
+        round_id=rid,
+    )
+    assert r.returncode == 0, f"kind={kind}: {r.stdout + r.stderr}"
+    assert _events(h["audit"], "committee_output") == []
 
 
 def test_v13_register_fail_distinguishable_from_noop(tmp_path: Path) -> None:

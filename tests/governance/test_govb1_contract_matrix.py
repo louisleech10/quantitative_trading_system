@@ -27,10 +27,10 @@ TODO = REPO / "docs" / "GOVB1_INPUT_QUALITY_TODO.md"
 # 被授權路徑之 `<mode> <type> <oid>` 逐字寫死；任一位元組變動即失去豁免。
 # 🔴 誠實邊界：本機制只防**意外與遺忘**，不防具寫入權者蓄意（SPEC §C-6／§C-9-7／§C-11）。
 _B49_GRANT_IDENTITY: dict[str, str] = {
-    "docs/GOVB1_INPUT_QUALITY_TODO.md": "100644 blob a5f433079e6eaaf2de2f60090e1a70d6a55bc979",
+    "docs/GOVB1_INPUT_QUALITY_TODO.md": "100644 blob 0573f19870b94496476b94a4cb89cebf0ba15e9c",
     "tests/governance/test_result_state_format_failed.py": "100644 blob 1b01812c71df498150e9391e6b7bb7b3e98e374e",
     "tests/governance/test_rolegate_predispatch.py": "100644 blob 60b3efab0eb00605b32e3dc98d0ae1137c3bb0ec",
-    "tests/governance/test_stamp_taskid_inject.py": "100644 blob 7e8014e9915f1680dd5d1f3fecff69641e5cadb8",
+    "tests/governance/test_stamp_taskid_inject.py": "100644 blob 62e48627323af6d58f8257d1c3eb8976528498cd",
 }
 _B49_HARNESS_GRANT = frozenset(_B49_GRANT_IDENTITY)
 
@@ -1129,7 +1129,7 @@ def test_r7_v1_current_manifest_decl_34_stable() -> None:
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 48, f"V1 期望 48 條 decl，得 {len(decl)}"
+    assert len(decl) == 49, f"V1 期望 49 條 decl，得 {len(decl)}"
     # 與第二次現跑逐字相同（穩定；非快取）
     again = _r7_baseline_decl()
     assert decl == again
@@ -1165,7 +1165,7 @@ def test_r7_v2_leading_whitespace_path_rejected() -> None:
     # 反例方向：移除該列 ⇒ 回 rc=0
     ok = _call_g7_policy()
     assert ok.returncode == 0, ok.stderr + ok.stdout
-    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 48
+    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 49
 
 
 def test_r7_v3_trailing_whitespace_path_rejected() -> None:
@@ -1446,7 +1446,7 @@ def test_wprime_a5_meta_tickets_in_decl_count_36() -> None:
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert "scripts/govb1_task_tickets.tsv" in decl
     assert "scripts/govb1_single_source_check.sh" in decl
-    assert len(decl) == 48, f"期望 decl 48，得 {len(decl)}"
+    assert len(decl) == 49, f"期望 decl 49，得 {len(decl)}"
 
 
 def test_wprime_a5_counterexample_remove_meta_uncovers_tsv() -> None:
@@ -1538,7 +1538,7 @@ def test_b2r3_c1_current_manifest_meta_count_6() -> None:
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 48, f"decl 應恰 48，got {len(decl)}"
+    assert len(decl) == 49, f"decl 應恰 49，got {len(decl)}"
     meta_n = sum(
         1
         for ln in MANIFEST.read_text(encoding="utf-8").splitlines()
@@ -2564,6 +2564,43 @@ def _b49_ticket_status() -> str:
     return found[0]
 
 
+# 票 B-49 之閉合證據：六格具名 selector（SPEC/TODO Task 2.3）。
+# 🔴 **逐字列出**——改名或刪除任一格即紅（`CODEX-R1-P1-02`：不得以整檔 exit 0 充當證據）。
+_B49_CLOSURE_FILE = "tests/governance/test_govb49_path_grant.py"
+_B49_CLOSURE_SELECTORS = (
+    "test_v12_body_has_no_skip_escape",
+    "test_v12_four_kinds_all_visited",
+    "test_stamp_path_invalid_implementer_turns_red",
+    "test_impl_path_works_for_every_cli_family",
+    "test_dispatch_set_equals_review_families",
+    "test_review_families_subset_of_eligible",
+)
+
+
+def _assert_b49_closure_evidence() -> None:
+    """票 B-49 關票前提：六格閉合證據**實跑**全綠，且逐格具名存在。
+
+    🔴 **不得寫成字面比對**（TODO Task 2.2「不可做」）：檔案裡有那六個函式名，
+    不代表它們跑得過——`CODEX-R3-P1-01` 那型假綠正是「保留字面、實質失效」。
+    """
+    assert len(_B49_CLOSURE_SELECTORS) == 6
+    sel = REPO / _B49_CLOSURE_FILE
+    assert sel.is_file(), f"閉合證據檔不存在：{_B49_CLOSURE_FILE} ⇒ 票不得 CLOSED"
+    src = sel.read_text(encoding="utf-8")
+    missing = [fn for fn in _B49_CLOSURE_SELECTORS if f"def {fn}(" not in src]
+    assert not missing, f"閉合證據缺具名 selector（改名／刪除？）：{missing}"
+
+    p = _run(
+        [sys.executable, "-m", "pytest", _B49_CLOSURE_FILE, "-q", "--tb=short",
+         "-p", "no:cacheprovider"]
+    )
+    out = p.stdout + p.stderr
+    assert p.returncode == 0, f"閉合證據未全綠 ⇒ 票不得 CLOSED：\n{out[-3000:]}"
+    m = re.search(r"(\d+) passed", out)
+    assert m and int(m.group(1)) == 6, f"閉合證據應恰 6 格：\n{out[-1200:]}"
+    assert " skipped" not in out, f"閉合證據不得有 skip：\n{out[-1200:]}"
+
+
 def test_b45_unfreeze_requires_roles_sot_closure() -> None:
     """🔴 定時炸彈：`_B45_HARNESS` 凍結一被解除／放寬，本測即紅。
 
@@ -2590,6 +2627,13 @@ def test_b45_unfreeze_requires_roles_sot_closure() -> None:
         f"票 {_B49_ID} 不在 {_B49_TICKET} ⇒ 炸彈失去標的（票被刪或改名？）"
     )
     if _b45_freeze_still_active():
+        if status == "CLOSED":
+            # 🔴 Task 2.2（狀態機 R-A）：B-49 的修法**只解凍三檔**，另兩檔設計上維持凍結
+            #    ⇒ 引信恆為 active。若沿用「凍結期間一律不得關票」，這張票**永遠關不掉**
+            #    （狀態機無可達終態，是 r3／r6 之後第四個同型死結）。
+            #    改為：凍結期間允許 CLOSED，但**必須**附閉合證據——且是**實跑**，非字面。
+            _assert_b49_closure_evidence()
+            return
         assert status == "OPEN", (
             f"凍結仍生效但票已 {status}——B-49 之修法須動 _B45_HARNESS，"
             "不可能在凍結期間真正完成。請確認不是提早關票。"
