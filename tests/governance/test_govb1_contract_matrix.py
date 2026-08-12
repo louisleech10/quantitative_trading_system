@@ -2604,6 +2604,39 @@ _B49_CLOSURE_SELECTORS = (
 )
 
 
+def _b49_selector_is_substantive(src: str, fn: str) -> bool:
+    """具名 selector 是否**有實質斷言**（≥1 個 `assert` 或 `pytest.raises`）。
+
+    〔`CODEX-R2-P0-01` 第二病；主委反向驗證實測命中〕
+    把 selector 的 body 換成只剩 docstring，它照樣 `1 passed` ⇒ 只驗 rc/passed
+    擋不住「掏空」。本函式以 AST 檢查該函式**自身**的 body。
+
+    🔴 **誠實邊界**：`assert True` 仍會通過。本檢查只防**意外掏空與重構失手**，
+    不防蓄意（SPEC §C-6 已具名排除；與整套 B-49 機制同一誠實邊界）。
+    """
+    import ast
+
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == fn:
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Assert):
+                    return True
+                if isinstance(sub, ast.With):
+                    for item in sub.items:
+                        call = item.context_expr
+                        if isinstance(call, ast.Call):
+                            f = call.func
+                            name = getattr(f, "attr", None) or getattr(f, "id", None)
+                            if name == "raises":
+                                return True
+            return False
+    return False
+
+
 def _assert_b49_closure_evidence() -> None:
     """票 B-49 關票前提：六格閉合證據**逐格於實體隔離副本實跑**，各自驗 rc／passed／skipped。
 
@@ -2622,6 +2655,8 @@ def _assert_b49_closure_evidence() -> None:
     src = sel.read_text(encoding="utf-8")
     missing = [fn for fn in _B49_CLOSURE_SELECTORS if f"def {fn}(" not in src]
     assert not missing, f"閉合證據缺具名 selector（改名／刪除？）：{missing}"
+    hollow = [fn for fn in _B49_CLOSURE_SELECTORS if not _b49_selector_is_substantive(src, fn)]
+    assert not hollow, f"閉合證據 selector 被掏空（無任何斷言）：{hollow}"
 
     # 隔離工具的單一定義處＝證據檔本身；函式內 import 以免模組級循環相依
     import tempfile

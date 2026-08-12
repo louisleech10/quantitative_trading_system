@@ -591,6 +591,28 @@ def test_mut16_closure_selector_rename_breaks_evidence(
 # ── ⑮ 票 CLOSED 但證據缺 ⇒ 炸彈必紅 ────────────────────────────────
 
 
+def test_mut17_hollow_selector_detected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """⑰ selector 被掏空（body 只剩 docstring）⇒ 閉合證據須拒。
+
+    主委反向驗證實測：只驗 `rc`／`passed` 時，掏空的 selector 照樣 `1 passed`
+    ⇒ 炸彈仍綠。本格打的是 `_b49_selector_is_substantive` **與其整合**。
+    """
+    real_src = (REPO / _CM._B49_CLOSURE_FILE).read_text(encoding="utf-8")
+    target = _CM._B49_CLOSURE_SELECTORS[0]
+    assert _CM._b49_selector_is_substantive(real_src, target), "基線：真實 selector 應有斷言"
+
+    gutted = 'def %s():\n    """gutted"""\n    pass\n' % target
+    assert not _CM._b49_selector_is_substantive(gutted, target), "掏空的 selector 須判為無實質"
+    assert not _CM._b49_selector_is_substantive(real_src, "no_such_selector_name"), (
+        "不存在的 selector 須判為無實質（fail-closed）"
+    )
+
+    # 整合：判定回 False 時，閉合證據必須拒（不得只在純函式層成立）
+    monkeypatch.setattr(_CM, "_b49_selector_is_substantive", lambda *_a, **_k: False)
+    with pytest.raises(AssertionError, match="掏空"):
+        _CM._assert_b49_closure_evidence()
+
+
 def test_mut15_closed_without_evidence_turns_red(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
