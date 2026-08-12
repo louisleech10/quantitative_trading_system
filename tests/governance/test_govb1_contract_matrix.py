@@ -2292,6 +2292,8 @@ _B5_MANIFEST_AUTHORIZED_ADDITIONS = frozenset(
         "allow tests/governance/test_rolegate_predispatch.py",
         "allow tests/governance/test_stamp_taskid_inject.py",
         "allow tests/governance/test_verify_gate_b3.py",
+        # 票 B-49 Task 2.3 之閉合證據檔（新建）
+        "allow tests/governance/test_govb49_path_grant.py",
     }
 )
 

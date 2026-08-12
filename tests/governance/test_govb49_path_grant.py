@@ -639,3 +639,102 @@ def test_mut14_symlink_scripts_rejected(tmp_path: Path) -> None:
     assert (fake / "scripts").is_symlink(), "前提壞了：沒建成 symlink"
     with pytest.raises(AssertionError, match="symlink"):
         _assert_physical_copy(fake)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Task 3.2 — 行為不變對照（OLD vs NEW）
+# ══════════════════════════════════════════════════════════════════════
+# 證明「grant 常數不存在」時，三道守衛對**既有**輸入的判定逐字無改變。
+# 🔴 baseline 用 **immutable pre-B49 SHA**，不得寫 `HEAD`（`CODEX-R1-P1-04`）：
+#    HEAD 會隨施工 commit 前移，第二個 commit 之後 baseline 就變成「已含 grant 的版本」
+#    ⇒ 對照退化成自己比自己，恆真。
+_PRE_B49_SHA = "835c3d35"
+
+
+def _load_pre_b49_module():
+    """把 pre-B49 版的契約矩陣載成獨立模組（`__file__` 指回真實路徑，`REPO` 才解得對）。"""
+    import types
+
+    p = subprocess.run(
+        ["git", "show", f"{_PRE_B49_SHA}:tests/governance/test_govb1_contract_matrix.py"],
+        cwd=str(REPO),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert p.returncode == 0 and p.stdout, f"取不到 pre-B49 baseline：{p.stderr}"
+    assert "_B49_GRANT_IDENTITY" not in p.stdout, (
+        f"{_PRE_B49_SHA} 已含 grant 常數 ⇒ 這不是施工前的版本，對照無效"
+    )
+    real_path = str(REPO / "tests" / "governance" / "test_govb1_contract_matrix.py")
+    mod = types.ModuleType("_cm_pre_b49")
+    mod.__file__ = real_path
+    exec(compile(p.stdout, real_path, "exec"), mod.__dict__)  # noqa: S102
+    return mod
+
+
+def _verdict_of(mod, monkeypatch: pytest.MonkeyPatch, names: list[str]) -> bool:
+    """對指定模組餵同一組假 diff，回傳「是否有守衛拒絕」。"""
+    real_run = mod._run
+    payload = "\n".join(names) + ("\n" if names else "")
+
+    def _fake(cmd, *a, **kw):
+        c = list(cmd)
+        if c[:3] == ["git", "diff", "--name-only"]:
+            return subprocess.CompletedProcess(c, 0, payload, "")
+        if c[:3] == ["git", "diff", "--name-status"]:
+            return subprocess.CompletedProcess(c, 0, "", "")
+        return real_run(cmd, *a, **kw)
+
+    monkeypatch.setattr(mod, "_run", _fake)
+    for fn in _GUARDS:
+        guard = getattr(mod, fn, None)
+        assert guard is not None, f"{mod.__name__} 缺守衛 {fn}"
+        try:
+            guard()
+        except AssertionError:
+            return True
+        except BaseException as exc:  # noqa: BLE001
+            if type(exc).__name__ == "Skipped":
+                continue
+            raise
+    return False
+
+
+_PARITY_CASES = [
+    ("empty", []),
+    ("ordinary_file", ["scripts/gate.sh"]),
+    ("unauthorized_harness", ["tests/governance/test_cxrun_stamp_prompt.py"]),
+    ("second_unauthorized_harness", ["tests/governance/test_completeness_idlike_fp.py"]),
+    ("govb1_prefix_not_granted", ["docs/GOVB1_INPUT_QUALITY_SPEC.md"]),
+    ("frozen_hashes", ["scripts/govb1_frozen_hashes.txt"]),
+    ("mixed", ["scripts/gate.sh", "tests/governance/test_cxrun_stamp_prompt.py"]),
+]
+
+
+@pytest.mark.parametrize("label,names", _PARITY_CASES, ids=[c[0] for c in _PARITY_CASES])
+def test_task32_old_new_behaviour_parity(
+    monkeypatch: pytest.MonkeyPatch, label: str, names: list[str]
+) -> None:
+    """OLD 與 NEW 對**未授權**輸入的判定必須逐格相同。
+
+    只比未授權輸入——授權路徑的判定**本來就該不同**（那正是本票的交付內容），
+    把它混進來比會是自欺。
+    """
+    granted = set(_CM._B49_GRANT_IDENTITY)
+    assert not (set(names) & granted), f"{label} 混入授權路徑 ⇒ 對照失去意義"
+    old = _verdict_of(_load_pre_b49_module(), monkeypatch, names)
+    new = _verdict_of(_CM, monkeypatch, names)
+    assert old == new, f"{label}：行為改變 old_reject={old} new_reject={new}"
+
+
+def test_task32_granted_paths_are_the_only_behaviour_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """反向：授權路徑上 OLD 拒、NEW 放 —— 差異**恰好**落在授權集合，不多不少。"""
+    pre = _load_pre_b49_module()
+    for p in sorted(_CM._B49_GRANT_IDENTITY):
+        old = _verdict_of(pre, monkeypatch, [p])
+        new = _verdict_of(_CM, monkeypatch, [p])
+        assert old is True, f"{p}：pre-B49 應拒（否則本票沒有解決任何問題）"
+        assert new is False, f"{p}：授權後應放行"
