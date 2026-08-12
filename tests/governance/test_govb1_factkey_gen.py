@@ -1019,6 +1019,10 @@ def test_wl01_table_write_then_check_round_trip(tmp_path):
     ["a", 1],                # 非字串
     ["a", "b|c"],            # 含 | （table 會被切碎）
     ["a", "b\tc"],           # 含 tab（破壞 @tsv 逐列語義）
+    ["a", "b\rc"],           # 🔴 CODEX-R1-P1-01：CR 會把表頭拆行
+    ["a", "b\nc"],           # LF 同上
+    ["a", "b\x01c"],         # 其餘控制字元（封閉集合，非逐個列舉）
+    ["a", "b\x7fc"],         # DEL
     "abc",                   # 非陣列
 ])
 def test_wl01_illegal_columns_is_fail_closed(tmp_path, columns):
@@ -1055,6 +1059,37 @@ def test_wl01_cell_with_tab_or_newline_is_fail_closed(tmp_path, bad):
         reg = _shape_reg(rows=[["010", bad, "z"]], **extra)
         r = _emit(tmp_path, reg, sub=f"{sub}-{len(bad)}")
         assert r.returncode != 0, f"{sub}: {bad!r} 應 fail-closed\n{r.stdout}"
+
+
+def test_wl01_r1_p1_01_cr_in_column_name_cannot_produce_silent_malformed_table(tmp_path):
+    """🔴 CODEX-R1-P1-01 閉合回歸（以其原始反例逐字重現）。
+
+    病：初版禁字元是**列舉黑名單**（`|` / tab / LF），漏了 CR。
+        表頭那兩行**不經 @tsv**（cells 才經），故 raw CR 直接進產出、把表頭拆成兩行；
+        `--check` 比的是字串，宿主同樣壞掉即兩邊相符 ⇒ **rc=0 靜默放行**。
+    修法：改為封閉集合（`|` ∪ `[[:cntrl:]]`），表頭與儲存格共用同一集合。
+
+    本測試同時釘住兩件事，缺一即無法證明缺口真的關上：
+      ① emit 必須 rc≠0（不得只是「輸出變好看」）
+      ② 產出中不得出現 CR（防有人改成「靜默剝除」——那會讓資料與宿主不再等價）
+    """
+    reg = _shape_reg(columns=["a\rb", "c", "d"], render="table")
+    r = _emit(tmp_path, reg)
+    assert r.returncode != 0, f"CR 欄名未 fail-closed（原始缺口未關）\n{r.stdout!r}"
+    assert "\r" not in r.stdout, "產出仍含 CR ⇒ 改成了靜默剝除而非拒絕"
+    assert "控制字元" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("bad", ["\r", "\x01", "\x0b", "\x7f"])
+def test_wl01_control_char_in_cell_is_fail_closed(tmp_path, bad):
+    """儲存格側同樣走封閉集合。
+
+    `@tsv` 只轉義 `\\t \\n \\r \\\\` —— 其餘控制字元原樣輸出，故不能只靠它。
+    """
+    reg = _shape_reg(columns=["a", "b", "c"], render="table",
+                     rows=[["010", f"x{bad}y", "z"]])
+    r = _emit(tmp_path, reg, sub=f"c{ord(bad)}")
+    assert r.returncode != 0, f"儲存格控制字元 {bad!r} 未 fail-closed\n{r.stdout!r}"
 
 
 def test_wl01_table_cell_with_pipe_is_fail_closed(tmp_path):

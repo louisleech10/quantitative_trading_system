@@ -10,7 +10,7 @@
     "fields": {
       "target": "string | array of string。repo 相對路徑；該檔即本 fact-key 的宿主，須含恰好一組邊界標記。陣列＝多宿主（票 B-25 站 2.5 Task 1.1）；同一 key 之所有宿主其區塊內容逐位元組相同（projection oracle）",
       "rows": "字串陣列之陣列；以 @tsv 輸出後 LC_ALL=C 排序",
-      "columns": "選填。字串陣列＝各欄名稱。非空、元素非空、不重複、不含 | tab 換行。一經宣告，rows 每列長度須恰等於欄數，否則 fail-closed（未宣告時無此不變式，掉欄會靜默產出參差 TSV）。消費端得以欄名取值，不必寫死索引",
+      "columns": "選填。字串陣列＝各欄名稱。非空、元素非空、不重複、不含 | 或任何控制字元（封閉集合非黑名單：表頭不經 @tsv，raw CR 會拆行且 --check 兩邊同樣壞掉而放行——CODEX-R1-P1-01 實跑重現）。一經宣告，rows 每列長度須恰等於欄數，否則 fail-closed（未宣告時無此不變式，掉欄會靜默產出參差 TSV）。消費端得以欄名取值，不必寫死索引",
       "render": "選填。tsv（預設，與 WL-01 擴充前逐位元組相同）｜table（markdown 表格，須有 columns）。兩種 render 共用同一排序點，換 render 不換順序"
     },
     "status_enum": ["✅", "⬜", "🔨", "🛑", "🟡", "未開工", "已落地", "收案", "部分完成", "待審", "進行中", "停手"],

@@ -23,8 +23,8 @@
 # fail-closed 點（皆非靜默放行）：
 #   註冊表缺失／非 JSON 物件／key 名不合法／缺 jq／缺 target／target 為絕對路徑或含 ..／
 #   rows 型別不符／宿主檔不存在／邊界標記缺失或不成對／
-#   columns 非法（空、含空字串、重複、含 | tab 換行）／列長與 columns 欄數不符／
-#   render 非 {tsv,table}／render=table 但缺 columns／儲存格含 tab 或換行（table 另禁 |）
+#   columns 非法（空、含空字串、重複、含 | 或任何控制字元）／列長與 columns 欄數不符／
+#   render 非 {tsv,table}／render=table 但缺 columns／儲存格含控制字元（table 另禁 |）
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -172,14 +172,21 @@ _fk_validate_shape() {   # $1=key；columns／render 之封閉驗證（全 fail-
       echo "gen_fact_key_blocks: key ${1} render=table 但未宣告 columns（無表頭）→ fail-closed" >&2
       _fksh_rc=1; }
   else
+    # 🔴 禁字元用**封閉集合**（`|` ∪ 全部控制字元），不是列舉黑名單〔CODEX-R1-P1-01〕：
+    #   初版只列 `| \t \n`，漏了 CR。表頭**不經 @tsv**（見 `_fk_gen_block` 的 columns 那兩行），
+    #   raw CR 會把表頭拆成兩行 ⇒ 產出 malformed markdown；而 `--check` 比的是字串，
+    #   宿主同樣壞掉即兩邊相符 ⇒ rc=0 靜默放行。codex 以 `columns:["a\rb","c"]` 實跑重現
+    #   （emit rc=0、stdout hex 含 `7c20610d62207c`、check rc=0）。
+    #   儲存格走 `@tsv` 會把 CR 轉義成字面 `\r` 故不受此害——**表頭與儲存格路徑不同**，
+    #   這正是只補一處會漏另一處的原因，故兩處都改用同一個封閉集合。
     LC_ALL=C jq -e --arg k "$1" '
       .[$k].columns
       | type == "array"
         and length > 0
-        and all(.[]; type == "string" and length > 0 and (test("[|\t\n]") | not))
+        and all(.[]; type == "string" and length > 0 and (test("[|[:cntrl:]]") | not))
         and (length == (unique | length))
     ' "${REG}" >/dev/null 2>&1 \
-      || { echo "gen_fact_key_blocks: key ${1} 之 columns 非法（須非空字串陣列；元素非空、不重複、不含 | tab 換行）→ fail-closed" >&2
+      || { echo "gen_fact_key_blocks: key ${1} 之 columns 非法（須非空字串陣列；元素非空、不重複、不含 | 或任何控制字元）→ fail-closed" >&2
            _fksh_rc=1; }
     LC_ALL=C jq -e --arg k "$1" '
       (.[$k].columns | length) as $n | .[$k].rows | all(.[]; length == $n)
@@ -188,10 +195,11 @@ _fk_validate_shape() {   # $1=key；columns／render 之封閉驗證（全 fail-
            _fksh_rc=1; }
   fi
 
-  # 儲存格字元限制：tab／換行破壞 @tsv 的「一列一行」語義（既有 key 實測皆無，故非放寬）
-  LC_ALL=C jq -e --arg k "$1" '.[$k].rows | all(.[][]; test("[\t\n]") | not)' \
+  # 儲存格字元限制：同上改用封閉集合（全部控制字元）。tab／換行破壞 @tsv 的「一列一行」
+  # 語義；其餘控制字元 @tsv 不轉義、會原樣進入產出。既有四 key 實測零命中，故非放寬。
+  LC_ALL=C jq -e --arg k "$1" '.[$k].rows | all(.[][]; test("[[:cntrl:]]") | not)' \
     "${REG}" >/dev/null 2>&1 \
-    || { echo "gen_fact_key_blocks: key ${1} 之儲存格含 tab 或換行（破壞逐列語義）→ fail-closed" >&2
+    || { echo "gen_fact_key_blocks: key ${1} 之儲存格含控制字元（破壞逐列語義）→ fail-closed" >&2
          _fksh_rc=1; }
   if [ "${_fksh_mode}" = "table" ]; then
     LC_ALL=C jq -e --arg k "$1" '.[$k].rows | all(.[][]; test("[|]") | not)' \
