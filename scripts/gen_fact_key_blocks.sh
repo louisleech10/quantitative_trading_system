@@ -22,7 +22,9 @@
 #
 # fail-closed 點（皆非靜默放行）：
 #   註冊表缺失／非 JSON 物件／key 名不合法／缺 jq／缺 target／target 為絕對路徑或含 ..／
-#   rows 型別不符／宿主檔不存在／邊界標記缺失或不成對
+#   rows 型別不符／宿主檔不存在／邊界標記缺失或不成對／
+#   columns 非法（空、含空字串、重複、含 | tab 換行）／列長與 columns 欄數不符／
+#   render 非 {tsv,table}／render=table 但缺 columns／儲存格含 tab 或換行（table 另禁 |）
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,6 +34,8 @@ REG="${SCRIPT_DIR}/fact_keys.json"
 _FK_RESERVED='_schema'
 # fact-key 名稱字元集合：限縮至此，故可安全嵌入 grep/sed 正則而無需跳脫
 _FK_KEY_RE='^[a-z0-9][a-z0-9-]*$'
+# render 模式封閉集合（寫死於此，非由註冊表自證）。未宣告者一律 tsv。
+_FK_RENDER_MODES='tsv table'
 
 _fk_die() { printf '%s\n' "$*" >&2; exit 1; }
 
@@ -120,14 +124,109 @@ _fk_validate_rows() {   # $1=key
          return 1; }
 }
 
+# 票 B-25「判準資料化」之前置（待辦清單 `WL-01`）：欄位宣告與表格投影。
+#
+# 出處：`x-consult-r12` J-1（codex＋composer 同判，證偽主委 assumed①）——
+#   「`.rows[]|@tsv` 只有平面列，沒有〔現行／已廢〕欄」⇒ 表格型判準無法入註冊表。
+#   該限制是「同 Task 內互斥判準偵測」與「改法段須有 FACT-RECEIPT」兩條檢查的唯一阻塞。
+#
+# 兩個選填欄位（皆為**加法**；未宣告者行為與擴充前逐位元組相同）：
+#   columns  字串陣列。非空、元素非空、不重複、不含 `|`／tab／換行。
+#            一經宣告，rows 每列長度須**恰等於**欄數 ⇒ 掉欄／多欄當場 fail-closed
+#            （擴充前無此不變式：列長不一致會靜默產出參差的 TSV）。
+#   render   "tsv"（預設）｜"table"（markdown 表格）。
+#            "table" 須有 columns——無表頭的表格不是表格 ⇒ fail-closed。
+#
+# 🔴 兩種 render **共用同一個排序點**（`_fk_rows_tsv`）：
+#   換 render 不得換順序，否則同一份資料在不同宿主呈現次序不同＝新的漂移源。
+#   排序點只有一處亦是 T-2.1-M1 兩條 mutation 的錨點前提（錨點須唯一，見測試檔註解）。
+_fk_render_of() {   # $1=key -> stdout: render 模式（未宣告 ⇒ tsv）
+  LC_ALL=C jq -r --arg k "$1" '.[$k].render // "tsv"' "${REG}"
+}
+
+_fk_validate_shape() {   # $1=key；columns／render 之封閉驗證（全 fail-closed）
+  _fksh_rc=0
+  _fksh_mode="tsv"
+  _fksh_rty="$(LC_ALL=C jq -r --arg k "$1" \
+                 '.[$k] | if has("render") then (.render | type) else "absent" end' \
+                 "${REG}" 2>/dev/null)" || _fksh_rty=""
+  case "${_fksh_rty}" in
+    absent) : ;;
+    string)
+      _fksh_mode="$(LC_ALL=C jq -r --arg k "$1" '.[$k].render' "${REG}")" || return 1
+      case " ${_FK_RENDER_MODES} " in
+        *" ${_fksh_mode} "*) : ;;
+        *) echo "gen_fact_key_blocks: key ${1} 之 render='${_fksh_mode}' 不在 {${_FK_RENDER_MODES}} → fail-closed" >&2
+           _fksh_rc=1; _fksh_mode="tsv" ;;
+      esac ;;
+    *)
+      echo "gen_fact_key_blocks: key ${1} 之 render 型別不符（須字串）→ fail-closed" >&2
+      _fksh_rc=1 ;;
+  esac
+
+  _fksh_cty="$(LC_ALL=C jq -r --arg k "$1" \
+                 '.[$k] | if has("columns") then (.columns | type) else "absent" end' \
+                 "${REG}" 2>/dev/null)" || _fksh_cty=""
+  if [ "${_fksh_cty}" = "absent" ]; then
+    [ "${_fksh_mode}" != "table" ] || {
+      echo "gen_fact_key_blocks: key ${1} render=table 但未宣告 columns（無表頭）→ fail-closed" >&2
+      _fksh_rc=1; }
+  else
+    LC_ALL=C jq -e --arg k "$1" '
+      .[$k].columns
+      | type == "array"
+        and length > 0
+        and all(.[]; type == "string" and length > 0 and (test("[|\t\n]") | not))
+        and (length == (unique | length))
+    ' "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: key ${1} 之 columns 非法（須非空字串陣列；元素非空、不重複、不含 | tab 換行）→ fail-closed" >&2
+           _fksh_rc=1; }
+    LC_ALL=C jq -e --arg k "$1" '
+      (.[$k].columns | length) as $n | .[$k].rows | all(.[]; length == $n)
+    ' "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: key ${1} 有列之欄數與 columns 宣告不符 → fail-closed" >&2
+           _fksh_rc=1; }
+  fi
+
+  # 儲存格字元限制：tab／換行破壞 @tsv 的「一列一行」語義（既有 key 實測皆無，故非放寬）
+  LC_ALL=C jq -e --arg k "$1" '.[$k].rows | all(.[][]; test("[\t\n]") | not)' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之儲存格含 tab 或換行（破壞逐列語義）→ fail-closed" >&2
+         _fksh_rc=1; }
+  if [ "${_fksh_mode}" = "table" ]; then
+    LC_ALL=C jq -e --arg k "$1" '.[$k].rows | all(.[][]; test("[|]") | not)' \
+      "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: key ${1} render=table 之儲存格含 |（會切碎表格）→ fail-closed" >&2
+           _fksh_rc=1; }
+  fi
+  return "${_fksh_rc}"
+}
+
+# 🔴 唯一排序點。兩種 render 皆經此函式，故下一行的排序管線在本檔**只出現一次**——
+#   T-2.1-M1a／M1b 以字串取代做 mutation 且只換第一處，出現兩次即打錯位置而空心。
+#   🔴 本註解刻意**不複述**該管線的字面文字：複述本身就會變成第二處
+#   （2026-08-12 WL-01 實際犯過一次，由 test_wl01_sort_anchor_stays_unique_in_generator 抓到）。
+#   LC_ALL=C 為決定性支點（見檔頭實測）；拿掉即 T-2.1-M1 轉紅。
+_fk_rows_tsv() {   # $1=key -> stdout: @tsv 後 LC_ALL=C 排序
+  LC_ALL=C jq -r --arg k "$1" '.[$k].rows[] | @tsv' "${REG}" | LC_ALL=C sort
+}
+
 _fk_gen_block() {   # $1=key -> stdout（決定性）
   # 🔴 每一步都須 `|| return 1`〔CODEX-R1-P1-03〕：
   #   前版最後一行是 printf ⇒ **函式 rc 恆為 0**，jq／sort 失敗被吞掉。
   #   `--check` 又只比對字串，於是「生成失敗但輸出恰好相符」＝靜默通過。
   printf '<!-- BEGIN GENERATED: %s -->\n' "$1" || return 1
-  # 🔴 LC_ALL=C 為決定性支點（見檔頭實測）；拿掉即 T-2.1-M1 轉紅
-  #   （pipefail 已於檔頭 set；此處 rc 反映 jq 或 sort 之失敗）
-  LC_ALL=C jq -r --arg k "$1" '.[$k].rows[] | @tsv' "${REG}" | LC_ALL=C sort || return 1
+  _fkg_mode="$(_fk_render_of "$1")" || return 1
+  if [ "${_fkg_mode}" = "table" ]; then
+    LC_ALL=C jq -r --arg k "$1" '.[$k].columns | "| " + join(" | ") + " |"' "${REG}" || return 1
+    LC_ALL=C jq -r --arg k "$1" '.[$k].columns | map("---") | "|" + join("|") + "|"' "${REG}" || return 1
+    # 欄數已由 `_fk_validate_shape` 鎖成與 columns 相等；此處只做格式化，不再猜欄數
+    _fk_rows_tsv "$1" \
+      | LC_ALL=C awk -F'\t' '{ line = "|"; for (i = 1; i <= NF; i++) line = line " " $i " |"; print line }' \
+      || return 1
+  else
+    _fk_rows_tsv "$1" || return 1
+  fi
   printf '<!-- END GENERATED: %s -->\n' "$1" || return 1
 }
 
@@ -234,6 +333,7 @@ _fk_emit_all() {
   while IFS= read -r _fke_k; do
     [ -n "${_fke_k}" ] || continue
     _fk_validate_rows "${_fke_k}" || { _fke_rc=1; continue; }
+    _fk_validate_shape "${_fke_k}" || { _fke_rc=1; continue; }
     _fk_gen_block "${_fke_k}" || _fke_rc=1
   done < <(_fk_keys)
   return "${_fke_rc}"
@@ -415,6 +515,7 @@ _fk_check() {
   while IFS= read -r _fkc_k; do
     [ -n "${_fkc_k}" ] || continue
     _fk_validate_rows "${_fkc_k}" || { _fkc_rc=1; continue; }
+    _fk_validate_shape "${_fkc_k}" || { _fkc_rc=1; continue; }
     _fkc_tgts="$(_fk_targets "${_fkc_k}")" || { _fkc_rc=1; continue; }
     # 🔴 生成結果先落變數並**驗 rc**，不得直接塞進 `[ = "$(...)" ]`〔CODEX-R1-P1-03〕：
     #   命令替換內的 rc 會被丟掉 ⇒ 生成失敗卻只比字串＝靜默通過。
@@ -453,6 +554,7 @@ _fk_write() {
   while IFS= read -r _fkw_k; do
     [ -n "${_fkw_k}" ] || continue
     _fk_validate_rows "${_fkw_k}" || { _fkw_rc=1; continue; }
+    _fk_validate_shape "${_fkw_k}" || { _fkw_rc=1; continue; }
     _fkw_tgts="$(_fk_targets "${_fkw_k}")" || { _fkw_rc=1; continue; }
     while IFS= read -r _fkw_tgt; do
     [ -n "${_fkw_tgt}" ] || continue

@@ -907,3 +907,232 @@ def test_t21_symlink_in_scope_is_fail_closed(tmp_path):
     r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
     assert r.returncode != 0, "symlink 未 fail-closed"
     assert "symlink" in r.stderr
+
+
+# ==========================================================================
+# 待辦清單 WL-01 — schema 由平面列擴為具名欄／表格投影
+#
+# 出處：`x-consult-r12` J-1（codex＋composer 同判）——`.rows[]|@tsv` 只有平面列，
+#   承載不了「現行／已廢」兩欄之判準表 ⇒ 票 B-25 之「判準資料化」無從施工。
+#   本節即該限制解除後的守衛：**加法**（未宣告 columns/render 者行為不變）＋
+#   **新不變式**（宣告 columns 後掉欄／多欄當場 fail-closed）。
+# ==========================================================================
+
+_WL01_ROWS = [["020", "b", "後"], ["010", "a", "前"]]
+
+
+def _shape_reg(**extra):
+    """單 key 註冊表；extra 覆寫該 key 之欄位（columns／render／rows）。"""
+    key = {"target": "t.md", "rows": _WL01_ROWS}
+    key.update(extra)
+    return {"k": key}
+
+
+def _emit(tmp_path: Path, registry: dict, sub: str = "s"):
+    """只跑生成（無宿主檔需求）；回傳 CompletedProcess。"""
+    sdir = _sandbox(tmp_path / sub, registry)
+    return _run([str(sdir / GEN.name)])
+
+
+# --- 加法性：未宣告者逐位元組不變 ------------------------------------------
+
+def test_wl01_absent_columns_and_render_keeps_flat_tsv_bytes(tmp_path):
+    """WL-01 是加法：不宣告 columns／render ⇒ 輸出與擴充前逐位元組相同。
+
+    這條是**相容性錨**：一旦有人把 table 設成預設，或在 tsv 路徑上多印表頭，本測試轉紅。
+    """
+    r = _emit(tmp_path, _shape_reg())
+    assert r.returncode == 0, r.stderr
+    assert r.stdout == (
+        "<!-- BEGIN GENERATED: k -->\n"
+        "010\ta\t前\n"
+        "020\tb\t後\n"
+        "<!-- END GENERATED: k -->\n"
+    ), r.stdout
+
+
+def test_wl01_columns_alone_does_not_change_output(tmp_path):
+    """只宣告 columns（render 仍為預設 tsv）⇒ 輸出不變，只是多了列長不變式。"""
+    a = _emit(tmp_path, _shape_reg(), sub="a")
+    b = _emit(tmp_path, _shape_reg(columns=["序", "名", "註"]), sub="b")
+    assert a.returncode == 0 and b.returncode == 0, (a.stderr, b.stderr)
+    assert a.stdout == b.stdout, "宣告 columns 不得改變 tsv 投影"
+
+
+# --- table 投影的形狀與排序 -------------------------------------------------
+
+def test_wl01_table_render_emits_header_separator_then_sorted_rows(tmp_path):
+    r = _emit(tmp_path, _shape_reg(columns=["序", "名", "註"], render="table"))
+    assert r.returncode == 0, r.stderr
+    assert r.stdout == (
+        "<!-- BEGIN GENERATED: k -->\n"
+        "| 序 | 名 | 註 |\n"
+        "|---|---|---|\n"
+        "| 010 | a | 前 |\n"
+        "| 020 | b | 後 |\n"
+        "<!-- END GENERATED: k -->\n"
+    ), r.stdout
+
+
+def test_wl01_render_does_not_change_row_order(tmp_path):
+    """兩種 render 共用同一排序點 ⇒ 換 render 不換順序。
+
+    反面才有鑑別力：若 table 路徑自己排一次（例如排渲染後的 `| …` 字串），
+    分隔符不同會在「某格是另一格之前綴」時給出不同次序 ⇒ 本測試轉紅。
+    """
+    # 鑑別力來源：`a` 是 `a b` 的前綴，其後的分隔字元不同——
+    #   TSV 比 `\t`(0x09) vs ` `(0x20) ⇒ `a` 在前；渲染後比 `|`(0x7C) vs `b`(0x62) ⇒ `a b` 在前。
+    #   兩者次序相反 ⇒ 若 table 分支自己再排一次，本測試轉紅。
+    rows = [["010", "a", "x"], ["010", "a b", "y"]]
+    tsv = _emit(tmp_path, {"k": {"target": "t.md", "rows": rows}}, sub="tsv")
+    tab = _emit(tmp_path, {"k": {"target": "t.md", "columns": ["1", "2", "3"],
+                                 "render": "table", "rows": rows}}, sub="tab")
+    assert tsv.returncode == 0 and tab.returncode == 0, (tsv.stderr, tab.stderr)
+    order_tsv = [ln.split("\t") for ln in tsv.stdout.splitlines()[1:-1]]
+    order_tab = [[c.strip() for c in ln.strip("|").split("|")]
+                 for ln in tab.stdout.splitlines()[3:-1]]
+    assert order_tsv == order_tab, f"tsv={order_tsv} table={order_tab}"
+
+
+def test_wl01_table_write_then_check_round_trip(tmp_path):
+    root = _mkroot(tmp_path)
+    (root / "docs" / "t.md").write_text(
+        "前言\n<!-- BEGIN GENERATED: k -->\n舊\n<!-- END GENERATED: k -->\n後記\n",
+        encoding="utf-8",
+    )
+    sdir = _sandbox(tmp_path, {"k": {"target": "docs/t.md", "columns": ["a", "b", "c"],
+                                     "render": "table", "rows": _WL01_ROWS}})
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    assert _run([str(sdir / GEN.name), "--write"], env_extra=env).returncode == 0
+    assert _run([str(sdir / GEN.name), "--check"], env_extra=env).returncode == 0
+    body = (root / "docs" / "t.md").read_text(encoding="utf-8")
+    assert body.startswith("前言\n") and body.endswith("後記\n")
+    assert "| a | b | c |\n|---|---|---|\n" in body
+
+
+# --- fail-closed 面 ---------------------------------------------------------
+
+@pytest.mark.parametrize("columns", [
+    [],                      # 空陣列
+    ["a", "a"],              # 重複欄名
+    ["a", ""],               # 空字串欄名
+    ["a", 1],                # 非字串
+    ["a", "b|c"],            # 含 | （table 會被切碎）
+    ["a", "b\tc"],           # 含 tab（破壞 @tsv 逐列語義）
+    "abc",                   # 非陣列
+])
+def test_wl01_illegal_columns_is_fail_closed(tmp_path, columns):
+    r = _emit(tmp_path, _shape_reg(columns=columns))
+    assert r.returncode != 0, f"columns={columns!r} 應 fail-closed\n{r.stdout}"
+
+
+def test_wl01_row_length_mismatch_is_fail_closed(tmp_path):
+    """宣告三欄卻有一列只有兩格 ⇒ 拒。擴充前此列會靜默產出參差 TSV。"""
+    reg = _shape_reg(columns=["a", "b", "c"], rows=[["010", "x", "y"], ["020", "z"]])
+    r = _emit(tmp_path, reg)
+    assert r.returncode != 0, r.stdout
+    assert "欄數" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("render", ["markdown", "TSV", "", 1, None])
+def test_wl01_unknown_render_is_fail_closed(tmp_path, render):
+    r = _emit(tmp_path, _shape_reg(columns=["a", "b", "c"], render=render))
+    assert r.returncode != 0, f"render={render!r} 應 fail-closed\n{r.stdout}"
+
+
+def test_wl01_table_render_without_columns_is_fail_closed(tmp_path):
+    """無表頭的表格不是表格 ⇒ 不得靜默退回 tsv。"""
+    r = _emit(tmp_path, _shape_reg(render="table"))
+    assert r.returncode != 0, r.stdout
+    assert "columns" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("bad", ["含\t分隔", "含\n換行"])
+def test_wl01_cell_with_tab_or_newline_is_fail_closed(tmp_path, bad):
+    """兩種 render 皆拒：tab／換行會讓「一列一行」的語義崩掉。"""
+    for extra, sub in ((dict(), "tsv"),
+                       (dict(columns=["a", "b", "c"], render="table"), "tab")):
+        reg = _shape_reg(rows=[["010", bad, "z"]], **extra)
+        r = _emit(tmp_path, reg, sub=f"{sub}-{len(bad)}")
+        assert r.returncode != 0, f"{sub}: {bad!r} 應 fail-closed\n{r.stdout}"
+
+
+def test_wl01_table_cell_with_pipe_is_fail_closed(tmp_path):
+    reg = _shape_reg(columns=["a", "b", "c"], render="table",
+                     rows=[["010", "含|管線", "z"]])
+    r = _emit(tmp_path, reg)
+    assert r.returncode != 0, r.stdout
+    assert "|" in r.stderr
+
+
+def test_wl01_pipe_in_cell_is_allowed_under_tsv_render(tmp_path):
+    """🔴 只在 table 模式禁 `|`。tsv 模式不受影響——否則就是趁機加嚴既有 key。"""
+    r = _emit(tmp_path, _shape_reg(rows=[["010", "含|管線", "z"]]))
+    assert r.returncode == 0, r.stderr
+
+
+# --- mutation：證明新檢查承重（拿掉即壞資料被放行）--------------------------
+
+def test_wl01_mutation_removing_length_check_lets_ragged_rows_through(tmp_path):
+    """引信：把列長比對改成恆真 ⇒ 參差列被放行 ⇒ 證明該檢查真的在擋。"""
+    reg = _shape_reg(columns=["a", "b", "c"], rows=[["010", "x", "y"], ["020", "z"]])
+    good = _sandbox(tmp_path / "good", reg)
+    bad = _sandbox(tmp_path / "bad", reg)
+    _mutate(bad, "length == $n", "length >= 0")
+    assert _run([str(good / GEN.name)]).returncode != 0
+    assert _run([str(bad / GEN.name)]).returncode == 0, "這條 mutation 是空心的"
+
+
+def test_wl01_mutation_removing_shape_call_in_check_lets_bad_render_through(tmp_path):
+    """引信：`--check` 路徑若不呼叫形狀驗證，非法 render 會一路走到字串比對。"""
+    root = _mkroot(tmp_path)
+    (root / "docs" / "t.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n", encoding="utf-8")
+    reg = {"k": {"target": "docs/t.md", "render": "markdown", "rows": [["010", "a"]]}}
+    good = _sandbox(tmp_path / "good", reg)
+    bad = _sandbox(tmp_path / "bad", reg)
+    _mutate(bad, '_fk_validate_shape "${_fkc_k}" || { _fkc_rc=1; continue; }', ":")
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    g = _run([str(good / GEN.name), "--check"], env_extra=env)
+    b = _run([str(bad / GEN.name), "--check"], env_extra=env)
+    assert g.returncode != 0 and "render" in g.stderr, g.stderr
+    assert "render" not in b.stderr, "拿掉呼叫後仍報 render ⇒ 這條 mutation 是空心的"
+
+
+def test_wl01_sort_anchor_stays_unique_in_generator():
+    """🔴 T-2.1-M1 的**前提**：`_mutate` 用 `replace(..., 1)` 只改第一處。
+
+    出生事故（2026-08-10）已因錨點撞到 `_fk_targets` 的去重排序而誤打一次。
+    WL-01 新增 table 分支時若各自寫一行排序，錨點會再度變成兩處 ⇒ 兩條 mutation
+    打不到生成排序而**空心通過**。修法＝排序集中在 `_fk_rows_tsv`；本測試釘住之。
+    """
+    src = GEN.read_text(encoding="utf-8")
+    n = src.count(_ROWS_SORT_ANCHOR)
+    assert n == 1, (
+        f"排序錨點 {_ROWS_SORT_ANCHOR!r} 在生產檔出現 {n} 次（須恰 1）——"
+        "T-2.1-M1a／M1b 會打到第一處而非生成排序，成為空心 mutation"
+    )
+
+
+def test_wl01_handwritten_status_detector_still_works_under_table_render(tmp_path):
+    """render 改變不得削弱手寫狀態偵測：識別碼仍由 rows 第 2 欄導出（讀 JSON，非讀投影）。"""
+    root = _mkroot(tmp_path)
+    (root / "docs" / "t.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n", encoding="utf-8")
+    (root / "docs" / "prose.md").write_text("ZZ-01 已落地\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    sdir = _sandbox(tmp_path, {
+        "_schema": {
+            "status_enum": ["已落地"],
+            "status_keys": ["k"],
+            "status_scope": ["docs/"],
+            "status_scope_grandfathered": ["docs/__none__.md"],
+        },
+        "k": {"target": "docs/t.md", "columns": ["序", "項", "狀"],
+              "render": "table", "rows": [["010", "ZZ-01", "已落地"]]},
+    })
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    assert _run([str(sdir / GEN.name), "--write"], env_extra=env).returncode == 0
+    r = _run([str(sdir / GEN.name), "--check"], env_extra=env)
+    assert r.returncode != 0, "table render 下偵測器失效 ⇒ 手寫狀態可繞過"
+    assert "HANDWRITTEN STATUS" in r.stderr and "prose.md" in r.stderr, r.stderr

@@ -9,7 +9,9 @@
     "reserved_keys_note": "保留鍵不是 fact-key，生成器逐字跳過。保留鍵字面集合寫死於生成器（_FK_RESERVED），非由本檔自證；本檔改名保留鍵不會被承認。",
     "fields": {
       "target": "string | array of string。repo 相對路徑；該檔即本 fact-key 的宿主，須含恰好一組邊界標記。陣列＝多宿主（票 B-25 站 2.5 Task 1.1）；同一 key 之所有宿主其區塊內容逐位元組相同（projection oracle）",
-      "rows": "字串陣列之陣列；以 @tsv 輸出後 LC_ALL=C 排序"
+      "rows": "字串陣列之陣列；以 @tsv 輸出後 LC_ALL=C 排序",
+      "columns": "選填。字串陣列＝各欄名稱。非空、元素非空、不重複、不含 | tab 換行。一經宣告，rows 每列長度須恰等於欄數，否則 fail-closed（未宣告時無此不變式，掉欄會靜默產出參差 TSV）。消費端得以欄名取值，不必寫死索引",
+      "render": "選填。tsv（預設，與 WL-01 擴充前逐位元組相同）｜table（markdown 表格，須有 columns）。兩種 render 共用同一排序點，換 render 不換順序"
     },
     "status_enum": ["✅", "⬜", "🔨", "🛑", "🟡", "未開工", "已落地", "收案", "部分完成", "待審", "進行中", "停手"],
     "status_keys": ["governance-batch-status", "governance-ticket-closure", "governance-worklist"],
@@ -24,11 +26,7 @@
       "白話說明/第1批-施工清單.md"
     ],
     "status_sets_note": "status_enum＝狀態字面值；status_keys＝哪些 key 屬狀態 key（識別碼僅由其 rows 第 2 欄導出，刻意排除 governance-execution-order：其第 2 欄為站名，併入會放大誤擋）；status_scope 編碼恰兩種——不以 / 結尾＝exact path（全等），以 / 結尾＝directory prefix（字首相符），禁 wildcard；status_scope_grandfathered＝2026-08-10 凍結之既存歷史日誌檔豁免清單，以集合相等鎖死，新增檔案不得靜默加入。逐檔實測命中數見 docs/GOVB25_STATUS_FACTKEY_SPEC.md §A（此處刻意不寫死數字——會漂）",
-    "row_columns": [
-      "ord — 三位零填序數，決定 LC_ALL=C 排序後的呈現次序",
-      "stage — 站/批名稱",
-      "tickets — 該站/批的票，以「，」分隔；箭號表示同批內先後"
-    ],
+    "row_columns_note": "原 row_columns 欄已刪，改由各 fact-key 自帶 columns（WL-01）。理由：它只描述 governance-execution-order 一個 key 的形狀卻掛在共用 _schema，第二個 key 一出生它就是過期副本——正是本註冊表要治的病。不得復原。",
     "invariants": [
       "同一事實只在本檔手改一次；文件內對應段落由生成器產出",
       "生成器輸出全程 LF、無 BOM、無時間戳、無環境相依（locale 固定 LC_ALL=C）",
@@ -44,6 +42,8 @@
   },
   "governance-execution-order": {
     "target": "docs/GOVERNANCE_EXECUTION_ORDER.md",
+    "columns": ["序", "站／批", "票"],
+    "render": "table",
     "rows": [
       ["010", "站 1", "B-39"],
       ["020", "站 2 第 1 批 2a 輸入品質族", "B-19，B-16 擴充 A/B/C，B-25，B-29"],
@@ -69,6 +69,8 @@
   },
   "governance-worklist": {
     "target": ["HANDOFF.md", "白話說明/接下來要做什麼.md"],
+    "columns": ["序", "項目", "狀態", "內容"],
+    "render": "table",
     "rows": [
       ["010", "WL-01", "未開工", "P0 前置：fact_keys schema 由平面列擴為兩欄表格。解鎖 WL-02／WL-03；票 B-25 殘留⑥之唯一阻塞"],
       ["020", "WL-02", "未開工", "P1-a 判準資料化：同 Task 內互斥判準偵測（抽 條件→期望rc 配對，同條件不同期望即 FAIL）。前置 WL-01；票 B-25"],
@@ -84,6 +86,8 @@
   },
   "governance-batch-status": {
     "target": ["docs/GOVERNANCE_EXECUTION_ORDER.md", "白話說明/接下來要做什麼.md"],
+    "columns": ["序", "批次", "狀態"],
+    "render": "table",
     "rows": [
       ["010", "B0", "已落地"],
       ["020", "B1", "已落地"],
@@ -108,6 +112,8 @@
   },
   "governance-ticket-closure": {
     "target": ["docs/GOVERNANCE_EXECUTION_ORDER.md", "白話說明/治理待辦總覽.md"],
+    "columns": ["序", "票", "狀態", "對外不得宣稱"],
+    "render": "table",
     "rows": [
       ["005", "B-25", "部分完成", "判準資料化整項未做，卡在 fact_keys 之 .rows[] 只支援平面列；三項殘留（正向斷言擋不住旁邊另寫互斥判準／引用已廢判準無機械偵測／完整解未做）＋兩條併入之機械檢查提案。不得宣稱已閉合"],
       ["010", "B-15", "部分完成", "不得宣稱誤擋已修復——B7 之後仍存在，GOVB0 B4 Task 2.3/2.4 未做"],
