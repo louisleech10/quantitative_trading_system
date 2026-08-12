@@ -106,4 +106,15 @@
 - 🔴 **`docs/GOVB1_` 前綴 OOE 亦禁**（硬保護集）⇒ 延伸檔須另取名。
 - 🔴 **背景任務 exit code ＝ 指令鏈最後一個的 rc**；推完用 `git rev-list --count origin/main..HEAD` 實查。
   **未看到 push 結果前不得宣告成功**（本 session 犯過一次）。
+- 🔴🔴 **推送前必跑 8 秒快閘，過了才推**（本 session 實測：全套 11 分 ×9 次＝100.7 分，
+  其中約 44 分可避免；而擋下兩次推送的原因，下面三條合計只要 8 秒）：
+  ```
+  bash scripts/govb1_final_gate.sh --only g7 && bash scripts/gen_fact_key_blocks.sh --check \
+    && bash scripts/plain_docs_sync_check.sh
+  ```
+- 🔴🔴 **push 失敗先 `grep -E "✗|FAIL|ERROR|FACTKEY" <push.log>`，禁直接重跑套件**。
+  push log 有 1600+ 行且**已含失敗原因**；本 session 兩次只 `tail -3` 就重跑 `gov_check`，
+  白花 22 分鐘去重新發現手上已有的資訊。導檔是對的，錯在該 grep 失敗行時只取尾。
+- 🔴 **乾跑用的 clone 放專案內的 gitignore 路徑**，別放 scratchpad——
+  專案外路徑每個指令都走權限分類器（本 session A 類卡頓 13 筆＝5.6 分）。
 - 🔴 閘會把含家族名的**讀取指令與 commit 訊息**當成派工 ⇒ 訊息一律用 Write 工具寫檔再 `-F`。
