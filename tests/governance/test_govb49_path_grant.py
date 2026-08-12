@@ -95,6 +95,14 @@ def _make_iso(tmp_path: Path) -> Path:
             shutil.copy2(REPO / init.relative_to(dst), init)
     (dst / "handoffs").mkdir(exist_ok=True)
     (dst / "docs").mkdir(exist_ok=True)
+    # 🔴 隔離副本必須是 git repo：巢狀執行時（閉合證據 → 隔離副本 → 副本內再開副本）
+    #    副本內的 `_repo_snapshot()` 會對副本根跑 `git status`，非 repo 即 fail-closed
+    #    ⇒ 關票路徑不可達。此為 review r2 反向驗證實測到的第二個「無可達終態」。
+    if not (dst / ".git").exists():
+        init = subprocess.run(
+            ["git", "init", "-q"], cwd=str(dst), capture_output=True, text=True, check=False
+        )
+        assert init.returncode == 0, f"隔離副本 git init 失敗（fail-closed）：{init.stderr}"
     _assert_physical_copy(dst)
     return dst
 
@@ -465,6 +473,36 @@ def test_mut11b_worktree_shape_probes(tmp_path: Path, shape: str) -> None:
         assert not _CM._b49_worktree_shape_ok(ok_file, "160000"), "gitlink mode 須拒"
     else:  # missing
         assert not _CM._b49_worktree_shape_ok(tmp_path / "nope", "100644"), "缺檔須拒"
+
+
+def test_mut11c_shape_check_is_wired_into_granted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """⑪c **整合驗證**：形狀檢查必須真的掛在 `_b49_granted` 的路徑上。
+
+    🔴 ⑪b 只打純函式 `_b49_worktree_shape_ok`——反向驗證實測：把
+    `_b49_worktree_bytes_match` 裡那行呼叫改成 `if False:`，⑪b 仍 4 passed
+    ⇒ 它證明不了整合還在（與 `CODEX-R2-P1-04` 抓到的 ⑬b／⑭ 同型）。
+    本格改為讓授權檔的工作樹**看起來帶 exec bit**，要求 `_b49_granted` 轉為 False。
+    """
+    p = _granted_paths()[0]
+    fp = REPO / p
+    assert _CM._b49_granted(p), "前提壞了：授權路徑在基線應被授權"
+
+    _orig_lstat = Path.lstat
+
+    def _fake_lstat(self: Path):
+        st = _orig_lstat(self)
+        if self == fp:
+            return os.stat_result(
+                (st.st_mode | 0o111,) + tuple(st)[1:]
+            )
+        return st
+
+    monkeypatch.setattr(Path, "lstat", _fake_lstat)
+    assert not _CM._b49_granted(p), (
+        "⑪c 工作樹 exec bit 與授權 mode 不符卻仍授權 ⇒ 形狀檢查沒掛在 _b49_granted 上"
+    )
 
 
 # ── ⑬ 授權檔刪除／改名 ⇒ 拒 ──────────────────────────────────────────
