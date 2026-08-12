@@ -56,8 +56,13 @@ def _run_fn(fns: tuple[str, ...], body: str, tmp: Path) -> subprocess.CompletedP
     """在隔離 shell 內載入生產原文並執行 `body`。"""
     script = tmp / "probe.sh"
     # REPO_ROOT：`_run_assert_lines` 固定 PATH 時會用到（生產環境由腳本位置導出）
+    # 🔴 TEMPLATE_CHECK_EXEC=1：2026-08-12 把「是否執行文件內 ASSERT」的預設反轉為**不執行**
+    #   （理由見 template_check.sh 檔頭：呼叫端集合不封閉，改由產出端決定）。
+    #   本 helper 的探針正是要驗**執行語意**（rc 比對、副作用、白名單），故明示 opt-in；
+    #   不帶的話這些探針會全部變成「沒跑而綠」＝空心。
     script.write_text(
-        f'set -u\nREPO_ROOT="{REPO}"\n' + _extract(*fns) + "\n" + body + "\n", encoding="utf-8"
+        f'set -u\nREPO_ROOT="{REPO}"\nTEMPLATE_CHECK_EXEC=1\n'
+        + _extract(*fns) + "\n" + body + "\n", encoding="utf-8"
     )
     return subprocess.run(
         ["bash", str(script)], cwd=REPO, capture_output=True, text=True, check=False
@@ -335,9 +340,14 @@ def test_t15_a1_path_hijack_blocked(tmp_path: Path) -> None:
     doc = tmp_path / "h.md"
     doc.write_text("ASSERT bash THEN rc=0\n", encoding="utf-8")
     script = tmp_path / "probe.sh"
+    # 🔴 TEMPLATE_CHECK_EXEC=1〔GROK-R1-P1-01〕：本 probe 是唯一**不走 `_run_fn`** 的承重測，
+    #   2026-08-12 預設反轉為「不執行」時只在 `_run_fn` 注入 opt-in，漏了這裡
+    #   ⇒ ASSERT 根本沒跑，marker 恆為不存在，本測變成**空心格**（拿掉 PATH 固定仍綠）。
+    #   grok 實測隔離：無 EXEC+evil PATH ⇒ marker=False；有 EXEC+拆掉 PATH 固定 ⇒ marker=True。
     script.write_text(
         "set -u\n"
         f'REPO_ROOT="{REPO}"\n'
+        "TEMPLATE_CHECK_EXEC=1\n"
         + _extract("_run_assert_lines")
         + f'\nPATH="{evil}:$PATH" _run_assert_lines {doc} >/dev/null 2>&1; echo "rc=$?"\n',
         encoding="utf-8",

@@ -198,7 +198,7 @@ out="$(
     #   本腳本掛在 Write/Edit 的 PostToolUse，若在此執行 ASSERT，
     #   一份含昂貴 ASSERT 的文件會使自己**編輯不動**（存檔即引爆 ⇒ 文件自鎖）。
     #   執行留給 `gate.sh`（真正的驗收點），該路徑行為逐字不變。
-    TEMPLATE_CHECK_NO_EXEC=1 bash "${SCRIPT_DIR}/template_check.sh" "${kind}" "${target}" 2>&1
+    bash "${SCRIPT_DIR}/template_check.sh" "${kind}" "${target}" 2>&1
   fi
 )"
 rc=$?

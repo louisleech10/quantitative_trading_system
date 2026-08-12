@@ -4,8 +4,10 @@
   A. 便宜段（1–4）任一紅 ⇒ **不得**進入 pytest 段（早退）。反面：拿掉早退就會跑到。
   B. 失敗原因必須進最末摘要，且帶可 grep 的固定前綴 `GOV-CHECK-FAILED:`。
   C. legacy backlog 掃描（不擋門、實測約 75 秒）**不得**排在擋門的段之前。
-  D. 路 A：`_run_assert_lines` 在 `TEMPLATE_CHECK_NO_EXEC=1` 下不執行文件內命令，
-     且**所有** `scripts/*.sh` 呼叫端都必須帶該環境變數（機械強制，非紀律）。
+  D. ASSERT 執行閘：`_run_assert_lines` **預設不執行**文件內命令，要執行須明示
+     `TEMPLATE_CHECK_EXEC=1`；強制點在**產出端**，呼叫端無須也不該配合。
+     （2026-08-12 反轉。前版是「呼叫端記得帶 NO_EXEC=1」＋掃 `scripts/*.sh` 當強制，
+      codex〔R1-P2-04〕實證該集合不封閉——變數／`eval` 呼叫正則看不見。）
 
 🔴 每條都附反面（mutation）：拿掉受測機制必須讓對應斷言轉紅，否則是廉價綠燈。
 
@@ -236,10 +238,14 @@ def _mk_assert_doc(tmp_path: Path, marker_rel: str) -> Path:
     return doc
 
 
-def test_no_exec_env_suppresses_document_assert_execution(tmp_path: Path) -> None:
-    """路 A 的核心：帶 NO_EXEC=1 時，文件內 ASSERT 不得被執行。
+def test_document_assert_is_not_executed_by_default(tmp_path: Path) -> None:
+    """🔴 核心契約：**預設不執行**文件內 ASSERT；要執行須明示 TEMPLATE_CHECK_EXEC=1。
 
-    附反面——不帶該變數時 marker 必須產生，證明本測不是在測空氣。
+    2026-08-12 反轉預設〔CODEX-R1-P2-04〕：前版是「呼叫端記得帶 NO_EXEC=1 才安全」，
+    而呼叫端集合被實證為不封閉（`scripts/test_template_check.sh:64` 以變數呼叫，
+    正則掃不到）。反轉後「忘記帶」的後果由危險變安全。
+
+    附反面——明示 opt-in 時 marker 必須產生，證明本測不是在測空氣。
     """
     script = REPO / "scripts" / "_probe_assert_marker.sh"
     script.write_text('#!/usr/bin/env bash\n: > "$1"\n', encoding="utf-8")
@@ -248,25 +254,26 @@ def test_no_exec_env_suppresses_document_assert_execution(tmp_path: Path) -> Non
     #   本測的探針文件在 tmp_path ⇒ 不 force 的話 _run_assert_lines 根本不會被呼叫，
     #   兩邊都不產生 marker，測試會「因為沒跑」而假綠（第一版即踩此坑）。
     env_base = {**os.environ, "TEMPLATE_CHECK_EXT_SCOPE": "force"}
+    env_base.pop("TEMPLATE_CHECK_EXEC", None)   # 環境殘留不得污染「預設」的判定
     # .claude/tmp/ 已列入 .gitignore，marker 不會弄髒工作區
     stem = tmp_path.name
     m1_rel, m2_rel = f".claude/tmp/{stem}_m1", f".claude/tmp/{stem}_m2"
     m1, m2 = REPO / m1_rel, REPO / m2_rel
     try:
-        # 反面：不帶 NO_EXEC ⇒ ASSERT 真的跑，marker 出現
+        # 反面：明示 opt-in ⇒ ASSERT 真的跑，marker 出現（證明本測有鑑別力）
         subprocess.run(
             ["bash", str(TC), "spec", str(_mk_assert_doc(tmp_path, m1_rel))],
-            cwd=REPO, capture_output=True, text=True, timeout=120, env=env_base,
+            cwd=REPO, capture_output=True, text=True, timeout=120,
+            env={**env_base, "TEMPLATE_CHECK_EXEC": "1"},
         )
-        assert m1.exists(), "不帶 NO_EXEC 時 ASSERT 未執行 ⇒ 本測失去鑑別力（測空氣）"
+        assert m1.exists(), "明示 TEMPLATE_CHECK_EXEC=1 仍未執行 ⇒ 本測失去鑑別力（測空氣）"
 
-        # 正面：帶 NO_EXEC ⇒ 不執行
+        # 正面：**什麼都不帶**（＝生產預設）⇒ 不執行
         subprocess.run(
             ["bash", str(TC), "spec", str(_mk_assert_doc(tmp_path, m2_rel))],
-            cwd=REPO, capture_output=True, text=True, timeout=120,
-            env={**env_base, "TEMPLATE_CHECK_NO_EXEC": "1"},
+            cwd=REPO, capture_output=True, text=True, timeout=120, env=env_base,
         )
-        assert not m2.exists(), "帶 NO_EXEC=1 仍執行了文件內命令 ⇒ 路 A 失效，自鎖會重演"
+        assert not m2.exists(), "預設竟執行了文件內命令 ⇒ 自鎖會重演（呼叫端無論怎麼寫都不該危險）"
     finally:
         script.unlink(missing_ok=True)
         m1.unlink(missing_ok=True)
@@ -305,20 +312,25 @@ def test_executable_assert_lines_are_a_frozen_named_set() -> None:
     )
 
 
-def test_no_exec_mode_announces_unverified_asserts(tmp_path: Path) -> None:
-    """未驗證必須**看得見**：NO_EXEC 下須印出具名提示，不得靜默略過。"""
+def test_default_mode_announces_unverified_asserts(tmp_path: Path) -> None:
+    """未驗證必須**看得見**：預設（不帶任何旗標）下須印出具名提示，不得靜默略過。
+
+    🔴 2026-08-12〔COMPOSER-R1-P2-01／GROK-R1-P2-01〕：本測前版仍注入已廢的
+    `TEMPLATE_CHECK_NO_EXEC=1`，且未清除環境中可能殘留的 `TEMPLATE_CHECK_EXEC`
+    ⇒ 測的不是「預設」，而是一個不存在的模式。已改為與 sibling 測對稱。
+    """
     script = REPO / "scripts" / "_probe_assert_marker.sh"
     script.write_text('#!/usr/bin/env bash\n: > "$1"\n', encoding="utf-8")
     m_rel = f".claude/tmp/{tmp_path.name}_m3"
+    env = {**os.environ, "TEMPLATE_CHECK_EXT_SCOPE": "force"}
+    env.pop("TEMPLATE_CHECK_EXEC", None)
     try:
         r = subprocess.run(
             ["bash", str(TC), "spec", str(_mk_assert_doc(tmp_path, m_rel))],
-            cwd=REPO, capture_output=True, text=True, timeout=120,
-            env={**os.environ, "TEMPLATE_CHECK_EXT_SCOPE": "force",
-                 "TEMPLATE_CHECK_NO_EXEC": "1"},
+            cwd=REPO, capture_output=True, text=True, timeout=120, env=env,
         )
         assert "ASSERT 未驗證" in (r.stdout + r.stderr), (
-            "NO_EXEC 下未印出「未驗證」提示 ⇒ 看起來像驗過了（codex P1-02 的核心）\n"
+            "預設下未印出「未驗證」提示 ⇒ 看起來像驗過了（codex R1-P1-02 的核心）\n"
             + r.stdout + r.stderr
         )
     finally:
@@ -326,26 +338,32 @@ def test_no_exec_mode_announces_unverified_asserts(tmp_path: Path) -> None:
         (REPO / m_rel).unlink(missing_ok=True)
 
 
-def test_every_shell_caller_of_template_check_passes_no_exec() -> None:
-    """🔴 把殘留②由紀律轉成機制：呼叫端漏帶 NO_EXEC ⇒ 本測轉紅。
+def test_no_caller_needs_to_opt_out_of_execution() -> None:
+    """🔴 反轉後的強制點在**產出端**，不在呼叫端——本測釘住這件事。
 
-    封閉集合＝`scripts/*.sh` 內所有實際呼叫 template_check.sh 的行
-    （排除註解與字串內的提及）。新增呼叫端而忘記帶環境變數會當場被抓。
+    前版是掃 `scripts/*.sh` 要求每個呼叫端帶 `TEMPLATE_CHECK_NO_EXEC=1`。
+    codex〔R1-P2-04〕實證該集合**不封閉**：`scripts/test_template_check.sh:64`
+    以 `bash "${TEMPLATE_CHECK}"` 呼叫，正則看不見；`eval`／`$(...)` 同理。
+    列舉式黑名單永遠列不完 ⇒ 該測試已刪，改為兩條可導出的判準：
+
+      ① `template_check.sh` 內的執行閘必須是「**須明示 opt-in**」形態；
+      ② 生產呼叫端**不得**再殘留已廢的 `TEMPLATE_CHECK_NO_EXEC`（死旗標會誤導後人）。
+
+    ① 的行為面由 test_document_assert_is_not_executed_by_default 以真實執行驗。
     """
-    offenders: list[str] = []
+    src = TC.read_text(encoding="utf-8")
+    assert 'if [ "${TEMPLATE_CHECK_EXEC:-0}" != "1" ]; then' in src, (
+        "執行閘不是 opt-in 形態 ⇒ 忘記帶旗標的後果又變回「危險」"
+    )
+    # 🔴 只看**非註解行**：危險的是還在運作的判定，不是解釋它為何被廢的那句說明。
+    #   （第一版連註解一起禁，把記錄出生事故的那行也判紅——那是把歷史抹掉，不是把洞補起來。）
+    stale = []
     for sh in sorted((REPO / "scripts").glob("*.sh")):
-        if sh.name == "template_check.sh":
-            continue
         for i, ln in enumerate(sh.read_text(encoding="utf-8").splitlines(), 1):
-            s = ln.strip()
-            if s.startswith("#") or "template_check.sh" not in s:
+            if ln.lstrip().startswith("#"):
                 continue
-            # 只認「真的執行它」的形態：bash …/template_check.sh
-            if not re.search(r"bash\s+\S*template_check\.sh", s):
-                continue
-            if "TEMPLATE_CHECK_NO_EXEC=1" not in s:
-                offenders.append(f"{sh.name}:{i}: {s}")
-    assert not offenders, (
-        "以下呼叫端未帶 TEMPLATE_CHECK_NO_EXEC=1 ⇒ 文件自鎖會在該路徑重演:\n"
-        + "\n".join(offenders)
+            if "TEMPLATE_CHECK_NO_EXEC" in ln:
+                stale.append(f"{sh.name}:{i}: {ln.strip()}")
+    assert not stale, (
+        "以下位置仍有已廢的 TEMPLATE_CHECK_NO_EXEC 活判定／死旗標:\n" + "\n".join(stale)
     )

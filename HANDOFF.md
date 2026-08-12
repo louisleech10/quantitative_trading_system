@@ -52,7 +52,23 @@
 　 缺腳本判紅，並補 `test_mutation_removing_g7_script_turns_red`
 ② NO_EXEC 靜默放行「文法對但結果會錯」之 ASSERT ⇒ 改為大聲印出，
 　 並把可執行 ASSERT 之**檔案集合凍成具名清單**（新增即轉紅）
-另 Codex 抓到主委自造回歸：以 `awk` 批次改註解時**掉了 `gov_check.sh` 的可執行位**，已還原。
+另 Grok＋Codex 抓到主委自造回歸：以 `awk` 批次改註解時**掉了 `gov_check.sh` 的可執行位**，已還原。
+
+### 續作（同日第二輪，session `20260812-govassert-x-review-r1`）
+
+`CODEX-R1-P2-04` 指出「掃呼叫端」判準**不封閉**（`scripts/test_template_check.sh:64`
+以 `bash "${TEMPLATE_CHECK}"` 呼叫，正則看不見）⇒ **反轉預設**：
+`template_check.sh` 改為預設不執行、須明示 `TEMPLATE_CHECK_EXEC=1`；
+四處呼叫端的死旗標移除；列舉式掃描測試刪除，改為形態面＋行為面兩條判準。
+
+三家再審 6 條**全數採納並修**。其中 `GROK-R1-P1-01` 為 BLOCKING：
+反轉後 `test_t15_a1_path_hijack_blocked`（唯一不走 `_run_fn` 的承重測）變成空心格，
+已修並經反面實證（拆掉 PATH 固定 ⇒ marker 出現）。
+
+🔴 **本輪品質觀察（重要）**：必答「是否出現空心格」一題，**Codex 與 Composer 皆答錯**
+（兩家都聲稱 PATH 劫持測經由 `_run_fn`，實為自建 probe），只有 grok 實跑隔離。
+⇒ 該兩家之「可 commit」verdict 建立在錯誤事實上。
+**review 品質的分水嶺是「有沒有真的跑」，不是家數**——派工時應要求附實跑隔離結果。
 
 ## 實測數字：本檔不重述，看唯一來源
 

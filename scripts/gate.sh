@@ -797,21 +797,18 @@ if [ "${kind}" = "dispatch" ]; then
         esac
         ;;
     esac
-    # 🔴 TEMPLATE_CHECK_NO_EXEC=1（2026-08-12 使用者裁定「路 A」）：
-    #   範本錨點／文法／白名單檢查**照跑**（那才是本呼叫的目的），
-    #   只不執行文件內的 `ASSERT <cmd> THEN rc=<n>`。
-    #   出生事故：T0 止血只堵住寫檔 hook 路徑，派工路徑（本行）仍會真的執行
-    #   文件內的任意命令 ⇒ SPEC 內一行 `ASSERT bash scripts/gov_check.sh …`
-    #   就能讓「派工」反過來跑整套治理閘門（**文件自鎖**，實測 605s、fork 耗盡）。
-    #   誠實邊界：那些 ASSERT 行自此**不再被任何路徑驗證**——具名殘留，
-    #   見 docs/GOV_ASSERT_PATHA_NOTE.md（在此之前它們也只在派工時才驗，非新缺口）。
-    TEMPLATE_CHECK_NO_EXEC=1 bash scripts/template_check.sh "${_spec_kind}" "${spec}" || { echo "ERROR: SPEC 未過範本機檢（見上），拒發 token。"; exit 1; }
+    # 🔴 範本錨點／文法／白名單檢查照跑；文件內 `ASSERT <cmd> THEN rc=<n>` **預設不執行**
+    #   （預設值反轉於 template_check.sh，本處不需也不得再帶旗標——帶了會是死旗標）。
+    #   出生事故：派工路徑原本會真的執行文件內任意命令 ⇒ SPEC 內一行
+    #   `ASSERT bash scripts/gov_check.sh …` 就能讓「派工」反過來跑整套治理閘門
+    #   （**文件自鎖**，實測 605s、fork 耗盡）。詳見 docs/GOV_ASSERT_PATHA_NOTE.md。
+    bash scripts/template_check.sh "${_spec_kind}" "${spec}" || { echo "ERROR: SPEC 未過範本機檢（見上），拒發 token。"; exit 1; }
     # coverage_check 比對 manifest 項是否都在文件裡，與 kind 無關，兩種都跑
     [ -n "${manifest}" ] && { bash scripts/coverage_check.sh "${manifest}" "${spec}" || { echo "ERROR: SPEC 漏 manifest 項（見上），拒發 token。"; exit 1; }; }
   fi
   if [ -n "${todo}" ]; then
-    # 🔴 同上（路 A）：只驗範本錨點，不執行文件內 ASSERT。理由見上一處註解。
-    TEMPLATE_CHECK_NO_EXEC=1 bash scripts/template_check.sh todo "${todo}" || { echo "ERROR: TODO 未過範本機檢（見上），拒發 token。"; exit 1; }
+    # 🔴 同上：只驗範本錨點；ASSERT 預設不執行。理由見上一處註解。
+    bash scripts/template_check.sh todo "${todo}" || { echo "ERROR: TODO 未過範本機檢（見上），拒發 token。"; exit 1; }
     [ -n "${manifest}" ] && { bash scripts/coverage_check.sh "${manifest}" "${todo}" || { echo "ERROR: TODO 漏 manifest 項（見上），拒發 token。"; exit 1; }; }
   fi
   if [ -z "${missing}" ] && [ -n "${task_id}" ]; then

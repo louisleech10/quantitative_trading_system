@@ -20,7 +20,8 @@
 
 | | 路 A（本次採用） | 路 B（未採用） |
 |---|---|---|
-| 作法 | 呼叫端一律帶 `TEMPLATE_CHECK_NO_EXEC=1`，只驗錨點不執行 | 改宣告式 `ASSERT-TEST: <path>::<test_name>`，靠 pytest 驗 |
+| 作法 | 只驗錨點、不執行文件內 ASSERT | 改宣告式 `ASSERT-TEST: <path>::<test_name>`，靠 pytest 驗 |
+| 現行實作 | **產出端反轉預設**：`template_check.sh` 預設不執行，要執行須明示 `TEMPLATE_CHECK_EXEC=1`（初版曾是「呼叫端帶 `NO_EXEC=1`」，已廢，見 §3） | — |
 | 改動量 | 2 行 | 見下方實測——**遠小於先前宣稱** |
 | 需否動凍結檔 | 否 | **否**（先前宣稱「45 行卡凍結檔」為誤，見下） |
 
@@ -40,17 +41,28 @@
    出處事故：連續八輪審查該 SPEC 期間**從未量過執行面**，只審文件記帳。
    教訓歸 `docs/SCAR_LEDGER.md`（實測 > 假設，本次再犯）。
 
-## 3. 封堵點（**三處**，合計即全部執行路徑）
+## 3. 封堵點：**沒有封堵點清單**（2026-08-12 二訂）
 
-| 呼叫端 | 位置 | 處置 |
+🔴 **強制點在產出端，不在呼叫端**：`scripts/template_check.sh` 的執行閘已反轉為
+「須明示 `TEMPLATE_CHECK_EXEC=1` 才執行」，**任何呼叫端都不必、也不該做任何事**。
+
+### 為何不再列清單（走過的三個階段，留著當教材）
+
+| 階段 | 做法 | 為何不成立 |
 |---|---|---|
-| 寫檔 PostToolUse hook | `scripts/doc_format_precheck.sh` | T0 止血已帶 `TEMPLATE_CHECK_NO_EXEC=1` |
-| 派工 `--spec`／`--todo` | `scripts/gate.sh`（2 處） | 本次補上 `TEMPLATE_CHECK_NO_EXEC=1` |
-| SPEC 四方一致性檢查 | `scripts/spec_fourway_check.sh:46` | 本次補上；**人工盤點原本漏掉這處** |
+| ① T0 止血 | 只有寫檔 hook 帶 `NO_EXEC=1` | 派工路徑仍會執行 |
+| ② 路 A 初版 | 人工盤點呼叫端，逐處補旗標 | 人工盤點說 2 處，機械掃描抓到第 3 處 |
+| ③ 路 A 初版＋掃描 | 掃 `scripts/*.sh` 要求每處帶旗標，當作封閉集合 | **codex〔R1-P2-04〕實證不封閉**：`scripts/test_template_check.sh:64` 以 `bash "${TEMPLATE_CHECK}"` 呼叫，正則看不見；`eval`／`$(...)`／間接層同理 |
+| ④ 現行 | **反轉預設**，呼叫端無須配合 | 忘記帶的後果由「危險」變「安全」；沒有集合要維護，就沒有集合會漏 |
 
-🔴 該表**不得手工維護**——第三處就是人工盤點漏掉、由
-`tests/governance/test_gov_check_cheap_first.py::test_every_shell_caller_of_template_check_passes_no_exec`
-掃 `scripts/*.sh` 機械抓出來的。表若與該測試不符，以測試為準。
+階段②③正是本 repo 已知的病：**列舉式黑名單永遠列不完**
+（前例：`_g2_regions` 一個機制衍生 4 條旁路）。
+
+判準由 `tests/governance/test_gov_check_cheap_first.py` 兩條釘住：
+`test_document_assert_is_not_executed_by_default`（行為面，真的跑一次看有無副作用）與
+`test_no_caller_needs_to_opt_out_of_execution`（形態面，執行閘須為 opt-in 且無死旗標殘留）。
+
+`scripts/gov_check.sh` 只檢查 `template_check.sh` 是否存在（fail-closed），不執行它。
 
 `scripts/gov_check.sh` 只檢查 `template_check.sh` 是否存在（fail-closed），不執行它。
 
@@ -59,10 +71,9 @@
 1. **那 2 行可執行 ASSERT 自此不再被任何路徑驗證**，等同註解。
    誠實邊界：在此之前它們也**只在派工當下**才驗，不是本次新開的缺口。
    其餘 12 行本來就因文法不符而未執行（只被印成文法錯），處置不變。
-2. `_run_assert_lines` 本體**仍保留執行能力**（`TEMPLATE_CHECK_NO_EXEC` 預設為 0）。
-   ⇒ 已由 `tests/governance/test_gov_check_cheap_first.py` 之呼叫端掃描機械強制：
-   任何 `scripts/*.sh` 內對 `template_check.sh` 的呼叫若未帶該環境變數，測試轉紅。
-   剩餘缺口：**非 `scripts/*.sh`** 的呼叫端（如外部工具）掃不到。
+2. `_run_assert_lines` 本體**仍保留執行能力**，但已改為 **opt-in**（`TEMPLATE_CHECK_EXEC=1`）。
+   ⇒ 呼叫端無論怎麼寫都不會意外執行；**這條殘留已由設計消除，不再靠紀律**。
+   剩餘缺口：有人**刻意**帶該變數去跑一份惡意文件。屬蓄意範疇，本 repo 威脅模型不涵蓋。
 3. 逐行 timeout（T0 止血②）仍在，故即使重演也不會再無上限地掛住。
 4. **真正的病灶是新文件，不是既有文件**：自鎖事故來自本 session 新寫的一份 SPEC，
    其中含行首 ASSERT 呼叫 `gov_check.sh`。路 A 封的正是這條路徑。

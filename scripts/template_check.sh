@@ -557,10 +557,21 @@ _TC_ASSERT_CMD_ALLOW='bash python3 pytest grep true false test'
 #   更糟：`doc_format_precheck.sh` 是 Write/Edit 的 PostToolUse hook 且會呼叫本檔
 #   ⇒ **要編輯該文件去移除那條 ASSERT，存檔又會再次引爆 ⇒ 文件自鎖**，只能 `mv` 脫困。
 #
-# 兩層防線（**不動 `gate.sh` 之預設行為**——那是真正的驗收點，關掉會成保護真空）：
-#   ① TEMPLATE_CHECK_NO_EXEC=1 ⇒ 文法／白名單／路徑檢查照跑，**只跳過執行**。
-#      由 `doc_format_precheck.sh`（寫檔 hook）設定；gate/freeze 不設，行為逐字不變。
+# 兩層防線：
+#   ① 🔴 **預設不執行**（2026-08-12 反轉；原為「呼叫端記得帶 NO_EXEC=1 才不執行」）。
+#      文法／白名單／路徑檢查照跑，只跳過執行；要執行須明示 `TEMPLATE_CHECK_EXEC=1`。
 #   ② 逐行 timeout ⇒ 逾時**判 FAIL**（fail-closed，非略過），無論 ① 是否啟用。
+#
+# 🔴 為何反轉預設〔CODEX-R1-P1-02／P2-04〕：
+#   前版靠「每個呼叫端都記得帶 TEMPLATE_CHECK_NO_EXEC=1」，並以掃 `scripts/*.sh` 的
+#   正則測試當強制手段。codex 實證該集合**不封閉**——`scripts/test_template_check.sh:64`
+#   以變數呼叫（`bash "${TEMPLATE_CHECK}"`），正則看不見；`eval`／`$(...)`／間接層同理。
+#   列舉式黑名單永遠列不完（本 repo 已有前例：`_g2_regions` 一機制衍生 4 旁路）。
+#   ⇒ 改為**產出端決定**：忘記帶的後果從「危險」變成「安全」，
+#      呼叫端掃描不再是強制手段（該測試已刪，改測預設值本身）。
+#   代價：ASSERT 行的驗收語意預設關閉。受影響行之集合由
+#   tests/governance/test_gov_check_cheap_first.py 之
+#   test_executable_assert_lines_are_a_frozen_named_set 凍住，不會靜默增生。
 #
 # 🔴 具名殘留：kill 只送給直接子程序，**孫程序可能存活**（POSIX sh 無 job control，
 #   背景子程序不必然自成 process group）。backstop＝`bash scripts/proc_guard.sh --clean`。
@@ -645,15 +656,13 @@ _run_assert_lines() {
     #   固定順序：系統目錄在前（`bash`/`grep`/`true` 必為系統版），
     #   repo venv 在後僅供 `pytest`；`REPO_ROOT` 由腳本位置導出，不取自環境。
     #   併清 `BASH_ENV`／`ENV`（bash 啟動時會 source）與 `*_PRELOAD`（動態載入注入）。
-    # 🔴 T0 止血①：寫檔 hook 路徑只驗文法，不執行（見檔頭常數區之出生事故）
+    # 🔴 T0 止血①：**預設不執行**；要執行須明示 TEMPLATE_CHECK_EXEC=1（見檔頭出生事故）
     # 🔴〔CODEX-R1-P1-02〕不得**靜默**跳過：文法與白名單都過、只是結果會錯的
-    #   ASSERT（例如 `ASSERT false THEN rc=0`）在本路徑不再被判失。
-    #   那是路 A 的實質語意損失，必須**大聲**印出來，不能看起來像驗過了。
+    #   ASSERT（例如 `ASSERT false THEN rc=0`）在本路徑不會被判失。
+    #   那是實質語意損失，必須**大聲**印出來，不能看起來像驗過了。
     #   非致命（不進 _ra_out ⇒ 不改 rc）：致命會讓既有文件在寫檔當下全部鎖死。
-    #   受影響行之集合由 tests/governance/test_gov_check_cheap_first.py 之
-    #   test_executable_assert_lines_are_a_frozen_named_set 凍住 ⇒ 不會靜默增生。
-    if [ "${TEMPLATE_CHECK_NO_EXEC:-0}" = "1" ]; then
-      printf '  · ASSERT 未驗證（本路徑不執行任意命令，路 A）: %s\n' "${_ra_cmd}" >&2
+    if [ "${TEMPLATE_CHECK_EXEC:-0}" != "1" ]; then
+      printf '  · ASSERT 未驗證（預設不執行任意命令；要驗請帶 TEMPLATE_CHECK_EXEC=1）: %s\n' "${_ra_cmd}" >&2
       continue
     fi
     # 🔴 T0 止血②：逐行 timeout，逾時 fail-closed（判 FAIL，不略過）
