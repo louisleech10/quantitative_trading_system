@@ -584,7 +584,8 @@ def test_mut16_closure_selector_rename_breaks_evidence(
 ) -> None:
     mutated = ("test_selector_that_does_not_exist",) + _CM._B49_CLOSURE_SELECTORS[1:]
     monkeypatch.setattr(_CM, "_B49_CLOSURE_SELECTORS", mutated)
-    with pytest.raises(AssertionError, match="具名 selector"):
+    # 改名會先被 r4 新增的「清單↔契約失配」守衛攔下；兩種訊息都算正確攔截
+    with pytest.raises(AssertionError, match="具名 selector|失配"):
         _CM._assert_b49_closure_evidence()
 
 
@@ -623,6 +624,20 @@ def test_mut17_hollow_selector_detected(monkeypatch: pytest.MonkeyPatch) -> None
     assert not _CM._b49_selector_is_substantive(dup_last_hollow, target), (
         "同名重複定義須 fail-closed（Python 生效的是最後一個，取首個會被騙）"
     )
+    # 🔴 `CODEX-R4-P0-01` 的三條靜態死碼探針
+    for label, dead in (
+        ("if False", "def %s():\n    if False:\n        assert True\n    pass\n" % target),
+        ("while False", "def %s():\n    while False:\n        assert True\n    pass\n" % target),
+        ("for in []", "def %s():\n    for _ in []:\n        assert True\n    pass\n" % target),
+    ):
+        assert not _CM._b49_selector_is_substantive(dead, target), (
+            f"靜態不可達分支（{label}）內的 assert 不得充當實質性"
+        )
+    # 反向：判不出真假者一律**計入**（保守方向），否則會誤殺合法測試
+    live = "def %s(x):\n    if x:\n        assert x\n" % target
+    assert _CM._b49_selector_is_substantive(live, target), (
+        "靜態判不出真假的分支須視為可達（保守方向），否則合法測試會被誤殺"
+    )
     nested_class = (
         "def %s():\n"
         "    class _C:\n"
@@ -637,6 +652,26 @@ def test_mut17_hollow_selector_detected(monkeypatch: pytest.MonkeyPatch) -> None
     # 整合：判定回 False 時，閉合證據必須拒（不得只在純函式層成立）
     monkeypatch.setattr(_CM, "_b49_selector_is_substantive", lambda *_a, **_k: False)
     with pytest.raises(AssertionError, match="掏空"):
+        _CM._assert_b49_closure_evidence()
+
+
+def test_mut18_selector_list_drift_detected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """⑱ selector 清單與 receipt 契約漂移須 fail-closed〔`CODEX-R4-P1-02`〕。
+
+    原本只斷言 tuple 長度為 6 ⇒ 把某格重複六次、留下失配的 expected key，
+    照樣綠而**實際漏驗五格**。
+    """
+    original = tuple(_CM._B49_CLOSURE_SELECTORS)  # 🔴 先存原始值：第二次 patch 不得讀到第一次的結果
+    monkeypatch.setattr(_CM, "_B49_CLOSURE_SELECTORS", (original[0],) * 6)
+    with pytest.raises(AssertionError, match="重複"):
+        _CM._assert_b49_closure_evidence()
+
+    monkeypatch.setattr(
+        _CM,
+        "_B49_CLOSURE_SELECTORS",
+        original[:5] + ("test_not_in_expected_contract",),
+    )
+    with pytest.raises(AssertionError, match="失配"):
         _CM._assert_b49_closure_evidence()
 
 

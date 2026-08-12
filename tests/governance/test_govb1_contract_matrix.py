@@ -2643,14 +2643,48 @@ def _b49_selector_is_substantive(src: str, fn: str) -> bool:
     if len(defs) != 1:
         return False
 
-    # 🔴 只看**自身可達 body**〔`CODEX-R3-P0-01` 探針 1〕：
-    #    巢狀函式／類別／lambda 內的 assert 是死碼，不得充當實質性。
+    def _static_truth(node: ast.AST):
+        """靜態可判定之真假值；判不出回 None（**不猜**）。"""
+        if isinstance(node, ast.Constant):
+            return bool(node.value)
+        if isinstance(node, (ast.List, ast.Tuple, ast.Set)) and not node.elts:
+            return False
+        if isinstance(node, ast.Dict) and not node.keys:
+            return False
+        return None
+
+    # 🔴 只看**自身可達 body**〔`CODEX-R3-P0-01` 探針 1、`CODEX-R4-P0-01` 探針 1–3〕：
+    #    ① 巢狀函式／類別／lambda 內的 assert 是死碼
+    #    ② `if False:` / `while False:` / `for _ in []:` 的 body 靜態不可達，同樣是死碼
+    #    判準是「**靜態可證不會執行**者不計」——封閉可導出，不是關鍵字黑名單。
+    #    誠實邊界：靜態可達性是**近似**；判不出者一律**計入**（保守方向＝當作可達）。
     def _own_nodes(node: ast.AST):
         for child in ast.iter_child_nodes(node):
             if isinstance(
                 child,
                 (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda),
             ):
+                continue
+            if isinstance(child, ast.If):
+                truth = _static_truth(child.test)
+                branches = (
+                    child.body + child.orelse
+                    if truth is None
+                    else (child.body if truth else child.orelse)
+                )
+                for stmt in branches:
+                    yield stmt
+                    yield from _own_nodes(stmt)
+                continue
+            if isinstance(child, ast.While) and _static_truth(child.test) is False:
+                for stmt in child.orelse:
+                    yield stmt
+                    yield from _own_nodes(stmt)
+                continue
+            if isinstance(child, ast.For) and _static_truth(child.iter) is False:
+                for stmt in child.orelse:
+                    yield stmt
+                    yield from _own_nodes(stmt)
                 continue
             yield child
             yield from _own_nodes(child)
@@ -2682,7 +2716,17 @@ def _assert_b49_closure_evidence() -> None:
     整檔 receipt 還有第二個病：**六格被替換成空測試也照樣綠**。
     ⇒ 改為逐格具名執行，缺 selector／逾時／snapshot 失敗一律 fail-closed。
     """
-    assert len(_B49_CLOSURE_SELECTORS) == 6
+    # 🔴 清單／契約漂移守衛〔`CODEX-R4-P1-02`〕：原本只斷言 tuple 長度為 6
+    #    ⇒ 把某格重複六次、留下失配的 expected key，照樣綠而實際漏驗五格。
+    assert len(_B49_CLOSURE_SELECTORS) == 6, "閉合證據 selector 應恰 6 格"
+    assert len(set(_B49_CLOSURE_SELECTORS)) == 6, (
+        f"閉合證據 selector 清單有重複：{_B49_CLOSURE_SELECTORS}"
+    )
+    assert set(_B49_CLOSURE_SELECTORS) == set(_B49_CLOSURE_EXPECTED), (
+        "selector 清單與 receipt 契約失配："
+        f"僅在清單={sorted(set(_B49_CLOSURE_SELECTORS) - set(_B49_CLOSURE_EXPECTED))} "
+        f"僅在契約={sorted(set(_B49_CLOSURE_EXPECTED) - set(_B49_CLOSURE_SELECTORS))}"
+    )
     sel = REPO / _B49_CLOSURE_FILE
     assert sel.is_file(), f"閉合證據檔不存在：{_B49_CLOSURE_FILE} ⇒ 票不得 CLOSED"
     src = sel.read_text(encoding="utf-8")
