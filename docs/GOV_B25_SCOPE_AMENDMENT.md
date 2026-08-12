@@ -25,12 +25,18 @@
 FACTKEY-FROZEN: governance-execution-order
 FACTKEY-ADDED: governance-batch-status
 FACTKEY-ADDED: governance-ticket-closure
+FACTKEY-ADDED: governance-worklist
 ```
+
+🔴 `governance-worklist`（使用者指示「寫在自己一定會看到、不會漏也不會讀錯的地方」）：
+宿主＝`HANDOFF.md`（SessionStart 自動注入 ⇒ 接手必見）＋`白話說明/接下來要做什麼.md`。
+待辦項之狀態自此為**機械投影**，任何文件手寫該狀態即 `--check` 非零。
 
 **契約（測試強制，四條缺一即紅）**：
 1. `scripts/fact_keys.json` 之 fact-key 集合 **恰等於** `FACTKEY-FROZEN` ∪ `FACTKEY-ADDED`。
-2. `FACTKEY-ADDED` 集合 **恰等於** SPEC Task 1.3 明定之兩個狀態 key
-   ——即 `scripts/fact_keys.json` 之 `_schema.status_keys`。
+2. `FACTKEY-ADDED` 集合 **恰等於** `scripts/fact_keys.json` 之 `_schema.status_keys`
+   （🔴 原文寫「兩個狀態 key」，該數字於新增 `governance-worklist` 後過期；
+   **不再寫死個數**——個數以 `status_keys` 為準，本檔只放指標）。
    🔴 此條為 r3 `CODEX-R3-P1-04` 之修法：單靠第 1 條是**自我循環**
    （延伸檔漏列一個 key，registry／測試／延伸檔三方仍互相一致而無人轉紅）。
 3. 本檔缺失、或任一清單含重複項、或含未註冊之 key ⇒ 測試 fail-closed。

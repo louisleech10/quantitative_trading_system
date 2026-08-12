@@ -20,7 +20,26 @@
 🔴 改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`；
 本檔**不得手寫**票／批次的狀態字面值（偵測器 fail-closed，本 session 踩三次）。
 
-# 🔴🔴🔴 接手第一件事：做 `票 B-25`
+# 🔴🔴🔴 待辦清單（唯一來源，機器投影——**本節不得手寫**）
+
+> 改法：編輯 `scripts/fact_keys.json` 之 `governance-worklist` → 跑
+> `bash scripts/gen_fact_key_blocks.sh --write`。**完成就把該列狀態改成 `收案`。**
+> 欄位＝排序號／項目 ID／狀態／內容。手寫狀態字面值會被 fail-closed 擋下。
+
+<!-- BEGIN GENERATED: governance-worklist -->
+010	WL-01	未開工	P0 前置：fact_keys schema 由平面列擴為兩欄表格。解鎖 WL-02／WL-03；票 B-25 殘留⑥之唯一阻塞
+020	WL-02	未開工	P1-a 判準資料化：同 Task 內互斥判準偵測（抽 條件→期望rc 配對，同條件不同期望即 FAIL）。前置 WL-01；票 B-25
+030	WL-03	未開工	P1-b 改法段之機制須有 FACT-RECEIPT 或標 assumed，否則 FAIL（撰寫當下攔先斷言後驗證）。前置 WL-01；票 B-25
+040	WL-04	未開工	P1-c 戳記整行由 harness 自動生成，消滅 64 位 hex 手抄。票 B-54（其樣本數1門檻已過期，須先更新）。無前置
+050	WL-05	未開工	P2 指令 tokenize 化：逐命令位置解 argv[0] 比對封閉 executor_clis。票 B-59（併 B-61 同型）。屬大重寫，須另立 epic
+060	WL-06	未開工	P3 測試空心／假綠之機械判準。併入票 B-25，不新開票（既有：PATH劫持1條已修、test_verify_gate系列3條、未列入排除清單2條）
+070	WL-07	未開工	管線豁免提案交三家（免SPEC/TODO之三條件；延伸檔，範圍由 govb1_scope.manifest 導出以免凍結變永久）
+080	WL-08	收案	CLAUDE.md 去除會漂的值：code review 家數改指向 ORCH §1；pytest 秒數/測試數改為不漂的定性判準
+090	WL-09	未開工	六張無批次歸屬之票排入執行序：B-48／B-50／B-51／B-52／B-53（排序凍結已解除，見 GOVERNANCE_EXECUTION_ORDER 之 RULED-BY；backlog:3129 之舊句已作廢）
+100	WL-10	未開工	站級施工順序不在本表重述，見 docs/GOVERNANCE_EXECUTION_ORDER.md 之 governance-execution-order 區塊
+<!-- END GENERATED: governance-worklist -->
+
+# 接手第一件事：做上表第一個未收案項
 
 使用者 2026-08-12 定序：「你這兩個問題做完清乾淨，然後交接寫明確做 B-25，然後才是站 5。」
 **PUSH 11 分鐘與 ASSERT 兩題已做完並經三家 review（見下）⇒ 下一項即 `票 B-25`，之後才是站 5。**

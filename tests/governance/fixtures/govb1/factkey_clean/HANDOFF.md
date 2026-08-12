@@ -1,6 +1,6 @@
 # fixture 宿主檔（非真實文件）
 
-本檔只為 T-2.1 的 --check 正反對照存在；票 B-25 站 2.5 多宿主（Task 1.1）之第二宿主。
+本檔只為 `governance-worklist` 的 --check 正反對照存在。
 
 <!-- BEGIN GENERATED: governance-worklist -->
 010	WL-01	未開工	P0 前置：fact_keys schema 由平面列擴為兩欄表格。解鎖 WL-02／WL-03；票 B-25 殘留⑥之唯一阻塞
@@ -14,25 +14,3 @@
 090	WL-09	未開工	六張無批次歸屬之票排入執行序：B-48／B-50／B-51／B-52／B-53（排序凍結已解除，見 GOVERNANCE_EXECUTION_ORDER 之 RULED-BY；backlog:3129 之舊句已作廢）
 100	WL-10	未開工	站級施工順序不在本表重述，見 docs/GOVERNANCE_EXECUTION_ORDER.md 之 governance-execution-order 區塊
 <!-- END GENERATED: governance-worklist -->
-
-<!-- BEGIN GENERATED: governance-batch-status -->
-010	B0	已落地
-020	B1	已落地
-030	B2	已落地
-040	B3	停手
-045	B3R	已落地
-050	B4	部分完成
-060	B5	未開工
-070	B6	未開工
-080	B7	未開工
-110	b1	部分完成
-120	b2	收案
-130	b3	收案
-140	b4	部分完成
-150	b5	收案
-160	b6	收案
-170	b7	收案
-180	b8	收案
-190	b9	收案
-200	b10	收案
-<!-- END GENERATED: governance-batch-status -->

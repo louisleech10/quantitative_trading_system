@@ -29,13 +29,13 @@ All code must support this evolution via clean decoupling.
 | **判準** | 改 1 函式/test/局部 bug；不命中 a-d；可本地 pytest 驗 | 單一 module、動既有 caller；不命中 a-d | 命中任一 a-d（模組會變、原則不變；不看檔案數） |
 | **管線** | Claude 自己做 + 自跑測試，不派工（省 token） | 完整管線：**SPEC + TODO + adversarial**，**不得跳步/不跳**（D-1） | 同左 + 白話簡述/manifest + **雙家族** adversarial reconcile |
 | **執行端** | — | 見 `docs/MULTI_AGENT_ORCHESTRATION.md` §1 **現行分工行**；動態，以使用者當下指示為準 | 同左 |
-| **code review** | — | **2 個非實作者家族**（實作者不自審；見 ORCH §1 現行分工） | 同左 |
+| **code review** | — | **家數與家族＝`ORCH §1 現行分工行`（唯一來源，本檔不重述）**；實作者不自審 | 同左 |
 | **SMALL_INLINE** | scope + 驗收命令 + 允許檔 + 禁止事項 | — | — |
 
 **高風險原則 (a)-(d)**：(a) 數值/資料品質 (b) 跨模組/共用路徑 (c) 多 phase/難回退 (d) ML/回測正確性。範例：Feature Factory/cache、IC Gatekeeper、回測引擎。
 
 **固定條款**（使用者定死，出處見 `docs/SCAR_LEDGER.md`）：
-- **中/大鐵律**：① 完整管線不得跳步（SPEC/TODO/adversarial 都要）② **code review = 2 個非實作者家族**（實作者不自審，非「一家」；見 ORCH §1；**機器強制** `scripts/review_quorum_check.sh`，接入 `gate.sh` 派下一批 impl 前驗前批 quorum，不足→拒發 token）③ 大任務附白話簡述 ④ 省步唯一允許=動工前明列讓使用者**否決** ⑤ **派工進度每 10 分鐘回報一次**
+- **中/大鐵律**：① 完整管線不得跳步（SPEC/TODO/adversarial 都要）② **code review 之家數與家族＝`docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行（唯一來源；🔴 本檔不得自寫家數——曾寫「2 個」而 ORCH 為「三家全員」，2026-08-12 害主委當場做錯一次）**；實作者不自審；**機器強制** `scripts/review_quorum_check.sh`，接入 `gate.sh` 派下一批 impl 前驗前批 quorum，不足→拒發 token ③ 大任務附白話簡述 ④ 省步唯一允許=動工前明列讓使用者**否決** ⑤ **派工進度每 10 分鐘回報一次**
 - **判不出大小**：明講不確定 + 先當「中」——**絕不靜默假設**
 - **膨脹升級 5 訊號**：檔案數超預期 / 碰 `factories.py`·`protocols.py`·`config.py` / 新 caller / 測試面擴大 / 觸及 a-d
 - **派工前後**：`bash scripts/agent_preflight.sh` → 派工 → `bash scripts/agent_postflight.sh`；PASS 才驗收
@@ -107,7 +107,7 @@ pytest                                           # all tests
 **B 類（Claude 端慢）已實測的成因：大輸出回灌**
 - `git push` 會觸發 pre-push 跑全套測試，**整份 30KB 輸出回灌 Claude context** → 實測 Claude 端多花 **89.9 秒**才發出下一個動作。
 - **避法**：輸出量大的指令一律導檔再取尾，例如 `git push -q origin main > /tmp/push.log 2>&1; tail -3 /tmp/push.log`。`pytest` 全套同理。
-- 🔴 **`git push` 必須丟背景**（2026-08-06 實測）：pre-push 全套 **267 秒** > Bash 前景上限 **120 秒** ⇒ **前景一定 timeout**。
+- 🔴 **`git push` 必須丟背景**：pre-push 委派 `gov_check.sh` 跑全套（十分鐘級）> Bash 前景上限 **120 秒** ⇒ **前景一定 timeout**。（2026-08-06 首次實測時為 267 秒，此後只增不減；秒數不寫死，見下節。）
   導檔取尾**擋不住這個**（那治的是輸出量，不是時長）。用 `run_in_background`。
 
 **哨兵**：`scripts/ts_stamp.sh`（掛 Pre/PostToolUse on `Bash|Edit|Write` + `UserPromptSubmit`）。
@@ -119,8 +119,12 @@ pytest                                           # all tests
 - **使用者不必盯螢幕、不必算時間、不必回報**。移除法見腳本檔頭。
 
 **測試與 CI**
-- `pytest tests/governance -q` 要 **~330 秒**（**1151 tests**；2026-08-10 實跑 `1151 passed in 325.77s`。舊記「828 / 275s」「766 / 267s」「110 秒 / 287 tests」皆已過期）。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套，且**丟背景**，否則看起來像當機。
-- `scripts/govb1_final_gate.sh` 全跑**內含 `_g0_tests`（全套 pytest）** ⇒ 實測 300–370 秒，**前景必 timeout，一律丟背景**。只驗單條用 `--only <name>`（`g0_syntax`／`g1`…`g8`），秒級完成。
+- 🔴 `pytest tests/governance -q` 是**十分鐘級**且**隨測試數持續變長** ⇒ **前景必 timeout，一律丟背景**。
+  **本檔刻意不寫秒數與測試數**——那是會漂的值，寫進來就是下一個過期副本（歷史上已過期四次：
+  「110 秒/287」「766/267s」「828/275s」「1151/330s」）。要精確值就跑一次看輸出，或查
+  `handoffs/run_receipts/*.json`。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套。
+- `scripts/govb1_final_gate.sh` 全跑**內含 `_g0_tests`（全套 pytest）** ⇒ 同屬十分鐘級，
+  **前景必 timeout，一律丟背景**。只驗單條用 `--only <name>`（`g0_syntax`／`g1`…`g8`），秒級完成。
 - 🔴 **執行端跑驗收時，主控端不得動檔**：`test_t01_f3_g7_when_committed` 類斷言會比對「工作區 dirty 數前後不變」，主控端同時寫檔會使其 flaky；亦不得並行跑兩份會就地 mutate 檔案再還原的 pytest（會互相污染）。2026-08-07 實際踩到。
 - 跑完測試須 `bash scripts/restore_golden_inventory.sh` 還原 golden inventory 的副作用（否則 `tests/golden/l65/test_inventory.txt` 會髒）。
 - CI 只剩 `governance.yml` + `verify_claim.yml`。`l65_benchmark.yml` 已於 2026-07-26 **刪除**（連續 startup failure、0 秒無 log、從未真的跑過＝零保護純噪音）。`scripts/benchmark_l65.py` **保留**，要測效能請本機跑——共用 runner 測效能回歸本來就低訊號。
