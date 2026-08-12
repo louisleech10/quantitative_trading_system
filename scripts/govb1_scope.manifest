@@ -61,3 +61,18 @@ meta 白話說明/
 meta scripts/govb1_task_tickets.tsv
 # Tier C：W′ 讀取端（恰此一支）；禁 allow（F5）故 meta
 meta scripts/govb1_single_source_check.sh
+
+# B-49 授權擴充（2026-08-12 使用者授權）：epic 期間實際會被修改之治理 harness／規格路徑。
+# 登記 ≠ 解凍：_B45_HARNESS 之凍結由三道 waiver 的 hit_harness 獨立看守，本節不影響之。
+allow docs/GOVB1_INPUT_QUALITY_TODO.md
+allow tests/governance/test_brief_conformance.py
+allow tests/governance/test_completeness_idlike_fp.py
+allow tests/governance/test_cxrun_selfcheck_prompt.py
+allow tests/governance/test_cxrun_stamp_prompt.py
+allow tests/governance/test_debt_emit.py
+allow tests/governance/test_doc_format_precheck.py
+allow tests/governance/test_gov_check_dep_failclosed.py
+allow tests/governance/test_result_state_format_failed.py
+allow tests/governance/test_rolegate_predispatch.py
+allow tests/governance/test_stamp_taskid_inject.py
+allow tests/governance/test_verify_gate_b3.py

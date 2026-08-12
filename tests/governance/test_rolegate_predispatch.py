@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.governance import _role_pin  # noqa: E402
+
 from tests.governance import _debt_probe_helper as _dph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -325,7 +327,7 @@ def test_t3_u1_review_plus_implementer_rejected_zero_side_effects(
 ) -> None:
     """T3-U1: review ＋ implementer ⇒ rc!=0 且零副作用。"""
     h = _harness(tmp_path, kind="review")
-    impl = _read_implementer(h["scripts"])
+    impl = _role_pin.pin_implementer(h["scripts"])
     before = _audit_bytes(h["audit"])
     r = _run_committee(h, fams_csv=impl, session="sess-t3-u1")
     assert r.returncode != 0, r.stdout + r.stderr
@@ -340,7 +342,7 @@ def test_t3_u1_review_plus_implementer_rejected_zero_side_effects(
 def test_t3_u2_consult_same_set_proceeds(tmp_path: Path) -> None:
     """T3-U2: consult ＋ 同組（含 implementer）⇒ 角色閘放行（可進 gate/開債）。"""
     h = _harness(tmp_path, kind="consult")
-    impl = _read_implementer(h["scripts"])
+    impl = _role_pin.pin_implementer(h["scripts"])
     # codex,composer,grok 含 implementer；consult 不限
     r = _run_committee(
         h,
@@ -358,7 +360,7 @@ def test_t3_u2_consult_same_set_proceeds(tmp_path: Path) -> None:
 def test_t3_u3_composer_not_false_rejected(tmp_path: Path) -> None:
     """T3-U3: composer 正例（防 raw intersection 誤拒）。"""
     h = _harness(tmp_path, kind="review")
-    impl = _read_implementer(h["scripts"])
+    impl = _role_pin.pin_implementer(h["scripts"])
     # review 派 composer（非 implementer）必須通過
     assert impl != "composer", "SoT implementer 不得為 composer（本測前提）"
     r = _run_role_gate(
@@ -417,7 +419,7 @@ def test_t3_b1_bad_roles_json_fail_closed(tmp_path: Path) -> None:
 def test_t3_b2_one_incompatible_rejects_whole_batch(tmp_path: Path) -> None:
     """T3-B2: 三家中一家不相容 ⇒ 整批拒。"""
     h = _harness(tmp_path, kind="review")
-    impl = _read_implementer(h["scripts"])
+    impl = _role_pin.pin_implementer(h["scripts"])
     # 合法 reviewer + implementer（不相容）混批
     reviewers = [f for f in ("codex", "composer", "grok") if f != impl]
     assert reviewers, "SoT 須有非 implementer 家族"
@@ -474,7 +476,7 @@ def test_t3_u6_impl_non_implementer_rejected_zero_side_effects(
 ) -> None:
     """T3-U6: brief-kind=impl ＋ 非 implementer ⇒ rc!=0、零副作用。"""
     h = _harness(tmp_path, kind="impl")
-    impl = _read_implementer(h["scripts"])
+    impl = _role_pin.pin_implementer(h["scripts"])
     non = next(f for f in ("codex", "composer", "grok") if f != impl)
     before = _audit_bytes(h["audit"])
     r = _run_committee(h, fams_csv=non, session="sess-t3-u6")
@@ -562,7 +564,7 @@ def test_t3_u7_unknown_family_rejected_nonzero(tmp_path: Path) -> None:
 def test_t3_b3_two_incompatible_full_list(tmp_path: Path) -> None:
     """T3-B3: impl 下兩家非 implementer 不相容 ⇒ 輸出同時含兩者（非只第一個）。"""
     h = _harness(tmp_path, kind="impl")
-    impl = _read_implementer(h["scripts"])
+    impl = _role_pin.pin_implementer(h["scripts"])
     non = [f for f in ("codex", "composer", "grok") if f != impl]
     assert len(non) >= 2
     fams_csv = f"{non[0]},{non[1]}"
@@ -883,7 +885,7 @@ def test_mutation_incompat_list_first_only_turns_red(
 ) -> None:
     """T3-M3 MUT：完整清單改成只印第一個 ⇒ T3-B3 類斷言轉紅。"""
     h = _harness(tmp_path, kind="impl")
-    impl = _read_implementer(h["scripts"])
+    impl = _role_pin.pin_implementer(h["scripts"])
     non = [f for f in ("codex", "composer", "grok") if f != impl]
     assert len(non) >= 2
     fams_csv = f"{non[0]},{non[1]}"

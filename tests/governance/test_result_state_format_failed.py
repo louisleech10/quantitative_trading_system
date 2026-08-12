@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.governance import _role_pin  # noqa: E402
+
 from tests.governance import _debt_probe_helper as _dph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -604,16 +606,18 @@ def test_t2_c1_debt_clear_rejects_format_failed(tmp_path: Path) -> None:
 def test_t2_c2_impl_kind_unchanged(tmp_path: Path) -> None:
     """T2-C2：brief-kind=impl ⇒ 判準與行為皆不變（仍 success + stub-ok，不跑 format）。"""
     h = _harness(tmp_path, kind="impl")
-    # impl 角色閘：implementer=grok
+    # 票 B-49：不再硬編 grok —— 沙箱名冊釘成有 CLI 配方之家族後由它回傳。
+    # 硬編會在使用者換 implementer 時整批回紅（形態 A），這正是本票要根除的。
+    fam = _role_pin.pin_implementer(h["scripts"])
     rid = str(uuid.uuid4())
     out_prefix = "handoffs/t2c2"
-    _open_round(h, round_id=rid, session="s-c2", fams=["grok"], out_prefix=out_prefix)
-    r = _run_cx(h, family="grok", out_rel=f"{out_prefix}-grok.md", round_id=rid)
+    _open_round(h, round_id=rid, session="s-c2", fams=[fam], out_prefix=out_prefix)
+    r = _run_cx(h, family=fam, out_rel=f"{out_prefix}-{fam}.md", round_id=rid)
     assert r.returncode == 0, r.stdout + r.stderr
-    out_path = h["root"] / f"{out_prefix}-grok.md"
+    out_path = h["root"] / f"{out_prefix}-{fam}.md"
     assert out_path.is_file()
     content = out_path.read_text(encoding="utf-8")
-    assert content.startswith("stub-ok family=grok")
+    assert content.startswith(f"stub-ok family={fam}")
     rows = _events(h["audit"], "committee_family_result")
     assert len(rows) == 1
     assert rows[0]["result_state"] == "success"

@@ -22,6 +22,80 @@ FROZEN = REPO / "scripts" / "govb1_frozen_hashes.txt"
 MANIFEST = REPO / "scripts" / "govb1_scope.manifest"
 SPEC = REPO / "docs" / "GOVB1_INPUT_QUALITY_SPEC.md"
 TODO = REPO / "docs" / "GOVB1_INPUT_QUALITY_TODO.md"
+
+# ── 票 B-49：永久 path grant（git 物件身分綁定）──────────────────────────
+# 被授權路徑之 `<mode> <type> <oid>` 逐字寫死；任一位元組變動即失去豁免。
+# 🔴 誠實邊界：本機制只防**意外與遺忘**，不防具寫入權者蓄意（SPEC §C-6／§C-9-7／§C-11）。
+_B49_GRANT_IDENTITY: dict[str, str] = {
+    "docs/GOVB1_INPUT_QUALITY_TODO.md": "100644 blob a5f433079e6eaaf2de2f60090e1a70d6a55bc979",
+    "tests/governance/test_result_state_format_failed.py": "100644 blob 1b01812c71df498150e9391e6b7bb7b3e98e374e",
+    "tests/governance/test_rolegate_predispatch.py": "100644 blob 60b3efab0eb00605b32e3dc98d0ae1137c3bb0ec",
+    "tests/governance/test_stamp_taskid_inject.py": "100644 blob 7e8014e9915f1680dd5d1f3fecff69641e5cadb8",
+}
+_B49_HARNESS_GRANT = frozenset(_B49_GRANT_IDENTITY)
+
+
+def _b49_object_identity(path: str) -> str | None:
+    """`git ls-tree HEAD -- <path>` 之 `<mode> <type> <oid>`；取不到一律 None（fail-closed）。"""
+    p = _run(["git", "ls-tree", "HEAD", "--", path])
+    if p.returncode != 0:
+        return None
+    line = p.stdout.strip()
+    if not line:
+        return None
+    meta = line.split("\t", 1)[0].split()
+    if len(meta) != 3:
+        return None
+    return " ".join(meta)
+
+
+def _b49_worktree_bytes_match(path: str) -> bool:
+    """授權 blob 與工作樹**逐位元組**比對；不經 index ⇒ skip-worktree 打不敗。"""
+    want = _B49_GRANT_IDENTITY.get(path)
+    if not want:
+        return False
+    parts = want.split()
+    if len(parts) != 3 or parts[1] != "blob":
+        return False
+    fp = REPO / path
+    if fp.is_symlink() or not fp.is_file():
+        return False
+    blob = subprocess.run(
+        ["git", "cat-file", "blob", parts[2]],
+        cwd=str(REPO),
+        capture_output=True,
+        check=False,
+    )
+    if blob.returncode != 0:
+        return False
+    return blob.stdout == fp.read_bytes()
+
+
+def _b49_granted(path: str) -> bool:
+    """身分三元組相符 **且** 工作樹位元組相符，才算被授權。"""
+    want = _B49_GRANT_IDENTITY.get(path)
+    if not want:
+        return False
+    return _b49_object_identity(path) == want and _b49_worktree_bytes_match(path)
+
+
+def _rename_old_names(rng: str) -> set[str]:
+    """`--name-only` **隱去 rename/copy 舊名** ⇒ 改名即可把受保護檔洗出保護範圍。
+
+    〔`CODEX-CONSULT-R1-P0-02`〕本函式以 `--name-status -M -C` 補回舊名，供三道守衛
+    聯集進 `names`。**原 `--name-only` 判定逐字保留**（TODO §0-3），本函式只做加法。
+    取不到一律 fail-closed 拋錯，不得靜默回空集合（那等於改名就放行）。
+    """
+    p = _run(["git", "diff", "--name-status", "-M", "-C", rng])
+    if p.returncode != 0:
+        raise AssertionError(f"rename 偵測失敗（fail-closed）：{rng}: {p.stderr}")
+    out: set[str] = set()
+    for ln in p.stdout.splitlines():
+        cols = ln.rstrip("\n").split("\t")
+        if len(cols) >= 3 and cols[0][:1] in ("R", "C"):
+            out.add(cols[1].strip())
+    return out
+
 BEHAVIOR_SPEC = REPO / "docs" / "GOV_DISPATCH_FLOW_FIX_SPEC.md"
 FIXTURE_ROOT = REPO / "tests" / "governance" / "fixtures" / "govb1"
 
@@ -1055,7 +1129,7 @@ def test_r7_v1_current_manifest_decl_34_stable() -> None:
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 36, f"V1 期望 36 條 decl，得 {len(decl)}"
+    assert len(decl) == 48, f"V1 期望 48 條 decl，得 {len(decl)}"
     # 與第二次現跑逐字相同（穩定；非快取）
     again = _r7_baseline_decl()
     assert decl == again
@@ -1091,7 +1165,7 @@ def test_r7_v2_leading_whitespace_path_rejected() -> None:
     # 反例方向：移除該列 ⇒ 回 rc=0
     ok = _call_g7_policy()
     assert ok.returncode == 0, ok.stderr + ok.stdout
-    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 36
+    assert len([ln for ln in ok.stdout.splitlines() if ln.strip()]) == 48
 
 
 def test_r7_v3_trailing_whitespace_path_rejected() -> None:
@@ -1372,7 +1446,7 @@ def test_wprime_a5_meta_tickets_in_decl_count_36() -> None:
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
     assert "scripts/govb1_task_tickets.tsv" in decl
     assert "scripts/govb1_single_source_check.sh" in decl
-    assert len(decl) == 36, f"期望 decl 36，得 {len(decl)}"
+    assert len(decl) == 48, f"期望 decl 48，得 {len(decl)}"
 
 
 def test_wprime_a5_counterexample_remove_meta_uncovers_tsv() -> None:
@@ -1464,7 +1538,7 @@ def test_b2r3_c1_current_manifest_meta_count_6() -> None:
     proc = _call_g7_policy()
     assert proc.returncode == 0, proc.stderr + proc.stdout
     decl = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    assert len(decl) == 36, f"decl 應恰 36，got {len(decl)}"
+    assert len(decl) == 48, f"decl 應恰 48，got {len(decl)}"
     meta_n = sum(
         1
         for ln in MANIFEST.read_text(encoding="utf-8").splitlines()
@@ -2037,15 +2111,23 @@ def test_waiver_b45_b3_range_does_not_touch_forbidden() -> None:
     diff = _run(["git", "diff", "--name-only", f"{b3}..{upper}"])
     assert diff.returncode == 0, diff.stderr
     names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
+    # 票 B-49：--name-only 隱去 rename 舊名 ⇒ 改名可洗出保護範圍（CODEX-CONSULT-R1-P0-02）
+    names |= _rename_old_names(f"{b3}..{upper}")
     assert names, f"b3_start..{upper} 應有 B3 改動"
 
     hit_harness = names & set(_B45_HARNESS)
-    assert not hit_harness, f"B3 range 觸及 B-45 harness: {hit_harness}"
+    # 票 B-49：通過 git 物件身分比對之授權路徑扣除；其餘一律仍拒。
+    unexcused = {p for p in hit_harness if not _b49_granted(p)}
+    assert not unexcused, f"B3 range 觸及未授權之 B-45 harness: {unexcused}"
     for pref in _B45_FORBIDDEN_PREFIXES:
         if pref == "scripts/govb1_frozen_hashes.txt":
             # 允許檔進 range（主委 b3_start 錨點）；內容走封閉集合比對
             continue
-        bad = {n for n in names if n == pref or n.startswith(pref)}
+        bad = {
+            n
+            for n in names
+            if (n == pref or n.startswith(pref)) and not _b49_granted(n)
+        }
         assert not bad, f"B3 range 觸及禁改前綴 {pref}: {bad}"
 
     # 封閉 key 集合：HEAD 須三 key 全齊；b3 錨點樹可缺 b3_start 行（主委後掛）
@@ -2135,14 +2217,22 @@ def test_waiver_b4_range_does_not_touch_forbidden() -> None:
     diff = _run(["git", "diff", "--name-only", f"{b4}..{upper}"])
     assert diff.returncode == 0, diff.stderr
     names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
+    # 票 B-49：--name-only 隱去 rename 舊名 ⇒ 改名可洗出保護範圍（CODEX-CONSULT-R1-P0-02）
+    names |= _rename_old_names(f"{b4}..{upper}")
 
     hit_harness = names & set(_B45_HARNESS)
-    assert not hit_harness, f"B4 range 觸及 B-45 harness: {hit_harness}"
+    # 票 B-49：通過 git 物件身分比對之授權路徑扣除；其餘一律仍拒。
+    unexcused = {p for p in hit_harness if not _b49_granted(p)}
+    assert not unexcused, f"B4 range 觸及未授權之 B-45 harness: {unexcused}"
     for pref in _B4_FORBIDDEN_PREFIXES:
         if pref == "scripts/govb1_frozen_hashes.txt":
             # 允許檔進 range（主委 b4_start 錨點）；內容走封閉集合比對（見下）
             continue
-        bad = {n for n in names if n == pref or n.startswith(pref)}
+        bad = {
+            n
+            for n in names
+            if (n == pref or n.startswith(pref)) and not _b49_granted(n)
+        }
         assert not bad, f"B4 range 觸及禁改前綴 {pref}: {bad}"
 
     # 封閉 key 集合：b4_start..HEAD 內三既有錨值皆不得變
@@ -2188,7 +2278,21 @@ _B5_FORBIDDEN_PREFIXES = tuple(
 )
 # 字面凍結：使用者授權新增之 manifest 條目（**只有這一行**）
 _B5_MANIFEST_AUTHORIZED_ADDITIONS = frozenset(
-    {"allow scripts/governance_families.json"}
+    {
+        "allow scripts/governance_families.json",
+        "allow docs/GOVB1_INPUT_QUALITY_TODO.md",
+        "allow tests/governance/test_brief_conformance.py",
+        "allow tests/governance/test_completeness_idlike_fp.py",
+        "allow tests/governance/test_cxrun_selfcheck_prompt.py",
+        "allow tests/governance/test_cxrun_stamp_prompt.py",
+        "allow tests/governance/test_debt_emit.py",
+        "allow tests/governance/test_doc_format_precheck.py",
+        "allow tests/governance/test_gov_check_dep_failclosed.py",
+        "allow tests/governance/test_result_state_format_failed.py",
+        "allow tests/governance/test_rolegate_predispatch.py",
+        "allow tests/governance/test_stamp_taskid_inject.py",
+        "allow tests/governance/test_verify_gate_b3.py",
+    }
 )
 
 
@@ -2256,13 +2360,21 @@ def test_waiver_b5_range_does_not_touch_forbidden() -> None:
     diff = _run(["git", "diff", "--name-only", f"{b5}..HEAD"])
     assert diff.returncode == 0, diff.stderr
     names = {ln.strip() for ln in diff.stdout.splitlines() if ln.strip()}
+    # 票 B-49：--name-only 隱去 rename 舊名 ⇒ 改名可洗出保護範圍（CODEX-CONSULT-R1-P0-02）
+    names |= _rename_old_names(f"{b5}..HEAD")
 
     hit_harness = names & set(_B45_HARNESS)
-    assert not hit_harness, f"B5 range 觸及 B-45 harness: {hit_harness}"
+    # 票 B-49：通過 git 物件身分比對之授權路徑扣除；其餘一律仍拒。
+    unexcused = {p for p in hit_harness if not _b49_granted(p)}
+    assert not unexcused, f"B5 range 觸及未授權之 B-45 harness: {unexcused}"
     for pref in _B5_FORBIDDEN_PREFIXES:
         if pref == "scripts/govb1_frozen_hashes.txt":
             continue  # 允許檔進 range（主委 b5_start 錨點）；內容走封閉集合比對
-        bad = {n for n in names if n == pref or n.startswith(pref)}
+        bad = {
+            n
+            for n in names
+            if (n == pref or n.startswith(pref)) and not _b49_granted(n)
+        }
         assert not bad, f"B5 range 觸及禁改前綴 {pref}: {bad}"
 
     def _frozen_at(rev: str) -> dict[str, str]:
@@ -2402,7 +2514,10 @@ def _b45_freeze_still_active() -> bool:
     def _fake_run(cmd, *a, **kw):
         # 只攔 `git diff --name-only <range>`；其餘（anchor/frozen_hashes）走真指令
         if list(cmd[:3]) == ["git", "diff", "--name-only"]:
-            return subprocess.CompletedProcess(list(cmd), 0, _B45_HARNESS[0] + "\n", "")
+            # 票 B-49：餵**未授權**之 harness；差集空 ⇒ 無可偵測對象（下方回 False）
+            _rest = sorted(set(_B45_HARNESS) - _B49_HARNESS_GRANT)
+            _probe = _rest[0] if _rest else ""
+            return subprocess.CompletedProcess(list(cmd), 0, _probe + "\n", "")
         return real_run(cmd, *a, **kw)
 
     rejected = 0

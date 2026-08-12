@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.governance import _role_pin  # noqa: E402
+
 import tests.governance._debt_probe_helper as _dph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -2070,10 +2072,9 @@ def test_mutation_v12_force_stamp_target_all_kinds_turns_red(
     # brief_conformance_check.sh，探針隨之改指新位置。**變異語意未變**——
     # 仍是「非 stamp kind 也強制 stamp-target」，仍預期 impl brief 被誤擋。
     _mutate_brief_conformance(h, force_all)
-    roles = json.loads(
-        (h["scripts"] / "governance_roles.json").read_text(encoding="utf-8")
-    )
-    fam = roles["implementer"]
+    # 票 B-49：沙箱名冊釘成有 CLI 配方之家族；否則 implementer=claude 會讓本測
+    # **因家族白名單被拒**而綠，而非因 V12 變異被誤擋 —— 那是假綠。
+    fam = _role_pin.pin_implementer(h["scripts"])
     _write_brief(h, kind="impl", stamp_target=None, name="brief.md")
     rid = "d3333333-3333-4333-8333-333333333333"
     _open_round(
@@ -2096,9 +2097,7 @@ def test_mutation_v12_force_stamp_target_all_kinds_turns_red(
     assert r.returncode == 2, "V12 閹割後無 stamp-target 的 impl 應被誤擋"
 
     h2 = _harness(tmp_path / "restore12")
-    fam2 = json.loads(
-        (h2["scripts"] / "governance_roles.json").read_text(encoding="utf-8")
-    )["implementer"]
+    fam2 = _role_pin.pin_implementer(h2["scripts"])
     _write_brief(h2, kind="impl", stamp_target=None, name="brief.md")
     rid2 = "d4444444-4444-4444-8444-444444444444"
     _open_round(
