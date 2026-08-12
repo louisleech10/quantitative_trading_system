@@ -550,9 +550,35 @@ _TC_ASSERT_SAFE_CHARS='^[A-Za-z0-9_./=:@,+ 	-]*$'
 #   （規格內檢查條件落筆即跑）；封閉的是「跑什麼」的來源，不是「不跑」。
 _TC_ASSERT_CMD_ALLOW='bash python3 pytest grep true false test'
 
+# ── T0 止血（2026-08-12；consult 20260812-govassert-x-consult-r1 三家一致）──────
+# 出生事故：某 SPEC 的 ASSERT 寫成 `bash scripts/gov_check.sh --no-probe …`
+#   ⇒ 本函式**真的執行**它 ⇒ 整套 1521 個測試被當成「文件檢查」跑起來
+#   ⇒ 吃光 per-user process 上限（實測 ulimit -u = 1333），連 `ps` 都 fork 不出來。
+#   更糟：`doc_format_precheck.sh` 是 Write/Edit 的 PostToolUse hook 且會呼叫本檔
+#   ⇒ **要編輯該文件去移除那條 ASSERT，存檔又會再次引爆 ⇒ 文件自鎖**，只能 `mv` 脫困。
+#
+# 兩層防線（**不動 `gate.sh` 之預設行為**——那是真正的驗收點，關掉會成保護真空）：
+#   ① TEMPLATE_CHECK_NO_EXEC=1 ⇒ 文法／白名單／路徑檢查照跑，**只跳過執行**。
+#      由 `doc_format_precheck.sh`（寫檔 hook）設定；gate/freeze 不設，行為逐字不變。
+#   ② 逐行 timeout ⇒ 逾時**判 FAIL**（fail-closed，非略過），無論 ① 是否啟用。
+#
+# 🔴 具名殘留：kill 只送給直接子程序，**孫程序可能存活**（POSIX sh 無 job control，
+#   背景子程序不必然自成 process group）。backstop＝`bash scripts/proc_guard.sh --clean`。
+#   完整修法（process-group 覆蓋）歸後續完整管線。
+# 🔴 秒數為 **PROVISIONAL**：codex 要求依 duration manifest 之
+#   `ceil(max(max_duration, P99×1.25))` 定稿；在取得 receipt 前暫定 60s，且**拒絕空值**。
+#   秒數取值與驗證**一律在 `_run_assert_lines` 內就地完成**（見該函式開頭）——
+#   不在此設檔頭常數：既有測試會把該函式單獨抽出 eval，檔頭常數屆時不存在，
+#   在 `set -u` 下會整支炸掉且無輸出（主委實測，24 條測試同時轉紅）。
+
 _run_assert_lines() {
   _ra_file="${1}"
   _ra_out=""
+  # 🔴 函式須自足：既有測試會把本函式**單獨抽出 eval**，屆時檔頭常數不存在，
+  #   在 `set -u` 下直接炸且無輸出（主委實測踩到）。故在此就地取值並自帶預設。
+  _ra_to="${_TC_ASSERT_TIMEOUT_SEC:-${TEMPLATE_CHECK_ASSERT_TIMEOUT_SEC:-60}}"
+  case "${_ra_to}" in ''|*[!0-9]*) _ra_to=60 ;; esac
+  [ "${_ra_to}" -gt 0 ] 2>/dev/null || _ra_to=60
   _ra_live="$(_tc_live_or_die "${_ra_file}")" || {
     printf '  · code fence 未閉合 ⇒ 其後宣告無法判定（fail-closed）\n'
     return 1
@@ -619,12 +645,32 @@ _run_assert_lines() {
     #   固定順序：系統目錄在前（`bash`/`grep`/`true` 必為系統版），
     #   repo venv 在後僅供 `pytest`；`REPO_ROOT` 由腳本位置導出，不取自環境。
     #   併清 `BASH_ENV`／`ENV`（bash 啟動時會 source）與 `*_PRELOAD`（動態載入注入）。
+    # 🔴 T0 止血①：寫檔 hook 路徑只驗文法，不執行（見檔頭常數區之出生事故）
+    if [ "${TEMPLATE_CHECK_NO_EXEC:-0}" = "1" ]; then
+      continue
+    fi
+    # 🔴 T0 止血②：逐行 timeout，逾時 fail-closed（判 FAIL，不略過）
     ( set -f; IFS=' 	'; set -- ${_ra_cmd}
       [ "$#" -gt 0 ] || exit 1
       PATH="/usr/bin:/bin:/usr/sbin:/sbin:${REPO_ROOT}/venv/bin"
       export PATH
       unset BASH_ENV ENV CDPATH LD_PRELOAD DYLD_INSERT_LIBRARIES DYLD_LIBRARY_PATH
-      exec "$@" ) >/dev/null 2>&1
+      exec "$@" ) >/dev/null 2>&1 &
+    _ra_pid=$!
+    _ra_waited=0
+    while [ "${_ra_waited}" -lt "${_ra_to}" ] && kill -0 "${_ra_pid}" 2>/dev/null; do
+      sleep 1
+      _ra_waited=$((_ra_waited + 1))
+    done
+    if kill -0 "${_ra_pid}" 2>/dev/null; then
+      kill -TERM "${_ra_pid}" 2>/dev/null
+      sleep 1
+      kill -KILL "${_ra_pid}" 2>/dev/null
+      wait "${_ra_pid}" 2>/dev/null
+      _ra_out="${_ra_out}  · ASSERT 逾時 ${_ra_to}s ⇒ fail-closed（勿於 ASSERT 呼叫治理閘門腳本）: ${_ra_cmd}\n"
+      continue
+    fi
+    wait "${_ra_pid}"
     _ra_rc=$?
     [ "${_ra_rc}" = "${_ra_exp}" ] || \
       _ra_out="${_ra_out}  · ASSERT rc 不符（期望 ${_ra_exp} 實得 ${_ra_rc}）: ${_ra_cmd}\n"
