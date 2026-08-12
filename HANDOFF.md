@@ -20,45 +20,52 @@
 🔴 改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`；
 本檔**不得手寫**票／批次的狀態字面值（偵測器 fail-closed，本 session 踩三次）。
 
-# 🔴🔴🔴 接手第一件事：等使用者回答兩個問題
+# 🔴🔴🔴 接手第一件事：做 `票 B-25`
 
-使用者 2026-08-12 指示：「**要做就做乾淨，不要用斷路器當理由又殘留**」、
-「把 PUSH 卡住問題和 ASSERT 問題清乾淨」、「**然後交接寫明確做 B-25，然後才是站 5**」。
-主委提出**四項一批做完**之方案，**使用者尚未答覆**：
+使用者 2026-08-12 定序：「你這兩個問題做完清乾淨，然後交接寫明確做 B-25，然後才是站 5。」
+**PUSH 11 分鐘與 ASSERT 兩題已做完並經三家 review（見下）⇒ 下一項即 `票 B-25`，之後才是站 5。**
 
-**(a)** 四項一批（Phase A 實作＋B.1 實作＋錨點檢查＋89 行遷移），不再拆 —— 認可否？
-**(b)** 第四項需改 `docs/GOVB1_INPUT_QUALITY_SPEC.md` 與 `..._TODO.md` 兩凍結檔內之
-　　舊 ASSERT 行（**只改那些行、技術內容不動**，比照 `票 B-49` 作法）—— 授權否？
-　　🔴 **若不授權**：交接須寫明「ASSERT 問題差最後一哩，卡在凍結檔授權」，
-　　**不得寫成一張沒人會做的票**（使用者已明確反對該作法）。
+🔴 **前版交接所列「等使用者回答的兩個問題」已作廢**：問題 (b)（凍結檔授權）
+建立在**錯誤量測**上——可執行 ASSERT 僅 2 行、兩份凍結檔 0 行，授權問題不存在。
+量法錯在何處見 `docs/GOV_ASSERT_PATHA_NOTE.md` §2。
 
-## 已完成並 push（`origin/main`，0 筆待推）
+## 已完成並 push（`origin/main`）
 
 - `票 B-49`：凍結出口補上、幽靈路徑 11→0、關票條件機械可驗（**狀態值見生成區塊**）
 - **ASSERT 自鎖 T0 止血**（`53966e90`）：寫檔路徑零執行 ＋ 逐行 timeout ＋ `proc_guard.sh`
-  實測 605s → 1s，fork 耗盡不再發生
 
-## 未完成（本 session 最大失敗）
+## 本批（2026-08-12；使用者裁定「不要再搞 SPEC/TODO」，直接實作＋三家 review）
 
-🔴 **PUSH 11 分鐘問題：一行程式碼都沒改。**
-`docs/GOV_GATECHAIN_SPEC.md`（288 行／3 Task）已走 **8 輪** adversarial，
-finding 數 13→16→17→10→10→12→16→19，**未收斂**。
+**PUSH 11 分鐘 ＋ ASSERT 自鎖，兩題皆已改碼**（前版交接記為「一行程式碼都沒改」）：
 
-**根因（實測分類）**：r6/r7/r8 之 finding 有 4／5／**8** 條屬同一型——
-「改法寫了要求、驗證欄沒對應格」。**手工維持該配對必然漏，且配對數隨修補增加。**
-⇒ 主委結論：**SPEC 已夠好到可實作**；再審是打磨文件記帳，不降低實作風險。
-剩餘記帳問題在測試寫出來後自動消失（測試即驗證）。
+| 改動 | 檔 |
+|---|---|
+| 段序改便宜先＋便宜段早退＋失敗摘要末尾化＋backlog 移至最末 | `scripts/gov_check.sh` |
+| 路 A：呼叫端不執行文件內 ASSERT（**三處**） | `gate.sh`×2、`spec_fourway_check.sh`×1 |
+| NO_EXEC 下印出「ASSERT 未驗證」（不得靜默） | `scripts/template_check.sh` |
+| 新增守衛測試 13 格（含 5 條 mutation 反面） | `tests/governance/test_gov_check_cheap_first.py` |
+| 處置與具名殘留 | `docs/GOV_ASSERT_PATHA_NOTE.md` |
 
-**Phase A 實質內容只有約 30 行 shell**：把段 4（白話 1s）／段 5（fact-key 0s）＋
-新增 G-7 預檢（`--only g7`，**必須帶此旗標**否則會跑全套 pytest）移到段 2（pytest 678s）之前；
-失敗摘要以 `GOV-CHECK-FAILED:` 印在**最末**。`--fast` 同批重定義為「pytest 前所有便宜段」。
+**三家 review**（`handoffs/20260812-govcheap-x-review-r1/`）：Composer／Grok 判可派工；
+**Codex 判需修補**（2 條 P1，附行號碼證）。依「不數人頭以碼證定」採 Codex，兩條均已修：
+① G-7 缺檔原寫成「略過」＝fail-open ⇒ 改以 `scripts/govb1_scope.manifest` 判適用性、
+　 缺腳本判紅，並補 `test_mutation_removing_g7_script_turns_red`
+② NO_EXEC 靜默放行「文法對但結果會錯」之 ASSERT ⇒ 改為大聲印出，
+　 並把可執行 ASSERT 之**檔案集合凍成具名清單**（新增即轉紅）
+另 Codex 抓到主委自造回歸：以 `awk` 批次改註解時**掉了 `gov_check.sh` 的可執行位**，已還原。
 
-## 實測事實（勿重測，直接用）
+## 實測數字：本檔不重述，看唯一來源
 
-- 全套 `pytest tests/governance` ≈ **678s／1521 passed**；最慢 26 項合計 276s（長尾，非單一元凶）
-- 三條便宜閘：`g7=7s factkey=0s plaindocs=1s`，**合計 8s**
-- 舊 ASSERT 文法：`grep -rlE "ASSERT .* THEN rc(=|!=)[0-9]+" docs/`＝**9 檔**、**89 行**；
-  其中 `GOVB1_INPUT_QUALITY_SPEC.md`／`..._TODO.md` 兩凍結檔佔 **45 行**
+| 量到什麼 | 唯一來源 |
+|---|---|
+| `--fast`／全套 push 路徑之前後對照、backlog 75 秒之根因 | `白話說明/接下來要做什麼.md` 之「8/12 深夜」節 |
+| 可稽核收據（含 exit_code／sha256／git_head） | `handoffs/run_receipts/20260812T121019Z-govcheap-fast-1s.*`<br>`handoffs/run_receipts/20260812T122358Z-govcheap-fullgate-703s.*` |
+| ASSERT 執行面之正確量法與數字 | `docs/GOV_ASSERT_PATHA_NOTE.md` §2 |
+
+🔴 **舊記「89 行／9 檔／凍結檔 45 行」係量法錯誤（未錨定行首），已作廢——勿再引用。**
+
+## 平台事實（勿重測，直接用）
+
 - `ulimit -H -u` 本機**不能降**（`Invalid argument`）；只降 soft 必被子程序抬回
 - **無 `setsid` 指令**；`set -m` 可使背景 job 自成 pgid，`kill -TERM -<pgid>` 實測連孫程序一併終止
 - per-user process 上限 `ulimit -u`＝**1333**

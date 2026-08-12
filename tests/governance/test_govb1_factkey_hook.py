@@ -6,12 +6,13 @@
   3. 🔴 `GOVB1_FACTKEY_ROOT` **不得**改變強制層的檢查對象（CODEX-R1-P1-01 回歸）
   4. 生成器缺失／不可執行 ⇒ fail-closed（刪掉腳本不得變成假綠）
   5. 段號分母**現算**——加一段就自動變 n+1，且全檔無寫死分母
-  6. `scripts/git_hooks/pre-push` 未被本 Task 改動，但其**委派鏈**確實會走到第 5 段
+  6. `scripts/git_hooks/pre-push` 未被本 Task 改動，但其**委派鏈**確實會走到第 3 段
 
 🔴 為何不直接跑真 repo 的 `bash scripts/gov_check.sh --no-probe`：
-   該模式的第 2 段會跑 `pytest tests/governance`，而本檔就在其中 ⇒ **無限遞迴**。
+   該模式的**第 5 段**會跑 `pytest tests/governance`，而本檔就在其中 ⇒ **無限遞迴**。
+   （2026-08-12 段序改「便宜先」後，pytest 由第 2 段移為第 5 段；此處同步更新。）
    改為在 tmp 建一個只含所需腳本、**不含 tests/governance** 的 git repo，
-   跑真正的 gov_check.sh（非 stub、非片段），第 2 段自然走「略過」分支。
+   跑真正的 gov_check.sh（非 stub、非片段），該段自然走「略過」分支。
 
 🔴 為何正反對照改用「把宿主檔放進 tmp repo 的真實路徑」而非 `GOVB1_FACTKEY_ROOT`：
    TODO 那兩條 ASSERT 以 env 傳 fixture 根，但強制層若照收該 env，
@@ -167,7 +168,7 @@ def test_t22_clean_host_rc_zero(tmp_path):
     root = _mk_repo(tmp_path)
     _install_host(root, CLEAN)
     r = _run_gov(root, "--no-probe")
-    assert "事實單一來源" in r.stdout, f"第 5 段未執行:\n{r.stdout}"
+    assert "事實單一來源" in r.stdout, f"第 3 段未執行:\n{r.stdout}"
     assert r.returncode == 0, f"clean 應 rc=0，實得 {r.returncode}\n{r.stdout}\n{r.stderr}"
 
 
@@ -216,11 +217,17 @@ def test_generator_absent_or_not_executable_is_fail_closed(tmp_path, how):
 
 
 def test_fast_mode_contract_is_unchanged(tmp_path):
-    """誠實邊界：--fast 是秒級語法自檢，不含第 5 段；push 路徑走 --no-probe，會含。"""
+    """誠實邊界：--fast 是秒級語法自檢，不含第 3 段；push 路徑走 --no-probe，會含。
+
+    🔴 2026-08-12 段序改為「便宜先」時**刻意保留**本契約不動：--fast 跑在
+       不含 govb1 資料檔的隔離副本上（見 test_gov_check_dep_failclosed.py），
+       把 fact-key／白話／G-7 併進 --fast 會讓那些副本因缺資料檔而紅 ⇒ 假紅。
+       fact-key 前移的收益全在 push 路徑（--no-probe），與 --fast 無關。
+    """
     root = _mk_repo(tmp_path)
     _install_host(root, DRIFTED)
     r = _run_gov(root, "--fast")
-    assert "事實單一來源" not in r.stdout, "--fast 不應執行第 5 段"
+    assert "事實單一來源" not in r.stdout, "--fast 不應執行第 3 段"
     assert r.returncode == 0, f"--fast 不應因 fact-key 漂移而紅:\n{r.stdout}{r.stderr}"
 
 
@@ -234,7 +241,7 @@ def test_pre_push_delegation_reaches_factkey_segment(tmp_path):
     _install_host(root, CLEAN)
     r = _run_prepush(root)
     assert "委派" in r.stdout, f"pre-push 未委派:\n{r.stdout}"
-    assert "事實單一來源" in r.stdout, f"委派鏈未走到第 5 段:\n{r.stdout}"
+    assert "事實單一來源" in r.stdout, f"委派鏈未走到第 3 段:\n{r.stdout}"
     assert r.returncode == 0, f"clean 下 pre-push 應放行:\n{r.stdout}\n{r.stderr}"
 
 
@@ -278,25 +285,25 @@ def test_all_printed_denominators_equal_registered_segment_count(tmp_path):
     seen = _SEG_LINE.findall(r.stdout)
     assert seen, f"未印出任何段號:\n{r.stdout}"
     denoms = {d for _, d in seen}
-    assert denoms == {"5"}, f"分母不一致（本 Task 要治的正是這個）: {denoms}"
-    assert "5" in {n for n, _ in seen}, "fact-key 段未編號為 5"
+    assert denoms == {"6"}, f"分母不一致（本 Task 要治的正是這個）: {denoms}"
+    assert "3" in {n for n, _ in seen}, "fact-key 段未編號為 3"
 
 
 def test_denominator_is_computed_not_literal(tmp_path):
-    """行為引信：在副本登記第 6 段 ⇒ 印出的分母必須自己變成 6。
+    """行為引信：在副本多登記一段 ⇒ 印出的分母必須自己 +1。
 
-    若分母是寫死的字面值，加一段之後它會維持 5 ⇒ 本測試轉紅。
+    若分母是寫死的字面值，加一段之後它會維持原值 ⇒ 本測試轉紅。
     """
     root = _mk_repo(tmp_path)
     _install_host(root, CLEAN)
     p = root / "scripts" / "gov_check.sh"
     src = p.read_text(encoding="utf-8")
-    old = "_GC_SEG_IDS='1 1b 2 3 4 5'"
+    old = "_GC_SEG_IDS='1 1b 2 3 4 5 6'"
     assert old in src, "測試與實作脫節：找不到段號宣告"
-    p.write_text(src.replace(old, "_GC_SEG_IDS='1 1b 2 3 4 5 6'", 1), encoding="utf-8")
+    p.write_text(src.replace(old, "_GC_SEG_IDS='1 1b 2 3 4 5 6 7'", 1), encoding="utf-8")
     r = _run_gov(root, "--no-probe")
     denoms = {d for _, d in _SEG_LINE.findall(r.stdout)}
-    assert denoms == {"6"}, f"加了一段但分母沒跟著變 ⇒ 分母不是現算的: {denoms}"
+    assert denoms == {"7"}, f"加了一段但分母沒跟著變 ⇒ 分母不是現算的: {denoms}"
 
 
 def test_letter_suffixed_segment_does_not_inflate_total(tmp_path):
@@ -305,13 +312,15 @@ def test_letter_suffixed_segment_does_not_inflate_total(tmp_path):
     _install_host(root, CLEAN)
     p = root / "scripts" / "gov_check.sh"
     src = p.read_text(encoding="utf-8")
+    old = "_GC_SEG_IDS='1 1b 2 3 4 5 6'"
+    assert old in src, "測試與實作脫節：找不到段號宣告"
     p.write_text(
-        src.replace("_GC_SEG_IDS='1 1b 2 3 4 5'", "_GC_SEG_IDS='1 1b 1c 2 3 4 5'", 1),
+        src.replace(old, "_GC_SEG_IDS='1 1b 1c 2 3 4 5 6'", 1),
         encoding="utf-8",
     )
     r = _run_gov(root, "--no-probe")
     denoms = {d for _, d in _SEG_LINE.findall(r.stdout)}
-    assert denoms == {"5"}, f"帶字母後綴的段被多算了一段: {denoms}"
+    assert denoms == {"6"}, f"帶字母後綴的段被多算了一段: {denoms}"
 
 
 def test_unregistered_segment_id_is_fail_closed(tmp_path):

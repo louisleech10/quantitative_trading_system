@@ -40,7 +40,10 @@ chk() {  # chk <說明> <期望數> <grep pattern>
 
 echo "=== 標的：$SPEC ($(wc -l < "$SPEC" | tr -d ' ') 行, sha=$(shasum -a 256 "$SPEC" | cut -c1-20)) ==="
 
-bash scripts/template_check.sh spec "$SPEC" >/dev/null 2>&1
+# 🔴 TEMPLATE_CHECK_NO_EXEC=1（路 A）：只驗範本錨點，不執行文件內 ASSERT。
+#   本呼叫端是機械強制（test_gov_check_cheap_first.py 之呼叫端掃描）抓出來的——
+#   人工盤點原本只認出 gate.sh 兩處，漏了這裡。理由見 docs/GOV_ASSERT_PATHA_NOTE.md。
+TEMPLATE_CHECK_NO_EXEC=1 bash scripts/template_check.sh spec "$SPEC" >/dev/null 2>&1
 rc=$?
 if [ "$rc" = 0 ]; then echo "  ✅ template_check rc=0"; else echo "  ❌ template_check rc=$rc"; fail=1; fi
 

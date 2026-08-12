@@ -646,7 +646,14 @@ _run_assert_lines() {
     #   repo venv 在後僅供 `pytest`；`REPO_ROOT` 由腳本位置導出，不取自環境。
     #   併清 `BASH_ENV`／`ENV`（bash 啟動時會 source）與 `*_PRELOAD`（動態載入注入）。
     # 🔴 T0 止血①：寫檔 hook 路徑只驗文法，不執行（見檔頭常數區之出生事故）
+    # 🔴〔CODEX-R1-P1-02〕不得**靜默**跳過：文法與白名單都過、只是結果會錯的
+    #   ASSERT（例如 `ASSERT false THEN rc=0`）在本路徑不再被判失。
+    #   那是路 A 的實質語意損失，必須**大聲**印出來，不能看起來像驗過了。
+    #   非致命（不進 _ra_out ⇒ 不改 rc）：致命會讓既有文件在寫檔當下全部鎖死。
+    #   受影響行之集合由 tests/governance/test_gov_check_cheap_first.py 之
+    #   test_executable_assert_lines_are_a_frozen_named_set 凍住 ⇒ 不會靜默增生。
     if [ "${TEMPLATE_CHECK_NO_EXEC:-0}" = "1" ]; then
+      printf '  · ASSERT 未驗證（本路徑不執行任意命令，路 A）: %s\n' "${_ra_cmd}" >&2
       continue
     fi
     # 🔴 T0 止血②：逐行 timeout，逾時 fail-closed（判 FAIL，不略過）
