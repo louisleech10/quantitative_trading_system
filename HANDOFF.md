@@ -39,19 +39,28 @@
 100	WL-10	未開工	站級施工順序不在本表重述，見 docs/GOVERNANCE_EXECUTION_ORDER.md 之 governance-execution-order 區塊
 <!-- END GENERATED: governance-worklist -->
 
-# 接手第一件事：做上表第一個未收案項
+# 接手第一件事：做上表**由上而下第一個尚未完成的項目**
 
-使用者 2026-08-12 定序：「你這兩個問題做完清乾淨，然後交接寫明確做 B-25，然後才是站 5。」
-**PUSH 11 分鐘與 ASSERT 兩題已做完並經三家 review（見下）⇒ 下一項即 `票 B-25`，之後才是站 5。**
+上表第一列即為之：`scripts/fact_keys.json` 之 `.rows[]|@tsv` 由**平面列擴為兩欄表格**。
+它是其後兩列的**唯一阻塞**，也是 `票 B-25` 殘留⑥「判準資料化」卡了兩個月的原因。
+**做完後只改 `scripts/fact_keys.json` 該列的狀態欄，再跑
+`bash scripts/gen_fact_key_blocks.sh --write`**，兩份文件同時更新。
+🔴 **不要在本檔任何地方手寫項目編號＋狀態值**——偵測器會擋（本次前置已擋下兩處）。
 
-🔴 **前版交接所列「等使用者回答的兩個問題」已作廢**：問題 (b)（凍結檔授權）
-建立在**錯誤量測**上——可執行 ASSERT 僅 2 行、兩份凍結檔 0 行，授權問題不存在。
+🔴 **不要再提「等使用者回答兩個問題」**——已作廢。問題 (b)（凍結檔授權）建立在
+**錯誤量測**上：可執行 ASSERT 僅 2 行、兩份凍結檔 0 行，授權問題不存在。
 量法錯在何處見 `docs/GOV_ASSERT_PATHA_NOTE.md` §2。
+
+## 🔴 推送狀態：**2 筆待推**（使用者指示先不 push）
+
+`eddd78e3`（待辦清單機械化＋CLAUDE.md 去漂）、`dd384910`（ASSERT 執行閘反轉 opt-in）。
+四道閘已於 commit 後重驗：`g7=0 factkey=0 plaindocs=0`；全套 1534 passed（收據見下）。
 
 ## 已完成並 push（`origin/main`）
 
 - `票 B-49`：凍結出口補上、幽靈路徑 11→0、關票條件機械可驗（**狀態值見生成區塊**）
 - **ASSERT 自鎖 T0 止血**（`53966e90`）：寫檔路徑零執行 ＋ 逐行 timeout ＋ `proc_guard.sh`
+- 檢查鏈段序改「便宜先」＋早退＋失敗摘要（`2c34027a`）
 
 ## 本批（2026-08-12；使用者裁定「不要再搞 SPEC/TODO」，直接實作＋三家 review）
 
@@ -89,6 +98,18 @@
 ⇒ 該兩家之「可 commit」verdict 建立在錯誤事實上。
 **review 品質的分水嶺是「有沒有真的跑」，不是家數**——派工時應要求附實跑隔離結果。
 
+### 第三批（`eddd78e3`；使用者指示「寫在一定會看到、不會漏也不會讀錯的地方」）
+
+- **待辦清單改為機械投影**：新 fact-key `governance-worklist`，宿主＝本檔＋
+  `白話說明/接下來要做什麼.md`。**狀態只改 `scripts/fact_keys.json` 一處**，手寫即 fail-closed。
+- **`CLAUDE.md` 去除會漂的值**：① code review 家數改為指向 `ORCH §1`
+  （原寫「2 個」而 ORCH 為三家，當日害主委做錯一次）② pytest 秒數／測試數改為
+  「十分鐘級、前景必 timeout」之不變判準（該數字已過期四次）。
+- 延伸檔 `docs/GOV_B25_SCOPE_AMENDMENT.md` 補列 `FACTKEY-ADDED: governance-worklist`，
+  並把該檔寫死的「兩個狀態 key」改為指標。
+- 🔴 **本批未經三家 review**（改動為資料註冊與文件去漂，無行為邏輯）。
+  若下個 session 認為需要，補派一輪即可；**不得宣稱已審**。
+
 ## 實測數字：本檔不重述，看唯一來源
 
 | 量到什麼 | 唯一來源 |
@@ -110,11 +131,12 @@
 > 🔴 **本節是機器輸入**：`governance-ticket-closure` 之導出集合＝本節 ∪
 > backlog「2026-08-10 scope 缺口」節所提及之票號。增刪票號提及須同步 `scripts/fact_keys.json`。
 
-- 🔴 `票 B-25`：**判準資料化整項未做**，卡在 `fact_keys` 之 `.rows[]|@tsv` 只支援平面列。
-  三項殘留：①正向斷言擋不住「有 pointer 但旁邊另寫互斥判準」②引用已廢判準無機械偵測
-  ③完整解未做。2026-08-12 併入兩條機械檢查提案：**同 Task 內互斥判準偵測**、
-  **改法段之機制須有 FACT-RECEIPT**。🔴 **B-25 不在票狀態表內**（該表正是它的交付物）
-  ⇒ 其殘留對機器隱形；使用者已指示「交接寫明確做 B-25」。
+- 🔴 `票 B-25`：**判準資料化整項未做**，卡在 `fact_keys` 之 `.rows[]|@tsv` 只支援平面列
+  （＝待辦清單之 `WL-01`）。三項殘留：①正向斷言擋不住「有 pointer 但旁邊另寫互斥判準」
+  ②引用已廢判準無機械偵測 ③完整解未做。併入兩條機械檢查提案：**同 Task 內互斥判準偵測**、
+  **改法段之機制須有 FACT-RECEIPT**（對應待辦清單第二、三列）。
+  該票於票狀態表之列為 ord `005`（**狀態值見生成區塊，本檔不重述**）；
+  票本身另有 **8 條**具名殘留，見 backlog `B-25` 節。
 - `R-12`：`brief_conformance_check.sh` full path 不驗 EXPECTED-DELTA；OOE 通道救不了
 - `R-13` Unicode 不可見碼點；`R-14` `b4-review-r2` 僅 2/3 戳記；`R-16`＝`票 B-55`
 - `票 B-49`：四條具名殘留見 `docs/GOV_B49_ASBUILT_DELTA.md` §3
@@ -137,10 +159,11 @@
 
 ## ⚠ 操作紀律（踩過的坑，一律照做）
 
-- 🔴 **推送前必跑 8 秒快閘**：`govb1_final_gate.sh --only g7` ＋ `gen_fact_key_blocks.sh --check`
-  ＋ `plain_docs_sync_check.sh`。本 session 全套跑 9 次＝100.7 分，其中約 44 分可避免。
-- 🔴 **push 失敗先 `grep -E "✗|FAIL|FACTKEY" <push.log>`，禁直接重跑套件**——
-  log 有 1600+ 行且已含失敗原因；本 session 兩次只 `tail -3` 就重跑，白花 22 分鐘。
+- ✅ **「推送前必跑 8 秒快閘」已不再是紀律**——白話同步／fact-key／G-7 已是 `gov_check.sh`
+  的第 2–4 段，且**便宜段一紅即早退**（實測 10 秒內給答案，不再跑滿 12 分鐘）。
+  自檢直接跑 `bash scripts/gov_check.sh --no-probe`（丟背景）即可。
+- 🔴 **失敗先看最末的 `GOV-CHECK-FAILED:` 摘要**（已具名段號與修法），**禁直接重跑套件**。
+  本 session 兩次只 `tail -3` 就重跑，白花 22 分鐘——摘要末尾化就是為此而做。
 - 🔴 **G-7／F5 用 endpoint 淨差**：commit **前**是綠的（檔還沒進範圍），一 commit 才現形
   ⇒ **commit 之後必須重驗**。本 session 頭尾各踩一次。
 - 🔴 **反向驗證才算數**（移除判定 ⇒ 對應斷言須轉紅）；**前必先 commit**——
