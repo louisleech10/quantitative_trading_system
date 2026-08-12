@@ -55,10 +55,38 @@
 **錯誤量測**上：可執行 ASSERT 僅 2 行、兩份凍結檔 0 行，授權問題不存在。
 量法錯在何處見 `docs/GOV_ASSERT_PATHA_NOTE.md` §2。
 
-## 🔴 推送狀態：**2 筆待推**（使用者指示先不 push）
+## 🔴 推送狀態：多筆待推（使用者指示先不 push）
 
-`eddd78e3`（待辦清單機械化＋CLAUDE.md 去漂）、`dd384910`（ASSERT 執行閘反轉 opt-in）。
-四道閘已於 commit 後重驗：`g7=0 factkey=0 plaindocs=0`；全套 1534 passed（收據見下）。
+最新為 `291e4e40`。筆數與四道閘現況**本檔不重述**——直接跑
+`git log --oneline origin/main..HEAD` 與 `bash scripts/gov_check.sh --no-probe`（丟背景）。
+髒檔應為 4 個且**全為規則禁止提交項**：`.claude/gate/*.log`×2、
+`governance_families.json`（`R-15`）、`docs/GOVB0_FRICTION_AMENDMENTS.md`。
+
+🔴 **本 session 兩次被目錄萬用字元 `git add` 咬到**：`git add docs/` 掃進
+`GOVB0_FRICTION_AMENDMENTS.md`、`git add scripts/` 掃進 `governance_families.json`，
+兩者皆為明令不得提交項。**逐檔列出，不要用目錄形式 add。**
+第二次還連帶要重寫三個本地 commit——因為 G-7 的豁免是
+「該路徑在範圍內**只**被 out-of-epic commit 觸及」，補後續 commit 解不掉。
+
+## 本 session（2026-08-13 凌晨）之待辦項目
+
+**做法**（使用者 08-12 夜間定）：不寫 SPEC/TODO，依待辦清單直接實作＋三家 review。
+每項鏈路：實作 → 三家 review → 採納修補 → **原提出方複驗**（章程 §B8）→ 三家戳記 → 清債。
+狀態值見本檔最上方生成區塊，此處不重述。
+
+| 項 | 交付 | 委員輪次 | 收斂檔（含量測與逐條處置） |
+|---|---|---|---|
+| 第一項 | `fact_keys` schema 擴為具名欄＋表格投影 | review → closure | `handoffs/reconcile/20260813-govwl01-x-review-r1/synth.md` |
+| 第二項 | 判準入註冊表＋三道機械檢查 | consult → review → closure | `handoffs/reconcile/20260813-govwl02-x-consult-r1/synth.md` |
+
+### 🔴 接手前必讀的兩條經驗（細節與量測一律看上表收斂檔，本檔不重述）
+
+1. **清單上的字面設計不等於既成事實。** 第二項的字面寫法經三家 consult 後**整個改寫**；
+   理由、量測方法與逐條裁定都在上表第二列的收斂檔。
+   **看到類似的字面設計，先量一次再動手，不要照抄開工。**
+2. **注意「檢查只掛在其中一條路徑上」這個形態。** 本 session 反覆出現，
+   逐次列舉見 `白話說明/流程摩擦記錄.md` 8/13 第十五條。
+   **審查時應主動問「同一種輸入有沒有第二條處理路徑」。**
 
 ## 已完成並 push（`origin/main`）
 
