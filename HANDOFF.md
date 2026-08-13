@@ -70,7 +70,7 @@
 | 0430 | S4.3 | 收案 | 能掛的掛上；不能的寫具名豁免。體例＝須同時寫「無等價判定之理由」與「部分閘是否已掛」 | 每張已交付票於 enforcement 有列，或有具名豁免理由 |
 | 0440 | S4.4 | 收案 | 🔴 三家逐條複驗每一則豁免理由。驗收判準：登記不是免死金牌——票有可執行 artifact 卻無對應機械檢查時，「無檢查可掛」之登記不得當成完成；對外宣稱完成而無可證偽之閘與豁免列者，該宣稱視為空殼 | 三家逐條複驗完成並戳記；reconcile_stamps_check rc=0 |
 | 0510 | S5.1 | 收案 | 三家 review 全鏈路 | 三家 review 完成，收斂檔 findings 全數處置 |
-| 0520 | S5.2 | 未開工 | 全套 gov_check 綠 ＋ 說明檔同步 | gov_check --no-probe rc=0 且 plain_docs_sync_check rc=0 |
+| 0520 | S5.2 | 收案 | 全套 gov_check 綠 ＋ 說明檔同步 | gov_check --no-probe rc=0 且 plain_docs_sync_check rc=0 |
 | 0530 | S5.3 | 未開工 | 解除 WL-04 之 BLOCKED（使用者定：這些確保都完成才能進 WL-04） | WL-04 之 BLOCKED 標記移除，且前置全部為收案 |
 <!-- END GENERATED: governance-sot-plan -->
 
