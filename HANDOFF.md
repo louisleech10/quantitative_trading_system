@@ -299,6 +299,30 @@
 - 🔴 **同一支腳本不得並行跑多份**——曾三份 `template_check` 併發導致 fork 耗盡（上限 1333）。
 - 🔴 fact-key 註記**不得含日期**；改 `fact_keys.json` 後 `factkey_clean`／`factkey_drifted`
   兩 fixture 皆須用 `GOVB1_FACTKEY_ROOT=<目錄>` 重生成，drifted 須維持「恰一列不同」。
+- 🔴 **新增一個 fact-key 有四項固定連帶工作，缺一即紅**（上輪四項全中，14 分鐘 gate 抓了三輪）：
+  ① 延伸檔補 `FACTKEY-ADDED:`（集合相等契約）② 兩份 fixture 各補宿主檔
+  ③ 內容不得含 `年-月-日` ④ 動到 `status_scope_grandfathered` 須同步
+  `test_govb1_factkey_gen.py` 之集合相等表。
+  **改完先跑窄測試**（`pytest tests/governance/test_govb1_factkey_{gen,hook}.py -q`，約 2 分鐘），
+  **不要讓 14 分鐘的全套去發現 2 分鐘能發現的事**。
+- 🔴 **說明檔同步是工作項目的最後一個 commit**：同一 commit 既動 `scripts/` 又動
+  `白話說明/` 必判過期（判準＝說明檔不早於其 WATCHED）。一輪內踩三次，一律拆兩個 commit。
+- 🔴 **commit 訊息檔寫在專案內**（如 `.claude/tmp/`），勿放 scratchpad——
+  `/private/tmp` 在專案外，每次 `git commit -F` 都命中權限分類器（實測 12–17 秒／次）。
+
+### 下個 session 開頭優先處理：把測試選擇機械化（未開工）
+
+**問題**：`gov_check` 含全套 pytest（1674 條、約 14 分鐘），而典型改動只牽動一小撮測試
+（本輪改 fact-key 只需 `test_govb1_factkey_*` 共 212 條、112 秒）。問題留到 push 才現形，
+一輪紅就是 14 分鐘，本輪連紅三輪。**這正是「檢查放在後面關卡＝純摩擦」的實例。**
+
+**提案**：`factkey_write_guard.sh`（已掛 `PostToolUse`）順帶跑相關測試子集。
+🔴 **必須 fail-closed**——改到的檔不在對應表內就跑全套；漏登記的代價是慢，不是放行。
+
+**另一條路（傾向否決）**：`pytest-xdist` 平行化。治理測試有一批會就地 mutate 檔案再還原，
+專案明令不得並行；標漏一個即隨機假綠。**風險高於收益。**
+
+⇒ 屬技術取捨，**交委員會裁定**，不佔用使用者判斷。
 - 🔴 `handoffs/run_receipts/` 進 commit 須帶 `Governance-Scope: out-of-epic` trailer，
   且 **trailer 必須在最後一段**（git 只解析最末段）。
 - 🔴 閘會把含家族名的**讀取指令與 commit 訊息**當成派工 ⇒ 訊息一律用 Write 工具寫檔再 `-F`。
