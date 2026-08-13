@@ -87,38 +87,54 @@
 **錯誤量測**上：可執行 ASSERT 僅 2 行、兩份凍結檔 0 行，授權問題不存在。
 量法錯在何處見 `docs/GOV_ASSERT_PATHA_NOTE.md` §2。
 
-## 🔴 推送狀態：多筆待推（使用者指示先不 push）
+## 推送狀態：**本檔不寫，直接查**
 
-**筆數與最新 hash 本檔刻意不寫**（一個 session 內就漂過一次）——直接跑
-`git log --oneline origin/main..HEAD` 與 `bash scripts/gov_check.sh --no-probe`（丟背景）。
+`git log --oneline origin/main..HEAD | wc -l`（待推筆數）與
+`bash scripts/gov_check.sh --no-probe`（丟背景）。
+🔴 **筆數與 hash 刻意不寫進本檔**——歷史上一個 session 內就漂過一次。
 髒檔應為 4 個且**全為規則禁止提交項**：`.claude/gate/*.log`×2、
 `governance_families.json`（`R-15`）、`docs/GOVB0_FRICTION_AMENDMENTS.md`。
 
-🔴 **本 session 兩次被目錄萬用字元 `git add` 咬到**：`git add docs/` 掃進
-`GOVB0_FRICTION_AMENDMENTS.md`、`git add scripts/` 掃進 `governance_families.json`，
-兩者皆為明令不得提交項。**逐檔列出，不要用目錄形式 add。**
-第二次還連帶要重寫三個本地 commit——因為 G-7 的豁免是
+🔴 **`git add` 一律逐檔列出，禁目錄形式，亦禁 `$(...)` 子命令展開**：
+歷次事故＝`git add docs/` 掃進 `GOVB0_FRICTION_AMENDMENTS.md`、
+`git add scripts/` 掃進 `governance_families.json`（兩者皆明令不得提交），
+其中一次還連帶要重寫三個本地 commit——因為 G-7 的豁免是
 「該路徑在範圍內**只**被 out-of-epic commit 觸及」，補後續 commit 解不掉。
+另：中文路徑經 `git status | awk` 取值會因 quotePath 轉義而**靜默取不到**，實際踩過。
 
-## 本 session（2026-08-13 凌晨）之待辦項目
+## 前一批之交付與收斂檔（**狀態值一律看最上方生成區塊，此處只給指標**）
 
 **做法**（使用者 08-12 夜間定）：不寫 SPEC/TODO，依待辦清單直接實作＋三家 review。
 每項鏈路：實作 → 三家 review → 採納修補 → **原提出方複驗**（章程 §B8）→ 三家戳記 → 清債。
-狀態值見本檔最上方生成區塊，此處不重述。
 
-| 項 | 交付 | 委員輪次 | 收斂檔（含量測與逐條處置） |
-|---|---|---|---|
-| 第一項 | `fact_keys` schema 擴為具名欄＋表格投影 | review → closure | `handoffs/reconcile/20260813-govwl01-x-review-r1/synth.md` |
-| 第二項 | 判準入註冊表＋三道機械檢查 | consult → review → closure | `handoffs/reconcile/20260813-govwl02-x-consult-r1/synth.md` |
+| 交付 | 委員輪次 | 收斂檔（含量測與逐條處置） |
+|---|---|---|
+| `fact_keys` schema 擴為具名欄＋表格投影 | review → closure | `handoffs/reconcile/20260813-govwl01-x-review-r1/synth.md` |
+| 判準入註冊表＋三道機械檢查 | consult → review → closure | `handoffs/reconcile/20260813-govwl02-x-consult-r1/synth.md` |
+| 機制證據登記（平台機制＋改法子樹掃描） | consult → review → stamp×2 | `handoffs/reconcile/20260813-govwl03-x-review-r1/synth.md`＋`…-stamp-r2/`、`…-stamp-r3/` |
+| 戳記手抄消滅之設計諮詢（**未實作**） | consult | `handoffs/reconcile/20260813-govwl04-x-consult-r1/synth.md` |
+| **產出端覆蓋鐵律**（票要標收案須先擋在產出端） | review | `handoffs/reconcile/20260813-govenf-x-review-r1/synth.md` |
+| **全量票之產出端覆蓋盤點** | consult | `handoffs/reconcile/20260813-govenf-x-consult-r2/synth.md` |
 
-### 🔴 接手前必讀的兩條經驗（細節與量測一律看上表收斂檔，本檔不重述）
+### 🔴 接手前必讀的五條（細節與量測看上表收斂檔，本檔不重述）
 
-1. **清單上的字面設計不等於既成事實。** 第二項的字面寫法經三家 consult 後**整個改寫**；
-   理由、量測方法與逐條裁定都在上表第二列的收斂檔。
-   **看到類似的字面設計，先量一次再動手，不要照抄開工。**
-2. **注意「檢查只掛在其中一條路徑上」這個形態。** 本 session 反覆出現，
-   逐次列舉見 `白話說明/流程摩擦記錄.md` 8/13 第十五條。
-   **審查時應主動問「同一種輸入有沒有第二條處理路徑」。**
+1. **清單上的字面設計不等於既成事實。** 判準與機制那兩項的字面寫法都在開工前量測時被推翻
+   （一項零訊號、一項誤擋率八九成）。**先量一次再動手，不要照抄開工。**
+2. **「檢查只掛在其中一條路徑上」這個形態反覆出現**（已累積六個位置）。
+   審查時主動問「同一種輸入有沒有第二條處理路徑」。
+3. **「兩家說沒問題、一家附可重現構造」時採後者**——本 epic 已四次，四次都是那一家對。
+4. 🔴 **`jq`／command substitution 的 rc 被吞掉是本 epic 最常見的空心來源**（已三個同型）。
+   `$(...)`、`< <(...)`、`2>/dev/null` 都會吞。一律先落變數驗 rc。
+5. 🔴 **反例只斷言 `rc≠0` 不夠，必須斷言目標錯誤訊息**——否則 DRIFT 之類的下游紅
+   會讓你誤以為目標檢查生效。實際差點把一個空心的核心卡點當成通過。
+
+### 🔴 「產出端」的定義（本輪釐清，勿再誤讀）
+
+使用者原話是「產出**完成前**」「連留到**下一節點派工**都已經是摩擦」⇒
+**產出端＝我還在做這件事的那個工作階段內就知道**；**消費端＝要等後面某個關卡才發現**。
+`PostToolUse` **屬產出端**（寫完當下回灌），不是「寫入前」。
+🔴 主委曾把它誤讀成「寫入前」並據此排錯優先序；`PreToolUse` 對**一致性型**檢查
+會直接死鎖（改註冊表必然先不一致 ⇒ 永遠通不過）。分類見 `governance-sot-plan` 之 `S3.2`。
 
 ## 已完成並 push（`origin/main`）
 
@@ -195,16 +211,24 @@
 > 🔴 **本節是機器輸入**：`governance-ticket-closure` 之導出集合＝本節 ∪
 > backlog「2026-08-10 scope 缺口」節所提及之票號。增刪票號提及須同步 `scripts/fact_keys.json`。
 
-- 🔴 `票 B-25`：schema 阻塞與互斥判準偵測已交付（待辦清單前兩列），
-  **機制證據登記（第三列）設計已定、尚未實作**。
+- 🔴 `票 B-25`：判準資料化**三段皆已交付**（待辦清單前三列）。
   🔴 **能力邊界（三家一致，永遠不會由本機制關閉）**：語意互斥——兩段話用**不同條件字串**
   描述同一物理事件時鍵不相等，機械上偵測不到；出生事故那型即屬此類。
-  完整殘留清單見 `docs/GOV_CRITERIA_REGISTRY.md`。
+  另：既有散文判準不溯及既往；機制證據那段在現樹訊號近零，且其子樹旁路
+  **四度被委員實構**（發現曲線未收斂，改 parser 須重跑候選組）。
+  完整殘留見 `docs/GOV_CRITERIA_REGISTRY.md` 與 `docs/GOV_MECHANISM_REGISTRY.md`（11 條）。
   該票於票狀態表之列為 ord `005`（**狀態值見生成區塊，本檔不重述**）；
   票本身另有具名殘留，見 backlog `B-25` 節。
 - `R-12`：`brief_conformance_check.sh` full path 不驗 EXPECTED-DELTA；OOE 通道救不了
 - `R-13` Unicode 不可見碼點；`R-14` `b4-review-r2` 僅 2/3 戳記；`R-16`＝`票 B-55`
-- `票 B-49`：四條具名殘留見 `docs/GOV_B49_ASBUILT_DELTA.md` §3
+- 🔴 `票 B-49`：**狀態已下修**（值見生成區塊）——產出端覆蓋鐵律之第一個溯及既往實例。
+  主委所寫之豁免理由經三家一致否決——閉合證據的靜態可判定部分無需 commit 亦可於產出端驗。
+  重新收案之前置＝把靜態子集前移至產出端，見 `docs/GOV_ENFORCEMENT_REGISTRY.md` 之 `E-007`。
+  另四條具名殘留見 `docs/GOV_B49_ASBUILT_DELTA.md` §3
+- 🔴 **產出端覆蓋機制本身之缺口**（9 條，見 `docs/GOV_ENFORCEMENT_REGISTRY.md` 殘留節）：
+  掛載點對證擋不掉「腳本被掏空」；自我保護有本質極限（守衛執行的正是可能已被竄改的生成器）
+  ⇒ **只擋意外不擋蓄意**；票表刪列可繞過；批次不受覆蓋要求；`settings.json` 缺席時略過對證
+  （主委為修測試而引入之 fail-open）。**當下票表已無收案票 ⇒ 該閘無實際攔截對象**
 - `票 B-54`：戳記 64 位 hex 仍由委員手抄，曾掉字一次。**已部分緩解但未機械化**——
   現行做法是在 stamp brief 內要求委員**自行以 `reconcile_body_hash.sh` 重算核對、不得抄**，
   並聲明「算出不同就以你算的為準並開 finding」。屬紀律非強制；根治＝待辦清單之 `WL-04`
@@ -269,3 +293,13 @@
   曾照「每次存檔都補」做而連撞三次。
 - 🔴 **委員戳記的 body hash 一律要求委員自算**（brief 內明寫「不得抄、算出不同以你的為準」）——
   `票 B-54` 是委員手抄掉字造成的。
+- 🔴 **生成區塊的內容不得含 `年-月-日`**——既有測試 `test_output_has_no_bom_no_crlf_no_timestamp`
+  會攔。要標時間點就寫「使用者定」「本輪」，日期留給 git。**本輪犯兩次。**
+- 🔴 **派工前先開 gate token**：`committee_run.sh` 本身就會被 `gate_check.sh` 擋
+  （它是 dispatch 動作），要先跑 `gate.sh dispatch`。另：session 名須符命名規約，
+  `kind ∈ {impl,review,stamp,consult,fix}`——**沒有 `closure`**，閉合輪走 `stamp-r<N>`；
+  task-id 須為 session 的**大寫**形式。三者本輪各擋一次。
+- 🔴 **委員 brief 要求「每條 finding 附修法」**（使用者本輪指示）：具體到檔＋行＋可貼片段，
+  無需修者寫 `不需修：<理由>`。實證可省掉整整一輪往返。
+- 🔴 **唯讀指令裡不要出現家族名**（如 `for f in codex composer grok`）——
+  會被 dispatch 閘誤判為派工（`票 B-15`，本輪又擋一次）。改用萬用字元或不列舉。
