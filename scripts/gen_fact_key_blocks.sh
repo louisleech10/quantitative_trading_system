@@ -1045,11 +1045,19 @@ _FK_ENFORCEMENT_SCHEMA_FIELDS='enforcement_keys enforcement_side_enum enforcemen
 #     刪 schema 不再等於關閉規則——那會直接 fail-closed。
 _FK_CLOSED_STATUS='收案'
 
-# 票表中是否存在標為收案之列（不依賴 enforcement schema，故無法被其缺席繞過）
+# 🔴 S2.1：綁定不再只認「收案」單一字面——status_enum 裡另有數個同表「已完成」之值，
+#   把票標成其中任一即可脫離收案綁定（grok 實構之繞法）。改以**完成語意封閉集合**判定。
+#   仍寫死於生成器（非由註冊表自證），理由同 _FK_CLOSED_STATUS：自證＝無檢查。
+#   ⚠️ 「部分完成」**刻意不列入**：依 S0.2 定義它是「驗收未全達成」，不是完成語意。
+_FK_COMPLETED_STATUSES='收案 已落地 已完成'
+
+# 票表中是否存在標為**任一完成語意**之列（不依賴 enforcement schema，故無法被其缺席繞過）
 _fk_has_closed_ticket() {
-  LC_ALL=C jq -e --arg c "${_FK_CLOSED_STATUS}" '
+  _fkhc_json="$(printf '%s\n' ${_FK_COMPLETED_STATUSES} | LC_ALL=C jq -R . | LC_ALL=C jq -sc .)"
+  LC_ALL=C jq -e --argjson cs "${_fkhc_json}" '
     (._schema.status_keys // []) as $sk
-    | [ $sk[] as $k | (.[$k].rows // [])[] | .[] ] | index($c) != null
+    | [ $sk[] as $k | (.[$k].rows // [])[] | .[] ] as $vals
+    | any($cs[]; . as $c | $vals | index($c) != null)
   ' "${REG}" >/dev/null 2>&1
 }
 
@@ -1097,23 +1105,32 @@ _fk_mount_exists() {   # $1=掛載點字串 → rc=0 表示 settings.json 內確
   # 🔴 片段須為 repo 內**實際存在且可執行**的腳本路徑
   #   〔GROK-R1-P1-01 實構：`contains` 下短子串如 `sh`／`a`／`bash` 對真實 settings.json
   #    即判「掛載存在」，等於任何新列都能自動過關〕
-  case "${_fkme_cmd}" in
+  # 🔴 S3.1：command 段允許**帶參數**（如 `scripts/ts_stamp.sh OUT`）——
+  #   原本對整段要求 `*.sh` 結尾，使任何帶參數的 hook 都無法登記（實測 PostToolUse 之
+  #   ts_stamp.sh OUT 與 UserPromptSubmit 皆卡在此）。改為只對**第一個 token**（腳本路徑）
+  #   施加 `.sh` 與存在性判準；完整字串仍用於 startswith 比對，故偽造空間未擴大。
+  _fkme_cmd_head="${_fkme_cmd%% *}"
+  case "${_fkme_cmd_head}" in
     *.sh) : ;;
     *)    return 1 ;;
   esac
   # 判準用 `-f` 不用 `-x`：hook 以 `bash <path>` 呼叫，**不依賴執行位**
   #   （實測 `doc_format_precheck.sh` 即無執行位卻正常運作）⇒ 要求 `-x` 是與呼叫方式不符的判準。
   #   封閉性由「`.sh` 結尾 ＋ 檔案存在 ＋ command 以 `bash <片段>` 起頭」三者共同保證。
-  [ -f "${_fkme_repo}/${_fkme_cmd}" ] || return 1
+  [ -f "${_fkme_repo}/${_fkme_cmd_head}" ] || return 1
   # matcher 以逗號分隔還原成 settings.json 內的 `|` 形式後比對
   _fkme_mt_pipe="$(printf '%s' "${_fkme_mt}" | tr ',' '|')"
   # 🔴 command 須**以 `bash <片段>` 起頭**，不是「含有該子串」
   #   〔CODEX-R1-P0-02／COMPOSER-R1-P1-03 實構：把 hook 換成 `echo …factkey_write_guard.sh`
   #    或永遠 rc=0 的 noop 但保留子字串，即可偽造掛載證明〕
   #   誠實邊界：這只擋掉「換成別的指令」，擋不掉「腳本被掏空」——見登記表殘留 3。
+  # 🔴 S3.1：matcher 段為 `-` 表示「該事件本來就沒有 matcher」。
+  #   實測 .claude/settings.json：UserPromptSubmit／Stop／SessionStart 三個事件的項目**無 matcher 欄**
+  #   （它們不針對工具）⇒ 原本一律比 `.matcher == $mt` 會使這類 runtime 檢查**永遠無法登記**，
+  #   進而被誤判為「應前移卻未前移」。此即 S3.1 要修的洞，非放寬。
   LC_ALL=C jq -e --arg ev "${_fkme_ev}" --arg mt "${_fkme_mt_pipe}" --arg cmd "${_fkme_cmd}" '
     (.hooks[$ev] // [])
-    | any(.[]; (.matcher == $mt)
+    | any(.[]; (if $mt == "-" then (.matcher == null) else (.matcher == $mt) end)
                and ((.hooks // []) | any(.[]; (.command // "") | startswith("bash " + $cmd))))
   ' "${_fkme_path}" >/dev/null 2>&1
 }
@@ -1145,6 +1162,18 @@ _fk_validate_enforcement() {
   LC_ALL=C jq -e --arg c "${_FK_CLOSED_STATUS}" '._schema.status_enum | index($c) != null' \
     "${REG}" >/dev/null 2>&1 \
     || { echo "gen_fact_key_blocks: 收案字面 '${_FK_CLOSED_STATUS}' 不在 status_enum 內 → fail-closed" >&2
+         return 1; }
+  # 🔴 S2.1：completed_statuses 須**恰等於**生成器寫死之集合（同理封死「改集合即脫鉤」）
+  _fkve_cslist="$(printf '%s\n' ${_FK_COMPLETED_STATUSES} | LC_ALL=C jq -R . | LC_ALL=C jq -sc 'sort')"
+  _fkve_declared="$(LC_ALL=C jq -c '._schema.enforcement_completed_statuses // [] | sort' "${REG}")" || {
+    echo "gen_fact_key_blocks: 讀取 enforcement_completed_statuses 失敗 → fail-closed" >&2; return 1; }
+  [ "${_fkve_declared}" = "${_fkve_cslist}" ] || {
+    echo "gen_fact_key_blocks: enforcement_completed_statuses=${_fkve_declared} 不等於生成器寫死之完成語意集合 ${_fkve_cslist} → fail-closed" >&2
+    echo "  （S2.1：綁定改認集合而非單一字面；改資料即脫鉤之路徑一併封死）" >&2
+    return 1; }
+  LC_ALL=C jq -e --argjson cs "${_fkve_cslist}" '._schema.status_enum as $e | all($cs[]; . as $c | $e | index($c) != null)' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: 完成語意集合中有值不在 status_enum 內 → fail-closed" >&2
          return 1; }
 
   _fkve_side="$(LC_ALL=C jq -r '._schema.enforcement_producer_side' "${REG}")"
@@ -1237,17 +1266,17 @@ EOF2
   # 🔴 欄名先綁成 `$tcol`：不可在 `index(...)` 的參數位置寫 `._schema…`——
   #   該處的 `.` 已被 pipe 改成 `$e.columns`，會取到 null 而使整條檢查恆綠。
   #   初版即如此，反例只因 DRIFT 而紅，**險些把空心檢查當成通過**（訊息斷言才抓到）。
-  _fkve_missing="$(LC_ALL=C jq -er --arg tk "${_fkve_tk}" '
+  # 🔴 S2.1：判定改用**完成語意集合**（原為單一 $closed 字面，把票標成 已落地／已完成 即可繞過）
+  _fkve_missing="$(LC_ALL=C jq -er --arg tk "${_fkve_tk}" --argjson cs "${_fkve_cslist}" '
     ._schema.enforcement_column_roles.ticket as $tcol
     | ._schema.enforcement_ticket_roles as $tr
-    | ._schema.enforcement_closed_status as $closed
     | [ ._schema.enforcement_keys[] as $ek
         | .[$ek] as $e
         | ($e.columns | index($tcol)) as $ti
         | $e.rows[] | .[$ti] ] as $covered
     | (.[$tk].columns | index($tr.id)) as $idi
     | (.[$tk].columns | index($tr.status)) as $sti
-    | [ .[$tk].rows[] | select(.[$sti] == $closed) | .[$idi] ]
+    | [ .[$tk].rows[] | select(.[$sti] as $s | ($cs | index($s)) != null) | .[$idi] ]
     | map(select(. as $t | ($covered | index($t)) == null))
     | join("\n")' "${REG}")" || {
     echo "gen_fact_key_blocks: 收案綁定檢查之 jq 失敗 → fail-closed（不得當成『沒有未覆蓋的票』）" >&2
@@ -1258,6 +1287,65 @@ EOF2
     echo "  規則（使用者 2026-08-13 定死）：治理票要標收案，其檢查必須擋在產出端；" >&2
     echo "  擋不了就在 governance-enforcement 具名寫出為什麼（如 G-7 需 commit、pytest 十分鐘級）。" >&2
     return 1; }
+
+  # ⑦ 🔴 S3.2 判定型分類：每列之「判定型」須在 enforcement_kind_enum 內，
+  #   且與強制側一致——產出端列不得填 n/a（那等於沒分類）、豁免列必須是 n/a
+  #   （豁免不涉產出端掛載階段，填內容型／一致性型是語意錯置）。
+  _fkve_kindbad="$(LC_ALL=C jq -er '
+    . as $root
+    | $root._schema.enforcement_column_roles.kind as $kcol
+    | $root._schema.enforcement_kind_enum as $kenum
+    | $root._schema.enforcement_column_roles.side as $scol
+    | $root._schema.enforcement_column_roles.id as $icol
+    | $root._schema.enforcement_producer_side as $pside
+    | [ $root._schema.enforcement_keys[] as $ek
+        | $root[$ek] as $e
+        | ($e.columns | index($kcol)) as $ki
+        | ($e.columns | index($scol)) as $si
+        | ($e.columns | index($icol)) as $ii
+        | $e.rows[]
+        | { id: .[$ii], kind: .[$ki], side: .[$si] } ]
+    | map(. as $row | select(
+        ($row.kind == null)
+        or (($kenum | index($row.kind)) == null)
+        or ($row.side == $pside and $row.kind == "n/a")
+        or ($row.side != $pside and $row.kind != "n/a")
+      ))
+    | map("\(.id)（強制側=\(.side) 判定型=\(.kind // "缺")）")
+    | join("\n")' "${REG}")" || {
+    echo "gen_fact_key_blocks: 判定型分類檢查之 jq 失敗 → fail-closed" >&2; return 1; }
+  [ -z "${_fkve_kindbad}" ] || {
+    echo "gen_fact_key_blocks: 下列列之「判定型」不合法或與強制側不一致 → fail-closed:" >&2
+    printf '%s\n' "${_fkve_kindbad}" | sed 's/^/    /' >&2
+    echo "  規則（S3.2）：產出端列須為 內容型 或 一致性型；豁免列須為 n/a。" >&2
+    echo "  判準：只看這一次的編輯內容能否判定對錯？能＝內容型，否＝一致性型。" >&2
+    return 1; }
+
+  # ⑥ 🔴 S2.2 提前預警：**尚未**標完成、但已在推進中的票，若無產出端覆蓋登記，先講。
+  #   ⚠️ 本條**刻意只警告不判紅**，與 S1.2 的「大聲印出不是阻擋」不同性質：
+  #     · S1.2 那條該紅——它是「檢查自己失效」，放行等於沒有檢查。
+  #     · 本條不該紅——「部分完成」依 S0.2 定義本就不需覆蓋；判紅會讓所有推進中的票全紅，
+  #       等於逼人不要記錄真實狀態。價值在於**提前告知**，而非再加一道閘。
+  #   目的：避免「做到最後一刻才發現缺覆蓋」——那正是使用者要治的、留到下一關才擋的摩擦。
+  _fkve_pending="$(LC_ALL=C jq -er --arg tk "${_fkve_tk}" '
+    ._schema.enforcement_column_roles.ticket as $tcol
+    | ._schema.enforcement_ticket_roles as $tr
+    | [ ._schema.enforcement_keys[] as $ek
+        | .[$ek] as $e
+        | ($e.columns | index($tcol)) as $ti
+        | $e.rows[] | .[$ti] ] as $covered
+    | (.[$tk].columns | index($tr.id)) as $idi
+    | (.[$tk].columns | index($tr.status)) as $sti
+    | [ .[$tk].rows[] | select(.[$sti] == "部分完成") | .[$idi] ]
+    | map(select(. as $t | ($covered | index($t)) == null))
+    | join(" ")' "${REG}" 2>/dev/null)" || _fkve_pending=""
+  [ -z "${_fkve_pending}" ] || {
+    # 🔴 用詞刻意避開「登記產出端覆蓋」字串：既有測試以該子串斷言「非完成票不被要求覆蓋」，
+    #   本預警若沿用同一措辭會讓那些測試誤紅（實測撞到兩條）。訊息語意不變。
+    echo "gen_fact_key_blocks: 〔S2.2 預警・不判紅〕下列票為『部分完成』，其產出端覆蓋尚未在登記表列出：" >&2
+    printf '    %s\n' "${_fkve_pending}" >&2
+    echo "    ⇒ 這些票**現在**不受阻擋；但要標完成前必須先在 governance-enforcement 補列，" >&2
+    echo "      否則屆時會被第④道收案綁定擋下。提前告知，避免最後一刻才發現。" >&2; }
 
   # ⑤ 🔴 S1.1 封死幽靈票 —— 對應票欄之值須在「票全集 ∪ 非票標的白名單」內
   #   allowlist 須存在且為字串陣列（缺欄即 fail-closed，不得因缺欄而略過整條檢查）。

@@ -964,6 +964,19 @@ def test_s11_ghost_ticket_is_rejected(tmp_path):
     )
 
 
+def test_s22_pending_coverage_warns_without_failing():
+    """S2.2：『部分完成』且未登記覆蓋之票，須**提前預警**且**不判紅**。
+
+    🔴 兩個斷言缺一不可：
+      · 只驗「有警告」⇒ 無法排除它同時把樹判紅（那會逼人不敢記錄真實狀態）
+      · 只驗「不判紅」⇒ 無法排除警告根本沒印（等於沒有預警）
+    目的是避免「做到最後一刻才發現缺覆蓋」——即使用者要治的、留到下一關才擋的摩擦。
+    """
+    r = _run([str(GEN), "--check"])
+    assert r.returncode == 0, f"預警不得判紅（現樹本應為綠）：{r.stdout}{r.stderr}"
+    assert "S2.2 預警" in r.stderr, f"未見預警訊息 ⇒ 提前告知未生效：{r.stderr}"
+
+
 def test_s12_missing_settings_with_dir_present_is_fail_closed(tmp_path):
     """S1.2：hook 設定之承載目錄存在、設定檔缺失 ⇒ fail-closed（非「大聲印出後放行」）。
 
@@ -2193,17 +2206,20 @@ def test_wl01_handwritten_status_detector_still_works_under_table_render(tmp_pat
     root = _mkroot(tmp_path)
     (root / "docs" / "t.md").write_text(
         "<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n", encoding="utf-8")
-    (root / "docs" / "prose.md").write_text("ZZ-01 已落地\n", encoding="utf-8")
+    # 🔴 狀態值刻意用「待審」而非「已落地」：S2.1 起「已落地」屬**完成語意集合**，
+    #   會連帶要求 registry 具備完整 enforcement schema，使本測試被無關的規則牽動。
+    #   本測試的標的是「render 改變不得削弱手寫狀態偵測」，與完成語意綁定無關 ⇒ 換值不損意圖。
+    (root / "docs" / "prose.md").write_text("ZZ-01 待審\n", encoding="utf-8")
     subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
     sdir = _sandbox(tmp_path, {
         "_schema": {
-            "status_enum": ["已落地"],
+            "status_enum": ["待審"],
             "status_keys": ["k"],
             "status_scope": ["docs/"],
             "status_scope_grandfathered": ["docs/__none__.md"],
         },
         "k": {"target": "docs/t.md", "columns": ["序", "項", "狀"],
-              "render": "table", "rows": [["010", "ZZ-01", "已落地"]]},
+              "render": "table", "rows": [["010", "ZZ-01", "待審"]]},
     })
     env = {"GOVB1_FACTKEY_ROOT": str(root)}
     assert _run([str(sdir / GEN.name), "--write"], env_extra=env).returncode == 0
