@@ -139,7 +139,7 @@ grep -n "B3R\|新的排序\|近程序\|第 2 站" handoffs/20260801-GOV-AMEND-BA
 | 140 | B-61 | 未開工 | 不得宣稱角色閘已無 fail-open——known_only 對未知家族仍靜默放行；既有行為非本輪引入 |
 <!-- END GENERATED: governance-ticket-closure -->
 
-### 站 1 — `票 B-39` ✅ 完成（2026-08-06）
+### 站 1 — `票 B-39`（狀態見 `docs/GOV_TICKET_SOT.md`）
 
 委員報告的標題格式判準過寬，把正常小標題判為違規 ⇒ 誤擋面 1236→292（−76%）。三家戳記核可。
 
