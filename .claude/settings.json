@@ -195,6 +195,10 @@
           {
             "type": "command",
             "command": "bash scripts/doc_format_precheck.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/factkey_write_guard.sh"
           }
         ]
       }

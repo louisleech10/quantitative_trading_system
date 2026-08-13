@@ -3,6 +3,7 @@
 FACT-KEY: governance-mechanism
 LAST-RULED: 2026-08-13
 RULED-BY: 三家委員 consult（`handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md`）
+CHECKED-AT: 產出端（`scripts/factkey_write_guard.sh`，PostToolUse Edit|Write）＋ pre-push
 
 ---
 
