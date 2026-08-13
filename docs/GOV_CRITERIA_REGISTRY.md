@@ -82,4 +82,9 @@ RULED-BY: 三家委員 consult（`handoffs/reconcile/20260813-govwl02-x-consult-
 | C-014 | gen_fact_key_blocks emit | 機制登記列宣稱 receipt 但該檔不存在 | 1 | 現行 | test_wl03_receipt_pointing_at_missing_file_is_fail_closed |
 | C-015 | gen_fact_key_blocks --check | opt-in 宿主之改法子樹含未登記平台機制 | 1 | 現行 | test_wl03_unregistered_mechanism_in_gaifa_subtree_is_fail_closed |
 | C-016 | gen_fact_key_blocks --check | 非 opt-in 宿主含同樣未登記平台機制 | 0 | 現行 | test_wl03_non_optin_host_is_not_scanned_named_residual |
+| C-017 | gen_fact_key_blocks --check | 改法子樹之巢狀子彈含未登記平台機制 | 1 | 現行 | test_wl03_nested_bullet_in_gaifa_subtree_is_scanned |
+| C-018 | gen_fact_key_blocks --check | 改法子樹空行後之續行含未登記平台機制 | 1 | 現行 | test_wl03_blank_line_does_not_end_gaifa_subtree |
+| C-019 | gen_fact_key_blocks --check | 機制登記列之 receipt 為 symlink | 1 | 現行 | test_wl03_symlink_receipt_is_fail_closed |
+| C-020 | gen_fact_key_blocks --write | opt-in 宿主之改法子樹含未登記平台機制 | 1 | 現行 | test_wl03_subtree_scan_also_runs_on_write |
+| C-021 | gen_fact_key_blocks emit | opt-in 宿主之改法子樹含未登記平台機制 | 0 | 現行 | test_wl03_subtree_scan_not_on_emit_named_residual |
 <!-- END GENERATED: governance-criteria -->

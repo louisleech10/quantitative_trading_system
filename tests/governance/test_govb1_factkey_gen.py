@@ -1230,7 +1230,13 @@ def _crit_run(tmp_path, registry, *, body="", sub="s"):
     root = _crit_root(tmp_path / sub, body=body)
     sdir = _sandbox(tmp_path / sub, registry)
     env = {"GOVB1_FACTKEY_ROOT": str(root)}
-    _run([str(sdir / GEN.name), "--write"], env_extra=env)
+    # 🔴 `--write` 的 rc 不得丟棄：本 helper 的多數用例餵的就是壞註冊表，`--write` 會先擋下，
+    #    此時若仍往下跑 `--check`，看到的是「區塊沒寫成」的 DRIFT，真正的錯因被掩蓋
+    #    ——2026-08-13 一次偶發紅即因此無從診斷。故 write 擋下時直接回傳它。
+    #    （不可改成 assert rc==0：那會讓「本來就該被 write 擋下」的四條測試轉紅。）
+    w = _run([str(sdir / GEN.name), "--write"], env_extra=env)
+    if w.returncode != 0 and "DRIFT" not in w.stderr:
+        return w, sdir, root
     return _run([str(sdir / GEN.name), "--check"], env_extra=env), sdir, root
 
 
@@ -1543,7 +1549,12 @@ def _mech_reg(rows, *, roles=None, cols=None, tokens=None, scope=None,
 
 
 def _mech_root(tmp_path, *, spec_body="", receipt=True):
-    """建宿主根。receipt 檔刻意放在 **sandbox 的父層**（＝生成器眼中的 repo root）。"""
+    """建宿主根。
+
+    🔴 receipt 檔放在 **root 內**（＝正在驗的那棵樹）〔CODEX-R1-P1-03〕。
+    初版放在 sandbox 父層（生成器所在 repo），使 root 缺 receipt 時仍被 repo 同名檔
+    遮蔽而 rc=0 —— codex 以 decoy 實構重現。
+    """
     root = _mkroot(tmp_path)
     (root / "docs" / "m.md").write_text(
         "前言\n<!-- BEGIN GENERATED: mech -->\n<!-- END GENERATED: mech -->\n",
@@ -1552,10 +1563,9 @@ def _mech_root(tmp_path, *, spec_body="", receipt=True):
         "<!-- BEGIN GENERATED: other -->\n<!-- END GENERATED: other -->\n", encoding="utf-8")
     (root / "docs" / "spec.md").write_text("# spec\n" + spec_body, encoding="utf-8")
     (root / "docs" / "outside.md").write_text("# 不在 opt-in 清單內\n", encoding="utf-8")
-    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
     if receipt:
-        (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "docs" / "r.md").write_text("實跑記錄\n", encoding="utf-8")
+        (root / "docs" / "r.md").write_text("實跑記錄\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
     return root
 
 
@@ -1567,7 +1577,12 @@ def _mech_run(tmp_path, registry, *, spec_body="", receipt=True, mode="--check",
         _mutate(sdir, *mutate)
     env = {"GOVB1_FACTKEY_ROOT": str(root)}
     if mode == "--check":
-        _run([str(sdir / GEN.name), "--write"], env_extra=env)
+        # 前置 write 的 rc 刻意**不** assert：本 helper 的多數用例就是要讓 write 也擋下
+        # （schema 壞、receipt 缺檔等），此處只在 write 綠時才有意義往下比 DRIFT。
+        w = _run([str(sdir / GEN.name), "--write"], env_extra=env)
+        if w.returncode != 0 and "DRIFT" not in w.stderr:
+            # write 已擋下 ⇒ 直接回傳它，避免下游 DRIFT 掩蓋真正錯因
+            return w, sdir, root
     args = [str(sdir / GEN.name)] + ([mode] if mode else [])
     return _run(args, env_extra=env), sdir, root
 
@@ -1726,6 +1741,131 @@ def test_wl03_subtree_ends_at_next_bullet(tmp_path):
     assert r.returncode == 0, r.stderr
 
 
+# ---- r1 三家實構之子樹旁路（初版全部漏掃；修法＝改用單一縮排判準）----
+
+def test_wl03_nested_bullet_in_gaifa_subtree_is_scanned(tmp_path):
+    """🔴 三家全員實構〔CODEX-R1-P1-01／GROK-R1-P1-01／COMPOSER-R1-P1-01〕。
+
+    本庫慣用「`- 改法：` 底下掛縮排子彈」寫步驟（GOVB25:143、DISPATCH:288 即此形），
+    初版把**任何**縮排層級的 `- ` 當終點 ⇒ 起點的下一行就截斷，整段改法漏掃。
+    """
+    body = ("\n- 改法：\n"
+            "  - 步驟一：收尾以 `nohup` 脫離終端。\n"
+            "- 驗證：見下節\n")
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=body)
+    assert r.returncode != 0, f"巢狀子彈上的未登記機制漏掃\n{r.stdout}"
+    assert "nohup" in r.stderr, r.stderr
+
+
+def test_wl03_blank_line_does_not_end_gaifa_subtree(tmp_path):
+    """🔴 GROK-R1-P1-02 實構：多段改法之第二段整段漏掃。
+
+    初版把空行當終點；改法寫成「一段、空行、再一段」是常見排版。
+    """
+    body = ("\n- 改法：把每一行丟進獨立 process group，\n"
+            "\n"
+            "  收尾以 `setsid` 建立新 session 後終止整群。\n"
+            "- 驗證：見下節\n")
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=body)
+    assert r.returncode != 0, f"空行後續行上的未登記機制漏掃\n{r.stdout}"
+    assert "setsid" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("start", ["- 🔴 **改法**：", "- **改法**：", "- 改法："])
+def test_wl03_decorated_gaifa_start_is_scanned(tmp_path, start):
+    """🔴 GROK-R1-P2-01 實構：opt-in 宿主內已存在 `- 🔴 **改法` 與 `- **改法`。
+
+    起點正則若只認樸素寫法，那兩種形態整段零覆蓋（DISPATCH:213、:264 即此形）。
+    """
+    body = f"\n{start}收尾以 `nohup` 脫離終端。\n- 驗證：見下節\n"
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=body)
+    assert r.returncode != 0, f"裝飾起點 {start!r} 之改法子樹漏掃\n{r.stdout}"
+    assert "nohup" in r.stderr, r.stderr
+
+
+def test_wl03_bold_paragraph_start_ends_subtree_named_residual(tmp_path):
+    """🔴 具名殘留 7（刻意）：縮排 0 的粗體段首終止子樹，且該行本身不掃。
+
+    〔COMPOSER-R1-P1-02 判 BLOCKING，主委裁定為殘留〕理由：`**Task**` 在縮排 0
+    是新段落的慣例標記；若改成「先掃再終止」，`- 驗證：` 那類行也會被納入改法子樹
+    而製造新的誤擋。若哪天改了判定，本測試會轉紅 —— 屆時請更新登記表殘留 7。
+    """
+    body = ("\n- 改法：改用零執行路徑。\n"
+            "**Task 9.9** 另一件事：用 `flock` 互斥。\n")
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=body)
+    assert r.returncode == 0, (
+        "粗體段首若已納入掃描，殘留 7 的宣稱就過期了 —— 請更新登記表而非只改測試\n"
+        + r.stderr
+    )
+
+
+def test_wl03_indented_bold_stays_inside_subtree(tmp_path):
+    """與上一條的對照：**縮排**的粗體仍屬改法正文，不得被當成段落終點。
+
+    🔴 探針必須用**未登記**的 token（`nohup`）—— 初版誤用 `flock`，
+    而 `flock` 在 `_MECH_OK` 已登記為現行，測試因此恆綠（自造的空心格）。
+    """
+    body = ("\n- 改法：改用零執行路徑，\n"
+            "  **關鍵**：以 `nohup` 做背景化。\n"
+            "- 驗證：見下節\n")
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=body)
+    assert r.returncode != 0, f"縮排粗體上的未登記機制漏掃\n{r.stdout}"
+    assert "nohup" in r.stderr, r.stderr
+
+
+def test_wl03_receipt_root_is_the_scanned_tree_not_generator_repo(tmp_path):
+    """🔴 CODEX-R1-P1-03 實構：receipt 必須對**正在驗的那棵樹**判定。
+
+    初版讓 receipt 相對生成器所在 repo ⇒ 被驗的 root 缺 receipt 時，
+    仍被生成器自身 repo 的同名檔遮蔽而 rc=0（decoy 遮蔽）。
+    """
+    rows = [["M-1", "timeout", "s1", "receipt:docs/r.md", "可用", "現行"]]
+    # receipt=False ⇒ 被驗的 root 內沒有 docs/r.md；真 repo 內也沒有同路徑檔可遮蔽，
+    # 但本測試的重點是「查的是 root」——故同時斷言錯誤訊息指向缺檔。
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows), receipt=False)
+    assert r.returncode != 0, f"被驗的 root 缺 receipt 卻通過 ⇒ 查錯了 root\n{r.stdout}"
+    assert "receipt 指向不存在之檔" in r.stderr, r.stderr
+
+
+def test_wl03_symlink_receipt_is_fail_closed(tmp_path):
+    """🔴 CODEX-R1-P2-04 實構：`-f` 會跟隨連結 ⇒ receipt 可指向 repo 之外。
+
+    與 `_fk_reject_handwritten_status` 對 symlink 的處置同一紀律。
+    """
+    rows = [["M-1", "timeout", "s1", "receipt:docs/link.md", "可用", "現行"]]
+    root = _mech_root(tmp_path, receipt=True)
+    outside = tmp_path / "outside-receipt.md"
+    outside.write_text("repo 外的東西\n", encoding="utf-8")
+    (root / "docs" / "link.md").symlink_to(outside)
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
+    sdir = _sandbox(tmp_path, _mech_reg(rows))
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+    assert r.returncode != 0, f"symlink receipt 通過 ⇒ 證據可指向 repo 外\n{r.stdout}"
+    assert "symlink" in r.stderr, r.stderr
+
+
+def test_wl03_subtree_scan_also_runs_on_write(tmp_path):
+    """🔴 COMPOSER-R1-P2-01：`--write` 本來就讀寫宿主檔，漏掛會讓單跑 --write 暫時綠。"""
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK),
+                        spec_body=_GAIFA_CONTINUATION, mode="--write")
+    assert r.returncode != 0, f"--write 未跑子樹掃描\n{r.stdout}"
+    assert "nohup" in r.stderr, r.stderr
+
+
+def test_wl03_subtree_scan_not_on_emit_named_residual(tmp_path):
+    """🔴 具名殘留 8（刻意）：emit 是純 stdout 投影、不讀宿主檔，故不跑子樹掃描。
+
+    掛上去等於憑空要求一棵樹。承重在 `--check`（`gov_check` 走這條）與 `--write`。
+    若哪天 emit 也掃了，本測試會轉紅 —— 屆時請更新登記表殘留 8。
+    """
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK),
+                        spec_body=_GAIFA_CONTINUATION, mode="")
+    assert r.returncode == 0, (
+        "emit 若已跑子樹掃描，殘留 8 的宣稱就過期了 —— 請更新登記表而非只改測試\n"
+        + r.stderr
+    )
+
+
 def test_wl03_mechanism_schema_fields_are_one_unit(tmp_path):
     """🔴 WL-02 CODEX-R2-P1-02 同型：單獨刪一欄不得靜默停用全部檢查。
 
@@ -1762,17 +1902,46 @@ def test_wl03_missing_optin_host_is_fail_closed(tmp_path):
     assert "宿主不存在" in r.stderr and "gone.md" in r.stderr, r.stderr
 
 
-@pytest.mark.parametrize("bad", ["docs/*.md", "docs/", "/abs/x.md", "docs/../x.md"])
-def test_wl03_scope_must_be_exact_paths(tmp_path, bad):
+@pytest.mark.parametrize("bad,why", [
+    ("docs/*.md", "不得含 wildcard"),
+    ("docs/", "須為 exact path"),
+    ("/abs/x.md", "絕對路徑或含 .."),
+    ("docs/../x.md", "絕對路徑或含 .."),
+])
+def test_wl03_scope_must_be_exact_paths(tmp_path, bad, why):
     """opt-in 必須逐檔顯式：wildcard／目錄前綴／絕對路徑／`..` 一律拒。
 
     這是與 WL-02 status_scope 的**刻意差異** —— 那邊允許目錄前綴，
     這邊不允許，因為「顯式 opt-in」正是三家用來取代未封閉 glob 的東西。
+
+    🔴 斷言**精確錯因**，不只斷言 `mechanism_scope` 出現〔CODEX-R1-P1-02〕：
+    這些 bad path 對應的檔都不存在，缺檔本身就會報 `mechanism_scope 所列宿主不存在`
+    ⇒ 移除語法守衛後測試仍綠。codex 以 mutation 實測三項斷言全 PASS。
     """
     reg = _mech_reg(_MECH_OK, scope=["docs/m.md", "docs/spec.md", bad])
     r, _, _ = _mech_run(tmp_path, reg)
     assert r.returncode != 0, r.stdout
-    assert "mechanism_scope" in r.stderr, r.stderr
+    assert why in r.stderr, (
+        f"未報出精確錯因 {why!r} ⇒ 可能是缺檔判定在頂替語法守衛（假綠）\n{r.stderr}"
+    )
+
+
+def test_wl03_mutation_removing_scope_syntax_guard_turns_green(tmp_path):
+    """反面實證：拿掉 scope 語法守衛後，wildcard 就不再以語法錯因被擋。
+
+    〔CODEX-R1-P1-02 之修法配套〕—— 證明上面那組斷言真的釘在守衛上。
+    """
+    reg = _mech_reg(_MECH_OK, scope=["docs/m.md", "docs/spec.md", "docs/*.md"])
+    good, _, _ = _mech_run(tmp_path / "g", reg)
+    # 🔴 錨點必須唯一：`*'*'*|*'?'*|*'['*)` 在 status_scope 的守衛裡也有一份，
+    #   `_mutate` 只換第一處 ⇒ 會打到那邊而空心（初版即如此）。故連同專屬變數一起錨定。
+    bad, _, _ = _mech_run(tmp_path / "b", reg, mutate=(
+        '    case "${_fkvm_sc}" in\n      *\'*\'*|*\'?\'*|*\'[\'*)',
+        '    case "${_fkvm_sc}" in\n      __never_match__)'))
+    assert "不得含 wildcard" in good.stderr, good.stderr
+    assert "不得含 wildcard" not in bad.stderr, (
+        f"拿掉 wildcard 守衛後仍報同一錯因 ⇒ 這條斷言是空心的\n{bad.stderr}"
+    )
 
 
 def test_wl03_role_columns_resolved_by_name_not_index(tmp_path):
@@ -1799,8 +1968,11 @@ def test_wl03_mutation_removing_subtree_scan_lets_unregistered_through(tmp_path)
     """反面實證：拿掉子樹掃描後，未登記機制就通過 ⇒ 證明上面那條不是空心格。"""
     reg = _mech_reg(_MECH_OK)
     good, _, _ = _mech_run(tmp_path / "g", reg, spec_body=_GAIFA_CONTINUATION)
-    bad, _, _ = _mech_run(tmp_path / "b", reg, spec_body=_GAIFA_CONTINUATION,
-                          mutate=("_fk_reject_unregistered_mechanisms || _fkc_rc=1", ":"))
+    # 🔴 錨在**函式定義**上，不錨在呼叫點：r1 修補後子樹掃描有兩個呼叫點
+    #   （`--check` 與 `--write`），只 mutate 一處會讓 `--write` 仍紅而測不到東西。
+    bad, _, _ = _mech_run(tmp_path / "b", reg, spec_body=_GAIFA_CONTINUATION, mutate=(
+        "_fk_reject_unregistered_mechanisms() {\n  _fk_mechanism_schema_present || return 0",
+        "_fk_reject_unregistered_mechanisms() {\n  return 0"))
     assert good.returncode != 0, good.stderr
     assert bad.returncode == 0, (
         f"拿掉子樹掃描後仍紅 ⇒ 這條 mutation 是空心的\n{bad.stderr}"
@@ -1815,7 +1987,7 @@ def test_wl03_mutation_removing_receipt_check_lets_missing_file_through(tmp_path
     # 🔴 `[ -f X ] || { 報錯 }` 的反面是 `true ||`，不是 `false ||`
     #    —— 後者反而**必定**進入報錯分支（本測試初版即打反，由紅燈抓到）
     bad, _, _ = _mech_run(tmp_path / "b", reg,
-                          mutate=('[ -f "${_FK_REPO_ROOT}/${_fkvm_val}" ] || {', "true || {"))
+                          mutate=('[ -f "$(_fk_root)/${_fkvm_val}" ] || {', "true || {"))
     assert good.returncode != 0, good.stderr
     assert bad.returncode == 0, (
         f"拿掉 receipt 存在性判定後仍紅 ⇒ 這條 mutation 是空心的\n{bad.stderr}"

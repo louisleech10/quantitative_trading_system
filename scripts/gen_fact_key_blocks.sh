@@ -734,10 +734,11 @@ _FK_MECHANISM_SCHEMA_FIELDS='mechanism_keys mechanism_status_enum mechanism_live
 #   assumed:<非空理由>        顯式未驗標記；允許，但可由生成區塊機械盤點
 _FK_EVIDENCE_FORMS='receipt assumed'
 
-# 🔴 receipt 路徑相對 **repo root**（本腳本之父目錄），不是 `_fk_root()`：
-#   receipt 是真實 repo 的資產，fixture root 底下不存在 ⇒ 用 `_fk_root()` 會使
-#   fixture 測試整批誤紅。宿主掃描則相反，走 `_fk_root()`（fixture 要能被掃）。
-_FK_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+# 🔴 receipt 路徑相對 `_fk_root()`，**即正在驗的那棵樹**〔CODEX-R1-P1-03〕。
+#   初版讓它相對生成器所在的 repo（`SCRIPT_DIR/..`），理由是遷就 fixture ——**那是錯的**：
+#   `GOVB1_FACTKEY_ROOT` 指向別的根時，receipt 在該根缺失、卻被生成器自身 repo 的同名檔
+#   遮蔽 ⇒ codex 以 decoy 實跑得 rc=0。同一種輸入走兩個 root，正是本 epic 反覆出現的形態。
+#   代價＝fixture 須自備 receipt 檔（已補），這是應該的：fixture 就該代表一棵完整的樹。
 
 _fk_mechanism_keys() { LC_ALL=C jq -r '._schema.mechanism_keys[]? // empty' "${REG}"; }
 
@@ -890,7 +891,14 @@ EOF
           echo "gen_fact_key_blocks: key ${_fkvm_k} 之 receipt 路徑不得為絕對路徑或含 ..：${_fkvm_val} → fail-closed" >&2
           _fkvm_rc=1; continue ;;
       esac
-      [ -f "${_FK_REPO_ROOT}/${_fkvm_val}" ] || {
+      # 🔴 symlink 一律拒〔CODEX-R1-P2-04〕：`-f` 會跟隨連結，故 `docs/link.md -> ../外部檔`
+      #   可讓 receipt 指向 repo 之外，codex 實跑得 rc=0。與 `_fk_reject_handwritten_status`
+      #   對 symlink 的處置同一紀律（那裡也是先判 `-L` 再判 regular file）。
+      if [ -L "$(_fk_root)/${_fkvm_val}" ]; then
+        echo "gen_fact_key_blocks: key ${_fkvm_k} 之 receipt 為 symlink：${_fkvm_val} → fail-closed（可指向 repo 外，證據不可稽核）" >&2
+        _fkvm_rc=1; continue
+      fi
+      [ -f "$(_fk_root)/${_fkvm_val}" ] || {
         echo "gen_fact_key_blocks: key ${_fkvm_k} 之 receipt 指向不存在之檔：${_fkvm_val} → fail-closed（宣稱實跑但無物可查）" >&2
         _fkvm_rc=1; }
     done <<EOF
@@ -933,10 +941,29 @@ _fk_reject_unregistered_mechanisms() {
         nt = split(toks, T, " ")
         nr = split(reg, R, " "); for (i = 1; i <= nr; i++) if (R[i] != "") REG[R[i]] = 1
       }
-      # 子樹起點釘死 `- 改法`；終點＝下一個同級 `- `／標題／粗體段首／空行
-      /^[[:space:]]*- 改法/ { insub = 1 }
-      insub && !/^[[:space:]]*- 改法/ {
-        if ($0 ~ /^[[:space:]]*- / || $0 ~ /^#/ || $0 ~ /^\*\*/ || $0 ~ /^[[:space:]]*$/) { insub = 0 }
+      # 🔴 子樹起點：`- 改法`，允許**實測導出**之裝飾前綴〔GROK-R1-P2-01〕。
+      #   opt-in 宿主內實際存在 `- 🔴 **改法` 與 `- **改法` 兩種寫法，原正則整段漏掃。
+      #   本集合與 `_FK_RC_CLAIM_FORMS` 同一紀律：**具名、實測導出、擴充須改本行**，
+      #   不得改成「任意前綴」——`- 見 改法 一節` 那類會被誤判為起點。
+      /^[[:space:]]*- (🔴[[:space:]]+)?(\*\*)?改法/ {
+        match($0, /^[[:space:]]*/); start_indent = RLENGTH
+        insub = 1
+      }
+      # 🔴 終點＝**單一封閉判準**：第一個「縮排 ≤ 起點縮排、且非空」之行。
+      #   原版列了四個條件（同級 bullet／標題／粗體段首／空行），三家各自實構出三個旁路：
+      #     · 巢狀 `- ` 提前截斷〔CODEX-R1-P1-01／GROK-R1-P1-01／COMPOSER-R1-P1-01，三家全員〕
+      #       —— 本庫慣用「`- 改法：` 底下掛縮排子彈」，起點下一行即截斷（GOVB25:143、DISPATCH:288）
+      #     · 空行提前截斷〔GROK-R1-P1-02〕—— 多段改法之第二段整段漏掃
+      #     · 粗體段首那行本身不被掃〔COMPOSER-R1-P1-02〕
+      #   改用縮排判準後前兩者一併消失：續行必然縮排更深，這是 markdown 的結構事實，
+      #   不是又一條列舉。空行不終止（縮排視為未定義，沿用 insub）。
+      #   🔴 具名殘留：縮排 0 之粗體段首仍終止且**不掃該行**——它是新段落的慣例標記，
+      #   納入會把 `- 驗證：` 那類行也算進改法子樹而製造新的誤擋。見登記表殘留 7。
+      insub && !/^[[:space:]]*- (🔴[[:space:]]+)?(\*\*)?改法/ {
+        if ($0 !~ /^[[:space:]]*$/) {
+          match($0, /^[[:space:]]*/)
+          if (RLENGTH <= start_indent) insub = 0
+        }
       }
       insub {
         for (i = 1; i <= nt; i++) {
@@ -1006,6 +1033,10 @@ _fk_write() {
   _fk_validate_schema_sets || return 1
   _fk_validate_criteria || return 1
   _fk_validate_mechanism || return 1
+  # 🔴 `--write` 也跑宿主子樹掃描〔COMPOSER-R1-P2-01〕：本路徑本來就讀寫宿主檔，
+  #   漏掛會讓「單跑 --write」的本地流程暫時綠。emit 刻意不掛——它是純 stdout 投影、
+  #   不讀宿主檔，掛上去等於憑空要求一棵樹。此差異列為登記表殘留 8，並有測試釘住。
+  _fk_reject_unregistered_mechanisms || return 1
   _fkw_root="$(_fk_root)"; _fkw_rc=0
   while IFS= read -r _fkw_k; do
     [ -n "${_fkw_k}" ] || continue
