@@ -19,8 +19,13 @@
 #      它跑在無 govb1 資料檔的隔離副本上(tests/governance/test_gov_check_dep_failclosed.py),
 #      把 fact-key/白話/G-7 併進去會讓那些副本因缺資料檔而紅 ⇒ 假紅。
 #
-# 誠實邊界:本機 oracle 有共同盲區(如 BSD/GNU realpath 分歧,本機全綠 CI 才紅)。
-#   **CI(Linux)仍是唯一跨環境 oracle,push 後仍須看 CI 結果**(ci_check_after_push hook 會自動回報)。
+# 🔴 誠實邊界(2026-08-13 使用者定,CI 全數刪除後):本機 macOS 是**唯一** oracle。
+#   跨平台盲區(如 BSD/GNU realpath、stat -f %m vs -c %Y)**不再有任何東西兜底**。
+#   刪 CI 之理由:governance.yml 連續五次全紅(42 failed)、verify_claim 亦紅,無人查看
+#   ⇒ 零保護純噪音,判準同 l65_benchmark.yml(2026-07-26 刪)。
+#   ⇒ 42 條紅經查證**無一為真實跨平台 bug**,全為 CI 環境配置(效能斷言在共用 runner
+#      不可靠、shallow clone 讀不到 git 歷史物件、G-7 需 commit 範圍)。
+#   ⇒ 推論:本段全套 pytest 已是唯一防線,**不得再以「CI 會兜底」為由移出 pre-push**。
 set -u
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" || exit 2

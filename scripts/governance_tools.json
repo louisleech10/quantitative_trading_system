@@ -180,12 +180,6 @@
       "why": "PreToolUse coarse-guard",
       "cmd": "(hook)"
     },
-    "ci_check_after_push.sh": {
-      "node": "H-hook自動",
-      "mandatory": false,
-      "why": "PostToolUse:push 後自動查 CI",
-      "cmd": "(hook)"
-    },
     "governance_families.sh": {
       "node": "L-library",
       "mandatory": false,

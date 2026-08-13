@@ -5,7 +5,8 @@
 #   CI 只能「push 後亮紅」擋不住 main。本 hook 把守衛檢查前移到 push 之前 = 壞的推不上去。
 # 檢查內容**不在此複製**,一律委派 gov_check.sh(單一真相源,避免兩處漂移)。
 # 誠實邊界:`git push --no-verify` 可繞過 → **擋粗心不防蓄意**(符合本 repo 威脅模型:擋意外 90-95%)。
-#   CI(Linux)仍是唯一跨環境 oracle,push 後仍須看 CI(ci_check_after_push hook 會自動回報)。
+# 🔴 CI 已於 2026-08-13 全數刪除(連續五次全紅、無人查看=零保護純噪音)
+#   ⇒ 本 hook 委派的 gov_check.sh 是**唯一防線**,跨平台盲區不再有兜底。理由見 gov_check.sh 檔頭。
 set -u
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1

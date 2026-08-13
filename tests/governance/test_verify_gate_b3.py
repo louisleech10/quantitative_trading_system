@@ -14,7 +14,6 @@ import textwrap
 from pathlib import Path
 
 import pytest
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 from tests.governance._pyenv import PYTHON  # CI 無 venv → fallback sys.executable
@@ -24,7 +23,6 @@ HEALTH = REPO_ROOT / "scripts" / "verify_hooks_health.sh"
 PREFLIGHT = REPO_ROOT / "scripts" / "agent_preflight.sh"
 CLAIM_CHECK = REPO_ROOT / "scripts" / "verification_claim_check.py"
 VERIFY_TASK_PROVENANCE = REPO_ROOT / "scripts" / "verify_task_provenance.py"
-WORKFLOW = REPO_ROOT / ".github" / "workflows" / "verify_claim.yml"
 
 RECEIPTS_DIR_ENV = "VERIFY_GATE_RECEIPTS_DIR"
 AUDIT_LOG_ENV = "VERIFY_GATE_AUDIT_LOG"
@@ -384,32 +382,11 @@ def test_git_hook_allows_verify_exempt_discussion(tmp_path: Path) -> None:
 
 
 # --- Task 3.3 CI workflow ---
-
-
-def test_verify_claim_workflow_yaml_parseable() -> None:
-  """workflow YAML 可被 yaml.safe_load 解析。"""
-  data = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-  assert data["name"] == "Verify Claim"
-  on_block = data.get("on") or data.get(True)
-  assert on_block is not None
-  assert "pull_request" in on_block
-
-
-def test_verify_claim_workflow_no_fail_open() -> None:
-  """grep 檢查步無 continue-on-error / || true。"""
-  text = WORKFLOW.read_text(encoding="utf-8")
-  check_section = text.split("jobs:")[1]
-  assert "continue-on-error" not in check_section
-  assert "|| true" not in check_section
-
-
-def test_verify_claim_workflow_scannable_pathspec_only() -> None:
-  """CI CHANGED 只含 scannable markdown pathspec。"""
-  text = WORKFLOW.read_text(encoding="utf-8")
-  assert "HANDOFF.md" in text
-  assert "'handoffs/*.md'" in text
-  assert "'docs/*.md'" in text
-  assert 'git diff --name-only "${BEFORE_SHA}...${HEAD_SHA}" --' in text
+# 🔴 三條 workflow 測試已刪除(2026-08-13,使用者定刪除全部 CI 之連帶)。
+#   原測 verify_claim.yml 之 YAML 可解析/無 fail-open/pathspec 範圍;
+#   該 workflow 連同 governance.yml 已刪(連續全紅、無人查看=零保護純噪音),
+#   受測對象不存在 ⇒ 測試一併移除,非「因為紅所以刪」。
+#   本檔其餘測試(PreToolUse 判定、git hook、health)測的是本地機制,不受影響。
 
 
 def test_explicit_files_binary_non_utf8_no_crash(tmp_path: Path) -> None:
