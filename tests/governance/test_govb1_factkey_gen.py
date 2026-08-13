@@ -964,17 +964,30 @@ def test_s11_ghost_ticket_is_rejected(tmp_path):
     )
 
 
-def test_s22_pending_coverage_warns_without_failing():
+def test_s22_pending_coverage_warns_without_failing(tmp_path):
     """S2.2：『部分完成』且未登記覆蓋之票，須**提前預警**且**不判紅**。
 
     🔴 兩個斷言缺一不可：
       · 只驗「有警告」⇒ 無法排除它同時把樹判紅（那會逼人不敢記錄真實狀態）
       · 只驗「不判紅」⇒ 無法排除警告根本沒印（等於沒有預警）
-    目的是避免「做到最後一刻才發現缺覆蓋」——即使用者要治的、留到下一關才擋的摩擦。
+    🔴 本測試**自行構造**待預警的票，不依賴現樹狀態——初版直接對現樹斷言，
+       在 S4.3 把所有已交付票補登記後即轉紅（預警正確地不再出現）。
+       依賴環境狀態的測試不是可證偽的測試。
     """
-    r = _run([str(GEN), "--check"])
-    assert r.returncode == 0, f"預警不得判紅（現樹本應為綠）：{r.stdout}{r.stderr}"
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    tk = data["_schema"]["enforcement_ticket_roles"]
+    cols = data[tk["key"]]["columns"]
+    idi, sti = cols.index(tk["id"]), cols.index(tk["status"])
+    row = list(data[tk["key"]]["rows"][0])
+    row[idi], row[sti] = "B-88888", "部分完成"          # 未登記於 enforcement
+    data[tk["key"]]["rows"].append(row)
+    sdir = _sandbox(tmp_path, data)
+
+    r = _run([str(sdir / GEN.name), "--check"],
+             env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
     assert "S2.2 預警" in r.stderr, f"未見預警訊息 ⇒ 提前告知未生效：{r.stderr}"
+    assert "B-88888" in r.stderr, f"預警未具名該票 ⇒ 訊息無法據以行動：{r.stderr}"
+    assert "與強制側不一致" not in r.stderr, "預警不應牽動判定型檢查"
 
 
 def test_s12_missing_settings_with_dir_present_is_fail_closed(tmp_path):
