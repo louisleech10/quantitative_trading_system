@@ -559,7 +559,9 @@ def test_fixtures_differ_only_in_block_content():
 import subprocess as _sp
 
 _BATCH_KEY = "governance-batch-status"
-_TICKET_KEY = "governance-ticket-closure"
+# 🔴 S0.6：governance-ticket-closure 已刪除（第二套可獨立編輯的票狀態源）。
+#    票狀態之唯一來源改為 governance-ticket-sot；宣稱限制併入其「狀態依據」欄。
+_SOT_KEY = "governance-ticket-sot"
 
 # SPEC §E 之票號 token 抽取器（絕對位移版）。
 # 🔴 此處**內嵌**而非獨立腳本：新增 scripts/ 檔不在 govb1_scope.manifest allow 內會撞 G-7。
@@ -712,14 +714,23 @@ def test_t12_empty_registry_still_rc_zero_after_schema_gate(tmp_path):
 
 # --- Task 1.3 §E 識別碼機械導出 vs key rows -------------------------------
 
-def test_e3_ticket_union_matches_key_rows():
-    """SPEC §E3：union（HANDOFF 活缺口 ∪ backlog scope 缺口子節）恰等於 ticket key 之票欄。"""
+def test_e3_ticket_union_is_covered_by_sot():
+    """S0.6 後之 §E3：union（HANDOFF 活缺口 ∪ backlog scope 缺口子節）須**被票 SoT 涵蓋**。
+
+    🔴 語意由「恰等於」改為「子集」，因為承載對象換了：
+      原 governance-ticket-closure 只收錄「有宣稱限制的票」，故與 union 相等；
+      governance-ticket-sot 是**全集**（61 張），union 只會是它的子集。
+      要求相等會恆紅，且會誘使把 SoT 縮成部分集合——與「唯一全集」的目的相反。
+    涵蓋方向仍是有效保證：union 中任一票若不在 SoT，即代表 SoT 漏收，須 fail。
+    B3R 為批次非票（見 governance-batch-status），不在 SoT，故排除。
+    """
     op1 = _section(REPO / "HANDOFF.md", r"^## 🔴 未修的活缺口", r"^## ")
     op2 = _section(REPO / "handoffs" / "20260801-GOV-AMEND-BACKLOG.md",
                    r"^### 🔴 2026-08-10 scope 缺口", r"^### ")
-    union = sorted(set(_tok(op1)) | set(_tok(op2)))
-    rows = sorted({r[1] for r in _rows(_TICKET_KEY)})
-    assert union == rows, f"E3 union={union} 與 key rows={rows} 不符（第三方可重跑）"
+    union = {t for t in (set(_tok(op1)) | set(_tok(op2))) if t != "B3R"}
+    rows = {r[1] for r in _rows(_SOT_KEY)}
+    missing = sorted(union - rows)
+    assert not missing, f"E3 union 有票不在票 SoT（漏收）：{missing}（第三方可重跑）"
 
 
 def test_e1_e2_batch_ids_match_key_rows():
@@ -742,7 +753,7 @@ def test_e1_e2_batch_ids_match_key_rows():
 
 def test_status_values_are_all_in_status_enum():
     enum = set(json.loads(REG.read_text(encoding="utf-8"))["_schema"]["status_enum"])
-    for key, col in ((_BATCH_KEY, 2), (_TICKET_KEY, 2)):
+    for key, col in ((_BATCH_KEY, 2), (_SOT_KEY, 2)):
         for r in _rows(key):
             assert r[col] in enum, f"{key} 之狀態值 {r[col]!r} 不在 status_enum"
 
