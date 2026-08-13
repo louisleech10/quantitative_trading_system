@@ -1813,6 +1813,44 @@ def test_wl03_indented_bold_stays_inside_subtree(tmp_path):
     assert "nohup" in r.stderr, r.stderr
 
 
+def test_wl03_nested_gaifa_start_does_not_overwrite_boundary(tmp_path):
+    """🔴 CODEX-R2-P1-01（r2 唯一 BLOCKING，三家中僅一家構造出來）。
+
+    `- 改法：` 底下再寫一個縮排的 `- 改法：`（內層步驟），內層起點會把 boundary
+    抬到縮排 2 ⇒ 其後同級的續行（縮排 2）當場被判終止而漏掃。
+    另兩家判「無第四旁路」，係未測此形態——採碼證不採家數。
+    """
+    body = ("\n- 改法：\n"
+            "  - 改法：內層步驟。\n"
+            "  - 外層續行使用 `nohup` 脫離終端。\n"
+            "- 驗證：見下節\n")
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=body)
+    assert r.returncode != 0, f"巢狀 `- 改法` 覆寫 boundary ⇒ 後續同級續行漏掃\n{r.stdout}"
+    assert "nohup" in r.stderr, r.stderr
+
+
+def test_wl03_jq_failure_is_fail_closed_not_empty_registry(tmp_path):
+    """🔴 r2 三家皆觀察到之偶發紅，根因：`jq` 的 rc 被 process substitution 吞掉。
+
+    `_fk_raw_keys` 失敗時原本被靜默當成「註冊表沒有任何 fact-key」，後果兩個方向都有：
+      · criteria／mechanism 驗證 ⇒ 所有 key 判「未註冊」＝**假紅**（三家看到的就是這個）
+      · schema_sets／handwritten_status 的「無 fact-key ⇒ rc=0」語意 ⇒ **假綠**
+    本測試釘住：jq 失敗必須報出**真正的病**，而不是誤導到「key 未註冊」。
+    """
+    root = _mech_root(tmp_path)
+    sdir = _sandbox(tmp_path, _mech_reg(_MECH_OK))
+    _mutate(sdir, """_fk_raw_keys() { LC_ALL=C jq -r 'keys[]' "${REG}"; }""",
+            "_fk_raw_keys() { return 1; }")
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+    assert r.returncode != 0, "jq 失敗被當成空註冊表而放行 ⇒ 假綠"
+    assert "讀取 fact-key 清單失敗" in r.stderr, (
+        f"jq 失敗未報出真正的病 ⇒ 診斷會被導向錯誤方向\n{r.stderr}"
+    )
+    assert "未註冊 key" not in r.stderr, (
+        f"jq 失敗仍偽裝成「key 未註冊」⇒ 就是本輪偶發紅的誤導形狀\n{r.stderr}"
+    )
+
+
 def test_wl03_receipt_root_is_the_scanned_tree_not_generator_repo(tmp_path):
     """🔴 CODEX-R1-P1-03 實構：receipt 必須對**正在驗的那棵樹**判定。
 

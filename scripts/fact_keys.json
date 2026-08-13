@@ -50,7 +50,7 @@
       "timeout", "ionice", "taskset", "renice", "chroot", "unshare",
       "launchctl", "sysctl"
     ],
-    "mechanism_note": "WL-03（票 B-25 機制證據登記）。目的＝把「改法宣稱要用某個平台機制」從散文變成可盤點的資料列，且該列必須帶實跑證據或顯式 assumed 標記。🔴 字面設計（掃改法段抽反引號）已由三家 consult 以實測否決（誤擋率 80-93%）⇒ 本落法禁掃散文，只對資料列驗證，外加一道以 `- 改法` 子樹為起點、比對 mechanism_tokens 封閉表的掃描。mechanism_scope＝顯式 opt-in 宿主（exact path，禁 wildcard、禁目錄前綴），membership 只靠登記，不靠檔名樣式——「凡含 FACT-RECEIPT」會回掃 53 檔且溯及既往、「凡新建 GOV*」是未封閉 glob，兩者皆經三家否決。🔴 誠實邊界：本規則在現樹訊號近零（五個 opt-in 宿主之改法子樹平台 token 命中＝0），價值在面向未來攔下日後寫入之未驗機制，不是清理現況。🔴 mechanism_tokens 以字面表比對，非以 PATH 探測——GROK-R1-P1-03 實跑證明本機 setsid 不在 PATH，用 PATH 探測反而會漏掉出生事故本身。🔴 r1 三家 review 各自實構出三個子樹旁路（巢狀子彈／空行／裝飾起點），修法＝終點改為單一縮排判準（縮排 ≤ 起點且非空）＋起點納入實測導出之裝飾前綴；receipt 存在性改對 _fk_root() 判定（原對生成器 repo，可被 decoy 遮蔽）並拒 symlink；--write 亦跑子樹掃描。逐條處置見 handoffs/reconcile/20260813-govwl03-x-review-r1/synth.md",
+    "mechanism_note": "WL-03（票 B-25 機制證據登記）。目的＝把「改法宣稱要用某個平台機制」從散文變成可盤點的資料列，且該列必須帶實跑證據或顯式 assumed 標記。🔴 字面設計（掃改法段抽反引號）已由三家 consult 以實測否決（誤擋率 80-93%）⇒ 本落法禁掃散文，只對資料列驗證，外加一道以 `- 改法` 子樹為起點、比對 mechanism_tokens 封閉表的掃描。mechanism_scope＝顯式 opt-in 宿主（exact path，禁 wildcard、禁目錄前綴），membership 只靠登記，不靠檔名樣式——「凡含 FACT-RECEIPT」會回掃 53 檔且溯及既往、「凡新建 GOV*」是未封閉 glob，兩者皆經三家否決。🔴 誠實邊界：本規則在現樹訊號近零（五個 opt-in 宿主之改法子樹平台 token 命中＝0），價值在面向未來攔下日後寫入之未驗機制，不是清理現況。🔴 mechanism_tokens 以字面表比對，非以 PATH 探測——GROK-R1-P1-03 實跑證明本機 setsid 不在 PATH，用 PATH 探測反而會漏掉出生事故本身。🔴 r1 三家 review 各自實構出三個子樹旁路（巢狀子彈／空行／裝飾起點），修法＝終點改為單一縮排判準（縮排 ≤ 起點且非空）＋起點納入實測導出之裝飾前綴；receipt 存在性改對 _fk_root() 判定（原對生成器 repo，可被 decoy 遮蔽）並拒 symlink；--write 亦跑子樹掃描。逐條處置見 handoffs/reconcile/20260813-govwl03-x-review-r1/synth.md。🔴 r2 閉合輪再修兩處：①巢狀 `- 改法` 起點會覆寫子樹 boundary 使其後同級續行漏掃（第四旁路，三家中僅 codex 構造出來，另兩家判無而未測此形態——採碼證不採家數）②讀取 fact-key 清單之 jq 失敗被 process substitution 吞掉，靜默當成「沒有任何 fact-key」，同一 bug 在 criteria/mechanism 路徑造成假紅、在 schema_sets/handwritten_status 路徑造成假綠；此即 r2 三家皆觀察到之偶發紅根因，已由主委以注入式實驗定案",
     "status_scope": ["HANDOFF.md", "docs/GOVERNANCE_EXECUTION_ORDER.md", "白話說明/"],
     "status_scope_grandfathered": [
       "白話說明/README.md",
@@ -145,7 +145,9 @@
       ["C-018", "gen_fact_key_blocks --check", "改法子樹空行後之續行含未登記平台機制", "1", "現行", "test_wl03_blank_line_does_not_end_gaifa_subtree"],
       ["C-019", "gen_fact_key_blocks --check", "機制登記列之 receipt 為 symlink", "1", "現行", "test_wl03_symlink_receipt_is_fail_closed"],
       ["C-020", "gen_fact_key_blocks --write", "opt-in 宿主之改法子樹含未登記平台機制", "1", "現行", "test_wl03_subtree_scan_also_runs_on_write"],
-      ["C-021", "gen_fact_key_blocks emit", "opt-in 宿主之改法子樹含未登記平台機制", "0", "現行", "test_wl03_subtree_scan_not_on_emit_named_residual"]
+      ["C-021", "gen_fact_key_blocks emit", "opt-in 宿主之改法子樹含未登記平台機制", "0", "現行", "test_wl03_subtree_scan_not_on_emit_named_residual"],
+      ["C-022", "gen_fact_key_blocks --check", "改法子樹內巢狀起點之後的同級續行含未登記平台機制", "1", "現行", "test_wl03_nested_gaifa_start_does_not_overwrite_boundary"],
+      ["C-023", "gen_fact_key_blocks --check", "讀取 fact-key 清單之 jq 失敗", "1", "現行", "test_wl03_jq_failure_is_fail_closed_not_empty_registry"]
     ]
   },
   "governance-mechanism": {

@@ -48,17 +48,37 @@ _fk_preflight() {
     || _fk_die "gen_fact_key_blocks: 註冊表 ${REG} 非合法 JSON 物件 → fail-closed"
 }
 
+# 🔴 jq 的 rc **不得丟棄**〔r2 三家皆觀察到之偶發紅，主委實驗定案根因〕：
+#   原版兩處以 `< <(_fk_raw_keys)` 讀取，process substitution 的 rc 拿不到 ⇒
+#   jq 偶發失敗（資源／fork 壓力）被靜默當成「註冊表沒有任何 fact-key」。
+#   後果**兩個方向都有**：
+#     · `_fk_validate_criteria`／`_fk_validate_mechanism` ⇒ 所有 key 被判「未註冊」＝假紅
+#       （三家看到的正是這兩行訊息；主委以 `_fk_raw_keys(){ return 1; }` 實驗完全重現）
+#     · `_fk_validate_schema_sets`／`_fk_reject_handwritten_status` 的「無 fact-key ⇒ rc=0」
+#       語意 ⇒ **靜默放行＝假綠**。同一個 bug 在不同路徑分別造成假紅與假綠。
+#   ⇒ 一律先落變數驗 rc。空輸出（真的空註冊表）仍合法，只有 rc≠0 才 fail-closed。
 _fk_raw_keys() { LC_ALL=C jq -r 'keys[]' "${REG}"; }
+
+_fk_raw_keys_checked() {   # stdout: 原始 key 清單；jq 非零 ⇒ 印訊息並回非 0
+  _fkrk_out="$(_fk_raw_keys)" || {
+    echo "gen_fact_key_blocks: 讀取 fact-key 清單失敗（jq 非零）→ fail-closed（不得當成『沒有任何 fact-key』）" >&2
+    return 1
+  }
+  printf '%s\n' "${_fkrk_out}"
+}
 
 # 非保留鍵即 fact-key；名稱不合法 ⇒ 整體 fail-closed（不得只跳過該筆）
 _fk_validate_keys() {
   _fkv_bad=""
+  _fkv_raw="$(_fk_raw_keys_checked)" || return 1
   while IFS= read -r _fkv_k; do
     [ -n "${_fkv_k}" ] || continue
     case "${_fkv_k}" in "${_FK_RESERVED}") continue ;; esac
     printf '%s' "${_fkv_k}" | LC_ALL=C grep -qE "${_FK_KEY_RE}" \
       || _fkv_bad="${_fkv_bad}${_fkv_k}"$'\n'
-  done < <(_fk_raw_keys)
+  done <<EOF
+${_fkv_raw}
+EOF
   [ -z "${_fkv_bad}" ] || {
     printf 'gen_fact_key_blocks: fact-key 名稱不合法（須符 %s）→ fail-closed:\n%s' \
       "${_FK_KEY_RE}" "${_fkv_bad}" >&2
@@ -67,11 +87,14 @@ _fk_validate_keys() {
 }
 
 _fk_keys() {
+  _fkk_raw="$(_fk_raw_keys_checked)" || return 1
   while IFS= read -r _fkk_k; do
     [ -n "${_fkk_k}" ] || continue
     case "${_fkk_k}" in "${_FK_RESERVED}") continue ;; esac
     printf '%s\n' "${_fkk_k}"
-  done < <(_fk_raw_keys)
+  done <<EOF
+${_fkk_raw}
+EOF
 }
 
 # 票 B-25 站 2.5 Task 1.1：一個 fact-key 可宣告 ≥1 個宿主檔。
@@ -344,12 +367,16 @@ _fk_emit_all() {
   _fk_validate_criteria || return 1
   _fk_validate_mechanism || return 1
   _fke_rc=0
+  # 🔴 不用 `< <(_fk_keys)`：process substitution 的 rc 拿不到（見 _fk_raw_keys_checked 註解）
+  _fke_keys="$(_fk_keys)" || return 1
   while IFS= read -r _fke_k; do
     [ -n "${_fke_k}" ] || continue
     _fk_validate_rows "${_fke_k}" || { _fke_rc=1; continue; }
     _fk_validate_shape "${_fke_k}" || { _fke_rc=1; continue; }
     _fk_gen_block "${_fke_k}" || _fke_rc=1
-  done < <(_fk_keys)
+  done <<EOF
+${_fke_keys}
+EOF
   return "${_fke_rc}"
 }
 
@@ -604,9 +631,10 @@ _fk_validate_criteria() {   # 判準表語意檢查（狀態列舉封閉 ＋ 同
     "${REG}" >/dev/null 2>&1 \
     || { echo "gen_fact_key_blocks: criteria_live_status='${_fkvc_live}' 不在 criteria_status_enum 內 → fail-closed" >&2
          return 1; }
+  _fkvc_all="$(_fk_keys)" || return 1        # 🔴 迴圈外取一次並驗 rc（原本每圈重跑且吞 rc）
   while IFS= read -r _fkvc_k; do
     [ -n "${_fkvc_k}" ] || continue
-    printf '%s\n' "$(_fk_keys)" | LC_ALL=C grep -qxF "${_fkvc_k}" || {
+    printf '%s\n' "${_fkvc_all}" | LC_ALL=C grep -qxF "${_fkvc_k}" || {
       echo "gen_fact_key_blocks: criteria_keys 含未註冊 key '${_fkvc_k}' → fail-closed" >&2
       _fkvc_rc=1; continue; }
     _fkvc_bad=""
@@ -826,9 +854,10 @@ _fk_validate_mechanism() {   # 機制表資料列之封閉驗證（不觸宿主�
 $(LC_ALL=C jq -r '._schema.mechanism_scope[]' "${REG}" 2>/dev/null)
 EOF
 
+  _fkvm_all="$(_fk_keys)" || return 1        # 🔴 同上：迴圈外取一次並驗 rc
   while IFS= read -r _fkvm_k; do
     [ -n "${_fkvm_k}" ] || continue
-    printf '%s\n' "$(_fk_keys)" | LC_ALL=C grep -qxF "${_fkvm_k}" || {
+    printf '%s\n' "${_fkvm_all}" | LC_ALL=C grep -qxF "${_fkvm_k}" || {
       echo "gen_fact_key_blocks: mechanism_keys 含未註冊 key '${_fkvm_k}' → fail-closed" >&2
       _fkvm_rc=1; continue; }
     _fkvm_bad=""
@@ -945,8 +974,13 @@ _fk_reject_unregistered_mechanisms() {
       #   opt-in 宿主內實際存在 `- 🔴 **改法` 與 `- **改法` 兩種寫法，原正則整段漏掃。
       #   本集合與 `_FK_RC_CLAIM_FORMS` 同一紀律：**具名、實測導出、擴充須改本行**，
       #   不得改成「任意前綴」——`- 見 改法 一節` 那類會被誤判為起點。
+      #   🔴 已在子樹內時，**更深縮排**的起點不得覆寫 boundary〔CODEX-R2-P1-01〕：
+      #   `- 改法：` ／ `  - 改法：內層步驟` ／ `  - 外層續行用 X` 這種寫法，
+      #   內層起點會把 start_indent 抬到 2，使其後的同級續行（縮排 2）當場被判終止 ⇒ 漏掃。
+      #   r2 三家中僅 codex 構造出此形（另兩家判「無第四旁路」，係未測此形態）。
       /^[[:space:]]*- (🔴[[:space:]]+)?(\*\*)?改法/ {
-        match($0, /^[[:space:]]*/); start_indent = RLENGTH
+        match($0, /^[[:space:]]*/)
+        if (!insub || RLENGTH <= start_indent) start_indent = RLENGTH
         insub = 1
       }
       # 🔴 終點＝**單一封閉判準**：第一個「縮排 ≤ 起點縮排、且非空」之行。
@@ -987,6 +1021,7 @@ _fk_check() {
   _fk_validate_keys || return 1
   _fk_validate_schema_sets || return 1
   _fkc_root="$(_fk_root)"; _fkc_rc=0
+  _fkc_keys="$(_fk_keys)" || return 1        # 🔴 rc 不得經 process substitution 丟失
   while IFS= read -r _fkc_k; do
     [ -n "${_fkc_k}" ] || continue
     _fk_validate_rows "${_fkc_k}" || { _fkc_rc=1; continue; }
@@ -1014,7 +1049,9 @@ _fk_check() {
     done <<EOF
 ${_fkc_tgts}
 EOF
-  done < <(_fk_keys)
+  done <<EOF2
+${_fkc_keys}
+EOF2
   # 未登記之 generated block 一律拒〔CODEX-R1-P1-02〕
   _fk_reject_unregistered_blocks || _fkc_rc=1
   # 生成區塊外之手寫狀態一律拒（票 B-25 站 2.5 Task 2.1）
@@ -1038,6 +1075,7 @@ _fk_write() {
   #   不讀宿主檔，掛上去等於憑空要求一棵樹。此差異列為登記表殘留 8，並有測試釘住。
   _fk_reject_unregistered_mechanisms || return 1
   _fkw_root="$(_fk_root)"; _fkw_rc=0
+  _fkw_keys="$(_fk_keys)" || return 1        # 🔴 rc 不得經 process substitution 丟失
   while IFS= read -r _fkw_k; do
     [ -n "${_fkw_k}" ] || continue
     _fk_validate_rows "${_fkw_k}" || { _fkw_rc=1; continue; }
@@ -1075,7 +1113,9 @@ _fk_write() {
     done <<EOF
 ${_fkw_tgts}
 EOF
-  done < <(_fk_keys)
+  done <<EOF2
+${_fkw_keys}
+EOF2
   return "${_fkw_rc}"
 }
 

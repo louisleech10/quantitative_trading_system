@@ -28,4 +28,6 @@
 | C-019 | gen_fact_key_blocks --check | 機制登記列之 receipt 為 symlink | 1 | 現行 | test_wl03_symlink_receipt_is_fail_closed |
 | C-020 | gen_fact_key_blocks --write | opt-in 宿主之改法子樹含未登記平台機制 | 1 | 現行 | test_wl03_subtree_scan_also_runs_on_write |
 | C-021 | gen_fact_key_blocks emit | opt-in 宿主之改法子樹含未登記平台機制 | 0 | 現行 | test_wl03_subtree_scan_not_on_emit_named_residual |
+| C-022 | gen_fact_key_blocks --check | 改法子樹內巢狀起點之後的同級續行含未登記平台機制 | 1 | 現行 | test_wl03_nested_gaifa_start_does_not_overwrite_boundary |
+| C-023 | gen_fact_key_blocks --check | 讀取 fact-key 清單之 jq 失敗 | 1 | 現行 | test_wl03_jq_failure_is_fail_closed_not_empty_registry |
 <!-- END GENERATED: governance-criteria -->
