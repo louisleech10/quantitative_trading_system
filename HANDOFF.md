@@ -31,7 +31,7 @@
 |---|---|---|---|
 | 010 | WL-01 | 收案 | P0 前置：fact_keys schema 由平面列擴為具名欄＋表格投影（columns／render）。三家 review＋閉合複驗＋戳記核可；票 B-25 殘留⑥之 schema 阻塞已解除 |
 | 020 | WL-02 | 收案 | P1-a 判準資料化：判準入註冊表＋三道機械檢查（狀態列舉封閉／同適用範圍同條件不得相異期望／判準宿主區塊外不得陳述期望結束狀態）。字面設計經實測為零訊號已由三家 consult 改寫；三輪委員（consult→review→closure）、三家戳記核可。🔴 語意互斥不被攔截，見 docs/GOV_CRITERIA_REGISTRY.md 殘留 1 |
-| 030 | WL-03 | 待審 | P1-b 機制證據登記。🔴 字面設計（掃改法段抽反引號）已由三家 consult 以實測否決（誤擋率 80-93%；且 setsid 不在 PATH，反而漏掉出生事故本身）。收斂後設計＝專用機制登記表＋顯式 opt-in 宿主＋receipt/assumed 只對資料列驗證，禁掃散文。設計已定、尚未實作。誠實邊界：現樹訊號近零，價值在面向未來。見 handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md |
+| 030 | WL-03 | 收案 | P1-b 機制證據登記：平台機制入專用登記表（receipt:／assumed: 封閉格式，receipt 須指向被驗樹內之真檔且非 symlink）＋顯式 opt-in 宿主之 `- 改法` 子樹掃描。三輪委員（consult→review→stamp×2）、兩份收斂檔各三枚戳記。🔴 誠實邊界：現樹訊號近零（opt-in 五宿主子樹 195 行、平台機制命中 0），價值在面向未來；子樹旁路四度被委員實構（發現曲線未收斂，改 parser 須重跑候選組）；偶發紅之 fail-open 已封但原始觸發未獨立重現。具名殘留 1-11 見 docs/GOV_MECHANISM_REGISTRY.md |
 | 040 | WL-04 | 未開工 | P1-c 戳記整行由 harness 自動生成，消滅 64 位 hex 手抄。票 B-54（其樣本數1門檻已過期，須先更新）。無前置 |
 | 050 | WL-05 | 未開工 | P2 指令 tokenize 化：逐命令位置解 argv[0] 比對封閉 executor_clis。票 B-59（併 B-61 同型）。屬大重寫，須另立 epic |
 | 060 | WL-06 | 未開工 | P3 測試空心／假綠之機械判準。併入票 B-25，不新開票（既有：PATH劫持1條已修、test_verify_gate系列3條、未列入排除清單2條） |
