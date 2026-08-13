@@ -70,7 +70,7 @@ def _amendment_keys():
     assert AMENDMENT.is_file(), (
         f"缺延伸檔 {AMENDMENT}：凍結宣告之偏離無登記處 → fail-closed"
     )
-    frozen, added, criteria, mechanism = [], [], [], []
+    frozen, added, criteria, mechanism, enforcement = [], [], [], [], []
     for line in AMENDMENT.read_text(encoding="utf-8").splitlines():
         if line.startswith("FACTKEY-FROZEN: "):
             frozen.append(line[len("FACTKEY-FROZEN: "):].strip())
@@ -80,12 +80,15 @@ def _amendment_keys():
             criteria.append(line[len("FACTKEY-CRITERIA: "):].strip())
         elif line.startswith("FACTKEY-MECHANISM: "):
             mechanism.append(line[len("FACTKEY-MECHANISM: "):].strip())
+        elif line.startswith("FACTKEY-ENFORCEMENT: "):
+            enforcement.append(line[len("FACTKEY-ENFORCEMENT: "):].strip())
     assert frozen, "延伸檔缺 FACTKEY-FROZEN 宣告 → fail-closed"
     assert added, "延伸檔缺 FACTKEY-ADDED 宣告 → fail-closed"
     assert criteria, "延伸檔缺 FACTKEY-CRITERIA 宣告 → fail-closed（WL-02 起）"
     assert mechanism, "延伸檔缺 FACTKEY-MECHANISM 宣告 → fail-closed（WL-03 起）"
-    lists = (("FROZEN", frozen), ("ADDED", added),
-             ("CRITERIA", criteria), ("MECHANISM", mechanism))
+    assert enforcement, "延伸檔缺 FACTKEY-ENFORCEMENT 宣告 → fail-closed（產出端覆蓋規則起）"
+    lists = (("FROZEN", frozen), ("ADDED", added), ("CRITERIA", criteria),
+             ("MECHANISM", mechanism), ("ENFORCEMENT", enforcement))
     for name, lst in lists:
         assert len(lst) == len(set(lst)), f"FACTKEY-{name} 含重複項: {lst}"
     sets = [set(lst) for _, lst in lists]
@@ -111,11 +114,11 @@ def test_registry_key_set_equals_amendment_declaration():
     data = json.loads(REG.read_text(encoding="utf-8"))
     assert isinstance(data, dict)
     fact_keys = {k for k in data if k != "_schema"}
-    frozen, added, criteria, mechanism = _amendment_keys()
+    frozen, added, criteria, mechanism, enforcement = _amendment_keys()
 
-    assert fact_keys == frozen | added | criteria | mechanism, (
+    assert fact_keys == frozen | added | criteria | mechanism | enforcement, (
         f"registry key 集合與延伸檔宣告不符：registry={sorted(fact_keys)} "
-        f"vs 宣告={sorted(frozen | added | criteria | mechanism)}"
+        f"vs 宣告={sorted(frozen | added | criteria | mechanism | enforcement)}"
     )
     assert KEY in frozen, f"凍結期單一 key {KEY} 未列於 FACTKEY-FROZEN"
 
@@ -133,6 +136,11 @@ def test_registry_key_set_equals_amendment_declaration():
     assert mechanism == mechanism_keys, (
         "🔴 延伸檔 MECHANISM 與 _schema.mechanism_keys 不相等 ⇒ 機制 key 漏交或多交："
         f"MECHANISM={sorted(mechanism)} vs mechanism_keys={sorted(mechanism_keys)}"
+    )
+    enforcement_keys = set(data["_schema"].get("enforcement_keys", []))
+    assert enforcement == enforcement_keys, (
+        "🔴 延伸檔 ENFORCEMENT 與 _schema.enforcement_keys 不相等 ⇒ 產出端覆蓋 key 漏交或多交："
+        f"ENFORCEMENT={sorted(enforcement)} vs enforcement_keys={sorted(enforcement_keys)}"
     )
 
     # 每個 key 的結構仍須合法

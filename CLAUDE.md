@@ -36,6 +36,13 @@ All code must support this evolution via clean decoupling.
 
 **固定條款**（使用者定死，出處見 `docs/SCAR_LEDGER.md`）：
 - **中/大鐵律**：① 完整管線不得跳步（SPEC/TODO/adversarial 都要）② **code review 之家數與家族＝`docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行（唯一來源；🔴 本檔不得自寫家數——曾寫「2 個」而 ORCH 為「三家全員」，2026-08-12 害主委當場做錯一次）**；實作者不自審；**機器強制** `scripts/review_quorum_check.sh`，接入 `gate.sh` 派下一批 impl 前驗前批 quorum，不足→拒發 token ③ 大任務附白話簡述 ④ 省步唯一允許=動工前明列讓使用者**否決** ⑤ **派工進度每 10 分鐘回報一次**
+- 🔴 **產出端覆蓋鐵律**（2026-08-13 使用者定死，適用**所有**治理 epic）：治理票的檢查
+  **必須擋在產出端**（`PreToolUse`／`PostToolUse` hook，寫檔當下就報），**這才能算已完成**；
+  擋不了者須在 `docs/GOV_ENFORCEMENT_REGISTRY.md` **具名寫出為什麼**（如 G-7 需 commit 才有
+  endpoint 淨差、全套 pytest 為十分鐘級）。理由：治理問題**全部在產出當下發生**，
+  留到 push 才擋，中間的派工與回頭修全是純摩擦。
+  **機器強制**：`gen_fact_key_blocks.sh` 之收案綁定檢查——票標「收案」而該票未登記
+  產出端覆蓋即 fail-closed；且掛載點會與 `.claude/settings.json` **機械對證**，禁自我宣稱。
 - **判不出大小**：明講不確定 + 先當「中」——**絕不靜默假設**
 - **膨脹升級 5 訊號**：檔案數超預期 / 碰 `factories.py`·`protocols.py`·`config.py` / 新 caller / 測試面擴大 / 觸及 a-d
 - **派工前後**：`bash scripts/agent_preflight.sh` → 派工 → `bash scripts/agent_postflight.sh`；PASS 才驗收

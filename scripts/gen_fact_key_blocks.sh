@@ -366,6 +366,7 @@ _fk_emit_all() {
   #    新增任何檢查前先問「同一種輸入有沒有第二條處理路徑」。
   _fk_validate_criteria || return 1
   _fk_validate_mechanism || return 1
+  _fk_validate_enforcement || return 1
   _fke_rc=0
   # 🔴 不用 `< <(_fk_keys)`：process substitution 的 rc 拿不到（見 _fk_raw_keys_checked 註解）
   _fke_keys="$(_fk_keys)" || return 1
@@ -1017,6 +1018,167 @@ EOF
   return "${_fkru_rc}"
 }
 
+# ==========================================================================
+# 產出端覆蓋登記表 — 使用者 2026-08-13 定死之憲法級規則的機械強制點
+#
+# 使用者逐字：「治理的所有票，包含已經做過和正在做和未來的實作，都要在產出端擋下，
+#   這才能當已完成，除非像 G-7 和 pytest 等可以說明為何不該放在產出端，
+#   這任務完成檢查在所有治理 epic 中都適用，你要想辦法卡住，不能漏。」
+#
+# 🔴 「不能漏」的落法＝檢查 ④：把**票能不能標收案**跟**它的檢查在不在產出端**綁死。
+#   任何票要標收案，必先在 `governance-enforcement` 登記其掛載點；
+#   掛不到產出端就得寫出為什麼。這不是文件宣告，是這裡的 fail-closed。
+#
+# 🔴 檢查 ② 是**機械對證**不是自我宣稱：宣告「產出端」者，其掛載點必須在
+#   `.claude/settings.json` 的 hooks 裡真的找得到（event＋matcher＋command 三者都要對上）。
+#   否則本表會退化成「大家都說自己有做」的散文目錄——那正是本 epic 反覆治的病。
+_FK_ENFORCEMENT_SCHEMA_FIELDS='enforcement_keys enforcement_side_enum enforcement_producer_side enforcement_column_roles enforcement_settings_path enforcement_closed_status enforcement_ticket_roles'
+
+# 豁免理由之佔位符黑名單（**刻意極小**：只擋明顯空殼，充分性由 review 判定，見登記表殘留 4）
+_FK_WAIVER_PLACEHOLDERS='— - 無 n/a N/A TBD tbd 待填 ?'
+
+_fk_enforcement_keys() { LC_ALL=C jq -r '._schema.enforcement_keys[]? // empty' "${REG}"; }
+
+_fk_enf_role_idx() { _fk_role_idx_of "$1" "$2" enforcement_column_roles; }
+
+_fk_enforcement_schema_present() {
+  for _fkep_f in ${_FK_ENFORCEMENT_SCHEMA_FIELDS}; do
+    LC_ALL=C jq -e --arg f "${_fkep_f}" '._schema | has($f)' "${REG}" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+
+# 掛載點對證：`<event>:<matcher>:<command 片段>`；matcher 內多工具以半形逗號分隔
+# （不用 `|`——render=table 儲存格禁 `|`，產出端守衛已於上線當天實際擋下一次）。
+_fk_mount_exists() {   # $1=掛載點字串 → rc=0 表示 settings.json 內確實有
+  _fkme_ev="${1%%:*}"; _fkme_rest="${1#*:}"
+  _fkme_mt="${_fkme_rest%%:*}"; _fkme_cmd="${_fkme_rest#*:}"
+  [ -n "${_fkme_ev}" ] && [ -n "${_fkme_mt}" ] && [ -n "${_fkme_cmd}" ] || return 1
+  [ "${_fkme_cmd}" != "${_fkme_rest}" ] || return 1        # 三段都要有
+  _fkme_sp="$(LC_ALL=C jq -r '._schema.enforcement_settings_path' "${REG}")" || return 1
+  # 🔴 settings.json 相對 **repo root**（腳本父目錄），不是 `_fk_root()`——
+  #   與 WL-03 的 receipt 刻意相反，理由不同：receipt 是「被驗那棵樹」的資產，
+  #   而 hook 掛載是**主控端環境**的事實，fixture 樹裡本來就不該有 settings.json。
+  #   若改成 `_fk_root()`，所有 fixture 測試會因缺該檔而整批誤紅。
+  _fkme_path="$(cd -- "${SCRIPT_DIR}/.." && pwd)/${_fkme_sp}"
+  [ -f "${_fkme_path}" ] || return 1
+  # matcher 以逗號分隔還原成 settings.json 內的 `|` 形式後比對
+  _fkme_mt_pipe="$(printf '%s' "${_fkme_mt}" | tr ',' '|')"
+  LC_ALL=C jq -e --arg ev "${_fkme_ev}" --arg mt "${_fkme_mt_pipe}" --arg cmd "${_fkme_cmd}" '
+    (.hooks[$ev] // [])
+    | any(.[]; (.matcher == $mt) and ((.hooks // []) | any(.[]; (.command // "") | contains($cmd))))
+  ' "${_fkme_path}" >/dev/null 2>&1
+}
+
+_fk_validate_enforcement() {
+  _fk_enforcement_schema_present || return 0        # 整組缺席＝未啟用本規則，合法
+  _fkve_rc=0
+  for _fkve_f in ${_FK_ENFORCEMENT_SCHEMA_FIELDS}; do
+    LC_ALL=C jq -e --arg f "${_fkve_f}" '._schema | has($f)' "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: _schema 已宣告部分產出端覆蓋欄，但缺 ${_fkve_f} → fail-closed（本 schema 為一整組）" >&2
+           _fkve_rc=1; }
+  done
+  [ "${_fkve_rc}" = "0" ] || return 1
+
+  _fkve_side="$(LC_ALL=C jq -r '._schema.enforcement_producer_side' "${REG}")"
+  LC_ALL=C jq -e --arg s "${_fkve_side}" '._schema.enforcement_side_enum | index($s) != null' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: enforcement_producer_side='${_fkve_side}' 不在 enforcement_side_enum 內 → fail-closed" >&2
+         return 1; }
+
+  _fkve_keys="$(_fk_enforcement_keys)" || return 1
+  [ -n "${_fkve_keys}" ] || {
+    echo "gen_fact_key_blocks: _schema.enforcement_keys 為空 → fail-closed（空清單會使四道檢查全部靜默停用）" >&2
+    return 1; }
+  _fkve_all="$(_fk_keys)" || return 1
+
+  while IFS= read -r _fkve_k; do
+    [ -n "${_fkve_k}" ] || continue
+    printf '%s\n' "${_fkve_all}" | LC_ALL=C grep -qxF "${_fkve_k}" || {
+      echo "gen_fact_key_blocks: enforcement_keys 含未註冊 key '${_fkve_k}' → fail-closed" >&2
+      _fkve_rc=1; continue; }
+    _fkve_bad=""
+    for _fkve_role in id ticket mount side waiver; do
+      _fk_enf_role_idx "${_fkve_k}" "${_fkve_role}" >/dev/null 2>&1 \
+        || _fkve_bad="${_fkve_bad} ${_fkve_role}"
+    done
+    [ -z "${_fkve_bad}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkve_k} 缺角色欄（enforcement_column_roles）:${_fkve_bad} → fail-closed" >&2
+      _fkve_rc=1; continue; }
+    _fkve_ii="$(_fk_enf_role_idx "${_fkve_k}" id)"     || { _fkve_rc=1; continue; }
+    _fkve_mi="$(_fk_enf_role_idx "${_fkve_k}" mount)"  || { _fkve_rc=1; continue; }
+    _fkve_si="$(_fk_enf_role_idx "${_fkve_k}" side)"   || { _fkve_rc=1; continue; }
+    _fkve_wi="$(_fk_enf_role_idx "${_fkve_k}" waiver)" || { _fkve_rc=1; continue; }
+
+    # ① 強制側封閉列舉
+    _fkve_unknown="$(LC_ALL=C jq -r --arg k "${_fkve_k}" --argjson si "${_fkve_si}" '
+      (._schema.enforcement_side_enum) as $e
+      | .[$k].rows[] | select((.[$si] | IN($e[]) | not)) | .[$si]' "${REG}" \
+      | LC_ALL=C sort -u)"
+    [ -z "${_fkve_unknown}" ] || {
+      echo "gen_fact_key_blocks: key ${_fkve_k} 之強制側不在 enforcement_side_enum 內 → fail-closed:" >&2
+      printf '%s\n' "${_fkve_unknown}" | sed 's/^/    /' >&2
+      _fkve_rc=1; }
+
+    # ②③ 逐列：產出端 ⇒ 掛載點須真的存在；豁免 ⇒ 理由非空且非佔位符
+    while IFS='	' read -r _fkve_id _fkve_mount _fkve_sd _fkve_wv; do
+      [ -n "${_fkve_id}" ] || continue
+      if [ "${_fkve_sd}" = "${_fkve_side}" ]; then
+        _fk_mount_exists "${_fkve_mount}" || {
+          echo "gen_fact_key_blocks: ${_fkve_id} 宣告為${_fkve_side}，但掛載點在 settings.json 內不存在：${_fkve_mount} → fail-closed（禁自我宣稱）" >&2
+          _fkve_rc=1; }
+      else
+        _fkve_hit=0
+        for _fkve_ph in ${_FK_WAIVER_PLACEHOLDERS}; do
+          [ "${_fkve_wv}" = "${_fkve_ph}" ] && _fkve_hit=1 && break
+        done
+        [ -n "${_fkve_wv}" ] && [ "${_fkve_hit}" = "0" ] || {
+          echo "gen_fact_key_blocks: ${_fkve_id} 為豁免但豁免理由為空或佔位符 → fail-closed" >&2
+          _fkve_rc=1; }
+      fi
+    done <<EOF
+$(LC_ALL=C jq -r --arg k "${_fkve_k}" --argjson ii "${_fkve_ii}" --argjson mi "${_fkve_mi}" \
+   --argjson si "${_fkve_si}" --argjson wi "${_fkve_wi}" \
+   '.[$k].rows[] | [.[$ii], .[$mi], .[$si], .[$wi]] | @tsv' "${REG}")
+EOF
+  done <<EOF2
+${_fkve_keys}
+EOF2
+
+  # ④ 🔴 收案綁定 —— 本規則的「卡住」之處
+  _fkve_tk="$(LC_ALL=C jq -r '._schema.enforcement_ticket_roles.key' "${REG}")"
+  printf '%s\n' "${_fkve_all}" | LC_ALL=C grep -qxF "${_fkve_tk}" || {
+    echo "gen_fact_key_blocks: enforcement_ticket_roles.key '${_fkve_tk}' 未註冊 → fail-closed" >&2
+    return 1; }
+  # 🔴 jq 錯誤**不得吞掉**：原版帶 `2>/dev/null`，jq 失敗時結果為空 ⇒ 靜默放行＝假綠。
+  #   （同型於本 epic 定案過的「jq rc 被 process substitution 吞掉」根因。）
+  # 🔴 欄名先綁成 `$tcol`：不可在 `index(...)` 的參數位置寫 `._schema…`——
+  #   該處的 `.` 已被 pipe 改成 `$e.columns`，會取到 null 而使整條檢查恆綠。
+  #   初版即如此，反例只因 DRIFT 而紅，**險些把空心檢查當成通過**（訊息斷言才抓到）。
+  _fkve_missing="$(LC_ALL=C jq -er --arg tk "${_fkve_tk}" '
+    ._schema.enforcement_column_roles.ticket as $tcol
+    | ._schema.enforcement_ticket_roles as $tr
+    | ._schema.enforcement_closed_status as $closed
+    | [ ._schema.enforcement_keys[] as $ek
+        | .[$ek] as $e
+        | ($e.columns | index($tcol)) as $ti
+        | $e.rows[] | .[$ti] ] as $covered
+    | (.[$tk].columns | index($tr.id)) as $idi
+    | (.[$tk].columns | index($tr.status)) as $sti
+    | [ .[$tk].rows[] | select(.[$sti] == $closed) | .[$idi] ]
+    | map(select(. as $t | ($covered | index($t)) == null))
+    | join("\n")' "${REG}")" || {
+    echo "gen_fact_key_blocks: 收案綁定檢查之 jq 失敗 → fail-closed（不得當成『沒有未覆蓋的票』）" >&2
+    return 1; }
+  [ -z "${_fkve_missing}" ] || {
+    echo "gen_fact_key_blocks: 下列票已標『$(LC_ALL=C jq -r '._schema.enforcement_closed_status' "${REG}")』但未在 ${_fkve_tk%%-*}-enforcement 登記產出端覆蓋 → fail-closed:" >&2
+    printf '%s\n' "${_fkve_missing}" | sed 's/^/    /' >&2
+    echo "  規則（使用者 2026-08-13 定死）：治理票要標收案，其檢查必須擋在產出端；" >&2
+    echo "  擋不了就在 governance-enforcement 具名寫出為什麼（如 G-7 需 commit、pytest 十分鐘級）。" >&2
+    return 1; }
+  return "${_fkve_rc}"
+}
+
 _fk_check() {
   _fk_validate_keys || return 1
   _fk_validate_schema_sets || return 1
@@ -1061,6 +1223,7 @@ EOF2
   _fk_reject_rc_claims_outside_blocks || _fkc_rc=1
   # 機制表語意 ＋ opt-in 宿主之改法子樹未登記機制（WL-03）
   _fk_validate_mechanism || _fkc_rc=1
+  _fk_validate_enforcement || _fkc_rc=1
   _fk_reject_unregistered_mechanisms || _fkc_rc=1
   return "${_fkc_rc}"
 }
@@ -1070,6 +1233,7 @@ _fk_write() {
   _fk_validate_schema_sets || return 1
   _fk_validate_criteria || return 1
   _fk_validate_mechanism || return 1
+  _fk_validate_enforcement || return 1
   # 🔴 `--write` 也跑宿主子樹掃描〔COMPOSER-R1-P2-01〕：本路徑本來就讀寫宿主檔，
   #   漏掛會讓「單跑 --write」的本地流程暫時綠。emit 刻意不掛——它是純 stdout 投影、
   #   不讀宿主檔，掛上去等於憑空要求一棵樹。此差異列為登記表殘留 8，並有測試釘住。

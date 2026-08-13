@@ -28,6 +28,7 @@ FACTKEY-ADDED: governance-ticket-closure
 FACTKEY-ADDED: governance-worklist
 FACTKEY-CRITERIA: governance-criteria
 FACTKEY-MECHANISM: governance-mechanism
+FACTKEY-ENFORCEMENT: governance-enforcement
 ```
 
 🔴 **第三種宣告 `FACTKEY-CRITERIA`（2026-08-13，待辦清單 `WL-02` 新增）**：
@@ -52,6 +53,9 @@ FACTKEY-MECHANISM: governance-mechanism
    亦以集合相等鎖死。）
 1b. `FACTKEY-CRITERIA` 集合 **恰等於** `_schema.criteria_keys`。
 1c. `FACTKEY-MECHANISM` 集合 **恰等於** `_schema.mechanism_keys`（理由同 1b）。
+1d. `FACTKEY-ENFORCEMENT` 集合 **恰等於** `_schema.enforcement_keys`（理由同 1b）。
+   🔴 該 key 承載使用者 2026-08-13 定死之憲法級規則（治理票須在產出端擋下才算完成），
+   其檢查會**擋住任何票標記收案**，故 key 集合漂移的後果比其他三種嚴重。
 2. `FACTKEY-ADDED` 集合 **恰等於** `scripts/fact_keys.json` 之 `_schema.status_keys`
    （🔴 原文寫「兩個狀態 key」，該數字於新增 `governance-worklist` 後過期；
    **不再寫死個數**——個數以 `status_keys` 為準，本檔只放指標）。

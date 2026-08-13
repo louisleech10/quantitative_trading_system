@@ -51,6 +51,24 @@
       "launchctl", "sysctl"
     ],
     "mechanism_note": "WL-03（票 B-25 機制證據登記）。目的＝把「改法宣稱要用某個平台機制」從散文變成可盤點的資料列，且該列必須帶實跑證據或顯式 assumed 標記。🔴 字面設計（掃改法段抽反引號）已由三家 consult 以實測否決（誤擋率 80-93%）⇒ 本落法禁掃散文，只對資料列驗證，外加一道以 `- 改法` 子樹為起點、比對 mechanism_tokens 封閉表的掃描。mechanism_scope＝顯式 opt-in 宿主（exact path，禁 wildcard、禁目錄前綴），membership 只靠登記，不靠檔名樣式——「凡含 FACT-RECEIPT」會回掃 53 檔且溯及既往、「凡新建 GOV*」是未封閉 glob，兩者皆經三家否決。🔴 誠實邊界：本規則在現樹訊號近零（五個 opt-in 宿主之改法子樹平台 token 命中＝0），價值在面向未來攔下日後寫入之未驗機制，不是清理現況。🔴 mechanism_tokens 以字面表比對，非以 PATH 探測——GROK-R1-P1-03 實跑證明本機 setsid 不在 PATH，用 PATH 探測反而會漏掉出生事故本身。🔴 r1 三家 review 各自實構出三個子樹旁路（巢狀子彈／空行／裝飾起點），修法＝終點改為單一縮排判準（縮排 ≤ 起點且非空）＋起點納入實測導出之裝飾前綴；receipt 存在性改對 _fk_root() 判定（原對生成器 repo，可被 decoy 遮蔽）並拒 symlink；--write 亦跑子樹掃描。逐條處置見 handoffs/reconcile/20260813-govwl03-x-review-r1/synth.md。🔴 r2 閉合輪再修兩處：①巢狀 `- 改法` 起點會覆寫子樹 boundary 使其後同級續行漏掃（第四旁路，三家中僅 codex 構造出來，另兩家判無而未測此形態——採碼證不採家數）②讀取 fact-key 清單之 jq 失敗被 process substitution 吞掉，靜默當成「沒有任何 fact-key」，同一 bug 在 criteria/mechanism 路徑造成假紅、在 schema_sets/handwritten_status 路徑造成假綠；此即 r2 三家皆觀察到之偶發紅根因，已由主委以注入式實驗定案",
+    "enforcement_keys": ["governance-enforcement"],
+    "enforcement_side_enum": ["產出端", "豁免"],
+    "enforcement_producer_side": "產出端",
+    "enforcement_column_roles": {
+      "id": "檢查ID",
+      "ticket": "對應票",
+      "mount": "掛載點",
+      "side": "強制側",
+      "waiver": "豁免理由"
+    },
+    "enforcement_settings_path": ".claude/settings.json",
+    "enforcement_closed_status": "收案",
+    "enforcement_ticket_roles": {
+      "key": "governance-ticket-closure",
+      "id": "票",
+      "status": "狀態"
+    },
+    "enforcement_note": "使用者 2026-08-13 定死之憲法級規則：治理的所有票（含已做、正在做、未來的實作）都要在產出端擋下才能當已完成，除非能說明為何不該放產出端（如 G-7 需要 commit 才有 endpoint 淨差、pytest 為十分鐘級）。🔴 本表即該規則的機械強制點，非文件宣告。四道檢查：①強制側須在 enforcement_side_enum 內 ②強制側=產出端者，其掛載點須在 enforcement_settings_path 之 hooks 內實際存在（機械對證，禁自我宣稱）③強制側=豁免者，豁免理由非空 ④🔴 governance-ticket-closure 中狀態為 enforcement_closed_status 的每一張票，必須在本表至少有一列——這條把「收案」與「產出端覆蓋」綁死，任何票要標收案都得先過此關。掛載點格式＝<event>:<matcher>:<command 片段>，三段以半形冒號分隔；matcher 段之多個工具名以**半形逗號**分隔（不用 `|`——render=table 之儲存格禁 `|`，會切碎表格；此限制由產出端守衛在寫檔當下實際擋下過）",
     "status_scope": ["HANDOFF.md", "docs/GOVERNANCE_EXECUTION_ORDER.md", "白話說明/"],
     "status_scope_grandfathered": [
       "白話說明/README.md",
@@ -159,6 +177,20 @@
       ["M-002", "ulimit", "fork bomb 之第二道防線（壓低 per-user 程序上限）", "receipt:handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md", "硬上限不可降——Invalid argument；只降 soft 必被子程序抬回，故不作為防線", "現行"],
       ["M-003", "timeout", "ASSERT 逐行逾時包裹", "receipt:docs/GOV_ASSERT_PATHA_NOTE.md", "可用，已上線於寫檔路徑之零執行改法", "現行"],
       ["M-004", "flock", "gate token 之併發互斥", "assumed:僅出現於敘事段落，尚未被任一改法採用，故未實跑", "未實跑——列此以示 assumed 是顯式標記而非省略", "現行"]
+    ]
+  },
+  "governance-enforcement": {
+    "target": "docs/GOV_ENFORCEMENT_REGISTRY.md",
+    "columns": ["檢查ID", "對應票", "掛載點", "強制側", "豁免理由"],
+    "render": "table",
+    "rows": [
+      ["E-001", "B-25", "PostToolUse:Edit,Write:factkey_write_guard.sh", "產出端", "—"],
+      ["E-002", "B-25", "pre-push:gov_check.sh 第 3 段", "豁免", "與 E-001 為同一支檢查之第二層；產出端已由 E-001 覆蓋，本列僅記錄 defense-in-depth 之另一掛載點"],
+      ["E-003", "B-38", "PostToolUse:Edit,Write:doc_format_precheck.sh", "產出端", "—"],
+      ["E-004", "B-31", "PreToolUse:Task,Bash,Write:gate_check.sh", "產出端", "—"],
+      ["E-005", "G-7", "pre-push:govb1_final_gate.sh --only g7", "豁免", "判定式為 base..HEAD 之 endpoint 淨差，無 commit 即無可算；最早只能到 pre-commit，本質上不存在寫檔當下的等價判定"],
+      ["E-006", "測試套件", "pre-push:gov_check.sh 第 5 段", "豁免", "全套 pytest 為十分鐘級，每次 Edit 觸發不可行；其承重之個別判準已分散於各票之產出端列"],
+      ["E-007", "B-49", "pre-push:gov_check.sh 第 5 段", "豁免", "🔴 待複核：關票證據之六個具名 selector 需於隔離副本重放並比對 git 狀態，單次 Edit 當下無等價判定。本列理由由主委起草，須經三家裁定是否成立"]
     ]
   },
   "governance-batch-status": {
