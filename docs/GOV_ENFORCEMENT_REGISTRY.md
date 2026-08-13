@@ -50,10 +50,27 @@ matcher 段之多個工具名以**半形逗號**分隔（`Edit,Write`），**不
 2. 🔴 **`E-007`（`票 B-49`）的豁免理由由主委起草，尚未經委員裁定。**
    該票已標收案，若三家判定其理由不成立，`B-49` 的收案宣稱要退回。
    這是本規則溯及既往的第一個實例，刻意留著讓它被檢驗。
-3. 🔴 **檢查 ② 只驗「掛載點存在」，不驗「它真的會擋住對應的問題」。**
-   一個掛在產出端但內容空洞的 hook 仍會通過。該層仍靠 review 與各票自己的 mutation 測試。
-4. **豁免理由的「充分性」不機械判定。** 檢查 ③ 只驗非空。理由寫得對不對是委員的事——
-   把它機械化需要理解語意，那是本專案反覆確認過的能力邊界。
+3. 🔴 **檢查 ② 擋得掉「換成別的指令」，擋不掉「腳本被掏空」。**
+   r1 三家全員實構出偽造路徑，已據此強化為：片段須為 `.sh`、對應檔須存在、
+   且 command 必須**以 `bash <片段>` 起頭**（原本只用 `contains`，`sh`／`a` 這種短子串
+   對真實 settings.json 即命中）。但把腳本內容換成永遠 rc=0 的 noop 仍會通過——
+   該層靠 review 與各票自己的 mutation 測試。
+4. **豁免理由的「充分性」不機械判定。** 檢查 ③ 只驗非空與佔位符。理由寫得對不對是委員的事。
+   🔴 **理由的體例（r1 群集 E 要求）**：必須同時寫出「**無等價判定**的理由」與
+   「**部分閘是否已掛**」。只寫「不好做」是藉口，不是理由。
+5. 🔴 **自我保護有本質極限（`CODEX-R1-P0-03`，無解）。**
+   生成器、守衛自身與 `settings.json` 已納入受管，但**把生成器加回受管不足以保護它**——
+   守衛執行的正是那支已被竄改的生成器。真正的獨立錨是 pytest 與 pre-push。
+   ⇒ 本機制**只擋意外改壞，不擋蓄意**。
+6. 🔴 **從票表刪掉整列可繞過檢查 ④**（`COMPOSER-R1-P1-01`）：票不在表裡就不算收案。
+   該層由 `test_e3_ticket_union_matches_key_rows`（要求票集合與 `HANDOFF` 活缺口節一致）承接，
+   但那是 pytest ＝消費端。具名缺口。
+7. 🔴 **批次不受覆蓋要求。** 啟用判定掃**所有**狀態表（含 `governance-batch-status`，
+   故有收案批次時規則無法被停用），但檢查 ④ 只要求**票**有覆蓋列。
+   這是刻意的不對稱——使用者的規則說的是「治理的所有票」。批次若要納入須另行裁定。
+8. 🔴 **本表現在只涵蓋「已收案」的票，而目前票表已無收案票**（`B-49` 於 r1 後退回）。
+   ⇒ 檢查 ④ 當下**沒有實際攔截對象**，其鑑別力由自造測試票的 pytest 承擔。
+   下一張票要標收案時它才會第一次真的咬人。
 
 ## 登記表
 
@@ -63,11 +80,11 @@ matcher 段之多個工具名以**半形逗號**分隔（`Edit,Write`），**不
 <!-- BEGIN GENERATED: governance-enforcement -->
 | 檢查ID | 對應票 | 掛載點 | 強制側 | 豁免理由 |
 |---|---|---|---|---|
-| E-001 | B-25 | PostToolUse:Edit,Write:factkey_write_guard.sh | 產出端 | — |
-| E-002 | B-25 | pre-push:gov_check.sh 第 3 段 | 豁免 | 與 E-001 為同一支檢查之第二層；產出端已由 E-001 覆蓋，本列僅記錄 defense-in-depth 之另一掛載點 |
-| E-003 | B-38 | PostToolUse:Edit,Write:doc_format_precheck.sh | 產出端 | — |
-| E-004 | B-31 | PreToolUse:Task,Bash,Write:gate_check.sh | 產出端 | — |
-| E-005 | G-7 | pre-push:govb1_final_gate.sh --only g7 | 豁免 | 判定式為 base..HEAD 之 endpoint 淨差，無 commit 即無可算；最早只能到 pre-commit，本質上不存在寫檔當下的等價判定 |
-| E-006 | 測試套件 | pre-push:gov_check.sh 第 5 段 | 豁免 | 全套 pytest 為十分鐘級，每次 Edit 觸發不可行；其承重之個別判準已分散於各票之產出端列 |
-| E-007 | B-49 | pre-push:gov_check.sh 第 5 段 | 豁免 | 🔴 待複核：關票證據之六個具名 selector 需於隔離副本重放並比對 git 狀態，單次 Edit 當下無等價判定。本列理由由主委起草，須經三家裁定是否成立 |
+| E-001 | B-25 | PostToolUse:Edit,Write:scripts/factkey_write_guard.sh | 產出端 | — |
+| E-002 | B-25 | pre-push:gov_check.sh 第 3 段 | 豁免 | 與 E-001 為同一支檢查之第二層；產出端已由 E-001 覆蓋（無等價判定？否——已有等價且已掛），本列僅記錄 defense-in-depth 之另一掛載點 |
+| E-003 | B-38 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | — |
+| E-004 | B-31 | PreToolUse:Task,Bash,Write:scripts/gate_check.sh | 產出端 | — |
+| E-005 | G-7 | pre-push:govb1_final_gate.sh --only g7 | 豁免 | 無等價判定：判定式為 base..HEAD 之 endpoint 淨差，無 commit 即無可算，最早只能到 pre-commit。部分閘是否已掛：無——本票不存在可前移的靜態子集 |
+| E-006 | 測試套件 | pre-push:gov_check.sh 第 5 段 | 豁免 | 無等價判定：全套 pytest 為十分鐘級，每次 Edit 觸發不可行。部分閘是否已掛：是——各票之承重判準已分散於本表其他列之產出端掛載 |
+| E-007 | B-49 | pre-push:gov_check.sh 第 5 段 | 豁免 | 🔴 主委原理由『單次 Edit 當下無等價判定』已由三家 r1 一致否決（CODEX-R1-P1-05／COMPOSER-R1-P1-02／GROK-R1-P2-01：閉合證據的靜態可判定部分無需 commit 亦可於產出端驗）。⇒ 該票已依規則退回部分完成。無等價判定：僅隔離重放＋git 狀態比對那一段成立。部分閘是否已掛：否——靜態子集尚未前移，此為具名缺口 |
 <!-- END GENERATED: governance-enforcement -->

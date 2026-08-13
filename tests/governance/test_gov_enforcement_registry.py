@@ -34,6 +34,12 @@ def _mkrepo(tmp_path: Path, mutate=None) -> Path:
     (root / ".claude").mkdir(parents=True, exist_ok=True)
     shutil.copy2(GEN, root / "scripts" / GEN.name)
     shutil.copy2(SETTINGS, root / ".claude" / "settings.json")
+    # 🔴 掛載點對證會驗「片段對應的腳本在 repo 內存在」⇒ 假 repo 必須備齊被登記的 hook 腳本，
+    #    否則基準會因對證失敗而紅（初版漏複製，DRIFT 把真正的錯因蓋掉）。
+    for extra in ("factkey_write_guard.sh", "doc_format_precheck.sh", "gate_check.sh"):
+        src = REPO / "scripts" / extra
+        if src.is_file():
+            shutil.copy2(src, root / "scripts" / extra)
     data = json.loads(REG.read_text(encoding="utf-8"))
     if mutate is not None:
         mutate(data)
@@ -120,44 +126,36 @@ def test_waiver_placeholder_is_rejected(tmp_path):
     assert "豁免理由為空或佔位符" in r.stderr, r.stderr
 
 
+def _add_ticket(d, status: str, tid: str = "TEST-TICKET"):
+    """在票表**新增**一列（不覆蓋覆蓋表）。
+
+    🔴 刻意自造而非挑現有票：生產資料的票狀態會漂（`B-49` 於本輪即由收案退回），
+    依賴它會讓測試在資料變動時靜默失去鑑別力——初版正是如此。
+    """
+    tk = d["_schema"]["enforcement_ticket_roles"]["key"]
+    cols = d[tk]["columns"]
+    tr = d["_schema"]["enforcement_ticket_roles"]
+    row = ["999"] * len(cols)
+    row[cols.index(tr["id"])] = tid
+    row[cols.index(tr["status"])] = status
+    d[tk]["rows"].append(row)
+
+
 def test_closed_ticket_without_coverage_is_fail_closed(tmp_path):
     """🔴🔴 核心卡點（檢查 ④）：票標收案但未登記產出端覆蓋 ⇒ 擋下。
 
     這是使用者「你要想辦法卡住，不能漏」的落法。任何票要收案都得先過這關。
     """
-    def m(d):
-        enf = _enf(d)
-        ti = enf["columns"].index(d["_schema"]["enforcement_column_roles"]["ticket"])
-        # 找一張已收案且有覆蓋列的票，把它的覆蓋列拿掉
-        tk = d["_schema"]["enforcement_ticket_roles"]["key"]
-        tr = d["_schema"]["enforcement_ticket_roles"]
-        idi = d[tk]["columns"].index(tr["id"])
-        sti = d[tk]["columns"].index(tr["status"])
-        closed = d["_schema"]["enforcement_closed_status"]
-        victims = {row[idi] for row in d[tk]["rows"] if row[sti] == closed}
-        enf["rows"] = [row for row in enf["rows"] if row[ti] not in victims]
-    r = _check(_mkrepo(tmp_path, m))
+    r = _check(_mkrepo(tmp_path, lambda d: _add_ticket(d, d["_schema"]["enforcement_closed_status"])))
     assert "登記產出端覆蓋" in r.stderr, (
         f"收案票未登記覆蓋卻通過 ⇒ 核心卡點是空心的\n{r.stderr}"
     )
+    assert "TEST-TICKET" in r.stderr, f"訊息未指出是哪張票\n{r.stderr}"
 
 
 def test_non_closed_ticket_does_not_require_coverage(tmp_path):
-    """對照組：票不是收案狀態時，不要求登記 —— 證明上一條釘在「收案」而非「所有票」。"""
-    def m(d):
-        enf = _enf(d)
-        ti = enf["columns"].index(d["_schema"]["enforcement_column_roles"]["ticket"])
-        tk = d["_schema"]["enforcement_ticket_roles"]["key"]
-        tr = d["_schema"]["enforcement_ticket_roles"]
-        idi = d[tk]["columns"].index(tr["id"])
-        sti = d[tk]["columns"].index(tr["status"])
-        closed = d["_schema"]["enforcement_closed_status"]
-        victims = {row[idi] for row in d[tk]["rows"] if row[sti] == closed}
-        enf["rows"] = [row for row in enf["rows"] if row[ti] not in victims]
-        for row in d[tk]["rows"]:
-            if row[sti] == closed:
-                row[sti] = "部分完成"
-    r = _check(_mkrepo(tmp_path, m))
+    """對照組：同一張票不是收案狀態時，不要求登記 —— 證明釘在「收案」而非「所有票」。"""
+    r = _check(_mkrepo(tmp_path, lambda d: _add_ticket(d, "部分完成")))
     assert "登記產出端覆蓋" not in r.stderr, (
         f"非收案票也被要求登記 ⇒ 條件釘錯了\n{r.stderr}"
     )
@@ -207,17 +205,8 @@ def test_production_tree_all_closed_tickets_are_covered():
 
 def test_mutation_removing_closure_binding_lets_it_through(tmp_path):
     """反面實證：拿掉收案綁定後，未覆蓋的收案票就通過 ⇒ 證明該條非空心。"""
-    def m(d):
-        enf = _enf(d)
-        ti = enf["columns"].index(d["_schema"]["enforcement_column_roles"]["ticket"])
-        tk = d["_schema"]["enforcement_ticket_roles"]["key"]
-        tr = d["_schema"]["enforcement_ticket_roles"]
-        idi = d[tk]["columns"].index(tr["id"])
-        sti = d[tk]["columns"].index(tr["status"])
-        closed = d["_schema"]["enforcement_closed_status"]
-        victims = {row[idi] for row in d[tk]["rows"] if row[sti] == closed}
-        enf["rows"] = [row for row in enf["rows"] if row[ti] not in victims]
-    root = _mkrepo(tmp_path, m)
+    root = _mkrepo(tmp_path,
+                   lambda d: _add_ticket(d, d["_schema"]["enforcement_closed_status"]))
     p = root / "scripts" / GEN.name
     src = p.read_text(encoding="utf-8")
     anchor = '  [ -z "${_fkve_missing}" ] || {'

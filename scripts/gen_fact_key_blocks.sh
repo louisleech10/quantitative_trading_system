@@ -1034,6 +1034,25 @@ EOF
 #   否則本表會退化成「大家都說自己有做」的散文目錄——那正是本 epic 反覆治的病。
 _FK_ENFORCEMENT_SCHEMA_FIELDS='enforcement_keys enforcement_side_enum enforcement_producer_side enforcement_column_roles enforcement_settings_path enforcement_closed_status enforcement_ticket_roles'
 
+# 🔴 收案字面**寫死於此**，非由註冊表自證——自證＝無檢查（同 `_FK_RESERVED` 之紀律）。
+#   r1 三家全員實構出「規則被它所管制的資料自己關掉」：
+#     · `COMPOSER-R1-P0-01`／`GROK-R1-P1-02`：把 `enforcement_closed_status` 改成票表用不到的
+#       字面（如 `CLOSED`），所有仍標收案的票即脫離綁定，`--check` 全綠。
+#     · `COMPOSER-R1-P0-02`：整組 `enforcement_*` 欄與 key 一併刪除 ⇒ 四道檢查靜默跳過。
+#     · `CODEX-R1-P0-01`：關閉狀態／schema presence／票列全由同一份可變 JSON 自己宣告。
+#   ⇒ 啟用判定改為**由票表反推**：只要任一狀態 key 的資料列出現此字面，
+#     enforcement schema 就**必須完整存在**，且其 closed_status 必須等於此值。
+#     刪 schema 不再等於關閉規則——那會直接 fail-closed。
+_FK_CLOSED_STATUS='收案'
+
+# 票表中是否存在標為收案之列（不依賴 enforcement schema，故無法被其缺席繞過）
+_fk_has_closed_ticket() {
+  LC_ALL=C jq -e --arg c "${_FK_CLOSED_STATUS}" '
+    (._schema.status_keys // []) as $sk
+    | [ $sk[] as $k | (.[$k].rows // [])[] | .[] ] | index($c) != null
+  ' "${REG}" >/dev/null 2>&1
+}
+
 # 豁免理由之佔位符黑名單（**刻意極小**：只擋明顯空殼，充分性由 review 判定，見登記表殘留 4）
 _FK_WAIVER_PLACEHOLDERS='— - 無 n/a N/A TBD tbd 待填 ?'
 
@@ -1060,18 +1079,44 @@ _fk_mount_exists() {   # $1=掛載點字串 → rc=0 表示 settings.json 內確
   #   與 WL-03 的 receipt 刻意相反，理由不同：receipt 是「被驗那棵樹」的資產，
   #   而 hook 掛載是**主控端環境**的事實，fixture 樹裡本來就不該有 settings.json。
   #   若改成 `_fk_root()`，所有 fixture 測試會因缺該檔而整批誤紅。
-  _fkme_path="$(cd -- "${SCRIPT_DIR}/.." && pwd)/${_fkme_sp}"
+  _fkme_repo="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+  _fkme_path="${_fkme_repo}/${_fkme_sp}"
   [ -f "${_fkme_path}" ] || return 1
+  # 🔴 片段須為 repo 內**實際存在且可執行**的腳本路徑
+  #   〔GROK-R1-P1-01 實構：`contains` 下短子串如 `sh`／`a`／`bash` 對真實 settings.json
+  #    即判「掛載存在」，等於任何新列都能自動過關〕
+  case "${_fkme_cmd}" in
+    *.sh) : ;;
+    *)    return 1 ;;
+  esac
+  # 判準用 `-f` 不用 `-x`：hook 以 `bash <path>` 呼叫，**不依賴執行位**
+  #   （實測 `doc_format_precheck.sh` 即無執行位卻正常運作）⇒ 要求 `-x` 是與呼叫方式不符的判準。
+  #   封閉性由「`.sh` 結尾 ＋ 檔案存在 ＋ command 以 `bash <片段>` 起頭」三者共同保證。
+  [ -f "${_fkme_repo}/${_fkme_cmd}" ] || return 1
   # matcher 以逗號分隔還原成 settings.json 內的 `|` 形式後比對
   _fkme_mt_pipe="$(printf '%s' "${_fkme_mt}" | tr ',' '|')"
+  # 🔴 command 須**以 `bash <片段>` 起頭**，不是「含有該子串」
+  #   〔CODEX-R1-P0-02／COMPOSER-R1-P1-03 實構：把 hook 換成 `echo …factkey_write_guard.sh`
+  #    或永遠 rc=0 的 noop 但保留子字串，即可偽造掛載證明〕
+  #   誠實邊界：這只擋掉「換成別的指令」，擋不掉「腳本被掏空」——見登記表殘留 3。
   LC_ALL=C jq -e --arg ev "${_fkme_ev}" --arg mt "${_fkme_mt_pipe}" --arg cmd "${_fkme_cmd}" '
     (.hooks[$ev] // [])
-    | any(.[]; (.matcher == $mt) and ((.hooks // []) | any(.[]; (.command // "") | contains($cmd))))
+    | any(.[]; (.matcher == $mt)
+               and ((.hooks // []) | any(.[]; (.command // "") | startswith("bash " + $cmd))))
   ' "${_fkme_path}" >/dev/null 2>&1
 }
 
 _fk_validate_enforcement() {
-  _fk_enforcement_schema_present || return 0        # 整組缺席＝未啟用本規則，合法
+  # 🔴 啟用判定由**票表**反推，不由 enforcement schema 自證（見 _FK_CLOSED_STATUS 註解）：
+  #   票表有收案列 ⇒ schema 必須完整；沒有收案列且 schema 整組缺席 ⇒ 才算未啟用。
+  if _fk_has_closed_ticket; then
+    _fk_enforcement_schema_present || {
+      echo "gen_fact_key_blocks: 票表存在標為『${_FK_CLOSED_STATUS}』之列，但 _schema 完全沒有產出端覆蓋宣告 → fail-closed" >&2
+      echo "  規則（使用者 2026-08-13 定死）：治理票要標收案，其檢查必須擋在產出端；刪掉 schema 不等於關閉本規則。" >&2
+      return 1; }
+  else
+    _fk_enforcement_schema_present || return 0      # 無收案票且整組缺席＝未啟用，合法
+  fi
   _fkve_rc=0
   for _fkve_f in ${_FK_ENFORCEMENT_SCHEMA_FIELDS}; do
     LC_ALL=C jq -e --arg f "${_fkve_f}" '._schema | has($f)' "${REG}" >/dev/null 2>&1 \
@@ -1079,6 +1124,16 @@ _fk_validate_enforcement() {
            _fkve_rc=1; }
   done
   [ "${_fkve_rc}" = "0" ] || return 1
+
+  # 🔴 closed_status 必須等於寫死值，封死「改字面即脫鉤」〔COMPOSER-R1-P0-01／GROK-R1-P1-02〕
+  _fkve_cs="$(LC_ALL=C jq -r '._schema.enforcement_closed_status' "${REG}")"
+  [ "${_fkve_cs}" = "${_FK_CLOSED_STATUS}" ] || {
+    echo "gen_fact_key_blocks: enforcement_closed_status='${_fkve_cs}' 不等於生成器寫死之收案字面 '${_FK_CLOSED_STATUS}' → fail-closed（改字面即脫鉤，已由委員實構）" >&2
+    return 1; }
+  LC_ALL=C jq -e --arg c "${_FK_CLOSED_STATUS}" '._schema.status_enum | index($c) != null' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: 收案字面 '${_FK_CLOSED_STATUS}' 不在 status_enum 內 → fail-closed" >&2
+         return 1; }
 
   _fkve_side="$(LC_ALL=C jq -r '._schema.enforcement_producer_side' "${REG}")"
   LC_ALL=C jq -e --arg s "${_fkve_side}" '._schema.enforcement_side_enum | index($s) != null' \
@@ -1121,6 +1176,13 @@ _fk_validate_enforcement() {
       _fkve_rc=1; }
 
     # ②③ 逐列：產出端 ⇒ 掛載點須真的存在；豁免 ⇒ 理由非空且非佔位符
+    # 🔴 jq rc 不得被 command substitution 吞掉〔CODEX-R1-P1-04〕：語法錯誤會被迴圈末 rc 蓋掉，
+    #    形成另一個空心檢查。這是本 session 第三個同型（前兩個：_fk_raw_keys、收案綁定 jq）。
+    _fkve_rows="$(LC_ALL=C jq -r --arg k "${_fkve_k}" --argjson ii "${_fkve_ii}" \
+       --argjson mi "${_fkve_mi}" --argjson si "${_fkve_si}" --argjson wi "${_fkve_wi}" \
+       '.[$k].rows[] | [.[$ii], .[$mi], .[$si], .[$wi]] | @tsv' "${REG}")" || {
+      echo "gen_fact_key_blocks: key ${_fkve_k} 之逐列抽取失敗（jq 非零）→ fail-closed" >&2
+      _fkve_rc=1; continue; }
     while IFS='	' read -r _fkve_id _fkve_mount _fkve_sd _fkve_wv; do
       [ -n "${_fkve_id}" ] || continue
       if [ "${_fkve_sd}" = "${_fkve_side}" ]; then
@@ -1137,9 +1199,7 @@ _fk_validate_enforcement() {
           _fkve_rc=1; }
       fi
     done <<EOF
-$(LC_ALL=C jq -r --arg k "${_fkve_k}" --argjson ii "${_fkve_ii}" --argjson mi "${_fkve_mi}" \
-   --argjson si "${_fkve_si}" --argjson wi "${_fkve_wi}" \
-   '.[$k].rows[] | [.[$ii], .[$mi], .[$si], .[$wi]] | @tsv' "${REG}")
+${_fkve_rows}
 EOF
   done <<EOF2
 ${_fkve_keys}

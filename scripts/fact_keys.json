@@ -184,13 +184,13 @@
     "columns": ["檢查ID", "對應票", "掛載點", "強制側", "豁免理由"],
     "render": "table",
     "rows": [
-      ["E-001", "B-25", "PostToolUse:Edit,Write:factkey_write_guard.sh", "產出端", "—"],
-      ["E-002", "B-25", "pre-push:gov_check.sh 第 3 段", "豁免", "與 E-001 為同一支檢查之第二層；產出端已由 E-001 覆蓋，本列僅記錄 defense-in-depth 之另一掛載點"],
-      ["E-003", "B-38", "PostToolUse:Edit,Write:doc_format_precheck.sh", "產出端", "—"],
-      ["E-004", "B-31", "PreToolUse:Task,Bash,Write:gate_check.sh", "產出端", "—"],
-      ["E-005", "G-7", "pre-push:govb1_final_gate.sh --only g7", "豁免", "判定式為 base..HEAD 之 endpoint 淨差，無 commit 即無可算；最早只能到 pre-commit，本質上不存在寫檔當下的等價判定"],
-      ["E-006", "測試套件", "pre-push:gov_check.sh 第 5 段", "豁免", "全套 pytest 為十分鐘級，每次 Edit 觸發不可行；其承重之個別判準已分散於各票之產出端列"],
-      ["E-007", "B-49", "pre-push:gov_check.sh 第 5 段", "豁免", "🔴 待複核：關票證據之六個具名 selector 需於隔離副本重放並比對 git 狀態，單次 Edit 當下無等價判定。本列理由由主委起草，須經三家裁定是否成立"]
+      ["E-001", "B-25", "PostToolUse:Edit,Write:scripts/factkey_write_guard.sh", "產出端", "—"],
+      ["E-002", "B-25", "pre-push:gov_check.sh 第 3 段", "豁免", "與 E-001 為同一支檢查之第二層；產出端已由 E-001 覆蓋（無等價判定？否——已有等價且已掛），本列僅記錄 defense-in-depth 之另一掛載點"],
+      ["E-003", "B-38", "PostToolUse:Edit,Write:scripts/doc_format_precheck.sh", "產出端", "—"],
+      ["E-004", "B-31", "PreToolUse:Task,Bash,Write:scripts/gate_check.sh", "產出端", "—"],
+      ["E-005", "G-7", "pre-push:govb1_final_gate.sh --only g7", "豁免", "無等價判定：判定式為 base..HEAD 之 endpoint 淨差，無 commit 即無可算，最早只能到 pre-commit。部分閘是否已掛：無——本票不存在可前移的靜態子集"],
+      ["E-006", "測試套件", "pre-push:gov_check.sh 第 5 段", "豁免", "無等價判定：全套 pytest 為十分鐘級，每次 Edit 觸發不可行。部分閘是否已掛：是——各票之承重判準已分散於本表其他列之產出端掛載"],
+      ["E-007", "B-49", "pre-push:gov_check.sh 第 5 段", "豁免", "🔴 主委原理由『單次 Edit 當下無等價判定』已由三家 r1 一致否決（CODEX-R1-P1-05／COMPOSER-R1-P1-02／GROK-R1-P2-01：閉合證據的靜態可判定部分無需 commit 亦可於產出端驗）。⇒ 該票已依規則退回部分完成。無等價判定：僅隔離重放＋git 狀態比對那一段成立。部分閘是否已掛：否——靜態子集尚未前移，此為具名缺口"]
     ]
   },
   "governance-batch-status": {
@@ -230,7 +230,7 @@
       ["030", "B-50", "部分完成", "不得宣稱已收案——流程面永久標記為跳步，形態①④ 未做"],
       ["040", "B-53", "未開工", "無"],
       ["050", "B3R", "部分完成", "不得稱 O(n)（實為 O(n·sqrt(n))）；不得稱修掉 fail-open；雙家 review 尚未戳記"],
-      ["060", "B-49", "收案", "關票證據機械可驗（票標 CLOSED 時逐格於隔離副本跑六個具名 selector）。不得宣稱防蓄意——只防意外與遺忘；四條具名殘留見 docs/GOV_B49_ASBUILT_DELTA.md §3"],
+      ["060", "B-49", "部分完成", "🔴 已由收案**退回**：依使用者定死之產出端覆蓋鐵律，票要標收案其檢查須擋在產出端；主委原豁免理由（單次 Edit 無等價判定）經三家 r1 一致否決——閉合證據的**靜態可判定部分**無需 commit 亦可於產出端驗（CODEX-R1-P1-05／COMPOSER-R1-P1-02／GROK-R1-P2-01）。關票證據本身仍機械可驗（票標 CLOSED 時逐格於隔離副本跑六個具名 selector），但該檢查僅掛 pre-push。不得宣稱防蓄意——只防意外與遺忘；四條具名殘留見 docs/GOV_B49_ASBUILT_DELTA.md §3。重新收案之前置＝把靜態子集前移至產出端，見 docs/GOV_ENFORCEMENT_REGISTRY.md 之 E-007"],
       ["070", "B-54", "未開工", "不得宣稱戳記已機械化——64 位 hex 仍由委員手抄，已實際掉字一次"],
       ["080", "B-55", "未開工", "不得宣稱旗標空值處置一致——只有 --spec 擋空值"],
       ["090", "B-56", "未開工", "低優先；不得以安全風險為由排程（慢不等於危險，見 C5 延伸勘誤）"],

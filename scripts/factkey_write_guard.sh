@@ -76,6 +76,15 @@ esac
 # 受管集合：由註冊表導出（邊界 3）。輸出一行一筆；以 `/` 結尾者為目錄前綴。
 _managed() {
   printf '%s\n' "scripts/fact_keys.json"
+  # 🔴 產出端本身也受管〔CODEX-R1-P0-03／COMPOSER-R1-P1-04／GROK-R1-P2-02 三家全員〕：
+  #   原版不含生成器、守衛自身與 settings.json ⇒ 掏空生成器或卸掛 hook 時不觸發任何檢查。
+  #   🔴 **誠實邊界（codex 指出，無解）**：把生成器加回受管**不足以保護它**——
+  #   守衛執行的正是那支**已被竄改的**生成器。自我保護在此有本質極限；
+  #   真正的獨立錨是 pytest（`test_guard_is_wired_into_posttooluse` 等）與 pre-push。
+  #   本項只擋「意外改壞」，不擋蓄意；見登記表殘留 3。
+  printf '%s\n' "scripts/gen_fact_key_blocks.sh"
+  printf '%s\n' "scripts/factkey_write_guard.sh"
+  LC_ALL=C jq -r '._schema.enforcement_settings_path? // empty' "${REG}" 2>/dev/null
   LC_ALL=C jq -r 'to_entries[] | select(.key != "_schema")
                   | .value.target | if type == "array" then .[] else . end' "${REG}" 2>/dev/null
   LC_ALL=C jq -r '._schema.mechanism_scope[]? // empty' "${REG}" 2>/dev/null
