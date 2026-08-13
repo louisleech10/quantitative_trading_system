@@ -904,6 +904,10 @@ def test_t21_grandfathered_list_is_locked_by_set_equality():
         "白話說明/第0批-施工清單.md",
         "白話說明/第1批-在做什麼.md",
         "白話說明/第1批-施工清單.md",
+        # 🔴 新增（票 SoT 上線）：該檔已標作廢、改由 docs/GOV_TICKET_SOT.md 承載票狀態。
+        #    其內 8 處歷史狀態符號刻意不逐行清除（歷史紀錄，且「修正只考慮以後」為使用者定死）。
+        #    本測試在該檔加入豁免時**實際擋下過主委一次**——這正是它存在的目的。
+        "白話說明/治理待辦總覽.md",
     }
     got = set(json.loads(REG.read_text(encoding="utf-8"))
               ["_schema"]["status_scope_grandfathered"])

@@ -27,6 +27,7 @@ FACTKEY-ADDED: governance-batch-status
 FACTKEY-ADDED: governance-ticket-closure
 FACTKEY-ADDED: governance-worklist
 FACTKEY-ADDED: governance-sot-plan
+FACTKEY-ADDED: governance-ticket-sot
 FACTKEY-CRITERIA: governance-criteria
 FACTKEY-MECHANISM: governance-mechanism
 FACTKEY-ENFORCEMENT: governance-enforcement
