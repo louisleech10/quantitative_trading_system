@@ -1084,10 +1084,16 @@ _fk_mount_exists() {   # $1=掛載點字串 → rc=0 表示 settings.json 內確
   # 🔴 rc=2 ＝**環境不完整**，與 rc=1「掛載點不存在」語意分開：
   #   settings.json 是**主控端環境**的事實；在不含它的 repo 副本（既有測試的最小 fixture）
   #   上問「掛載點在不在」無從回答，一律判紅會讓那些測試恆紅。
-  #   🔴 這是一個**刻意引入的 fail-open**（具名殘留 9）：刪掉 settings.json 即可跳過對證。
-  #   代價由兩處承接：① settings.json 已在產出端守衛的受管集合內
-  #   ② 刪掉它會使**全部** hook 失效，是比本檢查更早、更明顯的故障。
-  [ -f "${_fkme_path}" ] || return 2
+  #   🔴 S1.2 已收窄此 fail-open（原為：檔不存在即 rc=2 略過 ⇒ 刪掉 settings.json 即跳過對證，
+  #   codex 判「大聲印出不是阻擋」）。現行拆成兩種、以**目錄是否存在**判別，此判準封閉可判定：
+  #     · 承載目錄存在、settings.json 不存在 ⇒ **環境異常**（被刪／改名）⇒ rc=3 ⇒ fail-closed
+  #     · 承載目錄本身不存在 ⇒ 真的不是主控端環境（fixture 樹／委員沙箱）⇒ rc=2 ⇒ 略過
+  #   如此既堵住「刪檔即跳過」，又不讓沒有 .claude/ 的最小 fixture 整批誤紅。
+  if [ ! -f "${_fkme_path}" ]; then
+    _fkme_dir="$(dirname -- "${_fkme_path}")"
+    [ -d "${_fkme_dir}" ] && return 3
+    return 2
+  fi
   # 🔴 片段須為 repo 內**實際存在且可執行**的腳本路徑
   #   〔GROK-R1-P1-01 實構：`contains` 下短子串如 `sh`／`a`／`bash` 對真實 settings.json
   #    即判「掛載存在」，等於任何新列都能自動過關〕
@@ -1195,8 +1201,13 @@ _fk_validate_enforcement() {
         _fk_mount_exists "${_fkve_mount}"
         case "$?" in
           0) : ;;
-          2) # 環境不完整：大聲說，但不判紅（見 _fk_mount_exists 之 rc=2 註解）
-             echo "gen_fact_key_blocks: ${_fkve_id} 之掛載點未對證——本樹無 settings.json（非主控端環境）⇒ 略過對證。真主控端仍會驗。" >&2 ;;
+          2) # 承載目錄本身不存在＝真的非主控端環境（fixture／沙箱）：大聲說，不判紅
+             echo "gen_fact_key_blocks: ${_fkve_id} 之掛載點未對證——本樹無 hook 設定之承載目錄（非主控端環境）⇒ 略過對證。真主控端仍會驗。" >&2 ;;
+          3) # 🔴 S1.2：承載目錄在、設定檔不在 ⇒ 環境異常，判紅（原本此路與 rc=2 合流，是 fail-open）
+             echo "gen_fact_key_blocks: ${_fkve_id} 之掛載點無法對證——hook 設定之承載目錄存在，但設定檔缺失 → fail-closed" >&2
+             echo "  這不是「非主控端環境」，而是設定檔被刪或改名；此路徑原與略過合流，" >&2
+             echo "  等於刪掉設定檔即可跳過全部掛載點對證（S1.2 已封）。" >&2
+             _fkve_rc=1 ;;
           *) echo "gen_fact_key_blocks: ${_fkve_id} 宣告為${_fkve_side}，但掛載點在 settings.json 內不存在：${_fkve_mount} → fail-closed（禁自我宣稱）" >&2
              _fkve_rc=1 ;;
         esac

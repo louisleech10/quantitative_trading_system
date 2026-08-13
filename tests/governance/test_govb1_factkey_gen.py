@@ -964,6 +964,37 @@ def test_s11_ghost_ticket_is_rejected(tmp_path):
     )
 
 
+def test_s12_missing_settings_with_dir_present_is_fail_closed(tmp_path):
+    """S1.2：hook 設定之承載目錄存在、設定檔缺失 ⇒ fail-closed（非「大聲印出後放行」）。
+
+    🔴 原行為：設定檔不存在即略過全部掛載點對證 ⇒ **刪掉它就能跳過**（codex：
+       「大聲印出不是阻擋」）。修法以**目錄是否存在**區分兩種情況，判準封閉可判定。
+    本測試與 test_s12_missing_settings_dir_is_skipped 成對，證明修法精準而非一律判紅。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    sdir = _sandbox(tmp_path, data)
+    (sdir.parent / ".claude").mkdir(parents=True, exist_ok=True)   # 承載目錄在、設定檔不在
+
+    r = _run([str(sdir / GEN.name), "--check"],
+             env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    assert r.returncode != 0, f"設定檔缺失卻放行 ⇒ fail-open：{r.stdout}{r.stderr}"
+    assert "設定檔缺失" in (r.stdout + r.stderr), (
+        f"rc≠0 但未具名設定檔缺失 ⇒ 可能紅在別的原因：{r.stdout}{r.stderr}"
+    )
+
+
+def test_s12_missing_settings_dir_is_skipped(tmp_path):
+    """S1.2 對照：承載目錄本身不存在 ⇒ 仍略過（真的非主控端環境，fixture 不得整批誤紅）。"""
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    sdir = _sandbox(tmp_path, data)                                 # 不建 .claude/
+
+    r = _run([str(sdir / GEN.name), "--check"],
+             env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    assert "非主控端環境" in (r.stdout + r.stderr), (
+        f"承載目錄不存在時未走略過路徑 ⇒ 最小 fixture 會整批誤紅：{r.stdout}{r.stderr}"
+    )
+
+
 def test_t21_non_git_root_is_fail_closed(tmp_path):
     """SPEC Task 2.1 邊界⑥：非 git 樹 ⇒ fail-closed，不得靜默退回只掃 target。"""
     reg = {"k": {"target": "docs/a.md", "rows": [["010", "ZZID"]]}}
