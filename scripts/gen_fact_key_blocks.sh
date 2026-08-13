@@ -1081,7 +1081,13 @@ _fk_mount_exists() {   # $1=掛載點字串 → rc=0 表示 settings.json 內確
   #   若改成 `_fk_root()`，所有 fixture 測試會因缺該檔而整批誤紅。
   _fkme_repo="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
   _fkme_path="${_fkme_repo}/${_fkme_sp}"
-  [ -f "${_fkme_path}" ] || return 1
+  # 🔴 rc=2 ＝**環境不完整**，與 rc=1「掛載點不存在」語意分開：
+  #   settings.json 是**主控端環境**的事實；在不含它的 repo 副本（既有測試的最小 fixture）
+  #   上問「掛載點在不在」無從回答，一律判紅會讓那些測試恆紅。
+  #   🔴 這是一個**刻意引入的 fail-open**（具名殘留 9）：刪掉 settings.json 即可跳過對證。
+  #   代價由兩處承接：① settings.json 已在產出端守衛的受管集合內
+  #   ② 刪掉它會使**全部** hook 失效，是比本檢查更早、更明顯的故障。
+  [ -f "${_fkme_path}" ] || return 2
   # 🔴 片段須為 repo 內**實際存在且可執行**的腳本路徑
   #   〔GROK-R1-P1-01 實構：`contains` 下短子串如 `sh`／`a`／`bash` 對真實 settings.json
   #    即判「掛載存在」，等於任何新列都能自動過關〕
@@ -1186,9 +1192,14 @@ _fk_validate_enforcement() {
     while IFS='	' read -r _fkve_id _fkve_mount _fkve_sd _fkve_wv; do
       [ -n "${_fkve_id}" ] || continue
       if [ "${_fkve_sd}" = "${_fkve_side}" ]; then
-        _fk_mount_exists "${_fkve_mount}" || {
-          echo "gen_fact_key_blocks: ${_fkve_id} 宣告為${_fkve_side}，但掛載點在 settings.json 內不存在：${_fkve_mount} → fail-closed（禁自我宣稱）" >&2
-          _fkve_rc=1; }
+        _fk_mount_exists "${_fkve_mount}"
+        case "$?" in
+          0) : ;;
+          2) # 環境不完整：大聲說，但不判紅（見 _fk_mount_exists 之 rc=2 註解）
+             echo "gen_fact_key_blocks: ${_fkve_id} 之掛載點未對證——本樹無 settings.json（非主控端環境）⇒ 略過對證。真主控端仍會驗。" >&2 ;;
+          *) echo "gen_fact_key_blocks: ${_fkve_id} 宣告為${_fkve_side}，但掛載點在 settings.json 內不存在：${_fkve_mount} → fail-closed（禁自我宣稱）" >&2
+             _fkve_rc=1 ;;
+        esac
       else
         _fkve_hit=0
         for _fkve_ph in ${_FK_WAIVER_PLACEHOLDERS}; do

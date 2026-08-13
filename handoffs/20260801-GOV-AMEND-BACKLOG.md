@@ -2798,9 +2798,18 @@ TICKET-STATUS: OPEN
 
 ## B-49 票 `GOV-ROLES-SOT-CANNOT-EXPRESS-ORCHESTRATOR`
 
-TICKET-STATUS: CLOSED
+TICKET-STATUS: OPEN
 
-🔴 **關票日期**：2026-08-12。**關票證據為機械可驗，非宣稱**——
+🔴 **由 CLOSED 退回 OPEN（產出端覆蓋鐵律）**：使用者定死「治理票的檢查必須擋在產出端
+才能算已完成」。本票之關票證據檢查僅掛 pre-push；主委所寫之豁免理由
+（「單次 Edit 當下無等價判定」）經三家一致否決——`CODEX-R1-P1-05` 指出**現有
+output-side test 已能在獨立實體 repo 驗證那六個 selector，且不需新 commit**。
+⇒ **重新關票之前置＝把閉合證據的靜態子集前移至產出端**，見
+`docs/GOV_ENFORCEMENT_REGISTRY.md` 之 `E-007`。
+🔴 本次退回同時修掉一處 SoT 不一致：`governance-ticket-closure` 已改為「部分完成」，
+而本欄仍為 `CLOSED`，**兩處狀態分歧且無任何檢查會抓**——該缺口已具名，見登記表殘留 10。
+
+🔴 **原關票日期**：2026-08-12。**關票證據為機械可驗，非宣稱**——
 `test_b45_unfreeze_requires_roles_sot_closure` 於票標 `CLOSED` 時會呼叫
 `_assert_b49_closure_evidence()`，逐格於**實體隔離副本**執行六個具名 selector
 並驗各自的 `rc`／`passed`／`skipped`；缺 selector／被掏空／清單漂移／逾時
