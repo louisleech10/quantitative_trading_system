@@ -1032,7 +1032,7 @@ EOF
 # 🔴 檢查 ② 是**機械對證**不是自我宣稱：宣告「產出端」者，其掛載點必須在
 #   `.claude/settings.json` 的 hooks 裡真的找得到（event＋matcher＋command 三者都要對上）。
 #   否則本表會退化成「大家都說自己有做」的散文目錄——那正是本 epic 反覆治的病。
-_FK_ENFORCEMENT_SCHEMA_FIELDS='enforcement_keys enforcement_side_enum enforcement_producer_side enforcement_column_roles enforcement_settings_path enforcement_closed_status enforcement_ticket_roles'
+_FK_ENFORCEMENT_SCHEMA_FIELDS='enforcement_keys enforcement_side_enum enforcement_producer_side enforcement_column_roles enforcement_settings_path enforcement_closed_status enforcement_ticket_roles enforcement_ticket_allowlist'
 
 # 🔴 收案字面**寫死於此**，非由註冊表自證——自證＝無檢查（同 `_FK_RESERVED` 之紀律）。
 #   r1 三家全員實構出「規則被它所管制的資料自己關掉」：
@@ -1246,6 +1246,40 @@ EOF2
     printf '%s\n' "${_fkve_missing}" | sed 's/^/    /' >&2
     echo "  規則（使用者 2026-08-13 定死）：治理票要標收案，其檢查必須擋在產出端；" >&2
     echo "  擋不了就在 governance-enforcement 具名寫出為什麼（如 G-7 需 commit、pytest 十分鐘級）。" >&2
+    return 1; }
+
+  # ⑤ 🔴 S1.1 封死幽靈票 —— 對應票欄之值須在「票全集 ∪ 非票標的白名單」內
+  #   allowlist 須存在且為字串陣列（缺欄即 fail-closed，不得因缺欄而略過整條檢查）。
+  LC_ALL=C jq -e '._schema.enforcement_ticket_allowlist
+                  | type == "array" and (length >= 0)
+                  and (map(type == "string" and length > 0) | all)' "${REG}" >/dev/null 2>&1 || {
+    echo "gen_fact_key_blocks: _schema.enforcement_ticket_allowlist 缺席或非字串陣列 → fail-closed" >&2
+    return 1; }
+  # 🔴 全程以 `. as $root` 取值：不可在 index() 參數位置寫 `._schema…`——
+  #   該處的 `.` 已被前段 pipe 改寫，會取到 null 而使整條檢查恆綠（本檔 ④ 已踩過一次）。
+  _fkve_ghost="$(LC_ALL=C jq -er '
+    . as $root
+    | $root._schema.enforcement_column_roles.ticket as $tcol
+    | $root._schema.enforcement_ticket_allowlist as $allow
+    | $root._schema.enforcement_ticket_roles as $tr
+    | ($root[$tr.key].columns | index($tr.id)) as $idi
+    | [ $root[$tr.key].rows[] | .[$idi] ] as $universe
+    | [ $root._schema.enforcement_keys[] as $ek
+        | $root[$ek] as $e
+        | ($e.columns | index($tcol)) as $ti
+        | $e.rows[] | .[$ti] ]
+    | unique
+    | map(select(. as $v
+                 | ($universe | index($v)) == null
+                 and ($allow | index($v)) == null))
+    | join("\n")' "${REG}")" || {
+    echo "gen_fact_key_blocks: 幽靈票檢查之 jq 失敗 → fail-closed（不得當成『沒有幽靈票』）" >&2
+    return 1; }
+  [ -z "${_fkve_ghost}" ] || {
+    echo "gen_fact_key_blocks: governance-enforcement 之「對應票」欄含**票全集外之值** → fail-closed:" >&2
+    printf '%s\n' "${_fkve_ghost}" | sed 's/^/    /' >&2
+    echo "  修：①若為真票，先登記進 ${_fkve_tk}（票 SoT）②若為非票標的（如判準代號、測試套件），" >&2
+    echo "  　　須顯式加入 _schema.enforcement_ticket_allowlist 並在測試之集合相等表同步（禁靜默新增）。" >&2
     return 1; }
   return "${_fkve_rc}"
 }

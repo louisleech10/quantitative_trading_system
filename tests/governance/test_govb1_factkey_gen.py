@@ -928,6 +928,42 @@ def test_t21_grandfathered_list_is_locked_by_set_equality():
     )
 
 
+def test_s11_enforcement_ticket_allowlist_is_locked_by_set_equality():
+    """S1.1：非票標的白名單以集合相等鎖死 ⇒ 不得靜默把新值加進 enforcement 的對應票欄。
+
+    🔴 白名單存在的唯一正當性＝使用者定死之鐵律原文明文點名 G-7 與 pytest
+       （「除非像 G-7 和 pytest 等可以說明為何不該放在產出端」）。
+       任何第三個值都不是使用者點名的，必須經審查才能進來——本表即該審查的機械載體。
+    """
+    expected = {"G-7", "測試套件"}
+    got = set(json.loads(REG.read_text(encoding="utf-8"))
+              ["_schema"]["enforcement_ticket_allowlist"])
+    assert got == expected, (
+        f"非票標的白名單與本表不相等：多={sorted(got - expected)} 少={sorted(expected - got)}。"
+        "白名單是「合法的非票標的」之封閉集合；靜默新增等於為幽靈票開後門。"
+    )
+
+
+def test_s11_ghost_ticket_is_rejected(tmp_path):
+    """S1.1 反例（可證偽）：對應票填票全集外之值 ⇒ rc≠0 且訊息具名該值。
+
+    🔴 斷言訊息而非只看 rc——本 epic 已兩次因「紅在別的原因」而誤把空心檢查當成通過。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    ekey = data["_schema"]["enforcement_keys"][0]
+    tcol = data["_schema"]["enforcement_column_roles"]["ticket"]
+    ti = data[ekey]["columns"].index(tcol)
+    data[ekey]["rows"][0][ti] = "B-99999"      # 票全集內不存在，且不在 allowlist
+    sdir = _sandbox(tmp_path, data)            # data 已含 _schema ⇒ 不注入最小 schema
+
+    r = _run([str(sdir / GEN.name), "--check"],
+             env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    assert r.returncode != 0, f"幽靈票未被擋（rc=0）：{r.stdout}{r.stderr}"
+    assert "B-99999" in (r.stdout + r.stderr), (
+        f"rc≠0 但訊息未具名該幽靈票值 ⇒ 可能紅在別的原因：{r.stdout}{r.stderr}"
+    )
+
+
 def test_t21_non_git_root_is_fail_closed(tmp_path):
     """SPEC Task 2.1 邊界⑥：非 git 樹 ⇒ fail-closed，不得靜默退回只掃 target。"""
     reg = {"k": {"target": "docs/a.md", "rows": [["010", "ZZID"]]}}
