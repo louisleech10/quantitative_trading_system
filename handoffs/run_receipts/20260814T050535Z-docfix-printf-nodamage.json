@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260814T050535Z-docfix-printf-nodamage",
+  "claim_id": "docfix-printf-nodamage",
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--numstat",
+    "--",
+    "白話說明/第0批-施工清單.md",
+    "白話說明/第1批-在做什麼.md",
+    "白話說明/第1批-施工清單.md"
+  ],
+  "command_sha256": "fabbfe24088aaa5a78aeb16eaf76b4ecef6e9b5c40f52cbd26de25c1ec41d173",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "82633c264ca1b443f28d96885187cd17bcab1fcd",
+  "tree_dirty": true,
+  "started_at": "2026-08-14T05:05:35Z",
+  "ended_at": "2026-08-14T05:05:35Z",
+  "duration_seconds": 0.021181,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "781fa37d7cc047c0a0b693af1cb289644354a39a04acc0c816ee7bb200adf804",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "781fa37d7cc047c0a0b693af1cb289644354a39a04acc0c816ee7bb200adf804",
+  "log_path": "handoffs/run_receipts/20260814T050535Z-docfix-printf-nodamage.log",
+  "tail_excerpt": [
+    "3\t0\t\"\\347\\231\\275\\350\\251\\261\\350\\252\\252\\346\\230\\216/\\347\\254\\2540\\346\\211\\271-\\346\\226\\275\\345\\267\\245\\346\\270\\205\\345\\226\\256.md\"",
+    "3\t0\t\"\\347\\231\\275\\350\\251\\261\\350\\252\\252\\346\\230\\216/\\347\\254\\2541\\346\\211\\271-\\345\\234\\250\\345\\201\\232\\344\\273\\200\\351\\272\\274.md\"",
+    "3\t0\t\"\\347\\231\\275\\350\\251\\261\\350\\252\\252\\346\\230\\216/\\347\\254\\2541\\346\\211\\271-\\346\\226\\275\\345\\267\\245\\346\\270\\205\\345\\226\\256.md\""
+  ]
+}
