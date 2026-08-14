@@ -135,7 +135,7 @@ pytest                                           # all tests
 - 🔴 **執行端跑驗收時，主控端不得動檔**：`test_t01_f3_g7_when_committed` 類斷言會比對「工作區 dirty 數前後不變」，主控端同時寫檔會使其 flaky；亦不得並行跑兩份會就地 mutate 檔案再還原的 pytest（會互相污染）。2026-08-07 實際踩到。
 - 跑完測試須 `bash scripts/restore_golden_inventory.sh` 還原 golden inventory 的副作用（否則 `tests/golden/l65/test_inventory.txt` 會髒）。
 - 🔴 **本專案已無 CI**（2026-08-13 使用者定，`.github/workflows/` 整個刪除）。`governance.yml` 連續五次全紅（42 failed / 1631 passed）、`verify_claim.yml` 亦紅，**無人查看＝零保護純噪音**，判準同 `l65_benchmark.yml`（2026-07-26 刪，連續 startup failure）。那 42 條經查證**無一為真實跨平台 bug**，全是 CI 環境配置（效能斷言在共用 runner 不可靠、shallow clone 讀不到 git 歷史、G-7 需 commit 範圍）。`scripts/ci_check_after_push.sh` 與其 hook 掛載一併移除（它正是為「CI 紅了沒人看」而做，卻因 CI 需 18 分鐘、hook 在 push 當下查到的永遠是 pending 而從未生效——**非同步結果用同步 hook 查**）。
-- 🔴 **推論（勿再重議）**：`gov_check.sh` 的全套 pytest 現為**唯一防線**，**不得再以「CI 會兜底」為由移出 pre-push**。跨平台盲區（BSD/GNU `realpath`、`stat -f %m` vs `-c %Y`）**不再有任何東西擋**——要省 push 時間只能靠把檢查**前移到產出端**，不能靠移走。`scripts/benchmark_l65.py` 保留，效能本機跑。
+- 🔴 **本條已於 2026-08-14 由使用者裁定改寫**（原文：「全套 pytest 為唯一防線，不得移出 pre-push」）。**改寫理由是前提被實測推翻，不是放寬標準**：那 920 秒跑的是 `pytest tests/governance`，**只涵蓋治理腳本**；`tests/momentum`／`api`／`feature_engineering` 等 **2,445 條量化測試一條都沒跑**——它守的不是產品。同日使用者裁定回量化主線、治理不再擴建 ⇒ 治理腳本改動趨近零卻每次推送付 15 分鐘。使用者原話：「我只要 commit 和 push 是幾秒鐘內的事情」。**現行**：`pre-push` 只跑 `gov_check --fast`（秒級）。全套改為**明示的手動關卡**——動過 `scripts/`／`tests/governance/` 者，收 epic 前自行跑 `bash scripts/gov_check.sh --no-probe`（丟背景）。🔴 **誠實邊界**：這是降低防護換可用性的取捨，跨平台盲區（BSD/GNU `realpath`、`stat -f %m` vs `-c %Y`）**現在沒有任何東西擋**；日後若回頭大改治理，應把 `pre-push` 改回 `--no-probe`。`scripts/benchmark_l65.py` 保留，效能本機跑。
 - 3 個既有測試檔探針空心（`test_verify_gate{,_b3,_b4}.py`）＝假綠，已在 `gov_check.sh` 具名排除。
 
 **資料與數值**

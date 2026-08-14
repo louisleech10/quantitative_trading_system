@@ -21,13 +21,38 @@ fi
 [ -f scripts/gov_check.sh ] || {
   echo "pre-push: scripts/gov_check.sh 缺失 → fail-closed 拒 push" >&2; exit 1; }
 
-echo "pre-push: 委派 scripts/gov_check.sh --no-probe…"
-if ! bash scripts/gov_check.sh --no-probe; then
+# ── 🔴 2026-08-14 使用者定：pre-push 改為秒級 ────────────────────────────
+# 使用者原話：「我只要 commit 和 push 是幾秒鐘內的事情」。
+#
+# 為何可以改（**前提變了，不是放寬標準**）：
+#   · 舊設計把**全套 governance pytest**（實測 920 秒／15 分 20 秒）放在此處，
+#     理由是「CI 已刪，這是唯一防線」。
+#   · 2026-08-14 實測揭露該前提的缺口：那 920 秒跑的是 `pytest tests/governance`，
+#     **只涵蓋治理腳本**；`tests/momentum`／`api`／`feature_engineering` 等
+#     **2,445 條量化測試一條都沒跑**。它守的不是產品。
+#   · 同日使用者裁定**回量化主線、治理留現狀不再擴建** ⇒ 治理腳本的改動頻率趨近零，
+#     而每次推送仍付 15 分鐘。**成本與風險完全不成比例。**
+#
+# 現行：pre-push 只跑 `--fast`（shell 語法 ＋ 本次改動之治理文件格式，實測秒級）。
+#
+# 🔴 **移走的東西沒有消失，改為明示的手動關卡**：
+#   · 動到 `scripts/`／`tests/governance/` 之後，收 epic 前跑一次
+#     `bash scripts/gov_check.sh --no-probe`（丟背景，十分鐘級）
+#   · 本輪之前的既有紀律（commit 前跑受影響測試子集）不變
+#
+# 🔴 **誠實邊界**：這是**降低防護以換取可用性**的取捨，不是「其實不需要」。
+#   跨平台盲區（BSD/GNU `realpath`、`stat -f %m` vs `-c %Y`）現在**沒有任何東西擋**。
+#   若日後回頭大改治理，應把此段改回 `--no-probe`。
+_GC_MODE="--fast"
+echo "pre-push: 委派 scripts/gov_check.sh ${_GC_MODE}（秒級；全套已改為手動關卡，理由見本檔註解）…"
+if ! bash scripts/gov_check.sh "${_GC_MODE}"; then
   echo "" >&2
-  echo "pre-push: ✗ 治理檢查未過 → 拒 push。" >&2
-  echo "  修好再推;確有必要時 GOVERNANCE_SKIP_PREPUSH=1 git push(並自行確認 CI)。" >&2
+  echo "pre-push: ✗ 治理快閘未過 → 拒 push。" >&2
+  echo "  修好再推;確有必要時 GOVERNANCE_SKIP_PREPUSH=1 git push。" >&2
   exit 1
 fi
 
-echo "pre-push: ✓ 放行 push(push 後 ci_check_after_push 會自動回報 CI 結果)"
+echo "pre-push: ✓ 放行 push"
+echo "  🔴 提醒：全套 governance pytest **不再於此執行**。動過 scripts/ 或 tests/governance/ 者，"
+echo "     收 epic 前請自行跑一次 bash scripts/gov_check.sh --no-probe（丟背景）。"
 exit 0
