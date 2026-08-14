@@ -58,6 +58,7 @@
 | `mutation_probe_check.sh` | 工具 | gov_check  |
 | `plain_docs_guard_selftest.sh` | 一次性驗證 | 未掛 |
 | `plain_docs_sync_check.sh` | 常態檢查 | pre-commit gov_check  |
+| `precommit_selfcheck.sh` | 常態檢查 | 未掛 |
 | `proc_guard.sh` | 常態檢查 | 未掛 |
 | `reconcile_cluster_attribution_check.sh` | 常態檢查 | reconcile_build  |
 | `reconcile_stamps_check.sh` | 常態檢查 | gate  |
