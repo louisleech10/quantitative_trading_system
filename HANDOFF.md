@@ -138,13 +138,31 @@ grok 本輪已獨立審查並自行戳記，但 `verify_task_provenance` 要求�
 16 條全數採納並修，收斂檔 `handoffs/reconcile/20260814-govmount-x-review-r1/synth.md`，
 債已清（`debt_clear` OK，16/16 無掉項）。
 
-🔴 **仍未做（push 前必補）**：
-1. **未跑全套 `gov_check`**——本輪只跑受影響子集（`test_govb1_factkey_{gen,hook}` 223 條、
-   `test_narrow_check_router` 13 條、`test_decouple_baseline` 10 條、
-   `test_govb1_contract_matrix`＋`test_govb49_path_grant` 124 條，皆綠）。
-2. `白話說明/` 七份因本批動到 `scripts/` 而**時序過期**（`plain_docs_sync_check` 是 pre-push 硬擋）。
-3. 委員 review 檔尚無 **stamp 輪**——本輪只到 review＋reconcile，未請三家 append
-   `RECONCILE-STAMP`。要正式收案需補一輪 `stamp-r2`。
+✅ **stamp 輪已補**（`20260814-govmount-x-stamp-r2`）：三家各自複驗**自家**於 r1 提出之
+findings（章程 §B8 原提出方複驗），皆以**跑反例**而非讀碼確認關閉，三家零 findings sentinel
+並各自 append `RECONCILE-STAMP APPROVED`；body hash 三家各自重算且一致，
+`reconcile_stamps_check.sh` rc=0，債已清。
+🔴 grok 另獨立確認主委兩則「具名邊界」誠實：heredoc 那條**仍 HIT**（未修，與宣稱相符）、
+`check_decoupling_imports.py` 之 provenance 限制屬真限制而非逃避。
+
+✅ **白話說明七份已同步**（`a4d93a34`，`plain_docs_sync_check` rc=0）。
+
+🔴 **仍未做**：
+1. **未跑全套 `gov_check`**——本輪只跑受影響子集：`test_govb1_factkey_{gen,hook}` 223 條、
+   `test_narrow_check_router` 13 條、`test_decouple_baseline` **9** 條、
+   `test_govb1_contract_matrix`＋`test_govb49_path_grant` 124 條，皆綠。
+   （🔴 主委曾把 9 寫成 10，由三家回報值比對發現——**可查的計數不得憑印象寫**。）
+2. **推送等使用者明示**。筆數直接查。
+
+### 🔴 下一手可以直接做的一件事（本輪新發現，未修）
+
+`handoffs/` **外**的受戳記資產（如 `scripts/decouple_allowlist.md`），
+新戳記在現行機制下**無法通過 provenance**——`register-output` 只收 `handoffs/` 內的檔，
+既有戳記靠 `_is_legacy_allowlisted_stamp` 豁免。
+後果具體且已在咬人：canonical Rule 2/3/4 的 scanner **自 2026-07-14 起從未掃過**。
+掛載前置（baseline＋9 條測試）已全部就緒，**只差這個機制被修好**。
+🔴 修法應指向機制本身（例如 register-output 的受管路徑集合怎麼定義），
+**不得放寬 provenance 判準**。
 
 ## 接手第一件事：做上方投影表**由上而下第一個尚未完成的項目**
 
