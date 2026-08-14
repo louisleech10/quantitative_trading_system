@@ -1,0 +1,31 @@
+# decouple_baseline.txt — canonical Rule 2/3/4 之**既有債** baseline（自動生成，勿手改）
+#
+# 這份檔案的意思是：下列違反是 CLAUDE.md 記載的既有 P2 債，**已知、已具名、待清**；
+# scanner 掛上自動路徑後只擋「不在本清單內的新增違反」，不會因既有債而擋死日常編輯。
+#
+# 🔴 這不是豁免，是**債的清單**。每還一條就會印 BASELINE RESOLVED，屆時應把該列刪掉。
+# 🔴 鍵不含行號（否則每次編輯就整批失效）；代價＝同檔同標的再多加一個 import 抓不到。
+#
+# 重生成：venv/bin/python scripts/check_decoupling_imports.py \
+#           --baseline scripts/decouple_baseline.txt --update-baseline
+# 該指令會把當下所有違反吸收成「可接受」⇒ 其 diff 必須經 review 才可 commit。
+api/routes/ic_analysis.py|R3|from|momentum.Analysis.ic_reporter.assert_filtered_export_fresh|#1
+api/routes/ic_analysis.py|R3|from|momentum.Analysis.ic_reporter.normalize_analysis_status|#1
+api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.DegradedOOSViolation|#1
+api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.assert_filtered_export_fresh|#1
+api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.normalize_analysis_status|#1
+api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.normalize_analysis_status|#2
+api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.normalize_analysis_status|#3
+api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.normalize_analysis_status|#4
+api/services/model_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes|#1
+api/services/model_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.build_service_oot_bundle|#1
+api/services/model_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.performance_to_scoped_dict|#1
+api/services/pattern_management_service.py|R4|from|api.routes.pattern_analysis|#1
+api/services/pattern_management_service.py|R4|from|api.services.xgboost_batch_service|#1
+api/services/xgboost_batch_service.py|R3|from|momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes|#1
+api/services/xgboost_batch_service.py|R3|from|momentum.Analysis.eval_scope_utils.build_service_oot_bundle|#1
+api/services/xgboost_batch_service.py|R3|from|momentum.Analysis.eval_scope_utils.performance_to_scoped_dict|#1
+api/services/xgboost_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes|#1
+api/services/xgboost_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.build_service_oot_bundle|#1
+api/services/xgboost_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.performance_to_scoped_dict|#1
+momentum/Analysis/ic_filter_orchestrator.py|R2|from|momentum.FeatureEngineering.labels.label_generator.WINSORIZED_DISABLED_MSG|#1

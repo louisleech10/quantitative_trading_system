@@ -40,23 +40,26 @@
 | 腳本 | 類別 | 掛載點（機械導出） |
 |---|---|---|
 | `brief_conformance_check.sh` | 常態檢查 | gate gov_check committee_run cx_run  |
-| `check_agent_contract_sync.sh` | 常態檢查 | 未掛 |
+| `check_agent_contract_sync.sh` | 常態檢查 | narrow_check_router  |
 | `check_decoupling.sh` | 常態檢查 | 未掛 |
 | `check_decoupling_phase4.sh` | 常態檢查 | 未掛 |
-| `check_doc_anchors.sh` | 常態檢查 | 未掛 |
+| `check_doc_anchors.sh` | 常態檢查 | pre-commit  |
 | `completeness_check.sh` | 常態檢查 | gate cx_run reconcile_build  |
 | `coverage_check.sh` | 常態檢查 | gate  |
-| `doc_format_precheck.sh` | 常態檢查 | PostToolUse gate gov_check cx_run  |
+| `doc_format_precheck.sh` | 常態檢查 | PostToolUse gov_check  |
 | `draft_selfcheck.sh` | 常態檢查 | 未掛 |
 | `factkey_write_guard.sh` | 常態檢查 | PostToolUse  |
 | `g7_trailer_precheck.sh` | 常態檢查 | commit-msg  |
-| `gate_check.sh` | 常態檢查 | PreToolUse gate  |
-| `gov_check.sh` | 常態檢查 | pre-push gate cx_run  |
+| `gate_check.sh` | 常態檢查 | PreToolUse  |
+| `gen_fact_key_blocks.sh` | 常態檢查 | gov_check  |
+| `gov_check.sh` | 常態檢查 | pre-push  |
 | `govb1_ghostpath_check.sh` | 常態檢查 | 未掛 |
 | `govb1_selfcheck.sh` | 常態檢查 | gate  |
 | `govb1_single_source_check.sh` | 常態檢查 | gate  |
 | `install_verify_hooks.sh` | 工具 | 未掛 |
+| `list_active_mechanisms.sh` | 常態檢查 | PostToolUse  |
 | `mutation_probe_check.sh` | 工具 | gov_check  |
+| `narrow_check_router.sh` | 常態檢查 | PostToolUse  |
 | `plain_docs_guard_selftest.sh` | 一次性驗證 | 未掛 |
 | `plain_docs_sync_check.sh` | 常態檢查 | pre-commit gov_check  |
 | `precommit_selfcheck.sh` | 常態檢查 | 未掛 |
@@ -67,8 +70,9 @@
 | `session_name_check.sh` | 常態檢查 | committee_run  |
 | `spec_fourway_check.sh` | 常態檢查 | 未掛 |
 | `status_marker_check.sh` | 常態檢查 | Stop  |
-| `template_check.sh` | 常態檢查 | gate gov_check committee_run  |
+| `template_check.sh` | 常態檢查 | gate gov_check  |
 | `test_template_check.sh` | 一次性驗證 | 未掛 |
+| `ticket_universe.sh` | 常態檢查 | 未掛 |
 | `todo_spec_crosscheck.sh` | 常態檢查 | 未掛 |
 | `verdict_filled_check.sh` | 常態檢查 | gate  |
 | `verify_b1_independent.sh` | 一次性驗證 | 未掛 |
@@ -82,8 +86,11 @@
 | `verify_pretooluse.sh` | 常態檢查 | PreToolUse  |
 | `verify_role_gate.sh` | 常態檢查 | 未掛 |
 | `verify_spec_stamp_delta.sh` | 常態檢查 | 未掛 |
+| `b49_closure_static_check.py` | 常態檢查 | narrow_check_router  |
+| `build_l65_golden_baseline.py` | 常態檢查 | 未掛 |
 | `check_decoupling_imports.py` | 常態檢查 | 未掛 |
 | `check_doc_manifest_b.py` | 常態檢查 | 未掛 |
+| `extract_phase2_expected_flips.py` | 常態檢查 | narrow_check_router  |
 | `verification_claim_check.py` | 常態檢查 | pre-commit commit-msg  |
 | `verify_audit_chain.py` | 常態檢查 | 未掛 |
 | `verify_cgsa_pipeline.py` | 常態檢查 | 未掛 |
@@ -132,7 +139,7 @@
 | `B-10` | ✅ 產出端在跑（D 延伸檔） | 施工面無已知殘留，但狀態與現樹之落差尚未複核 |
 | `B-19` | ✅ 產出端在跑（brief 檔） | 檢查深度不足：`R-12`——full path 不驗 `EXPECTED-DELTA` |
 | `B-15` | ✅ 派工前在跑（`PreToolUse`）| 殘留是**誤擋率**而非缺掛載；誤擋事件無紀錄 ⇒ 無法量測、改完無法驗證 |
-| `B-49` | ⚠️ 僅 pre-push | 閉合證據的靜態子集尚未前移到產出端 |
+| `B-49` | ✅ 產出端在跑（閉合證據檔） | 🔴 2026-08-14 更新：靜態子集**已前移**（`scripts/b49_closure_static_check.py`，經 `narrow_check_router` 掛 `PostToolUse`）。仍不能收案，因四條具名殘留未閉（見 `docs/GOV_B49_ASBUILT_DELTA.md` §3）；隔離重放依其本質仍留在 pre-push |
 | 其餘 8 張 | ❌ 多未掛 | **改法本身未完成** ⇒ 無檢查可掛，非「不想掛」 |
 
 🔴 多數票卡在「**改法本身沒做完**」，不是卡在「機制沒掛上」。
@@ -170,3 +177,56 @@ bash scripts/list_active_mechanisms.sh --write   # 不一致時重生成
 bash .claude/tmp/s04_export_delivered.sh         # 已交付票（部分完成 ∪ 收案）
 LC_ALL=C jq -r '."governance-ticket-sot".rows[] | .[2]' scripts/fact_keys.json | sort | uniq -c
 ```
+
+---
+
+## 七、腳本級掛載判定（非票驅動，2026-08-14）
+
+> 使用者原話：「**全部的票和腳本，該掛哪／為何沒掛／能不能掛，可以掛的就要掛上去，
+> 只有掛和不掛兩種結果，不掛就要有原因，耗費時間太多也是原因。
+> 沒有什麼可能、推理、想看看——你用推理都全錯。不是表格列出，是實際上線。**」
+>
+> 🔴 本節記的是**腳本**，不是票。它們不進 `docs/GOV_ENFORCEMENT_REGISTRY.md`，
+> 因為該表的「對應票」欄由 `S1.1` 封閉集合鎖死，非票標的白名單經集合相等測試
+> 鎖為使用者點名的 `G-7`／`測試套件` 兩值；為登記腳本而撬那道鎖，代價大於收益。
+>
+> 🔴 每一列的判定都附**實測**，不接受讀碼推論。本日推理四次全錯、實測兩次全中。
+
+| 腳本 | 判定 | 依據（實測） |
+|---|---|---|
+| `check_agent_contract_sync.sh` | ✅ **已掛** `PostToolUse` | 經 `narrow_check_router.sh`，觸發條件＝四源合約檔之一被 Edit/Write。實測 rc=0／約 1 秒 |
+| `extract_phase2_expected_flips.py --check` | ✅ **已掛** `PostToolUse` | 同上，觸發條件＝`GOVB0_FRICTION_TODO.md` 或其 fixture 被改。實測 rc=0／0 秒 |
+| `check_doc_anchors.sh` | ✅ **已掛** `pre-commit`（非產出端） | 實測全庫 3.61 秒、`--files` 窄跑 3.76 秒 ⇒ **窄化省不到**（成本在建全庫標題索引）。掛 `PostToolUse` 技術上可行，但每次 `.md` 編輯多 3.6 秒，單一 session 的 md 編輯次數即為兩位數 ⇒ 分鐘級純摩擦。改掛 commit 邊界，且只在有 `.md` 進 staged 時才跑 |
+| `draft_selfcheck.sh` | ❌ **不掛**（已有裁決，非未做） | 委員會 R4 收斂裁定（`handoffs/reconcile/20260801-gov-amend-r4/synth.md:133`，三家 APPROVED）：「只能是 advisory，**不得作為安全邊界**。把可繞過的字面檢查掛成 gate 是製造程序假綠。」⇒ 掛上去本身違反裁決。理由已寫死於該腳本檔頭 |
+| `check_decoupling_imports.py` | ❌ **不掛**（現樹恆紅，紅因在戳記 provenance 機制） | 見下方「§七.1」逐步實測 |
+
+### §七.1 `check_decoupling_imports.py` 為何不掛（逐步實測，每步都可重跑）
+
+canonical Rule 2/3/4 是 `CLAUDE.md` 標為 **Zero Tolerance** 的規則，它的 scanner 卻**不掛**。
+理由不是「不想掛」，是四層剝下來以後**掛上去就是紅的**：
+
+1. **現樹 rc=1，但紅因不是解耦違反**——是 `scripts/decouple_allowlist.md`
+   缺 grok 的 `RECONCILE-STAMP`（既有兩枚皆 2026-07-14，而 grok 自 07-12 起為正式委員）。
+   ⇒ scanner 從那時起 fail-closed 在戳記關卡，**一行程式碼都沒掃過**。
+2. **本輪已請 grok 獨立審查並自行戳記**，戳記已落地（body hash 由 grok 自算，與既有兩枚一致）。
+3. **戳記仍不被採信**：`verify_task_provenance.py` 的 `check_stamp_provenance` 要求審計中
+   有一則指向**被戳記檔本身**的 `committee_output` 事件；而 `gate.sh register-output`
+   **只接受 `handoffs/` 內的檔**（實測：對 `scripts/decouple_allowlist.md` 直接 rc=1）。
+   🔴 既有兩枚戳記之所以過，是走 `_is_legacy_allowlisted_stamp` 的**豁免**，
+   **不是**真的通過 provenance——查 audit 可見 `DECOUPLE-SCAN2` 的 dispatch 事件同樣是 `pending`。
+   ⇒ **`handoffs/` 外的受戳記資產，新戳記在現行機制下無法通過 provenance。**
+   這是本輪新發現的結構性缺口，未修；**不得**以修改該判準來讓自己過關。
+4. **就算戳記通過，掃描本身仍紅**：以函式層注入 verifier 的唯讀探針量得
+   R2=1／R3=17／R4=2，共 20 筆（`CLAUDE.md` 記載的「R2=5/R3=12/R4=1」已過期）。
+   ⇒ 直接掛上會擋死所有 `momentum/`／`api/` 編輯。
+
+**已完成的準備**（掛載的前置都做好了，只差第 3 步那個缺口）：
+`--baseline` 模式（觀測集合 ⊆ baseline 即通過，只擋新增違反）、`scripts/decouple_baseline.txt`
+（20 筆，鍵為 `路徑|規則|形式|標的|#序號`——不含行號故位移不失效，含 occurrence 序號
+故「同檔同標的再加一個 import」仍判為新增〔`CODEX-R1-P1-05`〕）、
+以及 `tests/governance/test_decouple_baseline.py` 10 條（含缺檔 fail-closed、
+空 baseline 為最嚴格、以及「baseline 不得順手變成 stamp bypass」的反向確認）。
+
+🔴 **`draft_selfcheck.sh` 曾被誤記為「現樹就是紅的」**——那是拿 `HANDOFF.md` 當標的所致。
+它是**草案**自檢（要求檔內有 schema 與 §oracle 表），`HANDOFF.md` 兩者皆無，紅是預期。
+⇒ **探測選錯標的，不是樹紅。** 這正是「用推理寫進交接檔」的實例。

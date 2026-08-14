@@ -111,4 +111,28 @@ done < <(git diff --cached --name-only --diff-filter=ACMR -z)
 #    本層的價值＝在**當下**提醒，而非等到 push 時 commit 訊息都寫完了才發現。
 [ -f scripts/plain_docs_sync_check.sh ] && bash scripts/plain_docs_sync_check.sh --staged || true
 
+# ── 文件錨點／死連結（scripts/check_doc_anchors.sh）────────────────────────
+# 🔴 為何掛這裡而不是產出端（使用者 2026-08-14T18:40+08:00：「耗費時間太多也是原因」）：
+#   實測 2026-08-14：全庫 3.61 秒、`--files HANDOFF.md` 窄跑 3.76 秒——**窄化省不到**，
+#   因為成本在「建全庫標題索引」，而解析一條連結必須知道所有檔的所有標題。
+#   ⇒ 掛 PostToolUse 技術上可行（它就是個 rc≠0 的檢查），但代價是**每一次 .md 編輯**
+#     多 3.6 秒；本 session 的 .md 編輯次數是兩位數 ⇒ 分鐘級純摩擦。
+#   ⇒ 改掛 commit 邊界，且只在真的有 .md 進 staged 時才跑（無 .md ⇒ 零成本）。
+#   誠實邊界：這是**消費端**，不是產出端；死連結會活到 commit 當下才被發現。
+#   🔴 本列刻意**不進** docs/GOV_ENFORCEMENT_REGISTRY.md：該表之「對應票」欄由封閉集合
+#     鎖死（S1.1），非票標的白名單經集合相等測試鎖為使用者點名的兩個值。
+#     為登記一支腳本而撬那道鎖，代價大於收益。判定記於
+#     docs/GOV_ACTIVE_MECHANISMS.md「§七 腳本級掛載判定」。
+if [ -f scripts/check_doc_anchors.sh ]; then
+  _anchor_staged="$(git diff --cached --name-only --diff-filter=ACMR -- '*.md' 2>/dev/null | head -1)"
+  if [ -n "${_anchor_staged}" ]; then
+    bash scripts/check_doc_anchors.sh
+    _anchor_rc=$?          # 🔴 rc 直接取，禁經 pipe（CLAUDE.md 明載）
+    if [ "${_anchor_rc}" -ne 0 ]; then
+      echo "pre-commit: 🔴 文件錨點檢查未過（新增死連結）——修掉或說明後再 commit" >&2
+      exit 1
+    fi
+  fi
+fi
+
 exec "$py" "$checker" --staged

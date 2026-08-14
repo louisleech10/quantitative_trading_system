@@ -30,9 +30,24 @@ _where() {   # $1=腳本路徑 → 掛載點（空白分隔；無則「未掛」
   for h in pre-commit commit-msg pre-push; do
     LC_ALL=C grep -q "${b}" "scripts/git_hooks/${h}" 2>/dev/null && out="${out}${h} "
   done
-  for c in gate.sh gov_check.sh committee_run.sh cx_run.sh reconcile_build.sh; do
+  # 🔴 narrow_check_router.sh 於 2026-08-14 加入：它是 PostToolUse 的窄觸發路由器，
+  #   其 _routes() 對照表就是「誰被掛上」的權威來源之一。漏了它 ⇒ 表列的檢查
+  #   明明已上線卻仍顯示「未掛」（S6.1 抓過的同一種登記錯誤）。
+  for c in gate.sh gov_check.sh committee_run.sh cx_run.sh reconcile_build.sh narrow_check_router.sh; do
     [ "${b}" = "${c}" ] && continue
-    LC_ALL=C grep -q "${b}" "scripts/${c}" 2>/dev/null && out="${out}${c%.sh} "
+    # 🔴 **排除註解行**：純 grep 會把「檔頭註解提到某支腳本」當成掛載。
+    #   2026-08-14 實際發生：narrow_check_router.sh 的成本說明提到 check_doc_anchors.sh、
+    #   邊界說明提到 factkey_write_guard.sh，兩支立刻被記成「經 narrow_check_router 掛載」——
+    #   而它們根本不在 _routes() 表裡。本檔 §五.2 早已寫明「提及 ≠ 產出」，
+    #   偏偏這支導出器自己犯了同一條。
+    # 🔴 COMPOSER-R1-P2-01（沙箱實構）：只排整行 `#` 仍會把三種「提及」判成掛載——
+    #   ①行尾註解 `echo ok  # scripts/x.sh` ②`: 'scripts/x.sh'` 區塊註解 ③heredoc 內字面量。
+    #   ①②已於下方剝除；🔴 ③ **仍是具名邊界**：heredoc 內容在 shell 層無法只用 grep 分辨，
+    #   要根治須做 shell 解析。現樹無此形態（已逐支確認），故列為已知邊界不強解。
+    [ -f "scripts/${c}" ] || continue
+    LC_ALL=C grep -v '^[[:space:]]*#' "scripts/${c}" 2>/dev/null \
+      | LC_ALL=C sed -e 's/[[:space:]]#.*$//' -e '/^[[:space:]]*:[[:space:]]/d' \
+      | LC_ALL=C grep -q "${b}" && out="${out}${c%.sh} "
   done
   printf '%s' "${out:-未掛}"
 }
@@ -51,7 +66,15 @@ _emit() {
   for f in scripts/*.sh scripts/*.py; do
     [ -f "${f}" ] || continue
     b="$(basename "${f}")"
-    case "${b}" in *check*|*guard*|*verify*) : ;; *) continue ;; esac
+    # 納入判準＝**檔名樣式 ∪ 自身宣告 --check 模式**。
+    # 🔴 只用檔名是 proxy，會漏：`extract_phase2_expected_flips.py` 有 --check 卻因命名隱形，
+    #   於 2026-08-14 掛載盤點時才發現它「不在清單上所以沒人知道它沒掛」。
+    #   補法刻意**不是**把漏掉的檔名一個個加進來（黑名單永遠列不完），
+    #   而是改成可導出的封閉述詞：宣告了 --check 就是有通過／不通過語意的檢查。
+    case "${b}" in
+      *check*|*guard*|*verify*) : ;;
+      *) LC_ALL=C grep -qE '^[[:space:]]*(--check\)|"--check",?$)' "${f}" 2>/dev/null || continue ;;
+    esac
     printf '| `%s` | %s | %s |\n' "${b}" "$(_kind "${b}")" "$(_where "${f}")"
   done
 }
@@ -100,14 +123,34 @@ case "${1:-}" in
     # 產出端模式：只在**會改變掛載關係**的檔被改時才跑 --check（否則秒退）。
     # 受管集合為封閉列舉：hook 設定／git hooks／五個呼叫端／本文件／新增之 scripts 腳本。
     # 🔴 全量 --check 約 1.3 秒，對每次 Edit 都跑會疊在既有守衛之上 ⇒ 條件觸發。
+    # 🔴 GROK-R1-P1-01（BLOCKING，實構命中）：原版只讀 `${2:-}`，
+    #   但 `.claude/settings.json` 的 PostToolUse 是以 **stdin JSON** 餵 `tool_input.file_path`、
+    #   **不帶 argv**。⇒ p 恆為空字串 ⇒ 落到 `*) exit 0` ⇒ **本守衛從未真正跑過**，
+    #   是個掛著卻恆綠的空心格。體例改為與 factkey_write_guard.sh 一致：argv 優先、否則讀 stdin。
     p="${2:-}"
+    if [ -z "${p}" ] && [ ! -t 0 ]; then
+      p="$(python3 -c 'import json,sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print(""); raise SystemExit(0)
+ti = d.get("tool_input") or {}
+v = ti.get("file_path") or ti.get("path") or ""
+print(v if isinstance(v, str) else "")' 2>/dev/null || true)"
+      # 絕對路徑轉 repo 相對（hook 給的是絕對路徑；封閉列舉全是相對路徑）
+      case "${p}" in
+        "${PWD}"/*) p="${p#"${PWD}"/}" ;;
+      esac
+    fi
     case "${p}" in
       .claude/settings.json|scripts/git_hooks/*|docs/GOV_ACTIVE_MECHANISMS.md) : ;;
       scripts/gate.sh|scripts/gov_check.sh|scripts/committee_run.sh|scripts/cx_run.sh|scripts/reconcile_build.sh) : ;;
       scripts/*.sh|scripts/*.py) : ;;
       *) exit 0 ;;
     esac
-    out="$("$0" --check 2>&1)" || {
+    # 🔴 須以 `bash` 呼叫：本檔未必有可執行位（實測 Permission denied）。
+    #   這個 bug 在 P1-01 的空心格修好之前**永遠不會被執行到** ⇒ 空心格會藏住下游缺陷。
+    out="$(bash "$0" --check 2>&1)" || {
       printf '[mechanisms] 🔴 掛載一覽與實況不一致（你剛改了 %s）\n' "${p}" >&2
       printf '%s\n' "${out}" | sed 's/^/  /' >&2
       exit 2

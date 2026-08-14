@@ -329,10 +329,91 @@ def scan(
     return ScanResult(tuple(sorted(violations, key=lambda item: (str(item.path), item.line, item.target))))
 
 
+BASELINE_HEADER = """\
+# decouple_baseline.txt — canonical Rule 2/3/4 之**既有債** baseline（自動生成，勿手改）
+#
+# 這份檔案的意思是：下列違反是 CLAUDE.md 記載的既有 P2 債，**已知、已具名、待清**；
+# scanner 掛上自動路徑後只擋「不在本清單內的新增違反」，不會因既有債而擋死日常編輯。
+#
+# 🔴 這不是豁免，是**債的清單**。每還一條就會印 BASELINE RESOLVED，屆時應把該列刪掉。
+# 🔴 鍵不含行號（否則每次編輯就整批失效）；代價＝同檔同標的再多加一個 import 抓不到。
+#
+# 重生成：venv/bin/python scripts/check_decoupling_imports.py \\
+#           --baseline scripts/decouple_baseline.txt --update-baseline
+# 該指令會把當下所有違反吸收成「可接受」⇒ 其 diff 必須經 review 才可 commit。
+"""
+
+
+def baseline_key(violation: Violation, repo_root: Path) -> str:
+    """單筆違反的**群組**鍵：`<repo 相對路徑>|<規則>|<形式>|<標的>`。不含行號。
+
+    🔴 不含行號的理由：既有債散在會被日常編輯的檔裡，
+    含行號的 baseline 每改一行就整批失效，等於沒有 baseline。
+
+    🔴 但只有群組鍵**不夠**〔`CODEX-R1-P1-05`〕：同一檔對同一標的**再多加一個** import
+    會落在同一個鍵上，被誤當成既有債放行。⇒ 對外的 baseline 鍵由
+    `baseline_keys()` 產生，會在群組鍵後綴 occurrence 序號。本函式只負責群組。
+    """
+    try:
+        rel = violation.path.resolve().relative_to(repo_root)
+    except ValueError:
+        rel = violation.path
+    return f"{rel}|{violation.rule}|{violation.form}|{violation.target}"
+
+
+def baseline_keys(violations: Iterable[Violation], repo_root: Path) -> list[str]:
+    """完整 baseline 鍵集合：群組鍵 ＋ `|#<序號>`。
+
+    序號 ＝ 同一群組內依**行號排序**後的序位（1 起算）。
+
+    為什麼這樣既穩又準〔`CODEX-R1-P1-05`〕：
+      · 行號整批位移（上面插了幾行）⇒ 群組成員與序位皆不變 ⇒ baseline 仍成立
+      · 同一檔對同一標的**多加一個** import ⇒ 該群組多出 `#N+1` ⇒ **判為新增**
+      · 還掉一個 ⇒ 少一個序號 ⇒ 印 BASELINE RESOLVED
+    """
+    grouped: dict[str, list[Violation]] = {}
+    for v in violations:
+        grouped.setdefault(baseline_key(v, repo_root), []).append(v)
+    keys: list[str] = []
+    for gkey, items in grouped.items():
+        for idx, _ in enumerate(sorted(items, key=lambda x: x.line), start=1):
+            keys.append(f"{gkey}|#{idx}")
+    return sorted(keys)
+
+
+def load_baseline(path: Path) -> set[str]:
+    """讀 baseline；缺檔即 ScannerError（fail-closed，不得靜默視為空集合）。
+
+    🔴 「檔不在就當成沒有 baseline 然後放行」正是本專案 S1.2 抓到的 fail-open 病灶。
+    空檔（0 筆）是**合法且最嚴格**的 baseline：任何違反都算新增。
+    """
+    if not path.is_file():
+        raise ScannerError(f"baseline 檔不存在: {path}（缺檔不得視為零違反）")
+    keys = set()
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        keys.add(line)
+    return keys
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Production CLI；刻意不提供任何 stamp bypass。"""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args(argv)
+    parser.add_argument(
+        "--baseline",
+        help="既有債之 baseline 檔；觀測集合為其子集即通過（只擋新增違反）",
+    )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="把現況寫回 --baseline 指定之檔（大聲印出；產出須經 review 才可 commit）",
+    )
+    args = parser.parse_args(argv)
+    if args.update_baseline and not args.baseline:
+        print("ERROR: --update-baseline 須同時指定 --baseline", file=sys.stderr)
+        return 2
     repo_root = Path(__file__).resolve().parent.parent
     try:
         result = scan(
@@ -347,10 +428,51 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ScannerError as exc:
         print(f"DECOUPLING IMPORT SCANNER ERROR: {exc}", file=sys.stderr)
         return 1
+
     for violation in result.violations:
         print(violation.render())
     print(f"R2={result.count('R2')} R3={result.count('R3')} R4={result.count('R4')}")
-    return 1 if result.violations else 0
+
+    if not args.baseline:
+        return 1 if result.violations else 0
+
+    bpath = Path(args.baseline)
+    if not bpath.is_absolute():
+        bpath = repo_root / bpath
+    observed = set(baseline_keys(result.violations, repo_root))
+
+    if args.update_baseline:
+        body = BASELINE_HEADER + "\n".join(sorted(observed)) + ("\n" if observed else "")
+        bpath.write_text(body, encoding="utf-8")
+        print(f"BASELINE UPDATED: {bpath} ({len(observed)} 筆)")
+        print("🔴 這個動作會把現有違反全部吸收成『可接受』——產出必須經 review 才可 commit。")
+        return 0
+
+    try:
+        known = load_baseline(bpath)
+    except ScannerError as exc:
+        print(f"DECOUPLING IMPORT SCANNER ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    new_keys = sorted(set(observed) - known)
+    resolved = sorted(known - set(observed))
+    for key in resolved:
+        print(f"BASELINE RESOLVED（債已還，可自 baseline 移除）: {key}")
+    if new_keys:
+        print(
+            f"DECOUPLING NEW VIOLATIONS: {len(new_keys)} 筆不在 baseline 內 → 拒絕",
+            file=sys.stderr,
+        )
+        for key in new_keys:
+            print(f"  NEW: {key}", file=sys.stderr)
+        print(
+            "  修：把違反改掉（canonical Rule 2/3/4，見 CLAUDE.md）。"
+            "確定要納入既有債才跑 --update-baseline，且該 diff 須經 review。",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"BASELINE OK: 觀測 {len(observed)} 筆全在 baseline（{len(known)} 筆）內，無新增違反")
+    return 0
 
 
 if __name__ == "__main__":

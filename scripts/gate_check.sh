@@ -242,7 +242,10 @@ _gate_precheck_content() {
   #   ⇒ 任何以 `gate.sh dispatch` 為條件的 PreToolUse 檢查**永遠不會被執行到**。
   #   主委一度在此加了該檢查，實測（bash -x）證明它是死碼，已移除——
   #   留著會造成「看起來有防護、實際永不觸發」，比沒有更糟。
-  #   B-29 之檢查現況：仍在 gate.sh:684 之工具內部層，該層是它能到達的最早位置。
+  #   B-29 之檢查現況：仍在 gate.sh dispatch 之 impl 路徑內、由 brief_conformance_check.sh
+  #   承接的那一段（EXPECTED-DELTA 介面），屬工具內部層，是它能到達的最早位置。
+  #   🔴 COMPOSER-R1-P2-02：原註解寫「gate.sh:684」，該行實為 brief_conformance_check 呼叫，
+  #   非獨立的 B-29 區塊 ⇒ 行號錨點誤導。改為指名腳本與介面，不綁會漂的行號。
   # ── 票 B-48：no-findings-expected 標籤真偽（第二層）──
   case "${_gpc_cmd}" in *debt_clear*) : ;; *) return 0 ;; esac
   case "${_gpc_cmd}" in *no-findings-expected*) : ;; *) return 0 ;; esac
