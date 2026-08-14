@@ -195,6 +195,10 @@
           {
             "type": "command",
             "command": "bash scripts/factkey_write_guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/list_active_mechanisms.sh --hook"
           }
         ]
       }
