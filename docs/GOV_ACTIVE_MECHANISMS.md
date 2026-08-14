@@ -88,7 +88,7 @@
 | `verify_spec_stamp_delta.sh` | 常態檢查 | 未掛 |
 | `b49_closure_static_check.py` | 常態檢查 | narrow_check_router  |
 | `build_l65_golden_baseline.py` | 常態檢查 | 未掛 |
-| `check_decoupling_imports.py` | 常態檢查 | 未掛 |
+| `check_decoupling_imports.py` | 常態檢查 | narrow_check_router  |
 | `check_doc_manifest_b.py` | 常態檢查 | 未掛 |
 | `extract_phase2_expected_flips.py` | 常態檢查 | narrow_check_router  |
 | `verification_claim_check.py` | 常態檢查 | pre-commit commit-msg  |
@@ -198,9 +198,12 @@ LC_ALL=C jq -r '."governance-ticket-sot".rows[] | .[2]' scripts/fact_keys.json |
 | `extract_phase2_expected_flips.py --check` | ✅ **已掛** `PostToolUse` | 同上，觸發條件＝`GOVB0_FRICTION_TODO.md` 或其 fixture 被改。實測 rc=0／0 秒 |
 | `check_doc_anchors.sh` | ✅ **已掛** `pre-commit`（非產出端） | 實測全庫 3.61 秒、`--files` 窄跑 3.76 秒 ⇒ **窄化省不到**（成本在建全庫標題索引）。掛 `PostToolUse` 技術上可行，但每次 `.md` 編輯多 3.6 秒，單一 session 的 md 編輯次數即為兩位數 ⇒ 分鐘級純摩擦。改掛 commit 邊界，且只在有 `.md` 進 staged 時才跑 |
 | `draft_selfcheck.sh` | ❌ **不掛**（已有裁決，非未做） | 委員會 R4 收斂裁定（`handoffs/reconcile/20260801-gov-amend-r4/synth.md:133`，三家 APPROVED）：「只能是 advisory，**不得作為安全邊界**。把可繞過的字面檢查掛成 gate 是製造程序假綠。」⇒ 掛上去本身違反裁決。理由已寫死於該腳本檔頭 |
-| `check_decoupling_imports.py` | ❌ **不掛**（現樹恆紅，紅因在戳記 provenance 機制） | 見下方「§七.1」逐步實測 |
+| `check_decoupling_imports.py` | ✅ **已掛** `PostToolUse`（2026-08-14 修好卡點後上線） | 經 `narrow_check_router.sh` 之目錄前綴列，觸發條件＝`momentum/` 或 `api/` 被 Edit/Write。實測 1.67 秒／次、帶 `--baseline` 故只擋新增違反。**卡點與修法見下方 §七.1** |
 
-### §七.1 `check_decoupling_imports.py` 為何不掛（逐步實測，每步都可重跑）
+### §七.1 `check_decoupling_imports.py` 卡在哪、怎麼修好的（逐步實測，每步都可重跑）
+
+> ✅ **2026-08-14 已上線。** 本節保留完整診斷路徑——它是「一支腳本掛不上時，
+> 卡點常常不在那支腳本」的教科書案例：四層剝下來，前三層都不是它的問題。
 
 canonical Rule 2/3/4 是 `CLAUDE.md` 標為 **Zero Tolerance** 的規則，它的 scanner 卻**不掛**。
 理由不是「不想掛」，是四層剝下來以後**掛上去就是紅的**：
@@ -220,12 +223,49 @@ canonical Rule 2/3/4 是 `CLAUDE.md` 標為 **Zero Tolerance** 的規則，它�
    R2=1／R3=17／R4=2，共 20 筆（`CLAUDE.md` 記載的「R2=5/R3=12/R4=1」已過期）。
    ⇒ 直接掛上會擋死所有 `momentum/`／`api/` 編輯。
 
-**已完成的準備**（掛載的前置都做好了，只差第 3 步那個缺口）：
+**第 3 步之修法（已做）**：`scripts/gate.sh register-output` 的受管路徑集合由硬編
+`handoffs/*` 改為 `handoffs/* ∪ scripts/stampable_artifacts.txt` 之**字面列**
+（不接受萬用字元／目錄前綴／`..`，清單壞掉即 fail-closed；缺檔則退回只收 `handoffs/`）。
+🔴 **修的是「什麼可以被註冊」，不是 provenance 判定本身**——
+`check_stamp_provenance` 一字未改，仍要求有先行 dispatch、hash 相符、戳記格式正確。
+
+🔴 修完第一次仍紅，暴露**第二個洞**：`verify_task_provenance._handoffs_relative`
+對不含 `handoffs/` 的路徑**原樣返回** ⇒ 同一個檔用絕對路徑與相對路徑寫永遠比不相等。
+實測：`reconcile_stamps_check.sh scripts/decouple_allowlist.md` rc=0，
+同一支改傳絕對路徑 rc=1——而該 scanner 正是傳絕對路徑。已改為正規化為 repo 相對。
+
+**已完成的準備**：
 `--baseline` 模式（觀測集合 ⊆ baseline 即通過，只擋新增違反）、`scripts/decouple_baseline.txt`
 （20 筆，鍵為 `路徑|規則|形式|標的|#序號`——不含行號故位移不失效，含 occurrence 序號
 故「同檔同標的再加一個 import」仍判為新增〔`CODEX-R1-P1-05`〕）、
 以及 `tests/governance/test_decouple_baseline.py` 10 條（含缺檔 fail-closed、
 空 baseline 為最嚴格、以及「baseline 不得順手變成 stamp bypass」的反向確認）。
+
+### §七.2 治理文件能不能封存：**機械判定為 0 份**（2026-08-14）
+
+使用者要求「盤那兩萬行，能搬的搬 `docs/Archived/`，只留票 SoT 那一套」。
+盤了：`bash scripts/gov_doc_triage.sh`（四個判準皆機械可導出——fact-key 宿主／
+腳本非註解行引用／測試引用／被其他 `.md` 連結）。
+
+**結果：`docs/GOV*.md` 42 份，可封存 0 份。**
+
+第一趟只用「硬引用」判，42 份**全部**卡在「文件連結」；因治理文件彼此大量互連，
+故加了不動點（只被同樣可封存的檔連到者仍算可封存，因為整群一起搬時群內連結一起搬）。
+**跑完仍是 0 份。**
+
+原因不是技術限制，是**它們就是票表的證據層**。實例：
+
+| 被連的檔 | 連它的是誰 |
+|---|---|
+| `GOV_B49_ASBUILT_DELTA.md` | `GOV_TICKET_SOT.md`、`HANDOFF.md` |
+| `GOV_CRITERIA_REGISTRY.md` | `GOV_TICKET_SOT.md`、`白話說明/接下來要做什麼.md` |
+
+⇒ **票表每列的「還缺什麼」只有一行摘要，細節在那些檔裡。**
+搬走等於把要保留的那份表的證據抽掉；而 `check_doc_anchors.sh` 已掛 `pre-commit`，
+死連結會當場擋 commit。
+
+**結論：不搬。** 要搬只能同時改寫票表與交接檔裡的引用路徑——那是把證據指標一起搬，
+不是清雜訊，收益與風險不成比例。
 
 🔴 **`draft_selfcheck.sh` 曾被誤記為「現樹就是紅的」**——那是拿 `HANDOFF.md` 當標的所致。
 它是**草案**自檢（要求檔內有 schema 與 §oracle 表），`HANDOFF.md` 兩者皆無，紅是預期。

@@ -65,6 +65,16 @@ _routes() {
   # ⇒ 關票證據被抽掉。純 AST，不跑測試不碰 git ⇒ 寫檔當下就判得出來
   printf '%s\n' "tests/governance/test_govb49_path_grant.py|python3 scripts/b49_closure_static_check.py"
   printf '%s\n' "scripts/b49_closure_static_check.py|python3 scripts/b49_closure_static_check.py"
+  # 🔴 canonical Rule 2/3/4（CLAUDE.md 標「零容忍」）之 AST scanner。
+  #   目錄前綴列——刻意的例外，理由與成本：
+  #     · 實測 1.67 秒／次，且**只在改 momentum/ 或 api/ 時才觸發**（本 repo 的主線程式碼）
+  #     · 該 scanner 自 2026-07-14 起因戳記關卡停擺，07-15～07-22 有 21 個 commit
+  #       打進它守的檔，其中兩條新違反（R2/R3）於 07-18 無聲長出 ⇒ 消費端擋不住這種
+  #     · 帶 --baseline：既有 20 條債列管，只擋**新增**違反，不會擋死日常編輯
+  #   前綴列由 tests/…/test_narrow_check_router.py 之 ALLOWED_PREFIXES 集合相等鎖住，
+  #   新增前綴必須同時改測試 ⇒ 一定被 review。
+  printf '%s\n' "momentum/|python3 scripts/check_decoupling_imports.py --baseline scripts/decouple_baseline.txt"
+  printf '%s\n' "api/|python3 scripts/check_decoupling_imports.py --baseline scripts/decouple_baseline.txt"
 }
 # 🔴 上線實證（2026-08-14T21:0x+08:00，非推理）：曾臨時加一列
 #   `.claude/tmp/ncr_live_probe.txt|bash .claude/tmp/ncr_fail_stub.sh`（樁 rc=1），

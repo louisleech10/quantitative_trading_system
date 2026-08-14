@@ -165,12 +165,25 @@ def test_unwritable_tmpdir_fails_closed(tmp_path: Path) -> None:
         bad_tmp.chmod(0o700)
 
 
+# 🔴 目錄前綴之封閉白名單（GROK-R1-P2-03 之修法，2026-08-14 由「一律禁止」改為「明列才准」）。
+#
+# 原本一律禁止，但 canonical Rule 2/3/4 的 scanner 必須對 `momentum/`／`api/` 觸發——
+# 那正是它要守的主線程式碼。一律禁止會逼人繞道（另開 hook 條目），反而讓成本模型
+# 分散到看不見的地方。改為集合相等鎖：新增前綴必須同時改本表 ⇒ 一定被 review。
+#
+# 收錄條件（加列時逐條答，答不出來就不要加）：
+#   ① 該前綴涵蓋的路徑**不是高頻編輯面**（`scripts/`、`docs/` 這類一律不准）
+#   ② 對應檢查已實測秒數，且寫在 narrow_check_router.sh 的註解裡
+#   ③ 該檢查在現樹為綠（否則掛上即擋死該目錄的所有編輯）
+ALLOWED_PREFIXES = {"momentum/", "api/"}
+
+
 def test_routes_have_no_directory_prefix() -> None:
     """🔴 GROK-R1-P2-03：成本模型（未命中不 fork）建立在「命中率低」上。
 
     路由器的碼**支援** `/` 結尾的目錄前綴，一旦有人加入 `scripts/` 這類列，
     每次 Edit 都會命中，成本模型當場失效而測試不會發現。
-    ⇒ 把「不得有目錄前綴」機械鎖住，而不是寫在註解裡靠人記得。
+    ⇒ 前綴須在 `ALLOWED_PREFIXES` 內，且以**集合相等**鎖住（多一個少一個都紅）。
     """
     # 🔴 不能 `source` 本檔取 `_routes`：檔尾就是主流程，source 會直接跑掉並 exit。
     #    改自原始碼抽 `_routes()` 的 body——仍是**同一份**定義，不另抄一張表。
@@ -180,11 +193,25 @@ def test_routes_have_no_directory_prefix() -> None:
     body = src[start:end]
     rows = re.findall(r"printf '%s\\n' \"([^\"]+)\"", body)
     assert rows, "取不到對照表（`_routes()` 之抽取樣式已漂）"
-    bad = [r for r in rows if r.split("|", 1)[0].endswith("/")]
-    assert not bad, (
-        f"對照表出現目錄前綴列 {bad} ⇒ 每次 Edit 皆命中，"
-        "成本模型失效。要加請同步修改 narrow_check_router.sh 檔頭之成本節與本測試。"
+    found = {r.split("|", 1)[0] for r in rows if r.split("|", 1)[0].endswith("/")}
+    assert found == ALLOWED_PREFIXES, (
+        f"目錄前綴與白名單不相等：多={sorted(found - ALLOWED_PREFIXES)} "
+        f"少={sorted(ALLOWED_PREFIXES - found)}。"
+        "新增前綴須同時修改本表與 narrow_check_router.sh 之成本註解——"
+        "這正是「不得靜默擴大觸發面」的機械強制點。"
     )
+
+
+def test_prefix_checks_are_green_on_current_tree() -> None:
+    """🔴 前綴列涵蓋面大，掛上前必須在現樹為綠，否則整個目錄都改不動。
+
+    少了這條就可能掛上一個現樹本來就紅的檢查，使主委再也編輯不了 momentum/ 或 api/。
+    """
+    for rel in ("momentum/factories.py", "api/services/__init__.py"):
+        res = subprocess.run(
+            ["bash", str(ROUTER_SRC), rel], cwd=REPO, capture_output=True, text=True
+        )
+        assert res.returncode == 0, f"{rel} 在現樹即被擋：{res.stderr}"
 
 
 def test_real_tree_stays_green_for_phase2_fixture() -> None:

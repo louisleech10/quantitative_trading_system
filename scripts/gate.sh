@@ -166,9 +166,33 @@ if [ "${kind}" = "register-output" ]; then
   esac
   [ -f "${output_path}" ] || { echo "ERROR: register-output 檔不存在:${output_path}"; exit 1; }
   out_rel="$(_norm_output_path "${output_path}")"
+  # 受管路徑集合＝`handoffs/*` ∪ scripts/stampable_artifacts.txt 之字面列。
+  # 🔴 為何不是放寬前綴：見該檔檔頭。原硬編只收 handoffs/ 使
+  #   `scripts/decouple_allowlist.md` 這類受戳記資產**永遠註冊不了**，
+  #   連帶讓 canonical Rule 2/3/4 的 scanner 自 2026-07-14 起完全停擺。
+  # 🔴 缺檔／不可讀 ⇒ 只收 handoffs/（回到原行為），**不是全收**。
+  _GATE_STAMPABLE="${REPO_ROOT}/scripts/stampable_artifacts.txt"
+  _gate_is_stampable() {   # $1=out_rel；rc=0 命中
+    [ -r "${_GATE_STAMPABLE}" ] || return 1
+    local _l
+    while IFS= read -r _l; do
+      _l="${_l%%#*}"                                   # 去註解
+      _l="$(printf '%s' "${_l}" | tr -d '[:space:]')"  # 去空白
+      [ -n "${_l}" ] || continue
+      # 未封閉樣式一律 fail-closed：清單本身壞掉不得靜默放行
+      case "${_l}" in
+        *'*'*|*'?'*|*'['*|*/|*..*)
+          echo "ERROR: stampable_artifacts.txt 含未封閉樣式或 ..（不接受萬用字元／目錄前綴）:${_l}" >&2
+          exit 1 ;;
+      esac
+      [ "${_l}" = "$1" ] && return 0
+    done < "${_GATE_STAMPABLE}"
+    return 1
+  }
   case "${out_rel}" in
     handoffs/*) : ;;
-    *) echo "ERROR: register-output 只接受 handoffs/ 內檔案:${output_path}"; exit 1 ;;
+    *) _gate_is_stampable "${out_rel}" || {
+         echo "ERROR: register-output 只接受 handoffs/ 內檔案，或 scripts/stampable_artifacts.txt 明列者:${output_path}"; exit 1; } ;;
   esac
   case "${out_rel}" in
     *"/../"*|"../"*|*".."*) echo "ERROR: register-output 路徑不可含 ..:${output_path}"; exit 1 ;;

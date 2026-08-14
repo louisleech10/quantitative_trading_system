@@ -1,0 +1,33 @@
+# stampable_artifacts.txt — `handoffs/` 之外，**允許註冊 committee output** 的封閉清單
+#
+# ── 為何存在（2026-08-14）────────────────────────────────────────────
+# `scripts/gate.sh register-output` 原本硬編只收 `handoffs/*`。後果不是理論：
+#   · `scripts/decouple_allowlist.md` 要求全數委員核可，grok 2026-07-12 升正式委員後
+#     一直缺一枚戳記；補簽了也**不被採信**，因為 provenance 要求審計中有指向
+#     被戳記檔本身的 `committee_output` 事件，而該檔不在 `handoffs/` 底下 ⇒ 註冊不了。
+#   · ⇒ canonical Rule 2/3/4 的 scanner 自 2026-07-14 起 fail-closed 在戳記關卡，
+#     **一行程式碼都沒掃過**；07-15～07-22 有 21 個 commit 打進它守的那些檔，
+#     其中至少兩條新違反（R2 一條、R3 一條）於 07-18 長出來而無人知悉。
+#   · 既有兩枚戳記能過，是走 `_is_legacy_allowlisted_stamp` 的**豁免**，
+#     不是真的通過 provenance。
+#
+# ── 為何是清單而不是放寬前綴 ────────────────────────────────────────
+# 放寬成「任何路徑都能註冊」＝把 provenance 的錨點交給呼叫者自由指定。
+# 本專案已四次因**未封閉的 glob／前綴**被三家否決（見 GOV_MECHANISM_REGISTRY）。
+# ⇒ 本檔只收**完整路徑字面值**：
+#     · 不接受萬用字元（含 `*`、`?`、`[`）
+#     · 不接受目錄前綴（結尾 `/`）
+#     · 不接受 `..`
+#   違反者 `gate.sh` 直接 fail-closed，不是略過該列。
+#
+# ── 誠實邊界 ────────────────────────────────────────────────────────
+# 1. 本檔**只放寬「可以註冊」**，不放寬 provenance 的判定本身——
+#    `verify_task_provenance.check_stamp_provenance` 一字未改。
+#    註冊後仍須：有先行 committee_dispatch、hash 相符、戳記行格式正確。
+# 2. 本檔缺席或不可讀 ⇒ **只收 `handoffs/`**（回到原行為），不是「全收」。
+# 3. 加一列等於宣告「這份資產由委員戳記背書」，**其 diff 應被 review**。
+# ---------------------------------------------------------------------
+
+# canonical Rule 2/3/4 之精準豁免清單；由 scripts/check_decoupling_imports.py 讀取，
+# 該 scanner 在掃描前要求本檔獲全數委員 APPROVED 戳記。
+scripts/decouple_allowlist.md

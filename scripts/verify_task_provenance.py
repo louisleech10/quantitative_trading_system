@@ -147,12 +147,28 @@ def _verify_output_hash(output_path: Path, expected_sha256: str) -> tuple[bool, 
 
 
 def _handoffs_relative(path: str) -> str:
-    """取路徑中 handoffs/ 起的相對段（支援絕對路徑）。"""
+    """正規化為可比對的 repo 相對路徑（支援絕對路徑）。
+
+    🔴 2026-08-14 修正：原版只在字串含 `handoffs/` 時才裁切，其餘**原樣返回**
+    ⇒ 同一個檔用絕對路徑與相對路徑寫，兩者永遠比不相等。
+    實測：`reconcile_stamps_check.sh scripts/decouple_allowlist.md` → rc=0；
+    同一支腳本改傳絕對路徑 → rc=1（`check_decoupling_imports.py` 正是傳絕對路徑，
+    因而即使戳記齊備、committee_output 已註冊，仍判 provenance 不符）。
+    ⇒ 這不是放寬判準，是讓**同一個檔的兩種寫法**比得出相等；
+    判定本身（須有事件、hash 須相符）一字未動。
+    """
     norm = _norm_path(path)
     marker = "handoffs/"
     idx = norm.find(marker)
     if idx >= 0:
         return norm[idx:]
+    candidate = Path(norm)
+    if candidate.is_absolute():
+        # 本模組既有設計即假設 cwd＝repo root（DEFAULT_COMMITTEE_AUDIT 為相對路徑）
+        try:
+            return _norm_path(str(candidate.resolve().relative_to(Path.cwd().resolve())))
+        except (ValueError, OSError):
+            return norm
     return norm
 
 
