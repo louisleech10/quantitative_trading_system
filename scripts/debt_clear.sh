@@ -48,7 +48,52 @@ DO_ABANDON=0
 KIND=""
 REASON=""
 APPROVER=""
+ZF_VERIFIED=""
 ACTOR="debt_clear"
+
+# 🔴 「預期零 findings」標籤之真偽檢查（票 B-48，2026-08-14T17:10+08:00 使用者核可）
+#   病根即該票標題：宣告「預期零 findings」，該輪卻實收 5 個 findings（含 1 個 BLOCKING P0）。
+#   實測全期：180 輪標此 kind，其中 **20 輪標籤不實**——那些 findings 未經處置即結案，
+#   無任何紀錄可證明它們被看過。此前該標籤**純靠紀律**，零機械綁定。
+#   零 findings 之 sentinel（`## <FAMILY>-R<n>-P3-00`）是合法形態，須排除；
+#   初版判準未排除它，把 4 輪合法 sentinel 誤判成不實（24 → 20）。
+_DC_FINDING_RE='^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}'
+_DC_SENTINEL_RE='P3-00$'
+
+_dc_zero_findings_guard() {   # $1=round_id；rc=0 放行，rc=1 擋
+  _dcz_rid="$1"
+  [ -f "${AUDIT_LOG:-.claude/gate/audit.log}" ] || return 0
+  _dcz_outs="$(LC_ALL=C grep -E '^\{' "${AUDIT_LOG:-.claude/gate/audit.log}" \
+    | LC_ALL=C jq -r --arg r "${_dcz_rid}" '
+        select(.round_id == $r and .event == "committee_round_open")
+        | ((.expected_outputs // {}) | to_entries | map(.value) | join(","))' 2>/dev/null | head -1)"
+  [ -n "${_dcz_outs}" ] || return 0        # 查不到開輪紀錄 ⇒ 不阻擋（非本閘之判定範圍）
+  _dcz_hits=""
+  IFS=',' read -ra _dcz_paths <<< "${_dcz_outs}"
+  for _dcz_p in "${_dcz_paths[@]}"; do
+    [ -f "${_dcz_p}" ] || continue
+    _dcz_f="$(LC_ALL=C grep -nE "${_DC_FINDING_RE}" "${_dcz_p}" 2>/dev/null \
+              | LC_ALL=C grep -vE "${_DC_SENTINEL_RE}" || true)"
+    [ -n "${_dcz_f}" ] && _dcz_hits="${_dcz_hits}$(printf '%s' "${_dcz_f}" | sed "s#^#    ${_dcz_p}:#")"$'\n'
+  done
+  [ -n "${_dcz_hits}" ] || return 0
+  {
+    echo "🔴 debt_clear 拒絕：本輪標為「預期零 findings」，但產出檔內有實質 findings"
+    echo ""
+    printf '%s' "${_dcz_hits}"
+    echo ""
+    echo "「預期零 findings」的意思是委員沒有東西要報。上列 findings 若未處置即結案，"
+    echo "它們不會出現在任何收斂檔，等於**憑空消失**（票 B-48 之病，全期已發生 20 次）。"
+    echo ""
+    echo "三條出路："
+    echo "  1. findings 是真的 ⇒ 改走正常銷帳："
+    echo "       bash scripts/debt_clear.sh --round-id ${_dcz_rid} --session <名> --lock <sources.lock>"
+    echo "     把 findings 收進收斂檔逐條處置。這本來就是該做的事，本閘只是不讓你跳過。"
+    echo "  2. findings 屬他輪引用 ⇒ 加 --zero-findings-verified \"<理由>\"（寫入 audit，可被稽核）"
+    echo "  3. 本來就該用別的 kind ⇒ --kind collection-failed（不受本檢查約束）"
+  } >&2
+  return 1
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -88,6 +133,15 @@ while [ $# -gt 0 ]; do
     --approver)
       [ $# -ge 2 ] || die "--approver 需要參數"
       APPROVER="$2"
+      shift 2
+      ;;
+    # 🔴 逃生口：產出檔內之 findings 屬**他輪引用**而非本輪新提時使用。
+    #   沒有逃生口就是死鎖（本 epic 已撞過六次「規矩 A 要你做的事、規矩 B 不准你做」）。
+    #   濫用之防護＝理由寫進 audit ⇒「用了幾次」本身可量測，
+    #   逃生口若被當橡皮圖章用，那個數字會自己浮出來。
+    --zero-findings-verified)
+      [ $# -ge 2 ] || die "--zero-findings-verified 需要理由"
+      ZF_VERIFIED="$2"
       shift 2
       ;;
     --actor)
@@ -405,8 +459,11 @@ _emit_abandon() {
     --field "reason=${reason}" \
     --field "approver=${approver}" \
     --field "actor=${ACTOR}" \
+    --field "zero_findings_verified=${ZF_VERIFIED}" \
     --field "origin_script=debt_clear.sh"
 }
+# 🔴 逃生口必須落審計：`--zero-findings-verified` 的唯一防護就是「用了幾次是可查的」。
+#   不寫進 audit 的逃生口＝無聲的萬用鑰匙。初版只解析旗標未落審計，等於沒有防護。
 
 _assert_kind_in_enum() {
   local kind="$1"
@@ -485,6 +542,11 @@ _cmd_abandon() {
     echo "ERROR: --abandon 缺 --approver" >&2
     return 1
   }
+
+  # 🔴 票 B-48：僅 no-findings-expected 受此約束；其餘 kind 之事實查核條件不同（另議）
+  if [ "${kind}" = "no-findings-expected" ] && [ -z "${ZF_VERIFIED}" ]; then
+    _dc_zero_findings_guard "${rid}" || return 1
+  fi
 
   local min_chars
   min_chars="$(_registry_get constants.reason_min_chars)" || return 1

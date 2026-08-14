@@ -424,6 +424,19 @@ bash "${SCRIPT_DIR}/gate.sh" dispatch "${gate_args[@]}" || {
 
 # --- 1b) 開債（gate 成功之後、cx_run 之前；失敗不得啟動任何 cx_run）---
 round_id="$(_mint_round_id)" || die "mint round_id 失敗"
+# 🔴 開輪前顯示這個工作項目的累計成本（使用者 2026-08-14T17:10+08:00 定）。
+#   為何掛在這裡：這是**要不要再花一輪的決策點**。量測工具若只是躺在 repo 裡靠人記得去跑，
+#   等於沒有——使用者原話「你記得有且會用才有用，不然也沒意義」，
+#   而專案憲法第 3 條亦明定「寫出來的工具就是要有強制使用機制，不准靠紀律和記憶」。
+#   只印不擋：這是給人看的取捨資訊，不是合規判定；擋它沒有可判定的門檻。
+if [ -f "${SCRIPT_DIR}/round_cost.sh" ]; then
+  _cr_topic="$(printf '%s' "${session}" \
+    | LC_ALL=C sed -E -e 's/-x-[a-z]+-r[0-9]+$//' \
+                      -e 's/-(rev|stamp|fix|impl|dev|supp|clos|consult)[a-z0-9]*$//' \
+                      -e 's/^[0-9]{8}-//')"
+  bash "${SCRIPT_DIR}/round_cost.sh" --item "${_cr_topic}" 2>/dev/null || true
+fi
+
 echo "[committee_run] === open debt round_id=${round_id} session=${session} ==="
 if ! _open_debt "${round_id}"; then
   echo "ERROR: 開債失敗（session 重複或 audit 寫入失敗）→ 不啟動 cx_run" >&2

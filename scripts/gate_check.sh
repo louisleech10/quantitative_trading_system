@@ -228,6 +228,45 @@ case "$tool_name" in
     ;;
 esac
 
+# ── 指令內容型前置檢查（與 token 機制無關，先於 kind 判定後獨立執行）──
+# 🔴 為何掛在 PreToolUse 而非只留在工具內部（使用者 2026-08-14T18:05+08:00 定
+#   「可以掛的你就要找地方掛」）：工具內部那一層可以被改掉或繞過（改腳本、換路徑），
+#   PreToolUse 是**獨立的第二層**——同 E-001／E-002 之 defense-in-depth 形態。
+#   🔴 誠實邊界：本層**不比工具內部更早**（工具緊接著就會跑），
+#   價值在「工具那層失效時仍有人擋」，不在提早發現。不得宣稱為「前移」。
+_gate_precheck_content() {
+  _gpc_cmd="$1"
+  # 🔴🔴 票 B-29 在此**掛不上**——實測結論，不是還沒做（2026-08-14T18:20+08:00）：
+  #   本檔對 `bash scripts/gate.sh …` 這類指令有**自我豁免的提早 exit 0**
+  #   （見下方 self-gate 判定；沒有它，gate.sh 會被自己的閘擋住 ⇒ 死鎖）。
+  #   ⇒ 任何以 `gate.sh dispatch` 為條件的 PreToolUse 檢查**永遠不會被執行到**。
+  #   主委一度在此加了該檢查，實測（bash -x）證明它是死碼，已移除——
+  #   留著會造成「看起來有防護、實際永不觸發」，比沒有更糟。
+  #   B-29 之檢查現況：仍在 gate.sh:684 之工具內部層，該層是它能到達的最早位置。
+  # ── 票 B-48：no-findings-expected 標籤真偽（第二層）──
+  case "${_gpc_cmd}" in *debt_clear*) : ;; *) return 0 ;; esac
+  case "${_gpc_cmd}" in *no-findings-expected*) : ;; *) return 0 ;; esac
+  case "${_gpc_cmd}" in *--zero-findings-verified*) return 0 ;; esac   # 已具名逃生口
+  # 取 --round-id 的值（字面切，不用正則群組）
+  _gpc_rest="${_gpc_cmd#*--round-id }"
+  _gpc_rid="${_gpc_rest%% *}"
+  [ -n "${_gpc_rid}" ] || return 0
+  [ -f "${SCRIPT_DIR}/debt_clear.sh" ] || return 0
+  # 直接沿用 debt_clear 內的同一份守衛，不另抄一份判準（抄一份必漂）
+  AUDIT_LOG="${AUDIT_LOG:-${GATE_DIR}/audit.log}" \
+  bash -c '
+    set -u
+    src="$1"; rid="$2"
+    eval "$(sed -n "/^_DC_FINDING_RE=/,/^}$/p" "${src}" | sed -n "1,/^}$/p")"
+    _dc_zero_findings_guard "${rid}"
+  ' _ "${SCRIPT_DIR}/debt_clear.sh" "${_gpc_rid}"
+}
+
+if ! _gate_precheck_content "$cmd"; then
+  echo "[GATE BLOCKED] 票 B-48 之第二層（PreToolUse）：見上方 debt_clear 守衛訊息。" >&2
+  exit 2
+fi
+
 [ -z "$kind" ] && exit 0   # 非 gated 動作 → 放行
 
 token="$GATE_DIR/${kind}.token"
