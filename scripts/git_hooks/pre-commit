@@ -135,4 +135,19 @@ if [ -f scripts/check_doc_anchors.sh ]; then
   fi
 fi
 
+# ── 狀態檔不得純檔尾追加（流水帳防治；使用者 2026-08-14 定）────────────────
+# 病根：plain_docs_sync_check 只驗時序（其檔頭自述「可只改一字換綠燈」）
+# ⇒ 最便宜的合規動作＝在檔尾追加一行日期註記 ⇒ 狀態檔長成流水帳
+#   （HANDOFF.md 曾長到 495 行、白話說明 九份 514KB）。
+# 本檢查強迫**回頭改寫現況段**，而不是往下堆。帳本（摩擦記錄／進度日誌／
+# ROADMAP_DETAIL）不在受檢集合內——對它們而言追加是正確形態。
+if [ -f scripts/no_append_only_check.sh ]; then
+  bash scripts/no_append_only_check.sh --check
+  _nao_rc=$?          # 🔴 rc 直接取，禁經 pipe
+  if [ "${_nao_rc}" -ne 0 ]; then
+    echo "pre-commit: 🔴 狀態檔為純檔尾追加 → 拒絕。改寫現況段，或把歷史寫進帳本。" >&2
+    exit 1
+  fi
+fi
+
 exec "$py" "$checker" --staged

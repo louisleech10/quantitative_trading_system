@@ -926,14 +926,20 @@ def test_t21_grandfathered_list_is_locked_by_set_equality():
         "白話說明/README.md",
         "白話說明/流程摩擦記錄.md",
         "白話說明/治理進度日誌.md",
-        "白話說明/第0批-在做什麼.md",
-        "白話說明/第0批-施工清單.md",
-        "白話說明/第1批-在做什麼.md",
-        "白話說明/第1批-施工清單.md",
-        # 🔴 新增（票 SoT 上線）：該檔已標作廢、改由 docs/GOV_TICKET_SOT.md 承載票狀態。
+        # 🔴 2026-08-14 路徑更新（使用者：「已是凍結歷史的就移走」）：下列五檔已搬至
+        #    白話說明/Archived/。**豁免範圍未擴大，只是同一批檔改了位置**——
+        #    集合大小不變（8），仍以集合相等鎖死。
+        #    搬移理由：plain_docs_sync_check 的判準只驗時序 ⇒ 每動一次 scripts/
+        #    就得為凍結歷史檔貼一行日期註記換綠燈（實際貼過三次），純噪音。
+        #    該檢查明寫 Archived/ 除外，搬走即根治。
+        "白話說明/Archived/第0批-在做什麼.md",
+        "白話說明/Archived/第0批-施工清單.md",
+        "白話說明/Archived/第1批-在做什麼.md",
+        "白話說明/Archived/第1批-施工清單.md",
+        # 🔴 該檔已標作廢、改由 docs/GOV_TICKET_SOT.md 承載票狀態。
         #    其內 8 處歷史狀態符號刻意不逐行清除（歷史紀錄，且「修正只考慮以後」為使用者定死）。
         #    本測試在該檔加入豁免時**實際擋下過主委一次**——這正是它存在的目的。
-        "白話說明/治理待辦總覽.md",
+        "白話說明/Archived/治理待辦總覽.md",
     }
     got = set(json.loads(REG.read_text(encoding="utf-8"))
               ["_schema"]["status_scope_grandfathered"])
