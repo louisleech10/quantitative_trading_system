@@ -52,6 +52,7 @@
 | `g7_trailer_precheck.sh` | 常態檢查 | commit-msg  |
 | `gate_check.sh` | 常態檢查 | PreToolUse  |
 | `gen_fact_key_blocks.sh` | 常態檢查 | gov_check  |
+| `golden_staleness_check.sh` | 常態檢查 | 未掛 |
 | `gov_check.sh` | 常態檢查 | pre-push  |
 | `govb1_ghostpath_check.sh` | 常態檢查 | 未掛 |
 | `govb1_selfcheck.sh` | 常態檢查 | gate  |

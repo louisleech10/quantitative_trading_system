@@ -147,6 +147,78 @@
   在摩擦上」。8/1 起 `momentum/`／`api/`／`frontend/` 動 0 檔，此為已知且經同意。
   **進行中＝第 0 批**（`B-24`＋`B-15`＋`B-14` 合一批次，走完整大任務管線）。
 
+### 🔴 量化主線（IC 分析）— **被封存掉十天，2026-08-14 補回**
+
+> **事故**：`aae04295`（2026-08-05）把 ROADMAP 由 393 → 111 行、「敘事移出 Archived」，
+> **整條量化主線的下一步跟著被砍掉**。從那天起本檔「進行中／下一步」只剩治理兩項。
+> 使用者 2026-08-14 指出「早就提過做完要更新，你根本不去執行」——本檔檔頭自己就寫著
+> 「每次 commit 一併更新本檔（2026-06-26 使用者定）」。**規則寫在檔案裡，我照樣沒做。**
+> 完整敘事仍在 `docs/Archived/ROADMAP_P16_NARRATIVE_20260805.md:139-157`（本節不複製，只給指標與狀態）。
+
+**已完成（Phase 1 尾巴，2026-07-16 ～ 07-22）**：
+`ic-la0` → `ic-la1` → `ic-la2`（前瞻整治三站）→ `ic-1c`（Net IC 量綱）→
+`ic-1cfr`（canonical 因子報酬序列 F0–F5.2）→ `ic-1d`（factor attribution 六批 B0–B5 全完工）。
+🔴 `ic-1d` **B4／B5 亦已完工**（2026-08-14 逐項查證：7 支 mutation 探針＋cache/force 兩測、
+`FactorExposureRadar.test.tsx`、Radar 契約地雷殘留 0、ExportButtons 舊判斷殘留 0、前端 triage 檔皆在）。
+**2026-07-22 之後 `momentum/`／`api/` 零 commit**（23 天，全部在治理）。
+
+**下一個＝★IC 全棧健檢 epic**（2026-07-22 使用者定；Phase 1 收尾，**吸收原 `1f` 空圖**）。
+四步（定案，不得跳）：
+1. **discovery sweep**：Claude＋三委員平行，產「後端產出／前端消費／wiring／空態」四欄表
+2. **quant gap analysis**：現況 vs 業界；複審 4 個 deferred（funnel／capacity／regime IC／walk-forward+CPCV）
+3. **建 typed 契約 SoT ＋ wiring 閘門**（順手修 #1 幽靈＝原 `1f`）
+4. 跑閘門確認閉合，之後自動守
+
+設計原則（使用者洞察）：①audit 先天不完整 ⇒ time-box ②**手動快照會腐爛 ⇒ 把發現做成機器閘門**
+③分層防禦。底稿＝`handoffs/20260624-ic-map-WHOLEMAP.md`（**6/24 版，已隔月過時，須逐條複核**）。
+
+🔴 **底稿的複核狀態未建立**：該圖列 28 種分析、八類系統性缺陷，其中**一部分已被 7 月那五個 epic 修掉**，
+但**沒有任何地方記錄哪幾條已關**。2026-08-14 抽驗三條，三條皆已修
+（FDR 幽靈→`ic_filter_orchestrator.py:35,101` 已接線；Net IC 量綱→`net_ic_analyzer.py:223` 明載無 `net_ic` 鍵；
+`feature_filter` 靜默丟棄→`ic_config_schema.py:443` 已有欄位）。
+⇒ **最便宜的第一步＝把底稿逐條標「已修／未修／變形」**，範圍封閉且每條可機械查證。
+
+**後續兩票（皆 Phase 4，不插隊）**：
+- **票 A — 策略 timing-overlap／clone score 診斷**：開票前置＝先修 equity curve 契約
+  （`prediction_analyzer.py:163` 的 `strategy_returns` 實裝 `np.cumsum` 非逐期報酬、`:152` 只有 long/flat 無做空、
+  `api/routes/pattern_analysis.py:1050` 缺值 `fillna(0)`）
+- **票 B — 真·多標的橫截面 attribution**：**條件觸發，只有宇宙變多標的才成立**；
+  前置＝CS factor-return 管線（`factor_return_analyzer.py:272-287` 現僅收單一 `future_returns: pd.Series`）
+  ＋持倉權重 canonical 定義＋`analyze_cross_sectional` 與 deep 棧整合
+- **根因備忘（防未來重撞）**：單標的下 `ls_returnᵢ=positionᵢ⊙r`、組合報酬＝`position_p⊙r`，共用同一 `r`
+  ⇒ OLS 只識別 **position 重疊度**非風險曝險。β 可誠實命名 timing-overlap，**禁冒充 Barra attribution**。
+
+**兩筆 follow-up（2026-07-22 三方 IN-SCOPE-PASS 後登記，防丟）**：
+- **FU-1 exposure 家族 `fillna` fail-closed 化**：`factor_exposure_analyzer.py:111-307` 三個函式壞值靜默 `fillna(0.0)`。
+  嚴重度中（預設 `enabled=False`、僅餵 Radar 診斷非交易決策）。修法＝比照 `1d` B2。
+- **FU-2 cache close all-NaN carrier index 對齊**：kline `RangeIndex` vs features `DatetimeIndex` 對不齊。
+  **是票 A／票 B 的硬前置**（全 NaN carrier 上無法接真歸因）。
+
+**優先序（封存檔原文）**：`1d 清債 > 1f(全棧健檢) > Phase 2A/3 主線 >> 票 A >> 票 B`。
+🔴🔴 **2026-08-14 使用者明示：「現在開始就是要回去做量化主線」**
+⇒ **本節優先於上方 P0 治理**。此句覆蓋兩條舊裁決：P0 的「完成後才回 IC」（2026-07-05）
+與「治理優先於產品線」（2026-08-04）。治理留在現狀，已掛上的機制繼續運作、**不再擴建**。
+
+### 🔴 測試策略（2026-08-14 使用者定，適用回主線後所有新測試）
+
+使用者原話：「開發中還是隨時會建立新的測試量化的數據的正確性和系統的正確性，**邊走邊建立**。」
+
+**建測試時的優先序**（前三類的紅綠使用者可在不讀程式碼的前提下採信，第四類不可）：
+1. **性質檢驗**（`t` 不得依賴 `t+1`、跨 symbol 換料另一標的輸出不變、合併前後守恆）
+   ——**不需要凍結期望值，所以不會過期**
+2. **真實 kline**（`data_cache/feature_klines/kline_cache.h5`；禁合成 fixture，既有鐵律）
+3. **與第三方實作對照**（`scipy`／`statsmodels` 等）——量尺不是本專案產的
+4. ⚠️ **凍結 golden 比對**：能不用就不用；非用不可時**改行為的當下必須重凍**
+
+**病根（使用者 2026-08-14 指出，邏輯上無反駁餘地）**：基準與測試**兩側都是 Claude 產的**，
+拿一個量另一個是循環論證 ⇒ 使用者無法判斷紅綠真假。**只有非本專案產生的量尺逃得出這個圈。**
+
+**既有 32 個失效基準／40 個疑似孤兒＝不大清**（`scripts/golden_staleness_check.sh` 的歸屬判定
+**已實測有兩個 bug**——檔名碰撞與動態組路徑，其輸出**不得用於刪檔**，詳見該檔頭）。
+處置＝**碰到才處理**：動到某模組而其 golden 炸了，當場決定重凍或作廢。
+
+---
+
 ## ✅ 近期已完成（2026-06 / 2026-07）
 - **TEMPLATE_GATE_FIX epic（2026-07-05）**:派工品質防線修補——四方委員會(Claude+Codex+Composer+Gemini)審 template/機檢,實證 2 BLOCKING 繞過(FACT-RECEIPT/§G 逃逸)+多處範本↔機檢漂移;修=§A 段級狀態機+RISK-HIT 宣告制+per-Task 分段檢+RESULT 交叉規則+gate --reconcile 閉合鏈+adversarial 實核義務+TODO prompt 憲法瘦身(省每次 ~5,100 行)。驗收=14 fixture 矩陣+4 mutation+5 gate fixture+Codex 總 review 戳記。文件=docs/TEMPLATE_GATE_FIX_{BRIEF,SPEC,TODO,MANIFEST,GRANDFATHER}.md;現役文件 grandfather(僅新文件適用)。**新寫 SPEC 須帶 RISK-HIT: 宣告與 FACT-RECEIPT**。
 - **FF 一致性整併**:Q5/B1/B2/B3/B5/B6/B4/B8(觀測性 + 批次日期修復 + warmup-then-trim + 批次刪除/保留 UX)。每項走完整管線。
