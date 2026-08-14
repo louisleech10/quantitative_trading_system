@@ -1063,6 +1063,11 @@ _fk_has_closed_ticket() {
 
 # 豁免理由之佔位符黑名單（**刻意極小**：只擋明顯空殼，充分性由 review 判定，見登記表殘留 4）
 _FK_WAIVER_PLACEHOLDERS='— - 無 n/a N/A TBD tbd 待填 ?'
+# 🔴 S6.1 理由体例之具名段（唯一定義處；檢查 ⑧ 與登記表說明皆取用此四值）
+_FK_ENF_MARK_PRE='PreToolUse不可：'
+_FK_ENF_MARK_POST='PostToolUse不可：'
+_FK_ENF_MARK_PART='部分閘：'
+_FK_ENF_MARK_IMPL='實作位置：'
 
 _fk_enforcement_keys() { LC_ALL=C jq -r '._schema.enforcement_keys[]? // empty' "${REG}"; }
 
@@ -1320,6 +1325,131 @@ EOF2
     echo "  規則（S3.2）：產出端列須為 內容型 或 一致性型；豁免列須為 n/a。" >&2
     echo "  判準：只看這一次的編輯內容能否判定對錯？能＝內容型，否＝一致性型。" >&2
     return 1; }
+
+  # ⑧ 🔴 S6.1 豁免理由体例 ＋ 引用對證（兩條，皆封閉可判定）
+  #
+  #   (a) **体例**：豁免列的理由必須**同時**寫出兩側各自不可行的理由。
+  #       病根：S4.3 一口氣填 16 則，理由全寫成「輸入為完整文件，非單次編輯內容」——
+  #       那只證明**不能 PreToolUse**，完全沒有證明**不能 PostToolUse**。
+  #       反例就在同一棵樹上：factkey_write_guard 也要看整棵樹，照樣掛 PostToolUse。
+  #       ⇒ 本檢查要求兩段分開寫，寫不出「PostToolUse 也不行」就不該是豁免。
+  #       產出端列則須寫出「實作位置」，否則 S4.2 要求的「檢查位置紀錄（檔:行）」會在
+  #       改判為產出端的當下消失。
+  #
+  #   (b) **引用對證**：理由中 `部分閘：`／`實作位置：` 之後的 `<檔>:<行>` 引用，
+  #       該行不得為註解或空行、檔案須存在。
+  #       🔴 這條是拿人命換的：S4.4 三家複驗打回五則不實登記，其中 E-011 填的 :408
+  #       落在**註解區塊首行**；S6.1 重掃又抓到四處同型（E-014／E-015／E-019／E-020）。
+  #       同一種錯誤犯第六次就不該再靠人眼——判準本身封閉，直接機械化。
+  #
+  #   🔴 引用一律對 **repo root** 解析（與掛載點對證同理，與 `_fk_root()` 刻意相反）：
+  #     被引用的是**主控端現樹**的實作行，不是 fixture 樹的資產；對 fixture 解析會整批誤紅。
+  _fkve_repo2="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+  _fkve_formbad=""; _fkve_refbad=""
+  _fkve_wrows="$(LC_ALL=C jq -er '
+    . as $root
+    | $root._schema.enforcement_column_roles as $r
+    | [ $root._schema.enforcement_keys[] as $ek
+        | $root[$ek] as $e
+        | ($e.columns | index($r.id)) as $ii
+        | ($e.columns | index($r.side)) as $si
+        | ($e.columns | index($r.waiver)) as $wi
+        | $e.rows[]
+        | [ .[$ii], .[$si], .[$wi] ] | @tsv ]
+    | join("\n")' "${REG}")" || {
+    echo "gen_fact_key_blocks: 豁免理由体例檢查之 jq 失敗 → fail-closed" >&2; return 1; }
+  while IFS='	' read -r _fkve_wid _fkve_wsd _fkve_wtx; do
+    [ -n "${_fkve_wid}" ] || continue
+    if [ "${_fkve_wsd}" = "${_fkve_side}" ]; then
+      case "${_fkve_wtx}" in
+        *"${_FK_ENF_MARK_IMPL}"*) : ;;
+        *) _fkve_formbad="${_fkve_formbad}${_fkve_wid}（產出端列缺「${_FK_ENF_MARK_IMPL}」）"$'\n' ;;
+      esac
+    else
+      for _fkve_mk in "${_FK_ENF_MARK_PRE}" "${_FK_ENF_MARK_POST}" "${_FK_ENF_MARK_PART}"; do
+        case "${_fkve_wtx}" in
+          *"${_fkve_mk}"*) : ;;
+          *) _fkve_formbad="${_fkve_formbad}${_fkve_wid}（豁免列缺「${_fkve_mk}」）"$'\n' ;;
+        esac
+      done
+    fi
+    # (b) 只驗**具名段之後**的引用：`原填 X 為誤填` 這類更正紀錄刻意不受檢
+    #
+    # 🔴 只在**主控端環境**驗，判別式與掛載點對證**共用同一個**（`.claude/settings.json`
+    #   在不在 —— `_fk_mount_exists` 也正是有它才真的比對），不另造概念。
+    #   被引用的是主控端現樹的實作行；測試沙箱只複製生成器本身
+    #   （見 test_govb1_factkey_gen.py 之 `_sandbox`），對它解析會把每一條碼證
+    #   都判成「檔案不存在」⇒ 整批誤紅。體例檢查 (a) 不讀檔，故沙箱仍照驗。
+    [ -f "${_fkve_repo2}/.claude/settings.json" ] || continue
+    _fkve_tail=""
+    case "${_fkve_wtx}" in *"${_FK_ENF_MARK_PART}"*) _fkve_tail="${_fkve_wtx#*"${_FK_ENF_MARK_PART}"}" ;; esac
+    case "${_fkve_wtx}" in *"${_FK_ENF_MARK_IMPL}"*) _fkve_tail="${_fkve_tail} ${_fkve_wtx#*"${_FK_ENF_MARK_IMPL}"}" ;; esac
+    [ -n "${_fkve_tail}" ] || continue
+    # 🔴 marker 在場但**零引用**必須擋（CODEX-R2-P0-01 於隔離副本實構：把所有豁免列改成
+    #   `部分閘：沒有引用` 且不含任何 `<檔>:<行>`，--write 與 --check 皆 rc=0
+    #   ⇒ ⑧ 退化成「字串在不在」的形式檢查，擋不住空殼碼證）。
+    #   適用條件封閉：`實作位置：` 一律須有引用；`部分閘：` 僅在其值以「有」起頭時須有。
+    #   （`部分閘：無` 是合法且常見的答案，強制它附引用會逼人捏造。）
+    _fkve_need=0
+    case "${_fkve_wtx}" in *"${_FK_ENF_MARK_IMPL}"*) _fkve_need=1 ;; esac
+    case "${_fkve_wtx}" in
+      *"${_FK_ENF_MARK_PART}有"*) _fkve_need=1 ;;
+    esac
+    # 🔴 副檔名不限 .sh/.py（COMPOSER-R2-P1-01：原正則只抽這兩種，
+    #   於是 `部分閘：有——handoffs/x.md:99` 這種假碼證完全不受檢）。
+    _fkve_refs="$(printf '%s' "${_fkve_tail}" \
+                  | LC_ALL=C grep -oE '[A-Za-z0-9_./-]+\.[A-Za-z0-9]+:[0-9]+' || true)"
+    if [ "${_fkve_need}" -eq 1 ] && [ -z "${_fkve_refs}" ]; then
+      _fkve_refbad="${_fkve_refbad}${_fkve_wid}: 具名段宣稱有實作／部分閘，卻無任何 <檔>:<行> 引用"$'\n'
+    fi
+    for _fkve_ref in ${_fkve_refs}; do
+      _fkve_rf="${_fkve_ref%%:*}"; _fkve_rl="${_fkve_ref##*:}"
+      if [ ! -f "${_fkve_repo2}/${_fkve_rf}" ]; then
+        _fkve_refbad="${_fkve_refbad}${_fkve_wid}: ${_fkve_ref} → 檔案不存在"$'\n'; continue
+      fi
+      _fkve_rtxt="$(LC_ALL=C awk -v n="${_fkve_rl}" 'NR==n' "${_fkve_repo2}/${_fkve_rf}")"
+      case "${_fkve_rtxt}" in
+        ''|[[:space:]]*'#'*|'#'*)
+          _fkve_rnear="$(LC_ALL=C awk -v s="${_fkve_rl}" 'NR>=s && $0 !~ /^[[:space:]]*#/ && NF>0 {print NR; exit}' \
+                          "${_fkve_repo2}/${_fkve_rf}")"
+          _fkve_refbad="${_fkve_refbad}${_fkve_wid}: ${_fkve_ref} → 該行為註解或空行（最近可執行碼＝:${_fkve_rnear:-無}）"$'\n' ;;
+      esac
+    done
+  done <<EOF3
+${_fkve_wrows}
+EOF3
+  [ -z "${_fkve_formbad}" ] || {
+    echo "gen_fact_key_blocks: 下列列之理由不符 S6.1 体例 → fail-closed:" >&2
+    printf '%s' "${_fkve_formbad}" | sed 's/^/    /' >&2
+    echo "  豁免列須同時寫「${_FK_ENF_MARK_PRE}…」「${_FK_ENF_MARK_POST}…」「${_FK_ENF_MARK_PART}…」；" >&2
+    echo "  產出端列須寫「${_FK_ENF_MARK_IMPL}<檔:行>」。" >&2
+    echo "  理由：只說「輸入是完整文件」僅證明不能 PreToolUse，不能證明不能 PostToolUse。" >&2
+    _fkve_rc=1; }
+  [ -z "${_fkve_refbad}" ] || {
+    echo "gen_fact_key_blocks: 下列引用之行號落在註解／空行或檔案不存在 → fail-closed:" >&2
+    printf '%s' "${_fkve_refbad}" | sed 's/^/    /' >&2
+    echo "  引用要指向**可執行碼**；指到註解等於沒有碼證（S4.4 已打回一次，S6.1 又抓到四處）。" >&2
+    _fkve_rc=1; }
+  # ⑨ 🔴 enforcement_note 不得提及**已不存在的 fact-key**（CODEX-R3-P2-01）
+  #   病根：note 是 schema 內的散文，最容易變成過期副本——它一度同時寫著
+  #   「四道檢查」（實際八道）與 S0.6 已刪除的來源 key。主委第一次修訂只改了前者，
+  #   把作廢 key 留在「原文指向 X，已刪除」的歷史括註裡 ⇒ grep 仍然找得到，
+  #   codex 據此拒簽戳記。歷史敘事屬 docs/GOV_ENFORCEMENT_REGISTRY.md，不屬 schema。
+  #   判準封閉可導出：note 內任何 `governance-<名>` token 都必須是本註冊表現存的 key。
+  _fkve_note="$(LC_ALL=C jq -r '._schema.enforcement_note // ""' "${REG}")" || {
+    echo "gen_fact_key_blocks: 讀取 enforcement_note 失敗 → fail-closed" >&2; return 1; }
+  _fkve_ghostkey=""
+  for _fkve_tok in $(printf '%s' "${_fkve_note}" | LC_ALL=C grep -oE 'governance-[a-z0-9-]+' | LC_ALL=C sort -u); do
+    printf '%s\n' "${_fkve_all}" | LC_ALL=C grep -qxF "${_fkve_tok}" \
+      || _fkve_ghostkey="${_fkve_ghostkey}${_fkve_tok} "
+  done
+  [ -z "${_fkve_ghostkey}" ] || {
+    echo "gen_fact_key_blocks: enforcement_note 提及不存在之 fact-key → fail-closed: ${_fkve_ghostkey}" >&2
+    echo "  schema 的散文不得保留作廢來源（連「原文指向 X」這種歷史括註也不行——grep 仍會找到）。" >&2
+    echo "  歷史敘事寫進 docs/GOV_ENFORCEMENT_REGISTRY.md，不要留在 schema。" >&2
+    _fkve_rc=1; }
+
+  [ "${_fkve_rc}" -eq 0 ] || return 1
 
   # ⑥ 🔴 S2.2 提前預警：**尚未**標完成、但已在推進中的票，若無產出端覆蓋登記，先講。
   #   ⚠️ 本條**刻意只警告不判紅**，與 S1.2 的「大聲印出不是阻擋」不同性質：

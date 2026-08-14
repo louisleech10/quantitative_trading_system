@@ -780,6 +780,10 @@ _plan() {   # stdout: FILE\t<path> 或 UNRESOLVED\t<name>\t<reason>
 if [ "${1:-}" = "--print-batch3-paths" ]; then _g7_batch3_proxy_paths; exit $?; fi
 if [ "${1:-}" = "--print-batch3-targets" ]; then _g7_batch3_target_paths; exit $?; fi
 if [ "${1:-}" = "--print-plan" ]; then _plan; exit 0; fi
+# 🔴 唯讀導出本批 scope 白名單，供 commit-msg 之 G-7 前移檢查取用（S6.1）。
+#   存在理由＝**單一來源**：若前移檢查自行複寫 allow−deny 規則，兩份判準會漂移，
+#   而漂移的方向必然是「前移檢查較寬」⇒ 放行後在 pre-push 才紅，等於前移失效。
+if [ "${1:-}" = "--print-scope" ]; then _g7_policy; exit $?; fi
 
 _names() { _rows | cut -d'|' -f1; }
 if [ "${1:-}" = "--only" ]; then

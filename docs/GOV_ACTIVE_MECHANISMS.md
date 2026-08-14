@@ -49,6 +49,7 @@
 | `doc_format_precheck.sh` | 常態檢查 | PostToolUse gate gov_check cx_run  |
 | `draft_selfcheck.sh` | 常態檢查 | 未掛 |
 | `factkey_write_guard.sh` | 常態檢查 | PostToolUse  |
+| `g7_trailer_precheck.sh` | 常態檢查 | commit-msg  |
 | `gate_check.sh` | 常態檢查 | PreToolUse gate  |
 | `gov_check.sh` | 常態檢查 | pre-push gate cx_run  |
 | `govb1_ghostpath_check.sh` | 常態檢查 | 未掛 |
@@ -103,7 +104,7 @@
 | **產出端** | 每次工具呼叫 | `gate_check.sh`（Pre）、`factkey_write_guard.sh`（Post）、`doc_format_precheck.sh`（Post）、`verify_pretooluse.sh`（Pre）、`status_marker_check.sh`（Stop） | 派工無 token、事實來源漂移、文件格式、無憑據宣稱、狀態標記不誠實 |
 | **派工前** | `gate.sh dispatch` | `_check_open_debt`、`review_quorum_check.sh`、`reconcile_stamps_check.sh`、`template_check.sh`、`verdict_filled_check.sh`、`completeness_check.sh` | 委員債未清、quorum 不足、收斂檔無戳記、範本不合規、Verdict 未填、收斂掉項 |
 | **收斂節點** | `reconcile_build.sh` | `reconcile_cluster_attribution_check.sh`、`completeness_check.sh --lock` | 群集掉項、逐字保真與 body-hash |
-| **commit** | pre-commit／commit-msg | `plain_docs_sync_check.sh`、`verification_claim_check.py` | 白話說明未同步、訊息有宣稱無憑據 |
+| **commit** | pre-commit／commit-msg | `plain_docs_sync_check.sh`、`verification_claim_check.py`、`g7_trailer_precheck.sh` | 白話說明未同步、訊息有宣稱無憑據、scope 外路徑漏帶 `Governance-Scope` trailer |
 | **push** | pre-push | `gov_check.sh`（全套） | 上述總驗＋全套 pytest |
 
 ---

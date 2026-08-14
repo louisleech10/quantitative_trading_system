@@ -91,6 +91,15 @@ done
 [ -f "${brief}" ] || { echo "ERROR: brief 不存在: ${brief}" >&2; exit 2; }
 case "${out_prefix}" in handoffs/*) : ;; *) echo "ERROR: out前綴須在 handoffs/: ${out_prefix}" >&2; exit 2 ;; esac
 
+# 🔴 out 前綴之承載目錄須存在，否則三家會**各自跑到重導失敗**才發現（2026-08-14 實際踩到）：
+#   本腳本原本一個 mkdir 都沒有，`>"${log}"` 在目錄不存在時直接失敗，
+#   而失敗發生在**開完 gate token、開完委員債、派完三家之後** ⇒ 一輪派工全廢、債還留著。
+#   在此建目錄並 fail-closed，把代價從「一輪」收斂成「一行」。
+_cr_outdir="$(dirname -- "${out_prefix}")"
+mkdir -p "${_cr_outdir}" 2>/dev/null || true
+[ -d "${_cr_outdir}" ] || {
+  echo "ERROR: 無法建立 out 目錄: ${_cr_outdir}（fail-closed，不派工不開債）" >&2; exit 2; }
+
 # ---------------------------------------------------------------------------
 # GOV-STAMP-TASKID-INJECT / D-001 §D3：brief-kind 與 stamp-target 驗證
 # 必須在 gate.sh dispatch 之前 → 失敗時 audit 真正零新增。

@@ -1,0 +1,32 @@
+============================= test session starts ==============================
+collected 27 items
+
+tests/governance/test_gov_enforcement_registry.py::test_baseline_is_green PASSED [  3%]
+tests/governance/test_gov_enforcement_registry.py::test_mount_must_exist_in_settings_not_self_declared PASSED [  7%]
+tests/governance/test_gov_enforcement_registry.py::test_mount_matcher_mismatch_is_caught PASSED [ 11%]
+tests/governance/test_gov_enforcement_registry.py::test_waiver_placeholder_is_rejected PASSED [ 14%]
+tests/governance/test_gov_enforcement_registry.py::test_closed_ticket_without_coverage_is_fail_closed PASSED [ 18%]
+tests/governance/test_gov_enforcement_registry.py::test_non_closed_ticket_does_not_require_coverage PASSED [ 22%]
+tests/governance/test_gov_enforcement_registry.py::test_side_enum_is_closed PASSED [ 25%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_keys] PASSED [ 29%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_side_enum] PASSED [ 33%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_producer_side] PASSED [ 37%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_column_roles] PASSED [ 40%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_settings_path] PASSED [ 44%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_closed_status] PASSED [ 48%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_ticket_roles] PASSED [ 51%]
+tests/governance/test_gov_enforcement_registry.py::test_production_tree_all_closed_tickets_are_covered PASSED [ 55%]
+tests/governance/test_gov_enforcement_registry.py::test_mutation_removing_closure_binding_lets_it_through PASSED [ 59%]
+tests/governance/test_gov_enforcement_registry.py::test_note_must_not_mention_nonexistent_fact_key PASSED [ 62%]
+tests/governance/test_gov_enforcement_registry.py::test_note_mentioning_live_fact_key_is_allowed PASSED [ 66%]
+tests/governance/test_g7_trailer_precheck.py::test_out_of_scope_without_trailer_is_blocked PASSED [ 70%]
+tests/governance/test_g7_trailer_precheck.py::test_trailer_in_middle_paragraph_is_still_blocked PASSED [ 74%]
+tests/governance/test_g7_trailer_precheck.py::test_trailer_in_last_paragraph_passes PASSED [ 77%]
+tests/governance/test_g7_trailer_precheck.py::test_in_scope_only_passes_without_trailer PASSED [ 81%]
+tests/governance/test_g7_trailer_precheck.py::test_trailer_followed_by_garbage_is_blocked PASSED [ 85%]
+tests/governance/test_g7_trailer_precheck.py::test_type_change_is_not_skipped PASSED [ 88%]
+tests/governance/test_g7_trailer_precheck.py::test_rename_from_out_of_scope_keeps_old_name PASSED [ 92%]
+tests/governance/test_g7_trailer_precheck.py::test_unreadable_index_is_fail_closed PASSED [ 96%]
+tests/governance/test_g7_trailer_precheck.py::test_scope_derivation_failure_requires_trailer PASSED [100%]
+
+============================= 27 passed in 39.60s ==============================

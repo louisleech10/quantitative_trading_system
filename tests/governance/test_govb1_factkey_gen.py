@@ -2254,3 +2254,156 @@ def test_wl01_handwritten_status_detector_still_works_under_table_render(tmp_pat
     r = _run([str(sdir / GEN.name), "--check"], env_extra=env)
     assert r.returncode != 0, "table render 下偵測器失效 ⇒ 手寫狀態可繞過"
     assert "HANDWRITTEN STATUS" in r.stderr and "prose.md" in r.stderr, r.stderr
+
+
+# ---------------------------------------------------------------------------
+# S6.1：豁免理由体例 ＋ 引用對證（檢查 ⑧）
+#
+# 🔴 這三條測試守的是 S4.3 那個具體錯誤：16 則豁免的理由清一色寫
+#   「輸入為完整文件，非單次編輯內容」——只證明不能 PreToolUse，
+#   對 PostToolUse 一個字都沒說，而反例（factkey_write_guard 也讀整棵樹卻掛得上）
+#   就在同一棵樹上。S6.1 逐列重問後五列被實跑反例推翻。
+# ---------------------------------------------------------------------------
+def _enf_cols(data):
+    """回傳 (key, id欄, 強制側欄, 豁免理由欄) 之索引，全部由 schema 導出不寫死。"""
+    ek = data["_schema"]["enforcement_keys"][0]
+    roles = data["_schema"]["enforcement_column_roles"]
+    cols = data[ek]["columns"]
+    return ek, cols.index(roles["id"]), cols.index(roles["side"]), cols.index(roles["waiver"])
+
+
+def _first_row_of_side(data, ek, si, side):
+    for i, row in enumerate(data[ek]["rows"]):
+        if row[si] == side:
+            return i
+    raise AssertionError(f"註冊表無強制側為 {side} 之列，測試前提不成立")
+
+
+def test_s61_waiver_missing_posttooluse_reason_is_rejected(tmp_path):
+    """S6.1：豁免理由只寫「不能 PreToolUse」而未寫「不能 PostToolUse」⇒ fail-closed。
+
+    這正是 S4.3 的病：那 16 則理由全部只證明了寫入前判不了，
+    完全沒有回答「寫入後判得了嗎」——而三列的檢查其實早就在 PostToolUse 跑著。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    ek, ii, si, wi = _enf_cols(data)
+    side_waived = [s for s in data["_schema"]["enforcement_side_enum"]
+                   if s != data["_schema"]["enforcement_producer_side"]][0]
+    idx = _first_row_of_side(data, ek, si, side_waived)
+    data[ek]["rows"][idx][wi] = "PreToolUse不可：輸入為完整文件，非單次編輯內容。部分閘：無"
+    sdir = _sandbox(tmp_path, data)
+
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, f"單邊理由被放行 ⇒ S4.3 那型錯誤會再度通過：{out}"
+    assert "PostToolUse不可" in out, f"rc≠0 但未具名缺哪一段 ⇒ 可能紅在別的原因：{out}"
+
+
+def test_s61_producer_row_missing_impl_location_is_rejected(tmp_path):
+    """S6.1：產出端列未寫「實作位置」⇒ fail-closed。
+
+    改判為產出端時若把理由欄清成 `—`，S4.2 要求的「檢查位置紀錄（檔:行）」
+    會在改判當下**消失**——本條擋的就是那個靜默退化。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    ek, ii, si, wi = _enf_cols(data)
+    pside = data["_schema"]["enforcement_producer_side"]
+    idx = _first_row_of_side(data, ek, si, pside)
+    data[ek]["rows"][idx][wi] = "—"
+    sdir = _sandbox(tmp_path, data)
+
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, f"產出端列無實作位置卻放行 ⇒ 碼證可被清空：{out}"
+    assert "實作位置" in out, f"rc≠0 但未具名缺哪一段：{out}"
+
+
+def test_s61_citation_pointing_at_comment_line_is_rejected(tmp_path):
+    """S6.1：`部分閘：` 之後的 `<檔>:<行>` 指向註解行 ⇒ fail-closed。
+
+    🔴 同一種錯誤已犯六次：S4.4 打回 E-011 的 :408（註解區塊首行），
+    S6.1 重掃又抓到四處（E-014／E-015／E-019／E-020）。判準封閉，故機械化。
+    反例取 gen_fact_key_blocks.sh:1（shebang，恆為註解行），不依賴任何會漂的行號——
+    且該檔正是 `_sandbox` 唯一會複製進沙箱的腳本，故引用在沙箱內解析得到。
+
+    🔴 須自備 `.claude/settings.json`：引用對證與掛載點對證**共用同一個**主控端判別式，
+       沙箱預設沒有它 ⇒ 兩者都會被跳過（那是刻意的，否則每條碼證都會誤判成檔案不存在）。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    ek, ii, si, wi = _enf_cols(data)
+    side_waived = [s for s in data["_schema"]["enforcement_side_enum"]
+                   if s != data["_schema"]["enforcement_producer_side"]][0]
+    idx = _first_row_of_side(data, ek, si, side_waived)
+    data[ek]["rows"][idx][wi] = (
+        "PreToolUse不可：測試用。PostToolUse不可：測試用。"
+        "部分閘：有——scripts/gen_fact_key_blocks.sh:1"
+    )
+    sdir = _sandbox(tmp_path, data)
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO / ".claude" / "settings.json", claude_dir / "settings.json")
+
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, f"引用註解行被放行 ⇒ 碼證形同虛設：{out}"
+    assert "註解或空行" in out, f"rc≠0 但未具名引用問題 ⇒ 可能紅在別的原因：{out}"
+
+
+def _waived_row_with(data, waiver_text, tmp_path):
+    """把第一個豁免列的理由換掉，回傳可跑 --check 的沙箱（含主控端判別式）。"""
+    ek, _ii, si, wi = _enf_cols(data)
+    side_waived = [s for s in data["_schema"]["enforcement_side_enum"]
+                   if s != data["_schema"]["enforcement_producer_side"]][0]
+    idx = _first_row_of_side(data, ek, si, side_waived)
+    data[ek]["rows"][idx][wi] = waiver_text
+    sdir = _sandbox(tmp_path, data)
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO / ".claude" / "settings.json", claude_dir / "settings.json")
+    return sdir
+
+
+def test_s61_marker_present_but_zero_citation_is_rejected(tmp_path):
+    """🔴 `部分閘：有` 卻**一個引用都沒有** ⇒ fail-closed。
+
+    〔CODEX-R2-P0-01 於隔離副本實構〕原版 ⑧ 只驗 marker 字串在不在，
+    把全部豁免列改成「部分閘：沒有引用」且不含任何 `<檔>:<行>`，
+    `--write` 與 `--check` 皆 rc=0 ⇒ ⑧ 退化成形式檢查，擋不住空殼碼證。
+
+    對照 test_s61_partial_gate_none_is_allowed：`部分閘：無` 必須仍可通過，
+    否則會逼人為了過閘而捏造引用——那比沒有檢查更糟。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    sdir = _waived_row_with(
+        data, "PreToolUse不可：測試。PostToolUse不可：測試。部分閘：有——某個地方", tmp_path)
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, f"宣稱有部分閘卻無碼證被放行 ⇒ ⑧ 是空殼：{out}"
+    assert "無任何" in out, f"rc≠0 但未具名零引用 ⇒ 可能紅在別的原因：{out}"
+
+
+def test_s61_partial_gate_none_is_allowed(tmp_path):
+    """對照組：`部分閘：無` 是合法答案，不得被零引用規則誤擋。"""
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    sdir = _waived_row_with(
+        data, "PreToolUse不可：測試。PostToolUse不可：測試。部分閘：無", tmp_path)
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    out = r.stdout + r.stderr
+    assert "無任何" not in out, f"`部分閘：無` 被零引用規則誤擋 ⇒ 會逼人捏造引用：{out}"
+
+
+def test_s61_non_script_extension_citation_is_verified(tmp_path):
+    """非 `.sh`／`.py` 之假碼證也要驗。
+
+    〔COMPOSER-R2-P1-01〕原正則只抽 `.sh|.py`，故
+    `部分閘：有——handoffs/x.md:99` 這種引用完全不受檢即通過。
+    """
+    data = json.loads(REG.read_text(encoding="utf-8"))
+    sdir = _waived_row_with(
+        data,
+        "PreToolUse不可：測試。PostToolUse不可：測試。部分閘：有——docs/__不存在__.md:99",
+        tmp_path)
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(REPO)})
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, f".md 假碼證被放行 ⇒ 換個副檔名即可繞過：{out}"
+    assert "檔案不存在" in out, f"rc≠0 但未具名 ⇒ 可能紅在別的原因：{out}"

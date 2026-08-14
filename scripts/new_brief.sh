@@ -38,6 +38,16 @@ case "${out}" in handoffs/*) : ;; *) echo "ERROR: brief 建議放 handoffs/: ${o
     echo ""
     echo "## 產出"
     echo "改了哪些檔/函式、新增/改的測試、實跑結果與 rc、遇到的問題。收尾清 /tmp workdir（保留 claude-501）。"
+    echo ""
+    # 🔴 stamp 輪也必須產 canonical heading，否則整輪銷不了帳（2026-08-14 實際踩到）：
+    #   S6.1 的 stamp-r3 兩家只 append 戳記、無 findings，一家把 finding 寫成 prose
+    #   ⇒ completeness 抽不到任何 heading ID ⇒ 判 vacuous、rc=1 ⇒ 該輪只能 abandon。
+    #   病根在**骨架沒要求**，不在委員；故治在這裡而非每次手寫時記得。
+    echo "## 🔴 交件形態（缺這段整輪會銷不了帳）"
+    echo "無論結論為何，**檔內必須至少有一個 canonical heading**："
+    echo "- 有問題 → \`## <FAMILY>-R<輪次>-P<0-3>-<NN>\`，含 \`**斷言**\`／\`**碼證**\`／\`**來源摘要**\`（P0/P1 須 12 位雜湊）。"
+    echo "- 無問題 → 照 \`templates/COMMITTEE_FINDING_TEMPLATE.md\` 的**零 findings sentinel** 形態，不得只寫散文。"
+    echo "戳記本身 append 到 stamp-target 的 \`## 戳記\` 區，**不算**交件檔的 heading。"
   else
     echo "## 範本"
     echo "照 \`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md\` 全文執行（§0 挑戰前提／§1 必查／§2 獵空殼／canonical 四欄／Verdict）。"

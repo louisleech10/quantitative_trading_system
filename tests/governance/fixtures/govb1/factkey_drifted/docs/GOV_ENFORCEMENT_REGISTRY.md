@@ -5,24 +5,24 @@
 <!-- BEGIN GENERATED: governance-enforcement -->
 | 檢查ID | 對應票 | 掛載點 | 強制側 | 豁免理由 | 判定型 |
 |---|---|---|---|---|---|
-| E-001 | B-25 | PostToolUse:Edit,Write:scripts/factkey_write_guard.sh | 產出端 | — | 一致性型 |
-| E-002 | B-25 | pre-push:gov_check.sh 第 3 段 | 豁免 | 與 E-001 為同一支檢查之第二層；產出端已由 E-001 覆蓋（無等價判定？否——已有等價且已掛），本列僅記錄 defense-in-depth 之另一掛載點 | n/a |
-| E-003 | B-38 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | — | 內容型 |
-| E-004 | B-31 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | — | 內容型 |
-| E-005 | G-7 | pre-push:govb1_final_gate.sh --only g7 | 豁免 | 無等價判定：判定式為 base..HEAD 之 endpoint 淨差，無 commit 即無可算，最早只能到 pre-commit。部分閘是否已掛：無——本票不存在可前移的靜態子集 | n/a |
-| E-006 | 測試套件 | pre-push:gov_check.sh 第 5 段 | 豁免 | 無等價判定：全套 pytest 為十分鐘級，每次 Edit 觸發不可行。部分閘是否已掛：是——各票之承重判準已分散於本表其他列之產出端掛載 | n/a |
-| E-007 | B-49 | pre-push:gov_check.sh 第 5 段 | 豁免 | 🔴 主委原理由『單次 Edit 當下無等價判定』已由三家 r1 一致否決（CODEX-R1-P1-05／COMPOSER-R1-P1-02／GROK-R1-P2-01：閉合證據的靜態可判定部分無需 commit 亦可於產出端驗）。⇒ 該票已依規則退回部分完成。無等價判定：僅隔離重放＋git 狀態比對那一段成立。部分閘是否已掛：否——靜態子集尚未前移，此為具名缺口 | n/a |
-| E-008 | B-7 | — | 豁免 | 無等價判定：改法未完成，現樹無對應檢查可掛。部分閘是否已掛：無 | n/a |
-| E-009 | B-10 | — | 豁免 | 無等價判定：template_check 之檢查輸入為完整文件（須讀全檔判區塊完整性），非單次編輯內容。部分閘是否已掛：是——scripts/template_check.sh:324 之 dext kind 分支。🔴 R5 更正：原登記寫「改法未完成、部分閘無」為事實錯誤，三家一致指出 dext 已落地 | n/a |
-| E-010 | B-15 | — | 豁免 | 無等價判定：誤擋修復屬派工判定式行為，須完整指令上下文方能判，非單次編輯內容。部分閘是否已掛：無——B7 之後仍存在 | n/a |
-| E-011 | B-16 | — | 豁免 | 無等價判定：擴充 A/B/C 之判定輸入為完整文件（ASSERT 行語法／函式存在性／SCOPE-CLAIM 區塊），須讀全檔非單次編輯內容。部分閘是否已掛：是——scripts/template_check.sh:438 起之 _tc_live_lines 等實作。🔴 R5 更正：原填 :408 落在**註解區塊首行**非檢查碼；原述「只在派工閘階段執行」亦不成立，該檢查亦經 doc_format_precheck 路徑觸發 | n/a |
-| E-012 | B-19 | — | 豁免 | 無等價判定：brief 品質判定須讀完整 brief，非單次編輯可判。部分閘是否已掛：無。🔴 R5 更正：原填 scripts/govb1_task_tickets.tsv:13 為**任務清單之資料列**（欄位＝序／項次／票號／驗收字串），不是可執行檢查，三家一致指出此為誤填 | n/a |
-| E-013 | B-24 | — | 豁免 | 無等價判定：紀律面條文無機械判定式（本票另一半屬散文紀律）。部分閘是否已掛：無 | n/a |
-| E-014 | B-29 | — | 豁免 | 無等價判定：dispatch 須帶 brief 之檢查在派工當下執行，輸入為派工參數非編輯內容。部分閘是否已掛：是——scripts/committee_run.sh:410 | n/a |
-| E-015 | B-32 | — | 豁免 | 無等價判定：注入與否取決於派工參數與 brief-kind，判定輸入為派工上下文而非單次編輯內容。部分閘是否已掛：是——scripts/cx_run.sh:493 之 brief-kind 條件分流。🔴 R5 更正：原登記寫「部分閘無」為事實錯誤，grok 指出分流已落地 | n/a |
-| E-016 | B-34 | — | 豁免 | 無等價判定：改法未完成，現無對應檢查。部分閘是否已掛：無 | n/a |
-| E-017 | B-36 | — | 豁免 | 無等價判定：群集歸屬檢查須整份收斂檔方能判，屬一致性型且無寫入前等價判定。部分閘是否已掛：是——scripts/reconcile_cluster_attribution_check.sh（提示不阻擋） | n/a |
-| E-018 | B-37 | — | 豁免 | 無等價判定：摩擦統計為唯讀彙整，本質非阻擋型檢查。部分閘是否已掛：是——scripts/friction_tally.sh | n/a |
-| E-019 | B-39 | — | 豁免 | 無等價判定：完整性判定須讀整份收斂檔與其來源，非單次編輯可判。部分閘是否已掛：是——scripts/completeness_check.sh:135 | n/a |
-| E-020 | B-50 | — | 豁免 | 無等價判定：跳步標記屬流程紀錄，無單次編輯可判之判定式。部分閘是否已掛：是——scripts/committee_run.sh:267 | n/a |
+| E-001 | B-25 | PostToolUse:Edit,Write:scripts/factkey_write_guard.sh | 產出端 | 實作位置：scripts/factkey_write_guard.sh:116（寫檔當下對受管檔重跑 gen_fact_key_blocks --check） | 一致性型 |
+| E-002 | B-25 | pre-push:gov_check.sh 第 3 段 | 豁免 | PreToolUse不可：本列記錄的是 pre-push 之第二層掛載，該階段依定義在 commit 之後。PostToolUse不可：**不適用**——同一判定已由 E-001 掛在 PostToolUse；本列僅記錄 defense-in-depth 之第二個掛載點，非缺口。部分閘：有——scripts/factkey_write_guard.sh:116（同一判定之產出端掛載） | n/a |
+| E-003 | B-38 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/doc_format_precheck.sh:150（findings 分支呼叫 cx_run --selfcheck；零 findings 之 sentinel 形態與必填欄於該路徑檢查，反例已實跑） | 內容型 |
+| E-004 | B-31 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/doc_format_precheck.sh:150（與委員交件跑同一支檢查、同一組參數）。誠實邊界：票 SoT 之對外用語限「產出端已有檢查點」，不得稱強制 | 內容型 |
+| E-005 | G-7 | commit-msg:g7_trailer_precheck.sh ＋ pre-push:govb1_final_gate.sh --only g7 | 豁免 | PreToolUse不可：判定式為 base..HEAD 之 endpoint 淨差，寫入前無 commit 可算。PostToolUse不可：判定對象是 commit 的屬性（訊息末段之 Governance-Scope trailer），寫檔當下該物件尚不存在；而寫檔當下算得出的「路徑在 scope 外」若單獨告警，對本 repo 多數新增路徑恆真 ⇒ 高頻無訊號。部分閘：有——scripts/g7_trailer_precheck.sh:83（commit-msg 階段：staged 含 scope 外路徑而訊息末段無 trailer 即擋；四向反例已驗，含 trailer 放中間段仍擋、只動 scope 內檔則放行）。🔴 R6 更正：原登記「本票不存在可前移的靜態子集」為事實錯誤——同日兩次 G-7 紅正是此子集，且因豁免須「該路徑只被帶 trailer 的 commit 觸及」，補後續 commit 解不掉，只能重寫歷史 | n/a |
+| E-006 | 測試套件 | pre-push:gov_check.sh 第 5 段 | 豁免 | PreToolUse不可：全套 pytest 為十分鐘級，寫入前執行會使每次編輯停擺。PostToolUse不可：同上——此為**成本型**而非判定型限制，技術上跑得動、代價不可接受，兩者須誠實區分。部分閘：有——各票之承重判準已分散於本表其他列之產出端掛載，代表兩處為 scripts/factkey_write_guard.sh:116 與 scripts/doc_format_precheck.sh:150；測試子集化之提案見 HANDOFF 之「把測試選擇機械化」節（未開工） | n/a |
+| E-007 | B-49 | pre-push:gov_check.sh 第 5 段 | 豁免 | PreToolUse不可：閉合證據須隔離重放＋git 狀態比對，寫入前無可重放之標的。PostToolUse不可：**理由為「現行無可掛之判定」，不是「掛不上」**（CODEX-R2-P1-04 要求釐清）——三家 r1 一致認定閉合證據的靜態可判定部分無需 commit 亦可於產出端驗，故技術上掛得上；本列仍為豁免純因該靜態子集**尚未抽成可掛的檢查**（改法未完成）。部分閘：無——具名缺口，亦為該票重新收案之前置 | n/a |
+| E-008 | B-7 | — | 豁免 | PreToolUse不可：判定對象為委員產出的戳記行，派工前尚不存在。PostToolUse不可：戳記由執行端 CLI 直接寫檔，不經主控端 Edit/Write ⇒ 該 hook 不會被觸發。部分閘：有——scripts/cx_run.sh:776（派工 prompt 逐字注入 task-id 並明令 brief 內範例值不得採用，從源頭消滅手抄）＋ scripts/cx_run.sh:413（task_id 缺漏即拒派）。🔴 R6 更正：原登記「改法未完成、現樹無對應檢查可掛、部分閘無」為事實錯誤 | n/a |
+| E-009 | B-10 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/template_check.sh:324（dext 分支之必填錨點檢查；由 scripts/doc_format_precheck.sh:80 判型後呼叫）。🔴 R6 更正：原登記為豁免，理由寫「輸入為完整文件，非單次編輯內容」——那只證明不能 PreToolUse；實跑反例（寫入缺錨點之 D 延伸檔）當下即紅，證明 PostToolUse 本就掛得上、且早已掛上 | 內容型 |
+| E-010 | B-15 | PreToolUse:Task,Bash,Write:scripts/gate_check.sh | 產出端 | 實作位置：scripts/gate_check.sh:218（_gate_cmd_is_dispatch 之派工判定，掛 PreToolUse ⇒ 指令送出前即判）。🔴 R6 更正：原登記為豁免，理由「須完整指令上下文方能判」——完整指令字串正是 PreToolUse 的輸入，該理由不成立。誠實邊界：本票之殘留是**誤擋率**而非缺掛載，對外不得宣稱誤擋已修復 | 內容型 |
+| E-011 | B-16 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/template_check.sh:711（_check_scope_claim 與 _run_assert_lines 之接線，僅 docs 之 SPEC／TODO 檔套用）。誠實邊界：寫檔階段**不執行** ASSERT 行（T0 自鎖止血），只驗文法與錨點，執行留給 gate.sh。🔴 R6 更正：原登記為豁免，惟其 R5 更正已自承「該檢查亦經 doc_format_precheck 路徑觸發」，與豁免宣稱自相矛盾 | 內容型 |
+| E-012 | B-19 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/doc_format_precheck.sh:195（handoffs 下含 brief-kind 標記之檔即路由至 brief_conformance_check）。🔴 R6 更正：原登記「部分閘是否已掛：無」為事實錯誤——實跑反例（寫入不引用範本之 brief）當下即紅。殘留 R-12（full path 不驗 EXPECTED-DELTA）仍在，屬檢查深度不足，非未掛載 | 內容型 |
+| E-013 | B-24 | — | 豁免 | PreToolUse不可：現樹無對應判定式可執行（本票改法為紀律條文）。PostToolUse不可：同上——不是掛不上，是**沒有東西可掛**；「無檢查」與「檢查掛不了」不得混為一談。部分閘：無 | n/a |
+| E-014 | B-29 | — | 豁免 | PreToolUse不可：判定輸入為派工參數與 brief 檔內容之比對，寫檔當下無派工事件。PostToolUse不可：觸發源為派工指令而非 Edit/Write ⇒ 該 hook 不觸發；改掛 PostToolUse:Bash 亦判不了，因判定需 gate 內部狀態（已開 session、brief 已解析），非指令字串可導出。部分閘：有——scripts/committee_run.sh:420（gate_args 追加 --brief，否則 gate 之 --brief 掛點空轉）。🔴 R6 更正：原填 :410 落在註解行。🔴 R7 更正（GROK-R2-P1-01）：R6 改填之 :411 為**非註解但指錯行**（該行是工作區漂移之 echo）——檢查 ⑧ 只拒註解／空行／缺檔，擋不掉語意錯位，此為其具名能力邊界 | n/a |
+| E-015 | B-32 | — | 豁免 | PreToolUse不可：判定輸入為 brief-kind 與派工結果（CLI rc、輸出檔），寫入前皆不存在。PostToolUse不可：觸發源為派工指令而非 Edit/Write ⇒ 該 hook 不觸發。部分閘：有——scripts/cx_run.sh:495（_maybe_register_stamp_output，僅 stamp kind 且三條件成立才註冊）。🔴 R6 更正：原填 :493 落在註解行；R5 之「部分閘已落地」結論不變 | n/a |
+| E-016 | B-34 | — | 豁免 | PreToolUse不可：現樹無對應判定式（角色閘與戳記檢查之一致性改法未完成）。PostToolUse不可：同上——無物可掛，非掛不上。部分閘：無 | n/a |
+| E-017 | B-36 | — | 豁免 | PreToolUse不可：群集歸屬須整份收斂檔方能判，寫入前內容不完整。PostToolUse不可：**理由為「現行無可掛之阻擋判定」，不是「掛不上」**（CODEX-R2-P1-05 要求釐清）——synth 檔之寫入已由 scripts/doc_format_precheck.sh:96 路由，技術上掛得上；但 scripts/reconcile_cluster_attribution_check.sh 全檔僅為純報告、無失敗條件（三家 r2 實跑：對未被引用之 ID 仍 rc=0），且其唯一訊號在收斂檔撰寫過程中恆為真 ⇒ 掛上不產生任何拒絕語意且高誤擋（與 WL-02 開工前量測推翻字面設計同型）。⇒ 屬該票改法未完成。部分閘：有——scripts/reconcile_build.sh:378（收集節點呼叫，提示不阻擋） | n/a |
+| E-018 | B-37 | — | 豁免 | PreToolUse不可：本票產物為唯讀彙整報表，無「不通過」語意，無可阻擋之判定。PostToolUse不可：**理由為「無拒絕條件可掛」，不是「掛不上」**（CODEX-R2-P1-05 要求釐清）——掛得上，但本票產物本質為唯讀彙整，掛上不產生任何拒絕語意。部分閘：有——scripts/friction_tally.sh:154（彙整輸出行；唯讀無阻擋語意） | n/a |
+| E-019 | B-39 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/completeness_check.sh:157（heading 路由與必填欄判定；由 scripts/doc_format_precheck.sh:150 之 findings 分支經 cx_run --selfcheck 呼叫）。🔴 R6 更正：原登記為豁免且原填 :135 落在註解行；實跑反例（P0 來源摘要寫行號而非雜湊）當下即紅。誠實邊界：跨檔完整性（來源 ID 是否全在綜合）仍須 lock 與全部來源，屬合理的消費端檢查 | 內容型 |
+| E-020 | B-50 | — | 豁免 | PreToolUse不可：判定需「派工前」與「派工後」兩個工作區快照之差，寫入前只有單點。PostToolUse不可：觸發源為派工指令；Edit/Write 之 PostToolUse 取不到派工前那個快照。技術上可改掛 PostToolUse:Bash，但那會對**每一個** Bash 呼叫做 git status 全掃 ⇒ 成本與噪音不成比例，未採並具名記錄。部分閘：有——scripts/committee_run.sh:320（_ws_snapshot，派工前後比對）。🔴 R6 更正：原填 :267 落在註解行。🔴 R7 更正：R6 改填之 :311 於同輪內因本檔新增 mkdir 守衛而位移成註解行，三家 r2 一致以 --check rc=1 攔下——**行號引用會隨上游編輯漂移，這是本機制的內建代價，換來的是不會靜默腐爛** | n/a |
 <!-- END GENERATED: governance-enforcement -->

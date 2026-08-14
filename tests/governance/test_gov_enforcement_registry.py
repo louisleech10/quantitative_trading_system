@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -45,6 +46,26 @@ def _mkrepo(tmp_path: Path, mutate=None) -> Path:
         mutate(data)
     (root / "scripts" / "fact_keys.json").write_text(
         json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # 🔴 檢查 ⑧(b) 會驗「豁免理由／實作位置引用的 <檔>:<行> 存在且非註解」
+    #    ⇒ 假 repo 也必須備齊**被引用的檔**，理由與上面備齊 hook 腳本完全相同。
+    #    引用集合由註冊表**機械導出**，不寫死清單——寫死會在下次新增引用時再紅一次。
+    # 🔴 `.get()` 而非直接索引：部分 mutation 測試會**刪掉** schema 欄位來驗
+    #    「整組缺席即 fail-closed」，此處硬索引會讓那些測試死在 fixture 建置而非受測邏輯。
+    _roles = data["_schema"].get("enforcement_column_roles") or {}
+    for _ek in data["_schema"].get("enforcement_keys") or []:
+        if _ek not in data or "waiver" not in _roles:
+            continue
+        if _roles["waiver"] not in data[_ek].get("columns", []):
+            continue
+        _wi = data[_ek]["columns"].index(_roles["waiver"])
+        for _row in data[_ek]["rows"]:
+            for _ref in re.findall(r"[A-Za-z0-9_./-]+\.[A-Za-z0-9]+:[0-9]+", _row[_wi] or ""):
+                _rel = _ref.rsplit(":", 1)[0]
+                _src = REPO / _rel
+                _dst = root / _rel
+                if _src.is_file() and not _dst.exists():
+                    _dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(_src, _dst)
     # 宿主檔（含空邊界標記）
     # 🔴 同一檔可能是多個 key 的 target（如 GOVERNANCE_EXECUTION_ORDER.md 有三個）
     #    ⇒ 必須**累積**所有標記後一次寫入；逐 key 覆寫只會留下最後一個（初版即如此，基準轉紅）。
@@ -215,4 +236,38 @@ def test_mutation_removing_closure_binding_lets_it_through(tmp_path):
     r = _check(root)
     assert "登記產出端覆蓋" not in r.stderr, (
         f"拿掉收案綁定後仍報同一訊息 ⇒ 這條 mutation 是空心的\n{r.stderr}"
+    )
+
+
+def test_note_must_not_mention_nonexistent_fact_key(tmp_path):
+    """🔴 檢查 ⑨：`enforcement_note` 不得提及已不存在的 fact-key。
+
+    〔CODEX-R3-P2-01，戳記輪拒簽〕schema 內的散文最容易變成過期副本：
+    該 note 一度同時寫著「四道檢查」（實際八道）與 `S0.6` 已刪除的來源 key。
+    主委第一次修訂只改了前者，把作廢 key 留在「原文指向 X，已刪除」的歷史括註裡
+    ⇒ `jq ... contains("governance-ticket-closure")` 仍 rc=0，codex 據此拒簽。
+
+    判準封閉：note 內任何 `governance-<名>` token 都必須是本註冊表現存的 key。
+    """
+    def m(d):
+        d["_schema"]["enforcement_note"] = (
+            d["_schema"].get("enforcement_note", "")
+            + "（原文指向 governance-ticket-closure，該來源已刪除）"
+        )
+    r = _check(_mkrepo(tmp_path, m))
+    assert r.returncode != 0, (
+        f"note 提及作廢 key 卻放行 ⇒ schema 散文可留過期來源：{r.stdout}{r.stderr}"
+    )
+    assert "不存在之 fact-key" in r.stderr, f"rc≠0 但未具名 ⇒ 可能紅在別的原因：{r.stderr}"
+    assert "governance-ticket-closure" in r.stderr, f"未指出是哪個 key：{r.stderr}"
+
+
+def test_note_mentioning_live_fact_key_is_allowed(tmp_path):
+    """對照組：note 提及**現存**的 fact-key 必須通過，否則會逼人不敢在 note 裡寫來源。"""
+    def m(d):
+        live = [k for k in d if k != "_schema"][0]
+        d["_schema"]["enforcement_note"] = d["_schema"].get("enforcement_note", "") + f"（見 {live}）"
+    r = _check(_mkrepo(tmp_path, m))
+    assert "不存在之 fact-key" not in r.stderr, (
+        f"提及現存 key 被誤擋 ⇒ 檢查 ⑨ 過寬：{r.stderr}"
     )
