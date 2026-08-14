@@ -1084,8 +1084,16 @@ def test_r6_u1u2u4_g7_worktree_space_quote_paths() -> None:
             ]
         )
         assert add1.returncode == 0, add1.stderr
+        # 🔴 探針 commit 一律 --no-verify（S6.1 之後必要）：
+        #   本測試要驗的是 **G-7 對既成歷史的判定**，不是 hook 行為。
+        #   新增之 commit-msg 前移閘（scripts/g7_trailer_precheck.sh）會擋下
+        #   「staged 含 scope 外路徑而訊息無 trailer」的 commit——那正是本探針
+        #   刻意要構造的狀態。若改成加 trailer，G-7 就會合法通過，
+        #   **本測試將不再測到任何東西**（等於為了讓燈變綠而反轉測試前提）。
+        #   ⇒ 繞過的是 fixture 建構階段的 hook，斷言本身一字未改。
         c1 = wt_run(
-            ["git", "commit", "-m", "test: r6 probe declared space+quote paths"]
+            ["git", "commit", "--no-verify", "-m",
+             "test: r6 probe declared space+quote paths"]
         )
         assert c1.returncode == 0, c1.stderr + c1.stdout
 
@@ -1098,7 +1106,8 @@ def test_r6_u1u2u4_g7_worktree_space_quote_paths() -> None:
         # commit 2：未宣告 evil space ⇒ 須紅
         add2 = wt_run(["git", "add", "--", evil_rel])
         assert add2.returncode == 0, add2.stderr
-        c2 = wt_run(["git", "commit", "-m", "test: r6 probe undeclared evil space"])
+        c2 = wt_run(["git", "commit", "--no-verify", "-m",
+                     "test: r6 probe undeclared evil space"])  # 理由同 c1
         assert c2.returncode == 0, c2.stderr + c2.stdout
 
         g7_bad = wt_run(["bash", "scripts/govb1_final_gate.sh", "--only", "g7"])
@@ -1275,7 +1284,10 @@ def test_r7_v5_undeclared_space_quote_still_fails_g7() -> None:
             ]
         )
         assert add1.returncode == 0, add1.stderr
-        c1 = wt_run(["git", "commit", "-m", "test: r7 probe undeclared space+quote"])
+        # --no-verify 理由見 test_r6_u1u2u4_g7_worktree_space_quote_paths 之 c1 註解：
+        # 本測試驗的是 G-7 對既成歷史的判定，探針須能構造出「未宣告即 commit」的狀態。
+        c1 = wt_run(["git", "commit", "--no-verify", "-m",
+                     "test: r7 probe undeclared space+quote"])
         assert c1.returncode == 0, c1.stderr + c1.stdout
 
         g7_bad = wt_run(["bash", "scripts/govb1_final_gate.sh", "--only", "g7"])
