@@ -101,51 +101,50 @@
 掛載能不能成立取決於**執行時的控制流**（誰先誰後、哪裡提早 return），讀碼看不出來。
 實測法：真的掛上去 → 跑反例 → 看會不會擋。擋不住就拆掉並寫原因。
 
-### 票側（5 件）
+### ✅ 這 10 件已全部定案（`6c48fc73`，三家 review 16 條全數採納）
 
-| # | 做什麼 | 卡在哪 |
-|---|---|---|
-| 1 | `票 B-7` 定去向 | 與 2、3 同一格：**派工指令返回的當下，委員產出檔在不在** |
-| 2 | `票 B-32` 定去向 | 同上 |
-| 3 | `票 B-50` 定去向 | 同上（它要的是「派工後」那個工作區快照） |
-| 4 | `票 B-49` 抽出閉合證據之靜態子集 | 那是**實作**不是掛載；抽出後才談掛哪 |
-| 5 | `票 B-48` 補 enforcement 登記列 | 已掛 `PreToolUse`，登記表還沒補（機器已預警） |
+**掛上四項**（各經反例驗證，非宣稱）：`check_agent_contract_sync.sh`、
+`extract_phase2_expected_flips.py --check`、`b49_closure_static_check.py`（票 `B-49` 之
+靜態子集，新抽出）三支經新增的 `scripts/narrow_check_router.sh` 掛 `PostToolUse`；
+`check_doc_anchors.sh` 掛 `pre-commit`（3.6 秒／次，窄化省不到，成本理由寫死）。
+票 `B-48` 之登記列已補（`E-021`）。
 
-🔴 1–3 的實測法（**搭下一輪派工的便車，不必另開一輪**）：
-派工指令末尾加 `ls -la <產出檔>`。`PostToolUse` 就是在該 Bash 呼叫結束時觸發，
-**指令最後一行看到什麼，`PostToolUse` 就看到什麼**。
-在＝掛得上；不在＝掛不上，把理由寫死。
+**判定不掛三項**（理由寫死於腳本檔頭與 `docs/GOV_ACTIVE_MECHANISMS.md` §七）：
+票 `B-7`／`B-32`／`B-50`（實測：`PostToolUse:Bash` **確實觸發**，但派工背景執行
+⇒ 觸發當下委員產出檔尚不存在）、`draft_selfcheck.sh`（委員會 R4 裁定不得作安全邊界）、
+`check_decoupling_imports.py`（見下方唯一未閉之缺口）。
 
-### 腳本側（5 件）
-
-152 支已分流完（已掛 50／不掛 81／實測 22）。22 支裡 16 支非檢查，剩 6 支真檢查：
-
-| # | 腳本 | 實測 rc／秒 | 待辦 |
-|---|---|---|---|
-| 6 | `check_agent_contract_sync.sh` | 0／1s | **掛上**（便宜、有判定） |
-| 7 | `extract_phase2_expected_flips.py --check` | 0／0s | **掛上** |
-| 8 | `check_doc_anchors.sh` | 0／**3s** | 成本判定：3 秒／次掛 `PostToolUse` 會拖慢每次編輯 ⇒ 決定掛 pre-push 或不掛，**寫原因** |
-| 9 | `draft_selfcheck.sh` | **1**／0s | 🔴 **現樹就是紅的**（`HANDOFF.md` 有 1 條違反）——先修紅再談掛 |
-| 10 | `check_decoupling_imports.py` | **1**／1s | 🔴 **現樹就是紅的**（對應 CLAUDE.md 記載之 R2/R3/R4 既有 P2 債） |
-
-重跑分流：`bash scripts/mount_triage.sh`。量測成本：`bash scripts/round_cost.sh`。
+🔴 **`check_decoupling_imports.py` 是唯一未閉的一項，且卡在別人身上**：
+canonical Rule 2/3/4 的 scanner 自 2026-07-14 起 fail-closed 在戳記關卡，**從未掃過**。
+grok 本輪已獨立審查並自行戳記，但 `verify_task_provenance` 要求審計中有指向
+**被戳記檔本身**的 `committee_output`，而 `register-output` **只收 `handoffs/` 內的檔**
+⇒ `handoffs/` 外的受戳記資產，新戳記在現行機制下**無法通過 provenance**
+（既有兩枚是走 legacy allowlist 豁免，不是真的通過）。
+掛載前置已備妥（`--baseline` 模式＋`scripts/decouple_baseline.txt` 20 筆＋10 條測試）。
+🔴 **不得以修改該判準來讓自己過關**。詳見 `docs/GOV_ACTIVE_MECHANISMS.md` §七.1。
 
 ### 🔴 43 張未開工票不在這 10 件內
 
 它們**沒有產物**，「掛不掛」對它們沒有意義。真正的問題是**改法沒做**——
 那是排程決策（做或不做），**需要使用者定，不是技術判斷**。
 
-## 🔴🔴 推送與兩項具名欠缺
+## 🔴🔴 推送與具名欠缺
 
-**推送**：使用者 2026-08-14T14:20+08:00 指示「先停下，不要 Push」，
-覆蓋同日稍早的「做好那兩件事再 Push」。⇒ **一律不推，等再次明示**。筆數直接查。
+**推送**：使用者 2026-08-14T14:20+08:00 指示「先停下，不要 Push」。
+⇒ **一律不推，等再次明示**。筆數直接查。
 
-🔴 **最後一批（掛載分流）有兩項未做，是為了趕 compact 而省的，不是不必做**：
-1. **未經三家 review**——動了 `gate_check.sh`／`debt_clear.sh`／`committee_run.sh`（共用控制流），
-   依鐵律屬中／大任務必須三家審。
-2. **未跑全套 `gov_check`**——推送前必跑。
-🔴 另：`白話說明/` 七份因本批動到 `scripts/` 而全部**時序過期**，
-**push 前必須補**（`plain_docs_sync_check` 是 pre-push 硬擋）。
+✅ **前一批「未經三家 review」已補**：本輪 `20260814-govmount-x-review-r1` 三家合審
+兩批（含 `gate_check.sh`／`debt_clear.sh`／`committee_run.sh` 之共用控制流變更），
+16 條全數採納並修，收斂檔 `handoffs/reconcile/20260814-govmount-x-review-r1/synth.md`，
+債已清（`debt_clear` OK，16/16 無掉項）。
+
+🔴 **仍未做（push 前必補）**：
+1. **未跑全套 `gov_check`**——本輪只跑受影響子集（`test_govb1_factkey_{gen,hook}` 223 條、
+   `test_narrow_check_router` 13 條、`test_decouple_baseline` 10 條、
+   `test_govb1_contract_matrix`＋`test_govb49_path_grant` 124 條，皆綠）。
+2. `白話說明/` 七份因本批動到 `scripts/` 而**時序過期**（`plain_docs_sync_check` 是 pre-push 硬擋）。
+3. 委員 review 檔尚無 **stamp 輪**——本輪只到 review＋reconcile，未請三家 append
+   `RECONCILE-STAMP`。要正式收案需補一輪 `stamp-r2`。
 
 ## 接手第一件事：做上方投影表**由上而下第一個尚未完成的項目**
 
