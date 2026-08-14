@@ -150,3 +150,47 @@ RULED-BY: 使用者裁定「治理票的新增／刪減／修改／註解／狀�
 | 0600 | B-8 | 未開工 | 皆為 `FROZEN_DOC_AMENDMENT_PROCEDURE.md` v1.0 > 首次實戰才現形的問題：該程序創造了「D 延伸檔�… | r4 三家一致（歸屬判準：他票副產物不算本票落地） ｜還缺：正式的拒絕清單確認機制未建；現行緩解僅「--rejected 覆寫限測試 harness」與「每次執行印出清單 sha256」 |
 | 0610 | B-9 | 未開工 | `docs/` 內的 D 延伸檔無法取得可過機檢的戳記。 | r4 三家一致（歸屬判準：他票副產物不算本票落地） ｜還缺：修法須走程序 §5 的 R（完整三家審＋使用者裁定），尚未啟動 |
 <!-- END GENERATED: governance-ticket-sot -->
+
+---
+
+## 🔴 這張票掛在哪／為什麼沒掛（同一份資料，不是副本）
+
+> 使用者 2026-08-14 逐字：「**把治理 epic 的票，做過的能掛上的就掛上，不能掛的寫原因。**」
+> 那件事做完了，但答案原本只存在 `docs/GOV_ENFORCEMENT_REGISTRY.md`，
+> 打開本檔看不到 ⇒ **使用者問了五次都以為沒做**。
+>
+> ⇒ 下表與該檔**是同一個 fact-key 的同一份 rows**（`governance-enforcement` 之多宿主投影），
+> **不是抄過來的副本**。改一處兩邊同時變，手改會被 fail-closed 擋下。
+>
+> **怎麼讀**：`強制側 = 產出端` ⇒ **已掛上**，`掛載點` 欄就是掛在哪。
+> `強制側 = 豁免` ⇒ **不掛**，`豁免理由` 欄就是原因（体例＝須同時寫
+> 「`PreToolUse不可：`」「`PostToolUse不可：`」「`部分閘：`」三段）。
+>
+> 🔴 **未開工的票不在下表**——它們沒有產物，沒有東西可掛。要它們有掛載點，
+> 得先做它們的改法，那是排程決策不是掛載問題。
+
+<!-- BEGIN GENERATED: governance-enforcement -->
+| 檢查ID | 對應票 | 掛載點 | 強制側 | 豁免理由 | 判定型 |
+|---|---|---|---|---|---|
+| E-001 | B-25 | PostToolUse:Edit,Write:scripts/factkey_write_guard.sh | 產出端 | 實作位置：scripts/factkey_write_guard.sh:116（寫檔當下對受管檔重跑 gen_fact_key_blocks --check） | 一致性型 |
+| E-002 | B-25 | pre-push:gov_check.sh 第 3 段 | 豁免 | PreToolUse不可：本列記錄的是 pre-push 之第二層掛載，該階段依定義在 commit 之後。PostToolUse不可：**不適用**——同一判定已由 E-001 掛在 PostToolUse；本列僅記錄 defense-in-depth 之第二個掛載點，非缺口。部分閘：有——scripts/factkey_write_guard.sh:116（同一判定之產出端掛載） | n/a |
+| E-003 | B-38 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/doc_format_precheck.sh:150（findings 分支呼叫 cx_run --selfcheck；零 findings 之 sentinel 形態與必填欄於該路徑檢查，反例已實跑） | 內容型 |
+| E-004 | B-31 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/doc_format_precheck.sh:150（與委員交件跑同一支檢查、同一組參數）。誠實邊界：票 SoT 之對外用語限「產出端已有檢查點」，不得稱強制 | 內容型 |
+| E-005 | G-7 | commit-msg:g7_trailer_precheck.sh ＋ pre-push:govb1_final_gate.sh --only g7 | 豁免 | PreToolUse不可：判定式為 base..HEAD 之 endpoint 淨差，寫入前無 commit 可算。PostToolUse不可：判定對象是 commit 的屬性（訊息末段之 Governance-Scope trailer），寫檔當下該物件尚不存在；而寫檔當下算得出的「路徑在 scope 外」若單獨告警，對本 repo 多數新增路徑恆真 ⇒ 高頻無訊號。部分閘：有——scripts/g7_trailer_precheck.sh:83（commit-msg 階段：staged 含 scope 外路徑而訊息末段無 trailer 即擋；四向反例已驗，含 trailer 放中間段仍擋、只動 scope 內檔則放行）。🔴 R6 更正：原登記「本票不存在可前移的靜態子集」為事實錯誤——同日兩次 G-7 紅正是此子集，且因豁免須「該路徑只被帶 trailer 的 commit 觸及」，補後續 commit 解不掉，只能重寫歷史 | n/a |
+| E-006 | 測試套件 | pre-push:gov_check.sh 第 5 段 | 豁免 | PreToolUse不可：全套 pytest 為十分鐘級，寫入前執行會使每次編輯停擺。PostToolUse不可：同上——此為**成本型**而非判定型限制，技術上跑得動、代價不可接受，兩者須誠實區分。部分閘：有——各票之承重判準已分散於本表其他列之產出端掛載，代表兩處為 scripts/factkey_write_guard.sh:116 與 scripts/doc_format_precheck.sh:150；測試子集化之提案見 HANDOFF 之「把測試選擇機械化」節（未開工） | n/a |
+| E-007 | B-49 | PostToolUse:Edit,Write:scripts/narrow_check_router.sh | 產出端 | 實作位置：scripts/b49_closure_static_check.py:178（六格 selector 之實質斷言逐格判定；清單完整性於 :155 起之 check_static 前段）。🔴 R8 更正（2026-08-14）：原登記為豁免，理由「靜態子集尚未抽成可掛的檢查」——該改法**已完成**：靜態可判定的兩條（selector 清單完整性、每格是否有可達之實質斷言）已抽成獨立腳本並掛上 PostToolUse，寫檔當下即判；tests/governance/test_govb1_contract_matrix.py 改為自本檔 import 同一份定義，不再各持一份。誠實邊界：本層**不取代** pre-push 之 _assert_b49_closure_evidence（隔離重放、rc／passed／skipped 比對確實需要可重放標的，掛不上產出端），兩者為 defense-in-depth；且 assert True 仍會通過，只防意外掏空與重構失手 | 內容型 |
+| E-008 | B-7 | — | 豁免 | PreToolUse不可：判定對象為委員產出的戳記行，派工前尚不存在。PostToolUse不可：🔴 R8 實測更正（2026-08-14T19:0x+08:00）——原登記「不經主控端 Edit/Write ⇒ 該 hook 不會被觸發」**只對了一半**：真的把探針掛上 PostToolUse:Bash 後，派工指令**確實觸發**它（實證：scripts/probe_dispatch_posttooluse.sh，記錄於 .claude/tmp/probe_b50.log）。真正的限制是**時點**：委員派工依合約以背景執行（前景必 timeout），hook 觸發於**啟動當下**，該時點 handoffs/ 下只有 brief、無任何委員產出檔（實測 ls 僅列出 BRIEF 一列）⇒ 戳記行尚不存在，無標的可判。部分閘：有——scripts/cx_run.sh:776（派工 prompt 逐字注入 task-id 並明令 brief 內範例值不得採用，從源頭消滅手抄）＋ scripts/cx_run.sh:413（task_id 缺漏即拒派）。🔴 R6 更正：原登記「改法未完成、現樹無對應檢查可掛、部分閘無」為事實錯誤 | n/a |
+| E-009 | B-10 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/template_check.sh:324（dext 分支之必填錨點檢查；由 scripts/doc_format_precheck.sh:80 判型後呼叫）。🔴 R6 更正：原登記為豁免，理由寫「輸入為完整文件，非單次編輯內容」——那只證明不能 PreToolUse；實跑反例（寫入缺錨點之 D 延伸檔）當下即紅，證明 PostToolUse 本就掛得上、且早已掛上 | 內容型 |
+| E-010 | B-15 | PreToolUse:Task,Bash,Write:scripts/gate_check.sh | 產出端 | 實作位置：scripts/gate_check.sh:218（_gate_cmd_is_dispatch 之派工判定，掛 PreToolUse ⇒ 指令送出前即判）。🔴 R6 更正：原登記為豁免，理由「須完整指令上下文方能判」——完整指令字串正是 PreToolUse 的輸入，該理由不成立。誠實邊界：本票之殘留是**誤擋率**而非缺掛載，對外不得宣稱誤擋已修復 | 內容型 |
+| E-011 | B-16 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/template_check.sh:711（_check_scope_claim 與 _run_assert_lines 之接線，僅 docs 之 SPEC／TODO 檔套用）。誠實邊界：寫檔階段**不執行** ASSERT 行（T0 自鎖止血），只驗文法與錨點，執行留給 gate.sh。🔴 R6 更正：原登記為豁免，惟其 R5 更正已自承「該檢查亦經 doc_format_precheck 路徑觸發」，與豁免宣稱自相矛盾 | 內容型 |
+| E-012 | B-19 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/doc_format_precheck.sh:195（handoffs 下含 brief-kind 標記之檔即路由至 brief_conformance_check）。🔴 R6 更正：原登記「部分閘是否已掛：無」為事實錯誤——實跑反例（寫入不引用範本之 brief）當下即紅。殘留 R-12（full path 不驗 EXPECTED-DELTA）仍在，屬檢查深度不足，非未掛載 | 內容型 |
+| E-013 | B-24 | — | 豁免 | PreToolUse不可：現樹無對應判定式可執行（本票改法為紀律條文）。PostToolUse不可：同上——不是掛不上，是**沒有東西可掛**；「無檢查」與「檢查掛不了」不得混為一談。部分閘：無 | n/a |
+| E-014 | B-29 | — | 豁免 | PreToolUse不可：判定輸入為派工參數與 brief 檔內容之比對，寫檔當下無派工事件。PostToolUse不可：觸發源為派工指令而非 Edit/Write ⇒ 該 hook 不觸發；改掛 PostToolUse:Bash 亦判不了，因判定需 gate 內部狀態（已開 session、brief 已解析），非指令字串可導出。部分閘：有——scripts/committee_run.sh:420（gate_args 追加 --brief，否則 gate 之 --brief 掛點空轉）。🔴 R6 更正：原填 :410 落在註解行。🔴 R7 更正（GROK-R2-P1-01）：R6 改填之 :411 為**非註解但指錯行**（該行是工作區漂移之 echo）——檢查 ⑧ 只拒註解／空行／缺檔，擋不掉語意錯位，此為其具名能力邊界 | n/a |
+| E-015 | B-32 | — | 豁免 | PreToolUse不可：判定輸入為 brief-kind 與派工結果（CLI rc、輸出檔），寫入前皆不存在。PostToolUse不可：🔴 R8 實測更正（2026-08-14T19:0x+08:00）——原登記「觸發源為派工指令而非 Edit/Write ⇒ 該 hook 不觸發」為**事實錯誤**：掛上 PostToolUse:Bash 探針後派工指令確實觸發它。真正的限制是**時點**：派工依合約背景執行，hook 觸發於啟動當下，此時委員產出檔與 CLI rc 皆尚未產生（實測 ls 僅列出 BRIEF）⇒ brief-kind 與派工結果無從比對。部分閘：有——scripts/cx_run.sh:495（_maybe_register_stamp_output，僅 stamp kind 且三條件成立才註冊）。🔴 R6 更正：原填 :493 落在註解行；R5 之「部分閘已落地」結論不變 | n/a |
+| E-016 | B-34 | — | 豁免 | PreToolUse不可：現樹無對應判定式（角色閘與戳記檢查之一致性改法未完成）。PostToolUse不可：同上——無物可掛，非掛不上。部分閘：無 | n/a |
+| E-017 | B-36 | — | 豁免 | PreToolUse不可：群集歸屬須整份收斂檔方能判，寫入前內容不完整。PostToolUse不可：**理由為「現行無可掛之阻擋判定」，不是「掛不上」**（CODEX-R2-P1-05 要求釐清）——synth 檔之寫入已由 scripts/doc_format_precheck.sh:96 路由，技術上掛得上；但 scripts/reconcile_cluster_attribution_check.sh 全檔僅為純報告、無失敗條件（三家 r2 實跑：對未被引用之 ID 仍 rc=0），且其唯一訊號在收斂檔撰寫過程中恆為真 ⇒ 掛上不產生任何拒絕語意且高誤擋（與 WL-02 開工前量測推翻字面設計同型）。⇒ 屬該票改法未完成。部分閘：有——scripts/reconcile_build.sh:378（收集節點呼叫，提示不阻擋） | n/a |
+| E-018 | B-37 | — | 豁免 | PreToolUse不可：本票產物為唯讀彙整報表，無「不通過」語意，無可阻擋之判定。PostToolUse不可：**理由為「無拒絕條件可掛」，不是「掛不上」**（CODEX-R2-P1-05 要求釐清）——掛得上，但本票產物本質為唯讀彙整，掛上不產生任何拒絕語意。部分閘：有——scripts/friction_tally.sh:155（彙整輸出行；唯讀無阻擋語意。🔴 該腳本檔頭已依使用者 2026-08-14T18:05+08:00 之要求寫死「這裡沒有機械保護」） | n/a |
+| E-019 | B-39 | PostToolUse:Edit,Write:scripts/doc_format_precheck.sh | 產出端 | 實作位置：scripts/completeness_check.sh:157（heading 路由與必填欄判定；由 scripts/doc_format_precheck.sh:150 之 findings 分支經 cx_run --selfcheck 呼叫）。🔴 R6 更正：原登記為豁免且原填 :135 落在註解行；實跑反例（P0 來源摘要寫行號而非雜湊）當下即紅。誠實邊界：跨檔完整性（來源 ID 是否全在綜合）仍須 lock 與全部來源，屬合理的消費端檢查 | 內容型 |
+| E-020 | B-50 | — | 豁免 | PreToolUse不可：判定需「派工前」與「派工後」兩個工作區快照之差，寫入前只有單點。PostToolUse不可：🔴 R8 實測更正（2026-08-14T19:0x+08:00）——真的掛上 PostToolUse:Bash 探針實測，得到**兩個各自獨立就足以判死**的理由：①hook 只有**一個**時間點，「派工前」那個快照不在其視野內，差值算不出來 ②派工依合約背景執行 ⇒ 觸發當下「派工後」根本尚未發生（實測該時點 git status --porcelain 計數等於派工前之值）。原登記之成本理由（對每個 Bash 呼叫做 git status 全掃）仍成立，但那是次要理由，主因是上述時點問題。部分閘：有——scripts/committee_run.sh:320（_ws_snapshot，派工前後比對）。🔴 R6 更正：原填 :267 落在註解行。🔴 R7 更正：R6 改填之 :311 於同輪內因本檔新增 mkdir 守衛而位移成註解行，三家 r2 一致以 --check rc=1 攔下——**行號引用會隨上游編輯漂移，這是本機制的內建代價，換來的是不會靜默腐爛** | n/a |
+| E-021 | B-48 | PreToolUse:Task,Bash,Write:scripts/gate_check.sh | 產出端 | 實作位置：scripts/gate_check.sh:250（_gate_precheck_content 之 no-findings-expected 標籤真偽判定，掛 PreToolUse ⇒ debt_clear 指令送出前即判）。工具內部第一層在 scripts/debt_clear.sh:548（_dc_zero_findings_guard，結案前擋）。誠實邊界：本層**不比工具內部更早**（PreToolUse 之後工具緊接著就跑），價值在 defense-in-depth 與「指令字串即可判」，**不得對外稱前移**。逃生口 --zero-findings-verified 落審計（scripts/debt_clear.sh:462） | 內容型 |
+<!-- END GENERATED: governance-enforcement -->

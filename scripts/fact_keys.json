@@ -285,7 +285,7 @@
     ]
   },
   "governance-enforcement": {
-    "target": "docs/GOV_ENFORCEMENT_REGISTRY.md",
+    "target": ["docs/GOV_ENFORCEMENT_REGISTRY.md", "docs/GOV_TICKET_SOT.md"],
     "columns": ["檢查ID", "對應票", "掛載點", "強制側", "豁免理由", "判定型"],
     "render": "table",
     "rows": [
