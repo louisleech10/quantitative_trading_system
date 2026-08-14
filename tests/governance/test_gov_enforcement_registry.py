@@ -37,10 +37,11 @@ def _mkrepo(tmp_path: Path, mutate=None) -> Path:
     shutil.copy2(SETTINGS, root / ".claude" / "settings.json")
     # 🔴 掛載點對證會驗「片段對應的腳本在 repo 內存在」⇒ 假 repo 必須備齊被登記的 hook 腳本，
     #    否則基準會因對證失敗而紅（初版漏複製，DRIFT 把真正的錯因蓋掉）。
-    for extra in ("factkey_write_guard.sh", "doc_format_precheck.sh", "gate_check.sh",
-                  # 🔴 S6.2 ⑪：票全集對帳被接進 --check，故假 repo 也要備齊它與 backlog，
-                  #    否則該檢查在沙箱一律略過 ⇒ 「刪列繞過」的反例測不出來（等於沒有測試）。
-                  "ticket_universe.sh"):
+    for extra in (
+        # 🔴 S6.2 ⑪：票全集對帳被接進 --check，故假 repo 也要備齊它與 backlog，
+        #    否則該檢查在沙箱一律略過 ⇒ 「刪列繞過」的反例測不出來（等於沒有測試）。
+        "ticket_universe.sh",
+    ):
         src = REPO / "scripts" / extra
         if src.is_file():
             shutil.copy2(src, root / "scripts" / extra)
@@ -58,21 +59,33 @@ def _mkrepo(tmp_path: Path, mutate=None) -> Path:
     #    引用集合由註冊表**機械導出**，不寫死清單——寫死會在下次新增引用時再紅一次。
     # 🔴 `.get()` 而非直接索引：部分 mutation 測試會**刪掉** schema 欄位來驗
     #    「整組缺席即 fail-closed」，此處硬索引會讓那些測試死在 fixture 建置而非受測邏輯。
+    # 🔴 **掛載點欄也要機械導出**（2026-08-14）：原本被登記的 hook 腳本是**寫死清單**
+    #    （factkey_write_guard／doc_format_precheck／gate_check），而同一段註解自己就寫著
+    #    「寫死會在下次新增引用時再紅一次」——它防了 `豁免理由` 欄卻沒防 `掛載點` 欄。
+    #    實際後果：E-007 改掛 scripts/narrow_check_router.sh 後，沙箱缺該檔 ⇒ 掛載對證失敗
+    #    ⇒ `--write` 整個失敗 ⇒ **全部 key 都報 DRIFT，真正的錯因被蓋掉**（推送被擋一次）。
     _roles = data["_schema"].get("enforcement_column_roles") or {}
     for _ek in data["_schema"].get("enforcement_keys") or []:
-        if _ek not in data or "waiver" not in _roles:
+        if _ek not in data:
             continue
-        if _roles["waiver"] not in data[_ek].get("columns", []):
-            continue
-        _wi = data[_ek]["columns"].index(_roles["waiver"])
-        for _row in data[_ek]["rows"]:
-            for _ref in re.findall(r"[A-Za-z0-9_./-]+\.[A-Za-z0-9]+:[0-9]+", _row[_wi] or ""):
-                _rel = _ref.rsplit(":", 1)[0]
-                _src = REPO / _rel
-                _dst = root / _rel
-                if _src.is_file() and not _dst.exists():
-                    _dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(_src, _dst)
+        _cols = data[_ek].get("columns", [])
+        for _role, _pat in (("waiver", r"[A-Za-z0-9_./-]+\.[A-Za-z0-9]+:[0-9]+"),
+                            ("mount",  r"[A-Za-z0-9_./-]+\.(?:sh|py)")):
+            _name = _roles.get(_role)
+            if not _name or _name not in _cols:
+                continue
+            _ci = _cols.index(_name)
+            for _row in data[_ek]["rows"]:
+                for _ref in re.findall(_pat, _row[_ci] or ""):
+                    _rel = _ref.rsplit(":", 1)[0] if ":" in _ref else _ref
+                    # 掛載點欄常只寫 basename（如 `pre-push:gov_check.sh 第 3 段`）
+                    if "/" not in _rel:
+                        _rel = f"scripts/{_rel}"
+                    _src = REPO / _rel
+                    _dst = root / _rel
+                    if _src.is_file() and not _dst.exists():
+                        _dst.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(_src, _dst)
     # 宿主檔（含空邊界標記）
     # 🔴 同一檔可能是多個 key 的 target（如 GOVERNANCE_EXECUTION_ORDER.md 有三個）
     #    ⇒ 必須**累積**所有標記後一次寫入；逐 key 覆寫只會留下最後一個（初版即如此，基準轉紅）。

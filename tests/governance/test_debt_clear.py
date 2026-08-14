@@ -252,12 +252,21 @@ def _happy_path_prep(
     families: list[str] | None = None,
     mode: str = "review",
     roster: list[str] | None = None,
+    sentinel: bool = False,
 ) -> tuple[str, Path]:
+    """建一輪 happy path 的 fixture。
+
+    🔴 `sentinel=True` 產出**零-findings sentinel**（`-P3-00`）而非實質 finding。
+    給「預期零 findings」那類測試用——票 B-48 的守衛會拒絕
+    「標 no-findings-expected 但產出檔有實質 findings」，那是**刻意的**：
+    fixture 若寫實質 finding 卻標零 findings，是 fixture 自相矛盾，不是守衛過嚴。
+    （2026-08-14 實際咬到 `test_abandon_open_no_deadline`，push 被擋一次。）
+    """
     families = families or ["codex", "composer"]
     rid = str(uuid.uuid4())
     _open_round(root, audit, round_id=rid, session=session, participants=families)
     for fam in families:
-        body = _finding(f"{fam.upper()}-R1-P0-01")
+        body = _finding(f"{fam.upper()}-R1-P3-00" if sentinel else f"{fam.upper()}-R1-P0-01")
         p, sha = _write_output(root, session, fam, body)
         rel = str(p.relative_to(root))
         _result(root, audit, round_id=rid, family=fam, out_path=rel, out_sha=sha)
@@ -471,9 +480,14 @@ def test_abandon_missing_fields(tmp_path: Path) -> None:
 
 
 def test_abandon_open_no_deadline(tmp_path: Path) -> None:
-    """--abandon 在 OPEN 未逾任何期限 → rc=0。"""
+    """--abandon 在 OPEN 未逾任何期限 → rc=0。
+
+    🔴 fixture 用 `sentinel=True`：本測試的**受測對象是期限邏輯**，
+    但 kind 標的是「預期零 findings」⇒ 產出檔必須是合法的零-findings 形態，
+    否則票 B-48 的守衛會（正確地）擋下來。原 fixture 寫實質 finding 是矛盾的。
+    """
     root, audit = _setup(tmp_path)
-    rid, _ = _happy_path_prep(root, audit, session="ab-ok", families=["codex"])
+    rid, _ = _happy_path_prep(root, audit, session="ab-ok", families=["codex"], sentinel=True)
     r = _clear(
         root,
         audit,
