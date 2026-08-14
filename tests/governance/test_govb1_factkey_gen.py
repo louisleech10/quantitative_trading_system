@@ -199,12 +199,27 @@ def test_output_has_no_bom_no_crlf_no_timestamp():
     ).stdout
     assert not raw.startswith(b"\xef\xbb\xbf"), "輸出不得含 BOM"
     assert b"\r\n" not in raw, "輸出須全程 LF"
-    # 時間戳會使 diff 恆紅：任何 4 位年份樣式皆視為違規訊號
-    text = raw.decode("utf-8")
-    import re
 
-    assert not re.search(r"\b20\d{2}-\d{2}-\d{2}\b", text), (
-        f"輸出疑似含時間戳:\n{text}"
+    # 🔴 判準改為「連跑兩次逐位元組相同」，取代原本的「不得出現 20XX-XX-XX 樣式」。
+    #
+    #   原判準是 proxy，兩頭都不準：
+    #   · **嚴的地方誤擋**——資料裡的**固定歷史日期**（如「使用者 X 日定死此條」）
+    #     是寫死字串，重生成一模一樣，根本不會讓 diff 恆紅，卻被一律擋掉。
+    #     代價是註記失去時序：讀到兩條互相矛盾的規則時分不出哪條較新。
+    #     使用者 2026-08-14 指出此點（原話：「不然你也常搞不清先後順序和最新狀態」），
+    #     而主委本日確實因缺時序而誤判三次（讀到中間狀態、採信過期標記、搞錯 commit 順序）。
+    #   · **寬的地方漏**——隨機數、PID、絕對路徑、locale 相依輸出全部漏掉，
+    #     那些同樣會使 diff 恆紅，卻不含年份樣式。
+    #
+    #   新判準直接對應要防的問題（輸出不穩定 ⇒ diff 恆紅），且嚴格涵蓋舊判準的有效部分：
+    #   任何**動態**內容（含生成當下的時間戳）都會使兩次輸出相異而被抓到。
+    raw2 = subprocess.run(
+        ["bash", str(GEN)], cwd=str(REPO), capture_output=True
+    ).stdout
+    assert raw == raw2, (
+        "生成器連跑兩次輸出不同 ⇒ 含動態內容（時間戳／隨機數／PID／環境相依），"
+        "會使 diff 恆紅、機械投影失去意義。\n"
+        f"首次 {len(raw)} bytes、次次 {len(raw2)} bytes"
     )
 
 

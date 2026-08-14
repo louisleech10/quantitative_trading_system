@@ -150,7 +150,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -f HANDOFF.md ] && jq -Rs '{\"systemMessage\": (\"=== HANDOFF.md (自動注入) ===\\n\" + .)}' HANDOFF.md || echo '{}'"
+            "command": "bash scripts/inject_handoff.sh"
           }
         ]
       }
