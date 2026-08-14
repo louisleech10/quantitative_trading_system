@@ -1,0 +1,28 @@
+============================= test session starts ==============================
+collected 23 items
+
+tests/governance/test_gov_enforcement_registry.py::test_baseline_is_green PASSED [  4%]
+tests/governance/test_gov_enforcement_registry.py::test_mount_must_exist_in_settings_not_self_declared PASSED [  8%]
+tests/governance/test_gov_enforcement_registry.py::test_mount_matcher_mismatch_is_caught PASSED [ 13%]
+tests/governance/test_gov_enforcement_registry.py::test_waiver_placeholder_is_rejected PASSED [ 17%]
+tests/governance/test_gov_enforcement_registry.py::test_closed_ticket_without_coverage_is_fail_closed PASSED [ 21%]
+tests/governance/test_gov_enforcement_registry.py::test_non_closed_ticket_does_not_require_coverage PASSED [ 26%]
+tests/governance/test_gov_enforcement_registry.py::test_side_enum_is_closed PASSED [ 30%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_keys] PASSED [ 34%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_side_enum] PASSED [ 39%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_producer_side] PASSED [ 43%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_column_roles] PASSED [ 47%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_settings_path] PASSED [ 52%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_closed_status] PASSED [ 56%]
+tests/governance/test_gov_enforcement_registry.py::test_schema_fields_are_one_unit[enforcement_ticket_roles] PASSED [ 60%]
+tests/governance/test_gov_enforcement_registry.py::test_production_tree_all_closed_tickets_are_covered PASSED [ 65%]
+tests/governance/test_gov_enforcement_registry.py::test_mutation_removing_closure_binding_lets_it_through PASSED [ 69%]
+tests/governance/test_gov_enforcement_registry.py::test_note_must_not_mention_nonexistent_fact_key PASSED [ 73%]
+tests/governance/test_gov_enforcement_registry.py::test_s62_ticket_without_gap_text_is_rejected PASSED [ 78%]
+tests/governance/test_gov_enforcement_registry.py::test_s62_no_residual_marker_is_accepted PASSED [ 82%]
+tests/governance/test_gov_enforcement_registry.py::test_s62_markers_cannot_be_emptied PASSED [ 86%]
+tests/governance/test_gov_enforcement_registry.py::test_s62_marker_with_empty_payload_is_rejected PASSED [ 91%]
+tests/governance/test_gov_enforcement_registry.py::test_s62_deleting_a_ticket_row_is_caught PASSED [ 95%]
+tests/governance/test_gov_enforcement_registry.py::test_note_mentioning_live_fact_key_is_allowed PASSED [100%]
+
+============================= 23 passed in 56.20s ==============================

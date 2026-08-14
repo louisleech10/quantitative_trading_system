@@ -1068,6 +1068,9 @@ _FK_ENF_MARK_PRE='PreToolUse不可：'
 _FK_ENF_MARK_POST='PostToolUse不可：'
 _FK_ENF_MARK_PART='部分閘：'
 _FK_ENF_MARK_IMPL='實作位置：'
+# 🔴 S6.2 票之「狀態依據」封閉標記（唯一定義處，以**空白分隔**）。
+#   寫死於生成器而非只讀 schema：schema 自證＝無檢查（同 _FK_RESERVED 之紀律）。
+_FK_TICKET_BASIS_MARKERS='還缺： 無殘留'
 
 _fk_enforcement_keys() { LC_ALL=C jq -r '._schema.enforcement_keys[]? // empty' "${REG}"; }
 
@@ -1138,6 +1141,25 @@ _fk_mount_exists() {   # $1=掛載點字串 → rc=0 表示 settings.json 內確
     | any(.[]; (if $mt == "-" then (.matcher == null) else (.matcher == $mt) end)
                and ((.hooks // []) | any(.[]; (.command // "") | startswith("bash " + $cmd))))
   ' "${_fkme_path}" >/dev/null 2>&1
+}
+
+# ⑪ 🔴 S6.2 之閉合不變式：檢查 ⑩ 只遍歷**現存**列，刪掉整列即無感（CODEX-R1-P1-04 實構）。
+#   ⇒ 把 ticket_universe 的對帳接進**同一個 --check 入口**，使「每張票」成為真的不變式，
+#   而不是「每張還在表裡的票」。原本它是獨立指令，生成器的檢查鏈根本沒呼叫它。
+#   🔴 判別式沿用主控端判準（backlog 存在與否）：fixture 樹沒有 backlog，對它問「票全集齊不齊」
+#   無從回答，一律判紅會使最小 fixture 整批誤紅——與掛載點對證同一種處理，不另造概念。
+_fk_validate_ticket_universe() {
+  _fkvtu_repo="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+  _fkvtu_bl="${_fkvtu_repo}/handoffs/20260801-GOV-AMEND-BACKLOG.md"
+  _fkvtu_sh="${_fkvtu_repo}/scripts/ticket_universe.sh"
+  [ -f "${_fkvtu_bl}" ] && [ -f "${_fkvtu_sh}" ] || return 0
+  _fkvtu_out="$(bash "${_fkvtu_sh}" --check 2>&1)"; _fkvtu_rc=$?
+  [ "${_fkvtu_rc}" -eq 0 ] || {
+    echo "gen_fact_key_blocks: 票全集對帳未過（ticket_universe --check rc=${_fkvtu_rc}）→ fail-closed" >&2
+    printf '%s\n' "${_fkvtu_out}" | sed 's/^/    /' >&2
+    echo "  這道擋的是「把整列票刪掉就沒有還缺什麼可填」——刪列不等於票不存在。" >&2
+    return 1; }
+  return 0
 }
 
 _fk_validate_enforcement() {
@@ -1449,6 +1471,51 @@ EOF3
     echo "  歷史敘事寫進 docs/GOV_ENFORCEMENT_REGISTRY.md，不要留在 schema。" >&2
     _fkve_rc=1; }
 
+  # ⑩ 🔴 S6.2 每張票都要寫「還缺什麼」
+  #   病根：61 張票只有 13 張的狀態依據欄寫了缺口，其餘 48 張只寫「r3 三家一致」這種
+  #   **來源**而非**內容**；完整改法只存在於已標作廢的 backlog 長文
+  #   ⇒ 狀態單一化了，待辦內容卻還要回去翻作廢檔。
+  #   判準封閉：狀態依據欄須含 `ticket_basis_markers` 之一（還缺：／無殘留）。
+  #   「無殘留」保留給使用者裁定不做、或客觀不可執行者，不是逃生口——它仍是一句要寫的判斷。
+  #   🔴 三個 fail-open 已由三家 r1 同時實構，逐條堵在下面（COMPOSER-R1-P1-01／-P1-02、
+  #     GROK-R1-P2-01／-P2-02、CODEX-R1-P1-02／-P1-03）：
+  #     ① markers 刪除／null／空陣列 ⇒ 原本整段跳過 ⇒ 改為**與生成器寫死之集合相等**才算數
+  #     ② `｜還缺：` 後面留空 ⇒ 原本只驗子字串在不在 ⇒ 改為驗 marker 後之 payload 非空且非佔位符
+  #     ③ 刪掉整列票 ⇒ 只遍歷現存 rows 故無感 ⇒ 交由 ticket_universe 對帳（見下方 ⑪）
+  _fkve_bdecl="$(LC_ALL=C jq -c '._schema.ticket_basis_markers // [] | sort' "${REG}")" || {
+    echo "gen_fact_key_blocks: 讀取 ticket_basis_markers 失敗 → fail-closed" >&2; return 1; }
+  _fkve_bwant="$(printf '%s' "${_FK_TICKET_BASIS_MARKERS}" | LC_ALL=C jq -R 'split(" ") | sort' -c)"
+  [ "${_fkve_bdecl}" = "${_fkve_bwant}" ] || {
+    echo "gen_fact_key_blocks: ticket_basis_markers=${_fkve_bdecl} 不等於生成器寫死之集合 ${_fkve_bwant} → fail-closed" >&2
+    echo "  （刪除／改 null／清空即可讓 S6.2 閘整段停用，三家 r1 各自實構過；故改為集合相等。）" >&2
+    return 1; }
+  _fkve_bmark="$(LC_ALL=C jq -r '._schema.ticket_basis_markers | length' "${REG}")"
+  if [ "${_fkve_bmark}" -gt 0 ] 2>/dev/null; then
+    _fkve_nobasis="$(LC_ALL=C jq -er '
+      . as $root
+      | $root._schema.enforcement_ticket_roles as $tr
+      | $root[$tr.key] as $t
+      | ($t.columns | index($tr.id)) as $ii
+      | ($t.columns | index($tr.basis)) as $bi
+      | $root._schema.ticket_basis_markers as $marks
+      | [ $t.rows[]
+          | select($bi == null or ((.[$bi] // "") as $b
+              | ($marks
+                 | map(. as $m
+                     | ($b | contains($m))
+                       and (($b | split($m) | last | gsub("^\\s+|\\s+$"; "")) | length) >= 6)
+                 | any) | not))
+          | .[$ii] ]
+      | join(" ")' "${REG}")" || {
+      echo "gen_fact_key_blocks: 票之狀態依據檢查 jq 失敗 → fail-closed" >&2; return 1; }
+    [ -z "${_fkve_nobasis}" ] || {
+      echo "gen_fact_key_blocks: 下列票之「狀態依據」未寫出還缺什麼 → fail-closed:" >&2
+      printf '    %s\n' "${_fkve_nobasis}" >&2
+      echo "  規則（S6.2）：每張票須含 $(LC_ALL=C jq -r '._schema.ticket_basis_markers | join(" 或 ")' "${REG}")。" >&2
+      echo "  只寫「r3 三家一致」是**來源**不是**內容**——那會逼人回去翻已作廢的 backlog。" >&2
+      _fkve_rc=1; }
+  fi
+
   [ "${_fkve_rc}" -eq 0 ] || return 1
 
   # ⑥ 🔴 S2.2 提前預警：**尚未**標完成、但已在推進中的票，若無產出端覆蓋登記，先講。
@@ -1558,6 +1625,7 @@ EOF2
   # 機制表語意 ＋ opt-in 宿主之改法子樹未登記機制（WL-03）
   _fk_validate_mechanism || _fkc_rc=1
   _fk_validate_enforcement || _fkc_rc=1
+  _fk_validate_ticket_universe || _fkc_rc=1
   _fk_reject_unregistered_mechanisms || _fkc_rc=1
   return "${_fkc_rc}"
 }

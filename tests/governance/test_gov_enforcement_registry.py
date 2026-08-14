@@ -37,10 +37,17 @@ def _mkrepo(tmp_path: Path, mutate=None) -> Path:
     shutil.copy2(SETTINGS, root / ".claude" / "settings.json")
     # 🔴 掛載點對證會驗「片段對應的腳本在 repo 內存在」⇒ 假 repo 必須備齊被登記的 hook 腳本，
     #    否則基準會因對證失敗而紅（初版漏複製，DRIFT 把真正的錯因蓋掉）。
-    for extra in ("factkey_write_guard.sh", "doc_format_precheck.sh", "gate_check.sh"):
+    for extra in ("factkey_write_guard.sh", "doc_format_precheck.sh", "gate_check.sh",
+                  # 🔴 S6.2 ⑪：票全集對帳被接進 --check，故假 repo 也要備齊它與 backlog，
+                  #    否則該檢查在沙箱一律略過 ⇒ 「刪列繞過」的反例測不出來（等於沒有測試）。
+                  "ticket_universe.sh"):
         src = REPO / "scripts" / extra
         if src.is_file():
             shutil.copy2(src, root / "scripts" / extra)
+    _backlog = REPO / "handoffs" / "20260801-GOV-AMEND-BACKLOG.md"
+    if _backlog.is_file():
+        (root / "handoffs").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_backlog, root / "handoffs" / _backlog.name)
     data = json.loads(REG.read_text(encoding="utf-8"))
     if mutate is not None:
         mutate(data)
@@ -260,6 +267,81 @@ def test_note_must_not_mention_nonexistent_fact_key(tmp_path):
     )
     assert "不存在之 fact-key" in r.stderr, f"rc≠0 但未具名 ⇒ 可能紅在別的原因：{r.stderr}"
     assert "governance-ticket-closure" in r.stderr, f"未指出是哪個 key：{r.stderr}"
+
+
+def test_s62_ticket_without_gap_text_is_rejected(tmp_path):
+    """🔴 檢查 ⑩（S6.2）：票之「狀態依據」未寫出還缺什麼 ⇒ fail-closed。
+
+    病根：61 張票原本只有 13 張寫了缺口，其餘只寫「r3 三家一致」——那是**來源**不是**內容**，
+    等於狀態單一化了、待辦內容卻還要回去翻已標作廢的 backlog 長文。
+    """
+    def m(d):
+        tr = d["_schema"]["enforcement_ticket_roles"]
+        t = d[tr["key"]]
+        bi = t["columns"].index(tr["basis"])
+        t["rows"][0][bi] = "r3 三家一致"          # 只有來源，沒有內容
+    r = _check(_mkrepo(tmp_path, m))
+    assert r.returncode != 0, f"票無「還缺什麼」卻放行 ⇒ 待辦內容仍散在作廢檔：{r.stdout}{r.stderr}"
+    assert "未寫出還缺什麼" in r.stderr, f"rc≠0 但未具名 ⇒ 可能紅在別的原因：{r.stderr}"
+
+
+def test_s62_no_residual_marker_is_accepted(tmp_path):
+    """對照組：`無殘留` 是合法答案（使用者裁定不做／客觀不可執行者）。
+
+    若不接受，會逼人為了過閘而編造不存在的待辦——那比沒有檢查更糟。
+    """
+    def m(d):
+        tr = d["_schema"]["enforcement_ticket_roles"]
+        t = d[tr["key"]]
+        bi = t["columns"].index(tr["basis"])
+        t["rows"][0][bi] = "使用者裁定不做 ｜無殘留：非積壓工作"
+    r = _check(_mkrepo(tmp_path, m))
+    assert "未寫出還缺什麼" not in r.stderr, f"`無殘留` 被誤擋 ⇒ 會逼人編造待辦：{r.stderr}"
+
+
+def test_s62_markers_cannot_be_emptied(tmp_path):
+    """🔴 清空 `ticket_basis_markers` ⇒ fail-closed，不得讓 S6.2 閘整段停用。
+
+    〔COMPOSER-R1-P1-02／GROK-R1-P2-01／CODEX-R1-P1-02 三家獨立實構〕
+    初版以 `// []` 取值並在長度 0 時整段跳過——刪除、改 null 或清空即可關掉整道閘。
+    這與 S1.2「刪掉 settings.json 即跳過對證」是同一型的自關 fail-open，我才剛修過同型。
+    """
+    def m(d):
+        d["_schema"]["ticket_basis_markers"] = []
+    r = _check(_mkrepo(tmp_path, m))
+    assert r.returncode != 0, f"清空 markers 卻放行 ⇒ S6.2 閘可被靜默停用：{r.stdout}{r.stderr}"
+    assert "ticket_basis_markers" in r.stderr, f"rc≠0 但未具名：{r.stderr}"
+
+
+def test_s62_marker_with_empty_payload_is_rejected(tmp_path):
+    """🔴 `｜還缺：` 後面留空 ⇒ fail-closed（marker 在場不等於寫了內容）。
+
+    〔COMPOSER-R1-P1-01／GROK-R1-P2-02／CODEX-R1-P1-03〕
+    初版只驗子字串是否存在，於是空殼可過——正好退回 S4.3 之前「有標記無內容」的狀態。
+    """
+    def m(d):
+        tr = d["_schema"]["enforcement_ticket_roles"]
+        t = d[tr["key"]]
+        bi = t["columns"].index(tr["basis"])
+        t["rows"][0][bi] = "r3 三家一致 ｜還缺：   "
+    r = _check(_mkrepo(tmp_path, m))
+    assert r.returncode != 0, f"空 payload 被放行 ⇒ 檢查⑩仍是形式檢查：{r.stdout}{r.stderr}"
+    assert "未寫出還缺什麼" in r.stderr, f"rc≠0 但未具名：{r.stderr}"
+
+
+def test_s62_deleting_a_ticket_row_is_caught(tmp_path):
+    """🔴 刪掉整列票 ⇒ fail-closed（刪列不等於票不存在）。
+
+    〔CODEX-R1-P1-04〕檢查 ⑩ 只遍歷**現存** rows，故刪列後剩餘列全數通過。
+    修法＝把 ticket_universe 對帳接進同一個 --check 入口，
+    使「每張票都要寫還缺什麼」成為真的閉合不變式，而不是「每張還在表裡的票」。
+    """
+    def m(d):
+        tr = d["_schema"]["enforcement_ticket_roles"]
+        d[tr["key"]]["rows"].pop(0)
+    r = _check(_mkrepo(tmp_path, m))
+    assert r.returncode != 0, f"刪列被放行 ⇒ 少寫一張票只要把它刪掉即可：{r.stdout}{r.stderr}"
+    assert "票全集對帳" in r.stderr, f"rc≠0 但未具名對帳失敗 ⇒ 可能紅在別的原因：{r.stderr}"
 
 
 def test_note_mentioning_live_fact_key_is_allowed(tmp_path):
