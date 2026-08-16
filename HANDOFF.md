@@ -1,6 +1,6 @@
 # Handoff
 
-**Agent**: Claude(Opus 5) ｜ **Branch**: main ｜ 實作＝主委自任；review／adversarial＝codex+composer+grok 三家
+**Agent**: Claude(Fable 5) ｜ **Branch**: main ｜ 實作＝主委自任（Fable/Opus）；review／adversarial＝codex+composer+grok 三家
 
 > 🔴 **本檔只寫「接手要做什麼」。** 不寫日誌、不寫歷史、不重述別處已有的狀態。
 > 使用者 2026-08-14：「這是交接要做的事情，有需要寫這幾百行流水帳？
@@ -9,12 +9,13 @@
 
 ---
 
-## 🔴 接手第一件事：回量化主線
+## 🔴 接手第一件事：IC 全棧健檢 epic——偵察已完成，等使用者白話審閱後進 SPEC
 
-**使用者 2026-08-14 明示：「現在開始就是要回去做量化主線」。**
-覆蓋兩條舊裁決（`docs/ROADMAP.md` 之 P0「完成後才回 IC」、「治理優先於產品線」）。
-
-**→ 開 `docs/ROADMAP.md` 的狀態表（第 12 行起），第一列就是下一步。**
+2026-08-17 已完成步驟 1+2（偵察）：三家＋主委四方複核 6/24 底稿，reconcile 收斂於
+`handoffs/reconcile/20260817-ichc-x-consult-r1/synth.md`（C1–C13 群集，債已清）。
+**下一步＝使用者核可後由 Claude 起草 SPEC**（P0 修補：分位圖 schema／xsec 空殼／事件
+silent fallback；本體：typed 契約 SoT＋wiring 閘門）。分工見 ORCH §1 現行分工行（08-17 五調）。
+待手動清：`handoffs/reconcile/*.stale-*` 兩目錄（rm 被沙箱擋）。
 
 治理＝**留現狀、不再擴建**。已掛的機制繼續運作，不需要動。
 
@@ -37,12 +38,13 @@
 | 哪些檢查真的掛著 | `docs/GOV_ACTIVE_MECHANISMS.md` §二（機械生成） |
 | 治理 epic 的一切 | `docs/ROADMAP_DETAIL.md` |
 
-**髒檔應為 4 個且全為規則禁止提交項**：`.claude/gate/*.log`×2、
-`scripts/governance_families.json`（`R-15`）、`docs/GOVB0_FRICTION_AMENDMENTS.md`。
+**髒檔應為 5 個且全為規則禁止提交項或待處置**：`.claude/gate/*.log`×2、
+`scripts/governance_families.json`（`R-15`）、`docs/GOVB0_FRICTION_AMENDMENTS.md`、
+`handoffs/run_receipts/20260814T095050Z-fracdiff-maxlag-postfix-compare.log`（未追蹤 receipt，待處置）。
 
-🔴 **push 需使用者明示**。`pre-push` 會跑全套治理 pytest（十分鐘級，丟背景）——
-🔴 **注意：那 15 分鐘測的是治理腳本，`tests/momentum`／`api` 等 2,445 條量化測試一條都沒跑。**
-回主線後這個配置是否該改，需使用者裁定。
+🔴 **push 需使用者明示**。`pre-push` 已改秒級快閘 `gov_check --fast`（2026-08-14 使用者裁定，
+commit f50f9d0f）；全套治理 pytest 改為手動關卡——動過 `scripts/`／`tests/governance/` 者
+收 epic 前自跑 `bash scripts/gov_check.sh --no-probe`（丟背景）。
 
 ## ⚠ 對任何工作都適用的操作紀律
 

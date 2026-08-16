@@ -17,7 +17,7 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | `1d` 六批全完工（2026-07-22）；之後 23 天零 commit | **★IC 全棧健檢 epic**（見下節） | 本檔下節 |
+| **量化主線（IC 分析）** | **★IC 健檢 epic 偵察（步驟1-2）完成**（2026-08-17 四方 reconcile，債清） | SPEC 起草（**待使用者核可**）：3 P0＋typed 契約＋wiring 閘門 | 本檔下節＋`白話說明/IC健檢偵察結果.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
 | 票 A（timing-overlap 診斷） | **未開票** | Phase 4；前置見下節 | 本檔下節 |
@@ -34,7 +34,8 @@
 ## 量化主線（IC 分析）
 
 **已完成**：`ic-la0` → `ic-la1` → `ic-la2`（前瞻整治三站）→ `ic-1c`（Net IC 量綱）→
-`ic-1cfr`（canonical 因子報酬序列 F0–F5.2）→ `ic-1d`（factor attribution 六批 B0–B5）。
+`ic-1cfr`（canonical 因子報酬序列 F0–F5.2）→ `ic-1d`（factor attribution 六批 B0–B5）→
+`ic-1e+1b`（HAC 顯著性＋FDR 接線＋xsec p 值；**本行 2026-08-17 補記，原漏列**）。
 🔴 `ic-1d` **B4／B5 亦已完工**（2026-08-14 逐項查證：7 支 mutation 探針＋cache/force 兩測、
 `FactorExposureRadar.test.tsx`、Radar 契約地雷殘留 0、ExportButtons 舊判斷殘留 0、前端 triage 檔皆在）。
 
@@ -49,9 +50,9 @@
 設計原則（使用者洞察）：①audit 先天不完整 ⇒ time-box ②**手動快照會腐爛 ⇒ 把發現做成機器閘門**
 ③分層防禦。底稿＝`handoffs/20260624-ic-map-WHOLEMAP.md`（**6/24 版，已隔月過時，須逐條複核**）。
 
-🔴 **底稿的複核狀態未建立**：該圖列 28 種分析、八類系統性缺陷，其中一部分已被 7 月那五個 epic 修掉，
-但**沒有任何地方記錄哪幾條已關**。2026-08-14 抽驗三條皆已修（FDR 幽靈已接線／Net IC 量綱已改／
-`feature_filter` 欄位已補）。⇒ 最便宜的第一步＝**把底稿逐條標「已修／未修／變形」**。
+✅ **底稿複核已完成**（2026-08-17，四方獨立＋reconcile）：28 條逐條標定＝已修/部分修/變形 ≥15、
+未修 7、未查具名 6；三個 P0 仍活（分位圖巢狀 schema 空圖／xsec 硬編空殼／事件 silent fallback）。
+白話版＝`白話說明/IC健檢偵察結果.md`；技術收斂＝`handoffs/reconcile/20260817-ichc-x-consult-r1/`（本地）。
 
 🔴 **本節曾整段消失十天**：`aae04295`（2026-08-05）把 ROADMAP 由 393 → 111 行、「敘事移出 Archived」，
 連同量化主線的下一步一起砍掉，直到 2026-08-14 使用者追問才發現。完整敘事仍在

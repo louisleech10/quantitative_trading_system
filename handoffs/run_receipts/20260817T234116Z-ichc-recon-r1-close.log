@@ -1,0 +1,14 @@
+ICHC recon R1 receipt — 20260817T234116Z
+session=20260817-ichc-x-consult-r1 round_id=52a8c568-21bd-4e75-b868-4ab66f0e4de5
+ROUND CLOSED: committee_debt_clear 已入審計帳(sequence=1838), completeness_rc=0, attribution_rc=0
+--- completeness (rerun-verify) ---
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260817-ichc-x-consult-r1/sources/20260817-ichc-recon-codex.md — 10/10 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260817-ichc-x-consult-r1/sources/20260817-ichc-recon-composer.md — 8/8 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260817-ichc-x-consult-r1/sources/20260817-ichc-recon-grok.md — 12/12 個 ID 全在綜合檔。
+COMPLETENESS PASS(dropped-ID+schema+lock+body-hash 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。
+completeness_rc=0
+--- cluster attribution ---
+attribution_rc=0
+--- debt state ---
+{"actor": "cx_run", "attempt_id": "6e6e926d-b84f-4a1f-a0e8-86ac3dfdc2e7", "cli_rc": "0", "event": "committee_family_result", "event_id": "ecd1657a-8e6e-44a1-9572-f3048139ea03", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-ichc-recon-codex.md", "output_sha256": "6b45dfb61c4b416a4100d57c44a01da583278d1647b00ec695aa3bcbaec752b7", "producer": "audit_append.sh", "result_state": "success", "round_id": "52a8c568-21bd-4e75-b868-4ab66f0e4de5", "schema_version": 1, "sequence": 1837, "ts": "2026-08-16T23:09:52Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "7dfc1e55-477b-44df-b57b-d2c704077ae9", "lock_sha256": "6a247dbb1f9b1110211f3e41cb8c852248e65b38f8796499198e3238a434d229", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "52a8c568-21bd-4e75-b868-4ab66f0e4de5", "schema_version": 1, "sequence": 1838, "session_id": "20260817-ichc-x-consult-r1", "synth_sha256": "e1a39f441066f5c65b487deba052724fdf3f3ac06868020513fb4153a188e3b9", "ts": "2026-08-16T23:16:21Z"}

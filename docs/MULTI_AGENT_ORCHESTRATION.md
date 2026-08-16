@@ -58,7 +58,7 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 - **不得**因效率題改變正確性 gate 的判定；與 `CLAUDE.md` 優化優先序一致（**執行速度排第 4**，前三為跨層可重現／多標的穩定／資料品質）。
 - 常態題**預設答「無」即可**通過，避免 bikeshedding 與注意力稀釋。
 
-**現行分工(2026-08-11 使用者四調):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Claude(Opus)主委自任**;**討論/code review/adversarial=Codex+Grok+Composer 三家全員**(實作者不自審——實作端既為編排端,三家皆為合法審查者,不再有「因某家是實作者而少一家」的例外);委員會審查=三家;簽核 quorum=三家;小=Claude 自做。** 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-07-14 三調、2026-07-12 五調全文見 git log〕
+**現行分工(2026-08-17 使用者五調,回量化主線重申):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Claude(Fable 5/Opus)主委自任**;**討論/code review/adversarial=Codex+Grok+Composer(Cursor) 三家全員**(實作者不自審——實作端既為編排端,三家皆為合法審查者,不再有「因某家是實作者而少一家」的例外);委員會審查=三家;簽核 quorum=三家;小=Claude 自做。** 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-07-14 三調、2026-07-12 五調全文見 git log〕
 
 > 🔴 **本行是散文版,機器版才是判定依據**:`scripts/governance_roles.json`(`implementer`/`reviewers`,角色閘讀它)
 > 與 `scripts/governance_families.json`(`active_stampers`,戳記 quorum 讀它)。兩者不一致時**以機器版為準**,
