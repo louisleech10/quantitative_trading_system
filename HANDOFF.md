@@ -6,35 +6,33 @@
 
 ---
 
-## 🔴 接手第一件事：GAP-1 卡在「白話審閱閘」等使用者裁定
+## 🔴 接手第一件事：GAP-1 TODO 已生成（DRAFT），派三家 adversarial
 
-偵察已完成並收斂（四方 31 findings、attribution/lock/debt 全 rc=0）；
-**收斂結論＝`handoffs/reconcile/20260817-gap1-x-consult-r1/synth.md`**（群集 C1–C5 ＋前提修正 ＋Verdict）。
-主委自產版＝`handoffs/20260817-gap1-recon-claude.md`（非鎖來源，10 條 CLAUDE-R1-*）。
+**SPEC 定版**：`docs/GAP1_STRATEGY_OVERFIT_SPEC.md`（R8；七輪 adversarial 收斂＋使用者白話閘裁決收回三項殘留為 Task）。
+**TODO DRAFT**：`docs/GAP1_STRATEGY_OVERFIT_TODO.md`（`template_check todo` PASS；15 Task 四批；**尚未經三家 adversarial**）。
 
-**等使用者答的那一件**：交付範圍。使用者 2026-08-17 session 中途提醒
-「ML／Optuna／回測都是後續才要開發，可能只是殼」，主委實測複驗成立
-（`data/optuna_*.db` 不存在、`results/optimization_results/` 不存在 ⇒ 策略優化路徑從未跑過），
-故 synth 已加「前提修正」節把交付改為 **純統計核心＋typed 契約＋fail-closed**，
-對未成熟骨架的接線改造降級為具名待接線項。**使用者未答前不得起草 SPEC。**
-
-使用者答「照修正後範圍走」之後的順序：
-SPEC 起草（Claude）→ 三家 adversarial → 複驗＋戳記 → 白話閘 → TODO 同流程 → 實作（Claude）。
-分期＝`B1` 頻率/退化語意契約 → `B2` N ledger schema+讀取API → `B3` MinBTL+DSR 純統計 → `B4` PBO 純統計。
+**接手順序**：
+1. 派 TODO adversarial（brief 用 `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`；review 派工模板見記憶
+   `reference_committee_review_dispatch`：`--risk low --template "n/a: 用 brief"`，**勿**帶 `--spec/--adversarial waived`）。
+   審查範圍**必須含**：① SPEC R8 三項收回之 delta（Task 2.4／3.4／4.3 欄位，未經委員審）② §N 殘留逐條攻「為何現在不做」（範本已加常設必答）。
+2. 收斂（`reconcile_build.sh` 三來源）→ 修 TODO → 戳記 → Frozen → 開工 B1（Claude 自作，每批完成交三家 code review）。
+3. 補 `review-r7` 戳記（body sha256 `ad4c5c535461`；一份一輪，brief 仿 `handoffs/20260817-gap1-stamp-v6-BRIEF.md`）。
 
 ## 現在的狀態
 
 | 事實 | 怎麼查 |
 |---|---|
-| 待推筆數 | `git log --oneline origin/main..HEAD \| wc -l` |
-| 三項 BLOCKING 內容 | synth 的 C1／C2／C3 節（各附四方 finding ID） |
+| 待推筆數 | `git log --oneline origin/main..HEAD \| wc -l`（目前 2：R8 與 TODO；push 需使用者明示） |
+| 戳記狀態 | 已 PASS：consult-r1／review-r1／r2／r4／r5／r6。**待補**：r7 |
+| 待補完（不遺忘） | `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-1 待補完登記」G1-R1..R8（各附為何現在不做／觸發條件） |
+| 殘留規則（範本層） | `templates/SPEC_TEMPLATE.md` §N ＋ `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` §2 常設必答 |
 | 既有紅（勿誤認新紅） | 產品套件 14 條（A/B 隔離證明）＋治理段5 4 條（f50f9d0f 舊契約遺留） |
-| 未清雜物 | `scripts/ichc_t2_diag.py`／`ichc_t3_diff.py`／`ichc_t2_probe400.py`、`handoffs/reconcile/*.stale-*`（rm 被沙箱擋，需手清）；未 commit 的 `scripts/governance_families.json`(active_stampers)＋未追蹤 `docs/GOVB0_FRICTION_AMENDMENTS.md`（被 ROADMAP_DETAIL 引用，該補 commit） |
 
-## ⚠ 最常咬人的操作紀律（完整清單在 CLAUDE.md Gotchas，本檔不重述）
+## ⚠ 本 session 學到的操作紀律（完整清單在 CLAUDE.md Gotchas，本檔不重述）
 
-- 🔴 `git add` 逐檔列出；rc 直取禁 pipe；commit 訊息 `-F` 寫檔（`.claude/tmp/`）＋VERIFY receipt
-- 🔴 改檔用 Edit/Write；`docs/API_SPECIFICATION.md` **實務不可編輯**（檔名撞 SPEC 格式快閘）
-- 🔴 凡動 `scripts/` 的 commit，四份治理白話檔同 commit 更新（sync 守衛自指循環）
-- 🔴 **reconcile lock 只能鎖 round participants（三家）**：4 來源會被 roster 相等性擋（本輪與上輪各踩一次，見 `*.stale-4src`）；主委自產版走非鎖來源＋synth 註記
-- 🔴 委員債未清 ⇒ 擋**所有**新派工（含格式修補）：委員產出格式不合時只能收集端機械修正（`**來源摘要**` 是機器欄）或 abandon
+- 🔴 **reconcile 須先三家 RECONCILE-STAMP 才能派下一輪**（漏跑會被 codex 依 `AGENTS.md` 12 條停工）；stamp brief 需 `stamp-target:` 且**單一目標**⇒ 一份一輪；戳記輪銷帳用 `debt_clear.sh --abandon --kind no-findings-expected`。
+- 🔴 **委員債未清擋所有新派工**（含同 round 重試）：格式不合只能收集端機械修正（`**來源摘要**` `#` 後純 hex）或 abandon。
+- 🔴 **gate 被擋時整個複合 Bash 都不執行**（含前段 `cat > brief`）⇒ 寫檔與派工分兩次呼叫；Write 工具也受 artifact gate＋債務重查擋。
+- 🔴 reconcile lock 只鎖三家；主委自產版走非鎖來源。committee 三家 Verdict 分歧時**看碼證不數人頭、取較嚴版**（本 epic codex 六度比另兩家嚴且皆為真）。
+- 🔴 `git add -f` 才能把新 handoffs 檔入版控；commit 觸及 docs/handoffs 須末段 `Governance-Scope: out-of-epic <理由>`。
+- 🔴 委員 CLI 會 `resource_exhausted`（composer 實發生）⇒ 該輪 abandon（`collection-failed`）後重派。
