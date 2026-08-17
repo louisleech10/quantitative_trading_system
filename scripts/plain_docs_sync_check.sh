@@ -67,6 +67,9 @@ _watched_for() {
     第*批-*.md)                       echo "scripts/ docs/GOV tests/governance/" ;;
     "README.md"|"治理進度日誌.md"|"流程摩擦記錄.md"|"接下來要做什麼.md")
                                       echo "scripts/ docs/GOV tests/governance/" ;;
+    # 量化主線 ICHC epic 白話檔（2026-08-17）：看板盯憲章與閘門腳本；偵察結果盯缺口 registry
+    "IC健檢施工進度.md")             echo "docs/IC_HEALTHCHECK_SPEC.md docs/IC_HEALTHCHECK_TODO.md scripts/ic_wiring_check.py" ;;
+    "IC健檢偵察結果.md")             echo "docs/IC_QUANT_GAP_REGISTRY.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。

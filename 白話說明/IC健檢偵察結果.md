@@ -97,7 +97,7 @@
 （自動查「UI 開關必須真的連到後端」「後端算的必須有人消費」「空態必須分得清為什麼空」）。
 流程＝我起草 → Codex+Composer+Grok 三家對抗審 → 白話給你過 → 才開工實作（實作＝我）。
 
-## 排程對照（Task 6.4 落地；票的權威登記＝docs/IC_QUANT_GAP_REGISTRY.md）
+## 排程對照（Task 6.4 落地；票的權威登記＝docs/IC_QUANT_GAP_REGISTRY.md，該檔另含「切分現狀 holdout-only」誠實聲明節）
 
 | 順位 | 票 | 白話 | 什麼時候做 |
 |---|---|---|---|
