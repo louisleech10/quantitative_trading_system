@@ -1,0 +1,6 @@
+ICHC B4 verify receipt — 20260817T044410Z
+R5 committee CONVERGED verdict A-prime (3/3): fallback preserves event_timestamps + one-shot guard; chair C-preference overruled
+B4 tests: 12 passed (honesty resolver 3 + holdout*insufficient fullpath 2 + timestamps behavior 4 + wiring source 3... see files)
+gate suite: Analysis full + ichc_event + response_v2; FAILED set == baseline 14 (diff_rc=0)
+product bugs surfaced by wiring: raw ts serialization / epoch-int column mismatch / fallback param drop x2 paths
+BATCH GATE CLOSED: zero new failures APPROVED by machine diff; debt cleared round 724209af

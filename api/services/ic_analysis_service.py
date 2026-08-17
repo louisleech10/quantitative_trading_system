@@ -234,6 +234,7 @@ class ICAnalysisService:
                     config_override=config_override,
                     progress_callback=progress_callback,
                     kline_reader=kline_reader,
+                    event_timestamps=request.event_timestamps or None,
                 )
 
             with self._lock:
@@ -859,6 +860,7 @@ class ICAnalysisService:
                 config_override,
                 progress_callback,
                 None,
+                event_timestamps=getattr(request, "event_timestamps", None) or None,
             )
 
             deep_result: Optional[Dict[str, Any]] = None
@@ -1228,9 +1230,6 @@ class ICAnalysisService:
                     "query": request.event_query,
                 }
             })
-
-        if request.event_timestamps:
-            logger.warning("event_timestamps provided but not supported in API yet")
 
         if request.feature_filter:
             override = self._deep_merge(override, {

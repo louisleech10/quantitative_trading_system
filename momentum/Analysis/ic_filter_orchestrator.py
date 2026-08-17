@@ -865,8 +865,17 @@ class ICFilterOrchestrator:
         config_override: Optional[dict] = None,
         progress_callback: Optional[Callable] = None,
         kline_reader: Optional[IKlineReader] = None,
+        *,
+        event_timestamps: Optional[list] = None,
     ) -> dict:
-        """主入口：執行完整八階段流水線。"""
+        """主入口：執行完整八階段流水線。
+
+        event_timestamps（ICHC Task 4.2）：per-request 事件時間戳，keyword-only；
+        與 features index 同 epoch 語意（秒/毫秒判別沿用 ic_engine 自動偵測原語）；
+        空 list ≡ 未帶。不入 config schema（宣告性設定不承載 per-request 資料）。
+        """
+        if not event_timestamps:
+            event_timestamps = None
 
         config = self._apply_tier_config(self._apply_config_override(config_override))
         self._progress_callback = progress_callback
@@ -961,7 +970,8 @@ class ICFilterOrchestrator:
 
         self._report_progress(3, "event_filter", 0.35, "applying event filter")
         features_df, label_series, event_info = self._stage3_event_filter(
-            features_df, label_series, metadata, config, kline_reader
+            features_df, label_series, metadata, config, kline_reader,
+            event_timestamps=event_timestamps,
         )
         if split_context is not None:
             train_mask, test_mask = _derive_stage_masks(
@@ -991,6 +1001,13 @@ class ICFilterOrchestrator:
             split_context=split_context,
         )
         if ic_results.get("status") == "skipped":
+            # ICHC R5 one-shot guard：fallback 重跑內再觸發＝設計不變式被破壞
+            # （holdout off 後 stage4 不應再 skip）——fail-closed 禁遞迴。
+            if self._suppress_persist:
+                raise RuntimeError(
+                    "one-shot fallback guard: rolling_warmup_insufficient hit again "
+                    "inside fallback rerun (invariant: holdout-off skips no warmup)"
+                )
             return self._run_full_sample_fallback(
                 features_path,
                 labels_path,
@@ -1000,6 +1017,7 @@ class ICFilterOrchestrator:
                 kline_reader,
                 reason="rolling_warmup_insufficient",
                 details=ic_results.get("details") or {},
+                event_timestamps=event_timestamps,
             )
 
         self._report_progress(
@@ -1052,6 +1070,8 @@ class ICFilterOrchestrator:
         kline_reader: Optional[IKlineReader],
         reason: str,
         details: dict[str, Any],
+        *,
+        event_timestamps: Optional[list] = None,
     ) -> dict:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
 
@@ -1081,6 +1101,9 @@ class ICFilterOrchestrator:
         prev_suppress = self._suppress_persist
         self._suppress_persist = True
         try:
+            # ICHC R5 裁決（三家 CONVERGED=方案 A′）：fallback 重跑保留 event_timestamps
+            # ——事件語意不得靜默丟失；holdout off 後 stage4 不再進 warmup skip，
+            # one-shot guard 見 analyze() 內 _in_fallback_rerun。
             report = self.analyze(
                 features_path,
                 labels_path,
@@ -1088,6 +1111,7 @@ class ICFilterOrchestrator:
                 config_override=fallback_override,
                 progress_callback=progress_callback,
                 kline_reader=kline_reader,
+                event_timestamps=event_timestamps,
             )
         finally:
             self._suppress_persist = prev_suppress
@@ -1134,6 +1158,10 @@ class ICFilterOrchestrator:
         if meta.get("oos_guarantees") is False:
             return "degraded_full_sample", False
         if meta.get("fit_mode") == "full_sample":
+            return "degraded_full_sample", False
+        # ICHC Task 4.1：事件樣本不足回退全樣本 → 即使 holdout 已 applied 仍判 degraded
+        event_meta = meta.get("event_filter")
+        if isinstance(event_meta, dict) and event_meta.get("fallback") is True:
             return "degraded_full_sample", False
         split = meta.get("ic_train_test_split")
         if isinstance(split, dict):
@@ -2680,13 +2708,26 @@ class ICFilterOrchestrator:
         metadata: dict,
         config: ICConfig,
         kline_reader: Optional[IKlineReader],
+        *,
+        event_timestamps: Optional[list] = None,
     ) -> tuple[pd.DataFrame, pd.Series, dict]:
         event_cfg = config.event_filter
         if not event_cfg.enabled:
             return features_df, label_series, {"mode": "none"}
 
         query = event_cfg.query
-        timestamps = None
+        # ICHC Task 4.2：per-request timestamps 由 analyze() 參數下鑽（原寫死 None）。
+        # 正規化為 DatetimeIndex（epoch 語意契約）：數值輸入沿用 ms/s 量級判別
+        # （同 ic_engine._get_time_index 原語：>=1e12 判 ms，否則 s）。
+        timestamps = event_timestamps
+        if timestamps is not None:
+            ts_arr = np.asarray(list(timestamps))
+            if np.issubdtype(ts_arr.dtype, np.number):
+                max_abs = float(np.nanmax(np.abs(ts_arr.astype(float)))) if len(ts_arr) else 0.0
+                unit = "ms" if max_abs >= 1e12 else "s"
+                timestamps = list(pd.to_datetime(ts_arr, unit=unit, errors="raise"))
+            else:
+                timestamps = list(pd.to_datetime(ts_arr, errors="raise"))
 
         feature_index = _normalize_ic_time_index(features_df.index, "features_df")
         label_index = _normalize_ic_time_index(label_series.index, "label_series")
@@ -2709,12 +2750,25 @@ class ICFilterOrchestrator:
                     filter_base = raw_data.copy(deep=False)
                     filter_base.index = raw_index
 
+        # ICHC Task 4.2：timestamps 模式一律走「正規化後 index」比對——
+        # raw kline 的 `timestamp` 欄是 epoch int，會被 apply_filter 優先取用而恒 0 命中；
+        # 僅 timestamps 模式在本地淺 copy 上移除該欄（query 模式不動，query 可引用該欄）。
+        if timestamps is not None and "timestamp" in getattr(filter_base, "columns", []):
+            filter_base = filter_base.drop(columns=["timestamp"])
+
         filtered_df, info = self._event_filter.apply_filter(
             filter_base, query=query, timestamps=timestamps
         )
+        # ICHC Task 4.2：raw timestamps 清單不進 report metadata（不可序列化且可能巨大）
+        # ——只留計數；EventFilter 本體 filter_info 契約不動（其他 caller 不受影響）
+        info.pop("timestamps", None)
+        info["n_timestamps_requested"] = len(timestamps) if timestamps else 0
 
         if info.get("tier") == "insufficient":
+            # ICHC Task 4.1：loud fallback——reason 入契約枚舉；root 紅標由
+            # _resolve_root_status 讀 metadata.event_filter.fallback 觸發（禁 silent）
             info["fallback"] = True
+            info["reason"] = "insufficient_events"
             return features_df, label_series, info
 
         filtered_index = _normalize_ic_time_index(filtered_df.index, "filtered_events")

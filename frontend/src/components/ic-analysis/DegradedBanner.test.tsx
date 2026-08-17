@@ -24,6 +24,31 @@ describe('DegradedBanner', () => {
     expect(screen.getByText(/research-only/i)).toBeTruthy();
   });
 
+  it('ICHC 4.1：事件 fallback → 副文案（含 reason）', () => {
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'degraded_full_sample',
+      oos_guarantees: false,
+      metadata: {
+        event_filter: { fallback: true, reason: 'insufficient_events' },
+      },
+    } as unknown as ICReport);
+    render(<DegradedBanner />);
+    expect(screen.getByTestId('degraded-banner-event')).toBeTruthy();
+    expect(screen.getByText(/事件樣本不足，已退回全樣本分析/)).toBeTruthy();
+    expect(screen.getByText('insufficient_events')).toBeTruthy();
+  });
+
+  it('ICHC 4.1：degraded 但無事件 fallback → 無副文案（主文案不變）', () => {
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'degraded_full_sample',
+      oos_guarantees: false,
+      metadata: { event_filter: { mode: 'none' } },
+    } as unknown as ICReport);
+    render(<DegradedBanner />);
+    expect(screen.getByTestId('degraded-banner')).toBeTruthy();
+    expect(screen.queryByTestId('degraded-banner-event')).toBeNull();
+  });
+
   it('ok_oos → null', () => {
     useICAnalysisStore.getState().setReport({
       analysis_status: 'ok_oos',
