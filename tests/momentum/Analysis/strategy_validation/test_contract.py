@@ -249,3 +249,113 @@ def test_contract_module_is_importable_without_run_api():
     )
     assert completed.returncode == 0, completed.stderr
     assert "ok" in completed.stdout
+
+
+# ---------------------------------------------------------------------------
+# A1-21 L8 — loader fail-closed（頂層鍵集合／枚舉形狀）＋ 快取不可變、鍵控失效
+# ---------------------------------------------------------------------------
+
+
+def _write_variant(tmp_path, mutate):
+    payload = json.loads(_CONTRACT_FILE.read_text(encoding="utf-8"))
+    mutate(payload)
+    target = tmp_path / "variant.json"
+    target.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return target
+
+
+def test_loader_rejects_unknown_top_level_key(tmp_path):
+    """codex R14：多一個未知頂層鍵以前 load 成功（fail-open）；現在 raise。"""
+    target = _write_variant(tmp_path, lambda p: p.__setitem__("sneaky_new_key", [1]))
+    with pytest.raises(ContractViolation, match="extra=\\['sneaky_new_key'\\]"):
+        load_strategy_validation_contract(target)
+
+
+def test_loader_rejects_missing_top_level_key(tmp_path):
+    target = _write_variant(tmp_path, lambda p: p.pop("universe_scope_values"))
+    with pytest.raises(ContractViolation, match="missing=\\['universe_scope_values'\\]"):
+        load_strategy_validation_contract(target)
+
+
+def test_loader_rejects_empty_or_non_str_enum(tmp_path):
+    target = _write_variant(tmp_path, lambda p: p.__setitem__("metric_unit_values", []))
+    with pytest.raises(ContractViolation, match="metric_unit_values"):
+        load_strategy_validation_contract(target)
+    target = _write_variant(tmp_path, lambda p: p.__setitem__("t_semantics_values", ["a", 1]))
+    with pytest.raises(ContractViolation, match="t_semantics_values"):
+        load_strategy_validation_contract(target)
+
+
+def test_loader_rejects_reason_conditions_drift(tmp_path):
+    target = _write_variant(tmp_path, lambda p: p["reason_conditions"].pop("reporter_failed"))
+    with pytest.raises(ContractViolation, match="reason_conditions"):
+        load_strategy_validation_contract(target)
+
+
+@pytest.mark.parametrize(
+    "section, key, bad",
+    [
+        ("pbo", "universe_scope", "everything"),  # codex R14 反例：universe_scope 非法值曾通過
+        ("dsr", "variance_source", "made_up"),
+        ("provenance", "n_semantics", "made_up"),
+        ("provenance", "t_semantics", "made_up"),
+        ("provenance", "annualization_source", "made_up"),
+    ],
+)
+def test_validate_enforces_enum_membership_mechanically(section, key, bad):
+    """obj 之鍵 k 若契約有 `{k}_values` ⇒ 值須屬該枚舉（機械對映，非逐鍵 hardcode）。"""
+    contract = load_strategy_validation_contract()
+    spec = contract["report_sections"][section]
+    payload = {}
+    for k in spec["required_keys"]:
+        allowed = spec["types"][k]
+        payload[k] = None if "null" in allowed else {"str": "x", "int": 0, "float": 0.0, "bool": False}[allowed[0]]
+    payload["status"] = "ok"
+    payload["reason"] = ""
+    # 先確認合法值可過（否則下面的 raise 可能是別的原因）
+    payload[key] = contract[f"{key}_values"][0]
+    validate_against_contract(payload, section)
+    payload[key] = bad
+    with pytest.raises(ContractViolation, match=f"{key}_values"):
+        validate_against_contract(payload, section)
+
+
+def test_validate_enum_check_skips_none(tmp_path):
+    """nullable 枚舉欄位給 None ⇒ 不做 membership 檢查（型別已允許 null）。"""
+    contract = load_strategy_validation_contract()
+    spec = contract["report_sections"]["pbo"]
+    payload = {k: None for k in spec["required_keys"]}
+    payload["status"] = "not_computed"
+    payload["reason"] = "n_unknown"
+    validate_against_contract(payload, "pbo")
+
+
+def test_returned_contract_is_not_the_cache(monkeypatch):
+    """codex R14 `CACHE_MUTATION True`：外部改回傳值不得污染下一次 load。"""
+    first = load_strategy_validation_contract()
+    first["reasons"].append("injected_reason")
+    first["metric_unit_values"].clear()
+    second = load_strategy_validation_contract()
+    assert "injected_reason" not in second["reasons"]
+    assert second["metric_unit_values"] == ["per_period", "annualized"]
+    assert second is not first
+
+
+def test_cache_invalidates_when_default_file_changes(tmp_path, monkeypatch):
+    """快取以 (mtime_ns, size) 鍵控：預設路徑檔內容變 ⇒ 下一次 load 讀到新值（不 stale）。"""
+    from momentum.Analysis.strategy_validation import contract as contract_mod
+
+    payload = json.loads(_CONTRACT_FILE.read_text(encoding="utf-8"))
+    target = tmp_path / "default_copy.json"
+    target.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(contract_mod, "_CONTRACT_PATH", target)
+    monkeypatch.setattr(contract_mod, "_contract_cache", None)
+
+    v1 = load_strategy_validation_contract()
+    assert v1["version"] == payload["version"]
+    assert contract_mod._contract_cache is not None  # 走了預設路徑 ⇒ 有快取
+
+    payload["version"] = str(payload["version"]) + "-bumped"
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")  # size 亦變
+    v2 = load_strategy_validation_contract()
+    assert v2["version"] == payload["version"]

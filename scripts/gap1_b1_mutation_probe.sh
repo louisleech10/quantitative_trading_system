@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gap1_b1_mutation_probe.sh — B1 之 mutation 自證（§V-5／8／10／13／15）。
+# gap1_b1_mutation_probe.sh — B1／B2 之 mutation 自證（§V-5／8／9a／9b／10／13／15 ＋ §V-7／7b／7c／7d／7e）。
 #
 # 每條：就地 mutate 一行 → 跑對應測試 → 斷言**轉紅且為斷言失敗（非 collection error）** → 還原。
 # 產出 receipt 供 code review 對證（TODO §0「新測試須 mutation 自證（實跑貼 rc）」）。
@@ -43,7 +43,11 @@ TEST_FREQ=tests/momentum/Analysis/strategy_validation/test_frequency.py
 TEST_SHARPE=tests/momentum/Analysis/strategy_validation/test_sharpe.py
 TEST_RC=tests/momentum/Analysis/strategy_validation/test_returns_contract.py
 TEST_LEDGER=tests/momentum/Analysis/strategy_validation/test_ledger.py
+TEST_LEDGER_CONF=tests/momentum/Analysis/strategy_validation/test_ledger_conformance.py
+TEST_LEDGER_PATH=tests/momentum/Analysis/strategy_validation/test_ledger_path.py
 TEST_VB=tests/momentum/Strategy/test_vectorized_backtest.py
+# baseline／post-restore 之測試集合（單一定義，兩處共用；A1-21 L10 起含 B2 三檔）
+ALL_TESTS="${TEST_FREQ} ${TEST_SHARPE} ${TEST_RC} ${TEST_LEDGER} ${TEST_LEDGER_CONF} ${TEST_LEDGER_PATH} ${TEST_VB}"
 
 TARGETS="${FREQ} ${SHARPE} ${RC} ${LEDGER} ${TEST_VB}"
 BACKUP_DIR="$(mktemp -d)"
@@ -68,7 +72,7 @@ FAILED_DESIGN=0
 
 run_expect_red() {  # <label> <test-target>
   _label="$1"; _target="$2"
-  "$PY" -m pytest "$_target" -q > /tmp/gap1_mut.log 2>&1
+  "$PY" -m pytest ${_target} -q > /tmp/gap1_mut.log 2>&1  # 不加引號：允許多個測試目標（路徑無空白）
   _rc=$?
   _nfail="$(grep -cE '^FAILED' /tmp/gap1_mut.log)"
   if [ "$_rc" -eq 1 ] && [ "$_nfail" -ge 1 ]; then
@@ -96,7 +100,7 @@ PY
 }
 
 echo "[baseline] 未 mutate 時各檔應全綠（🔴 K2：baseline 紅即 fail-closed 退出，不得續跑）"
-"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_RC" "$TEST_LEDGER" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
+"$PY" -m pytest ${ALL_TESTS} -q > /tmp/gap1_mut.log 2>&1
 _base_rc=$?          # 🔴 rc 直接取，禁經 pipe
 echo "  baseline rc=${_base_rc} ($(tail -1 /tmp/gap1_mut.log))"
 if [ "${_base_rc}" -ne 0 ]; then
@@ -146,13 +150,33 @@ mutate "$LEDGER" "    if not path.is_file():
         return _unavailable().__class__(**{**_unavailable().__dict__, 'n_candidates_considered': 1, 'n_for_dsr': 1, 'status': 'ok', 'reason': ''})" || exit 1
 run_expect_red "§V-7" "$TEST_LEDGER"
 
+echo "[§V-7b] _row_problems 拿掉 isfinite（NaN／inf 之 metric_value 放行）"
+mutate "$LEDGER" '        if spec["type"] == "float" and not math.isfinite(value):' '        if False:  # MUTANT: isfinite removed' || exit 1
+run_expect_red "§V-7b" "$TEST_LEDGER $TEST_LEDGER_CONF"
+
+echo "[§V-7c] _snapshot_hash 改回裸 | 拼接（可碰撞之舊法）"
+mutate "$LEDGER" '    payload = json.dumps(
+        [sorted(artifact_hashes), dataset_key, research_session_id],
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )' '    payload = ",".join(sorted(artifact_hashes)) + "|" + dataset_key + "|" + research_session_id  # MUTANT' || exit 1
+run_expect_red "§V-7c" "$TEST_LEDGER"
+
+echo "[§V-7d] ledger_path 目錄字面改名（真實路徑推導須有回歸鎖）"
+mutate "$LEDGER" '_LEDGER_DIRNAME = "strategy_validation"' '_LEDGER_DIRNAME = "strategy_validation_MUTANT"' || exit 1
+run_expect_red "§V-7d" "$TEST_LEDGER_PATH"
+
+echo "[§V-7e] 拿掉 flock（掃描＋寫入不再原子 ⇒ 同 id 可雙寫）"
+mutate "$LEDGER" '        fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)' '        pass  # MUTANT: flock removed' || exit 1
+run_expect_red "§V-7e" "$TEST_LEDGER_CONF"
+
 echo "[verify] 還原後應無 mutant 殘留且全綠（🔴 K2：任一不成立即 exit 1）"
 restore_all
 if grep -rn "MUTANT" "$FREQ" "$SHARPE" "$RC" "$LEDGER" "$TEST_VB"; then
   echo "  🔴 有 mutant 殘留 ⇒ 還原機制失效（首版即因 git checkout 對未追蹤檔無效而發生）" >&2
   exit 1
 fi
-"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_RC" "$TEST_LEDGER" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
+"$PY" -m pytest ${ALL_TESTS} -q > /tmp/gap1_mut.log 2>&1
 _post_rc=$?          # 🔴 rc 直接取，禁經 pipe
 echo "  post-restore rc=${_post_rc} ($(tail -1 /tmp/gap1_mut.log))"
 if [ "${_post_rc}" -ne 0 ]; then
@@ -165,4 +189,4 @@ if [ "$FAILED_DESIGN" -ne 0 ]; then
   echo "[gap1-b1-mutation] 🔴 有 mutation 未通過「可證偽」判準"
   exit 1
 fi
-echo "[gap1-b1-mutation] ✅ 全部 mutation 皆使測試轉紅（rc=1 斷言失敗）"
+echo "[gap1-b1-mutation] ✅ 全部 12 條 mutation 皆使測試轉紅（rc=1 斷言失敗）"

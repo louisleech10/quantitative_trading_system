@@ -8,9 +8,10 @@ IC 契約；目標檔缺失／鍵缺失／型別不符一律 raise（fail-closed
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 _CONTRACT_PATH = (
     Path(__file__).resolve().parents[1] / "contracts" / "strategy_validation_contract.json"
@@ -26,7 +27,32 @@ _TYPE_MAP: Dict[str, tuple] = {
     "null": (type(None),),
 }
 
-_contract_cache: Dict[str, Any] | None = None
+# 契約頂層鍵集合（Task 2.1「恰 16」；A1-21 L8：loader 對集合相等 fail-closed，多／少皆 raise）。
+# 只列**鍵名**，不複列任何枚舉值（`capability_status` 六值仍只在 IC 契約）。
+_EXPECTED_TOP_LEVEL_KEYS: frozenset = frozenset(
+    {
+        "version",
+        "capability_status_ref",
+        "ledger_record_keys",
+        "n_fields",
+        "report_sections",
+        "eligibility_keys",
+        "annualization_source_values",
+        "metric_unit_values",
+        "n_semantics_values",
+        "selection_metric_values",
+        "t_semantics_values",
+        "universe_scope_values",
+        "universe_source_values",
+        "variance_source_values",
+        "reasons",
+        "reason_conditions",
+    }
+)
+
+# 快取（A1-21 L8）：以 `(mtime_ns, size)` 鍵控 ⇒ 檔變即失效；回傳 **deepcopy** ⇒ 外部改不到快取。
+# 仍是模組級 memo（不宣稱「無快取」），但不可變、可失效——滿足 Rule 8 之精神。
+_contract_cache: Optional[Tuple[Tuple[int, int], Dict[str, Any]]] = None
 
 
 class ContractViolation(ValueError):
@@ -65,12 +91,14 @@ def load_strategy_validation_contract(path: Path | None = None) -> Dict[str, Any
     """
     global _contract_cache
     use_default = path is None
-    if use_default and _contract_cache is not None:
-        return _contract_cache
-
     target = path or _CONTRACT_PATH
     if not target.is_file():
         raise ContractViolation(f"策略驗證契約檔不存在: {target}")
+    stat = target.stat()
+    cache_key = (stat.st_mtime_ns, stat.st_size)
+    if use_default and _contract_cache is not None and _contract_cache[0] == cache_key:
+        return copy.deepcopy(_contract_cache[1])
+
     try:
         with target.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
@@ -80,12 +108,39 @@ def load_strategy_validation_contract(path: Path | None = None) -> Dict[str, Any
         raise ContractViolation(f"策略驗證契約須為物件: {target}")
 
     payload = dict(payload)
+    _validate_contract_shape(payload, target)
     payload["capability_status"] = _dereference_capability_status(
         payload.get("capability_status_ref", "")
     )
     if use_default:
-        _contract_cache = payload
+        _contract_cache = (cache_key, copy.deepcopy(payload))
     return payload
+
+
+def _validate_contract_shape(payload: Mapping[str, Any], target: Path) -> None:
+    """契約檔本身之結構檢查（A1-21 L8；load 時 fail-closed，禁 fail-open 漂移）：
+    ① 頂層鍵集合恰為 `_EXPECTED_TOP_LEVEL_KEYS`（`_` 開頭之文件鍵除外）
+    ② 每個 `*_values` 皆為非空 str list
+    ③ `reasons` 為非空 str list 且 `set(reason_conditions) == set(reasons)`。
+    """
+    actual = {k for k in payload if not k.startswith("_")}
+    if actual != _EXPECTED_TOP_LEVEL_KEYS:
+        raise ContractViolation(
+            f"策略驗證契約頂層鍵集合非預期: {target}: "
+            f"missing={sorted(_EXPECTED_TOP_LEVEL_KEYS - actual)} extra={sorted(actual - _EXPECTED_TOP_LEVEL_KEYS)}"
+        )
+    for key in sorted(actual):
+        if not key.endswith("_values"):
+            continue
+        values = payload[key]
+        if not isinstance(values, list) or not values or not all(isinstance(v, str) for v in values):
+            raise ContractViolation(f"契約枚舉 {key!r} 須為非空 str list: {target}")
+    reasons = payload["reasons"]
+    if not isinstance(reasons, list) or not reasons or not all(isinstance(r, str) for r in reasons):
+        raise ContractViolation(f"契約 reasons 須為非空 str list: {target}")
+    conditions = payload["reason_conditions"]
+    if not isinstance(conditions, dict) or set(conditions) != set(reasons):
+        raise ContractViolation(f"契約 reason_conditions 鍵集合須等於 reasons: {target}")
 
 
 def contract_top_level_keys(contract: Mapping[str, Any] | None = None) -> set:
@@ -158,4 +213,15 @@ def validate_against_contract(obj: Dict[str, Any], section: str) -> None:
         if obj["reason"] not in contract["reasons"]:
             raise ContractViolation(
                 f"section {section!r} 之 reason={obj['reason']!r} 不在契約 reasons（禁自創字面）"
+            )
+    # A1-21 L8：枚舉 membership 之**機械對映**——obj 之鍵 `k` 若契約存在 `f"{k}_values"`，
+    # 非 None 之值須屬該枚舉（涵蓋 universe_scope／variance_source／n_semantics／t_semantics／
+    # annualization_source／universe_source／selection_metric／metric_unit；新增枚舉自動納入，禁散落 hardcode）。
+    for key, value in obj.items():
+        enum_key = f"{key}_values"
+        if value is None or enum_key not in contract:
+            continue
+        if value not in contract[enum_key]:
+            raise ContractViolation(
+                f"section {section!r} 之 {key}={value!r} 不在契約 {enum_key}（禁自創字面）"
             )

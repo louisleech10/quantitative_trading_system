@@ -129,6 +129,14 @@ def test_valid_sharpe_values_only_per_period(_redirect_ledger_root):
     _write(_redirect_ledger_root, rows)
     got = _read()
     assert got.valid_sharpe_values == (1.1, 2.2)
+    # A1-21 L3（取代 TODO ⑥b「計入 n_rows_rejected」字面）：annualized 是合法枚舉 ⇒ schema-valid，
+    # 計入 n_evaluated、n_rows_rejected 不增、reason 為空（把「不是 rejected」鎖成可證偽）。
+    assert got.n_rows_rejected == 0
+    assert got.n_evaluated == 5
+    assert got.n_valid_metrics == 4
+    assert got.n_failed_or_pruned == 1
+    assert got.reason == ""
+    assert got.status == "ok"
 
 
 def test_same_candidate_multiple_attempts(_redirect_ledger_root):
@@ -174,6 +182,79 @@ def test_invalid_rows_rejected_with_named_reason(_redirect_ledger_root, bad_row)
     assert got.n_rows_rejected == 1
     assert got.n_evaluated == 0
     assert "ledger_row_invalid" in got.reasons_seen
+    # A1-21 L2：檔存在但全列非法 ⇒ 是「帳本損壞」不是「無帳本」：reason 為 ledger_row_invalid、
+    # status 仍 unavailable（fail-closed，N=0）；n_unknown 只留給檔缺／真·零列。
+    assert got.reason == "ledger_row_invalid"
+    assert got.status == "unavailable"
+    assert got.n_for_dsr == 0
+
+
+@pytest.mark.parametrize("bad_value", ["NaN", "Infinity", "-Infinity"])
+def test_non_finite_metric_value_is_schema_invalid(_redirect_ledger_root, bad_value):
+    """A1-21 L1：metric_value 為 NaN／±inf ⇒ schema-invalid（計 n_rows_rejected），
+    **不**進 valid_sharpe_values（否則 B3 DSR 之 variance 會被投毒）。"""
+    good = _row(candidate_id="c1", evaluation_id="e1", metric_value=1.5)
+    bad_line = json.dumps(_row(candidate_id="c2", evaluation_id="e2")).replace(
+        "1.25", bad_value
+    )
+    assert bad_value in bad_line  # 手植（json.dumps 預設 allow_nan 會寫出這些字面）
+    _write(_redirect_ledger_root, [good, bad_line])
+    got = _read()
+    assert got.n_evaluated == 1
+    assert got.n_rows_rejected == 1
+    assert got.valid_sharpe_values == (1.5,)
+    assert got.reason == "ledger_row_invalid"
+
+
+def test_row_with_foreign_context_is_rejected(_redirect_ledger_root):
+    """A1-21 L5：row 之 research_session_id／dataset_key 與本帳本不符 ⇒ 對本帳本非法（不計入 N）。"""
+    rows = [
+        _row(candidate_id="c1", evaluation_id="e1"),
+        _row(candidate_id="c2", evaluation_id="e2", research_session_id="someone-else"),
+        _row(candidate_id="c3", evaluation_id="e3", dataset_key="other-ds"),
+    ]
+    _write(_redirect_ledger_root, rows)
+    got = _read()
+    assert got.n_evaluated == 1
+    assert got.n_rows_rejected == 2
+    assert got.candidate_ids == frozenset({"c1"})
+
+
+@pytest.mark.parametrize(
+    "left, right",
+    [
+        # 三家 R14 反例：舊法 ",".join(hashes)+"|"+dataset+"|"+session 對這三組皆同 payload
+        ((["h1"], "a|b", "c"), (["h1"], "a", "b|c")),
+        ((["x"], "a|b", "c"), (["x|a"], "b", "c")),
+        ((["a"], "b|c", "d"), (["a"], "b", "c|d")),
+        ((["h1", "h2"], "d", "s"), (["h1,h2"], "d", "s")),
+    ],
+)
+def test_snapshot_hash_has_no_delimiter_collision(left, right):
+    """A1-21 L4：分量含 `|`／`,` 時不同輸入不得同 hash（JSON 定界，非裸拼接）。"""
+    assert ledger_mod._snapshot_hash(*left) != ledger_mod._snapshot_hash(*right)
+
+
+def test_snapshot_hash_at_read_level_distinguishes_delimiter_inputs(_redirect_ledger_root, monkeypatch):
+    """讀路徑層級：dataset_key 含 `|` 的兩個不同帳本，snapshot_hash 不同。"""
+
+    def _fake_path(*, research_session_id, dataset_key):
+        safe = dataset_key.replace("|", "%7C")
+        return _redirect_ledger_root / "strategy_validation" / f"{research_session_id}__{safe}.jsonl"
+
+    monkeypatch.setattr(ledger_mod, "ledger_path", _fake_path)
+    hashes = []
+    for session, dataset in (("c", "a|b"), ("b|c", "a")):
+        path = _fake_path(research_session_id=session, dataset_key=dataset)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(_row(research_session_id=session, dataset_key=dataset)) + "\n",
+            encoding="utf-8",
+        )
+        got = read_trial_ledger(research_session_id=session, dataset_key=dataset)
+        assert got.status == "ok"
+        hashes.append(got.snapshot_hash)
+    assert hashes[0] != hashes[1]
 
 
 def test_unreadable_file_raises_rather_than_silently_ok(_redirect_ledger_root):

@@ -220,7 +220,7 @@
       "assertion_ref": "Task 1.2 驗證(退化);Task 3.2 驗證⑤c"
     },
     "ledger_row_invalid": {
-      "condition": "帳本某列不符 ledger_record_keys(缺鍵/型別錯/額外鍵/JSON 語法錯/metric_unit 非法)",
+      "condition": "帳本某列不符 ledger_record_keys(缺鍵/型別錯/額外鍵/JSON 語法錯/metric_unit 非法/數值非有限 NaN·inf/row 之 research_session_id·dataset_key 與本帳本不符);檔存在但全列非法亦記此 reason(status=unavailable);annualized 為合法枚舉、不記此 reason(A1-21)",
       "assertion_ref": "Task 2.2 驗證②⑧"
     },
     "all_paths_degenerate": {

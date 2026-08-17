@@ -383,6 +383,78 @@
 
 ---
 
+## A1-21 — 🔴 B2 code review 十群集修補（L1–L10）：⑥b 字面作廢＋唯一寫入口硬化
+
+- **來源**：B2 實作 code review（`20260818-GAP1-B2-REVIEW-R14`，三家 21 findings：codex 6／composer 5／grok 10；
+  收斂檔 `handoffs/reconcile/20260818-gap1-b2-review-r14/synth.md` 群集 L1–L10）。三家 Verdict 一致「需修補後進 B3」；
+  嚴重度分歧一律取較嚴版，**全部本輪修，不登記殘留**。
+- 🔴 **被推翻之主委宣稱**（brief 段 D，主委自寫）：「`metric_unit="annualized"` 之列我計入 `n_rows_rejected`」——
+  三家實跑皆得 `n_rows_rejected=0`：**實作本來就是 schema-valid、只不入 `valid_sharpe_values`**；是我描述自己的碼描述錯了。
+  同時三家一致判定 Frozen TODO:210 ⑥b「annualized ⇒ 計入 `n_rows_rejected`」與母 SPEC:252／:319「記 `reason=ledger_row_invalid`」
+  是**把合法枚舉誤判為 schema-invalid**（A1-7 定義 schema-invalid 只含 `metric_unit` **非法**）。
+  **TODO ⑥b／母 SPEC:252、:319 之該句作廢，以本條為準**：annualized ⇒ schema-valid、計入 `n_evaluated`（依 `metric_valid` 二分）、
+  `n_rows_rejected` **不**增、**不入** `valid_sharpe_values`、reason 為空。
+  回歸鎖：`test_valid_sharpe_values_only_per_period` 加 `n_rows_rejected==0`／`n_evaluated==5`／`reason==""` 顯式斷言。
+
+### L1（修）非有限 `metric_value` 拒收（`CODEX-R14-P1-02`／`GROK-R14-P1-02`）
+`_row_problems`：`float` 欄位加 `math.isfinite`（NaN／±inf ⇒ schema-invalid）；寫入口 `json.dumps(..., allow_nan=False)`；
+讀側計 `n_rows_rejected`、不入 `valid_sharpe_values`。契約 `ledger_row_invalid.condition` 補「數值非有限」。
+回歸鎖：`test_non_finite_metric_value_is_schema_invalid`（讀）／`test_non_finite_metric_value_is_rejected_at_write`（寫）；探針 **§V-7b**。
+
+### L2（修）全列非法 ⇒ `reason=ledger_row_invalid`（`CODEX-R14-P1-02`／`GROK-R14-P2-01`；codex P1 vs grok P2 取較嚴）
+檔存在但 `n_evaluated==0 ∧ n_rows_rejected>0` ⇒ `status=unavailable`、`reason=ledger_row_invalid`（是「帳本損壞」非「無帳本」）；
+`n_unknown` 只留給檔缺／真·零列。契約 `ledger_row_invalid.condition` 同步。
+回歸鎖：`test_invalid_rows_rejected_with_named_reason` 加 `got.reason`／`status`／`n_for_dsr==0` 斷言。
+
+### L3（延伸）見上「被推翻之主委宣稱」（`CODEX-R14-P1-03`／`GROK-R14-P1-01`）
+
+### L4（修）`snapshot_hash` 改 JSON 定界（`CODEX-R14-P1-04`／`COMPOSER-R14-P1-01`／`GROK-R14-P1-04`）
+`_snapshot_hash(artifact_hashes, dataset_key, research_session_id)` 純函式：
+`sha256(json.dumps([sorted(hashes), dataset_key, session], separators=(",",":"), ensure_ascii=False))`；
+舊法 `",".join(...)+"|"+...+"|"+...` 對三家反例皆碰撞。今日無既有帳本 ⇒ 無舊 hash 相容問題（面向未來不溯及既往）。
+回歸鎖：`test_snapshot_hash_has_no_delimiter_collision`（四組反例）＋讀路徑層級一則；探針 **§V-7c**。
+
+### L5（修）寫入口原子化＋context 綁定（`CODEX-R14-P1-01`／`COMPOSER-R14-P2-02`／`GROK-R14-P1-05`／`GROK-R14-P2-02`；composer P2 取較嚴）
+1. 掃描重複 `evaluation_id`＋append 包在 **`fcntl.flock(LOCK_EX)`**（sidecar `<ledger>.lock`；跨執行緒／跨行程互斥）；
+   讀側 `LOCK_SH`（不讀到半列）。「單次 write 不交錯（O_APPEND）」註解**作廢**（grok 量到 PIPE_BUF=512 < 典型列 ≈610B）。
+2. `record["research_session_id"]／["dataset_key"]` 與參數不等 ⇒ `ContractViolation`（codex `CROSS_CONTEXT`）；
+   讀側對 context 不符之列計 `n_rows_rejected`。
+3. 測試注入點 `_after_duplicate_scan_hook`（預設 `None`）：把 TOCTOU 視窗放大成**可證偽**測試
+   （`test_duplicate_evaluation_id_race_writes_exactly_one_row`：兩執行緒同 id ⇒ 恰 1 成功 1 列；拿掉 flock ⇒ 2 列 ⇒ 紅）；
+   `test_multi_process_long_lines_do_not_interleave`（4 行程 × 8KB 列 >PIPE_BUF）；`test_record_context_must_match_target_ledger`；
+   探針 **§V-7e**。
+
+### L6（修）`ledger_path` 真實推導回歸鎖（`CODEX-R14-P2-05`／`COMPOSER-R14-P1-02`／`GROK-R14-P1-03`）
+抽 `_ledger_filename()` 純函式＋常數 `_LEDGER_DIRNAME`；新檔 `test_ledger_path.py` **不** patch `ledger_path`，改 patch
+`MomentumConfig.from_project_root` 之 project_root，斷言 `<results>/strategy_validation/<s>__<d>.jsonl` 全路徑；探針 **§V-7d**。
+主委加碼（同群集）：識別字含 `os.sep`／`..`／NUL／空／非 str／**`__`**（檔名內兩識別字之分隔符，放行會使 `("a__b","c")` 與
+`("a","b__c")` 落同一檔）⇒ `ValueError`（fail-loud）。
+
+### L7（修）型別精確比對（`COMPOSER-R14-P2-01`／`GROK-R14-P2-03`；取較嚴＝只收純 Python 純量）
+`_row_problems` 以 `type(value) in expected` 取代 `isinstance`：`Enum(str)`／`numpy.float64`／`numpy.int64`／bool 冒充 int·float 一律拒；
+讀側 JSON 解出的本就是純 Python 型別不受影響；寫側生產者須 `float(x)`／`int(x)`（docstring 明寫）。
+回歸鎖：`test_exact_type_check_rejects_lookalikes`（六組）。
+
+### L8（修）契約 loader fail-closed＋快取不可變（`CODEX-R14-P2-06`／`GROK-R14-P3-02`）
+1. `_validate_contract_shape`：頂層鍵集合恰為 `_EXPECTED_TOP_LEVEL_KEYS`（16 鍵名；不複列任何枚舉值）、每個 `*_values` 非空 str list、
+   `set(reason_conditions)==set(reasons)`——多／少／漂即 raise。
+2. `validate_against_contract` 枚舉 membership 改**機械對映**：obj 之鍵 `k` 若契約存在 `f"{k}_values"` ⇒ 非 None 值須屬該枚舉
+   （涵蓋 `universe_scope`／`variance_source`／`n_semantics`／`t_semantics`／`annualization_source`／`universe_source`／`selection_metric`；
+   ledger `_row_problems` 同一機制涵蓋 `metric_unit`）。
+3. 快取以 `(mtime_ns, size)` 鍵控＋回傳 deepcopy；`_row_problems` 改收 `contract` 參數（讀迴圈只 load 一次）。
+   🔴 誠實邊界：仍是模組級 memo（不宣稱「無快取」）；不可變、可失效 ⇒ 滿足 Rule 8 之精神。
+回歸鎖：`test_loader_rejects_unknown_top_level_key`／`_missing_top_level_key`／`_empty_or_non_str_enum`／`_reason_conditions_drift`、
+`test_validate_enforces_enum_membership_mechanically`（五節）、`test_returned_contract_is_not_the_cache`、`test_cache_invalidates_when_default_file_changes`。
+
+### L9（微修）錯誤訊息列 missing／extra／bad_type（`GROK-R14-P3-01`；reason 字面不變）
+回歸鎖：`test_error_message_names_missing_and_extra_keys`。
+
+### L10（修）探針 8 → **12** 條（`COMPOSER-R14-P3-01`）
+新增 §V-7b（isfinite 拿掉）／7c（snapshot 改回 `|`）／7d（目錄字面改名）／7e（flock 拿掉）；baseline／post-restore 集合含 B2 三檔；
+`run_expect_red` 允許多目標。B2 Gate 文字＝「§V-7／7b／7c／7d／7e」。receipt：`handoffs/run_receipts/20260818T080000Z-gap1-b2-fix-mutation.log`。
+
+---
+
 ## 淨變動摘要（供 R9 複驗逐項對證）
 
 | 對象 | R8（母 SPEC） | A1 後 |
