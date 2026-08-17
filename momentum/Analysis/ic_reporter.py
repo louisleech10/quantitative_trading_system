@@ -331,7 +331,9 @@ class ICReporter:
             "filter_log": analysis_results.get("filter_log", {}),
             "summary_table": summary_table,
             "ic_decay": analysis_results.get("ic_decay", {}),
-            "quantile_returns": analysis_results.get("quantile_returns", {}),
+            "quantile_returns": self._flatten_quantile_returns(
+                analysis_results.get("quantile_returns", {})
+            ),
             "grouped_ic": analysis_results.get("grouped_ic", {}),
             "correlation_matrix": analysis_results.get("correlation_matrix", {}),
             "diversification_metrics": analysis_results.get(
@@ -349,7 +351,42 @@ class ICReporter:
         if deep_enabled and deep_report is not None:
             self._append_deep_analysis_fields(report, deep_report)
 
+        # ICHC Task 2.1：契約 validator 唯一邊界（下游出口讀已驗證 report，不各自再驗）
+        from momentum.Analysis.ic_config_schema import (
+            validate_report_against_contract,
+        )
+
+        validate_report_against_contract(report)
         return report
+
+    @staticmethod
+    def _flatten_quantile_returns(qr_tree: Any) -> dict:
+        """ICHC Task 2.1：per-feature 巢狀 payload 攤平為契約形狀（數值不變）。
+
+        映射（SPEC 定死）：內層 quantile_returns.* 全鍵上提 feature 根層；
+        long_short.spread→long_short_spread（內層已有同名鍵者以內層為準）；
+        monotonicity_score 留根層；不丟鍵。status 物件與已扁平 payload 原樣通過。
+        """
+        if not isinstance(qr_tree, dict):
+            return {}
+        flat: dict = {}
+        for feature, node in qr_tree.items():
+            if not isinstance(node, dict):
+                flat[feature] = node
+                continue
+            inner = node.get("quantile_returns")
+            if not isinstance(inner, dict):
+                flat[feature] = node  # 已扁平（或 status 物件）：原樣
+                continue
+            payload = dict(inner)
+            if "monotonicity_score" in node:
+                payload["monotonicity_score"] = node["monotonicity_score"]
+            long_short = node.get("long_short")
+            if isinstance(long_short, dict):
+                payload.setdefault("long_short_spread", long_short.get("spread"))
+                payload.setdefault("long_short_tstat", long_short.get("tstat"))
+            flat[feature] = payload
+        return flat
 
     def inject_deep_analysis(self, report: dict, deep_report: Any) -> dict:
         """在既有 report 上注入深度分析欄位（保持向後相容）。"""

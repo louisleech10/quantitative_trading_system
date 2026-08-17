@@ -2051,6 +2051,8 @@ export interface SectionStatusObject {
 export interface QuantileReturnData {
   quantile_mean_returns: Record<string, number>;
   long_short_spread?: number;
+  long_short_tstat?: number;
+  monotonicity_score?: number;
   cumulative_returns?: Record<string, number[]>;
 }
 

@@ -1,0 +1,8 @@
+ICHC B2 verify receipt — 20260817T035302Z
+golden determinism: rerun diff==0 (96025 bytes, ETHUSDT/12h, 14 features)
+T-G1: 6 passed (tests/momentum/Analysis/test_ichc_p2_golden.py)
+export matrix: 4 passed (test_ichc_p2_export_matrix.py)
+frontend chart contract: 3 passed (QuantileReturnChart.test.tsx)
+api response_v2: 7 passed
+full-suite A/B: baseline vs current FAILED sets identical (14 pre-existing), diff_rc=0
+BATCH GATE CLOSED: zero new failures; golden exact APPROVED by machine comparison (atol=0)
