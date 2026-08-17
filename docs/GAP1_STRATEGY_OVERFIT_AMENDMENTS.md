@@ -308,6 +308,36 @@
 
 ---
 
+# B1 實作期之追加修訂（A1-19；🔴 由 B1 code review 複核）
+
+## A1-19 — Task 1.1 之 canonical 實作落在 `momentum/core/frequency.py`（re-export 保持 TODO 路徑）
+
+- **來源**：B1 實作時之機器擋點（非委員 finding）。實跑證據：
+  `python3 scripts/check_decoupling_imports.py --baseline scripts/decouple_baseline.txt` → rc=1，
+  `NEW: momentum/Strategy/vectorized_backtest.py|R2|from|momentum.Analysis.strategy_validation.frequency.*`（2 筆）。
+- **衝突**：TODO Task 1.1 把 `resolve_periods_per_year`／`available_years` 放
+  `momentum/Analysis/strategy_validation/frequency.py`，而 Task 1.3 要求
+  `momentum/Strategy/vectorized_backtest.py` 呼叫之 ⇒ `momentum/Strategy/` → `momentum/Analysis/`
+  命中 **canonical Rule 2（跨域須經 Protocol）**，`check_decoupling_imports.py` fail-closed。
+  TODO §0 只列了 R1／R3／R6／R7，**未預見** R2 之 intra-`momentum` 跨域判定。
+- **修訂**：canonical 實作移至 **`momentum/core/frequency.py`**；
+  `momentum/Analysis/strategy_validation/frequency.py` 改為 **re-export**（`__all__` 三個名稱）。
+  ⇒ TODO 所寫之 import 路徑與 API **逐字仍成立**（`from momentum.Analysis.strategy_validation.frequency
+  import resolve_periods_per_year` 可用），三關與測試無須改寫。
+- **為何是 core 而非開 manifest allow**：`momentum.core.*` 與 `momentum.factories` 是 scanner 之
+  結構性豁免（`_is_exempt_target`）；且本函式是**純常數推導**（其唯一輸入 `TIMEFRAME_SECONDS`
+  本就住 `momentum/core/constants.py`），無任何領域邏輯 ⇒ 放 core 是架構上正確，而非為過閘而搬。
+  另一方案（改 manifest allowlist ＋ 重蓋 stamp）會把「Strategy 可直接 import Analysis」永久放寬，代價大得多。
+- **未變**：函式簽名、行為、錯誤型別、`available_years` 之唯一推導處地位、§V-8／15 mutation 皆不受影響
+  （實跑：`handoffs/run_receipts/20260817T170000Z-gap1-b1-mutation.log` 五條全轉紅 rc=1）。
+- **Task 1.3 之附帶決定（同屬本條，review 請一併看）**：`StrategyBacktestObjective.evaluate` **只在
+  `self.timeframe is not None` 時**才把 `timeframe`／`risk_free_rate` 傳給 engine。
+  理由：`IBacktestEngine` 之其他實作（含既有測試替身）簽名未含這兩參 ⇒ 無條件傳會使**未使用 GAP-1 的既有路徑**
+  全部 `TypeError`（實跑：18 failed）。給了 `timeframe` 而引擎不支援 ⇒ 仍 `TypeError`（fail-loud），
+  **不**靜默退回隱性 730。
+
+---
+
 ## 淨變動摘要（供 R9 複驗逐項對證）
 
 | 對象 | R8（母 SPEC） | A1 後 |

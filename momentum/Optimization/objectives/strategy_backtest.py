@@ -33,7 +33,13 @@ class StrategyBacktestObjective(IOptimizationObjective):
         target_metric: str = "expectancy",
         constraints: Optional[Dict[str, float]] = None,
         multi_objective: bool = False,
+        timeframe: Optional[str] = None,
+        risk_free_rate: float = 0.02,
     ):
+        # GAP-1 Task 1.3：年化來源必須從 objective 一路傳到 engine，
+        # 否則「策略路徑消除隱性 730」只是存在參數而未生效（SPEC 驗收②b）。
+        self.timeframe = timeframe
+        self.risk_free_rate = float(risk_free_rate)
         self.backtest_engine = backtest_engine
         self.prices = prices.copy()
         self.predicted_proba = pd.Series(predicted_proba).astype(float)
@@ -102,15 +108,32 @@ class StrategyBacktestObjective(IOptimizationObjective):
         }
 
     def evaluate(self, params: Dict[str, Any]) -> Union[float, Tuple[float, float]]:
+        # GAP-1 Task 1.3：只有在**本 objective 真的被指定 timeframe** 時才傳新參數。
+        # 理由：`IBacktestEngine` 之其他實作（含既有測試替身）簽名尚未含 timeframe／risk_free_rate；
+        # 無條件傳會使「沒用到 GAP-1 的既有路徑」爆 TypeError。
+        # timeframe 有給而引擎不支援 ⇒ TypeError（fail-loud），**不**靜默退回隱性 730。
+        extra_kwargs: Dict[str, Any] = {}
+        if self.timeframe is not None:
+            extra_kwargs["timeframe"] = self.timeframe
+            extra_kwargs["risk_free_rate"] = self.risk_free_rate
+
         result = self.backtest_engine.run_backtest(
             prices=self.prices,
             predicted_proba=self.predicted_proba,
             atr_values=self.atr_values,
             strategy_params=params,
+            **extra_kwargs,
         )
 
         from momentum.Strategy.performance_metrics import PerformanceMetrics  # noqa: PLC0415
-        metrics = PerformanceMetrics(result.equity_curve, result.trades).calculate_all()
+        # GAP-1 Task 1.3：periods_per_year 取自 engine 之解析結果（單一來源），不再隱性 730。
+        annualization = getattr(result, "annualization", None) or {}
+        metrics = PerformanceMetrics(
+            result.equity_curve,
+            result.trades,
+            risk_free_rate=self.risk_free_rate,
+            periods_per_year=int(annualization.get("periods_per_year", 730)),
+        ).calculate_all()
         self._record_trial_metrics(metrics)
         self._apply_constraints(metrics)
 

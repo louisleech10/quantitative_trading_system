@@ -1,0 +1,15 @@
+[baseline] 未 mutate 時三檔應全綠
+  baseline rc=0 (============================== 72 passed in 0.57s ==============================)
+[§V-8] resolve_periods_per_year 未知 timeframe 回 730（而非 raise）
+  ✅ §V-8: 轉紅 rc=1（8 條 FAILED＝斷言失敗）
+[§V-15] available_years 回 n_bars（把 bar 數當年數）
+  ✅ §V-15: 轉紅 rc=1（5 條 FAILED＝斷言失敗）
+[§V-5] compute_sharpe 退化情形回 0.0（而非 NaN＋status）
+  ✅ §V-5: 轉紅 rc=1（7 條 FAILED＝斷言失敗）
+[§V-10] Mertens (γ4-1)/4 改成 γ4/4（語法合法之數值 mutant）
+  ✅ §V-10: 轉紅 rc=1（1 條 FAILED＝斷言失敗）
+[§V-13] Task 1.3 斷言③ 之 fixture 改用 risk_free_rate=0.02
+  ✅ §V-13: 轉紅 rc=1（1 條 FAILED＝斷言失敗）
+[verify] 還原後應無 mutant 殘留且全綠
+  post-restore rc=0 (============================== 72 passed in 0.51s ==============================)
+[gap1-b1-mutation] ✅ 全部 mutation 皆使測試轉紅（rc=1 斷言失敗）

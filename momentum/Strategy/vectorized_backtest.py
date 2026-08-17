@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
 
+from momentum.core.frequency import UnknownTimeframeError, resolve_periods_per_year
 from momentum.core.logging import get_logger
 from momentum.factories import create_position_sizer
 from momentum.Strategy.performance_metrics import PerformanceMetrics
@@ -35,6 +36,9 @@ class BacktestResult:
     trades: List[Trade]
     metrics: Dict[str, float]
     config: Dict[str, Any]
+    # GAP-1 Task 1.3：年化來源之平行 metadata（**不**汙染 metrics: Dict[str, float] 型別）。
+    # {"source": "resolved"|"default_730", "periods_per_year": int, "timeframe": str|None}
+    annualization: Dict[str, Any] = field(default_factory=dict)
 
 
 class VectorizedBacktest:
@@ -46,14 +50,39 @@ class VectorizedBacktest:
         self.commission = commission
         self.slippage = slippage
 
+    @staticmethod
+    def _resolve_annualization(timeframe: str | None) -> Dict[str, Any]:
+        """GAP-1 Task 1.3：年化來源之機器可判讀 metadata（唯一組裝處）。
+
+        `timeframe` 給定且可解析 ⇒ `source="resolved"`；`None` 或未支援值 ⇒ 保持現行預設 730
+        且 `source="default_730"`（**禁**靜默假裝已解析）。
+        """
+        if timeframe is not None:
+            try:
+                ppy = resolve_periods_per_year(timeframe)
+            except UnknownTimeframeError:
+                logger.warning(
+                    "unknown timeframe %r for annualization; falling back to default 730",
+                    timeframe,
+                )
+            else:
+                return {"source": "resolved", "periods_per_year": ppy, "timeframe": timeframe}
+        return {"source": "default_730", "periods_per_year": 730, "timeframe": None}
+
     def run_backtest(
         self,
         prices: pd.DataFrame,
         predicted_proba: pd.Series,
         atr_values: pd.Series,
         strategy_params: dict,
+        timeframe: str | None = None,
+        risk_free_rate: float = 0.02,
     ) -> BacktestResult:
-        early_result = self._validate_inputs(prices, predicted_proba, atr_values, strategy_params)
+        annualization = self._resolve_annualization(timeframe)
+
+        early_result = self._validate_inputs(
+            prices, predicted_proba, atr_values, strategy_params, annualization
+        )
         if early_result is not None:
             return early_result
 
@@ -81,13 +110,19 @@ class VectorizedBacktest:
         )
 
         equity_curve = self._calculate_equity_curve(trades, prices)
-        metrics = PerformanceMetrics(equity_curve, trades).calculate_all()
+        metrics = PerformanceMetrics(
+            equity_curve,
+            trades,
+            risk_free_rate=risk_free_rate,
+            periods_per_year=annualization["periods_per_year"],
+        ).calculate_all()
 
         return BacktestResult(
             equity_curve=equity_curve,
             trades=trades,
             metrics=metrics,
             config=strategy_params,
+            annualization=annualization,
         )
 
     def _generate_entry_signals(self, proba: pd.Series, threshold: float) -> pd.Series:
@@ -344,6 +379,7 @@ class VectorizedBacktest:
         predicted_proba: pd.Series,
         atr_values: pd.Series,
         strategy_params: dict,
+        annualization: Dict[str, Any] | None = None,
     ) -> BacktestResult | None:
         required_cols = {"open", "high", "low", "close"}
         missing = required_cols - set(prices.columns)
@@ -356,6 +392,10 @@ class VectorizedBacktest:
                 trades=[],
                 metrics={},
                 config=strategy_params,
+                # Task 1.3：早退路徑亦須填 annualization（呼叫方無法區分「沒填」與「未解析」）
+                annualization=annualization
+                if annualization is not None
+                else {"source": "default_730", "periods_per_year": 730, "timeframe": None},
             )
         if len(prices) == 1:
             return BacktestResult(
@@ -363,6 +403,10 @@ class VectorizedBacktest:
                 trades=[],
                 metrics={},
                 config=strategy_params,
+                # Task 1.3：早退路徑亦須填 annualization（呼叫方無法區分「沒填」與「未解析」）
+                annualization=annualization
+                if annualization is not None
+                else {"source": "default_730", "periods_per_year": 730, "timeframe": None},
             )
         if len(prices) != len(predicted_proba):
             raise ValueError(

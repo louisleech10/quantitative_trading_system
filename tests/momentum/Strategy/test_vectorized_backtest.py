@@ -331,3 +331,98 @@ def test_calculate_equity_curve_skip_unknown_timestamp_exit():
     ]
     curve = vb._calculate_equity_curve(trades, prices)
     assert (curve == 1.0).all()
+
+
+# ============================================================================
+# GAP-1 Task 1.3 — 年化來源（annualization）新增斷言（只加，不改既有）
+# 通過條件見 docs/GAP1_STRATEGY_OVERFIT_TODO.md Task 1.3「驗證」欄。
+# ============================================================================
+
+
+def _ann_fixture(n=64, seed=20260817):
+    rng = np.random.default_rng(seed)
+    close = 100.0 + np.cumsum(rng.standard_normal(n))
+    prices = _build_prices(close)
+    proba = pd.Series(rng.uniform(0.0, 1.0, size=n))
+    atr = pd.Series(np.full(n, 1.5))
+    return prices, proba, atr
+
+
+def test_annualization_resolved_for_known_timeframe():
+    """① timeframe="1h" ⇒ source=resolved 且 periods_per_year=8760。"""
+    prices, proba, atr = _ann_fixture()
+    result = VectorizedBacktest().run_backtest(
+        prices, proba, atr, _default_params(), timeframe="1h"
+    )
+    assert result.annualization == {
+        "source": "resolved",
+        "periods_per_year": 8760,
+        "timeframe": "1h",
+    }
+
+
+def test_annualization_defaults_when_timeframe_missing():
+    """② timeframe=None ⇒ source=default_730（保持現行預設，不假裝已解析）。"""
+    prices, proba, atr = _ann_fixture()
+    result = VectorizedBacktest().run_backtest(prices, proba, atr, _default_params())
+    assert result.annualization["source"] == "default_730"
+    assert result.annualization["periods_per_year"] == 730
+    assert result.annualization["timeframe"] is None
+
+
+def test_annualization_unknown_timeframe_falls_back_and_is_machine_readable():
+    """② 未支援值 ⇒ 落 default_730（可機器判讀，非靜默）。"""
+    prices, proba, atr = _ann_fixture()
+    result = VectorizedBacktest().run_backtest(
+        prices, proba, atr, _default_params(), timeframe="7m"
+    )
+    assert result.annualization["source"] == "default_730"
+
+
+def test_sharpe_ratio_diverges_by_sqrt_ratio_with_zero_rf():
+    """③ rf=0 fixture 下 sharpe(1h)/sharpe(None) == sqrt(8760/730)（數值真的分叉）。
+
+    §V-13 mutation 鎖：本 fixture 若用 rf=0.02，該比值代數上不成立 ⇒ 轉紅。
+    """
+    prices, proba, atr = _ann_fixture()
+    vb = VectorizedBacktest()
+    hourly = vb.run_backtest(
+        prices, proba, atr, _default_params(), timeframe="1h", risk_free_rate=0.0
+    )
+    default = vb.run_backtest(prices, proba, atr, _default_params(), risk_free_rate=0.0)
+    if default.metrics["sharpe_ratio"] == 0.0:
+        pytest.skip("fixture 產生零 sharpe，換 seed 才有意義")
+    ratio = hourly.metrics["sharpe_ratio"] / default.metrics["sharpe_ratio"]
+    assert ratio == pytest.approx(np.sqrt(8760 / 730), abs=1e-9)
+
+
+def test_sharpe_ratio_differs_under_production_rf_default():
+    """③b rf=0.02（生產預設）下 periods 分叉且兩 sharpe 不等（不鎖比值）。"""
+    prices, proba, atr = _ann_fixture()
+    vb = VectorizedBacktest()
+    hourly = vb.run_backtest(prices, proba, atr, _default_params(), timeframe="1h")
+    default = vb.run_backtest(prices, proba, atr, _default_params())
+    assert hourly.annualization["periods_per_year"] == 8760
+    assert default.annualization["periods_per_year"] == 730
+    if default.metrics["sharpe_ratio"] != 0.0:
+        assert hourly.metrics["sharpe_ratio"] != default.metrics["sharpe_ratio"]
+
+
+def test_early_return_paths_carry_annualization():
+    """早退路徑（空 / 單根）亦須填 annualization，呼叫方才不必區分「沒填」與「未解析」。"""
+    vb = VectorizedBacktest()
+    empty = vb.run_backtest(
+        pd.DataFrame(columns=["open", "high", "low", "close"]),
+        pd.Series(dtype=float),
+        pd.Series(dtype=float),
+        _default_params(),
+        timeframe="1h",
+    )
+    assert empty.annualization["source"] == "resolved"
+    single = vb.run_backtest(
+        _build_prices([100.0]),
+        pd.Series([0.5]),
+        pd.Series([1.0]),
+        _default_params(),
+    )
+    assert single.annualization["source"] == "default_730"

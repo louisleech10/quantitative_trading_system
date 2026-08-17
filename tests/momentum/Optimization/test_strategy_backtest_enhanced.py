@@ -393,3 +393,114 @@ def test_record_trial_metrics_non_float_value_fallback():
     objective._current_trial = spy
     objective._record_trial_metrics({"meta": "not-a-float"})
     assert spy.calls["meta"] == "not-a-float"
+
+
+# ============================================================================
+# GAP-1 Task 1.3 — objective 端傳遞鏈斷言（只加，不改既有）
+# 驗收②b：timeframe 須真的傳到 engine 並改變數值，而非「只存在參數」。
+# ============================================================================
+
+
+class _RecordingEngine:
+    """記錄 run_backtest 收到的 kwargs，並回真實引擎之結果形狀。"""
+
+    def __init__(self):
+        self.calls = []
+
+    def run_backtest(self, prices, predicted_proba, atr_values, strategy_params, **kwargs):
+        from momentum.Strategy.vectorized_backtest import VectorizedBacktest
+
+        self.calls.append(kwargs)
+        return VectorizedBacktest().run_backtest(
+            prices, predicted_proba, atr_values, strategy_params, **kwargs
+        )
+
+
+def test_objective_forwards_timeframe_to_engine():
+    """②b 前半：timeframe 給定時，engine 真的收到（傳遞鏈存在）。"""
+    engine = _RecordingEngine()
+    objective = make_objective(backtest_engine=engine, timeframe="1h", risk_free_rate=0.0)
+    objective.evaluate(
+        {
+            "entry_threshold": 0.7,
+            "exit_threshold": 0.4,
+            "stop_loss_atr": 2.0,
+            "take_profit_ratio": 3.0,
+            "position_sizing_method": "fixed",
+            "position_size": 0.1,
+            "kelly_fraction": 0.5,
+            "max_position_size": 0.25,
+            "cooldown_bars": 0,
+            "trailing_stop_activation": 0.05,
+        }
+    )
+    assert engine.calls, "engine 未被呼叫"
+    assert engine.calls[0]["timeframe"] == "1h"
+    assert engine.calls[0]["risk_free_rate"] == 0.0
+
+
+def test_objective_omits_new_kwargs_when_timeframe_absent():
+    """既有路徑（未指定 timeframe）之呼叫形狀逐字不變 ⇒ 舊 engine 實作不破。"""
+    engine = _RecordingEngine()
+    objective = make_objective(backtest_engine=engine, target_metric="sharpe_ratio")
+    objective.evaluate(
+        {
+            "entry_threshold": 0.7,
+            "exit_threshold": 0.4,
+            "stop_loss_atr": 2.0,
+            "take_profit_ratio": 3.0,
+            "position_sizing_method": "fixed",
+            "position_size": 0.1,
+            "kelly_fraction": 0.5,
+            "max_position_size": 0.25,
+            "cooldown_bars": 0,
+            "trailing_stop_activation": 0.05,
+        }
+    )
+    assert engine.calls[0] == {}
+
+
+def test_objective_sharpe_matches_direct_engine_and_differs_from_default():
+    """②b 後半：objective 之 sharpe 與 engine 直呼同值，且與 timeframe=None 不等。"""
+    from momentum.Strategy.performance_metrics import PerformanceMetrics
+    from momentum.Strategy.vectorized_backtest import VectorizedBacktest
+
+    params = {
+        "entry_threshold": 0.7,
+        "exit_threshold": 0.4,
+        "stop_loss_atr": 2.0,
+        "take_profit_ratio": 3.0,
+        "position_sizing_method": "fixed",
+        "position_size": 0.1,
+        "kelly_fraction": 0.5,
+        "max_position_size": 0.25,
+        "cooldown_bars": 0,
+        "trailing_stop_activation": 0.05,
+    }
+    prices, proba, atr = make_inputs(60)
+
+    engine = _RecordingEngine()
+    objective = StrategyBacktestObjective(
+        backtest_engine=engine,
+        prices=prices,
+        predicted_proba=proba,
+        atr_values=atr,
+        target_metric="sharpe_ratio",
+        constraints={"max_drawdown": -1.0, "min_win_rate": 0.0, "min_trades": 0},
+        timeframe="1h",
+        risk_free_rate=0.0,
+    )
+    objective_value = objective.evaluate(params)
+
+    direct = VectorizedBacktest().run_backtest(
+        prices, proba, atr, params, timeframe="1h", risk_free_rate=0.0
+    )
+    assert direct.annualization["periods_per_year"] == 8760
+    assert objective_value == pytest.approx(direct.metrics["sharpe_ratio"], abs=1e-12)
+
+    default = VectorizedBacktest().run_backtest(prices, proba, atr, params, risk_free_rate=0.0)
+    default_sharpe = PerformanceMetrics(
+        default.equity_curve, default.trades, risk_free_rate=0.0, periods_per_year=730
+    ).calculate_all()["sharpe_ratio"]
+    if default_sharpe != 0.0:
+        assert objective_value != pytest.approx(default_sharpe, abs=1e-12)
