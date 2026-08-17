@@ -901,6 +901,7 @@ class ICFilterOrchestrator:
                 labels_df=labels_df,
             )
             if isinstance(split_result, SkippedResult):
+                # ICHC R6 修補（三家同判 P1）：R5 A′ 兩呼叫點皆須透傳事件語意
                 return self._run_full_sample_fallback(
                     features_path,
                     labels_path,
@@ -910,6 +911,7 @@ class ICFilterOrchestrator:
                     kline_reader,
                     reason="insufficient_data",
                     details=split_result.details or {},
+                    event_timestamps=event_timestamps,
                 )
             train_plan, test_plan = split_result
             train_mask, test_mask = _derive_stage_masks(
@@ -3595,6 +3597,13 @@ class ICFilterOrchestrator:
                     "regime_robust": None,
                 }
             )
+        # ICHC R6 修補（CODEX-R6）：turnover disabled → key 缺席（非 None 值）
+        if (
+            isinstance(turnover_results, dict)
+            and turnover_results.get("status") == "disabled"
+        ):
+            for row in table:
+                row.pop("turnover_rate", None)
         return table
 
     def _apply_thresholds(

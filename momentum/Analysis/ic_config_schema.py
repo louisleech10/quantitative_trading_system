@@ -490,10 +490,10 @@ def _warn_removed_keys(merged: Dict[str, Any]) -> None:
     不依賴 pydantic extra=ignore（其為靜默吞鍵）；命中→warning code
     ICHC-REMOVED-KEY；非清單內未知鍵維持現狀 ignore（回歸不變）。
     """
-    try:
-        removed_paths = load_report_contract().get("removed_config_keys", [])
-    except Exception:  # noqa: BLE001 —— 契約檔異常時本函式不得阻斷 config 載入
-        return
+    # ICHC R6 修補（CODEX-R6）：契約檔讀取失敗＝fail-closed raise（原 swallow
+    # 會讓契約檔壞損時 REMOVED_KEYS 偵測靜默失效；load_report_contract 本身
+    # 已是 fail-closed 設計，此處不得攔）
+    removed_paths = load_report_contract().get("removed_config_keys", [])
     for path in removed_paths:
         cursor: Any = merged
         for part in path:

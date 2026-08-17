@@ -37,10 +37,11 @@ class TestTurnoverDisabledPipeline:
         assert set(node.keys()) == {"status", "reason"}
 
     def test_summary_turnover_rate_absent(self, report):
+        """R6 修補（CODEX-R6）：key 缺席斷言（非值為 None——那是假綠形態）。"""
         rows = report.get("summary_table") or []
         assert rows, "summary 不應為空"
         for row in rows:
-            assert row.get("turnover_rate") is None
+            assert "turnover_rate" not in row
 
 
 class TestNetICDisabledUnit:

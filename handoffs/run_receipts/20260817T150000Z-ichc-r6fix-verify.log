@@ -1,0 +1,6 @@
+ICHC R6 fix receipt — 20260817T054755Z
+5 fixes landed: fallback 2nd call-site passthrough (3-family P1) / turnover_rate key-absence / warn_removed_keys fail-closed / 5.2 wider consistency / yaml EOF
+affected tests: 20 passed; final product gate: FAILED set == baseline 14 (diff_rc=0)
+gov_check manual gate: seg1-4 green, seg5 = 1723 passed / 4 failed ALL pre-existing (assert old pre-push contract, last touched 6c48fc73 < fast-gate f50f9d0f) - named residual, governance line frozen
+2 named residuals: rule-two narrow scanner (registry #6 upgrade path) / page-render fixtures (source-assertion precedent)
+R6 FIXES CLOSED pending 3-family closure re-verify + stamps

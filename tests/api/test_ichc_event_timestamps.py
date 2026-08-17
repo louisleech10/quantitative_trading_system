@@ -97,7 +97,9 @@ class TestServiceWiringSource:
         assert re.search(
             r"def _run_full_sample_fallback\([\s\S]{0,400}?event_timestamps: Optional\[list\] = None", src
         )
+        # R6 修補（三家同判）：兩個 fallback 呼叫點皆須透傳
         assert re.search(r"reason=\"rolling_warmup_insufficient\",[\s\S]{0,120}?event_timestamps=event_timestamps", src)
+        assert re.search(r"reason=\"insufficient_data\",[\s\S]{0,120}?event_timestamps=event_timestamps", src)
         assert "one-shot fallback guard" in src
 
     def test_orchestrator_chain_complete(self):

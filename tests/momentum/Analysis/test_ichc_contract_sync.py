@@ -40,6 +40,26 @@ class TestThreeWaySync:
             f"schema={sorted(schema_set)} pydantic={sorted(pydantic_set)} ts={sorted(ts_set)}"
         )
 
+    def test_r6_wider_contract_nodes_consistent(self):
+        """R6 修補（CODEX-R6）：不只 capability_status——reasons/split_method/
+        report_sections 鍵集也做跨源一致性（pydantic 消費點 vs 契約檔）。"""
+        contract = load_report_contract()
+        # split_method 枚舉：orchestrator 寫入值必在契約集合
+        assert {"holdout", "full_sample_fallback"} == set(contract["split_method"])
+        # reasons 消費點：程式碼中寫入的 reason 字面必在契約 reasons 值域
+        all_reasons = {
+            value for values in contract["reasons"].values() for value in values
+        }
+        orch_src = (REPO / "momentum/Analysis/ic_filter_orchestrator.py").read_text(
+            encoding="utf-8"
+        )
+        for literal in ("insufficient_events", "turnover_disabled"):
+            assert literal in all_reasons
+            assert literal in orch_src  # 消費點存在
+        # report_sections：五節鍵在 orchestrator 組裝面皆出現
+        for section in contract["report_sections"]:
+            assert f'"{section}"' in orch_src or section == "net_ic_analysis"
+
     def test_m6_tamper_one_side_breaks(self):
         """M6：任一側增/刪一鍵 → 集合不等（tamper fixture 自證可證偽）。"""
         schema_set = set(load_report_contract()["capability_status"])
