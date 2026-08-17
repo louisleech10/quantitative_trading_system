@@ -1,0 +1,3 @@
+noise  ∈[0.30,0.70]: 原形式=0.6483(綠)  §V-4 mutation(OOS 選 champion)=0.0000(紅)
+alpha_detectable <0.30: 原形式=0.0000(綠)  §V-4 mutation(OOS 選 champion)=0.0000(綠)
+alpha_undetectable >0.40: 原形式=0.5411(綠)  §V-4 mutation(OOS 選 champion)=0.0000(紅)

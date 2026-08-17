@@ -1,0 +1,20 @@
+契約 report_sections = ['dsr', 'eligibility', 'min_btl', 'pbo', 'provenance']
+
+1_直接 return dict 字面（規格預期形）
+   assembled=['dsr', 'eligibility', 'min_btl', 'pbo', 'provenance']
+   → rc=0 綠
+2_逐鍵指派
+   assembled=['dsr', 'eligibility', 'min_btl', 'pbo', 'provenance']
+   → rc=0 綠
+3_helper 函式組裝（跨函式）
+   assembled=[]
+   → rc=1 紅（缺 ['dsr', 'eligibility', 'min_btl', 'pbo', 'provenance']）
+4_迴圈＋變數鍵
+   assembled=[]
+   → rc=1 紅（缺 ['dsr', 'eligibility', 'min_btl', 'pbo', 'provenance']）
+5_dict(**展開)
+   assembled=['dsr', 'eligibility', 'min_btl', 'pbo', 'provenance']
+   → rc=0 綠
+6_註解／docstring 假綠測試（只寫在字串裡，未組裝）
+   assembled=['dsr', 'eligibility', 'min_btl', 'provenance']
+   → rc=1 紅（缺 ['pbo']）

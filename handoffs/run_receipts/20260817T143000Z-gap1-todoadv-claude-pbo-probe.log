@@ -1,0 +1,21 @@
+default_rng(T,N): noise pbo=0.6483 used=924 logits=(-3.912023005428146, -0.5212969236332861, 3.9120230054281437)  swapped=0.6483
+   alpha(mu=1.0684e-4) pbo=0.5411
+default_rng(N,T).T: noise pbo=0.6158 used=924 logits=(-3.912023005428146, -0.4382549309311555, 2.0149030205422647)  swapped=0.6158
+   alpha(mu=1.0684e-4) pbo=0.6201
+legacy seed(T,N): noise pbo=0.5357 used=924 logits=(-3.912023005428146, -0.11778303565638351, 3.198673117550682)  swapped=0.5357
+   alpha(mu=1.0684e-4) pbo=0.5487
+10 1.57459830134575
+100 2.5306028932016846
+1000 3.255121513652723
+--- alpha sweep (legacy seed, T,N) ---
+sr_pp=0.0107: pbo=0.5487
+sr_pp=0.05: pbo=0.3918
+sr_pp=0.1: pbo=0.1126
+sr_pp=0.15: pbo=0.0054
+sr_pp=0.2: pbo=0.0000
+sr_pp=0.3: pbo=0.0000
+--- alpha sweep (default_rng, T,N) ---
+sr_pp=0.1: pbo=0.0162
+sr_pp=0.15: pbo=0.0000
+sr_pp=0.2: pbo=0.0000
+sr_pp=0.3: pbo=0.0000

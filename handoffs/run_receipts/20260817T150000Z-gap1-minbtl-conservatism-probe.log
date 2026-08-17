@@ -1,0 +1,4 @@
+T_YEARS=9.210340371976184 n_obs=3362
+mean(max annualized SR)=0.843077  max=1.216377  min=0.577545
+assertion mean<=1.0 -> True；all<=1.0 -> False
+analytic E[maxSR]_annualized approx=0.833943

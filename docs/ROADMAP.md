@@ -17,10 +17,11 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | **GAP-1 SPEC 定版**（七輪 adversarial 23→7→11→7→4→1；使用者白話閘裁決收回三項殘留為 Task） | **TODO 生成→三家 adversarial→實作 B1** | `docs/GAP1_STRATEGY_OVERFIT_SPEC.md`；待補完登記 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-1 待補完」節 |
+| **量化主線（IC 分析）** | **GAP-1 TODO R2**（TODO 第一輪 adversarial 完成：三家 22 findings＋主委自產 3 條 P0；2 條 BLOCKING 已修；修訂落 SPEC 延伸檔 A1-1..A1-15） | **R9 受限複驗→三家戳記→Frozen→實作 B1** | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`；收斂 `handoffs/reconcile/20260817-gap1-x-review-r8/synth.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
-| GAP-1 DSR/PBO/MinBTL 策略層防偽 | **SPEC 定版**（B1 輸入語意→B2 N 帳本契約＋wiring 閘→B3 MinBTL+DSR＋ml_pipeline 警語→B4 PBO）；8 項待補完已登記附觸發條件 | TODO 生成→實作 B1 | SPEC：`docs/GAP1_STRATEGY_OVERFIT_SPEC.md`；待補完：registry「GAP-1 待補完」節 |
+| GAP-1 DSR/PBO/MinBTL 策略層防偽 | **TODO R2**（B1 輸入語意→B2 N 帳本契約→B3 MinBTL+DSR+報告+ml_pipeline 警語→B4 PBO＋wiring 閘）；殘留 8 項（G1-R8 收回為小票、新增 G1-R9） | R9 受限複驗→Frozen→實作 B1 | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |
+| PA-CUMSUM 單利權益改正（小票；G1-R8 收回） | **未開工**（自 registry 殘留收回；`momentum/Analysis/prediction_analyzer.py:155` `np.cumsum` 於權益曲線語意上應為 `cumprod`，或改欄名並停用策略敘事） | 排在 GAP-1 B4 完工後；Claude 小任務流程（自做＋自跑測試） | 出處＝`CODEX-R8-P1-12`／`GROK-R8-P1-03` 同輪；延伸檔 A1-10 第 3 項 |
 | GAP-2 IC↔ML 橋＋多因子/邊際 IC | 未開票 | 次位 | 同上 #2 |
 | GAP-3 事件 case-control 真套件 | 未開票 | 設計須含 R5 A′ 語意 | 同上 #3 |
 | GAP-4 Pooled/Panel IC | 未開票 | — | 同上 #4 |
