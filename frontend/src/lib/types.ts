@@ -2046,6 +2046,16 @@ export interface SectionStatusObject {
   status: CapabilityStatus;
   reason?: string;
 }
+
+/** ICHC type guard：節是 status 物件（不適用/停用…）而非 feature 資料 map */
+export function isSectionStatus(value: unknown): value is SectionStatusObject {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'status' in value &&
+    typeof (value as { status: unknown }).status === 'string'
+  );
+}
 // ===== ICHC 契約對應段結束 =====
 
 export interface QuantileReturnData {
@@ -2119,12 +2129,15 @@ export interface ICReport {
   metadata?: Record<string, unknown>;
   filter_log?: FilterLogData;
   summary_table?: ICFeatureInfo[];
-  ic_decay?: Record<string, ICDecayData>;
-  quantile_returns?: Record<string, QuantileReturnData>;
+  /** ICHC Task 3.2：五節 union——SectionStatusObject（xsec 不適用）或 legacy 資料形 */
+  ic_decay?: SectionStatusObject | Record<string, ICDecayData>;
+  quantile_returns?: SectionStatusObject | Record<string, QuantileReturnData>;
   correlation_matrix?: CorrelationMatrix;
-  grouped_ic?: GroupedICData;
+  grouped_ic?: SectionStatusObject | GroupedICData;
   rolling_ic_series?: Record<string, RollingICSeries>;
-  turnover_analysis?: Record<string, TurnoverFeatureData>;
+  turnover_analysis?: SectionStatusObject | Record<string, TurnoverFeatureData>;
+  /** coverage 目前無 UI consumer（wiring allowlist 具名孤兒欄）；型別先入契約 */
+  coverage_analysis?: SectionStatusObject | Record<string, unknown>;
   diversification_metrics?: Record<string, number>;
   cross_sectional_symbol_ic?: CrossSectionalICMatrix;
   cross_symbol_validation?: CrossSymbolValidationSummary;

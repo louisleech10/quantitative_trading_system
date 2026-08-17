@@ -12,6 +12,7 @@ import FilterFunnelChart from '@/components/ic-analysis/FilterFunnelChart';
 import RollingICChart from '@/components/ic-analysis/RollingICChart';
 import GroupedICBarChart from '@/components/ic-analysis/GroupedICBarChart';
 import RegimeRadarChart from '@/components/ic-analysis/RegimeRadarChart';
+import SectionStatusNotice from '@/components/ic-analysis/SectionStatusNotice';
 import ExportButtons from '@/components/ic-analysis/ExportButtons';
 import FeatureFilterPanel from '@/components/ic-analysis/FeatureFilterPanel';
 import DeepAnalysisConfigPanel from '@/components/ic-analysis/DeepAnalysisConfigPanel';
@@ -37,6 +38,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
+import { isSectionStatus } from '@/lib/types';
+import type { SectionStatusObject } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
 const EXPORT_TARGET_ID = 'ic-analysis-export';
@@ -193,6 +196,20 @@ function ICAnalysisPageContent() {
   }, [config.mode, report?.metadata]);
 
   const activeFeature = selectedFeature || summaryTable[0]?.feature_name || null;
+
+  // ICHC Task 3.2：五節 union 分流——status 物件（如 xsec 不適用）vs legacy feature map
+  const sectionSplit = useMemo(() => {
+    const split = <T,>(node: SectionStatusObject | T | undefined) =>
+      isSectionStatus(node)
+        ? { status: node as SectionStatusObject, map: undefined as T | undefined }
+        : { status: null, map: node as T | undefined };
+    return {
+      icDecay: split(report?.ic_decay),
+      quantile: split(report?.quantile_returns),
+      grouped: split(report?.grouped_ic),
+      turnover: split(report?.turnover_analysis),
+    };
+  }, [report?.ic_decay, report?.quantile_returns, report?.grouped_ic, report?.turnover_analysis]);
 
   const deepTabVisible = Boolean(report?.deep_analysis_enabled || deepAnalysisReport?.deep_analysis_enabled);
 
@@ -734,7 +751,14 @@ function ICAnalysisPageContent() {
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-6">
-                  <FilterFunnelChart filterLog={report?.filter_log} />
+                  {resultMode === 'cross_sectional' ? (
+                    <SectionStatusNotice
+                      title="特徵篩選漏斗"
+                      status={{ status: 'not_applicable', reason: 'cross_sectional_mode' }}
+                    />
+                  ) : (
+                    <FilterFunnelChart filterLog={report?.filter_log} />
+                  )}
 
                   {resultMode === 'cross_sectional' && (
                     <ChartErrorBoundary title="Cross-Sectional IC Heatmap">
@@ -743,15 +767,23 @@ function ICAnalysisPageContent() {
                   )}
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <ICDecayChart
-                      data={report?.ic_decay?.[activeFeature || ''] || null}
-                      featureName={activeFeature}
-                      timeframe={config.timeframe}
-                    />
-                    <QuantileReturnChart
-                      data={report?.quantile_returns?.[activeFeature || ''] || null}
-                      featureName={activeFeature}
-                    />
+                    {sectionSplit.icDecay.status ? (
+                      <SectionStatusNotice title="IC 衰減" status={sectionSplit.icDecay.status} />
+                    ) : (
+                      <ICDecayChart
+                        data={sectionSplit.icDecay.map?.[activeFeature || ''] || null}
+                        featureName={activeFeature}
+                        timeframe={config.timeframe}
+                      />
+                    )}
+                    {sectionSplit.quantile.status ? (
+                      <SectionStatusNotice title="分位數收益" status={sectionSplit.quantile.status} />
+                    ) : (
+                      <QuantileReturnChart
+                        data={sectionSplit.quantile.map?.[activeFeature || ''] || null}
+                        featureName={activeFeature}
+                      />
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -759,14 +791,22 @@ function ICAnalysisPageContent() {
                       series={report?.rolling_ic_series?.[activeFeature || ''] || null}
                       featureName={activeFeature}
                     />
-                    <GroupedICBarChart
-                      groupedIC={report?.grouped_ic || null}
-                      featureName={activeFeature}
-                    />
+                    {sectionSplit.grouped.status ? (
+                      <SectionStatusNotice title="分組 IC" status={sectionSplit.grouped.status} />
+                    ) : (
+                      <GroupedICBarChart
+                        groupedIC={sectionSplit.grouped.map || null}
+                        featureName={activeFeature}
+                      />
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <RegimeRadarChart groupedIC={report?.grouped_ic || null} featureName={activeFeature} />
+                    {sectionSplit.grouped.status ? (
+                      <SectionStatusNotice title="Regime 雷達" status={sectionSplit.grouped.status} />
+                    ) : (
+                      <RegimeRadarChart groupedIC={sectionSplit.grouped.map || null} featureName={activeFeature} />
+                    )}
                     <CorrelationHeatmap matrix={report?.correlation_matrix || null} />
                   </div>
                 </TabsContent>
@@ -789,15 +829,19 @@ function ICAnalysisPageContent() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {featureToggles.turnover_analysis && (
                         <ChartErrorBoundary title="Turnover Time Series">
-                          <TurnoverTimeSeriesChart
-                            data={report?.turnover_analysis?.[activeFeature || ''] || null}
-                            featureName={activeFeature}
-                          />
+                          {sectionSplit.turnover.status ? (
+                            <SectionStatusNotice title="換手率時間序列" status={sectionSplit.turnover.status} />
+                          ) : (
+                            <TurnoverTimeSeriesChart
+                              data={sectionSplit.turnover.map?.[activeFeature || ''] || null}
+                              featureName={activeFeature}
+                            />
+                          )}
                         </ChartErrorBoundary>
                       )}
                       <ChartErrorBoundary title="Factor Equity Curve">
                         <FactorEquityCurveChart
-                          data={report?.quantile_returns?.[activeFeature || ''] || null}
+                          data={sectionSplit.quantile.map?.[activeFeature || ''] || null}
                           featureName={activeFeature}
                           loading={isDeepRunning || deepAnalysisStatus === 'running'}
                           error={

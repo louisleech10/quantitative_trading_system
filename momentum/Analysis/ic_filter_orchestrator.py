@@ -1477,23 +1477,30 @@ class ICFilterOrchestrator:
         if split_meta is not None:
             metadata["ic_train_test_split"] = split_meta
 
+        # ICHC Task 3.1：五節由裸空 dict 改契約 status（區分「模式不適用」與「壞了」）
+        from momentum.Analysis.ic_config_schema import contract_enum
+
+        _na_status = "not_applicable"
+        assert _na_status in contract_enum("capability_status")
+        _xsec_na = {"status": _na_status, "reason": "cross_sectional_mode"}
+
         analysis_results = {
             "filter_log": {
                 "mode": "cross_sectional",
                 "n_timestamps": n_slices,
             },
             "summary_table": summary_table,
-            "ic_decay": {},
-            "quantile_returns": {},
-            "grouped_ic": {},
+            "ic_decay": dict(_xsec_na),
+            "quantile_returns": dict(_xsec_na),
+            "grouped_ic": dict(_xsec_na),
             "correlation_matrix": {"features": [], "matrix": []},
             "diversification_metrics": {},
             "rolling_ic_series": {
                 name: {"window_cross_sectional": values}
                 for name, values in ic_series.items()
             },
-            "turnover_analysis": {},
-            "coverage_analysis": {},
+            "turnover_analysis": dict(_xsec_na),
+            "coverage_analysis": dict(_xsec_na),
             "cross_sectional_symbol_ic": symbol_ic_matrix,
             "cross_symbol_validation": cross_symbol_validation,
         }

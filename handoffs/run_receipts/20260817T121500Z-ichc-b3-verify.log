@@ -1,0 +1,6 @@
+ICHC B3 verify receipt — 20260817T040503Z
+backend xsec capability: 4 passed (test_ichc_xsec_capability.py)
+frontend ic-analysis: 49 passed / 10 files (incl SectionStatusNotice 7)
+backend ichc total: 20 passed
+gate suite: Analysis full + 1eb_b3/b4 + cut2 + response_v2; FAILED set == baseline 14 (diff_rc=0)
+BATCH GATE CLOSED: zero new failures APPROVED by machine diff
