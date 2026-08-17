@@ -17,10 +17,10 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | **✔ IC 健檢 epic 收工**（2026-08-17：六批+三家 review 全鏈路） | **GAP-1 DSR/PBO/MinBTL**（開票走完整管線） | `docs/IC_QUANT_GAP_REGISTRY.md` |
+| **量化主線（IC 分析）** | **GAP-1 進行中**：偵察四方收斂完成（2026-08-17，31 findings、債已銷） | **白話閘→SPEC 起草→三家 adversarial** | `handoffs/reconcile/20260817-gap1-x-consult-r1/synth.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
-| GAP-1 DSR/PBO/MinBTL 策略層防偽 | 未開票 | 健檢後首位候選 | `docs/IC_QUANT_GAP_REGISTRY.md` #1 |
+| GAP-1 DSR/PBO/MinBTL 策略層防偽 | **已開票**：偵察收斂（4 方 31 findings；C1 N帳本／C2 報酬序列／C3 PBO矩陣 三項 BLOCKING 須進 SPEC） | 白話閘（使用者審閱）→ SPEC 起草 | synth：`handoffs/reconcile/20260817-gap1-x-consult-r1/`；票：`docs/IC_QUANT_GAP_REGISTRY.md` #1 |
 | GAP-2 IC↔ML 橋＋多因子/邊際 IC | 未開票 | 次位 | 同上 #2 |
 | GAP-3 事件 case-control 真套件 | 未開票 | 設計須含 R5 A′ 語意 | 同上 #3 |
 | GAP-4 Pooled/Panel IC | 未開票 | — | 同上 #4 |
