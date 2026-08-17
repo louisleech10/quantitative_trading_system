@@ -43016,3 +43016,55 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-17T07:36:31Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"bdb0a617d9b79903f3d8413d7b19bd1210819e4e0034b7220ffc86bd9f483c8b","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260817-gap1-recon-codex.md --family codex\nrc=$?\nprintf 'COMPLETENESS_RC=%s\\n' \"$rc\"\nprintf '%s\\n' '--- artifact status ---'\ngit status --short -- handoffs/20260817-gap1-recon-codex.md\nprintf '%s\\n' '--- tmp preservation check ---'\nif [ -d /tmp/workdir ]; then\n  find /tmp/workdir -mindepth 1 -maxdepth 1 -print | sort\nelse\n  echo '/tmp/workdir absent'\nfi\nif [ -e /tmp/claude-501 ]; then echo '/tmp/claude-501 present'; else echo '/tmp/claude-501 absent'; fi"}
 {"actor": "cx_run", "attempt_id": "72918eb8-f80e-4528-92d7-7c0c64d9b893", "cli_rc": "0", "event": "committee_family_result", "event_id": "d5cfcc68-1875-4ed0-8d62-bc85c2346007", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-recon-codex.md", "output_sha256": "40c0a4207f3d32fcbd9bef1ab052253b7289994c18bb0ca3aff6b3c3907f1c81", "producer": "audit_append.sh", "result_state": "success", "round_id": "383a848a-e527-4a2c-9d19-60329411fbdc", "schema_version": 1, "sequence": 1877, "ts": "2026-08-17T07:37:17Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "4a2edd49-452f-4fe0-968b-d2b821af9769", "lock_sha256": "966601de615fb4edd96ae5f4e9202d602f29e08b829b097c55ece1e439719cdf", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "383a848a-e527-4a2c-9d19-60329411fbdc", "schema_version": 1, "sequence": 1878, "session_id": "20260817-gap1-x-consult-r1", "synth_sha256": "9857050c8b8d342f500cf831d05da5491a0ffe3091d0e8be40becaba7993a334", "ts": "2026-08-17T07:40:50Z"}
+=== 2026-08-17 15:55:50 | artifact ===
+  ts=2026-08-17 15:55:50
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP1_STRATEGY_OVERFIT_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(RISK-HIT: a,b,d); §A=filled(含 FACT-RECEIPT 三條實跑); §C=filled; §G Golden 狀態=filled(第三方對照 oracle + 解析解 baseline,非合成 fixture); §P=filled(B1-B4 四批); §V=filled(mutation 設計); §R=filled; §N=filled(接線類 N/A 理由具名)
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-08-17T08:03:05Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"fd4dd8f93bc7512be88d69662ec0f0008c21bb258cf78a33cd754404710108a3","cmd_head":"bash scripts/committee_run.sh --session 20260817-gap1-x-review-r1 handoffs/20260817-gap1-specadv-BRIEF.md handoffs/20260817-gap1-specadv codex,composer,grok -- --intent \"GAP-1 SPEC adversarial R1:公式正確性+驗收可證偽+forward dependency+義務覆蓋+成熟度約束+契約設計+殘留誠實度\" --risk high --facts-asked \"template_check spec PASS;使用者裁決範圍A+降級展示不硬擋;成熟度地圖(optuna db與optimization_results不存在)\" --review-role \"SPEC adversarial 審查(禁改碼�"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260817-GAP1-X-REVIEW-R1", "ts": "2026-08-17T08:03:29Z"}
+=== 2026-08-17 16:03:29 | dispatch ===
+  ts=2026-08-17 16:03:29
+  kind=dispatch
+  intent=GAP-1 SPEC adversarial R1:公式正確性+驗收可證偽+forward dependency+義務覆蓋+成熟度約束+契約設計+殘留誠實度
+  risk=low
+  facts_asked=template_check spec PASS;使用者裁決範圍A+降級展示不硬擋;成熟度地圖(optuna db與optimization_results不存在)
+  review_role=SPEC adversarial 審查委員(禁改碼禁改SPEC)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260817-GAP1-X-REVIEW-R1", "ts": "2026-08-17T08:03:35Z"}
+=== 2026-08-17 16:03:35 | dispatch ===
+  ts=2026-08-17 16:03:35
+  kind=dispatch
+  intent=GAP-1 SPEC adversarial R1:公式正確性+驗收可證偽+forward dependency+義務覆蓋+成熟度約束+契約設計+殘留誠實度
+  risk=low
+  facts_asked=template_check spec PASS;使用者裁決範圍A+降級展示不硬擋;成熟度地圖(optuna db與optimization_results不存在)
+  review_role=SPEC adversarial 審查委員(禁改碼禁改SPEC)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260817-gap1-specadv-BRIEF.md", "brief_sha256": "c9eda9f41c98290c5a373100c2c8be567a61350eeb4535526e366ff5368ade39", "brief_sha256_norm": "c9eda9f41c98290c5a373100c2c8be567a61350eeb4535526e366ff5368ade39", "event": "committee_round_open", "event_id": "ac7403a0-5d0e-4893-aa01-d0669da8769b", "expected_outputs": {"codex": "handoffs/20260817-gap1-specadv-codex.md", "composer": "handoffs/20260817-gap1-specadv-composer.md", "grok": "handoffs/20260817-gap1-specadv-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "692b4789-4f60-4f1f-aa35-f96c8dee632e", "schema_version": 1, "sequence": 1879, "session_name": "20260817-gap1-x-review-r1", "task_id": "20260817-GAP1-X-REVIEW-R1", "ts": "2026-08-17T08:03:39Z"}
