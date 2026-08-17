@@ -57,6 +57,7 @@
 | `govb1_ghostpath_check.sh` | 常態檢查 | 未掛 |
 | `govb1_selfcheck.sh` | 常態檢查 | gate  |
 | `govb1_single_source_check.sh` | 常態檢查 | gate  |
+| `ic_wiring_check.sh` | 常態檢查 | 未掛 |
 | `install_verify_hooks.sh` | 工具 | 未掛 |
 | `list_active_mechanisms.sh` | 常態檢查 | PostToolUse  |
 | `mutation_probe_check.sh` | 工具 | gov_check  |
@@ -93,6 +94,7 @@
 | `check_decoupling_imports.py` | 常態檢查 | narrow_check_router  |
 | `check_doc_manifest_b.py` | 常態檢查 | 未掛 |
 | `extract_phase2_expected_flips.py` | 常態檢查 | narrow_check_router  |
+| `ic_wiring_check.py` | 常態檢查 | 未掛 |
 | `verification_claim_check.py` | 常態檢查 | pre-commit commit-msg  |
 | `verify_audit_chain.py` | 常態檢查 | 未掛 |
 | `verify_cgsa_pipeline.py` | 常態檢查 | 未掛 |

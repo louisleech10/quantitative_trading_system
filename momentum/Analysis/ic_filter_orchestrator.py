@@ -2348,6 +2348,15 @@ class ICFilterOrchestrator:
         """
         from momentum.Analysis.net_ic_analyzer import NetICAnalyzer
 
+        # ICHC Task 5.3（R1 三家同判 C1）：turnover 停用 → NetIC 顯式 typed
+        # unavailable（reason 入契約枚舉），禁靜默 skip、禁偷算 turnover（方案 B 否決）
+        turnover_section = (self._report or {}).get("turnover_analysis", {})
+        if (
+            isinstance(turnover_section, dict)
+            and turnover_section.get("status") == "disabled"
+        ):
+            return {"status": "unavailable", "reason": "turnover_disabled"}
+
         analyzer = NetICAnalyzer(config.net_ic_analysis.model_dump())
         summary = {
             row["feature_name"]: {"ic_mean": row.get("ic_mean")}
@@ -3161,7 +3170,15 @@ class ICFilterOrchestrator:
             features_for_stats, label_for_stats
         )
         coverage_results = self._coverage.compute_all(features_for_stats)
-        turnover_results = self._turnover.compute_all(features_for_stats)
+        # ICHC Task 5.3（方案 A）：enabled=false → 真不算（省算力＋尊重 flag 語意）；
+        # report 節輸出契約 status 物件；summary 端 turnover_rate 顯式缺席（空 dict）
+        if config.turnover.enabled:
+            turnover_results = self._turnover.compute_all(features_for_stats)
+        else:
+            from momentum.Analysis.ic_config_schema import contract_enum as _ce
+
+            assert "disabled" in _ce("capability_status")
+            turnover_results = {"status": "disabled", "reason": "turnover_disabled"}
 
         summary_table = self._build_summary_table(
             features_df.columns,

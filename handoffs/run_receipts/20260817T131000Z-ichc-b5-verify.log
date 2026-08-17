@@ -1,0 +1,6 @@
+ICHC B5 verify receipt — 20260817T045704Z
+5.3 turnover gate: 4 passed (default ON regression/pipeline disabled status/summary absent/NetIC typed unavailable M7-target)
+5.1 wiring check: 5 passed (green tree/M5 ghost inject red/allowlist absent fail-closed/stale entry red/missing target rc=2); first run caught+fixed backend-set false positive (factor_return via MODULE_ENABLED_PATHS)
+5.2 contract sync: 4 passed (three-way equal/M6 tamper both forms/comment-immune/empty-fail)
+gate suite: FAILED set == baseline 14 (diff_rc=0)
+BATCH GATE CLOSED: zero new failures APPROVED by machine diff

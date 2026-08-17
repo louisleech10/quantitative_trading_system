@@ -1,0 +1,82 @@
+{
+  "_doc": "ICHC Task 5.1 wiring allowlist——具名殘留封閉集合。條目欄位=key/file/kind/finding/status。kind: ghost_toggle=前端有鍵後端無消費(歷史遺留,待未來票接線或移除)/orphan_output=後端有值無UI consumer/dead_config=已移除之死配置(防復發哨兵)。lifecycle=ic_wiring_check.py R2:非dead_config條目其key必須仍存在於宣告檔(過期即紅);dead_config條目其key不得重現於 ic_config_schema.py。",
+  "entries": [
+    {
+      "key": "ic_calculation",
+      "file": "frontend/src/store/icAnalysisStore.ts",
+      "kind": "ghost_toggle",
+      "finding": "GROK-R1-P1-01",
+      "status": "legacy-informational-toggle"
+    },
+    {
+      "key": "ic_method_selection",
+      "file": "frontend/src/store/icAnalysisStore.ts",
+      "kind": "ghost_toggle",
+      "finding": "GROK-R1-P1-01",
+      "status": "pending-future-wiring"
+    },
+    {
+      "key": "winsorization_method",
+      "file": "frontend/src/store/icAnalysisStore.ts",
+      "kind": "ghost_toggle",
+      "finding": "GROK-R1-P1-01",
+      "status": "pending-future-wiring"
+    },
+    {
+      "key": "ic_autocorrelation",
+      "file": "frontend/src/store/icAnalysisStore.ts",
+      "kind": "ghost_toggle",
+      "finding": "GROK-R1-P1-01",
+      "status": "pending-future-wiring"
+    },
+    {
+      "key": "redundancy_method_selection",
+      "file": "frontend/src/store/icAnalysisStore.ts",
+      "kind": "ghost_toggle",
+      "finding": "GROK-R1-P1-01",
+      "status": "pending-future-wiring"
+    },
+    {
+      "key": "vif_filter",
+      "file": "frontend/src/store/icAnalysisStore.ts",
+      "kind": "ghost_toggle",
+      "finding": "GROK-R1-P1-01",
+      "status": "pending-future-wiring"
+    },
+    {
+      "key": "monotonicity_test",
+      "file": "frontend/src/store/icAnalysisStore.ts",
+      "kind": "ghost_toggle",
+      "finding": "ICHC-B5-SCAN",
+      "status": "legacy-informational-toggle"
+    },
+    {
+      "key": "return_type_selection",
+      "file": "frontend/src/store/icAnalysisStore.ts",
+      "kind": "ghost_toggle",
+      "finding": "ICHC-B5-SCAN",
+      "status": "legacy-informational-toggle"
+    },
+    {
+      "key": "coverage_analysis",
+      "file": "momentum/Analysis/ic_filter_orchestrator.py",
+      "kind": "orphan_output",
+      "finding": "GROK-R2-P2-04",
+      "status": "no-ui-consumer"
+    },
+    {
+      "key": "max_features_for_correlation",
+      "file": "momentum/Analysis/ic_config_schema.py",
+      "kind": "pending_removal",
+      "finding": "GROK-R2-P2-02",
+      "status": "to-be-removed-in-task-6.3-then-flip-dead_config"
+    },
+    {
+      "key": "ShapleyConfig",
+      "file": "momentum/Analysis/ic_config_schema.py",
+      "kind": "pending_removal",
+      "finding": "GROK-R2-P2-02",
+      "status": "to-be-removed-in-task-6.3-then-flip-dead_config"
+    }
+  ]
+}
