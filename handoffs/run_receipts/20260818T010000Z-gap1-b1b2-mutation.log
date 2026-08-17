@@ -1,0 +1,41 @@
+[baseline] 未 mutate 時各檔應全綠（🔴 K2：baseline 紅即 fail-closed 退出，不得續跑）
+  baseline rc=0 (============================== 99 passed in 1.19s ==============================)
+[§V-8] resolve_periods_per_year 未知 timeframe 回 730（而非 raise）
+  ✅ §V-8: 轉紅 rc=1（8 條 FAILED＝斷言失敗）
+[§V-15] available_years 回 n_bars（把 bar 數當年數）
+  ✅ §V-15: 轉紅 rc=1（5 條 FAILED＝斷言失敗）
+[§V-5] compute_sharpe 退化情形回 0.0（而非 NaN＋status）
+  ✅ §V-5: 轉紅 rc=1（7 條 FAILED＝斷言失敗）
+[§V-10] Mertens (γ4-1)/4 改成 γ4/4（語法合法之數值 mutant）
+  ✅ §V-10: 轉紅 rc=1（1 條 FAILED＝斷言失敗）
+[§V-13] Task 1.3 斷言③ 之 fixture 改用 risk_free_rate=0.02
+  ✅ §V-13: 轉紅 rc=1（1 條 FAILED＝斷言失敗）
+[§V-9a] returns_contract：bar_count 改回 status=ok（該語意膨脹 √(T-1)，必須非 ok）
+  ✅ §V-9a: 轉紅 rc=1（1 條 FAILED＝斷言失敗）
+[§V-9b] returns_contract：拿掉 source != resolved 之守衛（放行 default_730）
+  ✅ §V-9b: 轉紅 rc=1（1 條 FAILED＝斷言失敗）
+[§V-7] read_trial_ledger 缺檔時回 n=1（而非 fail-closed n_unknown）
+  ✅ §V-7: 轉紅 rc=1（1 條 FAILED＝斷言失敗）
+[verify] 還原後應無 mutant 殘留且全綠（🔴 K2：任一不成立即 exit 1）
+  post-restore rc=1 (========================= 1 failed, 99 passed in 1.27s =========================)
+  🔴 還原後非綠 ⇒ 探針弄髒了工作區。中止。
+tests/momentum/Strategy/test_vectorized_backtest.py::test_calculate_equity_curve_skip_unknown_timestamp_exit PASSED [ 94%]
+tests/momentum/Strategy/test_vectorized_backtest.py::test_annualization_resolved_for_known_timeframe PASSED [ 95%]
+tests/momentum/Strategy/test_vectorized_backtest.py::test_annualization_defaults_when_timeframe_missing PASSED [ 96%]
+tests/momentum/Strategy/test_vectorized_backtest.py::test_annualization_unknown_timeframe_falls_back_and_is_machine_readable 
+-------------------------------- live log call ---------------------------------
+00:26:16 [WARNING] unknown timeframe '7m' for annualization; falling back to default 730
+PASSED                                                                   [ 97%]
+tests/momentum/Strategy/test_vectorized_backtest.py::test_sharpe_ratio_diverges_by_sqrt_ratio_with_zero_rf PASSED [ 98%]
+tests/momentum/Strategy/test_vectorized_backtest.py::test_sharpe_ratio_differs_under_production_rf_default PASSED [ 99%]
+tests/momentum/Strategy/test_vectorized_backtest.py::test_early_return_paths_carry_annualization PASSED [100%]
+
+=================================== FAILURES ===================================
+______________________ test_k2_baseline_intentional_break ______________________
+tests/momentum/Analysis/strategy_validation/test_frequency.py:84: in test_k2_baseline_intentional_break
+    assert False, "intentional K2 baseline break"
+E   AssertionError: intentional K2 baseline break
+E   assert False
+=========================== short test summary info ============================
+FAILED tests/momentum/Analysis/strategy_validation/test_frequency.py::test_k2_baseline_intentional_break
+========================= 1 failed, 99 passed in 1.27s =========================

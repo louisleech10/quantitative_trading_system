@@ -1,0 +1,235 @@
+{
+  "_doc": "GAP-1 策略驗證契約單一真相源（Task 2.1）。欄位/枚舉值只住本檔；SPEC/TODO/程式/測試不得複列。capability_status 不在此重新定義,以 capability_status_ref 指向 IC 契約(執行期 dereference,失敗即 raise)。頂層鍵恰為 16 個(見 docs/GAP1_STRATEGY_OVERFIT_TODO.md Task 2.1 + 延伸檔 A1-4/A1-7/A1-8/A1-13)。",
+  "version": 1,
+  "capability_status_ref": "momentum/Analysis/contracts/ic_report_contract.json#capability_status",
+  "ledger_record_keys": {
+    "_doc": "N 帳本 JSONL 之單列 schema。additional_properties:false ⇒ 未列鍵之 row 即非法(reason=ledger_row_invalid,計入 n_rows_rejected)。",
+    "additional_properties": false,
+    "keys": {
+      "research_session_id": {"type": "str", "required": true},
+      "dataset_key": {"type": "str", "required": true},
+      "candidate_id": {"type": "str", "required": true},
+      "evaluation_id": {"type": "str", "required": true},
+      "attempt_index": {"type": "int", "required": true},
+      "state": {"type": "str", "required": true},
+      "metric_name": {"type": "str", "required": true},
+      "metric_value": {"type": "float", "required": true},
+      "metric_unit": {"type": "str", "required": true},
+      "metric_valid": {"type": "bool", "required": true},
+      "input_artifact_hash": {"type": "str", "required": true},
+      "ts": {"type": "str", "required": true}
+    }
+  },
+  "n_fields": [
+    "n_candidates_considered",
+    "n_evaluated",
+    "n_valid_metrics",
+    "n_failed_or_pruned",
+    "n_is_lower_bound",
+    "n_rows_rejected"
+  ],
+  "report_sections": {
+    "_doc": "三關報告之五節 required_keys 逐字(A1-13);各節 additional_properties:false。",
+    "eligibility": {
+      "required_keys": [
+        "eligible",
+        "required_years_upper_bound",
+        "available_years",
+        "trials_budget",
+        "trials_used",
+        "target_sharpe",
+        "n_source",
+        "display_downgrade",
+        "warning_text_key",
+        "status",
+        "reason"
+      ],
+      "optional_keys": [],
+      "types": {
+        "eligible": ["bool", "null"],
+        "required_years_upper_bound": ["float", "null"],
+        "available_years": ["float", "null"],
+        "trials_budget": ["int", "null"],
+        "trials_used": ["int", "null"],
+        "target_sharpe": ["float", "null"],
+        "n_source": ["str"],
+        "display_downgrade": ["bool"],
+        "warning_text_key": ["str"],
+        "status": ["str"],
+        "reason": ["str"]
+      },
+      "additional_properties": false
+    },
+    "min_btl": {
+      "required_keys": [
+        "status",
+        "reason",
+        "required_years_upper_bound",
+        "available_years",
+        "trials_budget",
+        "trials_used",
+        "target_sharpe"
+      ],
+      "optional_keys": [],
+      "types": {
+        "status": ["str"],
+        "reason": ["str"],
+        "required_years_upper_bound": ["float", "null"],
+        "available_years": ["float", "null"],
+        "trials_budget": ["int", "null"],
+        "trials_used": ["int", "null"],
+        "target_sharpe": ["float", "null"]
+      },
+      "additional_properties": false
+    },
+    "dsr": {
+      "required_keys": [
+        "status",
+        "reason",
+        "value",
+        "sr0",
+        "sr_obs_per_period",
+        "n_trials_used",
+        "variance_source",
+        "n_independence"
+      ],
+      "optional_keys": [],
+      "types": {
+        "status": ["str"],
+        "reason": ["str"],
+        "value": ["float", "null"],
+        "sr0": ["float", "null"],
+        "sr_obs_per_period": ["float", "null"],
+        "n_trials_used": ["int", "null"],
+        "variance_source": ["str", "null"],
+        "n_independence": ["str", "null"]
+      },
+      "additional_properties": false
+    },
+    "pbo": {
+      "required_keys": [
+        "status",
+        "reason",
+        "value",
+        "n_paths_used",
+        "n_paths_skipped",
+        "n_candidates_invalid",
+        "universe_scope"
+      ],
+      "optional_keys": [],
+      "types": {
+        "status": ["str"],
+        "reason": ["str"],
+        "value": ["float", "null"],
+        "n_paths_used": ["int", "null"],
+        "n_paths_skipped": ["int", "null"],
+        "n_candidates_invalid": ["int", "null"],
+        "universe_scope": ["str", "null"]
+      },
+      "additional_properties": false
+    },
+    "provenance": {
+      "required_keys": [
+        "status",
+        "reason",
+        "n_semantics",
+        "t_semantics",
+        "annualization_source",
+        "n_independence"
+      ],
+      "optional_keys": [],
+      "types": {
+        "status": ["str"],
+        "reason": ["str"],
+        "n_semantics": ["str", "null"],
+        "t_semantics": ["str", "null"],
+        "annualization_source": ["str", "null"],
+        "n_independence": ["str", "null"]
+      },
+      "additional_properties": false
+    }
+  },
+  "eligibility_keys": {
+    "eligible": {"type": ["bool", "null"], "required": true},
+    "required_years_upper_bound": {"type": ["float", "null"], "required": true},
+    "available_years": {"type": ["float", "null"], "required": true},
+    "trials_budget": {"type": ["int", "null"], "required": true},
+    "trials_used": {"type": ["int", "null"], "required": true},
+    "target_sharpe": {"type": ["float", "null"], "required": true},
+    "n_source": {"type": ["str"], "required": true},
+    "display_downgrade": {"type": ["bool"], "required": true},
+    "warning_text_key": {"type": ["str"], "required": true}
+  },
+  "annualization_source_values": ["resolved", "default_730"],
+  "t_semantics_values": ["bar_count", "nonzero_return_bars", "trade_level"],
+  "n_semantics_values": ["exhaustive_grid", "adaptive_search", "unknown"],
+  "selection_metric_values": ["sharpe", "mean_return"],
+  "universe_source_values": ["full_grid", "ledger_all_candidates", "external_declared"],
+  "variance_source_values": ["explicit", "ledger_cross_trial"],
+  "metric_unit_values": ["per_period", "annualized"],
+  "universe_scope_values": ["ledger_recorded_only"],
+  "reasons": [
+    "n_unknown",
+    "t_semantics_inflates_significance",
+    "annualization_unresolved",
+    "universe_selection_contaminated",
+    "insufficient_candidates",
+    "cross_trial_variance_unavailable",
+    "ledger_snapshot_mismatch",
+    "universe_provenance_unverifiable",
+    "degenerate_returns",
+    "ledger_row_invalid",
+    "all_paths_degenerate",
+    "reporter_failed"
+  ],
+  "reason_conditions": {
+    "n_unknown": {
+      "condition": "帳本檔不存在、或該 dataset_key 無任何列;亦用於 reporter 缺 dataset_key/t_years/target_sharpe 之誠實降級",
+      "assertion_ref": "Task 2.2 驗證①;Task 3.4 驗證①"
+    },
+    "t_semantics_inflates_significance": {
+      "condition": "t_semantics=bar_count(逐 bar 含結構性 0,會膨脹 sqrt(T-1))",
+      "assertion_ref": "Task 1.4 驗證②"
+    },
+    "annualization_unresolved": {
+      "condition": "BacktestResult 缺 annualization 欄,或 annualization.source != resolved",
+      "assertion_ref": "Task 1.4 驗證③⑤"
+    },
+    "universe_selection_contaminated": {
+      "condition": "UniverseProvenance.selection_free is not True",
+      "assertion_ref": "Task 4.3 驗證①"
+    },
+    "insufficient_candidates": {
+      "condition": "PBO 之有效候選數 < 2",
+      "assertion_ref": "Task 4.2 驗證⑥"
+    },
+    "cross_trial_variance_unavailable": {
+      "condition": "N>1 且跨 trial 變異數不可得(ledger valid_sharpe_values 長度<2,或 explicit 未傳值)",
+      "assertion_ref": "Task 3.2 驗證⑤⑤c"
+    },
+    "ledger_snapshot_mismatch": {
+      "condition": "period_returns.source_artifact_hash 不在 ledger_result.artifact_hashes,或 valid_sharpe_values 長度 > n_valid_metrics",
+      "assertion_ref": "Task 3.2 驗證⑤b"
+    },
+    "universe_provenance_unverifiable": {
+      "condition": "source in {full_grid, external_declared},或 ledger_all_candidates 之集合/count/hash 三項任一不符",
+      "assertion_ref": "Task 4.3 驗證④④b⑤⑤b⑤b2"
+    },
+    "degenerate_returns": {
+      "condition": "報酬序列退化(n<2/含 NaN·inf/std=0),或 explicit 跨 trial 變異數非有限或<=0",
+      "assertion_ref": "Task 1.2 驗證(退化);Task 3.2 驗證⑤c"
+    },
+    "ledger_row_invalid": {
+      "condition": "帳本某列不符 ledger_record_keys(缺鍵/型別錯/額外鍵/JSON 語法錯/metric_unit 非法)",
+      "assertion_ref": "Task 2.2 驗證②⑧"
+    },
+    "all_paths_degenerate": {
+      "condition": "PBO 之所有 CSCV path 皆被跳過(每 path 有效候選<2 或 champion 退化)",
+      "assertion_ref": "Task 4.2 驗證⑧"
+    },
+    "reporter_failed": {
+      "condition": "reporter 捕獲之資料型例外(OSError/JSONDecodeError/ContractViolation);程式型例外不得映射於此,一律上拋",
+      "assertion_ref": "Task 3.4 驗證⑦"
+    }
+  }
+}

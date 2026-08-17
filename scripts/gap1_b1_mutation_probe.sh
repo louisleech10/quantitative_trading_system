@@ -18,12 +18,14 @@ PY=venv/bin/python
 FREQ=momentum/core/frequency.py
 SHARPE=momentum/Analysis/strategy_validation/sharpe.py
 RC=momentum/Analysis/strategy_validation/returns_contract.py
+LEDGER=momentum/Analysis/strategy_validation/ledger.py
 TEST_FREQ=tests/momentum/Analysis/strategy_validation/test_frequency.py
 TEST_SHARPE=tests/momentum/Analysis/strategy_validation/test_sharpe.py
 TEST_RC=tests/momentum/Analysis/strategy_validation/test_returns_contract.py
+TEST_LEDGER=tests/momentum/Analysis/strategy_validation/test_ledger.py
 TEST_VB=tests/momentum/Strategy/test_vectorized_backtest.py
 
-TARGETS="${FREQ} ${SHARPE} ${RC} ${TEST_VB}"
+TARGETS="${FREQ} ${SHARPE} ${RC} ${LEDGER} ${TEST_VB}"
 BACKUP_DIR="$(mktemp -d)"
 
 backup_all() {
@@ -74,7 +76,7 @@ PY
 }
 
 echo "[baseline] 未 mutate 時各檔應全綠（🔴 K2：baseline 紅即 fail-closed 退出，不得續跑）"
-"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_RC" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
+"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_RC" "$TEST_LEDGER" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
 _base_rc=$?          # 🔴 rc 直接取，禁經 pipe
 echo "  baseline rc=${_base_rc} ($(tail -1 /tmp/gap1_mut.log))"
 if [ "${_base_rc}" -ne 0 ]; then
@@ -118,13 +120,19 @@ echo "[§V-9b] returns_contract：拿掉 source != resolved 之守衛（放行 d
 mutate "$RC" '    if source != "resolved":' '    if False:  # source != "resolved"' || exit 1
 run_expect_red "§V-9b" "$TEST_RC"
 
+echo "[§V-7] read_trial_ledger 缺檔時回 n=1（而非 fail-closed n_unknown）"
+mutate "$LEDGER" "    if not path.is_file():
+        return _unavailable()" "    if not path.is_file():
+        return _unavailable().__class__(**{**_unavailable().__dict__, 'n_candidates_considered': 1, 'n_for_dsr': 1, 'status': 'ok', 'reason': ''})" || exit 1
+run_expect_red "§V-7" "$TEST_LEDGER"
+
 echo "[verify] 還原後應無 mutant 殘留且全綠（🔴 K2：任一不成立即 exit 1）"
 restore_all
-if grep -rn "MUTANT" "$FREQ" "$SHARPE" "$RC" "$TEST_VB"; then
+if grep -rn "MUTANT" "$FREQ" "$SHARPE" "$RC" "$LEDGER" "$TEST_VB"; then
   echo "  🔴 有 mutant 殘留 ⇒ 還原機制失效（首版即因 git checkout 對未追蹤檔無效而發生）" >&2
   exit 1
 fi
-"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_RC" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
+"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_RC" "$TEST_LEDGER" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
 _post_rc=$?          # 🔴 rc 直接取，禁經 pipe
 echo "  post-restore rc=${_post_rc} ($(tail -1 /tmp/gap1_mut.log))"
 if [ "${_post_rc}" -ne 0 ]; then
