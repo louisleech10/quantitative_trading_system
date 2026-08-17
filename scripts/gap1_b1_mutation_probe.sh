@@ -11,8 +11,28 @@
 #   ② §V-10 之 mutant 把註解插進括號運算式中 ⇒ SyntaxError ⇒ pytest rc=2（collection error）。
 #      「因語法壞掉而紅」**不算**測試可證偽 ⇒ 本版對每條 mutation 斷言
 #      `FAILED` 條數 >= 1（rc=1），rc=2 一律判為 mutation 設計錯。
+#
+# 🔴 第三個缺陷（2026-08-18 由 codex 兩度 BLOCKED 抓到，本版修）：
+#   本探針**就地 mutate 共用工作區**，故**不可並行**。B1 戳記輪 brief 叫三家都跑，
+#   三個 agent 同時 mutate 同一批檔 ⇒ 彼此看到對方的 mutant，baseline 不穩定
+#   （codex 實測：一次 98 passed/1 failed、一次 89 passed/10 failed，失敗集合不同）。
+#   ⇒ 本版加**互斥鎖**（`mkdir` 為原子操作，macOS/Linux 皆可；不依賴 flock）：
+#   已有人在跑就直接 exit 3 並印出鎖持有者，而不是產生無意義的紅。
+#   鎖為 fail-closed：取不到鎖絕不繼續跑。
 set -u
 cd "$(git rev-parse --show-toplevel)" || exit 2
+
+LOCK_DIR=".claude/gate/gap1_mutation_probe.lock"
+if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
+  echo "🔴 探針已有另一個執行實例（鎖: ${LOCK_DIR}）。" >&2
+  echo "   本探針就地 mutate 共用工作區 ⇒ **不可並行**（並行會使 baseline 不穩定，" >&2
+  echo "   委員曾因此看到彼此的 mutant 而誤判）。請等對方跑完，或讀既有 receipt：" >&2
+  ls -t handoffs/run_receipts/*mutation*.log 2>/dev/null | head -3 >&2
+  [ -f "${LOCK_DIR}/owner" ] && cat "${LOCK_DIR}/owner" >&2
+  exit 3
+fi
+printf 'pid=%s started=%s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${LOCK_DIR}/owner"
+_release_lock() { rm -rf "${LOCK_DIR}"; }
 
 PY=venv/bin/python
 FREQ=momentum/core/frequency.py
@@ -39,7 +59,7 @@ restore_all() {
     [ -f "${BACKUP_DIR}/$f" ] && cp "${BACKUP_DIR}/$f" "$f"
   done
 }
-cleanup() { restore_all; rm -rf "${BACKUP_DIR}"; }
+cleanup() { restore_all; rm -rf "${BACKUP_DIR}"; _release_lock; }
 trap cleanup EXIT
 
 backup_all
