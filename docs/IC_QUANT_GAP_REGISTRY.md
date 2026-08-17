@@ -14,6 +14,19 @@
 | 5 | 容量 ADV 真資料接線 | 接真實成交量回答「能裝多少錢」；unknown 契約已鎖死（B6 Task 6.1） | CODEX-R1-P1-04, GROK-R1-P1-04 | **條件觸發**：volume 資料源就緒 | Phase 4 |
 | 6 | 430K 規模防護（correlation cap 等） | 大候選集運算上限與分批；死配置已移除（B6 Task 6.3），cap 本體歸此票 | CODEX-R1-P1-06, GROK-R1-P2-02 | 併既有 IC-PERF/串流 epic | Phase 3 |
 
+## IC 主路徑切分現狀（holdout-only）
+
+IC 分析主路徑的 train/test 切分**現況＝單次 holdout**（`ic_train_test_split` 預設 ON；
+失敗時 loud fallback 至 full-sample 並紅標 `degraded_full_sample`）。
+**未實作**：walk-forward 與 purged CPCV 於 IC 主路徑（相關模組存在於
+`momentum/Analysis/model_validation/` 但為 ML 孤島，未接 IC 選因子流程）——
+report `metadata.split_method`（枚舉住 `momentum/Analysis/contracts/ic_report_contract.json`）
+誠實標示現況，禁在任何輸出宣稱 CPCV/WF 保證。缺口票＝本檔 #1（策略層）與 phasing Phase 4。
+
+> 落點註記（凍結 TODO 之具名偏差）：Task 6.2 原定此節入 `docs/API_SPECIFICATION.md`，
+> 因該檔名命中 `docs/*SPEC*.md` 之治理格式快閘（任何編輯即擋 push、無豁免口），
+> 改落本檔；grep oracle 同步指向本檔。偏差交最終 code review 複核。
+
 ## 不遺忘機制（登記時同步建立）
 
 1. ROADMAP 狀態表六列 pointer 至本檔（commit 同步鐵律守著）。
