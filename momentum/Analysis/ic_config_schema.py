@@ -487,3 +487,90 @@ def load_ic_config(
 
     logger.info("IC config loaded")
     return ICConfig.model_validate(merged)
+
+
+# ============================================================================
+# ICHC report 契約（Task 1.1）——單一真相源＝contracts/ic_report_contract.json
+# ============================================================================
+
+_REPORT_CONTRACT_PATH = Path(__file__).parent / "contracts" / "ic_report_contract.json"
+_report_contract_cache: Optional[Dict[str, Any]] = None
+
+
+class ContractValidationError(ValueError):
+    """report 違反 ic_report_contract.json 契約（status 不在枚舉／必要鍵缺席）。"""
+
+
+def load_report_contract() -> Dict[str, Any]:
+    """載入 report 契約 SoT；檔缺或 JSON 語法錯一律 raise（fail-closed，啟動即錯）。"""
+    global _report_contract_cache
+    if _report_contract_cache is None:
+        import json
+
+        with _REPORT_CONTRACT_PATH.open("r", encoding="utf-8") as file:
+            _report_contract_cache = json.load(file)
+        if not isinstance(_report_contract_cache, dict):
+            raise ContractValidationError(
+                f"report contract must be a mapping: {_REPORT_CONTRACT_PATH}"
+            )
+    return _report_contract_cache
+
+
+def contract_enum(name: str) -> frozenset:
+    """取契約枚舉集合；未知節名 raise KeyError（不 fallback）。"""
+    contract = load_report_contract()
+    value = contract[name]
+    if isinstance(value, list):
+        return frozenset(value)
+    raise KeyError(f"contract node is not an enum list: {name}")
+
+
+def validate_report_against_contract(report: Any) -> None:
+    """契約 validator 唯一邊界的實體（消費點＝ic_reporter.generate_json_report 出口）。
+
+    規則：
+    - report_sections 各節若在 report 出現且為 status 物件（含 "status" 鍵）→
+      status 值必須 ∈ capability_status，且 status != "ok" 時 reason 必須非空。
+    - quantile_returns 之 per-feature payload（非 status 物件）→ 必要鍵齊備。
+    - 裸空 dict 依契約 notes.legacy_empty_allowed 暫容忍（Phase 3 前 xsec 遺留），
+      收緊由 wiring check 規則三承接。
+    """
+    if not isinstance(report, dict):
+        raise ContractValidationError("report must be a dict")
+    contract = load_report_contract()
+    statuses = frozenset(contract["capability_status"])
+    sections: Dict[str, Any] = contract["report_sections"]
+
+    def _check_status_obj(section: str, node: Dict[str, Any]) -> None:
+        status = node.get("status")
+        if status not in statuses:
+            raise ContractValidationError(
+                f"section {section!r}: status {status!r} not in contract enum"
+            )
+        if status != "ok" and not node.get("reason"):
+            raise ContractValidationError(
+                f"section {section!r}: non-ok status requires non-empty reason"
+            )
+
+    for section, spec in sections.items():
+        node = report.get(section)
+        if node is None or not isinstance(node, dict) or not node:
+            continue  # 缺節或 legacy 空 dict：v1 容忍（見 docstring）
+        if "status" in node:
+            _check_status_obj(section, node)
+            continue
+        required = spec.get("per_feature_required_keys")
+        if required:
+            for feature_name, payload in node.items():
+                if not isinstance(payload, dict):
+                    raise ContractValidationError(
+                        f"section {section!r} feature {feature_name!r}: payload must be a dict"
+                    )
+                if "status" in payload:
+                    _check_status_obj(f"{section}[{feature_name}]", payload)
+                    continue
+                missing = [key for key in required if key not in payload]
+                if missing:
+                    raise ContractValidationError(
+                        f"section {section!r} feature {feature_name!r}: missing keys {missing}"
+                    )

@@ -2033,6 +2033,21 @@ export interface TurnoverFeatureData {
   time_series?: TurnoverTimeSeriesData;
 }
 
+// ===== ICHC 契約對應段（SoT＝momentum/Analysis/contracts/ic_report_contract.json；Task 5.2 機檢三方一致，勿在此自行增刪值）=====
+export type CapabilityStatus =
+  | 'ok'
+  | 'not_applicable'
+  | 'not_computed'
+  | 'computation_failed'
+  | 'disabled'
+  | 'unavailable';
+
+export interface SectionStatusObject {
+  status: CapabilityStatus;
+  reason?: string;
+}
+// ===== ICHC 契約對應段結束 =====
+
 export interface QuantileReturnData {
   quantile_mean_returns: Record<string, number>;
   long_short_spread?: number;
