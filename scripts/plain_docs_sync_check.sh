@@ -69,6 +69,8 @@ _watched_for() {
                                       echo "scripts/ docs/GOV tests/governance/" ;;
     # 量化主線 ICHC epic 白話檔（2026-08-17）：看板盯憲章與閘門腳本；偵察結果盯缺口 registry
     "IC健檢施工進度.md")             echo "docs/IC_HEALTHCHECK_SPEC.md docs/IC_HEALTHCHECK_TODO.md scripts/ic_wiring_check.py" ;;
+    # GAP-1 施工看板：WATCHED 含 scripts/（gap1 探針）⇒ 合法持有批次進度；實作路徑動了就必須同步
+    "GAP-1施工進度.md")              echo "momentum/Analysis/strategy_validation/ momentum/core/frequency.py momentum/Analysis/contracts/strategy_validation_contract.json scripts/gap1_b1_mutation_probe.sh docs/GAP1_STRATEGY_OVERFIT_TODO.md docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md" ;;
     "IC健檢偵察結果.md")             echo "docs/IC_QUANT_GAP_REGISTRY.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
