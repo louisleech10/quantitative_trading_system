@@ -9,13 +9,18 @@
 
 ---
 
-## 🔴 接手第一件事：IC 全棧健檢 epic——偵察已完成，等使用者白話審閱後進 SPEC
+## ✔ IC 健檢 epic 已收工（2026-08-17）——接手第一件事＝開缺口票 GAP-1
 
-2026-08-17 已完成步驟 1+2（偵察）：三家＋主委四方複核 6/24 底稿，reconcile 收斂於
-`handoffs/reconcile/20260817-ichc-x-consult-r1/synth.md`（C1–C13 群集，債已清）。
-**下一步＝使用者核可後由 Claude 起草 SPEC**（P0 修補：分位圖 schema／xsec 空殼／事件
-silent fallback；本體：typed 契約 SoT＋wiring 閘門）。分工見 ORCH §1 現行分工行（08-17 五調）。
-待手動清：`handoffs/reconcile/*.stale-*` 兩目錄（rm 被沙箱擋）。
+epic 全鏈路完結：偵察（四方）→SPEC/TODO（凍結＋戳記）→六批實作（逐批 A/B Gate 零新增紅、
+逐批 push）→M1–M7 mutation 全紅過→三家 code review（8 findings：5 修 2 具名殘留 1 契約回應）
+→原提出方複驗全 CLOSED→三家 RECONCILE-STAMP（`handoffs/reconcile/20260817-ichc-x-review-r6/`）
+→債全清。中途一次斷路器委員裁決（R5 事件×fallback＝A′ 案）。
+**→ 下一步＝`docs/IC_QUANT_GAP_REGISTRY.md` 六票排程，首位 GAP-1（DSR/PBO/MinBTL）**，
+開工走完整管線（Claude 起草 SPEC→三家審）。
+具名殘留：治理段5 有 4 條 f50f9d0f 遺留紅（舊 pre-push 契約測試，屬治理線不擴建，未修）；
+產品套件 14 條既有紅（A/B 隔離證明非 ICHC 引入）；wiring 規則二為窄版（registry #6 升級路徑）。
+待手動清：`handoffs/reconcile/*.stale-*` 兩目錄＋`handoffs/run_receipts/20260817T000000Z-*.log`
+＋`scripts/ichc_t{2,3}_*.py` 三支臨時診斷腳本（rm 被沙箱擋）。
 
 治理＝**留現狀、不再擴建**。已掛的機制繼續運作，不需要動。
 

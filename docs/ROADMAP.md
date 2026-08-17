@@ -17,7 +17,7 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | **★IC 健檢 epic 偵察（步驟1-2）完成**（2026-08-17 四方 reconcile，債清） | SPEC 起草（**待使用者核可**）：3 P0＋typed 契約＋wiring 閘門 | 本檔下節＋`白話說明/IC健檢偵察結果.md` |
+| **量化主線（IC 分析）** | **✔ IC 健檢 epic 收工**（2026-08-17：六批+三家 review 全鏈路） | **GAP-1 DSR/PBO/MinBTL**（開票走完整管線） | `docs/IC_QUANT_GAP_REGISTRY.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
 | GAP-1 DSR/PBO/MinBTL 策略層防偽 | 未開票 | 健檢後首位候選 | `docs/IC_QUANT_GAP_REGISTRY.md` #1 |
@@ -45,8 +45,9 @@
 🔴 `ic-1d` **B4／B5 亦已完工**（2026-08-14 逐項查證：7 支 mutation 探針＋cache/force 兩測、
 `FactorExposureRadar.test.tsx`、Radar 契約地雷殘留 0、ExportButtons 舊判斷殘留 0、前端 triage 檔皆在）。
 
-**下一個＝★IC 全棧健檢 epic**（2026-07-22 使用者定；Phase 1 收尾，**吸收原 `1f` 空圖**）。
-四步，不得跳：
+**✔ IC 全棧健檢 epic 已收工（2026-08-17）**——四步全走完（偵察四方 reconcile→SPEC/TODO 凍結
+→六批實作 3×P0 修復＋契約 SoT＋wiring 閘門→三家 code review 全 CLOSED 三家戳記）。
+原定四步（存檔備查）：
 
 1. **discovery sweep**：Claude＋三委員平行，產「後端產出／前端消費／wiring／空態」四欄表
 2. **quant gap analysis**：現況 vs 業界；複審 4 個 deferred（funnel／capacity／regime IC／walk-forward+CPCV）
