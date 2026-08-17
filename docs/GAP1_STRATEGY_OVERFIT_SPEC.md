@@ -296,6 +296,10 @@ RISK-HIT: a,b,d
   （`n_is_lower_bound` 恆 `True`）＋**`n_for_dsr`**＋**`snapshot_hash`**＋
   **`artifact_hashes`（`frozenset[str]`，所有已讀 row 之 `input_artifact_hash` 集合；
   🔴 R5 CODEX-R5-P0-02：單一 digest 無法做 membership 測試，故必須保留集合本身）**＋
+  **`candidate_ids`（`frozenset[str]`，所有已讀 row 之 `candidate_id` 集合；
+  🔴 R6 CODEX-R6：Task 4.3 之守衛要求「`set(candidate_ids)` 等於 ledger candidate-id 集合」，
+  但前版 `LedgerReadResult` **未列**該集合 ⇒ 檢查無資料可比、集合等式不可執行。
+  本欄位使該檢查可機械實作；`len(candidate_ids) == n_candidates_considered` 為不變式）**＋
   `n_semantics`＋**`valid_sharpe_values`（float list，
   僅 `metric_name="sharpe"` 且 `metric_valid=True` 之列，供 DSR 之 `ledger_cross_trial` 變異來源
   ← R1 CODEX-R1-P0-03）**＋status/reason。帳本不存在／`dataset_key` 無列 ⇒ status 非 `ok`、
@@ -311,6 +315,8 @@ RISK-HIT: a,b,d
   且不進 `valid_sharpe_values`（R5 CODEX-R5-P0-04）
   ⑥ **`n_for_dsr == n_candidates_considered`**（R4 CODEX-R4-P1-02／GROK-R4-P1-02：三個 n 欄位可互不相等，
   DSR 之多重檢定 N 語意＝「試過幾個**不同候選**」故取 `n_candidates_considered`，此為契約非慣例）
+  ⑥c `candidate_ids` 為所有已讀 row 之 `candidate_id` 集合，且 `len(candidate_ids) == n_candidates_considered`
+  （不變式；同 candidate 多 attempt 之 fixture 斷言）
   ⑦ `snapshot_hash` ＝ 對所有已讀 row 之 `input_artifact_hash` 集合＋`dataset_key`＋`research_session_id`
   之 canonical 序列取 sha256（同一組 row 重讀 ⇒ 同值；多一列 ⇒ 變值）
   ⑧ 非法 row ⇒ `reason == "ledger_row_invalid"`。
@@ -529,7 +535,8 @@ RISK-HIT: a,b,d
   1. `selection_free is not True` ⇒ status 非 `ok`、`reason=universe_selection_contaminated`，不計算 PBO。
   2. 🔴 **唯一可驗證之成功路徑＝`ledger_all_candidates`（R4 CODEX-R4-P1-03；較 grok 建議之
      「具名殘留」更嚴，主委選較嚴版）**：該值須同時傳入 `ledger_result` 與 `candidate_ids`，並驗
-     ① `set(candidate_ids)` **等於** ledger 之 candidate_id 集合（集合相等，非只比 count／hash）
+     ① `frozenset(candidate_ids)` **等於** `ledger_result.candidate_ids`（集合相等，非只比 count／hash；
+     資料來源即 Task 2.2 之該欄位 ← R6 CODEX-R6 之 OPEN 修補）
      ② `candidate_count == ledger_result.n_candidates_considered == n_candidates == len(candidate_ids)`
      ③ `candidate_set_hash` 等於對 `sorted(candidate_ids)` 以 `sha256(",".join(...))` 重算之值
      （canonical 演算法＝**排序後以半形逗號連接再 sha256**，唯一定義處 ← 消除 R5 之 hash 演算法未定殘留）。
@@ -551,6 +558,9 @@ RISK-HIT: a,b,d
   ⑤b **top-K 反例（codex 原始反例，必測）**：ledger 有 50 個 candidate_id，呼叫方只傳其中績效最佳之
   10 個（矩陣 10 欄、`candidate_ids` 為該 10 個、`candidate_set_hash` 為該 10 個自算之正確 hash）
   ⇒ `status != "ok"` 且 `reason == "universe_provenance_unverifiable"`（集合相等檢查擋下）
+  ⑤b2 **同數量不同集合反例（R6 CODEX-R6：count 擋不住此例）**：ledger 之 50 個候選 vs 呼叫方傳
+  「數量同為 50 但其中 1 個 id 不同」之集合（count 三方相等、自算 hash 亦正確）
+  ⇒ 仍 `reason == "universe_provenance_unverifiable"`（僅集合相等可擋）
   ⑤c 三項全符（集合相等＋count 相等＋hash 相符）才 `status == "ok"`。
 - **邊界**：① `selection_free=False` ② `universe_provenance=None` ③ `source` 未知值。
 - **存活至**：全票完工後保留。
