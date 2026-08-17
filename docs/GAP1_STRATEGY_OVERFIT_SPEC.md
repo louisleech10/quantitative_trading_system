@@ -162,7 +162,8 @@ RISK-HIT: a,b,d
 - 檔案：新增 `momentum/Analysis/strategy_validation/returns_contract.py::extract_period_returns(backtest_result, *, timeframe) -> PeriodReturns`
 - 既有 caller/影響面：新建無 caller；讀 `BacktestResult`（`equity_curve`／`trades`／新增之 `annualization`）。
 - 改法：回傳 dataclass 含 `values`（1D float ndarray）／`t_semantics`／`n_obs`／`periods_per_year`／
-  `annualization_source`／`status`／`reason`。`t_semantics` 合法值集合住 Task 2.1（本 SPEC 不複列），
+  `annualization_source`／**`source_artifact_hash`（str，必填；供 DSR 做 ledger snapshot membership
+  測試 ← R5 CODEX-R5-P0-02）**／`status`／`reason`。`t_semantics` 合法值集合住 Task 2.1（本 SPEC 不複列），
   語意定義如下（唯一定義處）：
   `bar_count`＝逐 bar 報酬含結構性 0（trade-settled 零填充）；
   `nonzero_return_bars`＝僅取非零 bar；
@@ -227,19 +228,23 @@ RISK-HIT: a,b,d
   ＋`momentum/Analysis/strategy_validation/contract.py::load_strategy_validation_contract()`
   （唯一 resolver）與 `validate_against_contract(obj, section)`。
 - 既有 caller/影響面：新建；**不改** `ic_report_contract.json`（scope 錯位，見收斂檔 C4）。
-- 改法：JSON 須含且僅含下列 **14** 個頂層鍵（**本 SPEC 中此欄位集合只出現於本 Task**；
+- 改法：JSON 須含且僅含下列 **15** 個頂層鍵（**本 SPEC 中此欄位集合只出現於本 Task**；
   R4 CODEX-R4-P1-01／GROK-R4-P1-01 更正：前版要求「僅 13 鍵」卻又另外要求 `reason_conditions`，
   二者互斥 ⇒ 現明列 `reason_conditions` **為第 14 個頂層鍵**）：
   `version`、`capability_status_ref`、`ledger_record_keys`、`n_fields`、`report_sections`、
   `eligibility_keys`、`annualization_source_values`、`t_semantics_values`、`n_semantics_values`、
-  `selection_metric_values`、`universe_source_values`、`variance_source_values`、`reasons`、`reason_conditions`。
+  `selection_metric_values`、`universe_source_values`、`variance_source_values`、`metric_unit_values`、
+  `reasons`、`reason_conditions`（共 **15** 個頂層鍵）。
   各集合內容：
   `ledger_record_keys` ＝ **物件**（非字串陣列），鍵名如下、每鍵之值為
   `{"type": <str|float|int|bool>, "required": <bool>}`：`research_session_id`(str,required)／
   `dataset_key`(str,required)／`candidate_id`(str,required)／`evaluation_id`(str,required)／
   `attempt_index`(int,required)／`state`(str,required)／`metric_name`(str,required)／
-  `metric_value`(float,required)／`metric_valid`(bool,required)／`input_artifact_hash`(str,required)／
-  `ts`(str,required)；`additional_properties: false`（未列鍵之 row 即非法
+  `metric_value`(float,required)／`metric_unit`(str,required)／`metric_valid`(bool,required)／
+  `input_artifact_hash`(str,required)／`ts`(str,required)；
+  🔴 **`metric_unit` 為 R5 CODEX-R5-P0-04 新增**：值集合＝`per_period`／`annualized`（住本檔
+  `metric_unit_values` 之下，見下）；DSR 之 `ledger_cross_trial` **只接受 `metric_unit="per_period"`**
+  之 row（與 §G 之 per-period 鎖定一致），混入 `annualized` ⇒ `reason=ledger_row_invalid`；`additional_properties: false`（未列鍵之 row 即非法
   ⇒ `reason=ledger_row_invalid`）（R4 CODEX-R4-P1-01：前版只有名稱無型別/必填規則）；
   `n_fields` ＝ `n_candidates_considered`／`n_evaluated`／`n_valid_metrics`／`n_failed_or_pruned`／`n_is_lower_bound`
   （**禁**任何鍵名為 `n` 或 `N`）；
@@ -275,7 +280,8 @@ RISK-HIT: a,b,d
   `ic_config_schema.load_report_contract()["capability_status"]` **逐值相等**（ref 真的被解析）
   ② 六值枚舉**不**在策略契約檔字面出現（`grep -c` == 0，防兩處列舉）
   ③ 把 ref 改指向不存在之鍵（tmp fixture）⇒ raise（drift 偵測，R1 CODEX-R1-P1-08）
-  ④ 無鍵名為 `n` 或 `N`；⑤ 13 個頂層鍵齊備。
+  ④ 無鍵名為 `n` 或 `N`；⑤ **15** 個頂層鍵齊備（R5 三家指出之「13」殘字已更正）；
+  ⑥ `metric_unit_values == ["per_period", "annualized"]` 且 `reason_conditions` 之 key 集合與 `reasons` 雙向相等。
 - **邊界**：① JSON 語法錯 ⇒ raise ② ref 目標檔缺失 ⇒ raise ③ ref 鍵缺失 ⇒ raise ④ 未知頂層鍵 ⇒ `validate_against_contract` rc!=0 ⑤ 枚舉值重複 ⇒ raise。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無（新檔，無既有消費者）。
@@ -287,7 +293,10 @@ RISK-HIT: a,b,d
 - 既有 caller/影響面：新建無 caller；ledger 落地路徑由 `momentum/core/config.py` 既有輸出根目錄推導（不新增設定鍵）。
 - 改法：讀 append-only JSONL；逐列以 Task 2.1 之 `ledger_record_keys` 驗證，非法列 ⇒ 計入
   `n_failed_or_pruned` 並記 reason，**不得靜默丟棄**。回傳含 Task 2.1 之五個 `n_fields`
-  （`n_is_lower_bound` 恆 `True`）＋**`n_for_dsr`**＋**`snapshot_hash`**＋`n_semantics`＋**`valid_sharpe_values`（float list，
+  （`n_is_lower_bound` 恆 `True`）＋**`n_for_dsr`**＋**`snapshot_hash`**＋
+  **`artifact_hashes`（`frozenset[str]`，所有已讀 row 之 `input_artifact_hash` 集合；
+  🔴 R5 CODEX-R5-P0-02：單一 digest 無法做 membership 測試，故必須保留集合本身）**＋
+  `n_semantics`＋**`valid_sharpe_values`（float list，
   僅 `metric_name="sharpe"` 且 `metric_valid=True` 之列，供 DSR 之 `ledger_cross_trial` 變異來源
   ← R1 CODEX-R1-P0-03）**＋status/reason。帳本不存在／`dataset_key` 無列 ⇒ status 非 `ok`、
   `reason=n_unknown`；**禁**回 `n=1`、**禁**以 request `n_trials` 或完成數替代。
@@ -297,6 +306,9 @@ RISK-HIT: a,b,d
   ③ `n_is_lower_bound is True`（參數化 3 種輸入以上）
   ④ 含 2 筆 valid sharpe ⇒ `len(valid_sharpe_values) == 2`
   ⑤ 同 `candidate_id` 兩 `attempt_index` ⇒ `n_candidates_considered == 1` 且 `n_evaluated == 2`
+  ⑥b `valid_sharpe_values` 只收 `metric_name="sharpe"` 且 `metric_unit="per_period"` 且
+  `metric_valid=True` 之 row；混入 `annualized` row ⇒ 該 row 記 `reason=ledger_row_invalid`
+  且不進 `valid_sharpe_values`（R5 CODEX-R5-P0-04）
   ⑥ **`n_for_dsr == n_candidates_considered`**（R4 CODEX-R4-P1-02／GROK-R4-P1-02：三個 n 欄位可互不相等，
   DSR 之多重檢定 N 語意＝「試過幾個**不同候選**」故取 `n_candidates_considered`，此為契約非慣例）
   ⑦ `snapshot_hash` ＝ 對所有已讀 row 之 `input_artifact_hash` 集合＋`dataset_key`＋`research_session_id`
@@ -376,8 +388,9 @@ RISK-HIT: a,b,d
   `ledger_result` 在場時 SR0 之整數 N **恆取 `ledger_result.n_for_dsr`**（＝`n_candidates_considered`），
   且 `n_trials` 參數必須為 `None`（否則 raise）——呼叫方無從挑欄位；
   須驗 `len(ledger_result.valid_sharpe_values) <= ledger_result.n_valid_metrics`
-  且 `period_returns` 之來源 artifact hash 屬於 `ledger_result.snapshot_hash` 所涵蓋集合，
-  不符 ⇒ status 非 `ok`、`reason=ledger_snapshot_mismatch`。
+  且 `period_returns.source_artifact_hash`（Task 1.4 之 `PeriodReturns` **新增必填欄位**，
+  值＝產生該序列之 `BacktestResult` 之 artifact hash）**∈ `ledger_result.artifact_hashes`**
+  （集合成員測試，非 digest 比對），不符 ⇒ status 非 `ok`、`reason=ledger_snapshot_mismatch`。
   變異數須為有限且 `>0`，否則 `reason=degenerate_returns`。`n_trials == 1` ⇒ SR0=0，**不需**跨 trial 變異數；
   `n_trials > 1` 且兩者皆缺 ⇒ status 非 `ok`、`reason=cross_trial_variance_unavailable`
   （誠實不可算，**禁**無依據常數）。
@@ -455,7 +468,10 @@ RISK-HIT: a,b,d
 
 **Task 4.2 — PBO 值（矩陣語意與 oracle 全寫死）**
 - 目標：由候選×時間報酬矩陣算 PBO。
-- 檔案：新增 `momentum/Analysis/strategy_validation/pbo.py::probability_of_backtest_overfitting(*, returns_matrix, n_obs, n_candidates, s_blocks, selection_metric, universe_provenance) -> PBOResult`
+- 檔案：新增 `momentum/Analysis/strategy_validation/pbo.py::probability_of_backtest_overfitting(*, returns_matrix, n_obs, n_candidates, candidate_ids, s_blocks, selection_metric, universe_provenance, ledger_result=None) -> PBOResult`
+  （🔴 R5 CODEX-R5-P0-03：`candidate_ids`（長度＝`n_candidates`，與矩陣欄一一對應）與
+  `ledger_result` 為 universe 守衛之必要輸入——缺此二者，守衛只能比對呼叫方自算之 hash，
+  top-K 污染路徑無法封閉）
   （`n_obs`／`n_candidates` 為**必填**，使軸向可判定 ← R3 CODEX-R3-P0-01：純靠 shape 無法區分
   「(T,N) 轉置」與「合法的 T<N 輸入」）
 - 既有 caller/影響面：新建無 caller。
@@ -469,8 +485,11 @@ RISK-HIT: a,b,d
      ① 對每個有效候選，在 IS 索引上計算 `selection_metric`（值集合住 Task 2.1；
      `sharpe` ＝ Task 1.2 之 `value_per_period`，`mean_return` ＝ 算術平均）；
      ② **IS champion** ＝ IS metric 最大者；**平手時取候選索引最小者**（決定性 tie-break，寫死）；
-     ③ 在 OOS 索引上對**全部有效候選**計算同一 metric，取 champion 之名次
-     （**平均排名**處理平手），`rank ∈ [1, N_valid]`，`r = rank/(N_valid+1)`；
+     ③ 在 OOS 索引上對**該 path 之有效候選集合**（已扣除步驟 3b 之 path 級剔除者）計算同一 metric，
+     取 champion 之名次（**平均排名**＝`scipy.stats.rankdata(method="average")` 之等價定義），
+     `rank ∈ [1, N_valid_on_path]`，**`r = rank/(N_valid_on_path + 1)`**
+     （🔴 R5 CODEX-R5-P0-01：分母必為**該 path** 之有效候選數，**非**全域 `N_valid`——
+     兩者不等時 `ω` 與 PBO 之負值判定會分歧）；
      ④ `ω = ln(r/(1-r))`（`r` 由 ③ 之定義保證落於開區間，故不會取 log(0)）。
   3b. 🔴 **path 級退化處理（R4 CODEX-R4-P0-01；禁讓 NaN 排序決定結果）**：
      若某候選在**某 path** 之 IS 或 OOS 切片上 metric 非有限（例：`sharpe` 遇該切片 `std==0`），
@@ -487,6 +506,8 @@ RISK-HIT: a,b,d
   ⇒ raise；且 `n_obs=50, n_candidates=1200`（合法之 T<N）在 shape 相符時**不** raise
   （證明不依賴 `T>N` 假設 ← R3 CODEX-R3-P0-01）
   ④ 全平手矩陣 ⇒ `r == 0.5` 且 `omega == 0.0`（平均排名規則）；
+  ④c **per-path 分母**：構造「path A 有 5 個有效候選、path B 因退化只剩 3 個」之 fixture，
+  斷言兩 path 之 `r` 分母分別為 6 與 4（以 champion 名次相同時 `omega` 不同證明分母生效）；
   ④b IS 平手時 champion 取最小候選索引（決定性 tie-break，以刻意構造之雙冠矩陣斷言）
   ⑤ 5 候選含 1 NaN 候選 ⇒ `n_candidates_invalid == 1` 且分母為 4
   ⑥ 有效候選數 1 ⇒ `status != "ok"` 且 `math.isnan(pbo)`（**禁**回 0）
@@ -507,9 +528,12 @@ RISK-HIT: a,b,d
   **`candidate_count`（int）**。
   1. `selection_free is not True` ⇒ status 非 `ok`、`reason=universe_selection_contaminated`，不計算 PBO。
   2. 🔴 **唯一可驗證之成功路徑＝`ledger_all_candidates`（R4 CODEX-R4-P1-03；較 grok 建議之
-     「具名殘留」更嚴，主委選較嚴版）**：該值須同時傳入 `ledger_result`（Task 2.2 之
-     `LedgerReadResult`），並驗 `candidate_set_hash` 等於**由 ledger 之 candidate_id 集合重算**之
-     canonical hash 且 `candidate_count == ledger_result.n_candidates_considered == n_candidates`。
+     「具名殘留」更嚴，主委選較嚴版）**：該值須同時傳入 `ledger_result` 與 `candidate_ids`，並驗
+     ① `set(candidate_ids)` **等於** ledger 之 candidate_id 集合（集合相等，非只比 count／hash）
+     ② `candidate_count == ledger_result.n_candidates_considered == n_candidates == len(candidate_ids)`
+     ③ `candidate_set_hash` 等於對 `sorted(candidate_ids)` 以 `sha256(",".join(...))` 重算之值
+     （canonical 演算法＝**排序後以半形逗號連接再 sha256**，唯一定義處 ← 消除 R5 之 hash 演算法未定殘留）。
+     三者任一不符 ⇒ `reason=universe_provenance_unverifiable`。
   3. `source ∈ {full_grid, external_declared}` **一律非成功路徑**——回 status 非 `ok`、
      `reason=universe_provenance_unverifiable`。理由：純統計層無外部候選宇宙 SoT，
      「先做 top-K 再對同一子集自算 hash」可自洽通關（codex 反例），
@@ -523,8 +547,11 @@ RISK-HIT: a,b,d
   ④b `selection_free=True` 且 `source="full_grid"` **即使** `candidate_count` 與自備
   `candidate_set_hash` 皆自洽 ⇒ 仍 `reason == "universe_provenance_unverifiable"`
   （codex top-K 自算 hash 反例已封閉）
-  ⑤ `source="ledger_all_candidates"` 但未傳 `ledger_result`，或 `candidate_set_hash`
-  與由 ledger candidate 集合重算之值不符 ⇒ 同④之 reason；三者皆相符才 `status == "ok"`。
+  ⑤ `source="ledger_all_candidates"` 但未傳 `ledger_result` 或 `candidate_ids` ⇒ 同④之 reason
+  ⑤b **top-K 反例（codex 原始反例，必測）**：ledger 有 50 個 candidate_id，呼叫方只傳其中績效最佳之
+  10 個（矩陣 10 欄、`candidate_ids` 為該 10 個、`candidate_set_hash` 為該 10 個自算之正確 hash）
+  ⇒ `status != "ok"` 且 `reason == "universe_provenance_unverifiable"`（集合相等檢查擋下）
+  ⑤c 三項全符（集合相等＋count 相等＋hash 相符）才 `status == "ok"`。
 - **邊界**：① `selection_free=False` ② `universe_provenance=None` ③ `source` 未知值。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
