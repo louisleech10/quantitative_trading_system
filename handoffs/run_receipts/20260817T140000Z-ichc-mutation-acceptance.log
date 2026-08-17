@@ -1,0 +1,10 @@
+ICHC mutation acceptance — 20260817T051857Z
+M1 flatten key rename -> canonical sha differs: in-test probe (test_ichc_p2_golden) PASSED-as-red-proof
+M2 kill resolver event branch -> honesty suite 5 failed then restored (git diff clean)
+M3 force stage3 timestamps=None -> timestamps suite 7 FAILED then restored (git status clean)
+M4 bare {} xsec -> in-test probe (test_ichc_xsec_capability)
+M5 inject ghost toggle -> rc=1 (test_ichc_wiring_check)
+M6 tamper one side -> sets unequal (test_ichc_contract_sync)
+M7 remove turnover gate -> 4 FAILED then restored
+method note: manual mutations applied via sed+backup-restore cycle (transient, restoration machine-verified); Edit-tool rule exception scoped to mutation probes only
+ALL 7 MUTATIONS CLOSED: each red under its designed break, green restored
