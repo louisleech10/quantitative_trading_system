@@ -25,6 +25,14 @@
    🔴 **戳記期間主控端不得動工作區、不得跑探針**；探針有互斥鎖，**brief 只叫一家跑**）。
 3. **B3**（3.1 MinBTL → 3.2 DSR → 3.3 報告 → 3.4 reporter/API）→ 三家 review → 戳記 → **B4**（4.1→4.2→4.3→**2.4**）。
    B3 開工前先跑 `git stash list` 確認乾淨；每 Task 完成即補探針 mutation（§V-1／2／3／11／12 屬 B3）。
+3b. **🔴 小任務（使用者 2026-08-18 定，排在 B2 收斂之後、B3 之前）：白話說明之人類閱讀介面**。
+   決定＝**來源維持 .md**（我與委員、所有守衛不動），另**由腳本生成 HTML**：
+   `scripts/plain_docs_render.sh` → 用 venv 內已有的 `markdown_it`（rich 依賴）把 `白話說明/*.md` 渲染成
+   `docs/site/*.html`（含 `index.html`、簡潔 CSS、表格／狀態燈可讀、手機友善），**每次 commit 白話檔時同一 commit 產出**
+   （掛 pre-commit：staged 含 `白話說明/*.md` 即重生成並 `git add docs/site/`；缺產出＝擋）。
+   本機：`open docs/site/index.html`；GitHub：**使用者須在 repo Settings → Pages 選「Deploy from branch: main, /docs」**
+   （這步只有使用者能點），之後網址＝`https://<user>.github.io/<repo>/site/`。
+   小任務流程（Claude 自做＋自跑測試：渲染冪等、每個 .md 都有對應 .html、連結不死）；不派委員。
 4. **每批收尾固定動作**（順序不可調）：pytest → 探針 → commit → `git push -q origin main`（背景；pre-push 為 `--fast` 秒級）
    → 改 `白話說明/GAP-1施工進度.md`＋`接下來要做什麼.md` 現況段 → 再 commit+push。
    🔴 **使用者要求 commit+push 皆須秒級完成且每次都同步推上 GitHub**（2026-08-18 明示，覆蓋舊「push 需明示」）。
