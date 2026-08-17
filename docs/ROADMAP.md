@@ -17,10 +17,10 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | **GAP-1 進行中**：偵察四方收斂完成（2026-08-17，31 findings、債已銷） | **白話閘→SPEC 起草→三家 adversarial** | `handoffs/reconcile/20260817-gap1-x-consult-r1/synth.md` |
+| **量化主線（IC 分析）** | **GAP-1 SPEC 定版**（七輪 adversarial 23→7→11→7→4→1；使用者白話閘裁決收回三項殘留為 Task） | **TODO 生成→三家 adversarial→實作 B1** | `docs/GAP1_STRATEGY_OVERFIT_SPEC.md`；待補完登記 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-1 待補完」節 |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
-| GAP-1 DSR/PBO/MinBTL 策略層防偽 | **已開票**：偵察收斂（4 方 31 findings；C1 N帳本／C2 報酬序列／C3 PBO矩陣 三項 BLOCKING 須進 SPEC） | 白話閘（使用者審閱）→ SPEC 起草 | synth：`handoffs/reconcile/20260817-gap1-x-consult-r1/`；票：`docs/IC_QUANT_GAP_REGISTRY.md` #1 |
+| GAP-1 DSR/PBO/MinBTL 策略層防偽 | **SPEC 定版**（B1 輸入語意→B2 N 帳本契約＋wiring 閘→B3 MinBTL+DSR＋ml_pipeline 警語→B4 PBO）；8 項待補完已登記附觸發條件 | TODO 生成→實作 B1 | SPEC：`docs/GAP1_STRATEGY_OVERFIT_SPEC.md`；待補完：registry「GAP-1 待補完」節 |
 | GAP-2 IC↔ML 橋＋多因子/邊際 IC | 未開票 | 次位 | 同上 #2 |
 | GAP-3 事件 case-control 真套件 | 未開票 | 設計須含 R5 A′ 語意 | 同上 #3 |
 | GAP-4 Pooled/Panel IC | 未開票 | — | 同上 #4 |

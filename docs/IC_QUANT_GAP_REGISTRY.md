@@ -32,3 +32,20 @@ report `metadata.split_method`（枚舉住 `momentum/Analysis/contracts/ic_repor
 1. ROADMAP 狀態表六列 pointer 至本檔（commit 同步鐵律守著）。
 2. 產品端顯式化：wiring 閘門與 capability status 契約使「未實作」在系統輸出可見（如 `split_method=holdout`、NetIC `unavailable`）——缺口不靠文件記憶。
 3. 本檔更動走 commit review；票開工時各自立 SPEC、走完整管線。
+
+## GAP-1 待補完登記（不遺忘機制；2026-08-17 使用者裁決）
+
+> GAP-1 SPEC（`docs/GAP1_STRATEGY_OVERFIT_SPEC.md` §N）之殘留**同步登記於此**，每條附「為何現在不做」與**觸發條件**。
+> 規則：`為何現在不做` 只允許 `blocked-by:`／`user-ruling:`／`needs-research:` 三種；觸發條件成立時本表該列即轉為新票或併入當時 epic。
+> 本表為權威登記處；ROADMAP 只放 pointer。GAP-1 各批 code review 之 brief 須附本表以供委員複核「觸發是否已成立」。
+
+| # | 待補完項 | 為何現在不做 | 觸發條件 | 落地時之驗收錨點 |
+|---|---|---|---|---|
+| G1-R1 | Optuna／搜尋器把每次 trial 寫入 N ledger（生產者接線） | blocked-by: `momentum/Optimization` 屬不完整層，接上即於重寫時作廢 | Optuna／搜尋器重寫或開工時 | 須通過 SPEC Task 2.3 `test_ledger_conformance.py`（接不對即紅） |
+| G1-R2 | `optimization_output_service` 產出候選×時間報酬矩陣供 PBO | blocked-by: 該服務從未執行（`results/optimization_results/` 不存在） | 回測引擎首次產生真實 optimization 產出 | PBO 以 `ledger_all_candidates` 來源通過 Task 4.3 守衛 |
+| G1-R3 | 前端降級展示面板＋警語文案 | blocked-by: G1-R1／R2（後端無資料可顯示） | G1-R1 或 R2 任一落地 | 消費 API 回應之 `strategy_validation` 欄位（Task 3.4 已送到） |
+| G1-R4 | C1 六條 N 繞過路徑之機器阻止（換 study_name／重複送單／registry 淘汰／重啟／直呼引擎／UI-API 上限差） | blocked-by: G1-R1（生產者未接線前無從阻止；契約層已 fail-closed） | 與 G1-R1 同 | 各條各一測試：繞過後 `read_trial_ledger` 之 N 不低報 |
+| G1-R5 | API 層硬擋 promote（拒絕不合格冠軍建 pipeline） | user-ruling: 2026-08-17 採「降級展示＋明顯警語」（Task 3.4 已落警語，不拒絕） | 使用者要求，或該路徑上線後產生誤用 | 把 Task 3.4 之附加改為 4xx 拒絕；契約不變 |
+| G1-R6 | adaptive 搜尋下有效獨立 N 之估計 | needs-research: 無公認可驗方法；任何折算係數＝自創 | 有文獻或自研 Monte Carlo 可證偽方法時 | DSR `n_independence` 由 `unverified` 轉為具體值並附方法出處 |
+| G1-R7 | MinBTL 上界 `2ln(N)/SR²` 之近似誤差量化 | needs-research: 需獨立 Monte Carlo（另票規模） | 排程即可做 | 報告可附誤差帶；`upper_bound` 語意可保留或收緊 |
+| G1-R8 | `prediction_analyzer.py:154` `np.cumsum` 單利權益 | blocked-by: 不在策略路徑，屬 ML 診斷圖名實相符問題 | 排程即可做（小票） | 改 `cumprod` 或改欄名並停用策略敘事 |

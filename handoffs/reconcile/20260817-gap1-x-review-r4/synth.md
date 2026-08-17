@@ -12,9 +12,10 @@ VERIFY: 逐 ID `grep -c <ID> docs/GAP1_STRATEGY_OVERFIT_SPEC.md` 11/11 皆 ≥1�
 ### 家族 Verdict 分歧（依規則：看碼證不數人頭；取較嚴版）
 - **composer：可進 TODO，BLOCKING 清單無**（1 MAJOR＝μ 假等式，建議 golden 凍結前修）。
 - **grok：可進 TODO，BLOCKING 清單無**（1 MAJOR＝μ、1 MINOR＝`value=nan` 殘字）。
-- **codex：5 條 BLOCKING**（PBO 演算法未定義／μ／契約型別完備性／DSR-ledger snapshot 綁定／
-  universe 自我宣告；另 1 條 Task 1.3 objective 傳遞鏈）。
-**主委裁決＝採 codex 較嚴版全部修補**（理由：其五條皆為「實作者可自洽跑綠但語意錯」之空隙，
+- **codex：6 條 BLOCKING**（PBO 演算法未定義／μ／契約型別完備性／DSR-ledger snapshot 綁定／
+  universe 自我宣告／Task 1.3 objective 傳遞鏈；附錄 `[BLOCKING]` 標記計 6，與此相符——
+  前版誤寫「5 條＋另 1 條」，經 codex 於戳記輪 BLOCKED 指出後更正，語意不變）。
+**主委裁決＝採 codex 較嚴版全部修補**（理由：其六條皆為「實作者可自洽跑綠但語意錯」之空隙，
 與本票核心目的（防偽）同型；且修補成本低於一輪爭辯）。composer／grok 之 MAJOR/MINOR 一併修。
 
 ### F1 — PBO 核心演算法未完整定義（codex BLOCKING，主委接受）
@@ -72,7 +73,7 @@ R3 版寫 `mu = 0.01*1.0/sqrt(8760) = 1.0683760683760685e-04`，但**等式左�
 「跨 trial 變異數來源二態」。
 
 ### 未採納 / 部分採納
-- **無整條否決**。codex 之 5 條 BLOCKING 全採；composer／grok 判「不阻 TODO」之 MAJOR 亦全修
+- **無整條否決**。codex 之 6 條 BLOCKING 全採；composer／grok 判「不阻 TODO」之 MAJOR 亦全修
   （主委選擇在此輪一次修完，而非留到 golden 凍結前）。
 
 **Verdict**: 需修補後合併 → **已於 SPEC R4 逐條修補完成**（11/11 具名引用，`template_check` PASS）。
@@ -222,4 +223,6 @@ RECHECK：`python -c "import math; print(0.01/math.sqrt(8760), 0.01/93.6)"`。
 
 ## 戳記
 
-（待三家 append RECONCILE-STAMP）
+RECONCILE-STAMP: composer APPROVED 2026-08-17 sha256:61a8a01ce1bddaccbf0060b8caab542e2ff6345f432141acd87e6c50caa1b316 task:20260817-GAP1-X-STAMP-R5
+RECONCILE-STAMP: grok APPROVED 2026-08-17 sha256:61a8a01ce1bddaccbf0060b8caab542e2ff6345f432141acd87e6c50caa1b316 task:20260817-GAP1-X-STAMP-R5
+RECONCILE-STAMP: codex APPROVED 2026-08-17 sha256:61a8a01ce1bddaccbf0060b8caab542e2ff6345f432141acd87e6c50caa1b316 task:20260817-GAP1-X-STAMP-R5

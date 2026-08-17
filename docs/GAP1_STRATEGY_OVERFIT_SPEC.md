@@ -1,7 +1,7 @@
 # GAP-1 策略層防過擬合（MinBTL／DSR／PBO）— SPEC
 
 > 來源 PLAN/診斷：`handoffs/reconcile/20260817-gap1-x-consult-r1/synth.md`（四方偵察收斂，31 findings，債已銷）
-> ｜日期：2026-08-17（R2＝三家 adversarial R1 後修訂）｜對應 TODO：`docs/GAP1_STRATEGY_OVERFIT_TODO.md`（本 SPEC 定版後生成）
+> ｜日期：2026-08-17（R8＝七輪 adversarial 收斂後，依使用者白話閘裁決收回三項殘留為 Task）｜對應 TODO：`docs/GAP1_STRATEGY_OVERFIT_TODO.md`（本 SPEC 定版後生成）
 > 票：`docs/IC_QUANT_GAP_REGISTRY.md` #1｜偵察主委版：`handoffs/20260817-gap1-recon-claude.md`
 > R1 adversarial：`handoffs/20260817-gap1-specadv-{codex,composer,grok}.md`（23 findings）
 
@@ -13,8 +13,9 @@
   (d) ML/回測正確性——統計量之輸入語意（報酬序列、年化、T、N、V[SR]）錯誤會系統性偏樂觀。
 RISK-HIT: a,b,d
 - 命中 (a)(d) ⇒ §G 必填、adversarial review 必跑（三家：codex+composer+grok）。
-- **不承諾** `momentum/factories.py` 工廠出口（R1 CODEX-R1-P1-09）：三關為無狀態純函式、無跨域注入需求，
-  消費端直接 import；如未來接線批需要注入點，於該批新增，本票不做。
+- `momentum/factories.py` 工廠出口：**R8 改為需要一個**（`create_strategy_validation_reporter`），
+  因 Task 3.4 讓 `api/routes/ml_pipeline.py` 消費三關報告 ⇒ 解耦 R3（服務經 factories）適用；
+  R1 CODEX-R1-P1-09 之「純函式無 caller 時不需要」前提已因 Task 3.4 改變。僅此一個出口，見 §C 白名單。
 
 ## §A 假設與待使用者確認
 
@@ -69,6 +70,10 @@ RISK-HIT: a,b,d
      兩呼叫點**額外允許**顯式傳 `risk_free_rate`（預設維持現行 0.02；僅 oracle fixture 用 0.0）
      ——理由見 Task 1.3 斷言③（R2 CODEX-R2-P0-01／GROK-R2-P0-01）。
   3. 上述二者對應之既有測試檔（僅新增斷言，禁放寬既有斷言）。
+  4. **（R8 新增）** `momentum/factories.py`：**只新增** `create_strategy_validation_reporter()` 一個函式（Task 3.4）。
+  5. **（R8 新增）** `api/routes/ml_pipeline.py`：**只新增**回應欄位 `strategy_validation`（`eligibility`＋
+     `display_downgrade`＋`warning_text_key`）與對應 log；**不改**既有請求處理流程、**不拒絕**任何請求（Task 3.4）。
+  6. **（R8 新增）** `scripts/`：**只新增** `strategy_wiring_check.py`＋`.sh` 包裝（Task 2.4），不改 IC 版。
   **不改** `momentum/Strategy/performance_metrics.py`（其 `0.0` 退化語意與 `Dict[str, float]` 回傳保持原狀）。
 - **新資料結構一律 JSON SoT**：欄位/枚舉集合只在 Task 2.1 出現一次，其餘章節僅 pointer。
   capability status **不重新定義**，以 ref 指向 `ic_report_contract.json#capability_status`（resolver 見 Task 2.1）。
@@ -342,6 +347,29 @@ RISK-HIT: a,b,d
 - **覆蓋風險**：無。
 - 不可做：不得為通過測試而放寬 schema；不得在本票接上任何真實生產者。
 
+**Task 2.4 — 策略層 wiring 閘門（R8 由 §N 收回；使用者裁決）**
+- 目標：新增契約欄位／報告節時，機械偵測「兩端有但沒連」（幽靈 feature）；等價 `scripts/ic_wiring_check.py`
+  但吃 Task 2.1 之策略契約，**不擴 IC 版**（其 `REPORT_SECTIONS` 為 IC 封閉集合）。
+- 檔案：新增 `scripts/strategy_wiring_check.py`＋`scripts/strategy_wiring_check.sh`（包裝）；
+  常駐測試 `tests/momentum/Analysis/strategy_validation/test_wiring_check.py`（subprocess 呼叫，仿 IC 版）。
+- 既有 caller/影響面：新建無 caller；讀 `strategy_validation_contract.json`（Task 2.1）與
+  `momentum/Analysis/strategy_validation/report.py`（Task 3.3）。
+- 改法（封閉集合機械比對，禁散文判斷）：
+  W1 契約 `report_sections` 每節鍵**必須**在 `report.py::build_validation_section` 之輸出組裝中出現（AST／字面掃描）；
+  W2 契約 `reasons` 每值**必須**在 `strategy_validation/` 任一 `.py` 中被引用（未被引用之 reason＝死枚舉，紅）；
+  W3 程式中出現之 reason 字面值**必須**屬契約 `reasons`（自創 reason，紅）；
+  W4 契約 `eligibility_keys` 每鍵必須在 `report.py` 輸出中出現。
+  exit code：0 綠／1 違規／2 環境異常（fail-closed）。
+- **驗證**：`bash scripts/strategy_wiring_check.sh` rc=0；
+  mutation：於契約臨時加一個未被 `report.py` 使用之 section 鍵 ⇒ rc=1（W1）；
+  於 `pbo.py` 臨時寫一個不在契約之 reason 字面 ⇒ rc=1（W3）；
+  `pytest tests/momentum/Analysis/strategy_validation/test_wiring_check.py -q` rc=0。
+- **邊界**：① 契約檔缺失 ⇒ rc=2 ② `report.py` 缺失 ⇒ rc=2 ③ 契約 `reasons` 為空 ⇒ rc=1。
+- **存活至**：全票完工後保留（未來前端接線批加 W5「前端 types 對應」時擴充，不重寫）。
+- **覆蓋風險**：無。
+- 不可做：不得修改 `scripts/ic_wiring_check.py`；不得以散文/關鍵字判斷取代封閉集合比對。
+- **治理連動**：新增 `scripts/*` ⇒ 四份治理白話檔須同 commit 更新（CLAUDE.md 鐵律）；本 Task 之 commit 須含之。
+
 ### Phase B3 — MinBTL＋DSR 純統計核心（依賴：B1 全部、B2 Task 2.1／2.2）
 
 **Task 3.1 — MinBTL 上界與試驗預算**
@@ -445,6 +473,29 @@ RISK-HIT: a,b,d
 - 不可做：不得實作 API 層硬擋（使用者裁決）；不得把文案字串寫進 momentum 層；
   **不得複用或暗示既有 `overfitting_score`／`OverfittingCheckChart` 為本三關**（R1 GROK-R1-P2-02／COMPOSER-R1-P2-01）。
 
+**Task 3.4 — `ml_pipeline` 回應附資格狀態＋警語（非硬擋；R8 由 §N 收回）**
+- 目標：把使用者裁決「降級展示＋明顯警語」落到唯一會消費冠軍 trial 的既有 API 路徑上——
+  **只附加、不拒絕**（硬擋仍依裁決不做）。
+- 檔案：`momentum/factories.py::create_strategy_validation_reporter()`（白名單第 4 項）；
+  `api/routes/ml_pipeline.py::create_ml_pipeline`（白名單第 5 項）回應新增 `strategy_validation` 欄位。
+- 既有 caller/影響面：`api/routes/ml_pipeline.py:124-245`；既有測試 `tests/api/` 下 ml_pipeline 相關者
+  （動工前 diff，禁放寬）。
+- 改法：route 於建 pipeline 成功路徑**額外**呼叫 reporter 取得 Task 3.3 之 `build_validation_section(...)`
+  結果（輸入＝該 study/trial 對應之 `research_session_id`／`dataset_key`；今日無 ledger 生產者 ⇒
+  結果為 `eligible=None`＋`display_downgrade=true`＋非空 `warning_text_key`，**這正是誠實展示**），
+  將 `eligibility`／`display_downgrade`／`warning_text_key` 三者放入回應 `strategy_validation`；
+  reporter 任何例外 ⇒ 回應仍成功但 `strategy_validation.status="computation_failed"`（不得讓附加欄位打斷既有流程）。
+- **驗證**：`pytest tests/api/test_ml_pipeline_strategy_validation.py -q` rc=0，斷言
+  ① 建 pipeline 成功回應含 `strategy_validation` 且 `display_downgrade is True`（今日無帳本）
+  ② `warning_text_key` 非空 ③ HTTP 狀態碼與既有相同（**不擋**）
+  ④ reporter 拋例外時回應仍 2xx 且 `strategy_validation.status == "computation_failed"`
+  ⑤ 既有 ml_pipeline 測試全綠且斷言未放寬。
+- **邊界**：① 無 ledger ② reporter 例外 ③ study/trial 不存在（既有 404 路徑不變）。
+- **存活至**：全票完工後保留；`ml_pipeline.py` 若重寫，本欄位契約存活、實作可棄。
+- **覆蓋風險**：實作可能被 API 層重寫覆蓋——已知且接受（價值主體＝欄位契約與 Task 3.3）。
+- 不可做：**不得**拒絕請求（使用者裁決）；不得在 route 內做任何統計計算（全部經 reporter）；
+  不得因附加欄位改動既有回應 schema 之其他欄位。
+
 ### Phase B4 — PBO（CSCV）純統計核心（依賴：B1 Task 1.1／1.2／1.4、B2 Task 2.1；**不依賴 B3**）
 
 **Task 4.1 — CSCV 分割器（lazy＋資源守衛）**
@@ -529,9 +580,10 @@ RISK-HIT: a,b,d
 - 目標：把「禁用全樣本 top-K 子集」做成機械拒絕。
 - 檔案：`momentum/Analysis/strategy_validation/pbo.py` 之 `universe_provenance` 驗證。
 - 既有 caller/影響面：Task 4.2。
-- 改法：`universe_provenance` 為必填 dataclass，含 `selection_free`（bool）、`source`
-  （值集合＝Task 2.1 之 `universe_source_values`）、**`candidate_set_hash`（str）**與
-  **`candidate_count`（int）**。
+- 改法：`universe_provenance` 為必填 **frozen dataclass `UniverseProvenance`**，欄位**逐字**（R8 由 §N 收回）：
+  `selection_free: bool`／`source: str`（值集合＝Task 2.1 之 `universe_source_values`）／
+  `candidate_set_hash: str`／`candidate_count: int`／`declared_by: str`（呼叫方識別，供 audit）；
+  **無**其他欄位（`__post_init__` 驗型別，型別錯 raise）。
   1. `selection_free is not True` ⇒ status 非 `ok`、`reason=universe_selection_contaminated`，不計算 PBO。
   2. 🔴 **唯一可驗證之成功路徑＝`ledger_all_candidates`（R4 CODEX-R4-P1-03；較 grok 建議之
      「具名殘留」更嚴，主委選較嚴版）**：該值須同時傳入 `ledger_result` 與 `candidate_ids`，並驗
@@ -607,34 +659,36 @@ RISK-HIT: a,b,d
 
 ## §N N/A 登記
 
-- **接線類 Task（具名待接線項，理由＝§A 成熟度地圖：上游皆不完整，改其結構將於重寫時作廢）**：
-  1. Optuna／`_record_trial_metrics` 寫入 ledger（生產者接線）— 待引擎成熟；義務由 Task 2.3 conformance 鎖住。
-  2. `api/services/optimization_output_service.py` 產出候選×時間矩陣（PBO 重算式接線）— 待引擎成熟。
-  3. `api/routes/ml_pipeline.py` 掛載 eligibility 檢查 — 待 pipeline 路徑成形。
-  4. `frontend/` 之降級展示面板與警語文案 — 待後端接線完成；本票僅定義 `display_downgrade`／`warning_text_key`。
-  5. 策略層 wiring 閘門（等價 `ic_wiring_check.py` 但吃策略契約）— 待接線批；本票不擴 IC 版（其 sections 為 IC 封閉集合）。
-- **C1 之 N 繞過路徑逐條具名（R1 CODEX-R1-P0-04；本票以契約覆蓋、接線待未來批）**：
+> **R8 規則（使用者 2026-08-17 裁決）**：每條殘留**必須**帶 `為何現在不做:` 欄，值只允許三種：
+> `blocked-by:<具體依賴>`／`user-ruling:<裁決日期＋內容>`／`needs-research:<研究題目>`。
+> 寫不出三種之一＝該現在做。三項原列殘留者依此規則**收回為 Task**（2.4／3.4／4.3 欄位）。
+> 全部殘留同步登記於 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-1 待補完」節（附觸發條件；不遺忘機制）。
+
+- **接線類殘留（三項）**：
+  1. Optuna／`_record_trial_metrics` 寫入 ledger（生產者接線）。
+     `為何現在不做: blocked-by:momentum/Optimization 屬不完整層（成熟度地圖），接上即於重寫時作廢`；
+     義務由 Task 2.3 conformance 測試鎖住（未來引擎接不對即紅）。**觸發**：Optuna／搜尋器重寫或開工時。
+  2. `api/services/optimization_output_service.py` 產出候選×時間矩陣（PBO 重算式接線）。
+     `為何現在不做: blocked-by:該服務從未被執行（results/optimization_results/ 不存在），無可接之產出`。
+     **觸發**：回測引擎首次產生真實 optimization 產出時。
+  3. `frontend/` 之降級展示面板與警語文案。
+     `為何現在不做: blocked-by:殘留 1、2（後端無資料可顯示）`；本票已定義 `display_downgrade`／
+     `warning_text_key`，Task 3.4 已把欄位送到 API 回應。**觸發**：殘留 1 或 2 任一落地時。
+- **C1 之 N 繞過路徑逐條具名（R1 CODEX-R1-P0-04）**：
   ① 換 `study_name` 重開 study ② UI/API 重複送單無 idempotency ③ 記憶體 task registry
   `_cleanup_old_tasks(keep_latest=100)` 淘汰 ④ 行程重啟遺失 registry ⑤ `factories.create_optuna_optimizer`
   與 `VectorizedBacktest.run_backtest` 直呼 ⑥ UI 上限 1000 vs API 上限 10000。
-  **本票覆蓋方式**：`dataset_key`＋`research_session_id` 為 ledger 查詢主鍵（跨 study 自動彙總）、
-  `n_is_lower_bound` 恆真、缺帳本 `n_unknown` fail-closed。**未覆蓋**：上列六條在生產者未接線前
-  無法被機器阻止 ⇒ 屬待接線項 1 之驗收範圍，不得宣稱本票已關閉 C1 之繞過面。
-- **層級隔離**：IC 之 FDR `n_tests` 與 XGBoost `total_cases` **禁**映射為策略 N（因子層已由 FDR/HAC 罰過）；
-  本票以 ledger 之 `dataset_key` 語意隔離，且契約不提供任何從 IC/XGBoost 計數取 N 之欄位。
-- **API 層硬擋 promote**：本票不實作 — **使用者 2026-08-17 裁決採「降級展示＋明顯警語」**。
-  🔴 **具名殘留**：`api/routes/ml_pipeline.py:124-245` 之 promote/建 pipeline 路徑仍可消費不合格冠軍
-  （CODEX 偵察 R1-P1-06 之洞不關閉）。緩解＝Task 3.3 之機器可讀 `eligibility` 欄位。
-  觸發改判條件：使用者要求，或該路徑實際上線並產生誤用。
-- **TPE 自適應搜尋使「N 個獨立候選」前提失真**：本票不修（屬搜尋器設計）；
-  緩解＝契約 `n_semantics_values` 含 `adaptive_search`，報告須回顯；
-  DSR 之 `variance_source="ledger_cross_trial"` 在 adaptive 下為有偏估計 ⇒ 報告須同時輸出 `n_semantics`
-  供讀者判斷。跨 trial 變異數在 adaptive 下無無偏來源 ⇒ `n_trials>1` 時預設行為為
-  `cross_trial_variance_unavailable`（誠實不可算），**不**提供替代預設來源。
-- **effective independent N（R2 CODEX-R1-P0-01 殘留）**：`adaptive_search` 下之「有效獨立試驗數」
-  本票**不做任何換算**（無公認可驗方法）；誠實處理＝DSR 輸出 `n_independence="unverified"`（Task 3.2 斷言⑧）
-  ＋報告 `provenance.n_semantics` 回顯。**禁**以任何係數把 adaptive N 折算成獨立 N。
-- **MinBTL 上界之近似誤差量化**：本票不做（需獨立 Monte Carlo 研究）；
-  誠實處理＝函式名與報告欄位皆帶 `upper_bound` 語意（§A），禁宣稱精確值。
-- **`prediction_analyzer.py:154` `np.cumsum` 單利權益**：本票不修（不在策略路徑，收斂檔 C2 第 6 點）；
-  另立小票；Task 1.4 明定三關不得消費該路徑輸出。
+  `為何現在不做: blocked-by:殘留 1（生產者未接線前，機器無從阻止；契約層已 fail-closed：dataset_key＋
+  research_session_id 主鍵、n_is_lower_bound 恆真、缺帳本 n_unknown）`。**不得宣稱本票已關閉 C1 繞過面**。
+- **層級隔離**：IC 之 FDR `n_tests` 與 XGBoost `total_cases` **禁**映射為策略 N；契約不提供該路徑。（非殘留，為約束。）
+- **API 層硬擋 promote**：`為何現在不做: user-ruling:2026-08-17 使用者裁決採「降級展示＋明顯警語」`。
+  Task 3.4 已把警語落到 `ml_pipeline` 回應；**仍可消費不合格冠軍**（不拒絕）。
+  **觸發改判**：使用者要求，或該路徑實際上線並產生誤用。
+- **TPE 自適應搜尋使「N 個獨立候選」前提失真／effective independent N**：
+  `為何現在不做: needs-research:adaptive 搜尋下有效獨立試驗數之無偏估計（無公認可驗方法；任何折算係數＝自創＝取巧）`。
+  誠實處理＝`n_semantics="adaptive_search"` 回顯＋DSR `n_independence="unverified"`（Task 3.2 斷言⑧）
+  ＋`n_trials>1` 時 `cross_trial_variance_unavailable`。**禁**任何折算係數。
+- **MinBTL 上界之近似誤差量化**：`為何現在不做: needs-research:Monte Carlo 量化 2ln(N)/SR² 上界與真值之差（獨立票規模）`。
+  誠實處理＝函式名與欄位皆帶 `upper_bound`，禁宣稱精確值。
+- **`prediction_analyzer.py:154` `np.cumsum` 單利權益**：`為何現在不做: blocked-by:不在策略路徑（收斂檔 C2 第 6 點），
+  屬 ML 診斷圖之名實相符問題，另立小票`；Task 1.4 明定三關不得消費該路徑輸出。

@@ -43467,3 +43467,86 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-17T09:54:23Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"1a75ac73a37505d76593d86765e9c89593043e68eca277b5ad2e7202e07f5d9b","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260817-gap1-specadv-r7-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc"}
 {"actor": "cx_run", "attempt_id": "8483bf90-6b29-49d1-9c8a-86f90a0058b6", "cli_rc": "0", "event": "committee_family_result", "event_id": "46e0d6e9-cb30-4bb0-823e-1f68915d4dce", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-specadv-r7-codex.md", "output_sha256": "2cbe0757e03c3bb4af22181099721a0defef364f401d463f2ffc732cda57a9cc", "producer": "audit_append.sh", "result_state": "success", "round_id": "0eb21438-5345-4013-81ed-fbdba1474f3f", "schema_version": 1, "sequence": 1927, "ts": "2026-08-17T09:57:23Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "e435bd30-c357-4ae6-b80b-acffce3eed71", "lock_sha256": "b556e1407f1aec78458845f7cec453c8c11aa9ada44ed7478de9f69fef7e3f98", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "0eb21438-5345-4013-81ed-fbdba1474f3f", "schema_version": 1, "sequence": 1928, "session_id": "20260817-gap1-x-review-r7", "synth_sha256": "1dc223e5a1c0fdb643b374a6485cf37080042e045eb9b87d16c338093099c97d", "ts": "2026-08-17T09:59:07Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260817-GAP1-X-STAMP-R4", "ts": "2026-08-17T10:00:08Z"}
+=== 2026-08-17 18:00:08 | dispatch ===
+  ts=2026-08-17 18:00:08
+  kind=dispatch
+  intent=GAP-1 review-R4 收斂檔 RECONCILE-STAMP 核可
+  risk=low
+  facts_asked=body sha256 由 reconcile_body_hash.sh 實跑;較早三份已三家 APPROVED
+  review_role=戳記核可委員
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260817-GAP1-X-STAMP-R4", "ts": "2026-08-17T10:00:14Z"}
+=== 2026-08-17 18:00:14 | dispatch ===
+  ts=2026-08-17 18:00:14
+  kind=dispatch
+  intent=GAP-1 review-R4 收斂檔 RECONCILE-STAMP 核可
+  risk=low
+  facts_asked=body sha256 由 reconcile_body_hash.sh 實跑;較早三份已三家 APPROVED
+  review_role=戳記核可委員
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260817-gap1-stamp-v4-BRIEF.md", "brief_sha256": "e3436374ce82cde2df6598f157564891886267e66df85bb7a19f28c8b84c7e72", "brief_sha256_norm": "e3436374ce82cde2df6598f157564891886267e66df85bb7a19f28c8b84c7e72", "event": "committee_round_open", "event_id": "ec23445d-f8aa-4104-915e-584d7af1679b", "expected_outputs": {"codex": "handoffs/20260817-gap1-stamp-v4-codex.md", "composer": "handoffs/20260817-gap1-stamp-v4-composer.md", "grok": "handoffs/20260817-gap1-stamp-v4-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "a09b950b-c178-441b-a5bd-d034a97178f6", "schema_version": 1, "sequence": 1929, "session_name": "20260817-gap1-x-stamp-r4", "task_id": "20260817-GAP1-X-STAMP-R4", "ts": "2026-08-17T10:00:17Z"}
+{"actor": "cx_run", "attempt_id": "65bea9cb-1fac-4acf-96e5-1d8cb93e2cb7", "cli_rc": "0", "event": "committee_family_result", "event_id": "d4cd0c2d-d5c1-4076-8a91-ab8eefb84798", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-stamp-v4-grok.md", "output_sha256": "5f0dd6cebfa61926509c29e2cf8282a9ce8bb190f0089d3d7255fa72a8775e04", "producer": "audit_append.sh", "result_state": "success", "round_id": "a09b950b-c178-441b-a5bd-d034a97178f6", "schema_version": 1, "sequence": 1930, "ts": "2026-08-17T10:03:10Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260817-gap1-x-review-r4/synth.md", "output_sha256": "4550bc2749f079597a43056f1c0c737a0edb4242c98f074b2cb548692858972b", "task_id": "20260817-GAP1-X-STAMP-R4", "ts": "2026-08-17T10:03:11Z"}
+{"actor": "cx_run", "attempt_id": "20c16c75-ee54-4517-bf40-60123ceaa513", "cli_rc": "0", "event": "committee_family_result", "event_id": "6cdabe79-e4c0-4c0a-8eee-fbbc33e016c1", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-stamp-v4-codex.md", "output_sha256": "d07c7e794c7629d049f201b7890b11ea2d8791ba73176af0da46af36d42a1090", "producer": "audit_append.sh", "result_state": "success", "round_id": "a09b950b-c178-441b-a5bd-d034a97178f6", "schema_version": 1, "sequence": 1931, "ts": "2026-08-17T10:04:34Z"}
+{"actor": "cx_run", "attempt_id": "774bfe91-a798-432d-b679-0ff7becfaca2", "cli_rc": "0", "event": "committee_family_result", "event_id": "8249c33f-308e-4bb5-b27b-f78150af8be0", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-stamp-v4-composer.md", "output_sha256": "3f882a93b58e0787e3074bf316179d1dda525dcadea392ff9c75c2425bae843e", "producer": "audit_append.sh", "result_state": "success", "round_id": "a09b950b-c178-441b-a5bd-d034a97178f6", "schema_version": 1, "sequence": 1932, "ts": "2026-08-17T10:07:06Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260817-gap1-x-review-r4/synth.md", "output_sha256": "9eaa6349aedeec4e03a62547544e3c9fb907ae9e808543fdee6d957fcdd1c24a", "task_id": "20260817-GAP1-X-STAMP-R4", "ts": "2026-08-17T10:07:06Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-主委", "event": "debt_abandon", "event_id": "e160bad2-10a6-499e-af79-b45dc4a7b244", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp 輪不產 findings;review-r4 三家 RECONCILE-STAMP 均 APPROVED 且 body hash 相符,檢查器實跑 PASS", "round_id": "a09b950b-c178-441b-a5bd-d034a97178f6", "schema_version": 1, "sequence": 1933, "ts": "2026-08-17T13:04:25Z", "zero_findings_verified": ""}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260817-GAP1-X-STAMP-R5", "ts": "2026-08-17T13:05:31Z"}
+=== 2026-08-17 21:05:31 | dispatch ===
+  ts=2026-08-17 21:05:31
+  kind=dispatch
+  intent=GAP-1 review-R4 收斂檔 RECONCILE-STAMP 重蓋(計數字面已更正 5→6,語意不變)
+  risk=low
+  facts_asked=新 body sha256=61a8a01ce1bd 由 reconcile_body_hash.sh 實跑;上輪 codex BLOCKED 之字面不一致已修
+  review_role=戳記核可委員
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260817-GAP1-X-STAMP-R5", "ts": "2026-08-17T13:05:37Z"}
+=== 2026-08-17 21:05:37 | dispatch ===
+  ts=2026-08-17 21:05:37
+  kind=dispatch
+  intent=GAP-1 review-R4 收斂檔 RECONCILE-STAMP 重蓋(計數字面已更正 5→6,語意不變)
+  risk=low
+  facts_asked=新 body sha256=61a8a01ce1bd 由 reconcile_body_hash.sh 實跑;上輪 codex BLOCKED 之字面不一致已修
+  review_role=戳記核可委員
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260817-gap1-stamp-v4-BRIEF.md", "brief_sha256": "b005a56af75cdf28019bb8af81a4fa38c35c852bc915435eba08452b027b20cf", "brief_sha256_norm": "b005a56af75cdf28019bb8af81a4fa38c35c852bc915435eba08452b027b20cf", "event": "committee_round_open", "event_id": "47e951a0-01f3-467d-8fc6-82c641656831", "expected_outputs": {"codex": "handoffs/20260817-gap1-stamp-v4b-codex.md", "composer": "handoffs/20260817-gap1-stamp-v4b-composer.md", "grok": "handoffs/20260817-gap1-stamp-v4b-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "72892bef-1926-4ac8-9bcb-5780c8bb89a0", "schema_version": 1, "sequence": 1934, "session_name": "20260817-gap1-x-stamp-r5", "task_id": "20260817-GAP1-X-STAMP-R5", "ts": "2026-08-17T13:05:41Z"}
+{"actor": "cx_run", "attempt_id": "3801209e-183d-4aa4-9a11-9c6d4f9446a0", "cli_rc": "0", "event": "committee_family_result", "event_id": "362ae257-eedc-4867-868c-4f4587a3adfa", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-stamp-v4b-grok.md", "output_sha256": "c8af7608759be763a785df9cd1867d4ca65603b29dc5e57ed0686abdb1a41790", "producer": "audit_append.sh", "result_state": "success", "round_id": "72892bef-1926-4ac8-9bcb-5780c8bb89a0", "schema_version": 1, "sequence": 1935, "ts": "2026-08-17T13:08:00Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260817-gap1-x-review-r4/synth.md", "output_sha256": "7979a7f010273dbe055210cc949d6465d07d4b7790cd72445f3951052982aacf", "task_id": "20260817-GAP1-X-STAMP-R5", "ts": "2026-08-17T13:08:01Z"}
+{"actor": "cx_run", "attempt_id": "4030ccce-6af0-463f-b019-3211808c05ec", "cli_rc": "0", "event": "committee_family_result", "event_id": "3103778d-4be9-4472-aa43-5a1177950554", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-stamp-v4b-composer.md", "output_sha256": "8015a71de754b60060e98ea8615fa21eccb361f2459142feb1aeb3aff494739a", "producer": "audit_append.sh", "result_state": "success", "round_id": "72892bef-1926-4ac8-9bcb-5780c8bb89a0", "schema_version": 1, "sequence": 1936, "ts": "2026-08-17T13:08:03Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260817-gap1-x-review-r4/synth.md", "output_sha256": "7979a7f010273dbe055210cc949d6465d07d4b7790cd72445f3951052982aacf", "task_id": "20260817-GAP1-X-STAMP-R5", "ts": "2026-08-17T13:08:03Z"}
+{"actor": "cx_run", "attempt_id": "21423cd6-71a8-4d70-83cd-8c24f5092b2f", "cli_rc": "0", "event": "committee_family_result", "event_id": "f71e611f-3838-402c-8b07-9a732bacbd36", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-stamp-v4b-codex.md", "output_sha256": "4decbcb2c657258661f2708a84e4f08c00dee72cd372fb1b43d623278a27919c", "producer": "audit_append.sh", "result_state": "success", "round_id": "72892bef-1926-4ac8-9bcb-5780c8bb89a0", "schema_version": 1, "sequence": 1937, "ts": "2026-08-17T13:09:28Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260817-gap1-x-review-r4/synth.md", "output_sha256": "d29f1c3cf95fae2e8dbcee267a181c010aa6c439ccb9629700cef2e99a9ae0d6", "task_id": "20260817-GAP1-X-STAMP-R5", "ts": "2026-08-17T13:09:28Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-主委", "event": "debt_abandon", "event_id": "fb52b9f9-0750-4a2f-8595-0ac7448c5723", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp 輪不產 findings;review-r4 重蓋後三家 APPROVED 且 body hash 相符,檢查器實跑 PASS", "round_id": "72892bef-1926-4ac8-9bcb-5780c8bb89a0", "schema_version": 1, "sequence": 1938, "ts": "2026-08-17T13:16:38Z", "zero_findings_verified": ""}
