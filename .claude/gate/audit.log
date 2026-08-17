@@ -43959,3 +43959,50 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260817-gap1-stamp-v6-codex.md", "output_sha256": "d71c9f276451a75590110be8b8dc719412106b98809ead008473e42d73aa3fc4", "task_id": "20260817-GAP1-X-STAMP-R7", "ts": "2026-08-17T15:42:24Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260817-gap1-stamp-v6-composer.md", "output_sha256": "dfaa12e862e3df799a866f0f4f01746349711e7dfe1528e2ed628014ca54a6fd", "task_id": "20260817-GAP1-X-STAMP-R7", "ts": "2026-08-17T15:42:24Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260817-gap1-stamp-v6-grok.md", "output_sha256": "d9df93791945de555d7ebdfd66c158defa96ebbedae826f487b211f1a31530db", "task_id": "20260817-GAP1-X-STAMP-R7", "ts": "2026-08-17T15:42:24Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260817-gap1-x-review-r9/synth.md", "output_sha256": "b333039f240bd87132c029b61a4316646b8184cac7c2ae52dd630259a0339915", "task_id": "20260817-GAP1-B1-REVIEW-R10", "ts": "2026-08-17T15:57:37Z"}
+=== 2026-08-17 23:57:38 | dispatch ===
+  ts=2026-08-17 23:57:38
+  kind=dispatch
+  intent=GAP-1 B1 實作 code review（三家全員；含 A1-19 兩項實作期決定之複核）
+  risk=high
+  facts_asked=111 passed；解耦 BASELINE OK；五條 mutation 轉紅 rc=1
+  review_role=codex,composer,grok 三家 code review
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260817-gap1-x-review-r9/synth.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260817-gap1-x-review-r9/synth.md", "output_sha256": "b333039f240bd87132c029b61a4316646b8184cac7c2ae52dd630259a0339915", "task_id": "20260817-GAP1-B1-REVIEW-R10", "ts": "2026-08-17T15:57:44Z"}
+=== 2026-08-17 23:57:44 | dispatch ===
+  ts=2026-08-17 23:57:44
+  kind=dispatch
+  intent=GAP-1 B1 實作 code review（三家全員；含 A1-19 兩項實作期決定之複核）
+  risk=high
+  facts_asked=111 passed；解耦 BASELINE OK；五條 mutation 轉紅 rc=1
+  review_role=codex,composer,grok 三家 code review
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260817-gap1-x-review-r9/synth.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260817-gap1-b1-review-BRIEF.md", "brief_sha256": "20065cbd17a26bb7b65374312426b4f47657e00f8c80111b3da26a9820c225bc", "brief_sha256_norm": "20065cbd17a26bb7b65374312426b4f47657e00f8c80111b3da26a9820c225bc", "event": "committee_round_open", "event_id": "89b19759-9c9f-4765-93b0-1f0756f8351b", "expected_outputs": {"codex": "handoffs/20260817-gap1-b1-review-codex.md", "composer": "handoffs/20260817-gap1-b1-review-composer.md", "grok": "handoffs/20260817-gap1-b1-review-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "994f764c-daa6-45a7-bdff-04097dcb58eb", "schema_version": 1, "sequence": 1974, "session_name": "20260817-gap1-b1-review-r10", "task_id": "20260817-GAP1-B1-REVIEW-R10", "ts": "2026-08-17T15:57:48Z"}
+{"actor": "cx_run", "attempt_id": "f6f45723-3ad2-48cf-8ac4-2c889e1efdc3", "cli_rc": "0", "event": "committee_family_result", "event_id": "9c95a502-9989-499a-8dee-7e352259130d", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-b1-review-composer.md", "output_sha256": "9a91ad2274ead64ce5dc2b68ccc8ddc5310e5ce42ae8b4cfe938622da4955bbd", "producer": "audit_append.sh", "result_state": "success", "round_id": "994f764c-daa6-45a7-bdff-04097dcb58eb", "schema_version": 1, "sequence": 1975, "ts": "2026-08-17T16:03:01Z"}
+{"event":"gate_deny","ts":"2026-08-17T16:05:01Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"d6e695a6ef3a91084f79444108fe750c95fa5b94dd51715a45077eca2a038d1e","cmd_head":"bash -n scripts/gap1_b1_mutation_probe.sh; rc=$?; echo MUTATION_SYNTAX_RC=$rc; find /tmp -maxdepth 3 -type d -name '*workdir*' -print 2>/dev/null | sort; find /tmp -maxdepth 2 -type d -name 'claude-501' -print 2>/dev/null | sort; find /tmp -maxdepth 2 -type f -name 'gap1_mut.log' -print 2>/dev/null | sort"}
+{"actor": "cx_run", "attempt_id": "34393f7c-c9d4-4de5-af20-e7f4c03a7dfa", "cli_rc": "0", "event": "committee_family_result", "event_id": "853fe115-2c36-440a-b151-e929eb748856", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-b1-review-grok.md", "output_sha256": "16b9918851963222f064e586356da57b9c51477c24001f5ef42ed1bb16061cca", "producer": "audit_append.sh", "result_state": "success", "round_id": "994f764c-daa6-45a7-bdff-04097dcb58eb", "schema_version": 1, "sequence": 1976, "ts": "2026-08-17T16:05:12Z"}
+{"event":"gate_deny","ts":"2026-08-17T16:08:22Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"397e18262ca7ad8f8e4935d0c5a0b5fea2a41e66e98790fcaae912258d6b70eb","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260817-gap1-b1-review-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"event":"gate_deny","ts":"2026-08-17T16:08:34Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"b6e95e627f6ed228bb02e20f23c363b9956a1deab1ae95a9436f0e6334d7243f","cmd_head":"./scripts/completeness_check.sh --single handoffs/20260817-gap1-b1-review-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"event":"gate_deny","ts":"2026-08-17T16:08:41Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"fe27e6300bdee9d22a868547ab9b95edec03b764354efdf46b03128476994ad2","cmd_head":"zsh -c './scripts/completeness_check.sh --single handoffs/20260817-gap1-b1-review-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc'"}
+{"event":"gate_deny","ts":"2026-08-17T16:08:44Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"d21c370564b23fa2e396398efaca99612f7ba5e3ae3430b2ae3af45de8945bf6","cmd_head":"sh scripts/completeness_check.sh --single handoffs/20260817-gap1-b1-review-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"actor": "cx_run", "attempt_id": "f3dbe5ef-d38a-4caa-be79-833e885f81bf", "cli_rc": "0", "event": "committee_family_result", "event_id": "d39103b6-3373-4a0e-b8f1-65cc66f6259a", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260817-gap1-b1-review-codex.md", "output_sha256": "111fff5c0ab350ac332287908d83bccadb7f28f22780ffb2a8d9451e265e0f3b", "producer": "audit_append.sh", "result_state": "success", "round_id": "994f764c-daa6-45a7-bdff-04097dcb58eb", "schema_version": 1, "sequence": 1977, "ts": "2026-08-17T16:12:41Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "644f4058-c242-4620-9248-b998f4e61df6", "lock_sha256": "67fc9053c19b022c4361fecc86565f858646b47bb440d1d737c94e18effd0c23", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "994f764c-daa6-45a7-bdff-04097dcb58eb", "schema_version": 1, "sequence": 1978, "session_id": "20260817-gap1-b1-review-r10", "synth_sha256": "2fd6075d76d138995a21d5160be144d9db98713db2453fb4283d9d1f6ca5a03e", "ts": "2026-08-17T16:14:37Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260817-gap1-b1-review-codex.md", "output_sha256": "111fff5c0ab350ac332287908d83bccadb7f28f22780ffb2a8d9451e265e0f3b", "task_id": "20260817-GAP1-B1-REVIEW-R10", "ts": "2026-08-17T16:19:24Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260817-gap1-b1-review-composer.md", "output_sha256": "9a91ad2274ead64ce5dc2b68ccc8ddc5310e5ce42ae8b4cfe938622da4955bbd", "task_id": "20260817-GAP1-B1-REVIEW-R10", "ts": "2026-08-17T16:19:25Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260817-gap1-b1-review-grok.md", "output_sha256": "16b9918851963222f064e586356da57b9c51477c24001f5ef42ed1bb16061cca", "task_id": "20260817-GAP1-B1-REVIEW-R10", "ts": "2026-08-17T16:19:25Z"}

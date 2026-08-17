@@ -17,7 +17,7 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | **GAP-1 TODO R2**（TODO 第一輪 adversarial 完成：三家 22 findings＋主委自產 3 條 P0；2 條 BLOCKING 已修；修訂落 SPEC 延伸檔 A1-1..A1-15） | **R9 受限複驗→三家戳記→Frozen→實作 B1** | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`；收斂 `handoffs/reconcile/20260817-gap1-x-review-r8/synth.md` |
+| **量化主線（IC 分析）** | **GAP-1 TODO FROZEN R3 ＋ B1 已實作並過三家 code review 修補**（R8 22→R9 5→B1 review 10；修訂落延伸檔 A1-1..A1-20） | **B1 修補戳記 → 實作 B2（2.1–2.3）** | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`；收斂 `handoffs/reconcile/20260817-gap1-b1-review-r10/synth.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
 | GAP-1 DSR/PBO/MinBTL 策略層防偽 | **TODO R2**（B1 輸入語意→B2 N 帳本契約→B3 MinBTL+DSR+報告+ml_pipeline 警語→B4 PBO＋wiring 閘）；殘留 8 項（G1-R8 收回為小票、新增 G1-R9） | R9 受限複驗→Frozen→實作 B1 | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |

@@ -17,11 +17,13 @@ cd "$(git rev-parse --show-toplevel)" || exit 2
 PY=venv/bin/python
 FREQ=momentum/core/frequency.py
 SHARPE=momentum/Analysis/strategy_validation/sharpe.py
+RC=momentum/Analysis/strategy_validation/returns_contract.py
 TEST_FREQ=tests/momentum/Analysis/strategy_validation/test_frequency.py
 TEST_SHARPE=tests/momentum/Analysis/strategy_validation/test_sharpe.py
+TEST_RC=tests/momentum/Analysis/strategy_validation/test_returns_contract.py
 TEST_VB=tests/momentum/Strategy/test_vectorized_backtest.py
 
-TARGETS="${FREQ} ${SHARPE} ${TEST_VB}"
+TARGETS="${FREQ} ${SHARPE} ${RC} ${TEST_VB}"
 BACKUP_DIR="$(mktemp -d)"
 
 backup_all() {
@@ -71,9 +73,15 @@ p.write_text(s.replace(old, new, 1), encoding="utf-8")
 PY
 }
 
-echo "[baseline] 未 mutate 時三檔應全綠"
-"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
-echo "  baseline rc=$? ($(tail -1 /tmp/gap1_mut.log))"
+echo "[baseline] 未 mutate 時各檔應全綠（🔴 K2：baseline 紅即 fail-closed 退出，不得續跑）"
+"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_RC" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
+_base_rc=$?          # 🔴 rc 直接取，禁經 pipe
+echo "  baseline rc=${_base_rc} ($(tail -1 /tmp/gap1_mut.log))"
+if [ "${_base_rc}" -ne 0 ]; then
+  echo "  🔴 baseline 非綠 ⇒ mutation 之前提不成立（改壞才紅之判準失去意義）。中止。" >&2
+  tail -20 /tmp/gap1_mut.log >&2
+  exit 1
+fi
 
 echo "[§V-8] resolve_periods_per_year 未知 timeframe 回 730（而非 raise）"
 mutate "$FREQ" '        raise UnknownTimeframeError(f"unknown timeframe: {timeframe!r}")' '        return 730' || exit 1
@@ -100,11 +108,30 @@ mutate "$TEST_VB" '        prices, proba, atr, _default_params(), timeframe="1h"
     default = vb.run_backtest(prices, proba, atr, _default_params(), risk_free_rate=0.02)' || exit 1
 run_expect_red "§V-13" "${TEST_VB}::test_sharpe_ratio_diverges_by_sqrt_ratio_with_zero_rf"
 
-echo "[verify] 還原後應無 mutant 殘留且全綠"
+echo "[§V-9a] returns_contract：bar_count 改回 status=ok（該語意膨脹 √(T-1)，必須非 ok）"
+mutate "$RC" '            _REASON_T_SEMANTICS_INFLATES,
+            status="not_applicable",' '            _REASON_T_SEMANTICS_INFLATES,
+            status="ok",' || exit 1
+run_expect_red "§V-9a" "$TEST_RC"
+
+echo "[§V-9b] returns_contract：拿掉 source != resolved 之守衛（放行 default_730）"
+mutate "$RC" '    if source != "resolved":' '    if False:  # source != "resolved"' || exit 1
+run_expect_red "§V-9b" "$TEST_RC"
+
+echo "[verify] 還原後應無 mutant 殘留且全綠（🔴 K2：任一不成立即 exit 1）"
 restore_all
-grep -rn "MUTANT" "$FREQ" "$SHARPE" "$TEST_VB" && { echo "  🔴 有 mutant 殘留"; exit 1; }
-"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
-echo "  post-restore rc=$? ($(tail -1 /tmp/gap1_mut.log))"
+if grep -rn "MUTANT" "$FREQ" "$SHARPE" "$RC" "$TEST_VB"; then
+  echo "  🔴 有 mutant 殘留 ⇒ 還原機制失效（首版即因 git checkout 對未追蹤檔無效而發生）" >&2
+  exit 1
+fi
+"$PY" -m pytest "$TEST_FREQ" "$TEST_SHARPE" "$TEST_RC" "$TEST_VB" -q > /tmp/gap1_mut.log 2>&1
+_post_rc=$?          # 🔴 rc 直接取，禁經 pipe
+echo "  post-restore rc=${_post_rc} ($(tail -1 /tmp/gap1_mut.log))"
+if [ "${_post_rc}" -ne 0 ]; then
+  echo "  🔴 還原後非綠 ⇒ 探針弄髒了工作區。中止。" >&2
+  tail -20 /tmp/gap1_mut.log >&2
+  exit 1
+fi
 
 if [ "$FAILED_DESIGN" -ne 0 ]; then
   echo "[gap1-b1-mutation] 🔴 有 mutation 未通過「可證偽」判準"

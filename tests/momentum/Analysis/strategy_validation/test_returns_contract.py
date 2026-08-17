@@ -34,11 +34,23 @@ _PARAMS = {
 def _real_backtest(timeframe="1h", n=1500):
     """用**真實 kline**（`data_cache/feature_klines/kline_cache.h5`）跑一次回測。
 
-    禁合成 fixture 冒充真實資料（CLAUDE.md 資料真實性）；檔案不存在時 skip 而非造假。
+    禁合成 fixture 冒充真實資料（CLAUDE.md 資料真實性）。
+
+    🔴 **缺檔一律 `fail` 而非 `skip`**（B1 code review K4：`CODEX-R10-P1-01` MAJOR／
+    `GROK-R10-P2-03`，取較嚴版）：§G 明定本票之 receipt 必用真實 kline，
+    「真實資料測試的缺席不能被當成通過」——skip 會讓無資料環境呈現 0 failed 之假綠。
+    不依賴 kline 之 fail-closed 案例已另外拆出（見本檔 `test_*_without_kline`），
+    故無資料環境仍有實質覆蓋，而不是整檔消失。
     """
-    h5py = pytest.importorskip("h5py")
+    try:
+        import h5py  # noqa: PLC0415
+    except ImportError:  # pragma: no cover - 環境缺套件時亦不得靜默通過
+        pytest.fail("GAP-1 §G 要求真實 kline 驗證，但環境缺 h5py")
     if not _KLINE.is_file():
-        pytest.skip(f"真實 kline 不存在: {_KLINE}")
+        pytest.fail(
+            f"GAP-1 §G 要求以真實 kline 驗證 Task 1.4，但 {_KLINE} 不存在；"
+            "缺資料不得算通過（禁合成 fixture 冒充）"
+        )
     with h5py.File(_KLINE, "r") as fh:
         symbol = sorted(fh.keys())[0]
         data = fh[f"{symbol}/{timeframe}/data"][:n]
@@ -90,8 +102,12 @@ def test_default_730_is_rejected():
     assert got.reason == "annualization_unresolved"
 
 
-def test_missing_annualization_field_is_fail_closed():
-    """⑤ 舊物件（無 annualization 欄）⇒ annualization_unresolved，禁假設 730。"""
+def test_missing_annualization_field_is_fail_closed_without_kline():
+    """⑤ 舊物件（無 annualization 欄）⇒ annualization_unresolved，禁假設 730。
+
+    K4：本案例**不依賴真實 kline**（純 stub 物件，非冒充 kline 資料），
+    使無資料環境仍保有 fail-closed 覆蓋。
+    """
 
     class _Legacy:
         equity_curve = pd.Series([1.0, 1.01, 1.02])
@@ -147,8 +163,8 @@ def test_unknown_timeframe_propagates():
         extract_period_returns(_result(), timeframe="7m", t_semantics="trade_level")
 
 
-def test_no_trades_yields_zero_obs_without_crash():
-    """邊界①：無交易 ⇒ n_obs=0，不 crash、不回 NaN 汙染。"""
+def test_no_trades_yields_zero_obs_without_crash_without_kline():
+    """邊界①：無交易 ⇒ n_obs=0，不 crash、不回 NaN 汙染（K4：不依賴真實 kline）。"""
 
     class _NoTrades:
         equity_curve = pd.Series([1.0, 1.0, 1.0])

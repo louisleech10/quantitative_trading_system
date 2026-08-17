@@ -504,3 +504,61 @@ def test_objective_sharpe_matches_direct_engine_and_differs_from_default():
     ).calculate_all()["sharpe_ratio"]
     if default_sharpe != 0.0:
         assert objective_value != pytest.approx(default_sharpe, abs=1e-12)
+
+
+# ============================================================================
+# GAP-1 B1 code review K1 回歸鎖（CODEX-R10-P1-03／GROK-R10-P1-01 之可執行反例）
+# 病：engine 以 **kwargs 吞下 timeframe 但不回填 annualization ⇒ 舊寫法靜默用 730 年化。
+# ============================================================================
+
+
+class _SwallowEngine:
+    """接受任意 kwargs 但**不**回填 annualization 的引擎（兩家委員之反例）。"""
+
+    def run_backtest(self, prices, predicted_proba, atr_values, strategy_params, **kwargs):
+        equity_curve = pd.Series([1.0, 1.05, 1.02, 1.08, 1.11])
+        trades = [{"pnl": 0.03, "pnl_pct": 0.03}, {"pnl": -0.01, "pnl_pct": -0.01}]
+        return SimpleNamespace(
+            equity_curve=equity_curve, trades=trades, metrics={}, config=strategy_params
+        )
+
+
+class _WrongSourceEngine(_SwallowEngine):
+    """回填了 annualization 但 source 非 resolved（等同沒解析）。"""
+
+    def run_backtest(self, prices, predicted_proba, atr_values, strategy_params, **kwargs):
+        result = super().run_backtest(prices, predicted_proba, atr_values, strategy_params)
+        result.annualization = {"source": "default_730", "periods_per_year": 730, "timeframe": None}
+        return result
+
+
+_K1_PARAMS = {
+    "entry_threshold": 0.7,
+    "exit_threshold": 0.4,
+    "stop_loss_atr": 2.0,
+    "take_profit_ratio": 3.0,
+    "position_sizing_method": "fixed",
+    "position_size": 0.1,
+    "kelly_fraction": 0.5,
+    "max_position_size": 0.25,
+    "cooldown_bars": 0,
+    "trailing_stop_activation": 0.05,
+}
+
+
+@pytest.mark.parametrize("engine_cls", [_SwallowEngine, _WrongSourceEngine])
+def test_objective_fails_loud_when_engine_swallows_timeframe(engine_cls):
+    """K1：宣告 timeframe 後，engine 未回填／回錯 annualization ⇒ 必須 raise，禁靜默 730。"""
+    objective = make_objective(
+        backtest_engine=engine_cls(), timeframe="1h", target_metric="sharpe_ratio"
+    )
+    with pytest.raises(ValueError, match="730|annualization"):
+        objective.evaluate(_K1_PARAMS)
+
+
+def test_objective_legacy_path_keeps_730_without_timeframe():
+    """未宣告 timeframe 之既有路徑不受 K1 修補影響（legacy 相容，仍回 730 且不 raise）。"""
+    objective = make_objective(backtest_engine=_SwallowEngine(), target_metric="sharpe_ratio")
+    value = objective.evaluate(_K1_PARAMS)
+    assert isinstance(value, float)
+    assert objective._resolve_metrics_periods(None) == 730

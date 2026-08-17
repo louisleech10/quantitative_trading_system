@@ -336,6 +336,51 @@
   全部 `TypeError`（實跑：18 failed）。給了 `timeframe` 而引擎不支援 ⇒ 仍 `TypeError`（fail-loud），
   **不**靜默退回隱性 730。
 
+## A1-20 — 🔴 A1-19 之一項宣稱被推翻＋B1 code review 四項修補（K1–K4）
+
+- **來源**：B1 實作 code review（`20260817-GAP1-B1-REVIEW-R10`，三家 10 findings，
+  收斂檔 `handoffs/reconcile/20260817-gap1-b1-review-r10/synth.md` 群集 K1–K4）。三家 Verdict 一致。
+- 🔴 **被推翻之宣稱（A1-19 末段，主委自寫）**：「給了 timeframe 而引擎不支援 ⇒ 仍 `TypeError`（fail-loud），
+  **不**靜默退回隱性 730」——**只對「不接受 kwargs」那一類 engine 成立**。
+  `CODEX-R10-P1-03`／`GROK-R10-P1-01` 各以可執行反例證明：engine 若 `**kwargs` 吞下 `timeframe`
+  但不回填 `annualization`，`annualization.get("periods_per_year", 730)` 會**靜默**以 730 年化
+  （codex：`returned == expected_730`、`silent_730=True`）。此即 C2 要關的病。
+  **A1-19 該句作廢，以本條為準。**
+
+### K1（修）objective 端 annualization 硬性檢查
+`StrategyBacktestObjective._resolve_metrics_periods()`：`self.timeframe is not None` ⇒
+`annualization` 必須是 dict、`source == "resolved"`、`periods_per_year` 為正整數，
+任一不符 `raise ValueError`（**禁** `.get(..., 730)` 兜底）；`timeframe is None` 之 legacy 路徑
+維持 730 但改具名常數 `_LEGACY_PERIODS_PER_YEAR` 並 `logger.warning`。
+回歸鎖：`test_objective_fails_loud_when_engine_swallows_timeframe`（參數化兩種反例 engine）
+＋`test_objective_legacy_path_keeps_730_without_timeframe`。
+
+### K2（修）mutation 探針之「全綠自檢」曾是空殼
+`scripts/gap1_b1_mutation_probe.sh` 之 baseline 與 post-restore 原本只 `echo rc`、無非零分支
+（`CODEX-R10-P1-02` MAJOR 信心 10/10）⇒ baseline 本來就紅、或還原失敗留下 mutant，
+腳本仍會印「✅ 全部轉紅」。現改為兩處皆 `rc≠0 ⇒ exit 1`（rc 直接取、禁經 pipe），
+並保留 `grep MUTANT` 殘留檢查。**與「工具必須自帶強制機制、禁空殼檢查」對齊。**
+
+### K3（修）§V-9 補進探針
+探針原缺 TODO Gate 明列之 §V-9（`COMPOSER-R10-P1-01`／`GROK-R10-P2-02`）。
+新增 **§V-9a**（`bar_count` 分支改回 `status="ok"`）與 **§V-9b**（拿掉 `source != "resolved"` 守衛）。
+⇒ 探針 5 條 → **7 條**（§V-5／8／9a／9b／10／13／15），實跑全部 rc=1 且 FAILED≥1
+（receipt：`handoffs/run_receipts/20260818T000000Z-gap1-b1-mutation-v2.log`）。
+
+### K4（修 2／留 1）真實資料 skip、import 路徑漂移、Protocol 漂移
+1. **缺 kline 由 `skip` 改 `fail`**（`CODEX-R10-P1-01` MAJOR ／ `GROK-R10-P2-03` MINOR，取較嚴版）：
+   §G 明定 receipt 必用真實 kline，「真實資料測試的缺席不能被當成通過」。
+   同時把不依賴 kline 之 fail-closed 案例改名為 `test_*_without_kline`（純 stub，非冒充資料），
+   使無資料環境仍有實質覆蓋。
+2. **re-export 防漂移**（`GROK-R10-P2-01`）：`test_frequency.py` 新增 identity 斷言
+   （三個名稱皆 `is` core 之物件）；規定**新碼一律 import `momentum.core.frequency`**，
+   `momentum.Analysis.strategy_validation.frequency` 僅為相容 re-export。
+3. **`IBacktestEngine` Protocol 未宣告 `timeframe`／`risk_free_rate`**（`CODEX-R10-P2-04` MINOR）
+   ⇒ **具名殘留 G1-R10**：`為何現在不做: blocked-by:SPEC §C 白名單（既有測試檔只允許加斷言；
+   改 Protocol 須連動所有實作與 test doubles，超出本票允許改動面）`；觸發＝白名單擴充提案或使用者裁決。
+   🔴 誠實邊界：**現行相容靠條件分支而非 Protocol 宣告**；K1 已把數值危險面收掉，契約漂移仍在。
+4. **A1 範圍字面統一**（`CODEX-R10-P3-05`）：TODO 標頭／§0／追溯表與 package docstring 統一標 `A1-1..A1-20`。
+
 ---
 
 ## 淨變動摘要（供 R9 複驗逐項對證）

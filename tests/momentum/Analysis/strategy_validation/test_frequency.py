@@ -62,3 +62,19 @@ def test_available_years_frequency_invariance():
         available_years(n_bars=n, timeframe=tf) for tf, n in sorted(_REAL_KLINE_BARS.items())
     ]
     assert max(years) - min(years) < 1e-6
+
+
+# ============================================================================
+# B1 code review K4 / GROK-R10-P2-01：兩個 import 路徑之防漂移
+# canonical 實作住 momentum/core/frequency.py（A1-19）；本 package 之同名模組僅為 re-export。
+# 新碼一律 import core；本斷言鎖住「re-export 不得長出第二套邏輯」。
+# ============================================================================
+
+
+def test_reexport_is_identical_object_to_core_implementation():
+    from momentum.Analysis.strategy_validation import frequency as reexport
+    from momentum.core import frequency as core
+
+    assert reexport.resolve_periods_per_year is core.resolve_periods_per_year
+    assert reexport.available_years is core.available_years
+    assert reexport.UnknownTimeframeError is core.UnknownTimeframeError
