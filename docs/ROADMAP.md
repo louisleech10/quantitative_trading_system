@@ -20,6 +20,12 @@
 | **量化主線（IC 分析）** | **★IC 健檢 epic 偵察（步驟1-2）完成**（2026-08-17 四方 reconcile，債清） | SPEC 起草（**待使用者核可**）：3 P0＋typed 契約＋wiring 閘門 | 本檔下節＋`白話說明/IC健檢偵察結果.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
+| GAP-1 DSR/PBO/MinBTL 策略層防偽 | 未開票 | 健檢後首位候選 | `docs/IC_QUANT_GAP_REGISTRY.md` #1 |
+| GAP-2 IC↔ML 橋＋多因子/邊際 IC | 未開票 | 次位 | 同上 #2 |
+| GAP-3 事件 case-control 真套件 | 未開票 | 設計須含 R5 A′ 語意 | 同上 #3 |
+| GAP-4 Pooled/Panel IC | 未開票 | — | 同上 #4 |
+| GAP-5 容量 ADV 接線 | 未開票 | **條件觸發**：volume 資料源 | 同上 #5 |
+| GAP-6 430K 規模防護 | 未開票 | 併 IC-PERF epic | 同上 #6 |
 | 票 A（timing-overlap 診斷） | **未開票** | Phase 4；前置見下節 | 本檔下節 |
 | 票 B（多標的橫截面 attribution） | **未開票，條件觸發** | 只有宇宙變多標的才成立 | 本檔下節 |
 | FU-1 exposure `fillna` fail-closed | 未做 | 碰到再處理 | 本檔下節 |

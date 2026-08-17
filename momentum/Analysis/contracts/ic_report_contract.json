@@ -15,6 +15,10 @@
     "xsec_not_applicable": ["cross_sectional_mode"]
   },
   "split_method": ["holdout", "full_sample_fallback"],
+  "removed_config_keys": [
+    ["performance", "max_features_for_correlation"],
+    ["shapley"]
+  ],
   "notes": {
     "analysis_status": "root analysis_status 兩值契約（ok_oos|degraded_full_sample）由 ic_reporter.normalize_analysis_status 持有，本檔不重複定義",
     "timestamps_epoch": "event_timestamps 與 features index 同 epoch 語意；秒/毫秒判別沿用 ic_engine 既有自動偵測原語",

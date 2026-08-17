@@ -67,16 +67,16 @@
     {
       "key": "max_features_for_correlation",
       "file": "momentum/Analysis/ic_config_schema.py",
-      "kind": "pending_removal",
+      "kind": "dead_config",
       "finding": "GROK-R2-P2-02",
-      "status": "to-be-removed-in-task-6.3-then-flip-dead_config"
+      "status": "removed-in-task-6.3-sentinel-against-reintroduction"
     },
     {
       "key": "ShapleyConfig",
       "file": "momentum/Analysis/ic_config_schema.py",
-      "kind": "pending_removal",
+      "kind": "dead_config",
       "finding": "GROK-R2-P2-02",
-      "status": "to-be-removed-in-task-6.3-then-flip-dead_config"
+      "status": "removed-in-task-6.3-sentinel-against-reintroduction"
     }
   ]
 }

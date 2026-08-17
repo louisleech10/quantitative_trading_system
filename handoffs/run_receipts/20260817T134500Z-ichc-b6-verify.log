@@ -1,0 +1,8 @@
+ICHC B6 verify receipt — 20260817T051444Z
+6.3 config_compat: 4 passed (removed-key warning x2 exact / unknown-key regression / clean no-warn); dead-config grep == 0 across schema+yaml+api
+6.1 capacity contract: 5 passed (none/zero/negative ADV -> unknown; normal tier regression; unknown not tradable)
+6.2 split metadata: 3 passed (holdout default / contract enum / fallback marks full_sample_fallback); API spec section grep == 1
+6.4 registry: rows>=6, finding IDs>=6, ROADMAP pointer>=1
+golden rebase: per_feature byte-identical + feature_set same + only config_hash changed (6.3 schema removal, by design) - machine proven
+gate: FAILED set == baseline 14 (diff_rc=0)
+BATCH GATE CLOSED: zero new failures APPROVED; all six batches complete

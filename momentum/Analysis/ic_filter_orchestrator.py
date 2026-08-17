@@ -3711,6 +3711,13 @@ class ICFilterOrchestrator:
                 "warnings": warnings,
             }
         )
+        # ICHC Task 6.2：切分現狀誠實標示（枚舉住契約檔 split_method）——
+        # IC 主路徑現況=holdout-only；full-sample fallback 由 fit_mode 判別
+        meta["split_method"] = (
+            "full_sample_fallback"
+            if meta.get("fit_mode") == "full_sample"
+            else "holdout"
+        )
         if scope is not None:
             meta["scope"] = scope
         if selection_scope is not None:

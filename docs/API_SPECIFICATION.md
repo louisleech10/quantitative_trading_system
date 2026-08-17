@@ -2303,6 +2303,17 @@ POST /api/v1/model-enhancement/full-enhancement
 
 ---
 
+## IC 主路徑切分現狀（holdout-only）
+
+IC 分析主路徑的 train/test 切分**現況＝單次 holdout**（`ic_train_test_split` 預設 ON；
+失敗時 loud fallback 至 full-sample 並紅標 `degraded_full_sample`）。
+**未實作**：walk-forward 與 purged CPCV 於 IC 主路徑（相關模組存在於
+`momentum/Analysis/model_validation/` 但為 ML 孤島，未接 IC 選因子流程）——
+report `metadata.split_method`（枚舉住 `momentum/Analysis/contracts/ic_report_contract.json`）
+誠實標示現況，禁在任何输出宣稱 CPCV/WF 保證。缺口票見 `docs/IC_QUANT_GAP_REGISTRY.md`。
+
+---
+
 ## 開發環境
 
 ### 啟動後端

@@ -111,7 +111,6 @@ report:
 
 # 效能設定
 performance:
-  max_features_for_correlation: 200  # 相關性矩陣上限
   parallel_ic_calculation: true  # 平行計算 IC
   n_jobs: -1  # CPU 併行數
 
@@ -217,7 +216,3 @@ deep_analysis_global:
   timeout_overrides: {}
   regime_aware: false
 
-shapley:
-  enabled: false
-  max_factors: 20
-  use_approximation: true

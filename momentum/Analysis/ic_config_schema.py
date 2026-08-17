@@ -169,7 +169,8 @@ class ReportConfig(BaseModel):
 
 
 class PerformanceConfig(BaseModel):
-    max_features_for_correlation: int = 200
+    # ICHC Task 6.3：本節曾有一個零 consumer 死配置已移除（名單住契約檔
+    # removed_config_keys；遷移警告見 load_ic_config._warn_removed_keys）
     parallel_ic_calculation: bool = True
     n_jobs: int = -1
 
@@ -327,12 +328,6 @@ class DeepAnalysisGlobalConfig(BaseModel):
     regime_aware: bool = False
 
 
-class ShapleyConfig(BaseModel):
-    enabled: bool = False
-    max_factors: int = Field(default=20, ge=1, le=500)
-    use_approximation: bool = True
-
-
 class SignificanceFdrSchema(BaseModel):
     """FDR 校正子節（canonical: significance.fdr.*；D-F/D-G）。
 
@@ -437,7 +432,6 @@ class ICConfig(BaseModel):
     )
     net_ic_analysis: NetICAnalysisConfig = Field(default_factory=NetICAnalysisConfig)
     deep_analysis_global: DeepAnalysisGlobalConfig = Field(default_factory=DeepAnalysisGlobalConfig)
-    shapley: ShapleyConfig = Field(default_factory=ShapleyConfig)
     feature_tiers: FeatureTierConfig = Field(default_factory=FeatureTierConfig)
     significance: SignificanceSchema = Field(default_factory=SignificanceSchema)
     feature_filter: Optional[FeatureFilterSchema] = None
@@ -485,8 +479,34 @@ def load_ic_config(
             raise ValueError("api_override must be a dict")
         merged = _deep_merge(merged, api_override)
 
+    _warn_removed_keys(merged)
     logger.info("IC config loaded")
     return ICConfig.model_validate(merged)
+
+
+def _warn_removed_keys(merged: Dict[str, Any]) -> None:
+    """ICHC Task 6.3：已移除鍵偵測（顯式清單住契約檔 removed_config_keys）。
+
+    不依賴 pydantic extra=ignore（其為靜默吞鍵）；命中→warning code
+    ICHC-REMOVED-KEY；非清單內未知鍵維持現狀 ignore（回歸不變）。
+    """
+    try:
+        removed_paths = load_report_contract().get("removed_config_keys", [])
+    except Exception:  # noqa: BLE001 —— 契約檔異常時本函式不得阻斷 config 載入
+        return
+    for path in removed_paths:
+        cursor: Any = merged
+        for part in path:
+            if not isinstance(cursor, dict) or part not in cursor:
+                cursor = None
+                break
+            cursor = cursor[part]
+        if cursor is not None:
+            logger.warning(
+                "ICHC-REMOVED-KEY: config key %s 已移除（死配置，零 consumer）；"
+                "該值將被忽略，請自 config 清除",
+                ".".join(path),
+            )
 
 
 # ============================================================================
