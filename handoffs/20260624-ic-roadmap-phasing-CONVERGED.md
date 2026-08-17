@@ -1,5 +1,9 @@
 # IC 地圖修法 — 分階段執行計畫（四家委員會收斂）
 
+> 🔴 2026-08-17 pointer（ICHC Task 6.4；本檔內文不改，provenance 凍結）：
+> Phase 0/1 大宗已由 la0–1d/1e+1b/ICHC 諸 epic 完成；殘項與 Phase 2A/3/4 缺口的
+> **現行 SoT＝`docs/IC_QUANT_GAP_REGISTRY.md`**（六票對照本檔 Phase 編號）。
+
 > Claude 草案 → codex(contract-first) + Gemini(量化研究價值) + cursor(雙軌/前端返工) challenge → 本收斂版。
 > 四家獨立版見 handoffs/20260624-ic-roadmap-phasing-{CLAUDE,CODEX,CURSOR,GEMINI}.md。
 
