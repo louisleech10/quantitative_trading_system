@@ -22,7 +22,7 @@
 
 | 事實 | 怎麼查 |
 |---|---|
-| 待推筆數 | `git log --oneline origin/main..HEAD \| wc -l`（目前 2：R8 與 TODO；push 需使用者明示） |
+| 待推筆數 | `git log --oneline origin/main..HEAD \| wc -l`（目前 4：R8／TODO／HANDOFF／白話同步；push 需使用者明示） |
 | 戳記狀態 | 已 PASS：consult-r1／review-r1／r2／r4／r5／r6。**待補**：r7 |
 | 待補完（不遺忘） | `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-1 待補完登記」G1-R1..R8（各附為何現在不做／觸發條件） |
 | 殘留規則（範本層） | `templates/SPEC_TEMPLATE.md` §N ＋ `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` §2 常設必答 |
