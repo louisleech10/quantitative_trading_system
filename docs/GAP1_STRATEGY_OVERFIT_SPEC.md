@@ -102,9 +102,13 @@ RISK-HIT: a,b,d
        ⇒ 若採 grok 之修法會弄壞本節既有 oracle，故保留論文形式並改以命名區隔消除混淆。
   3. **統計性質對照（PBO 行為 oracle，參數全部寫死於 golden 檔）**：
      `seed=20260817`、候選數 `N=50`、觀測數 `T=1200`、`S=12`、noise 為 i.i.d. 常態（σ=0.01）；
-     全噪音 ⇒ PBO ∈ [0.40, 0.60]；alpha 案例＝於候選 0 之每期報酬加常數
-     **`mu = 0.01 * 1.0 / sqrt(8760) = 1.0683760683760685e-04`**（σ=0.01、年化 SR 目標 1.0、1h 頻率；
-     本數值於 SPEC 明列，golden 檔僅複製，**不得**只寫「寫死於 golden 檔」← R2 CODEX-R1-P1-05 殘留）
+     全噪音 ⇒ PBO ∈ [0.40, 0.60]；alpha 案例＝於候選 0 之每期報酬加常數，
+     **唯一推導式**（R3 CODEX-R3-P1-01／COMPOSER-R3-P1-01／GROK-R3-P1-01 三家一致指出前版為假等式：
+     主委誤用四捨五入之 `sqrt(8760)≈93.6` 得 `1.0683760683760685e-04`，相對差 5.48e-05）：
+     `mu = sigma_per_period * target_sharpe_annualized / sqrt(resolve_periods_per_year("1h"))`
+     ＝ `0.01 * 1.0 / sqrt(8760)` ＝ **`1.068434607926721e-04`**（完整精度）。
+     golden 檔之值須**由該式在測試中重算並斷言相等**（`atol=1e-18`），**禁**照抄字面值
+     ——避免「照公式算」與「抄字面」產出兩套 fixture。
      ⇒ PBO < 0.30。
 - **通過條件（可證偽，容差分尺度）**：文獻/解析類依上列各自 `atol`；`rtol` 僅用於
   `E[max SR]` 之大 N 漸近對照（`rtol=1e-3`，明示為近似）；統計類為固定 seed 之區間斷言；
@@ -138,8 +142,12 @@ RISK-HIT: a,b,d
   依 §G 公式計算，供 DSR 檢定統計量之分母使用）；
   🔴 **單位鎖定（R2 GROK-R2-P1-02）**：`skew`／`kurtosis`／`sr_estimator_variance` 一律以
   **per-period 報酬**計算；`value_annualized` 僅供報告展示，**禁**代入 DSR 檢定統計量；
-  空序列、`n_obs<2`、`std==0`、含 NaN/inf ⇒ `value=nan` 且 status 非 `ok`。
-- **驗證**：常數序列 ⇒ `math.isnan(value)` 且 `status != "ok"`（**非** 0.0）；已知手算案例 `atol=1e-12`；
+  空序列、`n_obs<2`、`std==0`、含 NaN/inf ⇒ `value_per_period` **與** `value_annualized`
+  **皆**為 `nan`、`sr_estimator_variance` 為 `nan`，且 status 非 `ok`、`reason=degenerate_returns`
+  （R3 GROK-R3-P2-01：前版寫不存在之單欄 `value`）。
+- **驗證**（`pytest tests/momentum/Analysis/strategy_validation/test_sharpe.py -q` rc=0）：
+  常數序列 ⇒ `math.isnan(value_per_period)` 且 `math.isnan(value_annualized)` 且
+  `status != "ok"`（**非** 0.0）；已知手算案例 `atol=1e-12`；
   `skew`/`kurtosis` 與 `scipy.stats.skew/kurtosis(fisher=False)` 一致（`atol=1e-10`）；
   `sr_estimator_variance` 與 §G 公式手算對照 `atol=1e-12`；
   `value_annualized == value_per_period * sqrt(periods_per_year)`（rf=0 時，`atol=1e-12`）。
@@ -186,10 +194,18 @@ RISK-HIT: a,b,d
   {"source": "resolved", "periods_per_year": <int>, "timeframe": <str>}`；
   `timeframe` 為 None 或 Task 1.1 raise ⇒ 保持現行預設值且
   `annualization = {"source": "default_730", "periods_per_year": 730, "timeframe": None}`。
+  🔴 **objective 端之傳遞鏈必須明列（R3 CODEX-R3-P1-05）**：`StrategyBacktestObjective.__init__`
+  收下的 `timeframe` 須在 `evaluate()`（`:104-121`）呼叫 `self.backtest_engine.run_backtest(...)`
+  時**一併傳入**，且該處 `PerformanceMetrics(result.equity_curve, result.trades)`（`:113`）
+  改為以 `result.annualization["periods_per_year"]` 建構（來源即上游 engine 之解析結果）——
+  否則 objective 仍以預設 730 計算，「策略路徑消除隱性 730」無法驗收。
   **不改** `PerformanceMetrics` 之簽名語意與 `metrics: Dict[str, float]` 型別（source 走平行 metadata）。
 - **驗證**：`pytest tests/momentum/Strategy/test_vectorized_backtest.py tests/momentum/Optimization/test_strategy_backtest_enhanced.py -q` rc=0；
   新增斷言 ① `timeframe="1h"` ⇒ `annualization["periods_per_year"] == 8760` 且 `annualization["source"] == "resolved"`
   ② `timeframe=None` ⇒ `annualization["source"] == "default_730"`
+  ②b **objective 端**：`StrategyBacktestObjective(timeframe="1h").evaluate(params)` 之 trial metrics
+  其 `sharpe_ratio` 與「engine 直呼 `timeframe="1h"`」之值相等（`atol=1e-12`），
+  且與 `timeframe=None` 之值**不**相等（證傳遞鏈生效，非只存在參數）
   ③ **在 `risk_free_rate=0.0` 之 fixture 下**，同一報酬序列在 `timeframe="1h"` 與 `timeframe=None` 下之
   `metrics["sharpe_ratio"]` 比值 ＝ `sqrt(8760/730)`（`atol=1e-9`）——「數值真的分叉」之證明（R1 GROK-R1-P1-04）。
   🔴 **rf 必須為 0**（R2 CODEX-R2-P0-01／GROK-R2-P0-01）：`sharpe = (mean - rf/periods)/std*sqrt(periods)`
@@ -233,8 +249,14 @@ RISK-HIT: a,b,d
   `eligibility_keys` ＝ `eligible`／`required_years_upper_bound`／`available_years`／`trials_budget`／
   `trials_used`／`target_sharpe`／`n_source`／`display_downgrade`／`warning_text_key`；
   `reasons` ＝ `n_unknown`／`t_semantics_inflates_significance`／`annualization_unresolved`／
-  `universe_selection_contaminated`／`insufficient_candidates`／`cross_trial_variance_unavailable`
+  `universe_selection_contaminated`／`insufficient_candidates`／`cross_trial_variance_unavailable`／
+  `ledger_snapshot_mismatch`／`universe_provenance_unverifiable`／`degenerate_returns`
   （**唯一** reason 字串來源；程式與測試不得自創字面值）。
+  🔴 **型別與完備性（R3 CODEX-R3-P1-02）**：本檔另須為每個 `report_sections` 節與 `eligibility_keys`
+  逐鍵標 `type`（`str`／`float`／`int`／`bool`／`null` 之允許集合）與 `required|optional`，
+  且宣告 `additional_properties: false`（未列鍵即違約）；
+  並提供 `reason_conditions` 對照表：每個 reason 對應**一個**可證偽的觸發條件（自然語言一句＋對應 Task 斷言編號），
+  使「非 ok 路徑」與 reason 為一對一。`validate_against_contract` 須驗型別、必填、額外鍵三者。
   **resolver 語意**：`capability_status_ref` 格式為 `<repo 相對路徑>#<頂層鍵名>`；
   `load_strategy_validation_contract()` 須實際 dereference（載入目標檔、取該鍵、驗證為非空字串 list），
   目標檔缺失／鍵缺失／型別不符 ⇒ raise（fail-closed，**禁**回退預設枚舉；R1 COMPOSER-R1-P2-02 要求之執行期 dereference）。
@@ -318,10 +340,11 @@ RISK-HIT: a,b,d
 - 不可做：**不得**提供調整公式常數（`2`、`ln`）之參數或旗標；不得以提高取樣頻率折抵年數
   （`t_years` 語意固定為年，見 §V 反向測試）；不得把上界輸出成「精確最短長度」。
 
-**Task 3.2 — Deflated Sharpe Ratio（全式寫死，V[SR] 三態）**
+**Task 3.2 — Deflated Sharpe Ratio（全式寫死；跨 trial 變異數來源二態）**
 - 目標：冠軍檢定，輸入語意鎖死且退化 fail-closed。
-- 檔案：新增 `momentum/Analysis/strategy_validation/deflated_sharpe.py::deflated_sharpe(*, period_returns, n_trials, variance_source, cross_trial_sr_variance=None, cross_trial_sr_values=None, n_semantics) -> DSRResult`
-  （`cross_trial_sr_values` 直接吃 Task 2.2 之 `valid_sharpe_values`，關閉 R1 CODEX-R1-P0-03 之 dataflow 殘留）
+- 檔案：新增 `momentum/Analysis/strategy_validation/deflated_sharpe.py::deflated_sharpe(*, period_returns, ledger_result=None, n_trials=None, variance_source, cross_trial_sr_variance=None, n_semantics) -> DSRResult`
+  （`ledger_result` ＝ Task 2.2 之 **typed** `LedgerReadResult`，同時提供 N 與 `valid_sharpe_values`，
+  關閉 R1 CODEX-R1-P0-03 之 dataflow 與 R3 CODEX-R3-P1-03 之 snapshot 綁定）
 - 既有 caller/影響面：新建無 caller；`period_returns` 型別＝Task 1.4 之 `PeriodReturns`
   （其 `t_semantics`／`annualization_source` 合法性由該 Task 判定，本函式拒收 status 非 ok）。
 - 改法（全式，唯一定義處）：
@@ -332,13 +355,20 @@ RISK-HIT: a,b,d
   分母之 `Var(SR_hat)` **恆**取自 Task 1.2 之 `sr_estimator_variance`（per-period，無來源選項）——
   這是 `N=1 ⇒ DSR == PSR` 成立之充要條件；
   `variance_source` **只**決定 SR0 所需之跨 trial `V[{SR_n}]`，二態（值集合住 Task 2.1）：
-  `explicit`（呼叫方傳 `cross_trial_sr_variance`）／`ledger_cross_trial`（`cross_trial_sr_values`
-  樣本變異數，長度 `>=2`）。`n_trials == 1` ⇒ SR0=0，**不需**跨 trial 變異數；
+  `explicit`（呼叫方傳 `cross_trial_sr_variance`）／`ledger_cross_trial`
+  （取 `ledger_result.valid_sharpe_values` 之樣本變異數，長度 `>=2`）。
+  🔴 **snapshot 綁定（R3 CODEX-R3-P1-03）**：`variance_source="ledger_cross_trial"` 時
+  **N 與 values 必須來自同一 `LedgerReadResult`**——禁 `n_trials` 由呼叫方另傳
+  （`ledger_result` 在場時 `n_trials` 參數必須為 `None`，否則 raise）；
+  且須驗 `len(valid_sharpe_values) <= n_valid_metrics` 與 `input_artifact_hash` 一致，
+  不符 ⇒ status 非 `ok`、`reason=ledger_snapshot_mismatch`。
+  變異數須為有限且 `>0`，否則 `reason=degenerate_returns`。`n_trials == 1` ⇒ SR0=0，**不需**跨 trial 變異數；
   `n_trials > 1` 且兩者皆缺 ⇒ status 非 `ok`、`reason=cross_trial_variance_unavailable`
   （誠實不可算，**禁**無依據常數）。
   所有進入檢定統計量之 `SR_obs`／`γ3`／`γ4`／`T` 一律 **per-period**；年化值僅回顯。
 - **驗證**：`pytest tests/momentum/Analysis/strategy_validation/test_deflated_sharpe.py -q` rc=0，斷言
-  ① `n_trials=1`、`variance_source="analytic"`、skew=0、kurt=3 ⇒ 等於 PSR 解析值（`atol=1e-10`）
+  ① `n_trials=1`（此時 SR0=0，**不需**跨 trial 變異數，`variance_source` 可為二態任一值且不影響結果）、
+  skew=0、kurt=3 ⇒ 等於 PSR 解析值（`atol=1e-10`）（R3 GROK-R3 更正：前版誤寫已移除之 `variance_source="analytic"`）
   ② `E[max SR]/√V[SR]` 三點對照（N=10/100/1000 → 1.5746/2.5306/3.2551，`atol=1e-4`）
   ③ N 遞增 ⇒ DSR 單調不增（參數化 10 點）
   ④ `period_returns.status != "ok"`（含 `bar_count`、`default_730` 兩情形）⇒ DSR `status != "ok"` 且 `math.isnan(value)`
@@ -406,18 +436,33 @@ RISK-HIT: a,b,d
 
 **Task 4.2 — PBO 值（矩陣語意與 oracle 全寫死）**
 - 目標：由候選×時間報酬矩陣算 PBO。
-- 檔案：新增 `momentum/Analysis/strategy_validation/pbo.py::probability_of_backtest_overfitting(*, returns_matrix, s_blocks, selection_metric, universe_provenance) -> PBOResult`
+- 檔案：新增 `momentum/Analysis/strategy_validation/pbo.py::probability_of_backtest_overfitting(*, returns_matrix, n_obs, n_candidates, s_blocks, selection_metric, universe_provenance) -> PBOResult`
+  （`n_obs`／`n_candidates` 為**必填**，使軸向可判定 ← R3 CODEX-R3-P0-01：純靠 shape 無法區分
+  「(T,N) 轉置」與「合法的 T<N 輸入」）
 - 既有 caller/影響面：新建無 caller。
-- 改法（唯一定義處，R1 CODEX-R1-P1-05）：`returns_matrix` shape 固定 **(T, N)**＝列為時間、欄為候選，
-  同一時間索引須跨候選同步（長度不一致 ⇒ raise）；`selection_metric` 值集合住 Task 2.1；
-  含 NaN 之候選標 invalid 並**自分母剔除**（記 `n_candidates_invalid`，不得靜默丟棄）；
-  有效候選數 <2 ⇒ status 非 `ok`；相對排名採 `r = rank/(N_valid+1)`，**平手用平均排名**；
-  `ω = ln(r/(1-r))`；`PBO = P(ω<0)` ＝ OOS 排名落於中位以下之 path 比例；回傳 PBO 值＋logit 摘要＋status。
+- 改法（唯一定義處，R1 CODEX-R1-P1-05／R3 CODEX-R3-P0-01 完整化）：
+  1. **軸向**：`returns_matrix.shape` 必須恰為 `(n_obs, n_candidates)`，否則 raise
+     （含轉置情形；不再依賴 `T>N` 之未宣告假設）。同一列索引跨候選同步（呼叫方保證，長度不符即 raise）。
+  2. **候選有效性**：任一候選含 NaN/inf ⇒ 標 invalid，自**選擇與排名的分母**剔除
+     （記 `n_candidates_invalid`，不得靜默丟棄）；有效候選數 `N_valid < 2` ⇒ status 非 `ok`、
+     `reason=insufficient_candidates`。
+  3. **逐 path 演算法**（每個 CSCV path 之 IS／OOS 索引由 Task 4.1 提供）：
+     ① 對每個有效候選，在 IS 索引上計算 `selection_metric`（值集合住 Task 2.1；
+     `sharpe` ＝ Task 1.2 之 `value_per_period`，`mean_return` ＝ 算術平均）；
+     ② **IS champion** ＝ IS metric 最大者；**平手時取候選索引最小者**（決定性 tie-break，寫死）；
+     ③ 在 OOS 索引上對**全部有效候選**計算同一 metric，取 champion 之名次
+     （**平均排名**處理平手），`rank ∈ [1, N_valid]`，`r = rank/(N_valid+1)`；
+     ④ `ω = ln(r/(1-r))`（`r` 由 ③ 之定義保證落於開區間，故不會取 log(0)）。
+  4. **PBO** ＝ `ω < 0` 之 path 比例（即 champion 之 OOS 名次落於中位以下之比例）；
+     回傳 PBO 值＋`logits` 摘要（min／median／max）＋`n_paths`＋`n_candidates_invalid`＋status。
 - **驗證**：`pytest tests/momentum/Analysis/strategy_validation/test_pbo.py -q` rc=0，斷言
   ① §G 全噪音 fixture（`seed=20260817`、N=50、T=1200、S=12）⇒ `0.40 <= pbo <= 0.60`
   ② §G 單一 alpha fixture ⇒ `pbo < 0.30`
-  ③ **轉置矩陣**（(N, T)）輸入 ⇒ raise（防錯軸仍跑綠）
-  ④ 全平手矩陣 ⇒ `r == 0.5` 且 `omega == 0.0`（平均排名規則）
+  ③ **軸向**：`returns_matrix` 為 `(n_candidates, n_obs)`（轉置）而 `n_obs`／`n_candidates` 如實傳入
+  ⇒ raise；且 `n_obs=50, n_candidates=1200`（合法之 T<N）在 shape 相符時**不** raise
+  （證明不依賴 `T>N` 假設 ← R3 CODEX-R3-P0-01）
+  ④ 全平手矩陣 ⇒ `r == 0.5` 且 `omega == 0.0`（平均排名規則）；
+  ④b IS 平手時 champion 取最小候選索引（決定性 tie-break，以刻意構造之雙冠矩陣斷言）
   ⑤ 5 候選含 1 NaN 候選 ⇒ `n_candidates_invalid == 1` 且分母為 4
   ⑥ 有效候選數 1 ⇒ `status != "ok"` 且 `math.isnan(pbo)`（**禁**回 0）。
 - **邊界**：① 候選數<2 ② NaN 候選 ③ 全候選相同 ④ T 不足以切 S 塊 ⑤ 平手 ⑥ 轉置輸入。
@@ -429,13 +474,24 @@ RISK-HIT: a,b,d
 - 目標：把「禁用全樣本 top-K 子集」做成機械拒絕。
 - 檔案：`momentum/Analysis/strategy_validation/pbo.py` 之 `universe_provenance` 驗證。
 - 既有 caller/影響面：Task 4.2。
-- 改法：`universe_provenance` 為必填 dataclass，含 `selection_free`（bool）與 `source`
-  （值集合＝Task 2.1 之 `universe_source_values`）；`selection_free is not True` ⇒ 直接回
-  status 非 `ok`、`reason=universe_selection_contaminated`，**不計算 PBO**。
+- 改法：`universe_provenance` 為必填 dataclass，含 `selection_free`（bool）、`source`
+  （值集合＝Task 2.1 之 `universe_source_values`）、**`candidate_set_hash`（str）**與
+  **`candidate_count`（int）**。
+  1. `selection_free is not True` ⇒ status 非 `ok`、`reason=universe_selection_contaminated`，不計算 PBO。
+  2. 🔴 **自我宣告不足（R3 CODEX-R3-P1-04）**：`source="external_declared"` **不再是成功路徑**——
+     該值一律回 status 非 `ok`、`reason=universe_provenance_unverifiable`
+     （保留於枚舉僅為可辨識地拒絕，非可通過）。
+  3. `source ∈ {full_grid, ledger_all_candidates}` 時須驗 `candidate_count == n_candidates`
+     且 `candidate_set_hash` 等於由候選識別集合重算之 hash（`ledger_all_candidates` 之來源＝
+     `LedgerReadResult` 的 candidate 集合），不符 ⇒ `reason=universe_provenance_unverifiable`。
 - **驗證**：`pytest tests/momentum/Analysis/strategy_validation/test_pbo_universe_guard.py -q` rc=0，斷言
   ① `selection_free=False` ⇒ `status != "ok"` 且 `math.isnan(value)` 且 `reason == "universe_selection_contaminated"`
   ② `selection_free=True` 但 `source` 不在枚舉 ⇒ raise（`pytest.raises`）
-  ③ `universe_provenance=None` ⇒ raise。
+  ③ `universe_provenance=None` ⇒ raise
+  ④ `selection_free=True` 且 `source="external_declared"` ⇒ `status != "ok"` 且
+  `reason == "universe_provenance_unverifiable"`（**無證明之成功路徑已封閉**）
+  ⑤ `source="full_grid"` 但 `candidate_count != n_candidates` 或 `candidate_set_hash` 不符
+  ⇒ 同④之 reason。
 - **邊界**：① `selection_free=False` ② `universe_provenance=None` ③ `source` 未知值。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
@@ -454,7 +510,7 @@ RISK-HIT: a,b,d
   8. `resolve_periods_per_year` 未知 timeframe 回 730 ⇒ Task 1.1 raise 斷言轉紅。
   9. DSR／`assess_eligibility` 接受 `annualization_source="default_730"` 或 `t_semantics="bar_count"`
      ⇒ Task 1.4 斷言②③ 與 Task 3.2 斷言④ 轉紅（R1 COMPOSER-R1-P1-04）。
-  10. 解析 V[SR] 係數改錯（如 `(γ4-1)/4` 改 `γ4/4`）⇒ Task 1.2 `variance_analytic` 對照與
+  10. Mertens `Var(SR_hat)` 係數改錯（如 `(γ4-1)/4` 改 `γ4/4`）⇒ Task 1.2 `sr_estimator_variance` 對照與
       Task 3.2 斷言①（N=1 退化為 PSR）轉紅（R1 GROK-R1-P1-03）。
   11. DSR 分母改用跨 trial `V[{SR_n}]`（grok R2 建議之錯誤形式）⇒ Task 3.2 斷言①（N=1 退化為 PSR）轉紅。
   12. `compute_sharpe` 之 `skew`／`kurtosis` 改以年化 SR 計算 ⇒ Task 3.2 斷言⑦（單位不變性）轉紅。
@@ -503,7 +559,8 @@ RISK-HIT: a,b,d
 - **TPE 自適應搜尋使「N 個獨立候選」前提失真**：本票不修（屬搜尋器設計）；
   緩解＝契約 `n_semantics_values` 含 `adaptive_search`，報告須回顯；
   DSR 之 `variance_source="ledger_cross_trial"` 在 adaptive 下為有偏估計 ⇒ 報告須同時輸出 `n_semantics`
-  供讀者判斷，且 `analytic` 為預設建議來源。
+  供讀者判斷。跨 trial 變異數在 adaptive 下無無偏來源 ⇒ `n_trials>1` 時預設行為為
+  `cross_trial_variance_unavailable`（誠實不可算），**不**提供替代預設來源。
 - **effective independent N（R2 CODEX-R1-P0-01 殘留）**：`adaptive_search` 下之「有效獨立試驗數」
   本票**不做任何換算**（無公認可驗方法）；誠實處理＝DSR 輸出 `n_independence="unverified"`（Task 3.2 斷言⑧）
   ＋報告 `provenance.n_semantics` 回顯。**禁**以任何係數把 adaptive N 折算成獨立 N。
