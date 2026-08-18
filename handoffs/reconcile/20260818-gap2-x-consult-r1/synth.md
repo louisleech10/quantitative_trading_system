@@ -282,3 +282,7 @@ RECHECK: 讀 refilter 全程無其他 stage 呼叫。
 
 ---
 
+
+## 戳記
+
+（待三家 append RECONCILE-STAMP）

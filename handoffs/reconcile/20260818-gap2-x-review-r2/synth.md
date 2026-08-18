@@ -218,3 +218,7 @@ O1 的 raw 反向斷言是本輪唯一已實跑的 oracle 紅；O5 的「mutatio
 
 ---
 
+
+## 戳記
+
+（待三家 append RECONCILE-STAMP）

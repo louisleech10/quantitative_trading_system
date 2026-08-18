@@ -183,3 +183,7 @@ RECHECK: `grep -n 'shuffle\|hash mismatch\|feature_set_hash' docs/GAP2_MARGINAL_
 
 ---
 
+
+## 戳記
+
+（待三家 append RECONCILE-STAMP）

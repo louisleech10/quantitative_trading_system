@@ -44785,3 +44785,46 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-gap2-specadv-r2-composer.md", "output_sha256": "510cc5f3e610de88ec053e4220bc4796fefa33b76c1e2577a6ff87ecb374eaaf", "task_id": "20260818-GAP2-X-REVIEW-R2", "ts": "2026-08-18T08:05:30Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-gap2-specadv-r2-grok.md", "output_sha256": "9df3d1ef567d9b272fbf7deab60ba5bd716f989f635f48fb260b7bcac08efdb4", "task_id": "20260818-GAP2-X-REVIEW-R2", "ts": "2026-08-18T08:05:30Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "9ab99b3e-6b77-4a8a-bf02-76cdc90764cf", "lock_sha256": "3e3d82445475d170b864abbf993ff885f9d522711f6e5b97462a2dc27bd5034c", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "831747c9-ef77-4960-b190-dca9dc5894de", "schema_version": 1, "sequence": 2061, "session_id": "20260818-gap2-x-review-r2", "synth_sha256": "f4d34b65ba513915cd1438a73b514387f029a922c4f6e27e6982b5dfd25763a2", "ts": "2026-08-18T08:05:31Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GAP2-SPECADV-R3", "ts": "2026-08-18T08:10:26Z"}
+=== 2026-08-18 16:10:26 | dispatch ===
+  ts=2026-08-18 16:10:26
+  kind=dispatch
+  intent=GAP-2 SPEC adversarial R3:R2 五群集修訂複核(收斂輪)
+  risk=low
+  facts_asked=template_check PASS;R2 12 findings 全寫回;三家 O2/O4/O5/O7 實跑落帶
+  review_role=SPEC adversarial 審查委員(禁改碼禁改SPEC)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-GAP2-X-REVIEW-R3", "ts": "2026-08-18T08:10:35Z"}
+=== 2026-08-18 16:10:35 | dispatch ===
+  ts=2026-08-18 16:10:35
+  kind=dispatch
+  intent=GAP-2 SPEC adversarial R3:R2 五群集修訂複核(收斂輪)
+  risk=low
+  facts_asked=template_check PASS;R2 12 findings 全寫回;三家 O2/O4/O5/O7 實跑落帶
+  review_role=SPEC adversarial 審查委員(禁改碼禁改SPEC)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260818-gap2-specadv-r3-BRIEF.md", "brief_sha256": "4c57dbb656aa319db0ca1c5b8fc6a176a1522dda9e3fae56dd4cf1230a0e8601", "brief_sha256_norm": "4c57dbb656aa319db0ca1c5b8fc6a176a1522dda9e3fae56dd4cf1230a0e8601", "event": "committee_round_open", "event_id": "ea81ccef-a5ae-40f2-ad54-0b156a051739", "expected_outputs": {"codex": "handoffs/20260818-gap2-specadv-r3-codex.md", "composer": "handoffs/20260818-gap2-specadv-r3-composer.md", "grok": "handoffs/20260818-gap2-specadv-r3-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "d61dc419-2a32-4455-8946-1914d9b6358d", "schema_version": 1, "sequence": 2062, "session_name": "20260818-gap2-x-review-r3", "task_id": "20260818-GAP2-X-REVIEW-R3", "ts": "2026-08-18T08:10:38Z"}
+{"event":"gate_deny","ts":"2026-08-18T08:13:11Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"f4debe9f6cf0df9534aff8135dcc40484dff684a53bc27c3df2f92fb833b92c8","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260818-gap2-specadv-r3-codex.md --family codex; rc=$?; echo RC=$rc"}
+{"actor": "cx_run", "attempt_id": "b2c7fec6-9183-4d14-9aee-25b73552d890", "cli_rc": "0", "event": "committee_family_result", "event_id": "4db031e3-af3d-482c-a5e2-e214af6c63e7", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-gap2-specadv-r3-codex.md", "output_sha256": "d95e806484af2f4f2884adee8771f98faf57f4acd372c1e549c8e7eb1c024824", "producer": "audit_append.sh", "result_state": "success", "round_id": "d61dc419-2a32-4455-8946-1914d9b6358d", "schema_version": 1, "sequence": 2063, "ts": "2026-08-18T08:15:05Z"}
+{"actor": "cx_run", "attempt_id": "0a303b8b-df6a-488f-a293-2fa8456beb1c", "cli_rc": "0", "event": "committee_family_result", "event_id": "a8e914c8-cd3f-44f6-9ffa-da8be345969f", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-gap2-specadv-r3-composer.md", "output_sha256": "878bc6d8e1a224a2dde24916aa42bcc2eb14221a671f0a85c3b4f9d789ba810e", "producer": "audit_append.sh", "result_state": "success", "round_id": "d61dc419-2a32-4455-8946-1914d9b6358d", "schema_version": 1, "sequence": 2064, "ts": "2026-08-18T08:17:00Z"}
+{"actor": "cx_run", "attempt_id": "32fcb5e0-7280-479b-9ac5-e9b1d9768e91", "cli_rc": "0", "event": "committee_family_result", "event_id": "7b008ce3-fc47-4add-95f7-2409ca6c1b3a", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-gap2-specadv-r3-grok.md", "output_sha256": "1217c2bc184a2f6a11c2e2ba781f24e59bc077906945dfcc602759fc839cbe08", "producer": "audit_append.sh", "result_state": "success", "round_id": "d61dc419-2a32-4455-8946-1914d9b6358d", "schema_version": 1, "sequence": 2065, "ts": "2026-08-18T08:17:05Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-gap2-specadv-r3-codex.md", "output_sha256": "d95e806484af2f4f2884adee8771f98faf57f4acd372c1e549c8e7eb1c024824", "task_id": "20260818-GAP2-X-REVIEW-R3", "ts": "2026-08-18T08:19:22Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-gap2-specadv-r3-composer.md", "output_sha256": "878bc6d8e1a224a2dde24916aa42bcc2eb14221a671f0a85c3b4f9d789ba810e", "task_id": "20260818-GAP2-X-REVIEW-R3", "ts": "2026-08-18T08:19:22Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-gap2-specadv-r3-grok.md", "output_sha256": "1217c2bc184a2f6a11c2e2ba781f24e59bc077906945dfcc602759fc839cbe08", "task_id": "20260818-GAP2-X-REVIEW-R3", "ts": "2026-08-18T08:19:23Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "e23e9796-d7b9-4bba-8d4f-a6fff16e170a", "lock_sha256": "b49e2ed81a316544ed1a1b0f163941cdd87ff5a751f9ad105d6e4381219f50f9", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "d61dc419-2a32-4455-8946-1914d9b6358d", "schema_version": 1, "sequence": 2066, "session_id": "20260818-gap2-x-review-r3", "synth_sha256": "f7d285faafb410d2e2d57a5558043a67bea52c86879722b0c06c1cff7ce08b7b", "ts": "2026-08-18T08:19:24Z"}
