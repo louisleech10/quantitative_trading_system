@@ -35,7 +35,7 @@ assumed: `ptp==0` 修法不改 golden 三案例 ← 請實跑（段 D）
 
 ## 範本
 `templates/COMMITTEE_SEMANTIC_REVIEW_TEMPLATE.md` 全文照做（§0 挑戰前提／canonical 四欄／Verdict）；finding 格式依 `templates/COMMITTEE_FINDING_TEMPLATE.md`。
-ID＝`## <FAMILY>-R20-P<0-3>-<NN>`，**本輪輪次=R20**；零 findings 用 sentinel `## <FAMILY>-R20-P3-00`。
+ID＝`## <FAMILY>-R20-P<0-3>-<NN>`，**本輪輪次=R20**（task-id `20260818-GAP1-X-CONSULT-R20`）；零 findings 用 sentinel `## <FAMILY>-R20-P3-00`。
 
 ## 產出
 Verdict（採主委方案／改為相對容差／維持現狀不修）＋ A–E 之查證證據（源碼行號／文獻條目）＋canonical findings。
