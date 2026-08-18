@@ -16,7 +16,7 @@
 - 大任務（命中 a/d）⇒ 完整管線：Claude 起草 SPEC → 三家 adversarial（reconcile＋戳記）→ 白話給使用者審 → TODO → 實作分批 → 三家 code review → 戳記。範本 `templates/`；SPEC 建檔需 gate token（`bash scripts/gate.sh artifact`）。
 - 開工前先稽核 HANDOFF／ROADMAP／registry vs repo，並看有無殘留委員行程（ps 查 cursor-agent／codex／grok）。
 
-**GAP-3 事件型（不是本 session 的事，勿順手開）**：使用者重定義＝外部標好正反例匯入→PIT 對齊→條件 IC／ML（非 event study）；**開發前先討論**：第一步＝唯讀事件語意 consult，5 題見 registry「GAP-3 開發前討論題」節。
+**GAP-3 事件型（不是本 session 的事，勿順手開）**：使用者重定義＝外部標好正反例匯入→PIT 對齊→條件 IC／ML（非 event study）；**開發前先討論**：第一步＝唯讀事件語意 consult，Q0（事件類型盤點）＋5 題見 registry「GAP-3 開發前討論題」節。
 
 ## ⚠ 收尾與坑（完整清單在 CLAUDE.md Gotchas／白話 摩擦記錄 六十一～六十七）
 - 🔴 每批收尾：pytest → 探針 → commit → push（背景）→ 白話 5 檔同步 → commit+push（`plain_docs_sync_check` 是 pre-push 硬擋，動 `scripts/` 就要更新白話 5 檔）。commit+push 皆秒級。
