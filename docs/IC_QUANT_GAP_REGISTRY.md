@@ -68,3 +68,18 @@ report `metadata.split_method`（枚舉住 `momentum/Analysis/contracts/ic_repor
 | **G1-R11** | ~~`compute_sharpe` 對「浮點上非精確常數」序列不視為退化~~ **已修（2026-08-18；consult r20 三家一致採 `ptp==0` 位元全等併判、反對相對容差；`sharpe.py`＋`pbo._sharpe_pp_1d` 同步；探針 §V-16；三家 review 可合併＋三家戳記 PASS，**關閉**）** | — | — | 業界（empyrical／quantstats／ffn／vectorbt／pyfolio）皆無容差亦無 ptp；本專案較業界嚴且不自創常數。scope＝編碼值相等，不保證跨異源浮點表達式之數學相等（`GROK-R20-P2-03`） |
 | **G1-R10** | `IBacktestEngine` Protocol 宣告 `timeframe`／`risk_free_rate`（現行相容靠 objective 之條件分支，非 Protocol 契約） | blocked-by: SPEC §C 白名單——既有測試檔只允許「加斷言」，改 Protocol 須連動所有實作與 test doubles，超出本票允許改動面〔出處＝`CODEX-R10-P2-04`；數值危險面已由 A1-20 K1 之 fail-loud 收掉〕 | 白名單擴充提案，或使用者裁決 | Protocol 宣告兩參後，`objectives/strategy_backtest.py` 之條件式 `extra_kwargs` 可刪除，改為無條件傳遞 |
 | **G1-R9** | ledger 完整性（無事後 top-K 寫入）之**生產者側**證明 | blocked-by: G1-R1（無生產者即無寫入面可證；純統計層無外部候選宇宙 SoT）〔出處＝`CODEX-R8-P0-01`；處置見延伸檔 A1-4〕 | G1-R1 落地 | `PBOResult.universe_scope` 可由 `ledger_recorded_only` 升為 `producer_conformance_verified`，且 Task 3.3 之強制降級可解除 |
+
+## GAP-2 待補完登記（不遺忘機制；2026-08-18 使用者白話閘裁決「殘留須確實寫下來確保未來不忘」）
+
+> GAP-2 SPEC（`docs/GAP2_MARGINAL_IC_SPEC.md` §N，R7 FROZEN）之殘留**同步登記於此**，每條附「為何現在不做」（三值）與**觸發條件**；
+> 經六輪三家 adversarial 逐條攻「其實現在就能做嗎」皆判成立（收斂檔 `handoffs/reconcile/20260818-gap2-x-review-r{1..6}/synth.md`）。
+> 本表為權威登記處；ROADMAP 只放 pointer；GAP-2 各批 code review 之 brief 須附本表供委員複核「觸發是否已成立」。
+
+| # | 待補完項 | 為何現在不做 | 觸發條件 | 落地時之驗收錨點 |
+|---|---|---|---|---|
+| G2-R1 | IC→ML 橋本體（讀 `ic_survivors_{case_id}.json` 餵 `xgboost_batch_service.selected_features`，強制 `sample_scope`／OOS 四欄） | user-ruling: 2026-08-18 使用者裁定橋本體 blocked-by ML 層（成熟度地圖：ML／回測屬不完整層、可能重寫；接上即隨殼作廢，同 G1-R1） | ML 層重寫或宣告穩定 | 以 `ic_survivor_contract.json`（`version`）為輸入起新票；消費端 conformance test 讀檔→驗四欄→事件型只在事件樣本訓練 |
+| G2-R2 | 以邊際 IC 做 forward-stepwise **選擇**（改變倖存者集合） | needs-research: post-FDR 第二次選擇之多重比較政策（候選域、α 分配、train 選／test 報之誠實揭露）無委員會認可方法；四方偵察同判預設不得開 | 委員會定出政策（可待 registry #4 Pooled IC 樣本量增益後再議） | 政策落地前，SPEC D4 禁止用邊際 IC 改動選擇；落地時須通過 F-MC-1..3 與 §V 對應 mutation |
+| G2-R3 | cross-sectional（`analyze_cross_sectional`）路徑之邊際 IC | blocked-by: registry #4 Pooled/Panel IC（xsec 主路徑之 IC 估計量／切分尚未按主線標準重建，先接即隨其重建作廢） | #4 完工 | xsec 報告之 `marginal_ic` 節由 `not_applicable:cross_sectional_mode` 轉 `ok`，並過同一套 §G oracle |
+| G2-R5 | nested／frozen final test（讓邊際／組合統計可宣稱獨立 OOS 驗證） | blocked-by: IC 主路徑切分現狀 holdout-only（見上「IC 主路徑切分現狀」節；主線 test 同時供 stage4–6 選擇；本票以 `independent_oos_validation=false`＋`selection_sample="test"` 揭露欄誠實標示） | 主線切分升級（WF／CPCV 接入或 nested holdout 契約成立） | `independent_oos_validation_allowed` 契約值由 `[false]` 升版；R5 落地時 §G O 系列 oracle 於 final test 重跑 |
+
+> G2-R4（前端表格）**不是殘留**：使用者 2026-08-18 白話閘裁定納入 B5（表格＋`marginal_ic` toggle 預設開）。

@@ -1,6 +1,6 @@
 # GAP-2a 邊際 IC／多因子組合（純 IC 層）＋ GAP-2b 倖存因子輸出契約 — SPEC
 
-> 來源 PLAN/診斷：`handoffs/reconcile/20260818-gap2-x-consult-r1/synth.md`（四方偵察收斂；主委版 `handoffs/20260818-gap2-recon-claude.md`）；R1 adversarial 收斂 `handoffs/reconcile/20260818-gap2-x-review-r1/synth.md`（14 findings 六群集 K1–K6 全部寫回）；R2 收斂 `handoffs/reconcile/20260818-gap2-x-review-r2/synth.md`（12 findings 五群集 L1–L5 全部寫回）；R3 收斂 `handoffs/reconcile/20260818-gap2-x-review-r3/synth.md`（文字對齊 2 處＋戳記流程補齊）；R4 收斂 `handoffs/reconcile/20260818-gap2-x-review-r4/synth.md`（composer／grok sentinel；codex 4 條 schema 釘死全部寫回）；R5 收斂 `handoffs/reconcile/20260818-gap2-x-review-r5/synth.md`（composer／grok sentinel；codex 2 條字面殘留寫回，本檔為 R5 修訂版）
+> 來源 PLAN/診斷：`handoffs/reconcile/20260818-gap2-x-consult-r1/synth.md`（四方偵察收斂；主委版 `handoffs/20260818-gap2-recon-claude.md`）；R1 adversarial 收斂 `handoffs/reconcile/20260818-gap2-x-review-r1/synth.md`（14 findings 六群集 K1–K6 全部寫回）；R2 收斂 `handoffs/reconcile/20260818-gap2-x-review-r2/synth.md`（12 findings 五群集 L1–L5 全部寫回）；R3 收斂 `handoffs/reconcile/20260818-gap2-x-review-r3/synth.md`（文字對齊 2 處＋戳記流程補齊）；R4 收斂 `handoffs/reconcile/20260818-gap2-x-review-r4/synth.md`（composer／grok sentinel；codex 4 條 schema 釘死全部寫回）；R5 收斂 `handoffs/reconcile/20260818-gap2-x-review-r5/synth.md`（composer／grok sentinel；codex 2 條字面殘留寫回）；R6 三家 sentinel 收斂 `handoffs/reconcile/20260818-gap2-x-review-r6/synth.md`；**R7＝2026-08-18 使用者白話閘裁決版（B5 toggle＋殘留登記）＝FROZEN**；後續修訂走延伸檔 `docs/GAP2_MARGINAL_IC_AMENDMENTS.md`
 > ｜日期：2026-08-18｜對應 TODO：`docs/GAP2_MARGINAL_IC_TODO.md`（本 SPEC 定版後生成）
 > 票：`docs/IC_QUANT_GAP_REGISTRY.md` #2a／#2b（來源 finding CODEX-R1-P1-09、GROK-R1-P1-06；健檢收斂 C9／C10／C11）
 > 使用者 2026-08-18 裁定：GAP-2 拆 2a／2b；2a 純 IC 層（不碰 ML、不碰事件型）；2b **只交付契約**（含 `sample_scope`＋provenance，序列型／事件型同一座橋），橋本體 blocked-by ML 層；GAP-3 另票。
@@ -39,6 +39,7 @@ RISK-HIT: a,b,d
 - `2026-08-18 使用者裁定`：GAP-2 拆 2a／2b；2a＝純 IC 層、不碰 ML、不碰事件型；2b＝契約先行（`sample_scope`＋provenance、序列型／事件型同一座橋）、橋本體 blocked-by ML 層；GAP-3 另票不碰。
 - `2026-08-17 使用者裁定（成熟度地圖）`：僅 Feature Factory 完整、IC 進行中；ML／回測／Optimization 屬不完整層，其內部結構不得作為設計依據。
 - `2026-08-18 使用者裁定（流程）`：技術取捨交委員會（看碼證不數人頭、取較嚴版、殘留具名三值）；只有 SPEC 白話審閱與真正的產品取捨才停下來問。
+- `2026-08-18 使用者白話閘裁決（SPEC 定版）`：核准 SPEC 進 TODO；B5 前端表格**納入**且加 `marginal_ic` toggle（預設開）；殘留 R1／R2／R3／R5 須同步登記 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-2 待補完」表（附觸發條件，不遺忘機制）；使用者提問「邊際 IC 是否一定要經過」之答覆＝stage 6b 為選後診斷、不改倖存者集合、後端預設開＋前端 toggle 可關。
 
 **偵察收斂之前置裁決（本 SPEC 全篇據此；四方同判，收斂檔 C 群集）**
 
@@ -228,18 +229,18 @@ RISK-HIT: a,b,d
 - **覆蓋風險**：無。
 - 不可做：不得以「重新凍結 pre 檔」讓對照變綠；不得跳過 §G-1 任何鍵。
 
-### Phase B5 — 前端最小鏡像（依賴：B4；使用者可於白話閘否決 ⇒ 改列 §N user-ruling）
+### Phase B5 — 前端最小鏡像（依賴：B4；使用者 2026-08-18 白話閘裁定納入：表格＋toggle 預設開）
 
-**Task 5.1 — `types.ts` 型別＋唯讀表格**
-- 目標：報告新節在 IC 頁面可見（表格：每 survivor 之 gross／marginal_loo／ci95／retained；composite vs top-train-single＋CI），無新 toggle、無新 API。
-- 檔案：`frontend/src/lib/types.ts`（ICHC 契約段**外**加 `MarginalICSection`）；新增 `frontend/src/components/ic-analysis/MarginalICTable.tsx`＋`MarginalICTable.test.tsx`；接入現有 IC 結果頁 deep 區塊之後（唯讀）。
-- 既有 caller/影響面：`scripts/ic_wiring_check.py` R1a/R1b（無新 toggle ⇒ 不受影響）；`npm run build`。
+**Task 5.1 — `types.ts` 型別＋唯讀表格＋前端 toggle（使用者 2026-08-18 白話閘裁定：表格納入、加 toggle 預設開）**
+- 目標：報告新節在 IC 頁面可見（表格：每 survivor 之 gross／marginal_loo／ci95／retained；composite vs top-train-single＋CI）；IC 面板加一個 `marginal_ic` toggle（預設勾選）映射後端 `marginal_ic.enabled`；無新 API。
+- 檔案：`frontend/src/lib/types.ts`（ICHC 契約段**外**加 `MarginalICSection`）；新增 `frontend/src/components/ic-analysis/MarginalICTable.tsx`＋`MarginalICTable.test.tsx`；接入現有 IC 結果頁 deep 區塊之後（唯讀）；`frontend/src/store/icAnalysisStore.ts`：`PRESET_TOGGLES` 三 preset 各加 `marginal_ic: true`、`getEffectiveConfig` 之 stageOverrides 加 `marginal_ic: Boolean(state.featureToggles.marginal_ic)`；後端 `ic_filter_orchestrator.STAGE_OVERRIDE_PATHS` 加 `"marginal_ic": ("marginal_ic", "enabled")`（B4 Task 4.1 一併加，供 wiring R1b 消費集）。
+- 既有 caller/影響面：`scripts/ic_wiring_check.py` R1a/R1b（新 toggle 須映射至後端可消費集，否則 R1a/R1b 紅；驗證⑤）；`npm run build`。
 - 改法：節 `status!="ok"` ⇒ 顯示 status/reason 文字（不畫表）；`oos_guarantees=false` ⇒ 顯示既有 degraded 樣式警語；數值四位小數。
-- **驗證**：`cd frontend && npx vitest run src/components/ic-analysis/MarginalICTable.test.tsx` 全綠（≥4 條：ok 表格／disabled 文字／degraded 警語／空 survivors）；`npm run build` rc=0；`npx tsc --noEmit` rc=0；`bash scripts/ic_wiring_check.sh` rc=0。
+- **驗證**：`cd frontend && npx vitest run src/components/ic-analysis/MarginalICTable.test.tsx` 全綠（≥4 條：ok 表格／disabled 文字／degraded 警語／空 survivors）；`npm run build` rc=0；`npx tsc --noEmit` rc=0；`bash scripts/ic_wiring_check.sh` rc=0（含新 toggle 之 R1a/R1b 映射）；⑤ toggle 關 ⇒ 送出 config 之 `marginal_ic.enabled=false` 且回報節 `status=="disabled"`、表格顯示 disabled 文字。
 - **邊界**：① 節缺席（舊報告）⇒ 不渲染 ② `ci95` null ③ 100+ survivors（表格可捲動）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
-- 不可做：不得新增 store toggle；不得改 `CapabilityStatus` 六值；不得畫圖表（表格即可）。
+- 不可做：除 `marginal_ic` 外不得新增 store toggle；不得改 `CapabilityStatus` 六值；不得畫圖表（表格即可）。
 
 ## §V 驗證策略與邊界測試目錄
 
@@ -289,6 +290,6 @@ RISK-HIT: a,b,d
 - R1 IC→ML 橋本體（讀 `ic_survivors_*.json` 餵 `xgboost_batch_service.selected_features` 並強制 `sample_scope`）— `為何現在不做: user-ruling:2026-08-18 使用者裁定橋本體 blocked-by ML 層（成熟度地圖：ML／回測屬不完整層、可能重寫；接上即隨殼作廢，同 G1-R1）`；觸發：ML 層重寫或宣告穩定時，以本契約 `version` 為輸入起新票；登記處：registry #2b（既有列）。
 - R2 以邊際 IC 做 forward-stepwise **選擇**（改變倖存者集合）— `為何現在不做: needs-research: post-FDR 第二次選擇之多重比較政策（候選域、α 分配、train 選／test 報的誠實揭露）尚無委員會認可之方法；四方偵察同判預設不得開啟`；觸發：委員會定出政策（可引 registry #4 Pooled IC 之樣本量增益後再議）；登記處：registry「GAP-2 待補完」。
 - R3 cross-sectional（`analyze_cross_sectional`）路徑之邊際 IC — `為何現在不做: blocked-by: registry #4 Pooled/Panel IC（xsec 主路徑之 IC 估計量／切分尚未按主線標準重建，先接即隨其重建作廢）`；觸發：#4 完工；登記處：同上。
-- R4 前端表格（B5）— **預設納入**；若使用者於白話閘否決 ⇒ 轉 `user-ruling:<日期＋否決>` 並登記。
+- R4 前端表格（B5）— **已由使用者 2026-08-18 白話閘裁定納入（表格＋toggle 預設開）**，不再是殘留。
 - R5 nested／frozen final test（讓邊際／組合統計可宣稱獨立 OOS 驗證）— `為何現在不做: blocked-by: IC 主路徑切分現狀 holdout-only（registry「IC 主路徑切分現狀」節；WF／CPCV 未接主線，主線 test 同時供 stage4-6 選擇；本票以 D3′ 揭露欄誠實標示）`；觸發：主線切分升級（WF／CPCV 接入或 nested holdout 契約成立）；登記處：registry「GAP-2 待補完」。
 - mutation：**非 N/A**（§V 24 條（V-19 三欄參數化），逐條由 `scripts/gap2_mutation_probe.sh` 實跑）。
