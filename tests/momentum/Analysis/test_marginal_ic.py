@@ -295,7 +295,8 @@ def test_o9_bootstrap_seed_determinism():
     with pytest.raises(ValueError):
         block_bootstrap_ci(lambda u, v: float(np.mean(u * v)), (np.arange(10.0), np.arange(10.0)), block_len=0, n_bootstrap=5, seed=1)
     one = block_bootstrap_ci(lambda u, v: float(np.mean(u * v)), (np.arange(10.0), np.arange(10.0)), block_len=3, n_bootstrap=1, seed=1)
-    assert one is not None and one[0] == one[1]
+    point = float(np.mean(np.arange(10.0) ** 2))
+    assert one is not None and one[0] <= point <= one[1]  # n_bootstrap=1 亦含點估（A1-8）
 
 
 # ============================================================================

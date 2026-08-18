@@ -35,3 +35,7 @@
 - **頂層 allowlist 豁免（K7）**：loader `SURVIVOR_CONTRACT_TOP_KEYS` 與測試①之逐字頂層鍵集為 TODO Task 1.0 步驟 4／驗證① 指定之 fail-closed 守衛，非 §0 JSON SoT 條款所指之欄位表複列；B4 若增頂層鍵須同步兩處（可見即為設計）。
 - **loader 回傳（K1）**：`load_survivor_contract()` 回 `deepcopy`（cache 為內部）。
 - **探針 V-3 對映改為 `test_marginal_uses_spearman_not_pearson`（K5）**；O6 保留為輔測。O9 加 CI 寬度＞0 與 seed 依賴斷言（K6）。
+
+## A1-8 — bootstrap CI 恆含點估之定義（母 SPEC §G O9「CI 含點估」；來源 R15 CODEX-R15-P1-01；收斂檔 `handoffs/reconcile/20260819-gap2-b2-review-r15/synth.md` L1）
+- 母 SPEC O9 要求 CI 含點估，但 percentile bootstrap 不保證（`n_bootstrap=1` 或偏態下可重現不含）。
+- 決策：`block_bootstrap_ci` 回傳 **percentile CI 與觀測統計量之包絡** `(min(q0.025, point), max(q0.975, point))`（`point=stat_fn(*arrays)`；非有限時不包絡）；`marginal_ic.ci95` 與 `composite.delta_ci95` 同源受惠；O9 兩檔加 `n_bootstrap=1` containment 迴歸。同輪 L2：`combine_factors` 簽名恢復 `params: MarginalICParams`（`TYPE_CHECKING` 匯入）／`fit_scope: Literal["train","full_sample"]`。

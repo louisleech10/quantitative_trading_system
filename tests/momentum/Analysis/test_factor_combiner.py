@@ -183,7 +183,9 @@ def _ref_block_ci(stat_fn, arrays, *, block_len: int, n_bootstrap: int, seed: in
         v = float(stat_fn(*[a[idx] for a in arrays]))
         if math.isfinite(v):
             vals.append(v)
-    return (float(np.quantile(vals, 0.025)), float(np.quantile(vals, 0.975)))
+    lo, hi = float(np.quantile(vals, 0.025)), float(np.quantile(vals, 0.975))
+    point = float(stat_fn(*arrays))
+    return (min(lo, point), max(hi, point))  # A1-8 包絡（與待測同定義）
 
 
 def test_delta_ci_uses_block_len_reference():
@@ -216,7 +218,10 @@ def test_o9_same_seed_exact_and_block_len_zero_raises():
     with pytest.raises(ValueError):
         _run(df, y, tr, te, ["s1"], params=MarginalICParams(n_bootstrap=5, block_len=0))
     one = _run(df, y, tr, te, ["s1"], params=MarginalICParams(n_bootstrap=1, block_len=5))
-    assert one.delta_ci95[0] == one.delta_ci95[1]  # n_bootstrap=1 可跑
+    assert one.delta_ci95[0] <= one.delta_vs_top_train_single <= one.delta_ci95[1]  # n_bootstrap=1 可跑且含點估（A1-8）
+    # codex R15 反例：O2 三因子、block_len=7、seed=1、n_bootstrap=1 ⇒ CI 仍含 delta
+    cx = _run(df, y, tr, te, ["s1", "s2", "f"], params=MarginalICParams(n_bootstrap=1, block_len=7, seed=1))
+    assert cx.delta_ci95[0] <= cx.delta_vs_top_train_single <= cx.delta_ci95[1]
     # bootstrap 搬移後 marginal_ic 之 re-export 為同一物件
     assert mic.block_bootstrap_ci is fcm.block_bootstrap_ci
 

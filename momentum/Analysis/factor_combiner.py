@@ -20,12 +20,20 @@ from __future__ import annotations
 import copy
 import math
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+
+try:  # Python 3.8+ 皆有 typing.Literal
+    from typing import Literal
+except ImportError:  # pragma: no cover
+    from typing_extensions import Literal  # type: ignore
 
 import numpy as np
 import pandas as pd
 
 from momentum.Analysis.survivor_contract import load_survivor_contract
+
+if TYPE_CHECKING:  # 只供型別檢查；runtime 以 lazy import 避免循環
+    from momentum.Analysis.marginal_ic import MarginalICParams
 
 __all__ = ["block_bootstrap_ci", "CompositeResult", "combine_factors"]
 
@@ -46,6 +54,7 @@ def block_bootstrap_ci(
     - ``arrays`` 為同長度陣列（同一組 block 索引同時重抽 ⇒ 成對）；``block_len<=0`` ⇒ ``ValueError``；
       ``n_bootstrap<1`` ⇒ ``ValueError``；``block_len>n`` 時截為 ``n``（單一 block）。
     - 每次抽 ``ceil(n/block_len)`` 個起點 ``rng.integers(0, n-block_len+1)``，串接後切至 ``n``。
+    - 回傳＝percentile CI 與觀測統計量之**包絡** ``(min(q0.025, point), max(q0.975, point))``（A1-8：恆含點估，含 ``n_bootstrap=1``）。
     - 統計量非有限者略過；全部非有限 ⇒ 回 ``None``；否則 ``(q0.025, q0.975)``。
     """
     if block_len <= 0:
@@ -64,6 +73,7 @@ def block_bootstrap_ci(
     n_blocks = int(math.ceil(n / b))
     rng = np.random.default_rng(seed)
     out: List[float] = []
+    point = float(stat_fn(*arrs))  # 觀測統計量（A1-8：CI 取與其之包絡，恆含點估）
     offsets = np.arange(b)
     for _ in range(int(n_bootstrap)):
         starts = rng.integers(0, n - b + 1, size=n_blocks)
@@ -73,7 +83,10 @@ def block_bootstrap_ci(
             out.append(val)
     if not out:
         return None
-    return (float(np.quantile(out, 0.025)), float(np.quantile(out, 0.975)))
+    lo, hi = float(np.quantile(out, 0.025)), float(np.quantile(out, 0.975))
+    if math.isfinite(point):  # A1-8（R15 CODEX-R15-P1-01）：percentile CI 與觀測統計量之包絡 ⇒ 恆含點估（n_bootstrap=1 亦然）
+        lo, hi = min(lo, point), max(hi, point)
+    return (lo, hi)
 
 
 # ============================================================================
@@ -153,8 +166,8 @@ def combine_factors(
     train_mask: Optional[np.ndarray],
     test_mask: Optional[np.ndarray],
     survivors: List[str],
-    params: Any,
-    fit_scope: str,
+    params: "MarginalICParams",
+    fit_scope: Literal["train", "full_sample"],
 ) -> CompositeResult:
     """等權／``ic_weighted`` 訊號合成之 test 段 IC，附 train-only 符號／權重與對 ``top_train_single`` 之 delta CI。"""
     from momentum.Analysis.marginal_ic import _finite_or_none, _spearman, normal_scores  # lazy：避免循環 import
