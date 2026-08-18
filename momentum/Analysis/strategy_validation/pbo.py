@@ -142,7 +142,7 @@ def _metric(col: np.ndarray, idx: np.ndarray, selection_metric: str) -> float:
 
 def _sharpe_pp_1d(col: np.ndarray) -> float:
     """per-period Sharpe（rf=0）：與 `compute_sharpe(col, periods_per_year=1).value_per_period` **逐位相同**之 1-D 縮減
-    （同一 `values.mean()`／`values.std(ddof=1)` 呼叫序與退化判定：`n<2`／含非有限／`std==0` ⇒ NaN）。
+    （同一 `values.mean()`／`values.std(ddof=1)` 呼叫序與退化判定：`n<2`／含非有限／`std==0`／**元素位元全等 `ptp==0`（G1-R11）** ⇒ NaN）。
     B4 review N5：2-D `axis=0` 縮減與 1-D 縮減之浮點順序不同，近常數欄會給出不同巨大值 ⇒ 改逐欄 1-D。
     """
     values = np.asarray(col, dtype=float).ravel()

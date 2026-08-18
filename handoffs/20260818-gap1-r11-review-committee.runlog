@@ -1,0 +1,18 @@
+[session_name] ✓ 20260818-gap1-x-review-r21 / 20260818-GAP1-X-REVIEW-R21
+[committee_run] === role gate preflight (before gate.sh dispatch) ===
+[committee_run] session=20260818-gap1-x-review-r21 brief=handoffs/20260818-gap1-r11-review-BRIEF.md  families=codex,composer,grok(3 家)  out=handoffs/20260818-gap1-r11-review-<family>.md
+[committee_run] === gate.sh dispatch ===
+GATE PASS：已發 dispatch token（有效 900s）。審計 → .claude/gate/audit.log
+使用者可稽核：cat .claude/gate/audit.log
+[round_cost] 工作項目「gap1」累計 21 輪：真 findings 107 個｜空輪 10｜無產出 0｜銷帳 10
+[committee_run] === open debt round_id=45d36f74-6d65-485a-bd69-3cf7088ee457 session=20260818-gap1-x-review-r21 ===
+[committee_run] 開債完成 round_id=45d36f74-6d65-485a-bd69-3cf7088ee457
+[committee_run] → 派 codex(out=handoffs/20260818-gap1-r11-review-codex.md)
+[committee_run] → 派 composer(out=handoffs/20260818-gap1-r11-review-composer.md)
+[committee_run] → 派 grok(out=handoffs/20260818-gap1-r11-review-grok.md)
+[committee_run] ✅ codex 完成 → handoffs/20260818-gap1-r11-review-codex.md
+[committee_run] ✅ composer 完成 → handoffs/20260818-gap1-r11-review-composer.md
+[committee_run] ✅ grok 完成 → handoffs/20260818-gap1-r11-review-grok.md
+[committee_run] ✅ 3 家全數完成。接著:bash scripts/reconcile_build.sh <session> handoffs/20260818-gap1-r11-review-*.md
+[committee_run] round_id=45d36f74-6d65-485a-bd69-3cf7088ee457 session=20260818-gap1-x-review-r21
+rc=0

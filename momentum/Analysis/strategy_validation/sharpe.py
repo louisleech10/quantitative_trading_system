@@ -70,7 +70,7 @@ def compute_sharpe(
         periods_per_year: 必填關鍵字；由 Task 1.1 之 `resolve_periods_per_year` 取得。
         risk_free_rate: 年化無風險利率（預設 0.0；內部以 `rf/periods_per_year` 換算為 per-period）。
 
-    Returns:
+        `SharpeResult`。退化條件：`n_obs < 2`／含 NaN·inf／`std(ddof=1) == 0`／**所有元素位元全等（`np.ptp == 0`；G1-R11，涵蓋 80×0.01 這類非二進位精確常數；不保證跨異源浮點表達式之數學相等）**。
         `SharpeResult`。退化條件：`n_obs < 2`／含 NaN·inf／`std(ddof=1) == 0`。
 
     Raises:
