@@ -29,7 +29,7 @@
 
 > **最新（GAP-1，8/18）**：策略層防偽三檢定**第 1、2 批皆完工＋三家蓋章**；小任務 3b 完工——這個資料夾現在
 > 有 **HTML 閱讀介面**：本機 `open docs/site/index.html`；GitHub 上要你去 **Settings → Pages → Deploy from a branch: `main`, `/docs`**
-> 點一次（只有你能點），之後網址＝ https://louisleech10.github.io/quantitative_trading_system/site/ 。
+> 點一次（只有你能點）——**你 8/18 已設好**，網址 https://louisleech10.github.io/quantitative_trading_system/site/ 實測可讀，每次 push 後約 1–2 分鐘更新。
 > 來源仍是這裡的 .md（我和委員照讀 .md）；HTML 由 `scripts/plain_docs_render.sh` 在每次 commit 白話檔時同一 commit 自動生成，缺產出會擋 commit。
 > 接著開第 3 批（MinBTL＋DSR＋報告＋API 警語）。看板在 [GAP-1施工進度.md](GAP-1施工進度.md)。
 > 這輪最值得你知道的：第 2 批三家 21 條全處置、沒有一條要重做；其中一條是**我派工單上對自己程式碼的描述寫錯**

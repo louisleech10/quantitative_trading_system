@@ -1799,6 +1799,10 @@ TOCTOU 探針（系統 Python 3.9、multiprocessing）死鎖，cursor-agent 一�
 在 30 秒內正常收尾（rc=0、產出檔 sha 不變）。<strong>教訓</strong>：①委員 brief 應要求「探針一律加 timeout」；②接手先看 <code>ps</code> 有沒有
 上一輪的委員行程還活著——同時發現上一個 Claude session 也還活著並在我接手後 commit 了一筆（內容正確，是收尾），
 兩個 session 共用工作區是風險，之後每次 commit 前先 <code>git status</code>／<code>git log -1</code> 確認沒被別人動過。</p>
+<blockquote>
+<p><strong>六十二補（同日）</strong>：修法已落地＝委員派工腳本加看門狗——委員產出已 <code>STATUS: DONE</code> 但 CLI 逾 5 分鐘不退 ⇒ 殺子樹、視為完成；
+硬上限 90 分鐘 ⇒ 殺、記 failed。三種情境隔離實測（卡住含子行程／正常 rc 透傳／硬上限）皆如預期。<strong>從此「產出好了但行程不退」不再需要人看 ps。</strong></p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
