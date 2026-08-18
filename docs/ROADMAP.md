@@ -21,7 +21,7 @@
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
 | GAP-1 DSR/PBO/MinBTL 策略層防偽 | 🏁 **全票 CLOSED（2026-08-18）**；殘留 registry G1-R1..R7＋R9＋R10 | —（殘留 registry 觸發時再開） | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |
-| PA-CUMSUM 單利權益改正（小票；G1-R8 收回） | **實作完成（2026-08-18）**：`EquityCurveData` 改為單利（cumsum）／複利（cumprod−1）**兩條都算、都標清楚**（後端＋API model＋前端切換，預設複利）；三家 code review 中 | review→戳記→收案 | 出處＝`CODEX-R8-P1-12`／`GROK-R8-P1-03`；使用者 2026-08-18 裁定「兩條都算＋前端切換一起做」 |
+| PA-CUMSUM 單利權益改正（小票；G1-R8 收回） | **實作完成（2026-08-18）**：`EquityCurveData` 改為單利（cumsum）／複利（cumprod−1）**兩條都算、都標清楚**（後端＋API model＋前端切換，預設複利）；三家 code review 7 條全修（多標的等權組合／proba 缺值 4xx／契約封閉）| 戳記→收案 | 出處＝`CODEX-R8-P1-12`／`GROK-R8-P1-03`；使用者 2026-08-18 裁定「兩條都算＋前端切換一起做」 |
 | GAP-2 IC↔ML 橋＋多因子/邊際 IC | 未開票 | 次位 | 同上 #2 |
 | GAP-3 事件 case-control 真套件 | 未開票 | 設計須含 R5 A′ 語意 | 同上 #3 |
 | GAP-4 Pooled/Panel IC | 未開票 | — | 同上 #4 |
@@ -69,9 +69,9 @@
 ### 後續兩票（皆 Phase 4，不插隊）
 
 - **票 A — 策略 timing-overlap／clone score 診斷**：回答「ML 是否只在做簡單因子規則」。
-  **開票前置＝先修 equity curve 契約**：`prediction_analyzer.py:163` 的 `strategy_returns`
-  實裝 `np.cumsum` 非逐期報酬、`:152` 只有 long/flat 無做空、
-  `api/routes/pattern_analysis.py:1050` 缺值 `fillna(0)`。
+  **開票前置＝先修 equity curve 契約**（**已於 2026-08-18 PA-CUMSUM 完成**：`EquityCurveData` 改單利／複利四序列＋四鍵終值、多標的逐 timestamp 等權組合、缺值 fail-closed）；
+  殘餘：`prediction_analyzer.calculate_strategy_equity_curve` 只有 long/flat 無做空、
+  `api/routes/pattern_analysis.py` 之 `actual_return.fillna(0)` 仍在（缺報酬視為 0，`predicted_proba` 缺值已改 4xx）。
 - **票 B — 真·多標的橫截面 attribution**：**條件觸發，只有宇宙變多標的才成立**。
   前置＝CS factor-return 管線（`factor_return_analyzer.py:272-287` 現僅收單一 `future_returns: pd.Series`）
   ＋持倉權重 canonical 定義＋`analyze_cross_sectional` 與 deep 棧整合。

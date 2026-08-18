@@ -500,16 +500,28 @@ class ProbabilityDensityData(BaseModel):
     overlap_score: float
 
 
+class EquityFinalReturnPct(BaseModel):
+    """權益曲線終值（百分比）四鍵——機械封閉，缺鍵即 422（R23 GROK-P2-01）。"""
+    strategy_simple: float = Field(..., description="策略終值%（單利：固定本金，cumsum）")
+    benchmark_simple: float = Field(..., description="基準終值%（單利）")
+    strategy_compound: float = Field(..., description="策略終值%（複利：全額滾入，cumprod(1+r)−1）")
+    benchmark_compound: float = Field(..., description="基準終值%（複利）")
+
+
 class EquityCurveData(BaseModel):
-    """策略權益曲線資料——單利（`*_simple`＝cumsum）與複利（`*_compound`＝cumprod−1）兩條都給、都標清楚（PA-CUMSUM）。
-    `final_return_pct` 四鍵：strategy_simple／benchmark_simple／strategy_compound／benchmark_compound（百分比）。"""
-    timestamps: List[int]
-    strategy_returns_simple: List[float]
-    benchmark_returns_simple: List[float]
-    strategy_returns_compound: List[float]
-    benchmark_returns_compound: List[float]
-    threshold: float
-    final_return_pct: Dict[str, float]
+    """策略權益曲線資料——單利（`*_simple`＝cumsum）與複利（`*_compound`＝cumprod−1）兩條都給、都標清楚（PA-CUMSUM，2026-08-18）。
+    多標的批次以逐 timestamp 等權組合聚合（`aggregation="equal_weight_by_timestamp"`），單一序列為 `"single_series"`。"""
+    timestamps: List[int] = Field(..., description="時間戳（多標的聚合時為去重升冪）")
+    strategy_returns_simple: List[float] = Field(..., description="策略累積報酬（單利：固定本金，每期報酬相加＝cumsum；小數）")
+    benchmark_returns_simple: List[float] = Field(..., description="基準累積報酬（單利；小數）")
+    strategy_returns_compound: List[float] = Field(..., description="策略累積報酬（複利：全額滾入，cumprod(1+r)−1；小數）")
+    benchmark_returns_compound: List[float] = Field(..., description="基準累積報酬（複利；小數）")
+    threshold: float = Field(..., description="持倉閾值：predicted_proba > threshold 持倉，否則空手")
+    final_return_pct: EquityFinalReturnPct = Field(..., description="四鍵終值（百分比）")
+    n_symbols: int = Field(1, ge=1, description="參與之相異 symbol 數")
+    aggregation: Literal["single_series", "equal_weight_by_timestamp"] = Field(
+        "single_series", description="single_series＝逐列；equal_weight_by_timestamp＝同一 timestamp 各 symbol 等權平均後再累積"
+    )
 
 
 class FalsePositiveCase(BaseModel):

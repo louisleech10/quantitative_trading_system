@@ -51,6 +51,8 @@ class EquityCurveData:
     benchmark_returns_compound: List[float]
     threshold: float
     final_return_pct: Dict[str, float]
+    n_symbols: int = 1
+    aggregation: str = "single_series"  # 或 equal_weight_by_timestamp（多標的等權組合；R23 CODEX-P1-01）
 
     def to_dict(self) -> Dict:
         return {
@@ -61,6 +63,8 @@ class EquityCurveData:
             "benchmark_returns_compound": self.benchmark_returns_compound,
             "threshold": self.threshold,
             "final_return_pct": self.final_return_pct,
+            "n_symbols": self.n_symbols,
+            "aggregation": self.aggregation,
         }
 
 
@@ -150,38 +154,62 @@ class PredictionAnalyzer:
         timestamps: List[int],
         y_pred_proba: np.ndarray,
         actual_returns: np.ndarray,
-        threshold: float = 0.75
+        threshold: float = 0.75,
+        symbols: Optional[List[str]] = None,
     ) -> EquityCurveData:
         """計算簡易策略權益曲線：單利（`cumsum`）與複利（`cumprod(1+r)-1`）**兩條都算**（見 `EquityCurveData`）。
 
-        `actual_returns` 為每期簡單報酬率（小數，非百分比）；`y_pred_proba > threshold` 之期數持倉、否則空手（報酬 0）。
-        含 NaN／inf 之報酬 ⇒ `ValueError`（禁靜默當 0；呼叫方應先決定如何填補）。
+        - `actual_returns`：每期簡單報酬率（小數）；`y_pred_proba > threshold` 之期數持倉、否則空手（報酬 0）。
+        - 🔴 fail-closed（R23 review）：`actual_returns` **與** `y_pred_proba` 任一含 NaN／inf ⇒ `ValueError`
+          （缺失預測**不得**靜默當「低於閾值⇒空手」；呼叫方須先決定如何填補）。
+        - 🔴 多標的（R23 `CODEX-R23-P1-01`）：`symbols` 給定且含 >1 個相異 symbol ⇒ **不得**把跨 symbol 的列當同一帳戶連乘；
+          改為**逐 timestamp 等權組合**（`aggregation="equal_weight_by_timestamp"`）：同一 timestamp 之各 symbol 策略報酬（持倉×報酬）
+          取平均、基準報酬取平均，再對聚合序列做單利／複利；輸出 timestamps 為去重升冪。單一 symbol／未給 ⇒ 逐列（`"single_series"`）。
         """
         y_pred_proba = np.asarray(y_pred_proba, dtype=float)
         actual_returns = np.asarray(actual_returns, dtype=float)
+        ts_arr = np.asarray(timestamps)
 
         if len(y_pred_proba) != len(actual_returns):
             raise ValueError("y_pred_proba 與 actual_returns 長度不一致")
-        if len(timestamps) != len(y_pred_proba):
+        if len(ts_arr) != len(y_pred_proba):
             raise ValueError("timestamps 與 y_pred_proba 長度不一致")
         if not np.all(np.isfinite(actual_returns)):
             raise ValueError("actual_returns 含 NaN／inf（呼叫方須先填補，禁靜默當 0）")
+        if not np.all(np.isfinite(y_pred_proba)):
+            raise ValueError("y_pred_proba 含 NaN／inf（缺失預測禁靜默當空手，呼叫方須先填補）")
+        if symbols is not None and len(symbols) != len(y_pred_proba):
+            raise ValueError("symbols 與 y_pred_proba 長度不一致")
 
         strategy_positions = (y_pred_proba > threshold).astype(float)
         strategy_returns = actual_returns * strategy_positions
 
+        n_symbols = int(len(set(map(str, symbols)))) if symbols is not None and len(symbols) > 0 else 1
+        if n_symbols > 1:
+            aggregation = "equal_weight_by_timestamp"
+            uniq_ts, inverse = np.unique(ts_arr, return_inverse=True)
+            counts = np.bincount(inverse, minlength=len(uniq_ts)).astype(float)
+            agg_strategy = np.bincount(inverse, weights=strategy_returns, minlength=len(uniq_ts)) / counts
+            agg_benchmark = np.bincount(inverse, weights=actual_returns, minlength=len(uniq_ts)) / counts
+            out_ts = [int(t) for t in uniq_ts]
+        else:
+            aggregation = "single_series"
+            agg_strategy = strategy_returns
+            agg_benchmark = actual_returns
+            out_ts = [int(t) for t in ts_arr]
+
         # 單利（固定本金）：報酬相加
-        cum_strategy_simple = np.cumsum(strategy_returns)
-        cum_benchmark_simple = np.cumsum(actual_returns)
+        cum_strategy_simple = np.cumsum(agg_strategy)
+        cum_benchmark_simple = np.cumsum(agg_benchmark)
         # 複利（全額滾入）：資產連乘 − 1
-        cum_strategy_compound = np.cumprod(1.0 + strategy_returns) - 1.0
-        cum_benchmark_compound = np.cumprod(1.0 + actual_returns) - 1.0
+        cum_strategy_compound = np.cumprod(1.0 + agg_strategy) - 1.0
+        cum_benchmark_compound = np.cumprod(1.0 + agg_benchmark) - 1.0
 
         def _final_pct(curve: np.ndarray) -> float:
             return float(curve[-1] * 100.0) if len(curve) > 0 else 0.0
 
         return EquityCurveData(
-            timestamps=[int(ts) for ts in timestamps],
+            timestamps=out_ts,
             strategy_returns_simple=cum_strategy_simple.tolist(),
             benchmark_returns_simple=cum_benchmark_simple.tolist(),
             strategy_returns_compound=cum_strategy_compound.tolist(),
@@ -193,6 +221,8 @@ class PredictionAnalyzer:
                 "strategy_compound": _final_pct(cum_strategy_compound),
                 "benchmark_compound": _final_pct(cum_benchmark_compound),
             },
+            n_symbols=n_symbols,
+            aggregation=aggregation,
         )
 
     def get_top_false_positives(

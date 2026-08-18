@@ -685,6 +685,9 @@ export interface EquityCurveData {
     strategy_compound: number;
     benchmark_compound: number;
   };
+  /** 參與之相異 symbol 數；>1 時後端已做逐 timestamp 等權組合 */
+  n_symbols: number;
+  aggregation: "single_series" | "equal_weight_by_timestamp";
 }
 
 export interface EquityCurveResponse {

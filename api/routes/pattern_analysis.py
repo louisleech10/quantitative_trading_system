@@ -1044,12 +1044,22 @@ async def get_strategy_equity(task_id: str, threshold: float = 0.75):
     if 'actual_return' not in predictions_df.columns or predictions_df['actual_return'].isna().all():
         raise HTTPException(status_code=400, detail="缺少 actual_return 資料，無法計算權益曲線")
 
-    equity_data = prediction_analyzer.calculate_strategy_equity_curve(
-        timestamps=predictions_df['timestamp'].fillna(0).astype(int).tolist(),
-        y_pred_proba=predictions_df['predicted_proba'].values,
-        actual_returns=predictions_df['actual_return'].fillna(0).values,
-        threshold=threshold
+    # PA-CUMSUM（R23 review）：缺失 predicted_proba 不得靜默當空手 ⇒ 4xx；多標的以 symbols 交給引擎做逐 timestamp 等權組合
+    if predictions_df['predicted_proba'].isna().any():
+        raise HTTPException(status_code=400, detail="predicted_proba 含缺值，無法計算權益曲線（禁靜默當空手）")
+    symbols = (
+        predictions_df['symbol'].astype(str).tolist() if 'symbol' in predictions_df.columns else None
     )
+    try:
+        equity_data = prediction_analyzer.calculate_strategy_equity_curve(
+            timestamps=predictions_df['timestamp'].fillna(0).astype(int).tolist(),
+            y_pred_proba=predictions_df['predicted_proba'].values,
+            actual_returns=predictions_df['actual_return'].fillna(0).values,
+            threshold=threshold,
+            symbols=symbols,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"權益曲線輸入不合法: {exc}")
 
     return EquityCurveResponse(task_id=task_id, data=equity_data.to_dict())
 

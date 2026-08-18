@@ -44549,3 +44549,44 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-gap1-r11-stamp-codex.md", "output_sha256": "a3a0b705331a85070365ce4d405f1badca86863faacd8666f632898e877dc91b", "task_id": "20260818-GAP1-X-STAMP-R22", "ts": "2026-08-18T04:00:53Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-gap1-r11-stamp-composer.md", "output_sha256": "034377f77986db2de1ead3ec0d6d5ac210d1778826d003ebdc5c11c24aeefb63", "task_id": "20260818-GAP1-X-STAMP-R22", "ts": "2026-08-18T04:00:53Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-gap1-r11-stamp-grok.md", "output_sha256": "efe8d9c4d15d4c2145dfeb57ad9d22a62868410dfdc5c58dc633acff076b2072", "task_id": "20260818-GAP1-X-STAMP-R22", "ts": "2026-08-18T04:00:53Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-PACUMSUM-X-REVIEW-R23", "ts": "2026-08-18T04:22:45Z"}
+=== 2026-08-18 12:22:45 | dispatch ===
+  ts=2026-08-18 12:22:45
+  kind=dispatch
+  intent=PA-CUMSUM 小票 code review（三家）
+  risk=low
+  facts_asked=5 passed；npm run build ✓；decoupling OK
+  review_role=codex,composer,grok 三家 code review
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260818-gap1-x-review-r21/synth.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-PACUMSUM-X-REVIEW-R23", "ts": "2026-08-18T04:22:53Z"}
+=== 2026-08-18 12:22:53 | dispatch ===
+  ts=2026-08-18 12:22:53
+  kind=dispatch
+  intent=PA-CUMSUM 小票 code review（三家）
+  risk=low
+  facts_asked=5 passed；npm run build ✓；decoupling OK
+  review_role=codex,composer,grok 三家 code review
+  template=n/a: 用 brief
+  adversarial=handoffs/reconcile/20260818-gap1-x-review-r21/synth.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260818-pacumsum-review-BRIEF.md", "brief_sha256": "ba3e971ef015746c55d6f60010f68d85800764b9c6079a24ca2a21f653fe1938", "brief_sha256_norm": "ba3e971ef015746c55d6f60010f68d85800764b9c6079a24ca2a21f653fe1938", "event": "committee_round_open", "event_id": "32bd1053-c601-462c-9ef8-00ce8bbdd9a0", "expected_outputs": {"codex": "handoffs/20260818-pacumsum-review-codex.md", "composer": "handoffs/20260818-pacumsum-review-composer.md", "grok": "handoffs/20260818-pacumsum-review-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "ae29a2ed-446d-41cd-9fdc-b6a7ae78cdcb", "schema_version": 1, "sequence": 2037, "session_name": "20260818-pacumsum-x-review-r23", "task_id": "20260818-PACUMSUM-X-REVIEW-R23", "ts": "2026-08-18T04:22:57Z"}
+{"actor": "cx_run", "attempt_id": "3374bb83-d36c-4f4f-9116-575a51c27b4c", "cli_rc": "0", "event": "committee_family_result", "event_id": "ec32c34f-9ac9-4332-a04b-d3082ed90f99", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-pacumsum-review-composer.md", "output_sha256": "408d07bd803972eb4925a41745c153bd4d4608adb7143f96ccab39ea4149fa5a", "producer": "audit_append.sh", "result_state": "success", "round_id": "ae29a2ed-446d-41cd-9fdc-b6a7ae78cdcb", "schema_version": 1, "sequence": 2038, "ts": "2026-08-18T04:25:03Z"}
+{"event":"gate_deny","ts":"2026-08-18T04:25:05Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"456ea819450920d7e4df31d5f708761bca2b2c6c22cf8f173da0ce78ff2dee9c","cmd_head":"git diff 7d516540^ 7d516540 -- docs/ROADMAP.md '白話說明/接下來要做什麼.md' '白話說明/治理進度日誌.md' docs/site/README.html docs/site/接下來要做什麼.html docs/site/治理進度日誌.html; printf '%s\\n' '--- model source ---'; nl -ba api/models/pattern_analysis_models.py | sed -n '495,520p'; printf '%s\\n' '--- all exact frontend legacy refs ---'; rg -n --hidden -g '!data_cache/**' -g '!.git/**' 'final_return_pct\\.(strategy|benchmark)|final_return_pct\\[[\"'\"'](strategy|benchmark)["}
+{"actor": "cx_run", "attempt_id": "57f4daee-6a87-4119-a801-93322262f286", "cli_rc": "0", "event": "committee_family_result", "event_id": "35c71034-fedb-4140-9de4-b8bfa6befcb9", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-pacumsum-review-grok.md", "output_sha256": "8dc7cfa36fbded91da5ebc13eeb1bb132d4e4b7f8fd1d58eef171851924bdbf8", "producer": "audit_append.sh", "result_state": "success", "round_id": "ae29a2ed-446d-41cd-9fdc-b6a7ae78cdcb", "schema_version": 1, "sequence": 2039, "ts": "2026-08-18T04:27:44Z"}
+{"event":"gate_deny","ts":"2026-08-18T04:29:47Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"0ceff36bd08f476bde59ebbda0e8b5644a8532a5434089aa2c686642e651178f","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260818-pacumsum-review-codex.md --family codex; rc=$?; echo RC=$rc; exit $rc"}
+{"actor": "cx_run", "attempt_id": "fc159c24-d55b-4eb9-b87d-27e65eaf7938", "cli_rc": "0", "event": "committee_family_result", "event_id": "6c73e7ae-34f9-406f-8e9c-cf41ba315ce6", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-pacumsum-review-codex.md", "output_sha256": "e7bf6f3fe483970eca48979ec88ae975560663bf3f55a36b40620e8d7c5925c8", "producer": "audit_append.sh", "result_state": "success", "round_id": "ae29a2ed-446d-41cd-9fdc-b6a7ae78cdcb", "schema_version": 1, "sequence": 2040, "ts": "2026-08-18T04:31:34Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "e5766669-3ec1-42a8-a4c0-a83b17a5a7c9", "lock_sha256": "12bc11dac7ee08f21b9490a1accf1f942ec0c9a290b1c70687b8d379d6bba173", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "ae29a2ed-446d-41cd-9fdc-b6a7ae78cdcb", "schema_version": 1, "sequence": 2041, "session_id": "20260818-pacumsum-x-review-r23", "synth_sha256": "ec30453e199e4f861e8da57c88a5d5278bd1f0d20d383042e2c24a47c85eac7d", "ts": "2026-08-18T04:36:51Z"}

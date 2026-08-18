@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "session_id": "20260818-pacumsum-x-review-r23",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260818-pacumsum-x-review-r23/sources/20260818-pacumsum-review-codex.md",
+      "sha256": "e7bf6f3fe483970eca48979ec88ae975560663bf3f55a36b40620e8d7c5925c8",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260818-pacumsum-x-review-r23/sources/20260818-pacumsum-review-composer.md",
+      "sha256": "408d07bd803972eb4925a41745c153bd4d4608adb7143f96ccab39ea4149fa5a",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260818-pacumsum-x-review-r23/sources/20260818-pacumsum-review-grok.md",
+      "sha256": "8dc7cfa36fbded91da5ebc13eeb1bb132d4e4b7f8fd1d58eef171851924bdbf8",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-08-18T04:32:30Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "ae29a2ed-446d-41cd-9fdc-b6a7ae78cdcb"
+}

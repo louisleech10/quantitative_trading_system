@@ -61,8 +61,18 @@ export default function NaiveStrategyEquityChart({ data, loading, defaultMode = 
               key={m}
               type="button"
               role="tab"
+              id={`equity-tab-${m}`}
               aria-selected={mode === m}
+              aria-controls="equity-tabpanel"
+              tabIndex={mode === m ? 0 : -1}
               onClick={() => setMode(m)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                  e.preventDefault();
+                  setMode(m === 'compound' ? 'simple' : 'compound');
+                }
+              }}
+              data-testid={`equity-mode-${m}`}
               className={`px-2 py-1 rounded border ${
                 mode === m
                   ? 'bg-emerald-400/20 border-emerald-400/60 text-emerald-200'
@@ -76,7 +86,7 @@ export default function NaiveStrategyEquityChart({ data, loading, defaultMode = 
         </div>
         <ChartExportButton targetRef={chartRef} filename={`strategy_equity_${mode}`} />
       </div>
-      <div ref={chartRef}>
+      <div ref={chartRef} role="tabpanel" id="equity-tabpanel" aria-labelledby={`equity-tab-${mode}`}>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -88,8 +98,13 @@ export default function NaiveStrategyEquityChart({ data, loading, defaultMode = 
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="text-xs text-slate-400 mt-2">
-        <span className="text-slate-300">{MODE_LABEL[mode]}</span> — 策略累積報酬 {finalStrategy.toFixed(2)}% ｜ 基準 {finalBenchmark.toFixed(2)}%
+      <div className="text-xs text-slate-400 mt-2" data-testid="equity-final">
+        <span className="text-slate-300">{MODE_LABEL[mode]}</span> — 策略累積報酬 <span data-testid="equity-final-strategy">{finalStrategy.toFixed(2)}%</span> ｜ 基準 {finalBenchmark.toFixed(2)}%
+        {data.aggregation === 'equal_weight_by_timestamp' && (
+          <span className="ml-2 text-amber-300/80" data-testid="equity-aggregation-note">
+            ｜ {data.n_symbols} 個標的，逐時間點等權組合（非單一帳戶連乘）
+          </span>
+        )}
         <span className="ml-3 text-slate-500">
           （另一種：{MODE_LABEL[mode === 'simple' ? 'compound' : 'simple']} 策略{' '}
           {(mode === 'simple' ? data.final_return_pct.strategy_compound : data.final_return_pct.strategy_simple).toFixed(2)}% ｜ 基準{' '}
