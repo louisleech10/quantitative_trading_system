@@ -1,6 +1,6 @@
 # GAP-2a 邊際 IC／多因子組合（純 IC 層）＋ GAP-2b 倖存因子輸出契約 — SPEC
 
-> 來源 PLAN/診斷：`handoffs/reconcile/20260818-gap2-x-consult-r1/synth.md`（四方偵察收斂；主委版 `handoffs/20260818-gap2-recon-claude.md`）；R1 adversarial 收斂 `handoffs/reconcile/20260818-gap2-x-review-r1/synth.md`（14 findings 六群集 K1–K6 全部寫回）；R2 收斂 `handoffs/reconcile/20260818-gap2-x-review-r2/synth.md`（12 findings 五群集 L1–L5 全部寫回）；R3 收斂 `handoffs/reconcile/20260818-gap2-x-review-r3/synth.md`（文字對齊 2 處＋戳記流程補齊）；R4 收斂 `handoffs/reconcile/20260818-gap2-x-review-r4/synth.md`（composer／grok sentinel；codex 4 條 schema 釘死全部寫回，本檔為 R4 修訂版）
+> 來源 PLAN/診斷：`handoffs/reconcile/20260818-gap2-x-consult-r1/synth.md`（四方偵察收斂；主委版 `handoffs/20260818-gap2-recon-claude.md`）；R1 adversarial 收斂 `handoffs/reconcile/20260818-gap2-x-review-r1/synth.md`（14 findings 六群集 K1–K6 全部寫回）；R2 收斂 `handoffs/reconcile/20260818-gap2-x-review-r2/synth.md`（12 findings 五群集 L1–L5 全部寫回）；R3 收斂 `handoffs/reconcile/20260818-gap2-x-review-r3/synth.md`（文字對齊 2 處＋戳記流程補齊）；R4 收斂 `handoffs/reconcile/20260818-gap2-x-review-r4/synth.md`（composer／grok sentinel；codex 4 條 schema 釘死全部寫回）；R5 收斂 `handoffs/reconcile/20260818-gap2-x-review-r5/synth.md`（composer／grok sentinel；codex 2 條字面殘留寫回，本檔為 R5 修訂版）
 > ｜日期：2026-08-18｜對應 TODO：`docs/GAP2_MARGINAL_IC_TODO.md`（本 SPEC 定版後生成）
 > 票：`docs/IC_QUANT_GAP_REGISTRY.md` #2a／#2b（來源 finding CODEX-R1-P1-09、GROK-R1-P1-06；健檢收斂 C9／C10／C11）
 > 使用者 2026-08-18 裁定：GAP-2 拆 2a／2b；2a 純 IC 層（不碰 ML、不碰事件型）；2b **只交付契約**（含 `sample_scope`＋provenance，序列型／事件型同一座橋），橋本體 blocked-by ML 層；GAP-3 另票。
@@ -210,8 +210,8 @@ RISK-HIT: a,b,d
 - 目標：2b 契約檔實際落地並與報告互指。
 - 檔案：`momentum/Analysis/ic_reporter.py::save_survivor_output(payload: dict, output_dir: str, case_id: str) -> str`（`validate_survivor_output` 後原子寫 `ic_survivors_{case_id}.json`）；`ic_filter_orchestrator.py::_persist_outputs` 呼叫並寫 `report_meta["survivor_output"]={status, reason, path, sha256, case_id}`（鍵集＝契約 `metadata.survivor_output_keys`，**五鍵恆存在**；`status!="ok"` ⇒ `path`／`sha256` 為 `null`（契約標 nullable），`reason` 非 null；`status=="ok"` ⇒ `path`／`sha256` 非 null 且 `reason=null`——R4 CODEX-R4-P0-01：成功／`identity_missing`／寫檔失敗三種形狀同一契約，Task 4.2 驗證⑦ 三形狀逐一過 validator）。
 - 既有 caller/影響面：`tests/momentum/Analysis/test_ic_persist_redirect_*.py`（persist 導向 fixture）——新寫檔必經同一 `output_dir` 解析，hermetic 測試不得落到真 `data_cache/`。
-- 改法：空 survivors 亦寫檔（`survivors=[]`＋status）；`_suppress_persist` 時不寫；輸入 `metadata` 缺 `symbol` 或 `timeframe` ⇒ **不寫檔**、`report_meta["survivor_output"]={status:"computation_failed", reason:"identity_missing"}`（R2 L3）；`case_id` 取 `_resolve_case_id(metadata)`（與 `ic_report_{case_id}.json` 檔名一致，`report_ref` 指該檔）；寫檔失敗 ⇒ `report_meta["survivor_output"]={status:"computation_failed", reason:...}`（不吞例外於 log 之外）。
-- **驗證**：`pytest tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_ic_persist_redirect_unit.py -q` rc=0；斷言 ⓪ `metadata.survivor_output` 三種形狀（ok／identity_missing／寫檔失敗）皆恰五鍵且 nullable 規則成立（R4 CODEX-R4-P0-01）① 檔存在且過 validator ② `feature_names == list(filtered_df.columns)` ③ `sha256(file) == report_meta.survivor_output.sha256` ④ hermetic redirect 下 `data_cache/reports/` 無新檔 ⑤ 事件模式（`event_timestamps` 給定且 tier 充足）⇒ `sample_scope.kind=="event"` 且 `event.definition_hash` 為 64 hex ⑥ 事件 fallback ⇒ `kind=="full"` 且 `degraded is True`。
+- 改法：空 survivors 亦寫檔（`survivors=[]`＋status）；`_suppress_persist` 時不寫；輸入 `metadata` 缺 `symbol` 或 `timeframe` ⇒ **不寫檔**、`report_meta["survivor_output"]={status:"computation_failed", reason:"identity_missing", path:null, sha256:null, case_id:<_resolve_case_id(metadata)>}`（R2 L3；五鍵恆存在——R5 CODEX-R5-P0-01）；`case_id` 取 `_resolve_case_id(metadata)`（與 `ic_report_{case_id}.json` 檔名一致，`report_ref` 指該檔）；寫檔失敗 ⇒ `report_meta["survivor_output"]={status:"computation_failed", reason:"write_failed:<exc class>", path:null, sha256:null, case_id:<case_id>}`（同五鍵）（不吞例外於 log 之外）。
+- **驗證**：`pytest tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_ic_persist_redirect_unit.py -q` rc=0；斷言 ⓪ `metadata.survivor_output` 三種形狀（ok／identity_missing／寫檔失敗）皆恰五鍵且 nullable 規則成立（R4 CODEX-R4-P0-01）① 檔存在且過 validator ② `feature_names == list(filtered_df.columns)` ③ `sha256(file) == report_meta.survivor_output.sha256` ④ hermetic redirect 下 `data_cache/reports/` 無新檔 ⑤ 事件模式（`event_timestamps` 給定且 tier 充足）⇒ `sample_scope.kind=="event"` 且 `event.definition_hash` 為 64 hex ⑥ 事件 fallback ⇒ `kind=="full"` 且 `degraded is True` ⑦ 並發：兩執行緒同時寫同 case_id ⇒ 最終檔為完整 JSON 且過 validator（原子 replace）。
 - **邊界**：① 空 survivors ② degraded root ③ 事件 fallback ④ 目錄不可寫。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
@@ -275,7 +275,7 @@ RISK-HIT: a,b,d
   - 風險原則：a,b,d。必做類別：A2 洩漏 MR（MR-L1 O5、MR-L2 O7 變體、MR-L3 O6）、A4 契約、A6 golden、A9 邊界。
   - Oracle 矩陣：O3／O6／O7／O8 EXACT（atol 1e-12）；O1／O2／O4 TOLERANCE（容差寫死＋seed）；O5 STATISTICAL（H0：無資訊，α=0.05，n_min=1000，多重比較＝Bonferroni 於同測試內多因子）；O9 EXACT（seed）；§G-1 EXACT sha。
   - 統計（§F）：F-IC-4 block bootstrap（Task 1.2／2.1）；F-IC-6 標籤置亂（O5）；F-IC-8 train vs test（`train_ic` 與 test `gross_ic` 並列輸出）；F-MC-1（不改 FDR；D4 禁第二次選擇）。
-  - 真實路徑：G-OLD＝§G-1 pre 檔；G-NEW＝§G-2；hermetic＝persist redirect。資料 manifest：`tests/golden/la0/inputs/ETHUSDT_12h_*_a0_tail2000.h5@<sha256 寫入 pre 檔>`。信心：full。已知不測：OOM／並發（具名如上）。
+  - 真實路徑：G-OLD＝§G-1 pre 檔；G-NEW＝§G-2；hermetic＝persist redirect。資料 manifest：`tests/golden/la0/inputs/ETHUSDT_12h_*_a0_tail2000.h5@<sha256 寫入 pre 檔>`。信心：full。已知不測：**無**——OOM 由計數 gate（Task 4.1 ⑮）＋Task 4.3 峰值資源 receipt 覆蓋（pass＝`n_regressions==600` 且 receipt 存在；資源上限不由實作端臆造，receipt 只記錄不設閾值）；並發寫由 Task 4.2 原子寫（tmp＋replace；測試：兩執行緒同時 `save_survivor_output` 同 case_id ⇒ 檔內容為其一之完整 JSON，不得交錯）覆蓋（R5 CODEX-R5-P1-02）。
 
 ## §R 回退
 
