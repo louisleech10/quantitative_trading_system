@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GAP-1 施工進度看板（策略層防過擬合：MinBTL／DSR／PBO）</title>
+<title>GAP-1 施工進度看板（策略層防過擬合：MinBTL／DSR／PBO）— 🏁 已收工（2026-08-18）</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-1施工進度.md</span></nav>
 <main>
-<h1 id="gap-1-施工進度看板策略層防過擬合minbtldsrpbo">GAP-1 施工進度看板（策略層防過擬合：MinBTL／DSR／PBO）</h1>
+<h1 id="gap-1-施工進度看板策略層防過擬合minbtldsrpbo-已收工2026-08-18">GAP-1 施工進度看板（策略層防過擬合：MinBTL／DSR／PBO）— 🏁 已收工（2026-08-18）</h1>
 <p><strong>這份是白話版</strong>：清單（TODO）在做哪些事、每件做到哪。技術版＝<code>docs/GAP1_STRATEGY_OVERFIT_TODO.md</code>（<strong>FROZEN R3</strong>）
 ＋延伸檔 <code>docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md</code>（A1-1..A1-24；規格已定版，修訂只走延伸檔）。
 狀態欄我每完成一批就改；最即時的程式碼證據看 git log 的 <code>feat(gap1)</code>／<code>fix(gap1)</code> 系列。</p>
@@ -19,8 +19,8 @@
 → **第1批完工**（三家 code review 10 條全處置、三家蓋章）
 → **第2批寫完 → 三家 code review 21 條全處置 → 修補完（141 條測試全過、12 條 mutation 全紅）**
 → **第2批修補三家蓋章 PASS**（B2 CLOSED）→ **小任務 3b 完工**（白話說明 → HTML 閱讀介面，掛 pre-commit 同 commit 產出）
-→ **第3批修補三家蓋章 PASS**（B3 CLOSED）→ **第4批寫完 → 三家 code review 13 條全處置 → 修補完（280 條測試全過、20 條 mutation 全紅、接線閘 rc=0）**
-→ **現在：第4批修補等三家蓋章** → 收工（殘留登記複核）
+→ **第3批修補三家蓋章 PASS**（B3 CLOSED）→ **第4批寫完 → 三家 code review 13 條全處置 → 修補完 → 三家蓋章 PASS**（B4 CLOSED）
+→ 🏁 **GAP-1 四批全部收工（2026-08-18）**：280 條測試全過、20 條 mutation 全紅、接線閘 rc=0、殘留 G1-R1..R7＋R9／R10／R11 逐項複核觸發未成立（三家蓋章時複核）
 </code></pre>
 <h2 id="這個-epic-到底在做什麼一句話">這個 epic 到底在做什麼（一句話）</h2>
 <p>「試了 N 個策略挑最好的，是真本事還是運氣？」——因子層已有 FDR，策略層原本裸奔。
@@ -107,25 +107,25 @@
 <td><strong>第4批</strong></td>
 <td>4.1 CSCV 切分</td>
 <td>組合式切分，lazy 不落地，超預算直接拒（防 OOM）</td>
-<td>✅ 審過＋修補完，<strong>等蓋章</strong></td>
+<td>✅ 完工＋審過＋修補＋三家蓋章</td>
 </tr>
 <tr>
 <td></td>
 <td>4.2 PBO</td>
 <td>每條路徑樣本內選冠軍、樣本外看排名；冠軍在樣本外退化就跳過該路徑（審查抓到的越界 bug 已寫進規格）</td>
-<td>✅ 審過＋修補完，<strong>等蓋章</strong></td>
+<td>✅ 完工＋審過＋修補＋三家蓋章</td>
 </tr>
 <tr>
 <td></td>
 <td>4.3 候選宇宙守衛</td>
 <td>禁「先挑前 K 名再算」：集合相等＋數量三方相等＋hash 三道；但<strong>帳本本身是否完整</strong>純統計層證不了 → 具名殘留 G1-R9</td>
-<td>✅ 審過＋修補完，<strong>等蓋章</strong></td>
+<td>✅ 完工＋審過＋修補＋三家蓋章</td>
 </tr>
 <tr>
 <td></td>
 <td>2.4 接線閘（移到最後）</td>
 <td>契約 vs 程式的封閉集合比對（AST，只認函式頂層無條件字面鍵；死分支不算）</td>
-<td>✅ 審過＋修補完，<strong>等蓋章</strong></td>
+<td>✅ 完工＋審過＋修補＋三家蓋章</td>
 </tr>
 </tbody>
 </table></div>
