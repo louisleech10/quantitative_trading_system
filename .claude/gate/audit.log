@@ -45403,3 +45403,38 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260818-gap2-x-review-r7/synth.md", "output_sha256": "24998f30725648a076c21b66c9873ddba37936b34cd9e3edaaa4ab9e62520f3a", "task_id": "20260818-GAP2-X-STAMP-R8", "ts": "2026-08-18T12:43:23Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260818-gap2-x-review-r7/synth.md", "output_sha256": "24998f30725648a076c21b66c9873ddba37936b34cd9e3edaaa4ab9e62520f3a", "task_id": "20260818-GAP2-X-STAMP-R8", "ts": "2026-08-18T12:44:01Z"}
 {"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "84fd09dd-bb12-46fc-8dcf-1781b2b330f7", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp 輪只 append 戳記無 findings;三家 APPROVED stamps_check PASS", "round_id": "7affa7c1-dd37-4fa2-ae74-8f8771147de5", "schema_version": 1, "sequence": 2126, "ts": "2026-08-18T12:44:02Z", "zero_findings_verified": ""}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GAP2-TODOADV-R8", "ts": "2026-08-18T12:44:06Z"}
+=== 2026-08-18 20:44:06 | dispatch ===
+  ts=2026-08-18 20:44:06
+  kind=dispatch
+  intent=GAP-2 TODO adversarial R8:R7 六群集修訂複核(收斂輪)
+  risk=low
+  facts_asked=TODO DRAFT R2 template PASS;八份 synth 三家戳記;A1-1..3
+  review_role=TODO adversarial 審查委員(禁改碼禁改 SPEC/TODO)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-GAP2-X-REVIEW-R8", "ts": "2026-08-18T12:44:15Z"}
+=== 2026-08-18 20:44:15 | dispatch ===
+  ts=2026-08-18 20:44:15
+  kind=dispatch
+  intent=GAP-2 TODO adversarial R8:R7 六群集修訂複核(收斂輪)
+  risk=low
+  facts_asked=TODO DRAFT R2 template PASS;八份 synth 三家戳記;A1-1..3
+  review_role=TODO adversarial 審查委員(禁改碼禁改 SPEC/TODO)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260818-gap2-todoadv-r8-BRIEF.md", "brief_sha256": "4bd330b32d70fd547a48e352945f66c6ac04a95335bace4bdd338e33ea481606", "brief_sha256_norm": "4bd330b32d70fd547a48e352945f66c6ac04a95335bace4bdd338e33ea481606", "event": "committee_round_open", "event_id": "a6b771c1-9063-41d1-aca2-6aecb68384e5", "expected_outputs": {"codex": "handoffs/20260818-gap2-todoadv-r8-codex.md", "composer": "handoffs/20260818-gap2-todoadv-r8-composer.md", "grok": "handoffs/20260818-gap2-todoadv-r8-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "daa84f4e-95ca-4d30-ab6c-a8dfbbd02278", "schema_version": 1, "sequence": 2127, "session_name": "20260818-gap2-x-review-r8", "task_id": "20260818-GAP2-X-REVIEW-R8", "ts": "2026-08-18T12:44:19Z"}
