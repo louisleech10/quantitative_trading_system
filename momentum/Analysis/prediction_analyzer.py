@@ -36,19 +36,31 @@ class ProbabilityDensityData:
 
 @dataclass
 class EquityCurveData:
+    """簡易策略權益曲線——**單利／複利兩條都算、都標清楚**（PA-CUMSUM 小票，2026-08-18 使用者定）。
+
+    - `*_simple`（單利；固定本金／固定金額下注）：每期報酬**相加** ⇒ `cumsum(r)`；等於「每期都拿同一筆本金下注」之累積損益率。
+    - `*_compound`（複利；全額滾入／固定比例）：資產**連乘** ⇒ `cumprod(1+r) - 1`；等於帳戶實際淨值變化。
+    兩者為不同部位假設下的正確算法，**不是**其中一個對一個錯；本檔不再輸出無標籤之 `strategy_returns`（曾以單利算、標成累積報酬 %）。
+    `final_return_pct` 四鍵：`strategy_simple`／`benchmark_simple`／`strategy_compound`／`benchmark_compound`（百分比）。
+    """
+
     timestamps: List[int]
-    strategy_returns: List[float]
-    benchmark_returns: List[float]
+    strategy_returns_simple: List[float]
+    benchmark_returns_simple: List[float]
+    strategy_returns_compound: List[float]
+    benchmark_returns_compound: List[float]
     threshold: float
     final_return_pct: Dict[str, float]
 
     def to_dict(self) -> Dict:
         return {
             "timestamps": self.timestamps,
-            "strategy_returns": self.strategy_returns,
-            "benchmark_returns": self.benchmark_returns,
+            "strategy_returns_simple": self.strategy_returns_simple,
+            "benchmark_returns_simple": self.benchmark_returns_simple,
+            "strategy_returns_compound": self.strategy_returns_compound,
+            "benchmark_returns_compound": self.benchmark_returns_compound,
             "threshold": self.threshold,
-            "final_return_pct": self.final_return_pct
+            "final_return_pct": self.final_return_pct,
         }
 
 
@@ -140,33 +152,47 @@ class PredictionAnalyzer:
         actual_returns: np.ndarray,
         threshold: float = 0.75
     ) -> EquityCurveData:
-        """計算簡易策略權益曲線"""
-        y_pred_proba = np.asarray(y_pred_proba)
-        actual_returns = np.asarray(actual_returns)
+        """計算簡易策略權益曲線：單利（`cumsum`）與複利（`cumprod(1+r)-1`）**兩條都算**（見 `EquityCurveData`）。
+
+        `actual_returns` 為每期簡單報酬率（小數，非百分比）；`y_pred_proba > threshold` 之期數持倉、否則空手（報酬 0）。
+        含 NaN／inf 之報酬 ⇒ `ValueError`（禁靜默當 0；呼叫方應先決定如何填補）。
+        """
+        y_pred_proba = np.asarray(y_pred_proba, dtype=float)
+        actual_returns = np.asarray(actual_returns, dtype=float)
 
         if len(y_pred_proba) != len(actual_returns):
             raise ValueError("y_pred_proba 與 actual_returns 長度不一致")
         if len(timestamps) != len(y_pred_proba):
             raise ValueError("timestamps 與 y_pred_proba 長度不一致")
+        if not np.all(np.isfinite(actual_returns)):
+            raise ValueError("actual_returns 含 NaN／inf（呼叫方須先填補，禁靜默當 0）")
 
         strategy_positions = (y_pred_proba > threshold).astype(float)
         strategy_returns = actual_returns * strategy_positions
 
-        cum_strategy = np.cumsum(strategy_returns)
-        cum_benchmark = np.cumsum(actual_returns)
+        # 單利（固定本金）：報酬相加
+        cum_strategy_simple = np.cumsum(strategy_returns)
+        cum_benchmark_simple = np.cumsum(actual_returns)
+        # 複利（全額滾入）：資產連乘 − 1
+        cum_strategy_compound = np.cumprod(1.0 + strategy_returns) - 1.0
+        cum_benchmark_compound = np.cumprod(1.0 + actual_returns) - 1.0
 
-        final_strategy = float(cum_strategy[-1] * 100) if len(cum_strategy) > 0 else 0.0
-        final_benchmark = float(cum_benchmark[-1] * 100) if len(cum_benchmark) > 0 else 0.0
+        def _final_pct(curve: np.ndarray) -> float:
+            return float(curve[-1] * 100.0) if len(curve) > 0 else 0.0
 
         return EquityCurveData(
             timestamps=[int(ts) for ts in timestamps],
-            strategy_returns=cum_strategy.tolist(),
-            benchmark_returns=cum_benchmark.tolist(),
+            strategy_returns_simple=cum_strategy_simple.tolist(),
+            benchmark_returns_simple=cum_benchmark_simple.tolist(),
+            strategy_returns_compound=cum_strategy_compound.tolist(),
+            benchmark_returns_compound=cum_benchmark_compound.tolist(),
             threshold=float(threshold),
             final_return_pct={
-                "strategy": final_strategy,
-                "benchmark": final_benchmark
-            }
+                "strategy_simple": _final_pct(cum_strategy_simple),
+                "benchmark_simple": _final_pct(cum_benchmark_simple),
+                "strategy_compound": _final_pct(cum_strategy_compound),
+                "benchmark_compound": _final_pct(cum_benchmark_compound),
+            },
         )
 
     def get_top_false_positives(

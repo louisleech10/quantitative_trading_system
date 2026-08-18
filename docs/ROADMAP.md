@@ -21,7 +21,7 @@
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
 | GAP-1 DSR/PBO/MinBTL 策略層防偽 | 🏁 **全票 CLOSED（2026-08-18）**；殘留 registry G1-R1..R7＋R9＋R10 | —（殘留 registry 觸發時再開） | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |
-| PA-CUMSUM 單利權益改正（小票；G1-R8 收回） | **未開工**（自 registry 殘留收回；`momentum/Analysis/prediction_analyzer.py:155` `np.cumsum` 於權益曲線語意上應為 `cumprod`，或改欄名並停用策略敘事） | 排在 GAP-1 B4 完工後；Claude 小任務流程（自做＋自跑測試） | 出處＝`CODEX-R8-P1-12`／`GROK-R8-P1-03` 同輪；延伸檔 A1-10 第 3 項 |
+| PA-CUMSUM 單利權益改正（小票；G1-R8 收回） | **實作完成（2026-08-18）**：`EquityCurveData` 改為單利（cumsum）／複利（cumprod−1）**兩條都算、都標清楚**（後端＋API model＋前端切換，預設複利）；三家 code review 中 | review→戳記→收案 | 出處＝`CODEX-R8-P1-12`／`GROK-R8-P1-03`；使用者 2026-08-18 裁定「兩條都算＋前端切換一起做」 |
 | GAP-2 IC↔ML 橋＋多因子/邊際 IC | 未開票 | 次位 | 同上 #2 |
 | GAP-3 事件 case-control 真套件 | 未開票 | 設計須含 R5 A′ 語意 | 同上 #3 |
 | GAP-4 Pooled/Panel IC | 未開票 | — | 同上 #4 |

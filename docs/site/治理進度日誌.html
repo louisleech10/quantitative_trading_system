@@ -2801,6 +2801,9 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 <blockquote>
 <p><strong>2026-08-18 追記九（G1-R11 consult＋修補）</strong>：三家 consult（唯讀）查業界五套件源碼＋文獻：皆無相對容差亦無 ptp；一致採主委「位元全等即常數」方案、判為 SPEC 字面之實作修補 ⇒ 小任務修（<code>sharpe.py</code>＋<code>pbo._sharpe_pp_1d</code>）＋探針 §V-16，281 測試／21 mutation 全紅；三家 review 派出。</p>
 </blockquote>
+<blockquote>
+<p><strong>2026-08-18 追記十（PA-CUMSUM 小票）</strong>：<code>prediction_analyzer.EquityCurveData</code> 改為單利（cumsum）／複利（cumprod−1）兩條都算＋四鍵 final_return_pct；API model／前端型別／圖表切換同步（預設複利）；5 條測試（手算 +50%/−50% ⇒ 0%／−25%）、<code>npm run build</code> 綠、decoupling OK；三家 review 派出。治理本體零擴建。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

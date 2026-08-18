@@ -672,10 +672,19 @@ export interface ProbabilityDensityResponse {
 
 export interface EquityCurveData {
   timestamps: number[];
-  strategy_returns: number[];
-  benchmark_returns: number[];
+  /** 單利（固定本金；每期報酬相加＝cumsum） */
+  strategy_returns_simple: number[];
+  benchmark_returns_simple: number[];
+  /** 複利（全額滾入；資產連乘＝cumprod−1） */
+  strategy_returns_compound: number[];
+  benchmark_returns_compound: number[];
   threshold: number;
-  final_return_pct: { strategy: number; benchmark: number };
+  final_return_pct: {
+    strategy_simple: number;
+    benchmark_simple: number;
+    strategy_compound: number;
+    benchmark_compound: number;
+  };
 }
 
 export interface EquityCurveResponse {

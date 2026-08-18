@@ -501,10 +501,13 @@ class ProbabilityDensityData(BaseModel):
 
 
 class EquityCurveData(BaseModel):
-    """策略權益曲線資料"""
+    """策略權益曲線資料——單利（`*_simple`＝cumsum）與複利（`*_compound`＝cumprod−1）兩條都給、都標清楚（PA-CUMSUM）。
+    `final_return_pct` 四鍵：strategy_simple／benchmark_simple／strategy_compound／benchmark_compound（百分比）。"""
     timestamps: List[int]
-    strategy_returns: List[float]
-    benchmark_returns: List[float]
+    strategy_returns_simple: List[float]
+    benchmark_returns_simple: List[float]
+    strategy_returns_compound: List[float]
+    benchmark_returns_compound: List[float]
     threshold: float
     final_return_pct: Dict[str, float]
 
