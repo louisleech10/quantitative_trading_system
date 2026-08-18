@@ -1837,6 +1837,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>七十一・（2026-08-18）review brief 的「前提」段一定要逐條標 <code>fact-verified:</code>／<code>assumed:</code></strong>：R11 首派時我用一般條列寫前提，<code>committee_run</code> 在 brief 範本檢查就擋下、一家都沒派，白等一輪。範本要求每種至少一條（「宣稱零假設本身可疑」）。已寫進 HANDOFF 坑清單。</p>
 </blockquote>
+<blockquote>
+<p><strong>七十二・（2026-08-18）commit 訊息的 <code>Governance-Scope:</code> trailer 必須是「最後一段」且該段只能有 trailer 行</strong>：我把「pytest 46 passed」那行放在 trailer 前同一段，G-7 前移檢查判無 trailer、commit 被擋（rc=1）。改成 trailer 獨立成段即過。順帶：pre-commit 的白話 render hook 會把 <code>docs/site/*.html</code> 一起 stage 進來，屬正常。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
