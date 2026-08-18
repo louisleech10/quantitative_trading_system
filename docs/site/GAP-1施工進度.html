@@ -19,7 +19,8 @@
 → **第1批完工**（三家 code review 10 條全處置、三家蓋章）
 → **第2批寫完 → 三家 code review 21 條全處置 → 修補完（141 條測試全過、12 條 mutation 全紅）**
 → **第2批修補三家蓋章 PASS**（B2 CLOSED）→ **小任務 3b 完工**（白話說明 → HTML 閱讀介面，掛 pre-commit 同 commit 產出）
-→ **現在：開第3批**（MinBTL＋DSR＋報告＋API 警語）→ 第4批（PBO＋接線閘）→ 收工
+→ **第3批寫完**（MinBTL＋DSR＋報告＋API 警語；220 條測試全過、17 條 mutation 全紅）→ **現在：三家 code review 中**
+→ 待做：第3批修補→蓋章 → 第4批（PBO＋接線閘）→ 收工
 </code></pre>
 <h2 id="這個-epic-到底在做什麼一句話">這個 epic 到底在做什麼（一句話）</h2>
 <p>「試了 N 個策略挑最好的，是真本事還是運氣？」——因子層已有 FDR，策略層原本裸奔。
@@ -82,25 +83,25 @@
 <td><strong>第3批</strong></td>
 <td>3.1 MinBTL</td>
 <td>「想宣稱這個夏普，資料至少要幾年」上界＋「這麼長的資料最多准試幾個」預算；公式常數不准調</td>
-<td>⬜</td>
+<td>✅ 寫完，<strong>審查中</strong></td>
 </tr>
 <tr>
 <td></td>
 <td>3.2 DSR</td>
 <td>冠軍檢定，全式寫死；N=1 時退化成 PSR（可證偽的錨點）</td>
-<td>⬜</td>
+<td>✅ 寫完，審查中</td>
 </tr>
 <tr>
 <td></td>
 <td>3.3 報告區段</td>
 <td>三關結果的機器可讀輸出；任一關不 ok ⇒ 降級＋警語，結構裡<strong>不准有推薦類欄位</strong></td>
-<td>⬜</td>
+<td>✅ 寫完，審查中</td>
 </tr>
 <tr>
 <td></td>
 <td>3.4 API 附警語</td>
 <td><code>ml_pipeline</code> 回應多三個欄位（資格／降級／警語鍵）；<strong>不拒絕請求</strong>（你的裁決）；程式 bug 不准被吞成「計算失敗」</td>
-<td>⬜</td>
+<td>✅ 寫完，審查中</td>
 </tr>
 <tr>
 <td><strong>第4批</strong></td>
@@ -130,9 +131,9 @@
 </table></div>
 <h2 id="每批的驗收證據不只-passfail">每批的驗收證據（不只 pass/fail）</h2>
 <ul>
-<li><strong>測試</strong>：<code>strategy_validation/</code> 目前 <strong>135 條全過</strong>（第1批 45＋第2批 90，其中 45 條是這輪審查後新加的回歸鎖）；<code>Strategy/</code>＋<code>Optimization/</code> 207 過／2 紅（那 2 條是別的模組的既有紅，與本 epic 無關）。</li>
+<li><strong>測試</strong>：<code>strategy_validation/</code>＋API 測試目前 <strong>220 條全過</strong>（第1批 45＋第2批 90＋第3批 85）；<code>Strategy/</code>＋<code>Optimization/</code> 207 過／2 紅（那 2 條是別的模組的既有紅，與本 epic 無關）。</li>
 <li><strong>真實資料</strong>：Task 1.4 的測試用你電腦上的<strong>真實 K 線</strong>（<code>data_cache/feature_klines/kline_cache.h5</code>）跑真回測，不是造出來的假資料；<strong>檔案不在時直接失敗</strong>，不准 skip 裝綠（審查抓的）。</li>
-<li><strong>改壞一定要變紅</strong>（mutation）：把 <strong>12</strong> 種已知錯誤寫法逐一植入（第1批 8 種：未知週期回 730／退化回 0.0／Mertens 係數改錯／rf 用 0.02／逐 bar 改成 ok／放行預設 730／帳本缺檔回 N=1／bar 數當年數；第2批新增 4 種：放行 NaN／快照 hash 改回會撞的舊法／帳本目錄名改掉／拿掉檔案鎖），<strong>12 次全部讓測試變紅</strong>（收據 <code>handoffs/run_receipts/20260818T080000Z-gap1-b2-fix-mutation.log</code>）。探針本身有互斥鎖，不能兩人同時跑（血淚見下）。</li>
+<li><strong>改壞一定要變紅</strong>（mutation）：把 <strong>17</strong> 種已知錯誤寫法逐一植入（第1批 8 種：未知週期回 730／退化回 0.0／Mertens 係數改錯／rf 用 0.02／逐 bar 改成 ok／放行預設 730／帳本缺檔回 N=1／bar 數當年數；第2批新增 4 種：放行 NaN／快照 hash 改回會撞的舊法／帳本目錄名改掉／拿掉檔案鎖；第3批新增 5 種：MinBTL 的 ln 改成 n／預算 floor 改 round／DSR 刪 γ 項／DSR 分母改用跨試驗變異數／矩公式代入年化夏普），<strong>17 次全部讓測試變紅</strong>（收據 <code>handoffs/run_receipts/20260818T090000Z-gap1-b3-mutation.log</code>）。探針本身有互斥鎖，不能兩人同時跑（血淚見下）。</li>
 </ul>
 <h2 id="這輪審查抓到且值得你知道的事">這輪審查抓到、且值得你知道的事</h2>
 <p><strong>第2批（21 條，三家一致「修完可進第3批」，沒有一條要重做；分歧只在嚴重度，一律取較嚴的那版，全部這輪修、不留待辦）</strong>：</p>

@@ -25,6 +25,7 @@ from momentum.Indicators.types import DataSourceEnum
 
 if TYPE_CHECKING:
     from momentum.Analysis.adversarial_validator import AdversarialValidator
+    from momentum.Analysis.strategy_validation.reporter import StrategyValidationReporter
     from momentum.Analysis.analysis_exporter import AnalysisExporter
     from momentum.Analysis.bootstrap_estimator import BootstrapEstimator
     from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
@@ -560,6 +561,7 @@ def create_adversarial_validator(
 ) -> "AdversarialValidator":
     """Factory — M4 Adversarial 驗證器。"""
     from momentum.Analysis.adversarial_validator import AdversarialValidator
+    from momentum.Analysis.strategy_validation.reporter import StrategyValidationReporter
 
     return AdversarialValidator(config=config)
 
@@ -760,6 +762,20 @@ def create_result_analyzer() -> "ResultAnalyzer":
     from momentum.Optimization.result_analyzer import ResultAnalyzer
 
     return ResultAnalyzer()
+
+
+def create_strategy_validation_reporter() -> "StrategyValidationReporter":
+    """GAP-1 Task 3.4：ml_pipeline 回應之「資格狀態＋警語」reporter（懶 import，仿既有）。"""
+    from momentum.Analysis.strategy_validation.reporter import StrategyValidationReporter
+
+    return StrategyValidationReporter()
+
+
+def get_invalid_validation_argument_class() -> type:
+    """GAP-1 A1-16：`InvalidValidationArgument`（ValueError 子類）之類別，供 route 精準辨識「呼叫方 bug ⇒ 5xx」（Rule 3）。"""
+    from momentum.Analysis.strategy_validation.min_btl import InvalidValidationArgument
+
+    return InvalidValidationArgument
 
 
 def get_momentum_config_class():

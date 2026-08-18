@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gap1_b1_mutation_probe.sh — B1／B2 之 mutation 自證（§V-5／8／9a／9b／10／13／15 ＋ §V-7／7b／7c／7d／7e）。
+# gap1_b1_mutation_probe.sh — B1／B2／B3 之 mutation 自證（§V-5／8／9a／9b／10／13／15 ＋ §V-7／7b／7c／7d／7e ＋ §V-1／2／3／11／12）。
 #
 # 每條：就地 mutate 一行 → 跑對應測試 → 斷言**轉紅且為斷言失敗（非 collection error）** → 還原。
 # 產出 receipt 供 code review 對證（TODO §0「新測試須 mutation 自證（實跑貼 rc）」）。
@@ -39,17 +39,22 @@ FREQ=momentum/core/frequency.py
 SHARPE=momentum/Analysis/strategy_validation/sharpe.py
 RC=momentum/Analysis/strategy_validation/returns_contract.py
 LEDGER=momentum/Analysis/strategy_validation/ledger.py
+MINBTL=momentum/Analysis/strategy_validation/min_btl.py
+DSR=momentum/Analysis/strategy_validation/deflated_sharpe.py
 TEST_FREQ=tests/momentum/Analysis/strategy_validation/test_frequency.py
 TEST_SHARPE=tests/momentum/Analysis/strategy_validation/test_sharpe.py
 TEST_RC=tests/momentum/Analysis/strategy_validation/test_returns_contract.py
 TEST_LEDGER=tests/momentum/Analysis/strategy_validation/test_ledger.py
 TEST_LEDGER_CONF=tests/momentum/Analysis/strategy_validation/test_ledger_conformance.py
 TEST_LEDGER_PATH=tests/momentum/Analysis/strategy_validation/test_ledger_path.py
+TEST_MINBTL=tests/momentum/Analysis/strategy_validation/test_min_btl.py
+TEST_DSR=tests/momentum/Analysis/strategy_validation/test_deflated_sharpe.py
+TEST_REPORT=tests/momentum/Analysis/strategy_validation/test_report_section.py
 TEST_VB=tests/momentum/Strategy/test_vectorized_backtest.py
 # baseline／post-restore 之測試集合（單一定義，兩處共用；A1-21 L10 起含 B2 三檔）
-ALL_TESTS="${TEST_FREQ} ${TEST_SHARPE} ${TEST_RC} ${TEST_LEDGER} ${TEST_LEDGER_CONF} ${TEST_LEDGER_PATH} ${TEST_VB}"
+ALL_TESTS="${TEST_FREQ} ${TEST_SHARPE} ${TEST_RC} ${TEST_LEDGER} ${TEST_LEDGER_CONF} ${TEST_LEDGER_PATH} ${TEST_MINBTL} ${TEST_DSR} ${TEST_REPORT} ${TEST_VB}"
 
-TARGETS="${FREQ} ${SHARPE} ${RC} ${LEDGER} ${TEST_VB}"
+TARGETS="${FREQ} ${SHARPE} ${RC} ${LEDGER} ${MINBTL} ${DSR} ${TEST_VB}"
 BACKUP_DIR="$(mktemp -d)"
 
 backup_all() {
@@ -170,9 +175,32 @@ echo "[§V-7e] 拿掉 flock（掃描＋寫入不再原子 ⇒ 同 id 可雙寫�
 mutate "$LEDGER" '        fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)' '        pass  # MUTANT: flock removed' || exit 1
 run_expect_red "§V-7e" "$TEST_LEDGER_CONF"
 
+echo "[§V-2] min_btl_years_upper_bound 之 ln(n_trials) 改為 n_trials"
+mutate "$MINBTL" '    return 2.0 * math.log(n_trials) / (float(target_sharpe) ** 2)' '    return 2.0 * n_trials / (float(target_sharpe) ** 2)  # MUTANT' || exit 1
+run_expect_red "§V-2" "$TEST_MINBTL"
+
+echo "[§V-3] max_trials_budget 之 floor 改為 round"
+mutate "$MINBTL" '    return int(math.floor(math.exp(x)))' '    return int(round(math.exp(x)))  # MUTANT' || exit 1
+run_expect_red "§V-3" "$TEST_MINBTL"
+
+echo "[§V-1] DSR 之 E[maxSR] 刪 γ 項（只留 (1-γ) 之 ppf(1-1/N)... 改為裸 ppf(1-1/N)）"
+mutate "$DSR" '    return (1.0 - _EULER_GAMMA) * float(norm.ppf(1.0 - 1.0 / n_trials)) + _EULER_GAMMA * float(
+        norm.ppf(1.0 - 1.0 / (n_trials * math.e))
+    )' '    return float(norm.ppf(1.0 - 1.0 / n_trials))  # MUTANT: γ 項刪除' || exit 1
+run_expect_red "§V-1" "$TEST_DSR"
+
+echo "[§V-11] DSR 分母改用跨 trial V[{SR_n}]（grok R2 建議之錯誤形式）"
+mutate "$DSR" '    stat = (sr_obs - sr0) / math.sqrt(sr.sr_estimator_variance)  # A1-12：分母唯一定義處' '    stat = (sr_obs - sr0) / math.sqrt(statistics.variance(ledger_result.valid_sharpe_values) if ledger_result is not None and len(ledger_result.valid_sharpe_values) >= 2 else sr.sr_estimator_variance)  # MUTANT' || exit 1
+run_expect_red "§V-11" "$TEST_DSR"
+
+echo "[§V-12] compute_sharpe 之 skew/kurt 矩公式改以年化 SR 代入（單位不變性須抓到）"
+mutate "$SHARPE" '    sr_var = (1.0 - skew * sr_pp + (kurtosis - 1.0) / 4.0 * sr_pp**2) / (n_obs - 1)' '    _sr_ann = sr_pp * float(np.sqrt(periods_per_year))  # MUTANT
+    sr_var = (1.0 - skew * _sr_ann + (kurtosis - 1.0) / 4.0 * _sr_ann**2) / (n_obs - 1)' || exit 1
+run_expect_red "§V-12" "$TEST_DSR"
+
 echo "[verify] 還原後應無 mutant 殘留且全綠（🔴 K2：任一不成立即 exit 1）"
 restore_all
-if grep -rn "MUTANT" "$FREQ" "$SHARPE" "$RC" "$LEDGER" "$TEST_VB"; then
+if grep -rn "MUTANT" "$FREQ" "$SHARPE" "$RC" "$LEDGER" "$MINBTL" "$DSR" "$TEST_VB"; then
   echo "  🔴 有 mutant 殘留 ⇒ 還原機制失效（首版即因 git checkout 對未追蹤檔無效而發生）" >&2
   exit 1
 fi
@@ -189,4 +217,4 @@ if [ "$FAILED_DESIGN" -ne 0 ]; then
   echo "[gap1-b1-mutation] 🔴 有 mutation 未通過「可證偽」判準"
   exit 1
 fi
-echo "[gap1-b1-mutation] ✅ 全部 12 條 mutation 皆使測試轉紅（rc=1 斷言失敗）"
+echo "[gap1-b1-mutation] ✅ 全部 17 條 mutation 皆使測試轉紅（rc=1 斷言失敗）"

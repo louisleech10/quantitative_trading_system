@@ -19,10 +19,17 @@ import json
 from pathlib import Path
 
 from api.core.logging import get_logger
-from momentum.factories import get_ml_pipeline_config_class
+from momentum.factories import (
+    create_strategy_validation_reporter,
+    get_invalid_validation_argument_class,
+    get_ml_pipeline_config_class,
+)
 from momentum.core.contracts import IndicatorConfig
 
 MLPipelineConfig = get_ml_pipeline_config_class()
+# GAP-1 Task 3.4／A1-16：reporter 之「提供了但非法」參數例外（ValueError 子類）須 5xx 可觀測，
+# 不得被本 route 之 `except ValueError → 400` 吞成用戶輸入錯（它是接線 bug）。經 factories 取類別（Rule 3）。
+InvalidValidationArgument = get_invalid_validation_argument_class()
 
 router = APIRouter(prefix="/api/v1/ml-pipeline")
 logger = get_logger("api.routes.ml_pipeline")
@@ -103,6 +110,8 @@ class CreatePipelineResponse(BaseModel):
     pipeline_id: str
     message: str
     pipeline_summary: Optional[dict] = None
+    # GAP-1 Task 3.4（A1-8）：只投影三鍵 {eligibility, display_downgrade, warning_text_key}；不拒絕請求
+    strategy_validation: Optional[Dict[str, Any]] = None
 
 
 class PipelineDetailResponse(BaseModel):
@@ -237,13 +246,30 @@ async def create_ml_pipeline(request: CreatePipelineRequest):
             ]
         }
         
+        # GAP-1 Task 3.4：資格狀態＋警語（降級展示，不拒絕）。今日三個 optional 皆不傳 ⇒ 誠實 unavailable/n_unknown。
+        # 🔴 禁 dataset_key=f"trial:{n}" 自創公式（per-trial 鍵使 N≡1）；dataset 級鍵由 G1-R1 生產者契約提供。
+        try:
+            section = create_strategy_validation_reporter().for_study_trial(
+                request.study_name, request.trial_number
+            )
+        except InvalidValidationArgument as exc:
+            # A1-16：「提供了但非法」＝接線 bug ⇒ 5xx 可觀測（不得走下方 ValueError→400、不得吞成 reporter_failed）
+            logger.error(f"strategy_validation invalid argument (wiring bug): {exc}", exc_info=True)
+            raise HTTPException(status_code=500, detail="strategy_validation reporter argument error")
+        strategy_validation = {
+            "eligibility": section["eligibility"],
+            "display_downgrade": section["display_downgrade"],
+            "warning_text_key": section["warning_text_key"],
+        }
+
         return CreatePipelineResponse(
             success=True,
             pipeline_id=pipeline_id,
             message=f"Pipeline created successfully in {mode} mode",
-            pipeline_summary=summary
+            pipeline_summary=summary,
+            strategy_validation=strategy_validation,
         )
-        
+
     except FileNotFoundError as e:
         logger.error(f"Study or trial not found: {e}", exc_info=True)
         raise HTTPException(
