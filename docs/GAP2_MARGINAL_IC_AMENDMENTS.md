@@ -20,7 +20,7 @@
 
 ## A1-5 — §C 既有檔白名單 #6 再擴 `frontend/src/app/ic-analysis/page.tsx`（母 SPEC §C#6／Task 5.1「接入現有 IC 結果頁 deep 區塊之後」；來源 R9 CODEX-R9-P1-02／COMPOSER-R9-P1-01／GROK-R9-P0-01；A1-4 同構補洞）
 - 母 SPEC Task 5.1 要求表格接入 IC 結果頁 deep 區塊，但 deep 區塊容器為既有檔 `page.tsx`（`TabsContent value="deep"` 以具名 import 掛載各圖，無動態註冊），§C#6／A1-4 未列 ⇒ 守白名單則表格永不可見。
-- 決策：§C#6 為**四檔**：A1-4 三檔＋`frontend/src/app/ic-analysis/page.tsx`（**只**①加 `import MarginalICTable from '@/components/ic-analysis/MarginalICTable'` ②於 deep `TabsContent` 末段（現 `NetICChart` 之後）加 `<ChartErrorBoundary title="邊際 IC／多因子組合"><MarginalICTable section={report?.marginal_ic} /></ChartErrorBoundary>`；資料源＝base `report`（非 `deepAnalysisReport`）；不改其他區塊／tab／樣式）。驗收須證頁面實際掛載（`page.tsx` 含該 import 與 JSX；vitest 或 grep 斷言），禁以「只測元件」代替。
+- 決策（掛載點依下方「A1-5 補正」為 **basic tab 末段**，本行 deep 字樣為 R9 synth 原文保留）：§C#6 為**四檔**：A1-4 三檔＋`frontend/src/app/ic-analysis/page.tsx`（**只**①加 `import MarginalICTable from '@/components/ic-analysis/MarginalICTable'` ②於 deep `TabsContent` 末段（現 `NetICChart` 之後）加 `<ChartErrorBoundary title="邊際 IC／多因子組合"><MarginalICTable section={report?.marginal_ic} /></ChartErrorBoundary>`；資料源＝base `report`（非 `deepAnalysisReport`）；不改其他區塊／tab／樣式）。驗收須證頁面實際掛載（`page.tsx` 含該 import 與 JSX；vitest 或 grep 斷言），禁以「只測元件」代替。
 
 ## A1-6 — `survivor_output.reason` 於寫檔失敗恆為契約字面 `write_failed`（母 SPEC Task 4.2 L214「`write_failed:<exc class>`」；來源 R9 CODEX-R9-P1-03）
 - 母 SPEC 寫 `reason:"write_failed:<exc class>"`，與契約 `reasons.survivor_output` 封閉集合（`identity_missing`／`write_failed`／`persist_suppressed`）互斥：嚴格 membership 檢查會拒絕，放寬則 SoT 不封閉。

@@ -1,6 +1,6 @@
 # GAP-2a 邊際 IC／多因子組合 ＋ GAP-2b 倖存因子輸出契約 — TODO
 
-版本：**DRAFT R4**（2026-08-18；R9 TODO adversarial 三家 7 findings 三群集全部接受：`page.tsx` 入白名單（A1-5）、Phase 各批 Gate 小節改 pointer §B＋逐字同命令、`write_failed` reason 字面封閉（A1-6）；三家皆確認 R8 十群集寫回成立、U6 駁回碼證可重現；R8：15 findings 十群集：14 接受寫回、1 駁回（CODEX-R8-P1-06 警語子字串，碼證於 `handoffs/reconcile/20260818-gap2-x-review-r8/synth.md` U6）：B5 白名單三檔（A1-4）、刪 4.1 `pass_class` 推導殘句、golden pre `case_id`＋`report_ref` 斷言、4.2 persist 顯式 kwargs＋三 caller 來源、`persist_suppressed` 五鍵 object、bench `fit_projection` spy、xsec N/A 節＋reporter 透傳、B1 gate 探針命令明列路徑＋每檔 `test_mutation_*` 名、「四處」→兩插入點；R7：gate 分跑、`summary_by_feature`＋root 注入 OOS、兩插入點＋`_in_fallback_rerun`、persist 顯式 kwargs＋`_features_path`、B5 toggle 具名 preset＋FeatureTierPanel、文案子字串、bench 觀測降級、mutation 唯一對映；SPEC 義務側擴張走延伸檔 A1-1..A1-6；待 R10 複核）｜基於 SPEC：`docs/GAP2_MARGINAL_IC_SPEC.md`（**R7 FROZEN**，2026-08-18 使用者白話閘核准；六輪三家 adversarial 收斂檔 `handoffs/reconcile/20260818-gap2-x-review-r{1..6}/synth.md` 皆三家 RECONCILE-STAMP）
+版本：**DRAFT R5**（2026-08-18；R10 TODO adversarial 三家：composer／grok sentinel「可 Frozen」、codex 1 MINOR（Phase B4 小節同文 §B）已寫回；A1-5 basic-tab 補正三家實核成立；R9 TODO adversarial 三家 7 findings 三群集全部接受：`page.tsx` 入白名單（A1-5）、Phase 各批 Gate 小節改 pointer §B＋逐字同命令、`write_failed` reason 字面封閉（A1-6）；三家皆確認 R8 十群集寫回成立、U6 駁回碼證可重現；R8：15 findings 十群集：14 接受寫回、1 駁回（CODEX-R8-P1-06 警語子字串，碼證於 `handoffs/reconcile/20260818-gap2-x-review-r8/synth.md` U6）：B5 白名單三檔（A1-4）、刪 4.1 `pass_class` 推導殘句、golden pre `case_id`＋`report_ref` 斷言、4.2 persist 顯式 kwargs＋三 caller 來源、`persist_suppressed` 五鍵 object、bench `fit_projection` spy、xsec N/A 節＋reporter 透傳、B1 gate 探針命令明列路徑＋每檔 `test_mutation_*` 名、「四處」→兩插入點；R7：gate 分跑、`summary_by_feature`＋root 注入 OOS、兩插入點＋`_in_fallback_rerun`、persist 顯式 kwargs＋`_features_path`、B5 toggle 具名 preset＋FeatureTierPanel、文案子字串、bench 觀測降級、mutation 唯一對映；SPEC 義務側擴張走延伸檔 A1-1..A1-6；待 R11 確認）｜基於 SPEC：`docs/GAP2_MARGINAL_IC_SPEC.md`（**R7 FROZEN**，2026-08-18 使用者白話閘核准；六輪三家 adversarial 收斂檔 `handoffs/reconcile/20260818-gap2-x-review-r{1..6}/synth.md` 皆三家 RECONCILE-STAMP）
 ｜實作端：Claude 主委自任｜review／adversarial：codex+composer+grok 三家（實作者不自審）｜SPEC 後續修訂走延伸檔 `docs/GAP2_MARGINAL_IC_AMENDMENTS.md`（衝突時以延伸檔為準）
 
 > 冷啟動原則：執行端讀完本檔即可逐 Task 寫碼，不需回讀 SPEC；SPEC 之義務以 `SPEC ref` 指回。
@@ -244,7 +244,7 @@
 - **覆蓋風險**：無。
 
 ### Phase B4 測試 ＋ Gate
-- **單一來源＝§B「B4→B5」列**（含 `mutation_probe_check.sh` 三新檔路徑、`ic_wiring_check.sh`、`gap2_freeze_golden.py --check`、`--batch B4`）；另 `bash scripts/plain_docs_sync_check.sh` ✓（動 `scripts/`）；三家 code review CLOSED＋戳記。
+- **單一來源＝§B「B4→B5」列（R10 CODEX-R10-P2-01：同文逐字）**：`pytest tests/momentum/Analysis/test_gap2_stage6b_wiring.py tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_gap2_golden.py tests/momentum/Analysis/test_ichc_contract_sync.py tests/momentum/Analysis/test_ichc_wiring_check.py tests/momentum/Analysis/test_ic_persist_redirect_unit.py -q` rc=0 ＋ `bash scripts/mutation_probe_check.sh tests/momentum/Analysis/test_gap2_stage6b_wiring.py tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_gap2_golden.py` rc=0 ＋ `bash scripts/ic_wiring_check.sh` rc=0 ＋ `venv/bin/python scripts/gap2_freeze_golden.py --check` rc=0 ＋ `--batch B4` rc=0 ＋ 三家 review CLOSED＋戳記；另 `bash scripts/plain_docs_sync_check.sh` ✓（動 `scripts/`）。
 
 ## Phase B5 — 前端最小鏡像（使用者 2026-08-18 白話閘裁定：表格＋toggle 預設開）
 
@@ -305,4 +305,4 @@
 5. 錨點：`## §0`、`## §B`、每 Task 含「驗證」「邊界」「不可做」「**存活至**」「**覆蓋風險**」。
 
 ## 階段 4 handoff
-`SPEC=docs/GAP2_MARGINAL_IC_SPEC.md AMEND=docs/GAP2_MARGINAL_IC_AMENDMENTS.md TODO=docs/GAP2_MARGINAL_IC_TODO.md FOCUS=TODO R10 複核（R9 三群集 V1–V3 寫回逐條核對：page.tsx A1-5、Phase gate pointer、write_failed A1-6；可 Frozen？）`
+`SPEC=docs/GAP2_MARGINAL_IC_SPEC.md AMEND=docs/GAP2_MARGINAL_IC_AMENDMENTS.md TODO=docs/GAP2_MARGINAL_IC_TODO.md FOCUS=TODO R11 確認（R10 W1 一行同文寫回；三家 sentinel ⇒ FROZEN）`
