@@ -187,3 +187,281 @@ def test_load_returns_copy_not_shared_singleton():
     assert b["version"] == 1
     assert "tampered" not in b["reasons"]["marginal_ic"]
     assert a is not b
+
+
+# ============================================================================
+# Task 3.1 — resolver／event identity／validator／build_survivor_output（B3；名稱不含 load）
+# ============================================================================
+import copy as _copy
+import hashlib as _hashlib
+from types import SimpleNamespace as _NS
+
+import numpy as _np
+import pandas as _pd
+
+from momentum.Analysis.factor_combiner import combine_factors as _combine
+from momentum.Analysis.marginal_ic import MarginalICParams as _P, compute_marginal_ic as _cmi
+from momentum.core.contracts import canonical_idx_hash as _cih
+
+
+def _o2():
+    rng = _np.random.default_rng(20260803)
+    n = 5000
+    s1, s2, f = rng.standard_normal(n), rng.standard_normal(n), rng.standard_normal(n)
+    eps = rng.normal(0.0, 0.812, n)
+    y = 0.3 * s1 + 0.3 * s2 + 0.4 * f + eps
+    df = _pd.DataFrame({"s1": s1, "s2": s2, "f": f, "z": rng.standard_normal(n)})
+    tr = _np.zeros(n, dtype=bool)
+    tr[:3000] = True
+    return df, _pd.Series(y), tr, ~tr
+
+
+def _build_kwargs(*, event=None, fallback=False, root="ok_oos", extra=("z",)):
+    df, y, tr, te = _o2()
+    p = _P(n_bootstrap=10, block_len=5)
+    surv = ["s1", "s2", "f"]
+    marg = _cmi(df, y, train_mask=tr, test_mask=te, survivors=surv, extra_candidates=list(extra), params=p, fit_scope="train")
+    comp = _combine(df, y, train_mask=tr, test_mask=te, survivors=surv, params=p, fit_scope="train")
+    idx = _np.arange(len(df))
+    train_plan = _NS(row_index=idx[tr], time_bounds=("2024-01-01", "2024-06-30"), embargo=2, purge_gap=3, base_universe_hash="u" * 8)
+    test_plan = _NS(row_index=idx[te], time_bounds=("2024-07-01", "2024-12-31"), embargo=2, purge_gap=3, base_universe_hash="u" * 8)
+    report_meta = {
+        "symbol": "ETHUSDT", "timeframe": "12h", "n_samples": len(df),
+        "event_filter": ({"fallback": True} if fallback else {"applied": True}) if event is not None else None,
+        "ic_train_test_split": {"applied": True}, "split_method": "holdout",
+        "selection_scope": {"scope_id": "scope-1"},
+    }
+    ev = sc.compute_event_identity(None, None) if event is None else event
+    return dict(
+        report_meta=report_meta, filtered_features=surv, marginal_ic_result=marg, composite_result=comp,
+        summary_by_feature={n: {"ic_mean": 0.1, "icir": 1.2, "p_value_adj": 0.01, "pass_class": "oos"} for n in surv},
+        root_analysis_status=root, event_identity=ev,
+        split_context={"train_plan": train_plan, "test_plan": test_plan}, config_hash="c" * 8, features_source_hash="f" * 64,
+        features_path="/tmp/x.h5", labels_content_hash="l" * 64, symbol="ETHUSDT", timeframe="12h", case_id="ic_gatekeeper",
+        generated_at="2026-08-19T00:00:00Z", fit_mode="train", pit_stats_version="v1", ic_method="spearman",
+        label_horizon=12, label_return_type="log", report_ref="ic_report_ic_gatekeeper.json",
+    ), test_plan
+
+
+def test_roundtrip_build_then_validate():  # ①
+    kw, test_plan = _build_kwargs()
+    payload = sc.build_survivor_output(**kw)
+    sc.validate_survivor_output(payload, report_meta=kw["report_meta"], report_ref_path="/x/ic_report_ic_gatekeeper.json")
+    assert payload["feature_names"] == ["s1", "s2", "f"]
+    assert payload["sample_scope"]["kind"] == "full" and payload["sample_scope"]["event"] is None
+    assert payload["split"]["row_identity"]["test_index_hash"] == _cih(test_plan.row_index)  # ⑬（合成 plan）
+    assert payload["survivors"][2]["marginal_ic_loo"] is not None and payload["survivors"][2]["redundancy_kept"] is True
+    assert payload["composite"]["method"] == "equal" and set(payload["removed_candidates"]) == {"z"}
+    assert payload["status"] == "ok" and payload["reason"] is None
+    assert payload["independent_oos_validation"] is False and payload["pass_class"] == "oos"
+    # 空 survivors 亦可組裝
+    kw2 = dict(kw); kw2["filtered_features"] = []; kw2["marginal_ic_result"] = None; kw2["composite_result"] = None
+    empty = sc.build_survivor_output(**kw2)
+    sc.validate_survivor_output(empty)
+    assert (empty["status"], empty["reason"]) == ("not_applicable", "no_survivors") and empty["survivors"] == []
+
+
+def _valid_payload():
+    kw, _ = _build_kwargs()
+    return sc.build_survivor_output(**kw), kw
+
+
+@pytest.mark.parametrize("path", [("schema_version",), ("sample_scope",), ("provenance", "config_hash"), ("split", "row_identity", "train_index_hash"), ("survivors", 0, "feature_name")])
+def test_missing_required_key_raises(path):  # ②
+    payload, _ = _valid_payload()
+    node = payload
+    for p in path[:-1]:
+        node = node[p]
+    del node[path[-1]]
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(payload)
+
+
+@pytest.mark.parametrize("path", [(), ("sample_scope",), ("split",), ("provenance",), ("composite",), ("survivors", 0), ("split", "row_identity")])
+def test_unknown_key_raises(path):  # ③ ⑩
+    payload, _ = _valid_payload()
+    node = payload
+    for p in path:
+        node = node[p]
+    node["__extra__"] = 1
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(payload)
+
+
+def test_kind_enum_and_event_null_raise():  # ④ ⑤
+    payload, _ = _valid_payload()
+    bad = _copy.deepcopy(payload); bad["sample_scope"]["kind"] = "panel"
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(bad)
+    bad2 = _copy.deepcopy(payload); bad2["sample_scope"]["kind"] = "event"; bad2["sample_scope"]["event"] = None
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(bad2)
+
+
+def test_oos_four_field_consistency():  # ⑥ ⑪ ⑯ ⑰
+    payload, _ = _valid_payload()
+    b = _copy.deepcopy(payload); b["analysis_status"] = "degraded_full_sample"  # oos 仍 True
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["oos_guarantees"] = False  # ok_oos + False
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["pass_class"] = "full_sample_research_only"
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["independent_oos_validation"] = True
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["oos_semantics"] = "independent_oos"
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["analysis_status"] = "research_only"
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    # degraded 組合合法
+    kw, _ = _build_kwargs(root="degraded_full_sample")
+    d = sc.build_survivor_output(**kw)
+    sc.validate_survivor_output(d)
+    assert (d["oos_guarantees"], d["pass_class"]) == (False, "full_sample_research_only")
+
+
+def test_resolve_ref_and_capability_status():  # ⑧
+    c = sc.load_survivor_contract()
+    assert frozenset(sc.resolve_ref(c["capability_status_ref"])) == contract_enum("capability_status")
+    with pytest.raises(ContractValidationError):
+        sc.resolve_ref("momentum/Analysis/contracts/nope.json#capability_status")
+    with pytest.raises(ContractValidationError):
+        sc.resolve_ref("momentum/Analysis/contracts/ic_report_contract.json#no_such_key")
+    with pytest.raises(ContractValidationError):
+        sc.resolve_ref("momentum/Analysis/contracts/ic_report_contract.json#reasons")  # dict 非 list
+    with pytest.raises(ContractValidationError):
+        sc.resolve_ref("garbage")
+
+
+def test_section_key_sets_match_dataclasses():  # ⑨
+    payload, kw = _valid_payload()
+    c = sc.load_survivor_contract()["marginal_ic_section_keys"]
+    assert set(kw["marginal_ic_result"].to_dict().keys()) == set(c["section_keys"]["keys"])
+    assert set(kw["composite_result"].to_dict().keys()) == set(c["composite_keys"]["keys"])
+    for e in kw["marginal_ic_result"].to_dict()["sequential"]:
+        assert set(e.keys()) == set(c["sequential_keys"]["keys"])
+
+
+def test_feature_set_hash_and_survivor_sequence():  # ⑫
+    payload, _ = _valid_payload()
+    b = _copy.deepcopy(payload); b["feature_set_hash"] = "0" * 64
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["survivors"][0], b["survivors"][1] = b["survivors"][1], b["survivors"][0]
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    assert payload["feature_set_hash"] == _hashlib.sha256(json.dumps(payload["feature_names"], separators=(",", ":")).encode()).hexdigest()
+
+
+def test_checklist_subset_of_contract_keys():  # ⑭
+    c = sc.load_survivor_contract()
+    checklist = {
+        "survivor_file_keys": ["symbol", "timeframe", "case_id", "sample_scope", "provenance", "split", "feature_names", "feature_set_hash", "survivors", "composite",
+                               "analysis_status", "oos_guarantees", "pass_class", "independent_oos_validation", "selection_sample", "oos_semantics", "statistic"],
+        "sample_scope_keys": ["kind", "event", "degraded"],
+        "event_definition_keys": ["definition_hash", "timestamps_hash", "mode", "n_events", "n_timestamps_requested"],
+        "provenance_keys": ["config_hash", "features_source_hash", "labels_content_hash", "features_path", "pit_stats_version", "fit_mode", "ic_method", "label_horizon", "label_return_type", "report_ref", "producer", "contract_version", "algorithm_version"],
+        "split_keys": ["split_method", "train_time_bounds", "test_time_bounds", "train_rows", "test_rows", "embargo", "purge_gap", "base_universe_hash", "selection_scope_id", "row_identity"],
+        "row_identity_keys": ["train_index_hash", "test_index_hash"],
+        "survivor_record_keys": ["ic_mean", "icir", "p_value_adj", "pass_class", "train_ic", "gross_ic", "marginal_ic_loo", "marginal_ic_loo_ci95", "marginal_ic_train_insample", "redundancy_kept"],
+    }
+    for schema_name, items in checklist.items():
+        assert set(items) <= set(c[schema_name]["keys"].keys()), schema_name
+
+
+def test_identity_three_fields():  # ⑮
+    payload, kw = _valid_payload()
+    meta = kw["report_meta"]
+    # 三欄由參數帶入（非寫死）：換值重組後 payload 必反映（V-19 三 case 之 oracle）
+    kw_b = dict(kw); kw_b.update(symbol="BTCUSDT", timeframe="1h", case_id="alt_case", report_ref="ic_report_alt_case.json")
+    kw_b["report_meta"] = {**meta, "symbol": "BTCUSDT", "timeframe": "1h"}
+    pb = sc.build_survivor_output(**kw_b)
+    assert (pb["symbol"], pb["timeframe"], pb["case_id"]) == ("BTCUSDT", "1h", "alt_case")
+    sc.validate_survivor_output(pb, report_meta=kw_b["report_meta"], report_ref_path="/r/ic_report_alt_case.json")
+    sc.validate_survivor_output(payload, report_meta=meta, report_ref_path="/r/ic_report_ic_gatekeeper.json")  # 正常
+    # symbol 篡改／缺失
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(payload, report_meta={**meta, "symbol": "BTCUSDT"})
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(payload, report_meta={k: v for k, v in meta.items() if k != "symbol"})
+    # timeframe 篡改／缺失
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(payload, report_meta={**meta, "timeframe": "1h"})
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(payload, report_meta={**meta, "timeframe": None})
+    # case_id vs report_ref_path 檔名段
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(payload, report_ref_path="/r/ic_report_other.json")
+    b = _copy.deepcopy(payload); b["provenance"]["report_ref"] = "ic_report_other.json"
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["case_id"] = "other"
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b, report_ref_path="/r/ic_report_ic_gatekeeper.json")
+
+
+def test_event_identity_serialization():  # ⑱
+    ts_a = ["2024-01-03T00:00:00Z", "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z", "2024-01-01T00:00:00Z"]
+    ts_b = ["2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z", "2024-01-03T00:00:00Z"]
+    a = sc.compute_event_identity(None, ts_a)
+    b = sc.compute_event_identity(None, ts_b)
+    assert a["mode"] == "timestamps" and a["timestamps_hash"] == b["timestamps_hash"] == a["definition_hash"]
+    assert a["n_events"] == 3 and a["n_timestamps_requested"] == 4 and b["n_timestamps_requested"] == 3
+    # 數值 epoch（ms 與 s 自動判別）與字串同值
+    ms = [1704067200000, 1704153600000, 1704240000000]
+    s = [1704067200, 1704153600, 1704240000]
+    assert sc.compute_event_identity(None, ms)["timestamps_hash"] == b["timestamps_hash"]
+    assert sc.compute_event_identity(None, s)["timestamps_hash"] == b["timestamps_hash"]
+    q = sc.compute_event_identity("  SELECT * FROM events  ", None)
+    assert q["mode"] == "query" and q["timestamps_hash"] is None and q["definition_hash"] == _hashlib.sha256(b"SELECT * FROM events").hexdigest()
+    assert q["n_events"] is None
+    none = sc.compute_event_identity("", [])
+    assert none == {"mode": "none", "definition_hash": None, "timestamps_hash": None, "n_events": None, "n_timestamps_requested": None}
+    # 事件模式與 fallback 之 sample_scope
+    kw, _ = _build_kwargs(event=b)
+    p_ev = sc.build_survivor_output(**kw)
+    sc.validate_survivor_output(p_ev)
+    assert p_ev["sample_scope"]["kind"] == "event" and p_ev["sample_scope"]["event"]["definition_hash"] == b["definition_hash"]
+    kw2, _ = _build_kwargs(event=b, fallback=True, root="degraded_full_sample")
+    p_fb = sc.build_survivor_output(**kw2)
+    sc.validate_survivor_output(p_fb)
+    assert p_fb["sample_scope"]["kind"] == "full" and p_fb["sample_scope"]["degraded"] is True
+
+
+def test_view_status_object_composite_and_type_checks():
+    payload, _ = _valid_payload()
+    b = _copy.deepcopy(payload); b["composite"] = {"status": "disabled", "reason": "disabled_by_config"}
+    sc.validate_survivor_output(b)
+    b["composite"] = {"status": "disabled", "reason": "disabled_by_config", "x": 1}
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["split"]["train_rows"] = "3000"
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["oos_guarantees"] = 1  # bool 欄不得為 int
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(payload); b["survivors"][0]["ic_mean"] = float("nan")
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+
+
+def test_mutation_validator_skips_feature_set_hash(monkeypatch):
+    """探針：validator 若略過 feature_set_hash 重算 ⇒ ⑫ 篡改案例不再 raise ⇒ 紅。"""
+    payload, _ = _valid_payload()
+    b = _copy.deepcopy(payload); b["feature_set_hash"] = "0" * 64
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)  # 基線：會 raise
+    monkeypatch.setattr(sc, "feature_set_hash", lambda names: b["feature_set_hash"])  # mutant：重算被繞過（恆等於 payload 值）
+    try:
+        sc.validate_survivor_output(b)
+        mutant_raised = False
+    except ContractValidationError:
+        mutant_raised = True
+    with pytest.raises(AssertionError):
+        assert mutant_raised, "oracle ⑫ 於 mutant 下應失效（篡改 hash 未被抓）"

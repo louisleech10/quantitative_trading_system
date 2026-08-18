@@ -43,7 +43,7 @@
 <tr>
 <td>B3</td>
 <td>契約讀取／驗證／組裝（缺欄／多欄／枚舉外／身分不符都擋）</td>
-<td>🔄 動工中</td>
+<td>✅ 寫完（35 條測試全綠；8 條 mutation 全紅）→ 待三家 code review＋蓋章</td>
 </tr>
 <tr>
 <td>B4</td>
@@ -71,6 +71,7 @@
 <li>第 2 批寫完（8/19 凌晨）：<code>combine_factors</code>——把倖存因子的秩常態分數用「只看訓練段決定的符號與權重」合成一個訊號，在測試段算 IC；附「訓練段最強單因子的測試段 IC」當對照與差值的 bootstrap 區間；bootstrap 從第 1 批搬家到這個模組（<code>marginal_ic</code> 改 import，避免循環 import 用函式內 lazy import）。SPEC 給的四因子加法性 oracle（等權 composite 0.55–0.61、每個邊際 0.26–0.31、平方和比 0.9–1.1）一次落帶。3 條 mutation：符號改用測試段／權重改用測試段／bootstrap 區塊長度強制 1，都改壞就紅。</li>
 <li>第 2 批 code review：codex 抓到 bootstrap 信賴區間在極端參數（只重抽 1 次）下可以不含點估——這違反規格 O9 的硬要求；修法是回傳「百分位區間與觀測值的包絡」（先試「把觀測值也丟進分佈」，被自己的另一條測試打回：內插分位數仍可能不含），兩檔各加 <code>n_bootstrap=1</code> 迴歸；另一條是函式簽名型別放寬，改回 typed。composer／grok 零意見。</li>
 <li>第 2 批蓋章：codex 又抓到一個字面級細節——<code>from __future__ import annotations</code> 下我把型別註記寫成字串，<code>inspect.signature</code> 顯示多一層引號，與 brief 判準字面不符；一行改掉、codex 單家獨占重驗即過。兩家一次 APPROVED。</li>
+<li>第 3 批寫完（8/19）：<code>resolve_ref</code>（跨檔引用 fail-closed）、<code>compute_event_identity</code>（事件時間戳→毫秒→去重排序→sha256；查詢模式只 hash 查詢字串）、<code>validate_survivor_output</code>（每一層物件都查缺鍵／多鍵／型別／可空；枚舉；OOS 四欄互斥；<code>feature_set_hash</code> 重算；身分三欄與報告對照）、<code>build_survivor_output</code>（純組裝，不寫檔）。8 條 mutation：拿掉 sample_scope／放寬多鍵／契約 kind 偷加 panel／不驗 independent_oos／symbol・timeframe・case_id 各自寫死／略過 hash 重算——全部改壞就紅。既有 report 契約同步測試仍綠（本批沒碰它）。</li>
 </ul>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-2施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>

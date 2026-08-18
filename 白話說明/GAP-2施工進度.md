@@ -13,7 +13,7 @@
 |---|---|---|
 | B1 | 契約 JSON 單一真相源＋邊際 IC 純函式＋9 類 oracle＋探針腳本 | ✅ **收案**（三家 code review 11 條全處置＋三家蓋章 PASS；46 測試全綠、10 mutation 全紅）|
 | B2 | 多因子組合＋區塊 bootstrap 信賴區間 | ✅ **收案**（三家 code review 4 條全處置＋三家蓋章 PASS；45 測試全綠、3 mutation 全紅）|
-| B3 | 契約讀取／驗證／組裝（缺欄／多欄／枚舉外／身分不符都擋） | 🔄 動工中 |
+| B3 | 契約讀取／驗證／組裝（缺欄／多欄／枚舉外／身分不符都擋） | ✅ 寫完（35 條測試全綠；8 條 mutation 全紅）→ 待三家 code review＋蓋章 |
 | B4 | 接進 IC 主流程（三個入口＋fallback）、倖存者檔、報告新節、golden、wiring 改讀契約、預算 receipt | — |
 | B5 | 前端：型別鏡像＋開關（預設開）＋一張唯讀表格 | — |
 
@@ -29,3 +29,4 @@
 - 第 2 批寫完（8/19 凌晨）：`combine_factors`——把倖存因子的秩常態分數用「只看訓練段決定的符號與權重」合成一個訊號，在測試段算 IC；附「訓練段最強單因子的測試段 IC」當對照與差值的 bootstrap 區間；bootstrap 從第 1 批搬家到這個模組（`marginal_ic` 改 import，避免循環 import 用函式內 lazy import）。SPEC 給的四因子加法性 oracle（等權 composite 0.55–0.61、每個邊際 0.26–0.31、平方和比 0.9–1.1）一次落帶。3 條 mutation：符號改用測試段／權重改用測試段／bootstrap 區塊長度強制 1，都改壞就紅。
 - 第 2 批 code review：codex 抓到 bootstrap 信賴區間在極端參數（只重抽 1 次）下可以不含點估——這違反規格 O9 的硬要求；修法是回傳「百分位區間與觀測值的包絡」（先試「把觀測值也丟進分佈」，被自己的另一條測試打回：內插分位數仍可能不含），兩檔各加 `n_bootstrap=1` 迴歸；另一條是函式簽名型別放寬，改回 typed。composer／grok 零意見。
 - 第 2 批蓋章：codex 又抓到一個字面級細節——`from __future__ import annotations` 下我把型別註記寫成字串，`inspect.signature` 顯示多一層引號，與 brief 判準字面不符；一行改掉、codex 單家獨占重驗即過。兩家一次 APPROVED。
+- 第 3 批寫完（8/19）：`resolve_ref`（跨檔引用 fail-closed）、`compute_event_identity`（事件時間戳→毫秒→去重排序→sha256；查詢模式只 hash 查詢字串）、`validate_survivor_output`（每一層物件都查缺鍵／多鍵／型別／可空；枚舉；OOS 四欄互斥；`feature_set_hash` 重算；身分三欄與報告對照）、`build_survivor_output`（純組裝，不寫檔）。8 條 mutation：拿掉 sample_scope／放寬多鍵／契約 kind 偷加 panel／不驗 independent_oos／symbol・timeframe・case_id 各自寫死／略過 hash 重算——全部改壞就紅。既有 report 契約同步測試仍綠（本批沒碰它）。

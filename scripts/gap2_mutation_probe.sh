@@ -31,6 +31,8 @@ PY=venv/bin/python
 MIC=momentum/Analysis/marginal_ic.py
 FC=momentum/Analysis/factor_combiner.py
 TEST_FC=tests/momentum/Analysis/test_factor_combiner.py
+SC=momentum/Analysis/survivor_contract.py
+CONTRACT=momentum/Analysis/contracts/ic_survivor_contract.json
 TEST_MIC=tests/momentum/Analysis/test_marginal_ic.py
 TEST_SC=tests/momentum/Analysis/test_survivor_contract.py
 
@@ -58,7 +60,19 @@ case "${BATCH}" in
     CASES+=("V-8|${FC}|    weight_source_ic = train_ic|    weight_source_ic = test_ic_all  # MUTANT: 權重用 test|test_ic_weighted_uses_train_ic_reference")
     CASES+=("V-9|${FC}|    b = min(int(block_len), n)  |    b = 1  # MUTANT: 強制 iid; |test_delta_ci_uses_block_len_reference")
     ;;
-  B3|B4|B5)
+  B3)
+    ALL_TESTS="${TEST_SC}"
+    TARGETS="${SC} ${CONTRACT}"
+    CASES+=("V-10|${SC}|        \"sample_scope\": sample_scope,|        \"sample_scope_\": sample_scope,  # MUTANT: 移除 sample_scope|test_roundtrip_build_then_validate")
+    CASES+=("V-11|${SC}|    if schema.get(\"additional_properties\") is False:|    if False:  # MUTANT: 放寬 additional_properties|test_unknown_key_raises")
+    CASES+=("V-12|${CONTRACT}|  \"sample_scope_kind_values\": [|  \"sample_scope_kind_values\": [\"panel\",|test_load_sample_scope_kind_values_subset_of_row_mask_plan_source")
+    CASES+=("V-17b|${SC}|    if payload[\"independent_oos_validation\"] not in c[\"independent_oos_validation_allowed\"]:|    if False:  # MUTANT: 不驗 independent_oos_validation|test_oos_four_field_consistency")
+    CASES+=("V-19a|${SC}|        \"symbol\": str(symbol),|        \"symbol\": \"ETHUSDT\",  # MUTANT: 寫死|test_identity_three_fields")
+    CASES+=("V-19b|${SC}|        \"timeframe\": str(timeframe),|        \"timeframe\": \"12h\",  # MUTANT: 寫死|test_identity_three_fields")
+    CASES+=("V-19c|${SC}|        \"case_id\": str(case_id),|        \"case_id\": \"ic_gatekeeper\",  # MUTANT: 寫死|test_identity_three_fields")
+    CASES+=("V-20|${SC}|    if payload[\"feature_set_hash\"] != feature_set_hash(names):|    if False:  # MUTANT: 略過 feature_set_hash 重算|test_feature_set_hash_and_survivor_sequence")
+    ;;
+  B4|B5)
     echo "🔴 batch ${BATCH} 之 case 表尚未定義（該批 Task 落地時加列）。" >&2
     exit 2
     ;;
