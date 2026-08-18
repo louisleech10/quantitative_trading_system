@@ -45299,3 +45299,19 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260818-gap2-x-review-r6/synth.md", "output_sha256": "20a4c2ce3b6597866dc80a05185e39e426bf5d0c1a6c85c427c1da3c7685e6de", "task_id": "20260818-GAP2-X-STAMP-R7", "ts": "2026-08-18T09:29:18Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260818-gap2-x-review-r6/synth.md", "output_sha256": "20a4c2ce3b6597866dc80a05185e39e426bf5d0c1a6c85c427c1da3c7685e6de", "task_id": "20260818-GAP2-X-STAMP-R7", "ts": "2026-08-18T12:07:30Z"}
 {"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "55b583cd-d496-418d-af9b-aa29fb300d7e", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp 輪只 append 戳記無 findings;三家 APPROVED stamps_check PASS", "round_id": "9deff1a3-00b8-4bb6-b3dc-d2265d743c17", "schema_version": 1, "sequence": 2116, "ts": "2026-08-18T12:07:30Z", "zero_findings_verified": ""}
+=== 2026-08-18 20:21:29 | artifact ===
+  ts=2026-08-18 20:21:29
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP2_MARGINAL_IC_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=filled(解耦/白名單/成熟度/禁取巧/OOS 揭露/JSON SoT/交付紀律); §B=filled(五批+批次間 Gate); Phase B1-B5 13 Task 每 Task 含 SPEC ref/輸入輸出/實作要點/修改檔案/不可做/邊界/風險緩解/驗證/存活至/覆蓋風險; 追溯表=filled; 階段3自檢=filled
+  spec=
+  todo=
+  manifest=
