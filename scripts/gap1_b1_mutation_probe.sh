@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gap1_b1_mutation_probe.sh — B1–B4 之 mutation 自證（§V-5／8／9a／9b／10／13／15 ＋ §V-7／7b／7c／7d／7e ＋ §V-1／2／3／11／12 ＋ §V-4／6／14）。
+# gap1_b1_mutation_probe.sh — B1–B4 之 mutation 自證（§V-5／8／9a／9b／10／13／15 ＋ §V-7／7b／7c／7d／7e ＋ §V-1／2／3／11／12 ＋ §V-4／6／14 ＋ §V-16）。
 #
 # 每條：就地 mutate 一行 → 跑對應測試 → 斷言**轉紅且為斷言失敗（非 collection error）** → 還原。
 # 產出 receipt 供 code review 對證（TODO §0「新測試須 mutation 自證（實跑貼 rc）」）。
@@ -131,6 +131,10 @@ echo "[§V-5] compute_sharpe 退化情形回 0.0（而非 NaN＋status）"
 mutate "$SHARPE" '    nan = float("nan")' "    nan = 0.0" || exit 1
 run_expect_red "§V-5" "$TEST_SHARPE"
 
+echo "[§V-16] compute_sharpe 拿掉 ptp==0 常數判定（G1-R11：非二進位精確常數回巨大 SR）"
+mutate "$SHARPE" '    if std == 0.0 or not np.isfinite(std) or float(np.ptp(values)) == 0.0:' '    if std == 0.0 or not np.isfinite(std):  # MUTANT: ptp removed' || exit 1
+run_expect_red "§V-16" "$TEST_SHARPE"
+
 echo "[§V-10] Mertens (γ4-1)/4 改成 γ4/4（語法合法之數值 mutant）"
 mutate "$SHARPE" "(kurtosis - 1.0) / 4.0 * sr_pp**2" "kurtosis / 4.0 * sr_pp**2" || exit 1
 run_expect_red "§V-10" "$TEST_SHARPE"
@@ -234,4 +238,4 @@ if [ "$FAILED_DESIGN" -ne 0 ]; then
   echo "[gap1-b1-mutation] 🔴 有 mutation 未通過「可證偽」判準"
   exit 1
 fi
-echo "[gap1-b1-mutation] ✅ 全部 20 條 mutation 皆使測試轉紅（rc=1 斷言失敗）"
+echo "[gap1-b1-mutation] ✅ 全部 21 條 mutation 皆使測試轉紅（rc=1 斷言失敗）"

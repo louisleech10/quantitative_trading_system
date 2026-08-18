@@ -86,7 +86,10 @@ def compute_sharpe(
         return _degenerate(periods_per_year, n_obs)
 
     std = float(values.std(ddof=1))
-    if std == 0.0 or not np.isfinite(std):
+    # 常數序列 ⇒ 退化：`std == 0.0` 之精確比對對「非二進位可精確表示之常數」（如 80×0.01）會因求和捨入得 std≈1e-18 而漏判
+    # ⇒ 併判 `np.ptp(values) == 0.0`（輸入元素**位元全等**；G1-R11／consult r20 三家一致：不引入相對容差，
+    #   「近常數微擾」之巨大 SR 為數學上正確；`ptp==0` 只辨識編碼值相等，不保證跨異源浮點表達式之數學相等）。
+    if std == 0.0 or not np.isfinite(std) or float(np.ptp(values)) == 0.0:
         return _degenerate(periods_per_year, n_obs)
 
     sr_pp = (float(values.mean()) - risk_free_rate / periods_per_year) / std

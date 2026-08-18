@@ -149,7 +149,7 @@ def _sharpe_pp_1d(col: np.ndarray) -> float:
     if values.size < 2 or not np.all(np.isfinite(values)):
         return float("nan")
     std = float(values.std(ddof=1))
-    if std == 0.0 or not np.isfinite(std):
+    if std == 0.0 or not np.isfinite(std) or float(np.ptp(values)) == 0.0:  # 同 compute_sharpe（G1-R11：常數＝位元全等）
         return float("nan")
     return float(values.mean()) / std
 

@@ -123,7 +123,7 @@ def test_vectorized_sharpe_matches_compute_sharpe():
     sub = rng.standard_normal((80, 9)) * 0.02
     sub[:, 3] = 0.5  # 常數（二進位可精確表示 ⇒ std 恰 0）⇒ NaN
     sub[5, 4] = np.nan  # 含 NaN ⇒ NaN
-    sub[:, 7] = 0.01  # B4 review N5：浮點非精確常數（std≈1e-18 非 0）⇒ 兩邊皆巨大有限值，須**逐位相同**
+    sub[:, 7] = 0.01  # B4 review N5／G1-R11：浮點非精確常數（std≈1e-18 非 0）⇒ 兩邊皆須為 NaN（ptp==0 位元全等 ⇒ 退化）
     sub[:, 8] = 0.01 + np.linspace(0, 1e-9, 80)  # 微擾近常數
     got = _metrics_columns(sub, "sharpe")
     for j in range(9):
@@ -134,8 +134,8 @@ def test_vectorized_sharpe_matches_compute_sharpe():
             assert got[j] == ref, (j, got[j], ref)  # 逐位相等（同一 1-D 縮減）
     assert math.isnan(_metrics_columns(sub[:1], "sharpe")[0])  # n<2 ⇒ NaN
     assert _metrics_columns(sub, "mean_return")[0] == pytest.approx(np.mean(sub[:, 0]))
-    # 🔴 具名殘留 G1-R11：浮點非精確常數欄 compute_sharpe 不視為退化（回巨大有限 SR）——B1 語意，本批不動
-    assert math.isfinite(got[7]) and abs(got[7]) > 1e6
+    # G1-R11 已修（consult r20）：非精確常數欄兩邊皆 NaN；微擾欄仍為巨大有限（不引入相對容差）
+    assert math.isnan(got[7]) and math.isfinite(got[8]) and abs(got[8]) > 1e6
 
 
 def test_transpose_raises_and_short_t_ok():
