@@ -455,11 +455,48 @@
 
 ---
 
+## A1-22 — 🔴 B3 code review 六群集修補（M1–M6）：route 例外分類／落盤順序／`n_source_values`（頂層鍵 16→17）
+
+- **來源**：B3 實作 code review（`20260818-GAP1-B3-REVIEW-R16`，三家 12 findings：codex 4／composer 2／grok 6；
+  收斂檔 `handoffs/reconcile/20260818-gap1-b3-review-r16/synth.md` 群集 M1–M6）。三家 Verdict 一致「需修補後進 B4」；嚴重度分歧取較嚴，**全部本輪修、不登記殘留**。
+- 🔴 **被推翻之主委假設**：①「對稱序列＋樣本 kurt 忠於驗收①『skew=0、kurt=3』字面」——樣本 Pearson kurt≈2.68≠3（codex／grok 各自實跑）；
+  ②「IVA→HTTPException(500) 再被外層重包仍符『既有 500 路徑』」——status 成立但 detail 被污染，且**裸 `ValueError`→400** 與 A1-16 衝突（composer／grok 皆 MAJOR）；
+  ③（brief 未列、兩家實跑抓到）route 於 reporter 5xx **之前**已把 pipeline JSON 落盤 ⇒ orphan artifact。
+
+### M1（修）route 例外分類（`COMPOSER-R16-P1-01`／`GROK-R16-P1-01`／`COMPOSER-R16-P2-01`／`GROK-R16-P2-01`）
+`create_ml_pipeline`：reporter 呼叫處 `except InvalidValidationArgument ⇒ HTTPException(500, "strategy_validation reporter argument error")`、
+**`except ValueError ⇒ HTTPException(500, "strategy_validation reporter internal error")`**（reporter 路徑之 ValueError 一律內部錯，非用戶 400；例外文字只進 log）；
+外層在 `except ValueError` 之前加 **`except HTTPException: raise`**（消除 `Internal error: 500: …` 重包）。
+**取代 A1-16 第 2 點「由 route 既有 500 路徑處理」之字面**：既有 500 路徑對 `ValueError` 子類會先命中 400 分支，故須在 reporter 呼叫處顯式分類。
+回歸鎖：`test_bare_value_error_from_reporter_is_5xx_not_400`；`test_wiring_error_negative_t_years_is_5xx_not_reporter_failed` 加 detail 字面斷言。
+
+### M2（修）reporter 先於落盤（`CODEX-R16-P2-03`／`GROK-R16-P1-02`）
+reporter 為純讀 ⇒ 呼叫移到 `pipeline_file` 寫入之前；5xx 即不落盤，無需 cleanup。回歸鎖：上述兩測試加「儲存目錄無 json」斷言＋`test_success_path_persists_pipeline_after_reporter` 對照。
+
+### M3（修，雙鎖）驗收①「skew=0、kurt=3」（`CODEX-R16-P2-01`／`GROK-R16-P2-03`）
+新增 `_kurt3_returns()`：`m±s` 各 n₁ 個＋4n₁ 個 `m` ⇒ population skew=0、Pearson kurt=N/(2n₁)=3（均值位移不改中央矩）；
+`test_n_one_equals_psr_closed_form_with_exact_skew0_kurt3` 先斷言矩（atol 1e-12）再斷言 DSR ＝ 閉式 `Φ(SR√(T-1)/√(1+SR²/2))`（atol 1e-10）；
+原「樣本矩獨立重算」案例保留為第二鎖（更強不變量）。
+
+### M4（修）`test_deflated_sharpe._ledger` fixture 不變式（`CODEX-R16-P2-02`／`GROK-R16-P2-04`）
+`n_failed_or_pruned = n_evaluated - n_valid_metrics` 由構造成立＋fixture 自檢斷言。
+
+### M5（修＋契約）`n_source_values`（`GROK-R16-P2-02`；composer 段 B1 同建議）
+契約新增頂層 **`n_source_values = ["ledger","ledger_unavailable","assumed_not_ledgered"]`** ⇒ 頂層鍵 **16 → 17**
+（**覆寫** Task 2.1／A1-4 之「恰 16」；`_EXPECTED_TOP_LEVEL_KEYS`／`test_exactly_seventeen_top_level_keys` 同步）。
+`validate_against_contract` 之 `{k}_values` 機械對映**自動**涵蓋 `eligibility.n_source`；`min_btl.py`／`reporter.py` 之三字面經 `_validated_n_source` 於構造時檢查。
+回歸鎖：`test_n_source_values_are_contract_enum_and_validated`。
+
+### M6（修）`factories.py` 誤插一行 runtime import（`CODEX-R16-P3-04`）
+主委 `sed` 之模式同時命中 `create_adversarial_validator()` 內之 lazy import 行 ⇒ 多插一行無用 import；已刪。教訓：多處同型行做 `sed` 前先 `grep -c`。
+
+---
+
 ## 淨變動摘要（供 R9 複驗逐項對證）
 
 | 對象 | R8（母 SPEC） | A1 後 |
 |---|---|---|
-| Task 2.1 頂層鍵 | 15 | **16**（＋`universe_scope_values`） |
+| Task 2.1 頂層鍵 | 15 | **17**（＋`universe_scope_values`；A1-22 ＋`n_source_values`） |
 | `n_fields` | 5 | **6**（＋`n_rows_rejected`） |
 | `reasons` | 11 | **12**（＋`reporter_failed`） |
 | `report_sections` required_keys | 未列（空殼） | **五節逐字**（A1-13） |

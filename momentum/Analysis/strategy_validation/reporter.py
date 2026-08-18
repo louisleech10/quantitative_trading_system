@@ -20,7 +20,11 @@ from typing import Any, Dict, Optional
 
 from momentum.Analysis.strategy_validation.contract import ContractViolation
 from momentum.Analysis.strategy_validation.ledger import read_trial_ledger
-from momentum.Analysis.strategy_validation.min_btl import EligibilityResult, assess_eligibility
+from momentum.Analysis.strategy_validation.min_btl import (
+    EligibilityResult,
+    _validated_n_source,
+    assess_eligibility,
+)
 from momentum.Analysis.strategy_validation.report import WARNING_TEXT_KEY, build_validation_section
 from momentum.core.logging import get_logger
 
@@ -116,7 +120,7 @@ class StrategyValidationReporter:
                     trials_budget=None,
                     trials_used=None,
                     target_sharpe=None,
-                    n_source=_N_SOURCE_ASSUMED,
+                    n_source=_validated_n_source(_N_SOURCE_ASSUMED),
                     status=_STATUS_UNAVAILABLE,
                     reason=_REASON_N_UNKNOWN,
                 )

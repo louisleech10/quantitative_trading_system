@@ -215,13 +215,34 @@ async def create_ml_pipeline(request: CreatePipelineRequest):
             
             mode = "multi_indicator"
         
+        # GAP-1 Task 3.4：資格狀態＋警語（降級展示，不拒絕）。今日三個 optional 皆不傳 ⇒ 誠實 unavailable/n_unknown。
+        # 🔴 禁 dataset_key=f"trial:{n}" 自創公式（per-trial 鍵使 N≡1）；dataset 級鍵由 G1-R1 生產者契約提供。
+        # 🔴 放在**落盤之前**（B3 review M2：reporter 為純讀；若其 5xx 已寫檔會留 orphan pipeline）。
+        try:
+            section = create_strategy_validation_reporter().for_study_trial(
+                request.study_name, request.trial_number
+            )
+        except InvalidValidationArgument as exc:
+            # A1-16：「提供了但非法」＝接線 bug ⇒ 5xx 可觀測（不得走下方 ValueError→400、不得吞成 reporter_failed）
+            logger.error(f"strategy_validation invalid argument (wiring bug): {exc}", exc_info=True)
+            raise HTTPException(status_code=500, detail="strategy_validation reporter argument error")
+        except ValueError as exc:
+            # A1-16／B3 review M1：reporter 路徑之其他 ValueError（枚舉／契約語意錯）亦為內部錯 ⇒ 5xx，非用戶 400
+            logger.error(f"strategy_validation reporter internal error: {exc}", exc_info=True)
+            raise HTTPException(status_code=500, detail="strategy_validation reporter internal error")
+        strategy_validation = {
+            "eligibility": section["eligibility"],
+            "display_downgrade": section["display_downgrade"],
+            "warning_text_key": section["warning_text_key"],
+        }
+
         # 儲存 Pipeline 配置到 JSON
         pipeline_file = PIPELINE_STORAGE_PATH / f"{pipeline_id}.json"
         pipeline_dict = pipeline_config.to_dict()
-        
+
         with open(pipeline_file, 'w', encoding='utf-8') as f:
             json.dump(pipeline_dict, f, indent=2, ensure_ascii=False)
-        
+
         logger.info(f"Pipeline config saved to: {pipeline_file}")
         
         # 準備摘要資訊
@@ -246,22 +267,6 @@ async def create_ml_pipeline(request: CreatePipelineRequest):
             ]
         }
         
-        # GAP-1 Task 3.4：資格狀態＋警語（降級展示，不拒絕）。今日三個 optional 皆不傳 ⇒ 誠實 unavailable/n_unknown。
-        # 🔴 禁 dataset_key=f"trial:{n}" 自創公式（per-trial 鍵使 N≡1）；dataset 級鍵由 G1-R1 生產者契約提供。
-        try:
-            section = create_strategy_validation_reporter().for_study_trial(
-                request.study_name, request.trial_number
-            )
-        except InvalidValidationArgument as exc:
-            # A1-16：「提供了但非法」＝接線 bug ⇒ 5xx 可觀測（不得走下方 ValueError→400、不得吞成 reporter_failed）
-            logger.error(f"strategy_validation invalid argument (wiring bug): {exc}", exc_info=True)
-            raise HTTPException(status_code=500, detail="strategy_validation reporter argument error")
-        strategy_validation = {
-            "eligibility": section["eligibility"],
-            "display_downgrade": section["display_downgrade"],
-            "warning_text_key": section["warning_text_key"],
-        }
-
         return CreatePipelineResponse(
             success=True,
             pipeline_id=pipeline_id,
@@ -276,6 +281,9 @@ async def create_ml_pipeline(request: CreatePipelineRequest):
             status_code=404,
             detail=f"Study '{request.study_name}' or Trial #{request.trial_number} not found"
         )
+    except HTTPException:
+        # B3 review M1：內層已定好狀態碼／detail 之 HTTPException 原樣上拋（不被下方 ValueError→400／Exception→500 重包）
+        raise
     except ValueError as e:
         logger.error(f"Invalid configuration: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))

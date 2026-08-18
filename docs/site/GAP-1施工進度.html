@@ -11,7 +11,7 @@
 <main>
 <h1 id="gap-1-施工進度看板策略層防過擬合minbtldsrpbo">GAP-1 施工進度看板（策略層防過擬合：MinBTL／DSR／PBO）</h1>
 <p><strong>這份是白話版</strong>：清單（TODO）在做哪些事、每件做到哪。技術版＝<code>docs/GAP1_STRATEGY_OVERFIT_TODO.md</code>（<strong>FROZEN R3</strong>）
-＋延伸檔 <code>docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md</code>（A1-1..A1-21；規格已定版，修訂只走延伸檔）。
+＋延伸檔 <code>docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md</code>（A1-1..A1-22；規格已定版，修訂只走延伸檔）。
 狀態欄我每完成一批就改；最即時的程式碼證據看 git log 的 <code>feat(gap1)</code>／<code>fix(gap1)</code> 系列。</p>
 <h2 id="走到哪了一眼版">走到哪了（一眼版）</h2>
 <pre><code>偵察（四方查證）完成 → SPEC 七輪對抗審查定版（你白話閘裁決三項收回）
@@ -19,8 +19,8 @@
 → **第1批完工**（三家 code review 10 條全處置、三家蓋章）
 → **第2批寫完 → 三家 code review 21 條全處置 → 修補完（141 條測試全過、12 條 mutation 全紅）**
 → **第2批修補三家蓋章 PASS**（B2 CLOSED）→ **小任務 3b 完工**（白話說明 → HTML 閱讀介面，掛 pre-commit 同 commit 產出）
-→ **第3批寫完**（MinBTL＋DSR＋報告＋API 警語；220 條測試全過、17 條 mutation 全紅）→ **現在：三家 code review 中**
-→ 待做：第3批修補→蓋章 → 第4批（PBO＋接線閘）→ 收工
+→ **第3批寫完 → 三家 code review 12 條全處置 → 修補完（224 條測試全過、17 條 mutation 全紅）→ 現在：等三家蓋章**
+→ 待做：第4批（PBO＋接線閘）→ 收工
 </code></pre>
 <h2 id="這個-epic-到底在做什麼一句話">這個 epic 到底在做什麼（一句話）</h2>
 <p>「試了 N 個策略挑最好的，是真本事還是運氣？」——因子層已有 FDR，策略層原本裸奔。
@@ -83,25 +83,25 @@
 <td><strong>第3批</strong></td>
 <td>3.1 MinBTL</td>
 <td>「想宣稱這個夏普，資料至少要幾年」上界＋「這麼長的資料最多准試幾個」預算；公式常數不准調</td>
-<td>✅ 寫完，<strong>審查中</strong></td>
+<td>✅ 審過＋修補完，<strong>等蓋章</strong></td>
 </tr>
 <tr>
 <td></td>
 <td>3.2 DSR</td>
 <td>冠軍檢定，全式寫死；N=1 時退化成 PSR（可證偽的錨點）</td>
-<td>✅ 寫完，審查中</td>
+<td>✅ 審過＋修補完，等蓋章</td>
 </tr>
 <tr>
 <td></td>
 <td>3.3 報告區段</td>
 <td>三關結果的機器可讀輸出；任一關不 ok ⇒ 降級＋警語，結構裡<strong>不准有推薦類欄位</strong></td>
-<td>✅ 寫完，審查中</td>
+<td>✅ 審過＋修補完，等蓋章</td>
 </tr>
 <tr>
 <td></td>
 <td>3.4 API 附警語</td>
 <td><code>ml_pipeline</code> 回應多三個欄位（資格／降級／警語鍵）；<strong>不拒絕請求</strong>（你的裁決）；程式 bug 不准被吞成「計算失敗」</td>
-<td>✅ 寫完，審查中</td>
+<td>✅ 審過＋修補完，等蓋章</td>
 </tr>
 <tr>
 <td><strong>第4批</strong></td>
@@ -131,7 +131,7 @@
 </table></div>
 <h2 id="每批的驗收證據不只-passfail">每批的驗收證據（不只 pass/fail）</h2>
 <ul>
-<li><strong>測試</strong>：<code>strategy_validation/</code>＋API 測試目前 <strong>220 條全過</strong>（第1批 45＋第2批 90＋第3批 85）；<code>Strategy/</code>＋<code>Optimization/</code> 207 過／2 紅（那 2 條是別的模組的既有紅，與本 epic 無關）。</li>
+<li><strong>測試</strong>：<code>strategy_validation/</code>＋API 測試目前 <strong>224 條全過</strong>（第1批 45＋第2批 90＋第3批 89）；<code>Strategy/</code>＋<code>Optimization/</code> 207 過／2 紅（那 2 條是別的模組的既有紅，與本 epic 無關）。</li>
 <li><strong>真實資料</strong>：Task 1.4 的測試用你電腦上的<strong>真實 K 線</strong>（<code>data_cache/feature_klines/kline_cache.h5</code>）跑真回測，不是造出來的假資料；<strong>檔案不在時直接失敗</strong>，不准 skip 裝綠（審查抓的）。</li>
 <li><strong>改壞一定要變紅</strong>（mutation）：把 <strong>17</strong> 種已知錯誤寫法逐一植入（第1批 8 種：未知週期回 730／退化回 0.0／Mertens 係數改錯／rf 用 0.02／逐 bar 改成 ok／放行預設 730／帳本缺檔回 N=1／bar 數當年數；第2批新增 4 種：放行 NaN／快照 hash 改回會撞的舊法／帳本目錄名改掉／拿掉檔案鎖；第3批新增 5 種：MinBTL 的 ln 改成 n／預算 floor 改 round／DSR 刪 γ 項／DSR 分母改用跨試驗變異數／矩公式代入年化夏普），<strong>17 次全部讓測試變紅</strong>（收據 <code>handoffs/run_receipts/20260818T090000Z-gap1-b3-mutation.log</code>）。探針本身有互斥鎖，不能兩人同時跑（血淚見下）。</li>
 </ul>
@@ -144,6 +144,15 @@
 <li><strong>快照 hash 會撞</strong>：用 <code>|</code> 拼接三段字串，段落裡若有 <code>|</code> 就撞（三家各給一組反例）。修：改 JSON 定界，反例全數變成不撞。</li>
 <li><strong>我自認最可疑的地方，三家確認確實是洞</strong>：帳本路徑怎麼算的那段程式，之前所有測試都把它整個換掉，等於<strong>沒測過</strong>。修：新增一檔測試走真路徑，改個目錄名就紅。</li>
 <li>其他：讀契約檔多／少鍵不再靜默放行、型別檢查改精確比對（Enum／numpy 冒充一律拒）、快取改成外面改不到、錯誤訊息會說缺哪個多哪個。</li>
+</ol>
+<p><strong>第3批（12 條，三家一致「修完可進第4批」；全部這輪修）</strong>：</p>
+<ol>
+<li><strong>API 錯誤分類有洞</strong>（兩家 MAJOR）：reporter 若丟出一般 <code>ValueError</code>，路由會把它當「用戶輸入錯」回 400；而「接線 bug」那類雖然回 500，訊息卻被外層再包一層。修：reporter 路徑的錯一律 500、訊息固定字面、外層不再重包；補測試。</li>
+<li><strong>失敗還留垃圾</strong>（兩家抓到，我 brief 沒列）：路由先把 pipeline 檔寫進磁碟、再呼叫 reporter，reporter 一報錯就留下一個孤兒檔。修：reporter 先跑（它只讀不寫），失敗就不落盤；測試斷言目錄空。</li>
+<li><strong>驗收字面「skew=0、kurt=3」我沒真的固定住</strong>（兩家）：我用對稱序列讓 skew 恰為 0，但峰度是樣本值 2.68 不是 3。修：另造一個峰度<strong>恰為 3</strong> 的序列（十字型：±s 各 n 個加 4n 個 0），先斷言矩再斷言 DSR 等於閉式 PSR——原本那條保留當第二道鎖。</li>
+<li><strong>測試用的假帳本違反帳本自己的不變式</strong>（兩家）：修成由構造滿足。</li>
+<li><strong><code>n_source</code> 三個字面沒住進契約</strong>（Grok；Composer 也建議）：加進契約枚舉（頂層鍵 16→17，延伸檔 A1-22 覆寫「恰 16」），loader 的機械枚舉對映自動接管、寫入端也驗。</li>
+<li><strong>我用 sed 多插了一行沒用的 import</strong>（Codex）：同一個模式命中兩處，我沒先 <code>grep -c</code>。已刪；本 epic 第二次同型錯，寫進收斂檔。</li>
 </ol>
 <p><strong>第1批（10 條）</strong>：</p>
 <ol>

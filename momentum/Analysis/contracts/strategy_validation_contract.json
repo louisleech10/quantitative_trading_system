@@ -168,6 +168,7 @@
   "variance_source_values": ["explicit", "ledger_cross_trial"],
   "metric_unit_values": ["per_period", "annualized"],
   "universe_scope_values": ["ledger_recorded_only"],
+  "n_source_values": ["ledger", "ledger_unavailable", "assumed_not_ledgered"],
   "reasons": [
     "n_unknown",
     "t_semantics_inflates_significance",

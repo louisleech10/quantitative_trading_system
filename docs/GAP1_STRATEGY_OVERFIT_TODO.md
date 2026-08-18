@@ -2,7 +2,7 @@
 
 版本：**FROZEN R3**（2026-08-17；r9 收斂檔三家 `RECONCILE-STAMP APPROVED`＋三條修補之機械核可通過
 ＋grok 兩處非阻擋殘句已修：B4 Gate「五條→六條」、驗收⑧ 措辭）｜基於 SPEC：`docs/GAP1_STRATEGY_OVERFIT_SPEC.md`（R8，2026-08-17）
-**＋延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`（A1-1..A1-21；衝突時以延伸檔為準）**
+**＋延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`（A1-1..A1-22；衝突時以延伸檔為準）**
 ｜實作端：Claude 主委自任｜review／adversarial：codex+composer+grok 三家（實作者不自審）
 
 > 冷啟動原則：執行端讀完本檔即可逐 Task 寫碼，不需回讀 SPEC；SPEC 之義務以 `SPEC ref` 指回。
@@ -39,7 +39,7 @@
   訊息 `-F .claude/tmp/…` 含 VERIFY receipt；**不 push**（三家 review 後由使用者明示）。
 - **SPEC §A manifest ref**（不複製）：[A-成熟度]＝成熟度地圖；[A-裁決-A]＝範圍 A；[A-裁決-降級]＝不硬擋；
   [A-文獻]＝MinBTL 為上界／N=1 特例／target_sharpe 語意；[A-單位]＝per-period 鎖定。
-- 🔴 **R2 之延伸檔優先序**：本 TODO 與 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`（A1-1..A1-21）一致；
+- 🔴 **R2 之延伸檔優先序**：本 TODO 與 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`（A1-1..A1-22）一致；
   當母 SPEC 與延伸檔衝突時**以延伸檔為準**（母 SPEC 定版後不就地改）。實作端只需讀本 TODO。
 - 🔴 **golden 檔生成式逐字（R2；A1-2；禁自選 RNG）**：`rng = np.random.default_rng(20260817)`；
   `M = rng.standard_normal((n_obs, n_candidates)) * 0.01`（`(T,N)=(1200,50)`、`S=12`、`float64`）。
@@ -517,12 +517,12 @@
 | §V 反向測試 | 1h/4h/12h `available_years` 相等 | **Task 1.1 驗證（R2 自 3.1⑧ 移入，去 vacuous）** |
 | §RISK a,b,d | 數值／跨模組／ML 回測 | §0 約束＋三家 review 必跑 |
 | §N 殘留 8 項 | 為何現在不做三值 | 不生 Task；registry「GAP-1 待補完」表；B4 Gate 複核觸發 |
-| **延伸檔 A1-1..A1-21（R2）** | 收斂處置之 SPEC 義務側 | 各 Task 之 `SPEC ref` 已逐條標 A1-n；淨變動摘要見延伸檔末表 |
+| **延伸檔 A1-1..A1-22（R2）** | 收斂處置之 SPEC 義務側 | 各 Task 之 `SPEC ref` 已逐條標 A1-n；淨變動摘要見延伸檔末表 |
 | Phase 依賴 | B1→B2→B3→B4（**R2：2.4 移入 B4 ⇒ B4 依賴 B3**） | §B 表 |
 | 合計 | SPEC Task 15／§G 3 類／§V 15＋1／§N 8（−R8＋R9） | TODO Task 15／全對應 |
 
 ## 階段 3 自檢（R2 重跑）
-1. 追溯：15/15 Task；§G／§V／§N／**A1-1..A1-21** 全對應；無真遺漏。
+1. 追溯：15/15 Task；§G／§V／§N／**A1-1..A1-22** 全對應；無真遺漏。
 2. 深度：每 Task 實作要點 ≥3 含偽碼、檔案到函式名、邊界 ≥2、驗證有 atol／rc／字面斷言。
 3. 語義：跨 Task 同檔＝`ledger.py`（2.2／2.3）同批；`pbo.py`（4.2／4.3）同批；`report.py`（3.3）與 `scripts/strategy_wiring_check.py`（2.4）
    **跨批**（B3→B4）已於 §B 依賴列明；引用之既有函式（`TIMEFRAME_SECONDS`、`contract_enum`、`load_report_contract`、`MomentumConfig.results_path`、`create_ml_pipeline`）皆已 grep 確認存在；Task 1.3 改既有 caller 有測試同步；golden 由 Task 3.1 動工前建檔、Task 4.2 只讀（SPEC §G 之凍結時機）。

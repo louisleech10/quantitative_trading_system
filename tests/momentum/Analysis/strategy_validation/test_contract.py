@@ -1,4 +1,4 @@
-"""Task 2.1 驗證：策略驗證契約（16 頂層鍵、ref 真解析、drift 偵測、型別/額外鍵）。"""
+"""Task 2.1 驗證：策略驗證契約（17 頂層鍵〔A1-22〕、ref 真解析、drift 偵測、型別/額外鍵）。"""
 
 import json
 import subprocess
@@ -31,6 +31,7 @@ _EXPECTED_TOP_LEVEL = {
     "variance_source_values",
     "metric_unit_values",
     "universe_scope_values",
+    "n_source_values",
     "reasons",
     "reason_conditions",
 }
@@ -85,8 +86,8 @@ def test_no_key_named_n_or_capital_n():
     assert "n" not in contract and "N" not in contract
 
 
-def test_exactly_sixteen_top_level_keys():
-    """⑤ 16 鍵齊備（逐字集合相等，非只數個數）。"""
+def test_exactly_seventeen_top_level_keys():
+    """⑤ 17 鍵齊備（逐字集合相等，非只數個數；A1-22：16→17，＋n_source_values）。"""
     assert contract_top_level_keys() == _EXPECTED_TOP_LEVEL
 
 

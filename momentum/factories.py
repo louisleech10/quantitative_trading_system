@@ -561,7 +561,6 @@ def create_adversarial_validator(
 ) -> "AdversarialValidator":
     """Factory — M4 Adversarial 驗證器。"""
     from momentum.Analysis.adversarial_validator import AdversarialValidator
-    from momentum.Analysis.strategy_validation.reporter import StrategyValidationReporter
 
     return AdversarialValidator(config=config)
 

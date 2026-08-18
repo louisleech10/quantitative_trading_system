@@ -117,8 +117,9 @@ def test_program_exceptions_are_not_swallowed_5xx(client, monkeypatch, exc):
     assert "reporter_failed" not in resp.text
 
 
-def test_wiring_error_negative_t_years_is_5xx_not_reporter_failed(client, monkeypatch):
-    """⑧ A1-16：route 端以 t_years=-1.0 呼叫真 reporter ⇒ InvalidValidationArgument 上拋 ⇒ 5xx，回應無 reporter_failed。"""
+def test_wiring_error_negative_t_years_is_5xx_not_reporter_failed(client, monkeypatch, tmp_path):
+    """⑧ A1-16：route 端以 t_years=-1.0 呼叫真 reporter ⇒ InvalidValidationArgument 上拋 ⇒ 5xx，回應無 reporter_failed；
+    B3 review M1：detail 為專用字面（不被外層 `Internal error:` 重包）；M2：5xx 時**不得**留下 pipeline JSON（reporter 先於落盤）。"""
 
     class _R(StrategyValidationReporter):
         def for_study_trial(self, study_name, trial_number, **kw):
@@ -128,6 +129,30 @@ def test_wiring_error_negative_t_years_is_5xx_not_reporter_failed(client, monkey
     resp = _post(client)
     assert 500 <= resp.status_code < 600, resp.text
     assert "reporter_failed" not in resp.text
+    assert resp.json()["detail"] == "strategy_validation reporter argument error"
+    assert list(tmp_path.glob("*.json")) == []  # 無 orphan artifact
+
+
+def test_bare_value_error_from_reporter_is_5xx_not_400(client, monkeypatch, tmp_path):
+    """B3 review M1（A1-16）：reporter 路徑冒出裸 ValueError（非 IVA）亦為內部錯 ⇒ 5xx（不得被既有 ValueError→400 標成用戶錯）；不落盤。"""
+
+    class _R:
+        def for_study_trial(self, *a, **k):
+            raise ValueError("enum boom")
+
+    monkeypatch.setattr(route_mod, "create_strategy_validation_reporter", lambda: _R())
+    resp = _post(client)
+    assert 500 <= resp.status_code < 600, resp.text
+    assert "enum boom" not in resp.text  # 例外文字只進 log
+    assert "reporter_failed" not in resp.text
+    assert list(tmp_path.glob("*.json")) == []
+
+
+def test_success_path_persists_pipeline_after_reporter(client, tmp_path):
+    """對照：成功路徑仍落盤（reporter 移到寫檔前不影響正常建立）。"""
+    resp = _post(client)
+    assert resp.status_code == 200
+    assert len(list(tmp_path.glob("pipeline_sv-test-study_trial3_*.json"))) == 1
 
 
 def test_reporter_none_path_does_not_touch_ledger(monkeypatch):

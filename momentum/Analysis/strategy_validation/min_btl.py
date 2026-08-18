@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from momentum.Analysis.ic_config_schema import contract_enum
+from momentum.Analysis.strategy_validation.contract import load_strategy_validation_contract
 from momentum.Analysis.strategy_validation.ledger import LedgerReadResult
 
 _EXP_ARG_LIMIT = 700.0  # A1-5：`math.exp(710)` 即 OverflowError；超過視為無物理意義輸入 ⇒ raise（禁 cap）
@@ -36,6 +37,14 @@ def _validated_status(status: str) -> str:
     if status not in allowed:
         raise ValueError(f"status {status!r} not in capability_status contract")
     return status
+
+
+def _validated_n_source(n_source: str) -> str:
+    """`n_source` 必須屬策略契約 `n_source_values`（A1-22；禁自創字面；loader 枚舉對映亦於 report 側再驗）。"""
+    allowed = load_strategy_validation_contract()["n_source_values"]
+    if n_source not in allowed:
+        raise ValueError(f"n_source {n_source!r} not in contract n_source_values {allowed}")
+    return n_source
 
 
 @dataclass(frozen=True)
@@ -118,7 +127,7 @@ def assess_eligibility(
             trials_budget=budget,
             trials_used=None,
             target_sharpe=float(target_sharpe),
-            n_source=_N_SOURCE_LEDGER_UNAVAILABLE,
+            n_source=_validated_n_source(_N_SOURCE_LEDGER_UNAVAILABLE),
             status=_validated_status(ledger_result.status),
             reason=ledger_result.reason,
         )
@@ -132,7 +141,7 @@ def assess_eligibility(
         trials_budget=budget,
         trials_used=n,
         target_sharpe=float(target_sharpe),
-        n_source=_N_SOURCE_LEDGER,
+        n_source=_validated_n_source(_N_SOURCE_LEDGER),
         status=_validated_status("ok"),
         reason="",
     )

@@ -48,13 +48,24 @@ def _pr(values, *, ppy=8760, status="ok", reason="", t_semantics="trade_level", 
     )
 
 
+def _kurt3_returns(n_half=20, mean=0.002, s=0.01):
+    """恰 skew=0、Pearson kurt=3 之序列（B3 review M3）：`m±s` 各 n_half 個＋ 4·n_half 個 `m`
+    ⇒ population m4/m2² = N/(2·n_half) = 3、skew = 0；均值位移不改中央矩。"""
+    d = np.concatenate([np.full(n_half, s), np.full(n_half, -s), np.zeros(4 * n_half)])
+    return mean + d
+
+
 def _ledger(n_for_dsr=10, sharpes=(0.01, 0.02, 0.03), hashes=(_HASH,), n_valid=None, status="ok", reason=""):
+    """typed 直構帳本；不變式 `n_evaluated == n_valid_metrics + n_failed_or_pruned` 由構造成立（B3 review M4）。"""
     n_valid = len(sharpes) if n_valid is None else n_valid
+    n_evaluated = max(n_valid, n_for_dsr)
+    n_failed = n_evaluated - n_valid
+    assert n_evaluated == n_valid + n_failed and n_failed >= 0
     return LedgerReadResult(
         n_candidates_considered=n_for_dsr,
-        n_evaluated=max(n_valid, n_for_dsr),
+        n_evaluated=n_evaluated,
         n_valid_metrics=n_valid,
-        n_failed_or_pruned=0,
+        n_failed_or_pruned=n_failed,
         n_rows_rejected=0,
         n_is_lower_bound=True,
         n_for_dsr=n_for_dsr,
@@ -78,8 +89,23 @@ def _psr_analytic(values):
     return float(norm.cdf(sr * math.sqrt(t - 1) / math.sqrt(1 - g3 * sr + (g4 - 1) / 4 * sr**2)))
 
 
+def test_n_one_equals_psr_closed_form_with_exact_skew0_kurt3():
+    """① 字面版（B3 review M3）：序列**恰** skew=0、Pearson kurt=3（先斷言矩），N=1 ⇒ DSR == 閉式 PSR
+    `Φ(SR·√(T-1)/√(1+SR²/2))`（atol 1e-10）——閉式不含任何 sharpe.py 之量。"""
+    values = _kurt3_returns()
+    assert float(sps.skew(values)) == pytest.approx(0.0, abs=1e-12)
+    assert float(sps.kurtosis(values, fisher=False)) == pytest.approx(3.0, abs=1e-12)
+    t = values.size
+    sr = values.mean() / values.std(ddof=1)
+    closed_form = float(norm.cdf(sr * math.sqrt(t - 1) / math.sqrt(1.0 + sr**2 / 2.0)))
+    for vs in ("explicit", "ledger_cross_trial"):
+        got = deflated_sharpe(period_returns=_pr(values), n_trials=1, variance_source=vs, n_semantics="exhaustive_grid")
+        assert got.status == "ok" and got.sr0 == 0.0
+        assert got.value == pytest.approx(closed_form, abs=1e-10)
+
+
 def test_n_one_equals_psr_analytic():
-    """① N=1 ⇒ SR0=0 ⇒ DSR == PSR（atol 1e-10；skew 由對稱構造恰 0，kurt 取樣本值）。兩種 N 來源皆驗。"""
+    """①（第二鎖，更強不變量）N=1 ⇒ SR0=0 ⇒ DSR == PSR（atol 1e-10；skew 由對稱構造恰 0，kurt 取**樣本值**並在測試側獨立重算）。"""
     values = _symmetric_returns()
     assert abs(float(sps.skew(values))) < 1e-12
     expected = _psr_analytic(values)

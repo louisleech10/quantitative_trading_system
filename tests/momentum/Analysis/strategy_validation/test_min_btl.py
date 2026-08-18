@@ -175,3 +175,29 @@ def test_minbtl_upper_bound_is_conservative_statistical_oracle():
     assert analytic == pytest.approx(0.833943, abs=1e-6)
     assert mean_max <= target_sr
     assert mean_max == pytest.approx(analytic, rel=0.05)
+
+
+def test_n_source_values_are_contract_enum_and_validated():
+    """A1-22（B3 review M5）：契約 `n_source_values` 三值；assess_eligibility 兩態之 n_source 皆屬枚舉；
+    report 側 `validate_against_contract` 之機械枚舉對映會拒絕自創字面。"""
+    from momentum.Analysis.strategy_validation.contract import (
+        ContractViolation,
+        load_strategy_validation_contract,
+        validate_against_contract,
+    )
+    from momentum.Analysis.strategy_validation.min_btl import _validated_n_source
+
+    values = load_strategy_validation_contract()["n_source_values"]
+    assert values == ["ledger", "ledger_unavailable", "assumed_not_ledgered"]
+    ok = assess_eligibility(t_years=_T_100, ledger_result=_ledger(100), target_sharpe=1.0)
+    bad = assess_eligibility(t_years=_T_100, ledger_result=_ledger(0, status="unavailable", reason="n_unknown"), target_sharpe=1.0)
+    assert ok.n_source in values and bad.n_source in values and ok.n_source != bad.n_source
+    with pytest.raises(ValueError):
+        _validated_n_source("made_up")
+    section = {
+        "eligible": None, "required_years_upper_bound": None, "available_years": None, "trials_budget": None,
+        "trials_used": None, "target_sharpe": None, "n_source": "made_up", "display_downgrade": True,
+        "warning_text_key": "strategy_validation.downgraded", "status": "unavailable", "reason": "n_unknown",
+    }
+    with pytest.raises(ContractViolation, match="n_source_values"):
+        validate_against_contract(section, "eligibility")

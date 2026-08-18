@@ -1,7 +1,7 @@
 """Task 2.1 — 策略驗證契約之唯一 resolver 與 validator。
 
 SPEC ref：Task 2.1 ＋ A1-4／A1-7／A1-8／A1-13。
-契約檔＝`momentum/Analysis/contracts/strategy_validation_contract.json`（16 頂層鍵）。
+契約檔＝`momentum/Analysis/contracts/strategy_validation_contract.json`（17 頂層鍵；A1-22 起）。
 `capability_status` **不**在策略契約內複列，改以 `capability_status_ref` 於**執行期 dereference**
 IC 契約；目標檔缺失／鍵缺失／型別不符一律 raise（fail-closed，禁回退預設枚舉）。
 """
@@ -27,7 +27,7 @@ _TYPE_MAP: Dict[str, tuple] = {
     "null": (type(None),),
 }
 
-# 契約頂層鍵集合（Task 2.1「恰 16」；A1-21 L8：loader 對集合相等 fail-closed，多／少皆 raise）。
+# 契約頂層鍵集合（Task 2.1「恰 16」→ A1-22「恰 17」（＋n_source_values）；A1-21 L8：loader 對集合相等 fail-closed，多／少皆 raise）。
 # 只列**鍵名**，不複列任何枚舉值（`capability_status` 六值仍只在 IC 契約）。
 _EXPECTED_TOP_LEVEL_KEYS: frozenset = frozenset(
     {
@@ -43,6 +43,7 @@ _EXPECTED_TOP_LEVEL_KEYS: frozenset = frozenset(
         "selection_metric_values",
         "t_semantics_values",
         "universe_scope_values",
+        "n_source_values",
         "universe_source_values",
         "variance_source_values",
         "reasons",
