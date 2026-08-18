@@ -2804,6 +2804,9 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 <blockquote>
 <p><strong>2026-08-18 追記十（PA-CUMSUM 小票）</strong>：<code>prediction_analyzer.EquityCurveData</code> 改為單利（cumsum）／複利（cumprod−1）兩條都算＋四鍵 final_return_pct；API model／前端型別／圖表切換同步（預設複利）；5 條測試（手算 +50%/−50% ⇒ 0%／−25%）、<code>npm run build</code> 綠、decoupling OK；三家 review 派出。治理本體零擴建。</p>
 </blockquote>
+<blockquote>
+<p><strong>2026-08-18 追記十一（PA-CUMSUM 收案）</strong>：三家 review 7 條（codex 3／composer 1／grok 3）收斂 Q1 多標的改逐 timestamp 等權組合（n_symbols／aggregation 可觀測）、Q2 y_pred_proba NaN／inf fail-closed（引擎 ValueError＋route 400）、Q3 API 契約封閉（EquityFinalReturnPct 四必填＋Field description＋aggregation Literal）；tab a11y＋4 條 vitest；後端 10 passed；修補 commit <code>d20f0627</code>；戳記輪 r24 三家 APPROVED（sha 73ca7d3a）⇒ CLOSED。殘留具名：route <code>actual_return.fillna(0)</code> 既有行為（user-ruling 待）、<code>API_SPECIFICATION.md</code> 格式快閘不可編輯（blocked-by 摩擦六十七）。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

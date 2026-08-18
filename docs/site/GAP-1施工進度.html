@@ -170,7 +170,7 @@
 <li><strong>我常批評的病自己犯</strong>：mutation 探針的「還原後全綠」自檢原本是空殼（只印 rc 不擋）。已改成 fail-closed，而且它馬上就抓到一次真實污染。</li>
 </ol>
 <h2 id="殘留不是不做是登記了為什麼現在不做">殘留（不是不做，是登記了為什麼現在不做）</h2>
-<p><code>docs/IC_QUANT_GAP_REGISTRY.md</code>「GAP-1 待補完」表：G1-R1..R7（原有）＋ <strong>G1-R9</strong>（帳本完整性要生產者側才證得了）＋ <strong>G1-R10</strong>（回測引擎 Protocol 沒宣告新參數，白名單不准改既有測試替身）＋ <strong>G1-R11</strong>（夏普對「浮點上幾乎是常數」的序列不當退化）——<strong>已修（8/18）</strong>：三家 consult 查了業界五套件源碼與文獻，一致採「所有值位元全等即常數」併判、反對加容差；改一行＋測試＋探針 §V-16；三家 review 一致「可合併」＋三家蓋章 PASS ⇒ <strong>G1-R11 關閉</strong>。每條都有「卡在誰／誰的裁決／需要研究」三值之一與觸發條件。</p>
+<p><code>docs/IC_QUANT_GAP_REGISTRY.md</code>「GAP-1 待補完」表：G1-R1..R7（原有）＋ <strong>G1-R9</strong>（帳本完整性要生產者側才證得了）＋ <strong>G1-R10</strong>（回測引擎 Protocol 沒宣告新參數，白名單不准改既有測試替身）＋ <strong>G1-R11</strong>（夏普對「浮點上幾乎是常數」的序列不當退化）——<strong>已修（8/18）</strong>：三家 consult 查了業界五套件源碼與文獻，一致採「所有值位元全等即常數」併判、反對加容差；改一行＋測試＋探針 §V-16；三家 review 一致「可合併」＋三家蓋章 PASS ⇒ <strong>G1-R11 關閉</strong>。<strong>G1-R8</strong>（權益曲線只算單利）本日也做完（PA-CUMSUM 小票）：單利／複利兩條都算、前端切換，三家 review 7 條修完＋三家蓋章 PASS ⇒ <strong>收案</strong>（<code>d20f0627</code>）。每條都有「卡在誰／誰的裁決／需要研究」三值之一與觸發條件。</p>
 <h2 id="推送">推送</h2>
 <p><strong>每批收尾都直接推上 GitHub</strong>（你 8/18 定的：commit＋push 秒級、每次同步）。本機與 <code>origin/main</code> 應零落差；
 要查就 <code>git log origin/main..HEAD</code>（應為空）。</p>

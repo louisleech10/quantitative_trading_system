@@ -31,7 +31,7 @@
 > 有 **HTML 閱讀介面**：本機 `open docs/site/index.html`；GitHub 上要你去 **Settings → Pages → Deploy from a branch: `main`, `/docs`**
 > 點一次（只有你能點）——**你 8/18 已設好**，網址 https://louisleech10.github.io/quantitative_trading_system/site/ 實測可讀，每次 push 後約 1–2 分鐘更新。
 > 來源仍是這裡的 .md（我和委員照讀 .md）；HTML 由 `scripts/plain_docs_render.sh` 在每次 commit 白話檔時同一 commit 自動生成，缺產出會擋 commit。
-> 🏁 GAP-1 收工；PA-CUMSUM 小票（權益曲線單利／複利兩條都算＋前端切換）寫完、三家 review 中。看板 [GAP-1施工進度.md](GAP-1施工進度.md)。
+> 🏁 GAP-1 收工；PA-CUMSUM 小票（權益曲線單利／複利兩條都算＋前端切換）三家 review 修完＋三家蓋章 PASS，**已收案**。看板 [GAP-1施工進度.md](GAP-1施工進度.md)。
 > 這輪最值得你知道的：第 2 批三家 21 條全處置、沒有一條要重做；其中一條是**我派工單上對自己程式碼的描述寫錯**
 > （程式對、我的話錯、清單字面也錯），延伸檔 A1-21 作廢那句。教訓寫在 [流程摩擦記錄.md](流程摩擦記錄.md) 第六十一～六十二條。
 >

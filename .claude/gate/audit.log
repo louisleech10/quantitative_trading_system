@@ -44590,3 +44590,49 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-18T04:29:47Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"0ceff36bd08f476bde59ebbda0e8b5644a8532a5434089aa2c686642e651178f","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260818-pacumsum-review-codex.md --family codex; rc=$?; echo RC=$rc; exit $rc"}
 {"actor": "cx_run", "attempt_id": "fc159c24-d55b-4eb9-b87d-27e65eaf7938", "cli_rc": "0", "event": "committee_family_result", "event_id": "6c73e7ae-34f9-406f-8e9c-cf41ba315ce6", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-pacumsum-review-codex.md", "output_sha256": "e7bf6f3fe483970eca48979ec88ae975560663bf3f55a36b40620e8d7c5925c8", "producer": "audit_append.sh", "result_state": "success", "round_id": "ae29a2ed-446d-41cd-9fdc-b6a7ae78cdcb", "schema_version": 1, "sequence": 2040, "ts": "2026-08-18T04:31:34Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "e5766669-3ec1-42a8-a4c0-a83b17a5a7c9", "lock_sha256": "12bc11dac7ee08f21b9490a1accf1f942ec0c9a290b1c70687b8d379d6bba173", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "ae29a2ed-446d-41cd-9fdc-b6a7ae78cdcb", "schema_version": 1, "sequence": 2041, "session_id": "20260818-pacumsum-x-review-r23", "synth_sha256": "ec30453e199e4f861e8da57c88a5d5278bd1f0d20d383042e2c24a47c85eac7d", "ts": "2026-08-18T04:36:51Z"}
+{"event":"gate_deny","ts":"2026-08-18T04:40:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"142e9f20ef7ad567650b58d114032894e3b2810b4046b1c03724c1200319ba7a","cmd_head":"bash scripts/committee_run.sh --session 20260818-pacumsum-x-stamp-r24 handoffs/20260818-pacumsum-stamp-BRIEF.md handoffs/20260818-pacumsum-stamp codex,composer,grok -- --intent \"PA-CUMSUM r23 收斂檔 RECONCILE-STAMP 三家戳記\" --risk low --facts-asked \"n/a: stamp\" --review-role \"stamp\" --template \"n/a: 用 brief\" --task-id \"20260818-PACUMSUM-X-STAMP-R24\" > handoffs/20260818-pacumsum-stamp-committee.runlog 2>&1; echo \"rc=$?\" >> handoffs/20260818-pacumsum-stamp-committee.runlog"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:40:33Z"}
+=== 2026-08-18 12:40:33 | dispatch ===
+  ts=2026-08-18 12:40:33
+  kind=dispatch
+  intent=PA-CUMSUM r23 收斂檔 RECONCILE-STAMP 三家戳記
+  risk=low
+  facts_asked=n/a: stamp
+  review_role=stamp
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:40:38Z"}
+=== 2026-08-18 12:40:38 | dispatch ===
+  ts=2026-08-18 12:40:38
+  kind=dispatch
+  intent=PA-CUMSUM r23 收斂檔 RECONCILE-STAMP 三家戳記
+  risk=low
+  facts_asked=n/a: stamp
+  review_role=stamp
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260818-pacumsum-stamp-BRIEF.md", "brief_sha256": "dff02e853c891178415f8f91757259e2b7092738c9e19b1ac1831963821628ad", "brief_sha256_norm": "dff02e853c891178415f8f91757259e2b7092738c9e19b1ac1831963821628ad", "event": "committee_round_open", "event_id": "61f6a9fb-6033-43a1-ba8f-ec399695bbb9", "expected_outputs": {"codex": "handoffs/20260818-pacumsum-stamp-codex.md", "composer": "handoffs/20260818-pacumsum-stamp-composer.md", "grok": "handoffs/20260818-pacumsum-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "b905d08c-ba05-4264-8657-99da44f0be2c", "schema_version": 1, "sequence": 2042, "session_name": "20260818-pacumsum-x-stamp-r24", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:40:42Z"}
+{"actor": "cx_run", "attempt_id": "f0402ad7-9a7e-4b07-8673-1800d3f7d8dc", "cli_rc": "0", "event": "committee_family_result", "event_id": "8b029c67-56be-46fe-bf0d-88a31f8edd4e", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-pacumsum-stamp-composer.md", "output_sha256": "29dc4a71b8761c75907bd597920d5b49b1ff4d8724eb6c8679136a159f4dca17", "producer": "audit_append.sh", "result_state": "success", "round_id": "b905d08c-ba05-4264-8657-99da44f0be2c", "schema_version": 1, "sequence": 2043, "ts": "2026-08-18T04:41:58Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260818-pacumsum-x-review-r23/synth.md", "output_sha256": "8bf7df8de62a2347f79f81e5e7b532367a5f8d5d20d44914aa4557493a8a1cbb", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:41:58Z"}
+{"actor": "cx_run", "attempt_id": "a02a6759-d88f-452b-9b0e-aa2be31d2bea", "cli_rc": "0", "event": "committee_family_result", "event_id": "099203f1-4811-4d40-b178-90a379394b8b", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-pacumsum-stamp-grok.md", "output_sha256": "3809b8f2f12de3380485616aa4a01823d86966a58e1c9d11015b5af526de9873", "producer": "audit_append.sh", "result_state": "success", "round_id": "b905d08c-ba05-4264-8657-99da44f0be2c", "schema_version": 1, "sequence": 2044, "ts": "2026-08-18T04:43:23Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260818-pacumsum-x-review-r23/synth.md", "output_sha256": "ed93d24bb738f74b13888d308900e179466b632950a7a30b977569a8f01108d3", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:43:23Z"}
+{"actor": "cx_run", "attempt_id": "29fc2830-0c2a-4141-840d-8bcd8766d68b", "cli_rc": "0", "event": "committee_family_result", "event_id": "be819f51-70b0-4205-9883-f0c934ff0782", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260818-pacumsum-stamp-codex.md", "output_sha256": "f40baf10e4863d71b23598e797836334daade066cec5c63ed94a05c038b75c7d", "producer": "audit_append.sh", "result_state": "success", "round_id": "b905d08c-ba05-4264-8657-99da44f0be2c", "schema_version": 1, "sequence": 2045, "ts": "2026-08-18T04:43:33Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260818-pacumsum-x-review-r23/synth.md", "output_sha256": "ed93d24bb738f74b13888d308900e179466b632950a7a30b977569a8f01108d3", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:43:33Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "036c8449-0460-4cc5-8414-3c55bcac6556", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp 輪不產 canonical findings；三家 APPROVED 且 reconcile_stamps_check PASS（sha 73ca7d3a）；PA-CUMSUM 收案", "round_id": "b905d08c-ba05-4264-8657-99da44f0be2c", "schema_version": 1, "sequence": 2046, "ts": "2026-08-18T04:43:53Z", "zero_findings_verified": ""}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-pacumsum-stamp-codex.md", "output_sha256": "f40baf10e4863d71b23598e797836334daade066cec5c63ed94a05c038b75c7d", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:43:53Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-pacumsum-stamp-composer.md", "output_sha256": "29dc4a71b8761c75907bd597920d5b49b1ff4d8724eb6c8679136a159f4dca17", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:43:53Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260818-pacumsum-stamp-grok.md", "output_sha256": "3809b8f2f12de3380485616aa4a01823d86966a58e1c9d11015b5af526de9873", "task_id": "20260818-PACUMSUM-X-STAMP-R24", "ts": "2026-08-18T04:43:53Z"}
