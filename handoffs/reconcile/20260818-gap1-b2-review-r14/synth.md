@@ -72,7 +72,7 @@ POSIX 嚴格語意下**對本 schema 不成立**。codex／grok P1、composer P2
 **處置（修）**：① 掃描＋寫入包在 **`fcntl.flock(LOCK_EX)`**（sidecar `<ledger>.lock`；跨行程／跨執行緒皆互斥；
 同時消掉 PIPE_BUF 交錯疑慮，註解改寫）② **context 綁定**：`record` 之 `research_session_id`／`dataset_key`
 與參數不等 ⇒ `ContractViolation`（不寫）③ 測試：(a) context mismatch ⇒ raise 且檔不存在
-(b) 可證偽 TOCTOU 回歸：模組級 `_post_scan_hook`（預設 `None`，測試注入 sleep）＋兩執行緒同 id
+(b) 可證偽 TOCTOU 回歸：模組級 `_after_duplicate_scan_hook`（預設 `None`，測試注入 sleep）＋兩執行緒同 id
 ⇒ 恰 1 成功 1 `ContractViolation`、檔內 1 列（**拿掉鎖 ⇒ 2 列 ⇒ 紅**）(c) 多**行程**（`subprocess` 4 個、
 各寫 >PIPE_BUF 的 8KB 列）⇒ 每列可 `json.loads` 且列數＝4 ④ 探針新增 **§V-7e**（拿掉 flock ⇒ 轉紅）。
 
@@ -84,7 +84,7 @@ f"{s}__{d}.jsonl"` 無回歸鎖（grok：改 `strategy_validation` 字面測試�
 **處置（修）**：① 抽純函式 `_ledger_filename(research_session_id, dataset_key) -> str`（單測字面）
 ② 新增 `test_ledger_path.py`：**不** patch `ledger_path`，改 patch `MomentumConfig.from_project_root`
 回傳 `results_path=tmp`，斷言完整路徑 `tmp/strategy_validation/<s>__<d>.jsonl` 與 parent 名
-③ 主委加碼（同群集、路徑安全）：`research_session_id`／`dataset_key` 含 `os.sep`／`..`／空字串 ⇒
+③ 主委加碼（同群集、路徑安全）：`research_session_id`／`dataset_key` 含 `os.sep`／`..`／NUL／`__`（檔名內兩識別字之分隔符，放行會使 `("a__b","c")` 與 `("a","b__c")` 落同一檔）／空字串／非 str ⇒
 `ValueError`（禁 path traversal；今日無生產者，面向未來） ④ 探針新增 **§V-7d**（目錄字面改名 ⇒ 轉紅）。
 
 ### L7 — 型別檢核不對稱：`str` 收 `Enum` 子類；`float` 收 `numpy.float64` 但 `int` 拒 `numpy.int64`
@@ -309,3 +309,5 @@ STATUS: DONE
 
 ---
 
+
+## 戳記
