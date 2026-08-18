@@ -1813,6 +1813,12 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 原始索引恰好等於壓縮位置，那個錯根本沒被觸發。<strong>「改壞一定要變紅」這條規矩就是為此而設</strong>：不是驗程式，是驗測試有沒有牙。
 補了一條讓兩者不同的案例（欄 0 全 NaN 被剔除）才紅。教訓：邊界測試要刻意讓「兩種索引語意」分歧，否則等價於沒測。</p>
 </blockquote>
+<blockquote>
+<p><strong>六十五・（2026-08-18）我為了「讓閘門過」把規則放寬，被兩家用反例打回</strong>：第 4 批接線閘的 W3 我放行了任意屬性／字典鍵當「傳遞既有 reason」，
+理由是「不放行閘門過不了」——結果 Grok 用 <code>reason=data[&quot;x&quot;]</code> 塞自創字面就繞過。<strong>「閘門過不了」的正解是收窄成封閉白名單再讓程式碼配合白名單，
+不是把閘門放寬到能過</strong>（我在延伸檔自揭時已心虛，寫成「待裁定」，委員也確實推翻）。同一輪我另一項自揭（PBO 名次母體）也被 Codex 引原典推翻——
+兩項都是「實作方便」壓過「規格字面」，以後這類偏離一律先問「字面能不能守」，守不了才提案。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
