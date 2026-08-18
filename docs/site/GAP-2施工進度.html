@@ -38,7 +38,7 @@
 <tr>
 <td>B2</td>
 <td>多因子組合＋區塊 bootstrap 信賴區間</td>
-<td>🔄 動工中</td>
+<td>✅ 寫完（11 條測試全綠：O4 四因子帶寬、O8 對照、O9 bootstrap；3 條 mutation 全紅）→ 待三家 code review＋蓋章</td>
 </tr>
 <tr>
 <td>B3</td>
@@ -68,6 +68,7 @@
 <li>清單第二輪：codex 拿舊版文案報了一條「警語含禁字串」——那句上一輪就改掉了，grep 零命中，另兩家實核也是否。駁回要附碼證，並在下一輪叫 codex 自己重跑同一條 grep 確認關閉（不是我說了算）。</li>
 <li>第 1 批 code review：codex 8 條、grok 2 條、composer 零意見。真正有料的三件：①「節的狀態」規則——原本只要有一個視角算了就標 ok，被抓到「全部候選都退化仍標 ok」和「主視角超預算、附帶視角算了也標 ok」兩個洞，改成「節狀態＝主視角（逐一剔除）狀態，且視角要真的至少算出一個才算 ok」；②標籤是常數時秩相關無定義，原本標 ok 全空值，加了明確原因 <code>label_degenerate</code>；③一條 mutation（Spearman 換 Pearson）原本靠 gross IC 那條路轉紅、沒證到邊際 IC 那條路，補了重尾標籤的窄測。駁回一條：codex 說 loader 的頂層鍵清單違反「只寫一次」原則，但那是清單（FROZEN）明文要求的守衛，不是欄位表複列。</li>
 <li>第 1 批蓋章時 codex 一度 BLOCKED：它量到「V-6 沒轉紅、測試 1 條紅」——查證是別家委員照我 brief 寫的「可以在模組暫時加一行裸字面驗測試會紅」<strong>就地改了共用工作區</strong>，同時間探針又並行，codex 量到移動中的標的（另兩家同一份程式十條全紅、46 全綠）。改成只派 codex 一家、工作區獨占、實驗只准在記憶體做，重驗即 APPROVED。教訓：brief 不准邀請委員就地改檔（記進摩擦七十三）。</li>
+<li>第 2 批寫完（8/19 凌晨）：<code>combine_factors</code>——把倖存因子的秩常態分數用「只看訓練段決定的符號與權重」合成一個訊號，在測試段算 IC；附「訓練段最強單因子的測試段 IC」當對照與差值的 bootstrap 區間；bootstrap 從第 1 批搬家到這個模組（<code>marginal_ic</code> 改 import，避免循環 import 用函式內 lazy import）。SPEC 給的四因子加法性 oracle（等權 composite 0.55–0.61、每個邊際 0.26–0.31、平方和比 0.9–1.1）一次落帶。3 條 mutation：符號改用測試段／權重改用測試段／bootstrap 區塊長度強制 1，都改壞就紅。</li>
 </ul>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-2施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>

@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from momentum.Analysis.factor_combiner import block_bootstrap_ci  # Task 2.1：bootstrap 搬至 factor_combiner（簽名不變）
 from momentum.Analysis.survivor_contract import load_survivor_contract
 
 __all__ = [
@@ -32,7 +33,7 @@ __all__ = [
     "normal_scores",
     "fit_projection",
     "apply_residual",
-    "block_bootstrap_ci",
+    "block_bootstrap_ci",  # re-export（自 factor_combiner）
     "MarginalICParams",
     "MarginalICResult",
     "compute_marginal_ic",
@@ -121,53 +122,6 @@ def apply_residual(z_target: np.ndarray, z_basis: np.ndarray, projection: Projec
             f"apply_residual: basis columns {X.shape[1]} != beta length {projection.beta.shape[0]}"
         )
     return target - X @ projection.beta
-
-
-# ============================================================================
-# Task 1.2 — moving-block bootstrap（B2 Task 2.1 搬至 factor_combiner.py，簽名不變）
-# ============================================================================
-def block_bootstrap_ci(
-    stat_fn: Callable[..., float],
-    arrays: Sequence[np.ndarray],
-    *,
-    block_len: int,
-    n_bootstrap: int,
-    seed: int,
-) -> Optional[Tuple[float, float]]:
-    """成對 moving-block bootstrap 95% CI。
-
-    - ``arrays`` 為同長度陣列（同一組 block 索引同時重抽 ⇒ 成對）；``block_len<=0`` ⇒ ``ValueError``；
-      ``n_bootstrap<1`` ⇒ ``ValueError``；``block_len>n`` 時截為 ``n``（單一 block）。
-    - 每次抽 ``ceil(n/block_len)`` 個起點 ``rng.integers(0, n-block_len+1)``，串接後切至 ``n``。
-    - 統計量非有限者略過；全部非有限 ⇒ 回 ``None``；否則 ``(q0.025, q0.975)``。
-    """
-    if block_len <= 0:
-        raise ValueError(f"block_len must be >= 1, got {block_len}")
-    if n_bootstrap < 1:
-        raise ValueError(f"n_bootstrap must be >= 1, got {n_bootstrap}")
-    arrs = [np.asarray(a) for a in arrays]
-    if not arrs:
-        raise ValueError("block_bootstrap_ci needs at least one array")
-    n = arrs[0].shape[0]
-    if any(a.shape[0] != n for a in arrs):
-        raise ValueError("block_bootstrap_ci arrays must share length")
-    if n == 0:
-        return None
-    b = min(int(block_len), n)
-    n_blocks = int(math.ceil(n / b))
-    rng = np.random.default_rng(seed)
-    out: List[float] = []
-    offsets = np.arange(b)
-    for _ in range(int(n_bootstrap)):
-        starts = rng.integers(0, n - b + 1, size=n_blocks)
-        idx = (starts[:, None] + offsets[None, :]).reshape(-1)[:n]
-        val = stat_fn(*[a[idx] for a in arrs])
-        val = float(val)
-        if math.isfinite(val):
-            out.append(val)
-    if not out:
-        return None
-    return (float(np.quantile(out, 0.025)), float(np.quantile(out, 0.975)))
 
 
 # ============================================================================

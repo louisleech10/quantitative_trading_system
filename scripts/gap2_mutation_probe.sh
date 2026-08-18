@@ -29,6 +29,8 @@ done
 
 PY=venv/bin/python
 MIC=momentum/Analysis/marginal_ic.py
+FC=momentum/Analysis/factor_combiner.py
+TEST_FC=tests/momentum/Analysis/test_factor_combiner.py
 TEST_MIC=tests/momentum/Analysis/test_marginal_ic.py
 TEST_SC=tests/momentum/Analysis/test_survivor_contract.py
 
@@ -37,19 +39,26 @@ declare -a CASES=()
 case "${BATCH}" in
   B1)
     ALL_TESTS="${TEST_SC} ${TEST_MIC}"
-    TARGETS="${MIC}"
+    TARGETS="${MIC} ${FC}"
     CASES+=("V-1|${MIC}|proj = fit_projection(z_f_tr, Z_S_tr)|proj = fit_projection(z_f_te, Z_S_te)|test_o7_train_fit")
     CASES+=("V-2|${MIC}|    return stats.norm.ppf(r / (n + 1.0))|    return arr  # MUTANT: identity|test_o1a_residual_degenerate")
     CASES+=("V-3|${MIC}|    return float(stats.spearmanr(a, b)[0])|    return float(stats.pearsonr(a, b)[0])  # MUTANT|test_marginal_uses_spearman_not_pearson")
     CASES+=("V-4|${MIC}|            S = [s for s in survivors if s != f]|            S = list(survivors)  # MUTANT: 含自身|test_o2_orthogonal_new_info")
     CASES+=("V-5|${MIC}|    order_key_ic = train_ic |    order_key_ic = _rank_ic(test_rows_mask) |test_sequential_order_by_train_ic")
-    CASES+=("V-6|${MIC}|    rng = np.random.default_rng(seed)|    rng = np.random.default_rng()  # MUTANT: 忽略 seed|test_o9_bootstrap_seed_determinism")
+    CASES+=("V-6|${FC}|    rng = np.random.default_rng(seed)|    rng = np.random.default_rng()  # MUTANT: 忽略 seed|test_o9_bootstrap_seed_determinism")
     CASES+=("V-17a|${MIC}|            insample = _spearman(r_tr, y_tr)|            insample = _spearman(r_te, y_te)  # MUTANT|test_o7_train_insample_differs")
     CASES+=("V-18|${MIC}|            S = [s for s in survivors if s != f]|            S = [s for j, s in enumerate(survivors) if j != 0]  # MUTANT: 位置|test_shuffle_survivors_invariance")
     CASES+=("V-21|${MIC}|        if float(np.var(r_te)) <= thr:|        if False:  # MUTANT: 退化 gate 移除|test_o1a_residual_degenerate")
     CASES+=("V-22a|${MIC}|    if loo_budget_ok:|    if True:  # MUTANT: 超限仍輸出|test_budget_survivors_whole_not_computed")
     ;;
-  B2|B3|B4|B5)
+  B2)
+    ALL_TESTS="${TEST_MIC} ${TEST_FC}"
+    TARGETS="${FC}"
+    CASES+=("V-7|${FC}|    sign_source_X, sign_source_y = X_tr, y_tr|    sign_source_X, sign_source_y = X_te, y_te  # MUTANT: 符號用 test|test_o8_sign_from_train_negative_case")
+    CASES+=("V-8|${FC}|    weight_source_ic = train_ic|    weight_source_ic = test_ic_all  # MUTANT: 權重用 test|test_ic_weighted_uses_train_ic_reference")
+    CASES+=("V-9|${FC}|    b = min(int(block_len), n)  |    b = 1  # MUTANT: 強制 iid; |test_delta_ci_uses_block_len_reference")
+    ;;
+  B3|B4|B5)
     echo "🔴 batch ${BATCH} 之 case 表尚未定義（該批 Task 落地時加列）。" >&2
     exit 2
     ;;
@@ -127,7 +136,7 @@ p.write_text(s.replace(old, new, 1), encoding="utf-8")
 PYEOF
   if [ $? -ne 0 ]; then log "🔴 ${vid}: mutate 失敗"; restore_all; exit 2; fi
 
-  "$PY" -m pytest "${TEST_MIC}" -q -x -k "${target}" > "${TMPLOG}" 2>&1
+  "$PY" -m pytest ${ALL_TESTS} -q -x -k "${target}" > "${TMPLOG}" 2>&1
   _rc=$?
   _nfail="$(grep -cE '^FAILED' "${TMPLOG}")"
   if [ "${_rc}" -eq 1 ] && [ "${_nfail}" -ge 1 ]; then
@@ -140,7 +149,7 @@ PYEOF
     FAIL=1
   fi
   restore_all
-  "$PY" -m pytest "${TEST_MIC}" -q -x -k "${target}" > "${TMPLOG}" 2>&1
+  "$PY" -m pytest ${ALL_TESTS} -q -x -k "${target}" > "${TMPLOG}" 2>&1
   _rc2=$?
   if [ "${_rc2}" -eq 0 ]; then
     log "MUTATION ${vid}: RESTORED GREEN ✓"
