@@ -1,0 +1,284 @@
+{
+  "version": 1,
+  "_doc": "GAP-2 倖存因子輸出契約＋邊際 IC 節契約單一真相源（docs/GAP2_MARGINAL_IC_TODO.md Task 1.0）。所有新欄位名／枚舉值／reason 字面只住本檔；SPEC／TODO／程式／測試不得複列，程式以 survivor_contract.load_survivor_contract() 讀取。消費端義務：(a) `sample_scope.kind=event` 之倖存者只得於事件樣本訓練；(b) 消費端須同時讀 `oos_guarantees`／`independent_oos_validation`／`oos_semantics`／`analysis_status` 四欄，禁只憑 `oos_guarantees` 判 OOS。event canonical 序列化：timestamps → int64 epoch ms UTC → sorted unique → JSON 陣列無空白（`json.dumps(list, separators=(\",\",\":\"))`）→ sha256；query 模式 `definition_hash=sha256(query.strip().encode(\"utf-8\"))`、`timestamps_hash=null`；無事件 ⇒ 兩者 null。capability_status 不在此重新定義，以 capability_status_ref 指向 IC report 契約（執行期 dereference，失敗即 raise）。每個 *_keys 物件層皆 additional_properties:false（未列鍵即非法）。type 值集：str|int|float|bool|list|object|null。",
+  "capability_status_ref": "momentum/Analysis/contracts/ic_report_contract.json#capability_status",
+  "reasons": {
+    "marginal_ic": [
+      "no_holdout_split",
+      "insufficient_test_rows",
+      "insufficient_train_rows",
+      "no_survivors",
+      "cross_sectional_mode",
+      "disabled_by_config",
+      "candidate_budget_exceeded",
+      "all_zero_train_ic"
+    ],
+    "marginal_ic_feature": [
+      "residual_degenerate",
+      "zero_train_ic",
+      "insufficient_rows"
+    ],
+    "survivor_output": [
+      "identity_missing",
+      "write_failed"
+    ]
+  },
+  "algorithm_version": "gap2_marginal_ic_v1",
+  "statistic_values": ["semi_partial_rank_ic"],
+  "projection_space_values": ["rank_normal"],
+  "weights_method_values": ["equal", "ic_weighted"],
+  "view_values": ["loo", "sequential", "removed_candidates"],
+  "fit_scope_values": ["train", "full_sample"],
+  "selection_sample_values": ["test"],
+  "oos_semantics_values": ["preprocessing_and_fit_excluded_test;selection_used_test;not_independent_oos"],
+  "independent_oos_validation_allowed": [false],
+  "sample_scope_kind_values": ["full", "event"],
+  "survivor_output_status_keys": {
+    "_doc": "報告 metadata.survivor_output 五鍵（Task 4.2 三形狀＋A1-1 persist_suppressed；status ∈ capability_status；reason ∈ reasons.survivor_output 或 null）。",
+    "additional_properties": false,
+    "nullable": ["reason", "path", "sha256"],
+    "keys": {
+      "status": {"type": "str", "required": true, "nullable": false},
+      "reason": {"type": "str", "required": true, "nullable": true},
+      "path": {"type": "str", "required": true, "nullable": true},
+      "sha256": {"type": "str", "required": true, "nullable": true},
+      "case_id": {"type": "str", "required": true, "nullable": false}
+    }
+  },
+  "survivor_file_keys": {
+    "_doc": "ic_survivors_{case_id}.json 頂層 schema（Task 3.1 build_survivor_output 組裝；validate_survivor_output 驗證）。",
+    "additional_properties": false,
+    "keys": {
+      "schema_version": {"type": "int", "required": true, "nullable": false},
+      "generated_at": {"type": "str", "required": true, "nullable": false},
+      "case_id": {"type": "str", "required": true, "nullable": false},
+      "symbol": {"type": "str", "required": true, "nullable": false},
+      "timeframe": {"type": "str", "required": true, "nullable": false},
+      "analysis_status": {"type": "str", "required": true, "nullable": false},
+      "oos_guarantees": {"type": "bool", "required": true, "nullable": false},
+      "pass_class": {"type": "str", "required": true, "nullable": false},
+      "independent_oos_validation": {"type": "bool", "required": true, "nullable": false},
+      "selection_sample": {"type": "str", "required": true, "nullable": false},
+      "oos_semantics": {"type": "str", "required": true, "nullable": false},
+      "statistic": {"type": "str", "required": true, "nullable": false},
+      "projection_space": {"type": "str", "required": true, "nullable": false},
+      "algorithm_version": {"type": "str", "required": true, "nullable": false},
+      "sample_scope": {"type": "object", "required": true, "nullable": false},
+      "split": {"type": "object", "required": true, "nullable": false},
+      "provenance": {"type": "object", "required": true, "nullable": false},
+      "feature_names": {"type": "list", "required": true, "nullable": false},
+      "feature_set_hash": {"type": "str", "required": true, "nullable": false},
+      "survivors": {"type": "list", "required": true, "nullable": false},
+      "composite": {"type": "object", "required": true, "nullable": false},
+      "removed_candidates": {"type": "object", "required": true, "nullable": false},
+      "status": {"type": "str", "required": true, "nullable": false},
+      "reason": {"type": "str", "required": true, "nullable": true}
+    }
+  },
+  "sample_scope_keys": {
+    "_doc": "sample_scope 為結構非裸枚舉（D6）；kind ⊆ RowMaskPlan.source；kind=event ⇒ event 非 null；事件 fallback ⇒ kind=full 且 degraded=true。",
+    "additional_properties": false,
+    "keys": {
+      "kind": {"type": "str", "required": true, "nullable": false},
+      "event": {"type": "object", "required": true, "nullable": true},
+      "n_samples_total": {"type": "int", "required": true, "nullable": false},
+      "n_samples_test": {"type": "int", "required": true, "nullable": true},
+      "degraded": {"type": "bool", "required": true, "nullable": false}
+    }
+  },
+  "event_definition_keys": {
+    "_doc": "sample_scope.event 物件（序列化規格見 _doc）。",
+    "additional_properties": false,
+    "keys": {
+      "definition_hash": {"type": "str", "required": true, "nullable": true},
+      "timestamps_hash": {"type": "str", "required": true, "nullable": true},
+      "mode": {"type": "str", "required": true, "nullable": false},
+      "n_events": {"type": "int", "required": true, "nullable": true},
+      "n_timestamps_requested": {"type": "int", "required": true, "nullable": true}
+    }
+  },
+  "event_identity_keys": {
+    "_doc": "orchestrator _ic_cache[\"event_identity\"]（stage3 pop timestamps 之前計算之不可變 dict；survivor_contract.compute_event_identity 產出）。mode ∈ {timestamps, query, none}。",
+    "additional_properties": false,
+    "keys": {
+      "mode": {"type": "str", "required": true, "nullable": false},
+      "definition_hash": {"type": "str", "required": true, "nullable": true},
+      "timestamps_hash": {"type": "str", "required": true, "nullable": true},
+      "n_events": {"type": "int", "required": true, "nullable": true},
+      "n_timestamps_requested": {"type": "int", "required": true, "nullable": true}
+    }
+  },
+  "split_keys": {
+    "_doc": "split 物件；無 split ⇒ bounds/rows 以 full 表述、row_identity 對全 index。",
+    "additional_properties": false,
+    "keys": {
+      "split_method": {"type": "str", "required": true, "nullable": false},
+      "train_time_bounds": {"type": "list", "required": true, "nullable": true},
+      "test_time_bounds": {"type": "list", "required": true, "nullable": true},
+      "train_rows": {"type": "int", "required": true, "nullable": false},
+      "test_rows": {"type": "int", "required": true, "nullable": false},
+      "embargo": {"type": "int", "required": true, "nullable": true},
+      "purge_gap": {"type": "int", "required": true, "nullable": true},
+      "base_universe_hash": {"type": "str", "required": true, "nullable": true},
+      "selection_scope_id": {"type": "str", "required": true, "nullable": true},
+      "row_identity": {"type": "object", "required": true, "nullable": false}
+    }
+  },
+  "row_identity_keys": {
+    "_doc": "canonical_idx_hash（momentum/core/contracts.py）之 train／test index hash。",
+    "additional_properties": false,
+    "keys": {
+      "train_index_hash": {"type": "str", "required": true, "nullable": false},
+      "test_index_hash": {"type": "str", "required": true, "nullable": false}
+    }
+  },
+  "provenance_keys": {
+    "_doc": "provenance 物件；producer 固定 ic_filter_orchestrator；contract_version＝本檔 version。",
+    "additional_properties": false,
+    "keys": {
+      "config_hash": {"type": "str", "required": true, "nullable": false},
+      "features_source_hash": {"type": "str", "required": true, "nullable": false},
+      "features_path": {"type": "str", "required": true, "nullable": true},
+      "labels_content_hash": {"type": "str", "required": true, "nullable": false},
+      "pit_stats_version": {"type": "str", "required": true, "nullable": true},
+      "fit_mode": {"type": "str", "required": true, "nullable": false},
+      "ic_method": {"type": "str", "required": true, "nullable": false},
+      "label_horizon": {"type": "int", "required": true, "nullable": true},
+      "label_return_type": {"type": "str", "required": true, "nullable": true},
+      "report_ref": {"type": "str", "required": true, "nullable": false},
+      "producer": {"type": "str", "required": true, "nullable": false},
+      "contract_version": {"type": "int", "required": true, "nullable": false},
+      "algorithm_version": {"type": "str", "required": true, "nullable": false}
+    }
+  },
+  "survivor_record_keys": {
+    "_doc": "survivors[] 單筆；IC 快照四欄自 report summary_table；marginal 欄自 marginal_ic loo 視角（not_computed ⇒ null）。",
+    "additional_properties": false,
+    "keys": {
+      "feature_name": {"type": "str", "required": true, "nullable": false},
+      "ic_mean": {"type": "float", "required": true, "nullable": true},
+      "icir": {"type": "float", "required": true, "nullable": true},
+      "p_value_adj": {"type": "float", "required": true, "nullable": true},
+      "pass_class": {"type": "str", "required": true, "nullable": true},
+      "train_ic": {"type": "float", "required": true, "nullable": true},
+      "gross_ic": {"type": "float", "required": true, "nullable": true},
+      "marginal_ic_loo": {"type": "float", "required": true, "nullable": true},
+      "marginal_ic_loo_ci95": {"type": "list", "required": true, "nullable": true},
+      "marginal_ic_train_insample": {"type": "float", "required": true, "nullable": true},
+      "redundancy_kept": {"type": "bool", "required": true, "nullable": false}
+    }
+  },
+  "marginal_ic_section_keys": {
+    "_doc": "報告 marginal_ic 節（MarginalICResult.to_dict() 鍵集＝section_keys；orchestrator 另加 composite＝composite_keys）。per_feature[name]／removed_candidates[name] 各＝per_feature_keys／removed_candidate_keys；sequential[i]＝sequential_keys；views[view]＝{status, reason}；budget＝budget_keys。",
+    "section_keys": {
+      "additional_properties": false,
+      "keys": {
+        "status": {"type": "str", "required": true, "nullable": false},
+        "reason": {"type": "str", "required": true, "nullable": true},
+        "fit_scope": {"type": "str", "required": true, "nullable": true},
+        "oos_guarantees": {"type": "bool", "required": true, "nullable": true},
+        "pass_class": {"type": "str", "required": true, "nullable": true},
+        "statistic": {"type": "str", "required": true, "nullable": false},
+        "projection_space": {"type": "str", "required": true, "nullable": false},
+        "independent_oos_validation": {"type": "bool", "required": true, "nullable": false},
+        "selection_sample": {"type": "str", "required": true, "nullable": false},
+        "oos_semantics": {"type": "str", "required": true, "nullable": false},
+        "algorithm_version": {"type": "str", "required": true, "nullable": false},
+        "views": {"type": "object", "required": true, "nullable": false},
+        "per_feature": {"type": "object", "required": true, "nullable": false},
+        "sequential": {"type": "list", "required": true, "nullable": false},
+        "removed_candidates": {"type": "object", "required": true, "nullable": false},
+        "train_ic": {"type": "object", "required": true, "nullable": false},
+        "n_train": {"type": "int", "required": true, "nullable": true},
+        "n_test": {"type": "int", "required": true, "nullable": true},
+        "n_regressions": {"type": "int", "required": true, "nullable": false},
+        "budget": {"type": "object", "required": true, "nullable": false}
+      }
+    },
+    "per_feature_keys": {
+      "additional_properties": false,
+      "keys": {
+        "status": {"type": "str", "required": true, "nullable": false},
+        "reason": {"type": "str", "required": true, "nullable": true},
+        "conditioning_set": {"type": "list", "required": true, "nullable": false},
+        "marginal_ic": {"type": "float", "required": true, "nullable": true},
+        "gross_ic": {"type": "float", "required": true, "nullable": true},
+        "ic_retained_ratio": {"type": "float", "required": true, "nullable": true},
+        "marginal_ic_train_insample": {"type": "float", "required": true, "nullable": true},
+        "ci95": {"type": "list", "required": true, "nullable": true},
+        "condition_number": {"type": "float", "required": true, "nullable": true},
+        "r2_train": {"type": "float", "required": true, "nullable": true},
+        "n_used_train": {"type": "int", "required": true, "nullable": false},
+        "n_used_test": {"type": "int", "required": true, "nullable": false}
+      }
+    },
+    "sequential_keys": {
+      "additional_properties": false,
+      "keys": {
+        "feature": {"type": "str", "required": true, "nullable": false},
+        "step": {"type": "int", "required": true, "nullable": false},
+        "status": {"type": "str", "required": true, "nullable": false},
+        "reason": {"type": "str", "required": true, "nullable": true},
+        "conditioning_set": {"type": "list", "required": true, "nullable": false},
+        "marginal_ic": {"type": "float", "required": true, "nullable": true},
+        "gross_ic": {"type": "float", "required": true, "nullable": true},
+        "ic_retained_ratio": {"type": "float", "required": true, "nullable": true},
+        "marginal_ic_train_insample": {"type": "float", "required": true, "nullable": true},
+        "ci95": {"type": "list", "required": true, "nullable": true},
+        "condition_number": {"type": "float", "required": true, "nullable": true},
+        "r2_train": {"type": "float", "required": true, "nullable": true},
+        "n_used_train": {"type": "int", "required": true, "nullable": false},
+        "n_used_test": {"type": "int", "required": true, "nullable": false}
+      }
+    },
+    "removed_candidate_keys": {
+      "additional_properties": false,
+      "keys": {
+        "status": {"type": "str", "required": true, "nullable": false},
+        "reason": {"type": "str", "required": true, "nullable": true},
+        "conditioning_set": {"type": "list", "required": true, "nullable": false},
+        "marginal_ic": {"type": "float", "required": true, "nullable": true},
+        "gross_ic": {"type": "float", "required": true, "nullable": true},
+        "ic_retained_ratio": {"type": "float", "required": true, "nullable": true},
+        "marginal_ic_train_insample": {"type": "float", "required": true, "nullable": true},
+        "ci95": {"type": "list", "required": true, "nullable": true},
+        "condition_number": {"type": "float", "required": true, "nullable": true},
+        "r2_train": {"type": "float", "required": true, "nullable": true},
+        "n_used_train": {"type": "int", "required": true, "nullable": false},
+        "n_used_test": {"type": "int", "required": true, "nullable": false}
+      }
+    },
+    "composite_keys": {
+      "additional_properties": false,
+      "keys": {
+        "status": {"type": "str", "required": true, "nullable": false},
+        "reason": {"type": "str", "required": true, "nullable": true},
+        "method": {"type": "str", "required": true, "nullable": false},
+        "weights": {"type": "object", "required": true, "nullable": false},
+        "signs": {"type": "object", "required": true, "nullable": false},
+        "excluded": {"type": "object", "required": true, "nullable": false},
+        "composite_ic": {"type": "float", "required": true, "nullable": true},
+        "composite_ic_train_insample": {"type": "float", "required": true, "nullable": true},
+        "top_train_single": {"type": "str", "required": true, "nullable": true},
+        "top_train_single_test_ic": {"type": "float", "required": true, "nullable": true},
+        "best_single_test_ic": {"type": "float", "required": true, "nullable": true},
+        "best_single_feature": {"type": "str", "required": true, "nullable": true},
+        "delta_vs_top_train_single": {"type": "float", "required": true, "nullable": true},
+        "delta_ci95": {"type": "list", "required": true, "nullable": true},
+        "n_used_test": {"type": "int", "required": true, "nullable": false},
+        "n_used_train": {"type": "int", "required": true, "nullable": false},
+        "fit_scope": {"type": "str", "required": true, "nullable": true},
+        "oos_guarantees": {"type": "bool", "required": true, "nullable": true}
+      }
+    },
+    "budget_keys": {
+      "additional_properties": false,
+      "keys": {
+        "max_survivors_for_loo": {"type": "int", "required": true, "nullable": false},
+        "max_removed_candidates": {"type": "int", "required": true, "nullable": false},
+        "n_survivors": {"type": "int", "required": true, "nullable": false},
+        "n_removed_candidates": {"type": "int", "required": true, "nullable": false}
+      }
+    }
+  }
+}
