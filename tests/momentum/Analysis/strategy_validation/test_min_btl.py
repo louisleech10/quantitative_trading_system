@@ -201,3 +201,16 @@ def test_n_source_values_are_contract_enum_and_validated():
     }
     with pytest.raises(ContractViolation, match="n_source_values"):
         validate_against_contract(section, "eligibility")
+
+
+def test_hand_constants_match_golden_file():
+    """B4 review N6：手算常數同時對照 golden 檔（sha256 經 `_golden` 唯一 loader 驗）——避免內嵌常數與 golden 雙源漂移。"""
+    from ._golden import load_golden
+
+    g = load_golden()["cases"]["min_btl"]
+    assert min_btl_years_upper_bound(n_trials=100, target_sharpe=1.0) == pytest.approx(g["upper_bound_100_sr1"], abs=1e-12)
+    b = g["budget_at_real_kline_years"]
+    assert b["t_years"] == _T_100
+    assert max_trials_budget(t_years=_T_100, target_sharpe=1.5) == b["sr_1.5"]
+    assert max_trials_budget(t_years=_T_100, target_sharpe=2.5) == b["sr_2.5"]
+    assert g["conservatism_oracle"]["n_obs"] == 3362 and g["conservatism_oracle"]["analytic_mean_max_annualized_sr"] == 0.833943

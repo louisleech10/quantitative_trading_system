@@ -100,51 +100,125 @@ def collect_assembled(func: ast.FunctionDef) -> Tuple[Set[str], Dict[str, Set[st
     return assembled, sections
 
 
-def _name_assignments(tree: ast.AST) -> Dict[str, List[ast.AST]]:
-    """同檔內每個 Name 之所有 Assign／AnnAssign 來源值（供 passthrough 判定）。"""
+def _scope_assignments(scope: ast.AST) -> Dict[str, List[ast.AST]]:
+    """某作用域（函式 body 或模組頂層）內每個 Name 之 Assign／AnnAssign 來源值（**不**深入巢狀函式）。"""
     out: Dict[str, List[ast.AST]] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for t in node.targets:
-                if isinstance(t, ast.Name):
-                    out.setdefault(t.id, []).append(node.value)
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
-            out.setdefault(node.target.id, []).append(node.value)
+
+    def _visit(node: ast.AST) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+                continue  # 巢狀作用域另計
+            if isinstance(child, ast.Assign):
+                for t in child.targets:
+                    if isinstance(t, ast.Name):
+                        out.setdefault(t.id, []).append(child.value)
+            elif isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name) and child.value is not None:
+                out.setdefault(child.target.id, []).append(child.value)
+            _visit(child)
+
+    _visit(scope)
     return out
 
 
-def _is_passthrough(node: ast.AST, assigns: Dict[str, List[ast.AST]], depth: int = 0) -> bool:
-    """「傳遞既有 reason 值」之封閉形態（不產生新字面）：
-    `x.reason`／`x["reason"]`（Attribute／Subscript）、`x.get("reason", <passthrough|Constant>)`、
-    `A if c else B`（兩支皆 passthrough／Constant）、`Name`（同檔所有指派來源皆 passthrough／Constant，或未被指派＝參數）。
-    JoinedStr（f-string）／BinOp／其他 Call／跨檔別名 ⇒ **非** passthrough ⇒ unresolved。"""
+class _Scope:
+    """passthrough 判定用之作用域：函式參數集合＋函式內指派＋模組頂層 str 常數（函式內同名指派**遮蔽**模組常數）。"""
+
+    def __init__(self, params: Set[str], local_assigns: Dict[str, List[ast.AST]], module_consts: Dict[str, str]):
+        self.params = params
+        self.local_assigns = local_assigns
+        self.module_consts = module_consts
+
+
+def _is_passthrough(node: ast.AST, scope: _Scope, depth: int = 0) -> bool:
+    """「傳遞既有 reason 值」之**封閉白名單**（A1-24；B4 review N1 收窄）：
+    ① `<x>.reason`（Attribute 且 attr=="reason"）② `<x>["reason"]`（Subscript 且 slice 為 Constant "reason"）
+    ③ `<x>.get("reason", <合規>)`（首參數為 Constant "reason"）④ `A if c else B`（兩支皆合規）
+    ⑤ `Name`：為該函式參數、或同**函式作用域**內所有指派來源皆合規、或（未在函式內指派時）為模組頂層 str 常數。
+    其餘（任意 Attribute／Subscript／其他 Call／JoinedStr／BinOp／跨檔別名）⇒ 非 passthrough ⇒ `[unresolved]` rc=1。"""
     if depth > 8:
         return False
     if isinstance(node, ast.Constant):
-        return True
+        return isinstance(node.value, str) or node.value is None
     if isinstance(node, ast.Attribute):
-        return True
+        return node.attr == "reason"
     if isinstance(node, ast.Subscript):
-        return isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)
+        return isinstance(node.slice, ast.Constant) and node.slice.value == "reason"
     if isinstance(node, ast.IfExp):
-        return _is_passthrough(node.body, assigns, depth + 1) and _is_passthrough(node.orelse, assigns, depth + 1)
+        return _is_passthrough(node.body, scope, depth + 1) and _is_passthrough(node.orelse, scope, depth + 1)
     if isinstance(node, ast.Call):
         f = node.func
-        if isinstance(f, ast.Attribute) and f.attr == "get" and node.args:
-            return all(_is_passthrough(a, assigns, depth + 1) for a in node.args)
+        if (
+            isinstance(f, ast.Attribute)
+            and f.attr == "get"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value == "reason"
+        ):
+            return all(_is_passthrough(a, scope, depth + 1) for a in node.args[1:])
         return False
     if isinstance(node, ast.Name):
-        sources = assigns.get(node.id, [])
-        return all(_is_passthrough(s, assigns, depth + 1) for s in sources)  # 無指派＝參數 ⇒ True
+        if node.id in scope.local_assigns:
+            return all(_is_passthrough(s, scope, depth + 1) for s in scope.local_assigns[node.id])
+        if node.id in scope.params:
+            return True
+        return node.id in scope.module_consts
     return False
 
 
+def _module_str_consts(tree: ast.AST) -> Dict[str, str]:
+    consts: Dict[str, str] = {}
+    if isinstance(tree, ast.Module):
+        for stmt in tree.body:
+            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+                if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                    consts[stmt.targets[0].id] = stmt.value.value
+    return consts
+
+
 def _reason_literals(tree: ast.AST) -> Tuple[Set[str], List[str]]:
-    """三形之 reason 字面；非 Constant 且非 passthrough ⇒ unresolved 清單（fail-closed）。"""
+    """三形之 reason 字面（逐作用域解析）；非 Constant 且非 passthrough ⇒ unresolved 清單（fail-closed）。"""
     found: Set[str] = set()
     unresolved: List[str] = []
-    assigns = _name_assignments(tree)
+    module_consts = _module_str_consts(tree)
+    scopes: List[Tuple[ast.AST, _Scope]] = [(tree, _Scope(set(), _scope_assignments(tree), module_consts))]
+    for fn in ast.walk(tree):
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            params = {a.arg for a in fn.args.args + fn.args.kwonlyargs + fn.args.posonlyargs}
+            if fn.args.vararg:
+                params.add(fn.args.vararg.arg)
+            if fn.args.kwarg:
+                params.add(fn.args.kwarg.arg)
+            scopes.append((fn, _Scope(params, _scope_assignments(fn), module_consts)))
+    for scope_node, scope in scopes:
+        _collect_reason_sites(scope_node, scope, found, unresolved)
+    return found, unresolved
 
+
+def _own_nodes(scope_node: ast.AST):
+    """該作用域**自身**之節點（不含巢狀函式／類別內部）。"""
+    stack = [scope_node]
+    while stack:
+        node = stack.pop()
+        yield node
+        for child in ast.iter_child_nodes(node):
+            if child is not scope_node and isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+                continue
+            stack.append(child)
+
+
+def _resolve_name_literal(name: str, scope: _Scope) -> Optional[str]:
+    """`Name` 可解析為單一 str 字面時回該字面（同函式內所有指派皆為同值 Constant；否則模組頂層常數且未被遮蔽／非參數）。"""
+    if name in scope.local_assigns:
+        vals = {s.value for s in scope.local_assigns[name] if isinstance(s, ast.Constant) and isinstance(s.value, str)}
+        if len(vals) == 1 and len(scope.local_assigns[name]) == 1:
+            return next(iter(vals))
+        return None
+    if name in scope.params:
+        return None
+    return scope.module_consts.get(name)
+
+
+def _collect_reason_sites(scope_node: ast.AST, scope: _Scope, found: Set[str], unresolved: List[str]) -> None:
     def _take(node: ast.AST, where: str) -> None:
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             if node.value:  # 空字串 = 無 reason，允許
@@ -154,12 +228,16 @@ def _reason_literals(tree: ast.AST) -> Tuple[Set[str], List[str]]:
         elif isinstance(node, ast.IfExp):
             _take(node.body, where)
             _take(node.orelse, where)
-        elif _is_passthrough(node, assigns):
+        elif isinstance(node, ast.Name) and _resolve_name_literal(node.id, scope) is not None:
+            lit = _resolve_name_literal(node.id, scope)
+            if lit:
+                found.add(lit)
+        elif _is_passthrough(node, scope):
             pass
         else:
             unresolved.append(f"{where}:L{getattr(node, 'lineno', '?')}:{type(node).__name__}")
 
-    for node in ast.walk(tree):
+    for node in _own_nodes(scope_node):
         if isinstance(node, ast.Call):
             for kw in node.keywords:
                 if kw.arg == "reason":
@@ -181,37 +259,14 @@ def _reason_literals(tree: ast.AST) -> Tuple[Set[str], List[str]]:
                     if isinstance(comp.value, str) and comp.value:
                         found.add(comp.value)
                 # 非 Constant 之比較（如 reason in contract["reasons"]）不屬三形，不列 unresolved
-    return found, unresolved
 
 
-def _all_constants(tree: ast.AST) -> Set[str]:
-    return {n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
-
-
-def _cross_file_reason_names(tree: ast.AST, module_consts: Dict[str, str]) -> None:
-    """同檔 `_REASON_X = "literal"` 之常數名對映（供 `reason=_REASON_X` 解析為 Constant）。"""
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-                module_consts[node.targets[0].id] = node.value.value
-
-
-def _resolve_same_file_names(tree: ast.AST) -> ast.AST:
-    """把 `Name` 指向同檔頂層 str 常數者改寫成 `Constant`（只追同檔頂層；跨檔別名一律 unresolved）。"""
-    consts: Dict[str, str] = {}
-    if isinstance(tree, ast.Module):
-        for stmt in tree.body:
-            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
-                if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
-                    consts[stmt.targets[0].id] = stmt.value.value
-
-    class _Rewriter(ast.NodeTransformer):
-        def visit_Name(self, node: ast.Name):  # type: ignore[override]
-            if isinstance(node.ctx, ast.Load) and node.id in consts:
-                return ast.copy_location(ast.Constant(value=consts[node.id]), node)
-            return node
-
-    return _Rewriter().visit(tree)
+def _used_module_const_values(tree: ast.AST) -> Set[str]:
+    """W2 之「已接線」第二形：模組頂層 str 常數之值，且該常數名於同檔**被引用**（Name Load，非其指派本身）。
+    只出現於 docstring／從未被引用之常數 ⇒ **不**算接線（B4 review N1／CODEX-R18-P2-06）。"""
+    consts = _module_str_consts(tree)
+    loaded = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+    return {v for name, v in consts.items() if name in loaded}
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -268,18 +323,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     if missing_elig:
         failures.append(f"W4: eligibility_keys 未於 eligibility 節頂層組裝: {missing_elig}（assembled={sorted(elig_assembled)}）")
     # W2 / W3
-    all_consts: Set[str] = set()
+    wired: Set[str] = set()  # W2「已接線」＝出現於 reason 位置（三形，經作用域解析）或為被引用之模組常數值
     reason_found: Set[str] = set()
     unresolved_all: List[str] = []
     for p, tree in trees.items():
-        all_consts |= _all_constants(tree)
-        resolved = _resolve_same_file_names(tree)
-        found, unresolved = _reason_literals(resolved)
+        found, unresolved = _reason_literals(tree)
         reason_found |= found
+        wired |= found | _used_module_const_values(tree)
         unresolved_all += [f"{p.name}:{u}" for u in unresolved]
-    dead = sorted(r for r in reasons if r not in all_consts)
+    dead = sorted(r for r in reasons if r not in wired)
     if dead:
-        failures.append(f"W2: 契約 reasons 未出現於 {pkg.name}/*.py 任何 Constant（死枚舉）: {dead}")
+        failures.append(
+            f"W2: 契約 reasons 未於 {pkg.name}/*.py 之 reason 位置或被引用常數出現（死枚舉；docstring／未用常數不算）: {dead}"
+        )
     invented = sorted(r for r in reason_found if r not in reasons)
     if invented:
         failures.append(f"W3: 自創 reason 字面（不在契約 reasons）: {invented}")

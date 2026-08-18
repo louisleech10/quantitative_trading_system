@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 import math
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, NamedTuple, Optional, Sequence
 
 import numpy as np
 from scipy.stats import rankdata
@@ -74,6 +74,13 @@ class PBOResult:
     reason: str
 
 
+class GuardResult(NamedTuple):
+    """Task 4.3 守衛結果（tuple 相容：可解包／與 `("ok", "")` 相等；具名欄位供 wiring 閘 W3 passthrough `guard.reason`）。"""
+
+    status: str
+    reason: str
+
+
 def candidate_set_hash(candidate_ids: Sequence[str]) -> str:
     """守衛用之 canonical hash：`sha256(",".join(sorted(ids)))`（唯一定義處；呼叫方自備 hash 不作證明）。"""
     return hashlib.sha256(",".join(sorted(candidate_ids)).encode("utf-8")).hexdigest()
@@ -84,7 +91,7 @@ def check_universe_provenance(
     candidate_ids: Sequence[str],
     n_candidates: int,
     ledger_result: Optional[LedgerReadResult],
-) -> Tuple[str, str]:
+) -> GuardResult:
     """Task 4.3 守衛：回 `(status, reason)`；唯一成功路徑＝`ledger_all_candidates` 且三項全符。
 
     Raises:
@@ -96,11 +103,11 @@ def check_universe_provenance(
     if prov.source not in allowed:
         raise ValueError(f"universe_provenance.source {prov.source!r} 不在契約 universe_source_values {allowed}")
     if prov.selection_free is not True:
-        return _validated_status("not_computed"), _REASON_CONTAMINATED
+        return GuardResult(_validated_status("not_computed"), _REASON_CONTAMINATED)
     if prov.source != _SOURCE_LEDGER_ALL:
-        return _validated_status("unavailable"), _REASON_UNVERIFIABLE  # full_grid／external_declared：無例外
+        return GuardResult(_validated_status("unavailable"), _REASON_UNVERIFIABLE)  # full_grid／external_declared：無例外
     if ledger_result is None or ledger_result.status != "ok":
-        return _validated_status("unavailable"), _REASON_UNVERIFIABLE
+        return GuardResult(_validated_status("unavailable"), _REASON_UNVERIFIABLE)
     ids = list(candidate_ids)
     set_ok = frozenset(ids) == frozenset(ledger_result.candidate_ids)
     count_ok = (
@@ -109,8 +116,8 @@ def check_universe_provenance(
     )
     hash_ok = prov.candidate_set_hash == candidate_set_hash(ids)
     if set_ok and count_ok and hash_ok:
-        return _validated_status("ok"), ""
-    return _validated_status("unavailable"), _REASON_UNVERIFIABLE
+        return GuardResult(_validated_status("ok"), "")
+    return GuardResult(_validated_status("unavailable"), _REASON_UNVERIFIABLE)
 
 
 def _fail(
@@ -133,24 +140,30 @@ def _metric(col: np.ndarray, idx: np.ndarray, selection_metric: str) -> float:
     return float(np.mean(col[idx]))  # mean_return
 
 
-def _metrics_columns(sub: np.ndarray, selection_metric: str) -> np.ndarray:
-    """向量化：對 `sub`（rows=該 path 之觀測、cols=候選）逐欄算選擇指標，回 shape `(n_cols,)`。
-
-    `sharpe` ＝ per-period `mean/std(ddof=1)`，退化（`n<2`／含非有限／`std==0`）⇒ NaN——**與 `compute_sharpe(...,
-    periods_per_year=1).value_per_period` 逐位一致**（`test_pbo.py::test_vectorized_sharpe_matches_compute_sharpe` 鎖住），
-    為 924 path × 50 候選之效能而向量化（逐欄呼叫 `compute_sharpe` 之 scipy 矩計算需 ~30s／案例）。
+def _sharpe_pp_1d(col: np.ndarray) -> float:
+    """per-period Sharpe（rf=0）：與 `compute_sharpe(col, periods_per_year=1).value_per_period` **逐位相同**之 1-D 縮減
+    （同一 `values.mean()`／`values.std(ddof=1)` 呼叫序與退化判定：`n<2`／含非有限／`std==0` ⇒ NaN）。
+    B4 review N5：2-D `axis=0` 縮減與 1-D 縮減之浮點順序不同，近常數欄會給出不同巨大值 ⇒ 改逐欄 1-D。
     """
-    n = sub.shape[0]
+    values = np.asarray(col, dtype=float).ravel()
+    if values.size < 2 or not np.all(np.isfinite(values)):
+        return float("nan")
+    std = float(values.std(ddof=1))
+    if std == 0.0 or not np.isfinite(std):
+        return float("nan")
+    return float(values.mean()) / std
+
+
+def _metrics_columns(sub: np.ndarray, selection_metric: str) -> np.ndarray:
+    """對 `sub`（rows=該 path 之觀測、cols=候選）逐欄算選擇指標，回 shape `(n_cols,)`。
+
+    `sharpe` 逐欄走 `_sharpe_pp_1d`（與 `compute_sharpe` 逐位相同，含近常數欄；
+    `test_pbo.py::test_vectorized_sharpe_matches_compute_sharpe` 以 `==` 鎖住）；不逐欄呼叫 `compute_sharpe` 本體是為避開
+    scipy 矩計算之成本（924 path × 50 候選 ~30s／案例 → 秒級），統計量定義未變。
+    """
     if selection_metric != "sharpe":
         return np.mean(sub, axis=0)
-    if n < 2:
-        return np.full(sub.shape[1], np.nan)
-    finite = np.all(np.isfinite(sub), axis=0)
-    std = sub.std(axis=0, ddof=1)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        sr = sub.mean(axis=0) / std
-    sr = np.where(finite & np.isfinite(std) & (std != 0.0), sr, np.nan)
-    return sr
+    return np.array([_sharpe_pp_1d(sub[:, j]) for j in range(sub.shape[1])], dtype=float)
 
 
 def probability_of_backtest_overfitting(
@@ -176,9 +189,9 @@ def probability_of_backtest_overfitting(
         raise ValueError(f"selection_metric {selection_metric!r} 不在契約 selection_metric_values")
 
     n_paths = cscv_path_count(s_blocks)
-    status, reason = check_universe_provenance(universe_provenance, candidate_ids, n_candidates, ledger_result)
-    if status != "ok":
-        return _fail(status=status, reason=reason, n_paths=n_paths, universe_scope=None)
+    guard = check_universe_provenance(universe_provenance, candidate_ids, n_candidates, ledger_result)
+    if guard.status != "ok":
+        return _fail(status=guard.status, reason=guard.reason, n_paths=n_paths, universe_scope=None)
     universe_scope = _UNIVERSE_SCOPE_LEDGER_ONLY  # A1-4：守衛 ok 之唯一今日值
 
     m = np.asarray(returns_matrix, dtype=float)
@@ -210,17 +223,17 @@ def probability_of_backtest_overfitting(
         # champion：path 有效候選中 IS metric 最大者；平手取最小原始欄索引（path_valid 已升冪，argmax 取首個）
         champ = path_valid[int(np.argmax([is_metrics[pos[c]] for c in path_valid]))]
         oos_all = _metrics_columns(m_valid[oos_idx], selection_metric)
-        oos_valid = [c for c in path_valid if math.isfinite(oos_all[pos[c]])]
-        n_excl += len(path_valid) - len(oos_valid)
-        if not math.isfinite(oos_all[pos[champ]]) or len(oos_valid) < 2:
-            # A1-15：champion 於 OOS 退化 ⇒ 跳過該 path，不重選
+        oos_vals = np.array([oos_all[pos[c]] for c in path_valid])
+        n_oos_bad = int(np.count_nonzero(~np.isfinite(oos_vals)))
+        n_excl += n_oos_bad  # 每候選每 path 至多 +1（B4 review N3；含 champion，不再額外 +1）
+        if n_oos_bad > 0:
+            # 守 Frozen 字面（B4 review N2）：名次母體＝path_valid、分母＝len(path_valid)+1；任一候選 OOS 非有限即無法
+            # 在該母體上取名次（`rankdata` 對 NaN 不可用、縮小母體會系統性改變 r）⇒ 跳過該 path（含 A1-15 之 champion 情形），不重選
             n_skipped += 1
-            n_excl += 1
             continue
-        oos_vals = np.array([oos_all[pos[c]] for c in oos_valid])
-        oos_pos = {c: i for i, c in enumerate(oos_valid)}  # A1-15：以壓縮位置取名次，禁原始索引
+        oos_pos = {c: i for i, c in enumerate(path_valid)}  # A1-15：以壓縮位置取名次，禁原始索引
         rank = float(rankdata(oos_vals, method="average")[oos_pos[champ]])
-        r = rank / (len(oos_valid) + 1)
+        r = rank / (len(path_valid) + 1)
         omega = math.log(r / (1.0 - r))
         logits.append(omega)
         n_used += 1

@@ -276,3 +276,12 @@ def test_degenerate_returns_and_unknown_ledger_n():
     )
     assert got.status == "unavailable" and got.reason == "n_unknown" and got.n_trials_used is None
     assert isinstance(got, DSRResult)
+
+
+def test_expected_max_sharpe_factor_matches_golden_file():
+    """B4 review N6：E[maxSR] 三點同時對照 golden 檔（sha256 經 `_golden` 唯一 loader 驗）。"""
+    from ._golden import load_golden
+
+    g = load_golden()["cases"]["expected_max_sharpe_factor"]
+    for n, v in g["values"].items():
+        assert expected_max_sharpe_factor(int(n)) == pytest.approx(v, abs=g["atol"])

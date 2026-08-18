@@ -163,3 +163,60 @@ def test_empty_reasons_is_rc1(tmp_path):
 
     proc = _run("--contract", str(_copy_contract(tmp_path, _m)), "--pkg", str(pkg))
     assert proc.returncode == 1
+
+
+# ── B4 review N1（A1-24）：passthrough 白名單收窄之回歸鎖 ─────────────────────
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        'data = {"not_reason": "invented_v"}\nx = f(reason=data["not_reason"])\n',  # Subscript 非 "reason" 鍵
+        'class O:\n    other = "invented_w"\nx = f(reason=O().other)\n',  # Attribute 非 .reason
+        'd = {"other": "n_unknown"}\nx = f(reason=d.get("other", "n_unknown"))\n',  # .get 首參數非 "reason"
+        '_R = "n_unknown"\ndef g(i):\n    _R = f"x_{i}"\n    return f(reason=_R)\n',  # 區域 f-string 遮蔽同名頂層常數
+        'def g(v):\n    reason = v + "_x"\n    return f(reason=reason)\n',  # BinOp
+    ],
+)
+def test_mutation_n1_non_whitelisted_passthrough_is_unresolved(tmp_path, snippet):
+    """grok／codex R18 反例：非白名單之屬性／字典鍵／`.get` 首參數／區域遮蔽／BinOp ⇒ [unresolved] rc=1。"""
+    pkg = _copy_pkg(tmp_path)
+    (pkg / "extra_mod.py").write_text("def f(**k):\n    return k\n\n" + snippet, encoding="utf-8")
+    proc = _run("--contract", str(_copy_contract(tmp_path)), "--pkg", str(pkg))
+    assert proc.returncode == 1 and "unresolved" in proc.stdout, proc.stdout
+
+
+def test_whitelisted_passthrough_forms_pass(tmp_path):
+    """白名單形態（`x.reason`／`x["reason"]`／`.get("reason", "")`／IfExp／參數／模組常數）⇒ rc=0。"""
+    pkg = _copy_pkg(tmp_path)
+    (pkg / "extra_mod.py").write_text(
+        "def f(**k):\n    return k\n\n"
+        '_R = "n_unknown"\n'
+        "def g(obj, d, flag, reason):\n"
+        '    a = f(reason=obj.reason)\n'
+        '    b = f(reason=d["reason"])\n'
+        '    c = f(reason=d.get("reason", ""))\n'
+        '    e = f(reason=_R if flag else "")\n'
+        "    h = f(reason=reason)\n"
+        "    return a, b, c, e, h\n",
+        encoding="utf-8",
+    )
+    proc = _run("--contract", str(_copy_contract(tmp_path)), "--pkg", str(pkg))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_mutation_n1_dead_enum_via_unused_constant_or_docstring_is_red(tmp_path):
+    """codex R18 P2-06：契約多一 reason，pkg 只以**未引用常數**／docstring 出現 ⇒ 仍為死枚舉 rc=1（W2）。"""
+    pkg = _copy_pkg(tmp_path)
+    (pkg / "extra_mod.py").write_text('"""docstring mentions ghost_reason"""\nUNUSED = "ghost_reason"\n', encoding="utf-8")
+
+    def _m(p):
+        p["reasons"].append("ghost_reason")
+        p["reason_conditions"]["ghost_reason"] = {"condition": "x", "assertion_ref": "x"}
+
+    proc = _run("--contract", str(_copy_contract(tmp_path, _m)), "--pkg", str(pkg))
+    assert proc.returncode == 1 and "ghost_reason" in proc.stdout and "W2" in proc.stdout
+    # 對照：被引用之模組常數即算接線
+    (pkg / "extra_mod.py").write_text('def f(**k):\n    return k\n\n_G = "ghost_reason"\nx = f(reason=_G)\n', encoding="utf-8")
+    proc = _run("--contract", str(_copy_contract(tmp_path, _m)), "--pkg", str(pkg))
+    assert proc.returncode == 0, proc.stdout

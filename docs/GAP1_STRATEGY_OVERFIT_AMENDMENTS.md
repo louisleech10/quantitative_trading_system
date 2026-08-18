@@ -492,7 +492,7 @@ reporter 為純讀 ⇒ 呼叫移到 `pipeline_file` 寫入之前；5xx 即不落
 
 ---
 
-## A1-23 — B4 實作備註（主委自產，**待 B4 code review 裁定**；四項偏離 TODO 字面之處置皆具名）
+## A1-23 — B4 實作備註（主委自產；**已由 R18 裁定，#1／#2／#6 被 A1-24 覆寫，#3／#4／#5／#7 維持**）
 
 - **來源**：B4 實作（Task 4.1／4.2／4.3／2.4，commit 見 git log `feat(gap1): B4`）；本條為主委**主動揭露**之偏離／解讀，非委員 finding。
   依「凡寫進契約的宣稱先有反例測試」與「禁靜默假設」，逐條列出並附回歸鎖；審查若判不可接受即改回字面。
@@ -523,6 +523,41 @@ reporter 為純讀 ⇒ 呼叫移到 `pipeline_file` 寫入之前；5xx 即不落
 7. **PBO 效能／探針**：§V-4（champion 改由 OOS 選）⇒ golden noise band 轉紅；§V-6（守衛移除）⇒ 6 條轉紅；
    §V-14（原始索引取名次）首版**未轉紅**（探針抓到：測試矩陣中原始索引＝壓縮位置）⇒ 新增 `test_rank_uses_compressed_position_not_original_index`
    （欄 0 全 NaN 使 valid_cols=[1,2,3]、champion 原始索引 3）⇒ 轉紅。探針 17 → **20** 條。
+
+---
+
+## A1-24 — 🔴 B4 code review 六群集修補（N1–N6）：W3 白名單收窄／PBO 守字面母體／exclusions 計數／雙冠手算鎖／`compute_sharpe` 逐位等價／golden 單一 loader
+
+- **來源**：B4 實作 code review（`20260818-GAP1-B4-REVIEW-R18`，三家 13 findings：codex 6／composer 2／grok 5；
+  收斂檔 `handoffs/reconcile/20260818-gap1-b4-review-r18/synth.md` 群集 N1–N6）。三家 Verdict 一致「需修補後收工」；分歧取較嚴、**全部本輪修**。
+- 🔴 **被推翻之主委假設（A1-23 自揭七項之裁定）**：#1 向量化等價鎖**不足**（近常數欄兩邊皆非 NaN 但值不同）⇒ N5；#2 W3 passthrough **有洞**（`reason=data["x"]`／`reason=o.other`／`.get` 首參數不驗／區域遮蔽）⇒ N1；
+  #6 OOS 名次母體**改變定義**（codex 引原典 Algorithm 2.3 全 N）⇒ N2 守字面；#3／#4／#5 三家可接受（#5 為過程債入帳）；#7 之 §V-14 補測獲確認；另 ④b 雙冠測試三家皆判廉價綠燈 ⇒ N4。
+
+### N1（修）W3 passthrough 封閉白名單＋W2 死枚舉判定（`CODEX-R18-P1-03`／`GROK-R18-P1-01`／`CODEX-R18-P2-06`）
+**覆寫 A1-23 #2**。W3 允許之非 Constant 形態**僅**：① `<x>.reason` ② `<x>["reason"]` ③ `<x>.get("reason", <合規>)` ④ `A if c else B`（兩支合規）
+⑤ `Name`＝該函式參數／同**函式作用域**內所有指派來源合規／模組頂層 str 常數（函式內同名指派**遮蔽**）。其餘（任意 Attribute／Subscript／其他 Call／JoinedStr／BinOp／跨檔別名）⇒ `[unresolved]` rc=1。
+W2「已接線」＝出現於 reason 位置（三形，逐作用域解析）**或**為被引用之模組 str 常數之值；只在 docstring／未引用常數 ⇒ 死枚舉 rc=1。
+回歸鎖：`test_wiring_check.py` 新增 5 條非白名單反例（rc=1）＋白名單正例（rc=0）＋未引用常數死枚舉（rc=1）；六條原 mutation 不變。
+連動：`pbo.py` 守衛回傳改 `GuardResult(NamedTuple)`（tuple 相容；`guard.reason` 為白名單形態）。
+
+### N2（修）PBO 名次母體與分母**守 Frozen 字面**（`CODEX-R18-P1-02`／`GROK-R18-P2-03`）
+**覆寫 A1-23 #6**：名次母體＝`path_valid`（IS 有限之候選）、`r = rank/(len(path_valid)+1)`；**任一** path 有效候選之 OOS metric 非有限 ⇒ 該 path 跳過
+（含 A1-15 之 champion 情形），**不**在縮小母體上取名次（`rankdata` 對 NaN 不可用是實作困難非語意依據；縮小母體會系統性改變 r）。golden 三案例 excl=0 不受影響。
+回歸鎖：`test_non_champion_oos_degenerate_skips_path_keeps_denominator`；`test_denominator_is_path_valid_count_plus_one`（④c 改為兩次真實 PBO 呼叫）。
+
+### N3（修）`n_path_exclusions` 每候選每 path 至多 +1（`CODEX-R18-P1-01`／`GROK-R18-P2-02`）
+IS 非有限 +1；OOS 非有限 +1（含 champion）；path skip 不再額外 +1。④d 改為精確斷言（fixture 手算＝2）。
+
+### N4（修）④b 雙冠測試改手算可證偽（`CODEX-R18-P2-04`／`COMPOSER-R18-P2-01`／`GROK-R18-P2-01`）
+`test_double_champion_takes_smallest_index_hand_computed`：path 0 IS 平手欄 1／3 ⇒ champion 欄 1、OOS 名次 2/4 ⇒ ω=ln(2/3)（誤取欄 3 ⇒ ln 4 即紅）；path 1 ⇒ ω=ln(7/3)；斷言 `logits_min/max` atol 1e-12。
+
+### N5（修＋殘留 G1-R11）`_sharpe_pp_1d` 與 `compute_sharpe` **逐位相同**（`CODEX-R18-P2-05`／`COMPOSER-R18-P2-02`）
+**覆寫 A1-23 #1**：`_metrics_columns("sharpe")` 改逐欄 1-D 縮減（同 `values.mean()`／`values.std(ddof=1)` 呼叫序與退化判定），等價鎖改 `==` 並加入 `0.01` 近常數欄與 `1e-9` 微擾欄；仍秒級。
+`compute_sharpe` 對浮點非精確常數不視為退化＝B1 已蓋章語意，本批不動 ⇒ **G1-R11**（needs-research：容差判準）登記於 registry。
+
+### N6（修）golden 單一 loader（`GROK-R18-P2-04`）
+`tests/momentum/Analysis/strategy_validation/_golden.py`（sha256 常數唯一定義處）；`test_pbo.py`／`test_min_btl.py`／`test_deflated_sharpe.py` 皆經此驗 sha 並對照 golden。
+過程債具名：§G「Task 3.1 動工前建立」golden 檔於 B4 補建（B3 之解析常數測試當時內嵌同值；本條後三檔皆讀 golden）。
 
 ---
 

@@ -26,15 +26,9 @@ from momentum.Analysis.strategy_validation.pbo import (
 from momentum.Analysis.strategy_validation.sharpe import compute_sharpe
 from momentum.core.frequency import resolve_periods_per_year
 
-_GOLDEN = Path(__file__).resolve().parents[1] / "golden" / "gap1_reference_cases.json"
-# 🔴 改 golden 檔須同步改本常數（兩處變更＝可審計；就地改寫即紅）
-_GOLDEN_SHA256 = "09a04b67168d571f1b1ec48cbfbfa0c402fd301bccd09a5b60d15bad1e95c418"
+from ._golden import GOLDEN_SHA256 as _GOLDEN_SHA256, load_golden as _golden  # noqa: E402  (N6：sha 常數唯一定義處)
 
 
-def _golden():
-    raw = _GOLDEN.read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == _GOLDEN_SHA256, "golden 檔被就地改寫（sha256 不符）"
-    return json.loads(raw.decode("utf-8"))
 
 
 def _ledger(ids):
@@ -126,18 +120,22 @@ def test_golden_alpha_undetectable():
 def test_vectorized_sharpe_matches_compute_sharpe():
     """`_metrics_columns("sharpe")` 逐位＝`compute_sharpe(col, periods_per_year=1).value_per_period`（含退化 NaN）。"""
     rng = np.random.default_rng(3)
-    sub = rng.standard_normal((80, 7)) * 0.02
+    sub = rng.standard_normal((80, 9)) * 0.02
     sub[:, 3] = 0.5  # 常數（二進位可精確表示 ⇒ std 恰 0）⇒ NaN
     sub[5, 4] = np.nan  # 含 NaN ⇒ NaN
+    sub[:, 7] = 0.01  # B4 review N5：浮點非精確常數（std≈1e-18 非 0）⇒ 兩邊皆巨大有限值，須**逐位相同**
+    sub[:, 8] = 0.01 + np.linspace(0, 1e-9, 80)  # 微擾近常數
     got = _metrics_columns(sub, "sharpe")
-    for j in range(7):
+    for j in range(9):
         ref = compute_sharpe(sub[:, j], periods_per_year=1).value_per_period
         if math.isnan(ref):
             assert math.isnan(got[j])
         else:
-            assert got[j] == pytest.approx(ref, abs=1e-15)
+            assert got[j] == ref, (j, got[j], ref)  # 逐位相等（同一 1-D 縮減）
     assert math.isnan(_metrics_columns(sub[:1], "sharpe")[0])  # n<2 ⇒ NaN
     assert _metrics_columns(sub, "mean_return")[0] == pytest.approx(np.mean(sub[:, 0]))
+    # 🔴 具名殘留 G1-R11：浮點非精確常數欄 compute_sharpe 不視為退化（回巨大有限 SR）——B1 語意，本批不動
+    assert math.isfinite(got[7]) and abs(got[7]) > 1e6
 
 
 def test_transpose_raises_and_short_t_ok():
@@ -167,28 +165,39 @@ def test_all_tie_gives_r_half_and_zero_logit():
     assert got.value == 0.0
 
 
-def test_double_champion_takes_smallest_index_and_denominators():
-    """④b 雙冠 ⇒ 最小原始索引；④c 5 vs 3 有效候選 ⇒ 分母 6 與 4（同名次 ω 不同）。"""
-    # 雙冠：欄 1 與欄 3 IS 完全相同且最佳；欄 3 OOS 更好 ⇒ 若取欄 3 名次會較高
+def test_double_champion_takes_smallest_index_hand_computed():
+    """④b 雙冠 ⇒ 最小原始索引（B4 review N4 重寫；手算可證偽）。mean_return、S=2、4 候選：
+    path 0（IS=前半）：欄 1／3 IS 平手最佳 ⇒ champion=欄 1；OOS=後半 欄 1 名次 2/4 ⇒ ω=ln((2/5)/(3/5))=ln(2/3)
+    （誤取欄 3 ⇒ 名次 4/4 ⇒ ω=ln 4，本測即紅）；
+    path 1（IS=後半）：欄 3 唯一最佳；OOS=前半 欄 3 與欄 1 平手名次 3.5 ⇒ r=0.7 ⇒ ω=ln(7/3)。"""
     n = 40
-    rng = np.random.default_rng(5)
-    base = rng.standard_normal((n, 4)) * 0.01
-    base[:, 3] = base[:, 1]  # 欄 3 複製欄 1（IS 平手）
-    base[n // 2:, 3] += 0.05  # 後半（某些 path 之 OOS）欄 3 更好
-    got = _run(base, s=2, metric="mean_return")
-    assert got.status == "ok"
-    # S=2 兩 path：IS=前半時欄 1/3 平手 ⇒ champion=欄 1；OOS=後半欄 3 領先 ⇒ 欄 1 名次非最高
-    # 若誤取欄 3 為 champion，其 OOS 名次會最高。此處只斷言至少一條 path 之 ω 非最大名次值。
-    assert got.n_paths_used == 2
-    # ④c：直接以壓縮位置與分母公式驗：5 候選全有效 ⇒ r=rank/6；3 有效 ⇒ r=rank/4
-    from scipy.stats import rankdata
+    h = n // 2
+    M = np.zeros((n, 4))
+    M[:h] = [0.001, 0.003, 0.002, 0.003]  # 前半：欄 1、3 平手最佳
+    M[h:] = [0.001, 0.002, 0.003, 0.004]  # 後半：欄 3 最佳、欄 1 第 2
+    got = _run(M, s=2, metric="mean_return")
+    assert got.status == "ok" and got.n_paths_used == 2 and got.n_path_exclusions == 0
+    expected = sorted([math.log(2 / 3), math.log(0.7 / 0.3)])
+    assert got.logits_min == pytest.approx(expected[0], abs=1e-12)
+    assert got.logits_max == pytest.approx(expected[1], abs=1e-12)
+    assert got.value == 0.5  # 一條 ω<0、一條 ω>0
 
-    assert rankdata([1, 2, 3, 4, 5], method="average")[4] / 6 == pytest.approx(5 / 6)
-    assert rankdata([1, 2, 3], method="average")[2] / 4 == pytest.approx(3 / 4)
+
+def test_denominator_is_path_valid_count_plus_one():
+    """④c 5 vs 3 有效候選 ⇒ 分母 6 與 4（兩次真實 PBO 呼叫；champion 恆最高名次 ⇒ ω=ln(n/1)）。"""
+    n = 40
+    M5 = np.tile(np.array([0.001, 0.002, 0.003, 0.004, 0.005]), (n, 1)) + np.linspace(0, 1e-7, n)[:, None]
+    got5 = _run(M5, s=2, metric="mean_return")
+    assert got5.status == "ok"
+    assert got5.logits_min == pytest.approx(math.log((5 / 6) / (1 / 6)), abs=1e-12)  # rank 5/(5+1)
+    got3 = _run(M5[:, :3].copy(), s=2, metric="mean_return")
+    assert got3.logits_min == pytest.approx(math.log((3 / 4) / (1 / 4)), abs=1e-12)  # rank 3/(3+1)
+    assert got5.logits_min != got3.logits_min  # 同「最高名次」不同分母 ⇒ ω 不同
 
 
 def test_champion_degenerate_in_oos_is_skipped_not_indexerror():
-    """④d A1-15：3 候選、IS champion＝原始索引 2、該候選 OOS 切片為常數 ⇒ path 計入 n_paths_skipped、不 raise、分母＝n_paths_used。"""
+    """④d A1-15：3 候選、IS champion＝原始索引 2、該候選 OOS 切片為常數 ⇒ path 計入 n_paths_skipped、不 raise、分母＝n_paths_used；
+    B4 review N3：n_path_exclusions 每候選每 path 至多 +1（本 fixture 手算＝2：path 0 之 OOS 欄 2 非有限 +1；path 1 之 IS 欄 2 非有限 +1）。"""
     n = 40
     M = np.zeros((n, 3))
     rng = np.random.default_rng(9)
@@ -197,13 +206,31 @@ def test_champion_degenerate_in_oos_is_skipped_not_indexerror():
     # 欄 2：前半 IS 極佳（大正均值有變異），後半常數（OOS 之 sharpe 退化）
     M[: n // 2, 2] = 0.05 + rng.standard_normal(n // 2) * 0.001
     M[n // 2 :, 2] = 0.0
-    got = _run(M, s=2, metric="sharpe")  # 2 paths：IS=前半（champ=2，OOS 常數 ⇒ skip）；IS=後半（欄 2 常數 ⇒ 排除）
-    assert got.status in ("ok", "not_computed")
-    assert got.n_paths_skipped >= 1
-    assert got.n_path_exclusions >= 1
+    got = _run(M, s=2, metric="sharpe")  # 2 paths：IS=前半（champ=2，OOS 常數 ⇒ skip）；IS=後半（欄 2 常數 ⇒ IS 排除，母體 2 欄）
+    assert got.status == "ok"
+    assert got.n_paths_skipped == 1 and got.n_paths_used == 1
+    assert got.n_path_exclusions == 2
     assert got.n_paths_used + got.n_paths_skipped == got.n_paths == 2
-    if got.status == "ok":
-        assert got.n_paths_used >= 1
+
+
+def test_non_champion_oos_degenerate_skips_path_keeps_denominator():
+    """B4 review N2：名次母體＝path_valid、分母＝len(path_valid)+1；**非** champion 之候選 OOS 非有限 ⇒ 該 path 跳過（不縮小母體取名次）。"""
+    n = 40
+    h = n // 2
+    M = np.zeros((n, 3))
+    M[:h] = [0.001, 0.003, 0.002]  # 前半：欄 1 最佳（IS of path 0）
+    M[h:] = [0.001, 0.002, 0.003]  # 後半（OOS of path 0）
+    M[:, 0] += np.linspace(0, 1e-7, n)  # 讓 sharpe 有變異
+    M[:, 1] += np.linspace(0, 1e-7, n)
+    M[:h, 2] += np.linspace(0, 1e-7, h)  # 欄 2 前半有變異（IS of path 0 有效）
+    M[h:, 2] = 0.5  # 欄 2 後半恰常數（0.5 二進位精確 ⇒ std 恰 0）⇒ path 0 之 OOS sharpe 退化（非 champion）；path 1 之 IS 退化（排除）
+    got = _run(M, s=2, metric="sharpe")
+    # path 0：欄 2 OOS 退化 ⇒ 整條 path skip；path 1：IS=後半 欄 2 常數 ⇒ IS 排除，母體={0,1}
+    assert got.n_paths_skipped == 1
+    assert got.n_paths_used == 1
+    assert got.n_path_exclusions == 2
+    # path 1 champion＝欄 1（IS 後半 0.002 > 0.001）；OOS 前半 欄 1 (0.003) > 欄 0 (0.001) ⇒ rank 2/(2+1)
+    assert got.logits_min == pytest.approx(math.log((2 / 3) / (1 / 3)), abs=1e-9)
 
 
 def test_rank_uses_compressed_position_not_original_index():

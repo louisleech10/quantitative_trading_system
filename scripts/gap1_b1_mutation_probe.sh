@@ -208,7 +208,7 @@ mutate "$PBO" '        champ = path_valid[int(np.argmax([is_metrics[pos[c]] for 
 run_expect_red "§V-4" "$TEST_PBO"
 
 echo "[§V-6] 移除 universe_provenance 守衛（一律 ok）"
-mutate "$PBO" '    status, reason = check_universe_provenance(universe_provenance, candidate_ids, n_candidates, ledger_result)' '    status, reason = ("ok", "")  # MUTANT: guard removed' || exit 1
+mutate "$PBO" '    guard = check_universe_provenance(universe_provenance, candidate_ids, n_candidates, ledger_result)' '    guard = GuardResult("ok", "")  # MUTANT: guard removed' || exit 1
 run_expect_red "§V-6" "$TEST_GUARD"
 
 echo "[§V-14] PBO 名次改回以原始欄索引索引壓縮陣列（A1-15 之 IndexError／錯值反例）"
