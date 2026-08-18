@@ -46044,3 +46044,44 @@ ts=2026-08-19 06:48:45 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260819-gap2-b2-stamp-grok.md", "output_sha256": "9027efa07871f176162aeed9f44aba558852270a65d57c594d9103895e3b9a15", "task_id": "20260819-GAP2-B2-STAMP-R16", "ts": "2026-08-18T22:52:19Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260819-gap2-b2-review-r15/synth.md", "output_sha256": "6c7171a6af112d38191e01c7c87c329a304cbe72982bb62bc6ee39aa413191e7", "task_id": "20260819-GAP2-B2-STAMP-R16", "ts": "2026-08-18T22:52:20Z"}
 {"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "main-agent", "event": "debt_abandon", "event_id": "f34ea9d0-68bf-473f-8ef8-6a0ab68a7c5d", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "戳記輪：composer/grok APPROVED；codex BLOCKED 於 L2 annotation 字面（__future__ annotations 下引號殘留），一行修正後派 codex 單家 r17；task 20260819-GAP2-B2-STAMP-R16", "round_id": "ea56bf19-4db5-46d2-a753-eb42a38b8f54", "schema_version": 1, "sequence": 2189, "ts": "2026-08-18T22:52:20Z", "zero_findings_verified": ""}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260819-GAP2-B2-STAMP-R17", "ts": "2026-08-18T22:52:38Z"}
+=== 2026-08-19 06:52:38 | dispatch ===
+  ts=2026-08-19 06:52:38
+  kind=dispatch
+  intent=GAP-2 B2 stamp r17(codex only;L2 annotation 一行補正 eb598289 重驗)
+  risk=low
+  facts_asked=body sha256=9d0650065c05;composer/grok r16 APPROVED;signature 已顯示 params: 'MarginalICParams';45 passed
+  review_role=戳記核可委員(只 append 戳記行)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260819-GAP2-B2-STAMP-R17", "ts": "2026-08-18T22:52:45Z"}
+=== 2026-08-19 06:52:45 | dispatch ===
+  ts=2026-08-19 06:52:45
+  kind=dispatch
+  intent=GAP-2 B2 stamp r17(codex only;L2 annotation 一行補正 eb598289 重驗)
+  risk=low
+  facts_asked=body sha256=9d0650065c05;composer/grok r16 APPROVED;signature 已顯示 params: 'MarginalICParams';45 passed
+  review_role=戳記核可委員(只 append 戳記行)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260819-gap2-b2-stamp-v2-BRIEF.md", "brief_sha256": "21e4d7b3d75c155f6312bde64fba351edeb413e3fab0b4039af7e88e1c79fa1e", "brief_sha256_norm": "21e4d7b3d75c155f6312bde64fba351edeb413e3fab0b4039af7e88e1c79fa1e", "event": "committee_round_open", "event_id": "1a9a4ac0-7e2d-499b-b093-4b475fa1893b", "expected_outputs": {"codex": "handoffs/20260819-gap2-b2-stamp-v2-codex.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex"], "producer": "audit_append.sh", "quorum_eligible": ["codex"], "round_id": "4c5d5d54-9a79-428b-80e5-81334b093e3b", "schema_version": 1, "sequence": 2190, "session_name": "20260819-gap2-b2-stamp-r17", "task_id": "20260819-GAP2-B2-STAMP-R17", "ts": "2026-08-18T22:52:49Z"}
+ts=2026-08-19 06:56:06 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260818T225606Z-mutation-test_factor_combiner.json
+{"actor": "cx_run", "attempt_id": "6a82a35b-edb5-44e5-8fff-f18dbee5ae23", "cli_rc": "0", "event": "committee_family_result", "event_id": "c04985d3-c59f-4e35-8278-2d43a8710c97", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260819-gap2-b2-stamp-v2-codex.md", "output_sha256": "acef4c514f2c7d7288d0866ef0ff6e77a6d8c87536bf42080d1d0b80e46bbcc9", "producer": "audit_append.sh", "result_state": "success", "round_id": "4c5d5d54-9a79-428b-80e5-81334b093e3b", "schema_version": 1, "sequence": 2191, "ts": "2026-08-18T22:59:51Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260819-gap2-b2-review-r15/synth.md", "output_sha256": "5491fd67e4bf062cf8271ad9361554f2070efa92885178f33b47173e7afe1592", "task_id": "20260819-GAP2-B2-STAMP-R17", "ts": "2026-08-18T22:59:51Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260819-gap2-b2-stamp-v2-codex.md", "output_sha256": "acef4c514f2c7d7288d0866ef0ff6e77a6d8c87536bf42080d1d0b80e46bbcc9", "task_id": "20260819-GAP2-B2-STAMP-R17", "ts": "2026-08-18T23:00:33Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260819-gap2-b2-review-r15/synth.md", "output_sha256": "5491fd67e4bf062cf8271ad9361554f2070efa92885178f33b47173e7afe1592", "task_id": "20260819-GAP2-B2-STAMP-R17", "ts": "2026-08-18T23:00:33Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "main-agent", "event": "debt_abandon", "event_id": "b0dee3e3-9fe2-45f8-9a30-91c718780093", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "戳記輪 v2（codex 單家）APPROVED；三家戳記齊；stamps_check PASS；task 20260819-GAP2-B2-STAMP-R17", "round_id": "4c5d5d54-9a79-428b-80e5-81334b093e3b", "schema_version": 1, "sequence": 2192, "ts": "2026-08-18T23:00:34Z", "zero_findings_verified": ""}
