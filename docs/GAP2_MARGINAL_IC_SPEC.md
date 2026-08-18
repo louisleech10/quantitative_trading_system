@@ -1,6 +1,6 @@
 # GAP-2a 邊際 IC／多因子組合（純 IC 層）＋ GAP-2b 倖存因子輸出契約 — SPEC
 
-> 來源 PLAN/診斷：`handoffs/reconcile/20260818-gap2-x-consult-r1/synth.md`（四方偵察收斂；主委版 `handoffs/20260818-gap2-recon-claude.md`）；R1 adversarial 收斂 `handoffs/reconcile/20260818-gap2-x-review-r1/synth.md`（14 findings 六群集 K1–K6 全部寫回）；R2 收斂 `handoffs/reconcile/20260818-gap2-x-review-r2/synth.md`（12 findings 五群集 L1–L5 全部寫回）；R3 收斂 `handoffs/reconcile/20260818-gap2-x-review-r3/synth.md`（文字對齊 2 處＋戳記流程補齊，本檔為 R3 修訂版）
+> 來源 PLAN/診斷：`handoffs/reconcile/20260818-gap2-x-consult-r1/synth.md`（四方偵察收斂；主委版 `handoffs/20260818-gap2-recon-claude.md`）；R1 adversarial 收斂 `handoffs/reconcile/20260818-gap2-x-review-r1/synth.md`（14 findings 六群集 K1–K6 全部寫回）；R2 收斂 `handoffs/reconcile/20260818-gap2-x-review-r2/synth.md`（12 findings 五群集 L1–L5 全部寫回）；R3 收斂 `handoffs/reconcile/20260818-gap2-x-review-r3/synth.md`（文字對齊 2 處＋戳記流程補齊）；R4 收斂 `handoffs/reconcile/20260818-gap2-x-review-r4/synth.md`（composer／grok sentinel；codex 4 條 schema 釘死全部寫回，本檔為 R4 修訂版）
 > ｜日期：2026-08-18｜對應 TODO：`docs/GAP2_MARGINAL_IC_TODO.md`（本 SPEC 定版後生成）
 > 票：`docs/IC_QUANT_GAP_REGISTRY.md` #2a／#2b（來源 finding CODEX-R1-P1-09、GROK-R1-P1-06；健檢收斂 C9／C10／C11）
 > 使用者 2026-08-18 裁定：GAP-2 拆 2a／2b；2a 純 IC 層（不碰 ML、不碰事件型）；2b **只交付契約**（含 `sample_scope`＋provenance，序列型／事件型同一座橋），橋本體 blocked-by ML 層；GAP-3 另票。
@@ -66,14 +66,14 @@ RISK-HIT: a,b,d
   6. `frontend/src/lib/types.ts`：ICHC 契約段**外**新增 `MarginalICSection` 型別；`CapabilityStatus` 六值**不變**。
   7. 上述對應之既有測試檔：只新增斷言，禁放寬。
   **不改** `factor_orthogonalizer.py`、`redundancy_filter.py`、`ic_engine.py`、`pit_stats.py`、`momentum/core/contracts.py`（`RowMaskPlan.source` 值集不動；新契約以 sync 測試對齊）。
-- **新資料結構一律 JSON SoT**：所有新欄位名／枚舉值只在 Task 3.1 之契約檔出現一次；本 SPEC 其餘章節與 TODO 只 pointer，**不複列欄位表**。既有 `capability_status` 以 `capability_status_ref` 指向 `ic_report_contract.json`（reasons **不** ref、不入 report 契約——R2 L2）。
+- **新資料結構一律 JSON SoT**：所有新欄位名／枚舉值只在 Task 1.0 之契約檔 `ic_survivor_contract.json` 出現一次（R4 CODEX-R4-P2-04 更正）；本 SPEC 其餘章節與 TODO 只 pointer，**不複列欄位表**。既有 `capability_status` 以 `capability_status_ref` 指向 `ic_report_contract.json`（reasons **不** ref、不入 report 契約——R2 L2）。
 
 ## §G Golden / Baseline
 
 - **feature/kline 條件**：本票不生成／不計算特徵、不 merge、不 split（吃 orchestrator 既有 `features_df`／`label_series`／`split_context`）；但接線後之主流程回歸必用真實 kline 衍生 fixture（§A receipt：`tests/golden/la0/inputs/ETHUSDT_12h_*_a0_tail2000.h5`，經 `tests/momentum/helpers/ichc_run.run_analyze()`），禁合成 fixture 充當。
 - **凍結時機 / reference 設定**：Task 4.1 動工前跑 `scripts/gap2_freeze_golden.py`（新建）→ `handoffs/run_receipts/gap2_golden_pre.json`（**唯一** baseline 檔，路徑寫死），內容＝以預設 `ICConfig` 跑 `run_analyze()`（`case_id=gap2_golden`），記錄：`report` 去除 `marginal_ic` 節與 `metadata.survivor_output`、`generated_at`、路徑欄後之 `canonical_sha`（沿用 `ichc_run.canonical_sha` 序列化）、`summary_table` 逐 feature 逐鍵值、`filter_log.stage5_thresholds`／`stage6_redundancy` 逐鍵。檔內附 `fixture_sha256`（h5）與 `config_hash`。
 - **baseline 內容（四類，皆非自造數值）**
-  1. **改前==改後（行為不變型）**：B4 接線後同 fixture 同 config，上述 `canonical_sha` 與 pre 檔 **exact 相等**（`sha256` 逐字元）；`summary_table` 逐 feature 逐鍵 `abs≤1e-12`；`filter_log` 兩節逐鍵 exact。任何差異 ⇒ 列出鍵與 diff＝FAIL。
+  1. **改前==改後（行為不變型）**：B4 接線後同 fixture 同 config，以 **`scripts/gap2_freeze_golden.py::gap2_canonical_sha(report)`**（唯一序列化實作，測試 import 之；scrub 清單**寫死且有序**：①刪 `marginal_ic` 節 ②刪 `metadata.survivor_output` ③刪 `metadata.filtered_features_path`／`filtered_generated_at`／`generated_at`／`filtered_features_written` ④其餘沿用 `ichc_run.canonical_sha` 之序列化——R4 CODEX-R4-P1-02：既有 `canonical_sha` 不 scrub `filtered_features_path`（隨機 tmp 路徑），實跑證 sha 隨路徑變）計得之 sha 與 pre 檔 **exact 相等**；並斷言同 fixture 於**兩個不同 sidefx 目錄**跑出之 sha 相等（路徑無關性）；`summary_table` 逐 feature 逐鍵 `abs≤1e-12`；`filter_log` 兩節逐鍵 exact。任何差異 ⇒ 列出鍵與 diff＝FAIL。
   2. **新節決定性**：同 fixture 同 config 連跑兩次，`marginal_ic` 節之 `sha256(json.dumps(sort_keys=True))` 相等（bootstrap 走固定 seed）；`ic_survivors_{case_id}.json` 去 `generated_at` 後 `sha256` 相等。
   3. **解析／構造 oracle（合成因子／label 序列；產生器參數全部寫死如下表，seed／n／係數／噪聲／mask 切法皆為 SPEC 條文非測試自選——R1 CODEX-R1-P1-02）**
      **合成產生器規格表**（`rng=np.random.default_rng(seed)`；生成順序＝表列因子→噪聲→label；mask 切法一律「前 60% 列 train／後 40% 列 test」；因子皆 `N(0,1)` iid；**所有噪聲一律以標準差 σ 表述**（R2 GROK-R2-P0-01：`N(0,0.64)` 曾被讀為 σ=0.64）；`N(0,σ)` 之第二參數＝σ）：
@@ -200,7 +200,7 @@ RISK-HIT: a,b,d
 - 檔案：`momentum/Analysis/ic_config_schema.py::MarginalICConfig(enabled: bool = True, min_test_rows: int = 30 (ge 10), min_rows_per_regressor: int = 5 (ge 1), degenerate_threshold: float = 1e-10, weights_method: Literal["equal","ic_weighted"] = "equal", n_bootstrap: int = 1000 (ge 1, le 20000), bootstrap_seed: int = 20260818, include_removed_candidates: bool = True, max_survivors_for_loo: int = 200 (ge 1), max_removed_candidates: int = 200 (ge 0))`＋`ICConfig.marginal_ic`（預算兩欄＝R2 CODEX-R2-P1-05：計數 gate 決定性、禁時間斷言）；`momentum/Analysis/ic_filter_orchestrator.py::_stage6b_marginal_ic(features_df, label_series, stage5_results, stage6_results, split_context, config) -> dict`，於 `analyze()`（stage6 後）、`refilter()`、`analyze_full()`（經 analyze）、`_run_full_sample_fallback()`（`fit_scope=full_sample`）四處掛載；`_stage7_report` 之 `analysis_results["marginal_ic"]`；`_ic_cache["stage6b_results"]`；**同 commit** 修改 `momentum/Analysis/contracts/ic_report_contract.json`：`report_sections.marginal_ic`（`status_object_keys`）與 `metadata.survivor_output_keys`（**不加 reasons**——R2 L2：reason 字面唯一住 survivor 契約；R1：契約節鍵與 orchestrator 組裝字面不可拆 commit）。
 - 既有 caller/影響面：三入口既有測試（`tests/momentum/test_ic_filter_orchestrator.py`、`tests/momentum/Analysis/test_ic1d_orchestrator_integration.py`、`tests/momentum/Analysis/test_ichc_*`）——動工前 diff 其斷言，禁放寬。
 - 改法：`enabled=False` ⇒ 節 `{"status":"disabled","reason":"disabled_by_config"}`（**非**裸 `{}`）；`split_context is None` 且非 fallback ⇒ `not_applicable:no_holdout_split`；fallback ⇒ 全 True masks＋`fit_scope=full_sample`、`oos_guarantees=False`；xsec ⇒ `not_applicable:cross_sectional_mode`；`block_len=max(effective_horizon, ceil(n_test**(1/3)))`；`survivors=list(filtered_df.columns)`、`extra_candidates=passed_features∖survivors`（`include_removed_candidates`）；結果 `to_dict()` 進報告節，並帶 `oos_guarantees`／`fit_scope`／`pass_class`（與 root 一致）。orchestrator 寫入之 marginal reason 字面 ⊆ `ic_survivor_contract.json#reasons`（同 commit 測試）；stage3 於 pop timestamps **之前**計算 `event_identity` 存 `_ic_cache["event_identity"]`（不可變；R2 CODEX-R2-P1-03），deep／refilter cache key 含其 hash；`symbol`／`timeframe` 缺任一 ⇒ 倖存者檔 `computation_failed:identity_missing`（節照算）；`_stage6b_marginal_ic` 以 **typed** `fit_scope`（`"train"` 於 holdout 路徑、`"full_sample"` 於 `_run_full_sample_fallback`）呼叫 Task 1.2，禁由 masks 形狀推測（R1 CODEX-R1-P1-03）。
-- **驗證**：`pytest tests/momentum/Analysis/test_gap2_stage6b_wiring.py tests/momentum/Analysis/test_ichc_contract_sync.py -q` rc=0；斷言 ① 預設 config 跑 `run_analyze()` ⇒ `report["marginal_ic"]["status"]=="ok"` 且 `oos_guarantees is True` 且 `fit_scope=="train"` ② `enabled=False` ⇒ `status=="disabled"` 且鍵集恰 `{status,reason}` ③ 強制 fallback（`ic_train_test_split=False`＋`preprocessing.fit_mode=full_sample` 路徑）⇒ `oos_guarantees is False`、`fit_scope=="full_sample"`、root `degraded_full_sample` ④ `refilter()` 後節與新 survivors 一致（`per_feature` 鍵集 == 新 `filtered_df.columns`）⑤ `deny_factor_in_ok_oos(report)` 於 ok_oos 不 raise ⑥ `test_r6_wider_contract_nodes_consistent` 綠（新 reason 消費點存在）⑦ 節 `sha256` 兩次相等（§G-2）⑧ 既有斷言未放寬（diff 附 commit）⑨ `bash scripts/ic_wiring_check.sh` rc=0 ⑩ cache 命中後 `refilter()` ⇒ `marginal_ic.per_feature` 鍵集 == 新 `filtered_df.columns` 且 `_ic_cache["stage6b_results"]` 之 `sha256(json.dumps(sort_keys=True))` 與命中前不同（已刷新；R1 COMPOSER-R1-P2-02）⑪ `test_r6_wider_contract_nodes_consistent` 於本 commit 綠（新節字面已在 orchestrator）⑫ orchestrator 內 marginal reason 字面（AST 常數掃描）⊆ survivor 契約 `reasons`（R2 L2）⑬ 同 request 之 analyze→refilter 兩次 `event_identity` 相等；換 request ⇒ 不沿用舊 cache（R2 CODEX-R2-P1-03）⑭ `symbol` 缺 ⇒ `metadata.survivor_output.status=="computation_failed"` 且 reason `identity_missing`，`marginal_ic` 節仍 `ok` ⑮ 超過 `max_survivors_for_loo` ⇒ `loo` 整體 `not_computed:candidate_budget_exceeded` 且無部分 per_feature 值。
+- **驗證**：`pytest tests/momentum/Analysis/test_gap2_stage6b_wiring.py tests/momentum/Analysis/test_ichc_contract_sync.py -q` rc=0；斷言 ① 預設 config 跑 `run_analyze()` ⇒ `report["marginal_ic"]["status"]=="ok"` 且 `oos_guarantees is True` 且 `fit_scope=="train"` ② `enabled=False` ⇒ `status=="disabled"` 且鍵集恰 `{status,reason}` ③ 強制 fallback（`ic_train_test_split=False`＋`preprocessing.fit_mode=full_sample` 路徑）⇒ `oos_guarantees is False`、`fit_scope=="full_sample"`、root `degraded_full_sample` ④ `refilter()` 後節與新 survivors 一致（`per_feature` 鍵集 == 新 `filtered_df.columns`）⑤ `deny_factor_in_ok_oos(report)` 於 ok_oos 不 raise ⑥ `test_r6_wider_contract_nodes_consistent` 綠（新 reason 消費點存在）⑦ 節 `sha256` 兩次相等（§G-2）⑧ 既有斷言未放寬（diff 附 commit）⑨ `bash scripts/ic_wiring_check.sh` rc=0 ⑩ cache 命中後 `refilter()` ⇒ `marginal_ic.per_feature` 鍵集 == 新 `filtered_df.columns` 且 `_ic_cache["stage6b_results"]` 之 `sha256(json.dumps(sort_keys=True))` 與命中前不同（已刷新；R1 COMPOSER-R1-P2-02）⑪ `test_r6_wider_contract_nodes_consistent` 於本 commit 綠（新節字面已在 orchestrator）⑫ orchestrator 內 marginal reason 字面（AST 常數掃描）⊆ survivor 契約 `reasons`（R2 L2）⑬ 同 request 之 analyze→refilter 兩次 `event_identity` 相等；換 request ⇒ 不沿用舊 cache（R2 CODEX-R2-P1-03）⑭ `symbol` 缺 ⇒ `metadata.survivor_output.status=="computation_failed"` 且 reason `identity_missing`，`marginal_ic` 節仍 `ok` ⑮ 超過 `max_survivors_for_loo` ⇒ `loo`＋`sequential` 整體 `not_computed:candidate_budget_exceeded` 且無部分 per_feature 值；超過 `max_removed_candidates` ⇒ `removed_candidates` 整體同 reason、`loo`／`sequential` 不受影響、`n_regressions` 不含被略過視角（R4 CODEX-R4-P1-03）。
 - **邊界**：① 無 survivors ② 單 survivor ③ n_test 低於下限 ④ cache-hit `refilter` ⑤ `include_removed_candidates=False`。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
@@ -208,20 +208,20 @@ RISK-HIT: a,b,d
 
 **Task 4.2 — 倖存者檔持久化＋報告 metadata 鏡像**
 - 目標：2b 契約檔實際落地並與報告互指。
-- 檔案：`momentum/Analysis/ic_reporter.py::save_survivor_output(payload: dict, output_dir: str, case_id: str) -> str`（`validate_survivor_output` 後原子寫 `ic_survivors_{case_id}.json`）；`ic_filter_orchestrator.py::_persist_outputs` 呼叫並寫 `report_meta["survivor_output"]={status, reason, path, sha256}`（鍵集＝契約 `metadata.survivor_output_keys`）。
+- 檔案：`momentum/Analysis/ic_reporter.py::save_survivor_output(payload: dict, output_dir: str, case_id: str) -> str`（`validate_survivor_output` 後原子寫 `ic_survivors_{case_id}.json`）；`ic_filter_orchestrator.py::_persist_outputs` 呼叫並寫 `report_meta["survivor_output"]={status, reason, path, sha256, case_id}`（鍵集＝契約 `metadata.survivor_output_keys`，**五鍵恆存在**；`status!="ok"` ⇒ `path`／`sha256` 為 `null`（契約標 nullable），`reason` 非 null；`status=="ok"` ⇒ `path`／`sha256` 非 null 且 `reason=null`——R4 CODEX-R4-P0-01：成功／`identity_missing`／寫檔失敗三種形狀同一契約，Task 4.2 驗證⑦ 三形狀逐一過 validator）。
 - 既有 caller/影響面：`tests/momentum/Analysis/test_ic_persist_redirect_*.py`（persist 導向 fixture）——新寫檔必經同一 `output_dir` 解析，hermetic 測試不得落到真 `data_cache/`。
 - 改法：空 survivors 亦寫檔（`survivors=[]`＋status）；`_suppress_persist` 時不寫；輸入 `metadata` 缺 `symbol` 或 `timeframe` ⇒ **不寫檔**、`report_meta["survivor_output"]={status:"computation_failed", reason:"identity_missing"}`（R2 L3）；`case_id` 取 `_resolve_case_id(metadata)`（與 `ic_report_{case_id}.json` 檔名一致，`report_ref` 指該檔）；寫檔失敗 ⇒ `report_meta["survivor_output"]={status:"computation_failed", reason:...}`（不吞例外於 log 之外）。
-- **驗證**：`pytest tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_ic_persist_redirect_unit.py -q` rc=0；斷言 ① 檔存在且過 validator ② `feature_names == list(filtered_df.columns)` ③ `sha256(file) == report_meta.survivor_output.sha256` ④ hermetic redirect 下 `data_cache/reports/` 無新檔 ⑤ 事件模式（`event_timestamps` 給定且 tier 充足）⇒ `sample_scope.kind=="event"` 且 `event.definition_hash` 為 64 hex ⑥ 事件 fallback ⇒ `kind=="full"` 且 `degraded is True`。
+- **驗證**：`pytest tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_ic_persist_redirect_unit.py -q` rc=0；斷言 ⓪ `metadata.survivor_output` 三種形狀（ok／identity_missing／寫檔失敗）皆恰五鍵且 nullable 規則成立（R4 CODEX-R4-P0-01）① 檔存在且過 validator ② `feature_names == list(filtered_df.columns)` ③ `sha256(file) == report_meta.survivor_output.sha256` ④ hermetic redirect 下 `data_cache/reports/` 無新檔 ⑤ 事件模式（`event_timestamps` 給定且 tier 充足）⇒ `sample_scope.kind=="event"` 且 `event.definition_hash` 為 64 hex ⑥ 事件 fallback ⇒ `kind=="full"` 且 `degraded is True`。
 - **邊界**：① 空 survivors ② degraded root ③ 事件 fallback ④ 目錄不可寫。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不得寫入 `data_cache/features/*.h5` attrs（不改既有 h5 契約）；不得在 `_suppress_persist` 下寫檔。
 
 **Task 4.3 — §G golden 凍結／對照＋wiring check 讀契約＋B4 探針**
-- 目標：改前==改後可證偽；wiring R3 自動涵蓋新節；§V-13..V-16。
+- 目標：改前==改後可證偽；wiring R3 自動涵蓋新節；§V-13..V-16、V-22..V-24。
 - 檔案：新增 `scripts/gap2_freeze_golden.py`（產 `handoffs/run_receipts/gap2_golden_pre.json`；`--check` 模式比對）、`tests/momentum/Analysis/test_gap2_golden.py`；修改 `scripts/ic_wiring_check.py`（`REPORT_SECTIONS` 改讀 `ic_report_contract.json#report_sections` 鍵）；`scripts/gap2_mutation_probe.sh --batch B4`。
 - 既有 caller/影響面：`tests/momentum/Analysis/test_ichc_wiring_check.py`（subprocess 常駐）；白話 5 檔（動 `scripts/` 須同步）。
-- 改法：pre 檔於 Task 4.1 動工前產生並 commit；`test_gap2_golden.py` 讀 pre 檔與 live 跑對照（§G-1）；§G-2 決定性；wiring check R3 對契約全部節鍵掃裸空。
+- 改法：pre 檔於 Task 4.1 動工前產生並 commit；`test_gap2_golden.py` 讀 pre 檔與 live 跑對照（§G-1）；§G-2 決定性；wiring check R3 對契約全部節鍵掃裸空；**預算基準 receipt（R4 CODEX-R4-P1-03）**：以合成 k=200 survivors＋200 removed、n=20000 跑 `compute_marginal_ic`＋`combine_factors`，記錄 wall time 與 peak RSS（`resource.getrusage`）至 `handoffs/run_receipts/<TS>-gap2-budget-bench.log`，並斷言 `n_regressions == 200(loo)+200(sequential)+200(removed) = 600`（計數語意＝實際 lstsq 呼叫次數；超限視角不計入）。
 - **驗證**：`pytest tests/momentum/Analysis/test_gap2_golden.py tests/momentum/Analysis/test_ichc_wiring_check.py -q` rc=0；`bash scripts/gap2_freeze_golden.py --check` rc=0；`bash scripts/gap2_mutation_probe.sh --batch B4` rc=0；`bash scripts/ic_wiring_check.sh` rc=0。
 - **邊界**：① pre 檔缺 ⇒ 測試 fail-closed（非 skip）② fixture sha 不符 ⇒ fail ③ 契約新節鍵在 orchestrator 以裸 `{}` 組裝 ⇒ wiring 紅。
 - **存活至**：全票完工後保留。
@@ -243,7 +243,7 @@ RISK-HIT: a,b,d
 
 ## §V 驗證策略與邊界測試目錄
 
-- **mutation 條件**：RISK-HIT 含 a,d ⇒ 必附。21 條（每條實跑貼 rc；改壞後**必須**有測試轉紅；統一由 `scripts/gap2_mutation_probe.sh --batch Bn` 執行）：
+- **mutation 條件**：RISK-HIT 含 a,d ⇒ 必附。24 條（每條實跑貼 rc；改壞後**必須**有測試轉紅；統一由 `scripts/gap2_mutation_probe.sh --batch Bn` 執行）：
   1. Task 1.1 `fit_projection` 改為在 test 陣列擬合（呼叫端傳錯 mask）⇒ §G O7 轉紅。
   2. `normal_scores` 改為恆等（raw 空間）⇒ §G O1a 轉紅（raw 線性殘差非退化 ⇒ status `ok` 而非預期 `residual_degenerate`；R2 三家更正）。
   3. `spearmanr` 改 `pearsonr` ⇒ §G O6 秩不變轉紅。
@@ -265,9 +265,12 @@ RISK-HIT: a,b,d
   19. **參數化三欄**（R2 CODEX-R2-P2-06）：`build_survivor_output` 之 `symbol`／`timeframe`／`case_id` 各自寫死或漏帶 ⇒ Task 3.1 驗證⑮ 對應欄轉紅（三次各 rc=1、還原 rc=0）與 §G-4 轉紅。
   20. `validate_survivor_output` 略過 `feature_set_hash` 重算 ⇒ Task 3.1 驗證⑫轉紅。
   21. Task 1.2 之 degenerate gate 移到 Spearman 之後（或刪除）⇒ §G O1a（`residual_degenerate` 預期）轉紅（R1 GROK-R1-P1-03）。
+  22. `removed_candidates` 超過 `max_removed_candidates` 時仍輸出部分結果（或 `n_regressions` 計入被略過視角）⇒ Task 4.1 驗證⑮轉紅（R4 CODEX-R4-P1-03）。
+  23. `gap2_canonical_sha` scrub 清單漏 `filtered_features_path` ⇒ §G-1「兩個 sidefx 目錄 sha 相等」斷言轉紅（R4 CODEX-R4-P1-02）。
+  24. `metadata.survivor_output` 於失敗形狀省略 `path`／`sha256` 鍵（非 null）⇒ Task 4.2 驗證⓪轉紅（R4 CODEX-R4-P0-01）。
 - **測試層級**：單元（B1–B3 純函式）／整合（B4 三入口、persist redirect）／Golden（§G-1／G-2 真實 kline 衍生 fixture）／邊界（各 Task 邊界欄）／前端元件（B5）。可獨立 `pytest tests/momentum/Analysis/` 跑，不需 `run_api.py`。
 - **防假綠**：diff 既有測試斷言（三入口測試、contract sync、wiring check、persist redirect），不得放寬／刪除；`scripts/mutation_probe_check.sh` 對新測試檔全綠；oracle 不得從待測自身衍生（O7 用獨立參考實作、O1–O6 用解析性質）。
-- **邊界目錄**：空DF ✓（無 survivors）／全NaN列 ✓（label 全 NaN、常數因子）／Inf ✓（finite 過濾）／std=0 ✓（residual_degenerate、zero_train_ic）／重複·亂序 timestamp ✗（上游 stage0 已守，不重做）／API 重啟 ✗（無狀態）／並發寫 ✓（原子寫檔）／OOM 降載 ✗（k≤數十、n≤數萬，O(k²n) 可忽略；具名不測）／大尺度浮點 reduction ✗（不適用）。
+- **邊界目錄**：空DF ✓（無 survivors）／全NaN列 ✓（label 全 NaN、常數因子）／Inf ✓（finite 過濾）／std=0 ✓（residual_degenerate、zero_train_ic）／重複·亂序 timestamp ✗（上游 stage0 已守，不重做）／API 重啟 ✗（無狀態）／並發寫 ✓（原子寫檔）／OOM 降載 ✓（計數 gate：`max_survivors_for_loo`／`max_removed_candidates` 預設 200 ⇒ 迴歸次數 ≤600、每次 lstsq n×≤201；Task 4.3 附 k=200／n=20000 之 wall time＋peak RSS receipt；超限整體 `not_computed`，非降載）／大尺度浮點 reduction ✗（不適用）。
 - **測試章程（`docs/TEST_DESIGN_CHARTER.md` §G 模板）**：
   - 風險原則：a,b,d。必做類別：A2 洩漏 MR（MR-L1 O5、MR-L2 O7 變體、MR-L3 O6）、A4 契約、A6 golden、A9 邊界。
   - Oracle 矩陣：O3／O6／O7／O8 EXACT（atol 1e-12）；O1／O2／O4 TOLERANCE（容差寫死＋seed）；O5 STATISTICAL（H0：無資訊，α=0.05，n_min=1000，多重比較＝Bonferroni 於同測試內多因子）；O9 EXACT（seed）；§G-1 EXACT sha。
@@ -288,4 +291,4 @@ RISK-HIT: a,b,d
 - R3 cross-sectional（`analyze_cross_sectional`）路徑之邊際 IC — `為何現在不做: blocked-by: registry #4 Pooled/Panel IC（xsec 主路徑之 IC 估計量／切分尚未按主線標準重建，先接即隨其重建作廢）`；觸發：#4 完工；登記處：同上。
 - R4 前端表格（B5）— **預設納入**；若使用者於白話閘否決 ⇒ 轉 `user-ruling:<日期＋否決>` 並登記。
 - R5 nested／frozen final test（讓邊際／組合統計可宣稱獨立 OOS 驗證）— `為何現在不做: blocked-by: IC 主路徑切分現狀 holdout-only（registry「IC 主路徑切分現狀」節；WF／CPCV 未接主線，主線 test 同時供 stage4-6 選擇；本票以 D3′ 揭露欄誠實標示）`；觸發：主線切分升級（WF／CPCV 接入或 nested holdout 契約成立）；登記處：registry「GAP-2 待補完」。
-- mutation：**非 N/A**（§V 21 條（V-19 三欄參數化），逐條由 `scripts/gap2_mutation_probe.sh` 實跑）。
+- mutation：**非 N/A**（§V 24 條（V-19 三欄參數化），逐條由 `scripts/gap2_mutation_probe.sh` 實跑）。
