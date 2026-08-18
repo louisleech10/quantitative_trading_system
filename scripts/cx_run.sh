@@ -426,6 +426,62 @@ _compute_output_sha() {
   shasum -a 256 "$1" | awk '{print $1}'
 }
 
+# ---------------------------------------------------------------------------
+# 委員 CLI 看門狗（2026-08-18；出生事故：composer 之自建多行程探針死鎖，cursor-agent 於 00:57 已寫完
+#   產出 `STATUS: DONE` 卻 6 小時 53 分不退出 ⇒ 本腳本永遠寫不出 committee_family_result ⇒ debt_clear
+#   fail-closed 拒銷、主控端也收不到完成通知，直到下一個 session 看 `ps` 才發現。**沒人盯 = 無限等**）。
+# 規則（機械，不靠人看 ps）：
+#   ① 產出檔已含 `STATUS: DONE`（委員自宣告完成）而 CLI 仍存活超過 CX_DONE_GRACE_SEC（預設 300）
+#      ⇒ 視為「產出完成、行程卡死」：SIGTERM 整棵子樹、cli_rc 取 0（產出完整才走到這裡；沙 sha 由 emit 算），
+#      runlog 具名 `WATCHDOG killed_after_done`。
+#   ② 硬上限 CX_MAX_SEC（預設 5400）：不論產出狀態一律殺，cli_rc=124（同 GNU timeout 慣例）⇒ result failed。
+# 誠實邊界：① 只認 `STATUS: DONE` 字面（委員產出契約已要求）；② 殺樹用 pkill -P（一層子代）＋ pid，
+#   孫代若已 setsid 脫離則殺不到（本事故之 python 子行程為直接子代，可殺）。
+# ---------------------------------------------------------------------------
+_kill_tree() {
+  local _pid="$1"
+  local _kids
+  _kids="$(pgrep -P "${_pid}" 2>/dev/null || true)"
+  local _k
+  for _k in ${_kids}; do _kill_tree "${_k}"; done
+  kill -TERM "${_pid}" 2>/dev/null || true
+}
+
+_run_cli_watched() {
+  # 用法：_run_cli_watched <out_path> -- <cmd> [args...]；回傳 CLI rc（或 0=killed_after_done／124=timeout）
+  local _out="$1"; shift
+  [ "${1:-}" = "--" ] && shift
+  local _grace="${CX_DONE_GRACE_SEC:-300}"
+  local _max="${CX_MAX_SEC:-5400}"
+  "$@" &
+  local _pid=$!
+  local _elapsed=0
+  local _done_since=-1
+  local _rc
+  while kill -0 "${_pid}" 2>/dev/null; do
+    sleep 5
+    _elapsed=$((_elapsed + 5))
+    if [ "${_done_since}" -lt 0 ] && [ -f "${_out}" ] && grep -q '^STATUS: DONE' "${_out}" 2>/dev/null; then
+      _done_since="${_elapsed}"
+    fi
+    if [ "${_done_since}" -ge 0 ] && [ $((_elapsed - _done_since)) -ge "${_grace}" ]; then
+      echo "[cx_run] WATCHDOG killed_after_done: 產出已 STATUS: DONE 逾 ${_grace}s 而 CLI 仍存活（pid ${_pid}）⇒ 終止子樹，cli_rc 取 0" >&2
+      _kill_tree "${_pid}"
+      wait "${_pid}" 2>/dev/null || true
+      return 0
+    fi
+    if [ "${_elapsed}" -ge "${_max}" ]; then
+      echo "[cx_run] WATCHDOG timeout: CLI 逾 ${_max}s（pid ${_pid}）⇒ 終止子樹，cli_rc=124" >&2
+      _kill_tree "${_pid}"
+      wait "${_pid}" 2>/dev/null || true
+      return 124
+    fi
+  done
+  wait "${_pid}"
+  _rc=$?
+  return "${_rc}"
+}
+
 _emit_family_result() {
   # $1=cli_rc  $2=fmt_rc（可選，預設 0）
   # 家族名直取 $fam；不得從路徑推導。
@@ -702,7 +758,7 @@ _run_cli_and_emit() {
           echo "ERROR: codex 不存在: ${CODEX}" >&2
           cli_rc=2
         else
-          "${CODEX}" exec -s workspace-write -m gpt-5.6-luna -c model_reasoning_effort="${effort}" "${prompt}" </dev/null
+          _run_cli_watched "${out}" -- "${CODEX}" exec -s workspace-write -m gpt-5.6-luna -c model_reasoning_effort="${effort}" "${prompt}" </dev/null
           cli_rc=$?
         fi
         ;;
@@ -711,7 +767,7 @@ _run_cli_and_emit() {
           echo "ERROR: grok 不存在: ${GROK}" >&2
           cli_rc=2
         else
-          "${GROK}" -m grok-4.5 --sandbox workspace --always-approve --output-format plain -p "${prompt}"
+          _run_cli_watched "${out}" -- "${GROK}" -m grok-4.5 --sandbox workspace --always-approve --output-format plain -p "${prompt}"
           cli_rc=$?
         fi
         ;;
@@ -720,7 +776,7 @@ _run_cli_and_emit() {
           echo "ERROR: cursor-agent 不存在（composer CLI）" >&2
           cli_rc=2
         else
-          cursor-agent -p --force --output-format text --model composer-2.5 "${prompt}"
+          _run_cli_watched "${out}" -- cursor-agent -p --force --output-format text --model composer-2.5 "${prompt}"
           cli_rc=$?
         fi
         ;;

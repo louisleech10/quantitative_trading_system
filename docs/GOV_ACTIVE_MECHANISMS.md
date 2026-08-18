@@ -64,6 +64,7 @@
 | `narrow_check_router.sh` | 常態檢查 | PostToolUse  |
 | `no_append_only_check.sh` | 常態檢查 | pre-commit  |
 | `plain_docs_guard_selftest.sh` | 一次性驗證 | 未掛 |
+| `plain_docs_render.sh` | 常態檢查 | pre-commit  |
 | `plain_docs_sync_check.sh` | 常態檢查 | pre-commit gov_check  |
 | `precommit_selfcheck.sh` | 常態檢查 | 未掛 |
 | `proc_guard.sh` | 常態檢查 | 未掛 |
