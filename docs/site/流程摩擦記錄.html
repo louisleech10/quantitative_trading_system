@@ -1846,6 +1846,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>七十四・（2026-08-19）「搬家」會讓既有 mutation 探針目標行失蹤</strong>：bootstrap 由 <code>marginal_ic.py</code> 搬到 <code>factor_combiner.py</code> 後，B1 探針 V-6 的目標行不在原檔 ⇒ 探針以 rc=2 拒跑（設計正確：不留髒檔）。教訓：搬檔時同步改探針 case 表的檔案欄並重跑該批探針；探針的「目標行先存在檢查」在這裡救了一次。</p>
 </blockquote>
+<blockquote>
+<p><strong>七十五・（2026-08-19）「寫死」類 mutation 需要 oracle 用不同值建兩次</strong>：V-19 要抓 symbol／timeframe／case_id 被寫死，若測試只用一組值（ETHUSDT／12h／ic_gatekeeper）建 payload，寫死同值的 mutant 永遠綠。修法：測試改用第二組值重建並斷言 payload 反映參數。這類「與 fixture 同值的寫死」是 mutation 探針的盲區，設計 oracle 時要換值。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
