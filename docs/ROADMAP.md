@@ -17,13 +17,14 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | 🏁 **GAP-1 四批全部 CLOSED（2026-08-18）**：B1–B4 各三家 code review＋三家戳記；280 測試／20 mutation／wiring 閘 rc=0；延伸檔 A1-1..A1-24；殘留 G1-R1..R7／R9／R10／R11 | **等使用者點下一步**（PA-CUMSUM／G1-R11 皆已收案；候選：IC 主線其他缺口票、GAP-2／GAP-3） | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`；收斂 `handoffs/reconcile/20260818-gap1-b4-review-r18/synth.md` |
+| **量化主線（IC 分析）** | 🏁 **GAP-1 四批全部 CLOSED（2026-08-18）**：B1–B4 各三家 code review＋三家戳記；280 測試／20 mutation／wiring 閘 rc=0；延伸檔 A1-1..A1-24；殘留 G1-R1..R7／R9／R10／R11 | **下一步＝GAP-2a 邊際 IC（使用者 8/18 點；新 session 開工）**；GAP-3 事件型開發前先 consult | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`；收斂 `handoffs/reconcile/20260818-gap1-b4-review-r18/synth.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
 | GAP-1 DSR/PBO/MinBTL 策略層防偽 | 🏁 **全票 CLOSED（2026-08-18）**；殘留 registry G1-R1..R7＋R9＋R10 | —（殘留 registry 觸發時再開） | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |
 | PA-CUMSUM 單利權益改正（小票；G1-R8 收回） | 🏁 **CLOSED（2026-08-18）**：`EquityCurveData` 改為單利（cumsum）／複利（cumprod−1）**兩條都算、都標清楚**（後端＋API model＋前端切換，預設複利）；三家 code review 7 條全修（多標的等權組合／proba 缺值 4xx／契約封閉）| — | 出處＝`CODEX-R8-P1-12`／`GROK-R8-P1-03`；使用者 2026-08-18 裁定「兩條都算＋前端切換一起做」；收斂＋三家戳記 `handoffs/reconcile/20260818-pacumsum-x-review-r23/synth.md` |
-| GAP-2 IC↔ML 橋＋多因子/邊際 IC | 未開票 | 次位 | 同上 #2 |
-| GAP-3 事件 case-control 真套件 | 未開票 | 設計須含 R5 A′ 語意 | 同上 #3 |
+| **GAP-2a 邊際 IC／多因子組合（純 IC 層）** | **下一票（2026-08-18 使用者點；新 session 開工）** | 大任務完整管線：SPEC＋TODO＋三家 adversarial；SPEC 內一併定 2b 倖存者契約（含 `sample_scope`） | registry #2a |
+| GAP-2b IC→ML 橋 | 契約先行；橋本體 blocked-by ML 層（不完整層） | 隨 2a SPEC 定契約；本體等 ML 層穩定 | registry #2b |
+| GAP-3 事件型分析（使用者重定義：外部標好正反例匯入→PIT 對齊→條件 IC／ML；非 event study） | 未開票；**開發前先討論** | 第一步＝唯讀事件語意 consult（三家＋主委），白話給使用者裁 5 題再進 SPEC；設計須含 R5 A′ 語意 | registry #3＋「GAP-3 開發前討論題」節 |
 | GAP-4 Pooled/Panel IC | 未開票 | — | 同上 #4 |
 | GAP-5 容量 ADV 接線 | 未開票 | **條件觸發**：volume 資料源 | 同上 #5 |
 | GAP-6 430K 規模防護 | 未開票 | 併 IC-PERF epic | 同上 #6 |

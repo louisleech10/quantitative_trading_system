@@ -6,26 +6,21 @@
 
 ---
 
-## 🔴 接手第一件事：GAP-1 全票 CLOSED＋PA-CUMSUM／G1-R11 皆已收案（2026-08-18）——沒有進行中的 epic；**等使用者點下一步**
+## 🔴 接手第一件事：開 **GAP-2a 邊際 IC／多因子組合**（使用者 2026-08-18 點；新 session 開工）
 
-**現況**（`git log origin/main..HEAD` 應為空；`bash scripts/debt_ledger.sh --list` 無 OPEN）：
-- B1–B4 各三家 code review＋三家 RECONCILE-STAMP PASS（收斂檔 `handoffs/reconcile/20260818-gap1-b{2,3,4}-review-r{14,16,18}/synth.md`、`20260817-gap1-b1-review-r10`）。
-- 測試 `venv/bin/python -m pytest tests/momentum/Analysis/strategy_validation/ tests/api/test_ml_pipeline_strategy_validation.py -q` → **280 passed**；
-  探針 `bash scripts/gap1_b1_mutation_probe.sh` → 21 條全紅（有互斥鎖，只能一人跑）；`bash scripts/strategy_wiring_check.sh` rc=0。
-- 文件：TODO FROZEN R3＋延伸檔 A1-1..A1-24（衝突以延伸檔為準）；白話看板 `白話說明/GAP-1施工進度.md` 已標收工；Pages 上線 https://louisleech10.github.io/quantitative_trading_system/site/ 。
-- 殘留：registry「GAP-1 待補完」G1-R1..R7／R9／R10（R11 已修：`ptp==0` 位元全等即常數；R8＝PA-CUMSUM 已收案）。
-- **PA-CUMSUM 收案**：權益曲線單利（cumsum）／複利（cumprod−1）兩條都算＋前端切換（預設複利）；多標的逐 timestamp 等權組合；proba NaN fail-closed；API 契約封閉。收斂＋三家戳記 `handoffs/reconcile/20260818-pacumsum-x-review-r23/synth.md`；測試 `tests/momentum/Analysis/test_prediction_analyzer_equity.py`（10）＋vitest `NaiveStrategyEquityChart.test.tsx`（4）。殘留具名：route `actual_return.fillna(0)` 既有行為（user-ruling）、`docs/API_SPECIFICATION.md` 格式快閘不可編輯（blocked-by 摩擦六十七）。
+**前提現況**（`git log origin/main..HEAD` 應為空；`bash scripts/debt_ledger.sh --list` 無 OPEN）：GAP-1 四批＋PA-CUMSUM＋G1-R11 皆 CLOSED（三家 review＋三家戳記；收斂檔在 `handoffs/reconcile/2026081{7,8}-*`）。無進行中 epic、無 OPEN 債。
 
-**候選下一步（由使用者點，勿自行開 epic）**：
-1. ~~PA-CUMSUM~~（已收案）。
-2. ~~G1-R11~~（已修並關閉，見 registry）。
-3. IC 主線其他缺口票（`docs/IC_QUANT_GAP_REGISTRY.md`）。
+**GAP-2a 定義與邊界**（`docs/IC_QUANT_GAP_REGISTRY.md` #2a／#2b；使用者裁定拆分）：
+- 2a＝純 IC 層：「這因子相對已有的帶來多少**新**資訊」（邊際 IC／多因子組合）。正交化 residual 已在 `momentum/Analysis/factor_orthogonalizer.py`；真歸因現為誠實 `unavailable`（健檢 C11）。**不碰 ML、不碰事件型**。
+- 2b＝IC→ML 橋：**契約先行**（倖存者輸出契約，須含 `sample_scope`＋provenance，序列型／事件型共用同一座橋），於 2a SPEC 內一併定義；**橋本體 blocked-by ML 層**（成熟度地圖：ML／回測屬不完整層），不接。
+- 大任務（命中 a/d）⇒ 完整管線：Claude 起草 SPEC → 三家 adversarial（reconcile＋戳記）→ 白話給使用者審 → TODO → 實作分批 → 三家 code review → 戳記。範本 `templates/`；SPEC 建檔需 gate token（`bash scripts/gate.sh artifact`）。
+- 開工前先稽核 HANDOFF／ROADMAP／registry vs repo，並看有無殘留委員行程（ps 查 cursor-agent／codex／grok）。
 
-## ⚠ 本 session 學到的（完整清單在 CLAUDE.md Gotchas／白話 摩擦記錄 六十一～六十七）
-- 🔴 委員 CLI 已有看門狗（`cx_run.sh`：產出 `STATUS: DONE` 逾 5 分鐘不退即殺子樹視為完成；硬上限 90 分鐘）；brief 要求委員自建探針加 timeout。
-- 🔴 接手先 `ps aux | grep -E "cursor-agent|codex exec|grok "` 看有無殘留委員行程／舊 Claude session（本日曾兩個 session 同時活著）。
-- 🔴 每批收尾：pytest → 探針 → commit → push（背景）→ 白話 5 檔同步 → commit+push（`plain_docs_sync_check` 是 pre-push 硬擋，動 `scripts/` 就要更新白話 5 檔）。
-- 🔴 `handoffs/*` 新檔被 `.git/info/exclude` 隱藏：reconcile 目錄／brief 須 `git add -f`。
-- 🔴 白話 .md commit 時 pre-commit 會同 commit 重生成 `docs/site/`（`plain_docs_render.sh --check` 缺產出／死連結即擋）。
-- 🔴 對多處同型行做 `sed` 前先 `grep -c`（本 epic 兩次誤傷）；「為了讓閘門過而放寬規則」會被委員反例打回——正解是收窄白名單再讓碼配合。
-- `scripts/governance_families.json` 有既有 no-op dirty（`active_stampers`），非本 epic 產生，未歸屬。
+**GAP-3 事件型（不是本 session 的事，勿順手開）**：使用者重定義＝外部標好正反例匯入→PIT 對齊→條件 IC／ML（非 event study）；**開發前先討論**：第一步＝唯讀事件語意 consult，5 題見 registry「GAP-3 開發前討論題」節。
+
+## ⚠ 收尾與坑（完整清單在 CLAUDE.md Gotchas／白話 摩擦記錄 六十一～六十七）
+- 🔴 每批收尾：pytest → 探針 → commit → push（背景）→ 白話 5 檔同步 → commit+push（`plain_docs_sync_check` 是 pre-push 硬擋，動 `scripts/` 就要更新白話 5 檔）。commit+push 皆秒級。
+- 🔴 委員 CLI 有看門狗（`cx_run.sh`）；brief 要求委員自建探針加 timeout；`handoffs/*` 新檔須 `git add -f`；白話 .md commit 時 pre-commit 同 commit 重生成 `docs/site/`。
+- 🔴 `docs/API_SPECIFICATION.md` 受格式快閘不可編輯（摩擦六十七）——契約以 pydantic schema 為準，勿再嘗試。
+- 對多處同型行做 `sed` 前先 `grep -c`；「為了讓閘門過而放寬規則」會被委員反例打回。
+- `scripts/governance_families.json` 有既有 no-op dirty，非本線產生，未歸屬。

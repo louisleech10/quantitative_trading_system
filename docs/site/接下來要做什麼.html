@@ -25,7 +25,18 @@
 我照下面那張表由上而下直接做，做完派三家委員審＋對抗、有分歧我跟委員自己決定。
 做完一項就把狀態改掉，改的是資料檔，這張表自動跟著變。</p>
 <hr />
-<h2 id="-現況最新gap-1-收工pa-cumsum-小票也收案了">🔴 現況（最新）：<strong>GAP-1 收工；PA-CUMSUM 小票也收案了</strong></h2>
+<h2 id="-現況最新gap-1-收工pa-cumsum-收案下一票gap-2a你-818-點的開新-session-做">🔴 現況（最新）：<strong>GAP-1 收工、PA-CUMSUM 收案；下一票＝GAP-2a（你 8/18 點的，開新 session 做）</strong></h2>
+<p><strong>你 8/18 傍晚裁定的方向（已同步進 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>、ROADMAP、HANDOFF）：</strong></p>
+<ul>
+<li><strong>GAP-2 拆成兩張</strong>：
+<ul>
+<li><strong>2a 邊際 IC／多因子組合</strong>：只在 IC 層做，回答「這個因子相對已有的，到底帶來多少<strong>新</strong>資訊」。不碰 ML、不碰事件型。<strong>這是下一票</strong>，走大任務完整管線（規格→三家對抗審→白話給你審→清單→分批實作→三家 review→蓋章）。</li>
+<li><strong>2b IC→ML 橋</strong>：不管因子是序列型還是事件型篩出來的，都走同一座橋進 ML。現在只先把「倖存因子輸出契約」定好（放進 2a 的規格裡；要有「樣本範圍」欄位，事件型才接得上）；橋本體要等 ML 層穩定（你定的成熟度地圖：ML／回測是不完整層），現在接上去會隨殼作廢。</li>
+</ul>
+</li>
+<li><strong>GAP-3 事件型：先討論、再開工。</strong> 你的原意＝你在外部自己標好正／反例（標的＋時間點＋標籤）餵進來，系統負責「不偷看、正確地」對齊特徵、切分、做條件 IC／ML，找正例的共通 pattern；事件類型很多，契約要通用。它不是金融課本的 event study。開工第一步是派一輪唯讀「事件語意討論」（三家＋我各出完整版），我再用白話整理 5 個要你裁的問題（決策時點怎麼定／反例是誰／重疊怎麼去重切分／標籤多嚴／怎麼證明 pattern 不是運氣），你裁完才寫規格。5 題已寫在 registry「GAP-3 開發前討論題」節，現在不展開。</li>
+<li>其餘：GAP-4（多標的合併估 IC）可做未排；GAP-5（容量）要等成交量資料源；GAP-6 併效能 epic。</li>
+</ul>
 <p><strong>一眼看</strong>：施工看板在 <a href="GAP-1施工進度.html">GAP-1施工進度.md</a>（四批×15 個任務逐項狀態、驗收證據、審查抓到的事）。</p>
 <ul>
 <li>清單 <strong>FROZEN R3</strong>（兩輪對抗 22→5 條＋我自產 3 條數值錯誤，三家蓋章）。</li>
@@ -39,7 +50,7 @@ https://louisleech10.github.io/quantitative_trading_system/site/ 實測可讀；
 來源仍是 .md；HTML 在每次 commit 白話檔時由 pre-commit 同 commit 自動生成，缺產出／過期／死連結會擋 commit。</li>
 <li><strong>第 3 批</strong>：三家 code review 12 條全處置、修補完、<strong>三家蓋章 PASS</strong>（B3 CLOSED）。</li>
 <li><strong>第 4 批</strong>：三家 code review 13 條全處置、修補完、<strong>三家蓋章 PASS</strong>（B4 CLOSED）⇒ 🏁 <strong>GAP-1 收工</strong>：280 條測試全過、20 條 mutation 全紅、接線閘 rc=0；殘留 G1-R1..R7／R9／R10／R11 逐項登記三值理由＋觸發條件（蓋章時三家複核未觸發）。</li>
-<li><strong>PA-CUMSUM 小票（你 8/18 點的）</strong>：權益曲線改為<strong>單利／複利兩條都算、都標清楚</strong>＋前端可切換（預設複利＝帳戶實際淨值）；三家 code review 7 條全處置（多標的改逐時間點等權組合、缺失預測改報錯、API 契約封閉四鍵＋欄位說明、前端 a11y＋4 條元件測試）；三家蓋章 PASS，<strong>已收案</strong>（commit <code>d20f0627</code>）。② <s>G1-R11</s>（已修並關閉）③ 回 IC 主線其他缺口票——等你點。</li>
+<li><strong>PA-CUMSUM 小票（你 8/18 點的）</strong>：權益曲線改為<strong>單利／複利兩條都算、都標清楚</strong>＋前端可切換（預設複利＝帳戶實際淨值）；三家 code review 7 條全處置（多標的改逐時間點等權組合、缺失預測改報錯、API 契約封閉四鍵＋欄位說明、前端 a11y＋4 條元件測試）；三家蓋章 PASS，<strong>已收案</strong>（commit <code>d20f0627</code>）。② <s>G1-R11</s>（已修並關閉）③ 下一票＝GAP-2a（見最上面）。</li>
 <li>推送規則：<strong>每批 commit 完直接 push</strong>（你 8/18 定的），不再等你說。</li>
 </ul>
 <hr />
