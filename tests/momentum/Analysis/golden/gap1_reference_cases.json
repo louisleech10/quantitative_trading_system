@@ -1,0 +1,51 @@
+{
+  "_doc": "GAP-1 SPEC §G golden／baseline（唯一 baseline 檔，路徑寫死）。每案例附 provenance；無 provenance 之數值不得入檔。測試以本檔 sha256（test_pbo.py::_GOLDEN_SHA256）斷言未被就地改寫——改本檔須同步改該常數並經審查。alpha 之 mu 一律由公式在測試中重算並斷言等於本檔值（atol=1e-18），禁照抄字面。",
+  "version": "gap1-golden-1",
+  "generation": {
+    "rng": "np.random.default_rng(20260817)",
+    "matrix": "rng.standard_normal((n_obs, n_candidates)) * sigma_per_period",
+    "n_obs": 1200,
+    "n_candidates": 50,
+    "sigma_per_period": 0.01,
+    "s_blocks": 12,
+    "dtype": "float64",
+    "selection_metric": "sharpe",
+    "provenance": "A1-2：RNG API 與抽樣形狀順序逐字寫死（三種合理實作曾得 0.6483／0.6158／0.5357，未寫死即不可重現）"
+  },
+  "cases": {
+    "expected_max_sharpe_factor": {
+      "provenance": "Bailey & López de Prado (2014) The Deflated Sharpe Ratio；E[max SR]/sqrt(V[SR]) ≈ (1-γ)Φ⁻¹(1-1/N)+γΦ⁻¹(1-1/(N e))，γ=0.5772156649015329；atol=1e-4",
+      "values": {"10": 1.5746, "100": 2.5306, "1000": 3.2551},
+      "atol": 1e-4
+    },
+    "cscv_path_count": {
+      "provenance": "Bailey et al. (2015) The Probability of Backtest Overfitting, Algorithm 2.3；C(S, S/2) 以 math.comb 對照",
+      "values": {"12": 924, "14": 3432, "16": 12870}
+    },
+    "min_btl": {
+      "provenance": "Bailey et al. (2014) Pseudo-Mathematics and Financial Charlatanism, Eq.(3.2)：MinBTL 上界 2 ln(N)/SR*²；預算 floor(exp(T SR*²/2))（floor 定義下之唯一正確不變式，不用 rtol）",
+      "upper_bound_100_sr1": 9.210340371976184,
+      "budget_at_real_kline_years": {"t_years": 2.3232876712328765, "sr_1.5": 13, "sr_1.0": 3, "sr_2.0": 104, "sr_2.5": 1422},
+      "conservatism_oracle": {"n_trials": 100, "target_sharpe": 1.0, "periods_per_year": 365, "n_obs": 3362, "seeds": "20260817+k, k=0..19", "analytic_mean_max_annualized_sr": 0.833943, "observed_mean": 0.843077, "rule": "mean(max annualized SR) <= 1.0 且 rtol<0.05 解析值；只斷言 20 seed 平均（per-seed 上界不成立，實跑 max=1.216377）"}
+    },
+    "pbo": {
+      "noise": {
+        "provenance": "A1-2：全噪音 i.i.d. 常態 σ=0.01；band [0.30,0.70]（放寬理由：924 path 共用觀測、有效獨立樣本遠小於 924，單 seed 散布遠大於 sqrt(0.25/924)）；主委三變體實測 0.6483（default_rng (T,N)）／0.6158（default_rng (N,T).T）／0.5357（legacy seed）",
+        "band": [0.30, 0.70],
+        "observed": {"default_rng_TN": 0.6483, "default_rng_NT_T": 0.6158, "legacy_seed": 0.5357}
+      },
+      "alpha_detectable": {
+        "provenance": "A1-1：候選 0 每期加 mu = sigma_per_period * 0.15（per-period SR 0.15 ＝ 3.68 個 IS 標準誤，設計上可被 CSCV 偵測）；主委實跑 default_rng 0.0000／legacy 0.0054",
+        "mu_formula": "sigma_per_period * 0.15",
+        "mu": 0.0015,
+        "rule": "pbo < 0.30"
+      },
+      "alpha_undetectable": {
+        "provenance": "A1-1／§G：mu = sigma_per_period * 1.0 / sqrt(resolve_periods_per_year('1h')) = 0.01/sqrt(8760)（完整精度）；年化 SR 1.0 之 alpha 在 T=1200 之 1h 資料上不可偵測（per-period SR≈0.0107 ≪ SR 標準誤≈0.0408）；主委實跑 0.5411／0.6201／0.5487。是「PBO 不會把弱 alpha 誤判為穩健」之唯一 oracle，不得為使其通過而縮 band 或改 sigma、不得刪除",
+        "mu_formula": "sigma_per_period * 1.0 / sqrt(8760)",
+        "mu": 0.00010684346079267205,
+        "rule": "pbo > 0.40"
+      }
+    }
+  }
+}

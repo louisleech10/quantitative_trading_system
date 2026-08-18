@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gap1_b1_mutation_probe.sh — B1／B2／B3 之 mutation 自證（§V-5／8／9a／9b／10／13／15 ＋ §V-7／7b／7c／7d／7e ＋ §V-1／2／3／11／12）。
+# gap1_b1_mutation_probe.sh — B1–B4 之 mutation 自證（§V-5／8／9a／9b／10／13／15 ＋ §V-7／7b／7c／7d／7e ＋ §V-1／2／3／11／12 ＋ §V-4／6／14）。
 #
 # 每條：就地 mutate 一行 → 跑對應測試 → 斷言**轉紅且為斷言失敗（非 collection error）** → 還原。
 # 產出 receipt 供 code review 對證（TODO §0「新測試須 mutation 自證（實跑貼 rc）」）。
@@ -41,6 +41,7 @@ RC=momentum/Analysis/strategy_validation/returns_contract.py
 LEDGER=momentum/Analysis/strategy_validation/ledger.py
 MINBTL=momentum/Analysis/strategy_validation/min_btl.py
 DSR=momentum/Analysis/strategy_validation/deflated_sharpe.py
+PBO=momentum/Analysis/strategy_validation/pbo.py
 TEST_FREQ=tests/momentum/Analysis/strategy_validation/test_frequency.py
 TEST_SHARPE=tests/momentum/Analysis/strategy_validation/test_sharpe.py
 TEST_RC=tests/momentum/Analysis/strategy_validation/test_returns_contract.py
@@ -50,11 +51,15 @@ TEST_LEDGER_PATH=tests/momentum/Analysis/strategy_validation/test_ledger_path.py
 TEST_MINBTL=tests/momentum/Analysis/strategy_validation/test_min_btl.py
 TEST_DSR=tests/momentum/Analysis/strategy_validation/test_deflated_sharpe.py
 TEST_REPORT=tests/momentum/Analysis/strategy_validation/test_report_section.py
+TEST_CSCV=tests/momentum/Analysis/strategy_validation/test_cscv.py
+TEST_PBO=tests/momentum/Analysis/strategy_validation/test_pbo.py
+TEST_GUARD=tests/momentum/Analysis/strategy_validation/test_pbo_universe_guard.py
+TEST_WIRING=tests/momentum/Analysis/strategy_validation/test_wiring_check.py
 TEST_VB=tests/momentum/Strategy/test_vectorized_backtest.py
 # baseline／post-restore 之測試集合（單一定義，兩處共用；A1-21 L10 起含 B2 三檔）
-ALL_TESTS="${TEST_FREQ} ${TEST_SHARPE} ${TEST_RC} ${TEST_LEDGER} ${TEST_LEDGER_CONF} ${TEST_LEDGER_PATH} ${TEST_MINBTL} ${TEST_DSR} ${TEST_REPORT} ${TEST_VB}"
+ALL_TESTS="${TEST_FREQ} ${TEST_SHARPE} ${TEST_RC} ${TEST_LEDGER} ${TEST_LEDGER_CONF} ${TEST_LEDGER_PATH} ${TEST_MINBTL} ${TEST_DSR} ${TEST_REPORT} ${TEST_CSCV} ${TEST_PBO} ${TEST_GUARD} ${TEST_WIRING} ${TEST_VB}"
 
-TARGETS="${FREQ} ${SHARPE} ${RC} ${LEDGER} ${MINBTL} ${DSR} ${TEST_VB}"
+TARGETS="${FREQ} ${SHARPE} ${RC} ${LEDGER} ${MINBTL} ${DSR} ${PBO} ${TEST_VB}"
 BACKUP_DIR="$(mktemp -d)"
 
 backup_all() {
@@ -198,9 +203,21 @@ mutate "$SHARPE" '    sr_var = (1.0 - skew * sr_pp + (kurtosis - 1.0) / 4.0 * sr
     sr_var = (1.0 - skew * _sr_ann + (kurtosis - 1.0) / 4.0 * _sr_ann**2) / (n_obs - 1)' || exit 1
 run_expect_red "§V-12" "$TEST_DSR"
 
+echo "[§V-4] PBO champion 改由 OOS metric 選（破壞「IS 選、OOS 評」⇒ golden noise band 轉紅）"
+mutate "$PBO" '        champ = path_valid[int(np.argmax([is_metrics[pos[c]] for c in path_valid]))]' '        champ = path_valid[int(np.argmax([_metrics_columns(m_valid[oos_idx], selection_metric)[pos[c]] for c in path_valid]))]  # MUTANT' || exit 1
+run_expect_red "§V-4" "$TEST_PBO"
+
+echo "[§V-6] 移除 universe_provenance 守衛（一律 ok）"
+mutate "$PBO" '    status, reason = check_universe_provenance(universe_provenance, candidate_ids, n_candidates, ledger_result)' '    status, reason = ("ok", "")  # MUTANT: guard removed' || exit 1
+run_expect_red "§V-6" "$TEST_GUARD"
+
+echo "[§V-14] PBO 名次改回以原始欄索引索引壓縮陣列（A1-15 之 IndexError／錯值反例）"
+mutate "$PBO" '        rank = float(rankdata(oos_vals, method="average")[oos_pos[champ]])' '        rank = float(rankdata(oos_vals, method="average")[champ])  # MUTANT' || exit 1
+run_expect_red "§V-14" "$TEST_PBO"
+
 echo "[verify] 還原後應無 mutant 殘留且全綠（🔴 K2：任一不成立即 exit 1）"
 restore_all
-if grep -rn "MUTANT" "$FREQ" "$SHARPE" "$RC" "$LEDGER" "$MINBTL" "$DSR" "$TEST_VB"; then
+if grep -rn "MUTANT" "$FREQ" "$SHARPE" "$RC" "$LEDGER" "$MINBTL" "$DSR" "$PBO" "$TEST_VB"; then
   echo "  🔴 有 mutant 殘留 ⇒ 還原機制失效（首版即因 git checkout 對未追蹤檔無效而發生）" >&2
   exit 1
 fi
@@ -217,4 +234,4 @@ if [ "$FAILED_DESIGN" -ne 0 ]; then
   echo "[gap1-b1-mutation] 🔴 有 mutation 未通過「可證偽」判準"
   exit 1
 fi
-echo "[gap1-b1-mutation] ✅ 全部 17 條 mutation 皆使測試轉紅（rc=1 斷言失敗）"
+echo "[gap1-b1-mutation] ✅ 全部 20 條 mutation 皆使測試轉紅（rc=1 斷言失敗）"

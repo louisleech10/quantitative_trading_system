@@ -17,10 +17,10 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | **GAP-1 TODO FROZEN R3 ＋ B1／B2 完工並三家蓋章（B2 review 21 條→L1–L10 全修，A1-21）＋ B3 寫完（3.1–3.4；220 測試、17 mutation 全紅）** | **B3 三家 code review → 修 → 戳記 → B4（4.1→4.2→4.3→2.4）** | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`（A1-1..A1-21）；收斂 `handoffs/reconcile/20260818-gap1-b2-review-r14/synth.md` |
+| **量化主線（IC 分析）** | **GAP-1 TODO FROZEN R3 ＋ B1／B2／B3 完工並三家蓋章（A1-21／A1-22）＋ B4 寫完（4.1–4.3＋2.4；269 測試、20 mutation 全紅、wiring 閘 rc=0）** | **B4 三家 code review → 修 → 戳記 → 收工（registry 殘留複核）** | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`（A1-1..A1-23）；收斂 `handoffs/reconcile/20260818-gap1-b3-review-r16/synth.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
-| GAP-1 DSR/PBO/MinBTL 策略層防偽 | **FROZEN R3；B1／B2 CLOSED、B3 寫完待審**（B4 PBO＋wiring 閘未開）；殘留 registry G1-R1..R7＋R9＋R10 | B3 review→戳記→B4 | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |
+| GAP-1 DSR/PBO/MinBTL 策略層防偽 | **FROZEN R3；B1／B2／B3 CLOSED、B4 寫完待審**；殘留 registry G1-R1..R7＋R9＋R10 | B4 review→戳記→收工 | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |
 | PA-CUMSUM 單利權益改正（小票；G1-R8 收回） | **未開工**（自 registry 殘留收回；`momentum/Analysis/prediction_analyzer.py:155` `np.cumsum` 於權益曲線語意上應為 `cumprod`，或改欄名並停用策略敘事） | 排在 GAP-1 B4 完工後；Claude 小任務流程（自做＋自跑測試） | 出處＝`CODEX-R8-P1-12`／`GROK-R8-P1-03` 同輪；延伸檔 A1-10 第 3 項 |
 | GAP-2 IC↔ML 橋＋多因子/邊際 IC | 未開票 | 次位 | 同上 #2 |
 | GAP-3 事件 case-control 真套件 | 未開票 | 設計須含 R5 A′ 語意 | 同上 #3 |

@@ -74,6 +74,7 @@
 | `session_name_check.sh` | 常態檢查 | committee_run  |
 | `spec_fourway_check.sh` | 常態檢查 | 未掛 |
 | `status_marker_check.sh` | 常態檢查 | Stop  |
+| `strategy_wiring_check.sh` | 常態檢查 | 未掛 |
 | `template_check.sh` | 常態檢查 | gate gov_check  |
 | `test_template_check.sh` | 一次性驗證 | 未掛 |
 | `ticket_universe.sh` | 常態檢查 | 未掛 |
@@ -96,6 +97,7 @@
 | `check_doc_manifest_b.py` | 常態檢查 | 未掛 |
 | `extract_phase2_expected_flips.py` | 常態檢查 | narrow_check_router  |
 | `ic_wiring_check.py` | 常態檢查 | 未掛 |
+| `strategy_wiring_check.py` | 常態檢查 | 未掛 |
 | `verification_claim_check.py` | 常態檢查 | pre-commit commit-msg  |
 | `verify_audit_chain.py` | 常態檢查 | 未掛 |
 | `verify_cgsa_pipeline.py` | 常態檢查 | 未掛 |

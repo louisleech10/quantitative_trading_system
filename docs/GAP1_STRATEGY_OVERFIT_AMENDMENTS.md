@@ -492,6 +492,40 @@ reporter 為純讀 ⇒ 呼叫移到 `pipeline_file` 寫入之前；5xx 即不落
 
 ---
 
+## A1-23 — B4 實作備註（主委自產，**待 B4 code review 裁定**；四項偏離 TODO 字面之處置皆具名）
+
+- **來源**：B4 實作（Task 4.1／4.2／4.3／2.4，commit 見 git log `feat(gap1): B4`）；本條為主委**主動揭露**之偏離／解讀，非委員 finding。
+  依「凡寫進契約的宣稱先有反例測試」與「禁靜默假設」，逐條列出並附回歸鎖；審查若判不可接受即改回字面。
+1. **Task 4.2 選擇指標之向量化**：TODO 字面「`sharpe`→`compute_sharpe(col[idx], periods_per_year=1).value_per_period`」；
+   實作 `_metrics_columns()` 以向量化 `mean/std(ddof=1)`（退化 ⇒ NaN）逐欄計算——逐欄呼叫 `compute_sharpe`（scipy 矩）之
+   924 path × 50 候選需 **~30s／案例**（三 golden 案例 ~95s，探針每輪再乘 20），向量化後 0.2s。
+   等價鎖：`test_pbo.py::test_vectorized_sharpe_matches_compute_sharpe`（含 std=0／NaN／n<2 退化，atol 1e-15）；
+   參考實作 `_metric()` 保留（仍呼叫 `compute_sharpe`）。
+2. **Task 2.4 W3 之 passthrough 形態**：TODO 字面「非 `Constant` 之動態值（f-string／變數／跨檔常數別名）⇒ `[unresolved]` rc=1」；
+   實作對**傳遞既有 reason 值**之封閉形態放行（`x.reason`／`x["reason"]`／`x.get("reason", <Const>)`／`A if c else B` 兩支皆合規／
+   `Name` 且同檔所有指派來源皆合規或為參數），其餘（f-string／BinOp／其他 Call／跨檔別名）仍 `[unresolved]` rc=1。
+   理由：`report.py`／`reporter.py` 之 `reason=eligibility.reason` 等 passthrough 為契約要求之語意（傳遞 Task 3.1／2.2 之 reason），
+   若一律 unresolved 則 B4 gate「`strategy_wiring_check.sh` rc=0」**不可達**（與 A1-11 之「gate 不可達」同型病）。
+   回歸鎖：mutation ⑤（`reason=f"x_{i}"`）與 ⑤b（`tmp=f"..."; reason=tmp`，經變數）皆 rc=1；六條 wiring mutation 全部 rc=1。
+   誠實邊界：`Name` 之判定只追同檔 Assign／AnnAssign（不做跨函式資料流）；參數（無指派）視為 passthrough。
+3. **`ledger.py` 之 `reason = reasons_seen[0] if reasons_seen else ""` 改為 `_REASON_ROW_INVALID if _REASON_ROW_INVALID in reasons_seen else ""`**：
+   前者為動態取值（W3 unresolved）；今日 `reasons_seen` 只可能含 `ledger_row_invalid`，改寫後行為逐位相同（`test_ledger.py` 25 passed），
+   未來多 reason 須顯式處理（fail-closed 於 wiring 閘）。
+4. **Task 4.2「`len(candidate_ids)!=n_candidates ⇒ ValueError`」不可達**：守衛（Task 4.3）先跑且其 count 三方比對已涵蓋
+   `n_candidates == len(candidate_ids)` ⇒ 不等時回 `universe_provenance_unverifiable` 而非 raise（`test_pbo.py::test_transpose_raises_and_short_t_ok` 具名記錄）。
+   `returns_matrix.shape` 不符仍 raise（轉置案例）。
+5. **golden 檔**：`tests/momentum/Analysis/golden/gap1_reference_cases.json`（§G 應於 Task 3.1 前建立，主委於 B4 補建——B3 之解析常數測試已內嵌同值，
+   golden 建立後以 `test_pbo.py::test_golden_file_sha256_and_analytic_constants` 對照）；`sha256` 常數住 `test_pbo.py`（改檔須兩處變更）；
+   alpha 之 `mu` 由公式重算 `atol=1e-18`（`alpha_undetectable` 之 JSON 字面須為完整 double `0.00010684346079267205`，
+   `1.068434607926721e-04` 差 5.4e-20 會使 atol 1e-18 斷言失敗——主委實測）。
+6. **PBO 名次分母**：TODO「`r = rank/(len(valid_cols)+1)`」——實作以「該 path **OOS 亦有限**之候選」為名次母體（`rankdata` 對 NaN 會使全體名次為 NaN）；
+   champion 於 OOS 非有限 ⇒ 跳過（A1-15）；其他候選 OOS 非有限 ⇒ 自名次母體剔除並計 `n_path_exclusions`。全 OOS 有限時與字面等價（golden 三案例 excl=0）。
+7. **PBO 效能／探針**：§V-4（champion 改由 OOS 選）⇒ golden noise band 轉紅；§V-6（守衛移除）⇒ 6 條轉紅；
+   §V-14（原始索引取名次）首版**未轉紅**（探針抓到：測試矩陣中原始索引＝壓縮位置）⇒ 新增 `test_rank_uses_compressed_position_not_original_index`
+   （欄 0 全 NaN 使 valid_cols=[1,2,3]、champion 原始索引 3）⇒ 轉紅。探針 17 → **20** 條。
+
+---
+
 ## 淨變動摘要（供 R9 複驗逐項對證）
 
 | 對象 | R8（母 SPEC） | A1 後 |

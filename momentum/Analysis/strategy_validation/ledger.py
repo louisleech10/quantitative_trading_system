@@ -275,7 +275,7 @@ def read_trial_ledger(*, research_session_id: str, dataset_key: str) -> LedgerRe
         reason = _REASON_ROW_INVALID  # 檔在、全列非法：是「帳本損壞」不是「無帳本」
     else:
         status = "ok"
-        reason = reasons_seen[0] if reasons_seen else ""
+        reason = _REASON_ROW_INVALID if _REASON_ROW_INVALID in reasons_seen else ""  # 靜態字面（wiring 閘 W3：禁 reasons_seen[0] 動態取值）
 
     if reason and reason not in contract["reasons"]:  # 防自創 reason 字面
         raise ContractViolation(f"reason 不在契約 reasons: {reason!r}")
