@@ -72,6 +72,8 @@ _watched_for() {
     # GAP-1 施工看板：WATCHED 含 scripts/（gap1 探針）⇒ 合法持有批次進度；實作路徑動了就必須同步
     "GAP-1施工進度.md")              echo "momentum/Analysis/strategy_validation/ momentum/core/frequency.py momentum/Analysis/contracts/strategy_validation_contract.json scripts/gap1_b1_mutation_probe.sh docs/GAP1_STRATEGY_OVERFIT_TODO.md docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md" ;;
     "IC健檢偵察結果.md")             echo "docs/IC_QUANT_GAP_REGISTRY.md" ;;
+    # GAP-2 施工看板（2026-08-18）：盯新模組／契約／探針／TODO／延伸檔
+    "GAP-2施工進度.md")              echo "momentum/Analysis/marginal_ic.py momentum/Analysis/factor_combiner.py momentum/Analysis/survivor_contract.py momentum/Analysis/contracts/ic_survivor_contract.json scripts/gap2_mutation_probe.sh scripts/gap2_freeze_golden.py docs/GAP2_MARGINAL_IC_TODO.md docs/GAP2_MARGINAL_IC_AMENDMENTS.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。

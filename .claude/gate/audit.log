@@ -45315,3 +45315,40 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GAP2-TODOADV-R7", "ts": "2026-08-18T12:22:47Z"}
+=== 2026-08-18 20:22:47 | dispatch ===
+  ts=2026-08-18 20:22:47
+  kind=dispatch
+  intent=GAP-2 TODO adversarial R7(TODO 首輪):可執行性/義務覆蓋/批次獨立/取巧面/測試設計
+  risk=low
+  facts_asked=template_check todo PASS;crosscheck PASS;SPEC R7 FROZEN 使用者核准
+  review_role=TODO adversarial 審查委員(禁改碼禁改 SPEC/TODO)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-GAP2-X-REVIEW-R7", "ts": "2026-08-18T12:22:56Z"}
+=== 2026-08-18 20:22:56 | dispatch ===
+  ts=2026-08-18 20:22:56
+  kind=dispatch
+  intent=GAP-2 TODO adversarial R7(TODO 首輪):可執行性/義務覆蓋/批次獨立/取巧面/測試設計
+  risk=low
+  facts_asked=template_check todo PASS;crosscheck PASS;SPEC R7 FROZEN 使用者核准
+  review_role=TODO adversarial 審查委員(禁改碼禁改 SPEC/TODO)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260818-gap2-todoadv-BRIEF.md", "brief_sha256": "647efdb13ebedf4ff08fbae1641bc196c7dd000d6d614b24d55dcbc400e01e0e", "brief_sha256_norm": "647efdb13ebedf4ff08fbae1641bc196c7dd000d6d614b24d55dcbc400e01e0e", "event": "committee_round_open", "event_id": "97942b89-0297-40b7-8568-f371966a8e6e", "expected_outputs": {"codex": "handoffs/20260818-gap2-todoadv-codex.md", "composer": "handoffs/20260818-gap2-todoadv-composer.md", "grok": "handoffs/20260818-gap2-todoadv-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "78933f21-4c28-44bc-ac9e-0ba37ea6b3af", "schema_version": 1, "sequence": 2117, "session_name": "20260818-gap2-x-review-r7", "task_id": "20260818-GAP2-X-REVIEW-R7", "ts": "2026-08-18T12:23:00Z"}
+{"event":"gate_deny","ts":"2026-08-18T12:23:52Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"e2089d23758d9c1acc858017703ac119660b60609e619be1b09fda455543bbda","cmd_head":"L=$(grep -n '\"IC健檢偵察結果.md\")' scripts/plain_docs_sync_check.sh | cut -d: -f1); cat > /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/239adb90-347a-4752-8ed8-0a5e412b4fa1/scratchpad/ins.txt <<'EOF'\n    # GAP-2 施工看板（2026-08-18）：盯新模組／契約／探針／TODO／延伸檔\n    \"GAP-2施工進度.md\")              echo \"momentum/Analysis/marginal_ic.py momentum/Analysis/factor_combiner.py momentum/Analysis/survivor_contract.py momentum/Analysis/contracts/ic"}
+{"event":"gate_deny","ts":"2026-08-18T12:24:59Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"94458c0f13662790a4efe5ca17860c92baf3b7ac603bf4da256daac87e2a26f9","cmd_head":"cat >> 白話說明/流程摩擦記錄.md <<'EOF'\n\n> **六十八・（2026-08-18）GAP-2 規格審查：我又漏跑「收斂檔要三家蓋章」——同第五十六條、GAP-1 同事故再犯**：偵察 R1、審查 R1／R2 三輪收斂檔都沒派蓋章輪就往下派 R3，codex 依 AGENTS 第 12 條停工「STATUS: BLOCKED — reconcile 未核可」，一整輪 codex 內容審查白費。補救＝四份 synth 序列補蓋章（每輪單一目標、約 5 分鐘）後重派，之後每輪審查後**立刻"}

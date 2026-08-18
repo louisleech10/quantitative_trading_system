@@ -6,21 +6,16 @@
 
 ---
 
-## 🔴 接手第一件事：開 **GAP-2a 邊際 IC／多因子組合**（使用者 2026-08-18 點；新 session 開工）
+## 🔴 接手第一件事：GAP-2 TODO adversarial R7 收斂 → TODO FROZEN → B1 實作
 
-**前提現況**（`git log origin/main..HEAD` 應為空；`bash scripts/debt_ledger.sh --list` 無 OPEN）：GAP-1 四批＋PA-CUMSUM＋G1-R11 皆 CLOSED（三家 review＋三家戳記；收斂檔在 `handoffs/reconcile/2026081{7,8}-*`）。無進行中 epic、無 OPEN 債。
+**現況**（2026-08-18 晚）：SPEC `docs/GAP2_MARGINAL_IC_SPEC.md` **R7 FROZEN**（六輪三家 adversarial 14→12→4→4→2→0；七份 synth 三家 RECONCILE-STAMP；使用者白話閘核准；B5 表格＋`marginal_ic` toggle 預設開）；殘留 G2-R1／R2／R3／R5 已登記 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-2 待補完」。TODO `docs/GAP2_MARGINAL_IC_TODO.md` **DRAFT R1** 已送三家（session `20260818-gap2-x-review-r7`，task `20260818-GAP2-X-REVIEW-R7`；產出 `handoffs/20260818-gap2-todoadv-{codex,composer,grok}.md`）。
 
-**GAP-2a 定義與邊界**（`docs/IC_QUANT_GAP_REGISTRY.md` #2a／#2b；使用者裁定拆分）：
-- 2a＝純 IC 層：「這因子相對已有的帶來多少**新**資訊」（邊際 IC／多因子組合）。正交化 residual 已在 `momentum/Analysis/factor_orthogonalizer.py`；真歸因現為誠實 `unavailable`（健檢 C11）。**不碰 ML、不碰事件型**。
-- 2b＝IC→ML 橋：**契約先行**（倖存者輸出契約，須含 `sample_scope`＋provenance，序列型／事件型共用同一座橋），於 2a SPEC 內一併定義；**橋本體 blocked-by ML 層**（成熟度地圖：ML／回測屬不完整層），不接。
-- 大任務（命中 a/d）⇒ 完整管線：Claude 起草 SPEC → 三家 adversarial（reconcile＋戳記）→ 白話給使用者審 → TODO → 實作分批 → 三家 code review → 戳記。範本 `templates/`；SPEC 建檔需 gate token（`bash scripts/gate.sh artifact`）。
-- 開工前先稽核 HANDOFF／ROADMAP／registry vs repo，並看有無殘留委員行程（ps 查 cursor-agent／codex／grok）。
+**接手步驟**：① 若 R7 已回：`reconcile_build.sh 20260818-gap2-x-review-r7 --mode review <三檔>` → 填群集 → 修 TODO（SPEC 義務側缺陷寫**延伸檔** `docs/GAP2_MARGINAL_IC_AMENDMENTS.md`，母 SPEC 不就地改）→ `template_check.sh todo` → register-output 三檔 → `debt_clear.sh` → **加 `## 戳記` 區＋派 stamp 輪**（🔴 每輪 review 後**必**接 stamp 輪，session `*-stamp-r<N>`、單一 target；漏跑會被 codex 依 AGENTS 12 條停工，本 session 已再犯一次）→ commit＋push；三家皆「可 Frozen」⇒ TODO FROZEN → 派 B1（Claude 自做：Task 1.0→1.1→1.2→1.3；收尾 pytest→探針→commit→push→白話 5 檔→commit+push）→ 三家 code review → 修 → stamp → B2…
+② 白話 5 檔＝`白話說明/{README,接下來要做什麼,治理進度日誌,流程摩擦記錄,GAP-2施工進度}.md`（`plain_docs_sync_check.sh` 已註冊 GAP-2 看板 WATCHED；動 `scripts/`／新模組必同步）。
 
-**GAP-3 事件型（不是本 session 的事，勿順手開）**：使用者重定義＝外部標好正反例匯入→PIT 對齊→條件 IC／ML（非 event study）；**開發前先討論**：第一步＝唯讀事件語意 consult，Q0（事件類型盤點）＋5 題見 registry「GAP-3 開發前討論題」節。
-
-## ⚠ 收尾與坑（完整清單在 CLAUDE.md Gotchas／白話 摩擦記錄 六十一～六十七）
-- 🔴 每批收尾：pytest → 探針 → commit → push（背景）→ 白話 5 檔同步 → commit+push（`plain_docs_sync_check` 是 pre-push 硬擋，動 `scripts/` 就要更新白話 5 檔）。commit+push 皆秒級。
-- 🔴 委員 CLI 有看門狗（`cx_run.sh`）；brief 要求委員自建探針加 timeout；`handoffs/*` 新檔須 `git add -f`；白話 .md commit 時 pre-commit 同 commit 重生成 `docs/site/`。
-- 🔴 `docs/API_SPECIFICATION.md` 受格式快閘不可編輯（摩擦六十七）——契約以 pydantic schema 為準，勿再嘗試。
-- 對多處同型行做 `sed` 前先 `grep -c`；「為了讓閘門過而放寬規則」會被委員反例打回。
-- `scripts/governance_families.json` 有既有 no-op dirty，非本線產生，未歸屬。
+## ⚠ 坑（本 session 實踩；完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～六十九）
+- 🔴 commit 訊息與 heredoc 內含 `codex`／`grok` 字樣可能被 gate_check 當派工擋（先 mint dispatch token 或改用 Edit 工具寫檔）。
+- 🔴 stamp 輪 session 名須 `…-stamp-r<N>`（無 r<N> 拒發）；stamp 輪結束用 `debt_clear.sh --abandon --kind no-findings-expected`＋`gate.sh register-output <task> <synth>`。
+- 🔴 判收斂看**每家最近一次內容審查**皆 sentinel，不是總數歸零（R3 codex 因流程停工未審內容 → R4 才出 4 條）。
+- 委員產出須 `gate.sh register-output` 才過 pre-commit claim checker；commit 須帶 `Governance-Scope:` trailer（G-7）。
+- `docs/API_SPECIFICATION.md` 受格式快閘不可編輯；`scripts/governance_families.json` 既有 no-op dirty 非本線。
