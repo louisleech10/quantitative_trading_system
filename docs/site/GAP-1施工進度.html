@@ -133,7 +133,7 @@
 <ul>
 <li><strong>測試</strong>：<code>strategy_validation/</code>＋API 測試目前 <strong>280 條全過</strong>（第1批 45＋第2批 90＋第3批 89＋第4批 56）；<code>Strategy/</code>＋<code>Optimization/</code> 207 過／2 紅（那 2 條是別的模組的既有紅，與本 epic 無關）。</li>
 <li><strong>真實資料</strong>：Task 1.4 的測試用你電腦上的<strong>真實 K 線</strong>（<code>data_cache/feature_klines/kline_cache.h5</code>）跑真回測，不是造出來的假資料；<strong>檔案不在時直接失敗</strong>，不准 skip 裝綠（審查抓的）。</li>
-<li><strong>改壞一定要變紅</strong>（mutation）：把 <strong>20</strong> 種已知錯誤寫法逐一植入（第1批 8 種：未知週期回 730／退化回 0.0／Mertens 係數改錯／rf 用 0.02／逐 bar 改成 ok／放行預設 730／帳本缺檔回 N=1／bar 數當年數；第2批新增 4 種：放行 NaN／快照 hash 改回會撞的舊法／帳本目錄名改掉／拿掉檔案鎖；第3批新增 5 種：MinBTL 的 ln 改成 n／預算 floor 改 round／DSR 刪 γ 項／DSR 分母改用跨試驗變異數／矩公式代入年化夏普；第4批新增 3 種：PBO 冠軍改用樣本外挑／拿掉候選宇宙守衛／名次改用原始索引），<strong>20 次全部讓測試變紅</strong>（收據 <code>handoffs/run_receipts/20260818T110000Z-gap1-b4-fix-mutation.log</code>）；第4批那條「名次改用原始索引」的植入<strong>第一次沒變紅</strong>——是探針抓到我的測試沒真的踩到那個洞，補了一條測試才紅。另外接線閘本身有 6 條植入測試（契約多節／自創 reason 兩形／節名只寫註解／f-string／死分支）全部變紅。探針本身有互斥鎖，不能兩人同時跑（血淚見下）。</li>
+<li><strong>改壞一定要變紅</strong>（mutation）：把 <strong>21</strong> 種已知錯誤寫法逐一植入（第1批 8 種：未知週期回 730／退化回 0.0／Mertens 係數改錯／rf 用 0.02／逐 bar 改成 ok／放行預設 730／帳本缺檔回 N=1／bar 數當年數；第2批新增 4 種：放行 NaN／快照 hash 改回會撞的舊法／帳本目錄名改掉／拿掉檔案鎖；第3批新增 5 種：MinBTL 的 ln 改成 n／預算 floor 改 round／DSR 刪 γ 項／DSR 分母改用跨試驗變異數／矩公式代入年化夏普；第4批新增 3 種：PBO 冠軍改用樣本外挑／拿掉候選宇宙守衛／名次改用原始索引；G1-R11 修補新增 1 種：拿掉「位元全等即常數」判定），<strong>21 次全部讓測試變紅</strong>（收據 <code>handoffs/run_receipts/20260818T120000Z-gap1-r11-mutation.log</code>）；第4批那條「名次改用原始索引」的植入<strong>第一次沒變紅</strong>——是探針抓到我的測試沒真的踩到那個洞，補了一條測試才紅。另外接線閘本身有 6 條植入測試（契約多節／自創 reason 兩形／節名只寫註解／f-string／死分支）全部變紅。探針本身有互斥鎖，不能兩人同時跑（血淚見下）。</li>
 </ul>
 <h2 id="這輪審查抓到且值得你知道的事">這輪審查抓到、且值得你知道的事</h2>
 <p><strong>第2批（21 條，三家一致「修完可進第3批」，沒有一條要重做；分歧只在嚴重度，一律取較嚴的那版，全部這輪修、不留待辦）</strong>：</p>
@@ -170,7 +170,7 @@
 <li><strong>我常批評的病自己犯</strong>：mutation 探針的「還原後全綠」自檢原本是空殼（只印 rc 不擋）。已改成 fail-closed，而且它馬上就抓到一次真實污染。</li>
 </ol>
 <h2 id="殘留不是不做是登記了為什麼現在不做">殘留（不是不做，是登記了為什麼現在不做）</h2>
-<p><code>docs/IC_QUANT_GAP_REGISTRY.md</code>「GAP-1 待補完」表：G1-R1..R7（原有）＋ <strong>G1-R9</strong>（帳本完整性要生產者側才證得了）＋ <strong>G1-R10</strong>（回測引擎 Protocol 沒宣告新參數，白名單不准改既有測試替身）＋ <strong>G1-R11</strong>（夏普計算對「浮點上幾乎是常數」的序列不當退化、會回天文數字——第 1 批已蓋章的語意，容差要怎麼定沒有公認判準，需研究）。每條都有「卡在誰／誰的裁決／需要研究」三值之一與觸發條件。</p>
+<p><code>docs/IC_QUANT_GAP_REGISTRY.md</code>「GAP-1 待補完」表：G1-R1..R7（原有）＋ <strong>G1-R9</strong>（帳本完整性要生產者側才證得了）＋ <strong>G1-R10</strong>（回測引擎 Protocol 沒宣告新參數，白名單不准改既有測試替身）＋ <strong>G1-R11</strong>（夏普對「浮點上幾乎是常數」的序列不當退化）——<strong>已修（8/18）</strong>：三家 consult 查了業界五套件源碼與文獻，一致採「所有值位元全等即常數」併判、反對加容差；改一行＋測試＋探針 §V-16，三家 review 中。每條都有「卡在誰／誰的裁決／需要研究」三值之一與觸發條件。</p>
 <h2 id="推送">推送</h2>
 <p><strong>每批收尾都直接推上 GitHub</strong>（你 8/18 定的：commit＋push 秒級、每次同步）。本機與 <code>origin/main</code> 應零落差；
 要查就 <code>git log origin/main..HEAD</code>（應為空）。</p>
