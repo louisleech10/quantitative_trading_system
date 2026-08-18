@@ -45695,3 +45695,38 @@ ts=2026-08-12 12:34:20 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-GAP2-X-REVIEW-R11", "ts": "2026-08-18T14:47:40Z"}
+=== 2026-08-18 22:47:40 | dispatch ===
+  ts=2026-08-18 22:47:40
+  kind=dispatch
+  intent=GAP-2a/2b TODO adversarial R11(DRAFT R5 收斂確認輪;窄範圍;預期三家 sentinel)
+  risk=low
+  facts_asked=template_check PASS;crosscheck PASS;W1 exact grep rc=1;R10 synth 三家戳記
+  review_role=TODO adversarial 審查委員(收斂確認)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260818-GAP2-X-REVIEW-R11", "ts": "2026-08-18T14:47:46Z"}
+=== 2026-08-18 22:47:46 | dispatch ===
+  ts=2026-08-18 22:47:46
+  kind=dispatch
+  intent=GAP-2a/2b TODO adversarial R11(DRAFT R5 收斂確認輪;窄範圍;預期三家 sentinel)
+  risk=low
+  facts_asked=template_check PASS;crosscheck PASS;W1 exact grep rc=1;R10 synth 三家戳記
+  review_role=TODO adversarial 審查委員(收斂確認)
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260818-gap2-todoadv-r11-BRIEF.md", "brief_sha256": "22f43ea540dd55bf24eecd14c7723e36fed8a42d72d7575e26092eaf1144225f", "brief_sha256_norm": "22f43ea540dd55bf24eecd14c7723e36fed8a42d72d7575e26092eaf1144225f", "event": "committee_round_open", "event_id": "a8a5184a-e9ec-4945-9f7f-432688b41d31", "expected_outputs": {"codex": "handoffs/20260818-gap2-todoadv-r11-codex.md", "composer": "handoffs/20260818-gap2-todoadv-r11-composer.md", "grok": "handoffs/20260818-gap2-todoadv-r11-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "cbdcabae-417c-4b17-b700-7776b6b561c7", "schema_version": 1, "sequence": 2157, "session_name": "20260818-gap2-x-review-r11", "task_id": "20260818-GAP2-X-REVIEW-R11", "ts": "2026-08-18T14:47:49Z"}

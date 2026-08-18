@@ -11,11 +11,12 @@ brief-kind: review
 - **R10 收斂檔**：`handoffs/reconcile/20260818-gap2-x-review-r10/synth.md`（W1／W2；三家戳記 stamp r11）；你 R10 的 review：`handoffs/20260818-gap2-todoadv-r10-<你的家族>.md`
 - 收斂檔（皆三家戳記）：`handoffs/reconcile/20260818-gap2-x-review-r{1..9}/synth.md`
 
-## 前提（fact-verified）
-- `bash scripts/template_check.sh todo docs/GAP2_MARGINAL_IC_TODO.md` → PASS；`bash scripts/todo_spec_crosscheck.sh <SPEC> <TODO>` → SMOKE PASS。
-- `grep -n 'mutation_probe_check.sh\`' docs/GAP2_MARGINAL_IC_TODO.md` → rc=1（W1 exact gate；**codex 請重跑**）。
-- `git diff HEAD~1 -- docs/GAP2_MARGINAL_IC_TODO.md` 只動兩處（版本行、Phase B4 小節）——請實核無其他漂移。
-
+## 本 brief 前提（逐條標）
+fact-verified: `bash scripts/template_check.sh todo docs/GAP2_MARGINAL_IC_TODO.md` → PASS；`bash scripts/todo_spec_crosscheck.sh <SPEC> <TODO>` → SMOKE PASS（Claude 實跑 2026-08-18，DRAFT R5）
+fact-verified: `grep -n 'mutation_probe_check.sh\`' docs/GAP2_MARGINAL_IC_TODO.md` → rc=1（W1 exact gate；**codex 請重跑**）
+fact-verified: R10 synth 三家 RECONCILE-STAMP APPROVED（stamp r11，sha 72bf9378c846…）
+assumed: `git diff HEAD~1 -- docs/GAP2_MARGINAL_IC_TODO.md` 只動兩處（版本行、Phase B4 小節）且 AMENDMENTS 只加 A1-5 一句 pointer，無其他漂移 ← 請實核 diff
+assumed: R5 相對 R4 之改動不影響你 R10 之判定（composer／grok 可 Frozen 維持；codex 待修項已關）← 請明答
 ## 必答
 1. W1 寫回成立？（Phase B4 小節與 §B L35 同文；exact grep rc=1）
 2. 你 R10 的判定（可 Frozen／待修）在 R5 上是否維持／轉為可 Frozen？
