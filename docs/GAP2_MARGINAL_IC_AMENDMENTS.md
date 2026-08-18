@@ -13,3 +13,7 @@
 ## A1-3 — 邊際 IC 節之 OOS 欄由 root 注入（母 SPEC Task 1.2 步驟「`fit_scope=train ⇒ oos_guarantees=True`」；來源 R7 GROK-R7-P1-02）
 - 母 SPEC 讓 `compute_marginal_ic` 由 `fit_scope` 推 `oos_guarantees`／`pass_class`；事件不足 fallback 下 holdout 仍在但 root=`degraded_full_sample`，兩者可互斥。
 - 決策：`fit_scope` 只描述投影擬合窗；`oos_guarantees`／`pass_class` 由 `_stage7_report` 於 `_resolve_root_status` 後注入（單一來源）；純函式回 `None` 佔位、`with_root()` helper 填值；validator ⑰ 一致性斷言不變。母 SPEC Task 1.2 驗證①（holdout ⇒ `oos_guarantees is True`）改於 Task 4.1 整合層斷言。
+
+## A1-4 — §C 既有檔白名單 #6 擴為三檔（母 SPEC §C「允許改動之既有檔白名單」#6；來源 R8 CODEX-R8-P1-01／GROK-R8-P0-01；R7 T4 之落地）
+- 母 SPEC §C#6 只列 `frontend/src/lib/types.ts`；R7 T4 已裁定 B5 toggle 須端到端可見可關（`FeatureTierPanel.TOGGLES` 硬編碼＋store 具名 preset 送出），無此兩檔 B5 無法落地。
+- 決策：§C#6 擴為 ① `frontend/src/lib/types.ts`（ICHC 契約段外加型別；`CapabilityStatus` 六值不變）② `frontend/src/store/icAnalysisStore.ts`（`PRESET_TOGGLES` 三 preset 加 `marginal_ic:true`；`getEffectiveConfig` custom＋具名 preset 分支送出 `marginal_ic`；**不加**其他 toggle）③ `frontend/src/components/ic-analysis/FeatureTierPanel.tsx`（**只**於 `TOGGLES` 加一列 `{key:"marginal_ic", label:"邊際 IC／多因子組合"}` 並改計數分母；不改其他列／樣式）。§C#1 之「四處掛載」依 R7 T3 落地為 `analyze()`／`refilter()` 兩插入點＋`_run_full_sample_fallback` 設 `self._in_fallback_rerun` 旗標（`analyze_full` 經 `analyze` 自動覆蓋），語意等價、檔案不變。白名單其餘各項不變。
