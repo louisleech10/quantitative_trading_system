@@ -166,7 +166,7 @@ def combine_factors(
     train_mask: Optional[np.ndarray],
     test_mask: Optional[np.ndarray],
     survivors: List[str],
-    params: "MarginalICParams",
+    params: MarginalICParams,
     fit_scope: Literal["train", "full_sample"],
 ) -> CompositeResult:
     """等權／``ic_weighted`` 訊號合成之 test 段 IC，附 train-only 符號／權重與對 ``top_train_single`` 之 delta CI。"""
