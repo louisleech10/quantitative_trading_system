@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 0 批 施工清單 — 白話版</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="top"><a href="../index.html">← 白話說明</a><span class="crumb">Archived ／ 第0批-施工清單.md</span></nav>
+<main>
+<h1 id="第-0-批-施工清單-白話版">第 0 批 施工清單 — 白話版</h1>
+<p><strong>這份告訴你：實作分幾批、每批做什麼、現在做到哪。</strong>
+技術版在 <code>docs/GOVB0_FRICTION_TODO.md</code>（692 行，已凍結）。</p>
+<p>想先知道「這批在修什麼問題」→ 看 <a href="第0批-在做什麼.html">第0批-在做什麼.md</a></p>
+<blockquote>
+<p>🔴 <strong>2026-08-14 註</strong>：本批的內容沒有變動。但本批產出的
+<code>extract_phase2_expected_flips.py --check</code>（Phase 2 預期轉向清單與 fixture 的一致性檢查）
+<strong>在此之前從來沒有掛在任何自動路徑上</strong>——只有人想到才會跑。
+現已掛到「存檔當下」：改到來源 TODO 或它的 fixture 就會立刻檢查。
+詳見 <a href="../接下來要做什麼.html">接下來要做什麼.md</a>。</p>
+<p>🔴 <strong>同日追記</strong>：另外盤了 42 份治理文件想把「純雜訊」搬進封存區，
+<strong>機械判定一份都搬不了</strong>——它們是票表的證據層。本批的文件也在其中。</p>
+</blockquote>
+<hr />
+<h2 id="-現在進度2026-08-06-凌晨更新">🔨 現在進度（2026-08-06 凌晨更新）</h2>
+<pre><code>規格   ✅ 完成    7 輪審查、三家委員簽核
+清單   ✅ 完成    3 輪審查、已凍結
+實作   B0✅ B1✅ B2✅ │ B3 🛑停手 │ 新增 B3R → B4~B7 待做
+驗收   ✅ B0+B1、B2 通過 │ 🛑 B3 修三次都沒過，機制自己喊停
+</code></pre>
+<p><strong>全套測試 766 條通過</strong>（起始 701）。〔2026-08-06 實跑：<code>pytest tests/governance -q</code> → <code>766 passed in 267.20s</code>〕</p>
+<blockquote>
+<p>🔴 <strong>2026-08-06 修正</strong>：這裡原本同時寫著「763」和「766」。同一個數字兩份副本、改了一處沒改另一處
+——你稽核時抓到。<strong>本檔往後測試數只在這一處</strong>，其他地方標明是歷史值。</p>
+</blockquote>
+<h3 id="-2026-08-06-新增38-張票已全部重新裁定">✅ 2026-08-06 新增：38 張票已全部重新裁定</h3>
+<p>依你當天定的判準（<strong>agent 少犯錯 ÷ 淨摩擦</strong>；可讀性不算數；不溯及既往），
+兩家委員逐張查證：<strong>7 張關閉、2 張分歧保留、4 張待二輪、25 張續做</strong>。</p>
+<p>順序也定了：<strong>先修「格式判斷太寬」</strong>（它擋著所有委員審查）→ 四個互卡的老問題
+（同批含 <code>B-29</code> 與 <code>B-16</code> 擴充 A/B/C）→ 補編號登記 → <strong>B3R</strong> → B4～B7。</p>
+<h3 id="-2026-08-07票-b-38-部分完成不屬第-0-批但動到同一批程式">🟡 2026-08-07：<code>票 B-38</code> 部分完成（<strong>不屬第 0 批，但動到同一批程式</strong>）</h3>
+<p>讓委員在「真的沒發現問題」時，寫一個<strong>系統認得的標記</strong>而不是散文，這樣就不會整輪作廢。
+<strong>檢查程式一行都沒改</strong>（那個標記本來就是合法格式）。<strong>測試 795 條全過</strong>。</p>
+<p>⚠️ <strong>票不能算關閉</strong>：委員如果沒讀到那句指示，交件照樣會過、等收斂才炸。
+而且 codex 用「故意改壞程式」證明<strong>我那條測試是假的</strong>（改壞後還是綠的）——已修並加對照測試。</p>
+<p>⚠️ 它改的是 <code>scripts/cx_run.sh</code> 與 <code>tests/governance/</code>，與第 0 批同一批檔案，故本檔一併更新。</p>
+<h3 id="-2026-08-06票-b-31-部分完成不屬第-0-批但動到同一批程式">🟡 2026-08-06：<code>票 B-31</code> 部分完成（<strong>不屬第 0 批，但動到同一批程式</strong>）</h3>
+<p>讓系統每次派工都自動告訴委員「寫完先自己跑一次檢查再交」，省掉整份重跑 15 分鐘。
+兩家 code review 抓到我兩個沒想到的問題（自檢指令少帶參數、我把宣稱寫得比證據強），
+都修了。<strong>789 條測試全過</strong>，三家委員戳記核可。詳見 <a href="治理待辦總覽.html">治理待辦總覽.md</a>。</p>
+<p>⚠️ 它改的是 <code>scripts/cx_run.sh</code> 與 <code>tests/governance/</code>，與第 0 批同一批檔案，故本檔一併更新。</p>
+<h3 id="-2026-08-06票-b-39-已完成不屬第-0-批但動到同一批程式">✅ 2026-08-06：<code>票 B-39</code> 已完成（<strong>不屬第 0 批，但動到同一批程式</strong>）</h3>
+<p>它擋著所有委員審查輪，所以先做。原以為是小修法，實際撞到另一份既有行為契約
+（同一個標題形狀，兩張票要相反結果），我的方案被三家委員實測推翻，改採第五案。
+<strong>誤擋降 76%，測試 782 條全過。</strong> 詳見 <a href="治理待辦總覽.html">治理待辦總覽.md</a> 的專節。</p>
+<p>⚠️ 它改的是 <code>scripts/completeness_check.sh</code> 與 <code>tests/governance/</code>，
+與第 0 批<strong>同一批檔案</strong>，所以本檔一併更新（機制要求）。第 0 批本身進度不變。</p>
+<p>🔴 <strong>2026-08-06 加開</strong>：<code>B-16</code> 擴充 C ——「驗了一部分卻講成全部」的機械閘。
+你問「這有辦法根治嗎」時定的，<strong>不開新票、併進既有票</strong>。詳見
+<a href="治理待辦總覽.html">治理待辦總覽.md</a> 的專節。</p>
+<p>⚠️ <strong>B3 不再單獨驗收，由 B3R 一併完成。</strong></p>
+<p>詳細裁定在 <code>handoffs/reconcile/20260806-govamend-x-consult-r1/synth.md</code>（三家已簽核）。</p>
+<hr />
+<h3 id="-背景b3-修了三次都沒過系統自己踩了煞車">🛑 背景：<strong>B3 修了三次都沒過，系統自己踩了煞車</strong></h3>
+<pre><code>B3 完成 → 審查抓 3 個洞 → 修 → 審查抓 2 個（其中 1 個是修出來的）
+        → 再修 → 審查再抓 2 個（其中 1 個又是修出來的）
+        → 🛑 停手，不准再修
+</code></pre>
+<p><strong>為什麼停</strong>：我們事先寫死一條規則——「連續兩輪修補都製造出新問題，就停止修補，
+把設計交給委員重審」。這次真的觸發了，<strong>這是這個機制第一次成功煞車</strong>。</p>
+<p><strong>停手之後做了什麼</strong>：三家委員各自重新設計，結論是
+<strong>那一層要整個重寫，但不能邊修邊試</strong> ⇒ 新增一批 <strong>B3R</strong>。</p>
+<h3 id="-b3r-是什麼新增的一批">🔴 B3R 是什麼（新增的一批）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步驟</th>
+<th>做什麼</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>先寫規格</strong>：定義那層要輸出哪些資訊</td>
+<td>委員實測我原本的設計<strong>少了 4 條規則導不出來</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>先做原型</strong>（在暫存區，不碰正式程式）</td>
+<td>前兩次就是直接改正式程式才越修越糟</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>差分驗證</strong>：改前改後判斷結果逐條比對</td>
+<td>不一致的地方必須是<strong>事先講好會變的那些</strong>，其餘一條都不准變</td>
+</tr>
+<tr>
+<td>4</td>
+<td>全部通過<strong>才准</strong>寫進正式程式</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>B4 要等 B3R 過關</strong>，三家一致：禁止在 B3 裡再補一刀然後併進 B4。</p>
+<p><strong>規格草案已寫好</strong>（<code>docs/GOVB0_B3R_LEXER_SPEC.md</code>），等你確認方向後派委員審。</p>
+<h3 id="-我被推翻三次都是委員實測打臉">🔴 我被推翻三次（都是委員實測打臉）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>我說</th>
+<th>實際</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>「這兩個問題是同一個原因」</td>
+<td>❌ 原因不同</td>
+</tr>
+<tr>
+<td>「根因是架構問題，要重寫前處理」</td>
+<td>❌ 是<strong>一行比對寫錯</strong>——用了字面的 <code>\n</code>，抓不到真的換行。<strong>照我的提案會改錯地方</strong></td>
+</tr>
+<tr>
+<td>「速度測試改取最小值就解決」</td>
+<td>❌ 真的變慢時最小值一樣過關 ⇒ <strong>等於作弊</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>第三項就是你問「latency 要不要放寬」時我提的方案。<strong>三家一致：不用改，也不用花力氣</strong> ——
+100ms 有明文出處，抖動的真正原因是<strong>電腦當下在忙</strong>（同時跑幾百條測試），
+而且那個測試<strong>根本不經過</strong>要重寫的那一層。你的直覺對，但理由不是門檻太嚴。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>批次</th>
+<th>內容</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B0</strong></td>
+<td>拍一張「改動前」的快照存起來</td>
+<td>✅ <strong>完成，審查通過</strong></td>
+</tr>
+<tr>
+<td><strong>B1</strong></td>
+<td>讓「被工具擋下」這件事留下紀錄</td>
+<td>✅ <strong>完成，審查通過</strong></td>
+</tr>
+<tr>
+<td><strong>B2</strong></td>
+<td>停止發出會誘導委員違規的指示</td>
+<td>✅ <strong>完成，審查通過</strong>（3 條意見全修）</td>
+</tr>
+<tr>
+<td><strong>B3</strong></td>
+<td>定義判斷規則 ＋ 修「引號裡的東西被誤判」</td>
+<td>🛑 <strong>修三次都沒過，已停手</strong></td>
+</tr>
+<tr>
+<td><strong>B3R</strong></td>
+<td><strong>新增</strong>：那一層整個重寫（先規格→先原型→先驗證）</td>
+<td>🔨 <strong>規格草案已寫，待審</strong></td>
+</tr>
+<tr>
+<td>B4</td>
+<td>修三個「該擋卻沒擋」的漏洞</td>
+<td>⬜ <strong>要等 B3R 過關</strong></td>
+</tr>
+<tr>
+<td>B5</td>
+<td>產出「改前 vs 改後」的差異報表</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>B6</td>
+<td>委員產出改成「寫完才上架」＋ 記錄耗時</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>B7</td>
+<td>加時間上限，委員卡住會自動收斂</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="2026-08-07第-0-批沒有進展但共用程式被第-1-批動到了">2026-08-07：第 0 批<strong>沒有進展</strong>，但共用程式被第 1 批動到了</h3>
+<p>第 0 批停在原地（<code>B3R</code> 規格草案仍待審，<code>B4</code>–<code>B7</code> 未開工）。這天做的是<strong>第 1 批</strong>。</p>
+<p>只是第 1 批動到了兩份<strong>兩批共用</strong>的東西，所以在這裡記一筆，免得你之後看到程式變了卻不知道為什麼：</p>
+<ul>
+<li><code>scripts/gate.sh</code> — 加了第 1 批專用的一段檢查（只認第 1 批的檔名，不影響第 0 批）</li>
+<li><code>tests/governance/</code> — 新增第 1 批的測試檔，<strong>既有測試一條沒動</strong></li>
+</ul>
+<p><strong>第 0 批的 <code>B3</code> 那十個檔案仍然維持沒有提交</strong>，照原訂計畫留給 <code>B3R</code> 重寫時處理。</p>
+<p><strong>同日夜間</strong>：第 1 批的 B1 完工（四個 commit）。第 0 批<strong>仍然沒有任何進展</strong>，
+<code>B3R</code> 規格草案還在等你確認方向、<code>B4</code>–<code>B7</code> 未開工。B3 那十個檔案<strong>經過整晚四次提交仍未被納入</strong>，
+每一次派工單都明列它們為禁止提交項，執行端也每次都複驗回報。</p>
+<h3 id="b0b1-做完的實際結果">B0＋B1 做完的實際結果</h3>
+<ul>
+<li><strong>測試從 701 條增加到 715 條</strong>（多了 14 條），<strong>沒有改動任何既有測試</strong></li>
+<li>「判斷結果完全沒變」這件事<strong>有真的驗</strong>：拿改前的快照跟改後的程式跑同一份清單，
+逐項比對結果，差異必須是零</li>
+<li>實作者發現我寫的清單裡<strong>有三個地方是錯的</strong>（照著做會弄壞既有測試、或自相矛盾），
+它<strong>明講出來</strong>而不是偷偷改掉——這是對的做法</li>
+</ul>
+<h3 id="雙家族審查結果通過">雙家族審查結果：<strong>通過</strong></h3>
+<p>兩家獨立審查，<strong>都判定沒有阻斷級問題</strong>（一家零意見、一家兩條非阻斷）。</p>
+<p>其中一家<strong>獨立驗證了我最擔心的一件事</strong>：B0 那張快照，到底是不是「改動之前」拍的？
+如果是改動之後才拍，那「改前 vs 改後」的比較就變成拿自己比自己，整個保證是假的。
+驗法是拿實作 commit 的<strong>上一版</strong>程式算指紋，比對快照與 sidecar——<strong>三者一致，成立</strong>。</p>
+<p><strong>兩條非阻斷意見我不留，併到 B2 一起修</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>意見</th>
+<th>為什麼要修</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>檢查用的指令清單<strong>沒涵蓋全部判斷分支</strong></td>
+<td>「判斷結果沒變」只驗到一部分，沒驗到的分支等於沒保護</td>
+</tr>
+<tr>
+<td>測試只驗指紋「長度對」，沒驗它<strong>真的等於完整指令的指紋</strong></td>
+<td>這樣的斷言太弱，改壞了也可能過</td>
+</tr>
+</tbody>
+</table></div>
+<p>兩條都不阻斷，但都<strong>弱化了這批的核心保證</strong>，所以現在修不留到以後。</p>
+<h3 id="b2-做完的實際結果含上面兩條的補修">B2 做完的實際結果（含上面兩條的補修）</h3>
+<ul>
+<li><strong>測試從 715 增加到 727 條</strong>（多了 12 條）</li>
+<li>檢查用的指令清單從 20 條擴到 <strong>28 條</strong>，每條都註明對應哪個判斷分支——不是憑空造的</li>
+<li>指紋斷言改成<strong>驗值相等</strong>（真的等於完整指令的指紋），不再只驗長度</li>
+</ul>
+<p>⚠️ <strong>有一條路徑沒能納入比對，我認為值得你知道</strong>：</p>
+<p>「有效令牌 ＋ 沒有欠帳 → 放行」這條路徑，<strong>快照跑不出來</strong>。
+原因是 B0 只複製了判斷程式本身、<strong>沒帶它依賴的其他腳本</strong>，所以快照在測試目錄裡執行時找不到那些依賴，一律變成「保守拒絕」。</p>
+<p>實作者的處理是：<strong>明講出來</strong> ＋ 改用一個獨立測試覆蓋那條路徑。我驗過那個替代測試是真的（不是空殼）。</p>
+<p>但這代表 <strong>B0 快照有結構性的盲區</strong>——任何依賴同目錄其他腳本的分支都無法比對。
+這條我列為審查的<strong>首要攻擊目標</strong>，不當作已解決。</p>
+<h3 id="b2-審查結果通過但推翻了我一個判斷">B2 審查結果：通過，但推翻了我一個判斷</h3>
+<p>兩家都判<strong>沒有阻斷級問題</strong>（可進下一批），但<strong>都推翻了我的一個假設</strong>：</p>
+<blockquote>
+<p>我當時認為「那條替代測試」可以取代快照比對。
+<strong>兩家獨立判定：不等價。</strong></p>
+</blockquote>
+<p>差別在哪：替代測試只驗「現在的程式行為對不對」，<strong>不驗「改前跟改後一不一樣」</strong>。
+而「改前改後一樣」才是這一批的核心保證。我只驗了它不是空殼，<strong>沒驗它等不等價</strong>——這是兩回事。</p>
+<p><strong>三條意見，都在下一批之前修</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>意見</th>
+<th>為什麼不能拖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>快照沒帶依賴，那條路徑無法比對（<strong>兩家都提</strong>）</td>
+<td><strong>B5 的差異報表就是用這張快照</strong>，而 B5 是整個 Phase 2 的合併關卡。快照有盲區 → 報表也有盲區</td>
+</tr>
+<tr>
+<td><code>closure</code> 分支與「說明 vs 實際規則一致」缺可證偽綁定</td>
+<td>這是<strong>廉價綠燈</strong>——測試看起來綠，但改壞了也不會紅</td>
+</tr>
+</tbody>
+</table></div>
+<p>第二條特別值得記：<strong>這正是我一路在要求委員檢查的東西，結果出現在我剛驗收通過的工作裡。</strong></p>
+<h3 id="三條都修好了進-b3-之前">三條都修好了（進 B3 之前）</h3>
+<p>你說「確保驗收是對的、<strong>不是缺東西</strong>」，所以我沒有只補那條漏掉的路徑，
+而是要求<strong>窮舉所有判斷分支、證明沒有缺口</strong>。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修的</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>快照沒帶依賴</td>
+<td>改成<strong>整包目錄</strong>（判斷程式 ＋ 3 個依賴），每個檔各自鎖指紋</td>
+</tr>
+<tr>
+<td>檢查清單有沒有缺</td>
+<td>列出 <strong>13 個判斷分支 → 對應清單條目</strong>的完整對照表，清單 28 → <strong>30 條</strong></td>
+</tr>
+<tr>
+<td>測試會不會假綠</td>
+<td>三個「故意改壞」測試全部實跑，<strong>改壞就變紅</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>測試從 727 增加到 734 條。</strong></p>
+<p>實作者多做了一件我沒要求的事，值得記：它<strong>把設定檔也一起釘成舊版</strong>——
+因為「用舊的判斷程式配新的設定檔」本身就是錯的比較。這點我沒想到。</p>
+<p><strong>我自己抽驗了三件事</strong>（沒有只看報告）：
+快照指紋確實等於改動前的版本、覆蓋度檢查是<strong>從程式自動導出</strong>而非手寫清單、三個改壞測試真的會紅。</p>
+<p>覆蓋度檢查還多了一道我沒要求的反向防護：<strong>如果清單裡標了一個不存在的分支名想充數，也會被抓</strong>。</p>
+<p>⚠️ <strong>還有兩個具名缺口</strong>（不是漏掉，是明講出來的）：
+一個需要「把 jq 拔掉」的環境才測得到；另一個是兩個規則代號已登記但尚未啟用，<strong>留給後面的批次</strong>。</p>
+<h3 id="b3-做完了但中間卡住一次是我的錯">B3 做完了，但中間卡住一次——<strong>是我的錯</strong></h3>
+<p>B3 是第一批「<strong>判斷結果真的會變</strong>」的工作（前三批都保證完全不變）。</p>
+<p>實作到一半停住，回報說：<strong>檢查清單裡有一條的判斷翻轉了</strong>。</p>
+<p><strong>根因是我自己把兩份文件寫矛盾了</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>我寫的</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>「判斷不得改變」的清單裡</td>
+<td>有 <code>pgrep -fl 'codex exec|...'</code> 這條</td>
+</tr>
+<tr>
+<td>施工文件裡</td>
+<td><strong>同一條</strong>，明文要求「由擋下改成放行」</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>我把「規定要改變」的東西，放進了「不准改變」的清單。</strong></p>
+<p>實作者的處理是對的——<strong>它停下來回報，沒有為了讓測試變綠去動清單</strong>。那正是我明文禁止、也最容易被繞過的地方。</p>
+<p><strong>修法的重點不是「把那條移出去」</strong>——那就變成我禁止的行為，只是換個位置。所以改成：</p>
+<ol>
+<li><strong>從施工文件自動抽出</strong>「哪些是規定要改變的」，產出清單檔＋指紋</li>
+<li>比對時排除這些，並加<strong>兩道反向檢查</strong>：被排除的必須在清單裡找得到（<strong>禁止偷偷排除</strong>）、清單裡的必須真的改變了（否則排除＝白白刪掉檢查）</li>
+<li><strong>原清單一條都不准刪</strong>——那條留著，只是比對時依規則排除</li>
+</ol>
+<p>實作者還多做一條我沒要求的：<strong>驗證那份清單能從施工文件重新產生</strong>，防止有人手改清單。</p>
+<p><strong>測試 750 條</strong>（起始 701 — <strong>這是 B3 完成當時的歷史值</strong>，現況見本檔開頭）。我親跑驗過相關那 24 條全過、排除機制的「故意改壞」也會紅。</p>
+<h3 id="-下面這一整段是錯的保留下來當紀錄">⚠️ 下面這一整段是<strong>錯的</strong>，保留下來當紀錄</h3>
+<p><strong>2026-08-05 更正</strong>：我下面寫的「速度測試紅了 → 封存舊紀錄 → 解決」<strong>整套診斷都是錯的</strong>。</p>
+<p><strong>真相</strong>：那次 287 毫秒是<strong>單次冷啟動的抖動</strong>，我<strong>沒有重跑確認</strong>就斷定「根因是檔案 34,479 行」。
+後來委員實測、我自己再連跑三次，<strong>在完整未動的檔案上全部通過</strong>（79 毫秒）。</p>
+<p>⇒ <strong>根本不需要封存。</strong> 而我為此做的封存還<strong>弄壞了戳記的真偽驗證</strong>
+（那個檢查要讀 <code>committee_dispatch</code> 事件，被我搬走了），下一次派工立刻失敗。</p>
+<p><strong>已全部撤回</strong>：紀錄檔還原成完整的 34,501 行、封存檔刪除、封存腳本刪除。</p>
+<p>🔴 <strong>我犯的錯是「實測 &gt; 假設」的反面</strong>——我整天要求別人實測，
+自己卻用一次量測就下結論，還據此做了破壞性改動。<strong>連「再跑一次看看」都沒做。</strong></p>
+<p>下面原文保留，不刪除。</p>
+<hr />
+<h3 id="速度測試紅了然後你一句話解掉了已證實為錯誤診斷"><s>速度測試紅了，然後你一句話解掉了</s>（<strong>已證實為錯誤診斷</strong>）</h3>
+<p>B3 做完後 push 被擋，因為<strong>速度檢查紅了</strong>（工具啟動要 287 毫秒，門檻是 100）。</p>
+<p><strong>不是 B3 造成的</strong>——改動前的舊版在同環境也要 203 毫秒。
+根因是那本紀錄檔已經 <strong>34,479 行</strong>，每次啟動都要讀完。</p>
+<p>我原本卡在一個死結：紀錄檔裡有大量「散文式」的舊紀錄，
+我想「那要先分析它們、把資訊搬到新格式再刪」——<strong>那是在對歷史資料做考古，做不完</strong>。</p>
+<p><strong>你點出：修正是考慮以後，不要把以前的錯誤或麻煩包回來。</strong></p>
+<p>照這個原則，事情變得很簡單：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>原本的想法</th>
+<th>照你的原則</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>舊紀錄</td>
+<td>分析、抽資訊、搬到新格式</td>
+<td><strong>整批原樣封存</strong>，不解析不搬</td>
+</tr>
+<tr>
+<td>保證什麼</td>
+<td>語意不遺失</td>
+<td><strong>查得到</strong>（一個字都沒改）＋ <strong>機器不停擺</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>實際只有 <strong>763 行</strong>（2.2%）是機器真的需要的（用來確認欠帳編號不缺號），
+其餘 <strong>33,716 行</strong>全部搬進唯讀歷史檔。</p>
+<p><strong>結果</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指標</th>
+<th>封存前</th>
+<th>封存後</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>紀錄檔行數</td>
+<td>34,479</td>
+<td><strong>763</strong></td>
+</tr>
+<tr>
+<td>欠帳輪次數</td>
+<td>199</td>
+<td><strong>199</strong>（沒變）</td>
+</tr>
+<tr>
+<td>速度檢查</td>
+<td>❌ 287ms</td>
+<td>✅ <strong>通過</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>我寫的腳本內建三道自檢：<strong>行數必須守恆</strong>、<strong>欠帳工具必須還能跑</strong>、<strong>輪次數不得歸零</strong>，
+任一不過就自動還原。第一次執行時確實因為技術問題失敗了——它<strong>沒有動到原檔</strong>，證明保護有效。</p>
+<hr />
+<h2 id="每批在做什麼">每批在做什麼</h2>
+<h3 id="b0-先拍快照沒有它後面沒得比較">B0 — 先拍快照（<strong>沒有它，後面沒得比較</strong>）</h3>
+<p>把現在的判斷程式<strong>原封不動複製一份存起來</strong>，再算一個指紋（雜湊）鎖住它。</p>
+<p><strong>為什麼要獨立成一批</strong>：後面 B5 要產出「改前 vs 改後」的差異報表。如果等到那時才複製，程式<strong>早就被 B3、B4 改過了</strong>——「改前」變成「已經改過的版本」，整份報表就沒有意義。</p>
+<p>這是委員審查時抓到的<strong>阻斷級問題</strong>：我原本把這步寫在 B5 裡，但 B5 排在 B3、B4 之後，自相矛盾。</p>
+<h3 id="b1-讓被擋留下紀錄">B1 — 讓「被擋」留下紀錄</h3>
+<p>現在被工具擋下時，紀錄裡<strong>只寫了兩種理由，沒有記是哪張票、也沒記你當時下了什麼指令</strong>。</p>
+<p>這批要補上：<strong>被擋的指令</strong>（存指紋＋前 512 字元）＋ <strong>是哪條規則擋的</strong>。</p>
+<p><strong>這是後面所有事的資料來源</strong>：</p>
+<ul>
+<li>B5 的差異報表要用它</li>
+<li>你提的「統計哪張票最常咬人」要用它</li>
+<li>「誤擋清單怎麼慢慢補完」也要用它</li>
+</ul>
+<p><strong>重要限制</strong>：這批<strong>不准改變任何判斷結果</strong>。只加紀錄欄位，該擋的還是擋、該放的還是放。驗收時會拿一份固定的指令清單跑「改前」和「改後」，<strong>兩邊結果必須一字不差</strong>。</p>
+<h3 id="b2-停止誘導委員違規">B2 — 停止誘導委員違規</h3>
+<p>我們發給委員的指示<strong>不管什麼場合都會塞一句「記得蓋戳記」</strong>。但很多輪次根本不需要，委員照做就變成格式違規、交件失敗。</p>
+<p>改成：<strong>看這輪的類型決定要不要提</strong>；遇到沒見過的類型，<strong>寧可拒絕派工也不猜</strong>。</p>
+<h3 id="b3-定義判斷規則-修誤擋">B3 — 定義判斷規則 ＋ 修誤擋</h3>
+<p><strong>先寫規則，再照規則寫程式</strong>——一共 11 條，每條都要有「該擋的例子」和「不該擋的例子」各至少一個，總共至少 22 個測試。</p>
+<p>然後修最常見的誤擋：<strong>引號裡面的分號被當成指令分隔符</strong>。</p>
+<p>⚠️ 這批技術上最難：判斷「引號從哪開始到哪結束」要能<strong>跨行</strong>，而且遇到看不懂的寫法<strong>一律當成危險</strong>（寧可誤擋，不可漏放）。</p>
+<h3 id="b4-修三個該擋卻沒擋">B4 — 修三個「該擋卻沒擋」</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>漏洞</th>
+<th>現在會發生什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>寫完整路徑就擋不住</td>
+<td><code>/opt/homebrew/bin/codex</code> 直接放行</td>
+</tr>
+<tr>
+<td><code>claude</code> 用字串比對</td>
+<td>目錄名叫 <code>claude-501</code> 就誤擋；但 <code>cat x | claude -p y</code> 反而漏放</td>
+</tr>
+<tr>
+<td>直接跑我們自己的派工腳本</td>
+<td>完全沒檢查</td>
+</tr>
+</tbody>
+</table></div>
+<p>三個都改同一個地方，所以綁在同一批做（分開派會互相衝突）。</p>
+<h3 id="b5-差異報表這批的驗收關卡">B5 — 差異報表（<strong>這批的驗收關卡</strong>）</h3>
+<p>拿一份<strong>固定的指令清單</strong>，分別餵給「改前」和「改後」，列出三堆：</p>
+<ol>
+<li>本來擋、現在放行（誤擋修好了）</li>
+<li>本來放行、現在擋（漏洞補起來了）</li>
+<li>沒變</li>
+</ol>
+<p><strong>只要出現一項「非預期」的差異，就不准合併。</strong></p>
+<p>還有一道防作弊：<strong>清單本身的指紋要對得上</strong>，不能改了清單再重跑來換綠燈。</p>
+<h3 id="b6-委員產出寫完才上架">B6 — 委員產出「寫完才上架」</h3>
+<p>現在委員直接寫進最終檔案，寫到一半外面就看得到，重寫還會蓋掉前一次。</p>
+<p>改成：<strong>先寫到暫存位置 → 全部完成且格式檢查過 → 才一次性搬過去</strong>。「搬過去」這個動作本身就是「我做完了」的信號。</p>
+<p>同時記錄每個委員實際花了多久——<strong>B7 的時間上限要靠這批的資料算出來</strong>。</p>
+<p>⚠️ 這批有一個<strong>已知會卡住的極端情況</strong>：如果程式在特定兩步之間被強制中斷，那條路徑會鎖死，<strong>需要人工清一下</strong>。這個明文寫在文件裡，不會假裝沒有。</p>
+<h3 id="b7-加時間上限">B7 — 加時間上限</h3>
+<p>委員卡住時自動收斂，但<strong>不能只是時間到就殺</strong>——那會把「已經做完只是還沒回報」的誤判成失敗。</p>
+<p>⚠️ <strong>目前的時間數字是暫定的</strong>，因為 B6 的耗時資料還沒累積。文件裡明文標成「未定稿」，等每個委員累積 50 筆以上、跨 3 天以上才會定死。</p>
+<hr />
+<h2 id="順序為什麼是這樣">順序為什麼是這樣</h2>
+<pre><code>B0 ──┐
+     ├──&gt; B3 ──&gt; B4 ──&gt; B5        （B0 和 B1 是 B3 的硬前置）
+B1 ──┘
+
+B2 ──&gt; B6 ──&gt; B7                  （B2 和上面那條完全獨立，可以同時做）
+</code></pre>
+<p><strong>兩條線互不相干，可以並行。</strong> 但每條線內部<strong>順序反了就要重做</strong>。</p>
+<hr />
+<h2 id="品質怎麼把關">品質怎麼把關</h2>
+<p><strong>每個修改都要能被證明「真的有效」。</strong> 做法是<strong>故意改壞它</strong>——把修法退回去，對應的測試<strong>必須變紅</strong>。如果改壞了測試還是綠的，那個測試就是假的。</p>
+<p>技術版裡每一條驗收都配了這種「故意改壞」的測試，一共 11 個 Task 全部都要有。</p>
+<p><strong>還有幾條硬規定</strong>：</p>
+<ul>
+<li>現有 <strong>701 個測試是下限</strong>，做完只能增加不能減少</li>
+<li><strong>不准為了讓測試變綠去改檢查程式或加排除清單</strong></li>
+<li>每一條驗收都要看<strong>執行完的狀態</strong>（檔案在不在、數字對不對），不能只看「指令有沒有跑完」</li>
+</ul>
+<hr />
+<h2 id="這份清單本身也審過三輪">這份清單本身也審過三輪</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>輪次</th>
+<th>抓到幾條</th>
+<th>其中會擋住實作的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第 1 輪</td>
+<td>9 條</td>
+<td>2 條</td>
+</tr>
+<tr>
+<td>第 2 輪</td>
+<td>6 條</td>
+<td>1 條</td>
+</tr>
+<tr>
+<td><strong>第 3 輪</strong></td>
+<td><strong>5 條</strong></td>
+<td><strong>0 條</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>前兩輪抓到的問題，<strong>幾乎都是我自己造成的</strong>——我照規格抄函式名沒去對照實際程式碼，結果引用了一個根本不存在的東西；還寫過一條<strong>引用不存在字串的測試</strong>（那條從落筆起就永遠不會通過）。</p>
+<p>第 3 輪是<strong>第一次沒有出現「我修東西又修出新問題」</strong>。兩家委員獨立確認後，這份清單才被凍結。</p>
+<p><strong>凍結不代表一定對</strong>——實作時如果發現有誤，要走正式的修訂程序，不能就地改。</p>
+<!-- r5-meta-sync: 2026-08-08 G-7 quotepath + meta 動詞落地後 plain-docs 時序同步 -->
+<!-- r6-nulsafe-sync: 2026-08-08 G-7 NUL-safe path parse 後 plain-docs 時序同步 -->
+<!-- r7-grammar-sync: 2026-08-08 G-7 manifest grammar fail-closed 後 plain-docs 時序同步 -->
+<!-- b2-wprime-sync: 2026-08-08 GOVB1 批2 W′ 歸屬 TSV 後 plain-docs 時序同步 -->
+<!-- b2-r2-meta-freeze-sync: 2026-08-08 meta expected-set + gate TSV msg 後 plain-docs 時序同步 -->
+<!-- b2-r3-meta-multiset-sync: 2026-08-08 meta 列數契約拒重複列後 plain-docs 時序同步 -->
+<!-- b2-t11-lifecycle-sync: 2026-08-08 GOVB1 Task 1.1 lifecycle matrix 後 plain-docs 時序同步 -->
+<!-- b2-t11-lifecycle-sync2: 2026-08-08 Task 1.1 fix embed/G-7 後 plain-docs 時序同步 -->
+<!-- b2-t11-lifecycle-sync3: 2026-08-08 batch3 proxy + set-u 後 plain-docs 時序同步 -->
+<!-- b2-closure-sync-b0: 2026-08-08 第1批 B2 收案，第0批內容未變動，時序同步 -->
+<!-- b3-inflight-sync: 2026-08-08 B3 實作中（審查第 5 輪，2 項 REGRESSION 待修）；本檔內容未變 -->
+<!-- b3-closure-sync: 2026-08-08 B3 收案（六輪 review，十項具名殘留）；詳見 第1批-施工清單.md -->
+<!-- b4-recon-sync: 2026-08-08 B4 偵察完成（四方）；本檔內容未變 -->
+<!-- b4-stage1-sync: 2026-08-09 第 0 批已完結；本檔內容未變，僅同步時序 -->
+<!-- b4-stage2-revert-sync: 2026-08-09 B4 階段 2 撤回（scope 錯配，見 第1批-在做什麼.md）；本檔內容未變 -->
+<!-- b5-recon-sync: 2026-08-09 B5 偵察完成（見 第1批-在做什麼.md）；本檔內容未變 -->
+<!-- b5-stamp-sync: 2026-08-09 B5 偵察收斂檔已戳記（2/2 可用家族）；本檔內容未變 -->
+<!-- b5-impl-brief-sync: 2026-08-09 B5 impl brief 已備妥待執行；本檔內容未變 -->
+<!-- roster-ooe-sync: 2026-08-09 委員一行調換 + out-of-epic 通道上線；本檔內容未變 -->
+<!-- ooe-r1-sync: 2026-08-09 out-of-epic 通道 review-r1（1 P0 已修，3 項待修）；本檔內容未變 -->
+<!-- roster-ooe-sync2: 2026-08-09 委員調換機制 + out-of-epic 通道（R-18/19/20 待修）；本檔內容未變 -->
+<!-- precompact-sync: 2026-08-09 交接補完（R-18/19/20 + 補帳）；本檔內容未變 -->
+<!-- r181920-sync: 2026-08-09 R-18/19/20 補完 + review-r2 四項修完並蓋章；本檔內容未變 -->
+<!-- r3-sync: 2026-08-09 review-r3 六項修完並雙戳記；本檔內容未變 -->
+<!-- b5-close: 2026-08-09 B5 收案（三輪退件循環）+ 票 B-50 入帳 -->
+<!-- b6-recon: 2026-08-09 -->
+<!-- b6-close: 2026-08-09 B6 收案（票 B-25）；本檔為第 0 批，內容未變 -->
+<!-- b3r-land: 2026-08-09 B3R 落地（151 行進版控）+ self-gate 換行旁路修補；詳見 第1批-施工清單.md -->
+<!-- b7-land: 2026-08-10 B7 落地；同型摩擦第二次現形（stamp 輪銷帳鎖死），已立 票 B-52 -->
+<!-- b8-r1fix: 2026-08-10 -->
+<!-- b8-close: 2026-08-10 -->
+<!-- b9-close: 2026-08-10 -->
+<!-- b10-inflight: 2026-08-10 B10 本體與兩件移交已落地；review-r1 三項阻擋待補 -->
+<!-- b10-r2close: 2026-08-10 第 1 批 B10 收尾；新入 GOVB0 的 票 B-53（主委自檢 fail-closed 路徑）；本檔第 0 批內容未變 -->
+<!-- b10-close: 2026-08-10 B10 全案收案（兩家 APPROVED 裁可收案）；第 1 批 B7/B8/B9/B10 四票全數完成；殘留 票 B-53 -->
+<!-- b50-land: 2026-08-10 票 B-50 實作落地（執行端工作區污染偵測，形態②③ 閉合／形態① 具名殘留）；測試 1261 → 1272；雙家族 code review 待派 -->
+<!-- b50-r1fix: 2026-08-10 票 B-50 review-r1 九條全修（含一條 BLOCKING 靜默漏報）+ 補追溯 TODO（兩家裁我跳步）；測試 1272 → 1279；r2 重審待派 -->
+<!-- b50-r2fix: 2026-08-10 票 B-50 r2 三條全修（換行路徑碰撞漏報、rename 假紅燈、追溯 TODO 不得宣稱閉合）；執行端 commit 污染事故已清理並補成形態④；測試 1279 → 1281 -->
+<!-- b50-stamp-r1fix: 2026-08-10 stamp-r1 一條 BLOCKING（ab cd 裸路徑假紅燈）已修，改依 -z 位置語意標記；票 B-52 第四次發作機制入票（stamp 輪產生 findings 必撞牆）；測試 1281 → 1283 -->
+<!-- b50-close-impl: 2026-08-10 票 B-50 實作面收案（四輪 9→3→1→0，兩家 APPROVED，測試 1283）；流程面永久標記跳步、形態①④ 未做 ⇒ TICKET-STATUS 仍 OPEN -->
+<!-- order-refactor: 2026-08-10 使用者解除排序凍結、指示以淨摩擦排序；新增站 2.5/2.6/2.7，原站 3（B-26）降為站 6，殘留六票落位站 7；順序唯一來源＝docs/GOVERNANCE_EXECUTION_ORDER.md -->
+<!-- order-refactor-fixture: 2026-08-10 順序改動後重生成 fact-key 對照 fixture（clean/drifted 各一份 generated block 副本）；證偽能力已複驗 clean rc=0 / drifted rc=1 -->
+<!-- order-live: 2026-08-10 新順序生效（站 2.5/2.6/2.7 → 站 4/5/6/7）；現況與下一步一律看 白話說明/接下來要做什麼.md，本檔不重述狀態 -->
+<hr />
+<p>🔴 <strong>2026-08-10 起，批次完成狀態不在本檔</strong>。
+本檔內的進度敘述是歷史紀錄，<strong>可能已過期</strong>；當前狀態一律看
+<a href="../接下來要做什麼.html">接下來要做什麼.md</a> 的生成區塊（由 <code>scripts/fact_keys.json</code> 產出，手改會被擋）。
+本檔已列入「不回頭整治」的既存清單（面向未來不溯及既往），其既有手寫狀態維持原樣。</p>
+<p>🔴 <strong>2026-08-10 再追記</strong>：手寫狀態偵測器已上線。本檔列於「不回頭整治」清單，
+其既有手寫狀態<strong>不會</strong>被擋；但<strong>新增</strong>的說明檔預設落入掃描範圍，
+且豁免清單以集合相等鎖死——無法靜默把新檔加進豁免。</p>
+<p>🔴 <strong>2026-08-10 三追記</strong>：偵測器經 code review 補了兩個繞法（假生成標記、含換行檔名）。
+本檔仍在「不回頭整治」清單內，既有手寫狀態不受影響。</p>
+<p>🔴 <strong>2026-08-10 四追記</strong>：站 2.6（摩擦統計唯讀最小版）已交付，本檔內容不受影響。</p>
+<p>🔴 <strong>2026-08-10 五追記</strong>：站 2.6 經 code review 修補三處（含兩處真實資料失真），本檔不受影響。</p>
+<p>🔴 <strong>2026-08-11 六追記</strong>：站 2.7 後半（第 1 批 <code>B4</code> 階段 2）已收案，<strong>本批（第 0 批）內容不受影響</strong>。
+第 0 批之 <code>B4</code>–<code>B7</code> 仍未開工，與第 1 批的 <code>B4</code> 是<strong>不同東西</strong>（同名不同批，容易看錯）。</p>
+<hr />
+<p>🔴 <strong>2026-08-11 追記（七份說明檔同步）</strong>：站 2.7 後半交付完之後，我又被兩道機檢各擋一次——</p>
+<ol>
+<li><strong>票的狀態區塊對不上</strong>：新開兩張票之後，那塊表的內容是<strong>機械導出</strong>的
+（來源＝交接文件的「未修的活缺口」節 ∪ 票庫的「scope 缺口」節），
+我沒同步資料檔 ⇒ 推送被擋。<strong>這正是那塊表存在的理由。</strong></li>
+<li><strong>生成內容不准出現日期</strong>：我在新票的說明裡寫了「2026-08-11 掉字一次」，
+撞到「生成物不得含時間戳」的決定性守衛 ⇒ 改寫成「已實際掉字一次」。</li>
+</ol>
+<p>另外我在精簡交接文件時<strong>誤刪了一張票的提及</strong>（<code>B-53</code>），害它掉出那個導出集合；已還原。</p>
+<p>⇒ 三件事都不是「想起來要做」，是<strong>機器擋下來我才發現</strong>。這一批治的就是這個。</p>
+<hr />
+<p>🔴 <strong>2026-08-11 追記</strong>：本批序列中的 <code>B3R</code>（指令解析層重寫）已完工進版（commit <code>f1d47c08</code>）。
+<strong>下一項是 <code>B4</code></strong>，其中包含「唯讀指令被誤擋」（票 <code>B-15</code>）的剩餘部分。</p>
+<p>那個誤擋今天又發作兩次，兩次都是純唯讀的量測指令：一條 <code>awk</code> 探針；
+以及一條同時含有 <code>.claude/</code> 路徑（提供 <code>claude</code> 字樣）與 <code>/usr/bin/time -p</code>（提供 <code>-p</code>）的指令
+——<strong>兩個片段各自都無害，是同一行內同時出現才被擋</strong>。這正是 <code>B4</code> 要處理的形態。</p>
+<p><code>B3R</code> 的價值有一段更正（我原本把它講成在修安全漏洞，查證後不成立），
+見 <a href="../接下來要做什麼.html">接下來要做什麼.md</a> 與 <code>docs/GOV_B3R_C5_RATIONALE_AMENDMENT.md</code>。</p>
+<hr />
+<h2 id="2026-08-11-深夜b4-站-5-的五式承重補完">2026-08-11 深夜：<code>B4</code> 站 5 的「五式承重」補完</h2>
+<p><strong>病</strong>：<code>B4</code> 把判定式收斂成五個共用變數之後，只有其中兩個被驗證過「真的有在起作用」。
+另外三個有「錨點」常數，但<strong>那三個常數從來沒有被任何測試用過</strong>——
+而且其中一個的內容還停在三輪之前的舊版本。<strong>看起來有防護，實際上既沒作用也不正確。</strong></p>
+<p><strong>做了什麼</strong>：五個判斷式各補一格定向驗證。每一格證明三件事：
+① 錨點對得上（對不上就直接紅，不會靜默跳過）
+② 把那條判斷式改弱 ⇒ 有一條原本擋得住的指令變成擋不住
+③ 對照組不受影響 ⇒ 證明是<strong>定向</strong>的，不是整體弱化</p>
+<p><strong>41 項全過。</strong> 死常數已刪。</p>
+<p>🔴 <strong>第五格是委員之間有分歧的</strong>：codex 說需要，另外兩家說不用。
+我照規矩判——<strong>附得出可重現反例的那家贏，不是看幾票</strong>。
+但 <strong>codex 給的對照組本身是錯的</strong>，我實跑發現它預期「會擋住」的那條其實也一起漏了；
+真正的原因比它講的更深一層（那條防護網自己也依賴同一個判斷式）。用正確對照組補上。</p>
+<p>⇒ 現在可以誠實說「五個判斷式各自都證明有在起作用」。
+⚠️ 但<strong>仍不可宣稱「這道閘已完備」</strong>——判定式本質是黑名單列舉，形態列不完，
+那是 <code>票 B-59</code> 的事，本批不處理。</p>
+<hr />
+<h2 id="2026-08-12-清晨-本批未被觸及處置紀錄">2026-08-12 清晨 — 本批未被觸及（處置紀錄）</h2>
+<p>本次改動屬 G-7 scope 治理與 <code>票 B-49</code> 前置，未動本批內容。</p>
+<hr />
+<h2 id="2026-08-12-本批未被觸及處置紀錄">2026-08-12 — 本批未被觸及（處置紀錄）</h2>
+<p>本次為使用者授權入帳與 Compact 前置，未動本批內容。</p>
+<hr />
+<h2 id="812-補記">8/12 補記</h2>
+<p>第 0 批的 <code>B4</code> 剩餘工作仍未開工；本日的工作全在票 <code>B-49</code>（凍結出口），
+與本批沒有交集，狀態不變。批次狀態一律看
+<a href="../接下來要做什麼.html">接下來要做什麼.md</a> 上方的生成區塊。</p>
+<blockquote>
+<p><strong>8/12 收尾補記</strong>：推送前置修補見 <a href="../流程摩擦記錄.html">流程摩擦記錄.md</a>。本批狀態不變。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/12 追記</strong>：文件檢查器的自鎖缺陷已止血（見 <a href="../流程摩擦記錄.html">流程摩擦記錄.md</a>），與本批內容無關，狀態不變。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/12 收尾補記</strong>：閘門鏈批次審查未定案，兩個問題待使用者決定；本批狀態不變。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/12 深夜</strong>：推送檢查鏈的段序與 ASSERT 兩題已改碼完成（見 <a href="../流程摩擦記錄.html">流程摩擦記錄.md</a>
+8/12 第五、六條）。<strong>與本批內容無關，狀態不變</strong>；只是本批做的東西之後跑得比較早、失敗看得比較清楚。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/12 最末</strong>：待辦清單改為機械投影（見 <a href="../接下來要做什麼.html">接下來要做什麼.md</a> 最上方那張表）。
+<strong>本批狀態不變</strong>；本批相關的剩餘工作已列入該表，不再散落在散文裡。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/13 凌晨</strong>：那張表改成有表頭的正常表格（機制升級，見 <a href="第1批-施工清單.html">第1批-施工清單.md</a>）。
+<strong>與本批內容無關、本批狀態不變</strong>；只是你讀那張表時會比較好認欄位。
+該次改動已完成三家審查與蓋章；本批相關項目在那張表裡，順序不變。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/13 凌晨（續）</strong>：判準登記機制上線（見 <a href="第1批-施工清單.html">第1批-施工清單.md</a>）。
+<strong>與本批內容無關、本批狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/13 凌晨（再續）</strong>：與本批無關之機制證據登記設計已定案。<strong>本批狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/13</strong>：該機制證據登記已實作並收案（見 <a href="第1批-施工清單.html">第1批-施工清單.md</a>）。
+<strong>與本批內容無關、本批狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/13（同日晚些）</strong>：新增全域規則——<strong>任何票要標完成，其檢查必須先擋在產出端</strong>
+（見 <a href="../治理進度日誌.html">治理進度日誌.md</a>）。<strong>本批狀態不變</strong>，
+但<strong>本批的票將來要標完成時會先撞到這道閘</strong>。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/13（同日最後）</strong>：查出票的狀態有三個來源且對不齊，已排定「把票整理成一份」的施作清單
+（見 <a href="../接下來要做什麼.html">接下來要做什麼.md</a> 第二張表）。<strong>本批狀態不變</strong>；
+但本批的票在那批做完後，狀態會改由單一來源控制。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/13（收尾）</strong>：整併<strong>已完成</strong>——61 張票收進
+<a href="../GOV_TICKET_SOT.md"><code>docs/GOV_TICKET_SOT.md</code></a> 一份表。
+<strong>本批狀態不變</strong>；本批的票之狀態自此只在該表維護，寫在別處會被機器擋下。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/13（收尾補記）</strong>：票整併之連帶工作已補齊（延伸檔宣告、fixture 宿主、描述去日期、豁免清單同步），全套檢查轉綠。<strong>本檔所述狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/13（深夜）</strong>：61 張票已全部查證，狀態自此只在
+<a href="../GOV_TICKET_SOT.md"><code>docs/GOV_TICKET_SOT.md</code></a> 維護；第二套來源已刪除。
+<strong>本批狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/14（凌晨）</strong>：治理施作清單 20 步已完成 19 步（票 SoT 上線、第二套來源刪除、
+產出端覆蓋逐張登記）。<strong>本批狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/14（收尾）</strong>：現行治理機制一覽已做成機械生成清單，見
+<a href="../GOV_ACTIVE_MECHANISMS.md"><code>docs/GOV_ACTIVE_MECHANISMS.md</code></a>。<strong>本批狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/14（Compact 前最後一次同步）</strong>：全套檢查連跑三輪各抓到不同的真問題
+（範圍標記漏帶、生成內容含日期、說明檔時序），全部修完。<strong>本檔所述狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/14（規則修訂）</strong>：「產出內容不得寫日期」已作廢——判準改為「連跑兩次結果須完全相同」。
+歷史日期現在可以寫，因為時序資訊有價值（使用者指出）。交接檔的更新時間改由版控自動顯示。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/14T09:30+08:00</strong>：新增 commit 前自檢腳本（秒級檢查一次跑完）；時間格式定死須到分秒＋時區。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/14T12:10+08:00</strong>：<code>S6.1</code> 收案——重審 16 則豁免理由，<strong>五則是錯的</strong>（三則的檢查一直都在跑）。
+新增「commit 訊息漏標記當下就擋」。<strong>本批所述狀態不變</strong>，細節見 <code>接下來要做什麼.md</code>。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/14T14:10+08:00</strong>：<code>S6.2</code> 收案——61 張票的「還缺什麼」全部補齊並機械化。
+<strong>本批所述狀態不變</strong>，細節見 <code>接下來要做什麼.md</code>。</p>
+</blockquote>
+<blockquote>
+<p><strong>8/14T15:05+08:00</strong>：三份治理文件之說明文字過期已修正（詳見 <code>流程摩擦記錄.md</code> 第四十四條）。
+<strong>本批所述狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/14T15:40+08:00</strong>：推送被完整檢查擋下一次（新閘擋到既有測試的探針），已修並補記
+（見 <code>流程摩擦記錄.md</code> 第四十五條）。<strong>本批所述狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>8/14T16:20+08:00</strong>：<code>接下來要做什麼.md</code> 已重整（803 → 140 行，日誌全搬到
+<code>治理進度日誌.md</code>）；票 <code>B-21</code> 之範圍擴充為「受管檔」。<strong>本批所述狀態不變。</strong></p>
+<p><strong>8/14 晚</strong>：推送被治理閘擋下一次（兩條測試紅，皆非本批範圍；
+詳見 <code>流程摩擦記錄.md</code> 第五十二條）。<strong>本批所述狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p>🔴 <strong>2026-08-14 夜追記</strong>：方向已改為<strong>回量化主線</strong>（治理留現狀、不再擴建）。
+同日教訓兩條見 <code>流程摩擦記錄.md</code> 第五十三／五十四條：主委被問一句就翻答案（一天四次）；
+基準與測試兩側皆由 Claude 產出，互相量測是循環論證。<strong>本批所述狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p>🔴 <strong>2026-08-14 夜二追記</strong>：ROADMAP 已重整為狀態表，敘事移入 <code>docs/ROADMAP_DETAIL.md</code>；搬檔後逐標題對帳，抓回一筆漏搬（P0 節）。<strong>本批所述狀態不變。</strong></p>
+</blockquote>
+<blockquote>
+<p>🔴 <strong>2026-08-14 夜三追記</strong>：<code>HANDOFF.md</code> 之「接手第一件事」原有四個並存，已收斂為一個（回量化主線）。<strong>本批所述狀態不變。</strong></p>
+</blockquote>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/Archived/第0批-施工清單.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

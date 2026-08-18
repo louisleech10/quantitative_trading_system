@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IC 健檢偵察結果（步驟 1＋2 完成版）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">IC健檢偵察結果.md</span></nav>
+<main>
+<h1 id="ic-健檢偵察結果步驟-12-完成版">IC 健檢偵察結果（步驟 1＋2 完成版）</h1>
+<p>2026-08-17 ｜ 四方獨立查證（我＋Codex＋Composer＋Grok），機器收斂零掉項，委員債已清。
+技術版：<code>handoffs/reconcile/20260817-ichc-x-consult-r1/synth.md</code>（收斂）＋四份偵察原檔 <code>handoffs/20260817-ichc-recon-*.md</code>。</p>
+<hr />
+<h2 id="一為什麼做這件事">一、為什麼做這件事</h2>
+<p>6 月 24 日委員會畫過一張「IC 分析全覆蓋地圖」：28 種分析、一堆缺陷。之後兩個月修了很多東西，
+但<strong>沒有任何地方記錄哪些修了、哪些沒修</strong>。要開下一個 epic（把契約和接線做成機器閘門），
+就得先知道今天的真實狀態——這就是步驟 1（逐條複核＋接線盤點）和步驟 2（跟業界標準比缺口）。</p>
+<h2 id="二總結一句話">二、總結一句話</h2>
+<p><strong>舊地圖過時了，而且是往好的方向過時——但還有 3 個你看得到的錯（P0）活著，
+和一批「登記在案、之後再做」的量化缺口。</strong></p>
+<h2 id="三步驟-1-成果28-條逐條複核">三、步驟 1 成果：28 條逐條複核</h2>
+<p>6/24 之後實際落了<strong>七個</strong>修復 epic（ROADMAP 自己都漏記一個）。複核結果分四類：</p>
+<h3 id="-已經修好的不用再做也別再排程">✅ 已經修好的（不用再做，也別再排程）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>當年的問題</th>
+<th>現在的狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>顯著性檢定用錯統計假設（把相關序列當獨立）</td>
+<td>改用正確的 HAC 方法，已進主流程</td>
+</tr>
+<tr>
+<td>FDR 多重比較防偽是「假開關」（UI 有、後端沒接）</td>
+<td>真的接上了，開關有效</td>
+</tr>
+<tr>
+<td>沒有訓練/測試切分，全部樣本內自我評分</td>
+<td>切分預設開啟，失敗時會大聲警告</td>
+</tr>
+<tr>
+<td>Net IC 公式量綱錯（相關係數減報酬率，數學無意義）</td>
+<td>公式修正，成本參數全棧接通</td>
+</tr>
+<tr>
+<td>因子歸因雷達圖顯示假數字（硬填 NaN 繞過）</td>
+<td>改成誠實顯示「不可用」＋原因</td>
+</tr>
+<tr>
+<td>feature_filter 前端送了後端偷偷丟掉</td>
+<td>已接通，真的會篩</td>
+</tr>
+<tr>
+<td>多處「偷看未來」的洩漏（rolling IC、分位門檻、regime）</td>
+<td>三個 epic 逐一修掉</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="-還活著的三個-p0使用者看得到的錯">🔴 還活著的三個 P0（使用者看得到的錯）</h3>
+<ol>
+<li><strong>分位數收益圖永遠空白</strong>。後端有算，但資料是「盒子裡再套盒子」的格式，
+前端卻直接找外層盒子裡的數字 → 永遠找不到 → 圖恒空、但旁邊的摘要分數有值。
+這條四方意見分裂（兩家說修好了），Grok 實際跑程式證明沒修，我親自讀碼裁決 Grok 對。</li>
+<li><strong>橫截面模式半殘</strong>。切到橫截面分析時，衰減/分位/分組/換手四類資料後端直接回空殼，
+前端顯示「暫無數據」——你分不清是「這模式本來就不算這個」還是「壞了」。</li>
+<li><strong>事件分析會靜默騙人</strong>。事件樣本不夠時，系統默默改跑全樣本，畫面不會告訴你。
+你以為在看「事件發生後的 IC」，其實看的是全樣本 IC。另外 API 收了事件時間戳
+但根本沒往下傳（只寫了一行 log）。</li>
+</ol>
+<h3 id="-修了一半變形的">⚠️ 修了一半／變形的</h3>
+<ul>
+<li><strong>正交化</strong>：現在真的有算殘差（以前只是轉換摘要冒充），但刻意標「僅供研究、禁下游消費」，
+而且前端沒有圖在顯示它——等於算了沒人看。</li>
+<li><strong>幽靈開關還有一批</strong>：換手率開關關了後端照算（只是前端藏圖）；前端面板有五個設定鍵
+後端根本不讀；兩個設定項（相關性上限 200、Shapley 設定）是「死配置」——寫在設定檔裡但
+程式從來不讀。<strong>這批正是下一步 wiring 閘門要永久防的東西。</strong></li>
+<li><strong>一些圖表把「沒資料」畫成 0</strong>，看起來像真的量測到 0——會誤導判讀。</li>
+</ul>
+<h3 id="-從來沒做的登記在案這次不施工">❌ 從來沒做的（登記在案，這次不施工）</h3>
+<ul>
+<li>策略層防過擬合三件套（DSR／PBO／MinBTL）——完全沒有</li>
+<li>IC 系統和 ML 系統（XGBoost/SHAP）是兩條平行線，沒有橋</li>
+<li>多因子組合 IC／邊際 IC（回答「這因子有沒有帶來新資訊」）——沒有</li>
+<li>Pooled/Panel 縱橫混合 IC——沒有</li>
+<li>容量/滑價估計——缺成交量資料源，只有空殼</li>
+</ul>
+<h2 id="四步驟-1-成果接線盤點哪些算了沒人看哪些看了沒在算">四、步驟 1 成果：接線盤點（哪些算了沒人看、哪些看了沒在算）</h2>
+<p>四方各產了一張「後端產出／前端消費／接線／空態」四欄表（細節在技術檔）。白話重點：</p>
+<ul>
+<li><strong>算了沒人看</strong>：正交化結果、coverage/換手率/半衰期等摘要欄位（後端有、主表不顯示）</li>
+<li><strong>看了沒在算</strong>：橫截面模式的四類圖（前端有圖框、後端給空殼）</li>
+<li><strong>開了沒在動</strong>：換手開關、前端五個設定鍵、兩個死配置</li>
+<li><strong>大多數核心圖表</strong>（IC 摘要、rolling IC、Net IC、因子報酬、暴露雷達）接線是好的</li>
+</ul>
+<h2 id="五步驟-2-成果跟業界標準比缺口排序">五、步驟 2 成果：跟業界標準比，缺口排序</h2>
+<p>按「研究有效性優先」排（防過擬合 ＞ 名實相符 ＞ 寫實度 ＞ 規模）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>排序</th>
+<th>缺口</th>
+<th>為什麼重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>三個 P0（上面那三個）</td>
+<td>現在就在誤導使用者</td>
+</tr>
+<tr>
+<td>2</td>
+<td>策略層過擬合防護（DSR/PBO/MinBTL）</td>
+<td>因子層防偽補齊了，策略層還在裸奔</td>
+</tr>
+<tr>
+<td>3</td>
+<td>IC↔ML 無橋＋多因子組合缺</td>
+<td>ML-first 平台的核心斷裂</td>
+</tr>
+<tr>
+<td>4</td>
+<td>事件研究真套件（配對、事件窗、正反標籤）</td>
+<td>你的主戰場，現在只是條件查詢</td>
+</tr>
+<tr>
+<td>5</td>
+<td>容量/滑價真實化</td>
+<td>缺成交量資料，先有誠實「unknown」契約</td>
+</tr>
+<tr>
+<td>6</td>
+<td>430K 規模防護（相關性矩陣無上限）</td>
+<td>另有 IC 優化 epic 承接</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="六四個懸而未決項的裁決四方共識">六、四個懸而未決項的裁決（四方共識）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>裁決</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>特徵篩選漏斗</td>
+<td>契約/接線面納入下一步 SPEC；演算法本身照舊延後</td>
+</tr>
+<tr>
+<td>容量估計</td>
+<td>只納入「誠實 unknown」契約（沒資料就明說，禁顯示可交易等級）；真資料接線延後</td>
+</tr>
+<tr>
+<td>Regime IC</td>
+<td>繼續延後（現在只進報告、不擋決策，不出錯）</td>
+</tr>
+<tr>
+<td>Walk-forward＋CPCV</td>
+<td>繼續延後接主流程；但文件必須誠實寫「現在只有單次 holdout」</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="七下一步待你核可才動">七、下一步（待你核可才動）</h2>
+<p><strong>SPEC 起草</strong>，內容＝修三個 P0 ＋ 建 typed 契約 SoT ＋ wiring 機器閘門
+（自動查「UI 開關必須真的連到後端」「後端算的必須有人消費」「空態必須分得清為什麼空」）。
+流程＝我起草 → Codex+Composer+Grok 三家對抗審 → 白話給你過 → 才開工實作（實作＝我）。</p>
+<h2 id="排程對照task-64-落地票的權威登記docsic_quant_gap_registrymd該檔另含切分現狀-holdout-only誠實聲明節">排程對照（Task 6.4 落地；票的權威登記＝docs/IC_QUANT_GAP_REGISTRY.md，該檔另含「切分現狀 holdout-only」誠實聲明節）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>順位</th>
+<th>票</th>
+<th>白話</th>
+<th>什麼時候做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DSR/PBO/MinBTL</td>
+<td>策略層「是真本事還是運氣」三檢定</td>
+<td>健檢收工後首位</td>
+</tr>
+<tr>
+<td>2</td>
+<td>IC↔ML 橋＋邊際 IC</td>
+<td>好因子一鍵丟 ML 驗證；「新資訊」產品答案</td>
+<td>次位</td>
+</tr>
+<tr>
+<td>3</td>
+<td>事件真套件</td>
+<td>事件組 vs 配對對照組的完整實驗設計</td>
+<td>第三</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Pooled IC</td>
+<td>多標的合併估計</td>
+<td>第四</td>
+</tr>
+<tr>
+<td>5</td>
+<td>容量接線</td>
+<td>接真實成交量</td>
+<td>等 volume 資料源就緒</td>
+</tr>
+<tr>
+<td>6</td>
+<td>規模防護</td>
+<td>43 萬特徵運算上限</td>
+<td>併既有優化 epic</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="gap-1-開工後的以後要補清單投影自-registrygap-1-待補完登記表">GAP-1 開工後的「以後要補」清單（投影自 registry「GAP-1 待補完登記」表）</h2>
+<p>第 1 張票（DSR/PBO/MinBTL）已開工：清單凍結、第 1 批完工、第 2 批審查中（看板：<a href="GAP-1施工進度.html">GAP-1施工進度.md</a>）。做的是<strong>核心與插座</strong>（統計函式＋契約），
+接線等引擎成熟。以下是<strong>明文登記、不會忘</strong>的待補完——每項只准三種理由，沒有「之後再說」。
+🔴 <strong>8/17–18 審查後三處改動</strong>：R3 的理由原寫「後端沒資料」被三家指出不成立（API 欄位已送出，空面板現在就能做）⇒ 改成「你的裁決：本票不含前端」；
+R7 的「保守性驗證」部分收回成清單驗收項；R8 被抓出「不是依賴、是拖延」⇒ <strong>收回成獨立小票</strong>（ROADMAP：PA-CUMSUM）；另新增 R9、R10。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>要補什麼</th>
+<th>為何現在不做</th>
+<th>什麼時候觸發</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td>搜尋器（Optuna）每次試驗寫進 N 帳本</td>
+<td>卡在依賴：那層是殼、要重寫</td>
+<td>搜尋器重寫或開工時（須通過一致性測試才算接對）</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>產出服務組出 PBO 要的候選×時間矩陣</td>
+<td>卡在依賴：該服務從沒被跑過</td>
+<td>回測引擎首次真的產出結果</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>前端降級展示面板＋警語</td>
+<td><strong>你的裁決</strong>：本票範圍不含前端（成熟度地圖：前端屬不完整層）〔原寫「後端沒資料」不成立，已改〕</td>
+<td>你要求 UI，或 R1／R2 任一落地</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>六條「試驗次數」繞過路徑的機器阻止</td>
+<td>卡在依賴：R1（生產者沒接線前擋不住；契約層已 fail-closed）</td>
+<td>與 R1 同</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>API 硬擋不合格冠軍建 pipeline</td>
+<td><strong>你的裁決</strong>：降級展示＋警語，不硬擋（警語已落到 API 回應）</td>
+<td>你要求，或該路徑上線後真出誤用</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>自適應搜尋下的「有效獨立試驗數」</td>
+<td>需要研究：沒有公認方法，任何折算係數都是自創</td>
+<td>有可證偽方法時</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>MinBTL 上界的<strong>誤差帶精確量化</strong>（保守性驗證已收回為第 3 批驗收項）</td>
+<td>需要研究：誤差帶的通過條件沒有公認方法</td>
+<td>具名票 GAP-1-R7-MC 建立並排入 ROADMAP 時</td>
+</tr>
+<tr>
+<td><s>R8</s></td>
+<td><s>預測分析圖的單利累加（cumsum）</s></td>
+<td><strong>已收回</strong>：那不是依賴、是拖延（三家＋我一致）⇒ 變成 ROADMAP 獨立小票「PA-CUMSUM」，排 GAP-1 收工後我自己做</td>
+<td>—</td>
+</tr>
+<tr>
+<td>R9</td>
+<td>帳本本身是否完整（沒被事後只寫前 K 名）</td>
+<td>卡在依賴：R1（沒有生產者就沒有可證明的寫入面；純統計層證不了）</td>
+<td>R1 落地</td>
+</tr>
+<tr>
+<td>R10</td>
+<td>回測引擎 Protocol 宣告新參數（timeframe／rf）</td>
+<td>卡在依賴：清單白名單不准改既有測試替身，改 Protocol 得連動全部實作</td>
+<td>白名單擴充提案或你的裁決</td>
+</tr>
+</tbody>
+</table></div>
+<p>權威表（含落地驗收錨點）：<code>docs/IC_QUANT_GAP_REGISTRY.md</code>「GAP-1 待補完登記」節。</p>
+<h2 id="附這輪偵察本身的品質說明">附：這輪偵察本身的品質說明</h2>
+<ul>
+<li>四方<strong>獨立</strong>各查一遍再機器收斂（30 條 findings、13 群集、零掉項）。</li>
+<li>有一條四方結論相反（分位圖），靠「實際跑程式」勝過「看到程式碼存在」裁決——
+我自己也被抓到三處誤判（把「程式存在」當「行為正確」），已具名記錄在技術檔。</li>
+<li>沒查完的部分<strong>具名列出</strong>（因子漂移接線、極端值診斷、秒/毫秒軸、430K 實跑記憶體等），
+不假裝查過；它們會在 SPEC 的閘門設計裡被機器接管。</li>
+</ul>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/IC健檢偵察結果.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

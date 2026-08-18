@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAP-1 施工進度看板（策略層防過擬合：MinBTL／DSR／PBO）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-1施工進度.md</span></nav>
+<main>
+<h1 id="gap-1-施工進度看板策略層防過擬合minbtldsrpbo">GAP-1 施工進度看板（策略層防過擬合：MinBTL／DSR／PBO）</h1>
+<p><strong>這份是白話版</strong>：清單（TODO）在做哪些事、每件做到哪。技術版＝<code>docs/GAP1_STRATEGY_OVERFIT_TODO.md</code>（<strong>FROZEN R3</strong>）
+＋延伸檔 <code>docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md</code>（A1-1..A1-21；規格已定版，修訂只走延伸檔）。
+狀態欄我每完成一批就改；最即時的程式碼證據看 git log 的 <code>feat(gap1)</code>／<code>fix(gap1)</code> 系列。</p>
+<h2 id="走到哪了一眼版">走到哪了（一眼版）</h2>
+<pre><code>偵察（四方查證）完成 → SPEC 七輪對抗審查定版（你白話閘裁決三項收回）
+→ TODO 兩輪對抗審查（22 條→5 條）＋我自產 3 條數值錯誤 → 三家蓋章 → **FROZEN R3**
+→ **第1批完工**（三家 code review 10 條全處置、三家蓋章）
+→ **第2批寫完 → 三家 code review 21 條全處置 → 修補完（141 條測試全過、12 條 mutation 全紅）**
+→ **第2批修補三家蓋章 PASS**（B2 CLOSED）→ **小任務 3b 完工**（白話說明 → HTML 閱讀介面，掛 pre-commit 同 commit 產出）
+→ **現在：開第3批**（MinBTL＋DSR＋報告＋API 警語）→ 第4批（PBO＋接線閘）→ 收工
+</code></pre>
+<h2 id="這個-epic-到底在做什麼一句話">這個 epic 到底在做什麼（一句話）</h2>
+<p>「試了 N 個策略挑最好的，是真本事還是運氣？」——因子層已有 FDR，策略層原本裸奔。
+做三個檢定：<strong>MinBTL</strong>（資料夠不夠長，才有資格宣稱這個夏普）、<strong>DSR</strong>（冠軍扣掉「試很多次」的膨脹後還顯著嗎）、
+<strong>PBO</strong>（換一段資料重選，還是它嗎）。不合格＝降級展示＋明顯警語，<strong>不硬擋</strong>（你 8/17 定的）。</p>
+<h2 id="四批任務與狀態">四批任務與狀態</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>批</th>
+<th>任務</th>
+<th>白話</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>第1批</strong></td>
+<td>1.1 年化頻率解析</td>
+<td>「幾小時 K 線＝一年幾期」變成一個函式，未知週期<strong>直接報錯</strong>，不准回預設 730</td>
+<td>✅ 完工＋審過＋蓋章</td>
+</tr>
+<tr>
+<td></td>
+<td>1.2 typed Sharpe</td>
+<td>夏普自己算；算不出來（樣本太少／含 NaN／全一樣）回 NaN＋狀態碼，<strong>不准回 0.0 裝有結果</strong></td>
+<td>✅</td>
+</tr>
+<tr>
+<td></td>
+<td>1.3 回測帶年化來源</td>
+<td>回測結果多一欄「年化是真解析還是退回預設」，機器可判讀；改了兩個既有檔（白名單內），既有測試斷言一條沒動</td>
+<td>✅</td>
+</tr>
+<tr>
+<td></td>
+<td>1.4 唯一合法輸入序列</td>
+<td>三種取法（逐 bar／非零 bar／逐筆交易）；逐 bar 一律標「不適用」，因為結構性的 0 會讓顯著性虛胖</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>第2批</strong></td>
+<td>2.1 契約 JSON</td>
+<td>16 個頂層鍵，所有欄位／枚舉<strong>只住這一個檔</strong>；狀態碼不複製，用 ref 指向 IC 契約，執行期解析失敗即報錯；<strong>審後加碼</strong>：讀契約檔時多／少一個鍵、枚舉形狀不對、reason 表漂移一律直接報錯（以前會靜默放行）</td>
+<td>✅ 完工＋審過＋修補＋三家蓋章</td>
+</tr>
+<tr>
+<td></td>
+<td>2.2 N 帳本讀取</td>
+<td>讀「試過幾個候選」的帳本；<strong>帳本不存在＝誠實回 N 未知</strong>，不准假裝 N=1、不准拿請求參數頂替；<strong>審後加碼</strong>：NaN／無限大的夏普值一律當非法列（不准混進 DSR）、檔在但全是壞列要說「帳本壞了」不是「沒帳本」、快照 hash 改成不會撞的編碼</td>
+<td>✅ 完工＋審過＋修補＋三家蓋章</td>
+</tr>
+<tr>
+<td></td>
+<td>2.3 生產者合約</td>
+<td>唯一寫入口＋可執行合約：未來搜尋引擎接不對就紅；<strong>審後加碼</strong>：寫入前先上檔案鎖（多行程也不會把同一筆記兩次、長列不會交錯）、不准把 A 帳本的列寫進 B 帳本、只收純 Python 數值（Enum／numpy 冒充一律拒）</td>
+<td>✅ 完工＋審過＋修補＋三家蓋章</td>
+</tr>
+<tr>
+<td><strong>第3批</strong></td>
+<td>3.1 MinBTL</td>
+<td>「想宣稱這個夏普，資料至少要幾年」上界＋「這麼長的資料最多准試幾個」預算；公式常數不准調</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td></td>
+<td>3.2 DSR</td>
+<td>冠軍檢定，全式寫死；N=1 時退化成 PSR（可證偽的錨點）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td></td>
+<td>3.3 報告區段</td>
+<td>三關結果的機器可讀輸出；任一關不 ok ⇒ 降級＋警語，結構裡<strong>不准有推薦類欄位</strong></td>
+<td>⬜</td>
+</tr>
+<tr>
+<td></td>
+<td>3.4 API 附警語</td>
+<td><code>ml_pipeline</code> 回應多三個欄位（資格／降級／警語鍵）；<strong>不拒絕請求</strong>（你的裁決）；程式 bug 不准被吞成「計算失敗」</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>第4批</strong></td>
+<td>4.1 CSCV 切分</td>
+<td>組合式切分，lazy 不落地，超預算直接拒（防 OOM）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td></td>
+<td>4.2 PBO</td>
+<td>每條路徑樣本內選冠軍、樣本外看排名；冠軍在樣本外退化就跳過該路徑（審查抓到的越界 bug 已寫進規格）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td></td>
+<td>4.3 候選宇宙守衛</td>
+<td>禁「先挑前 K 名再算」：集合相等＋數量三方相等＋hash 三道；但<strong>帳本本身是否完整</strong>純統計層證不了 → 具名殘留 G1-R9</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td></td>
+<td>2.4 接線閘（移到最後）</td>
+<td>契約 vs 程式的封閉集合比對（AST，只認函式頂層無條件字面鍵；死分支不算）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="每批的驗收證據不只-passfail">每批的驗收證據（不只 pass/fail）</h2>
+<ul>
+<li><strong>測試</strong>：<code>strategy_validation/</code> 目前 <strong>135 條全過</strong>（第1批 45＋第2批 90，其中 45 條是這輪審查後新加的回歸鎖）；<code>Strategy/</code>＋<code>Optimization/</code> 207 過／2 紅（那 2 條是別的模組的既有紅，與本 epic 無關）。</li>
+<li><strong>真實資料</strong>：Task 1.4 的測試用你電腦上的<strong>真實 K 線</strong>（<code>data_cache/feature_klines/kline_cache.h5</code>）跑真回測，不是造出來的假資料；<strong>檔案不在時直接失敗</strong>，不准 skip 裝綠（審查抓的）。</li>
+<li><strong>改壞一定要變紅</strong>（mutation）：把 <strong>12</strong> 種已知錯誤寫法逐一植入（第1批 8 種：未知週期回 730／退化回 0.0／Mertens 係數改錯／rf 用 0.02／逐 bar 改成 ok／放行預設 730／帳本缺檔回 N=1／bar 數當年數；第2批新增 4 種：放行 NaN／快照 hash 改回會撞的舊法／帳本目錄名改掉／拿掉檔案鎖），<strong>12 次全部讓測試變紅</strong>（收據 <code>handoffs/run_receipts/20260818T080000Z-gap1-b2-fix-mutation.log</code>）。探針本身有互斥鎖，不能兩人同時跑（血淚見下）。</li>
+</ul>
+<h2 id="這輪審查抓到且值得你知道的事">這輪審查抓到、且值得你知道的事</h2>
+<p><strong>第2批（21 條，三家一致「修完可進第3批」，沒有一條要重做；分歧只在嚴重度，一律取較嚴的那版，全部這輪修、不留待辦）</strong>：</p>
+<ol>
+<li><strong>我對自己程式碼的描述是錯的</strong>：我在派工單上寫「年化夏普那種列我算進『壞列』」，三家實跑都證明程式其實<strong>沒有</strong>算進壞列（那是合法列，只是不進 DSR）。而且三家一致判定：清單裡那句「年化列要算壞列」本身就寫錯了（合法枚舉不該當非法）。程式對、我的說法錯、清單字面錯 ⇒ 延伸檔 A1-21 把那句作廢，測試加了「壞列數＝0」的明確斷言鎖住。</li>
+<li><strong>同一筆可能被記兩次</strong>：唯一性檢查是「先讀再寫」，兩個行程同時寫就都會通過（Grok 硬逼出來重現了）。Codex 另抓到「可以把 A 帳本的列寫進 B 帳本」。修：寫入前上檔案鎖＋帳本身分必須相符；並做成「拿掉鎖就一定變紅」的測試。</li>
+<li><strong>NaN 可以寫進帳本、還會被 DSR 拿去算</strong>：三家中兩家抓到。修：寫入和讀取兩端都擋。</li>
+<li><strong>快照 hash 會撞</strong>：用 <code>|</code> 拼接三段字串，段落裡若有 <code>|</code> 就撞（三家各給一組反例）。修：改 JSON 定界，反例全數變成不撞。</li>
+<li><strong>我自認最可疑的地方，三家確認確實是洞</strong>：帳本路徑怎麼算的那段程式，之前所有測試都把它整個換掉，等於<strong>沒測過</strong>。修：新增一檔測試走真路徑，改個目錄名就紅。</li>
+<li>其他：讀契約檔多／少鍵不再靜默放行、型別檢查改精確比對（Enum／numpy 冒充一律拒）、快取改成外面改不到、錯誤訊息會說缺哪個多哪個。</li>
+</ol>
+<p><strong>第1批（10 條）</strong>：</p>
+<ol>
+<li><strong>我在文件裡寫的一句話被推翻</strong>：我寫「已不可能靜默退回 730」，Codex 和 Grok 各自寫反例證明——只要回測引擎「收下參數但不回填年化資訊」，程式就默默用 730。已改成直接報錯，並把那句話在延伸檔明文作廢（A1-20）。</li>
+<li><strong>Codex 兩次拒絕蓋章，兩次都對</strong>：第一次因為我在牠驗收時繼續改工作區；第二次因為三家同時跑我的 mutation 探針、互相看到對方植入的錯誤，baseline 不穩。前者是我違反自己的規矩，後者是探針設計缺陷。修法都做成機械強制（工作區先 commit 凍結；探針加鎖，併發直接退出）。</li>
+<li><strong>我常批評的病自己犯</strong>：mutation 探針的「還原後全綠」自檢原本是空殼（只印 rc 不擋）。已改成 fail-closed，而且它馬上就抓到一次真實污染。</li>
+</ol>
+<h2 id="殘留不是不做是登記了為什麼現在不做">殘留（不是不做，是登記了為什麼現在不做）</h2>
+<p><code>docs/IC_QUANT_GAP_REGISTRY.md</code>「GAP-1 待補完」表：G1-R1..R7（原有）＋ <strong>G1-R9</strong>（帳本完整性要生產者側才證得了）＋ <strong>G1-R10</strong>（回測引擎 Protocol 沒宣告新參數，白名單不准改既有測試替身）。每條都有「卡在誰／誰的裁決／需要研究」三值之一與觸發條件。</p>
+<h2 id="推送">推送</h2>
+<p><strong>每批收尾都直接推上 GitHub</strong>（你 8/18 定的：commit＋push 秒級、每次同步）。本機與 <code>origin/main</code> 應零落差；
+要查就 <code>git log origin/main..HEAD</code>（應為空）。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-1施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

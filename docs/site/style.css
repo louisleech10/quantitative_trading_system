@@ -1,0 +1,29 @@
+:root{--bg:#fff;--fg:#1c1e21;--muted:#5f6368;--link:#0b57d0;--border:#e0e0e0;--code:#f4f5f7;--accent:#f6f8fa}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--fg:#e6e6e6;--muted:#9aa0a6;--link:#8ab4f8;--border:#2a2e35;--code:#181b21;--accent:#161a20}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",Helvetica,Arial,sans-serif}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+.top{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--border);padding:.5rem 1rem;display:flex;gap:1rem;align-items:center;font-size:.9rem;z-index:1}
+.top .crumb{color:var(--muted)}
+main{max-width:52rem;margin:0 auto;padding:1rem 1rem 4rem}
+h1{font-size:1.6rem;line-height:1.3;margin:1rem 0 .75rem}h2{font-size:1.3rem;margin:2rem 0 .5rem;padding-top:.5rem;border-top:1px solid var(--border)}
+h3{font-size:1.1rem;margin:1.5rem 0 .5rem}h4{font-size:1rem}
+h1,h2,h3,h4{scroll-margin-top:3rem}
+p,li{overflow-wrap:anywhere}
+blockquote{margin:1rem 0;padding:.5rem 1rem;border-left:4px solid var(--border);background:var(--accent);color:inherit}
+blockquote p{margin:.4rem 0}
+code{font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code);padding:.75rem;border-radius:6px;overflow-x:auto;font-size:.85rem;line-height:1.5}
+pre code{background:none;padding:0;white-space:pre}
+.table-wrap{overflow-x:auto;margin:1rem 0;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;min-width:100%;font-size:.92rem}
+th,td{border:1px solid var(--border);padding:.4rem .6rem;vertical-align:top;text-align:left}
+th{background:var(--accent);position:sticky;top:0}
+tr:nth-child(even) td{background:var(--accent)}
+hr{border:0;border-top:1px solid var(--border);margin:2rem 0}
+img{max-width:100%}
+.index-list{list-style:none;padding:0}.index-list li{padding:.6rem 0;border-bottom:1px solid var(--border)}
+.index-list .desc{color:var(--muted);font-size:.9rem;display:block}
+footer{margin-top:3rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--muted);font-size:.85rem}
+@media (max-width:600px){body{font-size:15px}main{padding:.75rem .75rem 3rem}h1{font-size:1.35rem}h2{font-size:1.15rem}table{font-size:.85rem}}

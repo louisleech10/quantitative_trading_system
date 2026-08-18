@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 0 批在做什麼 — 白話版</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="top"><a href="../index.html">← 白話說明</a><span class="crumb">Archived ／ 第0批-在做什麼.md</span></nav>
+<main>
+<h1 id="第-0-批在做什麼-白話版">第 0 批在做什麼 — 白話版</h1>
+<p><strong>寫給你看的，不是工作文件。</strong> 技術版在 <code>docs/GOVB0_FRICTION_SPEC.md</code>（規格）與 <code>docs/GOVB0_FRICTION_TODO.md</code>（施工清單）。</p>
+<p>日期：2026-08-05</p>
+<hr />
+<h2 id="一句話">一句話</h2>
+<p><strong>這批是在修「你的工具自己擋你、或該擋的沒擋」的問題</strong>，一共四個毛病，外加一項紀律要求。</p>
+<hr />
+<h2 id="為什麼要先做這批">為什麼要先做這批</h2>
+<p>過去幾天每一輪工作，都有時間浪費在「工具本身不聽話」上，不是浪費在真正的工作上。</p>
+<p>舉幾個當天實際發生的：</p>
+<ul>
+<li>我想查一下背景程式跑到哪了，指令被系統擋下來說「這是派工，不准」——<strong>它把唯讀的查詢當成派工</strong>。同一天發生 9 次。</li>
+<li>有一次委員把報告寫完了，程式卻不肯結束，<strong>整輪空等了 2 小時 20 分</strong>。</li>
+<li>有一次委員把自己剛寫好的報告<strong>自己蓋掉了</strong>，沒人擋、也沒人看得出來，事後才發現多花了 28 分鐘。</li>
+<li>我們發給委員的指示，<strong>會誘導它寫出不合規的東西</strong>，交件必定失敗，重跑幾次都一樣。</li>
+</ul>
+<p>這些都不是「做事做錯」，是「做事前先跟工具打架」。所以排在最前面。</p>
+<hr />
+<h2 id="四個毛病各是什麼怎麼修">四個毛病，各是什麼、怎麼修</h2>
+<h3 id="1-唯讀查詢被誤判成派工b-15">1️⃣ 唯讀查詢被誤判成派工（<code>B-15</code>）</h3>
+<p><strong>問題</strong>：判斷「這是不是派工指令」的程式，用的是<strong>字串比對</strong>。只要指令裡出現某些字，就當成派工擋下來。</p>
+<p>實際被誤擋的例子：</p>
+<ul>
+<li>目錄名叫 <code>claude-501</code>，裡面又有個 <code>-p</code> 開頭的參數 → 被當成在呼叫 AI</li>
+<li>commit 訊息某一行剛好以委員的名字開頭 → 被擋</li>
+<li>引號<strong>裡面</strong>的分號被當成指令分隔符 → 被擋</li>
+</ul>
+<p><strong>怎麼修</strong>：先定一份「詞法契約」，把「什麼算指令開頭」「什麼算引號範圍」定死成 11 條可以逐條測試的規則，再照契約重寫判斷邏輯。</p>
+<p><strong>順帶發現 6 個反向問題</strong>——有些<strong>該擋的反而沒擋</strong>：</p>
+<ul>
+<li>寫成 <code>/opt/homebrew/bin/codex</code> 這種帶完整路徑的，擋不住</li>
+<li>用 <code>eval &quot;...&quot;</code>、<code>$(...)</code>、反引號包起來的，全部擋不住</li>
+<li>直接執行我們自己的派工腳本，擋不住</li>
+</ul>
+<p>這些比誤擋更嚴重——<strong>誤擋只是煩，漏擋是防線根本沒作用</strong>。</p>
+<h3 id="2-委員寫完報告不結束b-14">2️⃣ 委員寫完報告不結束（<code>B-14</code>）</h3>
+<p><strong>問題</strong>：沒有時間上限。委員的程式如果卡住，就一直等下去。</p>
+<p><strong>怎麼修</strong>：加時間上限，逾時就終止。</p>
+<p>但<strong>不能只是加個時限就殺</strong>——那會把「已經做完但還沒回報」的審查誤判成失敗，白白重跑。所以要配合下面第 3 項的機制，先確認產出到底完成了沒。</p>
+<p><strong>時限的數字目前是暫定的</strong>，因為還沒有足夠的實際耗時資料。這件事已經明文標成「未定稿」，等累積夠資料才會定死。</p>
+<h3 id="3-委員能把自己剛寫好的報告蓋掉b-30">3️⃣ 委員能把自己剛寫好的報告蓋掉（<code>B-30</code>）</h3>
+<p><strong>問題</strong>：委員直接寫進最終檔案。寫到一半的東西外面就看得到，而且重寫時會蓋掉前一次的成果。</p>
+<p><strong>怎麼修</strong>：改成「先寫到暫存位置，全部完成且格式檢查過了，才一次性搬到最終位置」。</p>
+<p>這樣有三個好處：</p>
+<ul>
+<li>寫到一半的東西外面看不到</li>
+<li>「搬過去」這個動作本身就等於「我做完了」的信號</li>
+<li>格式沒過的話，暫存檔還留著給人看，不會憑空消失</li>
+</ul>
+<p><strong>誠實邊界</strong>：這個機制<strong>不保證內容完整</strong>。如果報告中途被截斷、但最後一段剛好格式完整，還是會過。這個問題另外開票（<code>B-35</code>），本批<strong>明文不做</strong>。</p>
+<h3 id="4-我們自己的指示誘導委員違規b-32">4️⃣ 我們自己的指示誘導委員違規（<code>B-32</code>）</h3>
+<p><strong>問題</strong>：發給委員的提示語<strong>不管什麼場合都塞一句「記得蓋戳記」</strong>。但很多輪次根本不需要戳記，委員照做就變成格式違規，交件必失敗。</p>
+<p><strong>怎麼修</strong>：依照這一輪的類型決定要不要提戳記；遇到沒見過的類型，<strong>寧可拒絕派工，也不要猜</strong>。</p>
+<h3 id="-紀律要求b-24-的一半">➕ 紀律要求（<code>B-24</code> 的一半）</h3>
+<p><strong>問題</strong>：驗收條件常常寫成「跑了某個腳本」，而不是「跑完之後狀態對不對」。前者是「我做了動作」，後者才是「結果正確」。</p>
+<p><strong>怎麼修</strong>：本批所有驗收條件一律改寫成<strong>執行後的狀態判斷</strong>——檔案在不在、數字等不等、集合有沒有包含、雜湊一不一樣。</p>
+<p>⚠️ <strong>這只做了一半。</strong> 另一半是「寫一支程式強制檢查所有文件都照這樣寫」，那是獨立工程，已經移出去排期。所以<strong>這張票是「部分完成」，不是全綠</strong>（<code>VERIFY:b24-partial-status</code> — 票面實測 <code>grep -c 部分完成</code> → <code>2</code>，static 檢查）。</p>
+<hr />
+<h2 id="施工順序為什麼是這個順序">施工順序（為什麼是這個順序）</h2>
+<pre><code>第 0 步  凍結「改動前」的判斷程式副本      ← 沒有它，後面無法比較改了什麼
+第 1 步  讓「被擋」這件事留下紀錄          ← 沒有它，改完不知道有沒有改對
+第 2 步  修「誘導違規的指示」              ← 一行的事，且它正擋著這批自己
+第 3 步  修判斷邏輯（最大的一塊）
+第 4 步  產出「改前 vs 改後」的差異報表    ← 有非預期的差異就不准合併
+第 5 步  委員產出的生命週期（暫存→上架）
+第 6 步  加時間上限
+</code></pre>
+<p><strong>第 0 步和第 1 步是硬前置</strong>，順序反了整批要重做。</p>
+<p>第 1 步（留紀錄）還有兩個額外好處：</p>
+<ul>
+<li>它是你早上提的「統計哪張票最常咬人」（<code>B-37</code>）的資料來源</li>
+<li>它也是「誤擋清單怎麼收斂」的資料來源（見下）</li>
+</ul>
+<hr />
+<h2 id="你今天講的那個原則我寫進規格了">你今天講的那個原則，我寫進規格了</h2>
+<p>你說：<strong>用允許清單，發現違反的退回去改就好，不用無限枚舉。</strong></p>
+<p>這個判斷是對的，而且比我原本寫的準確。我原本寫「允許清單一樣列不完」——那句話沒抓到重點。</p>
+<p>真正的重點是<strong>漏掉一項時會怎樣</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>漏掉一項時</th>
+<th>你怎麼發現</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>禁止清單</strong></td>
+<td>該擋的<strong>放行了</strong></td>
+<td>出事才知道，或永遠不知道</td>
+</tr>
+<tr>
+<td><strong>允許清單</strong></td>
+<td>合法的<strong>被誤擋</strong></td>
+<td>使用者馬上抱怨</td>
+</tr>
+</tbody>
+</table></div>
+<p>所以允許清單<strong>會自己收斂</strong>：每發現一個誤擋就補一項，補一次少一次。禁止清單<strong>不會</strong>：你永遠不知道還有幾個沒列，而且不知道的那些正在漏放。</p>
+<p><strong>附帶條件</strong>：這個循環要成立，誤擋必須<strong>看得見</strong>。所以第 1 步（留紀錄）是硬前置——否則你只會覺得工具很煩然後繞路，訊號永遠收不到。</p>
+<p>這段連同理由都寫進規格了，免得實作的人看到清單不完整就自作主張改回禁止清單。</p>
+<hr />
+<h2 id="這批明文不做的事免得你以為做了">這批「明文不做」的事（免得你以為做了）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>不做的事</th>
+<th>為什麼</th>
+<th>去哪了</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>判斷委員報告有沒有被<strong>截斷</strong></td>
+<td>需要委員端先宣告「我預計寫幾條」，跨出這批範圍</td>
+<td><code>B-35</code></td>
+</tr>
+<tr>
+<td>讓驗收檢查<strong>自動強制執行</strong></td>
+<td>是獨立工程（要清單、負責人、到期日）</td>
+<td><code>B-24</code> 的另一半</td>
+</tr>
+<tr>
+<td>修「不同語系環境下守衛會失效」</td>
+<td>跟這批沒關聯，硬塞會撐爆範圍</td>
+<td><code>B-33</code></td>
+</tr>
+<tr>
+<td>防<strong>蓄意</strong>繞過</td>
+<td>這批的目標是擋<strong>意外</strong>。蓄意繞過是另一個問題</td>
+<td>另案</td>
+</tr>
+</tbody>
+</table></div>
+<p>還有兩項<strong>已知的殘留</strong>，做完之後仍然存在，我明文寫在規格裡：</p>
+<ol>
+<li><strong>允許清單還是可能漏字元</strong> → 後果是誤擋（安全方向），照上面那個循環慢慢補</li>
+<li><strong>鎖的回收在極端情況會卡住</strong> → 如果程式在特定兩步之間被強制中斷，那條路徑會鎖死，<strong>需要人工清一下</strong>。最壞情況只是「一條路徑暫時不能用」，不會出現兩個程式同時跑或漏放派工</li>
+</ol>
+<hr />
+<h2 id="品質是怎麼把關的">品質是怎麼把關的</h2>
+<p>規格走了 <strong>7 輪</strong>對抗審查才定案：</p>
+<pre><code>第1輪 19 個問題（5 個嚴重）
+第2輪 17 個（7 個嚴重）   ← 這裡卡住了
+第3輪 11 個（3 個嚴重）
+第4輪  8 個（2 個嚴重）
+第5輪  2 個（2 個嚴重）
+第6輪  3 個（2 個嚴重）
+第7輪  4 個（0 個嚴重）   ← 第一次沒有嚴重問題
+</code></pre>
+<p>第 2 輪卡住時，我依你定的「95% 就收」原則<strong>劃定了不受理範圍</strong>，趨勢隨即轉正。</p>
+<p><strong>中間抓到兩個真的會讓防線失效的漏洞</strong>，而且都是委員<strong>實際跑出來的</strong>，不是紙上推論：</p>
+<ul>
+<li>有一種合法的寫法會讓掃描器在錯誤的位置開始判斷，<strong>把真正的派工指令整段吞掉</strong>。實測跑出來「攻擊成功」而掃描器回報「放行」。</li>
+<li>兩個程序可以<strong>同時</strong>通過「現在沒有鎖」的檢查然後各自啟動。實測兩個都跑起來了。</li>
+</ul>
+<p><strong>這兩個都是我補的第一版規格自己的洞</strong>——我補完，委員打穿，我再補。所以第 7 輪我明文宣告是最後一輪，避免無限循環。</p>
+<p>施工清單也審了一輪，抓到 <strong>9 個問題</strong>，其中 3 個是我<strong>照規格抄函式名、沒對照實際程式碼</strong>造成的：我引用了一個不存在的函式、把呼叫方向寫反了、還寫了一條<strong>引用不存在字串的測試</strong>（那條測試從寫下的那一刻就永遠不會通過）。</p>
+<hr />
+<h2 id="現在進度">現在進度</h2>
+<p>🔴 <strong>進度不寫在這裡</strong> → 看 <a href="../README.html">README.md</a> 或 <a href="第0批-施工清單.html">第0批-施工清單.md</a>。</p>
+<p><strong>為什麼移走</strong>（2026-08-05，使用者問「你到底是要強制更新還是沒有」）：
+進度原本被抄在四個檔裡，抄越多份越保證有一份會斷——而<strong>這一份就斷了</strong>，
+它寫著「實作還沒開始」時實際已完成 4 批。
+機制抓不到，因為本檔監看的是<strong>規格</strong>（規格凍結後就不再變動），
+這個安排對本檔其餘內容是對的（問題描述不會因為程式改了就過時），
+錯的是<strong>把會變的進度塞進不會變的檔</strong>。</p>
+<p>⇒ 現在每個檔只有一個職責，也只監看對應的來源：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>檔案</th>
+<th>職責</th>
+<th>監看</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>README.md</code>／<code>第0批-施工清單.md</code></td>
+<td><strong>進度</strong></td>
+<td>程式</td>
+</tr>
+<tr>
+<td><code>治理進度日誌.md</code></td>
+<td>流水帳</td>
+<td>程式</td>
+</tr>
+<tr>
+<td><strong>本檔</strong></td>
+<td><strong>這批在修什麼問題</strong></td>
+<td>規格</td>
+</tr>
+<tr>
+<td><code>治理待辦總覽.md</code></td>
+<td>還有幾張票、什麼順序</td>
+<td>票的清單</td>
+</tr>
+</tbody>
+</table></div>
+<p>做完這批之後是 <strong>第 0.5 批：帳本分檔</strong>（線 C），然後是你提的<strong>統計欄</strong>（<code>B-37</code>）。</p>
+<!-- b5-stamp-sync: 2026-08-09 B5 偵察收斂檔已戳記（2/2 可用家族）；本檔內容未變 -->
+<!-- b5-impl-brief-sync: 2026-08-09 B5 impl brief 已備妥待執行；本檔內容未變 -->
+<!-- roster-ooe-sync: 2026-08-09 委員一行調換 + out-of-epic 通道上線；本檔內容未變 -->
+<!-- ooe-r1-sync: 2026-08-09 out-of-epic 通道 review-r1（1 P0 已修，3 項待修）；本檔內容未變 -->
+<!-- precompact-sync: 2026-08-09 交接補完（R-18/19/20 + 補帳）；本檔內容未變 -->
+<!-- b10-close: 2026-08-10 B10 全案收案（兩家 APPROVED 裁可收案）；第 1 批 B7/B8/B9/B10 四票全數完成；殘留 票 B-53 -->
+<!-- b50-land: 2026-08-10 票 B-50 實作落地（執行端工作區污染偵測，形態②③ 閉合／形態① 具名殘留）；測試 1261 → 1272；雙家族 code review 待派 -->
+<!-- b50-r1fix: 2026-08-10 票 B-50 review-r1 九條全修（含一條 BLOCKING 靜默漏報）+ 補追溯 TODO（兩家裁我跳步）；測試 1272 → 1279；r2 重審待派 -->
+<!-- b50-r2fix: 2026-08-10 票 B-50 r2 三條全修（換行路徑碰撞漏報、rename 假紅燈、追溯 TODO 不得宣稱閉合）；執行端 commit 污染事故已清理並補成形態④；測試 1279 → 1281 -->
+<!-- b50-stamp-r1fix: 2026-08-10 stamp-r1 一條 BLOCKING（ab cd 裸路徑假紅燈）已修，改依 -z 位置語意標記；票 B-52 第四次發作機制入票（stamp 輪產生 findings 必撞牆）；測試 1281 → 1283 -->
+<!-- b50-close-impl: 2026-08-10 票 B-50 實作面收案（四輪 9→3→1→0，兩家 APPROVED，測試 1283）；流程面永久標記跳步、形態①④ 未做 ⇒ TICKET-STATUS 仍 OPEN -->
+<!-- order-refactor: 2026-08-10 使用者解除排序凍結、指示以淨摩擦排序；新增站 2.5/2.6/2.7，原站 3（B-26）降為站 6，殘留六票落位站 7；順序唯一來源＝docs/GOVERNANCE_EXECUTION_ORDER.md -->
+<!-- order-refactor-fixture: 2026-08-10 順序改動後重生成 fact-key 對照 fixture（clean/drifted 各一份 generated block 副本）；證偽能力已複驗 clean rc=0 / drifted rc=1 -->
+<!-- order-live: 2026-08-10 新順序生效（站 2.5/2.6/2.7 → 站 4/5/6/7）；現況與下一步一律看 白話說明/接下來要做什麼.md，本檔不重述狀態 -->
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/Archived/第0批-在做什麼.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

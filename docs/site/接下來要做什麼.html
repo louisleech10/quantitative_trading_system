@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>接下來要做什麼</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">接下來要做什麼.md</span></nav>
+<main>
+<h1 id="接下來要做什麼">接下來要做什麼</h1>
+<p><strong>這份只回答三件事：現在在哪、下一步做什麼、為什麼是這個順序。</strong>
+不是流水帳——過程紀錄在 <a href="治理進度日誌.html">治理進度日誌.md</a>、<a href="流程摩擦記錄.html">流程摩擦記錄.md</a>。</p>
+<blockquote>
+<p>🔴 <strong>順序的唯一來源</strong>是 <code>docs/GOVERNANCE_EXECUTION_ORDER.md</code>（技術版，由資料檔生成）。
+本檔是投影；<strong>兩邊對不上時以那份為準，這裡就是錯的</strong>。</p>
+</blockquote>
+<blockquote>
+<p>🔴 <strong>本檔不寫「最後更新」日期</strong>——手寫的會漂（原本寫著 2026-08-13，
+而檔案早已改過多次）。要知道多新，看版控：<code>git log -1 -- 白話說明/接下來要做什麼.md</code>。
+<strong>新內容一律加在上面，不要往下堆</strong>；日誌請寫進 <a href="治理進度日誌.html">治理進度日誌.md</a>。</p>
+</blockquote>
+<p><strong>做法</strong>（你 8/12 睡前定的）：治理這條線<strong>不再寫規格文件</strong>，
+我照下面那張表由上而下直接做，做完派三家委員審＋對抗、有分歧我跟委員自己決定。
+做完一項就把狀態改掉，改的是資料檔，這張表自動跟著變。</p>
+<hr />
+<h2 id="-現況最新gap-1-第-12-批完工蓋章小任務-3b-完工接著第-3-批">🔴 現況（最新）：<strong>GAP-1 第 1、2 批完工蓋章；小任務 3b 完工</strong>；接著第 3 批</h2>
+<p><strong>一眼看</strong>：施工看板在 <a href="GAP-1施工進度.html">GAP-1施工進度.md</a>（四批×15 個任務逐項狀態、驗收證據、審查抓到的事）。</p>
+<ul>
+<li>清單 <strong>FROZEN R3</strong>（兩輪對抗 22→5 條＋我自產 3 條數值錯誤，三家蓋章）。</li>
+<li><strong>第 1 批</strong>（輸入語意）：完工、三家 code review 10 條全處置、三家蓋章。</li>
+<li><strong>第 2 批</strong>（N 帳本契約）：三家 code review <strong>21 條全處置、修補完</strong>（135 條測試全過、12 條 mutation 全紅），
+<strong>三家蓋章 PASS</strong>（B2 CLOSED）。這輪最該知道的一件事：我派工單上對自己程式碼的描述寫錯了、清單那句字面也錯了，
+程式反而是對的——三家實跑抓到，延伸檔 A1-21 作廢那句。</li>
+<li><strong>小任務 3b 完工</strong>（你 8/18 定的）：白話說明有 HTML 閱讀介面了。本機 <code>open docs/site/index.html</code>；
+<strong>🔴 要你做一步</strong>：GitHub repo → Settings → Pages → Build and deployment 選 <strong>Deploy from a branch</strong>、Branch <strong><code>main</code></strong>、資料夾 <strong><code>/docs</code></strong> → Save。
+之後網址 https://louisleech10.github.io/quantitative_trading_system/site/ （首次要等 1–2 分鐘部署）。
+來源仍是 .md；HTML 在每次 commit 白話檔時由 pre-commit 同 commit 自動生成，缺產出／過期／死連結會擋 commit。</li>
+<li><strong>現在開第 3 批</strong>（MinBTL＋DSR＋報告＋API 警語）→ 三家 review → 蓋章 → 第 4 批（PBO＋接線閘）。</li>
+<li>推送規則：<strong>每批 commit 完直接 push</strong>（你 8/18 定的），不再等你說。</li>
+</ul>
+<hr />
+<h2 id="上一輪現況817-深夜清單已被三家委員審過一輪抓到-25-個問題全部修好">上一輪現況（8/17 深夜）：清單已被三家委員審過一輪，<strong>抓到 25 個問題、全部修好</strong></h2>
+<p><strong>這輪做了什麼</strong>（你睡覺這段時間）：</p>
+<ol>
+<li>派三家委員（Codex／Composer／Grok）對清單做對抗審查 → 共 <strong>22 條</strong>發現。</li>
+<li>我自己也獨立審了一版（規則要求我不能只當編排），<strong>另外抓到 3 條沒人發現的數值錯誤</strong>（見下）。</li>
+<li>全部 25 條逐條處置、收斂檔 0 掉項、三家蓋章中；清單改成 R2 版，規格側的修訂寫成<strong>延伸檔</strong>
+（<code>docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md</code>，共 15 條）——因為規格已定版，規矩是不就地改。</li>
+</ol>
+<p><strong>最重要的三個發現（我自己抓的，實際跑數字才發現）</strong>：</p>
+<ul>
+<li><strong>規格裡的 PBO 驗收數字是錯的</strong>。原本寫「加一個年化夏普 1.0 的假 alpha 進去，PBO 應該 &lt; 0.30」。
+我實跑：PBO ＝ <strong>0.54~0.62</strong>，完全不成立。原因很物理：那個 alpha 每期只有 0.0107 個標準差，
+而每段樣本只有 600 根 K 線，雜訊本身的波動（0.041）比 alpha 大四倍——<strong>根本測不出來</strong>。
+⇒ 改成 per-period 夏普 0.15（實跑 PBO ＝ 0.005，通得過），並把原本那個案例<strong>留下來當反例</strong>
+（證明「弱 alpha 不該被誤判成穩健」）。若不修，開工後這條驗收永遠紅，實作的人就會被逼去「調到綠」＝取巧。</li>
+<li><strong>「亂數種子 20260817」這句話不夠</strong>。同一個種子，用新版 API、舊版 API、或先產 (50,1200) 再轉置，
+PBO 分別是 0.6483／0.5357／0.6158——<strong>三種寫法兩種通不過原本的區間</strong>。⇒ 生成方式逐字寫死、區間放寬並附理由。</li>
+<li><strong>有一條「改壞了測試要變紅」的檢查在數學上不可能成立</strong>。原本寫「把 CSCV 的樣本內/樣本外對調，測試該變紅」，
+但那個組合枚舉對「補集」是封閉的——對調只是把 924 條路徑重新排序，PBO <strong>一模一樣</strong>（實跑證實）。
+⇒ 換成「改成用樣本外挑冠軍」，這個會真的變紅。</li>
+</ul>
+<p><strong>委員抓到的重點（各家都有真貨）</strong>：</p>
+<ul>
+<li>Codex（最嚴，第七次比另兩家嚴）：① 一個<strong>會直接崩掉</strong>的索引 bug——冠軍策略如果剛好在樣本外那段退化被剔除，
+程式會拿越界的索引去取名次（他實跑出 IndexError）；② 帳本本身若只記錄「事後挑出的前 K 名」，
+三道防護全部會通過。這條我改成「可觀測欄位＋強制降級」：PBO 還是算得出來，但<strong>機械上</strong>不准被當成「已證明沒有選擇偏誤」，
+並登記為新的待補完 G1-R9（要等搜尋引擎接上才能真證明）。</li>
+<li>Grok：清單把 wiring 閘門排在第二批，但那個閘門要檢查的檔案第三批才出現 ⇒ <strong>第二批的驗收永遠過不了</strong>。已移到第四批最後。</li>
+<li>Composer：pipeline 回應的形狀和規格不一致（規格只要三個欄位，清單卻要送整包五節）。已改回三個欄位。</li>
+<li>三家＋我一致：<code>ml_pipeline</code> 那個警語功能<strong>照原清單寫出來會永遠是「計算失敗」</strong>（缺參數 ⇒ 一定走例外），
+連規格說要的「誠實回報無法判定」都產不出來。已重寫介面。</li>
+<li>三家＋我一致：我原本列的 8 項「以後再做」裡，<strong>有 3 項理由不成立</strong>（你 8/17 定的「殘留不得是偷懶」規則抓到的）：
+前端面板（其實現在就能做空面板 → 改成「你的裁決：本票不含前端」）、MinBTL 誤差量化（保守性驗證現在就能做
+→ <strong>收回一部分</strong>成為驗收項，我已實跑確認過得了）、<code>cumsum</code> 那條（不是依賴問題 → <strong>收回成獨立小票</strong>，
+排在 GAP-1 做完後我自己做）。</li>
+</ul>
+<p><strong>接著又跑完一輪（R9 複驗）</strong>：三家實跑複驗，<strong>25 條收斂到 5 條</strong>（另 1 家回報「無實質缺陷」）。
+這輪三家都<strong>真的自己跑了我的數字</strong>（PBO 探針、MinBTL 探針、§V-4 mutation），結果與我的 receipt 逐位一致
+——這是這個 epic 第一次有人獨立重現過驗收數字（前七輪都只在紙上審）。剩下 5 條收斂成三件事，全部是文件層：</p>
+<ol>
+<li><strong>我自己上一輪的修法有個洞，委員抓到了</strong>：我把 reporter 的例外捕獲寫成含 <code>ValueError</code>，
+但參數驗證錯誤也是 <code>ValueError</code> ⇒ 「呼叫方傳錯參數」這種程式 bug 會被吞成「計算失敗」回 200。
+⇒ 改成專用例外類別、捕獲集合收窄、程式 bug 一律回 500（可觀測）。
+我自己那版也獨立抓到同一條，四方一致。</li>
+<li><strong>AST 檢查有死分支假綠</strong>（Codex 實跑證明）：把五個區段名寫在 <code>if False:</code> 裡面，靜態掃描看起來齊全，
+實際執行卻缺欄位。⇒ 規則收窄成「只認函式最上層、不在條件/迴圈裡的字面鍵」，並加一條 mutation 鎖住這個反例。
+附帶：我自己的探針只測了 helper 函式與迴圈（結論是「會誤擋、不會假綠」），<strong>沒測死分支</strong>——
+這條是委員補上的真缺口，我在收斂檔裡具名寫了我漏掉。</li>
+<li><strong>回退順序矛盾</strong>：wiring 閘移到第四批後，第四批就依賴第三批，而原規格寫「三、四批可各自回退」。⇒ 延伸檔覆寫成「先退第四批再退第三批」。</li>
+</ol>
+<p><strong>那三條都改好、三家蓋章通過 → 清單正式凍結（FROZEN R3）→ 我已開工。</strong></p>
+<h2 id="開工後的進度你睡覺這段時間">開工後的進度（你睡覺這段時間）</h2>
+<p><strong>第一批 B1（輸入語意）已完工並過三家 code review 修補</strong>：</p>
+<ul>
+<li>做了什麼：①「幾小時 K 線 = 一年幾期」變成一個函式，未知的週期直接報錯（以前策略路徑寫死 730）
+②夏普比率自己算，遇到算不出來的情況回 NaN＋狀態碼（<strong>不准回 0.0 裝作有結果</strong>）
+③回測結果多帶一個「年化來源」欄位，可機器判讀是真解析還是退回預設
+④三個檢定的唯一合法輸入序列（逐 bar / 非零 bar / 逐筆交易），其中逐 bar 一律標「不適用」——
+因為裡面有一堆結構性的 0，會讓統計顯著性虛胖。</li>
+<li>測試：<code>strategy_validation</code> 目前 90 條全過；用的是<strong>你電腦上的真實 K 線</strong>，不是造出來的假資料。</li>
+<li><strong>改壞一定要有測試變紅</strong>：我把 8 種已知的錯誤寫法逐一植入程式，8 次全部讓測試變紅。</li>
+</ul>
+<p><strong>三家 code review 抓到 10 條，其中一條打臉我自己</strong>：我在文件裡寫「已經不可能靜默退回 730 了」，
+Codex 和 Grok 各自寫了一個反例程式證明<strong>還是會</strong>——只要回測引擎「收下參數但不回填年化資訊」，
+我的程式就會默默用 730 算。已改成：宣告了時間週期卻拿不到年化資訊 ⇒ <strong>直接報錯</strong>，不准猜。
+另外三條：我的 mutation 腳本「還原後全綠」那個自檢是空殼（我常批評別人這個病，自己犯）、
+少驗一條 §V-9、真實 K 線不存在時整檔靜默跳過＝假綠（已改成直接失敗）。全部修完並回歸鎖住。</p>
+<p><strong>第二批 B2（N 帳本契約）已寫完待驗</strong>：契約 JSON（16 個頂層鍵，所有欄位/枚舉只住這一個檔）、
+帳本讀取 API（沒有帳本就誠實回「N 未知」，<strong>不准假裝 N=1</strong>）、以及「未來搜尋引擎必須怎麼寫」的可執行合約。</p>
+<p><strong>下一步</strong>：B1 蓋章收尾 → commit B2 → 派 B2 code review → B3（MinBTL＋DSR）→ B4（PBO＋接線閘）。
+你醒來不需要做決定；有分歧我跟委員按你的規則自己決。</p>
+<hr />
+<h2 id="上一輪現況817-白天gap-1-規格定版清單草稿寫好">上一輪現況（8/17 白天）：GAP-1 規格定版、清單草稿寫好</h2>
+<p>治理線＝<strong>留現狀、不再擴建</strong>（你 8/14 定的），下面的治理表格全部凍結不動。</p>
+<p><strong>GAP-1 是什麼</strong>：策略層「試了 N 個策略挑最好的，是真本事還是運氣」的三個檢定
+（MinBTL 資格門檻／DSR 冠軍檢定／PBO 選法穩定性）。因子層已有 FDR，策略層原本裸奔。</p>
+<p><strong>走到哪了</strong>（技術版：<code>docs/GAP1_STRATEGY_OVERFIT_SPEC.md</code>＋<code>docs/GAP1_STRATEGY_OVERFIT_TODO.md</code>）：</p>
+<ul>
+<li>偵察：我＋三委員四方獨立查，31 條發現、零掉項、三家蓋章。</li>
+<li>規格：<strong>七輪對抗審查後定版</strong>（23→7→11→7→4→1 條，逐輪收斂）。委員抓到我<strong>三個真實數值錯誤</strong>
+（試驗預算用了四捨五入該用向下取整、夏普比值在無風險利率≠0 時代數不成立、alpha 用了四捨五入的 √8760），
+還有兩個「我規定了檢查但數學上做不到」的洞。全部修完；我駁回過委員一條修法（附數值判準，三家複核成立）。</li>
+<li>你在白話閘的三項裁決已落地：①範圍＝契約＋純統計核心全做，接線等引擎成熟 ②不合格＝降級展示＋明顯警語（不硬擋）
+③<strong>三項我原本列「以後再做」的被你抓出來收回現在做</strong>（策略層接線閘、pipeline 回應附警語、資料類別欄位）。</li>
+<li>清單（TODO）：草稿寫好，15 個 Task 分四批，<strong>還沒給委員審</strong>。</li>
+<li>推送：規格那 8 筆已推上 GitHub；之後 3 筆（R8 修訂／TODO／交接）<strong>還在本機</strong>，等你說推。</li>
+</ul>
+<p><strong>為什麼要「現在做」這些、跟「以後再做」的關係</strong>（你問過）：現在做的是<strong>核心與插座</strong>——
+統計函式跟論文對照可以驗到底、不依賴引擎；契約規定未來引擎必須交出什麼，交不出就誠實回「不可用」。
+以後要補的 8 項全登記在 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>「GAP-1 待補完」表，<strong>每項都寫了為何現在不做＋什麼時候觸發</strong>，
+而且「殘留不得是偷懶」已做成範本規則（每條殘留只准三種理由：卡在依賴／你的裁決／需要研究，沒有「之後再說」）。</p>
+<p><strong>MinBTL 那個 2.32 年</strong>：是你電腦上真實 K 線的長度（1 小時 K 20,352 根 ÷ 8,760）。它決定「試驗預算」：
+想宣稱年化夏普 1.5，最多試 <strong>13</strong> 個候選；資料抓到 5 年就變 277 個——資料越長越自由，公式常數不准調。</p>
+<p><strong>下一步（新 Session 第一件事）</strong>：派三家委員審 TODO 清單（範圍含規格 R8 那三項收回，還沒被審過）
+→ 收斂 → 蓋章 → 凍結 → 開工第一批 B1（我自己寫，每批交三家 code review）。</p>
+<p><strong>→ 治理看板／背景</strong>：健檢看板 <a href="IC健檢施工進度.html">IC健檢施工進度.md</a>（已收工）；偵察背景 <a href="IC健檢偵察結果.html">IC健檢偵察結果.md</a>。</p>
+<hr />
+<h2 id="現在在哪一眼版">現在在哪（一眼版）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>問題</th>
+<th>答案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>治理票總共幾張</td>
+<td><strong>61 張</strong></td>
+</tr>
+<tr>
+<td>做完幾張</td>
+<td><strong>0 張</strong>——九張的機制在跑，但都還不能算完成</td>
+</tr>
+<tr>
+<td>其餘</td>
+<td>未開工 44 張、部分完成 17 張</td>
+</tr>
+<tr>
+<td>每張還缺什麼</td>
+<td>都寫好了，看 <code>docs/GOV_TICKET_SOT.md</code></td>
+</tr>
+<tr>
+<td>下一步</td>
+<td>下表<strong>由上而下第一個未完成的那一項</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>數字會漂，權威一律看 <code>docs/GOV_TICKET_SOT.md</code></strong>（那份的表格是機器生成的）。
+這裡寫出來只是讓你一眼看到量級。</p>
+<hr />
+<h2 id="待辦清單機械產物我不能手改">待辦清單（機械產物，我不能手改）</h2>
+<p><strong>這張表就是「接下來要做什麼」的唯一來源。做完一項就把狀態改成「收案」，改的是資料檔，兩份文件同時更新。</strong>
+欄名見表頭（也是機械產物）。</p>
+<!-- BEGIN GENERATED: governance-worklist -->
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>序</th>
+<th>項目</th>
+<th>狀態</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>010</td>
+<td>WL-01</td>
+<td>收案</td>
+<td>P0 前置：fact_keys schema 由平面列擴為具名欄＋表格投影（columns／render）。三家 review＋閉合複驗＋戳記核可；票 B-25 殘留⑥之 schema 阻塞已解除</td>
+</tr>
+<tr>
+<td>020</td>
+<td>WL-02</td>
+<td>收案</td>
+<td>P1-a 判準資料化：判準入註冊表＋三道機械檢查（狀態列舉封閉／同適用範圍同條件不得相異期望／判準宿主區塊外不得陳述期望結束狀態）。字面設計經實測為零訊號已由三家 consult 改寫；三輪委員（consult→review→closure）、三家戳記核可。🔴 語意互斥不被攔截，見 docs/GOV_CRITERIA_REGISTRY.md 殘留 1</td>
+</tr>
+<tr>
+<td>030</td>
+<td>WL-03</td>
+<td>收案</td>
+<td>P1-b 機制證據登記：平台機制入專用登記表（receipt:／assumed: 封閉格式，receipt 須指向被驗樹內之真檔且非 symlink）＋顯式 opt-in 宿主之 <code>- 改法</code> 子樹掃描。三輪委員（consult→review→stamp×2）、兩份收斂檔各三枚戳記。🔴 誠實邊界：現樹訊號近零（opt-in 五宿主子樹 195 行、平台機制命中 0），價值在面向未來；子樹旁路四度被委員實構（發現曲線未收斂，改 parser 須重跑候選組）；偶發紅之 fail-open 已封但原始觸發未獨立重現。具名殘留 1-11 見 docs/GOV_MECHANISM_REGISTRY.md</td>
+</tr>
+<tr>
+<td>040</td>
+<td>WL-04</td>
+<td>未開工</td>
+<td>P1-c 戳記整行由 harness 自動生成，消滅 64 位 hex 手抄。票 B-54。🔴 BLOCKED：使用者定「票 SoT 統一與產出端覆蓋之確保都完成才能進本項」⇒ 前置＝governance-sot-plan 之 S0.1～S5.3 全部收案。設計已由三家 consult 定案（收斂檔 20260813-govwl04-x-consult-r1），票之修法方向須改寫：禁實作『自動生成整行』，改三條 harness 後處理</td>
+</tr>
+<tr>
+<td>050</td>
+<td>WL-05</td>
+<td>未開工</td>
+<td>P2 指令 tokenize 化：逐命令位置解 argv[0] 比對封閉 executor_clis。票 B-59（併 B-61 同型）。屬大重寫，須另立 epic</td>
+</tr>
+<tr>
+<td>060</td>
+<td>WL-06</td>
+<td>未開工</td>
+<td>P3 測試空心／假綠之機械判準。併入票 B-25，不新開票（既有：PATH劫持1條已修、test_verify_gate系列3條、未列入排除清單2條）</td>
+</tr>
+<tr>
+<td>070</td>
+<td>WL-07</td>
+<td>未開工</td>
+<td>管線豁免提案交三家（免SPEC/TODO之三條件；延伸檔，範圍由 govb1_scope.manifest 導出以免凍結變永久）</td>
+</tr>
+<tr>
+<td>080</td>
+<td>WL-08</td>
+<td>收案</td>
+<td>CLAUDE.md 去除會漂的值：code review 家數改指向 ORCH §1；pytest 秒數/測試數改為不漂的定性判準</td>
+</tr>
+<tr>
+<td>090</td>
+<td>WL-09</td>
+<td>未開工</td>
+<td>六張無批次歸屬之票排入執行序：B-48／B-50／B-51／B-52／B-53（排序凍結已解除，見 GOVERNANCE_EXECUTION_ORDER 之 RULED-BY；backlog:3129 之舊句已作廢）</td>
+</tr>
+<tr>
+<td>100</td>
+<td>WL-10</td>
+<td>未開工</td>
+<td>站級施工順序不在本表重述，見 docs/GOVERNANCE_EXECUTION_ORDER.md 之 governance-execution-order 區塊</td>
+</tr>
+</tbody>
+</table></div>
+<!-- END GENERATED: governance-worklist -->
+<h2 id="上表第四項的前置先把票整理成一份">上表第四項的前置：先把「票」整理成一份</h2>
+<p>你 8/13 說的：治理票的<strong>新增、刪減、修改、註解、狀態變更，只能有一套</strong>；
+而且<strong>這些做完才能進第四項</strong>。</p>
+<p><strong>原本的問題</strong>（已解決）：三個地方各記一份而且對不齊——同一張票在一邊叫「部分完成」、
+在另一邊只有「開著」兩種狀態，所以三家委員各自去數「做完幾張」會得到三個不同答案。</p>
+<p><strong>現在</strong>：<code>S0.6</code> 已經把第二套來源刪掉、舊長文標成作廢，
+票的狀態<strong>只有 <code>docs/GOV_TICKET_SOT.md</code> 一份</strong>，在別的地方手寫會被機器擋下。
+<code>S6.2</code> 又補上每張票的「還缺什麼」，所以連待辦內容也不必再翻舊文件。</p>
+<p>下表是施作順序，<strong>由上而下第一個未完成的就是現在在做的</strong>。
+狀態一樣只改一個地方，其他文件自動跟著變。</p>
+<!-- BEGIN GENERATED: governance-sot-plan -->
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>序</th>
+<th>步驟</th>
+<th>狀態</th>
+<th>內容</th>
+<th>驗收條件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0010</td>
+<td>S0.1</td>
+<td>收案</td>
+<td>定義票之全集如何機械列舉。🔴 原描述之前提已被實測推翻並更正：backlog 之 ## 標題共 61 張全為標準 B-&lt;數字&gt;，格式並無例外；真正的問題是<strong>票表混入 backlog 不存在的識別碼</strong>（B3R 無 ## B3R 標題，僅在他票內文被提及）＋ ## 標題另有群組標題等非票項。⇒ 列舉須同時封閉「哪些 ## 是票」與「票表不得含非票識別碼」。我起草→三家審</td>
+<td>bash scripts/ticket_universe.sh --check rc=0；重跑兩次輸出逐位元組相同；SoT 票集合恰等於列舉結果</td>
+</tr>
+<tr>
+<td>0020</td>
+<td>S0.2</td>
+<td>收案</td>
+<td>定義<strong>唯一一套</strong>狀態語意。🔴 原描述之前提已被實測推翻並更正：backlog 之 TICKET-STATUS 共 25 張（非 14），且有四態 OPEN／PARTIAL／DONE／PROVISIONAL——<strong>並非只有兩態、亦非表達不出「做了一半」</strong>。真正的問題是兩套值<strong>語意不對應且無映射</strong>（closure 用 未開工／部分完成／收案），加上兩邊涵蓋的票不同。我起草→三家審</td>
+<td>四個狀態值全在 status_enum；逐值反例——在受管檔寫「票號＋該值」皆須 rc≠0（含 已完成／狀態未確認）</td>
+</tr>
+<tr>
+<td>0030</td>
+<td>S0.3</td>
+<td>收案</td>
+<td>定義票之其餘欄位（標題／內容／註解／證據指標），使新增·刪減·修改·註解·狀態變更全部只能經同一套。我起草→三家審</td>
+<td>欄位齊備且 --check rc=0；改狀態只改 fact_keys 一處即全投影同步（反例：改投影檔須 rc≠0）</td>
+</tr>
+<tr>
+<td>0040</td>
+<td>S0.4</td>
+<td>收案</td>
+<td>逐張盤點 61 張票之真實狀態＋證據。🔴 我自產一版 ＋ 三家平行，逐張對照；分歧以證據裁定不數人頭（三家上輪各得 11／13／不同集合，因三來源本就對不齊）。每張須有可查證據（commit／測試名／收斂檔路徑），無證據者標「狀態未確認」不得猜</td>
+<td>SoT 中狀態未確認為 0；或未確認者逐張有具名理由且理由非「尚未查」</td>
+</tr>
+<tr>
+<td>0050</td>
+<td>S0.5</td>
+<td>收案</td>
+<td>落成機器可讀之 SoT（新 fact-key）。驗收：61 張全在、欄位齊備、--check 綠</td>
+<td>61 張全在、--check rc=0、已納入 status_keys</td>
+</tr>
+<tr>
+<td>0060</td>
+<td>S0.6</td>
+<td>收案</td>
+<td>🔴 消滅第二套：backlog 之 TICKET-STATUS 與 governance-ticket-closure 降為投影或作廢，不再是可獨立編輯之狀態源。<strong>不可逆體例變更，動手前改法先給使用者確認</strong></td>
+<td>舊來源皆標作廢；反例——在舊來源改狀態不影響 SoT，且新寫入被擋</td>
+</tr>
+<tr>
+<td>0070</td>
+<td>S0.7</td>
+<td>收案</td>
+<td>機械閘：SoT 之外手寫票狀態即 fail-closed（沿用既有手寫狀態偵測器）。驗收＝反例可構造。我→三家審。🔴 落法非新建閘，而是把兩個缺漏值補進 status_enum 使既有偵測器涵蓋完整。🔴 兩值的入列理由<strong>不同</strong>，勿混為一談（CODEX-R1-P1-01 實測更正主委原敘述）：狀態未確認＝<strong>S0.7 當時</strong> ticket-sot rows 實際在用（43 列），原缺即偵測有洞；已完成＝rows 並未使用，入列理由為 S0.2 驗收條件括號明列。🔴 上述兩個數字是<strong>當時的快照</strong>，S0.4 逐張補證據後 狀態未確認 已清零，現況一律看 docs/GOV_TICKET_SOT.md，勿引用本欄之數字，且加入後即在 GOVERNANCE_EXECUTION_ORDER 之非生成區塊抓到一處真實手寫漂移（該處寫 B1 已完成，而批次表權威值為 已落地）</td>
+<td>反例可構造：於 SoT 之外手寫任一狀態值即 rc≠0（逐值驗）</td>
+</tr>
+<tr>
+<td>0110</td>
+<td>S1.1</td>
+<td>收案</td>
+<td>封死幽靈票：enforcement 之 對應票 欄必須在票全集內。🔴 S0.4／S0.6 後<strong>原實例已失效並換形態</strong>（S0.7 後稽核更正）：B-38 現已在票 SoT（部分完成），原「在登記表、不在票表」不再成立；現存實例改為 enforcement 之對應票欄含<strong>非票號值</strong> G-7 與 測試套件——前者是判準代號、後者是泛稱，皆不在票全集內。⇒ 落法須先定義「合法對應票值」之封閉集合（票號 ∪ 顯式允許之非票標的），否則直接套用會把這兩列判死。依賴 S0.5（已收案）</td>
+<td>enforcement 之對應票填不存在之票號 ⇒ rc≠0</td>
+</tr>
+<tr>
+<td>0120</td>
+<td>S1.2</td>
+<td>收案</td>
+<td>rc=2 略過 改為可判別之 fail-closed。🔴 落法＝以<strong>承載目錄是否存在</strong>拆成兩路（封閉可判定）：目錄在而設定檔不在 ⇒ 環境異常 ⇒ rc=3 ⇒ fail-closed；目錄本身不在 ⇒ 真非主控端（fixture／沙箱）⇒ 仍略過。如此既堵住「刪檔即跳過全部掛載點對證」，又不使最小 fixture 整批誤紅。兩個對照測試成對釘住，證明修法精準非一律判紅。🔴 此洞為主委為修測試而引入（codex：『大聲印出不是阻擋』）</td>
+<td>settings.json 缺席時 rc≠0（非略過印訊息）</td>
+</tr>
+<tr>
+<td>0210</td>
+<td>S2.1</td>
+<td>收案</td>
+<td>收案綁定不只認「收案」字面，改綁 SoT 之所有完成語意。🔴 S0.6 後<strong>繞過路徑清單已縮減</strong>（S0.7 後稽核更正）：原列三條中，「backlog DONE」與「closure」兩條<strong>已隨作廢與刪除消失</strong>；現存繞法為①票 SoT 標「部分完成」而未登記覆蓋 ②governance-worklist 標「收案」③governance-batch-status／governance-sot-plan 標「收案」「已落地」——後兩者非票但同屬完成語意。問題本質不變（綁定只認單一字面），惟須以現存 status_keys 為準重新列舉（grok 實構）</td>
+<td>以任一「完成」語意標記票而未登記覆蓋 ⇒ rc≠0（不限收案字面）</td>
+</tr>
+<tr>
+<td>0220</td>
+<td>S2.2</td>
+<td>收案</td>
+<td>票在標完成<strong>之前</strong>即預警其產出端覆蓋缺口，非最後一刻才擋</td>
+<td>票標完成前即產生警告，且有測試釘住</td>
+</tr>
+<tr>
+<td>0310</td>
+<td>S3.1</td>
+<td>收案</td>
+<td>登記表支援多種 hook 事件（PreToolUse／PostToolUse／UserPromptSubmit／Stop）。🔴 現行只認 PostToolUse，會誤判 runtime 檢查為「應前移卻未前移」</td>
+<td>登記表可填 PreToolUse／UserPromptSubmit／Stop 並通過對證；填不存在之掛載 ⇒ rc≠0</td>
+</tr>
+<tr>
+<td>0320</td>
+<td>S3.2</td>
+<td>收案</td>
+<td>訂分類判準：內容型（單次編輯可判定）vs 一致性型（多步後才成立）。🔴 一致性型本質上做不到寫入前擋（實證：改註冊表在 PreToolUse 下會死鎖），該類是真豁免非藉口</td>
+<td>內容型與一致性型各有實例入表，且分類判準有測試</td>
+</tr>
+<tr>
+<td>0410</td>
+<td>S4.1</td>
+<td>收案</td>
+<td>依 SoT 機械導出所有已交付之票，不再靠判定式。🔴 本步由 S0.4 之完成而<strong>實質達成</strong>（S0.7 後稽核認定）：狀態填入 SoT 後，導出即為單一 jq 過濾，無需另建判定式。可重跑指令見 .claude/tmp/s04_export_delivered.sh（以 jq 對 governance-ticket-sot 之 rows 過濾狀態為 部分完成 或 收案 者取票號欄）⇒ 現得 17 張。🔴 此處刻意不內嵌 jq 指令：render=table 之儲存格禁管線符號，寫入會切碎表格（產出端守衛實際擋下過）。誠實邊界：機械化的是<strong>導出動作</strong>，不是狀態<strong>判定</strong>本身——判定仍由 S0.4 之人工＋三家完成，且其歸屬判準未機械化（CODEX-R4-P1-01）</td>
+<td>已交付票集合由 SoT 機械導出（指令可重跑），非人工判定</td>
+</tr>
+<tr>
+<td>0420</td>
+<td>S4.2</td>
+<td>收案</td>
+<td>逐張確認：檢查實際位置（檔:行）、掛載階段、屬內容型或一致性型。我＋三家</td>
+<td>每張已交付票有檢查位置紀錄（檔:行）</td>
+</tr>
+<tr>
+<td>0430</td>
+<td>S4.3</td>
+<td>收案</td>
+<td>能掛的掛上；不能的寫具名豁免。體例＝須同時寫「無等價判定之理由」與「部分閘是否已掛」</td>
+<td>每張已交付票於 enforcement 有列，或有具名豁免理由</td>
+</tr>
+<tr>
+<td>0440</td>
+<td>S4.4</td>
+<td>收案</td>
+<td>🔴 三家逐條複驗每一則豁免理由。驗收判準：登記不是免死金牌——票有可執行 artifact 卻無對應機械檢查時，「無檢查可掛」之登記不得當成完成；對外宣稱完成而無可證偽之閘與豁免列者，該宣稱視為空殼</td>
+<td>三家逐條複驗完成並戳記；reconcile_stamps_check rc=0</td>
+</tr>
+<tr>
+<td>0510</td>
+<td>S5.1</td>
+<td>收案</td>
+<td>三家 review 全鏈路</td>
+<td>三家 review 完成，收斂檔 findings 全數處置</td>
+</tr>
+<tr>
+<td>0520</td>
+<td>S5.2</td>
+<td>收案</td>
+<td>全套 gov_check 綠 ＋ 說明檔同步</td>
+<td>gov_check --no-probe rc=0 且 plain_docs_sync_check rc=0</td>
+</tr>
+<tr>
+<td>0530</td>
+<td>S5.3</td>
+<td>未開工</td>
+<td>解除 WL-04 之 BLOCKED（使用者定：這些確保都完成才能進 WL-04）。🔴 前置已擴充：除 S0.1～S5.2 外，另加 S6.1／S6.2（使用者 2026-08-14T08:20+08:00 交辦，須做完才 push；🔴 凡註記帶時間一律到分秒＋時區，只寫日期在單日多次變更時分不出先後——使用者 2026-08-14T09:18+08:00 定）</td>
+<td>WL-04 之 BLOCKED 標記移除，且前置全部為收案</td>
+</tr>
+<tr>
+<td>0610</td>
+<td>S6.1</td>
+<td>收案</td>
+<td>🔴 重審 S4.3 之 16 則豁免，改用<strong>正確判準</strong>。主委原判準為「能否掛 PreToolUse（寫入前）」，但那只證明不能寫入前擋，<strong>不能證明不能掛 PostToolUse</strong>——factkey_write_guard 即反例（它也要看整棵樹，照樣掛 PostToolUse）。codex 於 S4.4 之 E-004 修法建議已點到此理，主委照做卻未把同一推理套到其他列。逐列重問：這個檢查掛 PostToolUse 可行嗎？可行者改掛並改登記；不可行者具名寫出為何連寫入後都判不了。我＋三家</td>
+<td>每則豁免之理由明確區分「不能 PreToolUse」與「不能 PostToolUse」；可前移者已實際掛上並經反例驗證</td>
+</tr>
+<tr>
+<td>0620</td>
+<td>S6.2</td>
+<td>收案</td>
+<td>🔴 補齊票 SoT 之「還缺什麼」。現況：61 張中僅 13 張的狀態依據欄有寫缺口（全部來自原 closure 表），48 張沒有；完整改法<strong>只存在於已標作廢的 backlog 長文</strong>——狀態已單一化，但「待辦內容」尚未。逐張自 backlog 修法段抽出「還缺什麼才能完成」補入依據欄，使 backlog 真正可以不再看。🔴 依 S4.4 教訓：填此類內容前須先跑碼證掃描，不得憑印象（S4.3 憑印象填 13 則，四成有誤）。我＋三家</td>
+<td>61 張票之狀態依據欄皆含「還缺什麼」或明確標示「無殘留」；抽驗 5 張與 backlog 修法段一致</td>
+</tr>
+</tbody>
+</table></div>
+<!-- END GENERATED: governance-sot-plan -->
+<hr />
+<h2 id="現在在哪">現在在哪</h2>
+<p><strong>批次狀態是機械產物，下面這塊由資料檔生成——我不能手改，改了機器會擋。</strong>
+<code>B0</code>–<code>B7</code> 是第 0 批，<code>b1</code>–<code>b10</code> 是第 1 批。</p>
+<!-- BEGIN GENERATED: governance-batch-status -->
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>序</th>
+<th>批次</th>
+<th>狀態</th>
+<th>對外不得宣稱</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>010</td>
+<td>B0</td>
+<td>已落地</td>
+<td>無</td>
+</tr>
+<tr>
+<td>020</td>
+<td>B1</td>
+<td>已落地</td>
+<td>無</td>
+</tr>
+<tr>
+<td>030</td>
+<td>B2</td>
+<td>已落地</td>
+<td>無</td>
+</tr>
+<tr>
+<td>040</td>
+<td>B3</td>
+<td>停手</td>
+<td>無</td>
+</tr>
+<tr>
+<td>045</td>
+<td>B3R</td>
+<td>已落地</td>
+<td>不得稱 O(n)（實為 O(n·sqrt(n))）；不得稱修掉 fail-open；雙家 review 尚未戳記</td>
+</tr>
+<tr>
+<td>050</td>
+<td>B4</td>
+<td>部分完成</td>
+<td>無</td>
+</tr>
+<tr>
+<td>060</td>
+<td>B5</td>
+<td>未開工</td>
+<td>無</td>
+</tr>
+<tr>
+<td>070</td>
+<td>B6</td>
+<td>未開工</td>
+<td>無</td>
+</tr>
+<tr>
+<td>080</td>
+<td>B7</td>
+<td>未開工</td>
+<td>無</td>
+</tr>
+<tr>
+<td>110</td>
+<td>b1</td>
+<td>部分完成</td>
+<td>無</td>
+</tr>
+<tr>
+<td>120</td>
+<td>b2</td>
+<td>收案</td>
+<td>無</td>
+</tr>
+<tr>
+<td>130</td>
+<td>b3</td>
+<td>收案</td>
+<td>無</td>
+</tr>
+<tr>
+<td>140</td>
+<td>b4</td>
+<td>部分完成</td>
+<td>無</td>
+</tr>
+<tr>
+<td>150</td>
+<td>b5</td>
+<td>收案</td>
+<td>無</td>
+</tr>
+<tr>
+<td>160</td>
+<td>b6</td>
+<td>收案</td>
+<td>無</td>
+</tr>
+<tr>
+<td>170</td>
+<td>b7</td>
+<td>收案</td>
+<td>無</td>
+</tr>
+<tr>
+<td>180</td>
+<td>b8</td>
+<td>收案</td>
+<td>無</td>
+</tr>
+<tr>
+<td>190</td>
+<td>b9</td>
+<td>收案</td>
+<td>無</td>
+</tr>
+<tr>
+<td>200</td>
+<td>b10</td>
+<td>收案</td>
+<td>無</td>
+</tr>
+</tbody>
+</table></div>
+<!-- END GENERATED: governance-batch-status -->
+<p>🔴 <strong>「批次做完」不等於「票關掉」。</strong> 票的收案狀態與「對外不得宣稱什麼」，
+見 <a href="Archived/治理待辦總覽.html"><code>治理待辦總覽.md</code></a> 的同型生成區塊——那也是機械產物。</p>
+<hr />
+<h2 id="已知地雷動工前必看">已知地雷（動工前必看）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>地雷</th>
+<th>影響</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><s>稽核紀錄裡 <code>gate_deny</code> 的格式與其他事件不一樣（少一個空格）</s></td>
+<td>✅ <strong>已處理</strong>（站 2.6）。實測：那類 <strong>1385 筆全部無空格</strong>、其餘 <strong>3955 筆全部有空格</strong> ⇒ 用標準方式掃描會漏掉約四分之一、且剛好全是攔截紀錄。工具兩種都吃</td>
+</tr>
+<tr>
+<td>順序表的「生成區塊」有<strong>三份副本</strong>（正式文件＋兩份測試素材）</td>
+<td>改資料檔要同步三處；有機器擋，但會擋在推送時</td>
+</tr>
+<tr>
+<td>說明檔守衛只驗<strong>時序</strong>不驗<strong>內容</strong></td>
+<td>檔尾補一行標記就會變綠，標頭寫錯它不管</td>
+</tr>
+<tr>
+<td><strong>機械產物正確 ≠ 整份文件正確</strong></td>
+<td>生成區塊每次都對，<strong>區塊外的說明文字沒有任何檢查在看</strong>。本檔與 <code>GOV_TICKET_SOT.md</code> 都因此過期過。缺口已併入票 <code>B-16</code>／<code>B-21</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="剛做完你交代的10-件全部定案了">剛做完：你交代的「10 件」全部定案了</h2>
+<p>你說「<strong>可以掛的就要掛上去，只有掛和不掛兩種結果，不掛就要有原因，不是表格列出，
+是實際上線</strong>」。結果如下——<strong>每一項都是真的跑過，不是我判斷的</strong>。</p>
+<p><strong>真的掛上去了（4 項）</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>掛了什麼</th>
+<th>掛在哪</th>
+<th>什麼時候會擋你</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>四份執行合約的一致性檢查</td>
+<td>存檔當下</td>
+<td>改了 <code>CLAUDE.md</code>／<code>AGENTS.md</code> 等其中一份、忘了同步其他三份</td>
+</tr>
+<tr>
+<td>Phase 2 清單與 fixture 的一致性</td>
+<td>存檔當下</td>
+<td>改了來源 TODO 卻沒重生成 fixture</td>
+</tr>
+<tr>
+<td>票 <code>B-49</code> 的關票證據自檢</td>
+<td>存檔當下</td>
+<td>六格關票證據被掏空或改名（等於把關票的憑據抽掉）</td>
+</tr>
+<tr>
+<td>文件死連結檢查</td>
+<td>commit 當下</td>
+<td>新增了指向不存在標題的連結</td>
+</tr>
+</tbody>
+</table></div>
+<p>前三項走一支新的「窄觸發路由器」：<strong>跟這次改動無關就完全不跑</strong>，所以不會拖慢日常編輯。
+第四項每次要 3.6 秒，我量過窄化也省不掉（成本在建全庫索引），所以放在 commit 那一關——
+<strong>這就是你說的「耗費時間太多也是原因」</strong>。</p>
+<p>上線是驗過的：我臨時加一條指向必紅的樁，寫檔當下 hook 真的擋下來並把訊息餵回給我，
+然後才把臨時那條拆掉。</p>
+<p><strong>確定掛不上去（3 項，理由寫死在程式碼裡）</strong></p>
+<ul>
+<li><strong>三張跟派工有關的票</strong>（<code>B-7</code>／<code>B-32</code>／<code>B-50</code>）：我真的掛了一支探針去測。
+結果<strong>推翻了原本寫的理由</strong>——那個 hook 其實<strong>會</strong>在派工指令上觸發，
+但派工是背景執行，觸發的當下委員一個字都還沒寫出來，所以沒有東西可檢查。</li>
+<li><strong>草案自檢工具</strong>：委員會早就裁定過「它只能是提示、不能當關卡」，掛上去等於違反裁定。
+（順帶更正：交接檔原本寫它「現樹就是紅的」——那是我上次拿錯檔案去測，不是真的紅。）</li>
+<li><strong>解耦規則掃描器</strong>：這項卡住了，而且<strong>卡在別的地方</strong>，見下。</li>
+</ul>
+<p><strong>一個我修不掉的洞（要讓你知道）</strong></p>
+<p><code>CLAUDE.md</code> 裡標成「零容忍」的解耦規則，它的掃描器<strong>從 7 月 14 日起就沒跑過</strong>——
+它要求全體委員簽核那份豁免清單，而 grok 那時剛升正式委員、沒簽到，所以它一直卡在
+簽核那關，<strong>一行程式碼都沒掃</strong>。這輪我請 grok 補審補簽了，簽也簽上了，
+但系統仍不採信——因為驗證簽核來源的機制<strong>只認 <code>handoffs/</code> 資料夾裡的檔案</strong>，
+而那份清單放在 <code>scripts/</code>。既有的兩枚簽章之所以能過，是走了「舊資料豁免」，
+不是真的通過驗證。</p>
+<p><strong>我沒有去改那道驗證讓自己過關</strong>（你定死的規矩）。掛載需要的東西我全部備好了
+（只擋新增違反、既有 20 條債具名列管、9 條測試），差的就是那個機制本身要修。</p>
+<h3 id="-後續那個修不掉的洞修好了守門員活了">🔴 後續：那個「修不掉的洞」修好了，守門員活了</h3>
+<p>前面寫「解耦掃描器卡住、我不該自己去改那道驗證」——<strong>卡點找到了，而且不是驗證太嚴，是兩個 bug</strong>：</p>
+<ol>
+<li><strong>註冊產出時只收 <code>handoffs/</code> 資料夾的檔</strong>（硬編的）。那份豁免清單在 <code>scripts/</code>，
+所以委員簽了名也<strong>登記不進去</strong>。改法不是放寬，是<strong>明列一份「哪些檔可以被委員背書」的清單</strong>——
+只收完整檔名、不接受萬用字元，清單本身壞掉就直接擋。</li>
+<li>修完第一次<strong>還是紅</strong>，才發現第二個 bug：同一個檔，用「相對路徑」寫驗得過、
+用「絕對路徑」寫就不過——因為比對時沒把兩種寫法正規化。而掃描器剛好用絕對路徑。</li>
+</ol>
+<p>修好之後：<strong>掃描器從 2026-07-14 以來第一次真的跑完</strong>，而且已經掛到「存檔當下」——
+你之後改 <code>momentum/</code>、<code>api/</code> 的程式碼，新的解耦違反寫下去當天就會被擋
+（既有的 20 條列管，不會擋你）。每次 1.67 秒。</p>
+<h3 id="-把那兩萬行搬走的結果一份都搬不了">🔴 「把那兩萬行搬走」的結果：<strong>一份都搬不了</strong></h3>
+<p>盤了 42 份治理文件，四個判準全機械跑（誰被程式讀、誰被測試讀、誰被別的文件連到）。
+還加了一層：整群一起搬的話群內連結也一起搬，所以只被「同樣要搬的檔」連到的也算可搬。</p>
+<p><strong>跑完仍是 0 份可搬。</strong></p>
+<p>原因不是技術限制——連到那些檔的，正是<strong>你要留的那份票表</strong>和交接檔：</p>
+<pre><code>GOV_B49_ASBUILT_DELTA.md  ← 被 GOV_TICKET_SOT.md、HANDOFF.md 連到
+GOV_CRITERIA_REGISTRY.md  ← 被 GOV_TICKET_SOT.md、接下來要做什麼.md 連到
+</code></pre>
+<p><strong>那兩萬行不是雜訊，是票表的證據層。</strong> 票表每一列的「還缺什麼」只有一行摘要，
+細節就在那些檔裡。搬走等於把你要留的那份表的證據抽掉。</p>
+<p>⇒ <strong>判定不搬。</strong> 理由寫進 <code>docs/GOV_ACTIVE_MECHANISMS.md</code> §七.2。</p>
+<h2 id="-方向已改回量化主線">🔴🔴 方向已改：回量化主線</h2>
+<p>你說「現在開始就是要回去做量化主線」。ROADMAP 的優先序已經照這句改掉，
+它覆蓋兩條舊裁決（「治理做完才回 IC」「治理優先於產品線」）。
+<strong>治理留在現狀</strong>——已經掛上去的機制繼續跑，但<strong>不再擴建</strong>。</p>
+<h3 id="主線停在哪查證過不是印象">主線停在哪（查證過，不是印象）</h3>
+<pre><code>la0 → la1 → la2 → 1c → 1cfr → 1d      全部完成（1d 六批 B0–B5 逐項驗過）
+                                 ↑ 2026-07-22 收尾，之後 23 天零 commit
+下一個 = ★IC 全棧健檢 epic（你 2026-07-22 自己定的，吸收原「1f 空圖」）
+</code></pre>
+<p>🔴 它原本<strong>只存在於封存檔</strong>——2026-08-05 我把 ROADMAP 從 393 行砍到 111 行時，
+把整條主線的下一步一起砍掉了。已補回 ROADMAP。</p>
+<h3 id="測試怎麼建你定的邊走邊建立">測試怎麼建（你定的「邊走邊建立」）</h3>
+<p>你點破一件我反駁不了的事：<strong>基準和測試兩側都是我寫的，拿一個量另一個是循環</strong>，
+所以你沒辦法判斷紅綠是真是假。</p>
+<p>⇒ 往後新建測試優先選<strong>你能在不讀程式碼的前提下相信</strong>的那三類：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>類型</th>
+<th>為什麼你可以信</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>性質檢驗</strong></td>
+<td>例如「<code>t</code> 時刻的值不能依賴 <code>t+1</code>」「換掉 A 標的的資料、B 的輸出必須不變」。<strong>不需要我凍任何期望值</strong>，錯了就是數學上錯</td>
+</tr>
+<tr>
+<td><strong>真實 kline</strong></td>
+<td>外部資料，不是我造的</td>
+</tr>
+<tr>
+<td><strong>跟第三方對照</strong></td>
+<td>用 <code>scipy</code>／<code>statsmodels</code> 再算一次，量尺不是我寫的</td>
+</tr>
+<tr>
+<td>⚠️ 凍結 golden 比對</td>
+<td>能不用就不用——這正是今天出事的那類</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="-我做的盤點工具結論是錯的">🔴 我做的盤點工具，結論是錯的</h3>
+<p>我寫了支工具盤「哪些基準已經過期」，報了「32 個失效、40 個孤兒」。
+<strong>你問一句「你確定嗎」，我自己去打，找到兩個各自就足以推翻結論的 bug</strong>：</p>
+<ol>
+<li>我用<strong>檔名</strong>找誰在用這個基準。實際上叫 <code>baseline.json</code> 的檔只有 2 個，
+但提到這個字串的測試檔有 14 個 ⇒ 全被算進去，日期整個是假的。</li>
+<li>測試常用「資料夾＋動態組檔名」讀基準，我的檔名比對抓不到
+⇒ <strong>有在用的被判成孤兒</strong>。照著清會直接弄壞測試。</li>
+</ol>
+<p>而且我還附了「自檢通過」——<strong>它是為錯的理由通過的</strong>，只驗標籤沒驗推導。</p>
+<p>⇒ <strong>那 72 個一個都不動。</strong> 改成「碰到才處理」：哪天你動到某模組、它的 golden 炸了，
+當場決定重凍還是作廢。</p>
+<h3 id="-推送被自己的閘擋了一次">🔴 推送被自己的閘擋了一次</h3>
+<p>第一次推送<strong>被拒</strong>，兩條測試紅——<strong>都是我上一輪種下的</strong>，而且上一輪我只跑了
+「跟這次改動相關」的測試子集，所以延到推送才爆：</p>
+<ol>
+<li>一份測試用的假環境<strong>寫死了要複製哪些檔</strong>。我把某個檢查改掛到新腳本，
+假環境裡沒那個檔 ⇒ 整個產生器失敗 ⇒ <strong>所有項目都報錯</strong>，真正的原因被蓋住。
+（那段程式碼旁邊自己就寫著「不要寫死清單」——它防了一欄卻沒防另一欄。）</li>
+<li>我上一輪加的守衛擋到一條既有測試。查了之後確認<strong>不是守衛太嚴，是那條測試的
+假資料自相矛盾</strong>（宣稱「這輪沒問題」，假資料裡卻放了一個問題）。</li>
+</ol>
+<p>兩條都修了，<strong>斷言一字沒改</strong>——改的是自相矛盾的假資料與寫死的清單。</p>
+<h3 id="這一批的完成狀態已收尾三家蓋章過">這一批的完成狀態：<strong>已收尾，三家蓋章過</strong></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>關卡</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>三家審查</td>
+<td>✅ 16 條問題，全部採納、全部修掉，沒有一條被我退回</td>
+</tr>
+<tr>
+<td>原提出方複驗</td>
+<td>✅ 三家各自<strong>重跑自己當初的反例</strong>，確認真的關閉（不是看碼說已修）</td>
+</tr>
+<tr>
+<td>三家蓋章</td>
+<td>✅ 全數 APPROVED，指紋三家各自算、三個值一樣，機器複核通過</td>
+</tr>
+<tr>
+<td>說明檔同步</td>
+<td>✅ 九份全綠</td>
+</tr>
+<tr>
+<td>推送</td>
+<td>⬜ <strong>等你說</strong>（目前累積 6 筆未推）</td>
+</tr>
+<tr>
+<td>全套測試</td>
+<td>⬜ 沒跑（14 分鐘，不推就先不跑）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>其中最該讓你知道的</strong>：我在收斂檔裡標了兩處「這裡我沒修，是能力邊界」。
+grok <strong>真的去查了</strong>——他逐形態構造，確認我說已修的都真的不再命中、
+我說沒修的那一種<strong>確實仍然命中</strong>。⇒ 我沒有把沒做的說成做了。</p>
+<p>我也報錯了一個數字：上一則跟你說測試 10 條，<strong>實際 9 條</strong>，三家報的都是 9。已更正。</p>
+<hr />
+<h2 id="下一步">下一步</h2>
+<p><strong><code>S5.3</code></strong>——解除待辦清單第四項（<code>WL-04</code>）的 BLOCKED。</p>
+<p>它的前置（上表 <code>S0.1</code>～<code>S5.2</code> 加 <code>S6.1</code>／<code>S6.2</code>）<strong>現在全部滿足了</strong>，所以這一步本身很小：
+確認前置齊備、把 BLOCKED 標記拿掉。</p>
+<p><strong>再往下</strong>就進 <code>WL-04</code> 本體：消滅委員手抄 64 位雜湊。設計三家已經定案，
+而且<strong>方向被改過</strong>——原本要「自動生成整行」，委員指出那會讓戳記退化成橡皮圖章
+（委員沒真的比對也能蓋章），改成三條後處理。</p>
+<hr />
+<h2 id="自己查摩擦統計">自己查摩擦統計</h2>
+<p>🔴 <strong>這裡不寫死數字</strong>——紀錄檔每天在長，寫死當天就過期。要看現值跑這兩條：</p>
+<!-- BEGIN FRICTION-CMD -->
+<p>bash scripts/friction_tally.sh --by-event
+bash scripts/friction_tally.sh --field-presence</p>
+<!-- END FRICTION-CMD -->
+<blockquote>
+<p>第一條給「每種事件各幾次」，第二條給「哪些欄位有／沒有，各幾次」。
+這個區塊<strong>有測試釘住它必須在本檔</strong>（<code>test_friction_cmd_block_exact_two_command_closure</code>）——
+2026-08-14 重整時我把它連同敘事一起搬到日誌檔，當場弄壞那條測試、推送被擋。</p>
+</blockquote>
+<hr />
+<h2 id="需要你決定的">需要你決定的</h2>
+<p><strong>目前沒有。</strong> 下一步是 <code>S5.3</code>，我做完回報。</p>
+<p>真正需要你拍板的是<strong>更上層的取捨</strong>：治理這條線要做到什麼程度才回頭做量化本業。
+現在 61 張票<strong>一張都還沒收案</strong>，如果全部做完會是很長的路——
+但多數票的殘留已經逐張寫清楚了，你可以直接看 <code>docs/GOV_TICKET_SOT.md</code> 判斷哪些值得做。</p>
+<hr />
+<blockquote>
+<p>🔴 <strong>2026-08-14 夜二追記</strong>：ROADMAP 已重整為狀態表（103 行），敘事移入 <code>docs/ROADMAP_DETAIL.md</code>。
+主委四次說要改、四次講完就放掉，第五次才做。<strong>打開 ROADMAP 第一眼看到的不再是治理 P0，是量化主線。</strong></p>
+</blockquote>
+<blockquote>
+<p>🔴 <strong>2026-08-14 夜三追記</strong>：<code>HANDOFF.md</code> 也改了——它原本有<strong>四個「接手第一件事」</strong>，
+而它是每個 session 自動注入的那一份。現在只剩一個，寫著「回量化主線，不是治理」，
+並指向 <code>docs/ROADMAP.md</code> 狀態表。<strong>ROADMAP 改了而 HANDOFF 沒改，下一手照樣會走回治理。</strong></p>
+</blockquote>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/接下來要做什麼.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

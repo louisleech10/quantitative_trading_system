@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IC 健檢施工進度看板</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">IC健檢施工進度.md</span></nav>
+<main>
+<h1 id="ic-健檢施工進度看板">IC 健檢施工進度看板</h1>
+<p><strong>這份是白話版</strong>：SPEC/TODO 在做哪些事、每件做到哪。技術版＝<code>docs/IC_HEALTHCHECK_SPEC.md</code>＋<code>docs/IC_HEALTHCHECK_TODO.md</code>（皆已凍結）。
+狀態欄我每次 commit 會更新；要看最即時的程式碼證據，看 git log 的 <code>feat(ic-hc)</code> 系列。</p>
+<h2 id="走到哪了一眼版">走到哪了（一眼版）</h2>
+<pre><code>偵察（四方查證）完成 → SPEC（三家審→修→複驗→蓋章）凍結 → TODO（同流程）凍結
+→ **六批全部完成** → **三家 code review 完成**（8 條意見：5 修 2 具名殘留 1 契約回應；修補經原提出方複驗全關閉、三家蓋章）→ **✔ EPIC 收工（2026-08-17）**
+→ 下一步＝缺口票排程（docs/IC_QUANT_GAP_REGISTRY.md，首位 DSR/PBO/MinBTL）
+</code></pre>
+<h2 id="這個-epic-到底在做什麼一句話">這個 epic 到底在做什麼（一句話）</h2>
+<p>修掉健檢抓到的<strong>三個會誤導你的錯</strong>，並建一套<strong>機器自動抓「假開關、空圖、沒人看的數字」的閘門</strong>，讓這類病永久絕種。</p>
+<h2 id="六批任務與狀態">六批任務與狀態</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>批</th>
+<th>任務</th>
+<th>白話</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>第1批</strong></td>
+<td>1.1 契約檔</td>
+<td>前後端資料格式寫成一份「憲法檔」，誰違反機器就報錯</td>
+<td>✅ <strong>完成已 commit</strong>（12 測試綠）</td>
+</tr>
+<tr>
+<td><strong>第2批</strong></td>
+<td>2.0 凍結基準</td>
+<td>改碼前先用真實 K 線把分位圖數值全部拍照存證（ETHUSDT/12h、14 特徵）</td>
+<td>✅ 完成（重跑兩次 byte 相同）</td>
+</tr>
+<tr>
+<td><strong>第2批</strong></td>
+<td>2.1 修分位圖空白</td>
+<td>後端把「盒子套盒子」攤平成前端讀得懂的形狀；<strong>數值一個都不准變</strong>（跟拍照比對）</td>
+<td>✅ <strong>完成已 commit</strong>——基準比對 exact 相同；出口矩陣（JSON/CSV/落地重讀）4 綠；前端圖測 3 綠；API 子路由 7 綠；全套 A/B 比對<strong>零新增紅</strong>（14 條既有紅與改動前逐字相同，已具名列管）</td>
+</tr>
+<tr>
+<td><strong>第3批</strong></td>
+<td>3.1+3.2 修橫截面空殼</td>
+<td>四類空資料改成明說「此模式不適用」；前端顯示對應文案；漏斗圖在橫截面模式收起來（它的資料格式在該模式對不上）</td>
+<td>✅ <strong>完成已 commit</strong>——後端 status 4 綠；前端 49 綠（新增契約文案卡＋四節分流＋漏斗 gate）；全套 A/B 零新增紅</td>
+</tr>
+<tr>
+<td><strong>第4批</strong></td>
+<td>4.2+4.1 修事件靜默騙人</td>
+<td>你傳的事件時間戳從「收了就丟」改成真的生效；事件樣本不足退回全樣本時，頁面亮紅條說明</td>
+<td>✅ <strong>完成已 commit</strong>——接線當天挖出<strong>四個一直藏著的真 bug</strong>（時間戳清單塞爆報告、epoch 整數欄恒零命中、兩條路徑的 fallback 丟參）；其中「fallback 該不該保留事件」觸發斷路器開委員會，三家一致裁定保留（我原本的傾向被推翻）；12 測試綠＋全套零新增紅</td>
+</tr>
+<tr>
+<td><strong>第5批</strong></td>
+<td>5.3 換手開關真語意</td>
+<td>關掉換手開關就真的不算（現在關了照算）；Net IC 因此沒輸入時，顯式說「不可用：換手已停用」而不是靜默消失</td>
+<td>✅ <strong>完成已 commit</strong>——4 測試綠（含預設仍開啟的回歸）</td>
+</tr>
+<tr>
+<td><strong>第5批</strong></td>
+<td>5.1+5.2 接線閘門</td>
+<td>機器自動查三件事：UI 開關必須真連後端／後端算的必須有人看／空白必須有原因。這次抓到的幽靈開關全部列管</td>
+<td>✅ <strong>完成已 commit</strong>——掃描器上線（24 開關全查、11 條殘留具名列管、注入假開關必變紅）；首跑就抓到一條假陽性並修正，證明它真的在看</td>
+</tr>
+<tr>
+<td><strong>第6批</strong></td>
+<td>6.1–6.3 誠實契約</td>
+<td>容量沒資料就標 unknown（測試釘死防回退）；文件明寫「切分現在只有 holdout」；兩個沒人讀的死設定移除（舊設定檔不會爆，會警告）</td>
+<td>✅ <strong>完成已 commit</strong>——12 測試綠；移除死設定連帶 config 指紋變更，基準重凍並機械證明 14 特徵數值逐位不變</td>
+</tr>
+<tr>
+<td><strong>第6批</strong></td>
+<td>6.4 缺口登記</td>
+<td>六張未來票（DSR 防過擬合／IC-ML 橋／事件真套件／pooled IC／容量資料／規模上限）寫進 registry＋ROADMAP，白話檔加排程對照</td>
+<td>✅ <strong>完成已 commit</strong>——registry 六票＋ROADMAP 六列＋白話排程節</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="品質關卡每批都要過">品質關卡（每批都要過）</h2>
+<ul>
+<li>每批完工→測試全綠→獨立 commit（可單獨回退）</li>
+<li>七條「故意改壞必須變紅」的防偽探針（M1–M7），驗收時逐條實跑</li>
+<li>全部批次完工後→Codex＋Composer＋Grok 三家 code review→白話總結給你</li>
+</ul>
+<h2 id="流程軌跡審查不是橡皮圖章的證據">流程軌跡（審查不是橡皮圖章的證據）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>關卡</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SPEC 三家對抗審</td>
+<td>19 條意見（含 1 條三家同判的我方錯誤），全採納修訂</td>
+</tr>
+<tr>
+<td>SPEC 複驗＋蓋章</td>
+<td>三家重跑自己反例 19/19 關閉，全數 APPROVED</td>
+</tr>
+<tr>
+<td>TODO 三家對抗審</td>
+<td>20 條意見（含 2 條行為級抓漏：紅標落點錯、呼叫鏈斷點），全採納修訂</td>
+</tr>
+<tr>
+<td>TODO 複驗＋蓋章</td>
+<td>20/20 關閉，全數 APPROVED</td>
+</tr>
+<tr>
+<td>B1 實作</td>
+<td>12 新測試＋23 回歸全綠</td>
+</tr>
+<tr>
+<td>B2 基準比對</td>
+<td>攤平前後數值 exact 相同（golden 6/6）</td>
+</tr>
+</tbody>
+</table></div>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/IC健檢施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

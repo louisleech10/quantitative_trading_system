@@ -150,4 +150,23 @@ if [ -f scripts/no_append_only_check.sh ]; then
   fi
 fi
 
+# ── 白話說明 → docs/site HTML 產出（小任務 3b；使用者 2026-08-18 定）──────────────
+# 來源維持 .md 不動；staged 含 白話說明/**.md（含刪除）或渲染器本身 ⇒ 重生成並 `git add -A docs/site`，
+# 再 `--check`（每個 .md 都有對應且最新的 .html、0 死連結）不過 ⇒ **擋 commit**（缺產出即擋）。
+# 產出端強制（第 3 條治理原則）：與白話檔同 commit 產出，不靠人記得跑。
+# 誠實邊界：渲染讀的是工作樹 .md（部分 staging 時 html 反映工作樹版本）；`--no-verify` 可繞（同級既有機檢）。
+if [ -f scripts/plain_docs_render.sh ] && [ -f scripts/plain_docs_render.py ]; then
+  _pdr_staged="$(git -c core.quotepath=false diff --cached --name-only --diff-filter=ACMRD -- '白話說明/*.md' '白話說明/Archived/*.md' scripts/plain_docs_render.sh scripts/plain_docs_render.py 2>/dev/null | head -1)"
+  if [ -n "${_pdr_staged}" ]; then
+    bash scripts/plain_docs_render.sh >/dev/null 2>&1
+    git add -A docs/site docs/.nojekyll 2>/dev/null || true
+    bash scripts/plain_docs_render.sh --check
+    _pdr_rc=$?          # 🔴 rc 直接取，禁經 pipe
+    if [ "${_pdr_rc}" -ne 0 ]; then
+      echo "pre-commit: 🔴 白話說明 HTML 產出缺失／過期／有死連結——已嘗試重生成；仍紅表示 .md 有死連結，修好再 commit" >&2
+      exit 1
+    fi
+  fi
+fi
+
 exec "$py" "$checker" --staged
