@@ -13,7 +13,7 @@
 |---|---|---|
 | B1 | 契約 JSON 單一真相源＋邊際 IC 純函式＋9 類 oracle＋探針腳本 | ✅ **收案**（三家 code review 11 條全處置＋三家蓋章 PASS；46 測試全綠、10 mutation 全紅）|
 | B2 | 多因子組合＋區塊 bootstrap 信賴區間 | ✅ **收案**（三家 code review 4 條全處置＋三家蓋章 PASS；45 測試全綠、3 mutation 全紅）|
-| B3 | 契約讀取／驗證／組裝（缺欄／多欄／枚舉外／身分不符都擋） | ✅ 寫完（35 條測試全綠；8 條 mutation 全紅）→ 待三家 code review＋蓋章 |
+| B3 | 契約讀取／驗證／組裝（缺欄／多欄／枚舉外／身分不符都擋） | ✅ 寫完＋三家 code review 10 條全處置（codex 8 條全修好、兩家零意見）；44 條測試全綠、8 條 mutation 全紅；待戳記輪（兼修補驗收）→ B3 收案 |
 | B4 | 接進 IC 主流程（三個入口＋fallback）、倖存者檔、報告新節、golden、wiring 改讀契約、預算 receipt | — |
 | B5 | 前端：型別鏡像＋開關（預設開）＋一張唯讀表格 | — |
 
@@ -30,3 +30,4 @@
 - 第 2 批 code review：codex 抓到 bootstrap 信賴區間在極端參數（只重抽 1 次）下可以不含點估——這違反規格 O9 的硬要求；修法是回傳「百分位區間與觀測值的包絡」（先試「把觀測值也丟進分佈」，被自己的另一條測試打回：內插分位數仍可能不含），兩檔各加 `n_bootstrap=1` 迴歸；另一條是函式簽名型別放寬，改回 typed。composer／grok 零意見。
 - 第 2 批蓋章：codex 又抓到一個字面級細節——`from __future__ import annotations` 下我把型別註記寫成字串，`inspect.signature` 顯示多一層引號，與 brief 判準字面不符；一行改掉、codex 單家獨占重驗即過。兩家一次 APPROVED。
 - 第 3 批寫完（8/19）：`resolve_ref`（跨檔引用 fail-closed）、`compute_event_identity`（事件時間戳→毫秒→去重排序→sha256；查詢模式只 hash 查詢字串）、`validate_survivor_output`（每一層物件都查缺鍵／多鍵／型別／可空；枚舉；OOS 四欄互斥；`feature_set_hash` 重算；身分三欄與報告對照）、`build_survivor_output`（純組裝，不寫檔）。8 條 mutation：拿掉 sample_scope／放寬多鍵／契約 kind 偷加 panel／不驗 independent_oos／symbol・timeframe・case_id 各自寫死／略過 hash 重算——全部改壞就紅。既有 report 契約同步測試仍綠（本批沒碰它）。
+- 第 3 批 code review：codex 8 條全部成立、全修：最要緊的一條（P0）是我把「前處理的 fit_mode」（值是 train_mask／pit_expanding／full_sample）拿去用「投影 fit_scope」的枚舉驗，接主流程時正常 holdout 會被自己的 validator 拒絕——改為原值記錄、不映射；其餘：跨檔引用只准 repo 內相對路徑、事件身分依模式驗 hash 與計數不變式、fallback 時必須傳真實 index（不准用 0..n 位置冒充）、未知 root 狀態直接報錯不降級、樣本數與切分列數對帳（考慮 purge／embargo 用 ≥ 而非 ==）、checklist 補巢狀鍵、事件時間戳 naive 字串同 hash。composer／grok 零意見。

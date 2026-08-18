@@ -277,8 +277,14 @@ def test_missing_required_key_raises(path):  # ②
         sc.validate_survivor_output(payload)
 
 
-@pytest.mark.parametrize("path", [(), ("sample_scope",), ("split",), ("provenance",), ("composite",), ("survivors", 0), ("split", "row_identity")])
-def test_unknown_key_raises(path):  # ③ ⑩
+@pytest.mark.parametrize("path", [(), ("sample_scope",), ("split",), ("provenance",), ("composite",), ("survivors", 0), ("split", "row_identity"), ("removed_candidates", "z"), ("composite", "weights_dummy_parent")])
+def test_unknown_key_raises(path):  # ③ ⑩（含 nested composite／removed_candidates tamper）
+    if path == ("composite", "weights_dummy_parent"):
+        payload, _ = _valid_payload()
+        payload["composite"]["__extra__"] = 1  # composite 物件層加鍵
+        with pytest.raises(ContractValidationError):
+            sc.validate_survivor_output(payload)
+        return
     payload, _ = _valid_payload()
     node = payload
     for p in path:
@@ -363,15 +369,24 @@ def test_checklist_subset_of_contract_keys():  # ⑭
     checklist = {
         "survivor_file_keys": ["symbol", "timeframe", "case_id", "sample_scope", "provenance", "split", "feature_names", "feature_set_hash", "survivors", "composite",
                                "analysis_status", "oos_guarantees", "pass_class", "independent_oos_validation", "selection_sample", "oos_semantics", "statistic"],
-        "sample_scope_keys": ["kind", "event", "degraded"],
+        "sample_scope_keys": ["kind", "event", "n_samples_total", "n_samples_test", "degraded"],
         "event_definition_keys": ["definition_hash", "timestamps_hash", "mode", "n_events", "n_timestamps_requested"],
         "provenance_keys": ["config_hash", "features_source_hash", "labels_content_hash", "features_path", "pit_stats_version", "fit_mode", "ic_method", "label_horizon", "label_return_type", "report_ref", "producer", "contract_version", "algorithm_version"],
         "split_keys": ["split_method", "train_time_bounds", "test_time_bounds", "train_rows", "test_rows", "embargo", "purge_gap", "base_universe_hash", "selection_scope_id", "row_identity"],
         "row_identity_keys": ["train_index_hash", "test_index_hash"],
-        "survivor_record_keys": ["ic_mean", "icir", "p_value_adj", "pass_class", "train_ic", "gross_ic", "marginal_ic_loo", "marginal_ic_loo_ci95", "marginal_ic_train_insample", "redundancy_kept"],
+        "survivor_record_keys": ["feature_name", "ic_mean", "icir", "p_value_adj", "pass_class", "train_ic", "gross_ic", "marginal_ic_loo", "marginal_ic_loo_ci95", "marginal_ic_train_insample", "redundancy_kept"],
     }
     for schema_name, items in checklist.items():
         assert set(items) <= set(c[schema_name]["keys"].keys()), schema_name
+    # R18 CODEX-R18-P1-07：nested composite／removed_candidate 義務項（SPEC L179「composite＝B2 結果去序列」／removed_candidates）
+    nested = {
+        "composite_keys": ["method", "weights", "signs", "composite_ic", "composite_ic_train_insample", "top_train_single", "top_train_single_test_ic", "delta_vs_top_train_single", "delta_ci95", "fit_scope", "oos_guarantees"],
+        "removed_candidate_keys": ["status", "reason", "conditioning_set", "marginal_ic", "gross_ic", "ci95"],
+        "view_status_keys": ["status", "reason"],
+    }
+    sec = c["marginal_ic_section_keys"]
+    for schema_name, items in nested.items():
+        assert set(items) <= set(sec[schema_name]["keys"].keys()), schema_name
 
 
 def test_identity_three_fields():  # ⑮
@@ -465,3 +480,106 @@ def test_mutation_validator_skips_feature_set_hash(monkeypatch):
         mutant_raised = True
     with pytest.raises(AssertionError):
         assert mutant_raised, "oracle ⑫ 於 mutant 下應失效（篡改 hash 未被抓）"
+
+
+# ---------------------------------------------------------------- R18 修補（CODEX-R18-P0-01／P1-02..06／P2-08）
+def test_provenance_fit_mode_raw_orchestrator_values_accepted():
+    """P0-01：provenance.fit_mode 為 orchestrator 前處理 fit_mode 原值（train_mask／pit_expanding／full_sample），不映射、不受 fit_scope 枚舉限制。"""
+    for fm in ("train_mask", "pit_expanding", "full_sample"):
+        kw, _ = _build_kwargs()
+        kw["fit_mode"] = fm
+        p = sc.build_survivor_output(**kw)
+        sc.validate_survivor_output(p)
+        assert p["provenance"]["fit_mode"] == fm
+    b, _ = _valid_payload(); b["provenance"]["fit_mode"] = "  "
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+
+
+def test_resolve_ref_rejects_escape(tmp_path):
+    """P1-02：絕對路徑／`..`／逃出 repo root 一律 raise。"""
+    outside = tmp_path / "o.json"
+    outside.write_text(json.dumps({"k": [1]}), encoding="utf-8")
+    with pytest.raises(ContractValidationError):
+        sc.resolve_ref(f"{outside}#k")
+    with pytest.raises(ContractValidationError):
+        sc.resolve_ref("../etc/passwd#k")
+    with pytest.raises(ContractValidationError):
+        sc.resolve_ref("momentum/../../outside.json#k")
+
+
+def test_event_object_mode_invariants():
+    """P1-03：mode=timestamps 缺 hash／計數、query 帶 timestamps_hash、none 帶 hash ⇒ raise。"""
+    ident = sc.compute_event_identity(None, ["2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"])
+    kw, _ = _build_kwargs(event=ident)
+    p = sc.build_survivor_output(**kw)
+    sc.validate_survivor_output(p)
+    b = _copy.deepcopy(p); b["sample_scope"]["event"].update({"definition_hash": None, "timestamps_hash": None, "n_events": None, "n_timestamps_requested": None})
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(p); b["sample_scope"]["event"]["timestamps_hash"] = "0" * 64
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(p); b["sample_scope"]["event"]["n_timestamps_requested"] = 1
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(p); b["sample_scope"]["event"].update({"mode": "query"})
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    b = _copy.deepcopy(p); b["sample_scope"]["event"].update({"mode": "none"})
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(b)
+    q = sc.compute_event_identity("q", None)
+    kwq, _ = _build_kwargs(event=q)
+    pq = sc.build_survivor_output(**kwq)
+    sc.validate_survivor_output(pq)
+    assert pq["sample_scope"]["kind"] == "event"
+
+
+def test_fallback_requires_full_index_and_uses_real_index():
+    """P1-04：無 split 時 full_index 必傳（缺 ⇒ raise）；row_identity 用真實 index（timestamp index 與 arange 不同）。"""
+    kw, _ = _build_kwargs()
+    kw["split_context"] = None
+    kw["root_analysis_status"] = "degraded_full_sample"
+    with pytest.raises(ContractValidationError):
+        sc.build_survivor_output(**kw)
+    idx = _pd.date_range("2024-01-01", periods=5000, freq="12h")
+    kw["split_context"] = {"full_index": idx}
+    p = sc.build_survivor_output(**kw)
+    sc.validate_survivor_output(p)
+    assert p["split"]["row_identity"]["train_index_hash"] == _cih(idx) != _cih(_np.arange(5000))
+    assert p["split"]["train_rows"] == p["split"]["test_rows"] == 5000
+
+
+def test_unknown_root_status_raises():
+    """P1-05：未知 root status fail-closed。"""
+    kw, _ = _build_kwargs(root="research_only")
+    with pytest.raises(ContractValidationError):
+        sc.build_survivor_output(**kw)
+
+
+def test_n_samples_total_reconciliation():
+    """P1-06：n_samples_total 須 ≥ marginal／split 列數和；marginal n_test 與 split test_rows exact；非正整數 raise。"""
+    kw, _ = _build_kwargs()
+    kw["report_meta"] = {**kw["report_meta"], "n_samples": 1}
+    with pytest.raises(ContractValidationError):
+        sc.build_survivor_output(**kw)
+    kw["report_meta"] = {**kw["report_meta"], "n_samples": 0}
+    with pytest.raises(ContractValidationError):
+        sc.build_survivor_output(**kw)
+    kw2, test_plan = _build_kwargs()
+    kw2["report_meta"] = {**kw2["report_meta"], "n_samples": 6000}  # purge/embargo 情境：total > train+test 合法
+    p = sc.build_survivor_output(**kw2)
+    assert p["sample_scope"]["n_samples_total"] == 6000 and p["sample_scope"]["n_samples_test"] == 2000
+    kw3, _ = _build_kwargs()
+    kw3["split_context"]["test_plan"] = _NS(**{**vars(kw3["split_context"]["test_plan"]), "row_index": _np.arange(10)})
+    with pytest.raises(ContractValidationError):
+        sc.build_survivor_output(**kw3)
+
+
+def test_event_identity_naive_string_matches_aware():
+    """P2-08：naive 字串與 aware／ms／s 同 hash。"""
+    aware = sc.compute_event_identity(None, ["2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"])
+    naive = sc.compute_event_identity(None, ["2024-01-01 00:00:00", "2024-01-02 00:00:00"])
+    ms = sc.compute_event_identity(None, [1704067200000, 1704153600000])
+    assert aware["timestamps_hash"] == naive["timestamps_hash"] == ms["timestamps_hash"]

@@ -39,3 +39,12 @@
 ## A1-8 — bootstrap CI 恆含點估之定義（母 SPEC §G O9「CI 含點估」；來源 R15 CODEX-R15-P1-01；收斂檔 `handoffs/reconcile/20260819-gap2-b2-review-r15/synth.md` L1）
 - 母 SPEC O9 要求 CI 含點估，但 percentile bootstrap 不保證（`n_bootstrap=1` 或偏態下可重現不含）。
 - 決策：`block_bootstrap_ci` 回傳 **percentile CI 與觀測統計量之包絡** `(min(q0.025, point), max(q0.975, point))`（`point=stat_fn(*arrays)`；非有限時不包絡）；`marginal_ic.ci95` 與 `composite.delta_ci95` 同源受惠；O9 兩檔加 `n_bootstrap=1` containment 迴歸。同輪 L2：`combine_factors` 簽名恢復 `params: MarginalICParams`（`TYPE_CHECKING` 匯入）／`fit_scope: Literal["train","full_sample"]`。
+
+## A1-9 — B3 code review 修補之語意釘死（來源 R18 CODEX-R18-P0-01／P1-02..P1-07／P2-08；收斂檔 `handoffs/reconcile/20260819-gap2-b3-review-r18/synth.md`）
+- **`provenance.fit_mode`**＝orchestrator 前處理 `fit_mode` **原值**（`full_sample|train_mask|pit_expanding`），validator 只驗非空字串；與 `composite.fit_scope`（契約 `fit_scope_values`）語意不同、**不映射**（P0-01：原 validator 誤以 fit_scope 枚舉驗之，holdout 之 `train_mask` 會被拒）。B4 整合測試須以真實 holdout 路徑跑一次 build→validate。
+- **`resolve_ref`** 只准 repo 相對路徑（拒絕絕對路徑／`..`／resolve 後逃出 repo root）。
+- **event 物件不變式**：`timestamps` ⇒ 兩 hash 64-hex 且相等、`n_events≥1`、`n_timestamps_requested≥n_events`；`query` ⇒ `definition_hash` 64-hex、`timestamps_hash` null、計數 null；`none` ⇒ 全 null。
+- **無 split（fallback）**：`split_context["full_index"]` 必傳（row_identity 用真實 index；禁 positional `arange` 冒充）。**B4 呼叫方義務**。
+- **root status**：`build_survivor_output` 只接受 `ok_oos`／`degraded_full_sample`，其他 raise（禁靜默降級）。
+- **`n_samples_total` 對帳**：正整數；`≥ marginal n_train+n_test`；`≥ split train_rows+test_rows`（purge／embargo 使 `≥` 而非 `==`）；marginal `n_test` 與 split `test_rows` exact。
+- ⑭ checklist 擴至 `sample_scope.n_samples_*`／`survivor_record.feature_name`／composite／removed／view 巢狀鍵，並加巢狀 tamper；⑱ 加 naive 字串同 hash。

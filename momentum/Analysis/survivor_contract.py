@@ -142,7 +142,14 @@ def resolve_ref(ref: str) -> list:
     if not isinstance(ref, str) or "#" not in ref:
         raise ContractValidationError(f"bad ref (expect '<path>#<key.path>'): {ref!r}")
     rel_path, key_path = ref.split("#", 1)
-    target = REPO_ROOT / rel_path
+    rel = Path(rel_path)
+    if rel.is_absolute() or ".." in rel.parts or not rel_path.strip():
+        raise ContractValidationError(f"ref path must be repo-relative without '..': {rel_path!r}")
+    target = (REPO_ROOT / rel).resolve()
+    try:
+        target.relative_to(REPO_ROOT.resolve())
+    except ValueError:
+        raise ContractValidationError(f"ref path escapes repo root: {rel_path!r}")
     if not target.is_file():
         raise ContractValidationError(f"ref target missing: {target}")
     try:
@@ -276,9 +283,7 @@ def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[D
     if scope["kind"] == "event" and scope["event"] is None:
         raise ContractValidationError("sample_scope.kind=event requires event object")
     if scope["event"] is not None:
-        _check_object(scope["event"], c["event_definition_keys"], "sample_scope.event")
-        if scope["event"]["mode"] not in ("timestamps", "query", "none"):
-            raise ContractValidationError("sample_scope.event.mode invalid")
+        _check_event_object(scope["event"], c, "sample_scope.event")
 
     # ---- split / provenance ----
     split = payload["split"]
@@ -290,8 +295,8 @@ def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[D
         raise ContractValidationError("provenance.contract_version mismatch")
     if prov["algorithm_version"] != c["algorithm_version"]:
         raise ContractValidationError("provenance.algorithm_version mismatch")
-    if prov["fit_mode"] not in c["fit_scope_values"]:
-        raise ContractValidationError("provenance.fit_mode not in fit_scope_values")
+    if not str(prov["fit_mode"]).strip():
+        raise ContractValidationError("provenance.fit_mode must be non-empty (orchestrator preprocessing fit_mode 原值)")
 
     # ---- feature_names / feature_set_hash / survivors ----
     names = payload["feature_names"]
@@ -336,6 +341,37 @@ def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[D
         raise ContractValidationError(f"provenance.report_ref {prov['report_ref']!r} != {expected_ref!r}")
 
 
+def _is_sha256_hex(v: Any) -> bool:
+    return isinstance(v, str) and len(v) == 64 and all(ch in "0123456789abcdef" for ch in v)
+
+
+def _check_event_object(ev: Dict[str, Any], c: Dict[str, Any], label: str) -> None:
+    """event 物件依 mode 驗不變式（R18 CODEX-R18-P1-03）：
+    timestamps ⇒ 兩 hash 皆 64-hex 且相等、n_events≥1、n_timestamps_requested≥n_events；
+    query ⇒ definition_hash 64-hex、timestamps_hash None、計數 None；none ⇒ 全 None。"""
+    _check_object(ev, c["event_definition_keys"], label)
+    mode = ev["mode"]
+    if mode == "timestamps":
+        if not (_is_sha256_hex(ev["definition_hash"]) and _is_sha256_hex(ev["timestamps_hash"])):
+            raise ContractValidationError(f"{label}: timestamps mode requires 64-hex definition_hash and timestamps_hash")
+        if ev["definition_hash"] != ev["timestamps_hash"]:
+            raise ContractValidationError(f"{label}: timestamps mode requires definition_hash == timestamps_hash")
+        if not (isinstance(ev["n_events"], int) and ev["n_events"] >= 1):
+            raise ContractValidationError(f"{label}: timestamps mode requires n_events >= 1")
+        if not (isinstance(ev["n_timestamps_requested"], int) and ev["n_timestamps_requested"] >= ev["n_events"]):
+            raise ContractValidationError(f"{label}: n_timestamps_requested must be >= n_events")
+    elif mode == "query":
+        if not _is_sha256_hex(ev["definition_hash"]) or ev["timestamps_hash"] is not None:
+            raise ContractValidationError(f"{label}: query mode requires 64-hex definition_hash and null timestamps_hash")
+        if ev["n_events"] is not None or ev["n_timestamps_requested"] is not None:
+            raise ContractValidationError(f"{label}: query mode requires null counts")
+    elif mode == "none":
+        if any(ev[k] is not None for k in ("definition_hash", "timestamps_hash", "n_events", "n_timestamps_requested")):
+            raise ContractValidationError(f"{label}: none mode requires all-null identity")
+    else:
+        raise ContractValidationError(f"{label}: mode {mode!r} invalid")
+
+
 def _status_object(status: str, reason: Optional[str]) -> Dict[str, Any]:
     return {"status": status, "reason": reason}
 
@@ -370,7 +406,9 @@ def build_survivor_output(
     - OOS 四欄由 ``root_analysis_status`` 單一來源導出（``ok_oos`` ⇒ True／``oos``；否則 False／``full_sample_research_only``）。
     - ``sample_scope``：``event_identity.mode ∈ {query,timestamps}`` 且非 fallback ⇒ ``kind=event``；否則 ``kind=full``；
       ``degraded = bool(report_meta.event_filter.fallback)``；``event`` 於 mode≠none 時帶身分物件（fallback 仍保留供追溯）。
-    - ``n_samples_total`` 取 ``report_meta["n_samples"]``（orchestrator 於 report 組裝寫入）；缺則 ``marginal.n_train+n_test``；再缺則 split 列數和；皆缺 ⇒ raise。
+    - ``n_samples_total`` 取 ``report_meta["n_samples"]``（orchestrator 於 report 組裝寫入）；缺則 ``marginal.n_train+n_test``；再缺則 split 列數和；皆缺 ⇒ raise；並與 marginal／split 列數對帳（≥；test 列數 exact）。
+    - ``provenance.fit_mode``＝orchestrator 前處理 fit_mode **原值**（``full_sample|train_mask|pit_expanding``），與 ``composite.fit_scope`` 語意不同、不映射（A1-9）。
+    - 無 split（fallback）⇒ ``split_context["full_index"]`` 必傳（row_identity 用真實 index；禁 arange 冒充）。
     - ``survivors[]`` IC 快照自 ``summary_by_feature[name]``（``ic_mean``／``icir``／``p_value_adj``／``pass_class``；缺欄 ⇒ null）；
       marginal 欄自 ``marginal_ic_result.per_feature[name]``（loo 視角；不可算 ⇒ null）。
     """
@@ -384,8 +422,10 @@ def build_survivor_output(
     st = str(root_analysis_status)
     if st == "ok_oos":
         oos, pc = True, "oos"
-    else:
-        st, oos, pc = "degraded_full_sample", False, "full_sample_research_only"
+    elif st == "degraded_full_sample":
+        oos, pc = False, "full_sample_research_only"
+    else:  # R18 CODEX-R18-P1-05：未知 root status fail-closed（禁靜默降級）
+        raise ContractValidationError(f"root_analysis_status {st!r} not in {{ok_oos, degraded_full_sample}}")
 
     marg = marginal_ic_result.to_dict() if marginal_ic_result is not None and hasattr(marginal_ic_result, "to_dict") else (dict(marginal_ic_result) if isinstance(marginal_ic_result, dict) else None)
     comp = composite_result.to_dict() if composite_result is not None and hasattr(composite_result, "to_dict") else (dict(composite_result) if isinstance(composite_result, dict) else None)
@@ -408,6 +448,17 @@ def build_survivor_output(
         n_total = int(len(train_plan.row_index)) + int(len(test_plan.row_index))
     if n_total is None:
         raise ContractValidationError("n_samples_total unavailable (report_meta.n_samples / marginal n_train+n_test / split rows)")
+    if not (isinstance(n_total, int) and not isinstance(n_total, bool) and n_total >= 1):
+        raise ContractValidationError(f"n_samples_total must be positive int, got {n_total!r}")
+    # R18 CODEX-R18-P1-06：與 marginal／split 列數對帳（purge/embargo 使 train+test ≤ total，故為 ≥ 而非 ==；test 列數兩源須 exact）
+    if marg is not None and marg.get("n_train") is not None and marg.get("n_test") is not None:
+        if int(marg["n_train"]) + int(marg["n_test"]) > int(n_total):
+            raise ContractValidationError("n_samples_total < marginal n_train+n_test")
+    if train_plan is not None and test_plan is not None:
+        if int(len(train_plan.row_index)) + int(len(test_plan.row_index)) > int(n_total):
+            raise ContractValidationError("n_samples_total < split train_rows+test_rows")
+        if marg is not None and marg.get("n_test") is not None and int(marg["n_test"]) != int(len(test_plan.row_index)):
+            raise ContractValidationError("marginal n_test != split test_rows")
     n_test = None
     if marg is not None and marg.get("n_test") is not None:
         n_test = int(marg["n_test"])
@@ -437,7 +488,9 @@ def build_survivor_output(
         }
     else:
         full_index = split_context.get("full_index") if split_context else None
-        idx_hash = canonical_idx_hash(full_index) if full_index is not None else canonical_idx_hash(_np.arange(int(n_total)))
+        if full_index is None:  # R18 CODEX-R18-P1-04：禁以 positional arange 冒充 row identity
+            raise ContractValidationError("fallback/no-split requires split_context['full_index'] for row_identity")
+        idx_hash = canonical_idx_hash(full_index)
         split = {
             "split_method": str(report_meta.get("split_method") or "full_sample_fallback"),
             "train_time_bounds": None,
