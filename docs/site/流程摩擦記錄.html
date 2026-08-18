@@ -1808,6 +1808,11 @@ TOCTOU 探針（系統 Python 3.9、multiprocessing）死鎖，cursor-agent 一�
 PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）。改成 <code>factories.get_invalid_validation_argument_class()</code>。
 <strong>這是機制運作正確的例子</strong>：擋在寫檔當下，沒有等到 push。無需修法，記錄以資對照。</p>
 </blockquote>
+<blockquote>
+<p><strong>六十四・（2026-08-18）探針抓到我自己的測試「沒踩到洞」</strong>：第 4 批 §V-14（名次改用原始索引）植入後測試全綠——因為我的測試矩陣裡
+原始索引恰好等於壓縮位置，那個錯根本沒被觸發。<strong>「改壞一定要變紅」這條規矩就是為此而設</strong>：不是驗程式，是驗測試有沒有牙。
+補了一條讓兩者不同的案例（欄 0 全 NaN 被剔除）才紅。教訓：邊界測試要刻意讓「兩種索引語意」分歧，否則等價於沒測。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
