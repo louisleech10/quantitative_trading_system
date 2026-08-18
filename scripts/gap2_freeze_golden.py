@@ -11,6 +11,9 @@ pre 檔（唯一 baseline，路徑寫死）：handoffs/run_receipts/gap2_golden_
   - canonical_sha＝`gap2_canonical_sha(report)`（本檔為**唯一**序列化實作，測試 import 之）：
       有序 scrub ① `report.pop("marginal_ic")` ② `metadata.pop("survivor_output")`
       ③ metadata 刪 filtered_features_path／filtered_generated_at／generated_at／filtered_features_written；頂層刪 generated_at
+      ⑤ A1-10：`metadata.selection_scope.scope_id`（＝f"{config_hash}:{split_label}"）正規化為 split_label 段——
+         config_hash＝md5(config.model_dump()) 會因 ICConfig 新增 `marginal_ic` 欄而改變，與行為無關；
+         pre 檔另存 `canonical_sha_legacy`（不含 ⑤，僅供稽核，--check 不比對）
       ④ 其餘沿用 `tests/momentum/helpers/ichc_run.canonical_sha`（import 之，不重寫）
   - --check：canonical_sha exact；summary_table 逐列逐鍵 abs≤1e-12（非數值 exact）；filter_log 兩節 exact；case_id exact；
     fixture sha256 不符 ⇒ rc=1；並於兩個不同 sidefx 目錄各跑一次、兩 sha 相等（路徑無關性）。
@@ -37,8 +40,11 @@ PRE_PATH = REPO / "handoffs" / "run_receipts" / "gap2_golden_pre.json"
 _META_SCRUB = ("filtered_features_path", "filtered_generated_at", "generated_at", "filtered_features_written")
 
 
-def gap2_canonical_sha(report: Dict[str, Any]) -> str:
-    """唯一序列化實作（scrub 清單寫死且有序；其餘沿用 ichc_run.canonical_sha）。"""
+def gap2_canonical_sha(report: Dict[str, Any], *, normalize_scope_id: bool = True) -> str:
+    """唯一序列化實作（scrub 清單寫死且有序；其餘沿用 ichc_run.canonical_sha）。
+
+    ``normalize_scope_id=False`` 只供 legacy 稽核欄（不含 ⑤）。
+    """
     from tests.momentum.helpers.ichc_run import canonical_sha
 
     r = copy.deepcopy(report)
@@ -48,6 +54,10 @@ def gap2_canonical_sha(report: Dict[str, Any]) -> str:
         meta.pop("survivor_output", None)  # ②
         for key in _META_SCRUB:  # ③
             meta.pop(key, None)
+        if normalize_scope_id:  # ⑤ A1-10
+            scope = meta.get("selection_scope")
+            if isinstance(scope, dict) and isinstance(scope.get("scope_id"), str) and ":" in scope["scope_id"]:
+                scope["scope_id"] = scope["scope_id"].split(":", 1)[1]
     r.pop("generated_at", None)  # ③ 頂層
     return canonical_sha(r)  # ④
 
@@ -79,6 +89,7 @@ def _extract(report: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "case_id": str(meta.get("case_id") or "ic_gatekeeper"),
         "canonical_sha": gap2_canonical_sha(report),
+        "canonical_sha_legacy": gap2_canonical_sha(report, normalize_scope_id=False),
         "summary_table": list(report.get("summary_table") or []),
         "filter_log": {
             "stage5_thresholds": fl.get("stage5_thresholds"),
@@ -122,6 +133,7 @@ def _write() -> int:
         "config_hash": config_hash,
         "case_id": ext["case_id"],
         "canonical_sha": ext["canonical_sha"],
+        "canonical_sha_legacy": ext["canonical_sha_legacy"],
         "summary_table": ext["summary_table"],
         "filter_log": ext["filter_log"],
         "generated_by": "scripts/gap2_freeze_golden.py --write",
@@ -152,7 +164,7 @@ def _check() -> int:
         if live_ext is None:
             live_ext = ext
             if config_hash != pre.get("config_hash"):
-                problems.append(f"config_hash mismatch pre={pre.get('config_hash')} live={config_hash}")
+                print(f"[gap2_freeze_golden] note: config_hash pre={pre.get('config_hash')} live={config_hash}（ICConfig 欄位變動即變；記錄用，不判 FAIL；A1-10）")
     assert live_ext is not None
     if shas[0] != shas[1]:
         problems.append(f"path-independence: sha differs across sidefx dirs {shas[0][:12]} vs {shas[1][:12]}")

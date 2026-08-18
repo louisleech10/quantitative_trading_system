@@ -48,3 +48,8 @@
 - **root status**：`build_survivor_output` 只接受 `ok_oos`／`degraded_full_sample`，其他 raise（禁靜默降級）。
 - **`n_samples_total` 對帳**：正整數；`≥ marginal n_train+n_test`；`≥ split train_rows+test_rows`（purge／embargo 使 `≥` 而非 `==`）；marginal `n_test` 與 split `test_rows` exact。
 - ⑭ checklist 擴至 `sample_scope.n_samples_*`／`survivor_record.feature_name`／composite／removed／view 巢狀鍵，並加巢狀 tamper；⑱ 加 naive 字串同 hash。
+
+## A1-10 — §G-1 canonical_sha 對 `metadata.selection_scope.scope_id` 正規化（母 SPEC §G-1 scrub 清單「寫死且有序」；來源 B4 Task 4.0 實作期主委發現；待 B4 三家 review 攻）
+- 事實：orchestrator `config_hash = md5(json.dumps(config.model_dump()))`；`selection_scope.scope_id = f"{config_hash}:{split_label}"` 入報告 metadata。B4 Task 4.1 於 `ICConfig` 新增 `marginal_ic` 欄 ⇒ `config_hash` 必變 ⇒ `scope_id` 必變 ⇒ 母 SPEC §G-1 之 canonical_sha 在**行為完全不變**下仍不等（碰撞為結構性，非漂移）。
+- 決策：`gap2_canonical_sha` 於 scrub ③ 後加 ⑤：`metadata.selection_scope.scope_id`（形如 `hash:label`）正規化為 `label` 段；其餘 scrub 清單不變。pre 檔於 **orchestrator 未動前**以新定義重寫（commit 內 `canonical_sha_legacy` 保留原定義值 `55101dbf…` 供稽核：`git diff f6b8d881 -- handoffs/run_receipts/gap2_golden_pre.json` 只多 `canonical_sha`(v2)／`canonical_sha_legacy`／`ts`，`summary_table`／`filter_log`／`config_hash` 一字未動 ⇒ 非「重新凍結換綠」）。`--check` 對 `config_hash` 只記錄不判 FAIL（該值定義上隨 schema 變）。
+- 誠實邊界：正規化後 §G-1 不再偵測「selection scope 之 config_hash 部分」的變動；`split_label` 段仍比對；stage5／stage6 filter_log 與 summary_table 逐鍵 exact 仍是行為不變之主證。
