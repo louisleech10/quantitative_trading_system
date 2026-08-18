@@ -1,0 +1,19 @@
+[session_name] ✓ 20260818-gap1-b3-stamp-r17 / 20260818-GAP1-B3-STAMP-R17
+[committee_run] === role gate preflight (before gate.sh dispatch) ===
+[committee_run] session=20260818-gap1-b3-stamp-r17 brief=handoffs/20260818-gap1-b3-stamp-BRIEF.md  families=codex,composer,grok(3 家)  out=handoffs/20260818-gap1-b3-stamp-<family>.md
+[committee_run] === gate.sh dispatch ===
+GATE PASS：已發 dispatch token（有效 900s）。審計 → .claude/gate/audit.log
+使用者可稽核：cat .claude/gate/audit.log
+[round_cost] 工作項目「gap1-b3-stamp-r17」尚無歷史輪次（本輪為第 1 輪）
+[committee_run] === open debt round_id=5aaa7f15-e05a-4fce-8f70-29ba708137c0 session=20260818-gap1-b3-stamp-r17 ===
+[committee_run] 開債完成 round_id=5aaa7f15-e05a-4fce-8f70-29ba708137c0
+[committee_run] → 派 codex(out=handoffs/20260818-gap1-b3-stamp-codex.md)
+[committee_run] → 派 composer(out=handoffs/20260818-gap1-b3-stamp-composer.md)
+[committee_run] → 派 grok(out=handoffs/20260818-gap1-b3-stamp-grok.md)
+[committee_run] ✅ codex 完成 → handoffs/20260818-gap1-b3-stamp-codex.md
+[committee_run] ✅ composer 完成 → handoffs/20260818-gap1-b3-stamp-composer.md
+[committee_run] ✅ grok 完成 → handoffs/20260818-gap1-b3-stamp-grok.md
+[committee_run] 票 B-50：工作區有變動但**無污染跡象**（形態②③ 皆未命中；status 共 9 筆）。
+[committee_run] ✅ 3 家全數完成。接著:bash scripts/reconcile_build.sh <session> handoffs/20260818-gap1-b3-stamp-*.md
+[committee_run] round_id=5aaa7f15-e05a-4fce-8f70-29ba708137c0 session=20260818-gap1-b3-stamp-r17
+rc=0
