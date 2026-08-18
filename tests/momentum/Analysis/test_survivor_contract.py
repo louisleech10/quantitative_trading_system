@@ -176,3 +176,14 @@ def test_mutation_missing_top_key_raises(tmp_path):
     copy.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ContractValidationError):
         sc.load_survivor_contract(copy)
+
+
+# ---------------------------------------------------------------- A1-7 K1：回傳副本，caller 改寫不外洩
+def test_load_returns_copy_not_shared_singleton():
+    a = sc.load_survivor_contract()
+    a["version"] = 999
+    a["reasons"]["marginal_ic"].append("tampered")
+    b = sc.load_survivor_contract()
+    assert b["version"] == 1
+    assert "tampered" not in b["reasons"]["marginal_ic"]
+    assert a is not b

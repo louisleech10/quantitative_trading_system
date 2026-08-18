@@ -487,3 +487,130 @@ def test_mutation_test_fit_projection_breaks_o7(monkeypatch):
     mutant = _run(df, y, tr, te, ["s", "f"])
     with pytest.raises(AssertionError):
         assert abs(mutant.per_feature["f"]["marginal_ic"] - ref_train) <= 1e-12
+
+
+# ============================================================================
+# A1-7（B1 code review K2–K6 修補）
+# ============================================================================
+def test_reason_literals_in_marginal_ic_subset_of_contract():
+    """K2：AST 掃 marginal_ic.py 內傳給 ``_reason(literals, <group>, <name>)`` 之字串常數 ⊆ 契約對應組。"""
+    import ast
+    import inspect
+
+    src = inspect.getsource(mic)
+    tree = ast.parse(src)
+    contract = load_survivor_contract()
+    pool = {"section": set(contract["reasons"]["marginal_ic"]), "feature": set(contract["reasons"]["marginal_ic_feature"])}
+    seen = 0
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_reason":
+            assert len(node.args) == 3, ast.dump(node)
+            group, name = node.args[1], node.args[2]
+            assert isinstance(group, ast.Constant) and isinstance(name, ast.Constant), ast.dump(node)
+            assert name.value in pool[group.value], (group.value, name.value)
+            seen += 1
+    assert seen >= 8
+    # 節級／feature 級 reason 只由 _reason 取得：模組內不得有其他地方直接使用契約 reason 字面
+    all_reasons = pool["section"] | pool["feature"]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in all_reasons:
+            parent_ok = False
+            # 允許：作為 _reason 之第三引數
+            for call in ast.walk(tree):
+                if isinstance(call, ast.Call) and getattr(call.func, "id", None) == "_reason" and len(call.args) == 3 and call.args[2] is node:
+                    parent_ok = True
+                    break
+            assert parent_ok, f"reason literal {node.value!r} used outside _reason()"
+
+
+def test_view_status_keys_match_contract():
+    """K3：每個 view entry 鍵集 == 契約 view_status_keys。"""
+    df, y, tr, te = _gen("O2")
+    res = _run(df, y, tr, te, ["s1", "s2"], extra=["f"])
+    keys = set(load_survivor_contract()["marginal_ic_section_keys"]["view_status_keys"]["keys"].keys())
+    for view, entry in res.to_dict()["views"].items():
+        assert set(entry.keys()) == keys, view
+
+
+def test_view_and_section_status_semantics():
+    """K4：全部候選退化 ⇒ 節 not_computed:no_computable_candidates；loo 超限＋removed 非空 ⇒ 節仍 not_computed；removed 空 ⇒ not_applicable。"""
+    df, y, tr, te = _gen("O2")
+    df2 = df.copy()
+    df2["c1"] = 1.0
+    df2["c2"] = 2.0
+    all_deg = _run(df2, y, tr, te, ["c1", "c2"])
+    assert all(v["status"] == "not_computed" for v in all_deg.per_feature.values())
+    assert all_deg.views["loo"] == {"status": "not_computed", "reason": "no_computable_candidates"}
+    assert all_deg.views["sequential"]["reason"] == "no_computable_candidates"
+    assert (all_deg.status, all_deg.reason) == ("not_computed", "no_computable_candidates")
+    assert all_deg.views["removed_candidates"] == {"status": "not_applicable", "reason": "no_removed_candidates"}
+    # grok 反例：loo 超限但 removed 有候選且可算 ⇒ 節級仍 not_computed（removed 不抬升）
+    over = _run(df, y, tr, te, ["s1", "s2", "f"], extra=["s1"] , params=MarginalICParams(n_bootstrap=10, max_survivors_for_loo=2))
+    assert over.views["removed_candidates"]["status"] == "not_applicable"  # extra ⊆ survivors ⇒ 去重後空
+    df3 = df.copy()
+    df3["z"] = 0.1 * df3["f"] + np.random.default_rng(7).standard_normal(len(df3))
+    over2 = _run(df3, y, tr, te, ["s1", "s2", "f"], extra=["z"], params=MarginalICParams(n_bootstrap=10, max_survivors_for_loo=2))
+    assert over2.views["removed_candidates"]["status"] == "ok" and over2.removed_candidates["z"]["status"] == "ok"
+    assert over2.per_feature == {} and (over2.status, over2.reason) == ("not_computed", "candidate_budget_exceeded")
+    assert over2.n_regressions == 1
+    # 正常：removed 有候選 ⇒ ok；無候選 ⇒ not_applicable
+    normal = _run(df, y, tr, te, ["s1", "s2"], extra=["f"], params=MarginalICParams(n_bootstrap=10))
+    assert normal.views["removed_candidates"]["status"] == "ok" and normal.status == "ok"
+
+
+def test_constant_label_is_label_degenerate():
+    """K4：label 於 test（或 train）段為常數 ⇒ 候選 not_computed:label_degenerate（先於 Spearman）。"""
+    df, y, tr, te = _gen("O2")
+    y2 = y.copy()
+    y2[te] = 1.0
+    res = _run(df, y2, tr, te, ["s1", "s2"], params=MarginalICParams(n_bootstrap=10))
+    for name in ["s1", "s2"]:
+        pf = res.per_feature[name]
+        assert (pf["status"], pf["reason"]) == ("not_computed", "label_degenerate")
+        assert pf["marginal_ic"] is None and pf["gross_ic"] is None
+    assert (res.status, res.reason) == ("not_computed", "no_computable_candidates")
+    y3 = y.copy()
+    y3[tr] = 0.0
+    res_tr = _run(df, y3, tr, te, ["s1"], params=MarginalICParams(n_bootstrap=10))
+    assert res_tr.per_feature["s1"]["reason"] == "label_degenerate"
+
+
+def test_marginal_uses_spearman_not_pearson():
+    """K5：重尾 label 下秩常態殘差對 y 之 Spearman 與 Pearson 差 >0.05；marginal_ic 必等於 Spearman 參考（1e-12）。"""
+    rng = np.random.default_rng(20260819)
+    n = 4000
+    s = rng.standard_normal(n)
+    f = rng.standard_normal(n)
+    heavy = rng.standard_t(df=2, size=n)  # 重尾噪聲
+    y = 0.5 * s + 0.4 * f + heavy
+    df = pd.DataFrame({"s": s, "f": f})
+    tr, te = _masks(n)
+    res = _run(df, pd.Series(y), tr, te, ["s", "f"], params=MarginalICParams(n_bootstrap=10))
+    pf = res.per_feature["f"]
+    assert pf["status"] == "ok"
+    # 獨立參考：秩常態殘差（train 擬合）→ test 段 Spearman／Pearson
+    def vdw(v):
+        r = stats.rankdata(v, method="average")
+        return stats.norm.ppf(r / (len(v) + 1.0))
+    zf_tr, zs_tr = vdw(f[tr]), vdw(s[tr])
+    beta = np.linalg.lstsq(np.column_stack([np.ones(tr.sum()), zs_tr]), zf_tr, rcond=None)[0]
+    r_te = vdw(f[te]) - np.column_stack([np.ones(te.sum()), vdw(s[te])]) @ beta
+    sp = float(stats.spearmanr(r_te, y[te])[0])
+    pe = float(stats.pearsonr(r_te, y[te])[0])
+    assert abs(sp - pe) > 0.05, (sp, pe)
+    assert abs(pf["marginal_ic"] - sp) <= 1e-12
+    assert abs(pf["marginal_ic"] - pe) > 0.05
+
+
+def test_o9_bootstrap_resamples_nontrivially():
+    """K6：CI 寬度 >0（點估 mutant 寬度 0 ⇒ 紅）；換 seed 至少一特徵 CI 不同。"""
+    df, y, tr, te = _gen("O2")
+    a = _run(df, y, tr, te, ["s1", "s2", "f"], params=MarginalICParams(n_bootstrap=200, block_len=7, seed=1))
+    b = _run(df, y, tr, te, ["s1", "s2", "f"], params=MarginalICParams(n_bootstrap=200, block_len=7, seed=2))
+    widths = [a.per_feature[n]["ci95"][1] - a.per_feature[n]["ci95"][0] for n in ["s1", "s2", "f"]]
+    assert min(widths) > 0.0
+    assert any(a.per_feature[n]["ci95"] != b.per_feature[n]["ci95"] for n in ["s1", "s2", "f"])
+    arr = np.arange(30.0)
+    point = float(np.mean(arr * arr))
+    ci = block_bootstrap_ci(lambda u, v: float(np.mean(u * v)), (arr, arr), block_len=3, n_bootstrap=50, seed=3)
+    assert ci is not None and ci[0] < ci[1] and not (ci[0] == point == ci[1])

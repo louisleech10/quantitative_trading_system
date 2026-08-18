@@ -14,6 +14,7 @@
 #
 # case 表（V_ID|file|old|new|pytest_target）寫在本檔頂部之 case_* 陣列；後續批次只加列，每 V_ID 全票唯一：
 #   B1：V-1／2／3／4／5／6／17a／18／21／22a（純函式）；V-22／V-24 只在 B4；V-7..9 B2；V-10..12／17b／19／20 B3。
+#   A1-7 K5：V-3 對映改 test_marginal_uses_spearman_not_pearson（重尾 label 下 marginal 路徑 Spearman≠Pearson；O6 為輔測）。
 set -u
 cd "$(git rev-parse --show-toplevel)" || exit 2
 
@@ -39,7 +40,7 @@ case "${BATCH}" in
     TARGETS="${MIC}"
     CASES+=("V-1|${MIC}|proj = fit_projection(z_f_tr, Z_S_tr)|proj = fit_projection(z_f_te, Z_S_te)|test_o7_train_fit")
     CASES+=("V-2|${MIC}|    return stats.norm.ppf(r / (n + 1.0))|    return arr  # MUTANT: identity|test_o1a_residual_degenerate")
-    CASES+=("V-3|${MIC}|    return float(stats.spearmanr(a, b)[0])|    return float(stats.pearsonr(a, b)[0])  # MUTANT|test_o6_rank_invariance")
+    CASES+=("V-3|${MIC}|    return float(stats.spearmanr(a, b)[0])|    return float(stats.pearsonr(a, b)[0])  # MUTANT|test_marginal_uses_spearman_not_pearson")
     CASES+=("V-4|${MIC}|            S = [s for s in survivors if s != f]|            S = list(survivors)  # MUTANT: 含自身|test_o2_orthogonal_new_info")
     CASES+=("V-5|${MIC}|    order_key_ic = train_ic |    order_key_ic = _rank_ic(test_rows_mask) |test_sequential_order_by_train_ic")
     CASES+=("V-6|${MIC}|    rng = np.random.default_rng(seed)|    rng = np.random.default_rng()  # MUTANT: 忽略 seed|test_o9_bootstrap_seed_determinism")

@@ -26,3 +26,12 @@
 - 母 SPEC 寫 `reason:"write_failed:<exc class>"`，與契約 `reasons.survivor_output` 封閉集合（`identity_missing`／`write_failed`／`persist_suppressed`）互斥：嚴格 membership 檢查會拒絕，放寬則 SoT 不封閉。
 - 決策：`reason` 恆為 `write_failed`（exact；由 `load_survivor_contract()["reasons"]["survivor_output"]` 取值）；例外類別與訊息**只**進 orchestrator 層 `get_logger(__name__).error(..., exc_info=True)`；五鍵不增欄；validator reason-membership exact；例外不上拋、報告照存（不變）。
 - **A1-5 補正（主委實核，2026-08-18；待 R10 三家複核）**：R9 synth V1 原寫「deep `TabsContent` 末段 `NetICChart` 之後」，實核 `page.tsx:214` `deepTabVisible = Boolean(report?.deep_analysis_enabled || deepAnalysisReport?.deep_analysis_enabled)`、`:750`／`:814` deep tab 與其 `TabsContent` 皆受此 gating ⇒ `marginal_ic` 為 **base** 報告節（由 `analyze()` 主流程產生，不屬 deep），掛 deep tab 會在 deep 關閉時不可見，違反 Task 5.1 目標「報告新節在 IC 頁面可見」。**改為**：掛 **basic** `TabsContent`（`:753`）末段、`CorrelationHeatmap`（現 `:810`）之後、同一 `<div>` 內；母 SPEC「deep 區塊之後」讀為「基礎分析區塊之末、深度區塊之前」；其餘（只 import＋一處 JSX、資料源 base `report?.marginal_ic`、不改其他區塊）不變。
+
+## A1-7 — B1 code review 修補之契約增值與語意釘死（來源 R12：CODEX-R12-P1-01..06／P2-07／P2-08、GROK-R12-P1-01／P2-01；收斂檔 `handoffs/reconcile/20260818-gap2-b1-review-r12/synth.md` K1–K7）
+- **契約 `ic_survivor_contract.json`（頂層鍵集不變；Task 1.0 測試①不受影響）**：① `marginal_ic_section_keys` 增子鍵 `view_status_keys={additional_properties:false, keys:{status(str,required), reason(str,required,nullable)}}`（K3）② `reasons.marginal_ic` 增值 `no_computable_candidates`、`no_removed_candidates`；`reasons.marginal_ic_feature` 增值 `label_degenerate`（K4；只增值）。
+- **視角／節級 status 規則（K4）**：視角 `ok` **僅當**該視角至少一候選 `status=="ok"`；否則 `not_computed`（預算超限 ⇒ `candidate_budget_exceeded`；否則 `no_computable_candidates`）；removed 視角於無候選 ⇒ `not_applicable:no_removed_candidates`。**節級 `status`／`reason` ＝ `views["loo"]` 之值**（removed 成功不抬升節 status）。消費端（B4 報告／B5 表格）以節 status 為畫表閘即正確。
+- **label 退化 gate（K4）**：`_one` 於列數 gate 後，`ptp(y_te)==0` 或 `ptp(y_tr)==0` ⇒ 候選 `not_computed:label_degenerate`（先於任何 Spearman）。
+- **reason 選擇之 SoT 遵循方式（K2）**：程式以語意名經 `_reason()` 成員檢查取契約字面（改名 ⇒ KeyError fail-closed），並由 AST 測試鎖「傳給 `_reason()` 之字串常數 ⊆ 契約對應組」；不引入索引取值。
+- **頂層 allowlist 豁免（K7）**：loader `SURVIVOR_CONTRACT_TOP_KEYS` 與測試①之逐字頂層鍵集為 TODO Task 1.0 步驟 4／驗證① 指定之 fail-closed 守衛，非 §0 JSON SoT 條款所指之欄位表複列；B4 若增頂層鍵須同步兩處（可見即為設計）。
+- **loader 回傳（K1）**：`load_survivor_contract()` 回 `deepcopy`（cache 為內部）。
+- **探針 V-3 對映改為 `test_marginal_uses_spearman_not_pearson`（K5）**；O6 保留為輔測。O9 加 CI 寬度＞0 與 seed 依賴斷言（K6）。

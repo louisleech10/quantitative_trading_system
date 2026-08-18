@@ -1,0 +1,24 @@
+[gap2_mutation_probe] batch=B1 ts=20260818T154002Z cases=10
+[baseline] rc=0 (============================= 46 passed in 13.26s ==============================)
+MUTATION V-1: RED ✓ (test_o7_train_fit rc=1, FAILED=1)
+MUTATION V-1: RESTORED GREEN ✓
+MUTATION V-2: RED ✓ (test_o1a_residual_degenerate rc=1, FAILED=1)
+MUTATION V-2: RESTORED GREEN ✓
+MUTATION V-3: RED ✓ (test_marginal_uses_spearman_not_pearson rc=1, FAILED=1)
+MUTATION V-3: RESTORED GREEN ✓
+MUTATION V-4: RED ✓ (test_o2_orthogonal_new_info rc=1, FAILED=1)
+MUTATION V-4: RESTORED GREEN ✓
+MUTATION V-5: RED ✓ (test_sequential_order_by_train_ic rc=1, FAILED=1)
+MUTATION V-5: RESTORED GREEN ✓
+MUTATION V-6: RED ✓ (test_o9_bootstrap_seed_determinism rc=1, FAILED=1)
+MUTATION V-6: RESTORED GREEN ✓
+MUTATION V-17a: RED ✓ (test_o7_train_insample_differs rc=1, FAILED=1)
+MUTATION V-17a: RESTORED GREEN ✓
+MUTATION V-18: RED ✓ (test_shuffle_survivors_invariance rc=1, FAILED=1)
+MUTATION V-18: RESTORED GREEN ✓
+MUTATION V-21: RED ✓ (test_o1a_residual_degenerate rc=1, FAILED=1)
+MUTATION V-21: RESTORED GREEN ✓
+MUTATION V-22a: RED ✓ (test_budget_survivors_whole_not_computed rc=1, FAILED=1)
+MUTATION V-22a: RESTORED GREEN ✓
+[post-restore] rc=0 (============================= 46 passed in 13.36s ==============================)
+[gap2_mutation_probe] ✅ batch=B1 全部 10 條 mutation 轉紅且還原綠 → receipt handoffs/run_receipts/20260818T154002Z-gap2-B1-probe.log

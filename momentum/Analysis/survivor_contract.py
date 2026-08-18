@@ -9,6 +9,7 @@ resolver／validator／``build_survivor_output`` 於 Task 3.1 加入本檔。
 """
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -63,12 +64,12 @@ def load_survivor_contract(path: Optional[Path] = None) -> Dict[str, Any]:
     - 檔缺／JSON 壞／非 mapping ⇒ ``ContractValidationError``。
     - 頂層鍵集必須 **恰等於** ``SURVIVOR_CONTRACT_TOP_KEYS``；多鍵或少鍵皆 raise。
     - ``independent_oos_validation_allowed`` 必須恰為 ``[False]``（version=1 之硬約束）。
-    - 回傳 dict（不解析 ``capability_status_ref``；resolver 於 Task 3.1）。
+    - 回傳 dict **副本**（deepcopy；caller 改寫不影響後續呼叫——A1-7 K1）；不解析 ``capability_status_ref``（resolver 於 Task 3.1）。
     """
     global _contract_cache
     use_cache = path is None
     if use_cache and _contract_cache is not None:
-        return _contract_cache
+        return copy.deepcopy(_contract_cache)  # A1-7 K1：cache 為內部，回傳副本（禁 mutable singleton 外洩）
 
     contract_path = SURVIVOR_CONTRACT_PATH if path is None else Path(path)
     if not contract_path.is_file():
@@ -101,4 +102,4 @@ def load_survivor_contract(path: Optional[Path] = None) -> Dict[str, Any]:
 
     if use_cache:
         _contract_cache = contract
-    return contract
+    return copy.deepcopy(contract)

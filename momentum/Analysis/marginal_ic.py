@@ -476,6 +476,9 @@ def compute_marginal_ic(
         f_te_raw = X[rows_te, col_idx[f]]
         y_tr = y[rows_tr]
         y_te = y[rows_te]
+        # A1-7 K4：label 於任一段為常數 ⇒ 秩相關無定義 ⇒ 候選 not_computed（先於任何 Spearman）
+        if np.ptp(y_te) == 0.0 or np.ptp(y_tr) == 0.0:
+            return _not_computed_stat(_reason(literals, "feature", "label_degenerate"), S, n_used_train, n_used_test)
         z_f_tr = normal_scores(f_tr_raw)
         z_f_te = normal_scores(f_te_raw)
         Z_S_tr = (
@@ -528,6 +531,14 @@ def compute_marginal_ic(
     sequential: List[Dict[str, Any]] = []
     removed: Dict[str, Dict[str, Any]] = {}
 
+    no_computable = _reason(literals, "section", "no_computable_candidates")
+
+    def _view_status(entries: Sequence[Dict[str, Any]]) -> Dict[str, Optional[str]]:
+        """A1-7 K4(a)：視角 ok 僅當至少一候選 ok；否則 not_computed:no_computable_candidates。"""
+        if any(e["status"] == "ok" for e in entries):
+            return {"status": "ok", "reason": None}
+        return {"status": "not_computed", "reason": no_computable}
+
     if loo_budget_ok:  # 🔒 超限 ⇒ 整體 not_computed、無部分值（§V-22a mutation 目標行）
         for f in survivors:
             S = [s for s in survivors if s != f]  # 🔒 依名稱排除自身（§V-4／V-18 mutation 目標行）
@@ -535,27 +546,27 @@ def compute_marginal_ic(
         for i, f in enumerate(order):
             stat = _one(f, order[:i])
             sequential.append({"feature": f, "step": i, **stat})
-        views["loo"] = {"status": "ok", "reason": None}
-        views["sequential"] = {"status": "ok", "reason": None}
+        views["loo"] = _view_status(list(per_feature.values()))
+        views["sequential"] = _view_status(sequential)
     else:
         views["loo"] = {"status": "not_computed", "reason": budget_reason}
         views["sequential"] = {"status": "not_computed", "reason": budget_reason}
 
-    if removed_budget_ok:
+    if not removed_names:
+        views["removed_candidates"] = {
+            "status": "not_applicable",
+            "reason": _reason(literals, "section", "no_removed_candidates"),
+        }
+    elif removed_budget_ok:
         for c in removed_names:
             removed[c] = _one(c, survivors)
-        views["removed_candidates"] = {"status": "ok", "reason": None}
+        views["removed_candidates"] = _view_status(list(removed.values()))
     else:
         views["removed_candidates"] = {"status": "not_computed", "reason": budget_reason}
 
-    any_ok = any(v["status"] == "ok" for v in views.values())
-    if any_ok and not (loo_budget_ok or removed_names):
-        # 只剩 removed 視角「空集合 ok」而主視角超預算 ⇒ 節整體視為 not_computed
-        any_ok = False
-    if any_ok:
-        section_status, section_reason = "ok", None
-    else:
-        section_status, section_reason = "not_computed", budget_reason
+    # A1-7 K4(b)：節級 status/reason ＝ loo 視角（removed 成功不抬升節 status）
+    section_status = views["loo"]["status"]
+    section_reason = views["loo"]["reason"]
 
     return MarginalICResult(
         status=section_status,
