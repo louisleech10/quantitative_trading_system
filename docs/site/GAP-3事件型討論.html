@@ -362,8 +362,9 @@
 <li><strong>U1</strong> 目標＝A／B／C／兩段式全要；任何類型；一次只研究做多或做空（不混；long-short 列殘留）；finlab 那種事件後報酬表也要。</li>
 <li><strong>U2</strong> 正反例你在外部標好一起匯入；<strong>CSV＋當時的搜尋條件一起匯入</strong>；正反例都附「後面實際漲幾 %」。</li>
 <li><strong>U3</strong> 先討論再做；討論改這份文檔；委員意見寫在另一份對應檔。不寫規格、不動程式，直到你點頭。</li>
-<li><strong>U4</strong> 決策時點＝t₀ open（A／B 主目標）；特徵＝t₀ 之前 1h／4h 指標的<strong>數值與變化</strong>；反例三種（a 同漲不續／b 震盪／c 下跌）全標 0。</li>
-<li><strong>U5</strong> 規模＝150–200 標的、一兩萬案例。</li>
+<li><strong>U4</strong>（8/20 第 8 版改寫）決策時點＝t₀ open <strong>或 t₀ 前 k 根</strong>（訊號可能提早出現；決策時點＝獨立欄位，特徵截止跟著它走）；特徵＝決策時點之前任意 TF 指標的<strong>數值與變化</strong>（1h／4h 只是舉例）；反例多種全標 0，「反例種類」欄<strong>選填</strong>（平台可依 t₀ 走勢自動分類）。</li>
+<li><strong>U4b</strong>（8/20 新增）<strong>標籤基準＝t₀ close、close-to-close</strong>：未來漲幅一律相對 t₀ close ⇒ 條件 IC 直接吃 IC 主線 label；「基準價語意」欄保留、預設 <code>close_to_close</code>；實際進場價的持有報酬與標籤兩數並排揭露（§2-2）。</li>
+<li><strong>U5</strong> 規模＝150–200 標的、一兩萬案例——<strong>只是舉例，實際不定</strong>（8/20）；統計不寫死規模。</li>
 <li><strong>U6</strong> <strong>事件產生器列入開發、做完整版</strong>（§6 末 G1–G6，「應該沒漏、先做這些」）；落點 <code>/search</code> 升級；十類事件型怎麼做交委員（8/19 第五輪）。</li>
 <li><strong>U7</strong> <strong>現有頁面／程式根據現況新增或修改，不翻掉</strong>；只有「完全不通用」才重寫。</li>
 <li><strong>U8</strong> ML 引擎 LightGBM／XGBoost 兩個都在，用哪個不影響 GAP-3 設計，之後再議。</li>
@@ -374,9 +375,9 @@
 <p><strong>我的判斷（J 系列；寫在這裡讓你否決，不否決就當定案；委員 R2 會逐條攻）</strong></p>
 <ul>
 <li><strong>J1</strong> case-control 合法；<strong>配套＝用全部 K 線驗證</strong>（§3.1）。硬的。</li>
-<li><strong>J2</strong> 跨 TF 可以；鐵律＝只用 t₀ open 前已收盤的 bar（§2-3）。</li>
-<li><strong>J3</strong> 不切固定 K 線窗；全部 K 線連續算特徵、每案例取 t₀ 那一列；「變化」靠窗內摘要特徵（訊號在窗內任何位置都抓得到）；回看長短讓 IC 挑（§3.4）。</li>
-<li><strong>J4</strong> 匯入欄位加「反例種類」；分數按種類分開報；三種反例＝兩段式的合體（§3.5）。</li>
+<li><strong>J2</strong>（隨 U4 改寫）跨 TF 可以；鐵律＝只用<strong>決策時點</strong>前已收盤的 bar，每 TF 各自收據（§2-3）。</li>
+<li><strong>J3</strong> 不切固定 K 線窗；全部 K 線連續算特徵、每案例取<strong>決策時點</strong>那一列；「變化」靠窗內摘要特徵（訊號在窗內任何位置都抓得到）；回看長短讓 IC 挑（§3.4）。</li>
+<li><strong>J4</strong>（隨 U4 改寫）「反例種類」欄選填、平台可自動分類；分數按種類分開報；三種反例＝兩段式的合體（§3.5）。</li>
 <li><strong>J5</strong> 出場第一版＝時間出場；事件後報酬表回答「何時出」；triple-barrier／出場最佳化列殘留（§3.6）。</li>
 <li><strong>J6</strong> 跨標的合併（缺口票 #4）併進 GAP-3 做最小版（§3.8）。</li>
 <li><strong>J7</strong> 序列型 IC 的分析與圖表九成直接可用；要補對齊、0／1 統計、事件後報酬表、前端入口（§3.9）。</li>
@@ -386,8 +387,8 @@
 </ul>
 <p><strong>委員會定（K 系列；技術，不用你裁）——🟢 R2 已定案（2026-08-20；三家＋主委；白話版見 <a href="GAP-3事件型討論-委員意見.html">GAP-3事件型討論-委員意見.md</a> §3，技術版 <code>handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md</code>）</strong></p>
 <ul>
-<li><strong>K1</strong> 匯入契約欄位 → 已定（含進場價語意、反例種類＋來源、六時間點收據、T8／T9／T10 欄位形狀；毫秒）。</li>
-<li><strong>K2</strong> 對齊收據 → 已定（每事件 × 每 TF 一列；失敗原因枚舉、禁默默跳過）。</li>
+<li><strong>K1</strong> 匯入契約欄位 → 已定（含進場價語意〔8/20 預設改 <code>close_to_close</code>〕、反例種類〔8/20 改選填、可自動分類〕＋來源、六時間點收據、T8／T9／T10 欄位形狀；毫秒）。</li>
+<li><strong>K2</strong> 對齊收據 → 已定（每事件 × 每 TF 一列；失敗原因枚舉、禁默默跳過；〔8/20 擴充〕決策時點支援 t₀−k，SPEC 對抗審確認）。</li>
 <li><strong>K3</strong> 連續觸發 → 已定（C 簇首、A／B 全留＋唯一性權重；簇間隔用時間；另一種當敏感度；權重暫只進統計不進 ML 訓練）。</li>
 <li><strong>K4</strong> 切分＋跨標的 → 已定（每標的時間切＋緩衝；每標的等權為主；同時刻簇降權；不算完成 #4）。</li>
 <li><strong>K5</strong> 三張表 → 已定（事件後報酬／正反例辨別／條件 IC；分開報）。</li>
@@ -446,6 +447,9 @@
 <hr />
 <h2 id="8-討論紀錄新的寫上面只記改了什麼">§8 討論紀錄（新的寫上面；只記「改了什麼」）</h2>
 <ul>
+<li>
+<p><strong>2026-08-20（第 10 版）</strong>：你抓到「§2 改了、§7 表列沒跟上」⇒ §7 逐列補 8/20 澄清：U4 改寫＋新增 <strong>U4b</strong>（標籤基準 t₀ close）、U5 標舉例、J2／J3 改「決策時點」、J4 改選填、K1／K2 加〔8/20〕註記；委員意見檔 §2 受影響表列同步加註。</p>
+</li>
 <li>
 <p><strong>2026-08-20（第 9 版）</strong>：你問「SPEC 根據哪份」⇒ 新增 <strong>§7.5 SPEC 起草輸入清單</strong>（五層優先序＋衝突規則＋「最完整精確的那份＝SPEC §0，由對抗審驗沒漏沒錯」）。</p>
 </li>
