@@ -1,0 +1,20 @@
+[gap2_mutation_probe] batch=B3 ts=20260819T031911Z cases=8
+[baseline] rc=0 (============================== 44 passed in 6.35s ==============================)
+MUTATION V-10: RED ✓ (test_roundtrip_build_then_validate rc=1, FAILED=1)
+MUTATION V-10: RESTORED GREEN ✓
+MUTATION V-11: RED ✓ (test_unknown_key_raises rc=1, FAILED=1)
+MUTATION V-11: RESTORED GREEN ✓
+MUTATION V-12: RED ✓ (test_load_sample_scope_kind_values_subset_of_row_mask_plan_source rc=1, FAILED=1)
+MUTATION V-12: RESTORED GREEN ✓
+MUTATION V-17b: RED ✓ (test_oos_four_field_consistency rc=1, FAILED=1)
+MUTATION V-17b: RESTORED GREEN ✓
+MUTATION V-19a: RED ✓ (test_identity_three_fields rc=1, FAILED=1)
+MUTATION V-19a: RESTORED GREEN ✓
+MUTATION V-19b: RED ✓ (test_identity_three_fields rc=1, FAILED=1)
+MUTATION V-19b: RESTORED GREEN ✓
+MUTATION V-19c: RED ✓ (test_identity_three_fields rc=1, FAILED=1)
+MUTATION V-19c: RESTORED GREEN ✓
+MUTATION V-20: RED ✓ (test_feature_set_hash_and_survivor_sequence rc=1, FAILED=1)
+MUTATION V-20: RESTORED GREEN ✓
+[post-restore] rc=0 (============================== 44 passed in 6.45s ==============================)
+[gap2_mutation_probe] ✅ batch=B3 全部 8 條 mutation 轉紅且還原綠 → receipt handoffs/run_receipts/20260819T031911Z-gap2-B3-probe.log
