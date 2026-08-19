@@ -1862,6 +1862,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>八十・（2026-08-20）白話表格用 ✅／◐ 當表態欄會被 factkey 守衛誤判成「手寫狀態」</strong>：委員意見對應表的「同意／部分」欄原本用 ✅／◐，<code>factkey_write_guard</code> 把「ID＋✅」樣式當成區塊外手寫的批次狀態（它防的是白話看板假綠）。改用文字「同意／部分／不同意」即過。規則：<strong>給使用者的表格，表態欄用字不用表情符號</strong>；真正的批次狀態一律走 fact_keys 生成區塊。</p>
 </blockquote>
+<blockquote>
+<p><strong>八十一・（2026-08-20）pre-commit 的「index 尾隨空白移除」會打破委員檔的位元綁定</strong>：委員（grok）交件某行結尾多一個空白；pre-commit 只在 index 端把它刪掉（工作樹不動），於是 staged 內容的 sha256 ≠ <code>gate.sh register-output</code> 登記的 sha、也 ≠ FROZEN <code>sources.lock</code> 的 sha ⇒ claim checker 對該檔的委員豁免失效、commit 被擋。我前後試了六次才看懂（每次重 add 都被重新 strip，現象在「原檔」與「sources 副本」之間交替）。處置：原檔把 strip 後版本的 sha 也 register 一次（登記可疊加）即過；sources 副本因 lock FROZEN 不可改，<strong>不入版控、本機保留</strong>（reconcile 目錄本來就在 .gitignore）。規則：<strong>以後委員交件檔若有非兩空白的尾隨空白，commit 前先 register 兩個版本的 sha，或請委員交件前 strip</strong>；根本解法（hook 對已登記委員檔跳過 strip）列治理殘留，治理不擴建故不做。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
