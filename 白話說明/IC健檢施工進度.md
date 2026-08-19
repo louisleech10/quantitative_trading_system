@@ -45,3 +45,5 @@
 | TODO 複驗＋蓋章 | 20/20 關閉，全數 APPROVED |
 | B1 實作 | 12 新測試＋23 回歸全綠 |
 | B2 基準比對 | 攤平前後數值 exact 相同（golden 6/6） |
+
+> **2026-08-19 追記（GAP-2 B4 波及）**：`scripts/ic_wiring_check.py` 之 R3「報告節不得裸空」的節鍵清單改為**直接讀 `ic_report_contract.json` 的 report_sections**（原寫死五節），GAP-2 新增的 `marginal_ic` 節自動被涵蓋（現 7 節）；R1a／R1b／R2 規則不變。

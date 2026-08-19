@@ -14,7 +14,7 @@
 | B1 | 契約 JSON 單一真相源＋邊際 IC 純函式＋9 類 oracle＋探針腳本 | ✅ **收案**（三家 code review 11 條全處置＋三家蓋章 PASS；46 測試全綠、10 mutation 全紅）|
 | B2 | 多因子組合＋區塊 bootstrap 信賴區間 | ✅ **收案**（三家 code review 4 條全處置＋三家蓋章 PASS；45 測試全綠、3 mutation 全紅）|
 | B3 | 契約讀取／驗證／組裝（缺欄／多欄／枚舉外／身分不符都擋） | ✅ **收案**（三家 code review 10 條全處置＋三家蓋章 PASS；44 測試全綠、8 mutation 全紅）|
-| B4 | 接進 IC 主流程（三個入口＋fallback）、倖存者檔、報告新節、golden、wiring 改讀契約、預算 receipt | 🔄 動工中（先凍結 golden 基準，再動主流程）|
+| B4 | 接進 IC 主流程（三個入口＋fallback）、倖存者檔、報告新節、golden、wiring 改讀契約、預算 receipt | ✅ 寫完（真實 fixture 端到端：25 條新測試＋gate 共 71 條全綠；7 條 mutation 全紅；改前==改後 golden PASS）→ 待三家 code review＋蓋章 |
 | B5 | 前端：型別鏡像＋開關（預設開）＋一張唯讀表格 | — |
 
 ## 殘留（為何現在不做；已登記 registry，不會忘）
@@ -32,3 +32,4 @@
 - 第 3 批寫完（8/19）：`resolve_ref`（跨檔引用 fail-closed）、`compute_event_identity`（事件時間戳→毫秒→去重排序→sha256；查詢模式只 hash 查詢字串）、`validate_survivor_output`（每一層物件都查缺鍵／多鍵／型別／可空；枚舉；OOS 四欄互斥；`feature_set_hash` 重算；身分三欄與報告對照）、`build_survivor_output`（純組裝，不寫檔）。8 條 mutation：拿掉 sample_scope／放寬多鍵／契約 kind 偷加 panel／不驗 independent_oos／symbol・timeframe・case_id 各自寫死／略過 hash 重算——全部改壞就紅。既有 report 契約同步測試仍綠（本批沒碰它）。
 - 第 3 批 code review：codex 8 條全部成立、全修：最要緊的一條（P0）是我把「前處理的 fit_mode」（值是 train_mask／pit_expanding／full_sample）拿去用「投影 fit_scope」的枚舉驗，接主流程時正常 holdout 會被自己的 validator 拒絕——改為原值記錄、不映射；其餘：跨檔引用只准 repo 內相對路徑、事件身分依模式驗 hash 與計數不變式、fallback 時必須傳真實 index（不准用 0..n 位置冒充）、未知 root 狀態直接報錯不降級、樣本數與切分列數對帳（考慮 purge／embargo 用 ≥ 而非 ==）、checklist 補巢狀鍵、事件時間戳 naive 字串同 hash。composer／grok 零意見。
 - 第 3 批蓋章：codex／grok 一次 APPROVED；composer 判 APPROVED 但只寫在自己的交件檔、忘了 append 進收斂檔——我不代寫（那是它的簽名），派它單家補 append 即過。
+- 第 4 批寫完（8/19）：把邊際 IC 接進主流程（`analyze`／`refilter` 兩個插入點；全樣本 fallback 用旗標判定；OOS 兩欄只由 root 注入；橫截面路徑固定標「不適用」）、報告多一節、倖存者檔 `ic_survivors_{case_id}.json` 落地（跟報告同目錄、原子寫入、五鍵狀態恆存在）、golden 對照（改前==改後）、wiring 檢查改讀契約（7 節）、預算 bench receipt（600 次迴歸==spy 對證；82 秒／686MB 只記錄不設閾值）。三件值得說：①**結構性碰撞**——config 一加新欄，`config_hash` 就變，連帶報告 metadata 裡的 `scope_id` 變，golden 在行為完全不變下也會不等；處置＝比對時把 scope_id 正規化為標籤段（A1-10），pre 檔用 git stash 回到改前程式碼重算、可稽核不是「重新凍結換綠」；②第一版把 stage6b 回傳的裸 `{}` 靜默升級成 disabled 物件 ⇒ mutation V-14 抓不到 ⇒ 改成裸 `{}` 直接報錯；③`normal_scores` 加記憶化讓 bench 從 6 分鐘降到 1.5 分鐘（值不變，B1 測試全部照過）。兩個測試前提被 fixture 推翻（全樣本 fallback 預設門檻下 0 倖存者；缺 symbol 時主流程根本算不了 label）已改法並列進 review brief 讓三家判。
