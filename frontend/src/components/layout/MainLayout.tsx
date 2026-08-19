@@ -85,6 +85,12 @@ const navigationItems: NavItem[] = [
     badge: '待硬體升級'
   },
   {
+    name: '前端待補完',
+    href: '/pending-features',
+    icon: Star,
+    description: '需要前端但刻意先不做的殘留（為何／建議階段／觸發）'
+  },
+  {
     name: '系統設定',
     href: '/settings',
     icon: Settings,

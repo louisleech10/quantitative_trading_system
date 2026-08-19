@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import OptunaProgressBar from '@/components/optimization/common/OptunaProgressBar'
 import TrialComparisonTable from '@/components/optimization/common/TrialComparisonTable'
 import EquityCurveChart from '@/components/optimization/execution/EquityCurveChart'
+import PendingFeatureCard from '@/components/pending/PendingFeatureCard'
 import DrawdownChart from '@/components/optimization/execution/DrawdownChart'
 import ParetoFrontChart from '@/components/optimization/execution/ParetoFrontChart'
 import ParameterImportanceChart from '@/components/optimization/hyperparameter/ParameterImportanceChart'
@@ -291,6 +292,9 @@ export default function ExecutionOptimizationResultPage() {
             <Card><CardHeader><CardTitle>Best Value</CardTitle></CardHeader><CardContent>{result.best_trial?.value ?? '-'}</CardContent></Card>
             <Card><CardHeader><CardTitle>Pareto Points</CardTitle></CardHeader><CardContent>{paretoFront.length}</CardContent></Card>
           </div>
+
+          {/* GAP-1 前端占位殼（G1-R3／G1-R1）：策略驗證三關面板尚未接線——為何殘留／建議階段見卡片與 /pending-features */}
+          <PendingFeatureCard registryId="G1-R3" />
 
           <Card>
             <CardHeader>

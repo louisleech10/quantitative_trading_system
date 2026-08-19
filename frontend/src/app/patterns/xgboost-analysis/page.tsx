@@ -23,6 +23,7 @@ import { createPattern, getBatchTaskStatus, getCaseSummary, startBatchAnalysis, 
 import { fetchWatchlist } from '@/lib/api/watchlistApi';
 import type { AnalysisResult, CreatePatternRequest, IndicatorConfig, ValidationConfig } from '@/lib/patternTypes';
 import { usePatternStore } from '@/store/patternStore';
+import PendingFeatureCard from '@/components/pending/PendingFeatureCard';
 import { AlertCircle, BarChart2, Brain, CheckCircle, CheckSquare, Database, Info, List, Loader2, Play, Save, Square, TrendingUp } from 'lucide-react';
 
 interface CaseSummary {
@@ -483,6 +484,8 @@ function XGBoostAnalysisContent() {
                   </Alert>
                 )}
                 <MultiIndicatorConfig value={indicators} onChange={setIndicators} />
+                {/* GAP-2b 橋本體占位殼（G2-R1）：由倖存者檔選因子餵 ML 尚未接線——目前只能 Watchlist 手選 */}
+                <PendingFeatureCard registryId="G2-R1" />
               </CardContent>
             </Card>
 
