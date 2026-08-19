@@ -77,6 +77,8 @@ _watched_for() {
     # GAP-3 事件型討論文檔（2026-08-19；使用者：「先寫成一個文檔，討論就修改文檔」）：盯缺口 registry 與 consult 收斂檔；
     #   日後 GAP-3 SPEC 出現時把 SPEC 路徑加進來（SPEC 定版前本檔是討論的唯一落點）。
     "GAP-3事件型討論.md")            echo "docs/IC_QUANT_GAP_REGISTRY.md handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md handoffs/20260819-gap3-recon-BRIEF.md" ;;
+    # GAP-3 委員意見對應檔（2026-08-19；逐項對應討論檔 U/J/K/S/T/P/G 編號）：盯 R2 收斂檔與 R2 brief
+    "GAP-3事件型討論-委員意見.md")   echo "handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md handoffs/20260819-gap3-consult-r2-BRIEF.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。

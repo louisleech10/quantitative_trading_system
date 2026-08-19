@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAP-3 事件型討論 — 委員意見對應檔（第 2 輪；2026-08-20 凌晨）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-3事件型討論-委員意見.md</span></nav>
+<main>
+<h1 id="gap-3-事件型討論-委員意見對應檔第-2-輪2026-08-20-凌晨">GAP-3 事件型討論 — 委員意見對應檔（第 2 輪；2026-08-20 凌晨）</h1>
+<p><strong>這份是什麼</strong>：你睡前說「跟委員逐項討論，把委員是否同意和有何建議寫到另一文件，要能跟 <a href="GAP-3事件型討論.html">GAP-3事件型討論.md</a> 的項目對應」。這就是那份。
+<strong>編號</strong>跟討論文檔 §7 開頭定義的一樣：U＝你已定、J＝我的判斷、K＝委員會定的技術題、U2-x＝§2 你說的八點、S3.x＝§3 各小節、T1–T10＝§5 十類、P0–P10＝§6 流程、G1–G6＝§6 末產生器六點。
+<strong>誰參加</strong>：Codex、Composer（這輪成功交件）、Grok 三家委員＋我（主委版另寫、不算票）。技術版收斂檔：<code>handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md</code>（26 條意見收成 9 個群集、0 掉項，委員債已清）。</p>
+<blockquote>
+<p>讀法：先看 §0 一句話總結 → §1 委員抓到的四件最重要的事 → §2 逐項對應總表 → §3 技術題 K1–K10 的定案（白話） → §4 要你知道／裁的 → §5 接下來。</p>
+</blockquote>
+<hr />
+<h2 id="0-一句話總結">§0 一句話總結</h2>
+<p><strong>三家都說可以進規格（SPEC）起草；你裁的 U1–U11 沒有任何一條被判「技術上做不到」；我的十條判斷 J1–J10 沒有一條被推翻，其中七條被加了「要這樣做才算數」的條件。</strong> Codex 標了三個「P0」，意思不是停工，是「這三件事規格裡一定要寫死，不然結果會是假的」——我照較嚴的解讀：先把它們回填討論文檔（已做），你看過再寫規格。</p>
+<hr />
+<h2 id="1-委員抓到的四件最重要的事三家各自獨立都講到">§1 委員抓到的四件最重要的事（三家各自獨立都講到）</h2>
+<ol>
+<li><strong>進場價的語意要明寫，不能偷懶沿用 IC 主線的「收盤到收盤」</strong>（對應 U2-2／S3.9／J2／J7）。
+你是 <strong>open 買入</strong>，所以「後面漲幾 %」要從 open 起算；但現在序列型 IC 算的未來報酬是「這根 close → 幾根後 close」，<code>/search</code> 預設也是 close-to-close。我上一版說「把時間戳換成前一根就能共用 IC」——<strong>太簡化</strong>。委員定案：契約必填「進場價是哪個」（觸發根 open／觸發根 close／下一根 open）跟「報酬怎麼算」；A／B 預設「open 進、答案窗末 close 出」；條件 IC 在 A／B 要用你附的實際漲幅（U2）或平台重算 open 版，<strong>不准</strong>默默用 close-to-close。</li>
+<li><strong>多時間框架各自的「特徵截止點」要逐個寫收據，不是一個時間戳</strong>（U2-3／J2）。
+12h 的 t₀ 在 00:00，1h 最後一根已收盤的是 23:00 那根、4h 是 20:00 那根——兩個不一樣。收據要「每個事件 × 每個 TF 一列」，規則一律是「收盤時間 ≤ 決策時點的最後一根」；對不上的事件進失敗清單、不准默默跳過。</li>
+<li><strong>條件引擎的欄位要分角色</strong>（G1／J10／K9）：「挑樣本的條件」可以用未來（這是 case-control，合法）；「特徵」絕對不能用到決策後的東西；「標籤」只能進結果欄。同一個欄位不能一邊拿來挑樣本、一邊又當特徵。引擎做成純函式放核心層，<code>/search</code> 跟 IC 的事件過濾都只是外殼。</li>
+<li><strong>「全部 K 線驗證」要有固定的分母，而且學習樣本基率 vs 全樣本基率要並排</strong>（S3.1／J1／K8）：哪些 bar 算「可評估」（答案窗走完、資料連續、價格正常、沒偷看）要明列數量；報精確率／召回／PR 曲線／lift／訊號頻率／簡單持有報酬；不碰倉位、手續費、複利、資金曲線（那是回測層，現在不完整）。</li>
+</ol>
+<hr />
+<h2 id="2-逐項對應總表">§2 逐項對應總表</h2>
+<p>欄位：<strong>表態</strong>＝三家各自（C＝Codex、Co＝Composer、G＝Grok）；「同意」／「部分」（＝同意方向但加條件）／「不同意」／「—」不適用；U 系列只填「可行／有風險」。<strong>處置</strong>：「定」＝已寫進討論文檔或 K 定案；「知」＝告知你；「裁」＝要你決定。</p>
+<h3 id="u-系列你已定委員只看技術上能不能做到">U 系列（你已定：委員只看「技術上能不能做到」）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>項目</th>
+<th>C</th>
+<th>Co</th>
+<th>G</th>
+<th>委員補充（白話）</th>
+<th>處置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>U2-1</td>
+<td>/search→CSV→/data-preparation 流程</td>
+<td>可行</td>
+<td>可行</td>
+<td>可行</td>
+<td>概念對；舊欄位三個不夠、對齊「精確相等＋默默跳過」必換（升級不翻掉）</td>
+<td>定</td>
+</tr>
+<tr>
+<td>U2-2</td>
+<td>t₀ open 買入、預測 t₀ 漲不漲</td>
+<td>可行</td>
+<td>可行</td>
+<td>可行</td>
+<td>有一個風險＝進場價語意（§1-1）</td>
+<td>定</td>
+</tr>
+<tr>
+<td>U2-3</td>
+<td>12h 標 t₀、學 1h／4h</td>
+<td>可行</td>
+<td>可行</td>
+<td>可行</td>
+<td>每個 TF 各自寫截止收據（§1-2）</td>
+<td>定</td>
+</tr>
+<tr>
+<td>U2-4</td>
+<td>三種反例全標 0</td>
+<td>可行</td>
+<td>可行</td>
+<td>可行</td>
+<td>必填「反例種類」欄、分開報分數；模型容易只學會分「大漲 vs 大跌」</td>
+<td>定</td>
+</tr>
+<tr>
+<td>U2-5</td>
+<td>finlab 事件後報酬表</td>
+<td>可行</td>
+<td>可行</td>
+<td>可行</td>
+<td>不需反例；是描述統計，不是預測</td>
+<td>定</td>
+</tr>
+<tr>
+<td>U2-6</td>
+<td>150–200 標的、一兩萬案例</td>
+<td>可行</td>
+<td>可行</td>
+<td>可行</td>
+<td>夠用；但必須跨標的合併＋同時刻降權；算力沒實測</td>
+<td>定</td>
+</tr>
+<tr>
+<td>U2-7</td>
+<td>出場／連續觸發／X 根</td>
+<td>可行</td>
+<td>可行</td>
+<td>可行</td>
+<td>各有處置（K3／K5／K7）</td>
+<td>定</td>
+</tr>
+<tr>
+<td>U2-8</td>
+<td>先討論再問委員</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>本輪就是</td>
+<td>—</td>
+</tr>
+<tr>
+<td>U1–U11 其餘</td>
+<td>目標／多空／產生器完整版／前端同頁／全部 K 線交委員…</td>
+<td>可行</td>
+<td>可行</td>
+<td>可行</td>
+<td>無人判不可行</td>
+<td>定</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="s-系列3-我的陷阱與做法">S 系列（§3 我的陷阱與做法）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>項目</th>
+<th>C</th>
+<th>Co</th>
+<th>G</th>
+<th>委員補充（白話）</th>
+<th>處置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S3.1</td>
+<td>case-control 合法＋全部 K 線驗證</td>
+<td>部分</td>
+<td>同意</td>
+<td>部分</td>
+<td>合法；但要有固定分母＋兩種基率並排＋lift（§1-4）</td>
+<td>定（K8）</td>
+</tr>
+<tr>
+<td>S3.2</td>
+<td>三情境＝契約主維度</td>
+<td>同意</td>
+<td>同意</td>
+<td>同意</td>
+<td>契約加 <code>scenario</code> 欄（A／B／C／兩段式）＋決策時點欄</td>
+<td>定</td>
+</tr>
+<tr>
+<td>S3.3</td>
+<td>其他陷阱</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>連續觸發的「區間重疊」要進收據（不是只靠切分）</td>
+<td>定</td>
+</tr>
+<tr>
+<td>S3.4</td>
+<td>不切固定窗；窗內摘要特徵；IC 挑長短</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>對；窗內極值位置、斜率<strong>已經有</strong>，「距上次交叉幾根」「連續幾根」要補（K7）</td>
+<td>定</td>
+</tr>
+<tr>
+<td>S3.5</td>
+<td>三種反例＝兩段式合體；分報</td>
+<td>部分</td>
+<td>部分</td>
+<td>同意</td>
+<td>對；但「反例種類」不能取代「反例來源」欄，兩個都要</td>
+<td>定</td>
+</tr>
+<tr>
+<td>S3.6</td>
+<td>出場先時間出場</td>
+<td>同意</td>
+<td>同意</td>
+<td>同意</td>
+<td>—</td>
+<td>定</td>
+</tr>
+<tr>
+<td>S3.7</td>
+<td>連續觸發：C 簇首、A/B 全留降權、兩種都跑</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>方向對；「兩種都跑」改成主設定＋敏感度附錄（一兩萬事件跑兩遍太重）；簇間隔用「時間」不是「第幾列」</td>
+<td>定（K3）</td>
+</tr>
+<tr>
+<td>S3.8</td>
+<td>跨標的合併（#4）併入做最小版</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>要做，但「最小版」＝每標的各自切、合併統計、同時刻降權；<strong>不算完成 #4</strong>（#4 是正式 panel 估計量）</td>
+<td>定（K4）</td>
+</tr>
+<tr>
+<td>S3.9</td>
+<td>序列型圖表九成可用</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>圖表可用；但「換時間戳就能共用」太簡化（§1-1、§1-2）</td>
+<td>定（改寫）</td>
+</tr>
+<tr>
+<td>S3.10</td>
+<td>IC 篩→ML 組合→全部 K 線驗 ML</td>
+<td>同意</td>
+<td>同意</td>
+<td>同意</td>
+<td>—</td>
+<td>定</td>
+</tr>
+<tr>
+<td>S3.11</td>
+<td>前端：產事件另頁、分析同頁事件模式</td>
+<td>同意</td>
+<td>同意</td>
+<td>同意</td>
+<td>第一版占位、UAT 等整票</td>
+<td>定</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="t-系列5-十類事件型">T 系列（§5 十類事件型）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>項目</th>
+<th>C</th>
+<th>Co</th>
+<th>G</th>
+<th>委員補充（白話）</th>
+<th>處置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T1–T3</td>
+<td>價量／指標／狀態切換</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>產生器第一版可產；Codex 補：用到未來欄只能當「挑樣本」不能當特徵</td>
+<td>定</td>
+</tr>
+<tr>
+<td>T4／T6</td>
+<td>衍生品／新聞鏈上</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>要外部資料，這票不接、登記</td>
+<td>定</td>
+</tr>
+<tr>
+<td>T5／T7</td>
+<td>日曆／人工標定</td>
+<td>同意</td>
+<td>同意</td>
+<td>同意</td>
+<td>匯入就好</td>
+<td>定</td>
+</tr>
+<tr>
+<td>T8</td>
+<td>跨標的關聯</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>契約不能只存「參照標的名字」，還要 TF、對齊規則、資料版本</td>
+<td>定（K1）</td>
+</tr>
+<tr>
+<td>T9</td>
+<td>模型訊號當事件</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>要存「哪個模型、哪個版本、訊號幾點可用」；訊號不能晚於決策時點</td>
+<td>定（K1）</td>
+</tr>
+<tr>
+<td>T10</td>
+<td>組合／區間型</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>要有「區間起訖」欄；多條件用多標籤不互相覆蓋</td>
+<td>定（K1）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="p-系列6-流程與-g-系列產生器六點">P 系列（§6 流程）與 G 系列（產生器六點）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>項目</th>
+<th>C</th>
+<th>Co</th>
+<th>G</th>
+<th>委員補充（白話）</th>
+<th>處置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P0–P10</td>
+<td>流程十一步</td>
+<td>部分（全部）</td>
+<td>同意</td>
+<td>同意</td>
+<td>Codex 每步都「同意方向、要補可驗收的細節」（收據、枚舉、分母）；Composer／Grok 全同意</td>
+<td>定</td>
+</tr>
+<tr>
+<td>G1</td>
+<td>條件可用任何特徵＋t₀結果＋未來欄</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>可以，但欄位分角色（§1-3）</td>
+<td>定（K9）</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>多組條件各給標籤</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>用「標籤 ID」保留重疊，不用一個 0/1 覆寫</td>
+<td>定</td>
+</tr>
+<tr>
+<td>G3</td>
+<td>方向／情境／答案窗／規則摘要</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>欄位形狀見 K1</td>
+<td>定</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>產生時可選去重</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>參數跟 K3 一致</td>
+<td>定</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>一鍵合規事件檔</td>
+<td>同意</td>
+<td>同意</td>
+<td>同意</td>
+<td>要過同一套檢查器</td>
+<td>定</td>
+</tr>
+<tr>
+<td>G6</td>
+<td>同引擎套全部 K 線重算標籤</td>
+<td>部分</td>
+<td>部分</td>
+<td>同意</td>
+<td>可以，但特徵列仍受 PIT；分母見 K8</td>
+<td>定</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="j-系列我的十條判斷">J 系列（我的十條判斷）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>項目</th>
+<th>C</th>
+<th>Co</th>
+<th>G</th>
+<th>委員補充（白話）</th>
+<th>處置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>J1</td>
+<td>case-control＋全部 K 線驗證＝硬</td>
+<td>部分</td>
+<td>同意</td>
+<td>部分</td>
+<td>對；加「分母＋基率並排＋lift」</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J2</td>
+<td>跨 TF 鐵律</td>
+<td>部分</td>
+<td>部分</td>
+<td>同意</td>
+<td>對；每 TF 各自收據</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J3</td>
+<td>不切固定窗</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>對；補 K7 算子</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J4</td>
+<td>反例種類欄＋分報</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>對；再加反例來源欄</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J5</td>
+<td>時間出場</td>
+<td>同意</td>
+<td>同意</td>
+<td>同意</td>
+<td>—</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J6</td>
+<td>#4 併入最小版</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>對；劃清邊界、不算完成 #4</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J7</td>
+<td>序列型圖表九成可用</td>
+<td>部分</td>
+<td>同意</td>
+<td>部分</td>
+<td>對；對齊／label 語意要補</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J8</td>
+<td>IC 不取代 ML</td>
+<td>部分</td>
+<td>同意</td>
+<td>同意</td>
+<td>對；DSR/PBO 不跟 B1 綁</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J9</td>
+<td>情境＞類型</td>
+<td>同意</td>
+<td>同意</td>
+<td>同意</td>
+<td>—</td>
+<td>定</td>
+</tr>
+<tr>
+<td>J10</td>
+<td>產生器與 event_filter 共用引擎</td>
+<td>部分</td>
+<td>部分</td>
+<td>部分</td>
+<td>可共用底層，但現有那個不能直接當新契約的唯一來源；要 typed 引擎＋角色</td>
+<td>定（K9）</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="3-技術題-k1k10-委員會定案白話版技術細節在收斂檔">§3 技術題 K1–K10 委員會定案（白話版；技術細節在收斂檔）</h2>
+<ul>
+<li><strong>K1 匯入契約欄位</strong>：每列＝事件 ID、標的、時間框架、t₀（<strong>毫秒</strong> UTC、觸發根 open）、方向（多／空）、情境（A／B／C／兩段式）、決策時點規則、<strong>進場價語意</strong>、答案窗、標籤 0/1＋實際漲幅、<strong>反例種類</strong>＋反例來源、標籤規則摘要（/search 條件快照＋指紋）、來源檔指紋、資料版本指紋、事件形狀（一瞬間／一段區間）。選填：類型標籤、參照標的（T8）、來源模型（T9）、區間起訖（T10）。六個時間點（觀測到／決策／特徵截止每 TF／進場／答案起／答案止）由系統算出寫進收據，不用你填。</li>
+<li><strong>K2 對齊收據</strong>：每事件 × 每 TF 一列；A／B「t₀ open」⇒ 決策＝t₀、特徵截止＝各 TF 收盤 ≤ t₀ 的最後一根；失敗原因枚舉（缺 bar／單位錯／答案窗沒走完／特徵越過決策點…）逐事件列出、禁默默跳過。</li>
+<li><strong>K3 連續觸發</strong>：C 預設「簇首」（簇間隔＝答案窗長度，用時間算）；A／B 預設「全留＋唯一性權重」（重疊越多權重越低）並用對重疊穩健的統計；另一種當敏感度附錄，報告標「換設定結論會不會翻」；<strong>不硬性兩種都跑</strong>。另：權重目前只能進統計，還不能進 ML 訓練（ML 殼那條線未接、屬不完整層）。</li>
+<li><strong>K4 切分與跨標的</strong>：每標的各自按時間切＋留答案窗長度緩衝；合併時「每標的等權」為主、「每事件等權」當敏感度；同一時刻多標的一起動算一簇降權；<strong>不算完成缺口票 #4</strong>。</li>
+<li><strong>K5 三張表</strong>：事件後報酬表（多 horizon、平均／中位／勝率／樣本數／信賴區間；不需反例）、正反例分不分得開（只用驗證段分數；按反例種類分開；兩段式各一份；只有一類 ⇒ 標「無法計算」）、條件 IC（只吃連續值的實際漲幅；沿用 IC 主線）；三張分開報、不合成一個分數。</li>
+<li><strong>K6 防運氣</strong>：第一批就做「標籤打亂 ⇒ 應該什麼都看不到」＋「特徵截止故意往後移 ⇒ 系統必須擋」；DSR/PBO（扣運氣分）要等規則變成可比較的報酬序列、進 GAP-1 的帳本後才接（第四批）。</li>
+<li><strong>K7 變化類特徵</strong>：已經有的不重做（窗內極值位置、斜率、差分）；要補「距上次交叉幾根」「連續幾根同向」「距上次破閾幾根」「窗內最大值÷現值」「窗內交叉次數」；全部只看過去、缺資料不填 0。</li>
+<li><strong>K8 全部 K 線驗證</strong>（一次建完整）：固定分母（可評估的 bar 數＋各種排除原因的數量）；精確率／召回／F1／PR 曲線／lift／訊號頻率／簡單持有報酬（open 進、答案窗末 close 出）／按標的、方向、反例種類、時間段分層；學習基率 vs 全樣本基率並排；跟序列型全部 K 線 IC 並排。<strong>不做</strong>倉位、手續費、複利、資金曲線、停利停損最佳化、long-short。</li>
+<li><strong>K9 完整版事件產生器</strong>：純函式條件引擎放核心層，<code>/search</code> 升級成外殼、IC 事件過濾也是外殼；條件語法沿用現有安全子集；欄位分「特徵／挑樣本／標籤」三角色；多組條件→多標籤；產生時去重；輸出直接過 K1 檢查；現在寫死只准 <code>price_change</code> 的限制改成契約化允許清單；T1–T3＋T10 由產生器產、T5／T7 匯入、T8／T9 留欄位、T4／T6 等資料源。</li>
+<li><strong>K10 分批</strong>（主委定；三家建議略異）：B1 契約＋對齊＋去重／切分＋防運氣自檢＋單特徵基線 → B2 三張表＋倖存者契約升版＋<strong>全部 K 線驗證</strong>（因為它是整票靈魂） → B3 完整版事件產生器＋變化類特徵 → B4 找 pattern（GBDT／規則）＋DSR/PBO 接點 → B5 存檔／API／前端占位／UAT。產生器的最小版若 B2 有餘裕可提前，清單（TODO）階段再定。</li>
+</ul>
+<hr />
+<h2 id="4-要你知道裁的">§4 要你知道／裁的</h2>
+<p><strong>沒有新的要你裁的題。</strong> 三件要你知道：</p>
+<ol>
+<li>分批順序是我照三家交集定的（§3 K10）；如果你希望「事件產生器」更早（例如跟 B2 一起），說一聲就改。</li>
+<li>A／B「連續觸發全留＋降權」的權重現在只能進統計、不能進 ML 訓練（ML 殼那條線沒接）；等 ML 層重寫時再接。</li>
+<li>跨標的合併在 GAP-3 只做最小版，缺口票 #4 不會因此關掉。</li>
+</ol>
+<hr />
+<h2 id="5-接下來">§5 接下來</h2>
+<ol>
+<li>委員定案已回填討論文檔（§3.9 改寫、§7 K 系列標「已定（R2）」、§8 紀錄）——你醒來先看那份的 §7，再看這份。</li>
+<li>你點頭後 → 寫 GAP-3 規格（SPEC；大任務完整管線：規格 → 三家對抗審 → 白話給你審 → 清單 → 分批）。<strong>你沒點頭前不寫規格、不動程式。</strong></li>
+</ol>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3事件型討論-委員意見.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
