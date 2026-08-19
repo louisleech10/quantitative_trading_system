@@ -87,6 +87,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     feature_quality_diagnostics: false,
     net_ic_analysis: false,
     fdr_correction: true,
+    marginal_ic: true,
     vif_filter: false,
     factor_centrality: false,
     factor_orthogonalization: false,
@@ -114,6 +115,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     feature_quality_diagnostics: true,
     net_ic_analysis: true,
     fdr_correction: true,
+    marginal_ic: true,
     vif_filter: false,
     factor_centrality: true,
     factor_orthogonalization: false,
@@ -141,6 +143,7 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     feature_quality_diagnostics: true,
     net_ic_analysis: true,
     fdr_correction: true,
+    marginal_ic: true,
     vif_filter: true,
     factor_centrality: true,
     factor_orthogonalization: true,
@@ -334,6 +337,8 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
       ai_summary: Boolean(state.featureToggles.ai_summary),
       // UI 邊界唯一轉名點 → 後端 significance.fdr.enabled（D-G / Task 4.2）
       fdr_correction: Boolean(state.featureToggles.fdr_correction),
+      // GAP-2 Task 5.1：邊際 IC／多因子組合（後端 STAGE_OVERRIDE_PATHS.marginal_ic → marginal_ic.enabled；預設開）
+      marginal_ic: Boolean(state.featureToggles.marginal_ic),
     };
 
     const moduleOverrides: Record<string, boolean> = {
@@ -369,6 +374,8 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
         custom_overrides: {
           stage_overrides: {
             fdr_correction: Boolean(state.featureToggles.fdr_correction),
+            // GAP-2 Task 5.1：具名 preset 亦送出 marginal_ic（比照 fdr；後端具名分支消費）
+            marginal_ic: Boolean(state.featureToggles.marginal_ic),
           },
         },
       },

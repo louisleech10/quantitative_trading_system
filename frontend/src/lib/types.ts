@@ -2120,15 +2120,103 @@ export type RollingICSeries = Record<string, number[]>;
 
 export type GroupedICData = Record<string, Record<string, number> | Record<string, Record<string, number>>>;
 
+// ===== GAP-2 邊際 IC／倖存者輸出（SoT＝momentum/Analysis/contracts/ic_survivor_contract.json；此處為前端型別鏡像，欄名以契約為準；ICHC 契約段外）=====
+export interface MarginalICPerFeature {
+  status: CapabilityStatus;
+  reason: string | null;
+  conditioning_set: string[];
+  marginal_ic: number | null;
+  gross_ic: number | null;
+  ic_retained_ratio: number | null;
+  marginal_ic_train_insample: number | null;
+  ci95: [number, number] | null;
+  condition_number: number | null;
+  r2_train: number | null;
+  n_used_train: number;
+  n_used_test: number;
+}
+
+export interface MarginalICSequentialEntry extends MarginalICPerFeature {
+  feature: string;
+  step: number;
+}
+
+export interface MarginalICComposite {
+  status: CapabilityStatus;
+  reason: string | null;
+  method?: 'equal' | 'ic_weighted';
+  weights?: Record<string, number>;
+  signs?: Record<string, number>;
+  excluded?: Record<string, string>;
+  composite_ic?: number | null;
+  composite_ic_train_insample?: number | null;
+  top_train_single?: string | null;
+  top_train_single_test_ic?: number | null;
+  best_single_test_ic?: number | null;
+  best_single_feature?: string | null;
+  delta_vs_top_train_single?: number | null;
+  delta_ci95?: [number, number] | null;
+  n_used_test?: number;
+  n_used_train?: number;
+  fit_scope?: 'train' | 'full_sample' | null;
+  oos_guarantees?: boolean | null;
+}
+
+export interface MarginalICSection {
+  status: CapabilityStatus;
+  reason: string | null;
+  fit_scope: 'train' | 'full_sample' | null;
+  oos_guarantees: boolean | null;
+  pass_class: 'oos' | 'full_sample_research_only' | null;
+  statistic: string;
+  projection_space: string;
+  /** D3′：恆 false（契約 independent_oos_validation_allowed=[false]） */
+  independent_oos_validation: boolean;
+  selection_sample: string;
+  oos_semantics: string;
+  algorithm_version: string;
+  views: Record<string, SectionStatusObject>;
+  per_feature: Record<string, MarginalICPerFeature>;
+  sequential: MarginalICSequentialEntry[];
+  removed_candidates: Record<string, MarginalICPerFeature>;
+  train_ic: Record<string, number | null>;
+  n_train: number | null;
+  n_test: number | null;
+  n_regressions: number;
+  budget: Record<string, number>;
+  composite?: MarginalICComposite;
+}
+
+/** 報告 metadata.survivor_output 五鍵（契約 survivor_output_status_keys） */
+export interface SurvivorOutputMeta {
+  status: CapabilityStatus;
+  reason: string | null;
+  path: string | null;
+  sha256: string | null;
+  case_id: string;
+}
+
+/** type guard：完整邊際 IC 節（含 per_feature）而非純 status 物件 */
+export function isMarginalICSection(value: unknown): value is MarginalICSection {
+  return (
+    isSectionStatus(value) &&
+    typeof (value as { per_feature?: unknown }).per_feature === 'object' &&
+    (value as { per_feature?: unknown }).per_feature !== null
+  );
+}
+// ===== GAP-2 段結束 =====
+
 export interface ICReport {
   version?: string;
   /** LA-1 B3：ok_oos | degraded_full_sample（optional 相容舊 artifact；禁 |string 塌 union） */
   analysis_status?: 'ok_oos' | 'degraded_full_sample';
   /** LA-1 B3：root 鏡像 OOS 保證（optional 相容舊 artifact） */
   oos_guarantees?: boolean;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> & { survivor_output?: SurvivorOutputMeta };
   filter_log?: FilterLogData;
   summary_table?: ICFeatureInfo[];
+  /** GAP-2 Task 5.1：邊際 IC／多因子組合節（status object 或完整節；舊報告缺席） */
+  marginal_ic?: MarginalICSection | SectionStatusObject;
   /** ICHC Task 3.2：五節 union——SectionStatusObject（xsec 不適用）或 legacy 資料形 */
   ic_decay?: SectionStatusObject | Record<string, ICDecayData>;
   quantile_returns?: SectionStatusObject | Record<string, QuantileReturnData>;

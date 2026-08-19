@@ -33,6 +33,7 @@ import CrossSymbolValidationPanel from '@/components/ic-analysis/CrossSymbolVali
 import PartialFailureBanner from '@/components/ic-analysis/PartialFailureBanner';
 import DegradedBanner from '@/components/ic-analysis/DegradedBanner';
 import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
+import MarginalICTable from '@/components/ic-analysis/MarginalICTable';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -809,6 +810,11 @@ function ICAnalysisPageContent() {
                     )}
                     <CorrelationHeatmap matrix={report?.correlation_matrix || null} />
                   </div>
+
+                  {/* GAP-2 Task 5.1（A1-5 補正）：邊際 IC／多因子組合唯讀表格——base 報告節，掛 basic 分頁末段（deep 分頁受 deepTabVisible gating） */}
+                  <ChartErrorBoundary title="邊際 IC／多因子組合">
+                    <MarginalICTable section={report?.marginal_ic} />
+                  </ChartErrorBoundary>
                 </TabsContent>
 
                 {deepTabVisible && (

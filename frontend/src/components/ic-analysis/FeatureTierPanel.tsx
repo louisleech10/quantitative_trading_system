@@ -45,6 +45,7 @@ const TOGGLES: Array<{ key: string; label: string; tier: 'L1' | 'L2' | 'L3'; tip
     tip: '啟用時 p 閘用 BH q（p_value_adj）；關閉時用 HAC raw p。預設 ON',
   },
   { key: 'vif_filter', label: 'VIF 篩選', tier: 'L3', tip: '高階共線性過濾' },
+  { key: 'marginal_ic', label: '邊際 IC／多因子組合', tier: 'L3', tip: '倖存因子 semi-partial 秩 IC（loo／sequential）＋等權組合 IC；預設 ON；關閉 ⇒ 報告節 disabled' },
   { key: 'factor_centrality', label: 'Factor Centrality/PCA (Module 2)', tier: 'L3', tip: 'PCA 因子中心性' },
   { key: 'factor_orthogonalization', label: 'Factor Orthogonalization (Module 6)', tier: 'L3', tip: '因子正交化' },
   { key: 'factor_exposure', label: 'Factor Exposure (Module 7)', tier: 'L3', tip: '因子曝險(單標的position重疊,非橫截面歸因)' },
@@ -94,7 +95,7 @@ export default function FeatureTierPanel({
       </div>
 
       <div className="text-xs text-slate-400">{desc}</div>
-      <div className="text-xs text-slate-300">已啟用 {enabledCount}/24 項功能</div>
+      <div className="text-xs text-slate-300">已啟用 {enabledCount}/{TOGGLES.length} 項功能</div>
 
       <button
         type="button"
