@@ -1855,6 +1855,10 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>七十七・（2026-08-19）stamp brief 不得叫多家並行跑重測試</strong>：B4 stamp 判準 4 要三家各跑含 bench（600 次 12000×201 最小平方）的 73 條測試，三家並行互搶 CPU：codex 卡 1773 秒中斷判 BLOCKED、grok 卡 40 分鐘後拆 <code>-k &quot;not bench&quot;</code>＋獨占 bench 才過，整輪拖 1 小時 15 分。規則：戳記輪只准（a）讀已 commit 的 receipt、（b）in-memory 反例、（c）輕量測試（&lt;1 分鐘）；重 gate 由主委在派工前跑一次並附 receipt。另：brief 給 diff 範圍時 allowlist 要把中間夾的交接文件（HANDOFF）列進去，否則字面級 BLOCKED。</p>
 </blockquote>
+<blockquote>
+<p><strong>七十八・（2026-08-19）consult brief 把「決策時點」當 assumed 前提卻沒先用一句白話問使用者</strong>：我在 GAP-3 brief 寫「PIT 正確的決策時點＝觸發根 close」標 assumed 交委員攻，三方都攻了細節、沒人質疑「使用者是不是根本想在 open 買」。彈窗一問，使用者主要設想是 A／B（事件在未來、open 決策），整輪反例／決策時點結論只對 C 成立。規則：<strong>凡 brief 的 assumed 前提是「使用者意圖」（不是碼事實），派委員前先用一句白話問使用者</strong>；委員能攻碼、攻不了使用者腦中的情境。代價＝要補一輪 consult。
+<strong>七十九・（2026-08-19）committee_run 有一家失敗時的補救路徑</strong>：失敗家族在同 round 補跑只能 <code>ROUND_ID=&lt;id&gt; bash scripts/cx_run.sh &lt;family&gt; &lt;brief&gt; &lt;out&gt;</code>（gate 在債 OPEN 時拒發新 token，命令要放 scratchpad 腳本避 gate_check 字面偵測）；若外部服務持續失敗（Cursor <code>resource_exhausted</code> 兩次），roster 不等開債三家 ⇒ <code>debt_clear</code> 拒收、只能 <code>--abandon --kind collection-failed</code>（synth／lock 檔仍保留為下游輸入）。consult 非簽核閘可這樣收；review／stamp 輪不行（quorum 三家）。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
