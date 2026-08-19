@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import math
 import re
 import time
 from collections import OrderedDict
@@ -21,13 +22,21 @@ import pandas as pd
 from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
 from momentum.Analysis.data_preprocessor import DataPreprocessor
 from momentum.Analysis.event_filter import EventFilter
+from momentum.Analysis.factor_combiner import combine_factors
 from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.ic_reporter import ICReporter
+from momentum.Analysis.marginal_ic import MarginalICParams, compute_marginal_ic
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
 from momentum.Analysis.pit_stats import PIT_STATS_VERSION
 from momentum.Analysis.redundancy_filter import RedundancyFilter
 from scipy import stats as scipy_stats
 
+from momentum.Analysis.survivor_contract import (
+    build_survivor_output,
+    compute_event_identity,
+    load_survivor_contract,
+    validate_survivor_output,
+)
 from momentum.Analysis.statistical_validator import (
     StatisticalValidator,
     _hac_nan_result,
@@ -99,6 +108,7 @@ STAGE_OVERRIDE_PATHS: dict[str, tuple[str, ...]] = {
     "turnover_analysis": ("turnover", "enabled"),
     "ai_summary": ("report", "ai_summary"),
     "fdr_correction": ("significance", "fdr", "enabled"),
+    "marginal_ic": ("marginal_ic", "enabled"),  # GAP-2 Task 4.1（B5 toggle／wiring R1b）
 }
 
 
@@ -851,6 +861,13 @@ class ICFilterOrchestrator:
         self._active_fit_mode: Optional[str] = None
         # LA-1 B3：fallback 內層 analyze 禁 persist（G-C）；唯一寫出在 wrapper 加 root 後
         self._suppress_persist: bool = False
+        # GAP-2 Task 4.1：fallback 遞迴 analyze 之唯一判定旗標（_stage6b fit_scope=full_sample）；
+        # 事件身分（stage3 pop timestamps 前計算）；本 request 之 features/labels 路徑（refilter 沿用）；當次 run config hash
+        self._in_fallback_rerun: bool = False
+        self._event_identity: Optional[dict] = None
+        self._features_path: Optional[str] = None
+        self._labels_path: Optional[str] = None
+        self._current_config_hash: Optional[str] = None
         # 1c-FR-FULL F1.1：PIT 因子擇時序列 in-memory owner（F1 寫、F4 讀）
         # cache hit 無 series → 依賴 owner 的 net_ic 走 unavailable，不得崩
         self._factor_return_series: dict[str, FactorTimingReturnSeries] = {}
@@ -880,6 +897,10 @@ class ICFilterOrchestrator:
         config = self._apply_tier_config(self._apply_config_override(config_override))
         self._progress_callback = progress_callback
         self._clear_deep_analysis_cache()
+        # GAP-2 Task 4.1：入口存路徑（供 refilter／persist provenance）＋當次 config hash
+        self._features_path = str(features_path) if features_path else None
+        self._labels_path = str(labels_path) if labels_path else None
+        self._current_config_hash = self._hash_config(config)
 
         self._report_progress(0, "ingestion", 0.02, "loading inputs")
         features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
@@ -1044,6 +1065,17 @@ class ICFilterOrchestrator:
             split_context=split_context,
         )
 
+        # GAP-2 Task 4.1：stage 6b 邊際 IC／多因子組合（插入點①：analyze stage6 後、stage7 前）
+        stage6b_results = self._stage6b_marginal_ic(
+            features_df,
+            ic_results.get("label_series"),
+            stage5_results,
+            stage6_results,
+            split_context,
+            config,
+            fit_scope=self._resolve_stage6b_fit_scope(split_context),
+        )
+
         self._report_progress(7, "report", 0.95, "generating report")
         report = self._stage7_report(
             features_df,
@@ -1056,6 +1088,7 @@ class ICFilterOrchestrator:
             event_info,
             feature_filter_info,
             split_context=split_context,
+            stage6b_results=stage6b_results,
         )
 
         self._report_progress(7, "report", 1.0, "completed")
@@ -1102,6 +1135,7 @@ class ICFilterOrchestrator:
 
         prev_suppress = self._suppress_persist
         self._suppress_persist = True
+        self._in_fallback_rerun = True  # GAP-2 Task 4.1：唯一 fallback 判定機制（_stage6b fit_scope=full_sample）
         try:
             # ICHC R5 裁決（三家 CONVERGED=方案 A′）：fallback 重跑保留 event_timestamps
             # ——事件語意不得靜默丟失；holdout off 後 stage4 不再進 warmup skip，
@@ -1117,6 +1151,7 @@ class ICFilterOrchestrator:
             )
         finally:
             self._suppress_persist = prev_suppress
+            self._in_fallback_rerun = False
 
         report_meta = dict(report.get("metadata") or {})
         report_meta.pop("scope", None)
@@ -1132,6 +1167,8 @@ class ICFilterOrchestrator:
             analysis_status="degraded_full_sample",
             oos_guarantees=False,
         )
+        # GAP-2 A1-3／TODO 4.2(c)：邊際 IC 節之 OOS 兩欄同點重注入（root 單一來源）
+        self._inject_root_oos(report.get("marginal_ic"), "degraded_full_sample", False)
 
         # G-C：唯一寫出點 = root 欄位加註之後（外層未 suppress 時）
         if not self._suppress_persist:
@@ -1145,6 +1182,11 @@ class ICFilterOrchestrator:
                     report,
                     report_meta,
                     report.get("filter_log") or {},
+                    stage6b_results=report.get("marginal_ic"),
+                    event_identity=self._event_identity,
+                    features_path=self._features_path,
+                    label_series=self._ic_cache.get("label_series") if isinstance(self._ic_cache, dict) else None,
+                    split_context=self._ic_cache.get("split_context") if isinstance(self._ic_cache, dict) else None,
                 )
 
         self._report = report
@@ -1531,6 +1573,7 @@ class ICFilterOrchestrator:
             },
             "turnover_analysis": dict(_xsec_na),
             "coverage_analysis": dict(_xsec_na),
+            "marginal_ic": dict(_xsec_na),  # GAP-2 Task 4.1：xsec 路徑 not_applicable:cross_sectional_mode（禁呼叫計算）
             "cross_sectional_symbol_ic": symbol_ic_matrix,
             "cross_symbol_validation": cross_symbol_validation,
         }
@@ -1728,6 +1771,7 @@ class ICFilterOrchestrator:
         config_data = self._config.model_dump()
         merged = self._deep_merge(config_data, {"thresholds": thresholds or {}})
         config = ICConfig.model_validate(merged)
+        self._current_config_hash = self._hash_config(config)
 
         # 與首跑同 scope：從 cache 重建 split_context（OOS→test，full→None）
         split_context = self._ic_cache.get("split_context")
@@ -1751,6 +1795,17 @@ class ICFilterOrchestrator:
             split_context=split_context,
         )
 
+        # GAP-2 Task 4.1：stage 6b（插入點②：refilter stage6 後、stage7 前；同 request 之 event_identity 沿用）
+        stage6b_results = self._stage6b_marginal_ic(
+            self._ic_cache["features_df"],
+            self._ic_cache.get("label_series"),
+            stage5_results,
+            stage6_results,
+            split_context,
+            config,
+            fit_scope=self._resolve_stage6b_fit_scope(split_context),
+        )
+
         report = self._stage7_report(
             self._ic_cache["features_df"],
             metadata,
@@ -1762,6 +1817,7 @@ class ICFilterOrchestrator:
             self._ic_cache.get("event_info", {}),
             self._ic_cache.get("feature_filter_info", {}),
             split_context=split_context,
+            stage6b_results=stage6b_results,
         )
 
         self._report = report
@@ -2000,6 +2056,8 @@ class ICFilterOrchestrator:
             "pit_stats_version": PIT_STATS_VERSION,
             "fit_mode": fit_mode,
             "schema_version": FR_SCHEMA_VERSION,
+            # GAP-2 Task 4.1：事件身分入 key（換 request 不沿用舊 cache）
+            "event_identity": self._event_identity,
         }
         dump = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return hashlib.md5(dump.encode("utf-8")).hexdigest()
@@ -2723,6 +2781,11 @@ class ICFilterOrchestrator:
         event_timestamps: Optional[list] = None,
     ) -> tuple[pd.DataFrame, pd.Series, dict]:
         event_cfg = config.event_filter
+        # GAP-2 Task 4.1：事件身分於 pop timestamps **之前**以 request 原始輸入計算（不可變；refilter 沿用）
+        self._event_identity = compute_event_identity(
+            getattr(event_cfg, "query", None) if event_cfg.enabled else None,
+            list(event_timestamps) if (event_cfg.enabled and event_timestamps is not None) else None,
+        )
         if not event_cfg.enabled:
             return features_df, label_series, {"mode": "none"}
 
@@ -3374,6 +3437,7 @@ class ICFilterOrchestrator:
         event_info: dict,
         feature_filter_info: dict,
         split_context: Optional[dict] = None,
+        stage6b_results: Optional[dict] = None,
     ) -> dict:
         filter_log = self._reporter.generate_filter_log(
             {
@@ -3402,6 +3466,8 @@ class ICFilterOrchestrator:
             "rolling_ic_series": ic_results.get("rolling_ic", {}),
             "turnover_analysis": stage5_results.get("turnover", {}),
             "coverage_analysis": stage5_results.get("coverage", {}),
+            # GAP-2 Task 4.1：新節恆為 status object（呼叫方未傳 ⇒ disabled 物件；裸 {} ⇒ 程式錯，fail-loud 不掩蓋）
+            "marginal_ic": self._require_marginal_section(stage6b_results),
         }
 
         report_meta = self._build_report_metadata(
@@ -3426,6 +3492,8 @@ class ICFilterOrchestrator:
             analysis_status=status,
             oos_guarantees=oos,
         )
+        # GAP-2 A1-3：邊際 IC 節 OOS 兩欄由 root 注入（單一來源；獨立可 patch helper）
+        self._inject_root_oos(report.get("marginal_ic"), status, oos)
 
         # G-C：fallback 內層 skip；正常路徑寫出
         if not self._suppress_persist:
@@ -3435,7 +3503,22 @@ class ICFilterOrchestrator:
                 report,
                 report_meta,
                 filter_log,
+                stage6b_results=report.get("marginal_ic"),
+                event_identity=self._event_identity,
+                features_path=self._features_path,
+                label_series=ic_results.get("label_series") if isinstance(ic_results, dict) else None,
+                split_context=split_context,
             )
+        else:
+            # A1-1：suppress 時五鍵恆存在（wrapper 唯一寫出點會覆蓋為實值）
+            report_meta_obj = report.get("metadata") if isinstance(report.get("metadata"), dict) else report_meta
+            report_meta_obj["survivor_output"] = {
+                "status": "not_computed",
+                "reason": self._survivor_reason("persist_suppressed"),
+                "path": None,
+                "sha256": None,
+                "case_id": self._resolve_case_id(metadata),
+            }
 
         self._filtered_features_df = stage6_results.get("filtered_df")
 
@@ -3461,6 +3544,9 @@ class ICFilterOrchestrator:
             "preproc_log": preproc_log,
             # refilter 必須與首跑同 HAC/FDR scope（OOS→test_mask；full→None）
             "split_context": split_context,
+            # GAP-2 Task 4.1：persist 完成後才承接之 immutable snapshot（persist 只讀顯式 kwargs）
+            "stage6b_results": deepcopy(report.get("marginal_ic")),
+            "event_identity": deepcopy(self._event_identity),
         }
         self._monotonicity_cache = stage5_results.get("monotonicity", {})
         self._corr_cache = correlation_matrix
@@ -3786,6 +3872,121 @@ class ICFilterOrchestrator:
             return {}
         return {key: value for key, value in metadata.items() if isinstance(value, dict)}
 
+    # ------------------------------------------------------------------ GAP-2 Task 4.1／4.2 helpers
+    @staticmethod
+    def _marginal_status_object(status: str, reason: Optional[str]) -> dict:
+        """邊際 IC 節之 status object（reason 字面須 ∈ 契約 reasons.marginal_ic；不寫死於程式外）。"""
+        pool = load_survivor_contract()["reasons"]["marginal_ic"]
+        if reason is not None and reason not in pool:
+            raise KeyError(f"marginal_ic reason {reason!r} not in contract")
+        return {"status": status, "reason": reason}
+
+    def _require_marginal_section(self, stage6b_results: Optional[dict]) -> dict:
+        """None ⇒ disabled 物件；非 dict／裸 {}／缺 status ⇒ ValueError（禁把裸空節寫進報告——§V-14／wiring R3）。"""
+        if stage6b_results is None:
+            return self._marginal_status_object("disabled", "disabled_by_config")
+        if not isinstance(stage6b_results, dict) or not stage6b_results or "status" not in stage6b_results:
+            raise ValueError("stage6b returned a bare/invalid marginal_ic section (must be a status object)")
+        return stage6b_results
+
+    @staticmethod
+    def _survivor_reason(name: str) -> str:
+        pool = load_survivor_contract()["reasons"]["survivor_output"]
+        if name not in pool:
+            raise KeyError(f"survivor_output reason {name!r} not in contract")
+        return name
+
+    def _resolve_stage6b_fit_scope(self, split_context: Optional[dict]) -> Optional[str]:
+        """fit_scope 唯一判定：fallback 遞迴 ⇒ full_sample；無 split ⇒ None（節 not_applicable）；否則 train。"""
+        if self._in_fallback_rerun:
+            return "full_sample"
+        if split_context is None:
+            return None
+        return "train"
+
+    @staticmethod
+    def _inject_root_oos(section: Any, analysis_status: str, oos_guarantees: bool) -> None:
+        """A1-3：對 status==ok 之邊際 IC 節注入 root 之 oos_guarantees／pass_class（含 composite）。獨立可 patch。"""
+        if not isinstance(section, dict) or section.get("status") != "ok":
+            return
+        pass_class = "oos" if analysis_status == "ok_oos" else "full_sample_research_only"
+        section["oos_guarantees"] = bool(oos_guarantees)
+        section["pass_class"] = pass_class
+        comp = section.get("composite")
+        if isinstance(comp, dict) and "oos_guarantees" in comp:
+            comp["oos_guarantees"] = bool(oos_guarantees)
+
+    def _stage6b_marginal_ic(
+        self,
+        features_df: pd.DataFrame,
+        label_series: Optional[pd.Series],
+        stage5_results: dict,
+        stage6_results: dict,
+        split_context: Optional[dict],
+        config: ICConfig,
+        *,
+        fit_scope: Optional[str],
+    ) -> dict:
+        """GAP-2 stage 6b：semi-partial 秩 IC（loo／sequential／removed）＋多因子組合 IC。
+
+        - `enabled=False` ⇒ `{status:disabled, reason:disabled_by_config}`（非裸 {}）。
+        - masks：holdout ⇒ split_context 之 train/test mask、fit_scope=train；fallback ⇒ 全 True、full_sample；
+          無 split 且非 fallback ⇒ `not_applicable:no_holdout_split`。
+        - `oos_guarantees`／`pass_class` 維持 None 佔位，由 `_stage7_report` 依 root 注入（A1-3）。
+        """
+        cfg = config.marginal_ic
+        if not cfg.enabled:
+            return self._marginal_status_object("disabled", "disabled_by_config")
+        if label_series is None:
+            return self._marginal_status_object("not_computed", "insufficient_test_rows")
+        filtered_df = stage6_results.get("filtered_df")
+        survivors = list(filtered_df.columns) if filtered_df is not None else []
+        passed = list(stage5_results.get("passed_features") or [])
+        extra = [f for f in passed if f not in set(survivors)] if cfg.include_removed_candidates else []
+        n = int(len(features_df.index))
+        if fit_scope == "full_sample":
+            train_mask = np.ones(n, dtype=bool)
+            test_mask = np.ones(n, dtype=bool)
+        elif fit_scope == "train":
+            train_mask = np.asarray(split_context["train_mask"], dtype=bool)
+            test_mask = np.asarray(split_context["test_mask"], dtype=bool)
+        else:
+            return self._marginal_status_object("not_applicable", "no_holdout_split")
+        n_test = int(test_mask.sum())
+        horizon = 1
+        if isinstance(split_context, dict) and split_context.get("effective_horizon") is not None:
+            horizon = int(split_context["effective_horizon"])
+        block_len = max(int(horizon), int(math.ceil(n_test ** (1.0 / 3.0))) if n_test > 0 else 1, 1)
+        params = MarginalICParams(
+            min_test_rows=int(cfg.min_test_rows),
+            min_rows_per_regressor=int(cfg.min_rows_per_regressor),
+            degenerate_threshold=float(cfg.degenerate_threshold),
+            n_bootstrap=int(cfg.n_bootstrap),
+            block_len=int(block_len),
+            seed=int(cfg.bootstrap_seed),
+            weights_method=str(cfg.weights_method),
+            max_survivors_for_loo=int(cfg.max_survivors_for_loo),
+            max_removed_candidates=int(cfg.max_removed_candidates),
+        )
+        label = label_series if isinstance(label_series, pd.Series) else pd.Series(label_series, index=features_df.index)
+        if len(label) != n:
+            label = label.reindex(features_df.index)
+        res = compute_marginal_ic(
+            features_df, label, train_mask=train_mask, test_mask=test_mask, survivors=survivors,
+            extra_candidates=extra, params=params, fit_scope=fit_scope,
+        )
+        comp = combine_factors(
+            features_df, label, train_mask=train_mask, test_mask=test_mask, survivors=survivors,
+            params=params, fit_scope=fit_scope,
+        )
+        section = res.to_dict()
+        section["composite"] = comp.to_dict()
+        logger.info(
+            "IC stage6b marginal_ic: status=%s reason=%s survivors=%d removed=%d n_regressions=%d fit_scope=%s",
+            section["status"], section["reason"], len(survivors), len(extra), section["n_regressions"], fit_scope,
+        )
+        return section
+
     def _persist_outputs(
         self,
         features_df: pd.DataFrame,
@@ -3793,6 +3994,12 @@ class ICFilterOrchestrator:
         report: dict,
         metadata: dict,
         filter_log: dict,
+        *,
+        stage6b_results: Optional[dict] = None,
+        event_identity: Optional[dict] = None,
+        features_path: Optional[str] = None,
+        label_series: Optional[pd.Series] = None,
+        split_context: Optional[dict] = None,
     ) -> dict:
         output_paths: dict[str, str] = {}
         analysis_status = None
@@ -3851,7 +4058,121 @@ class ICFilterOrchestrator:
             case_id=self._resolve_case_id(metadata),
         )
 
+        # ---- GAP-2 Task 4.2：倖存者輸出檔（沿 report json 同 output_dir 解析；五鍵恆寫入 metadata.survivor_output）----
+        report_meta["survivor_output"] = self._write_survivor_output(
+            report=report,
+            report_meta=report_meta,
+            metadata=metadata,
+            filtered_df=filtered_df,
+            features_df=features_df,
+            report_json_path=report_paths.get("json"),
+            stage6b_results=stage6b_results,
+            event_identity=event_identity,
+            features_path=features_path,
+            label_series=label_series,
+            split_context=split_context,
+        )
+        if report_meta["survivor_output"].get("path"):
+            output_paths["survivor_output"] = report_meta["survivor_output"]["path"]
+
         return output_paths
+
+    def _write_survivor_output(
+        self,
+        *,
+        report: dict,
+        report_meta: dict,
+        metadata: dict,
+        filtered_df: Optional[pd.DataFrame],
+        features_df: pd.DataFrame,
+        report_json_path: Optional[str],
+        stage6b_results: Optional[dict],
+        event_identity: Optional[dict],
+        features_path: Optional[str],
+        label_series: Optional[pd.Series],
+        split_context: Optional[dict],
+    ) -> dict:
+        """組裝＋驗證＋原子寫出 ic_survivors_{case_id}.json；回五鍵 status object（TODO Task 4.2 三形狀）。
+
+        - 缺 symbol／timeframe ⇒ 不組裝不寫檔 ⇒ computation_failed:identity_missing。
+        - 組裝／驗證之 ContractValidationError **上拋**（fail-closed；屬程式錯非 IO 錯）。
+        - 寫檔 IO 例外 ⇒ computation_failed:write_failed（A1-6：reason 字面封閉，例外只進 log），報告照存。
+        """
+        case_id = self._resolve_case_id(metadata)
+        symbol = metadata.get("symbol") if isinstance(metadata, dict) else None
+        timeframe = metadata.get("timeframe") if isinstance(metadata, dict) else None
+        if not symbol or not timeframe:
+            return {
+                "status": "computation_failed",
+                "reason": self._survivor_reason("identity_missing"),
+                "path": None,
+                "sha256": None,
+                "case_id": case_id,
+            }
+        summary_by_feature = {
+            str(row.get("feature_name")): row
+            for row in (report.get("summary_table") or [])
+            if isinstance(row, dict) and row.get("feature_name") is not None
+        }
+        features_source_hash = ""
+        if features_path and Path(features_path).is_file():
+            h = hashlib.sha256()
+            with open(features_path, "rb") as fh:
+                for chunk in iter(lambda: fh.read(1 << 20), b""):
+                    h.update(chunk)
+            features_source_hash = h.hexdigest()
+        labels_content_hash = ""
+        if isinstance(label_series, pd.Series):
+            labels_content_hash = hashlib.sha256(
+                pd.to_numeric(label_series, errors="coerce").to_numpy(dtype=float).tobytes()
+            ).hexdigest()
+        split_ctx = dict(split_context or {})
+        split_ctx.setdefault("full_index", features_df.index)
+        section = stage6b_results if isinstance(stage6b_results, dict) else None
+        composite = section.get("composite") if isinstance(section, dict) else None
+        marginal = None
+        if isinstance(section, dict) and "views" in section:
+            marginal = {k: v for k, v in section.items() if k != "composite"}
+        report_ref = f"ic_report_{case_id}.json"
+        payload = build_survivor_output(
+            report_meta=report_meta,
+            filtered_features=list(filtered_df.columns) if filtered_df is not None else [],
+            marginal_ic_result=marginal,
+            composite_result=composite,
+            summary_by_feature=summary_by_feature,
+            root_analysis_status=str(report.get("analysis_status")),
+            event_identity=event_identity or compute_event_identity(None, None),
+            split_context=split_ctx,
+            config_hash=str(self._current_config_hash or self._hash_config(self._config)),
+            features_source_hash=features_source_hash,
+            features_path=str(features_path) if features_path else None,
+            labels_content_hash=labels_content_hash,
+            symbol=str(symbol),
+            timeframe=str(timeframe),
+            case_id=case_id,
+            generated_at=str(report.get("generated_at")),
+            fit_mode=str(report_meta.get("fit_mode") or metadata.get("fit_mode") or "unset"),
+            pit_stats_version=str(report_meta.get("pit_stats_version") or PIT_STATS_VERSION),
+            ic_method=str((self._config.ic_calculation.methods or ["spearman"])[0]),
+            label_horizon=int(split_ctx["effective_horizon"]) if split_ctx.get("effective_horizon") is not None else None,
+            label_return_type=str(self._config.labels.return_type),
+            report_ref=report_ref,
+        )
+        validate_survivor_output(payload, report_meta=report_meta, report_ref_path=report_json_path)
+        output_dir = str(Path(report_json_path).parent) if report_json_path else "data_cache/reports"
+        try:
+            path = self._reporter.save_survivor_output(payload, output_dir=output_dir, case_id=case_id)
+            digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        except Exception as exc:  # noqa: BLE001 — IO 失敗只記 log（A1-6），報告照存
+            logger.error("survivor output write failed: %s", exc, exc_info=True)
+            return {
+                "status": "computation_failed",
+                "reason": self._survivor_reason("write_failed"),
+                "path": None,
+                "sha256": None,
+                "case_id": case_id,
+            }
+        return {"status": "ok", "reason": None, "path": str(path), "sha256": digest, "case_id": case_id}
 
     def _resolve_case_id(self, metadata: dict) -> str:
         case_id = metadata.get("case_id") if metadata else None
@@ -4054,6 +4375,11 @@ class ICFilterOrchestrator:
                 )
             else:
                 _set_nested_bool(data, fdr_path, True)
+            # GAP-2 Task 4.1／5.1：具名 preset 分支同樣消費 marginal_ic（純 mapping；缺則沿 config 預設開）
+            if "marginal_ic" in stage_overrides:
+                _set_nested_bool(
+                    data, STAGE_OVERRIDE_PATHS["marginal_ic"], bool(stage_overrides["marginal_ic"])
+                )
 
         return ICConfig.model_validate(data)
 

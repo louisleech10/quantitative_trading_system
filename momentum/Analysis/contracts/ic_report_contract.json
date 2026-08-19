@@ -39,10 +39,12 @@
     "grouped_ic": { "status_object_keys": ["status", "reason"] },
     "turnover_analysis": { "status_object_keys": ["status", "reason"] },
     "coverage_analysis": { "status_object_keys": ["status", "reason"] },
-    "net_ic_analysis": { "status_object_keys": ["status", "reason"] }
+    "net_ic_analysis": { "status_object_keys": ["status", "reason"] },
+    "marginal_ic": { "status_object_keys": ["status", "reason"] }
   },
   "metadata": {
     "event_filter_keys": ["fallback", "reason"],
-    "split_method_key": "split_method"
+    "split_method_key": "split_method",
+    "survivor_output_keys": ["status", "reason", "path", "sha256", "case_id"]
   }
 }

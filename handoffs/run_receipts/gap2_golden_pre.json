@@ -2,7 +2,7 @@
   "fixture_sha256": "dfe038f5ec83efdc31118675604b8507cc441e5fe1f1fb3c71f144a1dbdb9a80",
   "config_hash": "9faf5345600a1aafd762c53d5b3377ba",
   "case_id": "ic_gatekeeper",
-  "canonical_sha": "b1bab18b27b2b3ecad62b0fdb75c38c5212d9a2c300ca515508d774f98893132",
+  "canonical_sha": "163c4cecb1006dc42dea0804acc365d83fe7cdbaf05ba64b1d794168dd67e463",
   "canonical_sha_legacy": "55101dbf64915ca86c42a75b134cf2057b80dce92f6bbd28a50adaec0420a27e",
   "summary_table": [
     {
@@ -290,5 +290,5 @@
     }
   },
   "generated_by": "scripts/gap2_freeze_golden.py --write",
-  "ts": "2026-08-18T23:41:30Z"
+  "ts": "2026-08-18T23:49:51Z"
 }

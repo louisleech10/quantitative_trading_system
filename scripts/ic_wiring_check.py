@@ -6,7 +6,7 @@
       ∪ 顯式轉名表——store 內註記的 UI 邊界唯一轉名點）
   R2  allowlist lifecycle：每條目之 key 必須仍存在於其宣告檔（過期即紅）；
       已判死配置（dead_config 類）不得重現於 schema（防復發）
-  R3  report 節組裝禁裸空 dict 字面（五節鍵）
+  R3  report 節組裝禁裸空 dict 字面（節鍵＝契約 report_sections；GAP-2 起讀契約）
 誠實邊界（具名殘留，非本檢查涵蓋）：全 schema 欄位 consumer 掃描（AST 級）未實作，
   R2 僅承載 allowlist 生命週期＋已判幽靈防復發；升級路徑=另立票。
 exit code：0=綠；1=違規；2=環境/輸入異常（fail-closed）。
@@ -27,13 +27,17 @@ ORCH = Path(_args.get("--orch", REPO / "momentum/Analysis/ic_filter_orchestrator
 SCHEMA = Path(_args.get("--schema", REPO / "momentum/Analysis/ic_config_schema.py"))
 ALLOWLIST = Path(_args.get("--allowlist", REPO / "scripts/ic_wiring_allowlist.json"))
 
-REPORT_SECTIONS = (
-    "ic_decay",
-    "quantile_returns",
-    "grouped_ic",
-    "turnover_analysis",
-    "coverage_analysis",
-)
+# GAP-2 Task 4.3：R3 節鍵改讀契約 SoT（消除五／六節漂移；新節自動涵蓋）
+def _load_report_sections() -> tuple:
+    import sys as _sys
+
+    _sys.path.insert(0, str(REPO))
+    from momentum.Analysis.ic_config_schema import load_report_contract
+
+    return tuple(load_report_contract()["report_sections"].keys())
+
+
+REPORT_SECTIONS = _load_report_sections()
 # UI 邊界顯式轉名（store 註記「唯一轉名點」）：前端鍵 → 後端 override 路徑存在即視為已消費
 EXPLICIT_RENAMES = {"fdr_correction": "significance.fdr.enabled"}
 

@@ -157,6 +157,21 @@ class TurnoverConfig(BaseModel):
     transaction_cost: float = 0.001
 
 
+class MarginalICConfig(BaseModel):
+    """GAP-2a 邊際 IC／多因子組合（TODO Task 4.1；預設開，B5 toggle 為逃生口）。"""
+
+    enabled: bool = True
+    min_test_rows: int = Field(default=30, ge=10)
+    min_rows_per_regressor: int = Field(default=5, ge=1)
+    degenerate_threshold: float = Field(default=1e-10, gt=0.0)
+    weights_method: Literal["equal", "ic_weighted"] = "equal"
+    n_bootstrap: int = Field(default=1000, ge=1, le=20000)
+    bootstrap_seed: int = 20260818
+    include_removed_candidates: bool = True
+    max_survivors_for_loo: int = Field(default=200, ge=1)
+    max_removed_candidates: int = Field(default=200, ge=0)
+
+
 class ReportConfig(BaseModel):
     top_n_features: int = 30
     include_decay_analysis: bool = True
@@ -435,6 +450,7 @@ class ICConfig(BaseModel):
     feature_tiers: FeatureTierConfig = Field(default_factory=FeatureTierConfig)
     significance: SignificanceSchema = Field(default_factory=SignificanceSchema)
     feature_filter: Optional[FeatureFilterSchema] = None
+    marginal_ic: MarginalICConfig = Field(default_factory=MarginalICConfig)
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:

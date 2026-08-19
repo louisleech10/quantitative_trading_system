@@ -346,6 +346,11 @@ class ICReporter:
             "cross_symbol_validation": analysis_results.get("cross_symbol_validation", {}),
         }
 
+        # GAP-2 Task 4.1（TODO §0 白名單④）：marginal_ic 節條件透傳——缺鍵時**省略**、不得補裸 {}
+        # （既有直接呼叫 reporter 之測試傳最小 analysis_results；orchestrator 三路徑恆給 status object）
+        if "marginal_ic" in analysis_results:
+            report["marginal_ic"] = analysis_results["marginal_ic"]
+
         deep_report = analysis_results.get("deep_analysis_report")
         deep_enabled = bool(analysis_results.get("deep_analysis_enabled", False))
         if deep_enabled and deep_report is not None:
@@ -838,6 +843,35 @@ class ICReporter:
 
         logger.info("IC report saved: %s", json_path)
         return {"json": str(json_path), "markdown": str(markdown_path)}
+
+    def save_survivor_output(self, payload: dict, output_dir: str, case_id: str) -> str:
+        """GAP-2b 倖存者輸出檔（TODO Task 4.2）：validator 前置 → tmp 寫入 → os.replace 原子落檔 → 回路徑。
+
+        例外向上拋（caller `_persist_outputs` 分類為 write_failed）。
+        """
+        import os
+        import tempfile
+
+        from momentum.Analysis.survivor_contract import validate_survivor_output
+
+        validate_survivor_output(payload)
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        final_path = output_path / f"ic_survivors_{case_id}.json"
+        fd, tmp_name = tempfile.mkstemp(prefix=f".ic_survivors_{case_id}.", suffix=".tmp", dir=str(output_path))
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as file:
+                json.dump(payload, file, ensure_ascii=False, indent=2, allow_nan=False, sort_keys=True)
+                file.write("\n")
+            os.replace(tmp_name, final_path)
+        except BaseException:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
+        logger.info("IC survivor output saved: %s", final_path)
+        return str(final_path)
 
     def save_filter_log(self, filter_log: dict, output_dir: str, case_id: str) -> str:
         """儲存篩選日誌 JSON。"""

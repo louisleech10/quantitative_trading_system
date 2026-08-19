@@ -1,0 +1,18 @@
+[gap2_mutation_probe] batch=B4 ts=20260819T002456Z cases=7
+[baseline] rc=0 (======================== 25 passed in 312.49s (0:05:12) ========================)
+MUTATION V-13: RED ✓ (test_event_fallback_holdout_present_but_root_degraded rc=1, FAILED=2)
+MUTATION V-13: RESTORED GREEN ✓
+MUTATION V-14: RED ✓ (test_disabled_gives_status_object_only rc=1, FAILED=2)
+MUTATION V-14: RESTORED GREEN ✓
+MUTATION V-15: RED ✓ (test_file_exists_validates_names_and_sha rc=1, FAILED=2)
+MUTATION V-15: RESTORED GREEN ✓
+MUTATION V-16: RED ✓ (test_g1_golden_unchanged rc=1, FAILED=2)
+MUTATION V-16: RESTORED GREEN ✓
+MUTATION V-22: RED ✓ (test_default_config_section_ok_and_root_oracle rc=1, FAILED=2)
+MUTATION V-22: RESTORED GREEN ✓
+MUTATION V-23: RED ✓ (test_g1_golden_unchanged rc=1, FAILED=2)
+MUTATION V-23: RESTORED GREEN ✓
+MUTATION V-24: RED ✓ (test_four_shapes_five_keys rc=1, FAILED=2)
+MUTATION V-24: RESTORED GREEN ✓
+[post-restore] rc=0 (======================== 25 passed in 309.40s (0:05:09) ========================)
+[gap2_mutation_probe] ✅ batch=B4 全部 7 條 mutation 轉紅且還原綠 → receipt handoffs/run_receipts/20260819T002456Z-gap2-B4-probe.log

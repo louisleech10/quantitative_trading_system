@@ -23,7 +23,8 @@
     ],
     "survivor_output": [
       "identity_missing",
-      "write_failed"
+      "write_failed",
+      "persist_suppressed"
     ]
   },
   "algorithm_version": "gap2_marginal_ic_v1",

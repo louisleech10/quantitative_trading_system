@@ -452,7 +452,11 @@ def build_survivor_output(
         raise ContractValidationError(f"n_samples_total must be positive int, got {n_total!r}")
     # R18 CODEX-R18-P1-06：與 marginal／split 列數對帳（purge/embargo 使 train+test ≤ total，故為 ≥ 而非 ==；test 列數兩源須 exact）
     if marg is not None and marg.get("n_train") is not None and marg.get("n_test") is not None:
-        if int(marg["n_train"]) + int(marg["n_test"]) > int(n_total):
+        n_tr, n_te = int(marg["n_train"]), int(marg["n_test"])
+        if marg.get("fit_scope") == "full_sample":  # 全樣本 fallback：兩 mask 皆全 True（重疊）⇒ 以 max 對帳
+            if max(n_tr, n_te) > int(n_total):
+                raise ContractValidationError("n_samples_total < marginal max(n_train, n_test) (full_sample)")
+        elif n_tr + n_te > int(n_total):
             raise ContractValidationError("n_samples_total < marginal n_train+n_test")
     if train_plan is not None and test_plan is not None:
         if int(len(train_plan.row_index)) + int(len(test_plan.row_index)) > int(n_total):

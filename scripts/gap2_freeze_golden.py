@@ -11,7 +11,7 @@ pre 檔（唯一 baseline，路徑寫死）：handoffs/run_receipts/gap2_golden_
   - canonical_sha＝`gap2_canonical_sha(report)`（本檔為**唯一**序列化實作，測試 import 之）：
       有序 scrub ① `report.pop("marginal_ic")` ② `metadata.pop("survivor_output")`
       ③ metadata 刪 filtered_features_path／filtered_generated_at／generated_at／filtered_features_written；頂層刪 generated_at
-      ⑤ A1-10：`metadata.selection_scope.scope_id`（＝f"{config_hash}:{split_label}"）正規化為 split_label 段——
+      ⑤ A1-10：`metadata.selection_scope.scope_id` 與 `metadata.significance.scope_id`（皆＝f"{config_hash}:{split_label}"）正規化為 split_label 段——
          config_hash＝md5(config.model_dump()) 會因 ICConfig 新增 `marginal_ic` 欄而改變，與行為無關；
          pre 檔另存 `canonical_sha_legacy`（不含 ⑤，僅供稽核，--check 不比對）
       ④ 其餘沿用 `tests/momentum/helpers/ichc_run.canonical_sha`（import 之，不重寫）
@@ -54,10 +54,11 @@ def gap2_canonical_sha(report: Dict[str, Any], *, normalize_scope_id: bool = Tru
         meta.pop("survivor_output", None)  # ②
         for key in _META_SCRUB:  # ③
             meta.pop(key, None)
-        if normalize_scope_id:  # ⑤ A1-10
-            scope = meta.get("selection_scope")
-            if isinstance(scope, dict) and isinstance(scope.get("scope_id"), str) and ":" in scope["scope_id"]:
-                scope["scope_id"] = scope["scope_id"].split(":", 1)[1]
+        if normalize_scope_id:  # ⑤ A1-10：selection_scope.scope_id 與 significance.scope_id 皆為 f"{config_hash}:{label}"
+            for holder in ("selection_scope", "significance"):
+                scope = meta.get(holder)
+                if isinstance(scope, dict) and isinstance(scope.get("scope_id"), str) and ":" in scope["scope_id"]:
+                    scope["scope_id"] = scope["scope_id"].split(":", 1)[1]
     r.pop("generated_at", None)  # ③ 頂層
     return canonical_sha(r)  # ④
 

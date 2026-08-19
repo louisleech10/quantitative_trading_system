@@ -32,6 +32,11 @@ MIC=momentum/Analysis/marginal_ic.py
 FC=momentum/Analysis/factor_combiner.py
 TEST_FC=tests/momentum/Analysis/test_factor_combiner.py
 SC=momentum/Analysis/survivor_contract.py
+ORCH=momentum/Analysis/ic_filter_orchestrator.py
+FREEZE=scripts/gap2_freeze_golden.py
+TEST_WIRING=tests/momentum/Analysis/test_gap2_stage6b_wiring.py
+TEST_PERSIST=tests/momentum/Analysis/test_gap2_survivor_persist.py
+TEST_GOLDEN=tests/momentum/Analysis/test_gap2_golden.py
 CONTRACT=momentum/Analysis/contracts/ic_survivor_contract.json
 TEST_MIC=tests/momentum/Analysis/test_marginal_ic.py
 TEST_SC=tests/momentum/Analysis/test_survivor_contract.py
@@ -72,7 +77,18 @@ case "${BATCH}" in
     CASES+=("V-19c|${SC}|        \"case_id\": str(case_id),|        \"case_id\": \"ic_gatekeeper\",  # MUTANT: 寫死|test_identity_three_fields")
     CASES+=("V-20|${SC}|    if payload[\"feature_set_hash\"] != feature_set_hash(names):|    if False:  # MUTANT: 略過 feature_set_hash 重算|test_feature_set_hash_and_survivor_sequence")
     ;;
-  B4|B5)
+  B4)
+    ALL_TESTS="${TEST_WIRING} ${TEST_PERSIST} ${TEST_GOLDEN}"
+    TARGETS="${ORCH} ${FREEZE} ${MIC}"
+    CASES+=("V-13|${ORCH}|        section[\"oos_guarantees\"] = bool(oos_guarantees)|        section[\"oos_guarantees\"] = True  # MUTANT: fallback 仍標 True|test_event_fallback_holdout_present_but_root_degraded")
+    CASES+=("V-14|${ORCH}|        if not cfg.enabled:\n            return self._marginal_status_object(\"disabled\", \"disabled_by_config\")|        if not cfg.enabled:\n            return {}  # MUTANT: 裸空|test_disabled_gives_status_object_only")
+    CASES+=("V-15|${ORCH}|            filtered_features=list(filtered_df.columns) if filtered_df is not None else [],|            filtered_features=[str(r.get(\"feature_name\")) for r in (report.get(\"summary_table\") or [])],  # MUTANT: passed_features|test_file_exists_validates_names_and_sha")
+    CASES+=("V-16|${ORCH}|            redundancy_log = {**redundancy_log, \"scope\": \"test\"}|            redundancy_log = {**redundancy_log, \"scope\": \"test\", \"method\": \"mutant\"}  # MUTANT: 動既有 stage6 鍵值|test_g1_golden_unchanged")
+    CASES+=("V-22|${MIC}|        n_regressions += 1|        n_regressions += 2  # MUTANT: 計數與實際 fit 脫鉤|test_default_config_section_ok_and_root_oracle")
+    CASES+=("V-23|${FREEZE}|_META_SCRUB = (\"filtered_features_path\", |_META_SCRUB = (|test_g1_golden_unchanged")
+    CASES+=("V-24|${ORCH}|                \"path\": None,|                \"path_\": None,  # MUTANT: 失敗形狀省略 path 鍵|test_four_shapes_five_keys")
+    ;;
+  B5)
     echo "🔴 batch ${BATCH} 之 case 表尚未定義（該批 Task 落地時加列）。" >&2
     exit 2
     ;;
@@ -115,8 +131,12 @@ log() { echo "$*" | tee -a "${RECEIPT}"; }
 # ---- 目標行存在檢查（全部 case 先查；缺任一 ⇒ rc=2、不動檔）----
 for c in "${CASES[@]}"; do
   IFS='|' read -r vid file old new target <<<"$c"
-  cnt="$(grep -cF -- "${old}" "${file}")"
-  if [ "${cnt}" -lt 1 ]; then
+  if ! "$PY" - "${file}" "${old}" <<'PYCHK'
+import pathlib, sys
+path, old = sys.argv[1], sys.argv[2].replace("\\n", "\n")
+sys.exit(0 if old in pathlib.Path(path).read_text(encoding="utf-8") else 1)
+PYCHK
+  then
     echo "🔴 ${vid}: mutation 目標行不存在於 ${file}: ${old}" >&2
     exit 2
   fi
@@ -142,6 +162,8 @@ for c in "${CASES[@]}"; do
   "$PY" - "${file}" "${old}" "${new}" <<'PYEOF'
 import pathlib, sys
 path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+old = old.replace("\\n", "\n")  # case 表以字面 \n 表示換行（多行目標）
+new = new.replace("\\n", "\n")
 p = pathlib.Path(path)
 s = p.read_text(encoding="utf-8")
 if old not in s:

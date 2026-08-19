@@ -46,7 +46,7 @@
 - **event 物件不變式**：`timestamps` ⇒ 兩 hash 64-hex 且相等、`n_events≥1`、`n_timestamps_requested≥n_events`；`query` ⇒ `definition_hash` 64-hex、`timestamps_hash` null、計數 null；`none` ⇒ 全 null。
 - **無 split（fallback）**：`split_context["full_index"]` 必傳（row_identity 用真實 index；禁 positional `arange` 冒充）。**B4 呼叫方義務**。
 - **root status**：`build_survivor_output` 只接受 `ok_oos`／`degraded_full_sample`，其他 raise（禁靜默降級）。
-- **`n_samples_total` 對帳**：正整數；`≥ marginal n_train+n_test`；`≥ split train_rows+test_rows`（purge／embargo 使 `≥` 而非 `==`）；marginal `n_test` 與 split `test_rows` exact。
+- **`n_samples_total` 對帳**：正整數；holdout ⇒ `≥ marginal n_train+n_test`、fallback（`fit_scope=full_sample`，兩 mask 全 True 重疊）⇒ `≥ max(n_train,n_test)`；`≥ split train_rows+test_rows`（purge／embargo 使 `≥` 而非 `==`）；marginal `n_test` 與 split `test_rows` exact（B4 實跑補正）。
 - ⑭ checklist 擴至 `sample_scope.n_samples_*`／`survivor_record.feature_name`／composite／removed／view 巢狀鍵，並加巢狀 tamper；⑱ 加 naive 字串同 hash。
 
 ## A1-10 — §G-1 canonical_sha 對 `metadata.selection_scope.scope_id` 正規化（母 SPEC §G-1 scrub 清單「寫死且有序」；來源 B4 Task 4.0 實作期主委發現；待 B4 三家 review 攻）

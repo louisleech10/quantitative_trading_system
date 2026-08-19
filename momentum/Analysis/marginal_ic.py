@@ -411,6 +411,16 @@ def compute_marginal_ic(
 
     n_regressions = 0
     thr = float(params.degenerate_threshold)
+    # 秩常態分數記憶化：鍵＝(欄, 列遮罩 bytes)。純效能（同輸入同輸出；無 NaN 時所有候選共用同一列集）
+    z_cache: Dict[Tuple[int, bytes], np.ndarray] = {}
+
+    def _z(j: int, rows: np.ndarray, rows_key: bytes) -> np.ndarray:
+        key = (j, rows_key)
+        z = z_cache.get(key)
+        if z is None:
+            z = normal_scores(X[rows, j])
+            z_cache[key] = z
+        return z
 
     # ---- 單候選計算（步驟 4）----
     def _one(f: str, S: Sequence[str]) -> Dict[str, Any]:
@@ -433,14 +443,16 @@ def compute_marginal_ic(
         # A1-7 K4：label 於任一段為常數 ⇒ 秩相關無定義 ⇒ 候選 not_computed（先於任何 Spearman）
         if np.ptp(y_te) == 0.0 or np.ptp(y_tr) == 0.0:
             return _not_computed_stat(_reason(literals, "feature", "label_degenerate"), S, n_used_train, n_used_test)
-        z_f_tr = normal_scores(f_tr_raw)
-        z_f_te = normal_scores(f_te_raw)
+        key_tr = np.packbits(rows_tr).tobytes()
+        key_te = np.packbits(rows_te).tobytes()
+        z_f_tr = _z(col_idx[f], rows_tr, key_tr)
+        z_f_te = _z(col_idx[f], rows_te, key_te)
         Z_S_tr = (
-            np.column_stack([normal_scores(X[rows_tr, col_idx[s]]) for s in S])
+            np.column_stack([_z(col_idx[s], rows_tr, key_tr) for s in S])
             if S else np.empty((n_used_train, 0))
         )
         Z_S_te = (
-            np.column_stack([normal_scores(X[rows_te, col_idx[s]]) for s in S])
+            np.column_stack([_z(col_idx[s], rows_te, key_te) for s in S])
             if S else np.empty((n_used_test, 0))
         )
         proj = fit_projection(z_f_tr, Z_S_tr)  # 🔒 投影只在 train 估計（§V-1 mutation 目標行）
