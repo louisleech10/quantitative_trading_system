@@ -48,7 +48,7 @@
 <tr>
 <td>B4</td>
 <td>接進 IC 主流程（三個入口＋fallback）、倖存者檔、報告新節、golden、wiring 改讀契約、預算 receipt</td>
-<td>✅ 寫完（真實 fixture 端到端：25 條新測試＋gate 共 71 條全綠；7 條 mutation 全紅；改前==改後 golden PASS）→ 待三家 code review＋蓋章</td>
+<td>✅ 寫完＋三家 code review 4 條全處置（codex 2 條修好、兩家零意見；A1-10 三家皆認可）；gate 73 條全綠、7 條 mutation 全紅；待戳記輪（兼修補驗收）→ B4 收案</td>
 </tr>
 <tr>
 <td>B5</td>
@@ -75,6 +75,7 @@
 <li>第 3 批 code review：codex 8 條全部成立、全修：最要緊的一條（P0）是我把「前處理的 fit_mode」（值是 train_mask／pit_expanding／full_sample）拿去用「投影 fit_scope」的枚舉驗，接主流程時正常 holdout 會被自己的 validator 拒絕——改為原值記錄、不映射；其餘：跨檔引用只准 repo 內相對路徑、事件身分依模式驗 hash 與計數不變式、fallback 時必須傳真實 index（不准用 0..n 位置冒充）、未知 root 狀態直接報錯不降級、樣本數與切分列數對帳（考慮 purge／embargo 用 ≥ 而非 ==）、checklist 補巢狀鍵、事件時間戳 naive 字串同 hash。composer／grok 零意見。</li>
 <li>第 3 批蓋章：codex／grok 一次 APPROVED；composer 判 APPROVED 但只寫在自己的交件檔、忘了 append 進收斂檔——我不代寫（那是它的簽名），派它單家補 append 即過。</li>
 <li>第 4 批寫完（8/19）：把邊際 IC 接進主流程（<code>analyze</code>／<code>refilter</code> 兩個插入點；全樣本 fallback 用旗標判定；OOS 兩欄只由 root 注入；橫截面路徑固定標「不適用」）、報告多一節、倖存者檔 <code>ic_survivors_{case_id}.json</code> 落地（跟報告同目錄、原子寫入、五鍵狀態恆存在）、golden 對照（改前==改後）、wiring 檢查改讀契約（7 節）、預算 bench receipt（600 次迴歸==spy 對證；82 秒／686MB 只記錄不設閾值）。三件值得說：①<strong>結構性碰撞</strong>——config 一加新欄，<code>config_hash</code> 就變，連帶報告 metadata 裡的 <code>scope_id</code> 變，golden 在行為完全不變下也會不等；處置＝比對時把 scope_id 正規化為標籤段（A1-10），pre 檔用 git stash 回到改前程式碼重算、可稽核不是「重新凍結換綠」；②第一版把 stage6b 回傳的裸 <code>{}</code> 靜默升級成 disabled 物件 ⇒ mutation V-14 抓不到 ⇒ 改成裸 <code>{}</code> 直接報錯；③<code>normal_scores</code> 加記憶化讓 bench 從 6 分鐘降到 1.5 分鐘（值不變，B1 測試全部照過）。兩個測試前提被 fixture 推翻（全樣本 fallback 預設門檻下 0 倖存者；缺 symbol 時主流程根本算不了 label）已改法並列進 review brief 讓三家判。</li>
+<li>第 4 批 code review：codex 兩條都真：①落盤的報告 JSON 沒帶倖存者檔的五鍵狀態（注入發生在存檔之後）——注入後重存一次；②倖存者檔 provenance 的 IC method／label 型別讀到的是建構時 config、不是這次的 override——改存本次 effective config。composer／grok 零意見，且三家都判 A1-10（config_hash 結構性碰撞的處置）成立、不是「重新凍結換綠」。</li>
 </ul>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-2施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>

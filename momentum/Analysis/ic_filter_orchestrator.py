@@ -868,6 +868,7 @@ class ICFilterOrchestrator:
         self._features_path: Optional[str] = None
         self._labels_path: Optional[str] = None
         self._current_config_hash: Optional[str] = None
+        self._current_config: Optional[ICConfig] = None
         # 1c-FR-FULL F1.1：PIT 因子擇時序列 in-memory owner（F1 寫、F4 讀）
         # cache hit 無 series → 依賴 owner 的 net_ic 走 unavailable，不得崩
         self._factor_return_series: dict[str, FactorTimingReturnSeries] = {}
@@ -901,6 +902,7 @@ class ICFilterOrchestrator:
         self._features_path = str(features_path) if features_path else None
         self._labels_path = str(labels_path) if labels_path else None
         self._current_config_hash = self._hash_config(config)
+        self._current_config = config  # 本次 effective config（provenance ic_method／label_return_type 取此，非建構時 config）
 
         self._report_progress(0, "ingestion", 0.02, "loading inputs")
         features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
@@ -1772,6 +1774,7 @@ class ICFilterOrchestrator:
         merged = self._deep_merge(config_data, {"thresholds": thresholds or {}})
         config = ICConfig.model_validate(merged)
         self._current_config_hash = self._hash_config(config)
+        self._current_config = config
 
         # 與首跑同 scope：從 cache 重建 split_context（OOS→test，full→None）
         split_context = self._ic_cache.get("split_context")
@@ -4074,6 +4077,13 @@ class ICFilterOrchestrator:
         )
         if report_meta["survivor_output"].get("path"):
             output_paths["survivor_output"] = report_meta["survivor_output"]["path"]
+        # R21 CODEX-R21-P1-01：五鍵注入發生在 save_report 之後 ⇒ 重存報告使落盤 ic_report_*.json 亦含 metadata.survivor_output（互指鏡像）
+        report_paths = self._reporter.save_report(
+            report,
+            output_dir="data_cache/reports",
+            case_id=self._resolve_case_id(metadata),
+        )
+        output_paths.update(report_paths)
 
         return output_paths
 
@@ -4143,7 +4153,7 @@ class ICFilterOrchestrator:
             root_analysis_status=str(report.get("analysis_status")),
             event_identity=event_identity or compute_event_identity(None, None),
             split_context=split_ctx,
-            config_hash=str(self._current_config_hash or self._hash_config(self._config)),
+            config_hash=str(self._current_config_hash or self._hash_config(self._current_config or self._config)),
             features_source_hash=features_source_hash,
             features_path=str(features_path) if features_path else None,
             labels_content_hash=labels_content_hash,
@@ -4153,9 +4163,9 @@ class ICFilterOrchestrator:
             generated_at=str(report.get("generated_at")),
             fit_mode=str(report_meta.get("fit_mode") or metadata.get("fit_mode") or "unset"),
             pit_stats_version=str(report_meta.get("pit_stats_version") or PIT_STATS_VERSION),
-            ic_method=str((self._config.ic_calculation.methods or ["spearman"])[0]),
+            ic_method=str(((self._current_config or self._config).ic_calculation.methods or ["spearman"])[0]),
             label_horizon=int(split_ctx["effective_horizon"]) if split_ctx.get("effective_horizon") is not None else None,
-            label_return_type=str(self._config.labels.return_type),
+            label_return_type=str((self._current_config or self._config).labels.return_type),
             report_ref=report_ref,
         )
         validate_survivor_output(payload, report_meta=report_meta, report_ref_path=report_json_path)

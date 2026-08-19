@@ -202,3 +202,21 @@ def test_mutation_persist_reads_ic_cache_breaks_cold_call(default_run, monkeypat
                                   features_path=orch._features_path, label_series=orch._ic_cache["label_series"], split_context=orch._ic_cache["split_context"])
         except TypeError:
             raise AssertionError("cold call broke: mutant reads _ic_cache")
+
+
+# ---------------------------------------------------------------- R21 修補（CODEX-R21-P1-01／P1-02）
+def test_persisted_report_json_mirrors_survivor_output(default_run):
+    """落盤之 ic_report_{case_id}.json 之 metadata.survivor_output 與回傳 report 五鍵一致（互指鏡像）。"""
+    orch, report, tmp = default_run
+    so = report["metadata"]["survivor_output"]
+    disk = json.loads((tmp / "reports" / "ic_report_ic_gatekeeper.json").read_text(encoding="utf-8"))
+    assert disk["metadata"]["survivor_output"] == so
+    assert disk["marginal_ic"]["status"] == report["marginal_ic"]["status"]
+
+
+def test_provenance_uses_effective_config():
+    """config_override 改 IC method／label return_type ⇒ 倖存者檔 provenance 反映本次 effective config。"""
+    _, report, _ = _run({"ic_calculation": {"methods": ["kendall"]}, "labels": {"return_type": "log"}})
+    payload = json.loads(Path(report["metadata"]["survivor_output"]["path"]).read_text(encoding="utf-8"))
+    assert payload["provenance"]["ic_method"] == "kendall"
+    assert payload["provenance"]["label_return_type"] == "log"

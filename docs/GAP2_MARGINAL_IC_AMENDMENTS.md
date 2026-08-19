@@ -53,3 +53,7 @@
 - 事實：orchestrator `config_hash = md5(json.dumps(config.model_dump()))`；`selection_scope.scope_id = f"{config_hash}:{split_label}"` 入報告 metadata。B4 Task 4.1 於 `ICConfig` 新增 `marginal_ic` 欄 ⇒ `config_hash` 必變 ⇒ `scope_id` 必變 ⇒ 母 SPEC §G-1 之 canonical_sha 在**行為完全不變**下仍不等（碰撞為結構性，非漂移）。
 - 決策：`gap2_canonical_sha` 於 scrub ③ 後加 ⑤：`metadata.selection_scope.scope_id`（形如 `hash:label`）正規化為 `label` 段；其餘 scrub 清單不變。pre 檔於 **orchestrator 未動前**以新定義重寫（commit 內 `canonical_sha_legacy` 保留原定義值 `55101dbf…` 供稽核：`git diff f6b8d881 -- handoffs/run_receipts/gap2_golden_pre.json` 只多 `canonical_sha`(v2)／`canonical_sha_legacy`／`ts`，`summary_table`／`filter_log`／`config_hash` 一字未動 ⇒ 非「重新凍結換綠」）。`--check` 對 `config_hash` 只記錄不判 FAIL（該值定義上隨 schema 變）。
 - 誠實邊界：正規化後 §G-1 不再偵測「selection scope 之 config_hash 部分」的變動；`split_label` 段仍比對；stage5／stage6 filter_log 與 summary_table 逐鍵 exact 仍是行為不變之主證。
+
+## A1-11 — B4 code review 修補（來源 R21 CODEX-R21-P1-01／P1-02；收斂檔 `handoffs/reconcile/20260819-gap2-b4-review-r21/synth.md` N1／N2）
+- **落盤報告鏡像**：`_persist_outputs` 於 `metadata.survivor_output` 五鍵注入後重存報告（`save_report` 二次、同路徑）⇒ `ic_report_{case_id}.json` 與回傳 report 之五鍵一致（母 SPEC Task 4.2「報告 metadata 鏡像」之落盤面）。
+- **provenance 取 effective config**：`self._current_config`（analyze／refilter 入口之 effective `ICConfig`）為 `config_hash`／`ic_method`／`label_return_type` 唯一來源；建構時 `self._config` 只作 fallback。
