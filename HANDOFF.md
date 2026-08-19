@@ -6,22 +6,16 @@
 
 ---
 
-## 🔴 接手第一件事：GAP-2 **B4 code review 收件**（B1–B3 CLOSED；B4 寫完已派 review）→ 修 → 戳記 → B5
+## 🔴 接手第一件事：GAP-2 **已全部收案（2026-08-19）** → 下一票 GAP-3 事件型（**先討論、使用者裁 Q0＋5 題，再寫 SPEC**）
 
-**現況**（2026-08-18 深夜）：SPEC `docs/GAP2_MARGINAL_IC_SPEC.md` **R7 FROZEN**＋延伸檔 `docs/GAP2_MARGINAL_IC_AMENDMENTS.md`（A1-1..A1-6，衝突時以延伸檔為準）；TODO `docs/GAP2_MARGINAL_IC_TODO.md` **FROZEN**（五輪 adversarial 20→15→7→1→0；十一份收斂檔 `handoffs/reconcile/20260818-gap2-x-{consult-r1,review-r1..r11}/synth.md` 皆三家 RECONCILE-STAMP）；殘留 G2-R1／R2／R3／R5 在 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-2 待補完」；債務清單乾淨。**B1／B2／B3 CLOSED**（收斂檔 `…-b1-review-r12`／`…-b2-review-r15`／`…-b3-review-r18` 皆三家戳記；A1-7／A1-8／A1-9）。**B4 寫完**（commit ab53c24e＋白話；A1-10）並已派三家 review：session `20260819-gap2-b4-review-r21`、task `20260819-GAP2-B4-REVIEW-R21`、產出 `handoffs/20260819-gap2-b4-review-{codex,composer,grok}.md`（**債 OPEN 中**，須銷）。
+**現況**：GAP-2 B1–B5 各三家 code review＋三家 RECONCILE-STAMP（收斂檔 `handoffs/reconcile/20260818-gap2-b1-review-r12`／`20260819-gap2-b{2,3,4,5}-review-r{15,18,21,24}`）；SPEC R7 FROZEN＋延伸檔 A1-1..A1-11；TODO FROZEN；§V 24 條 mutation 最終 receipts `handoffs/run_receipts/20260819T03{1612,1810,1911,2022}Z-gap2-B{1..4}-probe.log`；§G-1 golden pre `handoffs/run_receipts/gap2_golden_pre.json`（A1-10 scope_id 正規化）。殘留 G2-R1／R2／R3／R5／R6／R7／R8 於 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-2 待補完」；ROADMAP 已標 CLOSED；白話看板已移 `白話說明/Archived/GAP-2施工進度.md`。債務清單乾淨。**最後 commit 已 push**（看 `git log -1`／`git status -sb`）。
 
-**B4 收件步驟**：`reconcile_build.sh 20260819-gap2-b4-review-r21 --mode review <三檔>` → 群集 → 修補（延伸檔 A1-11+）→ 重跑 gate（§B「B4→B5」列：pytest 六檔 71 passed／`mutation_probe_check` 三新檔／`ic_wiring_check.sh`／`gap2_freeze_golden.py --check`／`--batch B4`；探針約 20 分鐘且互斥）→ commit → register-output＋debt_clear → `## 戳記`＋stamp r22（兼修補驗收；in-memory only；single family 重驗如遇並行干擾）→ B4 CLOSED → **B5**（Task 5.1：`types.ts`／`icAnalysisStore.ts`／`FeatureTierPanel.tsx`／`app/ic-analysis/page.tsx` basic tab 末段掛載（A1-5 補正）＋新 `MarginalICTable.tsx`／`.test.tsx`；收尾 vitest／build／tsc／wiring／§V 24 條全實跑）。
-**（B2 步驟留檔）**：`momentum/Analysis/factor_combiner.py::combine_factors`＋`CompositeResult`＋`block_bootstrap_ci` 自 `marginal_ic.py` 搬入（`marginal_ic.py` 改 import；避免循環 import：`factor_combiner` 對 `marginal_ic` 用函式內 lazy import）；`tests/momentum/Analysis/test_factor_combiner.py`（§G O4／O8／O9＋①–⑦＋`test_mutation_test_sign_breaks_o8`）；探針 `--batch B2` 加 V-7／8／9。Gate＝§B「B2→B3」列。之後 review brief 附 registry 表、stamp、B3。
-**（B1 步驟留檔）**：Task 1.0 `momentum/Analysis/contracts/ic_survivor_contract.json`＋`survivor_contract.py::load_survivor_contract()`＋`tests/momentum/Analysis/test_survivor_contract.py -k load` → Task 1.1 `marginal_ic.py::normal_scores/fit_projection/apply_residual/Projection` → Task 1.2 `MarginalICParams/MarginalICResult/compute_marginal_ic/block_bootstrap_ci`＋`test_marginal_ic.py`（§G O1a/O1b/O2/O3/O5/O6/O7/O9＋⑧–⑮ 含 `fit_projection` spy）→ Task 1.3 `scripts/gap2_mutation_probe.sh --batch B1`（十條唯一對映；沿用 `scripts/gap1_b1_mutation_probe.sh` 骨架）。收尾固定順序：pytest（兩條分跑）→ `bash scripts/mutation_probe_check.sh <兩測試檔>` → 探針 → commit → push（背景）→ 白話 5 檔 → commit+push。之後派三家 code review（brief 附 registry「GAP-2 待補完」表＋每 Task 派工 prompt 樣板 §B）→ 修 → stamp → B2。
-**注意**：venv Python **3.9.6**（禁 3.10+ 語法；Task 4.2 `hashlib.file_digest` 為 3.11+，B4 時用等價寫法並在 review brief 標明）；scipy 1.13.1／numpy 1.26.4／pandas 2.3.2。
-白話 5 檔＝`白話說明/{README,接下來要做什麼,治理進度日誌,流程摩擦記錄,GAP-2施工進度}.md`（`plain_docs_sync_check.sh` WATCHED 含 marginal_ic.py／factor_combiner.py／survivor_contract.py／契約 JSON／gap2 腳本／TODO／AMENDMENTS）。
+**下一步（GAP-3；使用者 8/18 裁定「先討論再開工」，未裁前不動 GAP-3 程式）**：① 派一輪唯讀 consult（三家＋主委各出完整版；`brief-kind: consult`；registry「GAP-3 開發前討論題」Q0＋5 題）→ reconcile → 戳記 → ② 主委用白話整理 Q0（事件類型盤點）＋5 題（決策時點／反例／重疊去重切分／標籤嚴格度／pattern 非運氣證明）給使用者裁（AskUserQuestion 阻塞＋推播）→ ③ 裁完才寫 SPEC（完整管線）。GAP-3 語意＝外部標好正反例匯入→PIT 對齊→條件 IC／ML；非 event study；契約通用（`sample_scope`／R5 A′ 事件語意保留）。
+**其他可做未排**：GAP-4 多標的合併估 IC；GAP-5 容量（等成交量源）；GAP-6 併效能 epic；G2-R6 前端 tsc 既有 8 紅（獨立小票）。
 
-## ⚠ 坑（本 session 實踩；完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～七十）
-- 🔴 `committee_run.sh` 的 Bash 呼叫會被 gate_check 當 dispatch 擋（指令含家族名）：先 `bash scripts/gate.sh dispatch <同 flags>` mint token，再跑 committee_run（同 flags）；gate.sh dispatch 在債 OPEN 時拒發 ⇒ 先 register-output＋debt_clear。
-- 🔴 stamp／review brief **不得邀請委員就地改檔實驗**（B1 stamp r13 codex 因他家插 decoy 字面＋探針並行而 BLOCKED；改 codex 單家獨占 r14 才過）；判準寫「in-memory only」；有疑義派單家獨占重驗。session 名 `-stamp-r<N>` 只准純數字（`r13v2` 被拒）。
-- 🔴 commit 訊息 `Governance-Scope:` trailer 須獨立成最後一段（同段夾其他行 ⇒ G-7 擋）。
-- 🔴 review brief 前提須逐條 `fact-verified:`／`assumed:` 前綴（各 ≥1），否則 committee_run 在 brief 檢查即失敗、不派任何一家。
-- 🔴 `debt_clear.sh --abandon` 必帶 `--approver main-agent`；stamp 輪 session 名須 `…-stamp-r<N>`；每輪 review 後必接 stamp。
-- 🔴 判收斂看**每家最近一次內容審查**皆 sentinel，不是總數歸零；駁回委員 finding 須附可重跑碼證＋下一輪叫提出方重跑確認。
-- 委員產出須 `gate.sh register-output` 才過 pre-commit claim checker；commit 須帶 `Governance-Scope:` trailer（G-7）；handoffs 檔被 `.git/info/exclude` 排除，須 `git add -f`。
-- `docs/API_SPECIFICATION.md` 受格式快閘不可編輯；`scripts/governance_families.json` 既有 no-op dirty 非本線。
+## ⚠ 坑（本 session 實踩；完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～七十七）
+- 🔴 `committee_run.sh` 的 Bash 呼叫會被 gate_check 當 dispatch 擋（指令含家族名）：先 `bash scripts/gate.sh dispatch <同 flags>` mint token，再跑 committee_run（同 flags）；gate.sh dispatch 在債 OPEN 時拒發 ⇒ 先 register-output＋debt_clear；含家族名的 Bash 於「有 token＋債 OPEN」時亦被擋 ⇒ 把命令寫進 scratchpad 腳本再 `bash <script>`。
+- 🔴 stamp brief **禁多家並行跑重測試／禁邀請就地改檔實驗**（摩擦七十三／七十七）：只准讀 receipt、in-memory 反例、<1 分鐘測試；有疑義派單家獨占重驗（session 名 `-stamp-r<N>` 純數字）；diff 範圍 allowlist 要含中間夾的 HANDOFF／白話。
+- 🔴 review brief 前提須逐條 `fact-verified:`／`assumed:`；commit 訊息 `Governance-Scope:` trailer 獨立成末段；含「全綠」等強極性詞會被 claim checker 要 VERIFY 收據 ⇒ 用中性措辭。
+- 🔴 `debt_clear.sh --abandon` 必帶 `--approver main-agent`；委員產出須 `gate.sh register-output`；handoffs 檔須 `git add -f`；push 丟背景。
+- venv Python 3.9.6；bench 測試 ~2.5 分鐘（G2-R7）；`docs/API_SPECIFICATION.md` 受格式快閘不可編輯；`scripts/governance_families.json` 既有 no-op dirty 非本線。

@@ -82,4 +82,9 @@ report `metadata.split_method`（枚舉住 `momentum/Analysis/contracts/ic_repor
 | G2-R3 | cross-sectional（`analyze_cross_sectional`）路徑之邊際 IC | blocked-by: registry #4 Pooled/Panel IC（xsec 主路徑之 IC 估計量／切分尚未按主線標準重建，先接即隨其重建作廢） | #4 完工 | xsec 報告之 `marginal_ic` 節由 `not_applicable:cross_sectional_mode` 轉 `ok`，並過同一套 §G oracle |
 | G2-R5 | nested／frozen final test（讓邊際／組合統計可宣稱獨立 OOS 驗證） | blocked-by: IC 主路徑切分現狀 holdout-only（見上「IC 主路徑切分現狀」節；主線 test 同時供 stage4–6 選擇；本票以 `independent_oos_validation=false`＋`selection_sample="test"` 揭露欄誠實標示） | 主線切分升級（WF／CPCV 接入或 nested holdout 契約成立） | `independent_oos_validation_allowed` 契約值由 `[false]` 升版；R5 落地時 §G O 系列 oracle 於 final test 重跑 |
 
+| G2-R6 | 前端 `tsc --noEmit` 8 條既有紅（`FactorReturnChart.test.tsx` 4／`useFeatureFactory.batchDate.test.ts` 4；最後 commit 早於 GAP-2）；TODO Task 5.1 字面 `tsc rc=0` 與實態差 | blocked-by: 白名單外既有測試檔（§C 只准動四檔）；B5 已驗本批檔 0 紅＋`npm run build` rc=0（三家 R24 一致判不擋收案） | 獨立 frontend 型別／測試修票 | 兩檔 tsc 0 紅；TODO 字面同步 |
+| G2-R7 | `test_gap2_golden.py::test_budget_bench_receipt`（n=20000×k=200，~2.5 分鐘）內嵌 B4→B5 gate；並行時互搶 CPU（B4 stamp r22 事故） | needs-research: 無核准 wall／RSS 閾值可作 pass 條件（R7 CODEX-R7-P1-03 已裁為觀測）；拆為獨立 receipt 腳本或標 slow 屬 DX／效能治理取捨 | 效能／DX 票（例：pytest marker `slow`＋收案前獨跑一次） | gate 不含 bench 仍 72 passed；bench receipt 另存 |
+| G2-R8 | `SectionStatusNotice.REASON_TEXT` 未含 GAP-2 reason 中文文案（顯示契約字面如 `disabled_by_config`） | user-ruling: 契約字面即 SoT、避免第二份文案表（B5 review 段 B-3 三家接受） | 產品要中文友好文案時開 UX 小票（文案表由委員會定） | 文案表 ⊆ 契約 reasons 且機檢一致 |
+
 > G2-R4（前端表格）**不是殘留**：使用者 2026-08-18 白話閘裁定納入 B5（表格＋`marginal_ic` toggle 預設開）。
+> 🏁 **GAP-2 收案（2026-08-19）**：B1–B5 各三家 code review＋三家 RECONCILE-STAMP（收斂檔 `handoffs/reconcile/20260818-gap2-b1-review-r12`／`20260819-gap2-b{2,3,4,5}-review-r{15,18,21,24}`）；延伸檔 A1-1..A1-11；§V 24 條 mutation 最終實跑 receipts `20260819T031612Z/031810Z/031911Z/032022Z-gap2-B{1..4}-probe.log`；§G-1 改前==改後 golden PASS（A1-10）；殘留 G2-R1／R2／R3／R5／R6／R7／R8。

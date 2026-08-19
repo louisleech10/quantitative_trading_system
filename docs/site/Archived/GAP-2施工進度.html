@@ -4,17 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GAP-2 施工看板：邊際 IC／多因子組合（2a）＋倖存因子輸出契約（2b）</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../style.css">
 </head>
 <body>
-<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-2施工進度.md</span></nav>
+<nav class="top"><a href="../index.html">← 白話說明</a><span class="crumb">Archived ／ GAP-2施工進度.md</span></nav>
 <main>
 <h1 id="gap-2-施工看板邊際-ic多因子組合2a倖存因子輸出契約2b">GAP-2 施工看板：邊際 IC／多因子組合（2a）＋倖存因子輸出契約（2b）</h1>
 <blockquote>
 <p>一句話：補「這個因子相對已經選進來的那幾個，到底多帶來多少<strong>新</strong>資訊」的產品答案，並先把倖存因子交給 ML 的<strong>契約格式</strong>釘死（橋本體等 ML 層穩定）。
 技術文件：<code>docs/GAP2_MARGINAL_IC_SPEC.md</code>（R7 FROZEN）、<code>docs/GAP2_MARGINAL_IC_TODO.md</code>；殘留登記 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>「GAP-2 待補完」。</p>
 </blockquote>
-<h2 id="現在在哪">現在在哪</h2>
+<h2 id="-gap-2-已收案2026-08-19">🏁 GAP-2 已收案（2026-08-19）</h2>
+<ul>
+<li>五批全部：各三家 code review＋三家蓋章；規格延伸決策 A1-1..A1-11；24 條 mutation 全部改壞就紅（最終實跑 receipts）；改前==改後 golden PASS；倖存者檔每次分析都會落檔（<code>ic_survivors_{case_id}.json</code>）；前端表格＋開關預設開。</li>
+<li>殘留 7 條（G2-R1／R2／R3／R5 原有＋R6 前端 tsc 既有 8 紅／R7 bench 內嵌 gate 太慢／R8 狀態文案未中文化）已登記 registry「GAP-2 待補完」，每條附三值理由與觸發條件。</li>
+</ul>
+<h2 id="現在在哪收案時快照">現在在哪（收案時快照）</h2>
 <ul>
 <li>✅ <strong>規格（SPEC）定版</strong>（8/18）：偵察 1 輪（三家＋我）＋對抗審 6 輪（14→12→4→4→2→0），七份收斂檔全數三家蓋章；你白話閘核准，並裁定前端表格＋開關（預設開）納入第 5 批。</li>
 <li>✅ <strong>清單（TODO）定版（FROZEN，8/18 深夜）</strong>：五輪三家對抗審 20→15→7→1→0，十一份收斂檔全數三家蓋章；第五輪三家零意見。前一輪（R5）：第四輪 composer／grok 都說「可定版」，codex 只剩一條文字殘留（第 4 批收尾小節少寫路徑）已同文修好；我對前端掛載點的補正三家獨立實核都說對。收斂檔三家蓋章（stamp r11）。依「每家最近一次都零意見才算收斂」的規矩，再派一輪窄範圍確認（第五輪）；三家零意見就定版。前一輪（R4）：第三輪三家 7 條（都是「範圍沒閉合」：前端結果頁容器檔要進白名單、批次收尾小節有一句舊命令、寫檔失敗的原因字串要用契約的封閉值）全接受寫回，收斂檔三家蓋章（stamp r10）；我實核發現結果頁的「深度分析」分頁只在開了深度分析才顯示，邊際 IC 是基礎報告節，掛在那會被藏起來 ⇒ 改掛「基礎分析」分頁末段（寫成 A1-5 補正，交第四輪三家獨立判對錯）。<strong>第四輪複核已派出</strong>。前一輪（R3）：第一輪對抗審三家 20 條全寫回（R2）；第二輪三家 15 條（codex 9／grok 4／composer 2）收成十群集——14 條接受寫回、1 條駁回（codex 說警語含禁字串，實際文案早在上一輪改掉，grep 零命中，另兩家也實核為否）。這輪修的重點：前端開關要動的兩個既有檔補進白名單（規格走延伸檔 A1-4，母規格不動）、「OOS 欄位只由 root 注入」的殘句刪乾淨、golden 要記 <code>case_id</code>、倖存者檔寫檔時不得讀尚未建立的 cache（三個呼叫點逐一列來源）、bench 的迴歸次數要用獨立計數器對證、橫截面路徑要有明確的「不適用」節、探針檢查命令要帶路徑。收斂檔三家蓋章（stamp r9）。<strong>第三輪複核已派出</strong>，三家都說「可定版」就 FROZEN。</li>
@@ -53,7 +58,7 @@
 <tr>
 <td>B5</td>
 <td>前端：型別鏡像＋開關（預設開）＋一張唯讀表格</td>
-<td>✅ 寫完（vitest 9 條全綠、build 過、wiring 25 toggles）→ 待三家 code review＋蓋章</td>
+<td>✅ <strong>收案</strong>（三家 code review 零意見＋三家蓋章 PASS；vitest 9、build、wiring 25 toggles）</td>
 </tr>
 </tbody>
 </table></div>
@@ -80,7 +85,7 @@
 <li>第 5 批寫完（8/19）：型別鏡像（只在 ICHC 契約段外加）、三個 preset 預設把「邊際 IC／多因子組合」開關打開且 custom／具名 preset 兩條路徑都會把開關值送到後端、面板多一列（計數改用列表長度不寫死）、唯讀表格 <code>MarginalICTable</code>（節不是 ok 就只顯示狀態文字；oos 不保證就出紅色警語；恆顯示「倖存者選於同一測試段；本節數字為描述統計，非獨立驗證」且測試斷言不含「獨立 OOS 驗證」）、掛在 IC 結果頁<strong>基礎分析</strong>分頁末段（A1-5 補正）。tsc 有 8 條既有紅在兩個舊測試檔，非本批。</li>
 </ul>
 
-<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-2施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/Archived/GAP-2施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
 </body>
 </html>
