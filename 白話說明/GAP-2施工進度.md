@@ -14,8 +14,8 @@
 | B1 | 契約 JSON 單一真相源＋邊際 IC 純函式＋9 類 oracle＋探針腳本 | ✅ **收案**（三家 code review 11 條全處置＋三家蓋章 PASS；46 測試全綠、10 mutation 全紅）|
 | B2 | 多因子組合＋區塊 bootstrap 信賴區間 | ✅ **收案**（三家 code review 4 條全處置＋三家蓋章 PASS；45 測試全綠、3 mutation 全紅）|
 | B3 | 契約讀取／驗證／組裝（缺欄／多欄／枚舉外／身分不符都擋） | ✅ **收案**（三家 code review 10 條全處置＋三家蓋章 PASS；44 測試全綠、8 mutation 全紅）|
-| B4 | 接進 IC 主流程（三個入口＋fallback）、倖存者檔、報告新節、golden、wiring 改讀契約、預算 receipt | ✅ 寫完＋三家 code review 4 條全處置（codex 2 條修好、兩家零意見；A1-10 三家皆認可）；gate 73 條全綠、7 條 mutation 全紅；待戳記輪（兼修補驗收）→ B4 收案 |
-| B5 | 前端：型別鏡像＋開關（預設開）＋一張唯讀表格 | — |
+| B4 | 接進 IC 主流程（三個入口＋fallback）、倖存者檔、報告新節、golden、wiring 改讀契約、預算 receipt | ✅ **收案**（三家 code review 4 條全處置＋三家蓋章 PASS；gate 73 條全綠、7 條 mutation 全紅、golden 改前==改後）|
+| B5 | 前端：型別鏡像＋開關（預設開）＋一張唯讀表格 | 🔄 動工中 |
 
 ## 殘留（為何現在不做；已登記 registry，不會忘）
 - G2-R1 橋本體：你裁定 blocked-by ML 層。 - G2-R2 用邊際 IC 二次挑選：多重比較政策無公認方法（needs-research）。 - G2-R3 橫截面路徑：等 #4 重建。 - G2-R5 真獨立 OOS：要改主線切分。
@@ -34,3 +34,4 @@
 - 第 3 批蓋章：codex／grok 一次 APPROVED；composer 判 APPROVED 但只寫在自己的交件檔、忘了 append 進收斂檔——我不代寫（那是它的簽名），派它單家補 append 即過。
 - 第 4 批寫完（8/19）：把邊際 IC 接進主流程（`analyze`／`refilter` 兩個插入點；全樣本 fallback 用旗標判定；OOS 兩欄只由 root 注入；橫截面路徑固定標「不適用」）、報告多一節、倖存者檔 `ic_survivors_{case_id}.json` 落地（跟報告同目錄、原子寫入、五鍵狀態恆存在）、golden 對照（改前==改後）、wiring 檢查改讀契約（7 節）、預算 bench receipt（600 次迴歸==spy 對證；82 秒／686MB 只記錄不設閾值）。三件值得說：①**結構性碰撞**——config 一加新欄，`config_hash` 就變，連帶報告 metadata 裡的 `scope_id` 變，golden 在行為完全不變下也會不等；處置＝比對時把 scope_id 正規化為標籤段（A1-10），pre 檔用 git stash 回到改前程式碼重算、可稽核不是「重新凍結換綠」；②第一版把 stage6b 回傳的裸 `{}` 靜默升級成 disabled 物件 ⇒ mutation V-14 抓不到 ⇒ 改成裸 `{}` 直接報錯；③`normal_scores` 加記憶化讓 bench 從 6 分鐘降到 1.5 分鐘（值不變，B1 測試全部照過）。兩個測試前提被 fixture 推翻（全樣本 fallback 預設門檻下 0 倖存者；缺 symbol 時主流程根本算不了 label）已改法並列進 review brief 讓三家判。
 - 第 4 批 code review：codex 兩條都真：①落盤的報告 JSON 沒帶倖存者檔的五鍵狀態（注入發生在存檔之後）——注入後重存一次；②倖存者檔 provenance 的 IC method／label 型別讀到的是建構時 config、不是這次的 override——改存本次 effective config。composer／grok 零意見，且三家都判 A1-10（config_hash 結構性碰撞的處置）成立、不是「重新凍結換綠」。
+- 第 4 批蓋章拖了 1 小時多：我在 brief 要三家各自重跑含 bench 的 73 條測試，三家並行互搶 CPU（bench 的 600 次大矩陣最小平方），codex 卡 30 分鐘後 BLOCKED、grok 卡 40 分鐘後拆開重跑才過；另一點是 brief 給的 diff 範圍夾了 HANDOFF 而 allowlist 漏列。兩點都是 brief 缺陷，改派 codex 單家、只跑不含 bench 的部分＋讀 receipt，即 APPROVED。教訓記摩擦七十七。

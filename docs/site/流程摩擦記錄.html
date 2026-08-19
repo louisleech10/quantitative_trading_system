@@ -1852,6 +1852,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>七十六・（2026-08-19）「行為不變」golden 會被 config schema 增欄打破——config_hash 進了報告 metadata</strong>：加一個 config 欄位，md5(model_dump) 就變，report metadata 的 scope_id 跟著變，golden 在行為完全不變下必不等。這不是漂移是結構性碰撞；處置＝比對時正規化該欄（走延伸檔 A1-10 明寫）並把 pre 檔用改前程式碼重算（git stash 只 stash 那四個檔），保留舊值欄供稽核。教訓：凍 golden 前先掃報告裡有沒有「隨 schema 變的識別子」，否則 golden 會在第一次接線就假紅。另：commit 訊息含「全綠」會被 claim checker 當 operational claim 要 VERIFY 收據（JSON），改中性措辭（rc=0／N passed）。</p>
 </blockquote>
+<blockquote>
+<p><strong>七十七・（2026-08-19）stamp brief 不得叫多家並行跑重測試</strong>：B4 stamp 判準 4 要三家各跑含 bench（600 次 12000×201 最小平方）的 73 條測試，三家並行互搶 CPU：codex 卡 1773 秒中斷判 BLOCKED、grok 卡 40 分鐘後拆 <code>-k &quot;not bench&quot;</code>＋獨占 bench 才過，整輪拖 1 小時 15 分。規則：戳記輪只准（a）讀已 commit 的 receipt、（b）in-memory 反例、（c）輕量測試（&lt;1 分鐘）；重 gate 由主委在派工前跑一次並附 receipt。另：brief 給 diff 範圍時 allowlist 要把中間夾的交接文件（HANDOFF）列進去，否則字面級 BLOCKED。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
