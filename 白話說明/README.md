@@ -31,7 +31,7 @@
 > 有 **HTML 閱讀介面**：本機 `open docs/site/index.html`；GitHub 上要你去 **Settings → Pages → Deploy from a branch: `main`, `/docs`**
 > 點一次（只有你能點）——**你 8/18 已設好**，網址 https://louisleech10.github.io/quantitative_trading_system/site/ 實測可讀，每次 push 後約 1–2 分鐘更新。
 > 來源仍是這裡的 .md（我和委員照讀 .md）；HTML 由 `scripts/plain_docs_render.sh` 在每次 commit 白話檔時同一 commit 自動生成，缺產出會擋 commit。
-> 🏁 **GAP-2 收案（8/19）**：邊際 IC／多因子組合＋倖存因子輸出契約——五批全部三家 review＋蓋章、24 條 mutation 全紅、改前==改後 golden PASS、前端表格＋開關預設開；殘留 7 條登記 registry「GAP-2 待補完」。看板已移 [Archived/GAP-2施工進度.md](Archived/GAP-2施工進度.md)。**下一票＝GAP-3 事件型（先討論再開工）**——細節見 [接下來要做什麼.md](接下來要做什麼.md)。
+> 🏁 **GAP-2 收案（8/19）**：邊際 IC／多因子組合＋倖存因子輸出契約——五批全部三家 review＋蓋章、24 條 mutation 全紅、改前==改後 golden PASS、前端表格＋開關預設開；殘留 7 條登記 registry「GAP-2 待補完」。看板已移 [Archived/GAP-2施工進度.md](Archived/GAP-2施工進度.md)。另：**前端「待補完」占位頁**（側欄 `/pending-features`）已上線——需要前端但先不做的殘留都寫著為何／建議階段，你點開就看得到。**下一票＝GAP-3 事件型（先討論再開工）**——細節見 [接下來要做什麼.md](接下來要做什麼.md)。
 > 🏁 GAP-1 收工；PA-CUMSUM 小票（權益曲線單利／複利兩條都算＋前端切換）三家 review 修完＋三家蓋章 PASS，**已收案**。**下一票＝GAP-2a 邊際 IC**（8/18 你點的，開新 session 做；GAP-2 拆 2a/2b、GAP-3 事件型先討論再開工——細節見 [接下來要做什麼.md](接下來要做什麼.md)）。看板 [GAP-1施工進度.md](GAP-1施工進度.md)。
 > 這輪最值得你知道的：第 2 批三家 21 條全處置、沒有一條要重做；其中一條是**我派工單上對自己程式碼的描述寫錯**
 > （程式對、我的話錯、清單字面也錯），延伸檔 A1-21 作廢那句。教訓寫在 [流程摩擦記錄.md](流程摩擦記錄.md) 第六十一～六十二條。
