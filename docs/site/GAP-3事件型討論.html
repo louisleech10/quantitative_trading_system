@@ -398,16 +398,81 @@
 <li><strong>K10</strong> 分批 → 已定（B1 契約對齊切分自檢 → B2 三表＋倖存者升版＋全部 K 線驗證 → B3 產生器＋變化特徵 → B4 pattern＋DSR/PBO → B5 存檔／API／前端占位／UAT）。</li>
 </ul>
 <hr />
+<h2 id="75-spec-起草輸入清單你-820-問spec-根據哪份答案在這節本節取材的唯一地圖">§7.5 SPEC 起草輸入清單（你 8/20 問「SPEC 根據哪份」——答案在這節；本節＝取材的唯一地圖）</h2>
+<p><strong>規則</strong>：SPEC 起草<strong>只准</strong>從下列來源取材，照優先序；衝突時<strong>新的使用者意圖蓋過舊的委員結論</strong>（差異都已在對應處標注）。SPEC 寫好後，它的 <strong>§0 前置裁決</strong>就是合併後「最完整精確」的那份（嚴謹技術語言、逐條可驗收），要過：三家對抗審逐條驗「對照本清單沒漏沒錯」→ 你的白話閘。SPEC 凍結後，本討論文檔降為歷史背景、不再更新。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>優先序</th>
+<th>來源</th>
+<th>取什麼</th>
+<th>注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1（最高）</td>
+<td>本檔 §7 <strong>U 系列</strong>＋**§8 第 8 版五點**（你的裁決與澄清）</td>
+<td>產品語意全部：目標情境、正反例來源、標籤基準＝t₀ close、決策時點可 t₀±偏移、反例種類選填、TF／規模不寫死、產生器完整版、前端落點、現有頁面升級不翻掉</td>
+<td>唯一權威；任何來源與此衝突以此為準</td>
+</tr>
+<tr>
+<td>2</td>
+<td>本檔 §7 <strong>J 系列</strong>（我的判斷，你未否決）</td>
+<td>全樣本驗證配套、跨 TF 鐵律、不切固定窗、按反例種類分報、時間出場、pooled 最小版、IC/ML 接力</td>
+<td>委員 R2 已逐條審過（意見檔 §2 J 表）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md</code> <strong>C1–C9</strong>（委員 R2 技術定案）</td>
+<td>K1–K10 全部技術細節：契約欄位清單與枚舉、對齊收據格式與失敗枚舉、簇／降權算法、切分與 time-cluster、三張表計算式、oracle、K7 特徵清單、產生器引擎落點、分批</td>
+<td>🔴 <strong>兩處已被第 8 版改寫</strong>：C1 標籤基準預設改 <code>close_to_close</code>；K1/K2 決策時點加 t₀−k 擴充（SPEC 對抗審時請委員確認擴充）。其餘照抄</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md</code>（R1，只取 R2 未覆蓋者）</td>
+<td>六時間欄不變式、毫秒單位閘、事件 taxonomy 正交欄、legacy 路徑不沿用清單</td>
+<td>R1 預設 C 情境的反例／決策時點結論<strong>不取</strong>（已被 A/B 修正）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>既有契約與紀律（引用不重抄）</td>
+<td><code>ic_survivor_contract.json</code>（擴欄升版）、<code>SplitPlan</code>／rows purge、<code>capability_status</code> 枚舉、<code>TEST_DESIGN_CHARTER</code>、GAP-1 DSR/PBO、成熟度地圖（禁改 ML 殼／不碰回測層）</td>
+<td>SPEC 只放 pointer，欄位枚舉單一真相源在契約 JSON</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>不取材</strong>：<code>GAP-3事件型討論-委員意見.md</code>（它是本清單第 3 項的白話投影，給你看的，不是工作文件）；R1 的 C-情境反例結論；舊 <code>CaseRecord</code>／<code>_select_negative_timestamps</code> 語意。</p>
+<hr />
 <h2 id="8-討論紀錄新的寫上面只記改了什麼">§8 討論紀錄（新的寫上面；只記「改了什麼」）</h2>
 <ul>
-<li><strong>2026-08-20（第 8 版）</strong>：你邊看邊補充五點——①<strong>買入可在 t₀ 之前</strong>（t₀＝事件錨點、決策時點＝獨立欄可為 t₀−k；A 的一般化；屬對委員 K1/K2 定案的小擴充，SPEC 對抗審時請委員確認）②<strong>標籤一律相對 t₀ close、close-to-close</strong>（契約「基準價語意」預設改 close_to_close；委員 C1 擔心解除一半；實際進場價 vs 標籤基準兩數並排揭露）③ TF 組合只是舉例、契約通用 ④「反例種類」欄改<strong>選填</strong>、平台可依 t₀ 走勢自動分類 ⑤規模只是舉例。改 §2-2／2-3／2-4／2-6／§3.2。</li>
-<li><strong>2026-08-20 凌晨（第 7 版）</strong>：委員 R2（Codex／Composer／Grok 三家齊＋主委）逐項審完，結果寫在 <a href="GAP-3事件型討論-委員意見.html">GAP-3事件型討論-委員意見.md</a>（逐項對應本檔編號）。本檔改動：§3.9-1 改寫（特徵可換算、<strong>標籤進場價語意不能偷懶沿用 close-to-close</strong>、每 TF 各自收據）；§7 K1–K10 標「已定（R2）」並各一句摘要；S3.7「兩種都跑」降為敏感度、S3.8 明寫不算完成 #4（見意見檔 §2）。<strong>沒有新的要你裁的題</strong>；你點頭後才寫規格。</li>
-<li><strong>2026-08-19 深夜（第 6 版）</strong>：你裁 Q-F1 同意、Q-V1 交委員（一次建完整）、Q-G1 就這些；§7 改成<strong>全編號</strong>（U／J／K 系列＋§2 U2-x／§3 S3.x／§5 T1–T10／§6 P0–P10／產生器 G1–G6），供《GAP-3事件型討論-委員意見.md》逐項對應。接著：派委員 R2 唯讀逐項討論（三家＋我），結果寫到那份對應檔；你醒來看。</li>
-<li><strong>2026-08-19 深夜（第 5 版）</strong>：照你第四輪——§3.4 加「訊號不在那幾根上怎麼辦」（窗內摘要特徵）；新增 §3.10（IC 篩特徵、ML 組合 pattern、全部 K 線驗證評 ML 訊號；LightGBM／XGBoost 都在、之後再議）、§3.11（前端：產事件在 /search＋/data-preparation，分析在 /ic-analysis 同頁加事件模式）；§4 改已定（只多或只空、不混；long-short 列殘留）；§5 事件類型擴成十類（新增 ⑧跨標的關聯、⑨模型訊號當事件＝meta-labeling、⑩組合／區間型）；§6 加「完整版事件產生器長什麼樣」六點（落點 /search；現況只准 price_change 一種條件）；§7 已定加 Q-H1／多空／ML 引擎／連續觸發交委員／產生器完整版，待確認剩 Q-F1／Q-V1／Q-G1。</li>
-<li><strong>2026-08-19 深夜（第 4 版）</strong>：照你第三輪——§3.4 重寫（你要找的是「數值＋變化」，認知一致；不切固定窗、全部 K 線連續算、每案例取 t₀ 那列、回看長短讓 IC 挑；變化類特徵要補一部分）；新增 §3.9（序列型 IC 分析與圖表九成可直接用：後端已收事件時間戳；要補對齊／0-1 統計／事件後報酬表／前端入口）；§7「已定」加三條（事件產生器列入開發＝升級 /search 條件引擎；正反例都附實際漲幅；現有頁面升級不翻掉），Q-S1／Q-V1／Q-H1 重講白（「答案窗」名詞解釋、CSV＋搜尋條件一起匯入），Q-T1 剩一個小確認。</li>
-<li><strong>2026-08-19 深夜（第 3 版）</strong>：照你第二輪七點——讀 <code>/data-preparation</code> 前後端寫進 §2-1／§6 ①②；新增 §3.4（100 根 K 線＝資料單位非訓練單位；X 由指標決定、讓 IC 挑）、§3.5（三種反例＝兩段式合體；按種類分開報；IC 不受 0/1 影響但受抽樣影響）、§3.6（出場：先時間出場；事件後報酬表回答何時出；triple-barrier 列殘留）、§3.7（連續觸發：C 簇首／A 全留降權、兩種都跑）、§3.8（規模：夠用但必須跨標的合併＝#4 併入；同時刻簇）；finlab 列為你要研究的類型（§2-5）；§7 新增 Q-D1。</li>
-<li><strong>2026-08-19 深夜（第 2 版）</strong>：照你六點回答整份改寫——/search 流程、決策時點＝t₀ open、跨 TF 可行、反例三種、finlab＝C 情境事件後報酬表、case-control 合法但必須全部 K 線驗證。</li>
-<li><strong>2026-08-19 晚（第 1 版）</strong>：建檔。委員討論輪（Codex／Grok／我；Composer 被 Cursor 額度擋）收斂；你在彈窗揭露主要設想是 A／B 而非委員分析的 C。</li>
+<li>
+<p><strong>2026-08-20（第 9 版）</strong>：你問「SPEC 根據哪份」⇒ 新增 <strong>§7.5 SPEC 起草輸入清單</strong>（五層優先序＋衝突規則＋「最完整精確的那份＝SPEC §0，由對抗審驗沒漏沒錯」）。</p>
+</li>
+<li>
+<p><strong>2026-08-20（第 8 版）</strong>：你邊看邊補充五點——①<strong>買入可在 t₀ 之前</strong>（t₀＝事件錨點、決策時點＝獨立欄可為 t₀−k；A 的一般化；屬對委員 K1/K2 定案的小擴充，SPEC 對抗審時請委員確認）②<strong>標籤一律相對 t₀ close、close-to-close</strong>（契約「基準價語意」預設改 close_to_close；委員 C1 擔心解除一半；實際進場價 vs 標籤基準兩數並排揭露）③ TF 組合只是舉例、契約通用 ④「反例種類」欄改<strong>選填</strong>、平台可依 t₀ 走勢自動分類 ⑤規模只是舉例。改 §2-2／2-3／2-4／2-6／§3.2。</p>
+</li>
+<li>
+<p><strong>2026-08-20 凌晨（第 7 版）</strong>：委員 R2（Codex／Composer／Grok 三家齊＋主委）逐項審完，結果寫在 <a href="GAP-3事件型討論-委員意見.html">GAP-3事件型討論-委員意見.md</a>（逐項對應本檔編號）。本檔改動：§3.9-1 改寫（特徵可換算、<strong>標籤進場價語意不能偷懶沿用 close-to-close</strong>、每 TF 各自收據）；§7 K1–K10 標「已定（R2）」並各一句摘要；S3.7「兩種都跑」降為敏感度、S3.8 明寫不算完成 #4（見意見檔 §2）。<strong>沒有新的要你裁的題</strong>；你點頭後才寫規格。</p>
+</li>
+<li>
+<p><strong>2026-08-19 深夜（第 6 版）</strong>：你裁 Q-F1 同意、Q-V1 交委員（一次建完整）、Q-G1 就這些；§7 改成<strong>全編號</strong>（U／J／K 系列＋§2 U2-x／§3 S3.x／§5 T1–T10／§6 P0–P10／產生器 G1–G6），供《GAP-3事件型討論-委員意見.md》逐項對應。接著：派委員 R2 唯讀逐項討論（三家＋我），結果寫到那份對應檔；你醒來看。</p>
+</li>
+<li>
+<p><strong>2026-08-19 深夜（第 5 版）</strong>：照你第四輪——§3.4 加「訊號不在那幾根上怎麼辦」（窗內摘要特徵）；新增 §3.10（IC 篩特徵、ML 組合 pattern、全部 K 線驗證評 ML 訊號；LightGBM／XGBoost 都在、之後再議）、§3.11（前端：產事件在 /search＋/data-preparation，分析在 /ic-analysis 同頁加事件模式）；§4 改已定（只多或只空、不混；long-short 列殘留）；§5 事件類型擴成十類（新增 ⑧跨標的關聯、⑨模型訊號當事件＝meta-labeling、⑩組合／區間型）；§6 加「完整版事件產生器長什麼樣」六點（落點 /search；現況只准 price_change 一種條件）；§7 已定加 Q-H1／多空／ML 引擎／連續觸發交委員／產生器完整版，待確認剩 Q-F1／Q-V1／Q-G1。</p>
+</li>
+<li>
+<p><strong>2026-08-19 深夜（第 4 版）</strong>：照你第三輪——§3.4 重寫（你要找的是「數值＋變化」，認知一致；不切固定窗、全部 K 線連續算、每案例取 t₀ 那列、回看長短讓 IC 挑；變化類特徵要補一部分）；新增 §3.9（序列型 IC 分析與圖表九成可直接用：後端已收事件時間戳；要補對齊／0-1 統計／事件後報酬表／前端入口）；§7「已定」加三條（事件產生器列入開發＝升級 /search 條件引擎；正反例都附實際漲幅；現有頁面升級不翻掉），Q-S1／Q-V1／Q-H1 重講白（「答案窗」名詞解釋、CSV＋搜尋條件一起匯入），Q-T1 剩一個小確認。</p>
+</li>
+<li>
+<p><strong>2026-08-19 深夜（第 3 版）</strong>：照你第二輪七點——讀 <code>/data-preparation</code> 前後端寫進 §2-1／§6 ①②；新增 §3.4（100 根 K 線＝資料單位非訓練單位；X 由指標決定、讓 IC 挑）、§3.5（三種反例＝兩段式合體；按種類分開報；IC 不受 0/1 影響但受抽樣影響）、§3.6（出場：先時間出場；事件後報酬表回答何時出；triple-barrier 列殘留）、§3.7（連續觸發：C 簇首／A 全留降權、兩種都跑）、§3.8（規模：夠用但必須跨標的合併＝#4 併入；同時刻簇）；finlab 列為你要研究的類型（§2-5）；§7 新增 Q-D1。</p>
+</li>
+<li>
+<p><strong>2026-08-19 深夜（第 2 版）</strong>：照你六點回答整份改寫——/search 流程、決策時點＝t₀ open、跨 TF 可行、反例三種、finlab＝C 情境事件後報酬表、case-control 合法但必須全部 K 線驗證。</p>
+</li>
+<li>
+<p><strong>2026-08-19 晚（第 1 版）</strong>：建檔。委員討論輪（Codex／Grok／我；Composer 被 Cursor 額度擋）收斂；你在彈窗揭露主要設想是 A／B 而非委員分析的 C。</p>
+</li>
 </ul>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3事件型討論.md</code> 生成；HTML 是產物，請改 .md。</footer>
