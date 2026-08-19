@@ -78,11 +78,11 @@
 <ol>
 <li><strong>流程與現有初版</strong>：<code>/search</code> 用條件搜出正反候選 → 匯出 CSV → 你手工細篩 → <code>/data-preparation</code> 上傳（欄位 <code>symbol, timestamp, Positive_case[, timeframe]</code>）→ 勾選要抓哪些時間框架（1h／4h／12h…），系統替<strong>每個案例</strong>抓 t₀ 前 lookback 根、後 forward 根、再加指標預熱（warmup）的 K 線存起來。
 我讀過這兩頁的前後端了：概念對（匯入 → 抓 K 線 → 訓練），<strong>但欄位不夠</strong>（沒有決策時點、沒有反例種類、沒有多空方向、沒有標籤規則摘要）、對齊用「時間戳剛好相等」、找不到就默默跳過——這些是要重做的地方（§6），不是概念錯。</li>
-<li><strong>目標</strong>：用 <strong>t₀ 之前</strong> 的 K 線指標（1h／4h，Feature Factory 算），<strong>預測 t₀ 會不會漲</strong>，在 t₀ <strong>open</strong> 買入（或賣空）。⇒ 決策時點＝t₀ open；事件本身（這根漲≥5%）是<strong>未來的結果</strong>。</li>
-<li><strong>跨時間框架</strong>：t₀ 標在 12h，特徵學 1h／4h。<strong>可以，而且是對的</strong>；鐵律只有一條：特徵只能用到「t₀ open 之前已經收盤」的 1h／4h bar（12h 的 open 在 00:00／12:00 UTC，剛好是 1h、4h 的邊界，對得整齊）。</li>
-<li><strong>反例有好幾種，全標 0</strong>：(a) 同樣漲≥5% 但後續不漲或下跌；(b) 只在震盪、close 上下 1%；(c) 跌 x%。⇒ 匯入時多一欄「<strong>反例種類</strong>」（a/b/c），理由見 §3.5。</li>
+<li><strong>目標</strong>：用 <strong>t₀ 之前</strong> 的 K 線指標（Feature Factory 算），<strong>預測 t₀ 會不會漲</strong>，在 t₀ <strong>open</strong> 買入（或賣空）。⇒ 決策時點＝t₀ open；事件本身（這根漲≥5%）是<strong>未來的結果</strong>。<strong>（8/20 你補充）買入也可以在 t₀ 之前</strong>——訊號可能幾根 K 前就出現 ⇒ t₀＝事件錨點、決策／進場時點＝<strong>獨立欄位</strong>（t₀ open 或 t₀ 前 k 根），特徵截止＝進場那一刻（更早 ⇒ 特徵更少、更難，但合法）；這是 A 的一般化，實盤面同樣由「每根 K 掃一次」（全部 K 線驗證）涵蓋。<strong>（8/20 你補充）標籤基準＝t₀ close、close-to-close</strong>：你算未來漲幅一律相對 t₀ close ⇒ 跟 IC 主線同語意、條件 IC 直接吃（委員 C1 的擔心解除一半；契約仍保留「基準價語意」欄以防沒寫明，預設改 <code>close_to_close</code>）。誠實揭露：實際進場價（open 或更早）≠ 標籤基準（t₀ close）——「全部 K 線驗證」的持有報酬用<strong>實際進場價</strong>算、標籤照你的規則算，兩數並排不混。</li>
+<li><strong>跨時間框架</strong>：t₀ 標在 12h、特徵學 1h／4h <strong>只是舉例</strong>（8/20 你補充）——契約與對齊對<strong>任何 TF 組合</strong>通用；鐵律只有一條：特徵只能用到「決策時點之前已經收盤」的 bar（每個 TF 各自取最後一根已收盤，收據每 TF 一列）。</li>
+<li><strong>反例有好幾種，全標 0</strong>：(a) 同樣漲≥5% 但後續不漲或下跌；(b) 只在震盪、close 上下 1%；(c) 跌 x%。「反例種類」欄＝<strong>選填</strong>（8/20 你問「不需要標？」——<strong>可以不標</strong>：平台有 K 線，能依 t₀ 那根實際走勢<strong>自動分類</strong> a/b/c，「按種類分開報分數」照樣做得到，分類門檻可調；你想標更細的種類再用那欄）。理由見 §3.5。</li>
 <li><strong>finlab 那篇</strong>（「23 次暴跌日後 20 天平均 +3.9%、勝率 74%」「跌破 60 日線是負向事件」「崩跌區首根 +2% 出現時買進、中位報酬 4.5%」）＝事件<strong>已經發生、看到了</strong>，統計它之後 5／10／20／45 天的報酬分布。<strong>你要研究這類</strong>（8/19 確認）⇒ 列為第一張要出的表「事件後報酬表」（§6 ⑤-i），<strong>不需要反例</strong>。</li>
-<li><strong>規模</strong>：標的約 150–200 個、正反案例合計一兩萬個（§3.8）。</li>
+<li><strong>規模</strong>：標的約 150–200 個、正反案例合計一兩萬個——<strong>只是舉例，實際不定</strong>（8/20 你補充）；統計機制不寫死規模（樣本不足走 tier 降級、標「不可算」）（§3.8）。</li>
 <li><strong>出場點還不知道怎麼辦</strong>（§3.6）；<strong>相鄰幾根都符合／漲了盤整幾根又符合</strong>不知道怎麼辦（§3.7）；<strong>X 根 K 線是隨便喊的</strong>（§3.4）。</li>
 <li><strong>先把問題訂清楚再問委員</strong>。✅ 本文檔就是在做這件事。</li>
 </ol>
@@ -133,7 +133,8 @@
 </tbody>
 </table></div>
 <ul>
-<li>A 跟 B 只差答案欄：B＝t₀ 自己 open→close 漲≥5%；A＝t₀ 漲≥5% <strong>而且</strong>後面 24／36／48h 續漲（從 open 進場價起算、含 t₀ 自己的漲幅）。契約一樣。</li>
+<li>A 跟 B 只差答案欄：B＝t₀ 自己 open→close 漲≥5%；A＝t₀ 漲≥5% <strong>而且</strong>後面 24／36／48h 續漲。<strong>（8/20 你定）標籤基準一律 t₀ close、close-to-close</strong>；實際進場（open 或 t₀ 前）賺到的會比標籤多 t₀ 那段，驗證時兩數並排（§2-2）。契約一樣。</li>
+<li><strong>（8/20 你補充）決策／進場可在 t₀ 之前</strong>（訊號幾根 K 前出現）：契約的決策時點欄一般化為「t₀ ± 偏移」；特徵截止跟著決策時點走。</li>
 <li>決策時點必須<strong>明寫在每個事件上</strong>；寫錯（說 open 決策、特徵卻用到 t₀ 收盤）⇒ 機器擋。</li>
 </ul>
 <h3 id="33-其他陷阱平台要擋的">3.3 其他陷阱（平台要擋的）</h3>
@@ -399,6 +400,7 @@
 <hr />
 <h2 id="8-討論紀錄新的寫上面只記改了什麼">§8 討論紀錄（新的寫上面；只記「改了什麼」）</h2>
 <ul>
+<li><strong>2026-08-20（第 8 版）</strong>：你邊看邊補充五點——①<strong>買入可在 t₀ 之前</strong>（t₀＝事件錨點、決策時點＝獨立欄可為 t₀−k；A 的一般化；屬對委員 K1/K2 定案的小擴充，SPEC 對抗審時請委員確認）②<strong>標籤一律相對 t₀ close、close-to-close</strong>（契約「基準價語意」預設改 close_to_close；委員 C1 擔心解除一半；實際進場價 vs 標籤基準兩數並排揭露）③ TF 組合只是舉例、契約通用 ④「反例種類」欄改<strong>選填</strong>、平台可依 t₀ 走勢自動分類 ⑤規模只是舉例。改 §2-2／2-3／2-4／2-6／§3.2。</li>
 <li><strong>2026-08-20 凌晨（第 7 版）</strong>：委員 R2（Codex／Composer／Grok 三家齊＋主委）逐項審完，結果寫在 <a href="GAP-3事件型討論-委員意見.html">GAP-3事件型討論-委員意見.md</a>（逐項對應本檔編號）。本檔改動：§3.9-1 改寫（特徵可換算、<strong>標籤進場價語意不能偷懶沿用 close-to-close</strong>、每 TF 各自收據）；§7 K1–K10 標「已定（R2）」並各一句摘要；S3.7「兩種都跑」降為敏感度、S3.8 明寫不算完成 #4（見意見檔 §2）。<strong>沒有新的要你裁的題</strong>；你點頭後才寫規格。</li>
 <li><strong>2026-08-19 深夜（第 6 版）</strong>：你裁 Q-F1 同意、Q-V1 交委員（一次建完整）、Q-G1 就這些；§7 改成<strong>全編號</strong>（U／J／K 系列＋§2 U2-x／§3 S3.x／§5 T1–T10／§6 P0–P10／產生器 G1–G6），供《GAP-3事件型討論-委員意見.md》逐項對應。接著：派委員 R2 唯讀逐項討論（三家＋我），結果寫到那份對應檔；你醒來看。</li>
 <li><strong>2026-08-19 深夜（第 5 版）</strong>：照你第四輪——§3.4 加「訊號不在那幾根上怎麼辦」（窗內摘要特徵）；新增 §3.10（IC 篩特徵、ML 組合 pattern、全部 K 線驗證評 ML 訊號；LightGBM／XGBoost 都在、之後再議）、§3.11（前端：產事件在 /search＋/data-preparation，分析在 /ic-analysis 同頁加事件模式）；§4 改已定（只多或只空、不混；long-short 列殘留）；§5 事件類型擴成十類（新增 ⑧跨標的關聯、⑨模型訊號當事件＝meta-labeling、⑩組合／區間型）；§6 加「完整版事件產生器長什麼樣」六點（落點 /search；現況只准 price_change 一種條件）；§7 已定加 Q-H1／多空／ML 引擎／連續觸發交委員／產生器完整版，待確認剩 Q-F1／Q-V1／Q-G1。</li>
