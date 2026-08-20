@@ -1,6 +1,6 @@
 # GAP-3 事件型分析（外部標註正反例匯入 → PIT 對齊 → 條件 IC／ML）— SPEC
 
-> 來源 PLAN/診斷：`白話說明/GAP-3事件型討論.md`（第 12 版；**§7.5 五層取材優先序＝本 SPEC 唯一取材地圖**）；consult R1 `handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md`（C1–C6）；consult R2 `handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md`（C1–C9＝K1–K10 技術定案）
+> 來源 PLAN/診斷：`白話說明/GAP-3事件型討論.md`（第 12 版；**§7.5 五層取材優先序＝本 SPEC 唯一取材地圖**）；consult R1 `handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md`（C1–C6）；consult R2 `handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md`（C1–C9＝K1–K10 技術定案）；**adversarial R1 收斂 `handoffs/reconcile/20260820-gap3-x-review-r1/synth.md`（15 findings 十三群集 X1–X13 全部寫回；AR-1..AR-6 裁定）**
 > ｜日期：2026-08-20｜對應 TODO：`docs/GAP3_EVENT_TODO.md`（本 SPEC 白話閘定版後生成）
 > ｜票：`docs/IC_QUANT_GAP_REGISTRY.md` #3；使用者 2026-08-20 裁定「討論收案、新 session 起草 SPEC」
 > ｜**對抗審第一項工作（強制）**：拿 §7.5 五層清單**逐條**比對本 SPEC——沒漏、沒錯、沒被舊結論污染（衝突時新使用者意圖蓋過舊委員結論；R1 之 C-情境反例結論不取；舊 `CaseRecord`／`_select_negative_timestamps` 語意不取）。第二項＝裁 §A 之 AR-1..AR-6。
@@ -19,14 +19,15 @@
 ## §0 前置裁決（D 系列＝R2 C1–C4 合併 2026-08-20 使用者增補；本節＝取材合併後「最完整精確」之點）
 
 **D1 — 標籤與價格語意（R2 C1 ⊕ U4b 改寫）**
-1. 契約必填 `entry_price_semantic`（值集見 Task B1.0 契約檔；基底＝R2 C1 之 `{trigger_open, trigger_close, next_open}`，8/20 決策時點 t₀−k 一般化後需擴 `decision_bar_open`——形式屬 AR-1）＋`label_return_mode ∈ {open_to_close, open_to_horizon_close, close_to_close}`。
+1. 契約必填 `entry_price_semantic ∈ {trigger_open, trigger_close, next_open, decision_bar_open, decision_bar_close}`（**事件頂層欄**，與 `label_definition` 平級——R1 X11／X1；字面唯一住契約檔）＋`label_return_mode ∈ {open_to_close, open_to_horizon_close, close_to_close}`（屬 `label_definition`）。
 2. **預設 `close_to_close`（U4b；改寫 R2 C1 之「A/B 預設 `open_to_horizon_close`」）**：標籤基準一律相對 **t₀ close**——與 IC 主線 label 同語意（`label_generator.py:40-47` 之 `close.shift(-h)/close-1`），條件 IC 直接吃；「基準價語意」欄保留以防未寫明。
-3. 條件 IC 於 A/B 用使用者附之 `label_value`（U2）或平台按契約語意重算；**禁止**把「語意不同的」序列型 `return_N` 靜默當事件 label；`label_return_mode ≠ close_to_close` 而沿用主線 label ⇒ 必標 `label_price_mismatch=true`。
+3. 條件 IC（`statistic_kind=conditional_ic`）之 `label_value`＝**條件必填**（R1 X3）：缺 ⇒ `capability_status=unavailable` reason=`missing_label_value`（字面入契約檔）；**v1 不重算**使用者 label（一致性探針＝§N-8）——不留「重算或拒絕」二選一給 TODO。**禁止**把「語意不同的」序列型 `return_N` 靜默當事件 label；`label_return_mode ≠ close_to_close` 而沿用主線 label ⇒ 必標 `label_price_mismatch=true`。
 4. 誠實揭露（U4b／§2-2）：**實際進場價**（open 或 t₀−k）之持有報酬與**標籤基準**（t₀ close）報酬為兩個數，全部 K 線驗證兩數並排、不混。
+5. **label 錨不變式（R1 X2）**：label 錨＝t₀ close，與 `decision_at` **永遠脫鉤**（`decision_offset_bars>0` 不改變錨）；**禁止**以 `decision_at` 列 join 主線 `return_N`（該列 `return_N` 錨在 decision close ≠ t₀ close）；B2.3 驗收含 t₀−k 手算案例斷言錨不隨 decision 移動。
 
 **D2 — PIT 時間軸與對齊收據（R2 C2 ⊕ R1 C1 六時間欄 ⊕ 8/20 t₀−k 擴充）**
 1. 六時間欄不變式（validator 機械檢查）：`observed_through ≤ feature_cutoff[tf] ≤ decision_at ≤ entry_at ≤ label_start < label_end`；`feature_cutoff` **per-TF 展開**，規則＝`max{bar.close_ms ≤ decision_at}`（12h t₀ 對 1h/4h 在 UTC 整點為常見特例，一律走 as-of）。
-2. `decision_at` ＝ t₀ open（預設）**或 t₀−k 根之時點**（8/20 U4 擴充；k 為契約欄；特徵截止跟著 decision_at 走；擴充之 validator 形式屬 **AR-1**）。A/B 之「事件在未來」⇒ `event_known_at_decision=false`、特徵 `observed_through ≤ decision_at`、選樣可用結果欄（分路徑見 D3）；`trigger_bar_open` 語意之決策只在 receipt 能證明事件於 open 前已知時合法（R1 C1-3），A/B 預測型**不**受此限（其事件本來就在未來、不進特徵）。
+2. 決策時點單一表示法（R1 X1＝AR-1 定形）：匯入欄＝`t0`（錨；epoch ms UTC；＝觸發根 open_time）＋`decision_offset_bars`（int ≥0，預設 0；語意＝決策時點為 t₀ 往前第 k 根**錨定 TF** bar 之 open；0＝t₀ open）；**不設** ms 覆寫欄（單一表示法）；`decision_at_ms` 由對齊函式推導寫入 receipt（`t0_ms/decision_offset_bars/decision_at_ms` 三欄並排）；validator 增 `decision_at ≤ t0_open_ms`；缺 bar 無法推導 ⇒ `missing_bar`。特徵截止跟著 decision_at 走。A/B 之「事件在未來」⇒ `event_known_at_decision=false`、特徵 `observed_through ≤ decision_at`、選樣可用結果欄（分路徑見 D3）；`trigger_bar_open` 語意之決策只在 receipt 能證明事件於 open 前已知時合法（R1 C1-3），A/B 預測型**不**受此限（其事件本來就在未來、不進特徵）。
 3. 時間戳單一單位 **epoch ms UTC**；量級像秒卻宣告 ms（或相反）⇒ 拒絕（R1 C2；ms 單位閘）。
 4. 對齊收據每事件 × 每 TF 一列 `{feature_cutoff_ms, last_bar_open_ms, last_bar_close_ms, row_id}`；失敗**枚舉**（聯集，R2 C2）：`invalid_timestamp_unit／timezone_missing／missing_bar／duplicate_bar／unsorted_bar／no_boundary_match／feature_after_decision／entry_before_decision／label_window_incomplete／nonpositive_reference_price／nan_or_inf_feature／reference_symbol_unavailable／warmup_insufficient_<tf>／tf_boundary_ambiguous`；逐事件寫 reason，**禁 silent `continue`**（現雛形 `xgboost_batch_service.py:621,651` 之靜默跳過不沿用）。
 
@@ -64,14 +65,14 @@
 
 **待使用者確認（未確認前不得實作）**：**待確認：無**（產品語意 U1–U13＋8/20 五點已全數裁定；技術取捨依 2026-08-18 裁定交委員會）。
 
-**待對抗審確認（AR 系列；三家 adversarial 逐項裁，reconcile 寫回本 SPEC；不裁完不得凍結）**
+**對抗審裁決紀錄（AR 系列；R1 三家已全數裁定——`handoffs/reconcile/20260820-gap3-x-review-r1/synth.md`）**
 
-- **AR-1 決策時點 t₀−k 擴充之契約形式**（8/20 U4 對 R2 K1/K2 定案之擴充）：`decision_at` 欄與 `entry_price_semantic` 值集如何一般化（獨立 `decision_offset_bars` 欄？`decision_at` 直接給 ms？）、validator 對 `decision_at < t0` 之不變式與 receipt 形式；委員確認擴充不破 C2 六欄不變式。
-- **AR-2 反例自動分類規則**（8/20 U4：`counterexample_kind` 改選填、平台可依 t₀ 走勢自動分類 a/b/c）：分類門檻的契約化形式（門檻可調、預設值、與使用者手標欄衝突時以誰為準）、`kind_source ∈ {user, platform_auto}` 揭露。
-- **AR-3 多標的必要化與 #4 邊界**（U12 ⊕ R2 C6）：事件型 IC/ML 一律在多標的合併樣本上跑（升為必要）後，K4 之 macro/micro、LOSO receipt、`degraded` 語意是否足夠；與 registry #4 的邊界線逐條確認（本票不關閉 #4）。
-- **AR-4 一份 SPEC vs 拆兩份**（U13 ⊕ R2 C9）：本 SPEC 以一份＋B1–B5 為預設；對抗審判定過大 ⇒ 拆（例：產生器＋前端另一份），拆分線由委員提。
-- **AR-5 產生器 G1–G6 落哪批**（R2 C9）：預設 B3（見 §P）；產生器 MVP（T1 價量＋G2–G5）若 B2 有餘裕可前移——裁「維持 B3」或「MVP 前移 B2」，細排留 TODO。
-- **AR-6 label 一致性探針**（R1 C2-4：v1 不重算使用者 label；可選 `price_return_threshold` 一族探針列 §N 或 B1 可選 task，「由 SPEC adversarial 定」）：裁「B1 可選 task」或「§N 殘留」。
+- **AR-1 決策時點 t₀−k 契約形式** → **已裁（X1）**：`t0`＋`decision_offset_bars`（int ≥0，預設 0）、`decision_at_ms` 由對齊推導、不設 ms 覆寫欄；`entry_price_semantic` 值集擴 `decision_bar_open/decision_bar_close`；六欄不變式不破＋`decision_at ≤ t0_open_ms`；規格見 D1-1/D2-2。
+- **AR-2 反例自動分類規則** → **已裁（X4）**：`counterexample_classifier_config` 入契約檔；direction-aware signed return、錨＝t₀ close；user 優先、platform 只補缺不回寫、衝突留痕 `platform_suggested_kind`；多類邊界 ⇒ `unclassifiable` 不猜；規格見 Task B1.0/B1.5。
+- **AR-3 多標的必要化與 #4 邊界** → **已裁（X6）**：多標的＝必要宣稱；`n_symbols==1` ⇒ `degraded:single_symbol`（exploratory 可跑）；`event_split_plan` 為 B2 各表＋B4.1 必需輸入；#4 不關閉、不做 cross-sectional/GEE。
+- **AR-4 一份 SPEC vs 拆兩份** → **已裁（三家一致）**：維持一份 SPEC＋B1–B5；TODO 階段若 B3/B5 膨脹再評估。
+- **AR-5 產生器 G1–G6 落哪批** → **已裁（三家一致）**：維持 B3；MVP 不前移 B2（B2 靈魂＝K8 優先）；前移僅得於 TODO 階段由主委明示。
+- **AR-6 label 一致性探針** → **已裁（X3；採 2:1 多數＋較小 scope）**：維持 §N-8 殘留（`needs-research`）；配套硬規則＝`conditional_ic` 缺 `label_value` ⇒ `unavailable:missing_label_value`、v1 不重算；grok 之 `label_probe_mismatch` 設計收錄於 §N-8 供日後升級。
 
 **已確認結果**
 
@@ -102,7 +103,7 @@
 - **凍結時機 / reference 設定**：Task B2.3 動工前（首次觸碰 IC 主線檔），以既有 ICHC golden 流程（`tests/momentum/helpers/ichc_run.run_analyze()`＋`tests/golden/la0/inputs/` 真實 kline 衍生 fixture）跑預設 config，凍結 baseline canonical **sha256** 於 `handoffs/run_receipts/gap3_golden_pre.json`（路徑寫死；scrub 規格沿 GAP-2 `gap2_freeze_golden.py` 手法，TODO 階段列細目；檔內附 fixture sha256＋config_hash）。
 - **baseline 內容（四類）**：
   1. **行為不變型（序列型主線）**：B2.3/B2.4/B3.2 各接線後，同 fixture 同 config 之序列型報告 canonical **sha256 與 pre 檔 exact 相等**（事件欄位全不觸發時）；`summary_table` 逐 feature 逐鍵 `abs≤atol=1e-12`；任何差異列鍵＋diff＝FAIL。
-  2. **對齊 golden（真實 kline 手算對照）**：自真實 kline 取 ≥3 個 t₀（12h UTC 整點、非整點邊界、資料末端），對 1h/4h/12h 各 TF **手算** `feature_cutoff[tf]`（`max{close_ms ≤ decision_at}`）與六時間欄，斷言 receipt 逐欄 **整數 ms exact（==，容差 0）**；含 `decision_at = t₀ open` 與 `t₀−k`（AR-1 定形後）兩形；資料末端案例預期 `label_window_incomplete` 拒絕。
+  2. **對齊 golden（真實 kline 手算對照）**：自真實 kline 取 ≥3 個 t₀（12h UTC 整點、非整點邊界、資料末端），對 1h/4h/12h 各 TF **手算** `feature_cutoff[tf]`（`max{close_ms ≤ decision_at}`）與六時間欄，斷言 receipt 逐欄 **整數 ms exact（==，容差 0）**；含 `decision_offset_bars=0` 與 `k>0` 各一 exact receipt oracle（R1 X1）；資料末端案例預期 `label_window_incomplete` 拒絕。
   3. **自檢 oracle**：(i) label 置亂（固定 seed）⇒ 二元辨別/條件 IC 全部落 chance-level CI 內（門檻以 CI 表述、不寫死數字）；(ii) PIT 後移 oracle：`feature_cutoff` 人為後移一根 ⇒ validator **必 raise**；(iii) ms 單位閘：秒級 timestamp 宣告 ms ⇒ 拒絕。
   4. **契約 oracle**：匯入檔過 `validate_event_import()` fail-closed（缺必填鍵/多未知鍵/枚舉外值/二元任務缺一類別 `missing_control_group`/digest 篡改 ⇒ 拒）；survivor v2 檔過升版後 validator。
 - **通過條件（可證偽，容差分尺度）**：1 sha256 exact＋`atol=1e-12`；2 ms 整數 `==`；3 (i) CI 判定（固定 seed，重跑 sha256 相等） (ii)(iii) rc!=0；4 fail-closed 逐條。報酬/統計類浮點對照 `abs≤atol=1e-12 或 rel≤rtol=1e-9`（float64；float32 放寬 `rtol=1e-6`）。超出即列出項目＋實際 diff＝FAIL。
@@ -111,15 +112,17 @@
 
 > 批次原則（C9）：每批可讀輸出＋golden/negative oracle＋依賴欄；B1 失敗不得靠後批占位或全票 UAT 遮蔽。B1 先能驗證資料正確 → B2 能看統計與實盤 estimand（C4＝整票靈魂故 K8 在 B2）→ B3 降低手工（產生器；AR-5）→ B4 找 pattern → B5 上 UI。
 
-### Phase B1 — 匯入契約＋PIT 對齊＋樣本 manifest＋切分＋自檢 oracle（依賴：無；批內順序 B1.0 → B1.1 → B1.2 → B1.3 → B1.4 → B1.5）
+### Phase B1 — 匯入契約＋PIT 對齊＋樣本 manifest＋切分＋特徵物化＋自檢 oracle（依賴：無；批內順序 B1.0 → B1.1 → B1.2 → B1.3 → B1.6 → B1.4 → B1.5）
 
 **Task B1.0 — 事件匯入契約 JSON SoT＋validator**
 - 目標：所有事件欄位名/枚舉值/reason 字面只在一個檔出現；匯入 fail-closed。
 - 檔案：新增 `momentum/Analysis/contracts/event_import_contract.json`＋`momentum/Analysis/event_samples/import_contract.py::load_event_import_contract()／validate_event_import()`（純函式）。
 - 既有 caller/影響面：新建無 caller；`CaseRecord`／`/case/import` 不動（B5 才接 legacy adapter）。
 - 改法（欄位**唯一列舉處**＝契約檔；下為規格要求，非複列）：
-  - 必填：`event_id`、`symbol`、`timeframe`（錨定 TF）、`t0`（epoch ms UTC；事件錨點）、決策時點欄（t₀ open 預設／t₀−k；形式 AR-1）、`direction ∈ {long, short}`（U1：一次只研究一向，匯入批內單值）、`scenario`（A/B 預測型／C 確認型／兩段式；D2 分路徑鍵）、`label ∈ {0,1}`、`label_definition{rule_id, canonical_digest, window, label_return_mode(預設 close_to_close), entry_price_semantic}`（D1）、`control_kind`（R1 C2 四值；**v1 只實作 `user_labeled_*`**，缺類別 ⇒ `missing_control_group`；`platform_*` 留枚舉位、B3 產生器落地後啟用）、`source_file_digest`、`data_snapshot_digest`。
-  - 選填：`label_value`（連續；建議同附）、`counterexample_kind`（a/b/c；**選填**＋`kind_source`；AR-2）、`search_rule_summary`（U2：當時搜尋條件）、taxonomy 正交欄（R1 C6：`event_source/observable_family/event_origin/event_shape/label_kind`）＋`event_type_tag` 自由標籤、T8 `reference_symbols[]{symbol,timeframe,alignment_rule,snapshot_digest}`、T9 `source_model{model_id,version,artifact_digest,split_plan_hash,feature_manifest_hash,available_at}`（`available_at ≤ decision_at` 否則 `research_only`/拒——R2 C7）、T10 `event_interval{start,end,endpoints_inclusive}`、`meta`。
+  - 必填：`event_id`、`symbol`、`timeframe`（錨定 TF）、`t0`（epoch ms UTC；事件錨點＝觸發根 open_time）、`decision_offset_bars`（int ≥0，預設 0；R1 X1＝AR-1 定形，語意見 D2-2）、`entry_price_semantic`（**頂層**，值集見 D1-1；R1 X11）、`direction ∈ {long, short}`（U1：一次只研究一向，匯入批內單值）、`scenario`（A/B 預測型／C 確認型／兩段式；D2 分路徑鍵）、`label ∈ {0,1}`、`label_definition{rule_id, canonical_digest, window, label_return_mode(預設 close_to_close)}`（D1；**不含** entry 語意——R1 X11）、`control_kind`（R1 C2 四值；**v1 只實作 `user_labeled_*`**，缺類別 ⇒ `missing_control_group`；`platform_same_trigger_rule`＝B3.2 可驗收能力（R1 X13）；`platform_random_bars` v1 `not_implemented`）、`source_file_digest`、`data_snapshot_digest`。
+  - 選填：`label_value`（連續；`conditional_ic` 之**條件必填**——D1-3）、`counterexample_kind`（a/b/c）＋`kind_source ∈ {user, platform_auto}`（R1 X4）、`search_rule_summary`（U2：當時搜尋條件）、taxonomy 正交欄（R1 C6：`event_source/observable_family/event_origin/event_shape/label_kind`）＋`event_type_tag` 自由標籤、`meta`。
+  - **條件必填（R1 X5）**：事件宣告用到跨標的參照 ⇒ T8 `reference_symbols[]{symbol,timeframe,alignment_rule,snapshot_digest}` 全欄必填；`event_origin=model` ⇒ T9 `source_model{model_id,version,artifact_digest,split_plan_hash,feature_manifest_hash,available_at}` 全欄＋availability receipt 必填（`available_at ≤ decision_at` 否則 `research_only`/拒——R2 C7）；`event_shape=interval` ⇒ T10 `event_interval{start,end,endpoints_inclusive}`＋overlap identity 必填；不得以自由 `meta` 補洞。
+  - **分類 config（R1 X4）**：`counterexample_classifier_config`（門檻/單位/預設值之唯一列舉處）住本契約檔；分類定義＝direction-aware signed return、錨＝t₀ close（同 D1）。
   - 衍生欄（對齊/組樣本寫入 receipt/manifest，**非匯入欄**）：六時間欄、`event_known_at_decision`、`dedupe_cluster_id`、`overlap_set_hash`、`uniqueness_weight`、`time_cluster_id`、`cluster_weight`。
   - v1 不重算使用者 label（一致性探針＝AR-6）；hash 相同不證內容正確（誠實邊界入 `_doc`）。
 - **驗證**：`pytest tests/momentum/event_samples/test_import_contract.py -q` rc=0；斷言①頂層鍵集 `==` 契約列舉②枚舉值閉集③缺必填/多未知鍵/枚舉外值 ⇒ `ContractValidationError`④二元任務單類別 ⇒ `missing_control_group`⑤ ms 量級閘（`t0 < 10^12` 宣告 ms ⇒ 拒）。
@@ -154,8 +157,8 @@
 - 目標：多標的合併樣本的切分與統計單位正確。
 - 檔案：新增 `momentum/Analysis/event_samples/event_split.py::split_events(manifest, split_config) -> event_split_plan`。
 - 既有 caller/影響面：新建無 caller；**不改 `SplitPlan`**（row identity 契約另軌；事件層自帶 interval purge）。
-- 改法：每標的各自按時間切＋緩衝 ≥ 答案窗；事件 interval 跨界 ⇒ purge；`time_cluster_id=floor(decision_at_ms/bucket)`（bucket 預設＝觸發 TF 一根）＋`cluster_weight`；統計 primary＝macro（symbol 等權）、micro（event 等權）＝敏感度；報 `n_symbols/per-symbol n/n_time_clusters/avg_cluster_size`；未做 cluster 調整 ⇒ `degraded`；跨 symbol 泛化宣稱須 LOSO/held-out-symbol receipt；test 段事件數 < tier 下限 ⇒ loud `insufficient_events_in_test`，**不**回退全樣本（R1 C3-3）。
-- **驗證**：`pytest tests/momentum/event_samples/test_event_split.py -q` rc=0；斷言①跨界事件被 purge（手造小例 exact）②禁 positional index（斷言 split 依 ms 時間非列號）③macro/micro 兩統計皆輸出且標示。
+- 改法：每標的各自按時間切＋緩衝 ≥ 答案窗；事件 interval 跨界 ⇒ purge；`time_cluster_id=floor(decision_at_ms/bucket)`（bucket 預設＝觸發 TF 一根）＋`cluster_weight = 1/n_events_in_time_cluster`（primary；R1 X9 裁定＝R2 C6 群集正文收斂值，附錄單家 `1/sqrt` 提案不採；bootstrap over clusters＝敏感度；字面唯一入契約檔）；統計 primary＝macro（symbol 等權）、micro（event 等權）＝敏感度；報 `n_symbols/per-symbol n/n_time_clusters/avg_cluster_size`；未做 cluster 調整 ⇒ `degraded`；跨 symbol 泛化宣稱須 LOSO/held-out-symbol receipt；test 段事件數 < tier 下限 ⇒ loud `insufficient_events_in_test`，**不**回退全樣本（R1 C3-3）。
+- **驗證**：`pytest tests/momentum/event_samples/test_event_split.py -q` rc=0；斷言①跨界事件被 purge（手造小例 exact）②禁 positional index（斷言 split 依 ms 時間非列號）③macro/micro 兩統計皆輸出且標示④手算小例：同 time_cluster 權重和＝1（`atol=1e-12`；R1 X9）。
 - **邊界**：①單 symbol ⇒ 退化為單標的切、macro==micro②某 symbol 事件全在 train ⇒ 該 symbol 不進 test 統計並報欄③同刻全 symbol 觸發 ⇒ cluster n=1。
 - **存活至**：全票完工後保留；#4 開票時之可複用原語（AR-3）。
 - **覆蓋風險**：無。
@@ -164,6 +167,7 @@
 **Task B1.4 — 單特徵二元 baseline＋自檢 oracle 載體（R1 C5-2）**
 - 目標：B1 有統計載體可掛 label 置亂與 PIT 後移 oracle（oracle 需要載體＝R1 採 codex 版之理由）。
 - 檔案：新增 `momentum/Analysis/event_samples/baseline.py::single_feature_binary_baseline(features_at_decision, labels, event_split_plan) -> report`。
+- 輸入來源：`features_at_decision`＝**Task B1.6 產出**（含 `feature_manifest_hash`；R1 X7）；`event_split_plan`＝B1.3。
 - 既有 caller/影響面：新建無 caller。
 - 改法：對每特徵單獨算 OOS AUC/PR-AUC（test 段 only）＋BH-FDR；chance-level 以 CI/固定 seed 判定不寫死數字；輸出掛 `statistic_kind=binary_discrimination`。
 - **驗證**：`pytest tests/momentum/event_samples/test_baseline_oracle.py -q` rc=0；label 置亂（固定 seed）⇒ 全特徵落 CI 內；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_baseline_oracle.py -q WHEN mutation=pit_shift THEN rc!=0`。
@@ -176,14 +180,27 @@
 - 目標：`counterexample_kind` 缺值時平台依 t₀ 走勢自動分類 a/b/c，門檻可調。
 - 檔案：新增 `momentum/Analysis/event_samples/counterexample_classifier.py`（純函式）。
 - 既有 caller/影響面：新建無 caller；B2 分層報表消費。
-- 改法：依 t₀ 那根與答案窗實際走勢分 a（同觸發不續漲）/b（震盪）/c（反向），門檻入 config；輸出帶 `kind_source=platform_auto`；使用者手標優先（衝突規則 AR-2 裁）。
-- **驗證**：`pytest tests/momentum/event_samples/test_counterexample_classifier.py -q` rc=0（手造三類小例 exact；門檻邊界值落點確定性）。
-- **邊界**：①走勢跨兩類門檻邊界 ⇒ 依 AR-2 裁定之 tie-break②答案窗不完整 ⇒ `unclassifiable` 非亂填。
+- 改法（R1 X4＝AR-2 定形）：依 t₀ 那根與答案窗實際走勢分 a（同觸發不續漲）/b（震盪）/c（反向）；門檻/單位/預設＝`counterexample_classifier_config`（B1.0 契約檔唯一列舉處）；分類定義＝direction-aware signed return、錨＝t₀ close（同 D1）；只在 `counterexample_kind` 缺值且 `label=0` 時執行、輸出 `kind_source=platform_auto`；使用者已標 ⇒ 不重算不回寫（`kind_source=user`）；user/platform 衝突 ⇒ 保留 user＋報告附 `platform_suggested_kind` 留痕；**邊界同時滿足多類 ⇒ `unclassifiable`（不猜）**。
+- **驗證**：`pytest tests/momentum/event_samples/test_counterexample_classifier.py -q` rc=0（手造三類小例 exact；逐類 exact boundary 案例；conflict case 斷言主鍵保留＋`platform_suggested_kind` 出現；多類邊界 ⇒ `unclassifiable`）。
+- **邊界**：①走勢同時滿足多類 ⇒ `unclassifiable`（不進分層分母）②答案窗不完整 ⇒ `unclassifiable` 非亂填③user 有標且 platform 建議不同 ⇒ 主鍵不變、留痕欄出現。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不回寫使用者手標欄；不把自動分類當 label（它只是報表分層鍵）。
 
+**Task B1.6 — 特徵物化與決策列選取（R1 X7 新增；批內順序在 B1.3 之後、B1.4 之前）**
+- 目標：把 J3「全部 K 線連續算特徵、每案例取決策時點那一列」落成有契約的資料路徑，杜絕「每案例固定窗」誤實作。
+- 檔案：新增 `momentum/Analysis/event_samples/feature_materialization.py::materialize_features_at_decision(receipts, bars_by_tf, feature_config) -> (features_at_decision, feature_manifest_hash)`（純函式；呼叫既有 Feature Factory，不重實作特徵）。
+- 既有 caller/影響面：B1.4/B2/B4 之特徵輸入唯一來源；Feature Factory 本體不改。
+- 改法：連續 per-TF 物化（全歷史或 ≥ 最長 lookback＋warmup 之段——結果須與全史算一致，§3.4 已證）→ 對每事件以 `decision_at` per-TF as-of 取列（規則同 D2-1）→ 輸出事件×特徵表＋`feature_manifest_hash`（特徵名集＋config digest）；per-TF warmup 不足 ⇒ NaN 前綴入對齊失敗枚舉 `warmup_insufficient_<tf>`；NaN 語意不填 0。
+- **驗證**：`pytest tests/momentum/event_samples/test_feature_materialization.py -q` rc=0；①真實 kline 上「足長段物化」vs「全史物化」取同事件列逐值 `atol=1e-12` 一致②因果 invariant：截斷 `decision_at` 之後的資料重算，事件列逐值不變（exact）③`feature_manifest_hash` 決定性（同 config 重跑 sha256 相等）。
+- **邊界**：①事件 `decision_at` 早於 warmup 完成點 ⇒ 該事件入失敗清單非 NaN 混入②多 TF 特徵欄名衝突 ⇒ loud 拒。
+- **存活至**：全票完工後保留；B2/B4 特徵路徑底座。
+- **覆蓋風險**：無。
+- 不可做：不切「每案例固定 N 根」窗當訓練單位；不在本函式內做特徵選擇；不引入 `shift(-n)` 未來欄。
+
 ### Phase B2 — 三張表＋survivor 契約升版＋全部 K 線驗證（依賴：B1）
+
+> **B2 全批共同約束（R1 X6＝AR-3 落地）**：B2.1/B2.2/B2.3/B2.5（及 B4.1）之**必需輸入**＝B1.3 `event_split_plan`＋cluster manifest；每張表/報告必列 macro primary、micro sensitivity、raw/effective n、cluster CI、`degraded`（含 `degraded:single_symbol`）、LOSO/held-out status；未 cluster 調整 ⇒ **禁 formal pooled inference**。各 Task 驗證含此共同約束斷言。
 
 **Task B2.1 — 事件後報酬表（K5/C7-i；finlab 型；U1）**
 - 目標：事件後多 horizon 報酬分布表；不需反例。
@@ -213,7 +230,7 @@
 - 既有 caller/影響面：IC 三入口（`analyze`/`refilter`/`analyze_full`）；**既有 stage 語意與報告鍵不變**（§G-1 golden 看住）。
 - 改法：條件 IC 只吃連續 `label_value`（D1-3；y=0/1 **不**當 return IC——R1 C5-1）；沿 stage3/4/5＋A′ fallback 透傳＋one-shot guard 原樣；`statistic_kind=conditional_ic`；`sample_scope.kind=event`。
 - **驗證**：`pytest tests/momentum/ -q -k "gap3 and conditional_ic"` rc=0；§G-1 行為不變 golden exact；A′ fallback 案例斷言 `event_timestamps` 透傳＋`degraded` 標示。
-- **邊界**：①事件數 < tier 下限 ⇒ 既有 tier 降級語意（U5）②`label_value` 全缺 ⇒ 節 `unavailable`。
+- **邊界**：①事件數 < tier 下限 ⇒ 既有 tier 降級語意（U5）②`label_value` 缺 ⇒ `unavailable:missing_label_value`（D1-3；**不重算**）③t₀−k 手算案例：label 錨不隨 decision 移動（D1-5）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不改 stage3/4/5 內部；不把 mismatch 語意的主線 `return_N` 靜默當事件 label（D1-3）。
@@ -240,7 +257,7 @@
 - **覆蓋風險**：無。
 - 不可做：D4-4 不做清單（倉位/費用/複利/資金曲線/turnover/capacity/triple-barrier/long-short）。
 
-### Phase B3 — 完整版事件產生器＋變化類特徵（依賴：B1；落批＝AR-5，預設本批）
+### Phase B3 — 完整版事件產生器＋變化類特徵（依賴：**B1＋B2.5**（G6 呼叫 all-bars evaluator——R1 X10）；AR-5 已裁維持本批）
 
 **Task B3.1 — 條件引擎純函式（K9/C3＝D3 全落地）**
 - 目標：typed AST＋欄位角色＋digest 的事件產生核心。
@@ -257,8 +274,8 @@
 - 目標：產生器能力全開（任意 FF 特徵＋t₀ 結果＋未來結果欄觸發；多組 label 一次設定；方向/情境/答案窗/規則摘要自動存；一鍵產合規事件檔；同引擎做全 K 線標籤重算）。
 - 檔案：`momentum/Analysis/event_filter.py`（掛 adapter；遮罩語意不變）；`/search` 後端 adapter 於 B5 接 API（本批先 `momentum/` 層）。
 - 既有 caller/影響面：IC 事件遮罩既有 caller（§G-1 看住）；`allowed_filtering_params` 契約化（D3-3）。
-- 改法：兩殼皆薄 adapter；G1–G6 逐項對應驗收；產出直接過 B1.0 validator。
-- **驗證**：`pytest tests/momentum/event_samples/test_generator_adapters.py -q` rc=0（十類中 ①②③⑩ 可產之代表案例各一；G4 去重回報原始/去重數）。
+- 改法：兩殼皆薄 adapter；G6＝**呼叫 B2.5 `evaluate_all_bars`，禁平行實作**（R1 X10）；產生器多組 label 產同觸發控制組——`control_kind=platform_same_trigger_rule` 於本 Task 啟用（R1 X13）；產出直接過 B1.0 validator。
+- **驗證**：`pytest tests/momentum/event_samples/test_generator_adapters.py -q` rc=0，G1–G6 逐項斷言（R1 X12）：G1 任意 FF 特徵＋t₀ 結果＋未來結果欄觸發（十類中 ①②③⑩ 代表案例各一）；G2 多組 label 一次設定（`label_id` manifest）；G3 方向/情境/答案窗/規則摘要自動存；G4 去重回報原始/去重後數；G5 一鍵合規檔（輸出過 B1.0 validator）；G6 呼叫 B2.5 之整合測試（禁平行實作）；另 `platform_same_trigger_rule` 控制組產出過 validator＋`control_kind` 正確標記（R1 X13）。
 - **邊界**：①條件命中 0 事件 ⇒ loud 空結果非錯②既有 `event_filter` query 路徑行為不變斷言。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
@@ -266,7 +283,7 @@
 
 **Task B3.3 — 變化類特徵算子（K7/C8）**
 - 目標：補 `bars_since_cross/consecutive_run/bars_since_threshold/window_max_ratio/cross_count`；已有算子不重做。
-- 檔案：新增 `momentum/FeatureEngineering/operators/state_counters.py`（或擴 `derived_operators`——TODO 定）＋`operator_registry` 註冊。
+- 檔案：新增 `momentum/FeatureEngineering/operators/state_counters.py`（落點寫死，不擴 `derived_operators`——R1 X7）＋`operator_registry` 註冊。
 - 既有 caller/影響面：Feature Factory pipeline；既有 `ts_argmax/ts_argmin/slope` 等**不動**。
 - 改法：每算子只看 `[t−lookback+1, t]`、輸出 `max_lookback/warmup/as-of` 中繼資料；NaN 語意明定不填 0；過 Feature Factory 因果/golden 紀律（三方數據正確性簽核鐵律適用）。
 - **驗證**：`pytest tests/momentum/feature_engineering/ -q -k state_counters` rc=0（手算小例 exact；因果測試：截斷未來資料結果不變）。
@@ -277,11 +294,13 @@
 
 ### Phase B4 — pattern＋DSR/PBO 橋（依賴：B2、B3）
 
+> K6（DSR/PBO）落批以 R2 **C9 為準（B4）**，覆寫 C7 正文之 B3 批號（R1 X12）。
+
 **Task B4.1 — pattern 抽取（J8：IC 篩 → ML 組合）**
 - 目標：在學習段找多特徵組合 pattern；ML 殼不動。
 - 檔案：`momentum/Analysis/` 既有 `pattern_extractor`／GBDT 分析器之消費側新函式（`event_samples/pattern_bridge.py`）；**禁改 `xgboost_batch_service` 訓練殼**。
 - 既有 caller/影響面：吃 B1 manifest＋B2.4 survivor v2；`SplitPlan` train fail-closed（R1 C5-3）。
-- 改法：訓練只在事件樣本 train 段；score 只在 test 段報；引擎 LightGBM/XGBoost 之選不影響契約（U8）。
+- 改法：訓練只在事件樣本 train 段；score 只在 test 段報；引擎 LightGBM/XGBoost 之選不影響契約（U8）；必需輸入含 B1.3 `event_split_plan`＋cluster manifest，報告列 macro/micro、`degraded`、LOSO status（R1 X6 共同約束）。
 - **驗證**：`pytest tests/momentum/event_samples/test_pattern_bridge.py -q` rc=0（train/test 隔離斷言；置亂 oracle 沿用）。
 - **邊界**：①特徵數 > 樣本可撐 ⇒ 依 IC 粗篩先行（J8）②test 段 one-class ⇒ `unavailable`。
 - **存活至**：全票完工後保留。
@@ -336,15 +355,19 @@
 
 ## §V 驗證策略與邊界測試目錄
 
-- **mutation 條件**：RISK-HIT 含 a,d ⇒ 附可證偽/mutation 設計（引 `docs/TEST_DESIGN_CHARTER.md`）。最小 mutation 集（各對應「改壞必 FAIL」的證明；TODO 階段展開為逐條命令）：
-  - M1 對齊 raise 改 silent `continue` ⇒ B1.1 測試紅（失敗記帳斷言）。
-  - M2 `feature_cutoff` 規則 `≤ decision_at` 改 `< decision_at+1bar`（後移一根）⇒ §G-3(ii) PIT oracle 紅。
-  - M3 ms 單位閘移除 ⇒ B1.0 量級測試紅。
-  - M4 all-bars 分母納入 ineligible ⇒ B2.5 手算分母測試紅。
-  - M5 uniqueness/cluster 權重全設 1 ⇒ B1.2/B1.3 權重和斷言紅。
-  - M6 條件引擎角色檢查移除（future 欄進 feature）⇒ B3.1 ASSERT 紅。
-  - M7 基率欄移除 ⇒ B2.5 `missing_prevalence_disclosure` 斷言紅。
-  - M8 label 置亂後統計仍顯著 ⇒ oracle 本身紅（防 oracle 空心）。
+- **mutation 條件**：RISK-HIT 含 a,d ⇒ 附可證偽/mutation 設計（引 `docs/TEST_DESIGN_CHARTER.md`）。最小 mutation 集（R1 X8 補強：每條=「baseline 行為＋mutation diff＋預期 rc」；輸入一律固定 seed＋fixture digest 記入測試；TODO 展開為逐條命令）：
+  - M1 失敗記帳被吞：baseline＝`align_events` 對每個 dropped 事件寫 reason 入 `failures`；mutation＝drop 但不寫 reason（`n_dropped_by_reason` 總數 < 實際 drop 數）⇒ `test_alignment.py` 記帳守恆斷言（`n_input == n_receipts + n_failures`）紅，rc!=0。
+  - M2 PIT 後移（跨 TF 可重現形）：mutation＝`feature_cutoff[tf]` 改選「`decision_at` 之後**下一實際 TF bar**」⇒ §G-3(ii) oracle（比對手算 receipt exact）紅，rc!=0。
+  - M3 ms 單位閘移除：mutation＝刪量級檢查 ⇒ 秒級 `t0` 測資通過匯入 ⇒ `test_import_contract.py` 拒收斷言紅，rc!=0。
+  - M4 分母竄改：mutation＝`evaluate_all_bars` 把 `label_window_incomplete` bars 計入 `n_eligible` ⇒ 真實 kline 小段手算分母 exact 斷言紅，rc!=0。
+  - M5 權重歸一：mutation＝`cluster_weight` 全設 1（棄 `1/n_events_in_time_cluster`——X9 公式）⇒ B1.3 同簇權重和＝1（`atol=1e-12`）斷言紅，rc!=0。
+  - M6 角色隔離移除：mutation＝condition_engine 允許 `future_*` 欄過 `feature` 角色 ⇒ B3.1 ASSERT（`WHEN expression_role=feature column=future_return THEN rc!=0`）反轉＝測試紅。
+  - M7 基率欄移除 ⇒ B2.5 `unavailable:missing_prevalence_disclosure` 斷言紅，rc!=0。
+  - M8 置亂 oracle 空心防護：baseline＝固定 seed（記入測試）置亂 label 後全統計落 chance-level CI（CI 式：`|stat| < z_{0.975}/sqrt(n_test)` 類，B1.4 定式）；mutation＝把置亂改為恆等排列 ⇒ oracle 必須轉紅（證 oracle 有牙），rc!=0。
+  - M9 offset 推導竄改：mutation＝`decision_at_ms` 推導 k 改 k−1 ⇒ §G-2 k>0 exact receipt oracle 紅，rc!=0（R1 X1）。
+  - M10 分類猜測：mutation＝多類邊界從 `unclassifiable` 改取 precedence 猜一類 ⇒ B1.5 邊界案例斷言紅，rc!=0（R1 X4）。
+  - M11 `degraded` 標記移除：mutation＝單 symbol 或未 cluster 調整時不標 `degraded` ⇒ B1.3/B2 共同約束斷言紅，rc!=0（R1 X6）。
+  - M12 T9 availability 檢查移除：mutation＝`available_at > decision_at` 仍收 ⇒ B1.0 條件必填斷言紅，rc!=0（R1 X5）。
 - **estimand 隔離**：`statistic_kind ∈ {event_return, binary_discrimination, conditional_ic}` 三值分節、禁合併總分；capability 枚舉沿 `ic_report_contract.json`（ref，不重定義）。
 - 測試層級：單元（純函式手算小例）／整合（真實 kline 端到端 B1→B2）／Golden（§G 四類）／邊界（下勾選）。全部可 `pytest tests/momentum/...` 獨立跑，不需 `run_api.py`。
 - **防假綠**：diff 既有測試斷言，不得放寬/刪除換綠燈；每批 review brief 附既有測試 diff。
@@ -369,5 +392,5 @@
 4. **uniqueness/cluster 權重接 GBDT `sample_weight` 訓練** — `為何現在不做: blocked-by:ML 殼 UNWIRED_MODULES 含 sample_weight（FACT-RECEIPT）＋成熟度地圖禁改訓練殼；B1 權重只進 manifest/統計有效 n（R2 C5）`；觸發：ML 殼允許接線閘開啟；登記處：同上。
 5. **正式 panel IC（cross-sectional 重建、random-effects/GEE）** — `為何現在不做: blocked-by:registry #4 獨立票（本票只蓋可複用原語：per-symbol 切分＋合併統計＋time-cluster——AR-3 邊界確認）`；觸發：#4 開票；登記處：registry #4。
 6. **金融 CAR/AAR event study、即時 NLP 事件** — `為何現在不做: user-ruling:2026-08-19（使用者重定義本票＝匯入標註樣本分析，非 event study；R1 C6 明列不支援）`；觸發：使用者提出新需求另開票；登記處：registry「GAP-3 殘留」。
-7. **`platform_*` 控制組自動抽樣**（`platform_same_trigger_rule/platform_random_bars`）— `為何現在不做: blocked-by:B3 產生器（需觸發規則引擎才能產同觸發控制組）；v1 枚舉留位、`not_implemented``；觸發：B3 完工後由 TODO 排入或轉殘留（對抗審一併看）；登記處：同上。
-8. **label 一致性探針**（v1 不重算使用者 label）— `為何現在不做: needs-research:AR-6（探針族只限 price_return_threshold？誤報處置？由對抗審裁 B1 可選 task 或殘留）`；觸發：AR-6 裁決；登記處：同上。
+7. **`platform_random_bars` 控制組自動抽樣** — `為何現在不做: needs-research:隨機 bar 控制組之 estimand 與抽樣契約未定義（R1 consult 已判「時間分離隨機反例」＝廢答案設計，禁隱式 fallback）`；觸發：委員會定出抽樣契約與 estimand；登記處：registry「GAP-3 殘留」。（R1 X13 拆分：`platform_same_trigger_rule` **不是殘留**——已收回為 Task B3.2 可驗收能力，循環 scope 解除。）
+8. **label 一致性探針**（v1 不重算使用者 label）— `為何現在不做: needs-research:探針族（price_return_threshold 一族）之涵蓋範圍與誤報處置未定義（R1 X3＝AR-6 裁定維持殘留，2:1 多數＋較小 scope）`；觸發：使用者要求，或匯入資料品質事故；日後升級直接取 grok 設計＝探針比對匯入 `label_value` vs 契約重算 close_to_close、誤報 ⇒ 報告欄 `label_probe_mismatch` loud、不自動改 label；登記處：同上。配套硬規則已入 D1-3（缺 `label_value` ⇒ `unavailable:missing_label_value`，不重算補洞）。
