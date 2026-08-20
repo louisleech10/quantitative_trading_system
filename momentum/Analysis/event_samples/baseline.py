@@ -85,7 +85,7 @@ def single_feature_binary_baseline(
     event_split_plan: EventSplitPlan,
     *,
     oracle_config: OracleConfig,
-    feature_manifest_hash: Optional[str] = None,
+    feature_manifest_hash: Optional[str],
 ) -> Dict:
     """對每特徵單獨算 OOS AUC/PR-AUC（test 段 only）＋BH-FDR＋permutation 帶。
 
@@ -95,12 +95,21 @@ def single_feature_binary_baseline(
     此處出現即契約破缺，不做 pairwise 靜默刪列）。
     feature_manifest_hash（CODEX-R1-P2-07）：B1.6 產出之 provenance，寫入 report receipts。
     """
+    if not isinstance(feature_manifest_hash, str) or len(feature_manifest_hash) != 64:
+        # CODEX-R2-P2-02：provenance 不可省略——缺 hash fail-closed
+        raise ValueError("single_feature_binary_baseline: feature_manifest_hash 須為 64 位 sha256（B1.6 產出），缺則 fail-closed")
     test_ids = event_split_plan.assignments.loc[
         event_split_plan.assignments["split_label"] == "test", "event_id"
     ]
     idx = features_at_decision.index.intersection(pd.Index(test_ids))
     X = features_at_decision.loc[idx]
     y = labels.loc[idx].astype(int).to_numpy()
+
+    # CODEX-R2-P2-01：有限值閘前移——在 one-class 分支之前，NaN 不得被誤報為 one_class_test_segment
+    Xv = X.to_numpy(dtype=float)
+    if Xv.size and not np.isfinite(Xv).all():
+        bad = [c for c in X.columns if not np.isfinite(X[c].to_numpy(dtype=float)).all()]
+        raise ValueError(f"single_feature_binary_baseline: 特徵含非有限值（NaN/inf）loud 拒——{bad}")
 
     report: Dict = {
         "statistic_kind": "binary_discrimination",
@@ -116,11 +125,6 @@ def single_feature_binary_baseline(
         report["reason"] = "one_class_test_segment"
         report["features"] = {}
         return report
-
-    Xv = X.to_numpy(dtype=float)
-    if Xv.size and not np.isfinite(Xv).all():
-        bad = [c for c in X.columns if not np.isfinite(X[c].to_numpy(dtype=float)).all()]
-        raise ValueError(f"single_feature_binary_baseline: 特徵含非有限值（NaN/inf）loud 拒——{bad}")
 
     feats: Dict[str, Dict] = {}
     pvals: List[float] = []

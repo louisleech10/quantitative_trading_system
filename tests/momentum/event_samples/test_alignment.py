@@ -172,6 +172,19 @@ def test_corrupt_close_time_rejected(bars):
     assert len(rec.event_level) == 0 and set(fail["reason"]) == {"unsorted_bar"}
 
 
+def test_uint64_descending_bars_rejected():
+    """CODEX-R2-P1-01：uint64 降序 timestamp 之差分下溢不得讓守衛放行。"""
+    import numpy as np
+    from momentum.Analysis.event_samples.alignment import _validate_bar_table
+    t = np.uint64(1704067200000)
+    b = pd.DataFrame({
+        "open_time_ms": np.array([t + np.uint64(86400000), t], dtype=np.uint64),
+        "close_time_ms": np.array([t + np.uint64(172800000), t + np.uint64(86400000)], dtype=np.uint64),
+        "open": [1.0, 1.0], "close": [1.1, 1.1],
+    })
+    assert _validate_bar_table(b) == "unsorted_bar"
+
+
 def test_w11_decision_gt_t0_guard_falsifiable(bars, monkeypatch):
     """W11 負例：竄改推導使 decision_at > t0 ⇒ loud 拒（守衛真的在看）。"""
     monkeypatch.setattr(al, "_decision_idx", lambda t0_idx, k: t0_idx + 1)

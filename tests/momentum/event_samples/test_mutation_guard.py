@@ -134,11 +134,11 @@ def test_M8_identity_permutation_hard_check(monkeypatch):
     plan = EventSplitPlan(
         assignments=pd.DataFrame({"event_id": ids, "symbol": "S", "split_label": ["test"] * 120}),
         purged=pd.DataFrame(), clusters=pd.DataFrame(), summary={})
-    ok = bl.single_feature_binary_baseline(X, y, plan, oracle_config=OracleConfig(n_perm=200))
+    ok = bl.single_feature_binary_baseline(X, y, plan, oracle_config=OracleConfig(n_perm=200), feature_manifest_hash="cd" * 32)
     assert ok["capability_status"] == "ok"                           # baseline 綠
     monkeypatch.setattr(bl, "_permute", lambda rng_, arr: arr.copy())
     with pytest.raises(ValueError, match="硬檢"):                     # mutation ⇒ 紅
-        bl.single_feature_binary_baseline(X, y, plan, oracle_config=OracleConfig(n_perm=200))
+        bl.single_feature_binary_baseline(X, y, plan, oracle_config=OracleConfig(n_perm=200), feature_manifest_hash="cd" * 32)
 
 
 def test_M9_offset_k_minus_one_detected(bars, monkeypatch):

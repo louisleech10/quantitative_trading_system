@@ -42,13 +42,16 @@ def _validate_bar_table(bars: pd.DataFrame) -> str:
     for arr in (ot, ct):  # CODEX-R1-P1-04：close_time 同受守護（cutoff searchsorted 依賴其排序）
         if len(arr) and arr.dtype.kind not in ("i", "u"):
             return "invalid_timestamp_unit"
+        if len(arr) and arr.dtype.kind == "u" and int(arr.max()) > np.iinfo(np.int64).max:
+            return "invalid_timestamp_unit"
+        arr = arr.astype(np.int64)  # CODEX-R2-P1-01：uint64 差分下溢會讓降序看似升序，一律轉有號再差分
         if len(arr) and int(arr.min()) < 10**12:
             return "invalid_timestamp_unit"  # 量級像秒（D2-3）
         if len(arr) > 1 and (np.diff(arr) < 0).any():
             return "unsorted_bar"
         if len(arr) != len(np.unique(arr)):
             return "duplicate_bar"
-    if len(ot) and (ct <= ot).any():
+    if len(ot) and (ct.astype(np.int64) <= ot.astype(np.int64)).any():
         return "tf_boundary_ambiguous"  # close_time 須嚴格晚於 open_time
     return ""
 

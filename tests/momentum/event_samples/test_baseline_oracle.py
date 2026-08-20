@@ -19,6 +19,7 @@ from momentum.Analysis.event_samples.types import EventSplitPlan, OracleConfig
 
 N = 240
 OC = OracleConfig(seed=20260820, n_perm=300)  # 測試用 n_perm 降速（SPEC 定式 1000＝正式跑；帶語意不變）
+H = "ab" * 32  # feature_manifest_hash（B1.6 產出；CODEX-R2-P2-02：缺則 fail-closed）
 
 
 def synth(seed=7):
@@ -47,14 +48,14 @@ def test_shuffled_labels_all_in_band():
     X, y, plan = synth()
     rng = np.random.default_rng(20260820)
     y_shuffled = pd.Series(rng.permutation(y.to_numpy()), index=y.index)
-    rep = single_feature_binary_baseline(X, y_shuffled, plan, oracle_config=OC)
+    rep = single_feature_binary_baseline(X, y_shuffled, plan, oracle_config=OC, feature_manifest_hash=H)
     assert rep["capability_status"] == "ok"
     assert all(f["auc_in_band"] for f in rep["features"].values())
 
 
 def test_informative_out_of_band_noise_in_band():
     X, y, plan = synth()
-    rep = single_feature_binary_baseline(X, y, plan, oracle_config=OC)
+    rep = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
     assert rep["features"]["informative"]["auc_in_band"] is False
     assert rep["features"]["informative"]["auc"] > 0.9
     assert rep["features"]["noise"]["auc_in_band"] is True
@@ -63,14 +64,14 @@ def test_informative_out_of_band_noise_in_band():
 
 def test_deterministic_same_seed():
     X, y, plan = synth()
-    r1 = single_feature_binary_baseline(X, y, plan, oracle_config=OC)
-    r2 = single_feature_binary_baseline(X, y, plan, oracle_config=OC)
+    r1 = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
+    r2 = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
     assert json.dumps(r1, sort_keys=True) == json.dumps(r2, sort_keys=True)
 
 
 def test_one_class_unavailable():
     X, y, plan = synth()
-    rep = single_feature_binary_baseline(X, pd.Series(1, index=y.index), plan, oracle_config=OC)
+    rep = single_feature_binary_baseline(X, pd.Series(1, index=y.index), plan, oracle_config=OC, feature_manifest_hash=H)
     assert rep["capability_status"] == "unavailable"
     assert rep["reason"] == "one_class_test_segment"
 
@@ -79,7 +80,7 @@ def test_all_nan_feature_loud():
     X, y, plan = synth()
     X["dead"] = np.nan
     with pytest.raises(ValueError, match="非有限值"):
-        single_feature_binary_baseline(X, y, plan, oracle_config=OC)
+        single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
 
 
 def test_partial_nonfinite_loud_no_silent_drop():
@@ -87,19 +88,30 @@ def test_partial_nonfinite_loud_no_silent_drop():
     X, y, plan = synth()
     X.iloc[200, X.columns.get_loc("noise")] = np.nan
     with pytest.raises(ValueError, match="非有限值"):
-        single_feature_binary_baseline(X, y, plan, oracle_config=OC)
+        single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
     X2, _, _ = synth()
     X2.iloc[200, X2.columns.get_loc("noise")] = np.inf
     with pytest.raises(ValueError, match="非有限值"):
-        single_feature_binary_baseline(X2, y, plan, oracle_config=OC)
+        single_feature_binary_baseline(X2, y, plan, oracle_config=OC, feature_manifest_hash=H)
 
 
-def test_feature_manifest_hash_in_receipts():
-    """CODEX-R1-P2-07：B1.6 之 feature_manifest_hash 進 report receipts（provenance）。"""
+def test_feature_manifest_hash_in_receipts_and_required():
+    """CODEX-R1-P2-07／R2-P2-02：hash 進 receipts 且不可省略（缺／格式錯 ⇒ fail-closed）。"""
     X, y, plan = synth()
-    rep = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash="ab" * 32)
-    assert rep["receipts"]["feature_manifest_hash"] == "ab" * 32
+    rep = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
+    assert rep["receipts"]["feature_manifest_hash"] == H
     assert rep["features"]["noise"]["n_used"] == N - N // 2
+    for bad in (None, "", "short"):
+        with pytest.raises(ValueError, match="feature_manifest_hash"):
+            single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=bad)
+
+
+def test_one_class_with_nonfinite_is_loud_not_unavailable():
+    """CODEX-R2-P2-01：有限值閘在 one-class 分支之前——NaN 不得被誤報成 one_class_test_segment。"""
+    X, y, plan = synth()
+    X.iloc[200, 0] = np.nan
+    with pytest.raises(ValueError, match="非有限值"):
+        single_feature_binary_baseline(X, pd.Series(1, index=y.index), plan, oracle_config=OC, feature_manifest_hash=H)
 
 
 def test_m8_identity_permutation_hard_check(monkeypatch):
@@ -107,7 +119,7 @@ def test_m8_identity_permutation_hard_check(monkeypatch):
     X, y, plan = synth()
     monkeypatch.setattr(bl, "_permute", lambda rng, arr: arr.copy())
     with pytest.raises(ValueError, match="硬檢"):
-        single_feature_binary_baseline(X, y, plan, oracle_config=OC)
+        single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
 
 
 def test_pit_shift_kills_signal():
@@ -116,8 +128,8 @@ def test_pit_shift_kills_signal():
     X, y, plan = synth()
     shifted = X.copy()
     shifted["informative"] = np.roll(shifted["informative"].to_numpy(), 1)  # 決策列錯位＝PIT 破壞
-    rep_ok = single_feature_binary_baseline(X, y, plan, oracle_config=OC)
-    rep_mut = single_feature_binary_baseline(shifted, y, plan, oracle_config=OC)
+    rep_ok = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
+    rep_mut = single_feature_binary_baseline(shifted, y, plan, oracle_config=OC, feature_manifest_hash=H)
     assert rep_ok["features"]["informative"]["auc_in_band"] is False
     assert rep_mut["features"]["informative"]["auc_in_band"] is True
 
