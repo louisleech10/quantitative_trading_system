@@ -20,6 +20,10 @@ from momentum.core.constants import TIMEFRAME_SECONDS
 _CONTRACT_PATH = Path(__file__).resolve().parents[1] / "contracts" / "event_import_contract.json"
 _HEX_CHARS = set("0123456789abcdef")
 
+# mutation-guard seam（M12）：T9 availability 檢查之開關。正式路徑恆 True；
+# test_mutation_guard.py 以 monkeypatch 置 False 證明「檢查移除 ⇒ B1.0 條件必填斷言紅」。
+_T9_AVAILABILITY_ENFORCED = True
+
 
 class ContractValidationError(ValueError):
     """匯入驗證失敗（fail-closed）。failures: list[dict{row, event_id, field, reason}]。"""
@@ -228,7 +232,7 @@ def validate_event_import(
                         else:
                             # 名目 decision_at＝t0 − k×TF_ms（誠實邊界 c；對齊層以實際 bar 複驗）
                             decision_at_nominal = int(r["t0"]) - k_off * tf_s * 1000
-                            if int(aa) > decision_at_nominal:
+                            if _T9_AVAILABILITY_ENFORCED and int(aa) > decision_at_nominal:
                                 fail(i, eid, "source_model.available_at", "research_only")
 
         if r.get("event_shape") == "interval":

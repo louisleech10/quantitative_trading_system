@@ -111,7 +111,7 @@
     "nonpositive_reference_price", "nan_or_inf_feature", "reference_symbol_unavailable",
     "warmup_insufficient_{tf}", "tf_boundary_ambiguous"
   ],
-  "capability_unavailable_reasons": ["missing_label_value", "missing_prevalence_disclosure"],
+  "capability_unavailable_reasons": ["missing_label_value", "missing_prevalence_disclosure", "one_class_test_segment"],
   "split_purge_reasons": ["interval_crosses_split_boundary"],
   "split_loud_flags": ["insufficient_events_in_test"],
   "degraded_flags": ["single_symbol", "no_cluster_adjustment"],
