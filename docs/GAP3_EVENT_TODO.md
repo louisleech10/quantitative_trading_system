@@ -12,7 +12,7 @@
 3. **NaN/inf 不弱化**（SPEC §C-2）：對齊/物化失敗＝loud 枚舉（reason 字面見契約檔），**禁 fillna(0)、禁 silent `continue`**（舊雛形 `xgboost_batch_service.py:621,651` 之靜默跳過＝反例，不沿用 [FACT-RECEIPT]）。
 4. **輸出大小**：IC 主線既有報告鍵集不變，只新增（§G-1 golden 機械看住）。
 5. **JSON SoT**（SPEC §C 範本鐵律）：事件欄位名/枚舉值/reason/分類門檻字面**只**在 `event_import_contract.json` 出現一次（B1.0）；survivor 擴欄字面**只**在 `ic_survivor_contract.json` v2（B2.4）。本檔各 Task 僅寫「鍵住契約檔 §<區>」。
-6. **允許改動之既有檔白名單**（SPEC §C-3 唯此六項）：① `ic_survivor_contract.json`＋`momentum/Analysis/survivor_contract.py` 只在 B2.4；② `momentum/Analysis/ic_filter_orchestrator.py` 只在 B2.3；③ `momentum/Analysis/event_filter.py` 只在 B3.2；④ `momentum/FeatureEngineering/operators/`＋registry 只在 B3.3；⑤ `api/models/`＋`api/routes/`＋`api/services/`（case/search/ic 路徑）與 `frontend/src/` 只在 B5；⑥ 既有測試檔只新增斷言禁放寬；⑦ `momentum/factories.py` **只在 B5.1** 新增 `create_event_sample_pipeline()` 一個出口（SPEC §RISK 末行明文授權；W2）；⑧ 收尾文件（`HANDOFF.md`／`docs/ROADMAP.md`／`docs/IC_QUANT_GAP_REGISTRY.md`／`白話說明/`）**只在 B5.3**（W2）。**不改**：`xgboost_batch_service` 訓練殼、`label_generator.py`、`SplitPlan`（`momentum/core/contracts.py`）、回測層、`pattern_extractor.py` 既有簽名。
+6. **允許改動之既有檔白名單**（唯此八項＝SPEC §C-3 原六項＋W2 寫回之 ⑦⑧）：① `ic_survivor_contract.json`＋`momentum/Analysis/survivor_contract.py` 只在 B2.4；② `momentum/Analysis/ic_filter_orchestrator.py` 只在 B2.3；③ `momentum/Analysis/event_filter.py` 只在 B3.2；④ `momentum/FeatureEngineering/operators/`＋registry 只在 B3.3；⑤ `api/models/`＋`api/routes/`＋`api/services/`（case/search/ic 路徑）與 `frontend/src/` 只在 B5；⑥ 既有測試檔只新增斷言禁放寬；⑦ `momentum/factories.py` **只在 B5.1** 新增 `create_event_sample_pipeline()` 一個出口（SPEC §RISK 末行明文授權；W2）；⑧ 收尾文件（`HANDOFF.md`／`docs/ROADMAP.md`／`docs/IC_QUANT_GAP_REGISTRY.md`／`白話說明/`）**只在 B5.3**（W2）。**不改**：`xgboost_batch_service` 訓練殼、`label_generator.py`、`SplitPlan`（`momentum/core/contracts.py`）、回測層、`pattern_extractor.py` 既有簽名。
 7. **成熟度約束**（SPEC §C）：`api/services/xgboost_*`、`momentum/Optimization/`、回測層內部不得作為設計依據；事件契約只綁 `symbol/timeframe/bar 邊界/時區/snapshot digest`，**不綁 HDF5 佈局**。
 8. **R5 A′ 語意原樣保留**（SPEC §C）：條件 IC fallback 時 `event_timestamps` 透傳＋one-shot guard 不動；fallback ⇒ `fallback_requested_scope`＋`degraded`，禁丟事件。
 9. **防假綠**（SPEC §V）：不得放寬/刪除既有測試斷言換綠；每批 review brief 附既有測試 diff。
@@ -360,7 +360,7 @@
   3. `operator_registry` 註冊（既有 `ts_argmax/ts_argmin/slope` 等不動）；過 Feature Factory 因果/golden 紀律（三方數據正確性簽核鐵律適用——本 Task 之 review 須含 explicit adversarial 獵漏）。
 - 修改檔案：新增 `state_counters.py`；改 `operator_registry`（僅註冊行）。既有 caller：Feature Factory pipeline。
 - 不可做：不重做已存在算子；不引入跨列未來資訊（`shift(-n)` 禁）。
-- 邊界：①窗內無交叉 ⇒ NaN/哨兵值（非 0）；②warmup 不足 ⇒ NaN 前綴。
+- 邊界：①窗內無交叉/事件 ⇒ NaN（`cross_count` 例外＝0，計數語意——W7 定義）；②warmup 不足 ⇒ NaN 前綴。
 - 風險緩解：RISK-a（Feature Factory 因果紀律）。
 - 驗證：`venv/bin/python -m pytest tests/momentum/feature_engineering/ -q -k state_counters` rc=0（手算小例 exact——每算子 ≥1 個寫死序列 expected；因果測試：截斷未來資料結果不變）。**測試落點＝新建目錄 `tests/momentum/feature_engineering/test_state_counters.py`（W14 裁決：該目錄現不存在、FF 既有測試在 `tests/feature_engineering/`；新建使 SPEC 命令字面可跑、不動既有，免 SPEC amendment）**。
 - **存活至**：全票完工後保留（Feature Factory 永久算子）。
