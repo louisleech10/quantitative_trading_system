@@ -20,10 +20,10 @@
 
 **D1 — 標籤與價格語意（R2 C1 ⊕ U4b 改寫）**
 1. 契約必填 `entry_price_semantic ∈ {trigger_open, trigger_close, next_open, decision_bar_open, decision_bar_close}`（**事件頂層欄**，與 `label_definition` 平級——R1 X11／X1；字面唯一住契約檔）＋`label_return_mode ∈ {open_to_close, open_to_horizon_close, close_to_close}`（屬 `label_definition`）。
-2. **預設 `close_to_close`（U4b；改寫 R2 C1 之「A/B 預設 `open_to_horizon_close`」）**：標籤基準一律相對 **t₀ close**——與 IC 主線 label 同語意（`label_generator.py:40-47` 之 `close.shift(-h)/close-1`），條件 IC 直接吃；「基準價語意」欄保留以防未寫明。
+2. **預設 `close_to_close`（U4b；改寫 R2 C1 之「A/B 預設 `open_to_horizon_close`」）**：**預設模式下**標籤基準一律相對 **t₀ close**——與 IC 主線 label 同語意（`label_generator.py:40-47` 之 `close.shift(-h)/close-1`），條件 IC 直接吃；「基準價語意」欄保留以防未寫明（U4b 原文脈絡：使用者實務一律 c2c、契約保留語意欄——「一律」是否**全禁**非 c2c 模式＝§A 待使用者確認②，R5 V1）。
 3. 條件 IC（`statistic_kind=conditional_ic`）之 `label_value`＝**條件必填**（R1 X3）：缺 ⇒ `capability_status=unavailable` reason=`missing_label_value`（字面入契約檔）；**v1 不重算**使用者 label（一致性探針＝§N-8）——不留「重算或拒絕」二選一給 TODO。**禁止**把「語意不同的」序列型 `return_N` 靜默當事件 label；`label_return_mode ≠ close_to_close` 而沿用主線 label ⇒ 必標 `label_price_mismatch=true`。
 4. 誠實揭露（U4b／§2-2）：**實際進場價**（open 或 t₀−k）之持有報酬與**標籤基準**（t₀ close）報酬為兩個數，全部 K 線驗證兩數並排、不混。
-5. **label 錨不變式（R1 X2）**：label 錨＝t₀ close，與 `decision_at` **永遠脫鉤**（`decision_offset_bars>0` 不改變錨）；**禁止**以 `decision_at` 列 join 主線 `return_N`（該列 `return_N` 錨在 decision close ≠ t₀ close）；B2.3 驗收含 t₀−k 手算案例斷言錨不隨 decision 移動。
+5. **label 錨不變式（R1 X2／R5 V1 mode-scoped 消歧）**：label 錨由 `label_return_mode` **機械唯一**決定，且**恆與 `decision_offset_bars`／entry 語意無關**——`close_to_close`（預設；U4b 使用者自身標註實務）⇒ 錨＝t₀ close；`open_to_close`／`open_to_horizon_close` ⇒ 錨＝entry 時點之進場價（**顯式宣告才合法、非預設**；R2 C1 保留選項；是否全禁＝§A 待使用者確認②）。同一輸入之 label 起點**唯一**。**禁止**（`close_to_close` 路徑）以 `decision_at` 列 join 主線 `return_N`（該列 `return_N` 錨在 decision close ≠ t₀ close）；B2.3 驗收含 t₀−k 手算案例斷言錨不隨 decision 移動。
 6. **entry 語意 → bar/price 唯一映射（R2 Y1）**：`trigger_open`＝t₀ bar 之 open；`trigger_close`＝t₀ bar 之 close；`next_open`＝t₀ 之後下一根**錨定 TF** bar 之 open；`decision_bar_open`／`decision_bar_close`＝decision bar（t₀−k）之 open／close。`entry_at`＝該 bar 對應時點（open 語意＝bar open_time、close 語意＝bar close_time）；validator 檢 `decision_at ≤ entry_at`（`entry_at` 對 `label_start` **無強制順序**——D2-1 三段鏈，R4 W1）；receipt 增 `entry_at_ms`＋`entry_price_source{bar_open_ms, field}`。所有「entry 依契約語意」處一律指本條。
 
 **D2 — PIT 時間軸與對齊收據（R2 C2 ⊕ R1 C1 六時間欄 ⊕ 8/20 t₀−k 擴充）**
@@ -68,7 +68,9 @@
 - FACT-RECEIPT: `sed -n '150,154p' api/models/ic_models.py` → 印出 `event_query` 與 `event_timestamps` 欄（IC 後端已收事件清單；Claude 實跑 2026-08-20）
 - FACT-RECEIPT: `grep -rn "feature_cutoff" momentum/ | wc -l` → 印出 `0`（per-TF 特徵截止不存在、須新建；Claude 實跑 2026-08-20）
 
-**待使用者確認（未確認前不得實作）**：**待確認：無**（產品語意 U1–U13＋8/20 五點已全數裁定；技術取捨依 2026-08-18 裁定交委員會）。
+**待使用者確認（未確認前不得實作；兩題皆於白話閘一併裁）**：
+1. **`drop_threshold` 之 x 值**（R3 Z2）：您原文只寫「跌 x%」——c 類反例自動分類的門檻要設多少（例 5%）？未裁前契約 `default=null`、c 類自動分類不啟用（fail-closed）。
+2. **U4b「一律相對 t₀ close」之範圍**（R5 V1）：是否**全禁**非 `close_to_close` 模式？裁「全禁」⇒ `label_return_mode` 枚舉收斂為單值、`open_to_*` 移除；裁「保留」⇒ D1-5 mode-scoped 錨定義生效（非預設、顯式宣告才合法）。裁決前 B1.0 契約不得凍結。
 
 **對抗審裁決紀錄（AR 系列；R1 三家已全數裁定——`handoffs/reconcile/20260820-gap3-x-review-r1/synth.md`）**
 
@@ -79,7 +81,7 @@
 - **AR-5 產生器 G1–G6 落哪批** → **已裁（三家一致）**：維持 B3；MVP 不前移 B2（B2 靈魂＝K8 優先）；前移僅得於 TODO 階段由主委明示。
 - **AR-6 label 一致性探針** → **已裁（X3；採 2:1 多數＋較小 scope）**：維持 §N-8 殘留（`needs-research`）；配套硬規則＝`conditional_ic` 缺 `label_value` ⇒ `unavailable:missing_label_value`、v1 不重算；grok 之 `label_probe_mismatch` 設計收錄於 §N-8 供日後升級。
 
-**已確認結果**
+**已確認結果（使用者裁決，2026-08-19/20；逐條附日期）**
 
 - `2026-08-19/20 使用者裁決 U1–U13＋8/20 五點`（唯一權威＝討論文檔 §7＋§8 第 8/11 版；本 SPEC 全篇據此）：目標 A/B/C/兩段式全要、一次只多或只空；正反例外部標好＋CSV＋搜尋條件一起匯入、正反例附實際漲幅；**U4** 決策時點＝t₀ open 或 t₀−k、特徵＝決策時點前任意 TF 數值與變化、反例多種全標 0＋種類欄選填；**U4b** 標籤基準＝t₀ close、close-to-close；**U5** 規模只是舉例、統計不寫死規模（樣本不足走 tier 降級、標不可算）；**U6** 事件產生器完整版列入開發、落點 `/search` 升級；**U7** 現有頁面升級不翻掉；**U8** LightGBM/XGBoost 之選不影響設計、之後再議；**U10** 前端落點＝產/匯入在 `/search`＋`/data-preparation`、分析在 `/ic-analysis` 加事件模式；**U11** 全部 K 線驗證一次建完整；**U12** 多標的＝常態必要；**U13** 一份 SPEC＋B1–B5＝Phase、每批三家 review＋戳記才進下批。
 - `2026-08-17 使用者裁定（成熟度地圖）`：僅 Feature Factory 完整、IC 進行中；ML/回測/Optimization 不完整層，其內部結構不得作為設計依據；**禁改 `xgboost_batch_service` 訓練殼；不碰回測層**。
