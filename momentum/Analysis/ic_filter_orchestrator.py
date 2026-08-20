@@ -885,8 +885,13 @@ class ICFilterOrchestrator:
         kline_reader: Optional[IKlineReader] = None,
         *,
         event_timestamps: Optional[list] = None,
+        event_label_values: Optional[dict] = None,
     ) -> dict:
         """主入口：執行完整八階段流水線。
+
+        event_label_values（GAP-3 Task B2.3）：{epoch_ms: label_value} 事件連續 label；
+        提供時條件 IC 只吃此 label（D1-3，禁以 decision 列 join 主線 return_N），
+        沿 `event_timestamps` 入口、stage3/4/5＋A′ fallback 原樣；不傳 ⇒ 行為逐位元組不變（§G-1 golden）。
 
         event_timestamps（ICHC Task 4.2）：per-request 事件時間戳，keyword-only；
         與 features index 同 epoch 語意（秒/毫秒判別沿用 ic_engine 自動偵測原語）；
@@ -935,6 +940,7 @@ class ICFilterOrchestrator:
                     reason="insufficient_data",
                     details=split_result.details or {},
                     event_timestamps=event_timestamps,
+                    event_label_values=event_label_values,
                 )
             train_plan, test_plan = split_result
             train_mask, test_mask = _derive_stage_masks(
@@ -997,6 +1003,7 @@ class ICFilterOrchestrator:
         features_df, label_series, event_info = self._stage3_event_filter(
             features_df, label_series, metadata, config, kline_reader,
             event_timestamps=event_timestamps,
+            event_label_values=event_label_values,
         )
         if split_context is not None:
             train_mask, test_mask = _derive_stage_masks(
@@ -1043,6 +1050,7 @@ class ICFilterOrchestrator:
                 reason="rolling_warmup_insufficient",
                 details=ic_results.get("details") or {},
                 event_timestamps=event_timestamps,
+                event_label_values=event_label_values,
             )
 
         self._report_progress(
@@ -1109,6 +1117,7 @@ class ICFilterOrchestrator:
         details: dict[str, Any],
         *,
         event_timestamps: Optional[list] = None,
+        event_label_values: Optional[dict] = None,
     ) -> dict:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
 
@@ -1150,6 +1159,7 @@ class ICFilterOrchestrator:
                 progress_callback=progress_callback,
                 kline_reader=kline_reader,
                 event_timestamps=event_timestamps,
+                event_label_values=event_label_values,  # GAP-3 B2.3：A′ 透傳亦保留事件 label（禁靜默丟）
             )
         finally:
             self._suppress_persist = prev_suppress
@@ -2782,6 +2792,7 @@ class ICFilterOrchestrator:
         kline_reader: Optional[IKlineReader],
         *,
         event_timestamps: Optional[list] = None,
+        event_label_values: Optional[dict] = None,
     ) -> tuple[pd.DataFrame, pd.Series, dict]:
         event_cfg = config.event_filter
         # GAP-2 Task 4.1：事件身分於 pop timestamps **之前**以 request 原始輸入計算（不可變；refilter 沿用）
@@ -2854,6 +2865,24 @@ class ICFilterOrchestrator:
             raise AlignmentViolationError("event filter produced no timestamps overlapping features")
         filtered_features = normalized_features.loc[selected_index]
         filtered_label = normalized_label.loc[selected_index]
+        if event_label_values is not None:
+            # GAP-3 Task B2.3：條件 IC 只吃事件連續 label_value（SPEC D1-3）；選中之每一 timestamp
+            # 必須有 label_value（缺 ⇒ loud，不回退主線 return_N——D1-5 禁以 decision 列 join）。
+            # 不傳 ⇒ 本分支不執行，既有 stage 語意與報告鍵逐位元組不變（§G-1 golden 看住）。
+            idx_ms = (selected_index.asi8 // 10**6).astype("int64")
+            missing = [int(t) for t in idx_ms if int(t) not in event_label_values]
+            if missing:
+                raise AlignmentViolationError(
+                    f"event_label_values missing for {len(missing)} selected timestamps (first={missing[:3]})"
+                )
+            filtered_label = pd.Series(
+                [float(event_label_values[int(t)]) for t in idx_ms],
+                index=filtered_label.index, name=filtered_label.name,
+            )
+            info = dict(info)
+            info["label_source"] = "event_label_value"
+            info["statistic_kind"] = "conditional_ic"
+            info["sample_scope_kind"] = "event"
         return filtered_features, filtered_label, info
 
     def _apply_feature_filter(
