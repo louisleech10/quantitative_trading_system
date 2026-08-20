@@ -1,6 +1,7 @@
-# GAP-3 事件型分析 TODO（DRAFT v0.2｜基於 `docs/GAP3_EVENT_SPEC.md` FROZEN 2026-08-20｜生成日 2026-08-20）
+# GAP-3 事件型分析 TODO（v0.2｜基於 `docs/GAP3_EVENT_SPEC.md` FROZEN 2026-08-20｜生成日 2026-08-20）
 
-> 狀態：**DRAFT**（v0.2＝R7 對抗審 12 修訂群集寫回，synth `handoffs/reconcile/20260820-gap3-x-review-r7/synth.md`；Frozen 前只能標 Internal Frozen）。
+> 🔒 **FROZEN（2026-08-20 使用者白話閘核准；三家 RECONCILE-STAMP `handoffs/reconcile/20260820-gap3-x-review-r8/synth.md` 機檢 rc=0）**。後續修訂走延伸檔 `docs/GAP3_EVENT_TODO_AMENDMENTS.md`，不就地改本檔。
+> 對抗審履歷：R7 14 findings（12 群集寫回 v0.2，synth `handoffs/reconcile/20260820-gap3-x-review-r7/synth.md`）→ R8 閉合 0 findings（原提出方全 CLOSED）→ stamp-r3 三家 APPROVED。
 > 生成依據：`templates/TODO_GENERATION_PROMPT.md` V13；階段 1 索引＝`handoffs/20260820-gap3-todo-stage1-index.md`（追溯基準：20 Task／26 驗證項／§G 6 項／M1–M12／殘留 8）。
 > 層級宣告（W1）：**操作依據＝本檔**（執行端逐 Task 寫碼以本檔為準）；**語意權威＝`docs/GAP3_EVENT_SPEC.md`（FROZEN）**——本檔與 SPEC 衝突時以 SPEC 為準並回報，不得自行取捨；**欄位/枚舉/reason 字面 SoT＝`momentum/Analysis/contracts/event_import_contract.json`（Task B1.0 產出）**——B1.0／B2.4 內之欄位列舉為 **genesis 建檔規格**（建檔依據，僅此兩處），檔建立後以契約檔為準、該列不再維護；其餘章節與程式禁複列鍵表。
 > 歸屬票：全部 Task＝`docs/IC_QUANT_GAP_REGISTRY.md` **#3（GAP-3）**；各 Task 標題之 `票 #3` 指此。
