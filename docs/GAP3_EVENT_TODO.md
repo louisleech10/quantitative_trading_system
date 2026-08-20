@@ -1,8 +1,8 @@
-# GAP-3 事件型分析 TODO（DRAFT v0.1｜基於 `docs/GAP3_EVENT_SPEC.md` FROZEN 2026-08-20｜生成日 2026-08-20）
+# GAP-3 事件型分析 TODO（DRAFT v0.2｜基於 `docs/GAP3_EVENT_SPEC.md` FROZEN 2026-08-20｜生成日 2026-08-20）
 
-> 狀態：**DRAFT**（未過三家對抗審；Frozen 前只能標 Internal Frozen）。
+> 狀態：**DRAFT**（v0.2＝R7 對抗審 12 修訂群集寫回，synth `handoffs/reconcile/20260820-gap3-x-review-r7/synth.md`；Frozen 前只能標 Internal Frozen）。
 > 生成依據：`templates/TODO_GENERATION_PROMPT.md` V13；階段 1 索引＝`handoffs/20260820-gap3-todo-stage1-index.md`（追溯基準：20 Task／26 驗證項／§G 6 項／M1–M12／殘留 8）。
-> 冷啟動原則：執行端讀本檔即可逐 Task 寫碼，不必回讀 SPEC；**但欄位/枚舉/reason 字面一律以 `momentum/Analysis/contracts/event_import_contract.json`（Task B1.0 產出）為唯一來源，本檔與程式禁複列鍵表**。
+> 層級宣告（W1）：**操作依據＝本檔**（執行端逐 Task 寫碼以本檔為準）；**語意權威＝`docs/GAP3_EVENT_SPEC.md`（FROZEN）**——本檔與 SPEC 衝突時以 SPEC 為準並回報，不得自行取捨；**欄位/枚舉/reason 字面 SoT＝`momentum/Analysis/contracts/event_import_contract.json`（Task B1.0 產出）**——B1.0／B2.4 內之欄位列舉為 **genesis 建檔規格**（建檔依據，僅此兩處），檔建立後以契約檔為準、該列不再維護；其餘章節與程式禁複列鍵表。
 > 歸屬票：全部 Task＝`docs/IC_QUANT_GAP_REGISTRY.md` **#3（GAP-3）**；各 Task 標題之 `票 #3` 指此。
 
 ## §0 全域規則與約束（執行端讀完即可遵守）
@@ -12,7 +12,7 @@
 3. **NaN/inf 不弱化**（SPEC §C-2）：對齊/物化失敗＝loud 枚舉（reason 字面見契約檔），**禁 fillna(0)、禁 silent `continue`**（舊雛形 `xgboost_batch_service.py:621,651` 之靜默跳過＝反例，不沿用 [FACT-RECEIPT]）。
 4. **輸出大小**：IC 主線既有報告鍵集不變，只新增（§G-1 golden 機械看住）。
 5. **JSON SoT**（SPEC §C 範本鐵律）：事件欄位名/枚舉值/reason/分類門檻字面**只**在 `event_import_contract.json` 出現一次（B1.0）；survivor 擴欄字面**只**在 `ic_survivor_contract.json` v2（B2.4）。本檔各 Task 僅寫「鍵住契約檔 §<區>」。
-6. **允許改動之既有檔白名單**（SPEC §C-3 唯此六項）：① `ic_survivor_contract.json`＋`momentum/Analysis/survivor_contract.py` 只在 B2.4；② `momentum/Analysis/ic_filter_orchestrator.py` 只在 B2.3；③ `momentum/Analysis/event_filter.py` 只在 B3.2；④ `momentum/FeatureEngineering/operators/`＋registry 只在 B3.3；⑤ `api/models/`＋`api/routes/`＋`api/services/`（case/search/ic 路徑）與 `frontend/src/` 只在 B5；⑥ 既有測試檔只新增斷言禁放寬。**不改**：`xgboost_batch_service` 訓練殼、`label_generator.py`、`SplitPlan`（`momentum/core/contracts.py`）、回測層、`pattern_extractor.py` 既有簽名。
+6. **允許改動之既有檔白名單**（SPEC §C-3 唯此六項）：① `ic_survivor_contract.json`＋`momentum/Analysis/survivor_contract.py` 只在 B2.4；② `momentum/Analysis/ic_filter_orchestrator.py` 只在 B2.3；③ `momentum/Analysis/event_filter.py` 只在 B3.2；④ `momentum/FeatureEngineering/operators/`＋registry 只在 B3.3；⑤ `api/models/`＋`api/routes/`＋`api/services/`（case/search/ic 路徑）與 `frontend/src/` 只在 B5；⑥ 既有測試檔只新增斷言禁放寬；⑦ `momentum/factories.py` **只在 B5.1** 新增 `create_event_sample_pipeline()` 一個出口（SPEC §RISK 末行明文授權；W2）；⑧ 收尾文件（`HANDOFF.md`／`docs/ROADMAP.md`／`docs/IC_QUANT_GAP_REGISTRY.md`／`白話說明/`）**只在 B5.3**（W2）。**不改**：`xgboost_batch_service` 訓練殼、`label_generator.py`、`SplitPlan`（`momentum/core/contracts.py`）、回測層、`pattern_extractor.py` 既有簽名。
 7. **成熟度約束**（SPEC §C）：`api/services/xgboost_*`、`momentum/Optimization/`、回測層內部不得作為設計依據；事件契約只綁 `symbol/timeframe/bar 邊界/時區/snapshot digest`，**不綁 HDF5 佈局**。
 8. **R5 A′ 語意原樣保留**（SPEC §C）：條件 IC fallback 時 `event_timestamps` 透傳＋one-shot guard 不動；fallback ⇒ `fallback_requested_scope`＋`degraded`，禁丟事件。
 9. **防假綠**（SPEC §V）：不得放寬/刪除既有測試斷言換綠；每批 review brief 附既有測試 diff。
@@ -34,10 +34,10 @@
 **批間 Gate（每批全過＋三家 code review＋三家戳記才進下批＝U13）**：
 
 - **B1 Gate**：`venv/bin/python -m pytest tests/momentum/event_samples/ -q` rc=0（含 `test_import_contract.py`／`test_alignment.py`／`test_dedupe.py`／`test_event_split.py`／`test_feature_materialization.py`／`test_baseline_oracle.py`／`test_counterexample_classifier.py`）＋mutation `test_mutation_guard.py -q -k "M1 or M2 or M3 or M5 or M8 or M9 or M10 or M12"`（B1 歸屬 8 條）逐條紅（mutation 注入時）／綠（baseline）。
-- **B2 Gate**：`pytest tests/momentum/event_samples/ -q`＋`pytest tests/momentum/ -q -k "gap3 and conditional_ic"`＋`pytest tests/momentum/Analysis/test_survivor_contract.py -q` rc=0；`venv/bin/python scripts/gap3_freeze_golden.py --check` rc=0（§G-1）；mutation M4/M7/M11。
+- **B2 Gate**：`pytest tests/momentum/event_samples/ -q`＋`pytest tests/momentum/ -q -k "gap3 and conditional_ic"`＋`pytest tests/momentum/Analysis/test_survivor_contract.py -q` rc=0；`venv/bin/python -m pytest tests/momentum/event_samples/test_baseline_oracle.py -q -k conditional_ic` rc=0（W3：conditional-IC 置亂 oracle）；`venv/bin/python scripts/gap3_freeze_golden.py --check` rc=0（§G-1）；mutation M4/M7/M11。
 - **B3 Gate**：`pytest tests/momentum/event_samples/ -q -k "condition_engine or generator_adapters"`＋`pytest tests/momentum/feature_engineering/ -q -k state_counters` rc=0；G1–G6 逐項斷言；mutation M6；§G-1 `--check` 複跑 rc=0（B3.2 接線後）。
 - **B4 Gate**：`pytest tests/momentum/event_samples/ -q -k "pattern_bridge or candidate_ledger"` rc=0（含 AUC→DSR 拒絕 ASSERT）。
-- **B5 Gate**：`pytest tests/api/ -q -k gap3_import`＋`cd frontend && npm run build`＋vitest＋`pytest tests/momentum/event_samples/ -q`＋`bash scripts/plain_docs_sync_check.sh` 全 rc=0；UAT checklist 使用者簽字。
+- **B5 Gate**：`pytest tests/api/ -q -k gap3_import`＋`cd frontend && npm run build`＋`cd frontend && npx vitest run gap3`＋`pytest tests/momentum/event_samples/ -q`＋`bash scripts/plain_docs_sync_check.sh` 全 rc=0；`docs/GAP3_UAT_CHECKLIST.md` 逐項附 rc＋使用者簽字。
 
 **每批派工 prompt 骨架（主委自任仍照走；review 派工另走 `gate.sh dispatch`＋brief）**：
 
@@ -52,7 +52,7 @@
 - SPEC ref：Task B1.0／D1-1／D2-2／[AR-1][AR-2]　目標：所有事件欄位名/枚舉值/reason 字面只在一個檔；匯入 fail-closed。
 - 輸入/輸出：輸入＝使用者 CSV/JSON 記錄列表；輸出＝`event_import_contract.json`（SoT）＋驗證通過之 `pd.DataFrame`（dtype 正規化）或 `ContractValidationError`。
 - 實作要點：
-  1. 新建 `momentum/Analysis/contracts/event_import_contract.json`，區塊：`version`、`required_fields`（`event_id/symbol/timeframe/t0/decision_offset_bars/entry_price_semantic/direction/scenario/label/label_definition/control_kind/source_file_digest/data_snapshot_digest`——值集與型別全在檔內定義，含 `entry_price_semantic` 五值、`label_return_mode` 三值預設 `close_to_close`、`control_kind` 四值閉集與 accepted 三值＋`platform_random_bars` 恆拒 reason）、`optional_fields`（`label_value/counterexample_kind/kind_source/search_rule_summary/taxonomy 五欄/event_type_tag/meta`）、`conditional_required`（T8 `reference_symbols[]`／T9 `source_model`／T10 `event_interval`——觸發條件與全欄列舉）、`derived_fields`（六時間欄、`event_known_at_decision/dedupe_cluster_id/overlap_set_hash/uniqueness_weight/time_cluster_id/cluster_weight/counterexample_kind_effective` 四值集）、`failure_reasons`（D2-4 枚舉聯集＋`missing_control_group/not_implemented_platform_random_bars/missing_label_value/missing_prevalence_disclosure`）、`counterexample_classifier_config`（四門檻 `example_default` 值 0.05/0.0/0.01/0.05＋單位＋公式參數；白話閘①）、`receipt_schema`（事件級＋per-TF 兩層欄名——D2-4）、`_doc`（誠實邊界：hash 相同不證內容正確；v1 不重算 label）。
+  1. 新建 `momentum/Analysis/contracts/event_import_contract.json`，區塊：`version`、`required_fields`（`event_id/symbol/timeframe/t0/decision_offset_bars/entry_price_semantic/direction/scenario/label/label_definition/control_kind/source_file_digest/data_snapshot_digest`——值集與型別全在檔內定義，含 `entry_price_semantic` 五值、`label_return_mode` 三值預設 `close_to_close`、`control_kind` 四值閉集與 accepted 三值＋`platform_random_bars` 恆拒 reason）、`optional_fields`（`label_value/counterexample_kind/kind_source/search_rule_summary/taxonomy 五欄/event_type_tag/meta`）、`conditional_required`（T8 `reference_symbols[]`／T9 `source_model`／T10 `event_interval`——觸發條件與全欄列舉）、`derived_fields`（六時間欄、`event_known_at_decision/dedupe_cluster_id/overlap_set_hash/uniqueness_weight/time_cluster_id/cluster_weight/counterexample_kind_effective` 四值集）、`failure_reasons`（D2-4 枚舉聯集＋`missing_control_group/not_implemented_platform_random_bars/missing_label_value/missing_prevalence_disclosure`）、`counterexample_classifier_config`（四門檻 `example_default` 值 0.05/0.0/0.01/0.05＋單位＋公式參數；白話閘①）、`receipt_schema`（事件級＋per-TF 兩層欄名——D2-4）、`_doc`（誠實邊界：hash 相同不證內容正確；v1 不重算 label）。〔本項全部列舉＝genesis 建檔規格；契約檔建立後以檔為準、本列不再維護——W1〕
   2. 新建 `momentum/Analysis/event_samples/import_contract.py`：
      ```python
      def load_event_import_contract() -> dict: ...  # 讀檔+版本檢
@@ -60,13 +60,13 @@
      def validate_event_import(records: list[dict] | pd.DataFrame,
                                *, contract: dict | None = None) -> pd.DataFrame: ...
      ```
-     偽碼：載契約 → 頂層鍵集比對（缺必填/多未知鍵 ⇒ 收集 reason）→ 逐欄型別/枚舉閉集檢 → ms 量級閘（`t0 < 10**12` 宣告 ms ⇒ 拒）→ 條件必填（T8/T9/T10 觸發即全欄檢；T9 `available_at > decision_at` ⇒ reason `research_only` 拒）→ 二元任務單類別 ⇒ `missing_control_group` → `counterexample_kind` 出現 `unclassifiable` ⇒ 拒（匯入值集僅 a/b/c）→ 重複 `event_id` ⇒ 拒 → 任一 failure ⇒ raise（fail-closed，不回部分結果）。
+     偽碼：載契約 → 頂層鍵集比對（缺必填/多未知鍵 ⇒ 收集 reason）→ 逐欄型別/枚舉閉集檢 → ms 量級閘（`t0 < 10**12` 宣告 ms ⇒ 拒）→ 條件必填（T8/T9/T10 觸發即全欄檢；T9 `available_at > decision_at` ⇒ reason `research_only` 拒）→ 二元任務單類別 ⇒ `missing_control_group` → **單批 `direction` 唯一值檢：同一匯入批同時出現 long 與 short ⇒ 拒（U1 一次只研究一向、匯入批內單值；規則住契約檔 validator/_doc——W12/GROK-R7-P1-02）** → `counterexample_kind` 出現 `unclassifiable` ⇒ 拒（匯入值集僅 a/b/c）→ 重複 `event_id` ⇒ 拒 → 任一 failure ⇒ raise（fail-closed，不回部分結果）。
   3. `momentum/Analysis/event_samples/types.py` 建 dataclass 殼（`AlignmentConfig/AlignmentReceipts/EventManifest/EventSplitPlan` 等，本批後續 Task 逐一填實；欄位名 pointer 契約檔）。
 - 修改檔案：新增 `momentum/Analysis/contracts/event_import_contract.json`；新增 `momentum/Analysis/event_samples/{__init__,import_contract,types}.py`。既有 caller：無（`CaseRecord`／`/case/import` 不動，B5 才接 legacy adapter）。
 - 不可做：不得在本檔/TODO/程式註解複列鍵表；不得沿用/擴充 `CaseRecord` 充當契約；不得實作 `platform_*` 抽樣。
 - 邊界：①空 CSV/空列表 ⇒ loud 拒；②重複 `event_id` ⇒ 拒；③`label_value` 與 `label` 矛盾——值缺失容許、型別錯拒；④T9 `available_at > decision_at` ⇒ `research_only`/拒。
 - 風險緩解：RISK-a（fail-closed 擋髒資料）；mutation M3/M12 歸屬本 Task 測試。
-- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_import_contract.py -q` rc=0；斷言①頂層鍵集 `==` 契約列舉②枚舉值閉集③缺必填/多未知鍵/枚舉外值 ⇒ `ContractValidationError`④二元任務單類別 ⇒ `missing_control_group`⑤ms 量級閘（`t0<10^12` 宣告 ms ⇒ 拒）。M3/M12 於 `test_mutation_guard.py -k "M3 or M12"` 可證偽。
+- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_import_contract.py -q` rc=0；斷言①頂層鍵集 `==` 契約列舉②枚舉值閉集③缺必填/多未知鍵/枚舉外值 ⇒ `ContractValidationError`④二元任務單類別 ⇒ `missing_control_group`⑤ms 量級閘（`t0<10^12` 宣告 ms ⇒ 拒）⑥**digest 篡改 negative fixture：`source_file_digest`／`data_snapshot_digest` 與實際內容不符 ⇒ 拒（§G-4 fail-closed——W4/CODEX-R7-P1-04）**⑦**單批 `direction` 混值（long＋short）⇒ 拒（W12）**。M3/M12 於 `test_mutation_guard.py -k "M3 or M12"` 可證偽。
 - **存活至**：全票完工後保留；未來事件型所有匯入之唯一契約。
 - **覆蓋風險**：無（B2.4 只動 survivor 契約，不動本檔）。
 
@@ -81,13 +81,13 @@
      def n_dropped_by_reason(failures: pd.DataFrame) -> dict[str, int]: ...
      ```
      `AlignmentReceipts`（types.py）＝`event_level: pd.DataFrame`（每事件一列：`t0_ms/decision_offset_bars/decision_at_ms/entry_at_ms/entry_price_source{bar_open_ms,field}/label_start_ms/label_end_ms/entry_after_label_start`）＋`per_tf: pd.DataFrame`（每事件×每 TF：`feature_cutoff_ms/last_bar_open_ms/last_bar_close_ms/row_id`）——欄名字面 pointer 契約檔 `receipt_schema`。
-  2. 推導偽碼（逐事件）：`decision_at`＝t₀ 往前第 k 根錨定 TF bar 之 open（k=`decision_offset_bars`；缺 bar ⇒ `missing_bar`）→ entry bar/price 依 D1-6 映射（`trigger_open`＝t₀ open；`trigger_close`＝t₀ close；`next_open`＝t₀ 後下一根錨定 TF open；`decision_bar_open/close`＝decision bar）→ `label_start` 依 mode 機械定（`close_to_close` ⇒ t₀ close_time；`open_to_*` ⇒ entry 時點）→ 三段鏈檢：PIT 鏈 `observed_through ≤ feature_cutoff[tf] ≤ decision_at ≤ entry_at`；label 鏈 `decision_at ≤ label_start < label_end`；持有鏈 `entry_at < label_end`；`entry_at` 對 `label_start` 無強制順序、`entry_after_label_start` 入收據 → per-TF `feature_cutoff[tf] = max{bar.close_ms ≤ decision_at}`（as-of，非整點邊界不報錯）。
+  2. 推導偽碼（逐事件）：`decision_at`＝t₀ 往前第 k 根錨定 TF bar 之 open（k=`decision_offset_bars`；缺 bar ⇒ `missing_bar`）→ **validator 檢 `decision_at ≤ t0_open_ms`（t₀＝觸發根 open_time；AR-1／D2-2 獨立不變式，非三段鏈涵蓋；違反 ⇒ 該事件入 failures，reason=`no_boundary_match`——W11/GROK-R7-P1-01）** → entry bar/price 依 D1-6 映射（`trigger_open`＝t₀ open；`trigger_close`＝t₀ close；`next_open`＝t₀ 後下一根錨定 TF open；`decision_bar_open/close`＝decision bar）→ `label_start` 依 mode 機械定（`close_to_close` ⇒ t₀ close_time；`open_to_*` ⇒ entry 時點）→ 三段鏈檢：PIT 鏈 `observed_through ≤ feature_cutoff[tf] ≤ decision_at ≤ entry_at`；label 鏈 `decision_at ≤ label_start < label_end`；持有鏈 `entry_at < label_end`；`entry_at` 對 `label_start` 無強制順序、`entry_after_label_start` 入收據 → per-TF `feature_cutoff[tf] = max{bar.close_ms ≤ decision_at}`（as-of，非整點邊界不報錯）。
   3. 違反任一不變式 ⇒ 該事件入 `failures{event_id, reason}`（reason＝契約檔 `failure_reasons` 枚舉）；**函式內無任何 silent skip 分支**（每個 drop 必有 reason 列）。
 - 修改檔案：新增 `alignment.py`（上列兩函式）；`types.py` 填 `AlignmentConfig/AlignmentReceipts`。既有 caller：無；B1.4/B1.6/B2 消費。
 - 不可做：不得用「時間戳剛好相等」對齊（as-of 取列）；不得對失敗事件 `continue` 不記帳；不得在本函式內算特徵；不得讀 HDF5（kline 隔離，吃已載入 bar 表）。
 - 邊界：①t₀ 在資料末端（答案窗未完）⇒ `label_window_incomplete`；②缺 bar/亂序/重複 bar ⇒ 各對應枚舉；③`decision_at` 早於資料起點 ⇒ `warmup_insufficient_<tf>`；④非整點 TF 邊界 ⇒ as-of 取列非報錯。
 - 風險緩解：RISK-a（look-ahead 之源頭閘）；mutation M1/M2/M9 歸屬本 Task。
-- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_alignment.py -q` rc=0（含 §G-2 真實 kline 手算對照：≥3 個 t₀〔12h UTC 整點/非整點邊界/資料末端〕×1h/4h/12h 手算 `feature_cutoff` 與六時間欄，整數 ms `==` 容差 0；`k=0`/`k>0`/`next_open` 三形 exact receipt oracle；各 mode `label_start_ms/label_end_ms` exact；`next_open`×`close_to_close` 斷言 `entry_after_label_start=true` 且三段鏈全過；末端案例預期 `label_window_incomplete`）；記帳守恆 `n_input == n_receipts + n_failures`；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_alignment.py -q WHEN mutation=cutoff_shift_one_bar THEN rc!=0`。
+- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_alignment.py -q` rc=0（含 §G-2 真實 kline 手算對照：≥3 個 t₀〔12h UTC 整點/非整點邊界/資料末端〕×1h/4h/12h 手算 `feature_cutoff` 與六時間欄，整數 ms `==` 容差 0；`k=0`/`k>0`/`next_open` 三形 exact receipt oracle；各 mode `label_start_ms/label_end_ms` exact；`next_open`×`close_to_close` 斷言 `entry_after_label_start=true` 且三段鏈全過；末端案例預期 `label_window_incomplete`）；記帳守恆 `n_input == n_receipts + n_failures`；**`decision_at ≤ t0_open_ms` 負例（竄改推導使 `decision_at > t0` ⇒ 斷言紅，rc!=0——W11）**；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_alignment.py -q WHEN mutation=cutoff_shift_one_bar THEN rc!=0`。
 - **存活至**：全票完工後保留；B2 三表與全 K 線驗證之對齊底座。
 - **覆蓋風險**：無。
 
@@ -107,7 +107,7 @@
 - 不可做：權重不進 ML 訓練（`UNWIRED_MODULES` 含 `sample_weight`；§N-4）；不得以 row count 當 gap 單位；不得把兩種 policy 都當 confirmatory。
 - 邊界：①單事件（無重疊）⇒ weight=1、自成簇；②全部同刻（極端簇）⇒ effective n=1 級；③缺 interval ⇒ fail-closed。
 - 風險緩解：RISK-d（重疊樣本膨脹顯著性）。
-- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_dedupe.py -q` rc=0；`ASSERT … WHEN scenario=C policy=primary THEN rc=0`（斷言簇首代表＝interval 最早）；權重和/簇計數對手算小例 exact。
+- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_dedupe.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_dedupe.py -q WHEN scenario=C policy=primary THEN rc=0`（斷言簇首代表＝interval 最早——W9/CODEX-R7-P2-09 恢復 SPEC 全文命令）；權重和/簇計數對手算小例 exact。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無（B4 之 GBDT 權重消費列 §N 殘留，不回頭改本 manifest）。
 
@@ -133,13 +133,15 @@
 
 ### Task B1.6 — 特徵物化與決策列選取（`票 #3`；批內順序在 B1.3 後、B1.4 前）
 - SPEC ref：Task B1.6（R1 X7）　目標：「全部 K 線連續算特徵、每案例取決策時點那一列」落成有契約的資料路徑，杜絕「每案例固定窗」誤實作。
-- 輸入/輸出：輸入＝B1.1 `AlignmentReceipts`＋`bars_by_tf`＋`feature_config`；輸出＝`(features_at_decision: pd.DataFrame, feature_manifest_hash: str)`。
+- 輸入/輸出：輸入＝B1.1 `AlignmentReceipts`＋`bars_by_tf`＋`feature_config`；輸出＝`(features_at_decision: pd.DataFrame, feature_manifest_hash: str, failures: pd.DataFrame)`（W5：failures 通道顯式回傳，reason 枚舉同契約檔，禁 silent drop／NaN 混入）。
 - 實作要點：
   1. `momentum/Analysis/event_samples/feature_materialization.py`：
      ```python
      def materialize_features_at_decision(receipts: AlignmentReceipts,
                                           bars_by_tf: dict[str, pd.DataFrame],
-                                          feature_config: dict) -> tuple[pd.DataFrame, str]: ...
+                                          feature_config: dict
+                                          ) -> tuple[pd.DataFrame, str, pd.DataFrame]: ...
+     # 第三元 failures{event_id, reason}；reason 字面＝契約檔 failure_reasons（W5/CODEX-R7-P1-05）
      ```
   2. 偽碼：per-TF **連續**物化（呼叫既有 Feature Factory 入口 `momentum.factories.create_feature_factory()`，不重實作特徵；段長＝全史或 ≥ 最長 lookback＋warmup——結果須與全史算一致）→ 每事件以 `decision_at` per-TF as-of 取列（規則同 D2-1 `max{close_ms ≤ decision_at}`）→ 輸出事件×特徵表。
   3. `feature_manifest_hash = sha256(sorted 特徵名集 + config canonical digest)`（決定性）；per-TF warmup 不足 ⇒ 該事件入失敗枚舉 `warmup_insufficient_<tf>`（非 NaN 混入）；NaN 語意不填 0。
@@ -147,7 +149,7 @@
 - 不可做：不切「每案例固定 N 根」窗當訓練單位；不在本函式內做特徵選擇；不引入 `shift(-n)` 未來欄。
 - 邊界：①事件 `decision_at` 早於 warmup 完成點 ⇒ 入失敗清單非 NaN 混入；②多 TF 特徵欄名衝突 ⇒ loud 拒。
 - 風險緩解：RISK-a/d（訓練特徵 look-ahead 之最後一道）。
-- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_feature_materialization.py -q` rc=0；①真實 kline「足長段物化」vs「全史物化」同事件列逐值 `atol=1e-12` 一致②因果 invariant：截斷 `decision_at` 之後資料重算，事件列逐值不變（exact）③`feature_manifest_hash` 決定性（同 config 重跑 sha256 相等）。
+- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_feature_materialization.py -q` rc=0；①真實 kline「足長段物化」vs「全史物化」同事件列逐值 `atol=1e-12` 一致②因果 invariant：截斷 `decision_at` 之後資料重算，事件列逐值不變（exact）③`feature_manifest_hash` 決定性（同 config 重跑 sha256 相等）④**記帳守恆 `n_input_receipts == n_feature_rows + n_failures`（W5）**。
 - **存活至**：全票完工後保留；B2/B4 特徵路徑底座。
 - **覆蓋風險**：無。
 
@@ -163,7 +165,7 @@
                                         *, oracle_config: OracleConfig) -> dict: ...
      ```
   2. 每特徵單獨算 OOS AUC/PR-AUC（test 段 only）＋BH-FDR。
-  3. chance-level oracle＝**permutation quantile**：固定 seed、`N_perm=1000`；per `statistic_kind` 以置亂分布 `[q_{0.025}, q_{0.975}]` 為帶（AUC null 中心 0.5、PR-AUC null 中心＝prevalence、IC null 中心 0，皆由置亂分布自然給出）；**三道硬檢**——(i) 分布非退化：`variance > 0` 且 `n_unique_perm_stats > 1`，否則 oracle 自身 FAIL；(ii) 至少一排列 ≠ identity（seed＋排列 digest 寫 receipt）；(iii) 帶判定用經驗分位。
+  3. chance-level oracle＝**permutation quantile**：固定 seed、`N_perm=1000`；per `statistic_kind` 以置亂分布 `[q_{0.025}, q_{0.975}]` 為帶（AUC null 中心 0.5、PR-AUC null 中心＝prevalence、IC null 中心 0，皆由置亂分布自然給出）；**三道硬檢**——(i) 分布非退化：`variance > 0` 且 `n_unique_perm_stats > 1`，否則 oracle 自身 FAIL；(ii) 至少一排列 ≠ identity（seed＋排列 digest 寫 receipt）；(iii) 帶判定用經驗分位。oracle 計算核心以 `statistic_kind` 參數化，供 B2.2/B2.3（`conditional_ic`，null 中心 0）直接重用（W3）。
 - 修改檔案：新增 `baseline.py`；`types.py` 填 `OracleConfig`。既有 caller：無；B2.2 擴為正式表（共用計算核心）。
 - 不可做：不做多特徵組合（B4）；不接 DSR/PBO（AUC 禁直接餵）。
 - 邊界：①one-class（test 段單類）⇒ `capability_status=unavailable`；②特徵全 NaN ⇒ loud 拒。
@@ -254,7 +256,7 @@
 - 不可做：不改 stage3/4/5 內部；不把 mismatch 語意的主線 `return_N` 靜默當事件 label；v2 survivor 新欄 payload 在 B2.4 升版 commit 前不得寫（`additional_properties:false` 會拒）。
 - 邊界：①事件數 < tier 下限 ⇒ 既有 tier 降級語意（U5）；②`label_value` 缺 ⇒ `unavailable:missing_label_value`；③t₀−k 手算案例：label 錨不隨 decision 移動（D1-5）。
 - 風險緩解：RISK-b（共用路徑）；§G-1 golden 看住行為不變。
-- 驗證：`venv/bin/python -m pytest tests/momentum/ -q -k "gap3 and conditional_ic"` rc=0；`venv/bin/python scripts/gap3_freeze_golden.py --check` rc=0（§G-1 行為不變 exact）；A′ fallback 案例斷言 `event_timestamps` 透傳＋`degraded` 標示。
+- 驗證：`venv/bin/python -m pytest tests/momentum/ -q -k "gap3 and conditional_ic"` rc=0；**conditional-IC 置亂 oracle（W3/CODEX-R7-P1-03＝§G-3(i) 落地）：label_value 置亂（固定 seed）⇒ 條件 IC 落 permutation quantile 帶內（共用 B1.4 oracle 計算核心，null 中心 0、`N_perm=1000`、經驗分位；`statistic_kind=conditional_ic`），`venv/bin/python -m pytest tests/momentum/event_samples/test_baseline_oracle.py -q -k conditional_ic` rc=0**；`venv/bin/python scripts/gap3_freeze_golden.py --check` rc=0（§G-1 行為不變 exact）；A′ fallback 案例斷言 `event_timestamps` 透傳＋`degraded` 標示。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 
@@ -262,7 +264,7 @@
 - SPEC ref：Task B2.4（R1 C4）　目標：事件型倖存者可被下游安全消費。
 - 輸入/輸出：輸入＝v1 契約＋B2.3 事件欄需求；輸出＝`ic_survivor_contract.json` version 2＋同步 validator/consumer/golden。
 - 實作要點：
-  1. `momentum/Analysis/contracts/ic_survivor_contract.json` version 1→2：event object 擴 `event_manifest_hash/label_definition_hash/decision_time_rule/feature_cutoff_rule/label_window_rule/control_kind`（字面唯一住契約檔）。
+  1. `momentum/Analysis/contracts/ic_survivor_contract.json` version 1→2：event object 擴 `event_manifest_hash/label_definition_hash/decision_time_rule/feature_cutoff_rule/label_window_rule/control_kind`（字面唯一住契約檔）。〔本列舉＝genesis 升版規格；v2 檔落地後以契約檔為準、本列不再維護——W1〕
   2. `momentum/Analysis/survivor_contract.py`（實際路徑，非 contracts/ 下）validator/consumer 同步：顯式版本判別——v1 舊檔讀舊版或拒，**禁 silent coerce**；v2 新欄缺 ⇒ 拒。
   3. golden 同步＋`fallback_requested_scope`/`degraded` 保留；升版獨立 commit，B2.3 餵入層自此 commit 後才寫新欄 payload。
 - 修改檔案：`ic_survivor_contract.json`＋`momentum/Analysis/survivor_contract.py`（白名單 §0-6-①）。既有 caller：GAP-2b 契約消費側（現唯讀）。
@@ -310,10 +312,14 @@
 - 實作要點：
   1. `momentum/Analysis/event_samples/condition_engine.py`：
      ```python
+     ExpressionRole = Literal["feature", "selection_predicate", "label"]  # W6：role 為輸入之一
      @dataclass(frozen=True)
-     class ConditionSpec:  # ast/canonical_digest/column_roles/max_lookback/label_ids
-     def parse_condition(expression: str, column_registry: dict[str, str]) -> ConditionSpec: ...
+     class ConditionSpec:  # ast/canonical_digest/column_roles/max_lookback/label_ids/expression_role
+     def parse_condition(expression: str, column_registry: dict[str, str],
+                         expression_role: ExpressionRole) -> ConditionSpec: ...
      def evaluate_condition(spec: ConditionSpec, df: pd.DataFrame) -> pd.Series: ...
+     # role-aware 檢查在 parse 期：expression_role='feature' 引用 future_*/trigger_outcome 欄 ⇒ 拒；
+     # 'selection_predicate' 放行未來欄但 spec.column_roles 全記錄、只進抽樣 provenance（W6/CODEX-R7-P1-06）
      ```
   2. safe-subset AST：僅已註冊欄位＋比較/布林/區間/缺值運算（白名單 node 型別，其餘拒）；canonical digest＝AST 正規化後 sha256（同式異白/排序 ⇒ 同 digest）。
   3. 角色隔離（D3）：欄位角色 `∈ {pit_feature, trigger_outcome, future_outcome}`；`feature` 角色引用 `future_*`/`trigger_outcome` 欄 ⇒ 拒；`selection_predicate` 可含未來欄但只進抽樣 provenance；多組 label 用 `label_id` manifest（非布林覆寫）；去重在產生期（G4）；輸出事件過 B1.0 validator（G5）。
@@ -321,7 +327,7 @@
 - 不可做：不得以 `df.eval` 任意字串為核心；不得讓 `selection_predicate` 欄流入特徵表（D3-4）。
 - 邊界：①未註冊欄位 ⇒ 拒；②表達式空/恆真 ⇒ loud；③digest 決定性（同式異白排序 ⇒ 同 digest）。
 - 風險緩解：RISK-a（選樣看答案、特徵不可）；mutation M6 歸屬本 Task。
-- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_condition_engine.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_condition_engine.py -q WHEN expression_role=feature column=future_return THEN rc!=0`。
+- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_condition_engine.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_condition_engine.py -q WHEN expression_role=feature column=future_return THEN rc!=0`；**雙案例（W6）：①`parse_condition(expr含future_return, registry, expression_role='selection_predicate')` 成功且 `column_roles` 記錄該欄為 `future_outcome`②同式 `expression_role='feature'` ⇒ 拒（兩案例同一表達式，只差 role）**。
 - **存活至**：全票完工後保留；IC 事件遮罩之長期底層（J10）。
 - **覆蓋風險**：無。
 
@@ -344,14 +350,19 @@
 - SPEC ref：Task B3.3（K7/C8）　目標：補 `bars_since_cross/consecutive_run/bars_since_threshold/window_max_ratio/cross_count`；已有算子不重做。
 - 輸入/輸出：輸入＝價格/特徵序列＋lookback 參數；輸出＝五個算子欄＋`max_lookback/warmup/as-of` 中繼資料。
 - 實作要點：
-  1. 新增 `momentum/FeatureEngineering/operators/state_counters.py`（落點寫死，不擴 `derived_operators.py`）：五算子各為向量化函式，簽名式樣 `def bars_since_cross(series_a: pd.Series, series_b: pd.Series, lookback: int) -> pd.Series`。
-  2. 每算子只看 `[t−lookback+1, t]`；NaN 語意明定不填 0；窗內無交叉 ⇒ NaN 或哨兵值（契約定，非 0）；warmup 不足 ⇒ NaN 前綴。
+  1. 新增 `momentum/FeatureEngineering/operators/state_counters.py`（落點寫死，不擴 `derived_operators.py`）。五算子精確語意（W7/CODEX-R7-P1-07；TODO 階段細化——SPEC 只命名算子未定公式；全部只看閉區間 `[t−lookback+1, t]`、含當前根 t；「交叉」定義＝`d_i = a_i − b_i` 之嚴格變號：`sign(d_i) ≠ sign(d_{i−1})` 且兩者皆非 NaN 非 0；`d=0` 不計交叉）：
+     - `def bars_since_cross(series_a: pd.Series, series_b: pd.Series, lookback: int) -> pd.Series`：t 減窗內最近一次交叉的 bar index；交叉發生在當前根 ⇒ 0；窗內無交叉 ⇒ NaN。
+     - `def consecutive_run(series: pd.Series, lookback: int) -> pd.Series`：以 t 結尾、`sign(series)` 連續同號（嚴格 >0 或 <0）之 run 長度（含 t），上限 lookback；`series_t==0` 或 NaN ⇒ NaN。
+     - `def bars_since_threshold(series: pd.Series, threshold: float, lookback: int) -> pd.Series`：t 減窗內最近一次「上穿」（`series_{i−1} < threshold ≤ series_i`）的 bar index；窗內無上穿 ⇒ NaN。
+     - `def window_max_ratio(series: pd.Series, lookback: int) -> pd.Series`：`series_t / rolling_max(series, lookback)_t`（分母含當前根）；分母 ≤0 或 NaN ⇒ NaN。
+     - `def cross_count(series_a: pd.Series, series_b: pd.Series, lookback: int) -> pd.Series`：窗內交叉（同上定義）次數；無 ⇒ 0（計數語意，非狀態語意，故 0 合法）。
+  2. NaN 語意明定不填 0；除 `cross_count` 外「窗內無事件」一律 NaN（非哨兵 0）；warmup 不足 ⇒ NaN 前綴；每算子附 ≥1 個 exact expected case（手算序列寫死於測試）。
   3. `operator_registry` 註冊（既有 `ts_argmax/ts_argmin/slope` 等不動）；過 Feature Factory 因果/golden 紀律（三方數據正確性簽核鐵律適用——本 Task 之 review 須含 explicit adversarial 獵漏）。
 - 修改檔案：新增 `state_counters.py`；改 `operator_registry`（僅註冊行）。既有 caller：Feature Factory pipeline。
 - 不可做：不重做已存在算子；不引入跨列未來資訊（`shift(-n)` 禁）。
 - 邊界：①窗內無交叉 ⇒ NaN/哨兵值（非 0）；②warmup 不足 ⇒ NaN 前綴。
 - 風險緩解：RISK-a（Feature Factory 因果紀律）。
-- 驗證：`venv/bin/python -m pytest tests/momentum/feature_engineering/ -q -k state_counters` rc=0（手算小例 exact；因果測試：截斷未來資料結果不變）。
+- 驗證：`venv/bin/python -m pytest tests/momentum/feature_engineering/ -q -k state_counters` rc=0（手算小例 exact——每算子 ≥1 個寫死序列 expected；因果測試：截斷未來資料結果不變）。**測試落點＝新建目錄 `tests/momentum/feature_engineering/test_state_counters.py`（W14 裁決：該目錄現不存在、FF 既有測試在 `tests/feature_engineering/`；新建使 SPEC 命令字面可跑、不動既有，免 SPEC amendment）**。
 - **存活至**：全票完工後保留（Feature Factory 永久算子）。
 - **覆蓋風險**：無。
 
@@ -388,7 +399,12 @@
   1. 新增 `momentum/Analysis/event_samples/candidate_ledger.py`：
      ```python
      def record_candidate(ledger_path, candidate_meta) -> None        # provenance：規則 digest/seed/輸入 digest
-     def to_return_series(rule_or_scores, bars, entry_semantic) -> pd.Series  # 同 D1-6 entry/exit 語意
+     def to_return_series(rule_or_scores, bars, entry_semantic,
+                          label_definition: dict,        # W8：window+label_return_mode ⇒ 退出時點唯一決定
+                          receipts: AlignmentReceipts    # W8：entry_at/label_end 從對齊收據取，禁自行推導
+                          ) -> pd.Series
+     # entry＝D1-6 映射（entry_price_source）；exit＝答案窗末 close（label_end；D1-4 持有鏈），horizon 由
+     # label_definition.window 唯一決定——禁把事件標籤報酬/實際進場報酬混用（W8/CODEX-R7-P1-08）
      def run_dsr_pbo(ledger_path, returns_by_candidate) -> dict
      ```
   2. 消費 `momentum/Analysis/strategy_validation/{pbo.py, min_btl.py}`（不改其簽名）；`n_trials` **從 ledger 讀**，禁 request 任意填。
@@ -397,7 +413,7 @@
 - 不可做：不為 AUC 自創 MinBTL 數字；不跳過 ledger 直餵。
 - 邊界：①ledger 空 ⇒ DSR/PBO `unavailable`；②return series 長度不足 MinBTL 前提 ⇒ loud。
 - 風險緩解：RISK-d（多重測試防線）。
-- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_candidate_ledger.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_candidate_ledger.py -q WHEN input_metric=auc target=dsr THEN rc!=0`。
+- 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/test_candidate_ledger.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_candidate_ledger.py -q WHEN input_metric=auc target=dsr THEN rc!=0`；**entry×exit 一致性（W8）：對 D1-6 五種 `entry_price_semantic` 各一手算案例，斷言 return series 之 entry 取 `entry_price_source`、exit 取 `label_end` close，逐值 exact**。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 
@@ -424,9 +440,9 @@
   3. `/case/import` 舊格式 ⇒ legacy adapter：顯式 migration 提示或拒絕，禁 silent coerce；舊 `cases.json` 不遷移；批次抓 K 線概念保留（lookback＋forward＋warmup；多 TF 已支援 [FACT-RECEIPT]）。
 - 修改檔案：`api/models/`（新 request/response 殼）＋`api/routes/case*`＋`api/services/case_import_service.py`＋`momentum/factories.py`（一個出口）＋新增 `event_samples/pipeline.py`。既有 caller：`/case/import` 前端呼叫端。
 - 不可做：不改 `xgboost_batch_service`；API 層不重複實作契約檢查。
-- 邊界：①混合新舊欄 CSV ⇒ 拒＋指出缺欄；②大檔（萬級事件）⇒ 分頁/串流不 OOM（實測記錄牆鐘——偵察待辦 T-4）。
+- 邊界：①混合新舊欄 CSV ⇒ 拒＋指出缺欄；②大檔（萬級事件）⇒ 分頁/串流處理；**驗收形（W10/CODEX-R7-P2-11，不捏門檻）：本 Task 前置＝偵察待辦 T-3 完成定 workload；驗收＝實測 receipt `handoffs/run_receipts/gap3_import_scale.json` 存在且含 `{n_events≥10000, wall_clock_s, peak_rss_mb}` 三欄（記錄型可證偽）；效能門檻若需，偵察後另走 SPEC amendment，TODO 不私定數值**。
 - 風險緩解：RISK-b。
-- 驗證：`venv/bin/python -m pytest tests/api/ -q -k gap3_import` rc=0（新 schema 過、舊格式得顯式錯誤訊息、無靜默轉換）。
+- 驗證：`venv/bin/python -m pytest tests/api/ -q -k gap3_import` rc=0（新 schema 過、舊格式得顯式錯誤訊息、無靜默轉換）；規模 receipt 檔存在＋三欄齊（W10）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 
@@ -441,7 +457,7 @@
 - 不可做：不另開分析頁（兩份殼——U10）；前端不重算任何統計。
 - 邊界：①未匯入任何事件 ⇒ 事件模式入口 empty state；②後端 `unavailable` ⇒ 顯示 reason。
 - 風險緩解：RISK-b（全棧 wiring：後端/前端/接線三欄齊查）。
-- 驗證：`cd frontend && npm run build` rc=0；vitest 對事件模式入口與兩表渲染之測試 rc=0。
+- 驗證：`cd frontend && npm run build` rc=0；**vitest（W9/CODEX-R7-P2-10）：測試檔命名規約 `frontend/src/**/gap3_*.test.{ts,tsx}`（≥3 檔：事件模式入口/兩表渲染/`unavailable`+empty state），命令 `cd frontend && npx vitest run gap3` rc=0（vitest 檔名子串過濾；`package.json` 既有 `"test": "vitest run"`）**。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 
@@ -449,10 +465,10 @@
 - SPEC ref：Task B5.3　目標：整票 UAT＋白話看板更新、殘留登記 registry、HANDOFF/ROADMAP 同步。
 - 輸入/輸出：輸入＝B1–B5 全部產出；輸出＝UAT checklist 檔（逐項實跑命令＋rc）＋文件同步 commit。
 - 實作要點：
-  1. UAT 腳本走真實流程：匯入 → 對齊 → 三表 → 全 K 線 → 報告（真實 kline）。
+  1. UAT 腳本走真實流程：匯入 → 對齊 → 三表 → 全 K 線 → 報告（真實 kline）；**checklist 檔＝`docs/GAP3_UAT_CHECKLIST.md`（本 Task 產出；逐項＝步驟＋實跑命令＋rc＋預期畫面/輸出；使用者簽字欄——W9/CODEX-R7-P2-10）**。
   2. 殘留逐條入 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-3 殘留」（§N 8 條三值理由已登記，UAT 後補新增項）；白話看板更新（`白話說明/`）；HANDOFF/ROADMAP 同步。
   3. UAT 發現缺陷 ⇒ 回對應批修，不在 B5 打補丁繞過。
-- 修改檔案：`白話說明/`＋`docs/IC_QUANT_GAP_REGISTRY.md`＋`HANDOFF.md`＋`docs/ROADMAP.md`。既有 caller：無程式面。
+- 修改檔案：`白話說明/`＋`docs/IC_QUANT_GAP_REGISTRY.md`＋`HANDOFF.md`＋`docs/ROADMAP.md`；新增 `docs/GAP3_UAT_CHECKLIST.md`（W9）。既有 caller：無程式面。
 - 不可做：不以 UAT 遮蔽 B1–B4 未驗收項（C9）。
 - 邊界：①UAT 缺陷 ⇒ 回批修；②使用者未簽字 ⇒ epic 不收案。
 - 風險緩解：⊘（流程項）。
