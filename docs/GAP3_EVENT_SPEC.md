@@ -1,5 +1,7 @@
 # GAP-3 事件型分析（外部標註正反例匯入 → PIT 對齊 → 條件 IC／ML）— SPEC
 
+> 🔒 **FROZEN（2026-08-20 使用者白話閘核准；三家 RECONCILE-STAMP `handoffs/reconcile/20260820-gap3-x-review-r6/synth.md` rc=0）**。後續修訂走延伸檔 `docs/GAP3_EVENT_SPEC_AMENDMENTS.md`，不就地改本檔。
+
 > 來源 PLAN/診斷：`白話說明/GAP-3事件型討論.md`（第 12 版；**§7.5 五層取材優先序＝本 SPEC 唯一取材地圖**）；consult R1 `handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md`（C1–C6）；consult R2 `handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md`（C1–C9＝K1–K10 技術定案）；**adversarial R1 收斂 `handoffs/reconcile/20260820-gap3-x-review-r1/synth.md`（15 findings 十三群集 X1–X13 全部寫回；AR-1..AR-6 裁定）**；**R2 收斂 `handoffs/reconcile/20260820-gap3-x-review-r2/synth.md`（composer/grok sentinel 0 findings；codex 6 條 Y1–Y6 全部寫回：entry 映射表 D1-6／分類公式與預設值／`counterexample_kind_effective` derived 值集／mutation 逐條命令與 fixture 身分／M8 permutation quantile／control_kind validator 矛盾解除）**；**R3 收斂 `handoffs/reconcile/20260820-gap3-x-review-r3/synth.md`（composer/grok sentinel；codex 4 條 Z1–Z4 全部寫回：receipt 兩層 schema／`drop_threshold` 預設收回待白話閘裁 x／D4 改 effective 欄／M8 三道防退化硬檢）**
 > ｜日期：2026-08-20｜對應 TODO：`docs/GAP3_EVENT_TODO.md`（本 SPEC 白話閘定版後生成）
 > ｜票：`docs/IC_QUANT_GAP_REGISTRY.md` #3；使用者 2026-08-20 裁定「討論收案、新 session 起草 SPEC」
@@ -20,10 +22,10 @@
 
 **D1 — 標籤與價格語意（R2 C1 ⊕ U4b 改寫）**
 1. 契約必填 `entry_price_semantic ∈ {trigger_open, trigger_close, next_open, decision_bar_open, decision_bar_close}`（**事件頂層欄**，與 `label_definition` 平級——R1 X11／X1；字面唯一住契約檔）＋`label_return_mode ∈ {open_to_close, open_to_horizon_close, close_to_close}`（屬 `label_definition`）。
-2. **預設 `close_to_close`（U4b；改寫 R2 C1 之「A/B 預設 `open_to_horizon_close`」）**：**預設模式下**標籤基準一律相對 **t₀ close**——與 IC 主線 label 同語意（`label_generator.py:40-47` 之 `close.shift(-h)/close-1`），條件 IC 直接吃；「基準價語意」欄保留以防未寫明（U4b 原文脈絡：使用者實務一律 c2c、契約保留語意欄——「一律」是否**全禁**非 c2c 模式＝§A 待使用者確認②，R5 V1）。
+2. **預設 `close_to_close`（U4b；改寫 R2 C1 之「A/B 預設 `open_to_horizon_close`」）**：**預設模式下**標籤基準一律相對 **t₀ close**——與 IC 主線 label 同語意（`label_generator.py:40-47` 之 `close.shift(-h)/close-1`），條件 IC 直接吃；「基準價語意」欄保留以防未寫明（U4b 原文脈絡：使用者實務一律 c2c、契約保留語意欄——「一律」範圍已裁＝**保留三值**（2026-08-20 白話閘裁決②），R5 V1）。
 3. 條件 IC（`statistic_kind=conditional_ic`）之 `label_value`＝**條件必填**（R1 X3）：缺 ⇒ `capability_status=unavailable` reason=`missing_label_value`（字面入契約檔）；**v1 不重算**使用者 label（一致性探針＝§N-8）——不留「重算或拒絕」二選一給 TODO。**禁止**把「語意不同的」序列型 `return_N` 靜默當事件 label；`label_return_mode ≠ close_to_close` 而沿用主線 label ⇒ 必標 `label_price_mismatch=true`。
 4. 誠實揭露（U4b／§2-2）：**實際進場價**（open 或 t₀−k）之持有報酬與**標籤基準**（t₀ close）報酬為兩個數，全部 K 線驗證兩數並排、不混。
-5. **label 錨不變式（R1 X2／R5 V1 mode-scoped 消歧）**：label 錨由 `label_return_mode` **機械唯一**決定，且**恆與 `decision_offset_bars`／entry 語意無關**——`close_to_close`（預設；U4b 使用者自身標註實務）⇒ 錨＝t₀ close；`open_to_close`／`open_to_horizon_close` ⇒ 錨＝entry 時點之進場價（**顯式宣告才合法、非預設**；R2 C1 保留選項；是否全禁＝§A 待使用者確認②）。同一輸入之 label 起點**唯一**。**禁止**（`close_to_close` 路徑）以 `decision_at` 列 join 主線 `return_N`（該列 `return_N` 錨在 decision close ≠ t₀ close）；B2.3 驗收含 t₀−k 手算案例斷言錨不隨 decision 移動。
+5. **label 錨不變式（R1 X2／R5 V1 mode-scoped 消歧）**：label 錨由 `label_return_mode` **機械唯一**決定，且**恆與 `decision_offset_bars`／entry 語意無關**——`close_to_close`（預設；U4b 使用者自身標註實務）⇒ 錨＝t₀ close；`open_to_close`／`open_to_horizon_close` ⇒ 錨＝entry 時點之進場價（**顯式宣告才合法、非預設**；R2 C1 保留選項；2026-08-20 白話閘裁決②＝保留）。同一輸入之 label 起點**唯一**。**禁止**（`close_to_close` 路徑）以 `decision_at` 列 join 主線 `return_N`（該列 `return_N` 錨在 decision close ≠ t₀ close）；B2.3 驗收含 t₀−k 手算案例斷言錨不隨 decision 移動。
 6. **entry 語意 → bar/price 唯一映射（R2 Y1）**：`trigger_open`＝t₀ bar 之 open；`trigger_close`＝t₀ bar 之 close；`next_open`＝t₀ 之後下一根**錨定 TF** bar 之 open；`decision_bar_open`／`decision_bar_close`＝decision bar（t₀−k）之 open／close。`entry_at`＝該 bar 對應時點（open 語意＝bar open_time、close 語意＝bar close_time）；validator 檢 `decision_at ≤ entry_at`（`entry_at` 對 `label_start` **無強制順序**——D2-1 三段鏈，R4 W1）；receipt 增 `entry_at_ms`＋`entry_price_source{bar_open_ms, field}`。所有「entry 依契約語意」處一律指本條。
 
 **D2 — PIT 時間軸與對齊收據（R2 C2 ⊕ R1 C1 六時間欄 ⊕ 8/20 t₀−k 擴充）**
@@ -68,9 +70,12 @@
 - FACT-RECEIPT: `sed -n '150,154p' api/models/ic_models.py` → 印出 `event_query` 與 `event_timestamps` 欄（IC 後端已收事件清單；Claude 實跑 2026-08-20）
 - FACT-RECEIPT: `grep -rn "feature_cutoff" momentum/ | wc -l` → 印出 `0`（per-TF 特徵截止不存在、須新建；Claude 實跑 2026-08-20）
 
-**待使用者確認（未確認前不得實作；兩題皆於白話閘一併裁）**：
-1. **`drop_threshold` 之 x 值**（R3 Z2）：您原文只寫「跌 x%」——c 類反例自動分類的門檻要設多少（例 5%）？未裁前契約 `default=null`、c 類自動分類不啟用（fail-closed）。
-2. **U4b「一律相對 t₀ close」之範圍**（R5 V1）：是否**全禁**非 `close_to_close` 模式？裁「全禁」⇒ `label_return_mode` 枚舉收斂為單值、`open_to_*` 移除；裁「保留」⇒ D1-5 mode-scoped 錨定義生效（非預設、顯式宣告才合法）。裁決前 B1.0 契約不得凍結。
+**待使用者確認**：**待確認：無**（原兩題已於 2026-08-20 白話閘裁決，見下）。
+
+**白話閘裁決（2026-08-20 使用者；本 SPEC 凍結依據）**
+1. **分類門檻全部＝舉例可調**（使用者原話「反例 a/b/c 類或是正例的任何漲跌幅度，我都只是舉例，沒有一定」）：B1.5 四門檻（含 `drop_threshold`）皆為可調參數、預設值＝舉例（0.05/0.0/0.01/0.05），契約標 `example_default`、不代表使用者裁定數值；c 類自動分類以舉例預設啟用（R3 Z2 之 fail-closed 解除）。
+2. **`label_return_mode` 保留三值**（R5 V1 之②）：預設 `close_to_close`；`open_to_*` 顯式宣告才合法——D1-5 mode-scoped 錨定義生效。
+3. **`decision_offset_bars` 語意澄清**（使用者確認理解正確）：訊號出現在 t₀ 前哪一根／是否為跨根趨勢＝**未知且不需標註**，由窗內摘要特徵（B1.6/B3.3）＋IC/ML 負責發現；`decision_offset_bars` 是「假設自己在哪一刻決策/進場」的**研究參數**（可多值掃描比較），非訊號位置標註；實盤面由全部 K 線驗證（每根掃一次）涵蓋。
 
 **對抗審裁決紀錄（AR 系列；R1 三家已全數裁定——`handoffs/reconcile/20260820-gap3-x-review-r1/synth.md`）**
 
@@ -187,7 +192,7 @@
 - 目標：`counterexample_kind` 缺值時平台依 t₀ 走勢自動分類 a/b/c，門檻可調。
 - 檔案：新增 `momentum/Analysis/event_samples/counterexample_classifier.py`（純函式）。
 - 既有 caller/影響面：新建無 caller；B2 分層報表消費。
-- 改法（R1 X4＝AR-2 定形；R2 Y2 公式寫死）：`dir∈{+1(long),−1(short)}`；`R0 = dir·(close_t0−open_t0)/open_t0`（t₀ 自身走勢）、`Rw = dir·(close_labelEnd−close_t0)/close_t0`（答案窗走勢；錨＝t₀ close 同 D1；aggregation＝label window 末 close）。分類（僅 `label=0`、`counterexample_kind` 缺值時執行）：**a**＝`R0 ≥ trigger_threshold ∧ Rw ≤ follow_threshold`；**b**＝`|R0| ≤ range_threshold`；**c**＝`R0 ≤ −drop_threshold`。預設（可調；字面唯一住 `counterexample_classifier_config`）：`trigger_threshold=0.05`、`follow_threshold=0.0`、`range_threshold=0.01`（三者源＝使用者 §2-4 原文：漲≥5%／續漲分界／上下 1%）；**`drop_threshold` 無預設（`default=null`）**——使用者原文只寫「跌 x%」、x 從未裁定（R3 Z2）：未設 ⇒ c 類判定**不啟用**、僅由 a/b 與 `unclassifiable` 覆蓋（fail-closed 不發明數字）；x 值**列入白話閘問題**請使用者裁，裁後寫入契約 default。輸出 derived 欄 `counterexample_kind_effective`＋`kind_source=platform_auto`；使用者已標 ⇒ 不重算不回寫（`kind_source=user`）；user/platform 衝突 ⇒ 保留 user＋報告附 `platform_suggested_kind` 留痕；**同時滿足多條 ⇒ `unclassifiable`（不猜）**。
+- 改法（R1 X4＝AR-2 定形；R2 Y2 公式寫死）：`dir∈{+1(long),−1(short)}`；`R0 = dir·(close_t0−open_t0)/open_t0`（t₀ 自身走勢）、`Rw = dir·(close_labelEnd−close_t0)/close_t0`（答案窗走勢；錨＝t₀ close 同 D1；aggregation＝label window 末 close）。分類（僅 `label=0`、`counterexample_kind` 缺值時執行）：**a**＝`R0 ≥ trigger_threshold ∧ Rw ≤ follow_threshold`；**b**＝`|R0| ≤ range_threshold`；**c**＝`R0 ≤ −drop_threshold`。預設（**全部＝舉例可調，`example_default`，非使用者裁定數值**——2026-08-20 白話閘裁決①「都只是舉例，沒有一定」；字面唯一住 `counterexample_classifier_config`）：`trigger_threshold=0.05`、`follow_threshold=0.0`、`range_threshold=0.01`、`drop_threshold=0.05`；四值皆可於 config/UI 調整；c 類自動分類以舉例預設啟用（R3 Z2 fail-closed 解除）。輸出 derived 欄 `counterexample_kind_effective`＋`kind_source=platform_auto`；使用者已標 ⇒ 不重算不回寫（`kind_source=user`）；user/platform 衝突 ⇒ 保留 user＋報告附 `platform_suggested_kind` 留痕；**同時滿足多條 ⇒ `unclassifiable`（不猜）**。
 - **驗證**：`pytest tests/momentum/event_samples/test_counterexample_classifier.py -q` rc=0（手造三類小例 exact；boundary fixtures：每門檻取 `=`、`+1e-9`、`−1e-9` 三點落位 exact——R2 Y2；conflict case 斷言主鍵保留＋`platform_suggested_kind` 出現；多類邊界 ⇒ `unclassifiable`）。
 - **邊界**：①走勢同時滿足多類 ⇒ `unclassifiable`（不進分層分母）②答案窗不完整 ⇒ `unclassifiable` 非亂填③user 有標且 platform 建議不同 ⇒ 主鍵不變、留痕欄出現。
 - **存活至**：全票完工後保留。

@@ -24,7 +24,7 @@
 | PA-CUMSUM 單利權益改正（小票；G1-R8 收回） | 🏁 **CLOSED（2026-08-18）**：`EquityCurveData` 改為單利（cumsum）／複利（cumprod−1）**兩條都算、都標清楚**（後端＋API model＋前端切換，預設複利）；三家 code review 7 條全修（多標的等權組合／proba 缺值 4xx／契約封閉）| — | 出處＝`CODEX-R8-P1-12`／`GROK-R8-P1-03`；使用者 2026-08-18 裁定「兩條都算＋前端切換一起做」；收斂＋三家戳記 `handoffs/reconcile/20260818-pacumsum-x-review-r23/synth.md` |
 | **GAP-2a 邊際 IC／多因子組合（純 IC 層）** | 🏁 **CLOSED（2026-08-19）**：SPEC R7 FROZEN＋TODO FROZEN（五輪 20→15→7→1→0）；B1–B5 各三家 code review＋三家戳記；A1-1..A1-11；§V 24 條 mutation 全 RED；§G-1 golden 改前==改後 PASS；殘留 G2-R1／R2／R3／R5／R6／R7／R8 見 registry「GAP-2 待補完」 | — | SPEC `docs/GAP2_MARGINAL_IC_SPEC.md`；registry #2a |
 | GAP-2b IC→ML 橋 | 契約 **已落地**（`ic_survivor_contract.json` v1＋`validate_survivor_output`／`build_survivor_output`；B1／B3／B4 三家戳記；倖存者檔 `ic_survivors_{case_id}.json` 每次 analyze 落檔）；橋本體＝殘留 G2-R1（user-ruling blocked-by ML 層） | 本體等 ML 層穩定 | registry #2b／「GAP-2 待補完」G2-R1 |
-| GAP-3 事件型分析（使用者重定義：外部標好正反例匯入→PIT 對齊→條件 IC／ML；非 event study） | **SPEC 對抗審收案、待白話閘**（2026-08-20：六輪 15→6→4→1→1→0、每條原提出方閉合；三家 RECONCILE-STAMP rc=0） | 白話閘裁 SPEC 核准＋兩題（drop_threshold x 值／U4b 範圍）→ FROZEN → TODO → B1–B5（每批三家 review＋戳記） | registry #3＋SPEC `docs/GAP3_EVENT_SPEC.md`＋`handoffs/reconcile/20260820-gap3-x-review-r6/synth.md` |
+| GAP-3 事件型分析（使用者重定義：外部標好正反例匯入→PIT 對齊→條件 IC／ML；非 event study） | **SPEC FROZEN（2026-08-20 白話閘核准）**：六輪對抗審 15→6→4→1→1→0＋三家 RECONCILE-STAMP rc=0＋三裁決入 §A；殘留 G3-R1..R8 入 registry | **下一步＝TODO 生成＋對抗審 → B1–B5 施工**（每批三家 review＋戳記） | registry #3＋SPEC `docs/GAP3_EVENT_SPEC.md`（FROZEN）＋`handoffs/reconcile/20260820-gap3-x-review-r6/synth.md` |
 | GAP-4 Pooled/Panel IC | 未開票 | — | 同上 #4 |
 | GAP-5 容量 ADV 接線 | 未開票 | **條件觸發**：volume 資料源 | 同上 #5 |
 | GAP-6 430K 規模防護 | 未開票 | 併 IC-PERF epic | 同上 #6 |

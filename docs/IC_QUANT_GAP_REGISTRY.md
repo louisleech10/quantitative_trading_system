@@ -19,6 +19,20 @@
 
 > **2026-08-20 討論階段收案**：consult R1（r1 synth；composer collection-failed）＋R2（`handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md`；三家齊、26 條九群集）＋使用者兩輪補充（七點）皆收斂於 **`白話說明/GAP-3事件型討論.md`（第 12 版；§7.5＝SPEC 取材唯一地圖）**。
 > 使用者 2026-08-20 裁定：**新 session 起草 SPEC**（`docs/GAP3_EVENT_SPEC.md`；HANDOFF 已備開工指令；五項「待 SPEC 對抗審確認」列於 HANDOFF）。本節凍結，後續以 SPEC 為準。
+> **2026-08-20 SPEC FROZEN**：六輪對抗審（15→6→4→1→1→0；原提出方逐條閉合）＋三家 RECONCILE-STAMP（`handoffs/reconcile/20260820-gap3-x-review-r6/synth.md` rc=0）＋使用者白話閘三裁決（門檻皆舉例可調／label_return_mode 保留三值／decision_offset_bars＝研究參數非訊號標註）。下一步＝TODO。
+
+### GAP-3 殘留（SPEC §N 八條；三值理由；觸發即轉新票——權威登記處，ROADMAP 只放 pointer）
+
+| # | 項目 | 為何現在不做 | 觸發 |
+|---|---|---|---|
+| G3-R1 | triple-barrier／出場最佳化 | user-ruling:2026-08-19（第一版時間出場）＋blocked-by:回測層不完整 | 使用者提出且回測層成熟 |
+| G3-R2 | long-short 組合 | user-ruling:2026-08-19 §4（一次只研究一向） | 使用者提出 |
+| G3-R3 | T4 衍生品/微結構、T6 新聞/鏈上事件 | blocked-by:外部資料源未接（契約欄位已留） | 資料源 epic 落地 |
+| G3-R4 | uniqueness/cluster 權重接 GBDT sample_weight | blocked-by:`UNWIRED_MODULES` 含 sample_weight＋成熟度地圖禁改訓練殼 | ML 殼允許接線閘 |
+| G3-R5 | 正式 panel IC（cross-sectional/GEE） | blocked-by:registry #4 獨立票（本票只蓋可複用原語） | #4 開票 |
+| G3-R6 | CAR/AAR event study、即時 NLP 事件 | user-ruling:2026-08-19/20（非本票定義；使用者確認不需要） | 使用者提出新需求另開票 |
+| G3-R7 | `platform_random_bars` 控制組自動抽樣 | needs-research:estimand 與抽樣契約未定義（R1 判時間分離隨機反例＝廢答案設計） | 委員會定出契約 |
+| G3-R8 | label 一致性探針 | needs-research:探針族範圍與誤報處置未定義（AR-6 裁 2:1；配套硬規則已入 SPEC D1-3） | 使用者要求或匯入資料品質事故 |
 
 使用者原意（逐字義）：例＝12h K 漲≥5% 定該根 open 為 t₀；t₀ 後 24／36／48h 之 close 皆比 t₀ close 高≥3% ⇒ 正例，否則反例；特徵＝t₀ 往前 x 根 1h／4h 指標；目標＝在數千～數萬個 t₀ 中找正例共通 pattern 當策略。**這只是其中一種事件**；正反例將由使用者自外部檔案標好餵入。
 

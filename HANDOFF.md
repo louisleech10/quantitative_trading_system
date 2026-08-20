@@ -6,21 +6,16 @@
 
 ---
 
-## 🔴 當前狀態：**GAP-3 SPEC 對抗審全管線收案，阻塞在使用者白話閘**
+## 🔴 接手任務：**生成 GAP-3 TODO 並走對抗審**（SPEC 已 FROZEN，2026-08-20 使用者白話閘核准）
 
-- SPEC＝`docs/GAP3_EVENT_SPEC.md` @ HEAD（六輪對抗審 15→6→4→1→1→0；每條由原提出方重跑反例閉合）。
-- 收斂檔鏈＝`handoffs/reconcile/20260820-gap3-x-review-r{1..6}/synth.md`（R1=X1–X13＋AR-1..6 裁決；R2=Y1–Y6；R3=Z1–Z4；R4=W1；R5=V1；R6=終態）＋stamp-r1/r2。
-- **三家 RECONCILE-STAMP 已核可 r6 synth**（`reconcile_stamps_check` rc=0，body sha `f833c6b9…`）；債帳 0 OPEN。
-- **白話閘（阻塞彈窗）已發給使用者，等裁三題**：①SPEC 核准進 TODO？②`drop_threshold` x 值（SPEC §A 待確認①；未裁前 c 類自動分類 fail-closed 不啟用）③U4b「一律 t₀ close」範圍（§A 待確認②；全禁 open_to_* vs 保留須顯式宣告）。
-
-## 接手動作（依使用者裁決分支）
-1. **核准**：把 ②③ 裁決寫入 SPEC §A 已確認結果＋對應條文（②入 B1.5/契約 default；③定 enum）→ SPEC 標 FROZEN → 走 `templates/TODO_GENERATION_PROMPT.md` 生成 `docs/GAP3_EVENT_TODO.md`（gate artifact 開門）→ TODO 對抗審。
-2. **退回**：照裁示修訂，修訂＝新一輪三家對抗審＋重新戳記（body 變 ⇒ 舊戳記自動失效）。
-3. 殘留八條（SPEC §N）於 freeze 時同步登記 `docs/IC_QUANT_GAP_REGISTRY.md`「GAP-3 殘留」；ROADMAP 只放 pointer。
+- **SPEC＝`docs/GAP3_EVENT_SPEC.md`（FROZEN；修訂走延伸檔 `docs/GAP3_EVENT_SPEC_AMENDMENTS.md`）**。白話閘三裁決已寫入 §A：門檻皆舉例可調／`label_return_mode` 保留三值／`decision_offset_bars`＝研究參數非訊號標註。
+- 對抗審履歷：六輪 15→6→4→1→1→0（synth 鏈 `handoffs/reconcile/20260820-gap3-x-review-r{1..6}/`）；三家 RECONCILE-STAMP 蓋 r6 synth rc=0；殘留 G3-R1..R8 已登記 registry。
+- **下一步**：①照 `templates/TODO_GENERATION_PROMPT.md` 生成 `docs/GAP3_EVENT_TODO.md`（創建須 `bash scripts/gate.sh artifact --file docs/GAP3_EVENT_TODO.md --template-opened templates/TODO_GENERATION_PROMPT.md --sections ...`）②TODO 三家對抗審（抄寫漂移是 TODO 階段主病——逐 Task 對 SPEC 條文比對）→ reconcile＋戳記 → TODO FROZEN ③開 B1 施工（主委自任實作；每批三家 code review＋戳記才進下批；B1 批內順序 B1.0→B1.1→B1.2→B1.3→B1.6→B1.4→B1.5）。
+- TODO 要點提醒：§V M1–M12 逐字抄不得增刪；契約欄位只 pointer `event_import_contract.json`（Task B1.0 建）；`ic_survivor_contract` 升版只在 B2.4；§G golden 凍結時機＝B2.3 動工前。
 
 ## ⚠ 坑（完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～八十一）
-- 🔴 含家族名的 Bash 會被擋 ⇒ 命令寫 scratchpad 腳本再 `bash <script>`。committee_run 一家失敗：同 round `ROUND_ID=<id> bash scripts/cx_run.sh <fam> <brief> <out>` 補跑；**同 round 該家已 success 會拒重派 ⇒ 開新 kind 輪**（本線 stamp-r2 前例）。
-- 🔴 Cursor `resource_exhausted` 多為**端點暫時故障非額度**（8/20 實測：最小探針 `cursor-agent -p … "回覆兩個字"` rc=0 即恢復）；先探針再退避，review/stamp 輪禁 abandon。
-- 🔴 **戳記時序坑（摩擦候補）**：stamp-target 尚無 `## 戳記` 區時委員算的 body hash＝全檔，區塊建立後即跨版失效 ⇒ 派 stamp 前主委先在 target 建空 `## 戳記` 區，或 brief 明令「先確認區塊存在」。
-- reconcile 正式入口＝`completeness_check.sh --lock <sources.lock>`（只吃 lock，不吃 synth 路徑）；review 輪 lock 須 `--mode review`（discovery 建的用 `--rebuild` 升級）。
+- 🔴 含家族名的 Bash 會被擋 ⇒ 命令寫 scratchpad 腳本再 `bash <script>`。committee_run 一家失敗：同 round `ROUND_ID=<id> bash scripts/cx_run.sh <fam> <brief> <out>` 補跑；**同 round 該家已 success 拒重派 ⇒ 開新輪**。
+- 🔴 Cursor `resource_exhausted` 多為端點暫時故障非額度（先最小探針 `cursor-agent -p … "回覆兩個字"`，rc=0 即可重派）；review/stamp 輪禁 abandon。
+- 🔴 戳記時序坑：stamp-target 無 `## 戳記` 區時委員算的 body hash＝全檔，區塊建立後跨版失效 ⇒ 派 stamp 前先在 target 建空 `## 戳記` 區。
+- reconcile 正式入口＝`completeness_check.sh --lock <sources.lock>`；review 輪 lock 須 `--mode review`（`--rebuild` 可升級）。
 - `factkey_write_guard` 對 `Archived/GAP-2施工進度.md:13-22` 紅＝既有；`scripts/governance_families.json` no-op dirty＝既有；push 丟背景；venv Python 3.9.6；三支臨時腳本 `scripts/ichc_t2_*.py`／`ichc_t3_diff.py` 待清（非本線）。
