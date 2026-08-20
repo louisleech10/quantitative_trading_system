@@ -17,6 +17,12 @@ from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.Analysis.event_samples.types import EventManifest, EventSplitConfig, EventSplitPlan
 
 
+def _cluster_weight(counts: "pd.Series") -> "pd.Series":
+    """time-cluster 權重公式 w=1/n（R1 X9）唯一實作點（CODEX-R1-P1-01：M5 production
+    seam——monkeypatch 改全 1 即破「同簇權重和＝1」斷言，測試必紅）。"""
+    return 1.0 / counts
+
+
 def split_events(manifest: EventManifest, split_config: EventSplitConfig) -> EventSplitPlan:
     """事件切分：每標的各自按時間切＋緩衝 ≥ 答案窗；interval 跨界 ⇒ purge。"""
     t = manifest.table
@@ -75,7 +81,7 @@ def split_events(manifest: EventManifest, split_config: EventSplitConfig) -> Eve
     clusters = pd.DataFrame({
         "event_id": t["event_id"],
         "time_cluster_id": tc.astype("int64"),
-        "cluster_weight": 1.0 / counts.astype(float),  # primary（R1 X9）；bootstrap over clusters＝敏感度
+        "cluster_weight": _cluster_weight(counts.astype(float)),  # primary（R1 X9）；bootstrap over clusters＝敏感度
     })
 
     n_symbols = len(per_symbol_n)

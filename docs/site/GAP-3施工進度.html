@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>量化主線：GAP-3 事件型施工看板</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-3施工進度.md</span></nav>
+<main>
+<h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
+<p><strong>這張表回答：五批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
+<h2 id="五批總覽">五批總覽</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>批</th>
+<th>內容（白話）</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B1</strong></td>
+<td>匯入契約＋不偷看未來的時間對齊＋去重切分＋特徵取列＋自檢 oracle（7 項）</td>
+<td>🔧 <strong>施工完、三家審查第一輪抓 8 條、全部修完、等複驗蓋章</strong></td>
+</tr>
+<tr>
+<td>B2</td>
+<td>三張統計表＋倖存者契約升版＋全部 K 線驗證</td>
+<td>排隊中（等 B1 蓋章）</td>
+</tr>
+<tr>
+<td>B3</td>
+<td>事件產生器＋變化類特徵算子</td>
+<td>排隊中</td>
+</tr>
+<tr>
+<td>B4</td>
+<td>pattern 抽取＋接 GAP-1 防過擬合</td>
+<td>排隊中</td>
+</tr>
+<tr>
+<td>B5</td>
+<td>API／前端三頁／UAT</td>
+<td>排隊中</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="b1-逐項7-項驗收pytest-testsmomentumevent_samples">B1 逐項（7 項；驗收＝<code>pytest tests/momentum/event_samples/</code>）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項</th>
+<th>做什麼</th>
+<th>驗收證據</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1.0 匯入契約</td>
+<td>所有欄位名／枚舉／拒收理由只住一個 JSON 檔；匯入 fail-closed（缺欄、多欄、枚舉外、秒級時間戳、來源檔 digest 被改、同批方向混用、只有正例沒反例 ⇒ 全部拒收）</td>
+<td>28 條測試；digest 篡改、方向混用、T8/T9/T10 巢狀欄位型別皆有反例</td>
+</tr>
+<tr>
+<td>B1.1 時間對齊</td>
+<td>每個事件推導六個時間點（決策／進場／標籤起訖／各 TF 特徵截止），機器檢查順序不得顛倒；對不上就列清單，<strong>不准默默丟</strong>（記帳守恆：進來幾個＝收據＋失敗清單）</td>
+<td>12 條；<strong>真實 K 線手算對照整數毫秒 exact</strong>（整點／非整點／資料末端三案）；bar 表亂序／重複／close≤open 全擋</td>
+</tr>
+<tr>
+<td>B1.2 去重成簇</td>
+<td>標籤窗重疊的連續觸發合併成簇（真正的連通分量，不是只看前一顆）；C 情境取簇首、A/B 全留但降權</td>
+<td>8 條；含兩家審查給的「夾心事件」反例</td>
+</tr>
+<tr>
+<td>B1.3 切分</td>
+<td>每個標的各自按時間切、留緩衝、跨界 purge；同一時刻多標的觸發算同一簇、權重 1/n</td>
+<td>9 條；打亂列序結果不變（禁 positional index）</td>
+</tr>
+<tr>
+<td>B1.6 特徵取列</td>
+<td>全部 K 線連續算特徵（真實 Feature Factory），每個事件只取決策那一列；warmup 沒好的事件進失敗清單，<strong>不准混 NaN</strong></td>
+<td>7 條；足長段 vs 全史、截斷未來重算不變</td>
+</tr>
+<tr>
+<td>B1.4 自檢 oracle</td>
+<td>把答案打亂後模型應落回瞎猜水準（置亂 1000 次取經驗帶；三道硬檢防假綠）</td>
+<td>11 條；資訊特徵出帶、噪音在帶內</td>
+</tr>
+<tr>
+<td>B1.5 反例分類</td>
+<td>反例缺種類時依 t₀ 走勢自動分 a/b/c，門檻全是你說的「舉例可調」；同時命中多類就標「不可分類」不猜</td>
+<td>16 條；每門檻 =／±1e-9 三點落位 exact</td>
+</tr>
+<tr>
+<td>mutation guard</td>
+<td>故意弄壞 8 種（吞失敗記帳、偷看下一根、拆掉毫秒閘、權重全 1、恆等置亂、偏移算錯、分類亂猜、模型可得性不檢）⇒ 對應測試必須變紅</td>
+<td>8 條全部證明「弄壞會紅」</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>合計 98 條測試</strong>（第一輪審查前 87 條，修補後新增 11 條）。</p>
+<h2 id="三家審查第一輪抓到什麼821">三家審查第一輪抓到什麼（8/21）</h2>
+<ul>
+<li><strong>最重要的一條（codex＋composer 各自用反例打穿）</strong>：去重成簇我寫成「只跟前一顆比」，遇到「長窗包住短窗、再來一顆只跟長窗相交」會把第三顆錯拆成另一簇 ⇒ 代表選錯、權重算錯。已改成真正的連通分量（union-find），兩家反例都進回歸測試。grok 當時判「等價」是錯的，碼證勝過人頭。</li>
+<li>codex 另外 5 條：巢狀欄位沒逐欄驗型（數字當字串混進來）／bar 表只驗 open 不驗 close／特徵取列的列號對證有漏洞／oracle 遇到缺值會默默刪列／特徵表的指紋沒帶進報告。<strong>全部採納修完</strong>。</li>
+<li>codex 對 mutation guard 的批評也對：有 4 條只在測試裡模擬「弄壞」，沒真的去戳生產碼。已改成全部 monkeypatch 生產路徑。</li>
+</ul>
+<h2 id="施工中抓到的一個真發現延伸檔-d-001">施工中抓到的一個真發現（延伸檔 D-001）</h2>
+<p>清單寫「足長段物化要跟全史一致到 1e-12」——實測做不到，原因不是程式錯：Feature Factory 存特徵<strong>大多用 float16</strong>（15 欄裡 14 欄），精度天花板就在那；差異全部是量化級（最後一位翻一個 bin），截斷未來重算 14/15 欄<strong>完全相等</strong>，證明不是偷看未來。判準改成「≤ 儲存精度量子」分層，證據鏈寫進 <code>docs/GAP3_EVENT_TODO.D-001.md</code>，三家審查裁定「是前提修正，不是降標」。</p>
+<h2 id="下一步">下一步</h2>
+<p>B1 複驗輪（原提出方重跑自己的反例）→ 三家蓋章 → 進 B2（三張表；B2.3 動工前先凍結 IC 主線 golden）。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

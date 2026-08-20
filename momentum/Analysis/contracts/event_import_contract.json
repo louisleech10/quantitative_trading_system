@@ -72,20 +72,24 @@
       "trigger": "field_present_nonempty",
       "type": "list",
       "item_fields": ["symbol", "timeframe", "alignment_rule", "snapshot_digest"],
-      "doc": "T8 跨標的參照；出現即全欄必填，缺 ⇒ conditional_required_missing"
+      "item_types": { "symbol": "str", "timeframe": "str", "alignment_rule": "str", "snapshot_digest": "str" },
+      "doc": "T8 跨標的參照；出現即全欄必填且逐欄驗型（禁 coercion；CODEX-R1-P1-03），缺 ⇒ conditional_required_missing、型錯 ⇒ type_error"
     },
     "source_model": {
       "trigger": "event_origin == 'model'",
       "type": "object",
       "item_fields": ["model_id", "version", "artifact_digest", "split_plan_hash", "feature_manifest_hash", "available_at"],
+      "item_types": { "model_id": "str", "version": "str", "artifact_digest": "str", "split_plan_hash": "str", "feature_manifest_hash": "str", "available_at": "int_ms" },
       "rule": "available_at(ms) <= decision_at_nominal(= t0 - decision_offset_bars×TF_ms) 否則 reason=research_only 拒（R2 C7；M12 看住）",
-      "doc": "T9 模型產事件之 availability receipt"
+      "doc": "T9 模型產事件之 availability receipt；逐欄驗型"
     },
     "event_interval": {
       "trigger": "event_shape == 'interval'",
       "type": "object",
       "item_fields": ["start", "end", "endpoints_inclusive"],
-      "doc": "T10 區間事件；start/end epoch ms、endpoints_inclusive={start:bool,end:bool}"
+      "item_types": { "start": "int_ms", "end": "int_ms", "endpoints_inclusive": "object{start:bool,end:bool}" },
+      "rule": "start < end",
+      "doc": "T10 區間事件；start/end epoch ms（量級閘同 t0）、endpoints_inclusive={start:bool,end:bool}；逐欄驗型"
     }
   },
   "derived_fields": {

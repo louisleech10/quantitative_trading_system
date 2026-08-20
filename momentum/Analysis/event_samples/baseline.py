@@ -10,7 +10,7 @@ N_perm=1000、經驗分位帶；三道硬檢——(i) 置亂分布非退化（va
 from __future__ import annotations
 
 import hashlib
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -85,11 +85,15 @@ def single_feature_binary_baseline(
     event_split_plan: EventSplitPlan,
     *,
     oracle_config: OracleConfig,
+    feature_manifest_hash: Optional[str] = None,
 ) -> Dict:
     """對每特徵單獨算 OOS AUC/PR-AUC（test 段 only）＋BH-FDR＋permutation 帶。
 
     features_at_decision：index=event_id、columns=特徵；labels：index=event_id 之 0/1。
-    one-class test 段 ⇒ capability unavailable:one_class_test_segment；特徵全 NaN ⇒ loud 拒。
+    one-class test 段 ⇒ capability unavailable:one_class_test_segment。
+    任何非有限值（NaN/inf）⇒ loud 拒（CODEX-R1-P1-06：上游 B1.6 已保證無 NaN 混入，
+    此處出現即契約破缺，不做 pairwise 靜默刪列）。
+    feature_manifest_hash（CODEX-R1-P2-07）：B1.6 產出之 provenance，寫入 report receipts。
     """
     test_ids = event_split_plan.assignments.loc[
         event_split_plan.assignments["split_label"] == "test", "event_id"
@@ -102,7 +106,10 @@ def single_feature_binary_baseline(
         "statistic_kind": "binary_discrimination",
         "n_test": int(len(idx)),
         "prevalence": float(y.mean()) if len(y) else float("nan"),
-        "receipts": {"seed": oracle_config.seed, "n_perm": oracle_config.n_perm},
+        "receipts": {
+            "seed": oracle_config.seed, "n_perm": oracle_config.n_perm,
+            "feature_manifest_hash": feature_manifest_hash,
+        },
     }
     if len(np.unique(y)) < 2:
         report["capability_status"] = "unavailable"
@@ -110,15 +117,16 @@ def single_feature_binary_baseline(
         report["features"] = {}
         return report
 
+    Xv = X.to_numpy(dtype=float)
+    if Xv.size and not np.isfinite(Xv).all():
+        bad = [c for c in X.columns if not np.isfinite(X[c].to_numpy(dtype=float)).all()]
+        raise ValueError(f"single_feature_binary_baseline: 特徵含非有限值（NaN/inf）loud 拒——{bad}")
+
     feats: Dict[str, Dict] = {}
     pvals: List[float] = []
     names: List[str] = []
     for col in features_at_decision.columns:
-        v = X[col].to_numpy(dtype=float)
-        mask = np.isfinite(v)
-        if not mask.any():
-            raise ValueError(f"single_feature_binary_baseline: 特徵全 NaN loud 拒——{col}")
-        vv, yy = v[mask], y[mask]
+        vv, yy = X[col].to_numpy(dtype=float), y
         if len(np.unique(yy)) < 2:
             feats[col] = {"capability_status": "unavailable", "reason": "one_class_test_segment"}
             continue
@@ -134,6 +142,7 @@ def single_feature_binary_baseline(
             "pr_auc": o_pr["observed"], "pr_auc_band": [o_pr["band_low"], o_pr["band_high"]],
             "pr_auc_in_band": o_pr["in_band"],
             "permutation_digest": o_auc["receipt"]["first_permutation_digest"],
+            "n_used": int(len(vv)),
         }
         pvals.append(o_auc["p_value"])
         names.append(col)

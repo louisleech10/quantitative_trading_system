@@ -38,15 +38,25 @@ def _validate_bar_table(bars: pd.DataFrame) -> str:
         if col not in bars.columns:
             return "missing_bar"
     ot = bars["open_time_ms"].to_numpy()
-    if len(ot) and ot.dtype.kind not in ("i", "u"):
-        return "invalid_timestamp_unit"
-    if len(ot) and int(ot.min()) < 10**12:
-        return "invalid_timestamp_unit"  # 量級像秒（D2-3）
-    if len(ot) > 1 and (np.diff(ot) < 0).any():
-        return "unsorted_bar"
-    if len(ot) != len(np.unique(ot)):
-        return "duplicate_bar"
+    ct = bars["close_time_ms"].to_numpy()
+    for arr in (ot, ct):  # CODEX-R1-P1-04：close_time 同受守護（cutoff searchsorted 依賴其排序）
+        if len(arr) and arr.dtype.kind not in ("i", "u"):
+            return "invalid_timestamp_unit"
+        if len(arr) and int(arr.min()) < 10**12:
+            return "invalid_timestamp_unit"  # 量級像秒（D2-3）
+        if len(arr) > 1 and (np.diff(arr) < 0).any():
+            return "unsorted_bar"
+        if len(arr) != len(np.unique(arr)):
+            return "duplicate_bar"
+    if len(ot) and (ct <= ot).any():
+        return "tf_boundary_ambiguous"  # close_time 須嚴格晚於 open_time
     return ""
+
+
+def _append_failure(fail_rows: List[dict], event_id, reason: str) -> None:
+    """失敗記帳唯一寫入點（CODEX-R1-P1-01：M1 production seam——monkeypatch 吞記帳
+    即破記帳守恆 n_input == n_receipts + n_failures，測試必紅）。"""
+    fail_rows.append({"event_id": event_id, "reason": reason})
 
 
 def _decision_idx(t0_idx: int, k: int) -> int:
@@ -195,7 +205,7 @@ def align_events(
             })
             tf_rows.extend(tf_batch)
         except _EventFailure as ef:
-            fail_rows.append({"event_id": eid, "reason": ef.reason})
+            _append_failure(fail_rows, eid, ef.reason)
 
     receipts = AlignmentReceipts(
         event_level=pd.DataFrame(ev_rows, columns=_EVENT_COLS),

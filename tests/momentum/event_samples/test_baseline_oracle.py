@@ -78,8 +78,28 @@ def test_one_class_unavailable():
 def test_all_nan_feature_loud():
     X, y, plan = synth()
     X["dead"] = np.nan
-    with pytest.raises(ValueError, match="全 NaN"):
+    with pytest.raises(ValueError, match="非有限值"):
         single_feature_binary_baseline(X, y, plan, oracle_config=OC)
+
+
+def test_partial_nonfinite_loud_no_silent_drop():
+    """CODEX-R1-P1-06：單一 cell NaN/inf 亦 fail-closed，不做 pairwise 靜默刪列。"""
+    X, y, plan = synth()
+    X.iloc[200, X.columns.get_loc("noise")] = np.nan
+    with pytest.raises(ValueError, match="非有限值"):
+        single_feature_binary_baseline(X, y, plan, oracle_config=OC)
+    X2, _, _ = synth()
+    X2.iloc[200, X2.columns.get_loc("noise")] = np.inf
+    with pytest.raises(ValueError, match="非有限值"):
+        single_feature_binary_baseline(X2, y, plan, oracle_config=OC)
+
+
+def test_feature_manifest_hash_in_receipts():
+    """CODEX-R1-P2-07：B1.6 之 feature_manifest_hash 進 report receipts（provenance）。"""
+    X, y, plan = synth()
+    rep = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash="ab" * 32)
+    assert rep["receipts"]["feature_manifest_hash"] == "ab" * 32
+    assert rep["features"]["noise"]["n_used"] == N - N // 2
 
 
 def test_m8_identity_permutation_hard_check(monkeypatch):

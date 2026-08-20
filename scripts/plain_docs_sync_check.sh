@@ -74,6 +74,8 @@ _watched_for() {
     "IC健檢偵察結果.md")             echo "docs/IC_QUANT_GAP_REGISTRY.md" ;;
     # GAP-2 施工看板（2026-08-18）：盯新模組／契約／探針／TODO／延伸檔
     "GAP-2施工進度.md")              echo "momentum/Analysis/marginal_ic.py momentum/Analysis/factor_combiner.py momentum/Analysis/survivor_contract.py momentum/Analysis/contracts/ic_survivor_contract.json scripts/gap2_mutation_probe.sh scripts/gap2_freeze_golden.py docs/GAP2_MARGINAL_IC_TODO.md docs/GAP2_MARGINAL_IC_AMENDMENTS.md" ;;
+    # GAP-3 施工看板（2026-08-21）：盯事件樣本模組／契約／測試／凍結 TODO 與 D 延伸檔／§G 凍結腳本（B2.3 建）
+    "GAP-3施工進度.md")              echo "momentum/Analysis/event_samples/ momentum/Analysis/contracts/event_import_contract.json tests/momentum/event_samples/ scripts/gap3_freeze_golden.py docs/GAP3_EVENT_TODO.md docs/GAP3_EVENT_TODO.D-001.md" ;;
     # GAP-3 事件型討論文檔（2026-08-19；使用者：「先寫成一個文檔，討論就修改文檔」）：盯缺口 registry 與 consult 收斂檔；
     #   日後 GAP-3 SPEC 出現時把 SPEC 路徑加進來（SPEC 定版前本檔是討論的唯一落點）。
     "GAP-3事件型討論.md")            echo "docs/IC_QUANT_GAP_REGISTRY.md handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md handoffs/20260819-gap3-recon-BRIEF.md" ;;

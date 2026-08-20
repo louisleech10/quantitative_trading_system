@@ -60,15 +60,17 @@ def _aligned(events, bars, tfs=("12h",)):
     return df, align_events(df, bars, AlignmentConfig(timeframes=tfs))
 
 
-def test_M1_failure_accounting_swallow_detected(bars):
-    """M1：drop 不寫 reason ⇒ 記帳守恆斷言（n_input == n_receipts + n_failures）紅。"""
+def test_M1_failure_accounting_swallow_detected(bars, monkeypatch):
+    """M1：drop 不寫 reason ⇒ 記帳守恆斷言（n_input == n_receipts + n_failures）紅。
+    production seam＝alignment._append_failure（CODEX-R1-P1-01 修：真 monkeypatch 生產路徑）。"""
     events = _fixed_event_table(1) + [make_event(99, t0=1777291200000, label=0)]  # 末端必失敗
     _record_fixture("M1_events", events)
     df, (rec, fail) = _aligned(events, bars)
     assert len(df) == len(rec.event_level) + len(fail)              # baseline 守恆
-    swallowed = fail.iloc[:-1]                                       # mutation：吞掉一筆失敗記帳
-    assert len(df) != len(rec.event_level) + len(swallowed)          # 守恆斷言必抓到（紅）
     assert sum(n_dropped_by_reason(fail).values()) == len(fail)
+    monkeypatch.setattr(al, "_append_failure", lambda rows, eid, reason: None)  # mutation：吞記帳
+    _, (rec2, fail2) = _aligned(events, bars)
+    assert len(df) != len(rec2.event_level) + len(fail2)            # 守恆斷言必抓到（紅）
 
 
 def test_M2_pit_shift_next_bar_detected(bars, monkeypatch):
@@ -91,12 +93,15 @@ def test_M3_ms_gate_removed_lets_seconds_pass(monkeypatch):
         validate_event_import(events)
     mutated = ic.load_event_import_contract()
     mutated["ms_magnitude_min"] = 10**9                              # mutation：閘鬆到秒級也放行（等效移除）
-    df = validate_event_import(events, contract=mutated)
+    monkeypatch.setattr(ic, "load_event_import_contract", lambda: mutated)  # 生產載入路徑（CODEX-R1-P1-01 修）
+    df = validate_event_import(events)                               # 不傳 contract ⇒ 走 production loader
     assert len(df) == 2                                              # 秒級混入 ⇒ 拒收斷言必紅
 
 
-def test_M5_cluster_weight_all_one_detected():
-    """M5：cluster_weight 全設 1（棄 1/n）⇒ 同簇權重和＝1（atol=1e-12）斷言紅。"""
+def test_M5_cluster_weight_all_one_detected(monkeypatch):
+    """M5：cluster_weight 全設 1（棄 1/n）⇒ 同簇權重和＝1（atol=1e-12）斷言紅。
+    production seam＝event_split._cluster_weight（CODEX-R1-P1-01 修）。"""
+    from momentum.Analysis.event_samples import event_split as es
     rows = []
     rng = np.random.default_rng(SEED + 5)
     for s, sym in enumerate(("ETHUSDT", "BTCUSDT")):
@@ -112,8 +117,9 @@ def test_M5_cluster_weight_all_one_detected():
     plan = split_events(manifest, EventSplitConfig(test_fraction=0.4, tier_min_test_events=0))
     sums = plan.clusters.groupby("time_cluster_id")["cluster_weight"].sum()
     assert (sums - 1.0).abs().max() <= 1e-12                         # baseline
-    mutated = plan.clusters.assign(cluster_weight=1.0)               # mutation
-    sums_m = mutated.groupby("time_cluster_id")["cluster_weight"].sum()
+    monkeypatch.setattr(es, "_cluster_weight", lambda counts: counts * 0.0 + 1.0)  # mutation：全 1
+    plan_m = split_events(manifest, EventSplitConfig(test_fraction=0.4, tier_min_test_events=0))
+    sums_m = plan_m.clusters.groupby("time_cluster_id")["cluster_weight"].sum()
     assert (sums_m - 1.0).abs().max() > 1e-12                        # 斷言必抓到（紅）
 
 
@@ -147,22 +153,30 @@ def test_M9_offset_k_minus_one_detected(bars, monkeypatch):
     assert got != T0_100 - H12                                       # exact oracle 必抓到（紅）
 
 
-def test_M10_multi_hit_precedence_guess_detected():
-    """M10：多類邊界從 unclassifiable 改取 precedence 猜一類 ⇒ 邊界案例斷言紅。"""
-    cfg = {"thresholds": {"trigger_threshold": 0.005, "follow_threshold": 0.0,
-                          "range_threshold": 0.01, "drop_threshold": 0.05}}
-    _record_fixture("M10_case", {"r0": 0.005, "rw": -0.01, "cfg": cfg})
-    assert _classify_one(0.005, -0.01, cfg) == "unclassifiable"      # baseline：不猜
+def test_M10_multi_hit_precedence_guess_detected(bars, monkeypatch):
+    """M10：多類邊界從 unclassifiable 改取 precedence 猜一類 ⇒ 邊界案例斷言紅。
+    production seam＝counterexample_classifier._classify_one，端到端走 classify_counterexamples（CODEX-R1-P1-01 修）。"""
+    from momentum.Analysis.event_samples import counterexample_classifier as cc
+    # 門檻使任何 R0≥0 事件同時命中 a 與 b（range=1 恆真、trigger=0、follow=1）⇒ 真實事件必多命中
+    cfg = {"thresholds": {"trigger_threshold": 0.0, "follow_threshold": 1.0,
+                          "range_threshold": 1.0, "drop_threshold": 0.05}}
+    events = [make_event(i, t0=T0_100 + i * H12, label=0) for i in range(4)] + [make_event(9, t0=T0_100 + 20 * H12, label=1)]
+    _record_fixture("M10_events", events)
+    df, (rec, fail) = _aligned(events, bars)
+    base = cc.classify_counterexamples(df, rec, bars, cfg).set_index("event_id")["counterexample_kind_effective"]
+    assert (base == "unclassifiable").any()                          # baseline：多命中不猜
 
-    def mutated(r0, rw, c):                                          # mutation：取第一命中
-        hits = []
-        if r0 >= 0.005 and rw <= 0.0:
-            hits.append("a_trigger_no_follow")
-        if abs(r0) <= 0.01:
-            hits.append("b_range")
-        return hits[0] if hits else "unclassifiable"
+    orig = cc._classify_one
 
-    assert mutated(0.005, -0.01, cfg) != "unclassifiable"            # 斷言必抓到（紅）
+    def guess(r0, rw, c):                                            # mutation：多命中取第一
+        out = orig(r0, rw, c)
+        if out == "unclassifiable" and abs(r0) <= 1.0:
+            return "b_range"
+        return out
+
+    monkeypatch.setattr(cc, "_classify_one", guess)
+    mut = cc.classify_counterexamples(df, rec, bars, cfg).set_index("event_id")["counterexample_kind_effective"]
+    assert not (mut == "unclassifiable").any()                       # 邊界斷言必抓到（紅）
 
 
 def test_M12_t9_availability_removed_accepts(monkeypatch):

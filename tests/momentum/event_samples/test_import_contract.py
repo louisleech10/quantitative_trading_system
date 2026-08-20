@@ -220,6 +220,29 @@ def test_t8_reference_symbols_all_fields_required():
     assert "conditional_required_missing" in reasons_of(ei.value)
 
 
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda e: e.update(reference_symbols=[{"symbol": 123, "timeframe": "12h", "alignment_rule": "asof", "snapshot_digest": "x" * 64}]),
+        lambda e: e.update(event_origin="model", source_model={"model_id": 7, "version": "1", "artifact_digest": "d" * 64,
+                                                               "split_plan_hash": "e" * 64, "feature_manifest_hash": "f" * 64,
+                                                               "available_at": T0 - TF_MS}, decision_offset_bars=1),
+        lambda e: e.update(event_shape="interval", event_interval={"start": "1704067200000", "end": T0 + TF_MS,
+                                                                   "endpoints_inclusive": {"start": True, "end": False}}),
+        lambda e: e.update(event_shape="interval", event_interval={"start": T0 + TF_MS, "end": T0,
+                                                                   "endpoints_inclusive": {"start": True, "end": False}}),
+        lambda e: e.update(event_shape="interval", event_interval={"start": T0, "end": T0 + TF_MS, "endpoints_inclusive": [True, False]}),
+    ],
+)
+def test_nested_conditional_types_fail_closed(mutate):
+    """CODEX-R1-P1-03：T8/T9/T10 nested 逐欄驗型、禁 coercion（數字當字串／字串當 ms／start≥end／list 當 object 皆拒）。"""
+    batch = valid_batch()
+    mutate(batch[0])
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch)
+    assert reasons_of(ei.value) & {"type_error"}
+
+
 def test_t10_interval_trigger():
     batch = valid_batch()
     batch[0]["event_shape"] = "interval"

@@ -208,8 +208,11 @@ def validate_event_import(
                         fail(i, eid, f"reference_symbols[{j}]", "conditional_required_missing")
                         continue
                     for sub in cond["reference_symbols"]["item_fields"]:
-                        if not _nonempty_str(str(item.get(sub) or "")):
+                        v = item.get(sub)
+                        if v is None or v == "":
                             fail(i, eid, f"reference_symbols[{j}].{sub}", "conditional_required_missing")
+                        elif not _nonempty_str(v):  # 逐欄驗型、禁 coercion（CODEX-R1-P1-03）
+                            fail(i, eid, f"reference_symbols[{j}].{sub}", "type_error")
 
         if r.get("event_origin") == "model":
             sm = r.get("source_model")
@@ -218,8 +221,12 @@ def validate_event_import(
             else:
                 ok = True
                 for sub in cond["source_model"]["item_fields"]:
-                    if sm.get(sub) in (None, ""):
+                    v = sm.get(sub)
+                    if v is None or v == "":
                         fail(i, eid, f"source_model.{sub}", "conditional_required_missing")
+                        ok = False
+                    elif sub != "available_at" and not _nonempty_str(v):  # 逐欄驗型（CODEX-R1-P1-03）
+                        fail(i, eid, f"source_model.{sub}", "type_error")
                         ok = False
                 if ok:
                     aa = sm.get("available_at")
@@ -243,6 +250,22 @@ def validate_event_import(
                 for sub in cond["event_interval"]["item_fields"]:
                     if iv.get(sub) is None:
                         fail(i, eid, f"event_interval.{sub}", "conditional_required_missing")
+                # 逐欄驗型（CODEX-R1-P1-03）：start/end int ms＋量級閘＋start<end；endpoints_inclusive={start:bool,end:bool}
+                s_, e_ = iv.get("start"), iv.get("end")
+                for nm, v in (("start", s_), ("end", e_)):
+                    if v is not None:
+                        if not _is_int(v):
+                            fail(i, eid, f"event_interval.{nm}", "type_error")
+                        elif not (ms_min <= int(v) < ms_max):
+                            fail(i, eid, f"event_interval.{nm}", "invalid_timestamp_unit")
+                if _is_int(s_) and _is_int(e_) and not int(s_) < int(e_):
+                    fail(i, eid, "event_interval", "type_error")
+                inc = iv.get("endpoints_inclusive")
+                if inc is not None and not (
+                    isinstance(inc, dict) and set(inc) == {"start", "end"}
+                    and all(isinstance(inc[k], bool) for k in ("start", "end"))
+                ):
+                    fail(i, eid, "event_interval.endpoints_inclusive", "type_error")
 
         out = dict(r)
         out["decision_offset_bars"] = k_off

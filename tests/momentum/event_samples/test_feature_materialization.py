@@ -104,6 +104,17 @@ def test_warmup_event_goes_to_failures_not_nan(bars):
     assert rec.per_tf["event_id"].nunique() == len(feats) + len(fails)
 
 
+def test_corrupt_row_id_rejected_in_full_mode(bars):
+    """CODEX-R1-P1-05：全史模式 row_id 無條件對證——越界或指向他列皆 loud。"""
+    df, rec = prep(bars, [300, 400])
+    for bad in (999999, 301):
+        per_tf = rec.per_tf.copy()
+        per_tf.loc[per_tf["event_id"] == "ev0", "row_id"] = bad
+        from momentum.Analysis.event_samples.types import AlignmentReceipts
+        with pytest.raises(ValueError, match="不對證"):
+            materialize_features_at_decision(AlignmentReceipts(rec.event_level, per_tf), bars, dict(FC), events=df)
+
+
 def test_column_collision_loud():
     """邊界②：多 TF 欄名衝突 ⇒ loud 拒（純邏輯，不跑 FF）。"""
     with pytest.raises(ValueError, match="衝突"):

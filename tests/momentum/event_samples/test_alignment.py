@@ -154,6 +154,24 @@ def test_missing_tf_and_corrupt_bars(bars):
     assert set(fail["reason"]) == {"duplicate_bar"}
 
 
+def test_corrupt_close_time_rejected(bars):
+    """CODEX-R1-P1-04：close_time 亂序／close≤open 的 bar 表一律 fail-closed（cutoff searchsorted 依賴其排序）。"""
+    ev2 = two(make_event(0, t0=T0_100, label=1))
+    df = validate_event_import(ev2)
+    b12 = bars["ETHUSDT"]["12h"].copy()
+    b12["close_time_ms"] = b12["open_time_ms"]  # 全表 close == open（仍排序唯一）⇒ 邊界語意壞
+    rec, fail = align_events(df, {"ETHUSDT": {"1h": bars["ETHUSDT"]["1h"], "4h": bars["ETHUSDT"]["4h"], "12h": b12}}, CFG3)
+    assert len(rec.event_level) == 0 and set(fail["reason"]) == {"tf_boundary_ambiguous"}
+    b12c = bars["ETHUSDT"]["12h"].copy()
+    b12c.loc[100, "close_time_ms"] = b12c.loc[100, "open_time_ms"]  # 單列 close==open ⇒ 與前列 close 重複
+    rec, fail = align_events(df, {"ETHUSDT": {"1h": bars["ETHUSDT"]["1h"], "4h": bars["ETHUSDT"]["4h"], "12h": b12c}}, CFG3)
+    assert len(rec.event_level) == 0 and set(fail["reason"]) == {"duplicate_bar"}
+    b12b = bars["ETHUSDT"]["12h"].copy()
+    b12b.loc[[100, 101], "close_time_ms"] = b12b.loc[[101, 100], "close_time_ms"].to_numpy()  # close 亂序
+    rec, fail = align_events(df, {"ETHUSDT": {"1h": bars["ETHUSDT"]["1h"], "4h": bars["ETHUSDT"]["4h"], "12h": b12b}}, CFG3)
+    assert len(rec.event_level) == 0 and set(fail["reason"]) == {"unsorted_bar"}
+
+
 def test_w11_decision_gt_t0_guard_falsifiable(bars, monkeypatch):
     """W11 負例：竄改推導使 decision_at > t0 ⇒ loud 拒（守衛真的在看）。"""
     monkeypatch.setattr(al, "_decision_idx", lambda t0_idx, k: t0_idx + 1)

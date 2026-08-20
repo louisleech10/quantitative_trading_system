@@ -56,6 +56,7 @@ def materialize_features_at_decision(
 
     ff = create_feature_factory(cache_dir="data_cache/feature_klines")
     reader = create_feature_reader()
+    truncated_mode = bool(feature_config.get("start_date") or feature_config.get("end_date"))
 
     # ---- 連續 per-TF 物化（persist=True 走 V7 artifact；快取命中即秒回）----
     frames: Dict[Tuple[str, str], pd.DataFrame] = {}
@@ -109,9 +110,15 @@ def materialize_features_at_decision(
                 raise ValueError(
                     f"materialize: 收據取列時點與 feature row_index 不對證（event={eid} tf={rec['timeframe']}）"
                 )
-            # 全史物化時 row_index 與 bar 網格同列 ⇒ 與收據 row_id 交叉對證（截斷段不適用）
-            if len(ms) > int(rec["row_id"]) and int(ms[int(rec["row_id"])]) == target and pos != int(rec["row_id"]):
-                raise ValueError(f"materialize: row_id 交叉對證失敗（event={eid}）")
+            # CODEX-R1-P1-05：全史模式（無 start/end_date）row_index 與 bar 網格同列 ⇒ **無條件**對證
+            # 0 ≤ row_id < len 且 ms[row_id] == target == ms[pos]；截斷段模式（顯式 start/end_date）
+            # 網格位移，改以 timestamp 定位（上方 pos 已對證）。
+            if not truncated_mode:
+                rid = int(rec["row_id"])
+                if not (0 <= rid < len(ms)) or int(ms[rid]) != target or pos != rid:
+                    raise ValueError(
+                        f"materialize: 收據 row_id 與 feature row_index 不對證（event={eid} row_id={rid} target={target}）"
+                    )
             vals = df.iloc[pos]
             if not np.isfinite(vals.to_numpy(dtype=float)).all():
                 failed = f"warmup_insufficient_{rec['timeframe']}"  # 任一 NaN＝warmup 未完（禁 NaN 混入）

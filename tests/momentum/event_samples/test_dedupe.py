@@ -82,6 +82,32 @@ def test_missing_interval_fail_closed():
         build_event_manifest(r, DedupePolicyConfig(scenario="C"))
 
 
+def test_transitive_overlap_union_find_composer_counterexample():
+    """COMPOSER-R1-P1-01：A[0,100]⊃C[30,35]、B[40,50]⊂A 但不與 C 相交 ⇒ 三者須同簇（鏈式掃描會拆開 B）。"""
+    m = build_event_manifest(
+        mk_receipts([("A", B, B + 100), ("C", B + 30, B + 35), ("B", B + 40, B + 50)]),
+        DedupePolicyConfig(scenario="A", cluster_gap_ms=0),
+    )
+    t = m.table.set_index("event_id")
+    assert t.loc["A", "dedupe_cluster_id"] == t.loc["B", "dedupe_cluster_id"] == t.loc["C", "dedupe_cluster_id"]
+    assert m.summary["n_clusters"] == 1
+    # 權重與簇一致：A 與兩者皆交 ⇒ 1/3；C、B 各只與 A 交 ⇒ 1/2
+    assert t.loc["A", "uniqueness_weight"] == pytest.approx(1 / 3, abs=1e-12)
+    assert t.loc["C", "uniqueness_weight"] == 0.5 and t.loc["B", "uniqueness_weight"] == 0.5
+
+
+def test_transitive_overlap_union_find_codex_counterexample():
+    """CODEX-R1-P1-02：a[0,100]、b[50,60]、c[90,120]（gap=0）⇒ 區間聯集連通，三者同簇且 C 簇首＝a。"""
+    m = build_event_manifest(
+        mk_receipts([("a", B, B + 100), ("b", B + 50, B + 60), ("c", B + 90, B + 120)]),
+        DedupePolicyConfig(scenario="C", cluster_gap_ms=0),
+    )
+    t = m.table.set_index("event_id")
+    assert t["dedupe_cluster_id"].nunique() == 1
+    assert bool(t.loc["a", "in_primary"]) is True and not bool(t.loc["b", "in_primary"]) and not bool(t.loc["c", "in_primary"])
+    assert m.summary["n_events_effective"] == 1
+
+
 def test_events_context_join():
     ev = pd.DataFrame({"event_id": ["e1"], "symbol": ["ETHUSDT"], "timeframe": ["12h"], "label": [1],
                        "scenario": ["C"], "direction": ["long"]})

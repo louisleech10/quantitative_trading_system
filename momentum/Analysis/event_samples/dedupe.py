@@ -48,19 +48,40 @@ def build_event_manifest(
     ends = ev["label_end_ms"].astype("int64").to_numpy()
     n = len(ev)
 
-    # ---- 簇 union（單鏈掃描：與前一事件 interval overlap，或 start 差 ≤ cluster_gap 即同簇）----
+    # ---- 簇 union-find（COMPOSER-R1-P1-01／CODEX-R1-P1-02 修）：interval overlap 或
+    # start 差 ≤ cluster_gap 即 union；連通分量＝簇。鏈式「只比前一顆」會把
+    # 仍與更早長窗相交之事件錯拆（反例：A[0,100],C[30,35],B[40,50]）。O(n²) 對事件級 n 可承受。----
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)
+
+    for i in range(n):
+        gap_i = policy_config.cluster_gap_ms
+        if gap_i is None:
+            gap_i = int(ends[i] - starts[i])  # 預設＝該事件答案窗 duration（UTC duration）
+        for j in range(i + 1, n):
+            if _overlap(int(starts[i]), int(ends[i]), int(starts[j]), int(ends[j])) or (
+                int(starts[j] - starts[i]) <= gap_i
+            ):
+                union(i, j)
+
+    # 連通分量 → 依最早 start 之出現序編號（決定性）
+    root_order: Dict[int, int] = {}
     cluster_ids: List[int] = [0] * n
-    cid = 0
-    for i in range(1, n):
-        gap = policy_config.cluster_gap_ms
-        if gap is None:
-            gap = int(ends[i - 1] - starts[i - 1])  # 預設＝前一事件答案窗 duration（UTC duration）
-        linked = _overlap(int(starts[i - 1]), int(ends[i - 1]), int(starts[i]), int(ends[i])) or (
-            int(starts[i] - starts[i - 1]) <= gap
-        )
-        if not linked:
-            cid += 1
-        cluster_ids[i] = cid
+    for i in range(n):
+        r = find(i)
+        if r not in root_order:
+            root_order[r] = len(root_order)
+        cluster_ids[i] = root_order[r]
 
     # ---- overlap set / uniqueness weight（label 窗兩兩相交；簇內 n 小）----
     overlap_sets: List[List[str]] = []
