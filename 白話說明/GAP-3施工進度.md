@@ -7,7 +7,7 @@
 | 批 | 內容（白話） | 狀態 |
 |---|---|---|
 | **B1** | 匯入契約＋不偷看未來的時間對齊＋去重切分＋特徵取列＋自檢 oracle（7 項） | **完工蓋章（8/21）**：四輪審查 8→3→1→0、三家蓋章機檢通過、100 條測試 |
-| B2 | 三張統計表＋倖存者契約升版＋全部 K 線驗證 | **下一批**（B2.3 動工前先凍結 IC 主線 golden） |
+| B2 | 三張統計表＋倖存者契約升版＋全部 K 線驗證 | **施工完（8/21）、等三家審查**：五項落地、IC 主線 golden 凍結後接線 sha 不變、全套 123 條測試 |
 | B3 | 事件產生器＋變化類特徵算子 | 排隊中 |
 | B4 | pattern 抽取＋接 GAP-1 防過擬合 | 排隊中 |
 | B5 | API／前端三頁／UAT | 排隊中 |
@@ -55,6 +55,17 @@
 
 以上每條都有測試釘住（真實 K 線手算整數毫秒、夾心反例、同簇權重和＝1）。
 
+## B2 逐項（5 項；驗收＝`pytest tests/momentum/event_samples/`＋`tests/momentum/Analysis/test_survivor_contract.py`＋`gap3_freeze_golden.py --check`）
+
+| 項 | 做什麼 | 驗收證據 |
+|---|---|---|
+| B2.1 事件後報酬表 | 事件後 1/2/…根的 signed 報酬分布（平均／中位／勝率／樣本數），實際進場報酬與標籤基準報酬並排；CI 用 time-cluster bootstrap | 手算 exact、固定 seed 決定性、horizon 超出資料的格子排除不灌 0 |
+| B2.2 正反例辨別表 | 只用 test 段分數算 AUC／PR-AUC／lift／混淆矩陣；按反例種類 a/b/c 分層，「不可分類」不進分母 | 置亂 oracle 沿 B1.4、單類 unavailable |
+| B2.3 條件 IC 接線 | IC 主線新增 `event_label_values` 入口：事件子樣本的 IC 用你給的連續 label，不偷拿主線 return_N；不傳時行為一個位元組都不變 | **golden 凍結 → 接線 → `--check` PASS（sha 不變）**；缺 label 的事件 loud；A′ fallback 透傳 |
+| B2.4 倖存者契約 v2 | 事件型倖存者多帶六個身分欄（manifest 指紋／標籤定義指紋／三條規則／控制組種類）；v1 舊檔顯式拒收不靜默轉 | 51 條契約測試（含六鍵半套／非 hex／閉集外皆拒） |
+| B2.5 全部 K 線驗證 | 整票靈魂：每一根 K 線都當一次決策、固定分母（答案窗完整＋價格有效＋warmup 夠）、學習樣本基率與全 K 線基率並排＋lift；缺基率揭露就 unavailable | 真實 K 線 100 根手算分母 exact（98 eligible／2 尾端排除）；M4 分母竄改必紅 |
+| mutation | M4／M7／M11（分母竄改／基率欄移除／degraded 標記移除）＋B1 的 8 條 | 11 條全部「弄壞必紅」 |
+
 ## 下一步
 
-B2：事件後報酬表（B2.1）→ 正反例辨別表（B2.2）→ 凍結 IC 主線 golden → 條件 IC 接線（B2.3）→ 倖存者契約 v2（B2.4）→ 全部 K 線驗證（B2.5）；做完三家 review＋蓋章才進 B3。
+B2 三家 code review → 修補 → 閉合 → 蓋章 → B3（事件產生器＋變化類算子）。

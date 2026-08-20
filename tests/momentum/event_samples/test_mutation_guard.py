@@ -179,6 +179,60 @@ def test_M10_multi_hit_precedence_guess_detected(bars, monkeypatch):
     assert not (mut == "unclassifiable").any()                       # 邊界斷言必抓到（紅）
 
 
+def test_M4_denominator_tamper_detected(bars, monkeypatch):
+    """M4：evaluate_all_bars 把 label_window_incomplete bars 計入 n_eligible ⇒ 真實 kline 小段手算分母 exact 斷言紅。"""
+    from momentum.Analysis.event_samples import all_bars_eval as ab
+    seg = {"ETHUSDT": bars["ETHUSDT"]["12h"].iloc[1000:1100].reset_index(drop=True)}
+    ot = seg["ETHUSDT"]["open_time_ms"].to_numpy()
+    rng = np.random.default_rng(SEED + 4)
+    scores = pd.Series(rng.uniform(0, 1, len(ot)), index=pd.MultiIndex.from_product([["ETHUSDT"], ot]))
+    _record_fixture("M4_segment", {"rows": [1000, 1100], "scores_head": scores.to_numpy()[:5].tolist()})
+    cfg = {"horizon_bars": 2, "label_threshold": 0.01, "prevalence_learn": 0.5, "sample_design": "case_control", "n_boot": 5}
+    assert ab.evaluate_all_bars(scores, seg, cfg)["counts"]["n_eligible"] == 98      # baseline 手算 exact
+    orig = ab._is_eligible
+
+    def tampered(i, n, h, k, o, c):
+        r = orig(i, n, h, k, o, c)
+        return None if (r == "label_window_incomplete" and i + 1 < n) else r      # 把倒數第二根計入分母
+
+    monkeypatch.setattr(ab, "_is_eligible", tampered)
+    try:
+        n_el = ab.evaluate_all_bars(scores, seg, cfg)["counts"]["n_eligible"]
+        assert n_el != 98                                                             # 斷言必抓到（紅）
+    except IndexError:
+        pass                                                                          # 或直接越界 loud——同屬紅
+
+
+def test_M7_prevalence_disclosure_removed_detected(bars):
+    """M7：基率欄移除 ⇒ unavailable:missing_prevalence_disclosure 斷言（缺揭露不得產 ok 報告）。"""
+    from momentum.Analysis.event_samples.all_bars_eval import evaluate_all_bars
+    seg = {"ETHUSDT": bars["ETHUSDT"]["12h"].iloc[1000:1100].reset_index(drop=True)}
+    ot = seg["ETHUSDT"]["open_time_ms"].to_numpy()
+    scores = pd.Series(np.linspace(0, 1, len(ot)), index=pd.MultiIndex.from_product([["ETHUSDT"], ot]))
+    _record_fixture("M7_segment", {"rows": [1000, 1100]})
+    ok = evaluate_all_bars(scores, seg, {"horizon_bars": 2, "label_threshold": 0.01, "prevalence_learn": 0.4, "sample_design": "case_control", "n_boot": 5})
+    assert ok["capability_status"] == "ok"
+    mutated = evaluate_all_bars(scores, seg, {"horizon_bars": 2, "label_threshold": 0.01, "sample_design": "case_control", "n_boot": 5})
+    assert mutated["capability_status"] == "unavailable" and mutated["reason"] == "missing_prevalence_disclosure"
+
+
+def test_M11_degraded_flag_removed_detected(monkeypatch):
+    """M11：單 symbol／未 cluster 調整時不標 degraded ⇒ B1.3/B2 共同約束斷言紅（seam=event_split._degraded_flags）。"""
+    from momentum.Analysis.event_samples import event_split as es
+    rows = [{"event_id": f"e{i}", "symbol": "ETHUSDT", "decision_at_ms": BASE + i * H12,
+             "observation_interval_start_ms": BASE + i * H12, "observation_interval_end_ms": BASE + (i + 1) * H12,
+             "label_start_ms": BASE + i * H12, "label_end_ms": BASE + (i + 1) * H12, "dedupe_cluster_id": "c0",
+             "overlap_set_hash": "h", "uniqueness_weight": 1.0, "in_primary": True, "in_sensitivity": True, "timeframe": "12h"}
+            for i in range(5)]
+    _record_fixture("M11_rows", rows)
+    manifest = EventManifest(table=pd.DataFrame(rows), summary={"n_events_raw": 5, "n_events_effective": 5}, policy={})
+    plan = split_events(manifest, EventSplitConfig(test_fraction=0.4, tier_min_test_events=0))
+    assert "single_symbol" in plan.summary["degraded"]                               # baseline：共同約束成立
+    monkeypatch.setattr(es, "_degraded_flags", lambda n, cluster_adjusted=True: [])  # mutation：標記移除
+    plan_m = split_events(manifest, EventSplitConfig(test_fraction=0.4, tier_min_test_events=0))
+    assert "single_symbol" not in plan_m.summary["degraded"]                         # 共同約束斷言必抓到（紅）
+
+
 def test_M12_t9_availability_removed_accepts(monkeypatch):
     """M12：available_at > decision_at 仍收 ⇒ B1.0 條件必填斷言紅。"""
     sm = {"model_id": "m", "version": "1", "artifact_digest": "d" * 64, "split_plan_hash": "e" * 64,

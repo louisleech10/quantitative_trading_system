@@ -50,7 +50,7 @@ def test_load_top_level_keys_exact():
     }
     assert set(contract.keys()) == expected
     assert sc.SURVIVOR_CONTRACT_TOP_KEYS == frozenset(expected)
-    assert contract["version"] == 1
+    assert contract["version"] == 2  # GAP-3 Task B2.4 升版（v1→v2：event 物件擴六鍵）
 
 
 # ---------------------------------------------------------------- ② capability_status_ref
@@ -170,7 +170,7 @@ def test_mutation_missing_top_key_raises(tmp_path):
     """
     copy = tmp_path / "ic_survivor_contract.json"
     shutil.copy(sc.SURVIVOR_CONTRACT_PATH, copy)
-    assert sc.load_survivor_contract(copy)["version"] == 1  # 基線綠
+    assert sc.load_survivor_contract(copy)["version"] == 2  # 基線綠
     data = json.loads(copy.read_text(encoding="utf-8"))
     del data["sample_scope_kind_values"]
     copy.write_text(json.dumps(data), encoding="utf-8")
@@ -184,7 +184,7 @@ def test_load_returns_copy_not_shared_singleton():
     a["version"] = 999
     a["reasons"]["marginal_ic"].append("tampered")
     b = sc.load_survivor_contract()
-    assert b["version"] == 1
+    assert b["version"] == 2
     assert "tampered" not in b["reasons"]["marginal_ic"]
     assert a is not b
 
@@ -583,3 +583,63 @@ def test_event_identity_naive_string_matches_aware():
     naive = sc.compute_event_identity(None, ["2024-01-01 00:00:00", "2024-01-02 00:00:00"])
     ms = sc.compute_event_identity(None, [1704067200000, 1704153600000])
     assert aware["timestamps_hash"] == naive["timestamps_hash"] == ms["timestamps_hash"]
+
+
+# ============================================================================
+# GAP-3 Task B2.4：survivor contract v2（event 物件擴六鍵；v1 顯式拒；鍵集斷言）
+# ============================================================================
+_V2_KEYS = ("event_manifest_hash", "label_definition_hash", "decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind")
+
+
+def _event_kwargs(event_context=None):
+    ev = sc.compute_event_identity(None, [1704067200000 + i * 43200000 for i in range(40)])
+    kw, _ = _build_kwargs(event=ev)
+    if event_context is not None:
+        kw["event_context"] = event_context
+    return kw
+
+
+def _ctx():
+    return {
+        "event_manifest_hash": "1" * 64, "label_definition_hash": "2" * 64,
+        "decision_time_rule": "t0_open_minus_k_bars", "feature_cutoff_rule": "max_close_le_decision_at",
+        "label_window_rule": "close_to_close:horizon_bars=2", "control_kind": "user_labeled_same_trigger",
+    }
+
+
+def test_v2_event_keyset_and_nulls_when_no_context():
+    c = sc.load_survivor_contract()
+    assert set(_V2_KEYS) <= set(c["event_definition_keys"]["keys"])
+    payload = sc.build_survivor_output(**_event_kwargs())
+    assert payload["schema_version"] == 2 and payload["sample_scope"]["kind"] == "event"
+    assert all(payload["sample_scope"]["event"][k] is None for k in _V2_KEYS)  # GAP-2 語意不變：全 null
+    sc.validate_survivor_output(payload)
+
+
+def test_v2_event_context_filled_and_validated():
+    payload = sc.build_survivor_output(**_event_kwargs(_ctx()))
+    assert {k: payload["sample_scope"]["event"][k] for k in _V2_KEYS} == _ctx()
+    sc.validate_survivor_output(payload)
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda e: e.update(event_manifest_hash=None),                 # 半套
+    lambda e: e.update(label_definition_hash="g" * 64),           # 非 hex
+    lambda e: e.update(decision_time_rule=""),                    # 空字串
+    lambda e: e.update(control_kind="platform_whatever"),         # 閉集外
+])
+def test_v2_event_keys_fail_closed(mutate):
+    payload = sc.build_survivor_output(**_event_kwargs(_ctx()))
+    mutate(payload["sample_scope"]["event"])
+    with pytest.raises(ContractValidationError):
+        sc.validate_survivor_output(payload)
+
+
+def test_v1_payload_explicitly_rejected_no_silent_coerce():
+    payload, _ = _valid_payload()
+    payload["schema_version"] = 1
+    with pytest.raises(ContractValidationError, match="legacy"):
+        sc.validate_survivor_output(payload)
+    payload["schema_version"] = 3
+    with pytest.raises(ContractValidationError, match="schema_version"):
+        sc.validate_survivor_output(payload)

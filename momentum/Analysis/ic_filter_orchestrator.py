@@ -865,6 +865,7 @@ class ICFilterOrchestrator:
         # 事件身分（stage3 pop timestamps 前計算）；本 request 之 features/labels 路徑（refilter 沿用）；當次 run config hash
         self._in_fallback_rerun: bool = False
         self._event_identity: Optional[dict] = None
+        self._event_context: Optional[dict] = None  # GAP-3 B2.4：survivor v2 六鍵（餵入層提供；None ⇒ 全 null）
         self._features_path: Optional[str] = None
         self._labels_path: Optional[str] = None
         self._current_config_hash: Optional[str] = None
@@ -886,6 +887,7 @@ class ICFilterOrchestrator:
         *,
         event_timestamps: Optional[list] = None,
         event_label_values: Optional[dict] = None,
+        event_context: Optional[dict] = None,
     ) -> dict:
         """主入口：執行完整八階段流水線。
 
@@ -908,6 +910,7 @@ class ICFilterOrchestrator:
         self._labels_path = str(labels_path) if labels_path else None
         self._current_config_hash = self._hash_config(config)
         self._current_config = config  # 本次 effective config（provenance ic_method／label_return_type 取此，非建構時 config）
+        self._event_context = dict(event_context) if event_context else None  # GAP-3 B2.4：survivor v2 六鍵來源
 
         self._report_progress(0, "ingestion", 0.02, "loading inputs")
         features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
@@ -941,6 +944,7 @@ class ICFilterOrchestrator:
                     details=split_result.details or {},
                     event_timestamps=event_timestamps,
                     event_label_values=event_label_values,
+                    event_context=event_context,
                 )
             train_plan, test_plan = split_result
             train_mask, test_mask = _derive_stage_masks(
@@ -1051,6 +1055,7 @@ class ICFilterOrchestrator:
                 details=ic_results.get("details") or {},
                 event_timestamps=event_timestamps,
                 event_label_values=event_label_values,
+                event_context=event_context,
             )
 
         self._report_progress(
@@ -1118,6 +1123,7 @@ class ICFilterOrchestrator:
         *,
         event_timestamps: Optional[list] = None,
         event_label_values: Optional[dict] = None,
+        event_context: Optional[dict] = None,
     ) -> dict:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
 
@@ -1160,6 +1166,7 @@ class ICFilterOrchestrator:
                 kline_reader=kline_reader,
                 event_timestamps=event_timestamps,
                 event_label_values=event_label_values,  # GAP-3 B2.3：A′ 透傳亦保留事件 label（禁靜默丟）
+                event_context=event_context,
             )
         finally:
             self._suppress_persist = prev_suppress
@@ -4181,6 +4188,7 @@ class ICFilterOrchestrator:
             summary_by_feature=summary_by_feature,
             root_analysis_status=str(report.get("analysis_status")),
             event_identity=event_identity or compute_event_identity(None, None),
+            event_context=getattr(self, "_event_context", None),
             split_context=split_ctx,
             config_hash=str(self._current_config_hash or self._hash_config(self._current_config or self._config)),
             features_source_hash=features_source_hash,

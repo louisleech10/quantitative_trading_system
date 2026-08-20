@@ -29,7 +29,7 @@
 <tr>
 <td>B2</td>
 <td>三張統計表＋倖存者契約升版＋全部 K 線驗證</td>
-<td><strong>下一批</strong>（B2.3 動工前先凍結 IC 主線 golden）</td>
+<td><strong>施工完（8/21）、等三家審查</strong>：五項落地、IC 主線 golden 凍結後接線 sha 不變、全套 123 條測試</td>
 </tr>
 <tr>
 <td>B3</td>
@@ -126,8 +126,50 @@
 <li><strong>切分</strong>：每標的各自按決策時間切 train/test，邊界前留 ≥ 答案窗長度的緩衝；窗跨邊界的事件整個剔除並列清單附原因，不准半個在 train、半個在 test。</li>
 </ol>
 <p>以上每條都有測試釘住（真實 K 線手算整數毫秒、夾心反例、同簇權重和＝1）。</p>
+<h2 id="b2-逐項5-項驗收pytest-testsmomentumevent_samplestestsmomentumanalysistest_survivor_contractpygap3_freeze_goldenpy---check">B2 逐項（5 項；驗收＝<code>pytest tests/momentum/event_samples/</code>＋<code>tests/momentum/Analysis/test_survivor_contract.py</code>＋<code>gap3_freeze_golden.py --check</code>）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項</th>
+<th>做什麼</th>
+<th>驗收證據</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B2.1 事件後報酬表</td>
+<td>事件後 1/2/…根的 signed 報酬分布（平均／中位／勝率／樣本數），實際進場報酬與標籤基準報酬並排；CI 用 time-cluster bootstrap</td>
+<td>手算 exact、固定 seed 決定性、horizon 超出資料的格子排除不灌 0</td>
+</tr>
+<tr>
+<td>B2.2 正反例辨別表</td>
+<td>只用 test 段分數算 AUC／PR-AUC／lift／混淆矩陣；按反例種類 a/b/c 分層，「不可分類」不進分母</td>
+<td>置亂 oracle 沿 B1.4、單類 unavailable</td>
+</tr>
+<tr>
+<td>B2.3 條件 IC 接線</td>
+<td>IC 主線新增 <code>event_label_values</code> 入口：事件子樣本的 IC 用你給的連續 label，不偷拿主線 return_N；不傳時行為一個位元組都不變</td>
+<td><strong>golden 凍結 → 接線 → <code>--check</code> PASS（sha 不變）</strong>；缺 label 的事件 loud；A′ fallback 透傳</td>
+</tr>
+<tr>
+<td>B2.4 倖存者契約 v2</td>
+<td>事件型倖存者多帶六個身分欄（manifest 指紋／標籤定義指紋／三條規則／控制組種類）；v1 舊檔顯式拒收不靜默轉</td>
+<td>51 條契約測試（含六鍵半套／非 hex／閉集外皆拒）</td>
+</tr>
+<tr>
+<td>B2.5 全部 K 線驗證</td>
+<td>整票靈魂：每一根 K 線都當一次決策、固定分母（答案窗完整＋價格有效＋warmup 夠）、學習樣本基率與全 K 線基率並排＋lift；缺基率揭露就 unavailable</td>
+<td>真實 K 線 100 根手算分母 exact（98 eligible／2 尾端排除）；M4 分母竄改必紅</td>
+</tr>
+<tr>
+<td>mutation</td>
+<td>M4／M7／M11（分母竄改／基率欄移除／degraded 標記移除）＋B1 的 8 條</td>
+<td>11 條全部「弄壞必紅」</td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="下一步">下一步</h2>
-<p>B2：事件後報酬表（B2.1）→ 正反例辨別表（B2.2）→ 凍結 IC 主線 golden → 條件 IC 接線（B2.3）→ 倖存者契約 v2（B2.4）→ 全部 K 線驗證（B2.5）；做完三家 review＋蓋章才進 B3。</p>
+<p>B2 三家 code review → 修補 → 閉合 → 蓋章 → B3（事件產生器＋變化類算子）。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

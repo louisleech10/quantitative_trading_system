@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "_doc": "GAP-2 倖存因子輸出契約＋邊際 IC 節契約單一真相源（docs/GAP2_MARGINAL_IC_TODO.md Task 1.0）。所有新欄位名／枚舉值／reason 字面只住本檔；SPEC／TODO／程式／測試不得複列，程式以 survivor_contract.load_survivor_contract() 讀取。消費端義務：(a) `sample_scope.kind=event` 之倖存者只得於事件樣本訓練；(b) 消費端須同時讀 `oos_guarantees`／`independent_oos_validation`／`oos_semantics`／`analysis_status` 四欄，禁只憑 `oos_guarantees` 判 OOS。event canonical 序列化：timestamps → int64 epoch ms UTC → sorted unique → JSON 陣列無空白（`json.dumps(list, separators=(\",\",\":\"))`）→ sha256；query 模式 `definition_hash=sha256(query.strip().encode(\"utf-8\"))`、`timestamps_hash=null`；無事件 ⇒ 兩者 null。capability_status 不在此重新定義，以 capability_status_ref 指向 IC report 契約（執行期 dereference，失敗即 raise）。每個 *_keys 物件層皆 additional_properties:false（未列鍵即非法）。type 值集：str|int|float|bool|list|object|null。",
   "capability_status_ref": "momentum/Analysis/contracts/ic_report_contract.json#capability_status",
   "reasons": {
@@ -254,7 +254,7 @@
     }
   },
   "event_definition_keys": {
-    "_doc": "sample_scope.event 物件（序列化規格見 _doc）。",
+    "_doc": "sample_scope.event 物件（序列化規格見 _doc）。version 2（GAP-3 Task B2.4）擴六鍵：event_manifest_hash／label_definition_hash（64-hex）、decision_time_rule／feature_cutoff_rule／label_window_rule（非空字串）、control_kind（event_import_contract.control_kind 閉集）；六鍵 required 且 nullable——GAP-2 序列型／query 模式為 null；GAP-3 事件樣本（statistic_kind=conditional_ic）六鍵全非 null。v1 payload（schema_version=1）由 validate_survivor_output 顯式拒收（禁 silent coerce）。",
     "additional_properties": false,
     "keys": {
       "definition_hash": {
@@ -279,6 +279,36 @@
       },
       "n_timestamps_requested": {
         "type": "int",
+        "required": true,
+        "nullable": true
+      },
+      "event_manifest_hash": {
+        "type": "str",
+        "required": true,
+        "nullable": true
+      },
+      "label_definition_hash": {
+        "type": "str",
+        "required": true,
+        "nullable": true
+      },
+      "decision_time_rule": {
+        "type": "str",
+        "required": true,
+        "nullable": true
+      },
+      "feature_cutoff_rule": {
+        "type": "str",
+        "required": true,
+        "nullable": true
+      },
+      "label_window_rule": {
+        "type": "str",
+        "required": true,
+        "nullable": true
+      },
+      "control_kind": {
+        "type": "str",
         "required": true,
         "nullable": true
       }

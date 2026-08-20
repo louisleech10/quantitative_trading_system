@@ -240,6 +240,9 @@ def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[D
     c = load_survivor_contract()
     sec = c["marginal_ic_section_keys"]
     _check_object(payload, c["survivor_file_keys"], "survivor_file")
+    if payload["schema_version"] == 1 and c["version"] == 2:
+        # GAP-3 Task B2.4：v1 舊檔顯式版本判別——拒收（不 silent coerce；需讀舊檔請以 v1 契約獨立工具處理）
+        raise ContractValidationError("legacy survivor payload schema_version=1 rejected by v2 contract (no silent coerce; regenerate under v2)")
     if payload["schema_version"] != c["version"]:
         raise ContractValidationError(f"schema_version {payload['schema_version']!r} != contract version {c['version']!r}")
 
@@ -350,6 +353,22 @@ def _check_event_object(ev: Dict[str, Any], c: Dict[str, Any], label: str) -> No
     timestamps ⇒ 兩 hash 皆 64-hex 且相等、n_events≥1、n_timestamps_requested≥n_events；
     query ⇒ definition_hash 64-hex、timestamps_hash None、計數 None；none ⇒ 全 None。"""
     _check_object(ev, c["event_definition_keys"], label)
+    # GAP-3 Task B2.4（v2 六鍵）：全 null（GAP-2 序列型／query）或全非 null（GAP-3 事件樣本）；半套 ⇒ 拒
+    v2_keys = ("event_manifest_hash", "label_definition_hash", "decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind")
+    present = [k for k in v2_keys if ev.get(k) is not None]
+    if present and len(present) != len(v2_keys):
+        raise ContractValidationError(f"{label}: v2 event keys must be all-null or all-set (got {present})")
+    if present:
+        for k in ("event_manifest_hash", "label_definition_hash"):
+            if not _is_sha256_hex(ev[k]):
+                raise ContractValidationError(f"{label}.{k}: requires 64-hex sha256")
+        for k in ("decision_time_rule", "feature_cutoff_rule", "label_window_rule"):
+            if not (isinstance(ev[k], str) and ev[k]):
+                raise ContractValidationError(f"{label}.{k}: requires non-empty str")
+        from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+        ck = load_event_import_contract()["required_fields"]["control_kind"]["enum"]
+        if ev["control_kind"] not in ck:
+            raise ContractValidationError(f"{label}.control_kind {ev['control_kind']!r} not in event_import_contract enum")
     mode = ev["mode"]
     if mode == "timestamps":
         if not (_is_sha256_hex(ev["definition_hash"]) and _is_sha256_hex(ev["timestamps_hash"])):
@@ -386,6 +405,7 @@ def build_survivor_output(
     root_analysis_status: str,
     event_identity: Dict[str, Any],
     split_context: Optional[Dict[str, Any]],
+    event_context: Optional[Dict[str, Any]] = None,
     config_hash: str,
     features_source_hash: str,
     features_path: Optional[str],
@@ -439,6 +459,10 @@ def build_survivor_output(
     event_obj = None
     if ev_mode in ("query", "timestamps"):
         event_obj = {k: ev.get(k) for k in c["event_definition_keys"]["keys"].keys()}
+        # GAP-3 Task B2.4：v2 六鍵由 event_context 填（GAP-3 餵入層提供）；未提供 ⇒ 全 null（GAP-2 語意不變）
+        for k, v in (event_context or {}).items():
+            if k in event_obj:
+                event_obj[k] = v
     n_total = report_meta.get("n_samples") if isinstance(report_meta, dict) else None
     if n_total is None and marg is not None and marg.get("n_train") is not None and marg.get("n_test") is not None:
         n_total = int(marg["n_train"]) + int(marg["n_test"])

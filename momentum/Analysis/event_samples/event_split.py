@@ -17,6 +17,18 @@ from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.Analysis.event_samples.types import EventManifest, EventSplitConfig, EventSplitPlan
 
 
+def _degraded_flags(n_symbols: int, *, cluster_adjusted: bool) -> List[str]:
+    """`degraded` 旗標唯一產生點（AR-3 共同約束；M11 mutation seam）：
+    單 symbol ⇒ `single_symbol`（exploratory 可跑、禁 formal pooled inference）；未 cluster 調整 ⇒ `no_cluster_adjustment`。
+    字面＝契約檔 degraded_flags。"""
+    flags: List[str] = []
+    if n_symbols == 1:
+        flags.append("single_symbol")
+    if not cluster_adjusted:
+        flags.append("no_cluster_adjustment")
+    return flags
+
+
 def _cluster_weight(counts: "pd.Series") -> "pd.Series":
     """time-cluster 權重公式 w=1/n（R1 X9）唯一實作點（CODEX-R1-P1-01：M5 production
     seam——monkeypatch 改全 1 即破「同簇權重和＝1」斷言，測試必紅）。"""
@@ -85,9 +97,7 @@ def split_events(manifest: EventManifest, split_config: EventSplitConfig) -> Eve
     })
 
     n_symbols = len(per_symbol_n)
-    degraded: List[str] = []
-    if n_symbols == 1:
-        degraded.append("single_symbol")  # exploratory 可跑；禁 formal pooled inference 由下游讀旗標強制
+    degraded: List[str] = _degraded_flags(n_symbols, cluster_adjusted=True)
 
     summary = {
         "n_symbols": n_symbols,
