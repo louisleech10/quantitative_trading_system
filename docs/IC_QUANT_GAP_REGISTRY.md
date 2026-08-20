@@ -17,9 +17,8 @@
 
 ## GAP-3 開發前討論題（2026-08-18 使用者：「需要討論、現在不展開」；consult 輪之輸入）
 
-> **2026-08-19 進度**：consult R1 已收斂（`handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md`；codex＋grok＋主委，composer collection-failed）。
-> 使用者彈窗回答揭露主要設想為 **A／B（open 決策、事件在未來）** 而非 consult 預設之 C（收盤確認後）⇒ 反例／決策時點／與序列型主線關係三條待 consult R2 重議；
-> 使用者裁定「先寫成一個文檔，討論就修改文檔」⇒ **討論唯一落點＝`白話說明/GAP-3事件型討論.md`**（SPEC 前本節不再更新，以該檔 §6 清單為準）。
+> **2026-08-20 討論階段收案**：consult R1（r1 synth；composer collection-failed）＋R2（`handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md`；三家齊、26 條九群集）＋使用者兩輪補充（七點）皆收斂於 **`白話說明/GAP-3事件型討論.md`（第 12 版；§7.5＝SPEC 取材唯一地圖）**。
+> 使用者 2026-08-20 裁定：**新 session 起草 SPEC**（`docs/GAP3_EVENT_SPEC.md`；HANDOFF 已備開工指令；五項「待 SPEC 對抗審確認」列於 HANDOFF）。本節凍結，後續以 SPEC 為準。
 
 使用者原意（逐字義）：例＝12h K 漲≥5% 定該根 open 為 t₀；t₀ 後 24／36／48h 之 close 皆比 t₀ close 高≥3% ⇒ 正例，否則反例；特徵＝t₀ 往前 x 根 1h／4h 指標；目標＝在數千～數萬個 t₀ 中找正例共通 pattern 當策略。**這只是其中一種事件**；正反例將由使用者自外部檔案標好餵入。
 

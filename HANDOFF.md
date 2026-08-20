@@ -6,16 +6,21 @@
 
 ---
 
-## 🔴 接手第一件事：GAP-3 事件型——討論文檔第 7 版＋委員 R2 意見檔已出，**等使用者醒來點頭才寫 SPEC**（2026-08-20 凌晨）
+## 🔴 接手任務：**起草 GAP-3 事件型 SPEC**（使用者 2026-08-20 裁定「新 session 開始 SPEC」；討論階段已完成，勿再開 consult）
 
-**現況**：使用者 8/19 五輪對談把意圖定版（U1–U11，見 `白話說明/GAP-3事件型討論.md` §7：A／B／C／兩段式全要、任何類型、多空分開、正反例自標＋CSV＋搜尋條件一起匯入、事件產生器完整版列入、前端同頁事件模式、全部 K 線驗證交委員、現有頁面升級不翻掉）。consult R2（`handoffs/20260819-gap3-consult-r2-BRIEF.md`；三家齊＋主委版）逐項審＋K1–K10 定案 ⇒ reconcile `handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md`（26 條九群集 C1–C9；債已清）。給使用者的對應檔 `白話說明/GAP-3事件型討論-委員意見.md`。三家一致：可進 **decision-gated SPEC**；無 U 不可行；J1–J10 無一推翻。
-**R2 四項硬結論（SPEC 必寫死；🔴 C1 已被使用者 8/20 澄清部分改寫）**：C1 `entry_price_semantic`＋`label_return_mode` 欄保留，但使用者澄清**標籤一律相對 t₀ close（close-to-close）** ⇒ 預設 `close_to_close`、條件 IC 可直吃主線 label；揭露改為「實際進場價持有報酬 vs 標籤」兩數並排。另使用者 8/20 補：決策時點可為 **t₀ 前 k 根**（K1/K2 小擴充，SPEC 對抗審確認）；「反例種類」欄改選填（平台可自動分類）；TF／規模皆舉例。**8/20 第二輪（U12／U13，第 11 版）**：多標的＝常態必要（事件型合併樣本；序列型多標的＝#4 優先度升、邊界待對抗審）；SPEC 結構＝一份 SPEC＋B1–B5 五批預設、太大再拆待對抗審。SYNC-GAP3 同步規則在討論文檔檔頭（使用者每次補充會帶 Prompt 觸發，六項缺一＝沒做完）。見討論文檔 §8。C2 per-TF `feature_cutoff` 收據＋六時間欄＋失敗枚舉 loud；C3 條件引擎欄位三角色 `feature／selection_predicate／label`、typed AST＋digest、純函式落 `momentum/`，`/search`／`event_filter` 皆 adapter；C4 全樣本驗證 evaluation manifest 固定分母＋`prevalence_learn` vs `prevalence_full`＋lift，不碰回測層。其餘 C5 去重（C 簇首／A-B 全留唯一性權重；敏感度非 B1 門檻；sample_weight UNWIRED）、C6 pooled 最小版（macro primary、time-cluster、不關閉 #4）、C7 三表／T8-T10 欄位／DSR-PBO 只在 B3 後、C8 K7 特徵清單、C9 分批 B1→B5（主委定）。
-**下一步**：① 使用者讀兩份檔、點頭（或改意見 ⇒ 改討論文檔第 8 版；若動 K 定案須再問委員）② 點頭後寫 `docs/GAP3_EVENT_SPEC.md`（gate artifact；SPEC_TEMPLATE；前置裁決 D1–D4＝C1–C4；Task 分批 B1–B5；§N 殘留：triple-barrier／long-short／T4 T6 資料源／sample_weight 接線／#4 正式 panel）→ 三家 adversarial → 白話閘 → TODO → 分批實作（主委）→ 三家 review＋戳記。**點頭前不寫 SPEC、不動 GAP-3 程式。**
-**前端占位規則**（commit aded5574）：需要前端的殘留一律先做 `/pending-features` 條目＋原位置殼；vitest 對 registry 機檢。
-**其他可做未排**：GAP-4（#4 正式 panel IC；GAP-3 只做最小 pooled 不關閉 #4）；GAP-5 容量；GAP-6 效能；G2-R6 前端 tsc 既有 8 紅；三支未登記臨時腳本 `scripts/ichc_t2_diag.py`／`ichc_t2_probe400.py`／`ichc_t3_diff.py` 待清。
+**這是大任務**（命中 a／b／d）→ 完整管線：SPEC 初稿（主委起草）→ 三家 adversarial → reconcile＋三家戳記 → **白話閘給使用者裁** → TODO（凍結）→ 分批實作 B1–B5（主委自任；每批三家 code review＋三家戳記才進下批）。
 
-## ⚠ 坑（完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～八十）
-- 🔴 含家族名的 Bash 在「有 token＋債 OPEN」或「無 token」時都被 gate_check 擋 ⇒ 命令寫 scratchpad 腳本再 `bash <script>`；讀委員檔用 Read 工具。committee_run 有一家失敗：同 round 補跑 `ROUND_ID=<id> bash scripts/cx_run.sh <fam> <brief> <out>`；外部服務持續失敗 ⇒ roster 不等只能 `debt_clear --abandon --kind collection-failed --approver main-agent`（consult 可、review/stamp 不可）。R2 三家齊 ⇒ 正常 `debt_clear --lock`（需 `--mode review` lock）。
-- 🔴 consult brief 之「使用者意圖」類 assumed 前提要先白話問使用者再派委員（摩擦七十八）；白話表格表態欄用文字不用 ✅（factkey 守衛誤判，摩擦八十）。
-- 白話資料夾新增 .md 須登記 `plain_docs_sync_check.sh _watched_for`；動 `scripts/` 時 README／接下來／日誌／摩擦 四檔須同 commit staged；`factkey_write_guard` 對 `Archived/GAP-2施工進度.md:13-22` 的紅為既有（pre-commit 放行）。
-- stamp brief 禁多家並行跑重測試；review brief 前提逐條 `fact-verified:`／`assumed:`；commit 訊息 `Governance-Scope:` trailer 獨立末段；venv Python 3.9.6；`docs/API_SPECIFICATION.md` 受格式快閘不可編輯；`scripts/governance_families.json` 既有 no-op dirty 非本線；push 丟背景。
+**取材（唯一地圖＝`白話說明/GAP-3事件型討論.md` §7.5 五層優先序；現為第 11 版；衝突以新使用者意圖為準）**：
+1. 討論文檔 §7 U1–U13＋§8 第 8／11 版增補（使用者裁決）——最高權威。**特別注意 8/20 改寫**：標籤基準預設 `close_to_close`（相對 t₀ close；U4b）；決策時點可 t₀−k；反例種類欄選填（平台可依 t₀ 走勢自動分類）；TF／規模不寫死；多標的＝常態必要（U12）。
+2. §7 J1–J10（主委判斷，委員已審）。
+3. `handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md` C1–C9（K1–K10 全部技術細節；**C1 已被 U4b 改寫**、K1/K2 受 t₀−k 擴充）。
+4. `handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md`（只取 R2 未覆蓋：六時間欄不變式、ms 單位閘、taxonomy 正交欄；其 C-情境反例結論**不取**）。
+5. 既有契約 pointer：`ic_survivor_contract.json`（擴欄升版）、`SplitPlan`／rows purge、`capability_status` 枚舉、`TEST_DESIGN_CHARTER`、GAP-1 DSR/PBO、成熟度地圖（禁改 `xgboost_batch_service` 訓練殼；不碰回測層）。
+
+**SPEC 要件**：檔名 `docs/GAP3_EVENT_SPEC.md`；創建須 `bash scripts/gate.sh artifact --file docs/GAP3_EVENT_SPEC.md --template-opened templates/SPEC_TEMPLATE.md --sections ...`（PreToolUse gate 擋無 token 創建）；§0 前置裁決 D 系列＝R2 C1–C4 合併 8/20 增補（**這是「最完整精確」的合併點**，對抗審第一項工作＝拿 §7.5 逐條比對「沒漏沒錯沒被舊結論污染」）；Task 分批 B1–B5（K10；一份 SPEC 預設，太大再拆）；§N 殘留（三值理由）：triple-barrier／long-short／T4 T6 資料源／sample_weight 接 ML 訓練／#4 正式 panel IC。**五項「待 SPEC 對抗審確認」**：①決策時點 t₀−k 擴充（K1/K2）②反例自動分類規則 ③多標的必要化與 #4 邊界（K4）④一份 SPEC vs 拆兩份（K10）⑤產生器 G1–G6 落哪批。
+**每次使用者補充**：照討論文檔檔頭 **SYNC-GAP3** 六項同步（使用者會帶 Prompt 觸發；缺一項＝沒做完；收尾給「檔 × 改動節」對照表）。SPEC 凍結後討論文檔降為歷史。
+
+## ⚠ 坑（完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～八十一）
+- 🔴 含家族名的 Bash 會被 gate_check 擋 ⇒ 命令寫 scratchpad 腳本再 `bash <script>`；讀委員檔用 Read。committee_run 一家失敗：同 round `ROUND_ID=<id> bash scripts/cx_run.sh <fam> <brief> <out>` 補跑；外部服務連續失敗 ⇒ `debt_clear --abandon --kind collection-failed --approver main-agent`（consult 可、review/stamp 不可）。
+- 🔴 委員交件檔有尾隨空白 ⇒ pre-commit index-strip 打破位元綁定（摩擦八十一）：register 兩版 sha 或 sources 副本不入版控；白話表格表態欄用文字不用 ✅（摩擦八十）；「使用者意圖」類 assumed 前提先白話問使用者再派委員（摩擦七十八）。
+- review brief 前提逐條 `fact-verified:`／`assumed:`；stamp brief 禁多家並行跑重測試；commit 訊息 `Governance-Scope:` trailer 獨立末段；白話新增 .md 須登記 `plain_docs_sync_check.sh`；`factkey_write_guard` 對 `Archived/GAP-2施工進度.md:13-22` 紅為既有；venv Python 3.9.6；`docs/API_SPECIFICATION.md` 格式快閘不可編輯；`scripts/governance_families.json` 既有 no-op dirty；push 丟背景；三支臨時腳本 `scripts/ichc_t2_diag.py`／`ichc_t2_probe400.py`／`ichc_t3_diff.py` 待清（非本線）。

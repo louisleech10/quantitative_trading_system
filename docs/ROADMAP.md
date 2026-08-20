@@ -17,7 +17,7 @@
 
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
-| **量化主線（IC 分析）** | 🏁 **GAP-1 四批全部 CLOSED（2026-08-18）**：B1–B4 各三家 code review＋三家戳記；280 測試／20 mutation／wiring 閘 rc=0；延伸檔 A1-1..A1-24；殘留 G1-R1..R7／R9／R10／R11 | GAP-2a 亦 CLOSED（2026-08-19，見下列）；**下一步＝GAP-3 事件型：開發前先唯讀 consult → 白話 Q0＋5 題給使用者裁 → 再寫 SPEC（2026-08-19 session 開工）** | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`；收斂 `handoffs/reconcile/20260818-gap1-b4-review-r18/synth.md` |
+| **量化主線（IC 分析）** | 🏁 **GAP-1 四批全部 CLOSED（2026-08-18）**：B1–B4 各三家 code review＋三家戳記；280 測試／20 mutation／wiring 閘 rc=0；延伸檔 A1-1..A1-24；殘留 G1-R1..R7／R9／R10／R11 | GAP-2a 亦 CLOSED（2026-08-19）；GAP-3 討論階段收案（consult R1＋R2＋討論文檔 12 版；`白話說明/GAP-3事件型討論.md` §7.5＝SPEC 取材地圖）；**下一步＝GAP-3 SPEC 起草（使用者 2026-08-20 裁定新 session 開工；HANDOFF 已備開工指令）** | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`；收斂 `handoffs/reconcile/20260818-gap1-b4-review-r18/synth.md` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
 | GAP-1 DSR/PBO/MinBTL 策略層防偽 | 🏁 **全票 CLOSED（2026-08-18）**；殘留 registry G1-R1..R7＋R9＋R10 | —（殘留 registry 觸發時再開） | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |
