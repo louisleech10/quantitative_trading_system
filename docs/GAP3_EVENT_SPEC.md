@@ -1,6 +1,6 @@
 # GAP-3 事件型分析（外部標註正反例匯入 → PIT 對齊 → 條件 IC／ML）— SPEC
 
-> 來源 PLAN/診斷：`白話說明/GAP-3事件型討論.md`（第 12 版；**§7.5 五層取材優先序＝本 SPEC 唯一取材地圖**）；consult R1 `handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md`（C1–C6）；consult R2 `handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md`（C1–C9＝K1–K10 技術定案）；**adversarial R1 收斂 `handoffs/reconcile/20260820-gap3-x-review-r1/synth.md`（15 findings 十三群集 X1–X13 全部寫回；AR-1..AR-6 裁定）**；**R2 收斂 `handoffs/reconcile/20260820-gap3-x-review-r2/synth.md`（composer/grok sentinel 0 findings；codex 6 條 Y1–Y6 全部寫回：entry 映射表 D1-6／分類公式與預設值／`counterexample_kind_effective` derived 值集／mutation 逐條命令與 fixture 身分／M8 permutation quantile／control_kind validator 矛盾解除）**
+> 來源 PLAN/診斷：`白話說明/GAP-3事件型討論.md`（第 12 版；**§7.5 五層取材優先序＝本 SPEC 唯一取材地圖**）；consult R1 `handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md`（C1–C6）；consult R2 `handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md`（C1–C9＝K1–K10 技術定案）；**adversarial R1 收斂 `handoffs/reconcile/20260820-gap3-x-review-r1/synth.md`（15 findings 十三群集 X1–X13 全部寫回；AR-1..AR-6 裁定）**；**R2 收斂 `handoffs/reconcile/20260820-gap3-x-review-r2/synth.md`（composer/grok sentinel 0 findings；codex 6 條 Y1–Y6 全部寫回：entry 映射表 D1-6／分類公式與預設值／`counterexample_kind_effective` derived 值集／mutation 逐條命令與 fixture 身分／M8 permutation quantile／control_kind validator 矛盾解除）**；**R3 收斂 `handoffs/reconcile/20260820-gap3-x-review-r3/synth.md`（composer/grok sentinel；codex 4 條 Z1–Z4 全部寫回：receipt 兩層 schema／`drop_threshold` 預設收回待白話閘裁 x／D4 改 effective 欄／M8 三道防退化硬檢）**
 > ｜日期：2026-08-20｜對應 TODO：`docs/GAP3_EVENT_TODO.md`（本 SPEC 白話閘定版後生成）
 > ｜票：`docs/IC_QUANT_GAP_REGISTRY.md` #3；使用者 2026-08-20 裁定「討論收案、新 session 起草 SPEC」
 > ｜**對抗審第一項工作（強制）**：拿 §7.5 五層清單**逐條**比對本 SPEC——沒漏、沒錯、沒被舊結論污染（衝突時新使用者意圖蓋過舊委員結論；R1 之 C-情境反例結論不取；舊 `CaseRecord`／`_select_negative_timestamps` 語意不取）。第二項＝裁 §A 之 AR-1..AR-6。
@@ -30,7 +30,7 @@
 1. 六時間欄不變式（validator 機械檢查）：`observed_through ≤ feature_cutoff[tf] ≤ decision_at ≤ entry_at ≤ label_start < label_end`；`feature_cutoff` **per-TF 展開**，規則＝`max{bar.close_ms ≤ decision_at}`（12h t₀ 對 1h/4h 在 UTC 整點為常見特例，一律走 as-of）。
 2. 決策時點單一表示法（R1 X1＝AR-1 定形）：匯入欄＝`t0`（錨；epoch ms UTC；＝觸發根 open_time）＋`decision_offset_bars`（int ≥0，預設 0；語意＝決策時點為 t₀ 往前第 k 根**錨定 TF** bar 之 open；0＝t₀ open）；**不設** ms 覆寫欄（單一表示法）；`decision_at_ms` 由對齊函式推導寫入 receipt（`t0_ms/decision_offset_bars/decision_at_ms` 三欄並排）；validator 增 `decision_at ≤ t0_open_ms`；缺 bar 無法推導 ⇒ `missing_bar`。特徵截止跟著 decision_at 走。A/B 之「事件在未來」⇒ `event_known_at_decision=false`、特徵 `observed_through ≤ decision_at`、選樣可用結果欄（分路徑見 D3）；`trigger_bar_open` 語意之決策只在 receipt 能證明事件於 open 前已知時合法（R1 C1-3），A/B 預測型**不**受此限（其事件本來就在未來、不進特徵）。
 3. 時間戳單一單位 **epoch ms UTC**；量級像秒卻宣告 ms（或相反）⇒ 拒絕（R1 C2；ms 單位閘）。
-4. 對齊收據每事件 × 每 TF 一列 `{feature_cutoff_ms, last_bar_open_ms, last_bar_close_ms, row_id}`；失敗**枚舉**（聯集，R2 C2）：`invalid_timestamp_unit／timezone_missing／missing_bar／duplicate_bar／unsorted_bar／no_boundary_match／feature_after_decision／entry_before_decision／label_window_incomplete／nonpositive_reference_price／nan_or_inf_feature／reference_symbol_unavailable／warmup_insufficient_<tf>／tf_boundary_ambiguous`；逐事件寫 reason，**禁 silent `continue`**（現雛形 `xgboost_batch_service.py:621,651` 之靜默跳過不沿用）。
+4. 對齊收據兩層（R2 Y1／R3 Z1；兩層皆入 SoT、§G-2 驗兩層）：**事件級**每事件一列 `{t0_ms, decision_offset_bars, decision_at_ms, entry_at_ms, entry_price_source{bar_open_ms, field}}`；**per-TF** 每事件 × 每 TF 一列 `{feature_cutoff_ms, last_bar_open_ms, last_bar_close_ms, row_id}`。失敗**枚舉**（聯集，R2 C2）：`invalid_timestamp_unit／timezone_missing／missing_bar／duplicate_bar／unsorted_bar／no_boundary_match／feature_after_decision／entry_before_decision／label_window_incomplete／nonpositive_reference_price／nan_or_inf_feature／reference_symbol_unavailable／warmup_insufficient_<tf>／tf_boundary_ambiguous`；逐事件寫 reason，**禁 silent `continue`**（現雛形 `xgboost_batch_service.py:621,651` 之靜默跳過不沿用）。
 
 **D3 — 條件引擎欄位角色隔離（R2 C3）**
 1. 所有 expression／欄位分三角色：`feature`（必 `available_at ≤ feature_cutoff`）／`selection_predicate`（可含未來欄，**只進抽樣 provenance**）／`label`（只進結果欄）；等價欄位登記 `column_role ∈ {pit_feature, trigger_outcome, future_outcome}`。
@@ -40,7 +40,7 @@
 
 **D4 — 全部 K 線驗證＝固定分母 evaluation manifest（R2 C4；U11 一次建完整；整票靈魂 J1 的機器形）**
 1. all-bars evaluation manifest 以 `decision_at` 為索引，只納 `eligible`（答案窗完整、資料連續、價格有效、PIT 合法）；報 `n_total／n_eligible／n_labeled／n_unknown／n_tail_excluded／n_missing`＋reason。
-2. 輸出：precision／recall／F1／PR 曲線＋AUC／PR-AUC／lift（top-q% 與固定閾值）／confusion matrix／訊號頻率／簡單 signed 持有報酬（**實際進場價 → 答案窗末 close**，與 D1-4 並排揭露）／按 symbol、direction、counterexample_kind、時間段分層＋CI。
+2. 輸出：precision／recall／F1／PR 曲線＋AUC／PR-AUC／lift（top-q% 與固定閾值）／confusion matrix／訊號頻率／簡單 signed 持有報酬（**實際進場價 → 答案窗末 close**，與 D1-4 並排揭露）／按 symbol、direction、**`counterexample_kind_effective`（derived 欄；R3 Z3）**、時間段分層＋CI（分層報表列 `n_unclassifiable`）。
 3. `prevalence_learn` 與 `prevalence_full` **必**並排＋`sample_design=case_control` 揭露＋lift；缺任一 ⇒ `capability_status=unavailable`，reason=`missing_prevalence_disclosure`。
 4. **不做**（不碰回測層；成熟度地圖）：倉位、手續費/滑價、複利、資金曲線、turnover/capacity、triple-barrier 最佳化、long-short 組合。
 
@@ -170,7 +170,7 @@
 - 檔案：新增 `momentum/Analysis/event_samples/baseline.py::single_feature_binary_baseline(features_at_decision, labels, event_split_plan) -> report`。
 - 輸入來源：`features_at_decision`＝**Task B1.6 產出**（含 `feature_manifest_hash`；R1 X7）；`event_split_plan`＝B1.3。
 - 既有 caller/影響面：新建無 caller。
-- 改法：對每特徵單獨算 OOS AUC/PR-AUC（test 段 only）＋BH-FDR；chance-level oracle＝**permutation quantile**（R2 Y5）：固定 seed、`N_perm=1000`，per `statistic_kind` 以置亂分布 `[q_{0.025}, q_{0.975}]` 為帶（AUC null 中心 0.5、PR-AUC null 中心＝prevalence、IC null 中心 0，皆由置亂分布自然給出，不用解析近似式）；輸出掛 `statistic_kind=binary_discrimination`。
+- 改法：對每特徵單獨算 OOS AUC/PR-AUC（test 段 only）＋BH-FDR；chance-level oracle＝**permutation quantile**（R2 Y5／R3 Z4 防退化）：固定 seed、`N_perm=1000`，per `statistic_kind` 以置亂分布 `[q_{0.025}, q_{0.975}]` 為帶（AUC null 中心 0.5、PR-AUC null 中心＝prevalence、IC null 中心 0，皆由置亂分布自然給出）；**三道硬檢**——(i) 分布非退化：`variance > 0` 且 `n_unique_perm_stats > 1`，否則 oracle 自身 FAIL；(ii) 斷言至少一排列 ≠ identity（seed＋排列 digest 寫 receipt）；(iii) 帶判定用經驗分位；輸出掛 `statistic_kind=binary_discrimination`。
 - **驗證**：`pytest tests/momentum/event_samples/test_baseline_oracle.py -q` rc=0；label 置亂（固定 seed）⇒ 全特徵落 CI 內；`ASSERT venv/bin/python -m pytest tests/momentum/event_samples/test_baseline_oracle.py -q WHEN mutation=pit_shift THEN rc!=0`。
 - **邊界**：①one-class（test 段單類）⇒ `capability_status=unavailable`②特徵全 NaN ⇒ loud 拒。
 - **存活至**：B2 三表落地後降級為自檢工具（保留不刪）。
@@ -181,7 +181,7 @@
 - 目標：`counterexample_kind` 缺值時平台依 t₀ 走勢自動分類 a/b/c，門檻可調。
 - 檔案：新增 `momentum/Analysis/event_samples/counterexample_classifier.py`（純函式）。
 - 既有 caller/影響面：新建無 caller；B2 分層報表消費。
-- 改法（R1 X4＝AR-2 定形；R2 Y2 公式寫死）：`dir∈{+1(long),−1(short)}`；`R0 = dir·(close_t0−open_t0)/open_t0`（t₀ 自身走勢）、`Rw = dir·(close_labelEnd−close_t0)/close_t0`（答案窗走勢；錨＝t₀ close 同 D1；aggregation＝label window 末 close）。分類（僅 `label=0`、`counterexample_kind` 缺值時執行）：**a**＝`R0 ≥ trigger_threshold ∧ Rw ≤ follow_threshold`；**b**＝`|R0| ≤ range_threshold`；**c**＝`R0 ≤ −drop_threshold`。預設（可調；字面唯一住 `counterexample_classifier_config`）：`trigger_threshold=0.05`、`follow_threshold=0.0`、`range_threshold=0.01`、`drop_threshold=0.05`（源＝使用者 §2-4 原例）。輸出 derived 欄 `counterexample_kind_effective`＋`kind_source=platform_auto`；使用者已標 ⇒ 不重算不回寫（`kind_source=user`）；user/platform 衝突 ⇒ 保留 user＋報告附 `platform_suggested_kind` 留痕；**同時滿足多條 ⇒ `unclassifiable`（不猜）**。
+- 改法（R1 X4＝AR-2 定形；R2 Y2 公式寫死）：`dir∈{+1(long),−1(short)}`；`R0 = dir·(close_t0−open_t0)/open_t0`（t₀ 自身走勢）、`Rw = dir·(close_labelEnd−close_t0)/close_t0`（答案窗走勢；錨＝t₀ close 同 D1；aggregation＝label window 末 close）。分類（僅 `label=0`、`counterexample_kind` 缺值時執行）：**a**＝`R0 ≥ trigger_threshold ∧ Rw ≤ follow_threshold`；**b**＝`|R0| ≤ range_threshold`；**c**＝`R0 ≤ −drop_threshold`。預設（可調；字面唯一住 `counterexample_classifier_config`）：`trigger_threshold=0.05`、`follow_threshold=0.0`、`range_threshold=0.01`（三者源＝使用者 §2-4 原文：漲≥5%／續漲分界／上下 1%）；**`drop_threshold` 無預設（`default=null`）**——使用者原文只寫「跌 x%」、x 從未裁定（R3 Z2）：未設 ⇒ c 類判定**不啟用**、僅由 a/b 與 `unclassifiable` 覆蓋（fail-closed 不發明數字）；x 值**列入白話閘問題**請使用者裁，裁後寫入契約 default。輸出 derived 欄 `counterexample_kind_effective`＋`kind_source=platform_auto`；使用者已標 ⇒ 不重算不回寫（`kind_source=user`）；user/platform 衝突 ⇒ 保留 user＋報告附 `platform_suggested_kind` 留痕；**同時滿足多條 ⇒ `unclassifiable`（不猜）**。
 - **驗證**：`pytest tests/momentum/event_samples/test_counterexample_classifier.py -q` rc=0（手造三類小例 exact；boundary fixtures：每門檻取 `=`、`+1e-9`、`−1e-9` 三點落位 exact——R2 Y2；conflict case 斷言主鍵保留＋`platform_suggested_kind` 出現；多類邊界 ⇒ `unclassifiable`）。
 - **邊界**：①走勢同時滿足多類 ⇒ `unclassifiable`（不進分層分母）②答案窗不完整 ⇒ `unclassifiable` 非亂填③user 有標且 platform 建議不同 ⇒ 主鍵不變、留痕欄出現。
 - **存活至**：全票完工後保留。
@@ -364,7 +364,7 @@
   - M5 權重歸一：mutation＝`cluster_weight` 全設 1（棄 `1/n_events_in_time_cluster`——X9 公式）⇒ B1.3 同簇權重和＝1（`atol=1e-12`）斷言紅，rc!=0。
   - M6 角色隔離移除：mutation＝condition_engine 允許 `future_*` 欄過 `feature` 角色 ⇒ B3.1 ASSERT（`WHEN expression_role=feature column=future_return THEN rc!=0`）反轉＝測試紅。
   - M7 基率欄移除 ⇒ B2.5 `unavailable:missing_prevalence_disclosure` 斷言紅，rc!=0。
-  - M8 置亂 oracle 空心防護（R2 Y5 定式）：baseline＝固定 seed 置亂 label 後，各 `statistic_kind` 觀測值落 **permutation quantile 帶** `[q_{0.025}, q_{0.975}]`（`N_perm=1000`；AUC null 中心 0.5、PR-AUC null 中心＝prevalence、IC null 中心 0，由置亂分布自然給出）；mutation＝把置亂改為恆等排列 ⇒ oracle 必須轉紅（證 oracle 有牙），rc!=0。
+  - M8 置亂 oracle 空心防護（R2 Y5／R3 Z4 定式）：baseline＝固定 seed 置亂 label 後，各 `statistic_kind` 觀測值落 **permutation quantile 帶**（B1.4 定式：`N_perm=1000`＋三道硬檢——非退化 `variance>0`／`n_unique>1`、非恆等斷言、經驗分位）；mutation＝把置亂改為恆等排列 ⇒ 非退化與非恆等硬檢**必觸發** ⇒ 紅，rc!=0（「觀測值∈觀測值」假綠路徑已封死）。
   - M9 offset 推導竄改：mutation＝`decision_at_ms` 推導 k 改 k−1 ⇒ §G-2 k>0 exact receipt oracle 紅，rc!=0（R1 X1）。
   - M10 分類猜測：mutation＝多類邊界從 `unclassifiable` 改取 precedence 猜一類 ⇒ B1.5 邊界案例斷言紅，rc!=0（R1 X4）。
   - M11 `degraded` 標記移除：mutation＝單 symbol 或未 cluster 調整時不標 `degraded` ⇒ B1.3/B2 共同約束斷言紅，rc!=0（R1 X6）。
