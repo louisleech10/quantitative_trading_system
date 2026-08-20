@@ -95,7 +95,11 @@ def single_feature_binary_baseline(
     此處出現即契約破缺，不做 pairwise 靜默刪列）。
     feature_manifest_hash（CODEX-R1-P2-07）：B1.6 產出之 provenance，寫入 report receipts。
     """
-    if not isinstance(feature_manifest_hash, str) or len(feature_manifest_hash) != 64:
+    if (
+        not isinstance(feature_manifest_hash, str)
+        or len(feature_manifest_hash) != 64
+        or set(feature_manifest_hash) - set("0123456789abcdef")  # CODEX-R3-P2-01：逐字元 hex 驗證
+    ):
         # CODEX-R2-P2-02：provenance 不可省略——缺 hash fail-closed
         raise ValueError("single_feature_binary_baseline: feature_manifest_hash 須為 64 位 sha256（B1.6 產出），缺則 fail-closed")
     test_ids = event_split_plan.assignments.loc[

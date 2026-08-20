@@ -101,7 +101,7 @@ def test_feature_manifest_hash_in_receipts_and_required():
     rep = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
     assert rep["receipts"]["feature_manifest_hash"] == H
     assert rep["features"]["noise"]["n_used"] == N - N // 2
-    for bad in (None, "", "short"):
+    for bad in (None, "", "short", "g" * 64, "AB" * 32):  # 非 hex／大寫皆拒（CODEX-R3-P2-01）
         with pytest.raises(ValueError, match="feature_manifest_hash"):
             single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=bad)
 
