@@ -39,12 +39,12 @@
 <tr>
 <td>B4</td>
 <td>pattern 抽取＋接 GAP-1 防過擬合</td>
-<td><strong>施工完、等三家審查（8/21）</strong>：兩項落地、B4 Gate 全綠（22 條新測試；AUC 餵 DSR 必拒）</td>
+<td><strong>完工蓋章（8/21）</strong>：四輪審查 8→2→1→0、三家蓋章機檢通過、29 條新測試（AUC 餵 DSR 必拒）</td>
 </tr>
 <tr>
 <td>B5</td>
 <td>API／前端三頁／UAT</td>
-<td>排隊中</td>
+<td><strong>下一批（新 session 開工）</strong></td>
 </tr>
 </tbody>
 </table></div>
@@ -225,8 +225,9 @@
 <p><strong>B4 三家審查第一輪（8/21）抓 8 條、全修</strong>：三家同抓「PBO 的觀測軸用事件 ID 字串排序而不是進場時間，切塊會亂」（已改用收據裡的進場時間排序、衝突就拒）；兩家抓「把分數數列標成 return_series 就能繞過型別閘」（已改成必須帶 <code>to_return_series</code> 的收據鍵，沒收據的一律拒）；codex 另抓三條：pattern 橋沒強制簇 manifest（已必填）、沒記帳的候選可以當 DSR 冠軍（已要求輸入集＝帳本集）、provenance 的命令／預期可省略（已必填且寫檔前先驗）。修後 27 條綠，等 R2 原提出方閉合。</p>
 <p><strong>B4 R2（8/21）</strong>：R1 八條原提出方全部 CLOSED、composer／grok 0 新問題；codex 再抓兩條第一輪漏的（都對）：「帳本寫成功但 provenance 附檔寫失敗時，下游看不出來」（已改成 provenance 先寫、帳本後寫，且算 DSR 前先對帳，缺 provenance 直接 unavailable）、「報酬序列 copy 後改值，舊的指紋還在、閘門照放」（已改成閘門重算指紋比對，改過必拒）。修後 29 條綠，等 R3 codex 閉合。</p>
 <p><strong>B4 R3（8/21）</strong>：codex 兩條 CLOSED、兩家複核同意；codex 再抓一條修補引入的洞：「對帳按候選名聚合，同一候選用新 evaluation 重試後，舊的孤兒就看不見了」（已改成逐 evaluation 對帳，孤兒永遠列得出來、帳本缺 provenance 的 evaluation 一律 unavailable）。29 條綠，等 R4 codex 閉合。</p>
+<p><strong>B4 R4／蓋章（8/21）</strong>：codex 重跑反例 CLOSED、兩家複核同意、三家 0 新問題；三家蓋章 r4 收斂檔、機檢 PASS ⇒ <strong>第 4 批完工蓋章</strong>。這批的教訓：codex 連三輪各抓一條「上一輪修補引入／漏抓」的 provenance 交易問題（先寫哪個檔、改值後舊指紋、按候選聚合吞孤兒）——每條都對，也每條都是「修了但沒修到底」的型；下次碰帳本／收據類修補，先把「寫入順序、完整性對帳、指紋綁值」三件一次想完再動手（摩擦八十四）。</p>
 <h2 id="下一步">下一步</h2>
-<p><strong>R4 閉合</strong>（session <code>20260821-gap3-b4-review-r4</code>；codex 重跑 R3 反例、其餘兩家複核）→ 三家蓋章 → 進 B5。</p>
+<p><strong>B5（新 session 開工；HANDOFF 已寫好開工指令）</strong>：B5.1 API 接線＋legacy adapter＋<code>factories.create_event_sample_pipeline()</code> 出口 → B5.2 前端三頁升級（<code>/search</code>／<code>/data-preparation</code>／<code>/ic-analysis</code> 事件模式）→ B5.3 UAT 清單＋收尾文件。做完三家 review＋蓋章＋你逐項簽 UAT，整票才算完成。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
