@@ -235,8 +235,13 @@
 <li><strong>UAT 少驗兩件事（codex＋grok）</strong>：清單自稱「匯入→對齊→三表→全 K 線」，實際只驗兩張表。已補：後端分析端點加<strong>全 K 線驗證</strong>（固定分母、基率並排）、前端多一個區塊、<code>/search</code> 匯出補 <code>label_value</code> 讓**條件 IC（第三張表）**算得出來；UAT 加 B8b／B9b。</li>
 <li>其餘：過期的前端占位卡改真實殘留（G3-R9／R10／R11 入 registry）、factories 出口收斂回唯一一個、<code>Event_ID</code> 大小寫變體也會被導向新端點、萬級匯入補 API 路徑實測（10k 筆 0.38 秒）、測試計數敘事改引 receipt 實測值。</li>
 </ul>
+<h2 id="b5-第二三輪審查821-晚822">B5 第二、三輪審查（8/21 晚～8/22）</h2>
+<ul>
+<li><strong>R2（5 條全修）</strong>：codex 抓三個真問題——①「往前 k 根決策」的事件，全 K 線驗證把訊號標在觸發根、但評分程式讀的是決策根 ⇒ k&gt;0 時整張表算錯（已改標決策根，混合 k 直接拒算）；②匯出的 <code>label_value</code> 我拿「觸發那根自己的漲跌」冒充「答案窗報酬」⇒ 條件 IC 會測錯東西（已改取同答案窗的未來報酬欄）；③匯入的 digest 驗證在 JSON 端點必然自相矛盾（已改成顯式拒並指路）。另補前端揭露「這張表在算什麼」。</li>
+<li><strong>R3（4 條）</strong>：codex 指出我上一輪補的測試「看起來有驗、其實沒驗到」（監視函式定義了卻沒接上）——已改成真的攔截評分程式收到的分數，斷言 1 落在決策根、觸發根為 0；並補「匯出前先算有幾筆缺答案窗欄位並提示」、「來源檔可一起下載＋上傳以通過 digest 驗證」。三家同抓白話文件同步檢查在 HEAD 是紅的（我第三次漏在同一個 commit 更新看板）。</li>
+</ul>
 <h2 id="下一步">下一步</h2>
-<p><strong>B5 R2 閉合</strong>（session <code>20260821-gap3-b5-review-r2</code>；原提出方重跑同一反例）→ 三家蓋章 → 你照 <code>docs/GAP3_UAT_CHECKLIST.md</code> B 段逐項簽字（13 項）→ 整票完成。</p>
+<p><strong>B5 R4 閉合</strong>（session <code>20260822-gap3-b5-review-r4</code>）→ 三家蓋章 → 你照 <code>docs/GAP3_UAT_CHECKLIST.md</code> B 段逐項簽字（13 項）→ 整票完成。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

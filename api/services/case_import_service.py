@@ -708,10 +708,11 @@ class EventImportService:
     # ---- 匯入 ----
     def import_records(
         self, records: List[Dict[str, object]], *, source_name: Optional[str], upload_bytes: Optional[bytes],
-        validate_only: bool, verify_source_digest: bool = False,
+        validate_only: bool, verify_source_digest: bool = False, source_bytes: Optional[bytes] = None,
     ) -> EventImportResponse:
-        """upload_bytes：上傳內容（記 sha256 供 provenance）。verify_source_digest=True 時把它當契約 `source_file_digest`
-        的對證來源（逐列 digest_mismatch）——預設關：上傳檔不可能含自己的 hash，契約欄語意＝使用者原始來源檔 sha256。"""
+        """upload_bytes：事件檔內容（記 `upload_sha256` 供 provenance）。
+        source_bytes：契約所指之**來源檔**位元組（CODEX-R2-P1-03）；`verify_source_digest=True` 時以此逐列對證
+        `source_file_digest`（未提供則退回 upload_bytes——僅在事件檔本身即來源檔時才有意義）。"""
         columns = sorted({k for r in records for k in r.keys()}) if records else []
         if self.looks_legacy(columns):
             raise EventImportRejectedError(EventImportRejected(
@@ -719,7 +720,8 @@ class EventImportService:
                 message="偵測到舊三欄格式（symbol/timestamp/Positive_case）；新端點只收 event_import_contract 新 schema，不做靜默轉換",
                 migration_hint=self.migration_hint(columns),
             ))
-        df, failures = self._pipeline.validate(records, source_bytes=upload_bytes if verify_source_digest else None)
+        verify_bytes = (source_bytes if source_bytes is not None else upload_bytes) if verify_source_digest else None
+        df, failures = self._pipeline.validate(records, source_bytes=verify_bytes)
         digest = _hashlib.sha256(upload_bytes).hexdigest() if upload_bytes is not None else None
         if df is None:
             raise EventImportRejectedError(EventImportRejected(
@@ -737,6 +739,7 @@ class EventImportService:
             payload = {
                 "import_id": import_id, "source_name": source_name, "upload_sha256": digest,
                 "source_digest_verified": bool(verify_source_digest),
+                "source_file_sha256": _hashlib.sha256(source_bytes).hexdigest() if source_bytes is not None else None,
                 "imported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "contract_version": str(self._contract.get("version")),
                 "records": df.to_dict("records"),

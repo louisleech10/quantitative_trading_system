@@ -6,6 +6,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import EventImportForm from '@/components/case/EventImportForm';
 import { EventImportRejectedError } from '@/lib/api';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { buildEventContractRecords, canonicalSourceText, inferDirection, sha256Hex, toEpochMs } from '@/lib/eventExport';
 import type { CaseData } from '@/lib/types';
@@ -107,6 +109,10 @@ describe('GAP-3 /search 匯出組裝器', () => {
     expect(out.source_file_digest).toBe(expected);
     expect(out.records.every((r) => r.source_file_digest === expected)).toBe(true);
     expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    // CODEX-R2-P1-03：companion 來源檔內容即 source_file_text，其 sha256 === source_file_digest（匯入可 verify）
+    expect(out.source_file_text).toBe(canonicalSourceText(cases));
+    expect(createHash('sha256').update(out.source_file_text).digest('hex')).toBe(out.source_file_digest);
+    expect(out.verify_note).toContain('source_file');
     // 改值 ⇒ digest 變
     const out2 = await buildEventContractRecords([{ ...cases[0], price_change: 0.06 }, cases[1]] as CaseData[], { timeframe: '12h', conditions: [], priceChangeMethod: 'x' });
     expect(out2.source_file_digest).not.toBe(expected);
@@ -122,6 +128,7 @@ describe('GAP-3 /search 匯出組裝器', () => {
     expect('label_value' in h2.records[1]).toBe(false);
     expect(h2.skipped.some((s) => s.reason.includes('future_2bar_return'))).toBe(true);
     expect(h2.label_value_source).toContain('future_2bar_return');
+    expect(h2.n_missing_label_value).toBe(1);                            // CODEX-R3-P1-02：缺欄筆數可供匯出前提示
     const h4 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', horizonBars: 4 });
     expect(h4.records[0].label_value).toBe(0.077);                       // 隨 horizon 改欄
     expect(h4.records[0].label_definition.window.horizon_bars).toBe(4);
@@ -136,5 +143,17 @@ describe('GAP-3 /search 匯出組裝器', () => {
     expect(toEpochMs(1704067200)).toBe(1704067200000);
     expect(toEpochMs(1704067200000)).toBe(1704067200000);
     expect(toEpochMs('')).toBeNull();
+  });
+});
+
+describe('GAP-3 /search 匯出頁面接線（CODEX-R3-P1-02）', () => {
+  it('答案窗可選、缺 label_value 先提示、同時下載來源檔', () => {
+    const src = readFileSync(resolve(__dirname, '../../app/search/page.tsx'), 'utf-8');
+    expect(src).toContain('export-gap3-horizon');                       // horizon 選單
+    expect(src).toContain('horizonBars: eventHorizonBars');             // 傳入匯出器
+    expect(src).toContain('payload.n_missing_label_value > 0');         // 缺欄提示
+    expect(src).toContain('missing_label_value');
+    expect(src).toContain('.source.json');                              // companion 來源檔
+    expect(src).toContain('payload.source_file_text');
   });
 });

@@ -138,21 +138,31 @@ def _rejected(exc: EventImportRejectedError) -> HTTPException:
 # ---------------------------------------------------------------------------
 @router.post("/case/import-events", response_model=EventImportResponse)
 async def import_events_file(
-    file: UploadFile = File(...),
+    file: UploadFile = File(..., description="事件檔（CSV／JSON，新 schema）"),
+    source_file: Optional[UploadFile] = File(None, description="契約所指之『來源檔』；`verify_source_digest=true` 時以此檔位元組對證"),
     validate_only: bool = Query(False),
     verify_source_digest: bool = Query(
         False,
-        description=("以上傳檔位元組 sha256 逐列對證 source_file_digest——**僅當上傳檔本身即契約所指之來源檔時**才開；"
-                     "由 /search 匯出之事件 JSON 其 digest 綁『搜尋結果來源』而非檔案自身，開啟會 digest_mismatch"),
+        description=("逐列對證 source_file_digest。對證位元組＝`source_file`（若提供）否則 `file` 自身——"
+                     "事件檔含自己的 digest，故自我對證必然 mismatch；由 /search 匯出者請一併上傳其 `.source.json`（CODEX-R2-P1-03）"),
     ),
 ):
     """上傳 CSV/JSON（GAP-3 事件契約新 schema）。拒收 ⇒ 400（legacy／parse）或 422（契約違規，逐列 reason）。"""
     svc = get_event_import_service()
     content = await file.read()
+    src_bytes = await source_file.read() if source_file is not None else None
+    if verify_source_digest and src_bytes is None:
+        # 顯式引導：自我對證必然失敗，直接說清楚要傳什麼（而非讓使用者拿到一堆 digest_mismatch）
+        raise HTTPException(status_code=400, detail=EventImportRejected(
+            kind="source_file_required_for_verify",
+            message=("verify_source_digest=true 需一併上傳 source_file（契約所指來源檔）；"
+                     "事件檔本身含 source_file_digest 欄，對自己取 sha256 必然不符。"
+                     "由 /search 匯出者：同時下載的 *.source.json 即為該來源檔"),
+        ).model_dump())
     try:
         records = svc.parse_upload(content, file.filename or "")
         return svc.import_records(records, source_name=file.filename, upload_bytes=content, validate_only=validate_only,
-                                  verify_source_digest=verify_source_digest)
+                                  verify_source_digest=verify_source_digest, source_bytes=src_bytes)
     except EventImportRejectedError as exc:
         raise _rejected(exc)
 

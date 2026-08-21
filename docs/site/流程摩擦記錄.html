@@ -1886,6 +1886,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>八十八・（2026-08-22）測試計數同一批連錯兩次（13 vs 9、232 vs 229），根因是我從記憶寫數字</strong>：grok 在 B5 R1 已抓「brief 寫 13、實為 9」，我修完 R1 後在新 brief／synth 又寫「event_samples 232」（實 229），R2 再被抓一次。兩次都不影響 rc，但污染跨 agent 驗收敘事——委員得自己重跑才能信任任何數字。做法改成機械化：<strong>任何要寫進 brief／synth／commit／看板的測試數字，先 <code>grep -E &quot;passed&quot; &lt;receipt&gt;</code> 把該行複製出來再貼，不准憑印象</strong>；計數與 rc 一樣屬 fact-verified，錯了就是不實。</p>
 </blockquote>
+<blockquote>
+<p><strong>八十九・（2026-08-22）同一批 commit 三次踩「白話文件沒跟實作同 commit」，被三家委員抓三次</strong>：<code>plain_docs_sync_check</code> 是<strong>時序判準</strong>——只要 commit 動到 WATCHED 路徑（<code>scripts/</code>／<code>momentum/</code>／<code>docs/</code>…）而受管白話檔不在同一個 commit，下一次跑就紅。我在 B5 的 R1／R2／R3 修補 commit 各犯一次（每次都想著「先把碼修完，文件等收尾一起寫」）。委員每輪都要為此開一條 finding，純摩擦。<strong>做法改成固定動作：<code>git add</code> 完成後、<code>git commit</code> 之前，先跑 <code>bash scripts/plain_docs_sync_check.sh --staged</code>，紅就把該白話檔一起 add</strong>——不要等 commit 後再補，補一次就多一個 commit、下一輪又可能再紅。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

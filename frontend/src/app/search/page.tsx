@@ -50,6 +50,8 @@ export default function SearchPage() {
 
   // 基礎狀態
   const [currentStage, setCurrentStage] = useState<string>('');
+  // GAP-3 匯出：答案窗根數（決定 label_definition.window.horizon_bars 與 label_value 取哪個 future_Nbar_return）
+  const [eventHorizonBars, setEventHorizonBars] = useState<number>(2);
   
   // 搜索參數狀態
   const [searchParams, setSearchParams] = useState<SimpleSearchRequest>({
@@ -521,14 +523,29 @@ export default function SearchPage() {
       timeframe: searchParams.timeframe,
       conditions: ruleConditions,
       priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
+      horizonBars: eventHorizonBars,
     });
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `gap3_events_${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    // CODEX-R3-P1-02：缺該 horizon 之未來報酬欄 ⇒ 該列無 label_value，條件 IC 會 unavailable；匯出前先講清楚
+    if (payload.n_missing_label_value > 0) {
+      const proceed = window.confirm(
+        `${payload.n_missing_label_value}/${payload.n_records} 筆缺 future_${eventHorizonBars}bar_return，` +
+        `這些事件不會帶 label_value ⇒ 匯入後「條件 IC」會顯示 unavailable（missing_label_value）。\n\n` +
+        `建議改選有資料的答案窗（1–12 根），或先重跑搜尋。仍要匯出嗎？`,
+      );
+      if (!proceed) return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    const download = (text: string, name: string, type: string) => {
+      const url = URL.createObjectURL(new Blob([text], { type }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+    download(JSON.stringify(payload, null, 2), `gap3_events_${stamp}.json`, 'application/json;charset=utf-8;');
+    // 同時下載「來源檔」：其 sha256 === 每列 source_file_digest；匯入時放 source_file 欄即可通過 verify
+    download(payload.source_file_text, `gap3_events_${stamp}.source.json`, 'application/json;charset=utf-8;');
   };
 
   // CSV導出函數
@@ -1545,11 +1562,24 @@ export default function SearchPage() {
                 <Download className="w-5 h-5" />
                 導出CSV檔案
               </button>
+              <label className="ml-3 flex items-center gap-2 text-sm text-slate-300">
+                答案窗
+                <select
+                  data-testid="export-gap3-horizon"
+                  value={eventHorizonBars}
+                  onChange={(e) => setEventHorizonBars(Number(e.target.value))}
+                  className="rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-200"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+                    <option key={h} value={h}>{h} 根</option>
+                  ))}
+                </select>
+              </label>
               <button
                 onClick={() => void exportSearchResultsToEventJson()}
                 data-testid="export-gap3-events"
                 className="ml-3 flex items-center gap-2 px-6 py-3 bg-sky-500/20 text-sky-100 border border-sky-400/40 rounded-lg font-medium hover:bg-sky-500/30 transition-colors"
-                title="匯出 GAP-3 事件契約 JSON（可手改後到「數據準備」以新契約匯入）"
+                title="匯出 GAP-3 事件契約 JSON＋來源檔（可手改後到「數據準備」以新契約匯入）"
               >
                 <Download className="w-5 h-5" />
                 匯出事件契約 JSON

@@ -204,17 +204,48 @@ def test_gap3_import_json_verify_source_digest_rejected():
     assert client.post("/api/v1/case/import-events/json", json={"records": _records()}).status_code == 200
 
 
-def test_gap3_import_file_verify_source_digest_matches_uploaded_bytes(tmp_path):
-    """檔案端點：上傳檔即來源檔時 verify 可用——digest 相符收、不符 ⇒ 422 digest_mismatch（契約字面）。"""
+def test_gap3_import_file_verify_requires_source_file(tmp_path):
+    """檔案端點：開 verify 但只給事件檔 ⇒ 400 顯式引導（自我對證必然不符，不讓使用者看一堆 digest_mismatch）；
+    關閉 verify ⇒ 正常收（預設語意）。可通過之路徑見 test_gap3_import_verify_with_companion_source_file_passes。"""
     import hashlib
     recs = _records()
     body = json.dumps(recs, ensure_ascii=False).encode("utf-8")
-    digest = hashlib.sha256(body).hexdigest()
-    fixed = [dict(r, source_file_digest=digest) for r in recs]
-    body2 = json.dumps(fixed, ensure_ascii=False).encode("utf-8")               # 改寫後位元組已變 ⇒ 應 mismatch
+    fixed = [dict(r, source_file_digest=hashlib.sha256(body).hexdigest()) for r in recs]
+    body2 = json.dumps(fixed, ensure_ascii=False).encode("utf-8")
     r = client.post("/api/v1/case/import-events", files={"file": ("ev.json", body2, "application/json")},
                     params={"validate_only": "true", "verify_source_digest": "true"})
-    assert r.status_code == 422 and {f["reason"] for f in r.json()["detail"]["failures"]} == {"digest_mismatch"}
-    # 關閉 verify ⇒ 收（預設語意）
+    assert r.status_code == 400 and r.json()["detail"]["kind"] == "source_file_required_for_verify"
+    assert "source_file" in r.json()["detail"]["message"]
     assert client.post("/api/v1/case/import-events", files={"file": ("ev.json", body2, "application/json")},
                        params={"validate_only": "true"}).status_code == 200
+
+
+def test_gap3_import_verify_with_companion_source_file_passes(_isolated_storage):
+    """CODEX-R2-P1-03 RECHECK（原 OPEN）：/search 匯出之 events＋companion source 檔可端到端通過 verify。
+    來源檔 sha256 == 各列 source_file_digest ⇒ 200；不傳 source_file 而開 verify ⇒ 400 顯式引導；來源檔被改 ⇒ 422 digest_mismatch。"""
+    import hashlib
+    source_text = json.dumps([{"symbol": "ETHUSDT", "timeframe": "12h", "timestamp": "1704067200", "positive_case": 1, "price_change": 0.05},
+                              {"symbol": "ETHUSDT", "timeframe": "12h", "timestamp": "1704110400", "positive_case": 0, "price_change": -0.01}],
+                             ensure_ascii=False)
+    src_bytes = source_text.encode("utf-8")
+    digest = hashlib.sha256(src_bytes).hexdigest()
+    recs = [dict(make_event(i, label=i % 2), source_file_digest=digest) for i in range(2)]
+    events_bytes = json.dumps(recs, ensure_ascii=False).encode("utf-8")
+
+    # ① 兩檔齊 ⇒ verify 通過並落檔
+    r = client.post("/api/v1/case/import-events",
+                    files={"file": ("ev.json", events_bytes, "application/json"),
+                           "source_file": ("ev.source.json", src_bytes, "application/json")},
+                    params={"verify_source_digest": "true"})
+    assert r.status_code == 200, r.text
+    assert r.json()["source_digest_verified"] is True and r.json()["n_valid"] == 2
+    # ② 開 verify 但沒給 source_file ⇒ 400 顯式引導（非一堆 digest_mismatch）
+    r2 = client.post("/api/v1/case/import-events", files={"file": ("ev.json", events_bytes, "application/json")},
+                     params={"verify_source_digest": "true"})
+    assert r2.status_code == 400 and r2.json()["detail"]["kind"] == "source_file_required_for_verify"
+    # ③ 來源檔被竄改 ⇒ 422 digest_mismatch（契約字面）
+    r3 = client.post("/api/v1/case/import-events",
+                     files={"file": ("ev.json", events_bytes, "application/json"),
+                            "source_file": ("ev.source.json", src_bytes + b" ", "application/json")},
+                     params={"verify_source_digest": "true", "validate_only": "true"})
+    assert r3.status_code == 422 and {f["reason"] for f in r3.json()["detail"]["failures"]} == {"digest_mismatch"}

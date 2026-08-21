@@ -1,0 +1,155 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 492 items / 477 deselected / 15 selected
+
+tests/api/test_gap3_import.py ...............                            [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/fastapi/applications.py:1051
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/fastapi/applications.py:1051: PytestCollectionWarning: cannot collect 'test_app' because it is not a function.
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================ 15 passed, 477 deselected, 5 warnings in 2.81s ================
+rc_api_gap3_import=0
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 230 items
+
+tests/momentum/event_samples/test_alignment.py .............             [  5%]
+tests/momentum/event_samples/test_all_bars_eval.py ............          [ 10%]
+tests/momentum/event_samples/test_baseline_oracle.py ...........         [ 15%]
+tests/momentum/event_samples/test_candidate_ledger.py .................. [ 23%]
+.                                                                        [ 23%]
+tests/momentum/event_samples/test_condition_engine.py .................. [ 31%]
+.........................                                                [ 42%]
+tests/momentum/event_samples/test_counterexample_classifier.py ......... [ 46%]
+.......                                                                  [ 49%]
+tests/momentum/event_samples/test_dedupe.py ........                     [ 53%]
+tests/momentum/event_samples/test_event_split.py .........               [ 56%]
+tests/momentum/event_samples/test_feature_materialization.py .......     [ 60%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py ........        [ 63%]
+tests/momentum/event_samples/test_generator_adapters.py ................ [ 70%]
+.....                                                                    [ 72%]
+tests/momentum/event_samples/test_import_contract.py ................... [ 80%]
+.........                                                                [ 84%]
+tests/momentum/event_samples/test_mutation_guard.py ............         [ 90%]
+tests/momentum/event_samples/test_pattern_bridge.py ..........           [ 94%]
+tests/momentum/event_samples/test_pipeline.py ......                     [ 96%]
+tests/momentum/event_samples/test_tables.py .......                      [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 230 passed, 4 warnings in 26.04s =======================
+rc_event_samples=0
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 289 items
+
+tests/momentum/feature_engineering/test_state_counters.py .............. [  4%]
+...                                                                      [  5%]
+tests/momentum/Analysis/strategy_validation/test_contract.py ........... [  9%]
+....................                                                     [ 16%]
+tests/momentum/Analysis/strategy_validation/test_cscv.py .........       [ 19%]
+tests/momentum/Analysis/strategy_validation/test_deflated_sharpe.py .... [ 21%]
+...............                                                          [ 26%]
+tests/momentum/Analysis/strategy_validation/test_frequency.py .......... [ 29%]
+............                                                             [ 33%]
+tests/momentum/Analysis/strategy_validation/test_ledger.py ............. [ 38%]
+............                                                             [ 42%]
+tests/momentum/Analysis/strategy_validation/test_ledger_conformance.py . [ 42%]
+.....................                                                    [ 50%]
+tests/momentum/Analysis/strategy_validation/test_ledger_path.py ........ [ 52%]
+...                                                                      [ 53%]
+tests/momentum/Analysis/strategy_validation/test_min_btl.py ............ [ 58%]
+....................                                                     [ 65%]
+tests/momentum/Analysis/strategy_validation/test_pbo.py ................ [ 70%]
+.                                                                        [ 70%]
+tests/momentum/Analysis/strategy_validation/test_pbo_universe_guard.py . [ 71%]
+........                                                                 [ 74%]
+tests/momentum/Analysis/strategy_validation/test_report_section.py ..... [ 75%]
+..........................                                               [ 84%]
+tests/momentum/Analysis/strategy_validation/test_returns_contract.py ... [ 85%]
+.......                                                                  [ 88%]
+tests/momentum/Analysis/strategy_validation/test_sharpe.py ............. [ 92%]
+..                                                                       [ 93%]
+tests/momentum/Analysis/strategy_validation/test_wiring_check.py ....... [ 95%]
+............                                                             [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 289 passed, 4 warnings in 14.62s =======================
+rc_fe_gap1=0
+npm run build rc=0; vitest gap3+pendingFeatures 4 files/22 tests rc=0

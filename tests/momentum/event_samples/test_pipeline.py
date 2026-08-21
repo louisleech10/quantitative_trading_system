@@ -98,17 +98,36 @@ def test_all_bars_signal_indexed_at_decision_bar_and_mixed_k_rejected(bars):
     evs = [make_event(i, t0=BASE + x * H12, label=i % 2, decision_offset_bars=2) for i, x in enumerate(idxs)]
     res = p.run_with_params(evs, bars, test_fraction=0.4, tier_min_test_events=0)
     seg = {"ETHUSDT": {"12h": bars["ETHUSDT"]["12h"].iloc[:1200].reset_index(drop=True)}}
+    # CODEX-R3-P2-03：必須真的攔截 evaluator 收到的 scores，斷言 1 落在 t₀−k、t₀ 本身為 0（舊版只驗 counts 會放行錯位）
     captured = {}
-    import momentum.Analysis.event_samples.all_bars_eval as ab_mod
-    orig = ab_mod.evaluate_all_bars
+    import momentum.Analysis.event_samples.pipeline as pl_mod
+    from momentum.Analysis.event_samples.all_bars_eval import evaluate_all_bars as _orig_eval
 
     def spy(scores, b, cfg, **kw):
         captured["scores"] = scores
         captured["cfg"] = cfg
-        return orig(scores, b, cfg, **kw)
+        return _orig_eval(scores, b, cfg, **kw)
 
-    ab = p.analyze_tables(res, seg, horizons=(1,), n_boot=10, )  # type: ignore[call-arg]
+    orig_at = pl_mod.EventSamplePipeline._all_bars_for_events
+
+    def patched(result, bars_by_tf, *, seed, n_boot, evaluate_all_bars):
+        return orig_at(result, bars_by_tf, seed=seed, n_boot=n_boot, evaluate_all_bars=spy)
+
+    pl_mod.EventSamplePipeline._all_bars_for_events = staticmethod(patched)
+    try:
+        ab = p.analyze_tables(res, seg, horizons=(1,), n_boot=10)
+    finally:
+        pl_mod.EventSamplePipeline._all_bars_for_events = staticmethod(orig_at)
+
     assert ab["all_bars_evaluation"]["capability_status"] == "ok"
+    scores = captured["scores"]
+    assert captured["cfg"]["decision_offset_bars"] == 2
+    for x in idxs:
+        t0_ms = BASE + x * H12
+        decision_ms = BASE + (x - 2) * H12                      # t₀ 往前 2 根
+        assert scores.loc[("ETHUSDT", decision_ms)] == 1.0, f"決策根未標訊號：{decision_ms}"
+        assert scores.loc[("ETHUSDT", t0_ms)] == 0.0, f"訊號誤標在觸發根：{t0_ms}"
+    assert scores.sum() == 3.0                                   # 全表僅三根訊號
     sm = ab["all_bars_evaluation"]["signal_mapping"]
     assert sm["decision_offset_bars"] == 2 and sm["n_signal_bars"] == 3 and sm["n_events_unmapped"] == 0
     assert sm["indexed_at"] == "decision_bar_open_ms"
@@ -120,4 +139,3 @@ def test_all_bars_signal_indexed_at_decision_bar_and_mixed_k_rejected(bars):
     t2 = p.analyze_tables(res, seg, horizons=(1,), n_boot=10)
     assert t2["all_bars_evaluation"]["reason"] == "batch_not_single_valued"
     assert "decision_offset_bars" in t2["all_bars_evaluation"]["doc"]
-    assert captured is not None and orig is ab_mod.evaluate_all_bars

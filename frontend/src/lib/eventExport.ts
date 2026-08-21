@@ -115,7 +115,10 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
     n_records: records.length,
     source_file_digest: sourceDigest,
     source_digest_of: 'canonical JSON of search result cases (symbol,timeframe,timestamp,positive_case,price_change)',
-    verify_note: '此 digest 綁「搜尋結果來源」而非本匯出檔自身；匯入時勿開 verify_source_digest（該旗標比對的是上傳位元組）',
+    /** 契約所指「來源檔」之內容：其 sha256 === source_file_digest；匯入時以 source_file 一併上傳即可通過 verify（CODEX-R2-P1-03） */
+    source_file_text: sourceText,
+    verify_note: '要驗 digest：匯入時把同時下載的 *.source.json 放在 source_file 欄並開 verify_source_digest；事件檔自身含 digest 欄，自我對證必然不符',
+    n_missing_label_value: skipped.filter((s) => s.reason.includes('label_value_omitted')).length,
     label_value_source: `future_${horizon}bar_return（signed；short 取負）`,
     note: `匯入前請確認 label_definition.window.horizon_bars（現為 ${horizon}）與你的答案窗一致；label_value 取同 horizon 之未來報酬欄，缺者不寫（條件 IC 會顯示 unavailable）；欄位以 event_import_contract.json 為準`,
   };
