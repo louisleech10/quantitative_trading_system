@@ -774,6 +774,33 @@ class EventImportService:
         return EventImportDetailResponse(summary=self._summary(payload), records=list(payload.get("records") or []))
 
 
+    # ---- 分析（B5.2 兩表資料源；統計全在 momentum，本層只組 request/response） ----
+    def analyze(self, import_id: str, req) -> Optional[Dict[str, object]]:
+        from api.utils.json_serializer import sanitize_for_json
+
+        detail = self.get_import(import_id)
+        if detail is None:
+            return None
+        records = detail.records
+        symbols = sorted({str(r["symbol"]) for r in records})
+        tfs = sorted({str(r["timeframe"]) for r in records})
+        bars = self._pipeline.bars_from_kline_cache(symbols, tfs)
+        res = self._pipeline.run_with_params(
+            records, bars, test_fraction=float(req.test_fraction), embargo_ms=req.embargo_ms,
+            tier_min_test_events=int(req.tier_min_test_events),
+        )
+        tables = self._pipeline.analyze_tables(res, bars, horizons=tuple(int(h) for h in req.horizons),
+                                               seed=int(req.seed), n_boot=int(req.n_boot))
+        payload = {
+            "import_id": import_id,
+            "summary": res.summary,
+            "align_failures": res.align_failures.to_dict("records") if not res.align_failures.empty else [],
+            "tables": tables,
+            "event_timestamps": [int(t) for t in res.events["t0"].tolist()],
+        }
+        return sanitize_for_json(payload)
+
+
 _event_import_service: Optional[EventImportService] = None
 
 

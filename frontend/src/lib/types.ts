@@ -1960,6 +1960,8 @@ export interface ICAnalysisConfig {
   cross_sectional_symbols?: string[];
   event_query?: string;
   event_timestamps?: number[];
+  /** GAP-3 B5.2：從已匯入事件批（/case/events）選事件；選定後 event_timestamps 由該批 t0 帶入 */
+  event_import_id?: string;
   horizons: number[];
   thresholds: {
     ic_mean_min: number;
@@ -2819,4 +2821,69 @@ export interface GroupFeatureCoverageResponsePayload {
   matrix: Record<string, Record<string, number | null>>;
   divergence: Record<string, number>;
   row_counts: Record<string, number>;
+}
+
+// ============================================================
+// GAP-3 事件型（B5.2）：匯入批與兩張表（欄位字面以後端契約為準，前端不重算統計）
+// ============================================================
+export interface EventImportSummary {
+  import_id: string;
+  source_name: string | null;
+  upload_sha256: string;
+  imported_at: string;
+  n_events: number;
+  symbols: string[];
+  timeframes: string[];
+  direction: string | null;
+  scenario: string | null;
+}
+
+export interface EventImportListResponse {
+  total: number;
+  imports: EventImportSummary[];
+}
+
+export interface EventImportFailure {
+  row: number | null;
+  event_id: string | number | null;
+  field: string | null;
+  reason: string;
+}
+
+export interface EventImportResponse {
+  accepted: boolean;
+  import_id: string | null;
+  n_rows: number;
+  n_valid: number;
+  failures: EventImportFailure[];
+  warnings: string[];
+  upload_sha256: string | null;
+  source_digest_verified: boolean;
+  contract_version: string | null;
+  stored_path: string | null;
+}
+
+export interface EventImportRejected {
+  kind: 'legacy_schema_detected' | 'new_schema_on_legacy_endpoint' | 'contract_violation' | 'parse_error' | string;
+  message: string;
+  failures: EventImportFailure[];
+  migration_hint?: Record<string, unknown> | null;
+}
+
+/** 表格 capability：ok ⇒ 數值；其他 ⇒ 顯示 reason（不得空白） */
+export interface EventTableStatus {
+  capability_status?: 'ok' | 'unavailable' | 'not_computed' | 'not_applicable' | string;
+  reason?: string | null;
+  [k: string]: unknown;
+}
+
+export interface EventAnalyzeResponse {
+  import_id: string;
+  summary: Record<string, unknown>;
+  align_failures: { event_id: string; reason: string }[];
+  tables: {
+    event_forward_return_table: EventTableStatus;
+    binary_discrimination_table: EventTableStatus;
+  };
+  event_timestamps: number[];
 }

@@ -1,0 +1,104 @@
+/**
+ * GAP-3 B5.2（W9）：新契約匯入表單——拒收顯示後端逐列 reason 與 migration 提示（前端不重做檢查）；
+ * 接受顯示 import_id；/search 匯出組裝器產契約形狀記錄（t0 ms、label、label_definition）。
+ */
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import EventImportForm from '@/components/case/EventImportForm';
+import { EventImportRejectedError } from '@/lib/api';
+import { buildEventContractRecords, inferDirection, toEpochMs } from '@/lib/eventExport';
+import type { CaseData } from '@/lib/types';
+
+const uploadMock = vi.fn();
+vi.mock('@/lib/api', async (orig) => {
+  const actual = await orig<typeof import('@/lib/api')>();
+  return { ...actual, uploadEventImport: (...a: unknown[]) => uploadMock(...a) };
+});
+
+afterEach(() => {
+  cleanup();
+  uploadMock.mockReset();
+});
+
+function pickFile() {
+  const input = screen.getByTestId('event-import-file') as HTMLInputElement;
+  const file = new File(['event_id,t0\n'], 'ev.csv', { type: 'text/csv' });
+  fireEvent.change(input, { target: { files: [file] } });
+}
+
+describe('GAP-3 事件匯入表單', () => {
+  it('契約違規 ⇒ 逐列 reason 表格＋migration 提示', async () => {
+    uploadMock.mockRejectedValueOnce(new EventImportRejectedError(422, {
+      kind: 'contract_violation',
+      message: '2 筆契約違規',
+      failures: [
+        { row: 0, event_id: 'e0', field: 'label_definition', reason: 'missing_required_field' },
+        { row: 1, event_id: 'e1', field: 't0', reason: 'invalid_timestamp_unit' },
+      ],
+      migration_hint: { endpoint: '/api/v1/case/import-events', required_fields_absent: ['label_definition'] },
+    }));
+    render(<EventImportForm />);
+    pickFile();
+    fireEvent.click(screen.getByTestId('event-import-submit'));
+    await waitFor(() => expect(screen.getByTestId('event-import-rejected')).toBeTruthy());
+    const rows = screen.getAllByTestId('event-import-failure-row');
+    expect(rows.length).toBe(2);
+    expect(rows[1].textContent).toContain('invalid_timestamp_unit');
+    expect(screen.getByTestId('event-import-rejected').textContent).toContain('required_fields_absent');
+  });
+
+  it('舊三欄 ⇒ legacy_schema_detected 訊息', async () => {
+    uploadMock.mockRejectedValueOnce(new EventImportRejectedError(400, {
+      kind: 'legacy_schema_detected', message: '偵測到舊三欄格式', failures: [], migration_hint: { endpoint: '/api/v1/case/import-events' },
+    }));
+    render(<EventImportForm />);
+    pickFile();
+    fireEvent.click(screen.getByTestId('event-import-submit'));
+    await waitFor(() => expect(screen.getByTestId('event-import-rejected').textContent).toContain('legacy_schema_detected'));
+  });
+
+  it('接受 ⇒ 顯示 import_id 並回呼 onImported', async () => {
+    uploadMock.mockResolvedValueOnce({
+      accepted: true, import_id: 'imp-9', n_rows: 3, n_valid: 3, failures: [], warnings: [],
+      upload_sha256: 'a'.repeat(64), source_digest_verified: false, contract_version: '1.0', stored_path: '/x/imp-9.json',
+    });
+    const onImported = vi.fn();
+    render(<EventImportForm onImported={onImported} />);
+    pickFile();
+    fireEvent.click(screen.getByTestId('event-import-submit'));
+    await waitFor(() => expect(screen.getByTestId('event-import-result').textContent).toContain('imp-9'));
+    expect(onImported).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GAP-3 /search 匯出組裝器', () => {
+  it('t0 為 ms（秒級自動 ×1000、ISO 可解）；label 取正反例；缺標記者列 skipped', async () => {
+    const cases = [
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704067200', positive_case: 1 },
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '2024-01-01 12:00:00', positive_case: false },
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: 'n/a', positive_case: 1 },
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704153600', positive_case: undefined },
+    ] as unknown as CaseData[];
+    const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '>=', value: 0.05 }], priceChangeMethod: 'close_to_close' });
+    expect(out.n_records).toBe(2);
+    expect(out.skipped.map((s) => s.reason)).toEqual(['unparseable_timestamp', 'missing_positive_case_flag']);
+    const r0 = out.records[0];
+    expect(r0.t0).toBe(1704067200000);
+    expect(r0.label).toBe(1);
+    expect(out.records[1].t0).toBe(Date.parse('2024-01-01T12:00:00Z'));
+    expect(out.records[1].label).toBe(0);
+    expect(r0.label_definition.window.horizon_bars).toBe(2);
+    expect(r0.label_definition.canonical_digest).toHaveLength(64);
+    expect(r0.source_file_digest).toHaveLength(64);
+    expect(r0.control_kind).toBe('user_labeled_same_trigger');
+    expect(r0.direction).toBe('long');
+  });
+
+  it('方向推斷：price_change <= 或負值 ⇒ short；toEpochMs 邊界', () => {
+    expect(inferDirection([{ parameter: 'price_change', operator: '<=', value: -0.03 }])).toBe('short');
+    expect(inferDirection([{ parameter: 'price_change', operator: '>=', value: 0.03 }])).toBe('long');
+    expect(toEpochMs(1704067200)).toBe(1704067200000);
+    expect(toEpochMs(1704067200000)).toBe(1704067200000);
+    expect(toEpochMs('')).toBeNull();
+  });
+});

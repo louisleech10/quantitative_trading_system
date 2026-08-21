@@ -58,6 +58,39 @@ class EventPipelineResult:
 class EventSamplePipeline:
     """validate→align→dedupe→split→materialize 組合殼（純組合；不 log hot loop）。"""
 
+    @staticmethod
+    def bars_from_kline_cache(symbols, timeframes, *, cache_path=None) -> Dict[str, Dict[str, pd.DataFrame]]:
+        """真實 kline bars（`bars_source.load_bars_from_kline_cache`）；服務端取 bars 的唯一入口。"""
+        from momentum.Analysis.event_samples.bars_source import load_bars_from_kline_cache
+
+        return load_bars_from_kline_cache(symbols, timeframes, cache_path=cache_path)
+
+    def run_with_params(
+        self, records, bars_by_tf, *, test_fraction: float = 0.3, embargo_ms: Optional[int] = None,
+        tier_min_test_events: int = 1, timeframes: Tuple[str, ...] = (), cluster_gap_ms: Optional[int] = None,
+    ) -> "EventPipelineResult":
+        """純量參數版 `run`（服務端經 factories 出口呼叫、不 import momentum dataclass——R3/R7）。"""
+        cfg = EventPipelineConfig(
+            timeframes=tuple(timeframes), cluster_gap_ms=cluster_gap_ms,
+            split=EventSplitConfig(test_fraction=float(test_fraction), embargo_ms=embargo_ms,
+                                   tier_min_test_events=int(tier_min_test_events)),
+        )
+        return self.run(records, bars_by_tf, cfg)
+
+    def analyze_tables(
+        self, result: "EventPipelineResult", bars_by_tf: Dict[str, Dict[str, pd.DataFrame]], *,
+        horizons: Tuple[int, ...] = (1, 2, 4), seed: int = 20260820, n_boot: int = 300,
+    ) -> Dict[str, Any]:
+        """B2 兩張表（事件後報酬表；辨別表需模型分數——無分數 ⇒ `not_computed`＋reason，前端顯示原因）。"""
+        from momentum.Analysis.event_samples.tables import event_forward_return_table
+
+        fwd = event_forward_return_table(result.manifest, result.receipts, bars_by_tf, result.split_plan,
+                                         {"horizons": [int(h) for h in horizons], "seed": int(seed), "n_boot": int(n_boot)})
+        disc = {"statistic_kind": "binary_discrimination", "capability_status": "not_computed",
+                "reason": "no_model_scores_in_event_pipeline",
+                "doc": "辨別表需 test 段模型分數（B4.1 pattern 橋或外部模型）；匯入管線本身不產分數，不在此重算統計"}
+        return {"event_forward_return_table": fwd, "binary_discrimination_table": disc}
+
     def validate(
         self, records: Union[List[dict], pd.DataFrame], *, source_bytes: Optional[bytes] = None
     ) -> Tuple[Optional[pd.DataFrame], List[Dict[str, Any]]]:

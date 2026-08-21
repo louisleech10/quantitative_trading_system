@@ -73,3 +73,22 @@ class EventImportListResponse(BaseModel):
 class EventImportDetailResponse(BaseModel):
     summary: EventImportSummary
     records: List[Dict[str, Any]]
+
+
+class EventAnalyzeRequest(BaseModel):
+    """對一筆匯入跑 validate→align→dedupe→split＋兩張表（純透傳；統計在 momentum）。"""
+
+    horizons: List[int] = Field(default_factory=lambda: [1, 2, 4], description="事件後報酬表 horizon（bars）")
+    n_boot: int = Field(300, ge=10, le=5000)
+    seed: int = Field(20260820)
+    test_fraction: float = Field(0.3, gt=0.0, lt=1.0)
+    embargo_ms: Optional[int] = None
+    tier_min_test_events: int = Field(1, ge=0)
+
+
+class EventAnalyzeResponse(BaseModel):
+    import_id: str
+    summary: Dict[str, Any] = Field(..., description="pipeline summary（記帳／去重／切分）")
+    align_failures: List[Dict[str, Any]] = Field(default_factory=list)
+    tables: Dict[str, Any] = Field(..., description="event_forward_return_table / binary_discrimination_table（含 capability_status／reason）")
+    event_timestamps: List[int] = Field(default_factory=list, description="對齊成功事件之 t0（ms）；供 /ic-analysis 事件模式帶入")

@@ -2871,6 +2871,9 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 <blockquote>
 <p><strong>2026-08-21 追記三十（GAP-3 B1 蓋章＋B2 全批）</strong>：B1 review R2 3→R3 1→R4 0、三家 RECONCILE-STAMP 蓋 r4 synth rc=0 ⇒ B1 CLOSED（看板入「標籤窗／t₀／重疊」白話舉例，使用者問）。B2：B2.1/B2.2 三表 → §G-1 golden 凍結（<code>gap3_freeze_golden.py</code> 復用 gap2 序列化；sha 163c4ce）→ B2.3 條件 IC 接線（orchestrator 新增 <code>event_label_values</code>／<code>event_context</code> keyword；不傳行為不變，--check 三次 PASS）→ B2.4 survivor v2（六鍵＋第七鍵 <code>label_source</code>；v1 顯式拒；GAP-2 消費側 81 passed）→ B2.5 全 K 線 evaluator（固定分母、基率並排、cluster CI）；mutation M4/M7/M11。review R1 11（三家同抓 AR-3 共同欄未機械落地；grok 抓事件不足靜默退主線 label）→ R2 codex 4 條「修未修淨」（摩擦八十三）→ R3 0；三家 stamp 蓋 r3 synth rc=0 ⇒ B2 CLOSED。184 tests。HANDOFF 改寫為 B3 開工指令（使用者裁：新 session 做 B3）。</p>
 </blockquote>
+<blockquote>
+<p><strong>2026-08-21 追記三十一（GAP-3 B3／B4 蓋章、B5 施工）</strong>：B3（條件引擎／產生器 adapter／五算子）review 9→0、B4（pattern 橋／candidate ledger→GAP-1 DSR/PBO）review 8→2→1→0，兩批三家 RECONCILE-STAMP rc=0。B5.1：新契約匯入 API（<code>/case/import-events</code>＋分析端點）、<code>pipeline.py</code> 組合殼＋<code>factories.create_event_sample_pipeline()</code>（R3 擋了兩次直 import，改走 factories 出口）、<code>scripts/gap3_import_scale.py</code> 萬級規模 receipt（10k 事件對齊 73s／RSS 305MB）。B5.2：三頁升級（匯出契約 JSON／新契約匯入／IC 事件模式選批＋兩表），vitest gap3 13、全套 156、build rc=0。摩擦八十四～八十六（帳本收據三問／委員清掉 scratchpad／gate_check 誤擋長命令）。tests/api 既有紅 7 條於乾淨 HEAD 同紅、非本批引入（receipt 記錄）。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

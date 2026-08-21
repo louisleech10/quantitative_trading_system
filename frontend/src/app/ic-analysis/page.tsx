@@ -34,6 +34,7 @@ import PartialFailureBanner from '@/components/ic-analysis/PartialFailureBanner'
 import DegradedBanner from '@/components/ic-analysis/DegradedBanner';
 import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
 import MarginalICTable from '@/components/ic-analysis/MarginalICTable';
+import EventTablesPanel from '@/components/ic-analysis/EventTablesPanel';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -581,6 +582,9 @@ function ICAnalysisPageContent() {
             </div>
 
             <DegradedBanner />
+
+            {/* GAP-3 B5.2：事件型兩表——只在事件模式顯示（U10 不另開頁） */}
+            {config.mode === 'event' && <EventTablesPanel importId={config.event_import_id} />}
 
             {summaryText && (
               <div className="glass-panel rounded-2xl border border-white/10 p-5">

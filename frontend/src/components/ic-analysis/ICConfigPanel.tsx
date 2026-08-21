@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatRunLabel } from '@/lib/runExplorer';
+import EventImportPicker from '@/components/ic-analysis/EventImportPicker';
 
 interface ICConfigPanelProps {
   config: ICAnalysisConfig;
@@ -263,12 +264,20 @@ export default function ICConfigPanel({
         </Select>
 
         {config.mode === 'event' && (
-          <Textarea
-            placeholder="例如: (close > close_EMA_55) & (close_ADX_14 > 25)"
-            value={config.event_query || ''}
-            onChange={(event) => updateConfig({ event_query: event.target.value })}
-            rows={4}
-          />
+          <>
+            <Textarea
+              placeholder="例如: (close > close_EMA_55) & (close_ADX_14 > 25)"
+              value={config.event_query || ''}
+              onChange={(event) => updateConfig({ event_query: event.target.value })}
+              rows={4}
+            />
+            <EventImportPicker
+              value={config.event_import_id}
+              onPick={(importId, timestamps) =>
+                updateConfig({ event_import_id: importId || undefined, event_timestamps: timestamps.length ? timestamps : undefined })
+              }
+            />
+          </>
         )}
 
         {isCrossSectionalMode && (

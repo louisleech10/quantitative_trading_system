@@ -494,6 +494,43 @@ export default function SearchPage() {
     }
   };
 
+  // GAP-3 B5.2：匯出事件契約 JSON（新 schema；label 取正反例標記、t0＝timestamp→ms、規則摘要自動存；
+  // 使用者仍可手改後投 /case/import-events。不做任何統計，只組記錄）
+  const exportSearchResultsToEventJson = async () => {
+    if (!currentResult || !currentResult.cases || currentResult.cases.length === 0) {
+      alert('沒有搜索結果可以匯出');
+      return;
+    }
+    const { buildEventContractRecords } = await import('@/lib/eventExport');
+    // 規則摘要（G3：條件自動存；值單位同 UI：% 與倍數）
+    const ruleConditions = [
+      {
+        parameter: 'price_change',
+        operator: operators.priceChange,
+        value: operators.priceChange === 'BETWEEN'
+          ? [rangeValues.priceChange.min, rangeValues.priceChange.max]
+          : searchParams.priceChange,
+        unit: 'percent',
+      },
+      { parameter: 'volume_multiplier', operator: operators.volumeMultiplier, value: searchParams.volumeMultiplier },
+      { parameter: 'closing_strength', operator: operators.closingStrength, value: searchParams.closingStrength },
+      { parameter: 'taker_buy_ratio', operator: operators.takerBuyRatio, value: searchParams.takerBuyRatio },
+      { parameter: 'price_position', operator: operators.pricePosition, value: searchParams.pricePosition },
+    ].filter((c) => c.value !== null && c.value !== undefined);
+    const payload = await buildEventContractRecords(currentResult.cases, {
+      timeframe: searchParams.timeframe,
+      conditions: ruleConditions,
+      priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
+    });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `gap3_events_${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   // CSV導出函數
   const exportSearchResultsToCSV = () => {
     if (!currentResult || !currentResult.cases || currentResult.cases.length === 0) {
@@ -1507,6 +1544,15 @@ export default function SearchPage() {
               >
                 <Download className="w-5 h-5" />
                 導出CSV檔案
+              </button>
+              <button
+                onClick={() => void exportSearchResultsToEventJson()}
+                data-testid="export-gap3-events"
+                className="ml-3 flex items-center gap-2 px-6 py-3 bg-sky-500/20 text-sky-100 border border-sky-400/40 rounded-lg font-medium hover:bg-sky-500/30 transition-colors"
+                title="匯出 GAP-3 事件契約 JSON（可手改後到「數據準備」以新契約匯入）"
+              >
+                <Download className="w-5 h-5" />
+                匯出事件契約 JSON
               </button>
             </div>
           </div>

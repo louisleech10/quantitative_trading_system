@@ -3,11 +3,23 @@
 import { useState, useEffect } from "react";
 import CaseImportForm from "@/components/case/CaseImportForm";
 import BatchDownloadPanel from "@/components/case/BatchDownloadPanel";
+import EventImportForm from "@/components/case/EventImportForm";
+import { listEventImports } from "@/lib/api";
+import type { EventImportSummary } from "@/lib/types";
 
 export default function DataPreparationPage() {
   const [totalCases, setTotalCases] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isClearing, setIsClearing] = useState(false);
+  const [eventImports, setEventImports] = useState<EventImportSummary[]>([]);
+  const [eventImportsError, setEventImportsError] = useState<string | null>(null);
+
+  // GAP-3 B5.2：已匯入事件批（新契約）
+  useEffect(() => {
+    listEventImports()
+      .then((r) => setEventImports(r.imports))
+      .catch((err) => setEventImportsError(err instanceof Error ? err.message : '載入事件批失敗'));
+  }, [refreshKey]);
 
   // 頁面加載時獲取當前案例數
   useEffect(() => {
@@ -154,6 +166,27 @@ export default function DataPreparationPage() {
               totalCases={totalCases}
               onDownloadComplete={handleDownloadComplete}
             />
+          </div>
+        </div>
+
+        {/* GAP-3 B5.2：新契約事件匯入＋已匯入批列表（與舊三欄流程並列、不互轉） */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <EventImportForm onImported={() => setRefreshKey((k) => k + 1)} />
+          <div className="glass-panel rounded-xl p-6 border border-slate-800/80" data-testid="event-imports-list">
+            <h4 className="font-bold text-slate-100 mb-2">已匯入事件批（GAP-3）</h4>
+            {eventImportsError && <p className="text-sm text-rose-300">{eventImportsError}</p>}
+            {!eventImportsError && eventImports.length === 0 && (
+              <p className="text-sm text-slate-400">尚無事件批。匯入後可在「IC 分析 → Event-Driven 模式」選用。</p>
+            )}
+            {eventImports.length > 0 && (
+              <ul className="space-y-1 text-sm text-slate-200">
+                {eventImports.map((it) => (
+                  <li key={it.import_id} className="font-mono text-xs">
+                    {it.import_id} · {it.symbols.join('/')} {it.timeframes.join('/')} · {it.n_events} 筆 · {it.imported_at}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 

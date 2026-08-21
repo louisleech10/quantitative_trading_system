@@ -974,3 +974,75 @@ export async function exportPdfReport(taskId: string): Promise<Blob> {
   void taskId;
   throw new Error('PDF報告匯出功能已暫緩至Phase 4實作');
 }
+
+// ============================================================
+// GAP-3 事件型（B5.2）：匯入批 / 兩張表（後端 /api/v1/case/events*）
+// ============================================================
+import type { EventAnalyzeResponse, EventImportListResponse, EventImportRejected, EventImportResponse } from './types';
+
+export class EventImportRejectedError extends Error {
+  payload: EventImportRejected;
+  status: number;
+  constructor(status: number, payload: EventImportRejected) {
+    super(payload.message);
+    this.payload = payload;
+    this.status = status;
+  }
+}
+
+async function parseRejected(response: Response): Promise<never> {
+  let payload: EventImportRejected = { kind: 'http_error', message: `HTTP ${response.status}`, failures: [] };
+  try {
+    const data = await response.json();
+    const detail = data?.detail ?? data?.error?.message ?? data;
+    if (detail && typeof detail === 'object' && 'message' in detail) payload = detail as EventImportRejected;
+    else if (typeof detail === 'string') payload = { kind: 'http_error', message: detail, failures: [] };
+  } catch {
+    /* keep default */
+  }
+  throw new EventImportRejectedError(response.status, payload);
+}
+
+export async function listEventImports(): Promise<EventImportListResponse> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/events`);
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+export async function uploadEventImport(file: File, validateOnly: boolean): Promise<EventImportResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(
+    `${API_BASE_URL}${API_PREFIX}/case/import-events?validate_only=${validateOnly ? 'true' : 'false'}`,
+    { method: 'POST', body: formData },
+  );
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+export async function analyzeEventImport(
+  importId: string,
+  body: { horizons?: number[]; n_boot?: number; test_fraction?: number } = {},
+): Promise<EventAnalyzeResponse> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/events/${encodeURIComponent(importId)}/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+export async function getEventImport(importId: string): Promise<{ summary: EventImportListResponse['imports'][number]; records: Record<string, unknown>[] }> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/events/${encodeURIComponent(importId)}`);
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+/** GAP-3 事件 t0 為 epoch ms；IC 主線 event_timestamps 為 bar open 秒（row_index）⇒ 橋接時 ÷1000。 */
+export function eventT0MsToIcTimestamps(records: Record<string, unknown>[]): number[] {
+  return records
+    .map((r) => Number(r.t0))
+    .filter((v) => Number.isFinite(v) && v > 0)
+    .map((ms) => Math.floor(ms / 1000));
+}

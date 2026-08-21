@@ -21,6 +21,8 @@ from ..services.case_import_service import (
     get_event_import_service,
 )
 from ..models.event_import_models import (
+    EventAnalyzeRequest,
+    EventAnalyzeResponse,
     EventImportDetailResponse,
     EventImportJsonRequest,
     EventImportListResponse,
@@ -173,6 +175,21 @@ async def list_event_imports():
 @router.get("/case/events/{import_id}", response_model=EventImportDetailResponse)
 async def get_event_import(import_id: str):
     out = get_event_import_service().get_import(import_id)
+    if out is None:
+        raise HTTPException(status_code=404, detail=f"event import {import_id!r} not found")
+    return out
+
+
+@router.post("/case/events/{import_id}/analyze", response_model=EventAnalyzeResponse)
+async def analyze_event_import(import_id: str, request: EventAnalyzeRequest):
+    """對一筆匯入跑對齊→去重→切分＋兩張表（真實 kline；統計全在 momentum）。缺 kline／契約違規 ⇒ 4xx 顯式。"""
+    svc = get_event_import_service()
+    try:
+        out = svc.analyze(import_id, request)
+    except (KeyError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=409, detail={"kind": "bars_unavailable", "message": str(exc)})
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"kind": "pipeline_rejected", "message": str(exc)})
     if out is None:
         raise HTTPException(status_code=404, detail=f"event import {import_id!r} not found")
     return out

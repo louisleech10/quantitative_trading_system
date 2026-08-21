@@ -133,3 +133,25 @@ def test_gap3_import_allowed_filtering_params_from_contract():
     assert "{'price_change'}" not in src
     with pytest.raises(ValueError):
         FilterConditionRequest(condition_type="percentage", parameter="rsi_14", operator=">=", value=1)
+
+
+def test_gap3_import_analyze_tables_real_kline(_isolated_storage):
+    """B5.2 資料源：POST /case/events/{id}/analyze ⇒ 對齊→去重→切分＋兩表（真實 kline）；辨別表 not_computed 帶 reason；404／缺 kline 顯式。"""
+    BASE, H12 = 1704067200000, 43200000
+    recs = [make_event(i, t0=BASE + x * H12, label=i % 2) for i, x in enumerate([300, 420, 560, 700, 820, 940])]
+    imp = client.post("/api/v1/case/import-events/json", json={"records": recs}).json()
+    r = client.post(f"/api/v1/case/events/{imp['import_id']}/analyze", json={"horizons": [1, 2], "n_boot": 20, "tier_min_test_events": 0})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["summary"]["n_input"] == 6 and body["summary"]["accounting_ok"] is True
+    fwd = body["tables"]["event_forward_return_table"]
+    assert fwd["statistic_kind"] == "event_return" and set(fwd["sensitivity_micro"]) == {"1", "2"}
+    assert "common" in fwd and "formal_pooled_inference_allowed" in fwd["common"]
+    disc = body["tables"]["binary_discrimination_table"]
+    assert disc["capability_status"] == "not_computed" and disc["reason"]
+    assert sorted(body["event_timestamps"]) == sorted(e["t0"] for e in recs)
+    assert client.post("/api/v1/case/events/nope/analyze", json={}).status_code == 404
+    bad = [make_event(i, symbol="NOPEUSDT", t0=BASE + x * H12, label=i % 2) for i, x in enumerate([300, 420])]
+    imp2 = client.post("/api/v1/case/import-events/json", json={"records": bad}).json()
+    r2 = client.post(f"/api/v1/case/events/{imp2['import_id']}/analyze", json={})
+    assert r2.status_code == 409 and r2.json()["detail"]["kind"] == "bars_unavailable"

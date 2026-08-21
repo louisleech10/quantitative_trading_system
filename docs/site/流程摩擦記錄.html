@@ -1877,6 +1877,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>八十五・（2026-08-21）委員「收尾清 /tmp workdir」把 Claude 的 scratchpad 整個刪了</strong>：brief 尾句「收尾清 /tmp workdir（保留 claude-501）」，B4 stamp 輪某家把 <code>/private/tmp/claude-501/.../scratchpad</code> 刪掉（派工 log、dispatch 腳本全失；任務回報 exit 1 但三家戳記其實都蓋好了）。損失只有 log；但若把唯一 receipt 放 scratchpad 就會連證據一起沒。規則：<strong>要保留的 receipt 一律寫 <code>handoffs/run_receipts/</code>，scratchpad 只放可重建的腳本；每次派工前 <code>mkdir -p</code> scratchpad</strong>；brief 的清理句改成明指路徑（委員自己的 workdir），不再用「保留 claude-501」這種要委員自行判斷的寫法。</p>
 </blockquote>
+<blockquote>
+<p><strong>八十六・（2026-08-21）<code>gate_check</code> 把我幾條「跑測試＋寫 receipt＋commit」的長複合命令誤判成派工、直接擋下</strong>：B5 期間四次 GATE BLOCKED，命令裡沒有派工、沒有創建治理文件；拆成短命令（pytest 一段、commit 用 <code>git commit -F &lt;訊息檔&gt;</code>）就過。沒時間反推是哪個字面觸發（疑似長訊息裡的關鍵字），規則先記做法：<strong>長 commit 訊息一律寫檔後 <code>-F</code>，測試與 commit 分開跑</strong>；根因列治理殘留（治理不擴建，不修 gate_check）。附帶：<code>scripts/</code> 下新增任何腳本都會讓 WATCHED 它的三份白話檔（接下來／日誌／摩擦）在下一次 commit 被 <code>plain_docs_sync_check</code> 判過期——新增腳本的那個 commit 就要同步更新它們。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
