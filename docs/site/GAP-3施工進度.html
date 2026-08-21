@@ -44,7 +44,7 @@
 <tr>
 <td>B5</td>
 <td>API／前端三頁／UAT</td>
-<td><strong>施工中（8/21 開工）</strong>：B5.1 API 接線完成（新 schema 匯入端點＋舊格式顯式拒、pipeline 組合殼＋factories 出口、萬級規模 receipt）；B5.2 前端三頁完成（<code>/search</code> 匯出契約 JSON、<code>/data-preparation</code> 新契約匯入＋批列表、<code>/ic-analysis</code> 事件模式選批＋兩表；vitest 13 條）；B5.3 UAT 清單起草中</td>
+<td><strong>施工中（8/21 開工）</strong>：B5.1 API 接線完成（新 schema 匯入端點＋舊格式顯式拒、pipeline 組合殼＋factories 出口、萬級規模 receipt）；B5.2 前端三頁完成（<code>/search</code> 匯出契約 JSON、<code>/data-preparation</code> 新契約匯入＋批列表、<code>/ic-analysis</code> 事件模式選批＋兩表；vitest 13 條）；B5.3 UAT 清單完成；三家審查第一輪 11 條全修（含 1 條最嚴重），等第二輪閉合</td>
 </tr>
 </tbody>
 </table></div>
@@ -227,7 +227,16 @@
 <p><strong>B4 R3（8/21）</strong>：codex 兩條 CLOSED、兩家複核同意；codex 再抓一條修補引入的洞：「對帳按候選名聚合，同一候選用新 evaluation 重試後，舊的孤兒就看不見了」（已改成逐 evaluation 對帳，孤兒永遠列得出來、帳本缺 provenance 的 evaluation 一律 unavailable）。29 條綠，等 R4 codex 閉合。</p>
 <p><strong>B4 R4／蓋章（8/21）</strong>：codex 重跑反例 CLOSED、兩家複核同意、三家 0 新問題；三家蓋章 r4 收斂檔、機檢 PASS ⇒ <strong>第 4 批完工蓋章</strong>。這批的教訓：codex 連三輪各抓一條「上一輪修補引入／漏抓」的 provenance 交易問題（先寫哪個檔、改值後舊指紋、按候選聚合吞孤兒）——每條都對，也每條都是「修了但沒修到底」的型；下次碰帳本／收據類修補，先把「寫入順序、完整性對帳、指紋綁值」三件一次想完再動手（摩擦八十四）。</p>
 <h2 id="下一步">下一步</h2>
-<p><strong>B5（新 session 開工；HANDOFF 已寫好開工指令）</strong>：B5.1 API 接線＋legacy adapter＋<code>factories.create_event_sample_pipeline()</code> 出口 → B5.2 前端三頁升級（<code>/search</code>／<code>/data-preparation</code>／<code>/ic-analysis</code> 事件模式）→ B5.3 UAT 清單＋收尾文件。做完三家 review＋蓋章＋你逐項簽 UAT，整票才算完成。</p>
+<h2 id="b5-三家審查第一輪821-晚抓-11-條全修">B5 三家審查第一輪（8/21 晚）抓 11 條、全修</h2>
+<ul>
+<li><strong>最嚴重（grok，P0）</strong>：我在派工單把「白話文件同步檢查」的紅寫成綠——委員引我自己附的 receipt 尾行打穿。已修檢查本身，並記教訓（摩擦八十七：派工單的「已驗證」欄只能貼實際 rc，不准自己判斷「這個不算紅」）。</li>
+<li><strong>功能斷鏈（codex）</strong>：<code>/ic-analysis</code> 事件模式選了批，前端沒把事件時間戳送給後端，且後端在「只給時間戳、沒給查詢字串」時不啟用事件過濾 ⇒ 選了等於沒選。兩端都修，加測試釘住。</li>
+<li><strong>匯出檔指紋造假（codex）</strong>：測試環境沒有瀏覽器加密 API 時我寫了假 hash 退路（長度像 SHA-256 但不是）。已刪退路（沒有就報錯），指紋改綁「來源資料的標準化 JSON」，並用 Node 內建 crypto 獨立重算對照。</li>
+<li><strong>UAT 少驗兩件事（codex＋grok）</strong>：清單自稱「匯入→對齊→三表→全 K 線」，實際只驗兩張表。已補：後端分析端點加<strong>全 K 線驗證</strong>（固定分母、基率並排）、前端多一個區塊、<code>/search</code> 匯出補 <code>label_value</code> 讓**條件 IC（第三張表）**算得出來；UAT 加 B8b／B9b。</li>
+<li>其餘：過期的前端占位卡改真實殘留（G3-R9／R10／R11 入 registry）、factories 出口收斂回唯一一個、<code>Event_ID</code> 大小寫變體也會被導向新端點、萬級匯入補 API 路徑實測（10k 筆 0.38 秒）、測試計數敘事改引 receipt 實測值。</li>
+</ul>
+<h2 id="下一步">下一步</h2>
+<p><strong>B5 R2 閉合</strong>（session <code>20260821-gap3-b5-review-r2</code>；原提出方重跑同一反例）→ 三家蓋章 → 你照 <code>docs/GAP3_UAT_CHECKLIST.md</code> B 段逐項簽字（13 項）→ 整票完成。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

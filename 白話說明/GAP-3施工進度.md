@@ -10,7 +10,7 @@
 | B2 | 三張統計表＋倖存者契約升版＋全部 K 線驗證 | **完工蓋章（8/21）**：三輪審查 11→4→0、三家蓋章機檢通過、184 條測試、IC 主線 golden 接線前後 sha 不變 |
 | B3 | 事件產生器＋變化類特徵算子 | **完工蓋章（8/21）**：兩輪審查 9→0、三家蓋章機檢通過、82 條新測試＋M6 弄壞必紅、IC 主線 golden sha 不變 |
 | B4 | pattern 抽取＋接 GAP-1 防過擬合 | **完工蓋章（8/21）**：四輪審查 8→2→1→0、三家蓋章機檢通過、29 條新測試（AUC 餵 DSR 必拒） |
-| B5 | API／前端三頁／UAT | **施工中（8/21 開工）**：B5.1 API 接線完成（新 schema 匯入端點＋舊格式顯式拒、pipeline 組合殼＋factories 出口、萬級規模 receipt）；B5.2 前端三頁完成（`/search` 匯出契約 JSON、`/data-preparation` 新契約匯入＋批列表、`/ic-analysis` 事件模式選批＋兩表；vitest 13 條）；B5.3 UAT 清單起草中 |
+| B5 | API／前端三頁／UAT | **施工中（8/21 開工）**：B5.1 API 接線完成（新 schema 匯入端點＋舊格式顯式拒、pipeline 組合殼＋factories 出口、萬級規模 receipt）；B5.2 前端三頁完成（`/search` 匯出契約 JSON、`/data-preparation` 新契約匯入＋批列表、`/ic-analysis` 事件模式選批＋兩表；vitest 13 條）；B5.3 UAT 清單完成；三家審查第一輪 11 條全修（含 1 條最嚴重），等第二輪閉合 |
 
 ## B1 逐項（7 項；驗收＝`pytest tests/momentum/event_samples/`）
 
@@ -101,4 +101,14 @@
 
 ## 下一步
 
-**B5（新 session 開工；HANDOFF 已寫好開工指令）**：B5.1 API 接線＋legacy adapter＋`factories.create_event_sample_pipeline()` 出口 → B5.2 前端三頁升級（`/search`／`/data-preparation`／`/ic-analysis` 事件模式）→ B5.3 UAT 清單＋收尾文件。做完三家 review＋蓋章＋你逐項簽 UAT，整票才算完成。
+## B5 三家審查第一輪（8/21 晚）抓 11 條、全修
+
+- **最嚴重（grok，P0）**：我在派工單把「白話文件同步檢查」的紅寫成綠——委員引我自己附的 receipt 尾行打穿。已修檢查本身，並記教訓（摩擦八十七：派工單的「已驗證」欄只能貼實際 rc，不准自己判斷「這個不算紅」）。
+- **功能斷鏈（codex）**：`/ic-analysis` 事件模式選了批，前端沒把事件時間戳送給後端，且後端在「只給時間戳、沒給查詢字串」時不啟用事件過濾 ⇒ 選了等於沒選。兩端都修，加測試釘住。
+- **匯出檔指紋造假（codex）**：測試環境沒有瀏覽器加密 API 時我寫了假 hash 退路（長度像 SHA-256 但不是）。已刪退路（沒有就報錯），指紋改綁「來源資料的標準化 JSON」，並用 Node 內建 crypto 獨立重算對照。
+- **UAT 少驗兩件事（codex＋grok）**：清單自稱「匯入→對齊→三表→全 K 線」，實際只驗兩張表。已補：後端分析端點加**全 K 線驗證**（固定分母、基率並排）、前端多一個區塊、`/search` 匯出補 `label_value` 讓**條件 IC（第三張表）**算得出來；UAT 加 B8b／B9b。
+- 其餘：過期的前端占位卡改真實殘留（G3-R9／R10／R11 入 registry）、factories 出口收斂回唯一一個、`Event_ID` 大小寫變體也會被導向新端點、萬級匯入補 API 路徑實測（10k 筆 0.38 秒）、測試計數敘事改引 receipt 實測值。
+
+## 下一步
+
+**B5 R2 閉合**（session `20260821-gap3-b5-review-r2`；原提出方重跑同一反例）→ 三家蓋章 → 你照 `docs/GAP3_UAT_CHECKLIST.md` B 段逐項簽字（13 項）→ 整票完成。
