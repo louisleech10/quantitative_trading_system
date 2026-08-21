@@ -6,7 +6,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import EventImportForm from '@/components/case/EventImportForm';
 import { EventImportRejectedError } from '@/lib/api';
-import { buildEventContractRecords, inferDirection, toEpochMs } from '@/lib/eventExport';
+import { createHash } from 'node:crypto';
+import { buildEventContractRecords, canonicalSourceText, inferDirection, sha256Hex, toEpochMs } from '@/lib/eventExport';
 import type { CaseData } from '@/lib/types';
 
 const uploadMock = vi.fn();
@@ -92,6 +93,34 @@ describe('GAP-3 /search 匯出組裝器', () => {
     expect(r0.source_file_digest).toHaveLength(64);
     expect(r0.control_kind).toBe('user_labeled_same_trigger');
     expect(r0.direction).toBe('long');
+  });
+
+  it('CODEX-R1-P1-02：source_file_digest＝來源 canonical JSON 之真 SHA-256（對照 node:crypto）；無假 hash 退路', async () => {
+    const cases = [
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704067200', positive_case: 1, price_change: 0.052 },
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704110400', positive_case: 0, price_change: -0.011 },
+    ] as unknown as CaseData[];
+    const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'close_to_close' });
+    const expected = createHash('sha256').update(canonicalSourceText(cases)).digest('hex');
+    expect(out.source_file_digest).toBe(expected);
+    expect(out.records.every((r) => r.source_file_digest === expected)).toBe(true);
+    expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    // 改值 ⇒ digest 變
+    const out2 = await buildEventContractRecords([{ ...cases[0], price_change: 0.06 }, cases[1]] as CaseData[], { timeframe: '12h', conditions: [], priceChangeMethod: 'x' });
+    expect(out2.source_file_digest).not.toBe(expected);
+  });
+
+  it('GROK-R1-P1-02：label_value＝搜尋結果 signed 漲跌幅（short 取負）；缺 price_change 則不寫欄', async () => {
+    const cases = [
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704067200', positive_case: 1, price_change: 0.052 },
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704110400', positive_case: 0 },
+    ] as unknown as CaseData[];
+    const long = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x' });
+    expect(long.records[0].label_value).toBe(0.052);
+    expect('label_value' in long.records[1]).toBe(false);
+    const short = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '<=', value: -0.03 }], priceChangeMethod: 'x' });
+    expect(short.records[0].direction).toBe('short');
+    expect(short.records[0].label_value).toBe(-0.052);
   });
 
   it('方向推斷：price_change <= 或負值 ⇒ short；toEpochMs 邊界', () => {

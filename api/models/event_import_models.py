@@ -90,5 +90,6 @@ class EventAnalyzeResponse(BaseModel):
     import_id: str
     summary: Dict[str, Any] = Field(..., description="pipeline summary（記帳／去重／切分）")
     align_failures: List[Dict[str, Any]] = Field(default_factory=list)
-    tables: Dict[str, Any] = Field(..., description="event_forward_return_table / binary_discrimination_table（含 capability_status／reason）")
-    event_timestamps: List[int] = Field(default_factory=list, description="對齊成功事件之 t0（ms）；供 /ic-analysis 事件模式帶入")
+    tables: Dict[str, Any] = Field(..., description="event_forward_return_table / binary_discrimination_table / all_bars_evaluation（含 capability_status／reason）")
+    event_timestamps: List[int] = Field(default_factory=list, description="對齊成功事件之 t0，**epoch ms**（契約單位；非 IC 秒）")
+    event_timestamps_ic_seconds: List[int] = Field(default_factory=list, description="同上換算為 bar open **秒**（IC 主線 event_timestamps 單位；GROK-R1-P2-02）")

@@ -46,9 +46,9 @@ class FilterConditionRequest(BaseModel):
     @field_validator('parameter')
     def validate_parameter_for_filtering(cls, v):
         """驗證參數是否可用於篩選（允許清單＝契約出口，GAP-3 D3-3；B3 follow-up 於 B5.1 收）"""
-        from momentum.factories import create_condition_engine_contract
+        from momentum.factories import create_event_sample_pipeline
 
-        allowed_filtering_params = set(create_condition_engine_contract()["allowed_filtering_params"])
+        allowed_filtering_params = set(create_event_sample_pipeline().condition_engine_contract()["allowed_filtering_params"])
         
         if v not in allowed_filtering_params:
             raise ValueError(f"參數 '{v}' 不可用於篩選。僅支援篩選參數: {allowed_filtering_params}")

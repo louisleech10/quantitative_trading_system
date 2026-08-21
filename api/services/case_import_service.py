@@ -616,10 +616,10 @@ class EventImportService:
     MAX_FILE_SIZE = 50 * 1024 * 1024
 
     def __init__(self, storage_dir: Optional[Path] = None):
-        from momentum.factories import create_event_import_contract, create_event_sample_pipeline
+        from momentum.factories import create_event_sample_pipeline  # 唯一出口（TODO §0-6-⑦）
 
         self._pipeline = create_event_sample_pipeline()
-        self._contract = create_event_import_contract()
+        self._contract = self._pipeline.import_contract()
         project_root = Path(__file__).resolve().parents[2]
         self.storage_dir = Path(storage_dir) if storage_dir else project_root / "data_cache" / "events"
 
@@ -627,13 +627,17 @@ class EventImportService:
     def required_fields(self) -> List[str]:
         return list(self._contract["required_fields"].keys())
 
+    @staticmethod
+    def _canon_cols(columns: List[str]) -> set:
+        """偵測用欄名正規化：去 BOM／引號／空白、casefold（CODEX-R1-P2-06：`Event_ID,T0,Label` 亦須命中 marker）。"""
+        return {str(c).replace("﻿", "").strip().strip('"').strip("'").strip().casefold() for c in columns}
+
     def looks_legacy(self, columns: List[str]) -> bool:
-        cols = {str(c).strip().lower() for c in columns}
+        cols = self._canon_cols(columns)
         return LEGACY_COLUMNS <= cols and not ({"event_id", "t0", "label"} <= cols)
 
     def looks_new_schema(self, columns: List[str]) -> bool:
-        cols = {str(c).strip() for c in columns}
-        return {"event_id", "t0", "label"} <= cols
+        return {"event_id", "t0", "label"} <= self._canon_cols(columns)
 
     def migration_hint(self, columns: List[str]) -> Dict[str, object]:
         cols = {str(c).strip() for c in columns}
@@ -658,18 +662,24 @@ class EventImportService:
                 if not isinstance(records, list):
                     raise ValueError("JSON 須為記錄列表或 {records: [...]}")
                 return [dict(r) for r in records]
-            df = pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False)
+            # 分塊解析（TODO B5.1 邊界②：不一次 materialize 整個 DataFrame；上限由 MAX_FILE_SIZE 界定）
+            records: List[Dict[str, object]] = []
+            for chunk in pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False, chunksize=self.CSV_CHUNK_ROWS):
+                records.extend(self._csv_rows_to_records(chunk))
+            return records
         except EventImportRejectedError:
             raise
         except Exception as exc:  # noqa: BLE001
             raise EventImportRejectedError(EventImportRejected(kind="parse_error", message=f"解析失敗：{exc}")) from exc
-        return self._csv_rows_to_records(df)
+
+    CSV_CHUNK_ROWS = 5000
 
     def _csv_rows_to_records(self, df: pd.DataFrame) -> List[Dict[str, object]]:
         """CSV → 記錄：巢狀欄接受 JSON 字串儲存格或 dotted 欄（`label_definition.rule_id`）；數值欄以 JSON 解碼。"""
         records: List[Dict[str, object]] = []
         cols = list(df.columns)
-        for _, row in df.iterrows():
+        for row_t in df.itertuples(index=False, name=None):
+            row = dict(zip(cols, row_t))
             rec: Dict[str, object] = {}
             for c in cols:
                 raw = row[c]
@@ -796,7 +806,8 @@ class EventImportService:
             "summary": res.summary,
             "align_failures": res.align_failures.to_dict("records") if not res.align_failures.empty else [],
             "tables": tables,
-            "event_timestamps": [int(t) for t in res.events["t0"].tolist()],
+            "event_timestamps": [int(t) for t in res.events["t0"].tolist()],                     # epoch ms（契約 t0）
+            "event_timestamps_ic_seconds": [int(t) // 1000 for t in res.events["t0"].tolist()],  # IC 主線 row_index＝bar open 秒
         }
         return sanitize_for_json(payload)
 

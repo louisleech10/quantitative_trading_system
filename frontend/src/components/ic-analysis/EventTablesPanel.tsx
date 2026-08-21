@@ -94,8 +94,47 @@ function DiscriminationTable({ table }: { table: EventTableStatus }) {
   );
 }
 
+function AllBarsTable({ table }: { table: EventTableStatus | undefined }) {
+  const st = statusLabel(table);
+  if (!st.ok || !table) {
+    return (
+      <p className="text-sm text-amber-200" data-testid="event-allbars-unavailable">
+        全 K 線驗證不可用：{st.text}
+      </p>
+    );
+  }
+  const counts = (table.counts ?? {}) as Record<string, unknown>;
+  const o = (table.overall ?? {}) as Record<string, unknown>;
+  const overallOk = (o.capability_status ?? 'ok') === 'ok';
+  return (
+    <div className="space-y-1 text-xs text-slate-200" data-testid="event-allbars-table">
+      <p className="text-[11px] text-slate-400">
+        n_total {fmt(counts.n_total, 0)}／eligible {fmt(counts.n_eligible, 0)}／labeled {fmt(counts.n_labeled, 0)}／tail_excluded {fmt(counts.n_tail_excluded, 0)}／unknown {fmt(counts.n_unknown, 0)}
+      </p>
+      {overallOk ? (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <dt className="text-slate-400">prevalence_full</dt>
+          <dd className="font-mono">{fmt(o.prevalence_full)}</dd>
+          <dt className="text-slate-400">prevalence_learn</dt>
+          <dd className="font-mono">{fmt(o.prevalence_learn)}</dd>
+          <dt className="text-slate-400">lift_threshold</dt>
+          <dd className="font-mono">{fmt(o.lift_threshold)}</dd>
+          <dt className="text-slate-400">precision</dt>
+          <dd className="font-mono">{fmt(o.precision)}</dd>
+          <dt className="text-slate-400">signal_frequency</dt>
+          <dd className="font-mono">{fmt(o.signal_frequency, 5)}</dd>
+        </dl>
+      ) : (
+        <p className="text-amber-200" data-testid="event-allbars-overall-unavailable">
+          overall：{String(o.capability_status)}{o.reason ? `：${String(o.reason)}` : '（後端未給 reason）'}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
- * GAP-3 B5.2：事件模式專屬兩張表（事件後報酬表／正反例辨別表）。
+ * GAP-3 B5.2：事件模式專屬表（事件後報酬表／正反例辨別表／全 K 線驗證）。
  * 只在事件模式掛載；後端 unavailable／not_computed 一律顯示原因，不顯示空白；前端不重算任何統計。
  */
 export default function EventTablesPanel({ importId, data }: EventTablesPanelProps) {
@@ -170,6 +209,10 @@ export default function EventTablesPanel({ importId, data }: EventTablesPanelPro
       <div>
         <p className="text-xs font-semibold text-slate-200 mb-1">正反例辨別表</p>
         <DiscriminationTable table={resp.tables.binary_discrimination_table} />
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-slate-200 mb-1">全 K 線驗證（固定分母；rule＝事件成員）</p>
+        <AllBarsTable table={resp.tables.all_bars_evaluation} />
       </div>
       {resp.align_failures.length > 0 && (
         <details className="text-[11px] text-slate-400">

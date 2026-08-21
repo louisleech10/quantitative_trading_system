@@ -29,8 +29,10 @@
 | B5 | 把舊三欄 CSV（symbol/timestamp/Positive_case）丟進「匯入事件」 | 拒收：`legacy_schema_detected`＋migration 提示（欄位對照）；舊流程「導入案例」不受影響 | ｜ |
 | B6 | 把 B2 的 JSON 轉成 CSV 丟進舊的「導入案例」 | 拒收：`new_schema_on_legacy_endpoint`，訊息指向 `/case/import-events` | ｜ |
 | B7 | 開 `/ic-analysis`，分析模式切「Event-Driven」 | 出現「從已匯入案例選事件」下拉（未匯入時顯示 empty state 文字）；兩表區塊出現（未選批 ⇒ 「尚未選擇事件批」） | ｜ |
-| B8 | 下拉選 B4 那批 | 兩表區塊顯示「匯入／對齊／train／test／purge」計數、事件後報酬表逐 horizon 數值（macro／micro／win_rate／n）；辨別表顯示 `not_computed：no_model_scores_in_event_pipeline`（原因非空白） | ｜ |
+| B8 | 下拉選 B4 那批 | 表區塊顯示「匯入／對齊／train／test／purge」計數、事件後報酬表逐 horizon 數值（macro／micro／win_rate／n）；辨別表顯示 `not_computed：no_model_scores_in_event_pipeline`（原因非空白；殘留 G3-R9） | ｜ |
+| B8b | 同區塊「全 K 線驗證（固定分母；rule＝事件成員）」 | 顯示 `n_total／eligible／labeled／tail_excluded／unknown` 計數與 `prevalence_full` vs `prevalence_learn` 並排＋`lift_threshold`；若批內 timeframe／direction／entry／label_definition 不單一 ⇒ 顯示 `not_computed：batch_not_single_valued` | ｜ |
 | B9 | 同一批按「開始分析」跑 IC | IC 報告 metadata `event_filter.mode=timestamps`、`n_events`＝該批對齊成功數；既有圖表照常 | ｜ |
+| B9b | 同一 IC 報告找「條件 IC」（第三張表）節 | 報告 `statistic_kind=conditional_ic` 段：B2 匯出之批有 `label_value` ⇒ 顯示數值；若匯入批缺 `label_value` ⇒ `unavailable：missing_label_value`（原因非空白，不得靜默退回主線標籤） | ｜ |
 | B10 | 切回 Global 模式 | 兩表區塊與事件下拉消失；全域報告不變 | ｜ |
 | B11 | 看 `白話說明/GAP-3施工進度.md` 五批總覽 | B1–B5 狀態與本清單一致；無「收案」字樣貼批號 | ｜ |
 
@@ -38,9 +40,9 @@
 
 | 項 | 為何現在不做 |
 |---|---|
-| 辨別表在 `/ic-analysis` 事件模式只顯示 `not_computed`（需 test 段模型分數） | `needs-research:分數來源＝B4.1 pattern 橋或外部模型；UI 接線屬 ML 層（不完整層），待 ML 層穩定後接 B4.1 輸出` |
-| 萬級事件對齊 73s（純 Python 逐事件；receipt `gap3_import_scale.json`） | `user-ruling:W10 記錄型不設門檻；向量化對齊待需求出現再做` |
-| `tests/api` 既有紅 7 條（B5 前即紅：batch_alias／ic_deep／ichc t2-t3／model_enhancement×3） | `blocked-by:非 GAP-3 模組；另開票處理` |
+| G3-R9 辨別表在 `/ic-analysis` 事件模式只顯示 `not_computed`（需 test 段模型分數） | `blocked-by:分數來源＝B4.1 pattern 橋／ML 層（成熟度地圖不完整層）；匯入管線不產分數`（registry 已登記；`/pending-features` 有占位） |
+| G3-R10 事件匯入大檔串流／背景 worker（現＝50MB 上限＋CSV 分塊解析；receipt `gap3_import_scale.json` 含 direct 路徑 77s 與 API 路徑 0.38s 兩組） | `user-ruling:W10 記錄型不設門檻；效能門檻須 SPEC amendment`（registry 已登記） |
+| G3-R11 `tests/api` 既有紅 7 條（B5 前即紅：batch_alias／ic_deep／ichc t2-t3／model_enhancement×3；乾淨 HEAD 同紅） | `blocked-by:非 GAP-3 模組；另開票處理`（registry 已登記） |
 
 ## 簽字
 

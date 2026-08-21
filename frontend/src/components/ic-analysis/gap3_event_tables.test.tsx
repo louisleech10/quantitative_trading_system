@@ -24,8 +24,14 @@ const OK: EventAnalyzeResponse = {
       },
     },
     binary_discrimination_table: { capability_status: 'not_computed', reason: 'no_model_scores_in_event_pipeline' },
+    all_bars_evaluation: {
+      capability_status: 'ok',
+      counts: { n_total: 1200, n_eligible: 1198, n_labeled: 1198, n_tail_excluded: 2, n_unknown: 0 },
+      overall: { capability_status: 'ok', prevalence_full: 0.51, prevalence_learn: 0.5, lift_threshold: 1.2, precision: 0.6, signal_frequency: 0.005 },
+    },
   },
   event_timestamps: [1704067200000],
+  event_timestamps_ic_seconds: [1704067200],
 };
 
 describe('GAP-3 事件型兩表', () => {
@@ -54,6 +60,21 @@ describe('GAP-3 事件型兩表', () => {
     const noReason = { ...OK, tables: { ...OK.tables, binary_discrimination_table: { capability_status: 'unavailable' } } };
     render(<EventTablesPanel data={noReason} importId="imp-1" />);
     expect(screen.getByTestId('event-disc-unavailable').textContent).toContain('後端未給 reason');
+  });
+
+  it('全 K 線驗證：ok ⇒ 固定分母計數＋基率並排；缺表／unavailable ⇒ 顯示原因', () => {
+    render(<EventTablesPanel data={OK} importId="imp-1" />);
+    const ab = screen.getByTestId('event-allbars-table');
+    expect(ab.textContent).toContain('1198');
+    expect(ab.textContent).toContain('0.5100');
+    cleanup();
+    const missing = { ...OK, tables: { ...OK.tables, all_bars_evaluation: undefined } };
+    render(<EventTablesPanel data={missing} importId="imp-1" />);
+    expect(screen.getByTestId('event-allbars-unavailable').textContent).toContain('後端未回傳此表');
+    cleanup();
+    const nc = { ...OK, tables: { ...OK.tables, all_bars_evaluation: { capability_status: 'not_computed', reason: 'batch_not_single_valued' } } };
+    render(<EventTablesPanel data={nc} importId="imp-1" />);
+    expect(screen.getByTestId('event-allbars-unavailable').textContent).toContain('batch_not_single_valued');
   });
 
   it('未選批 ⇒ empty state', () => {

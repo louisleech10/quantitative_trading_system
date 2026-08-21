@@ -2884,6 +2884,10 @@ export interface EventAnalyzeResponse {
   tables: {
     event_forward_return_table: EventTableStatus;
     binary_discrimination_table: EventTableStatus;
+    all_bars_evaluation?: EventTableStatus;
   };
+  /** epoch ms（契約單位） */
   event_timestamps: number[];
+  /** bar open 秒（IC 主線單位） */
+  event_timestamps_ic_seconds?: number[];
 }

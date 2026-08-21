@@ -1230,6 +1230,10 @@ class ICAnalysisService:
                     "query": request.event_query,
                 }
             })
+        elif request.event_timestamps:
+            # GAP-3 B5.2（CODEX-R1-P1-01）：只給 timestamps（從已匯入案例選事件）亦須啟用 event filter，
+            # 否則 orchestrator 因 enabled=False 直接回 mode=none、事件被靜默丟棄
+            override = self._deep_merge(override, {"event_filter": {"enabled": True}})
 
         if request.feature_filter:
             override = self._deep_merge(override, {

@@ -1,4 +1,15 @@
 {
+ "api_path": {
+  "endpoint": "/api/v1/case/import-events/json",
+  "http_status": 200,
+  "n_records": 10000,
+  "n_valid": 10000,
+  "peak_rss_mb_after": 496.4,
+  "rss_before_mb": 496.4,
+  "status": "ok",
+  "stored": true,
+  "wall_clock_s": 0.382
+ },
  "bootstrap": {
   "horizons": [
    1,
@@ -17,16 +28,16 @@
  "n_test": 3000,
  "n_train": 6999,
  "note": "記錄型 receipt（W10）；事件合成、bars 真實；效能門檻若需另走 SPEC amendment",
- "peak_rss_mb": 305.1,
+ "peak_rss_mb": 496.4,
  "platform": "darwin",
  "python": "3.9.6",
- "rss_before_mb": 291.3,
+ "rss_before_mb": 291.2,
  "stages_s": {
-  "align_dedupe_split_s": 72.733,
-  "forward_return_table_bootstrap_s": 3.542,
-  "validate_s": 0.101
+  "align_dedupe_split_s": 73.34,
+  "forward_return_table_bootstrap_s": 3.528,
+  "validate_s": 0.109
  },
  "symbol": "ETHUSDT",
  "timeframe": "1h",
- "wall_clock_s": 76.377
+ "wall_clock_s": 76.978
 }

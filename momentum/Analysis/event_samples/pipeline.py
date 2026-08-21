@@ -58,6 +58,21 @@ class EventPipelineResult:
 class EventSamplePipeline:
     """validate→align→dedupe→split→materialize 組合殼（純組合；不 log hot loop）。"""
 
+    # ---- 契約唯讀出口（R3：api 層只經 factories 一個出口取得 pipeline，再由此讀契約；不直 import momentum 內部）----
+    @staticmethod
+    def import_contract() -> dict:
+        """事件匯入契約 JSON（SoT；唯讀拷貝）。"""
+        from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+
+        return load_event_import_contract()
+
+    @staticmethod
+    def condition_engine_contract() -> dict:
+        """條件引擎契約 JSON（含 `allowed_filtering_params`；深拷貝）。"""
+        from momentum.Analysis.event_samples.condition_engine import load_condition_engine_contract
+
+        return load_condition_engine_contract()
+
     @staticmethod
     def bars_from_kline_cache(symbols, timeframes, *, cache_path=None) -> Dict[str, Dict[str, pd.DataFrame]]:
         """真實 kline bars（`bars_source.load_bars_from_kline_cache`）；服務端取 bars 的唯一入口。"""
@@ -81,7 +96,9 @@ class EventSamplePipeline:
         self, result: "EventPipelineResult", bars_by_tf: Dict[str, Dict[str, pd.DataFrame]], *,
         horizons: Tuple[int, ...] = (1, 2, 4), seed: int = 20260820, n_boot: int = 300,
     ) -> Dict[str, Any]:
-        """B2 兩張表（事件後報酬表；辨別表需模型分數——無分數 ⇒ `not_computed`＋reason，前端顯示原因）。"""
+        """B2 表：事件後報酬表（B2.1）＋全 K 線驗證（B2.5 `evaluate_all_bars`，rule＝事件成員：事件 t₀ 根 score=1、其餘 0）；
+        辨別表需模型分數——無分數 ⇒ `not_computed`＋reason（前端顯示原因，不重算）。"""
+        from momentum.Analysis.event_samples.all_bars_eval import evaluate_all_bars
         from momentum.Analysis.event_samples.tables import event_forward_return_table
 
         fwd = event_forward_return_table(result.manifest, result.receipts, bars_by_tf, result.split_plan,
@@ -89,7 +106,48 @@ class EventSamplePipeline:
         disc = {"statistic_kind": "binary_discrimination", "capability_status": "not_computed",
                 "reason": "no_model_scores_in_event_pipeline",
                 "doc": "辨別表需 test 段模型分數（B4.1 pattern 橋或外部模型）；匯入管線本身不產分數，不在此重算統計"}
-        return {"event_forward_return_table": fwd, "binary_discrimination_table": disc}
+        all_bars = self._all_bars_for_events(result, bars_by_tf, seed=seed, n_boot=n_boot, evaluate_all_bars=evaluate_all_bars)
+        return {"event_forward_return_table": fwd, "binary_discrimination_table": disc, "all_bars_evaluation": all_bars}
+
+    @staticmethod
+    def _all_bars_for_events(result, bars_by_tf, *, seed: int, n_boot: int, evaluate_all_bars) -> Dict[str, Any]:
+        """全 K 線驗證（U11 靈魂路徑）：把匯入事件集當訊號（事件 t₀ 根 score=1、其餘 0），固定分母跑 B2.5；
+        manifest_config 全自事件欄導出（label_definition.window／direction／entry_price_semantic／timeframe 批內須單值）；
+        prevalence_learn＝匯入事件正例率（case-control 揭露）。"""
+        ev = result.events
+        tfs = sorted(set(ev["timeframe"]))
+        dirs = sorted(set(ev["direction"]))
+        ents = sorted(set(ev["entry_price_semantic"]))
+        lds = {(d["window"]["horizon_bars"], d.get("label_return_mode", "close_to_close")) for d in ev["label_definition"]}
+        if len(tfs) != 1 or len(dirs) != 1 or len(ents) != 1 or len(lds) != 1:
+            return {"statistic_kind": "all_bars_evaluation", "capability_status": "not_computed",
+                    "reason": "batch_not_single_valued",
+                    "doc": f"全 K 線驗證需批內單一 timeframe/direction/entry_price_semantic/label_definition（得 {len(tfs)}/{len(dirs)}/{len(ents)}/{len(lds)}）"}
+        (horizon, mode), = lds
+        if mode != "close_to_close":
+            return {"statistic_kind": "all_bars_evaluation", "capability_status": "not_computed",
+                    "reason": "label_return_mode_not_supported", "doc": f"evaluate_all_bars 標籤公式為 close_to_close；批為 {mode}"}
+        tf = tfs[0]
+        bars = {s: bars_by_tf[s][tf] for s in sorted(set(ev["symbol"]))}
+        idx = pd.MultiIndex.from_arrays([ev["symbol"].to_numpy(), ev["t0"].astype("int64").to_numpy()])
+        members = pd.Series(1.0, index=idx)
+        rows = []
+        for s, b in bars.items():
+            ot = b["open_time_ms"].astype("int64").to_numpy()
+            sc = pd.Series(0.0, index=pd.MultiIndex.from_arrays([[s] * len(ot), ot]))
+            hit = members.index[members.index.get_level_values(0) == s]
+            sc.loc[hit] = 1.0
+            rows.append(sc)
+        scores = pd.concat(rows)
+        cfg = {"horizon_bars": int(horizon), "label_threshold": 0.0, "direction": dirs[0],
+               "decision_offset_bars": int(ev["decision_offset_bars"].iloc[0]), "score_threshold": 0.5, "top_q": 0.1,
+               "prevalence_learn": float(ev["label"].mean()), "sample_design": "case_control",
+               "seed": int(seed), "n_boot": int(n_boot), "label_id": "event_membership",
+               "entry_price_semantic": ents[0], "timeframe": tf}
+        rep = evaluate_all_bars(scores, bars, cfg, event_split_plan=result.split_plan, manifest=result.manifest)
+        rep["rule"] = "event_membership (score=1 at imported event t0 bars, else 0)"
+        rep["label_threshold_note"] = "threshold=0.0（signed 報酬 ≥0 ⇒ 1）；使用者標籤門檻不在事件欄，此為 all-bars 基準語意"
+        return rep
 
     def validate(
         self, records: Union[List[dict], pd.DataFrame], *, source_bytes: Optional[bytes] = None

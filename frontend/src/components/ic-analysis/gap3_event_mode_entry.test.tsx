@@ -56,4 +56,11 @@ describe('GAP-3 事件模式入口', () => {
     const page = readFileSync(resolve(__dirname, '../../app/ic-analysis/page.tsx'), 'utf-8');
     expect(page.includes("config.mode === 'event' && <EventTablesPanel")).toBe(true);
   });
+
+  it('CODEX-R1-P1-01：useICAnalysis /analyze payload 序列化 event_timestamps（事件模式且非空）', () => {
+    const hook = readFileSync(resolve(__dirname, '../../hooks/useICAnalysis.ts'), 'utf-8');
+    const payloadBlock = hook.slice(hook.indexOf('const payload = {'), hook.indexOf("requestJson<{ task_id: string; status: string }>('/analyze'"));
+    expect(payloadBlock).toContain('event_timestamps:');
+    expect(payloadBlock).toContain("config.mode === 'event' && config.event_timestamps && config.event_timestamps.length > 0");
+  });
 });

@@ -33,6 +33,9 @@
 | G3-R6 | CAR/AAR event study、即時 NLP 事件 | user-ruling:2026-08-19/20（非本票定義；使用者確認不需要） | 使用者提出新需求另開票 |
 | G3-R7 | `platform_random_bars` 控制組自動抽樣 | needs-research:estimand 與抽樣契約未定義（R1 判時間分離隨機反例＝廢答案設計） | 委員會定出契約 |
 | G3-R8 | label 一致性探針 | needs-research:探針族範圍與誤報處置未定義（AR-6 裁 2:1；配套硬規則已入 SPEC D1-3） | 使用者要求或匯入資料品質事故 |
+| G3-R9 | `/ic-analysis` 事件模式辨別表接真實模型分數（現回 `not_computed:no_model_scores_in_event_pipeline`，前端顯示原因） | blocked-by:分數來源＝B4.1 pattern 橋／ML 層（成熟度地圖不完整層）；匯入管線不產分數 | ML 層穩定或使用者點名（B5 review R1 登記） |
+| G3-R10 | 事件匯入大檔串流／分頁＋背景 worker（現＝MAX_FILE_SIZE 50MB＋CSV 分塊解析，10k 事件同步對齊 ~73s；receipt `handoffs/run_receipts/gap3_import_scale.json`） | user-ruling:W10 記錄型不私定門檻；效能門檻須 SPEC amendment | 萬級以上需求或門檻明確化（B5 review R1 登記） |
+| G3-R11 | `tests/api` 既有紅 7 條（batch_alias／ic_deep_analysis／ichc_event_timestamps t2-t3／model_enhancement×3；乾淨 HEAD 同紅） | blocked-by:非 GAP-3 模組（feature registry／deep cache／model_enhancement／ichc slow）；另開票 | 對應模組開工時（B5.1 receipt 記錄） |
 
 使用者原意（逐字義）：例＝12h K 漲≥5% 定該根 open 為 t₀；t₀ 後 24／36／48h 之 close 皆比 t₀ close 高≥3% ⇒ 正例，否則反例；特徵＝t₀ 往前 x 根 1h／4h 指標；目標＝在數千～數萬個 t₀ 中找正例共通 pattern 當策略。**這只是其中一種事件**；正反例將由使用者自外部檔案標好餵入。
 

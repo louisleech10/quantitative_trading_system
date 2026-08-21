@@ -280,6 +280,11 @@ export function useICAnalysis() {
         feature_tiers: effectiveConfig.feature_tiers,
         feature_filter: hasFeatureFilter ? normalizedFeatureFilter : undefined,
         event_query: config.mode === 'event' ? config.event_query?.trim() || undefined : undefined,
+        // GAP-3 B5.2：從已匯入案例選事件 ⇒ 帶 event_timestamps（bar open 秒；picker 已 ms→秒）
+        event_timestamps:
+          config.mode === 'event' && config.event_timestamps && config.event_timestamps.length > 0
+            ? config.event_timestamps
+            : undefined,
       };
 
       const result = await requestJson<{ task_id: string; status: string }>('/analyze', {

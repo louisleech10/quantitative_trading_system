@@ -64,7 +64,32 @@ def main() -> int:
                                      {"horizons": [1, 2, 4], "seed": 1, "n_boot": 200})
     t["forward_return_table_bootstrap_s"] = time.perf_counter() - t0
     total = sum(t.values())
+
+    # API 路徑（CODEX-R1-P1-03）：同一 workload 經 /case/import-events/json（validate_only）實測牆鐘／RSS；落檔目錄導到暫存
+    api_path = {"status": "skipped"}
+    try:
+        import tempfile
+        from fastapi.testclient import TestClient
+        from api.main import app
+        from api.services import case_import_service as svc_mod
+
+        with tempfile.TemporaryDirectory() as td:
+            svc_mod._event_import_service = svc_mod.EventImportService(storage_dir=Path(td) / "events")
+            client = TestClient(app)
+            rss_api0 = _rss_mb()
+            t0 = time.perf_counter()
+            r = client.post("/api/v1/case/import-events/json", json={"records": events, "validate_only": False})
+            api_s = time.perf_counter() - t0
+            body = r.json() if r.status_code == 200 else {"error": r.text[:300]}
+            api_path = {"status": "ok" if r.status_code == 200 else "failed", "http_status": r.status_code,
+                        "endpoint": "/api/v1/case/import-events/json", "n_records": len(events), "wall_clock_s": round(api_s, 3),
+                        "peak_rss_mb_after": round(_rss_mb(), 1), "rss_before_mb": round(rss_api0, 1),
+                        "n_valid": body.get("n_valid"), "stored": bool(body.get("stored_path"))}
+    except Exception as exc:  # noqa: BLE001 —— API 路徑量測失敗不遮 direct receipt，如實記錄
+        api_path = {"status": "failed", "error": repr(exc)[:300]}
+
     receipt = {
+        "api_path": api_path,
         "n_events": int(len(events)), "timeframe": a.tf, "symbol": "ETHUSDT", "n_bars": int(len(ot)),
         "wall_clock_s": round(total, 3), "stages_s": {k: round(v, 3) for k, v in t.items()},
         "peak_rss_mb": round(_rss_mb(), 1), "rss_before_mb": round(rss0, 1),

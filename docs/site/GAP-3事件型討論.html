@@ -218,7 +218,7 @@
 <li>但<strong>平均每個標的只有 50–130 個案例</strong>，單一標的撐不起統計 ⇒ 事件型<strong>幾乎一定要把多個標的合在一起算</strong>（統計學叫 pooled／panel）。這正是缺口票 #4「多標的合併估 IC」的內容——GAP-3 會逼著它一起做（至少做「每個標的各自時間切，但統計合併」）。</li>
 <li>合併的代價：同一時刻 BTC／ETH／SOL 一起大漲是<strong>一件事</strong>，不是三個樣本；要按「時間簇」降權或分塊（§3.3），否則樣本數灌水。</li>
 <li><strong>（8/20 第二輪你定）多標的＝常態需求，不是配套</strong>：事件型的 IC 與 ML 本來就在多標的合併樣本上跑（本節機制），標成必要；<strong>序列型的多標的研究</strong>＝缺口票 #4 本體，你的需求讓 #4 優先度上升——GAP-3 蓋的原語（每標的切分＋合併統計＋時間簇）#4 直接複用，但 #4 本體不在這票〔邊界標「待 SPEC 對抗審確認」〕。</li>
-<li>資料量：200 標的 × 1h／4h × 全史算 Feature Factory 是重的，但 <code>/data-preparation</code> 只抓每案例前後一段，存得下；計算時間要實測（第一批做完會量）。</li>
+<li>資料量：200 標的 × 1h／4h × 全史算 Feature Factory 是重的，但 <code>/data-preparation</code> 只抓每案例前後一段，存得下；計算時間要實測（第一批完成後會量；實測見 <code>handoffs/run_receipts/gap3_import_scale.json</code>）。</li>
 </ul>
 <h3 id="39-序列型-ic-現有的基礎深度分析圖表頁面事件型都不能用你問的第三輪第-3-點">3.9 序列型 IC 現有的基礎／深度分析、圖表、頁面，事件型都不能用？（你問的第三輪第 3 點）</h3>
 <p><strong>大部分可以用，而且是直接用。</strong> 我查了：IC 分析的後端 API <strong>已經接受「事件時間戳清單」</strong>（<code>event_timestamps</code>）和「事件條件」（<code>event_query</code>）——丟進去之後，整條 IC 流程（算 IC → FDR → 冗餘 → 報告 → 邊際 IC → 基礎分析那些圖：IC 衰減、分位報酬、rolling IC、相關熱圖、漏斗…；深度分析：因子報酬、多空比較、OOS 分布、跨標的驗證…）<strong>就是在你的事件子樣本上跑</strong>。這就是 §6 ⑦-(iii)「條件 IC」，本來就是設計來給事件型用的（健檢票 R5 還特別修過「fallback 時不能把事件丟掉」）。</p>

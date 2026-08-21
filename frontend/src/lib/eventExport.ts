@@ -16,22 +16,25 @@ export interface EventExportOptions {
   entryPriceSemantic?: 'trigger_open' | 'trigger_close' | 'next_open' | 'decision_bar_open' | 'decision_bar_close';
 }
 
-async function sha256Hex(text: string): Promise<string> {
+/** 真 SHA-256（WebCrypto）；環境無 subtle ⇒ 拋錯，不做假 hash 退路（CODEX-R1-P1-02）。 */
+export async function sha256Hex(text: string): Promise<string> {
   const subtle = globalThis.crypto?.subtle;
-  if (subtle) {
-    const buf = await subtle.digest('SHA-256', new TextEncoder().encode(text));
-    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  // jsdom／舊環境退路：FNV-1a 64 位展開為 64 hex（僅供測試環境；瀏覽器一律走 subtle）
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
-    h2 = Math.imul(h2 ^ c, 0x811c9dc5) >>> 0;
-  }
-  const part = (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')).repeat(4);
-  return part.slice(0, 64);
+  if (!subtle) throw new Error('WebCrypto subtle 不可用：無法計算 source_file_digest（不提供非 SHA-256 退路）');
+  const buf = await subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** 來源 canonical bytes：搜尋結果（cases）之 canonical JSON——`source_file_digest` 綁的是這份「來源」，非匯出檔自身。 */
+export function canonicalSourceText(cases: CaseData[]): string {
+  return JSON.stringify(
+    cases.map((c) => ({
+      symbol: c.symbol,
+      timeframe: c.timeframe ?? null,
+      timestamp: c.timestamp,
+      positive_case: (c as CaseData & { positive_case?: unknown }).positive_case ?? null,
+      price_change: typeof c.price_change === 'number' ? c.price_change : null,
+    })),
+  );
 }
 
 /** timestamp 字串／數字 → epoch ms（秒級自動 ×1000；ISO 字串 Date.parse）。 */
@@ -59,7 +62,8 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
   const direction = opts.direction ?? inferDirection(opts.conditions);
   const ruleSummary = JSON.stringify({ conditions: opts.conditions, price_change_method: opts.priceChangeMethod, timeframe: opts.timeframe });
   const ruleDigest = await sha256Hex(ruleSummary);
-  const sourceDigest = await sha256Hex(JSON.stringify(cases.map((c) => [c.symbol, c.timestamp, (c as CaseData & { positive_case?: unknown }).positive_case])));
+  const sourceText = canonicalSourceText(cases);
+  const sourceDigest = await sha256Hex(sourceText);
   const snapshot = `search:${opts.timeframe}:${new Date().toISOString().slice(0, 10)}`;
   const skipped: { index: number; reason: string }[] = [];
   const records = cases.flatMap((c, i) => {
@@ -74,6 +78,9 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
       skipped.push({ index: i, reason: 'missing_positive_case_flag' });
       return [];
     }
+    // label_value：搜尋結果之 signed 實際漲跌幅（條件 IC 第三表之必填；缺 ⇒ 後端 unavailable:missing_label_value；GROK-R1-P1-02）
+    const pcRaw = typeof c.price_change === 'number' && Number.isFinite(c.price_change) ? c.price_change : null;
+    const labelValue = pcRaw === null ? null : direction === 'short' ? -pcRaw : pcRaw;
     return [{
       event_id: `${c.symbol}:${c.timeframe || opts.timeframe}:${t0}`,
       symbol: c.symbol,
@@ -84,6 +91,7 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
       direction,
       scenario: opts.scenario ?? 'C',
       label,
+      ...(labelValue === null ? {} : { label_value: labelValue }),
       label_definition: {
         rule_id: `search:price_change:${opts.priceChangeMethod || 'default'}`,
         canonical_digest: ruleDigest,
@@ -97,5 +105,13 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
       kind_source: 'user',
     }];
   });
-  return { records, skipped, n_cases: cases.length, n_records: records.length, note: '匯入前請確認 label_definition.window.horizon_bars 與你的答案窗一致；欄位以 event_import_contract.json 為準' };
+  return {
+    records,
+    skipped,
+    n_cases: cases.length,
+    n_records: records.length,
+    source_file_digest: sourceDigest,
+    source_digest_of: 'canonical JSON of search result cases (symbol,timeframe,timestamp,positive_case,price_change)',
+    note: '匯入前請確認 label_definition.window.horizon_bars 與你的答案窗一致；label_value＝搜尋結果 signed 漲跌幅；欄位以 event_import_contract.json 為準',
+  };
 }

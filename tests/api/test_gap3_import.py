@@ -109,8 +109,8 @@ def test_gap3_import_mixed_columns_rejected_listing_missing_fields():
 
 def test_gap3_import_contract_reasons_passthrough_not_reimplemented():
     """API 層不得重複實作契約檢查：failures 字面全來自契約檔；service 檔無自寫 reason 字面。"""
-    from momentum.factories import create_event_import_contract
-    reasons = set(create_event_import_contract()["import_failure_reasons"])
+    from momentum.factories import create_event_sample_pipeline
+    reasons = set(create_event_sample_pipeline().import_contract()["import_failure_reasons"])
     bad = [make_event(0, t0=1704067200, label=1), make_event(1, label=0, control_kind="platform_random_bars")]
     r = client.post("/api/v1/case/import-events/json", json={"records": bad})
     assert r.status_code == 422
@@ -121,13 +121,14 @@ def test_gap3_import_contract_reasons_passthrough_not_reimplemented():
     for literal in ("invalid_timestamp_unit", "missing_required_field", "enum_violation", "duplicate_event_id"):
         assert literal not in gap3_part, f"API 層不得複列契約 reason 字面：{literal}"
     assert re.search(r"create_event_sample_pipeline\(\)", gap3_part)        # 經 factories 出口消費
+    assert "validate_event_import" not in gap3_part and "import_contract import" not in gap3_part   # 不直 import validator（COMPOSER 建議）
 
 
 def test_gap3_import_allowed_filtering_params_from_contract():
     """B3 follow-up：/search 篩選參數允許清單改讀契約出口（requests.py 不再硬編碼）。"""
     from api.models.requests import FilterConditionRequest
-    from momentum.factories import create_condition_engine_contract
-    allowed = set(create_condition_engine_contract()["allowed_filtering_params"])
+    from momentum.factories import create_event_sample_pipeline
+    allowed = set(create_event_sample_pipeline().condition_engine_contract()["allowed_filtering_params"])
     assert "price_change" in allowed
     src = (REPO / "api" / "models" / "requests.py").read_text(encoding="utf-8")
     assert "{'price_change'}" not in src
@@ -155,3 +156,38 @@ def test_gap3_import_analyze_tables_real_kline(_isolated_storage):
     imp2 = client.post("/api/v1/case/import-events/json", json={"records": bad}).json()
     r2 = client.post(f"/api/v1/case/events/{imp2['import_id']}/analyze", json={})
     assert r2.status_code == 409 and r2.json()["detail"]["kind"] == "bars_unavailable"
+
+
+def test_gap3_import_new_schema_case_variants_on_legacy_endpoint():
+    """CODEX-R1-P2-06 RECHECK：`Event_ID,T0,Label`／BOM／引號變體投舊端點 ⇒ 仍 400 new_schema_on_legacy_endpoint（非 generic 缺欄錯）。"""
+    for header in ("Event_ID,Symbol,Timeframe,T0,Label", '"event_id","symbol","timeframe","t0","label"', "﻿EVENT_ID,symbol,timeframe,t0,LABEL"):
+        csv = header + "\nev0,ETHUSDT,12h,1704067200000,1\n"
+        r = client.post("/api/v1/case/import", files={"file": ("v.csv", csv.encode("utf-8"), "text/csv")}, params={"validate_only": "true"})
+        assert r.status_code == 400 and r.json()["detail"]["kind"] == "new_schema_on_legacy_endpoint", (header, r.text)
+    # 舊三欄大小寫變體投新端點 ⇒ legacy_schema_detected
+    r2 = client.post("/api/v1/case/import-events/json", json={"records": [{"Symbol": "ETHUSDT", "Timestamp": 1704067200, "POSITIVE_CASE": 1}]})
+    assert r2.status_code == 400 and r2.json()["detail"]["kind"] == "legacy_schema_detected"
+
+
+def test_gap3_import_ic_timestamps_only_enables_event_filter():
+    """CODEX-R1-P1-01 RECHECK：ICAnalyzeRequest 只給 event_timestamps（無 query）⇒ config_override 啟用 event_filter（否則 orchestrator mode=none 靜默丟事件）。"""
+    from api.models.ic_models import ICAnalyzeRequest
+    from api.services.ic_analysis_service import ICAnalysisService
+    svc = ICAnalysisService()
+    ov = svc._build_config_override(ICAnalyzeRequest(event_timestamps=[1704067200, 1704110400]))
+    assert ov["event_filter"]["enabled"] is True and "query" not in ov["event_filter"]
+    ov2 = svc._build_config_override(ICAnalyzeRequest(event_query="close > 1"))
+    assert ov2["event_filter"] == {"enabled": True, "query": "close > 1"}
+    assert svc._build_config_override(ICAnalyzeRequest()) is None
+
+
+def test_gap3_import_analyze_all_bars_and_ic_seconds(_isolated_storage):
+    """U11：analyze 端點附全 K 線驗證（rule＝事件成員）；event_timestamps 為 ms、event_timestamps_ic_seconds 為秒（GROK-R1-P2-02）。"""
+    BASE, H12 = 1704067200000, 43200000
+    recs = [make_event(i, t0=BASE + x * H12, label=i % 2) for i, x in enumerate([300, 420, 560, 700])]
+    imp = client.post("/api/v1/case/import-events/json", json={"records": recs}).json()
+    body = client.post(f"/api/v1/case/events/{imp['import_id']}/analyze", json={"horizons": [1], "n_boot": 10, "tier_min_test_events": 0}).json()
+    ab = body["tables"]["all_bars_evaluation"]
+    assert ab["statistic_kind"] == "all_bars_evaluation" and ab["capability_status"] == "ok" and ab["counts"]["n_total"] > 1000
+    assert ab["overall"]["prevalence_learn"] == 0.5 and ab["label_id"] == "event_membership"
+    assert all(t >= 1e12 for t in body["event_timestamps"]) and body["event_timestamps_ic_seconds"] == [t // 1000 for t in body["event_timestamps"]]
