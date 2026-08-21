@@ -10,9 +10,44 @@ import pandas as pd
 
 from momentum.core.exceptions import InvalidQueryError
 from momentum.core.logging import get_logger
+from momentum.Analysis.event_samples.condition_engine import (
+    ConditionError,
+    ConditionSpec,
+    allowed_filtering_params,
+    evaluate_condition,
+)
 
 
 logger = get_logger(__name__)
+
+
+def apply_condition_spec(df: pd.DataFrame, spec: ConditionSpec) -> tuple[pd.DataFrame, dict]:
+    """GAP-3 B3.2 薄 adapter：以 B3.1 條件引擎對 df 求遮罩（同引擎、非平行實作）。
+
+    只接受 `expression_role='feature'`（D3-4：selection_predicate 欄不得流入特徵表）。
+    回 (filtered_df, info)；info 帶 `mode='condition_engine'`＋digest＋column_roles 供 provenance。
+    """
+    if spec.expression_role != "feature":
+        raise InvalidQueryError(
+            f"event_filter 只接受 expression_role='feature'（D3-4），得 {spec.expression_role!r}"
+        )
+    try:
+        mask = evaluate_condition(spec, df)
+    except (ConditionError, KeyError) as exc:
+        raise InvalidQueryError(f"condition evaluation failed: {exc}") from exc
+    info = {
+        "mode": "condition_engine",
+        "condition_digest": spec.canonical_digest,
+        "condition_expression": spec.expression,
+        "condition_column_roles": dict(spec.column_roles),
+        "condition_max_lookback": int(spec.max_lookback),
+        # 誠實邊界（D3-3）：legacy df.eval 路徑仍保留；「已共用完整引擎」須待角色隔離 receipt 過審後才得宣稱
+        "engine": "condition_engine_adapter",
+    }
+    return df[mask], info
+
+
+__all__ = ["EventFilter", "IEventFilter", "allowed_filtering_params", "apply_condition_spec"]
 
 
 class IEventFilter(Protocol):
@@ -57,8 +92,17 @@ class EventFilter:
         df: pd.DataFrame,
         query: Optional[str] = None,
         timestamps: Optional[list[int]] = None,
+        *,
+        condition_spec: Optional["ConditionSpec"] = None,
     ) -> tuple[pd.DataFrame, dict]:
-        """套用事件過濾。"""
+        """套用事件過濾。
+
+        既有 `query`（legacy `df.eval` 遮罩）與 `timestamps` 路徑語意不變。
+        `condition_spec`（GAP-3 B3.2 薄 adapter；keyword-only，預設 None ⇒ 行為不變）：以 B3.1
+        條件引擎求遮罩；IC 事件遮罩之欄位進特徵表，故 **只接受 `expression_role='feature'`**
+        （selection_predicate 欄不得流入特徵表——SPEC D3-4），否則 InvalidQueryError。
+        與 `query` 同時給 ⇒ 拒（單一遮罩來源）。
+        """
 
         if df is None:
             raise ValueError("df is required")
@@ -70,7 +114,12 @@ class EventFilter:
         }
 
         filtered = df
-        if query:
+        if condition_spec is not None:
+            if query:
+                raise InvalidQueryError("condition_spec and query are mutually exclusive")
+            filtered, cond_info = apply_condition_spec(df, condition_spec)
+            filter_info.update(cond_info)
+        elif query:
             self._ensure_valid_query(query, df.columns.tolist())
             try:
                 mask = df.eval(query, engine="python")
