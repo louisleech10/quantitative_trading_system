@@ -25,7 +25,12 @@
 我照下面那張表由上而下直接做，做完派三家委員審＋對抗、有分歧我跟委員自己決定。
 做完一項就把狀態改掉，改的是資料檔，這張表自動跟著變。</p>
 <hr />
-<h2 id="-現況最新821-晚gap-3-第-5-批施工中api-接線前端三頁已落地等三家審查你簽-uat">🔴 現況（最新，8/21 晚）：<strong>GAP-3 第 5 批施工中——API 接線＋前端三頁已落地，等三家審查＋你簽 UAT</strong></h2>
+<h2 id="-現況最新822gap-3-第-5-批審查完工蓋章輪到你簽-uat13-項">🔴 現況（最新，8/22）：<strong>GAP-3 第 5 批審查完工蓋章——輪到你簽 UAT（13 項）</strong></h2>
+<ul>
+<li>五輪審查 11→5→4→1→0、三家蓋章機檢通過；我這邊的機械檢查（測試／build／golden／規模）9 項 rc 全 0。</li>
+<li><strong>你要做的</strong>：開 <code>docs/GAP3_UAT_CHECKLIST.md</code>，照 B 段 B1–B11 逐項操作並簽字（含新增的 digest 驗證、全 K 線、條件 IC 三項）。啟動：後端 <code>python run_api.py</code>、前端 <code>cd frontend &amp;&amp; npm run dev</code>。簽完整票完成；任一項不過我回對應批修。</li>
+</ul>
+<h2 id="前一段821-晚gap-3-第-5-批施工中api-接線前端三頁已落地">前一段（8/21 晚）：GAP-3 第 5 批施工中——API 接線＋前端三頁已落地</h2>
 <ul>
 <li>B5.1：新契約匯入端點（<code>/case/import-events</code>；舊三欄投新端點、新 schema 投舊端點都顯式拒、混合欄逐列指出缺欄）、pipeline 組合殼＋<code>factories.create_event_sample_pipeline()</code>、萬級事件規模 receipt（10k 事件：對齊 73 秒、峰值記憶體 305MB，記錄型不設門檻）。</li>
 <li>B5.2：<code>/search</code> 多一顆「匯出事件契約 JSON」；<code>/data-preparation</code> 多「匯入事件（新契約）」＋批列表；<code>/ic-analysis</code> Event-Driven 模式可「從已匯入案例選事件」、事件型兩表只在事件模式顯示（後端不可用一律顯示原因）。vitest 13 條、build 通過。</li>

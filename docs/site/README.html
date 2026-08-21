@@ -83,7 +83,8 @@
 <hr />
 <h2 id="-現在做到哪">🔨 現在做到哪</h2>
 <blockquote>
-<p><strong>最新（GAP-3，8/21 晚）</strong>：<strong>第 5 批施工中、第一輪審查 11 條全修</strong>——API 新契約匯入端點＋pipeline 出口＋萬級規模 receipt（B5.1）、前端三頁升級（匯出契約 JSON／新契約匯入／IC 事件模式選批＋三個表；B5.2）落地；審查抓到「選了事件批卻沒送給後端」與「匯出檔指紋在測試環境是假的」兩個真問題，已修並補測試；UAT 清單 <code>docs/GAP3_UAT_CHECKLIST.md</code>（13 項）等第二輪閉合＋蓋章後由你逐項簽。
+<p><strong>最新（GAP-3，8/22）</strong>：<strong>第 5 批審查完工蓋章——輪到你簽 UAT</strong>。五輪審查 11→5→4→1→0、三家蓋章機檢通過；機械檢查 9 項 rc 全 0。請開 <code>docs/GAP3_UAT_CHECKLIST.md</code> B 段逐項操作簽字（13 項），簽完 GAP-3 整票完成。看板 <a href="GAP-3施工進度.html">GAP-3施工進度.md</a>。
+<strong>前一段（8/21 晚）</strong>：第 5 批施工中、第一輪審查 11 條全修——API 新契約匯入端點＋pipeline 出口＋萬級規模 receipt（B5.1）、前端三頁升級（匯出契約 JSON／新契約匯入／IC 事件模式選批＋三個表；B5.2）落地；審查抓到「選了事件批卻沒送給後端」與「匯出檔指紋在測試環境是假的」兩個真問題，已修並補測試；UAT 清單 <code>docs/GAP3_UAT_CHECKLIST.md</code>（13 項）等第二輪閉合＋蓋章後由你逐項簽。
 <strong>前一段（8/21）</strong>：<strong>第 3、4 批皆完工蓋章</strong>——B3 條件引擎／事件產生器／五個變化類算子（審查 9→0）；B4 pattern 橋（只在學習段擬合）＋candidate ledger 接 GAP-1 DSR／PBO／MinBTL（試了幾次只從帳本讀；AUC 餵 DSR 必拒；審查四輪 8→2→1→0）；兩批三家蓋章機檢 PASS；event_samples 全套 224 條綠。<strong>下一批 B5（API／前端／UAT）由新 session 開工（HANDOFF 已備）。</strong> 看板 <a href="GAP-3施工進度.html">GAP-3施工進度.md</a>。
 <strong>前一段（8/21 深夜）</strong>：<strong>第 1、2 批皆完工蓋章</strong>——B2 三輪審查 11→4→0、三家蓋章；三張表、IC 主線條件 IC 接線（golden sha 不變）、倖存者契約 v2、全部 K 線驗證；184 條測試綠。
 <strong>前一段（8/21）</strong>：<strong>第 1 批完工蓋章</strong>——四輪審查 8→3→1→0、三家蓋章機檢 PASS、100 條測試綠（真實 K 線手算 exact、8 條 mutation 弄壞必紅）；審查最重要的一條「去重成簇只看前一顆」被兩家反例打穿已改連通分量；施工中抓到 Feature Factory float16 精度天花板（延伸檔 D-001，三家裁定前提修正非降標）。看板 <a href="GAP-3施工進度.html">GAP-3施工進度.md</a>（含「標籤窗／t₀／重疊」白話舉例）。<strong>下一批 B2。</strong>

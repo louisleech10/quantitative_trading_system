@@ -44,7 +44,7 @@
 <tr>
 <td>B5</td>
 <td>API／前端三頁／UAT</td>
-<td><strong>施工中（8/21 開工）</strong>：B5.1 API 接線完成（新 schema 匯入端點＋舊格式顯式拒、pipeline 組合殼＋factories 出口、萬級規模 receipt）；B5.2 前端三頁完成（<code>/search</code> 匯出契約 JSON、<code>/data-preparation</code> 新契約匯入＋批列表、<code>/ic-analysis</code> 事件模式選批＋兩表；vitest 13 條）；B5.3 UAT 清單完成；三家審查第一輪 11 條全修（含 1 條最嚴重），等第二輪閉合</td>
+<td><strong>審查完工蓋章（8/22），等你簽 UAT</strong>：五輪審查 11→5→4→1→0、三家蓋章機檢通過；UAT 機械段 9 項 rc 全 0，剩你逐項簽 B 段 13 項</td>
 </tr>
 </tbody>
 </table></div>
@@ -237,11 +237,24 @@
 </ul>
 <h2 id="b5-第二三輪審查821-晚822">B5 第二、三輪審查（8/21 晚～8/22）</h2>
 <ul>
-<li><strong>R2（5 條全修）</strong>：codex 抓三個真問題——①「往前 k 根決策」的事件，全 K 線驗證把訊號標在觸發根、但評分程式讀的是決策根 ⇒ k&gt;0 時整張表算錯（已改標決策根，混合 k 直接拒算）；②匯出的 <code>label_value</code> 我拿「觸發那根自己的漲跌」冒充「答案窗報酬」⇒ 條件 IC 會測錯東西（已改取同答案窗的未來報酬欄）；③匯入的 digest 驗證在 JSON 端點必然自相矛盾（已改成顯式拒並指路）。另補前端揭露「這張表在算什麼」。</li>
-<li><strong>R3（4 條）</strong>：codex 指出我上一輪補的測試「看起來有驗、其實沒驗到」（監視函式定義了卻沒接上）——已改成真的攔截評分程式收到的分數，斷言 1 落在決策根、觸發根為 0；並補「匯出前先算有幾筆缺答案窗欄位並提示」、「來源檔可一起下載＋上傳以通過 digest 驗證」。三家同抓白話文件同步檢查在 HEAD 是紅的（我第三次漏在同一個 commit 更新看板）。</li>
+<li>
+<p><strong>R2（5 條全修）</strong>：codex 抓三個真問題——①「往前 k 根決策」的事件，全 K 線驗證把訊號標在觸發根、但評分程式讀的是決策根 ⇒ k&gt;0 時整張表算錯（已改標決策根，混合 k 直接拒算）；②匯出的 <code>label_value</code> 我拿「觸發那根自己的漲跌」冒充「答案窗報酬」⇒ 條件 IC 會測錯東西（已改取同答案窗的未來報酬欄）；③匯入的 digest 驗證在 JSON 端點必然自相矛盾（已改成顯式拒並指路）。另補前端揭露「這張表在算什麼」。</p>
+</li>
+<li>
+<p><strong>R3（4 條）</strong>：codex 指出我上一輪補的測試「看起來有驗、其實沒驗到」（監視函式定義了卻沒接上）——已改成真的攔截評分程式收到的分數，斷言 1 落在決策根、觸發根為 0；並補「匯出前先算有幾筆缺答案窗欄位並提示」、「來源檔可一起下載＋上傳以通過 digest 驗證」。三家同抓白話文件同步檢查在 HEAD 是紅的（我第三次漏在同一個 commit 更新看板）。</p>
+</li>
+<li>
+<p><strong>R4／R5（8/22）</strong>：codex 抓到我在派工單宣稱「同一個檔可以同時當事件檔和來源檔通過驗證」——它用探針證明不可能（檔案裡含著自己的指紋），已改成機械拒並在訊息裡指路。R5 三家零問題、全判可蓋章。</p>
+</li>
+<li>
+<p><strong>五輪收斂</strong>：11 → 5 → 4 → 1 → 0；三家蓋章、機檢通過。</p>
+</li>
 </ul>
+<h2 id="現在輪到你uat-簽字13-項">現在輪到你：UAT 簽字（13 項）</h2>
+<p>機械檢查（A 段 9 項）我已跑完、rc 全 0（證據 <code>handoffs/run_receipts/20260822T040000Z-gap3-b5-uat-sectionA.log</code>）。<strong>剩下的是你操作驗收</strong>：打開 <code>docs/GAP3_UAT_CHECKLIST.md</code> 的 B 段，照 B1–B11（含新增的 B2b digest 驗證、B8b 全 K 線、B9b 條件 IC）逐項操作並簽字。你簽完，GAP-3 整票才算完成。</p>
+<p>啟動方式：後端 <code>source venv/bin/activate &amp;&amp; python run_api.py</code>；前端 <code>cd frontend &amp;&amp; npm run dev</code>。</p>
 <h2 id="下一步">下一步</h2>
-<p><strong>B5 R4 閉合</strong>（session <code>20260822-gap3-b5-review-r4</code>）→ 三家蓋章 → 你照 <code>docs/GAP3_UAT_CHECKLIST.md</code> B 段逐項簽字（13 項）→ 整票完成。</p>
+<p><strong>你簽 UAT</strong> → 全簽過 ⇒ 我做收尾（registry／ROADMAP／看板歸檔）＝ GAP-3 完成；任一項不過 ⇒ 回對應批修（不在 B5 打補丁繞過）。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

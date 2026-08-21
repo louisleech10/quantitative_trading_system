@@ -6,17 +6,19 @@
 
 ## A. 機械前置（主委實跑；rc 欄由主委填、receipt 路徑可稽核）
 
-| # | 步驟 | 命令 | rc | receipt |
+> **主委實跑 2026-08-22**，全段 receipt＝`handoffs/run_receipts/20260822T040000Z-gap3-b5-uat-sectionA.log`（rc 逐行可稽核）。
+
+| # | 步驟 | 命令 | rc | 結果 |
 |---|---|---|---|---|
-| A1 | 事件樣本層全套 | `venv/bin/python -m pytest tests/momentum/event_samples/ -q` | ｜ | `handoffs/run_receipts/<ts>-gap3-b5-gate.log` |
-| A2 | state-counter 算子 | `venv/bin/python -m pytest tests/momentum/feature_engineering/ -q -k state_counters` | ｜ | 同上 |
-| A3 | GAP-1 防線不退步 | `venv/bin/python -m pytest tests/momentum/Analysis/strategy_validation -q` | ｜ | 同上 |
-| A4 | API 匯入／分析 | `venv/bin/python -m pytest tests/api/ -q -k gap3_import` | ｜ | 同上 |
-| A5 | 前端 build | `cd frontend && npm run build` | ｜ | 同上 |
-| A6 | 前端 vitest（gap3） | `cd frontend && npx vitest run gap3` | ｜ | 同上 |
-| A7 | 白話同步守衛 | `bash scripts/plain_docs_sync_check.sh` | ｜ | 同上 |
-| A8 | IC 主線行為不變 | `venv/bin/python scripts/gap3_freeze_golden.py --check` | ｜ | 同上（sha 163c4ce…） |
-| A9 | 萬級規模 receipt | `venv/bin/python scripts/gap3_import_scale.py --n 10000 --write` | ｜ | `handoffs/run_receipts/gap3_import_scale.json` |
+| A1 | 事件樣本層全套 | `venv/bin/python -m pytest tests/momentum/event_samples/ -q` | 0 | 230 passed |
+| A2 | state-counter 算子 | `venv/bin/python -m pytest tests/momentum/feature_engineering/ -q -k state_counters` | 0 | 17 passed |
+| A3 | GAP-1 防線不退步 | `venv/bin/python -m pytest tests/momentum/Analysis/strategy_validation -q` | 0 | 272 passed |
+| A4 | API 匯入／分析 | `venv/bin/python -m pytest tests/api/ -q -k gap3_import` | 0 | 16 passed |
+| A5 | 前端 build | `cd frontend && npm run build` | 0 | build 成功 |
+| A6 | 前端 vitest（gap3） | `cd frontend && npx vitest run gap3` | 0 | 3 files／18 passed |
+| A7 | 白話同步守衛 | `bash scripts/plain_docs_sync_check.sh` | 0 | 受管檔皆同步 |
+| A8 | IC 主線行為不變 | `venv/bin/python scripts/gap3_freeze_golden.py --check` | 0 | CHECK PASS sha 163c4ce… |
+| A9 | 萬級規模 receipt | `venv/bin/python scripts/gap3_import_scale.py --n 10000 --write` | 0 | `gap3_import_scale.json`：n_events 10000／direct 76.978s／api_path 0.382s ok／peak_rss 496.4MB |
 
 ## B. 使用者逐項驗收（真實操作；每項附預期畫面；簽字欄由使用者填）
 
@@ -47,5 +49,5 @@
 
 ## 簽字
 
-- 主委（Claude）：A 段全 rc=0 於 ＿＿＿＿（receipt 路徑：＿＿＿＿）
+- 主委（Claude）：A 段 9 項 rc 全為 0，實跑於 **2026-08-22**（receipt：`handoffs/run_receipts/20260822T040000Z-gap3-b5-uat-sectionA.log`）。B1–B5 五批各三家 code review＋三家 RECONCILE-STAMP 機檢 PASS（B5 收斂 R1 11→R2 5→R3 4→R4 1→R5 0）。
 - 使用者：B 段逐項簽字完成於 ＿＿＿＿；epic 收案：是／否
