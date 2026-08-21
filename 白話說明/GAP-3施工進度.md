@@ -95,6 +95,8 @@
 
 **B4 R2（8/21）**：R1 八條原提出方全部 CLOSED、composer／grok 0 新問題；codex 再抓兩條第一輪漏的（都對）：「帳本寫成功但 provenance 附檔寫失敗時，下游看不出來」（已改成 provenance 先寫、帳本後寫，且算 DSR 前先對帳，缺 provenance 直接 unavailable）、「報酬序列 copy 後改值，舊的指紋還在、閘門照放」（已改成閘門重算指紋比對，改過必拒）。修後 29 條綠，等 R3 codex 閉合。
 
+**B4 R3（8/21）**：codex 兩條 CLOSED、兩家複核同意；codex 再抓一條修補引入的洞：「對帳按候選名聚合，同一候選用新 evaluation 重試後，舊的孤兒就看不見了」（已改成逐 evaluation 對帳，孤兒永遠列得出來、帳本缺 provenance 的 evaluation 一律 unavailable）。29 條綠，等 R4 codex 閉合。
+
 ## 下一步
 
-**R3 閉合**（session `20260821-gap3-b4-review-r3`；codex 重跑兩條反例、其餘兩家複核）→ 三家蓋章 → 進 B5。
+**R4 閉合**（session `20260821-gap3-b4-review-r4`；codex 重跑 R3 反例、其餘兩家複核）→ 三家蓋章 → 進 B5。

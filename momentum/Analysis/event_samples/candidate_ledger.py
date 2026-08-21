@@ -237,7 +237,7 @@ def record_candidate(ledger_path: LedgerKey, candidate_meta: Dict[str, Any]) -> 
         "ts": ts,
     }
     # 寫入順序（CODEX-R2-P1-01）：**sidecar 先、帳本後**——帳本 append 失敗只留 provenance 孤兒（不影響 N）；
-    # 反向「帳本有、sidecar 無」由 run_dsr_pbo 消費端 `_provenance_complete` 檢查 ⇒ unavailable（fail-closed）。
+    # 反向「帳本有、sidecar 無」由 run_dsr_pbo 消費端 `provenance_reconcile` 逐 evaluation 檢查 ⇒ unavailable（fail-closed）。
     prov_path = _provenance_path(ledger_path)
     prov = {
         "candidate_id": record["candidate_id"], "evaluation_id": record["evaluation_id"],
