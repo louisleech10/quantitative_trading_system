@@ -712,7 +712,8 @@ class EventImportService:
     ) -> EventImportResponse:
         """upload_bytes：事件檔內容（記 `upload_sha256` 供 provenance）。
         source_bytes：契約所指之**來源檔**位元組（CODEX-R2-P1-03）；`verify_source_digest=True` 時以此逐列對證
-        `source_file_digest`（未提供則退回 upload_bytes——僅在事件檔本身即來源檔時才有意義）。"""
+        `source_file_digest`。**必須是與事件檔相異之檔**——事件檔含自身 digest 欄，自我對證恆不自洽
+        （路由層以 `source_file_must_differ_from_event_file`／`source_file_required_for_verify` 擋在前面；CODEX-R4-P1-01）。"""
         columns = sorted({k for r in records for k in r.keys()}) if records else []
         if self.looks_legacy(columns):
             raise EventImportRejectedError(EventImportRejected(

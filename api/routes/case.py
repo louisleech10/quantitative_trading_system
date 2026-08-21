@@ -143,14 +143,24 @@ async def import_events_file(
     validate_only: bool = Query(False),
     verify_source_digest: bool = Query(
         False,
-        description=("逐列對證 source_file_digest。對證位元組＝`source_file`（若提供）否則 `file` 自身——"
-                     "事件檔含自己的 digest，故自我對證必然 mismatch；由 /search 匯出者請一併上傳其 `.source.json`（CODEX-R2-P1-03）"),
+        description=("逐列對證 source_file_digest。**必須另附 `source_file`**（產生事件的來源檔）——事件檔含自己的 digest，"
+                     "自我對證在數學上不可能（同檔 ⇒ 400 `source_file_must_differ_from_event_file`；未附 ⇒ 400 "
+                     "`source_file_required_for_verify`）。由 /search 匯出者請上傳同時下載的 `*.source.json`（CODEX-R2-P1-03／R4-P1-01）"),
     ),
 ):
     """上傳 CSV/JSON（GAP-3 事件契約新 schema）。拒收 ⇒ 400（legacy／parse）或 422（契約違規，逐列 reason）。"""
     svc = get_event_import_service()
     content = await file.read()
     src_bytes = await source_file.read() if source_file is not None else None
+    if verify_source_digest and src_bytes is not None and src_bytes == content:
+        # CODEX-R4-P1-01：事件檔內含 source_file_digest 欄，對自身取 sha256 恆不自洽 ⇒ 同檔對證在數學上不可能。
+        # 直接以專屬 reason 拒（而非讓使用者收一堆 digest_mismatch），並指出正解＝另附來源檔。
+        raise HTTPException(status_code=400, detail=EventImportRejected(
+            kind="source_file_must_differ_from_event_file",
+            message=("source_file 與事件檔位元組相同：事件檔含 source_file_digest 欄，對自身取 sha256 必不相符（自我指涉）。"
+                     "請附**產生這些事件的來源檔**（/search 匯出者即同時下載的 *.source.json）；"
+                     "若無來源檔可對證，請關閉 verify_source_digest"),
+        ).model_dump())
     if verify_source_digest and src_bytes is None:
         # 顯式引導：自我對證必然失敗，直接說清楚要傳什麼（而非讓使用者拿到一堆 digest_mismatch）
         raise HTTPException(status_code=400, detail=EventImportRejected(

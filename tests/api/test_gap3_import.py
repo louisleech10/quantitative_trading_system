@@ -249,3 +249,23 @@ def test_gap3_import_verify_with_companion_source_file_passes(_isolated_storage)
                             "source_file": ("ev.source.json", src_bytes + b" ", "application/json")},
                      params={"verify_source_digest": "true", "validate_only": "true"})
     assert r3.status_code == 422 and {f["reason"] for f in r3.json()["detail"]["failures"]} == {"digest_mismatch"}
+
+
+def test_gap3_import_verify_same_file_rejected_explicitly():
+    """CODEX-R4-P1-01 RECHECK：source_file 與事件檔位元組相同 ⇒ 400 source_file_must_differ_from_event_file
+    （自我指涉在數學上不可能；不讓使用者收一堆 digest_mismatch）。distinct companion 路徑仍可通過。"""
+    import hashlib
+    recs = _records()
+    body = json.dumps(recs, ensure_ascii=False).encode("utf-8")
+    fixed = [dict(r, source_file_digest=hashlib.sha256(body).hexdigest()) for r in recs]
+    ev = json.dumps(fixed, ensure_ascii=False).encode("utf-8")
+    r = client.post("/api/v1/case/import-events",
+                    files={"file": ("ev.json", ev, "application/json"), "source_file": ("ev.json", ev, "application/json")},
+                    params={"verify_source_digest": "true", "validate_only": "true"})
+    assert r.status_code == 400
+    d = r.json()["detail"]
+    assert d["kind"] == "source_file_must_differ_from_event_file" and "source.json" in d["message"]
+    # 關閉 verify ⇒ 同檔上傳仍可收（不影響既有路徑）
+    assert client.post("/api/v1/case/import-events",
+                       files={"file": ("ev.json", ev, "application/json"), "source_file": ("ev.json", ev, "application/json")},
+                       params={"validate_only": "true"}).status_code == 200

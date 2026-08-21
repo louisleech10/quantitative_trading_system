@@ -23,7 +23,8 @@
 | # | 步驟（你做） | 預期畫面／輸出 | 通過？（簽字／日期） |
 |---|---|---|---|
 | B1 | 啟動後端＋前端（`python run_api.py`；`cd frontend && npm run dev`），開 `/search`，跑一次正反例搜尋 | 結果列表出現；底部多一顆「匯出事件契約 JSON」 | ｜ |
-| B2 | 點「匯出事件契約 JSON」 | 下載 `gap3_events_<日期>.json`；內容每筆含 `event_id/t0(ms)/label/label_definition/control_kind`；`skipped[]` 列出無法轉換者（reason） | ｜ |
+| B2 | 選好「答案窗 N 根」後點「匯出事件契約 JSON」 | 下載**兩個檔**：`gap3_events_<日期>.json`（每筆含 `event_id/t0(ms)/label/label_value/label_definition/control_kind`）與 `gap3_events_<日期>.source.json`（來源檔，其 sha256＝各列 `source_file_digest`）；若有事件缺該答案窗的未來報酬欄，匯出前會先跳確認框告訴你「N/M 筆不會帶 label_value ⇒ 條件 IC 會 unavailable」 | ｜ |
+| B2b | （選用）驗 digest：在「匯入事件」勾 `verify_source_digest` 並同時附上 `*.source.json` | 通過；若只附事件檔 ⇒ 400 要你附來源檔；若把事件檔當來源檔重複上傳 ⇒ 400 說明自我對證不可能 | ｜ |
 | B3 | 開 `/data-preparation`，用「匯入事件（GAP-3 新契約）」上傳 B2 的 JSON（先勾「僅驗證」） | 顯示「驗證通過 N 筆（未落檔）」；若契約違規 ⇒ 逐列 reason 表格＋migration 提示（**不是**空白或 500） | ｜ |
 | B4 | 取消「僅驗證」再上傳 | 顯示 import_id；右側「已匯入事件批」出現該批（symbols／timeframe／筆數） | ｜ |
 | B5 | 把舊三欄 CSV（symbol/timestamp/Positive_case）丟進「匯入事件」 | 拒收：`legacy_schema_detected`＋migration 提示（欄位對照）；舊流程「導入案例」不受影響 | ｜ |
