@@ -292,7 +292,14 @@ def test_sidecar_first_and_ledger_without_provenance_unavailable(_redirect_ledge
     rep = run_dsr_pbo(KEY, {"a": a})
     assert rep["ledger"]["status"] == "unavailable"                         # N 不受孤兒 provenance 影響
     recon = cl.provenance_reconcile(KEY)
-    assert recon["provenance_without_ledger"] == ["a"] and recon["complete"] is False
+    assert recon["provenance_without_ledger"] == ["a:eval-a"] and recon["complete"] is False
+    # CODEX-R3-P1-01：同 candidate 以新 evaluation_id 重試入帳 ⇒ 孤兒 eval-a 仍被列出（逐 evaluation 對帳，不按 candidate 吞掉）
+    record_candidate(KEY, _meta(a, evaluation_id="eval-a-retry"))
+    recon_retry = cl.provenance_reconcile(KEY)
+    assert recon_retry["provenance_without_ledger"] == ["a:eval-a"] and recon_retry["ledger_without_provenance"] == []
+    assert recon_retry["complete"] is True and recon_retry["n_ledger_evaluations"] == 1 and recon_retry["n_provenance_rows"] == 2
+    rep_retry = run_dsr_pbo(KEY, {"a": a})
+    assert rep_retry["capability_status"] == "ok" and rep_retry["provenance_reconcile"]["provenance_without_ledger"] == ["a:eval-a"]
     # ② 直接寫帳本列（繞過 record_candidate）⇒ 無 sidecar ⇒ unavailable
     b = _cand("b", seed=2)
     ledger_mod.append_trial_attempt(research_session_id=KEY.research_session_id, dataset_key=KEY.dataset_key, record={
@@ -300,15 +307,23 @@ def test_sidecar_first_and_ledger_without_provenance_unavailable(_redirect_ledge
         "evaluation_id": "eval-b", "attempt_index": 0, "state": "complete", "metric_name": "sharpe", "metric_value": 0.1,
         "metric_unit": "per_period", "metric_valid": True, "input_artifact_hash": b.returns.attrs["source_artifact_hash"],
         "ts": "2026-08-21T00:00:00Z"})
-    rep2 = run_dsr_pbo(KEY, {"b": b})
+    rep2 = run_dsr_pbo(KEY, {"a": a, "b": b}, s_blocks=4)
     assert rep2["capability_status"] == "unavailable" and rep2["reason"] == "provenance_incomplete"
-    assert rep2["dsr"]["status"] == "unavailable" and rep2["provenance_reconcile"]["ledger_without_provenance"] == ["b"]
-    # ③ 正常路徑：sidecar＋帳本齊 ⇒ ok
+    assert rep2["dsr"]["status"] == "unavailable" and rep2["provenance_reconcile"]["ledger_without_provenance"] == ["b:eval-b"]
+    # 同 candidate b 以新 evaluation_id 經正規路徑入帳，仍不得遮掩 eval-b 缺 provenance（逐 evaluation）
+    record_candidate(KEY, _meta(b, evaluation_id="eval-b2"))
+    rep2b = run_dsr_pbo(KEY, {"a": a, "b": b}, s_blocks=4)
+    assert rep2b["reason"] == "provenance_incomplete" and rep2b["provenance_reconcile"]["ledger_without_provenance"] == ["b:eval-b"]
+    # ③ 補 eval-b 之 provenance（sidecar 直寫同 evaluation_id）⇒ 齊備 ⇒ ok
+    prov_path = root / f"{KEY.research_session_id}__{KEY.dataset_key}.provenance.jsonl"
+    with prov_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"candidate_id": "b", "evaluation_id": "eval-b", "rule_digest": "r" * 64, "seed": 7,
+                            "input_digest": "i" * 64, "command": "manual-backfill", "expected": "pass"}) + "\n")
     c = _cand("c", seed=3)
     record_candidate(KEY, _meta(c))
-    record_candidate(KEY, _meta(b, evaluation_id="eval-b2"))                # 補 b 之 provenance
-    rep3 = run_dsr_pbo(KEY, {"b": b, "c": c}, s_blocks=4)
+    rep3 = run_dsr_pbo(KEY, {"a": a, "b": b, "c": c}, s_blocks=4)
     assert rep3["capability_status"] == "ok" and rep3["provenance_reconcile"]["complete"] is True
+    assert rep3["provenance_reconcile"]["ledger_without_provenance"] == []
     prov_lines = (root / f"{KEY.research_session_id}__{KEY.dataset_key}.provenance.jsonl").read_text().splitlines()
     assert {json.loads(p)["candidate_id"] for p in prov_lines} == {"a", "b", "c"}
 

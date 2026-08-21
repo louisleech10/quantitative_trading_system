@@ -197,8 +197,9 @@ def record_candidate(ledger_path: LedgerKey, candidate_meta: Dict[str, Any]) -> 
 
     candidate_meta 必含：`candidate_id`、`evaluation_id`、`returns`（CandidateReturns）、`rule_digest`、`seed`、
     `input_digest`、`command`（可重播命令）、`expected`（oracle 預期 'pass'|'fail'）；選填 `attempt_index`（預設 0）、`ts`。
-    寫入順序：全部驗證 → `append_trial_attempt`（GAP-1 自帶 flock）→ sidecar（自帶 sidecar flock）；
-    誠實邊界：兩檔非同一交易，sidecar 寫失敗會 raise（帳本列已在，可由 evaluation_id 對帳）。
+    寫入順序：全部驗證 → **sidecar**（自帶 flock）→ `append_trial_attempt`（GAP-1 自帶 flock）；
+    誠實邊界：兩檔非同一交易——帳本 append 失敗只留 provenance 孤兒（不影響 N，`provenance_reconcile` 可列出）；
+    反向「帳本有、sidecar 無」由 `run_dsr_pbo` 逐 evaluation 對帳 ⇒ unavailable。
     metric 固定 `sharpe`／`per_period`（由 return series 算；退化 ⇒ metric_valid=False、state=failed）。
     """
     if not isinstance(ledger_path, LedgerKey):
@@ -259,13 +260,11 @@ def _provenance_path(key: LedgerKey):
                                dataset_key=key.dataset_key).with_suffix(".provenance.jsonl")
 
 
-def _read_provenance(key: LedgerKey) -> Dict[str, set]:
-    """回 {candidate_id: {evaluation_id,...}}；檔缺 ⇒ 空。"""
-    p = _provenance_path(key)
-    out: Dict[str, set] = {}
-    if not p.is_file():
-        return out
-    for line in p.read_text(encoding="utf-8").splitlines():
+def _jsonl_rows(path) -> list:
+    if not path.is_file():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -273,22 +272,45 @@ def _read_provenance(key: LedgerKey) -> Dict[str, set]:
             row = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if isinstance(row, dict) and "candidate_id" in row and "evaluation_id" in row:
-            out.setdefault(str(row["candidate_id"]), set()).add(str(row["evaluation_id"]))
+        if isinstance(row, dict):
+            out.append(row)
     return out
 
 
+def _read_provenance_pairs(key: LedgerKey) -> set:
+    """sidecar 之 {(candidate_id, evaluation_id)}；檔缺 ⇒ 空。"""
+    return {(str(r["candidate_id"]), str(r["evaluation_id"])) for r in _jsonl_rows(_provenance_path(key))
+            if "candidate_id" in r and "evaluation_id" in r}
+
+
+def _read_ledger_pairs(key: LedgerKey) -> set:
+    """帳本 schema-valid 列之 {(candidate_id, evaluation_id)}（與 `read_trial_ledger` 同一合法性判準；只讀不寫）。"""
+    contract = _ledger.load_strategy_validation_contract()
+    schema = contract["ledger_record_keys"]["keys"]
+    p = _ledger.ledger_path(research_session_id=key.research_session_id, dataset_key=key.dataset_key)
+    pairs = set()
+    for r in _jsonl_rows(p):
+        if _ledger._row_is_valid(r, schema, contract) and r["research_session_id"] == key.research_session_id \
+                and r["dataset_key"] == key.dataset_key:
+            pairs.add((str(r["candidate_id"]), str(r["evaluation_id"])))
+    return pairs
+
+
 def provenance_reconcile(ledger_path: LedgerKey) -> Dict[str, Any]:
-    """帳本 vs sidecar 對帳（可驗證之 orphan 路徑）：`ledger_without_provenance`（⇒ DSR/PBO 不可用）、
-    `provenance_without_ledger`（帳本 append 失敗留下之孤兒；不影響 N）。"""
+    """帳本 vs sidecar **逐 evaluation** 對帳（CODEX-R3-P1-01：同 candidate 多 evaluation_id，按 candidate 聚合會吞孤兒）。
+    `ledger_without_provenance`：帳本 evaluation 缺 sidecar（⇒ DSR/PBO 不可用）；
+    `provenance_without_ledger`：sidecar 孤兒（帳本 append 失敗留下；不影響 N，列出供對帳）。值為 "candidate_id:evaluation_id"。"""
     lr = _ledger.read_trial_ledger(research_session_id=ledger_path.research_session_id, dataset_key=ledger_path.dataset_key)
-    prov = _read_provenance(ledger_path)
-    ledger_ids = set(lr.candidate_ids)
+    ledger_pairs = _read_ledger_pairs(ledger_path)
+    prov_pairs = _read_provenance_pairs(ledger_path)
+    fmt = lambda s: sorted(f"{c}:{e}" for c, e in s)  # noqa: E731
     return {
         "ledger_status": lr.status,
-        "ledger_without_provenance": sorted(ledger_ids - set(prov)),
-        "provenance_without_ledger": sorted(set(prov) - ledger_ids),
-        "complete": bool(lr.status == "ok" and ledger_ids <= set(prov)),
+        "n_ledger_evaluations": len(ledger_pairs),
+        "n_provenance_rows": len(prov_pairs),
+        "ledger_without_provenance": fmt(ledger_pairs - prov_pairs),
+        "provenance_without_ledger": fmt(prov_pairs - ledger_pairs),
+        "complete": bool(lr.status == "ok" and ledger_pairs and ledger_pairs <= prov_pairs),
     }
 
 
