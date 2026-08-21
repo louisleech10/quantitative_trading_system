@@ -238,6 +238,8 @@ def test_assert_no_outcome_columns():
     assert ei.value.reason == "role_isolation_violation"
     with pytest.raises(ConditionError):
         assert_no_outcome_columns(["trigger_return"], REG)
+    with pytest.raises(ConditionError):
+        assert_no_outcome_columns(["Future_Return_2"], {"Future_Return_2": "pit_feature"})   # casefold backstop（GROK R2 殘差）
 
 
 def test_allowed_filtering_params_from_contract():

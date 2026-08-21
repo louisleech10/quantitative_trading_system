@@ -357,7 +357,7 @@ def assert_no_outcome_columns(columns: Mapping[str, str] | List[str], column_reg
     bad = []
     for c in list(columns):
         role = column_registry.get(c)
-        if role in ("trigger_outcome", "future_outcome") or str(c).startswith(contract["future_column_prefix"]):
+        if role in ("trigger_outcome", "future_outcome") or str(c).casefold().startswith(str(contract["future_column_prefix"]).casefold()):
             bad.append(c)
     if bad:
         raise ConditionError("role_isolation_violation", f"特徵表含結果欄 {sorted(bad)}")
