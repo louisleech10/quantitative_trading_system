@@ -95,9 +95,9 @@ def _cand(cid, n=40, mu=0.002, seed=1, span_years=2.0, ids=None, entry_ms=None):
     n = len(ids)
     entry_ms = entry_ms or {e: BASE + i * H12 for i, e in enumerate(ids)}
     s = pd.Series(rng.normal(mu, 0.02, n), index=ids, name="hold_return")
-    s.attrs.update({"span_years": span_years, "source_artifact_hash": cl._digest({"cid": cid, "seed": seed, "ids": ids}),
-                    "entry_semantic": "trigger_open", "label_definition": LD, "t_semantics": "trade_level",
-                    "entry_at_ms_by_event": dict(entry_ms)})
+    s.attrs.update({"span_years": span_years, "entry_semantic": "trigger_open", "label_definition": LD,
+                    "t_semantics": "trade_level", "entry_at_ms_by_event": dict(entry_ms)})
+    s.attrs["source_artifact_hash"] = cl.receipt_digest(s)                  # 與 to_return_series 同一收據 digest
     return CandidateReturns(candidate_id=cid, returns=s)
 
 
@@ -218,8 +218,7 @@ def test_unlogged_candidate_cannot_be_champion():
     """CODEX-R1-P1-02 RECHECK：ledger 只記 logged；輸入 unlogged（attrs.hash 借 logged 之 H）⇒ DSR／MinBTL 皆 unavailable。"""
     logged = _cand("logged", mu=0.0)
     record_candidate(KEY, _meta(logged))
-    un = _cand("unlogged", mu=0.01, seed=9)
-    un.returns.attrs["source_artifact_hash"] = logged.returns.attrs["source_artifact_hash"]
+    un = _cand("unlogged", mu=0.01, seed=9)                                 # 收據合法但未記帳
     rep = run_dsr_pbo(KEY, {"unlogged": un})
     assert rep["capability_status"] == "unavailable" and rep["dsr"]["status"] == "unavailable"
     assert rep["eligibility"]["status"] == "unavailable" and "champion" not in rep
@@ -253,6 +252,65 @@ def test_pbo_observation_axis_by_entry_time_not_lexicographic(monkeypatch):
     record_candidate(KEY, _meta(c))
     with pytest.raises(ValueError, match="不一致"):
         run_dsr_pbo(KEY, {"a": a, "b": b, "c": c}, s_blocks=4)
+
+
+def test_stale_receipt_after_copy_mutation_rejected(bars):
+    """CODEX-R2-P1-02 RECHECK：to_return_series 真實產出 copy 後原地改值 ⇒ hash 與 values 不符 ⇒ MetricTypeError；未改者通過。"""
+    df, rec = _events("trigger_open", [300, 420, 555])
+    g = bars["ETHUSDT"]["12h"]
+    s = to_return_series(pd.Series(True, index=df["event_id"]), {"ETHUSDT": g}, "trigger_open", LD, rec, events=df)
+    assert cl.receipt_digest(s) == s.attrs["source_artifact_hash"]
+    cl._assert_return_series(CandidateReturns("a", s), "t")                 # 真實產出通過
+    mutated = s.copy()
+    mutated.iloc[0] += 0.123
+    assert mutated.attrs["source_artifact_hash"] == s.attrs["source_artifact_hash"]   # pandas copy 帶舊 hash
+    with pytest.raises(MetricTypeError, match="stale"):
+        run_dsr_pbo(KEY, {"a": CandidateReturns("a", mutated)})
+    with pytest.raises(MetricTypeError, match="stale"):
+        record_candidate(KEY, _meta(CandidateReturns("a", mutated)))
+    reindexed = s.copy()
+    reindexed.index = [f"x{i}" for i in range(len(s))]                       # 改 index 亦 stale
+    reindexed.attrs["entry_at_ms_by_event"] = {f"x{i}": v for i, v in enumerate(s.attrs["entry_at_ms_by_event"].values())}
+    with pytest.raises(MetricTypeError, match="stale"):
+        run_dsr_pbo(KEY, {"a": CandidateReturns("a", reindexed)})
+
+
+def test_sidecar_first_and_ledger_without_provenance_unavailable(_redirect_ledger_root, monkeypatch):
+    """CODEX-R2-P1-01 RECHECK：①sidecar 先寫——帳本 append 失敗只留 provenance 孤兒、N 不變；
+    ②帳本有列但無 sidecar ⇒ run_dsr_pbo unavailable:provenance_incomplete；③provenance_reconcile 可驗證 orphan。"""
+    import json
+    a = _cand("a")
+    # ① 帳本 append 失敗
+    orig = ledger_mod.append_trial_attempt
+    monkeypatch.setattr(ledger_mod, "append_trial_attempt", lambda **kw: (_ for _ in ()).throw(OSError("ledger write unavailable")))
+    with pytest.raises(OSError):
+        record_candidate(KEY, _meta(a))
+    monkeypatch.setattr(ledger_mod, "append_trial_attempt", orig)
+    root = _redirect_ledger_root / "strategy_validation"
+    assert not (root / f"{KEY.research_session_id}__{KEY.dataset_key}.jsonl").exists()
+    assert (root / f"{KEY.research_session_id}__{KEY.dataset_key}.provenance.jsonl").exists()
+    rep = run_dsr_pbo(KEY, {"a": a})
+    assert rep["ledger"]["status"] == "unavailable"                         # N 不受孤兒 provenance 影響
+    recon = cl.provenance_reconcile(KEY)
+    assert recon["provenance_without_ledger"] == ["a"] and recon["complete"] is False
+    # ② 直接寫帳本列（繞過 record_candidate）⇒ 無 sidecar ⇒ unavailable
+    b = _cand("b", seed=2)
+    ledger_mod.append_trial_attempt(research_session_id=KEY.research_session_id, dataset_key=KEY.dataset_key, record={
+        "research_session_id": KEY.research_session_id, "dataset_key": KEY.dataset_key, "candidate_id": "b",
+        "evaluation_id": "eval-b", "attempt_index": 0, "state": "complete", "metric_name": "sharpe", "metric_value": 0.1,
+        "metric_unit": "per_period", "metric_valid": True, "input_artifact_hash": b.returns.attrs["source_artifact_hash"],
+        "ts": "2026-08-21T00:00:00Z"})
+    rep2 = run_dsr_pbo(KEY, {"b": b})
+    assert rep2["capability_status"] == "unavailable" and rep2["reason"] == "provenance_incomplete"
+    assert rep2["dsr"]["status"] == "unavailable" and rep2["provenance_reconcile"]["ledger_without_provenance"] == ["b"]
+    # ③ 正常路徑：sidecar＋帳本齊 ⇒ ok
+    c = _cand("c", seed=3)
+    record_candidate(KEY, _meta(c))
+    record_candidate(KEY, _meta(b, evaluation_id="eval-b2"))                # 補 b 之 provenance
+    rep3 = run_dsr_pbo(KEY, {"b": b, "c": c}, s_blocks=4)
+    assert rep3["capability_status"] == "ok" and rep3["provenance_reconcile"]["complete"] is True
+    prov_lines = (root / f"{KEY.research_session_id}__{KEY.dataset_key}.provenance.jsonl").read_text().splitlines()
+    assert {json.loads(p)["candidate_id"] for p in prov_lines} == {"a", "b", "c"}
 
 
 def test_record_requires_command_and_expected_before_any_write(_redirect_ledger_root):

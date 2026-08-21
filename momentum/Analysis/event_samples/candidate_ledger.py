@@ -96,10 +96,20 @@ def _assert_return_series(cr: Any, where: str) -> None:
         raise MetricTypeError(f"{where}: entry_at_ms_by_event 須覆蓋全部事件（觀測軸時序收據）")
     if not np.isfinite(cr.returns.to_numpy(dtype=float)).all():
         raise ValueError(f"{where}: returns 含 NaN/inf（loud）")
+    if receipt_digest(cr.returns) != h:
+        raise MetricTypeError(f"{where}: source_artifact_hash 與目前 index/values 不符（stale receipt：序列被改動或非 to_return_series 產出）")
 
 
 def _digest(obj: Any) -> str:
     return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+def receipt_digest(returns: pd.Series) -> str:
+    """return series 收據 digest＝f(index, values, entry_semantic, label_definition)——`to_return_series` 產生、
+    `_assert_return_series` 重算比對（CODEX-R2-P1-02：copy 後原地改值之 stale receipt 必拒）。"""
+    a = returns.attrs
+    return _digest({"events": [str(e) for e in returns.index], "entry": a.get("entry_semantic"), "ld": a.get("label_definition"),
+                    "values": [float(v) for v in returns.to_numpy(dtype=float)]})
 
 
 # --------------------------------------------------------------------------- return series（W8）
@@ -175,10 +185,9 @@ def to_return_series(
     out.attrs["span_years"] = float(span_ms / _MS_PER_YEAR)
     out.attrs["entry_semantic"] = entry_semantic
     out.attrs["label_definition"] = dict(ld_key)
-    out.attrs["source_artifact_hash"] = _digest({"events": sorted(signaled), "entry": entry_semantic, "ld": ld_key,
-                                                 "values": [float(x[3]) for x in rows]})
     out.attrs["t_semantics"] = _T_SEMANTICS
     out.attrs["entry_at_ms_by_event"] = {x[2]: int(x[0]) for x in rows}   # 觀測軸時序收據（PBO 聯集軸依此排序）
+    out.attrs["source_artifact_hash"] = receipt_digest(out)               # 綁 index＋values＋entry＋ld（消費端重算比對）
     return out
 
 
@@ -226,11 +235,9 @@ def record_candidate(ledger_path: LedgerKey, candidate_meta: Dict[str, Any]) -> 
         "input_artifact_hash": str(cr.returns.attrs.get("source_artifact_hash") or candidate_meta["input_digest"]),
         "ts": ts,
     }
-    _ledger.append_trial_attempt(research_session_id=ledger_path.research_session_id,
-                                 dataset_key=ledger_path.dataset_key, record=record)
-    # provenance sidecar（帳本 schema 為閉集，規則 digest／seed／命令／預期另存）
-    prov_path = _ledger.ledger_path(research_session_id=ledger_path.research_session_id,
-                                    dataset_key=ledger_path.dataset_key).with_suffix(".provenance.jsonl")
+    # 寫入順序（CODEX-R2-P1-01）：**sidecar 先、帳本後**——帳本 append 失敗只留 provenance 孤兒（不影響 N）；
+    # 反向「帳本有、sidecar 無」由 run_dsr_pbo 消費端 `_provenance_complete` 檢查 ⇒ unavailable（fail-closed）。
+    prov_path = _provenance_path(ledger_path)
     prov = {
         "candidate_id": record["candidate_id"], "evaluation_id": record["evaluation_id"],
         "rule_digest": str(candidate_meta["rule_digest"]), "seed": int(candidate_meta["seed"]),
@@ -239,9 +246,50 @@ def record_candidate(ledger_path: LedgerKey, candidate_meta: Dict[str, Any]) -> 
         "entry_semantic": cr.returns.attrs.get("entry_semantic"), "label_definition": cr.returns.attrs.get("label_definition"),
         "command": str(candidate_meta["command"]), "expected": str(candidate_meta["expected"]), "ts": ts,
     }
+    prov_path.parent.mkdir(parents=True, exist_ok=True)
     with _ledger._ledger_lock(prov_path, exclusive=True):
         with prov_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(prov, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+    _ledger.append_trial_attempt(research_session_id=ledger_path.research_session_id,
+                                 dataset_key=ledger_path.dataset_key, record=record)
+
+
+def _provenance_path(key: LedgerKey):
+    return _ledger.ledger_path(research_session_id=key.research_session_id,
+                               dataset_key=key.dataset_key).with_suffix(".provenance.jsonl")
+
+
+def _read_provenance(key: LedgerKey) -> Dict[str, set]:
+    """回 {candidate_id: {evaluation_id,...}}；檔缺 ⇒ 空。"""
+    p = _provenance_path(key)
+    out: Dict[str, set] = {}
+    if not p.is_file():
+        return out
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict) and "candidate_id" in row and "evaluation_id" in row:
+            out.setdefault(str(row["candidate_id"]), set()).add(str(row["evaluation_id"]))
+    return out
+
+
+def provenance_reconcile(ledger_path: LedgerKey) -> Dict[str, Any]:
+    """帳本 vs sidecar 對帳（可驗證之 orphan 路徑）：`ledger_without_provenance`（⇒ DSR/PBO 不可用）、
+    `provenance_without_ledger`（帳本 append 失敗留下之孤兒；不影響 N）。"""
+    lr = _ledger.read_trial_ledger(research_session_id=ledger_path.research_session_id, dataset_key=ledger_path.dataset_key)
+    prov = _read_provenance(ledger_path)
+    ledger_ids = set(lr.candidate_ids)
+    return {
+        "ledger_status": lr.status,
+        "ledger_without_provenance": sorted(ledger_ids - set(prov)),
+        "provenance_without_ledger": sorted(set(prov) - ledger_ids),
+        "complete": bool(lr.status == "ok" and ledger_ids <= set(prov)),
+    }
 
 
 def _periods_per_year(s: pd.Series) -> float:
@@ -299,6 +347,16 @@ def run_dsr_pbo(
                     "eligibility": {"status": "unavailable", "reason": reason}})
         return out
 
+    # CODEX-R2-P1-01：每個帳本候選須有 provenance sidecar 列，否則 unavailable（sidecar 缺＝規則 digest／seed／命令不可追）
+    recon = provenance_reconcile(ledger_path)
+    out["provenance_reconcile"] = recon
+    if recon["ledger_without_provenance"]:
+        reason = "provenance_incomplete"
+        out.update({"capability_status": "unavailable", "reason": reason,
+                    "dsr": {"status": "unavailable", "reason": reason},
+                    "pbo": {"status": "unavailable", "reason": reason},
+                    "eligibility": {"status": "unavailable", "reason": reason}})
+        return out
     # CODEX-R1-P1-02：DSR／MinBTL 前先要求輸入候選集 == ledger 候選集（未記帳候選不得成 champion；禁跳過 ledger 直餵）
     if frozenset(returns_by_candidate) != frozenset(lr.candidate_ids):
         reason = "universe_provenance_unverifiable"
@@ -370,4 +428,4 @@ def run_dsr_pbo(
 
 
 __all__ = ["CandidateReturns", "LedgerKey", "MetricTypeError", "METRIC_KIND_RETURN_SERIES",
-           "record_candidate", "run_dsr_pbo", "to_return_series"]
+           "provenance_reconcile", "receipt_digest", "record_candidate", "run_dsr_pbo", "to_return_series"]
