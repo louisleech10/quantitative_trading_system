@@ -829,3 +829,27 @@ def create_indicator_cache(**kwargs: Any) -> "IndicatorCache":
     from momentum.Analysis.indicator_cache import IndicatorCache
 
     return IndicatorCache(**kwargs)
+
+
+# ---------------------------------------------------------------------------
+# GAP-3 事件樣本層（Task B5.1；SPEC §RISK 末行授權之唯一 factories 出口＋兩個契約唯讀出口，R3）
+# ---------------------------------------------------------------------------
+def create_event_sample_pipeline() -> "EventSamplePipeline":
+    """事件樣本組合殼（validate→align→dedupe→split→materialize）；服務端唯一消費入口。"""
+    from momentum.Analysis.event_samples.pipeline import EventSamplePipeline
+
+    return EventSamplePipeline()
+
+
+def create_event_import_contract() -> dict:
+    """事件匯入契約 JSON（唯讀 SoT；api 層只得讀鍵名，不得複列檢查）。"""
+    from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+
+    return load_event_import_contract()
+
+
+def create_condition_engine_contract() -> dict:
+    """條件引擎契約 JSON（深拷貝；含 `allowed_filtering_params`＝legacy `/search` 篩選參數允許清單，D3-3）。"""
+    from momentum.Analysis.event_samples.condition_engine import load_condition_engine_contract
+
+    return load_condition_engine_contract()

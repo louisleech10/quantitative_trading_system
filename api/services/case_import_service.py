@@ -579,3 +579,206 @@ def get_case_import_service() -> CaseImportService:
         logger.info("Created global CaseImportService instance with shared storage")
 
     return _case_import_service
+
+
+# ===========================================================================
+# GAP-3 Task B5.1 — 新 schema 事件匯入（驗證唯一實作在 momentum/ 純函式；本層只解析檔案、透傳、落檔）
+# ===========================================================================
+import hashlib as _hashlib
+import json as _json
+import uuid as _uuid
+
+from api.models.event_import_models import (
+    EventImportDetailResponse, EventImportFailure, EventImportListResponse, EventImportRejected,
+    EventImportResponse, EventImportSummary,
+)
+
+LEGACY_COLUMNS = frozenset({"symbol", "timestamp", "positive_case"})
+_NESTED_FIELDS = ("label_definition", "meta", "source_model", "event_interval", "reference_symbols")
+
+
+class EventImportRejectedError(ValueError):
+    """匯入拒收（顯式、逐列 reason；路由轉 4xx）。"""
+
+    def __init__(self, payload: EventImportRejected):
+        self.payload = payload
+        super().__init__(payload.message)
+
+
+class EventImportService:
+    """新 schema 事件匯入：解析（CSV/JSON）→ `create_event_sample_pipeline().validate()` → 落檔。
+
+    - 契約檢查**不**在此重複（R7）：只呼叫 momentum 純函式並透傳 failures。
+    - legacy 三欄（symbol/timestamp/Positive_case）⇒ 顯式 migration 提示拒收（禁 silent coerce）。
+    - 落檔：`<storage_dir>/<import_id>.json`（預設 `data_cache/events/`；舊 `cases.json` 不遷移）。
+    """
+
+    MAX_FILE_SIZE = 50 * 1024 * 1024
+
+    def __init__(self, storage_dir: Optional[Path] = None):
+        from momentum.factories import create_event_import_contract, create_event_sample_pipeline
+
+        self._pipeline = create_event_sample_pipeline()
+        self._contract = create_event_import_contract()
+        project_root = Path(__file__).resolve().parents[2]
+        self.storage_dir = Path(storage_dir) if storage_dir else project_root / "data_cache" / "events"
+
+    # ---- 偵測（只看鍵名，不做檢查） ----
+    def required_fields(self) -> List[str]:
+        return list(self._contract["required_fields"].keys())
+
+    def looks_legacy(self, columns: List[str]) -> bool:
+        cols = {str(c).strip().lower() for c in columns}
+        return LEGACY_COLUMNS <= cols and not ({"event_id", "t0", "label"} <= cols)
+
+    def looks_new_schema(self, columns: List[str]) -> bool:
+        cols = {str(c).strip() for c in columns}
+        return {"event_id", "t0", "label"} <= cols
+
+    def migration_hint(self, columns: List[str]) -> Dict[str, object]:
+        cols = {str(c).strip() for c in columns}
+        return {
+            "endpoint": "/api/v1/case/import-events",
+            "required_fields_absent": [f for f in self.required_fields() if f not in cols],
+            "field_mapping": {"timestamp(秒)": "t0(epoch ms UTC；錨定 TF bar open)", "Positive_case": "label(0/1)",
+                              "symbol": "symbol", "timeframe": "timeframe(錨定 TF，必填)"},
+            "contract": "momentum/Analysis/contracts/event_import_contract.json",
+            "note": "舊 cases.json 不遷移；新 schema 須逐列附 label_definition/control_kind/digest 等欄位",
+        }
+
+    # ---- 解析 ----
+    def parse_upload(self, content: bytes, filename: str) -> List[Dict[str, object]]:
+        if len(content) > self.MAX_FILE_SIZE:
+            raise EventImportRejectedError(EventImportRejected(kind="parse_error", message=f"檔案超過 {self.MAX_FILE_SIZE} bytes"))
+        name = (filename or "").lower()
+        try:
+            if name.endswith(".json"):
+                data = _json.loads(content.decode("utf-8"))
+                records = data.get("records") if isinstance(data, dict) else data
+                if not isinstance(records, list):
+                    raise ValueError("JSON 須為記錄列表或 {records: [...]}")
+                return [dict(r) for r in records]
+            df = pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False)
+        except EventImportRejectedError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise EventImportRejectedError(EventImportRejected(kind="parse_error", message=f"解析失敗：{exc}")) from exc
+        return self._csv_rows_to_records(df)
+
+    def _csv_rows_to_records(self, df: pd.DataFrame) -> List[Dict[str, object]]:
+        """CSV → 記錄：巢狀欄接受 JSON 字串儲存格或 dotted 欄（`label_definition.rule_id`）；數值欄以 JSON 解碼。"""
+        records: List[Dict[str, object]] = []
+        cols = list(df.columns)
+        for _, row in df.iterrows():
+            rec: Dict[str, object] = {}
+            for c in cols:
+                raw = row[c]
+                if raw == "" or raw is None:
+                    continue
+                key = str(c).strip()
+                val: object = raw
+                try:
+                    val = _json.loads(raw)
+                except (ValueError, TypeError):
+                    val = raw
+                if "." in key and key.split(".", 1)[0] in _NESTED_FIELDS:
+                    top, sub = key.split(".", 1)
+                    target = rec.setdefault(top, {})
+                    if isinstance(target, dict):
+                        if "." in sub:
+                            s1, s2 = sub.split(".", 1)
+                            target.setdefault(s1, {})[s2] = val
+                        else:
+                            target[sub] = val
+                    continue
+                rec[key] = val
+            records.append(rec)
+        return records
+
+    # ---- 匯入 ----
+    def import_records(
+        self, records: List[Dict[str, object]], *, source_name: Optional[str], upload_bytes: Optional[bytes],
+        validate_only: bool, verify_source_digest: bool = False,
+    ) -> EventImportResponse:
+        """upload_bytes：上傳內容（記 sha256 供 provenance）。verify_source_digest=True 時把它當契約 `source_file_digest`
+        的對證來源（逐列 digest_mismatch）——預設關：上傳檔不可能含自己的 hash，契約欄語意＝使用者原始來源檔 sha256。"""
+        columns = sorted({k for r in records for k in r.keys()}) if records else []
+        if self.looks_legacy(columns):
+            raise EventImportRejectedError(EventImportRejected(
+                kind="legacy_schema_detected",
+                message="偵測到舊三欄格式（symbol/timestamp/Positive_case）；新端點只收 event_import_contract 新 schema，不做靜默轉換",
+                migration_hint=self.migration_hint(columns),
+            ))
+        df, failures = self._pipeline.validate(records, source_bytes=upload_bytes if verify_source_digest else None)
+        digest = _hashlib.sha256(upload_bytes).hexdigest() if upload_bytes is not None else None
+        if df is None:
+            raise EventImportRejectedError(EventImportRejected(
+                kind="contract_violation",
+                message=f"{len(failures)} 筆契約違規（逐列 reason 見 failures；字面＝event_import_contract.json）",
+                failures=[EventImportFailure(**{k: f.get(k) for k in ("row", "event_id", "field", "reason")}) for f in failures],
+                migration_hint=self.migration_hint(columns) if self.migration_hint(columns)["required_fields_absent"] else None,
+            ))
+        warnings: List[str] = []
+        import_id = None
+        stored_path = None
+        if not validate_only:
+            import_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + _uuid.uuid4().hex[:8]
+            self.storage_dir.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "import_id": import_id, "source_name": source_name, "upload_sha256": digest,
+                "source_digest_verified": bool(verify_source_digest),
+                "imported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "contract_version": str(self._contract.get("version")),
+                "records": df.to_dict("records"),
+            }
+            p = self.storage_dir / f"{import_id}.json"
+            p.write_text(_json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str), encoding="utf-8")
+            stored_path = str(p)
+        return EventImportResponse(
+            accepted=True, import_id=import_id, n_rows=len(records), n_valid=int(len(df)), failures=[],
+            warnings=warnings, upload_sha256=digest, source_digest_verified=bool(verify_source_digest),
+            contract_version=str(self._contract.get("version")), stored_path=stored_path,
+        )
+
+    # ---- 查詢 ----
+    def _load(self, path: Path) -> Dict[str, object]:
+        return _json.loads(path.read_text(encoding="utf-8"))
+
+    def _summary(self, payload: Dict[str, object]) -> EventImportSummary:
+        recs = payload.get("records") or []
+        return EventImportSummary(
+            import_id=str(payload["import_id"]), source_name=payload.get("source_name"),
+            upload_sha256=str(payload.get("upload_sha256") or ""), imported_at=str(payload["imported_at"]),
+            n_events=len(recs), symbols=sorted({str(r.get("symbol")) for r in recs}),
+            timeframes=sorted({str(r.get("timeframe")) for r in recs}),
+            direction=str(recs[0].get("direction")) if recs else None, scenario=str(recs[0].get("scenario")) if recs else None,
+        )
+
+    def list_imports(self) -> EventImportListResponse:
+        items: List[EventImportSummary] = []
+        if self.storage_dir.is_dir():
+            for p in sorted(self.storage_dir.glob("*.json")):
+                try:
+                    items.append(self._summary(self._load(p)))
+                except Exception:  # noqa: BLE001 —— 壞檔列為不可讀、不吞；以 warning log 揭露
+                    logger.warning("event import 檔無法讀取：%s", p)
+        return EventImportListResponse(total=len(items), imports=items)
+
+    def get_import(self, import_id: str) -> Optional[EventImportDetailResponse]:
+        if not import_id or "/" in import_id or ".." in import_id:
+            return None
+        p = self.storage_dir / f"{import_id}.json"
+        if not p.is_file():
+            return None
+        payload = self._load(p)
+        return EventImportDetailResponse(summary=self._summary(payload), records=list(payload.get("records") or []))
+
+
+_event_import_service: Optional[EventImportService] = None
+
+
+def get_event_import_service() -> EventImportService:
+    global _event_import_service
+    if _event_import_service is None:
+        _event_import_service = EventImportService()
+    return _event_import_service

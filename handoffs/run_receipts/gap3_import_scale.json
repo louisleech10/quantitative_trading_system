@@ -1,0 +1,32 @@
+{
+ "bootstrap": {
+  "horizons": [
+   1,
+   2,
+   4
+  ],
+  "n_boot": 200,
+  "status": "ok"
+ },
+ "generated_by": "scripts/gap3_import_scale.py",
+ "n_align_failures": 0,
+ "n_aligned": 10000,
+ "n_bars": 20352,
+ "n_clusters": 2511,
+ "n_events": 10000,
+ "n_test": 3000,
+ "n_train": 6999,
+ "note": "記錄型 receipt（W10）；事件合成、bars 真實；效能門檻若需另走 SPEC amendment",
+ "peak_rss_mb": 305.1,
+ "platform": "darwin",
+ "python": "3.9.6",
+ "rss_before_mb": 291.3,
+ "stages_s": {
+  "align_dedupe_split_s": 72.733,
+  "forward_return_table_bootstrap_s": 3.542,
+  "validate_s": 0.101
+ },
+ "symbol": "ETHUSDT",
+ "timeframe": "1h",
+ "wall_clock_s": 76.377
+}

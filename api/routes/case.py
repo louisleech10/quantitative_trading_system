@@ -15,7 +15,18 @@ from ..models.case_models import (
     DownloadResult,
     CaseListResponse
 )
-from ..services.case_import_service import get_case_import_service
+from ..services.case_import_service import (
+    EventImportRejectedError,
+    get_case_import_service,
+    get_event_import_service,
+)
+from ..models.event_import_models import (
+    EventImportDetailResponse,
+    EventImportJsonRequest,
+    EventImportListResponse,
+    EventImportRejected,
+    EventImportResponse,
+)
 from ..services.batch_download_service import get_batch_download_service
 from ..utils.case_storage import get_case_storage_manager
 from ..core.logging import get_logger
@@ -68,10 +79,18 @@ async def import_cases_from_csv(
                    f"Supported formats: .csv, .xlsx, .xls, .txt"
         )
 
-    try:
-        # 讀取文件內容
-        file_content = await file.read()
+    # 讀取文件內容
+    file_content = await file.read()
 
+    # GAP-3 B5.1 legacy adapter：新 schema 檔誤投舊端點 ⇒ 顯式 400（禁 silent coerce）；放在 try 外免被泛捕成 500
+    _header = _csv_header(file_content, filename)
+    if _header is not None and get_event_import_service().looks_new_schema(_header):
+        raise HTTPException(status_code=400, detail=EventImportRejected(
+            kind="new_schema_on_legacy_endpoint",
+            message="偵測到 GAP-3 新 schema（event_id/t0/label…）；請改投 /api/v1/case/import-events，本端點只收舊三欄格式",
+        ).model_dump())
+
+    try:
         # 導入案例（支持force_clear參數）
         result = case_import_service.import_from_file(
             file_content=file_content,
@@ -95,6 +114,68 @@ async def import_cases_from_csv(
     except Exception as e:
         logger.error(f"Unexpected error during case import: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
+
+def _csv_header(content: bytes, filename: str) -> Optional[list]:
+    """只讀 CSV 首列鍵名供 schema 偵測（不做任何契約檢查）。"""
+    if not filename or not filename.lower().endswith((".csv", ".txt")):
+        return None
+    try:
+        first = content.split(b"\n", 1)[0].decode("utf-8-sig", errors="replace")
+    except Exception:  # noqa: BLE001
+        return None
+    return [c.strip().strip('"') for c in first.split(",")]
+
+
+def _rejected(exc: EventImportRejectedError) -> HTTPException:
+    return HTTPException(status_code=422 if exc.payload.kind == "contract_violation" else 400, detail=exc.payload.model_dump())
+
+
+# ---------------------------------------------------------------------------
+# GAP-3 Task B5.1 — 新 schema 事件匯入（驗證唯一實作在 momentum/；本層透傳）
+# ---------------------------------------------------------------------------
+@router.post("/case/import-events", response_model=EventImportResponse)
+async def import_events_file(
+    file: UploadFile = File(...),
+    validate_only: bool = Query(False),
+    verify_source_digest: bool = Query(False, description="以上傳內容 sha256 對證各列 source_file_digest"),
+):
+    """上傳 CSV/JSON（GAP-3 事件契約新 schema）。拒收 ⇒ 400（legacy／parse）或 422（契約違規，逐列 reason）。"""
+    svc = get_event_import_service()
+    content = await file.read()
+    try:
+        records = svc.parse_upload(content, file.filename or "")
+        return svc.import_records(records, source_name=file.filename, upload_bytes=content, validate_only=validate_only,
+                                  verify_source_digest=verify_source_digest)
+    except EventImportRejectedError as exc:
+        raise _rejected(exc)
+
+
+@router.post("/case/import-events/json", response_model=EventImportResponse)
+async def import_events_json(request: EventImportJsonRequest):
+    """JSON 記錄列表匯入（同一 validator；`source_file_digest`＝canonical JSON sha256）。"""
+    import json as _json
+
+    svc = get_event_import_service()
+    body = _json.dumps(request.records, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+    try:
+        return svc.import_records(request.records, source_name=request.source_name, upload_bytes=body,
+                                  validate_only=request.validate_only, verify_source_digest=request.verify_source_digest)
+    except EventImportRejectedError as exc:
+        raise _rejected(exc)
+
+
+@router.get("/case/events", response_model=EventImportListResponse)
+async def list_event_imports():
+    return get_event_import_service().list_imports()
+
+
+@router.get("/case/events/{import_id}", response_model=EventImportDetailResponse)
+async def get_event_import(import_id: str):
+    out = get_event_import_service().get_import(import_id)
+    if out is None:
+        raise HTTPException(status_code=404, detail=f"event import {import_id!r} not found")
+    return out
 
 
 @router.get("/case/list", response_model=CaseListResponse)
