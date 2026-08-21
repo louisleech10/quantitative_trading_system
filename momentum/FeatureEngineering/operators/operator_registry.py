@@ -48,4 +48,12 @@ class OperatorRegistry:
         registry.register("log1p", engine.transform_log1p)
         registry.register("abs", engine.transform_abs)
         registry.register("clip", engine.transform_clip)
+        # GAP-3 Task B3.3 state-counter 算子（僅註冊行；既有算子不動）
+        from momentum.FeatureEngineering.operators import state_counters as sc
+
+        registry.register("bars_since_cross", sc.bars_since_cross)
+        registry.register("consecutive_run", sc.consecutive_run)
+        registry.register("bars_since_threshold", sc.bars_since_threshold)
+        registry.register("window_max_ratio", sc.window_max_ratio)
+        registry.register("cross_count", sc.cross_count)
         return registry
