@@ -61,7 +61,7 @@ def test_missing_scores_counted_not_dropped(seg):
 def test_assert_mutation_ineligible_in_denominator_red(seg, monkeypatch):
     """ASSERT …WHEN mutation=ineligible_in_denominator THEN rc!=0（M4）：把 label_window_incomplete 計入 eligible ⇒ 分母手算斷言紅。"""
     orig = ab._is_eligible
-    monkeypatch.setattr(ab, "_is_eligible", lambda i, n, h, k, o, c: None if orig(i, n, h, k, o, c) == "label_window_incomplete" and i + 1 < n else orig(i, n, h, k, o, c))
+    monkeypatch.setattr(ab, "_is_eligible", lambda i, n, h, k, o, c, *a: None if orig(i, n, h, k, o, c, *a) == "label_window_incomplete" and i + 1 < n else orig(i, n, h, k, o, c, *a))
     with pytest.raises((IndexError, AssertionError)):
         rep = evaluate_all_bars(scores_for(seg), seg, cfg())
         assert rep["counts"]["n_eligible"] == 98  # 分母手算 exact 斷言（mutation 態必不等 ⇒ 紅）
@@ -80,6 +80,39 @@ def test_multiple_label_ids_not_overwritten(seg):
     b = evaluate_all_bars(scores_for(seg), seg, cfg(label_id="rule_B", label_threshold=0.05))
     assert a["label_id"] == "rule_A" and b["label_id"] == "rule_B"
     assert a["overall"]["prevalence_full"] >= b["overall"]["prevalence_full"]
+
+
+def test_common_constraint_block_present(seg):
+    """AR-3（三家 R1 同抓）：無 split plan ⇒ formal_pooled_inference_allowed=False＋reason；帶 plan ⇒ 同 tables 共同欄。"""
+    from momentum.Analysis.event_samples.types import EventSplitPlan
+    rep = evaluate_all_bars(scores_for(seg), seg, cfg())
+    assert rep["common"]["formal_pooled_inference_allowed"] is False and rep["common"]["reason"] == "no_event_split_plan"
+    plan = EventSplitPlan(assignments=pd.DataFrame(), purged=pd.DataFrame(), clusters=pd.DataFrame(),
+                          summary={"degraded": ["single_symbol"], "loso_status": "not_evaluated", "n_symbols": 1,
+                                   "stats_modes": {"primary": "macro", "sensitivity": "micro"}})
+    rep2 = evaluate_all_bars(scores_for(seg), seg, cfg(), event_split_plan=plan)
+    assert rep2["common"]["degraded"] == ["single_symbol"] and rep2["common"]["formal_pooled_inference_allowed"] is False
+    assert rep2["common"]["cluster_adjusted"] is True
+
+
+def test_grid_gap_counted_as_missing_bar(seg):
+    """CODEX-R1-P1-02：決策→答案窗缺根 ⇒ missing_bar（不納分母）。刪掉第 50 根。"""
+    b = seg["ETHUSDT"].drop(index=50).reset_index(drop=True)
+    s2 = {"ETHUSDT": b}
+    rep = evaluate_all_bars(scores_for(s2), s2, cfg())
+    assert rep["ineligible_reasons"].get("missing_bar") == 2            # 窗跨缺口的兩根（i=48,49 之 h=2 窗）
+    assert rep["counts"]["n_eligible"] == 99 - 2 - 2
+
+
+def test_entry_semantic_next_open_hold_return_exact(seg):
+    """D1-6 進場語意（CODEX-R1-P1-02）：next_open ⇒ entry=open[i+1]，持有報酬手算 exact。"""
+    b = seg["ETHUSDT"]
+    rule = lambda df: pd.Series(1.0, index=df["open_time_ms"])  # noqa: E731  # 全部發訊號
+    rep = evaluate_all_bars(rule, seg, cfg(entry_price_semantic="next_open", n_boot=2))
+    o, c = b["open"].to_numpy(dtype=float), b["close"].to_numpy(dtype=float)
+    expected = np.mean([(c[i + 2] - o[i + 1]) / o[i + 1] for i in range(98)])
+    assert rep["overall"]["signed_hold_return_signaled_mean"] == pytest.approx(expected, abs=1e-12)
+    assert rep["manifest"]["entry_price_semantic"] == "next_open"
 
 
 def test_rule_callable_and_kind_strata(seg):

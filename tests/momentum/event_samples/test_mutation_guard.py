@@ -191,8 +191,8 @@ def test_M4_denominator_tamper_detected(bars, monkeypatch):
     assert ab.evaluate_all_bars(scores, seg, cfg)["counts"]["n_eligible"] == 98      # baseline 手算 exact
     orig = ab._is_eligible
 
-    def tampered(i, n, h, k, o, c):
-        r = orig(i, n, h, k, o, c)
+    def tampered(i, n, h, k, o, c, *a):
+        r = orig(i, n, h, k, o, c, *a)
         return None if (r == "label_window_incomplete" and i + 1 < n) else r      # 把倒數第二根計入分母
 
     monkeypatch.setattr(ab, "_is_eligible", tampered)

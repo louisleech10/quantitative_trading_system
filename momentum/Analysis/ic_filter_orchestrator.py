@@ -2864,6 +2864,12 @@ class ICFilterOrchestrator:
             # _resolve_root_status 讀 metadata.event_filter.fallback 觸發（禁 silent）
             info["fallback"] = True
             info["reason"] = "insufficient_events"
+            if event_label_values is not None:
+                # GROK-R1-P1-01：事件不足時 conditional IC 不可算——全樣本續算用的是主線 return_N，
+                # 必須 loud 揭露（禁靜默退回）；下游讀 conditional_ic_abandoned 判 unavailable。
+                info["label_source"] = "mainline_return_N"
+                info["conditional_ic_abandoned"] = True
+                info["statistic_kind"] = "conditional_ic_unavailable"
             return features_df, label_series, info
 
         filtered_index = _normalize_ic_time_index(filtered_df.index, "filtered_events")
@@ -2882,10 +2888,10 @@ class ICFilterOrchestrator:
                 raise AlignmentViolationError(
                     f"event_label_values missing for {len(missing)} selected timestamps (first={missing[:3]})"
                 )
-            filtered_label = pd.Series(
-                [float(event_label_values[int(t)]) for t in idx_ms],
-                index=filtered_label.index, name=filtered_label.name,
-            )
+            vals = np.asarray([float(event_label_values[int(t)]) for t in idx_ms], dtype=float)
+            if not np.isfinite(vals).all():  # CODEX-R1-P2-05：label 覆寫須有限值閘（inf/NaN loud）
+                raise AlignmentViolationError("event_label_values contain non-finite values")
+            filtered_label = pd.Series(vals, index=filtered_label.index, name=filtered_label.name)
             info = dict(info)
             info["label_source"] = "event_label_value"
             info["statistic_kind"] = "conditional_ic"

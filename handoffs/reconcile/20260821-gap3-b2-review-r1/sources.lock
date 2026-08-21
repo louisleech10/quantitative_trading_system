@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "session_id": "20260821-gap3-b2-review-r1",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260821-gap3-b2-review-r1/sources/20260821-gap3-b2-review-r1-codex.md",
+      "sha256": "c0997252770bc460a0a0b594f1140d54cc32fec8d7d108e4e8c6b3a712b4791b",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260821-gap3-b2-review-r1/sources/20260821-gap3-b2-review-r1-composer.md",
+      "sha256": "671666802e21de35077805c0fdcba2f014f0b7761df32c964850a37d8ab33bd7",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260821-gap3-b2-review-r1/sources/20260821-gap3-b2-review-r1-grok.md",
+      "sha256": "5cdad93444cbe68b1fed7ee235c35ce515a7d7ef01d459f5759859844d2a8f4f",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-08-20T23:42:45Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "b8c895f9-4e3a-408a-8f2a-1c728c0da729"
+}

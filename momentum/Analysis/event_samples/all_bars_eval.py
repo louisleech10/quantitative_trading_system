@@ -18,17 +18,42 @@ from sklearn.metrics import average_precision_score, precision_recall_curve, roc
 from momentum.Analysis.event_samples.counterexample_classifier import _classify_one
 
 
-def _is_eligible(i: int, n: int, horizon: int, k: int, open_: np.ndarray, close: np.ndarray) -> Optional[str]:
-    """回 None＝eligible，否則 reason。獨立小函式供 mutation guard（M4 分母竄改）monkeypatch。"""
+def _is_eligible(
+    i: int, n: int, horizon: int, k: int, open_: np.ndarray, close: np.ndarray,
+    open_ms: Optional[np.ndarray] = None, step_ms: Optional[int] = None,
+) -> Optional[str]:
+    """回 None＝eligible，否則 reason（D4-1：答案窗完整／資料連續／價格有效／PIT 合法）。
+    獨立小函式供 mutation guard（M4 分母竄改）monkeypatch。"""
     if i - k < 0:
         return "warmup_insufficient"
     if i + horizon >= n:
         return "label_window_incomplete"
+    # 資料連續（CODEX-R1-P1-02）：決策 bar → 答案窗末 bar 須為連續網格（缺根 ⇒ missing_bar）
+    if open_ms is not None and step_ms is not None:
+        if int(open_ms[i + horizon]) - int(open_ms[i - k]) != (horizon + k) * int(step_ms):
+            return "missing_bar"
     seg_o = open_[i - k: i + horizon + 1]
     seg_c = close[i - k: i + horizon + 1]
     if not (np.isfinite(seg_o).all() and np.isfinite(seg_c).all() and (seg_o > 0).all() and (seg_c > 0).all()):
         return "nonpositive_reference_price"
     return None
+
+
+def _entry_price(semantic: str, open_: np.ndarray, close: np.ndarray, i: int, k: int, horizon: int) -> float:
+    """D1-6 entry 語意 → 價格（與 B1.1 映射同義；next_open 須落在答案窗內）。"""
+    if semantic == "trigger_open":
+        return float(open_[i])
+    if semantic == "trigger_close":
+        return float(close[i])
+    if semantic == "next_open":
+        if horizon < 1:
+            raise ValueError("next_open 需 horizon_bars ≥ 1")
+        return float(open_[i + 1])
+    if semantic == "decision_bar_open":
+        return float(open_[i - k])
+    if semantic == "decision_bar_close":
+        return float(close[i - k])
+    raise ValueError(f"unknown entry_price_semantic {semantic!r}")
 
 
 def _label_from_rule(direction_sign: float, close: np.ndarray, i: int, horizon: int, threshold: float) -> int:
@@ -41,6 +66,9 @@ def evaluate_all_bars(
     model_scores_or_rule: Union[pd.Series, Callable[[pd.DataFrame], pd.Series]],
     bars: Dict[str, pd.DataFrame],
     manifest_config: dict,
+    *,
+    event_split_plan=None,
+    manifest=None,
 ) -> Dict:
     """固定分母 evaluation。
 
@@ -62,6 +90,7 @@ def evaluate_all_bars(
     n_boot = int(manifest_config.get("n_boot", 300))
     cls_cfg = manifest_config.get("classifier_config")
     label_id = str(manifest_config.get("label_id", "default"))
+    entry_semantic = str(manifest_config.get("entry_price_semantic", "trigger_open"))  # D1-6（CODEX-R1-P1-02）
 
     prevalence_learn = manifest_config.get("prevalence_learn")
     if prevalence_learn is None or manifest_config.get("sample_design") != "case_control":
@@ -81,6 +110,7 @@ def evaluate_all_bars(
         close = df["close"].to_numpy(dtype=float)
         ot = df["open_time_ms"].to_numpy()
         n = len(df)
+        step_ms = int(np.median(np.diff(ot))) if n > 1 else None  # 網格步長（連續性判準）
         if callable(model_scores_or_rule):
             scores = model_scores_or_rule(df)
             scores = pd.Series(np.asarray(scores, dtype=float), index=ot)
@@ -89,7 +119,7 @@ def evaluate_all_bars(
             scores = s.xs(symbol, level=0) if isinstance(s.index, pd.MultiIndex) else s
         for i in range(n):
             counts["n_total"] += 1
-            reason = _is_eligible(i, n, horizon, k, open_, close)
+            reason = _is_eligible(i, n, horizon, k, open_, close, ot, step_ms)
             if reason is not None:
                 reasons[reason] = reasons.get(reason, 0) + 1
                 if reason == "label_window_incomplete":
@@ -105,8 +135,9 @@ def evaluate_all_bars(
                 continue
             y = _label_from_rule(sign, close, i, horizon, thr_label)
             counts["n_labeled"] += 1
-            # 實際持有報酬：決策列 open → 答案窗末 close（D1-4 並排）
-            hold = sign * (close[i + horizon] - open_[i - k]) / open_[i - k]
+            # 實際持有報酬：entry（D1-6 語意）→ 答案窗末 close（D1-4 並排）
+            entry = _entry_price(entry_semantic, open_, close, i, k, horizon)
+            hold = sign * (close[i + horizon] - entry) / entry
             kind = None
             if cls_cfg is not None and y == 0:
                 r0 = sign * (close[i] - open_[i]) / open_[i]
@@ -167,10 +198,13 @@ def evaluate_all_bars(
             "n_unclassifiable": int((m["counterexample_kind_effective"] == "unclassifiable").sum()) if not m.empty else 0,
         },
         "manifest": {"horizon_bars": horizon, "label_threshold": thr_label, "direction": manifest_config.get("direction", "long"),
-                     "decision_offset_bars": k, "score_threshold": score_thr, "top_q": top_q,
-                     "index": "decision_at_ms", "eligibility": "label_window_complete ∧ prices_finite_positive ∧ warmup_ok"},
+                     "decision_offset_bars": k, "score_threshold": score_thr, "top_q": top_q, "entry_price_semantic": entry_semantic,
+                     "index": "decision_at_ms", "eligibility": "label_window_complete ∧ grid_continuous ∧ prices_finite_positive ∧ warmup_ok"},
         "receipts": {"seed": seed, "n_boot": n_boot},
     }
+    # AR-3 共同約束欄（B2 全批共同；三家 R1 同抓）：缺 split plan ⇒ formal_pooled_inference_allowed=False 揭露
+    from momentum.Analysis.event_samples.tables import _common_constraint_block
+    out["common"] = _common_constraint_block(event_split_plan, manifest)
     assert counts["n_total"] == counts["n_eligible"] + counts["n_unknown"] + counts["n_tail_excluded"]
     assert counts["n_eligible"] == counts["n_labeled"] + counts["n_missing"]
     return out

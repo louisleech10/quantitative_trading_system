@@ -287,6 +287,12 @@ def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[D
         raise ContractValidationError("sample_scope.kind=event requires event object")
     if scope["event"] is not None:
         _check_event_object(scope["event"], c, "sample_scope.event")
+        # CODEX-R1-P1-03：conditional IC（report_meta.event_filter.label_source=event_label_value）⇒ v2 六鍵必非 null
+        ef = report_meta.get("event_filter") if isinstance(report_meta, dict) else None
+        if isinstance(ef, dict) and ef.get("label_source") == "event_label_value":
+            nulls = [k for k in ("event_manifest_hash", "label_definition_hash", "decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind") if scope["event"].get(k) is None]
+            if nulls:
+                raise ContractValidationError(f"sample_scope.event: conditional_ic requires v2 keys non-null, got null {nulls}")
 
     # ---- split / provenance ----
     split = payload["split"]
@@ -366,9 +372,9 @@ def _check_event_object(ev: Dict[str, Any], c: Dict[str, Any], label: str) -> No
             if not (isinstance(ev[k], str) and ev[k]):
                 raise ContractValidationError(f"{label}.{k}: requires non-empty str")
         from momentum.Analysis.event_samples.import_contract import load_event_import_contract
-        ck = load_event_import_contract()["required_fields"]["control_kind"]["enum"]
+        ck = load_event_import_contract()["required_fields"]["control_kind"]["accepted"]  # CODEX-R1-P2-04：accepted 非 enum
         if ev["control_kind"] not in ck:
-            raise ContractValidationError(f"{label}.control_kind {ev['control_kind']!r} not in event_import_contract enum")
+            raise ContractValidationError(f"{label}.control_kind {ev['control_kind']!r} not in event_import_contract accepted set")
     mode = ev["mode"]
     if mode == "timestamps":
         if not (_is_sha256_hex(ev["definition_hash"]) and _is_sha256_hex(ev["timestamps_hash"])):
@@ -463,6 +469,9 @@ def build_survivor_output(
         for k, v in (event_context or {}).items():
             if k in event_obj:
                 event_obj[k] = v
+        # CODEX-R1-P1-03：conditional IC 卻無 event_context ⇒ build 期 fail-closed（不產全 null 的事件倖存者）
+        if isinstance(ef, dict) and ef.get("label_source") == "event_label_value" and not event_context:
+            raise ContractValidationError("build_survivor_output: conditional_ic run requires event_context (v2 six keys)")
     n_total = report_meta.get("n_samples") if isinstance(report_meta, dict) else None
     if n_total is None and marg is not None and marg.get("n_train") is not None and marg.get("n_test") is not None:
         n_total = int(marg["n_train"]) + int(marg["n_test"])

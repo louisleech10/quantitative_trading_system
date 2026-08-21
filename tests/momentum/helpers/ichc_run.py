@@ -32,6 +32,7 @@ def run_analyze(
     event_timestamps: Optional[list] = None,
     sidefx_dir: Optional[Path] = None,
     event_label_values: Optional[dict] = None,  # GAP-3 B2.3：條件 IC 事件 label（透傳；None ⇒ 原行為）
+    event_context: Optional[dict] = None,       # GAP-3 B2.4：survivor v2 六鍵（透傳）
 ) -> dict:
     from momentum.factories import create_ic_analyzer, create_kline_storage_manager
 
@@ -65,6 +66,7 @@ def run_analyze(
         kline_reader=kline_reader,
         event_timestamps=event_timestamps,
         event_label_values=event_label_values,
+        event_context=event_context,
     )
 
 

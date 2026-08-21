@@ -49,12 +49,15 @@ def test_forward_return_hand_example_exact(bars):
         for n in (300, 600):
             entry = float(b["open"].iloc[n])
             expected.append((float(b["close"].iloc[n + h]) - entry) / entry)
-        got = rep["raw_all_unweighted"][str(h)]
+        got = rep["sensitivity_micro"][str(h)]                             # micro＝event 等權（AR-3；GROK-R1-P2-02）
         assert got["n"] == 2
         assert got["mean"] == pytest.approx(np.mean(expected), abs=1e-12)
+        assert "uniqueness_weighted" in rep and str(h) in rep["uniqueness_weighted"]
     assert rep["statistic_kind"] == "event_return"
     assert "label_anchor_mean" in rep["sensitivity_micro"]["1"]          # 兩數並排（D1-4）
     assert rep["common"]["degraded"] == ["single_symbol"]
+    assert rep["common"]["formal_pooled_inference_allowed"] is False    # AR-3 機械可讀
+    assert rep["common"]["n_events_raw"] == 2
 
 
 def test_forward_return_ci_deterministic_and_horizon_excluded(bars):
@@ -65,8 +68,8 @@ def test_forward_return_ci_deterministic_and_horizon_excluded(bars):
     r2 = event_forward_return_table(man, rec, bars, plan, cfg)
     assert json.dumps(r1, sort_keys=True) == json.dumps(r2, sort_keys=True)
     # last-3 事件：h=5 超出資料 ⇒ 該格 n=3（排除）不灌 0
-    assert r1["raw_all_unweighted"]["1"]["n"] == 4 and r1["raw_all_unweighted"]["5"]["n"] == 3
-    assert r1["raw_all_unweighted"]["1"]["ci"]["status"] == "ok"
+    assert r1["sensitivity_micro"]["1"]["n"] == 4 and r1["sensitivity_micro"]["5"]["n"] == 3
+    assert r1["sensitivity_micro"]["1"]["ci"]["status"] == "ok"
 
 
 def test_forward_return_single_event_ci_unavailable(bars):
@@ -108,6 +111,10 @@ def test_discrimination_oos_only_and_kind_strata():
     assert set(rep["by_counterexample_kind"]) == {"a_trigger_no_follow", "b_range", "c_drop"}
     assert rep["n_unclassifiable"] == int((strata.reindex(s.index[100:])["counterexample_kind_effective"] == "unclassifiable").sum())
     assert rep["receipts"]["oos_only"] is True
+    # AR-3 共同欄全套（COMPOSER/GROK R1-P2-01）：無 manifest ⇒ raw/effective n null；degraded ⇒ 禁 formal pooled
+    assert rep["common"]["formal_pooled_inference_allowed"] is False
+    assert rep["common"]["degraded"] == ["single_symbol"] and rep["common"]["n_events_raw"] is None
+    assert set(rep["common"]) >= {"stats_modes", "n_events_raw", "n_events_effective", "degraded", "loso_status", "cluster_adjusted"}
 
 
 def test_discrimination_shuffled_in_band_and_one_class():

@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Dict
 
 import pandas as pd
@@ -55,6 +57,26 @@ def build_event_ic_inputs(
             raise ValueError(f"build_event_ic_inputs: 兩事件映射同一 feature 列 {ts}（禁默默覆蓋；請先 dedupe）")
         ts_map[ts] = float(ev.loc[eid, "label_value"])
 
+    # survivor v2 六鍵 event_context（CODEX-R1-P1-03：餵入層必須接通；批內 label_definition／control_kind 須單值）
+    lds = ev.loc[keep["event_id"], "label_definition"].map(lambda d: json.dumps(d, sort_keys=True, separators=(",", ":")))
+    if lds.nunique() != 1:
+        raise ValueError("build_event_ic_inputs: 批內 label_definition 不唯一（多組 label 請以 label_id 分批餵入）")
+    cks = ev.loc[keep["event_id"], "control_kind"]
+    if cks.nunique() != 1:
+        raise ValueError("build_event_ic_inputs: 批內 control_kind 不唯一")
+    ld = ev.loc[keep["event_id"].iloc[0], "label_definition"]
+    manifest_hash = hashlib.sha256(
+        keep.sort_values("event_id")[["event_id", "label_start_ms", "label_end_ms", "dedupe_cluster_id", "uniqueness_weight"]]
+        .to_json(orient="records").encode("utf-8")
+    ).hexdigest()
+    event_context = {
+        "event_manifest_hash": manifest_hash,
+        "label_definition_hash": hashlib.sha256(lds.iloc[0].encode("utf-8")).hexdigest(),
+        "decision_time_rule": "t0_open_minus_k_bars",
+        "feature_cutoff_rule": "max_close_ms_le_decision_at",
+        "label_window_rule": f"{ld.get('label_return_mode')}:horizon_bars={ld['window']['horizon_bars']}",
+        "control_kind": str(cks.iloc[0]),
+    }
     return {
         **base,
         "capability_status": "ok",
@@ -62,4 +84,5 @@ def build_event_ic_inputs(
         "event_timestamps": sorted(ts_map),
         "event_label_values": ts_map,
         "label_price_mismatch": label_price_mismatch,
+        "event_context": event_context,
     }

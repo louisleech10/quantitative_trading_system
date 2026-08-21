@@ -94,13 +94,47 @@ def _find_key(d, key):
     return None
 
 
-def test_conditional_ic_orchestrator_label_override_wiring():
+CTX = {
+    "event_manifest_hash": "1" * 64, "label_definition_hash": "2" * 64,
+    "decision_time_rule": "t0_open_minus_k_bars", "feature_cutoff_rule": "max_close_ms_le_decision_at",
+    "label_window_rule": "close_to_close:horizon_bars=2", "control_kind": "user_labeled_same_trigger",
+}
+
+
+def test_conditional_ic_feed_emits_event_context(bars):
+    """CODEX-R1-P1-03：餵入層必產 survivor v2 六鍵 context。"""
+    _, _, out = feed(bars, [300, 600], [1, 0], [0.02, -0.01])
+    ctx = out["event_context"]
+    assert set(ctx) == set(CTX) and len(ctx["event_manifest_hash"]) == 64 and len(ctx["label_definition_hash"]) == 64
+    assert ctx["label_window_rule"] == "close_to_close:horizon_bars=2" and ctx["control_kind"] == "user_labeled_same_trigger"
+
+
+def test_conditional_ic_orchestrator_label_override_wiring_and_survivor_v2():
+    import json
+    from pathlib import Path
     idx = feature_index(80)
     lv = _labels_for(idx)
     report = run_analyze({"event_filter": {"enabled": True, "min_events": 30}},
-                         event_timestamps=list(lv.keys()), event_label_values=lv)
+                         event_timestamps=list(lv.keys()), event_label_values=lv, event_context=CTX)
     assert _find_key(report.get("metadata"), "label_source") == "event_label_value"
     assert _find_key(report.get("metadata"), "statistic_kind") == "conditional_ic"
+    so = _find_key(report.get("metadata"), "survivor_output")
+    if isinstance(so, dict) and so.get("path") and Path(so["path"]).exists():   # 事件模式且有 survivors 才落檔
+        payload = json.loads(Path(so["path"]).read_text(encoding="utf-8"))
+        ev = payload["sample_scope"]["event"]
+        assert all(ev[k] == CTX[k] for k in CTX)                                # 六鍵非 null 且等於 context
+
+
+def test_conditional_ic_orchestrator_nonfinite_label_loud():
+    """CODEX-R1-P2-05：label 覆寫含 inf ⇒ loud。"""
+    from momentum.Analysis.ic_filter_orchestrator import AlignmentViolationError
+    idx = feature_index(80)
+    lv = _labels_for(idx)
+    first = next(iter(lv))
+    lv[first] = float("inf")
+    with pytest.raises(AlignmentViolationError, match="non-finite"):
+        run_analyze({"event_filter": {"enabled": True, "min_events": 30}},
+                    event_timestamps=list(lv.keys()), event_label_values=lv, event_context=CTX)
 
 
 def test_conditional_ic_orchestrator_missing_label_loud():
@@ -118,5 +152,8 @@ def test_conditional_ic_orchestrator_aprime_fallback_passthrough():
     idx = feature_index(3)
     lv = _labels_for(idx)
     report = run_analyze({"event_filter": {"enabled": True, "min_events": 30}},
-                         event_timestamps=list(lv.keys()), event_label_values=lv)
+                         event_timestamps=list(lv.keys()), event_label_values=lv, event_context=CTX)
     assert _find_key(report.get("metadata"), "fallback") is True
+    # GROK-R1-P1-01：事件不足 ⇒ 續算用主線 return_N 必 loud 揭露，不得假裝 conditional_ic
+    assert _find_key(report.get("metadata"), "conditional_ic_abandoned") is True
+    assert _find_key(report.get("metadata"), "label_source") == "mainline_return_N"

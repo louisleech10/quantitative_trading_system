@@ -627,12 +627,31 @@ def test_v2_event_context_filled_and_validated():
     lambda e: e.update(label_definition_hash="g" * 64),           # 非 hex
     lambda e: e.update(decision_time_rule=""),                    # 空字串
     lambda e: e.update(control_kind="platform_whatever"),         # 閉集外
+    lambda e: e.update(control_kind="platform_random_bars"),      # enum 內但 accepted 外（CODEX-R1-P2-04）
 ])
 def test_v2_event_keys_fail_closed(mutate):
     payload = sc.build_survivor_output(**_event_kwargs(_ctx()))
     mutate(payload["sample_scope"]["event"])
     with pytest.raises(ContractValidationError):
         sc.validate_survivor_output(payload)
+
+
+def test_conditional_ic_requires_event_context_fail_closed():
+    """CODEX-R1-P1-03：conditional_ic run（event_filter.label_source=event_label_value）缺六鍵 ⇒ build 與 validate 皆拒。"""
+    kw = _event_kwargs()
+    kw["report_meta"] = {**kw["report_meta"], "event_filter": {"applied": True, "label_source": "event_label_value"}}
+    with pytest.raises(ContractValidationError, match="event_context"):
+        sc.build_survivor_output(**kw)
+    kw2 = _event_kwargs(_ctx())
+    kw2["report_meta"] = {**kw2["report_meta"], "event_filter": {"applied": True, "label_source": "event_label_value"}}
+    payload = sc.build_survivor_output(**kw2)
+    sc.validate_survivor_output(payload, report_meta=kw2["report_meta"])
+    payload["sample_scope"]["event"]["event_manifest_hash"] = None
+    payload["sample_scope"]["event"]["label_definition_hash"] = None
+    for k in ("decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind"):
+        payload["sample_scope"]["event"][k] = None
+    with pytest.raises(ContractValidationError, match="non-null"):
+        sc.validate_survivor_output(payload, report_meta=kw2["report_meta"])
 
 
 def test_v1_payload_explicitly_rejected_no_silent_coerce():

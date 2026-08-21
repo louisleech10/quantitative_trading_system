@@ -58,18 +58,27 @@ def _weighted_stats(values: np.ndarray, weights: np.ndarray) -> Dict[str, float]
     }
 
 
-def _common_constraint_block(event_split_plan: EventSplitPlan, manifest: EventManifest) -> Dict:
-    """AR-3 共同約束欄（每張表必列）。"""
-    s = event_split_plan.summary
+def _common_constraint_block(event_split_plan: Optional[EventSplitPlan], manifest: Optional[EventManifest]) -> Dict:
+    """AR-3 共同約束欄（每張表/報告必列；機械可讀）。
+
+    缺 split plan ⇒ `formal_pooled_inference_allowed=False`＋`reason=no_event_split_plan`（fail-closed 揭露，
+    CODEX/COMPOSER/GROK B2-R1 共同 finding）；缺 manifest ⇒ raw/effective n 為 null。
+    """
+    s = event_split_plan.summary if event_split_plan is not None else {}
+    degraded = list(s.get("degraded", []))
+    allowed = bool(event_split_plan is not None and not degraded and s.get("loso_status") not in (None, "not_evaluated"))
     return {
         "stats_modes": s.get("stats_modes", {"primary": "macro", "sensitivity": "micro"}),
-        "n_events_raw": int(manifest.summary["n_events_raw"]),
-        "n_events_effective": manifest.summary["n_events_effective"],
-        "degraded": list(s.get("degraded", [])),
+        "n_events_raw": int(manifest.summary["n_events_raw"]) if manifest is not None else None,
+        "n_events_effective": manifest.summary["n_events_effective"] if manifest is not None else None,
+        "degraded": degraded,
         "loso_status": s.get("loso_status", "not_evaluated"),
         "n_symbols": int(s.get("n_symbols", 0)),
-        "formal_pooled_inference_allowed": (not s.get("degraded")) and s.get("loso_status") != "not_evaluated",
-        "dedupe_policy": manifest.policy,
+        "insufficient_events_in_test": list(s.get("insufficient_events_in_test", [])),
+        "cluster_adjusted": event_split_plan is not None and "no_cluster_adjustment" not in degraded,
+        "formal_pooled_inference_allowed": allowed,
+        "reason": None if event_split_plan is not None else "no_event_split_plan",
+        "dedupe_policy": manifest.policy if manifest is not None else None,
     }
 
 
@@ -145,7 +154,8 @@ def event_forward_return_table(
             }
         return out
 
-    # primary＝macro（symbol 等權：各 symbol 先算再等權平均）；sensitivity＝micro（event 等權／uniqueness 加權）
+    # primary＝macro（symbol 等權：各 symbol 先算再等權平均）；sensitivity＝micro（**event 等權**，AR-3／B1.3 定義；
+    # GROK-R1-P2-02：uniqueness 加權另立獨立鍵 `uniqueness_weighted`，不冒充 micro）
     per_symbol = {sym: block(g, weighted=True) for sym, g in df.groupby("symbol")}
     macro: Dict = {}
     for h in horizons:
@@ -162,8 +172,8 @@ def event_forward_return_table(
         "statistic_kind": "event_return",
         "horizons": horizons,
         "primary_macro": macro,
-        "sensitivity_micro": block(df, weighted=True),
-        "raw_all_unweighted": block(df, weighted=False),
+        "sensitivity_micro": block(df, weighted=False),        # event 等權（AR-3 micro）
+        "uniqueness_weighted": block(df, weighted=True),       # 1/overlap_count 加權（B1.2 policy；非 micro）
         "strata": strata,
         "common": _common_constraint_block(event_split_plan, manifest),
         "receipts": {"seed": seed, "n_boot": n_boot, "n_rows": int(len(df))},
@@ -179,6 +189,8 @@ def binary_discrimination_table(
     event_split_plan: EventSplitPlan,
     strata: pd.DataFrame,
     table_config: dict,
+    *,
+    manifest: Optional[EventManifest] = None,
 ) -> Dict:
     """OOS only 之 0/1 辨別表（K5/C7-ii）；擴 B1.4 baseline 為正式表，共用 permutation 核心。
 
@@ -233,11 +245,6 @@ def binary_discrimination_table(
     if "leg" in strata.columns:
         legs = strata.reindex(idx)["leg"]
         out["by_leg"] = {str(l): metrics(s[(legs == l).to_numpy()], y[(legs == l).to_numpy()]) for l in legs.dropna().unique()}
-    out["common"] = {
-        "stats_modes": event_split_plan.summary.get("stats_modes"),
-        "degraded": list(event_split_plan.summary.get("degraded", [])),
-        "loso_status": event_split_plan.summary.get("loso_status", "not_evaluated"),
-        "insufficient_events_in_test": event_split_plan.summary.get("insufficient_events_in_test", []),
-    }
+    out["common"] = _common_constraint_block(event_split_plan, manifest)  # AR-3 全套欄（COMPOSER/GROK R1-P2-01）
     out["receipts"] = {"seed": oc.seed, "n_perm": oc.n_perm, "oos_only": True}
     return out
