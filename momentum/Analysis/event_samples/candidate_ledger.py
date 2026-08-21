@@ -1,0 +1,327 @@
+"""GAP-3 規則 → return series → candidate ledger → DSR/PBO/MinBTL（docs/GAP3_EVENT_TODO.md Task B4.2；SPEC K6/C7；W8）。
+
+GAP-1 對接（**唯讀消費、不改簽名**）：
+- 帳本＝`strategy_validation/ledger.py`（`append_trial_attempt` 唯一合法寫入口；`read_trial_ledger` 讀 N）；
+  `n_trials` **只**從 ledger 讀（`LedgerReadResult`），禁 request 任意填。
+- 檢定＝`deflated_sharpe`／`probability_of_backtest_overfitting`／`assess_eligibility`（MinBTL）。
+- 型別閘：AUC／PR-AUC／rank-biserial **不得**餵 return-based DSR/PBO——`CandidateReturns.metric_kind` 必為
+  `return_series`，其他一律 `MetricTypeError`（機械拒，非文件約定）。
+
+W8 entry×exit 一致性：`to_return_series` 之 entry 取對齊收據 `entry_price_source_bar_open_ms`＋`entry_price_source_field`
+（D1-6 映射），exit＝`label_end_ms` 對應 bar 之 close（D1-4 持有鏈）；horizon 由 `label_definition.window` 唯一決定——
+**禁**自行推導時點、禁把事件標籤報酬／實際進場報酬混用。
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from typing import Any, Dict, Mapping, Optional, Union
+
+import numpy as np
+import pandas as pd
+
+from momentum.core.logging import get_logger
+from momentum.Analysis.event_samples.types import AlignmentReceipts
+from momentum.Analysis.strategy_validation import ledger as _ledger
+from momentum.Analysis.strategy_validation.deflated_sharpe import deflated_sharpe
+from momentum.Analysis.strategy_validation.min_btl import assess_eligibility
+from momentum.Analysis.strategy_validation.pbo import UniverseProvenance, candidate_set_hash, probability_of_backtest_overfitting
+from momentum.Analysis.strategy_validation.returns_contract import PeriodReturns
+from momentum.Analysis.strategy_validation.sharpe import compute_sharpe
+
+logger = get_logger(__name__)
+
+METRIC_KIND_RETURN_SERIES = "return_series"
+_FORBIDDEN_METRIC_KINDS = ("auc", "pr_auc", "rank_biserial", "roc_auc", "precision", "recall", "f1", "lift")
+_MS_PER_YEAR = 365.25 * 86400 * 1000.0
+_T_SEMANTICS = "trade_level"
+
+
+class MetricTypeError(TypeError):
+    """非 return-based 指標（AUC／PR-AUC／rank-biserial…）餵入 DSR/PBO/ledger（機械拒）。"""
+
+
+@dataclass(frozen=True)
+class LedgerKey:
+    """GAP-1 帳本身分（檔名由 `ledger.ledger_path` 推導；本模組不自行開檔）。"""
+
+    research_session_id: str
+    dataset_key: str
+
+
+@dataclass(frozen=True)
+class CandidateReturns:
+    """一個候選之 per-trade return series（typed 容器；DSR/PBO 唯一合法輸入形）。
+
+    returns：index=event_id（依 entry_at 排序）、值＝signed 持有報酬；attrs 帶 `source_artifact_hash`／`span_years`。
+    metric_kind：必為 `return_series`；其他（auc／pr_auc／rank_biserial…）⇒ MetricTypeError。
+    """
+
+    candidate_id: str
+    returns: pd.Series
+    metric_kind: str = METRIC_KIND_RETURN_SERIES
+
+
+def _assert_return_series(cr: Any, where: str) -> None:
+    if not isinstance(cr, CandidateReturns):
+        raise MetricTypeError(f"{where}: 須為 CandidateReturns，得 {type(cr).__name__}")
+    if str(cr.metric_kind).lower() != METRIC_KIND_RETURN_SERIES:
+        raise MetricTypeError(f"{where}: metric_kind={cr.metric_kind!r} 非 return_series（AUC/PR-AUC/rank-biserial 禁餵 DSR/PBO）")
+    if not isinstance(cr.returns, pd.Series) or cr.returns.empty:
+        raise MetricTypeError(f"{where}: returns 須為非空 pd.Series（per-trade return series）")
+    if str(cr.returns.name or "").lower() in _FORBIDDEN_METRIC_KINDS:
+        raise MetricTypeError(f"{where}: returns.name={cr.returns.name!r} 指向分類指標，非 return series")
+    if not np.isfinite(cr.returns.to_numpy(dtype=float)).all():
+        raise ValueError(f"{where}: returns 含 NaN/inf（loud）")
+
+
+def _digest(obj: Any) -> str:
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+# --------------------------------------------------------------------------- return series（W8）
+def to_return_series(
+    rule_or_scores: Union[pd.Series, Mapping[str, Any]],
+    bars: Mapping[str, pd.DataFrame],
+    entry_semantic: str,
+    label_definition: dict,
+    receipts: AlignmentReceipts,
+    *,
+    events: Optional[pd.DataFrame] = None,
+    score_threshold: float = 0.5,
+) -> pd.Series:
+    """訊號事件 → signed 持有報酬序列（index=event_id，依 entry_at_ms 排序）。
+
+    rule_or_scores：index=event_id 之 bool 遮罩或分數（≥ score_threshold 為訊號）。
+    bars：{symbol: DataFrame(open_time_ms/close_time_ms/open/close)}（錨定 TF）。
+    entry_semantic／label_definition：須與 events 之 `entry_price_semantic`／`label_definition` 全列一致（W8：禁混用）。
+    receipts：B1.1 對齊收據——entry 時點／價源欄、label_end **只**從此取。
+    events：驗證後匯入表（symbol／direction／entry_price_semantic／label_definition context；必填）。
+    """
+    if events is None or events.empty:
+        raise ValueError("to_return_series: 需 events= context（symbol/direction/label_definition）")
+    for col in ("event_id", "symbol", "direction", "entry_price_semantic", "label_definition"):
+        if col not in events.columns:
+            raise ValueError(f"to_return_series: events 缺欄 {col}")
+    ev = events.set_index("event_id")
+    if not (ev["entry_price_semantic"] == entry_semantic).all():
+        raise ValueError("to_return_series: entry_semantic 與 events.entry_price_semantic 不一致（W8 禁混用）")
+    ld_key = {"rule_id": label_definition.get("rule_id"), "canonical_digest": label_definition.get("canonical_digest"),
+              "window": label_definition.get("window"), "label_return_mode": label_definition.get("label_return_mode", "close_to_close")}
+    bad = [e for e, d in ev["label_definition"].items()
+           if {k: d.get(k) for k in ld_key} != {**ld_key, "label_return_mode": d.get("label_return_mode", "close_to_close")}]
+    if bad:
+        raise ValueError(f"to_return_series: label_definition 與 events 不一致（W8：horizon 由 label_definition 唯一決定）：{bad[:3]}")
+
+    sig = pd.Series(rule_or_scores) if not isinstance(rule_or_scores, pd.Series) else rule_or_scores
+    if sig.dtype == bool:
+        signaled = set(sig.index[sig])
+    else:
+        signaled = set(sig.index[sig.astype(float) >= float(score_threshold)])
+
+    rec = receipts.event_level.set_index("event_id")
+    rows = []
+    for eid in sorted(signaled):
+        if eid not in rec.index:
+            raise ValueError(f"to_return_series: 訊號事件 {eid} 無對齊收據（禁自行推導時點）")
+        r = rec.loc[eid]
+        symbol = ev.loc[eid, "symbol"]
+        if symbol not in bars:
+            raise ValueError(f"to_return_series: bars 缺 symbol {symbol}")
+        b = bars[symbol]
+        ot = b["open_time_ms"].to_numpy().astype("int64")
+        ct = b["close_time_ms"].to_numpy().astype("int64")
+        i_entry = int(np.searchsorted(ot, int(r["entry_price_source_bar_open_ms"])))
+        if i_entry >= len(ot) or ot[i_entry] != int(r["entry_price_source_bar_open_ms"]):
+            raise ValueError(f"to_return_series: {eid} entry 價源 bar 不在 bars")
+        field = str(r["entry_price_source_field"])
+        if field not in ("open", "close"):
+            raise ValueError(f"to_return_series: {eid} entry_price_source_field {field!r} 非 open/close")
+        entry = float(b[field].to_numpy()[i_entry])
+        i_exit = int(np.searchsorted(ct, int(r["label_end_ms"])))
+        if i_exit >= len(ct) or ct[i_exit] != int(r["label_end_ms"]):
+            raise ValueError(f"to_return_series: {eid} label_end bar 不在 bars")
+        exit_ = float(b["close"].to_numpy()[i_exit])
+        if not (np.isfinite(entry) and np.isfinite(exit_) and entry > 0 and exit_ > 0):
+            raise ValueError(f"to_return_series: {eid} 價格非有限正值")
+        sign = 1.0 if ev.loc[eid, "direction"] == "long" else -1.0
+        rows.append((int(r["entry_at_ms"]), int(r["label_end_ms"]), eid, sign * (exit_ / entry - 1.0)))
+    rows.sort()
+    out = pd.Series([x[3] for x in rows], index=[x[2] for x in rows], dtype=float, name="hold_return")
+    span_ms = (max(x[1] for x in rows) - min(x[0] for x in rows)) if rows else 0
+    out.attrs["span_years"] = float(span_ms / _MS_PER_YEAR)
+    out.attrs["entry_semantic"] = entry_semantic
+    out.attrs["label_definition"] = dict(ld_key)
+    out.attrs["source_artifact_hash"] = _digest({"events": sorted(signaled), "entry": entry_semantic, "ld": ld_key,
+                                                 "values": [float(x[3]) for x in rows]})
+    out.attrs["t_semantics"] = _T_SEMANTICS
+    return out
+
+
+# --------------------------------------------------------------------------- ledger
+def record_candidate(ledger_path: LedgerKey, candidate_meta: Dict[str, Any]) -> None:
+    """寫一筆 candidate 至 GAP-1 帳本（唯一合法寫入口 `append_trial_attempt`）＋provenance sidecar。
+
+    candidate_meta 必含：`candidate_id`、`evaluation_id`、`returns`（CandidateReturns）、`rule_digest`、`seed`、
+    `input_digest`；選填 `attempt_index`（預設 0）、`command`、`expected`（oracle 預期 fail/pass）、`ts`。
+    metric 固定 `sharpe`／`per_period`（由 return series 算；退化 ⇒ metric_valid=False、state=failed）。
+    """
+    if not isinstance(ledger_path, LedgerKey):
+        raise TypeError("record_candidate: ledger_path 須為 LedgerKey（檔名由 GAP-1 ledger_path 推導）")
+    for k in ("candidate_id", "evaluation_id", "returns", "rule_digest", "seed", "input_digest"):
+        if k not in candidate_meta:
+            raise ValueError(f"record_candidate: candidate_meta 缺 {k}")
+    if str(candidate_meta.get("metric_kind", METRIC_KIND_RETURN_SERIES)).lower() != METRIC_KIND_RETURN_SERIES:
+        raise MetricTypeError(f"record_candidate: metric_kind={candidate_meta.get('metric_kind')!r} 非 return_series")
+    cr: CandidateReturns = candidate_meta["returns"]
+    _assert_return_series(cr, "record_candidate")
+    if cr.candidate_id != candidate_meta["candidate_id"]:
+        raise ValueError("record_candidate: candidate_id 與 returns.candidate_id 不符")
+
+    vals = cr.returns.to_numpy(dtype=float)
+    ppy = _periods_per_year(cr.returns)
+    sr = compute_sharpe(vals, periods_per_year=int(round(ppy)) if ppy >= 1 else 1)
+    valid = sr.status == "ok" and np.isfinite(sr.value_per_period)
+    ts = str(candidate_meta.get("ts") or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    record = {
+        "research_session_id": ledger_path.research_session_id,
+        "dataset_key": ledger_path.dataset_key,
+        "candidate_id": str(candidate_meta["candidate_id"]),
+        "evaluation_id": str(candidate_meta["evaluation_id"]),
+        "attempt_index": int(candidate_meta.get("attempt_index", 0)),
+        "state": "complete" if valid else "failed",
+        "metric_name": "sharpe",
+        "metric_value": float(sr.value_per_period) if valid else 0.0,
+        "metric_unit": "per_period",
+        "metric_valid": bool(valid),
+        "input_artifact_hash": str(cr.returns.attrs.get("source_artifact_hash") or candidate_meta["input_digest"]),
+        "ts": ts,
+    }
+    _ledger.append_trial_attempt(research_session_id=ledger_path.research_session_id,
+                                 dataset_key=ledger_path.dataset_key, record=record)
+    # provenance sidecar（帳本 schema 為閉集，規則 digest／seed／命令／預期另存）
+    prov_path = _ledger.ledger_path(research_session_id=ledger_path.research_session_id,
+                                    dataset_key=ledger_path.dataset_key).with_suffix(".provenance.jsonl")
+    prov = {
+        "candidate_id": record["candidate_id"], "evaluation_id": record["evaluation_id"],
+        "rule_digest": str(candidate_meta["rule_digest"]), "seed": int(candidate_meta["seed"]),
+        "input_digest": str(candidate_meta["input_digest"]), "input_artifact_hash": record["input_artifact_hash"],
+        "n_trades": int(len(vals)), "span_years": float(cr.returns.attrs.get("span_years", float("nan"))),
+        "entry_semantic": cr.returns.attrs.get("entry_semantic"), "label_definition": cr.returns.attrs.get("label_definition"),
+        "command": candidate_meta.get("command"), "expected": candidate_meta.get("expected"), "ts": ts,
+    }
+    with prov_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(prov, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+
+
+def _periods_per_year(s: pd.Series) -> float:
+    years = float(s.attrs.get("span_years", 0.0) or 0.0)
+    return float(len(s) / years) if years > 0 else 0.0
+
+
+def _period_returns(cr: CandidateReturns) -> PeriodReturns:
+    vals = cr.returns.to_numpy(dtype=float)
+    ppy = _periods_per_year(cr.returns)
+    ok = ppy > 0 and len(vals) >= 2
+    return PeriodReturns(
+        values=vals, t_semantics=_T_SEMANTICS, n_obs=int(len(vals)), periods_per_year=float(ppy),
+        annualization_source="resolved" if ok else "",
+        source_artifact_hash=str(cr.returns.attrs.get("source_artifact_hash", "")),
+        status="ok" if ok else "unavailable",
+        reason="" if ok else "annualization_unresolved",
+    )
+
+
+# --------------------------------------------------------------------------- DSR/PBO/MinBTL
+def run_dsr_pbo(
+    ledger_path: LedgerKey,
+    returns_by_candidate: Mapping[str, CandidateReturns],
+    *,
+    target_sharpe: float = 1.0,
+    s_blocks: int = 8,
+    selection_metric: str = "sharpe",
+) -> Dict[str, Any]:
+    """N 從 ledger 讀 → champion DSR（ledger_cross_trial）＋PBO（CSCV）＋MinBTL 資格。
+
+    ledger 空／不可讀 ⇒ 三者 `unavailable`（reason 傳遞）；return series 長度不足 MinBTL 前提 ⇒ `eligible=False` loud。
+    PBO 之觀測軸＝各候選訊號事件聯集（依 entry 時間排序），未出手者 0 報酬（無部位）。
+    """
+    if not isinstance(ledger_path, LedgerKey):
+        raise TypeError("run_dsr_pbo: ledger_path 須為 LedgerKey")
+    for cid, cr in returns_by_candidate.items():
+        _assert_return_series(cr, f"run_dsr_pbo[{cid}]")
+        if cr.candidate_id != cid:
+            raise ValueError(f"run_dsr_pbo: key {cid!r} ≠ returns.candidate_id {cr.candidate_id!r}")
+
+    lr = _ledger.read_trial_ledger(research_session_id=ledger_path.research_session_id, dataset_key=ledger_path.dataset_key)
+    out: Dict[str, Any] = {
+        "statistic_kind": "dsr_pbo_bridge",
+        "ledger": {"status": lr.status, "reason": lr.reason, "n_for_dsr": int(lr.n_for_dsr), "n_evaluated": int(lr.n_evaluated),
+                   "n_candidates_considered": int(lr.n_candidates_considered), "n_rows_rejected": int(lr.n_rows_rejected),
+                   "n_semantics": lr.n_semantics, "snapshot_hash": lr.snapshot_hash},
+        "n_trials_source": "ledger",
+    }
+    if lr.status != "ok" or not returns_by_candidate:
+        reason = lr.reason if lr.status != "ok" else "no_candidates"
+        out.update({"capability_status": "unavailable", "reason": reason,
+                    "dsr": {"status": "unavailable", "reason": reason},
+                    "pbo": {"status": "unavailable", "reason": reason},
+                    "eligibility": {"status": "unavailable", "reason": reason}})
+        return out
+
+    # champion＝per-period Sharpe 最大（平手取 candidate_id 最小）
+    sharpes = {}
+    for cid, cr in returns_by_candidate.items():
+        pr = _period_returns(cr)
+        sr = compute_sharpe(pr.values, periods_per_year=int(round(pr.periods_per_year)) if pr.periods_per_year >= 1 else 1)
+        sharpes[cid] = float(sr.value_per_period) if sr.status == "ok" else float("nan")
+    finite = {c: v for c, v in sharpes.items() if np.isfinite(v)}
+    champion = sorted(finite, key=lambda c: (-finite[c], c))[0] if finite else sorted(returns_by_candidate)[0]
+    pr_champ = _period_returns(returns_by_candidate[champion])
+    dsr = deflated_sharpe(period_returns=pr_champ, ledger_result=lr, variance_source="ledger_cross_trial",
+                          n_semantics=lr.n_semantics)
+    out["champion"] = champion
+    out["sharpe_per_period_by_candidate"] = sharpes
+    out["dsr"] = asdict(dsr)
+
+    # MinBTL：t_years＝champion 序列跨度；N 從 ledger
+    span = float(pr_champ.values.size and returns_by_candidate[champion].returns.attrs.get("span_years", 0.0) or 0.0)
+    if span > 0:
+        el = assess_eligibility(t_years=span, ledger_result=lr, target_sharpe=float(target_sharpe))
+        out["eligibility"] = asdict(el)
+        if el.eligible is False:
+            logger.warning("run_dsr_pbo: return series 跨度 %.3f 年不足 MinBTL 上界 %.3f 年（N=%s）", span, el.required_years_upper_bound, el.trials_used)
+            out["eligibility"]["loud"] = "return_series_shorter_than_min_btl"
+    else:
+        out["eligibility"] = {"status": "unavailable", "reason": "span_unknown"}
+
+    # PBO：聯集觀測軸；ledger 候選集須與輸入一致（universe guard）
+    ids = sorted(returns_by_candidate)
+    if len(ids) < 2:
+        out["pbo"] = {"status": "unavailable", "reason": "single_candidate"}
+    else:
+        union = sorted({e for cid in ids for e in returns_by_candidate[cid].returns.index})
+        M = np.zeros((len(union), len(ids)), dtype=float)
+        for j, cid in enumerate(ids):
+            M[:, j] = returns_by_candidate[cid].returns.reindex(union).fillna(0.0).to_numpy(dtype=float)
+        if len(union) < int(s_blocks):
+            out["pbo"] = {"status": "unavailable", "reason": "n_obs_below_s_blocks", "n_obs": len(union), "s_blocks": int(s_blocks)}
+        else:
+            prov = UniverseProvenance(selection_free=True, source="ledger_all_candidates",
+                                      candidate_set_hash=candidate_set_hash(ids), candidate_count=len(ids),
+                                      declared_by="candidate_ledger")
+            pbo = probability_of_backtest_overfitting(
+                returns_matrix=M, n_obs=len(union), n_candidates=len(ids), candidate_ids=ids, s_blocks=int(s_blocks),
+                selection_metric=selection_metric, universe_provenance=prov, ledger_result=lr,
+            )
+            out["pbo"] = {**asdict(pbo), "n_obs": len(union), "observation_axis": "union_of_signaled_events_zero_when_flat"}
+    out["capability_status"] = "ok"
+    out["reason"] = None
+    return out
+
+
+__all__ = ["CandidateReturns", "LedgerKey", "MetricTypeError", "METRIC_KIND_RETURN_SERIES",
+           "record_candidate", "run_dsr_pbo", "to_return_series"]
