@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "_doc": "GAP-3 Task B3.1 條件引擎契約 SoT（SPEC D3）：expression/欄位角色枚舉、safe-subset AST 白名單、拒收 reason 字面、legacy 篩選參數允許清單（D3-3 契約化）只在本檔出現一次；程式禁複列。",
+  "expression_roles": {
+    "feature": "只得引用 pit_feature 欄（available_at ≤ feature_cutoff）；引用 trigger_outcome/future_outcome 或 future_* 命名欄 ⇒ role_isolation_violation",
+    "selection_predicate": "可含未來/結果欄；column_roles 全記錄、只進抽樣 provenance，不得流入特徵表（D3-4）",
+    "label": "只進結果欄；須至少引用一個 trigger_outcome/future_outcome 欄"
+  },
+  "column_roles": [
+    "pit_feature",
+    "trigger_outcome",
+    "future_outcome"
+  ],
+  "future_column_prefix": "future_",
+  "allowed_ast_nodes": [
+    "Expression",
+    "BoolOp",
+    "And",
+    "Or",
+    "UnaryOp",
+    "Not",
+    "USub",
+    "Compare",
+    "Lt",
+    "LtE",
+    "Gt",
+    "GtE",
+    "Eq",
+    "NotEq",
+    "Name",
+    "Constant",
+    "Call",
+    "Load"
+  ],
+  "allowed_functions": {
+    "isnull": {"arity": 1, "doc": "欄位缺值遮罩"},
+    "notnull": {"arity": 1, "doc": "欄位非缺值遮罩"},
+    "abs": {"arity": 1, "doc": "絕對值"},
+    "lag": {"arity": 2, "doc": "lag(col, n)：n 為正整數常數、只往過去取（shift(n)）；貢獻 max_lookback"}
+  },
+  "failure_reasons": [
+    "empty_expression",
+    "syntax_error",
+    "disallowed_node",
+    "disallowed_function",
+    "unregistered_column",
+    "unknown_column_role",
+    "role_isolation_violation",
+    "label_without_outcome_column",
+    "constant_expression",
+    "invalid_lag",
+    "non_boolean_result",
+    "unknown_expression_role"
+  ],
+  "allowed_filtering_params": [
+    "price_change"
+  ]
+}

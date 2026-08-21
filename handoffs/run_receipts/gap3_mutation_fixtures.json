@@ -1,0 +1,54 @@
+{
+ "M10_case": {
+  "seed": 20260820,
+  "sha256": "786efdc0c91a7c6e0dbc09c173781cc9798193a649f83ce982c71cbfd2729975"
+ },
+ "M10_events": {
+  "seed": 20260820,
+  "sha256": "f855765f1aaa652e967442bf4b9517ad5052ee5995b2a0c43aafafcc376f655e"
+ },
+ "M11_rows": {
+  "seed": 20260820,
+  "sha256": "b9633a22e2cbabb0c2cfab2886dd2c189a071e4359423e4dfe02feb3d6dabf1c"
+ },
+ "M12_events": {
+  "seed": 20260820,
+  "sha256": "f95a0ce29f6781831c93f24898aa50805aa9405334f30dc1ff273c74d3a6e348"
+ },
+ "M1_events": {
+  "seed": 20260820,
+  "sha256": "c868efa2e6cff1479492ed1ac466b7d45f78c7cd0f64713809207b8512c0ff26"
+ },
+ "M2_events": {
+  "seed": 20260820,
+  "sha256": "8527349031e3c27405e38a6b7633f9f43b3665a5ed55a9dbe42805cb8102a4fe"
+ },
+ "M3_events": {
+  "seed": 20260820,
+  "sha256": "f77e6f7f02148e0f29fb6761683f83acefd1874364eeeea253fcd80e76438571"
+ },
+ "M4_segment": {
+  "seed": 20260820,
+  "sha256": "431b175fff3f41e571d93c3586fc2806a1cf8e414abc4351e2a437c8f31339b2"
+ },
+ "M5_manifest_rows": {
+  "seed": 20260820,
+  "sha256": "4c8965298be2a9349b94757fc0da521372ccba1f7e7fbfa7d4cd5ab39dfe70a5"
+ },
+ "M6_expr": {
+  "seed": 20260820,
+  "sha256": "3ada673c54e57c4ab2010df4936173633b493b02e980039b55fd06481eaa5222"
+ },
+ "M7_segment": {
+  "seed": 20260820,
+  "sha256": "8d58bec32bc8952abcfeb73f571b765e5a84aadf43c6425fec3d76af41f3deb6"
+ },
+ "M8_series": {
+  "seed": 20260820,
+  "sha256": "9c2bbbd7aa0f4059389a6195f7acc741d23964ea15a0497586fe6acad2410339"
+ },
+ "M9_events": {
+  "seed": 20260820,
+  "sha256": "5fe5a47d673fd51725b09021047a2f98e4bd81c2df477ff1466ae830d4ef401c"
+ }
+}

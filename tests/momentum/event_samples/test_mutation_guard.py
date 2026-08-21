@@ -1,4 +1,4 @@
-"""GAP-3 §V 最小 mutation 集——B1 歸屬 8 條（M1/M2/M3/M5/M8/M9/M10/M12；M4/M7/M11=B2、M6=B3）。
+"""GAP-3 §V 最小 mutation 集——B1 歸屬 8 條（M1/M2/M3/M5/M8/M9/M10/M12）＋B2 M4/M7/M11＋B3 M6。
 
 統一命令：`venv/bin/python -m pytest tests/momentum/event_samples/test_mutation_guard.py -q -k M<n>`。
 每條＝「baseline 預期＋mutation diff＋預期 rc」：mutation 以 monkeypatch 注入，測試斷言
@@ -247,3 +247,18 @@ def test_M12_t9_availability_removed_accepts(monkeypatch):
         validate_event_import(events)
     monkeypatch.setattr(ic, "_T9_AVAILABILITY_ENFORCED", False)      # mutation：檢查移除
     assert len(validate_event_import(events)) == 2                   # 收下 ⇒ 斷言必紅
+
+
+def test_M6_role_isolation_removed_detected(monkeypatch):
+    """M6：condition_engine 允許 future_* 欄過 feature 角色 ⇒ B3.1 ASSERT（WHEN expression_role=feature
+    column=future_return THEN 拒）反轉＝紅。seam＝condition_engine._role_violation（生產路徑 monkeypatch）。"""
+    from momentum.Analysis.event_samples import condition_engine as ce
+    reg = {"rsi_14": "pit_feature", "future_return": "future_outcome"}
+    expr = "rsi_14 < 30 and future_return >= 0.01"
+    _record_fixture("M6_expr", {"expr": expr, "registry": reg})
+    with pytest.raises(ce.ConditionError) as ei:                       # baseline：feature 角色拒 future 欄
+        ce.parse_condition(expr, reg, "feature")
+    assert ei.value.reason == "role_isolation_violation"
+    monkeypatch.setattr(ce, "_role_violation", lambda role, col, crole, contract: None)  # mutation：隔離移除
+    spec = ce.parse_condition(expr, reg, "feature")                    # 收下 ⇒ 斷言必紅
+    assert "future_return" in spec.column_roles
