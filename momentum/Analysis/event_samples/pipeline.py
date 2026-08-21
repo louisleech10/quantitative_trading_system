@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
@@ -118,35 +119,51 @@ class EventSamplePipeline:
         tfs = sorted(set(ev["timeframe"]))
         dirs = sorted(set(ev["direction"]))
         ents = sorted(set(ev["entry_price_semantic"]))
+        ks = sorted({int(k) for k in ev["decision_offset_bars"]})   # CODEX-R2-P1-01：混合 k 不得取第一筆
         lds = {(d["window"]["horizon_bars"], d.get("label_return_mode", "close_to_close")) for d in ev["label_definition"]}
-        if len(tfs) != 1 or len(dirs) != 1 or len(ents) != 1 or len(lds) != 1:
+        if len(tfs) != 1 or len(dirs) != 1 or len(ents) != 1 or len(lds) != 1 or len(ks) != 1:
             return {"statistic_kind": "all_bars_evaluation", "capability_status": "not_computed",
                     "reason": "batch_not_single_valued",
-                    "doc": f"全 K 線驗證需批內單一 timeframe/direction/entry_price_semantic/label_definition（得 {len(tfs)}/{len(dirs)}/{len(ents)}/{len(lds)}）"}
+                    "doc": ("全 K 線驗證需批內單一 timeframe/direction/entry_price_semantic/label_definition/decision_offset_bars"
+                            f"（得 {len(tfs)}/{len(dirs)}/{len(ents)}/{len(lds)}/{len(ks)}）")}
         (horizon, mode), = lds
         if mode != "close_to_close":
             return {"statistic_kind": "all_bars_evaluation", "capability_status": "not_computed",
                     "reason": "label_return_mode_not_supported", "doc": f"evaluate_all_bars 標籤公式為 close_to_close；批為 {mode}"}
-        tf = tfs[0]
+        tf, k = tfs[0], ks[0]
         bars = {s: bars_by_tf[s][tf] for s in sorted(set(ev["symbol"]))}
-        idx = pd.MultiIndex.from_arrays([ev["symbol"].to_numpy(), ev["t0"].astype("int64").to_numpy()])
-        members = pd.Series(1.0, index=idx)
-        rows = []
+        # CODEX-R2-P1-01：`evaluate_all_bars` 於觸發根 i 取 `scores[ot[i-k]]`（**決策根**索引）⇒ 訊號須標在
+        # 「t₀ 往前 k 根」之 open_time，而非 t₀ 本身；k=0 時兩者相同。缺該決策根 ⇒ 該事件不入訊號（loud 記數）。
+        t0_by_symbol: Dict[str, set] = {}
+        for s, t0 in zip(ev["symbol"], ev["t0"].astype("int64")):
+            t0_by_symbol.setdefault(str(s), set()).add(int(t0))
+        rows, n_signal, n_unmapped = [], 0, 0
         for s, b in bars.items():
             ot = b["open_time_ms"].astype("int64").to_numpy()
-            sc = pd.Series(0.0, index=pd.MultiIndex.from_arrays([[s] * len(ot), ot]))
-            hit = members.index[members.index.get_level_values(0) == s]
-            sc.loc[hit] = 1.0
-            rows.append(sc)
+            pos = {int(t): i for i, t in enumerate(ot)}
+            vals = np.zeros(len(ot), dtype=float)
+            for t0 in sorted(t0_by_symbol.get(s, ())):
+                i = pos.get(t0)
+                if i is None or i - k < 0:
+                    n_unmapped += 1
+                    continue
+                vals[i - k] = 1.0                       # 決策根
+                n_signal += 1
+            rows.append(pd.Series(vals, index=pd.MultiIndex.from_arrays([[s] * len(ot), ot])))
         scores = pd.concat(rows)
         cfg = {"horizon_bars": int(horizon), "label_threshold": 0.0, "direction": dirs[0],
-               "decision_offset_bars": int(ev["decision_offset_bars"].iloc[0]), "score_threshold": 0.5, "top_q": 0.1,
+               "decision_offset_bars": int(k), "score_threshold": 0.5, "top_q": 0.1,
                "prevalence_learn": float(ev["label"].mean()), "sample_design": "case_control",
                "seed": int(seed), "n_boot": int(n_boot), "label_id": "event_membership",
                "entry_price_semantic": ents[0], "timeframe": tf}
         rep = evaluate_all_bars(scores, bars, cfg, event_split_plan=result.split_plan, manifest=result.manifest)
-        rep["rule"] = "event_membership (score=1 at imported event t0 bars, else 0)"
-        rep["label_threshold_note"] = "threshold=0.0（signed 報酬 ≥0 ⇒ 1）；使用者標籤門檻不在事件欄，此為 all-bars 基準語意"
+        rep["rule"] = f"event_membership: score=1 於各事件之決策根（t₀ 往前 {k} 根 open），其餘 0"
+        rep["label_threshold_note"] = ("threshold=0.0（signed 報酬 ≥0 ⇒ 1）；使用者標籤門檻不在事件欄位，"
+                                       "故此表之 label 為 all-bars 基準語意，**非**使用者標註之正反例")
+        rep["estimand_note"] = ("此表回答「若把這批事件當訊號、在全部 K 線上以固定分母評分會如何」——"
+                                "不是模型預測力評估（事件本身即訊號，rule 無 out-of-sample 意義）")
+        rep["signal_mapping"] = {"n_signal_bars": int(n_signal), "n_events_unmapped": int(n_unmapped),
+                                 "decision_offset_bars": int(k), "indexed_at": "decision_bar_open_ms"}
         return rep
 
     def validate(

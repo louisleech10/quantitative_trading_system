@@ -26,7 +26,12 @@ class EventImportJsonRequest(BaseModel):
     records: List[Dict[str, Any]] = Field(..., description="事件記錄（欄位依 event_import_contract.json）")
     validate_only: bool = Field(False, description="僅驗證不落檔")
     source_name: Optional[str] = Field(None, description="來源名稱（供 provenance；選填）")
-    verify_source_digest: bool = Field(False, description="以請求內容 sha256 對證各列 source_file_digest（預設關）")
+    verify_source_digest: bool = Field(
+        False,
+        description=("JSON 端點**不支援**（傳 true ⇒ 400）：契約 source_file_digest 指使用者原始來源檔之 sha256，"
+                     "而本端點的位元組是 request body 本身，兩者必然不符（CODEX-R2-P1-03）。"
+                     "需對證請改用檔案端點並上傳該來源檔。"),
+    )
 
 
 class EventImportResponse(BaseModel):

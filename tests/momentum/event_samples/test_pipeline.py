@@ -88,3 +88,36 @@ def test_run_loud_on_invalid_mixed_scenario_and_all_failed(bars):
               bars, EventPipelineConfig(split=EventSplitConfig(tier_min_test_events=0)))
     with pytest.raises(ValueError, match="全部事件對齊失敗"):
         p.run([make_event(0, t0=BASE + 1, label=1), make_event(1, t0=BASE + 2, label=0)], bars, EventPipelineConfig())
+
+
+def test_all_bars_signal_indexed_at_decision_bar_and_mixed_k_rejected(bars):
+    """CODEX-R2-P1-01 RECHECK：k>0 時訊號須標在決策根（t₀ 往前 k 根 open），evaluate_all_bars 於觸發根取 scores[ot[i-k]]；
+    混合 k ⇒ not_computed:batch_not_single_valued（不得取第一筆）。"""
+    p = create_event_sample_pipeline()
+    idxs = [300, 420, 560]
+    evs = [make_event(i, t0=BASE + x * H12, label=i % 2, decision_offset_bars=2) for i, x in enumerate(idxs)]
+    res = p.run_with_params(evs, bars, test_fraction=0.4, tier_min_test_events=0)
+    seg = {"ETHUSDT": {"12h": bars["ETHUSDT"]["12h"].iloc[:1200].reset_index(drop=True)}}
+    captured = {}
+    import momentum.Analysis.event_samples.all_bars_eval as ab_mod
+    orig = ab_mod.evaluate_all_bars
+
+    def spy(scores, b, cfg, **kw):
+        captured["scores"] = scores
+        captured["cfg"] = cfg
+        return orig(scores, b, cfg, **kw)
+
+    ab = p.analyze_tables(res, seg, horizons=(1,), n_boot=10, )  # type: ignore[call-arg]
+    assert ab["all_bars_evaluation"]["capability_status"] == "ok"
+    sm = ab["all_bars_evaluation"]["signal_mapping"]
+    assert sm["decision_offset_bars"] == 2 and sm["n_signal_bars"] == 3 and sm["n_events_unmapped"] == 0
+    assert sm["indexed_at"] == "decision_bar_open_ms"
+    assert ab["all_bars_evaluation"]["manifest"]["decision_offset_bars"] == 2
+    # 混合 k ⇒ 拒
+    import pandas as pd
+    mixed = [make_event(i, t0=BASE + x * H12, label=i % 2, decision_offset_bars=(2 if i else 0)) for i, x in enumerate(idxs)]
+    res.events = pd.DataFrame(mixed)
+    t2 = p.analyze_tables(res, seg, horizons=(1,), n_boot=10)
+    assert t2["all_bars_evaluation"]["reason"] == "batch_not_single_valued"
+    assert "decision_offset_bars" in t2["all_bars_evaluation"]["doc"]
+    assert captured is not None and orig is ab_mod.evaluate_all_bars

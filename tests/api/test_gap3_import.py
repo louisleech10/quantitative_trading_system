@@ -191,3 +191,30 @@ def test_gap3_import_analyze_all_bars_and_ic_seconds(_isolated_storage):
     assert ab["statistic_kind"] == "all_bars_evaluation" and ab["capability_status"] == "ok" and ab["counts"]["n_total"] > 1000
     assert ab["overall"]["prevalence_learn"] == 0.5 and ab["label_id"] == "event_membership"
     assert all(t >= 1e12 for t in body["event_timestamps"]) and body["event_timestamps_ic_seconds"] == [t // 1000 for t in body["event_timestamps"]]
+
+
+def test_gap3_import_json_verify_source_digest_rejected():
+    """CODEX-R2-P1-03 RECHECK：JSON 端點傳 verify_source_digest=true ⇒ 400 顯式（body 位元組 ≠ 契約來源檔，比對必然不符）。"""
+    r = client.post("/api/v1/case/import-events/json", json={"records": _records(), "verify_source_digest": True})
+    assert r.status_code == 400
+    d = r.json()["detail"]
+    assert d["kind"] == "verify_unsupported_on_json_endpoint" and "import-events" in d["message"]
+    assert client.get("/api/v1/case/events").json()["total"] == 0                # 拒收不落檔
+    # 預設關 ⇒ 正常收
+    assert client.post("/api/v1/case/import-events/json", json={"records": _records()}).status_code == 200
+
+
+def test_gap3_import_file_verify_source_digest_matches_uploaded_bytes(tmp_path):
+    """檔案端點：上傳檔即來源檔時 verify 可用——digest 相符收、不符 ⇒ 422 digest_mismatch（契約字面）。"""
+    import hashlib
+    recs = _records()
+    body = json.dumps(recs, ensure_ascii=False).encode("utf-8")
+    digest = hashlib.sha256(body).hexdigest()
+    fixed = [dict(r, source_file_digest=digest) for r in recs]
+    body2 = json.dumps(fixed, ensure_ascii=False).encode("utf-8")               # 改寫後位元組已變 ⇒ 應 mismatch
+    r = client.post("/api/v1/case/import-events", files={"file": ("ev.json", body2, "application/json")},
+                    params={"validate_only": "true", "verify_source_digest": "true"})
+    assert r.status_code == 422 and {f["reason"] for f in r.json()["detail"]["failures"]} == {"digest_mismatch"}
+    # 關閉 verify ⇒ 收（預設語意）
+    assert client.post("/api/v1/case/import-events", files={"file": ("ev.json", body2, "application/json")},
+                       params={"validate_only": "true"}).status_code == 200

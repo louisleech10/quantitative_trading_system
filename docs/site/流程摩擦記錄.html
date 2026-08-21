@@ -1883,6 +1883,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>八十七・（2026-08-21）我在 review brief 的 <code>fact-verified</code> 欄把紅的寫成綠，被委員用我自己附的 receipt 打穿</strong>：B5 brief 寫「B5 Gate 全綠（含 plain_docs）」，但同一份 receipt 尾行明明是 <code>rc_plain_docs_sync=2</code>（我當下判斷「那是待補的白話同步、不算 Gate 紅」就順手寫成綠）。grok 直接引 receipt 尾行判 P0-BLOCKING，完全正確。這比漏做更糟：<strong>brief 的 fact-verified 是委員信任的地基，一次不實就得整輪重驗</strong>。規則：<strong>fact-verified 只能貼 receipt 實際 rc；任何「我認為不算」的判斷一律改寫成 assumed 並說明理由，交委員裁</strong>——Gate 命令的 rc 沒有「不算」這種東西。</p>
 </blockquote>
+<blockquote>
+<p><strong>八十八・（2026-08-22）測試計數同一批連錯兩次（13 vs 9、232 vs 229），根因是我從記憶寫數字</strong>：grok 在 B5 R1 已抓「brief 寫 13、實為 9」，我修完 R1 後在新 brief／synth 又寫「event_samples 232」（實 229），R2 再被抓一次。兩次都不影響 rc，但污染跨 agent 驗收敘事——委員得自己重跑才能信任任何數字。做法改成機械化：<strong>任何要寫進 brief／synth／commit／看板的測試數字，先 <code>grep -E &quot;passed&quot; &lt;receipt&gt;</code> 把該行複製出來再貼，不准憑印象</strong>；計數與 rc 一樣屬 fact-verified，錯了就是不實。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

@@ -78,9 +78,12 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
       skipped.push({ index: i, reason: 'missing_positive_case_flag' });
       return [];
     }
-    // label_value：搜尋結果之 signed 實際漲跌幅（條件 IC 第三表之必填；缺 ⇒ 後端 unavailable:missing_label_value；GROK-R1-P1-02）
-    const pcRaw = typeof c.price_change === 'number' && Number.isFinite(c.price_change) ? c.price_change : null;
-    const labelValue = pcRaw === null ? null : direction === 'short' ? -pcRaw : pcRaw;
+    // label_value：**答案窗**未來報酬（`future_{horizon}bar_return`），與 label_definition.window.horizon_bars 對齊；
+    // CODEX-R2-P1-02：不得用 `price_change`（觸發根自身報酬，語意不同）。缺該欄 ⇒ 不寫 label_value（條件 IC 會 loud unavailable）。
+    const futureKey = `future_${horizon}bar_return` as keyof CaseData;
+    const fwdRaw = typeof c[futureKey] === 'number' && Number.isFinite(c[futureKey] as number) ? (c[futureKey] as number) : null;
+    const labelValue = fwdRaw === null ? null : direction === 'short' ? -fwdRaw : fwdRaw;
+    if (fwdRaw === null) skipped.push({ index: i, reason: `missing_${String(futureKey)}_label_value_omitted` });
     return [{
       event_id: `${c.symbol}:${c.timeframe || opts.timeframe}:${t0}`,
       symbol: c.symbol,
@@ -112,6 +115,8 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
     n_records: records.length,
     source_file_digest: sourceDigest,
     source_digest_of: 'canonical JSON of search result cases (symbol,timeframe,timestamp,positive_case,price_change)',
-    note: '匯入前請確認 label_definition.window.horizon_bars 與你的答案窗一致；label_value＝搜尋結果 signed 漲跌幅；欄位以 event_import_contract.json 為準',
+    verify_note: '此 digest 綁「搜尋結果來源」而非本匯出檔自身；匯入時勿開 verify_source_digest（該旗標比對的是上傳位元組）',
+    label_value_source: `future_${horizon}bar_return（signed；short 取負）`,
+    note: `匯入前請確認 label_definition.window.horizon_bars（現為 ${horizon}）與你的答案窗一致；label_value 取同 horizon 之未來報酬欄，缺者不寫（條件 IC 會顯示 unavailable）；欄位以 event_import_contract.json 為準`,
   };
 }

@@ -82,7 +82,9 @@ describe('GAP-3 /search 匯出組裝器', () => {
     ] as unknown as CaseData[];
     const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '>=', value: 0.05 }], priceChangeMethod: 'close_to_close' });
     expect(out.n_records).toBe(2);
-    expect(out.skipped.map((s) => s.reason)).toEqual(['unparseable_timestamp', 'missing_positive_case_flag']);
+    // 整列被剔除者（label_value 缺欄只是不寫該欄、列仍保留）
+    expect(out.skipped.filter((s) => !s.reason.includes('label_value_omitted')).map((s) => s.reason))
+      .toEqual(['unparseable_timestamp', 'missing_positive_case_flag']);
     const r0 = out.records[0];
     expect(r0.t0).toBe(1704067200000);
     expect(r0.label).toBe(1);
@@ -110,17 +112,22 @@ describe('GAP-3 /search 匯出組裝器', () => {
     expect(out2.source_file_digest).not.toBe(expected);
   });
 
-  it('GROK-R1-P1-02：label_value＝搜尋結果 signed 漲跌幅（short 取負）；缺 price_change 則不寫欄', async () => {
+  it('CODEX-R2-P1-02：label_value＝同 horizon 之答案窗未來報酬（future_Nbar_return），非觸發根 price_change；short 取負；缺欄不寫並記 skipped', async () => {
     const cases = [
-      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704067200', positive_case: 1, price_change: 0.052 },
-      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704110400', positive_case: 0 },
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704067200', positive_case: 1, price_change: 0.052, future_2bar_return: 0.031, future_4bar_return: 0.077 },
+      { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704110400', positive_case: 0, price_change: -0.011 },
     ] as unknown as CaseData[];
-    const long = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x' });
-    expect(long.records[0].label_value).toBe(0.052);
-    expect('label_value' in long.records[1]).toBe(false);
+    const h2 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x' });
+    expect(h2.records[0].label_value).toBe(0.031);                       // 非 price_change 0.052
+    expect('label_value' in h2.records[1]).toBe(false);
+    expect(h2.skipped.some((s) => s.reason.includes('future_2bar_return'))).toBe(true);
+    expect(h2.label_value_source).toContain('future_2bar_return');
+    const h4 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', horizonBars: 4 });
+    expect(h4.records[0].label_value).toBe(0.077);                       // 隨 horizon 改欄
+    expect(h4.records[0].label_definition.window.horizon_bars).toBe(4);
     const short = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '<=', value: -0.03 }], priceChangeMethod: 'x' });
     expect(short.records[0].direction).toBe('short');
-    expect(short.records[0].label_value).toBe(-0.052);
+    expect(short.records[0].label_value).toBe(-0.031);
   });
 
   it('方向推斷：price_change <= 或負值 ⇒ short；toEpochMs 邊界', () => {

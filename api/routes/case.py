@@ -140,7 +140,11 @@ def _rejected(exc: EventImportRejectedError) -> HTTPException:
 async def import_events_file(
     file: UploadFile = File(...),
     validate_only: bool = Query(False),
-    verify_source_digest: bool = Query(False, description="以上傳內容 sha256 對證各列 source_file_digest"),
+    verify_source_digest: bool = Query(
+        False,
+        description=("以上傳檔位元組 sha256 逐列對證 source_file_digest——**僅當上傳檔本身即契約所指之來源檔時**才開；"
+                     "由 /search 匯出之事件 JSON 其 digest 綁『搜尋結果來源』而非檔案自身，開啟會 digest_mismatch"),
+    ),
 ):
     """上傳 CSV/JSON（GAP-3 事件契約新 schema）。拒收 ⇒ 400（legacy／parse）或 422（契約違規，逐列 reason）。"""
     svc = get_event_import_service()
@@ -159,6 +163,13 @@ async def import_events_json(request: EventImportJsonRequest):
     import json as _json
 
     svc = get_event_import_service()
+    if request.verify_source_digest:
+        # CODEX-R2-P1-03：JSON body ≠ 契約所指「來源檔」；開此旗標必然 digest_mismatch ⇒ 顯式拒，不做無意義比對
+        raise HTTPException(status_code=400, detail=EventImportRejected(
+            kind="verify_unsupported_on_json_endpoint",
+            message=("JSON 端點不支援 verify_source_digest：契約 source_file_digest＝使用者原始來源檔 sha256，"
+                     "本端點位元組為 request body，比對必然不符。請改用 /case/import-events 上傳該來源檔並帶 verify_source_digest=true"),
+        ).model_dump())
     body = _json.dumps(request.records, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
     try:
         return svc.import_records(request.records, source_name=request.source_name, upload_bytes=body,

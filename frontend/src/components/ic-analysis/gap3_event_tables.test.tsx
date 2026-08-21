@@ -28,6 +28,11 @@ const OK: EventAnalyzeResponse = {
       capability_status: 'ok',
       counts: { n_total: 1200, n_eligible: 1198, n_labeled: 1198, n_tail_excluded: 2, n_unknown: 0 },
       overall: { capability_status: 'ok', prevalence_full: 0.51, prevalence_learn: 0.5, lift_threshold: 1.2, precision: 0.6, signal_frequency: 0.005 },
+      rule: 'event_membership: score=1 於各事件之決策根（t₀ 往前 2 根 open），其餘 0',
+      estimand_note: '此表回答「若把這批事件當訊號…」——不是模型預測力評估',
+      label_threshold_note: 'threshold=0.0（signed 報酬 ≥0 ⇒ 1）；使用者標籤門檻不在事件欄位',
+      manifest: { horizon_bars: 2, label_threshold: 0.0, direction: 'long', entry_price_semantic: 'trigger_open', decision_offset_bars: 2, eligibility: 'label_window_complete ∧ grid_continuous' },
+      signal_mapping: { n_signal_bars: 6, n_events_unmapped: 0, decision_offset_bars: 2, indexed_at: 'decision_bar_open_ms' },
     },
   },
   event_timestamps: [1704067200000],
@@ -67,6 +72,13 @@ describe('GAP-3 事件型兩表', () => {
     const ab = screen.getByTestId('event-allbars-table');
     expect(ab.textContent).toContain('1198');
     expect(ab.textContent).toContain('0.5100');
+    // CODEX-R2-P2-01：estimand 揭露（rule／threshold note／manifest／訊號對映）須可見
+    const disc = screen.getByTestId('event-allbars-disclosure');
+    expect(screen.getByTestId('event-allbars-rule').textContent).toContain('決策根');
+    expect(screen.getByTestId('event-allbars-threshold-note').textContent).toContain('threshold=0.0');
+    expect(disc.textContent).toContain('不是模型預測力評估');
+    expect(disc.textContent).toContain('entry trigger_open');
+    expect(disc.textContent).toContain('訊號根 6');
     cleanup();
     const missing = { ...OK, tables: { ...OK.tables, all_bars_evaluation: undefined } };
     render(<EventTablesPanel data={missing} importId="imp-1" />);

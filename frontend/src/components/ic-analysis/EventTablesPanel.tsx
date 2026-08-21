@@ -105,9 +105,23 @@ function AllBarsTable({ table }: { table: EventTableStatus | undefined }) {
   }
   const counts = (table.counts ?? {}) as Record<string, unknown>;
   const o = (table.overall ?? {}) as Record<string, unknown>;
+  const manifest = (table.manifest ?? {}) as Record<string, unknown>;
+  const mapping = (table.signal_mapping ?? {}) as Record<string, unknown>;
   const overallOk = (o.capability_status ?? 'ok') === 'ok';
   return (
     <div className="space-y-1 text-xs text-slate-200" data-testid="event-allbars-table">
+      {/* CODEX-R2-P2-01：estimand 揭露（rule／threshold／manifest）須可見，不得只有數值 */}
+      <div className="rounded border border-slate-700/60 bg-slate-900/40 p-2 text-[11px] text-slate-300" data-testid="event-allbars-disclosure">
+        {table.rule ? <p data-testid="event-allbars-rule">規則：{String(table.rule)}</p> : null}
+        {table.estimand_note ? <p className="text-amber-200/90">{String(table.estimand_note)}</p> : null}
+        {table.label_threshold_note ? <p className="text-amber-200/90" data-testid="event-allbars-threshold-note">{String(table.label_threshold_note)}</p> : null}
+        <p className="text-slate-400">
+          manifest：horizon {fmt(manifest.horizon_bars, 0)}／threshold {fmt(manifest.label_threshold, 4)}／direction {String(manifest.direction ?? '—')}／
+          entry {String(manifest.entry_price_semantic ?? '—')}／k {fmt(manifest.decision_offset_bars, 0)}
+          {mapping.n_signal_bars === undefined ? null : `／訊號根 ${fmt(mapping.n_signal_bars, 0)}（未對映 ${fmt(mapping.n_events_unmapped, 0)}）`}
+        </p>
+        {manifest.eligibility ? <p className="text-slate-500">eligibility：{String(manifest.eligibility)}</p> : null}
+      </div>
       <p className="text-[11px] text-slate-400">
         n_total {fmt(counts.n_total, 0)}／eligible {fmt(counts.n_eligible, 0)}／labeled {fmt(counts.n_labeled, 0)}／tail_excluded {fmt(counts.n_tail_excluded, 0)}／unknown {fmt(counts.n_unknown, 0)}
       </p>
