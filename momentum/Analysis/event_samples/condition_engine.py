@@ -14,6 +14,7 @@ mutation M6 seam＝`_role_violation`（允許 future 欄過 feature 角色 ⇒ �
 from __future__ import annotations
 
 import ast
+import copy
 import hashlib
 import json
 from dataclasses import dataclass
@@ -35,12 +36,12 @@ _CONTRACT_CACHE: Optional[dict] = None
 
 
 def load_condition_engine_contract() -> dict:
-    """讀引擎契約（字面 SoT）；module 級快取，唯讀。"""
+    """讀引擎契約（字面 SoT）；module 級快取，**每次回傳深拷貝**（CODEX-R1-P2-04：caller 改寫不得污染 SoT）。"""
     global _CONTRACT_CACHE
     if _CONTRACT_CACHE is None:
         with _CONTRACT_PATH.open("r", encoding="utf-8") as f:
             _CONTRACT_CACHE = json.load(f)
-    return _CONTRACT_CACHE
+    return copy.deepcopy(_CONTRACT_CACHE)
 
 
 class ConditionError(ValueError):
@@ -78,9 +79,18 @@ _CMP_FLIP = {"Lt": "Gt", "LtE": "GtE", "Gt": "Lt", "GtE": "LtE", "Eq": "Eq", "No
 
 
 def _role_violation(expression_role: str, column: str, column_role: str, contract: dict) -> Optional[str]:
-    """角色隔離判定（M6 seam）。回 None＝合法，否則 reason。"""
+    """角色隔離判定（M6 seam；生產路徑唯一判定點）。回 None＝合法，否則 reason。
+
+    feature：只准 pit_feature 且命名不得為 `future_*`（casefold——GROK-R1-P2-01）。
+    label：只准結果欄（trigger_outcome／future_outcome），混入 pit_feature ⇒ 拒（CODEX-R1-P1-02）。
+    selection_predicate：全放行（只進 provenance）。
+    """
+    prefix = str(contract["future_column_prefix"]).casefold()
     if expression_role == "feature":
-        if column_role != "pit_feature" or column.startswith(contract["future_column_prefix"]):
+        if column_role != "pit_feature" or column.casefold().startswith(prefix):
+            return "role_isolation_violation"
+    elif expression_role == "label":
+        if column_role not in ("trigger_outcome", "future_outcome"):
             return "role_isolation_violation"
     return None
 
@@ -199,6 +209,36 @@ def _is_trivial_compare(t: Tuple[Any, ...]) -> bool:
     return False
 
 
+def _fold(t: Tuple[Any, ...]) -> Optional[bool]:
+    """三值常數摺疊（COMPOSER-R1-P1-01）：回 True／False＝可判定之恆真／恆假，None＝依資料而定。
+    `x or not x` ⇒ True、`x and not x` ⇒ False（排中律／矛盾律）。"""
+    kind = t[0]
+    if kind == "const":
+        return bool(t[1]) if isinstance(t[1], bool) else None
+    if kind in ("col", "lag", "isnull", "notnull", "abs"):
+        return None
+    if kind == "cmp":
+        if t[2][0] == "const" and t[3][0] == "const":
+            a, b = t[2][1], t[3][1]
+            return {"Lt": a < b, "LtE": a <= b, "Gt": a > b, "GtE": a >= b, "Eq": a == b, "NotEq": a != b}[t[1]]
+        return True if t[1] in ("LtE", "GtE", "Eq") and t[2] == t[3] else (False if t[2] == t[3] else None)
+    if kind == "not":
+        v = _fold(t[1])
+        return None if v is None else (not v)
+    vals = [_fold(x) for x in t[1:]]
+    children = list(t[1:])
+    complementary = any(("not", c) in children for c in children)
+    if kind == "and":
+        if any(v is False for v in vals) or complementary:
+            return False
+        return True if all(v is True for v in vals) else None
+    if kind == "or":
+        if any(v is True for v in vals) or complementary:
+            return True
+        return False if all(v is False for v in vals) else None
+    return None  # pragma: no cover
+
+
 def parse_condition(
     expression: str,
     column_registry: Mapping[str, str],
@@ -226,6 +266,9 @@ def parse_condition(
 
     if _is_constant_tree(canon) or _is_trivial_compare(canon):
         raise ConditionError("constant_expression", "表達式不引用欄位或恆真／恆假")
+    folded = _fold(canon)
+    if folded is not None:
+        raise ConditionError("constant_expression", f"邏輯恆{'真' if folded else '假'}（常數摺疊可判定）")
 
     for col, role in sorted(cols.items()):
         r = _role_violation(expression_role, col, role, contract)

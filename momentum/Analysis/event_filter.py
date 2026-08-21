@@ -58,6 +58,8 @@ class IEventFilter(Protocol):
         df: pd.DataFrame,
         query: Optional[str] = None,
         timestamps: Optional[list[int]] = None,
+        *,
+        condition_spec: Optional[ConditionSpec] = None,
     ) -> tuple[pd.DataFrame, dict]:
         ...
 

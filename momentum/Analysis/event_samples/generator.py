@@ -29,14 +29,17 @@ from momentum.Analysis.event_samples import all_bars_eval as _ab
 from momentum.Analysis.event_samples.alignment import align_events, n_dropped_by_reason
 from momentum.Analysis.event_samples.condition_engine import ConditionSpec, evaluate_condition
 from momentum.Analysis.event_samples.dedupe import build_event_manifest
-from momentum.Analysis.event_samples.import_contract import validate_event_import
-from momentum.Analysis.event_samples.types import AlignmentConfig, DedupePolicyConfig
+from momentum.Analysis.event_samples.import_contract import load_event_import_contract, validate_event_import
+from momentum.Analysis.event_samples.types import AlignmentConfig, AlignmentReceipts, DedupePolicyConfig
 
 logger = get_logger(__name__)
 
 TRIGGER_RETURN_COL = "trigger_return"
 FUTURE_RETURN_PREFIX = "future_return_"
 _BAR_COLS = ("open_time_ms", "close_time_ms", "open", "close")
+# CODEX-R1-P1-03：平台產生器之 control_kind 寫死為 platform_same_trigger_rule，不可由設定覆寫
+# （user_labeled_* 只得由匯入路徑產生）；字面於 _check_inputs 對契約 accepted 對證。
+PLATFORM_CONTROL_KIND = "platform_same_trigger_rule"
 
 
 @dataclass(frozen=True)
@@ -63,7 +66,6 @@ class GeneratorConfig:
     scenario: str = "C"
     decision_offset_bars: int = 0
     entry_price_semantic: str = "trigger_open"
-    control_kind: str = "platform_same_trigger_rule"
     cluster_gap_ms: Optional[int] = None
     run_all_bars_eval: bool = True
     classifier_config: Optional[dict] = None
@@ -122,6 +124,9 @@ def _check_inputs(spec: ConditionSpec, bars_by_tf: Mapping[str, pd.DataFrame], l
         raise ValueError("generate_events: data_snapshot_digest 必填非空")
     if int(gen_config.decision_offset_bars) < 0:
         raise ValueError("generate_events: decision_offset_bars 須 ≥ 0")
+    accepted = load_event_import_contract()["required_fields"]["control_kind"]["accepted"]
+    if PLATFORM_CONTROL_KIND not in accepted:
+        raise ValueError(f"generate_events: {PLATFORM_CONTROL_KIND!r} 不在契約 control_kind.accepted")
 
 
 def generate_events(
@@ -207,7 +212,7 @@ def generate_events(
                 "label_value": float(sign * (close[i + h] / close[i] - 1.0)),
                 "label_definition": {"rule_id": r.label_id, "canonical_digest": lm["canonical_digest"],
                                      "window": {"horizon_bars": h}, "label_return_mode": r.label_return_mode},
-                "control_kind": gen_config.control_kind,
+                "control_kind": PLATFORM_CONTROL_KIND,
                 "source_file_digest": source_digest,
                 "data_snapshot_digest": gen_config.data_snapshot_digest,
                 "search_rule_summary": rule_summary,
@@ -251,20 +256,46 @@ def generate_events(
         events = validate_event_import(events.to_dict("records"))   # 丟棄後仍須過同一 validator（單類別 ⇒ raise）
         receipts, failures = align_events(events, {gen_config.symbol: {tf: bars_core}}, AlignmentConfig(timeframes=(tf,)))
         assert len(failures) == 0
-    manifest = build_event_manifest(receipts, DedupePolicyConfig(cluster_gap_ms=gen_config.cluster_gap_ms,
-                                                                 scenario=gen_config.scenario), events=events)
-    keep_ids = set(manifest.table.loc[manifest.table["in_primary"], "event_id"])
+    # 去重 **逐 label_id**（CODEX-R1-P1-01）：不同 label_id 的答案窗重疊是設計使然（同 t₀ 多組標籤），
+    # C 情境 cluster_first 若跨 label_id 成簇會把其他 label_id 整組刪光；每 label_id 自成 manifest。
+    rule_ids = events["label_definition"].apply(lambda d: d["rule_id"])
+    ev_level = receipts.event_level
+    manifests: Dict[str, Any] = {}
+    keep_ids: set = set()
+    dedupe_prov: Dict[str, Any] = {}
+    for r in label_config:
+        sub_ids = set(events.loc[rule_ids == r.label_id, "event_id"])
+        if not sub_ids:
+            continue
+        sub_receipts = AlignmentReceipts(
+            event_level=ev_level[ev_level["event_id"].isin(sub_ids)].reset_index(drop=True),
+            per_tf=receipts.per_tf[receipts.per_tf["event_id"].isin(sub_ids)].reset_index(drop=True),
+        )
+        m = build_event_manifest(sub_receipts, DedupePolicyConfig(cluster_gap_ms=gen_config.cluster_gap_ms,
+                                                                  scenario=gen_config.scenario),
+                                 events=events[events["event_id"].isin(sub_ids)])
+        manifests[r.label_id] = m
+        keep_ids |= set(m.table.loc[m.table["in_primary"], "event_id"])
+        dedupe_prov[r.label_id] = {**m.summary, "policy": m.policy}
     deduped = events[events["event_id"].isin(keep_ids)].reset_index(drop=True)
     prov["n_events_after_dedupe"] = int(len(deduped))
-    prov["dedupe"] = {**manifest.summary, "policy": manifest.policy}
-    prov["manifest"] = manifest
+    prov["dedupe"] = dedupe_prov                     # 逐 label_id：n_events_raw／n_events_effective／policy
+    prov["manifests"] = manifests                    # 逐 label_id EventManifest
+    # COMPOSER-R1-P2-02：結果欄為 raw（未乘方向）、label_value 為 signed——provenance 明示；short＋結果欄選樣 loud
+    prov["outcome_columns_are_raw_unsigned"] = True
+    prov["label_value_is_signed"] = True
+    if gen_config.direction == "short" and prov["selection_uses_outcome_columns"]:
+        logger.warning("generate_events: direction=short 且選樣條件引用 raw 結果欄（%s）——結果欄未乘方向，與 signed label_value 方向相反",
+                       [c for c, v in spec.column_roles.items() if v != "pit_feature"])
 
     # G6：全 K 線標籤重算＝呼叫 B2.5（禁平行實作）。rule callable 在決策根 i−k 之分數＝「觸發於 i」
     # 之遮罩（與 evaluate_all_bars 自身 decision=ot[i−k]、label 取 close[i]→close[i+h] 之映射一致）。
     if gen_config.run_all_bars_eval:
         abe: Dict[str, Any] = {}
+        ded_rule_ids = deduped["label_definition"].apply(lambda d: d["rule_id"])
         for r in label_config:
-            sub = events[events["label_definition"].apply(lambda d: d["rule_id"]) == r.label_id]
+            # GROK-R1-P1-01：prevalence_learn＝**回傳之 primary（去重後）集**該 label_id 正例率（與下游學習樣本一致）
+            sub = deduped[ded_rule_ids == r.label_id]
             prevalence_learn = float(sub["label"].mean()) if len(sub) else float("nan")
 
             def _rule(df_bars: pd.DataFrame, _spec=spec, _k=k) -> pd.Series:
@@ -278,7 +309,9 @@ def generate_events(
                    "classifier_config": gen_config.classifier_config, "seed": gen_config.seed,
                    "n_boot": gen_config.n_boot, "label_id": r.label_id,
                    "entry_price_semantic": gen_config.entry_price_semantic, "timeframe": tf}
-            rep = _ab.evaluate_all_bars(_rule, {gen_config.symbol: bars_by_tf[tf]}, cfg, manifest=manifest)
+            rep = _ab.evaluate_all_bars(_rule, {gen_config.symbol: bars_by_tf[tf]}, cfg,
+                                        manifest=manifests.get(r.label_id))
+            rep["prevalence_learn_scope"] = "primary_after_dedupe"
             rep["estimand_note"] = (
                 "selection_predicate 引用結果欄 ⇒ 此為標籤重算而非預測力評估（D3-3）"
                 if prov["selection_uses_outcome_columns"] else "rule 僅引用 pit 特徵；可作規則命中之全 K 線評估"

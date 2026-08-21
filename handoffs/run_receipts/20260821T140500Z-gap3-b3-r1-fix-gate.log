@@ -1,0 +1,169 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 195 items / 131 deselected / 64 selected
+
+tests/momentum/event_samples/test_condition_engine.py .................. [ 28%]
+.........................                                                [ 67%]
+tests/momentum/event_samples/test_generator_adapters.py ................ [ 92%]
+.....                                                                    [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================ 64 passed, 131 deselected, 4 warnings in 1.37s ================
+rc_gate1=0
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 17 items
+
+tests/momentum/feature_engineering/test_state_counters.py .............. [ 82%]
+...                                                                      [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 17 passed, 4 warnings in 0.56s ========================
+rc_gate2=0
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 12 items / 11 deselected / 1 selected
+
+tests/momentum/event_samples/test_mutation_guard.py .                    [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 1 passed, 11 deselected, 4 warnings in 0.52s =================
+rc_M6=0
+[gap3_freeze_golden] CHECK PASS canonical_sha=163c4cecb1006dc42dea0804acc365d83fe7cdbaf05ba64b1d794168dd67e463
+rc_golden=0
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 256 items
+
+tests/momentum/event_samples/test_alignment.py .............             [  5%]
+tests/momentum/event_samples/test_all_bars_eval.py ............          [  9%]
+tests/momentum/event_samples/test_baseline_oracle.py ...........         [ 14%]
+tests/momentum/event_samples/test_condition_engine.py .................. [ 21%]
+.........................                                                [ 30%]
+tests/momentum/event_samples/test_counterexample_classifier.py ......... [ 34%]
+.......                                                                  [ 37%]
+tests/momentum/event_samples/test_dedupe.py ........                     [ 40%]
+tests/momentum/event_samples/test_event_split.py .........               [ 43%]
+tests/momentum/event_samples/test_feature_materialization.py .......     [ 46%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py ........        [ 49%]
+tests/momentum/event_samples/test_generator_adapters.py ................ [ 55%]
+.....                                                                    [ 57%]
+tests/momentum/event_samples/test_import_contract.py ................... [ 65%]
+.........                                                                [ 68%]
+tests/momentum/event_samples/test_mutation_guard.py ............         [ 73%]
+tests/momentum/event_samples/test_tables.py .......                      [ 76%]
+tests/momentum/test_event_filter.py .................                    [ 82%]
+tests/momentum/test_ic_filter_orchestrator.py .......................... [ 92%]
+..................                                                       [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+tests/momentum/test_ic_filter_orchestrator.py: 48 warnings
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+tests/momentum/test_ic_filter_orchestrator.py: 48 warnings
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2898: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[None, :]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+====================== 256 passed, 100 warnings in 25.39s ======================
+rc_all=0

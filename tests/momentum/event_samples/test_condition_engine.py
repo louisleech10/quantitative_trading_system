@@ -65,9 +65,65 @@ def test_feature_role_rejects_trigger_outcome_and_future_prefix_backstop():
 def test_label_role_requires_outcome_column():
     with pytest.raises(ConditionError) as ei:
         parse_condition("rsi_14 < 30", REG, "label")
-    assert ei.value.reason == "label_without_outcome_column"
+    assert ei.value.reason == "role_isolation_violation"            # CODEX-R1-P1-02：label 拒 pit_feature
     spec = parse_condition("future_return_2 >= 0.01", REG, "label")
     assert spec.column_roles == {"future_return_2": "future_outcome"}
+    spec2 = parse_condition("trigger_return > 0 and future_return_2 >= 0.01", REG, "label")
+    assert set(spec2.column_roles.values()) == {"trigger_outcome", "future_outcome"}
+
+
+def test_label_role_rejects_mixed_feature_and_outcome():
+    """CODEX-R1-P1-02 RECHECK：label 混入 pit_feature ⇒ 拒；同式 selection_predicate 通過、feature 拒。"""
+    expr = "rsi_14 > 0 and future_return_2 > 0"
+    with pytest.raises(ConditionError) as ei:
+        parse_condition(expr, REG, "label")
+    assert ei.value.reason == "role_isolation_violation"
+    assert parse_condition(expr, REG, "selection_predicate").column_roles["rsi_14"] == "pit_feature"
+    with pytest.raises(ConditionError):
+        parse_condition(expr, REG, "feature")
+
+
+def test_future_prefix_backstop_is_case_insensitive():
+    """GROK-R1-P2-01 RECHECK：`Future_Return`／`FUTURE_X` 誤登 pit_feature 仍拒。"""
+    for col in ("Future_Return", "FUTURE_X", "fUtUrE_y"):
+        with pytest.raises(ConditionError) as ei:
+            parse_condition(f"{col} > 0", {col: "pit_feature"}, "feature")
+        assert ei.value.reason == "role_isolation_violation"
+        assert parse_condition(f"{col} > 0", {col: "pit_feature"}, "selection_predicate").column_roles == {col: "pit_feature"}
+
+
+@pytest.mark.parametrize("expr", [
+    "True or rsi_14 > 0",
+    "rsi_14 > 0 or True",
+    "False and rsi_14 > 0",
+    "rsi_14 > 0 or not rsi_14 > 0",
+    "rsi_14 > 0 and not (rsi_14 > 0)",
+    "not (rsi_14 > 0 or not rsi_14 > 0)",
+    "(1 < 2 or rsi_14 > 0) and ema_gap > 0 or True",
+    "rsi_14 <= rsi_14 and ema_gap > 0 or 3 > 2",
+])
+def test_logical_tautology_rejected(expr):
+    """COMPOSER-R1-P1-01 RECHECK：引用欄位但邏輯恆真／恆假 ⇒ constant_expression（parse-time fail-closed）。"""
+    with pytest.raises(ConditionError) as ei:
+        parse_condition(expr, REG, "feature")
+    assert ei.value.reason == "constant_expression"
+
+
+def test_non_tautology_with_constant_subterm_accepted():
+    spec = parse_condition("(rsi_14 > 0 or 1 > 2) and ema_gap > 0", REG, "feature")   # `1>2` 恆假但整體仍依資料
+    assert spec.column_roles == {"ema_gap": "pit_feature", "rsi_14": "pit_feature"}
+    assert evaluate_condition(spec, _df()).tolist() == [False, True, False, False, False]   # 列 2 rsi NaN ⇒ False
+
+
+def test_contract_cache_immutable():
+    """CODEX-R1-P2-04 RECHECK：caller 改寫回傳 dict 不污染 SoT。"""
+    c = load_condition_engine_contract()
+    c["future_column_prefix"] = "zzz_"
+    c["allowed_functions"]["evil"] = {"arity": 1}
+    assert load_condition_engine_contract()["future_column_prefix"] == "future_"
+    assert "evil" not in load_condition_engine_contract()["allowed_functions"]
+    with pytest.raises(ConditionError):
+        parse_condition("future_q > 0", {"future_q": "pit_feature"}, "feature")
 
 
 # ---- safe-subset ----
