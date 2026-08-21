@@ -93,18 +93,22 @@ def extract_event_patterns(
     survivor_v2: Optional[dict],
     bridge_config: BridgeConfig,
     *,
-    manifest: Optional[EventManifest] = None,
+    manifest: EventManifest,
     strata: Optional[pd.DataFrame] = None,
 ) -> Dict[str, Any]:
     """在事件 train 段擬合多特徵組合、test 段評分。
 
     features_at_decision：index=event_id（B1.6 產出）；labels：index=event_id ∈ {0,1}。
     event_split_plan：B1.3 產出（必填；None ⇒ PatternSplitRequiredError）。
+    manifest：B1.2 cluster manifest（**必填** keyword；AR-3 必需輸入——raw/effective n 來源；缺 ⇒ ValueError，CODEX-R1-P1-01）。
     survivor_v2：B2.4 payload（選用；給定 ⇒ 特徵候選限縮為倖存特徵）。
-    strata：index=event_id，欄 `counterexample_kind_effective`（選用；供 B2.2 分層）。
+    strata：index=event_id，欄 `counterexample_kind_effective`（選用；反例分層非 AR-3 必需輸入，缺 ⇒ 分層空、overall 照算）。
     """
     if event_split_plan is None:
         raise PatternSplitRequiredError("extract_event_patterns: event_split_plan 必填（fail-closed；不 fallback 全樣本）")
+    if not isinstance(manifest, EventManifest) or manifest.table is None or manifest.table.empty \
+            or "n_events_raw" not in manifest.summary or "n_events_effective" not in manifest.summary:
+        raise ValueError("extract_event_patterns: manifest（B1.2 cluster manifest）必填且須含 table＋summary.n_events_raw/effective（AR-3 必需輸入）")
     if not isinstance(features_at_decision, pd.DataFrame) or features_at_decision.empty:
         raise ValueError("extract_event_patterns: features_at_decision 為空")
     assign = event_split_plan.assignments

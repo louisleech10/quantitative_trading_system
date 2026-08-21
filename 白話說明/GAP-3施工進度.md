@@ -84,6 +84,15 @@
 
 **B3 R2／蓋章（8/21）**：原提出方逐條重跑同一反例，9 條全部 CLOSED、三家交叉複核同意、0 新問題；grok 順手指出「匯出特徵表的未來欄檢查也該不分大小寫」已一併補；三家蓋章 r2 收斂檔、機檢 PASS ⇒ **第 3 批完工蓋章**。唯一留給 B5 的：`/search` API 那邊寫死的篩選參數清單要改成讀契約（api/ 路徑只在 B5 白名單）。
 
+## B4 逐項（2 項；驗收＝`pytest tests/momentum/event_samples/ -k "pattern_bridge or candidate_ledger"`＋AUC 餵 DSR 必拒）
+
+| 項 | 做什麼 | 驗收證據 |
+|---|---|---|
+| B4.1 pattern 橋 | 在事件樣本的「學習段」用既有的規則抽取器找多特徵組合（ML 殼一行不動）；只在學習段擬合、只在測試段評分；沒有切分計畫就直接拒（不偷偷退回全樣本）；特徵太多時先用學習段的 IC 粗篩；測試段評分復用第 2 批辨別表（含置亂 oracle） | 10 條測試：fit 被監視只看得到學習段列、沒傳 sample_weight；label 打亂 ⇒ AUC 落帶內；粗篩不看測試段；簇 manifest 必填 |
+| B4.2 candidate ledger | 規則訊號 → 實際持有報酬序列（進場價與出場時點**只從對齊收據取**，五種進場語意真實 K 線手算 exact）→ 寫進 GAP-1 的試驗帳本（唯一寫入口）→ DSR／PBO／MinBTL 的「試了幾次」只從帳本讀；AUC 之類分類分數餵進來直接 `MetricTypeError` | 17 條測試：AUC／偽裝分數數列皆拒、帳本空 ⇒ unavailable、未記帳候選不得當冠軍、PBO 觀測軸按進場時間、跨度不足 MinBTL 會吼 |
+
+**B4 三家審查第一輪（8/21）抓 8 條、全修**：三家同抓「PBO 的觀測軸用事件 ID 字串排序而不是進場時間，切塊會亂」（已改用收據裡的進場時間排序、衝突就拒）；兩家抓「把分數數列標成 return_series 就能繞過型別閘」（已改成必須帶 `to_return_series` 的收據鍵，沒收據的一律拒）；codex 另抓三條：pattern 橋沒強制簇 manifest（已必填）、沒記帳的候選可以當 DSR 冠軍（已要求輸入集＝帳本集）、provenance 的命令／預期可省略（已必填且寫檔前先驗）。修後 27 條綠，等 R2 原提出方閉合。
+
 ## 下一步
 
-**B4（新 session 開工；HANDOFF 已寫好開工指令）**：B4.1 pattern 橋（學習段找多特徵組合）→ B4.2 candidate ledger＋訊號轉 return series 接 GAP-1 DSR/PBO 防線（AUC 誤餵 DSR 必須被機械拒絕）。做完三家 review＋蓋章才進 B5。
+**R2 閉合**（session `20260821-gap3-b4-review-r2`；原提出方重跑同一反例）→ 三家蓋章 → 進 B5。

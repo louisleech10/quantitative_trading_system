@@ -65,15 +65,35 @@ class CandidateReturns:
     metric_kind: str = METRIC_KIND_RETURN_SERIES
 
 
+_RECEIPT_ATTRS = ("t_semantics", "entry_semantic", "label_definition", "source_artifact_hash", "span_years", "entry_at_ms_by_event")
+
+
 def _assert_return_series(cr: Any, where: str) -> None:
+    """K6/C7 型別閘（機械）：typed 容器＋`to_return_series` 收據 attrs 全齊（COMPOSER-R1-P1-01／GROK-R1-P2-01：
+    只擋 metric_kind／name 可被「預設 return_series＋分數數列」繞過 ⇒ 改驗收據鍵：t_semantics=trade_level、
+    entry_semantic、label_definition、source_artifact_hash(64hex)、span_years>0、entry_at_ms_by_event 覆蓋全 index、n≥2）。"""
     if not isinstance(cr, CandidateReturns):
         raise MetricTypeError(f"{where}: 須為 CandidateReturns，得 {type(cr).__name__}")
     if str(cr.metric_kind).lower() != METRIC_KIND_RETURN_SERIES:
         raise MetricTypeError(f"{where}: metric_kind={cr.metric_kind!r} 非 return_series（AUC/PR-AUC/rank-biserial 禁餵 DSR/PBO）")
-    if not isinstance(cr.returns, pd.Series) or cr.returns.empty:
-        raise MetricTypeError(f"{where}: returns 須為非空 pd.Series（per-trade return series）")
+    if not isinstance(cr.returns, pd.Series) or len(cr.returns) < 2:
+        raise MetricTypeError(f"{where}: returns 須為 ≥2 筆之 pd.Series（per-trade return series；單一分數非序列）")
     if str(cr.returns.name or "").lower() in _FORBIDDEN_METRIC_KINDS:
         raise MetricTypeError(f"{where}: returns.name={cr.returns.name!r} 指向分類指標，非 return series")
+    a = cr.returns.attrs
+    missing = [k for k in _RECEIPT_ATTRS if k not in a]
+    if missing:
+        raise MetricTypeError(f"{where}: returns 缺 to_return_series 收據 attrs {missing}（分數／AUC 數列不得冒充 return series）")
+    if a["t_semantics"] != _T_SEMANTICS:
+        raise MetricTypeError(f"{where}: t_semantics={a['t_semantics']!r} ≠ {_T_SEMANTICS}")
+    h = str(a["source_artifact_hash"])
+    if len(h) != 64 or any(ch not in "0123456789abcdef" for ch in h):
+        raise MetricTypeError(f"{where}: source_artifact_hash 非 64 hex")
+    if not (isinstance(a["span_years"], (int, float)) and np.isfinite(a["span_years"]) and a["span_years"] > 0):
+        raise MetricTypeError(f"{where}: span_years 須 >0（收據）")
+    ent = a["entry_at_ms_by_event"]
+    if not isinstance(ent, dict) or not set(cr.returns.index) <= set(ent):
+        raise MetricTypeError(f"{where}: entry_at_ms_by_event 須覆蓋全部事件（觀測軸時序收據）")
     if not np.isfinite(cr.returns.to_numpy(dtype=float)).all():
         raise ValueError(f"{where}: returns 含 NaN/inf（loud）")
 
@@ -158,6 +178,7 @@ def to_return_series(
     out.attrs["source_artifact_hash"] = _digest({"events": sorted(signaled), "entry": entry_semantic, "ld": ld_key,
                                                  "values": [float(x[3]) for x in rows]})
     out.attrs["t_semantics"] = _T_SEMANTICS
+    out.attrs["entry_at_ms_by_event"] = {x[2]: int(x[0]) for x in rows}   # 觀測軸時序收據（PBO 聯集軸依此排序）
     return out
 
 
@@ -166,14 +187,19 @@ def record_candidate(ledger_path: LedgerKey, candidate_meta: Dict[str, Any]) -> 
     """寫一筆 candidate 至 GAP-1 帳本（唯一合法寫入口 `append_trial_attempt`）＋provenance sidecar。
 
     candidate_meta 必含：`candidate_id`、`evaluation_id`、`returns`（CandidateReturns）、`rule_digest`、`seed`、
-    `input_digest`；選填 `attempt_index`（預設 0）、`command`、`expected`（oracle 預期 fail/pass）、`ts`。
+    `input_digest`、`command`（可重播命令）、`expected`（oracle 預期 'pass'|'fail'）；選填 `attempt_index`（預設 0）、`ts`。
+    寫入順序：全部驗證 → `append_trial_attempt`（GAP-1 自帶 flock）→ sidecar（自帶 sidecar flock）；
+    誠實邊界：兩檔非同一交易，sidecar 寫失敗會 raise（帳本列已在，可由 evaluation_id 對帳）。
     metric 固定 `sharpe`／`per_period`（由 return series 算；退化 ⇒ metric_valid=False、state=failed）。
     """
     if not isinstance(ledger_path, LedgerKey):
         raise TypeError("record_candidate: ledger_path 須為 LedgerKey（檔名由 GAP-1 ledger_path 推導）")
-    for k in ("candidate_id", "evaluation_id", "returns", "rule_digest", "seed", "input_digest"):
-        if k not in candidate_meta:
-            raise ValueError(f"record_candidate: candidate_meta 缺 {k}")
+    # CODEX-R1-P1-04：每 oracle 必記可重播命令＋預期 fail/pass——command／expected 必填非空，寫任何檔前先驗
+    for k in ("candidate_id", "evaluation_id", "returns", "rule_digest", "seed", "input_digest", "command", "expected"):
+        if k not in candidate_meta or candidate_meta[k] is None or (isinstance(candidate_meta[k], str) and not candidate_meta[k].strip()):
+            raise ValueError(f"record_candidate: candidate_meta 缺 {k}（provenance 必填；未寫入任何檔）")
+    if str(candidate_meta["expected"]) not in ("pass", "fail"):
+        raise ValueError("record_candidate: expected 須為 'pass'|'fail'")
     if str(candidate_meta.get("metric_kind", METRIC_KIND_RETURN_SERIES)).lower() != METRIC_KIND_RETURN_SERIES:
         raise MetricTypeError(f"record_candidate: metric_kind={candidate_meta.get('metric_kind')!r} 非 return_series")
     cr: CandidateReturns = candidate_meta["returns"]
@@ -211,10 +237,11 @@ def record_candidate(ledger_path: LedgerKey, candidate_meta: Dict[str, Any]) -> 
         "input_digest": str(candidate_meta["input_digest"]), "input_artifact_hash": record["input_artifact_hash"],
         "n_trades": int(len(vals)), "span_years": float(cr.returns.attrs.get("span_years", float("nan"))),
         "entry_semantic": cr.returns.attrs.get("entry_semantic"), "label_definition": cr.returns.attrs.get("label_definition"),
-        "command": candidate_meta.get("command"), "expected": candidate_meta.get("expected"), "ts": ts,
+        "command": str(candidate_meta["command"]), "expected": str(candidate_meta["expected"]), "ts": ts,
     }
-    with prov_path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(prov, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+    with _ledger._ledger_lock(prov_path, exclusive=True):
+        with prov_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(prov, ensure_ascii=False, sort_keys=True, default=str) + "\n")
 
 
 def _periods_per_year(s: pd.Series) -> float:
@@ -272,6 +299,16 @@ def run_dsr_pbo(
                     "eligibility": {"status": "unavailable", "reason": reason}})
         return out
 
+    # CODEX-R1-P1-02：DSR／MinBTL 前先要求輸入候選集 == ledger 候選集（未記帳候選不得成 champion；禁跳過 ledger 直餵）
+    if frozenset(returns_by_candidate) != frozenset(lr.candidate_ids):
+        reason = "universe_provenance_unverifiable"
+        out.update({"capability_status": "unavailable", "reason": reason,
+                    "candidate_set_mismatch": {"input": sorted(returns_by_candidate), "ledger": sorted(lr.candidate_ids)},
+                    "dsr": {"status": "unavailable", "reason": reason},
+                    "pbo": {"status": "unavailable", "reason": reason},
+                    "eligibility": {"status": "unavailable", "reason": reason}})
+        return out
+
     # champion＝per-period Sharpe 最大（平手取 candidate_id 最小）
     sharpes = {}
     for cid, cr in returns_by_candidate.items():
@@ -303,7 +340,15 @@ def run_dsr_pbo(
     if len(ids) < 2:
         out["pbo"] = {"status": "unavailable", "reason": "single_candidate"}
     else:
-        union = sorted({e for cid in ids for e in returns_by_candidate[cid].returns.index})
+        # 觀測軸＝entry 時間序（CODEX-R1-P1-03／COMPOSER-R1-P2-02／GROK-R1-P1-01：字串序 ≠ 時序 ⇒ CSCV 塊切壞）；
+        # 時間戳只取 to_return_series 收據 attrs.entry_at_ms_by_event；同事件跨候選時間戳不一致 ⇒ fail-closed
+        entry_at: Dict[str, int] = {}
+        for cid in ids:
+            for e, t in returns_by_candidate[cid].returns.attrs["entry_at_ms_by_event"].items():
+                if e in entry_at and entry_at[e] != int(t):
+                    raise ValueError(f"run_dsr_pbo: 事件 {e} 於候選間 entry_at_ms 不一致（收據衝突）")
+                entry_at[e] = int(t)
+        union = sorted({e for cid in ids for e in returns_by_candidate[cid].returns.index}, key=lambda e: (entry_at[e], e))
         M = np.zeros((len(union), len(ids)), dtype=float)
         for j, cid in enumerate(ids):
             M[:, j] = returns_by_candidate[cid].returns.reindex(union).fillna(0.0).to_numpy(dtype=float)
@@ -317,7 +362,8 @@ def run_dsr_pbo(
                 returns_matrix=M, n_obs=len(union), n_candidates=len(ids), candidate_ids=ids, s_blocks=int(s_blocks),
                 selection_metric=selection_metric, universe_provenance=prov, ledger_result=lr,
             )
-            out["pbo"] = {**asdict(pbo), "n_obs": len(union), "observation_axis": "union_of_signaled_events_zero_when_flat"}
+            out["pbo"] = {**asdict(pbo), "n_obs": len(union), "observation_axis": "union_of_signaled_events_sorted_by_entry_at_ms_zero_when_flat",
+                          "observation_axis_first_last_entry_ms": [entry_at[union[0]], entry_at[union[-1]]]}
     out["capability_status"] = "ok"
     out["reason"] = None
     return out

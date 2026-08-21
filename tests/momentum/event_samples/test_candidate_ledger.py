@@ -89,11 +89,15 @@ def test_to_return_series_w8_mismatch_rejected(bars):
 
 
 # ---- 合成 candidate return series（事件／報酬序列合成合法，章程 §F）----
-def _cand(cid, n=40, mu=0.002, seed=1, span_years=2.0):
+def _cand(cid, n=40, mu=0.002, seed=1, span_years=2.0, ids=None, entry_ms=None):
     rng = np.random.default_rng(seed)
-    s = pd.Series(rng.normal(mu, 0.02, n), index=[f"e{i:03d}" for i in range(n)], name="hold_return")
-    s.attrs.update({"span_years": span_years, "source_artifact_hash": cl._digest({"cid": cid, "seed": seed}),
-                    "entry_semantic": "trigger_open", "label_definition": LD, "t_semantics": "trade_level"})
+    ids = ids or [f"e{i:03d}" for i in range(n)]
+    n = len(ids)
+    entry_ms = entry_ms or {e: BASE + i * H12 for i, e in enumerate(ids)}
+    s = pd.Series(rng.normal(mu, 0.02, n), index=ids, name="hold_return")
+    s.attrs.update({"span_years": span_years, "source_artifact_hash": cl._digest({"cid": cid, "seed": seed, "ids": ids}),
+                    "entry_semantic": "trigger_open", "label_definition": LD, "t_semantics": "trade_level",
+                    "entry_at_ms_by_event": dict(entry_ms)})
     return CandidateReturns(candidate_id=cid, returns=s)
 
 
@@ -182,4 +186,84 @@ def test_record_guards_and_ledger_mismatch_unverifiable():
     # ledger 只記 a、輸入 a+b ⇒ universe guard unverifiable（禁跳過 ledger 直餵）
     record_candidate(KEY, _meta(a))
     rep = run_dsr_pbo(KEY, {"a": a, "b": _cand("b", seed=2)}, s_blocks=4)
-    assert rep["pbo"]["status"] == "unavailable" and rep["pbo"]["reason"] != ""
+    assert rep["capability_status"] == "unavailable" and rep["reason"] == "universe_provenance_unverifiable"
+    assert rep["pbo"]["status"] == "unavailable" and rep["dsr"]["status"] == "unavailable"   # CODEX-R1-P1-02：未記帳候選不得成 champion
+    assert rep["candidate_set_mismatch"] == {"input": ["a", "b"], "ledger": ["a"]}
+
+
+def test_disguised_score_series_rejected():
+    """COMPOSER-R1-P1-01／GROK-R1-P2-01 RECHECK：metric_kind 預設＋分數數列（無 to_return_series 收據 attrs）⇒ MetricTypeError。"""
+    s = pd.Series([0.9, 0.85, 0.72], index=["e0", "e1", "e2"], name="hold_return")
+    s.attrs.update({"span_years": 2.0})
+    with pytest.raises(MetricTypeError):
+        run_dsr_pbo(KEY, {"a": CandidateReturns("a", s)})
+    with pytest.raises(MetricTypeError):
+        record_candidate(KEY, _meta(CandidateReturns("a", s)))
+    s2 = pd.Series([0.73, 0.81, 0.66], index=["e0", "e1", "e2"], name="score")
+    with pytest.raises(MetricTypeError):
+        run_dsr_pbo(KEY, {"a": CandidateReturns("a", s2)})
+    single = _cand("a").returns.iloc[:1]                                   # 單一值非序列
+    with pytest.raises(MetricTypeError):
+        run_dsr_pbo(KEY, {"a": CandidateReturns("a", single)})
+    # 收據鍵不全／t_semantics 錯／hash 非 64hex／span≤0／時序收據未覆蓋 ⇒ 各拒
+    for tweak in ({"t_semantics": "bar_count"}, {"source_artifact_hash": "zz"}, {"span_years": 0.0},
+                  {"entry_at_ms_by_event": {"e000": 1}}):
+        bad = _cand("a").returns.copy()
+        bad.attrs = {**_cand("a").returns.attrs, **tweak}
+        with pytest.raises(MetricTypeError):
+            run_dsr_pbo(KEY, {"a": CandidateReturns("a", bad)})
+
+
+def test_unlogged_candidate_cannot_be_champion():
+    """CODEX-R1-P1-02 RECHECK：ledger 只記 logged；輸入 unlogged（attrs.hash 借 logged 之 H）⇒ DSR／MinBTL 皆 unavailable。"""
+    logged = _cand("logged", mu=0.0)
+    record_candidate(KEY, _meta(logged))
+    un = _cand("unlogged", mu=0.01, seed=9)
+    un.returns.attrs["source_artifact_hash"] = logged.returns.attrs["source_artifact_hash"]
+    rep = run_dsr_pbo(KEY, {"unlogged": un})
+    assert rep["capability_status"] == "unavailable" and rep["dsr"]["status"] == "unavailable"
+    assert rep["eligibility"]["status"] == "unavailable" and "champion" not in rep
+
+
+def test_pbo_observation_axis_by_entry_time_not_lexicographic(monkeypatch):
+    """CODEX-R1-P1-03／COMPOSER-R1-P2-02／GROK-R1-P1-01 RECHECK：event_id 字串序與時間序相反 ⇒ 矩陣列仍依 entry_at_ms。"""
+    ids = [f"evt_{i}" for i in (10, 9, 8, 7, 6, 5, 4, 3, 2, 1)]            # 時間序：evt_10 最早
+    entry = {e: BASE + i * H12 for i, e in enumerate(ids)}
+    a = _cand("a", ids=ids, entry_ms=entry, seed=1)
+    b = _cand("b", ids=ids[::2], entry_ms={e: entry[e] for e in ids[::2]}, seed=2)
+    for cr in (a, b):
+        record_candidate(KEY, _meta(cr))
+    captured = {}
+    import momentum.Analysis.event_samples.candidate_ledger as mod
+    orig = mod.probability_of_backtest_overfitting
+
+    def spy(**kw):
+        captured["M"] = kw["returns_matrix"].copy()
+        return orig(**kw)
+
+    monkeypatch.setattr(mod, "probability_of_backtest_overfitting", spy)
+    rep = run_dsr_pbo(KEY, {"a": a, "b": b}, s_blocks=4)
+    assert rep["pbo"]["status"] == "ok"
+    M = captured["M"]
+    np.testing.assert_allclose(M[:, 0], a.returns.loc[ids].to_numpy())       # 列序＝時間序（evt_10 在第 0 列）
+    assert rep["pbo"]["observation_axis_first_last_entry_ms"] == [entry["evt_10"], entry["evt_1"]]
+    assert M[1, 1] == 0.0 and M[0, 1] == b.returns.loc["evt_10"]             # b 未出手者 0
+    # 跨候選同事件時間戳衝突 ⇒ fail-closed
+    c = _cand("c", ids=ids[:4], entry_ms={**{e: entry[e] for e in ids[:4]}, "evt_9": entry["evt_9"] + 1}, seed=3)
+    record_candidate(KEY, _meta(c))
+    with pytest.raises(ValueError, match="不一致"):
+        run_dsr_pbo(KEY, {"a": a, "b": b, "c": c}, s_blocks=4)
+
+
+def test_record_requires_command_and_expected_before_any_write(_redirect_ledger_root):
+    """CODEX-R1-P1-04 RECHECK：缺 command／expected 或 expected 非 pass|fail ⇒ 拒，且帳本與 sidecar 皆未建立。"""
+    a = _cand("a")
+    for bad in ({"command": None}, {"command": "  "}, {"expected": None}, {"expected": "maybe"}):
+        with pytest.raises(ValueError):
+            record_candidate(KEY, _meta(a, **bad))
+    root = _redirect_ledger_root / "strategy_validation"
+    assert not root.exists() or not any(root.iterdir())
+    record_candidate(KEY, _meta(a))
+    import json
+    prov = (root / f"{KEY.research_session_id}__{KEY.dataset_key}.provenance.jsonl").read_text().splitlines()
+    assert json.loads(prov[0])["command"] and json.loads(prov[0])["expected"] == "pass"

@@ -200,8 +200,31 @@
 <p><strong>合計 66 條新測試＋M6</strong>；B3 Gate 全命令 rc=0（receipt <code>handoffs/run_receipts/20260821T133500Z-gap3-b3-gate.log</code>）。</p>
 <p><strong>B3 三家審查第一輪（8/21）抓 9 條、全修</strong>：最重要的四條——codex 抓到「預設確認型情境下，多組標籤的事件會被另一組標籤的簇刪光」（已改成每組標籤各自去重）、「標籤角色可以混進特徵欄」（已拒）、「平台產生器的控制組種類可被設定覆寫成『使用者標的』」（已寫死不可改）；grok 抓到「全 K 線驗證揭露的學習基率用的是去重前的樣本，和實際回傳的樣本差約 6 個百分點」（已改成用回傳樣本、測試釘到 1e-12）；composer 抓到「<code>True or 條件</code> 這種表面有條件、實際恆真的式子沒在解析期擋」（已加常數摺疊、排中律也擋）。另四條小的（契約快取可被改寫、Protocol 簽名沒同步、未來欄命名大小寫繞過、做空時結果欄方向沒揭露）全修；其中 <code>requests.py</code> 改用契約出口屬 B5 範圍登記 follow-up。修後 64＋17 條綠、golden sha 不變，等 R2 原提出方閉合。</p>
 <p><strong>B3 R2／蓋章（8/21）</strong>：原提出方逐條重跑同一反例，9 條全部 CLOSED、三家交叉複核同意、0 新問題；grok 順手指出「匯出特徵表的未來欄檢查也該不分大小寫」已一併補；三家蓋章 r2 收斂檔、機檢 PASS ⇒ <strong>第 3 批完工蓋章</strong>。唯一留給 B5 的：<code>/search</code> API 那邊寫死的篩選參數清單要改成讀契約（api/ 路徑只在 B5 白名單）。</p>
+<h2 id="b4-逐項2-項驗收pytest-testsmomentumevent_samples--k-pattern_bridge-or-candidate_ledgerauc-餵-dsr-必拒">B4 逐項（2 項；驗收＝<code>pytest tests/momentum/event_samples/ -k &quot;pattern_bridge or candidate_ledger&quot;</code>＋AUC 餵 DSR 必拒）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項</th>
+<th>做什麼</th>
+<th>驗收證據</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B4.1 pattern 橋</td>
+<td>在事件樣本的「學習段」用既有的規則抽取器找多特徵組合（ML 殼一行不動）；只在學習段擬合、只在測試段評分；沒有切分計畫就直接拒（不偷偷退回全樣本）；特徵太多時先用學習段的 IC 粗篩；測試段評分復用第 2 批辨別表（含置亂 oracle）</td>
+<td>10 條測試：fit 被監視只看得到學習段列、沒傳 sample_weight；label 打亂 ⇒ AUC 落帶內；粗篩不看測試段；簇 manifest 必填</td>
+</tr>
+<tr>
+<td>B4.2 candidate ledger</td>
+<td>規則訊號 → 實際持有報酬序列（進場價與出場時點<strong>只從對齊收據取</strong>，五種進場語意真實 K 線手算 exact）→ 寫進 GAP-1 的試驗帳本（唯一寫入口）→ DSR／PBO／MinBTL 的「試了幾次」只從帳本讀；AUC 之類分類分數餵進來直接 <code>MetricTypeError</code></td>
+<td>17 條測試：AUC／偽裝分數數列皆拒、帳本空 ⇒ unavailable、未記帳候選不得當冠軍、PBO 觀測軸按進場時間、跨度不足 MinBTL 會吼</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>B4 三家審查第一輪（8/21）抓 8 條、全修</strong>：三家同抓「PBO 的觀測軸用事件 ID 字串排序而不是進場時間，切塊會亂」（已改用收據裡的進場時間排序、衝突就拒）；兩家抓「把分數數列標成 return_series 就能繞過型別閘」（已改成必須帶 <code>to_return_series</code> 的收據鍵，沒收據的一律拒）；codex 另抓三條：pattern 橋沒強制簇 manifest（已必填）、沒記帳的候選可以當 DSR 冠軍（已要求輸入集＝帳本集）、provenance 的命令／預期可省略（已必填且寫檔前先驗）。修後 27 條綠，等 R2 原提出方閉合。</p>
 <h2 id="下一步">下一步</h2>
-<p><strong>B4（新 session 開工；HANDOFF 已寫好開工指令）</strong>：B4.1 pattern 橋（學習段找多特徵組合）→ B4.2 candidate ledger＋訊號轉 return series 接 GAP-1 DSR/PBO 防線（AUC 誤餵 DSR 必須被機械拒絕）。做完三家 review＋蓋章才進 B5。</p>
+<p><strong>R2 閉合</strong>（session <code>20260821-gap3-b4-review-r2</code>；原提出方重跑同一反例）→ 三家蓋章 → 進 B5。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
