@@ -29,12 +29,12 @@
 <tr>
 <td>B2</td>
 <td>三張統計表＋倖存者契約升版＋全部 K 線驗證</td>
-<td><strong>施工完（8/21）、等三家審查</strong>：五項落地、IC 主線 golden 凍結後接線 sha 不變、全套 123 條測試</td>
+<td><strong>完工蓋章（8/21）</strong>：三輪審查 11→4→0、三家蓋章機檢通過、184 條測試、IC 主線 golden 接線前後 sha 不變</td>
 </tr>
 <tr>
 <td>B3</td>
 <td>事件產生器＋變化類特徵算子</td>
-<td>排隊中</td>
+<td><strong>下一批（新 session 開工）</strong></td>
 </tr>
 <tr>
 <td>B4</td>
@@ -169,8 +169,9 @@
 </tbody>
 </table></div>
 <p><strong>B2 三家審查第一輪（8/21 晚）抓 11 條、全修</strong>：最重要的是三家同抓「全部 K 線驗證／辨別表沒把『能不能做正式合併推論』那組欄位機械列出來」（已補：缺切分計畫就直接標不准）；grok 抓到「事件數不足時會默默改用主線標籤繼續算」（已改成 loud 標 <code>conditional_ic_abandoned</code>）；codex 抓到全 K 線驗證沒驗資料連續性、進場價寫死開盤價（已改：缺根排除、支援五種進場語意）、倖存者六鍵沒從餵入層接通（已接通＋validator 缺鍵必拒）。修後 181 條測試綠，等 R2 複驗。</p>
+<p><strong>B2 R2／R3（8/21）</strong>：R2 composer/grok 全 CLOSED、codex 7 條中 4 條判「修未修淨」（共同欄只有旗標沒數值／連續性用資料自算步長／builder 不拒半套 context／<code>conditional_ic_abandoned</code> 沒人消費）→ 全部修到底（實際 macro/micro AUC＋time-cluster CI、契約 TF 逐鄰檢＋進場語意必填、倖存者加第七鍵 <code>label_source</code> 讓驗證器自足、報告 <code>metadata.conditional_ic=unavailable</code>）；R3 三家 0 findings；三家蓋章 r3 收斂檔、機檢 PASS ⇒ <strong>第 2 批完工蓋章</strong>。教訓記摩擦八十三。</p>
 <h2 id="下一步">下一步</h2>
-<p>B2 R2 閉合 → 蓋章 → B3（事件產生器＋變化類算子）。</p>
+<p><strong>B3（新 session 開工；HANDOFF 已寫好開工指令）</strong>：B3.1 條件引擎（typed AST＋欄位角色＋digest）→ B3.2 <code>/search</code>／<code>event_filter</code> adapter（G1–G6；G6 呼叫 B2.5 evaluator 禁平行實作）→ B3.3 五個變化類算子（<code>tests/momentum/feature_engineering/</code> 新建目錄）。做完三家 review＋蓋章才進 B4。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工進度.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

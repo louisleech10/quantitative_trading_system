@@ -1868,6 +1868,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>八十二・（2026-08-21）施工批開工時沒同步建白話看板，使用者問「白話說明怎麼都沒更新」才補</strong>：GAP-1／GAP-2 各有施工看板，GAP-3 B1 從開工到三家審查完（四個 commit）白話資料夾只有 TODO 凍結那一筆；<code>plain_docs_sync_check</code> 沒擋是因為看板根本不存在、沒有 WATCHED 可比。規則：<strong>每個施工 epic 的第一個實作 commit 必須同時建 <code>白話說明/&lt;epic&gt;施工進度.md</code> 並登記 WATCHED（含實作路徑與 scripts/）</strong>，之後每批 commit 由守衛強制同步；HANDOFF「每批收尾固定動作」列明。附帶：看板表格的狀態欄用文字（排隊中／施工完）不用 ⬜／✅（摩擦八十）。</p>
 </blockquote>
+<blockquote>
+<p><strong>八十三・（2026-08-21）「修了但沒修淨」——B1 codex 7 條有 3 條、B2 7 條有 4 條在閉合輪被原提出方判 NOT-CLOSED</strong>：共同模式是我照 finding 的「精神」修（例：加了旗標、加了檢查），沒逐字對 finding 的「修法」欄自檢（它要的是<strong>實際數值欄</strong>不是旗標、要<strong>契約步長</strong>不是資料自算、要 <strong>builder 也拒半套</strong>不只 validator、要<strong>下游真的消費</strong>旗標）。每條多花一輪閉合。規則：<strong>寫回前把 finding 的「修法」句拆成可勾選清單逐條對碼</strong>，並把它的 RECHECK 命令自己先跑一次（原提出方會跑同一條）；synth 處置欄要引 finding 修法原文而非改寫。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

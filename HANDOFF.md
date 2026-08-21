@@ -6,15 +6,15 @@
 
 ---
 
-## 🔴 接手任務：**GAP-3 開 B2 施工（B1 已 CLOSED 2026-08-21：四輪 review 8→3→1→0＋三家戳記 rc=0）**
+## 🔴 接手任務：**GAP-3 開 B3 施工（B1、B2 已 CLOSED 2026-08-21：各批三家 RECONCILE-STAMP rc=0；使用者裁定 B3 由新 session 開工、可直接動工）**
 
-- **依據**：`docs/GAP3_EVENT_TODO.md`（FROZEN）＋延伸檔 `docs/GAP3_EVENT_TODO.D-001.md`（A-01 FF float16 容差分層／A-02 檔名規約／A-03 `events=` context keyword＋`entry_after_label_start >=`）；SPEC FROZEN。
-- **B2 批內順序**：B2.1 → B2.2 → **`scripts/gap3_freeze_golden.py --write`（import 復用 `gap2_freeze_golden.py::gap2_canonical_sha`，寫 `handoffs/run_receipts/gap3_golden_pre.json`，獨立 commit）** → B2.3（沿 `event_timestamps` 入口；v2 payload 在 B2.4 前不得寫）→ B2.4（`momentum/Analysis/survivor_contract.py`＋json v1→2）→ B2.5。mutation 本批落 M4/M7/M11；B2 Gate 命令見 TODO §B。
-- **B1 產出可用介面**：`event_samples/{import_contract,alignment,dedupe,event_split,feature_materialization,baseline,counterexample_classifier}.py`；`build_event_manifest(..., events=)`／`materialize_features_at_decision(..., events=)` 需帶 events context；`single_feature_binary_baseline(..., feature_manifest_hash=<64hex>)` 必填；`permutation_oracle(values, y, stat_fn, cfg)` 供 B2.2/B2.3 重用（W3）。
-- **每批收尾固定動作**：更新 `白話說明/GAP-3施工進度.md`（WATCHED 已登記）＋接下來/README；commit 後背景 push；review 輪 session 命名 `20260821-gap3-b2-review-r<N>`。
+- **依據**：`docs/GAP3_EVENT_TODO.md`（FROZEN）Phase B3＋延伸檔 `docs/GAP3_EVENT_TODO.D-001.md`（A-01 FF float16 容差分層／A-03 `events=` context keyword、`entry_after_label_start >=`）；SPEC FROZEN（D3 欄位角色隔離＝B3.1 規格全文）。開工前照 CLAUDE.md 稽核 HANDOFF vs repo（`git log -3`、`pytest tests/momentum/event_samples/ -q` 應 ~130 passed、`tests/momentum/Analysis/test_survivor_contract.py` 55）。
+- **B3 批內順序**：B3.1 `event_samples/condition_engine.py`（`parse_condition(expression, column_registry, expression_role)`→`ConditionSpec{ast,canonical_digest,column_roles,max_lookback,label_ids,expression_role}`；safe-subset AST；`feature` 角色引用 `future_*`/`trigger_outcome` ⇒ 拒、`selection_predicate` 放行只進 provenance；M6 seam）→ B3.2 `event_samples/generator.py::generate_events(...)`＋`momentum/Analysis/event_filter.py` 薄 adapter（白名單 §0-6-③；G1–G6；**G6 呼叫 `all_bars_eval.evaluate_all_bars` 禁平行實作**；`control_kind=platform_same_trigger_rule` 產出過 B1.0 validator；`allowed_filtering_params` 契約化）→ B3.3 `momentum/FeatureEngineering/operators/state_counters.py` 五算子（TODO W7 精確語意：閉區間含當前根、嚴格變號 d=0 不計、無事件 NaN 唯 `cross_count`=0）＋`operator_registry` 註冊；測試落**新建** `tests/momentum/feature_engineering/`（含 `__init__.py`）。B3 Gate 命令見 TODO §B；`scripts/gap3_freeze_golden.py --check` 於 B3.2 後須 PASS（sha 163c4ce…）。
+- **既有介面（B1/B2 產出，直接消費）**：`validate_event_import`／`align_events`／`build_event_manifest(..., events=)`／`split_events`／`materialize_features_at_decision(..., events=)`→三元／`single_feature_binary_baseline(..., feature_manifest_hash=<64hex>)`／`permutation_oracle`／`event_forward_return_table`／`binary_discrimination_table(..., manifest=)`／`ic_feed.build_event_ic_inputs`（產 `event_timestamps`/`event_label_values`/`event_context`）／`evaluate_all_bars(scores_or_rule, bars, manifest_config{entry_price_semantic,timeframe 必填}, event_split_plan=, manifest=)`；orchestrator `analyze(..., event_timestamps=, event_label_values=, event_context=)`。
+- **每批收尾固定動作**：更新 `白話說明/GAP-3施工進度.md`（WATCHED 已登記，含 scripts/）＋接下來/README；commit 後背景 push；review session 命名 `<YYYYMMDD>-gap3-b3-review-r<N>`、stamp `…-b3-stamp-r1`；寫回前把 finding「修法」拆清單逐條對碼＋自跑其 RECHECK（摩擦八十三）。
 
-## ⚠ 坑（完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～八十二）
-- 🔴 含家族名的 Bash 會被擋 ⇒ 命令寫 scratchpad 腳本再 `bash <script>`；session 命名規約 `<YYYYMMDD>-<epic>-<batch|x>-<kind>-r<N>`、task-id＝大寫。
-- 🔴 FF V7 `features_df` 恆 0 欄——特徵走 `create_feature_reader().load_columns_v2/load_row_index_v2`（row_index＝bar open 秒）；儲存 float16 為主；standard preset 跑 ~150s、minimal 0.8s。kline cache timestamp＝epoch 秒、bar open_time。
-- 🔴 戳記時序：stamp-target 先建空 `## 戳記` 區再派；戳記後 `gate.sh register-output <TASK> <synth>` 補 provenance。debt 銷帳 `debt_clear.sh --round-id --session --lock`。
-- 白話看板表格狀態欄用文字不用 ⬜／✅（factkey 守衛）；`factkey_write_guard` 對 `Archived/GAP-2施工進度.md:13-22` 紅＝既有；push 丟背景；venv Python 3.9.6。
+## ⚠ 坑（完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～八十三）
+- 🔴 含家族名的 Bash 會被擋 ⇒ 命令寫 scratchpad 腳本再 `bash <script>`；session 命名規約 `<YYYYMMDD>-<epic>-<batch|x>-<kind>-r<N>`、task-id＝大寫；stamp 輪交件須含 canonical sentinel heading，否則 completeness vacuous ⇒ 用 `debt_clear.sh --abandon --kind no-findings-expected` 收。
+- 🔴 FF V7 `features_df` 恆 0 欄——特徵走 `create_feature_reader().load_columns_v2/load_row_index_v2`（row_index＝bar open 秒）；儲存 float16 為主；minimal preset 0.8s、standard ~150s。kline cache timestamp＝epoch 秒、bar open_time、連續網格。
+- 🔴 戳記時序：stamp-target 先建空 `## 戳記` 區再派；戳記後 `gate.sh register-output <TASK> <synth>`；債銷帳 `debt_clear.sh --round-id --session --lock`。
+- 白話看板狀態欄用文字（排隊中／完工蓋章），禁 ⬜／✅／「收案」字樣貼 B<n>（factkey 守衛）；`Archived/GAP-2施工進度.md:13-22` 紅＝既有；push 丟背景；venv Python 3.9.6。

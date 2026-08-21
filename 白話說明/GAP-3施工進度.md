@@ -7,8 +7,8 @@
 | 批 | 內容（白話） | 狀態 |
 |---|---|---|
 | **B1** | 匯入契約＋不偷看未來的時間對齊＋去重切分＋特徵取列＋自檢 oracle（7 項） | **完工蓋章（8/21）**：四輪審查 8→3→1→0、三家蓋章機檢通過、100 條測試 |
-| B2 | 三張統計表＋倖存者契約升版＋全部 K 線驗證 | **施工完（8/21）、等三家審查**：五項落地、IC 主線 golden 凍結後接線 sha 不變、全套 123 條測試 |
-| B3 | 事件產生器＋變化類特徵算子 | 排隊中 |
+| B2 | 三張統計表＋倖存者契約升版＋全部 K 線驗證 | **完工蓋章（8/21）**：三輪審查 11→4→0、三家蓋章機檢通過、184 條測試、IC 主線 golden 接線前後 sha 不變 |
+| B3 | 事件產生器＋變化類特徵算子 | **下一批（新 session 開工）** |
 | B4 | pattern 抽取＋接 GAP-1 防過擬合 | 排隊中 |
 | B5 | API／前端三頁／UAT | 排隊中 |
 
@@ -68,6 +68,8 @@
 
 **B2 三家審查第一輪（8/21 晚）抓 11 條、全修**：最重要的是三家同抓「全部 K 線驗證／辨別表沒把『能不能做正式合併推論』那組欄位機械列出來」（已補：缺切分計畫就直接標不准）；grok 抓到「事件數不足時會默默改用主線標籤繼續算」（已改成 loud 標 `conditional_ic_abandoned`）；codex 抓到全 K 線驗證沒驗資料連續性、進場價寫死開盤價（已改：缺根排除、支援五種進場語意）、倖存者六鍵沒從餵入層接通（已接通＋validator 缺鍵必拒）。修後 181 條測試綠，等 R2 複驗。
 
+**B2 R2／R3（8/21）**：R2 composer/grok 全 CLOSED、codex 7 條中 4 條判「修未修淨」（共同欄只有旗標沒數值／連續性用資料自算步長／builder 不拒半套 context／`conditional_ic_abandoned` 沒人消費）→ 全部修到底（實際 macro/micro AUC＋time-cluster CI、契約 TF 逐鄰檢＋進場語意必填、倖存者加第七鍵 `label_source` 讓驗證器自足、報告 `metadata.conditional_ic=unavailable`）；R3 三家 0 findings；三家蓋章 r3 收斂檔、機檢 PASS ⇒ **第 2 批完工蓋章**。教訓記摩擦八十三。
+
 ## 下一步
 
-B2 R2 閉合 → 蓋章 → B3（事件產生器＋變化類算子）。
+**B3（新 session 開工；HANDOFF 已寫好開工指令）**：B3.1 條件引擎（typed AST＋欄位角色＋digest）→ B3.2 `/search`／`event_filter` adapter（G1–G6；G6 呼叫 B2.5 evaluator 禁平行實作）→ B3.3 五個變化類算子（`tests/momentum/feature_engineering/` 新建目錄）。做完三家 review＋蓋章才進 B4。
