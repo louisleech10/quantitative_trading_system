@@ -115,6 +115,10 @@ def test_discrimination_oos_only_and_kind_strata():
     assert rep["common"]["formal_pooled_inference_allowed"] is False
     assert rep["common"]["degraded"] == ["single_symbol"] and rep["common"]["n_events_raw"] is None
     assert set(rep["common"]) >= {"stats_modes", "n_events_raw", "n_events_effective", "degraded", "loso_status", "cluster_adjusted"}
+    # CODEX-R2-P1-01：實際 macro／micro／cluster-CI 數值
+    assert rep["common"]["micro_auc"] == pytest.approx(rep["overall"]["auc"], abs=1e-12)
+    assert rep["common"]["macro_auc"] == pytest.approx(rep["overall"]["auc"], abs=1e-12)
+    assert rep["common"]["auc_cluster_ci"]["status"] == "ok" and rep["common"]["n_time_clusters"] == 100
 
 
 def test_discrimination_shuffled_in_band_and_one_class():

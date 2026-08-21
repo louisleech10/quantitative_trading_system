@@ -187,7 +187,8 @@ def test_M4_denominator_tamper_detected(bars, monkeypatch):
     rng = np.random.default_rng(SEED + 4)
     scores = pd.Series(rng.uniform(0, 1, len(ot)), index=pd.MultiIndex.from_product([["ETHUSDT"], ot]))
     _record_fixture("M4_segment", {"rows": [1000, 1100], "scores_head": scores.to_numpy()[:5].tolist()})
-    cfg = {"horizon_bars": 2, "label_threshold": 0.01, "prevalence_learn": 0.5, "sample_design": "case_control", "n_boot": 5}
+    cfg = {"horizon_bars": 2, "label_threshold": 0.01, "prevalence_learn": 0.5, "sample_design": "case_control", "n_boot": 5,
+           "entry_price_semantic": "trigger_open", "timeframe": "12h"}
     assert ab.evaluate_all_bars(scores, seg, cfg)["counts"]["n_eligible"] == 98      # baseline 手算 exact
     orig = ab._is_eligible
 
@@ -210,9 +211,11 @@ def test_M7_prevalence_disclosure_removed_detected(bars):
     ot = seg["ETHUSDT"]["open_time_ms"].to_numpy()
     scores = pd.Series(np.linspace(0, 1, len(ot)), index=pd.MultiIndex.from_product([["ETHUSDT"], ot]))
     _record_fixture("M7_segment", {"rows": [1000, 1100]})
-    ok = evaluate_all_bars(scores, seg, {"horizon_bars": 2, "label_threshold": 0.01, "prevalence_learn": 0.4, "sample_design": "case_control", "n_boot": 5})
+    base = {"horizon_bars": 2, "label_threshold": 0.01, "sample_design": "case_control", "n_boot": 5,
+            "entry_price_semantic": "trigger_open", "timeframe": "12h"}
+    ok = evaluate_all_bars(scores, seg, {**base, "prevalence_learn": 0.4})
     assert ok["capability_status"] == "ok"
-    mutated = evaluate_all_bars(scores, seg, {"horizon_bars": 2, "label_threshold": 0.01, "sample_design": "case_control", "n_boot": 5})
+    mutated = evaluate_all_bars(scores, seg, base)
     assert mutated["capability_status"] == "unavailable" and mutated["reason"] == "missing_prevalence_disclosure"
 
 

@@ -246,5 +246,25 @@ def binary_discrimination_table(
         legs = strata.reindex(idx)["leg"]
         out["by_leg"] = {str(l): metrics(s[(legs == l).to_numpy()], y[(legs == l).to_numpy()]) for l in legs.dropna().unique()}
     out["common"] = _common_constraint_block(event_split_plan, manifest)  # AR-3 全套欄（COMPOSER/GROK R1-P2-01）
+    # CODEX-R2-P1-01：實際 macro／micro／cluster-CI 數值（非只旗標）
+    sym = event_split_plan.assignments.set_index("event_id")["symbol"].reindex(idx)
+    clus = event_split_plan.clusters.set_index("event_id")["time_cluster_id"].reindex(idx) if not event_split_plan.clusters.empty else pd.Series(range(len(idx)), index=idx)
+    if len(np.unique(y)) >= 2:
+        per_sym = []
+        for s_name, g in pd.DataFrame({"y": y, "s": s, "sym": sym.to_numpy()}).groupby("sym"):
+            if g["y"].nunique() >= 2:
+                per_sym.append(float(roc_auc_score(g["y"], g["s"])))
+        out["common"]["macro_auc"] = float(np.mean(per_sym)) if per_sym else float("nan")
+        out["common"]["micro_auc"] = float(roc_auc_score(y, s))
+        cl = clus.fillna(-1).to_numpy().astype("int64")
+        from momentum.Analysis.event_samples.all_bars_eval import _cluster_bootstrap_stat
+
+        def _auc_sel(sel):
+            return float(roc_auc_score(y[sel], s[sel])) if len(np.unique(y[sel])) >= 2 else None
+
+        out["common"]["auc_cluster_ci"] = _cluster_bootstrap_stat(_auc_sel, cl, seed=oc.seed, n_boot=int(table_config.get("n_boot", 300)))
+        out["common"]["n_time_clusters"] = int(len(np.unique(cl)))
+    else:
+        out["common"].update({"macro_auc": None, "micro_auc": None, "auc_cluster_ci": {"status": "unavailable"}, "n_time_clusters": 0})
     out["receipts"] = {"seed": oc.seed, "n_perm": oc.n_perm, "oos_only": True}
     return out

@@ -654,6 +654,26 @@ def test_conditional_ic_requires_event_context_fail_closed():
         sc.validate_survivor_output(payload, report_meta=kw2["report_meta"])
 
 
+def test_partial_event_context_rejected_and_validator_independent_of_report_meta():
+    """CODEX-R2-P1-03：builder 對半套 context 拒；validator 以 payload 自述 label_source 判 conditional IC（不需 report_meta）。"""
+    kw = _event_kwargs({k: v for k, v in _ctx().items() if k != "control_kind"})  # 半套
+    with pytest.raises(ContractValidationError, match="exactly the six"):
+        sc.build_survivor_output(**kw)
+    kw2 = _event_kwargs(_ctx())
+    kw2["report_meta"] = {**kw2["report_meta"], "event_filter": {"applied": True, "label_source": "event_label_value"}}
+    payload = sc.build_survivor_output(**kw2)
+    assert payload["sample_scope"]["event"]["label_source"] == "event_label_value"
+    sc.validate_survivor_output(payload)                                   # 不帶 report_meta 亦驗
+    for k in ("event_manifest_hash", "label_definition_hash"):
+        payload["sample_scope"]["event"][k] = None
+    for k in ("decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind"):
+        payload["sample_scope"]["event"][k] = None
+    with pytest.raises(ContractValidationError, match="non-null"):
+        sc.validate_survivor_output(payload)                               # 不帶 report_meta 仍拒
+    payload2 = sc.build_survivor_output(**_event_kwargs())
+    assert payload2["sample_scope"]["event"]["label_source"] is None       # 無事件 label ⇒ null
+
+
 def test_v1_payload_explicitly_rejected_no_silent_coerce():
     payload, _ = _valid_payload()
     payload["schema_version"] = 1

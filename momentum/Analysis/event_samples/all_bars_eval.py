@@ -15,7 +15,31 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
+from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.Analysis.event_samples.counterexample_classifier import _classify_one
+
+
+def _cluster_bootstrap_stat(
+    values_fn, clusters: np.ndarray, *, seed: int, n_boot: int
+) -> Dict[str, float]:
+    """以 cluster 為抽樣單位的 bootstrap 分位 CI（CODEX-R2-P1-01：共同欄須含實際 cluster-CI）。
+    values_fn(sel_idx) → 統計量；單一 cluster ⇒ unavailable。"""
+    uniq = np.unique(clusters)
+    if len(uniq) < 2:
+        return {"ci_low": float("nan"), "ci_high": float("nan"), "n_clusters": int(len(uniq)), "status": "unavailable"}
+    rng = np.random.default_rng(seed)
+    idx_by = [np.flatnonzero(clusters == c) for c in uniq]
+    boots = []
+    for _ in range(n_boot):
+        pick = rng.integers(0, len(uniq), len(uniq))
+        sel = np.concatenate([idx_by[p] for p in pick])
+        v = values_fn(sel)
+        if v is not None and np.isfinite(v):
+            boots.append(float(v))
+    if len(boots) < max(10, n_boot // 4):
+        return {"ci_low": float("nan"), "ci_high": float("nan"), "n_clusters": int(len(uniq)), "status": "unavailable"}
+    return {"ci_low": float(np.quantile(boots, 0.025)), "ci_high": float(np.quantile(boots, 0.975)),
+            "n_clusters": int(len(uniq)), "status": "ok"}
 
 
 def _is_eligible(
@@ -28,9 +52,11 @@ def _is_eligible(
         return "warmup_insufficient"
     if i + horizon >= n:
         return "label_window_incomplete"
-    # 資料連續（CODEX-R1-P1-02）：決策 bar → 答案窗末 bar 須為連續網格（缺根 ⇒ missing_bar）
+    # 資料連續（CODEX-R1-P1-02／R2-P1-02）：決策 bar → 答案窗末 bar **逐鄰**差恰＝契約 TF 步長
+    # （duplicate ⇒ 差 0、缺根 ⇒ 差 2Δ，皆拒；步長來自 TIMEFRAME_SECONDS 非資料自身）
     if open_ms is not None and step_ms is not None:
-        if int(open_ms[i + horizon]) - int(open_ms[i - k]) != (horizon + k) * int(step_ms):
+        seg = open_ms[i - k: i + horizon + 1].astype("int64")
+        if len(seg) > 1 and not (np.diff(seg) == int(step_ms)).all():
             return "missing_bar"
     seg_o = open_[i - k: i + horizon + 1]
     seg_c = close[i - k: i + horizon + 1]
@@ -90,7 +116,18 @@ def evaluate_all_bars(
     n_boot = int(manifest_config.get("n_boot", 300))
     cls_cfg = manifest_config.get("classifier_config")
     label_id = str(manifest_config.get("label_id", "default"))
-    entry_semantic = str(manifest_config.get("entry_price_semantic", "trigger_open"))  # D1-6（CODEX-R1-P1-02）
+    # CODEX-R2-P1-02：entry 語意與 TF 為必填（無預設；estimand 不得靜默改變）；k ≥ 0
+    if "entry_price_semantic" not in manifest_config:
+        raise ValueError("evaluate_all_bars: manifest_config.entry_price_semantic 必填（D1-6 五值之一，無預設）")
+    entry_semantic = str(manifest_config["entry_price_semantic"])
+    if entry_semantic not in ("trigger_open", "trigger_close", "next_open", "decision_bar_open", "decision_bar_close"):
+        raise ValueError(f"evaluate_all_bars: entry_price_semantic {entry_semantic!r} 非 D1-6 五值")
+    if k < 0:
+        raise ValueError("evaluate_all_bars: decision_offset_bars 須 ≥ 0")
+    if "timeframe" not in manifest_config or manifest_config["timeframe"] not in TIMEFRAME_SECONDS:
+        raise ValueError("evaluate_all_bars: manifest_config.timeframe 必填且須在 TIMEFRAME_SECONDS（網格步長來源）")
+    expected_step_ms = TIMEFRAME_SECONDS[manifest_config["timeframe"]] * 1000
+    bucket_ms = int(manifest_config.get("bucket_ms", expected_step_ms))  # time-cluster 桶（cluster CI 用）
 
     prevalence_learn = manifest_config.get("prevalence_learn")
     if prevalence_learn is None or manifest_config.get("sample_design") != "case_control":
@@ -110,7 +147,9 @@ def evaluate_all_bars(
         close = df["close"].to_numpy(dtype=float)
         ot = df["open_time_ms"].to_numpy()
         n = len(df)
-        step_ms = int(np.median(np.diff(ot))) if n > 1 else None  # 網格步長（連續性判準）
+        step_ms = expected_step_ms  # 網格步長＝契約 TF（非資料自身 median；CODEX-R2-P1-02）
+        if n != len(np.unique(ot)):
+            raise ValueError(f"evaluate_all_bars: {symbol} bars 含重複 open_time_ms（duplicate_bar）")
         if callable(model_scores_or_rule):
             scores = model_scores_or_rule(df)
             scores = pd.Series(np.asarray(scores, dtype=float), index=ot)
@@ -147,6 +186,7 @@ def evaluate_all_bars(
                 "symbol": symbol, "decision_at_ms": decision_ms, "t0_ms": int(ot[i]), "score": float(sc), "y": y,
                 "hold_return": hold, "period": pd.Timestamp(int(ot[i]), unit="ms", tz="UTC").strftime("%Y-%m"),
                 "counterexample_kind_effective": kind, "label_id": label_id,
+                "time_cluster_id": int(decision_ms // bucket_ms),
             })
     m = pd.DataFrame(rows)
 
@@ -205,6 +245,23 @@ def evaluate_all_bars(
     # AR-3 共同約束欄（B2 全批共同；三家 R1 同抓）：缺 split plan ⇒ formal_pooled_inference_allowed=False 揭露
     from momentum.Analysis.event_samples.tables import _common_constraint_block
     out["common"] = _common_constraint_block(event_split_plan, manifest)
+    # CODEX-R2-P1-01：共同欄須含**實際** macro／micro／cluster-CI 數值（非只旗標）
+    if not m.empty and m["y"].nunique() >= 2:
+        yv, sv = m["y"].to_numpy(), m["score"].to_numpy()
+        cl = m["time_cluster_id"].to_numpy()
+
+        def _auc_sel(sel):
+            if len(np.unique(yv[sel])) < 2:
+                return None
+            return float(roc_auc_score(yv[sel], sv[sel]))
+
+        per_sym = [v["auc"] for v in out["strata"]["by_symbol"].values() if v.get("capability_status") == "ok"]
+        out["common"]["macro_auc"] = float(np.mean(per_sym)) if per_sym else float("nan")   # symbol 等權
+        out["common"]["micro_auc"] = float(roc_auc_score(yv, sv))                            # bar 等權（pooled）
+        out["common"]["auc_cluster_ci"] = _cluster_bootstrap_stat(_auc_sel, cl, seed=seed, n_boot=n_boot)
+        out["common"]["n_time_clusters"] = int(len(np.unique(cl)))
+    else:
+        out["common"].update({"macro_auc": None, "micro_auc": None, "auc_cluster_ci": {"status": "unavailable"}, "n_time_clusters": 0})
     assert counts["n_total"] == counts["n_eligible"] + counts["n_unknown"] + counts["n_tail_excluded"]
     assert counts["n_eligible"] == counts["n_labeled"] + counts["n_missing"]
     return out

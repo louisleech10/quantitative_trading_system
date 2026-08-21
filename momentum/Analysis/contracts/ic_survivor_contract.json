@@ -254,7 +254,7 @@
     }
   },
   "event_definition_keys": {
-    "_doc": "sample_scope.event 物件（序列化規格見 _doc）。version 2（GAP-3 Task B2.4）擴六鍵：event_manifest_hash／label_definition_hash（64-hex）、decision_time_rule／feature_cutoff_rule／label_window_rule（非空字串）、control_kind（event_import_contract.control_kind 閉集）；六鍵 required 且 nullable——GAP-2 序列型／query 模式為 null；GAP-3 事件樣本（statistic_kind=conditional_ic）六鍵全非 null。v1 payload（schema_version=1）由 validate_survivor_output 顯式拒收（禁 silent coerce）。",
+    "_doc": "sample_scope.event 物件（序列化規格見 _doc）。version 2（GAP-3 Task B2.4）擴六鍵：event_manifest_hash／label_definition_hash（64-hex）、decision_time_rule／feature_cutoff_rule／label_window_rule（非空字串）、control_kind（event_import_contract.control_kind 閉集）；六鍵 required 且 nullable——GAP-2 序列型／query 模式為 null；GAP-3 事件樣本（statistic_kind=conditional_ic）六鍵全非 null。v1 payload（schema_version=1）由 validate_survivor_output 顯式拒收（禁 silent coerce）。第七鍵 label_source（CODEX-R2-P1-03）＝payload 自述 label 來源：event_label_value（條件 IC；六鍵必非 null）／mainline_return_N（事件不足 conditional_ic_abandoned）／null（無事件 label）；validator 不依賴 report_meta 即可判 conditional IC。",
     "additional_properties": false,
     "keys": {
       "definition_hash": {
@@ -308,6 +308,11 @@
         "nullable": true
       },
       "control_kind": {
+        "type": "str",
+        "required": true,
+        "nullable": true
+      },
+      "label_source": {
         "type": "str",
         "required": true,
         "nullable": true

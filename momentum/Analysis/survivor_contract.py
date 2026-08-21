@@ -287,9 +287,14 @@ def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[D
         raise ContractValidationError("sample_scope.kind=event requires event object")
     if scope["event"] is not None:
         _check_event_object(scope["event"], c, "sample_scope.event")
-        # CODEX-R1-P1-03：conditional IC（report_meta.event_filter.label_source=event_label_value）⇒ v2 六鍵必非 null
+        # CODEX-R1-P1-03／R2-P1-03：conditional IC 由 payload 自述 `event.label_source` 判定（不依賴 report_meta）
+        ls = scope["event"].get("label_source")
+        if ls not in (None, "event_label_value", "mainline_return_N"):
+            raise ContractValidationError(f"sample_scope.event.label_source {ls!r} invalid")
         ef = report_meta.get("event_filter") if isinstance(report_meta, dict) else None
-        if isinstance(ef, dict) and ef.get("label_source") == "event_label_value":
+        if isinstance(ef, dict) and ef.get("label_source") and ef.get("label_source") != ls:
+            raise ContractValidationError("sample_scope.event.label_source != report_meta.event_filter.label_source")
+        if ls == "event_label_value":
             nulls = [k for k in ("event_manifest_hash", "label_definition_hash", "decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind") if scope["event"].get(k) is None]
             if nulls:
                 raise ContractValidationError(f"sample_scope.event: conditional_ic requires v2 keys non-null, got null {nulls}")
@@ -362,6 +367,8 @@ def _check_event_object(ev: Dict[str, Any], c: Dict[str, Any], label: str) -> No
     # GAP-3 Task B2.4（v2 六鍵）：全 null（GAP-2 序列型／query）或全非 null（GAP-3 事件樣本）；半套 ⇒ 拒
     v2_keys = ("event_manifest_hash", "label_definition_hash", "decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind")
     present = [k for k in v2_keys if ev.get(k) is not None]
+    if ev.get("label_source") not in (None, "event_label_value", "mainline_return_N"):
+        raise ContractValidationError(f"{label}.label_source {ev.get('label_source')!r} invalid")
     if present and len(present) != len(v2_keys):
         raise ContractValidationError(f"{label}: v2 event keys must be all-null or all-set (got {present})")
     if present:
@@ -466,11 +473,19 @@ def build_survivor_output(
     if ev_mode in ("query", "timestamps"):
         event_obj = {k: ev.get(k) for k in c["event_definition_keys"]["keys"].keys()}
         # GAP-3 Task B2.4：v2 六鍵由 event_context 填（GAP-3 餵入層提供）；未提供 ⇒ 全 null（GAP-2 語意不變）
-        for k, v in (event_context or {}).items():
-            if k in event_obj:
-                event_obj[k] = v
+        six = ("event_manifest_hash", "label_definition_hash", "decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind")
+        if event_context:
+            # CODEX-R2-P1-03：partial context 拒（六鍵須齊且非 null）
+            missing = [k for k in six if event_context.get(k) is None]
+            unknown = sorted(set(event_context) - set(six))
+            if missing or unknown:
+                raise ContractValidationError(f"build_survivor_output: event_context must contain exactly the six v2 keys non-null (missing={missing}, unknown={unknown})")
+            for k in six:
+                event_obj[k] = event_context[k]
+        # payload 自述 label 來源（第七鍵）：取自 report_meta.event_filter.label_source（無 ⇒ null）
+        event_obj["label_source"] = ef.get("label_source") if isinstance(ef, dict) else None
         # CODEX-R1-P1-03：conditional IC 卻無 event_context ⇒ build 期 fail-closed（不產全 null 的事件倖存者）
-        if isinstance(ef, dict) and ef.get("label_source") == "event_label_value" and not event_context:
+        if event_obj["label_source"] == "event_label_value" and not event_context:
             raise ContractValidationError("build_survivor_output: conditional_ic run requires event_context (v2 six keys)")
     n_total = report_meta.get("n_samples") if isinstance(report_meta, dict) else None
     if n_total is None and marg is not None and marg.get("n_train") is not None and marg.get("n_test") is not None:

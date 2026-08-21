@@ -1009,6 +1009,16 @@ class ICFilterOrchestrator:
             event_timestamps=event_timestamps,
             event_label_values=event_label_values,
         )
+        if event_info.get("conditional_ic_abandoned"):
+            # CODEX-R2-P1-04（GROK-R1-P1-01 方案②之下游消費）：事件不足 ⇒ 條件 IC 明確 unavailable，
+            # 後續 stage 之數值為主線 return_N 全樣本 IC，報告 metadata 機械標示、禁當條件 IC 消費。
+            metadata = dict(metadata)
+            metadata["conditional_ic"] = {
+                "capability_status": "unavailable",
+                "reason": "insufficient_events",
+                "label_source": "mainline_return_N",
+                "doc": "event_label_values 已提供但事件數 < min_events；下游不得把本報告 IC 當條件 IC",
+            }
         if split_context is not None:
             train_mask, test_mask = _derive_stage_masks(
                 split_context["train_plan"],

@@ -157,3 +157,6 @@ def test_conditional_ic_orchestrator_aprime_fallback_passthrough():
     # GROK-R1-P1-01：事件不足 ⇒ 續算用主線 return_N 必 loud 揭露，不得假裝 conditional_ic
     assert _find_key(report.get("metadata"), "conditional_ic_abandoned") is True
     assert _find_key(report.get("metadata"), "label_source") == "mainline_return_N"
+    # CODEX-R2-P1-04：下游消費——報告 metadata.conditional_ic 明確 unavailable:insufficient_events
+    ci = report["metadata"].get("conditional_ic")
+    assert ci == {"capability_status": "unavailable", "reason": "insufficient_events", "label_source": "mainline_return_N", "doc": ci["doc"]}

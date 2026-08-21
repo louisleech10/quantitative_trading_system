@@ -21,7 +21,7 @@ def seg():
 def cfg(**over):
     base = {"horizon_bars": 2, "label_threshold": 0.01, "direction": "long", "decision_offset_bars": 0,
             "score_threshold": 0.5, "top_q": 0.1, "prevalence_learn": 0.5, "sample_design": "case_control",
-            "seed": 1, "n_boot": 20}
+            "seed": 1, "n_boot": 20, "entry_price_semantic": "trigger_open", "timeframe": "12h"}
     base.update(over)
     return base
 
@@ -113,6 +113,31 @@ def test_entry_semantic_next_open_hold_return_exact(seg):
     expected = np.mean([(c[i + 2] - o[i + 1]) / o[i + 1] for i in range(98)])
     assert rep["overall"]["signed_hold_return_signaled_mean"] == pytest.approx(expected, abs=1e-12)
     assert rep["manifest"]["entry_price_semantic"] == "next_open"
+
+
+def test_required_entry_semantic_timeframe_and_duplicate_bar_fail_closed(seg):
+    """CODEX-R2-P1-02：entry 語意／TF 必填無預設；duplicate bar 拒。"""
+    c = cfg(); del c["entry_price_semantic"]
+    with pytest.raises(ValueError, match="entry_price_semantic"):
+        evaluate_all_bars(scores_for(seg), seg, c)
+    c2 = cfg(); del c2["timeframe"]
+    with pytest.raises(ValueError, match="timeframe"):
+        evaluate_all_bars(scores_for(seg), seg, c2)
+    dup = {"ETHUSDT": pd.concat([seg["ETHUSDT"], seg["ETHUSDT"].iloc[[50]]]).sort_values("open_time_ms").reset_index(drop=True)}
+    with pytest.raises(ValueError, match="duplicate"):
+        evaluate_all_bars(scores_for(dup), dup, cfg())
+
+
+def test_common_has_actual_macro_micro_cluster_ci(seg):
+    """CODEX-R2-P1-01：共同欄含實際 macro／micro AUC 與 cluster-CI；cluster-aware 反例＝單一桶 ⇒ CI unavailable。"""
+    rep = evaluate_all_bars(scores_for(seg), seg, cfg(n_boot=60))
+    c = rep["common"]
+    assert c["micro_auc"] == pytest.approx(rep["overall"]["auc"], abs=1e-12)
+    assert c["macro_auc"] == pytest.approx(rep["overall"]["auc"], abs=1e-12)   # 單 symbol ⇒ macro==micro
+    assert c["auc_cluster_ci"]["status"] == "ok" and c["auc_cluster_ci"]["ci_low"] <= c["micro_auc"] <= c["auc_cluster_ci"]["ci_high"]
+    assert c["n_time_clusters"] == 98
+    rep1 = evaluate_all_bars(scores_for(seg), seg, cfg(n_boot=60, bucket_ms=10**15))  # 全部落同一桶
+    assert rep1["common"]["n_time_clusters"] == 1 and rep1["common"]["auc_cluster_ci"]["status"] == "unavailable"
 
 
 def test_rule_callable_and_kind_strata(seg):
