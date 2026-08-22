@@ -1,5 +1,15 @@
 # GAP-3 事件型 UAT 缺口修補 — SPEC
 
+<!-- SYNC-FORBID: 正反例由 \*\*t0 條件\*\*決定 -->
+<!-- SYNC-FORBID: 掃描條件引用之 `future_\{N\}bar_return` 欄 -->
+<!-- SYNC-FORBID: lookahead_bars.*=.*72 -->
+<!-- 上列由 `scripts/spec_ruling_task_sync.sh` 機械強制：
+     ①每條 `**D-<n>` 裁定須被 §P 至少一個 Task 引用（否則只停在敘述層）
+     ②禁用語不得在 §P 殘留。
+     出處＝2026-08-22 R3 之三條 P0（Task 4.1b 寫死 scenario 專屬文案／Task 2.1b 未同步 D-7 L1／
+     Task 1.10 把 future72 之 72 誤當根數），皆為「改 §D 未同步 §P」之同一病根，
+     `feedback_cross_reference_sync` 載此類錯已犯 7 次 ⇒ 改以閘門而非紀律。 -->
+
 出處：使用者 2026-08-22 跑完 UAT B1–B13 後提出的 10 條問題。
 本 SPEC 涵蓋**事件型**那批（#0/#1/#2/#3/#4/#5/#6 ＋ #9a 止血閘）。
 #7 為回答性問題（已答，見 §N）；#8/#10 列具名殘留（見 §N）；#9b 規模防護本體排入 GAP-6。
@@ -175,6 +185,23 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 
 **待使用者確認：無**（A-4'／A-5'／A-6 為技術主張，依「技術決策委派委員會」由委員裁決；
 A-6 因改變使用者可見行為，另於白話閘向使用者說明）。
+
+### 已驗證事實（FACT-RECEIPT；14 條，皆可由 repo 內命令重現）
+
+- FACT-RECEIPT: `python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));print(len(c['required_fields']),len(c['import_failure_reasons']))"` → 印出 `13 15`（Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `python3 -c "import json,re;raw=open('momentum/Analysis/contracts/event_import_contract.json').read();print(re.search(r'\"scenario\"\s*:\s*\{[^}]*\}',raw).group(0))"` → 印出含 `\"enum\": [\"A\", \"B\", \"C\", \"two_stage\"]` 與 doc「A/B 預測型（事件在未來、不進特徵）／C 確認型／兩段式」（Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `grep -n "_POLICY_BY_SCENARIO" momentum/Analysis/event_samples/dedupe.py` → 印出 `20:_POLICY_BY_SCENARIO = {"C": "cluster_first", "A": "all_with_uniqueness", "B": "all_with_uniqueness", "two_stage": "all_with_uniqueness"}`（**四種 scenario 後端皆已分流**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `grep -nE "scenario:|control_kind:|entry_price_semantic|label_return_mode|decision_offset_bars" frontend/src/lib/eventExport.ts` → 印出 `92: decision_offset_bars: 0,`／`93: entry_price_semantic: opts.entryPriceSemantic ?? 'trigger_open',`／`95: scenario: opts.scenario ?? 'C',`／`102: label_return_mode: 'close_to_close',`／`104: control_kind: 'user_labeled_same_trigger',`（**五處寫死**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `grep -c "counterexample_kind" frontend/src/lib/eventExport.ts` → 印出 `0`（**第六維度完全未送**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `for f in scenario controlKind entryPriceSemantic labelReturnMode decisionOffset counterexample; do echo -n "$f:"; grep -rl "$f" frontend/src/app frontend/src/components 2>/dev/null | wc -l; done` → 印出 `scenario:2`、其餘五項皆 `0`（**UI 未接出**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `sed -n 88p frontend/src/lib/eventExport.ts` → 印出 ``event_id: `${c.symbol}:${c.timeframe || opts.timeframe}:${t0}`,``（**event_id canonical；含 timeframe、不含 label、非 sha256**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `sed -n 59,61p momentum/Analysis/event_samples/event_split.py` → 印出 `embargo = split_config.embargo_ms if split_config.embargo_ms is not None else int(window.max())` 與 `if embargo < int(window.max()): raise ValueError(...)`（**答案窗決定 purge 寬度**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `sed -n 76,77p momentum/Analysis/event_samples/ic_feed.py` → 印出 `"feature_cutoff_rule": "max_close_ms_le_decision_at",`／`"label_window_rule": ...`；同檔 `:75` 印出 `"decision_time_rule": "t0_open_minus_k_bars",`（**特徵最晚取至決策前已收盤 bar，PIT 無洩漏**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `grep -n "def event_forward_return_table" -A 7 momentum/Analysis/event_samples/tables.py` → 簽章為 `(manifest, receipts, bars_by_tf, event_split_plan, table_config)`，**無 `labels` 參數**，docstring 含「不需反例」（**報酬表全批混算、不看 control_kind**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `grep -n "horizons" momentum/Analysis/event_samples/pipeline.py | head -1` → 印出 `98: horizons: Tuple[int, ...] = (1, 2, 4), seed: int = 20260820, n_boot: int = 300,`（**事件報酬表預設只算三個 horizon**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `sed -n 1385,1387p momentum/DataExtraction/case_search_engine.py` → 印出 `df['future24_close_return'] = (df['close'].shift(-periods_24h) - df['close']) / df['close']` 等三行（**`future{H}_*` 之 H 為小時、非根數；根數＝`H // hours_per_candle`**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `grep -noE "future_?[0-9]*[a-z_]*(return|drawdown)[a-z_]*" momentum/DataExtraction/case_search_engine.py | cut -d: -f2 | sort -u | head -3` → 印出 `future1_close_return`／`future24_close_return`／`future2_close_return`（**bar 命名與小時命名兩套並存**；Claude 實跑 2026-08-22）
+- FACT-RECEIPT: `python3 -c "import json,collections;d=json.load(open('data_cache/events/20260822T011331Z-eb210a16.json'));r=d if isinstance(d,list) else d.get('records',[]);print(len(r),collections.Counter(x.get('label') for x in r),r[0]['control_kind'],r[0]['scenario'],r[0]['label_definition']['window']['horizon_bars'])"` → 印出 `780 Counter({0: 520, 1: 260}) user_labeled_same_trigger C 3`（**使用者實際批次**；Claude 實跑 2026-08-22）
 
 ---
 

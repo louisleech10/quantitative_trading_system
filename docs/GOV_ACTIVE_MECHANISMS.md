@@ -68,6 +68,7 @@
 | `plain_docs_sync_check.sh` | 常態檢查 | pre-commit gov_check  |
 | `precommit_selfcheck.sh` | 常態檢查 | 未掛 |
 | `proc_guard.sh` | 常態檢查 | 未掛 |
+| `quant_standard_check.sh` | 常態檢查 | narrow_check_router  |
 | `reconcile_cluster_attribution_check.sh` | 常態檢查 | reconcile_build  |
 | `reconcile_stamps_check.sh` | 常態檢查 | gate  |
 | `review_quorum_check.sh` | 常態檢查 | gate  |

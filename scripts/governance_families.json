@@ -1,7 +1,9 @@
 {
   "_doc": "治理家族單一真相源(SoT)。所有 gate/stamp/ADV/executor 家族清單一律讀此檔,禁散落 hardcode。改此檔即改全鏈。事故:grok 散在 4 檔 11 處缺漏,逐處手補必漏(2026-07-23)。",
+  "_active_stampers_doc": "🔴 **要暫停/調換委員,只改 active_stampers 這一行,其餘一律不動。** review_families = 正式名冊(誰是委員),active_stampers = 本期實際要求蓋章者。兩者差集 = 暫停中,由 scripts/gov_check.sh 每次 push 印出,不靠記憶。出生理由(2026-08-09):grok 額度用罄(403 spending-limit),而 reconcile_stamps_check 預設要求 review_families 全員 ⇒ 一家掛掉全線停擺;直接改 review_families 會弄紅 9 個把名冊寫死的既有斷言(其中 test_rolegate_predispatch.py 屬 _B45_HARNESS 禁改)。缺 active_stampers ⇒ 回退 review_families(行為逐字不變)。",
   "families": ["codex", "composer", "grok", "claude", "agy"],
   "review_families": ["codex", "composer", "grok"],
+  "active_stampers": ["codex", "composer", "grok"],
   "executor_clis": ["codex", "cursor-agent", "grok", "agy"],
   "advisory_only": ["agy"]
 }

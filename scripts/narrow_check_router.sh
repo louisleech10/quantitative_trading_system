@@ -55,6 +55,12 @@ _routes() {
   # 四源執行合約：改一處忘了同步其他 ⇒ 執行端讀到不一致合約
   printf '%s\n' "AGENTS.md|bash scripts/check_agent_contract_sync.sh"
   printf '%s\n' ".cursorrules|bash scripts/check_agent_contract_sync.sh"
+  # 量化主線 SPEC：①裁定(§D)→施工(§P Task)同步 ②放水語（QUANT-STD-100）
+  #   出處＝2026-08-22 GAP-3 UX SPEC R3 三條 P0 皆為「改 §D 未同步 §P」；
+  #   `feedback_cross_reference_sync` 載此類錯已犯 7 次 ⇒ 改以閘門而非紀律。
+  #   🔴 逐檔精確列（禁目錄前綴，見上方成本節）；新增量化 SPEC 時加兩列。
+  printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|bash scripts/spec_ruling_task_sync.sh docs/GAP3_EVENT_UX_SPEC.md"
+  printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|bash scripts/quant_standard_check.sh docs/GAP3_EVENT_UX_SPEC.md"
   printf '%s\n' "CLAUDE.md|bash scripts/check_agent_contract_sync.sh"
   printf '%s\n' "docs/MULTI_AGENT_ORCHESTRATION.md|bash scripts/check_agent_contract_sync.sh"
   # Phase 2 預期轉向 fixture：TODO 改了而 fixture 沒重生成 ⇒ 測試斷言變成對舊語料
