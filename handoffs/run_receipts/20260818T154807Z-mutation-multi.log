@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 46 items / 43 deselected / 3 selected
+
+tests/momentum/Analysis/test_survivor_contract.py::test_mutation_missing_top_key_raises PASSED [ 33%]
+tests/momentum/Analysis/test_marginal_ic.py::test_mutation_raw_scores_break_monotone_invariance PASSED [ 66%]
+tests/momentum/Analysis/test_marginal_ic.py::test_mutation_test_fit_projection_breaks_o7 FAILED [100%]
+
+=================================== FAILURES ===================================
+_________________ test_mutation_test_fit_projection_breaks_o7 __________________
+tests/momentum/Analysis/test_marginal_ic.py:474: in test_mutation_test_fit_projection_breaks_o7
+    assert abs(base.per_feature["f"]["marginal_ic"] - ref_train) <= 1e-12  # 基線綠
+E   assert 0.015317779953081812 <= 1e-12
+E    +  where 0.015317779953081812 = abs((-0.5284193651490136 - -0.5131015851959317))
+=========================== short test summary info ============================
+FAILED tests/momentum/Analysis/test_marginal_ic.py::test_mutation_test_fit_projection_breaks_o7 - assert 0.015317779953081812 <= 1e-12
+ +  where 0.015317779953081812 = abs((-0.5284193651490136 - -0.5131015851959317))
+================== 1 failed, 2 passed, 43 deselected in 0.87s ==================

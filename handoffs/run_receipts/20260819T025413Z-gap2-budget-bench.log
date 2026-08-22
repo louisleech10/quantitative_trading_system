@@ -1,0 +1,6 @@
+[gap2-budget-bench] ts=20260819T025413Z n=20000 k=200 m=200 seed=20260818 n_bootstrap=1
+n_regressions=600 fit_projection_spy=600 max_design_cols=199(main run: ≤200)
+over_budget_survivors(max_survivors_for_loo=199): spy=0 n_regressions=0
+over_budget_removed(max_removed_candidates=199): spy=400 n_regressions=400
+wall_time_s=443.1 ru_maxrss=511950848 （觀測資料；無通過閾值——R7 CODEX-R7-P1-03；OOM 保護宣稱僅計數上界）
+composite_ic=0.2675499942273437

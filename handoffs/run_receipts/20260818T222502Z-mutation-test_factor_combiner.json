@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260818T222502Z-mutation-test_factor_combiner",
+  "claim_id": "mutation-test_factor_combiner",
+  "command": [
+    "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python",
+    "-W",
+    "ignore",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "test_mutation_",
+    "tests/momentum/Analysis/test_factor_combiner.py"
+  ],
+  "command_sha256": "cd6e37455f11cc258c0194c9fa00ec6f6c6caab9e4f5e958ba9276abab4f3b56",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "35bd66a125ab7efe3c5eb5b570d797566f90e230",
+  "tree_dirty": true,
+  "started_at": "2026-08-18T22:24:58Z",
+  "ended_at": "2026-08-18T22:25:02Z",
+  "duration_seconds": 3.680922,
+  "exit_code": 0,
+  "runtime_class": "mutation_runtime",
+  "requested_class": null,
+  "pytest_summary": "======================= 1 passed, 10 deselected in 0.62s =======================",
+  "selected_node_ids": [
+    "tests/momentum/Analysis/test_factor_combiner.py::test_mutation_test_sign_breaks_o8"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 1,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "6f87d578793f05ffd37f2de975e5592a55f2d91e93622c51eb2b59c09c3c0a9f",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "6f87d578793f05ffd37f2de975e5592a55f2d91e93622c51eb2b59c09c3c0a9f",
+  "log_path": "handoffs/run_receipts/20260818T222502Z-mutation-test_factor_combiner.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 11 items / 10 deselected / 1 selected",
+    "",
+    "tests/momentum/Analysis/test_factor_combiner.py::test_mutation_test_sign_breaks_o8 PASSED [100%]",
+    "",
+    "======================= 1 passed, 10 deselected in 0.62s ======================="
+  ]
+}

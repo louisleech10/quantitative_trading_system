@@ -1,0 +1,99 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 25 items / 21 deselected / 4 selected
+
+tests/momentum/Analysis/test_gap2_stage6b_wiring.py::test_mutation_fit_scope_derived_oos_breaks_root_oracle 
+-------------------------------- live log call ---------------------------------
+08:52:20 [INFO] IC config loaded
+08:52:20 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+08:52:20 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:20 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:20 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+08:52:20 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+08:52:20 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:20 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+08:52:20 [WARNING] Insufficient events: n=3
+08:52:20 [INFO] IC autocorr persistent: count=14
+08:52:20 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+08:52:20 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+08:52:26 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+08:52:29 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+08:52:29 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_6809jba2/features/ETHUSDT_12h_filtered.h5
+08:52:29 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_6809jba2/reports/ic_report_ic_gatekeeper.json
+08:52:29 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_6809jba2/reports/ic_survivors_ic_gatekeeper.json
+08:52:29 [INFO] IC config loaded
+08:52:29 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+08:52:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:29 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+08:52:29 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+08:52:29 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:29 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+08:52:29 [WARNING] Insufficient events: n=3
+08:52:30 [INFO] IC autocorr persistent: count=14
+08:52:30 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+08:52:30 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+08:52:36 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+08:52:39 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+08:52:39 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_d33ychq9/features/ETHUSDT_12h_filtered.h5
+08:52:39 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_d33ychq9/reports/ic_report_ic_gatekeeper.json
+08:52:39 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_d33ychq9/reports/ic_survivors_ic_gatekeeper.json
+PASSED                                                                   [ 25%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_mutation_persist_reads_ic_cache_breaks_cold_call 
+-------------------------------- live log setup --------------------------------
+08:52:39 [INFO] IC config loaded
+08:52:39 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+08:52:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:39 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+08:52:39 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+08:52:39 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:39 [INFO] IC autocorr persistent: count=14
+08:52:39 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+08:52:39 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+08:52:45 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+08:52:48 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+08:52:48 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_qrzr8jmj/features/ETHUSDT_12h_filtered.h5
+08:52:48 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_qrzr8jmj/reports/ic_report_ic_gatekeeper.json
+08:52:48 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_qrzr8jmj/reports/ic_survivors_ic_gatekeeper.json
+PASSED                                                                   [ 50%]
+tests/momentum/Analysis/test_gap2_golden.py::test_mutation_scrub_extra_key_breaks_canonical_sha 
+-------------------------------- live log setup --------------------------------
+08:52:48 [INFO] IC config loaded
+08:52:48 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+08:52:48 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:48 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:48 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+08:52:48 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+08:52:48 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:49 [INFO] IC autocorr persistent: count=14
+08:52:49 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+08:52:49 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+08:52:55 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+08:52:58 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+08:52:58 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_golden_a_s1tfsnkt/features/ETHUSDT_12h_filtered.h5
+08:52:58 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_golden_a_s1tfsnkt/reports/ic_report_ic_gatekeeper.json
+08:52:58 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_golden_a_s1tfsnkt/reports/ic_survivors_ic_gatekeeper.json
+08:52:58 [INFO] IC config loaded
+08:52:58 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+08:52:58 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:58 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:58 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+08:52:58 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+08:52:58 [WARNING] Falling back to configured label horizon because labels_df is unavailable
+08:52:58 [INFO] IC autocorr persistent: count=14
+08:52:58 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+08:52:58 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+08:53:04 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+08:53:07 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+08:53:07 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_golden_b_kcloumnz/features/ETHUSDT_12h_filtered.h5
+08:53:07 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_golden_b_kcloumnz/reports/ic_report_ic_gatekeeper.json
+08:53:07 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_golden_b_kcloumnz/reports/ic_survivors_ic_gatekeeper.json
+PASSED                                                                   [ 75%]
+tests/momentum/Analysis/test_gap2_golden.py::test_mutation_counter_without_fit_call_breaks_spy PASSED [100%]
+
+====================== 4 passed, 21 deselected in 48.45s =======================

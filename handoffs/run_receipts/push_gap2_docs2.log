@@ -1,0 +1,194 @@
+pre-push: 委派 scripts/gov_check.sh --fast（秒級；全套已改為手動關卡，理由見本檔註解）…
+[gov_check] ℹ out-of-epic commit（G-7 manifest 白名單已豁免，供稽核）:
+            0dffa656 docs(pa-cumsum): 收案——三家 RECONCILE-STAMP APPROVED(sha 73ca7d3a,r24);ROADMAP/白話看板/HANDOFF 標 CLOSED;殘留具名(fillna(0) user-ruling、API_SPECIFICATION 快閘 blocked-by)
+            d20f0627 fix(pa-cumsum): review 修補(Q1-Q3)——多標的改逐 timestamp 等權組合(不再單一帳戶連乘)+n_symbols/aggregation 可觀測;y_pred_proba NaN/inf fail-closed(route 400);API 契約封閉(EquityFinalReturnPct 四必填+Field description+aggregation Literal);tab a11y+元件測試 4 條;ROADMAP 舊鍵文字更正
+            3600818c chore(pa-cumsum): code review brief(三家)
+            e0bb0345 docs(白話): 摩擦六十七——API_SPECIFICATION 再被格式快閘擋(第二次),欄位說明改落 model docstring
+            7d516540 feat(pa-cumsum): 權益曲線單利/複利兩條都算、都標清楚+前端切換(預設複利)——EquityCurveData 四序列+四鍵 final_return_pct;API model/TS 型別/圖表同步;API_SPECIFICATION 10.8 補欄位
+            98b985eb docs(白話): 偵察結果 R11 關閉字面與 registry 同步
+            91028e7a docs(registry): G1-R11 標關閉(review 可合併+三家戳記 PASS)
+            c16782ed chore(gap1): G1-R11 三家 RECONCILE-STAMP APPROVED(r22;sha 008b9d2a)——殘留 G1-R11 關閉;registry/白話同步
+            a95e6fe1 chore(gap1): G1-R11 戳記 brief(三家;body sha 008b9d2a)
+            53b84900 docs(白話): G1-R11 review 可合併、等蓋章
+            c17560e6 fix(gap1): G1-R11 修補 review(三家可合併)——docstring 同步 ptp==0 語意(CODEX-R21-P2-01);np.ptp +0.5s/PBO 已量測記錄不改(P2-02);收斂檔 P1-P2 0 掉項債已銷
+            1b639522 chore(gap1): G1-R11 修補 review brief(三家小任務 review;探針只 codex 跑)
+            4e44c1b2 docs(白話): G1-R11 依三家 consult 修補——看板/偵察結果/現況/日誌追記九/摩擦六十六(先問是不是容差問題)
+            16e5971c fix(gap1): G1-R11——compute_sharpe/pbo 常數判定併判 ptp==0(位元全等;不引入相對容差);consult r20 三家一致採主委方案並判為實作修補;探針 20→21 全紅
+            026df439 chore(gap1): consult brief 補 task-id 字面(命名規約)
+            be5e48b1 chore(gap1): G1-R11 諮詢 brief(三家 consult;業界/文獻對 Sharpe 常數序列退化之處理;主委方案 ptp==0)
+            04c82bd7 docs(gap1): 🏁 GAP-1 四批全部 CLOSED——HANDOFF/ROADMAP/白話看板收工;下一步等使用者點(PA-CUMSUM/G1-R11/IC 缺口票)
+            4d1545a4 chore(gap1): B4 收斂檔三家 RECONCILE-STAMP APPROVED(r19;sha c69a22c0)+戳記產出+audit;GAP-1 四批全部 CLOSED
+            76a2f512 chore(gap1): B4 戳記 brief(三家;探針只 codex 跑;body sha c69a22c0;PASS 即收工)
+            0b506b47 docs(白話): 第 4 批審完修完等蓋章——現況段/README/偵察結果 R11/日誌追記七/摩擦六十五(放寬閘門被反例打回)
+            00965160 fix(gap1): B4 code review 修補(N1-N6)——三家 13 條全處置;wiring W3 白名單收窄+W2 死枚舉判定(5 反例紅)、PBO 守 Frozen 字面(母體=path_valid、任一 OOS 非有限即跳過)、exclusions 每候選每 path 至多 +1、雙冠手算鎖、sharpe 逐位等價、golden 單一 loader;A1-24;G1-R11 登記
+            01391501 chore(gap1): B4 code review brief(三家;A1-23 七項自揭+段 B 九條;探針只 codex 跑)
+            4d77eb30 docs(白話): 第 3 批蓋章、第 4 批寫完審查中——現況段/README/日誌追記六/摩擦六十四(探針抓到測試沒牙)
+            763b9d56 feat(gap1): B4 CSCV+PBO+候選宇宙守衛+策略層 wiring 閘(Task 4.1-4.3+2.4)+golden 檔;269 測試全過;探針 17→20 全紅;wiring 閘 rc=0
+            4aa67e6d chore(gap1): B3 收斂檔三家 RECONCILE-STAMP APPROVED(r17;sha b367b572)+戳記產出+audit;B3 CLOSED 可進 B4
+            42af183a chore(gap1): B3 戳記 brief(三家;探針只 codex 跑;body sha b367b572)
+            e20776ca fix(gap1): B3 code review 修補(M1-M6)——三家 12 條全處置;route 例外分類(ValueError→5xx、HTTPException 不重包)+reporter 先於落盤(無 orphan)+驗收①恰 kurt=3 雙鎖+fixture 不變式+契約 n_source_values(16→17,A1-22)+刪誤插 import
+            dcdc5079 chore(gap1): B3 code review brief(三家;段 B 九條自攻假設;探針只 codex 跑;自建探針須 timeout)
+            c1a95926 docs(白話): 第 3 批寫完審查中——現況段/README/日誌追記五/摩擦六十三(R3 守衛產出端攔截實例)
+            cbd9ec69 feat(gap1): B3 MinBTL+DSR+報告+API 警語(Task 3.1-3.4)——純統計核心+降級展示不拒絕;220 測試全過;探針 12→17 全紅
+            e462931c docs(白話): 摩擦六十二補修法(看門狗)+README Pages 已設好
+            4e58bb52 docs(白話): Pages 已由使用者開通(實測 200)+看門狗追記;現況段同步
+            09a094f5 feat(白話): 小任務 3b——白話說明 md→HTML 閱讀介面(scripts/plain_docs_render.{sh,py}→docs/site;index/CSS/手機友善/連結改寫);掛 pre-commit 同 commit 產出、缺產出即擋;selftest+pytest 驗冪等/每 md 對應 html/連結不死;B2 蓋章 PASS 白話同步
+            fabdcdca chore(gap1): B2 收斂檔三家 RECONCILE-STAMP APPROVED(r15;sha d5e6b1a8)+戳記產出+audit;B2 CLOSED 可進 B3
+            4d806d32 chore(gap1): B2 收斂檔補戳記區段+B2 戳記 brief(三家;探針只 codex 跑;探針加 timeout)
+            7cdd24b0 docs(白話): GAP-1 第2批審完修完等蓋章——現況段/README/日誌追記二/摩擦六十一~六十二(brief 自述錯、委員探針卡死 7 小時)
+            0ab25f54 fix(gap1): B2 code review 修補(L1-L10)——三家 21 條全處置;寫入口 flock+context 綁定、非有限值拒收、snapshot JSON 定界、路徑推導回歸鎖、契約 loader fail-closed;探針 8→12 全紅;A1-21 作廢 TODO ⑥b 字面
+            0de70ad9 chore(gap1): 收 B1 收斂檔之 codex R13 APPROVED 戳記+B2 review committee runlog(rc=0)
+            51e3c6b3 docs(handoff): 小任務 3b——白話說明 md→HTML 生成介面(使用者 2026-08-18 定;來源維持 md)
+            25617cdc docs(handoff): GAP-1 交接——B2 review 三家 21 條待收斂;每批收尾固定動作含 commit+push 秒級
+            9fd8ee77 docs(白話): 補開 GAP-1 施工進度看板+現況置頂+殘留表同步 R3/R7/R8/R9/R10+摩擦五十八~六十
+            fbb12301 fix(gap1): mutation 探針加互斥鎖——並行執行會使 baseline 不穩定(codex 兩度 BLOCKED 抓到)
+            7f0decc8 feat(gap1): B2 N 帳本契約與 fail-closed 讀取(Task 2.1-2.3)+探針補 §V-7;工作區凍結供 B1 戳記重驗
+            660e4f91 fix(gap1): B1 code review 修補(K1-K4)——objective 靜默 730 封死+探針 fail-closed+§V-9 補齊
+            7093d00f feat(gap1): B1 輸入語意契約落地(Task 1.1-1.4)——年化來源可機器判讀+typed Sharpe+canonical 報酬序列
+            5a98ffd8 docs(gap1): TODO FROZEN R3——兩輪 adversarial(22→5)+主委自產 3 條 P0;SPEC 修訂走延伸檔 A1-1..A1-18
+            e52130cf docs(handoff): 待推筆數校正 2→4
+            aa1377e9 docs(白話): GAP-1 現況同步——規格定版/清單草稿/待補完 8 項投影+摩擦第五十五~五十七條
+            6bf8fb1d docs(handoff): GAP-1 TODO DRAFT 交接——接手先派三家 adversarial(含 R8 delta+殘留攻擊)
+            f2955713 docs(gap1): TODO 生成(DRAFT)——15 Task 四批+100% SPEC 追溯;尚未經三家 adversarial
+            4692ddfd docs(gap1): SPEC R8——使用者白話閘裁決:收回三項殘留為 Task+殘留規則機制化+待補完登記
+            e205cdf6 docs(gap1): SPEC R7——codex 之 OPEN 收束(守衛缺資料欄位);SPEC 修訂於此收斂
+            56cfb961 docs(gap1): SPEC R6——codex 四條 FATAL 全修(數值級);頂層鍵 14→15;殘字清零
+            2482de77 docs(gap1): SPEC R5——採 codex 較嚴版:契約矛盾/DSR N 釘死/PBO path 退化/universe 封閉
+            85f1a70e docs(gap1): SPEC R4——採 codex 較嚴版:5 條 BLOCKING 全修+第三次數值失誤(μ 假等式)
+            7f5bcc20 docs(gap1): SPEC R3——R2 closure 複驗 8 條處理(含第二條真實代數錯誤+一條附證據駁回)
+            4f59a010 docs(gap1): SPEC R2——三家 adversarial 23 findings 全數修補(含一條真實數值錯誤)
+            1c448808 docs(gap1): SPEC 起草——四批(B1-B4)+三項BLOCKING收斂+使用者兩項裁決
+            39d2560c docs(gap1): 偵察四方收斂——31 findings 全收+三項 BLOCKING+使用者前提修正
+            48cf56d8 docs(ic-hc): phasing 收斂檔檔頭 pointer(Task 6.4 遺漏項補交)
+            bc99fcfb docs(ic-hc): epic 收工——看板/HANDOFF 終態+ROADMAP 主線列更新
+            38cb724f fix(ic-hc): R6 code review 修補——fallback 第二呼叫點+key缺席+fail-closed+比對面
+            3e3a861d chore(ic-hc): 白話同步守衛補 ICHC 兩檔 WATCHED 定義
+            044385f1 docs(ic-hc): 白話說明四檔同步至六批完工現況
+            67d4d240 fix(ic-hc): B6 收尾——6.2 文件節落點改 registry(具名偏差)
+            a943e500 feat(ic-hc): B6 誠實契約收口——死配置移除+capacity/split 契約+六缺口票登記
+            1514795a feat(ic-hc): B5 wiring 閘門——turnover 真 gate+三規則掃描器+三方契約同步
+            4ece6afb feat(ic-hc): B4 事件誠實化——timestamps 真接線+loud fallback+R5 委員裁決 A案落地
+            e3d99cdf feat(ic-hc): B3 xsec capability status——五節空殼改契約狀態+前端分流/漏斗 gate
+            66b31cce feat(ic-hc): B2 分位圖 envelope 修復——golden exact 不變+契約 validator 單點接線
+            ec1fcea5 feat(ic-hc): B1 契約 SoT——ic_report_contract.json+三具名 API+types 對應段
+            274f5593 feat(ic-hc): IC 全棧健檢偵察(步驟1-2)完工——四方複核 28 條+白話成果檔
+            f50f9d0f perf(gate): pre-push 改為秒級快閘 — 全套 governance pytest 移為手動關卡
+            2b33ea68 refactor(docs): 交接檔與說明檔去流水帳 — 移走不相關內容並加機械閘
+            7bda93b3 docs(handoff): 收斂為單一「接手第一件事」＝回量化主線
+            5af25085 docs(roadmap): 重整為狀態表，敘事移入 ROADMAP_DETAIL.md
+            d46d78a9 docs(roadmap): 回量化主線 + 測試策略定案；新工具自陳輸出不可採信
+            8be0d09c docs(白話): 七份同步 — 推送被自己的閘擋了一次
+            4928a46c fix(test): 修兩條擋住推送的紅 — 沙箱寫死清單漏補、B-48 守衛咬到矛盾 fixture
+            7093c641 docs(白話): 七份同步 — 守門員復活、封存盤點 0 份、量測工具被問垮
+            8e7cb168 feat(gov): 解耦掃描器復活並掛上產出端 ＋ 治理文件封存盤點（可搬 0 份）
+            a111face fix(gov): round_cost 兩欄由自報標籤改為實數委員交件 — 舊版量的是我填的字串
+            ace40b08 docs(gov): 更正票表導讀 — 「豁免」不等於沒掛，讀法有三種不是兩種
+            c0d1572e fix(gov): 票→掛載的答案投影進票表檔 — 使用者問了五次都看不到
+            d03e2432 docs(白話): 補上這一批的完成狀態 — 戳記輪結果與一處數字更正
+            1f670595 docs(handoff): stamp 輪完成 — 三家複驗後全數 APPROVED，並更正一處測試計數
+            a4d93a34 docs(白話): 七份說明檔同步 — 掛載上線那一輪的白話版
+            8a97493d docs(handoff): 10 件定案 — 掛上四項、判定不掛三項，唯一未閉者具名記錄
+            6c48fc73 feat(gov): 掛載實際上線 — 剩餘 10 件逐件定案，三家 review 16 條全數採納並修
+            3c4cdab2 docs(handoff): 交接更新 — 剩餘 10 件逐項寫死，含實測法與兩項具名欠缺
+            f7b59099 feat(gov): 掛載分流 — 全部 152 支腳本逐支定去向，B-48 掛上，不能掛者原因寫死
+            4f05f737 fix(白話): 搬回被誤搬的 FRICTION-CMD 區塊，並記第四十七條（使用者推翻我寫的教訓）
+            1e09495b docs(白話): 補齊其餘五份說明檔 — 第四十六條：修完被指出的那處，沒掃同型的隔壁
+            7e141e22 docs(白話): 接下來要做什麼.md 重整結構 — 它自稱不是流水帳，實際是
+            1e1068ba fix(gov): B-21 範圍擴充為受管檔（使用者裁定）
+            e4cd8096 docs(白話): 說明檔同步 — 第四十五條：推送被自己今天做的閘擋下
+            7956a845 fix(gov): 修 S6.1 引入之測試回歸，並修 gov_check 失敗時印出成功語
+            787646c0 docs(白話): 說明檔同步 — 答使用者兩題，並記第四十四條摩擦
+            82633c26 fix(gov): 三份文件之散文區過期修正，並把該缺口併入票 B-16
+            957dfdfb docs(handoff): 推送指示更新為「先停下不 Push」，並留下 S6.x 的四條接手要點
+            9fad17c4 docs(白話): S6.2 說明檔同步 — 三條新摩擦，全部自造
+            022bdfaf feat(gov): S6.2 票 SoT 補齊「還缺什麼」— 61 張全覆蓋，並機械化其閉合不變式
+            5ad73d3f docs(白話): S6.1 說明檔同步 — 五則「做不到」其實做得到，外加四條新摩擦
+            9849fef1 feat(gov): S6.1 產出端豁免重審 — 五列改判、G-7 前移至 commit-msg、判準機械化
+            78582f82 feat(gov): commit 前自檢腳本 — 秒級檢查前移，並定死時間格式須到分秒
+            8ae89c44 fix(gov): 判準改為「連跑兩次逐位元組相同」，時序資訊回歸
+            aa0cfe84 feat(gov): 新增現行機制一覽 — 機械生成＋fail-closed，回答「哪些真的在用」
+            d98b3671 feat(gov): S4.4／S5.1 收案 — 三家逐條複驗打回五則不實登記，全數更正
+            1358fd85 feat(gov): S4.2／S4.3 收案 — 17 張已交付票全部有產出端覆蓋登記或具名豁免
+            93a01d44 feat(gov): S2.1／S2.2／S3.1／S3.2 收案 — 完成語意集合、提前預警、多事件對證、判定型分類
+            760ef929 feat(gov): S1.2 收案 — 設定檔缺失由「印訊息後放行」改為 fail-closed
+            c75e2042 feat(gov): S1.1 收案 — 封死幽靈票，enforcement 對應票欄綁定票全集
+            a25f97fc docs(gov): S0.x 完成後之施作清單稽核 — 三步前提失效並更正，S4.1 認定收案
+            66282db4 feat(gov): S0.6 收案 — 消滅第二套票狀態源，governance-ticket-closure 刪除
+            9672ef63 feat(gov): S0.4 收案 — 61 張治理票逐張查證，全部有狀態與證據
+            5c197345 chore(ci): 刪除全部 CI — 連續全紅無人查看，零保護純噪音
+            f1d9ae0d fix(gov): 票 SoT 上線之連帶工作補齊 — 六條測試轉綠
+            930a9efc feat(gov): 治理票收成唯一一份 — 61 張含狀態與問題描述
+            0f7c72d0 feat(gov): 票 SoT 統一與產出端覆蓋之施作清單改為機械投影
+            5f9675de fix(gov): 產出端覆蓋鐵律 r1 三家 review — 自我停用／掛載點偽造全修＋B-49 依規則退回
+            b75ea6f4 feat(gov): 產出端覆蓋鐵律 — 票要標收案，其檢查必須先擋在產出端
+            072dd0f6 feat(gov): fact-key 檢查點前移到產出端 — 寫檔當下就報，不等到 push
+            afa57d38 docs(gov): WL-03 收案 — 狀態改機械投影＋十一條具名殘留＋說明檔同步
+            436f102d fix(gov): WL-03 r2 閉合輪 — 第四個子樹旁路＋偶發紅根因（jq rc 被吞）
+            22a20c24 fix(gov): WL-03 r1 三家 review — 子樹 parser 三個旁路＋receipt 查錯 root 全修
+            744e7a13 feat(gov): WL-03 機制證據登記 — 平台機制入註冊表＋opt-in 宿主改法子樹掃描
+            291e4e40 fix(gov): 判準檢查三條 P1 修補 ＋ 標記收案 ＋ 說明檔同步
+            56ae639f feat(gov): 判準資料化 — 判準入註冊表 ＋ 三道機械檢查
+            76f80736 docs: Compact 前置 — 交接檔去除四處過期內容 ＋ 收據入版控
+            eddd78e3 feat(gov): 待辦清單改為機械投影 ＋ CLAUDE.md 去除會漂的值
+            dd384910 refactor(gov): ASSERT 執行閘反轉為 opt-in——強制點由呼叫端移到產出端
+            3a085d2b docs(白話): 六份說明追記 8/12 深夜批次的摩擦與一則更正
+            2c34027a perf(gov): 檢查鏈段序改「便宜先」＋ ASSERT 路 A ＋ 三家 review 修補
+            ac9011ba docs: Compact 前置 — 交接重寫 ＋ 票 B-25 入狀態表 ＋ 閘門鏈 SPEC 入 repo
+            53966e90 fix(gov): T0 止血 — 文件檢查器執行 ASSERT 導致 session 自鎖
+            8ffac293 docs(handoff): 記入三條推送紀律 — 本 session 實測浪費約 50 分鐘
+            31673617 docs(handoff): 交接 538 → 109 行；還原被誤刪的機器輸入節
+            2e2f2faf fix(gov): 補登記 GOVERNANCE_EXECUTION_ORDER.md ＋ 收據路徑 trailer
+            eee9b6b5 feat(gov): 票 B-49 收案 — 凍結出口補上，關票條件機械可驗
+            835c3d35 docs(gov): 使用者授權入帳 — B-49 解凍由主委+委員決定，一次做完不留卡點
+            b0e0704c fix(gov): 修正兩處狀態事實 — B4 部分完成、B-49 代價 2→3+4 條紅
+            1c1612f7 feat(gov): B-49 施工清單 TODO ＋ TODO review r1 — 阻塞於使用者層級約束
+            a4d5e786 docs(白話): 六份說明檔同步至 51d8ac7f — G-7 幽靈路徑與裁 C
+            51d8ac7f fix(gov): G-7 幽靈路徑盤點工具 ＋ 裁 C（接受 G-7 紅）；A 實作後證明不可行已還原
+            5ea99af1 docs(白話): 六份說明檔同步至 1f697465 — 站 5 五式承重、B-49 定案、四筆新摩擦
+            1f697465 fix(gov): 三家名冊落地之四條紅 — 修好未凍結的一條，其餘三條定案 SPEC（B-49 r6）
+            e029514d perf(gate): B3R 站 4 — 詞法層超線性修法（視窗存取＋批次跳躍）
+            38a0beda docs: HANDOFF 165→123 行—站 4 收據「搬」到 docs，不是刪
+            2ed1f7ef docs: Compact 前置—使用者裁定照順序走 ＋ 記入 roles 名冊地雷 ＋ 更正一則措辭
+            5f438ff5 docs: 站 4 Phase 2 原型與差分完成—C-5 未達標，依 SPEC 不得進 repo
+            4b8346d6 docs(白話): 追記兩句改寫—第三次被自己的手寫狀態偵測器擋下
+            3d57e2e7 docs(白話): 七份說明檔追記—兩道機檢各擋我一次（票收案導出集合、生成物禁時間戳）
+            5d8e8071 fix(governance): 票收案區塊補三列—B-49／B-54／B-55（機械導出集合對帳）
+            51cae53c docs: 兩處手寫狀態改為指向生成區塊—被自身偵測器擋下（第二次）
+            63c22350 docs: 站 2.7 後半收案—b4 階段 2 兩家蓋章，五項具名殘留，新開 B-54／B-55
+            82fd52ba docs(governance): 延伸檔補 §A′／§A″ 並把安全宣稱改為有條件（CODEX-R1-P2-03）
+            bc6ced10 test(governance): (d) 階段 2 之載體遷移—三個 allow 外測試檔補合規 --brief ＋ 延伸檔
+            aa783093 docs(governance): 站 2.6 收案—兩家戳記 APPROVED，六條具名殘留
+            3787531b fix(governance): 站 2.6 r5 code review—兩處真實資料失真 + 一條空心測試全修
+            9104679f feat(governance): 站 2.6—摩擦統計唯讀最小版（票 B-37）
+            50cfc5bd fix(governance): 站 2.5 r6 code review—兩個可構造 fail-open 全修
+            ad38bac9 feat(governance): 站 2.5 C2—手寫狀態偵測器 ＋ 拆除 21 行字面狀態副本
+            e7567f08 feat(governance): 站 2.5 C1—狀態事實入 fact-key（多宿主＋schema 封閉集合＋兩狀態 key）
+            6913bc08 docs(governance): 移除會漂的寫死筆數，改附導出指令
+            16405276 docs(governance): 全文件同步至新順序 + 新增使用者向現況文檔
+            2eb5ea04 feat(governance): 依淨摩擦重排執行順序（使用者 2026-08-10 解除凍結）
+            e865178d fix(governance): 票 B-50 stamp-r1 BLOCKING 修補 + 票 B-52 第四次發作機制入票
+            eafc9e5e fix(governance): 票 B-50 r2 三條全修 + 執行端 commit 污染事故入票（形態④）
+            6663e191 fix(governance): 票 B-50 review-r1 九條全修 + 補追溯 TODO（兩家裁我跳步）
+            0309ea87 feat(governance): 票 B-50 — 派工前後工作區快照比對（只回報、不擋）
+            53d83dbf feat(governance): 主委自產 findings 於寫檔當下走同一支檢查（B10 r2 必答 1 裁 (A)）
+            29577548 docs(governance): B8 延伸檔補 §7 委員裁決（review-r1 逐條處置）
+            4a9de374 docs(governance): B8 延伸檔—凍結 TODO 兩個靜默 bug、覆蓋率與三入口阻塞
+            a5ddf059 feat(governance): B7 — claude 段收窄（GOVB0 Task 2.2 ＝ GOVB1 Task 3.2，票 B-26 重號一併結清）
+            e7be91f8 fix(governance): 修 self-gate 換行旁路（真派工可繞過派工閘）
+            a1a95cc8 feat(governance): B3R 詞法層落地—151 行生產碼進版控（延宕交付收束）
+            87aeb8c7 docs(governance): B6 延伸檔—補第二項偏離與兩家裁決
+            11ea47a6 docs(governance): B6 前置—fact-key 宿主檔植入 generated block + scope 修訂延伸檔
+            bc2c1919 fix(governance): review-r3—set_roles fallback fail-closed + 逃生口須具名理由
+            1bc47dab fix(governance): C4 落地—set_roles 換實作端前先驗 review quorum 可行性
+            c54d27b9 fix(governance): review-r2—gate _stamp_families 三態測試 + 修正點錯的具名殘留
+            4cf27ca9 fix(governance): R-19 active_stampers fail-closed + R-20 戳記預設可證偽
+            d0dc6824 fix(governance): reconcile_stamps_check 預設改讀 active_stampers（解 R-17） (grandfather)
+            28b586a8 fix(governance): 戳記預設測試改為與名冊無關（原本把 grok 寫死） (grandfather)
+[gov_check] 1/6 shell 語法 (bash -n)…
+[gov_check] ✓ shell 語法 OK
+[gov_check] 1b/6 治理文件格式 (doc_format_precheck，範圍=本次改動)…
+[gov_check] ✓ 治理文件格式 OK（本次改動 1 個）
+[gov_check] ✅ --fast 完成(契約＝語法+格式;刻意不含第 2–4 段,理由見檔頭)
+pre-push: ✓ 放行 push
+  🔴 提醒：全套 governance pytest **不再於此執行**。動過 scripts/ 或 tests/governance/ 者，
+     收 epic 前請自行跑一次 bash scripts/gov_check.sh --no-probe（丟背景）。

@@ -1,0 +1,11 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 11 items / 10 deselected / 1 selected
+
+tests/momentum/Analysis/test_factor_combiner.py::test_mutation_test_sign_breaks_o8 PASSED [100%]
+
+======================= 1 passed, 10 deselected in 0.67s =======================

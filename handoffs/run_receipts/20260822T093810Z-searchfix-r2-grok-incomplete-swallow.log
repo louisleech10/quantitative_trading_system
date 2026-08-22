@@ -1,0 +1,4 @@
+2026-08-22 09:38:46,686 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-08-22 09:38:46,686 - t - ERROR - [SEARCH_FAILED] Symbol: ETHUSDT | Error: IncompleteDownloadError: stale test
+SWALLOW_RESULT []
+to_thread_sites 1

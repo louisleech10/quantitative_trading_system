@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 46 items / 43 deselected / 3 selected
+
+tests/momentum/Analysis/test_survivor_contract.py::test_mutation_missing_top_key_raises PASSED [ 33%]
+tests/momentum/Analysis/test_marginal_ic.py::test_mutation_raw_scores_break_monotone_invariance PASSED [ 66%]
+tests/momentum/Analysis/test_marginal_ic.py::test_mutation_test_fit_projection_breaks_o7 PASSED [100%]
+
+======================= 3 passed, 43 deselected in 1.02s =======================

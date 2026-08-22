@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260818T233623Z-mutation-test_survivor_contract",
+  "claim_id": "mutation-test_survivor_contract",
+  "command": [
+    "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python",
+    "-W",
+    "ignore",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "test_mutation_",
+    "tests/momentum/Analysis/test_survivor_contract.py"
+  ],
+  "command_sha256": "9ed810796db95dc0c1a3589724bd40f8f98dde36516acbf408e3952587e59209",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "bfe4da9978ff37cf636ce6592718d2dd040efa47",
+  "tree_dirty": true,
+  "started_at": "2026-08-18T23:36:19Z",
+  "ended_at": "2026-08-18T23:36:23Z",
+  "duration_seconds": 3.484491,
+  "exit_code": 0,
+  "runtime_class": "mutation_runtime",
+  "requested_class": null,
+  "pytest_summary": "======================= 2 passed, 42 deselected in 0.51s =======================",
+  "selected_node_ids": [
+    "tests/momentum/Analysis/test_survivor_contract.py::test_mutation_missing_top_key_raises",
+    "tests/momentum/Analysis/test_survivor_contract.py::test_mutation_validator_skips_feature_set_hash"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 2,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "b42209a1b49c91469adaef4f108542089b51d728a33b2487c3210f2260342901",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "b42209a1b49c91469adaef4f108542089b51d728a33b2487c3210f2260342901",
+  "log_path": "handoffs/run_receipts/20260818T233623Z-mutation-test_survivor_contract.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 44 items / 42 deselected / 2 selected",
+    "",
+    "tests/momentum/Analysis/test_survivor_contract.py::test_mutation_missing_top_key_raises PASSED [ 50%]",
+    "tests/momentum/Analysis/test_survivor_contract.py::test_mutation_validator_skips_feature_set_hash PASSED [100%]",
+    "",
+    "======================= 2 passed, 42 deselected in 0.51s ======================="
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260818T152612Z-mutation-multi",
+  "claim_id": "mutation-multi",
+  "command": [
+    "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python",
+    "-W",
+    "ignore",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-k",
+    "test_mutation_",
+    "tests/momentum/Analysis/test_survivor_contract.py",
+    "tests/momentum/Analysis/test_marginal_ic.py"
+  ],
+  "command_sha256": "316385e47c65f867c9325f03cb0a9d68183af0ee427e9e462b68ed2eabe96c6f",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "5da0817b2b5557fbe79bf9228caa5392f8edd0f9",
+  "tree_dirty": true,
+  "started_at": "2026-08-18T15:26:07Z",
+  "ended_at": "2026-08-18T15:26:12Z",
+  "duration_seconds": 4.235679,
+  "exit_code": 0,
+  "runtime_class": "mutation_runtime",
+  "requested_class": null,
+  "pytest_summary": "======================= 3 passed, 36 deselected in 1.00s =======================",
+  "selected_node_ids": [
+    "tests/momentum/Analysis/test_survivor_contract.py::test_mutation_missing_top_key_raises",
+    "tests/momentum/Analysis/test_marginal_ic.py::test_mutation_raw_scores_break_monotone_invariance",
+    "tests/momentum/Analysis/test_marginal_ic.py::test_mutation_test_fit_projection_breaks_o7"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 3,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "4182ceae0597940667c78d1ac91d3b28e919cfde9a2f1de35483610af8fb46a5",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "4182ceae0597940667c78d1ac91d3b28e919cfde9a2f1de35483610af8fb46a5",
+  "log_path": "handoffs/run_receipts/20260818T152612Z-mutation-multi.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 39 items / 36 deselected / 3 selected",
+    "",
+    "tests/momentum/Analysis/test_survivor_contract.py::test_mutation_missing_top_key_raises PASSED [ 33%]",
+    "tests/momentum/Analysis/test_marginal_ic.py::test_mutation_raw_scores_break_monotone_invariance PASSED [ 66%]",
+    "tests/momentum/Analysis/test_marginal_ic.py::test_mutation_test_fit_projection_breaks_o7 PASSED [100%]",
+    "",
+    "======================= 3 passed, 36 deselected in 1.00s ======================="
+  ]
+}

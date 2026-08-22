@@ -1,0 +1,3 @@
+[gap2_mutation_probe] batch=B1 ts=20260818T154919Z cases=10
+[baseline] rc=1 (=================== 1 failed, 45 passed, 1 warning in 13.47s ===================)
+🔴 baseline 非綠 ⇒ mutation 前提不成立，中止。

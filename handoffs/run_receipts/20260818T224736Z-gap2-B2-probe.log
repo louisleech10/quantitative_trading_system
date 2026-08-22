@@ -1,0 +1,10 @@
+[gap2_mutation_probe] batch=B2 ts=20260818T224736Z cases=3
+[baseline] rc=0 (======================== 45 passed, 1 warning in 21.13s ========================)
+MUTATION V-7: RED ✓ (test_o8_sign_from_train_negative_case rc=1, FAILED=1)
+MUTATION V-7: RESTORED GREEN ✓
+MUTATION V-8: RED ✓ (test_ic_weighted_uses_train_ic_reference rc=1, FAILED=1)
+MUTATION V-8: RESTORED GREEN ✓
+MUTATION V-9: RED ✓ (test_delta_ci_uses_block_len_reference rc=1, FAILED=1)
+MUTATION V-9: RESTORED GREEN ✓
+[post-restore] rc=0 (======================== 45 passed, 1 warning in 18.85s ========================)
+[gap2_mutation_probe] ✅ batch=B2 全部 3 條 mutation 轉紅且還原綠 → receipt handoffs/run_receipts/20260818T224736Z-gap2-B2-probe.log

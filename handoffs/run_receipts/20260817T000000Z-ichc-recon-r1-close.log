@@ -1,0 +1,6 @@
+ICHC recon R1 receipt — 20260817T234116Z
+session=20260817-ichc-x-consult-r1 round_id=52a8c568-21bd-4e75-b868-4ab66f0e4de5
+--- debt_clear (rerun-verify) ---
+COMPLETENESS FAIL: 正式 --lock 入口禁 argv 來源覆寫（收到 1 個多餘參數）
+--- cluster attribution ---
+attribution_rc=0
