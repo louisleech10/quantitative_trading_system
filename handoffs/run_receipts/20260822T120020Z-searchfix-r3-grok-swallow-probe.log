@@ -1,0 +1,11 @@
+2026-08-22 10:21:16,530 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-08-22 10:21:16,530 - probe - DEBUG - Searching symbol: ETHUSDT, timeframe=12h
+2026-08-22 10:21:16,530 - probe - DEBUG - Loading data for ETHUSDT
+2026-08-22 10:21:16,531 - probe - DEBUG - Searching symbol: ETHUSDT, timeframe=12h
+2026-08-22 10:21:16,531 - probe - DEBUG - Loading data for ETHUSDT
+RAISED IncompleteDownloadError stale probe
+BATCH_RAISED IncompleteDownloadError
+classify FailureType.INVALID_CONFIG
+to_thread_count 3
+EMPTY_ADVANCE_LINE current_start = batch_end + timedelta
+BATCH_END_MIN batch_end = min(
