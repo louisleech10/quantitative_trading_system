@@ -74,6 +74,7 @@
 | `review_quorum_check.sh` | 常態檢查 | gate  |
 | `session_name_check.sh` | 常態檢查 | committee_run  |
 | `spec_fourway_check.sh` | 常態檢查 | 未掛 |
+| `spec_v_task_ref_check.sh` | 常態檢查 | narrow_check_router  |
 | `status_marker_check.sh` | 常態檢查 | Stop  |
 | `strategy_wiring_check.sh` | 常態檢查 | 未掛 |
 | `template_check.sh` | 常態檢查 | gate gov_check  |

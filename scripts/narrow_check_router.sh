@@ -60,6 +60,8 @@ _routes() {
   #   `feedback_cross_reference_sync` 載此類錯已犯 7 次 ⇒ 改以閘門而非紀律。
   #   🔴 逐檔精確列（禁目錄前綴，見上方成本節）；新增量化 SPEC 時加兩列。
   printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|bash scripts/spec_ruling_task_sync.sh docs/GAP3_EVENT_UX_SPEC.md"
+  # §V 不得複述 §P 斷言（R5 consult 三家全員裁；病根＝R4/R5 兩輪 8 條主委自傷皆為「改了 §P 未同步 §V」）
+  printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|bash scripts/spec_v_task_ref_check.sh docs/GAP3_EVENT_UX_SPEC.md"
   printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|bash scripts/quant_standard_check.sh docs/GAP3_EVENT_UX_SPEC.md"
   printf '%s\n' "CLAUDE.md|bash scripts/check_agent_contract_sync.sh"
   printf '%s\n' "docs/MULTI_AGENT_ORCHESTRATION.md|bash scripts/check_agent_contract_sync.sh"

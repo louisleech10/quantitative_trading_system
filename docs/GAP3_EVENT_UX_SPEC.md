@@ -4,6 +4,7 @@
 <!-- SYNC-FORBID: 掃描條件引用之 `future_\{N\}bar_return` 欄 -->
 <!-- SYNC-FORBID: lookahead_bars.*=.*72 -->
 <!-- SYNC-FORBID: future[0-9]+_[^→]*→[[:space:]]*[0-9] -->
+<!-- SYNC-FORBID: contractAccepted -->
 <!-- 上列由 `scripts/spec_ruling_task_sync.sh` 機械強制：
      ①每條 `**D-<n>` 裁定須被 §P 至少一個 Task 引用（否則只停在敘述層）
      ②禁用語不得在 §P 殘留。
@@ -24,7 +25,7 @@
 
 | 群集 | 內容 | 落點 |
 |---|---|---|
-| A（＝R3 遺留 **D**） | Task 7.2 只驗集合、可被 disabled 湊過、無 round-trip；`enum`(4) vs `accepted`(3) 基準不明 | 新增 **Task 7.0**（先擴 `EventExportOptions`）；改寫 **Task 7.1／7.2／V-11** 為三層驗證 |
+| A（＝R3 遺留 **D**） | Task 7.2 只驗集合、可被 disabled 湊過、無 round-trip；`enum`(4) vs `accepted`(3) 基準不明 | 新增 **Task 7.0**（先擴 `EventExportOptions`）；改寫 **Task 7.1／7.2** 為三層驗證，比對基準＝`selectable(path,dim)`；**V-11 改為純引用**（R5 consult 裁，見 §V 書寫規則） |
 | B（＝R3 遺留 **F**） | G-2 canonical serialization 未定義 ⇒ 不可位元組級證偽 | **§G 新增 S-1..S-8**；Task 2.2 改為純引用 |
 | C（＝R3 遺留 **E**） | IC 分析頁與 Feature Library `time_range` 對證缺口；且檔頭禁殘留而 §N 仍殘留 | 新增 **Task 7.6／7.7**、**V-14／V-15**；**§N 之 #8／#10 殘留撤回** |
 | D（＝R3 遺留 **G**） | A／B 之 label 來源與機械深度未定義 | **Task 7.1「邊界」**加路徑級限制（`/search` 本批只開 C／two_stage）；**深度公式**落 Task 2.1b，由 1.9／V-12 引用 |
@@ -285,7 +286,8 @@ R1 推翻了原版「本批不動任何數值路徑」之主張（§D-4），本
 故 G-1 **不得**被引用為「事件輸出未變」之證據。
 
 **G-2 事件路徑專屬 golden（本批新建）**：固定 fixture（真實 kline 切片）＋固定 horizons，
-凍結 `event_forward_return_table` 之輸出為 sha256；逐 horizon 驗
+凍結 `event_forward_return_table` 之輸出為 sha256——**該 sha256 之計算規則唯一定義於 S-9**
+（`sha256 = S-9(輸出 dict)`），凍結與比對腳本只准 import S-9 之參考實作；逐 horizon 驗
 ① exact return 值（`atol=0`，位元組相等）②NaN／缺 bar mask 位置 ③PIT anchor（t0 對應根）。
 Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 說明改了什麼、為什麼**
 （合法變更），而非靜默重凍。
@@ -335,6 +337,44 @@ mask oracle ＝ 「(event_id × horizon) 之布林出現矩陣」，須與 golde
 **S-8 oracle 獨立性**：expected rows 須以**獨立手算**產生（另寫一份直算 entry/exit close 之腳本
 或試算表數值），**禁以被測函式自產 golden 後回頭比自己**。至少涵蓋：
 `horizons=[1,3,7]`、`ret_entry` 與 `ret_label_anchor` 兩種 return、尾端資料不足之 omission。
+
+**S-9 位元組 encoder（G-2 sha256 之唯一計算規則）**
+
+出處＝R5 consult 三家全員（CODEX-R2-P0-01／COMPOSER-R2-P0-01／GROK-R2-P0-02）：
+S-1..S-8 定義了**欄位語意與排序**，但未定義 **dict → bytes** 這一步
+⇒ 不同實作者選不同 `separators`／escaping／尾端 newline 仍各自「符合 S-1..S-8」卻得到不同 sha256。
+本節即該步之唯一規則；**任何實作不得自行約定 `json.dumps` 參數**。
+
+1. **輸入**：已依 S-1..S-7 組好之 Python `dict`（鍵序已符合 S-2，**不得再 sort**）。
+2. **型別白名單**：只接受 `bool`／`int`／有限 `float`／`str`／`list`／`dict`／`None`；
+   其他型別（`Decimal`、`numpy` 純量、`datetime` 等）**一律先轉為上列型別**，禁依賴 encoder 隱式轉換。
+3. **正規化**：`NaN`／`+Inf`／`-Inf` **一律轉 `None`**（與 S-5 一致）；`-0.0` **保留為 `-0.0`**
+   （不得正規化為 `0.0`——兩者 JSON lexeme 不同，會使 hash 隨實作漂移）；
+   **缺席鍵保持缺席**（不得補 `null`）；`list` 順序原樣保留。
+4. **JSON 生成**：
+   `json.dumps(obj, ensure_ascii=False, separators=(',', ':'), allow_nan=False, sort_keys=False)`
+   - 禁 `indent`；禁 `sort_keys=True`（順序由 S-2 保證，排序會破壞 S-1 固定序與 horizon 之 int 序）。
+   - 字串 escaping 依 JSON 規則：只 escape `"`、`\` 與 `U+0000`–`U+001F`；
+     非 ASCII 以**字面 UTF-8** 輸出（`ensure_ascii=False`），不得 `\u` 脫逃。
+   - 有限 `float` 之 JSON number lexeme 須等於 CPython `repr(float)`（與 S-5 之 round-trip 一致）。
+5. **尾端**：**不得**附加尾端 `\n` 或任何 whitespace。
+   🔴 **此為三家分歧之裁決點**：composer 與 grok 指定「禁尾端 newline」、codex 指定「加一個 `\n`」
+   ⇒ 採 2:1 之「禁」。裁決理由僅為多數，**非**技術優劣——兩者皆自洽，重點是全專案唯一。
+6. **編碼與雜湊**：`.encode('utf-8')`（禁 UTF-8 BOM）→ `hashlib.sha256(bytes).hexdigest()`。
+7. **參考實作**：`momentum/Analysis/event_samples/canonical_serialize.py::canonical_event_table_bytes`
+   （Task 4.2 實作時建）。G-2 之凍結與比對腳本**只准 import 該函式，禁複製邏輯**——
+   複製即第二份副本，副本必然漂移（同 §V 書寫規則之理由）。
+   🔴 檔名為三家分歧之裁決點（composer `canonical_serialize.py` vs grok `canonical_json.py`）
+   ⇒ 採 composer 版；實質無差異。
+
+**S-9 之驗收**（`pytest tests/momentum/event_samples/ -q -k canonical_serialize` ≥6 條）：
+① fixture bytes 與 golden 逐位元組相等
+② `separators` 改成 `(', ', ': ')` ⇒ hash 變、測試紅
+③ 附加尾端 `\n` ⇒ hash 變、測試紅
+④ `ensure_ascii=True` ⇒ hash 變、測試紅
+⑤ `NaN` 未轉 `None` ⇒ `allow_nan=False` 之 `json.dumps` raise（**非**靜默輸出 `NaN` 字面）
+⑥ `-0.0` 被正規化成 `0.0` ⇒ hash 變、測試紅
+fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／`±Inf`、`-0.0`、`None`、缺席鍵。
 
 ---
 
@@ -632,7 +672,8 @@ mask oracle ＝ 「(event_id × horizon) 之布林出現矩陣」，須與 golde
 - 覆蓋風險：`filters` 為 Task 1.1 已登記之契約欄位，Phase 3..7 無 Task 改寫其 schema；D-2 禁止
   `filters` 進入 `event_id` 之輸入 ⇒ 寫入 `filters` 不回頭改變事件識別。**須同步**：Phase 7 之
   六維度亦寫入 `label_definition`（同一物件之其他鍵）⇒ 兩者須在同一序列化點寫出，並**依 §G 之
-  S-2（鍵序）與 S-5（NaN 與浮點表示）**處理；本 Task **不自行定義**序列化規則，一律引用該節。
+  S-1..S-9**處理（S-2 鍵序／S-5 NaN 與浮點／**S-9 位元組 encoder**）；
+  本 Task **不自行定義**序列化規則，一律引用該節。
   （R4 群集 B 之修正：R3 版此欄把序列化義務寫成本 Task 自行宣告，而當時 §G 尚無該定義
   ⇒ 等於對一個不存在的規則下義務。§G 之 S-1..S-8 補上後，本欄改為純引用。）
 - 邊界：只記錄條件，不改變 `label` 值本身。
@@ -739,7 +780,9 @@ mask oracle ＝ 「(event_id × horizon) 之布林出現矩陣」，須與 golde
   前端可選要看的 horizon 集合。
 - 驗證：`pytest tests/momentum/event_samples/ -q -k horizon_curve` ≥3 條；列數 `== len(horizons)`；
   **且 G-2 事件 golden 須同步更新並在 commit message 說明**（D-4：這是**合法的數值輸出變更**，
-  不得靜默重凍）。
+  不得靜默重凍）；重凍**須以 §G S-9 之參考實作重算**
+  （`canonical_serialize.py::canonical_event_table_bytes`），禁另寫序列化。
+  本 Task 一併建該參考實作並附 S-9 之 6 條驗收（見 §G S-9 驗收）。
 - 存活至：Phase 6。
 - 覆蓋風險：改變 `analyze_tables` 預設值之呼叫形態（**刻意**，已由 G-2 守）。
 - 邊界：只改要算哪些 horizon；**不改**每個 horizon 之計算式。
@@ -969,7 +1012,7 @@ mask oracle ＝ 「(event_id × horizon) 之布林出現矩陣」，須與 golde
 - 不可做：不得在前端硬寫 enum 清單（必須由契約導出，否則下次加值又漂）；
   不得在未交付 A／B label producer 前於 `/search` 開放 A／B（見「邊界」）。
 
-**Task 7.2 — 機械閘：可操作選項集合 ＝ 契約 accepted，且選值真的傳到落檔（依賴 Task 7.0／7.1）**
+**Task 7.2 — 機械閘：可操作選項集合 ＝ `selectable(path,dim)`，且選值真的傳到落檔（依賴 Task 7.0／7.1）**
 - 內容：新增測試，對六個維度逐一驗**三層**（R4 群集 A：R3 版只驗第一層，三家全員判不足）：
   **① 集合層**——「**可操作**（`disabled === false` 且可 focus）之 UI 選項集合」`==`
     `selectable(path, dim)`（定義見 Task 7.1：`accepted` 減 `pathExclusions`）。
@@ -994,9 +1037,10 @@ mask oracle ＝ 「(event_id × horizon) 之布林出現矩陣」，須與 golde
   (c) 呼叫端 `page.tsx` 漏傳某維度之 opts ⇒ ②紅
   (d) 把某維度改回寫死 ⇒ ②紅
 - 存活至：Phase 7（終）。
-- 覆蓋風險：本閘為 Task 7.0／7.1 之防漂移守衛，存活至 Phase 7（終），比對基準為契約 `accepted`
-  （導出自契約檔）而非人工清單 ⇒ 後續任一 Phase 於契約增值時本閘自動變紅，該紅為設計意圖，
-  **不得以更新人工清單消紅**。**須同步**：Task 1.1 於契約新增之 reason 與 `filters` 屬非 enum 型欄位，
+- 覆蓋風險：本閘為 Task 7.0／7.1 之防漂移守衛，存活至 Phase 7（終）。
+  🔴 比對基準為 `selectable(path,dim)`（定義見 Task 7.1），**非**裸契約 `accepted`——
+  其中 `accepted(dim)` 導出自契約檔、`pathExclusions` 導出自具名常數，二者皆非人工清單
+  ⇒ 後續任一 Phase 於契約增值時本閘自動變紅，該紅為設計意圖，**不得以更新人工清單消紅**。**須同步**：Task 1.1 於契約新增之 reason 與 `filters` 屬非 enum 型欄位，
   **不在本閘涵蓋面內** ⇒ 本閘只保護六個維度、不保護契約全部欄位；此邊界須明寫於實作註解與測試名稱，
   避免日後誤以為「有機械閘＝契約全欄受保護」而略過 Task 1.1 之常數同步（見 Task 1.1 覆蓋風險）。
   另：`accepted` 為契約既有鍵，本 Task **不新增**該鍵到其他維度——只在存在時採用。
@@ -1118,6 +1162,19 @@ mask oracle ＝ 「(event_id × horizon) 之布林出現矩陣」，須與 golde
 
 ## §V 驗證策略與邊界測試目錄
 
+### §V 書寫規則（R5 consult 裁；三家全員同向）
+
+🔴 **§V 是索引，不是第二份規格。**
+出處＝R4／R5 連兩輪之自傷共 8 條，形態一致：**改了 §P 之權威定義，未同步 §V 之複述**
+（最嚴重者＝V-11 仍寫 `contractAccepted` 而 Task 7.1／7.2 已改 `selectable(path,dim)`，
+照 V-11 實作會強迫 UI 啟用 A／B、推翻路徑級限制）。
+**複述即第二份副本，副本必然漂移**——故本節不靠紀律，改以規則＋機械閘消除複述本身。
+
+- 凡 V 列對應某個 Task 者：「手段／通過條件」**只寫**「執行 Task `<id>` 之驗證欄，其命令 rc=0」
+  （可加一句路徑對照），**禁止**重寫集合等式、公式、enum 字面清單或 mutation 條文。
+- 唯一例外：跨多 Task 之整合列（如 V-M）可列 Task ID **清單**，仍不得另造第二套通過條件。
+- 機械強制：`scripts/spec_v_task_ref_check.sh`（掛 `narrow_check_router.sh`）。
+
 | ID | 驗什麼 | 手段 | 通過條件 |
 |---|---|---|---|
 | V-1 | CSV 對映之 label **照抄正確** | 真實 CSV fixture → 匯入 → 逐列比對 | 每列 `label ==` CSV 指定欄之值。**誠實邊界：本項不證明使用者選對欄**（D-1，語意不可機械證明）；選欄風險由 V-1b/V-1c 降低 |
@@ -1129,16 +1186,16 @@ mask oracle ＝ 「(event_id × horizon) 之布林出現矩陣」，須與 golde
 | V-5 | 刪除後該批消失 | 刪除 → 列表／analyze 各查一次 | 列表無該批；analyze status_code `== 404` |
 | V-6 | 附帶 horizon 欄與 label 語意分離（D-3） | 主答案窗 `=4`、附帶 `[1,3,7]` → 匯出 | 含 `future_{1,3,7}bar_return`；`window.horizon_bars == 4`；`label_value ==` 各列 `future_4bar_return` |
 | V-7 | `.source.json` 誤傳之訊息含正解 | 上傳 `.source.json` 當事件檔 | status_code `== 400` 且訊息含 `source_file` |
-| V-8 | 止血閘生效且**未載入大矩陣**（D-5） | 218369 特徵之 run 呼叫 analyze，依 Task 6.4 之採樣點 | ①status_code `== 400` ②**任務未建立**（task store 筆數不變）③cap 檢查後之 footprint 相對 baseline 增幅 `< 0.2GB`，量測用 `sample <pid>` 之 Physical footprint（**禁 `ps rss`**）④進程存活 |
+| V-8 | 止血閘生效且**未載入大矩陣**（D-5） | **執行 Task 6.4 之驗證欄全部條目**（其 V-8 三項斷言與採樣時點）；§V 不重述斷言字面 | `pytest tests/api -q -k ic_stop_gate_alive` rc=0 且條目數 `>=` Task 6.4 所列；量測工具與禁令見 Task 6.2 |
 | V-9 | 止血閘不誤擋 | 小 run（15 特徵）呼叫 | status_code `== 200` **且任務確實被建立**（task store 筆數 +1；R1 指出只驗 200 不足） |
 | V-10 | tooltip 與 glossary 不漂移 | 逐表頭比對 | tooltip 文字 `==` glossary `definition` |
 | G-1 | IC 主線未被波及 | `python3 scripts/gap3_freeze_golden.py --check` | 通過。**誠實邊界：不涵蓋事件路徑**（D-4） |
 | G-2 | 事件路徑數值未意外改變 | 本批新建之事件 golden | 逐 horizon exact return（`atol=0`）／NaN mask／PIT anchor 全等；Task 4.2 之合法變更須同 commit 更新並說明 |
-| V-11 | 六維度全接出、不可漂移、且**選值真的傳到落檔**（Phase 7；R4 群集 A 改寫） | 逐維度三層：①可操作選項集合 vs 契約 `accepted` ②非預設值 round-trip 到落檔 ③非 enum 欄之邊界與傳值 | ①`new Set(selectableOptions)` 等於 `new Set(contractAccepted)` 且長度相等（disabled 不計入）②`records[0].<path> === '<非預設值>'`，`label_return_mode` 走巢狀路徑 ③`decision_offset_bars === 3`、輸入 `-1` fail-closed。**mutation 四條**：契約加第 5 個 scenario 不改 UI ⇒ ①紅；`platform_random_bars` 改 enabled 湊數 ⇒ ①紅；呼叫端漏傳 opts ⇒ ②紅；改回寫死 ⇒ ②紅 |
-| V-12 | lookahead 深度由標註導出、未知即擋（D-7 修訂 L1/L2/L3；R4 群集 D／G 擴充） | 六組 fixture | ①全部欄可解析 ⇒ 深度 `==` Task 2.1b 之公式值（**含 `window.horizon_bars` 左項**）②含 `future_4bar_max_drawdown` ⇒ 深度 `>= 4`（證明不只認 return）③含自訂欄 ⇒ **拒絕進入切分**（斷言 split 未執行、非只回警告）④小時命名欄：`future72_max_return` 於 `12h` 線 ⇒ 深度 `== 6`、於 `1h` 線 ⇒ `== 72`（禁寫死 72）⑤`window.horizon_bars=12` 而條件只引用 `future_2` ⇒ 深度 `== 12`（左項生效）⑥外部上傳欄名為 `future_4bar_return` 但無 producer provenance ⇒ `requires_declaration == True`（改名攻擊，見 Task 1.10④） |
-| V-14 | IC 分析頁揭露該批六維度（Task 7.6） | 選批後讀 UI；與 Task 7.3 共用 formatter | 六段文字皆出現；改批次任一維度 ⇒ 顯示字串 `!==` 前值；兩處呼叫同一 exported function（**mutation**：前端另寫一份文案 ⇒ 須紅） |
-| V-15 | 特徵覆蓋對證 fail-closed（Task 7.7） | 小型跨日期 fixture ×4 | ①t0 全在區間內 ⇒ 放行 ②t0 早於 `start` 一根 ⇒ `capability_status == "unavailable"`、reason `== "feature_coverage_insufficient"` ③`max(t0)+horizon` 超出 `end` ⇒ **仍** fail-closed ④`time_range == {start: None, end: None}`（legacy run）⇒ fail-closed、reason `== "feature_coverage_unknown_legacy_run"`。**mutation**：右界不加 horizon ⇒ ③紅；legacy 放行 ⇒ ④紅 |
-| V-13 | 報酬表三組（Task 7.5） | 正／反／全體三組 | 三組列數各 `== len(horizons)`；正 n ＋ 反 n `==` 全體 n；`control_kind == 'user_labeled_other'` ⇒ 全體組 `not_computed` |
+| V-11 | 六維度全接出、不可漂移、且**選值真的傳到落檔**（Phase 7） | **執行 Task 7.2 之驗證欄全部條目**（三層＋其 mutation）；§V 不重述任何斷言字面 | `npx vitest run contractEnumWiring` rc=0 且用例數 `>=` Task 7.2 所列；集合層之唯一基準 ＝ Task 7.1 定義之 `selectable(path, dim)` |
+| V-12 | lookahead 深度由標註導出、未知即擋（D-7 之 L1/L2/L3） | **執行 Task 1.10／1.11／1.12／2.1b 之驗證欄全部條目**；§V 不重述深度公式與 fixture 條文 | 四個 Task 之命令皆 rc=0；深度公式之唯一定義見 Task 2.1b，改名攻擊之判準見 Task 1.10 |
+| V-14 | IC 分析頁揭露該批六維度 | **執行 Task 7.6 之驗證欄全部條目**；§V 不重述斷言字面 | `pytest tests/api -q -k event_batch_detail_dims` 與 `npx vitest run icEventBatchDisclosure` 皆 rc=0 且條目數 `>=` Task 7.6 所列 |
+| V-15 | 特徵覆蓋對證 fail-closed | **執行 Task 7.7 之驗證欄全部條目**；§V 不重述 containment 邊界公式 | `pytest tests/api -q -k feature_coverage_gate` rc=0 且條目數 `>=` Task 7.7 所列；containment 之唯一定義見 Task 7.7 |
+| V-13 | 報酬表正／反／全體三組 | **執行 Task 7.5 之驗證欄全部條目**；§V 不重述斷言字面 | `pytest tests/momentum/event_samples/ -q -k return_table_by_label` rc=0 且條目數 `>=` Task 7.5 所列 |
 | V-M | 可證偽性 | **逐 Task** 列出：mutation 內容、命令、預期紅、實際 receipt 路徑 | 逐條紅；還原後全綠。**不得只寫「逐條紅」**（CODEX-R1-P0-06） |
 
 **測試設計紀律**（本 session 已四次交出假綠，逐條套用）：

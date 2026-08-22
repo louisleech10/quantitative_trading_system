@@ -1898,6 +1898,9 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>九十二・（2026-08-22）新增機檢規則第一版關鍵字太寬，對 166 份文件掃出 17 個誤報</strong>：為擋「驗收欄寫 <code>python3 -c &quot;...&quot;</code>（真的就三個點）卻因含 <code>==</code>／<code>.py</code> 而過檢查」的空殼形態，我在 <code>template_check.sh</code> 加了佔位偵測，第一版把 <code>TODO</code>／<code>TBD</code>／<code>FIXME</code>／<code>XXX</code> 一併列入 ⇒ 本 repo 拿 <strong>TODO 當文件型別名</strong>（<code>GAP3_EVENT_TODO.md</code>、「SPEC/TODO 統一此一命令」）、<code>XXX</code> 見於用法字串（<code>docs/XXX_SPEC.md</code>），實掃 17 份誤報。收窄到只擋引號內省略號與中文佔位後誤報歸零、mutation 仍轉紅。規則：<strong>新增任何關鍵字型機檢，上線前必須對全 repo 同類檔實掃一次並報出誤報數；誤報 &gt; 0 就收窄，不得靠「之後再說」</strong>——關鍵字集合要窄而準，寧可漏也不要吵（黑名單永遠列不完，見票 B-23）。</p>
 </blockquote>
+<blockquote>
+<p><strong>九十三・（2026-08-22）§V 複述 §P 是我連兩輪自傷的根因；使用者裁定「直接問委員要怎麼修」後由三家裁掉</strong>：GAP-3 UAT 缺口 SPEC 之 R4／R5 兩輪，我修訂自行引入的 findings 共 <strong>8 條</strong>，形態完全一致——<strong>改了 §P 的權威定義，忘了同步 §V 的複述</strong>。最嚴重的一條：Task 7.1／7.2 已把比對基準改成 <code>selectable(path,dim)</code>，而 V-11 仍寫 <code>new Set(contractAccepted)</code>；兩者對 <code>/search</code>×<code>scenario</code> 不相等（4 值 vs 2 值）⇒ 照 V-11 實作會<strong>強迫 UI 啟用 A／B</strong>，直接推翻我剛加的路徑級限制。composer 與 grok <strong>兩家獨立命中</strong>。使用者裁定不再由我自選修法，改派 consult 輪由三家指定、我照抄。三家<strong>全員同向</strong>裁出結構性修法：<strong>§V 改為純索引（只寫「執行 Task <id> 之驗證欄」，禁重寫集合等式／公式／enum 清單／mutation 條文），並加機械閘 <code>scripts/spec_v_task_ref_check.sh</code></strong>。實作時另發現除 V-11 外還有 5 條 V 列同屬雙源（V-8／12／13／14／15），一併引用化。閘以 R5 的實際 bug 字面反測 rc=2、現行 SPEC rc=0。<strong>規則</strong>：<strong>摘要表若複述權威定義，它就是第二份副本，副本必然漂移——不要靠紀律同步，直接讓複述本身不可能存在</strong>（同理適用於任何「總覽表／檢查清單／看板」對規格的複述）。附帶教訓：連兩輪自傷之後，「換一個人決定怎麼修」比「我更小心一點」有效——這是使用者裁的，不是我想到的。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
