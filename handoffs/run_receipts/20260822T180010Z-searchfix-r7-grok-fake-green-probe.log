@@ -1,0 +1,40 @@
+2026-08-22 11:46:07,150 - momentum.DataExtraction.parallel_search_engine - INFO - 並行搜索引擎已初始化: workers=2, parallel=True
+2026-08-22 11:46:07,151 - momentum.DataExtraction.case_search_engine - INFO - 並行搜索引擎已啟用
+2026-08-22 11:46:07,151 - momentum.DataExtraction.parallel_search_engine - DEBUG - 將4個symbols分成2批: [2, 2]
+2026-08-22 11:46:07,393 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+2026-08-22 11:46:07,394 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+PARALLEL_NUM_WORKERS 2
+SYMBOLS_LEN 4
+SERIAL_FALLBACK_PRED len(symbols)<num_workers False → expect False (parallel path)
+CHUNKS [['AAAUSDT', 'BBBUSDT'], ['CCCUSDT', 'DDDUSDT']]
+N_CHUNKS 2
+HAS_SERIAL_GATE True
+HAS_PROCESS_POOL True
+HAS_INCOMPLETE_RERAISE True
+MODULE_ProcessPoolExecutor ProcessPoolExecutor
+RUN_TASK_LEN 19232
+RUN_TASK_CALLS_search_cases True
+RUN_TASK_HAS_EXCEPT_FAILED True
+RUN_TASK_FINALLY_ACTIVE True
+RUN_TASK_MOMENTUM_GATE True
+RUN_TASK_CONVERT_CONFIG True
+PATCH_ANALYSIS:
+  momentum_available=True → 通過 availability gate（否則早退 FAILED 'not available'，永不呼叫 search_engine）
+  _convert_request_to_search_config → 避開假 Request 缺欄；發生在 search_cases 之前
+  search_engine=_RejectingEngine → 只換最底層；await search_cases → except → FAILED 仍是 production 碼
+  BYPASS_CLAIMED_PATH? NO — claimed path is rejection→FAILED+symbol+_active_searches restore
+INIT_momentum_available False
+INIT_search_engine None
+INIT_task_manager_type StandaloneTaskManager
+CSE_search_cases_Incomplete_reraise True
+PSE_collect_Incomplete_raise True
+CSE_single_has_Incomplete True
+GREEN_HOLES_ASSESSMENT:
+  ProcessPool pickling/SemLock: NOT covered (ThreadPool swap) — R1-R6 residual blocked-by-env; out of R7 scope
+  real _process_chunk_worker body: stubbed — collection/raise contract still production
+  search_cases swallow → P2-01 red (mutation receipt 1 failed)
+  parallel continue → P2-02 red (mutation receipt 2 failed)
+  single_symbol swallow → multi red (mutation receipt 3 failed); search_cases swallow also turns P2-03 red via COMPLETED
+  _run_search_task strip symbol / mark COMPLETED on Exception → P2-03 red
+  FAKE_GREEN_FOR_CLAIMED_CONTRACT? NO within R7 scope
+PROBE_OK

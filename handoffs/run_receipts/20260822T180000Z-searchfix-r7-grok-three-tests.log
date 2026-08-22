@@ -1,0 +1,47 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/louis/Desktop/quantitative_trading_system/venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 3 items
+
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_public_search_cases_surfaces_rejection_through_real_constructor 
+-------------------------------- live log call ---------------------------------
+11:45:35 [INFO] 並行處理已禁用，使用串行模式
+11:45:35 [INFO] Search started: 1 symbols, 2024-01-01 to 2026-04-27
+11:45:35 [INFO] 使用串行處理模式
+11:45:35 [INFO] Processing batch 1: ['BADSYM']
+PASSED                                                                   [ 33%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_real_search_cases_parallel_propagates_rejection 
+-------------------------------- live log call ---------------------------------
+11:45:35 [INFO] 並行搜索引擎已初始化: workers=2, parallel=True
+11:45:35 [INFO] 並行搜索引擎已啟用
+11:45:35 [INFO] 開始並行搜索: 4個symbols, 2個workers
+11:45:35 [INFO] 批次完成 1/2, 成功: 1, 失敗: 0, 批次耗時: 0.00秒
+PASSED                                                                   [ 66%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_run_search_task_marks_failed_with_symbol_on_rejection 
+-------------------------------- live log call ---------------------------------
+11:45:35 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+11:45:35 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+11:45:35 [INFO] Created task 4711338e-779a-4694-9f01-9666db877d80 for config: search
+11:45:35 [INFO] Updated task 4711338e-779a-4694-9f01-9666db877d80 status to running
+11:45:35 [INFO] Running real search for: t
+11:45:35 [ERROR] Real search failed: [worker 2/3] symbol=BADSYM 下載被拒收: stale
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/standalone_search_service.py", line 450, in _run_search_task
+    real_cases_dict = await self.search_engine.search_cases(
+  File "/Users/louis/Desktop/quantitative_trading_system/tests/momentum/DataExtraction/test_search_download_pagination.py", line 1102, in search_cases
+    raise IncompleteDownloadError("[worker 2/3] symbol=BADSYM 下載被拒收: stale")
+momentum.DataExtraction.data_loader_momentum.IncompleteDownloadError: [worker 2/3] symbol=BADSYM 下載被拒收: stale
+11:45:35 [INFO] Updated task 4711338e-779a-4694-9f01-9666db877d80 status to failed
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 3 passed, 1 warning in 0.19s =========================
