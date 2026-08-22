@@ -178,6 +178,35 @@ A-6 因改變使用者可見行為，另於白話閘向使用者說明）。
 
 ---
 
+## §C0 收斂標準（使用者 2026-08-22 定死，最高位階，覆蓋一切其他規則）
+
+🔴 **「95% 解法就收、殘留具名記錄不當阻塞」在本 SPEC 與整條量化主線一律不適用。**
+
+使用者逐字：
+> 「95% 解法就收、殘留具名記錄不當阻塞這是在針對治理 epic 中會有散文化和文字問題，
+> **在量化主線完全不接受，數據/品質一定是要 100% 正確，只能更嚴但不能放水**。」
+> 「你要絕對保證在量化正確性不能用治理那套『95% 就收』這點，
+> **絕對不能犯或不小心有任何一條或引用到，要整條刪除都可以**。」
+
+**適用範圍**：本 SPEC 全部 Phase／Task／§V 各條目，以及其衍生之 TODO、實作、review、蓋章各輪。
+
+**具體禁止**（任一出現即為違規，須停下重做，不得以殘留登記帶過）：
+1. 不得以「95%／夠好了／先收再說」為由結束任一輪審查。
+2. 不得把**數值正確性**或**資料洩漏**類 finding 降級為具名殘留而放行
+   （殘留只適用於「已證明不影響正確性」之工程增強，且須帶三值理由）。
+3. 不得以「委員已同意可合併」替代「該條 finding 已實際修復並經 mutation 證偽」。
+4. 主委不得援引治理 epic 之收斂慣例（含 P1-6 無限迴圈教訓）來收窄量化正確性之審查範圍。
+
+**主委違規紀錄（保留為警示，不得刪）**：2026-08-22 SPEC R3 輪，主委因 findings 由 7 條反彈至 18 條，
+援引「95% 就收」建議收斂並停止加固——**該建議被使用者當場駁回**。
+援引錯誤在於：該規則出自治理散文之對抗審無限迴圈，而本 SPEC 之標的是
+**lookahead 深度、purge 寬度、資料洩漏**，屬不可妥協之數值正確性。
+
+**與 §V 之關係**：§V 全部條目為**必達**（rc=0 或斷言 `==` 成立），非「盡量達成」；
+任一條未通過即不得進入下一 Phase，亦不得定版。
+
+---
+
 ## §C 約束（引用，不重抄）
 
 - **契約唯一真相源**：`momentum/Analysis/contracts/event_import_contract.json`——欄位名與
@@ -290,7 +319,64 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 邊界：只拒收並指出衝突；不自動分批。
 - 不可做：不得靜默取第一列之值套用全批。
 
-**Task 1.9 — 答案窗宣告與 purge 下界（D-7；本批最高優先）**
+**Task 1.10 — 欄位級 `lookahead_bars` 契約（D-7 之 L1；Task 1.9／2.1b 之前置）**
+- 內容：新建 `momentum/Analysis/contracts/future_column_lookahead.json`，
+  登記搜尋結果**每一個**未來欄之 `lookahead_bars`：
+  🔴 **兩套命名並存、單位不同**（GROK-R3-P1-01 抓出主委原寫死 72 之錯誤，實查證屬實）：
+  - **bar 命名**（`future_{N}bar_return`／`future_{N}bar_max_drawdown`）：`N` **就是根數** ⇒ `lookahead_bars = N`
+  - **小時命名**（`future{H}_close_return`／`future72_max_return`／`future72_max_drawdown`，
+    H ∈ {1,2,4,6,24,48,72}）：`H` 是**小時**，實際根數 ＝ `H ÷ 每根小時數`
+    （`case_search_engine.py:1385-1387` 之 `periods_{H}h`；12h 線 ⇒ `future72_*` 為 **6 根**，
+    1h 線 ⇒ **72 根**）⇒ `lookahead_bars` **與 timeframe 相依，不得寫死常數**。
+  ⇒ registry 對小時命名欄須存 `lookahead_hours` 並於執行期換算，**禁存固定 bar 數**。
+  ⚠️ **另註**：`periods_72h` 亦被用於**過去 3 天 lookback**（`:1028-1046`），
+  與未來欄同名不同義，登記時**不得混淆**（主委原將其誤認為未來欄）。
+  盤點來源＝`case_search_engine.py:669-697`（CaseData 欄位）＋`:946-947`（擴展欄），不得遺漏。
+  **辨識規則**須同時涵蓋：契約蛇形、CSV 標題形（`Future_NBar_Return_%`／`Future_NBar_Drawdown_%`，
+  大小寫與 `%` 後綴，見 `search/page.tsx:567-573`）。
+  **owner**：新增未來欄之 PR 須同步登記；**未登記即 fail-closed**（見下方②）。
+- 驗證（`pytest` 與 `python3 -c` 實跑，逐項 `==` 斷言）：
+  ①bar 命名：`m['future_4bar_max_drawdown']['lookahead_bars'] == 4`；
+    小時命名：`m['future72_max_return']['lookahead_hours'] == 72` **且無 `lookahead_bars` 鍵**
+    （防寫死）；換算函式對 `timeframe='12h'` 回 `6`、對 `'1h'` 回 `72`（`==` 精確比對）
+  ②**缺標註 validator**：`pytest tests/momentum/event_samples/ -q -k lookahead_registry_complete`——
+    掃描 `CaseData` 之所有 `future*` 欄名，**任一未登記即紅**（斷言未登記集合 `== set()`）
+  ③辨識三形態：`Future_4Bar_Return_%`／`future_4bar_return`／`FUTURE_4BAR_RETURN` 皆解析為 4
+  **mutation**：刪掉 registry 中 `future_4bar_max_drawdown` 一筆 ⇒ ②須紅。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：無。
+- 邊界：只登記深度，不改任何欄位之計算。
+- 不可做：不得以欄名字串樣式**推測**深度（推測即可被改名偽造，見 L2）；
+  不得漏登 `*_max_drawdown` 與 `future72_*`（R2 三家指出之實際繞法）。
+
+**Task 1.11 — 未知欄強制宣告（D-7 之 L2）**
+- 內容：解析欄位時若出現**無法由 Task 1.10 registry 解析深度**之 `future*` 欄或自訂欄
+  ⇒ **不得靜默採用可解析欄之 max**，改為**強制使用者填寫宣告 ＋ 勾選不可驗聲明**；
+  UI 明示「系統無法驗證此深度，錯報將導致資料洩漏」。
+- 驗證（`pytest tests/api -q -k lookahead_declaration` ≥2 條）：fixture 含 `my_custom_signal` 欄且被條件引用 ⇒
+  ①不得自動放行（斷言 `requires_declaration == True`）
+  ②未填宣告即送出 ⇒ fail-closed（落檔數 `== 0`）
+  **mutation**：改為「忽略無法解析之欄」⇒ ①須紅。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：無。
+- 邊界：只處理「解析不出深度」的情形。
+- 不可做：不得因為「其他欄都能解析」就用它們的 max 當全批深度。
+
+**Task 1.12 — 不可證則禁進切分（D-7 之 L3）**
+- 內容：若使用者**未填** L2 之宣告、或宣告與 registry 衝突 ⇒ 該批**禁止進入
+  train/test 切分與條件 IC**（`split_events` 與 `ic_feed` 皆拒），僅允許事件研究表
+  （無訓練即無洩漏）。批次狀態標 `split_blocked_unverifiable_lookahead`（須先進契約 reason 清單）。
+- 驗證（`pytest tests/momentum/event_samples/ -q -k split_blocked` ≥3 條）：
+  ①該批呼叫 analyze ⇒ 切分**未執行**（斷言 `split_events` 未被呼叫，非只回警告字串）
+  ②條件 IC ⇒ `capability_status == "unavailable"`、reason `== "split_blocked_unverifiable_lookahead"`
+  ③事件研究表**仍可產出**（斷言表格列數 `== len(horizons)`）
+  **mutation**：把禁令改成僅記 log ⇒ ①須紅。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：無。
+- 邊界：只擋切分與條件 IC，不擋事件研究。
+- 不可做：不得以「警告後放行」替代（R2 codex 明指此為 fail-open）。
+
+**Task 1.9 — 答案窗宣告與 purge 下界（D-7 之 L2 使用者介面；依賴 Task 1.10／1.11）**
 - 內容：CSV 上傳時，答案窗**預設取檔內最大可用 horizon**（有 `future_1..12` ⇒ 預設 12）；
   可往下調但須勾選「我的篩選條件未用到超過第 N 根」之聲明，UI 明示**此為無法驗證的聲明**；
   欄位接受**任意正整數**（不限 1..12）。宣告值寫入 `label_definition.window.horizon_bars`，
@@ -322,7 +408,8 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 不可做：不得在篩選中改動任何原始欄位值。
 
 **Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）**
-- 內容：系統內篩選時，掃描條件引用之 `future_{N}bar_return` 欄，取 `max(N)` 為答案窗**下界並鎖定**，
+- 內容：系統內篩選時，**依 Task 1.10 之欄位級 `lookahead_bars` 標註**解析條件引用之**所有**欄位
+  （含 `*_max_drawdown`／`future72_*`／任何登記欄），取 `max(lookahead_bars)` 為答案窗**下界並鎖定**，
   使用者**不得調低**（與 CSV 路徑之「可調低但需聲明」不同——此處是機器可證，不需聲明）。
 - 驗證：條件用到 `future_2` 與 `future_7` ⇒ 答案窗鎖定 `>= 7`；
   嘗試設 5 ⇒ 前端阻擋且 `fetch` call count `== 0`。
@@ -394,9 +481,9 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 
 **Task 4.1b — 匯出時揭露每個選項在動什麼（使用者 2026-08-22：「我不知道有什麼東西」）**
 - 內容：匯出面板明文顯示三件現行完全未告知之事實：
-  ①「正反例由 **t0 條件**決定，不看未來」（若使用者加了品質過濾則改顯示其 lookahead 深度）
-  ②「主答案窗 h 只影響**條件 IC**（特徵 vs h 根後報酬），**不影響**你的分類標籤」
-  ③「因此 purge h 根是為條件 IC 服務；你的分類任務本身不需要」
+  ① **本批 scenario ＝ {實際值} — {契約 doc 之白話}**（由實際設定導出，**禁寫死**）
+  ② **lookahead 深度 ＝ {N} 根，來源＝{引用之欄位清單}**（依 D-7 通則導出；C 無品質過濾時為 0）
+  ③ **purge 將為 {N} 根**，並說明「此深度來自你的 label 定義最遠引用到 t0 之後第幾根」
   ④ 本批 `control_kind` 之值與白話意思（現由 `eventExport.ts:104` 寫死 `user_labeled_same_trigger`，
     使用者從未選過亦不知其存在）。
 - 驗證：vitest 斷言四段文字皆出現；`control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
