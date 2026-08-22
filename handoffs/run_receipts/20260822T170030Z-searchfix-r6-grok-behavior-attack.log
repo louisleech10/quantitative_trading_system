@@ -1,0 +1,12 @@
+=== behavior attack 2026-08-22T03:29:39Z ===
+2026-08-22 11:29:40,695 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-08-22 11:29:40,696 - momentum.DataExtraction.parallel_search_engine - INFO - 開始並行搜索: 1個symbols, 1個workers
+2026-08-22 11:29:40,931 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+COLLECTION_TEST_CALLS_search_cases_parallel: False
+COLLECTION_TEST_HAS_scenario_rewrite: True
+REAL_PARALLEL_THREADPOOL: RAISED IncompleteDownloadError [worker 1/1] symbol=BADSYM 下載被拒收: probe
+RUN_TASK_HAS_INCOMPLETE_HANDLER: False
+RUN_TASK_BROAD_EXCEPT_FAILED: True
+RUN_TASK_EMPTY_COMPLETED: True
+DOC_CLAIMS_DIRECT_PRODUCTION: True
+FOURTH_TEST_IS_REPLICA: True

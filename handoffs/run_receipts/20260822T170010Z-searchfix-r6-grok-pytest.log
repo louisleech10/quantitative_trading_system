@@ -1,0 +1,47 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 41 items / 15 deselected / 26 selected
+
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_incomplete_download_is_not_swallowed_by_single_symbol PASSED [  3%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_incomplete_download_propagates_through_search_batch PASSED [  7%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_parallel_worker_outer_catch_does_not_swallow_rejection 
+-------------------------------- live log call ---------------------------------
+11:29:42 [INFO] Worker 2/2 啟動, 處理 1 個symbols
+11:29:42 [INFO] Worker 2/2: 處理 BADSYM (1/1)
+11:29:42 [ERROR] 資料完整性拒收，worker 2 中斷於 BADSYM: K 線回應非遞增或末筆非最大值（拒收，不得落快取）
+PASSED                                                                   [ 11%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_parallel_collection_propagates_rejection_instead_of_continue PASSED [ 15%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_parallel_paths_reraise_rejection_at_every_swallow_point PASSED [ 19%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[bare_except] PASSED [ 23%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[base_exception] PASSED [ 26%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[coswallow_tuple] PASSED [ 30%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[dead_branch_raise] PASSED [ 34%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[dynamic_handler] PASSED [ 38%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[named_but_no_raise] PASSED [ 42%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[plain_exception] PASSED [ 46%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[raise_wrong_type] PASSED [ 50%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[runtime_error] PASSED [ 53%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[tuple_handler] PASSED [ 57%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[tuple_single] PASSED [ 61%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[unknown_name] PASSED [ 65%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_module_level_bypass_forms[alias_assign] PASSED [ 69%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_module_level_bypass_forms[alias_import] PASSED [ 73%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_module_level_bypass_forms[getattr_dynamic_name] PASSED [ 76%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_module_level_bypass_forms[getattr_indirect] PASSED [ 80%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_module_level_bypass_forms[getattr_unlisted_method] PASSED [ 84%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_module_level_bypass_forms[swallow_inside_exempt_func] PASSED [ 88%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_accepts_correct_forms[name_before_exception] PASSED [ 92%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_accepts_correct_forms[name_before_tuple] PASSED [ 96%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_ignores_try_that_cannot_reach_download PASSED [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 26 passed, 15 deselected, 1 warning in 0.12s =================
