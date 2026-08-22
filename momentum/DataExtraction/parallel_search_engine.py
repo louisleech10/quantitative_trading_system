@@ -22,10 +22,12 @@ import logging
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 import multiprocessing
+import os
 import psutil
 import time
 import json
@@ -251,6 +253,15 @@ class ParallelSearchEngine:
             f"workers={self.num_workers}, "
             f"parallel={self.enable_parallel}"
         )
+
+    @staticmethod
+    def _worker_log_path() -> Optional[str]:
+        """worker 日誌路徑（與 API 同一個 `logs/case_search_api_<YYYYMMDD>.log`；取不到 ⇒ None，fail-open）。"""
+        try:
+            root = Path(__file__).resolve().parents[2]
+            return str(root / "logs" / f"case_search_api_{datetime.now().strftime('%Y%m%d')}.log")
+        except Exception:                                # noqa: BLE001
+            return None
 
     def _get_optimal_workers(self) -> int:
         """
@@ -553,16 +564,22 @@ class ParallelSearchEngine:
                         chunk,
                         config,
                         chunk_idx,
-                        len(symbol_chunks)
+                        len(symbol_chunks),
+                        self._worker_log_path(),      # 子進程日誌落檔路徑（不落檔＝查不到任何 worker 紀錄）
                     )
                     futures.append(future)
 
                 # 收集結果
+                # 🔴 不得用 concurrent.futures.as_completed／future.result()：兩者都是**同步阻塞**，
+                # 在 async 函式內會鎖住整個事件迴圈 ⇒ 搜尋期間後端對任何 HTTP 請求都不回應
+                # （前端輪詢逾時報「請求超時」；2026-08-22 UAT B1 實測，sample 顯示主執行緒卡在 pthread_cond_wait）。
+                # 改以 asyncio.wrap_future 包成 awaitable，逐個完成即處理，其餘時間讓出迴圈。
                 completed = 0
-                for future in as_completed(futures):
+                aio_futures = [asyncio.wrap_future(f) for f in futures]
+                for aio_future in asyncio.as_completed(aio_futures):
                     batch_start = time.time()
                     try:
-                        chunk_data = future.result()
+                        chunk_data = await aio_future
                         batch_elapsed = time.time() - batch_start
 
                         # 收集成功結果
@@ -693,10 +710,45 @@ class ParallelSearchEngine:
                 self.enable_parallel = original_enable_parallel
 
 
+_WORKER_LOG_HANDLER_MARKER = "_search_worker_file_handler"
+
+
+def _init_worker_file_logging(log_path: Optional[str]) -> None:
+    """在 ProcessPool worker 子進程把 `momentum` namespace 的日誌落檔（fail-open、idempotent）。
+
+    子進程不繼承父進程 handler；不掛的話 worker 內所有 INFO/ERROR（含每個 symbol 的失敗原因）
+    只會噴到 console 而不進 `logs/`，使用者事後查不到任何紀錄。
+    """
+    if not log_path:
+        return
+    try:
+        import logging as _logging
+        from pathlib import Path as _Path
+
+        target = _logging.getLogger("momentum")
+        for handler in target.handlers:
+            if getattr(handler, _WORKER_LOG_HANDLER_MARKER, False):
+                return                                   # 同進程重複呼叫不重複掛
+        path = _Path(log_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = _logging.FileHandler(path, encoding="utf-8")
+        setattr(file_handler, _WORKER_LOG_HANDLER_MARKER, True)
+        file_handler.setLevel(_logging.INFO)
+        file_handler.setFormatter(_logging.Formatter(
+            fmt=f"%(asctime)s - %(name)s - [search-worker pid={os.getpid()}] %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        ))
+        target.setLevel(_logging.INFO)
+        target.addHandler(file_handler)
+    except Exception:                                    # noqa: BLE001 —— 日誌掛載失敗不得影響搜尋
+        pass
+
+
 def _process_chunk_worker(symbols_chunk: List[str],
                           config,
                           chunk_idx: int,
-                          total_chunks: int) -> Dict:
+                          total_chunks: int,
+                          log_path: Optional[str] = None) -> Dict:
     """
     Worker進程：處理一批symbols（含智能重試和失敗記錄）
 
@@ -720,6 +772,10 @@ def _process_chunk_worker(symbols_chunk: List[str],
         import logging
         import asyncio
         worker_logger = logging.getLogger(__name__)
+        # 子進程的 logger 沒有父進程的 handler ⇒ 搜尋期間所有 worker 日誌（含失敗原因）都不會進 logs/，
+        # 使用者只看得到 console 殘影（2026-08-22 UAT B1：log 停在「開始並行搜索」、errors_*.log 為 0 bytes）。
+        # 於此掛檔案 handler（fail-open，掛不上不影響搜尋）。
+        _init_worker_file_logging(log_path)
 
         # 在worker進程中重新創建引擎實例
         from momentum.DataExtraction.case_search_engine import CaseSearchEngine

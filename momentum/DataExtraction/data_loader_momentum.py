@@ -357,16 +357,31 @@ class DataLoader(DataProviderBase):
                     
                     if batch_klines:
                         all_klines.extend(batch_klines)
-                    
+
                     # 更新下一批次的開始時間
+                    previous_start = current_start
                     if not batch_klines:
                         # 如果沒有數據，增加一個較大的時間間隔以避免無限循環
                         current_start = batch_end + timedelta(days=1)
                     else:
-                        # 使用最後一根K線的時間作為下一批次的開始
+                        # 自最後一根K線起「推進一整根」——**不可只加 1 毫秒**：
+                        # 請求時間戳以「秒」為粒度送出（見 _fetch_klines_batch），毫秒會被截掉而回到同一根，
+                        # 使同一窗永遠重抓 ⇒ 無窮迴圈＋同一根 K 線被重複 append（2026-08-22 UAT B1 實測）。
                         last_timestamp = batch_klines[-1][0]
-                        current_start = pd.to_datetime(last_timestamp, unit='ms') + timedelta(milliseconds=1)
-                    
+                        current_start = (
+                            pd.to_datetime(last_timestamp, unit='ms')
+                            + timedelta(seconds=interval_seconds)
+                        )
+
+                    # 機械防呆：無論精度／回應內容如何，未前進即中止（不依賴上面的推進假設）
+                    if current_start <= previous_start:
+                        self.logger.error(
+                            f"分批下載未前進，中止以免無限迴圈: {symbol} {interval} "
+                            f"current_start={previous_start} batch_end={batch_end} "
+                            f"n_klines={len(batch_klines) if batch_klines else 0}"
+                        )
+                        break
+
                     # 避免API限制
                     time.sleep(0.1)
             else:
@@ -412,11 +427,13 @@ class DataLoader(DataProviderBase):
         
         while retry_count < max_retries:
             try:
+                # 以 epoch **毫秒**送出，不用 strftime（'%H:%M:%S' 只到秒，會把分頁推進的毫秒截掉，
+                # 造成同一根 K 線被重複請求 ⇒ 無限迴圈；2026-08-22 UAT B1 實測病因）
                 klines = self.client.get_historical_klines(
                     symbol=symbol,
                     interval=binance_interval,
-                    start_str=start_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                    end_str=end_dt.strftime('%Y-%m-%d %H:%M:%S')
+                    start_str=str(int(pd.Timestamp(start_dt).value // 1_000_000)),
+                    end_str=str(int(pd.Timestamp(end_dt).value // 1_000_000)),
                 )
                 
                 # 更新API請求計數
