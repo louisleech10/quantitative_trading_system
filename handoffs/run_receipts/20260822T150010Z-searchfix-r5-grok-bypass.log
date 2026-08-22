@@ -1,0 +1,310 @@
+=== R4_composer_tuple_Exception_continue ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await aio_future
+    except (Exception,) as e:
+        continue
+
+
+=== R4_prod_tuple_bypass_coswallow ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：與會吞型別同 handler／未 raise；捕捉型別=['Exception', 'IncompleteDownloadError'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except (Exception, IncompleteDownloadError):
+        continue
+
+
+=== R4_tuple_Exception_ValueError ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception', 'ValueError'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except (Exception, ValueError):
+        pass
+
+
+=== R4_runtime_error ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['RuntimeError'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except RuntimeError:
+        pass
+
+
+=== R4_base_exception ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['BaseException'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except BaseException:
+        pass
+
+
+=== R4_bare_except ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['BaseException'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except:
+        pass
+
+
+=== A1_alias_Exception ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+SomeAlias = Exception
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except SomeAlias:
+        pass
+
+
+=== A1b_import_alias ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+from builtins import Exception as ExcAlias
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except ExcAlias:
+        pass
+
+
+=== A2_exempt_save_failure_with_download ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+async def _save_failure_report(self):
+    try:
+        await self.get_historical_data()
+    except Exception:
+        pass
+
+
+=== A2b_exempt_init_logging_with_download ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+def _init_worker_file_logging():
+    try:
+        get_historical_klines()
+    except Exception:
+        pass
+
+
+=== A3_getattr_with_await ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await getattr(loader, "get_historical_data")()
+    except Exception:
+        pass
+
+
+=== A3b_getattr_no_await ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        getattr(loader, "get_historical_data")()
+    except Exception:
+        pass
+
+
+=== A3c_bound_method_alias_no_await ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        fn = self.get_historical_data
+        fn("SYM", "12h")
+    except Exception:
+        pass
+
+
+=== A3d_indirect_helper_name ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        helper_download()
+    except Exception:
+        pass
+
+def helper_download():
+    get_historical_data()
+
+
+=== A4_retype_raise_RuntimeError ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except IncompleteDownloadError:
+        raise RuntimeError("wrapped rejection")
+    except Exception:
+        pass
+
+
+=== A4b_retype_raise_from ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except IncompleteDownloadError as e:
+        raise ValueError(str(e)) from e
+    except Exception:
+        pass
+
+
+=== A4c_correct_bare_reraise_control ===
+expect_caught=False got=MISSED PASS_PROBE=True
+offenders=[]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except IncompleteDownloadError:
+        raise  # correct bare re-raise
+    except Exception:
+        pass
+
+
+=== A5_nested_inner_swallows_outer_correct ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:4(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        try:
+            await self._process_chunk_worker()
+        except Exception:
+            pass
+    except IncompleteDownloadError:
+        raise
+
+
+=== A5b_swallow_inside_except_body ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:8(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except IncompleteDownloadError:
+        raise
+    except Exception:
+        try:
+            await self._process_chunk_worker()
+        except Exception:
+            pass
+
+
+=== X1_attr_builtins_Exception ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except builtins.Exception:
+        pass
+
+
+=== X2_oserror_does_not_swallow_control ===
+expect_caught=False got=MISSED PASS_PROBE=True
+offenders=[]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except OSError:
+        pass
+
+
+=== X3_named_return_no_raise ===
+expect_caught=True got=CAUGHT PASS_PROBE=True
+offenders=["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：與會吞型別同 handler／未 raise；捕捉型別=['IncompleteDownloadError', 'Exception'])"]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except IncompleteDownloadError:
+        return None  # no raise — swallow by return
+    except Exception:
+        pass
+
+
+=== X4_raise_in_dead_branch ===
+expect_caught=True got=MISSED PASS_PROBE=False
+offenders=[]
+SRC:
+
+async def search_cases_parallel(self):
+    try:
+        await self._process_chunk_worker()
+    except IncompleteDownloadError as e:
+        if False:
+            raise
+        pass
+    except Exception:
+        pass
+
+
+=== PROD_SCAN ===
+offenders=[]
+PROD_CLEAN=True
+
+=== SUMMARY ===
+unexpected_results=10 / 23
+NOTE: unexpected when expect_caught=True but MISSED => real guard hole
+      unexpected when expect_caught=False but CAUGHT => false positive

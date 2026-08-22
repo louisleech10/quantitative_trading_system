@@ -1,0 +1,90 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 32 items
+
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_pagination_branch_is_exercised_and_converges 
+-------------------------------- live log call ---------------------------------
+11:06:44 [WARNING] KlineStorageManager 未啟用，略過緩存寫入
+PASSED                                                                   [  3%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_millisecond_cursor_survives_request_serialization 
+-------------------------------- live log call ---------------------------------
+11:06:44 [WARNING] KlineStorageManager 未啟用，略過緩存寫入
+11:06:44 [WARNING] KlineStorageManager 未啟用，略過緩存寫入
+PASSED                                                                   [  6%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_stale_or_unsorted_response_is_rejected_not_silently_truncated 
+-------------------------------- live log call ---------------------------------
+11:06:44 [WARNING] 從 kline_cache.h5 讀取緩存失敗: Out of bounds nanosecond timestamp: 58286-01-04 00:00:00
+11:06:44 [ERROR] 獲取歷史K線時出錯: K 線回應非遞增或末筆非最大值（拒收，不得落快取）: ETHUSDT 12h first=1712577600000 last=1712534400000 max=1755691200000 n=1000
+PASSED                                                                   [  9%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_no_progress_is_fail_closed 
+-------------------------------- live log call ---------------------------------
+11:06:44 [WARNING] 從 kline_cache.h5 讀取緩存失敗: Out of bounds nanosecond timestamp: 58286-01-04 00:00:00
+11:06:44 [ERROR] 獲取歷史K線時出錯: 分批下載未前進（拒收，不得落快取）: ETHUSDT 12h current_start=2024-04-08 12:00:00 batch_end=2025-08-21 12:00:00 n_klines=1
+PASSED                                                                   [ 12%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_successful_download_does_write_cache 
+-------------------------------- live log call ---------------------------------
+11:06:44 [INFO] 數據已緩存到 kline_cache.h5: ETHUSDT/12h, 1500 行
+PASSED                                                                   [ 15%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_empty_window_skips_only_proven_empty_range 
+-------------------------------- live log call ---------------------------------
+11:06:44 [WARNING] KlineStorageManager 未啟用，略過緩存寫入
+PASSED                                                                   [ 18%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_symbol_search_does_not_block_event_loop 
+-------------------------------- live log call ---------------------------------
+11:06:45 [WARNING] No data available for ETHUSDT
+PASSED                                                                   [ 21%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_process_pool_results_are_awaited_not_blocking PASSED [ 25%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_worker_logging_captures_dataloader_and_momentum_in_real_child SKIPPED [ 28%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_worker_logging_idempotent_and_failopen 
+-------------------------------- live log call ---------------------------------
+11:06:45 [INFO] visible-info
+PASSED                                                                   [ 31%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_incomplete_download_is_not_swallowed_by_single_symbol PASSED [ 34%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_incomplete_download_propagates_through_search_batch PASSED [ 37%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ordinary_download_error_is_still_swallowed_per_symbol 
+-------------------------------- live log call ---------------------------------
+11:06:45 [ERROR] [SEARCH_FAILED] Symbol: TESTSYM | Error: ValueError: some transient parse issue
+PASSED                                                                   [ 40%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_incomplete_download_is_classified_non_retryable PASSED [ 43%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_shared_loader_serializes_concurrent_downloads PASSED [ 46%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_no_synchronous_download_remains_in_async_search_paths PASSED [ 50%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_parallel_worker_outer_catch_does_not_swallow_rejection 
+-------------------------------- live log call ---------------------------------
+11:06:45 [INFO] Worker 2/2 啟動, 處理 1 個symbols
+11:06:45 [INFO] Worker 2/2: 處理 BADSYM (1/1)
+11:06:45 [ERROR] 資料完整性拒收，worker 2 中斷於 BADSYM: K 線回應非遞增或末筆非最大值（拒收，不得落快取）
+PASSED                                                                   [ 53%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_parallel_worker_still_returns_failed_records_for_ordinary_errors 
+-------------------------------- live log call ---------------------------------
+11:06:45 [INFO] Worker 1/1 啟動, 處理 1 個symbols
+11:06:45 [INFO] Worker 1/1: 處理 OKSYM (1/1)
+11:06:45 [ERROR] Worker 1: OKSYM 重試1次後最終失敗 (data_not_found): no data for symbol
+11:06:45 [INFO] Worker 1/1 完成, 成功: 0 個案例, 失敗: 1 個symbols, 重試: 0 次
+PASSED                                                                   [ 56%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_parallel_collection_propagates_rejection_instead_of_continue PASSED [ 59%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_parallel_paths_reraise_rejection_at_every_swallow_point PASSED [ 62%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[bare_except] PASSED [ 65%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[base_exception] PASSED [ 68%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[coswallow_tuple] PASSED [ 71%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[dynamic_handler] PASSED [ 75%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[named_but_no_raise] PASSED [ 78%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[plain_exception] PASSED [ 81%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[runtime_error] PASSED [ 84%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[tuple_handler] PASSED [ 87%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_detects_every_known_bypass_form[tuple_single] PASSED [ 90%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_accepts_correct_forms[name_before_exception] PASSED [ 93%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_accepts_correct_forms[name_before_tuple] PASSED [ 96%]
+tests/momentum/DataExtraction/test_search_download_pagination.py::test_ast_guard_ignores_try_that_cannot_reach_download PASSED [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 1] Operation not permitted.  joblib will operate in serial mode
+    warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=================== 31 passed, 1 skipped, 1 warning in 1.12s ===================
+rc=0
