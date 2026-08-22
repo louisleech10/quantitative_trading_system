@@ -1,0 +1,17 @@
+[session_name] ✓ 20260822-gap3ux-x-review-r6 / 20260822-GAP3UX-X-REVIEW-R6
+[committee_run] === role gate preflight (before gate.sh dispatch) ===
+[committee_run] session=20260822-gap3ux-x-review-r6 brief=handoffs/20260822-gap3ux-x-review-r6-brief.md  families=codex,composer,grok(3 家)  out=handoffs/20260822-gap3ux-x-review-r6-<family>.md
+[committee_run] === gate.sh dispatch ===
+GATE PASS：已發 dispatch token（有效 900s）。審計 → .claude/gate/audit.log
+使用者可稽核：cat .claude/gate/audit.log
+[round_cost] 工作項目「gap3ux」累計 7 輪：真 findings 128 個｜空輪 0｜無產出 0｜銷帳 7
+[committee_run] === open debt round_id=ad7419d1-6762-43c2-a795-c9116d18bc41 session=20260822-gap3ux-x-review-r6 ===
+[committee_run] 開債完成 round_id=ad7419d1-6762-43c2-a795-c9116d18bc41
+[committee_run] → 派 codex(out=handoffs/20260822-gap3ux-x-review-r6-codex.md)
+[committee_run] → 派 composer(out=handoffs/20260822-gap3ux-x-review-r6-composer.md)
+[committee_run] → 派 grok(out=handoffs/20260822-gap3ux-x-review-r6-grok.md)
+[committee_run] ✅ codex 完成 → handoffs/20260822-gap3ux-x-review-r6-codex.md
+[committee_run] ✅ composer 完成 → handoffs/20260822-gap3ux-x-review-r6-composer.md
+[committee_run] ✅ grok 完成 → handoffs/20260822-gap3ux-x-review-r6-grok.md
+[committee_run] ✅ 3 家全數完成。接著:bash scripts/reconcile_build.sh <session> handoffs/20260822-gap3ux-x-review-r6-*.md
+[committee_run] round_id=ad7419d1-6762-43c2-a795-c9116d18bc41 session=20260822-gap3ux-x-review-r6

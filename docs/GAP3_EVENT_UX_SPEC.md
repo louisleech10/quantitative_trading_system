@@ -433,14 +433,18 @@ S-1..S-8 定義了**欄位語意與排序**，但未定義 **dict → bytes** �
    🔴 檔名為三家分歧之裁決點（composer `canonical_serialize.py` vs grok `canonical_json.py`）
    ⇒ 採 composer 版；實質無差異。
 
-**S-9 之驗收**（`pytest tests/momentum/event_samples/ -q -k canonical_serialize` ≥6 條）：
+**S-9 之驗收**（`pytest tests/momentum/event_samples/ -q -k canonical_serialize` ≥7 條）：
 ① fixture bytes 與 golden 逐位元組相等
 ② `separators` 改成 `(', ', ': ')` ⇒ hash 變、測試紅
 ③ 附加尾端 `\n` ⇒ hash 變、測試紅
 ④ `ensure_ascii=True` ⇒ hash 變、測試紅
 ⑤ `NaN` 未轉 `None` ⇒ `allow_nan=False` 之 `json.dumps` raise（**非**靜默輸出 `NaN` 字面）
 ⑥ `-0.0` 被正規化成 `0.0` ⇒ hash 變、測試紅
+⑦**重複 horizon**（R6 群集 J）：`horizons=[1,3,3,7]` ⇒ `event_forward_return_table`
+  **raise `ValueError`**（S-3 已規定 fail-closed，R5 版卻無對應測試；
+  現碼只擋 `h < 1` 與空清單，重複 h 會在 `out[str(h)]` 互相覆寫而靜默通過）
 fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／`±Inf`、`-0.0`、`None`、缺席鍵。
+**S-9 之 mutation**：移除重複 h 之守衛 ⇒ ⑦須紅。
 
 ---
 
@@ -450,16 +454,20 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 
 **Task 1.1 — 契約先行：新增 reason 與 label_definition.filters**
 - 內容：`import_failure_reasons` 增 `column_mapping_missing`／`column_not_found_in_file`／
-  `label_column_not_binary`／`heterogeneous_rows_in_batch`（15→19）；
+  `label_column_not_binary`／`heterogeneous_rows_in_batch`，
+  ＋§F-2 之 `label_producer_unsupported_for_declared_semantics`（15→**20**，R6 群集 D）；
   `label_definition.fields` 增 `filters`（型別＋`_doc`）以承載 Phase 2 之篩選條件（D-6）。
-- 驗證：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert len(c['import_failure_reasons'])==19;assert 'filters' in c['label_definition']['fields']"` rc=0。
+- 驗證：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert len(c['import_failure_reasons'])==20;assert 'filters' in c['label_definition']['fields']"` rc=0。
 - 存活至：Phase 6。
 - 覆蓋風險：契約為**唯讀增量**——四個新 reason 與 `filters` 鍵在 Phase 2..7 全程只被讀取或填值，
   無任一 Task 刪改其字面與順序。Phase 2 之 Task 2.2 只寫 `filters` 之**值**；Phase 6 之 Task 6.0
   另建 IC 側 reason 檔而**不併入本檔**（D-6）；Phase 7 之五維度動的是 `label_definition` 之其他鍵
   ⇒ 本 Task 產出不被覆蓋。**須同步**：Task 1.12 之 `split_blocked_unverifiable_lookahead` 進的是
-  `capability_unavailable_reasons`（3→4）而非 `import_failure_reasons`，故本 Task 之 `== 19` 斷言不變；
+  `capability_unavailable_reasons`（3→4）而非 `import_failure_reasons`，故本 Task 之 `== 20` 斷言不受該項影響；
   日後任一 Phase 於 `import_failure_reasons` 增值，須同批更新此常數，否則契約與驗證斷言互相矛盾。
+  🔴 **本批已有一筆**（R6 群集 D）：§F-2 之 `label_producer_unsupported_for_declared_semantics`
+  進 `import_failure_reasons` ⇒ 本 Task 之斷言由 `== 19` 改為 **`== 20`**，
+  且新增值須列入 Task 1.1 之「內容」清單（15 → 19 → **20**）。
 - 邊界：只加，**不動**既有 15 個 reason 之字面與順序。
 - 不可做：不得在 `api/` 或 `frontend/` 另寫一份 reason 清單。
 
@@ -477,8 +485,17 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 內容：`event_id` ＝ `` `${symbol}:${timeframe}:${t0}` ``，與 `eventExport.ts:88` **同一實作**
   （抽為共用函式，前後端各自呼叫同一定義來源）。
   `source_file_digest` ＝上傳 CSV 位元組之 `hashlib.sha256(raw).hexdigest()`。
+  🔴 **`/search` 路徑之 `canonicalSourceText` 須綁完整 `CaseData`（R6 群集 H；R5 群集 H 之未閉合半邊）**：
+  現行只取五欄（symbol／timeframe／timestamp／positive_case／price_change，`eventExport.ts:27-37`）
+  ⇒ 刪除、改名或改值任一 `future_*` 欄後 digest **不變**，改名攻擊（Task 1.10 之信任邊界）之證據面未閉合。
+  改為：**每列完整 `CaseData` 之遞迴 canonical JSON**——保留所有 own keys 與值（含全部 future return／drawdown 欄），
+  只做固定 key ordering（依 §G S-2 之 UTF-8 升冪），**不改名、不篩欄、不省略**；digest 綁此完整 bytes。
 - 驗證：同一批事件「JSON 匯出檔」與「CSV 回灌」之 `event_id` 集合 `==`（集合相等斷言）；
   改 1 byte 重傳 ⇒ `source_file_digest !=` 原值。
+  **R6 群集 H 追加**（`npx vitest run canonicalSourceCoverage` ≥3 條）：對同一組 cases，
+  ①**刪除**一個 `future_*` 欄 ⇒ digest 改變 ②**改名**一個 `future_*` 欄 ⇒ digest 改變
+  ③**改值**一個 `future_*` 欄之數值 ⇒ digest 改變。
+  **mutation**：把 `canonicalSourceText` 改回五欄子集 ⇒ ①②③全紅。
 - 存活至：Phase 6。
 - 覆蓋風險：`event_id` 之輸入僅 symbol／timeframe／t0 三者，後續 Phase 皆不改此三者之定義——
   Phase 2 之篩選條件由 Task 2.2「不可做」明令禁止進入 `event_id` 輸入（D-2）；Phase 4 之附帶
@@ -655,7 +672,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   ⇒ 互不覆蓋，亦不得合併為同一回應
   （合併會使使用者無法分辨「洩漏不可證」與「特徵數過大」兩種完全不同的拒絕）。
   **須同步**：`split_blocked_unverifiable_lookahead` 登記於 `capability_unavailable_reasons`
-  （現 3 → 4），**不進** `import_failure_reasons` ⇒ Task 1.1 之 `== 19` 斷言不受影響，兩處常數各自成立。
+  （現 3 → 4），**不進** `import_failure_reasons` ⇒ Task 1.1 之 `== 20` 斷言不受影響，兩處常數各自成立。
 - 邊界：只擋切分與條件 IC，不擋事件研究。
 - 不可做：不得以「警告後放行」替代（R2 codex 明指此為 fail-open）。
 
@@ -1043,6 +1060,12 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 
 **F-2 偏離即 fail-closed**：三維度任一偏離 F-1 ⇒ **整批拒絕匯出**（`n_records == 0`），
 reason `== "label_producer_unsupported_for_declared_semantics"`。
+🔴 **該 reason 須先登記契約**（R6 群集 D；§C／D-6：新增 reason 一律先改契約）：
+登記於 `momentum/Analysis/contracts/event_import_contract.json` 之 `import_failure_reasons`
+（該清單由 15 增為 **16**，Task 1.1 之常數斷言須同批更新——見 Task 1.1「須同步」）；
+程式與前端一律由該檔取字面，硬編碼數須 `== 0`。
+（R5 版遺漏此項：主委在 Task 7.5 之兩 reason 與 Task 7.7 之四 reason 皆明定登記處，
+唯獨此處未寫 ⇒ 同一規則未一致套用，grok 命中。）
 🔴 **不得**單列 skip 後假裝成功，**更不得**在宣告 `next_open` 之下仍寫入 close→close 之數字
 ——那正是本群集要根除的假語意。
 
@@ -1068,7 +1091,9 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   而 `buildEventContractRecords` 之 `:92`／`:102`／`:104` 仍為寫死值。
   本 Task **只做型別與參數化**：補齊五個 opts 欄位、把三處寫死改為 `opts.X ?? <現行預設>`、
   🔴 **不含** `counterexample_kind`（R5 群集 G：逐列選填欄，非批次維度）。
-  **不動任何預設值、不加任何 UI。**
+  🔴 **預設值之唯一例外**：依 §F-3 把 `entry_price_semantic` 之寫死預設由 `trigger_open`
+  改為 `trigger_close`（D-4 合法變更；`label_value` 位元組不變，變的只有宣告欄字面）。
+  **除此一項外不動任何預設值、不加任何 UI。**
   🔴 `label_return_mode` 之寫入路徑為**巢狀**（`label_definition.fields`，見 Phase 7 前言表格），
   與其餘五者之頂層路徑不同，須各自對應正確路徑。
 - 驗證：`npx vitest run eventExportOptions` ≥7 條——
@@ -1089,9 +1114,46 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
 - 覆蓋風險：本 Task 只擴介面不接 UI，其產出被 Task 7.1（接 UI）與 7.2（機械閘）**依賴而非覆蓋**
   ⇒ 三者為 7.0 → 7.1 → 7.2 之嚴格順序。**須同步**：7.0 之⑦「不傳即等於現行預設」是 7.1
   golden byte 回歸之**基準**；若 7.0 順手改了任一預設值，7.1 之回歸就失去意義 ⇒ 兩者須同批驗。
-- 邊界：只擴型別與參數化；不加 UI、不改預設值、不改任何後端。
-- 不可做：不得順手調整任何預設值；不得把 `label_return_mode` 寫到頂層——正確路徑為
+- 邊界：只擴型別與參數化＋§F-3 之單一預設更正；不加 UI；
+  **本 Task 範圍內**不改後端（F-4 之後端唯一 producer 由 **Task 7.0b** 承載）。
+- 不可做：**除 §F-3 明列之 `entry_price_semantic` 一項外**，不得調整任何其他預設值
+  （R6 群集 C：R5 版三處禁令與 F-3 互斥，Agent 可援引禁令拒絕 F-3）；
+  不得把 `label_return_mode` 寫到頂層——正確路徑為
   `label_definition.label_return_mode`，寫錯位置會使契約 schema 檢核通過但語意落在錯的物件。
+
+**Task 7.0b — 後端唯一 `label_value` producer（R6 群集 E；F-4 之承載 Task）**
+- 內容：§F-4 要求「判定與換算由後端唯一函式承載、禁 TS 另寫一份」，但 R5 版**未建立任何
+  Task 承載它**，且 Task 7.0 明寫「不改任何後端」⇒ 實作者可通過 7.0／7.1 之 UI round-trip
+  而完全不做 producer（CODEX-R6-P0-01）。本 Task 補上該承載：
+  新建 `momentum/Analysis/event_samples/label_value_from_case.py`，公開單一函式
+  ```
+  resolve_label_value(case, *, entry_price_semantic, label_return_mode,
+                      decision_offset_bars, horizon_bars, direction, timeframe)
+      -> {"supported": bool, "label_value": float | None, "reason": str | None}
+  ```
+  - `supported` 由 §F-1 之支援矩陣判定；不在矩陣內 ⇒ `supported=False`、
+    `label_value=None`、`reason = "label_producer_unsupported_for_declared_semantics"`。
+  - 在矩陣內 ⇒ `label_value` 取 `future_{horizon_bars}bar_return`，short 取負
+    （既有規則不變）；缺該欄 ⇒ `label_value=None`、`reason` 走既有缺欄路徑。
+  - **前端只呼叫本函式之結果或其對應 API**，禁在 TS 重寫等價公式（§F-4）。
+- 驗證：`pytest tests/momentum/event_samples/ -q -k label_value_from_case` ≥6 條——
+  ①支援矩陣內（`trigger_close`／`close_to_close`／`k=0`）⇒ `supported is True` 且
+    `label_value ==` 手算之 `(close[t+h]-close[t])/close[t]`（long）
+  ②同上 short ⇒ 值為①之相反數（`== -x`，`atol=0`）
+  ③`entry_price_semantic='next_open'` ⇒ `supported is False` 且 `label_value is None`
+  ④`decision_offset_bars=3` ⇒ 同③
+  ⑤`label_return_mode='open_to_close'` ⇒ 同③
+  ⑥`reason` 字面取自契約：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert 'label_producer_unsupported_for_declared_semantics' in c['import_failure_reasons']"` rc=0
+  ＋`npx vitest run eventExportLabelProducer` ≥2 條：前端在不支援組合下**不產生**任何帶
+  `label_value` 之列；且 TS 內無等價公式（`grep -c "shift(-" frontend/src/lib/eventExport.ts` `== 0`）
+  **mutation（三條，皆須紅）**：`supported` 恆真 ⇒ ③；short 不取負 ⇒ ②；
+  在 TS 重寫一份公式 ⇒ vitest 之 grep 條。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：本 Task 為 §F-4 之唯一承載；Task 7.0 只做前端型別與參數化、7.1 只接 UI
+  ⇒ 三者為 7.0b／7.0 → 7.1 → 7.2 之依賴鏈，互不覆蓋。**須同步**：§F-5 若日後開放更多組合，
+  只需擴充本函式之支援矩陣與 golden，**不得**在前端或匯出層另開分支。
+- 邊界：只判定與換算 `label_value`；不改 `event_id`、不改契約其他欄位。
+- 不可做：不得在不支援之組合下回傳任何非 `None` 之 `label_value`（那正是 §F-2 要根除者）。
 
 **Task 7.1 — 五維度全部接出前端（依賴 Task 7.0）**
 - 內容：`/search` 匯出面板與 `/data-preparation` 匯入表單各提供五個維度之選擇；
@@ -1118,10 +1180,15 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   ①~⑤每維度各一條，斷言「**可操作**（非 disabled）之 UI 選項集合 `==` `selectable(path, dim)`」
     （`accepted` 由契約導出、排除由具名常數導出，**兩者皆非硬編碼清單**）
   ⑦`control_kind` 之 disabled 選項存在且其 title/aria 含 `not_implemented_platform_random_bars`
-  ⑧`/search` 之 `scenario` 之 `A`／`B` 為 disabled 且顯示排除理由；
+  ⑧`/search` 之 `scenario` 之 `A`／`B`／**`two_stage`** 三者皆為 disabled 且顯示排除理由；
     同一維度在 `/data-preparation` 之 selectable `==` 全部 4 值（證明限制**只在該路徑**）
-  ⑨`EVENT_DIM_PATH_EXCLUSIONS` 之每筆理由字串 `!== ''`，且該常數之筆數 `=== 1`
-    （防止日後靜默擴張路徑排除面）
+  ⑨`EVENT_DIM_PATH_EXCLUSIONS` 之每筆理由字串 `!== ''`，且該常數之內容**集合相等**於
+    ```
+    {('/search','scenario'):            {A, B, two_stage},
+     ('/search','entry_price_semantic'):{trigger_open, next_open, decision_bar_open, decision_bar_close},
+     ('/search','label_return_mode'):   {open_to_close, open_to_horizon_close}}
+    ```
+    🔴 **以集合相等斷言，不用計數字面**（理由見本 Task 覆蓋風險）
   ⑩**五維度全部維持預設 ⇒ G-2 事件 golden byte 級不變**（證明接出 UI 本身不動數值）
   ＋`npm run build` rc=0。
   **mutation**：把 `pathExclusions` 清空 ⇒ ⑧須紅；把排除改成寫在元件內的 if ⇒ ⑨須紅。
@@ -1132,6 +1199,10 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   （見本 Phase 前言「數值影響」）⇒ 驗收須含一條「五維度全部維持預設 ⇒ G-2 事件 golden **byte 級
   不變**」之回歸，證明**接出 UI 這件事本身不動任何數值**；使用者主動改動預設值所導致之 golden
   改變，屬 D-4 之合法數值輸出變更，須在 commit message 說明，不得靜默重凍。
+- 覆蓋風險（R6 群集 A 追記）：驗收⑨改以**集合相等**斷言之理由——R4 版寫「該常數之筆數
+  `=== 1`」，主委依 consult 群集 F／H 把該常數擴為三筆時**未同步該計數字面**，
+  COMPOSER-R6-P1-01 與 GROK-R6-P0-01 兩家獨立命中。**計數字面會隨擴充而漂，集合相等不會**
+  ⇒ 本 SPEC 一律優先用集合相等；殘存之計數字面由 `scripts/spec_count_audit.py` 稽核。
 - 邊界：只接出既有能力；**不新增**任何後端未支援之值。
   🔴 **`scenario` 之路徑級限制（R4 群集 D；R5 群集 H 收緊）**：
   `/search` 匯出路徑本批**只可選 `C`**；`A`／`B`／**`two_stage`** 於該路徑 disabled 並顯示理由
@@ -1250,7 +1321,13 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   ⑨兩個 reason 字面取自契約：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/ic_report_contract.json'));s=c['report_sections']['event_return_table'];assert s['not_computed_reasons']==['control_kind_not_comparable','mixed_control_kind_in_batch'];assert s['group_status_object_keys']==['status','reason']"` rc=0
   ⑩`positive`／`negative` 兩組之統計值在三種 `control_kind` 下 **byte 級相同**
     （證明 `control_kind` 只影響 `all`）
-  **mutation（五條，皆須紅）**：三組提到新頂層鍵 ⇒ ①；`control_kind` 從 manifest merge 清單移除 ⇒ ⑧；
+  ⑪**前端實際顯示三組**（R6 群集 I；全棧三欄稽核產物）：
+    `npx vitest run eventTablesPanelByLabel` ≥3 條——`EventTablesPanel` 讀
+    `strata.by_label` 之三組並垂直排列；`all` 為 `not_computed` 時顯示其 `reason` 而非空表；
+    🔴 現行該元件只讀 `sensitivity_micro` ⇒ 後端通過本 Task 之 pytest 仍會讓前端顯示舊的單一組
+    （靜默失效）。**本 Task 之驗收不得只有 backend pytest。**
+  **mutation（六條，皆須紅）**：三組提到新頂層鍵 ⇒ ①；`control_kind` 從 manifest merge 清單移除 ⇒ ⑧；
+  前端仍讀 `sensitivity_micro` ⇒ ⑪；
   多值時改取多數決 ⇒ ⑦；`not_computed` 改回 `n=0` 空統計塊 ⇒ ⑥；
   把 `platform_same_trigger_rule` 當成 `other` 處理 ⇒ ⑤。
 - 存活至：Phase 7（終）。
@@ -1271,14 +1348,19 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   ⇒ 使用者在**不知道這批用什麼 scenario／進場價／報酬算法**的情況下跑條件 IC。
   本 Task 讓事件批 detail 端點回傳該批之五維度實際值，前端於選批後**唯讀揭露**，
   文案模板與 Task 7.3 之匯出面板揭露**共用同一實作**（不另寫第二份）。
-- 驗證：`pytest tests/api -q -k event_batch_detail_dims` ≥2 條——斷言 detail 回應含六個鍵
-  且值 `==` 該批落檔記錄之實際值（非預設值）；
+- 驗證：`pytest tests/api -q -k event_batch_detail_dims` ≥2 條——斷言 detail 回應之維度鍵集
+  **集合相等**於 `{scenario, control_kind, entry_price_semantic, label_return_mode,
+  decision_offset_bars}`（🔴 **明列鍵名、不用計數字面**；理由見本 Task 覆蓋風險），
+  且各值 `==` 該批落檔記錄之實際值（非預設值）；
   `npx vitest run icEventBatchDisclosure` ≥3 條——選批後五段文字皆出現；
   改批次之任一維度 ⇒ 顯示字串 `!==` 前值；與 Task 7.3 共用同一 formatter
   （斷言兩處呼叫同一 exported function，非各自複製）。
   **mutation**：把揭露文案改成前端寫死 ⇒ 「同一 formatter」那條須紅。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：本 Task 只讀不寫，不改任何 IC 計算路徑 ⇒ 無後續 Phase 覆蓋。**須同步**：
+- 覆蓋風險（R6 群集 B 追記）：驗收改以**明列鍵名之集合相等**之理由——R4 版寫「detail 回應
+  含六個鍵」，R5 群集 G 把批次維度六改五時該字面未同步，**三家全員命中**；
+  且因未列鍵名，Agent 無法唯一決定第六鍵，可能把已移出之 `counterexample_kind` 加回。
+  本 Task 只讀不寫，不改任何 IC 計算路徑 ⇒ 無後續 Phase 覆蓋。**須同步**：
   與 Task 7.3 共用 formatter ⇒ 7.3 之維度集合擴充時本頁自動跟進；若各寫一份，
   下次加維度就會只改一邊（Phase 7 前言所述之病因原型）。
 - 邊界：只揭露該批已落檔之設定；**不允許**在 IC 頁修改批次設定。
@@ -1316,14 +1398,24 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
      `max_close_ms <= decision_at`（`ic_feed.py`），`decision_offset_bars = k > 0` 時
      `decision_at < t0` ⇒ 用 `min(t0)` 會放行「run 未涵蓋決策時點」之批次（fail-open 窗口）。
      **不得**在本 Task 任何處殘留 `min(t0)` 之舊字面。
-  ④ **`time_range` 字串 → epoch ms 之 parse 規則**：
-     以 `datetime.fromisoformat(s)` 解析；**tz-aware ⇒ 轉 UTC epoch ms**；
-     🔴 **tz-naive ⇒ fail-closed**，reason `== "feature_coverage_unknown_timezone"`。
-     ⚠️ **本項為主委裁定，非委員指定**：三家皆未觸及「manifest 之 `time_range` 是字串」
-     這一層（grok 且誤判為 int）。依 §C0「只能更嚴」取嚴版——把 naive 時間當 UTC 是**假設**，
-     假設錯誤會使覆蓋判斷整體偏移。**待 R6 裁定**：若實測顯示現存 run 之 manifest 皆為
-     tz-naive，本規則會擋下全部 run ⇒ 屆時須改為「以 row_index artifact 之 epoch 秒為準」，
-     而**不是**放寬為「naive 視為 UTC」。
+  ④ **`time_range` 字串 → epoch ms 之 parse 規則（R6 群集 G：三家以真實 manifest 推翻 R5 版）**：
+     🔴 **實測事實**：現存非 legacy manifest 之 `time_range` 為 **epoch 秒之數字字串**，例
+     `data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json`
+     → `{"start": "1704067200", "end": "1777330800"}`（兩值型別皆 `str`）。
+     R5 版指定之 `datetime.fromisoformat(s)` 對此**直接 raise**
+     ⇒ 照 R5 版實作會把**全部現存 run** 判為 parse failure。三家全員命中，主委獨立覆核屬實。
+     **解析順序（唯一；先數字後 ISO）**：
+     1. `s` 去除前後空白後**全為十進位數字**（可含前導 `-`）⇒ 視為 **epoch 秒**，
+        `epoch_ms = int(s) * 1000`。
+        合理性檢查：`0 < int(s) < 4102444800`（＝2100-01-01）；超出 ⇒ fail-closed。
+     2. 否則以 `datetime.fromisoformat(s)` 解析：**tz-aware ⇒ 轉 UTC epoch ms**；
+        **tz-naive ⇒ fail-closed**（把 naive 當 UTC 是假設，假設錯誤會使覆蓋判斷整體偏移）。
+     3. 兩者皆不成 ⇒ fail-closed。
+     1–3 之任何 fail-closed 皆回 reason `== "feature_coverage_unknown_timestamp_format"`
+     （取代 R5 版之 `feature_coverage_unknown_timestamp_format`；後者語意過窄，涵蓋不了數字字串路徑）。
+     ⚠️ **不得**以「猜一個格式試試看」實作——三條分支之判定須為封閉且可逐條測試。
+     📌 **本項之處理過程保留為範例**：R5 版由主委補充並**自行具名標為「待 R6 裁定」**，
+     R6 三家即以真實 manifest 打穿之。該「主委補充須具名待裁」之作法有效，予以保留。
   ⑤ **legacy run**：`time_range` 為 `{"start": None, "end": None}`（`feature_reader.py:455`）
      ⇒ **不得**視為「涵蓋全部」而放行，一律 fail-closed，
      reason `== "feature_coverage_unknown_legacy_run"`。
@@ -1336,7 +1428,7 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     `start`／`end` 原樣進 `/api/v1/features/runs`（型別為 `str` 或 `None`，未被轉型）
   ②`analysis_rejected` 之**最終**內容 `== ['feature_count_exceeds_cap',
     'feature_coverage_insufficient', 'feature_coverage_unknown_legacy_run',
-    'feature_coverage_unknown_timeframe', 'feature_coverage_unknown_timezone']`
+    'feature_coverage_unknown_timeframe', 'feature_coverage_unknown_timestamp_format']`
   ③小型跨日期 fixture：事件期全落在 run 區間內 ⇒ 放行（`capability_status != "unavailable"`）
   ④`decision_offset_bars = 3` 且 `run_start` 落在 `decision_at` 與 `t0` **之間**
     ⇒ **fail-closed**，reason `== "feature_coverage_insufficient"`（左界回歸；R5 群集 E）
@@ -1348,10 +1440,16 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     reason `== "feature_coverage_unknown_timeframe"`
   ⑨`time_range == {"start": None, "end": None}` ⇒ fail-closed，
     reason `== "feature_coverage_unknown_legacy_run"`；
-    `start` 為 tz-naive 字串 ⇒ fail-closed，reason `== "feature_coverage_unknown_timezone"`
+    `start` 為 tz-naive ISO 字串 ⇒ fail-closed，reason `== "feature_coverage_unknown_timestamp_format"`
+  ⑩**epoch 秒數字字串正例**（現存 run 之實際格式）：`time_range == {"start":"1704067200","end":"1777330800"}`
+    ⇒ **解析成功**（`1704067200 * 1000` 得 epoch ms）且覆蓋判斷正常進行——
+    此條防「照 R5 版實作而擋下全部現存 run」之回歸
+  ⑪`start == "99999999999"`（超出 2100-01-01）⇒ fail-closed，
+    reason `== "feature_coverage_unknown_timestamp_format"`
   **mutation（六條，皆須紅）**：左界改回 `min(t0)` ⇒ ④；右界不含答案窗 ⇒ ⑤；
   改用 run 之 tf 或批內 `max(tf)` ⇒ ⑥⑦；legacy 之 `None` 改成放行 ⇒ ⑨；
-  未知 tf 改成沿用預設 ⇒ ⑧；fail-closed 改成只回警告字串 ⇒ ③。
+  未知 tf 改成沿用預設 ⇒ ⑧；fail-closed 改成只回警告字串 ⇒ ③；
+  把解析改回「只用 `datetime.fromisoformat`」⇒ ⑩須紅（R6 群集 G 之回歸樁）。
 - 存活至：Phase 7（終）。
 - 覆蓋風險：本 Task 之 gate 位於 IC 分析**入口**，與 Phase 6 之特徵數止血閘（Task 6.1）同在入口
   但為**不同拒絕條件、不同 reason**（覆蓋不足 vs 特徵數過大）⇒ 兩者須各自回應、不得合併。
