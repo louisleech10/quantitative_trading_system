@@ -1,0 +1,18 @@
+swallow_single         => ============= 2 failed, 13 passed, 1 skipped, 4 warnings in 6.43s ==============
+swallow_batch          => ============= 1 failed, 14 passed, 1 skipped, 4 warnings in 6.41s ==============
+noclassify             => ============= 1 failed, 14 passed, 1 skipped, 4 warnings in 6.43s ==============
+nolock                 => ============= 1 failed, 14 passed, 1 skipped, 4 warnings in 6.21s ==============
+sync_process_symbol    => ============= 1 failed, 14 passed, 1 skipped, 4 warnings in 6.38s ==============
+save_before_raise      => ============= 1 failed, 14 passed, 1 skipped, 4 warnings in 6.34s ==============
+restored               => ================== 15 passed, 1 skipped, 4 warnings in 6.19s ===================
+
+
+== R1 七條 mutation 複驗（對現行測試檔；restore 來源＝bak3 乾淨快照）==
+advance          =>  1 failed, 14 passed, 1 skipped, 4 warnings in 6.33s 
+strftime         =>  4 failed, 11 passed, 1 skipped, 4 warnings in 6.37s 
+noguard          =>  1 failed, 14 passed, 1 skipped, 4 warnings in 6.31s 
+nosortcheck      =>  1 failed, 14 passed, 1 skipped, 4 warnings in 6.31s 
+oneday           =>  1 failed, 14 passed, 1 skipped, 4 warnings in 6.30s 
+blocking_sync    =>  2 failed, 13 passed, 1 skipped, 4 warnings in 6.35s 
+nolog_root       =>  1 failed, 14 passed, 1 skipped, 4 warnings in 6.35s 
+restored         =>  15 passed, 1 skipped, 4 warnings in 6.17s 

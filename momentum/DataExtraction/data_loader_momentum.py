@@ -9,6 +9,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 import time
+import threading
 from functools import wraps
 import asyncio
 import sys
@@ -165,6 +166,18 @@ class DataLoader(DataProviderBase):
         self._memory_cache_size = 0
         self._max_memory_cache = 1024 * 1024 * 1024  # 1GB 內存緩存限制
 
+        # 🔴 下載互斥鎖（CODEX-R2-P1-01／GROK-R2-P1-02／COMPOSER 必答 2①，三家全員）：
+        #   `_search_single_symbol` 改 `asyncio.to_thread` 之後，同一個 loader 可被**多個並行搜尋
+        #   任務**同時進入（`standalone_search_service` 是模組級 singleton，
+        #   `MAX_CONCURRENT_SEARCHES` 預設 3）。改之前同步下載鎖住事件迴圈，等於**意外**把這條
+        #   路徑序列化；改之後那個隱式保證消失，而 `_symbol_data_cache` 的 read-modify-write、
+        #   `_memory_cache_size` 累加、`request_weight` 計數、以及 kline HDF5 的
+        #   read→concat→write 全都沒有鎖。
+        #   本鎖是**還原**那個被我拿掉的序列化保證，不是新增併發控制：仍在 worker 執行緒內持有，
+        #   事件迴圈不受影響（liveness 測試涵蓋）。RLock 而非 Lock——同一執行緒內
+        #   `get_historical_klines → _save_to_cache → _add_to_memory_cache` 會重入。
+        self._loader_lock = threading.RLock()
+
         # API請求控制
         self.request_weight = 0
         self.last_request_time = time.time()
@@ -211,13 +224,18 @@ class DataLoader(DataProviderBase):
         Returns:
             pd.DataFrame: 包含OHLCV數據的DataFrame
         """
-        # 調用舊的方法並確保格式統一
-        result = self.get_historical_klines(
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
-            interval=interval
-        )
+        # 🔴 整段下載（含快取讀、分頁抓取、快取寫）在 loader 鎖內完成，見 `_loader_lock` 之註解。
+        #    鎖粒度刻意取「整趟下載」而非「單次 dict 突變」：真正會壞的是
+        #    read-modify-write（記憶體快取的淘汰迴圈、HDF5 的 read→concat→write），
+        #    只鎖單次突變擋不住那個交錯。
+        with self._loader_lock:
+            # 調用舊的方法並確保格式統一
+            result = self.get_historical_klines(
+                symbol=symbol,
+                start_time=start_time,
+                end_time=end_time,
+                interval=interval
+            )
         # 檢查原始獲取的數據中是否有NaN值
         if isinstance(result, pd.DataFrame) and not result.empty:
             nan_counts = result.isna().sum()

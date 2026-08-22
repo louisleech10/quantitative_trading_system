@@ -11,6 +11,8 @@ import os
 import json
 from functools import partial
 
+from momentum.DataExtraction.data_loader_momentum import IncompleteDownloadError
+
 # 設置日誌
 logging.basicConfig(
     level=logging.DEBUG,
@@ -419,6 +421,8 @@ class CaseSearchEngine:
             # 確保返回值不為 None
             return all_results if all_results is not None else []
 
+        except IncompleteDownloadError:
+            raise  # 見 `_search_single_symbol` 之註解：拒收必須傳到任務層標 FAILED，不得變成空成功
         except Exception as e:
             self.logger.error(f"[SEARCH_FAILED] Search execution error: {type(e).__name__}: {str(e)}", exc_info=True)
             return []  # 發生任何錯誤都返回空列表
@@ -437,7 +441,9 @@ class CaseSearchEngine:
                     self.logger.debug(f"Processing {symbol}: {len(symbol_results)} cases found")
                 else:
                     self.logger.debug(f"Processing {symbol}: no cases found")
-                    
+
+            except IncompleteDownloadError:
+                raise  # 見 `_search_single_symbol` 之註解：拒收必須被看見，不得 continue 成空結果
             except Exception as e:
                 self.logger.error(f"[PROCESS_FAILED] Symbol: {symbol} | Error: {type(e).__name__}: {str(e)}")
                 continue  # 跳過有問題的交易對，繼續處理下一個
@@ -525,7 +531,15 @@ class CaseSearchEngine:
                     continue
             
             return results
-            
+
+        except IncompleteDownloadError:
+            # 🔴 不得吞（CODEX-R2-P1-02／GROK-R2-P1-01，兩家獨立命中）：
+            #   `IncompleteDownloadError` 的**全部**價值在於「拒收不完整資料」這件事要**被看見**。
+            #   下方的 `except Exception: return []` 會把它變成「該 symbol 沒有案例」，於是
+            #   `_run_search_task` 標 COMPLETED、前端顯示 `No cases found`——使用者拿到一份
+            #   看起來成功、實則資料被拒收的空結果。那比回傳 partial 更糟：partial 至少看得出少。
+            #   fail-closed 只守住「不落快取」而不守住「呼叫端可見」＝只做一半。
+            raise
         except Exception as e:
             self.logger.error(f"[SEARCH_FAILED] Symbol: {symbol} | Error: {type(e).__name__}: {str(e)}")
             return []
@@ -839,11 +853,16 @@ class CaseSearchEngine:
                         return []
             
             # 獲取歷史數據
-            data = self.data_loader.get_historical_data(
+            # 🔴 GROK-R2-P2-03：本函式目前**無任何呼叫端**（全庫僅此定義），但仍改 `to_thread`
+            #   而非留著同步呼叫——留著就是地雷：日後任何人把它接回 async 路徑，
+            #   就重現 UAT B1「整台後端不回應」。不刪是因為刪一個 ~100 行、零測試覆蓋的
+            #   函式屬另一個 scope；本輪只拆引信。
+            data = await asyncio.to_thread(
+                self.data_loader.get_historical_data,
                 symbol=symbol,
                 start_time=config.start_time,
                 end_time=config.end_time,
-                interval=config.timeframe
+                interval=config.timeframe,
             )
             
             if data.empty:

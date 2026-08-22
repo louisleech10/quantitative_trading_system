@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import multiprocessing
+import threading
 import time
 from datetime import datetime, timedelta
 
@@ -69,17 +70,43 @@ class FakeBinanceClient:
         return [[self.bars[0]]]
 
 
-def _loader(client, monkeypatch) -> DataLoader:
+class SpyStorage:
+    """記錄快取讀寫的 `KlineStorageManager` 替身。
+
+    🔴 CODEX-R2-P1-03：原本 fixture 把 `kline_storage_manager` 設成 `None`，於是
+    `_save_to_cache` 一進門就 return——**即使**未來有人把 raise 移到寫檔之後，
+    「不得落快取」那兩條測試照樣綠。那是假綠：斷言的是例外型別，不是「沒寫」。
+    本替身讓「寫了幾次」成為可斷言的中間值。
+    """
+
+    def __init__(self, seeded: pd.DataFrame | None = None):
+        self.seeded = seeded
+        self.writes: list[dict] = []
+        self.reads = 0
+
+    def read_klines(self, symbol, timeframe, start_time=None, end_time=None, **kw):
+        self.reads += 1
+        return self.seeded
+
+    def write_klines(self, symbol, timeframe, df, data_source="binance", **kw):
+        self.writes.append({"symbol": symbol, "timeframe": timeframe, "rows": len(df)})
+        return True
+
+
+def _loader(client, monkeypatch, storage=None) -> DataLoader:
     loader = DataLoader.__new__(DataLoader)               # 不跑 __init__（避免真連線／讀設定）
     loader.client = client
     loader.logger = logging.getLogger("momentum.test_loader")
     loader.request_weight = 0
     loader.last_request_time = 0.0
     loader.hdf5_cache_manager = None
-    loader.kline_storage_manager = None
+    loader.kline_storage_manager = storage
     loader._symbols_info_cache = {}
     loader._exchange_info_cache = None
     loader._symbol_data_cache = {}
+    loader._memory_cache_size = 0
+    loader._max_memory_cache = 1024 * 1024 * 1024
+    loader._loader_lock = threading.RLock()
     loader.interval_map = {"12h": "12h"}
     monkeypatch.setattr(loader, "_check_api_limits", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(loader, "_interval_to_seconds", lambda i: H12_S, raising=False)
@@ -132,29 +159,62 @@ def test_millisecond_cursor_survives_request_serialization(monkeypatch):
     assert len(df2) == n, "整根 bar 推進應使秒粒度截斷也不致重抓同一根"
 
 
+def _seed_frame() -> pd.DataFrame:
+    """既有快取內容（storage 格式）——用來驗「拒收時既有資料原封不動」。"""
+    return pd.DataFrame({
+        "timestamp": [BASE_MS - 3 * H12_MS, BASE_MS - 2 * H12_MS],
+        "open": [1.0, 1.0], "high": [2.0, 2.0], "low": [0.5, 0.5],
+        "close": [1.5, 1.5], "volume": [10.0, 10.0],
+    })
+
+
 def test_stale_or_unsorted_response_is_rejected_not_silently_truncated(monkeypatch):
-    """②：末筆非最大值（亂序／stale）⇒ fail-closed，不得回 partial（更不得落快取）。"""
+    """②：末筆非最大值（亂序／stale）⇒ fail-closed，不得回 partial，且**不得寫快取**。"""
     n = 1500
     bars = series(n)
+    seed = _seed_frame()
+    storage = SpyStorage(seeded=seed.copy())
     client = FakeBinanceClient(bars=bars, stale_last=True)
-    loader = _loader(client, monkeypatch)
+    loader = _loader(client, monkeypatch, storage=storage)
     start, end = _range(bars)
     with pytest.raises(IncompleteDownloadError, match="非遞增或末筆非最大值"):
         loader.get_historical_klines(symbol="ETHUSDT", start_time=start, end_time=end, interval="12h")
+    # 🔴 中間值斷言（CODEX-R2-P1-03）：例外型別對了不代表沒寫；要斷言的是**沒寫**。
+    assert storage.writes == [], f"拒收後仍寫入快取：{storage.writes}"
+    pd.testing.assert_frame_equal(storage.seeded, seed)      # 既有快取未被動到
 
 
 def test_no_progress_is_fail_closed(monkeypatch):
-    """②：游標未前進（伺服器忽略 startTime、永遠回同一根）⇒ IncompleteDownloadError。
+    """②：游標未前進（伺服器忽略 startTime、永遠回同一根）⇒ IncompleteDownloadError 且不寫快取。
 
     舊碼在此情境是無窮迴圈；加了 break 後則是「把 partial 當成功返回並落快取」——兩者都不可接受。
     """
     n = 1500
     bars = series(n)
+    seed = _seed_frame()
+    storage = SpyStorage(seeded=seed.copy())
     client = FakeBinanceClient(bars=bars, frozen_bar=True)
-    loader = _loader(client, monkeypatch)
+    loader = _loader(client, monkeypatch, storage=storage)
     start, end = _range(bars)
     with pytest.raises(IncompleteDownloadError, match="未前進"):
         loader.get_historical_klines(symbol="ETHUSDT", start_time=start, end_time=end, interval="12h")
+    assert storage.writes == [], f"拒收後仍寫入快取：{storage.writes}"
+    pd.testing.assert_frame_equal(storage.seeded, seed)
+
+
+def test_successful_download_does_write_cache(monkeypatch):
+    """②之對照組：spy 本身有鑑別力——正常下載**會**寫快取。
+
+    沒有這條，上面兩條的 `writes == []` 可能只是因為 spy 根本沒接上（永遠為空＝空心綠）。
+    """
+    bars = series(1500)
+    storage = SpyStorage(seeded=None)
+    loader = _loader(FakeBinanceClient(bars=bars), monkeypatch, storage=storage)
+    start, end = _range(bars)
+    df = loader.get_historical_klines(symbol="ETHUSDT", start_time=start, end_time=end, interval="12h")
+    assert len(df) == 1500
+    assert len(storage.writes) == 1, f"正常路徑未寫快取，spy 無鑑別力：{storage.writes}"
+    assert storage.writes[0]["rows"] == 1500
 
 
 def test_empty_window_skips_only_proven_empty_range(monkeypatch):
@@ -270,10 +330,16 @@ def _child_emits_logs(log_path: str, q):
 def test_worker_logging_captures_dataloader_and_momentum_in_real_child(tmp_path):
     """⑤：真子進程中，頂層 `DataLoader` 與 `momentum.*` 的 ERROR 都須落檔（掛 momentum 命名空間會漏前者）。"""
     log_file = tmp_path / "case_search_api_child.log"
-    ctx = multiprocessing.get_context("spawn")
-    q = ctx.Queue()
-    p = ctx.Process(target=_child_emits_logs, args=(str(log_file), q))
-    p.start()
+    # 🔴 GROK-R2 回報：在更嚴的沙箱裡，`ctx.Queue()` 建構期就 `PermissionError: SemLock`，
+    #   在 `p.start()` **之前**炸掉 ⇒ 原本只看 `exitcode` 的 skip 分支根本進不去，測試硬紅。
+    #   環境不允許建立 semaphore／子進程是**環境限制**，不是產品回歸，必須 skip 而非 fail。
+    try:
+        ctx = multiprocessing.get_context("spawn")
+        q = ctx.Queue()
+        p = ctx.Process(target=_child_emits_logs, args=(str(log_file), q))
+        p.start()
+    except (PermissionError, OSError) as exc:
+        pytest.skip(f"子進程／semaphore 不可用（沙箱限制）：{type(exc).__name__}: {exc}")
     p.join(timeout=60)
     try:
         status = q.get(timeout=5)
@@ -313,3 +379,149 @@ def test_worker_logging_idempotent_and_failopen(tmp_path):
 
 
 
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# R2 修補之回歸（CODEX-R2-P1-01/P1-02、GROK-R2-P1-01/P1-02/P2-03）
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _RejectingLoader:
+    """下載一律以 `IncompleteDownloadError` 拒收（模擬亂序／stale 回應）。"""
+
+    def __init__(self):
+        self.calls = 0
+
+    def get_historical_data(self, **kw):
+        self.calls += 1
+        raise IncompleteDownloadError("K 線回應非遞增或末筆非最大值（拒收，不得落快取）: TESTSYM")
+
+
+def _engine_with(loader):
+    from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+
+    engine = CaseSearchEngine.__new__(CaseSearchEngine)
+    engine.logger = logging.getLogger("momentum.test_engine")
+    engine.data_loader = loader
+    return engine
+
+
+class _Cfg2:
+    timeframe = "12h"
+    start_time = "2024-01-01"
+    end_time = "2026-04-27"
+    time_range = None
+
+
+def test_incomplete_download_is_not_swallowed_by_single_symbol():
+    """⑥：`_search_single_symbol` 不得把拒收吞成 `[]`（否則使用者看成「無案例」）。
+
+    這是 R1 fail-closed 只做一半之處：loader 拒收了，呼叫端卻回報成功空結果。
+    """
+    engine = _engine_with(_RejectingLoader())
+    loop = asyncio.new_event_loop()
+    try:
+        with pytest.raises(IncompleteDownloadError):
+            loop.run_until_complete(engine._search_single_symbol("TESTSYM", _Cfg2()))
+    finally:
+        loop.close()
+
+
+def test_incomplete_download_propagates_through_search_batch():
+    """⑥：`_search_batch` 的 `except Exception: continue` 亦不得吞——否則整批變成空成功。"""
+    engine = _engine_with(_RejectingLoader())
+    loop = asyncio.new_event_loop()
+    try:
+        with pytest.raises(IncompleteDownloadError):
+            loop.run_until_complete(engine._search_batch(_Cfg2(), ["TESTSYM"]))
+    finally:
+        loop.close()
+
+
+def test_ordinary_download_error_is_still_swallowed_per_symbol():
+    """⑥之邊界：**只有**拒收要往上拋；一般錯誤仍維持「跳過該 symbol」的既有語意。
+
+    沒有這條，上面兩條可能只是因為「什麼都往上拋」而綠——那會把單一壞 symbol 變成整批失敗。
+    """
+    class _BoomLoader:
+        def get_historical_data(self, **kw):
+            raise ValueError("some transient parse issue")
+
+    engine = _engine_with(_BoomLoader())
+    loop = asyncio.new_event_loop()
+    try:
+        assert loop.run_until_complete(engine._search_batch(_Cfg2(), ["TESTSYM"])) == []
+    finally:
+        loop.close()
+
+
+def test_incomplete_download_is_classified_non_retryable():
+    """⑥：worker 端不得把拒收當暫時性故障重試——訊息是中文，字串分類會落到 UNKNOWN(retry=1)。"""
+    err = IncompleteDownloadError("分批下載未前進（拒收，不得落快取）: TESTSYM 12h")
+    assert pse.classify_error(err) is pse.FailureType.INVALID_CONFIG
+    assert pse.RETRY_CONFIG[pse.classify_error(err)]["max_retries"] == 0
+    # 對照：一般網路錯誤仍走重試路徑（證明上面不是「全部歸 INVALID_CONFIG」）
+    assert pse.classify_error(TimeoutError("connection timeout")) is pse.FailureType.NETWORK_ERROR
+
+
+def test_shared_loader_serializes_concurrent_downloads(monkeypatch):
+    """⑦：共用 loader 之下載須互斥（`to_thread` 後多個並行 /search 會同時進入同一個 loader）。
+
+    修前同步下載鎖住事件迴圈＝意外序列化；改 `to_thread` 後那個隱式保證消失，
+    `_symbol_data_cache` 的淘汰迴圈與 HDF5 的 read→concat→write 會交錯。
+    """
+    loader = DataLoader.__new__(DataLoader)
+    loader.logger = logging.getLogger("momentum.test_loader")
+    loader._loader_lock = threading.RLock()
+
+    overlap = {"max": 0, "cur": 0}
+    guard = threading.Lock()
+
+    def _fake_klines(**kw):
+        with guard:
+            overlap["cur"] += 1
+            overlap["max"] = max(overlap["max"], overlap["cur"])
+        time.sleep(0.05)
+        with guard:
+            overlap["cur"] -= 1
+        return pd.DataFrame()
+
+    monkeypatch.setattr(loader, "get_historical_klines", _fake_klines, raising=False)
+    monkeypatch.setattr(loader, "format_output", lambda df: df, raising=False)
+
+    threads = [
+        threading.Thread(
+            target=loader.get_historical_data,
+            kwargs={"symbol": f"S{i}", "start_time": "2024-01-01", "interval": "12h"},
+        )
+        for i in range(4)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert overlap["max"] == 1, f"共用 loader 之下載未互斥（最大同時進入 {overlap['max']} 條執行緒）"
+
+
+def test_no_synchronous_download_remains_in_async_search_paths():
+    """⑦：`case_search_engine` 內所有 `async def` 的下載呼叫都須經 `to_thread`。
+
+    R1 的 commit message 宣稱「兩處」而工作樹只有一處（GROK-R2-P2-03）——`_process_symbol`
+    當時仍同步。它目前無呼叫端，但留著就是地雷：接回 async 路徑即重現 UAT B1。
+    以 AST 判定，不用 grep 計數（計數會隨無關改動漂）。
+    """
+    import ast
+    import inspect
+    from momentum.DataExtraction import case_search_engine as cse
+
+    tree = ast.parse(inspect.getsource(cse))
+    offenders = []
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.AsyncFunctionDef):
+            continue
+        for node in ast.walk(fn):
+            # 直接呼叫 `<x>.get_historical_data(...)` 而非 `asyncio.to_thread(<x>.get_historical_data, ...)`
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                    and node.func.attr == "get_historical_data":
+                offenders.append(f"{fn.name}:{node.lineno}")
+    assert offenders == [], f"async 路徑仍有同步下載（會鎖住事件迴圈）：{offenders}"

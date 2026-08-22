@@ -33,6 +33,8 @@ import time
 import json
 from pathlib import Path
 
+from momentum.DataExtraction.data_loader_momentum import IncompleteDownloadError
+
 logger = logging.getLogger(__name__)
 
 
@@ -103,6 +105,14 @@ def classify_error(error: Exception) -> FailureType:
     Returns:
         FailureType: 錯誤類型
     """
+    # 🔴 型別優先於字串（CODEX-R2-P1-02／GROK-R2-P1-01 之衍生）：`IncompleteDownloadError`
+    #   是**資料完整性拒收**，不是暫時性故障——重試它只會重複打同一個回亂序／stale 的端點。
+    #   且其訊息含「拒收」「不得落快取」等中文字樣，不會命中下方任何英文關鍵字，
+    #   落到 UNKNOWN 後仍會被重試。故在字串分類**之前**以型別攔截，歸為 INVALID_CONFIG
+    #   （RETRY_CONFIG 中唯一 max_retries=0 且會立即中斷 worker 的類別）。
+    if isinstance(error, IncompleteDownloadError):
+        return FailureType.INVALID_CONFIG
+
     error_msg = str(error).lower()
     error_type_name = type(error).__name__.lower()
 
@@ -363,6 +373,10 @@ class ParallelSearchEngine:
                 if batch_results:
                     all_results.extend(batch_results)
                     logger.debug(f"{symbol}: 找到 {len(batch_results)} 個案例")
+            except IncompleteDownloadError:
+                # 見 `case_search_engine._search_single_symbol` 之註解：下載被拒收必須傳到任務層，
+                # 不得在此記 log 後續跑成「其餘 symbol 的成功結果」——那份結果的完整性已無法宣稱。
+                raise
             except Exception as e:
                 logger.error(f"Symbol {symbol} 處理失敗: {e}", exc_info=True)
 

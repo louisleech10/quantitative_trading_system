@@ -1,0 +1,621 @@
+== 新回歸（行為級，含 R2 六條）==
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 16 items
+
+tests/momentum/DataExtraction/test_search_download_pagination.py ....... [ 43%]
+.s.......                                                                [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 15 passed, 1 skipped, 4 warnings in 6.18s ===================
+rc_new=0
+== 既有消費端 ==
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 2 items
+
+tests/test_legacy_storage_step6.py ..                                    [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 2 passed, 4 warnings in 0.03s =========================
+rc_legacy=0
+== event_samples ==
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 230 items
+
+tests/momentum/event_samples/test_alignment.py .............             [  5%]
+tests/momentum/event_samples/test_all_bars_eval.py ............          [ 10%]
+tests/momentum/event_samples/test_baseline_oracle.py ...........         [ 15%]
+tests/momentum/event_samples/test_candidate_ledger.py .................. [ 23%]
+.                                                                        [ 23%]
+tests/momentum/event_samples/test_condition_engine.py .................. [ 31%]
+.........................                                                [ 42%]
+tests/momentum/event_samples/test_counterexample_classifier.py ......... [ 46%]
+.......                                                                  [ 49%]
+tests/momentum/event_samples/test_dedupe.py ........                     [ 53%]
+tests/momentum/event_samples/test_event_split.py .........               [ 56%]
+tests/momentum/event_samples/test_feature_materialization.py .......     [ 60%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py ........        [ 63%]
+tests/momentum/event_samples/test_generator_adapters.py ................ [ 70%]
+.....                                                                    [ 72%]
+tests/momentum/event_samples/test_import_contract.py ................... [ 80%]
+.........                                                                [ 84%]
+tests/momentum/event_samples/test_mutation_guard.py ............         [ 90%]
+tests/momentum/event_samples/test_pattern_bridge.py ..........           [ 94%]
+tests/momentum/event_samples/test_pipeline.py ......                     [ 96%]
+tests/momentum/event_samples/test_tables.py .......                      [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 230 passed, 4 warnings in 26.71s =======================
+rc_event_samples=0
+== api ==
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 493 items
+
+tests/api/test_b4_bulk_delete_orphan.py .................                [  3%]
+tests/api/test_batch_adapters_injection.py ....                          [  4%]
+tests/api/test_batch_alias.py .............F...                          [  7%]
+tests/api/test_batch_date.py .........                                   [  9%]
+tests/api/test_batch_download_multi_timeframe.py ....                    [ 10%]
+tests/api/test_batch_layer_metrics.py ...                                [ 10%]
+tests/api/test_batch_progress_normalize.py ...                           [ 11%]
+tests/api/test_batch_retention.py ...................................... [ 19%]
+.                                                                        [ 19%]
+tests/api/test_batch_status_layer.py ........                            [ 21%]
+tests/api/test_data_quality_report.py ..............                     [ 23%]
+tests/api/test_export_api.py ........                                    [ 25%]
+tests/api/test_export_routes.py .....                                    [ 26%]
+tests/api/test_failopen_api_flags.py ....                                [ 27%]
+tests/api/test_feature_api.py .....                                      [ 28%]
+tests/api/test_feature_browser_routes.py ....                            [ 29%]
+tests/api/test_feature_browser_service.py .......                        [ 30%]
+tests/api/test_feature_explorer_optimizations.py ...........             [ 32%]
+tests/api/test_feature_export.py ........EE.................             [ 38%]
+tests/api/test_feature_factory_batch_list.py ...                         [ 38%]
+tests/api/test_feature_factory_batch_quality.py .......                  [ 40%]
+tests/api/test_feature_factory_batch_resume.py .................         [ 43%]
+tests/api/test_feature_factory_batch_step4.py ...........                [ 46%]
+tests/api/test_feature_factory_service_browse_summary.py ........        [ 47%]
+tests/api/test_feature_factory_service_phase_d.py ......                 [ 48%]
+tests/api/test_feature_factory_timeframe_validation_step6.py .           [ 49%]
+tests/api/test_feature_toggle_routes.py .......                          [ 50%]
+tests/api/test_ff_progress_normalize.py ...........                      [ 52%]
+tests/api/test_gap3_import.py ................                           [ 55%]
+tests/api/test_ic_analysis_api.py ..........                             [ 58%]
+tests/api/test_ic_analysis_service.py ...........                        [ 60%]
+tests/api/test_ic_deep_analysis.py ...F................................. [ 67%]
+........                                                                 [ 69%]
+tests/api/test_ic_la1_degraded_gate.py ............................      [ 75%]
+tests/api/test_ic_list_features.py .                                     [ 75%]
+tests/api/test_ic_models.py ..                                           [ 75%]
+tests/api/test_ic_response_v2.py .......                                 [ 77%]
+tests/api/test_ic_run_selector.py ......                                 [ 78%]
+tests/api/test_ic_transform_feature_loading.py ......                    [ 79%]
+tests/api/test_ichc_event_timestamps.py F.F....                          [ 80%]
+tests/api/test_ml_pipeline_strategy_validation.py .........              [ 82%]
+tests/api/test_model_api_endpoints.py ....                               [ 83%]
+tests/api/test_model_enhancement_routes.py ...                           [ 84%]
+tests/api/test_model_enhancement_service.py F.F.F                        [ 85%]
+tests/api/test_model_task_cache.py ..                                    [ 85%]
+tests/api/test_optimization_output_service.py ...                        [ 86%]
+tests/api/test_phase4_optimization_routes.py ..........                  [ 88%]
+tests/api/test_progress_rss_fields.py ..F...F                            [ 89%]
+tests/api/test_run_lifecycle_api.py ................E.                   [ 93%]
+tests/api/test_single_progress_rss.py ...                                [ 93%]
+tests/api/test_tier_api.py ....                                          [ 94%]
+tests/api/test_warmup_warning.py .......                                 [ 96%]
+tests/api/test_watchlist_routes.py ..                                    [ 96%]
+tests/api/test_worker_logging.py F............                           [ 99%]
+tests/api/test_xgboost_sequence_features.py ...                          [ 99%]
+tests/api/test_xgboost_training_gate.py .                                [100%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of test_cgsa_csv_date_subset_uses_sidecar_not_full_kline_cache _
+file /Users/louis/Desktop/quantitative_trading_system/tests/api/test_feature_export.py, line 347
+  def test_cgsa_csv_date_subset_uses_sidecar_not_full_kline_cache(
+E       fixture 'caplog' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, app, async_client, batch_service_factory, cache, capfd, capfdbinary, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, ic_first_factory, ic_persist_redirect, mock_atr, mock_browse_registrar, mock_predicted_proba, mock_prices, mock_quality_computer, mock_strategy_params, model_config_manager, monkeypatch, no_cover, pipeline_id, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, redirect_patch_set, redirect_root_module, redirect_root_session, requires_kline_data, service, synthetic_l65_dataset, synthetic_training_data, test_cache_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, trained_lightgbm, trained_xgboost, training_window, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/louis/Desktop/quantitative_trading_system/tests/api/test_feature_export.py:347
+_ ERROR at setup of test_cgsa_csv_legacy_without_row_index_falls_back_to_integer_on_full_kline_mismatch _
+file /Users/louis/Desktop/quantitative_trading_system/tests/api/test_feature_export.py, line 395
+  def test_cgsa_csv_legacy_without_row_index_falls_back_to_integer_on_full_kline_mismatch(
+E       fixture 'caplog' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, app, async_client, batch_service_factory, cache, capfd, capfdbinary, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, ic_first_factory, ic_persist_redirect, mock_atr, mock_browse_registrar, mock_predicted_proba, mock_prices, mock_quality_computer, mock_strategy_params, model_config_manager, monkeypatch, no_cover, pipeline_id, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, redirect_patch_set, redirect_root_module, redirect_root_session, requires_kline_data, service, synthetic_l65_dataset, synthetic_training_data, test_cache_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, trained_lightgbm, trained_xgboost, training_window, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/louis/Desktop/quantitative_trading_system/tests/api/test_feature_export.py:395
+_______ ERROR at setup of test_resume_batch_keeps_legacy_completed_item ________
+file /Users/louis/Desktop/quantitative_trading_system/tests/api/test_run_lifecycle_api.py, line 515
+  @pytest.mark.asyncio
+  async def test_resume_batch_keeps_legacy_completed_item(
+      tmp_path: Path,
+      batch_service_factory,
+      caplog: pytest.LogCaptureFixture,
+      monkeypatch: pytest.MonkeyPatch,
+  ) -> None:
+      service = batch_service_factory(tmp_path / "checkpoints")
+      request = BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="12h")
+      checkpoint = service._build_initial_checkpoint("batch-legacy", request)
+      checkpoint["completed_items"] = [{
+          "symbol": "BTCUSDT",
+          "timeframe": "12h",
+          "output_paths": ["BTCUSDT_12h_factory.h5"],
+          "browse_task_id": "browse_BTCUSDT_12h",
+      }]
+      checkpoint["queued_items"] = []
+      service._safe_persist_checkpoint(checkpoint)
+      execute_mock = AsyncMock()
+      monkeypatch.setattr(service, "execute_resume", execute_mock)
+
+      with caplog.at_level("WARNING", logger="api.feature_factory_batch_service"):
+          response = await service.resume_batch("batch-legacy")
+
+      assert response["status"] == "completed"
+      assert response["skipped_items"] == 1
+      execute_mock.assert_not_called()
+      assert "Legacy completed item has no resolvable run hash" in caplog.text
+E       fixture 'caplog' not found
+>       available fixtures: _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, app, async_client, batch_service_factory, cache, capfd, capfdbinary, capsys, capsysbinary, capteesys, cov, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, ic_first_factory, ic_persist_redirect, mock_atr, mock_browse_registrar, mock_predicted_proba, mock_prices, mock_quality_computer, mock_strategy_params, model_config_manager, monkeypatch, no_cover, pipeline_id, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, redirect_patch_set, redirect_root_module, redirect_root_session, requires_kline_data, service, synthetic_l65_dataset, synthetic_training_data, test_cache_dir, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, trained_lightgbm, trained_xgboost, training_window, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/louis/Desktop/quantitative_trading_system/tests/api/test_run_lifecycle_api.py:515
+=================================== FAILURES ===================================
+_________________ test_patch_batch_alias_deleting_returns_409 __________________
+tests/api/test_batch_alias.py:283: in test_patch_batch_alias_deleting_returns_409
+    assert "batch_alias" not in registry.get("BTCUSDT", "12h", "cfg_a")
+E   TypeError: argument of type 'NoneType' is not iterable
+---------------------------- Captured stderr setup -----------------------------
+2026-08-22 10:00:53,843 - asyncio - DEBUG - Using selector: KqueueSelector
+----------------------------- Captured stderr call -----------------------------
+[2026-08-22 10:00:53,845] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 1 entries
+2026-08-22 10:00:53,845 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 1 entries
+[2026-08-22 10:00:53,846] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 1 entries
+2026-08-22 10:00:53,846 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 1 entries
+2026-08-22 10:00:53,846 - httpx - INFO - HTTP Request: PATCH http://test/api/v1/features/batch/batch-1/alias "HTTP/1.1 409 Conflict"
+__________________ test_api_deep_cache_key_includes_fit_mode ___________________
+tests/api/test_ic_deep_analysis.py:279: in test_api_deep_cache_key_includes_fit_mode
+    assert key_a == expected
+E   AssertionError: assert 'e3d70b8f849e...0dd3f8e68c39d' == 'b6a858b509b3...97a998f4e4fc1'
+E     
+E     - b6a858b509b35c9d3b597a998f4e4fc1
+E     + e3d70b8f849e924d8720dd3f8e68c39d
+----------------------------- Captured stdout call -----------------------------
+2026-08-22 10:02:54 - api.ic_analysis_service - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep analysis started for task: d861debd-2bc7-49a8-9f82-79b5b7cc87ed
+2026-08-22 10:02:54 - api.middleware.request - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] [6cefdf28] POST /api/v1/ic/deep-analysis/d861debd-2bc7-49a8-9f82-79b5b7cc87ed - 200 - 0.013s
+2026-08-22 10:02:54 - httpx - [32mINFO[0m - HTTP Request: POST http://testserver/api/v1/ic/deep-analysis/d861debd-2bc7-49a8-9f82-79b5b7cc87ed "HTTP/1.1 200 OK"
+2026-08-22 10:02:54 - momentum.Analysis.ic_filter_orchestrator - [31mERROR[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep module failed: factor_centrality
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 1975, in run_deep_analysis
+    result = runner(selected, config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2209, in _run_factor_centrality
+    raise InsufficientDataError(centrality.reason)
+momentum.core.exceptions.InsufficientDataError: n_features(2) < min_required(3)
+2026-08-22 10:02:54 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep module skipped: factor_centrality, reason=n_features(2) < min_required(3)
+2026-08-22 10:02:54 - momentum.Analysis.trend_analyzer - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Trend analysis completed: 2 features
+2026-08-22 10:02:54 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep module completed: trend_analysis in 0.00s
+2026-08-22 10:02:54 - momentum.Analysis.parameter_sensitivity_analyzer - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Parameter sensitivity completed: 0 families
+2026-08-22 10:02:54 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep module completed: parameter_sensitivity in 0.00s
+2026-08-22 10:02:54 - api.middleware.request - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] [8fd65a81] GET /api/v1/ic/deep-analysis/d861debd-2bc7-49a8-9f82-79b5b7cc87ed/result - 200 - 0.010s
+2026-08-22 10:02:54 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/deep-analysis/d861debd-2bc7-49a8-9f82-79b5b7cc87ed/result "HTTP/1.1 200 OK"
+2026-08-22 10:02:54 - momentum.Analysis.rolling_oos_validator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Rolling OOS completed: 2 features
+2026-08-22 10:02:54 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep module completed: rolling_oos in 0.03s
+2026-08-22 10:02:54 - momentum.Analysis.long_short_analyzer - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Long/short analysis completed: 2 features
+2026-08-22 10:02:54 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep module completed: long_short_analysis in 0.28s
+2026-08-22 10:02:55 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep module completed: feature_quality_diagnostics in 0.04s
+2026-08-22 10:02:55 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Deep module completed: net_ic_analysis in 0.00s
+2026-08-22 10:02:55 - api.middleware.request - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] [8b067ddc] GET /api/v1/ic/deep-analysis/d861debd-2bc7-49a8-9f82-79b5b7cc87ed/result - 200 - 0.007s
+2026-08-22 10:02:55 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/deep-analysis/d861debd-2bc7-49a8-9f82-79b5b7cc87ed/result "HTTP/1.1 200 OK"
+----------------------------- Captured stderr call -----------------------------
+[2026-08-22 10:02:54,650] ERROR momentum.Analysis.ic_filter_orchestrator: Deep module failed: factor_centrality
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 1975, in run_deep_analysis
+    result = runner(selected, config)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 2209, in _run_factor_centrality
+    raise InsufficientDataError(centrality.reason)
+momentum.core.exceptions.InsufficientDataError: n_features(2) < min_required(3)
+[2026-08-22 10:02:54,666] WARNING momentum.Analysis.ic_filter_orchestrator: Deep module skipped: factor_centrality, reason=n_features(2) < min_required(3)
+[2026-08-22 10:02:54,669] INFO momentum.Analysis.trend_analyzer: Trend analysis completed: 2 features
+[2026-08-22 10:02:54,669] INFO momentum.Analysis.ic_filter_orchestrator: Deep module completed: trend_analysis in 0.00s
+[2026-08-22 10:02:54,669] INFO momentum.Analysis.parameter_sensitivity_analyzer: Parameter sensitivity completed: 0 families
+[2026-08-22 10:02:54,669] INFO momentum.Analysis.ic_filter_orchestrator: Deep module completed: parameter_sensitivity in 0.00s
+[2026-08-22 10:02:54,700] INFO momentum.Analysis.rolling_oos_validator: Rolling OOS completed: 2 features
+[2026-08-22 10:02:54,701] INFO momentum.Analysis.ic_filter_orchestrator: Deep module completed: rolling_oos in 0.03s
+[2026-08-22 10:02:54,982] INFO momentum.Analysis.long_short_analyzer: Long/short analysis completed: 2 features
+[2026-08-22 10:02:54,982] INFO momentum.Analysis.ic_filter_orchestrator: Deep module completed: long_short_analysis in 0.28s
+[2026-08-22 10:02:55,020] INFO momentum.Analysis.ic_filter_orchestrator: Deep module completed: feature_quality_diagnostics in 0.04s
+[2026-08-22 10:02:55,021] INFO momentum.Analysis.ic_filter_orchestrator: Deep module completed: net_ic_analysis in 0.00s
+________ TestTimestampsBehavior.test_t2_large_subset_effective_and_oos _________
+tests/api/test_ichc_event_timestamps.py:25: in test_t2_large_subset_effective_and_oos
+    report = run_analyze(
+tests/momentum/helpers/ichc_run.py:61: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1105: in analyze
+    report = self._stage7_report(
+momentum/Analysis/ic_filter_orchestrator.py:3555: in _stage7_report
+    self._persist_outputs(
+tests/fixtures/ic_persist_redirect.py:227: in wrapped
+    return original(self, *args, **kwargs)
+momentum/Analysis/ic_filter_orchestrator.py:4117: in _persist_outputs
+    report_meta["survivor_output"] = self._write_survivor_output(
+momentum/Analysis/ic_filter_orchestrator.py:4199: in _write_survivor_output
+    payload = build_survivor_output(
+momentum/Analysis/survivor_contract.py:511: in build_survivor_output
+    raise ContractValidationError("n_samples_total < split train_rows+test_rows")
+E   momentum.Analysis.ic_config_schema.ContractValidationError: n_samples_total < split train_rows+test_rows
+----------------------------- Captured stdout call -----------------------------
+2026-08-22 10:05:48 - momentum.Analysis.ic_config_schema - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC config loaded
+2026-08-22 10:05:48 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-08-22 10:05:48 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:05:48 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:05:48 - momentum.Analysis.data_preprocessor - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-08-22 10:05:48 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.004s
+2026-08-22 10:05:48 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:05:48 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.002s
+2026-08-22 10:05:48 - momentum.Analysis.ic_engine - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC autocorr persistent: count=14
+2026-08-22 10:05:48 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.003s
+2026-08-22 10:05:48 - momentum.Analysis.ic_engine - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Decay: 8/14 fit warnings summarized (low_r2=8)
+2026-08-22 10:05:49 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+2026-08-22 10:05:49 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_k6d1n7tp/reports/ic_report_ic_gatekeeper.json
+----------------------------- Captured stderr call -----------------------------
+[2026-08-22 10:05:48,308] INFO momentum.Analysis.ic_config_schema: IC config loaded
+[2026-08-22 10:05:48,318] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:05:48,318] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:05:48,350] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+[2026-08-22 10:05:48,356] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:05:48,447] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=14
+[2026-08-22 10:05:48,573] INFO momentum.Analysis.ic_engine: Decay: 8/14 fit warnings summarized (low_r2=8)
+[2026-08-22 10:05:49,395] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+[2026-08-22 10:05:49,415] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_k6d1n7tp/reports/ic_report_ic_gatekeeper.json
+_ TestTimestampsBehavior.test_t3_absent_is_deterministic_and_empty_list_equals_absent _
+tests/api/test_ichc_event_timestamps.py:64: in test_t3_absent_is_deterministic_and_empty_list_equals_absent
+    assert canonical_sha(base_a) == canonical_sha(base_b)
+E   AssertionError: assert '7472d39feb05...b55c91fe50c64' == '7541b2c5f569...991f4707a7d20'
+E     
+E     - 7541b2c5f569ca3983530dbc2fd5d9becf1e9de88a057c14476991f4707a7d20
+E     + 7472d39feb0561b35dc84553a8a873bf374db1f5e768c98d596b55c91fe50c64
+----------------------------- Captured stdout call -----------------------------
+2026-08-22 10:05:57 - momentum.Analysis.ic_config_schema - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC config loaded
+2026-08-22 10:05:57 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-08-22 10:05:57 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:05:57 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:05:57 - momentum.Analysis.data_preprocessor - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-08-22 10:05:57 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.003s
+2026-08-22 10:05:57 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:05:57 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.003s
+2026-08-22 10:05:58 - momentum.Analysis.ic_engine - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC autocorr persistent: count=14
+2026-08-22 10:05:58 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.003s
+2026-08-22 10:05:58 - momentum.Analysis.ic_engine - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Decay: 4/14 fit warnings summarized (low_r2=4)
+2026-08-22 10:06:04 - momentum.Analysis.redundancy_filter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Redundancy filter completed: method=greedy input=2 output=2
+2026-08-22 10:06:07 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+2026-08-22 10:06:07 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/features/ETHUSDT_12h_filtered.h5
+2026-08-22 10:06:07 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_report_ic_gatekeeper.json
+2026-08-22 10:06:07 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_survivors_ic_gatekeeper.json
+2026-08-22 10:06:07 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_report_ic_gatekeeper.json
+2026-08-22 10:06:07 - momentum.Analysis.ic_config_schema - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC config loaded
+2026-08-22 10:06:07 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-08-22 10:06:07 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:06:07 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:06:07 - momentum.Analysis.data_preprocessor - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-08-22 10:06:07 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.003s
+2026-08-22 10:06:07 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - [pid=42229 sym=BTCUSDT tf=12h] Falling back to configured label horizon because labels_df is unavailable
+2026-08-22 10:06:07 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.002s
+2026-08-22 10:06:08 - momentum.Analysis.ic_engine - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC autocorr persistent: count=14
+2026-08-22 10:06:08 - momentum.DataExtraction.kline_storage - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Read 1696 klines from ETHUSDT/12h in 0.004s
+2026-08-22 10:06:08 - momentum.Analysis.ic_engine - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Decay: 4/14 fit warnings summarized (low_r2=4)
+2026-08-22 10:06:14 - momentum.Analysis.redundancy_filter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Redundancy filter completed: method=greedy input=2 output=2
+2026-08-22 10:06:17 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+2026-08-22 10:06:17 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/features/ETHUSDT_12h_filtered.h5
+2026-08-22 10:06:17 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_report_ic_gatekeeper.json
+2026-08-22 10:06:17 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_survivors_ic_gatekeeper.json
+2026-08-22 10:06:17 - momentum.Analysis.ic_reporter - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_report_ic_gatekeeper.json
+----------------------------- Captured stderr call -----------------------------
+[2026-08-22 10:05:57,957] INFO momentum.Analysis.ic_config_schema: IC config loaded
+[2026-08-22 10:05:57,960] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:05:57,960] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:05:57,984] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+[2026-08-22 10:05:57,988] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:05:58,151] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=14
+[2026-08-22 10:05:58,283] INFO momentum.Analysis.ic_engine: Decay: 4/14 fit warnings summarized (low_r2=4)
+[2026-08-22 10:06:04,597] INFO momentum.Analysis.redundancy_filter: Redundancy filter completed: method=greedy input=2 output=2
+[2026-08-22 10:06:07,731] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+[2026-08-22 10:06:07,748] INFO momentum.Analysis.ic_reporter: Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/features/ETHUSDT_12h_filtered.h5
+[2026-08-22 10:06:07,796] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_report_ic_gatekeeper.json
+[2026-08-22 10:06:07,799] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_survivors_ic_gatekeeper.json
+[2026-08-22 10:06:07,847] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_report_ic_gatekeeper.json
+[2026-08-22 10:06:07,863] INFO momentum.Analysis.ic_config_schema: IC config loaded
+[2026-08-22 10:06:07,866] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:06:07,866] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:06:07,891] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+[2026-08-22 10:06:07,894] WARNING momentum.Analysis.ic_filter_orchestrator: Falling back to configured label horizon because labels_df is unavailable
+[2026-08-22 10:06:08,058] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=14
+[2026-08-22 10:06:08,202] INFO momentum.Analysis.ic_engine: Decay: 4/14 fit warnings summarized (low_r2=4)
+[2026-08-22 10:06:14,675] INFO momentum.Analysis.redundancy_filter: Redundancy filter completed: method=greedy input=2 output=2
+[2026-08-22 10:06:17,785] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+[2026-08-22 10:06:17,789] INFO momentum.Analysis.ic_reporter: Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/features/ETHUSDT_12h_filtered.h5
+[2026-08-22 10:06:17,836] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_report_ic_gatekeeper.json
+[2026-08-22 10:06:17,840] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_survivors_ic_gatekeeper.json
+[2026-08-22 10:06:17,886] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-765/test_t3_absent_is_deterministi0/sidefx/reports/ic_report_ic_gatekeeper.json
+______________________ test_execute_calibration_completed ______________________
+tests/api/test_model_enhancement_service.py:75: in test_execute_calibration_completed
+    assert final.status == "completed"
+E   AssertionError: assert 'failed' == 'completed'
+E     
+E     - completed
+E     + failed
+----------------------------- Captured stdout call -----------------------------
+2026-08-22 10:06:28 - api.services.model_enhancement_service - [31mERROR[0m - [pid=42229 sym=BTCUSDT tf=12h] ModelEnhancement task=0a213ae0-4c5e-4fe7-935b-30fad8481f88 module=calibration failed: CalibratorReceipt required for signal-facing calibration (missing train_plan/calib_idx/model_artifact in task payload)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/model_enhancement_service.py", line 191, in _run_and_store
+    output = await asyncio.wait_for(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/tasks.py", line 481, in wait_for
+    return fut.result()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/model_enhancement_service.py", line 267, in _run_calibration
+    raise ReceiptVerificationError(
+momentum.core.contracts.ReceiptVerificationError: CalibratorReceipt required for signal-facing calibration (missing train_plan/calib_idx/model_artifact in task payload)
+___________________ test_execute_calibration_timeout_failed ____________________
+tests/api/test_model_enhancement_service.py:114: in test_execute_calibration_timeout_failed
+    assert final.skipped_reason == "timeout"
+E   AssertionError: assert 'CalibratorRe...task payload)' == 'timeout'
+E     
+E     - timeout
+E     + CalibratorReceipt required for signal-facing calibration (missing train_plan/calib_idx/model_artifact in task payload)
+----------------------------- Captured stdout call -----------------------------
+2026-08-22 10:06:28 - api.services.model_enhancement_service - [31mERROR[0m - [pid=42229 sym=BTCUSDT tf=12h] ModelEnhancement task=822131a4-ef73-4176-aa46-5f0df02fa104 module=calibration failed: CalibratorReceipt required for signal-facing calibration (missing train_plan/calib_idx/model_artifact in task payload)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/model_enhancement_service.py", line 191, in _run_and_store
+    output = await asyncio.wait_for(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/tasks.py", line 481, in wait_for
+    return fut.result()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/model_enhancement_service.py", line 267, in _run_calibration
+    raise ReceiptVerificationError(
+momentum.core.contracts.ReceiptVerificationError: CalibratorReceipt required for signal-facing calibration (missing train_plan/calib_idx/model_artifact in task payload)
+__________________ test_execute_module_handles_skipped_result __________________
+tests/api/test_model_enhancement_service.py:163: in test_execute_module_handles_skipped_result
+    assert final.status == "skipped"
+E   AssertionError: assert 'failed' == 'skipped'
+E     
+E     - skipped
+E     + failed
+----------------------------- Captured stdout call -----------------------------
+2026-08-22 10:06:28 - api.services.model_enhancement_service - [31mERROR[0m - [pid=42229 sym=BTCUSDT tf=12h] ModelEnhancement task=25f91304-bb44-4741-8d33-16edb6c4c8f7 module=calibration failed: CalibratorReceipt required for signal-facing calibration (missing train_plan/calib_idx/model_artifact in task payload)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/model_enhancement_service.py", line 191, in _run_and_store
+    output = await asyncio.wait_for(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/tasks.py", line 481, in wait_for
+    return fut.result()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/model_enhancement_service.py", line 267, in _run_calibration
+    raise ReceiptVerificationError(
+momentum.core.contracts.ReceiptVerificationError: CalibratorReceipt required for signal-facing calibration (missing train_plan/calib_idx/model_artifact in task payload)
+_____________ test_parity_batch_rest_worker_rss_and_schema_version _____________
+tests/api/test_progress_rss_fields.py:63: in test_parity_batch_rest_worker_rss_and_schema_version
+    service = batch_service_factory(tmp_path)
+tests/api/conftest.py:66: in _factory
+    return FeatureFactoryBatchService(
+api/services/feature_factory_batch_service.py:173: in __init__
+    self._lock = asyncio.Lock()
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/locks.py:81: in __init__
+    self._loop = events.get_event_loop()
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/events.py:642: in get_event_loop
+    raise RuntimeError('There is no current event loop in thread %r.'
+E   RuntimeError: There is no current event loop in thread 'MainThread'.
+_________________ test_parity_concurrent_gt_one_no_fake_stage __________________
+tests/api/test_progress_rss_fields.py:144: in test_parity_concurrent_gt_one_no_fake_stage
+    service = batch_service_factory(tmp_path)
+tests/api/conftest.py:66: in _factory
+    return FeatureFactoryBatchService(
+api/services/feature_factory_batch_service.py:173: in __init__
+    self._lock = asyncio.Lock()
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/locks.py:81: in __init__
+    self._loop = events.get_event_loop()
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/events.py:642: in get_event_loop
+    raise RuntimeError('There is no current event loop in thread %r.'
+E   RuntimeError: There is no current event loop in thread 'MainThread'.
+_______________ test_init_worker_logging_idempotent_single_line ________________
+tests/api/test_worker_logging.py:79: in test_init_worker_logging_idempotent_single_line
+    assert len(probe_lines) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+----------------------------- Captured stdout call -----------------------------
+2026-08-22 10:06:30 - momentum.test - [32mINFO[0m - [pid=42229 sym=BTCUSDT tf=12h] worker momentum log probe
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/fastapi/applications.py:1051
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/fastapi/applications.py:1051: PytestCollectionWarning: cannot collect 'test_app' because it is not a function.
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+
+tests/api/test_feature_api.py::test_feature_extraction_api
+tests/api/test_feature_api.py::test_feature_task_status_api
+  /Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/indicators/ema_extractor.py:167: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+    ema_short_above_prev = ema_short_above.shift(1).fillna(False)
+
+tests/api/test_feature_api.py::test_feature_extraction_api
+tests/api/test_feature_api.py::test_feature_task_status_api
+  /Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/feature_validator.py:402: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+    df[feature_names] = df[feature_names].fillna(method='ffill')
+
+tests/api/test_feature_factory_batch_quality.py::test_batch_quality_uses_real_nan_not_null_count
+tests/api/test_feature_factory_batch_quality.py::test_batch_quality_invalidates_dq_v4_disk_cache_and_persists_nan_ratio
+tests/api/test_feature_factory_batch_resume.py::test_quality_adapter_computes_from_real_parquet_manifest
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/statsmodels/regression/linear_model.py:955: RuntimeWarning: divide by zero encountered in log
+    llf = -nobs2*np.log(2*np.pi) - nobs2*np.log(ssr / nobs) - nobs2
+
+tests/api/test_ic_analysis_service.py: 1695 warnings
+tests/api/test_ichc_event_timestamps.py: 1 warning
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+tests/api/test_ic_analysis_service.py: 1695 warnings
+tests/api/test_ichc_event_timestamps.py: 1 warning
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2898: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[None, :]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/api/test_batch_alias.py::test_patch_batch_alias_deleting_returns_409
+FAILED tests/api/test_ic_deep_analysis.py::test_api_deep_cache_key_includes_fit_mode
+FAILED tests/api/test_ichc_event_timestamps.py::TestTimestampsBehavior::test_t2_large_subset_effective_and_oos
+FAILED tests/api/test_ichc_event_timestamps.py::TestTimestampsBehavior::test_t3_absent_is_deterministic_and_empty_list_equals_absent
+FAILED tests/api/test_model_enhancement_service.py::test_execute_calibration_completed
+FAILED tests/api/test_model_enhancement_service.py::test_execute_calibration_timeout_failed
+FAILED tests/api/test_model_enhancement_service.py::test_execute_module_handles_skipped_result
+FAILED tests/api/test_progress_rss_fields.py::test_parity_batch_rest_worker_rss_and_schema_version
+FAILED tests/api/test_progress_rss_fields.py::test_parity_concurrent_gt_one_no_fake_stage
+FAILED tests/api/test_worker_logging.py::test_init_worker_logging_idempotent_single_line
+ERROR tests/api/test_feature_export.py::test_cgsa_csv_date_subset_uses_sidecar_not_full_kline_cache
+ERROR tests/api/test_feature_export.py::test_cgsa_csv_legacy_without_row_index_falls_back_to_integer_on_full_kline_mismatch
+ERROR tests/api/test_run_lifecycle_api.py::test_resume_batch_keeps_legacy_completed_item
+===== 10 failed, 480 passed, 3404 warnings, 3 errors in 343.40s (0:05:43) ======
+rc_api=1
+/Users/louis/Desktop/quantitative_trading_system/api/routes/ic_analysis.py:330:R3:from:momentum.Analysis.ic_reporter.assert_filtered_export_fresh
+/Users/louis/Desktop/quantitative_trading_system/api/routes/ic_analysis.py:420:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:256:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:321:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:485:R3:from:momentum.Analysis.ic_reporter.assert_filtered_export_fresh
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:908:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:1088:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:1106:R3:from:momentum.Analysis.ic_reporter.DegradedOOSViolation
+/Users/louis/Desktop/quantitative_trading_system/api/services/model_task_service.py:85:R3:from:momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes
+/Users/louis/Desktop/quantitative_trading_system/api/services/model_task_service.py:85:R3:from:momentum.Analysis.eval_scope_utils.build_service_oot_bundle
+/Users/louis/Desktop/quantitative_trading_system/api/services/model_task_service.py:85:R3:from:momentum.Analysis.eval_scope_utils.performance_to_scoped_dict
+/Users/louis/Desktop/quantitative_trading_system/api/services/pattern_management_service.py:70:R4:from:api.routes.pattern_analysis
+/Users/louis/Desktop/quantitative_trading_system/api/services/pattern_management_service.py:78:R4:from:api.services.xgboost_batch_service
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_batch_service.py:746:R3:from:momentum.Analysis.eval_scope_utils.build_service_oot_bundle
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_batch_service.py:1011:R3:from:momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_batch_service.py:1011:R3:from:momentum.Analysis.eval_scope_utils.performance_to_scoped_dict
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_task_service.py:247:R3:from:momentum.Analysis.eval_scope_utils.build_service_oot_bundle
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_task_service.py:443:R3:from:momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_task_service.py:443:R3:from:momentum.Analysis.eval_scope_utils.performance_to_scoped_dict
+/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py:2739:R2:from:momentum.FeatureEngineering.labels.label_generator.WINSORIZED_DISABLED_MSG
+R2=1 R3=17 R4=2
+BASELINE OK: 觀測 20 筆全在 baseline（20 筆）內，無新增違反
+rc_decouple=0
+
+== tests/api 基準對證（byte-identical 比對，證明本輪未新增紅）==
+HEAD（R1 狀態，git checkout 四檔後）: 10 failed, 480 passed, 3 errors
+本輪（R2 修補後）                   : 10 failed, 480 passed, 3 errors
+FAILED/ERROR 清單逐條相同（13 條）⇒ 本輪對 tests/api 零影響。
+🔴 訂正：R2 brief 寫「tests/api 既有紅 7 條」為過期數字，實為 10 failed + 3 errors。
+
+== 實跑（ETHUSDT 12h 2024-01-01→2026-04-27，繞過快取）==
+rows=1695 index_unique=True monotonic=True bar_gaps={12:00:00}
+
+== mutation（R1 七條 + R2 六條，各自還原皆紅）==
+見 handoffs/run_receipts/20260822T110000Z-searchfix-r2-mutation.log
+
+== 已知限制 ==
+真子進程日誌測試在本機沙箱 skip；grok 環境為 PermissionError(SemLock) 硬紅 ⇒ 本輪已把
+skip 判定前移到 Queue/Process 建構期（try/except PermissionError,OSError），該環境現應為 skip。
