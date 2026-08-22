@@ -85,7 +85,8 @@
       "白話說明/Archived/第0批-施工清單.md",
       "白話說明/Archived/第1批-在做什麼.md",
       "白話說明/Archived/第1批-施工清單.md",
-      "白話說明/Archived/治理待辦總覽.md"
+      "白話說明/Archived/治理待辦總覽.md",
+      "白話說明/Archived/GAP-2施工進度.md"
     ],
     "status_sets_note": "status_enum＝狀態字面值；status_keys＝哪些 key 屬狀態 key（識別碼僅由其 rows 第 2 欄導出，刻意排除 governance-execution-order：其第 2 欄為站名，併入會放大誤擋）；status_scope 編碼恰兩種——不以 / 結尾＝exact path（全等），以 / 結尾＝directory prefix（字首相符），禁 wildcard；status_scope_grandfathered＝2026-08-10 凍結之既存歷史日誌檔豁免清單，以集合相等鎖死，新增檔案不得靜默加入。逐檔實測命中數見 docs/GOVB25_STATUS_FACTKEY_SPEC.md §A（此處刻意不寫死數字——會漂）",
     "row_columns_note": "原 row_columns 欄已刪，改由各 fact-key 自帶 columns（WL-01）。理由：它只描述 governance-execution-order 一個 key 的形狀卻掛在共用 _schema，第二個 key 一出生它就是過期副本——正是本註冊表要治的病。不得復原。",

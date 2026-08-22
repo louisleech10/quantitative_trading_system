@@ -1889,6 +1889,15 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>八十九・（2026-08-22）同一批 commit 三次踩「白話文件沒跟實作同 commit」，被三家委員抓三次</strong>：<code>plain_docs_sync_check</code> 是<strong>時序判準</strong>——只要 commit 動到 WATCHED 路徑（<code>scripts/</code>／<code>momentum/</code>／<code>docs/</code>…）而受管白話檔不在同一個 commit，下一次跑就紅。我在 B5 的 R1／R2／R3 修補 commit 各犯一次（每次都想著「先把碼修完，文件等收尾一起寫」）。委員每輪都要為此開一條 finding，純摩擦。<strong>做法改成固定動作：<code>git add</code> 完成後、<code>git commit</code> 之前，先跑 <code>bash scripts/plain_docs_sync_check.sh --staged</code>，紅就把該白話檔一起 add</strong>——不要等 commit 後再補，補一次就多一個 commit、下一輪又可能再紅。</p>
 </blockquote>
+<blockquote>
+<p><strong>九十・（2026-08-22）派工單上寫「請攻某某」＝我在替委員決定看哪裡，量化證據顯示它壓縮了審查涵蓋面</strong>：GAP-3 UAT 缺口修補 SPEC 的 R1–R3 三份 brief 共 <strong>10 處</strong>「請攻 X」，而 R3 的 18 條 findings <strong>幾乎全落在我點名的軸上</strong>（composer consult 輪量化指出）。R4 改成「主委不指定方向、各家獨立盤點」後，同一份規格多出 <strong>5 條前三輪無人觸及的 findings</strong>，其中一條是 SPEC 與實碼的真矛盾（D-7 L3 要求「不進 split 但事件研究表仍可產出」，而 <code>event_forward_return_table</code> 的 <code>event_split_plan</code> 是必填、<code>run()</code> 無條件呼叫 <code>split_events</code>）。<strong>這條做不成機械閘</strong>——寫規格的人同時決定審查者看哪裡，是結構性的，只能靠紀律。規則：<strong>review brief 一律不得出現「請攻／重點看／最重要的是」；未證假設仍要逐條列出（揭露用），但須明寫「非攻擊清單，可全部略過」</strong>。R4 brief 內該三個詞的實際指令數＝0（僅出現在說明「本輪為何不這樣寫」的段落）。</p>
+</blockquote>
+<blockquote>
+<p><strong>九十一・（2026-08-22）我在 SPEC 檔頭寫「某條已修」而實際只改了一半，三家都抓到</strong>：R3 版檔頭寫「群集 C（future72 單位）已修」——Task 1.10 確實改了，但 §D-7 L1 的敘事仍寫 <code>future72_max_*→72</code>（暗示根數＝72），兩處互相矛盾。<code>spec_ruling_task_sync.sh</code> 沒擋下來，因為它的 SYNC-FORBID 正規式是 <code>lookahead_bars.*=.*72</code>，而那行<strong>不含 <code>lookahead_bars</code> 字樣</strong>。同輪還有 <strong>2 條 findings 是我上一輪改「覆蓋風險」欄時自己造出來的</strong>（對一個尚不存在的 §G 序列化定義下同步義務；在檔頭寫「不得登記為具名殘留」卻在 §N 保留同一項殘留）。三條都被抓到的原因是我<strong>事前在 brief 具名寫了「這批改寫未經任何人審查、與其餘部分同等受審」</strong>。規則兩條：<strong>①「已修」只能寫在同時 grep 過所有引用點之後（改裁決必同步所有引用，此類錯已犯 8 次）②新產出若未經審查，就在 brief 具名標出來，讓委員知道要去看——這次它有效</strong>。</p>
+</blockquote>
+<blockquote>
+<p><strong>九十二・（2026-08-22）新增機檢規則第一版關鍵字太寬，對 166 份文件掃出 17 個誤報</strong>：為擋「驗收欄寫 <code>python3 -c &quot;...&quot;</code>（真的就三個點）卻因含 <code>==</code>／<code>.py</code> 而過檢查」的空殼形態，我在 <code>template_check.sh</code> 加了佔位偵測，第一版把 <code>TODO</code>／<code>TBD</code>／<code>FIXME</code>／<code>XXX</code> 一併列入 ⇒ 本 repo 拿 <strong>TODO 當文件型別名</strong>（<code>GAP3_EVENT_TODO.md</code>、「SPEC/TODO 統一此一命令」）、<code>XXX</code> 見於用法字串（<code>docs/XXX_SPEC.md</code>），實掃 17 份誤報。收窄到只擋引號內省略號與中文佔位後誤報歸零、mutation 仍轉紅。規則：<strong>新增任何關鍵字型機檢，上線前必須對全 repo 同類檔實掃一次並報出誤報數；誤報 &gt; 0 就收窄，不得靠「之後再說」</strong>——關鍵字集合要窄而準，寧可漏也不要吵（黑名單永遠列不完，見票 B-23）。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
