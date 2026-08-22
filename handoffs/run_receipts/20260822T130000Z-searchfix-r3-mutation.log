@@ -1,0 +1,5 @@
+worker_symbol      =>  2 failed, 17 passed, 1 skipped, 4 warnings in 6.48s 
+worker_outer       =>  2 failed, 17 passed, 1 skipped, 4 warnings in 6.42s 
+collect_continue   =>  1 failed, 18 passed, 1 skipped, 4 warnings in 6.43s 
+fallback_serial    =>  1 failed, 18 passed, 1 skipped, 4 warnings in 6.42s 
+restored           =>  19 passed, 1 skipped, 4 warnings in 6.31s 

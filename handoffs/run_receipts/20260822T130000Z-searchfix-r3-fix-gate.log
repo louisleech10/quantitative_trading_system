@@ -1,0 +1,159 @@
+== 新回歸（行為級，含 R3 四條）==
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 20 items
+
+tests/momentum/DataExtraction/test_search_download_pagination.py ....... [ 35%]
+.s...........                                                            [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 19 passed, 1 skipped, 4 warnings in 6.30s ===================
+rc_new=0
+== 既有消費端 ==
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 2 items
+
+tests/test_legacy_storage_step6.py ..                                    [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 2 passed, 4 warnings in 0.03s =========================
+rc_legacy=0
+== event_samples ==
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 230 items
+
+tests/momentum/event_samples/test_alignment.py .............             [  5%]
+tests/momentum/event_samples/test_all_bars_eval.py ............          [ 10%]
+tests/momentum/event_samples/test_baseline_oracle.py ...........         [ 15%]
+tests/momentum/event_samples/test_candidate_ledger.py .................. [ 23%]
+.                                                                        [ 23%]
+tests/momentum/event_samples/test_condition_engine.py .................. [ 31%]
+.........................                                                [ 42%]
+tests/momentum/event_samples/test_counterexample_classifier.py ......... [ 46%]
+.......                                                                  [ 49%]
+tests/momentum/event_samples/test_dedupe.py ........                     [ 53%]
+tests/momentum/event_samples/test_event_split.py .........               [ 56%]
+tests/momentum/event_samples/test_feature_materialization.py .......     [ 60%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py ........        [ 63%]
+tests/momentum/event_samples/test_generator_adapters.py ................ [ 70%]
+.....                                                                    [ 72%]
+tests/momentum/event_samples/test_import_contract.py ................... [ 80%]
+.........                                                                [ 84%]
+tests/momentum/event_samples/test_mutation_guard.py ............         [ 90%]
+tests/momentum/event_samples/test_pattern_bridge.py ..........           [ 94%]
+tests/momentum/event_samples/test_pipeline.py ......                     [ 96%]
+tests/momentum/event_samples/test_tables.py .......                      [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_date_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_format
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:1474: PytestConfigWarning: Unknown config option: log_cli_level
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 230 passed, 4 warnings in 26.83s =======================
+rc_event_samples=0
+/Users/louis/Desktop/quantitative_trading_system/api/routes/ic_analysis.py:330:R3:from:momentum.Analysis.ic_reporter.assert_filtered_export_fresh
+/Users/louis/Desktop/quantitative_trading_system/api/routes/ic_analysis.py:420:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:256:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:321:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:485:R3:from:momentum.Analysis.ic_reporter.assert_filtered_export_fresh
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:908:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:1088:R3:from:momentum.Analysis.ic_reporter.normalize_analysis_status
+/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py:1106:R3:from:momentum.Analysis.ic_reporter.DegradedOOSViolation
+/Users/louis/Desktop/quantitative_trading_system/api/services/model_task_service.py:85:R3:from:momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes
+/Users/louis/Desktop/quantitative_trading_system/api/services/model_task_service.py:85:R3:from:momentum.Analysis.eval_scope_utils.build_service_oot_bundle
+/Users/louis/Desktop/quantitative_trading_system/api/services/model_task_service.py:85:R3:from:momentum.Analysis.eval_scope_utils.performance_to_scoped_dict
+/Users/louis/Desktop/quantitative_trading_system/api/services/pattern_management_service.py:70:R4:from:api.routes.pattern_analysis
+/Users/louis/Desktop/quantitative_trading_system/api/services/pattern_management_service.py:78:R4:from:api.services.xgboost_batch_service
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_batch_service.py:746:R3:from:momentum.Analysis.eval_scope_utils.build_service_oot_bundle
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_batch_service.py:1011:R3:from:momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_batch_service.py:1011:R3:from:momentum.Analysis.eval_scope_utils.performance_to_scoped_dict
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_task_service.py:247:R3:from:momentum.Analysis.eval_scope_utils.build_service_oot_bundle
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_task_service.py:443:R3:from:momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes
+/Users/louis/Desktop/quantitative_trading_system/api/services/xgboost_task_service.py:443:R3:from:momentum.Analysis.eval_scope_utils.performance_to_scoped_dict
+/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py:2739:R2:from:momentum.FeatureEngineering.labels.label_generator.WINSORIZED_DISABLED_MSG
+R2=1 R3=17 R4=2
+BASELINE OK: 觀測 20 筆全在 baseline（20 筆）內，無新增違反
+rc_decouple=0
+
+== mutation（R3 四條，各自還原皆紅）==
+worker_symbol / worker_outer / collect_continue / fallback_serial => 各 1~2 failed；還原 19 passed 1 skipped
+receipt: handoffs/run_receipts/20260822T130000Z-searchfix-r3-mutation.log
+
+🔴 自陳：AST 測試 test_parallel_paths_reraise_rejection_at_every_swallow_point 首兩版皆為部分空心——
+   v1 白名單寫 "search_cases"（真名 search_cases_parallel）⇒ 兩個真旁路根本沒被檢查；
+   v2 豁免條件掃字串 "save_results" ⇒ 該字串遍布整棵 try 子樹而誤豁免。
+   兩版皆由 mutation（collect_continue／fallback_serial 不紅）抓出，非自查發現。
+   v3 改為：函式層 fail-closed 豁免名單 + try 層封閉正面集合（DOWNLOAD_REACHING ∪ 任何 await）。

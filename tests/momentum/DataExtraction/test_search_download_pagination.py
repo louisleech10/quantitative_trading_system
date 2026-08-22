@@ -525,3 +525,174 @@ def test_no_synchronous_download_remains_in_async_search_paths():
                     and node.func.attr == "get_historical_data":
                 offenders.append(f"{fn.name}:{node.lineno}")
     assert offenders == [], f"async 路徑仍有同步下載（會鎖住事件迴圈）：{offenders}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# R3 修補之回歸（CODEX-R3-P1-01：parallel 路徑同樣不得把拒收吞成空成功）
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _WorkerCfg:
+    timeframe = "12h"
+    start_time = "2024-01-01"
+    end_time = "2026-04-27"
+    time_range = None
+
+
+def _stub_worker_deps(monkeypatch, single_symbol_impl):
+    """把 `_process_chunk_worker` 自建的 loader/engine 換掉，使其可在本進程內直接驅動。"""
+    from momentum.DataExtraction import data_loader_momentum as dlm
+    from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+
+    class _StubLoader:
+        def __init__(self, *a, **k):
+            pass
+
+    monkeypatch.setattr(dlm, "DataLoader", _StubLoader)
+    monkeypatch.setattr(CaseSearchEngine, "__init__", lambda self, **k: None)
+    monkeypatch.setattr(CaseSearchEngine, "_search_single_symbol", single_symbol_impl)
+
+
+def test_parallel_worker_outer_catch_does_not_swallow_rejection(monkeypatch, tmp_path):
+    """⑧：worker 最外層 `except Exception` 不得把拒收整包丟成 `success_results=[]`。
+
+    R2 只修了 serial 路徑；parallel 路徑的 chunk 失敗原會被最外層整包吃掉、父層再 `continue`
+    ⇒ 100-symbol 搜尋回「成功但沒案例」——與 R2 群集 A 同型，換條路重演（CODEX-R3-P1-01）。
+
+    行為級：**在本進程內直接呼叫** `_process_chunk_worker`，斷言它**拋出**且訊息帶
+    worker／symbol 身分，而非回傳一份空的成功字典。
+    """
+    async def _reject(self, symbol, config):
+        raise IncompleteDownloadError("K 線回應非遞增或末筆非最大值（拒收，不得落快取）")
+
+    _stub_worker_deps(monkeypatch, _reject)
+    with pytest.raises(IncompleteDownloadError, match="symbol=BADSYM"):
+        pse._process_chunk_worker(["BADSYM"], _WorkerCfg(), 1, 2, log_path=str(tmp_path / "w.log"))
+
+
+def test_parallel_worker_still_returns_failed_records_for_ordinary_errors(monkeypatch, tmp_path):
+    """⑧之邊界：一般錯誤仍走既有「重試→failed_records→回傳」語意。
+
+    沒有這條，上一條可能只是因為 worker 對**任何**錯誤都拋出而綠——那會讓單一壞 symbol
+    炸掉整個 chunk，把既有的失敗透明化機制（failed_records／失敗報告）整個廢掉。
+    """
+    async def _boom(self, symbol, config):
+        raise ValueError("no data for symbol")
+
+    _stub_worker_deps(monkeypatch, _boom)
+    monkeypatch.setattr(pse.time, "sleep", lambda *a, **k: None)
+    out = pse._process_chunk_worker(["OKSYM"], _WorkerCfg(), 0, 1, log_path=str(tmp_path / "w2.log"))
+    assert out["success_results"] == []
+    assert len(out["failed_records"]) == 1, f"一般錯誤未記入 failed_records：{out}"
+    assert out["failed_records"][0]["symbol"] == "OKSYM"
+
+
+def test_parallel_collection_propagates_rejection_instead_of_continue():
+    """⑧：父層收集迴圈對拒收須往上拋，不得 `continue` 後回其餘 chunk 的成功結果。
+
+    行為級：直接驅動 `asyncio.as_completed` 的例外分支（與 production 同形），
+    斷言「拒收會終止收集」而非「被記 log 後續跑」。
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _ok_chunk():
+        return {"success_results": [{"symbol": "OK"}], "failed_records": [], "retry_stats": {}}
+
+    def _rejecting_chunk():
+        time.sleep(0.02)
+        raise IncompleteDownloadError("[worker 2/2] symbol=BAD 下載被拒收: 末筆非最大值")
+
+    async def scenario():
+        collected = []
+        ex = ThreadPoolExecutor(max_workers=2)
+        try:
+            futures = [ex.submit(_ok_chunk), ex.submit(_rejecting_chunk)]
+            for aio_future in asyncio.as_completed([asyncio.wrap_future(f) for f in futures]):
+                try:
+                    collected.append(await aio_future)
+                except IncompleteDownloadError:
+                    raise                                  # production 之處置
+                except Exception:                          # noqa: BLE001
+                    continue                               # 一般錯誤仍逐 chunk 跳過
+        finally:
+            await asyncio.to_thread(ex.shutdown, True)
+        return collected
+
+    loop = asyncio.new_event_loop()
+    try:
+        with pytest.raises(IncompleteDownloadError, match="symbol=BAD"):
+            loop.run_until_complete(scenario())
+    finally:
+        loop.close()
+
+
+def test_parallel_paths_reraise_rejection_at_every_swallow_point():
+    """⑧：`parallel_search_engine` 內每個會吞例外的點，都須對拒收 re-raise。
+
+    以 AST 判定：凡 `except Exception` 之 handler，同一 try 必須也有
+    `except IncompleteDownloadError`（且在其之前）。用 AST 不用 grep——
+    grep 數量會隨無關改動漂，且看不出兩個 handler 是否屬於同一個 try。
+    """
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(pse))
+    # 🔴 **fail-closed 名單**：預設每個函式都受檢，只有列名者豁免。
+    #   原版是白名單 `{"_serial_search_fallback", "_process_chunk_worker", "search_cases"}`，
+    #   而真正的方法名是 `search_cases_parallel` ⇒ 該函式內的**兩個**真實旁路
+    #   （父層收集迴圈 continue、退回串行 fallback）根本沒被檢查，測試對它們是空的。
+    #   白名單打錯字就靜默失效；豁免名單打錯字只會多檢查一個函式（安全方向）。
+    EXEMPT_FUNCS = {
+        "to_dict", "classify_error", "calculate_backoff_delay", "create_failure_record",
+        "__init__", "_worker_log_path", "_get_optimal_workers", "_chunk_symbols",
+        "_save_failure_report", "_init_worker_file_logging",
+    }
+    # 🔴 受檢範圍以**封閉正面集合**判定，不用「豁免關鍵字」。
+    #   兩版失敗史：①用 `"save_results" in ast.dump(node)` 當豁免 ⇒ 該字串遍布整棵子樹，
+    #   兩個真實旁路被靜默豁免；②改成「直接語句全為存檔呼叫才豁免」⇒ 存檔 try 裡的
+    #   `len()`／`logger.warning()` 使 all() 為假，反而誤擋。
+    #   正解：問「這個 try 的 body **碰得到下載嗎**」——碰得到才受檢。
+    #   碰得到＝出現下列任一呼叫名，或出現 `await`（等待 worker future 即等待下載）。
+    DOWNLOAD_REACHING = {
+        "_search_batch", "_search_single_symbol", "_process_chunk_worker",
+        "search_cases", "search_cases_parallel",
+        "get_historical_data", "get_historical_klines", "_fetch_klines_batch",
+    }
+
+    def _owner_of(target):
+        for fn in ast.walk(tree):
+            if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for sub in ast.walk(fn):
+                    if sub is target:
+                        return fn.name
+        return None
+
+    def _reaches_download(try_node):
+        """try 的 body 碰得到下載嗎（下列呼叫名之一，或任何 await）。"""
+        for stmt in try_node.body:
+            for sub in ast.walk(stmt):
+                if isinstance(sub, ast.Await):
+                    return True
+                if isinstance(sub, ast.Call):
+                    fname = sub.func.attr if isinstance(sub.func, ast.Attribute) else \
+                            (sub.func.id if isinstance(sub.func, ast.Name) else "")
+                    if fname in DOWNLOAD_REACHING:
+                        return True
+        return False
+
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Try):
+            continue
+        names = [h.type.id for h in node.handlers if isinstance(h.type, ast.Name)]
+        if "Exception" not in names:
+            continue
+        owner = _owner_of(node)
+        if owner is None or owner in EXEMPT_FUNCS:
+            continue
+        if not _reaches_download(node):
+            continue
+        if "IncompleteDownloadError" not in names:
+            offenders.append(f"{owner}:{node.lineno}(缺 IncompleteDownloadError handler)")
+        elif names.index("IncompleteDownloadError") > names.index("Exception"):
+            offenders.append(f"{owner}:{node.lineno}(順序錯：Exception 在前會先吃掉)")
+    assert offenders == [], f"搜尋主鏈仍有會吞掉拒收的 except Exception：{offenders}"

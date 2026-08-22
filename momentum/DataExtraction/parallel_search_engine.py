@@ -636,6 +636,12 @@ class ParallelSearchEngine:
                             f"批次耗時: {batch_elapsed:.2f}秒"
                         )
 
+                    except IncompleteDownloadError:
+                        # 🔴 CODEX-R3-P1-01：資料完整性拒收不是「單個批次失敗」——
+                        #   它使整份結果的完整性無法宣稱。其餘 chunk 的成功結果照回等於
+                        #   把「缺了資料」藏起來，與 R2 群集 A 修掉的失敗模式同型。
+                        #   往上拋 ⇒ `_run_search_task` 標 FAILED 並帶出訊息（含 worker/symbol 身分）。
+                        raise
                     except Exception as e:
                         logger.error(f"批次處理失敗: {e}", exc_info=True)
                         # 單個批次失敗不影響其他批次
@@ -715,6 +721,11 @@ class ParallelSearchEngine:
 
             return all_results
 
+        except IncompleteDownloadError:
+            # 🔴 CODEX-R3-P1-01：不得退回串行重跑。拒收不是「並行機制壞了」，
+            #   串行會對同一端點再抓一次、再被拒一次——白付一整趟下載才得到同樣結論。
+            #   直接往上拋，讓 `_run_search_task` 標 FAILED。
+            raise
         except Exception as e:
             logger.error(f"並行搜索失敗: {e}", exc_info=True)
 
@@ -877,6 +888,19 @@ def _process_chunk_worker(symbols_chunk: List[str],
 
                     break  # 成功，跳出重試循環
 
+                # 資料完整性拒收 → 立即中斷，且**帶著 symbol 身分**往上拋。
+                # 🔴 刻意是**獨立的 except 子句**而非 `except Exception` 內的 isinstance 分支
+                #   （CODEX-R3-P1-01 之修補）：獨立子句才能被 AST 機械檢查
+                #   `test_parallel_paths_reraise_rejection_at_every_swallow_point` 盤點到；
+                #   藏在 handler body 裡的 isinstance，下一個人改動時看不見、也掃不出來。
+                except IncompleteDownloadError as e:
+                    worker_logger.error(
+                        f"資料完整性拒收，worker {chunk_idx+1} 中斷於 {symbol}: {e}"
+                    )
+                    raise IncompleteDownloadError(
+                        f"[worker {chunk_idx+1}/{total_chunks}] symbol={symbol} 下載被拒收: {e}"
+                    ) from e
+
                 except Exception as e:
                     # 記錄首次失敗時間
                     if first_failed_at is None:
@@ -947,6 +971,12 @@ def _process_chunk_worker(symbols_chunk: List[str],
             'retry_stats': retry_stats
         }
 
+    except IncompleteDownloadError:
+        # 🔴 CODEX-R3-P1-01：不得被下方的「整包丟掉」吞掉。
+        #   原碼在此把整個 chunk 變成 `success_results=[] / failed_records=[]`，
+        #   父層再 `except Exception: continue` ⇒ 100-symbol 的並行搜尋會回「成功但沒案例」，
+        #   正是 R2 群集 A 在 serial 路徑修掉的那個失敗模式，只是換到 parallel 路徑重演。
+        raise
     except Exception as e:
         worker_logger.error(f"Worker {chunk_idx+1} 整體失敗: {e}", exc_info=True)
         return {
