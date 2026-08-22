@@ -760,14 +760,18 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 
 **盤點結果（實查證）**：後端六維度皆已實作，前端**一個都沒接**，全走 `eventExport.ts` 之寫死預設。
 
-| 契約欄位 | 後端 enum | 前端現況 | UI |
-|---|---|---|---|
-| `scenario` | A／B／C／two_stage | 寫死 `'C'`（`:95`） | ❌ |
-| `control_kind` | 4 種 | 寫死 `user_labeled_same_trigger`（`:104`） | ❌ |
-| `entry_price_semantic` | 5 種 | 寫死 `trigger_open`（`:93`） | ❌ |
-| `label_return_mode` | 3 種 | 寫死 `close_to_close`（`:102`） | ❌ |
-| `decision_offset_bars` | 任意 int | 寫死 `0`（`:92`） | ❌ |
-| `counterexample_kind` | 3 種 | **完全未送** | ❌ |
+| 契約欄位 | 契約內完整路徑 | 後端 enum（元素數） | 前端現況 | UI |
+|---|---|---|---|---|
+| `scenario` | `/required_fields/scenario` | 4：A／B／C／two_stage | 寫死 `'C'`（`:95`） | ❌ |
+| `control_kind` | `/required_fields/control_kind` | enum 4；另有 `accepted` 子集 3（`platform_random_bars` 恆拒） | 寫死 `user_labeled_same_trigger`（`:104`） | ❌ |
+| `entry_price_semantic` | `/required_fields/entry_price_semantic` | 5 | 寫死 `trigger_open`（`:93`） | ❌ |
+| `label_return_mode` | **`/required_fields/label_definition/fields/label_return_mode`**（唯一巢狀者） | 3 | 寫死 `close_to_close`（`:102`） | ❌ |
+| `decision_offset_bars` | `/required_fields/decision_offset_bars` | 無 enum（`int`，`min=0`） | 寫死 `0`（`:92`） | ❌ |
+| `counterexample_kind` | `/optional_fields/counterexample_kind` | 3 | **完全未送** | ❌ |
+
+> 路徑欄之 receipt：`python3 handoffs/20260822-gap3ux-x-review-r4-dims.py`（遞迴搜尋，不預設層級）。
+> 六者分佈於 `required_fields`／`optional_fields`／`label_definition.fields` **三個不同層級**
+> ⇒ Task 7.2 之機械閘不得以單一固定層級讀取 enum。
 
 `buildEventContractRecords` 之 `opts` 介面**已有** `scenario?`／`entryPriceSemantic?` 等參數，
 但 `/search` 呼叫端（`page.tsx:522-525`）**一個都沒傳** ⇒ 介面留了、UI 沒做。
