@@ -628,8 +628,31 @@ def test_parallel_collection_propagates_rejection_instead_of_continue():
 def _scan_swallowed_rejections(source: str) -> list:
     """盤點 source 內「會吞掉 `IncompleteDownloadError` 而未 re-raise」的 try 區塊。
 
-    🔴 本函式**自身**由 `test_ast_guard_detects_every_known_bypass_form` 以合成旁路驗證——
-    這是本 epic 三次「守衛範圍寫錯而測試仍綠」之後的機制性修法：
+    🔴🔴 **本守衛的效力範圍（2026-08-22 定，五版之後）**
+    本函式是 **lint，不是證明**。它擋的是**意外**重新引入「靜默空成功」——
+    有人重構時順手加了 `except Exception: continue`、或以為「有 raise 就安全」而換了型別。
+    它**不擋蓄意規避**：靜態分析對「這段 try 會不會吞掉某個 runtime 型別」本質上不可判定
+    （動態 handler、跨模組別名、`exec`、猴補丁……），對抗審永遠能構造下一種寫法。
+
+    **真正的防線是行為測試**，不是本守衛：
+    `test_incomplete_download_is_not_swallowed_by_single_symbol`／`..._propagates_through_search_batch`／
+    `test_parallel_worker_outer_catch_does_not_swallow_rejection`／
+    `test_parallel_collection_propagates_rejection_instead_of_continue`
+    直接驅動 production 路徑、斷言拒收會拋出——那些**與 handler 語法無關**，
+    改成任何寫法只要行為錯了就紅。本守衛只是額外一層，用來在行為測試沒覆蓋到的新程式碼上
+    早期示警。
+
+    因此：**發現新的靜態旁路寫法 ⇒ 加進 `_BYPASS_FORMS`／`_ALIAS_BYPASS_SOURCES` 並修，
+    但不視為阻斷收案的缺陷**（除非 production 現行碼真的踩中）。
+    依據＝使用者定死之「95% 解法就收、殘留具名記錄不當阻塞」，
+    以及 P1-6 的教訓：對抗審在「防蓄意」框架下是無限迴圈。
+
+    已封形態（v5）：tuple／bare／dynamic／`BaseException`／`RuntimeError`／共吞 tuple／
+    無 raise／raise 換型別／死枝 raise／未知 Name／模組層別名賦值／`import as` 別名／
+    `getattr` 動態分派（名字可解、不可解、不在清單三種）／吞點搬進豁免函式。
+    版本史見 `docs/` 之 R1–R5 收斂檔；**四次空心全由 mutation 或委員抓出，無一由自查發現**。
+
+    🔴 本函式**自身**由 `test_ast_guard_detects_every_known_bypass_form` 等元測試以合成旁路驗證——
     盤點型守衛的判定範圍必須自己被測，不能只靠對 production code 跑一次得綠。
     """
     import ast
@@ -665,18 +688,80 @@ def _scan_swallowed_rejections(source: str) -> list:
                         return fn.name
         return None
 
-    def _reaches_download(try_node):
-        """try 的 body 碰得到下載嗎（下列呼叫名之一，或任何 await）。"""
-        for stmt in try_node.body:
+    # 模組層 `NAME = "字串常數"` 解析——`getattr(h, MARKER, False)` 這種以常數名當屬性名的查值
+    # 必須解得出來，否則會落進 fail-closed 而誤報（v5 首版即誤擋 `_init_worker_file_logging`）。
+    _const_strings = {}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant) \
+                and isinstance(n.value.value, str):
+            for t in n.targets:
+                if isinstance(t, ast.Name):
+                    _const_strings[t.id] = n.value.value
+
+    def _const_str(node):
+        """解出節點的字串值；解不出回 None（呼叫端據此 fail-closed）。"""
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.Name):
+            return _const_strings.get(node.id)
+        return None
+
+    def _reaches_download(node_or_body):
+        """碰得到下載嗎（清單內呼叫名、任何 await，或任何 `getattr` 動態分派）。
+
+        🔴 v5（CODEX-R5-P2-03／COMPOSER-R5-P2-03）：原版只認直呼名 ⇒
+        `getattr(loader, "get_historical_data")()` 完全不被視為 reach，整個 try 跳過。
+        `getattr` 的目標名可以是變數，靜態解不出來 ⇒ **一律 fail-closed 視為 reach**。
+        """
+        stmts = node_or_body.body if hasattr(node_or_body, "body") else node_or_body
+        for stmt in stmts:
             for sub in ast.walk(stmt):
                 if isinstance(sub, ast.Await):
                     return True
-                if isinstance(sub, ast.Call):
-                    fname = sub.func.attr if isinstance(sub.func, ast.Attribute) else \
-                            (sub.func.id if isinstance(sub.func, ast.Name) else "")
-                    if fname in DOWNLOAD_REACHING:
+                if not isinstance(sub, ast.Call):
+                    continue
+                # `getattr(x, ...)(...)`：被**呼叫**的動態分派才算 reach。
+                # 單純的 `getattr(h, MARKER, False)` 查值不算——否則
+                # `_init_worker_file_logging` 這種純查旗標的函式會被誤擋（v5 首版誤報）。
+                if isinstance(sub.func, ast.Call) and isinstance(sub.func.func, ast.Name) \
+                        and sub.func.func.id == "getattr":
+                    return True
+                fname = sub.func.attr if isinstance(sub.func, ast.Attribute) else \
+                        (sub.func.id if isinstance(sub.func, ast.Name) else "")
+                if fname in DOWNLOAD_REACHING:
+                    return True
+                # `f = getattr(loader, "get_historical_data")` 之後才呼叫：
+                # 第二參數是清單內的字串常數即算 reach。
+                if fname == "getattr" and len(sub.args) >= 2:
+                    resolved = _const_str(sub.args[1])
+                    if resolved is None:                   # 名字算不出來 ⇒ fail-closed
+                        return True
+                    if resolved in DOWNLOAD_REACHING:
                         return True
         return False
+
+    # 🔴 v5（CODEX-R5-P2-03）：豁免**有條件**——豁免名單內的函式若自己碰得到下載，
+    #   豁免作廢。原版無條件跳過 ⇒ 把吞點搬進 `_save_failure_report` 即可繞過整條守衛。
+    _exempt_ok = set()
+    for fn in ast.walk(tree):
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) and fn.name in EXEMPT_FUNCS:
+            if not _reaches_download(fn):
+                _exempt_ok.add(fn.name)
+
+    # 🔴 v5（CODEX-R5-P1-01／COMPOSER-R5-P2-01／GROK-R5-P2-01，三家全員）：解析例外別名。
+    #   `SomeAlias = Exception` 或 `from builtins import Exception as ExcAlias` 之後，
+    #   `except SomeAlias:` 在 AST 只是 Name「SomeAlias」，字面比對看不見 ⇒ 守衛假綠。
+    _ALIAS_ROOTS = {"Exception", "BaseException", "RuntimeError"}
+    _alias_to_root = {}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Name) and n.value.id in _ALIAS_ROOTS:
+            for t in n.targets:
+                if isinstance(t, ast.Name):
+                    _alias_to_root[t.id] = n.value.id
+        elif isinstance(n, (ast.Import, ast.ImportFrom)):
+            for a in n.names:
+                if a.asname and a.name.split(".")[-1] in _ALIAS_ROOTS:
+                    _alias_to_root[a.asname] = a.name.split(".")[-1]
 
     # 🔴 v4（CODEX-R4-P1-01／COMPOSER-R4-P2-01，兩家獨立命中）：handler 型別須**正規化**。
     #   v3 只收 `isinstance(h.type, ast.Name)` ⇒ `except (Exception, X):` 這種 tuple handler
@@ -686,6 +771,13 @@ def _scan_swallowed_rejections(source: str) -> list:
     #   `except:`（bare）之 h.type 為 None，也吞。
     SWALLOWS_REJECTION = {"Exception", "BaseException", "RuntimeError"}
 
+    # 靜態解得出的「安全」型別：捕捉它們不會吞掉拒收。其餘未知 Name 一律 fail-closed。
+    _KNOWN_NARROW = {
+        "IncompleteDownloadError", "ValueError", "TypeError", "KeyError", "IndexError",
+        "AttributeError", "OSError", "IOError", "TimeoutError", "ConnectionError",
+        "KeyboardInterrupt", "StopIteration", "ZeroDivisionError", "ImportError",
+    }
+
     def _handler_names(h):
         """把 handler 的捕捉型別正規化成名字集合；bare except 以 'BaseException' 表示。"""
         if h.type is None:
@@ -694,9 +786,12 @@ def _scan_swallowed_rejections(source: str) -> list:
         out = []
         for n in nodes:
             if isinstance(n, ast.Name):
-                out.append(n.id)
+                # v5：別名解析＋未知名 fail-closed（三家全員 R5）
+                out.append(_alias_to_root.get(n.id, n.id if n.id in _KNOWN_NARROW else
+                                              (n.id if n.id in SWALLOWS_REJECTION else "<unknown>")))
             elif isinstance(n, ast.Attribute):
-                out.append(n.attr)
+                out.append(n.attr if n.attr in _KNOWN_NARROW or n.attr in SWALLOWS_REJECTION
+                           else "<unknown>")
             else:
                 # 動態運算出的 handler 型別（如 `except X if c else Y:`）無法靜態判定
                 # ⇒ fail-closed，當成「會吞」。
@@ -710,15 +805,16 @@ def _scan_swallowed_rejections(source: str) -> list:
         per_handler = [_handler_names(h) for h in node.handlers]
         flat = [n for names in per_handler for n in names]
         # 這個 try 有沒有「會吞掉拒收」的 handler？
+        def _swallows(names):
+            return any(n in SWALLOWS_REJECTION or n in ("<dynamic>", "<unknown>") for n in names)
+
         swallow_idx = next(
-            (i for i, names in enumerate(per_handler)
-             if any(n in SWALLOWS_REJECTION or n == "<dynamic>" for n in names)),
-            None,
+            (i for i, names in enumerate(per_handler) if _swallows(names)), None
         )
         if swallow_idx is None:
             continue
         owner = _owner_of(node)
-        if owner is None or owner in EXEMPT_FUNCS:
+        if owner is None or owner in _exempt_ok:      # v5：豁免有條件，見 `_exempt_ok`
             continue
         if not _reaches_download(node):
             continue
@@ -727,15 +823,32 @@ def _scan_swallowed_rejections(source: str) -> list:
         #   ② **不與**會吞的型別同處一個 handler——`except (Exception, IncompleteDownloadError): continue`
         #      看起來「有處理」，實際是把拒收和一般錯誤一起吞掉。這正是 mutation `prod_tuple_bypass`
         #      打穿第一版 v4 的方式：我只檢查名字在不在，沒檢查它是否被綁進吞掉的那個 handler。
-        #   ③ handler body 真的 `raise`——只寫 `except IncompleteDownloadError: pass` 更糟。
+        #   ③ handler body 真的 `raise`，且 raise 的是**原來的拒收**——
+        #      v5（CODEX-R5-P1-02／COMPOSER-R5-P2-02／GROK-R5-P2-02，三家全員）：
+        #      原版只問「有沒有任一 ast.Raise」⇒ `raise SomeOtherError(...)` 換型別、
+        #      或 `if False: raise` 死枝，都被當成合格。前者更陰險：上層專捕
+        #      `IncompleteDownloadError` 的四個點全部接不到，拒收降級成普通 RuntimeError。
+        #      合格形態＝bare `raise`／`raise IncompleteDownloadError(...)`（可含 `from`），
+        #      且必須是 handler 的**直接**語句（不在 if/for 等分支內，避免死枝假綠）。
         def _is_valid_reraise(idx):
             import ast as _ast
             names = per_handler[idx]
             if "IncompleteDownloadError" not in names:
                 return False
-            if any(n in SWALLOWS_REJECTION or n == "<dynamic>" for n in names):
+            if _swallows(names):
                 return False
-            return any(isinstance(s, _ast.Raise) for s in ast.walk(node.handlers[idx]))
+            for stmt in node.handlers[idx].body:          # 只看直接語句
+                if not isinstance(stmt, _ast.Raise):
+                    continue
+                if stmt.exc is None:                      # bare `raise`
+                    return True
+                exc = stmt.exc
+                target = exc.func if isinstance(exc, _ast.Call) else exc
+                name = target.id if isinstance(target, _ast.Name) else \
+                       (target.attr if isinstance(target, _ast.Attribute) else "")
+                if name == "IncompleteDownloadError":
+                    return True
+            return False
 
         reraise_idx = next((i for i in range(len(per_handler)) if _is_valid_reraise(i)), None)
         if reraise_idx is None:
@@ -772,6 +885,50 @@ _BYPASS_FORMS = {
     # 🔴 下面兩種「看起來有處理」但實際照吞——mutation prod_tuple_bypass 打穿第一版 v4 的形態
     "coswallow_tuple":    "    except (Exception, IncompleteDownloadError):\n        pass\n",
     "named_but_no_raise": "    except IncompleteDownloadError:\n        pass\n    except Exception:\n        pass\n",
+    # 🔴 v5 新增（R5 三家全員各自構造）
+    "raise_wrong_type":   "    except IncompleteDownloadError:\n        raise RuntimeError('wrapped')\n"
+                          "    except Exception:\n        pass\n",
+    "dead_branch_raise":  "    except IncompleteDownloadError:\n        if False:\n            raise\n"
+                          "    except Exception:\n        pass\n",
+    "unknown_name":       "    except SomeUnknownError:\n        pass\n",
+}
+
+# 別名旁路需要模組層賦值／import，故用獨立語料（`_BYPASS_TEMPLATE` 不含頂層陳述）。
+_ALIAS_BYPASS_SOURCES = {
+    "alias_assign": (
+        "SomeAlias = Exception\n"
+        "async def search_cases_parallel(self):\n"
+        "    try:\n        await self._something()\n"
+        "    except SomeAlias:\n        pass\n"
+    ),
+    "alias_import": (
+        "from builtins import Exception as ExcAlias\n"
+        "async def search_cases_parallel(self):\n"
+        "    try:\n        await self._something()\n"
+        "    except ExcAlias:\n        pass\n"
+    ),
+    "getattr_indirect": (
+        "def search_cases_parallel(self):\n"
+        "    try:\n        getattr(self.loader, 'get_historical_data')('BTCUSDT')\n"
+        "    except Exception:\n        pass\n"
+    ),
+    "swallow_inside_exempt_func": (
+        "def _save_failure_report(self, records):\n"
+        "    try:\n        self.loader.get_historical_data('BTCUSDT')\n"
+        "    except Exception:\n        pass\n"
+    ),
+    # 動態分派且方法名**算不出來**——靜態上無從得知它會不會下載 ⇒ 必須 fail-closed
+    "getattr_dynamic_name": (
+        "def search_cases_parallel(self, method_name):\n"
+        "    try:\n        getattr(self.loader, method_name)('BTCUSDT')\n"
+        "    except Exception:\n        pass\n"
+    ),
+    # 動態分派、名字算得出來但不在清單內——仍是被**呼叫**的動態分派 ⇒ fail-closed
+    "getattr_unlisted_method": (
+        "def search_cases_parallel(self):\n"
+        "    try:\n        getattr(self.loader, 'fetch_everything')('BTCUSDT')\n"
+        "    except Exception:\n        pass\n"
+    ),
 }
 
 _BYPASS_TEMPLATE = """
@@ -797,6 +954,14 @@ def test_ast_guard_detects_every_known_bypass_form(form):
     共同點是**沒有任何測試在測守衛自己**。這條補上那個缺口。
     """
     src = _BYPASS_TEMPLATE.format(handler=_BYPASS_FORMS[form])
+    assert _scan_swallowed_rejections(src), f"守衛漏掉旁路寫法 {form}：\n{src}"
+
+
+@pytest.mark.parametrize("form", sorted(_ALIAS_BYPASS_SOURCES))
+def test_ast_guard_detects_module_level_bypass_forms(form):
+    """⑧之元測試（v5）：需要模組層陳述的旁路——別名賦值／import as／getattr 動態分派／
+    把吞點搬進豁免名單內的函式。四種皆由 R5 三家獨立構造，v4.1 全部漏掉。"""
+    src = _ALIAS_BYPASS_SOURCES[form]
     assert _scan_swallowed_rejections(src), f"守衛漏掉旁路寫法 {form}：\n{src}"
 
 

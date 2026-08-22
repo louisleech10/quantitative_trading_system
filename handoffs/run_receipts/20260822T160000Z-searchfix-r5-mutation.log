@@ -1,0 +1,7 @@
+no_alias_resolution      =>  3 failed, 37 passed, 1 skipped, 4 warnings in 6.48s 
+no_unknown_failclosed    =>  1 failed, 39 passed, 1 skipped, 4 warnings in 6.44s 
+raise_any                =>  2 failed, 38 passed, 1 skipped, 4 warnings in 6.50s 
+unconditional_exempt     =>  1 failed, 39 passed, 1 skipped, 4 warnings in 6.48s 
+no_getattr_reach         =>  1 failed, 39 passed, 1 skipped, 4 warnings in 6.46s 
+prod_raise_wrong_type    =>  1 failed, 39 passed, 1 skipped, 4 warnings in 6.50s 
+restored                 =>  40 passed, 1 skipped, 4 warnings in 6.36s 
