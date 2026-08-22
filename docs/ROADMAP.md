@@ -18,6 +18,7 @@
 | 工作線 | 狀態 | 下一步 | 細節 |
 |---|---|---|---|
 | **量化主線（IC 分析）** | 🏁 **GAP-1 四批全部 CLOSED（2026-08-18）**：B1–B4 各三家 code review＋三家戳記；280 測試／20 mutation／wiring 閘 rc=0；延伸檔 A1-1..A1-24；殘留 G1-R1..R7／R9／R10／R11 | GAP-2a 亦 CLOSED（2026-08-19）；GAP-3 討論階段收案（consult R1＋R2＋討論文檔 12 版；`白話說明/GAP-3事件型討論.md` §7.5＝SPEC 取材地圖）；**下一步＝GAP-3 SPEC 起草（使用者 2026-08-20 裁定新 session 開工；HANDOFF 已備開工指令）** | TODO `docs/GAP1_STRATEGY_OVERFIT_TODO.md`；延伸檔 `docs/GAP1_STRATEGY_OVERFIT_AMENDMENTS.md`；收斂 `handoffs/reconcile/20260818-gap1-b4-review-r18/synth.md` |
+| **`/search` 修復（out-of-epic）** | 🏁 **CLOSED（2026-08-22）**：使用者 UAT 現場抓到三個既有 bug（毫秒游標→無窮迴圈＋資料重複、同步下載佔事件迴圈、worker 日誌不落檔）；7 輪三家對抗審＋2 輪蓋章，findings 8→7→2→2→3→3→0；`reconcile_stamps_check.sh` rc=0 三家 APPROVED | —（九項具名殘留各帶三值理由，觸發時再開） | 收斂＋戳記 `handoffs/reconcile/20260822-searchfix-x-review-r7/synth.md`；白話 `白話說明/search搜尋修復.md`；commit `bf0fd48a` |
 | 治理 epic | **留現狀、不再擴建**（使用者 2026-08-14） | 無。已掛機制繼續運作 | `ROADMAP_DETAIL.md` |
 | P1-6 委員債狀態機 | B5 未完工（線 C 未做） | 不排程（治理不再擴建） | `ROADMAP_DETAIL.md` |
 | GAP-1 DSR/PBO/MinBTL 策略層防偽 | 🏁 **全票 CLOSED（2026-08-18）**；殘留 registry G1-R1..R7＋R9＋R10 | —（殘留 registry 觸發時再開） | TODO＋延伸檔（見上行）；待補完：registry「GAP-1 待補完」節 |

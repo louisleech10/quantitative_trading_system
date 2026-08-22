@@ -25,7 +25,23 @@
 我照下面那張表由上而下直接做，做完派三家委員審＋對抗、有分歧我跟委員自己決定。
 做完一項就把狀態改掉，改的是資料檔，這張表自動跟著變。</p>
 <hr />
-<h2 id="-現況最新822gap-3-第-5-批審查完工蓋章輪到你簽-uat13-項">🔴 現況（最新，8/22）：<strong>GAP-3 第 5 批審查完工蓋章——輪到你簽 UAT（13 項）</strong></h2>
+<h2 id="-現況最新822-晚搜尋修好了兩件事都等你">🔴 現況（最新，8/22 晚）：<strong>搜尋修好了，兩件事都等你</strong></h2>
+<p><strong>兩件事，都在等你操作：</strong></p>
+<ol>
+<li><strong>重跑 GAP-3 的 UAT B1</strong>（4 個 symbol、2024/01/01–2026/04/27）——搜尋卡住的三個 bug 已修完、三家蓋章。</li>
+<li><strong>跑完 GAP-3 UAT B 段 13 項並簽字</strong> → GAP-3 才算結案。</li>
+</ol>
+<p><strong>搜尋修復摘要</strong>（完整版：<a href="search搜尋修復.html">search搜尋修復.md</a>）：</p>
+<ul>
+<li>你的三個症狀＝三個 bug：游標用秒送出導致無窮迴圈＋資料重複、同步下載佔住主執行緒、子行程日誌不落檔。</li>
+<li>順便修掉一個更陰險的：資料下載不完整時<strong>原本會默默當成功回傳還寫進快取</strong>。現在改成整個拒收、任務標失敗。</li>
+<li>⚠️ <strong>行為變了</strong>：以前這種情況顯示「找不到案例」（你會以為條件沒中），現在顯示錯誤訊息。後者才是實話。</li>
+<li><strong>誠實帳</strong>：跑了 7 輪審查，但 <code>/search</code> 本身只有 3 個 bug；另外 11 個問題<strong>是我的修補自己引入的</strong>，
+還有 4 次是<strong>我寫的測試自己假綠</strong>（全部被 mutation 或委員抓到，沒有一次我自己發現）。</li>
+<li>還沒做的 8 件事都在白話檔裡，每條都寫了為什麼現在不做。</li>
+</ul>
+<hr />
+<h2 id="前一段822gap-3-第-5-批審查完工蓋章輪到你簽-uat13-項">前一段（8/22）：<strong>GAP-3 第 5 批審查完工蓋章——輪到你簽 UAT（13 項）</strong></h2>
 <ul>
 <li>五輪審查 11→5→4→1→0、三家蓋章機檢通過；我這邊的機械檢查（測試／build／golden／規模）9 項 rc 全 0。</li>
 <li><strong>你要做的</strong>：開 <code>docs/GAP3_UAT_CHECKLIST.md</code>，照 B 段 B1–B11 逐項操作並簽字（含新增的 digest 驗證、全 K 線、條件 IC 三項）。啟動：後端 <code>python run_api.py</code>、前端 <code>cd frontend &amp;&amp; npm run dev</code>。簽完整票完成；任一項不過我回對應批修。</li>
