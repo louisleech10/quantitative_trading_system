@@ -12,6 +12,14 @@ import time
 from functools import wraps
 import asyncio
 import sys
+
+
+class IncompleteDownloadError(RuntimeError):
+    """分批下載未能完整取得所指定區間（游標未前進／回應亂序或 stale）。
+
+    **fail-closed**：寧可讓呼叫端看到錯誤，也不把不完整資料當成功返回並寫入快取
+    （靜默截斷會污染後續所有分析；CODEX-R1-P1-03）。
+    """
 import json
 
 # 確保可以導入抽象基類
@@ -361,26 +369,35 @@ class DataLoader(DataProviderBase):
                     # 更新下一批次的開始時間
                     previous_start = current_start
                     if not batch_klines:
-                        # 如果沒有數據，增加一個較大的時間間隔以避免無限循環
-                        current_start = batch_end + timedelta(days=1)
+                        # 該窗證實無資料 ⇒ 只跳過「已證實為空」的範圍，不多跳
+                        # （原本固定 +1 天會吃掉窗末之後才恢復的 bar；CODEX-R1-P1-03 反例 B）
+                        current_start = batch_end + timedelta(seconds=interval_seconds)
                     else:
                         # 自最後一根K線起「推進一整根」——**不可只加 1 毫秒**：
                         # 請求時間戳以「秒」為粒度送出（見 _fetch_klines_batch），毫秒會被截掉而回到同一根，
                         # 使同一窗永遠重抓 ⇒ 無窮迴圈＋同一根 K 線被重複 append（2026-08-22 UAT B1 實測）。
-                        last_timestamp = batch_klines[-1][0]
+                        # 前提：回應依 open time 遞增且最後一筆為該頁最大值。**驗證而非假設**——
+                        # 亂序／stale 回應會使「自最後一筆前進」跳過資料（CODEX-R1-P1-03 反例 A）。
+                        opens = [int(k[0]) for k in batch_klines]
+                        max_open = max(opens)
+                        if opens != sorted(opens) or opens[-1] != max_open:
+                            raise IncompleteDownloadError(
+                                f"K 線回應非遞增或末筆非最大值（拒收，不得落快取）: {symbol} {interval} "
+                                f"first={opens[0]} last={opens[-1]} max={max_open} n={len(opens)}"
+                            )
                         current_start = (
-                            pd.to_datetime(last_timestamp, unit='ms')
+                            pd.to_datetime(max_open, unit='ms')
                             + timedelta(seconds=interval_seconds)
                         )
 
-                    # 機械防呆：無論精度／回應內容如何，未前進即中止（不依賴上面的推進假設）
+                    # 機械防呆：未前進即 **fail-closed**（不可 break 後把 partial 當成功返回並落快取
+                    # ——那是靜默截斷；CODEX-R1-P1-03）
                     if current_start <= previous_start:
-                        self.logger.error(
-                            f"分批下載未前進，中止以免無限迴圈: {symbol} {interval} "
+                        raise IncompleteDownloadError(
+                            f"分批下載未前進（拒收，不得落快取）: {symbol} {interval} "
                             f"current_start={previous_start} batch_end={batch_end} "
                             f"n_klines={len(batch_klines) if batch_klines else 0}"
                         )
-                        break
 
                     # 避免API限制
                     time.sleep(0.1)

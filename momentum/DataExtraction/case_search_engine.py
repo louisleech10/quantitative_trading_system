@@ -459,11 +459,15 @@ class CaseSearchEngine:
             else:
                 start_time, end_time = config.start_time, config.end_time
                 
-            data = self.data_loader.get_historical_data(
+            # 🔴 下載是**同步阻塞**（HTTP＋time.sleep）：直接在 coroutine 內呼叫會鎖住事件迴圈，
+            # 使整台後端在搜尋期間對任何請求不回應（CODEX-R1-P0-01／GROK-R1-P1-01：symbols < workers
+            # 時走 serial fallback，ProcessPool 端的修補對此路徑無效）。一律丟執行緒。
+            data = await asyncio.to_thread(
+                self.data_loader.get_historical_data,
                 symbol=symbol,
                 start_time=start_time,
                 end_time=end_time,
-                interval=config.timeframe
+                interval=config.timeframe,
             )
             
             if data is None or data.empty:

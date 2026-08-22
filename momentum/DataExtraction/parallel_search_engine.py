@@ -256,10 +256,23 @@ class ParallelSearchEngine:
 
     @staticmethod
     def _worker_log_path() -> Optional[str]:
-        """worker 日誌路徑（與 API 同一個 `logs/case_search_api_<YYYYMMDD>.log`；取不到 ⇒ None，fail-open）。"""
+        """worker 日誌路徑；取不到 ⇒ None（fail-open，只是沒有 worker 日誌，不影響搜尋）。
+
+        優先用 `momentum/core/config.py` 解析之專案根（安裝／symlink 佈局下仍正確），
+        `Path(__file__).parents[2]` 只作為最後退路（CODEX-R1-P2-06：硬推 root 非部署穩固契約）。
+        呼叫端亦可自行傳 `log_path` 覆寫（`_process_chunk_worker(log_path=...)`）。
+        """
+        root = None
         try:
-            root = Path(__file__).resolve().parents[2]
-            return str(root / "logs" / f"case_search_api_{datetime.now().strftime('%Y%m%d')}.log")
+            from momentum.core.config import MomentumConfig
+
+            root = Path(MomentumConfig.from_project_root().results_path).parent
+        except Exception:                                # noqa: BLE001 —— 設定不可用時退路
+            root = None
+        try:
+            if root is None:
+                root = Path(__file__).resolve().parents[2]
+            return str(Path(root) / "logs" / f"case_search_api_{datetime.now().strftime('%Y%m%d')}.log")
         except Exception:                                # noqa: BLE001
             return None
 
@@ -555,7 +568,10 @@ class ParallelSearchEngine:
                 'failed_retries': 0
             }
 
-            with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+            # 不用 `with`：其 __exit__ ⇒ shutdown(wait=True) ⇒ 在**事件迴圈執行緒**上 join worker
+            # （取消或 worker 卡住時仍會鎖住整台服務；CODEX-R1-P1-05）。改由 finally 丟執行緒關閉。
+            executor = ProcessPoolExecutor(max_workers=self.num_workers)
+            try:
                 # 提交任務
                 futures = []
                 for chunk_idx, chunk in enumerate(symbol_chunks):
@@ -610,6 +626,9 @@ class ParallelSearchEngine:
                         logger.error(f"批次處理失敗: {e}", exc_info=True)
                         # 單個批次失敗不影響其他批次
                         continue
+            finally:
+                # 關閉（含 join）丟到執行緒，事件迴圈期間仍可服務其他請求；取消時亦不阻塞
+                await asyncio.to_thread(executor.shutdown, True)
 
             elapsed = time.time() - start_time
 
@@ -725,7 +744,10 @@ def _init_worker_file_logging(log_path: Optional[str]) -> None:
         import logging as _logging
         from pathlib import Path as _Path
 
-        target = _logging.getLogger("momentum")
+        # 掛在 **root**：下載器的 logger 名是頂層 `DataLoader`（`self.__class__.__name__`，parent=root），
+        # 不在 `momentum` 命名空間下——只掛 momentum 會漏掉最需要的下載／retry／錯誤日誌
+        # （CODEX-R1-P1-04 實測 `data_is_momentum_descendant=False`）。
+        target = _logging.getLogger()
         for handler in target.handlers:
             if getattr(handler, _WORKER_LOG_HANDLER_MARKER, False):
                 return                                   # 同進程重複呼叫不重複掛
@@ -733,12 +755,15 @@ def _init_worker_file_logging(log_path: Optional[str]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = _logging.FileHandler(path, encoding="utf-8")
         setattr(file_handler, _WORKER_LOG_HANDLER_MARKER, True)
-        file_handler.setLevel(_logging.INFO)
+        file_handler.setLevel(_logging.INFO)             # handler 只收 INFO 以上（不放大既有 logger）
         file_handler.setFormatter(_logging.Formatter(
             fmt=f"%(asctime)s - %(name)s - [search-worker pid={os.getpid()}] %(levelname)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         ))
-        target.setLevel(_logging.INFO)
+        # 子進程 root 預設 WARNING ⇒ INFO 根本不會傳到 handler；只在「比 INFO 嚴」時放寬，
+        # 且僅限本子進程（不回寫父進程狀態）。不動任何具名 logger 的 level（CODEX-R1-P1-04）。
+        if target.level == _logging.NOTSET or target.level > _logging.INFO:
+            target.setLevel(_logging.INFO)
         target.addHandler(file_handler)
     except Exception:                                    # noqa: BLE001 —— 日誌掛載失敗不得影響搜尋
         pass
