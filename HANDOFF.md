@@ -1,27 +1,31 @@
-# Handoff
+# HANDOFF
 
-**Agent**: Claude(Fable 5) ｜ **Branch**: main ｜ 實作＝主委自任；review／adversarial＝codex+composer+grok 三家
+**當前**：`/search` 三 bug 修復（out-of-epic；UAT B1 阻塞）R2 閉合輪派工中。
+GAP-3 B1–B5 全數蓋章完工，**只差使用者 UAT B 段 13 項簽字**（未簽不結案）。
 
-> 🔴 **本檔只寫「接手要做什麼」。** 不寫日誌、不寫歷史、不重述別處已有的狀態。
+## 進行中：/search 修復
+使用者 UAT B1 實測抓到三個既有 bug（非 GAP-3 引入）：無窮迴圈＋資料重複、事件迴圈鎖死、worker 日誌不落檔。
+- `6e7275da` R0 三修 → R1 三家審查抓 **2×P0**（我的修補對使用者實際輸入無效；新測試假綠）
+- `c7ea4ebe` R1 六條全修：serial fallback 改 `asyncio.to_thread`（兩處）／測試整檔行為級重寫 9 條／
+  `IncompleteDownloadError` fail-closed＋逐頁遞增驗證＋空窗只跳已證實範圍／worker handler 改掛 root／
+  executor `try/finally`＋`await to_thread(shutdown)`／log path 優先 `MomentumConfig`
+- `bfed7726` R1 審計鏈＋synth 群集處置（8 findings→6 群集）＋債銷帳（`--has-open` rc=0）
+- **R2 已派**（session `20260822-searchfix-x-review-r2`，三家全員）→ 收齊後 reconcile→修補→stamp
 
----
+驗證：`tests/momentum/DataExtraction/` 8 passed 1 skipped、legacy 2、event_samples 230、decoupling rc=0；
+實跑 ETHUSDT 12h 2024-01-01→2026-04-27 = 1695 根唯一遞增間隔全 12h；mutation 七條各自還原皆紅。
+receipt `handoffs/run_receipts/20260822T100000Z-searchfix-r1-fix-gate.log`。
 
-## 🔴 接手任務：**GAP-3 等使用者 UAT 簽字（B1–B5 全部審查完工蓋章 2026-08-22；B5 review 五輪 11→5→4→1→0＋三家 RECONCILE-STAMP rc=0 蓋 `handoffs/reconcile/20260822-gap3-b5-review-r5/synth.md`）**
+**待告知使用者**：R0 後我說「重啟重跑即可」對 4 symbols 不成立（走 serial fallback），現已修好可重跑。
 
-- **現況**：五批全數落地並蓋章；UAT **A 段（機械）9 項 rc 全 0**（receipt `handoffs/run_receipts/20260822T040000Z-gap3-b5-uat-sectionA.log`）。**唯一未完成＝使用者 UAT B 段 13 項簽字**（`docs/GAP3_UAT_CHECKLIST.md`；TODO B5.3 邊界②：使用者未簽字則整票不得結案）。
-- **接手時做什麼**：
-  1. 先問使用者是否已跑 UAT B 段；**未簽 ⇒ 不得宣稱 epic 收案**，也不要自行開新批。
-  2. 使用者回報某項不過 ⇒ **回對應批修**（B1–B4 或 B5.1／B5.2），不在 B5 打補丁繞過（C9）；修完重跑該項＋A 段相關命令，再請使用者複簽該項。
-  3. 全簽過 ⇒ 收尾：`docs/IC_QUANT_GAP_REGISTRY.md` 票 #3 標收案＋殘留 G3-R1..R11 確認、`docs/ROADMAP.md`／`白話說明/`（看板移 `Archived/`、README 與接下來要做什麼改指下一條主線）、HANDOFF 改寫為下一任務。
-- **啟動方式（給使用者）**：後端 `source venv/bin/activate && python run_api.py`；前端 `cd frontend && npm run dev`。UAT B 段涵蓋：`/search` 匯出契約 JSON＋companion 來源檔（B1–B2b）、`/data-preparation` 新契約匯入與舊格式雙向拒收（B3–B6）、`/ic-analysis` 事件模式選批＋事件後報酬表／辨別表／全 K 線驗證／條件 IC（B7–B9b）、切回 Global 不受影響（B10）、看板一致（B11）。
-- **殘留（registry 已登記，勿當缺陷）**：G3-R9 辨別表接真實模型分數（blocked-by ML 層；現顯示 `not_computed:no_model_scores_in_event_pipeline`）、G3-R10 大檔串流／背景 worker（user-ruling W10）、G3-R11 `tests/api` 既有紅 7 條（blocked-by 非 GAP-3 模組，乾淨 HEAD 同紅）。
-- **既有介面（B1–B5 產出）**：`create_event_sample_pipeline()`＝**唯一** factories 出口（契約經 `pipeline.import_contract()`／`.condition_engine_contract()` 唯讀取得）；`EventSamplePipeline.run/run_with_params/analyze_tables/bars_from_kline_cache`；API `/api/v1/case/import-events[/json]`、`/case/events[/{id}]`、`/case/events/{id}/analyze`；前端 `lib/eventExport.ts`（`buildEventContractRecords`／`canonicalSourceText`／`sha256Hex`）、`components/ic-analysis/{EventImportPicker,EventTablesPanel}.tsx`、`components/case/EventImportForm.tsx`。
+## 坑（本輪新增）
+- **commit 前必跑** `bash scripts/plain_docs_sync_check.sh --staged`（`git add` 之後、commit 之前）
+- brief 的 `fact-verified` **只准貼實跑 rc**，禁推理（摩擦八十七）；測試計數一律從 receipt `grep` 複製（八十八）
+- 回歸測試須斷言**中間值／真實行為**，禁 `inspect.getsource` 字串守衛當主要防線；
+  寫完必跑 mutation sweep 確認每條都會紅——本輪首版重寫仍有兩條不紅
+- `completeness_check.sh` 正式入口＝`--lock <sources.lock>` **單獨使用**，不得再帶 synth 路徑
+- 委員 session 命名須 `<YYYYMMDD>-<epic>-<batch>-<kind>-r<N>`，task-id＝其大寫
 
-## ⚠ 坑（完整清單 CLAUDE.md Gotchas／白話 摩擦 六十八～八十九）
-- 🔴 **commit 前必跑 `bash scripts/plain_docs_sync_check.sh --staged`**（`git add` 後、`commit` 前）：只要 commit 動到 WATCHED（`scripts/`／`momentum/`／`docs/`…）而受管白話檔不在同一 commit，下輪必紅——B5 為此被委員抓三次（摩擦八十九）。
-- 🔴 **brief 的 `fact-verified` 只能貼實跑 rc／計數**：B5 期間三次寫了未實測的宣稱（plain_docs 綠、測試計數、同檔 verify 相容），三次都被委員用我自己附的 receipt／探針打穿（摩擦八十七／八十八）。數字一律 `grep -E "passed" <receipt>` 複製；相容性宣稱先跑探針。
-- 🔴 **回歸測試必須斷言被監視的中間值**：B5 我交過一個「定義了 spy 卻沒接上」的測試（看似有驗、mutation 不會紅），codex 抓出（摩擦：R3 Z2）。寫 mutation guard 時自問「把碼改壞這條會不會紅」。
-- 🔴 含家族名的 Bash 會被擋 ⇒ 命令寫 scratchpad 腳本再 `bash <script>`；長 commit 訊息寫檔後 `git commit -F`（`gate_check` 會誤判長複合命令為派工，摩擦八十六）；`reconcile_build.sh <s> --mode review <三檔逐列>`（glob 會吃到 brief）。
-- 🔴 handoffs 委員交件／brief 被 .gitignore；審計鏈入檔＝`git add -f handoffs/reconcile/<session>/`；commit 訊息末段必帶 `Governance-Scope: out-of-epic GAP-3 …`；synth 內「全綠」等極性詞會被 claim checker 擋，改寫「各命令 rc=0」。
-- 🔴 委員「清 /tmp workdir」會刪掉 Claude scratchpad（B4 實際發生）⇒ receipt 一律寫 `handoffs/run_receipts/`；brief 清理句只寫「清你自己的 workdir」。
-- 白話看板狀態欄用文字，禁 ⬜／✅／「收案」／「進行中」貼 B<n>（factkey 守衛）；push 丟背景；venv Python 3.9.6；`-p no:logging` 會拿掉 caplog。
+## 接下來
+1. 收 R2 三家 → reconcile→修補→原提出方閉合→三家 RECONCILE-STAMP
+2. 使用者跑 UAT B 段 13 項（`docs/GAP3_UAT_CHECKLIST.md`）並簽字 → GAP-3 結案

@@ -47429,3 +47429,38 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-22T01:15:27Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"363ed3064a9044287c77b492c91352cb870847b0a6a56d3965b10bd450400ab3","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260822-searchfix-x-review-r1-codex.md --family codex; rc=$?; printf 'completeness_rc=%s\\n' \"$rc\"; exit \"$rc\""}
 {"actor": "cx_run", "attempt_id": "54cc7931-fd76-407c-a242-00ef41a5c5c2", "cli_rc": "0", "event": "committee_family_result", "event_id": "a1edc600-7f12-4171-aef1-0074f27e1852", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260822-searchfix-x-review-r1-codex.md", "output_sha256": "37258ceea0ac606ab8b516125452b510345bd5292a3bb45da1e96c4a46e6ab3a", "producer": "audit_append.sh", "result_state": "success", "round_id": "25bdfa07-7b52-4a0f-b854-9707d0af66be", "schema_version": 1, "sequence": 2416, "ts": "2026-08-22T01:16:08Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "6994415a-9c08-4994-89e7-4fdad31a4609", "lock_sha256": "553c917e16dfad72e7830ea3a992a6e426ea05e2f334029662ed40e968ee897c", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "25bdfa07-7b52-4a0f-b854-9707d0af66be", "schema_version": 1, "sequence": 2417, "session_id": "20260822-searchfix-x-review-r1", "synth_sha256": "0a67ca3f4fcb52195234b5e57123e0e0a517fc3062ce42f452503574a8717f71", "ts": "2026-08-22T01:32:54Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260822-SEARCHFIX-X-REVIEW-R2", "ts": "2026-08-22T01:34:40Z"}
+=== 2026-08-22 09:34:40 | dispatch ===
+  ts=2026-08-22 09:34:40
+  kind=dispatch
+  intent=/search 三 bug 修復 R2 閉合輪：R1 六條由原提出方標 CLOSED／OPEN，三家全員
+  risk=low
+  facts_asked=R1 條目閉合判定；to_thread 後 DataLoader 共享狀態 thread-safety；IncompleteDownloadError fail-closed 行為變更之呼叫端影響；空窗 +interval 推進之請求量；真子進程日誌測試在各家環境 pass/fail/skip
+  review_role=adversarial code review（禁改碼）
+  template=n/a: review 輪走 SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md §0/§1/§3
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260822-SEARCHFIX-X-REVIEW-R2", "ts": "2026-08-22T01:35:00Z"}
+=== 2026-08-22 09:35:00 | dispatch ===
+  ts=2026-08-22 09:35:00
+  kind=dispatch
+  intent=/search 三 bug 修復 R2 閉合輪：R1 六條由原提出方標 CLOSED／OPEN，三家全員
+  risk=low
+  facts_asked=R1 條目閉合判定；to_thread 後 DataLoader 共享狀態 thread-safety；IncompleteDownloadError fail-closed 行為變更之呼叫端影響；空窗 +interval 推進之請求量；真子進程日誌測試在各家環境 pass/fail/skip
+  review_role=adversarial code review（禁改碼）
+  template=n/a: review 輪走 SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md §0/§1/§3
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260822-searchfix-x-review-r2-brief.md", "brief_sha256": "46bcc1ee4bc8ffeccf9630573c715cdbff677b034cfd5b968253e5fbafe23858", "brief_sha256_norm": "46bcc1ee4bc8ffeccf9630573c715cdbff677b034cfd5b968253e5fbafe23858", "event": "committee_round_open", "event_id": "50a22f1b-c132-4a00-b5f5-671257b91d15", "expected_outputs": {"codex": "handoffs/20260822-searchfix-x-review-r2-codex.md", "composer": "handoffs/20260822-searchfix-x-review-r2-composer.md", "grok": "handoffs/20260822-searchfix-x-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "5fdfa21d-5531-4758-bd0c-ff4d047c62e8", "schema_version": 1, "sequence": 2418, "session_name": "20260822-searchfix-x-review-r2", "task_id": "20260822-SEARCHFIX-X-REVIEW-R2", "ts": "2026-08-22T01:35:04Z"}
