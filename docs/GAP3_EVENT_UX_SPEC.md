@@ -82,6 +82,54 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 🔴 **偵測不可能**：使用者指出「CSV 本來就有 future_1..12 全欄，我用哪幾欄是在 Excel 決定的」
 ⇒ 系統無法由「欄位存在與否」推斷實際用到第幾根。此為**與 D-1 同類**的不可驗事實。
 
+**D-7 之修訂（R2；CODEX-R2-P0-01＋GROK-R2-P0-01＋COMPOSER-R2-P1-01 三家全員）**
+原處置以「掃描 `future_{N}bar_return` 欄名取 max(N)」為機器可證基礎，**該基礎不成立**：
+- 搜尋結果另含 `future_{N}bar_max_drawdown`（同深度）與 `future72_max_return`／
+  `future72_max_drawdown`（更深），引用它們**不會**抬高下界（`case_search_engine.py:669-697`）。
+  🔴 使用者實際會這樣寫——以 drawdown 排除「漲完就崩」比用 return 更直接。
+- CSV 實際欄名為 `Future_NBar_Return_%`／`Future_NBar_Drawdown_%`（大寫＋百分比後綴，
+  `search/page.tsx:567-573`），**非契約蛇形**，字串比對全部落空。
+- 使用者可刪高 N 欄後上傳以壓低「檔內最大值」。
+- 自訂欄／衍生欄（Excel 算完貼回）之前視深度**靜態不可知**。
+
+**修訂後之處置（採 codex「可驗 provenance；不可證則 fail-closed」）**：
+- **L1 欄位級 lookahead 標註**：搜尋結果之每個未來欄在契約登記其 `lookahead_bars`
+  （`future_4bar_return`→4、`future_4bar_max_drawdown`→4、`future72_max_*`→72）；
+  掃描改**讀標註**而非猜欄名。辨識須涵蓋大小寫、`Return`／`Drawdown`、蛇形與 `%` 後綴。
+- **L2 未知欄 ⇒ 強制宣告**：出現無法解析深度之 `future*` 或自訂欄 ⇒
+  **不得靜默採用偏小 max**，改為強制使用者填寫宣告＋不可驗聲明（Task 1.9）。
+- **L3 算不出來 ⇒ 擋在切分外**：仍無法證明 lookahead 深度者，該批**禁止進入
+  train/test 切分與條件 IC**，只允許看事件研究表（無訓練即無洩漏）。
+
+**🔴 通則化（使用者 2026-08-22 打斷並糾正；本 SPEC 原本把單一 scenario 當成全部）**
+
+主委原寫「使用者的 label 由『事件條件＋品質過濾』兩段組成」——**那只是 `scenario=C` 的形態**，
+被我當成系統通則。使用者逐字糾正：「其他情況，像是預測未來幾根會漲或跌也是一種 scenario，
+所以你不能將系統寫死，要考量到其他的設想狀況」。
+
+**契約本來就已區分四種**（`event_import_contract.json` 之 `scenario` enum，主委先前未用上）：
+
+| scenario | 事件在哪 | lookahead 來源 | 深度 |
+|---|---|---|---|
+| **C 確認型** | t0 當根 | 品質過濾（可選） | 0 或過濾引用之最遠根數 |
+| **A／B 預測型** | **未來** | 事件定義本身即在未來 | ≥ 事件之時間距離 |
+| **two_stage** | 兩段 | 兩段各自 | 取兩段最大 |
+
+**唯一通則（取代原本的分段描述）**：
+
+> **lookahead 深度 ＝ 該批 label 定義所引用之最遠未來根數**
+> ——不論該條件在語意上是「事件本身」還是「品質過濾」。
+> **purge 必須 ≥ 此深度。**
+
+⇒ 系統的職責是**確定或要求宣告此深度**，**不得假設它從哪一段來**。
+一條規則涵蓋 A／B／C／two_stage 全部，無須為預測型另寫一套。
+
+使用者確認：以「選 t0 漲跌 ＋ 自行篩 future 1-12」即可構成預測型事件（label 由未來條件決定）
+⇒ **機制相同、僅語意不同**，現有工具已足以表達，缺的是前端沒把 `scenario` 接出來（見 Phase 7）。
+
+**UI 揭露須動態**：顯示「本批 scenario＝X、lookahead 深度＝N、來源＝<引用之欄位清單>」，
+**禁寫死任何固定文案**（主委原擬之「正反例由 t0 條件決定、不看未來」僅對 C 成立，對 A/B 全錯）。
+
 **處置（三層）**：
 1. **CSV 上傳路徑**：答案窗**預設取檔內最大可用 horizon**（保守）；使用者可往下調，
    但須明確勾選「我的篩選條件未用到超過第 N 根」之聲明，UI 明示此為**無法驗證的聲明**。
@@ -91,9 +139,20 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 3. 答案窗欄位接受**任意正整數**，不限 1..12（使用者：「12 根也是我自己訂的，沒有理論根據，
    會不會用到 12 根以外也有可能」）。
 
-**已知影響（須告知使用者，不隱瞞）**：使用者既有批次 `20260822T011331Z-eb210a16`
-以 `purge 2` 產出（780 筆：train 542／test 236／purge 2）。若其篩選條件實際用到 future_4，
-該批隔離不足 ⇒ **其 IC／分類結果應視為可能偏樂觀**；修補後重匯即乾淨。
+**🔴 主委對使用者既有批次之判斷已兩度修正，此為最終版（實查證，非推論）**：
+實讀 `data_cache/events/20260822T011331Z-eb210a16.json`：780 筆、`label` 分布 0:520／1:260、
+`control_kind` 全為 `user_labeled_same_trigger`、`scenario=C`、`decision_offset_bars=0`、
+`label_definition.window.horizon_bars=3`。
+使用者 2026-08-22 明言該批**未做任何篩選**（「單純跑出來就匯出」），
+且案例搜尋之正反例**僅依 t0 條件**判定（「沒在管後面 30 個欄位」）。
+⇒ 該批 label 之 lookahead **＝ 0**，D-7 之洩漏情境**不適用**。
+⇒ 原寫「其 IC／分類結果應視為可能偏樂觀」**撤回**——那是把使用者舉例的假設條件
+套到一批實際未篩選的資料上，屬推論過頭。
+⇒ 該批 `purge 2` 係為 `horizon_bars=3` 之**條件 IC** 而付，與其分類任務無關。
+
+**PIT 已驗證無洩漏**：`ic_feed.py:76` 之 `feature_cutoff_rule = "max_close_ms_le_decision_at"`
+＋`decision_time_rule = "t0_open_minus_k_bars"`，`decision_offset_bars=0`
+⇒ 特徵最晚僅取至 **t0−1 收盤**，**未偷看 t0 那根**。使用者「用 t0 之前資訊抓 t0 事件」之設定成立。
 
 ---
 
@@ -333,6 +392,31 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 邊界：h ∈ 1..12；附帶欄只是攜帶，不參與 label 判定。
 - 不可做：不得讓多選改變 `label_value` 之來源（那是 (b)/(c) 方案，本批不做）。
 
+**Task 4.1b — 匯出時揭露每個選項在動什麼（使用者 2026-08-22：「我不知道有什麼東西」）**
+- 內容：匯出面板明文顯示三件現行完全未告知之事實：
+  ①「正反例由 **t0 條件**決定，不看未來」（若使用者加了品質過濾則改顯示其 lookahead 深度）
+  ②「主答案窗 h 只影響**條件 IC**（特徵 vs h 根後報酬），**不影響**你的分類標籤」
+  ③「因此 purge h 根是為條件 IC 服務；你的分類任務本身不需要」
+  ④ 本批 `control_kind` 之值與白話意思（現由 `eventExport.ts:104` 寫死 `user_labeled_same_trigger`，
+    使用者從未選過亦不知其存在）。
+- 驗證：vitest 斷言四段文字皆出現；`control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
+- 存活至：Phase 6。
+- 覆蓋風險：無。
+- 邊界：只揭露，不改任何預設值。
+- 不可做：不得只寫在文件而不顯示於 UI（使用者原話：「我不知道你 JSON 內怎麼寫」）。
+
+**Task 4.1c — 明文標示本批不提供 IC decay（CODEX-R2-P1-02／GROK-R2-P2-01）**
+- 內容：SPEC §D-3 與 UI 皆須明寫：「條件 IC decay 曲線**非本批交付**；
+  附帶之 `future_*` 欄**不進入 `ic_feed`**（`ic_feed.py:4-5` 只吃單一 `label_value`）；
+  需要 decay 則換主答案窗重跑，或待 GAP-6 之 IC-Analysis 整體處理。」
+- 驗證：`grep -c "IC decay" docs/GAP3_EVENT_UX_SPEC.md` `>= 1`；
+  vitest 斷言該說明出現於匯出面板；**加一條驗收**：選 `[1,3,7]` 附帶欄
+  ⇒ `label_definition.window.horizon_bars` 與 `label_value` **不變**（證明附帶欄不改 IC horizon）。
+- 存活至：GAP-6。
+- 覆蓋風險：GAP-6 若交付 multi-horizon IC，本說明須撤除。
+- 邊界：只是揭露邊界，不改行為。
+- 不可做：不得讓使用者以為多選附帶欄就會得到多條 IC。
+
 **Task 4.2 — 事件後報酬表顯示完整曲線**
 - 內容：`analyze_tables` 之 `horizons` 由呼叫端傳入（現碼預設 `(1,2,4)`，`pipeline.py:98`），
   前端可選要看的 horizon 集合。
@@ -448,6 +532,89 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 邊界：只驗記憶體與存活。
 - 不可做：不得在 cap 檢查**之前**採樣就宣稱通過（R1 明列此假綠形態）。
 
+### Phase 7 — 全棧接線：把後端既有能力接出前端（依賴：無）　【使用者 2026-08-22 裁定「全接出來，一次做完整」】
+
+> **病因（使用者問「怎麼又出現前後端無法串聯的情況？」）**：
+> B5 之 SPEC 寫的是「API 接線＋前端三頁」、驗收條件是「UAT 能跑通」
+> ⇒ 主委做了「能跑通的最小路徑」，六個維度全走預設值。
+> 三輪 code review 未抓到，因**委員審的是 SPEC/TODO 有無被正確實作**——
+> SPEC 沒要求接，實作沒接就不算違規。**規格層的漏，審查層抓不出來。**
+> 主委另有現成規則 `feedback_fullstack_wiring_audit`（全棧三欄稽核）**未執行**，
+> 而該規則正是上次「幽靈 feature_filter」事故後所立——同病第二次。
+
+**盤點結果（實查證）**：後端六維度皆已實作，前端**一個都沒接**，全走 `eventExport.ts` 之寫死預設。
+
+| 契約欄位 | 後端 enum | 前端現況 | UI |
+|---|---|---|---|
+| `scenario` | A／B／C／two_stage | 寫死 `'C'`（`:95`） | ❌ |
+| `control_kind` | 4 種 | 寫死 `user_labeled_same_trigger`（`:104`） | ❌ |
+| `entry_price_semantic` | 5 種 | 寫死 `trigger_open`（`:93`） | ❌ |
+| `label_return_mode` | 3 種 | 寫死 `close_to_close`（`:102`） | ❌ |
+| `decision_offset_bars` | 任意 int | 寫死 `0`（`:92`） | ❌ |
+| `counterexample_kind` | 3 種 | **完全未送** | ❌ |
+
+`buildEventContractRecords` 之 `opts` 介面**已有** `scenario?`／`entryPriceSemantic?` 等參數，
+但 `/search` 呼叫端（`page.tsx:522-525`）**一個都沒傳** ⇒ 介面留了、UI 沒做。
+
+**數值影響（須告知使用者）**：`entry_price_semantic`／`decision_offset_bars`／`label_return_mode`
+三者**直接改變報酬數字**——現行所有事件報酬皆以「觸發根開盤進場、收盤到收盤」算出，
+若使用者實際策略是「訊號後下一根開盤進場」（`next_open`），現有數字與其策略不符。
+
+**Task 7.1 — 六維度全部接出前端**
+- 內容：`/search` 匯出面板與 `/data-preparation` 匯入表單各提供六個維度之選擇；
+  每個選項旁附白話說明（取自契約 `doc` 欄，不另寫）。預設值維持現行以免既有流程改變，
+  但**必須可見可改**。
+- 驗證：`npx vitest run eventContractOptions` ≥6 條——每維度各一條，斷言
+  「UI 選項集合 `==` 契約 enum 集合」（非硬編碼清單）；`npm run build` rc=0。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：無（純新增 UI 控制項）。
+- 邊界：只接出既有能力；**不新增**任何後端未支援之值。
+- 不可做：不得在前端硬寫 enum 清單（必須由契約導出，否則下次加值又漂）。
+
+**Task 7.2 — 機械閘：契約 enum 與 UI 選項數必須相等**
+- 內容：新增測試——對六個維度逐一比對「契約 enum 元素數」與「前端可選項數」；
+  **不相等即紅**。並禁止 `eventExport.ts` 出現無 UI 對應的寫死值。
+- 驗證：`npx vitest run contractEnumWiring`；斷言 `uiOptions.length === contractEnum.length`
+  且 `new Set(uiOptions) 等於 new Set(contractEnum)`。
+  **mutation**：契約新增第 5 個 `scenario` 值而不改 UI ⇒ 該測試須紅；
+  把某維度改回寫死 ⇒ 須紅。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：無。
+- 邊界：只驗 enum 型欄位；`decision_offset_bars`（任意 int）改驗「有輸入控制項且非唯讀」。
+- 不可做：**不得以人工清單當比對基準**（那就是第三份副本）。
+
+**Task 7.3 — 動態揭露本批設定（取代原擬之固定文案）**
+- 內容：匯出前顯示「本批：scenario＝X／進場價＝Y／報酬算法＝Z／決策位移＝K／
+  lookahead 深度＝N（來源：<欄位清單>）／purge 將為 N 根」，**全部由實際設定導出**。
+- 驗證：vitest 改任一維度 ⇒ 顯示字串隨之改變（斷言前後 `!==`）；
+  `control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：無。
+- 邊界：只揭露，不改預設值。
+- 不可做：不得寫死任何「正反例由 t0 條件決定」類之 scenario 專屬文案（D-7 通則化）。
+
+**Task 7.4 — 條件 IC decay 之邊界揭露（CODEX-R2-P1-02／GROK-R2-P2-01）**
+- 內容：明文標示「條件 IC decay 曲線**非本批交付**；附帶之 `future_*` 欄**不進入** `ic_feed`
+  （`ic_feed.py:4-5` 只吃單一 `label_value`）；需要 decay 則換主答案窗重跑，或待 GAP-6。」
+- 驗證：`grep -c "IC decay" docs/GAP3_EVENT_UX_SPEC.md` `>= 1`；vitest 斷言該說明現於匯出面板；
+  **加驗收**：選附帶欄 `[1,3,7]` ⇒ `window.horizon_bars` 與 `label_value` **不變**。
+- 存活至：GAP-6（屆時若交付 multi-horizon IC 則撤除）。
+- 覆蓋風險：GAP-6 可能取代。
+- 邊界：只揭露邊界。
+- 不可做：不得讓使用者以為多選附帶欄就會得到多條 IC。
+
+**Task 7.5 — 事件後報酬表正／反／全體三組（使用者 2026-08-22 指定垂直排列）**
+- 內容：報酬表由單一組改為**三組垂直排列**（正例組／反例組／全體組），每組各自跑完所有 horizon。
+  並依 `control_kind` 標示：`user_labeled_same_trigger` ⇒「同觸發，全體組可混算」；
+  `user_labeled_other` ⇒「不同觸發，**全體組無意義**」並將全體組標為不可用。
+- 驗證：`pytest tests/momentum/event_samples/ -q -k return_table_by_label` ≥4 條——
+  斷言三組列數各 `== len(horizons)`；正例組 n ＋ 反例組 n `==` 全體組 n；
+  `control_kind == 'user_labeled_other'` ⇒ 全體組標記為 `not_computed`。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：與 Task 4.2 同一表格，兩者須合併實作（4.2 先）。
+- 邊界：只分組顯示；**不改**每組之計算式。
+- 不可做：不得因分組而改變 `n_eff` 或 bootstrap 之定義。
+
 ---
 
 ## §V 驗證策略與邊界測試目錄
@@ -468,6 +635,9 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 | V-10 | tooltip 與 glossary 不漂移 | 逐表頭比對 | tooltip 文字 `==` glossary `definition` |
 | G-1 | IC 主線未被波及 | `python3 scripts/gap3_freeze_golden.py --check` | 通過。**誠實邊界：不涵蓋事件路徑**（D-4） |
 | G-2 | 事件路徑數值未意外改變 | 本批新建之事件 golden | 逐 horizon exact return（`atol=0`）／NaN mask／PIT anchor 全等；Task 4.2 之合法變更須同 commit 更新並說明 |
+| V-11 | 六維度全接出且不可漂移（Phase 7） | 逐維度比對契約 enum 與 UI 選項 | `new Set(uiOptions)` 等於 `new Set(contractEnum)`；**mutation**：契約加第 5 個 scenario 值而不改 UI ⇒ 須紅 |
+| V-12 | lookahead 深度由標註導出、未知即擋（D-7 修訂 L1/L2/L3） | 三組 fixture | ①全部欄可解析 ⇒ 深度 `== max(lookahead_bars)` ②含 `future_4bar_max_drawdown` ⇒ 深度 `>= 4`（證明不只認 return）③含自訂欄 ⇒ **拒絕進入切分**（斷言 split 未執行、非只回警告） |
+| V-13 | 報酬表三組（Task 7.5） | 正／反／全體三組 | 三組列數各 `== len(horizons)`；正 n ＋ 反 n `==` 全體 n；`control_kind == 'user_labeled_other'` ⇒ 全體組 `not_computed` |
 | V-M | 可證偽性 | **逐 Task** 列出：mutation 內容、命令、預期紅、實際 receipt 路徑 | 逐條紅；還原後全綠。**不得只寫「逐條紅」**（CODEX-R1-P0-06） |
 
 **測試設計紀律**（本 session 已四次交出假綠，逐條套用）：
