@@ -625,17 +625,16 @@ def test_parallel_collection_propagates_rejection_instead_of_continue():
         loop.close()
 
 
-def test_parallel_paths_reraise_rejection_at_every_swallow_point():
-    """⑧：`parallel_search_engine` 內每個會吞例外的點，都須對拒收 re-raise。
+def _scan_swallowed_rejections(source: str) -> list:
+    """盤點 source 內「會吞掉 `IncompleteDownloadError` 而未 re-raise」的 try 區塊。
 
-    以 AST 判定：凡 `except Exception` 之 handler，同一 try 必須也有
-    `except IncompleteDownloadError`（且在其之前）。用 AST 不用 grep——
-    grep 數量會隨無關改動漂，且看不出兩個 handler 是否屬於同一個 try。
+    🔴 本函式**自身**由 `test_ast_guard_detects_every_known_bypass_form` 以合成旁路驗證——
+    這是本 epic 三次「守衛範圍寫錯而測試仍綠」之後的機制性修法：
+    盤點型守衛的判定範圍必須自己被測，不能只靠對 production code 跑一次得綠。
     """
     import ast
-    import inspect
 
-    tree = ast.parse(inspect.getsource(pse))
+    tree = ast.parse(source)
     # 🔴 **fail-closed 名單**：預設每個函式都受檢，只有列名者豁免。
     #   原版是白名單 `{"_serial_search_fallback", "_process_chunk_worker", "search_cases"}`，
     #   而真正的方法名是 `search_cases_parallel` ⇒ 該函式內的**兩個**真實旁路
@@ -679,20 +678,142 @@ def test_parallel_paths_reraise_rejection_at_every_swallow_point():
                         return True
         return False
 
+    # 🔴 v4（CODEX-R4-P1-01／COMPOSER-R4-P2-01，兩家獨立命中）：handler 型別須**正規化**。
+    #   v3 只收 `isinstance(h.type, ast.Name)` ⇒ `except (Exception, X):` 這種 tuple handler
+    #   得到空 names、整個 try 被跳過 ⇒ 可在受檢函式內原樣重建吞點而測試仍綠。
+    #   同理 `except BaseException:` 與 `except RuntimeError:` 也會吞掉拒收
+    #   （`IncompleteDownloadError` 是 `RuntimeError` 子類），v3 一樣看不見。
+    #   `except:`（bare）之 h.type 為 None，也吞。
+    SWALLOWS_REJECTION = {"Exception", "BaseException", "RuntimeError"}
+
+    def _handler_names(h):
+        """把 handler 的捕捉型別正規化成名字集合；bare except 以 'BaseException' 表示。"""
+        if h.type is None:
+            return ["BaseException"]                       # bare `except:` 捕捉一切
+        nodes = h.type.elts if isinstance(h.type, ast.Tuple) else [h.type]
+        out = []
+        for n in nodes:
+            if isinstance(n, ast.Name):
+                out.append(n.id)
+            elif isinstance(n, ast.Attribute):
+                out.append(n.attr)
+            else:
+                # 動態運算出的 handler 型別（如 `except X if c else Y:`）無法靜態判定
+                # ⇒ fail-closed，當成「會吞」。
+                out.append("<dynamic>")
+        return out
+
     offenders = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Try):
             continue
-        names = [h.type.id for h in node.handlers if isinstance(h.type, ast.Name)]
-        if "Exception" not in names:
+        per_handler = [_handler_names(h) for h in node.handlers]
+        flat = [n for names in per_handler for n in names]
+        # 這個 try 有沒有「會吞掉拒收」的 handler？
+        swallow_idx = next(
+            (i for i, names in enumerate(per_handler)
+             if any(n in SWALLOWS_REJECTION or n == "<dynamic>" for n in names)),
+            None,
+        )
+        if swallow_idx is None:
             continue
         owner = _owner_of(node)
         if owner is None or owner in EXEMPT_FUNCS:
             continue
         if not _reaches_download(node):
             continue
-        if "IncompleteDownloadError" not in names:
-            offenders.append(f"{owner}:{node.lineno}(缺 IncompleteDownloadError handler)")
-        elif names.index("IncompleteDownloadError") > names.index("Exception"):
-            offenders.append(f"{owner}:{node.lineno}(順序錯：Exception 在前會先吃掉)")
-    assert offenders == [], f"搜尋主鏈仍有會吞掉拒收的 except Exception：{offenders}"
+        # 🔴 合格的 re-raise handler 必須三者皆成立（缺一即無效）：
+        #   ① 捕捉 `IncompleteDownloadError`
+        #   ② **不與**會吞的型別同處一個 handler——`except (Exception, IncompleteDownloadError): continue`
+        #      看起來「有處理」，實際是把拒收和一般錯誤一起吞掉。這正是 mutation `prod_tuple_bypass`
+        #      打穿第一版 v4 的方式：我只檢查名字在不在，沒檢查它是否被綁進吞掉的那個 handler。
+        #   ③ handler body 真的 `raise`——只寫 `except IncompleteDownloadError: pass` 更糟。
+        def _is_valid_reraise(idx):
+            import ast as _ast
+            names = per_handler[idx]
+            if "IncompleteDownloadError" not in names:
+                return False
+            if any(n in SWALLOWS_REJECTION or n == "<dynamic>" for n in names):
+                return False
+            return any(isinstance(s, _ast.Raise) for s in ast.walk(node.handlers[idx]))
+
+        reraise_idx = next((i for i in range(len(per_handler)) if _is_valid_reraise(i)), None)
+        if reraise_idx is None:
+            has_name = any("IncompleteDownloadError" in n for n in per_handler)
+            why = "與會吞型別同 handler／未 raise" if has_name else "缺 handler"
+            offenders.append(
+                f"{owner}:{node.lineno}(無有效 IncompleteDownloadError re-raise：{why}；捕捉型別={flat})"
+            )
+        elif reraise_idx > swallow_idx:
+            offenders.append(
+                f"{owner}:{node.lineno}(順序錯：{per_handler[swallow_idx]} 在前會先吃掉)"
+            )
+    return offenders
+
+
+def test_parallel_paths_reraise_rejection_at_every_swallow_point():
+    """⑧：`parallel_search_engine` 內每個會吞例外的點，都須對拒收 re-raise。"""
+    import inspect
+
+    offenders = _scan_swallowed_rejections(inspect.getsource(pse))
+    assert offenders == [], f"搜尋主鏈仍有會吞掉拒收的 handler：{offenders}"
+
+
+# 🔴 合成旁路語料（CODEX-R4-P1-01／COMPOSER-R4-P2-01）：每一種寫法都**能吞掉拒收**，
+#   守衛必須全部抓到。v3 對前四種完全不掃描（`isinstance(h.type, ast.Name)` 為假 ⇒ 整個 try 跳過）。
+_BYPASS_FORMS = {
+    "tuple_handler":      "    except (Exception, ValueError):\n        pass\n",
+    "tuple_single":       "    except (Exception,):\n        pass\n",
+    "bare_except":        "    except:\n        pass\n",
+    "dynamic_handler":    "    except (Exception if True else ValueError):\n        pass\n",
+    "base_exception":     "    except BaseException:\n        pass\n",
+    "runtime_error":      "    except RuntimeError:\n        pass\n",   # 拒收是 RuntimeError 子類
+    "plain_exception":    "    except Exception:\n        pass\n",
+    # 🔴 下面兩種「看起來有處理」但實際照吞——mutation prod_tuple_bypass 打穿第一版 v4 的形態
+    "coswallow_tuple":    "    except (Exception, IncompleteDownloadError):\n        pass\n",
+    "named_but_no_raise": "    except IncompleteDownloadError:\n        pass\n    except Exception:\n        pass\n",
+}
+
+_BYPASS_TEMPLATE = """
+async def search_cases_parallel(self):
+    try:
+        await self._something()
+{handler}"""
+
+_CORRECT_FORMS = {
+    "name_before_exception":
+        "    except IncompleteDownloadError:\n        raise\n    except Exception:\n        pass\n",
+    "name_before_tuple":
+        "    except IncompleteDownloadError:\n        raise\n    except (Exception, ValueError):\n        pass\n",
+}
+
+
+@pytest.mark.parametrize("form", sorted(_BYPASS_FORMS))
+def test_ast_guard_detects_every_known_bypass_form(form):
+    """⑧之元測試：守衛本身要有鑑別力——每一種能吞掉拒收的 handler 寫法都必須被抓到。
+
+    這條測的是**守衛的判定範圍**，不是 production code。本 epic 三次空心
+    （v1 白名單打錯函式名、v2 豁免掃字串、v3 tuple handler 漏掃）全屬「範圍寫錯而測試仍綠」，
+    共同點是**沒有任何測試在測守衛自己**。這條補上那個缺口。
+    """
+    src = _BYPASS_TEMPLATE.format(handler=_BYPASS_FORMS[form])
+    assert _scan_swallowed_rejections(src), f"守衛漏掉旁路寫法 {form}：\n{src}"
+
+
+@pytest.mark.parametrize("form", sorted(_CORRECT_FORMS))
+def test_ast_guard_accepts_correct_forms(form):
+    """⑧之元測試（對照組）：正確寫法不得被誤報，否則守衛只是恆真。"""
+    src = _BYPASS_TEMPLATE.format(handler=_CORRECT_FORMS[form])
+    assert _scan_swallowed_rejections(src) == [], f"正確寫法被誤報 {form}：\n{src}"
+
+
+def test_ast_guard_ignores_try_that_cannot_reach_download():
+    """⑧之元測試（範圍下界）：碰不到下載的 try 不受檢，否則存檔／日誌 handler 會被誤擋。"""
+    src = (
+        "async def search_cases_parallel(self):\n"
+        "    try:\n"
+        "        self._save_failure_report(records)\n"
+        "    except Exception:\n"
+        "        pass\n"
+    )
+    assert _scan_swallowed_rejections(src) == []
