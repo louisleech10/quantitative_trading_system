@@ -1,0 +1,4 @@
+search_cases_swallow       =>  1 failed, 42 passed, 1 skipped, 4 warnings in 6.54s 
+single_symbol_swallow      =>  3 failed, 40 passed, 1 skipped, 4 warnings in 6.63s 
+parallel_collect_continue  =>  2 failed, 41 passed, 1 skipped, 4 warnings in 6.61s 
+restored                   =>  43 passed, 1 skipped, 4 warnings in 6.46s 

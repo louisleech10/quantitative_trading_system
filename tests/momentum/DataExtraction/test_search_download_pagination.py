@@ -982,3 +982,143 @@ def test_ast_guard_ignores_try_that_cannot_reach_download():
         "        pass\n"
     )
     assert _scan_swallowed_rejections(src) == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# R6 修補：把行為測試接到**真實** production 路徑（CODEX-R6-P2-01/02/03）
+#   前面四條行為測試都繞過了組裝與外層邊界：
+#   P2-01 用 `__new__` 直呼 private method ⇒ 測不到 `__init__` 與 public `search_cases`
+#   P2-02 重寫收集迴圈 ⇒ 測的是我的複製品，不是 `search_cases_parallel`
+#   P2-03 全部止於 `pytest.raises` ⇒ 沒有一條驗端到端 task 狀態
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _RejectOnDownloadLoader:
+    """真 `CaseSearchEngine.__init__` 可接受的 loader；下載一律拒收。"""
+
+    def __init__(self):
+        self.calls = 0
+
+    def get_historical_data(self, **kw):
+        self.calls += 1
+        raise IncompleteDownloadError(
+            "K 線回應非遞增或末筆非最大值（拒收，不得落快取）: " + str(kw.get("symbol"))
+        )
+
+
+def _real_config():
+    from momentum.DataExtraction.case_search_engine import SearchConfiguration
+
+    cfg = SearchConfiguration.__new__(SearchConfiguration)
+    cfg.timeframe = "12h"
+    cfg.start_time = "2024-01-01"
+    cfg.end_time = "2026-04-27"
+    cfg.time_range = None
+    return cfg
+
+
+def test_public_search_cases_surfaces_rejection_through_real_constructor(tmp_path, monkeypatch):
+    """⑨（CODEX-R6-P2-01）：走**真 `__init__`＋public `search_cases`**，拒收須一路拋到呼叫端。
+
+    前四條行為測試用 `__new__` 略過組裝、直呼 private method ⇒ constructor 或
+    `search_cases` 外層邊界的迴歸測不到。這條補上：真建構、`enable_parallel=False`、公開入口。
+    """
+    from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+
+    monkeypatch.chdir(tmp_path)                       # `__init__` 會 mkdir("search_results")
+    loader = _RejectOnDownloadLoader()
+    engine = CaseSearchEngine(data_loader=loader, enable_parallel=False)
+    assert engine.parallel_engine is None and engine.enable_parallel is False
+
+    loop = asyncio.new_event_loop()
+    try:
+        with pytest.raises(IncompleteDownloadError, match="BADSYM"):
+            loop.run_until_complete(
+                engine.search_cases(config=_real_config(), symbols=["BADSYM"], save_results=False)
+            )
+    finally:
+        loop.close()
+    assert loader.calls == 1, "未真的走到下載（測試沒接上 production 路徑）"
+
+
+def test_real_search_cases_parallel_propagates_rejection(tmp_path, monkeypatch):
+    """⑨（CODEX-R6-P2-02）：驅動**真** `search_cases_parallel`，不是我重寫的收集迴圈。
+
+    沙箱建不了 ProcessPool（SemLock），故把模組綁定的 `ProcessPoolExecutor` 換成
+    `ThreadPoolExecutor` 並 stub `_process_chunk_worker`——executor 提交／`wrap_future`／
+    `as_completed` 收集／`finally` 關閉全部走 production 自己的程式碼。
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+
+    monkeypatch.chdir(tmp_path)
+    engine = CaseSearchEngine(data_loader=_RejectOnDownloadLoader(), enable_parallel=True,
+                              num_workers=2)
+    parallel = engine.parallel_engine
+    assert parallel is not None
+
+    monkeypatch.setattr(pse, "ProcessPoolExecutor", ThreadPoolExecutor)
+
+    seen = []
+
+    def _fake_worker(chunk, config, chunk_idx, total_chunks, log_path=None):
+        seen.append(chunk_idx)
+        if chunk_idx == 1:
+            raise IncompleteDownloadError(
+                f"[worker {chunk_idx+1}/{total_chunks}] symbol={chunk[0]} 下載被拒收: stale"
+            )
+        return {"success_results": [{"symbol": chunk[0]}], "failed_records": [],
+                "retry_stats": {"total_retries": 0, "successful_retries": 0, "failed_retries": 0}}
+
+    monkeypatch.setattr(pse, "_process_chunk_worker", _fake_worker)
+
+    loop = asyncio.new_event_loop()
+    try:
+        with pytest.raises(IncompleteDownloadError, match="symbol="):
+            loop.run_until_complete(
+                parallel.search_cases_parallel(
+                    config=_real_config(),
+                    symbols=["AAAUSDT", "BBBUSDT", "CCCUSDT", "DDDUSDT"],
+                    save_results=False,
+                )
+            )
+    finally:
+        loop.close()
+    assert len(seen) >= 1, "真 search_cases_parallel 未提交任何 chunk（測試沒接上）"
+
+
+def test_run_search_task_marks_failed_with_symbol_on_rejection(monkeypatch):
+    """⑨（CODEX-R6-P2-03）：端到端 task 狀態——拒收須使任務標 FAILED 且訊息帶 symbol。
+
+    前四條全部止於 `pytest.raises`，等於只驗到「下層會拋」；使用者看到的是 task 狀態，
+    而「COMPLETED＋No cases found」正是 R2 群集 A 要消滅的失敗模式。這條才是那個契約的守衛。
+    """
+    from api.services.standalone_search_service import StandaloneSearchService
+    from api.models.responses import TaskStatusEnum
+
+    svc = StandaloneSearchService()
+
+    class _RejectingEngine:
+        async def search_cases(self, **kw):
+            raise IncompleteDownloadError("[worker 2/3] symbol=BADSYM 下載被拒收: stale")
+
+    # 真 task_manager、真 `_run_search_task`；只把最底層的引擎換成會拒收的替身。
+    monkeypatch.setattr(svc, "search_engine", _RejectingEngine(), raising=False)
+    monkeypatch.setattr(svc, "momentum_available", True, raising=False)
+    monkeypatch.setattr(svc, "_convert_request_to_search_config",
+                        lambda request: _real_config(), raising=False)
+
+    task_id = svc.task_manager.create_task("search")
+    req = type("_Req", (), {"name": "t", "symbols": ["BADSYM"]})()
+
+    before = svc._active_searches
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(svc._run_search_task(task_id, req))
+    finally:
+        loop.close()
+
+    task = svc.task_manager.get_task_status(task_id)
+    assert task.status == TaskStatusEnum.FAILED, f"拒收未使任務失敗（狀態={task.status}）"
+    assert "BADSYM" in (task.error_message or ""), \
+        f"錯誤訊息未帶 symbol 身分，使用者查不出哪個 symbol 被拒：{task.error_message!r}"
+    assert svc._active_searches == before, "並發計數未歸還（finally 未執行）"

@@ -1,0 +1,10 @@
+=== R6 GROK recheck probes 2026-08-22T03:29:39Z ===
+GROK-R5-P2-01/alias_assign: CAUGHT ["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+GROK-R5-P2-01/alias_import: CAUGHT ["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+GROK-R5-P2-02/raise_wrong_type: CAUGHT ["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：與會吞型別同 handler／未 raise；捕捉型別=['IncompleteDownloadError', 'Exception'])"]
+GROK-R5-P2-02/dead_branch_raise: CAUGHT ["search_cases_parallel:3(無有效 IncompleteDownloadError re-raise：與會吞型別同 handler／未 raise；捕捉型別=['IncompleteDownloadError', 'Exception'])"]
+CROSS/getattr_indirect: CAUGHT ["search_cases_parallel:2(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+CROSS/getattr_dynamic_name: CAUGHT ["search_cases_parallel:2(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+CROSS/getattr_unlisted_method: CAUGHT ["search_cases_parallel:2(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+CROSS/swallow_inside_exempt_func: CAUGHT ["_save_failure_report:2(無有效 IncompleteDownloadError re-raise：缺 handler；捕捉型別=['Exception'])"]
+PROD_SCAN: CLEAN []
