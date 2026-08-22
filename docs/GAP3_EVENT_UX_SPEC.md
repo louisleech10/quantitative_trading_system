@@ -14,7 +14,16 @@
 本 SPEC 涵蓋**事件型**那批（#0/#1/#2/#3/#4/#5/#6 ＋ #9a 止血閘）。
 #7 為回答性問題（已答，見 §N）；#8/#10 列具名殘留（見 §N）；#9b 規模防護本體排入 GAP-6。
 
-**版本**：R2（依 R1 三家 24 條 findings 全面改寫；R1 六條 P0 之處置見 §D）
+**版本**：R3（收斂履歷：R1 24 條 → R2 7 條 → R3 18 條 findings，逐輪改寫；R1 六條 P0 之處置見 §D）。
+**狀態：未 FROZEN**——R3 群集 A（Task 4.1b 寫死 scenario 文案）／B（D-7 之 L1/L2/L3 未落 Task）／
+C（future72 單位）已修。**下列四條為 R3 遺留、R4 須裁定之未決項**（依 §C0，四條皆屬正確性範疇，
+**不得**登記為具名殘留放行）：
+- **D**：Task 7.2 之機械閘可被 disabled 控制項湊過；`control_kind` 契約 enum 為 4 值而
+  可匯入之 accepted 值為 3 值（`counterexample_kind_not_importable`），兩數不相等使
+  「UI 選項數 `==` 契約 enum 數」之斷言本身定義不明。
+- **E**：Phase 7 之全棧接線未涵蓋 IC 分析頁與 Feature Library 之 `time_range` 對證。
+- **F**：G-2 之 canonical serialization 仍未定義（主委 R2 裁「留實作階段」，三家推翻）。
+- **G**：A／B 兩型之機械式深度定義；選 A／B 時「label 來源不變」之語意漂移。
 
 ---
 
@@ -275,7 +284,12 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   `label_definition.fields` 增 `filters`（型別＋`_doc`）以承載 Phase 2 之篩選條件（D-6）。
 - 驗證：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert len(c['import_failure_reasons'])==19;assert 'filters' in c['label_definition']['fields']"` rc=0。
 - 存活至：Phase 6。
-- 覆蓋風險：無後續 Phase 刪改此四值與 `filters`。
+- 覆蓋風險：契約為**唯讀增量**——四個新 reason 與 `filters` 鍵在 Phase 2..7 全程只被讀取或填值，
+  無任一 Task 刪改其字面與順序。Phase 2 之 Task 2.2 只寫 `filters` 之**值**；Phase 6 之 Task 6.0
+  另建 IC 側 reason 檔而**不併入本檔**（D-6）；Phase 7 之六維度動的是 `label_definition` 之其他鍵
+  ⇒ 本 Task 產出不被覆蓋。**須同步**：Task 1.12 之 `split_blocked_unverifiable_lookahead` 進的是
+  `capability_unavailable_reasons`（3→4）而非 `import_failure_reasons`，故本 Task 之 `== 19` 斷言不變；
+  日後任一 Phase 於 `import_failure_reasons` 增值，須同批更新此常數，否則契約與驗證斷言互相矛盾。
 - 邊界：只加，**不動**既有 15 個 reason 之字面與順序。
 - 不可做：不得在 `api/` 或 `frontend/` 另寫一份 reason 清單。
 
@@ -296,7 +310,12 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 驗證：同一批事件「JSON 匯出檔」與「CSV 回灌」之 `event_id` 集合 `==`（集合相等斷言）；
   改 1 byte 重傳 ⇒ `source_file_digest !=` 原值。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：`event_id` 之輸入僅 symbol／timeframe／t0 三者，後續 Phase 皆不改此三者之定義——
+  Phase 2 之篩選條件由 Task 2.2「不可做」明令禁止進入 `event_id` 輸入（D-2）；Phase 4 之附帶
+  `future_*` 欄只加輸出欄；Phase 7 之六維度屬 `label_definition` 層設定 ⇒ 不被覆蓋。
+  **須同步**：Phase 7 之 `decision_offset_bars`／`entry_price_semantic` 若被實作成改動 t0 之取值，
+  同一事件將跨批得到不同 `event_id` ⇒ 實作 Task 7.1 時須重跑本 Task 之集合相等斷言
+  （JSON 匯出 vs CSV 回灌 `==`），不得只跑 7.1 自身測試。
 - 邊界：digest 綁**上傳的位元組**，不綁解析後的 DataFrame。
 - 不可做：**不得發明新的 event_id 演算法**（R1 兩家獨立指出此為 BLOCKING）。
 
@@ -304,7 +323,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 內容：沿用契約 `ms_magnitude_min`；秒級 ×1000；無法判定 ⇒ `invalid_timestamp_unit`。
 - 驗證：三組 fixture（ms／秒／不合法）各 1 測；ms 值精確比對 `== 1704067200000`。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：單位偵測位於解析入口，其輸出（毫秒整數）為後續全部 Phase 之唯一時間表示；
+  無任一 Task 改寫 `ms_magnitude_min` 或新增第二條單位判定路徑 ⇒ 不被覆蓋。
+  **須同步**：Task 1.2 之 CSV 端點與既有 `/import-events` 須共用同一偵測函式
+  （Task 1.2「不可做」已要求共用 schema 檢核），否則兩條路徑會各自演化出不同單位判定
+  ⇒ V-3 之 AST oracle 涵蓋面須包含此偵測函式，不得只證 schema 檢核共用。
 - 邊界：只判單位，不做時區推斷。
 - 不可做：不得在判不出單位時猜預設值。
 
@@ -324,7 +347,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 驗證：`pytest tests/api -q -k gap3_csv_provenance` ≥2 條；
   斷言 receipt 之 `column_mapping.label ==` 送出值。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：receipt 為只增欄位之記錄檔，Phase 2..7 只讀不改；Phase 2 之 `filters` 與 Phase 7 之
+  六維度均寫入 `label_definition` 而非本 receipt ⇒ 本 Task 之既有欄位不被覆蓋。
+  **須同步**：Task 7.1 讓六維度由寫死改為使用者可選之後，「這批依哪一欄、哪個檔宣告」已不足以
+  還原全批設定 ⇒ Task 7.1 實作時 receipt 須一併記錄六維度之實際選值；未同步則 provenance 在
+  Phase 7 之後對「這批是用什麼語意算出來的」不可追。
 - 邊界：只記錄，不參與任何計算。
 - 不可做：不得省略 `source_file_digest`（否則無法對證來源）。
 
@@ -333,7 +360,10 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   提示「這些欄看起來也像標記，請確認你選的是哪一個」。
 - 驗證：fixture 含 3 個二元欄 ⇒ 警示列出另外 2 個（`len == 2` 且集合相等）。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：警示只在 Phase 1 之預覽階段執行，不寫入任何持久產物，後續 Phase 無讀取者亦無改寫者
+  ⇒ 不被覆蓋。**須同步**：Phase 2 之篩選作用於系統內搜尋結果（欄位由系統產生，非使用者上傳），
+  **不得**與本掃描合併為同一實作——合併後，凡值域落在 {0,1} 之系統旗標欄都會被列為「可疑標記欄」，
+  警示失去鑑別力（Task 1.7 驗證之「`len == 2` 且集合相等」即會鬆脫）。
 - 邊界：只警示不阻擋（語意不可機械判定，見 D-1）。
 - 不可做：不得因為只有一個二元欄就自動選它（A-4'：不推斷）。
 
@@ -342,7 +372,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   `batch_defaults` 未涵蓋 ⇒ `heterogeneous_rows_in_batch`，訊息列出前 3 個衝突列號與欄名。
 - 驗證：fixture 混 long/short ⇒ 得該 reason 且**落檔數 `== 0`**。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：拒收判準（列間於 `direction`／`scenario`／`label_definition` 不一致且 `batch_defaults`
+  未涵蓋即拒收）本身在後續 Phase 不變 ⇒ 本 Task 之邏輯不被覆蓋。**須同步**：Task 7.1 將 `scenario`
+  由寫死 `'C'` 改為四值可選（A／B／C／two_stage），`batch_defaults` 之可能取值面隨之擴大
+  ⇒ 本 Task 之 fixture 須加一組「defaults 指定 `scenario='A'` 而列間混 A／B」之案例並斷言落檔數
+  `== 0`，否則 Phase 7 擴大出來的取值面沒有對應測試。
 - 邊界：只拒收並指出衝突；不自動分批。
 - 不可做：不得靜默取第一列之值套用全批。
 
@@ -371,7 +405,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   ③辨識三形態：`Future_4Bar_Return_%`／`future_4bar_return`／`FUTURE_4BAR_RETURN` 皆解析為 4
   **mutation**：刪掉 registry 中 `future_4bar_max_drawdown` 一筆 ⇒ ②須紅。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：無。
+- 覆蓋風險：registry 為 D-7 三層防線之根（L1），Task 1.11（L2）／1.12（L3）／2.1b 皆只讀它、
+  無一改寫它——「存活至 Phase 7（終）」即由此而來 ⇒ 不被覆蓋。**須同步**：Phase 4 之 Task 4.1
+  引入附帶 `future_*` 欄、Phase 7 之 Task 7.5 分組報酬表若引入任何新的未來欄，皆須**先**在本
+  registry 登記；未登記時 Task 1.10 驗證②之「未登記集合 `== set()`」會紅，該紅為 fail-closed 之
+  預期行為，**不得以放寬 validator 或加白名單消紅**。
 - 邊界：只登記深度，不改任何欄位之計算。
 - 不可做：不得以欄名字串樣式**推測**深度（推測即可被改名偽造，見 L2）；
   不得漏登 `*_max_drawdown` 與 `future72_*`（R2 三家指出之實際繞法）。
@@ -385,7 +423,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   ②未填宣告即送出 ⇒ fail-closed（落檔數 `== 0`）
   **mutation**：改為「忽略無法解析之欄」⇒ ①須紅。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：無。
+- 覆蓋風險：L2 之強制宣告只在「registry 解析不出深度」時觸發；Phase 2 之 Task 2.1b 走的是
+  「條件引用之欄位全部可解析」之機器可證路徑，兩者為**互斥分支**而非覆蓋關係 ⇒ 不被覆蓋。
+  **須同步**：Task 7.1「邊界」已限定只接出後端既有能力、不新增後端未支援之值，故 Phase 7 不擴大
+  本 Task 之觸發面；日後若任一 Phase 允許使用者自訂欄名進入篩選條件，該 Phase 須同批擴充本 Task
+  之宣告 UI，否則自訂欄會落入「無人負責宣告深度」之縫隙而被 L3 一律擋死。
 - 邊界：只處理「解析不出深度」的情形。
 - 不可做：不得因為「其他欄都能解析」就用它們的 max 當全批深度。
 
@@ -397,9 +439,16 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   ①該批呼叫 analyze ⇒ 切分**未執行**（斷言 `split_events` 未被呼叫，非只回警告字串）
   ②條件 IC ⇒ `capability_status == "unavailable"`、reason `== "split_blocked_unverifiable_lookahead"`
   ③事件研究表**仍可產出**（斷言表格列數 `== len(horizons)`）
-  **mutation**：把禁令改成僅記 log ⇒ ①須紅。
+  ④reason 字面取自契約：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert len(c['capability_unavailable_reasons'])==4;assert 'split_blocked_unverifiable_lookahead' in c['capability_unavailable_reasons']"` rc=0，
+    且 `grep -rc 'split_blocked_unverifiable_lookahead' api/ frontend/src/ momentum/ --include=*.py --include=*.ts` 之硬編碼字面數 `== 0`
+  **mutation**：把禁令改成僅記 log ⇒ ①須紅；把 reason 硬寫進程式 ⇒ ④須紅。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：無。
+- 覆蓋風險：本禁令作用於 `split_events` 與 `ic_feed` 兩個消費端；Phase 6 之止血閘擋的是 IC 分析
+  入口之**特徵數**，兩者為不同拒絕條件、不同 reason 來源（本 Task 走契約之
+  `capability_unavailable_reasons`，Task 6.0 走 IC 側另建之登記檔）⇒ 互不覆蓋，亦不得合併為同一回應
+  （合併會使使用者無法分辨「洩漏不可證」與「特徵數過大」兩種完全不同的拒絕）。
+  **須同步**：`split_blocked_unverifiable_lookahead` 登記於 `capability_unavailable_reasons`
+  （現 3 → 4），**不進** `import_failure_reasons` ⇒ Task 1.1 之 `== 19` 斷言不受影響，兩處常數各自成立。
 - 邊界：只擋切分與條件 IC，不擋事件研究。
 - 不可做：不得以「警告後放行」替代（R2 codex 明指此為 fail-open）。
 
@@ -415,7 +464,12 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   ④宣告 20（>12）⇒ 接受（不限 1..12）。
   **mutation**：把預設值改回 1 ⇒ ①須紅。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：本 Task 之宣告值寫入 `label_definition.window.horizon_bars`，與 Phase 4 之「主答案窗」
+  為**同一欄位** ⇒ 兩者必為同一寫入點；Task 4.1「不可做」已明令附帶欄多選不得改變該欄之來源，
+  故 Phase 4 為疊加而非覆蓋。**須同步**：Phase 2 之 Task 2.1b 對系統內篩選路徑**鎖定下界且不可調低**，
+  與本 Task 之「可調低但須勾選聲明」為兩條路徑之不同規則 ⇒ 實作須以批次來源（CSV 匯入 vs
+  系統內篩選）分派；統一為寬鬆版即 fail-open（機器可證的下界被聲明繞過），統一為嚴格版則 CSV
+  路徑無法上傳（CSV 無條件可解析）。
 - 邊界：只管「宣告多遠」與其 purge 連動；不改 `event_split.py` 之 purge 演算法。
 - 不可做：不得以「檔內有哪些 future_N 欄」推斷實際用到第幾根（D-7：偵測不可能）；
   不得給小於檔內最大 horizon 的預設值。
@@ -430,7 +484,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 內容：對搜尋結果任一數值欄設 `>=`／`<=`／區間，多條件 AND。
 - 驗證：`npx vitest run exportFilter` ≥6 條；含「篩選後筆數 `==` 手算筆數」之數值斷言。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：面板只讀搜尋結果並產生條件物件，不改任何原始欄位值（「不可做」已鎖）⇒ 後續 Phase
+  無改寫者。**須同步**：Phase 4 之附帶欄多選（Task 4.1）與 Phase 7 之六維度選擇（Task 7.1）與本
+  面板同處匯出面板，但作用於不同輸出區塊——篩選決定**哪些列**、4.1 決定**哪些欄**、
+  7.1 決定**用什麼語意算**，三者疊加不互相覆蓋；三個區塊須共用 Task 2.3 之同一筆數計算函式，
+  否則使用者會在同一畫面看到互相矛盾的筆數。
 - 邊界：只篩**數值**欄；字串欄不在本 Task。
 - 不可做：不得在篩選中改動任何原始欄位值。
 
@@ -442,7 +500,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   嘗試設 5 ⇒ 前端阻擋且 `fetch` call count `== 0`。
   **mutation**：把 `max()` 改成 `min()` ⇒ 該測試須紅。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：下界導出完全依賴 Task 1.10 之 registry，該 registry 存活至 Phase 7（終）且只增不改
+  ⇒ 本 Task 之導出結果不因後續 Phase 失效。**須同步**：Phase 4 之 Task 4.1 讓使用者多選附帶
+  `future_*` 欄——附帶欄**不是**篩選條件所引用之欄，**不得**納入 `max(lookahead_bars)`，
+  否則答案窗會被與 label 判定無關的攜帶欄推高（過度保守亦屬錯誤：purge 過寬會吃掉訓練樣本）。
+  此區分須以測試釘死：條件只引用 `future_2`、附帶欄選 `[1,3,7]` ⇒ 導出下界仍 `== 2`。
 - 邊界：只導出下界；使用者可往上調（保守方向永遠允許）。
 - 不可做：不得允許調低於導出值（那等於明知條件用到第 7 根卻只隔 5 根）。
 
@@ -451,7 +513,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 驗證：匯出檔 `label_definition.filters` 與送出條件深度相等（`==`）；
   且 `filters` 鍵存在於契約 `label_definition.fields`（防漂移斷言）。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：`filters` 為 Task 1.1 已登記之契約欄位，Phase 3..7 無 Task 改寫其 schema；D-2 禁止
+  `filters` 進入 `event_id` 之輸入 ⇒ 寫入 `filters` 不回頭改變事件識別。**須同步**：Phase 7 之
+  六維度亦寫入 `label_definition`（同一物件之其他鍵）⇒ 兩者須在同一序列化點寫出，且 G-2 之
+  canonical serialization 定義須同時涵蓋 `filters` 與六維度鍵之排序與空值表示；未同時涵蓋，
+  同一批事件在 Phase 2 與 Phase 7 之後會得到不同 golden bytes 而使 G-2 失去鑑別力。
 - 邊界：只記錄條件，不改變 `label` 值本身。
 - 不可做：不得把篩選條件納入 `event_id` 之輸入（會使同事件跨批 id 不同，違反 D-2）。
 
@@ -459,7 +525,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 內容：顯示「將匯出 N 筆（原 M 筆）／你聲明的正例 X／反例 Y」。
 - 驗證：vitest 斷言 `N + 被濾掉數 == M` 且 `X + Y == N`。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：本 Task 無持久產物，但其「正例 X／反例 Y」與 Task 1.5 之上傳確認、Task 4.1b／7.3 之
+  動態揭露為**同一組事實之多個顯示點** ⇒ 四處須取自同一計算函式，任一 Phase 改變計數口徑時全部
+  顯示點同步改變。**須同步**：Task 7.5 把報酬表拆為正／反／全體三組後計數口徑不變
+  （`X + Y == N` 仍成立），但 `control_kind == 'user_labeled_other'` 時全體組標為 `not_computed`
+  ⇒ 本 Task 之文案不得讓使用者以為全體組必然可算。
 - 邊界：純顯示。
 - 不可做：不得以估算值顯示。
 
@@ -467,9 +537,15 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 
 **Task 3.1 — DELETE /api/v1/case/events/{import_id}**
 - 內容：刪除該批事件與其 artifact。
-- 驗證：`pytest tests/api -q -k gap3_event_delete` ≥4 條；刪後 `GET` status_code `== 404`。
+- 驗證：`pytest tests/api -q -k gap3_event_delete` ≥4 條；刪後 `GET` status_code `== 404`；
+  且斷言該 `import_id` 之所有落檔路徑（事件檔＋Task 1.6 之 receipt＋該批 artifact）殘留檔數 `== 0`
+  （防孤兒檔：僅驗 404 無法偵測磁碟殘留）。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：刪除只作用於已落檔之批次與其 artifact，不改任何契約與計算路徑，後續 Phase 無讀取
+  或改寫此端點者 ⇒ 不被覆蓋。**須同步**：Phase 1 之 Task 1.6 receipt 與 Phase 2 寫入之
+  `label_definition.filters` 皆屬「該批之 artifact」⇒ 刪除範圍須隨這兩個 Phase 新增之產物同步擴張；
+  「刪後 `GET` `== 404`」偵測不到孤兒檔（端點回 404 但 receipt 仍在磁碟），故本 Task 之驗證
+  另加落檔路徑清空斷言。
 - 邊界：只刪該批；不連帶刪 kline 快取或 Feature Library。
 - 不可做：不得提供「刪除全部」端點。
 
@@ -477,7 +553,10 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 內容：確認框顯示該批筆數與匯入時間。
 - 驗證：vitest 斷言未確認時 `fetch` call count `== 0`。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：本確認框為 Phase 3 專屬元件，與 Task 4.3／5.3 之「缺答案窗欄」確認框為不同元件、
+  不同觸發點 ⇒ 不共用亦不覆蓋。**須同步**：Task 3.3 於**同一個**確認框疊加警語 ⇒ 兩者合併實作
+  （3.2 先、3.3 後），且 3.3 上線後本 Task 之「未確認時 `fetch` call count `== 0`」斷言須維持
+  通過（回歸），不得因加警語而改動確認流程之控制流。
 - 邊界：只在批列表提供。
 - 不可做：不得以 `window.confirm` 帶過。
 
@@ -485,7 +564,10 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 內容：仍可刪，確認框明示「引用它的分析結果將無法重現」。
 - 驗證：vitest 斷言該字串出現於確認框（`toContain` 斷言）。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：警語疊加於 Task 3.2 之確認框，不改刪除行為本身，後續 Phase 無改寫者 ⇒ 不被覆蓋。
+  **須同步**：警語「引用它的分析結果將無法重現」之正確性依賴 Task 3.1 之刪除範圍確實涵蓋該批
+  全部產物；若 3.1 未隨 Phase 1／2 新增之 receipt 與 `filters` 擴張刪除範圍，警語與實況不符
+  （部分產物仍在、分析其實仍可重現）⇒ 3.1 與 3.3 須同批驗收。
 - 邊界：只加警語。
 - 不可做：不得靜默刪除被引用批次。
 
@@ -515,7 +597,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
     使用者從未選過亦不知其存在）。
 - 驗證：vitest 斷言四段文字皆出現；`control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：**會被 Phase 7 之 Task 7.3 覆蓋**——7.3 之動態揭露涵蓋 scenario／進場價／報酬算法／
+  決策位移／lookahead 深度／purge，為本 Task 四段揭露之嚴格超集，且同樣由實際設定導出、同樣禁寫死
+  ⇒ 實作順序 4.1b 先、7.3 後；**7.3 上線時須移除本 Task 之獨立實作**，否則同一面板出現兩份揭露、
+  兩份文案來源，日後改一份漏一份。此為**刻意覆蓋**，非漂移。**須同步**：兩者皆為 UI 文案、
+  不進序列化產物 ⇒ 此覆蓋不影響 G-2 golden。
 - 邊界：只揭露，不改任何預設值。
 - 不可做：不得只寫在文件而不顯示於 UI（使用者原話：「我不知道你 JSON 內怎麼寫」）。
 
@@ -560,7 +646,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   `{term, definition, formula_ref}`，作為前後端**唯一**文案來源。
 - 驗證：`python3 -c "import json;g=json.load(open('momentum/Analysis/contracts/event_metrics_glossary.json'));assert set(g)>= {'macro_mean','micro_mean','n_eff','lift_threshold','prevalence_full','prevalence_learn','signal_frequency','tail_excluded'}"` rc=0。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：glossary 為前後端唯一文案來源，Task 5.2 只讀不寫，Phase 6 不動事件型兩表
+  ⇒ 本 Task 之既有鍵集不被覆蓋。**須同步**：Task 7.5 把報酬表改為正／反／全體三組後，
+  新增之分組標籤與 `not_computed` 狀態文字亦屬表頭文案 ⇒ 須登記進 glossary；未登記則 Task 5.2 之
+  「tooltip 文字 `==` glossary `definition`」對新表頭無可比對之來源，前端只能另寫一份定義，
+  即本 Task「不可做」所禁之第二份副本。
 - 邊界：只放文案與公式指標，不放數值。
 - 不可做：不得把定義同時寫在前端（Task 5.2 以 `==` 斷言防漂移）。
 
@@ -570,7 +660,10 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   訊息追加「此為來源對證檔，請改放在 `source_file` 欄並勾選 `verify_source_digest`」。
 - 驗證：`pytest tests/api -q -k source_json_hint`；status_code `== 400` 且訊息含 `source_file`。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：只在既有回應訊息尾端追加提示字串、reason 字面不變 ⇒ 任何依 reason 字面判斷之下游
+  （含 Task 1.1 之契約清單）不受影響，後續 Phase 無改寫者。**須同步**：Task 1.2 新增 CSV 端點後，
+  誤把 `.source.json` 送到 CSV 端點會走另一條錯誤路徑（副檔名非 `.csv`）⇒ 該路徑須給出同一則
+  正解提示，否則使用者在新端點得到的訊息比舊端點更難排除，本 Task 的修補在新路徑上等於沒做。
 - 邊界：只追加提示；`legacy_schema_detected` 之 reason 字面**不變**。
 - 不可做：不得因判別為 source.json 就自動改走 `source_file` 流程（靜默轉換＝契約禁止）。
 
@@ -578,7 +671,10 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 內容：兩表所有表頭加 tooltip，文案取自 `event_metrics_glossary.json`。
 - 驗證：vitest 斷言每個表頭之 tooltip 文字 `==` glossary 對應 `definition` 值。
 - 存活至：Phase 6。
-- 覆蓋風險：無。
+- 覆蓋風險：tooltip 純讀 Task 5.0 之 glossary，不改數值與版面；Phase 6 不動事件型兩表
+  ⇒ 本 Task 不被覆蓋。**須同步**：Task 7.5 改變表格結構（單組 → 三組垂直排列）⇒ 三組共用同一組
+  表頭鍵，本 Task 之「每個表頭之 tooltip `==` glossary `definition`」斷言須在三組結構下**逐組**
+  重跑；實作順序 5.2 先、7.5 後，且 7.5 不得為分組另寫一份表頭文案。
 - 邊界：只加 tooltip，不改數值與版面。
 - 不可做：不得在前端另寫一份定義。
 
@@ -633,7 +729,10 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 驗證：`pytest tests/api -q -k ic_progress_fields` 斷言 response 含 `feature_count` 鍵；
   vitest 斷言兩種狀態之顯示字串 `!==`。
 - 存活至：GAP-6 之後仍保留。
-- 覆蓋風險：無。
+- 覆蓋風險：本 Task「存活至 GAP-6 之後仍保留」——Phase 6 五個 Task 中，6.0／6.1／6.2／6.4 之
+  「存活至」皆止於 GAP-6（隨止血閘一併被取代），只有本 Task 為永久產出 ⇒ 本批內不被覆蓋。**須同步**：GAP-6 引入分塊計算後進度階段
+  會細分得更多 ⇒ 本 Task 之階段字串須設計為**可擴充集合**，測試不得以固定 enum 之窮舉相等斷言
+  鎖死（否則 GAP-6 會被迫改寫本 Task 之測試，而改測試是掩蓋行為變更的常見路徑）。
 - 邊界：只加欄位與狀態區分。
 - 不可做：不得以固定假進度值填充（UAT 已證實 `progress==0.12` 卡 15 分鐘之誤導性）。
 
@@ -642,7 +741,10 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   footprint，證明「未載入大矩陣」。
 - 驗證：V-8 之三項斷言（見 §V）。
 - 存活至：GAP-6。
-- 覆蓋風險：無。
+- 覆蓋風險：V-8 三項斷言綁定「cap 檢查**之後**才採樣」之取樣時點，而該時點由 Task 6.1 之前置檢查
+  位置決定 ⇒ 6.1 之檢查若被移到任務啟動之後，本 Task 會量到已載入大矩陣之 footprint 而失去意義；
+  兩者須同批實作並以同一測試釘住先後順序。**須同步**：GAP-6 之分塊計算取代 6.1 時本 Task 一併作廢
+  ⇒ 須在 GAP-6 之 SPEC 明列作廢並刪除，不得留著空跑而成為永遠通過的假綠。
 - 邊界：只驗記憶體與存活。
 - 不可做：不得在 cap 檢查**之前**採樣就宣稱通過（R1 明列此假綠形態）。
 
@@ -681,7 +783,12 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 驗證：`npx vitest run eventContractOptions` ≥6 條——每維度各一條，斷言
   「UI 選項集合 `==` 契約 enum 集合」（非硬編碼清單）；`npm run build` rc=0。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：無（純新增 UI 控制項）。
+- 覆蓋風險：Phase 7 為最後一個 Phase，本 Task 純新增 UI 控制項且「內容」已鎖預設值維持現行
+  ⇒ 無後續 Phase 覆蓋。**須同步**：本 Task 讓 `entry_price_semantic`／`decision_offset_bars`／
+  `label_return_mode` 之實際取值面由單一寫死值擴為 enum 全集，而這三者**直接改變報酬數字**
+  （見本 Phase 前言「數值影響」）⇒ 驗收須含一條「六維度全部維持預設 ⇒ G-2 事件 golden **byte 級
+  不變**」之回歸，證明**接出 UI 這件事本身不動任何數值**；使用者主動改動預設值所導致之 golden
+  改變，屬 D-4 之合法數值輸出變更，須在 commit message 說明，不得靜默重凍。
 - 邊界：只接出既有能力；**不新增**任何後端未支援之值。
 - 不可做：不得在前端硬寫 enum 清單（必須由契約導出，否則下次加值又漂）。
 
@@ -693,7 +800,11 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
   **mutation**：契約新增第 5 個 `scenario` 值而不改 UI ⇒ 該測試須紅；
   把某維度改回寫死 ⇒ 須紅。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：無。
+- 覆蓋風險：本閘為 Task 7.1 之防漂移守衛，存活至 Phase 7（終），比對基準為契約 enum 而非人工清單
+  ⇒ 後續任一 Phase 於契約新增 enum 值時本閘自動變紅，該紅為設計意圖，**不得以更新人工清單消紅**。
+  **須同步**：Task 1.1 於契約新增之 reason 與 `filters` 屬非 enum 型欄位，**不在本閘涵蓋面內**
+  ⇒ 本閘只保護六個維度、不保護契約全部欄位；此邊界須明寫於實作註解與測試名稱，避免日後誤以為
+  「有機械閘＝契約全欄受保護」而略過 Task 1.1 之常數同步（見 Task 1.1 覆蓋風險）。
 - 邊界：只驗 enum 型欄位；`decision_offset_bars`（任意 int）改驗「有輸入控制項且非唯讀」。
 - 不可做：**不得以人工清單當比對基準**（那就是第三份副本）。
 
@@ -703,7 +814,10 @@ Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 
 - 驗證：vitest 改任一維度 ⇒ 顯示字串隨之改變（斷言前後 `!==`）；
   `control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：無。
+- 覆蓋風險：本 Task **取代** Phase 4 之 Task 4.1b（後者為其真子集，見 4.1b 之覆蓋風險）；
+  Phase 7 為最後一個 Phase ⇒ 本 Task 為本批揭露之終點，無更後續之覆蓋者。**須同步**：本 Task 之
+  驗證「改任一維度 ⇒ 顯示字串 `!==` 前值」偵測不到「**新增**維度未被顯示」⇒ 維度涵蓋率由 Task 7.2
+  之 enum 對證閘負責；兩者缺一，日後契約新增維度會靜默不揭露，回到 Phase 7 前言所述之病因。
 - 邊界：只揭露，不改預設值。
 - 不可做：不得寫死任何「正反例由 t0 條件決定」類之 scenario 專屬文案（D-7 通則化）。
 
