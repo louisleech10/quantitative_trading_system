@@ -1,0 +1,5 @@
+classify_incomplete FailureType.INVALID_CONFIG max_retries 0
+classify_config_str FailureType.INVALID_CONFIG
+classify_unknown FailureType.UNKNOWN
+symbol_try_handlers ['IncompleteDownloadError', 'Exception'] lineno 820
+symbol_try_handlers ['IncompleteDownloadError', 'Exception'] lineno 866

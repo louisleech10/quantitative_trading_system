@@ -1,0 +1,25 @@
+=== B1_exempt_owner_indirect ===
+offenders []
+  ('_save_failure_report', 3, 'EXEMPT', ['Exception'])
+=== B2_indirect_call_no_await ===
+offenders []
+  ('search_cases_parallel', 3, 'NO_REACH', ['Exception'])
+=== B3_BaseException_not_Exception ===
+offenders []
+=== B4_tuple_Exception ===
+offenders []
+=== B6_exempt_with_direct_download_name ===
+offenders []
+  ('_init_worker_file_logging', 3, 'EXEMPT', ['Exception'])
+=== B7_aliased_callable_Name ===
+offenders []
+  ('search_cases_parallel', 4, 'NO_REACH', ['Exception'])
+=== B8_getattr_call ===
+offenders []
+  ('search_cases_parallel', 3, 'NO_REACH', ['Exception'])
+=== CTRL_should_offend ===
+offenders ['search_cases_parallel:3']
+  ('search_cases_parallel', 3, 'OFFENDER', ['Exception'])
+=== CTRL2_should_ok ===
+offenders []
+  ('search_cases_parallel', 3, 'OK', ['IncompleteDownloadError', 'Exception'])

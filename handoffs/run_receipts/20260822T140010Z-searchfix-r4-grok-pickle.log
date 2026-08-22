@@ -1,0 +1,28 @@
+2026-08-22 10:45:00,474 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-08-22 10:45:00,475 - asyncio - DEBUG - Using selector: KqueueSelector
+py 3.9.6 (default, May 22 2026, 11:13:45) 
+[Clang 21.0.0 (clang-2100.1.1.101)]
+PRE_PICKLE cause <class 'momentum.DataExtraction.data_loader_momentum.IncompleteDownloadError'> inner root
+PRE_PICKLE context <class 'momentum.DataExtraction.data_loader_momentum.IncompleteDownloadError'>
+POST_PICKLE type <class 'momentum.DataExtraction.data_loader_momentum.IncompleteDownloadError'> args ('[worker 1/2] symbol=BAD 下載被拒收: inner root',)
+POST_PICKLE cause None
+POST_PICKLE isinstance Incomplete True
+POST_PICKLE isinstance RuntimeError True
+EWT_POST type <class 'momentum.DataExtraction.data_loader_momentum.IncompleteDownloadError'> args ('[w] symbol=S: inner2',)
+EWT_POST cause 
+"""
+Traceback (most recent call last):
+  File "<stdin>", line 35, in <module>
+momentum.DataExtraction.data_loader_momentum.IncompleteDownloadError: inner2
+
+The above exception was the direct cause of the following exception:
+
+momentum.DataExtraction.data_loader_momentum.IncompleteDownloadError: [w] symbol=S: inner2
+"""
+EWT_IS_INCOMPLETE True
+WRAP_TYPE IncompleteDownloadError module momentum.DataExtraction.data_loader_momentum
+WRAP_IS_INCOMPLETE True
+WRAP_CAUSE IncompleteDownloadError inner
+WRAP_ARGS ('[worker 2/2] symbol=BAD 下載被拒收: inner',)
+THREAD_SHUTDOWN_OK
+FINALLY_RAN True
