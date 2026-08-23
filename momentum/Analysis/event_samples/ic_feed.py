@@ -2,7 +2,11 @@
 
 純函式：由 manifest＋收據＋匯入表產 `event_timestamps`（＝錨定 TF 之 feature_cutoff bar open，
 即決策前最後一根已收盤 bar 的特徵列）＋`event_label_values`（{ms: label_value}）。
-條件 IC 只吃連續 `label_value`（缺任一 ⇒ capability unavailable:missing_label_value，v1 不重算）；
+條件 IC 只吃連續 `label_value`（缺任一 ⇒ capability unavailable:missing_label_value）。
+🔴 「v1 不重算」是**版本限制、非能力限制**：`docs/GAP3_EVENT_UX_SPEC.md` §D-3′ 已裁定
+答案窗屬 IC 分析層、`label_value` 於**分析時**由後端 producer 計算並餵入本模組
+（落點＝該 SPEC 之 Task 7.0b）。**該路徑尚未實作**——`build_event_ic_inputs` 現行行為仍為
+「不重算」，此註記只是避免把版本現況誤讀為設計上限。
 `label_return_mode ≠ close_to_close` ⇒ `label_price_mismatch=true` 揭露。
 """
 

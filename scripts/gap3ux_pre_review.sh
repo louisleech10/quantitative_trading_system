@@ -10,8 +10,10 @@
 #   🔴 **新增任何 GAP-3 UX 相關機械閘，必須加進本檔**——這是唯一清單。
 #
 # 用法：
-#   bash scripts/gap3ux_pre_review.sh                    # 只跑規格三閘＋計數閘
+#   bash scripts/gap3ux_pre_review.sh                    # 只跑常駐閘（清單見下方 run 呼叫）
 #   bash scripts/gap3ux_pre_review.sh <patch.md> [...]   # 另加 locus 對證
+# 🔴 本檔與任何文件一律**不寫閘數**——閘數字面漂移已犯三次（R6 三→四、R7 四→五、R8 清單分歧）。
+#    要知道跑了哪些閘，看下方 `run "..."` 之呼叫序列，那是唯一清單。
 # rc: 0=全綠；非 0=有閘紅（逐條列出）
 set -u
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" || exit 2
@@ -22,6 +24,10 @@ SPEC=docs/GAP3_EVENT_UX_SPEC.md
 #    ⇒ 「加閘／換檔未同步清單」第三、四次。本檔不得自帶參數清單。
 
 fail=0
+LOG=".claude/gate/gap3ux_pre_review.last.log"
+mkdir -p "$(dirname "${LOG}")" 2>/dev/null
+: > "${LOG}"
+
 run() {  # run <名稱> <命令...>
   local name="$1"; shift
   "$@" > /tmp/.gap3ux_gate.$$ 2>&1
@@ -30,7 +36,13 @@ run() {  # run <名稱> <命令...>
     printf '  ✓ %-28s rc=0\n' "${name}"
   else
     printf '  ✗ %-28s rc=%d\n' "${name}" "${rc}"
-    sed -n '1,6p' /tmp/.gap3ux_gate.$$ | sed 's/^/      /'
+    # 🔴 2026-08-23：原本此處為 `sed -n '1,6p'`，**截斷輸出**。
+    #    實際後果（主委當場踩到）：一次傳四份補丁包跑 locus 對證，前兩份的未達 locus
+    #    就把六行用完，**後兩份的未達 locus 完全不顯示** ⇒ 主委一度判定「後兩份全過」。
+    #    這是報告層的 fail-open，與 R8 那三個假綠同型（工具自己騙自己）。
+    #    ⇒ 一律全量輸出；量大時看 ${LOG} 之完整副本。
+    sed 's/^/      /' /tmp/.gap3ux_gate.$$
+    cat /tmp/.gap3ux_gate.$$ >> "${LOG}"
     fail=1
   fi
   rm -f /tmp/.gap3ux_gate.$$

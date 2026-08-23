@@ -17,8 +17,8 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R5-consult（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 條 findings）。
-**狀態：未 FROZEN。**
+**版本**：R8-arch（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12 → R8 17 條 findings）。
+**狀態：未 FROZEN**（待 R9 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 
 🔴 **本版之產生方式與前五輪不同（使用者 2026-08-22 裁定）**：
 R5 之 13 條中**有 5 條為主委 R4 修訂自行引入**（R4 亦有 3 條），共 8 條形態一致——
@@ -27,7 +27,7 @@ R5 之 13 條中**有 5 條為主委 R4 修訂自行引入**（R4 亦有 3 條�
 ⇒ 開 consult 輪（`handoffs/20260822-gap3ux-x-consult-r2-brief.md`），
 三家各交 10–11 條**四欄修法**（改哪裡／改成什麼成品文字／怎麼驗／**必須同步哪些其他位置**），
 主委**照抄實作、不自行發揮**；三家 Verdict 一致「照抄後進 R6」。
-**R6 複審通過、且 A-6 經使用者白話閘確認，方得 FROZEN**（見 §A）。
+**A-6′ 已於 R8 經使用者 2026-08-23 逐字裁定確認**（見 §A）；FROZEN 之其餘條件見角色卡。
 
 **R5 十一群集之落點**（reconcile：`handoffs/reconcile/20260822-gap3ux-x-review-r5/synth.md`）：
 
@@ -43,7 +43,7 @@ R5 之 13 條中**有 5 條為主委 R4 修訂自行引入**（R4 亦有 3 條�
 | H | `/search` 放行 `two_stage` 但無 producer | **Task 7.1 邊界**＋`pathExclusions` 擴充 |
 | I | `mixed_control_kind_in_batch` 未登記契約 | **Task 7.5**（`ic_report_contract.json` 之 `event_return_table`） |
 | J | `facts.sh` 未開 pipefail ⇒ 假 rc=0 | 主委直接修（工具 bug，非 SPEC 判斷） |
-| K | §A 之 A-6 自相矛盾 | **§A**（A-6 待白話閘；確認前不得 FROZEN） |
+| K | §A 之 A-6 自相矛盾 | **§A**（A-6 待白話閘；確認前不得 FROZEN）。🔴 **R8 已結案**：A-6 之前提被使用者裁定推翻而整條作廢，取代者 A-6′ 已確認，見 §A |
 
 **三家分歧之裁決點（全部記錄，不隱藏）**：
 S-9 尾端 newline 禁用（2:1）／S-9 章節編號（2:1）／`by_label` 鍵名逐鍵取多數
@@ -120,11 +120,56 @@ IC 分析的頁面，而不是 `/search` 吧」。
 **採 (d) 分析時計算**：
 - `/search` 匯出**只承載事件事實**——t0、`label`（來自 t0 條件之 `positive_case`）、
   五維度契約設定。
-- **不得**在匯出端寫入 `label_value`；**不得**在匯出端寫入
-  `label_definition.window.horizon_bars`。
+- **不得**在匯出端寫入 `label_value`。
 - 答案窗（`horizon_bars`）與報酬語意（`entry_price_semantic`／`label_return_mode`／
   `decision_offset_bars`）於 **IC 分析頁**由使用者給定；
   後端以 `bars_from_kline_cache` ＋ `align_events` **同一公式**於分析時計算。
+
+🔴 **D-3′-a｜匯出端仍須寫 `label_definition.window.horizon_bars`，但其語意改變**
+
+**主委裁決點（兩份補丁包互斥；依角色卡「在具體提案之間裁決並記錄理由」）**：
+- `-arch-shift.md` 之 D-3 diff 主張「**不得**在匯出端寫入
+  `label_definition.window.horizon_bars`」。
+- `-arch-analyze-time-label.md` §3 主張「既有批若帶烤入之 `label_value`／**窗欄**：
+  分析端以本次 h 重算並覆蓋**分析用副本**」——其前提是**匯出仍帶窗欄**。
+
+**採後者。理由為實碼 receipt，非偏好**：
+`momentum/Analysis/event_samples/import_contract.py:163` 對 `label_definition.window`
+強制 `horizon_bars` 為 `int ≥ 1`，缺欄／非法即 `missing_required_field`；
+且 `label_definition` 在 `event_import_contract.json` 之 **`required_fields`** 內
+（`label_value` 則在 `optional_fields` ⇒ 省略合法）。
+⇒ 照 `-arch-shift` 實作，匯出檔**一律無法匯入**，該句不可實作。
+
+**改採之語意（本節為權威，他處只得引用）**：
+| 欄 | 屬哪一層 | 誰寫 | 誰讀 |
+|---|---|---|---|
+| `label_definition.window.horizon_bars`（匯出檔內） | **事件事實層** | `/search` 匯出端 | D-7 之 lookahead 深度宣告 |
+| 條件 IC 之答案窗 `h`（`event_label_spec`） | **分析層** | IC 分析頁 | 分析時 label／purge |
+
+- 匯出檔內之 `window.horizon_bars` ＝ **該批 label 定義所引用之最遠未來根數**（D-7 之唯一通則），
+  **不是**條件 IC 之答案窗。
+- 分析層**禁止**把匯出檔之 `window.horizon_bars` 讀為答案窗；
+  答案窗只能來自本次 `event_label_spec`（見 D-3a）。
+- `/search` 之 `label` 由 t0 條件判定（`scenario=C`、無品質過濾）⇒ 該欄之值為 **lookahead 深度**，
+  依 D-7 由實際引用之欄位導出，**不得**沿用「使用者選的答案窗」當它的值。
+
+📌 **主委補充，具名標「待 R9 裁定」**（三份補丁包皆未觸及此層；依角色卡須具名而非靜默決定）：
+
+**（i）深度 0 與契約下限 1 之衝突**：D-7 明訂 `scenario=C` 且無品質過濾時 lookahead 深度 **＝ 0**
+（實查證之既有批 `20260822T011331Z-eb210a16.json` 即此形態），
+而 `import_contract.py:163` 之下限為 `int ≥ 1` ⇒ 深度 0 **無法照實寫入**。
+處置：深度 0 時寫入**契約最小合法值 `1`**，並於 receipt 同時記錄 `lookahead_bars_declared = 0`。
+理由：`1` 使 embargo 隔一根，比實際需要**更嚴**（§C0 允許更嚴、禁更鬆）；
+反向（改契約下限為 0）會放寬既有 fail-closed，§C0 禁止。
+⚠️ **副作用須揭露**：purge 因此比理論值多一根，屬**保守偏差**，非計算錯誤。
+
+**（ii）purge 下界為兩個約束之聯集**：D-7 要求 `purge ≥ lookahead 深度`；
+D-3a 要求 `purge ≥ 本次分析 h 之 label 窗寬`。兩者皆為現行有效裁定且來源不同
+（前者防「標籤偷看未來」，後者防「答案窗大於隔離帶」）⇒
+```
+purge_lower_bound = max(lookahead 深度換算之 ms, 本次 event_label_spec 之 label 窗寬 ms)
+```
+**不得**只取其一。依 §C0「只能更嚴」取 `max`。此式之驗收落 Task 7.0b。
 
 **碼證（皆可重跑）**：
 `eventExport.ts:75-79`（`label` 來自 `positive_case`，**不看答案窗**）／
@@ -251,6 +296,17 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 3. 答案窗欄位接受**任意正整數**，不限 1..12（使用者：「12 根也是我自己訂的，沒有理論根據，
    會不會用到 12 根以外也有可能」）。
 
+🔴 **D-7 之 R8 增訂｜分析時答案窗（出處＝`-arch-analyze-time-label.md` §3；不削弱既有 L1／L2／L3）**
+
+架構變更後條件 IC 之 h 在 IC 頁給定（D-3′）⇒ D-7 之 purge 約束須同時涵蓋**分析層**：
+- purge／embargo 之下界須取 **D-3′-a（ii）之 `max` 式**（該式之權威定義在 D-3′-a，本節不重述）。
+- **不得**沿用匯入檔內過期之 `horizon_bars`／`label_end_ms` 而使 embargo 偏小。
+- 既有批帶烤入之 `label_value`／窗欄者：分析端**以本次 `event_label_spec` 重算並覆蓋
+  分析用副本**（in-memory；不回寫匯出檔）；**不得**靜默混用「舊窗＋新 h」。
+- 覆蓋之欄恰為 `align_events` 之四個輸入：`label_definition.window.horizon_bars`／
+  `label_definition.label_return_mode`／`entry_price_semantic`／`decision_offset_bars`
+  （receipt：`alignment.py:152-168` 逐欄取用處）。
+
 **🔴 主委對使用者既有批次之判斷已兩度修正，此為最終版（實查證，非推論）**：
 實讀 `data_cache/events/20260822T011331Z-eb210a16.json`：780 筆、`label` 分布 0:520／1:260、
 `control_kind` 全為 `user_labeled_same_trigger`、`scenario=C`、`decision_offset_bars=0`、
@@ -277,7 +333,8 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 | A-3 | #9b 排入 GAP-6 | 已確認 |
 | A-4' | `label` 為**使用者聲明**，系統不推斷、不預設、不宣稱其正確；未指定 ⇒ fail-closed | R1 三家一致，已改寫（§D-1） |
 | A-5' | 批次層預設值對整批一致；**異質列須顯式拒收**（非靜默取第一列） | R1 codex 指出原 A-5 不足，已補（Task 1.8） |
-| A-6 | D-3 之 (a) 方案（多選只影響匯出欄，label 仍單一主答案窗）符合使用者「答案窗不夠用」之真實訴求 | 🔴 **待使用者白話閘確認**（技術上可行且經委員複核；但**改變使用者可見行為**） |
+| ~~A-6~~ | D-3 之 (a) 方案（多選只影響匯出欄，label 仍綁單一主答案窗）符合使用者訴求 | ⛔ **R8 作廢**：該問句建立在「條件 IC 之答案窗屬匯出層」之前提上，**前提已被使用者 2026-08-23 裁定推翻**（見 §D-3 撤回理由）⇒ 整條作廢，非「仍待確認」 |
+| A-6′ | 條件 IC 之答案窗與連續 `label_value` 於 **IC 分析頁分析時計算**；`/search` 事件批次只固化事實（t0＋二元 `label`＋五維度契約設定） | ✅ **已確認**——使用者 2026-08-23 逐字裁定即取代裁定本身（見下） |
 | A-4'／A-5' 之狀態語 | — | 二者為**技術裁定（委員）**，不屬「待使用者確認」 |
 
 **已確認**（使用者 2026-08-22 回覆逐字）：
@@ -286,16 +343,21 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 - A-3：「將#9排在Gap-4(Pooled IC), Gap-5(容量接線)，併入Gap-6規模防護之後」
   ＋「這樣我就等Gap-6之後再針對整個IC-Analysis做測試就好。先把事件型做完」
 
-**待使用者確認：A-6**（R5 群集 K；grok＋composer 兩家指出原文自相矛盾）。
-🔴 舊版同時寫「請使用者於白話閘確認」與「待使用者確認：**無**」，兩者互斥；
-且本輪 brief 未附任何 user-visible 決策 receipt ⇒ **不得**把 A-6 當已驗證事實凍結。
+**A-6′ 之確認 receipt（R8；取代 R5 群集 K 之待確認狀態）**
 
 - **A-4'／A-5'**：純技術主張，依「技術決策委派委員會」由委員裁決，**不列入**本區塊。
-- **A-6**：改變使用者可見行為（附帶 horizon 多選只影響匯出欄、不動主答案窗與 `label_value`）
-  ⇒ 須由使用者於白話閘**逐字確認**後，狀態方可改為「已確認」。
-  🔴 **確認前不得 FROZEN**（採 composer 之嚴版；grok 提「可 FROZEN 但不得宣稱使用者已接受」，
-  依 §C0「只能更嚴」取前者）。實作可依 (a) 推進，但 §A 須保持本狀態字面，
-  且任何文件**不得**宣稱「使用者已接受 (a)」。
+- **A-6′ 已確認之依據**：白話閘之目的＝取得使用者對「改變其可見行為」之逐字同意。
+  本項之改變**由使用者自己提出**——2026-08-23 逐字：「條件 IC 本來就算一種類型的
+  IC-Analysis，條件給定應該就是要在 IC 分析的頁面，而不是 `/search` 吧」，
+  三家以碼證確認該架構成立（見 §D-3 碼證）⇒ **使用者原話即取代裁定本身**，
+  不存在「還要再問使用者一次他自己提的事」之空間。
+  使用者 2026-08-23 就 FROZEN 條件另逐字裁定：該條件視為滿足。
+- **可見行為之變更清單（本項之實質內容，供日後追溯）**：
+  ① `/search` 匯出面板**移除**「主答案窗」單選；
+  ② `/search` 匯出檔**不再**含 `label_value`；
+  ③ IC 分析頁**新增**答案窗與報酬語意之分析參數（見 Task 7.6）；
+  ④ 比較 h=3 與 h=7 **不需**重新匯出事件批。
+- 🔴 **仍為 user assertion、系統不宣稱其正確者**＝ D-1 之 `label` 語意，與本項無關，狀態不變。
 
 ### 已驗證事實（FACT-RECEIPT；14 條，皆可由 repo 內命令重現）
 
@@ -374,6 +436,44 @@ R1 推翻了原版「本批不動任何數值路徑」之主張（§D-4），本
 ① exact return 值（`atol=0`，位元組相等）②NaN／缺 bar mask 位置 ③PIT anchor（t0 對應根）。
 Task 4.2 若改預設 horizons，**必須同步更新 G-2 並在 commit message 說明改了什麼、為什麼**
 （合法變更），而非靜默重凍。
+
+**G-3 analysis-label golden（R8 新建；`-codex-pit-wiring.md` ＋ `-arch-analyze-time-label.md` §6）**
+
+§D-3′ 把 `label_value` 由**匯出時**移到**分析時**產生 ⇒ G-2（事件報酬表）**涵蓋不到**這條新路徑：
+G-2 凍的是 `event_forward_return_table` 之輸出，而分析時 label 走的是
+`align_events` → `resolve_label_value_at_analyze` → `ic_feed`。**兩者不可互相替代。**
+
+**固定輸入（全部寫死於 fixture，缺一即 bytes 不可重現）**：
+真實 kline 切片（`data_cache/feature_klines/kline_cache.h5`，禁合成 fixture）、
+t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode = mode`、
+`entry_price_semantic`、`direction`、`timeframe`。
+
+**凍結對象（逐項 exact，`atol=0`）**：
+① 每 event 之 `label_value`
+② 每 event 之 label window（`label_start_ms`／`label_end_ms`）
+③ feature timestamp map（`event_id → decision_at_ms`；即餵給 `ic_feed` 之 sample key）
+④ **purge boundary**（該次分析實際採用之 embargo ms）
+⑤ NaN／尾端不足之 mask（哪些 event_id 之 `label_value` 為 `None`）
+
+**覆蓋面（最小集；不足即不得宣稱本 golden 有效）**：
+`direction ∈ {long, short}` × `timeframe ∈ {1h, 12h}` × `h ∈ {1, 7}`，
+外加一組「尾端不足」之邊界 fixture。
+
+**可證偽條（五條，皆須可獨立跑）**：
+1. 特徵截止仍為 `feature_cutoff_rule = max_close_ms_le_decision_at`（不變；受本 golden 之③保護）。
+2. `label_value` 與**獨立手算** `(close[t0+h] − close[t0]) / close[t0]`（long）相等，`atol=0`；
+   short 取其相反數。🔴 **oracle 獨立性同 S-8**：expected 值須另寫直算腳本產生，
+   **禁以 `resolve_label_value_at_analyze` 自產 golden 後回頭比自己**。
+3. 尾端不足 ⇒ `label_value is None` 且該 event **不進** `ic_feed`（loud），**禁填 0**。
+4. **同批 h=3 與 h=7 兩次分析**：事件事實 id 集合**相同**；`label_value` 集合**不同**；
+   ②④各自對應自己的 h。
+5. **mutation（兩條，皆須紅）**：分析改 h 卻不重算 window／embargo ⇒ ④紅；
+   以匯出檔烤入之舊 `label_value` 覆蓋分析結果 ⇒ ①紅。
+
+**序列化**：本 golden 之 dict → bytes **沿用 S-9 之同一參考實作**
+（`canonical_serialize.py::canonical_event_table_bytes`），**不得**另寫第二個 encoder。
+
+**驗收命令**：`pytest tests/momentum/event_samples/ -q -k analysis_label_golden`。
 
 #### G-2 canonical serialization（R4 群集 B；三家全員判「未定義即不可位元組級證偽」）
 
@@ -492,22 +592,46 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 ### Phase 1 — 使用者自篩 CSV 匯入（依賴：無）　【#0(b) ＋ #5】
 
 **Task 1.1 — 契約先行：新增 reason 與 label_definition.filters**
-- 內容：`import_failure_reasons` 增 `column_mapping_missing`／`column_not_found_in_file`／
-  `label_column_not_binary`／`heterogeneous_rows_in_batch`，
-  ＋§F-2 之 `label_producer_unsupported_for_declared_semantics`（15→**20**，R6 群集 D）；
-  `label_definition.fields` 增 `filters`（型別＋`_doc`）以承載 Phase 2 之篩選條件（D-6）。
-- 驗證：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert len(c['import_failure_reasons'])==20;assert 'filters' in c['label_definition']['fields']"` rc=0。
+- 內容（**R8 改寫：改為集合差集，不再寫計數字面**）：
+  ① `import_failure_reasons` 增 `column_mapping_missing`／`column_not_found_in_file`／
+     `label_column_not_binary`／`heterogeneous_rows_in_batch`。
+  ② 🔴 **R8 依 §F-2′ 改掛層次**：`label_producer_unsupported_for_declared_semantics`
+     **不再**進 `import_failure_reasons`（R6 群集 D 之落點作廢），改進
+     `capability_unavailable_reasons`——理由：§D-3′ 後該 reason 之語意由「匯入失敗」
+     變為「本次分析之能力不可用」，兩個清單語意不同，放錯清單會使前端在錯誤的
+     生命週期顯示它。
+  ③ `capability_unavailable_reasons` 因此增兩值：②之 reason
+     ＋ Task 1.12 之 `split_blocked_unverifiable_lookahead`。
+  ④ `label_definition.fields` 增 `filters`（型別＋`_doc`）以承載 Phase 2 之篩選條件（D-6）。
+  🔴 **改前基準以 fixture 凍結**：`tests/momentum/event_samples/fixtures/event_import_contract.pre_gap3.json`
+  ＝本批動工前之契約副本（位元組拷貝）。所有增量以**對該 fixture 之差集**表述，
+  **不在 SPEC 或測試內重列既有 reason 字面**（重列即第二份副本）。
+- 驗證：`pytest tests/api -q -k gap3_contract_reason_registry` ≥5 條——
+  ①`set(now['import_failure_reasons']) - set(pre['import_failure_reasons'])` **集合相等**於
+    `{'column_mapping_missing','column_not_found_in_file','label_column_not_binary','heterogeneous_rows_in_batch'}`
+  ②`set(pre['import_failure_reasons']) - set(now['import_failure_reasons'])` 為**空集**
+    且 `now['import_failure_reasons'][:len(pre['import_failure_reasons'])] == pre['import_failure_reasons']`
+    （既有字面與**順序**皆不變）
+  ③`'label_producer_unsupported_for_declared_semantics' not in now['import_failure_reasons']`
+  ④`set(now['capability_unavailable_reasons']) - set(pre['capability_unavailable_reasons'])` **集合相等**於
+    `{'split_blocked_unverifiable_lookahead','label_producer_unsupported_for_declared_semantics'}`
+  ⑤`'filters' in now['label_definition']['fields']`
+  **mutation（兩條，皆須紅）**：把 `label_producer_unsupported_for_declared_semantics`
+  放回 `import_failure_reasons` ⇒ ③④；改動既有 reason 之順序 ⇒ ②。
 - 存活至：Phase 6。
-- 覆蓋風險：契約為**唯讀增量**——四個新 reason 與 `filters` 鍵在 Phase 2..7 全程只被讀取或填值，
+- 覆蓋風險：契約為**唯讀增量**——新 reason 與 `filters` 鍵在 Phase 2..7 全程只被讀取或填值，
   無任一 Task 刪改其字面與順序。Phase 2 之 Task 2.2 只寫 `filters` 之**值**；Phase 6 之 Task 6.0
   另建 IC 側 reason 檔而**不併入本檔**（D-6）；Phase 7 之五維度動的是 `label_definition` 之其他鍵
-  ⇒ 本 Task 產出不被覆蓋。**須同步**：Task 1.12 之 `split_blocked_unverifiable_lookahead` 進的是
-  `capability_unavailable_reasons`（3→4）而非 `import_failure_reasons`，故本 Task 之 `== 20` 斷言不受該項影響；
-  日後任一 Phase 於 `import_failure_reasons` 增值，須同批更新此常數，否則契約與驗證斷言互相矛盾。
-  🔴 **本批已有一筆**（R6 群集 D）：§F-2 之 `label_producer_unsupported_for_declared_semantics`
-  進 `import_failure_reasons` ⇒ 本 Task 之斷言由 `== 19` 改為 **`== 20`**，
-  且新增值須列入 Task 1.1 之「內容」清單（15 → 19 → **20**）。
-- 邊界：只加，**不動**既有 15 個 reason 之字面與順序。
+  ⇒ 本 Task 產出不被覆蓋。
+  🔴 **R8 改寫之理由（本欄自身即事故現場）**：R6／R7 兩輪之自傷各有一條發生在本欄——
+  「`15→19`」「`== 19` 改 `== 20`」「`3→4`」皆為**計數字面**，而它所計之物在同一批內又被改了兩次
+  （R6 把 §F-2 之 reason 加進本清單、R8 依 §F-2′ 又把它移到另一個清單）。
+  ⇒ 本 Task 之驗收已全面改為**對凍結 fixture 之差集**，SPEC 內**不再出現任何 reason 計數**；
+  日後任一 Phase 增值，只需更新該 Phase 自己的差集斷言，本 Task 不必跟著改。
+  **須同步**：Task 1.12 之 `split_blocked_unverifiable_lookahead` 與 §F-2′ 之
+  `label_producer_unsupported_for_declared_semantics` **同進** `capability_unavailable_reasons`
+  ⇒ 兩者之差集斷言在本 Task 驗收④**合併驗一次**，Task 1.12 不得另寫第二份。
+- 邊界：只加，**不動**既有 reason 之字面與順序（以驗收②機械對證，不靠計數）。
 - 不可做：不得在 `api/` 或 `frontend/` 另寫一份 reason 清單。
 
 **Task 1.2 — 新端點 POST /api/v1/case/import-events/csv**
@@ -719,7 +843,9 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
     且 `common['formal_pooled_inference_allowed'] is False`、
     `common['reason'] == "no_event_split_plan"`
   ③c 傳入一個 `clusters` 為空 DataFrame 之假 split plan ⇒ **raise**（不得靜默當成 None 走過去）
-  ④reason 字面取自契約：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert len(c['capability_unavailable_reasons'])==4;assert 'split_blocked_unverifiable_lookahead' in c['capability_unavailable_reasons']"` rc=0，
+  ④reason 字面取自契約：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert 'split_blocked_unverifiable_lookahead' in c['capability_unavailable_reasons']"` rc=0
+    （🔴 **R8 移除本條之計數斷言**——該清單之增量已由 Task 1.1 驗收④以**對凍結 fixture 之差集**
+    一次驗完；此處再寫計數即第二份副本，且 R8 已因 §F-2′ 再增一值而使原 `== 4` 失效），
     且 `grep -rc 'split_blocked_unverifiable_lookahead' api/ frontend/src/ momentum/ --include=*.py --include=*.ts` 之硬編碼字面數 `== 0`
   **mutation（四條，皆須紅）**：把禁令改成僅記 log ⇒ ①；把 reason 硬寫進程式 ⇒ ④；
   讓 `run_event_study_only()` 內部仍呼叫 `split_events` ⇒ ①；
@@ -730,8 +856,11 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   `capability_unavailable_reasons`，Task 6.0 走 `ic_report_contract.json` 之 `reasons.analysis_rejected`）
   ⇒ 互不覆蓋，亦不得合併為同一回應
   （合併會使使用者無法分辨「洩漏不可證」與「特徵數過大」兩種完全不同的拒絕）。
-  **須同步**：`split_blocked_unverifiable_lookahead` 登記於 `capability_unavailable_reasons`
-  （現 3 → 4），**不進** `import_failure_reasons` ⇒ Task 1.1 之 `== 20` 斷言不受影響，兩處常數各自成立。
+  **須同步**：`split_blocked_unverifiable_lookahead` 登記於 `capability_unavailable_reasons`、
+  **不進** `import_failure_reasons`；🔴 **R8 改寫**：該清單之增量由 Task 1.1 驗收④
+  以對凍結 fixture（`event_import_contract.pre_gap3.json`）之差集統一驗證，本 Task 不再自寫計數
+  （原文之「現 3 → 4」與 Task 1.1 之「`== 20`」皆已因 §F-2′ 改掛層次而失效——
+  同型錯誤本欄已犯過，故改為機械差集而非人工同步）。
 - 邊界：只擋切分與條件 IC，不擋事件研究。
 - 不可做：不得以「警告後放行」替代（R2 codex 明指此為 fail-open）。
 
@@ -751,9 +880,11 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   **mutation（兩條，皆須紅）**：把預設值改回 1 ⇒ ①；
   讓 CSV 路徑另寫一份深度計算（不呼叫同一函式）⇒ ⑤。
 - 存活至：Phase 6。
-- 覆蓋風險：本 Task 之宣告值寫入 `label_definition.window.horizon_bars`，與 Phase 4 之「主答案窗」
-  為**同一欄位** ⇒ 兩者必為同一寫入點；Task 4.1「不可做」已明令附帶欄多選不得改變該欄之來源，
-  故 Phase 4 為疊加而非覆蓋。**須同步**：Phase 2 之 Task 2.1b 對系統內篩選路徑**鎖定下界且不可調低**，
+- 覆蓋風險：本 Task 之宣告值寫入 `label_definition.window.horizon_bars`，與 `/search` 路徑
+  （Task 4.1 ③）之深度宣告為**同一欄位、同一寫入點**（R8 改寫：Phase 4 之「主答案窗」已依
+  §D-3′ 移除，該欄不再有第二種語意）⇒ 兩路徑須呼叫 Task 2.1b 之同一深度函式；
+  Task 4.1「不可做」已明令附帶欄多選不得改變該欄之來源。
+  **須同步**：Phase 2 之 Task 2.1b 對系統內篩選路徑**鎖定下界且不可調低**，
   與本 Task 之「可調低但須勾選聲明」為兩條路徑之不同規則 ⇒ 實作須以批次來源（CSV 匯入 vs
   系統內篩選）分派；統一為寬鬆版即 fail-open（機器可證的下界被聲明繞過），統一為嚴格版則 CSV
   路徑無法上傳（CSV 無條件可解析）。
@@ -871,28 +1002,54 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 邊界：只加警語。
 - 不可做：不得靜默刪除被引用批次。
 
-### Phase 4 — 答案窗（依賴：無；**修正 R1 之錯誤相依聲明**）　【#1】
+### Phase 4 — 匯出端之報酬欄與揭露（原名「答案窗」；依賴：無；**修正 R1 之錯誤相依聲明**）　【#1】
+
+> 🔴 **R8 更名理由**：§D-3′ 把答案窗移到 IC 分析層 ⇒ 本 Phase 已不含答案窗。
+> 保留舊名會使實作者在此尋找答案窗 UI 而找不到，或反過來把它加回匯出面板。
+> 答案窗之落點＝Task 7.6（UI）＋ Task 7.0b（計算）。
 
 > GROK-R1-P1-05 指出原版標「依賴 Phase 1、覆蓋 Phase 1 單 horizon 邏輯」是**錯的**：
 > Phase 1 是 CSV **匯入**對映，不含答案窗／`future_*`／`label_value` 產生；
 > 現行單 horizon 邏輯在 `eventExport.ts` 與 `/search`（B5 已落地）。已改正。
 
-**Task 4.1 — 匯出檔可多帶 future_* 欄（D-3 之 (a)）**
-- 內容：新增「附帶報酬欄」多選（預設全選 1..12），匯出檔為每個選中 h 帶
-  `future_{h}bar_return`；**`label_value` 與 `label_definition.window.horizon_bars`
-  仍取自另一個單選之「主答案窗」，語意不變**。
-- 驗證：主答案窗 `=4`、附帶選 `[1,3,7]` ⇒ 匯出檔含 `future_{1,3,7}bar_return` 三欄
-  且 `label_definition.window.horizon_bars == 4`、`label_value ==` 各列之 `future_4bar_return`。
-- 存活至：Phase 6。
-- 覆蓋風險：**不覆蓋**任何既有邏輯（純疊加欄位）；契約不變。
-- 邊界：h ∈ 1..12；附帶欄只是攜帶，不參與 label 判定。
-- 不可做：不得讓多選改變 `label_value` 之來源（那是 (b)/(c) 方案，本批不做）。
+**Task 4.1 — 匯出檔之附帶 `future_*` 欄；並移除匯出端之答案窗與 `label_value`（D-3′）**
 
-**Task 4.1b — 匯出時揭露每個選項在動什麼（使用者 2026-08-22：「我不知道有什麼東西」）**
+🔴 **R8 REOPEN 改寫**：本 Task 原名「可多帶 future_* 欄（D-3 之 (a)）」，
+其「主答案窗」單選為 D-3 撤回之 (a) 方案之產物 ⇒ 依 D-3′ 移除。
+
+- 內容（三件事）：
+  ① **新增**「附帶報酬欄」多選（預設全選 1..12），匯出檔為每個選中 h 帶
+     `future_{h}bar_return`——**純供 Excel 分析攜帶**，不進 `ic_feed`、不決定任何 horizon。
+  ② **移除**匯出面板之「主答案窗」單選；匯出端**不再**寫入 `label_value`
+     （`label_value` 於契約為 `optional_fields`，省略合法）。
+  ③ `label_definition.window.horizon_bars` **仍寫入**，其值＝ **D-7 之 lookahead 深度宣告**
+     （語意與寫入規則之權威在 §D-3′-a，本 Task 不重述）。
+- 驗證：`npx vitest run eventExportHorizonColumns` ≥5 條——
+  ①附帶選 `[1,3,7]` ⇒ 匯出檔含 `future_{1,3,7}bar_return` 三欄
+  ②`'label_value' in records[0]` `=== false`（**每一列皆然**，非只驗第一列）
+  ③匯出面板**不存在**「主答案窗」控制項（以 testing-library `queryBy*` 斷言為 `null`）
+  ④`records[0].label_definition.window.horizon_bars` `===` 執行 Task 1.10／2.1b 之深度導出函式
+    對同一輸入之回傳（**呼叫同一 exported 函式比對，非寫死數字**）
+  ⑤附帶欄之選擇改變 ⇒ ④之值**不變**（證明附帶欄不參與深度導出）
+  **mutation（三條，皆須紅）**：匯出端恢復寫 `label_value` ⇒ ②；
+  把「主答案窗」控制項加回 ⇒ ③；`window.horizon_bars` 改讀附帶欄之 `max` ⇒ ④⑤。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：本 Task **覆蓋** R1 版之 (a) 方案（刻意，見 §D-3 撤回理由）。
+  **須同步**：Task 1.9 之覆蓋風險原寫「本 Task 之宣告值…與 Phase 4 之『主答案窗』為**同一欄位**」
+  ——「主答案窗」已移除 ⇒ 該處已改寫為「與 `/search` 路徑之深度宣告為同一欄位、同一寫入點」。
+  兩路徑（CSV 宣告 vs `/search` 導出）仍須呼叫 Task 2.1b 之同一深度函式。
+- 邊界：附帶欄 h ∈ 1..12；附帶欄只是攜帶，不參與 label 判定、不參與深度導出。
+- 不可做：不得在匯出端以任何形式寫入 `label_value`（含寫 `null`、寫 `0`、
+  或另立 `label_value_status` 之類新欄——新欄須先改契約，D-6）；
+  不得把附帶欄之 `max` 當成 lookahead 深度（那是 D-7 明禁之「由欄位存在與否推斷」）。
+
+**Task 4.1b — 匯出時揭露每個選項在動什麼（使用者 2026-08-22：「我不知道有什麼東西」；R8 依 §D-3′ 改寫③）**
 - 內容：匯出面板明文顯示三件現行完全未告知之事實：
   ① **本批 scenario ＝ {實際值} — {契約 doc 之白話}**（由實際設定導出，**禁寫死**）
   ② **lookahead 深度 ＝ {N} 根，來源＝{引用之欄位清單}**（依 D-7 通則導出；C 無品質過濾時為 0）
-  ③ **purge 將為 {N} 根**，並說明「此深度來自你的 label 定義最遠引用到 t0 之後第幾根」
+  ③ **本批之 purge 下界（事件事實層）＝ {N} 根**，並說明「此深度來自你的 label 定義最遠引用到
+    t0 之後第幾根」。🔴 **R8 增訂**：同時明示「條件 IC 分析時之實際 purge 另取本次答案窗，
+    取兩者較大者」——公式之權威在 §D-3′-a（ii），本欄只揭露、不重述式子
   ④ 本批 `control_kind` 之值與白話意思（現由 `eventExport.ts:104` 寫死 `user_labeled_same_trigger`，
     使用者從未選過亦不知其存在）。
 - 驗證：vitest 斷言四段文字皆出現；`control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
@@ -910,12 +1067,18 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 不可做：不得只寫在文件而不顯示於 UI（使用者原話：「我不知道你 JSON 內怎麼寫」）。
 
 **Task 4.1c — 明文標示本批不提供 IC decay（CODEX-R2-P1-02／GROK-R2-P2-01）**
-- 內容：SPEC §D-3 與 UI 皆須明寫：「條件 IC decay 曲線**非本批交付**；
-  附帶之 `future_*` 欄**不進入 `ic_feed`**（`ic_feed.py:4-5` 只吃單一 `label_value`）；
-  需要 decay 則換主答案窗重跑，或待 GAP-6 之 IC-Analysis 整體處理。」
+- 內容（**R8 依 §D-3′ 改寫措辭**）：SPEC §D-3 與 UI 皆須明寫：
+  「條件 IC decay **曲線**（一次分析同時得到多個 h 的 IC）**非本批交付**；
+  附帶之 `future_*` 欄**不進入 `ic_feed`**；
+  要看不同答案窗，請**於 IC 分析頁改答案窗重跑分析**——
+  **不需重新匯出事件批**（同一批事件事實可重複分析，見 §D-3′）；
+  一次得到整條 decay 曲線待 GAP-6 之 IC-Analysis 整體處理。」
+  🔴 舊措辭「需要 decay 則換**主答案窗**重跑」已隨主答案窗移除而作廢，不得殘留。
 - 驗證：`grep -c "IC decay" docs/GAP3_EVENT_UX_SPEC.md` `>= 1`；
-  vitest 斷言該說明出現於匯出面板；**加一條驗收**：選 `[1,3,7]` 附帶欄
-  ⇒ `label_definition.window.horizon_bars` 與 `label_value` **不變**（證明附帶欄不改 IC horizon）。
+  vitest 斷言該說明出現於匯出面板；**加兩條驗收**：
+  ①選 `[1,3,7]` 附帶欄 ⇒ `label_definition.window.horizon_bars` **不變**
+    （證明附帶欄不改深度宣告；`label_value` 已不存在於匯出檔，見 Task 4.1 ②）
+  ②文案中**不得**出現「重新匯出」作為換 h 之手段（斷言該字串不出現）。
 - 存活至：GAP-6。
 - 覆蓋風險：GAP-6 若交付 multi-horizon IC，本說明須撤除。
 - 邊界：只是揭露邊界，不改行為。
@@ -935,12 +1098,17 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 不可做：不得因列數變多而改變 `n_eff` 之定義。
 
 **Task 4.3 — 缺欄確認框逐 horizon 列出**
-- 內容：訊息改為逐 horizon 列缺幾筆（主答案窗與附帶欄分開列）。
-- 驗證：vitest 斷言訊息含每個缺欄 horizon 之筆數數字。
-- 存活至：Phase 6。
-- 覆蓋風險：覆蓋現行單一 horizon 之訊息字串（**刻意**）。
+- 內容（**R8 依 §D-3′ 改寫**）：訊息改為**逐附帶 horizon** 列缺幾筆。
+  🔴 原文之「主答案窗與附帶欄**分開列**」已作廢——主答案窗已移除，匯出端不再有
+  「答案窗缺欄」這件事（`label_value` 不在匯出檔內）⇒ 只剩附帶欄一類。
+  答案窗之可算／缺筆數改於 **IC 分析頁**揭露（落點＝Task 7.6 之分析參數區）。
+- 驗證：vitest 斷言訊息含每個缺欄**附帶** horizon 之筆數數字；
+  **加一條**：訊息**不得**含「主答案窗」字樣（斷言不出現）。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：覆蓋現行單一 horizon 之訊息字串（**刻意**）。**須同步**：Task 5.3 原以
+  「主答案窗 h：N/M 筆可算」為顯示內容，已隨本 Task 一併改寫（見 Task 5.3）。
 - 邊界：只改訊息，不改「缺欄不寫值」之既有行為。
-- 不可做：不得因缺欄而阻擋匯出。
+- 不可做：不得因缺欄而阻擋匯出；不得在此處揭露答案窗（那已不屬匯出層）。
 
 ### Phase 5 — 錯誤訊息與表頭說明（依賴：Task 5.0）　【#2 ＋ #3 ＋ #6】
 
@@ -986,10 +1154,14 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 
 **Task 5.3 — #2 缺答案窗欄之確認框（GROK-R1-P2-01 指出 #2 原版未交代）**
 - 內容：使用者 #2 問「要自己找案例時間點測嗎」——現行確認框只在缺 `future_{h}bar_return`
-  時跳。改為：匯出前**主動顯示**「主答案窗 h：N/M 筆可算、K 筆因資料尾端不足而缺」，
+  時跳。改為：匯出前**主動顯示**「附帶欄 h：N/M 筆可算、K 筆因資料尾端不足而缺」，
   使用者不必自己去湊時間點才知道。
-- 驗證：fixture 尾端 3 筆不足 ⇒ 訊息含 `3`（數字精確比對）。
-- 存活至：Phase 6。
+  🔴 **R8 依 §D-3′ 改寫**：原文顯示對象為「主答案窗 h」，該概念已移出匯出層
+  ⇒ 匯出前之顯示對象改為**每個附帶 horizon**；答案窗之可算／缺筆數於 IC 分析頁揭露
+  （落點＝Task 7.6）。使用者關切之「要自己找案例時間點測嗎」在兩處各自被回答。
+- 驗證：fixture 尾端 3 筆不足 ⇒ 訊息含 `3`（數字精確比對）；
+  **加一條**：訊息**不得**含「主答案窗」字樣。
+- 存活至：Phase 7（終）。
 - 覆蓋風險：與 Task 4.3 同一訊息區塊，兩者須合併實作（Task 4.3 先）。
 - 邊界：只改顯示時機與內容。
 - 不可做：不得阻擋匯出。
@@ -1107,7 +1279,20 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 三者**直接改變報酬數字**；若使用者實際策略是「訊號後下一根開盤進場」（`next_open`），
 現有數字與其策略不符。
 
-#### `/search` 之 `label_value` producer 綁定（R5 群集 F；觸及數值正確性，§C0 不得降殘留）
+#### `label_value` producer 綁定（R5 群集 F；R8 依 §D-3′ 由匯出層改掛分析層；觸及數值正確性，§C0 不得降殘留）
+
+🔴 **R8 改寫之範圍聲明（先讀本段再讀 F-1..F-5）**：本節原題為「`/search` 之 `label_value`
+producer 綁定」，其全部條文都建立在「`/search` 匯出端寫 `label_value`」之前提上。
+§D-3′ 已裁定匯出端**不寫** `label_value` ⇒ **前提消失**。
+本節改寫為**分析層** producer 之綁定；`/search` 端之對應規則退化為單一條 F-0。
+
+**F-0（`/search` 端；取代原 F-1..F-3 對匯出層之全部要求）**：
+`/search` 匯出端**不產生、不寫入 `label_value`**（Task 4.1 ②）
+⇒ 匯出層不再有「宣告語意 vs 實際數值不一致」之問題，原 F-2 之整批拒絕匯出
+與 reason `label_producer_unsupported_for_declared_semantics` **不掛在匯出層**（改掛分析層，見 F-2′）。
+`entry_price_semantic`／`label_return_mode`／`decision_offset_bars` 三者在匯出檔內
+之角色 ＝ **該批之預設宣告（批次事實層）**，供 IC 分析頁作為分析參數之初始值；
+其**不**決定任何數值，因為匯出檔內已無數值可決定。
 
 🔴 **實碼查證之既有不一致（三家 R5 命中；主委實測覆核屬實）**：
 `/search` 匯出之 `label_value` 固定取 `future_{horizon}bar_return`，而該欄之產生式為
@@ -1117,12 +1302,38 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 但 `eventExport.ts:93` 之現行預設寫 `entry_price_semantic: 'trigger_open'`
 ⇒ **現行預設宣稱的語意與實際數值本來就不一致**，不是接出 UI 之後才產生的問題。
 
-**F-1 支援矩陣（封閉集合）**：`/search` 路徑只有**唯一**受支援之三元組
-`(trigger_close, close_to_close, k=0)`。落在此三元組內才允許以 `future_{horizon}bar_return`
-寫入 `label_value`（short 取負之既有規則不變）。
+🔴 **R8 註**：上段之「既有不一致」在 §D-3′ 下**自動消失**——匯出端不寫 `label_value`，
+就沒有「宣告 `trigger_open` 卻寫 close→close 數字」這回事。
+保留本段為**病因紀錄**（它是 F-1 支援矩陣之由來），不得刪；但其結論已被 F-0 取代。
 
-**F-2 偏離即 fail-closed**：三維度任一偏離 F-1 ⇒ **整批拒絕匯出**（`n_records == 0`），
-reason `== "label_producer_unsupported_for_declared_semantics"`。
+**F-1′ 分析層支援矩陣（封閉集合；R8 由匯出層改掛分析層）**：
+條件 IC 之分析層 producer 本批只支援**唯一**之報酬語意三元組
+`(trigger_close, close_to_close, k=0)`；**答案窗 `h` 為任意正整數，不受本矩陣限制**。
+落在此三元組內才產生 `label_value`。short 取負之既有規則不變。
+
+🔴 **主委裁決點（兩份補丁包互斥）**：
+- `-arch-shift.md` 之 Task 7.6 diff 主張「**允許**在 IC 頁設定分析參數
+  （`horizon_bars`、報酬語意三元組）」——即三元組亦可自由設定。
+- `-arch-analyze-time-label.md` §6.2 之 golden 只涵蓋「(t0, h, direction, **F-1 三元組**)」，
+  `-codex-pit-wiring.md` 之 golden 只涵蓋 long/short × 1h/12h × h=1/7
+  ——**兩份補丁包所指定之 exact golden 皆未涵蓋其他三元組**。
+- 既有 F-5 明訂「開放更多組合須先有逐組合之 exact golden」（R5 三家）。
+
+**裁決**：三元組之控制項**移到 IC 分析頁**（arch-shift 之「可設定」在**位置**上落實），
+但**本批之可操作集合仍鎖 F-1′**，其餘值 disabled ＋顯示 F-5′ 之開放前置理由。
+理由：§C0「只能更嚴」；且無 golden 之組合一旦可選，使用者會拿到**沒有任何 oracle 驗過**
+之 `label_value` 直接餵條件 IC——這正是 F-2′ 要根除者。
+機制**沿用** Task 7.1 之 `EVENT_DIM_PATH_EXCLUSIONS`（路徑鍵新增 `'/ic-analysis'`），
+**不另創第四種機制**。
+
+**F-2′ 偏離即 fail-closed（分析層）**：三元組任一偏離 F-1′ ⇒ **該次分析拒絕**，
+`capability_status == "unavailable"`，reason `== "label_producer_unsupported_for_declared_semantics"`。
+🔴 **登記處隨層次改變**：本 reason 原登記於 `event_import_contract.json` 之
+`import_failure_reasons`（匯入失敗）；改掛分析層後，其語意為**分析能力不可用**
+⇒ 須改登記於 `event_import_contract.json` 之 **`capability_unavailable_reasons`**
+（該鍵既有值＝`missing_label_value`／`missing_prevalence_disclosure`／`one_class_test_segment`；
+receipt：`event_import_contract.json` 之同名鍵）。
+🔴 **兩處清單之最終內容之權威在 Task 1.1**，本節**不重述計數亦不重述最終集合**。
 🔴 **該 reason 須先登記契約**（R6 群集 D；§C／D-6：新增 reason 一律先改契約）：
 登記於 `momentum/Analysis/contracts/event_import_contract.json` 之 `import_failure_reasons`；
 🔴 **該清單之最終計數與內容之權威在 Task 1.1**，本節**不重述計數**
@@ -1134,21 +1345,31 @@ reason `== "label_producer_unsupported_for_declared_semantics"`。
 🔴 **不得**單列 skip 後假裝成功，**更不得**在宣告 `next_open` 之下仍寫入 close→close 之數字
 ——那正是本群集要根除的假語意。
 
-**F-3 預設值更正（D-4 合法變更；誠實預設）**：`entry_price_semantic` 之寫死預設由
-`trigger_open` 改為 **`trigger_close`**，使「使用者完全不動 UI」時三元組落在 F-1 內、
-且與歷史 `future_*` 數值一致。
-⚠️ 這是**修正一個既存的假宣稱**，不是改變任何數字——改前改後 `label_value` 位元組相同，
-變的只有 `entry_price_semantic` 這個宣告欄之字面。須在 commit message 說明。
+**F-3′ 預設值更正（D-4 合法變更；誠實預設）**：`entry_price_semantic` 之寫死預設由
+`trigger_open` 改為 **`trigger_close`**，使「使用者完全不動 UI」時三元組落在 F-1′ 內。
+⚠️ **R8 下之性質改變**：原文說「改前改後 `label_value` 位元組相同」——匯出端現已無
+`label_value` ⇒ 該保證改述為：**本改動不影響任何數值**，只改該批之宣告欄字面，
+且使該宣告與分析層之預設分析參數一致。須在 commit message 說明。
 
-**F-4 單一公式來源**：判定與換算須由**後端唯一函式**承載
-（`momentum/Analysis/event_samples/label_value_from_case.py`），
-前端只呼叫其結果或其對應之 API；**禁止**在 TS 另寫一份等價公式（第二份副本必漂移）。
+**F-4′ 單一公式來源（分析層）**：判定與換算須由**後端唯一函式**承載，
+其呼叫點在**條件 IC 分析路徑**（非 `/search` 匯出）；
+前端**不得**在 TS 產生、推導或攜帶 `label_value`（第二份副本必漂移）。
+函式與 transport 之定義見 **Task 7.0b**（本節不重述簽章與端點）。
 
-**F-5 開放更多組合之前置**：`next_open`／`decision_bar_*`／`k > 0`／非 `close_to_close`
-於 `/search` **本批不開放**（disabled ＋顯示理由）。要開放，須先有真正的 label producer
-（重用 `align_events` 之 `decision_at_ms`／`entry_at_ms`／`label_start_ms`／`label_end_ms` 與 bars）
-＋ 逐組合之 exact golden；在那之前寫入不匹配之 `label_value` 一律視為 fail-closed 之對象。
-CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須過既有契約與 D-7 之 L2／L3。
+**F-5′ 開放更多組合之前置**：`next_open`／`decision_bar_*`／`k > 0`／非 `close_to_close`
+於**條件 IC 分析頁**本批不開放（disabled ＋顯示理由）。
+要開放，須有**逐組合之 exact golden**（§G G-3 之 analysis-label golden 擴充）；
+在那之前產生不匹配之 `label_value` 一律視為 F-2′ fail-closed 之對象。
+🔴 **R8 註**：R5 版所列之開放前置「須先有真正的 label producer（重用 `align_events` 之
+`decision_at_ms`／`entry_at_ms`／`label_start_ms`／`label_end_ms` 與 bars）」
+**已由 §D-3′ 之分析時 producer 滿足**（Task 7.0b）⇒ 剩下之唯一前置是 golden 覆蓋。
+CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須過既有契約與 D-7 之 L2／L3；
+🔴 **自帶 `label_value` 與分析時重算之互斥處置（`-arch-analyze-time-label.md` §5 要求「須寫死一種」）**：
+採 **fail-closed** ——CSV 自帶 `label_value` 之批次，若使用者在 IC 頁給定與匯入宣告
+不同之答案窗 `h`，該次分析**拒絕**，reason `== "label_producer_unsupported_for_declared_semantics"`。
+理由：另一選項（鎖定匯入值、禁改 h）等於把不可驗之使用者數值當 oracle 沿用，
+而系統無法證明該值對應哪個 h ⇒ 依 §C0 取嚴版。
+📌 **具名標「待 R9 裁定」**：補丁包只要求二擇一、未指定哪一個，本裁決為主委選擇。
 
 **Task 7.0 — 前置：擴 `EventExportOptions` 補齊五維度（R4 群集 A；Task 7.1／7.2 之前置）**
 - 內容：`frontend/src/lib/eventExport.ts` 之 `EventExportOptions`（`:9-17`）現缺
@@ -1156,8 +1377,9 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   而 `buildEventContractRecords` 之 `:92`／`:102`／`:104` 仍為寫死值。
   本 Task **只做型別與參數化**：補齊五個 opts 欄位、把三處寫死改為 `opts.X ?? <現行預設>`、
   🔴 **不含** `counterexample_kind`（R5 群集 G：逐列選填欄，非批次維度）。
-  🔴 **預設值之唯一例外**：依 §F-3 把 `entry_price_semantic` 之寫死預設由 `trigger_open`
-  改為 `trigger_close`（D-4 合法變更；`label_value` 位元組不變，變的只有宣告欄字面）。
+  🔴 **預設值之唯一例外**：依 §F-3′ 把 `entry_price_semantic` 之寫死預設由 `trigger_open`
+  改為 `trigger_close`（D-4 合法變更；**不影響任何數值**，變的只有宣告欄字面
+  ——匯出端於 R8 已不寫 `label_value`，見 Task 4.1 ②）。
   **除此一項外不動任何預設值、不加任何 UI。**
   🔴 `label_return_mode` 之寫入路徑為**巢狀**（`label_definition.fields`，見 Phase 7 前言表格），
   與其餘五者之頂層路徑不同，須各自對應正確路徑。
@@ -1167,14 +1389,17 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   ⑦全部不傳 opts ⇒ 五欄之值 `===` 預設（`'C'`／`user_labeled_same_trigger`／
     **`trigger_close`**／`close_to_close`／`0`），且 `counterexample_kind` **不出現於輸出**
     （逐列選填欄，見 G-1）
-    🔴 `entry_price_semantic` 之預設基準已由 `trigger_open` 改為 `trigger_close`（見 F-3）
-    ——本 Task 之「行為不變」指 **`label_value` 位元組不變**，宣告欄字面刻意改正
-  ⑧三元組偏離 F-1 之支援矩陣（例如傳 `entryPriceSemantic='next_open'`）
-    ⇒ 產出 `n_records === 0` 且 reason
-    `=== 'label_producer_unsupported_for_declared_semantics'`；
-    **斷言不得產生任何帶 `label_value` 之列**
+    🔴 `entry_price_semantic` 之預設基準已由 `trigger_open` 改為 `trigger_close`（見 F-3′）
+    ——本 Task 之「行為不變」指 **G-2 事件 golden byte 級不變**，宣告欄字面刻意改正
+  ⑧🔴 **R8 依 §F-0 改寫**：原⑧要求「三元組偏離 F-1 ⇒ 產出 `n_records === 0` 且 reason
+    `label_producer_unsupported_for_declared_semantics`」——該 fail-closed 已隨
+    §D-3′ 移到**分析層**（§F-2′，驗收落 Task 7.0b ③⑤）。
+    匯出端已不寫 `label_value` ⇒ **沒有可假冒的數值**，整批拒絕匯出即無依據。
+    改為：傳任一非 F-1′ 之三元組 ⇒ 匯出**照常成功**，
+    且每一列皆**不含** `label_value`，`records[0].entry_price_semantic` 忠實等於所傳值
+    （宣告即事實，不再有「宣告與數值不符」之可能）
   **mutation（兩條，皆須紅）**：把任一 `opts.X ?? default` 改回寫死 ⇒ 對應那條；
-  在 `next_open` 之下仍寫入 `future_{h}bar_return` ⇒ ⑧。
+  在任一三元組之下於匯出端寫入 `future_{h}bar_return` 作為 `label_value` ⇒ ⑧。
 - 存活至：Phase 7（終）。
 - 覆蓋風險：本 Task 只擴介面不接 UI，其產出被 Task 7.1（接 UI）與 7.2（機械閘）**依賴而非覆蓋**
   ⇒ 三者為 7.0 → 7.1 → 7.2 之嚴格順序。**須同步**：7.0 之⑦「不傳即等於現行預設」是 7.1
@@ -1186,59 +1411,113 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   不得把 `label_return_mode` 寫到頂層——正確路徑為
   `label_definition.label_return_mode`，寫錯位置會使契約 schema 檢核通過但語意落在錯的物件。
 
-**Task 7.0b — 後端唯一 `label_value` producer（R6 群集 E；F-4 之承載 Task）**
-- 內容：§F-4 要求「判定與換算由後端唯一函式承載、禁 TS 另寫一份」，但 R5 版**未建立任何
-  Task 承載它**，且 Task 7.0 明寫「不改任何後端」⇒ 實作者可通過 7.0／7.1 之 UI round-trip
-  而完全不做 producer（CODEX-R6-P0-01）。本 Task 補上該承載：
+**Task 7.0b — 分析時 `label_value` producer 與其 wiring（R6 群集 E；F-4′ 之承載 Task）**
+
+🔴 **R8 REOPEN 重寫**：R7 才補上之 `POST /api/v1/case/label-values` 落在**匯出**生命週期
+（request 帶 `cases`＝`/search` 之結果列、呼叫點為 `buildEventContractRecords`）。
+§D-3′ 裁定答案窗屬**分析層** ⇒ 該端點之整個生命週期位置錯誤，**非改參數可補**，故重寫。
+原版條文保留於本 Task 末「原版與撤回理由」，不得刪。
+
+- 內容（四件事）：
+
+  **① 後端唯一 producer 函式**
   新建 `momentum/Analysis/event_samples/label_value_from_case.py`，公開單一函式
   ```
-  resolve_label_value(case, *, entry_price_semantic, label_return_mode,
-                      decision_offset_bars, horizon_bars, direction, timeframe)
-      -> {"supported": bool, "label_value": float | None, "reason": str | None}
+  resolve_label_value_at_analyze(records, bars_by_tf, *, event_label_spec)
+      -> {"supported": bool,
+          "label_values": {event_id: float | None},
+          "windows": {event_id: {"label_start_ms": int, "label_end_ms": int,
+                                 "decision_at_ms": int, "entry_at_ms": int}},
+          "reason": str | None}
   ```
-  - `supported` 由 §F-1 之支援矩陣判定；不在矩陣內 ⇒ `supported=False`、
-    `label_value=None`、`reason = "label_producer_unsupported_for_declared_semantics"`。
-  - 在矩陣內 ⇒ `label_value` 取 `future_{horizon_bars}bar_return`，short 取負
-    （既有規則不變）；缺該欄 ⇒ `label_value=None`、`reason` 走既有缺欄路徑。
-  🔴 **API 契約與 wiring（R7 群集 E；三家全員命中「只有 helper、無落地路徑」）**：
-  只定義 Python helper 而不定義 transport ⇒ 實作者可新增 helper 而 TS 仍直接讀
-  `future_{horizon}bar_return`，§F-4 等於無法落地。本 Task 一併定義：
-  - **端點**：`POST /api/v1/case/label-values`
-  - **request**：`{cases: [...], entry_price_semantic, label_return_mode,
-    decision_offset_bars, horizon_bars, timeframe}`（`cases` 為 `/search` 之結果列）
-  - **response（支援）**：`200`，`{supported: true, label_values: [float|null, ...],
-    n_records: int}`——`label_values` 之長度與順序與 `cases` **逐列對應**
-  - **response（不支援）**：`200`，`{supported: false, label_values: [], n_records: 0,
-    reason: "label_producer_unsupported_for_declared_semantics"}`
-    （🔴 **非 4xx**：這是合法查詢得到「此組合不支援」之答案，不是請求格式錯）
-  - **request 格式錯**（缺欄／enum 外）：`400` ＋ 契約既有 reason
-  - **前端呼叫點**：`buildEventContractRecords` **只得**由本端點取 `label_value`；
-    禁在 TS 以任何方式自行推導。
-  - **前端只呼叫本函式之結果或其對應 API**，禁在 TS 重寫等價公式（§F-4）。
-- 驗證：`pytest tests/momentum/event_samples/ -q -k label_value_from_case` ≥6 條——
-  ①支援矩陣內（`trigger_close`／`close_to_close`／`k=0`）⇒ `supported is True` 且
-    `label_value ==` 手算之 `(close[t+h]-close[t])/close[t]`（long）
+  - `event_label_spec` ＝ `{horizon_bars, entry_price_semantic, label_return_mode,
+    decision_offset_bars}`；`supported` 由 §F-1′ 判定，偏離 ⇒ F-2′ 之 reason。
+  - **禁止**自行實作報酬公式：`windows` 與 `label_value` 一律由既有 `align_events`
+    產生（receipt：`alignment.py:152-172` 已由 `label_definition.window.horizon_bars`／
+    `label_return_mode`／`entry_price_semantic`／`decision_offset_bars` 導出四個時間戳）。
+  - 呼叫前先建**分析用副本**：把 `event_label_spec` 之四值覆寫到記錄副本之對應欄
+    （in-memory；**不回寫**匯出檔／已落檔事件批），覆寫規則之權威在 §D-7 之 R8 增訂。
+  - bars 一律經 `bars_from_kline_cache`（服務端取 bars 唯一入口，`pipeline.py:77-81`）；
+    取不到 bars ⇒ `supported=False`、reason 走既有 capability unavailable 路徑。
+  - 尾端不足 ⇒ 該 event 之 `label_value` 為 `None` 且**不進 IC**（loud），**禁填 0**。
+
+  **② transport：折進既有 IC analyze，不另開端點**
+  🔴 **主委裁決點（三份補丁包提出三種 transport，互斥）**：
+  - `-arch-shift.md`：`POST /api/v1/ic/event-label-values`（前端先取 `label_values` 再送分析）
+  - `-arch-analyze-time-label.md`：`POST /api/v1/event-batches/{id}/conditional-ic`
+  - `-codex-analysis-label.md` ＋ `-codex-pit-wiring.md`：**不另開端點**，於
+    `ICAnalyzeRequest` 增 `event_import_id` ＋ `event_label_spec`，
+    由 `ic_analysis_service._run_analysis` 於服務端呼叫 producer
+    （兩份補丁包之 SYNC-LOCI 皆列 `api/models/ic_models.py#ICAnalyzeRequest`
+    與 `api/services/ic_analysis_service.py#_run_analysis`）。
+
+  **裁決：採第三種（折進 IC analyze）。理由為正確性，非偏好**：
+  前兩種讓 `label_value` 經前端往返一趟 ⇒ 前端可能以 `h=3` 取得 `label_values`
+  卻以 `h=7` 送出分析，**purge 與 label 分屬不同 h**，正是 §D-3a 三步順序要根除者；
+  且 §D-3a 明訂「①檢核 spec ②以該次 h 建立 purge／split ③以同一 spec 產生 labels」
+  必須**在同一次分析內原子完成**，跨請求即無法保證。
+  `-arch-shift.md` 自身亦允許「或**同函式之服務端呼叫**」⇒ 本裁決在其容許範圍內。
+  ⇒ **不採**任何獨立 `label-values` 端點；前端**不得**持有或傳送 `label_value`。
+
+  **③ 契約欄位（先改契約，D-6）**
+  - `ICAnalyzeRequest` 新增 `event_import_id: Optional[str]` 與
+    `event_label_spec: Optional[dict]`（欄集恰為 ① 所列四鍵）。
+  - `event_label_spec` 存在而 `event_import_id` 缺 ⇒ `400`；反之（只給 import_id）
+    ⇒ 以該批之匯出宣告值為分析參數初始值（F-0）。
+  - 🔴 現況 `event_import_id` **只存在於前端 config**、從未送到後端
+    （receipt：`ICConfigPanel.tsx:275-277` 寫入 config；`useICAnalysis.ts:283-286`
+    只送 `event_timestamps`）⇒ 本 Task 一併補此 wiring。
+
+  **④ 執行順序與 purge（§D-3a 三步之落地點）**
+  `_run_analysis` 之事件分支固定為：①檢核 `event_label_spec`
+  ②以 **§D-3′-a（ii）之 `max` 式**計 purge 下界並建 split
+  ③以同一 spec 呼叫 ① 之 producer 產生 labels ④ labels 餵 `ic_feed`。
+  **禁止**沿用匯入檔之 `label_end_ms − label_start_ms` 當 embargo。
+
+- 驗證（pytest 兩組 ＋ vitest 兩組，逐條如下）：
+  `pytest tests/momentum/event_samples/ -q -k analysis_label_producer` ≥7 條——
+  ①F-1′ 內（`trigger_close`／`close_to_close`／`k=0`）⇒ `supported is True` 且
+    `label_values[eid] ==` 手算之 `(close[t0+h]-close[t0])/close[t0]`（long，`atol=0`）
   ②同上 short ⇒ 值為①之相反數（`== -x`，`atol=0`）
-  ③`entry_price_semantic='next_open'` ⇒ `supported is False` 且 `label_value is None`
-  ④`decision_offset_bars=3` ⇒ 同③
+  ③`entry_price_semantic='next_open'` ⇒ `supported is False`、`label_values == {}`
+  ④`decision_offset_bars=3` ⇒ 同③；且 `windows[eid]['decision_at_ms']` `<` `t0`
+    （證明 k 之映射確實生效，而非被忽略）
   ⑤`label_return_mode='open_to_close'` ⇒ 同③
-  ⑥`reason` 字面取自契約：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert 'label_producer_unsupported_for_declared_semantics' in c['import_failure_reasons']"` rc=0
-  ＋`npx vitest run eventExportLabelProducer` ≥4 條：
-    ①前端在不支援組合下**不產生**任何帶 `label_value` 之列
-    ②支援組合下 `label_value` 之值 `===` 端點回傳者（逐列對應）
-    ③**端到端 wiring**：mock 端點回 `supported: false` ⇒ 匯出 `n_records === 0`
-    ④🔴 **`eventExport.ts` 內不得存在 `label_value` 之本地取值路徑**——
-      斷言 `grep -cE "label_value[^:]*=[^=]*future_|future_[^\n]*bar_return" frontend/src/lib/eventExport.ts` `== 0`
-      （R7 群集 E：R6 版寫 `grep -c "shift(-" … == 0` 是**空斷言**——現行該檔本就無
-      `shift(-`，該條恆綠；grok 命中。改為斷言真正會出現之取值形態。）
-  **mutation（三條，皆須紅）**：`supported` 恆真 ⇒ ③；short 不取負 ⇒ ②；
-  在 TS 重寫一份公式 ⇒ vitest 之 grep 條。
+  ⑥同一批以 `h=3` 與 `h=7` 各跑一次 ⇒ event id 集合**相同**、
+    `label_values` **不相同**、`windows[*]['label_end_ms']` 各自對應自己的 h
+  ⑦尾端不足 ⇒ 該 eid 之 `label_value is None` 且**不出現**於餵給 `ic_feed` 之輸入
+    （斷言 `ic_feed` 輸入之鍵集不含該 eid；**非**填 0）
+  `pytest tests/api -q -k event_analysis_horizon_purge` ≥5 條——
+  ⑧`h=7` **不得**沿用 `h=1` 之 labels／split；`split purge >=` 本次 label end
+  ⑨purge 下界 `==` §D-3′-a（ii）之 `max(lookahead 深度, 本次 h 窗寬)`：
+    以「深度 12、h=3」與「深度 1、h=7」兩組 fixture 各驗一次，證明兩邊都可能是勝者
+  ⑩`event_label_spec` 存在而 `event_import_id` 缺 ⇒ `400`
+  ⑪`event_import_id` 確實由前端送達後端（`npx vitest run icEventAnalysisRequest` ≥2 條：
+    選批後送出之 payload 含 `event_import_id` 與 `event_label_spec`）
+  ⑫🔴 **前端不得持有 `label_value`**：斷言
+    `grep -cE "label_value" frontend/src/lib/eventExport.ts` `== 0` 且
+    `grep -cE "label_value" frontend/src/hooks/useICAnalysis.ts` `== 0`
+  **mutation（六條，皆須紅）**：`supported` 恆真 ⇒ ③；short 不取負 ⇒ ②；
+  purge 改回沿用匯入值 ⇒ ⑧；`max` 式改成只取本次 h ⇒ ⑨；
+  尾端不足改填 0 ⇒ ⑦；在 TS 重寫一份公式 ⇒ ⑫。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：本 Task 為 §F-4 之唯一承載；Task 7.0 只做前端型別與參數化、7.1 只接 UI
-  ⇒ 三者為 7.0b／7.0 → 7.1 → 7.2 之依賴鏈，互不覆蓋。**須同步**：§F-5 若日後開放更多組合，
-  只需擴充本函式之支援矩陣與 golden，**不得**在前端或匯出層另開分支。
-- 邊界：只判定與換算 `label_value`；不改 `event_id`、不改契約其他欄位。
-- 不可做：不得在不支援之組合下回傳任何非 `None` 之 `label_value`（那正是 §F-2 要根除者）。
+- 覆蓋風險：本 Task **取代** R7 版之匯出端 producer（刻意；見上「REOPEN」）。
+  **須同步**：§F-5′ 若日後開放更多三元組，只需擴充本函式之支援矩陣與 §G G-3 之 golden，
+  **不得**在前端或匯出層另開分支；Task 7.6 之分析參數 UI 與本 Task 之 `event_label_spec`
+  為**同一組欄位**，欄位增減須同批改。
+- 邊界：只在分析時判定與換算 `label_value` 與其 window；不改 `event_id`、
+  不回寫任何已落檔之事件批、不改契約其他欄位。
+- 不可做：不得在不支援之組合下回傳任何非 `None` 之 `label_value`（§F-2′）；
+  不得讓前端持有、推導或傳送 `label_value`（§F-4′）；
+  不得為「省一次計算」而快取上一次 h 之 labels 給不同 h 之分析使用。
+
+**原版與撤回理由（R7 版，保留不得刪）**：
+R7 版定義 `resolve_label_value(case, *, ...)` 單列函式 ＋ `POST /api/v1/case/label-values`，
+request 之 `cases` 為 `/search` 之結果列，前端呼叫點為 `buildEventContractRecords`，
+並要求「`buildEventContractRecords` **只得**由本端點取 `label_value`」。
+**撤回理由**：該設計把 producer 綁在**匯出**生命週期上，而 §D-3′ 裁定答案窗屬分析層
+⇒ 匯出時根本還不知道使用者要用哪個 h，端點的 `horizon_bars` 參數無來源。
+R7 版之驗收⑥（reason 取自 `import_failure_reasons`）亦隨 F-2′ 之登記處改變而作廢。
 
 **Task 7.1 — 五維度全部接出前端（依賴 Task 7.0）**
 - 內容：`/search` 匯出面板與 `/data-preparation` 匯入表單各提供五個維度之選擇；
@@ -1251,13 +1530,22 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   - `pathExclusions` ＝ **前端單一具名常數**（如 `EVENT_DIM_PATH_EXCLUSIONS`），
     每筆須帶**非空理由字串**。**本批之封閉內容**（R5 群集 F／H 擴充後）：
     ```
-    ('/search', 'scenario',             { A, B, two_stage })   # 皆無獨立 label producer
-    ('/search', 'entry_price_semantic', { trigger_open, next_open, decision_bar_open, decision_bar_close })
-    ('/search', 'label_return_mode',    { open_to_close, open_to_horizon_close })
+    ('/search',      'scenario',             { A, B, two_stage })   # 皆無獨立 label producer
+    ('/search',      'entry_price_semantic', { trigger_open, next_open, decision_bar_open, decision_bar_close })
+    ('/search',      'label_return_mode',    { open_to_close, open_to_horizon_close })
+    ('/ic-analysis', 'entry_price_semantic', { trigger_open, next_open, decision_bar_open, decision_bar_close })
+    ('/ic-analysis', 'label_return_mode',    { open_to_close, open_to_horizon_close })
     ```
     ⇒ `/search` 之 `scenario` 只開 `C`；`entry_price_semantic` 只開 `trigger_close`；
-    `label_return_mode` 只開 `close_to_close`——恰為 F-1 之支援矩陣。
-    `decision_offset_bars` 非 enum，於 `/search` 之可輸入範圍鎖定為 `0`（見 F-1）。
+    `label_return_mode` 只開 `close_to_close`——恰為 §F-1′ 之支援矩陣。
+    `decision_offset_bars` 非 enum，於 `/search` 與 `/ic-analysis` 之可輸入範圍均鎖定為 `0`（見 §F-1′）。
+    🔴 **新增 `/ic-analysis` 列之理由**：§D-3′ 後三元組之控制項移到 IC 分析頁
+    （Task 7.6 ③），該處之可操作集合須與 §F-1′ 一致 ⇒ 沿用**同一具名常數**，
+    **不另建第二份排除清單**（另建即第二份副本）。
+    🔴 **`/search` 各列之理由字串須隨 §F-0 更新**：原理由為「匯出端會寫 `label_value`，
+    偏離即假語意」；匯出端已不寫 `label_value` ⇒ 新理由為
+    「該值宣告後，分析層本批不支援以其計算 `label_value`（§F-5′）⇒ 該批將無法做條件 IC」。
+    依 §C0「只能更嚴」**保留**排除，只改理由字串。
     ⇒ 排除是**封閉可列舉集合**，不是散落在元件裡的 if；新增或移除排除須改該常數並同步本 SPEC。
   - 兩類**不可選**值之 UI 呈現不同、須分別顯示：契約恆拒者顯示契約之 `rejected_with_reason`
     字面；路徑排除者顯示 `pathExclusions` 之理由字串。兩者皆 **disabled 且不計入 selectable**。
@@ -1267,11 +1555,13 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   ⑦`control_kind` 之 disabled 選項存在且其 title/aria 含 `not_implemented_platform_random_bars`
   ⑧`/search` 之 `scenario` 之 `A`／`B`／**`two_stage`** 三者皆為 disabled 且顯示排除理由；
     同一維度在 `/data-preparation` 之 selectable `==` 全部 4 值（證明限制**只在該路徑**）
-  ⑨`EVENT_DIM_PATH_EXCLUSIONS` 之每筆理由字串 `!== ''`，且該常數之內容**集合相等**於
+  ⑨`EVENT_DIM_PATH_EXCLUSIONS` 之每個理由字串 `!== ''`，且該常數之內容**集合相等**於
     ```
-    {('/search','scenario'):            {A, B, two_stage},
-     ('/search','entry_price_semantic'):{trigger_open, next_open, decision_bar_open, decision_bar_close},
-     ('/search','label_return_mode'):   {open_to_close, open_to_horizon_close}}
+    {('/search','scenario'):                 {A, B, two_stage},
+     ('/search','entry_price_semantic'):     {trigger_open, next_open, decision_bar_open, decision_bar_close},
+     ('/search','label_return_mode'):        {open_to_close, open_to_horizon_close},
+     ('/ic-analysis','entry_price_semantic'):{trigger_open, next_open, decision_bar_open, decision_bar_close},
+     ('/ic-analysis','label_return_mode'):   {open_to_close, open_to_horizon_close}}
     ```
     🔴 **以集合相等斷言，不用計數字面**（理由見本 Task 覆蓋風險）
   ⑩**五維度全部維持預設 ⇒ G-2 事件 golden byte 級不變**（證明接出 UI 本身不動數值）
@@ -1334,6 +1624,10 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   **不在本閘涵蓋面內** ⇒ 本閘只保護五個批次維度、不保護契約全部欄位；此邊界須明寫於實作註解與測試名稱，
   避免日後誤以為「有機械閘＝契約全欄受保護」而略過 Task 1.1 之常數同步（見 Task 1.1 覆蓋風險）。
   另：`accepted` 為契約既有鍵，本 Task **不新增**該鍵到其他維度——只在存在時採用。
+  🔴 **R8 邊界追記**：§D-3′ 後 IC 分析頁另有一組**分析參數** UI（Task 7.6 ③），其可操作集合
+  由 **Task 7.6 驗收⑤** 守、其常數內容由 **Task 7.1 驗收⑨** 之集合相等守
+  ⇒ 本閘**不擴及** `/ic-analysis`，避免同一斷言出現兩份。
+  若日後把分析參數也納入本閘，須同時刪除 Task 7.6 ⑤，不得兩處並存。
 - 邊界：涵蓋五個批次維度之三層；enum 型走①②、`decision_offset_bars`（`int`, `min: 0`）走②③。
   **不驗**「選了之後後端算出來對不對」——那是 G-2 與各 Phase 自身驗收的事。
 - 不可做：**不得以人工清單當比對基準**（那就是第三份副本）。
@@ -1355,11 +1649,16 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
 - 邊界：只揭露，不改預設值。
 - 不可做：不得寫死任何「正反例由 t0 條件決定」類之 scenario 專屬文案（D-7 通則化）。
 
-**Task 7.4 — 條件 IC decay 之邊界揭露（CODEX-R2-P1-02／GROK-R2-P2-01）**
-- 內容：明文標示「條件 IC decay 曲線**非本批交付**；附帶之 `future_*` 欄**不進入** `ic_feed`
-  （`ic_feed.py:4-5` 只吃單一 `label_value`）；需要 decay 則換主答案窗重跑，或待 GAP-6。」
+**Task 7.4 — 條件 IC decay 之邊界揭露（CODEX-R2-P1-02／GROK-R2-P2-01；R8 依 §D-3′ 改寫措辭）**
+- 內容（**R8 依 §D-3′ 改寫措辭；與 Task 4.1c 為同一文案來源，不得各寫一份**）：
+  明文標示「條件 IC decay **曲線**（一次分析同時得到多個 h）**非本批交付**；
+  附帶之 `future_*` 欄**不進入** `ic_feed`；
+  要看不同答案窗，於 **IC 分析頁改答案窗重跑分析**，**不需重新匯出事件批**；
+  一次得到整條曲線待 GAP-6。」
 - 驗證：`grep -c "IC decay" docs/GAP3_EVENT_UX_SPEC.md` `>= 1`；vitest 斷言該說明現於匯出面板；
-  **加驗收**：選附帶欄 `[1,3,7]` ⇒ `window.horizon_bars` 與 `label_value` **不變**。
+  **加驗收**：①選附帶欄 `[1,3,7]` ⇒ `window.horizon_bars` **不變**
+  ②本 Task 與 Task 4.1c 之文案來自**同一 exported 常數／formatter**（斷言同一參考）
+  ③文案中**不得**出現「重新匯出」作為換 h 之手段。
 - 存活至：GAP-6（屆時若交付 multi-horizon IC 則撤除）。
 - 覆蓋風險：GAP-6 可能取代。
 - 邊界：只揭露邊界。
@@ -1431,31 +1730,61 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
 - 邊界：只分組顯示與 `control_kind` 之傳遞；**不改**每組之計算式。
 - 不可做：不得因分組而改變 `n_eff` 或 bootstrap 之定義；不得在表格層寫死 `control_kind`。
 
-**Task 7.6 — IC 分析頁：選批後揭露該批之五維度契約設定（R4 群集 C／遺留 E）**
-- 內容：IC 分析頁之事件模式，現行 `EventImportPicker.tsx:45-52` 之 `onPick` **只回傳
-  `importId` 與 t0 timestamps**，`ICConfigPanel.tsx:274-279` 只把兩者寫入 config
-  ⇒ 使用者在**不知道這批用什麼 scenario／進場價／報酬算法**的情況下跑條件 IC。
-  本 Task 讓事件批 detail 端點回傳該批之五維度實際值，前端於選批後**唯讀揭露**，
-  文案模板與 Task 7.3 之匯出面板揭露**共用同一實作**（不另寫第二份）。
-- 驗證：`pytest tests/api -q -k event_batch_detail_dims` ≥2 條——斷言 detail 回應之維度鍵集
+**Task 7.6 — IC 分析頁：批次事實欄唯讀揭露 ＋ 分析參數可設定（R4 群集 C／遺留 E；R8 依 §D-3′ 改寫）**
+
+🔴 **R8 改寫之衝突與其解**：R7 版之「邊界」寫「**不允許**在 IC 頁修改批次設定」，
+與 §D-3′「答案窗與報酬語意於 IC 分析頁由使用者給定」**直接互斥**。
+解法＝**把原本混為一談的「批次設定」拆成兩類**（`-arch-shift.md` 之 Task 7.6 diff 即此意）：
+
+| 類別 | 欄 | 在 IC 頁 | 寫回事件批？ |
+|---|---|---|---|
+| **批次事實欄** | `scenario`／`control_kind`／`direction`／`t0`／`label` | **唯讀揭露** | — |
+| **分析參數**（`event_label_spec`） | `horizon_bars`／`entry_price_semantic`／`label_return_mode`／`decision_offset_bars` | **可設定**；初始值＝該批之匯出宣告（F-0） | 🔴 **否**——只作用於本次分析用副本 |
+
+- 內容（三件事）：
+  ① 事件批 detail 端點回傳該批之**五維度實際值**（既有需求，不變）。
+  ② IC 分析頁選批後：**批次事實欄唯讀揭露**，文案模板與 Task 7.3 之匯出面板揭露
+     **共用同一實作**（不另寫第二份）。
+  ③ IC 分析頁新增**分析參數區**：`event_label_spec` 之四欄。
+     - `horizon_bars`：任意正整數，可自由設定（§F-1′ 不限制 h）。
+     - 報酬語意三元組：本批**可操作集合鎖定 F-1′**，其餘值 disabled ＋顯示
+       §F-5′ 之開放前置理由。排除集合沿用 Task 7.1 之 `EVENT_DIM_PATH_EXCLUSIONS`
+       （新增路徑鍵 `'/ic-analysis'`），**不另建第二份排除清單**。
+     - 🔴 同時揭露 **本次答案窗之可算／缺筆數**（Task 4.3／5.3 由匯出層移來之揭露）。
+     - 🔴 同時揭露 **本次 purge 下界**，其式之權威在 §D-3′-a（ii），本區只顯示結果。
+- 驗證（pytest 一組 ＋ vitest 一組，逐條如下）：
+  `pytest tests/api -q -k event_batch_detail_dims` ≥2 條——斷言 detail 回應之維度鍵集
   **集合相等**於 `{scenario, control_kind, entry_price_semantic, label_return_mode,
   decision_offset_bars}`（🔴 **明列鍵名、不用計數字面**；理由見本 Task 覆蓋風險），
   且各值 `==` 該批落檔記錄之實際值（非預設值）；
-  `npx vitest run icEventBatchDisclosure` ≥3 條——選批後五段文字皆出現；
-  改批次之任一維度 ⇒ 顯示字串 `!==` 前值；與 Task 7.3 共用同一 formatter
-  （斷言兩處呼叫同一 exported function，非各自複製）。
-  **mutation**：把揭露文案改成前端寫死 ⇒ 「同一 formatter」那條須紅。
+  `npx vitest run icEventBatchDisclosure` ≥6 條——
+  ①批次事實欄之各段文字皆出現，且與 Task 7.3 呼叫**同一 exported formatter**
+    （斷言為同一函式參考，非各自複製）
+  ②改批次之任一事實欄 ⇒ 顯示字串 `!==` 前值
+  ③**批次事實欄不可編輯**：斷言其 DOM 節點無可輸入控制項（`queryByRole('combobox'/'textbox')` 為 `null`）
+  ④**分析參數可編輯**：`horizon_bars` 有可輸入控制項；輸入 `7` ⇒ 送出 payload 之
+    `event_label_spec.horizon_bars === 7`
+  ⑤三元組之**可操作**選項集合 `==` §F-1′ 之唯一三元組；其餘值 disabled 且顯示理由
+  ⑥**改分析參數不改事件批**：改 `horizon_bars` 後重查 detail 端點，
+    該批落檔記錄之 `label_definition.window.horizon_bars` **不變**（證明不回寫）
+  **mutation（四條，皆須紅）**：把揭露文案改成前端寫死 ⇒ ①；
+  把批次事實欄改成可編輯 ⇒ ③；三元組開放 F-1′ 以外之值 ⇒ ⑤；
+  分析參數回寫事件批 ⇒ ⑥。
 - 存活至：Phase 7（終）。
 - 覆蓋風險（R6 群集 B 追記）：驗收改以**明列鍵名之集合相等**之理由——R4 版寫「detail 回應
   含六個鍵」，R5 群集 G 把批次維度六改五時該字面未同步，**三家全員命中**；
   且因未列鍵名，Agent 無法唯一決定第六鍵，可能把已移出之 `counterexample_kind` 加回。
-  本 Task 只讀不寫，不改任何 IC 計算路徑 ⇒ 無後續 Phase 覆蓋。**須同步**：
-  與 Task 7.3 共用 formatter ⇒ 7.3 之維度集合擴充時本頁自動跟進；若各寫一份，
-  下次加維度就會只改一邊（Phase 7 前言所述之病因原型）。
-- 邊界：只揭露該批已落檔之設定；**不允許**在 IC 頁修改批次設定。
-- 不可做：不得只在 tooltip 顯示 `importId` 就算揭露（使用者要的是語意，不是識別碼）。
+  🔴 **R8 追記**：本 Task 由「只讀不寫」改為「讀 ＋ 收分析參數」⇒ **確實改動 IC 計算路徑**
+  （分析參數餵 Task 7.0b 之 producer）；原「不改任何 IC 計算路徑 ⇒ 無後續 Phase 覆蓋」
+  之理由已不成立，改由 Task 7.0b 之驗收⑧⑨⑪承接該路徑之正確性。
+  **須同步**：與 Task 7.3 共用 formatter ⇒ 7.3 之事實欄集合擴充時本頁自動跟進；
+  分析參數之欄集與 Task 7.0b 之 `event_label_spec` 為**同一組**，欄位增減須同批改。
+- 邊界：批次事實欄**只揭露、不可改**；分析參數**只作用於本次分析**、**不回寫**事件批。
+- 不可做：不得只在 tooltip 顯示 `importId` 就算揭露（使用者要的是語意，不是識別碼）；
+  不得讓分析參數以任何形式回寫已落檔之事件批（那會使同一批事實隨分析而變，
+  §D-3′ 之整個分層即為此而設）。
 
-**Task 7.7 — Feature run `time_range` 與事件期之對證（R4 群集 C；R5 群集 D／E 改寫）**
+**Task 7.7 — Feature run `time_range` 與事件期之對證（R4 群集 C；R5 群集 D／E 改寫；R8 增訂⑦ picker 之 decision_at 映射）**
 - 內容：`RunInfo`（`api/models/feature_factory_models.py:116-133`）**無 `time_range`**，
   而 manifest artifact **已有**（`feature_reader.py:455`；非 legacy 路徑之產生處＝
   `feature_storage._resolve_l7_v2_time_range`）⇒ 資料在後端、前端拿不到，
@@ -1514,8 +1843,25 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
      reason `== "feature_coverage_unknown_legacy_run"`。
   ⑥ 不滿足 ③ ⇒ fail-closed，`capability_status == "unavailable"`、
      reason `== "feature_coverage_insufficient"`。
-  ②④⑤⑥ 之四個 reason 一律登記於 `ic_report_contract.json` 之 `reasons.analysis_rejected`
-  （與 Task 6.0 同一處；程式與前端由該檔取字面）。
+  ⑦ 🔴 **IC picker 之 feature timestamp 映射（CODEX-R8-P0-03；R8 新增）**：
+     現行 `eventT0MsToIcTimestamps`（`frontend/src/lib/api.ts:1042-1048`）把
+     **原始 `t0` ÷1000** 當成 IC 主線之 `event_timestamps`。
+     §D-3a 已裁定「每列 feature sample key 須為 receipt 之
+     `last_bar_open_ms`／`decision_at_ms`，**不是原始 t0**」
+     ⇒ `decision_offset_bars = k > 0` 時，現行映射會把特徵取樣點推到**決策時點之後**，
+     與 `ic_feed.py:76` 之 `feature_cutoff_rule = max_close_ms_le_decision_at` 互斥。
+     **處置**：映射改由**後端**於分析時依 receipt 產生（隨 Task 7.0b ② 之 `event_import_id`
+     入後端後，前端不再需要自算 timestamps）；
+     前端之 `eventT0MsToIcTimestamps` **移除**，`useICAnalysis` 不再送 `event_timestamps`。
+     映射不合法（該 t0 無對應 bar）⇒ fail-closed，reason 取自契約既有
+     `alignment_failure_reasons.missing_bar`；
+     兩個事件映射到**同一** decision bar ⇒ fail-closed，reason `duplicate_bar`。
+     🔴 **不新增 reason**（D-6：能用契約既有字面就不擴清單）。
+  ②④⑤⑥ 所列之 reason 一律登記於 `ic_report_contract.json` 之 `reasons.analysis_rejected`
+  （與 Task 6.0 同一處；程式與前端由該檔取字面；**最終集合見下方驗證②，本欄不重述**）。
+  ⑦ 所引之 reason 集合恰為 `{missing_bar, duplicate_bar}`，取自
+  `event_import_contract.json` 之既有 `alignment_failure_reasons`，
+  **不登記於** `analysis_rejected`（層次不同：對齊失敗 vs 分析入口拒絕）。
 - 驗證：`pytest tests/api -q -k feature_coverage_gate` ≥9 條——
   ①`assert 'time_range' in RunInfo.model_fields`；且讀一份**真實** manifest 斷言
     `start`／`end` 原樣進 `/api/v1/features/runs`（型別為 `str` 或 `None`，未被轉型）
@@ -1539,10 +1885,20 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     此條防「照 R5 版實作而擋下全部現存 run」之回歸
   ⑪`start == "99999999999"`（超出 2100-01-01）⇒ fail-closed，
     reason `== "feature_coverage_unknown_timestamp_format"`
-  **mutation（六條，皆須紅）**：左界改回 `min(t0)` ⇒ ④；右界不含答案窗 ⇒ ⑤；
+  ⑫🔴 **decision_at 映射（內容⑦；R8 新增）**：`decision_offset_bars = 3` 之批次
+    ⇒ 送入 `ic_feed` 之每列 feature sample key `==` receipt 之
+    `decision_at_ms`（換算後）且 `!=` 原始 `t0`；`k = 0` 之批次兩者相等（對照組，
+    證明本條不是恆真也不是恆假）
+  ⑬映射不合法（某 t0 無對應 bar）⇒ fail-closed，reason `== "missing_bar"`；
+    兩事件映射到同一 decision bar ⇒ fail-closed，reason `== "duplicate_bar"`
+  ＋`npx vitest run icEventPickerNoLocalMapping` ≥2 條——
+  ⑭`grep -c "eventT0MsToIcTimestamps" frontend/src/` `== 0`（前端不再自算映射）
+  ⑮`useICAnalysis` 送出之 payload **不含** `event_timestamps`、**含** `event_import_id`
+  **mutation（八條，皆須紅）**：左界改回 `min(t0)` ⇒ ④；右界不含答案窗 ⇒ ⑤；
   改用 run 之 tf 或批內 `max(tf)` ⇒ ⑥⑦；legacy 之 `None` 改成放行 ⇒ ⑨；
   未知 tf 改成沿用預設 ⇒ ⑧；fail-closed 改成只回警告字串 ⇒ ③；
-  把解析改回「只用 `datetime.fromisoformat`」⇒ ⑩須紅（R6 群集 G 之回歸樁）。
+  把解析改回「只用 `datetime.fromisoformat`」⇒ ⑩須紅（R6 群集 G 之回歸樁）；
+  🔴 把 feature sample key 改回原始 `t0` ⇒ ⑫須紅（R8 之回歸樁）。
 - 存活至：Phase 7（終）。
 - 覆蓋風險：本 Task 之 gate 位於 IC 分析**入口**，與 Phase 6 之特徵數止血閘（Task 6.1）同在入口
   但為**不同拒絕條件、不同 reason**（覆蓋不足 vs 特徵數過大）⇒ 兩者須各自回應、不得合併。
@@ -1577,15 +1933,18 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
 | V-3 | CSV 與 JSON 路徑**共用同一函式** | **兩重 oracle**（R1 三家指出單靠 sha256 相等不成立） | ①靜態：AST 斷言 CSV route 呼叫 `/import-events` 之同名驗證函式 ②行為：mutation——把該共用函式改壞，**兩條路徑之測試須同時轉紅**（只有一條紅 ⇒ 存在平行實作） |
 | V-4 | `event_id` 跨路徑一致（D-2） | 同批事件之 JSON 匯出 vs CSV 回灌 | `event_id` 集合 `==`（集合相等，非逐列順序） |
 | V-5 | 刪除後該批消失 | 刪除 → 列表／analyze 各查一次 | 列表無該批；analyze status_code `== 404` |
-| V-6 | 附帶 horizon 欄與 label 語意分離（D-3） | 主答案窗 `=4`、附帶 `[1,3,7]` → 匯出 | 含 `future_{1,3,7}bar_return`；`window.horizon_bars == 4`；`label_value ==` 各列 `future_4bar_return` |
+| V-6 | 附帶 `future_*` 欄與**分析層** `label_value` 分離；匯出端不寫 `label_value`；換 h 不需重匯出（D-3′） | **執行 Task 4.1／4.1c 之驗證欄全部條目**；§V 不重述斷言字面 | 兩 Task 之命令皆 rc=0 且條目數 `>=` 各自所列 |
 | V-7 | `.source.json` 誤傳之訊息含正解 | 上傳 `.source.json` 當事件檔 | status_code `== 400` 且訊息含 `source_file` |
 | V-8 | 止血閘生效且**未載入大矩陣**（D-5） | **執行 Task 6.4 之驗證欄全部條目**（其 V-8 三項斷言與採樣時點）；§V 不重述斷言字面 | `pytest tests/api -q -k ic_stop_gate_alive` rc=0 且條目數 `>=` Task 6.4 所列；量測工具與禁令見 Task 6.2 |
 | V-9 | 止血閘不誤擋 | 小 run（15 特徵）呼叫 | status_code `== 200` **且任務確實被建立**（task store 筆數 +1；R1 指出只驗 200 不足） |
 | V-10 | tooltip 與 glossary 不漂移 | 逐表頭比對 | tooltip 文字 `==` glossary `definition` |
 | G-1 | IC 主線未被波及 | `python3 scripts/gap3_freeze_golden.py --check` | 通過。**誠實邊界：不涵蓋事件路徑**（D-4） |
 | G-2 | 事件路徑數值未意外改變 | 本批新建之事件 golden | 逐 horizon exact return（`atol=0`）／NaN mask／PIT anchor 全等；Task 4.2 之合法變更須同 commit 更新並說明 |
+| G-3 | **分析時** `label_value`／window／purge／feature timestamp map 未意外改變（D-3′） | 本批新建之 analysis-label golden（§G G-3） | `pytest tests/momentum/event_samples/ -q -k analysis_label_golden` rc=0；覆蓋面與可證偽條之唯一定義見 §G G-3。**誠實邊界：G-2 涵蓋不到此路徑**（兩者不可互相替代） |
+| V-16 | 分析時 producer 之支援矩陣、purge 下界與前端不持有 `label_value`（D-3′／D-3a／F-1′／F-2′／F-4′） | **執行 Task 7.0b 之驗證欄全部條目**；§V 不重述支援矩陣與 purge 公式 | Task 7.0b 之命令皆 rc=0 且條目數 `>=` 其所列；purge 下界之唯一定義見 §D-3′-a（ii） |
+| V-17 | IC 分析頁：批次事實欄唯讀、分析參數可設定且不回寫（D-3′） | **執行 Task 7.6 之驗證欄全部條目**；§V 不重述斷言字面 | Task 7.6 之命令皆 rc=0 且條目數 `>=` 其所列 |
 | V-11 | 五維度全接出、不可漂移、且**選值真的傳到落檔**（Phase 7） | **執行 Task 7.2 之驗證欄全部條目**（三層＋其 mutation）；§V 不重述任何斷言字面 | `npx vitest run contractEnumWiring` rc=0 且用例數 `>=` Task 7.2 所列；集合層之唯一基準 ＝ Task 7.1 定義之 `selectable(path, dim)` |
-| V-12 | lookahead 深度由標註導出、未知即擋（D-7 之 L1/L2/L3） | **執行 Task 1.10／1.11／1.12／2.1b 之驗證欄全部條目**；§V 不重述深度公式與 fixture 條文 | 四個 Task 之命令皆 rc=0；深度公式之唯一定義見 Task 2.1b，改名攻擊之判準見 Task 1.10 |
+| V-12 | lookahead 深度由標註導出、未知即擋（D-7 之 L1/L2/L3） | **執行 Task 1.10／1.11／1.12／2.1b 之驗證欄全部條目**；§V 不重述深度公式與 fixture 條文 | 各該 Task 之命令皆 rc=0；深度公式之唯一定義見 Task 2.1b，改名攻擊之判準見 Task 1.10。🔴 **R8 邊界**：本列只管**深度導出**；深度與分析時 h 合成 purge 下界之 `max` 式屬 §D-3′-a（ii），由 **V-16** 承接，兩列不重疊 |
 | V-14 | IC 分析頁揭露該批五維度 | **執行 Task 7.6 之驗證欄全部條目**；§V 不重述斷言字面 | `pytest tests/api -q -k event_batch_detail_dims` 與 `npx vitest run icEventBatchDisclosure` 皆 rc=0 且條目數 `>=` Task 7.6 所列 |
 | V-15 | 特徵覆蓋對證 fail-closed | **執行 Task 7.7 之驗證欄全部條目**；§V 不重述 containment 邊界公式 | `pytest tests/api -q -k feature_coverage_gate` rc=0 且條目數 `>=` Task 7.7 所列；containment 之唯一定義見 Task 7.7 |
 | V-13 | 報酬表正／反／全體三組 | **執行 Task 7.5 之驗證欄全部條目**；§V 不重述斷言字面 | `pytest tests/momentum/event_samples/ -q -k return_table_by_label` rc=0 且條目數 `>=` Task 7.5 所列 |
@@ -1603,7 +1962,10 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
 
 各 Phase 獨立 commit，可逐一 `git revert`。
 Task 1.1（契約）為其他 Task 之前置，回退須連同 Phase 1/2 一併回退。
-Phase 4 為純疊加（D-3 之 (a)），回退不影響既有 label 語意。
+🔴 **Phase 4 之回退性已於 R8 改變**：原為「純疊加（D-3 之 (a)），回退不影響既有 label 語意」；
+§D-3′ 後 Phase 4 **移除**匯出端之答案窗與 `label_value` ⇒ 單獨回退 Phase 4 會使匯出端
+恢復寫 `label_value`，而分析層（Task 7.0b）仍會自行計算一份 ⇒ **同一批出現兩份 `label_value`**。
+⇒ Phase 4 與 Task 7.0b／7.6 為**同一回退單元**，須一併 revert。
 Phase 6 為純新增之前置檢查，回退即恢復「可按但會吃垮機器」的現況（不建議）。
 
 ---
