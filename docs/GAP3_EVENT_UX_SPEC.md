@@ -299,8 +299,23 @@ R8 版 §D-3a 只寫「②以該次 h 建立 purge／split ③以同一 spec 產
    `align_events`，產生分析時
    `decision_at_ms`／`entry_at_ms`／`label_start_ms`／`label_end_ms` ＋ per-TF feature cutoff，
    並**在此唯一一處**計算下方之 `analysis_alignment_receipt_hash`。
-3. **coverage**：Task 7.7 之對證**讀同一份 receipt**（不得讀匯入檔舊值）。
+3. 🔴 **兩個 coverage 是不同的東西，R13 起分開命名**（COMPOSER-R13-P0-01：R12 落地把兩者
+   混為一步，Agent 會跳過 event-id 過濾、或把 feature gate 嵌進 analyze 內部）：
+   - **3a. feature-run coverage gate（Task 7.7）**：驗「特徵 run 之 `time_range` 是否涵蓋事件期」
+     ——**批次級 pass/fail**，不產生 event-id 子集；讀同一份分析時 receipt（不得讀匯入檔舊值）。
+     不通過 ⇒ 整批 `capability_status == "unavailable"`。
+   - **3b. event-coverage（`apply_event_coverage()`，本 Task 之階段）**：逐列剔除不可用事件，
+     產生 `allowed_event_ids` 並回傳新的 `PreparedAnalysisWindows`（見 Task 7.0b ①）。
+   **順序固定 3a → 3b**；3a 為批次閘、3b 為逐列過濾，**不得合併、不得互換**。
 4. **purge／split**：以同一 receipt ＋（ii）之式計 `purge_lower_bound_ms(scope)` 並建 split。
+   🔴 **R13 修正（CODEX-R13＋GROK-R13 兩家）**：`purge_lower_bound_ms(scope)` 之
+   **輸入事件集合＝3b 之前（pre-coverage）之全部事件**，於**階段 2 末**即算出
+   **immutable per-symbol map** 並隨 receipt 攜帶；階段 4 只**讀該 map**、不重算。
+   理由：R12 版之⑭(f) 要求「剔除某 TF 全部列後 purge 不變」，而（ii）之式對
+   **scope 內事件**取 max ⇒ 剔除後 max 當然會變，**兩者互斥**（我 R12 自己造的矛盾）。
+   固定為 pre-coverage 之後，「不變」成為**定義上為真**，⑭(f) 才可判定。
+   ⚠️ **副作用須揭露**：purge 因此以未過濾之事件集合為準，可能**略寬**於「只看倖存列」
+   ——依 §C0「只能更嚴」接受，並在 ⑭(f) 明寫此為刻意。
 5. **materialize labels**：只用同一 receipt 之有效事件產生 `label_value` 並餵 `ic_feed`；
    **不得**重跑 `align_events`（重跑即 hash 變 ⇒ Task 7.0b ⑩須紅）。
 
@@ -694,9 +709,16 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
    (b) 🔴 **小時命名欄**（同一個 `future72_max_drawdown`）：
        ⚠️ **R12 更正（CODEX-R12-P2-08）**：R11 版寫「鏡像 Task 7.0b ⑨(e)」——
        「鏡像」不是機制，兩份 fixture 可各自漂移而仍各自通過。
-       ⇒ 兩處**共用同一份具名 fixture**（`fixtures/hour_named_mixed_tf.json`，
-       單一 source of truth）；本節與 Task 7.0b ⑨(e) 皆以 **fixture ID** 引用，
-       **不得**各自另建資料。
+       ⇒ 兩處**共用同一份具名 fixture**。
+       🔴 **R13 補（CODEX-R13：同名不等於同一份）**：僅寫路徑仍可各自 inline 或
+       resolve 到不同資料。**定死三件**：
+       (1) **owner ＝ Task 7.0b**，提供**唯一 typed loader**
+           `load_hour_named_mixed_tf() -> HourNamedFixture`（frozen）；
+       (2) fixture 檔 `tests/momentum/event_samples/fixtures/hour_named_mixed_tf.json`
+           之 **sha256 一併凍進 §G G-3 之 golden**；loader 於載入時比對，不符 ⇒ fail-closed；
+       (3) 本節與 Task 7.0b ⑨(e) **皆呼叫該 loader**（斷言同一 exported 函式參考），
+           **不得**各自 `json.load` 或 inline 資料。
+       **mutation**：改動 fixture 一個位元組 ⇒ 兩處**同時**轉紅（證明共用而非各持一份）。
        斷言：兩 tf 之 `lookahead_depth_ms` **相等**，
        而 `lookahead_bars_declared` 之兩鍵值**不等**。
        ⚠️ **只有 (b) 能證偽「scalar 深度 × 逐列 tf」之回歸**；R10 版只寫 (a)
@@ -985,8 +1007,15 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   🔴 **R11 定案（主委自查；同型於 CODEX-R11-P1-05／GROK-R11-P1-04 所指之「留選項＝延後錯誤」）**：
   R7 版此處原寫「前端自行實作等價浮點格式化，**或**改由後端計算 digest，二擇一須明示」
   ——那是**第三處**未定案之實作分叉，已撤回。
-  **定案：digest 一律由後端計算**——前端把完整 `CaseData` 列送 `POST /api/v1/case/source-digest`
-  （或既有匯出端點之同一服務端路徑），由 Python 端**直接呼叫 §G S-9 之參考實作**產生。
+  **定案：digest 一律由後端計算**（R13 修正承載，見下）。
+  🔴 **R13：不新增 transport（CODEX-R13 裁「新端點違反入口閘」＋GROK-R13 抓到殘句）**——
+  R12 版寫「送 `POST /api/v1/case/source-digest`（**或**既有匯出端點之同一服務端路徑）」，
+  ①新增第二個 transport 違反角色卡入口閘①，且主委給的理由「唯一承載」**不是**可機械判定之例外；
+  ②那個「或」本身又是第二承載殘句——**已撤回**；
+  （誠實邊界：既有之未定案分叉閘只擋四字字面，寫成「或」就繞過去了）。
+  ⇒ **定案：沿用既有匯出流程之服務端路徑**——`/search` 匯出在送出前呼叫既有
+  case 匯出／檢核之同一服務端入口取得 digest，**不新增任何 route**。
+  由 Python 端**直接呼叫 §G S-9 之參考實作**產生。
   理由：「等價實作」本身不可機械證明（要證等價就得逐值比對兩個實作，
   那等於已經有後端實作了）；且 S-9 第 7 條明訂「只准 import 該函式，禁複製邏輯」，
   在 TS 重寫一份浮點格式化正是該條所禁之第二份副本。
@@ -1000,16 +1029,24 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
     R7 版之④⑤原寫「前端與後端**各算一次**、位元組相等」，
     與 R11「前端不得自算」**直接互斥**，且 mutation 還假設前端可改用 `JSON.stringify`
     ⇒ 三家 R12 命中，該兩條已刪）：
-    (a) `grep -cE "sha256Hex|createHash|digest\\s*=" frontend/src/lib/eventExport.ts` `== 0`
-        （前端只允許**呼叫端點取回值**）；
+    (a) 🔴 **R13 改為 call-boundary 斷言，不用 grep**（CODEX-R13：grep 只掃
+        `eventExport.ts` 且只認三個字面，改名／搬 helper／改用 `crypto.subtle.digest`
+        即可假綠——實跑 probe 已證 `grep -cE …` 對 `crypto.subtle.digest` 回 `0`）：
+        以 vitest **spy 整個 `frontend/src/lib/` 之雜湊呼叫面**
+        （`crypto.subtle.digest`／`createHash`／任何 `*Hex` helper），
+        斷言在完整匯出流程中該面之 `call_count` **對 `source_file_digest` 而言為 `0`**
+        （`rule_digest` 之呼叫不計入——兩者已於上方分離）；
     (b) 同一組 cases 經**前端流程**取得之 digest，與**直接呼叫** Python
         §G S-9 參考實作所得者 **位元組相同**（證明前端拿到的就是後端算的那一個，
         **不是**前端自己算出巧合相同之值）；
     (c) 含 `-0.0`／極大極小浮點之 fixture ⇒ (b) 仍成立。
   🔴 **端點與時序（R12 補；CODEX-R12-P1-03＋COMPOSER 命中「route 不存在、時序未裁」）**：
-    - **端點**：`POST /api/v1/case/source-digest`，request `{cases: [...]}`（完整 `CaseData` 列），
-      response `{source_file_digest: str, source_file_text: str}`；**本 Task 一併建立**
-      （R11 只寫了「由後端算」卻沒把 route 列進任何 Task ⇒ 無承載點）。
+    - **承載（R13 定案；不新增 route）**：沿用既有匯出流程之服務端入口，
+      其回應**增兩鍵** `{source_file_digest: str, source_file_text: str}`
+      （`source_file_text` 為 §G S-9 之 exact bytes 之 UTF-8 解碼，**無尾端 newline**）。
+      🔴 **`rule_digest` 與 `source_file_digest` 為兩件事，須分離**（CODEX-R13）：
+      前者綁搜尋規則（`search_rule_summary`），後者綁完整 `CaseData` 列；
+      同一 helper **不得**同時產出兩者而共用序列化路徑。
     - **時序（定案）**：digest 於**匯出當下**由後端就該批 `cases` 產生，並與
       `source_file_text` 一同回傳、一同寫進匯出檔；**匯入時不重算**，只做比對
       （`verify_source_digest`）。理由：匯入端拿到的是使用者可能已在 Excel 動過的檔，
@@ -1834,8 +1871,11 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   #                                              #   feature_cutoff_ms；欄集恰三鍵、按
   #                                              #   (event_id, timeframe) UTF-8 升冪。
   #                                              #   **coverage／Task 7.7／G-3／ic_feed 之唯一讀取路徑**
-  #    .normalized_spec: Mapping[str, object]    # R12 補：本 receipt 實際使用之 event_label_spec
-  #                                              #   （四鍵，正規化後）
+  #    .normalized_spec_bytes: bytes             # R13 定死（R12 之 Mapping + 「canonically 相等」
+  #                                              #   無定義，三家命中）：本 receipt 實際使用之
+  #                                              #   event_label_spec 經**唯一 normalizer** 後，
+  #                                              #   以 §G S-9 encoder 產出之 **exact bytes**。
+  #                                              #   相等判定＝**bytes 相等**，非 dict==、非 json.dumps。
   #    .allowed_event_ids: frozenset[str]        # prepare 之**初值＝通過驗證之全部 event_id**；
   #                                              # coverage **不得原地寫入**（frozen ⇒ TypeError），見下
   #    .prepared_token: str                      # **非決定性**：每次呼叫都不同
@@ -1843,7 +1883,12 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
 
   # 階段 5（materialize values）：吃階段 2 之**物件**，**不得**重跑 align_events
   # 🔴 R12（CODEX-R12-P1-05）：`event_label_spec` 須與 prepared 綁定——
-  #    resolve 收到之 spec 若與 `prepared.normalized_spec` **不 canonically 相等 ⇒ fail-closed**。
+  #    resolve 收到之 spec 經**同一 normalizer + S-9 encoder** 產出 bytes 後，
+  #    與 `prepared.normalized_spec_bytes` **不逐位元組相等 ⇒ fail-closed**。
+  #    🔴 **normalizer（唯一；R13 定死）**：輸入須恰為四鍵
+  #      `{horizon_bars:int, entry_price_semantic:str, label_return_mode:str, decision_offset_bars:int}`
+  #      ——**多一鍵／少一鍵／型別不符 ⇒ fail-closed**（不做預設值填補、不做型別轉換）；
+  #      鍵序固定為上列順序；輸出 dict 直接餵 §G S-9 encoder。
   #    否則可用 h=7 prepare 產生 hash／token，再以 h=3 resolve，兩者仍回同一 hash／token
   #    而驗收⑩全綠（＝purge 用 h=7、label 用 h=3，正是 §D-3a 要根除者的復發）。
   resolve_label_value_at_analyze(prepared: PreparedAnalysisWindows, bars_by_tf,
@@ -1879,11 +1924,27 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   這是主委 R11 自己引入之矛盾——frozen 禁屬性賦值，而 `dataclasses.replace` 會產生新身分）。
   **唯一路徑（採 `-prepared-coverage-writeback.md`；codex／composer 之兩份提案結論相同，
   取 grok 版因其把初值、函式名與驗收改寫都寫死）**：
+  🔴 **R13 補三條（不補則 R12 之修法仍不可實作）**：
+  - **(α) `replace` 會重跑 `__post_init__`**（CODEX-R13-P0-01 實跑 probe：
+    `replace_reruns_post_init True`）⇒ 若 token／hash 由 `__post_init__` 衍生，
+    `prepared1` 之值會**重算**，(ii′) 之「兩者相等」可假綠亦可假紅。
+    **定死**：`PreparedAnalysisWindows` **不得有 `__post_init__`**；
+    `analysis_alignment_receipt_hash` 與 `prepared_token` 皆為**建構參數**，
+    由 `prepare_analysis_windows` 於階段 2 一次算出後傳入，`replace` 原樣攜帶。
+  - **(β) frozen 是淺層**（CODEX-R13 probe：`frozen_shallow_nested_mutation True`）
+    ⇒ `.windows` 若為普通 `dict`，consumer 改一列即可讓 hash 與內容不一致。
+    **定死**：`.windows` 之型別為 `tuple[WindowRow, ...]`（`WindowRow` 亦 frozen dataclass，
+    欄集恰 `{event_id, decision_at_ms, entry_at_ms, label_start_ms, label_end_ms}`，
+    按 `event_id` UTF-8 升冪）；`.per_tf` 同理為 `tuple[PerTfRow, ...]`。
+    **禁**任何 `dict`／`list`／可變容器出現在本物件之欄位型別中。
+  - **(γ) purge 下界隨 receipt 攜帶**：`.purge_lower_bound_ms_by_symbol: Mapping[str, int]`
+    （以 `types.MappingProxyType` 包住之唯讀映射），於**階段 2 末**由 pre-coverage 事件集合算出
+    （見 §D-3′-a（iii）階段 4 之 R13 修正）；階段 4 只讀不算。
   ```text
   apply_event_coverage(prepared: PreparedAnalysisWindows, ...) -> PreparedAnalysisWindows
       # 回傳 dataclasses.replace(prepared, allowed_event_ids=<過濾後 frozenset>)
       # **禁** prepared.allowed_event_ids = ...（frozen 下 TypeError）
-      # hash 與 prepared_token **原樣攜帶**（coverage 不改變 windows，故不重算）
+      # hash 與 prepared_token **原樣攜帶**（無 __post_init__ ⇒ replace 不會重算）
 
   # _run_analysis 事件分支：
   prepared0 = prepare_analysis_windows(...)          # spy: call_count == 1
@@ -2022,10 +2083,13 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     (iv) 🔴 **spec 綁定**（CODEX-R12-P1-05）：以 `h=7` prepare、再以 `h=3` 呼叫 resolve
         ⇒ **fail-closed**（比對 `prepared.normalized_spec`）；
         `h=7` prepare ＋ `h=7` resolve ⇒ 通過（正例對照）；
-    (v) 🔴 **per-TF 單一讀取路徑**（CODEX-R12-P1-02）：Task 7.7 之 coverage、
-        §G G-3 之 feature timestamp map、餵 `ic_feed` 之 per-TF cutoff
-        **三處皆讀 `prepared1.per_tf`**（斷言同一物件參考），
-        **不得**旁讀未綁定之 `AlignmentReceipts` 或各自重算。
+    (v) 🔴 **per-TF 單一讀取路徑**（CODEX-R12-P1-02；**R13 修正斷言方式**，
+        COMPOSER-R13：G-3 是 golden／pytest 層、Task 7.7 是 API 層、`ic_feed` 是 momentum 層
+        ——**跨層要求 `is` 同一 tuple 不可實作，也不該成為規格要求**）：
+        改為**值相等 ＋ 來源可追**：三處讀到之 per-TF 內容
+        **逐列位元組相同**，且各自所屬之 `analysis_alignment_receipt_hash` **同值**；
+        另斷言三處**皆未**呼叫 `align_events`（spy `call_count == 0`），
+        以此證明沒有旁讀未綁定之 `AlignmentReceipts`、也沒有各自重算。
     **mutation（三條，皆須紅）**：在任一 consumer 內改為自行呼叫 prepare ⇒ (i)(iii)；
     coverage 改為原地賦值 ⇒ 直接 `TypeError`（frozen），(ii′) 紅；
     coverage 回傳全新建構之物件（未帶原 token／hash）⇒ (ii′) 紅。
@@ -2042,7 +2106,15 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     (e) 🔴 **prepare 之初值為全集**（COMPOSER-R12 命中「初值未定 ⇒ 空集 vs 全集不可區分」）：
         `prepared0.allowed_event_ids == frozenset(prepared0.windows.keys())`；
         coverage 未剔除任何列時 `prepared1.allowed_event_ids == prepared0.allowed_event_ids`
-    (f) 🔴 **coverage 剔除某 TF 之全部列後，`lookahead_bars_declared` 之鍵集不變**
+    (f) 🔴 **R13 修正之判準**（CODEX-R13＋GROK-R13 兩家：R12 版之「purge 不因剔除而改變」
+        與（ii）式「對 scope 內事件取 max」**互斥**，因剔除後 max 當然會變）：
+        purge 下界之輸入已固定為 **pre-coverage 事件集合**，且於階段 2 末算出
+        `purge_lower_bound_ms_by_symbol` 隨 receipt 攜帶（見 §D-3′-a（iii）階段 4 之 R13 修正）
+        ⇒ 本條之斷言改為：`prepared0.purge_lower_bound_ms_by_symbol
+        == prepared1.purge_lower_bound_ms_by_symbol`（coverage 前後**同一映射物件之值相等**），
+        且 split 實際採用之 embargo **讀自該映射**、不重算。
+        ⚠️ 此為**刻意之保守偏差**：purge 以未過濾集合為準，可能略寬於「只看倖存列」，依 §C0 接受。
+    (g) 🔴 **coverage 剔除某 TF 之全部列後，`lookahead_bars_declared` 之鍵集不變**
         （CODEX-R12-P1-04＋COMPOSER＋GROK-R12-P1-02 **三家全員**：
         §D-3′-a（ii）雖已寫死此規則，但**無任何 fixture 或 mutation 證偽「coverage 後重建鍵集」**
         ⇒ 實作者在 coverage 後由 surviving rows 重建，現有測試全綠）：
@@ -2052,7 +2124,8 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     **mutation（四條，皆須紅）**：coverage 只濾 events 不濾 receipts ⇒ (a)；
     coverage 移到 `build_event_manifest` 之後 ⇒ (a)；
     prepare 之初值改為空集 ⇒ (e)；
-    **coverage 後由 surviving rows 重建 `lookahead_bars_declared` ⇒ (f)**。
+    **coverage 後由 surviving rows 重建 `lookahead_bars_declared` ⇒ (g)**；
+    🔴 **purge 下界改在階段 4 由 post-coverage 集合重算（而非讀階段 2 之映射）⇒ (f)**。
   ⑬🔴 **前端不得持有 `label_value`**：斷言
     `grep -cE "label_value" frontend/src/lib/eventExport.ts` `== 0` 且
     `grep -cE "label_value" frontend/src/hooks/useICAnalysis.ts` `== 0`

@@ -1,12 +1,14 @@
 # HANDOFF
 
 **當前**：GAP-3 事件型 UAT 缺口修補 SPEC（`docs/GAP3_EVENT_UX_SPEC.md`）
-——**R12 十五條全數落地**，**待派 R13**。SPEC 2618 行、**42 Task（未增未減）**。
-sha256 見 `shasum -a 256 docs/GAP3_EVENT_UX_SPEC.md`（R13 審查期間不得動該檔）。
+——**R13 十四條全數落地**，**待派 R14**。SPEC 2691 行、**42 Task（未增未減）**。
+sha256 見 `shasum -a 256 docs/GAP3_EVENT_UX_SPEC.md`（R14 審查期間不得動該檔）。
 
-🔴 **findings 走勢 17 → 14 → 11 → 20 → 15**。R12 三家**自行歸因**之絕對數：
-**(N) 新缺口 2／(A) accretion 13／(R) 回歸 0** ⇒ **(A) 仍占 13/15**，
-主委 R11 之對策①②**經三家判定不足**。
+🔴 **findings 走勢 17 → 14 → 11 → 20 → 15 → 14**。三家歸因絕對數：
+R12＝(N) 2／(A) 13／(R) 0；**R13＝(N) 0／(A) 9／(R) 1**
+⇒ **(A) 下降（13→9）、(N) 歸零**，但**首見 (R) 回歸 1**（主委把兩個 coverage 混為一步）。
+🔴 **入口閘首次實測＝有效但不足，且擋不住主委自己**——R13 裁定主委 R12 新增之
+`POST /api/v1/case/source-digest` **違反入口閘①**，已改為不新增 route。
 ⇒ R12 給出 **scope accretion 入口閘**（已寫入角色卡新節）：
 ① 一個 Task 只能有一個可執行 owner，新增要求只能擴充其 schema／測試，
    **不得**再增第二個 producer／transport／receipt／encoder／parallel fixture；
@@ -34,24 +36,27 @@ stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` �
 
 ---
 
-## R12 之七群集（全部已落地；三家 Verdict 一致「需修訂後定版」）
+## R13 之十群集（全部已落地；三家 Verdict 一致「需修訂後定版」）
 
 | 群集 | 家數 | 落點 |
 |---|---|---|
-| **A**（P0）`PreparedAnalysisWindows` frozen ／寫回 ／`is` 同一物件**三者不可同時成立** | **三家** | `allowed_event_ids` 初值＝全集；新增 `apply_event_coverage()` 以 `dataclasses.replace` 回傳新物件；驗收⑩之 `is` 對象改為 coverage 後之 `prepared1` |
-| B（P1）Task 1.3 digest 定案未接線、驗收④⑤仍要前端各算一次 | 兩家 | 刪互斥條；補端點 `POST /api/v1/case/source-digest` 之承載；**時序定案＝匯出當下算、匯入只比對** |
-| C（P1）coverage 剔除整 TF 後鍵集保留**無 fixture／mutation** | **三家** | Task 7.0b ⑭(f)＋mutation |
-| D（P1）prepared 無 per-TF surface | codex | 增 `.per_tf` typed tuple；驗收⑩(v) 三處讀同一份 |
-| E（P1）spec 未綁定 ⇒ h=7 prepare ＋ h=3 resolve 仍同 hash | codex | 增 `.normalized_spec`；不相等即 fail-closed；驗收⑩(iv) |
-| F（P1）`allowed_event_ids` 初值未定 | composer | 併入 A；驗收⑭(e) |
-| G（P2×2）derived 欄名不一致／hour-named fixture 只寫「鏡像」 | codex | 正名；改共用具名 fixture `fixtures/hour_named_mixed_tf.json` |
+| **A**（P0，**(R) 回歸**）兩個 coverage 被混為一步 | composer | 階段 3 拆 **3a feature-run gate（批次級）／3b event-coverage（逐列）**，順序固定 |
+| **B**（P0）`replace` 重跑 `__post_init__` ⇒ token／hash 不保證攜帶 | 兩家 | 定死**不得有 `__post_init__`**；兩欄為建構參數 |
+| C frozen 是淺層，nested dict 可變 | codex | `.windows`／`.per_tf` 改 `tuple[frozen dataclass, ...]`；禁可變容器 |
+| D `normalized_spec` 之「canonically 相等」無定義 | **三家** | 改 `.normalized_spec_bytes`；唯一 normalizer ＋ S-9；相等＝bytes 相等 |
+| E ⑭(f) 與（ii）式互斥 | 兩家 | purge 輸入固定為 **pre-coverage**，階段 2 末算唯讀映射隨 receipt 攜帶 |
+| F ⑩(v) 跨層 `is` 不可實作 | composer | 改「逐列 bytes 相同 ＋ hash 同值 ＋ `align_events` spy `call_count == 0`」 |
+| G digest grep 驗收可繞過；兩種 digest 共用 helper | codex | 改 call-boundary spy；`rule_digest` 與 `source_file_digest` 分離 |
+| H 新端點違反入口閘 | codex | **不新增 route**，沿用既有匯出流程之服務端入口 |
+| I L989 殘留「或既有匯出端點」 | grok | 撤回（`SYNC-FORBID: 二擇一` 擋不到「或」，已具名為誠實邊界） |
+| J 共用 fixture 同名 ≠ 同一份 | codex | owner＋唯一 typed loader＋sha256 凍進 G-3；改一位元組兩處同時紅 |
 
 ---
 
 ## 🔴 立即待辦：派 R11
 
-- brief／facts／locus 三檔沿用 R12（`…-r12-*`）改輪次；
-  locus 腳本之 `--diff-base` 預設值須改為 **R12 落地 commit 之父**。
+- brief／facts／locus 三檔沿用 R13（`…-r13-*`）改輪次；
+  locus 腳本之 `--diff-base` 預設值須改為 **R13 落地 commit 之父**。
 - 🔴 **R13 brief 須把角色卡新增之「scope accretion 入口閘」與「anchor 寫法」列為硬性要求**，
   並續要求三家做 (N)/(A)/(R) 三類歸因之絕對數（看 (A) 是否下降）。
 
@@ -61,10 +66,10 @@ stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` �
 
 | # | 條件 | 現況 |
 |---|---|---|
-| ① | 正確性／洩漏／接線類 OPEN P0＝0、P1＝0 | ⬜ 待 R13 複審 |
-| ② | 本輪主委自傷絕對數＝0 | ⬜ R12 為 **7** |
+| ① | 正確性／洩漏／接線類 OPEN P0＝0、P1＝0 | ⬜ 待 R14 複審 |
+| ② | 本輪主委自傷絕對數＝0 | ⬜ R13 為 **10**（本輪最高） |
 | ③ | A-6′ 經使用者確認 | ✅ 已滿足 |
-| ④ | `gap3ux_pre_review.sh <patch.md>` rc=0 | ⬜ 查法：`bash scripts/gap3ux_pre_review.sh handoffs/patches/20260823-gap3ux-r12-*.md`；R12 補丁包寫於本輪 anchor 裁定**之前**，anchor 多為段落指標 ⇒ 依裁定歸**委員責任**，R13 起補丁包須照新寫法 |
+| ④ | `gap3ux_pre_review.sh <patch.md>` rc=0 | ⬜ 查法：`bash scripts/gap3ux_pre_review.sh handoffs/patches/20260823-gap3ux-r13-*.md`；R13 補丁包仍多為段落指標 anchor ⇒ 依 R12 裁定歸**委員責任** |
 
 ---
 
@@ -84,10 +89,11 @@ stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` �
 | R9 | 14（8 群集） | 7 | 單位換算／階段未定義／殘段未刪／鍵集互斥 |
 | R10 | 11（7 群集） | 7 | 裁決錯誤（未驗邊界）／留下不可行選項／只寫敘述無算法 |
 | R11 | 20（9 群集）🔴 反轉上升 | 9 | scope accretion：新增機制未定死其形狀 |
-| **R12** | **15（7 群集）** | **7** | **同上；三家歸因 (N)2／(A)13／(R)0** |
+| R12 | 15（7 群集） | 7 | 同上；三家歸因 (N)2／(A)13／(R)0 |
+| **R13** | **14（10 群集）** | **10** | **三家歸因 (N)0／(A)9／(R)1——(A) 降、(N) 歸零、首見回歸** |
 | R8–R11 落地 | —（自查） | 2 ＋ 2 ＋ 2 ＋ 1 | 截斷／pipefail｜quotepath 測試兩版假綠｜anchor 判準錯＋hunk header 洩漏｜意圖來源含 SYNC-LOCI 本身（恆真） |
 
-**Task 數**：R8→R12 皆 **42 → 42**（委員未新增 Task）。
+**Task 數**：R8→R13 皆 **42 → 42**（委員未新增 Task）。
 
 ---
 
@@ -108,6 +114,12 @@ stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` �
 - 🔴 **`git diff -U0` 之 `-` 行是弱證據**：同檔刪掉**無關**內容若恰含 anchor 字面即會通過
   ⇒ 弱證據須另有補丁包正文之意圖佐證；且**意圖來源必須排除 SYNC-LOCI 區段本身**
   （該區段就寫著 anchor ⇒ 拿它當佐證等於恆真）
+- 🔴 **在規格裡宣稱語言／函式庫「會怎樣」之前跑三行 probe**：
+  `dataclasses.replace` **會重跑 `__post_init__`**；`frozen=True` **只凍最外層**
+  ——兩條都是主委憑印象寫、被 codex 用 probe 打穿
+- 🔴 **同一個中文詞指涉兩個東西時立刻各給具名 ID**（coverage 混用造成本 epic 首條回歸）
+- 🔴 **牽涉規則本身的事，先問後做**：主委違反自己三天前立的入口閘（新增 transport），
+  且是「知道有疑慮卻先做、附帶問」
 - 🔴 **多條約束加在同一物件上，最後要問「能同時成立嗎」**：R11 之
   frozen ＋ 寫回 ＋ `is` 同一物件，三個好理由加起來是 Python 做不到的事
 - 🔴 **「我定案了」≠「規格有可執行路徑」**：定案時同一次要①刪互斥舊條②指定 Task 承載
