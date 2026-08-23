@@ -1,2 +1,24 @@
-Task 1.10	一筆
-Task 7.1	五維度
+20260823-gap3ux-x-review-r7-facts.sh|(檔頭)	五支機械閘
+GAP3_EVENT_UX_SPEC.md|Task 1.1	一筆
+GAP3_EVENT_UX_SPEC.md|Task 1.1	五維度
+GAP3_EVENT_UX_SPEC.md|Task 1.10	一筆
+GAP3_EVENT_UX_SPEC.md|Task 1.3	五維度
+GAP3_EVENT_UX_SPEC.md|Task 1.6	五維度
+GAP3_EVENT_UX_SPEC.md|Task 2.1	五維度
+GAP3_EVENT_UX_SPEC.md|Task 2.2	五維度
+GAP3_EVENT_UX_SPEC.md|Task 6.0	兩個 reason
+GAP3_EVENT_UX_SPEC.md|Task 6.4	一個值
+GAP3_EVENT_UX_SPEC.md|Task 6.4	三維度
+GAP3_EVENT_UX_SPEC.md|Task 6.4	五維度
+GAP3_EVENT_UX_SPEC.md|Task 6.4	六個維度
+GAP3_EVENT_UX_SPEC.md|Task 7.0	五維度
+GAP3_EVENT_UX_SPEC.md|Task 7.1	三筆
+GAP3_EVENT_UX_SPEC.md|Task 7.1	五個維度
+GAP3_EVENT_UX_SPEC.md|Task 7.1	五維度
+GAP3_EVENT_UX_SPEC.md|Task 7.2	五個維度
+GAP3_EVENT_UX_SPEC.md|Task 7.5	兩個 reason
+GAP3_EVENT_UX_SPEC.md|Task 7.6	五維度
+GAP3_EVENT_UX_SPEC.md|Task 7.6	六個鍵
+GAP3_EVENT_UX_SPEC.md|Task 7.7	四個 reason
+GAP3_EVENT_UX_SPEC.md|§A	五維度
+GAP3_EVENT_UX_SPEC.md|§V	五維度

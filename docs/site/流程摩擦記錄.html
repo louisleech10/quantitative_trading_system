@@ -1907,6 +1907,12 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>九十五・（2026-08-23）我寫的機械閘第一版是假綠，自己跑 mutation 才發現</strong>：<code>spec_count_audit</code> 首版寫成 shell，用 awk 的 <code>[一二三四五六七八九十兩0-9]+</code> 比對中文——<strong>macOS 的 BWK awk 不是 UTF-8 aware，字元類別是逐位元組比對</strong> ⇒ 輸出的中文被咬碎成 <code>\xe5\x85\x83組</code>，而且 <code>筆數 === 1</code> 的 mutation <strong>沒有轉紅</strong>。我是照自己「新閘上線必須用實際 bug 反測」的規矩跑了才發現，否則就掛上一支永遠綠的閘。改用 Python 重寫後三個 mutation 全紅。<strong>規則</strong>：<strong>shell 文字工具（awk/sed 的字元類別）對非 ASCII 不可靠，凡要比對中文一律用 Python</strong>；此坑與 CLAUDE.md 已載的「<code>stat -f %m</code> 在 linux 失敗」同類——都是「在我的機器上看起來對」。附帶：新閘的誤報收窄也是實測驅動——寬集合版對本 SPEC 命中 408 條（絕大多數是「三家」這種敘事），收窄到驗收語境＋封閉量詞後剩 2 條。</p>
 </blockquote>
+<blockquote>
+<p><strong>九十六・（2026-08-23）我為了壓誤報把新閘的掃描面收窄，下一輪就有三條從縫隙漏出——收窄的理由本身是錯的</strong>：R6 我做了計數稽核閘，實掃寬集合版對 SPEC 命中 408 條（多為「三家」這種敘事），於是我把掃描面收窄到「SPEC 的驗收欄」。R7 隨即有三條同型錯誤漏出：<code>facts.sh</code> 的「四支機械閘」（<strong>不是 SPEC</strong>）、§F-2 的「15 增為 16」（<strong>不是驗收欄</strong>）、Task 7.7 ①的格式斷言（同屬「改一處未同步另一處」）。<strong>錯在我把一次性成本當成持續代價</strong>——這支閘是<strong>基準比對</strong>式的，既有字面收進基準後就永遠不會再叫，噪音只付一次。收窄反而製造了縫隙。放寬到「所有檔、所有語境」後，基準 24 條，且<strong>立刻抓到 3 處我沒發現的活的過期字面</strong>（facts.sh 的 F-02／F-03／F-06 還寫「六維度」，實際已是五）。<strong>規則</strong>：<strong>基準比對式的檢查，預設應掃到最寬；只有「每次都要人判斷」的檢查才需要收窄</strong>。兩者不可混為一談——摩擦九十二講的是後者（關鍵字型黑名單），本條講的是前者。</p>
+</blockquote>
+<blockquote>
+<p><strong>九十七・（2026-08-23）同一形態在相鄰兩輪各犯一次，證明「修實例」不等於「修機制」</strong>：R6 群集 F 是「機械閘三支增為四支而 receipt 工具仍寫三支」，我修了；<strong>同一輪我新增第五支閘，又沒同步同一個地方</strong> ⇒ R7 群集 A 兩家再抓一次。修實例只花三十秒，但下一次新增閘時我還是會忘。真正有效的是<strong>把「新增閘必須同步此處」寫進那個檔案的註解</strong>＋<strong>讓計數閘掃到該檔</strong>——兩件都做了才算修完。<strong>規則</strong>：<strong>收到「X 沒跟著 Y 改」這類 finding 時，除了改 X，必須問「下次改 Y 的人怎麼會知道要改 X」，並把答案做成註解或機械檢查</strong>；只改 X 是把同一張帳單押後。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

@@ -11,7 +11,52 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <p><strong>這張表回答：五批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
-<h2 id="-目前正在做第-6-輪審完-15-條已全修準備派第-7-輪823">🔴 目前正在做：第 6 輪審完 15 條、已全修，準備派第 7 輪（8/23）</h2>
+<h2 id="-目前正在做第-7-輪-12-條已全修準備派第-8-輪823-二">🔴 目前正在做：第 7 輪 12 條已全修，準備派第 8 輪（8/23 二）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>輪次</th>
+<th>委員找到幾條</th>
+<th>其中我造的</th>
+<th>佔比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第 4 輪</td>
+<td>19</td>
+<td>3</td>
+<td>16%</td>
+</tr>
+<tr>
+<td>第 5 輪</td>
+<td>13</td>
+<td>5</td>
+<td>38%</td>
+</tr>
+<tr>
+<td>第 6 輪</td>
+<td>15</td>
+<td>6</td>
+<td>40%</td>
+</tr>
+<tr>
+<td><strong>第 7 輪</strong></td>
+<td><strong>12</strong></td>
+<td><strong>7</strong></td>
+<td><strong>58%</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>委員找到的「真缺口」在減少（這輪只有 5 條），但我自製再被抓的比例在升。不粉飾。</p>
+<p><strong>這輪最重的真缺口（三家全員）</strong>：我第 6 輪新增的那個 Task 只定義了一個 Python 函式、
+<strong>沒定義任何 HTTP 端點</strong>，前端還是能繞過去自己算；我為它寫的驗收還是<strong>空的</strong>
+（斷言某個字串不存在，但那個檔案本來就沒有）。已補完整 API 契約與端到端驗收。</p>
+<p><strong>我的計數閘沒擋住三條</strong>，因為我為了壓誤報收窄了掃描面——而收窄的理由本身是錯的
+（那是基準比對式檢查，噪音只付一次）。放寬後<strong>立刻又抓到 3 處我沒發現的過期字面</strong>。</p>
+<p>🔴 <strong>第 8 輪通過＋你確認 A-6，才凍結。</strong></p>
+<hr />
+<h2 id="前一段第-6-輪審完-15-條已全修823">前一段：第 6 輪審完 15 條、已全修（8/23）</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>

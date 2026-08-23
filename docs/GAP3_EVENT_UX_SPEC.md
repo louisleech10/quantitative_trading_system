@@ -489,13 +489,23 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   現行只取五欄（symbol／timeframe／timestamp／positive_case／price_change，`eventExport.ts:27-37`）
   ⇒ 刪除、改名或改值任一 `future_*` 欄後 digest **不變**，改名攻擊（Task 1.10 之信任邊界）之證據面未閉合。
   改為：**每列完整 `CaseData` 之遞迴 canonical JSON**——保留所有 own keys 與值（含全部 future return／drawdown 欄），
-  只做固定 key ordering（依 §G S-2 之 UTF-8 升冪），**不改名、不篩欄、不省略**；digest 綁此完整 bytes。
+  只做固定 key ordering（依 §G S-2 之 UTF-8 升冪），**不改名、不篩欄、不省略**；
+  digest 綁此完整 bytes。
+  🔴 **序列化須依 §G S-9**（R7 群集 G；composer 命中）：含**浮點 lexeme 規則**
+  （`repr(float)` round-trip）、NaN／±Inf → `null`、`-0.0` 保留、separators、UTF-8 無 BOM。
+  未引用該規則時，瀏覽器之 `JSON.stringify` 與 Python 之 `repr(float)` 對**同一數值**
+  可產生不同字面 ⇒ 同一批事件跨執行環境之 digest 不同，改名攻擊之證據面反而不穩。
+  ⇒ 前端須以與 S-9 等價之浮點格式化實作（或改由後端端點計算 digest；二擇一，須明示選哪個）。
 - 驗證：同一批事件「JSON 匯出檔」與「CSV 回灌」之 `event_id` 集合 `==`（集合相等斷言）；
   改 1 byte 重傳 ⇒ `source_file_digest !=` 原值。
   **R6 群集 H 追加**（`npx vitest run canonicalSourceCoverage` ≥3 條）：對同一組 cases，
   ①**刪除**一個 `future_*` 欄 ⇒ digest 改變 ②**改名**一個 `future_*` 欄 ⇒ digest 改變
-  ③**改值**一個 `future_*` 欄之數值 ⇒ digest 改變。
-  **mutation**：把 `canonicalSourceText` 改回五欄子集 ⇒ ①②③全紅。
+  ③**改值**一個 `future_*` 欄之數值 ⇒ digest 改變
+  ④🔴 **跨環境一致**：同一批 cases 於前端與後端各算一次 digest ⇒ **位元組相等**
+    （R7 群集 G：防 `JSON.stringify` 與 `repr(float)` 之浮點字面差異）
+  ⑤含 `-0.0`／極大極小浮點之 fixture ⇒ 前後端 digest 仍相等。
+  **mutation（兩條，皆須紅）**：把 `canonicalSourceText` 改回五欄子集 ⇒ ①②③；
+  前端改用預設 `JSON.stringify`（不套 S-9 浮點規則）⇒ ④⑤。
 - 存活至：Phase 6。
 - 覆蓋風險：`event_id` 之輸入僅 symbol／timeframe／t0 三者，後續 Phase 皆不改此三者之定義——
   Phase 2 之篩選條件由 Task 2.2「不可做」明令禁止進入 `event_id` 輸入（D-2）；Phase 4 之附帶
@@ -600,13 +610,23 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   ②**缺標註 validator**：`pytest tests/momentum/event_samples/ -q -k lookahead_registry_complete`——
     掃描 `CaseData` 之所有 `future*` 欄名，**任一未登記即紅**（斷言未登記集合 `== set()`）
   ③辨識三形態：`Future_4Bar_Return_%`／`future_4bar_return`／`FUTURE_4BAR_RETURN` 皆解析為 4
-  ④**改名攻擊**（R4 群集 G）：`pytest tests/api -q -k lookahead_rename_attack` ≥2 條——
+  ④**registry 內容正確性**（R7 群集 F；codex：R6 版只驗「未登記集合 `== set()`」，
+    **未驗登記的深度對不對**）：以實跑盤出之全部 `future*` 欄名逐欄對證單位與深度——
+    `future_{N}bar_*` ⇒ `lookahead_bars == N`；
+    `future{H}_*` ⇒ `lookahead_hours == H` 且**無** `lookahead_bars` 鍵；
+    🔴 **無數字之 legacy 欄**（`future_max_return`／`future_max_drawdown` 等）
+    ⇒ 其深度**不可由欄名導出** ⇒ registry 須顯式標 `lookahead_unknown: true`，
+    並依 D-7 之 L2／L3 走強制宣告與禁進切分，**不得**給任何預設深度。
+    盤點命令：`grep -oE "future[_0-9][A-Za-z0-9_]*" momentum/DataExtraction/case_search_engine.py | sort -u`
+    ——該清單之每一項須在 registry 有對應且分類正確（三類：bar／hour／unknown）。
+  ⑤**改名攻擊**（R4 群集 G）：`pytest tests/api -q -k lookahead_rename_attack` ≥2 條——
     上傳一份 CSV，欄名為 `future_4bar_return` 但**無 producer provenance**
     ⇒ 斷言 `requires_declaration == True`（不得因名稱命中 registry 而直接放行）；
     未填宣告即送出 ⇒ 依 L3 `split_events` 未被呼叫。
     對照組：同一欄名但來自 `/search` 之系統產生批（有 provenance）⇒ 深度直接解析 `== 4`。
-  **mutation（兩條，皆須紅）**：刪掉 registry 中 `future_4bar_max_drawdown` 一筆 ⇒ ②；
-  把外部上傳欄改成「名稱命中 registry 即直接解析」⇒ ④。
+  **mutation（三條，皆須紅）**：刪掉 registry 中 `future_4bar_max_drawdown` 一筆 ⇒ ②；
+  把 `future_max_return` 改標成 `lookahead_bars: 12`（猜一個深度）⇒ ④；
+  把外部上傳欄改成「名稱命中 registry 即直接解析」⇒ ⑤。
 - 存活至：Phase 7（終）。
 - 覆蓋風險：registry 為 D-7 三層防線之根（L1），Task 1.11（L2）／1.12（L3）／2.1b 皆只讀它、
   無一改寫它——「存活至 Phase 7（終）」即由此而來 ⇒ 不被覆蓋。**須同步**：Phase 4 之 Task 4.1
@@ -838,8 +858,12 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
     使用者從未選過亦不知其存在）。
 - 驗證：vitest 斷言四段文字皆出現；`control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
 - 存活至：Phase 6。
-- 覆蓋風險：**會被 Phase 7 之 Task 7.3 覆蓋**——7.3 之動態揭露涵蓋 scenario／進場價／報酬算法／
-  決策位移／lookahead 深度／purge，為本 Task 四段揭露之嚴格超集，且同樣由實際設定導出、同樣禁寫死
+- 覆蓋風險：**會被 Phase 7 之 Task 7.3 覆蓋**——7.3 之動態揭露涵蓋 scenario／**control_kind**／
+  進場價／報酬算法／決策位移／lookahead 深度／purge，為本 Task 四段揭露之嚴格超集，
+  且同樣由實際設定導出、同樣禁寫死。
+  🔴 **超集關係須以逐項對照驗證，非口頭宣稱**（R7 群集 D：本欄原宣稱超集，
+  而 7.3 之揭露清單當時**漏掉 `control_kind`**，取代後 UI 反而少揭露一項）
+  ——移除 4.1b 之獨立實作前，須逐項比對兩邊之揭露項集合並斷言 4.1b ⊆ 7.3。
   ⇒ 實作順序 4.1b 先、7.3 後；**7.3 上線時須移除本 Task 之獨立實作**，否則同一面板出現兩份揭露、
   兩份文案來源，日後改一份漏一份。此為**刻意覆蓋**，非漂移。**須同步**：兩者皆為 UI 文案、
   不進序列化產物 ⇒ 此覆蓋不影響 G-2 golden。
@@ -1061,8 +1085,10 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 **F-2 偏離即 fail-closed**：三維度任一偏離 F-1 ⇒ **整批拒絕匯出**（`n_records == 0`），
 reason `== "label_producer_unsupported_for_declared_semantics"`。
 🔴 **該 reason 須先登記契約**（R6 群集 D；§C／D-6：新增 reason 一律先改契約）：
-登記於 `momentum/Analysis/contracts/event_import_contract.json` 之 `import_failure_reasons`
-（該清單由 15 增為 **16**，Task 1.1 之常數斷言須同批更新——見 Task 1.1「須同步」）；
+登記於 `momentum/Analysis/contracts/event_import_contract.json` 之 `import_failure_reasons`；
+🔴 **該清單之最終計數與內容之權威在 Task 1.1**，本節**不重述計數**
+（R7 群集 B：R6 版此處寫「由 15 增為 16」而 Task 1.1 寫最終 `== 20`，
+兩個互斥終態並存，兩家獨立命中；同 §V 書寫規則之理由——複述即第二份副本）。
 程式與前端一律由該檔取字面，硬編碼數須 `== 0`。
 （R5 版遺漏此項：主委在 Task 7.5 之兩 reason 與 Task 7.7 之四 reason 皆明定登記處，
 唯獨此處未寫 ⇒ 同一規則未一致套用，grok 命中。）
@@ -1135,6 +1161,20 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     `label_value=None`、`reason = "label_producer_unsupported_for_declared_semantics"`。
   - 在矩陣內 ⇒ `label_value` 取 `future_{horizon_bars}bar_return`，short 取負
     （既有規則不變）；缺該欄 ⇒ `label_value=None`、`reason` 走既有缺欄路徑。
+  🔴 **API 契約與 wiring（R7 群集 E；三家全員命中「只有 helper、無落地路徑」）**：
+  只定義 Python helper 而不定義 transport ⇒ 實作者可新增 helper 而 TS 仍直接讀
+  `future_{horizon}bar_return`，§F-4 等於無法落地。本 Task 一併定義：
+  - **端點**：`POST /api/v1/case/label-values`
+  - **request**：`{cases: [...], entry_price_semantic, label_return_mode,
+    decision_offset_bars, horizon_bars, timeframe}`（`cases` 為 `/search` 之結果列）
+  - **response（支援）**：`200`，`{supported: true, label_values: [float|null, ...],
+    n_records: int}`——`label_values` 之長度與順序與 `cases` **逐列對應**
+  - **response（不支援）**：`200`，`{supported: false, label_values: [], n_records: 0,
+    reason: "label_producer_unsupported_for_declared_semantics"}`
+    （🔴 **非 4xx**：這是合法查詢得到「此組合不支援」之答案，不是請求格式錯）
+  - **request 格式錯**（缺欄／enum 外）：`400` ＋ 契約既有 reason
+  - **前端呼叫點**：`buildEventContractRecords` **只得**由本端點取 `label_value`；
+    禁在 TS 以任何方式自行推導。
   - **前端只呼叫本函式之結果或其對應 API**，禁在 TS 重寫等價公式（§F-4）。
 - 驗證：`pytest tests/momentum/event_samples/ -q -k label_value_from_case` ≥6 條——
   ①支援矩陣內（`trigger_close`／`close_to_close`／`k=0`）⇒ `supported is True` 且
@@ -1144,8 +1184,14 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   ④`decision_offset_bars=3` ⇒ 同③
   ⑤`label_return_mode='open_to_close'` ⇒ 同③
   ⑥`reason` 字面取自契約：`python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));assert 'label_producer_unsupported_for_declared_semantics' in c['import_failure_reasons']"` rc=0
-  ＋`npx vitest run eventExportLabelProducer` ≥2 條：前端在不支援組合下**不產生**任何帶
-  `label_value` 之列；且 TS 內無等價公式（`grep -c "shift(-" frontend/src/lib/eventExport.ts` `== 0`）
+  ＋`npx vitest run eventExportLabelProducer` ≥4 條：
+    ①前端在不支援組合下**不產生**任何帶 `label_value` 之列
+    ②支援組合下 `label_value` 之值 `===` 端點回傳者（逐列對應）
+    ③**端到端 wiring**：mock 端點回 `supported: false` ⇒ 匯出 `n_records === 0`
+    ④🔴 **`eventExport.ts` 內不得存在 `label_value` 之本地取值路徑**——
+      斷言 `grep -cE "label_value[^:]*=[^=]*future_|future_[^\n]*bar_return" frontend/src/lib/eventExport.ts` `== 0`
+      （R7 群集 E：R6 版寫 `grep -c "shift(-" … == 0` 是**空斷言**——現行該檔本就無
+      `shift(-`，該條恆綠；grok 命中。改為斷言真正會出現之取值形態。）
   **mutation（三條，皆須紅）**：`supported` 恆真 ⇒ ③；short 不取負 ⇒ ②；
   在 TS 重寫一份公式 ⇒ vitest 之 grep 條。
 - 存活至：Phase 7（終）。
@@ -1254,8 +1300,12 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
 - 不可做：**不得以人工清單當比對基準**（那就是第三份副本）。
 
 **Task 7.3 — 動態揭露本批設定（取代原擬之固定文案）**
-- 內容：匯出前顯示「本批：scenario＝X／進場價＝Y／報酬算法＝Z／決策位移＝K／
-  lookahead 深度＝N（來源：<欄位清單>）／purge 將為 N 根」，**全部由實際設定導出**。
+- 內容：匯出前顯示「本批：scenario＝X／**control_kind＝C**／進場價＝Y／報酬算法＝Z／
+  決策位移＝K／lookahead 深度＝N（來源：<欄位清單>）／purge 將為 N 根」，
+  **全部由實際設定導出**。
+  🔴 `control_kind` 為 R7 群集 D 補入：Task 4.1b 之覆蓋風險宣稱本 Task 為其**嚴格超集**
+  並要求 7.3 上線時移除 4.1b 之獨立實作，但本清單原**漏掉 4.1b 明列之 `control_kind`**
+  ⇒ 取代後 UI 反而不再揭露該批 control kind（codex 命中）。
 - 驗證：vitest 改任一維度 ⇒ 顯示字串隨之改變（斷言前後 `!==`）；
   `control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
 - 存活至：Phase 7（終）。
@@ -1374,8 +1424,12 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   ① **wiring（本 Task 之一部分，非另開票）**：
      `RunInfo.time_range: Optional[dict]`，形狀與 manifest **同形**：`{"start": str|None, "end": str|None}`。
      🔴 **型別依實碼裁定，非投票**：`_resolve_l7_v2_time_range` 之回傳型別為
-     `Dict[str, Optional[str]]`，值經 `_format_manifest_value` 走 `isoformat()`
-     ⇒ **是 ISO-8601 字串，不是 epoch 毫秒**（grok 之修法寫 `int|None`，與實碼不符，不採）。
+     `Dict[str, Optional[str]]` ⇒ **值為字串，不是 epoch 毫秒整數**
+     （grok 之修法寫 `int|None`，與實碼不符，不採）。
+     ⚠️ **該字串之實際格式見 ④**——`_format_manifest_value` 只對有 `isoformat` 屬性者
+     走 ISO，其餘走 `str(value)`；實測現存 manifest 皆為 **epoch 秒數字字串**。
+     （R7 群集 C：R6 版此處斷言「是 ISO-8601 字串」而 ④ 已裁定為 epoch 秒字串，
+     同一 Task 內兩處互斥，兩家獨立命中——主委修 ④ 未同步 ①。）
      service 端 `_browse_metadata_for_run` 由 manifest **原樣帶出**（禁在此層轉型別）；
      `/features/runs` response 與前端 `types.ts` 之 `RunInfo` 均須含此鍵。
   ② **時間基準之換算（R5 群集 D；三家一致「逐列取事件列之 tf」）**：

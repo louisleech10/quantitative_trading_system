@@ -62,8 +62,10 @@ _routes() {
   printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|bash scripts/spec_ruling_task_sync.sh docs/GAP3_EVENT_UX_SPEC.md"
   # §V 不得複述 §P 斷言（R5 consult 三家全員裁；病根＝R4/R5 兩輪 8 條主委自傷皆為「改了 §P 未同步 §V」）
   printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|bash scripts/spec_v_task_ref_check.sh docs/GAP3_EVENT_UX_SPEC.md"
-  # 驗收欄之計數字面稽核（使用者 2026-08-23 裁；病根＝R6 三條「計數字面沒跟著它所計之物一起改」）
-  printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|python3 scripts/spec_count_audit.py --check docs/GAP3_EVENT_UX_SPEC.md handoffs/run_receipts/gap3ux-spec-count-baseline.txt"
+  # 計數字面稽核（使用者 2026-08-23 裁；病根＝R6 三條＋R7 三條「計數字面沒跟著它所計之物一起改」）
+  # 🔴 掃描面於 R7 後放寬至「所有檔所有語境」——首版只掃 SPEC 驗收欄，
+  #    R7 隨即有三條從縫隙漏出（facts.sh 之閘數、§F-2 之 reason 計數）。
+  printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|python3 scripts/spec_count_audit.py --check docs/GAP3_EVENT_UX_SPEC.md handoffs/20260823-gap3ux-x-review-r7-facts.sh --baseline handoffs/run_receipts/gap3ux-spec-count-baseline.txt"
   printf '%s\n' "docs/GAP3_EVENT_UX_SPEC.md|bash scripts/quant_standard_check.sh docs/GAP3_EVENT_UX_SPEC.md"
   printf '%s\n' "CLAUDE.md|bash scripts/check_agent_contract_sync.sh"
   printf '%s\n' "docs/MULTI_AGENT_ORCHESTRATION.md|bash scripts/check_agent_contract_sync.sh"
