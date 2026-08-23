@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAP-3 事件型規格：還差什麼才算「完整凍結」</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-3還差什麼才算完整.md</span></nav>
+<main>
+<h1 id="gap-3-事件型規格還差什麼才算完整凍結">GAP-3 事件型規格：還差什麼才算「完整凍結」</h1>
+<p><strong>這張表回答一件事：現在到底卡在哪、還要多久、有沒有在前進。</strong>
+（2026-08-23 深夜，第 11 輪審完、第 12 輪派出後寫。）</p>
+<hr />
+<h2 id="一句話結論">一句話結論</h2>
+<p><strong>規格本身的內容已經穩了；卡住的是「每一輪修訂又長出新的細節缺口」。</strong>
+最嚴重等級（會算錯數字、會偷看未來）的問題<strong>目前是 0 條</strong>——這是委員自己講的，不是我說的。</p>
+<hr />
+<h2 id="凍結要滿足四個條件現在差兩個半">凍結要滿足四個條件，現在差兩個半</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>條件</th>
+<th>現況</th>
+<th>白話</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>①</td>
+<td>最嚴重與次嚴重的問題都清零</td>
+<td>⬜ 差</td>
+<td>第 11 輪還有 20 條次嚴重，已全修，等第 12 輪確認</td>
+</tr>
+<tr>
+<td>②</td>
+<td>那一輪<strong>我自己</strong>沒造成新問題</td>
+<td>⬜ 差</td>
+<td>第 11 輪我造成 9 條。這是最難的一條</td>
+</tr>
+<tr>
+<td>③</td>
+<td>你要拍板的那項（A-6′）</td>
+<td>✅ <strong>已滿足</strong></td>
+<td>你 8/23 的原話就是取代裁定</td>
+</tr>
+<tr>
+<td>④</td>
+<td>機械檢查全綠</td>
+<td>⬜ 半</td>
+<td>常駐檢查全綠；「補丁有沒有改到位」那支還紅（原因見下）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>②是真正的瓶頸。</strong> 前八輪我造成的條數是 3 → 5 → 6 → 7 → 6 → 7 → 7 → 9，沒有下降。</p>
+<hr />
+<h2 id="為什麼條數會反彈17-14-11-20">為什麼條數會反彈（17 → 14 → 11 → 20）</h2>
+<p>不是委員變嚴，也不是架構動搖。<strong>是我每輪為了補洞而加新機制，但沒把新機制寫完。</strong></p>
+<p>舉一個具體例子（第 10 輪 → 第 11 輪）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>我第 10 輪加的</th>
+<th>第 11 輪委員問的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>深度改成「每個時間框架一個值」的表</td>
+<td>這張表的<strong>鍵什麼時候固定</strong>？涵蓋檢查把某個時間框架的資料全篩掉之後，表要不要重建？</td>
+</tr>
+<tr>
+<td>加一個 receipt 指紋，三處要比對同一個</td>
+<td>指紋要<strong>餵什麼資料結構</strong>去算？欄位叫什麼、順序是什麼？</td>
+</tr>
+<tr>
+<td>拆成兩個函式，避免重算</td>
+<td>函式是決定性的，<strong>三個地方各叫一次也會得到同一個指紋</strong>，你的檢查照樣綠</td>
+</tr>
+<tr>
+<td>隔離帶改成逐標的</td>
+<td>那個欄位到底<strong>叫什麼名字</strong>？和舊欄位衝突時怎麼辦？</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>每一條都對。</strong> 這叫 scope accretion——這個專案的前一個 epic 曾為同樣的毛病卡了八輪。</p>
+<hr />
+<h2 id="我這輪改了做法不是再多跑一輪就好">我這輪改了做法（不是再多跑一輪就好）</h2>
+<ol>
+<li><strong>加機制時，同一次就把形狀寫死</strong>：資料結構長什麼樣、欄位叫什麼、順序、遷移怎麼走、
+物件怎麼比身分。<strong>不再寫「例如 A，或 B」。</strong></li>
+<li><strong>把「留選項」這個毛病做成機械檢查</strong>——而且沒有寫新工具，
+既有的檢查腳本本來就支援「規格自己宣告禁用字」，我只加了一行「二擇一」。
+<strong>這個檢查一上線就抓到第三處</strong>：有一句「浮點指紋前端自己算，或改由後端算，二擇一」
+<strong>從第 7 輪就在，委員三輪都沒抓到</strong>。已定案為「一律後端算」。</li>
+</ol>
+<hr />
+<h2 id="那個補丁有沒有改到位的檢查為什麼還紅">那個「補丁有沒有改到位」的檢查為什麼還紅</h2>
+<p><strong>不是內容沒改。</strong> 是這支檢查的判準有結構性問題：</p>
+<p>委員在補丁包裡標的「要改哪裡」是<strong>段落指標</strong>（例如「Task 7.6」「purge 公式那一段」），
+但正確的修改常常是<strong>在那一段旁邊加字</strong>，而不是改動被標記的那一行本身
+⇒ 檢查看不到那一行被改，就報「沒改到」。</p>
+<p><strong>我已經改過這支檢查的判準三次（第 9、10、11 輪），每次都引入一個新洞——3 次全中。</strong>
+所以這次我停手，把它列為第 12 輪的第一個議題交給委員裁定，附上三次的失敗紀錄。</p>
+<hr />
+<h2 id="規格現在多大">規格現在多大</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>行數</th>
+<th>Task 數</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第 8 輪</td>
+<td>1,981</td>
+<td>42</td>
+</tr>
+<tr>
+<td>第 9 輪</td>
+<td>2,158</td>
+<td>42</td>
+</tr>
+<tr>
+<td>第 10 輪</td>
+<td>2,325</td>
+<td>42</td>
+</tr>
+<tr>
+<td>第 11 輪</td>
+<td><strong>2,541</strong></td>
+<td><strong>42</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Task 數從你看過勾選表以來一個都沒變</strong>（委員沒有再新增任務）。
+長的是<strong>同一批任務的細節精度</strong>——每一輪把「怎麼驗」寫得更死。</p>
+<p>我已經在第 12 輪明確問委員兩件事：
+<strong>「有沒有一個判準說『該停止再加機制了』？」</strong>
+<strong>「規格 2,541 行，凍前仍不拆嗎？對後面實作有沒有風險？」</strong></p>
+<hr />
+<h2 id="你現在需要做什麼">你現在需要做什麼</h2>
+<p><strong>目前沒有需要你決定的事。</strong>
+③已經滿足，其餘三條都是我和委員之間的工作。</p>
+<p>會需要你的時間點有兩個：</p>
+<ol>
+<li><strong>凍結之後</strong>——我會停下來等你，不會自己往施工清單或實作走（你交代過）。</li>
+<li><strong>如果委員裁定「應該縮範圍」</strong>——那會改變你「42 個一個不砍」的裁定，我一定先問你。</li>
+</ol>
+<hr />
+<h2 id="我的誠實判斷不是安慰你">我的誠實判斷（不是安慰你）</h2>
+<p><strong>會收斂，但不會在下一輪。</strong>
+理由：條數反彈的原因已經定位得很具體（不是模糊的「品質不好」），
+而且這輪的對策裡有一項是<strong>機械檢查</strong>——它上線第一天就抓到一個人工三輪沒抓到的。
+機械檢查會累積，人的注意力不會。</p>
+<p><strong>風險是</strong>：若第 12 輪的 findings 仍有大半歸類為「上一輪新機制沒寫完」，
+那表示對策不夠，我會要求委員給第三個結構性對策，而不是繼續同樣的循環——
+這一條我已經寫進第 12 輪的派工單，並要求他們<strong>把每條 finding 自己歸類並給絕對數</strong>。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3還差什麼才算完整.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
