@@ -1989,6 +1989,12 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百二十七・（2026-08-24）我的規格檔頭停在六輪之前，而檔頭正是別人判斷「現在到哪」的依據</strong>：codex 抓到 SPEC 檔頭仍寫「版本 R8-arch、R8 17 findings、狀態＝待 R9 對抗審」——當時實際已是 R14。我每輪都認真更新 §D、Task、驗收、HANDOFF、白話看板，<strong>唯獨檔頭那兩行從 R8 之後就沒再動</strong>。它被歸為 (N)（不是 accretion，是舊漏）。<strong>病根是「檔頭不在我每輪的檢查動線上」</strong>：我改的是被 finding 指到的位置，而檔頭從來沒被指到。修法：在檔頭那一行<strong>寫死它自己的維護義務</strong>（「本行為單一 current-round receipt，每輪落地須同批更新」），讓下一個讀到的人（包括未來的我）看到義務就在原地。<strong>規則</strong>：<strong>狀態宣告要把「誰負責更新我」寫在自己旁邊</strong>——放在別處的維護清單，只會在有人去讀那份清單時才生效。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百二十八・（2026-08-24）改了型別，卻沒定義「它流到邊界另一側時要變成什麼」</strong>：R14 我把 purge 下界的 receipt 欄從 <code>MappingProxyType</code> 改成 <code>tuple[SymbolPurgeRow, ...]</code>（為了擋住兩個 probe），R15 codex 與 grok 同時指出：下游的 <code>EventSplitConfig.embargo_ms_by_symbol</code> <strong>仍然收 <code>Mapping[str, int]</code></strong>，而全文<strong>沒有任何一處</strong>定義這兩者怎麼轉換。後果不是「少寫一段」——是實作者會<strong>自行發明</strong>（重複 symbol 取最後一筆？取 max？）或<strong>直接把 receipt 欄改回 Mapping</strong>，那就把我上一輪加的 probe 整個打穿，等於白做。<strong>規則</strong>：<strong>改一個欄位的型別時，同批把「這個值會流進哪些既有簽章」列出來</strong>；只要兩端型別不同，就在同一次修訂裡定義投影（唯一實作點、重複鍵怎麼辦、能不能快取），不能留給實作階段。這是「複述即第二份副本」的反面——<strong>沉默即第二種實作</strong>。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百二十九・（2026-08-24）把掃描範圍變大不等於把入口變封閉</strong>：R13 我寫「spy <code>frontend/src/lib/</code> 的雜湊呼叫」，R14 委員說可以把實作搬到 component 繞過，我就改成「spy <strong>整個</strong> <code>frontend/src/</code>」。R15 codex 再抓：<strong>這仍然是以「範圍」描述的閘</strong>——改名、搬 helper、動態 import、純 JS 手刻 sha256，任何一種都能落在範圍內卻不被 spy 看到。真正該枚舉的不是<strong>檔案範圍</strong>（開放集合），是<strong>雜湊入口</strong>（<code>crypto.subtle.digest</code>／<code>node:crypto</code> 的 <code>createHash</code>／<code>webcrypto</code>——封閉集合）。改成執行期 stub 封閉入口集合 ＋ AST 靜態掃描雙軌，並誠實寫下「純 JS 手刻 sha256 本閘看不見」為具名殘留。<strong>規則</strong>：<strong>閘要枚舉「能力入口」，不是「程式碼位置」</strong>——位置永遠可以搬，入口是有限的。這條與記憶裡「文字問題用白名單機械卡」同源：<strong>擴大黑名單的掃描面，仍然是黑名單</strong>。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
