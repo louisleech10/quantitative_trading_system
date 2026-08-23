@@ -24,7 +24,7 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R31-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R32-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
 → R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 → R29 8 條 findings（**composer 降至 1 條**；兩件跨包衝突已解除）；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
 🔴 **`ERRATA-R30-01`——R30 輪之 `-landing` 字樣不代表有內容落地**：R30 輪（ledger round
@@ -2341,8 +2341,12 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   （CODEX-R11-P0-03 之拆分要求）⇒ 本模組公開**恰兩個**函式，簽章如下
   ```
   # 階段 2（prepare-windows）：唯一產生 receipt 與其 hash 之處
-  prepare_analysis_windows(records, bars_by_tf, *, event_label_spec, event_import_id,
-                           lookahead_bars_declared, timeframe_seconds)
+  prepare_analysis_windows(
+      records, bars_by_tf,
+      event_label_spec=event_label_spec,
+      event_import_id=event_import_id,
+      lookahead_bars_declared=lookahead_bars_declared,
+      timeframe_seconds=timeframe_seconds)
   # 🔴 R27（三家：CODEX-R27-P1-01＋GROK-R27-P1-01＋COMPOSER-R27-P1-01）：
   #   R25／R26 之取得點散文要求「prepare 前建構一次 timeframe_seconds、以同一物件傳入
   #   purge 與 gate」，但**本 producer 之簽章未列該 map** ⇒ 規格內無路徑可傳進來，
@@ -2521,20 +2525,27 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
       event_import_id=event_import_id,
       lookahead_bars_declared=lookahead_bars_declared,
       timeframe_seconds=timeframe_seconds)  # spy: call_count == 1
-  # 3a feature-run gate 讀同一 timeframe_seconds 物件（is）
+  check_feature_run_coverage(
+      timeframe_seconds=timeframe_seconds,
+      feature_manifest_time_range=feature_manifest_time_range,
+      event_windows=prepared0.windows)
   prepared1 = apply_event_coverage(prepared0, ...)   # 新身分、同 token 同 hash
   # manifest／split／materialize／ic_feed **只**吃 prepared1
   ```
-  🔴 **`ERRATA-R31-C`——上列草圖之呼叫行**：原文為
-  `records, bars_by_tf, *, event_label_spec, …`，在**呼叫**位置寫裸 `*` 為非法 Python
+  🔴 **`ERRATA-R31-C`——上列草圖之呼叫行**：原文在**呼叫**位置寫裸 `*`，為非法 Python
   （`compile()` → `SyntaxError: iterable argument unpacking follows keyword argument unpacking`；
-  CODEX-R31-P1-04／COMPOSER-R31-P1-04 同時提出）。本條有兩份補丁包：
-  COMPOSER `r31-prepare-call-fix` 之 AFTER **仍保留裸 `*,`**，其自附之 VERIFY 字串
-  亦同——主委實跑 `compile()` 兩者**皆 SyntaxError**，即該包之 VERIFY 為假綠；
+  CODEX-R31-P1-04／COMPOSER-R31-P1-04 同時提出）。**本 ERRATA 不重貼該非法字面**
+  （R32 三家一致：引用反例會被字面對證工具算成落地，本身即一條自傷）。本條有兩份補丁包：
+  COMPOSER `r31-prepare-call-fix` 之 AFTER **與其自附之 VERIFY 字串**皆仍為同一非法形，
+  主委實跑 `compile()` 兩者**皆 SyntaxError**，即該包之 VERIFY 為假綠；
   CODEX `r31-codex-prepare-call` 之 SHAPE 明寫「四個明確 keyword assignment」且
   NEGATIVE_MUTATION 明列「bare `*`」須紅。⇒ **採 CODEX 版**（機器可導出，非偏好）。
-  落地後對 SPEC 現存字面實跑 `compile()` → **rc=0**。
-  ⚠️ 主委依 CODEX 之 SHAPE 寫出該字面（該包未附 literal AFTER）；**請 R32 之 codex 逐字覆核**。
+  落地後對 SPEC 現存字面實跑 `compile()` → **rc=0**；**R32 三家一致判本擇取未越權**。
+  🔴 **`ERRATA-R32-C`**：R32 另查出 Task 7.0b ① 之**權威簽章塊**當時仍為同一非法形，
+  與已修正之編排草圖分裂（COMPOSER-R32-P1-01）⇒ 依 `r32-prepare-signature-fix` 同步改為
+  明確 keyword 形式。⚠️ **主委具名保留一點疑義（R33 裁）**：該塊之標題寫「簽章如下」，
+  而所採 AFTER 為**呼叫形式**（`名=值`），在簽章語境下 `=` 會被讀成預設值；
+  主委**無競爭補丁包可依**，故照套未改寫，請 R33 確認此形式是否正確。
   - `event_label_spec` ＝ `{horizon_bars, entry_price_semantic, label_return_mode,
     decision_offset_bars}`；`supported` 由 §F-1′ 判定，偏離 ⇒ F-2′ 之 reason。
   - **禁止**自行實作報酬公式：`windows` 與 `label_value` 一律由既有 `align_events`
@@ -3205,12 +3216,22 @@ t0 formatter 讀得到 label、label formatter 讀得到 t0（欄位語意重疊
        🔴 **主委之擇取理由（`ERRATA-R31-B`）**：本條有兩份互斥補丁包——COMPOSER
        `r31-spy-gate-shape` 與 GROK `r31-spy-gate-must-create`，**方向一致**（皆維持 (乙)、
        皆要求明列須新建、皆要求收斂重複合議段），差異在字面與涵蓋面。**採 COMPOSER 版**，
-       理由為機器可導出、非偏好：GROK 版之編排草圖 AFTER 行
-       `check_feature_run_coverage(prepared0, feature_run_manifest, *, timeframe_seconds=...)`
-       經 `compile()` 實跑為 **SyntaxError**（與本輪 P1-04 同一病），照抄即不可執行；
+       理由為機器可導出、非偏好：GROK 版之編排草圖 AFTER 在**呼叫位置**使用裸 `*`
+       （與本輪 P1-04 同一病），`compile()` 實跑為 **SyntaxError**，照抄即不可執行；
+       **本 ERRATA 不重貼該非法字面**（避免 must_exist／Agent 誤抄）。
        COMPOSER 版另為唯一提供 `def` 簽章者（三家皆要求之 shape 要素）。
-       ⚠️ **未閉項（R32 待裁）**：GROK 版之 VERIFY 要求字面「須於本 Task 新建」，本 AFTER
-       未含該字面；主委**不自行補寫**，列為 R32 由 grok 確認或改寫。
+       ✅ **R32 已結**：三家一致判本擇取**未越權**。GROK 之「須於本 Task 新建」字面
+       依 CODEX-R32-P2-01 之裁定**視為撤回之冗餘字面**（上方「函式**須新建**」已保留語義）。
+       🔴 **`ERRATA-R32-B2`——gate 具名呼叫之擇取**：本群集有兩份互斥 AFTER。
+       COMPOSER／GROK 版（同名檔 `r32-spy-gate-call.md`，見下方 `ERRATA-R32-COLLISION`）
+       之第二引數取自**一個本檔從未定義的 manifest 變數**（名稱見該補丁包，**本 ERRATA
+       刻意不重貼**）——屬 R11 意義下之 dangling，與本 epic 連三輪判為 P1 之缺陷同類；
+       CODEX `r32-feature-run-gate-call` 之引數則**即上方 `def` 之 keyword-only 參數名**。
+       ⇒ **採 CODEX 版**（機器可導出：該 dangling 名於本檔之定義數＝0）。
+       🔴 **`ERRATA-R32-COLLISION`**：COMPOSER 與 GROK 本輪**輸出同一檔名**
+       `handoffs/patches/20260824-gap3ux-r32-spy-gate-call.md` ⇒ **其中一家之補丁包被靜默覆蓋**
+       （本輪 15 條 findings 卻只有 14 份補丁檔）。主委**無法判定倖存者為何家**，
+       亦無法復原被覆蓋者 ⇒ **R33 請兩家各自改名重交**，並請三家裁此檔名碰撞是否須機械擋。
        🔴 **R27（三家：CODEX-R27＋GROK-R27＋COMPOSER-R27）**：R26 主委寫之 `args[N]` 中
        **`N` 未定**，且兩 spy 掛載點未具名 ⇒ 為 dangling。
        **主委已於 R27 brief 自行揭露此假設**，三家確認並給出上列 AFTER。

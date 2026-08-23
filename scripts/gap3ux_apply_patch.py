@@ -77,13 +77,23 @@ def verify_greps(body):
     for ln in m.group(1).split("\n"):
         if "grep" not in ln:
             continue
-        lit = re.search(r"`([^`]{4,})`", ln)
-        if not lit:
+        # 🔴 R32：字面＝grep 之搜尋 pattern，不是整條反引號指令
+        m = re.search(
+            r"""(?:-nF|-nE|-F|-E|--fixed-strings)\s+'((?:\\'|[^'])+)'""", ln)
+        if not m:
+            m = re.search(
+                r'''(?:-nF|-nE|-F|-E|--fixed-strings)\s+"((?:\\"|[^"])+)"''', ln)
+        if not m:
+            m = re.search(r"""grep\s+(?:-[a-zA-Z0-9]+\s+)*'((?:\\'|[^'])+)'""", ln)
+        if not m:
+            m = re.search(r'''grep\s+(?:-[a-zA-Z0-9]+\s+)*"((?:\\"|[^"])+)"''', ln)
+        if not m:
             continue
+        lit = m.group(1).replace("\\'", "'").replace('\\"', '"')
         if re.search(r"(→|->|⇒)\s*0\b", ln):
-            out.append((lit.group(1), 0))
+            out.append((lit, 0, ln))
         elif re.search(r"(≥\s*1|>=\s*1)", ln):
-            out.append((lit.group(1), 1))
+            out.append((lit, 1, ln))
     return out
 
 
@@ -112,8 +122,10 @@ def main():
 
         vs = verify_greps(body)
         vbad = []
-        for lit, expect in vs:
-            n = spec.count(lit)
+        for lit, expect, vln in vs:
+            pm = re.search(r'(docs/[\w./-]+|scripts/[\w./-]+|[\w./-]+\.(?:py|md|sh))', vln)
+            blob = io.open(pm.group(1), encoding="utf-8").read() if pm and os.path.exists(pm.group(1)) else spec
+            n = blob.count(lit)
             if (expect == 0 and n != 0) or (expect >= 1 and n < 1):
                 vbad.append((lit, expect, n))
         tot_v += len(vs); ok_v += len(vs) - len(vbad)
