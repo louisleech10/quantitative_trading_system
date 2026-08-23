@@ -71,9 +71,97 @@ def test_anchor_not_in_diff_is_red(tmp_path):
         )
         rc, log = _run(patch)
         assert rc == 2, "anchor 不在內容中卻回 rc=%d；輸出：%s" % (rc, log)
-        assert "anchor 未出現在該檔之 diff hunk 內" in log, log
+        # 🔴 R10：判準細分後，「當前內容與 diff hunk 皆找不到」歸類為**非字面**（委員責任）；
+        #    「在內容中但不在 diff」才是「未改到」（主委責任）——見下一條測試。
+        assert "anchor 非字面" in log, log
     finally:
         fixture.unlink(missing_ok=True)
+
+
+def test_anchor_in_content_but_not_in_diff_is_red(tmp_path):
+    """anchor **在當前內容中**但**不在本次 diff hunk** ⇒ rc=2，且訊息為「未改到」而非「非字面」。
+
+    🔴 這是 R10 修正判準後的關鍵對照組：
+    首版把兩種情形混為一談，導致「委員 anchor 引用被刪除之舊文字」被誤判成非字面。
+    本條用獨立 tmp git repo：檔內兩段字面，只改其中一段，anchor 指未改的那段。
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*a):
+        return subprocess.run(["git"] + list(a), cwd=str(repo),
+                              capture_output=True, text=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    target = repo / "doc.md"
+    target.write_text("SECTION_UNTOUCHED\nSECTION_EDITED old\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "init")
+    target.write_text("SECTION_UNTOUCHED\nSECTION_EDITED new\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "edit")
+    head_ts = int(git("log", "-1", "--format=%ct").stdout.strip())
+    os.utime(str(target), (head_ts - 3600, head_ts - 3600))
+
+    patch = tmp_path / "patch.md"
+    patch.write_text(
+        "# PATCH cluster test\nAUTHORITY: 測試用\nSYNC-LOCI:\n"
+        "- doc.md#SECTION_UNTOUCHED\n"
+        "BEFORE/AFTER: （略）\nVERIFY:\n- true\n",
+        encoding="utf-8",
+    )
+    out = subprocess.run(
+        [sys.executable, str(GATE), str(patch), "--diff-base", "HEAD~1"],
+        capture_output=True, text=True, cwd=str(repo),
+    )
+    log = out.stdout + out.stderr
+    assert out.returncode == 2, log
+    assert "anchor 未出現在該檔之 diff hunk 內" in log, log
+    assert "anchor 非字面" not in log, log
+
+
+def test_anchor_quoting_deleted_text_is_green(tmp_path):
+    """anchor 引用**被刪除**之舊文字 ⇒ 應為綠（它出現在 diff 之 `-` 行）。
+
+    🔴 **主委首版此判準錯誤**：只查「當前內容」⇒ 委員在 BEFORE 段引用將被刪除之字面，
+    套用後必然找不到，會被誤判「非字面」並誤歸委員責任。R10 十二份補丁包有十餘個
+    anchor 因此假紅。本條為該修正之回歸樁；把判準退回「只查當前內容」⇒ 本條轉紅。
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*a):
+        return subprocess.run(["git"] + list(a), cwd=str(repo),
+                              capture_output=True, text=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    target = repo / "doc.md"
+    target.write_text("OLD_CLAUSE_TO_BE_DELETED\nkeep\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "init")
+    target.write_text("NEW_CLAUSE\nkeep\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "edit")
+    head_ts = int(git("log", "-1", "--format=%ct").stdout.strip())
+    os.utime(str(target), (head_ts - 3600, head_ts - 3600))
+
+    patch = tmp_path / "patch.md"
+    patch.write_text(
+        "# PATCH cluster test\nAUTHORITY: 測試用\nSYNC-LOCI:\n"
+        "- doc.md#OLD_CLAUSE_TO_BE_DELETED\n"
+        "BEFORE/AFTER: （略）\nVERIFY:\n- true\n",
+        encoding="utf-8",
+    )
+    out = subprocess.run(
+        [sys.executable, str(GATE), str(patch), "--diff-base", "HEAD~1"],
+        capture_output=True, text=True, cwd=str(repo),
+    )
+    log = out.stdout + out.stderr
+    assert out.returncode == 0, "引用被刪除文字之 anchor 應為綠；輸出：%s" % log
 
 
 def test_anchor_present_is_green(tmp_path):

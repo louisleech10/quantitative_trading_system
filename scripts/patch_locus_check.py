@@ -133,21 +133,6 @@ def parse_patch(path):
                     if sm:
                         stage = sm.group(1)
                         f = _STAGE_SUFFIX.sub('', f).strip()
-                # 🔴 anchor 格式閘（三家一致；CODEX-R9-P1-06 ③、GROK-R9-P1-04 ③）：
-                #   anchor 必須是**該檔當前內容可字面找到**之字串。
-                #   R8 有五個 anchor 寫成敘述（`檔頭 A-6／FROZEN 句`／`§A-A-6`／`§G-G-2`…），
-                #   這些字串在檔內根本不存在 ⇒ 實質內容改完了、閘仍紅，且紅得沒有資訊。
-                #   ⇒ 提交當下就 fail-closed（委員責任），不等到 diff 對證。
-                #   誠實邊界：本閘不驗 anchor 是否**精確指到該改的段落**，只驗它存在。
-                if anchor and os.path.isfile(f):
-                    try:
-                        cur = io.open(f, encoding='utf-8', errors='replace').read()
-                    except IOError:
-                        cur = ''
-                    if anchor not in cur:
-                        errors.append(
-                            'anchor 非字面：`%s#%s` 在該檔當前內容中找不到'
-                            '（敘述型 anchor 不可用；須為可 grep 之字面）' % (f, anchor))
                 loci.append((f, anchor, stage))
             elif line.strip() == '':
                 continue
@@ -225,7 +210,16 @@ def diff_hunks(path, base):
         if out.returncode == 0:
             body += out.stdout
     if body.strip():
-        return body
+        # 🔴 只保留**新增／刪除行**，丟掉 hunk header。
+        #   病根（主委自查，R10）：`git diff -U0` 之 hunk header 形如
+        #   `@@ -1,2 +1,2 @@ SECTION_UNTOUCHED`——git 會把它認定之「所屬區塊標題」
+        #   （對 .md 常是前一個標題行）附在 `@@` 之後。若把整份 diff 當比對面，
+        #   **未改動之標題文字會被當成「改到了」** ⇒ 同檔任一改動即可讓該標題下的
+        #   所有 anchor 通過，正是 CODEX-R8-P1-06 要根除之「僅檔名相符」之變體。
+        kept = [l for l in body.split('\n')
+                if (l.startswith('+') or l.startswith('-'))
+                and not l.startswith('+++') and not l.startswith('---')]
+        return '\n'.join(kept)
     # 未追蹤（新建）檔：git diff 無輸出 ⇒ 全檔視為新增
     try:
         return io.open(path, encoding='utf-8', errors='replace').read()
@@ -276,7 +270,27 @@ def main(argv):
                 # 🔴 CODEX-R8-P1-06：僅檔名相符不足，anchor 須出現在 diff hunk 內
                 body = diff_hunks(f, base)
                 if anchor not in body:
-                    why = 'anchor 未出現在該檔之 diff hunk 內'
+                    # 🔴 anchor 字面閘（CODEX-R9-P1-06 ③／GROK-R9-P1-04 ③）：
+                    #   分辨「該改而未改」與「anchor 根本不是字面（委員責任）」。
+                    #   判準＝anchor 出現在**當前內容**或**diff hunk（含被刪除行）**之任一者。
+                    #
+                    #   ⚠️ **首版判準錯誤（主委自查，R10 套用當下發現）**：首版只查「當前內容」
+                    #   ⇒ 委員 anchor 若引用**將被刪除**之舊文字（BEFORE 段），套用後當然找不到，
+                    #   會被誤判為「非字面」並歸咎委員。實際上那是**正確的字面 anchor**，
+                    #   它出現在 diff 之 `-` 行。R10 十二份補丁包有十餘個 anchor 因此假紅。
+                    #   ⇒ 改為「當前內容 OR diff hunk」；R8 之真敘述型 anchor
+                    #   （`檔頭 A-6／FROZEN 句` 等）兩者皆無，仍正確轉紅。
+                    cur = ''
+                    if os.path.isfile(f):
+                        try:
+                            cur = io.open(f, encoding='utf-8', errors='replace').read()
+                        except IOError:
+                            cur = ''
+                    if anchor in cur:
+                        why = 'anchor 未出現在該檔之 diff hunk 內'
+                    else:
+                        why = ('anchor 非字面：當前內容與 diff hunk 皆找不到'
+                               '（敘述型 anchor 不可用；須為可 grep 之字面）⇒ 委員責任')
             if why is None:
                 continue
             # 🔴 stage=impl 之未達 locus：預設列為 DEFERRED、不計 rc

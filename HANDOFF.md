@@ -1,8 +1,8 @@
 # HANDOFF
 
 **當前**：GAP-3 事件型 UAT 缺口修補 SPEC（`docs/GAP3_EVENT_UX_SPEC.md`）
-——**R9 十四條全數落地**，**待派 R10**。SPEC 2158 行、**42 Task（未增未減）**。
-sha256 `a376ecfe…`（R10 審查期間不得動該檔）。
+——**R10 十一條全數落地**，**待派 R11**。SPEC 2325 行、**42 Task（未增未減）**。
+sha256 `fe8e84d9…`（R11 審查期間不得動該檔）。
 
 🔴 使用者 2026-08-23 裁定：**輪次上限已解除**、**42 個一個不砍**、**A-6′ 已確認**
 ⇒ 三者皆**不必再問使用者**。FROZEN 之後停下來等使用者，不自行往 TODO／實作走。
@@ -14,39 +14,38 @@ sha256 `a376ecfe…`（R10 審查期間不得動該檔）。
 **角色卡＝`docs/GAP3_EVENT_UX_ROLE_CARD.md`**：主委不得自寫第二處複述／
 觸及 SPEC 之 commit 須有補丁包或 ERRATA id／派審前跑 `bash scripts/gap3ux_pre_review.sh <patch.md>`。
 🔴 **任何文件一律不寫閘數**；權威清單唯一在 `gap3ux_pre_review.sh` 之 `run` 呼叫序列。
-🔴 **補丁包之 anchor 須為該檔當前內容之字面**；stage 後綴 `@spec/@doc/@harness/@impl`
-（缺省 `@spec`），未達之 `@impl` 為 DEFERRED；呼叫端只有 `--also-impl` 這個**加寬**旗標。
+🔴 **補丁包 anchor 須為字面**（判準＝當前內容 **OR** diff hunk 含 `-` 行）；
+stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` 為 DEFERRED；
+呼叫端只有 `--also-impl` 這個**加寬**旗標。**commit 後複驗須帶 `--diff-base <套用前 ref>`**。
 
 ---
 
-## R9 之八群集（全部已落地；三家 Verdict 一致「需修訂後定版」）
+## R10 之七群集（全部已落地；三家 Verdict 一致「需修訂後定版」）
 
 | 群集 | 家數 | 落點 |
 |---|---|---|
-| **A**（P0）purge 混用單位、無逐列 ms 換算 ⇒ 洩漏 | **三家** | §D-3′-a（ii）權威式；Task 7.0b ⑨ 四組 fixture；§G G-3 ④ |
-| **B**（P0）分析時 receipt 未定義 ⇒ h=7 在 h=1 舊 window 建 split | codex | **§D-3′-a（iii）五階段**；§D-3a 改純引用；Task 7.0b ④⑩；Task 7.7 ③；G-3 ⑥ |
-| C（P1）§F-2′ reason 登記處自相矛盾 | **三家** | 刪 R6 殘段，只引用 Task 1.1 |
-| D（P1）Task 7.6 事實欄與 detail 鍵集互斥、`direction` 歸屬 | 兩家 | Task 7.6 **三分權威表**；formatter 改**欄位級 registry**；Task 7.3 同步 |
-| E（P1）depth=0 之 floor 與真實深度混淆 | codex | 新增 derived 欄 `lookahead_bars_declared`；Task 1.1 ⑤⑦／2.1b／1.9／4.1／4.1b |
-| F（P1）`pre_gap3.json` fixture 無建立步驟 | codex | Task 1.1 寫死 `cp`→`cmp`→`shasum` 順序＋immutable＋驗收⑥ |
-| G（P1）`h` 以匯出深度欄種子化 | grok | Task 7.0b ③／Task 7.6 表：初始值＝常數 `1`；驗收⑦ |
-| H（P1）locus 閘缺 stage＋CJK 假紅 | **三家**裁定＋grok | `patch_locus_check.py`（quotepath／stage／anchor 字面閘）；角色卡；測試檔擴充 |
+| **A**（P0）小時命名欄使「批次 scalar 深度」無唯一值——**推翻主委 R9 之裁決** | codex | `lookahead_bars_declared` 改 `Mapping[tf->int]`；Task 2.1b `depth(tf)`；Task 7.0b ⑨ 加 fixture (e) |
+| **B**（P0）`SplitConfig` 之「TODO 二擇一」含不可行選項② ⇒ under-purge | **三家** | §D-3′-a（ii）規格階段鎖 per-scope embargo、刪選項② |
+| **C**（P0/P1）receipt id／hash 無產生點／輸入／契約落點 | **三家** | §D-3′-a（iii）新增「receipt 身分」段；欄名 `analysis_alignment_receipt_hash`；序列化引用 §G S-9 |
+| D（P0 同源）兩階段只在散文層明示 | codex | Task 7.0b ① 拆為 `prepare_analysis_windows` ＋ `resolve_label_value_at_analyze` |
+| E（P1）IC event path wiring 落點未明列 | codex | Task 7.0b ③ (a)–(d) |
+| F（P1）`receipt_schema` 只是欄名清單、型別無驗收 | codex | Task 1.1 ⑦ typed schema ＋ validator；驗收⑧ |
+| G（P1）Task 7.0b ② 殘留 R8 三步副本 | grok | 改引用五階段 |
+| H（P1）Task 7.6 之 `t0`／`label` 形狀未定義 | composer | 新增形狀表；驗收①③ |
 
-**三個主委裁決點經三家覆核＝全部裁對**；兩處主委補充中（i）被推翻（改群集 E）、（ii）方向對但換算未閉合（改群集 A）。
+（C／D 同源於 CODEX-R10-P0-03，計 7 個獨立群集。）
+
+**議題三**：委員逐條覆核主委自建之 locus 閘，**本輪未找到新缺口**
+（所有 git 呼叫走 `_git`、stage 預設正確、mutation 均轉紅）。
 
 ---
 
-## 🔴 立即待辦：派 R10
+## 🔴 立即待辦：派 R11
 
-- brief 沿用 R9（`handoffs/20260823-gap3ux-x-review-r9-brief.md`），改輪次；
-  facts 產生器複製 `…-r9-facts.sh` 改輪次；`…-r9-locus.sh` 同理。
-- 🔴 **R10 brief 須新增要求**：補丁包之 SYNC-LOCI **必須標 stage 後綴**，
-  且 anchor 須為可 grep 之字面（R9 已落地機械閘，未標＝預設 `@spec`）。
-- **locus 現況之查法**（不在此複述結果，跑一次即知）：
-  `bash scripts/gap3ux_pre_review.sh handoffs/patches/20260823-gap3ux-r9-*.md`。
-  已知殘項為兩個 `@impl` 性質之 locus（`event_import_contract.json#receipt_schema`、
-  `pre_gap3.json#version`——皆 Task 1.1 實作時才會動）；委員撰寫時 stage 機制尚未存在
-  故未標，預設 `@spec` ⇒ **屬委員責任、非主委漏套**，R10 起補標即消。
+- brief／facts／locus 三檔沿用 R10（`…-r10-*`）改輪次；
+  locus 腳本之 `--diff-base` 預設值須改為 **R10 落地 commit 之父**。
+- R11 brief 應續問：群集 A 之 per-tf map 是否在所有讀取點都改齊；
+  群集 C 之 hash 輸入是否真的封閉；群集 D 之兩函式切分是否擋得住重跑。
 
 ---
 
@@ -54,16 +53,16 @@ sha256 `a376ecfe…`（R10 審查期間不得動該檔）。
 
 | # | 條件 | 現況 |
 |---|---|---|
-| ① | 正確性／洩漏／接線類 OPEN P0＝0、P1＝0 | ⬜ 待 R10 複審（R9 兩條 P0 已落地，須反例重跑確認閉合） |
-| ② | 本輪主委自傷絕對數＝0 | ⬜ R9 為 **7** |
+| ① | 正確性／洩漏／接線類 OPEN P0＝0、P1＝0 | ⬜ 待 R11 複審 |
+| ② | 本輪主委自傷絕對數＝0 | ⬜ R10 為 **7** |
 | ③ | A-6′ 經使用者確認 | ✅ 已滿足 |
-| ④ | `gap3ux_pre_review.sh <patch.md>` rc=0 | ⬜ 見上「locus 現況之查法」 |
+| ④ | `gap3ux_pre_review.sh <patch.md>` rc=0 | ⬜ 查法：`bash scripts/gap3ux_pre_review.sh handoffs/patches/20260823-gap3ux-r10-*.md`（殘項為委員 anchor 少寫反引號一處，＋`@impl` DEFERRED） |
 
 ---
 
-## 🔴 做不成機械閘者（三家明列，不得宣稱已封）
-「選哪個技術修法正確」／「使用者 label 語意是否正確」／「**未被列出的**隱藏複述」
-／**R9 追加**：「委員把 spec locus 誤標 `@impl`」（與 anchor 精確度同類，屬委員責任）
+## 🔴 做不成機械閘者（不得宣稱已封）
+「選哪個技術修法正確」／「使用者 label 語意是否正確」／「**未被列出的**隱藏複述」／
+「委員把 spec locus 誤標 `@impl`」／**R10 追加**：「anchor 寫得太籠統（如 `#main`）仍會通過」
 
 ---
 
@@ -73,34 +72,39 @@ sha256 `a376ecfe…`（R10 審查期間不得動該檔）。
 |---|---|---|---|
 | R1–R3 | 24 → 7 → 18 | — | — |
 | R4 → R7 | 19 → 13 → 15 → 12 | 3 → 5 → 6 → 7 | 選錯修法 → 整合字面不同步 |
-| R8 | 17 | 6 | 全在主委自建工具／receipt |
-| R8 落地 | —（自查） | 2 | 報告層截斷；pipefail 假綠 |
-| **R9** | **14（8 群集）** | **7**（計入 quotepath 則 8；兩種算法皆列，不擇有利者） | 單位換算／階段未定義／殘段未刪／鍵集互斥 |
-| R9 落地 | —（自查） | 2 | locus 列表 pipefail 假綠；**quotepath 回歸測試連兩版假綠** |
+| R8 | 17 | 6 | 主委自建工具／receipt |
+| R9 | 14（8 群集） | 7 | 單位換算／階段未定義／殘段未刪／鍵集互斥 |
+| **R10** | **11（7 群集）** | **7** | **裁決錯誤（未驗邊界）／留下不可行選項／只寫敘述無算法** |
+| R8–R10 落地 | —（自查） | 2 ＋ 2 ＋ 2 | 截斷／pipefail｜quotepath 測試兩版假綠｜anchor 判準錯＋hunk header 洩漏 |
 
-**Task 數**：R8→R9→R9 落地皆 **42 → 42**（本輪委員未新增 Task）。
+**Task 數**：R8→R9→R10 皆 **42 → 42**（委員未新增 Task）。
 
 ---
 
 ## 坑（累積；全部實測過）
 
-- **rc 一律直接取**：`set -o pipefail` 下 `cmd | grep … || echo '全達'` 會在有缺口時照印「全達」
+- **rc 一律直接取**：`pipefail` 下 `cmd | grep … || echo '全達'` 會在有缺口時照印「全達」
 - **報告層截斷＝fail-open**：`sed -n '1,6p'` 會把後面的紅吃掉
-- 🔴 **`git diff --name-only` 預設 `core.quotepath=true`** ⇒ CJK 路徑輸出成八進位字面，
-  與 UTF-8 路徑永不相等（機械閘假紅）。**所有 git 呼叫一律 `-c core.quotepath=false`**
-- 🔴 **寫「假紅／假綠」之回歸測試時，先確認 fixture 真的會走到那條路徑**：
-  quotepath 之測試連兩版假綠——①未追蹤檔走 `git status -z`（本就不 quote）
-  ②tmp repo 但未壓 mtime（`is_touched` 之 mtime 回退把它救綠）。第三版壓 mtime 才真紅
+- 🔴 **`git diff --name-only` 預設 `core.quotepath=true`** ⇒ CJK 路徑變八進位字面（機械閘假紅）
+  ⇒ 所有 git 呼叫一律 `-c core.quotepath=false`
+- 🔴 **`git diff -U0` 之 hunk header 會附「所屬區塊標題」**（`@@ … @@ SOME_HEADING`）
+  ⇒ 把整份 diff 當比對面時，**未改動之標題會被當成改過了**。只保留 `+`／`-` 行
+- 🔴 **anchor 有兩種合法用法**：指向保留的文字、指向**被刪除**的文字
+  ⇒ 字面判準必須是「當前內容 **OR** diff hunk」，只查前者會誤扣委員責任
+- 🔴 **每加一條反測就配一條對照組**（一條該紅、一條該綠）——單邊測試只證明閘會叫，
+  不證明它叫對地方；本 session 三次栽在「工具自己騙自己」
+- 🔴 **`is_touched` 有 mtime 回退**（給 gitignore 檔用）⇒ 寫 git 相關測試時
+  新建檔必然「比 HEAD 新」而被判已改動；要測真路徑須 `os.utime` 把 mtime 壓到 HEAD 之前
 - **`doc_format_precheck` 之空殼偵測按「行」判**：續行以 `**` 開頭會被當 bullet；
   該行若含「驗證」二字又無數字／`pytest`／`==` 等 token ⇒ 判空殼
-- **`verify_pretooluse` 掃 HANDOFF 之 operational claim**：寫「N 份全綠」這類結果宣稱會被擋
-  （HANDOFF 零豁免）⇒ 改寫成「查法＋命令」而非結果
+- **`verify_pretooluse` 掃 HANDOFF 之 operational claim**：寫「N 份全綠」會被擋
+  （HANDOFF 零豁免）⇒ 改寫成「查法＋命令」
+- **SYNC-FORBID `lookahead_bars.*=.*72`**：寫小時欄之正確 per-tf 值時要避開該行形態
 - **shell 文字工具對非 ASCII 不可靠**（macOS awk 逐位元組）⇒ 比對中文一律用 Python
 - **`git status -uall` 不含 ignored**；`handoffs/*` 在 `.git/info/exclude`，新檔須 `git add -f`
 - **委員產出（review／補丁包）不入版控**；`handoffs/reconcile/*/sources/` 承接審計鏈
 - `debt_clear` 要求 `sources.lock` 之 `mode == review`；
-  `bash scripts/reconcile_build.sh <session> --mode review --rebuild` 可就地升級
-  （**不得**同時傳委員檔）
+  `bash scripts/reconcile_build.sh <session> --mode review --rebuild` 可就地升級（不得同時傳委員檔）
 - `git checkout`／`rm` 被 auto-mode classifier 擋；`cd <絕對路徑>` 觸發分類器
 - `plain_docs_sync_check` 是 commit 時序判準：先 `git add` 再跑 `--staged`
 - commit 之 `Governance-Scope` trailer 須單行且在**最末段**；長訊息一律 `git commit -F <檔>`
