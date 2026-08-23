@@ -2076,6 +2076,15 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百五十六・（2026-08-24）委員裁定我停止自擬檢查清單</strong>：R22 我照紀律跑了全檔 grep 卻仍漏一處，因為清單是我自己擬的。R23 我把這個方法缺口交出去，兩家的答覆一致而且很直接——codex：「grep 清單應由<strong>委員</strong>全檔審查；自動導出的候選<strong>只能報告、不能變成新的閘</strong>」；grok：「自動 grep 清單<strong>不應由主委建成新機制</strong>」。⇒ <strong>我不再自擬清單，只負責落地；全檔殘留查核由委員每輪執行</strong>（那本來就是他們的工作）。<strong>規則</strong>：<strong>當我發現某個步驟依賴我的記憶而反覆出錯，先問「這件事是不是本來就該由別人做」</strong>——我的直覺是「做一個工具幫我記得」，而正確答案往往是「這個角色不該做這件事」。這是繼「停止新建機制」之後，第二件被從我手上拿走的事。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百五十七・（2026-08-24）我送出了一份自相矛盾的派工單，被開了本 epic 第一條最嚴重等級（P0）</strong>：派工單裡有一行「審查標的鎖版：sha256 = XXX，開工第一件事重跑，不符即停下」。codex 一跑，<strong>不符</strong>——因為我的流程順序是：①產生派工包（此時算 hash 寫進去）②<strong>又編輯了規格</strong>（補一個標記）③才派工。<strong>派工單送出時，鎖版已經失效。</strong> codex 依派工單明文停止審查、不進內容——<strong>做得完全正確，而損失是本輪少了一家的內容審查</strong>。另兩家的處置也都合理：grok 偵測到不符、明確標示並診斷出原因，然後對實際內容審；composer 以實際檔案的 hash 為基準審。<strong>三家沒有一家做錯，錯的是我。</strong> 修法（立即生效）：<strong>派工前規格必須已 commit 且工作區乾淨，hash 在該狀態下計算，建包與派工之間不得再編輯規格</strong>。<strong>規則</strong>：<strong>任何「鎖版」欄位，必須在送出前的最後一刻重算</strong>——我的舊習慣是「先建包、再補幾筆、才派」，那個習慣本身就是這條 P0 的成因。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百五十八・（2026-08-24）我修掉一個「指向不存在的東西」，下一輪就再造一個——但這次是我自己先抓到的</strong>：R23 我修掉「指向不存在的 ⑨(g)」。R23 落地時我新寫的檢查條裡用了 <code>pre_coverage_event_rows</code>——<strong>全檔只出現在那一行，欄位根本沒定義</strong>。同型錯誤，隔一輪再犯。<strong>差別在於：這次是我在建下一輪派工包時自查抓到的</strong>，而不是等委員抓。我沒有自己補那個欄位（新增欄位可能構成「新建機制」，而我已被禁止），改成就地標「待裁定・本條在該欄具名落地前不生效」，並把自查結論寫進派工單，<strong>不讓委員白花時間重新發現</strong>。委員後來給的解法比我想的好：<strong>改用一個既有的具名欄位，根本不需要新增</strong>。<strong>規則</strong>：<strong>發現自己犯錯時，先看能不能用既有的東西解決，再考慮新增</strong>——我的直覺是「補一個欄位」，而正確答案往往是「你要的東西已經存在，只是名字不一樣」。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百五十九・（2026-08-24）同一個「撤回」我清了兩輪，還是有第六處、第七處</strong>：「以集合相等取代同源宣稱」這個撤回，R23 我改了 (d-3a) 那一處，<strong>漏了另一處</strong>（grok 抓到）；同時 composer 抓到<strong>檔首摘要表</strong>還寫著舊的單位來源。加起來這是同一類錯誤的第六、第七處。<strong>規則</strong>：<strong>「撤回一個說法」要當成一次全檔搜尋任務，不是一次編輯任務</strong>——而且依 R23 裁定，這件事現在<strong>由委員做</strong>（我已停止自擬查核清單）；本輪的兩處正是由委員找出來的，這證明那個裁定是對的。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

@@ -24,10 +24,10 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R23-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R24-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
-→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 條 findings；**P0=0（連九輪）**、**(N)=0（連九輪）**；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
-**狀態：未 FROZEN**（待 R24 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 9 條 findings（含 **CODEX-R24-P0-01：主委 brief 之 sha 鎖版失效**，係主委派工流程錯誤、非 SPEC 內容缺陷；(N)=0 連十輪）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
+**狀態：未 FROZEN**（待 R25 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
 歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
@@ -52,7 +52,7 @@ R5 之 13 條中**有 5 條為主委 R4 修訂自行引入**（R4 亦有 3 條�
 | A | §V 複述 §P 之斷言（V-11 等六列雙源） | **§V 書寫規則**＋六列引用化＋Task 7.2 標題與覆蓋風險＋新閘 `spec_v_task_ref_check.sh` |
 | B | G-2 無 dict→bytes encoder | **§G S-9** |
 | C | 三組報酬表與 S-1 八鍵互斥 | **§G S-1a／S-7a**＋Task 7.5 輸出形狀 |
-| D | `horizon_bars→ms` 之 tf 來源未定 | **Task 7.7 ①②**（逐列取事件列 tf；`TIMEFRAME_SECONDS`） |
+| D | `horizon_bars→ms` 之 tf 來源未定 | **Task 7.7 ①②**（逐列取事件列 tf；**注入之** `timeframe_seconds`——R24 更正：原寫 module 常數，與 L3006 注入模型互斥） |
 | E | Task 7.7 左界未扣 `decision_offset_bars` | **Task 7.7 ③**（左界改 `decision_at_ms`） |
 | F | 匯出固定取 `future_${h}bar_return` 與宣告不符 | **Phase 7 前言 F-1..F-5**＋Task 7.0 ⑦⑧ |
 | G | `counterexample_kind` 為逐列選填欄 | **維度由六改五**＋逐列映射規則 |
@@ -452,10 +452,13 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
                                        #     `event_level` **只含 alignment 成功之列**
                                        #     ⇒ 對齊失敗之事件其 TF 會從 digest 消失，
                                        #     而 lookahead 鍵集仍含之。
-                                       #   ⇒ **定死唯一 producer**：兩者**同讀階段 2 之
-                                       #     同一個 frozen 物件**（`PreparedAnalysisWindows`），
+                                       #   ⇒ **定死唯一 producer**：兩者皆於階段 2 產生，
                                        #     不各自從 records／pipeline 中段重建；
                                        #     其 receipt identity 即 `analysis_alignment_receipt_hash`。
+                                       #   🔴 R24 刪「同讀同一個 frozen 物件」之**同源宣稱**
+                                       #     （GROK-R24-P1-01）：R23 主委宣稱以集合相等取代同源，
+                                       #     **卻只刪了 (d-3a) 那一處、漏了本處** ⇒ 第六次「撤回沒清乾淨」。
+                                       #     兩者之一致性由 (d-3a) 之**集合相等**對證，**不以物件身分宣稱**。
                                        #   ⇒ **unknown TF 之 fail-closed**：某觸發 TF 不在
                                        #     注入之 `timeframe_seconds` 鍵中 ⇒ **拒算**
                                        #     （不得略過該列、不得以預設秒數代入）。
@@ -939,8 +942,15 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
        (d-3a) 🔴 **鍵集集合相等（採 GROK-R22 提案；R23 依委員補丁包更正來源）**：斷言
              `set(timeframe_seconds.keys())`
              **==** `set(lookahead_bars_declared.keys())`
-             **==** `set(e.timeframe for e in pre_coverage_event_rows)`
-             （三側皆於階段 2 自同一 `PreparedAnalysisWindows` 讀取）。
+             **==** `set(row.timeframe for row in prepared.windows)`
+             （`prepared` ＝階段 2 之 `PreparedAnalysisWindows`；`windows` 欄集見 Task 7.0b ①；
+             為 coverage 前之全批對齊成功列。**不得**以 `event_level` 或 post-coverage 子集取代。）
+             🔴 **R24 更正（兩家；COMPOSER-R24-P1-01＋GROK-R24-P1-01）**：R23 版寫
+             `pre_coverage_event_rows`——**該名稱全檔僅出現於該行、欄集未定義**，
+             與 R23 才剛修掉之 `⑨(g)` **同型**（指向不存在之物），主委下一輪又犯一次。
+             ⇒ 改用**既有具名欄** `prepared.windows`（採委員補丁包；**不新增欄位**）。
+             🔴 **鍵集斷言須在階段 2 末執行**；**coverage 後禁重算 map 鍵集**
+             （否則 post-coverage 兩側自洽 ⇒ 假綠）。
              🔴 **R23 更正右側來源（COMPOSER-R23-P1-02）**：R22 版寫
              `set(e.timeframe for e in event_level)`，但 `event_level`
              **只含 alignment 成功之列**（R21 已載），與「pre-coverage 快照」**互斥**
@@ -957,7 +967,10 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
              ⚠️ **本處已被連續六輪攻擊**（列舉三／列舉四／解析文件／常數清單／
              `TypeError` 誇大／(d-3) 不足）；R22 起**鍵集面由 (d-3a) 機械收斂、
              值面由實作測試收斂**，規格層**不再新增第七版敘事**。
-       **mutation（五條）**：①呼叫端漏傳 `timeframe_seconds` ⇒ `TypeError`；
+       **mutation（四條 active ＋ 一條【待裁定】）**（🔴 R24 更正計數字面：COMPOSER-R24-P2-01＋GROK-R24-P2-01——
+       R23 把 ② 標【待裁定】、VERIFY 只列 ①③④⑤，**標題卻仍寫「五條」**；
+       依 R22 通則「mutation 效力不得高於其所依賴之驗收條」，計數字面須同步）：
+       ①呼叫端漏傳 `timeframe_seconds` ⇒ `TypeError`；
        ②**【待裁定】**函式內改用 module-level `TIMEFRAME_SECONDS`
        （`ImportFrom` 或 `Attribute Load`）⇒ AST 斷言紅
        🔴 **R23 更正（GROK-R23-P2-01＋COMPOSER-R23-P1-03 兩家）**：本條所依賴之 AST 斷言
@@ -3001,6 +3014,14 @@ t0 formatter 讀得到 label、label formatter 讀得到 t0（欄位語意重疊
      **但本處未同步** ⇒ 同一 SPEC 內兩個互斥之單位 SoT，實作者可任選其一。
      ⇒ 本處之 `timeframe_seconds` **即 §G G-3 ⑥(d) 注入之同一 map**；
      其鍵集由 (d-3a) 之集合相等對證。
+     🔴 **R24 補「取得點」（兩家；COMPOSER-R24-P1-02＋GROK-R24-P1-02）**：R23 版只說
+     「即同一 map」，**未定義本 Task 從何處取得它**——該 map 之注入寫在
+     `purge_lower_bound_ms` 之簽章內，而 feature-run gate **不在該函式內**
+     ⇒ 實作者可在 coverage 路徑**直讀 module 常數而不違反任何可執行條文**。
+     **取得點（唯一；採委員補丁包）**：`_run_analysis` 之事件分支，
+     於 **prepare-windows 之後、coverage／本 gate／purge 之前**建構**一次**
+     `timeframe_seconds`，並以**同一物件或等位元組拷貝**傳入
+     `purge_lower_bound_ms` 與本 gate。**禁**各自建構、**禁**在本 gate 內直讀 module 常數。
      （`momentum/core/constants.py:6` 之 `TIMEFRAME_SECONDS` 為該 map 之**建構素材**，
      七值閉集；**不得**於本處直讀。）
      🔴 **禁止**取 run 之 tf、批內 `max(tf)`／`min(tf)`／平均——**逐列用該列自己的 `timeframe`**；
