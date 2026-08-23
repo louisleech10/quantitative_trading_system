@@ -101,8 +101,18 @@ def _git(*args):
 
 
 def parse_patch(path):
-    """回傳 (loci, errors)；loci 為 [(檔案, 錨點or None, stage)]。"""
+    """回傳 (loci, errors, body_text)；loci 為 [(檔案, 錨點or None, stage)]。
+
+    🔴 **SYNC-LOCI 區段之終止條件為封閉集合**（CODEX-R11-P1-09）：
+    首版遇到「非空、非合法 item」之行就靜默 `in_loci = False` ⇒
+    `- a#X` / `MALFORMED` / `- b#Y` 這種內容只解析到第一條，**後面的 locus 整段消失**
+    且 rc=0（實測 probe：`malformed_locus_ignored_rc=0`）。
+    格式破壞會截斷驗證範圍，是本閘之**第四個自欺點**。
+    ⇒ 只有 `_SECTION`（AUTHORITY/BEFORE-AFTER/VERIFY…）或 `#` 標題可終止該區段；
+      其餘非空且非合法 item 之行一律 **parse error、fail-closed**。
+    """
     loci, errors = [], []
+    outside = []          # SYNC-LOCI 區段**以外**之正文（＝委員意圖之證據來源）
     text = io.open(path, encoding='utf-8').read()
     if 'AUTHORITY:' not in text:
         errors.append('缺 AUTHORITY 欄')
@@ -115,9 +125,12 @@ def parse_patch(path):
         if _LOCI_START.match(line):
             in_loci = True
             continue
+        if not in_loci:
+            outside.append(line)
         if in_loci:
             if _SECTION.match(line) or line.startswith('#'):
                 in_loci = False
+                outside.append(line)
                 continue
             m = _LOCI_ITEM.match(line)
             if m:
@@ -134,13 +147,19 @@ def parse_patch(path):
                         stage = sm.group(1)
                         f = _STAGE_SUFFIX.sub('', f).strip()
                 loci.append((f, anchor, stage))
-            elif line.strip() == '':
+            elif line.strip() == '':          # 空行不終止區段（R11：只有 _SECTION／# 可終止）
                 continue
             else:
+                errors.append(
+                    'SYNC-LOCI 內有非法行（既非 `- <檔>[#<anchor>][@stage]`、'
+                    '亦非 AUTHORITY/BEFORE-AFTER/VERIFY 之區段起點）：%r'
+                    '——格式破壞會截斷解析範圍，fail-closed' % line[:80])
                 in_loci = False
     if not loci and 'SYNC-LOCI:' in text:
         errors.append('SYNC-LOCI 欄為空（空對空恆綠是假綠）')
-    return loci, errors
+    # 🔴 意圖證據**必須排除 SYNC-LOCI 區段本身**：該區段就寫著 anchor 字面，
+    #   拿它當「委員說要動這個字面」等於自我證明，弱證據之補強會變成恆真（假綠）。
+    return loci, errors, '\n'.join(outside)
 
 
 def changed_files(base):
@@ -184,6 +203,8 @@ def is_touched(path, touched, head_ts):
     列為 locus，會被誤判「未改動」——與首版之 untracked 盲區同型，是**第二個** fail-open。
     ⇒ git 看不見者，退回**檔案 mtime 對 HEAD commit 時間**之比較：
       mtime > HEAD 之 commit 時間 ⇒ 視為本次改動。
+    🔴 **R11**：此路徑之 anchor 比對屬**弱證據**（`diff_hunks` 回 `weak_full=True`），
+      須另有補丁包正文之意圖佐證才算達成——否則零內容改動亦會通過。
     誠實邊界：mtime 可被 `touch` 偽造，且同一 commit 週期內之舊改動也會算進來
     ——這是 gitignore 檔的先天限制，不宣稱與 tracked 檔同強度。
     """
@@ -198,7 +219,14 @@ def is_touched(path, touched, head_ts):
 
 
 def diff_hunks(path, base):
-    """回傳該檔之 diff hunk 內容（含新增與刪除行）。未追蹤檔 ⇒ 回全檔內容。"""
+    """回傳 `(added, removed, weak_full)`。
+
+    · `added`／`removed`：該檔 diff 之 `+`／`-` 行內容（各自串接）。
+    · `weak_full`：True 表示**無法取得 diff**（未追蹤／被 gitignore 之檔），
+      退回「全檔內容當作新增」——**這是弱證據**（GROK-R11-P1-06）：
+      該檔只要 mtime 比 HEAD 新就會被 `is_touched` 判為 touched，
+      再把全檔當 hunk ⇒ **檔內既有字面在零內容改動下也會通過**。
+    """
     cmds = []
     if base:
         cmds.append(['diff', '-U0', base, '--', path])
@@ -210,21 +238,22 @@ def diff_hunks(path, base):
         if out.returncode == 0:
             body += out.stdout
     if body.strip():
-        # 🔴 只保留**新增／刪除行**，丟掉 hunk header。
+        # 🔴 只保留**新增／刪除行**，丟掉 hunk header，並**分開**回傳。
         #   病根（主委自查，R10）：`git diff -U0` 之 hunk header 形如
         #   `@@ -1,2 +1,2 @@ SECTION_UNTOUCHED`——git 會把它認定之「所屬區塊標題」
         #   （對 .md 常是前一個標題行）附在 `@@` 之後。若把整份 diff 當比對面，
         #   **未改動之標題文字會被當成「改到了」** ⇒ 同檔任一改動即可讓該標題下的
         #   所有 anchor 通過，正是 CODEX-R8-P1-06 要根除之「僅檔名相符」之變體。
-        kept = [l for l in body.split('\n')
-                if (l.startswith('+') or l.startswith('-'))
-                and not l.startswith('+++') and not l.startswith('---')]
-        return '\n'.join(kept)
-    # 未追蹤（新建）檔：git diff 無輸出 ⇒ 全檔視為新增
+        added = [l for l in body.split('\n')
+                 if l.startswith('+') and not l.startswith('+++')]
+        removed = [l for l in body.split('\n')
+                   if l.startswith('-') and not l.startswith('---')]
+        return '\n'.join(added), '\n'.join(removed), False
+    # 未追蹤（新建）／被 gitignore 之檔：git diff 無輸出 ⇒ 全檔視為新增（**弱證據**）
     try:
-        return io.open(path, encoding='utf-8', errors='replace').read()
+        return io.open(path, encoding='utf-8', errors='replace').read(), '', True
     except IOError:
-        return ''
+        return '', '', True
 
 
 def main(argv):
@@ -256,7 +285,7 @@ def main(argv):
             print('ERROR: 補丁包不存在：%s（fail-closed）' % pf, file=sys.stderr)
             rc = 2
             continue
-        loci, errors = parse_patch(pf)
+        loci, errors, patch_text = parse_patch(pf)
         for e in errors:
             print('[patch_locus_check] 🔴 %s：%s' % (pf, e), file=sys.stderr)
             rc = 2
@@ -267,19 +296,34 @@ def main(argv):
             if not is_touched(f, touched, head_ts):
                 why = '檔案未被本次改動'
             elif anchor:
-                # 🔴 CODEX-R8-P1-06：僅檔名相符不足，anchor 須出現在 diff hunk 內
-                body = diff_hunks(f, base)
-                if anchor not in body:
+                # 🔴 CODEX-R8-P1-06：僅檔名相符不足，anchor 須出現在 diff hunk 內。
+                #
+                # 🔴 **R11：證據分強弱（COMPOSER-R11-P1-03／GROK-R11-P1-06）**
+                #   強證據＝anchor 出現在**新增行**（`+`）。
+                #   弱證據有二，R10 版對它們**無條件放行**，各是一個假綠：
+                #     (1) anchor 只出現在**刪除行**——同檔刪掉一段**無關**文字若恰含該字面即通過；
+                #     (2) `weak_full`（未追蹤／被 gitignore 之檔取不到 diff，退回全檔當新增）
+                #         ——該檔只要 mtime 比 HEAD 新就被判 touched，**零內容改動亦通過**。
+                #   ⇒ 弱證據改為**須另有委員意圖佐證**：該 anchor 亦須出現在**補丁包自身正文**
+                #     （AUTHORITY／BEFORE-AFTER／VERIFY 任一處），即委員自己寫出要動這個字面。
+                #     強證據不受影響 ⇒ 這是**收緊**，不是放寬。
+                #   誠實邊界：委員若在 BEFORE/AFTER 抄了字面卻其實沒打算動，本閘看不見
+                #   ——與 anchor 精確度同類，屬委員責任。
+                added, removed, weak_full = diff_hunks(f, base)
+                if anchor in added and not weak_full:
+                    continue                      # 強證據
+                weak_hit = (anchor in removed) or (weak_full and anchor in added)
+                if weak_hit:
+                    if anchor in patch_text:
+                        continue                  # 弱證據 ＋ 委員意圖佐證
+                    why = ('anchor 僅有弱證據（%s）而補丁包正文未提及該字面'
+                           % ('全檔 fallback：無 diff 可取' if weak_full else '只出現在刪除行'))
+                else:
                     # 🔴 anchor 字面閘（CODEX-R9-P1-06 ③／GROK-R9-P1-04 ③）：
                     #   分辨「該改而未改」與「anchor 根本不是字面（委員責任）」。
-                    #   判準＝anchor 出現在**當前內容**或**diff hunk（含被刪除行）**之任一者。
-                    #
-                    #   ⚠️ **首版判準錯誤（主委自查，R10 套用當下發現）**：首版只查「當前內容」
-                    #   ⇒ 委員 anchor 若引用**將被刪除**之舊文字（BEFORE 段），套用後當然找不到，
-                    #   會被誤判為「非字面」並歸咎委員。實際上那是**正確的字面 anchor**，
-                    #   它出現在 diff 之 `-` 行。R10 十二份補丁包有十餘個 anchor 因此假紅。
-                    #   ⇒ 改為「當前內容 OR diff hunk」；R8 之真敘述型 anchor
-                    #   （`檔頭 A-6／FROZEN 句` 等）兩者皆無，仍正確轉紅。
+                    #   ⚠️ **R9 版判準錯誤**：只查「當前內容」⇒ 委員 anchor 若引用
+                    #   **將被刪除**之舊文字，套用後必然找不到而被誤歸委員責任
+                    #   （R10 十餘個 anchor 因此假紅）。刪除行之情形已由上方 weak_hit 承接。
                     cur = ''
                     if os.path.isfile(f):
                         try:

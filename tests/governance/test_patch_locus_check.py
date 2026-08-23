@@ -35,13 +35,19 @@ def _run(patch_path, cwd=None):
     return out.returncode, out.stdout + out.stderr
 
 
-def _write_patch(tmp_path, loci_lines, *, authority=True, verify=True):
+def _write_patch(tmp_path, loci_lines, *, authority=True, verify=True, before_after="（略）"):
+    """🔴 R11：`before_after` 是**弱證據之意圖來源**。
+
+    弱證據（anchor 只在刪除行／未追蹤檔之全檔 fallback）須額外要求 anchor 出現在
+    **SYNC-LOCI 以外**之補丁包正文；`_write_patch` 預設之「（略）」不含任何 anchor，
+    因此弱證據案例必須顯式傳入 `before_after`，否則應為紅——這正是新規則的用意。
+    """
     body = ["# PATCH cluster test"]
     if authority:
         body.append("AUTHORITY: 測試用")
     body.append("SYNC-LOCI:")
     body.extend(loci_lines)
-    body.append("BEFORE/AFTER: （略）")
+    body.append("BEFORE/AFTER: " + before_after)
     if verify:
         body.append("VERIFY:")
         body.append("- true")
@@ -122,7 +128,7 @@ def test_anchor_in_content_but_not_in_diff_is_red(tmp_path):
     assert "anchor 非字面" not in log, log
 
 
-def test_anchor_quoting_deleted_text_is_green(tmp_path):
+def test_anchor_quoting_deleted_text_is_green(tmp_path):  # R11：已加意圖佐證，見 _write_patch
     """anchor 引用**被刪除**之舊文字 ⇒ 應為綠（它出現在 diff 之 `-` 行）。
 
     🔴 **主委首版此判準錯誤**：只查「當前內容」⇒ 委員在 BEFORE 段引用將被刪除之字面，
@@ -153,7 +159,8 @@ def test_anchor_quoting_deleted_text_is_green(tmp_path):
     patch.write_text(
         "# PATCH cluster test\nAUTHORITY: 測試用\nSYNC-LOCI:\n"
         "- doc.md#OLD_CLAUSE_TO_BE_DELETED\n"
-        "BEFORE/AFTER: （略）\nVERIFY:\n- true\n",
+        "BEFORE/AFTER: 刪除 OLD_CLAUSE_TO_BE_DELETED，改為 NEW_CLAUSE\n"
+        "VERIFY:\n- true\n",
         encoding="utf-8",
     )
     out = subprocess.run(
@@ -165,13 +172,19 @@ def test_anchor_quoting_deleted_text_is_green(tmp_path):
 
 
 def test_anchor_present_is_green(tmp_path):
-    """anchor 確實出現在該檔內容中 ⇒ rc=0（正例，防「恆紅」型假保證）。"""
+    """anchor 確實出現在該檔內容中 ⇒ rc=0（正例，防「恆紅」型假保證）。
+
+    🔴 R11：此 fixture 為**未追蹤檔**，走 `weak_full` 全檔 fallback（弱證據）
+    ⇒ 須在 BEFORE/AFTER 附上該 anchor 之意圖佐證。對照組見
+    `test_untracked_full_fallback_without_intent_is_red`。
+    """
     fixture = REPO / "tests" / "governance" / "_tmp_locus_fixture.txt"
     fixture.write_text("內容含 ANCHOR_PRESENT_MARKER 這個字串。\n", encoding="utf-8")
     try:
         patch = _write_patch(
             tmp_path,
             ["- tests/governance/_tmp_locus_fixture.txt#ANCHOR_PRESENT_MARKER"],
+            before_after="把 ANCHOR_PRESENT_MARKER 這一段改寫成新內容",
         )
         rc, log = _run(patch)
         assert rc == 0, "anchor 在內容中卻回 rc=%d；輸出：%s" % (rc, log)
@@ -180,7 +193,7 @@ def test_anchor_present_is_green(tmp_path):
         fixture.unlink(missing_ok=True)
 
 
-def test_empty_sync_loci_is_red(tmp_path):
+def test_empty_sync_loci_is_red(tmp_path):  # R11：與 malformed-line 反測同屬格式 fail-closed 家族
     """SYNC-LOCI 為空 ⇒ rc=2（空對空恆綠是假綠）。"""
     patch = _write_patch(tmp_path, [])
     rc, log = _run(patch)
@@ -288,7 +301,7 @@ def test_also_impl_widens_and_turns_impl_red(tmp_path):
 
 
 
-def test_cjk_path_with_diff_base_is_recognised(tmp_path):
+def test_cjk_path_with_diff_base_is_recognised(tmp_path):  # R11：本檔另有弱證據系列反測
     """**tracked** 之 CJK 路徑在 `--diff-base` 路徑下不得被 quotepath 咬成假紅。
 
     🔴 GROK-R9-P1-04 之回歸樁。**首版此測試是假綠**（主委自查發現）：
@@ -336,3 +349,121 @@ def test_cjk_path_with_diff_base_is_recognised(tmp_path):
     log = out.stdout + out.stderr
     assert "檔案未被本次改動" not in log, "CJK 路徑被 quotepath 咬成假紅：%s" % log
     assert out.returncode == 0, log
+
+
+# ────────────────────────────────────────────────────────────────────
+# R11：SYNC-LOCI 格式截斷／弱證據須有委員意圖佐證
+# 出處＝CODEX-R11-P1-09（malformed 行截斷解析）
+#      ＋COMPOSER-R11-P1-03（無關刪除行假綠）
+#      ＋GROK-R11-P1-06（未追蹤檔全檔 fallback，零改動亦綠）
+# ────────────────────────────────────────────────────────────────────
+
+
+def test_malformed_loci_line_is_red_and_does_not_truncate(tmp_path):
+    """`- 合法` / `MALFORMED` / `- 缺失` ⇒ rc=2，且**後續 locus 不得被靜默丟棄**。
+
+    🔴 mutation guard：把非法行改回靜默 `in_loci = False`（首版行為）⇒
+    本條會變成「只解析到第一條、rc=0」而轉綠。
+    """
+    fixture = REPO / "tests" / "governance" / "_tmp_locus_fixture.txt"
+    fixture.write_text("內容含 FIRST_VALID_ANCHOR 這個字串。\n", encoding="utf-8")
+    try:
+        patch = _write_patch(
+            tmp_path,
+            [
+                "- tests/governance/_tmp_locus_fixture.txt#FIRST_VALID_ANCHOR",
+                "MALFORMED_LOCUS_LINE",
+                "- tests/governance/__no_such_file__.md#MISSING_REQUIRED_LOCUS",
+            ],
+            before_after="改寫 FIRST_VALID_ANCHOR 與 MISSING_REQUIRED_LOCUS",
+        )
+        rc, log = _run(patch)
+        assert rc == 2, "malformed 行未 fail-closed；輸出：%s" % log
+        assert "SYNC-LOCI 內有非法行" in log, log
+    finally:
+        fixture.unlink(missing_ok=True)
+
+
+def test_unrelated_deleted_line_without_intent_is_red(tmp_path):
+    """anchor 只出現在**無關**之刪除行、且補丁包正文未提及 ⇒ rc=2。
+
+    情境：同檔改 A 段、刪掉恰含該 anchor 字面的 B 段。R10 版「OR diff hunk」會綠。
+    🔴 mutation guard：拿掉「弱證據須有意圖佐證」⇒ 本條轉綠。
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*a):
+        return subprocess.run(["git"] + list(a), cwd=str(repo),
+                              capture_output=True, text=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    target = repo / "doc.md"
+    target.write_text("A_SECTION old\nUNRELATED_ANCHOR_TEXT\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "init")
+    # 改 A 段、順手刪掉含 anchor 字面的無關那行
+    target.write_text("A_SECTION new\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "edit")
+    head_ts = int(git("log", "-1", "--format=%ct").stdout.strip())
+    os.utime(str(target), (head_ts - 3600, head_ts - 3600))
+
+    patch = tmp_path / "patch.md"
+    patch.write_text(
+        "# PATCH cluster test\nAUTHORITY: 測試用\nSYNC-LOCI:\n"
+        "- doc.md#UNRELATED_ANCHOR_TEXT\n"
+        "BEFORE/AFTER: 只改 A_SECTION，完全沒提要動那一行\n"
+        "VERIFY:\n- true\n",
+        encoding="utf-8",
+    )
+    out = subprocess.run(
+        [sys.executable, str(GATE), str(patch), "--diff-base", "HEAD~1"],
+        capture_output=True, text=True, cwd=str(repo),
+    )
+    log = out.stdout + out.stderr
+    assert out.returncode == 2, "無關刪除行仍被當成改到；輸出：%s" % log
+    assert "弱證據" in log, log
+
+
+def test_untracked_full_fallback_without_intent_is_red(tmp_path):
+    """未追蹤檔之全檔 fallback（零內容改動）且補丁包正文未提及 ⇒ rc=2。
+
+    🔴 GROK-R11-P1-06 之回歸樁：該檔只要 mtime 比 HEAD 新就被判 touched，
+    再把全檔當新增 ⇒ 檔內既有字面在**沒有任何改動**下也會通過。
+    對照組＝`test_anchor_present_is_green`（有意圖佐證 ⇒ 綠）。
+    """
+    fixture = REPO / "tests" / "governance" / "_tmp_locus_fixture.txt"
+    fixture.write_text("內容含 ANCHOR_PRESENT_MARKER 這個字串。\n", encoding="utf-8")
+    try:
+        patch = _write_patch(
+            tmp_path,
+            ["- tests/governance/_tmp_locus_fixture.txt#ANCHOR_PRESENT_MARKER"],
+        )  # before_after 預設「（略）」＝無意圖佐證
+        rc, log = _run(patch)
+        assert rc == 2, "全檔 fallback 在無意圖佐證下仍綠；輸出：%s" % log
+        assert "弱證據" in log, log
+    finally:
+        fixture.unlink(missing_ok=True)
+
+
+def test_sync_loci_section_is_not_its_own_intent_evidence(tmp_path):
+    """意圖佐證**不得**取自 SYNC-LOCI 區段本身（否則恆真、補強變假綠）。
+
+    本條與上一條的差別只有「anchor 是否出現在 BEFORE/AFTER」；
+    若實作把整份 patch 當意圖來源，兩條會同時綠 ⇒ 補強機制失效。
+    """
+    fixture = REPO / "tests" / "governance" / "_tmp_locus_fixture.txt"
+    fixture.write_text("內容含 ONLY_IN_LOCI_LINE 這個字串。\n", encoding="utf-8")
+    try:
+        patch = _write_patch(
+            tmp_path,
+            ["- tests/governance/_tmp_locus_fixture.txt#ONLY_IN_LOCI_LINE"],
+            before_after="這段完全沒有提到那個錨點字面",
+        )
+        rc, log = _run(patch)
+        assert rc == 2, "SYNC-LOCI 自身被當成意圖佐證（恆真假綠）；輸出：%s" % log
+    finally:
+        fixture.unlink(missing_ok=True)
