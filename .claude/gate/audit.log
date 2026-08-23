@@ -48514,3 +48514,42 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "462d0951-defd-42b3-9594-7e681e201ecc", "cli_rc": "0", "event": "committee_family_result", "event_id": "be3f8b5c-5c68-4e59-934f-6eade6cf960c", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r22-codex.md", "output_sha256": "a79aa4560c46e711d378262dd728200c8b64d9d8b9d71ae3c6223f3cd76cd536", "producer": "audit_append.sh", "result_state": "success", "round_id": "48e4a534-9bde-4207-a09e-f7f74c9df99a", "schema_version": 1, "sequence": 2581, "ts": "2026-08-23T15:04:36Z"}
 {"event":"gate_deny","ts":"2026-08-23T15:07:22Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"a5c5bf1cee052c3d5471ca36bd85612b5a933ef16c929be0732f79585876db7b","cmd_head":"cd /Users/louis/Desktop/quantitative_trading_system 2>/dev/null; python3 - \"$@\" <<'PYEOF' 2>/dev/null || sed -i '' '919a\\\n             🔴 **R22 補（三家；CODEX-R22-P1-01＋GROK-R22-P1-02＋COMPOSER-R22 議題三）**：\\\n             (d-3) **只保證 digest 與傳入 map 位元組一致**，**擋不住**下列兩形——\\\n             ①傳入之 map **多了本批未用到之 tf** ⇒ digest 不同 ⇒ **假紅**；\\\n             ②**少了某 tf** 而該 tf 之事件已被 coverage 濾掉 ⇒ �"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "a82cec3e-d42d-49b4-a8c6-3c9046dd17a4", "lock_sha256": "5a44fc80e1c833c626a81dae79ec1e3bb9c76a4000251d1fe05248712e3fdac7", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "48e4a534-9bde-4207-a09e-f7f74c9df99a", "schema_version": 1, "sequence": 2582, "session_id": "20260824-gap3ux-x-review-r22", "synth_sha256": "09312616e22164f167eb75473a608e8afd79721d3444c8cbde26dc345c3cba4f", "ts": "2026-08-23T15:11:36Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R23", "ts": "2026-08-23T15:19:12Z"}
+=== 2026-08-23 23:19:12 | dispatch ===
+  ts=2026-08-23 23:19:12
+  kind=dispatch
+  intent=GAP-3 SPEC R23 對抗審：新制第一次執行（委員歸類主委改動）；並判 findings 下降是真收斂或分母縮小
+  risk=low
+  facts_asked=bash handoffs/20260824-gap3ux-x-review-r23-facts.sh（19 條 fact receipt，rc=0）
+  review_role=adversarial reviewer
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R23", "ts": "2026-08-23T15:19:26Z"}
+=== 2026-08-23 23:19:26 | dispatch ===
+  ts=2026-08-23 23:19:26
+  kind=dispatch
+  intent=GAP-3 SPEC R23 對抗審：新制第一次執行（委員歸類主委改動）；並判 findings 下降是真收斂或分母縮小
+  risk=low
+  facts_asked=bash handoffs/20260824-gap3ux-x-review-r23-facts.sh（19 條 fact receipt，rc=0）
+  review_role=adversarial reviewer
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260824-gap3ux-x-review-r23-brief.md", "brief_sha256": "21e2f20047af8b43c879ec544f959112c6e21df73087976fa1a237750ac2fe94", "brief_sha256_norm": "21e2f20047af8b43c879ec544f959112c6e21df73087976fa1a237750ac2fe94", "event": "committee_round_open", "event_id": "7e640a84-cdd5-466c-bf7c-d4790201b0c8", "expected_outputs": {"codex": "handoffs/20260824-gap3ux-x-review-r23-codex.md", "composer": "handoffs/20260824-gap3ux-x-review-r23-composer.md", "grok": "handoffs/20260824-gap3ux-x-review-r23-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "d1602478-b813-4fd3-ad35-6b1335ca4742", "schema_version": 1, "sequence": 2583, "session_name": "20260824-gap3ux-x-review-r23", "task_id": "20260824-GAP3UX-X-REVIEW-R23", "ts": "2026-08-23T15:19:30Z"}
+{"actor": "cx_run", "attempt_id": "a31af03c-d76a-4b40-8e98-ffc87b7552a8", "cli_rc": "0", "event": "committee_family_result", "event_id": "2b562f72-820f-4553-9a8b-6bc3aa19f3f7", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r23-grok.md", "output_sha256": "31da3debbff4bad2a87453ac4bdd7d4a8324f6c06dfb7582a103f0b0016b938f", "producer": "audit_append.sh", "result_state": "success", "round_id": "d1602478-b813-4fd3-ad35-6b1335ca4742", "schema_version": 1, "sequence": 2584, "ts": "2026-08-23T15:27:22Z"}
+{"actor": "cx_run", "attempt_id": "56fc2e15-907f-433d-8e1f-b809ffbde486", "cli_rc": "0", "event": "committee_family_result", "event_id": "44bee313-c757-470b-bfaa-d244d85404c1", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r23-composer.md", "output_sha256": "fd26199f0227878852ed89f4527ad4ca44dcf3b59b064c796e3d465102874baa", "producer": "audit_append.sh", "result_state": "success", "round_id": "d1602478-b813-4fd3-ad35-6b1335ca4742", "schema_version": 1, "sequence": 2585, "ts": "2026-08-23T15:28:13Z"}
+{"actor": "cx_run", "attempt_id": "87c0eca5-f4f2-4eee-95fc-6995ffcf2c5d", "cli_rc": "0", "event": "committee_family_result", "event_id": "ed2b815d-918f-429f-819d-cba569065711", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r23-codex.md", "output_sha256": "b601f185f9787464233b55494e7bc2e4e51c8987bbd757e03517e575e9f34e3d", "producer": "audit_append.sh", "result_state": "success", "round_id": "d1602478-b813-4fd3-ad35-6b1335ca4742", "schema_version": 1, "sequence": 2586, "ts": "2026-08-23T15:31:53Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "24e95103-224c-4425-b01c-23e4cb541d90", "lock_sha256": "a98c4b6b990fe7e10070f239b731b42a36632bb9a647eda5acfdcc0a86024a74", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "d1602478-b813-4fd3-ad35-6b1335ca4742", "schema_version": 1, "sequence": 2587, "session_id": "20260824-gap3ux-x-review-r23", "synth_sha256": "01882b0a1f86c99bad818883e41ddfb62982376901da23b5f89bca5da62d9e92", "ts": "2026-08-23T15:36:59Z"}
