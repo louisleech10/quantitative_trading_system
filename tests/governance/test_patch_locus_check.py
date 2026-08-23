@@ -54,15 +54,41 @@ def test_anchor_not_in_diff_is_red(tmp_path):
 
     🔴 本條同時是「檔名比對 → anchor 比對」升級之 mutation guard：
     若退回首版（只比檔名），本條會轉綠。
+
+    🔴 **測試須自帶 fixture、不得依賴 repo 之髒污狀態**：
+    首版用 `scripts/patch_locus_check.py` 當 locus，前提是「該檔此刻是 dirty」——
+    commit 之後該前提消失、測試轉紅。這是測試設計缺陷（依賴外部狀態），
+    已改為在 repo 內建一個**未追蹤**之 fixture 檔（未追蹤即視為本次改動），
+    再給一個不存在於其內容中的 anchor。
     """
-    # 用一個**確實被本次改動**的檔，但給一個不存在於其 diff 內的 anchor
-    patch = _write_patch(
-        tmp_path,
-        ["- scripts/patch_locus_check.py#__ANCHOR_THAT_DOES_NOT_EXIST__"],
-    )
-    rc, log = _run(patch)
-    assert rc == 2, "anchor 不在 diff 內卻回 rc=%d；輸出：%s" % (rc, log)
-    assert "anchor 未出現在該檔之 diff hunk 內" in log
+    fixture = REPO / "tests" / "governance" / "_tmp_locus_fixture.txt"
+    fixture.write_text("這是 fixture 內容，不含目標錨點。\n", encoding="utf-8")
+    try:
+        patch = _write_patch(
+            tmp_path,
+            ["- tests/governance/_tmp_locus_fixture.txt#__ANCHOR_THAT_DOES_NOT_EXIST__"],
+        )
+        rc, log = _run(patch)
+        assert rc == 2, "anchor 不在內容中卻回 rc=%d；輸出：%s" % (rc, log)
+        assert "anchor 未出現在該檔之 diff hunk 內" in log, log
+    finally:
+        fixture.unlink(missing_ok=True)
+
+
+def test_anchor_present_is_green(tmp_path):
+    """anchor 確實出現在該檔內容中 ⇒ rc=0（正例，防「恆紅」型假保證）。"""
+    fixture = REPO / "tests" / "governance" / "_tmp_locus_fixture.txt"
+    fixture.write_text("內容含 ANCHOR_PRESENT_MARKER 這個字串。\n", encoding="utf-8")
+    try:
+        patch = _write_patch(
+            tmp_path,
+            ["- tests/governance/_tmp_locus_fixture.txt#ANCHOR_PRESENT_MARKER"],
+        )
+        rc, log = _run(patch)
+        assert rc == 0, "anchor 在內容中卻回 rc=%d；輸出：%s" % (rc, log)
+        assert "全部被改到" in log, log
+    finally:
+        fixture.unlink(missing_ok=True)
 
 
 def test_empty_sync_loci_is_red(tmp_path):

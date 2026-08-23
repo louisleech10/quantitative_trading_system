@@ -110,13 +110,52 @@ SPEC 與 UI 文案一律用「你聲明的正反例標記」，**禁用「label 
 直接打斷使用者「匯出→Excel 細篩→CSV 回灌」的閉環，且使我自訂的 V-3 在真實對照下不可達。
 ⇒ CSV 路徑**沿用同一 canonical**，見 Task 1.3。
 
-**D-3（GROK-R1-P0-02）Phase 4 多 horizon 之語意先裁定**
-採 grok 所列之 **(a)**：多選**只影響匯出檔帶哪些 `future_{h}bar_return` 欄**（供 Excel 分析）；
-`label_value` 與 `label_definition.window.horizon_bars` **仍綁單一「主答案窗」**（另一個單選）。
-理由：①契約 `window.horizon_bars` 為單一 int，(b)/(c) 都要改契約與 230 條底線測試，
-超出本批範圍 ②grok 查證 `/search` 之 CSV **早已輸出 `future_1..12bar_return` 全欄**
-⇒ 使用者「看整條曲線」的需求在 CSV 端已滿足，缺的是**事件匯出檔**帶不帶這些欄。
-⇒ 契約不變、label 語意不變、只是匯出檔多帶欄位。
+**D-3（R8 架構調整；使用者 2026-08-23 提出、三家碼證確認）條件 IC 之答案窗層次裁定**
+
+🔴 **本裁定取代 R1 之 (a) 方案**（原文保留於下方「原裁定與撤回理由」）。
+
+**使用者原話**：「條件 IC 本來就算一種類型的 IC-Analysis，條件給定應該就是要在
+IC 分析的頁面，而不是 `/search` 吧」。
+
+**採 (d) 分析時計算**：
+- `/search` 匯出**只承載事件事實**——t0、`label`（來自 t0 條件之 `positive_case`）、
+  五維度契約設定。
+- **不得**在匯出端寫入 `label_value`；**不得**在匯出端寫入
+  `label_definition.window.horizon_bars`。
+- 答案窗（`horizon_bars`）與報酬語意（`entry_price_semantic`／`label_return_mode`／
+  `decision_offset_bars`）於 **IC 分析頁**由使用者給定；
+  後端以 `bars_from_kline_cache` ＋ `align_events` **同一公式**於分析時計算。
+
+**碼證（皆可重跑）**：
+`eventExport.ts:75-79`（`label` 來自 `positive_case`，**不看答案窗**）／
+`ic_feed.py:4-5`（「v1 不重算」為**版本限制非能力限制**）／
+`pipeline.py:77-81`（`bars_from_kline_cache` 已是**服務端取 bars 唯一入口**）。
+
+🔴 **D-3a｜embargo 必須由分析時之 h 重新導出（本裁定之不可分割部分）**
+
+出處＝CODEX-R8-P0-02 ＋ GROK-R8-P0-02（**兩家獨立命中**），
+推翻主委於 R8 brief 之 assumed「PIT 可由既有 `decision_time_rule`／`feature_cutoff_rule`
+保證、不需新機制」。
+⚠️ 補丁包 `-arch-shift.md` 之 AUTHORITY 亦持該被推翻之宣稱 ⇒ **該句不採**；
+採 `-codex-pit-wiring.md` 之版本。
+
+- IC analyze 之執行順序固定為 3 步且不得顛倒：①檢核 `event_label_spec`（h／mode／entry／k）
+  ②**以該次 h 建立 purge／split** ③以同一 spec 產生 labels。
+- **禁止**沿用匯入檔烤入之舊 `label_end_ms − label_start_ms` 當 embargo
+  ——改大 h 時 purge 會小於實際 label window ⇒ **train/test 洩漏，違反 §C0**。
+- 每列 feature sample key 須為 receipt 之 `last_bar_open_ms`／`decision_at_ms`，
+  **不是原始 t0**；`decision_offset_bars = k > 0` 之 t0→decision 映射須有 exact receipt
+  （CODEX-R8-P0-03）。
+- 驗收：`pytest tests/api -q -k event_analysis_horizon_purge`——
+  `h=7` **不得**沿用 `h=1` 之 labels／split；`split purge >=` 本次 label end。
+  **mutation**：把 purge 改回沿用匯入值 ⇒ 該測試須紅。
+
+**原裁定與撤回理由（保留，不得刪）**：R1 採 grok 之 **(a)**——
+「多選只影響匯出檔帶哪些 `future_{h}bar_return` 欄；`label_value` 與 `horizon_bars`
+仍綁單一主答案窗」。當時理由為「契約 `window.horizon_bars` 為單一 int，改動超出本批範圍」。
+**撤回理由**：該方案把**分析參數烤進資料**——同一批事件事實，想比較 h=3 與 h=7
+必須重新匯出兩次（grok：「強迫為換 h 而重匯出未變之事件事實批」）。
+且 A-6 因此是在**錯誤的層次**發問（見 §A）。
 
 **D-4（CODEX-R1-P0-05 ＋ GROK-R1-P1-03 ＋ COMPOSER-R1-P2-01）§G 主張過度，需拆 golden**
 接受。實查證：`scripts/gap3_freeze_golden.py:28` import `gap2_freeze_golden._run`，

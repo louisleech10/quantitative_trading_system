@@ -17,15 +17,9 @@ set -u
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" || exit 2
 
 SPEC=docs/GAP3_EVENT_UX_SPEC.md
-BASE=handoffs/run_receipts/gap3ux-spec-count-baseline.txt
-# 🔴 R8 群集 H（COMPOSER-R8-P1-01／GROK-R8-P1-03）：原寫死 `…-r7-facts.sh`，
-#    R8 已換檔而此處未同步 ⇒ 計數稽核掃 **stale receipt**。
-#    這是「加閘／換檔未同步清單」第三次（R6 三→四、R7 四→五、R8 r7→r8），
-#    且諷刺的是主委上一輪才為此病做了「唯一入口」，結果入口自己指向過期檔。
-#    ⇒ **不寫死輪次**：掃所有 gap3ux facts 產生器，新增輪次自動納入。
-FACTS_GLOB='handoffs/*gap3ux*-facts.sh'
-FACTS=$(ls -1 ${FACTS_GLOB} 2>/dev/null | tr '\n' ' ')
-[ -n "${FACTS}" ] || { echo "ERROR: 找不到任何 ${FACTS_GLOB}（fail-closed）" >&2; exit 2; }
+# 🔴 R8 群集 H：計數稽核之掃描面與呼叫方式**唯一來源＝scripts/gap3ux_count_check.sh**。
+#    原本此處與 narrow_check_router 各寫一份、且寫死輪次（`…-r7-facts.sh`）
+#    ⇒ 「加閘／換檔未同步清單」第三、四次。本檔不得自帶參數清單。
 
 fail=0
 run() {  # run <名稱> <命令...>
@@ -47,8 +41,7 @@ run "doc_format_precheck"   bash scripts/doc_format_precheck.sh "${SPEC}"
 run "spec_ruling_task_sync" bash scripts/spec_ruling_task_sync.sh "${SPEC}"
 run "spec_v_task_ref_check" bash scripts/spec_v_task_ref_check.sh "${SPEC}"
 run "quant_standard_check"  bash scripts/quant_standard_check.sh
-# shellcheck disable=SC2086  # FACTS 為多檔清單，需詞彙切分
-run "spec_count_audit"      python3 scripts/spec_count_audit.py --check "${SPEC}" ${FACTS} --baseline "${BASE}"
+run "spec_count_audit"      bash scripts/gap3ux_count_check.sh
 
 if [ "$#" -gt 0 ]; then
   echo "[gap3ux_pre_review] 補丁包 locus 對證（$# 份）"

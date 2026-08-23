@@ -50,6 +50,7 @@
 | `draft_selfcheck.sh` | 常態檢查 | 未掛 |
 | `factkey_write_guard.sh` | 常態檢查 | PostToolUse  |
 | `g7_trailer_precheck.sh` | 常態檢查 | commit-msg  |
+| `gap3ux_count_check.sh` | 常態檢查 | narrow_check_router  |
 | `gate_check.sh` | 常態檢查 | PreToolUse  |
 | `gen_fact_key_blocks.sh` | 常態檢查 | gov_check  |
 | `golden_staleness_check.sh` | 常態檢查 | 未掛 |

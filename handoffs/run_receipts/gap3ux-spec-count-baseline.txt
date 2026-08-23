@@ -30,4 +30,5 @@ GAP3_EVENT_UX_SPEC.md|Task 7.6	五維度
 GAP3_EVENT_UX_SPEC.md|Task 7.6	六個鍵
 GAP3_EVENT_UX_SPEC.md|Task 7.7	四個 reason
 GAP3_EVENT_UX_SPEC.md|§A	五維度
+GAP3_EVENT_UX_SPEC.md|§D	五維度
 GAP3_EVENT_UX_SPEC.md|§V	五維度

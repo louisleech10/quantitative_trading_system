@@ -1928,6 +1928,12 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百零二・（2026-08-23）我在文件裡把自製閘描述得比它實際能力強，被委員抓到</strong>：我寫的 <code>patch_locus_check</code> 首版只比對「哪些檔被改過」，但我在 HANDOFF 與角色卡把它描述成「diff 觸及集合 ⊇ SYNC-LOCI」——聽起來像驗到了改動內容，實際上同檔的<strong>無關修改</strong>就能讓它通過。codex 直接指出「描述高於實際能力」。這比單純的 bug 更糟：<strong>別人（包括未來的我）會根據那個描述決定還要不要人工檢查</strong>。修法：升級成 anchor 層級比對，並在檔頭誠實邊界寫明「anchor 若寫得太籠統，同檔任何含該字串之改動都會通過 ⇒ anchor 精確度是委員的責任」。<strong>規則</strong>：<strong>自製工具的文件描述必須寫它「實際驗了什麼」，不是它「想達成什麼」</strong>；每支閘檔頭的「誠實邊界」段要具體到能讓人判斷「哪些情況它看不見」。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百零三・（2026-08-23）「唯一入口」不夠——入口裡的寫死字面與散在兩處的呼叫，讓同型錯誤第四次發生</strong>：「加閘／換檔未同步清單」在 R6（三→四）、R7（四→五）、R8（r7→r8）各犯一次；我在 R7 做了唯一入口 <code>gap3ux_pre_review.sh</code> 當解法，R8 又發現<strong>那個入口自己把 facts 路徑寫死成上一輪</strong>。修完入口後，改 SPEC 時 <code>narrow_check_router</code> 立刻紅——因為<strong>同一個 count-audit 呼叫在兩個檔各寫一份</strong>，我只修了一處。<strong>規則</strong>：<strong>做「單一來源」要同時滿足兩件事——①那個來源裡不含可漂移的字面（用 glob／導出，而非列舉）②所有呼叫者都只能呼叫它、不得自帶參數清單</strong>。只做①或只做②，漂移都會從另一邊回來。落法：新增 <code>scripts/gap3ux_count_check.sh</code> 承載掃描面與呼叫方式，<code>pre_review</code> 與 <code>narrow_check_router</code> 皆改為只呼叫它。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百零四・（2026-08-23）我寫的回歸測試依賴 repo 的髒污狀態，commit 後自己轉紅</strong>：為 locus 閘寫的 mutation guard 用 <code>scripts/patch_locus_check.py</code> 當 locus，前提是「該檔此刻是 dirty」——commit 之後前提消失、測試失敗。<strong>測試若依賴外部可變狀態（工作區是否髒、某檔是否存在、某服務是否啟動），它驗的就不是被測物</strong>。修法：測試自帶 fixture（建一個未追蹤的暫存檔，用完刪），並補一條<strong>正例</strong>——只有反測沒有正例時，一支「永遠紅」的閘也能讓反測全過，那是另一種假保證。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
