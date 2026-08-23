@@ -11,7 +11,101 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <p><strong>這張表回答：五批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
-<h2 id="-目前正在做第-11-輪審完20-條全修準備派第-12-輪823-六・深夜">🔴 目前正在做：第 11 輪審完、20 條全修，準備派第 12 輪（8/23 六・深夜）</h2>
+<h2 id="-目前正在做第-12-輪審完15-條全修準備派第-13-輪823-六・深夜">🔴 目前正在做：第 12 輪審完、15 條全修，準備派第 13 輪（8/23 六・深夜）</h2>
+<p><strong>條數回落：20 → 15。</strong> 三家仍「需修訂後定版」。</p>
+<h3 id="-這輪最重要的不是任何一條缺口是兩個裁定">🔴 這輪最重要的不是任何一條缺口，是兩個裁定</h3>
+<p><strong>一、我要求三家把每條缺口自己歸類，結果出來了：</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>類別</th>
+<th>條數</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全新的缺口（跟我上輪加的東西無關）</td>
+<td><strong>2</strong></td>
+</tr>
+<tr>
+<td><strong>我上輪新加的機制沒寫完</strong></td>
+<td><strong>13</strong></td>
+</tr>
+<tr>
+<td>我把原本對的改壞了</td>
+<td><strong>0</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>⇒ <strong>13/15 還是同一個病</strong>。三家一致認定我上輪的兩個對策<strong>不夠</strong>，
+於是給了一個<strong>入口閘</strong>（已寫進角色卡）：</p>
+<blockquote>
+<p>① <strong>一個任務只能有一個可執行的負責物件</strong>。已經有了，新需求只能擴充它的
+結構與測試，<strong>不准再多加一個</strong> producer／傳輸層／receipt／編碼器／平行 fixture。
+② 新機制要進規格，必須在<strong>同一份補丁包</strong>裡同時給出
+<strong>負責物件／完整形狀／消費端／會轉紅的反例／要同步改哪些位置</strong> 五樣，缺一不得進。
+③ 這是<strong>入口閘，不是刪任務的授權</strong>。</p>
+</blockquote>
+<p><strong>二、那支檢查工具的判準，三家裁定「不要改」——並且背書我停手的決定。</strong>
+我提的兩個候選都被否決：「前後 N 行」會讓同檔任何無關改動變綠（比現在更糟）、
+「行號區間」會因後續插入而漂移。裁定維持現況，<strong>改的是委員自己寫錨點的方式</strong>——
+要指向<strong>真的會被改到的那一行</strong>，指到段落標題<strong>算委員的責任</strong>。</p>
+<h3 id="七個群集全部已修">七個群集（全部已修）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>群集</th>
+<th>幾家</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td><strong>三家</strong></td>
+<td>🔴 我上輪寫了<strong>在 Python 裡不可能同時成立</strong>的三條約束（物件不可變／要寫回結果／三處要是同一個物件）。已改成「coverage 產生新物件、身分約束移到那個新物件上」</td>
+</tr>
+<tr>
+<td>B</td>
+<td>兩家</td>
+<td>我上輪自查定案「指紋一律後端算」，但<strong>沒刪掉互斥的舊驗收</strong>、<strong>沒指定誰去建那條 API</strong>、<strong>沒裁匯出時算還是匯入時算</strong> ⇒ 三件全補</td>
+</tr>
+<tr>
+<td>C</td>
+<td><strong>三家</strong></td>
+<td>「涵蓋檢查把某時間框架全篩掉後，深度表的鍵要保留」這條規則我寫死了，<strong>卻沒有任何測試能證偽它</strong> ⇒ 補反例</td>
+</tr>
+<tr>
+<td>D</td>
+<td>codex</td>
+<td>那個物件沒有「逐時間框架」的欄位，但指紋和 golden 都要用 ⇒ 補上，並要求三處讀同一份</td>
+</tr>
+<tr>
+<td>E</td>
+<td>codex</td>
+<td>🔴 用答案窗 7 準備、再用答案窗 3 計算，<strong>指紋仍相同、檢查照樣綠</strong>（等於舊病復發）⇒ 綁定並在不符時擋下</td>
+</tr>
+<tr>
+<td>F</td>
+<td>composer</td>
+<td>那個集合的<strong>初始值</strong>沒定，「空的」和「全部」分不出來</td>
+</tr>
+<tr>
+<td>G</td>
+<td>codex</td>
+<td>欄位歸類講錯；兩份測試只寫「互相鏡像」而沒共用同一份資料 ⇒ 改為共用具名 fixture</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="-我要老實講的三件事">🔴 我要老實講的三件事</h3>
+<p><strong>一、7 個群集全是我上一批寫壞的</strong>，自傷絕對數 3→5→6→7→6→7→7→9→<strong>7</strong>。</p>
+<p><strong>二、A 群集是我為了「更嚴」而寫出的不可能。</strong> 三條約束各自都有正當理由
+（不可變是為了安全、寫回是為了傳結果、同一物件是為了防重算），
+但我沒有把三條放在一起問「這能同時做到嗎」。</p>
+<p><strong>三、B 群集顯示「我定案了」和「規格裡有一條可執行的路徑」是兩件事</strong>——
+定案時必須同時：刪掉互斥的舊條文、指定一個任務去承載、把時序寫死。少一件就等於沒定。</p>
+<hr />
+<h2 id="前一段第-11-輪審完並落地823-六・深夜">前一段：第 11 輪審完並落地（8/23 六・深夜）</h2>
 <h3 id="-要先講一件不好看的事委員找到的條數反彈了">🔴 要先講一件不好看的事：<strong>委員找到的條數反彈了</strong></h3>
 <p>17 → 14 → 11 → <strong>20</strong>。前三輪在降，這輪彈回去。</p>
 <p><strong>但 20 條裡沒有一條是新的洩漏、也沒有一條說架構錯了</strong>（composer 明講「最嚴重等級 0 條，
