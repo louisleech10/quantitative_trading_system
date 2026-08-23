@@ -64,8 +64,21 @@ ${ledger}
 EOF
 
 if [ -z "${max_round}" ]; then
-  echo "[header_round] （債務帳本中無本 epic 之輪次 ⇒ 真·新 epic 首輪，不適用）"
-  exit 0
+  # 🔴 R18（CODEX-R18-P1-05）：R17 版此處直接 exit 0 ⇒ **仍是 fail-open**。
+  #   codex 之反例：把本檔之 EPIC_RE 改成不存在的 epic 即得 rc=0（帳本查無列 ⇒ 靜默放行）。
+  #   ⇒ 改為 fail-closed，唯一合法之 skip 須有**顯式初始 marker 檔**。
+  #   marker 只在真·新 epic 首輪派工前建立，內容為該 epic 之 EPIC_RE，可被人眼與機器稽核。
+  MARKER=".claude/gate/gap3ux_epic_initial_round.marker"
+  if [ -f "${MARKER}" ] && grep -qF "${EPIC_RE}" "${MARKER}"; then
+    echo "[header_round] （帳本無本 epic 輪次，且存在初始 marker ${MARKER} ⇒ 真·新 epic 首輪，不適用）"
+    exit 0
+  fi
+  echo "[header_round] ✗ 債務帳本查無本 epic（pattern=${EPIC_RE}）之任何輪次 ⇒ fail-closed"
+  echo "               這通常表示 EPIC_RE 被改壞、或帳本路徑錯誤，**不是**「沒有輪次」。"
+  echo "               若確為真·新 epic 首輪，請顯式建立 marker："
+  echo "                 echo '${EPIC_RE}' > ${MARKER}"
+  echo "               （出處 CODEX-R18-P1-05：R17 版此分支靜默 rc=0，改 EPIC_RE 即可繞過）"
+  exit 2
 fi
 [ -n "${max_state}" ] || {
   echo "[header_round] ✗ 帳本可讀但 state 欄不可解析（round=R${max_round}）⇒ fail-closed"; exit 2; }

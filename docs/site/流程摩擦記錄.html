@@ -2016,6 +2016,15 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百三十六・（2026-08-24）我用 <code>git stash</code> 做實驗，把自己剛寫好的腳本一起藏起來了</strong>：我想驗證新閘在「檔案乾淨」時會不會查，就跑了 <code>git stash --keep-index</code>——結果它<strong>連我剛改好的那支閘本身一起 stash 掉</strong>，於是跑到的是舊版，測出來的結論是錯的。而且工作區裡本來就躺著另一個別人留下的 stash，差點分不清哪個是我的。<strong>規則</strong>：<strong>驗證「檔案乾淨時的行為」不要用 stash 清工作區</strong>——被清掉的不只是待測資料，還有待測程式本身；正確作法是先 commit，再在 clean 狀態下跑一次。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百三十七・（2026-08-24）同一句話被反例打破三次，我才發現錯的不是內容而是方法</strong>：我在規格裡宣稱「purge（防洩漏的隔離長度）的所有輸入都已經綁進身分指紋了」。第 17 輪 codex 用「交換 symbol 分派」打破（我漏了 <code>symbol</code>）；我補上 <code>symbol</code>，第 18 輪 codex 與 grok <strong>兩家</strong>又用「交換觸發時間框」打破（我漏了 <code>timeframe</code>）。<strong>兩次我都是補完那一欄、再宣稱一次「這下全了」。</strong> 第三次我停下來看：問題不在「又漏一欄」，在於我用<strong>列舉</strong>（把想得到的欄位列出來）代替<strong>導出</strong>（把公式逐符號展開，出現什麼就是什麼）。修法不是補第五欄，是①在規格裡寫下<strong>導出程序</strong>（逐符號展開權威式，凡非常數者即為自由變數）②加一條測試做<strong>集合相等</strong>斷言（解析公式的符號 vs 指紋欄位清單，<code>V == H</code>），公式多一個變數而清單沒跟上就紅。<strong>規則</strong>：<strong>當一個「已經全部涵蓋」的宣稱被打破第二次，不要補第三次——改成從定義導出＋機械對證</strong>。列舉會漏，集合相等不會；這跟「複述即第二份副本」是同一家族，只是這次副本長在「我腦中的清單」上。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百三十八・（2026-08-24）我在規格裡寫了一條「不可執行」的驗收，因為我沒去看專案怎麼跑測試</strong>：digest 那條閘，我上輪寫「用 <code>Object.getOwnPropertyNames(require('node:crypto'))</code> 實跑列舉後比對清單」。codex 指出兩件事：①本專案 vitest 用 <code>environment: jsdom</code>、測試以 <strong>ESM</strong> 執行，裸 <code>require</code> 是 <code>ReferenceError</code> ②那個呼叫回傳 <strong>71 個</strong> export，而我沒定義要怎麼從中篩出「雜湊入口」。<strong>這條寫得像很嚴，其實實作者根本跑不起來。</strong> 修法：改 <code>await import('node:crypto')</code>，並把篩選判準寫成<strong>行為判準為主</strong>（prototype 上同時有 <code>update</code> 與 <code>digest</code>）＋名稱判準為輔。<strong>規則</strong>：<strong>規格裡凡寫出一段「請這樣跑」的驗收，先確認它在本專案的測試環境真的跑得起來</strong>——ESM/CJS、jsdom/node、有沒有那個全域，這些都不是細節，是「能不能執行」。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百三十九・（2026-08-24）我在派工單裡把自己沒讀過的程式描述成事實，被碼證撤回兩處</strong>：①我寫「<code>ICFullAnalysisRequest</code> 有第二次 analyzer 呼叫，容易漏」——實際上 <code>class ICFullAnalysisRequest(ICAnalyzeRequest)</code> 是<strong>繼承</strong>，驗證掛在父類就同時涵蓋兩個端點，根本沒有第二條路徑；②我寫的驗收是「斷言 spy 收到 receipt 的時間戳，<strong>而且</strong>回應 400」——<strong>兩者不可能同時成立</strong>，因為若在請求邊界就回 400，analyzer 根本不會被呼叫。<strong>兩處都是我沒開檔案、憑印象描述。</strong> 這與摩擦一百二十三（憑印象宣稱 <code>dataclasses.replace</code> 行為）、一百三十一（憑印象宣稱「這是全部入口」）是同一種病，本 epic 第三次。<strong>規則</strong>：<strong>規格裡凡出現「A 呼叫 B」「有第二條路徑」這類結構斷言，旁邊要附行號碼證</strong>；沒有碼證的結構描述一律當待驗證假設，不能寫成驗收條文。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

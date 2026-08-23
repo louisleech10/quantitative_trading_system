@@ -24,10 +24,10 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R17-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R18-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
-→ R17 12 條 findings；R17 **P0=0**，(N) 僅 composer 報 1 條）。
-**狀態：未 FROZEN**（待 R18 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+→ R17 12 → R18 8 條 findings；R18 **P0=0（連四輪）**；兩家明確判「未陷入不收斂」並給出停止加工判準）。
+**狀態：未 FROZEN**（待 R19 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
 歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
@@ -216,6 +216,32 @@ purge_lower_bound_ms(scope) = max over e in scope of max( lookahead_depth_ms(e),
                               # scope ＝ symbol（event_split.py:54 之 groupby）；R10 鎖 per-scope embargo
 ```
 
+🔴 **R18：purge 之自由變數集合（由上式**導出**，非逐次列舉）**
+（出處：同一「已全部綁進 hash」之宣稱**連三輪被反例打破**——R16 版漏 `symbol`
+（CODEX-R17-P1-01）、R17 版漏**觸發** `timeframe`（CODEX-R18-P1-01＋GROK-R18-P1-01
+兩家）。**病根不是漏了哪一欄，是主委用「列舉＋宣稱窮盡」代替「從式子導出」**。）
+
+**導出程序（唯一；實作與驗收都照這個做，不得改抄清單）**：
+把上式**逐符號展開**，凡出現且非常數者即為自由變數：
+
+| 出現處 | 符號 | 是逐事件還是批次 | 落在 hash 何處 |
+|---|---|---|---|
+| `scope` 之定義 | `e.symbol` | 逐事件 | `event_level.symbol` |
+| `lookahead_depth_ms` | `lookahead_bars_declared` | 批次 | `batch.lookahead_bars_declared` |
+| `lookahead_depth_ms` | `e.timeframe`（**觸發 TF**） | 逐事件 | `event_level.timeframe` ← 🔴 **R18 新增** |
+| `label_window_ms` | `row(e).label_start_ms` | 逐事件 | `event_level.label_start_ms` |
+| `label_window_ms` | `row(e).label_end_ms` | 逐事件 | `event_level.label_end_ms` |
+| （常數，不計） | `TIMEFRAME_SECONDS` | — | — |
+
+⚠️ **`per_tf.timeframe` 不能代替 `event_level.timeframe`**（兩家碼證）：`per_tf` 逐
+(event_id, timeframe) 一列、記的是**特徵 TF 集合**，一個事件可有多列
+⇒ **無法唯一還原該事件之觸發 TF**。兩者名字相同、語意不同，須各自存在。
+
+🔴 **完整性由機械檢查保證，不由主委宣稱**（落 §G G-3 ⑥ 之新驗收 (d)）：
+測試**解析本節權威式之符號**，與 hash 輸入 fence 之欄位做**集合相等**斷言；
+式子新增任一自由變數而 fence 未同步 ⇒ **紅**。
+**這條取代「主委列舉並宣稱窮盡」**——列舉會漏，集合相等不會。
+
 🔴 **R10 修正：`lookahead_bars_declared` 由「批次 scalar」改為「逐 timeframe 之 map」**
 （CODEX-R10-P0-01；**主委 R9 之裁決在此半邊是錯的，已推翻**）。
 主委 R9 在兩份補丁包間裁「換算採**批次層深度** × 逐列 tf」，理由是「D-7 只定義批次層深度」。
@@ -300,16 +326,13 @@ project_purge(rows: tuple[SymbolPurgeRow, ...]) -> Mapping[str, int]
 - `rows` 內 `symbol` **重複 ⇒ fail-closed**（不做去重、不取最大值）。
 - 投影**只在呼叫 `split_events` 之當下產生**，用完即棄；
   **不得**掛回 `PreparedAnalysisWindows`（那會使 (β)「禁可變容器」與 (γ) 之 tuple 化失效）。
-- 🔴 **驗收落 Task 7.0b ⑨(f)（R16 新建；不改寫既有 ⑨(d) 之本義）**：
-  斷言 `dict(split 收到之 embargo_ms_by_symbol)
-  == {r.symbol: r.purge_lower_bound_ms for r in prepared1.purge_lower_bound_ms_by_symbol}`
-  （在合法、無重複 symbol 之 prepared 上）。
-  **mutation（須紅）**：①以**含重複 symbol** 之 rows，把投影改成「取 max 去重」
-  ⇒ ⑨(f) 之 fail-closed 斷言紅；②在合法 rows 上把某鍵值改成 `max(全部 purge 值)`
-  ⇒ ⑨(f) 等式紅。
-  🔴 **R16 出處（GROK-R16-P1-02 之 probe）**：原掛 ⑨(d) 不可證偽——
-  ⑨(d) 本義為「兩 symbol 窗寬不同／證偽全批 scalar」，其 fixture 之 symbol 唯一，
-  故 `D2_unique_take_max_equals_exact True`（取 max 與 exact 投影位元組相同）⇒ 測試不紅。
+- 🔴 **驗收之唯一所在＝Task 7.0b ⑨(f)**（不改寫既有 ⑨(d) 之本義）。
+  🔴 **R18 刪除本處原有之衛星驗收段**（CODEX-R18-P1-02＋GROK-R18-P1-02 兩家）：
+  該段複述了 R16 版之兩條 mutation（「取 max 去重」「改成全體 max」），
+  而那正是 CODEX-R17-P1-03 **已證明可假綠**之版本（expected 用 dict 生成式建，
+  重複列先被靜默折疊）。⑨(f) 已於 R17 重寫為三條較強 mutation，
+  兩處並存＝**雙源**，Agent 抄到衛星段就回到假綠版。
+  **本節不重述任何 mutation 條文**——**唯一來源在 ⑨(f)**。
 - **互斥**：兩欄**同時非 None ⇒ fail-closed**（不做「以哪個為優先」之隱含規則）。
 - **事件分析路徑（§D-3′-a（iii）階段 4）必傳 `embargo_ms_by_symbol` 且非空**；
   傳 `embargo_ms` 或留兩者皆 None ⇒ fail-closed。
@@ -394,13 +417,17 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
                                        # ——`bool ⊂ int`，`True` 會序列化為 `true` 而非 `1`
     },
     "event_level": [                 # 按 event_id 之 UTF-8 升冪
-      {"event_id": str, "symbol": str, "decision_at_ms": int, "entry_at_ms": int,
-       "label_start_ms": int, "label_end_ms": int},   # 鍵序固定，**恰六鍵**
-      # 🔴 R17 新增 `symbol`（CODEX-R17-P1-01 之反例）：purge 之 scope＝symbol，
-      #    而原五鍵**不含 symbol** ⇒ 同一組時間／窗寬／深度 bytes 下，
-      #    只交換 event→symbol 之分派即可改變 per-symbol purge 而 hash 不變。
-      #    加入後 purge 之四個輸入（深度 map／timeframe／label 窗／symbol）**全在 hash**，
-      #    R16 裁決 D 之「遞移綁定」才真正成立。
+      {"event_id": str, "symbol": str, "timeframe": str,
+       "decision_at_ms": int, "entry_at_ms": int,
+       "label_start_ms": int, "label_end_ms": int},   # 鍵序固定，**恰七鍵**
+      # 🔴 本列之欄集**不得手動維護**：其「purge 相關子集」由上方
+      #    §D-3′-a（ii）之權威式**導出**（`symbol`／`timeframe`／`label_*_ms`），
+      #    並由 §G G-3 ⑥(d) 之集合相等斷言強制。
+      #    R17 新增 `symbol`（CODEX-R17-P1-01）、R18 新增 `timeframe`
+      #    （CODEX-R18-P1-01＋GROK-R18-P1-01）——**兩次都是列舉漏項**，
+      #    故 R18 起改由式子導出＋機械對證，不再靠列舉。
+      #    ⚠️ `timeframe` 指**觸發 TF**（`lookahead_depth_ms` 所讀），
+      #    **不是** `per_tf` 之特徵 TF 集合；後者一事件可多列，無法唯一還原前者。
       # 其餘列同形，逐列一個 dict
     ],
     "per_tf": [                      # 先 event_id 升冪、同 event_id 再 timeframe 升冪
@@ -792,6 +819,20 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
    (b) 保持全部時間欄／窗寬／深度 map 不變，**只交換兩個 event 之 `symbol` 分派**
        ⇒ 本欄必須改變（R17；CODEX-R17-P1-01 之反例）；
    (c) `lookahead_bars_declared` 之某值以 `True` 取代 `1` ⇒ **fail-closed**（R17）。
+   (d) 🔴 **R18 新增——purge 自由變數之集合相等（取代「主委列舉並宣稱窮盡」）**：
+       測試**解析** §D-3′-a（ii）權威式之符號，得自由變數集合 `V`
+       （解析對象＝該節 code fence 內之式子；`TIMEFRAME_SECONDS` 等常數排除，
+       排除清單本身寫在該節導出表之「（常數，不計）」列，為封閉集合）；
+       再解析 hash 輸入 fence 之欄位，取其「purge 相關子集」`H`；
+       斷言 **`V == H`**（集合相等，非包含）。
+       **mutation（兩條，皆須紅）**：①在權威式加入一個新自由變數而不改 fence ⇒ 紅；
+       ②從 fence 刪除 `symbol` 或 `timeframe` ⇒ 紅。
+       🔴 **本條之存在理由（不得刪）**：同一「已全部綁進 hash」之宣稱
+       **連三輪被反例打破**（R16 漏 `symbol`、R17 漏觸發 `timeframe`）。
+       兩次都不是「想不到」，是**用列舉代替導出**；集合相等斷言使第三次不可能靜默發生。
+   (e) 🔴 **R18：交換觸發 `timeframe` 之 mutation**——保持全部時間欄／窗寬／深度 map／
+       `symbol` 不變，**只交換兩個 event 之 `timeframe`** ⇒ 本欄必須改變
+       （CODEX-R18-P1-01＋GROK-R18-P1-01 之反例本身，改為常設 mutation）。
 
 **覆蓋面（最小集；不足即不得宣稱本 golden 有效；R11 追加小時命名欄組，見可證偽條 5(b)）**：
 `direction ∈ {long, short}` × `timeframe ∈ {1h, 12h}` × `h ∈ {1, 7}`，
@@ -1153,9 +1194,25 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
             與 `createHash` 同 hex，且 `Hash === createHash` 為 `false`（是兩個入口），
             DeprecationWarning 不等於廢除。CODEX-R17-P1-04＋GROK-R17-P1-02 各自實跑。
             🔴 **本清單已連三輪被補**（R15 三項→R16 補 `hash`→R17 補 `Hash`）
-            ⇒ 實作時**不得**以本清單自稱窮舉，須在 setupFiles 以
-            `Object.getOwnPropertyNames(require('node:crypto'))` **實跑列舉**後比對本清單，
-            出現清單外之雜湊入口即 fail-closed）
+            ⇒ 實作時**不得**以本清單自稱窮舉。
+            🔴 **R18 改寫此要求為可執行形式（CODEX-R18-P1-03）**：R17 版寫
+            `Object.getOwnPropertyNames(require('node:crypto'))`，但本專案 vitest
+            `environment: 'jsdom'`、測試以 **ESM** 執行 ⇒ 裸 `require` 是 `ReferenceError`；
+            且該呼叫回傳 **71 個** export，SPEC 未定義如何從中篩出「雜湊入口」
+            ⇒ 原文**不可執行**。改為：
+              (i) 取得模組用 `await import('node:crypto')`（ESM）或
+                  `import * as nodeCrypto from 'node:crypto'`；**不得**用 `require`。
+              (ii) **篩選判準（封閉、可導出）**：對每個 export `k`，
+                   若 `typeof m[k] === 'function'` 且下列任一為真即視為雜湊入口——
+                   ① `k` 之小寫形式含 `hash`；② `m[k]` 為 class 且其 prototype 有
+                   `update` 與 `digest` 兩方法；③ `k === 'webcrypto'` 且
+                   `typeof m[k].subtle?.digest === 'function'`。
+                   （此三條**不是關鍵字黑名單**：②③是**行為判準**，只有①是名稱判準，
+                   且①之遺漏會被②補上——`update`+`digest` 是 Node 雜湊物件之結構特徵。）
+              (iii) 斷言篩出之集合 **⊆ 本節清單**；出現清單外者 ⇒ **fail-closed**，
+                   訊息列出多出之名稱（讓下一次補清單不必再靠委員實跑）。
+              (iv) `globalThis.crypto.subtle.digest` 屬 Web Crypto，不在 node 模組列舉內，
+                   須**另行**斷言其已被 stub。
             （🔴 R16：R15 版**漏 `crypto.hash`**——codex 與 grok 各自實跑 Node v22.18.0
             證得 `typeof crypto.hash === 'function'` 且 `crypto.hash('sha256', x, 'hex')`
             與 `createHash` 同輸出；`webcrypto.subtle.digest` 與 `globalThis` 為同一語意入口之
@@ -1999,9 +2056,12 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   #    .supported: bool
   #    .windows: tuple[WindowRow, ...]           # R13 (β) 定死；**不是 dict**
   #                                              #   WindowRow 為 frozen dataclass，欄集恰
-  #                                              #   {event_id, decision_at_ms, entry_at_ms,
+  #                                              #   {event_id, symbol, timeframe,
+  #                                              #    decision_at_ms, entry_at_ms,
   #                                              #    label_start_ms, label_end_ms}，
   #                                              #   按 event_id UTF-8 升冪
+  #                                              #   🔴 R18：symbol／timeframe 為 R17／R18
+  #                                              #   新增，來源見 §D-3′-a（ii）之導出表
   #    .analysis_alignment_receipt_hash: str     # 決定性（同輸入同值）
   #    .per_tf: tuple[PerTfRow, ...]             # R12 補：逐 (event_id, timeframe) 之
   #                                              #   feature_cutoff_ms；欄集恰三鍵、按
@@ -2077,8 +2137,23 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   - **(β) frozen 是淺層**（CODEX-R13 probe：`frozen_shallow_nested_mutation True`）
     ⇒ `.windows` 若為普通 `dict`，consumer 改一列即可讓 hash 與內容不一致。
     **定死**：`.windows` 之型別為 `tuple[WindowRow, ...]`（`WindowRow` 亦 frozen dataclass，
-    欄集恰 `{event_id, decision_at_ms, entry_at_ms, label_start_ms, label_end_ms}`，
-    按 `event_id` UTF-8 升冪）；`.per_tf` 同理為 `tuple[PerTfRow, ...]`。
+    欄集恰 `{event_id, symbol, timeframe, decision_at_ms, entry_at_ms,
+    label_start_ms, label_end_ms}`，按 `event_id` UTF-8 升冪）；
+    `.per_tf` 同理為 `tuple[PerTfRow, ...]`。
+    🔴 **R18 補 `symbol`／`timeframe` 兩欄與其來源（COMPOSER-R18-P1-01）**：
+    R17 只在 hash 之 `event_level` 要求 `symbol`，**卻未同步本欄集**，亦未規定該值從哪來
+    ⇒ 實作者會自行從匯入檔或其他處取，與 split 之 groupby 鍵可能不同源。
+    **定死來源（唯一）**：
+    - 現碼 `momentum/Analysis/event_samples/alignment.py:21` 之 `_EVENT_COLS`
+      **不含** `symbol`／`timeframe` ⇒ **本 Task 須擴充該常數**（先改契約，D-6）。
+    - 兩欄之值一律取自**該事件之契約記錄**（`records[event_id].symbol` /
+      `.timeframe`），**不得**由檔名、UI 選單或 run 設定推得。
+    - `symbol` 須與 `event_split.py:54` 之 `groupby("symbol")` 鍵**同一個值**
+      ——驗收以「同一 exported 取值函式」斷言（同 Task 1.1 ⑧(e) 之作法），不靠字面相等。
+    - `timeframe` 為**觸發 TF**，與 `per_tf` 之特徵 TF 集合**不同語意**（見 §D-3′-a（ii））。
+    **mutation（兩條，皆須紅）**：①`WindowRow` 移除 `symbol` 或 `timeframe`
+    ⇒ §G G-3 ⑥(d) 之集合相等斷言紅；②`symbol` 改由匯入檔欄位直取而非契約記錄
+    ⇒ 與 split groupby 鍵不同源之 fixture 須紅。
     **禁**任何 `dict`／`list`／可變容器出現在本物件之欄位型別中。
   - **(γ) purge 下界隨 receipt 攜帶**：`.purge_lower_bound_ms_by_symbol: tuple[SymbolPurgeRow, ...]`
     （🔴 R15 修正標題行：R14 已於後文改為 tuple，但此處仍寫 `Mapping[str, int]`
@@ -2799,13 +2874,26 @@ t0 formatter 讀得到 label、label formatter 讀得到 t0（欄位語意重疊
     **可繞過 receipt-derived `decision_at`**，回到原始 `t0÷1000`（洩漏面）。
     ⇒ 定死：**`event_import_id` 存在時，同一 request 帶 `event_timestamps` ⇒ HTTP 400
     fail-closed**（不是忽略、不是取其一）；事件路徑之時間戳**唯一來源**＝receipt。
-    (a) `ICAnalyzeRequest` 之 validator 落此互斥；
-    (b) `ICFullAnalysisRequest` 之**第二次** analyzer 呼叫同受此約束（易漏）；
-    (c) **legacy 非事件呼叫端**（只帶 `event_timestamps`、無 `event_import_id`）
-        之既有路徑**保留**，但須在契約明示為 legacy，並有獨立測試釘住其存活。
-    **mutation（須紅）**：request 同時帶 `event_import_id` 與一組**故意錯誤**之
-    `event_timestamps` ⇒ 服務端不得把該 timestamps 傳入事件 analyzer（斷言 spy 收到之
-    時間戳來自 receipt，且回應為 400）；把 (b) 之第二條路徑漏掉 ⇒ 該 mutation 不紅。
+    🔴 **R18 更正（CODEX-R18-P1-04）——R17 版之兩處寫錯**：
+    (a) **驗收自相矛盾**：原寫「斷言 spy 收到之時間戳來自 receipt，**且**回應為 400」。
+        兩者不可同時成立——若 validator 在 request boundary 就拒絕，analyzer **根本不會被呼叫**。
+        ⇒ **拆成兩條獨立驗收**（見下 (i)(ii)）。
+    (b) **「`ICFullAnalysisRequest` 之第二次 analyzer 呼叫」不存在**：碼證
+        `api/models/ic_models.py:173` 為 `class ICFullAnalysisRequest(ICAnalyzeRequest)`
+        ——**繼承**，故 validator 掛在父類即同時涵蓋兩個端點；full-analysis 路徑
+        （`ic_analysis_service.py:793 start_full_analysis`）並無第二次獨立的
+        event-analyzer 呼叫。原文之「易漏的第二條路徑」係主委臆測，撤回。
+    **落點與驗收**：
+    (i) **互斥 → 400**：validator 掛 `ICAnalyzeRequest`（`ICFullAnalysisRequest` 由繼承取得）。
+        測試**參數化涵蓋兩個端點**，斷言 ①HTTP `400` ②event-analyzer 之 spy
+        `call_count == 0`（**不是**斷言 spy 收到什麼）。
+    (ii) **正常事件路徑**：只帶 `event_import_id`（不帶 `event_timestamps`）⇒
+        斷言 analyzer 收到之 `decision_at` **逐列等於** receipt 導出值。
+    (iii) **legacy 非事件呼叫端**（只帶 `event_timestamps`、無 `event_import_id`）
+        之既有路徑**保留**，須在契約明示為 legacy，並有獨立測試釘住其存活。
+    **mutation（三條，皆須紅）**：①把 validator 從父類移到子類 ⇒ 純
+    `ICAnalyzeRequest` 端點之 (i) 不再回 400；②把互斥改成「忽略 `event_timestamps`」
+    ⇒ (i) 之 `400` 斷言紅；③把 (ii) 之時間戳來源改回原始 `t0÷1000` ⇒ (ii) 紅。
   **mutation（八條，皆須紅）**：左界改回 `min(t0)` ⇒ ④；右界不含答案窗 ⇒ ⑤；
   改用 run 之 tf 或批內 `max(tf)` ⇒ ⑥⑦；legacy 之 `None` 改成放行 ⇒ ⑨；
   未知 tf 改成沿用預設 ⇒ ⑧；fail-closed 改成只回警告字串 ⇒ ③；
