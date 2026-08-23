@@ -49096,3 +49096,20 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event":"gate_deny","ts":"2026-08-23T22:44:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"aec2ba54db27f6198d3b4425774c867237b898967be06713fc76b25d5f331569","cmd_head":"cat >> docs/GAP3_EVENT_UX_SPEC.md <<'MDEOF'\n\n---\n\n## 🔴 凍結時之具名殘留（2026-08-24，使用者裁定凍結；**不排工，不另立治理票**）\n\n**四類皆非量化正確性。** 依使用者 2026-08-14 裁定「回量化主線、治理不再擴建」，\n**不另立治理票**（開新票只是換包裝）；本節即其唯一登記處。\n三值理由一律填 `user-ruling`（使用者 2026-08-24 逐字：治理是無解才不做，岔題問委員永遠沒完沒了）。\n\n| # | 殘留 | 現"}
+{"event":"gate_deny","ts":"2026-08-23T23:12:10Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"8baf073e7b9060b10b12c1e285321eb4f1b14655756c48d52ccc5641d1ca6979","cmd_head":"D=/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/24be5c9e-b255-45c1-912b-62fbb85ddc57/scratchpad; python3 - <<'PY' 2>/dev/null || python3 -c \"\nimport io\nP='$D/GAP3_EVENT_UX_TODO.md'\nt=io.open(P,encoding='utf-8').read()\na='- **實作要點**（四段**皆由實際設定導出，禁寫死**）：'\nb='- **實作要點**：\\n  0. 🔴 下列四段**皆由實際設定導出，禁寫死**。'\nassert a in t, 'miss'\nio.open(P,'w',encoding='utf-8').write(t.replace(a,b,1))\nprint('ok')\n\"\nPY\np"}
+=== 2026-08-24 07:12:56 | artifact ===
+  ts=2026-08-24 07:12:56
+  kind=artifact
+  intent=GAP-3 事件型 UAT TODO v0.1 DRAFT 落檔
+  risk=low
+  facts_asked=none-needed:全部內容導出自 FROZEN 之 SPEC 與實碼盤點
+  review_role=single-executor:n/a
+  template=templates/TODO_GENERATION_PROMPT.md V13 全程跟過
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_UX_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=filled; §B=filled; Phase1-7=filled; 階段3自檢=rc0
+  spec=
+  todo=
+  manifest=
