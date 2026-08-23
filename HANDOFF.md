@@ -1,43 +1,36 @@
 # HANDOFF
 
-## 當前：GAP-3 事件型 UAT 缺口修補 SPEC（目標＝FROZEN）
+## GAP-3 事件型 UAT 缺口修補 SPEC — 🔴 **已 FROZEN**（2026-08-24，使用者裁定）
 
-- 標的 `docs/GAP3_EVENT_UX_SPEC.md`：**3,547 行／42 Task（三十四輪未增未減）**，版本行 `R34-landing`，**未 FROZEN**。
-- R34 已落地（3 件），債已銷。**下一步＝建 R35 派工包並派三家。**
-- 🔴 **本 session 動過 `scripts/`**（`gap3ux_apply_patch.py`、`gap3ux_header_round_check.sh`）
-  ⇒ **收 epic 前須跑 `bash scripts/gov_check.sh --no-probe`（丟背景）**；本輪尚未跑完。
-  ⚠️ 跑它時**主控端不得動檔**（治理測試比對工作區 dirty 數）。
+- `docs/GAP3_EVENT_UX_SPEC.md`：**42 Task 定版**，3,5xx 行。**不再受理規格審查輪次。**
+- 凍結依據：P0＝0；全新缺口 (N)＝0 連二十輪；Task 連三十四輪未增未減。
+- 🔴 **誠實邊界**：委員四條件之①（OPEN P1＝0）**未滿足**（凍結時 P1＝11），
+  由使用者直接裁定覆蓋。四類殘留具名於 SPEC 末節「凍結時之具名殘留」，
+  **不排工、不另立治理票**（依使用者 2026-08-14「回量化主線、治理不再擴建」）。
 
-## R35 必辦（理由皆為實跑，勿重推測）
+## 🔴 下一手務必先讀：不要再碰治理
 
-1. **E-1 同輪重派死鎖**：GROK 字面讀 `GATE_CHECK_CMD`——`grep -c` → **0**；真正變數是 `cmd`
-   （`gate_check.sh:164` 由 `jq -r '.tool_input.command'` 取得）⇒ parser 恆空、helper 永不被呼叫；
-   且該 parser **不檢查 intent 字面**，重開 CODEX-R34-P1-01 之洞。請 GROK 修、CODEX 覆核（勿再交散文）。
-2. **E-3 補丁包碰撞收集端閘**：CODEX 散文／COMPOSER 引用**不存在**之 `scripts/gap3ux_patch_family_audit.sh`／
-   GROK 用 `declare -A`（bash 4）而**本機為 bash 3.2.57**（`declare -A` → `invalid option`）。
-   三家一致：**產出端在本架構無可攔截點** ⇒ 須 registry 具名豁免＋收集端 fail-closed。
-3. **編排草圖自 R34 起不再 `compile()` 通過**（含 illustrative 佔位 `<Task 7.7 picker 所選 run_id>`）。
-   三家皆標 illustrative，**但無人明講可放棄該 receipt** ⇒ 請裁。
-4. **主委兩處具名修正待覆核**：`gap3ux_header_round_check.sh` 之 `sed -E` 可攜性修正
-   （BSD sed 不支援 BRE `\|`，實測誤紅）。
-5. **第三類 VERIFY 撰寫缺陷**：包側 VERIFY 與自身 AFTER 自相矛盾。
-   原則已定（`CODEX-R34-P2-02`）：**由 package author 修 scope，不放寬 extractor 或判準**。
+本 session 花掉六輪在**主委自己造出來的**問題上：R27 三家判定瓶頸為主委落地方式後，
+主委**新建對證工具**而非提高抄寫精度，此後一直在修那支工具，
+並把工具問題寫進每輪派工單 ⇒ 委員回更多治理 findings ⇒ 自我餵養。
+**使用者 2026-08-24 明確制止**（逐字：治理是無解才不做，岔題去問委員永遠沒完沒了）。
 
-## 最高位階條款（`docs/GAP3_EVENT_UX_ROLE_CARD.md` 為準）
+⇒ **F-1 同輪重派死鎖／F-2 補丁包檔名碰撞／F-4 VERIFY 撰寫缺陷：一律不修、不開票。**
+遇到就繞過並具名記錄。要修須使用者明示。
 
-R20 不得新建驗收機制／R21 條件②′／R22 不得自我歸類／R23 不自擬殘留查核清單／
-R25 anchor 只錨會被寫入之字面／**R32 擇一權＋機器判準（角色卡首節）**。
+## 待使用者決定
 
-🔴 **R32 判準**：得擇一，**僅當被排除之 AFTER 不可執行或自相矛盾**
-（`compile()` 失敗／引用名在包內與標的皆無定義／宣稱效果在其所改範圍不可能達成／
-觸發條件永不成立／**依賴不存在之變數或檔案**／**用了本機 shell 不支援的語法**）。
-「語意較佳」「兩家同向」皆不算 ⇒ 停手。
-🔴 **副則**：ERRATA 不重貼被否決之字面（已咬三次）。
+**SPEC 已凍結，下一步是否進 TODO／實作，等使用者指示。不要自己往下走。**
 
-## 未答否決點（自 R21 起十四輪）
+另有一件仍在使用者手上：GAP-3 B5 之 UAT B 段簽字（`docs/GAP3_UAT_CHECKLIST.md`）。
 
-凍結條件②之替換（改為四指標），使用者可推翻。
+## 既有帳（非本輪造成，勿追）
 
-## 下一步
+- `gov_check` 之 **G-7 為紅**：27 條「未宣告即修改」路徑多屬他 epic；
+  commit `51d8ac7f` 已裁「接受 G-7 紅」。⚠️ 但它會讓 `gov_check` 在第 4 段中止，
+  **後面的全套 pytest 跑不到** —— 需要時直接跑 `pytest tests/governance -q`（約 44 分鐘）。
+- 該套最近實跑：**1743 passed / 6 failed**，6 條皆 G-7／factkey-hook 既有帳。
 
-R35 → **FROZEN 後停下來等使用者**，不要自己往 TODO 或實作走。
+## 未答否決點
+
+凍結條件②之替換（改為四指標）自 R21 起未答；**已隨凍結失效，無需再答**。

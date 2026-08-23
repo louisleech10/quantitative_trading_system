@@ -49076,3 +49076,23 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "50481489-1205-4a94-81cc-04bd2e972266", "cli_rc": "0", "event": "committee_family_result", "event_id": "6174961c-1acc-4345-8e71-b833b6b70e3f", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r34-grok.md", "output_sha256": "ca94ee09dc04e533d0896b54634be7d79f91fc7bd35196b28cc654a16710b749", "producer": "audit_append.sh", "result_state": "success", "round_id": "0ed684a4-eabb-412f-9468-0455e49371a0", "schema_version": 1, "sequence": 2640, "ts": "2026-08-23T21:00:19Z"}
 {"actor": "cx_run", "attempt_id": "aa192d1d-2345-4450-bd51-7d0a0c83f920", "cli_rc": "0", "event": "committee_family_result", "event_id": "6d8c63cf-a716-430f-ad4c-d5bcc156cf67", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r34-codex.md", "output_sha256": "3dfa31b788de6ad5f99ca8b3c94fe5bc262bd0c74c64f73a54da68dff2f0f562", "producer": "audit_append.sh", "result_state": "success", "round_id": "0ed684a4-eabb-412f-9468-0455e49371a0", "schema_version": 1, "sequence": 2641, "ts": "2026-08-23T21:12:02Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "c01afb81-931d-40ee-ac88-329cffd6e910", "lock_sha256": "09685c4dbc570b2ad7e91d3e99a520cf568fce522df502c2f87973430b02de4e", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "0ed684a4-eabb-412f-9468-0455e49371a0", "schema_version": 1, "sequence": 2642, "session_id": "20260824-gap3ux-x-review-r34", "synth_sha256": "27cc020368b7b5104682cb23a3f6840a53582a76063e820c51fbcbfc4d34602a", "ts": "2026-08-23T21:21:01Z"}
+{"event":"gate_deny","ts":"2026-08-23T22:19:50Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event":"gate_deny","ts":"2026-08-23T22:19:50Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"04f20189e859833839760831b464a9b90a45eb50d7e55034958c4b0515f9e8a0","cmd_head":"codex exec hello"}
+{"event":"gate_deny","ts":"2026-08-23T22:43:39Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"4bf881f8e3bf8051dfd37d4ccc951f04b504be7f91b933edefc06f43eda00b6f","cmd_head":"cat >> docs/GAP3_EVENT_UX_SPEC.md <<'MDEOF'\n\n---\n\n## 🔴 凍結時之具名殘留（2026-08-24，使用者裁定凍結；**不排工，不另立治理票**）\n\n**四類皆非量化正確性。** 依使用者 2026-08-14 裁定「回量化主線、治理不再擴建」，\n**不另立治理票**（開新票只是換包裝）；本節即其唯一登記處。\n三值理由一律填 `user-ruling`（使用者 2026-08-24 逐字：治理是無解才不做，岔題問委員永遠沒完沒了）。\n\n| # | 殘留 | 現"}
+=== 2026-08-24 06:44:06 | artifact ===
+  ts=2026-08-24 06:44:06
+  kind=artifact
+  intent=GAP-3 SPEC 凍結：寫入具名殘留段
+  risk=low
+  facts_asked=none-needed:使用者 2026-08-24 直接裁定凍結
+  review_role=single-executor:n/a
+  template=n/a:凍結收尾，非新 SPEC 產出
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_UX_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=凍結時之具名殘留=filled
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-08-23T22:44:35Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"aec2ba54db27f6198d3b4425774c867237b898967be06713fc76b25d5f331569","cmd_head":"cat >> docs/GAP3_EVENT_UX_SPEC.md <<'MDEOF'\n\n---\n\n## 🔴 凍結時之具名殘留（2026-08-24，使用者裁定凍結；**不排工，不另立治理票**）\n\n**四類皆非量化正確性。** 依使用者 2026-08-14 裁定「回量化主線、治理不再擴建」，\n**不另立治理票**（開新票只是換包裝）；本節即其唯一登記處。\n三值理由一律填 `user-ruling`（使用者 2026-08-24 逐字：治理是無解才不做，岔題問委員永遠沒完沒了）。\n\n| # | 殘留 | 現"}
