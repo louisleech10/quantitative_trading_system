@@ -11,7 +11,65 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <p><strong>這張表回答：五批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
-<h2 id="-目前正在做第-13-輪審完14-條全修準備派第-14-輪824-日・凌晨">🔴 目前正在做：第 13 輪審完、14 條全修，準備派第 14 輪（8/24 日・凌晨）</h2>
+<h2 id="-目前正在做第-14-輪審完18-條全修準備派第-15-輪824-日・凌晨">🔴 目前正在做：第 14 輪審完、18 條全修，準備派第 15 輪（8/24 日・凌晨）</h2>
+<h3 id="-三家第一次告訴你還要幾輪">🔴 三家第一次告訴你「還要幾輪」</h3>
+<p>我這輪在派工單裡強制要求他們回答，<strong>不接受「不確定」</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>委員</th>
+<th>估計</th>
+<th>依據／條件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>grok</strong></td>
+<td><strong>再 1 輪</strong></td>
+<td>條件：我只套「刪殘／改型別」的修法，<strong>不再新增任何抽象／API／編碼器</strong>；違反則改估 2+</td>
+</tr>
+<tr>
+<td>composer</td>
+<td>2 輪</td>
+<td>剩餘都是字面漂移類，不是新架構</td>
+</tr>
+<tr>
+<td>codex</td>
+<td>3 輪</td>
+<td>修補 → 獨立複核 → 最終 gate</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>三個數字不同，但條件一致指向同一件事：變數不是委員找得多快，是我還加不加東西。</strong></p>
+<h3 id="這輪-18-條的性質變了">這輪 18 條的性質變了</h3>
+<p>前幾輪是「我新加的機制沒寫完」；<strong>這輪是「新機制寫完了，但舊字面沒刪乾淨」</strong>——
+18 條裡<strong>沒有一條要求新增機制</strong>。例如：</p>
+<ul>
+<li>我上輪把某個欄位改成不可變的 tuple，但<strong>簽章註解還寫著 dict</strong>、驗收還在呼叫 <code>.keys()</code></li>
+<li>我上輪把某個欄位改名加了 <code>_bytes</code>，但<strong>驗收還在比對舊名</strong>（幽靈欄位）</li>
+<li>我上輪拆開了兩個同名的 coverage，但<strong>還有兩處指著舊的</strong></li>
+</ul>
+<p><strong>所以我這輪落地就照 grok 的條件做：只刪殘、只改型別、只同步交叉引用，一個新東西都沒加。</strong>
+（唯二的新增是文件層：角色卡與殘留登記。）</p>
+<h3 id="委員又用-probe-打穿我兩處">委員又用 probe 打穿我兩處</h3>
+<ul>
+<li><strong><code>MappingProxyType</code> 不是真的唯讀</strong>：它只擋在 proxy 上寫入，<strong>建構時傳進去的那個 dict 還在</strong>，
+持有它的人改值就改到 receipt 了。而且它跟我自己寫的「禁任何可變容器」互相矛盾。</li>
+<li><strong><code>isinstance(True, int)</code> 是真的</strong>：所以「型別必須是 int」用 <code>isinstance</code> 檢查，
+<code>True</code> 會通過，但序列化出來是 <code>true</code> 不是 <code>1</code>，指紋就不一樣了。改成 <code>type(v) is int</code>。</li>
+</ul>
+<h3 id="還有一條是我六輪沒發現的">還有一條是我六輪沒發現的</h3>
+<p>規格<strong>檔頭</strong>還寫著「版本 R8、待第 9 輪審查」——實際已經第 14 輪。
+我每輪認真更新內文、交接文件、這張看板，<strong>唯獨檔頭那兩行從第 8 輪後就沒動過</strong>，
+因為它從來沒被任何一條 finding 指到。已改，並把「每輪必須同批更新」<strong>寫在那一行旁邊</strong>。</p>
+<h3 id="-我違反入口閘那件事的制度補強">🔴 我違反入口閘那件事的制度補強</h3>
+<p>上輪裁定我違反了自己立的閘。這輪 codex 進一步指出：<strong>那條閘只寫「約束委員的補丁包」，
+根本沒明文約束我</strong>。已改：閘<strong>同等適用於我的落地</strong>；我若判斷「這不算新增機制」，
+必須在 commit 訊息用一句話說明歸類，<strong>讓下一輪可以逐條覆核</strong>；並新增「先問後做」的觸發條件。</p>
+<p>⚠️ <strong>但要老實講</strong>：目前<strong>沒有任何機械檢查</strong>能在我新增 API／producer 時當場攔下來
+——這一項已列為具名殘留（<code>needs-research</code>），<strong>不宣稱已經封住</strong>。</p>
+<hr />
+<h2 id="前一段第-13-輪審完並落地824-日・凌晨">前一段：第 13 輪審完並落地（8/24 日・凌晨）</h2>
 <p><strong>條數 15 → 14。</strong> 更重要的是<strong>歸因在改善</strong>：</p>
 <div class="table-wrap"><table>
 <thead>

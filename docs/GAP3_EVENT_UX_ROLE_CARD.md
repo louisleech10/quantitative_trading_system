@@ -41,7 +41,25 @@ R12 三家自行歸類之絕對數為 **(N) 新缺口 0–1／(A) accretion 3–
 ——**幾乎全部是「上一輪為修洞而新增的機制，本身沒有被定死」**。
 與 `feedback_epic_convergence_breaker` 所載 P16「連八輪卡 20–25 findings」同型。
 
-**入口閘（寫死；本卡生效即適用，含委員之補丁包）**：
+🔴 **R14 擴及主委（CODEX-R14；出處＝主委自己違反）**：R12 版寫「含委員之補丁包」，
+**未明文約束主委之落地**——而 R13 裁定主委 R12 新增之 transport 正是違反本閘。
+⇒ **本閘同等適用於主委之落地編輯**；主委若判斷「非新增機制」，須在 commit message
+以一句話說明其歸類（例：「`apply_event_coverage` ＝既有階段之具名化，owner 仍為 Task 7.0b」），
+使該判斷**可被下一輪逐條覆核**。
+
+🔴 **先問後做（R14 定；出處＝主委「知道有疑慮卻先做、附帶問」）**：
+主委**自認可能違反本閘**時（判準：該編輯新增了 producer／transport／receipt／encoder／
+parallel fixture 之任一，且主委需要用一句以上的理由說明它「不算新增」），
+**不得先落地再於 brief 附帶問**——須先以 consult／brief 取得裁定。
+
+⚠️ **具名殘留（做不成機械閘；R14 codex 明列）**：目前**沒有任何閘**能在
+「新增 transport／producer／receipt／encoder／parallel fixture 或改 owner／shape」時當場攔截
+——`gap3ux_pre_review.sh` 只跑既有常駐閘與 optional locus。
+三值理由＝`needs-research`（封閉可導出集合尚未設計出來）；**owner＝主委**；
+**觸發＝FROZEN 後、TODO 生成前**一併設計。
+🔴 **不得**因為「已寫進角色卡」就宣稱本項已封——它目前**只靠紀律**。
+
+**入口閘（寫死；本卡生效即適用，含委員之補丁包**與主委之落地**）**：
 
 1. **一個 Task 只能有一個可執行 owner。** 該 Task 已有 owner 時，新增要求**只能擴充該 owner
    之 schema／測試**，**不得**再增加第二個 producer／transport／receipt／encoder／

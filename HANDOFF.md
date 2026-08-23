@@ -1,14 +1,19 @@
 # HANDOFF
 
 **當前**：GAP-3 事件型 UAT 缺口修補 SPEC（`docs/GAP3_EVENT_UX_SPEC.md`）
-——**R13 十四條全數落地**，**待派 R14**。SPEC 2691 行、**42 Task（未增未減）**。
-sha256 見 `shasum -a 256 docs/GAP3_EVENT_UX_SPEC.md`（R14 審查期間不得動該檔）。
+——**R14 十八條全數落地**，**待派 R15**。SPEC 2743 行、**42 Task（未增未減）**。
+sha256 見 `shasum -a 256 docs/GAP3_EVENT_UX_SPEC.md`（R15 審查期間不得動該檔）。
 
-🔴 **findings 走勢 17 → 14 → 11 → 20 → 15 → 14**。三家歸因絕對數：
-R12＝(N) 2／(A) 13／(R) 0；**R13＝(N) 0／(A) 9／(R) 1**
-⇒ **(A) 下降（13→9）、(N) 歸零**，但**首見 (R) 回歸 1**（主委把兩個 coverage 混為一步）。
-🔴 **入口閘首次實測＝有效但不足，且擋不住主委自己**——R13 裁定主委 R12 新增之
-`POST /api/v1/case/source-digest` **違反入口閘①**，已改為不新增 route。
+🔴 **findings 走勢 17→14→11→20→15→14→18**。R14 三家歸因：
+codex (N)2／(A)6／(R)1；composer (N)0／(A)1／(R)3；grok (N)0／(A)5／(R)0。
+🔴 **三家首次給出「距可定版」估計**：**grok 再 1 輪**（條件：主委只套「刪殘／改型別」、
+**不再引入新抽象／transport／encoder**；違反則 +1～2）／composer 2 輪／codex 3 輪。
+🔴 **R14 之 18 條性質已變**：不再是「新機制沒寫完」，而是**「新機制寫完了、舊字面沒刪乾淨」**
+——18 條**無一要求新增機制**。
+⇒ **R14 落地即採 grok 之收斂條件**：只刪殘／改型別／同步交叉引用，
+**未新增任何 producer／transport／receipt／encoder／parallel fixture**
+（唯二新增皆文件層：角色卡入口閘擴及主委、§N 下推清單具名殘留）。
+🔴 **R15 起主委須維持此紀律**——這是 grok 估計「再 1 輪」之前提。
 ⇒ R12 給出 **scope accretion 入口閘**（已寫入角色卡新節）：
 ① 一個 Task 只能有一個可執行 owner，新增要求只能擴充其 schema／測試，
    **不得**再增第二個 producer／transport／receipt／encoder／parallel fixture；
@@ -36,27 +41,28 @@ stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` �
 
 ---
 
-## R13 之十群集（全部已落地；三家 Verdict 一致「需修訂後定版」）
+## R14 之十群集（全部已落地；三家 Verdict 一致「需修訂後定版」）
 
-| 群集 | 家數 | 落點 |
-|---|---|---|
-| **A**（P0，**(R) 回歸**）兩個 coverage 被混為一步 | composer | 階段 3 拆 **3a feature-run gate（批次級）／3b event-coverage（逐列）**，順序固定 |
-| **B**（P0）`replace` 重跑 `__post_init__` ⇒ token／hash 不保證攜帶 | 兩家 | 定死**不得有 `__post_init__`**；兩欄為建構參數 |
-| C frozen 是淺層，nested dict 可變 | codex | `.windows`／`.per_tf` 改 `tuple[frozen dataclass, ...]`；禁可變容器 |
-| D `normalized_spec` 之「canonically 相等」無定義 | **三家** | 改 `.normalized_spec_bytes`；唯一 normalizer ＋ S-9；相等＝bytes 相等 |
-| E ⑭(f) 與（ii）式互斥 | 兩家 | purge 輸入固定為 **pre-coverage**，階段 2 末算唯讀映射隨 receipt 攜帶 |
-| F ⑩(v) 跨層 `is` 不可實作 | composer | 改「逐列 bytes 相同 ＋ hash 同值 ＋ `align_events` spy `call_count == 0`」 |
-| G digest grep 驗收可繞過；兩種 digest 共用 helper | codex | 改 call-boundary spy；`rule_digest` 與 `source_file_digest` 分離 |
-| H 新端點違反入口閘 | codex | **不新增 route**，沿用既有匯出流程之服務端入口 |
-| I L989 殘留「或既有匯出端點」 | grok | 撤回（`SYNC-FORBID: 二擇一` 擋不到「或」，已具名為誠實邊界） |
-| J 共用 fixture 同名 ≠ 同一份 | codex | owner＋唯一 typed loader＋sha256 凍進 G-3；改一位元組兩處同時紅 |
+全部為**刪殘／改型別／同步字面**，無一新增機制：
+A `.windows` 註解仍寫 dict＋⑭(e) 用 `.keys()`（**三家**）｜B ⑩(iv) 幽靈欄 `normalized_spec`（**三家**）｜
+C `MappingProxyType` 不隔離 mutable alias 且與 (β) 矛盾 ⇒ 改 `tuple[SymbolPurgeRow, ...]`（兩家 probe）｜
+D normalizer 未拒 `bool`／`numpy` ⇒ 定死 `type(v) is int`、**不用 `isinstance`**（**三家**）｜
+E ⑩ 與 §D-3′-a（ii）仍寫「Task 7.7 之 coverage」⇒ 全改指 **3a**（兩家）｜
+F ⑭(g) 殘留「purge 值不變」半句＋階段 4 仍寫「計」⇒ 刪半句、改「讀」（兩家）｜
+G purge map 鍵集未固定為 pre-coverage symbols（codex）｜
+H digest spy scope 只覆蓋 `lib/` ⇒ 擴 `frontend/src/`（codex）｜
+I **SPEC header 自 R8 起未更新**（codex，**(N)**）⇒ 改 R14-landing ＋ 明訂單一 current-round receipt 義務｜
+J 入口閘未明文約束主委（codex）⇒ 角色卡擴及主委落地＋「先問後做」判準；
+  🔴 **「無機械閘能攔截新增 transport」列為具名殘留**（`needs-research`，owner 主委，觸發＝FROZEN 後）
+
+**Q10 下推清單**（三家裁定之具體條目）已寫入 §N 為具名殘留，`blocked-by` TODO 生成，凍後執行。
 
 ---
 
 ## 🔴 立即待辦：派 R11
 
-- brief／facts／locus 三檔沿用 R13（`…-r13-*`）改輪次；
-  locus 腳本之 `--diff-base` 預設值須改為 **R13 落地 commit 之父**。
+- brief／facts／locus 三檔沿用 R14（`…-r14-*`）改輪次；
+  locus 腳本之 `--diff-base` 預設值須改為 **R14 落地 commit 之父**。
 - 🔴 **R13 brief 須把角色卡新增之「scope accretion 入口閘」與「anchor 寫法」列為硬性要求**，
   並續要求三家做 (N)/(A)/(R) 三類歸因之絕對數（看 (A) 是否下降）。
 
@@ -66,10 +72,10 @@ stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` �
 
 | # | 條件 | 現況 |
 |---|---|---|
-| ① | 正確性／洩漏／接線類 OPEN P0＝0、P1＝0 | ⬜ 待 R14 複審 |
-| ② | 本輪主委自傷絕對數＝0 | ⬜ R13 為 **10**（本輪最高） |
+| ① | 正確性／洩漏／接線類 OPEN P0＝0、P1＝0 | ⬜ 待 R15 複審 |
+| ② | 本輪主委自傷絕對數＝0 | ⬜ R14 為 **10** |
 | ③ | A-6′ 經使用者確認 | ✅ 已滿足 |
-| ④ | `gap3ux_pre_review.sh <patch.md>` rc=0 | ⬜ 查法：`bash scripts/gap3ux_pre_review.sh handoffs/patches/20260823-gap3ux-r13-*.md`；R13 補丁包仍多為段落指標 anchor ⇒ 依 R12 裁定歸**委員責任** |
+| ④ | `gap3ux_pre_review.sh <patch.md>` rc=0 | ⬜ 查法：`bash scripts/gap3ux_pre_review.sh handoffs/patches/20260824-gap3ux-r14-*.md`；補丁包 anchor 若仍為段落指標 ⇒ 依 R12 裁定歸**委員責任** |
 
 ---
 
@@ -90,10 +96,11 @@ stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` �
 | R10 | 11（7 群集） | 7 | 裁決錯誤（未驗邊界）／留下不可行選項／只寫敘述無算法 |
 | R11 | 20（9 群集）🔴 反轉上升 | 9 | scope accretion：新增機制未定死其形狀 |
 | R12 | 15（7 群集） | 7 | 同上；三家歸因 (N)2／(A)13／(R)0 |
-| **R13** | **14（10 群集）** | **10** | **三家歸因 (N)0／(A)9／(R)1——(A) 降、(N) 歸零、首見回歸** |
+| R13 | 14（10 群集） | 10 | 三家歸因 (N)0／(A)9／(R)1——(A) 降、(N) 歸零、首見回歸 |
+| **R14** | **18（10 群集）** | **10** | **全為刪殘／改型別／同步字面，無一要求新增機制** |
 | R8–R11 落地 | —（自查） | 2 ＋ 2 ＋ 2 ＋ 1 | 截斷／pipefail｜quotepath 測試兩版假綠｜anchor 判準錯＋hunk header 洩漏｜意圖來源含 SYNC-LOCI 本身（恆真） |
 
-**Task 數**：R8→R13 皆 **42 → 42**（委員未新增 Task）。
+**Task 數**：R8→R14 皆 **42 → 42**（委員未新增 Task）。
 
 ---
 
@@ -114,6 +121,11 @@ stage 後綴 `@spec/@doc/@harness/@impl`（缺省 `@spec`），未達 `@impl` �
 - 🔴 **`git diff -U0` 之 `-` 行是弱證據**：同檔刪掉**無關**內容若恰含 anchor 字面即會通過
   ⇒ 弱證據須另有補丁包正文之意圖佐證；且**意圖來源必須排除 SYNC-LOCI 區段本身**
   （該區段就寫著 anchor ⇒ 拿它當佐證等於恆真）
+- 🔴 **型別白名單用 `type(v) is X`，不用 `isinstance`**：`bool ⊂ int`，
+  `isinstance(True, int)` 為真但序列化成 `true` ≠ `1`
+- 🔴 **`MappingProxyType` 不是真唯讀**：只擋 proxy 上的寫入，建構時傳入之 dict alias 仍可改
+- 🔴 **狀態宣告要把「誰負責更新我」寫在自己旁邊**：SPEC header 自 R8 起六輪未更新，
+  因為它不在任何 finding 的指涉範圍內
 - 🔴 **在規格裡宣稱語言／函式庫「會怎樣」之前跑三行 probe**：
   `dataclasses.replace` **會重跑 `__post_init__`**；`frozen=True` **只凍最外層**
   ——兩條都是主委憑印象寫、被 codex 用 probe 打穿
