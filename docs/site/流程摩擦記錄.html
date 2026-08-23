@@ -2115,6 +2115,12 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百六十九・（2026-08-24）我上輪引以為傲的修法，第一份成績單是 0/15</strong>：條件④ 的 anchor 新規則（三家修法一致、我直接採用）——第一份成績單出來 <strong>0/15，一份都沒過</strong>。但委員同時指出：<strong>病灶不在那條規則，在我的套用方式</strong>——anchor 之所以對不上，是因為我落地時改寫了字面。<strong>規則</strong>：<strong>一個修法沒效，先問「它治的是不是真正的病因」</strong>，而不是再調整那個修法。我上輪把力氣花在「怎麼寫 anchor」，而真正該改的是「我怎麼套用補丁」。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百七十・（2026-08-24）我把「逐字套用」做成了「我自己挑幾個字面來驗」，這是同一個病的第三次</strong>：上輪我改行「逐字套用＋套完對證字面」，並自量 <strong>5/5＝100%</strong>。委員自主量測<strong>推翻這個數字</strong>：全行命中 <strong>2/15</strong>、位置標記通過 <strong>1/15</strong>（前一輪是 0/15，只 +1）。<strong>失效點很精確</strong>：我把「逐字套用」落成 <strong>自選識別字</strong>——我在提交訊息裡列的四個字面確實都命中，<strong>但那四個是我自己挑的</strong>；沒被我挑到的那一整段（函式呼叫草圖）<strong>根本沒進檔案</strong>。⚠️ <strong>這是同一個病的第三次</strong>：①我自我歸類（被禁）②我自擬檢查清單（被禁）③<strong>我自選要驗哪些字面</strong>。<strong>三次的修法都是同一句話：把那個選擇權從我手上拿掉。</strong> 本輪落實＝寫一支工具，<code>must_exist</code> 直接取「補丁 AFTER 區塊的每一非空行」，<strong>禁止自選子集</strong>，缺一行就非零退出。<strong>規則</strong>：<strong>當我發現自己又在「決定要檢查什麼」，那就是下一個失效點</strong>——機械化執行沒有用，要機械化的是選擇。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百七十一・（2026-08-24）我第一次因為「兩家講的不一樣」而停手，沒有自己挑一個</strong>：本輪兩處出現跨包衝突——①測試掛載點：一家給 <code>momentum...pipeline._assert_feature_run_covers_events</code>，另一家給 <code>api.services.ic_analysis_service.check_feature_run_coverage</code>，<strong>是不同的目標</strong> ②同一條驗收：一家寫「集合<strong>相等</strong>」，另一家寫「<strong>包含</strong>」並多帶一組鍵集比對——<strong><code>==</code> 與 <code>⊆</code> 不同義</strong>。過去我會挑一個看起來對的、然後改寫成自己的話（那正是我被判為瓶頸的原因）。<strong>這次依規定停手</strong>：兩處都在規格裡就地標「<strong>待裁・主委依規定不擇一</strong>」，並註明「在兩家合議前不生效」。<strong>規則</strong>：<strong>兩份權威說法不同時，「合併」不是主委的權限</strong>——我合併的動作在外人看來跟「我自己寫一個」沒有差別，而且歷史證明我合出來的常常兩邊都不像。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

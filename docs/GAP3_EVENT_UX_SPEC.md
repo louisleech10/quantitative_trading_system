@@ -24,10 +24,10 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R27-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R28-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
-→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 條 findings；**P0=0**；**(N)=0 連十三輪**；🔴 **R27 三家判定 (丙)：主委落地方式為瓶頸**，本輪起改行「逐字套 AFTER＋套後字面對證」；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
-**狀態：未 FROZEN**（待 R28 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 條 findings；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
+**狀態：未 FROZEN**（待 R29 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
 歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
@@ -2437,8 +2437,14 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     **定死來源（唯一）**：
     - 現碼 `momentum/Analysis/event_samples/alignment.py:21` 之 `_EVENT_COLS`
       **不含** `symbol`／`timeframe` ⇒ **本 Task 須擴充該常數**（先改契約，D-6）。
-    - 兩欄之值一律取自**該事件之契約記錄**（`records[event_id].symbol` /
-      `.timeframe`），**不得**由檔名、UI 選單或 run 設定推得。
+    - 兩欄之值一律取自 `records` 中該事件之 `Mapping[str, Any]` record，經
+      `event_scope_key(record)`／`event_trigger_timeframe(record)` 取得；accessor 內固定使用
+      `record["symbol"]`／`record["timeframe"]`，禁 `records[event_id]` 與 attribute access。
+      **不得**由檔名、UI 選單或 run 設定推得。
+      🔴 **R28（CODEX-R28-P1-03）**：R27 版寫 `records[event_id].symbol`——
+      既用 **id 下標**又用 **attribute 存取**，與 R27 才剛定死之
+      「`records` 為 `tuple[Mapping,...]`、一律 key access」**兩處互斥**。
+      若需按 id 查詢，**先建** `Mapping[event_id, row]` 再 `by_id[eid]["symbol"]`。
     - `symbol` 須與 `event_split.py:54` 之 `groupby("symbol")` 鍵**同一個值**。
       🔴 **R19 補齊（CODEX-R19-P1-03）**：R18 版只寫「同一 exported 取值函式」，
       **沒給函式名、owner、參數／回傳 shape，而現碼也沒有這樣一個 accessor**
@@ -2502,7 +2508,11 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
       # hash 與 prepared_token **原樣攜帶**（無 __post_init__ ⇒ replace 不會重算）
 
   # _run_analysis 事件分支：
-  prepared0 = prepare_analysis_windows(...)          # spy: call_count == 1
+  # 匯入 validation 通過後、prepare 前：建構一次 timeframe_seconds（鍵集滿足 (d-3a)）
+  prepared0 = prepare_analysis_windows(
+      records, bars_by_tf, *, event_label_spec, event_import_id,
+      lookahead_bars_declared, timeframe_seconds)  # spy: call_count == 1
+  # 3a feature-run gate 讀同一 timeframe_seconds 物件（is）
   prepared1 = apply_event_coverage(prepared0, ...)   # 新身分、同 token 同 hash
   # manifest／split／materialize／ic_feed **只**吃 prepared1
   ```
@@ -2555,7 +2565,8 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
         🔴 **R27 定義 `records` 之 normalized shape（CODEX-R27-P1-02）**：
         本處為 `records` **首次取得之落點**，此後全 SPEC 之規範性讀取**一律採同一存取法**。
         · **shape**：`tuple[Mapping[str, Any], ...]`，每列**至少**含
-          `event_id`／`symbol`／`timeframe`／`t0_ms`；**鍵集由契約 `required_fields` 決定**。
+          `event_id`／`symbol`／`timeframe`／`t0`；**鍵集由契約 `required_fields` 決定**
+          （receipt：`event_import_contract.json`；`t0_ms` 屬 alignment 後 `event_level`／`WindowRow`，**非**本集合之鍵）。
         · **存取法**：一律 `r["timeframe"]` 之 **key access**；
           🔴 **禁**同一物件在 SPEC 內時而 `r.timeframe`、時而 `r["timeframe"]`
           ——R26 主委即因此寫出 `set(e.timeframe for r in records)` 之不可執行式。
@@ -2610,6 +2621,17 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   `pytest tests/api -q -k event_analysis_horizon_purge` ≥5 條——
   ⑧`h=7` **不得**沿用 `h=1` 之 labels／split；`split purge >=` 本次 label end
   ⑨purge 下界 `==` §D-3′-a（ii）之 `purge_lower_bound_ms(scope)`（R10 擴為五組 fixture）
+  ⑨(h) 🔴🔴 **【R29 待裁・跨包字面衝突，主委依規定不擇一】**：兩家皆提出新增 ⑨(h)
+      「對齊失敗列不進 purge／split」之驗收，但**AFTER 文字不同**——
+      (甲) COMPOSER-R28-P1-02：`scope` 內事件集合 **==** `prepared0.windows`；
+           對齊失敗 `event_id` 不進 split assignments；mutation：餵入 ⇒ `exit != 0`。
+      (乙) CODEX-R28：`set(purge_scope_event_ids) ⊆ {w.event_id for w in prepared0.windows}`
+           （**⊆ 而非 ==**），且併驗
+           `set(timeframe_seconds) == set(lookahead_bars_declared) == {r["timeframe"] for r in records}`。
+      🔴 **兩者非同義**：(甲) 為**相等**、(乙) 為**包含**；且 (乙) 多帶鍵集三方相等。
+      ⇒ 依 **GROK-R28 方案 (iii)**，**主委不得擇一**；本條**在兩家合議前不生效**。
+      **請 R29 交出單一合併 AFTER**（並說明取 `==` 或 `⊆` 之理由——
+      若 coverage 前 scope 恰為全部對齊成功列則兩者等價，若否則語意不同）。
     （深度與窗寬**皆已換算 ms**；公式之唯一定義在 §D-3′-a（ii），本欄不重述）。
     fixture 須涵蓋**五組**，證明各維度都可能是勝者且換算逐列：
     (a)「深度 12、h=3」⇒ 深度側勝　(b)「深度 1、h=7」⇒ 窗寬側勝
@@ -3133,17 +3155,26 @@ t0 formatter 讀得到 label、label formatter 讀得到 t0（欄位語意重疊
      本輪補齊：
      **驗收**：以 spy 記錄 `purge_lower_bound_ms` 與 feature-run gate 各自收到之
      `timeframe_seconds`，斷言 `a is b` 為真（物件參考比對，角色卡 (b)）。
-     **mutation（兩條，皆須紅）**：(m1) 任一 consumer 改為自行建構一份**內容相同**之 map
-     ⇒ `is` 斷言紅（**內容相同故等式比對抓不到，只有 `is` 抓得到**）；
-     (m2) 任一 consumer 改為直讀 module 常數 ⇒ `is` 斷言紅。
+     **mutation（三條，皆須紅）**：(m1) 任一 consumer 改為自行建構一份**內容相同**之 map
+     ⇒ `is` 斷言紅；（m2) 任一 consumer 改為直讀 module 常數 ⇒ `is` 斷言紅；
+     (m3) feature-run gate 改以 **positional** 傳入 `timeframe_seconds`（map 內容相同）
+     ⇒ `exit != 0`（證明「只准 keyword-only」可機械紅）。
      - 驗證：`pytest tests/api -q -k timeframe_seconds_identity` 之 (m1)(m2) 各自 `exit != 0`；
        正例斷言
        `spy_purge.kwargs["timeframe_seconds"] is spy_gate.kwargs["timeframe_seconds"]`
        為 `True`。
        feature-run gate 之 `timeframe_seconds` **只准 keyword-only**（禁 positional）。
-       兩 spy 掛載點具名：`purge_lower_bound_ms` 與 Task 7.7 ② feature-run gate 之
-       **唯一呼叫點**（完整可 import 路徑於實作 Task 開檔時寫入本條；本輪 SPEC 先禁
-       `args[N]` 與未具名掛載）。
+       兩 spy 掛載點具名（字面須可 grep）：
+       - `unittest.mock.patch("momentum.Analysis.event_samples.label_value_from_case.purge_lower_bound_ms")` → `spy_purge`
+       - `unittest.mock.patch("momentum.Analysis.event_samples.pipeline._assert_feature_run_covers_events")` → `spy_gate`
+       （Task 7.7 ② 3a feature-run gate **唯一呼叫點**；禁 `args[N]` 與未具名掛載）。
+       🔴🔴 **【R29 待裁・跨包字面衝突，主委依規定不擇一】**：`spy_gate` 之掛載點
+       **兩家給出不同路徑**——
+       (甲) `momentum.Analysis.event_samples.pipeline._assert_feature_run_covers_events`
+       (乙) `api.services.ic_analysis_service.check_feature_run_coverage`
+       ⇒ 依 **GROK-R28 方案 (iii)**「跨包字面衝突 ⇒ 停手、退回原家族重交合併 AFTER，
+       **主委不得擇一改寫**」，本條之 `spy_gate` 路徑**在兩家合議前不生效**。
+       上列 (甲) 為暫錄之字面，**不代表裁定**。
        🔴 **R27（三家：CODEX-R27＋GROK-R27＋COMPOSER-R27）**：R26 主委寫之 `args[N]` 中
        **`N` 未定**，且兩 spy 掛載點未具名 ⇒ 為 dangling。
        **主委已於 R27 brief 自行揭露此假設**，三家確認並給出上列 AFTER。

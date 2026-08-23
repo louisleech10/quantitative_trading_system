@@ -11,7 +11,57 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <p><strong>這張表回答：五批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
-<h2 id="-目前正在做第-27-輪審完15-條全修用新方法準備派第-28-輪824">🔴 目前正在做：第 27 輪審完、15 條全修（<strong>用新方法</strong>），準備派第 28 輪（8/24）</h2>
+<h2 id="-目前正在做第-28-輪審完12-條處置準備派第-29-輪824">🔴 目前正在做：第 28 輪審完、12 條處置，準備派第 29 輪（8/24）</h2>
+<h3 id="-我上輪自報100委員一量是-215-而失效點是同一個病的第三次">🔴 我上輪自報「100%」，委員一量是 2/15 —— 而失效點是同一個病的第三次</h3>
+<p>上輪我改行「逐字套用」並自量 <strong>5/5＝100%</strong>。委員自主量測<strong>推翻</strong>：
+<strong>全行命中 2/15、位置標記通過 1/15</strong>（前輪 0/15，只 +1）。</p>
+<p><strong>失效點很精確</strong>：我把「逐字套用」做成了「<strong>我自己挑幾個字面來驗</strong>」。
+我在提交訊息列的四個字面確實都命中 —— <strong>但那四個是我挑的</strong>；
+沒被我挑到的那一整段（函式呼叫草圖）<strong>根本沒進檔案</strong>。</p>
+<p>⚠️ <strong>這是同一個病的第三次</strong>：
+① 我自我分類（被禁）② 我自擬檢查清單（被禁）③ <strong>我自選要驗哪些字面</strong>。
+<strong>三次的修法都是同一句話：把那個選擇權從我手上拿掉。</strong></p>
+<p><strong>這輪的落實</strong>：寫了一支工具，要驗的字面<strong>直接取「補丁裡 AFTER 區塊的每一行」</strong>，
+<strong>禁止我自選</strong>，缺一行就非零退出。落地前 14/55 → 落地後 <strong>33/55</strong>。
+🔴 <strong>我不宣稱這叫有效</strong> —— 還有 22 行沒進去，已請委員自己覆量。</p>
+<h3 id="我第一次因為兩家講的不一樣而停手">我第一次因為「兩家講的不一樣」而停手</h3>
+<p>本輪兩處衝突：①測試掛載點兩家給<strong>不同目標</strong> ②同一條驗收，一家寫「集合<strong>相等</strong>」、
+另一家寫「<strong>包含</strong>」—— <strong>不同義</strong>。</p>
+<p>過去我會挑一個、改寫成自己的話（那正是我被判為瓶頸的原因）。
+<strong>這次依規定停手</strong>，兩處都在規格裡標「<strong>待裁・主委不擇一</strong>」，並註明合議前不生效。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>看什麼</th>
+<th>第 27 輪</th>
+<th><strong>第 28 輪</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>委員找到的問題</td>
+<td>15</td>
+<td><strong>12</strong></td>
+</tr>
+<tr>
+<td>最嚴重</td>
+<td>0</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td><strong>全新缺口</strong></td>
+<td>0</td>
+<td><strong>0（連十四輪）</strong></td>
+</tr>
+<tr>
+<td>任務數</td>
+<td>42</td>
+<td><strong>42</strong>（二十九輪沒變）</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="第-27-輪824">第 27 輪（8/24）</h2>
 <h3 id="-我一直回報全數落地這句話不準確-我自己驗證過了">🔴🔴 我一直回報「全數落地」，這句話不準確 —— 我自己驗證過了</h3>
 <p>委員抽查我上一輪的落地，比對他們補丁包裡「應該寫成什麼」的原文，發現<strong>多個字面在規格裡
 根本不存在</strong>（count=0），而我同時在提交訊息寫「十五條五群集全落地」。</p>
