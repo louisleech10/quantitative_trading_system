@@ -2121,6 +2121,12 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百七十一・（2026-08-24）我第一次因為「兩家講的不一樣」而停手，沒有自己挑一個</strong>：本輪兩處出現跨包衝突——①測試掛載點：一家給 <code>momentum...pipeline._assert_feature_run_covers_events</code>，另一家給 <code>api.services.ic_analysis_service.check_feature_run_coverage</code>，<strong>是不同的目標</strong> ②同一條驗收：一家寫「集合<strong>相等</strong>」，另一家寫「<strong>包含</strong>」並多帶一組鍵集比對——<strong><code>==</code> 與 <code>⊆</code> 不同義</strong>。過去我會挑一個看起來對的、然後改寫成自己的話（那正是我被判為瓶頸的原因）。<strong>這次依規定停手</strong>：兩處都在規格裡就地標「<strong>待裁・主委依規定不擇一</strong>」，並註明「在兩家合議前不生效」。<strong>規則</strong>：<strong>兩份權威說法不同時，「合併」不是主委的權限</strong>——我合併的動作在外人看來跟「我自己寫一個」沒有差別，而且歷史證明我合出來的常常兩邊都不像。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百七十二・（2026-08-24）我第一次「停手不擇一」，結果拿回來的比我自己挑會更好</strong>：上輪兩處兩家講法不同，我依規定停手、標「待裁」。這輪他們給的東西比我原本會挑的好得多——①掛載點：一家附<strong>碼證</strong>指出那個檢查讀的是 API 層的資料、而另一條路徑屬於「匯入管線」是不同的鏈；②更關鍵的是<strong>第三種答案</strong>：兩家原本一個寫「集合相等」、一個寫「包含」，而第三家指出<strong>兩個都不對</strong>——因為切分是<strong>逐 symbol</strong> 做的，全域比對會<strong>掩蓋單一 symbol 的隔離不足</strong>。<strong>我若自己挑，一定是在「相等」和「包含」之間挑一個，永遠挑不到「維度錯了」。</strong> 規則：<strong>停手不只是避免我改壞，是讓別人有機會給出我想不到的第三種答案</strong>——我挑選時的視野被限制在「他們給的選項」裡，而他們彼此看到對方的產出後會超出那個範圍。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百七十三・（2026-08-24）我的自判第一次被覆核為成立，而原因值得記</strong>：我判「新寫的套用工具沒有越界（沒有新建驗收機制類型）」，委員覆核<strong>成立</strong>——這是我一連串自判被推翻之後的第一次。但真正的原因不是我這次判得比較準：<strong>是那支工具沒有給我任何選擇權</strong>。它把「要驗哪些字面」直接綁死成「補丁 AFTER 區塊的每一行」，我無從挑選。前三次自判被推翻（自我分類／自擬清單／自選字面），共同點都是<strong>我還握著一個選擇</strong>。<strong>規則</strong>：<strong>我的自判可不可信，取決於那件事還留給我多少裁量空間</strong>——裁量空間為零時，自判等同於陳述事實；只要還有一點，自判就會往對我有利的方向滑。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
