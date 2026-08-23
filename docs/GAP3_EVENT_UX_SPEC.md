@@ -24,10 +24,16 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R29-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R30-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
 → R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 → R29 8 條 findings（**composer 降至 1 條**；兩件跨包衝突已解除）；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
-**狀態：未 FROZEN**（待 R30 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+🔴 **`ERRATA-R30-01`——R30 輪之 `-landing` 字樣不代表有內容落地**：R30 輪（ledger round
+`03422383-21ae-4efb-ab14-a3214950522e`）因 codex 交件格式不合規、且「同輪重派需 dispatch token
+／`gate.sh` 於 OPEN 債時拒發」構成主委路徑上的死鎖，已依設計逃生口
+`debt_clear --abandon --kind collection-failed` 銷帳，**該輪零 findings 落地、SPEC 內容一字未改**。
+本行之 `R30-landing` 係 `gap3ux_header_round_check.sh` 對「已終結輪次」之固定字面格式要求
+（該閘於 R19 起將 ABANDONED 與 CLOSED 同等對待），**屬帳本收據，非內容宣稱**。
+**狀態：未 FROZEN**（待 R31 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
 歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
