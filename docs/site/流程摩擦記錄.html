@@ -2034,6 +2034,15 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百四十二・（2026-08-24）機檢只警告不擋，我差點就放過去了</strong>：收斂檔的群集歸因檢查跑完 rc=0，但輸出裡有六行「⚠️ 未被任何群集引用（掉項？）」——因為我在群集表只寫「兩家」「三家」而沒寫 finding 的編號。<strong>rc=0，所以照流程我可以直接往下走。</strong> 我停下來把六個編號補進去才繼續。<strong>規則</strong>：<strong>rc=0 不等於沒問題</strong>——工具的警告區要讀完，尤其是「掉項？」這種它自己也不確定的提示。這與本專案「檢查工具會騙你」那條同源，只是這次工具沒騙我，是我差點不看它說的話。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百四十三・（2026-08-24）我主動問「我是不是一直在自己製造問題」，兩家委員回答：是，請停止</strong>：R19 有三條 findings 落在我自己為了防錯而蓋的機制裡。我在 R20 派工單加了一題直接問：「這是規格已穩、剩下我的工藝問題，還是<strong>我每輪新建機制本身就是新的缺口來源，應該停止新建</strong>？」<strong>兩家明確裁定後者</strong>——grok：「主委每輪新建『解析／分類／第四套綁定清單』類機制，本身即為新缺口來源，本輪起應停止新建此類機制」；composer：「本輪起禁止再新建任何驗收機制，只允許 (a) 收斂進單一碼內常數 (b) 位元組／集合／<code>is</code> 三類機械斷言 (c) 修既有閘」。<strong>這條已寫進角色卡當最高位階條款</strong>，並要求我每輪落地後逐條聲明改動屬 (a)(b)(c) 何者、無法歸類就不准落地。<strong>規則</strong>：<strong>當我發現自己在同一件事上反覆修補，正確動作是把「我是否應該停手」交給別人裁，而不是再想一個更聰明的修法</strong>——因為想修法的正是出錯的那個判斷力。這條和「兩輪斷路器」同源，但層級更高：斷路器管單一 bug，這條管「我這個角色該不該繼續做某類事」。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百四十四・（2026-08-24）同一個宣稱被打破第四次，我終於不再自己想辦法</strong>：「purge 的自由變數都綁進指紋了」——R16 列舉三個（漏 symbol）、R17 列舉四個（漏 timeframe）、R18 改成「解析規格文件比對集合」（不可實作）、R19 改成「碼內常數清單，計算程式讀它就不會漏」。R20 grok 實跑打破第四次：常數少一項，purge <strong>照樣算出看似合理的值</strong>（<code>v1=14400000</code>／<code>v2=28800000</code>）；codex 另指出我的 (d-3) 是<strong>循環自證</strong>。<strong>四次都是同一種錯：我用「一份要人維護的清單＋一句語意宣稱」冒充機械保證。</strong> 這次的修法<strong>不是我想的</strong>，是採用 grok 補丁包：改成 <strong>keyword-only 參數注入</strong>——漏傳就是 <code>TypeError</code>，自由變數集合由 <code>inspect.signature</code> 導出。<strong>沒有清單可以漂移，沒有宣稱可以出錯。</strong> 規則：<strong>當一個保證需要「某人記得維護某份東西」才成立，它就不是保證</strong>；把它改成「漏了就跑不起來」才是。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百四十五・（2026-08-24）我在宣稱要消除「第二套並行敘事」的同一次修訂裡，製造了兩套</strong>：R19 我撤回「解析文件比對集合」那個做法，改寫了 §G G-3 ⑥(d)——但<strong>沒刪 §D-3′-a（ii）裡同義的那段</strong>。R20 三家全員抓到：兩套互斥驗收並存，實作者可以只做其一就宣稱合規。更難看的是，我這輪落地時自己又發現：<strong>我新寫的 (d) 下面還留著一整段舊的 mutation 清單</strong>，裡面還寫著已經撤回的常數名。<strong>規則</strong>：<strong>撤回一個做法時，要 grep 它的所有同義字面，不是只改你正在編輯的那一段</strong>——「我改了那個地方」跟「那個東西不存在了」是兩件事。這與交叉引用同步那條同源，差別在這次要刪的是<strong>我自己上一輪寫的東西</strong>，而人對自己剛寫的東西最容易漏看。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

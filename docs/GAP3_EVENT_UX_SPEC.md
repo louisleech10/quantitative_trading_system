@@ -24,10 +24,10 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R19-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R20-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
-→ R17 12 → R18 8 → R19 8 條 findings；**P0=0（連五輪）**；R19 八條**全部**為 R18 落地批之缺陷，其中三條在主委自建之防錯機制內）。
-**狀態：未 FROZEN**（待 R20 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+→ R17 12 → R18 8 → R19 8 → R20 12 條 findings；**P0=0（連六輪）**；🔴 **R20 三家裁定主委本輪起停止新建任何驗收機制**，見角色卡）。
+**狀態：未 FROZEN**（待 R21 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
 歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
@@ -250,10 +250,12 @@ purge_lower_bound_ms(scope) = max over e in scope of max( lookahead_depth_ms(e),
 (event_id, timeframe) 一列、記的是**特徵 TF 集合**，一個事件可有多列
 ⇒ **無法唯一還原該事件之觸發 TF**。兩者名字相同、語意不同，須各自存在。
 
-🔴 **完整性由機械檢查保證，不由主委宣稱**（落 §G G-3 ⑥ 之新驗收 (d)）：
-測試**解析本節權威式之符號**，與 hash 輸入 fence 之欄位做**集合相等**斷言；
-式子新增任一自由變數而 fence 未同步 ⇒ **紅**。
-**這條取代「主委列舉並宣稱窮盡」**——列舉會漏，集合相等不會。
+🔴 **完整性之唯一落點＝§G G-3 ⑥(d)**（本節**不重述**任何判準）。
+🔴 **R20 刪除本處原有之衛星句（三家全員：COMPOSER-R20-P1-01＋CODEX-R20-P1-02＋GROK-R20-P1-02）**：
+原文要求「測試**解析本節權威式之符號**，與 hash fence 做集合相等」——
+該作法已於 **R19 因不可實作而撤回**（markdown 無文法），但主委**只改了 ⑥(d)、
+沒刪本處**，形成兩套互斥驗收並存；實作者可只實作其一而宣稱合規。
+**這正是主委自己宣稱要消除的「第二套並行敘事」，卻由主委自己製造。**
 
 🔴 **R10 修正：`lookahead_bars_declared` 由「批次 scalar」改為「逐 timeframe 之 map」**
 （CODEX-R10-P0-01；**主委 R9 之裁決在此半邊是錯的，已推翻**）。
@@ -429,15 +431,27 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
                                        # 🔴 值之型別判定＝`type(v) is int`（**不用 isinstance**）
                                        # ——`bool ⊂ int`，`True` 會序列化為 `true` 而非 `1`
       "timeframe_seconds_digest": str, # 🔴 R19 新增（CODEX-R19-P1-01）
-                                       #   ＝對「本次分析實際用到之 tf 子集」取 {tf: secs}
-                                       #     後以 §G S-9 同一 encoder 序列化再 sha256
+                                       #   ＝對**觸發 TF 子集**取 {tf: secs} 後
+                                       #     以 §G S-9 同一 encoder 序列化再 sha256
+                                       #   🔴 R20 定義收緊（三家全員：CODEX-R20-P1-03＋
+                                       #     COMPOSER-R20-P1-03＋GROK-R20-P1-03）：
+                                       #     「本次分析實際用到之 tf 子集」有歧義
+                                       #     （可被讀成 union per_tf 之特徵 TF、
+                                       #      或 post-coverage 重算）。
+                                       #   **唯一定義**：`sorted(set(e.timeframe
+                                       #     for e in event_level))`——即**觸發 TF** 之相異值，
+                                       #     取 **pre-coverage** 事件集合（與
+                                       #     `lookahead_bars_declared` 之鍵集凍結規則同源，
+                                       #     見 §D-3′-a（ii）⑭(g)）。
+                                       #   🔴 **不得** union `per_tf.timeframe`（那是特徵 TF）；
+                                       #   🔴 **不得** 於 coverage 後重算。
                                        #   出處：TIMEFRAME_SECONDS 是 module-level 可變 dict
                                        #   （momentum/core/constants.py:6），非常數
                                        #   ⇒ 不入 hash 則 alias mutation 可改 purge 而 hash 不變
                                        #   ⚠️ 只取用到之子集：整個 dict 會讓無關 tf 之增修改變 hash
     },
     # 🔴 `batch` 為**恰七鍵**。本欄集之「purge 相關子集」由 §D-3′-a（ii）之導出表決定，
-    #    並由 §G G-3 ⑥(d) 之單一來源常數 `PURGE_FREE_VARIABLES` 機械對證（R19 改寫）。
+    #    並由 §G G-3 ⑥(d) 之 `inspect.signature(purge_lower_bound_ms)` 機械導出（R20 改為簽章注入）。
     "event_level": [                 # 按 event_id 之 UTF-8 升冪
       {"event_id": str, "symbol": str, "timeframe": str,
        "decision_at_ms": int, "entry_at_ms": int,
@@ -836,7 +850,7 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
    ⚠️ 本欄由 §G S-9 之同一 encoder 產生 ⇒ **不得**為它另寫序列化（S-9 第 7 條）
    🔴 **R16／R17 追加 negative mutation（三條，皆須紅）**（權威與裁決紀錄在
    §D-3′-a（iii），本節不重述理由）：
-   (a) 保持 `event_level`／`per_tf` 與 `batch` 其餘五鍵**逐位元組不變**，
+   (a) 保持 `event_level`／`per_tf` 與 `batch` 其餘**六鍵**（R20 更正：`batch` 已為七鍵，原寫五鍵；GROK-R20-P1-04）**逐位元組不變**，
        **只改 `lookahead_bars_declared` 之任一鍵值** ⇒ 本欄必須改變（R16）；
    (b) 保持全部時間欄／窗寬／深度 map 不變，**只交換兩個 event 之 `symbol` 分派**
        ⇒ 本欄必須改變（R17；CODEX-R17-P1-01 之反例）；
@@ -852,27 +866,47 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
        （前一次＝R18 群集 E 之 ESM `require`）。**病根：把「解析自然語言文件」當成機械檢查。**
 
        **R19 版（可實作；單一來源在**碼**，不在文件）**：
-       (d-1) 實作階段須提供**單一 exported 常數**
-             `momentum/Analysis/event_samples/purge.py::PURGE_FREE_VARIABLES`
-             ——`tuple[str, ...]`，內容即權威式之自由變數名（含其所屬 namespace，
-             如 `("batch.lookahead_bars_declared", "batch.timeframe_seconds_digest",
-             "event_level.symbol", "event_level.timeframe",
-             "event_level.label_start_ms", "event_level.label_end_ms")`）。
-       (d-2) **`purge_lower_bound_ms()` 之實作本身必須讀該常數**取值（而非各自寫欄名）
-             ⇒ 常數與式子**不可能漂移**：漏一個變數，purge 就算不出來。
-       (d-3) 測試斷言 `set(PURGE_FREE_VARIABLES)` **等於** hash 輸入之 purge 相關欄位集合
-             （後者亦由**同一份 shape 宣告**導出，不得手抄）。
+       🔴 **R20 撤回 (d-1)(d-2)(d-3) 之 R19 版——宣稱被反例打破（第四次）**
+       （GROK-R20-P1-01＋CODEX-R20-P1-01）：R19 版仍是**手維清單＋語意宣稱**。
+       grok 之反例實跑：常數少 `timeframe_seconds_digest` 時
+       `omit_digest_still_computes True`（`v1=14400000`／`v2=28800000`，
+       mutate `TIMEFRAME_SECONDS['1h']` 3600→7200）——**purge 照樣算出看似合理之值**。
+       codex 另指出 (d-3) 為**循環自證**：「同一份 shape 宣告」未具名，自指則恆真
+       （`d3_tautology True`）。
+       ⚠️ **這是同一宣稱第四次被打破**（R16 三輸入／R17 四輸入／R18 解析文件／R19 常數清單）。
+
+       **R20 版（採 GROK-R20 補丁包 `-purge-binding-inject.md`；主委未自創）**：
+       (d-1) **改為簽章注入**，不再有任何「自由變數清單」：
+             ```
+             def purge_lower_bound_ms(
+                 rows, *, lookahead_bars_declared, timeframe_seconds
+             ) -> int: ...
+             ```
+             · **keyword-only**：漏任一個 ⇒ **`TypeError`**（語言層 fail-closed，
+               不是宣稱、不是檢查）。
+             · 🔴 **禁在函式內 `import TIMEFRAME_SECONDS`**（否則注入形同虛設）
+               ——以 AST 斷言該函式體內無該 import／無 module-level 查表。
+       (d-2) **期望自由變數集合由 `inspect.signature(purge_lower_bound_ms)` 機械導出**
+             ——**沒有第二份清單可漂移**；新增一個自由變數 ⇒ 必須加參數 ⇒ 呼叫端漏傳即 `TypeError`。
+       (d-3) `batch.timeframe_seconds_digest` 綁定「**傳入之同一個 map**」之 S-9 位元組
+             （非 module-level 之 `TIMEFRAME_SECONDS`）⇒ alias mutation 不再能改結果而 hash 不變。
+       **mutation（四條，皆須紅）**：①呼叫端漏傳 `timeframe_seconds` ⇒ `TypeError`；
+       ②函式內改為 `from momentum.core.constants import TIMEFRAME_SECONDS` ⇒ AST 斷言紅；
+       ③digest 改由 module-level dict 算而非傳入之 map ⇒ alias mutation 反例紅；
+       ④新增自由變數而未加參數 ⇒ (d-2) 之 signature 對證紅。
        (d-4) 🔴 **語意 mutation（補 R18 版只驗名稱之不足）**：把 scope 由 `symbol`
              改為 `(symbol, timeframe)` ⇒ 必須有測試變紅（受影響者＝逐 scope 之 purge 值
              與 `SymbolPurgeRow` 之鍵；**不是** `V == H`）。
-       **mutation（四條，皆須紅）**：①`PURGE_FREE_VARIABLES` 少一項 ⇒ (d-2) 之 purge 算不出／
-       (d-3) 紅；②hash shape 少一欄 ⇒ (d-3) 紅；③`purge_lower_bound_ms` 改為硬編碼欄名
-       而不讀常數 ⇒ 須有測試偵測（斷言其讀取路徑）；④(d-4) 之 scope 變更 ⇒ 紅。
-       🔴 **本條之存在理由（不得刪）**：同一「已全部綁進 hash」之宣稱
-       **連三輪被反例打破**（R16 漏 `symbol`、R17 漏觸發 `timeframe`、
-       R19 漏 `TIMEFRAME_SECONDS`——第三次是**排除清單不封閉**）。
-       R18 想用「解析文件」解決，本身又不可實作；**R19 改為把單一來源放進碼**，
-       讓「漏一個變數」直接使 purge 算不出來，而不是靠任何檢查去發現。
+       🔴 **本條之存在理由（不得刪）**：同一「purge 自由變數已全部綁進 hash」之宣稱
+       **連四輪被反例打破**——R16 漏 `symbol`／R17 漏觸發 `timeframe`／
+       R18 之「解析文件比對集合」不可實作／R19 之「常數清單」被 grok 實跑打破
+       （`omit_digest_still_computes True`）。
+       **四次都是同一種錯：主委用「一份要人維護的清單＋一句語意宣稱」當機械保證。**
+       R20 改為**簽章注入**後，該宣稱不再存在——漏參數是 `TypeError`，
+       自由變數集合由 `inspect.signature` 導出，**沒有任何清單可漂移、沒有任何宣稱可錯**。
+       🔴 **R20 刪除本處原有之第二份 mutation 清單**（它仍寫著已撤回之
+       `PURGE_FREE_VARIABLES`）——主委在同一次修訂中一邊宣稱要消除第二套並行敘事、
+       一邊留下一套，正是三家本輪點名之病。
    (e) 🔴 **R18：交換觸發 `timeframe` 之 mutation**——保持全部時間欄／窗寬／深度 map／
        `symbol` 不變，**只交換兩個 event 之 `timeframe`** ⇒ 本欄必須改變
        （CODEX-R18-P1-01＋GROK-R18-P1-01 之反例本身，改為常設 mutation）。
@@ -1259,8 +1293,19 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
                    (ii-a) 測試以 `await import('node:crypto')` 取模組，
                           斷言 `Object.getOwnPropertyNames(m).sort()` **逐字等於**
                           一份**簽入版控之 golden 清單**（`tests/.../node_crypto_exports.golden.json`）。
-                   (ii-b) Node 升級或改名導致該清單變動 ⇒ **測試紅**，由人複審新項目是否為雜湊入口，
-                          若是則同批加入 (a) 之 stub 清單。
+                   (ii-b) 🔴 **R20 補閉環（CODEX-R20-P1-05）**：R19 版寫「測試紅 ⇒ 由人複審 ⇒
+                          若是則同批加入 stub 清單」——**沒有 receipt、沒有機械連結**，
+                          只更新 golden 而漏更新 stub 時**測試仍綠**，§C0 之判斷被推給未來的人。
+                          ⇒ 保留「不分類之 golden boundary」，但**新增版本化之複審 manifest**
+                          （`tests/.../node_crypto_review_manifest.json`），逐筆記：
+                          golden 之 added／removed export、**是否為 digest entry**、
+                          對應之 stub action、reviewer 與 commit context。
+                          測試以 **golden delta × manifest 做封閉集合比對**：
+                          ①golden 有而 manifest 無 ②manifest 有而 golden 無
+                          ③manifest 標為 digest entry 卻未入顯式 stub 清單
+                          ——**三者皆紅**。
+                          ⚠️ §N 之「純 JS 手刻 sha256」殘留**仍獨立標記**，
+                          **不得**宣稱已被本閘解決。
                    (ii-c) **stub 清單維持顯式枚舉**（`subtle.digest`／`createHash`／`hash`／
                           `Hash`／`webcrypto`），**不再嘗試自動推導**。
                    ⚠️ **誠實邊界（寫明，不假裝解決）**：本設計**不分類**，只保證
@@ -2212,17 +2257,24 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
       def event_scope_key(record) -> str:
           """事件之 split scope 鍵。**唯一**取值點。"""
       ```
-      · **consumer 恰三處**：①`align_events` 組 `WindowRow.symbol`
-        ②hash 輸入組裝 `event_level.symbol` ③`event_split` 之 `groupby` 鍵。
-      · 驗收：三處**斷言同一函式參考**（`is` 比對 exported object），不靠字面相等
-        （同 Task 1.1 ⑧(e) 之作法）。
-      · 🔴 **`timeframe` 同理**：`event_trigger_timeframe(record) -> str`，同檔、同驗收方式；
-        consumer＝`WindowRow.timeframe`、`event_level.timeframe`、`lookahead_depth_ms` 之查表。
+      · 🔴 **R20 刪除「consumer 恰三處」之枚舉（CODEX-R20-P1-04）**：R19 版列了三處
+        （`align_events`／hash 組裝／`event_split` groupby），**漏算**階段 2 之 purge rows、
+        depth map 查表、digest 之 keyset 等資料路徑。正確實作之 consumer **超過三處**；
+        硬守三處反而逼實作者在階段 2 直接讀 raw field。
+        ⚠️ **枚舉 consumer 數量正是本 epic 反覆出錯之形態**（purge 自由變數四次、
+        雜湊入口三次），**不再枚舉**。
+      · **改為不依賴數量之判準**：`record.symbol`／`record.timeframe` 之**任何讀取**
+        皆須經該函式。驗收＝
+        (i) **AST 斷言**：`momentum/Analysis/event_samples/**` 內，除 `keys.py` 自身外
+            **無任何模組**出現 `.symbol`／`.timeframe` 之屬性直取（以 record 為 receiver）；
+        (ii) 每個實際 consumer **斷言同一函式參考**（`is` 比對 exported object，
+            同 Task 1.1 ⑧(e) 之作法）——**斷言其為同一物件，不斷言有幾個**。
+      · 🔴 **`timeframe` 同理**：`event_trigger_timeframe(record) -> str`，同檔、同驗收方式。
     - `timeframe` 為**觸發 TF**，與 `per_tf` 之特徵 TF 集合**不同語意**（見 §D-3′-a（ii））。
     **mutation（三條，皆須紅）**：①`WindowRow` 移除 `symbol` 或 `timeframe`
-    ⇒ §G G-3 ⑥(d) 之 `PURGE_FREE_VARIABLES` 對證紅；②`symbol` 改由匯入檔欄位直取而非
-    `event_scope_key()` ⇒ 三處同一函式參考之斷言紅；③三個 consumer 之一改為自寫取值
-    ⇒ 同上斷言紅。
+    ⇒ §G G-3 ⑥(d) 之 signature 對證紅；②`symbol` 改由匯入檔欄位直取而非
+    `event_scope_key()` ⇒ (i) 之 AST 斷言紅；③任一 consumer 改為自寫取值 ⇒ (ii) 之
+    `is` 斷言紅。
     **禁**任何 `dict`／`list`／可變容器出現在本物件之欄位型別中。
   - **(γ) purge 下界隨 receipt 攜帶**：`.purge_lower_bound_ms_by_symbol: tuple[SymbolPurgeRow, ...]`
     （🔴 R15 修正標題行：R14 已於後文改為 tuple，但此處仍寫 `Mapping[str, int]`
