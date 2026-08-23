@@ -24,10 +24,10 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R20-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R21-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
-→ R17 12 → R18 8 → R19 8 → R20 12 條 findings；**P0=0（連六輪）**；🔴 **R20 三家裁定主委本輪起停止新建任何驗收機制**，見角色卡）。
-**狀態：未 FROZEN**（待 R21 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 條 findings；**P0=0（連七輪）**、**(N)=0 連七輪**；🔴 R20 裁定「主委停止新建機制」、R21 裁定「條件② 不可達，替換為 ②′」，兩者皆見角色卡）。
+**狀態：未 FROZEN**（待 R22 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
 歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
@@ -439,10 +439,21 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
                                        #     （可被讀成 union per_tf 之特徵 TF、
                                        #      或 post-coverage 重算）。
                                        #   **唯一定義**：`sorted(set(e.timeframe
-                                       #     for e in event_level))`——即**觸發 TF** 之相異值，
-                                       #     取 **pre-coverage** 事件集合（與
-                                       #     `lookahead_bars_declared` 之鍵集凍結規則同源，
-                                       #     見 §D-3′-a（ii）⑭(g)）。
+                                       #     for e in event_level))`——即**觸發 TF** 之相異值。
+                                       #   🔴 R21 更正（CODEX-R21-P1-02）：R20 版稱「與
+                                       #     lookahead_bars_declared 之鍵集凍結規則同源」，
+                                       #     但兩者來源**實不相同**——SPEC 該處指「匯入驗證後
+                                       #     整批 persisted rows」，而現行 pipeline 之
+                                       #     `event_level` **只含 alignment 成功之列**
+                                       #     ⇒ 對齊失敗之事件其 TF 會從 digest 消失，
+                                       #     而 lookahead 鍵集仍含之。
+                                       #   ⇒ **定死唯一 producer**：兩者**同讀階段 2 之
+                                       #     同一個 frozen 物件**（`PreparedAnalysisWindows`），
+                                       #     不各自從 records／pipeline 中段重建；
+                                       #     其 receipt identity 即 `analysis_alignment_receipt_hash`。
+                                       #   ⇒ **unknown TF 之 fail-closed**：某觸發 TF 不在
+                                       #     `TIMEFRAME_SECONDS` 之鍵中 ⇒ **拒算**（不得略過該列、
+                                       #     不得以預設秒數代入）。
                                        #   🔴 **不得** union `per_tf.timeframe`（那是特徵 TF）；
                                        #   🔴 **不得** 於 coverage 後重算。
                                        #   出處：TIMEFRAME_SECONDS 是 module-level 可變 dict
@@ -458,7 +469,11 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
        "label_start_ms": int, "label_end_ms": int},   # 鍵序固定，**恰七鍵**
       # 🔴 本列之欄集**不得手動維護**：其「purge 相關子集」由上方
       #    §D-3′-a（ii）之權威式**導出**（`symbol`／`timeframe`／`label_*_ms`），
-      #    並由 §G G-3 ⑥(d) 之集合相等斷言強制。
+      #    並由 §G G-3 ⑥(d) 之 `inspect.signature` 簽章注入對證強制。
+      #    🔴 R21 更正（COMPOSER-R21-P1-03＋GROK-R21-P1-02）：本註解原寫
+      #    「集合相等斷言」——該作法已於 R20 撤回，此為**第三處** active 殘留。
+      #    ⚠️ 主委已於 R20 摩擦紀錄寫下「撤回一個做法要 grep 所有同義字面」，
+      #      **下一輪立刻又犯同一個錯**。
       #    R17 新增 `symbol`（CODEX-R17-P1-01）、R18 新增 `timeframe`
       #    （CODEX-R18-P1-01＋GROK-R18-P1-01）——**兩次都是列舉漏項**，
       #    故 R18 起改由式子導出＋機械對證，不再靠列舉。
@@ -505,7 +520,10 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
   purge 公式之全部自由度即宣稱成立；R17 之要求（構造反例）正是為此而設。
 
   - **negative mutation（三條，皆須紅，落 §G G-3 ⑥）**：
-    (a) 保持 `event_level`／`per_tf`／其餘 `batch` 五鍵不變，
+    (a) 保持 `event_level`／`per_tf`／其餘 `batch` **六鍵**不變
+        （🔴 R21 更正：`batch` 已為恰七鍵，本處為第二處複述且漏同步；
+        少凍 `timeframe_seconds_digest` ⇒ 該 mutation 形同虛設。
+        三家全員：COMPOSER-R21-P1-01＋CODEX-R21-P1-05＋GROK-R21-P1-01），
         **只改 `lookahead_bars_declared` 之任一鍵值** ⇒ hash **必須改變**；
     (b) 🔴 **R17 新增**：保持全部時間欄、窗寬、深度 map 不變，
         **只交換兩個 event 之 `symbol` 分派** ⇒ hash **必須改變**
@@ -882,18 +900,37 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
                  rows, *, lookahead_bars_declared, timeframe_seconds
              ) -> int: ...
              ```
-             · **keyword-only**：漏任一個 ⇒ **`TypeError`**（語言層 fail-closed，
-               不是宣稱、不是檢查）。
-             · 🔴 **禁在函式內 `import TIMEFRAME_SECONDS`**（否則注入形同虛設）
-               ——以 AST 斷言該函式體內無該 import／無 module-level 查表。
+             · **keyword-only**：漏任一個 ⇒ **`TypeError`**（語言層 fail-closed）。
+               🔴 **R21 誠實收窄（三家全員：CODEX-R21-P1-01＋COMPOSER-R21-P1-02＋
+               GROK-R21-P1-03）**：`TypeError` **只覆蓋「缺參數」**，
+               **不覆蓋「傳錯物件／錯值」**——呼叫端可傳齊 kwargs 卻傳入
+               **module 全表 `TIMEFRAME_SECONDS`**（而非本次子集），不觸發任何錯誤，
+               purge 可**靜默翻倍**。
+               ⇒ **R20 之「沒有任何宣稱可錯」為誇大，撤回該句**（見下方修正）。
+             · **錯 map 之主防護＝(d-3)**：digest 必須對**傳入之同一物件**做 S-9；
+               鍵齊而秒數錯之 map ⇒ digest 不同 ⇒ 綁定比對紅。
+             · 🔴 **禁在函式內取用 module-level `TIMEFRAME_SECONDS`**——
+               禁 `ImportFrom` **且**禁名為 `TIMEFRAME_SECONDS` 之 `Attribute Load`
+               （GROK-R21 補丁包；原文只禁 import，`module.TIMEFRAME_SECONDS` 可繞）。
+               ⚠️ **此條之 AST 斷言依 CODEX-R21-P1-03 之裁定改標「待裁定」**，見下。
        (d-2) **期望自由變數集合由 `inspect.signature(purge_lower_bound_ms)` 機械導出**
              ——**沒有第二份清單可漂移**；新增一個自由變數 ⇒ 必須加參數 ⇒ 呼叫端漏傳即 `TypeError`。
        (d-3) `batch.timeframe_seconds_digest` 綁定「**傳入之同一個 map**」之 S-9 位元組
              （非 module-level 之 `TIMEFRAME_SECONDS`）⇒ alias mutation 不再能改結果而 hash 不變。
-       **mutation（四條，皆須紅）**：①呼叫端漏傳 `timeframe_seconds` ⇒ `TypeError`；
-       ②函式內改為 `from momentum.core.constants import TIMEFRAME_SECONDS` ⇒ AST 斷言紅；
-       ③digest 改由 module-level dict 算而非傳入之 map ⇒ alias mutation 反例紅；
-       ④新增自由變數而未加參數 ⇒ (d-2) 之 signature 對證紅。
+       **mutation（五條）**：①呼叫端漏傳 `timeframe_seconds` ⇒ `TypeError`；
+       ②函式內改用 module-level `TIMEFRAME_SECONDS`（`ImportFrom` 或 `Attribute Load`）
+       ⇒ AST 斷言紅；③digest 改由 module-level dict 算而非傳入之 map ⇒ alias mutation 反例紅；
+       ④新增自由變數而未加參數 ⇒ (d-2) 之 signature 對證紅；
+       ⑤🔴 **R21 新增**：kwargs 傳齊但傳入**鍵齊而秒數錯**之 map ⇒ digest 不同 ⇒ 綁定比對紅
+       （此即三家指出「`TypeError` 擋不了錯 map」之反例，改為常設 mutation）。
+       🔴 **R21 標記（依角色卡 Rule 3；CODEX-R21-P1-06）**：本五條 mutation 與 ② 之 AST 斷言
+       **主委皆未隔離實跑**（規格階段尚無實作）⇒ **①③④⑤ 標「實作階段必跑」，
+       ② 之 AST 斷言標 `待裁定`**（與下方 Task 7.0b 之 `keys.py` AST 條同一裁定）。
+       寫在 SPEC 內**不等於**已跑過；未見 `pytest` 實跑輸出前不得宣稱其成立。
+       - 驗證：`pytest tests/momentum/event_samples/ -k purge_signature_injection` 之
+         mutation ①③④⑤ 各自 `exit != 0`；`inspect.signature(purge_lower_bound_ms)` 之
+         keyword-only 參數集合 `== {"lookahead_bars_declared", "timeframe_seconds"}`；
+         mutation ⑤ 之兩份 map 其 `sha256` **不相等**。
        (d-4) 🔴 **語意 mutation（補 R18 版只驗名稱之不足）**：把 scope 由 `symbol`
              改為 `(symbol, timeframe)` ⇒ 必須有測試變紅（受影響者＝逐 scope 之 purge 值
              與 `SymbolPurgeRow` 之鍵；**不是** `V == H`）。
@@ -902,8 +939,12 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
        R18 之「解析文件比對集合」不可實作／R19 之「常數清單」被 grok 實跑打破
        （`omit_digest_still_computes True`）。
        **四次都是同一種錯：主委用「一份要人維護的清單＋一句語意宣稱」當機械保證。**
-       R20 改為**簽章注入**後，該宣稱不再存在——漏參數是 `TypeError`，
-       自由變數集合由 `inspect.signature` 導出，**沒有任何清單可漂移、沒有任何宣稱可錯**。
+       R20 改為**簽章注入**後，**「清單可漂移」這一面**確已消除
+       （自由變數集合由 `inspect.signature` 導出，無第二份清單）。
+       🔴 **但 R20 之「沒有任何宣稱可錯」是誇大，R21 撤回**（三家全員）：
+       `TypeError` 只擋缺參數，**擋不了傳錯 map**；錯 map 之防護在 (d-3) 之 digest 綁定，
+       那仍是一條需要被驗證的條文，不是語言層保證。
+       **第五次的教訓：把「某一面已解決」寫成「全面已解決」，本身就是下一個 finding。**
        🔴 **R20 刪除本處原有之第二份 mutation 清單**（它仍寫著已撤回之
        `PURGE_FREE_VARIABLES`）——主委在同一次修訂中一邊宣稱要消除第二套並行敘事、
        一邊留下一套，正是三家本輪點名之病。
@@ -1296,14 +1337,21 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
                    (ii-b) 🔴 **R20 補閉環（CODEX-R20-P1-05）**：R19 版寫「測試紅 ⇒ 由人複審 ⇒
                           若是則同批加入 stub 清單」——**沒有 receipt、沒有機械連結**，
                           只更新 golden 而漏更新 stub 時**測試仍綠**，§C0 之判斷被推給未來的人。
-                          ⇒ 保留「不分類之 golden boundary」，但**新增版本化之複審 manifest**
-                          （`tests/.../node_crypto_review_manifest.json`），逐筆記：
-                          golden 之 added／removed export、**是否為 digest entry**、
-                          對應之 stub action、reviewer 與 commit context。
+                          ⇒ 保留「不分類之 golden boundary」，並新增版本化之複審 manifest
+                          （`tests/.../node_crypto_review_manifest.json`）作為
+                          **「誰在何時複審過哪些 delta」之 receipt**，逐筆記：
+                          golden 之 added／removed export 名、reviewer、commit context。
                           測試以 **golden delta × manifest 做封閉集合比對**：
-                          ①golden 有而 manifest 無 ②manifest 有而 golden 無
-                          ③manifest 標為 digest entry 卻未入顯式 stub 清單
-                          ——**三者皆紅**。
+                          ①golden 有而 manifest 無 ②manifest 有而 golden 無 ⇒ **兩者皆紅**。
+                          🔴 **R21 刪除原第三欄「是否為 digest entry」與其 mutation③**
+                          （CODEX-R21-P1-04＋GROK-R21-P1-04 兩家）：那是把 **R19 已撤回之
+                          「分類什麼是雜湊入口」重新做成一個要人維護的布林欄**；
+                          且三條 mutation 只驗集合同步、**不驗分類正確**——
+                          人工誤標 `false` 時 golden／manifest 仍綠。
+                          **主委原自我歸類為 (c)「修既有閘」不成立**（兩家）。
+                          ⇒ digest 入口之顯式 stub 清單維持既有枚舉 (ii-c)，
+                          **不由 manifest 分類推導**；「stub 漏更新」由既有
+                          stub 清單 × 呼叫面之斷言承擔。
                           ⚠️ §N 之「純 JS 手刻 sha256」殘留**仍獨立標記**，
                           **不得**宣稱已被本閘解決。
                    (ii-c) **stub 清單維持顯式枚舉**（`subtle.digest`／`createHash`／`hash`／
@@ -2263,12 +2311,18 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
         硬守三處反而逼實作者在階段 2 直接讀 raw field。
         ⚠️ **枚舉 consumer 數量正是本 epic 反覆出錯之形態**（purge 自由變數四次、
         雜湊入口三次），**不再枚舉**。
-      · **改為不依賴數量之判準**：`record.symbol`／`record.timeframe` 之**任何讀取**
-        皆須經該函式。驗收＝
-        (i) **AST 斷言**：`momentum/Analysis/event_samples/**` 內，除 `keys.py` 自身外
-            **無任何模組**出現 `.symbol`／`.timeframe` 之屬性直取（以 record 為 receiver）；
-        (ii) 每個實際 consumer **斷言同一函式參考**（`is` 比對 exported object，
-            同 Task 1.1 ⑧(e) 之作法）——**斷言其為同一物件，不斷言有幾個**。
+      · 🔴 **R21 降級為「待裁定」（CODEX-R21-P1-03 裁定，主委自我歸類被推翻）**：
+        R20 主委把本條自判為角色卡允許之 (b)「三類機械斷言」，**該自判錯誤**——
+        AST 斷言是**解析 Python source 並分類 AST 節點**，不是位元組／集合／`is` 比對。
+        且該掃描面只涵蓋 `event_samples/**` 之**屬性直取**，
+        現行主要 consumer 用的是 **dict subscript**，掃不到；
+        「每個實際 consumer」亦無可驗證之枚舉器。
+        ⇒ **本條不作 active acceptance**，改標 **`待裁定`**：
+        由實作 Task 明定 code-owned accessor 之 call-site／identity 證據與 scope，
+        **不得**以「未維護之 consumer 數量」或「不完整之 AST 掃描」收斂。
+        （採 CODEX-R21 補丁包 `-keys-consumer-guard.md`；主委未自創。）
+      · **本輪仍成立之部分**：`record.symbol`／`record.timeframe` 之任何讀取皆須經該函式
+        ——此為**規範陳述**，其驗收形式待實作 Task 定。
       · 🔴 **`timeframe` 同理**：`event_trigger_timeframe(record) -> str`，同檔、同驗收方式。
     - `timeframe` 為**觸發 TF**，與 `per_tf` 之特徵 TF 集合**不同語意**（見 §D-3′-a（ii））。
     **mutation（三條，皆須紅）**：①`WindowRow` 移除 `symbol` 或 `timeframe`
