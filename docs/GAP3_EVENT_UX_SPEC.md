@@ -24,10 +24,10 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R25-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R26-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
-→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 條 findings；**P0=0**（R24 之 P0 為主委派工流程錯誤，已以建包前置修正）；**(N)=0 連十一輪**；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
-**狀態：未 FROZEN**（待 R26 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 條 findings；**P0=0**；**(N)=0 連十二輪**；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
+**狀態：未 FROZEN**（待 R27 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
 歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
@@ -217,7 +217,27 @@ label_window_ms(e)    = row(e).label_end_ms - row(e).label_start_ms   # 分析�
                         # 🔴 R15：windows 已是 tuple[WindowRow, ...]，**不得**用 windows[e] 下標
 purge_lower_bound_ms(scope) = max over e in scope of max( lookahead_depth_ms(e), label_window_ms(e) )
                               # scope ＝ symbol（event_split.py:54 之 groupby）；R10 鎖 per-scope embargo
+                              # e ∈ aligned_pre_coverage_windows（見下方 R26 之角色分離）
 ```
+
+🔴 **R26：兩個 pre-coverage 集合之角色分離（採 CODEX-R26-P1-02 補丁包）**
+**問題**：權威式之 `row(e)` 指向 alignment receipt 之 `WindowRow`，而階段 2 之 purge 輸入
+又被寫成「coverage 前之**全部**事件」。碼證 `alignment.py:199-218`：**對齊失敗之列只進
+`failures`、不會產生 `event_level`／`WindowRow`** ⇒ 對失敗列之 `label_window_ms(e)`
+**根本沒有定義**——既無法證明「只是略寬」，也無法安全排除其 under／over-purge 影響。
+⚠️ §C0 明定**過度 purge 亦是錯誤**，不得以「保守」一語代替範圍定義。
+
+| 集合 | 內容 | 用途 |
+|---|---|---|
+| `records` | 該批**全部已落檔**事件列（pre-alignment、pre-coverage） | **只供** `lookahead_bars_declared` 鍵集凍結／`timeframe_seconds` 鍵集／digest |
+| `aligned_pre_coverage_windows` | `records` 中**對齊成功**者之 `WindowRow`（pre-coverage） | **只供** purge 權威式之 `scope` 與 split |
+
+- **對齊失敗之列**：**不進** purge／split（其無 `WindowRow`，公式對它無定義）；
+  **但其 `timeframe` 仍保留在鍵集內**（維持 R11 之 P0 凍結不變式）。
+- ⇒ 鍵集**不隨對齊結果變動**（P0 不變式成立），而 purge 之 max **只取有 window 之列**
+  （公式有定義）。**兩件事分開，不再互相污染。**
+- 🔴 **R25 主委採 (甲) 時未看出此缺口**——(甲) 只解決了「鍵集兩側不同源」，
+  未處理「purge 輸入集合與 `row(e)` 之定義域不一致」。此為 (甲) 之補完，非推翻。
 
 🔴 **R18：purge 之自由變數集合（由上式**導出**，非逐次列舉）**
 （出處：同一「已全部綁進 hash」之宣稱**連三輪被反例打破**——R16 版漏 `symbol`
@@ -276,8 +296,11 @@ bar 命名欄（`future_4bar_return`）則本就逐 tf 不同（1h 得 4h、12h 
 - `e.timeframe` 不在該 map 之鍵集 ⇒ **fail-closed**（沿用 Task 7.7 ② 之
   `feature_coverage_unknown_timeframe` 同型處置，本節不新增 reason）。
 - 🔴 **R11：鍵集之凍結時點（CODEX-R11-P0-01）**——鍵集＝**匯入驗證通過後、
-  prepare-windows 與 coverage 之前**，由**整批已落檔事件列**之 `timeframe` 集合決定，
+  prepare-windows 與 coverage 之前**，由 **`records`**（Task 7.0b (a) 之具名物：
+  「以 `request.event_import_id` 查出該批已落檔 records」）之 `timeframe` 集合決定，
   並隨批次固化。
+  🔴 **R26 綁定具名物**（三家）：原寫中文散文詞「整批已落檔事件列」，
+  與 (d-3a)／digest 之定義同病 ⇒ 三處自本輪起**同綁 `records`**，不再以散文詞指涉。
   **coverage 只過濾 (event, tf) 配對，不得重建鍵集**；亦即某 TF 之列被 coverage 全數剔除時，
   該 TF 之鍵**仍留在 map 內**。
   理由：若容許 coverage 後重建，`lookahead_depth_ms` 與 purge 下界會**隨 coverage 結果改變**，
@@ -444,7 +467,8 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
                                        #     （可被讀成 union per_tf 之特徵 TF、
                                        #      或 post-coverage 重算）。
                                        #   **唯一定義**：`sorted(set(e.timeframe
-                                       #     for e in 整批已落檔事件列))`——即**觸發 TF** 之相異值，
+                                       #     for r in records))`——即**觸發 TF** 之相異值
+                                       #     （`records` 見 Task 7.0b (a)；R26 由散文詞改綁具名物），
                                        #     依 §D-3′-a（ii）L278–282 之凍結規則
                                        #     （＝`lookahead_bars_declared.keys()`）。
                                        #   🔴 R25 更正（COMPOSER-R25-P2-03）：原寫 `event_level`
@@ -540,7 +564,11 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
   purge 公式之全部自由度即宣稱成立；R17 之要求（構造反例）正是為此而設。
 
   - **negative mutation（三條，皆須紅，落 §G G-3 ⑥）**：
-    (a) 保持 `event_level`／`per_tf`／其餘 `batch` **六鍵**不變
+    (a) 保持 `event_level`／`per_tf`／`batch` **除受測鍵外之其餘各鍵**不變
+        （🔴 R26 更正：原寫「六鍵」，而 canonical `batch` 為**恰七鍵**；
+        照抄會漏凍 `timeframe_seconds_digest`。**本處起不再寫死鍵數**
+        ——鍵數已在 canonical fence 唯一定義，此處複述即第二份副本。
+        CODEX-R26-P1-05＋GROK-R26-P1-05＋COMPOSER-R26-P2-02）
         （🔴 R21 更正：`batch` 已為恰七鍵，本處為第二處複述且漏同步；
         少凍 `timeframe_seconds_digest` ⇒ 該 mutation 形同虛設。
         三家全員：COMPOSER-R21-P1-01＋CODEX-R21-P1-05＋GROK-R21-P1-01），
@@ -888,7 +916,9 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
    ⚠️ 本欄由 §G S-9 之同一 encoder 產生 ⇒ **不得**為它另寫序列化（S-9 第 7 條）
    🔴 **R16／R17 追加 negative mutation（三條，皆須紅）**（權威與裁決紀錄在
    §D-3′-a（iii），本節不重述理由）：
-   (a) 保持 `event_level`／`per_tf` 與 `batch` 其餘**六鍵**（R20 更正：`batch` 已為七鍵，原寫五鍵；GROK-R20-P1-04）**逐位元組不變**，
+   (a) 保持 `event_level`／`per_tf` 與 `batch` **除受測鍵外之其餘各鍵逐位元組不變**
+       （🔴 R26：本處歷經 R20「五→六鍵」、R26「六鍵→不寫死」兩次更正——
+       **寫死鍵數本身就是缺陷來源**，鍵數唯一定義在 canonical fence），
        **只改 `lookahead_bars_declared` 之任一鍵值** ⇒ 本欄必須改變（R16）；
    (b) 保持全部時間欄／窗寬／深度 map 不變，**只交換兩個 event 之 `symbol` 分派**
        ⇒ 本欄必須改變（R17；CODEX-R17-P1-01 之反例）；
@@ -947,7 +977,14 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
        (d-3a) 🔴 **鍵集集合相等（採 GROK-R22 提案；R23 依委員補丁包更正來源）**：斷言
              `set(timeframe_seconds.keys())`
              **==** `set(lookahead_bars_declared.keys())`
-             **==** `set(e.timeframe for e in 整批已落檔事件列)`
+             **==** `set(r.timeframe for r in records)`
+             （`records` ＝ **Task 7.0b (a) 已具名之物**：
+             「以 `request.event_import_id` **查出該批已落檔 records**」；
+             🔴 **R26 更正（三家：CODEX-R26-P1-01＋GROK-R26-P1-04＋COMPOSER-R26-P1-01）**：
+             R25 版寫中文散文詞「整批已落檔事件列」——**全檔 5 處皆為散文、非可 grep 之具名物**，
+             與 R24 之 `pre_coverage_event_rows` **同型**（指向沒有具名 shape 之物）。
+             主委已於 R26 brief 自行揭露此假設，三家確認並指出**既有具名物即 `records`**。
+             ⇒ 綁定 `records`，**不新增任何物件**。）
              （**依 §D-3′-a（ii）L278–282 之凍結規則**：鍵集＝匯入驗證通過後、
              prepare-windows 與 coverage **之前**，由**整批已落檔事件列**之 `timeframe`
              集合決定並隨批次固化 ⇒ 依定義**此即 `lookahead_bars_declared.keys()`**，
@@ -986,7 +1023,7 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
              ⚠️ **本處已被連續六輪攻擊**（列舉三／列舉四／解析文件／常數清單／
              `TypeError` 誇大／(d-3) 不足）；R22 起**鍵集面由 (d-3a) 機械收斂、
              值面由實作測試收斂**，規格層**不再新增第七版敘事**。
-       **mutation（四條 active ＋ 一條【待裁定】）**（🔴 R24 更正計數字面：COMPOSER-R24-P2-01＋GROK-R24-P2-01——
+       **mutation（清單如下；**不寫死條數**——見下方更正史）**（🔴 R26 第三次更正本處計數字面：R24 由「五條」改「四條 active＋一條待裁定」，R25 又新增 ⑥⑦ 而**未同步本標題** ⇒ 實際 active 為 ①③④⑤⑥⑦。**同一處計數字面三輪三錯 ⇒ 本輪起不再寫死條數**，以清單本身為準。CODEX-R26-P2-06＋GROK-R26-P1-01。原 R24 更正出處：
        R23 把 ② 標【待裁定】、VERIFY 只列 ①③④⑤，**標題卻仍寫「五條」**；
        依 R22 通則「mutation 效力不得高於其所依賴之驗收條」，計數字面須同步）：
        ①呼叫端漏傳 `timeframe_seconds` ⇒ `TypeError`；
@@ -3057,8 +3094,19 @@ t0 formatter 讀得到 label、label formatter 讀得到 t0（欄位語意重疊
      亦無驗收可證兩 consumer 收到同一 map ⇒ **只准同一物件**，驗收以 `is` 比對
      （角色卡 (b) 之物件參考比對）。
      ③**子集來源具名**：`timeframe_seconds` 之鍵集 **==** `lookahead_bars_declared.keys()`
-     （即 L278–282 之凍結集合）；**禁**傳 module 全表、**禁**以對齊成功列或
-     post-coverage 子集建構。此即 (d-3a) 三側之一。
+     （即 L278–282 之凍結集合，源自 `records`）；**禁**傳 module 全表、
+     **禁**以對齊成功列或 post-coverage 子集建構。此即 (d-3a) 三側之一。
+     ④🔴 **R26 補「同一物件」之可紅 mutation（三家：CODEX-R26-P1-03＋GROK-R26-P1-03＋
+     COMPOSER-R26-P1-02）**：R25 版之「只准同一物件、以 `is` 比對」**全檔僅散文、
+     無任何可紅條** ⇒ 依角色卡 Rule 3「驗收寫不出可紅 mutation ⇒ 不得入 SPEC」，
+     本輪補齊：
+     **驗收**：以 spy 記錄 `purge_lower_bound_ms` 與 feature-run gate 各自收到之
+     `timeframe_seconds`，斷言 `a is b` 為真（物件參考比對，角色卡 (b)）。
+     **mutation（兩條，皆須紅）**：(m1) 任一 consumer 改為自行建構一份**內容相同**之 map
+     ⇒ `is` 斷言紅（**內容相同故等式比對抓不到，只有 `is` 抓得到**）；
+     (m2) 任一 consumer 改為直讀 module 常數 ⇒ `is` 斷言紅。
+     - 驗證：`pytest tests/api -q -k timeframe_seconds_identity` 之 (m1)(m2) 各自 `exit != 0`；
+       正例斷言 `spy_purge.kwargs["timeframe_seconds"] is spy_gate.args[N]` 為 `True`。
      （`momentum/core/constants.py:6` 之 `TIMEFRAME_SECONDS` 為該 map 之**建構素材**，
      七值閉集；**不得**於本處直讀。）
      🔴 **禁止**取 run 之 tf、批內 `max(tf)`／`min(tf)`／平均——**逐列用該列自己的 `timeframe`**；
