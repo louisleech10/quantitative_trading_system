@@ -101,7 +101,21 @@ fail() {
   exit 2
 }
 
-if [ "${max_state}" = "CLOSED" ]; then
+# 🔴 R19（CODEX-R19-P1-05）：R18 版只特判 `CLOSED`，其餘一律落入 OPEN 之 generic else。
+#   但 `debt_ledger` 之 state 值域為 **OPEN／CLOSED／ABANDONED 三值**（碼證：debt_ledger.sh）
+#   ⇒ `ABANDONED` 被當成 OPEN 處理，clean tree 之 stale header 又能通過。
+#   **這是同一支閘連三輪被抓出 fail-open**（R17 clean-tree／R18 no-row／R19 ABANDONED）。
+#   ⇒ 改為**逐值窮舉**，未知值 fail-closed；日後 debt_ledger 新增第四個 state 會當場報錯，
+#     而不是靜默落入某個分支。
+case "${max_state}" in
+  OPEN|CLOSED|ABANDONED) ;;
+  *) echo "[header_round] ✗ 未知之輪次 state='${max_state}'（值域應為 OPEN/CLOSED/ABANDONED）⇒ fail-closed"
+     echo "               debt_ledger 若新增 state，須同批更新本檔之 case 分支。"
+     exit 2 ;;
+esac
+
+# ABANDONED 與 CLOSED 同樣代表「該輪已終結」⇒ 檔頭必須等於它（clean tree 也查）
+if [ "${max_state}" = "CLOSED" ] || [ "${max_state}" = "ABANDONED" ]; then
   # 該輪已收案 ⇒ 落地應已完成，檔頭必須等於它（**clean tree 也查**，這是 R17 封的洞）
   [ "${hdr_round}" -eq "${max_round}" ] || fail "已收案之輪次要求檔頭＝R${max_round}-landing"
 else

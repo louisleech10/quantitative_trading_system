@@ -11,7 +11,88 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <p><strong>這張表回答：五批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
-<h2 id="-目前正在做第-18-輪審完8-條全修準備派第-19-輪824-日">🔴 目前正在做：第 18 輪審完、8 條全修，準備派第 19 輪（8/24 日）</h2>
+<h2 id="-目前正在做第-19-輪審完8-條全修準備派第-20-輪824-日">🔴 目前正在做：第 19 輪審完、8 條全修，準備派第 20 輪（8/24 日）</h2>
+<h3 id="這輪是驗收輪而驗收結果對我不好看">這輪是驗收輪，而驗收結果對我不好看</h3>
+<p>上一輪委員給了五條「做到這些就可以定版」。<strong>我這輪去驗，發現其中三條的機制本身是壞的。</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>上輪的判準</th>
+<th>驗證結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>purge 的輸入都綁進指紋</td>
+<td>❌ 我把 <code>TIMEFRAME_SECONDS</code>（時間框對應幾秒）當成常數排除，<strong>它其實是可以被改的</strong>——改了它 purge 就變、指紋卻不變</td>
+</tr>
+<tr>
+<td>驗收只有單一來源</td>
+<td>✅ 過</td>
+</tr>
+<tr>
+<td>兩條路徑都會擋</td>
+<td>✅ 過</td>
+</tr>
+<tr>
+<td>雜湊入口檢查跑得起來</td>
+<td>❌ <strong>三家各自實跑打穿</strong>：我寫的自動判斷式把清單內的項目擋掉、又誤抓兩個不相干的 ⇒ <strong>就算實作是對的，這條驗收也永遠是紅的</strong></td>
+</tr>
+<tr>
+<td>閘的最後一個放行漏洞補好了</td>
+<td>❌ <strong>同一支閘連三輪被抓到放行</strong>：狀態有三個值，我只處理了一個</td>
+</tr>
+</tbody>
+</table></div>
+<p>再加一條：我上輪為了「取代列舉」而發明的「<strong>解析規格文件、比對集合</strong>」檢查，
+<strong>兩家判定不可實作</strong>——那是 markdown 文字，沒有文法可言，抽出來會混進 <code>max</code>、<code>over</code> 這種詞，
+實作者只能硬編碼答案，等於沒有檢查。</p>
+<h3 id="共同病根我把讀文字和判斷分類當成機械檢查">共同病根：我把「讀文字」和「判斷分類」當成機械檢查</h3>
+<p>這是<strong>連續第二輪同一種錯</strong>（上輪是「在 ESM 環境用 <code>require</code>」）。
+機械檢查只能做三件事：<strong>比對位元組、比對集合成員、比對物件參考</strong>。
+凡是需要「解析一段文字」或「判斷這算不算某一類」，那就不是檢查，是把判斷偽裝成檢查。</p>
+<p><strong>所以這輪我改的是做法，不是再補一次</strong>：</p>
+<ul>
+<li>把單一來源<strong>搬進程式碼</strong>——purge 的變數清單變成一個常數，而<strong>計算 purge 的程式本身要讀它</strong>；
+漏一個變數，purge 直接算不出來，不需要任何檢查去發現。</li>
+<li>雜湊入口<strong>不再自動分類</strong>，改成「Node 的匯出清單存成 golden，一有變動測試就紅、由人複審」。
+誠實講：它<strong>不分類</strong>，只保證有人會看到。</li>
+<li>「常數」這件事從此<strong>要附碼證</strong>才能宣稱，否則一律當變數。</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>看什麼</th>
+<th>第 18 輪</th>
+<th><strong>第 19 輪</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>委員找到的問題</td>
+<td>8</td>
+<td><strong>8</strong></td>
+</tr>
+<tr>
+<td>最嚴重</td>
+<td>0</td>
+<td><strong>0（連五輪）</strong></td>
+</tr>
+<tr>
+<td><strong>全新缺口</strong></td>
+<td>0</td>
+<td><strong>0</strong>（八條全是我上輪落地造成的）</td>
+</tr>
+<tr>
+<td>任務數</td>
+<td>42</td>
+<td><strong>42</strong>（二十輪沒變）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>凍結四條件</strong>：最嚴重 0／次嚴重 8（⬜）・我的自傷 5 群（⬜）・你的裁定 ✅・當輪標記待清（⬜）。</p>
+<hr />
+<h2 id="第-18-輪824">第 18 輪（8/24）</h2>
 <h3 id="我問了委員是不是已經在原地打轉兩家說沒有並給了停止條件">我問了委員「是不是已經在原地打轉」——兩家說沒有，並給了停止條件</h3>
 <p>上一輪我在派工單加了一題：「若你認為主委已陷入每輪修洞又長新洞的不收斂狀態，請直接說。」</p>
 <p><strong>兩家都說沒有。</strong> 一家說「只剩 1 條接線型缺口，屬上一輪同一群的尾巴，不是新的架構債」；
