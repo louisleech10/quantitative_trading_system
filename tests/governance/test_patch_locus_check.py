@@ -18,6 +18,7 @@
 故第 1 條同時是本次強度升級之 mutation guard。
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -124,3 +125,126 @@ def test_nonexistent_patch_file_is_red(tmp_path):
     rc, log = _run(tmp_path / "no_such_patch.md")
     assert rc == 2
     assert "補丁包不存在" in log
+
+
+# ────────────────────────────────────────────────────────────────────
+# R9 新增：stage 維度／anchor 字面閘／CJK 路徑（quotepath）
+# 出處＝CODEX-R9-P1-06（stage 由補丁包宣告）＋ GROK-R9-P1-04（quotepath 假紅）。
+# ────────────────────────────────────────────────────────────────────
+
+
+def _run_args(patch_path, *extra):
+    out = subprocess.run(
+        [sys.executable, str(GATE), str(patch_path)] + list(extra),
+        capture_output=True, text=True, cwd=str(REPO),
+    )
+    return out.returncode, out.stdout + out.stderr
+
+
+def test_descriptive_anchor_is_red_at_parse_time(tmp_path):
+    """anchor 非字面（該檔內容找不到）⇒ 提交當下即 rc=2，屬委員責任。
+
+    🔴 mutation guard：拿掉 parse 期之字面閘，本條會退化成
+    「anchor 未出現在 diff hunk 內」而訊息不同 ⇒ 斷言訊息字面即可偵測。
+    """
+    fixture = REPO / "tests" / "governance" / "_tmp_locus_fixture.txt"
+    fixture.write_text("內容含 ANCHOR_PRESENT_MARKER 這個字串。\n", encoding="utf-8")
+    try:
+        patch = _write_patch(
+            tmp_path,
+            ["- tests/governance/_tmp_locus_fixture.txt#檔頭之某段敘述性描述"],
+        )
+        rc, log = _run(patch)
+        assert rc == 2, log
+        assert "anchor 非字面" in log, log
+    finally:
+        fixture.unlink(missing_ok=True)
+
+
+def test_impl_stage_locus_is_deferred_not_red(tmp_path):
+    """未達之 `@impl` locus ⇒ DEFERRED、不計 rc（stage 由補丁包宣告）。
+
+    對照組（下一條）：同一 locus 不標 stage（缺省 @spec）⇒ 必紅。
+    兩條並存才能證明 DEFERRED 不是「全部放行」。
+    """
+    patch = _write_patch(
+        tmp_path,
+        ["- api/models/ic_models.py#ICAnalyzeRequest@impl"],
+    )
+    rc, log = _run(patch)
+    assert rc == 0, "標 @impl 之未達 locus 不應計 rc；輸出：%s" % log
+    assert "DEFERRED" in log, log
+
+
+def test_unstaged_locus_defaults_to_spec_and_is_red(tmp_path):
+    """未標 stage ⇒ 缺省 `@spec` ⇒ 未達即紅（證明預設值是最嚴的那個）。"""
+    patch = _write_patch(
+        tmp_path,
+        ["- api/models/ic_models.py#ICAnalyzeRequest"],
+    )
+    rc, log = _run(patch)
+    assert rc == 2, "缺省 stage 應為 spec 而必紅；輸出：%s" % log
+    assert "[@spec]" in log, log
+
+
+def test_also_impl_widens_and_turns_impl_red(tmp_path):
+    """`--also-impl` 只**加寬**：同一 @impl locus 加旗標後轉紅。"""
+    patch = _write_patch(
+        tmp_path,
+        ["- api/models/ic_models.py#ICAnalyzeRequest@impl"],
+    )
+    rc, log = _run_args(patch, "--also-impl")
+    assert rc == 2, "--also-impl 應使 @impl 計入 rc；輸出：%s" % log
+    assert "[@impl]" in log, log
+
+
+
+
+def test_cjk_path_with_diff_base_is_recognised(tmp_path):
+    """**tracked** 之 CJK 路徑在 `--diff-base` 路徑下不得被 quotepath 咬成假紅。
+
+    🔴 GROK-R9-P1-04 之回歸樁。**首版此測試是假綠**（主委自查發現）：
+    首版用 repo 內**未追蹤**之 CJK fixture，而未追蹤檔走的是
+    `git status --porcelain -z`——`-z` 本來就不做 quoting ⇒ 拿掉
+    `core.quotepath=false` 也不會轉紅。**真正會被咬的是 `git diff --name-only <base>`**。
+    ⇒ 改為在 tmp_path 建**獨立 git repo**：commit 一個 CJK 路徑檔、改它、再以
+    `--diff-base HEAD` 對證。自帶 fixture、不依賴本 repo 之歷史或髒污狀態。
+
+    mutation：把 `_git` 之 `-c core.quotepath=false` 拿掉 ⇒ 本條必紅。
+    """
+    repo = tmp_path / "repo"
+    (repo / "tests").mkdir(parents=True)
+    def git(*a):
+        return subprocess.run(["git"] + list(a), cwd=str(repo),
+                              capture_output=True, text=True)
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    target = repo / "白話說明" / "中文檔.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("第一版\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "init")
+    target.write_text("第一版\nANCHOR_AFTER_EDIT\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "edit")
+    # 🔴 **必須把 mtime 壓到 HEAD commit 時間之前**，否則 `is_touched()` 的
+    #    mtime 回退（給 gitignore 檔用的）會讓本測試在 quotepath 壞掉時仍然綠——
+    #    主委首兩版此測試都因此假綠，第三版才真的能被 mutation 打紅。
+    head_ts = int(git("log", "-1", "--format=%ct").stdout.strip())
+    os.utime(str(target), (head_ts - 3600, head_ts - 3600))
+
+    patch = tmp_path / "patch.md"
+    patch.write_text(
+        "# PATCH cluster test\nAUTHORITY: 測試用\nSYNC-LOCI:\n"
+        "- 白話說明/中文檔.md#ANCHOR_AFTER_EDIT\n"
+        "BEFORE/AFTER: （略）\nVERIFY:\n- true\n",
+        encoding="utf-8",
+    )
+    out = subprocess.run(
+        [sys.executable, str(GATE), str(patch), "--diff-base", "HEAD~1"],
+        capture_output=True, text=True, cwd=str(repo),
+    )
+    log = out.stdout + out.stderr
+    assert "檔案未被本次改動" not in log, "CJK 路徑被 quotepath 咬成假紅：%s" % log
+    assert out.returncode == 0, log

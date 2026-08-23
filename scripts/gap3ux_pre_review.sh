@@ -56,6 +56,13 @@ run "quant_standard_check"  bash scripts/quant_standard_check.sh
 run "spec_count_audit"      bash scripts/gap3ux_count_check.sh
 
 if [ "$#" -gt 0 ]; then
+  # 🔴 R9（CODEX-R9-P1-06／GROK-R9-P1-04；三家議題一裁定）：補丁包 locus 對證新增 stage 維度。
+  #    · SYNC-LOCI 每列可加 `@spec`／`@doc`／`@harness`／`@impl`，**缺省＝@spec**（最嚴）。
+  #    · 未達之 `@impl` 印 DEFERRED、不計 rc（凍前不實作）。
+  #    · 呼叫端只有 `--also-impl` 這個**加寬**旗標；**本檔不得**新增任何縮窄旗標
+  #      （角色卡：不得為降噪收窄掃描面）。實作階段驗收時由呼叫者自行加 `--also-impl`。
+  #    · commit 後複驗須帶 `--diff-base <套用前 ref>`，否則已落地之 locus 會被誤報未改動。
+  #    · 另修 patch_locus_check 之 CJK 路徑假紅（git 之 core.quotepath；GROK-R9-P1-04）。
   echo "[gap3ux_pre_review] 補丁包 locus 對證（$# 份）"
   run "patch_locus_check" python3 scripts/patch_locus_check.py "$@"
 else

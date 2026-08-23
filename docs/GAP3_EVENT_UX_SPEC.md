@@ -153,23 +153,87 @@ IC 分析的頁面，而不是 `/search` 吧」。
 - `/search` 之 `label` 由 t0 條件判定（`scenario=C`、無品質過濾）⇒ 該欄之值為 **lookahead 深度**，
   依 D-7 由實際引用之欄位導出，**不得**沿用「使用者選的答案窗」當它的值。
 
-📌 **主委補充，具名標「待 R9 裁定」**（三份補丁包皆未觸及此層；依角色卡須具名而非靜默決定）：
+🔴 **R9 已裁定（原「待 R9 裁定」之兩項，三家皆有回覆；以下為裁定後之權威條文）**：
 
-**（i）深度 0 與契約下限 1 之衝突**：D-7 明訂 `scenario=C` 且無品質過濾時 lookahead 深度 **＝ 0**
+**（i）深度 0 與契約下限 1 之衝突 —— 裁定：保留契約下限 1，另登記真實深度欄**
+D-7 明訂 `scenario=C` 且無品質過濾時 lookahead 深度 **＝ 0**
 （實查證之既有批 `20260822T011331Z-eb210a16.json` 即此形態），
-而 `import_contract.py:163` 之下限為 `int ≥ 1` ⇒ 深度 0 **無法照實寫入**。
-處置：深度 0 時寫入**契約最小合法值 `1`**，並於 receipt 同時記錄 `lookahead_bars_declared = 0`。
-理由：`1` 使 embargo 隔一根，比實際需要**更嚴**（§C0 允許更嚴、禁更鬆）；
-反向（改契約下限為 0）會放寬既有 fail-closed，§C0 禁止。
-⚠️ **副作用須揭露**：purge 因此比理論值多一根，屬**保守偏差**，非計算錯誤。
+而 `import_contract.py:163` 之下限為 `int ≥ 1` ⇒ 深度 0 **無法寫進該欄**。
 
-**（ii）purge 下界為兩個約束之聯集**：D-7 要求 `purge ≥ lookahead 深度`；
-D-3a 要求 `purge ≥ 本次分析 h 之 label 窗寬`。兩者皆為現行有效裁定且來源不同
-（前者防「標籤偷看未來」，後者防「答案窗大於隔離帶」）⇒
+- **契約下限維持 1，不改為 0**（改下限會放寬既有 fail-closed，§C0 禁；三家一致）。
+- `label_definition.window.horizon_bars = 1` 在深度 0 時**僅是 serialization floor**，
+  **不是**深度 oracle。
+- **真實深度**寫入契約新登記之 derived／receipt 欄 **`lookahead_bars_declared`**
+  （登記處＝`momentum/Analysis/contracts/event_import_contract.json` 之
+  `derived_fields.names` ＋ `receipt_schema`；先改契約，D-6）。
+- 🔴 **所有下游一律讀 `lookahead_bars_declared`，不得讀 `window.horizon_bars` 當深度**：
+  Task 2.1b 之深度公式、Task 4.1 ③ 之匯出寫入、Task 4.1b 之 UI 揭露、
+  本節（ii）之 purge 式、§G G-3 之 golden。深度 > 0 時兩值相等。
+- **receipt 缺該欄 ⇒ fail-closed**，不得以 `1` 默認替代。
+- ⚠️ 主委 R8 版原寫「寫 1 屬保守偏差、可接受」——**該說法被 CODEX-R9-P1-03 推翻**：
+  把 1 當真實深度會使 UI／purge／golden 互相不一致，且違反 Task 2.1b「過度 purge 亦屬錯誤」。
+  ⇒ 改為「floor 只影響序列化欄位，深度語意另有其欄」。
+
+**（ii）purge 下界 —— 裁定：逐列換算 ms、逐 split scope 取 max**
+
+出處＝**三家全員命中**（CODEX-R9-P0-02／COMPOSER-R9-P0-01／GROK-R9-P0-01）：
+R8 版寫 `max(lookahead 深度, 本次 h 窗寬)` **混用單位**（深度是根數、窗寬是 ms），
+且未給換算 ⇒ 例：深度 12 根 × 1h 對 h=1 之窗，
+若直接 `max(12, 3600000)` 取到窗寬側 ⇒ **purge 少 11 根 = train/test 洩漏**。
+
+**權威式（本節為唯一定義；Task 7.0b／§G G-3 只引用）**：
 ```
-purge_lower_bound = max(lookahead 深度換算之 ms, 本次 event_label_spec 之 label 窗寬 ms)
+lookahead_depth_ms(e) = lookahead_bars_declared(batch) * TIMEFRAME_SECONDS[e.timeframe] * 1000
+label_window_ms(e)    = windows[e].label_end_ms - windows[e].label_start_ms   # 來自分析時 align_events
+purge_lower_bound_ms(scope) = max over e in scope of max( lookahead_depth_ms(e), label_window_ms(e) )
 ```
-**不得**只取其一。依 §C0「只能更嚴」取 `max`。此式之驗收落 Task 7.0b。
+- `lookahead_bars_declared` 為**批次層**宣告（D-7 通則：該批 label 定義所引用之最遠未來根數）；
+  **ms 換算逐列**用該列自己的 `e.timeframe`，**禁止**用 run 之 tf、批內 `max/min/平均 tf`
+  （同 Task 7.7 ② 之規則，單位來源＝`momentum/core/constants.py:6` 之 `TIMEFRAME_SECONDS`）。
+- `windows[e]` 必須來自**本次分析**之 align_events receipt（見下方（iii）），
+  **不得**取匯入檔烤入之舊 `label_end_ms`／`label_start_ms`。
+- **`scope` ＝ split scope ＝ `symbol`**（碼證：`event_split.py:54` 之
+  `for symbol, g in t.groupby("symbol", sort=True)`；`:58-61` 之 `window`／`embargo`
+  皆在該 group 內計算）。
+  🔴 **主委裁決點（兩份補丁包互斥）**：`-purge-ms-conversion.md`（composer／grok）寫
+  「全批 `max_e`」；`-purge-multitf.md`（codex）寫「至少 per symbol」。
+  **採 codex 之 per-symbol**：切分本就逐 symbol 進行，洩漏只發生在同 symbol 時間軸內；
+  取全批 max 會對窗較小之 symbol **過度 purge**，而 Task 2.1b 明訂
+  「過度保守亦屬錯誤：purge 過寬會吃掉訓練樣本」。
+  換算公式則採 composer／grok 版（批次層深度 × 逐列 tf），
+  因 D-7 只定義**批次層**深度，codex 之 `lookahead_bars(e)` 無 D-7 依據。
+- 🔴 **實作約束（實碼 receipt，非推測）**：`SplitConfig.embargo_ms` 現為**單一 scalar**
+  （`event_split.py:59`），無法直接表達 per-symbol 下界；而 `embargo_ms is None` 時
+  現碼**已**逐 symbol 取 `window.max()`。⇒ 實作二擇一，**須在 TODO 階段寫死一種**：
+  ① 擴充 `SplitConfig` 為 per-scope embargo；或
+  ② 傳 `embargo_ms=None`，並確保 `lookahead_depth_ms` 之下界已被折進該 scope 之
+     `label_end_ms − label_start_ms`（即 windows 已反映深度下界）。
+  **不得**以單一 batch scalar 冒充 per-scope 下界而不揭露其過度 purge。
+- 此式之驗收落 Task 7.0b ⑨（含混 1h／12h、跨 symbol、兩側各自勝出之反例）。
+
+**（iii）分析時 receipt 之唯一性與階段順序（CODEX-R9-P0-01）**
+
+R8 版 §D-3a 只寫「②以該次 h 建立 purge／split ③以同一 spec 產生 labels」，
+**未定義②所用之 window 從哪來** ⇒ 實作者會沿用匯入檔之
+`label_start_ms`／`label_end_ms`，使 h=7 在 h=1 之舊 window 上建 split（under-purge）。
+碼證：現行可執行鏈為 `align_events` → `build_event_manifest` → `split_events`
+（`pipeline.py:189-200`），而 `event_split.py:58-61` 直接吃 manifest 之
+`label_end_ms − label_start_ms`。
+
+**五階段（固定順序，不得顛倒；取代 R8 版之三步）**：
+1. **驗證** `event_label_spec`（h／entry／mode／k 之型別與 §F-1′ 支援矩陣）。
+2. **prepare-windows**：以該 spec 覆寫 in-memory record copy 之四欄後跑**一次**
+   `align_events`，產生帶 **receipt id／hash** 之分析時
+   `decision_at_ms`／`entry_at_ms`／`label_start_ms`／`label_end_ms` ＋ per-TF feature cutoff。
+3. **coverage**：Task 7.7 之對證**讀同一份 receipt**（不得讀匯入檔舊值）。
+4. **purge／split**：以同一 receipt ＋（ii）之式計 `purge_lower_bound_ms(scope)` 並建 split。
+5. **materialize labels**：只用同一 receipt 之有效事件產生 `label_value` 並餵 `ic_feed`。
+
+- 🔴 **匯入檔之舊 `label_start_ms`／`label_end_ms`／`label_value` 不得進入 3／4／5 任一處。**
+- producer API 須**明示**「prepare windows」與「materialize values」兩階段
+  （或等價地回傳並重用同一 receipt），**不得靠呼叫順序推測**。
+- 驗收落 Task 7.0b ⑧⑨＋新增之 receipt 同一性斷言；
+  mutation：coverage 或 split 改讀匯入檔舊 receipt ⇒ 須紅。
 
 **碼證（皆可重跑）**：
 `eventExport.ts:75-79`（`label` 來自 `positive_case`，**不看答案窗**）／
@@ -184,8 +248,11 @@ purge_lower_bound = max(lookahead 深度換算之 ms, 本次 event_label_spec �
 ⚠️ 補丁包 `-arch-shift.md` 之 AUTHORITY 亦持該被推翻之宣稱 ⇒ **該句不採**；
 採 `-codex-pit-wiring.md` 之版本。
 
-- IC analyze 之執行順序固定為 3 步且不得顛倒：①檢核 `event_label_spec`（h／mode／entry／k）
-  ②**以該次 h 建立 purge／split** ③以同一 spec 產生 labels。
+- IC analyze 之執行順序固定且不得顛倒。
+  🔴 **R9 改寫**：R8 版寫「3 步：①檢核 spec ②以該次 h 建立 purge／split ③以同一 spec 產生 labels」
+  ——**②所用之 window 從哪來未定義**（CODEX-R9-P0-01）⇒ 實作者會沿用匯入檔舊值。
+  **階段之權威定義已移至 §D-3′-a（iii）之五階段**（prepare-windows 先於 coverage／split／labels），
+  本節不重述階段清單。
 - **禁止**沿用匯入檔烤入之舊 `label_end_ms − label_start_ms` 當 embargo
   ——改大 h 時 purge 會小於實際 label window ⇒ **train/test 洩漏，違反 §C0**。
 - 每列 feature sample key 須為 receipt 之 `last_bar_open_ms`／`decision_at_ms`，
@@ -452,12 +519,20 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
 ① 每 event 之 `label_value`
 ② 每 event 之 label window（`label_start_ms`／`label_end_ms`）
 ③ feature timestamp map（`event_id → decision_at_ms`；即餵給 `ic_feed` 之 sample key）
-④ **purge boundary**（該次分析實際採用之 embargo ms）
+④ **purge boundary**——🔴 **R9 擴充**：須逐列凍結 `timeframe`、`lookahead_depth_ms(e)`、
+   `label_window_ms(e)`，再凍結**逐 scope（symbol）**之 `purge_lower_bound_ms(scope)`
+   （式之權威在 §D-3′-a（ii））。只凍一個 aggregate 數字**不足以**證偽單位換算錯誤
 ⑤ NaN／尾端不足之 mask（哪些 event_id 之 `label_value` 為 `None`）
+⑥ 🔴 **分析時 receipt 之 id／hash**（§D-3′-a（iii））——同一次分析中 coverage／split／labels
+   三處所讀之 receipt 須為同一份；golden 凍該 id／hash 使「其中一處改讀匯入檔舊值」可被證偽
 
 **覆蓋面（最小集；不足即不得宣稱本 golden 有效）**：
 `direction ∈ {long, short}` × `timeframe ∈ {1h, 12h}` × `h ∈ {1, 7}`，
 外加一組「尾端不足」之邊界 fixture。
+🔴 **R9 追加兩組（CODEX-R9-P0-02）**：
+（甲）**同批混 1h 與 12h**（同一 symbol）——證明 ms 換算逐列取該列 `timeframe`；
+（乙）**兩個 symbol、窗寬不同**——證明 `purge_lower_bound_ms` 逐 scope 各自成立，
+      小窗 symbol 未被大窗 symbol 過度 purge。
 
 **可證偽條（五條，皆須可獨立跑）**：
 1. 特徵截止仍為 `feature_cutoff_rule = max_close_ms_le_decision_at`（不變；受本 golden 之③保護）。
@@ -467,8 +542,14 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
 3. 尾端不足 ⇒ `label_value is None` 且該 event **不進** `ic_feed`（loud），**禁填 0**。
 4. **同批 h=3 與 h=7 兩次分析**：事件事實 id 集合**相同**；`label_value` 集合**不同**；
    ②④各自對應自己的 h。
-5. **mutation（兩條，皆須紅）**：分析改 h 卻不重算 window／embargo ⇒ ④紅；
-   以匯出檔烤入之舊 `label_value` 覆蓋分析結果 ⇒ ①紅。
+5. **多 TF 與多 symbol 之逐列換算**（R9 追加甲乙兩組 fixture）：
+   `lookahead_depth_ms(e)` 於 12h 列為 1h 列之 12 倍；
+   `purge_lower_bound_ms` 逐 symbol 各自成立。
+6. **mutation（五條，皆須紅）**：分析改 h 卻不重算 window／embargo ⇒ ④紅；
+   以匯出檔烤入之舊 `label_value` 覆蓋分析結果 ⇒ ①紅；
+   ms 換算改用批內 max tf 或固定 run tf ⇒ ④之逐列值紅；
+   `purge_lower_bound_ms` 改成全批單一 scalar ⇒ ④之 per-scope 值紅；
+   coverage／split／labels 三者改讀不同 receipt ⇒ ⑥紅。
 
 **序列化**：本 golden 之 dict → bytes **沿用 S-9 之同一參考實作**
 （`canonical_serialize.py::canonical_event_table_bytes`），**不得**另寫第二個 encoder。
@@ -603,6 +684,25 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   ③ `capability_unavailable_reasons` 因此增兩值：②之 reason
      ＋ Task 1.12 之 `split_blocked_unverifiable_lookahead`。
   ④ `label_definition.fields` 增 `filters`（型別＋`_doc`）以承載 Phase 2 之篩選條件（D-6）。
+  ⑤ 🔴 **R9 新增（CODEX-R9-P1-03）**：登記 **`lookahead_bars_declared`**——
+     `derived_fields.names` 加該名，`receipt_schema` 加其欄位與型別（`int >= 0`）。
+     語意＝**該批 label 定義所引用之最遠未來根數之真實值**（D-7 通則），
+     與 `label_definition.window.horizon_bars` **不同**（後者下限為 1，深度 0 時只是
+     serialization floor，見 §D-3′-a（i））。深度 > 0 時兩值相等。
+     receipt 缺該欄 ⇒ fail-closed，**不得**以 `1` 默認替代。
+  🔴 **步驟順序寫死（CODEX-R9-P1-05）**：本 Task 之**第一個動作**是建立改前基準，
+  **在動任何契約欄位之前**：
+  ```
+  cp momentum/Analysis/contracts/event_import_contract.json \
+     tests/momentum/event_samples/fixtures/event_import_contract.pre_gap3.json
+  cmp -s momentum/Analysis/contracts/event_import_contract.json \
+         tests/momentum/event_samples/fixtures/event_import_contract.pre_gap3.json
+  shasum -a 256 tests/momentum/event_samples/fixtures/event_import_contract.pre_gap3.json
+  ```
+  三條之輸出**須入 commit message** 作為 byte-faithful receipt。
+  fixture 建立後即視為 **immutable**；**runtime loader 不得讀該 fixture**
+  （只有測試以顯式 path 載入）；fixture 事後被改動 ⇒ 驗收 fail-closed。
+  ⚠️ 先改契約再複製、或產生 sanitized／重排版之 fixture ⇒ 差集失去改前語意，屬違規。
   🔴 **改前基準以 fixture 凍結**：`tests/momentum/event_samples/fixtures/event_import_contract.pre_gap3.json`
   ＝本批動工前之契約副本（位元組拷貝）。所有增量以**對該 fixture 之差集**表述，
   **不在 SPEC 或測試內重列既有 reason 字面**（重列即第二份副本）。
@@ -616,8 +716,18 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   ④`set(now['capability_unavailable_reasons']) - set(pre['capability_unavailable_reasons'])` **集合相等**於
     `{'split_blocked_unverifiable_lookahead','label_producer_unsupported_for_declared_semantics'}`
   ⑤`'filters' in now['label_definition']['fields']`
-  **mutation（兩條，皆須紅）**：把 `label_producer_unsupported_for_declared_semantics`
-  放回 `import_failure_reasons` ⇒ ③④；改動既有 reason 之順序 ⇒ ②。
+  ⑥🔴 **baseline fixture 之存在性與 byte-faithful**（CODEX-R9-P1-05）：
+    `test -f tests/momentum/event_samples/fixtures/event_import_contract.pre_gap3.json` rc=0；
+    該 fixture 之 sha256 `==` commit message 所記之值；
+    且 runtime loader（`load_event_import_contract` 之類）之搜尋路徑**不含** `tests/`
+    （斷言以 `inspect.getsource` 或設定值檢查，不靠註解宣稱）
+  ⑦🔴 **`lookahead_bars_declared` 已登記**：
+    `'lookahead_bars_declared' in now['derived_fields']['names']` 且
+    該欄出現在 `now['receipt_schema']`；`set(now['derived_fields']['names']) -
+    set(pre['derived_fields']['names'])` **集合相等**於 `{'lookahead_bars_declared'}`
+  **mutation（四條，皆須紅）**：把 `label_producer_unsupported_for_declared_semantics`
+  放回 `import_failure_reasons` ⇒ ③④；改動既有 reason 之順序 ⇒ ②；
+  刪除或改動 baseline fixture ⇒ ⑥；移除 `lookahead_bars_declared` 之登記 ⇒ ⑦。
 - 存活至：Phase 6。
 - 覆蓋風險：契約為**唯讀增量**——新 reason 與 `filters` 鍵在 Phase 2..7 全程只被讀取或填值，
   無任一 Task 刪改其字面與順序。Phase 2 之 Task 2.2 只寫 `filters` 之**值**；Phase 6 之 Task 6.0
@@ -867,8 +977,10 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 **Task 1.9 — 答案窗宣告與 purge 下界（D-7 之 L2 使用者介面；依賴 Task 1.10／1.11）**
 - 內容：CSV 上傳時，答案窗**預設取檔內最大可用 horizon**（有 `future_1..12` ⇒ 預設 12）；
   可往下調但須勾選「我的篩選條件未用到超過第 N 根」之聲明，UI 明示**此為無法驗證的聲明**；
-  欄位接受**任意正整數**（不限 1..12）。宣告值寫入 `label_definition.window.horizon_bars`，
-  由既有 `event_split.py` 之 `embargo = window.max()` 自動決定 purge 寬度。
+  欄位接受**任意正整數**（不限 1..12）。宣告值寫入 derived 欄 **`lookahead_bars_declared`**，
+  並以 `max(1, 宣告值)` 寫入 `label_definition.window.horizon_bars`（契約下限；
+  🔴 **R9 修正**：R8 版只寫後者，會把真實深度 0 讀成 1，見 §D-3′-a（i））。
+  purge 寬度之下界式見 §D-3′-a（ii），本欄不重述。
 - 驗證：`pytest tests/api -q -k gap3_horizon_declaration` ≥4 條——
   ①CSV 含 future_1..12 ⇒ 預設值 `== 12`
   ②未勾聲明而調低 ⇒ fail-closed（落檔數 `== 0`）
@@ -916,11 +1028,18 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   使用者**不得調低**（與 CSV 路徑之「可調低但需聲明」不同——此處是機器可證，不需聲明）。
   🔴 **深度公式（R4 群集 D；本批唯一權威定義，Task 1.9 與 V-12 一律引用本式）**：
   ```
-  depth = max( label_definition.window.horizon_bars ,
+  depth = max( declared_window_bars ,
                max over 所有實際被引用之欄位 c of  bars_of(c, timeframe) )
   bars_of(c, tf) = c.lookahead_bars                     # bar 命名欄
                  = c.lookahead_hours ÷ hours_per_bar(tf) # 小時命名欄（禁寫死常數）
   ```
+  🔴 **R9 修正左項（CODEX-R9-P1-03）**：R8 版左項寫
+  `label_definition.window.horizon_bars`——該欄自 §D-3′-a（i）起**下限為 1**，
+  深度 0 時只是 serialization floor ⇒ 直接當左項會把真實 0 讀成 1，
+  使 UI／purge／golden 互相不一致，且違反本 Task 覆蓋風險所禁之「過度 purge」。
+  ⇒ 左項改為 **`declared_window_bars` ＝ `lookahead_bars_declared`**
+  （契約 derived 欄，Task 1.1 ⑤ 登記；缺該欄 ⇒ fail-closed，**不得**以 `1` 默認替代）。
+  匯出／CSV 兩路徑寫入該欄之值即本式之輸出。
   ⇒ 深度**同時**取「宣告的答案窗」與「條件實際引用的最遠欄」之較大者，兩者缺一不可：
   只取前者會漏掉品質過濾欄；只取後者會漏掉「宣告 12 但條件只用 2」之情形。
   **四種 scenario 一律適用同一式**——A／B 之「事件在未來」由其 `window.horizon_bars` 表達，
@@ -1022,17 +1141,24 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
      `future_{h}bar_return`——**純供 Excel 分析攜帶**，不進 `ic_feed`、不決定任何 horizon。
   ② **移除**匯出面板之「主答案窗」單選；匯出端**不再**寫入 `label_value`
      （`label_value` 於契約為 `optional_fields`，省略合法）。
-  ③ `label_definition.window.horizon_bars` **仍寫入**，其值＝ **D-7 之 lookahead 深度宣告**
-     （語意與寫入規則之權威在 §D-3′-a，本 Task 不重述）。
+  ③ `label_definition.window.horizon_bars` **仍寫入**，其值＝
+     `max(1, lookahead_bars_declared)`（**下限 1 為契約 serialization floor**）；
+     **真實深度**另寫入 derived 欄 `lookahead_bars_declared`（Task 1.1 ⑤ 登記）。
+     語意與寫入規則之權威在 §D-3′-a（i），本 Task 不重述。
 - 驗證：`npx vitest run eventExportHorizonColumns` ≥5 條——
   ①附帶選 `[1,3,7]` ⇒ 匯出檔含 `future_{1,3,7}bar_return` 三欄
   ②`'label_value' in records[0]` `=== false`（**每一列皆然**，非只驗第一列）
   ③匯出面板**不存在**「主答案窗」控制項（以 testing-library `queryBy*` 斷言為 `null`）
-  ④`records[0].label_definition.window.horizon_bars` `===` 執行 Task 1.10／2.1b 之深度導出函式
-    對同一輸入之回傳（**呼叫同一 exported 函式比對，非寫死數字**）
-  ⑤附帶欄之選擇改變 ⇒ ④之值**不變**（證明附帶欄不參與深度導出）
-  **mutation（三條，皆須紅）**：匯出端恢復寫 `label_value` ⇒ ②；
-  把「主答案窗」控制項加回 ⇒ ③；`window.horizon_bars` 改讀附帶欄之 `max` ⇒ ④⑤。
+  ④`records[0].lookahead_bars_declared` `===` 執行 Task 1.10／2.1b 之深度導出函式
+    對同一輸入之回傳（**呼叫同一 exported 函式比對，非寫死數字**），
+    且 `records[0].label_definition.window.horizon_bars === Math.max(1, 該值)`
+  ⑤附帶欄之選擇改變 ⇒ ④所斷言之 `lookahead_bars_declared` 與 `window.horizon_bars`
+    **皆不變**（證明附帶欄不參與深度導出）
+  ⑥🔴 **深度 0 之 floor 行為**（§D-3′-a（i））：`scenario='C'` 且無品質過濾之 fixture
+    ⇒ `lookahead_bars_declared === 0` 且 `window.horizon_bars === 1`（兩者刻意不等）
+  **mutation（四條，皆須紅）**：匯出端恢復寫 `label_value` ⇒ ②；
+  把「主答案窗」控制項加回 ⇒ ③；`window.horizon_bars` 改讀附帶欄之 `max` ⇒ ④⑤；
+  把 `lookahead_bars_declared` 也寫成 `max(1, depth)` ⇒ ⑥。
 - 存活至：Phase 7（終）。
 - 覆蓋風險：本 Task **覆蓋** R1 版之 (a) 方案（刻意，見 §D-3 撤回理由）。
   **須同步**：Task 1.9 之覆蓋風險原寫「本 Task 之宣告值…與 Phase 4 之『主答案窗』為**同一欄位**」
@@ -1046,7 +1172,10 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 **Task 4.1b — 匯出時揭露每個選項在動什麼（使用者 2026-08-22：「我不知道有什麼東西」；R8 依 §D-3′ 改寫③）**
 - 內容：匯出面板明文顯示三件現行完全未告知之事實：
   ① **本批 scenario ＝ {實際值} — {契約 doc 之白話}**（由實際設定導出，**禁寫死**）
-  ② **lookahead 深度 ＝ {N} 根，來源＝{引用之欄位清單}**（依 D-7 通則導出；C 無品質過濾時為 0）
+  ② **lookahead 深度 ＝ {N} 根，來源＝{引用之欄位清單}**——`N` 取自 derived 欄
+    **`lookahead_bars_declared`**（依 D-7 通則導出；C 無品質過濾時為 **0**）；
+    🔴 **不得**顯示 `label_definition.window.horizon_bars`（該欄有下限 1 之 floor，
+    深度 0 時會顯示成 1，見 §D-3′-a（i））
   ③ **本批之 purge 下界（事件事實層）＝ {N} 根**，並說明「此深度來自你的 label 定義最遠引用到
     t0 之後第幾根」。🔴 **R8 增訂**：同時明示「條件 IC 分析時之實際 purge 另取本次答案窗，
     取兩者較大者」——公式之權威在 §D-3′-a（ii），本欄只揭露、不重述式子
@@ -1334,14 +1463,11 @@ producer 綁定」，其全部條文都建立在「`/search` 匯出端寫 `label
 （該鍵既有值＝`missing_label_value`／`missing_prevalence_disclosure`／`one_class_test_segment`；
 receipt：`event_import_contract.json` 之同名鍵）。
 🔴 **兩處清單之最終內容之權威在 Task 1.1**，本節**不重述計數亦不重述最終集合**。
-🔴 **該 reason 須先登記契約**（R6 群集 D；§C／D-6：新增 reason 一律先改契約）：
-登記於 `momentum/Analysis/contracts/event_import_contract.json` 之 `import_failure_reasons`；
-🔴 **該清單之最終計數與內容之權威在 Task 1.1**，本節**不重述計數**
-（R7 群集 B：R6 版此處寫「由 15 增為 16」而 Task 1.1 寫最終 `== 20`，
-兩個互斥終態並存，兩家獨立命中；同 §V 書寫規則之理由——複述即第二份副本）。
-程式與前端一律由該檔取字面，硬編碼數須 `== 0`。
-（R5 版遺漏此項：主委在 Task 7.5 之兩 reason 與 Task 7.7 之四 reason 皆明定登記處，
-唯獨此處未寫 ⇒ 同一規則未一致套用，grok 命中。）
+🔴 **R9 刪除 R6 殘段（三家全員命中：CODEX-R9-P1-04／COMPOSER-R9-P1-01／GROK-R9-P1-01）**：
+此處原殘留 R6 之祈使句「登記於 `import_failure_reasons`」，與上一段之
+`capability_unavailable_reasons` **同段互斥**，實作者讀後段會把 reason 加回匯入失敗清單。
+⇒ 該段已刪。本節對登記處**只引用 Task 1.1**，不再自寫任何登記祈使句或計數。
+程式與前端一律由契約檔取字面，硬編碼數須 `== 0`。
 🔴 **不得**單列 skip 後假裝成功，**更不得**在宣告 `next_open` 之下仍寫入 close→close 之數字
 ——那正是本群集要根除的假語意。
 
@@ -1463,16 +1589,21 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   - `ICAnalyzeRequest` 新增 `event_import_id: Optional[str]` 與
     `event_label_spec: Optional[dict]`（欄集恰為 ① 所列四鍵）。
   - `event_label_spec` 存在而 `event_import_id` 缺 ⇒ `400`；反之（只給 import_id）
-    ⇒ 以該批之匯出宣告值為分析參數初始值（F-0）。
+    ⇒ **報酬語意三元組**以該批之匯出宣告值為初始值（F-0 之三鍵）；
+    🔴 **`horizon_bars` 缺省為字面常數 `1`**（GROK-R9-P1-03；本批不做 session 記憶）。
+    **禁止**以匯出檔／已落檔批之 `label_definition.window.horizon_bars` 種子化分析用 `h`
+    ——§D-3′-a 已裁定該欄語意為 D-7 深度宣告、**分析層禁止讀為答案窗**；
+    既有批之該欄殘值為 `3`，種子化即等於靜默給錯預設答案窗。
   - 🔴 現況 `event_import_id` **只存在於前端 config**、從未送到後端
     （receipt：`ICConfigPanel.tsx:275-277` 寫入 config；`useICAnalysis.ts:283-286`
     只送 `event_timestamps`）⇒ 本 Task 一併補此 wiring。
 
-  **④ 執行順序與 purge（§D-3a 三步之落地點）**
-  `_run_analysis` 之事件分支固定為：①檢核 `event_label_spec`
-  ②以 **§D-3′-a（ii）之 `max` 式**計 purge 下界並建 split
-  ③以同一 spec 呼叫 ① 之 producer 產生 labels ④ labels 餵 `ic_feed`。
+  **④ 執行順序與 purge（§D-3′-a（iii）五階段之落地點）**
+  `_run_analysis` 之事件分支**逐字實作 §D-3′-a（iii）之五階段**，本欄不重述階段清單。
+  purge 下界取 **§D-3′-a（ii）之 `purge_lower_bound_ms(scope)`**（本欄不重述公式）。
   **禁止**沿用匯入檔之 `label_end_ms − label_start_ms` 當 embargo。
+  🔴 **R9 改寫**：R8 版此欄自寫「①②③④」四步，與 §D-3a 之三步**又是第二份副本**，
+  且同樣未定義②所用之 window 來源（CODEX-R9-P0-01）⇒ 改為純引用。
 
 - 驗證（pytest 兩組 ＋ vitest 兩組，逐條如下）：
   `pytest tests/momentum/event_samples/ -q -k analysis_label_producer` ≥7 條——
@@ -1489,17 +1620,31 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     （斷言 `ic_feed` 輸入之鍵集不含該 eid；**非**填 0）
   `pytest tests/api -q -k event_analysis_horizon_purge` ≥5 條——
   ⑧`h=7` **不得**沿用 `h=1` 之 labels／split；`split purge >=` 本次 label end
-  ⑨purge 下界 `==` §D-3′-a（ii）之 `max(lookahead 深度, 本次 h 窗寬)`：
-    以「深度 12、h=3」與「深度 1、h=7」兩組 fixture 各驗一次，證明兩邊都可能是勝者
-  ⑩`event_label_spec` 存在而 `event_import_id` 缺 ⇒ `400`
-  ⑪`event_import_id` 確實由前端送達後端（`npx vitest run icEventAnalysisRequest` ≥2 條：
-    選批後送出之 payload 含 `event_import_id` 與 `event_label_spec`）
-  ⑫🔴 **前端不得持有 `label_value`**：斷言
+  ⑨purge 下界 `==` §D-3′-a（ii）之 `purge_lower_bound_ms(scope)`
+    （深度與窗寬**皆已換算 ms**；公式之唯一定義在 §D-3′-a（ii），本欄不重述）。
+    fixture 須涵蓋**四組**，證明各維度都可能是勝者且換算逐列：
+    (a)「深度 12、h=3」⇒ 深度側勝　(b)「深度 1、h=7」⇒ 窗寬側勝
+    (c) **同批混 1h 與 12h 各一列**（同 symbol）⇒ 兩列之 `lookahead_depth_ms`
+        相差 12 倍，斷言用**該列** `timeframe` 換算，而非批內 max／min tf
+    (d) **兩個 symbol、各自窗寬不同** ⇒ 斷言 purge 下界**逐 symbol 各自成立**，
+        且小窗 symbol **未被**大窗 symbol 的值過度 purge
+  ⑩🔴 **分析時 receipt 之唯一性（§D-3′-a（iii））**：同一次分析中，
+    Task 7.7 之 coverage、split 之 purge、餵 `ic_feed` 之 labels **三者所用之
+    `label_start_ms`／`label_end_ms`／`decision_at_ms` 逐列位元組相同**
+    （斷言三處取到同一 receipt id／hash）；且該 receipt **不等於**匯入檔之對應值
+    （以 `decision_offset_bars=3`、匯入 `window.horizon_bars=3`、分析 h=7 之 fixture 驗）
+  ⑪`event_label_spec` 存在而 `event_import_id` 缺 ⇒ `400`
+  ⑫`event_import_id` 確實由前端送達後端（`npx vitest run icEventAnalysisRequest` ≥3 條：
+    選批後送出之 payload 含 `event_import_id` 與 `event_label_spec`；
+    且**只給 import_id 時** `event_label_spec.horizon_bars === 1`（非匯出之深度欄值））
+  ⑬🔴 **前端不得持有 `label_value`**：斷言
     `grep -cE "label_value" frontend/src/lib/eventExport.ts` `== 0` 且
     `grep -cE "label_value" frontend/src/hooks/useICAnalysis.ts` `== 0`
-  **mutation（六條，皆須紅）**：`supported` 恆真 ⇒ ③；short 不取負 ⇒ ②；
-  purge 改回沿用匯入值 ⇒ ⑧；`max` 式改成只取本次 h ⇒ ⑨；
-  尾端不足改填 0 ⇒ ⑦；在 TS 重寫一份公式 ⇒ ⑫。
+  **mutation（九條，皆須紅）**：`supported` 恆真 ⇒ ③；short 不取負 ⇒ ②；
+  purge 改回沿用匯入值 ⇒ ⑧；把 ms 換算改成批內 max tf 或固定 run tf ⇒ ⑨(c)；
+  purge 下界改成全批單一 scalar ⇒ ⑨(d)；深度與窗寬直接 `max` 而不換算 ⇒ ⑨(a)；
+  coverage 或 split 改讀匯入檔舊 receipt ⇒ ⑩；
+  尾端不足改填 0 ⇒ ⑦；在 TS 重寫一份公式 ⇒ ⑬。
 - 存活至：Phase 7（終）。
 - 覆蓋風險：本 Task **取代** R7 版之匯出端 producer（刻意；見上「REOPEN」）。
   **須同步**：§F-5′ 若日後開放更多三元組，只需擴充本函式之支援矩陣與 §G G-3 之 golden，
@@ -1639,8 +1784,15 @@ R7 版之驗收⑥（reason 取自 `import_failure_reasons`）亦隨 F-2′ 之�
   🔴 `control_kind` 為 R7 群集 D 補入：Task 4.1b 之覆蓋風險宣稱本 Task 為其**嚴格超集**
   並要求 7.3 上線時移除 4.1b 之獨立實作，但本清單原**漏掉 4.1b 明列之 `control_kind`**
   ⇒ 取代後 UI 反而不再揭露該批 control kind（codex 命中）。
-- 驗證：vitest 改任一維度 ⇒ 顯示字串隨之改變（斷言前後 `!==`）；
-  `control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
+  🔴 **R9 追記（實作形態）**：本 Task 之文案須來自 Task 7.6 內容②所定義之
+  **欄位級 formatter registry**（每欄一個 formatter），本頁只選取自己的欄集；
+  **不得**寫成硬編欄集之面板級 formatter——IC 分析頁之欄集與本頁不同，
+  面板級共用會逼其中一頁多顯示或少顯示欄位。
+- 驗證：`npx vitest run eventExportDisclosure` ≥3 條——
+  ①改任一維度 ⇒ 顯示字串隨之改變（斷言前後 `!==`）
+  ②`control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）
+  ③本頁與 Task 7.6 取用**同一 registry 物件**（斷言同一 exported 參考），
+    且兩頁之欄集**不相等**（證明共用的是 registry 而非欄集）。
 - 存活至：Phase 7（終）。
 - 覆蓋風險：本 Task **取代** Phase 4 之 Task 4.1b（後者為其真子集，見 4.1b 之覆蓋風險）；
   Phase 7 為最後一個 Phase ⇒ 本 Task 為本批揭露之終點，無更後續之覆蓋者。**須同步**：本 Task 之
@@ -1736,28 +1888,45 @@ R7 版之驗收⑥（reason 取自 `import_failure_reasons`）亦隨 F-2′ 之�
 與 §D-3′「答案窗與報酬語意於 IC 分析頁由使用者給定」**直接互斥**。
 解法＝**把原本混為一談的「批次設定」拆成兩類**（`-arch-shift.md` 之 Task 7.6 diff 即此意）：
 
-| 類別 | 欄 | 在 IC 頁 | 寫回事件批？ |
-|---|---|---|---|
-| **批次事實欄** | `scenario`／`control_kind`／`direction`／`t0`／`label` | **唯讀揭露** | — |
-| **分析參數**（`event_label_spec`） | `horizon_bars`／`entry_price_semantic`／`label_return_mode`／`decision_offset_bars` | **可設定**；初始值＝該批之匯出宣告（F-0） | 🔴 **否**——只作用於本次分析用副本 |
+🔴 **R9 再改（CODEX-R9-P1-07＋GROK-R9-P1-02 兩家獨立命中）**：R8 版之「批次事實欄」表列
+`direction`／`t0`／`label`，而同 Task 之 detail 驗收鍵集卻是三元組三鍵 ⇒ **同 Task 兩處互斥**，
+Agent 無法唯一決定唯讀集合與 `direction` 之歸屬。下表為**三分之權威定義**（封閉集合）：
+
+| 類別 | 欄集合（封閉） | 在 IC 頁 | detail 端點 | 寫回事件批？ |
+|---|---|---|---|---|
+| **批次事實欄** | `{scenario, control_kind, direction, t0, label}` | **唯讀揭露** | **必須**回傳；驗收②之集合相等對象、驗收③之 DOM 不可編輯對象皆為本集合 | — |
+| **批次宣告種子（F-0）** | `{entry_price_semantic, label_return_mode, decision_offset_bars}` | 顯示於分析參數區作為初始值 | 可回傳，但**不計入**「批次事實欄」之集合相等 | — |
+| **分析參數**（`event_label_spec`） | `{horizon_bars, entry_price_semantic, label_return_mode, decision_offset_bars}` | **可設定**；三元組初始值＝F-0 種子，`horizon_bars` 初始值＝**常數 `1`** | — | 🔴 **否**——只作用於本次分析用副本 |
+
+🔴 `direction` 歸**批次事實**（它決定 short 取負、是 §G G-3 之 golden input），
+**不**進 `event_label_spec`、**不**可在 IC 頁修改。
 
 - 內容（三件事）：
   ① 事件批 detail 端點回傳該批之**五維度實際值**（既有需求，不變）。
-  ② IC 分析頁選批後：**批次事實欄唯讀揭露**，文案模板與 Task 7.3 之匯出面板揭露
+  ② IC 分析頁選批後：**批次事實欄唯讀揭露**，文案與 Task 7.3 之匯出面板揭露
      **共用同一實作**（不另寫第二份）。
+     🔴 **共用之粒度為「欄位級」，非「面板級」**（CODEX-R9-P1-07 之衍生要求）：
+     兩頁之揭露**欄集不同**（匯出面板揭露五維度＋lookahead＋purge；IC 頁揭露批次事實五欄），
+     故共用者為單一 exported **欄位→白話字串** registry
+     （每個欄位一個 formatter，值由實際設定導出），各頁只選取自己的欄集。
+     **不得**寫成兩個各自硬編欄集的面板級 formatter——那正是第二份副本。
   ③ IC 分析頁新增**分析參數區**：`event_label_spec` 之四欄。
-     - `horizon_bars`：任意正整數，可自由設定（§F-1′ 不限制 h）。
+     - `horizon_bars`：任意正整數，可自由設定（§F-1′ 不限制 h）；
+       🔴 **初始值＝字面常數 `1`**，**禁止**以匯出檔之 `label_definition.window.horizon_bars`
+       種子化（該欄語意為 D-7 深度宣告，§D-3′-a 已裁定分析層禁止讀為答案窗）。
      - 報酬語意三元組：本批**可操作集合鎖定 F-1′**，其餘值 disabled ＋顯示
        §F-5′ 之開放前置理由。排除集合沿用 Task 7.1 之 `EVENT_DIM_PATH_EXCLUSIONS`
        （新增路徑鍵 `'/ic-analysis'`），**不另建第二份排除清單**。
      - 🔴 同時揭露 **本次答案窗之可算／缺筆數**（Task 4.3／5.3 由匯出層移來之揭露）。
      - 🔴 同時揭露 **本次 purge 下界**，其式之權威在 §D-3′-a（ii），本區只顯示結果。
 - 驗證（pytest 一組 ＋ vitest 一組，逐條如下）：
-  `pytest tests/api -q -k event_batch_detail_dims` ≥2 條——斷言 detail 回應之維度鍵集
-  **集合相等**於 `{scenario, control_kind, entry_price_semantic, label_return_mode,
-  decision_offset_bars}`（🔴 **明列鍵名、不用計數字面**；理由見本 Task 覆蓋風險），
-  且各值 `==` 該批落檔記錄之實際值（非預設值）；
-  `npx vitest run icEventBatchDisclosure` ≥6 條——
+  `pytest tests/api -q -k event_batch_detail_dims` ≥3 條——
+  ①detail 回應之**批次事實欄**鍵集**集合相等**於 `{scenario, control_kind, direction, t0, label}`
+    （🔴 **明列鍵名、不用計數字面**；集合之權威在上方三分表）
+  ②detail 回應**另含** F-0 種子三鍵 `{entry_price_semantic, label_return_mode, decision_offset_bars}`，
+    且該三鍵**不**計入①之集合相等
+  ③各值 `==` 該批落檔記錄之實際值（非預設值）；
+  `npx vitest run icEventBatchDisclosure` ≥7 條——
   ①批次事實欄之各段文字皆出現，且與 Task 7.3 呼叫**同一 exported formatter**
     （斷言為同一函式參考，非各自複製）
   ②改批次之任一事實欄 ⇒ 顯示字串 `!==` 前值
@@ -1767,17 +1936,21 @@ R7 版之驗收⑥（reason 取自 `import_failure_reasons`）亦隨 F-2′ 之�
   ⑤三元組之**可操作**選項集合 `==` §F-1′ 之唯一三元組；其餘值 disabled 且顯示理由
   ⑥**改分析參數不改事件批**：改 `horizon_bars` 後重查 detail 端點，
     該批落檔記錄之 `label_definition.window.horizon_bars` **不變**（證明不回寫）
-  **mutation（四條，皆須紅）**：把揭露文案改成前端寫死 ⇒ ①；
+  ⑦🔴 **`h` 不得由匯出深度欄種子化（GROK-R9-P1-03）**：既有批之
+    `label_definition.window.horizon_bars === 3`（深度欄殘值）且使用者**未改**分析參數
+    ⇒ 送出 payload 之 `event_label_spec.horizon_bars === 1`（**非** `3`）
+  **mutation（五條，皆須紅）**：把揭露文案改成前端寫死 ⇒ ①；
   把批次事實欄改成可編輯 ⇒ ③；三元組開放 F-1′ 以外之值 ⇒ ⑤；
-  分析參數回寫事件批 ⇒ ⑥。
+  分析參數回寫事件批 ⇒ ⑥；改回以匯出 `window.horizon_bars` 種子化 `h` ⇒ ⑦。
 - 存活至：Phase 7（終）。
 - 覆蓋風險（R6 群集 B 追記）：驗收改以**明列鍵名之集合相等**之理由——R4 版寫「detail 回應
   含六個鍵」，R5 群集 G 把批次維度六改五時該字面未同步，**三家全員命中**；
   且因未列鍵名，Agent 無法唯一決定第六鍵，可能把已移出之 `counterexample_kind` 加回。
   🔴 **R8 追記**：本 Task 由「只讀不寫」改為「讀 ＋ 收分析參數」⇒ **確實改動 IC 計算路徑**
   （分析參數餵 Task 7.0b 之 producer）；原「不改任何 IC 計算路徑 ⇒ 無後續 Phase 覆蓋」
-  之理由已不成立，改由 Task 7.0b 之驗收⑧⑨⑪承接該路徑之正確性。
-  **須同步**：與 Task 7.3 共用 formatter ⇒ 7.3 之事實欄集合擴充時本頁自動跟進；
+  之理由已不成立，改由 Task 7.0b 之驗收⑧⑨⑩承接該路徑之正確性。
+  **須同步**：與 Task 7.3 共用**欄位級** formatter registry ⇒ 新增欄位時兩頁自動有文案，
+  但**欄集各自選取**（兩頁欄集不同，見內容②）；
   分析參數之欄集與 Task 7.0b 之 `event_label_spec` 為**同一組**，欄位增減須同批改。
 - 邊界：批次事實欄**只揭露、不可改**；分析參數**只作用於本次分析**、**不回寫**事件批。
 - 不可做：不得只在 tooltip 顯示 `importId` 就算揭露（使用者要的是語意，不是識別碼）；
@@ -1808,7 +1981,11 @@ R7 版之驗收⑥（reason 取自 `import_failure_reasons`）亦隨 F-2′ 之�
      ⇒ 整批 fail-closed，reason `== "feature_coverage_unknown_timeframe"`。
      此為與 R3 之 future72 單位錯**同型**之缺口（grok 明指），故單位來源須寫死於本欄。
   ③ **containment policy（唯一；R5 群集 E 修正左界）**：
-     優先取 alignment receipt 之既有欄位，**不自行以裸 `horizon_bars` 加時間戳**：
+     🔴 **R9 收緊（CODEX-R9-P0-01）**：所取之 receipt **必須是 §D-3′-a（iii）階段 2 產生之
+     本次分析 receipt**（其 id／hash 與 split／labels 所用者相同），
+     **不得**讀匯入檔烤入之 `label_start_ms`／`label_end_ms`——否則 h=7 之 coverage
+     會以 h=1 之舊右界判定而 fail-open。
+     取 alignment receipt 之既有欄位，**不自行以裸 `horizon_bars` 加時間戳**：
      ```
      required_start(e) = receipt.decision_at_ms(e)      # = t0 往前 decision_offset_bars 根
      required_end(e)   = receipt.label_end_ms(e)        # = 含答案窗之右界
@@ -1941,7 +2118,7 @@ R7 版之驗收⑥（reason 取自 `import_failure_reasons`）亦隨 F-2′ 之�
 | G-1 | IC 主線未被波及 | `python3 scripts/gap3_freeze_golden.py --check` | 通過。**誠實邊界：不涵蓋事件路徑**（D-4） |
 | G-2 | 事件路徑數值未意外改變 | 本批新建之事件 golden | 逐 horizon exact return（`atol=0`）／NaN mask／PIT anchor 全等；Task 4.2 之合法變更須同 commit 更新並說明 |
 | G-3 | **分析時** `label_value`／window／purge／feature timestamp map 未意外改變（D-3′） | 本批新建之 analysis-label golden（§G G-3） | `pytest tests/momentum/event_samples/ -q -k analysis_label_golden` rc=0；覆蓋面與可證偽條之唯一定義見 §G G-3。**誠實邊界：G-2 涵蓋不到此路徑**（兩者不可互相替代） |
-| V-16 | 分析時 producer 之支援矩陣、purge 下界與前端不持有 `label_value`（D-3′／D-3a／F-1′／F-2′／F-4′） | **執行 Task 7.0b 之驗證欄全部條目**；§V 不重述支援矩陣與 purge 公式 | Task 7.0b 之命令皆 rc=0 且條目數 `>=` 其所列；purge 下界之唯一定義見 §D-3′-a（ii） |
+| V-16 | 分析時 producer 之支援矩陣、purge 下界（含逐列 ms 換算與 per-scope 聚合）、分析時 receipt 之唯一性、前端不持有 `label_value`（D-3′／D-3a／F-1′／F-2′／F-4′） | **執行 Task 7.0b 之驗證欄全部條目**；§V 不重述支援矩陣、purge 公式與階段清單 | Task 7.0b 之命令皆 rc=0 且條目數 `>=` 其所列；purge 下界之唯一定義見 §D-3′-a（ii）、階段之唯一定義見 §D-3′-a（iii） |
 | V-17 | IC 分析頁：批次事實欄唯讀、分析參數可設定且不回寫（D-3′） | **執行 Task 7.6 之驗證欄全部條目**；§V 不重述斷言字面 | Task 7.6 之命令皆 rc=0 且條目數 `>=` 其所列 |
 | V-11 | 五維度全接出、不可漂移、且**選值真的傳到落檔**（Phase 7） | **執行 Task 7.2 之驗證欄全部條目**（三層＋其 mutation）；§V 不重述任何斷言字面 | `npx vitest run contractEnumWiring` rc=0 且用例數 `>=` Task 7.2 所列；集合層之唯一基準 ＝ Task 7.1 定義之 `selectable(path, dim)` |
 | V-12 | lookahead 深度由標註導出、未知即擋（D-7 之 L1/L2/L3） | **執行 Task 1.10／1.11／1.12／2.1b 之驗證欄全部條目**；§V 不重述深度公式與 fixture 條文 | 各該 Task 之命令皆 rc=0；深度公式之唯一定義見 Task 2.1b，改名攻擊之判準見 Task 1.10。🔴 **R8 邊界**：本列只管**深度導出**；深度與分析時 h 合成 purge 下界之 `max` 式屬 §D-3′-a（ii），由 **V-16** 承接，兩列不重疊 |

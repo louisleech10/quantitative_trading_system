@@ -29,10 +29,17 @@ R5 起改由委員逐條指定修法、主委照抄，技術決策因此零錯�
     - <命令>
 
 用法：
-    python3 scripts/patch_locus_check.py <patch.md> [<patch.md> ...] [--diff-base <git-ref>]
+    python3 scripts/patch_locus_check.py <patch.md> [...] [--diff-base <ref>] [--also-impl]
 
 不給 --diff-base 時，比對「工作區相對 HEAD」之改動（含 staged 與 unstaged）。
-rc: 0=diff 覆蓋全部 SYNC-LOCI；2=有 locus 未被觸及（或補丁包格式不合）
+🔴 **commit 之後複驗必須帶 `--diff-base <套用前 ref>`**（GROK-R9-P1-04 ④）：
+   對乾淨 worktree 跑無 base 之檢查，會把**已落地**之 locus 誤報為「檔案未被本次改動」
+   ——那是方法論假紅，與 stage／quotepath 是三件不同的事，勿混為一談。
+
+SYNC-LOCI 每列可加 stage 後綴 `@spec`／`@doc`／`@harness`／`@impl`（**缺省＝`@spec`**）。
+未達之 `@impl` 列為 DEFERRED、不計 rc；`--also-impl` 使其亦計入（**只加寬，不縮窄**）。
+
+rc: 0=diff 覆蓋全部非 DEFERRED 之 SYNC-LOCI；2=有 locus 未被觸及（或補丁包格式不合）
 
 🔴 **2026-08-23 強度訂正（CODEX-R8-P1-06）**：首版只以「dirty worktree 之**檔名**集合」
 判定 locus ⇒ 同檔之**無關修改**、或該檔本來就 dirty，即可被誤算為「補丁已套用」。
@@ -61,9 +68,40 @@ _LOCI_START = re.compile(r'^SYNC-LOCI:\s*$')
 _LOCI_ITEM = re.compile(r'^\s*-\s+(\S+?)(?:#(.+))?\s*$')
 _SECTION = re.compile(r'^(AUTHORITY|BEFORE/AFTER|VERIFY|BEFORE|AFTER)\s*:')
 
+# 🔴 R9（CODEX-R9-P1-06 ＋ GROK-R9-P1-04；三家議題一裁定）：stage 維度。
+#
+# 病根：R8 之補丁包把「SPEC 段落」與「實作階段才會動到的程式檔」混列在同一份 SYNC-LOCI。
+#   epic 在規格階段，那些程式檔現在不該動 ⇒ locus 閘必紅，且無法區分
+#   「合法的凍前狀態」與「主委漏套」。
+#
+# 三家裁定（brief 議題一）：**stage 是補丁包自我宣告的責任資料，不是呼叫端的降噪開關**。
+#   ⇒ 呼叫端**只能加寬**（`--also-impl`），**不得**有「只檢查某 subset」之旗標。
+#
+# 兩份補丁包互斥，主委裁決採 GROK 版（逐 locus 後綴）：
+#   · CODEX `-locus-stage.md`：`STAGE:` header，每包單一 stage，impl loci 另立包。
+#   · GROK  `-locus-stage-quotepath.md`：逐 locus `@stage` 後綴，缺省 `@spec`。
+#   採後者之理由：一次改動本就同時觸及 SPEC 文字、白話說明與治理腳本（不同 stage
+#   但同一件事），強制「每包單一 stage」會逼委員把一個群集拆成三包，反而增加漏列面；
+#   逐 locus 後綴之預設值是 `@spec`（最嚴），未標註者行為與 R8 完全相同 ⇒ 不放寬。
+_STAGES = ('spec', 'doc', 'harness', 'impl')
+_DEFAULT_STAGE = 'spec'
+_STAGE_SUFFIX = re.compile(r'\s*@(' + '|'.join(_STAGES) + r')\s*$')
+
+
+def _git(*args):
+    """git 呼叫統一入口。
+
+    🔴 **必加 `-c core.quotepath=false`**（GROK-R9-P1-04，實測）：預設 `quotepath=true`
+    時，非 ASCII 路徑會被輸出成 `"\\347\\231\\275\\350\\251\\261..."` 八進位字面，
+    與 SYNC-LOCI 之 UTF-8 路徑**永不相等** ⇒ `白話說明/…` 這類檔即使已改也報
+    「檔案未被本次改動」。此為機械閘之**假紅**，與 R8 之輸出截斷、pipefail 假綠同型。
+    """
+    return subprocess.run(['git', '-c', 'core.quotepath=false'] + list(args),
+                          capture_output=True, text=True)
+
 
 def parse_patch(path):
-    """回傳 (loci, errors)；loci 為 [(檔案, 錨點or None)]。"""
+    """回傳 (loci, errors)；loci 為 [(檔案, 錨點or None, stage)]。"""
     loci, errors = [], []
     text = io.open(path, encoding='utf-8').read()
     if 'AUTHORITY:' not in text:
@@ -83,7 +121,34 @@ def parse_patch(path):
                 continue
             m = _LOCI_ITEM.match(line)
             if m:
-                loci.append((m.group(1), m.group(2)))
+                f, anchor = m.group(1), m.group(2)
+                stage = _DEFAULT_STAGE
+                if anchor:
+                    sm = _STAGE_SUFFIX.search(anchor)
+                    if sm:
+                        stage = sm.group(1)
+                        anchor = _STAGE_SUFFIX.sub('', anchor).strip() or None
+                else:
+                    sm = _STAGE_SUFFIX.search(f)
+                    if sm:
+                        stage = sm.group(1)
+                        f = _STAGE_SUFFIX.sub('', f).strip()
+                # 🔴 anchor 格式閘（三家一致；CODEX-R9-P1-06 ③、GROK-R9-P1-04 ③）：
+                #   anchor 必須是**該檔當前內容可字面找到**之字串。
+                #   R8 有五個 anchor 寫成敘述（`檔頭 A-6／FROZEN 句`／`§A-A-6`／`§G-G-2`…），
+                #   這些字串在檔內根本不存在 ⇒ 實質內容改完了、閘仍紅，且紅得沒有資訊。
+                #   ⇒ 提交當下就 fail-closed（委員責任），不等到 diff 對證。
+                #   誠實邊界：本閘不驗 anchor 是否**精確指到該改的段落**，只驗它存在。
+                if anchor and os.path.isfile(f):
+                    try:
+                        cur = io.open(f, encoding='utf-8', errors='replace').read()
+                    except IOError:
+                        cur = ''
+                    if anchor not in cur:
+                        errors.append(
+                            'anchor 非字面：`%s#%s` 在該檔當前內容中找不到'
+                            '（敘述型 anchor 不可用；須為可 grep 之字面）' % (f, anchor))
+                loci.append((f, anchor, stage))
             elif line.strip() == '':
                 continue
             else:
@@ -105,13 +170,11 @@ def changed_files(base):
     """
     names = set()
     if base:
-        out = subprocess.run(['git', 'diff', '--name-only', base],
-                             capture_output=True, text=True)
+        out = _git('diff', '--name-only', base)
         if out.returncode != 0:
             return None
         names |= {l.strip() for l in out.stdout.splitlines() if l.strip()}
-    st = subprocess.run(['git', 'status', '--porcelain', '-z', '-uall'],
-                        capture_output=True, text=True)
+    st = _git('status', '--porcelain', '-z', '-uall')
     if st.returncode != 0:
         return None
     for rec in st.stdout.split('\0'):
@@ -121,8 +184,7 @@ def changed_files(base):
 
 
 def _head_time():
-    out = subprocess.run(['git', 'log', '-1', '--format=%ct'],
-                         capture_output=True, text=True)
+    out = _git('log', '-1', '--format=%ct')
     if out.returncode != 0 or not out.stdout.strip():
         return None
     return int(out.stdout.strip())
@@ -154,12 +216,12 @@ def diff_hunks(path, base):
     """回傳該檔之 diff hunk 內容（含新增與刪除行）。未追蹤檔 ⇒ 回全檔內容。"""
     cmds = []
     if base:
-        cmds.append(['git', 'diff', '-U0', base, '--', path])
-    cmds.append(['git', 'diff', '-U0', 'HEAD', '--', path])
-    cmds.append(['git', 'diff', '-U0', '--cached', '--', path])
+        cmds.append(['diff', '-U0', base, '--', path])
+    cmds.append(['diff', '-U0', 'HEAD', '--', path])
+    cmds.append(['diff', '-U0', '--cached', '--', path])
     body = ''
     for c in cmds:
-        out = subprocess.run(c, capture_output=True, text=True)
+        out = _git(*c)
         if out.returncode == 0:
             body += out.stdout
     if body.strip():
@@ -181,6 +243,8 @@ def main(argv):
             return 2
         base = args[i + 1]
         args = args[:i] + args[i + 2:]
+    also_impl = '--also-impl' in args
+    args = [a for a in args if a != '--also-impl']
     patches = args
     if not patches:
         print(__doc__.rsplit('用法：', 1)[-1], file=sys.stderr)
@@ -203,25 +267,43 @@ def main(argv):
             print('[patch_locus_check] 🔴 %s：%s' % (pf, e), file=sys.stderr)
             rc = 2
         missing = []
-        for f, anchor in loci:
+        deferred = []
+        for f, anchor, stage in loci:
+            why = None
             if not is_touched(f, touched, head_ts):
-                missing.append((f, anchor, '檔案未被本次改動'))
-                continue
-            if anchor:
+                why = '檔案未被本次改動'
+            elif anchor:
                 # 🔴 CODEX-R8-P1-06：僅檔名相符不足，anchor 須出現在 diff hunk 內
                 body = diff_hunks(f, base)
                 if anchor not in body:
-                    missing.append((f, anchor, 'anchor 未出現在該檔之 diff hunk 內'))
+                    why = 'anchor 未出現在該檔之 diff hunk 內'
+            if why is None:
+                continue
+            # 🔴 stage=impl 之未達 locus：預設列為 DEFERRED、不計 rc
+            #    （三家裁定：stage 由補丁包宣告；呼叫端只可用 --also-impl **加寬**）。
+            #    誠實邊界：委員若把 spec locus 誤標 @impl，本閘看不見 ⇒ 屬 anchor 精確度
+            #    同類之委員責任，保留獨立審查（角色卡「做不成機械閘者」第三項）。
+            if stage == 'impl' and not also_impl:
+                deferred.append((f, anchor, why))
+            else:
+                missing.append((f, anchor, stage, why))
         if missing:
             rc = 2
             print('[patch_locus_check] 🔴 %s：以下 SYNC-LOCI 未被本次改動涵蓋' % pf,
                   file=sys.stderr)
-            for f, a, why in missing:
-                print('    · %s%s  ← %s' % (f, ('#' + a) if a else '', why),
+            for f, a, stage, why in missing:
+                print('    · %s%s  [@%s]  ← %s' % (f, ('#' + a) if a else '', stage, why),
                       file=sys.stderr)
-        elif loci and not errors:
-            print('[patch_locus_check] ✓ %s：%d 個 locus 全部被改到（含 anchor 比對）'
-                  % (pf, len(loci)))
+        if deferred:
+            print('[patch_locus_check] ⏳ %s：以下 locus 標 @impl，凍前不套用（DEFERRED，不計 rc）'
+                  % pf)
+            for f, a, why in deferred:
+                print('    · %s%s  ← %s' % (f, ('#' + a) if a else '', why))
+            print('    （實作階段驗收請加 --also-impl；本旗標只加寬、不縮窄）')
+        if not missing and loci and not errors:
+            print('[patch_locus_check] ✓ %s：%d 個 locus 全部被改到（含 anchor 比對）%s'
+                  % (pf, len(loci) - len(deferred),
+                     ('；另 %d 個 @impl DEFERRED' % len(deferred)) if deferred else ''))
     if rc:
         print('\n  規則：主委 commit 之 diff 觸及集合須 ⊇ 補丁包之 SYNC-LOCI。',
               file=sys.stderr)
