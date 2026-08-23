@@ -48208,3 +48208,62 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-23T10:31:00Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"be62b8bec10138fe77b14218e32a82deb2dd8e56a9ec98e8c5a09cf39ddc4ab3","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260824-gap3ux-x-review-r15-codex.md --family codex; rc=$?; echo completeness_rc=$rc; exit $rc"}
 {"actor": "cx_run", "attempt_id": "7f225547-2fac-4b24-b702-49535d932770", "cli_rc": "0", "event": "committee_family_result", "event_id": "445aff69-c7dc-47f7-9dfe-f4e0828b0868", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r15-codex.md", "output_sha256": "f78a36ee04aabfcbfc03e4bdee557786e24b21e35628e29e55b5f93cb87a2db8", "producer": "audit_append.sh", "result_state": "success", "round_id": "7507a3e0-8918-4476-bc83-d929e75b6911", "schema_version": 1, "sequence": 2546, "ts": "2026-08-23T10:34:00Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "8c28dc9c-7fcd-4b8e-882c-eb10454f09a4", "lock_sha256": "93aab9ad78c6e4cc8aa1b1e08b3627434c5bc53463787c323e41abe2f5abe363", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "7507a3e0-8918-4476-bc83-d929e75b6911", "schema_version": 1, "sequence": 2547, "session_id": "20260824-gap3ux-x-review-r15", "synth_sha256": "f068a7c8213fc1533af9377518dcdcef8b7f11af98a022d963c72592a6fdb2e7", "ts": "2026-08-23T10:38:08Z"}
+{"event":"gate_deny","ts":"2026-08-23T10:53:16Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"f7ba022590d38935fcb38b145596029ab4f042f17eb68f0fd0d07a22cbca95f6","cmd_head":"bash scripts/committee_run.sh --session 20260824-gap3ux-x-review-r16 \\\n  handoffs/20260824-gap3ux-x-review-r16-brief.md handoffs/20260824-gap3ux-x-review-r16 codex,composer,grok -- \\\n  --intent \"GAP-3 SPEC R16 對抗審：R15 十條六群集落地之複審；(N)=0 之後能否定版\" \\\n  --risk low \\\n  --facts-asked \"bash handoffs/20260824-gap3ux-x-review-r16-facts.sh（19 條 fact receipt，rc=0）\" \\\n  --review-role \"adversarial reviewer\" \\\n  --template \"n/a: 用 brief\" \\\n  --spec docs/GAP3_EVENT_UX_SPEC."}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "GAP3UX-SPEC-R16", "ts": "2026-08-23T10:53:51Z"}
+=== 2026-08-23 18:53:51 | dispatch ===
+  ts=2026-08-23 18:53:51
+  kind=dispatch
+  intent=GAP-3 SPEC R16 對抗審：R15 十條六群集落地之複審；(N)=0 之後能否定版
+  risk=low
+  facts_asked=bash handoffs/20260824-gap3ux-x-review-r16-facts.sh（19 條 fact receipt，rc=0）
+  review_role=adversarial reviewer
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R16", "ts": "2026-08-23T10:54:21Z"}
+=== 2026-08-23 18:54:21 | dispatch ===
+  ts=2026-08-23 18:54:21
+  kind=dispatch
+  intent=GAP-3 SPEC R16 對抗審：R15 十條六群集落地之複審；(N)=0 之後能否定版
+  risk=low
+  facts_asked=bash handoffs/20260824-gap3ux-x-review-r16-facts.sh（19 條 fact receipt，rc=0）
+  review_role=adversarial reviewer
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R16", "ts": "2026-08-23T10:54:29Z"}
+=== 2026-08-23 18:54:29 | dispatch ===
+  ts=2026-08-23 18:54:29
+  kind=dispatch
+  intent=GAP-3 SPEC R16 對抗審：R15 十條六群集落地之複審；(N)=0 之後能否定版
+  risk=low
+  facts_asked=bash handoffs/20260824-gap3ux-x-review-r16-facts.sh（19 條 fact receipt，rc=0）
+  review_role=adversarial reviewer
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260824-gap3ux-x-review-r16-brief.md", "brief_sha256": "1a45cdd377af66f5e250cc948cc6bf99dd864b7698dbfa23da4733f7b2195163", "brief_sha256_norm": "1a45cdd377af66f5e250cc948cc6bf99dd864b7698dbfa23da4733f7b2195163", "event": "committee_round_open", "event_id": "bfae0bcd-ab3b-461c-bbb9-dbe7cef68c84", "expected_outputs": {"codex": "handoffs/20260824-gap3ux-x-review-r16-codex.md", "composer": "handoffs/20260824-gap3ux-x-review-r16-composer.md", "grok": "handoffs/20260824-gap3ux-x-review-r16-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8e5e9855-864e-44e4-b5ad-1e542a2f4ba7", "schema_version": 1, "sequence": 2548, "session_name": "20260824-gap3ux-x-review-r16", "task_id": "20260824-GAP3UX-X-REVIEW-R16", "ts": "2026-08-23T10:54:33Z"}
+{"actor": "cx_run", "attempt_id": "6b903aec-0fb8-4400-b9ea-d015277c09ce", "cli_rc": "0", "event": "committee_family_result", "event_id": "0f380fad-1559-4ce1-bae4-5951396b6ff5", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r16-composer.md", "output_sha256": "548f26d6c9511a79872bbb983ea3179dbd83c64328540d6fd28d3329009aa8f3", "producer": "audit_append.sh", "result_state": "success", "round_id": "8e5e9855-864e-44e4-b5ad-1e542a2f4ba7", "schema_version": 1, "sequence": 2549, "ts": "2026-08-23T11:02:50Z"}
+{"actor": "cx_run", "attempt_id": "b0a036d5-e56b-4e3d-85d9-83374bfd6539", "cli_rc": "0", "event": "committee_family_result", "event_id": "72793ad1-2d9a-402f-b2a6-0da7be144f47", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r16-grok.md", "output_sha256": "2fdbd862fa1fa9e6bbc4556115c6943fc6754cbeeeb2de8c8e67382e91e47672", "producer": "audit_append.sh", "result_state": "success", "round_id": "8e5e9855-864e-44e4-b5ad-1e542a2f4ba7", "schema_version": 1, "sequence": 2550, "ts": "2026-08-23T11:02:55Z"}
+{"event":"gate_deny","ts":"2026-08-23T11:08:42Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"25649881dc1b701f78414f0ed1d3aa20ce06423c84638c263e2a9d22d4135fdd","cmd_head":"set +e\nbash scripts/completeness_check.sh --single handoffs/20260824-gap3ux-x-review-r16-codex.md --family codex\nrc=$?\nprintf 'COMPLETENESS_RC=%s\\n' \"$rc\"\nexit \"$rc\""}
+{"actor": "cx_run", "attempt_id": "a52ad663-013f-4dd5-9e58-21b43b647ff7", "cli_rc": "0", "event": "committee_family_result", "event_id": "9946ce84-b3c9-47c3-98f4-730cbe6cb4ae", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r16-codex.md", "output_sha256": "1cc1236d13d4d899d7135b09d88e61810f65611b2c361d47af242d71cc9207e1", "producer": "audit_append.sh", "result_state": "success", "round_id": "8e5e9855-864e-44e4-b5ad-1e542a2f4ba7", "schema_version": 1, "sequence": 2551, "ts": "2026-08-23T11:12:38Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "2a90d4da-39f3-4a9c-8681-01947393ac44", "lock_sha256": "7d84d748b290c57419367e191801b5259abbd36a28d3d676498b6785c99bd656", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "8e5e9855-864e-44e4-b5ad-1e542a2f4ba7", "schema_version": 1, "sequence": 2552, "session_id": "20260824-gap3ux-x-review-r16", "synth_sha256": "ec968f7a722f7e9bd4bf5fcc9e5f7ec6e881f48d02a6615d123feaaa0ed83c92", "ts": "2026-08-23T11:27:18Z"}
+{"event":"gate_deny","ts":"2026-08-23T11:31:12Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"fa216927fed0c61e9d1b942e04d7484e1d3a71302014a755034d69a236d6fd7c","cmd_head":"cat > HANDOFF.md <<'MDEOF'\n# HANDOFF\n\n**當前任務**：GAP-3 事件型 UAT 缺口修補 SPEC（`docs/GAP3_EVENT_UX_SPEC.md`）審到 **完整 FROZEN**。\n**工作方法**：先讀 `docs/GAP3_EVENT_UX_ROLE_CARD.md`（委員出補丁包、主委整包套用；主委不得自寫第二處複述）。\n\n## 狀態（R16 已全數落地並收尾）\n\n- SPEC **2,898 行／42 Task**（十七輪未增未減）；版本行 = `R16-landing`，狀態 **未 FROZEN，待 R17**。\n- R16：9 findings（codex 5／composer 1�"}

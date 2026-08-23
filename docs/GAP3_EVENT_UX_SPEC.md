@@ -24,12 +24,15 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R15-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
-→ R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 條 findings；
-R15 三類歸因 (N)0／(A)8／(R)2 ⇒ **(N) 三家全員為 0**）。
-**狀態：未 FROZEN**（待 R16 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+**版本**：R16-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+→ R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9 條 findings；
+R16 三類歸因 (N)0／(A)4／(R)5 ⇒ **(N) 三家全員為 0，連兩輪**）。
+**狀態：未 FROZEN**（待 R17 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
 （CODEX-R14：本行自 R8 起未更新，會誤導 reviewer 對 FROZEN 狀態之判讀）。
+🔴 **R16 起本行由機械閘強制**：`scripts/gap3ux_header_round_check.sh`
+（掛在 `gap3ux_pre_review.sh`）——SPEC 有未提交改動時，本行輪次須等於已有委員產出之
+最大輪次，否則 fail-closed。**該閘上線首跑即抓到本行仍停在 R15**（散文版沒抓到）。
 
 🔴 **本版之產生方式與前五輪不同（使用者 2026-08-22 裁定）**：
 R5 之 13 條中**有 5 條為主委 R4 修訂自行引入**（R4 亦有 3 條），共 8 條形態一致——
@@ -282,13 +285,29 @@ embargo_ms_by_symbol:  Optional[Mapping[str, int]]    # R11 新增；事件分�
 ```
 project_purge(rows: tuple[SymbolPurgeRow, ...]) -> Mapping[str, int]
     # 唯一實作點＝階段 4 之呼叫端；**禁**在 receipt 側預存 Mapping 副本
-    return MappingProxyType({r.symbol: r.purge_lower_bound_ms for r in rows})
+    # **禁** dict／dict-comp 靜默去重（R16：原偽碼與下方 fail-closed 條互斥）
+    seen: set[str] = set()
+    out: dict[str, int] = {}
+    for r in rows:
+        if r.symbol in seen:
+            raise ValueError(f"duplicate symbol in purge rows: {r.symbol}")  # fail-closed
+        seen.add(r.symbol)
+        out[r.symbol] = r.purge_lower_bound_ms
+    return MappingProxyType(out)
 ```
 - `rows` 內 `symbol` **重複 ⇒ fail-closed**（不做去重、不取最大值）。
 - 投影**只在呼叫 `split_events` 之當下產生**，用完即棄；
   **不得**掛回 `PreparedAnalysisWindows`（那會使 (β)「禁可變容器」與 (γ) 之 tuple 化失效）。
-- 驗收落 Task 7.0b ⑨(d)：斷言 `split_events` 收到之 map 之鍵值
-  **逐項等於** `prepared1.purge_lower_bound_ms_by_symbol` 之對應列。
+- 🔴 **驗收落 Task 7.0b ⑨(f)（R16 新建；不改寫既有 ⑨(d) 之本義）**：
+  斷言 `dict(split 收到之 embargo_ms_by_symbol)
+  == {r.symbol: r.purge_lower_bound_ms for r in prepared1.purge_lower_bound_ms_by_symbol}`
+  （在合法、無重複 symbol 之 prepared 上）。
+  **mutation（須紅）**：①以**含重複 symbol** 之 rows，把投影改成「取 max 去重」
+  ⇒ ⑨(f) 之 fail-closed 斷言紅；②在合法 rows 上把某鍵值改成 `max(全部 purge 值)`
+  ⇒ ⑨(f) 等式紅。
+  🔴 **R16 出處（GROK-R16-P1-02 之 probe）**：原掛 ⑨(d) 不可證偽——
+  ⑨(d) 本義為「兩 symbol 窗寬不同／證偽全批 scalar」，其 fixture 之 symbol 唯一，
+  故 `D2_unique_take_max_equals_exact True`（取 max 與 exact 投影位元組相同）⇒ 測試不紅。
 - **互斥**：兩欄**同時非 None ⇒ fail-closed**（不做「以哪個為優先」之隱含規則）。
 - **事件分析路徑（§D-3′-a（iii）階段 4）必傳 `embargo_ms_by_symbol` 且非空**；
   傳 `embargo_ms` 或留兩者皆 None ⇒ fail-closed。
@@ -378,6 +397,30 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
     ],
   }
   ```
+  🔴 **R16 修正：`batch` 增列第六鍵 `lookahead_bars_declared`（置於
+  `decision_offset_bars` 之後，鍵序固定）**，值為 `Mapping[tf -> int >= 0]`，
+  由 S-9 第 2–6 條序列化（鍵按 UTF-8 升冪，與其餘 dict 同規則）。
+  **出處（CODEX-R16-P1-02）**：`purge_lower_bound_ms(scope)` 之三個輸入為
+  `lookahead_bars_declared`（深度）、`timeframe`（換算）、`label_start_ms`／`label_end_ms`
+  （窗寬）；後兩者已在 `per_tf`／`event_level` 內，**唯獨深度 map 不在 hash 輸入**
+  ⇒ 只改深度宣告即可得到**不同 purge、相同 hash**，⑩ 之「三處同一 receipt」
+  對 purge 邊界形同虛設（洩漏面）。依 §C0「只能更嚴」納入。
+
+  🔴 **主委裁決（兩份判斷互斥，理由入規格供 R17 覆核）**：
+  - CODEX-R16-P1-02 主張把 **`lookahead_bars_declared` 與 per-symbol purge rows 兩者**
+    都加進 `batch`；GROK-R16 判此 finding **不成立**（理由：purge 之保護在 §G G-3 ④
+    之逐列 golden 與列等式，不在本 hash）。
+  - **裁定：採 codex 之機制、但只納入 `lookahead_bars_declared`；不納入 purge rows。**
+  - 理由一（採 codex 之部分）：grok 所指之 G-3 ④ 是**凍結 fixture 之回歸保護**，
+    而 hash 是**執行期身分綁定**；兩者守不同東西。深度宣告改變而 receipt 身分不變，
+    是身分碰撞，golden 擋不到 live run。
+  - 理由二（不採 codex 之另一半）：`purge_lower_bound_ms_by_symbol` 是
+    **由上述三個輸入導出之值**。把導出值也納入 hash，等於在權威式之外再立
+    第二個可與之相左的來源——即本 epic 反覆踩到之「複述即第二份副本」。
+    三個輸入全部入 hash 後，purge 已**遞移地**被綁定。
+  - **negative mutation（須紅，落 §G G-3 ⑥）**：保持 `event_level`／`per_tf`／
+    其餘 `batch` 五鍵不變，**只改 `lookahead_bars_declared` 之任一鍵值**
+    ⇒ `analysis_alignment_receipt_hash` **必須改變**；舊 receipt 不得通過 ⑩。
   - **row keyset 為封閉集合**：多一鍵、少一鍵、改鍵序皆為契約違反（不是「等價寫法」）。
   - **缺席欄處理**：`event_level`／`per_tf` 之任一鍵**不得缺席**；取不到值 ⇒ **fail-closed**，
     **不得**補 `null`（與 S-9 第 3 條「缺席鍵保持缺席」不同——這裡是**必填**）。
@@ -713,6 +756,10 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
    同一次分析中 coverage／split／labels 三處所讀之該欄須同值；
    golden 凍住它，使「其中一處改讀匯入檔舊值」或「某階段自行重跑 `align_events`」皆可被證偽。
    ⚠️ 本欄由 §G S-9 之同一 encoder 產生 ⇒ **不得**為它另寫序列化（S-9 第 7 條）
+   🔴 **R16 追加 negative mutation（須紅）**：保持 `event_level`／`per_tf` 與
+   `batch` 其餘五鍵**逐位元組不變**，**只改 `lookahead_bars_declared` 之任一鍵值**
+   ⇒ 本欄之值**必須改變**（缺此條則深度宣告改變不會改身分，purge 邊界無執行期綁定；
+   出處與主委裁決見 §D-3′-a（iii）之「R16 修正：`batch` 增列第六鍵」）。
 
 **覆蓋面（最小集；不足即不得宣稱本 golden 有效；R11 追加小時命名欄組，見可證偽條 5(b)）**：
 `direction ∈ {long, short}` × `timeframe ∈ {1h, 12h}` × `h ∈ {1, 7}`，
@@ -1062,17 +1109,21 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
         「spy 整個 `frontend/src/`」仍是模糊描述，改名／搬 helper／純 JS helper／
         dynamic import 皆可繞過）：
         (a) **執行期**：vitest 於 `setupFiles` 統一 stub **全域雜湊入口之封閉集合**
-            ——`globalThis.crypto.subtle.digest`、`node:crypto` 之 `createHash`／`webcrypto`
-            （此集合為 JS 環境中產生 sha256 之**全部**入口；新增入口須同批更新本清單）；
+            ——`globalThis.crypto.subtle.digest`、`node:crypto` 之
+            `createHash`／`hash`／`webcrypto`
+            （🔴 R16：R15 版**漏 `crypto.hash`**——codex 與 grok 各自實跑 Node v22.18.0
+            證得 `typeof crypto.hash === 'function'` 且 `crypto.hash('sha256', x, 'hex')`
+            與 `createHash` 同輸出；`webcrypto.subtle.digest` 與 `globalThis` 為同一語意入口之
+            兩條取得路徑，stub 須兩者皆蓋。新增入口須同批更新本清單）；
             跑完整匯出流程後斷言：與 `source_file_digest` 相關之呼叫數 `== 0`
             （`rule_digest` 之呼叫另計，兩者已於上方分離）。
         (b) **靜態**：以 AST（非 grep）掃 `frontend/src/**`，斷言
             **無任何模組同時** import 上述任一雜湊入口 **且** 出現 `source_file_digest` 之寫入。
         ⚠️ 誠實邊界：純 JS 手刻 sha256（不經上述入口）本閘看不見
         ——列為**具名殘留**（三值理由 `needs-research`；owner 主委；觸發＝FROZEN 後）。
-        （`crypto.subtle.digest`／`createHash`／任何 `*Hex` helper），
-        斷言在完整匯出流程中該面之 `call_count` **對 `source_file_digest` 而言為 `0`**
-        （`rule_digest` 之呼叫不計入——兩者已於上方分離）；
+        （🔴 R16 刪除此處三行 R13 殘句——原為 R13 版之呼叫面敘事，R15 插入 (a)/(b) 雙軌後
+        未一併刪除，與上方 (a) 之 `call_count == 0` 及 (b) 之靜態條件並列會被讀成**第三套**
+        判準；執行期斷言已由 (a) 承載、靜態條件已由 (b) 承載。CODEX-R16-P1-01＋GROK-R16-P1-03）
     (b) 同一組 cases 經**前端流程**取得之 digest，與**直接呼叫** Python
         §G S-9 參考實作所得者 **位元組相同**（證明前端拿到的就是後端算的那一個，
         **不是**前端自己算出巧合相同之值）；
@@ -2074,7 +2125,8 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
         (events, receipts) 配對**——兩者須**同時**過濾，不得只濾其一。
         `allowed_event_ids` 為空 ⇒ 走既有 loud／`capability unavailable` 路徑，不得靜默出空表。
         驗收：⑭（見下）以 id-set 相等與 stale-manifest mutation 對證。
-    (c) `split_events` 之呼叫改傳 **`EventSplitConfig.embargo_ms_by_symbol`**
+    (c) `split_events` 之呼叫改傳 **`EventSplitConfig.embargo_ms_by_symbol = project_purge(prepared1.purge_lower_bound_ms_by_symbol)`**
+        （🔴 R16 具名：原只寫欄名未具名投影函式，實作者會自行發明取值路徑；唯一合法取值即此式，權威定義在 §D-3′-a（ii））
         （欄名、互斥與 fail-closed 規則之權威在 §D-3′-a（ii），本欄不重述）；
     (d) `momentum/Analysis/event_samples/types.py::AlignmentReceipts` 增
         `analysis_alignment_receipt_hash` 欄（現僅 `event_level`／`per_tf` 兩個 DataFrame）。
@@ -2121,6 +2173,18 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     (d) **兩個 symbol、各自窗寬不同** ⇒ 斷言 purge 下界**逐 symbol 各自成立**；
         小窗 symbol 之實際 purge `>=` 其自身下界，且**未被**大窗 symbol 之值抬高
         （證偽「全批單一 scalar embargo」）
+    (f) 🔴 **R16 新建——`project_purge()` 之投影正確性**
+        （CODEX-R16-P1-03＋GROK-R16-P1-02；**不改寫 (d) 之本義**）：
+        斷言 `dict(split_events 收到之 embargo_ms_by_symbol)
+        == {r.symbol: r.purge_lower_bound_ms
+            for r in prepared1.purge_lower_bound_ms_by_symbol}`
+        （在合法、**無重複 symbol** 之 prepared 上；函式之權威定義在 §D-3′-a（ii））。
+        **mutation（兩條，皆須紅）**：
+        ①以**含重複 symbol** 之 rows，把投影改成「取 max 去重」⇒ fail-closed 斷言紅；
+        ②在合法 rows 上把某鍵值改成 `max(全部 purge 值)` ⇒ 等式紅。
+        🔴 **本條之出處＝原掛 (d) 不可證偽**：(d) 之 fixture symbol 唯一，
+        grok probe 實跑 `D2_unique_take_max_equals_exact True`
+        ——取 max 與 exact 投影在唯一 symbol 下位元組相同 ⇒ 該 mutation 不紅。
   ⑩🔴 **分析時 receipt 之唯一性（§D-3′-a（iii））**：同一次分析中，
     **3a（Task 7.7 feature-run gate）**、split 之 purge、餵 `ic_feed` 之 labels **三者所用之
     （🔴 R14 修正：R13 已拆 3a／3b，此處原寫「Task 7.7 之 coverage」會把 **event-id 過濾**
@@ -2177,8 +2241,10 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
         purge 下界之輸入已固定為 **pre-coverage 事件集合**，且於階段 2 末算出
         `purge_lower_bound_ms_by_symbol` 隨 receipt 攜帶（見 §D-3′-a（iii）階段 4 之 R13 修正）
         ⇒ 本條之斷言改為：`prepared0.purge_lower_bound_ms_by_symbol
-        == prepared1.purge_lower_bound_ms_by_symbol`（coverage 前後**同一映射物件之值相等**），
-        且 split 實際採用之 embargo **讀自該映射**、不重算。
+        == prepared1.purge_lower_bound_ms_by_symbol`（coverage 前後**同一 tuple 之列／值相等**），
+        且 split 實際採用之 `embargo_ms_by_symbol`
+        **讀自 `project_purge(prepared1.purge_lower_bound_ms_by_symbol)` 之投影**、不重算。
+        （🔴 R16：R15 宣稱群集 E 已閉，但本條本體未同步——三家全員命中，歸類 (R) 回歸）
         ⚠️ 此為**刻意之保守偏差**：purge 以未過濾集合為準，可能略寬於「只看倖存列」，依 §C0 接受。
     (g) 🔴 **coverage 剔除某 TF 之全部列後，`lookahead_bars_declared` 之鍵集不變**
         （CODEX-R12-P1-04＋COMPOSER＋GROK-R12-P1-02 **三家全員**：
@@ -2193,7 +2259,8 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
     coverage 移到 `build_event_manifest` 之後 ⇒ (a)；
     prepare 之初值改為空集 ⇒ (e)；
     **coverage 後由 surviving rows 重建 `lookahead_bars_declared` ⇒ (g)**；
-    🔴 **purge 下界改在階段 4 由 post-coverage 集合重算（而非讀階段 2 之映射）⇒ (f)**。
+    🔴 **purge 下界改在階段 4 由 post-coverage 集合重算
+    （而非讀階段 2 之 tuple／`project_purge` 投影）⇒ (f)**。
   ⑬🔴 **前端不得持有 `label_value`**：斷言
     `grep -cE "label_value" frontend/src/lib/eventExport.ts` `== 0` 且
     `grep -cE "label_value" frontend/src/hooks/useICAnalysis.ts` `== 0`
@@ -2775,7 +2842,51 @@ Phase 6 為純新增之前置檢查，回退即恢復「可按但會吃垮機器
 | 條目 | 三值理由 | owner／觸發 |
 |---|---|---|
 | **純 JS 手刻 sha256 繞過 digest 閘**：Task 1.3 ④ 之閘枚舉「雜湊入口封閉集合」＋AST 靜態掃描，兩軌皆看不見「不呼叫任何標準入口、自行實作 sha256 之程式碼」 | `needs-research`——**位置無限、入口有限**，故閘只能枚舉入口；要擋手刻實作需另尋可判定形式（如輸出 bytes 之 differential test），尚無成案 | 主委／FROZEN 後 |
-| **三條主委紀律仍為 prose，無機械檢查**（CODEX-R15）：①SPEC 檔頭之單一 current-round receipt 義務 ②角色卡之「先問後做」 ③scope accretion 入口閘——三者皆靠主委自認觸發 | `needs-research`——主委自建閘已有 **4 次自欺紀錄**，在未先取得「可由第三方機械判定之觸發條件」前新增自建閘只會增加第 5 次；此為**收斂期不擴建**之刻意選擇，非遺漏 | 主委／FROZEN 後 |
+| ~~**三條主委紀律仍為 prose**~~ → 🔴 **R16 拆分處置**：①檔頭 current-round receipt **已封口**（見下）；②「先問後做」與③scope accretion 入口閘**維持殘留** | ②③`needs-research`（理由見下方裁決） | 主委／FROZEN 後 |
+
+#### 🔴 R16 主委裁決：治理紀律殘留之拆分（CODEX-R16-P2-05 vs GROK／COMPOSER-R16）
+
+**兩造**：codex 判 R15 之「三條紀律維持殘留」是**藉口**——角色卡已列出有限觸發面
+（producer／transport／receipt／encoder／parallel fixture ＋ owner／shape），故可 diff-based 機械化；
+grok 判 `needs-research` **理由成立、非逃避**，composer 判已登記無問題。
+
+**裁定：三條逐條拆開，不整包接受也不整包拒絕。**
+
+| # | 條目 | 裁定 | 理由 |
+|---|---|---|---|
+| ① | SPEC 檔頭 current-round receipt | **採 codex，本輪封口** | 觸發面確實封閉且兩端皆可導出：「SPEC 有未提交改動」×「檔頭輪次 ≠ 已有委員產出之最大輪次」。已落為 `scripts/gap3ux_header_round_check.sh`，掛在 `gap3ux_pre_review.sh`。🔴 **該閘上線首跑即抓到檔頭仍停在 R15**——散文版連續兩輪沒抓到 |
+| ② | 「先問後做」 | **維持殘留** | 「決定不先問」不會在任何 diff 留下痕跡，**結構上不可觀測**；這不是設計難度問題 |
+| ③ | scope accretion 入口閘 | **維持殘留**（`needs-research`） | codex 所指之封閉集合是**機制種類**之集合，不是 **diff 字面**之集合；以關鍵字比對 diff 即**黑名單**，正是 `_g2_regions`「一機制衍生四條旁路」之同型（記憶：文字問題用白名單機械卡）。**兩者之對應關係才是未解的部分** |
+
+⚠️ **本裁決之誠實邊界**：①封口後，②③仍為 fail-open；主委自建閘之 4 次自欺紀錄依然成立，
+故 ① 之閘本身應由 R17 覆核其可證偽性（mutation：把檔頭改回舊輪次 ⇒ 須紅）。
+
+#### 🔴 FROZEN 條件④之歷史 locus 債：R16 已清 12 條，餘 13 條**須 R17 裁定**
+
+**R16 已做（不改判準、不豁免）**：R15 之 10 份補丁包原有 **25 條**未達 anchor。
+其中 **12 條**之失敗原因為「anchor 只出現在**刪除行**，而補丁包正文未逐字引用該字面」
+——已把被刪字面逐字補進各該補丁包之新增區塊「R16 補：被刪字面」，
+可於 `git show ae9f8d99^:docs/GAP3_EVENT_UX_SPEC.md` 覆核。
+**結果：25 → 13；全綠補丁包 2 → 4。**
+
+**餘 13 條之三類，主委不自行處置，理由如下**：
+
+| 類 | 條數 | 為何主委不自行處置 |
+|---|---|---|
+| 敘述型 anchor（當前內容與 diff hunk 皆找不到） | 4 | 須**改寫歷史補丁包之 anchor 本身**。R12 三家已裁「anchor 寫法屬委員責任」⇒ 由主委代改，等於主委替委員重寫其產物 |
+| anchor 未出現在該檔之 diff hunk 內 | 7 | 該 anchor 所指之行**當時確實沒被改動**（多為 context anchor）。要turn 綠只能宣稱發生過未發生的改動 ⇒ **這是造假，不做** |
+| 檔案未被本次改動 | 2 | 同上（role card 在該 commit 未被觸及） |
+
+**🔴 請 R17 在下列兩個具體選項之間裁定（主委不自裁，因主委是受益方）**：
+- **(甲)** 條件④之量測範圍＝**當輪**補丁包（歷史輪之 anchor 債以具名紀錄結案）。
+  依據：使用者 2026-08-05「面向未來不溯及既往」；且 R15 之落地已由 R16 委員
+  **以反例重跑**獨立證實（6 群集中 5 個確認閉合、第 6 個被抓出並於本輪修好）
+  ——那是比 anchor grep **更強**的證據。
+- **(乙)** 逐條清到 0，由**原提出家族**重寫其 anchor（不由主委代改）。
+  依據：CODEX-R16「不得改弱判準或豁免」。
+
+⚠️ **主委立場揭露**：(甲) 對主委有利，故不自裁。但若採 (乙)，主委**不得**代委員改寫
+——需另派一輪 anchor 重寫工，且該輪不產生任何規格內容改善。
 
 
 | 段 | 理由 |

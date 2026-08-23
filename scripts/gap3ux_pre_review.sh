@@ -54,6 +54,9 @@ run "spec_ruling_task_sync" bash scripts/spec_ruling_task_sync.sh "${SPEC}"
 run "spec_v_task_ref_check" bash scripts/spec_v_task_ref_check.sh "${SPEC}"
 run "quant_standard_check"  bash scripts/quant_standard_check.sh
 run "spec_count_audit"      bash scripts/gap3ux_count_check.sh
+# 🔴 R16（CODEX-R16-P2-05）：檔頭 current-round receipt 由散文改為機械閘。
+#    主委裁決之範圍與**不採**的兩項（關鍵字黑名單／先問後做），理由寫在該檔頭註解與 SPEC §N。
+run "spec_header_round"     bash scripts/gap3ux_header_round_check.sh
 
 if [ "$#" -gt 0 ]; then
   # 🔴 R9（CODEX-R9-P1-06／GROK-R9-P1-04；三家議題一裁定）：補丁包 locus 對證新增 stage 維度。
