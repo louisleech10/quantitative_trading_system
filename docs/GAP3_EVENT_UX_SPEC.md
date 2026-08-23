@@ -24,7 +24,7 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R30-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R31-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
 → R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 → R29 8 條 findings（**composer 降至 1 條**；兩件跨包衝突已解除）；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
 🔴 **`ERRATA-R30-01`——R30 輪之 `-landing` 字樣不代表有內容落地**：R30 輪（ledger round
@@ -2516,12 +2516,25 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   # _run_analysis 事件分支：
   # 匯入 validation 通過後、prepare 前：建構一次 timeframe_seconds（鍵集滿足 (d-3a)）
   prepared0 = prepare_analysis_windows(
-      records, bars_by_tf, *, event_label_spec, event_import_id,
-      lookahead_bars_declared, timeframe_seconds)  # spy: call_count == 1
+      records, bars_by_tf,
+      event_label_spec=event_label_spec,
+      event_import_id=event_import_id,
+      lookahead_bars_declared=lookahead_bars_declared,
+      timeframe_seconds=timeframe_seconds)  # spy: call_count == 1
   # 3a feature-run gate 讀同一 timeframe_seconds 物件（is）
   prepared1 = apply_event_coverage(prepared0, ...)   # 新身分、同 token 同 hash
   # manifest／split／materialize／ic_feed **只**吃 prepared1
   ```
+  🔴 **`ERRATA-R31-C`——上列草圖之呼叫行**：原文為
+  `records, bars_by_tf, *, event_label_spec, …`，在**呼叫**位置寫裸 `*` 為非法 Python
+  （`compile()` → `SyntaxError: iterable argument unpacking follows keyword argument unpacking`；
+  CODEX-R31-P1-04／COMPOSER-R31-P1-04 同時提出）。本條有兩份補丁包：
+  COMPOSER `r31-prepare-call-fix` 之 AFTER **仍保留裸 `*,`**，其自附之 VERIFY 字串
+  亦同——主委實跑 `compile()` 兩者**皆 SyntaxError**，即該包之 VERIFY 為假綠；
+  CODEX `r31-codex-prepare-call` 之 SHAPE 明寫「四個明確 keyword assignment」且
+  NEGATIVE_MUTATION 明列「bare `*`」須紅。⇒ **採 CODEX 版**（機器可導出，非偏好）。
+  落地後對 SPEC 現存字面實跑 `compile()` → **rc=0**。
+  ⚠️ 主委依 CODEX 之 SHAPE 寫出該字面（該包未附 literal AFTER）；**請 R32 之 codex 逐字覆核**。
   - `event_label_spec` ＝ `{horizon_bars, entry_price_semantic, label_return_mode,
     decision_offset_bars}`；`supported` 由 §F-1′ 判定，偏離 ⇒ F-2′ 之 reason。
   - **禁止**自行實作報酬公式：`windows` 與 `label_value` 一律由既有 `align_events`
@@ -2627,31 +2640,25 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   `pytest tests/api -q -k event_analysis_horizon_purge` ≥5 條——
   ⑧`h=7` **不得**沿用 `h=1` 之 labels／split；`split purge >=` 本次 label end
   ⑨purge 下界 `==` §D-3′-a（ii）之 `purge_lower_bound_ms(scope)`（R10 擴為五組 fixture）
-  ⑨(h) 🔴 **R29 解除（採 CODEX-R29-P1-02 之 per-symbol 形式）**：
+  ⑨(h) 🔴 **R31（GROK；保 per-symbol ==，刪 dangling 名）**：
       在既有 mixed-alignment fixture 中，**對每個 symbol scope** 斷言
-      `set(purge_scope_event_ids(scope)) == {w.event_id for w in prepared0.windows if w.symbol == scope}`；
-      且 alignment-failure `event_id` **不得**出現在 split assignments；
-      併驗 (d-3a) 三側鍵集相等：
-      `set(timeframe_seconds.keys()) == set(lookahead_bars_declared.keys()) == {r["timeframe"] for r in records}`。
-      **mutation**：把 failure row 餵入 purge／split ⇒ `exit != 0`。
-      🔴 **主委之取捨理由（非偏好，係嚴格性）**：COMPOSER-R29 交出之合議 AFTER 為**全域**
-      相等；CODEX-R29-P1-02 以碼證 `event_split.py:54-61`（**按 `symbol` 分組並逐組算
-      window／embargo**）指出**全域相等會掩蓋 symbol-level under-purge**。
-      per-symbol 形式**嚴格蘊含**全域形式（各 scope 皆相等 ⇒ 全域相等），
-      故依「兩家不決則採較嚴版」取之，**並非主委偏好**。
-      ⚠️ 兩家係**平行作業**，composer 交出合議稿時未見 codex 之 per-symbol 碼證
-      ⇒ **請 R30 確認 composer 是否同意**；若不同意，本條回到待裁。
-      **以下為原待裁紀錄，保留不刪**——兩家皆提出新增 ⑨(h)
-      「對齊失敗列不進 purge／split」之驗收，但**AFTER 文字不同**——
-      (甲) COMPOSER-R28-P1-02：`scope` 內事件集合 **==** `prepared0.windows`；
-           對齊失敗 `event_id` 不進 split assignments；mutation：餵入 ⇒ `exit != 0`。
-      (乙) CODEX-R28：`set(purge_scope_event_ids) ⊆ {w.event_id for w in prepared0.windows}`
-           （**⊆ 而非 ==**），且併驗
-           `set(timeframe_seconds) == set(lookahead_bars_declared) == {r["timeframe"] for r in records}`。
-      🔴 **兩者非同義**：(甲) 為**相等**、(乙) 為**包含**；且 (乙) 多帶鍵集三方相等。
-      ⇒ 依 **GROK-R28 方案 (iii)**，**主委不得擇一**；本條**在兩家合議前不生效**。
-      **請 R29 交出單一合併 AFTER**（並說明取 `==` 或 `⊆` 之理由——
-      若 coverage 前 scope 恰為全部對齊成功列則兩者等價，若否則語意不同）。
+      餵入 `purge_lower_bound_ms` 之 event_id 集合
+      `== {w.event_id for w in prepared0.windows if w.symbol == scope}`
+      （`WindowRow.symbol` 見欄集；右側即 scope 之定義域）；
+      且 alignment-failure `event_id` **不得**出現在 split assignments。
+      **mutation**：把 failure row 餵入 purge／split，或使某 scope 之餵入集為右側真子集
+      ⇒ `exit != 0`。
+      （(d-3a) 三側鍵集相等仍只在 §G G-3 ⑥(d-3a)；本條不重述。）
+      🔴 **R31（COMPOSER 表態）**：同意 per-symbol 形式；理由見 R29 codex 碼證
+      `event_split.py:54-61`；「per-symbol 嚴格蘊含全域」成立。
+      🔴 **主委之擇取理由（`ERRATA-R31-A`；依使用者工作方法「補丁包互相矛盾時在具體提案之間
+      裁決並把理由寫進 SPEC」）**：本條有兩份互斥補丁包——GROK `r31-purge-scope-ids`
+      主張**刪除**該 dangling 名並改用既有 `purge_lower_bound_ms` 之餵入集；
+      COMPOSER `r31-purge-scope-define` 主張在 §D-3′-a（ii）**新增一個具名輔助函式**
+      （其名稱與簽章見該補丁包，本檔不複述）。**採 GROK 版**，兩個理由皆非偏好：
+      ① 方向面 codex＋grok 兩家一致（CODEX-R31-P1-02 明寫「不新增 dangling helper」）；
+      ② composer 版須新建一個具名物，落在 R20「停止新建驗收機制」之疑義面，grok 版只用既有物。
+      ⚠️ **composer 未見此擇取即交件** ⇒ 具名保留其異議，**R32 請 composer 確認或推翻**。
     （深度與窗寬**皆已換算 ms**；公式之唯一定義在 §D-3′-a（ii），本欄不重述）。
     fixture 須涵蓋**五組**，證明各維度都可能是勝者且換算逐列：
     (a)「深度 12、h=3」⇒ 深度側勝　(b)「深度 1、h=7」⇒ 窗寬側勝
@@ -3186,25 +3193,24 @@ t0 formatter 讀得到 label、label formatter 讀得到 t0（欄位語意重疊
        feature-run gate 之 `timeframe_seconds` **只准 keyword-only**（禁 positional）。
        兩 spy 掛載點具名（字面須可 grep）：
        - `unittest.mock.patch("momentum.Analysis.event_samples.label_value_from_case.purge_lower_bound_ms")` → `spy_purge`
+  `def check_feature_run_coverage(*, timeframe_seconds: Mapping[str, int],
+      feature_manifest_time_range: dict[str, str | None],
+      event_windows: tuple[WindowRow, ...]) -> None`
+  ——Task 7.7 ② 3a；由 `_run_analysis` 事件分支在 `prepare_analysis_windows` 之後、
+  `apply_event_coverage` 之前以 **keyword-only** 呼叫一次；讀 `_feature_library` manifest
+  之 `time_range` 與 `event_windows` 比對；不符 ⇒ `ValueError`。
        - `unittest.mock.patch("api.services.ic_analysis_service.check_feature_run_coverage")` → `spy_gate`
-       （Task 7.7 ② 3a feature-run gate **唯一呼叫點**＝`ic_analysis_service._run_analysis` 事件分支、
-       prepare-windows 之後、`apply_event_coverage` 之前；禁 `args[N]` 與未具名掛載）。
-       🔴 **R29 合議（COMPOSER）**：掛載點取 (乙)——gate 讀 `_feature_library` manifest（Task 7.7 ①–③），
-       五階段編排落點在 `_run_analysis`（L3137–3139、L2600）；`pipeline.py` 現行鏈為匯入管線
-       `validate→align→manifest→split`（L2583–2584），與 IC 分析分支不同鏈。
-       （Task 7.7 ② 3a feature-run gate **唯一呼叫點**＝`_run_analysis` 事件分支呼叫之
-       同模組具名函式；禁 `args[N]`、禁 `pipeline._assert_feature_run_covers_events`、禁未具名掛載）。
-       🔴 **主委附註（非改寫）**：兩家之 AFTER 於**掛載路徑上一致**（皆取 (乙)／API 層），
-       差異僅在括號說明；GROK 版**另含一條 composer 版所無之禁令**
-       （**禁** `pipeline._assert_feature_run_covers_events`）⇒ 依「採較嚴版」**併列附加**，
-       **未改寫任一方之文字**。
-       🔴 **R29 合議解除（COMPOSER-R29 交出單一合併 AFTER 並附碼證）**：
-       `spy_gate` 之掛載點採 **(乙)** `api.services.ic_analysis_service.check_feature_run_coverage`。
-       **碼證**：五階段編排之落點＝`ic_analysis_service._run_analysis` 事件分支；
-       Task 7.7 讀 `_feature_library` manifest，**屬 API 層**，
-       feature-run gate 之**唯一實際呼叫點**在該層而非 `momentum...pipeline`。
-       ⚠️ **CODEX-R29-P1-01 認為本衝突「不能被稱為已裁定」** ⇒ 具名記錄該異議，
-       請 R30 以碼證確認（若 codex 能證明呼叫點在 `momentum` 層，本條應改回 (甲)）。
+       （**唯一**呼叫點＝`_run_analysis` 事件分支；禁 `pipeline._assert_feature_run_covers_events`、禁 `args[N]`。）
+       🔴 **R31 裁定**：函式**須新建**（現行碼 grep→0）；掛載層＝API service（(乙)），非 `pipeline.py`。
+       🔴 **主委之擇取理由（`ERRATA-R31-B`）**：本條有兩份互斥補丁包——COMPOSER
+       `r31-spy-gate-shape` 與 GROK `r31-spy-gate-must-create`，**方向一致**（皆維持 (乙)、
+       皆要求明列須新建、皆要求收斂重複合議段），差異在字面與涵蓋面。**採 COMPOSER 版**，
+       理由為機器可導出、非偏好：GROK 版之編排草圖 AFTER 行
+       `check_feature_run_coverage(prepared0, feature_run_manifest, *, timeframe_seconds=...)`
+       經 `compile()` 實跑為 **SyntaxError**（與本輪 P1-04 同一病），照抄即不可執行；
+       COMPOSER 版另為唯一提供 `def` 簽章者（三家皆要求之 shape 要素）。
+       ⚠️ **未閉項（R32 待裁）**：GROK 版之 VERIFY 要求字面「須於本 Task 新建」，本 AFTER
+       未含該字面；主委**不自行補寫**，列為 R32 由 grok 確認或改寫。
        🔴 **R27（三家：CODEX-R27＋GROK-R27＋COMPOSER-R27）**：R26 主委寫之 `args[N]` 中
        **`N` 未定**，且兩 spy 掛載點未具名 ⇒ 為 dangling。
        **主委已於 R27 brief 自行揭露此假設**，三家確認並給出上列 AFTER。

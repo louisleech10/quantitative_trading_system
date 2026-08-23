@@ -48798,3 +48798,123 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-23T18:18:28Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"4808b559869ece7c671f9764a8ac53238775a29f9f1e4182a50e20548ed811a6","cmd_head":"wc -l handoffs/20260824-gap3ux-x-review-r29-codex.md handoffs/patches/20260824-gap3ux-r29-codex-*.md\ngit status --short -- handoffs/20260824-gap3ux-x-review-r29-codex.md handoffs/patches/20260824-gap3ux-r29-codex-*.md\nbash scripts/completeness_check.sh --single handoffs/20260824-gap3ux-x-review-r29-codex.md --family codex; rc=$?; echo \"COMPLETENESS_RC=$rc\"; exit \"$rc\""}
 {"actor": "cx_run", "attempt_id": "ec22c33e-d5f1-497c-9271-fcf36ee19640", "cli_rc": "0", "event": "committee_family_result", "event_id": "5505699f-f386-483f-bd43-620321afb32b", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r29-codex.md", "output_sha256": "a99ca2d13a817fef3357f56719f1bd1888708272011d68dd27e977a2d796a3bd", "producer": "audit_append.sh", "result_state": "success", "round_id": "32f5650a-e039-43ea-9fdb-e45b6d0c017c", "schema_version": 1, "sequence": 2616, "ts": "2026-08-23T18:19:35Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "d1c9f3f8-f5e4-4cfb-9370-63182cf3c881", "lock_sha256": "04b52d4821f4b9365d1145649be5ed325aaa85f4b610d4dd9779b0271903dc4c", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "32f5650a-e039-43ea-9fdb-e45b6d0c017c", "schema_version": 1, "sequence": 2617, "session_id": "20260824-gap3ux-x-review-r29", "synth_sha256": "2e0866a62fd13106d122e59def958d26ab896da81e450292b865e8d083568b17", "ts": "2026-08-23T18:24:35Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R30", "ts": "2026-08-23T18:30:27Z"}
+=== 2026-08-24 02:30:27 | dispatch ===
+  ts=2026-08-24 02:30:27
+  kind=dispatch
+  intent=GAP-3 SPEC R30 對抗審：衝突解除請確認（主委已讀碼：合議之掛載點函式不存在）；下降是真收斂或分母縮小
+  risk=low
+  facts_asked=bash handoffs/20260824-gap3ux-x-review-r30-facts.sh（19 條 fact receipt，rc=0）
+  review_role=adversarial reviewer
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R30", "ts": "2026-08-23T18:30:39Z"}
+=== 2026-08-24 02:30:39 | dispatch ===
+  ts=2026-08-24 02:30:39
+  kind=dispatch
+  intent=GAP-3 SPEC R30 對抗審：衝突解除請確認（主委已讀碼：合議之掛載點函式不存在）；下降是真收斂或分母縮小
+  risk=low
+  facts_asked=bash handoffs/20260824-gap3ux-x-review-r30-facts.sh（19 條 fact receipt，rc=0）
+  review_role=adversarial reviewer
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260824-gap3ux-x-review-r30-brief.md", "brief_sha256": "8b98f404fc2563d4d1f29afa9f9fe9b462d611557366edac1afd021d3277d1d5", "brief_sha256_norm": "8b98f404fc2563d4d1f29afa9f9fe9b462d611557366edac1afd021d3277d1d5", "event": "committee_round_open", "event_id": "528dab3b-0cc7-477b-a5c2-ad1d2817619c", "expected_outputs": {"codex": "handoffs/20260824-gap3ux-x-review-r30-codex.md", "composer": "handoffs/20260824-gap3ux-x-review-r30-composer.md", "grok": "handoffs/20260824-gap3ux-x-review-r30-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "03422383-21ae-4efb-ab14-a3214950522e", "schema_version": 1, "sequence": 2618, "session_name": "20260824-gap3ux-x-review-r30", "task_id": "20260824-GAP3UX-X-REVIEW-R30", "ts": "2026-08-23T18:30:43Z"}
+{"actor": "cx_run", "attempt_id": "53623d15-d95b-4e99-8761-488fba232013", "cli_rc": "0", "event": "committee_family_result", "event_id": "25ef7b44-9e73-40e6-8bf6-22df8d2bea47", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r30-composer.md", "output_sha256": "099ecfad3464869781244012bdef6ff344ed7f400ffb20b973684fa2e63f2691", "producer": "audit_append.sh", "result_state": "success", "round_id": "03422383-21ae-4efb-ab14-a3214950522e", "schema_version": 1, "sequence": 2619, "ts": "2026-08-23T18:36:50Z"}
+{"actor": "cx_run", "attempt_id": "d48a1caa-843a-4920-b4fb-ddde43daaf24", "cli_rc": "0", "event": "committee_family_result", "event_id": "7f754f65-eaa1-487e-b06e-9f72c0b3d33d", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r30-grok.md", "output_sha256": "a9989c3cd7b3134760699ff0c643c7d44ad20d40fac6427022d69a7412015fcf", "producer": "audit_append.sh", "result_state": "success", "round_id": "03422383-21ae-4efb-ab14-a3214950522e", "schema_version": 1, "sequence": 2620, "ts": "2026-08-23T18:38:01Z"}
+{"event":"gate_deny","ts":"2026-08-23T18:43:14Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"e9b75e5a3a62d83655f678e6db9f16e7925a5d63e6f4ed9466628a66552df7e5","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260824-gap3ux-x-review-r30-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260824-gap3ux-x-review-r30-codex.md", "output_sha256": "1b1e7326a6ffc2865ab770440f0ce6bf3d10cba6c869ecba4339a767d354cbbc", "task_id": "20260824-GAP3UX-X-REVIEW-R30", "ts": "2026-08-23T18:44:36Z"}
+{"event":"gate_deny","ts":"2026-08-23T18:44:39Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"e9b75e5a3a62d83655f678e6db9f16e7925a5d63e6f4ed9466628a66552df7e5","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260824-gap3ux-x-review-r30-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260824-gap3ux-x-review-r30-codex.md", "output_sha256": "5bf7a411bd2de3bc5ac2b07176e99ce1a53132a5074504ec62a97102cabeabf5", "task_id": "20260824-GAP3UX-X-REVIEW-R30", "ts": "2026-08-23T18:45:19Z"}
+{"actor": "cx_run", "attempt_id": "640ce795-d106-4c5c-8a55-0676db23af8f", "cli_rc": "0", "event": "committee_family_result", "event_id": "e51b890e-ea42-4652-86c6-66df973a1a24", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r30-codex.md", "output_sha256": "5bf7a411bd2de3bc5ac2b07176e99ce1a53132a5074504ec62a97102cabeabf5", "producer": "audit_append.sh", "result_state": "format-failed", "round_id": "03422383-21ae-4efb-ab14-a3214950522e", "schema_version": 1, "sequence": 2621, "ts": "2026-08-23T18:47:13Z"}
+{"event":"gate_deny","ts":"2026-08-23T18:48:54Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"889fe413b281559adc2a86a6749e2ff7695b382dffdc796261b546d52272e67d","cmd_head":"cat >> handoffs/20260824-gap3ux-x-review-r30-brief.md <<'MDEOF'\n\n---\n\n## 🔴 重派附註（主委於同輪追加；**僅程序面，未動任何內容或 sha 鎖版**）\n\n**codex 首次交件被交件端閘擋下**：4 條 P1 之「來源摘要」格式不合規。\n\n**根因（主委已讀檢查器）**：`scripts/completeness_check.sh:352` 之判準為\n`$0 ~ /\\*\\*來源摘要\\*\\*/ && $0 ~ /#[0-9a-fA-F]{12}/`\n——要求 `#` **緊接 12 位 hex**。本輪 codex 寫成 `path#sha256:a8bea3a1f693`，\n`#` �"}
+{"event":"gate_deny","ts":"2026-08-23T18:52:14Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"3c02772839043eec06977360139c1062ba33c1a2a246c7d614b2c5dce1fa3b83","cmd_head":"bash scripts/cx_run.sh codex handoffs/20260824-gap3ux-x-review-r30-brief.md handoffs/20260824-gap3ux-x-review-r30-codex.md > /tmp/redispatch30.log 2>&1; echo \"REDISPATCH_RC=$?\""}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude-chair", "event": "debt_abandon", "event_id": "cc7e6a6a-8ab5-4ccc-aba8-d6ee89927b84", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "codex 交件格式不合規導致本輪無法收齊，同輪重派因 OPEN 債拒發 token 而死鎖，依設計逃生口銷帳後只重派 codex 一家", "round_id": "03422383-21ae-4efb-ab14-a3214950522e", "schema_version": 1, "sequence": 2622, "ts": "2026-08-23T18:54:54Z", "zero_findings_verified": ""}
+{"event":"gate_deny","ts":"2026-08-23T18:56:05Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"d4971bee789b34256a2aa78fdfb3df8950fbd986fef3ca2edc383fed80306ecb","cmd_head":"bash scripts/committee_run.sh --session 20260824-gap3ux-x-review-r30 handoffs/20260824-gap3ux-x-review-r30-brief.md handoffs/20260824-gap3ux-x-review-r30 codex,composer,grok -- --task-id 20260824-GAP3UX-X-REVIEW-R30 --intent \"R30 三家審 GAP-3 SPEC：確認 R29 兩件衝突之解除、落地方法第三份成績單、FROZEN 距離\" --risk low --facts-asked \"none-needed:議題與碼證皆在 brief 內，無需向使用者確認\" --review-role \"codex=挑戰前提/adversary；composer=合議稿；grok=獨立"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R30", "ts": "2026-08-23T18:56:15Z"}
+=== 2026-08-24 02:56:15 | dispatch ===
+  ts=2026-08-24 02:56:15
+  kind=dispatch
+  intent=R30 三家審 GAP-3 SPEC
+  risk=low
+  facts_asked=none-needed:議題與碼證皆在 brief 內
+  review_role=codex=adversary；composer=合議稿；grok=獨立覆核
+  template=n/a:對既有 SPEC 之審查，非 SPEC 產出派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R30", "ts": "2026-08-23T18:56:25Z"}
+=== 2026-08-24 02:56:25 | dispatch ===
+  ts=2026-08-24 02:56:25
+  kind=dispatch
+  intent=R30 三家審 GAP-3 SPEC：確認 R29 兩件衝突之解除、落地方法第三份成績單、FROZEN 距離
+  risk=low
+  facts_asked=none-needed:議題與碼證皆在 brief 內，無需向使用者確認
+  review_role=codex=挑戰前提/adversary；composer=合議稿；grok=獨立覆核
+  template=n/a:非 SPEC 產出派工，係對既有 SPEC 之審查
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R31", "ts": "2026-08-23T19:01:30Z"}
+=== 2026-08-24 03:01:30 | dispatch ===
+  ts=2026-08-24 03:01:30
+  kind=dispatch
+  intent=R31 三家審 GAP-3 SPEC
+  risk=low
+  facts_asked=none-needed:議題與碼證皆在 brief 內
+  review_role=codex=adversary；composer=合議稿；grok=獨立覆核
+  template=n/a:對既有 SPEC 之審查，非 SPEC 產出派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-X-REVIEW-R31", "ts": "2026-08-23T19:01:40Z"}
+=== 2026-08-24 03:01:40 | dispatch ===
+  ts=2026-08-24 03:01:40
+  kind=dispatch
+  intent=R31 三家審 GAP-3 SPEC：確認 R30 兩件衝突之解除、落地方法第三份成績單、FROZEN 距離
+  risk=low
+  facts_asked=none-needed:議題與碼證皆在 brief 內，無需向使用者確認
+  review_role=codex=挑戰前提/adversary；composer=合議稿；grok=獨立覆核
+  template=n/a:非 SPEC 產出派工，係對既有 SPEC 之審查
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260824-gap3ux-x-review-r31-brief.md", "brief_sha256": "6e78a625b4236508395ce65a06a811b619b5dea4ad58ef3730757d4bc87f0f61", "brief_sha256_norm": "6e78a625b4236508395ce65a06a811b619b5dea4ad58ef3730757d4bc87f0f61", "event": "committee_round_open", "event_id": "d253961c-7e79-48b7-8dfd-cba6a56ba53f", "expected_outputs": {"codex": "handoffs/20260824-gap3ux-x-review-r31-codex.md", "composer": "handoffs/20260824-gap3ux-x-review-r31-composer.md", "grok": "handoffs/20260824-gap3ux-x-review-r31-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "e0bdac3b-d5f5-4b02-9d36-a3bf9797f16b", "schema_version": 1, "sequence": 2623, "session_name": "20260824-gap3ux-x-review-r31", "task_id": "20260824-GAP3UX-X-REVIEW-R31", "ts": "2026-08-23T19:01:44Z"}
+{"actor": "cx_run", "attempt_id": "6346e546-f37b-4b50-a0d1-fe286dd67a97", "cli_rc": "0", "event": "committee_family_result", "event_id": "3297f2e6-3e64-4a24-bd75-14ac07d09236", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r31-grok.md", "output_sha256": "8a0f51588136ec0dd7ba1d9cbcb7d76a9d7cf14763b9d3efadba07712bd1f96a", "producer": "audit_append.sh", "result_state": "success", "round_id": "e0bdac3b-d5f5-4b02-9d36-a3bf9797f16b", "schema_version": 1, "sequence": 2624, "ts": "2026-08-23T19:07:01Z"}
+{"actor": "cx_run", "attempt_id": "5402e64d-c46f-4d6d-857c-2a2646e78c15", "cli_rc": "0", "event": "committee_family_result", "event_id": "6825b35d-37be-4d74-9be1-8dd753289fb6", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r31-composer.md", "output_sha256": "885964c45ed9dc7d0b0a9217631fd5167a6b6ae697a9842982405c5d8ecaab2d", "producer": "audit_append.sh", "result_state": "success", "round_id": "e0bdac3b-d5f5-4b02-9d36-a3bf9797f16b", "schema_version": 1, "sequence": 2625, "ts": "2026-08-23T19:08:31Z"}
+{"event":"gate_deny","ts":"2026-08-23T19:10:46Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"e937e096124dcdfb226ccd7023d03ca251c32a5c7c9f02ba0ee761b3d3fc6e1e","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260824-gap3ux-x-review-r31-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"actor": "cx_run", "attempt_id": "c59b6798-7aff-4474-8cad-24b794f9fb22", "cli_rc": "0", "event": "committee_family_result", "event_id": "458e4493-396f-47c1-99dd-fffbc2145c13", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-x-review-r31-codex.md", "output_sha256": "99f4df8363ffdeea3d1374a77e62f8e17594edf7c70cc0902bda721f16423c9a", "producer": "audit_append.sh", "result_state": "success", "round_id": "e0bdac3b-d5f5-4b02-9d36-a3bf9797f16b", "schema_version": 1, "sequence": 2626, "ts": "2026-08-23T19:14:23Z"}
+{"event":"gate_deny","ts":"2026-08-23T19:32:38Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"79affd51fc057e66e643426b5afcd19e808d9141c078d5827e2593caeb021973","cmd_head":"git add -A -- docs/ scripts/ 白話說明/ HANDOFF.md .claude/gate/audit.log && git commit -q -m \"spec(gap3ux): R31 十三條處置——兩件跨包衝突以機器可導出之理由裁決；主委另證出落地工具第二處假綠\n\n三家 13 條（codex 5／composer 4／grok 4），Verdict 一致「需修訂後定版」。\nP0=0；(N)=0 連十七輪；Task 42→42（三十一輪未增未減）；SPEC 3,511→3,517 行。\n\n群集 A：⑨(h) purge_scope_event_ids 為 dangling（三家）。跨包衝突：gr"}

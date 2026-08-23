@@ -1,65 +1,37 @@
 # HANDOFF
 
-**當前任務**：GAP-3 事件型 UAT 缺口修補 SPEC（`docs/GAP3_EVENT_UX_SPEC.md`）審到 **完整 FROZEN**。
-**工作方法**：先讀 `docs/GAP3_EVENT_UX_ROLE_CARD.md`。
-🔴 **開工前必讀角色卡三條最高位階條款**：①R20「主委不得新建驗收機制」
-②R21「條件②′」＋R22「②′(2) 換四指標」③R22「主委不得做權威自我歸類」。
-🔴 **R23 追加：主委不再自擬 grep／殘留查核清單**（委員裁定；全檔殘留查核由委員每輪執行）。
+## 當前：GAP-3 事件型 UAT 缺口修補 SPEC（目標＝FROZEN）
 
-## 狀態（R23 已全數落地並收尾）
+- 標的 `docs/GAP3_EVENT_UX_SPEC.md`：**3,511 行／42 Task（三十輪未增未減）**，版本行 `R30-landing`，**狀態未 FROZEN**。
+- 內容最後落地＝R29 八條（commit `f15e9cea`）。`ed411291`＝**僅檔頭收據＋`ERRATA-R30-01`**，零內容。
+- **進行中**：R31 三家對抗審已派出，ledger round `e0bdac3b-d5f5-4b02-9d36-a3bf9797f16b`（OPEN）。
+  產物 `handoffs/20260824-gap3ux-x-review-r31-{codex,composer,grok}.md`。
 
-- SPEC **3,304 行／42 Task**（二十四輪未增未減）；版本行 = `R23-landing`，狀態 **未 FROZEN，待 R24**。
-- R23：11 findings（codex 3／composer 5／grok 3）→ 5 群集，**全數落地**；三家 Verdict 一致「需修訂後定版」。
-  **P0＝0（連九輪）**、**(N)＝0（連九輪）**。
-- 🔴 **元問題裁定：findings 由 14→9 之下降＝「混合」，非純真收斂**——
-  grok：「條數下降但**同一傷口可再打穿**」；**本輪即實證**（R22 三項落地當輪被再打穿）。
-  區分觀察量：已關閉群集之再攻擊是否復發／補丁包 AFTER 字面 ⊆ SPEC 之位元組對證率／(A) 佔比。
-- 🔴 **主委三個新事實錯誤**：①點名從未寫過之 `Task 7.0b ⑨(g)`（三家）②新寫之 (d-3a) 右側
-  取 `event_level`（只含 alignment 成功列），與 pre-coverage 互斥 ⇒ 假紅（composer）
-  ③**同一輪違反自己剛立之通則**（mutation 效力不得高於所依賴之驗收條；兩家）。
-- 🔴 **「撤回沒清乾淨」第五次**：Task 7.7 ② 仍以 module-level `TIMEFRAME_SECONDS` 算 `bar_ms`
-  （三家）；codex 逐一裁 22 個命中，僅 L2976／L2979 為 active violation。
+## R30 輪的處置（已結案，勿重查）
 
-## FROZEN 條件現況
+R30（round `03422383`）codex 交件格式不合規（來源摘要寫成 `path#sha256:<hex>`，
+`completeness_check.sh:352` 要求 `#` 緊接 12 位 hex）。`cx_run` 說「可同輪重派」，
+但**同輪重派需 dispatch token，而 `gate.sh` 於 OPEN 債時一律拒發** ⇒ 主委路徑上死鎖。
+依設計逃生口 `debt_clear --abandon --kind collection-failed` 銷帳，**該輪零落地**，
+議題原封不動改編為 R31 重派三家。此死鎖與「ABANDONED 輪被 header 閘要求寫 `-landing`」
+兩件，是本輪新發現的工具自傷，**應列入 R31 議題請委員裁**。
 
-①⬜ P0=0／**P1=11**　②′(1)✅ (3)✅　③✅　④**明確未達**（R22 十份補丁包中八份 locus rc=2）
+## 最高位階條款（`docs/GAP3_EVENT_UX_ROLE_CARD.md` 為準，本檔不重述細節）
 
-## 下一步（依序）
+R20 主委不得新建驗收機制／R21 條件②′／R22 主委不得自我歸類＋(a)-(e) 五類／
+R23 主委不再自擬殘留查核清單／R25 anchor 只錨 AFTER 仍存在之字面／
+R28 `must_exist`＝AFTER 每一非空行、跨包衝突停手不擇一。
 
-1. **派 R24**：由 r23 三份改號生成 brief/facts/locus。
-   🔴 **改號時必查 `locus.sh` 之 PATCHES glob 有沒有跟著換**（R17 踩過）。
-   🔴 **R24 brief 必含**：①**由委員歸類主委 R23 之六項改動**（R22 新制第二次執行）
-   ②驗 (d-3a) 三側集合相等是否真閉合（第七次攻擊同一處）
-   ③**條件④之清帳**：R22／R23 補丁包 anchor 重寫屬**原提出家族**責任（R17 裁定 (甲)），
-   請各家於本輪交出重寫後之 SYNC-LOCI ④依 R23 裁定，**全檔殘留查核由委員執行**，
-   請回報本輪查了哪些字面。
-   `--task-id` **須為 session 之大寫形式**（`20260824-GAP3UX-X-REVIEW-R24`）。
-2. R24 落地 → 若條件齊備 ⇒ **FROZEN，然後停下來等使用者**（不得自行往 TODO 或實作走）。
+## 工作方法（不得違反）
 
-## 查法（不寫聲稱，只寫命令）
+委員出【補丁包】、主委整包**逐字**套用（`scripts/gap3ux_apply_patch.py`），不得自寫第二處複述；
+觸及 SPEC 之 commit 須有補丁包或 ERRATA id；派審前 `gap3ux_pre_review.sh` 須 rc=0；
+補丁包互相矛盾時在具體提案間裁決並把理由寫進 SPEC，不另創第四種；文件一律不寫閘數。
 
-- 常駐閘：`bash scripts/gap3ux_pre_review.sh`；失敗全量輸出落 `.claude/gate/gap3ux_pre_review.last.log`
-- locus：`python3 scripts/patch_locus_check.py handoffs/patches/*r23*.md`
-- 債務：`bash scripts/debt_ledger.sh --has-open`　治理票：`bash scripts/gen_fact_key_blocks.sh --check`
-- 白話看板同步：`bash scripts/plain_docs_sync_check.sh`
-- 🔴 **每輪派工前先跑 `bash scripts/agent_preflight.sh`**——快照存於 `/tmp`，
-  **會被委員收尾清理刪除**（R21／R22 連兩輪 postflight rc=1）。根因未修，暫以「每輪重跑」規避。
+## 未答否決點（自 R21 起十輪）
 
-## 定案，不要重新討論
+凍結條件②之替換（改為四指標），使用者可推翻。
 
-輪次上限**已解除**／42 Task 一個不砍／條件 IC 答案窗屬 IC 分析層／A-6＝使用者原話（③已滿足）／
-凍前**不拆 SPEC**／條件④＝(甲)（R17）／主委不得新建驗收機制（R20）／條件②′（R21＋R22）／
-主委不得自我歸類（R22）／**主委不再自擬殘留查核清單（R23）**。
+## 下一步
 
-## 流程紀律（累積）
-
-- 批次套補丁之腳本**任一條沒命中須非零退出**；落地後**當場跑補丁包 VERIFY grep**（R16）。
-- **不要用 `git stash` 驗「檔案乾淨時的行為」**（R17）。工作區另有他人之 `stash@{0}: review-temp`，**勿誤刪**。
-- **結構斷言須附行號碼證**；**「請這樣跑」之驗收須先確認在本專案環境跑得起來**（R18）。
-- **機械閘只能比對位元組／集合成員／物件參考**（R19）。**「這是常數」需碼證**（R19）。
-- **保證若需要「某人記得維護某份東西」，它就不是保證**（R20）。
-- **「已解決」要標明解決的是哪一面**；全稱句＝邀請反例（R21）。
-- 🔴 **寫下「見某某條」時，當下就要確認該條存在**——「等一下補」在文件裡等同於一個洞（R23）。
-- 🔴 **新增斷言時，把兩側各自「包含哪些列」寫出來對一次**——名字像不代表內容一樣（R23）。
-- 🔴 **立下通則的那一次修訂，就是該通則的第一個適用對象**（R23：同一輪違反自己的通則）。
-- 🔴 **某步驟若依賴我的記憶而反覆出錯，先問「這件事是不是本來就不該我做」**（R23）。
+R31 落地 → 續派 R32 → **FROZEN 後停下來等使用者**，不要自己往 TODO 或實作走。

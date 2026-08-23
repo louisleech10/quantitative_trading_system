@@ -36,7 +36,12 @@ DEFAULT_TARGET = "docs/GAP3_EVENT_UX_SPEC.md"
 
 _AFTER_RE = re.compile(r"^AFTER[^\n]*\n(.*?)(?=^VERIFY|\Z)", re.S | re.M)
 _FENCE_RE = re.compile(r"```[a-zA-Z]*\n(.*?)```", re.S)
-_VERIFY_RE = re.compile(r"^VERIFY[^\n]*\n(.*?)(?=^\S|\Z)", re.S | re.M)
+# 🔴 R31：停在下一「區段標題」（行首大寫關鍵字）或 EOF；勿用 ^\S（會切掉 `- \`grep` bullet）
+_VERIFY_RE = re.compile(
+    r"^VERIFY[^\n]*\n(.*?)(?=^(?:BEFORE|AFTER|VERIFY|AUTHORITY|OWNER|SHAPE|CONSUMER|"
+    r"NEGATIVE_MUTATION|SYNC-LOCI|SYNC-LOCI:)\b|\Z)",
+    re.S | re.M,
+)
 
 
 def _norm(s):
