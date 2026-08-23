@@ -2157,6 +2157,15 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百八十三・（2026-08-24）委員交了完整字面，我還是沒落地——因為沒有人審過它</strong>：這輪我要的核心閘修補，那家把完整的程式碼字面交出來了，另外兩家在派工單裡也被要求「攻擊它、找出繞過方式」。但三家是<strong>同時平行跑的</strong>，交件時誰也沒看過那份字面。<strong>於是那段要改動權限判斷的程式碼，目前是零審查狀態。</strong> 我沒有落地它。<strong>規則</strong>：<strong>平行作業換來速度，但「請 B 審 A 的產出」這種依賴在平行下必然落空</strong>——要嘛拆成兩輪，要嘛在派工單裡就講明「這一項下輪才審」，不要假裝它這輪會被審到。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百八十四・（2026-08-24）我請他們互相攻擊，兩家當場在第三家的程式碼裡找到真洞</strong>：上一輪某家交了完整的程式碼字面，但三家是同時跑的、沒人看過它，我因此沒落地。這輪我在派工單裡指名「請實讀那個檔、每家至少給兩個繞過嘗試」。回來的結果：<strong>兩家各自找出真缺口</strong>——某個必填欄位可以傳空字串就跳過檢查、另一處的驗證只測了兩個掛點中的一個。<strong>規則</strong>：<strong>「讓 B 審 A 的產出」在平行作業下必然落空，但拆成兩輪就會生效</strong>——代價是一輪延遲，換到的是原本會被落地的洞。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百八十五・（2026-08-24）這輪三家交的六份修補，我實跑之後全部退回——而且退回的理由都是跑出來的，不是讀出來的</strong>：①一份的程式碼讀一個<strong>根本不存在的環境變數</strong>（我 <code>grep</code> 出來是 0，真正的變數叫別的名字）②一份用了 <strong>bash 4 才有的語法</strong>，而本專案憲法是 bash 3.2（我實跑 <code>declare -A</code> 當場報 <code>invalid option</code>）③一份引用了一個<strong>不存在的腳本檔</strong>④兩份把 AFTER 寫成散文而不是可套用的字面。<strong>規則</strong>：<strong>「委員交了東西」和「那東西能用」是兩件事，而且差距經常大到一跑就知道</strong>——所以退回理由要用跑的產生，不要用讀的推測；跑出來的理由對方無從爭辯，讀出來的會變成下一輪的口水。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百八十六・（2026-08-24）委員交來的程式碼在我的機器上跑不起來，因為他用了 GNU 的寫法</strong>：某份治理閘的修補用 <code>sed</code> 的 <code>\|</code> 做交替——那是 GNU 擴充，<strong>BSD（macOS 內建）的 <code>sed</code> 不吃</strong>。實跑的症狀很隱蔽：它不報錯，只是<strong>沒有把字尾切掉</strong>，於是後面拿去做數字比較時才炸出「integer expression expected」。我改成 <code>sed -E</code>（ERE，兩邊都支援），只動這一處、不動判準，並在腳本裡具名記下是我改的、請下輪覆核。<strong>規則</strong>：<strong>跨平台的差異多半不是「報錯」，而是「安靜地做錯」</strong>——所以驗收要看最終值，不能只看指令有沒有非零退出。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

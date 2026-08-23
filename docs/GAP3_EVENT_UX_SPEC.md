@@ -24,7 +24,7 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R33-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R34-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
 → R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 → R29 8 條 findings（**composer 降至 1 條**；兩件跨包衝突已解除）；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
 🔴 **`ERRATA-R30-01`——R30 輪之 `-landing` 字樣不代表有內容落地**：R30 輪（ledger round
@@ -2358,7 +2358,7 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   #   散文與簽章互斥。**主委連兩輪未同步簽章**（R26 之 prepare-map-kwargs 補丁包整包未套）。
   #   ⇒ 簽章補 `lookahead_bars_declared`／`timeframe_seconds` 兩個 keyword-only 參數，
   #   與 §G G-3 ⑥(d) 之 keyword 集合一致。
-      -> PreparedAnalysisWindows        # frozen dataclass，欄集恰如下
+  # PreparedAnalysisWindows 欄集恰如下
   #    .supported: bool
   #    .windows: tuple[WindowRow, ...]           # R13 (β) 定死；**不是 dict**
   #                                              #   WindowRow 為 frozen dataclass，欄集恰
@@ -2530,6 +2530,10 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
       event_import_id=event_import_id,
       lookahead_bars_declared=lookahead_bars_declared,
       timeframe_seconds=timeframe_seconds)  # spy: call_count == 1
+  # 3a：time_range 唯一來源＝Task 7.7 ① 具名物（禁 feature_run_manifest／feature_run_time_range）
+  # <Task 7.7 picker 所選 run_id> 之表達式權威在 Task 7.7；本草圖不發明第三名
+  run_info = _browse_metadata_for_run(<Task 7.7 picker 所選 run_id>)  # -> RunInfo
+  feature_manifest_time_range = run_info.time_range  # Optional[dict] 同形；禁轉型別
   check_feature_run_coverage(
       timeframe_seconds=timeframe_seconds,
       feature_manifest_time_range=feature_manifest_time_range,

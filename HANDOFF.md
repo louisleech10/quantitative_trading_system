@@ -2,37 +2,42 @@
 
 ## 當前：GAP-3 事件型 UAT 缺口修補 SPEC（目標＝FROZEN）
 
-- 標的 `docs/GAP3_EVENT_UX_SPEC.md`：**3,538 行／42 Task（三十二輪未增未減）**，版本行 `R32-landing`，**狀態未 FROZEN**。
-- 最後落地＝**R32 十五條處置**（commit `61404144`）。
-- **下一步**：建 R33 派工包並派三家。
+- 標的 `docs/GAP3_EVENT_UX_SPEC.md`：**3,547 行／42 Task（三十四輪未增未減）**，版本行 `R34-landing`，**未 FROZEN**。
+- R34 已落地（3 件），債已銷。**下一步＝建 R35 派工包並派三家。**
+- 🔴 **本 session 動過 `scripts/`**（`gap3ux_apply_patch.py`、`gap3ux_header_round_check.sh`）
+  ⇒ **收 epic 前須跑 `bash scripts/gov_check.sh --no-probe`（丟背景）**；本輪尚未跑完。
+  ⚠️ 跑它時**主控端不得動檔**（治理測試比對工作區 dirty 數）。
 
-## R33 必辦（已定，勿重議）
+## R35 必辦（理由皆為實跑，勿重推測）
 
-1. **E-1 同輪重派死鎖**：方向三家已定「必修、不得以 ERRATA 代替」。三版中只有 CODEX 完整
-   （須讓 `gate.sh` 與 `gate_check.sh:125` 之獨立重查用同一 predicate），**但未附 bash literal**、
-   其 VERIFY 指名之 `tests/governance/test_result_state_format_failed.py` 不存在
-   ⇒ **請 codex 附完整 literal ＋ 反測 receipt**。主委不自寫核心閘控制流。
-2. **E-2 ABANDONED 假收據**：composer 版呼叫無定義 helper 已排除；CODEX（檔頭＝前一輪）與
-   GROK（後綴允許 `-abandoned`）**皆可執行、語義互斥、無機器判別** ⇒ **停手，請兩家合議**。
-3. **`ERRATA-R32-COLLISION`**：composer 與 grok 本輪輸出同一檔名 `r32-spy-gate-call.md`，
-   一家補丁包被靜默覆蓋（15 findings 對 14 檔）⇒ 兩家改名重交，並裁檔名碰撞是否須機械擋。
-4. **群集 C 疑義**：Task 7.0b ① 該塊標題寫「簽章如下」而所採 AFTER 為呼叫形式（`名=值`）。
-5. **harness 殘留**：`verify_greps` 抽出之字面含跳脫反引號時 `unescape` 未處理，仍有一條假紅。
+1. **E-1 同輪重派死鎖**：GROK 字面讀 `GATE_CHECK_CMD`——`grep -c` → **0**；真正變數是 `cmd`
+   （`gate_check.sh:164` 由 `jq -r '.tool_input.command'` 取得）⇒ parser 恆空、helper 永不被呼叫；
+   且該 parser **不檢查 intent 字面**，重開 CODEX-R34-P1-01 之洞。請 GROK 修、CODEX 覆核（勿再交散文）。
+2. **E-3 補丁包碰撞收集端閘**：CODEX 散文／COMPOSER 引用**不存在**之 `scripts/gap3ux_patch_family_audit.sh`／
+   GROK 用 `declare -A`（bash 4）而**本機為 bash 3.2.57**（`declare -A` → `invalid option`）。
+   三家一致：**產出端在本架構無可攔截點** ⇒ 須 registry 具名豁免＋收集端 fail-closed。
+3. **編排草圖自 R34 起不再 `compile()` 通過**（含 illustrative 佔位 `<Task 7.7 picker 所選 run_id>`）。
+   三家皆標 illustrative，**但無人明講可放棄該 receipt** ⇒ 請裁。
+4. **主委兩處具名修正待覆核**：`gap3ux_header_round_check.sh` 之 `sed -E` 可攜性修正
+   （BSD sed 不支援 BRE `\|`，實測誤紅）。
+5. **第三類 VERIFY 撰寫缺陷**：包側 VERIFY 與自身 AFTER 自相矛盾。
+   原則已定（`CODEX-R34-P2-02`）：**由 package author 修 scope，不放寬 extractor 或判準**。
 
-## 最高位階條款（`docs/GAP3_EVENT_UX_ROLE_CARD.md` 為準，本檔不重述細節）
+## 最高位階條款（`docs/GAP3_EVENT_UX_ROLE_CARD.md` 為準）
 
-R20 停止新建驗收機制／R21 條件②′／R22 不得自我歸類／R23 不自擬殘留查核清單／
-R25 anchor 只錨會被寫入之字面／**R32 擇一權＋機器可導出判準（新，見角色卡首節）**。
+R20 不得新建驗收機制／R21 條件②′／R22 不得自我歸類／R23 不自擬殘留查核清單／
+R25 anchor 只錨會被寫入之字面／**R32 擇一權＋機器判準（角色卡首節）**。
 
-🔴 **R32 判準摘要**：主委**得**擇一，但**僅當被排除之 AFTER 本身不可執行或自相矛盾**
-（`compile()` 失敗／引用之名在包內與標的皆無定義／宣稱效果在其所改範圍不可能達成／
-觸發條件永不成立）。**「語意較佳」「兩家同向」「觸及 R20 疑慮」皆不算證據 ⇒ 停手。**
-🔴 **副則**：**ERRATA 一律不重貼被否決之字面**（引用反例會被對證工具算成落地；已咬兩次）。
+🔴 **R32 判準**：得擇一，**僅當被排除之 AFTER 不可執行或自相矛盾**
+（`compile()` 失敗／引用名在包內與標的皆無定義／宣稱效果在其所改範圍不可能達成／
+觸發條件永不成立／**依賴不存在之變數或檔案**／**用了本機 shell 不支援的語法**）。
+「語意較佳」「兩家同向」皆不算 ⇒ 停手。
+🔴 **副則**：ERRATA 不重貼被否決之字面（已咬三次）。
 
-## 未答否決點（自 R21 起十二輪）
+## 未答否決點（自 R21 起十四輪）
 
 凍結條件②之替換（改為四指標），使用者可推翻。
 
 ## 下一步
 
-R33 → **FROZEN 後停下來等使用者**，不要自己往 TODO 或實作走。
+R35 → **FROZEN 後停下來等使用者**，不要自己往 TODO 或實作走。

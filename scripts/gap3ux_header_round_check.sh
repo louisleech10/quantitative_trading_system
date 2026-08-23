@@ -32,14 +32,18 @@ EPIC_RE='gap3ux-x-review-r'
 [ -f "${SPEC}" ] || { echo "[header_round] ✗ 找不到 ${SPEC}"; exit 2; }
 
 # ── ① 解析檔頭輪次；格式不可解析或多於一行 ⇒ fail-closed
-hdr_lines=$(grep -c '^\*\*版本\*\*：R[0-9]\{1,\}-landing' "${SPEC}")
+hdr_lines=$(grep -c '^\*\*版本\*\*：R[0-9]\{1,\}-\(landing\|abandoned\)' "${SPEC}")
 if [ "${hdr_lines}" -ne 1 ]; then
   echo "[header_round] ✗ 檔頭 current-round receipt 不是恰好一行（實得 ${hdr_lines} 行）"
-  echo "               期望格式：**版本**：R<n>-landing（…）"
+  echo "               期望格式：**版本**：R<n>-landing 或 R<n>-abandoned（…）"
   exit 2
 fi
-hdr_round=$(grep -o '^\*\*版本\*\*：R[0-9]\{1,\}-landing' "${SPEC}" | head -1 |
-            sed 's/^\*\*版本\*\*：R//; s/-landing$//')
+hdr_receipt=$(grep -o '^\*\*版本\*\*：R[0-9]\{1,\}-\(landing\|abandoned\)' "${SPEC}" | head -1)
+# 🔴 跨平台：BSD `sed` 之 BRE **不支援** `\|` 交替（實測 macOS 會留下 `34-landing`）
+#   ⇒ 一律用 `sed -E`（ERE，BSD／GNU 皆支援）。此為主委對 CODEX-R34 字面之
+#   可攜性修正，已具名於 reconcile；R35 請覆核。
+hdr_round=$(printf '%s\n' "${hdr_receipt}" | sed -E 's/^\*\*版本\*\*：R//; s/-(landing|abandoned)$//')
+hdr_suffix=$(printf '%s\n' "${hdr_receipt}" | sed -E 's/^.*-//')
 
 # ── ② 由債務帳本取本 epic 之最大輪次與其狀態（不靠 handoffs glob）
 ledger="$(bash scripts/debt_ledger.sh --list 2>/dev/null)"
@@ -114,20 +118,36 @@ case "${max_state}" in
      exit 2 ;;
 esac
 
-# ABANDONED 與 CLOSED 同樣代表「該輪已終結」⇒ 檔頭必須等於它（clean tree 也查）
-if [ "${max_state}" = "CLOSED" ] || [ "${max_state}" = "ABANDONED" ]; then
-  # 該輪已收案 ⇒ 落地應已完成，檔頭必須等於它（**clean tree 也查**，這是 R17 封的洞）
-  [ "${hdr_round}" -eq "${max_round}" ] || fail "已收案之輪次要求檔頭＝R${max_round}-landing"
-else
-  # OPEN：審查中（檔頭＝R$prev）或落地中（檔頭應已改為 R$max_round）
-  if [ "${dirty}" -eq 1 ]; then
-    [ "${hdr_round}" -eq "${max_round}" ] || \
-      fail "SPEC 有未提交改動（＝正在落地）⇒ 檔頭必須先改為 R${max_round}-landing"
-  else
-    [ "${hdr_round}" -eq "${max_round}" ] || [ "${hdr_round}" -eq "${prev}" ] || \
-      fail "審查中允許 R${prev} 或 R${max_round}，實得 R${hdr_round}"
-  fi
-fi
+# 🔴 R34（CODEX-R34-P1-02；三家覆核，判別依據＝連續兩輪 ABANDONED 之可滿足性）：
+#   CLOSED 與 ABANDONED **不再合併**——ABANDONED 為零落地，強迫寫 `-landing` 即假收據
+#   （R30 實害，見 SPEC 之 `ERRATA-R30-01`）。舊寫法另使「ABANDONED 之後開下一輪」
+#   在 OPEN clean 分支卡死（前輪收據為 `-abandoned`，而 OPEN 只認 landing）⇒ 一併放行。
+case "${max_state}" in
+  CLOSED)
+    { [ "${hdr_round}" -eq "${max_round}" ] && [ "${hdr_suffix}" = "landing" ]; } || \
+      fail "CLOSED 要求 R${max_round}-landing，實得 R${hdr_round}-${hdr_suffix}"
+    ;;
+  ABANDONED)
+    { [ "${hdr_round}" -eq "${max_round}" ] && [ "${hdr_suffix}" = "abandoned" ]; } || \
+      fail "ABANDONED 零落地要求 R${max_round}-abandoned，實得 R${hdr_round}-${hdr_suffix}"
+    ;;
+  OPEN)
+    if [ "${dirty}" -eq 1 ]; then
+      { [ "${hdr_round}" -eq "${max_round}" ] && [ "${hdr_suffix}" = "landing" ]; } || \
+        fail "SPEC 有未提交改動（＝正在落地）⇒ 檔頭必須為 R${max_round}-landing，實得 R${hdr_round}-${hdr_suffix}"
+    else
+      if [ "${hdr_round}" -eq "${max_round}" ] && [ "${hdr_suffix}" = "landing" ]; then
+        :
+      elif [ "${hdr_round}" -eq "${prev}" ] && \
+           { [ "${hdr_suffix}" = "landing" ] || [ "${hdr_suffix}" = "abandoned" ]; }; then
+        :
+      else
+        fail "OPEN clean 要求 R${max_round}-landing、R${prev}-landing 或 R${prev}-abandoned，實得 R${hdr_round}-${hdr_suffix}"
+      fi
+    fi
+    ;;
+  *) fail "未知輪次 state=${max_state}" ;;
+esac
 
-echo "[header_round] ✓ 檔頭＝R${hdr_round}-landing｜帳本最新＝R${max_round}(${max_state})｜dirty=${dirty}"
+echo "[header_round] ✓ 檔頭＝R${hdr_round}-${hdr_suffix}｜帳本最新＝R${max_round}(${max_state})｜dirty=${dirty}"
 exit 0
