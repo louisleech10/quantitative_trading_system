@@ -24,7 +24,7 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R32-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R33-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
 → R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 → R29 8 條 findings（**composer 降至 1 條**；兩件跨包衝突已解除）；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
 🔴 **`ERRATA-R30-01`——R30 輪之 `-landing` 字樣不代表有內容落地**：R30 輪（ledger round
@@ -2341,12 +2341,17 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   （CODEX-R11-P0-03 之拆分要求）⇒ 本模組公開**恰兩個**函式，簽章如下
   ```
   # 階段 2（prepare-windows）：唯一產生 receipt 與其 hash 之處
-  prepare_analysis_windows(
-      records, bars_by_tf,
-      event_label_spec=event_label_spec,
-      event_import_id=event_import_id,
-      lookahead_bars_declared=lookahead_bars_declared,
-      timeframe_seconds=timeframe_seconds)
+  def prepare_analysis_windows(
+      records,
+      bars_by_tf,
+      *,
+      event_label_spec,
+      event_import_id,
+      lookahead_bars_declared,
+      timeframe_seconds) -> PreparedAnalysisWindows:
+  # 🔴 R33 三家逐字一致：本塊為**簽章**（`def …:` 形），`*` 後為 required keyword-only；
+  #   **不得**寫成呼叫形 `名=值`（在簽章語境會被讀成預設值，並使 §G G-3 之
+  #   `inspect.signature` 驗收失去唯一來源）。呼叫形只出現在下方編排草圖。
   # 🔴 R27（三家：CODEX-R27-P1-01＋GROK-R27-P1-01＋COMPOSER-R27-P1-01）：
   #   R25／R26 之取得點散文要求「prepare 前建構一次 timeframe_seconds、以同一物件傳入
   #   purge 與 gate」，但**本 producer 之簽章未列該 map** ⇒ 規格內無路徑可傳進來，

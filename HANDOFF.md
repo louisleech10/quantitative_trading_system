@@ -2,36 +2,37 @@
 
 ## 當前：GAP-3 事件型 UAT 缺口修補 SPEC（目標＝FROZEN）
 
-- 標的 `docs/GAP3_EVENT_UX_SPEC.md`：**3,511 行／42 Task（三十輪未增未減）**，版本行 `R30-landing`，**狀態未 FROZEN**。
-- 內容最後落地＝R29 八條（commit `f15e9cea`）。`ed411291`＝**僅檔頭收據＋`ERRATA-R30-01`**，零內容。
-- **進行中**：R31 三家對抗審已派出，ledger round `e0bdac3b-d5f5-4b02-9d36-a3bf9797f16b`（OPEN）。
-  產物 `handoffs/20260824-gap3ux-x-review-r31-{codex,composer,grok}.md`。
+- 標的 `docs/GAP3_EVENT_UX_SPEC.md`：**3,538 行／42 Task（三十二輪未增未減）**，版本行 `R32-landing`，**狀態未 FROZEN**。
+- 最後落地＝**R32 十五條處置**（commit `61404144`）。
+- **下一步**：建 R33 派工包並派三家。
 
-## R30 輪的處置（已結案，勿重查）
+## R33 必辦（已定，勿重議）
 
-R30（round `03422383`）codex 交件格式不合規（來源摘要寫成 `path#sha256:<hex>`，
-`completeness_check.sh:352` 要求 `#` 緊接 12 位 hex）。`cx_run` 說「可同輪重派」，
-但**同輪重派需 dispatch token，而 `gate.sh` 於 OPEN 債時一律拒發** ⇒ 主委路徑上死鎖。
-依設計逃生口 `debt_clear --abandon --kind collection-failed` 銷帳，**該輪零落地**，
-議題原封不動改編為 R31 重派三家。此死鎖與「ABANDONED 輪被 header 閘要求寫 `-landing`」
-兩件，是本輪新發現的工具自傷，**應列入 R31 議題請委員裁**。
+1. **E-1 同輪重派死鎖**：方向三家已定「必修、不得以 ERRATA 代替」。三版中只有 CODEX 完整
+   （須讓 `gate.sh` 與 `gate_check.sh:125` 之獨立重查用同一 predicate），**但未附 bash literal**、
+   其 VERIFY 指名之 `tests/governance/test_result_state_format_failed.py` 不存在
+   ⇒ **請 codex 附完整 literal ＋ 反測 receipt**。主委不自寫核心閘控制流。
+2. **E-2 ABANDONED 假收據**：composer 版呼叫無定義 helper 已排除；CODEX（檔頭＝前一輪）與
+   GROK（後綴允許 `-abandoned`）**皆可執行、語義互斥、無機器判別** ⇒ **停手，請兩家合議**。
+3. **`ERRATA-R32-COLLISION`**：composer 與 grok 本輪輸出同一檔名 `r32-spy-gate-call.md`，
+   一家補丁包被靜默覆蓋（15 findings 對 14 檔）⇒ 兩家改名重交，並裁檔名碰撞是否須機械擋。
+4. **群集 C 疑義**：Task 7.0b ① 該塊標題寫「簽章如下」而所採 AFTER 為呼叫形式（`名=值`）。
+5. **harness 殘留**：`verify_greps` 抽出之字面含跳脫反引號時 `unescape` 未處理，仍有一條假紅。
 
 ## 最高位階條款（`docs/GAP3_EVENT_UX_ROLE_CARD.md` 為準，本檔不重述細節）
 
-R20 主委不得新建驗收機制／R21 條件②′／R22 主委不得自我歸類＋(a)-(e) 五類／
-R23 主委不再自擬殘留查核清單／R25 anchor 只錨 AFTER 仍存在之字面／
-R28 `must_exist`＝AFTER 每一非空行、跨包衝突停手不擇一。
+R20 停止新建驗收機制／R21 條件②′／R22 不得自我歸類／R23 不自擬殘留查核清單／
+R25 anchor 只錨會被寫入之字面／**R32 擇一權＋機器可導出判準（新，見角色卡首節）**。
 
-## 工作方法（不得違反）
+🔴 **R32 判準摘要**：主委**得**擇一，但**僅當被排除之 AFTER 本身不可執行或自相矛盾**
+（`compile()` 失敗／引用之名在包內與標的皆無定義／宣稱效果在其所改範圍不可能達成／
+觸發條件永不成立）。**「語意較佳」「兩家同向」「觸及 R20 疑慮」皆不算證據 ⇒ 停手。**
+🔴 **副則**：**ERRATA 一律不重貼被否決之字面**（引用反例會被對證工具算成落地；已咬兩次）。
 
-委員出【補丁包】、主委整包**逐字**套用（`scripts/gap3ux_apply_patch.py`），不得自寫第二處複述；
-觸及 SPEC 之 commit 須有補丁包或 ERRATA id；派審前 `gap3ux_pre_review.sh` 須 rc=0；
-補丁包互相矛盾時在具體提案間裁決並把理由寫進 SPEC，不另創第四種；文件一律不寫閘數。
-
-## 未答否決點（自 R21 起十輪）
+## 未答否決點（自 R21 起十二輪）
 
 凍結條件②之替換（改為四指標），使用者可推翻。
 
 ## 下一步
 
-R31 落地 → 續派 R32 → **FROZEN 後停下來等使用者**，不要自己往 TODO 或實作走。
+R33 → **FROZEN 後停下來等使用者**，不要自己往 TODO 或實作走。

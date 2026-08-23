@@ -89,7 +89,8 @@ def verify_greps(body):
             m = re.search(r'''grep\s+(?:-[a-zA-Z0-9]+\s+)*"((?:\\"|[^"])+)"''', ln)
         if not m:
             continue
-        lit = m.group(1).replace("\\'", "'").replace('\\"', '"')
+        lit = (m.group(1).replace("\\'", "'").replace('\\"', '"')
+               .replace("\\`", "`"))
         if re.search(r"(→|->|⇒)\s*0\b", ln):
             out.append((lit, 0, ln))
         elif re.search(r"(≥\s*1|>=\s*1)", ln):
