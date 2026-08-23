@@ -1,4 +1,13 @@
+20260822-gap3ux-x-review-r4-facts.sh|(檔頭)	三支機械閘
+20260822-gap3ux-x-review-r4-facts.sh|(檔頭)	六維度
+20260822-gap3ux-x-review-r5-facts.sh|(檔頭)	三支機械閘
+20260822-gap3ux-x-review-r5-facts.sh|(檔頭)	六維度
+20260822-gap3ux-x-review-r6-facts.sh|(檔頭)	三支
+20260822-gap3ux-x-review-r6-facts.sh|(檔頭)	六維度
+20260822-gap3ux-x-review-r6-facts.sh|(檔頭)	四支機械閘
+20260822-gap3ux-x-review-r6-facts.sh|(檔頭)	四支閘
 20260823-gap3ux-x-review-r7-facts.sh|(檔頭)	五支機械閘
+20260823-gap3ux-x-review-r8-facts.sh|(檔頭)	五支
 GAP3_EVENT_UX_SPEC.md|Task 1.1	一筆
 GAP3_EVENT_UX_SPEC.md|Task 1.1	五維度
 GAP3_EVENT_UX_SPEC.md|Task 1.10	一筆

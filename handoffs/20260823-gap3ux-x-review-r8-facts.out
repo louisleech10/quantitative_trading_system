@@ -1,0 +1,210 @@
+GAP-3 SPEC R8 FACT RECEIPTS
+repo HEAD: 37f357e5  branch: main
+
+=== F-01 | 審查標的之 SPEC 指紋（審查期間不得變動） ===
+$ shasum -a 256 docs/GAP3_EVENT_UX_SPEC.md; wc -l < docs/GAP3_EVENT_UX_SPEC.md
+01cf2468573ff50f9d3933698d2b110824bccc259bb519a1e2f523ca5b151bd0  docs/GAP3_EVENT_UX_SPEC.md
+    1580
+[rc=0]
+
+=== F-02 | Phase 7 批次維度在契約中之**完整路徑**、型別與 enum（遞迴搜尋，不預設巢狀層級） ===
+$ python3 handoffs/20260823-gap3ux-x-review-r8-dims.py
+scenario               path=/required_fields/scenario
+                       def ={"type": "str", "enum": ["A", "B", "C", "two_stage"], "doc": "A/B 預測型（事件在未來、不進特徵）／C 確認型／兩段式；D2 分路徑鍵"}
+control_kind           path=/required_fields/control_kind
+                       def ={"type": "str", "enum": ["user_labeled_same_trigger", "user_labeled_other", "platform_same_trigger_rule", "platform_random_bars"], "accepted": ["user_labeled_same_trigger", "user_labeled_other", "platform_same_trigger_rule"], "rejected_with_reason": {"platform_random_bars": "not_implemented_platform_random_bars"}, "doc": "四值閉集；platform_random_bars 恆拒（SPEC §N-7 解除前）；platform_same_trigger_rule 自 B3.2 起由產生器產出、過同一 validator"}
+entry_price_semantic   path=/required_fields/entry_price_semantic
+                       def ={"type": "str", "enum": ["trigger_open", "trigger_close", "next_open", "decision_bar_open", "decision_bar_close"], "doc": "entry bar/price 唯一映射見 SPEC D1-6；事件頂層欄，不住 label_definition"}
+label_return_mode      path=/required_fields/label_definition/fields/label_return_mode
+                       def ={"type": "str", "enum": ["open_to_close", "open_to_horizon_close", "close_to_close"], "default": "close_to_close", "doc": "label 錨 mode-scoped 機械唯一（SPEC D1-5）；open_to_* 顯式宣告才合法（白話閘裁決②）"}
+decision_offset_bars   path=/required_fields/decision_offset_bars
+                       def ={"type": "int", "min": 0, "default": 0, "doc": "決策時點＝t0 往前第 k 根錨定 TF bar 之 open；研究參數非訊號標註（白話閘裁決③）"}
+counterexample_kind    path=/optional_fields/counterexample_kind
+                       def ={"type": "str", "enum": ["a_trigger_no_follow", "b_range", "c_drop"], "doc": "僅使用者填；unclassifiable 不可匯入（⇒ counterexample_kind_not_importable）"}
+[rc=0]
+
+=== F-03 | 各批次維度之 enum 元素數與 accepted 子集（Task 7.2 之比對基準） ===
+$ python3 handoffs/20260823-gap3ux-x-review-r8-dims.py --counts
+scenario               enum_len=4 accepted_len=None enum=['A', 'B', 'C', 'two_stage']
+control_kind           enum_len=4 accepted_len=3 enum=['user_labeled_same_trigger', 'user_labeled_other', 'platform_same_trigger_rule', 'platform_random_bars']
+entry_price_semantic   enum_len=5 accepted_len=None enum=['trigger_open', 'trigger_close', 'next_open', 'decision_bar_open', 'decision_bar_close']
+label_return_mode      enum_len=3 accepted_len=None enum=['open_to_close', 'open_to_horizon_close', 'close_to_close']
+decision_offset_bars   enum_len=0 accepted_len=None enum=None
+counterexample_kind    enum_len=3 accepted_len=None enum=['a_trigger_no_follow', 'b_range', 'c_drop']
+[rc=0]
+
+=== F-04 | 契約之六份 reason／flag 清單長度（Task 1.1 與 1.12 之常數依據） ===
+$ python3 -c "import json;c=json.load(open('momentum/Analysis/contracts/event_import_contract.json'));[print(k,len(c[k]),c[k]) for k in ('import_failure_reasons','alignment_failure_reasons','capability_unavailable_reasons','split_purge_reasons','split_loud_flags','degraded_flags')]"
+import_failure_reasons 15 ['missing_required_field', 'unknown_field', 'enum_violation', 'type_error', 'invalid_timestamp_unit', 'duplicate_event_id', 'empty_import', 'missing_control_group', 'not_implemented_platform_random_bars', 'direction_mixed_in_batch', 'conditional_required_missing', 'research_only', 'digest_mismatch', 'label_value_type_error', 'counterexample_kind_not_importable']
+alignment_failure_reasons 14 ['invalid_timestamp_unit', 'timezone_missing', 'missing_bar', 'duplicate_bar', 'unsorted_bar', 'no_boundary_match', 'feature_after_decision', 'entry_before_decision', 'label_window_incomplete', 'nonpositive_reference_price', 'nan_or_inf_feature', 'reference_symbol_unavailable', 'warmup_insufficient_{tf}', 'tf_boundary_ambiguous']
+capability_unavailable_reasons 3 ['missing_label_value', 'missing_prevalence_disclosure', 'one_class_test_segment']
+split_purge_reasons 1 ['interval_crosses_split_boundary']
+split_loud_flags 1 ['insufficient_events_in_test']
+degraded_flags 2 ['single_symbol', 'no_cluster_adjustment']
+[rc=0]
+
+=== F-05 | dedupe 依 scenario 分流（證明系統本就非單一 scenario） ===
+$ grep -n '_POLICY_BY_SCENARIO' -A 8 momentum/Analysis/event_samples/dedupe.py
+20:_POLICY_BY_SCENARIO = {"C": "cluster_first", "A": "all_with_uniqueness", "B": "all_with_uniqueness", "two_stage": "all_with_uniqueness"}
+21-
+22-
+23-def _overlap(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
+24-    return a_start < b_end and b_start < a_end
+25-
+26-
+27-def build_event_manifest(
+28-    receipts: AlignmentReceipts,
+--
+126:    primary = _POLICY_BY_SCENARIO.get(policy_config.scenario)
+127-    if primary is None:
+128-        raise ValueError(f"unknown scenario for dedupe policy: {policy_config.scenario!r}")
+129-    sensitivity = "all_with_uniqueness" if primary == "cluster_first" else "cluster_first"
+130-
+131-    table["in_primary"] = retained(primary)
+132-    table["in_sensitivity"] = retained(sensitivity)
+133-
+134-    n_clusters = table["dedupe_cluster_id"].nunique()
+[rc=0]
+
+=== F-06 | eventExport.ts 各維度寫死位置（Phase 7 之接線缺口） ===
+$ grep -n 'decision_offset_bars\|entry_price_semantic\|scenario\|label_return_mode\|control_kind\|counterexample_kind' frontend/src/lib/eventExport.ts
+4: * scenario 預設 C（確認型）、entry_price_semantic 預設 trigger_open、label_definition 由搜尋條件摘要＋digest 組。
+15:  scenario?: 'A' | 'B' | 'C' | 'two_stage';
+92:      decision_offset_bars: 0,
+93:      entry_price_semantic: opts.entryPriceSemantic ?? 'trigger_open',
+95:      scenario: opts.scenario ?? 'C',
+102:        label_return_mode: 'close_to_close',
+104:      control_kind: 'user_labeled_same_trigger',
+[rc=0]
+
+=== F-07 | /search 呼叫端未傳任何 opts（介面留了、UI 沒做） ===
+$ grep -n 'buildEventContractRecords' -A 8 frontend/src/app/search/page.tsx
+506:    const { buildEventContractRecords } = await import('@/lib/eventExport');
+507-    // 規則摘要（G3：條件自動存；值單位同 UI：% 與倍數）
+508-    const ruleConditions = [
+509-      {
+510-        parameter: 'price_change',
+511-        operator: operators.priceChange,
+512-        value: operators.priceChange === 'BETWEEN'
+513-          ? [rangeValues.priceChange.min, rangeValues.priceChange.max]
+514-          : searchParams.priceChange,
+--
+522:    const payload = await buildEventContractRecords(currentResult.cases, {
+523-      timeframe: searchParams.timeframe,
+524-      conditions: ruleConditions,
+525-      priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
+526-      horizonBars: eventHorizonBars,
+527-    });
+528-    // CODEX-R3-P1-02：缺該 horizon 之未來報酬欄 ⇒ 該列無 label_value，條件 IC 會 unavailable；匯出前先講清楚
+529-    if (payload.n_missing_label_value > 0) {
+530-      const proceed = window.confirm(
+[rc=0]
+
+=== F-08 | event_forward_return_table 簽章（無 labels 參數 ⇒ Task 7.5 三組為新增行為） ===
+$ grep -rn 'def event_forward_return_table' -A 12 momentum/Analysis/event_samples/
+momentum/Analysis/event_samples/tables.py:88:def event_forward_return_table(
+momentum/Analysis/event_samples/tables.py-89-    manifest: EventManifest,
+momentum/Analysis/event_samples/tables.py-90-    receipts: AlignmentReceipts,
+momentum/Analysis/event_samples/tables.py-91-    bars_by_tf: Dict[str, Dict[str, pd.DataFrame]],
+momentum/Analysis/event_samples/tables.py-92-    event_split_plan: EventSplitPlan,
+momentum/Analysis/event_samples/tables.py-93-    table_config: dict,
+momentum/Analysis/event_samples/tables.py-94-) -> Dict:
+momentum/Analysis/event_samples/tables.py-95-    """事件後多 horizon signed 報酬分布表（K5/C7-i；U1；不需反例）。
+momentum/Analysis/event_samples/tables.py-96-
+momentum/Analysis/event_samples/tables.py-97-    signed `(exit_h − entry)/entry`：entry＝D1-6 映射（收據 `entry_price_source_*`）、
+momentum/Analysis/event_samples/tables.py-98-    exit_h＝entry bar 之後第 h 根錨定 TF bar 之 close（與標籤基準 t₀ close 報酬並排揭露＝D1-4）。
+momentum/Analysis/event_samples/tables.py-99-    table_config：{"horizons": [int,...]（config 化，不寫死）, "seed": int, "n_boot": int}。
+momentum/Analysis/event_samples/tables.py-100-    horizon 超出資料 ⇒ 該格 n 反映排除、不灌 0；單事件 ⇒ CI unavailable。
+[rc=0]
+
+=== F-09 | ic_feed 之 PIT 規則（特徵最晚取至 t0−1 收盤） ===
+$ grep -n 'decision_time_rule\|feature_cutoff_rule' momentum/Analysis/event_samples/ic_feed.py
+75:        "decision_time_rule": "t0_open_minus_k_bars",
+76:        "feature_cutoff_rule": "max_close_ms_le_decision_at",
+[rc=0]
+
+=== F-10 | analyze_tables 之 horizons 預設（Task 4.2 之改動基準） ===
+$ grep -rn 'horizons' momentum/Analysis/event_samples/pipeline.py | head -20
+momentum/Analysis/event_samples/pipeline.py:98:        horizons: Tuple[int, ...] = (1, 2, 4), seed: int = 20260820, n_boot: int = 300,
+momentum/Analysis/event_samples/pipeline.py:106:                                         {"horizons": [int(h) for h in horizons], "seed": int(seed), "n_boot": int(n_boot)})
+[rc=0]
+
+=== F-11 | future 欄之兩套命名與其小時→根數換算（Task 1.10 之 registry 依據） ===
+$ grep -n 'periods_\|future' momentum/DataExtraction/case_search_engine.py | sed -n '1,40p'
+328:                parameter="future_close_return",
+338:                parameter="future_max_drawdown",
+655:                'future_1bar_return': safe_get('future_1bar_return'),
+656:                'future_2bar_return': safe_get('future_2bar_return'),
+657:                'future_3bar_return': safe_get('future_3bar_return'),
+658:                'future_4bar_return': safe_get('future_4bar_return'),
+659:                'future_5bar_return': safe_get('future_5bar_return'),
+660:                'future_6bar_return': safe_get('future_6bar_return'),
+661:                'future_7bar_return': safe_get('future_7bar_return'),
+662:                'future_8bar_return': safe_get('future_8bar_return'),
+663:                'future_9bar_return': safe_get('future_9bar_return'),
+664:                'future_10bar_return': safe_get('future_10bar_return'),
+665:                'future_11bar_return': safe_get('future_11bar_return'),
+666:                'future_12bar_return': safe_get('future_12bar_return'),
+669:                'future_1bar_max_drawdown': safe_get('future_1bar_max_drawdown'),
+670:                'future_2bar_max_drawdown': safe_get('future_2bar_max_drawdown'),
+671:                'future_3bar_max_drawdown': safe_get('future_3bar_max_drawdown'),
+672:                'future_4bar_max_drawdown': safe_get('future_4bar_max_drawdown'),
+673:                'future_5bar_max_drawdown': safe_get('future_5bar_max_drawdown'),
+674:                'future_6bar_max_drawdown': safe_get('future_6bar_max_drawdown'),
+675:                'future_7bar_max_drawdown': safe_get('future_7bar_max_drawdown'),
+676:                'future_8bar_max_drawdown': safe_get('future_8bar_max_drawdown'),
+677:                'future_9bar_max_drawdown': safe_get('future_9bar_max_drawdown'),
+678:                'future_10bar_max_drawdown': safe_get('future_10bar_max_drawdown'),
+679:                'future_11bar_max_drawdown': safe_get('future_11bar_max_drawdown'),
+680:                'future_12bar_max_drawdown': safe_get('future_12bar_max_drawdown'),
+687:                'future1_close_return': safe_get('future1_close_return'),
+688:                'future2_close_return': safe_get('future2_close_return'),
+689:                'future4_close_return': safe_get('future4_close_return'),
+690:                'future6_close_return': safe_get('future6_close_return'),
+691:                'future24_close_return': safe_get('future24_close_return'),
+692:                'future48_close_return': safe_get('future48_close_return'),
+693:                'future72_close_return': safe_get('future72_close_return'),
+694:                'future_max_return': safe_get('future_max_return'),
+695:                'future_max_drawdown': safe_get('future_max_drawdown'),
+696:                'future72_max_return': safe_get('future72_max_return'),
+697:                'future72_max_drawdown': safe_get('future72_max_drawdown'),
+698:                'future24_close': safe_get('future24_close'),
+699:                'future24_low': safe_get('future24_low'),
+705:                'future_1bar_return': safe_get('future_1bar_return'),
+[rc=0]
+
+=== F-12 | 使用者既有事件批次之實際內容（D-7 洩漏情境是否適用之依據） ===
+$ ls -1 data_cache/events/*.json 2>/dev/null | tail -3
+data_cache/events/20260822T011331Z-eb210a16.json
+data_cache/events/20260822T011439Z-8885b4fa.json
+data_cache/events/20260822T011727Z-f0daec3e.json
+[rc=0]
+
+=== F-13 | IC 分析頁與 Feature Library 之 time_range（R3 群集 E 之盤點起點） ===
+$ grep -rn 'time_range' frontend/src/app api/routes --include=*.tsx --include=*.ts --include=*.py | head -20
+frontend/src/app/result/page.tsx:87:  time_range: {
+frontend/src/app/result/page.tsx:101:    time_range: {
+frontend/src/app/charts/page.tsx:77:    time_range: { start: number; end: number };
+frontend/src/app/charts/page.tsx:757:                    <p className="text-xs text-slate-400">{formatTimestampDate(chartData.metadata.time_range.start)} → {formatTimestampDate(chartData.metadata.time_range.end)} ・ {chartData.metadata.total_bars} 根 K 線</p>
+api/routes/two_stage_search.py:241:                    time_range={"start": "N/A", "end": "N/A"},
+api/routes/two_stage_search.py:272:                "time_range": {
+api/routes/two_stage_search.py:325:        # logger.info(f"Request time_range: {request.time_range}")
+[rc=0]
+
+=== F-14 | 本 SPEC 五支機械閘之現況（皆須 rc=0） ===
+$ bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_SPEC.md; echo doc_format=$?; bash scripts/spec_ruling_task_sync.sh docs/GAP3_EVENT_UX_SPEC.md; echo ruling_sync=$?; bash scripts/spec_v_task_ref_check.sh docs/GAP3_EVENT_UX_SPEC.md; echo v_task_ref=$?; bash scripts/quant_standard_check.sh; echo quant_std=$?; python3 scripts/spec_count_audit.py --check docs/GAP3_EVENT_UX_SPEC.md --baseline handoffs/run_receipts/gap3ux-spec-count-baseline.txt; echo count_audit=$?
+doc_format=0
+ruling_sync=0
+v_task_ref=0
+quant_std=0
+[spec_count_audit] 🔴 計數字面有變動 ⇒ 請逐條複核它所計之物的實際數
+  ── 消失（確認是刻意移除，非誤刪斷言）──
+    - 20260823-gap3ux-x-review-r7-facts.sh|(檔頭)	五支機械閘
+
+  病根：R6 三條、R7 三條皆為「計數字面沒跟著它所計之物一起改」（閘 3→4→5 支／維度 6→5 個／reason 16 vs 20）。
+  正解：能改成集合相等斷言的就別寫計數字面；真要寫數字，複核後更新基準：
+        python3 scripts/spec_count_audit.py --list docs/GAP3_EVENT_UX_SPEC.md > handoffs/run_receipts/gap3ux-spec-count-baseline.txt
+count_audit=2
+[rc=0]
+
+=== 總計 14 條 fact；rc_all=0 ===

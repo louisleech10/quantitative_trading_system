@@ -34,11 +34,20 @@ R5 起改由委員逐條指定修法、主委照抄，技術決策因此零錯�
 不給 --diff-base 時，比對「工作區相對 HEAD」之改動（含 staged 與 unstaged）。
 rc: 0=diff 覆蓋全部 SYNC-LOCI；2=有 locus 未被觸及（或補丁包格式不合）
 
-🔴 誠實邊界（三家明列，不得誇大）：
-  1. 本閘只驗「宣告的 locus 有沒有被碰到」。**委員漏列的 locus，本閘看不見**
+🔴 **2026-08-23 強度訂正（CODEX-R8-P1-06）**：首版只以「dirty worktree 之**檔名**集合」
+判定 locus ⇒ 同檔之**無關修改**、或該檔本來就 dirty，即可被誤算為「補丁已套用」。
+主委當時在 HANDOFF 與角色卡以「diff 觸及集合 ⊇ SYNC-LOCI」描述其強度，
+**該描述高於實際能力**。現改為驗到 **anchor 層級**：
+locus 帶 `#anchor` 者，該 anchor 之字面必須出現在**該檔之 diff hunk 內容**中
+（新增或刪除行皆算），僅檔名相符不足。
+
+🔴 誠實邊界（不得誇大）：
+  1. 本閘只驗「宣告的 locus 有沒有被真的改到」。**委員漏列的 locus，本閘看不見**
      ——那要靠 review 輪抓，且算委員責任。
-  2. 只驗「檔案有被改」與「錨點行仍存在／已變動」，**不驗改得對不對**。
-  3. 「選哪個技術修法正確」「使用者 label 語意是否正確」「未被列出的隱藏複述」
+  2. anchor 比對是**字面比對**：anchor 若寫得太籠統（如 `#main`），
+     同檔任何含該字串之改動都會通過 ⇒ **anchor 之精確度是委員的責任**。
+  3. 不驗「改得對不對」，只驗「有沒有改到那裡」。
+  4. 「選哪個技術修法正確」「使用者 label 語意是否正確」「未被列出的隱藏複述」
      ——三家明說**做不成機械閘**，保留獨立委員與使用者裁定。
 """
 
@@ -111,6 +120,57 @@ def changed_files(base):
     return names
 
 
+def _head_time():
+    out = subprocess.run(['git', 'log', '-1', '--format=%ct'],
+                         capture_output=True, text=True)
+    if out.returncode != 0 or not out.stdout.strip():
+        return None
+    return int(out.stdout.strip())
+
+
+def is_touched(path, touched, head_ts):
+    """該 locus 檔本次有無被改動。
+
+    🔴 **gitignore 之盲區（2026-08-23 主委反測發現）**：本 repo 之 `handoffs/*` 列在
+    `.git/info/exclude` ⇒ `git status --porcelain -uall` **不列 ignored 檔**
+    （`-uall` 只含 untracked，不含 ignored）。補丁包若把 `handoffs/*-facts.sh`
+    列為 locus，會被誤判「未改動」——與首版之 untracked 盲區同型，是**第二個** fail-open。
+    ⇒ git 看不見者，退回**檔案 mtime 對 HEAD commit 時間**之比較：
+      mtime > HEAD 之 commit 時間 ⇒ 視為本次改動。
+    誠實邊界：mtime 可被 `touch` 偽造，且同一 commit 週期內之舊改動也會算進來
+    ——這是 gitignore 檔的先天限制，不宣稱與 tracked 檔同強度。
+    """
+    if path in touched:
+        return True
+    if head_ts is None:
+        return False
+    try:
+        return os.path.getmtime(path) > head_ts
+    except OSError:
+        return False
+
+
+def diff_hunks(path, base):
+    """回傳該檔之 diff hunk 內容（含新增與刪除行）。未追蹤檔 ⇒ 回全檔內容。"""
+    cmds = []
+    if base:
+        cmds.append(['git', 'diff', '-U0', base, '--', path])
+    cmds.append(['git', 'diff', '-U0', 'HEAD', '--', path])
+    cmds.append(['git', 'diff', '-U0', '--cached', '--', path])
+    body = ''
+    for c in cmds:
+        out = subprocess.run(c, capture_output=True, text=True)
+        if out.returncode == 0:
+            body += out.stdout
+    if body.strip():
+        return body
+    # 未追蹤（新建）檔：git diff 無輸出 ⇒ 全檔視為新增
+    try:
+        return io.open(path, encoding='utf-8', errors='replace').read()
+    except IOError:
+        return ''
+
+
 def main(argv):
     args = [a for a in argv[1:] if a]
     base = None
@@ -130,6 +190,7 @@ def main(argv):
     if touched is None:
         print('ERROR: git diff 失敗（fail-closed）', file=sys.stderr)
         return 2
+    head_ts = _head_time()
 
     rc = 0
     for pf in patches:
@@ -143,16 +204,24 @@ def main(argv):
             rc = 2
         missing = []
         for f, anchor in loci:
-            if f not in touched:
-                missing.append((f, anchor))
+            if not is_touched(f, touched, head_ts):
+                missing.append((f, anchor, '檔案未被本次改動'))
+                continue
+            if anchor:
+                # 🔴 CODEX-R8-P1-06：僅檔名相符不足，anchor 須出現在 diff hunk 內
+                body = diff_hunks(f, base)
+                if anchor not in body:
+                    missing.append((f, anchor, 'anchor 未出現在該檔之 diff hunk 內'))
         if missing:
             rc = 2
-            print('[patch_locus_check] 🔴 %s：以下 SYNC-LOCI 未被本次 diff 觸及' % pf,
+            print('[patch_locus_check] 🔴 %s：以下 SYNC-LOCI 未被本次改動涵蓋' % pf,
                   file=sys.stderr)
-            for f, a in missing:
-                print('    · %s%s' % (f, ('#' + a) if a else ''), file=sys.stderr)
+            for f, a, why in missing:
+                print('    · %s%s  ← %s' % (f, ('#' + a) if a else '', why),
+                      file=sys.stderr)
         elif loci and not errors:
-            print('[patch_locus_check] ✓ %s：%d 個 locus 全部被觸及' % (pf, len(loci)))
+            print('[patch_locus_check] ✓ %s：%d 個 locus 全部被改到（含 anchor 比對）'
+                  % (pf, len(loci)))
     if rc:
         print('\n  規則：主委 commit 之 diff 觸及集合須 ⊇ 補丁包之 SYNC-LOCI。',
               file=sys.stderr)

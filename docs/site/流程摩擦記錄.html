@@ -1922,6 +1922,12 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百・（2026-08-23）我用「自傷佔比」當錯誤率指標，被 grok 指出那個分母會自己變小</strong>：我連續幾輪跟使用者報「我造成的錯誤從 16% 升到 58%」，grok 指出這是壞指標——<strong>委員找到的真缺口在下降（約 16→5），分母縮小會讓佔比自動上升</strong>，而我的自傷絕對數其實是 3→5→6→7 緩升。我的表述雖非不實，但<strong>度量方式會誤導使用者對趨勢的判斷</strong>。<strong>規則</strong>：<strong>任何「比例型」自評指標，必須並列絕對數與分母</strong>；尤其當分母本身是「別人找到多少問題」這種會隨改善而下降的量時，比例會製造惡化的假象（反之亦然——分母上升時也會製造改善的假象）。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百零一・（2026-08-23）我為「唯一入口」做的入口自己指向過期檔——同型錯誤第三次</strong>：「新增機械閘後沒更新檢查清單」在 R6（三→四）、R7（四→五）各犯一次，我在 R7 為它做了「唯一入口 <code>gap3ux_pre_review.sh</code>」當解法；R8 委員抓到<strong>那個入口自己把 FACTS 寫死成上一輪的檔</strong>（r7），而本輪已是 r8 ⇒ 計數稽核掃的是過期 receipt。<strong>收斂唯一入口沒有用，因為入口裡還是有寫死的字面</strong>。修法：入口不寫死輪次，改用 glob 掃所有同類檔，新增輪次自動納入。<strong>規則</strong>：<strong>做「單一來源」時要問「這個來源裡面還有沒有寫死的東西」</strong>——把三處字面收斂成一處，只是把三個漂移點變成一個漂移點，不是消除漂移；真正的解是讓那個點<strong>不含可漂移的字面</strong>（用 glob／導出，而非列舉）。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百零二・（2026-08-23）我在文件裡把自製閘描述得比它實際能力強，被委員抓到</strong>：我寫的 <code>patch_locus_check</code> 首版只比對「哪些檔被改過」，但我在 HANDOFF 與角色卡把它描述成「diff 觸及集合 ⊇ SYNC-LOCI」——聽起來像驗到了改動內容，實際上同檔的<strong>無關修改</strong>就能讓它通過。codex 直接指出「描述高於實際能力」。這比單純的 bug 更糟：<strong>別人（包括未來的我）會根據那個描述決定還要不要人工檢查</strong>。修法：升級成 anchor 層級比對，並在檔頭誠實邊界寫明「anchor 若寫得太籠統，同檔任何含該字串之改動都會通過 ⇒ anchor 精確度是委員的責任」。<strong>規則</strong>：<strong>自製工具的文件描述必須寫它「實際驗了什麼」，不是它「想達成什麼」</strong>；每支閘檔頭的「誠實邊界」段要具體到能讓人判斷「哪些情況它看不見」。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
