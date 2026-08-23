@@ -24,10 +24,10 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R21-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R22-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
-→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 條 findings；**P0=0（連七輪）**、**(N)=0 連七輪**；🔴 R20 裁定「主委停止新建機制」、R21 裁定「條件② 不可達，替換為 ②′」，兩者皆見角色卡）。
-**狀態：未 FROZEN**（待 R22 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+→ R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 條 findings；**P0=0（連八輪）**、**(N)=0（連八輪）**；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
+**狀態：未 FROZEN**（待 R23 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
 🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
 歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
@@ -208,7 +208,10 @@ D-7 明訂 `scenario=C` 且無品質過濾時 lookahead 深度 **＝ 0**
 # 逐 timeframe 解析之深度（bars）；來源＝Task 2.1b 之 bars_of()，本節不另立公式
 lookahead_bars_declared : Mapping[timeframe -> int >= 0]     # 批內每個出現過的 tf 各一值
 
-lookahead_depth_ms(e) = lookahead_bars_declared[e.timeframe] * TIMEFRAME_SECONDS[e.timeframe] * 1000
+lookahead_depth_ms(e) = lookahead_bars_declared[e.timeframe] * timeframe_seconds[e.timeframe] * 1000
+#   🔴 R22（COMPOSER-R22-P1-02）：`timeframe_seconds` ＝ **注入之 map**
+#   （見 §G G-3 ⑥(d) 之 keyword-only 簽章），**不是** module-level `TIMEFRAME_SECONDS`。
+#   原文寫死 module 常數，與 R20 之注入改法互斥——**撤回未清乾淨之第四處**。
 label_window_ms(e)    = row(e).label_end_ms - row(e).label_start_ms   # 分析時 align_events
                         # row(e) ＝ windows 中 event_id == e 之唯一 WindowRow
                         # 🔴 R15：windows 已是 tuple[WindowRow, ...]，**不得**用 windows[e] 下標
@@ -284,8 +287,10 @@ bar 命名欄（`future_4bar_return`）則本就逐 tf 不同（1h 得 4h、12h 
   ⇒ 使用者宣告之答案窗根數亦以 `Mapping[timeframe -> int >= 0]` 表達
   （單一 TF 批次退化為單鍵；CSV 上傳時由 Task 1.9 之 UI 逐 tf 收集或以同值填滿）。
   Task 2.1b 之 `depth(tf)` 左項取 `declared_window_bars[tf]`。
-- **禁止**用 run 之 tf、批內 `max/min/平均 tf`（同 Task 7.7 ②；單位來源＝
-  `momentum/core/constants.py:6` 之 `TIMEFRAME_SECONDS`）。
+- **禁止**用 run 之 tf、批內 `max/min/平均 tf`（同 Task 7.7 ②）。
+  🔴 **R22 更正單位來源**：秒數一律取自**注入之 `timeframe_seconds` map**；
+  `momentum/core/constants.py:6` 之 `TIMEFRAME_SECONDS` 僅為該 map 之**建構素材**，
+  **不得**於計算路徑直接讀取（見 §G G-3 ⑥(d) 之 AST 禁用條）。
 
 - `row(e)`（即 `windows` 中之對應 `WindowRow`）必須來自**本次分析**之 align_events receipt（見下方（iii）），
   **不得**取匯入檔烤入之舊 `label_end_ms`／`label_start_ms`。
@@ -452,8 +457,12 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
                                        #     不各自從 records／pipeline 中段重建；
                                        #     其 receipt identity 即 `analysis_alignment_receipt_hash`。
                                        #   ⇒ **unknown TF 之 fail-closed**：某觸發 TF 不在
-                                       #     `TIMEFRAME_SECONDS` 之鍵中 ⇒ **拒算**（不得略過該列、
-                                       #     不得以預設秒數代入）。
+                                       #     注入之 `timeframe_seconds` 鍵中 ⇒ **拒算**
+                                       #     （不得略過該列、不得以預設秒數代入）。
+                                       #   🔴 R22（GROK-R22-P1-02＋CODEX-R22-P1-02）：本條原**無可執行落點**
+                                       #     ⇒ 驗收落 **Task 7.0b ⑨(g)**（新子條，見該 Task）；
+                                       #     並由 (d-3a) 之鍵集集合相等**同時**涵蓋
+                                       #     （unknown TF 必使兩側集合不等 ⇒ 紅）。
                                        #   🔴 **不得** union `per_tf.timeframe`（那是特徵 TF）；
                                        #   🔴 **不得** 於 coverage 後重算。
                                        #   出處：TIMEFRAME_SECONDS 是 module-level 可變 dict
@@ -917,6 +926,21 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
              ——**沒有第二份清單可漂移**；新增一個自由變數 ⇒ 必須加參數 ⇒ 呼叫端漏傳即 `TypeError`。
        (d-3) `batch.timeframe_seconds_digest` 綁定「**傳入之同一個 map**」之 S-9 位元組
              （非 module-level 之 `TIMEFRAME_SECONDS`）⇒ alias mutation 不再能改結果而 hash 不變。
+             🔴 **R22 補（三家；CODEX-R22-P1-01＋GROK-R22-P1-02＋COMPOSER-R22 議題三）**：
+             (d-3) **只保證 digest 與傳入 map 位元組一致**，**擋不住**下列兩形——
+             ①傳入之 map **多了本批未用到之 tf** ⇒ digest 不同 ⇒ **假紅**；
+             ②**少了某 tf** 而該 tf 之事件已被 coverage 濾掉 ⇒ 兩邊自洽 ⇒ **假綠**。
+       (d-3a) 🔴 **鍵集集合相等（採 GROK-R22 提案；主委未自創）**：斷言
+             `set(timeframe_seconds.keys())` **==** `set(e.timeframe for e in event_level)`
+             （**pre-coverage 快照**；兩側皆取自階段 2 之同一 frozen 物件）。
+             多一鍵、少一鍵**皆紅**——集合成員比對，屬角色卡 (b)。
+             此條**同時**涵蓋 unknown-TF：未知 tf 必使兩側集合不等 ⇒ 紅。
+             🔴 **其餘「錯值面」不再以規格條文加防護**
+             （grok 明示「此處不宜再堆第 N 版敘事防護」）——**下推實作階段之 pytest**
+             （mutation ⑤ 已覆蓋「鍵齊而秒數錯」）。
+             ⚠️ **本處已被連續六輪攻擊**（列舉三／列舉四／解析文件／常數清單／
+             `TypeError` 誇大／(d-3) 不足）；R22 起**鍵集面由 (d-3a) 機械收斂、
+             值面由實作測試收斂**，規格層**不再新增第七版敘事**。
        **mutation（五條）**：①呼叫端漏傳 `timeframe_seconds` ⇒ `TypeError`；
        ②函式內改用 module-level `TIMEFRAME_SECONDS`（`ImportFrom` 或 `Attribute Load`）
        ⇒ AST 斷言紅；③digest 改由 module-level dict 算而非傳入之 map ⇒ alias mutation 反例紅；
@@ -2325,10 +2349,16 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
         ——此為**規範陳述**，其驗收形式待實作 Task 定。
       · 🔴 **`timeframe` 同理**：`event_trigger_timeframe(record) -> str`，同檔、同驗收方式。
     - `timeframe` 為**觸發 TF**，與 `per_tf` 之特徵 TF 集合**不同語意**（見 §D-3′-a（ii））。
-    **mutation（三條，皆須紅）**：①`WindowRow` 移除 `symbol` 或 `timeframe`
-    ⇒ §G G-3 ⑥(d) 之 signature 對證紅；②`symbol` 改由匯入檔欄位直取而非
-    `event_scope_key()` ⇒ (i) 之 AST 斷言紅；③任一 consumer 改為自寫取值 ⇒ (ii) 之
-    `is` 斷言紅。
+    **mutation**：①`WindowRow` 移除 `symbol` 或 `timeframe`
+    ⇒ §G G-3 ⑥(d) 之 signature 對證紅（**本條生效**）。
+    🔴 **R22 更正（三家；COMPOSER-R22-P1-01＋CODEX-R22-P1-03＋GROK-R22-P1-01）**：
+    原 ②③ 分別指向 (i) 之 AST 斷言與 (ii) 之 `is` 斷言，而**該兩條已於 R21 標「待裁定」**
+    ⇒ **依賴待裁定條文之 mutation，其自身亦為待裁定**；原寫「三條**皆須紅**」會使
+    reviewer 把**尚未生效**之驗收當成凍結門檻。
+    ⇒ **②③ 同步標 `待裁定`**：②`symbol` 改由匯入檔欄位直取而非 `event_scope_key()`；
+    ③任一 consumer 改為自寫取值。二者之驗收形式**與 (i)(ii) 同批由實作 Task 定**。
+    ⚠️ **通則（本輪起適用全檔）**：**mutation 之效力不得高於其所依賴之驗收條**；
+    降級一條驗收時，**須同批降級所有指向它的 mutation**。
     **禁**任何 `dict`／`list`／可變容器出現在本物件之欄位型別中。
   - **(γ) purge 下界隨 receipt 攜帶**：`.purge_lower_bound_ms_by_symbol: tuple[SymbolPurgeRow, ...]`
     （🔴 R15 修正標題行：R14 已於後文改為 tuple，但此處仍寫 `Mapping[str, int]`
