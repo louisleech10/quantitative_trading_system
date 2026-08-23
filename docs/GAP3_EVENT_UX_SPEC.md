@@ -24,10 +24,12 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R16-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
-→ R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9 條 findings；
-R16 三類歸因 (N)0／(A)4／(R)5 ⇒ **(N) 三家全員為 0，連兩輪**）。
-**狀態：未 FROZEN**（待 R17 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+**版本**：R17-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+→ R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
+→ R17 12 條 findings；R17 **P0=0**，(N) 僅 composer 報 1 條）。
+**狀態：未 FROZEN**（待 R18 對抗審；FROZEN 之四條件見 `docs/GAP3_EVENT_UX_ROLE_CARD.md`，本檔不重述）。
+🔴 **R17 已由委員裁定條件④＝(甲)**（composer＋grok 兩家）：條件④之量測範圍＝**當輪**補丁包；
+歷史輪之 anchor 債以具名紀錄結案（見 §N）。主委未參與該裁定（受益方）。
 🔴 **本行為單一 current-round receipt**：每輪落地須同批更新，**不得**停在舊輪次
 （CODEX-R14：本行自 R8 起未更新，會誤導 reviewer 對 FROZEN 狀態之判讀）。
 🔴 **R16 起本行由機械閘強制**：`scripts/gap3ux_header_round_check.sh`
@@ -355,7 +357,9 @@ R8 版 §D-3a 只寫「②以該次 h 建立 purge／split ③以同一 spec 產
    **輸入事件集合＝3b 之前（pre-coverage）之全部事件**，於**階段 2 末**即算出
    **immutable per-symbol tuple**（`tuple[SymbolPurgeRow, ...]`）並隨 receipt 攜帶；
    階段 4 只**讀該 tuple**、不重算。
-   （🔴 R15 統一詞彙：R14 已改型別，此處與 ⑭ 旁白仍稱「map」，並存會誘導實作回 Mapping）
+   （🔴 R15 統一詞彙：R14 已改型別；**原文此處與 ⑭ 旁白之「map」字面已於 R15／R16 撤回**，
+   本括號僅為歷史紀錄，**不指涉當前資料結構**——當前型別即上句之
+   `tuple[SymbolPurgeRow, ...]`。CODEX-R17-P2-06：原括號是作用中之第四處 map 殘留）
    理由：R12 版之⑭(f) 要求「剔除某 TF 全部列後 purge 不變」，而（ii）之式對
    **scope 內事件**取 max ⇒ 剔除後 max 當然會變，**兩者互斥**（我 R12 自己造的矛盾）。
    固定為 pre-coverage 之後，「不變」成為**定義上為真**，⑭(f) 才可判定。
@@ -379,16 +383,24 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
   **唯一合法之輸入 dict（頂層鍵固定此三個、固定此順序，不得增減）**：
   ```python
   {
-    "batch": {                       # 鍵序固定如下
+    "batch": {                       # 鍵序固定如下（**恰六鍵**）
       "event_import_id": str,
       "horizon_bars": int,
       "entry_price_semantic": str,
       "label_return_mode": str,
       "decision_offset_bars": int,
+      "lookahead_bars_declared": "Mapping[tf -> int >= 0]",  # R16 新增；鍵按 UTF-8 升冪後入 S-9
+                                       # 🔴 值之型別判定＝`type(v) is int`（**不用 isinstance**）
+                                       # ——`bool ⊂ int`，`True` 會序列化為 `true` 而非 `1`
     },
     "event_level": [                 # 按 event_id 之 UTF-8 升冪
-      {"event_id": str, "decision_at_ms": int, "entry_at_ms": int,
-       "label_start_ms": int, "label_end_ms": int},   # 鍵序固定，恰五鍵
+      {"event_id": str, "symbol": str, "decision_at_ms": int, "entry_at_ms": int,
+       "label_start_ms": int, "label_end_ms": int},   # 鍵序固定，**恰六鍵**
+      # 🔴 R17 新增 `symbol`（CODEX-R17-P1-01 之反例）：purge 之 scope＝symbol，
+      #    而原五鍵**不含 symbol** ⇒ 同一組時間／窗寬／深度 bytes 下，
+      #    只交換 event→symbol 之分派即可改變 per-symbol purge 而 hash 不變。
+      #    加入後 purge 之四個輸入（深度 map／timeframe／label 窗／symbol）**全在 hash**，
+      #    R16 裁決 D 之「遞移綁定」才真正成立。
       # 其餘列同形，逐列一個 dict
     ],
     "per_tf": [                      # 先 event_id 升冪、同 event_id 再 timeframe 升冪
@@ -415,12 +427,29 @@ R9 版反覆要求「同一 receipt id／hash」，卻**未定義** hash 輸入�
     而 hash 是**執行期身分綁定**；兩者守不同東西。深度宣告改變而 receipt 身分不變，
     是身分碰撞，golden 擋不到 live run。
   - 理由二（不採 codex 之另一半）：`purge_lower_bound_ms_by_symbol` 是
-    **由上述三個輸入導出之值**。把導出值也納入 hash，等於在權威式之外再立
+    **由上述輸入導出之值**。把導出值也納入 hash，等於在權威式之外再立
     第二個可與之相左的來源——即本 epic 反覆踩到之「複述即第二份副本」。
-    三個輸入全部入 hash 後，purge 已**遞移地**被綁定。
-  - **negative mutation（須紅，落 §G G-3 ⑥）**：保持 `event_level`／`per_tf`／
-    其餘 `batch` 五鍵不變，**只改 `lookahead_bars_declared` 之任一鍵值**
-    ⇒ `analysis_alignment_receipt_hash` **必須改變**；舊 receipt 不得通過 ⑩。
+    輸入全部入 hash 後，purge 已**遞移地**被綁定。
+
+  🔴 **R17 更正：理由二在 R16 版**不成立**，已由 CODEX-R17-P1-01 之反例打破**——
+  R16 版列出之輸入只有三個（深度 map／`timeframe`／label 窗），而 **purge 之 scope＝symbol**，
+  `event_level` 原五鍵**不含 `symbol`** ⇒ 同一組時間／窗寬／深度 bytes 下，
+  **只交換 event→symbol 之分派**即可改變 per-symbol purge 而 hash 不變。
+  **處置**：不改裁定方向（仍不納入導出之 purge rows），而是**補齊缺的那個輸入**
+  ——`event_level` 每列增 `symbol`（見上方 fence）。四個輸入
+  （深度 map／`timeframe`／label 窗／`symbol`）全在 hash 後，「遞移綁定」才真正成立。
+  ⚠️ **這是主委裁決被反例修正之紀錄，不得刪**：R16 之「遞移綁定」係主委未逐項列舉
+  purge 公式之全部自由度即宣稱成立；R17 之要求（構造反例）正是為此而設。
+
+  - **negative mutation（三條，皆須紅，落 §G G-3 ⑥）**：
+    (a) 保持 `event_level`／`per_tf`／其餘 `batch` 五鍵不變，
+        **只改 `lookahead_bars_declared` 之任一鍵值** ⇒ hash **必須改變**；
+    (b) 🔴 **R17 新增**：保持全部時間欄、窗寬、深度 map 不變，
+        **只交換兩個 event 之 `symbol` 分派** ⇒ hash **必須改變**
+        （此即 CODEX-R17-P1-01 之反例本身，改為常設 mutation）；
+    (c) 🔴 **R17 新增**：`lookahead_bars_declared` 之某值以 `True` 取代 `1`
+        ⇒ **fail-closed**（`type(v) is int`；不得序列化為 `true`）。
+    三者之舊 receipt 皆不得通過 ⑩。
   - **row keyset 為封閉集合**：多一鍵、少一鍵、改鍵序皆為契約違反（不是「等價寫法」）。
   - **缺席欄處理**：`event_level`／`per_tf` 之任一鍵**不得缺席**；取不到值 ⇒ **fail-closed**，
     **不得**補 `null`（與 S-9 第 3 條「缺席鍵保持缺席」不同——這裡是**必填**）。
@@ -756,10 +785,13 @@ t0 清單、`decision_offset_bars = k`、`horizon_bars = h`、`label_return_mode
    同一次分析中 coverage／split／labels 三處所讀之該欄須同值；
    golden 凍住它，使「其中一處改讀匯入檔舊值」或「某階段自行重跑 `align_events`」皆可被證偽。
    ⚠️ 本欄由 §G S-9 之同一 encoder 產生 ⇒ **不得**為它另寫序列化（S-9 第 7 條）
-   🔴 **R16 追加 negative mutation（須紅）**：保持 `event_level`／`per_tf` 與
-   `batch` 其餘五鍵**逐位元組不變**，**只改 `lookahead_bars_declared` 之任一鍵值**
-   ⇒ 本欄之值**必須改變**（缺此條則深度宣告改變不會改身分，purge 邊界無執行期綁定；
-   出處與主委裁決見 §D-3′-a（iii）之「R16 修正：`batch` 增列第六鍵」）。
+   🔴 **R16／R17 追加 negative mutation（三條，皆須紅）**（權威與裁決紀錄在
+   §D-3′-a（iii），本節不重述理由）：
+   (a) 保持 `event_level`／`per_tf` 與 `batch` 其餘五鍵**逐位元組不變**，
+       **只改 `lookahead_bars_declared` 之任一鍵值** ⇒ 本欄必須改變（R16）；
+   (b) 保持全部時間欄／窗寬／深度 map 不變，**只交換兩個 event 之 `symbol` 分派**
+       ⇒ 本欄必須改變（R17；CODEX-R17-P1-01 之反例）；
+   (c) `lookahead_bars_declared` 之某值以 `True` 取代 `1` ⇒ **fail-closed**（R17）。
 
 **覆蓋面（最小集；不足即不得宣稱本 golden 有效；R11 追加小時命名欄組，見可證偽條 5(b)）**：
 `direction ∈ {long, short}` × `timeframe ∈ {1h, 12h}` × `h ∈ {1, 7}`，
@@ -1025,11 +1057,17 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
         `Mapping[timeframe -> int >= 0]` 之契約表示；
         `now['receipt_schema']['batch']['analysis_alignment_receipt_hash'] == 'str'`
     (c) **runtime validator 真的擋得住**：以 `lookahead_bars_declared` 為
-        `{'1h': -1}`／`{'1h': 1.5}`／**`72`（root scalar，＝R9 之形態）**／`{'1h': '3'}`
-        四個反例落檔 ⇒ **各自 fail-closed**（非僅警告）
+        `{'1h': -1}`／`{'1h': 1.5}`／**`72`（root scalar，＝R9 之形態）**／`{'1h': '3'}`／
+        🔴 **`{'1h': True}`（R17 新增第五反例）** 五個反例落檔 ⇒ **各自 fail-closed**（非僅警告）
         🔴 root scalar 一條為 GROK-R11-P1-07 補：R10 版反例只有 map 內負數／非 int，
         「該欄直接是一個裸整數」這種 R9 形態**可以通過型別登記**
         （反例值即上句 (c) 所列之 root scalar）
+        🔴 **第五反例為 CODEX-R17-P1-02 補**：R16 把本欄納入 receipt hash 之 `batch`，
+        而 `bool ⊂ int` ⇒ `isinstance(True, int)` 為真、S-9 白名單又同時收 `bool`
+        ⇒ `True` 通過檢查卻序列化為 `true` 而非 `1`，產出不同 bytes、綁定比對失效。
+        **判定一律 `type(v) is int`，不用 `isinstance`**（同 R14 對 `event_label_spec`
+        normalizer 之定死；本條與該處**共用 (e) 之同一 traversal／型別判定函式**，
+        不得各寫一份）。
     (d) 正例對照：`{'1h': 0, '12h': 6}` ⇒ 通過（防「恆紅型假保證」）
     (e) validator 與本驗收**呼叫同一 exported traversal／型別判定函式**
         （斷言同一函式參考，非各自複製）
@@ -1110,7 +1148,14 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
         dynamic import 皆可繞過）：
         (a) **執行期**：vitest 於 `setupFiles` 統一 stub **全域雜湊入口之封閉集合**
             ——`globalThis.crypto.subtle.digest`、`node:crypto` 之
-            `createHash`／`hash`／`webcrypto`
+            `createHash`／`hash`／**`Hash`（建構子）**／`webcrypto`
+            （🔴 R17：R16 版補了 `hash` 仍**漏 `Hash` 建構子**——`new crypto.Hash('sha256')`
+            與 `createHash` 同 hex，且 `Hash === createHash` 為 `false`（是兩個入口），
+            DeprecationWarning 不等於廢除。CODEX-R17-P1-04＋GROK-R17-P1-02 各自實跑。
+            🔴 **本清單已連三輪被補**（R15 三項→R16 補 `hash`→R17 補 `Hash`）
+            ⇒ 實作時**不得**以本清單自稱窮舉，須在 setupFiles 以
+            `Object.getOwnPropertyNames(require('node:crypto'))` **實跑列舉**後比對本清單，
+            出現清單外之雜湊入口即 fail-closed）
             （🔴 R16：R15 版**漏 `crypto.hash`**——codex 與 grok 各自實跑 Node v22.18.0
             證得 `typeof crypto.hash === 'function'` 且 `crypto.hash('sha256', x, 'hex')`
             與 `createHash` 同輸出；`webcrypto.subtle.digest` 與 `globalThis` 為同一語意入口之
@@ -2179,9 +2224,17 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
         == {r.symbol: r.purge_lower_bound_ms
             for r in prepared1.purge_lower_bound_ms_by_symbol}`
         （在合法、**無重複 symbol** 之 prepared 上；函式之權威定義在 §D-3′-a（ii））。
-        **mutation（兩條，皆須紅）**：
-        ①以**含重複 symbol** 之 rows，把投影改成「取 max 去重」⇒ fail-closed 斷言紅；
-        ②在合法 rows 上把某鍵值改成 `max(全部 purge 值)` ⇒ 等式紅。
+        **mutation（三條，皆須紅；🔴 R17 重寫——原兩條仍可假綠）**：
+        ① **duplicate case 用 exception oracle，不用等式**：
+           以 rows `[('A',100), ('A',200)]` 呼叫 ⇒ **必須 raise**（`ValueError`）。
+           🔴 **不得**以「投影結果 == expected dict」判定——expected 若也用 dict 生成式建，
+           重複列已被**靜默折疊**，`{'A':200}` 兩邊相等而綠（CODEX-R17-P1-03 之反例）。
+        ② **合法 case 用非最大鍵之 exact 等式**：rows `[('A',100), ('B',300)]`，
+           把投影某鍵值改成 `max(全部 purge 值)`（即 `A→300`）⇒ 等式紅。
+           **兩值必須不同、且被改的是非最大鍵**，否則 mutation 與原值相同而不紅。
+        ③ 把 `seen` 檢查整段刪除 ⇒ ① 之 duplicate case 不再 raise ⇒ 紅。
+        ⚠️ ⑨(f) 與 ⑨(d) 之語意分離：⑨(f) 驗**投影**（tuple → Mapping 之邊界），
+        ⑨(d) 驗**逐 symbol 窗寬**（證偽全批單一 scalar）；兩者不得互相取代。
         🔴 **本條之出處＝原掛 (d) 不可證偽**：(d) 之 fixture symbol 唯一，
         grok probe 實跑 `D2_unique_take_max_equals_exact True`
         ——取 max 與 exact 投影在唯一 symbol 下位元組相同 ⇒ 該 mutation 不紅。
@@ -2739,6 +2792,20 @@ t0 formatter 讀得到 label、label formatter 讀得到 t0（欄位語意重疊
   ＋`npx vitest run icEventPickerNoLocalMapping` ≥2 條——
   ⑭`grep -c "eventT0MsToIcTimestamps" frontend/src/` `== 0`（前端不再自算映射）
   ⑮`useICAnalysis` 送出之 payload **不含** `event_timestamps`、**含** `event_import_id`
+  ⑯🔴 **R17 新增——後端對「兩欄同時出現」之優先序（CODEX-R17-P1-05）**：
+    ⑮ 只驗**新前端**不送 `event_timestamps`，但 `ICAnalyzeRequest` **仍接受該欄**，
+    且 `_run_analysis` 與 full-analysis 路徑仍**無條件**把它傳給 analyzer
+    ⇒ 任何非本前端之呼叫端（curl／舊分頁／第三方）同時帶兩欄時，
+    **可繞過 receipt-derived `decision_at`**，回到原始 `t0÷1000`（洩漏面）。
+    ⇒ 定死：**`event_import_id` 存在時，同一 request 帶 `event_timestamps` ⇒ HTTP 400
+    fail-closed**（不是忽略、不是取其一）；事件路徑之時間戳**唯一來源**＝receipt。
+    (a) `ICAnalyzeRequest` 之 validator 落此互斥；
+    (b) `ICFullAnalysisRequest` 之**第二次** analyzer 呼叫同受此約束（易漏）；
+    (c) **legacy 非事件呼叫端**（只帶 `event_timestamps`、無 `event_import_id`）
+        之既有路徑**保留**，但須在契約明示為 legacy，並有獨立測試釘住其存活。
+    **mutation（須紅）**：request 同時帶 `event_import_id` 與一組**故意錯誤**之
+    `event_timestamps` ⇒ 服務端不得把該 timestamps 傳入事件 analyzer（斷言 spy 收到之
+    時間戳來自 receipt，且回應為 400）；把 (b) 之第二條路徑漏掉 ⇒ 該 mutation 不紅。
   **mutation（八條，皆須紅）**：左界改回 `min(t0)` ⇒ ④；右界不含答案窗 ⇒ ⑤；
   改用 run 之 tf 或批內 `max(tf)` ⇒ ⑥⑦；legacy 之 `None` 改成放行 ⇒ ⑨；
   未知 tf 改成沿用預設 ⇒ ⑧；fail-closed 改成只回警告字串 ⇒ ③；
@@ -2857,6 +2924,24 @@ grok 判 `needs-research` **理由成立、非逃避**，composer 判已登記�
 | ① | SPEC 檔頭 current-round receipt | **採 codex，本輪封口** | 觸發面確實封閉且兩端皆可導出：「SPEC 有未提交改動」×「檔頭輪次 ≠ 已有委員產出之最大輪次」。已落為 `scripts/gap3ux_header_round_check.sh`，掛在 `gap3ux_pre_review.sh`。🔴 **該閘上線首跑即抓到檔頭仍停在 R15**——散文版連續兩輪沒抓到 |
 | ② | 「先問後做」 | **維持殘留** | 「決定不先問」不會在任何 diff 留下痕跡，**結構上不可觀測**；這不是設計難度問題 |
 | ③ | scope accretion 入口閘 | **維持殘留**（`needs-research`） | codex 所指之封閉集合是**機制種類**之集合，不是 **diff 字面**之集合；以關鍵字比對 diff 即**黑名單**，正是 `_g2_regions`「一機制衍生四條旁路」之同型（記憶：文字問題用白名單機械卡）。**兩者之對應關係才是未解的部分** |
+
+##### 🔴 R17 更正（CODEX-R17-P2-08）：上表②③之理由**過度概括**，此處收窄
+
+codex 指出：**package／consult 之內容、hash、時序本身都是可觀測 artifact**，
+故「結構上不可觀測」對②③並非全稱成立。**此更正成立，主委接受**——原表述把
+「無法觀測**意圖**」誤寫成「無法觀測**任何相關事物**」。收窄後之準確表述：
+
+| 標的 | 可否機械觀測 | 現況 |
+|---|---|---|
+| 主委**心裡有疑慮卻沒問** | **不可**（無 artifact） | 永久不可機械化；只能靠事後由委員從結果反推 |
+| 一份 mechanism package **有無**對應之 consult receipt，且該 receipt 之 hash 出現在**目標修改之前**的 audit event | **可**（ancestry＋hash 皆為 artifact） | 🔴 **可做，但本輪不做**——理由見下 |
+| 一段 diff **是不是**引入了新 producer／transport | **不可**（需語意判斷；關鍵字比對＝黑名單） | 維持殘留 |
+
+**為何第二列可做卻不在本輪做**（三值理由改為 `blocked-by`，不再是 `needs-research`）：
+它擋的是「**已宣告**之 mechanism package」，而本 epic 剩餘工作已無新 package 產生；
+在收斂期再添主委自建閘，其風險（自建閘屢有自欺紀錄，R17 又抓到本輪新閘之
+fail-open 分支）高於它在剩餘輪次內能擋到的東西。**blocked-by＝FROZEN**；
+owner＝主委；觸發＝FROZEN 後之第一個新 mechanism package。
 
 ⚠️ **本裁決之誠實邊界**：①封口後，②③仍為 fail-open；主委自建閘之 4 次自欺紀錄依然成立，
 故 ① 之閘本身應由 R17 覆核其可證偽性（mutation：把檔頭改回舊輪次 ⇒ 須紅）。

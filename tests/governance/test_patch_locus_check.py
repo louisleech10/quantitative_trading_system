@@ -277,6 +277,27 @@ def test_impl_stage_locus_is_deferred_not_red(tmp_path):
     assert "DEFERRED" in log, log
 
 
+def test_bracket_stage_suffix_is_parsed_not_part_of_anchor(tmp_path):
+    """`[@impl]`（方括號形、無前置空白）須與 `@impl` 同解析。
+
+    出處（R17）：brief 之格式行寫作 `- <檔>#<錨點>[@spec|@doc|@harness|@impl]`，
+    方括號在該行是「可選」之標記；三家委員合理地照字面寫成 `#錨點[@spec]`。
+    舊 regex 只吃 `\\s*@stage$` ⇒ `[@spec]` 被併入 anchor ⇒ 該 anchor 永遠 grep 不到
+    ＝**假紅**（22 個 locus 一次全中）。
+
+    可證偽性：若解析回退（把 `[@impl]` 當 anchor 的一部分），本條之 rc 會變成 2
+    ——因為缺省 stage 是最嚴的 `@spec`，未達即紅。
+    """
+    patch = _write_patch(
+        tmp_path,
+        ["- api/models/ic_models.py#ICAnalyzeRequest[@impl]"],
+    )
+    rc, log = _run(patch)
+    assert rc == 0, "`[@impl]` 應被解析為 stage 而非 anchor 之一部分；輸出：%s" % log
+    assert "DEFERRED" in log, log
+    assert "[@impl]" not in log.split("←")[0], "anchor 不應仍夾帶 `[@impl]`：%s" % log
+
+
 def test_unstaged_locus_defaults_to_spec_and_is_red(tmp_path):
     """未標 stage ⇒ 缺省 `@spec` ⇒ 未達即紅（證明預設值是最嚴的那個）。"""
     patch = _write_patch(

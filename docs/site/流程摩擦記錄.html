@@ -2007,6 +2007,15 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百三十三・（2026-08-24）我是受益方的判定，我不自己裁</strong>：FROZEN 條件④（補丁標記要對得上）還欠 25 條。我能誠實做的只有 12 條（把被刪掉的原字面補回補丁包正文——那是還原本該有的證據）。剩下 13 條要嘛得改寫委員寫的標記，要嘛得<strong>宣稱發生過沒發生的改動</strong>。我手上有兩條互相衝突的既有規則可以引用：「面向未來不溯及既往」（可以放過）與 codex 的「不得改弱判準或豁免」（不能放過）。<strong>兩邊都講得通，而放過對我有利</strong>——這種時候我引哪一條都像在替自己找台階。所以我把它寫成兩個具體選項交給下一輪裁，並在規格裡<strong>明說「主委是受益方，故不自裁」</strong>。<strong>規則</strong>：<strong>當一個判定的受益者是我自己、而規則庫又剛好兩邊都有依據時，把選項寫清楚交出去，不要自己選</strong>——這不是推卸，是因為此時我的判斷力本身就不可信。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百三十四・（2026-08-24）我自己新裝的閘，被委員指出有兩個「靜默放行」的出口——而我在檔頭註解裡把它們寫成「誠實邊界」</strong>：R16 我做了「規格檔頭輪次必須跟上」的檢查，觸發條件寫成「SPEC 有未提交改動」。R17 codex 直接指出兩個 fail-open：①<strong>檔案已經 commit 之後，這支閘就不查了</strong>——所以「stale header 被提交進版控」這個最該擋的情境，它擋不到；②找不到委員產出檔時也直接放行。<strong>我當時把這兩個出口寫進註解稱作「誠實邊界」，但誠實地寫下一個洞，不等於那個洞可以留著。</strong> 修法：改用<strong>債務帳本的輪次狀態</strong>判定（該輪已收案 ⇒ 檔頭必須等於它，clean tree 也查；審查中 ⇒ 允許 N-1 或 N，但檔案一旦有改動就必須是 N）。<strong>規則</strong>：<strong>「已知限制」要分成兩種——「結構上做不到」跟「我這版沒做」</strong>；前者才配叫誠實邊界，後者只是還沒修，寫進註解不會讓它變成前者。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百三十五・（2026-08-24）三家委員一起「寫錯格式」，其實是我的說明寫錯了</strong>：R17 的 locus 檢查一次噴出 22 個「anchor 非字面」，三家全中。我第一反應是「委員又沒照規矩寫」。實際去看原始行才發現：我的派工單格式寫成 <code>- &lt;檔&gt;#&lt;錨點&gt;[@spec|@doc|@harness|@impl]</code>，方括號在那行是「可選」的意思，<strong>但三家都合理地照字面把 <code>[@spec]</code> 直接接在錨點後面</strong>；而檢查程式只認「空白 + @spec」，於是 <code>[@spec]</code> 被當成錨點的一部分 ⇒ <strong>永遠 grep 不到＝假紅</strong>。<strong>規則</strong>：<strong>當同一個錯誤三家一起犯，先假設是我的文件寫錯，不是三家一起失手</strong>——獨立的三方同時犯同一個錯，機率上指向共同輸入。修法是讓程式同時接受兩種寫法（stage 只有四個值，切分無歧義，不影響任何判準），並補回歸測試。附帶教訓：我改 regex 時把原本的 <code>\s*</code> 收窄成 <code>\s+</code>，<strong>當場弄紅兩條既有測試</strong>——先跑測試才發現，這正是「改機檢腳本先盤攻擊面＋連動測試矩陣」那條規則的用處。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百三十六・（2026-08-24）我用 <code>git stash</code> 做實驗，把自己剛寫好的腳本一起藏起來了</strong>：我想驗證新閘在「檔案乾淨」時會不會查，就跑了 <code>git stash --keep-index</code>——結果它<strong>連我剛改好的那支閘本身一起 stash 掉</strong>，於是跑到的是舊版，測出來的結論是錯的。而且工作區裡本來就躺著另一個別人留下的 stash，差點分不清哪個是我的。<strong>規則</strong>：<strong>驗證「檔案乾淨時的行為」不要用 stash 清工作區</strong>——被清掉的不只是待測資料，還有待測程式本身；正確作法是先 commit，再在 clean 狀態下跑一次。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

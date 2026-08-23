@@ -85,7 +85,22 @@ _SECTION = re.compile(r'^(AUTHORITY|BEFORE/AFTER|VERIFY|BEFORE|AFTER)\s*:')
 #   逐 locus 後綴之預設值是 `@spec`（最嚴），未標註者行為與 R8 完全相同 ⇒ 不放寬。
 _STAGES = ('spec', 'doc', 'harness', 'impl')
 _DEFAULT_STAGE = 'spec'
-_STAGE_SUFFIX = re.compile(r'\s*@(' + '|'.join(_STAGES) + r')\s*$')
+# 🔴 R17：同時接受 `@stage`（原形）與 `[@stage]`（方括號形），且**方括號形不要求前置空白**。
+#   出處：R17 三家共 22 個 anchor 被判「非字面」——實因 brief 之格式行寫作
+#   `- <檔>#<錨點>[@spec|@doc|@harness|@impl]`，方括號在該行是「可選」之標記，
+#   委員合理地照字面寫成 `#錨點[@spec]`（無空白）⇒ 舊 regex 只吃 `\s*@stage$`
+#   ⇒ `[@spec]` 被當成 anchor 的一部分 ⇒ **永遠 grep 不到＝假紅**（不是 fail-open）。
+#   本次修正**只影響切分**，不改任何達成/未達成之判準：切出正確 anchor 後，
+#   該 anchor 反而要接受完整比對（比假紅更嚴）。stage 集合為封閉四值，切分無歧義。
+#   ⚠️ 原形之前置空白為 `\s*`（**零個也合法**，R9 起即如此，`ICAnalyzeRequest@impl` 靠此解析）
+#      ——改成 `\s+` 會讓既有兩條回歸測試變紅（R17 落地時實際踩到），不得收窄。
+_STAGE_SUFFIX = re.compile(
+    r'(?:\s*\[\s*@(' + '|'.join(_STAGES) + r')\s*\]|\s*@(' + '|'.join(_STAGES) + r'))\s*$')
+
+
+def _stage_of(match):
+    """_STAGE_SUFFIX 有兩個互斥 group（方括號形／空白形），取有值者。"""
+    return match.group(1) or match.group(2)
 
 
 def _git(*args):
@@ -139,12 +154,12 @@ def parse_patch(path):
                 if anchor:
                     sm = _STAGE_SUFFIX.search(anchor)
                     if sm:
-                        stage = sm.group(1)
+                        stage = _stage_of(sm)
                         anchor = _STAGE_SUFFIX.sub('', anchor).strip() or None
                 else:
                     sm = _STAGE_SUFFIX.search(f)
                     if sm:
-                        stage = sm.group(1)
+                        stage = _stage_of(sm)
                         f = _STAGE_SUFFIX.sub('', f).strip()
                 loci.append((f, anchor, stage))
             elif line.strip() == '':          # 空行不終止區段（R11：只有 _SECTION／# 可終止）
