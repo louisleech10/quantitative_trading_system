@@ -83,6 +83,9 @@ _watched_for() {
     "GAP-3事件型討論.md")            echo "docs/IC_QUANT_GAP_REGISTRY.md handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md handoffs/20260819-gap3-recon-BRIEF.md" ;;
     # GAP-3 委員意見對應檔（2026-08-19；逐項對應討論檔 U/J/K/S/T/P/G 編號）：盯 R2 收斂檔與 R2 brief
     "GAP-3事件型討論-委員意見.md")   echo "handoffs/reconcile/20260819-gap3-x-consult-r2/synth.md handoffs/20260819-gap3-consult-r2-BRIEF.md" ;;
+    # 42 Task 勾選表（2026-08-23 使用者要求）：盯 UX SPEC——Task 增減時本表必須跟著動，
+    #   否則使用者看到的是過期的範圍清單（正是本表要治的病）。
+    "GAP-3規格42個Task勾選表.md")    echo "docs/GAP3_EVENT_UX_SPEC.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。
