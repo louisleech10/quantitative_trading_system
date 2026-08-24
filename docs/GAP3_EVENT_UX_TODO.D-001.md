@@ -55,6 +55,17 @@ PREDECESSOR: none
 （委員於此 append；格式：
 `RECONCILE-STAMP: <family> APPROVED <YYYY-MM-DD> sha256:<body-hash> task:<harness-task-id>`）
 
-⚠️ **本延伸檔尚未取得委員戳記**——A-001 為主委自查所得之互斥更正，
-屬「文件內部兩處互斥」之機械事實（非語意判斷），已附 mutation 與驗證命令。
-**若使用者裁定開工 B1，本檔須先過戳記輪**（與 TODO 定版時同一程序）。
+✅ **戳記輪已完成**（2026-08-24，task `20260824-GAP3UXTODOD001-X-STAMP-R1`）——
+三家全數 APPROVED，逐項核對「互斥存在／以跨批依賴表為準正確／B5 B7 連動讀法無誤」皆 PASS。
+（原記於此處之「尚未取得委員戳記」已由本輪解除；本段位於 `## 戳記` 區內，不影響本體雜湊。）
+
+🔴 **具名殘留（工具限制，繞過不修）**：`scripts/gate.sh register-output` 只收 `handoffs/` 內檔
+或 `scripts/stampable_artifacts.txt` 明列者 ⇒ `docs/` 下之延伸檔**無法登記 committee_output**
+⇒ 對本檔跑 `reconcile_stamps_check.sh` 會報 `provenance 不符（pending）`，
+**非**戳記造假。provenance 完備之機械標的＝
+`handoffs/reconcile/20260824-gap3uxtodod001-x-stamp/synth.md`（同輪同決，`rc=0`）。
+三值理由 `user-ruling`（使用者 2026-08-24 定死治理工具不修、不開票，要動須明示）。
+
+RECONCILE-STAMP: composer APPROVED 2026-08-24 sha256:3bc09cf9fa056986c936adca5ffda82ab8959aa1e353e401345ad00a20cdfa1f task:20260824-GAP3UXTODOD001-X-STAMP-R1
+RECONCILE-STAMP: grok APPROVED 2026-08-24 sha256:3bc09cf9fa056986c936adca5ffda82ab8959aa1e353e401345ad00a20cdfa1f task:20260824-GAP3UXTODOD001-X-STAMP-R1
+RECONCILE-STAMP: codex APPROVED 2026-08-24 sha256:3bc09cf9fa056986c936adca5ffda82ab8959aa1e353e401345ad00a20cdfa1f task:20260824-GAP3UXTODOD001-X-STAMP-R1

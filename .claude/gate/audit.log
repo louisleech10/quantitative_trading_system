@@ -49298,3 +49298,47 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event":"gate_deny","ts":"2026-08-24T08:29:02Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"2cef07d58a7179d5a979e6157f1c632a7dcde9faa5cb69ddb95b97f8ddb53dc5","cmd_head":"bash scripts/committee_run.sh --session 20260824-gap3uxtodod001-x-stamp-r1 \\\n  handoffs/20260824-gap3ux-todo-d001-stamp-brief.md \\\n  handoffs/20260824-gap3ux-todo-d001-stamp \\\n  codex,composer,grok -- \\\n  --intent \"GAP3_EVENT_UX_TODO.D-001 戳記輪：三家核可 A-001（§B 之 B1 列與跨批單點依賴表互斥，以後者為準：B1 含 1.1／1.10／2.1b／4.2 之 S-9 部分）\" \\\n  --risk low \\\n  --facts-asked \"①§B 表格 B1 列與跨批單點依賴表是否確實互斥 ②以後者為準是否正"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UXTODOD001-X-STAMP-R1", "ts": "2026-08-24T08:29:08Z"}
+=== 2026-08-24 16:29:08 | dispatch ===
+  ts=2026-08-24 16:29:08
+  kind=dispatch
+  intent=GAP3_EVENT_UX_TODO.D-001 戳記輪：三家核可 A-001
+  risk=low
+  facts_asked=§B 表格 B1 列與跨批單點依賴表是否互斥；以後者為準是否正確；B5/B7 連動讀法
+  review_role=stamp：核可或退回 D-001 之 A-001，不受理新 finding
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UXTODOD001-X-STAMP-R1", "ts": "2026-08-24T08:29:17Z"}
+=== 2026-08-24 16:29:17 | dispatch ===
+  ts=2026-08-24 16:29:17
+  kind=dispatch
+  intent=GAP3_EVENT_UX_TODO.D-001 戳記輪：三家核可 A-001（§B 之 B1 列與跨批單點依賴表互斥，以後者為準：B1 含 1.1／1.10／2.1b／4.2 之 S-9 部分）
+  risk=low
+  facts_asked=①§B 表格 B1 列與跨批單點依賴表是否確實互斥 ②以後者為準是否正確（canonical_serialize.py 為 B2 之 1.3 所需、depth_by_timeframe() 為 B3 之 1.9 與 B7 之 4.1 所需）③B5／B7 連動讀法是否無誤
+  review_role=stamp：核可或退回 D-001 之 A-001，不受理新 finding
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260824-gap3ux-todo-d001-stamp-brief.md", "brief_sha256": "b657683e3a1e588c6e03cd92cdfb0416fb2ed40b6bb5d567f628e0f0eca6e69c", "brief_sha256_norm": "b657683e3a1e588c6e03cd92cdfb0416fb2ed40b6bb5d567f628e0f0eca6e69c", "event": "committee_round_open", "event_id": "030cd619-0bdb-4d6a-9fe9-00a2a306451f", "expected_outputs": {"codex": "handoffs/20260824-gap3ux-todo-d001-stamp-codex.md", "composer": "handoffs/20260824-gap3ux-todo-d001-stamp-composer.md", "grok": "handoffs/20260824-gap3ux-todo-d001-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "a0d06ad4-5543-4f9d-81aa-916732eb2306", "schema_version": 1, "sequence": 2663, "session_name": "20260824-gap3uxtodod001-x-stamp-r1", "task_id": "20260824-GAP3UXTODOD001-X-STAMP-R1", "ts": "2026-08-24T08:29:21Z"}
+{"actor": "cx_run", "attempt_id": "813a8d5f-52fa-457b-b53a-62d9b9413e94", "cli_rc": "0", "event": "committee_family_result", "event_id": "558adaab-70e3-48cd-a2a6-bac97b999eb6", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-d001-stamp-composer.md", "output_sha256": "5bade2fd95b9e5ed8c4d003dcdf6e2d771681c47ffa4cb6a0f455ae3f75eacdd", "producer": "audit_append.sh", "result_state": "success", "round_id": "a0d06ad4-5543-4f9d-81aa-916732eb2306", "schema_version": 1, "sequence": 2664, "ts": "2026-08-24T08:31:12Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260824-gap3uxtodod001-x-stamp/synth.md", "output_sha256": "170e209f52b4727412a1baa16d71cd59ff0594e8081e95d13a3d6e1577b94a3d", "task_id": "20260824-GAP3UXTODOD001-X-STAMP-R1", "ts": "2026-08-24T08:31:13Z"}
+{"actor": "cx_run", "attempt_id": "740039d3-0d23-48e4-8912-ee504b5abd23", "cli_rc": "0", "event": "committee_family_result", "event_id": "984737e8-5d85-4fff-9ddd-a9809a82866f", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-d001-stamp-grok.md", "output_sha256": "fc112ec6733911340f4ab554381fd2dbf58090702de3b02476371f133fb10e59", "producer": "audit_append.sh", "result_state": "success", "round_id": "a0d06ad4-5543-4f9d-81aa-916732eb2306", "schema_version": 1, "sequence": 2665, "ts": "2026-08-24T08:31:22Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260824-gap3uxtodod001-x-stamp/synth.md", "output_sha256": "170e209f52b4727412a1baa16d71cd59ff0594e8081e95d13a3d6e1577b94a3d", "task_id": "20260824-GAP3UXTODOD001-X-STAMP-R1", "ts": "2026-08-24T08:31:23Z"}
+{"event":"gate_deny","ts":"2026-08-24T08:33:20Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"d4f4112a7c54fdfc393e1e4af3d653edbf2c9d98ff28bafe5d417a953fa31dc1","cmd_head":"printf '%s\\n' '--- prior stamp report patterns ---' && rg --files handoffs | rg 'stamp.*(codex|CODEX)|codex.*stamp' | head -20 | while read -r f; do echo \"--- $f\"; tail -20 \"$f\"; done && printf '%s\\n' '--- final artifact checks ---' && wc -l handoffs/20260824-gap3ux-todo-d001-stamp-codex.md && tail -1 handoffs/20260824-gap3ux-todo-d001-stamp-codex.md && rg -n '^RECONCILE-STAMP: codex APPROVED ' handoffs/reconcile/20260824-gap3uxtodod001-x-stamp/synth.md docs/GAP3_EVENT_UX_TODO.D-001.md && bash scripts/recon"}
+{"actor": "cx_run", "attempt_id": "0d118a63-6530-4aab-97e2-df0404beed59", "cli_rc": "0", "event": "committee_family_result", "event_id": "935a5437-cf35-444a-b4cf-7959d42cfc18", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-d001-stamp-codex.md", "output_sha256": "3a775f99f1c0f337536a21e6608cf9dd1faed8c1715fc5d9d6e96d6df1eb1a53", "producer": "audit_append.sh", "result_state": "success", "round_id": "a0d06ad4-5543-4f9d-81aa-916732eb2306", "schema_version": 1, "sequence": 2666, "ts": "2026-08-24T08:33:53Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260824-gap3uxtodod001-x-stamp/synth.md", "output_sha256": "75016684c01988ebe514f970ab43f49550e224ef184e1dae358328d9fe680498", "task_id": "20260824-GAP3UXTODOD001-X-STAMP-R1", "ts": "2026-08-24T08:33:53Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-主委", "event": "debt_abandon", "event_id": "7f803aff-5b5d-457d-af00-ff2688d9e54d", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp 輪依定義不產 canonical finding；三家皆 APPROVED 且 STATUS DONE，機械標的 reconcile_stamps_check rc=0", "round_id": "a0d06ad4-5543-4f9d-81aa-916732eb2306", "schema_version": 1, "sequence": 2667, "ts": "2026-08-24T08:34:32Z", "zero_findings_verified": ""}
