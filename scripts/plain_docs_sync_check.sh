@@ -88,6 +88,11 @@ _watched_for() {
     "GAP-3規格42個Task勾選表.md")    echo "docs/GAP3_EVENT_UX_SPEC.md" ;;
     # R11：凍結進度之白話總覽——盯 SPEC 本體（規格一改，「還差什麼」必須跟著重講）
     "GAP-3還差什麼才算完整.md")      echo "docs/GAP3_EVENT_UX_SPEC.md" ;;
+    # 🔴 42 Task 施工看板（2026-08-24 使用者指出「沒有施工進度追蹤」而建）：
+    #   由 FROZEN TODO ＋ 其 D 延伸檔**機械產生**（`scratchpad/gen_board2.py`），禁手抄。
+    #   盯 TODO 與延伸檔——批次或 Task 一動，看板必須跟著重生，否則使用者看到的是過期批次。
+    #   另盯事件樣本模組與測試：實作開跑後每個 Task 之狀態改變都源自那裡。
+    "GAP-3施工看板.md")              echo "docs/GAP3_EVENT_UX_TODO.md docs/GAP3_EVENT_UX_TODO.D-001.md momentum/Analysis/event_samples/ tests/momentum/event_samples/" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。

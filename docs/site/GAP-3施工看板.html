@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAP-3 事件型 UAT — 施工進度看板</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-3施工看板.md</span></nav>
+<main>
+<h1 id="gap-3-事件型-uat-施工進度看板">GAP-3 事件型 UAT — 施工進度看板</h1>
+<blockquote>
+<p><strong>這份只回答一件事：42 個 Task，哪些做了、哪些沒做、卡在哪。</strong>
+由 <code>docs/GAP3_EVENT_UX_TODO.md</code>（<strong>FROZEN v1.0</strong>）＋ 其延伸檔
+<code>docs/GAP3_EVENT_UX_TODO.D-001.md</code> <strong>機械產生，禁手抄</strong>。</p>
+</blockquote>
+<h2 id="一眼看完">一眼看完</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>規格（SPEC）</td>
+<td>🔒 <strong>已凍結</strong></td>
+</tr>
+<tr>
+<td>施工清單（TODO）</td>
+<td>🔒 <strong>已凍結 v1.0</strong>，可據以派工</td>
+</tr>
+<tr>
+<td><strong>實作</strong></td>
+<td>⬜ <strong>尚未開始</strong></td>
+</tr>
+<tr>
+<td>Task 總數</td>
+<td><strong>42</strong></td>
+</tr>
+<tr>
+<td>✅ 已完成</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>🔧 進行中</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>⬜ 未開工</td>
+<td><strong>42</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>下一個動作是你的</strong>：要不要開第一批（B1）。我不會自己開始。</p>
+<h2 id="批次順序做的順序">批次順序（做的順序）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>批</th>
+<th>含哪些 Task</th>
+<th>依賴</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B1 契約與深度根基</strong></td>
+<td>1.1、1.10、2.1b、4.2（僅 §G S-9 參考實作部分）　🔴 <strong>依 D-001 A-001 更正</strong></td>
+<td>無</td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B2 CSV 匯入主線</strong></td>
+<td>1.2、1.3、1.4、1.8</td>
+<td>B1</td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B3 深度三層防線</strong></td>
+<td>1.11、1.12、1.9</td>
+<td>B1、B2、<strong>Task 2.1b</strong></td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B4 匯入前端</strong></td>
+<td>1.5、1.6、1.7</td>
+<td>B2</td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B5 匯出前篩選</strong></td>
+<td>Phase 2 全部（扣除已於 B1 完成之 2.1b）</td>
+<td>B1</td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B6 刪除</strong></td>
+<td>Phase 3 全部</td>
+<td>無</td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B7 匯出端報酬欄</strong></td>
+<td>Phase 4 全部（4.2 之 S-9 部分已於 B1 完成）</td>
+<td>B1、<strong>Task 2.1b</strong></td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B8 訊息與表頭</strong></td>
+<td>Phase 5 全部</td>
+<td>Task 5.0</td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B9 IC 止血閘</strong></td>
+<td>Phase 6 全部</td>
+<td>Task 6.0</td>
+<td>⬜ 未開工</td>
+</tr>
+<tr>
+<td><strong>B10 全棧接線</strong></td>
+<td>Phase 7 全部</td>
+<td>B1–B9</td>
+<td>⬜ 未開工</td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>B1 是唯一沒有前置的一批</strong>，其餘全部等它。
+B1 裡有兩個「被很多批共用」的工具（深度計算函式、序列化參考實作），
+<strong>原本被排在需要它們的批次之後</strong>——第二輪審查抓出來才提前的。</p>
+<p>⚠️ <strong>B1 那一列是我在做這份看板時才發現要更正的</strong>：施工清單的批次表寫「1.1、1.10」，
+但同一節下方的依賴表寫的是四個 Task——<strong>兩處互斥</strong>。
+三輪委員審查加一輪蓋章都沒抓到，是「把文件做成看板」這個動作抓到的。
+更正記在 <code>docs/GAP3_EVENT_UX_TODO.D-001.md</code>（凍結後不就地改，走延伸檔）。</p>
+<h2 id="逐-task-狀態42-個">逐 Task 狀態（42 個）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Task</th>
+<th>在做什麼</th>
+<th>Phase</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Task 1.1</strong></td>
+<td>契約先行：新增 reason 與 label_definition.filters</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.2</strong></td>
+<td>新端點 <code>POST /api/v1/case/import-events/csv</code></td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.3</strong></td>
+<td><code>event_id</code> 沿用既有 canonical（D-2）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.4</strong></td>
+<td>t0 單位偵測</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.5</strong></td>
+<td>前端上傳、預覽與對映 UI（含強制確認）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.6</strong></td>
+<td>對映 provenance 落檔（D-1）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.7</strong></td>
+<td>可疑欄警示（D-1）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.8</strong></td>
+<td>異質列顯式拒收（A-5′）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.10</strong></td>
+<td>欄位級 <code>lookahead_bars</code> 契約（D-7 之 L1）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.11</strong></td>
+<td>未知欄強制宣告（D-7 之 L2）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.12</strong></td>
+<td>不可證則禁進切分（D-7 之 L3）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 1.9</strong></td>
+<td>答案窗宣告與 purge 下界（D-7 之 L2 使用者介面）</td>
+<td>Phase 1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 2.1</strong></td>
+<td><code>/search</code> 匯出前篩選面板</td>
+<td>Phase 2</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 2.1b</strong></td>
+<td>由篩選條件自動導出答案窗下界（D-7 第 2 層）</td>
+<td>Phase 2</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 2.2</strong></td>
+<td>篩選條件寫入 <code>label_definition.filters</code></td>
+<td>Phase 2</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 2.3</strong></td>
+<td>即時筆數顯示</td>
+<td>Phase 2</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 3.1</strong></td>
+<td><code>DELETE /api/v1/case/events/{import_id}</code></td>
+<td>Phase 3</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 3.2</strong></td>
+<td>前端刪除鈕與二次確認</td>
+<td>Phase 3</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 3.3</strong></td>
+<td>已被引用批次之警語</td>
+<td>Phase 3</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 4.1</strong></td>
+<td>匯出檔之附帶 <code>future_*</code> 欄；移除匯出端之答案窗與 <code>label_value</code>（D-3′）</td>
+<td>Phase 4</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 4.1b</strong></td>
+<td>匯出時揭露每個選項在動什麼</td>
+<td>Phase 4</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 4.1c</strong></td>
+<td>明文標示本批不提供 IC decay</td>
+<td>Phase 4</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 4.2</strong></td>
+<td>事件後報酬表顯示完整曲線</td>
+<td>Phase 4</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 4.3</strong></td>
+<td>缺欄確認框逐 horizon 列出</td>
+<td>Phase 4</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 5.0</strong></td>
+<td>建立指標詞彙 SoT</td>
+<td>Phase 5</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 5.1</strong></td>
+<td><code>.source.json</code> 誤傳之訊息追加正解</td>
+<td>Phase 5</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 5.2</strong></td>
+<td>事件型兩表 tooltip（讀 Task 5.0 之 SoT）</td>
+<td>Phase 5</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 5.3</strong></td>
+<td>缺答案窗欄之確認框</td>
+<td>Phase 5</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 6.0</strong></td>
+<td>IC 錯誤 reason 之登記處（D-6）</td>
+<td>Phase 6</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 6.1</strong></td>
+<td>analyze 前置特徵數檢查</td>
+<td>Phase 6</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 6.2</strong></td>
+<td>上限值之量測協定（D-5）</td>
+<td>Phase 6</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 6.3</strong></td>
+<td>進度回報與前端狀態區分</td>
+<td>Phase 6</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 6.4</strong></td>
+<td>止血閘之存活驗證（D-5）</td>
+<td>Phase 6</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.0</strong></td>
+<td>前置：擴 <code>EventExportOptions</code> 補齊五維度</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.0b</strong></td>
+<td>分析時 <code>label_value</code> producer 與其 wiring</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.1</strong></td>
+<td>五維度全部接出前端（依賴 7.0）</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.2</strong></td>
+<td>機械閘：可操作選項集合＝<code>selectable(path,dim)</code> 且選值真的傳到落檔（依賴 7.0／7.1）</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.3</strong></td>
+<td>動態揭露本批設定</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.4</strong></td>
+<td>條件 IC decay 之邊界揭露</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.5</strong></td>
+<td>事件後報酬表正／反／全體三組</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.6</strong></td>
+<td>IC 分析頁：批次事實欄唯讀揭露 ＋ 分析參數可設定</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><strong>Task 7.7</strong></td>
+<td>Feature run <code>time_range</code> 與事件期之對證</td>
+<td>Phase 7</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="狀態符號與完成的判準">狀態符號與「完成」的判準</h2>
+<p>⬜ 未開工　🔧 進行中　✅ 已完成　⛔ 卡住（<strong>須寫</strong>：卡在什麼、誰能解）</p>
+<p>🔴 <strong>標 ✅ 的條件（不得放寬）</strong>：該 Task「驗證」欄的命令<strong>全部 rc=0</strong>，
+<strong>而且</strong>它的 mutation 已經實跑過——<strong>故意改壞會轉紅、還原後轉綠</strong>，receipt 路徑寫進 commit。
+<strong>只有測試綠、沒有 mutation receipt ⇒ 仍是 🔧，不是 ✅。</strong>
+理由：測試綠只證明「現在沒壞」，mutation 才證明「壞了測得出來」。</p>
+<h2 id="這份怎麼維護">這份怎麼維護</h2>
+<p>每做完一個 Task 就改該列並補 receipt；每收一批就更新「一眼看完」的三個數字。
+<strong>歷史不寫在這裡</strong>——過程在 <a href="治理進度日誌.html">治理進度日誌.md</a>、
+踩過的坑在 <a href="流程摩擦記錄.html">流程摩擦記錄.md</a>、
+每個 Task 是誰要的在 <a href="GAP-3規格42個Task勾選表.html">GAP-3規格42個Task勾選表.md</a>。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3施工看板.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
