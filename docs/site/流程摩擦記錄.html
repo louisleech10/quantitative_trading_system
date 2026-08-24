@@ -2166,6 +2166,18 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百八十六・（2026-08-24）委員交來的程式碼在我的機器上跑不起來，因為他用了 GNU 的寫法</strong>：某份治理閘的修補用 <code>sed</code> 的 <code>\|</code> 做交替——那是 GNU 擴充，<strong>BSD（macOS 內建）的 <code>sed</code> 不吃</strong>。實跑的症狀很隱蔽：它不報錯，只是<strong>沒有把字尾切掉</strong>，於是後面拿去做數字比較時才炸出「integer expression expected」。我改成 <code>sed -E</code>（ERE，兩邊都支援），只動這一處、不動判準，並在腳本裡具名記下是我改的、請下輪覆核。<strong>規則</strong>：<strong>跨平台的差異多半不是「報錯」，而是「安靜地做錯」</strong>——所以驗收要看最終值，不能只看指令有沒有非零退出。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百八十七・（2026-08-24）我把鎖版號碼寫在修改之前，兩位委員因此白跑一輪</strong>：派工單要求委員開工第一件事是核對檔案指紋，不符就停下。我寫指紋時是修改<strong>前</strong>的值，之後又改了檔案卻沒回頭更新派工單——兩家一開工就對不上，依明文停在門口，一整輪的審查視角就這樣沒了。<strong>同一個錯我在上一個 epic 已經犯過一次。</strong> 修法不是「下次記得」：改成<strong>由建包腳本即時計算</strong>，而且工作區不乾淨就中止建包，人工填不進去。<strong>規則</strong>：<strong>凡是「兩份東西必須一致」的欄位，就不該由人填</strong>——人一定會在其中一份改完之後忘記另一份。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百八十八・（2026-08-24）我加的防漂移檢查，本身是假的</strong>：我怕文件裡的函式簽章副本跟正本漂移，加了一條「同步斷言」，說明文字寫「參數名序列逐字相等」，但實際命令只是 <code>'def xxx(' in 兩個檔案</code>——<strong>只驗那個字串存在，改任何一個參數名照樣綠</strong>。兩家委員各自命中。<strong>規則</strong>：<strong>說明文字寫的判準，跟命令實際做的事，要逐字對得起來</strong>——我寫散文時想的是嚴格版，寫命令時挑了容易寫的版本，中間沒有人擋。這類「宣稱嚴格、實作寬鬆」只能靠別人讀命令本身抓出來。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百八十九・（2026-08-24）「比對範圍過寬」這一種錯，我這個 epic 犯了四次</strong>：①把測試層標籤取成跟 Task 欄位一樣的名字，機械閘分不出來 ②用行號注入修補，而行號取自修改前的掃描結果、中間檔案已經位移，三處全落到錯的 Task ③判斷某個 Task 有沒有寫 mutation 時去掃<strong>整個區塊</strong>，結果被區塊尾端別人的文字騙過 ④剛才那條假綠。<strong>四次的共同形狀都是：我拿一個比目標更大的範圍去比對，然後把命中當成目標命中。</strong> 規則：<strong>錨點要落在你真正要判斷的那個東西上</strong>——不是它的段落、不是它的行號、不是它附近的字。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百九十・（2026-08-24）委員擋在門口不進來，是對的</strong>：最後一輪某家沒有交任何內容審查，只交一條「你的前面兩輪 reconcile 從來沒有委員蓋章，依合約我不能用它的結論來審」。我一查——真的，收案程序我兩輪都漏了。他沒有虛構 finding、也沒有假裝零 finding，就停在那裡。<strong>規則</strong>：<strong>「我不能在這個狀態下工作」是一種合法且珍貴的產出</strong>——比硬著頭皮交一份建立在壞前提上的審查有價值得多。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

@@ -1,6 +1,29 @@
-# GAP-3 事件型 UAT 缺口修補 TODO（v0.1 DRAFT｜基於 `docs/GAP3_EVENT_UX_SPEC.md` **FROZEN 2026-08-24**｜生成日 2026-08-24）
+# GAP-3 事件型 UAT 缺口修補 TODO（v1.0 **FROZEN 2026-08-24**｜基於 `docs/GAP3_EVENT_UX_SPEC.md` FROZEN 2026-08-24）
 
-> ⚠️ **DRAFT — 未過 adversarial review，不得據以派工。**
+> 🔒 **FROZEN（2026-08-24）**——**42 Task 定版，可據以派工。**
+> 後續修訂走延伸檔 `docs/GAP3_EVENT_UX_TODO_AMENDMENTS.md`，**不就地改本檔**。
+>
+> **對抗審履歷（三輪，輪次上限）**：
+> R1 12 findings（主委 brief 鎖版失效致 codex／grok 正確停手，composer 10 條全數落地；
+> 主委自查另發現「以行號注入致三處錯置」）→
+> R2 19 findings（抓出主委 R1 修法留下之**假綠**、mutation 覆蓋率宣稱有誤、
+> §B 缺跨批單點依賴；CLOSED 16／PARTIAL 3）→
+> R3 3 findings（**composer 與 grok 皆判可定版**，(N)=0／(A)=0／(R)=4、P0=P1=P2=0；
+> codex 程序性 BLOCKED——R1／R2 缺委員戳記，該缺失成立且已補）。
+>
+> **RECONCILE 戳記**：`reconcile_stamps_check.sh` 對 R1／R2／R3 三份 synth **皆 PASS**，
+> 三家 `codex,composer,grok` 全數 **APPROVED** 且本體雜湊相符。
+>
+> **定版時之機械對證**：Task **42/42**（追溯缺 0 多 0）；§V **20/20**、§G **3/3** 皆有落點；
+> 五個必填欄各 **42/42**；驗證欄 mutation **42/42**、可執行前綴 **42/42**；
+> §B 拓撲經 Kahn 檢查**無環**；7.0b 簽章 SPEC≡TODO；`doc_format_precheck.sh` **rc=0**。
+> 🔴 上列數字**由 composer 與 grok 各自獨立複跑證實**（brief 明文要求不得採信主委數字）。
+>
+> **具名殘留（4 條，三值理由齊備；見 R3 之 reconcile）**：
+> ①前端 directory-only 路徑 10 處（`user-ruling`）②Task 5.0 驗證 defer SPEC（`user-ruling`）
+> ③五 Task 之 mutation 全文 defer SPEC（`blocked-by`：SPEC 已 FROZEN；composer 已交 exact mutant 補丁包）
+> ④B1 須並讀 FROZEN SPEC（`user-ruling`：三家同意「不內聯 SPEC 大段落」之取捨成立）。
+>
 > 生成依據：`templates/TODO_GENERATION_PROMPT.md` V13；
 > 階段 1 索引＝`handoffs/20260824-gap3ux-todo-stage1-index.md`
 > （追溯基準：**Phase 7／Task 42／§V 驗證項 20／§G Golden 3／§A 假設 4**）。
