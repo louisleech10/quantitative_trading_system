@@ -49113,3 +49113,42 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UX-TODO-REVIEW-R1", "ts": "2026-08-24T00:39:40Z"}
+=== 2026-08-24 08:39:40 | dispatch ===
+  ts=2026-08-24 08:39:40
+  kind=dispatch
+  intent=三家 adversarial 審 GAP-3 事件型 UAT TODO v0.1 DRAFT
+  risk=low
+  facts_asked=none-needed:標的與追溯基準皆在 brief 內
+  review_role=codex=挑戰前提/adversary；composer=合議稿；grok=獨立覆核
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md 全文執行
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UXTODO-X-REVIEW-R1", "ts": "2026-08-24T00:39:53Z"}
+=== 2026-08-24 08:39:53 | dispatch ===
+  ts=2026-08-24 08:39:53
+  kind=dispatch
+  intent=三家 adversarial 審 GAP-3 事件型 UAT TODO：冷啟動可執行性、追溯涵蓋、跨 Task 一致性、深度紅線、全棧三欄
+  risk=low
+  facts_asked=none-needed:標的與追溯基準皆在 brief 內
+  review_role=codex=挑戰前提/adversary；composer=合議稿；grok=獨立覆核
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md 全文執行
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260824-gap3ux-todo-review-r1-brief.md", "brief_sha256": "a96853ff81ab46e0472aead196841bed717a138f3bae39adb1afcb63887607b9", "brief_sha256_norm": "a96853ff81ab46e0472aead196841bed717a138f3bae39adb1afcb63887607b9", "event": "committee_round_open", "event_id": "38907425-0652-40df-b1df-1818c6a2f53b", "expected_outputs": {"codex": "handoffs/20260824-gap3ux-todo-review-r1-codex.md", "composer": "handoffs/20260824-gap3ux-todo-review-r1-composer.md", "grok": "handoffs/20260824-gap3ux-todo-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8d9f49e8-09f3-4f35-b750-3da05fd1299d", "schema_version": 1, "sequence": 2643, "session_name": "20260824-gap3uxtodo-x-review-r1", "task_id": "20260824-GAP3UXTODO-X-REVIEW-R1", "ts": "2026-08-24T00:39:57Z"}
+{"actor": "cx_run", "attempt_id": "cf8d4759-14be-4861-828c-62f5665404f5", "cli_rc": "0", "event": "committee_family_result", "event_id": "a5bed30e-cd6c-47aa-b9a3-1cfe69fa5108", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-review-r1-codex.md", "output_sha256": "cf93366812782475585d2b2cd744a6b3b21a57420f37556184094f8b7bd910ef", "producer": "audit_append.sh", "result_state": "success", "round_id": "8d9f49e8-09f3-4f35-b750-3da05fd1299d", "schema_version": 1, "sequence": 2644, "ts": "2026-08-24T00:43:34Z"}
+{"actor": "cx_run", "attempt_id": "e55506ea-e67f-4fe8-b819-ffec10e81a94", "cli_rc": "0", "event": "committee_family_result", "event_id": "6be1a559-0bfa-4ee3-a478-008dd9aa48af", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-review-r1-grok.md", "output_sha256": "7fd5bf77c67ca9f12cf14c417926ff5f9af3f0a8d9bc5da8d274e8d3fc7b5a37", "producer": "audit_append.sh", "result_state": "success", "round_id": "8d9f49e8-09f3-4f35-b750-3da05fd1299d", "schema_version": 1, "sequence": 2645, "ts": "2026-08-24T00:45:29Z"}
+{"actor": "cx_run", "attempt_id": "97e9d079-63ce-4ddd-bbb7-75e98642de20", "cli_rc": "0", "event": "committee_family_result", "event_id": "0c2be747-487a-49b7-a729-27d8ef746fd5", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-review-r1-composer.md", "output_sha256": "9aaaee80bff3590b57b17306dc9f9caa4a8805f97196e6470a41c3e701287c53", "producer": "audit_append.sh", "result_state": "success", "round_id": "8d9f49e8-09f3-4f35-b750-3da05fd1299d", "schema_version": 1, "sequence": 2646, "ts": "2026-08-24T00:46:35Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "1f3f069b-9109-43f5-a933-34f62510d0e3", "lock_sha256": "6fd981c2072f09ec6ba2196e851815eb3db197b892346dfcf23fdf7e6fe1d7ff", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "8d9f49e8-09f3-4f35-b750-3da05fd1299d", "schema_version": 1, "sequence": 2647, "session_id": "20260824-gap3uxtodo-x-review-r1", "synth_sha256": "4415708b1702599e3f0ae38f7108431d2a9ee4d4bb356a2740f04a272033e65f", "ts": "2026-08-24T00:52:21Z"}
