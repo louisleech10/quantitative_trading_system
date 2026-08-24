@@ -113,12 +113,17 @@ def test_canonical_serialize_06_negative_zero_preserved() -> None:
 
 # ── ⑦ 重複 horizon ⇒ event_forward_return_table raise ValueError ──────────
 def test_canonical_serialize_07_duplicate_horizon_raises() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as dup:
         event_forward_return_table(None, None, None, None, {"horizons": [1, 3, 3, 7]})
-    # 對照組：不重複時**不得**因本守衛而擋（否則是恆紅）
-    with pytest.raises(Exception) as ei:
+    assert "不得重複" in str(dup.value)
+
+    # 🔴 對照組（CODEX-R1-P1-02 之修法）：舊寫法只驗「例外訊息不含『不得重複』」，
+    #    一個「所有 horizons 一律 raise ValueError」的壞實作照樣全綠。
+    #    改為斷言**控制流真的走過了 horizon 驗證區**——manifest=None 之下一步
+    #    `t = manifest.table` 必然 AttributeError。任何在該點之前 raise 的壞法都會轉紅。
+    with pytest.raises(AttributeError) as ok:
         event_forward_return_table(None, None, None, None, {"horizons": [1, 3, 7]})
-    assert "不得重複" not in str(ei.value)
+    assert "table" in str(ok.value)
 
 
 # ── 型別白名單：非白名單型別須 raise，禁依賴 encoder 隱式轉換 ────────────────

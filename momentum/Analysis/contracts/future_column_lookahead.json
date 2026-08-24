@@ -1,6 +1,14 @@
 {
   "version": 1,
-  "_doc": "GAP-3 UX Task 1.10（D-7 之 L1）——搜尋結果每一個未來欄之前視深度登記處，單一真相源。盤點來源＝api/models/responses.py::CaseData 之欄位（篩 startswith('future')），非文字掃描（CODEX-R2-P1-05：grep 會把區域變數／f-string 片段／註解字樣混進來）。🔴 兩套命名、單位不同：bar 命名之 N 就是根數；小時命名之 H 是小時，實際根數與 timeframe 相依，故只存 lookahead_hours、禁存固定 bar 數。無數字之 legacy 欄深度不可由欄名導出 ⇒ 顯式標 lookahead_unknown，不得給任何預設深度。⚠️ case_search_engine.py 之 periods_72h 亦用於過去 3 天 lookback（:1028-1046），與未來欄同名不同義，本檔不登記那個用法。",
+  "_doc": "GAP-3 UX Task 1.10（D-7 之 L1）——搜尋結果每一個未來欄之前視深度登記處，單一真相源。盤點來源＝api/models/responses.py::CaseData 之欄位（篩 startswith('future')），非文字掃描（CODEX-R2-P1-05：grep 會把區域變數／f-string 片段／註解字樣混進來）。🔴 分類依據＝**producer 實際怎麼算**，不是欄名長相（見 classification_evidence）。bar 類之 N 就是根數；hour 類之 H 是小時，實際根數與 timeframe 相依，故只存 lookahead_hours、禁存固定 bar 數。無數字之 legacy 欄深度不可由欄名導出 ⇒ 顯式標 lookahead_unknown，不得給任何預設深度。⚠️ case_search_engine.py 之 periods_72h 亦用於過去 3 天 lookback（:1028-1046），與未來欄同名不同義，本檔不登記那個用法。",
+  "classification_evidence": {
+    "_doc": "🔴 CODEX-R1-P1-01（B1 code review R1，實跑確認成立）：SPEC Task 1.10 寫『小時命名 future{H}_close_return，H ∈ {1,2,4,6,24,48,72} 之 H 是小時』——**對 H ∈ {1,2,4,6} 是錯的**。producer 對這四個用的是裸 shift(-N)＝N 根，只有 24／48／72 才用 periods_{H}h。照 SPEC 登記會在 12h 線上把 future6（實際 6 根）算成 1 根，purge 低估六倍＝真洩漏。本檔以 producer 為準並於 docs/GAP3_EVENT_UX_TODO.D-002.md A-005 回報。",
+    "producer": "momentum/DataExtraction/case_search_engine.py",
+    "bar_evidence": "df['future{N}_close_return'] = (df['close'].shift(-N) - df['close']) / df['close']，N ∈ {1,2,4,6}——裸整數 shift，與 timeframe 無關",
+    "hour_evidence": "df['future{H}_close_return'] = (df['close'].shift(-periods_{H}h) - ...)，H ∈ {24,48,72}；future24_close／future24_low 用 periods_24h；future72_max_return／future72_max_drawdown 之窗 lookahead_periods = periods_72h",
+    "unknown_evidence": "future_max_return／future_max_drawdown 之窗為寫死之 standard_lookahead = 6（根）。🔴 仍標 lookahead_unknown＝遵 SPEC「無數字之 legacy 欄不得給任何預設深度」；該值只作紀錄，**不得**被解析為深度。",
+    "drift_guard": "tests/momentum/event_samples/test_lookahead_registry.py 之 producer-backed 表（含上列字面）逐欄對證本檔。⚠️ 該表為人工稽核所得，非執跑探針；producer 若改算法而未同步該表，本閘看不見（見 D-002 A-005 之具名殘留）。"
+  },
   "hours_to_bars_rounding": "ceil",
   "hours_to_bars_rounding_doc": "小時命名欄換算根數採**向上取整**。SPEC 只寫 `H ÷ 每根小時數`，未定捨入；72h 在 1h／12h 上兩種捨入同值（72／6），但 1h 命名欄在 12h 線上 floor 會得 0 ⇒ 等於宣稱「不必 purge」，那是放水。依 §C0『量化正確性只能更嚴、不得放水』取 ceil。",
   "provenance_trust_boundary": {
@@ -48,10 +56,10 @@
     "future_10bar_max_drawdown": { "kind": "bar", "lookahead_bars": 10 },
     "future_11bar_max_drawdown": { "kind": "bar", "lookahead_bars": 11 },
     "future_12bar_max_drawdown": { "kind": "bar", "lookahead_bars": 12 },
-    "future1_close_return": { "kind": "hour", "lookahead_hours": 1 },
-    "future2_close_return": { "kind": "hour", "lookahead_hours": 2 },
-    "future4_close_return": { "kind": "hour", "lookahead_hours": 4 },
-    "future6_close_return": { "kind": "hour", "lookahead_hours": 6 },
+    "future1_close_return": { "kind": "bar", "lookahead_bars": 1 },
+    "future2_close_return": { "kind": "bar", "lookahead_bars": 2 },
+    "future4_close_return": { "kind": "bar", "lookahead_bars": 4 },
+    "future6_close_return": { "kind": "bar", "lookahead_bars": 6 },
     "future24_close_return": { "kind": "hour", "lookahead_hours": 24 },
     "future48_close_return": { "kind": "hour", "lookahead_hours": 48 },
     "future72_close_return": { "kind": "hour", "lookahead_hours": 72 },

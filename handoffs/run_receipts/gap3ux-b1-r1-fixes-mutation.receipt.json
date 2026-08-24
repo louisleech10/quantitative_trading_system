@@ -1,0 +1,76 @@
+{
+  "all_pass": true,
+  "mutations": [
+    {
+      "id": "1.10-M4",
+      "task": "1.10",
+      "desc": "把 future6_close_return 改回小時類（CODEX-R1-P1-01 回歸鎖）",
+      "selector": [
+        "tests/momentum/event_samples/",
+        "-k",
+        "lookahead_registry_complete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_registry_complete_05_registry_content_correct",
+        "test_lookahead_registry_complete_05c_shift_named_columns_are_bar_kind"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_registry_complete_05_registry_content_correct",
+        "test_lookahead_registry_complete_05c_shift_named_columns_are_bar_kind"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M4",
+      "task": "2.1b",
+      "desc": "刪掉 page.tsx 之匯出守衛（GROK-R1-P2-01 呼叫點鎖）",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.page.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ① 匯出處理器內確實呼叫守衛函式",
+        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ② 該呼叫位於帶 return 的 if 內（是守衛，不只是顯示）",
+        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ③ 守衛出現在第一個 await 之前（阻擋早於任何網路動作）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ① 匯出處理器內確實呼叫守衛函式",
+        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ② 該呼叫位於帶 return 的 if 內（是守衛，不只是顯示）",
+        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ③ 守衛出現在第一個 await 之前（阻擋早於任何網路動作）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "4.2-M2",
+      "task": "4.2",
+      "desc": "所有 horizons 一律被擋（CODEX-R1-P1-02 對照組鎖）",
+      "selector": [
+        "tests/momentum/event_samples/",
+        "-k",
+        "canonical_serialize"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_canonical_serialize_07_duplicate_horizon_raises"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_canonical_serialize_07_duplicate_horizon_raises"
+      ],
+      "verdict": "PASS"
+    }
+  ]
+}

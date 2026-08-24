@@ -76,6 +76,71 @@ A-004 為 B1 交付邊界，依「殘留每條必帶為何現在不做」具名�
 - **owner**：主委。**觸發**：Task 2.1（B5）與 Task 1.3（B2）皆落地後，於 B5 收尾一併接線。
 - **不得宣稱已解決**：B1 交付的是鎖定機制，不是下界值。
 
+### A-005 — 🔴 SPEC Task 1.10 對 `future{1,2,4,6}_close_return` 之單位敘述**與 producer 不符**
+
+- **SPEC 原文**（Task 1.10 內容欄）：「**小時命名**（`future{H}_close_return`／`future72_max_return`／
+  `future72_max_drawdown`，H ∈ {1,2,4,6,24,48,72}）：`H` 是**小時**」。
+- **producer 實況**（`momentum/DataExtraction/case_search_engine.py`）：
+  - `df['future{N}_close_return'] = (df['close'].shift(-N) - df['close']) / df['close']`，
+    **N ∈ {1,2,4,6}** ——裸整數 shift，就是**根數**，與 timeframe 無關。
+  - 只有 `df['future{H}_close_return'] = (df['close'].shift(-periods_{H}h) - …)`，
+    **H ∈ {24,48,72}** 才是小時。
+- **後果（若照 SPEC 登記）**：12h 線上 `future6_close_return` 實際看 **6 根**，
+  registry 卻回 `ceil(6/12) = 1` 根 ⇒ 答案窗下界被低估 **六倍**，purge 不足 ⇒ **標籤洩漏**。
+  屬 §C0「資料正確性類缺口」，**不得**降級為具名殘留。
+- **裁定**：**以 producer 為準**，`future{1,2,4,6}_close_return` 登記為 `kind: bar`、
+  `lookahead_bars = N`。此為 FROZEN SPEC 與實況衝突之回報（TODO §層級宣告要求「衝突以 SPEC 為準
+  並回報」；但此處 SPEC 之敘述是**對實況的事實陳述**且該陳述可被實跑否證，
+  照抄會製造洩漏 ⇒ 取實況並在此具名，不動 SPEC 本體）。
+- **發現者**：`CODEX-R1-P1-01`（B1 code review 第一輪），主委實跑覆核成立。
+  三輪 SPEC 對抗審與 TODO 三輪審**都沒抓到**——因為它們比對的是文件之間，沒有回讀 producer。
+- **連動更正 A-003**：A-003 舉的例子（`future1_close_return` 在 12h 線上 floor 得 0）
+  **建立在錯誤分類上**，該例作廢。ceil 之裁定**維持**（保守方向），但更正其現況說明：
+  修正後 hour 類只剩 `{24,48,72}`，對現行全部 timeframe 皆整除
+  ⇒ **ceil 與 floor 目前無任何活的欄位差異**，本決策現為對函式本身之防禦性釘死。
+- **另記（不改行為）**：`future_max_return`／`future_max_drawdown` 之 producer 窗為寫死之
+  `standard_lookahead = 6`（根）。仍依 SPEC 標 `lookahead_unknown: true`、不得給預設深度
+  ——保守方向；該事實只記入 registry 之 `classification_evidence`，**不得**被解析為深度。
+- **驗證**：`pytest tests/momentum/event_samples/ -q -k lookahead_registry_complete` **≥14 條**，
+  其中 `test_lookahead_registry_complete_05_registry_content_correct` 之 oracle 改為
+  **producer-backed 表**（不再由欄名 regex 導出）、
+  `…_05b_producer_oracle_covers_every_non_bar_column` 防該表漏欄、
+  `…_05c_shift_named_columns_are_bar_kind` 為定向回歸鎖。
+- **mutation**：把 `future6_close_return` 改回 `{"kind":"hour","lookahead_hours":6}`
+  ⇒ `…_05_registry_content_correct` 與 `…_05c_shift_named_columns_are_bar_kind` 轉紅；還原轉綠。
+  receipt：`handoffs/run_receipts/gap3ux-b1-all-mutations.receipt.json`（`1.10-M4`）。
+- 🔴 **具名殘留（R-A005-1）**：producer-backed 表為**人工稽核**所得，非執跑探針
+  ——producer 若改算式而未同步該表，本閘看不見。
+  **為何現在不做執跑探針**：三值理由 `needs-research`
+  ——要真正量測「這一欄看多遠」須把 `CaseSearchEngine` 之未來欄計算段抽成可獨立呼叫之純函式，
+  那是對搜尋引擎之重構，超出 B1（契約與深度根基）之範圍，且會動到 GAP-3 以外之呼叫端。
+  **owner**：主委。**觸發**：下次動到 `case_search_engine.py` 之未來欄計算段時一併做。
+
+### A-006 — S-9 ⑦ 之對照組過寬（假綠）
+
+- **原寫法**：不重複之 `horizons=[1,3,7]` 只斷言「例外訊息**不含**『不得重複』」。
+- **失效**：一個「所有 horizons 一律 raise `ValueError`」之壞實作，訊息不同 ⇒ 照樣全綠
+  （codex 實跑該 mutant 得 `9 passed`／rc=0）。完整曲線可被靜默禁用而無人察覺。
+- **修法**：改為斷言控制流**真的走過了 horizon 驗證區**——`manifest=None` 之下一步
+  `t = manifest.table` 必然 `AttributeError` ⇒ 對照組期望 `AttributeError` 且訊息含 `table`。
+  任何在該點之前 raise 的壞法都會轉紅。
+- **發現者**：`CODEX-R1-P1-02`。
+- **mutation**：把重複守衛之條件改為 `if True`（所有 horizons 一律被擋）
+  ⇒ `test_canonical_serialize_07_duplicate_horizon_raises` 轉紅；還原轉綠（`4.2-M2`）。
+
+### A-007 — Task 2.1b 前端守衛之**真實呼叫點**未被覆蓋（假綠）
+
+- **失效**：`frontend/src/lib/lookaheadDepthLock.test.ts` 用的是自建之 `exportGuarded` 雙胞，
+  註解寫「與 `search/page.tsx` 同一形態」卻**不 import page**
+  ⇒ 把 `page.tsx` 之匯出守衛整段刪掉，該檔仍 7 passed（grok 實跑）。
+  與本 epic 犯過四次之「比對範圍過寬」同族：錨點落在**像目標的東西**上，不是目標本身。
+- **修法**：新增 `frontend/src/lib/lookaheadDepthLock.page.test.ts`，以 **TypeScript AST**（非 grep）
+  對 `page.tsx` 之 `exportSearchResultsToEventJson` 斷言三件事：
+  ①確實呼叫 `isHorizonBelowLowerBound` ②該呼叫位於帶 `return` 之 `if` 內
+  ③該守衛之位移**小於**該函式第一個 `await` 之位移（阻擋早於任何網路動作）。
+- **發現者**：`GROK-R1-P2-01`。
+- **mutation**：刪掉 `page.tsx` 之匯出守衛 ⇒ 上列①②③三條全部轉紅；還原轉綠（`2.1b-M4`）。
+
 ## 修訂索引
 
 | 編號 | 標的 | 一句話 | 日期 |
@@ -83,6 +148,9 @@ A-004 為 B1 交付邊界，依「殘留每條必帶為何現在不做」具名�
 | **A-002** | Task 4.2 驗證欄 | 「S-9 之 6 條」與 SPEC 之 ≥7 條衝突，以 SPEC 為準；⑦是真缺口 | 2026-08-24 |
 | **A-003** | 小時命名欄換算 | SPEC 未定捨入 ⇒ 取 ceil（保守方向），寫進 registry 並 fail-closed | 2026-08-24 |
 | **A-004** | Task 2.1b 前端 | 下界**值來源**待 B2／B5 接線；B1 只交鎖定機制 | 2026-08-24 |
+| **A-005** | Task 1.10 registry | 🔴 SPEC 把 `future{1,2,4,6}_close_return` 說成小時欄，producer 是 `shift(-N)`＝根；照抄會低估 purge 六倍。以 producer 為準 | 2026-08-24 |
+| **A-006** | §G S-9 ⑦ 對照組 | 只驗訊息不含關鍵字 ⇒「全部 horizons 都 raise」照樣綠；改驗控制流走過驗證區 | 2026-08-24 |
+| **A-007** | Task 2.1b 前端測試 | vitest 測的是雙胞不是 page；改用 TypeScript AST 鎖真實呼叫點 | 2026-08-24 |
 
 ## 戳記
 
