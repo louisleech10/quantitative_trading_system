@@ -1,0 +1,27 @@
+{
+  "all_pass": true,
+  "mutations": [
+    {
+      "id": "4.2-M1",
+      "task": "4.2",
+      "desc": "移除重複 horizon 之守衛（S-9 ⑦）",
+      "selector": [
+        "tests/momentum/event_samples/",
+        "-k",
+        "canonical_serialize"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_canonical_serialize_07_duplicate_horizon_raises"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_canonical_serialize_07_duplicate_horizon_raises"
+      ],
+      "verdict": "PASS"
+    }
+  ]
+}

@@ -8,6 +8,7 @@ void formatTimestamp;
 import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart, MarketClassPieChart, DifficultyPieChart } from '@/components/ui/PieChart';
 import { useSearchStore } from '@/store/searchStore';
 import { PriceChangeMethod, CaseData } from '@/lib/types';
+import { isHorizonBelowLowerBound, horizonLowerBoundMessage } from '@/lib/lookaheadDepthLock';
 
 
 
@@ -52,6 +53,11 @@ export default function SearchPage() {
   const [currentStage, setCurrentStage] = useState<string>('');
   // GAP-3 匯出：答案窗根數（決定 label_definition.window.horizon_bars 與 label_value 取哪個 future_Nbar_return）
   const [eventHorizonBars, setEventHorizonBars] = useState<number>(2);
+  // GAP-3 UX Task 2.1b：答案窗下界。值由後端之 depth_by_timeframe() 導出——
+  // 🔴 前端**不自算深度**（第二份實作必然漂移）。篩選面板（Task 2.1／B5）接上後由它餵；
+  // 在那之前恆為 null＝尚無約束，鎖定機制本身已可運作且受測。
+  const [lookaheadLowerBound, setLookaheadLowerBound] = useState<number | null>(null);
+  void setLookaheadLowerBound;
   
   // 搜索參數狀態
   const [searchParams, setSearchParams] = useState<SimpleSearchRequest>({
@@ -501,6 +507,12 @@ export default function SearchPage() {
   const exportSearchResultsToEventJson = async () => {
     if (!currentResult || !currentResult.cases || currentResult.cases.length === 0) {
       alert('沒有搜索結果可以匯出');
+      return;
+    }
+    // GAP-3 UX Task 2.1b：答案窗不得低於導出下界——阻擋須在任何網路動作**之前**
+    // （驗收①：嘗試設低於下界 ⇒ fetch call count == 0）。
+    if (isHorizonBelowLowerBound(eventHorizonBars, lookaheadLowerBound)) {
+      alert(horizonLowerBoundMessage(lookaheadLowerBound as number));
       return;
     }
     const { buildEventContractRecords } = await import('@/lib/eventExport');
@@ -1571,7 +1583,13 @@ export default function SearchPage() {
                   className="rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-200"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
-                    <option key={h} value={h}>{h} 根</option>
+                    <option
+                      key={h}
+                      value={h}
+                      disabled={isHorizonBelowLowerBound(h, lookaheadLowerBound)}
+                    >
+                      {h} 根{isHorizonBelowLowerBound(h, lookaheadLowerBound) ? '（低於下界，鎖定）' : ''}
+                    </option>
                   ))}
                 </select>
               </label>

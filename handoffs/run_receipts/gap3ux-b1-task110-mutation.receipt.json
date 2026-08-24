@@ -1,0 +1,79 @@
+{
+  "all_pass": true,
+  "mutations": [
+    {
+      "id": "1.10-M1",
+      "task": "1.10",
+      "desc": "刪掉 registry 中 future_4bar_max_drawdown 一筆",
+      "selector": [
+        "tests/momentum/event_samples/",
+        "-k",
+        "lookahead_registry_complete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_registry_complete_01_no_unregistered_future_columns",
+        "test_lookahead_registry_complete_02_units_and_conversion",
+        "test_lookahead_registry_complete_03_bar_named_depth_equals_n",
+        "test_lookahead_registry_complete_04b_csv_drawdown_alias"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_registry_complete_01_no_unregistered_future_columns",
+        "test_lookahead_registry_complete_02_units_and_conversion",
+        "test_lookahead_registry_complete_03_bar_named_depth_equals_n",
+        "test_lookahead_registry_complete_04b_csv_drawdown_alias"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.10-M2",
+      "task": "1.10",
+      "desc": "把 future_max_return 猜一個深度 lookahead_bars=12",
+      "selector": [
+        "tests/momentum/event_samples/",
+        "-k",
+        "lookahead_registry_complete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_registry_complete_05_registry_content_correct",
+        "test_lookahead_registry_complete_06_legacy_columns_marked_unknown[future_max_return]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_registry_complete_05_registry_content_correct",
+        "test_lookahead_registry_complete_06_legacy_columns_marked_unknown[future_max_return]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.10-M3",
+      "task": "1.10",
+      "desc": "外部上傳欄改成「名稱命中 registry 即直接解析」",
+      "selector": [
+        "tests/api",
+        "-k",
+        "lookahead_rename_attack"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration"
+      ],
+      "verdict": "PASS"
+    }
+  ]
+}

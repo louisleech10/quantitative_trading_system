@@ -12,9 +12,9 @@
 | 施工清單（TODO） | 🔒 **已凍結 v1.0**，可據以派工 |
 | **實作** | **第一批施工中** |
 | Task 總數 | **42** |
-| 已完成 | **0** |
-| 進行中 | **0** |
-| 未開工 | **42** |
+| 已完成 | **3** |
+| 進行中 | **1** |
+| 未開工 | **38** |
 
 🔴 **現在在做**：第一批（B1）——契約與深度根基。使用者已裁定開工。
 
@@ -46,7 +46,7 @@
 
 | Task | 在做什麼 | Phase | 狀態 |
 |---|---|---|---|
-| **Task 1.1** | 契約先行：新增 reason 與 label_definition.filters | Phase 1 | ⬜ |
+| **Task 1.1** | 契約先行：新增 reason 與 label_definition.filters | Phase 1 | ✅ |
 | **Task 1.2** | 新端點 `POST /api/v1/case/import-events/csv` | Phase 1 | ⬜ |
 | **Task 1.3** | `event_id` 沿用既有 canonical（D-2） | Phase 1 | ⬜ |
 | **Task 1.4** | t0 單位偵測 | Phase 1 | ⬜ |
@@ -54,12 +54,12 @@
 | **Task 1.6** | 對映 provenance 落檔（D-1） | Phase 1 | ⬜ |
 | **Task 1.7** | 可疑欄警示（D-1） | Phase 1 | ⬜ |
 | **Task 1.8** | 異質列顯式拒收（A-5′） | Phase 1 | ⬜ |
-| **Task 1.10** | 欄位級 `lookahead_bars` 契約（D-7 之 L1） | Phase 1 | ⬜ |
+| **Task 1.10** | 欄位級 `lookahead_bars` 契約（D-7 之 L1） | Phase 1 | ✅ |
 | **Task 1.11** | 未知欄強制宣告（D-7 之 L2） | Phase 1 | ⬜ |
 | **Task 1.12** | 不可證則禁進切分（D-7 之 L3） | Phase 1 | ⬜ |
 | **Task 1.9** | 答案窗宣告與 purge 下界（D-7 之 L2 使用者介面） | Phase 1 | ⬜ |
 | **Task 2.1** | `/search` 匯出前篩選面板 | Phase 2 | ⬜ |
-| **Task 2.1b** | 由篩選條件自動導出答案窗下界（D-7 第 2 層） | Phase 2 | ⬜ |
+| **Task 2.1b** | 由篩選條件自動導出答案窗下界（D-7 第 2 層） | Phase 2 | ✅ |
 | **Task 2.2** | 篩選條件寫入 `label_definition.filters` | Phase 2 | ⬜ |
 | **Task 2.3** | 即時筆數顯示 | Phase 2 | ⬜ |
 | **Task 3.1** | `DELETE /api/v1/case/events/{import_id}` | Phase 3 | ⬜ |
@@ -68,7 +68,7 @@
 | **Task 4.1** | 匯出檔之附帶 `future_*` 欄；移除匯出端之答案窗與 `label_value`（D-3′） | Phase 4 | ⬜ |
 | **Task 4.1b** | 匯出時揭露每個選項在動什麼 | Phase 4 | ⬜ |
 | **Task 4.1c** | 明文標示本批不提供 IC decay | Phase 4 | ⬜ |
-| **Task 4.2** | 事件後報酬表顯示完整曲線 | Phase 4 | ⬜ |
+| **Task 4.2** | 事件後報酬表顯示完整曲線（拆兩半：序列化規則這半做了，曲線那半排在後面的批次） | Phase 4 | 🔧 |
 | **Task 4.3** | 缺欄確認框逐 horizon 列出 | Phase 4 | ⬜ |
 | **Task 5.0** | 建立指標詞彙 SoT | Phase 5 | ⬜ |
 | **Task 5.1** | `.source.json` 誤傳之訊息追加正解 | Phase 5 | ⬜ |

@@ -49342,3 +49342,19 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "0d118a63-6530-4aab-97e2-df0404beed59", "cli_rc": "0", "event": "committee_family_result", "event_id": "935a5437-cf35-444a-b4cf-7959d42cfc18", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-d001-stamp-codex.md", "output_sha256": "3a775f99f1c0f337536a21e6608cf9dd1faed8c1715fc5d9d6e96d6df1eb1a53", "producer": "audit_append.sh", "result_state": "success", "round_id": "a0d06ad4-5543-4f9d-81aa-916732eb2306", "schema_version": 1, "sequence": 2666, "ts": "2026-08-24T08:33:53Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260824-gap3uxtodod001-x-stamp/synth.md", "output_sha256": "75016684c01988ebe514f970ab43f49550e224ef184e1dae358328d9fe680498", "task_id": "20260824-GAP3UXTODOD001-X-STAMP-R1", "ts": "2026-08-24T08:33:53Z"}
 {"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "claude-主委", "event": "debt_abandon", "event_id": "7f803aff-5b5d-457d-af00-ff2688d9e54d", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp 輪依定義不產 canonical finding；三家皆 APPROVED 且 STATUS DONE，機械標的 reconcile_stamps_check rc=0", "round_id": "a0d06ad4-5543-4f9d-81aa-916732eb2306", "schema_version": 1, "sequence": 2667, "ts": "2026-08-24T08:34:32Z", "zero_findings_verified": ""}
+=== 2026-08-24 17:22:53 | artifact ===
+  ts=2026-08-24 17:22:53
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_UX_TODO.D-002.md
+  template_opened=docs/GAP3_EVENT_UX_TODO.D-001.md
+  sections=BASE=filled; PREDECESSOR=filled; 觸及面宣告=filled; 內容=filled; 戳記=pending-committee
+  spec=
+  todo=
+  manifest=

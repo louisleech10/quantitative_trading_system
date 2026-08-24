@@ -1,0 +1,87 @@
+{
+  "all_pass": true,
+  "mutations": [
+    {
+      "id": "2.1b-M1",
+      "task": "2.1b",
+      "desc": "把 max() 改成 min()",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_lookahead_depth"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_lookahead_depth_01_bar_named_locks_to_max",
+        "test_gap3_lookahead_depth_02_hour_named_resolves_per_tf",
+        "test_gap3_lookahead_depth_03_hour_named_equal_ms_across_tf",
+        "test_gap3_lookahead_depth_04_single_tf_degenerates_to_one_key",
+        "test_gap3_lookahead_depth_05_attached_columns_not_in_max",
+        "test_gap3_lookahead_depth_09_map_not_collapsed_to_scalar"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_lookahead_depth_01_bar_named_locks_to_max",
+        "test_gap3_lookahead_depth_02_hour_named_resolves_per_tf",
+        "test_gap3_lookahead_depth_03_hour_named_equal_ms_across_tf",
+        "test_gap3_lookahead_depth_04_single_tf_degenerates_to_one_key",
+        "test_gap3_lookahead_depth_05_attached_columns_not_in_max",
+        "test_gap3_lookahead_depth_09_map_not_collapsed_to_scalar"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M2",
+      "task": "2.1b",
+      "desc": "bars_of 之小時分支直接取 lookahead_hours 當根數",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_lookahead_depth"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_lookahead_depth_02_hour_named_resolves_per_tf",
+        "test_gap3_lookahead_depth_03_hour_named_equal_ms_across_tf"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_lookahead_depth_02_hour_named_resolves_per_tf",
+        "test_gap3_lookahead_depth_03_hour_named_equal_ms_across_tf"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M3",
+      "task": "2.1b",
+      "desc": "把 map 塌成單一 scalar（取批內任一 tf）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_lookahead_depth"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_lookahead_depth_02_hour_named_resolves_per_tf",
+        "test_gap3_lookahead_depth_03_hour_named_equal_ms_across_tf",
+        "test_gap3_lookahead_depth_09_map_not_collapsed_to_scalar"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_lookahead_depth_02_hour_named_resolves_per_tf",
+        "test_gap3_lookahead_depth_03_hour_named_equal_ms_across_tf",
+        "test_gap3_lookahead_depth_09_map_not_collapsed_to_scalar"
+      ],
+      "verdict": "PASS"
+    }
+  ]
+}

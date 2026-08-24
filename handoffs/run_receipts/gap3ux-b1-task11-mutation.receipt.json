@@ -1,0 +1,165 @@
+{
+  "all_pass": true,
+  "mutations": [
+    {
+      "id": "1.1-M1",
+      "task": "1.1",
+      "desc": "把 label_producer_… 放回 import_failure_reasons",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_01_import_failure_added",
+        "test_gap3_contract_reason_registry_03_producer_reason_not_in_import_list",
+        "test_gap3_contract_reason_registry_04_capability_reasons_added"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_01_import_failure_added",
+        "test_gap3_contract_reason_registry_03_producer_reason_not_in_import_list",
+        "test_gap3_contract_reason_registry_04_capability_reasons_added"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.1-M2",
+      "task": "1.1",
+      "desc": "改動既有 reason 之順序",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_02_existing_prefix_unchanged"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_02_existing_prefix_unchanged"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.1-M3",
+      "task": "1.1",
+      "desc": "改動 baseline fixture（位元組不再一致）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_06_baseline_fixture_byte_faithful"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_06_baseline_fixture_byte_faithful"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.1-M4",
+      "task": "1.1",
+      "desc": "移除新 derived 欄之登記",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_07_new_registered_fields"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_07_new_registered_fields"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.1-M5",
+      "task": "1.1",
+      "desc": "把 receipt_schema 退回欄名清單",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_07_new_registered_fields",
+        "test_gap3_contract_reason_registry_08a_flatten_prefix_preserved",
+        "test_gap3_contract_reason_registry_08b_namespaces_are_typed_dicts",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[bool]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[float]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[str]",
+        "test_gap3_contract_reason_registry_08d_validator_accepts_valid"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_07_new_registered_fields",
+        "test_gap3_contract_reason_registry_08a_flatten_prefix_preserved",
+        "test_gap3_contract_reason_registry_08b_namespaces_are_typed_dicts",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[bool]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[float]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[str]",
+        "test_gap3_contract_reason_registry_08d_validator_accepts_valid"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.1-M6",
+      "task": "1.1",
+      "desc": "拿掉 runtime validator",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_08c_validator_rejects[bool]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[float]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[str]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_08c_validator_rejects[bool]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[float]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[str]"
+      ],
+      "verdict": "PASS"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ import hashlib
 import json
 import numbers
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Union
 
 import pandas as pd
 
@@ -53,6 +53,98 @@ def allowed_top_level_keys(contract: dict) -> set:
         | set(contract["optional_fields"])
         | set(contract["conditional_required"])
     )
+
+
+def flatten_receipt_schema(schema: Mapping[str, Any]) -> List[str]:
+    """把 namespace-aware 之 `receipt_schema` 攤成保序之 `["<namespace>.<欄名>", ...]`。
+
+    GAP-3 UX Task 1.1（SPEC R11 ⑧(a)）：**唯一** exported traversal——runtime validator
+    與驗收共用同一函式參考，不得各寫一份。改前（欄名 list）與改後（{欄名: 型別} dict）
+    兩種形態皆吃，故「改前 vs 改後」之 prefix 相等斷言可用同一 traversal 產生兩側。
+
+    順序＝namespace 之插入序 × 該 namespace 內欄名之插入序（Python 3.7+ dict 保序）。
+    """
+    out: List[str] = []
+    for ns, fields in schema.items():
+        if isinstance(fields, Mapping):
+            names: List[str] = list(fields.keys())
+        elif isinstance(fields, (list, tuple)):
+            names = [str(n) for n in fields]
+        else:
+            raise ValueError(
+                f"receipt_schema['{ns}'] 須為 Mapping（改後）或 list（改前），實得 {type(fields).__name__}"
+            )
+        out.extend(f"{ns}.{n}" for n in names)
+    return out
+
+
+def receipt_type_ok(type_decl: str, value: Any) -> bool:
+    """依契約之型別字面判定 receipt 欄位值是否合法（封閉集合；未知字面 ⇒ raise，fail-closed）。
+
+    GAP-3 UX Task 1.1（SPEC R11 ⑧(c)(e)）：判定一律 `type(v) is int`，**不用 `isinstance`**
+    ——`bool ⊂ int`，`True` 會通過 `isinstance` 檢查卻序列化成 `true` 而非 `1`，
+    使 §G S-9 之位元組綁定失效（CODEX-R17-P1-02）。
+    本函式為 validator 與驗收之**同一函式參考**，不得複製其邏輯。
+    """
+    if type_decl == "str":
+        return type(value) is str
+    if type_decl == "bool":
+        return type(value) is bool
+    if type_decl == "int":
+        return type(value) is int
+    if type_decl == "int>=0":
+        return type(value) is int and value >= 0
+    if type_decl == "Mapping[str,int>=0]":
+        if type(value) is not dict:
+            return False
+        return all(
+            type(k) is str and type(v) is int and v >= 0
+            for k, v in value.items()
+        )
+    raise ValueError(f"receipt_schema 出現未知型別字面: {type_decl!r}（fail-closed，不得放行）")
+
+
+def validate_receipt_namespace(
+    namespace: str,
+    values: Mapping[str, Any],
+    *,
+    contract: Optional[dict] = None,
+) -> None:
+    """驗證某個 receipt namespace 之落檔值；任一不合即 raise ContractValidationError（fail-closed）。
+
+    GAP-3 UX Task 1.1：型別登記若沒有 runtime 生效點，就只是「登記了但沒生效」。
+    本函式即該生效點，與驗收共用 `flatten_receipt_schema` / `receipt_type_ok`。
+    """
+    c = contract if contract is not None else load_event_import_contract()
+    schema = c["receipt_schema"]
+    if namespace not in schema:
+        raise ContractValidationError(
+            [{"row": None, "event_id": None, "field": namespace, "reason": "unknown_field"}]
+        )
+    declared = schema[namespace]
+    if not isinstance(declared, Mapping):
+        raise ValueError(
+            f"receipt_schema['{namespace}'] 尚未升為 typed dict（migration 未完成，fail-closed）"
+        )
+
+    failures: List[Dict[str, Any]] = []
+    for name in declared:
+        if name not in values:
+            failures.append(
+                {"row": None, "event_id": None, "field": f"{namespace}.{name}",
+                 "reason": "missing_required_field"}
+            )
+        elif not receipt_type_ok(declared[name], values[name]):
+            failures.append(
+                {"row": None, "event_id": None, "field": f"{namespace}.{name}", "reason": "type_error"}
+            )
+    for name in values:
+        if name not in declared:
+            failures.append(
+                {"row": None, "event_id": None, "field": f"{namespace}.{name}", "reason": "unknown_field"}
+            )
+    if failures:
+        raise ContractValidationError(failures)
 
 
 def _is_int(v: Any) -> bool:

@@ -36,10 +36,6 @@
           "enum": ["open_to_close", "open_to_horizon_close", "close_to_close"],
           "default": "close_to_close",
           "doc": "label 錨 mode-scoped 機械唯一（SPEC D1-5）；open_to_* 顯式宣告才合法（白話閘裁決②）"
-        },
-        "filters": {
-          "type": "object",
-          "doc": "GAP-3 UX Task 1.1／D-6：Phase 2 匯出前篩選之條件物件；Task 2.2 只寫其值，序列化依 §G S-1..S-9。不參與 event_id 之輸入（違反 D-2）"
         }
       },
       "doc": "不含 entry 語意（R1 X11）"
@@ -102,8 +98,7 @@
       "observed_through_ms", "feature_cutoff_ms", "decision_at_ms", "entry_at_ms", "label_start_ms", "label_end_ms",
       "event_known_at_decision", "entry_after_label_start",
       "dedupe_cluster_id", "overlap_set_hash", "uniqueness_weight", "time_cluster_id", "cluster_weight",
-      "counterexample_kind_effective", "platform_suggested_kind",
-      "lookahead_bars_declared"
+      "counterexample_kind_effective", "platform_suggested_kind"
     ],
     "counterexample_kind_effective_enum": ["a_trigger_no_follow", "b_range", "c_drop", "unclassifiable"]
   },
@@ -112,9 +107,7 @@
     "invalid_timestamp_unit", "duplicate_event_id", "empty_import",
     "missing_control_group", "not_implemented_platform_random_bars",
     "direction_mixed_in_batch", "conditional_required_missing", "research_only",
-    "digest_mismatch", "label_value_type_error", "counterexample_kind_not_importable",
-    "column_mapping_missing", "column_not_found_in_file",
-    "label_column_not_binary", "heterogeneous_rows_in_batch"
+    "digest_mismatch", "label_value_type_error", "counterexample_kind_not_importable"
   ],
   "alignment_failure_reasons": [
     "invalid_timestamp_unit", "timezone_missing", "missing_bar", "duplicate_bar", "unsorted_bar",
@@ -122,10 +115,7 @@
     "nonpositive_reference_price", "nan_or_inf_feature", "reference_symbol_unavailable",
     "warmup_insufficient_{tf}", "tf_boundary_ambiguous"
   ],
-  "capability_unavailable_reasons": [
-    "missing_label_value", "missing_prevalence_disclosure", "one_class_test_segment",
-    "split_blocked_unverifiable_lookahead", "label_producer_unsupported_for_declared_semantics"
-  ],
+  "capability_unavailable_reasons": ["missing_label_value", "missing_prevalence_disclosure", "one_class_test_segment"],
   "split_purge_reasons": ["interval_crosses_split_boundary"],
   "split_loud_flags": ["insufficient_events_in_test"],
   "degraded_flags": ["single_symbol", "no_cluster_adjustment"],
@@ -142,31 +132,12 @@
     },
     "thresholds_doc": "四門檻全部＝舉例可調（2026-08-20 白話閘裁決①「都只是舉例，沒有一定」），非使用者裁定數值；config/UI 可覆寫"
   },
-  "receipt_schema_doc": "GAP-3 UX Task 1.1／R11：receipt_schema 由「欄名清單」升為 namespace-aware 之 {欄名: 型別}（不攤平）。既有欄名與插入順序照抄，只補型別；新增 batch namespace 承載批次層屬性（非逐列、非逐 TF）。traversal 與型別判定唯一住 momentum/Analysis/event_samples/import_contract.py（flatten_receipt_schema／receipt_type_ok），runtime validator 與驗收共用同一函式參考，禁各寫一份。",
   "receipt_schema": {
-    "event_level": {
-      "event_id": "str",
-      "t0_ms": "int",
-      "decision_offset_bars": "int>=0",
-      "decision_at_ms": "int",
-      "entry_at_ms": "int",
-      "entry_price_source_bar_open_ms": "int",
-      "entry_price_source_field": "str",
-      "label_start_ms": "int",
-      "label_end_ms": "int",
-      "entry_after_label_start": "bool"
-    },
-    "per_tf": {
-      "event_id": "str",
-      "timeframe": "str",
-      "feature_cutoff_ms": "int",
-      "last_bar_open_ms": "int",
-      "last_bar_close_ms": "int",
-      "row_id": "int>=0"
-    },
-    "batch": {
-      "lookahead_bars_declared": "Mapping[str,int>=0]",
-      "analysis_alignment_receipt_hash": "str"
-    }
+    "event_level": [
+      "event_id", "t0_ms", "decision_offset_bars", "decision_at_ms", "entry_at_ms",
+      "entry_price_source_bar_open_ms", "entry_price_source_field",
+      "label_start_ms", "label_end_ms", "entry_after_label_start"
+    ],
+    "per_tf": ["event_id", "timeframe", "feature_cutoff_ms", "last_bar_open_ms", "last_bar_close_ms", "row_id"]
   }
 }

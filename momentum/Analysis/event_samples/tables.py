@@ -102,6 +102,10 @@ def event_forward_return_table(
     horizons: List[int] = [int(h) for h in table_config["horizons"]]
     if not horizons or any(h < 1 for h in horizons):
         raise ValueError("event_forward_return_table: horizons 須為 ≥1 之整數清單（config 化）")
+    # GAP-3 UX §G S-9 ⑦：重複 h 會在 out[str(h)] 互相覆寫而**靜默**通過
+    # （S-3 已規定 fail-closed，但原本只擋 h<1 與空清單）。
+    if len(set(horizons)) != len(horizons):
+        raise ValueError("event_forward_return_table: horizons 不得重複（S-3 fail-closed；重複 h 會在 out[str(h)] 互相覆寫）")
     seed = int(table_config.get("seed", 20260820))
     n_boot = int(table_config.get("n_boot", 500))
 
