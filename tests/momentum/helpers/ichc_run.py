@@ -100,16 +100,28 @@ def canonical_sha(report: dict) -> str:
     排除清單寫死＝{generated_at, filtered_generated_at}：後者是前者的鏡像轉寫
     （orchestrator._persist_outputs 之 source_generated_at=report["generated_at"]），
     同一時鐘源，非第二個排除語意。
+
+    🔴 2026-08-24 新增第三個時鐘鏡像 `metadata.survivor_output.sha256`：
+    GAP-2 Task 4.2 之 `_write_survivor_output` 把 `generated_at` 寫進倖存者輸出檔
+    （`ic_filter_orchestrator.py` 之 `generated_at=str(report.get("generated_at"))`），
+    再對**該檔位元組**取 sha256 ⇒ 每跑一次必變。它與前兩者**同一時鐘源**，
+    不是第三個排除語意。本 helper 建於該功能之前，遂使 t3 決定性測試長期紅。
+    🔴 **以路徑限定排除，不是排除所有叫 `sha256` 的鍵**——後者會把真正該比的
+    內容雜湊一起吃掉（本 epic 反覆犯的「比對範圍過寬」）。
     """
     _CLOCK_KEYS = frozenset({"generated_at", "filtered_generated_at"})
+    # (父路徑, 鍵) 之封閉集合；父路徑以 "." 串接，root 為 ""。
+    _CLOCK_MIRROR_PATHS = frozenset({("metadata.survivor_output", "sha256")})
 
-    def scrub(node: Any) -> Any:
+    def scrub(node: Any, path: str = "") -> Any:
         if isinstance(node, dict):
             return {
-                k: scrub(v) for k, v in node.items() if k not in _CLOCK_KEYS
+                k: scrub(v, f"{path}.{k}" if path else k)
+                for k, v in node.items()
+                if k not in _CLOCK_KEYS and (path, k) not in _CLOCK_MIRROR_PATHS
             }
         if isinstance(node, list):
-            return [scrub(v) for v in node]
+            return [scrub(v, path) for v in node]
         if isinstance(node, float) and math.isnan(node):
             return "__nan__"
         return node

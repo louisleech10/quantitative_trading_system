@@ -23,6 +23,16 @@ REDIRECT_FILES = (
 )
 
 EXPECTED_CALLERS = {
+    # ── 2026-08-24 刷新（六個新呼叫端；刷新前本閘因清單過期而長期紅）──────────
+    # 本閘之職責就是「新呼叫端出現要被看見」，所以**維持 `==` 不放寬**；
+    # 新增檔案時要一併登記，那是刻意的摩擦，不是缺陷。
+    "tests/api/test_ic_la1_degraded_gate.py",              # IC-LA1 降級閘
+    "tests/golden/la0/build_after_and_attribution.py",     # LA-0 after/attribution 產生器
+    "tests/golden/la1/gen_baseline.py",                    # LA-1 baseline 產生器
+    "tests/momentum/Analysis/test_gap2_stage6b_wiring.py",  # GAP-2 stage6b 接線
+    "tests/momentum/helpers/ichc_run.py",                  # ICHC 測試 harness（本身會呼叫 analyze）
+    "tests/momentum/test_la1_lookahead.py",                # IC-LA1 lookahead
+    # ── 原有 ────────────────────────────────────────────────────────────────
     "tests/api/test_ic_run_selector.py",
     "tests/fixtures/gen_ic_run_selector_baseline.py",
     "tests/golden/ic_phase1_1a_cut1/freeze_baseline.py",

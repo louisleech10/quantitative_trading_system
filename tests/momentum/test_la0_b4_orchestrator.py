@@ -138,13 +138,49 @@ def test_deep_cache_key_includes_pit_version_and_fit_mode() -> None:
         "net_ic_analysis": cfg.net_ic_analysis.model_dump(),
         "deep_analysis_global": cfg.deep_analysis_global.model_dump(),
     }
-    payload = {
-        "features": ["f1", "f2"],
-        "deep_config": deep_cfg,
-        "pit_stats_version": PIT_STATS_VERSION,
-        "fit_mode": "train_mask",
-    }
-    expected = hashlib.md5(
-        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
-    ).hexdigest()
-    assert key_a == expected
+    # 🔴 2026-08-24 改寫（原寫法之病與修法）：
+    #    原本這裡拿上面那個 `deep_cfg` **手工重算**一份 payload 與 key 比對——那是把
+    #    `_compute_deep_cache_key` 的內容抄成**第二份副本**。真實 payload 後來加了
+    #    `schema_version`（F2 ⑩）與 `event_identity`（GAP-2 Task 4.1），副本沒跟上，遂長期紅。
+    #    ⇒ 改為**行為探針**：逐個擾動 payload 之組成，看 key 有沒有跟著變。
+    #      證明的是同一件事（那些東西真的進了 hash），但**不需要維護副本**，不會再漂。
+    del deep_cfg  # 副本已不再使用；保留上方構造只為讓 diff 看得出改了什麼
+    import momentum.Analysis.factor_return_sanitizer as _fr_sanitizer
+    import momentum.Analysis.ic_filter_orchestrator as _orch_mod
+
+    baseline = orch._compute_deep_cache_key(["f1", "f2"], cfg)
+    assert baseline == key_a
+
+    # ① features 進 key
+    assert orch._compute_deep_cache_key(["f1", "f3"], cfg) != baseline
+
+    # ② deep_config 進 key（動任一模組設定）
+    cfg2 = ICConfig()
+    cfg2.factor_return.num_quantiles = cfg.factor_return.num_quantiles + 1
+    assert orch._compute_deep_cache_key(["f1", "f2"], cfg2) != baseline
+
+    # ③ pit_stats_version 進 key
+    original_pit = _orch_mod.PIT_STATS_VERSION
+    try:
+        _orch_mod.PIT_STATS_VERSION = f"{original_pit}-probe"
+        assert orch._compute_deep_cache_key(["f1", "f2"], cfg) != baseline
+    finally:
+        _orch_mod.PIT_STATS_VERSION = original_pit
+    assert orch._compute_deep_cache_key(["f1", "f2"], cfg) == baseline  # 還原後回到原 key
+
+    # ④ schema_version 進 key（F2 ⑩：防命中 stopgap 舊 unavailable 快取）
+    original_schema = _fr_sanitizer.FR_SCHEMA_VERSION
+    try:
+        _fr_sanitizer.FR_SCHEMA_VERSION = f"{original_schema}-probe"
+        assert orch._compute_deep_cache_key(["f1", "f2"], cfg) != baseline
+    finally:
+        _fr_sanitizer.FR_SCHEMA_VERSION = original_schema
+
+    # ⑤ event_identity 進 key（GAP-2 Task 4.1：換 request 不沿用舊 cache）
+    original_event = orch._event_identity
+    try:
+        orch._event_identity = {"probe": "different-event"}
+        assert orch._compute_deep_cache_key(["f1", "f2"], cfg) != baseline
+    finally:
+        orch._event_identity = original_event
+    assert orch._compute_deep_cache_key(["f1", "f2"], cfg) == baseline

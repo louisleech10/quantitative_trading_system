@@ -21,6 +21,45 @@ from api.services.model_enhancement_service import ModelEnhancementService
 from momentum.core.contracts import SkippedResult
 
 
+def _calibrator_receipt_inputs(n: int) -> dict:
+    """signal-facing calibration 之 SplitPlan 綁定與 CalibratorReceipt。
+
+    🔴 為何本檔需要這一段（2026-08-24 補）：`IC-LA2 B2`（commit `24376dd1`，2026-07-18）把
+    calibration 改為 **fail-closed**——缺 `train_plan`／`calib_idx`／`model_artifact` 或
+    缺外部傳入之 `calibrator_receipt` 一律 raise，且**禁 calibrator 自簽**
+    （`api/services/model_enhancement_service.py` 逐字：「signal-facing：缺 split/artifact/receipt
+    即 fail-closed（非 warn、不自簽）」）。本檔之 payload 建於該契約之前，遂長期紅。
+    ⇒ 依「以現行程式碼為準」，補的是**測試的輸入**，**不動那個契約**。
+    建法照 `tests/momentum/test_la2_lookahead.py::test_calibrator_receipt` 之 canonical recipe。
+    """
+    from momentum.core.contracts import SplitPlan, make_calibrator_receipt
+
+    split = n * 2 // 3  # 80/120
+    train_plan = SplitPlan(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.arange(0, split, dtype=int),
+        time_bounds=(None, None),
+        purge_gap=0,
+        embargo=0,
+        purge_semantic="rows",
+        expected_freq=None,
+        base_universe_hash="u1",
+        symbol="BTCUSDT",
+    )
+    calib_idx = np.arange(split, n)  # 與 train 不相交（重疊則 make_ 會拒）
+    model_artifact = b"model-enhancement-service-test-artifact"
+    receipt = make_calibrator_receipt(
+        train_plan, calib_idx, model_artifact, trusted_issuer="probability_calibrator"
+    )
+    return {
+        "train_plan": train_plan,
+        "calib_idx": calib_idx,
+        "model_artifact": model_artifact,
+        "calibrator_receipt": receipt,
+    }
+
+
 def _base_payload() -> dict:
     rng = np.random.default_rng(42)
     n = 120
@@ -47,6 +86,7 @@ def _base_payload() -> dict:
                 "y_train": y[:80],
                 "X_cal": X.iloc[:80].copy(),
                 "y_cal": y[:80],
+                **_calibrator_receipt_inputs(n),
             }
         }
     }
@@ -94,7 +134,11 @@ async def test_execute_calibration_timeout_failed(monkeypatch):
         def __init__(self, config=None):
             self.config = config or {}
 
-        def fit_from_predictions(self, y_true, y_pred_proba, method="auto", cv=5):
+        # 簽章須跟上 IC-LA2 B2 之 signal-facing 契約（service 會傳這五個 kwarg）；
+        # 樁少收任一個都會變成 TypeError 而蓋掉本測試真正要驗的 timeout。
+        def fit_from_predictions(
+            self, y_true, y_pred_proba, method="auto", cv=5, **_receipt_kwargs
+        ):
             import time
 
             time.sleep(0.2)
@@ -148,7 +192,10 @@ async def test_execute_module_handles_skipped_result():
         def __init__(self, config=None):
             self.config = config or {}
 
-        def fit_from_predictions(self, y_true, y_pred_proba, method="auto", cv=5):
+        # 同 SlowCalibrator：簽章須跟上 IC-LA2 B2 之 signal-facing 契約
+        def fit_from_predictions(
+            self, y_true, y_pred_proba, method="auto", cv=5, **_receipt_kwargs
+        ):
             return SkippedResult(module_name="probability_calibrator", reason="skip", error_type="INSUFFICIENT_DATA")
 
     payload = _base_payload()

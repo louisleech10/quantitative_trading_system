@@ -265,18 +265,25 @@ def test_api_deep_cache_key_includes_fit_mode(completed_ic_task: str) -> None:
     }
     from momentum.Analysis.factor_return_sanitizer import FR_SCHEMA_VERSION
 
-    payload = {
-        "features": sorted(features_for_key),
-        "deep_config": deep_cfg,
-        "pit_stats_version": PIT_STATS_VERSION,
-        "fit_mode": fit_mode,
-        # F2 ⑩: cache key 含 schema_version
-        "schema_version": FR_SCHEMA_VERSION,
-    }
-    expected = hashlib.md5(
-        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
-    ).hexdigest()
-    assert key_a == expected
+    # 🔴 2026-08-24 改寫（原寫法之病與修法）：
+    #    原本這裡手工重算一份 payload 與 key 比對——那是 `_compute_deep_cache_key` 的
+    #    **第二份副本**。真實 payload 後來加了 `event_identity`（GAP-2 Task 4.1），
+    #    副本沒跟上，遂長期紅。副本必然漂移。
+    #    ⇒ 改為**行為探針**：擾動 payload 之組成，看 key 有沒有跟著變。
+    #      本檔為 API 路徑，重點在「真 API 留下的 analyzer 上這條 key 建構路徑是活的」，
+    #      逐欄擾動之完整版在 `tests/momentum/test_la0_b4_orchestrator.py`。
+    del deep_cfg, FR_SCHEMA_VERSION  # 副本已不再使用
+
+    # ① features 進 key
+    assert analyzer._compute_deep_cache_key(features_for_key + ["__probe__"], cfg) != key_a
+    # ② event_identity 進 key（GAP-2 Task 4.1：換 request 不沿用舊 cache）
+    _prev_event = analyzer._event_identity
+    try:
+        analyzer._event_identity = {"probe": "different-event"}
+        assert analyzer._compute_deep_cache_key(features_for_key, cfg) != key_a
+    finally:
+        analyzer._event_identity = _prev_event
+    assert analyzer._compute_deep_cache_key(features_for_key, cfg) == key_a
 
     # mode 變 → key 變（cache 隔離）
     prev = analyzer._active_fit_mode

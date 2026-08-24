@@ -28,9 +28,20 @@ def test_advanced_preset_enables_all():
     orchestrator = ICFilterOrchestrator(config)
 
     applied = orchestrator._apply_tier_config(config)
-    # 舊斷言為何錯: tier 後 `factor_return.enabled is True` 固化 tier 強制開啟錯位模組;
-    # IC1C-FR-STOPGAP 從 tier 強制清單排除 factor_return → 保持 default-off False。
-    assert applied.factor_return.enabled is False
+    # 期望值沿革（**以現行程式碼為準**，2026-08-24 更新）:
+    #   ① 原斷言 True: tier 強制開啟。
+    #   ② IC1C-FR-STOPGAP 改 False: 從 tier 強制清單排除 factor_return → 當時 schema default-off。
+    #   ③ **現行 True**: `FactorReturnConfig.enabled` 之 schema 預設已於 **F5.2 刻意 flip 為 True**
+    #      （`momentum/Analysis/ic_config_schema.py` 該欄註解逐字:
+    #       「F5.2: enabled=True 最終 flip(F0-F4 全綠後;§R 回退=revert 本 commit)」）。
+    #      本測試在 ② 之後未更新，遂與現行程式碼不符而長期紅。
+    # 🔴 stopgap 之語意**未被推翻**：`_apply_tier_config` 對 `factor_return` 明確 `continue`
+    #    （`ic_filter_orchestrator.py` 該處註解逐字：「F1.2 tier truth table(D13)：
+    #     不強制覆寫 factor_return.enabled … F5.2 flip True 後自然入 run」）
+    #    ⇒ 這裡的 True **不是 tier 強制開啟**，是沿用 schema 預設。兩件事仍分得開。
+    #    tier 真的關得掉這件事由 `test_intermediate_preset_disabled_modules` 與
+    #    `test_apply_tier_foundation_skips_deep` 驗。
+    assert applied.factor_return.enabled is True
     assert applied.factor_orthogonalization.enabled is True
     assert applied.factor_exposure.enabled is True
 

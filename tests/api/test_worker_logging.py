@@ -61,6 +61,13 @@ def _remove_worker_handlers() -> None:
 
 @pytest.fixture(autouse=True)
 def _cleanup_worker_handlers():
+    # 🔴 2026-08-24：原本只在測試**後**清理。`init_worker_logging` 是 idempotent 的
+    #    （`_has_worker_log_handler()` 為真就提早 return），所以只要**別的測試檔**在本檔之前
+    #    留下一個 marked handler，本檔的測試就會從髒狀態起跑——handler 不會掛到 tmp_path，
+    #    log 一行都不會寫，`test_init_worker_logging_idempotent_single_line` 遂 assert 0 == 1。
+    #    單獨跑本檔 13 passed、全量跑才紅，就是這個原因。
+    #    ⇒ 前置也清一次，使本檔不依賴執行順序。
+    _remove_worker_handlers()
     yield
     _remove_worker_handlers()
 
