@@ -45,7 +45,24 @@ def test_lookahead_rename_attack_03_system_generated_unknown_still_declares() ->
     assert res["reason"] == "depth_not_derivable_from_registry"
 
 
-def test_lookahead_rename_attack_04_unknown_provenance_fail_closed() -> None:
-    """provenance 為封閉集合；未知值即 raise，不得靜默當成可信。"""
+# 🔴 CODEX-R3-P2-04：舊版只測 literal "trust_me" ⇒ 實作若寫成
+#    `if provenance == "trust_me": raise`（只拒那一個字串、其餘一律放行）仍全綠。
+#    改為多值參數化 ＋ 對「封閉集合」本身做斷言。
+@pytest.mark.parametrize(
+    "bogus",
+    ["trust_me", "", "SYSTEM_GENERATED", "system-generated", "external", None, 0, "user", "internal"],
+)
+def test_lookahead_rename_attack_04_unknown_provenance_fail_closed(bogus) -> None:
+    """provenance 為封閉集合；**任何**非集合內之值即 raise，不得靜默當成可信。"""
     with pytest.raises(ValueError):
-        lookahead_resolution("future_4bar_return", "1h", provenance="trust_me")
+        lookahead_resolution("future_4bar_return", "1h", provenance=bogus)
+
+
+def test_lookahead_rename_attack_05_provenance_closed_set_is_exactly_two() -> None:
+    """封閉集合之字面本身受測——多一個值進來就會紅（防悄悄放寬）。"""
+    from momentum.Analysis.event_samples import lookahead_registry as lr
+
+    assert set(lr._PROVENANCE_KINDS) == {PROVENANCE_SYSTEM_GENERATED, PROVENANCE_EXTERNAL_UPLOAD}
+    # 集合內之兩值皆不得 raise（防「恆紅型假保證」）
+    for ok in (PROVENANCE_SYSTEM_GENERATED, PROVENANCE_EXTERNAL_UPLOAD):
+        lookahead_resolution("future_4bar_return", "1h", provenance=ok)

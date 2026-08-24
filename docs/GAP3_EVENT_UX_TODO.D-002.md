@@ -164,6 +164,75 @@ A-004 為 B1 交付邊界，依「殘留每條必帶為何現在不做」具名�
 - **發現者**：`CODEX-R2-P2-02`。
 - **mutation**：`4.2-M2`（所有 horizons 一律被擋）在新對照組下仍轉紅（已實跑重驗）。
 
+### A-010 — 🔴 前端守衛之驗收由「檢查原始碼長相」改為「檢查行為」（R3 三條合併）
+
+R3 三家各自實跑，證明 A-007／A-008 之 **AST 做法本身**擋不住四種壞法：
+
+| 壞法 | 提出方 | 舊 AST 為何綠 |
+|---|---|---|
+| 函式開頭插誘餌守衛 `if (isHorizonBelowLowerBound(999,1)) return;`，真守衛移到 `await` 之後 | `GROK-R3-P2-01` | ①②③ 判準都是「**第一個**命中之位移」，誘餌就是第一個 |
+| handler 之 `return` 換成 `(() => { return; })();` | `CODEX-R3-P2-02` | ② 只要求 then 子樹**任一** `ReturnStatement`，巢狀函式的也算 |
+| 把 `disabled` 綁定搬到別的 `<select>` 之 `<option>` | `CODEX-R3-P2-01` | ④ 掃**全檔**之 `<option>`，未錨定目標 `<select>` |
+
+⇒ **問題不在漏了哪一條斷言，而在「用原始碼形狀去證明執行期性質」這件事本身**：
+形狀有無限多種等價寫法，逐一列舉是黑名單，永遠列不完
+（同 `docs/SCAR_LEDGER.md`「文字問題用白名單機械卡」之判準）。
+
+**裁定：改設計，不是加檢查。**
+新增 `frontend/src/lib/lookaheadDepthLock.ts::withHorizonLowerBoundGuard(selected, lowerBound, {notify, proceed})`
+——**把整段匯出邏輯包進 `proceed`**。於是：
+
+- 「阻擋早於任何網路動作」**不再是需要檢查的性質**，而是**結構上保證**的事實
+  ：`proceed` 沒被呼叫，裡面的 `await` 就不可能發生。
+- 該性質因此可用**真正的行為測試**驗：`proceed` 呼叫次數 `== 0`（`lookaheadDepthLock.test.ts`）。
+- `page.tsx` 之 AST 測試（`lookaheadDepthLock.page.test.ts`）縮小為**只驗接線**：
+  ①委派恰一處（誘餌即紅）②引數逐字 ③**該函式內每一個 `await` 都落在 `proceed` 之內**
+  （由位移包含關係判定，不是先後順序）④`disabled` 綁定錨定到
+  `data-testid="export-gap3-horizon"` 之 `<select>` 子樹內、引數逐字。
+- **mutation**：`2.1b-M4`（守衛選值被架空）／`M6`（await 跑到守衛外）／`M7`（誘餌）／`M8`（綁定引數被換）
+  ——四條各自轉紅。
+
+### A-011 — 偵測器沒有負例：空集可以來自「沒漏」也可以來自「沒在看」
+
+- `CODEX-R3-P2-03`：`unregistered_future_columns` 只有「未登記集合 `== set()`」這個**正例**
+  ⇒ 把該函式直接 `return set()` 也全綠（實跑 14 passed）。
+- `GROK-R3-P2-02`：把過濾器由 `startswith("future")` 窄成 `startswith("future_")`
+  ⇒ 小時命名活欄（`future72_*`／`future24_*`）整批退出檢查範圍，`== set()` 仍成立
+  ⇒ 以**縮篩後之空集**冒充完整集合相等（實跑 16 passed）。
+- **修法**：新增 `…_01b`（五種未登記形態逐一須被抓到）、`…_01c`（無底線形態之定向負例，
+  並斷言實際欄集中確實存在該形態——否則負例只是打空氣）、`…_01d`（非 future 欄不得誤報）。
+- **mutation**：`1.10-M5`（偵測器掏空）、`1.10-M6`（過濾器窄化）。
+
+### A-012 — 參數面只取單一值：`N=4`、`provenance="trust_me"`
+
+- `CODEX-R3-P2-05`：CSV 標題形態只測 `N=4` ⇒ 正規化若只支援 `4bar` 仍全綠（實跑 14 passed）。
+  **修法**：`N ∈ {1,2,3,4,7,11,12}` × `{Return, Drawdown}` × 三形態全參數化，且每組同時驗 `1h`／`12h`。
+- `CODEX-R3-P2-04`：未知 provenance 只測 literal `"trust_me"` ⇒ 實作若寫成
+  `if provenance == "trust_me": raise`（只拒那一個字串）仍全綠（實跑 13 passed）。
+  **修法**：九個值參數化 ＋ 新增 `…_05` 對**封閉集合字面本身**斷言（悄悄放寬即紅），
+  並含兩個合法值之正例（防恆紅型假保證）。
+- **mutation**：`1.10-M7`（只支援 4bar）、`1.10-M8`（只拒一個字串）。
+
+### A-013 — 共用 traversal 使 baseline 側自我配對
+
+- `CODEX-R3-P2-06`：⑧(a) 之 `pre_names` 與 `now_names` 都由**同一支** `flatten_receipt_schema` 產生。
+  共用是 SPEC ⑧(e) 明訂的（validator 與驗收須同一函式參考），但副作用是：
+  list 分支若壞掉（改回 `[]`），兩側**一起**變形而自我配對，baseline 根本沒被驗到（實跑 16 passed）。
+- **修法**：新增 `…_08a2` —— baseline 側之**獨立 oracle**，不呼叫共用函式，
+  直接以 fixture 原始結構逐鍵展開後與共用 traversal 之輸出比對，並附三個字面錨點
+  （首欄名／`per_tf.row_id` 存在／改前不得有 `batch.` 前綴）。
+  ⑧(e) 之共用函式參考斷言**維持不變**——兩者不衝突：一個驗「同一支」，一個驗「那一支是對的」。
+- **mutation**：`1.1-M7`（list 分支掏空）。
+
+### A-014 — 文案斷言以子字串代替逐字
+
+- `COMPOSER-R3-P2-01`／`GROK-R3-P3-01`（同一處，兩家各以不同壞法命中）：
+  `expect(msg).toContain('7')` ⇒ 把 `horizonLowerBoundMessage` 改成硬編碼「17 根」
+  或改成 `return String(lowerBound)`，兩者都仍全綠（「17」含子字串「7」）。
+- **修法**：**逐字**比對整串期望文案；另加「不同下界須得不同字串」（防硬編碼／忽略參數）；
+  「不得含『label 正確』」維持。
+- **mutation**：`2.1b-M9`（文案硬編碼忽略參數）。
+
 ## 修訂索引
 
 | 編號 | 標的 | 一句話 | 日期 |
@@ -176,6 +245,11 @@ A-004 為 B1 交付邊界，依「殘留每條必帶為何現在不做」具名�
 | **A-007** | Task 2.1b 前端測試 | vitest 測的是雙胞不是 page；改用 TypeScript AST 鎖真實呼叫點 | 2026-08-24 |
 | **A-008** | AST 測試 ④ | 用呼叫次數代替綁定 ⇒ 刪 `<option disabled>` 仍綠；改鎖屬性本身與引數字面 | 2026-08-24 |
 | **A-009** | §G S-9 ⑦ 對照組 | 把 CPython 例外型別／訊息當控制流契約；改用自訂哨兵 probe | 2026-08-24 |
+| **A-010** | Task 2.1b 前端 | 🔴 用原始碼形狀證明執行期性質＝黑名單，永遠列不完；改設計把匯出包進 `proceed`，性質變成結構保證、可行為測試 | 2026-08-24 |
+| **A-011** | Task 1.10 偵測器 | 只有正例 ⇒ 掏空／窄化過濾器皆全綠；補負例與過濾面斷言 | 2026-08-24 |
+| **A-012** | Task 1.10 參數面 | CSV 形態只測 N=4、未知 provenance 只測一個字串；改全參數化＋封閉集合字面斷言 | 2026-08-24 |
+| **A-013** | Task 1.1 ⑧(a) | 共用 traversal 使 baseline 側自我配對；補獨立 oracle（不與 ⑧(e) 衝突） | 2026-08-24 |
+| **A-014** | Task 2.1b 文案 | `toContain` 子字串 ⇒「17」含「7」；改逐字＋不同下界須不同字串 | 2026-08-24 |
 
 ## 戳記
 

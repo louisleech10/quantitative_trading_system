@@ -76,6 +76,45 @@ def test_lookahead_registry_complete_01_no_unregistered_future_columns(actual_co
     assert len(actual_columns) > 0  # 防「空清單當全綠」
 
 
+# ── 🔴 負例：偵測器本身要抓得到東西（CODEX-R3-P2-03） ──────────────────────
+# 舊版只有「未登記集合 == set()」這個正例 ⇒ 把 unregistered_future_columns 直接 `return set()`
+# 也會全綠（codex 實跑 14 passed）。空集合可以來自「真的沒漏」，也可以來自「根本沒在看」。
+@pytest.mark.parametrize(
+    "bogus",
+    [
+        "future_999bar_return",      # 蛇形 bar 命名，但 999 未登記
+        "future_999bar_max_drawdown",
+        "future999_close_return",    # 小時形，未登記
+        "futureXYZ",                 # 無數字
+        "Future_999Bar_Return_%",    # CSV 標題形
+    ],
+)
+def test_lookahead_registry_complete_01b_detector_catches_unregistered(bogus, registry) -> None:
+    assert unregistered_future_columns([bogus], registry) == {bogus}
+
+
+# ── 🔴 過濾器不得被窄化（GROK-R3-P2-02） ───────────────────────────────────
+# 把 `startswith("future")` 窄成 `startswith("future_")`，小時命名活欄（future72_* 等）
+# 就整批退出檢查範圍，「未登記 == set()」仍成立 ⇒ 以縮篩後之空集冒充完整集合相等。
+def test_lookahead_registry_complete_01c_filter_covers_no_underscore_forms(registry) -> None:
+    # 這些形態**沒有**底線，窄化過濾器會漏掉它們
+    assert unregistered_future_columns(["future72_not_registered"], registry) == {
+        "future72_not_registered"
+    }
+    assert unregistered_future_columns(["future24_not_registered"], registry) == {
+        "future24_not_registered"
+    }
+    # 且實際欄集裡確實存在無底線形態——否則上面兩條只是打空氣
+    with open(_FIXTURE, "r", encoding="utf-8") as f:
+        cols = json.load(f)["columns"]
+    assert any(c.startswith("future") and not c.startswith("future_") for c in cols)
+
+
+# ── 非 future 欄不得被誤報（防「恆非空型假保證」） ──────────────────────────
+def test_lookahead_registry_complete_01d_non_future_columns_ignored(registry) -> None:
+    assert unregistered_future_columns(["close", "volume", "past_3day_direction"], registry) == set()
+
+
 # ── ① 兩套命名之單位與換算 ────────────────────────────────────────────────
 def test_lookahead_registry_complete_02_units_and_conversion(cols, registry) -> None:
     assert cols["future_4bar_max_drawdown"]["lookahead_bars"] == 4
@@ -101,17 +140,17 @@ def test_lookahead_registry_complete_03_bar_named_depth_equals_n(actual_columns,
 
 
 # ── ③ 三形態辨識（契約蛇形／CSV 標題形／全大寫） ───────────────────────────
-@pytest.mark.parametrize(
-    "form",
-    ["Future_4Bar_Return_%", "future_4bar_return", "FUTURE_4BAR_RETURN"],
-)
-def test_lookahead_registry_complete_04_three_header_forms(form, registry) -> None:
-    assert resolve_lookahead_bars(form, "1h", registry) == 4
-
-
-def test_lookahead_registry_complete_04b_csv_drawdown_alias(registry) -> None:
-    # CSV 標題是 Future_4Bar_Drawdown_%，契約蛇形是 future_4bar_max_drawdown（少了 max）
-    assert resolve_lookahead_bars("Future_4Bar_Drawdown_%", "1h", registry) == 4
+# 🔴 CODEX-R3-P2-05：舊版只用 N=4 ⇒ 正規化若只支援 `4bar` 之壞法仍全綠（codex 實跑 14 passed）。
+#    改為 N 逐值參數化 × return／drawdown × 三形態，讓「只支援某一個 N」立刻現形。
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 7, 11, 12])
+@pytest.mark.parametrize("kind", ["Return", "Drawdown"])
+def test_lookahead_registry_complete_04_header_forms(n, kind, registry) -> None:
+    snake = f"future_{n}bar_{'return' if kind == 'Return' else 'max_drawdown'}"
+    csv_header = f"Future_{n}Bar_{kind}_%"
+    upper = snake.upper()
+    for form in (snake, csv_header, upper):
+        assert resolve_lookahead_bars(form, "1h", registry) == n, form
+        assert resolve_lookahead_bars(form, "12h", registry) == n, form
 
 
 # ── ④ registry 內容正確性：以 **producer 實際算式** 逐欄對證分類與深度 ───────

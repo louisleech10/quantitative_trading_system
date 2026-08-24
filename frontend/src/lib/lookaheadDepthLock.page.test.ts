@@ -1,15 +1,17 @@
 /**
- * GAP-3 UX Task 2.1b — **真實呼叫點**之覆蓋（GROK-R1-P2-01 之修法）。
+ * GAP-3 UX Task 2.1b — page 之**接線**檢查（不是行為檢查）。
  *
- * 出事情境：`lookaheadDepthLock.test.ts` 用的是自建之 `exportGuarded` 雙胞，
- * 註解寫「與 search/page.tsx 同一形態」卻**不 import page** ⇒ 把 page 的守衛整段刪掉，
- * 那份測試仍然 7 passed。這與本 epic 犯過四次之「比對範圍過寬」同族：
- * 錨點落在**像目標的東西**上，不是目標本身。
+ * 分工（R3 重寫後）：
+ *  - **行為**由 `lookaheadDepthLock.test.ts` 驗——它測 page 實際呼叫的
+ *    `withHorizonLowerBoundGuard`，用 `proceed` 呼叫次數證明「未達下界 ⇒ 網路動作不發生」。
+ *  - **本檔只驗一件事**：`page.tsx` 真的把整段匯出**委派**給那個守衛，而不是自己另寫一份。
  *
- * 本檔以 **TypeScript AST**（非 grep）鎖住真正的呼叫點：
- *   ① `exportSearchResultsToEventJson` 內確實呼叫 `isHorizonBelowLowerBound`
- *   ② 該呼叫位於一個帶 `return` 的 `if` 內（是守衛，不是純顯示）
- *   ③ 該守衛出現在該函式**第一個 `await` 之前**（阻擋須早於任何網路動作）
+ * 🔴 為什麼上一版不夠（R3 三條）：舊版用「第一個命中之位移」與「子樹裡任一個 return」當判準
+ *    ⇒ 誘餌守衛（`if (isHorizonBelowLowerBound(999,1)) return;` 放開頭）、
+ *      巢狀 `(() => { return; })()`、把真守衛移到 `await` 之後、
+ *      把 `disabled` 綁到別的 `<select>` 之 `<option>`——四種壞法都能讓它全綠。
+ *    現版改為**結構包含關係**：整段匯出被包進 `proceed`，
+ *    所以「阻擋早於網路動作」不再靠先後位移判斷，而是靠「所有 await 都在 proceed 之內」。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,110 +19,137 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const PAGE = path.resolve(__dirname, '../app/search/page.tsx');
-const GUARD_FN = 'isHorizonBelowLowerBound';
+const GUARD_FN = 'withHorizonLowerBoundGuard';
+const PREDICATE_FN = 'isHorizonBelowLowerBound';
 const EXPORT_FN = 'exportSearchResultsToEventJson';
+const HORIZON_SELECT_TESTID = 'export-gap3-horizon';
 
-function exportHandlerBody(): { node: ts.Node; source: ts.SourceFile } {
+function parsePage(): ts.SourceFile {
   const text = fs.readFileSync(PAGE, 'utf8');
-  const source = ts.createSourceFile(PAGE, text, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX);
+  return ts.createSourceFile(PAGE, text, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX);
+}
 
+function findNode(root: ts.Node, predicate: (n: ts.Node) => boolean): ts.Node | undefined {
   let found: ts.Node | undefined;
   const visit = (n: ts.Node): void => {
-    if (
-      ts.isVariableDeclaration(n) &&
-      ts.isIdentifier(n.name) &&
-      n.name.text === EXPORT_FN &&
-      n.initializer
-    ) {
-      found = n.initializer;
+    if (found) return;
+    if (predicate(n)) {
+      found = n;
       return;
     }
     ts.forEachChild(n, visit);
   };
-  visit(source);
-  if (!found) throw new Error(`在 ${PAGE} 找不到 ${EXPORT_FN}（字面錨點失效，不是通過）`);
-  return { node: found, source };
+  visit(root);
+  return found;
 }
 
-/** 回傳該節點子樹中，符合 predicate 之第一個節點的起始位移（找不到回 -1）。 */
-function firstOffset(root: ts.Node, predicate: (n: ts.Node) => boolean): number {
-  let best = -1;
+function collect(root: ts.Node, predicate: (n: ts.Node) => boolean): ts.Node[] {
+  const out: ts.Node[] = [];
   const visit = (n: ts.Node): void => {
-    if (predicate(n)) {
-      const start = n.getStart();
-      if (best === -1 || start < best) best = start;
-    }
+    if (predicate(n)) out.push(n);
     ts.forEachChild(n, visit);
   };
   visit(root);
-  return best;
+  return out;
 }
 
-const isGuardCall = (n: ts.Node): boolean =>
+function exportHandler(source: ts.SourceFile): ts.Node {
+  const decl = findNode(
+    source,
+    (n) =>
+      ts.isVariableDeclaration(n) &&
+      ts.isIdentifier(n.name) &&
+      n.name.text === EXPORT_FN &&
+      !!n.initializer,
+  ) as ts.VariableDeclaration | undefined;
+  if (!decl?.initializer) throw new Error(`找不到 ${EXPORT_FN}（字面錨點失效，不是通過）`);
+  return decl.initializer;
+}
+
+const isGuardCall = (n: ts.Node): n is ts.CallExpression =>
   ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === GUARD_FN;
 
-describe('gap3 lookahead depth lock — search/page.tsx 真實呼叫點', () => {
-  it('① 匯出處理器內確實呼叫守衛函式', () => {
-    const { node } = exportHandlerBody();
-    expect(firstOffset(node, isGuardCall)).toBeGreaterThan(-1);
+/** 取 guard 呼叫之第三引數（deps 物件字面）中 `proceed` 的值節點。 */
+function proceedArg(call: ts.CallExpression): ts.Node {
+  const deps = call.arguments[2];
+  if (!deps || !ts.isObjectLiteralExpression(deps)) throw new Error('guard 之第三引數不是物件字面');
+  const prop = deps.properties.find(
+    (p) => ts.isPropertyAssignment(p) && p.name.getText() === 'proceed',
+  ) as ts.PropertyAssignment | undefined;
+  if (!prop) throw new Error('deps 缺 proceed');
+  return prop.initializer;
+}
+
+describe('gap3 lookahead depth lock — search/page.tsx 接線', () => {
+  it('① 匯出處理器把工作委派給守衛，且**恰一處**（誘餌會被這條抓到）', () => {
+    const handler = exportHandler(parsePage());
+    const calls = collect(handler, isGuardCall) as ts.CallExpression[];
+    expect(calls.length).toBe(1);
   });
 
-  it('② 該呼叫位於帶 return 的 if 內（是守衛，不只是顯示）', () => {
-    const { node } = exportHandlerBody();
-    const guardingIf = firstOffset(
-      node,
-      (n) =>
-        ts.isIfStatement(n) &&
-        firstOffset(n.expression, isGuardCall) > -1 &&
-        firstOffset(n.thenStatement, (m) => ts.isReturnStatement(m)) > -1,
-    );
-    expect(guardingIf).toBeGreaterThan(-1);
+  it('② 守衛之引數逐字為 (eventHorizonBars, lookaheadLowerBound, {notify, proceed})', () => {
+    const handler = exportHandler(parsePage());
+    const call = (collect(handler, isGuardCall) as ts.CallExpression[])[0];
+    expect(call.arguments.slice(0, 2).map((a) => a.getText())).toEqual([
+      'eventHorizonBars',
+      'lookaheadLowerBound',
+    ]);
+    const deps = call.arguments[2] as ts.ObjectLiteralExpression;
+    expect(deps.properties.map((p) => p.name?.getText()).sort()).toEqual(['notify', 'proceed']);
   });
 
-  it('③ 守衛出現在第一個 await 之前（阻擋早於任何網路動作）', () => {
-    const { node } = exportHandlerBody();
-    const guardAt = firstOffset(node, isGuardCall);
-    const awaitAt = firstOffset(node, (n) => ts.isAwaitExpression(n));
-    expect(guardAt).toBeGreaterThan(-1);
-    expect(awaitAt).toBeGreaterThan(-1); // 該函式本來就有 await；沒有代表錨點抓錯
-    expect(guardAt).toBeLessThan(awaitAt);
+  it('③ 該函式內**每一個** await 都落在 proceed 之內（阻擋早於網路動作＝結構保證）', () => {
+    const handler = exportHandler(parsePage());
+    const call = (collect(handler, isGuardCall) as ts.CallExpression[])[0];
+    const proceed = proceedArg(call);
+    const [pStart, pEnd] = [proceed.getStart(), proceed.getEnd()];
+
+    const awaits = collect(handler, (n) => ts.isAwaitExpression(n));
+    expect(awaits.length).toBeGreaterThan(0); // 該函式本來就有 await；沒有代表錨點抓錯
+    for (const a of awaits) {
+      expect(a.getStart()).toBeGreaterThanOrEqual(pStart);
+      expect(a.getEnd()).toBeLessThanOrEqual(pEnd);
+    }
   });
 
-  it('④ 答案窗選單之 <option disabled> 由同一函式綁定（不是計數，是綁定）', () => {
-    // 🔴 CODEX-R2-P2-01：原寫法只數 `isHorizonBelowLowerBound` 之呼叫次數（`calls >= 2`）
-    //    ⇒ 把 <option> 之 disabled 綁定整個刪掉，次數仍達標、測試照樣綠（codex 實跑 rc=0）。
-    //    計數不是綁定——這又是一次「比對範圍過寬」。改為在 AST 上鎖住那個屬性本身。
-    const text = fs.readFileSync(PAGE, 'utf8');
-    const source = ts.createSourceFile(PAGE, text, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX);
+  it('④ 答案窗那個 <select> 之 <option disabled> 由同一判定函式綁定（錨定到該 select，不是任一 select）', () => {
+    // 🔴 CODEX-R3-P2-01：舊版掃全檔之 <option>，把同形綁定搬到別的選單也會綠。
+    const source = parsePage();
+    const select = findNode(source, (n) => {
+      if (!ts.isJsxOpeningElement(n) && !ts.isJsxSelfClosingElement(n)) return false;
+      if ((n as ts.JsxOpeningElement).tagName.getText() !== 'select') return false;
+      return (n as ts.JsxOpeningElement).attributes.properties.some(
+        (attr) =>
+          ts.isJsxAttribute(attr) &&
+          attr.name.getText() === 'data-testid' &&
+          attr.initializer !== undefined &&
+          attr.initializer.getText().includes(HORIZON_SELECT_TESTID),
+      );
+    });
+    expect(select, `找不到 data-testid=${HORIZON_SELECT_TESTID} 之 select`).toBeDefined();
 
-    const optionDisabledBindings: ts.JsxAttribute[] = [];
-    const visit = (n: ts.Node): void => {
-      if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
-        const tag = n.tagName.getText();
-        if (tag === 'option') {
-          for (const attr of n.attributes.properties) {
-            if (
-              ts.isJsxAttribute(attr) &&
-              attr.name.getText() === 'disabled' &&
-              attr.initializer &&
-              ts.isJsxExpression(attr.initializer) &&
-              attr.initializer.expression &&
-              isGuardCall(attr.initializer.expression)
-            ) {
-              optionDisabledBindings.push(attr);
-            }
-          }
-        }
-      }
-      ts.forEachChild(n, visit);
-    };
-    visit(source);
+    // 該 select 元素（含子樹）＝其 JsxElement 父節點
+    const element = select!.parent;
+    const bindings = collect(element, (n) => {
+      if (!ts.isJsxAttribute(n) || n.name.getText() !== 'disabled') return false;
+      const owner = n.parent.parent;
+      const tag =
+        ts.isJsxOpeningElement(owner) || ts.isJsxSelfClosingElement(owner)
+          ? owner.tagName.getText()
+          : '';
+      if (tag !== 'option') return false;
+      return (
+        !!n.initializer &&
+        ts.isJsxExpression(n.initializer) &&
+        !!n.initializer.expression &&
+        ts.isCallExpression(n.initializer.expression) &&
+        ts.isIdentifier(n.initializer.expression.expression) &&
+        n.initializer.expression.expression.text === PREDICATE_FN
+      );
+    }) as ts.JsxAttribute[];
 
-    expect(optionDisabledBindings.length).toBe(1);
-
-    // 兩個引數也要對：選項自己的根數，以及導出下界。任一被換掉即紅。
-    const call = (optionDisabledBindings[0].initializer as ts.JsxExpression)
-      .expression as ts.CallExpression;
+    expect(bindings.length).toBe(1);
+    const call = (bindings[0].initializer as ts.JsxExpression).expression as ts.CallExpression;
     expect(call.arguments.map((a) => a.getText())).toEqual(['h', 'lookaheadLowerBound']);
   });
 });

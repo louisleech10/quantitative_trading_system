@@ -177,7 +177,7 @@
         "test_lookahead_registry_complete_01_no_unregistered_future_columns",
         "test_lookahead_registry_complete_02_units_and_conversion",
         "test_lookahead_registry_complete_03_bar_named_depth_equals_n",
-        "test_lookahead_registry_complete_04b_csv_drawdown_alias"
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-4]"
       ],
       "restored_rc": 0,
       "restored_failed": [],
@@ -185,7 +185,7 @@
         "test_lookahead_registry_complete_01_no_unregistered_future_columns",
         "test_lookahead_registry_complete_02_units_and_conversion",
         "test_lookahead_registry_complete_03_bar_named_depth_equals_n",
-        "test_lookahead_registry_complete_04b_csv_drawdown_alias"
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-4]"
       ],
       "verdict": "PASS"
     },
@@ -344,7 +344,7 @@
     {
       "id": "2.1b-M4",
       "task": "2.1b",
-      "desc": "刪掉 page.tsx 之匯出守衛（GROK-R1-P2-01 呼叫點鎖）",
+      "desc": "守衛之選值被架空（GROK-R1-P2-01 呼叫點鎖；R3 重構後改形）",
       "selector": [
         "VITEST",
         "src/lib/lookaheadDepthLock.page.test.ts"
@@ -353,16 +353,12 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
-        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ① 匯出處理器內確實呼叫守衛函式",
-        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ② 該呼叫位於帶 return 的 if 內（是守衛，不只是顯示）",
-        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ③ 守衛出現在第一個 await 之前（阻擋早於任何網路動作）"
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ② 守衛之引數逐字為 (eventHorizonBars, lookaheadLowerBound, {notify, proceed})"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
-        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ① 匯出處理器內確實呼叫守衛函式",
-        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ② 該呼叫位於帶 return 的 if 內（是守衛，不只是顯示）",
-        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ③ 守衛出現在第一個 await 之前（阻擋早於任何網路動作）"
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ② 守衛之引數逐字為 (eventHorizonBars, lookaheadLowerBound, {notify, proceed})"
       ],
       "verdict": "PASS"
     },
@@ -378,12 +374,262 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
-        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ④ 答案窗選單之 <option disabled> 由同一函式綁定（不是計數，是綁定）"
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ④ 答案窗那個 <select> 之 <option disabled> 由同一判定函式綁定（錨定到該 select，不是任一 select）"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
-        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ④ 答案窗選單之 <option disabled> 由同一函式綁定（不是計數，是綁定）"
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ④ 答案窗那個 <select> 之 <option disabled> 由同一判定函式綁定（錨定到該 select，不是任一 select）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.10-M5",
+      "task": "1.10",
+      "desc": "偵測器直接回空集合（CODEX-R3-P2-03）",
+      "selector": [
+        "tests/momentum/event_samples/",
+        "-k",
+        "lookahead_registry_complete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[Future_999Bar_Return_%]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[future999_close_return]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[futureXYZ]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[future_999bar_max_drawdown]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[future_999bar_return]",
+        "test_lookahead_registry_complete_01c_filter_covers_no_underscore_forms"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[Future_999Bar_Return_%]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[future999_close_return]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[futureXYZ]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[future_999bar_max_drawdown]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[future_999bar_return]",
+        "test_lookahead_registry_complete_01c_filter_covers_no_underscore_forms"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.10-M6",
+      "task": "1.10",
+      "desc": "過濾器窄化成 future_（GROK-R3-P2-02）",
+      "selector": [
+        "tests/momentum/event_samples/",
+        "-k",
+        "lookahead_registry_complete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[future999_close_return]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[futureXYZ]",
+        "test_lookahead_registry_complete_01c_filter_covers_no_underscore_forms"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[future999_close_return]",
+        "test_lookahead_registry_complete_01b_detector_catches_unregistered[futureXYZ]",
+        "test_lookahead_registry_complete_01c_filter_covers_no_underscore_forms"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.10-M7",
+      "task": "1.10",
+      "desc": "正規化只支援 4bar（CODEX-R3-P2-05）",
+      "selector": [
+        "tests/momentum/event_samples/",
+        "-k",
+        "lookahead_registry_complete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-11]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-12]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-1]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-2]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-3]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-7]",
+        "test_lookahead_registry_complete_04_header_forms[Return-11]",
+        "test_lookahead_registry_complete_04_header_forms[Return-12]",
+        "test_lookahead_registry_complete_04_header_forms[Return-1]",
+        "test_lookahead_registry_complete_04_header_forms[Return-2]",
+        "test_lookahead_registry_complete_04_header_forms[Return-3]",
+        "test_lookahead_registry_complete_04_header_forms[Return-7]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-11]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-12]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-1]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-2]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-3]",
+        "test_lookahead_registry_complete_04_header_forms[Drawdown-7]",
+        "test_lookahead_registry_complete_04_header_forms[Return-11]",
+        "test_lookahead_registry_complete_04_header_forms[Return-12]",
+        "test_lookahead_registry_complete_04_header_forms[Return-1]",
+        "test_lookahead_registry_complete_04_header_forms[Return-2]",
+        "test_lookahead_registry_complete_04_header_forms[Return-3]",
+        "test_lookahead_registry_complete_04_header_forms[Return-7]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.10-M8",
+      "task": "1.10",
+      "desc": "只拒 literal trust_me（CODEX-R3-P2-04）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "lookahead_rename_attack"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[0]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[None]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[SYSTEM_GENERATED]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[external]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[internal]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[system-generated]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[user]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[0]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[None]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[SYSTEM_GENERATED]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[external]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[internal]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[system-generated]",
+        "test_lookahead_rename_attack_04_unknown_provenance_fail_closed[user]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.1-M7",
+      "task": "1.1",
+      "desc": "共用 traversal 之 list 分支掏空（CODEX-R3-P2-06）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_08a2_baseline_side_has_independent_oracle"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_08a2_baseline_side_has_independent_oracle"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M6",
+      "task": "2.1b",
+      "desc": "await 跑到守衛之外（GROK-R3-P2-01）",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.page.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ③ 該函式內**每一個** await 都落在 proceed 之內（阻擋早於網路動作＝結構保證）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ③ 該函式內**每一個** await 都落在 proceed 之內（阻擋早於網路動作＝結構保證）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M7",
+      "task": "2.1b",
+      "desc": "多一處誘餌守衛呼叫",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.page.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ① 匯出處理器把工作委派給守衛，且**恰一處**（誘餌會被這條抓到）",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ② 守衛之引數逐字為 (eventHorizonBars, lookaheadLowerBound, {notify, proceed})",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ③ 該函式內**每一個** await 都落在 proceed 之內（阻擋早於網路動作＝結構保證）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ① 匯出處理器把工作委派給守衛，且**恰一處**（誘餌會被這條抓到）",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ② 守衛之引數逐字為 (eventHorizonBars, lookaheadLowerBound, {notify, proceed})",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ③ 該函式內**每一個** await 都落在 proceed 之內（阻擋早於網路動作＝結構保證）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M8",
+      "task": "2.1b",
+      "desc": "option disabled 引數被換掉（CODEX-R3-P2-01）",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.page.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ④ 答案窗那個 <select> 之 <option disabled> 由同一判定函式綁定（錨定到該 select，不是任一 select）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ④ 答案窗那個 <select> 之 <option disabled> 由同一判定函式綁定（錨定到該 select，不是任一 select）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M9",
+      "task": "2.1b",
+      "desc": "阻擋文案硬編碼忽略參數（COMPOSER-R3-P2-01／GROK-R3-P3-01）",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — 阻擋文案 > 不同下界 ⇒ 不同文案（防硬編碼／忽略參數）",
+        "gap3 lookahead depth lock — 阻擋文案 > 文案逐字相等（不是「含有那個數字」）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — 阻擋文案 > 不同下界 ⇒ 不同文案（防硬編碼／忽略參數）",
+        "gap3 lookahead depth lock — 阻擋文案 > 文案逐字相等（不是「含有那個數字」）"
       ],
       "verdict": "PASS"
     },

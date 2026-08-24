@@ -8,7 +8,7 @@ void formatTimestamp;
 import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart, MarketClassPieChart, DifficultyPieChart } from '@/components/ui/PieChart';
 import { useSearchStore } from '@/store/searchStore';
 import { PriceChangeMethod, CaseData } from '@/lib/types';
-import { isHorizonBelowLowerBound, horizonLowerBoundMessage } from '@/lib/lookaheadDepthLock';
+import { isHorizonBelowLowerBound, withHorizonLowerBoundGuard } from '@/lib/lookaheadDepthLock';
 
 
 
@@ -509,12 +509,12 @@ export default function SearchPage() {
       alert('沒有搜索結果可以匯出');
       return;
     }
-    // GAP-3 UX Task 2.1b：答案窗不得低於導出下界——阻擋須在任何網路動作**之前**
-    // （驗收①：嘗試設低於下界 ⇒ fetch call count == 0）。
-    if (isHorizonBelowLowerBound(eventHorizonBars, lookaheadLowerBound)) {
-      alert(horizonLowerBoundMessage(lookaheadLowerBound as number));
-      return;
-    }
+    // GAP-3 UX Task 2.1b：答案窗不得低於導出下界。
+    // 🔴 整段匯出邏輯**包在 proceed 內**——「阻擋早於任何網路動作」因此是結構上保證的事實，
+    //    不是需要用原始碼形狀去檢查的性質（GROK-R3-P2-01 等三條之修法）。
+    return withHorizonLowerBoundGuard(eventHorizonBars, lookaheadLowerBound, {
+      notify: alert,
+      proceed: async () => {
     const { buildEventContractRecords } = await import('@/lib/eventExport');
     // 規則摘要（G3：條件自動存；值單位同 UI：% 與倍數）
     const ruleConditions = [
@@ -558,6 +558,8 @@ export default function SearchPage() {
     download(JSON.stringify(payload, null, 2), `gap3_events_${stamp}.json`, 'application/json;charset=utf-8;');
     // 同時下載「來源檔」：其 sha256 === 每列 source_file_digest；匯入時放 source_file 欄即可通過 verify
     download(payload.source_file_text, `gap3_events_${stamp}.source.json`, 'application/json;charset=utf-8;');
+      },
+    });
   };
 
   // CSV導出函數

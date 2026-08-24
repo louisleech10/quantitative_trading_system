@@ -115,6 +115,32 @@ def test_gap3_contract_reason_registry_08a_flatten_prefix_preserved(pre: dict, n
     assert len(now_names) > len(pre_names)
 
 
+def test_gap3_contract_reason_registry_08a2_baseline_side_has_independent_oracle(pre: dict) -> None:
+    """🔴 CODEX-R3-P2-06：⑧(a) 兩側都由**同一支** `flatten_receipt_schema` 產生。
+
+    共用 traversal 是 SPEC ⑧(e) 要求的（validator 與驗收須同一函式參考），但它有個副作用：
+    若 list 分支壞掉（例如回空），`pre_names` 與 `now_names` 會**一起**變形而自我配對，
+    baseline 根本沒被驗到（codex 實跑：把 list 分支改回 `[]` 後仍 16 passed）。
+
+    ⇒ 本條為 **baseline 側之獨立 oracle**：不呼叫 `flatten_receipt_schema`，
+    直接以 fixture 之原始結構逐鍵展開，再與共用 traversal 之輸出比對。
+    兩者不一致即紅——共用 traversal 壞掉時，本條會抓到。
+    """
+    schema = pre["receipt_schema"]
+    independent = []
+    for ns, fields in schema.items():
+        assert isinstance(fields, list), f"baseline 之 {ns} 應為欄名 list（改前形態）"
+        for name in fields:
+            independent.append(f"{ns}.{name}")
+
+    assert independent == flatten_receipt_schema(schema)
+    assert len(independent) > 0  # 防「兩邊都空也算相等」
+    # 幾個 baseline 欄名之字面錨點（改前語意；fixture 被動過即紅）
+    assert independent[0] == "event_level.event_id"
+    assert "per_tf.row_id" in independent
+    assert not any(n.startswith("batch.") for n in independent)
+
+
 # ── ⑧(b) 每個 namespace 為 {欄名: 型別}（非 list）；batch 兩欄之型別字面 ────
 def test_gap3_contract_reason_registry_08b_namespaces_are_typed_dicts(now: dict) -> None:
     schema = now["receipt_schema"]
