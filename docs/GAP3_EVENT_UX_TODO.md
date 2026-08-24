@@ -80,17 +80,25 @@ Retryable：rate_limit／timeout；Non-retryable：invalid_symbol／logic／data
 |---|---|---|---|---|
 | **B1 契約與深度根基** | 1.1、1.10 | 無 | 兩者皆為**唯讀增量之根**：1.1 定 reason／derived 欄／typed receipt schema，1.10 定 lookahead registry。後續每個 Phase 都讀它們；先落地才能讓其餘 Task 的 fail-closed 有依據 | 中 |
 | **B2 CSV 匯入主線** | 1.2、1.3、1.4、1.8 | B1 | 同一端點之解析鏈（收檔→digest→單位→異質列），共用同一 schema 檢核函式；拆開會讓 V-3 之共用性 oracle 無法一次驗 | 中 |
-| **B3 深度三層防線** | 1.11、1.12、1.9 | B1、B2 | L2（強制宣告）→L3（禁進切分）→L2 之 UI（答案窗宣告）為同一條 D-7 防線，且 1.9 明文依賴 1.10／1.11 | 大 |
+| **B3 深度三層防線** | 1.11、1.12、1.9 | B1、B2、**Task 2.1b**（🔴 CODEX-R2-P1-04：1.9 呼叫 `depth_by_timeframe`，該 helper 由 **Task 2.1b** 建立）| L2（強制宣告）→L3（禁進切分）→L2 之 UI（答案窗宣告）為同一條 D-7 防線，且 1.9 明文依賴 1.10／1.11 | 大 |
 | **B4 匯入前端** | 1.5、1.6、1.7 | B2 | 同一頁面之上傳／預覽／對映／provenance／可疑欄警示，共用同一 React 元件樹 | 中 |
 | **B5 匯出前篩選** | Phase 2 全部 | B1 | 見 Part 2 | — |
 | **B6 刪除** | Phase 3 全部 | 無 | 見 Part 2 | — |
-| **B7 匯出端報酬欄** | Phase 4 全部 | B1 | 見 Part 2 | — |
+| **B7 匯出端報酬欄** | Phase 4 全部 | B1、**Task 2.1b**（🔴 Task 4.1 亦消費 `depth_by_timeframe`）| 見 Part 2 | — |
 | **B8 訊息與表頭** | Phase 5 全部 | Task 5.0（同批內最先做） | 見 Part 2 | — |
 | **B9 IC 止血閘** | Phase 6 全部 | Task 6.0（同批內最先做） | 見 Part 2 | — |
 | **B10 全棧接線** | Phase 7 全部 | B1–B9 | 見 Part 2；🔴 **批內強制順序**：`7.0 → 7.1 → 7.2`；且 **7.6 之 formatter registry 須先於 7.3**（7.3 只選取自己的欄集，registry 由 7.6 定義）；`4.2 → 7.5`（同一表格）；`4.1b → 7.3`（後者取代前者，取代前須逐項比對 4.1b ⊆ 7.3） | — |
 
 🔴 **批次間 Gate**：下一批開工前，上一批之**全部 mutation 須實跑轉紅並還原轉綠**，
 receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
+
+🔴 **跨批單點依賴（R2 補；CODEX-R2-P1-04＋GROK-R2-P1-04）**——下列兩個產物被**多批**消費，
+其**建立 Task 必須先做**，不得因批次編號較後而延後：
+| 產物 | 唯一建立 Task | 消費者 | 處置 |
+|---|---|---|---|
+| `depth_by_timeframe()`（唯一深度函式） | **Task 2.1b**（B5） | Task 1.9（B3）、Task 4.1（B7） | 🔴 **Task 2.1b 提前至 B1 一併做**；B5 其餘 Task 不變 |
+| `canonical_serialize.py`（§G S-9 參考實作） | **Task 4.2**（B7） | Task 1.3（B2）、Task 7.5（B10） | 🔴 **Task 4.2 之 S-9 建立部分提前至 B1**；其 horizon 曲線部分留 B7 |
+⇒ **B1 之實際內容為：Task 1.1、1.10、2.1b、4.2（僅 S-9 參考實作部分）**。
 
 ---
 
@@ -178,7 +186,10 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **風險緩解**：RISK-(b)——共用性由 V-3 **兩重 oracle**（AST 靜態＋mutation 行為）機械對證，
   不靠 sha256 相等。
 - **驗證**：`pytest tests/api -q -k gap3_csv_import` **≥8 條**全綠；
-  共用性見 V-3（SPEC L3428）。
+  共用性見 V-3（SPEC L3428）之**兩重 oracle**（AST 靜態＋行為 mutation）。
+  🔴 **mutation（V-M）**：為 CSV 路徑另寫一份 schema 檢核函式（即不再共用）
+  ⇒ V-3 之行為 oracle 須**只有一條路徑轉紅**（若兩條同時紅代表仍共用，測試無效）；
+  還原後兩條皆綠。receipt 入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**——Phase 4 疊加 horizon 欄，端點簽章不變。
 ### Task 1.3 — `event_id` 沿用既有 canonical（D-2）（`票 #3-5`）
@@ -207,7 +218,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   - `frontend/src/lib/eventExport.ts`：`canonicalSourceText`（改為呼叫後端取得，不自算）
   - 既有匯出服務端入口（`api/routes/export.py` 或 case 匯出鏈之對應 handler）：回應增兩鍵
   - `momentum/Analysis/event_samples/import_contract.py`：新增 `verify_source_digest()`
-  - S-9 參考實作模組（依 SPEC §G S-9 所指位置）
+  - 🔴 S-9 參考實作＝`momentum/Analysis/event_samples/canonical_serialize.py::canonical_event_table_bytes()`——**其建立屬 Task 4.2**，依 §B 之跨批單點依賴表**已提前至 B1**；本 Task（B2）開工時該檔**必須已存在**，不存在即停批（GROK-R2-P1-04）
   - **既有 caller**：`frontend/src/app/search/page.tsx`（匯出按鈕鏈）
 - **不可做**：🔴 **不得發明新的 `event_id` 演算法**；前端**不得**自行計算 `source_file_digest`；
   不得新增第二個 transport／route。
@@ -251,7 +262,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **邊界**：① `1704067200`（秒）⇒ `== 1704067200000`。
   ② 落在 `ms_magnitude_min` 兩側之模糊值 ⇒ `invalid_timestamp_unit`，不猜。
 - **風險緩解**：RISK-(a)。
-- **驗證**：三組 fixture（ms／秒／不合法）各 1 測；ms 值精確 `== 1704067200000`。
+- **驗證**：`pytest tests/api -q -k gap3_t0_unit_detect` **≥3 條**（ms／秒／不合法各一）；秒級輸入之輸出精確 `== 1704067200000`。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（`1704067200`（秒）⇒ `== 1704067200000`。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**。🔴 **須同步**：V-3 之 AST oracle 涵蓋面**須包含本偵測函式**，
@@ -396,9 +407,17 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
     ——未登記集合 `== set()`
   - ③ 三形態 `Future_4Bar_Return_%`／`future_4bar_return`／`FUTURE_4BAR_RETURN` 皆解析為 4
   - ④ **registry 內容正確性**：以實跑盤出之全部 `future*` 欄逐欄對證單位與深度；
-    盤點命令
-    `grep -oE "future[_0-9][A-Za-z0-9_]*" momentum/DataExtraction/case_search_engine.py | sort -u`
-    ——每項須在 registry 有對應且**分類正確（bar／hour／unknown 三類）**
+    🔴 **盤點來源（R2 修正；CODEX-R2-P1-05）**：原 `grep -oE "future[_0-9]…"` 會把
+    **區域變數、f-string 片段與註解字樣**與真欄名混在一起 ⇒ `未登記集合 == set()` 不可靠。
+    改為**以實際產出之欄名為準**——取 `CaseData` 之 DataFrame `columns`
+    （或其欄位 dataclass 之 `__annotations__`），篩 `startswith('future')` 者逐欄對證：
+    ```python
+    future_cols = {c for c in actual_columns if c.lower().startswith("future")}
+    assert future_cols - set(registry) == set()   # 未登記即紅
+    ```
+    ——每項須在 registry 有對應且**分類正確（bar／hour／unknown 三類）**。
+    ⚠️ 若測試環境取不到該欄集，**須以 fixture 凍結一份實際欄名清單**並於 commit message
+    附其產生命令；**不得**退回文字掃描。
   - ⑤ `pytest tests/api -q -k lookahead_rename_attack` **≥2 條**（見邊界①②）
   - **mutation 三條**（SPEC L1680–1683）
 - **存活至**：**Phase 7（終）**。
@@ -649,7 +668,9 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **不可做**：不得以估算值顯示。
 - **邊界**：① `N + 被濾掉數 == M`。② `X + Y == N`。
 - **風險緩解**：RISK-(b)——四個顯示點共用同一函式，避免同畫面矛盾筆數。
-- **驗證**：vitest 斷言邊界①②。
+- **驗證**：`npx vitest run exportCounts` **≥2 條**——①`N + 被濾掉數 == M`；②`X + Y == N`。
+  🔴 **mutation（V-M）**：讓 `computeExportCounts` 以估算值（如四捨五入之抽樣推估）回傳
+  ⇒ ①②須轉紅；還原後轉綠。receipt 入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**（無持久產物）。
   🔴 **須同步**：Task 7.5 把報酬表拆為正／反／全體三組後計數口徑不變（`X + Y == N` 仍成立），
@@ -706,7 +727,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **不可做**：不得以 `window.confirm` 帶過。
 - **邊界**：① 未確認時 `fetch` call count `== 0`。② 只在批列表提供（其他頁面無入口）。
 - **風險緩解**：RISK-(b)。
-- **驗證**：vitest 斷言邊界①。
+- **驗證**：`npx vitest run eventBatchDeleteConfirm` **≥2 條**——①未確認時 `fetch` call count `== 0`；②確認框顯示之筆數與匯入時間 `==` 批列表之值。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（未確認時 `fetch` call count `== 0`。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**（與 Task 4.3／5.3 之確認框為不同元件、不同觸發點）。
@@ -728,7 +749,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **邊界**：① 該字串出現於確認框（`toContain` 斷言）。
   ② 未被引用之批次 ⇒ 不顯示該警語（避免恆顯示而失去鑑別力）。
 - **風險緩解**：RISK-(b)。
-- **驗證**：vitest `toContain` 斷言（邊界①②）。
+- **驗證**：`npx vitest run eventBatchDeleteWarning` **≥2 條**——①被引用批次之確認框 `toContain('引用它的分析結果將無法重現')`；②未被引用者**不顯示**該警語。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（該字串出現於確認框（`toContain` 斷言）。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**。🔴 **須同步**：若 3.1 未隨 Phase 1／2 擴張刪除範圍，
@@ -808,7 +829,7 @@ Gate＝V-5 對應條目全綠 ＋ 落檔殘留 `== 0`。
 - **不可做**：不得只寫在文件而不顯示於 UI。
 - **邊界**：① 四段文字皆出現。② `control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
 - **風險緩解**：RISK-(a)。
-- **驗證**：vitest 斷言邊界①②。
+- **驗證**：`npx vitest run eventExportDisclosureLegacy` **≥2 條**——①四段文字皆出現；②`control_kind` 顯示值 `==` 匯出檔實際值（防寫死漂移）。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（四段文字皆出現。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：🔴 **會被 Task 7.3 刻意覆蓋**——7.3 為本 Task 四段揭露之**嚴格超集**。
@@ -878,7 +899,7 @@ Gate＝V-5 對應條目全綠 ＋ 落檔殘留 `== 0`。
 - **邊界**：① 訊息含每個缺欄附帶 horizon 之筆數數字。
   ② 訊息**不得**含「主答案窗」字樣（斷言不出現）。
 - **風險緩解**：RISK-(b)。
-- **驗證**：vitest 斷言邊界①②。
+- **驗證**：`npx vitest run exportMissingColumnDialog` **≥2 條**——①訊息含每個缺欄附帶 horizon 之筆數數字；②訊息**不含**「主答案窗」字樣。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（訊息含每個缺欄附帶 horizon 之筆數數字。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：**Phase 7（終）**。
 - **覆蓋風險**：覆蓋現行單一 horizon 之訊息字串（**刻意**）。
@@ -960,7 +981,7 @@ Gate＝V-6 對應條目全綠 ＋ G-2 golden 重凍已於 commit message 說明�
 - **邊界**：① 每個表頭之 tooltip 文字 `==` glossary 對應 `definition`。
   ② glossary 缺該鍵 ⇒ 顯示 fail-closed 之佔位而非空字串（避免靜默漏 tooltip）。
 - **風險緩解**：RISK-(b)。
-- **驗證**：vitest 斷言邊界①（逐表頭 `==`）。
+- **驗證**：`npx vitest run eventTableTooltips` **≥2 條**——①逐表頭之 tooltip 文字 `==` glossary 對應 `definition`；②glossary 缺該鍵 ⇒ 顯示 fail-closed 佔位而非空字串。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（每個表頭之 tooltip 文字 `==` glossary 對應 `definition`。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**。🔴 **須同步**：Task 7.5 改為三組垂直排列後，
@@ -982,7 +1003,7 @@ Gate＝V-6 對應條目全綠 ＋ G-2 golden 重凍已於 commit message 說明�
 - **邊界**：① fixture 尾端 3 筆不足 ⇒ 訊息含 `3`（數字精確比對）。
   ② 訊息**不得**含「主答案窗」字樣。
 - **風險緩解**：RISK-(b)。
-- **驗證**：vitest 斷言邊界①②。
+- **驗證**：`npx vitest run exportHorizonCoverageDialog` **≥2 條**——①fixture 尾端 3 筆不足 ⇒ 訊息含 `3`（數字精確比對）；②訊息**不含**「主答案窗」字樣。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（fixture 尾端 3 筆不足 ⇒ 訊息含 `3`（數字精確比對）。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：**Phase 7（終）**。
 - **覆蓋風險**：與 Task 4.3 同一區塊，合併實作。
@@ -1114,7 +1135,12 @@ Task 5.0 之一行斷言；Gate＝V-7／V-10 對應條目全綠。
   ② 若 6.1 之檢查被移到任務啟動之後 ⇒ 本測試須**紅**（釘住先後順序）。
 - **風險緩解**：RISK-(a)。
 - **驗證**：`pytest tests/api -q -k ic_stop_gate_alive` rc=0，條目數 `>=` V-8 所列。
-  🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（V-8 之三項斷言（見 SPEC §V L3433）。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
+  🔴 **mutation（V-M；R2 具體化——原導出式只寫「反轉邊界①」，而邊界① 本身 defer 至
+  SPEC 行號，執行端不知要改哪一行；COMPOSER-R2-P2-04＋GROK-R2-P2-02 兩家命中）**：
+  **把 Task 6.1 之特徵數前置檢查，從「啟動任務前」移到「任務啟動之後」**
+  （改 `api/routes/ic_analysis.py` 之 analyze handler 內該檢查之位置）
+  ⇒ 本 Task 之採樣會量到**已載入大矩陣**之 footprint ⇒ V-8 之「未載入大矩陣」斷言
+  **須轉紅**；把位置還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：**GAP-6**。
 - **覆蓋風險**：🔴 GAP-6 之分塊計算取代 6.1 時本 Task **一併作廢**
   ⇒ 須在 GAP-6 之 SPEC **明列作廢並刪除**，**不得留著空跑而成為永遠通過的假綠**。
@@ -1203,15 +1229,29 @@ Gate＝V-8／V-9 對應條目全綠 ＋ 量測 receipt 六欄齊全且重跑差�
          prepared,
          bars_by_tf,
          *,
-         event_label_spec) -> Mapping[str, float | None]:
-         """階段 3：依 F-1′ 支援矩陣產生 label_value；偏離即回 supported=False。"""
+         event_label_spec) -> AnalysisLabelResult:
+         """階段 3：依 F-1′ 支援矩陣產生 label_value；偏離即 supported=False。"""
      ```
      `*` 後為 **required keyword-only**（不是預設值）。
+     🔴 **回傳為結構化物件，不是裸 map**（GROK-R2-P1-02）：
+     ```python
+     @dataclass(frozen=True)
+     class AnalysisLabelResult:
+         supported: bool                       # 落在 F-1′ 三元組內才 True
+         label_values: Mapping[str, float | None]   # eid -> 值；尾端不足者為 None
+         analysis_alignment_receipt_hash: str  # 與 prepared 同值（決定性）
+         prepared_token: str                   # 綁定本次 prepare 之 token
+         reason: str | None                    # 不支援時＝F-2′ 之 reason；支援時為 None
+     ```
   2. `PreparedAnalysisWindows` 欄集**恰如** SPEC L2378–2396：
      `.supported`／`.windows: tuple[WindowRow, ...]`（**不是 dict**）／
      `.analysis_alignment_receipt_hash: str`（決定性）／`.per_tf: tuple[PerTfRow, ...]`／
      `.normalized_spec_bytes: bytes`（相等判定＝**bytes 相等**，非 `dict==`、非 `json.dumps`）／
-     `.allowed_event_ids: frozenset[str]`。
+     `.allowed_event_ids: frozenset[str]`／
+     🔴 `.purge_lower_bound_ms_by_symbol: Mapping[str, int]`（**per-symbol**；
+     於階段 2 末即算出——見 Task 7.7 之取得點時序）／
+     🔴 `.prepared_token: str`（綁定本次 prepare；`apply_event_coverage` 產生新身分時
+     **同 token 同 hash**）。
      `WindowRow` 欄集恰 `{event_id, symbol, timeframe, decision_at_ms, entry_at_ms,
      label_start_ms, label_end_ms}`，按 `event_id` UTF-8 升冪。
   3. 🔴 **F-1′ 支援矩陣（封閉）**：本批只支援三元組
@@ -1245,10 +1285,26 @@ Gate＝V-8／V-9 對應條目全綠 ＋ 量測 receipt 六欄齊全且重跑差�
      各 `WindowRow.label_end_ms` 各自對應自己的 h。
 - **風險緩解**：RISK-(a)——本 Task 觸及數值正確性，§C0 不得降殘留。
 - **驗證**（`pytest tests/momentum/event_samples/ -q -k analysis_label_producer` **≥7 條** ＋ `pytest tests/api -q -k event_analysis_horizon_purge` **≥5 條**；🔴 `eventContractOptions` 屬 **Task 7.1**，本 Task 不共用）：
-  - 🔴 **簽章同步斷言（防本檔內聯副本與 SPEC 漂移）**：
-    `python3 -c "import io,re;s=io.open('docs/GAP3_EVENT_UX_SPEC.md',encoding='utf-8').read();d=io.open('docs/GAP3_EVENT_UX_TODO.md',encoding='utf-8').read();import sys;sys.exit(0 if 'def prepare_analysis_windows(' in s and 'def prepare_analysis_windows(' in d else 1)"` rc=0，
-    且兩檔之 `prepare_analysis_windows` 參數名序列**逐字相等**（以 `inspect`-style 文字比對；
-    不相等即紅，須改 TODO 而非改 SPEC——SPEC 已 FROZEN）。
+  - 🔴 **簽章同步斷言（防本檔內聯副本與 SPEC 漂移）**——
+    🔴 **R2 修正（CODEX-R2-P1-07＋COMPOSER-R2-P2-01 兩家命中）**：R1 版之命令只檢查
+    **子字串是否存在**，改任一參數名仍會綠 ⇒ **那是假綠**。改為**真的比對參數名序列**：
+    ```bash
+    python3 - <<'PY'
+    import io, re, sys
+    def params(path):
+        s = io.open(path, encoding="utf-8").read()
+        m = re.search(r"def prepare_analysis_windows\((.*?)\)\s*->", s, re.S)
+        if not m:
+            sys.exit("no signature in %s" % path)
+        body = re.sub(r"#[^\n]*", "", m.group(1))
+        return [p.strip() for p in body.split(",") if p.strip()]
+    a = params("docs/GAP3_EVENT_UX_SPEC.md")
+    b = params("docs/GAP3_EVENT_UX_TODO.md")
+    sys.exit(0 if a == b else "SIGNATURE DRIFT\nSPEC=%s\nTODO=%s" % (a, b))
+    PY
+    ```
+    rc=0 才算通過；**不相等即紅，須改 TODO 而非改 SPEC**（SPEC 已 FROZEN）。
+    **mutation**：把 TODO 內聯簽章之任一參數改名 ⇒ 本命令須非零。
   - `pytest tests/momentum/event_samples/ -q -k analysis_label_producer` **≥7 條**
     （①–⑦，SPEC L2665–2677；①②之 `atol=0`）
   - `pytest tests/api -q -k event_analysis_horizon_purge` **≥5 條**（⑧–⑨，含 ⑨(h) **per-symbol**
@@ -1430,6 +1486,11 @@ Gate＝V-8／V-9 對應條目全綠 ＋ 量測 receipt 六欄齊全且重跑差�
   (a) 新增 `strata.by_label` ＝**已核准之結構／數值輸出變更（D-4）**
       ⇒ **須同一 commit 依 §G S-9 重建 G-2 golden 並在 commit message 說明**，
       且新 golden 須以 §G S-8 之**獨立 oracle** 驗證，**不得以被測函式自產**。
+  (c) 🔴 **回應 Task 2.3 與 Task 5.0 之「須同步」（雙向登記；R2 補）**：
+      本 Task 拆三組後——①**須重跑 Task 2.3 之筆數守恆斷言**（`X + Y == N` 在三組結構下
+      仍須成立），②**新增之分組標籤與 `not_computed` 狀態文字須先登記進 Task 5.0 之
+      `event_metrics_glossary.json`**，否則 Task 5.2 之「tooltip `==` glossary `definition`」
+      對新表頭無可比對來源。**實作本 Task 時兩者皆須一併驗，不得只跑本 Task 自身測試。**
   (b) 於 `dedupe.py` 加 `control_kind` 欄 ⇒ 該加欄**不應**改變 G-2 bytes
       （manifest 本身不進輸出）⇒ 仍須保留「加欄前後 G-2 byte 級不變」之回歸；
       若真變了代表加欄意外進了輸出，**須查明而非重凍**。
@@ -1494,6 +1555,10 @@ Gate＝V-8／V-9 對應條目全綠 ＋ 量測 receipt 六欄齊全且重跑差�
   - `api/services/ic_analysis_service.py`：新建 `check_feature_run_coverage()`；
     `_run_analysis` 事件分支之編排
   - `frontend/src/lib/types.ts`（`RunInfo` 增 `time_range`）
+  - 🔴 **`/features/runs` 之 response producer**（CODEX-R2-P1-02：只改 model／service／
+    前端 type **不足以**讓 `time_range` 真的到達前端）——即該 route handler 組裝
+    `RunInfo` 回應之處（`api/routes/feature_factory.py` 或 `feature_registry.py` 之
+    runs 端點，**開工第一件事以 `grep -rn "features/runs" api/routes/` 定位並記入 commit**）
   **既有 caller**：`_browse_metadata_for_run`；`/features/runs`
 - **不可做**：不得在 service 層轉型別；不得直讀 module 常數；不得開第二入口。
 - **邊界**：① 特徵 run **不涵蓋**事件期 ⇒ fail-closed（非警告）。
