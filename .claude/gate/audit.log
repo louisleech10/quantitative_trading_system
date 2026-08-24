@@ -49522,3 +49522,47 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "36202401-217a-467c-9893-ba6bc95c1cdb", "cli_rc": "0", "event": "committee_family_result", "event_id": "65393eec-504f-4573-ae46-99717b7f84c1", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-b1-codereview-r4-composer.md", "output_sha256": "b813734e8939eaeda72bcd3906f8d8b86c80415b6eb5b862fc41a58f8a5af5f8", "producer": "audit_append.sh", "result_state": "success", "round_id": "95fcf4f7-44e7-4fc9-8e77-fa0f7896357c", "schema_version": 1, "sequence": 2685, "ts": "2026-08-24T12:26:16Z"}
 {"event":"gate_deny","ts":"2026-08-24T12:35:17Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"425cc84928cfab21b82cd92c60d22e0a94ded3b9c406659920d59f3eb4d8b9de","cmd_head":"wc -l handoffs/20260824-gap3ux-b1-codereview-r4-codex.md\nbash scripts/completeness_check.sh --single handoffs/20260824-gap3ux-b1-codereview-r4-codex.md --family codex\nR4_COMPLETENESS_RC=$?\nprintf 'RC=%s\\n' \"$R4_COMPLETENESS_RC\"\nexit \"$R4_COMPLETENESS_RC\""}
 {"actor": "cx_run", "attempt_id": "9512fd73-0c1c-4fbe-a33b-158667c84bf8", "cli_rc": "0", "event": "committee_family_result", "event_id": "e7203691-152c-4ebd-803b-d6fdec701edf", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-b1-codereview-r4-codex.md", "output_sha256": "4e2f9c121d011a5a98a83d86f18b20d83236d6970215b8ba7f7bfd3f12d519a0", "producer": "audit_append.sh", "result_state": "success", "round_id": "95fcf4f7-44e7-4fc9-8e77-fa0f7896357c", "schema_version": 1, "sequence": 2686, "ts": "2026-08-24T12:36:48Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "fffade10-d850-4757-890c-69c29c4d4d27", "lock_sha256": "824b42531639eb6b2e1f879cc053d929801ecb4d02e2a2e79e5bbe78b25f2ac0", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "95fcf4f7-44e7-4fc9-8e77-fa0f7896357c", "schema_version": 1, "sequence": 2687, "session_id": "20260824-gap3uxb1-x-review-r4", "synth_sha256": "fc9d7b94219d0ee1b69287233ec8e1a9207eabc2c12d6112e69a1950c4e5ac87", "ts": "2026-08-24T13:06:37Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UXTODOD002-X-STAMP-R1", "ts": "2026-08-24T13:23:35Z"}
+=== 2026-08-24 21:23:35 | dispatch ===
+  ts=2026-08-24 21:23:35
+  kind=dispatch
+  intent=GAP3_EVENT_UX_TODO.D-002 戳記輪：三家核可 B1 實作期之 14 條修訂（使用者裁定開第二批前補）
+  risk=low
+  facts_asked=D-002 對 R1-R4 四輪之記載是否如實；A-005 以 producer 為準之裁定與碼證；A-010 設計改變之敘述與落地是否一致；回歸鎖編號抽驗
+  review_role=stamp：核可或退回 D-002，不受理新 finding
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260824-GAP3UXTODOD002-X-STAMP-R1", "ts": "2026-08-24T13:23:42Z"}
+=== 2026-08-24 21:23:42 | dispatch ===
+  ts=2026-08-24 21:23:42
+  kind=dispatch
+  intent=GAP3_EVENT_UX_TODO.D-002 戳記輪：三家核可 B1 實作期之 14 條修訂（使用者裁定開第二批前補）
+  risk=low
+  facts_asked=D-002 對 R1-R4 四輪之記載是否如實；A-005 以 producer 為準之裁定與碼證；A-010 設計改變之敘述與落地是否一致；回歸鎖編號抽驗
+  review_role=stamp：核可或退回 D-002，不受理新 finding
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260824-gap3ux-todo-d002-stamp-brief.md", "brief_sha256": "ab3628d4e6b271c6176a8ef9f2666a3c7215386ce421fd50cc4fb130d1bd8990", "brief_sha256_norm": "ab3628d4e6b271c6176a8ef9f2666a3c7215386ce421fd50cc4fb130d1bd8990", "event": "committee_round_open", "event_id": "0eb0c809-d00c-4744-b0fa-7f7d83b38d55", "expected_outputs": {"codex": "handoffs/20260824-gap3ux-todo-d002-stamp-codex.md", "composer": "handoffs/20260824-gap3ux-todo-d002-stamp-composer.md", "grok": "handoffs/20260824-gap3ux-todo-d002-stamp-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "a40cdcb1-b53a-4dc2-ae32-234c0fa3c3be", "schema_version": 1, "sequence": 2688, "session_name": "20260824-gap3uxtodod002-x-stamp-r1", "task_id": "20260824-GAP3UXTODOD002-X-STAMP-R1", "ts": "2026-08-24T13:23:48Z"}
+{"actor": "cx_run", "attempt_id": "352fbc8b-5554-493b-948f-838e3bbfa06e", "cli_rc": "0", "event": "committee_family_result", "event_id": "97107927-fa4b-44e3-8c2f-7ddd4f34fd8e", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-d002-stamp-grok.md", "output_sha256": "c475bc72bbcaaf11f1799992a8a4168667576c78f7d957180ef47d6b381e4757", "producer": "audit_append.sh", "result_state": "success", "round_id": "a40cdcb1-b53a-4dc2-ae32-234c0fa3c3be", "schema_version": 1, "sequence": 2689, "ts": "2026-08-24T13:25:34Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260824-gap3uxtodod002-x-stamp/synth.md", "output_sha256": "53d19ac6dadaaa5eb1c5bc2d7fcac6a03f3742b3d9fcd82f603e834ded87f561", "task_id": "20260824-GAP3UXTODOD002-X-STAMP-R1", "ts": "2026-08-24T13:25:34Z"}
+{"actor": "cx_run", "attempt_id": "f6dcb963-335f-4671-ad66-ac2b28b3f1c7", "cli_rc": "0", "event": "committee_family_result", "event_id": "294e4b1c-8bca-4c48-a690-ee5aa9eed062", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-d002-stamp-composer.md", "output_sha256": "ffc1f272918985ed92676d07e0c3f7efbb647a9eb91a57510017f768dab7f7b7", "producer": "audit_append.sh", "result_state": "success", "round_id": "a40cdcb1-b53a-4dc2-ae32-234c0fa3c3be", "schema_version": 1, "sequence": 2690, "ts": "2026-08-24T13:25:44Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260824-gap3uxtodod002-x-stamp/synth.md", "output_sha256": "53d19ac6dadaaa5eb1c5bc2d7fcac6a03f3742b3d9fcd82f603e834ded87f561", "task_id": "20260824-GAP3UXTODOD002-X-STAMP-R1", "ts": "2026-08-24T13:25:44Z"}
+{"event":"gate_deny","ts":"2026-08-24T13:27:34Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"d94aef10b7652976515b727960bad67afca2c4f9c02105fa8037f9399ef654f6","cmd_head":"bash scripts/reconcile_body_hash.sh docs/GAP3_EVENT_UX_TODO.D-002.md; bash scripts/reconcile_body_hash.sh handoffs/reconcile/20260824-gap3uxtodod002-x-stamp/synth.md; rg -n '^RECONCILE-STAMP: (codex|composer|grok) APPROVED 2026-08-24 sha256:(04482ecab25b2ef3e3e98f34d36f56eacf0712b3a66349ec659b3dbc805b2cf1|410fe8cd33902e5cb97c53bbb18ae4a4b4b81648d18de2d49ce148123d74a1b6) task:20260824-GAP3UXTODOD002-X-STAMP-R1$' docs/GAP3_EVENT_UX_TODO.D-002.md handoffs/reconcile/20260824-gap3uxtodod002-x-stamp/synth.md"}
+{"actor": "cx_run", "attempt_id": "9a6b2201-b1b8-46e6-86b3-b017af89a6dd", "cli_rc": "0", "event": "committee_family_result", "event_id": "6805a984-f321-408f-a14f-755fb7248f14", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-todo-d002-stamp-codex.md", "output_sha256": "372d174b185f729ee3609d394687b997cd190a201cf2dc38e3e98d479befa88a", "producer": "audit_append.sh", "result_state": "success", "round_id": "a40cdcb1-b53a-4dc2-ae32-234c0fa3c3be", "schema_version": 1, "sequence": 2691, "ts": "2026-08-24T13:28:19Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260824-gap3uxtodod002-x-stamp/synth.md", "output_sha256": "350957dfbe5a8d2ec23bca3a1f17fd46e25580e5ecb38048e808bce51259648e", "task_id": "20260824-GAP3UXTODOD002-X-STAMP-R1", "ts": "2026-08-24T13:28:20Z"}
+{"abandon_kind": "no-findings-expected", "actor": "debt_clear", "approver": "使用者裁定要簽，三家已簽", "event": "debt_abandon", "event_id": "519c6b09-de69-4ad2-b583-328459d2e6d8", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "stamp 輪依定義不產 canonical finding；三家皆 APPROVED 兩份檔且 reconcile_stamps_check rc=0", "round_id": "a40cdcb1-b53a-4dc2-ae32-234c0fa3c3be", "schema_version": 1, "sequence": 2692, "ts": "2026-08-24T13:28:54Z", "zero_findings_verified": ""}
