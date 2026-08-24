@@ -114,22 +114,28 @@ describe('gap3 lookahead depth lock — search/page.tsx 接線', () => {
 
   it('④ 答案窗那個 <select> 之 <option disabled> 由同一判定函式綁定（錨定到該 select，不是任一 select）', () => {
     // 🔴 CODEX-R3-P2-01：舊版掃全檔之 <option>，把同形綁定搬到別的選單也會綠。
+    // 🔴 GROK-R4-P2-01：舊版用 `getText().includes(testid)` ＋ `findNode` 第一命中
+    //    ⇒ 在真 select **之前**插一個 testid **含該子字串**的誘餌 select（綁定正確），
+    //      再把真 select 的綁定改壞，四條仍全綠。子字串＋第一命中＝兩個代理物疊在一起。
+    //    改為 **exact 比對 testid**，且斷言符合者**恰一個**（誘餌會被這條抓到）。
     const source = parsePage();
-    const select = findNode(source, (n) => {
+    const selects = collect(source, (n) => {
       if (!ts.isJsxOpeningElement(n) && !ts.isJsxSelfClosingElement(n)) return false;
       if ((n as ts.JsxOpeningElement).tagName.getText() !== 'select') return false;
-      return (n as ts.JsxOpeningElement).attributes.properties.some(
-        (attr) =>
-          ts.isJsxAttribute(attr) &&
-          attr.name.getText() === 'data-testid' &&
-          attr.initializer !== undefined &&
-          attr.initializer.getText().includes(HORIZON_SELECT_TESTID),
-      );
+      return (n as ts.JsxOpeningElement).attributes.properties.some((attr) => {
+        if (!ts.isJsxAttribute(attr) || attr.name.getText() !== 'data-testid') return false;
+        const init = attr.initializer;
+        if (!init || !ts.isStringLiteral(init)) return false;
+        return init.text === HORIZON_SELECT_TESTID; // exact，不是 includes
+      });
     });
-    expect(select, `找不到 data-testid=${HORIZON_SELECT_TESTID} 之 select`).toBeDefined();
+    expect(
+      selects.length,
+      `data-testid 恰等於 ${HORIZON_SELECT_TESTID} 之 select 須恰一個`,
+    ).toBe(1);
 
     // 該 select 元素（含子樹）＝其 JsxElement 父節點
-    const element = select!.parent;
+    const element = selects[0].parent;
     const bindings = collect(element, (n) => {
       if (!ts.isJsxAttribute(n) || n.name.getText() !== 'disabled') return false;
       const owner = n.parent.parent;

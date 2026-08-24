@@ -17,13 +17,26 @@ import {
 } from './lookaheadDepthLock';
 
 describe('gap3 lookahead depth lock — 判定', () => {
-  it('低於下界即阻擋（下界 7、選 5）', () => {
-    expect(isHorizonBelowLowerBound(5, 7)).toBe(true);
+  // 🔴 CODEX-R4-P2-05：舊版只有 (5,7) 一組嚴格小於 ⇒ 實作改成
+  //    `return selectedBars === 5 && lowerBound === 7` 仍全綠。改為多組覆蓋。
+  it.each([
+    [5, 7],
+    [1, 2],
+    [11, 12],
+    [0, 1],
+    [3, 100],
+  ])('低於下界即阻擋（選 %i、下界 %i）', (selected, bound) => {
+    expect(isHorizonBelowLowerBound(selected, bound)).toBe(true);
   });
 
-  it('等於或高於下界皆放行（保守方向永遠允許）', () => {
-    expect(isHorizonBelowLowerBound(7, 7)).toBe(false);
-    expect(isHorizonBelowLowerBound(12, 7)).toBe(false);
+  it.each([
+    [7, 7],
+    [12, 7],
+    [2, 1],
+    [1, 1],
+    [100, 3],
+  ])('等於或高於下界皆放行（選 %i、下界 %i；保守方向永遠允許）', (selected, bound) => {
+    expect(isHorizonBelowLowerBound(selected, bound)).toBe(false);
   });
 
   it('尚無下界（null／undefined）⇒ 無約束，不得誤擋', () => {
@@ -75,7 +88,23 @@ describe('gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的�
     expect(proceed).toHaveBeenCalledTimes(0);
     expect(fetchSpy).toHaveBeenCalledTimes(0);
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify.mock.calls[0][0]).toContain('7');
+    // 🔴 CODEX-R4-P2-04／GROK-R4-P2-02：舊版只驗 `toContain('7')`
+    //    ⇒ 把守衛改成 `deps.notify('7')` 或 `deps.notify(String(lowerBound))`（根本不呼叫
+    //      文案函式）都仍全綠——「守衛送出正確阻擋文案」被兩個代理物代替：
+    //      「文案函式本身字面正確」＋「notify 的字串裡有那個數字」。
+    //    改為驗**配線本身**：notify 收到的須逐字等於文案函式對同一下界之輸出。
+    expect(notify.mock.calls[0][0]).toBe(horizonLowerBoundMessage(7));
+  });
+
+  it('阻擋文案之配線隨下界改變（防守衛硬編一個字串）', async () => {
+    const notify = vi.fn();
+    const proceed = vi.fn(async () => 'sent' as const);
+
+    await withHorizonLowerBoundGuard(1, 17, { notify, proceed });
+
+    expect(proceed).toHaveBeenCalledTimes(0);
+    expect(notify.mock.calls[0][0]).toBe(horizonLowerBoundMessage(17));
+    expect(notify.mock.calls[0][0]).not.toBe(horizonLowerBoundMessage(7));
   });
 
   it('對照組：選 7、下界 7 ⇒ proceed 被呼叫且回其結果（防「恆擋型假保證」）', async () => {

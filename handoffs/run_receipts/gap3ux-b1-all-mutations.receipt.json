@@ -1,4 +1,6 @@
 {
+  "closure": "CLOSED",
+  "closure_doc": "CLOSED＝列出之每一條 mutation 皆「改壞後轉紅之 test 集合逐一等於預期」且「還原後 rc=0」。任一條不符即 NOT-CLOSED。",
   "all_pass": true,
   "mutations": [
     {
@@ -106,6 +108,7 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
+        "test_gap3_contract_reason_registry_06_baseline_fixture_byte_faithful",
         "test_gap3_contract_reason_registry_07_new_registered_fields",
         "test_gap3_contract_reason_registry_08a_flatten_prefix_preserved",
         "test_gap3_contract_reason_registry_08b_namespaces_are_typed_dicts",
@@ -114,11 +117,13 @@
         "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
         "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
         "test_gap3_contract_reason_registry_08c_validator_rejects[str]",
-        "test_gap3_contract_reason_registry_08d_validator_accepts_valid"
+        "test_gap3_contract_reason_registry_08d_validator_accepts_valid",
+        "test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
+        "test_gap3_contract_reason_registry_06_baseline_fixture_byte_faithful",
         "test_gap3_contract_reason_registry_07_new_registered_fields",
         "test_gap3_contract_reason_registry_08a_flatten_prefix_preserved",
         "test_gap3_contract_reason_registry_08b_namespaces_are_typed_dicts",
@@ -127,7 +132,8 @@
         "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
         "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
         "test_gap3_contract_reason_registry_08c_validator_rejects[str]",
-        "test_gap3_contract_reason_registry_08d_validator_accepts_valid"
+        "test_gap3_contract_reason_registry_08d_validator_accepts_valid",
+        "test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper"
       ],
       "verdict": "PASS"
     },
@@ -148,7 +154,8 @@
         "test_gap3_contract_reason_registry_08c_validator_rejects[float]",
         "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
         "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
-        "test_gap3_contract_reason_registry_08c_validator_rejects[str]"
+        "test_gap3_contract_reason_registry_08c_validator_rejects[str]",
+        "test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper"
       ],
       "restored_rc": 0,
       "restored_failed": [],
@@ -157,7 +164,8 @@
         "test_gap3_contract_reason_registry_08c_validator_rejects[float]",
         "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
         "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
-        "test_gap3_contract_reason_registry_08c_validator_rejects[str]"
+        "test_gap3_contract_reason_registry_08c_validator_rejects[str]",
+        "test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper"
       ],
       "verdict": "PASS"
     },
@@ -226,12 +234,24 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
-        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration"
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[Future_7Bar_Return_%]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future24_close]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future72_max_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_11bar_max_drawdown]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_4bar_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_max_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[my_custom_signal]"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
-        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration"
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[Future_7Bar_Return_%]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future24_close]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future72_max_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_11bar_max_drawdown]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_4bar_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_max_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[my_custom_signal]"
       ],
       "verdict": "PASS"
     },
@@ -622,14 +642,191 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
+        "gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式） > 阻擋文案之配線隨下界改變（防守衛硬編一個字串）",
         "gap3 lookahead depth lock — 阻擋文案 > 不同下界 ⇒ 不同文案（防硬編碼／忽略參數）",
         "gap3 lookahead depth lock — 阻擋文案 > 文案逐字相等（不是「含有那個數字」）"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
+        "gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式） > 阻擋文案之配線隨下界改變（防守衛硬編一個字串）",
         "gap3 lookahead depth lock — 阻擋文案 > 不同下界 ⇒ 不同文案（防硬編碼／忽略參數）",
         "gap3 lookahead depth lock — 阻擋文案 > 文案逐字相等（不是「含有那個數字」）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.10-M9",
+      "task": "1.10",
+      "desc": "external 分支特殊化成只認一欄（CODEX-R4-P2-01）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "lookahead_rename_attack"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[Future_7Bar_Return_%]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future24_close]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future72_max_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_11bar_max_drawdown]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_max_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[my_custom_signal]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[Future_7Bar_Return_%]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future24_close]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future72_max_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_11bar_max_drawdown]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[future_max_return]",
+        "test_lookahead_rename_attack_01_uploaded_column_requires_declaration[my_custom_signal]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.1-M8",
+      "task": "1.1",
+      "desc": "loader 改讀 tests 側副本（CODEX-R4-P2-02）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_01_import_failure_added",
+        "test_gap3_contract_reason_registry_04_capability_reasons_added",
+        "test_gap3_contract_reason_registry_05_filters_field_registered",
+        "test_gap3_contract_reason_registry_06_baseline_fixture_byte_faithful",
+        "test_gap3_contract_reason_registry_07_new_registered_fields",
+        "test_gap3_contract_reason_registry_08a_flatten_prefix_preserved",
+        "test_gap3_contract_reason_registry_08b_namespaces_are_typed_dicts",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[bool]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[float]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[str]",
+        "test_gap3_contract_reason_registry_08d_validator_accepts_valid",
+        "test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_01_import_failure_added",
+        "test_gap3_contract_reason_registry_04_capability_reasons_added",
+        "test_gap3_contract_reason_registry_05_filters_field_registered",
+        "test_gap3_contract_reason_registry_06_baseline_fixture_byte_faithful",
+        "test_gap3_contract_reason_registry_07_new_registered_fields",
+        "test_gap3_contract_reason_registry_08a_flatten_prefix_preserved",
+        "test_gap3_contract_reason_registry_08b_namespaces_are_typed_dicts",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[bool]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[float]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[neg]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[root_scalar]",
+        "test_gap3_contract_reason_registry_08c_validator_rejects[str]",
+        "test_gap3_contract_reason_registry_08d_validator_accepts_valid",
+        "test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.1-M9",
+      "task": "1.1",
+      "desc": "validator 走等價副本而非唯一 helper（CODEX-R4-P2-03）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_contract_reason_registry"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M10",
+      "task": "2.1b",
+      "desc": "守衛不呼叫文案函式（CODEX-R4-P2-04／GROK-R4-P2-02）",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式） > 選 5、下界 7 ⇒ proceed 一次都沒被呼叫、fetch call count == 0",
+        "gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式） > 阻擋文案之配線隨下界改變（防守衛硬編一個字串）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式） > 選 5、下界 7 ⇒ proceed 一次都沒被呼叫、fetch call count == 0",
+        "gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式） > 阻擋文案之配線隨下界改變（防守衛硬編一個字串）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M11",
+      "task": "2.1b",
+      "desc": "判定特殊化成只認 (5,7)（CODEX-R4-P2-05）",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — 判定 > 低於下界即阻擋（選 0、下界 1）",
+        "gap3 lookahead depth lock — 判定 > 低於下界即阻擋（選 11、下界 12）",
+        "gap3 lookahead depth lock — 判定 > 低於下界即阻擋（選 1、下界 2）",
+        "gap3 lookahead depth lock — 判定 > 低於下界即阻擋（選 3、下界 100）",
+        "gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式） > 阻擋文案之配線隨下界改變（防守衛硬編一個字串）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — 判定 > 低於下界即阻擋（選 0、下界 1）",
+        "gap3 lookahead depth lock — 判定 > 低於下界即阻擋（選 11、下界 12）",
+        "gap3 lookahead depth lock — 判定 > 低於下界即阻擋（選 1、下界 2）",
+        "gap3 lookahead depth lock — 判定 > 低於下界即阻擋（選 3、下界 100）",
+        "gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式） > 阻擋文案之配線隨下界改變（防守衛硬編一個字串）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "2.1b-M12",
+      "task": "2.1b",
+      "desc": "誘餌 select（testid 含子字串）＋真綁定改壞（GROK-R4-P2-01）",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.page.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ④ 答案窗那個 <select> 之 <option disabled> 由同一判定函式綁定（錨定到該 select，不是任一 select）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ④ 答案窗那個 <select> 之 <option disabled> 由同一判定函式綁定（錨定到該 select，不是任一 select）"
       ],
       "verdict": "PASS"
     },

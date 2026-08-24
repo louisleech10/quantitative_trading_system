@@ -16,23 +16,47 @@ from momentum.Analysis.event_samples.lookahead_registry import (
 )
 
 
-def test_lookahead_rename_attack_01_uploaded_column_requires_declaration() -> None:
-    """上傳 CSV 之欄名命中 registry，但無 producer provenance ⇒ 仍須強制宣告。"""
-    res = lookahead_resolution(
-        "future_4bar_return", "1h", provenance=PROVENANCE_EXTERNAL_UPLOAD
-    )
-    assert res["requires_declaration"] is True
-    assert res["lookahead_bars"] is None
-    assert res["reason"] == "external_upload_column_name_not_evidence"
+# 🔴 CODEX-R4-P2-01：舊版兩條都只用 `future_4bar_return` ⇒ 把任一分支「特殊化成只認那一欄」
+#    之壞法仍全綠（codex 實跑兩種突變皆 13 passed）。改為覆蓋 bar／hour／unknown 三類多欄。
+_UPLOAD_CASES = [
+    "future_4bar_return",        # bar 類，命中 registry
+    "future_11bar_max_drawdown",  # bar 類，另一個 N
+    "future72_max_return",        # hour 類
+    "future24_close",             # hour 類，非 return 欄
+    "future_max_return",          # unknown 類
+    "my_custom_signal",           # 未登記
+    "Future_7Bar_Return_%",       # CSV 標題形
+]
 
 
-def test_lookahead_rename_attack_02_system_generated_resolves_directly() -> None:
-    """對照組：同一欄名但來自 /search 之系統產生批（有 provenance）⇒ 深度直接解析 == 4。"""
-    res = lookahead_resolution(
-        "future_4bar_return", "1h", provenance=PROVENANCE_SYSTEM_GENERATED
-    )
-    assert res["requires_declaration"] is False
-    assert res["lookahead_bars"] == 4
+@pytest.mark.parametrize("column", _UPLOAD_CASES)
+def test_lookahead_rename_attack_01_uploaded_column_requires_declaration(column) -> None:
+    """外部上傳一律須強制宣告——**無論欄名是否命中 registry、屬哪一類**。"""
+    res = lookahead_resolution(column, "1h", provenance=PROVENANCE_EXTERNAL_UPLOAD)
+    assert res["requires_declaration"] is True, column
+    assert res["lookahead_bars"] is None, column
+    assert res["reason"] == "external_upload_column_name_not_evidence", column
+
+
+@pytest.mark.parametrize(
+    "column,timeframe,expected_bars",
+    [
+        ("future_4bar_return", "1h", 4),
+        ("future_11bar_max_drawdown", "1h", 11),
+        ("future_4bar_return", "12h", 4),      # bar 類與 tf 無關
+        ("future72_max_return", "1h", 72),
+        ("future72_max_return", "12h", 6),      # hour 類逐 tf 不同
+        ("future24_close", "12h", 2),
+        ("Future_7Bar_Return_%", "1h", 7),      # CSV 標題形
+    ],
+)
+def test_lookahead_rename_attack_02_system_generated_resolves_directly(
+    column, timeframe, expected_bars
+) -> None:
+    """對照組：來自 /search 之系統產生批（有 provenance）⇒ 深度直接解析。"""
+    res = lookahead_resolution(column, timeframe, provenance=PROVENANCE_SYSTEM_GENERATED)
+    assert res["requires_declaration"] is False, column
+    assert res["lookahead_bars"] == expected_bars, column
 
 
 def test_lookahead_rename_attack_03_system_generated_unknown_still_declares() -> None:

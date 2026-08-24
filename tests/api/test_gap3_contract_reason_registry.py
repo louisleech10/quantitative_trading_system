@@ -91,10 +91,24 @@ def test_gap3_contract_reason_registry_06_baseline_fixture_byte_faithful() -> No
     digest = hashlib.sha256(_BASELINE.read_bytes()).hexdigest()
     assert digest == _BASELINE_SHA256
 
-    # runtime loader 之搜尋路徑不得含 tests/（斷言設定值與源碼，不靠註解宣稱）
+    # 🔴 CODEX-R4-P2-02：舊版以 `inspect.getsource` ＋ `_CONTRACT_PATH.parts` 斷言
+    #    「loader 不讀 tests」——那是**原始碼／設定值**，不是**執行期來源事實**。
+    #    codex 實跑：把 loader 改成以 `("te"+"sts")` 動態組路徑讀 tests 側同 bytes 之副本，
+    #    兩條斷言照樣綠。⇒ 改為**行為判準**：loader 實際回來的東西必須是 production 那一份。
+    prod_path = _REPO / "momentum" / "Analysis" / "contracts" / "event_import_contract.json"
+    with open(prod_path, "r", encoding="utf-8") as f:
+        production = json.load(f)
+    loaded = load_event_import_contract()
+    assert loaded == production                      # loader 回的就是 production 內容
+    with open(_BASELINE, "r", encoding="utf-8") as f:
+        baseline = json.load(f)
+    assert loaded != baseline                        # 且**不是** tests 側那份凍結副本
+    # 兩份確實不同，上一條才有鑑別力（fixture 若被改成與 production 相同，本條即紅）
+    assert baseline["receipt_schema"] != production["receipt_schema"]
+
+    # 設定值層之輔助斷言保留（便宜、且能更早指出問題），但不再是唯一依據
     assert "tests" not in import_contract._CONTRACT_PATH.parts
-    src = inspect.getsource(load_event_import_contract)
-    assert "tests" not in src
+    assert "tests" not in inspect.getsource(load_event_import_contract)
 
 
 # ── ⑦ 兩個新登記欄（derived 欄 vs batch receipt 欄，名稱已由 R12 正名） ─────
@@ -194,3 +208,30 @@ def test_gap3_contract_reason_registry_08e_same_function_reference() -> None:
     # 型別判定之唯一入口：未知型別字面 fail-closed，不得靜默放行
     with pytest.raises(ValueError):
         receipt_type_ok("NoSuchType", 1)
+
+
+def test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper(
+    now: dict, monkeypatch
+) -> None:
+    """🔴 CODEX-R4-P2-03：⑧(e) 只驗 module global 之 identity——那證明「名字綁在同一個物件上」，
+    **不證明 validator 執行時真的走那條路**。
+
+    codex 實跑：在 `validate_receipt_namespace` 內放一份等價的 copied type checker 並改呼叫它，
+    ⑧(e) 照樣綠。⇒ 本條以 **spy** 驗執行期事實：validator 跑一次，helper 必須真的被呼叫，
+    且**每個宣告欄位各一次**。
+    """
+    calls = []
+    real = import_contract.receipt_type_ok
+
+    def spy(type_decl, value):
+        calls.append((type_decl, value))
+        return real(type_decl, value)
+
+    monkeypatch.setattr(import_contract, "receipt_type_ok", spy)
+
+    values = {"lookahead_bars_declared": {"1h": 0}, "analysis_alignment_receipt_hash": "deadbeef"}
+    import_contract.validate_receipt_namespace("batch", values, contract=now)
+
+    declared = now["receipt_schema"]["batch"]
+    assert len(calls) == len(declared)
+    assert {c[0] for c in calls} == set(declared.values())
