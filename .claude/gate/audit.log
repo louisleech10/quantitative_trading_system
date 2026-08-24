@@ -49606,3 +49606,83 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "67d56c8d-90a4-4f06-81b2-c035b15c89b9", "cli_rc": "0", "event": "committee_family_result", "event_id": "73465efd-1662-47f4-ab98-441658b35f60", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-b1-codereview-r5-codex.md", "output_sha256": "b55006cf364b0ff15cb223944a702602efcef85475aee20b649ef146f773cf08", "producer": "audit_append.sh", "result_state": "success", "round_id": "dd3834df-4aec-4a0c-870c-e9a18f399104", "schema_version": 1, "sequence": 2695, "ts": "2026-08-24T14:11:17Z"}
 {"actor": "cx_run", "attempt_id": "a7839ed1-3423-4c11-b3a0-6c30056a1eb3", "cli_rc": "0", "event": "committee_family_result", "event_id": "2af1a580-765f-499d-85c8-99f0c27cc736", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260824-gap3ux-b1-codereview-r5-composer.md", "output_sha256": "c28a3cccf4c64900d963cd6d02e67cf6d616f3d825c9d9f1279f280d80e83e79", "producer": "audit_append.sh", "result_state": "success", "round_id": "dd3834df-4aec-4a0c-870c-e9a18f399104", "schema_version": 1, "sequence": 2696, "ts": "2026-08-24T14:12:32Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "041a8b57-56d6-43b6-84a2-a4dd9cb97eba", "lock_sha256": "262fa1a559f2ea38b42b8ddd40f17e1659abe5b89e5348fbe85070ede81a6191", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "dd3834df-4aec-4a0c-870c-e9a18f399104", "schema_version": 1, "sequence": 2697, "session_id": "20260824-gap3uxb1-x-review-r5", "synth_sha256": "ef3ad9f10ae28fdca671b7069dd9c25e56d8870359869f9c28633c1ffcd0d950", "ts": "2026-08-24T14:13:18Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260825-SURVIVORNSAMPLES-X-CONSULT-R1", "ts": "2026-08-24T22:06:50Z"}
+=== 2026-08-25 06:06:50 | dispatch ===
+  ts=2026-08-25 06:06:50
+  kind=dispatch
+  intent=survivor_contract 對帳誤擋事件模式：三家 consult 定修法語意（比什麼、資料從哪來、非事件模式保護不得弱化、同段另兩條是否同型錯、golden 影響、purge 對事件列是否足夠）
+  risk=high
+  facts_asked=對帳應比什麼；有效訓練/測試事件數是否已存在於現有結構；在哪一層算；非事件模式保護如何機械證明不被弱化；相鄰兩條檢查是否同型錯；golden 影響；purge 對事件列是否足夠
+  review_role=consult：定修法語意，不受理治理與範圍外意見
+  template=n/a: 用 brief
+  adversarial=waived:本輪即為 adversarial consult 本身，標的為產品缺陷之修法語意，尚無前置 adversarial 報告
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260825-SURVIVORNSAMPLES-X-CONSULT-R1", "ts": "2026-08-24T22:07:00Z"}
+=== 2026-08-25 06:07:00 | dispatch ===
+  ts=2026-08-25 06:07:00
+  kind=dispatch
+  intent=survivor_contract 對帳誤擋事件模式：三家 consult 定修法語意
+  risk=high
+  facts_asked=對帳應比什麼；有效訓練/測試事件數是否已存在於現有結構；在哪一層算；非事件模式保護如何機械證明不被弱化；相鄰兩條檢查是否同型錯；golden 影響；purge 對事件列是否足夠
+  review_role=consult：定修法語意
+  template=n/a: 用 brief
+  adversarial=waived:本輪即為 adversarial consult 本身
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260825-survivor-nsamples-consult-brief.md", "brief_sha256": "d9200ef32c70fd5faf0092376dd91268245e2e780a3d7ccd0f86b730eb40651f", "brief_sha256_norm": "d9200ef32c70fd5faf0092376dd91268245e2e780a3d7ccd0f86b730eb40651f", "event": "committee_round_open", "event_id": "5b37a64e-b5bb-4404-8055-75951096ece4", "expected_outputs": {"codex": "handoffs/20260825-survivor-nsamples-consult-codex.md", "composer": "handoffs/20260825-survivor-nsamples-consult-composer.md", "grok": "handoffs/20260825-survivor-nsamples-consult-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "c6c3b3b0-b2c7-45b1-87b2-7f426eb116ac", "schema_version": 1, "sequence": 2698, "session_name": "20260825-survivornsamples-x-consult-r1", "task_id": "20260825-SURVIVORNSAMPLES-X-CONSULT-R1", "ts": "2026-08-24T22:07:04Z"}
+{"actor": "cx_run", "attempt_id": "9bf99be3-f76f-4017-a3dc-0845acfbe4ba", "cli_rc": "0", "event": "committee_family_result", "event_id": "df7864e1-6a87-41a4-8564-f713606ba2d0", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-consult-composer.md", "output_sha256": "1750d5d4355b567600fada74d7f9d56f5f1cf25fda84e0dd00b93eca43a07a2d", "producer": "audit_append.sh", "result_state": "success", "round_id": "c6c3b3b0-b2c7-45b1-87b2-7f426eb116ac", "schema_version": 1, "sequence": 2699, "ts": "2026-08-24T22:10:56Z"}
+{"actor": "cx_run", "attempt_id": "eb1b7499-6a69-48f4-a057-5de555663d94", "cli_rc": "0", "event": "committee_family_result", "event_id": "2ca1e901-88f9-48e0-952a-6e9d7e2b988b", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-consult-grok.md", "output_sha256": "9c84aaf11844b0df987917f5c32590fc038f51c4dad88917ba040f160fdb1cbb", "producer": "audit_append.sh", "result_state": "success", "round_id": "c6c3b3b0-b2c7-45b1-87b2-7f426eb116ac", "schema_version": 1, "sequence": 2700, "ts": "2026-08-24T22:13:11Z"}
+{"event":"gate_deny","ts":"2026-08-24T22:14:35Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"07aa6617e06c428542aac0461175c70eeae69a3513fbbf564bcadec48455ec86","cmd_head":"wc -l handoffs/20260825-survivor-nsamples-consult-codex.md; sed -n '1,120p' handoffs/20260825-survivor-nsamples-consult-codex.md; bash scripts/completeness_check.sh --single handoffs/20260825-survivor-nsamples-consult-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"actor": "cx_run", "attempt_id": "f3e3b1f7-c9db-4c79-85f4-b1f019926f32", "cli_rc": "0", "event": "committee_family_result", "event_id": "0dd89158-0c25-43be-b98a-a33a5f6d39e7", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-consult-codex.md", "output_sha256": "1a69d1211f554a4fa0ebb4480c7dfa2b42c4077fe63c57c6a309d0be12ec387f", "producer": "audit_append.sh", "result_state": "success", "round_id": "c6c3b3b0-b2c7-45b1-87b2-7f426eb116ac", "schema_version": 1, "sequence": 2701, "ts": "2026-08-24T22:15:17Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "83dd7554-6645-4f58-a404-1b6728c588ee", "lock_sha256": "3902f1d89449b418487c8863f9533cd6e2d9b31b02da046e050a908ba45c13f3", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "c6c3b3b0-b2c7-45b1-87b2-7f426eb116ac", "schema_version": 1, "sequence": 2702, "session_id": "20260825-survivornsamples-x-consult-r1", "synth_sha256": "80a3ba5c57fdc39029ceaa3e00d3ebcf642bad0553b4c91c8a0546d6b6282c69", "ts": "2026-08-24T22:17:56Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260825-survivornsamples-x-consult-r1/synth.md", "output_sha256": "80a3ba5c57fdc39029ceaa3e00d3ebcf642bad0553b4c91c8a0546d6b6282c69", "task_id": "20260825-SURVIVORNSAMPLES-X-REVIEW-R1", "ts": "2026-08-24T22:51:25Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260825-SURVIVORNSAMPLES-X-REVIEW-R1", "ts": "2026-08-24T22:51:41Z"}
+=== 2026-08-25 06:51:41 | dispatch ===
+  ts=2026-08-25 06:51:41
+  kind=dispatch
+  intent=survivor_contract 事件模式對帳修法之 code review（三家全員，實作者不自審；依據＝同 task 之 consult reconcile）
+  risk=low
+  facts_asked=三落點是否窮盡同型比較；非事件保護是否被弱化；≤ 是否正確；缺 mask 只在有歧義時擋是否留漏洞；mask 長度是否為正確同母體判準；六條新測試有無假綠；golden 影響
+  review_role=adversarial code review
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260825-SURVIVORNSAMPLES-X-REVIEW-R1", "ts": "2026-08-24T22:51:50Z"}
+=== 2026-08-25 06:51:51 | dispatch ===
+  ts=2026-08-25 06:51:51
+  kind=dispatch
+  intent=survivor_contract 事件模式對帳修法之 code review（三家全員，實作者不自審）
+  risk=low
+  facts_asked=三落點是否窮盡同型比較；非事件保護是否被弱化；≤ 是否正確；缺 mask 只在有歧義時擋是否留漏洞；mask 長度是否為正確同母體判準；六條新測試有無假綠；golden 影響
+  review_role=adversarial code review
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260825-survivor-nsamples-review-brief.md", "brief_sha256": "8ba25cc0bd6596a6727888299eaa992bd203686b0c18a04f42a754a229b56611", "brief_sha256_norm": "8ba25cc0bd6596a6727888299eaa992bd203686b0c18a04f42a754a229b56611", "event": "committee_round_open", "event_id": "baa37c90-737d-4276-9cb3-e599e34f3bad", "expected_outputs": {"codex": "handoffs/20260825-survivor-nsamples-review-codex.md", "composer": "handoffs/20260825-survivor-nsamples-review-composer.md", "grok": "handoffs/20260825-survivor-nsamples-review-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8842ae0c-2477-44d1-af77-f6d9758883b8", "schema_version": 1, "sequence": 2703, "session_name": "20260825-survivornsamples-x-review-r1", "task_id": "20260825-SURVIVORNSAMPLES-X-REVIEW-R1", "ts": "2026-08-24T22:51:55Z"}
+{"actor": "cx_run", "attempt_id": "b8c9d948-fe33-4f6f-9b74-f73e2d505d5f", "cli_rc": "0", "event": "committee_family_result", "event_id": "204bb5a6-29ac-4f91-8180-9be94635864d", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-review-grok.md", "output_sha256": "3122e0628b906487a72ce07d7df82232f21c63a6668f828b862e9cbe67629b24", "producer": "audit_append.sh", "result_state": "success", "round_id": "8842ae0c-2477-44d1-af77-f6d9758883b8", "schema_version": 1, "sequence": 2704, "ts": "2026-08-24T23:00:17Z"}
+{"event":"gate_deny","ts":"2026-08-24T23:02:27Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"129b937b0996d6192938b985b9f4cb7c9019b393f8e3ea788e5ce9ccd6d9b285","cmd_head":"set +e\nbash scripts/completeness_check.sh --single handoffs/20260825-survivor-nsamples-review-codex.md --family codex\nrc=$?\nprintf 'COMPLETENESS_RC=%s\\n' \"$rc\"\nexit \"$rc\""}
+{"actor": "cx_run", "attempt_id": "8541b53a-bc3c-417c-8fcb-392284fa1e42", "cli_rc": "0", "event": "committee_family_result", "event_id": "3751651e-4333-4d84-87f6-6ef811551301", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-review-codex.md", "output_sha256": "2609cd454d160719a9e8f4aa34bce0dd67f799da45d88169ca8c981ebd5db1d7", "producer": "audit_append.sh", "result_state": "success", "round_id": "8842ae0c-2477-44d1-af77-f6d9758883b8", "schema_version": 1, "sequence": 2705, "ts": "2026-08-24T23:04:18Z"}
+{"actor": "cx_run", "attempt_id": "f54d0e6e-eb12-44c8-858b-b3beda356fe3", "cli_rc": "0", "event": "committee_family_result", "event_id": "90451dd8-87c2-4f57-a299-d3264710fbaf", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-review-composer.md", "output_sha256": "faa3b9be5edef1b91973f6a78ee5eb473777742be196993e235fbac4c3336d7b", "producer": "audit_append.sh", "result_state": "success", "round_id": "8842ae0c-2477-44d1-af77-f6d9758883b8", "schema_version": 1, "sequence": 2706, "ts": "2026-08-24T23:04:33Z"}

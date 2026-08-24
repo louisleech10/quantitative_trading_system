@@ -506,14 +506,74 @@ def build_survivor_output(
                 raise ContractValidationError("n_samples_total < marginal max(n_train, n_test) (full_sample)")
         elif n_tr + n_te > int(n_total):
             raise ContractValidationError("n_samples_total < marginal n_train+n_test")
+    # ---- 事件模式之對帳母體（consult 20260825-SURVIVORNSAMPLES-X-CONSULT-R1，三家一致）----
+    # 🔴 原缺陷＝**跨母體比較**：`kind == "event"` 時 `n_total` 是**事件過濾後**之列數
+    #    （orchestrator 之 `"n_samples": int(len(features_df))`），而 `train_plan`／`test_plan`
+    #    之 `row_index` 是**全時間軸**索引。兩者不可比——事件是時間軸之子集，
+    #    「plan 列數 ≤ 事件數」通常必然為假，該不等式不帶任何資訊，卻是 fail-closed 判準，
+    #    使 `analyze()` 整段中止（例外經 _write_survivor_output → _persist_outputs → _stage7_report）。
+    # 🔴 切分邊界**維持在全時間軸上做，不改**（使用者 2026-08-25 裁定）：洩漏是時間上的，
+    #    邊界須是真實日期；若改在事件上切，purge 隔開的是序號而非時間，失去意義。
+    # ⇒ 只把**對帳的量**換成同母體者：事件過濾後之 train/test mask 計數。
+    #    該數字**已存在**（orchestrator 於 `if split_context is not None:` 以 `_derive_stage_masks`
+    #    對過濾後之 `features_df.index` 重導並寫回 split_context），**禁在此重算第二份真相**。
+    # ⚠️ 只有**真的要對帳時**才要求 mask：無 split（train_plan/test_plan 皆 None，例如事件數不足
+    #    而未建 holdout）時本來就沒有跨母體比較，不得因缺 mask 而擋——那會把原本能跑的情形弄壞
+    #    （實測 n_events=100 即此形態；它是本修法之回歸金絲雀）。
+    event_train_rows: Optional[int] = None
+    event_test_rows: Optional[int] = None
+    if kind == "event" and train_plan is not None and test_plan is not None:
+        tm = split_context.get("train_mask") if split_context else None
+        sm = split_context.get("test_mask") if split_context else None
+        if tm is not None and sm is not None:
+            # mask 須與 n_total 同母體；長度不符即代表兩者不是同一批列 ⇒ fail-closed。
+            if int(len(tm)) != int(n_total) or int(len(sm)) != int(n_total):
+                raise ContractValidationError(
+                    f"event mask length != n_samples_total (train={len(tm)}, test={len(sm)}, total={n_total})"
+                )
+            event_train_rows = int(_np.asarray(tm).sum())
+            event_test_rows = int(_np.asarray(sm).sum())
+        # mask 缺席時**不在此擋**：正式路徑之 orchestrator 只要有 split_context 就必寫入兩 mask
+        # （`if split_context is not None:` 之 `_derive_stage_masks`），所以「有 plan 卻無 mask」
+        # 只出現在手工組 split_context 之單元測試，而那些 fixture 之 n_samples 本就等於 plan 列數
+        # （同母體，無歧義）。真正有歧義的情形（無 mask 且 plan 列數和 > n_total）於下方具名擋。
+
     if train_plan is not None and test_plan is not None:
-        if int(len(train_plan.row_index)) + int(len(test_plan.row_index)) > int(n_total):
+        if event_train_rows is not None:
+            # 🔴 關係為 `≤` 非 `==`：落在 purge／embargo 時間帶內之事件，兩 mask 皆 False，
+            #    不應算入 train／test 任一側（實測 800 事件中有 3 列因此被排除）。
+            if event_train_rows + int(event_test_rows) > int(n_total):
+                raise ContractValidationError("n_samples_total < event train_rows+test_rows")
+        elif int(len(train_plan.row_index)) + int(len(test_plan.row_index)) > int(n_total):
+            # 非事件／fallback：維持原 plan-row 對帳（抓「訓練+測試多於總數」＝列被重複算／索引錯亂）
+            if kind == "event":
+                # 事件模式卻無 mask 可比 ⇒ 無法判斷這是「真的算錯」還是「跨母體」⇒ 具名 fail-closed，
+                # **不得**靜默把跨母體之不等式當成錯誤（那就是原缺陷）。
+                raise ContractValidationError(
+                    "event mode: split_context lacks train_mask/test_mask, cannot reconcile "
+                    "filtered n_samples against full-axis split rows"
+                )
             raise ContractValidationError("n_samples_total < split train_rows+test_rows")
-        if marg is not None and marg.get("n_test") is not None and int(marg["n_test"]) != int(len(test_plan.row_index)):
+        # exact 對帳同樣須同母體：事件模式下 marginal 之 n_test 亦來自過濾後 test_mask.sum()
+        _expected_test_rows = (
+            int(event_test_rows) if event_test_rows is not None else int(len(test_plan.row_index))
+        )
+        if marg is not None and marg.get("n_test") is not None and int(marg["n_test"]) != _expected_test_rows:
             raise ContractValidationError("marginal n_test != split test_rows")
     n_test = None
     if marg is not None and marg.get("n_test") is not None:
         n_test = int(marg["n_test"])
+    elif event_test_rows is not None:
+        # marginal 缺 views（如 disabled_by_config）時，事件模式**不得**退回全軸 plan 列數，
+        # 否則 payload 之 n_samples_test 與 n_samples_total 又是跨母體（GROK-R1-P2-02）。
+        n_test = int(event_test_rows)
+    elif kind == "event":
+        # 🔴 GROK-R1-P2-01（review R1）：事件模式**缺 mask 又無 marginal** 時，
+        #    先前會落到下面那條而把**全軸** `len(test_plan.row_index)` 寫進 `n_samples_test`，
+        #    與 `n_samples_total`（過濾後）又成跨母體——與原缺陷同型，只是靜默而非 raise。
+        #    正式路徑碰不到（orchestrator 有 split_context 就必寫雙 mask），但不留這個形狀。
+        #    ⇒ 寧可誠實留 null（schema `nullable: true`），也不寫一個母體不對的數字。
+        n_test = None
     elif test_plan is not None:
         n_test = int(len(test_plan.row_index))
     sample_scope = {"kind": kind, "event": event_obj, "n_samples_total": int(n_total), "n_samples_test": n_test, "degraded": fallback}

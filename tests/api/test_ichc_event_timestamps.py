@@ -17,25 +17,6 @@ REPO = Path(__file__).resolve().parents[2]
 
 @pytest.mark.slow
 class TestTimestampsBehavior:
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "🔴 已知**產品**缺陷（2026-08-24 診斷，非測試過時）：event_filter 開啟時 "
-            "`report_meta.n_samples` 記的是**過濾後之事件數**，而 split plan 之 row_index 仍是"
-            "**全量索引**；`survivor_contract.build_survivor_output` 之 "
-            "`n_samples_total < split train_rows+test_rows` 檢查把兩者當同一母體比較，遂 raise，"
-            "且例外一路傳出 `analyze()`——不是只有 survivor 輸出失敗，是整個分析掛掉。\n"
-            "實測（fixture 全長 1696、split train/test = 1356/335 = 1691）："
-            "n_events=100 成功（走事件數不足之 fallback）、800 失敗、1695 失敗。\n"
-            "🔴 **可從正式 API 觸及**：`api/services/ic_analysis_service.py` 於 "
-            "`elif request.event_timestamps:` 分支設 `event_filter.enabled=True`"
-            "（GAP-3 B5.2 之「匯入案例→選事件→跑 IC」流程），輸入形狀與本測試相同。\n"
-            "本測試**未改為期望 raise**——那等於把缺陷寫成正規行為。"
-            "使用者 2026-08-24 裁定「以現行程式碼為準、修測試不修產品碼」，"
-            "故本條標 xfail(strict) 待修：**產品修好後本條會因 XPASS 而紅**，不會靜默腐爛。\n"
-            "診斷探針：handoffs/probe_t2_inputs.py、handoffs/probe_t2_boundary.py"
-        ),
-    )
     def test_t2_large_subset_effective_and_oos(self):
         """R5 裁決正例（codex 必答 3）：n=800 → mode=timestamps、n_events==800<full_n、
         無 fallback、ok_oos（holdout 可行）。"""

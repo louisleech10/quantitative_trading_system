@@ -682,3 +682,138 @@ def test_v1_payload_explicitly_rejected_no_silent_coerce():
     payload["schema_version"] = 3
     with pytest.raises(ContractValidationError, match="schema_version"):
         sc.validate_survivor_output(payload)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 事件模式之對帳母體（20260825-SURVIVORNSAMPLES-X-CONSULT-R1；三家一致）
+#
+# 🔴 修法前之缺陷：`kind == "event"` 時 `n_samples` 是**過濾後**列數，而
+#    `train_plan`／`test_plan` 之 `row_index` 是**全時間軸**索引；契約拿兩者對帳
+#    ⇒ 必假陽 ⇒ 例外一路傳出 `analyze()`，整段分析中止。
+#    三個落點：①split 和對帳 ②`marginal n_test` exact 對帳 ③`n_samples_test` fallback。
+# 本節每一條各鎖一個落點；改壞任一處都要有一條轉紅。
+# ════════════════════════════════════════════════════════════════════════════
+
+_EV_N = 800          # 過濾後之事件列數
+_EV_TRAIN = 600      # 落在訓練區之事件數
+_EV_TEST = 197       # 落在測試區之事件數（600+197=797 < 800：3 個落在 purge／embargo 帶）
+_FULL_TRAIN = 3000   # 全時間軸切分列數（與事件數無關，故意遠大於 _EV_N）
+_FULL_TEST = 2000
+
+
+def _build_event_kwargs(*, with_masks=True, mask_len=None, marginal=True):
+    """事件模式之 kwargs：n_samples 為過濾後列數，plan 為全時間軸列數（原缺陷之形態）。"""
+    rng = _np.random.default_rng(20260825)
+    df = _pd.DataFrame({k: rng.standard_normal(_EV_N) for k in ("s1", "s2", "f", "z")})
+    y = _pd.Series(0.3 * df["s1"] + 0.3 * df["s2"] + 0.4 * df["f"] + rng.normal(0, 0.8, _EV_N))
+    tr = _np.zeros(_EV_N, dtype=bool)
+    te = _np.zeros(_EV_N, dtype=bool)
+    tr[:_EV_TRAIN] = True
+    te[_EV_TRAIN + 3:] = True          # 中間 3 列＝purge／embargo 帶，兩側皆 False
+    assert int(tr.sum()) == _EV_TRAIN and int(te.sum()) == _EV_TEST
+
+    surv = ["s1", "s2", "f"]
+    marg = None
+    if marginal:
+        marg = _cmi(df, y, train_mask=tr, test_mask=te, survivors=surv,
+                    extra_candidates=["z"], params=_P(n_bootstrap=10, block_len=5), fit_scope="train")
+    comp = _combine(df, y, train_mask=tr, test_mask=te, survivors=surv,
+                    params=_P(n_bootstrap=10, block_len=5), fit_scope="train")
+
+    train_plan = _NS(row_index=_np.arange(_FULL_TRAIN), time_bounds=("2024-01-01", "2024-06-30"),
+                     embargo=2, purge_gap=3, base_universe_hash="u" * 8)
+    test_plan = _NS(row_index=_np.arange(_FULL_TRAIN, _FULL_TRAIN + _FULL_TEST),
+                    time_bounds=("2024-07-01", "2024-12-31"),
+                    embargo=2, purge_gap=3, base_universe_hash="u" * 8)
+
+    split_context = {"train_plan": train_plan, "test_plan": test_plan}
+    if with_masks:
+        n = _EV_N if mask_len is None else mask_len
+        split_context["train_mask"] = tr[:n] if n <= _EV_N else _np.concatenate([tr, _np.zeros(n - _EV_N, bool)])
+        split_context["test_mask"] = te[:n] if n <= _EV_N else _np.concatenate([te, _np.zeros(n - _EV_N, bool)])
+
+    return dict(
+        report_meta={
+            "symbol": "ETHUSDT", "timeframe": "12h", "n_samples": _EV_N,
+            "event_filter": {"applied": True, "mode": "timestamps", "n_events": _EV_N},
+            "ic_train_test_split": {"applied": True}, "split_method": "holdout",
+            "selection_scope": {"scope_id": "scope-1"},
+        },
+        filtered_features=surv, marginal_ic_result=marg, composite_result=comp,
+        summary_by_feature={n: {"ic_mean": 0.1, "icir": 1.2, "p_value_adj": 0.01, "pass_class": "oos"} for n in surv},
+        root_analysis_status="ok_oos",
+        event_identity=sc.compute_event_identity(None, list(range(_EV_N))),
+        split_context=split_context, config_hash="c" * 8, features_source_hash="f" * 64,
+        features_path="/tmp/x.h5", labels_content_hash="l" * 64, symbol="ETHUSDT", timeframe="12h",
+        case_id="ic_gatekeeper", generated_at="2026-08-25T00:00:00Z", fit_mode="train",
+        pit_stats_version="v1", ic_method="spearman", label_horizon=12, label_return_type="log",
+        report_ref="ic_report_ic_gatekeeper.json",
+    )
+
+
+def test_event_mode_reconciles_on_filtered_masks():
+    """落點①②：事件模式以過濾後 mask 對帳 ⇒ 可產出（修法前此處必 raise）。"""
+    payload = sc.build_survivor_output(**_build_event_kwargs())
+    scope = payload["sample_scope"]
+    assert scope["kind"] == "event"
+    assert scope["n_samples_total"] == _EV_N
+    # 🔴 逐字：測試列數必須是**事件側**的 197，不是全軸的 2000
+    assert scope["n_samples_test"] == _EV_TEST
+    assert scope["n_samples_test"] != _FULL_TEST
+
+
+def test_event_mode_allows_purge_gap_le_not_eq():
+    """關係為 `≤` 非 `==`：落在 purge／embargo 帶之事件兩側皆不算，797 < 800 須放行。"""
+    assert _EV_TRAIN + _EV_TEST < _EV_N            # 前提本身受測（否則本條打空氣）
+    sc.build_survivor_output(**_build_event_kwargs())
+
+
+def test_event_mode_without_masks_fails_closed_when_ambiguous():
+    """事件模式缺 mask **且** plan 列數和 > n_samples ⇒ 無法判斷是算錯還是跨母體 ⇒ 具名 fail-closed。
+
+    🔴 不得靜默把跨母體之不等式當成錯誤（那就是原缺陷），也不得靜默放行。
+    正式路徑不會走到這裡：orchestrator 只要有 split_context 就必寫入兩 mask。
+    """
+    with pytest.raises(ContractValidationError, match="lacks train_mask/test_mask"):
+        sc.build_survivor_output(**_build_event_kwargs(with_masks=False))
+
+
+def test_event_mode_mask_length_must_equal_n_samples():
+    """mask 與 n_samples 不同長 ⇒ 兩者不是同一批列 ⇒ fail-closed。"""
+    with pytest.raises(ContractValidationError, match="mask length"):
+        sc.build_survivor_output(**_build_event_kwargs(mask_len=_EV_N - 1))
+
+
+def test_event_mode_n_samples_test_no_full_axis_fallback():
+    """落點③（GROK-R1-P2-02）：marginal 缺席時，n_samples_test 仍須取事件側，不得退回全軸。"""
+    payload = sc.build_survivor_output(**_build_event_kwargs(marginal=False))
+    assert payload["sample_scope"]["n_samples_test"] == _EV_TEST
+    assert payload["sample_scope"]["n_samples_test"] != _FULL_TEST
+
+
+def test_non_event_split_row_guard_preserved():
+    """非事件模式之原保護不得被弱化：plan train+test > n_samples 仍須 raise。"""
+    kw, _ = _build_kwargs()                 # event=None ⇒ kind=full
+    kw["report_meta"] = dict(kw["report_meta"])
+    kw["report_meta"]["n_samples"] = 1      # 人為讓 plan 列數遠大於總數
+    kw["marginal_ic_result"] = None         # 排除 marginal 那條先命中
+    with pytest.raises(ContractValidationError, match="split train_rows\\+test_rows"):
+        sc.build_survivor_output(**kw)
+
+
+def test_event_mode_no_masks_no_marginal_leaves_n_samples_test_null():
+    """GROK-R1-P2-01：事件模式缺 mask 又無 marginal ⇒ n_samples_test 須為 null。
+
+    🔴 不得靜默寫入**全軸** `len(test_plan.row_index)`——那與 n_samples_total（過濾後）
+    又是跨母體，與原缺陷同型，只是靜默而非 raise。寧可誠實留 null（schema nullable）。
+    前提：本形態須不觸發「有歧義」之 raise ⇒ plan 列數和必須 ≤ n_samples。
+    """
+    kw = _build_event_kwargs(with_masks=False, marginal=False)
+    # 讓 plan 列數和 ≤ n_total（否則會先命中具名 fail-closed，測不到本條）
+    kw["report_meta"] = dict(kw["report_meta"])
+    kw["report_meta"]["n_samples"] = _FULL_TRAIN + _FULL_TEST + 1
+    payload = sc.build_survivor_output(**kw)
+    scope = payload["sample_scope"]
+    assert scope["kind"] == "event"
+    assert scope["n_samples_test"] is None
+    assert scope["n_samples_test"] != _FULL_TEST

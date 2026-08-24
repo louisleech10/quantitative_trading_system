@@ -1,0 +1,135 @@
+{
+  "closure": "CLOSED",
+  "closure_doc": "CLOSED＝每條 mutation 之轉紅集合逐一等於預期且還原後 rc=0",
+  "all_pass": true,
+  "mutations": [
+    {
+      "id": "SITE1",
+      "desc": "對帳退回全軸 plan 列數（修法前行為）",
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "TestTimestampsBehavior::test_t2_large_subset_effective_and_oos",
+        "test_event_mode_allows_purge_gap_le_not_eq",
+        "test_event_mode_n_samples_test_no_full_axis_fallback",
+        "test_event_mode_reconciles_on_filtered_masks"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "TestTimestampsBehavior::test_t2_large_subset_effective_and_oos",
+        "test_event_mode_allows_purge_gap_le_not_eq",
+        "test_event_mode_n_samples_test_no_full_axis_fallback",
+        "test_event_mode_reconciles_on_filtered_masks"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "SITE2",
+      "desc": "exact 對帳退回全軸 test_plan 列數",
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "TestTimestampsBehavior::test_t2_large_subset_effective_and_oos",
+        "test_event_mode_allows_purge_gap_le_not_eq",
+        "test_event_mode_reconciles_on_filtered_masks"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "TestTimestampsBehavior::test_t2_large_subset_effective_and_oos",
+        "test_event_mode_allows_purge_gap_le_not_eq",
+        "test_event_mode_reconciles_on_filtered_masks"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "SITE3",
+      "desc": "n_samples_test 退回全軸 test_plan 列數",
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_event_mode_n_samples_test_no_full_axis_fallback"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_event_mode_n_samples_test_no_full_axis_fallback"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "LE_EQ",
+      "desc": "把 ≤ 收成 ==（purge 帶內事件被誤擋）",
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "TestTimestampsBehavior::test_t2_large_subset_effective_and_oos",
+        "test_event_mode_allows_purge_gap_le_not_eq",
+        "test_event_mode_n_samples_test_no_full_axis_fallback",
+        "test_event_mode_reconciles_on_filtered_masks"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "TestTimestampsBehavior::test_t2_large_subset_effective_and_oos",
+        "test_event_mode_allows_purge_gap_le_not_eq",
+        "test_event_mode_n_samples_test_no_full_axis_fallback",
+        "test_event_mode_reconciles_on_filtered_masks"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "MASKLEN",
+      "desc": "mask 長度守衛被移除",
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_event_mode_mask_length_must_equal_n_samples"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_event_mode_mask_length_must_equal_n_samples"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "NONEVENT",
+      "desc": "非事件模式之原保護被移除",
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_non_event_split_row_guard_preserved"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_non_event_split_row_guard_preserved"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "EVNULL",
+      "desc": "事件模式缺 mask 時之 null 保護被移除（GROK-R1-P2-01）",
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_event_mode_no_masks_no_marginal_leaves_n_samples_test_null"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_event_mode_no_masks_no_marginal_leaves_n_samples_test_null"
+      ],
+      "verdict": "PASS"
+    }
+  ]
+}
