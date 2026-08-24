@@ -216,7 +216,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
      **匯入時不重算**，只比對（`verify_source_digest`）。
 - **修改檔案**：
   - `frontend/src/lib/eventExport.ts`：`canonicalSourceText`（改為呼叫後端取得，不自算）
-  - 既有匯出服務端入口（`api/routes/export.py` 或 case 匯出鏈之對應 handler）：回應增兩鍵
+  - 🔴 **定案（R2 主委實跑）**：`api/routes/export.py` 之路由為 `/{model_task_id}`＝**模型匯出**，**不是** case 匯出鏈 ⇒ 不改該檔。case 側之 `source_file` 處理現於 `api/routes/case.py:142-147`（匯入端）。`/search` 匯出目前**由前端組檔、後端無對應 route**⇒ 本 Task 之服務端入口＝**在 `api/routes/case.py` 既有 case 鏈內新增一個回應欄位承載點**（不新增 route，見「不可做」），其 handler 名於開工時以 `grep -n '@router' api/routes/case.py` 定位並記入 commit message
   - `momentum/Analysis/event_samples/import_contract.py`：新增 `verify_source_digest()`
   - 🔴 S-9 參考實作＝`momentum/Analysis/event_samples/canonical_serialize.py::canonical_event_table_bytes()`——**其建立屬 Task 4.2**，依 §B 之跨批單點依賴表**已提前至 B1**；本 Task（B2）開工時該檔**必須已存在**，不存在即停批（GROK-R2-P1-04）
   - **既有 caller**：`frontend/src/app/search/page.tsx`（匯出按鈕鏈）
@@ -256,7 +256,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   2. 秒級 ×1000；無法判定 ⇒ `invalid_timestamp_unit`（既有 reason）。
   3. 偵測函式須為 **exported 單一函式**，CSV 與 JSON 兩路徑共用。
 - **修改檔案**：`momentum/Analysis/event_samples/import_contract.py`
-  （新增或抽出 `detect_t0_unit_ms()`）；`api/services/case_import_service.py::EventImportService` 呼叫之
+  （新增 `detect_t0_unit_ms()`；🔴 定案：**新增**，不從既有碼抽出——現行單位判定散在 `validate_event_import()` 內，抽出會動到既有行為）；`api/services/case_import_service.py::EventImportService` 呼叫之
   **既有 caller**：`import_events_file`／`import_events_json`（經 service）
 - **不可做**：判不出單位時**不得猜預設值**。
 - **邊界**：① `1704067200`（秒）⇒ `== 1704067200000`。
@@ -638,7 +638,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   2. 序列化**一律依 §G S-1..S-9**（S-2 鍵序／S-5 NaN 與浮點／S-9 位元組 encoder）；
      🔴 本 Task **不自行定義**序列化規則，只引用。
   3. 與 Phase 7 之五維度（同一 `label_definition` 物件之其他鍵）**在同一序列化點寫出**。
-- **修改檔案**：`api/services/case_import_service.py`（或匯出組裝點）之
+- **修改檔案**：🔴 **定案**＝`api/services/case_import_service.py::EventImportService` 之
   `label_definition` 序列化函式；引用 §G S-9 參考實作
   **既有 caller**：`/search` 匯出流程、Task 1.2 CSV 端點
 - **不可做**：🔴 **不得把篩選條件納入 `event_id` 之輸入**（會使同事件跨批 id 不同，違反 D-2）。
@@ -953,7 +953,7 @@ Gate＝V-6 對應條目全綠 ＋ G-2 golden 重凍已於 commit message 說明�
      （symbol／timeframe／timestamp／positive_case／price_change）。
   2. 訊息**追加**「此為來源對證檔，請改放在 `source_file` 欄並勾選 `verify_source_digest`」。
   3. 🔴 `legacy_schema_detected` 之 **reason 字面不變**（只追加提示字串）。
-- **修改檔案**：`api/routes/case.py::_rejected()`（或訊息組裝點）；
+- **修改檔案**：🔴 **定案**＝`api/routes/case.py::_rejected()`（`:132`；既有唯一訊息組裝點）；
   判別函式入 `momentum/Analysis/event_samples/import_contract.py`
   **既有 caller**：`import_events_file`；🔴 **Task 1.2 之 CSV 端點須走同一則提示**
 - **不可做**：不得因判別為 `source.json` 就自動改走 `source_file` 流程（靜默轉換＝契約禁止）。
@@ -975,7 +975,7 @@ Gate＝V-6 對應條目全綠 ＋ G-2 golden 重凍已於 commit message 說明�
   2. 每個表頭鍵對應一個 tooltip。
   3. 只加 tooltip，**不改數值與版面**。
 - **修改檔案**：`frontend/src/components/`（事件型兩表之表頭元件）；
-  glossary 取得管道（build-time import 或 API）
+  🔴 **定案＝build-time import**（與 `frontend/src/lib/types.ts:2038` 既有慣例一致：契約以 SoT 註解鏡射進前端型別，不另開 API）
   **既有 caller**：事件型兩表頁面
 - **不可做**：不得在前端另寫一份定義。
 - **邊界**：① 每個表頭之 tooltip 文字 `==` glossary 對應 `definition`。
@@ -1055,8 +1055,10 @@ Task 5.0 之一行斷言；Gate＝V-7／V-10 對應條目全綠。
   1. 於 `/api/v1/ic/analyze` **啟動任務之前**檢查特徵數。
   2. 超過上限 ⇒ 400，reason 取自 Task 6.0 之登記檔，訊息含**實際數與上限數**。
   3. 🔴 **碼內須註明本 Task 為過渡止血，GAP-6 之分塊計算上線後取代**。
-- **修改檔案**：`api/routes/ic_analysis.py`（analyze handler 之前置檢查）；
-  `api/services/ic_analysis_service.py`（若檢查落在 service 層）
+- **修改檔案**：🔴 **定案**＝`api/routes/ic_analysis.py` 之
+  `@router.post("/analyze")` handler（`:34`）**內、任務建立之前**——
+  放 route 層而非 service 層，因 Task 6.4 要求「在 cap 檢查之後才採樣」，
+  檢查點須在 handler 可觀測之位置。**不動** `api/services/ic_analysis_service.py`。
   **既有 caller**：IC 分析頁
 - **不可做**：不得提供「強制略過上限」之開關。
 - **邊界**：① 以 218369 特徵之 run 呼叫 ⇒ status_code `== 400`
@@ -1080,7 +1082,7 @@ Task 5.0 之一行斷言；Gate＝V-7／V-10 對應條目全綠。
      **禁用 `ps rss`**——macOS 壓縮頁面使 RSS 失真（UAT 實測 RSS 96–400MB vs footprint 7.1GB）。
   3. 上限 ＝ **最小超標點之 `feature_count` × 安全係數 0.5**。
 - **修改檔案**：新增 `scripts/measure_ic_footprint.sh`（量測協定之可重跑腳本）；
-  receipt 落 `handoffs/run_receipts/`；設定值入 `api/core/config.py` 或 `momentum/core/config.py`
+  receipt 落 `handoffs/run_receipts/`；🔴 **設定值定案入 `api/core/config.py::Settings`**（`:7`；本上限為 **API 層**之請求閘門，非 core 計算參數）
   **既有 caller**：Task 6.1 讀該設定值
 - **不可做**：🔴 **禁拍腦袋填數字**；**無 receipt 不得寫入設定**；**禁以 `ps rss` 當量測值**。
 - **邊界**：① receipt 含 **≥3 個量測點**且每點**六欄齊全**。
@@ -1557,8 +1559,10 @@ Gate＝V-8／V-9 對應條目全綠 ＋ 量測 receipt 六欄齊全且重跑差�
   - `frontend/src/lib/types.ts`（`RunInfo` 增 `time_range`）
   - 🔴 **`/features/runs` 之 response producer**（CODEX-R2-P1-02：只改 model／service／
     前端 type **不足以**讓 `time_range` 真的到達前端）——即該 route handler 組裝
-    `RunInfo` 回應之處（`api/routes/feature_factory.py` 或 `feature_registry.py` 之
-    runs 端點，**開工第一件事以 `grep -rn "features/runs" api/routes/` 定位並記入 commit**）
+    🔴 **定案（R2 主委實跑）**＝`api/routes/feature_factory.py::list_runs()`
+    （`:60-62`，`@router.get("/runs", response_model=list[RunInfo])`），
+    其回傳來自 `feature_factory_service.list_runs()` ⇒ **該 service 方法亦須帶出 `time_range`**，
+    否則只改 model 與前端 type 仍拿不到值。
   **既有 caller**：`_browse_metadata_for_run`；`/features/runs`
 - **不可做**：不得在 service 層轉型別；不得直讀 module 常數；不得開第二入口。
 - **邊界**：① 特徵 run **不涵蓋**事件期 ⇒ fail-closed（非警告）。
