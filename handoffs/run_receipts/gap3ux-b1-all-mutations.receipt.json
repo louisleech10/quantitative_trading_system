@@ -367,6 +367,27 @@
       "verdict": "PASS"
     },
     {
+      "id": "2.1b-M5",
+      "task": "2.1b",
+      "desc": "刪掉 <option> 之 disabled 綁定（CODEX-R2-P2-01 綁定鎖）",
+      "selector": [
+        "VITEST",
+        "src/lib/lookaheadDepthLock.page.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ④ 答案窗選單之 <option disabled> 由同一函式綁定（不是計數，是綁定）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "gap3 lookahead depth lock — search/page.tsx 真實呼叫點 > ④ 答案窗選單之 <option disabled> 由同一函式綁定（不是計數，是綁定）"
+      ],
+      "verdict": "PASS"
+    },
+    {
       "id": "4.2-M1",
       "task": "4.2",
       "desc": "移除重複 horizon 之守衛（S-9 ⑦）",

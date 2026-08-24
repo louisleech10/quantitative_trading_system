@@ -86,16 +86,41 @@ describe('gap3 lookahead depth lock — search/page.tsx 真實呼叫點', () => 
     expect(guardAt).toBeLessThan(awaitAt);
   });
 
-  it('④ 選單以同一函式 disable 低於下界之選項（不是另寫一份比較）', () => {
+  it('④ 答案窗選單之 <option disabled> 由同一函式綁定（不是計數，是綁定）', () => {
+    // 🔴 CODEX-R2-P2-01：原寫法只數 `isHorizonBelowLowerBound` 之呼叫次數（`calls >= 2`）
+    //    ⇒ 把 <option> 之 disabled 綁定整個刪掉，次數仍達標、測試照樣綠（codex 實跑 rc=0）。
+    //    計數不是綁定——這又是一次「比對範圍過寬」。改為在 AST 上鎖住那個屬性本身。
     const text = fs.readFileSync(PAGE, 'utf8');
     const source = ts.createSourceFile(PAGE, text, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX);
-    let calls = 0;
+
+    const optionDisabledBindings: ts.JsxAttribute[] = [];
     const visit = (n: ts.Node): void => {
-      if (isGuardCall(n)) calls += 1;
+      if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
+        const tag = n.tagName.getText();
+        if (tag === 'option') {
+          for (const attr of n.attributes.properties) {
+            if (
+              ts.isJsxAttribute(attr) &&
+              attr.name.getText() === 'disabled' &&
+              attr.initializer &&
+              ts.isJsxExpression(attr.initializer) &&
+              attr.initializer.expression &&
+              isGuardCall(attr.initializer.expression)
+            ) {
+              optionDisabledBindings.push(attr);
+            }
+          }
+        }
+      }
       ts.forEachChild(n, visit);
     };
     visit(source);
-    // 匯出守衛 1 次 ＋ option disabled 1 次 ＋ option 文案 1 次
-    expect(calls).toBeGreaterThanOrEqual(2);
+
+    expect(optionDisabledBindings.length).toBe(1);
+
+    // 兩個引數也要對：選項自己的根數，以及導出下界。任一被換掉即紅。
+    const call = (optionDisabledBindings[0].initializer as ts.JsxExpression)
+      .expression as ts.CallExpression;
+    expect(call.arguments.map((a) => a.getText())).toEqual(['h', 'lookaheadLowerBound']);
   });
 });

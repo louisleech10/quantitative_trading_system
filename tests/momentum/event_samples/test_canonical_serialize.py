@@ -111,19 +111,38 @@ def test_canonical_serialize_06_negative_zero_preserved() -> None:
     assert math.copysign(1.0, normalize_for_canonical(-0.0)) == -1.0
 
 
+class _ReachedManifestTable(Exception):
+    """哨兵：`event_forward_return_table` 之控制流已走過 horizon 驗證區、開始讀 manifest。"""
+
+
+class _ManifestProbe:
+    """只在被讀 `.table` 時丟哨兵；讀取次數可稽核（防「根本沒讀到」被當成通過）。"""
+
+    def __init__(self) -> None:
+        self.table_reads = 0
+
+    @property
+    def table(self):  # noqa: ANN201 —— 永不回值
+        self.table_reads += 1
+        raise _ReachedManifestTable("horizon 驗證區已通過")
+
+
 # ── ⑦ 重複 horizon ⇒ event_forward_return_table raise ValueError ──────────
 def test_canonical_serialize_07_duplicate_horizon_raises() -> None:
     with pytest.raises(ValueError) as dup:
         event_forward_return_table(None, None, None, None, {"horizons": [1, 3, 3, 7]})
     assert "不得重複" in str(dup.value)
 
-    # 🔴 對照組（CODEX-R1-P1-02 之修法）：舊寫法只驗「例外訊息不含『不得重複』」，
-    #    一個「所有 horizons 一律 raise ValueError」的壞實作照樣全綠。
-    #    改為斷言**控制流真的走過了 horizon 驗證區**——manifest=None 之下一步
-    #    `t = manifest.table` 必然 AttributeError。任何在該點之前 raise 的壞法都會轉紅。
-    with pytest.raises(AttributeError) as ok:
-        event_forward_return_table(None, None, None, None, {"horizons": [1, 3, 7]})
-    assert "table" in str(ok.value)
+    # 🔴 對照組（CODEX-R1-P1-02 → CODEX-R2-P2-02 兩輪修法）：
+    #    R1 版只驗「例外訊息不含『不得重複』」⇒「所有 horizons 一律 raise」之壞實作照樣全綠。
+    #    R2 版改期望 CPython 之 AttributeError／訊息含 "table"——控制力有效，但把
+    #    **例外型別與直譯器訊息**當成控制流契約，首段驗證之合法重構會造成偽陰。
+    #    現版改用**本檔自己的哨兵**：manifest 只在被讀 `.table` 時丟一個專屬例外
+    #    ⇒「有沒有走過 horizon 驗證區」變成我們自己定義的事實，不依賴 CPython 行為。
+    probe = _ManifestProbe()
+    with pytest.raises(_ReachedManifestTable):
+        event_forward_return_table(probe, None, None, None, {"horizons": [1, 3, 7]})
+    assert probe.table_reads == 1
 
 
 # ── 型別白名單：非白名單型別須 raise，禁依賴 encoder 隱式轉換 ────────────────

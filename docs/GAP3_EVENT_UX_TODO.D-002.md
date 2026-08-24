@@ -141,6 +141,29 @@ A-004 為 B1 交付邊界，依「殘留每條必帶為何現在不做」具名�
 - **發現者**：`GROK-R1-P2-01`。
 - **mutation**：刪掉 `page.tsx` 之匯出守衛 ⇒ 上列①②③三條全部轉紅；還原轉綠（`2.1b-M4`）。
 
+### A-008 — AST 測試 ④ 用「呼叫次數」代替「綁定」（假綠，R2）
+
+- **原寫法**：只數 `isHorizonBelowLowerBound` 在 `page.tsx` 全檔之呼叫次數 `>= 2`。
+- **失效**：把 `<option>` 之 `disabled={…}` 綁定整段刪掉，次數仍達標 ⇒ 測試照樣綠
+  （codex 實跑 rc=0／4 tests passed）。**計數不是綁定**——這是「比對範圍過寬」在同一批內的第三次。
+- **修法**：在 AST 上鎖住那個屬性本身——找 `<option>` 之 `disabled` 屬性，
+  斷言其 initializer 為對 `isHorizonBelowLowerBound` 之呼叫，且**引數逐字**為
+  `['h', 'lookaheadLowerBound']`（換掉任一引數即紅），並斷言這樣的綁定**恰一處**。
+- **發現者**：`CODEX-R2-P2-01`。
+- **mutation**：刪掉該 `disabled` 綁定 ⇒ ④ 轉紅；還原轉綠（`2.1b-M5`）。
+
+### A-009 — S-9 ⑦ 對照組把 CPython 例外當控制流契約（脆弱，R2）
+
+- **A-006 之修法**（期望 `AttributeError` 且訊息含 `table`）**控制力有效**
+  ——「所有非空 horizons 一律 raise」之 mutant 實跑 rc=1（8 passed／1 failed）。
+- **但**它把**例外型別與直譯器訊息**當成控制流契約：`event_forward_return_table` 首段
+  之合法重構（例如先取 `manifest`、或改用 `getattr`）會使該對照組偽陰。
+- **修法**：改用**本檔自己的哨兵**——傳入一個只在被讀 `.table` 時丟 `_ReachedManifestTable`
+  之 probe 物件，並斷言 `probe.table_reads == 1`。
+  「有沒有走過 horizon 驗證區」由此變成**我們自己定義的事實**，不依賴 CPython 行為。
+- **發現者**：`CODEX-R2-P2-02`。
+- **mutation**：`4.2-M2`（所有 horizons 一律被擋）在新對照組下仍轉紅（已實跑重驗）。
+
 ## 修訂索引
 
 | 編號 | 標的 | 一句話 | 日期 |
@@ -151,6 +174,8 @@ A-004 為 B1 交付邊界，依「殘留每條必帶為何現在不做」具名�
 | **A-005** | Task 1.10 registry | 🔴 SPEC 把 `future{1,2,4,6}_close_return` 說成小時欄，producer 是 `shift(-N)`＝根；照抄會低估 purge 六倍。以 producer 為準 | 2026-08-24 |
 | **A-006** | §G S-9 ⑦ 對照組 | 只驗訊息不含關鍵字 ⇒「全部 horizons 都 raise」照樣綠；改驗控制流走過驗證區 | 2026-08-24 |
 | **A-007** | Task 2.1b 前端測試 | vitest 測的是雙胞不是 page；改用 TypeScript AST 鎖真實呼叫點 | 2026-08-24 |
+| **A-008** | AST 測試 ④ | 用呼叫次數代替綁定 ⇒ 刪 `<option disabled>` 仍綠；改鎖屬性本身與引數字面 | 2026-08-24 |
+| **A-009** | §G S-9 ⑦ 對照組 | 把 CPython 例外型別／訊息當控制流契約；改用自訂哨兵 probe | 2026-08-24 |
 
 ## 戳記
 
