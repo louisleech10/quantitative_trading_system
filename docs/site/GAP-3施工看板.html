@@ -12,8 +12,8 @@
 <h1 id="gap-3-事件型-uat-施工進度看板">GAP-3 事件型 UAT — 施工進度看板</h1>
 <blockquote>
 <p><strong>這份只回答一件事：42 個 Task，哪些做了、哪些沒做、卡在哪。</strong>
-由 <code>docs/GAP3_EVENT_UX_TODO.md</code>（<strong>FROZEN v1.0</strong>）＋ 其延伸檔
-<code>docs/GAP3_EVENT_UX_TODO.D-001.md</code> <strong>機械產生，禁手抄</strong>。</p>
+由 <code>docs/GAP3_EVENT_UX_TODO.md</code>（<strong>FROZEN v1.0</strong>）＋ <code>docs/GAP3_EVENT_UX_TODO.D-001.md</code>
+<strong>機械產生，禁手抄</strong>。</p>
 </blockquote>
 <h2 id="一眼看完">一眼看完</h2>
 <div class="table-wrap"><table>
@@ -34,35 +34,34 @@
 </tr>
 <tr>
 <td><strong>實作</strong></td>
-<td>⬜ <strong>尚未開始</strong></td>
+<td><strong>尚未開始</strong></td>
 </tr>
 <tr>
 <td>Task 總數</td>
 <td><strong>42</strong></td>
 </tr>
 <tr>
-<td>✅ 已完成</td>
+<td>已完成</td>
 <td><strong>0</strong></td>
 </tr>
 <tr>
-<td>🔧 進行中</td>
+<td>進行中</td>
 <td><strong>0</strong></td>
 </tr>
 <tr>
-<td>⬜ 未開工</td>
+<td>未開工</td>
 <td><strong>42</strong></td>
 </tr>
 </tbody>
 </table></div>
-<p>🔴 <strong>下一個動作是你的</strong>：要不要開第一批（B1）。我不會自己開始。</p>
-<h2 id="批次順序做的順序">批次順序（做的順序）</h2>
+<p>🔴 <strong>下一個動作是使用者的</strong>：要不要開第一批。實作端不自行開工。</p>
+<h2 id="批次順序做的順序本表不帶狀態狀態一律看下方逐-task-表">批次順序（做的順序；本表不帶狀態，狀態一律看下方逐 Task 表）</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>批</th>
 <th>含哪些 Task</th>
 <th>依賴</th>
-<th>狀態</th>
 </tr>
 </thead>
 <tbody>
@@ -70,71 +69,60 @@
 <td><strong>B1 契約與深度根基</strong></td>
 <td>1.1、1.10、2.1b、4.2（僅 §G S-9 參考實作部分）　🔴 <strong>依 D-001 A-001 更正</strong></td>
 <td>無</td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B2 CSV 匯入主線</strong></td>
 <td>1.2、1.3、1.4、1.8</td>
 <td>B1</td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B3 深度三層防線</strong></td>
 <td>1.11、1.12、1.9</td>
 <td>B1、B2、<strong>Task 2.1b</strong></td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B4 匯入前端</strong></td>
 <td>1.5、1.6、1.7</td>
 <td>B2</td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B5 匯出前篩選</strong></td>
 <td>Phase 2 全部（扣除已於 B1 完成之 2.1b）</td>
 <td>B1</td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B6 刪除</strong></td>
 <td>Phase 3 全部</td>
 <td>無</td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B7 匯出端報酬欄</strong></td>
 <td>Phase 4 全部（4.2 之 S-9 部分已於 B1 完成）</td>
 <td>B1、<strong>Task 2.1b</strong></td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B8 訊息與表頭</strong></td>
 <td>Phase 5 全部</td>
 <td>Task 5.0</td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B9 IC 止血閘</strong></td>
 <td>Phase 6 全部</td>
 <td>Task 6.0</td>
-<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td><strong>B10 全棧接線</strong></td>
 <td>Phase 7 全部</td>
 <td>B1–B9</td>
-<td>⬜ 未開工</td>
 </tr>
 </tbody>
 </table></div>
-<p>🔴 <strong>B1 是唯一沒有前置的一批</strong>，其餘全部等它。
-B1 裡有兩個「被很多批共用」的工具（深度計算函式、序列化參考實作），
-<strong>原本被排在需要它們的批次之後</strong>——第二輪審查抓出來才提前的。</p>
-<p>⚠️ <strong>B1 那一列是我在做這份看板時才發現要更正的</strong>：施工清單的批次表寫「1.1、1.10」，
-但同一節下方的依賴表寫的是四個 Task——<strong>兩處互斥</strong>。
-三輪委員審查加一輪蓋章都沒抓到，是「把文件做成看板」這個動作抓到的。
-更正記在 <code>docs/GAP3_EVENT_UX_TODO.D-001.md</code>（凍結後不就地改，走延伸檔）。</p>
+<p>🔴 <strong>第一批是唯一沒有前置的</strong>，其餘全部等它。裡面有兩個「被很多批共用」的工具
+（深度計算函式、序列化參考實作），<strong>原本被排在需要它們的批次之後</strong>——第二輪審查抓出來才提前的。</p>
+<p>⚠️ <strong>第一批那一列是我在做這份看板時才發現要更正的</strong>：施工清單的批次表寫兩個 Task，
+但同一節下方的依賴表寫四個——<strong>兩處互斥</strong>。三輪委員審查加一輪蓋章都沒抓到，
+是「把文件做成看板」這個動作抓到的。更正記在 <code>docs/GAP3_EVENT_UX_TODO.D-001.md</code>
+（凍結後不就地改，走延伸檔）。⚠️ 該延伸檔<strong>尚未過委員蓋章</strong>，開工前要補。</p>
 <h2 id="逐-task-狀態42-個">逐 Task 狀態（42 個）</h2>
 <div class="table-wrap"><table>
 <thead>

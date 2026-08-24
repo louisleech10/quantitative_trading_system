@@ -1,51 +1,38 @@
 # HANDOFF
 
-## GAP-3 事件型 UAT — SPEC 與 TODO **皆已 FROZEN**（2026-08-24）
+## 🔴 接手第一件事：讀 `docs/GAP3UX_IMPL_HANDOFF.md`（完整實作交接，191 行）
 
-| 文件 | 狀態 | 依據 |
+**使用者已裁定：新 session 開始實作 GAP-3 事件型 UAT 缺口修補。**
+本檔只放指標，開工所需之全部細節（稽核命令、B1 內容、派工管線、地雷、檔案地圖）在上列那份。
+
+## 狀態
+
+| 文件 | 狀態 | commit |
 |---|---|---|
-| `docs/GAP3_EVENT_UX_SPEC.md` | 🔒 **FROZEN**（3,547 行／42 Task） | 使用者 2026-08-24 直接裁定；commit `4ce3d6d9` |
-| `docs/GAP3_EVENT_UX_TODO.md` | 🔒 **FROZEN v1.0**（1,618 行／42 Task） | 三輪對抗審＋戳記輪；三家全數 APPROVED |
+| `docs/GAP3_EVENT_UX_SPEC.md`（語意權威） | 🔒 FROZEN，42 Task | `4ce3d6d9` |
+| `docs/GAP3_EVENT_UX_TODO.md`（操作依據） | 🔒 FROZEN v1.0，42 Task | `afa70967` |
+| `docs/GAP3_EVENT_UX_TODO.D-001.md`（**須並讀**） | ⚠️ **未過戳記** | `f466a23b` |
+| 實作 | ⬜ **42 Task 全部未開工** | — |
 
-**TODO 已可據以派工。** 後續修訂走延伸檔 `docs/GAP3_EVENT_UX_TODO_AMENDMENTS.md`，不就地改。
+看板（給使用者看）：`白話說明/GAP-3施工看板.md`。
 
-## 🔴 下一手：停在這裡，等使用者指示
+## 開工三件事（順序不可換）
 
-**使用者尚未裁定是否進實作。** 不要自己開 B1。
+1. 跑 `docs/GAP3UX_IMPL_HANDOFF.md` §1 之稽核命令（含三份 reconcile 之 stamp check 須 PASS）。
+2. 🔴 **補跑 D-001 之戳記輪**（A-001 是主委自查更正，未經三家核可；開 B1 前必辦）。
+3. 開 **B1＝Task 1.1、1.10、2.1b、4.2（僅 §G S-9 部分）**——
+   🔴 **四個，不是兩個**；TODO §B 表格那列是錯的，D-001 A-001 已更正。
+   照表格只做兩個 ⇒ B2／B3／B7 開工時 helper 不存在、當場停擺。
 
-## TODO 之對抗審履歷（三輪，輪次上限）
+## 三條鐵律（違反即返工）
 
-- **R1**（12 findings）：主委 brief 鎖版失效 ⇒ codex／grok 正確停手、內容審缺席；
-  composer 10 條全數落地。主委自查另發現「以行號注入致三處錯置」（無委員提出）。
-- **R2**（19 findings）：抓出主委 R1 修法留下之**假綠**（同步斷言只驗子字串存在）、
-  mutation 覆蓋率宣稱有誤（腳本比對範圍過寬致假跳過）、**§B 缺跨批單點依賴**
-  （`depth_by_timeframe` 與 `canonical_serialize.py` 建立批次晚於消費批次）。CLOSED 16／PARTIAL 3。
-- **R3**（3 findings）：composer 與 grok 皆判**可定版**；codex 程序性 BLOCKED
-  ——R1／R2 之 reconcile **缺委員戳記**（主委漏做收案程序），該缺失成立、已補。
-- **戳記輪**：`reconcile_stamps_check.sh` 對 R1／R2／R3 **皆 PASS**，三家全數 APPROVED。
+- **完成 ＝ 驗證命令 rc=0 ＋ mutation 實跑轉紅還原轉綠 ＋ receipt 入 commit**。只有測試綠不算完成。
+- **不得碰治理**（使用者 2026-08-24 定死）。工具壞掉 ⇒ 繞過並具名記錄，不修不開票。
+  落地出錯就抄仔細，**不要做工具來量自己**——那是 SPEC 階段燒掉六輪的原因。
+- **一律字面錨點，禁行號**；檢查寫完要用「已知會紅的輸入」試一次。
+  「比對範圍過寬」本 epic 已犯四次，四次形狀相同（詳見實作交接 §6.1）。
 
-## 定版時之機械對證（皆經 composer 與 grok 獨立複跑）
+## 收 epic 前須補
 
-Task 42/42（追溯缺 0 多 0）；§V 20/20、§G 3/3 有落點；五必填欄各 42/42；
-驗證欄 mutation 42/42、可執行前綴 42/42；§B 經 Kahn 檢查**無環**；
-7.0b 簽章 SPEC≡TODO；`doc_format_precheck.sh` rc=0。
-
-## 具名殘留（SPEC 4 條 ＋ TODO 4 條，皆非量化正確性）
-
-- **SPEC**（末節 F-1..F-4）：同輪重派死鎖／補丁包檔名碰撞／草圖 illustrative 佔位不通過
-  `compile()`／`gap3ux_apply_patch.py` 包側 VERIFY 缺陷。**不排工、不另立治理票。**
-- **TODO**（R3 reconcile）：前端 directory-only 路徑 10 處／Task 5.0 驗證 defer SPEC／
-  五 Task 之 mutation 全文 defer SPEC（composer 已交 exact mutant 補丁包）／B1 須並讀 SPEC。
-
-## 🔴 不要再碰治理（使用者 2026-08-24 定死）
-
-逐字：「當初就是發現你做治理是無解才不做」「你這樣岔題去問委員，永遠沒完沒了」。
-遇治理工具壞掉 ⇒ **繞過並具名記錄，不修、不開票**。要動須使用者明示。
-⚠️ 本 session 之教訓：落地出錯就**抄仔細**，不要做工具量自己——
-那正是 GAP-3 SPEC 燒掉六輪的原因。
-
-## 本 session 之主委自傷（供下一手避開）
-
-「比對範圍過寬」犯**四次**：Phase Gate 標籤與 Task 欄位同字面／以**行號**注入落到錯的
-Task（行號取自修補前之掃描，中間已位移）／mutation 跳過判準掃整個區塊／
-同步斷言只驗子字串存在（假綠）。**一律用字面錨點，且檢查要用「已知會紅的輸入」試一次。**
+動過 `scripts/plain_docs_sync_check.sh` ⇒ 跑 `bash scripts/gov_check.sh --no-probe`（**丟背景**，
+十分鐘級；**跑它時不得動檔**）。另 GAP-3 B5 之 UAT B 段簽字仍在使用者手上。
