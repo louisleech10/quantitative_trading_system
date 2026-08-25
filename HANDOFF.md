@@ -31,6 +31,20 @@ GAP-3 之 42 個 Task：3 個 ✅、1 個 🔧、38 個 ⬜。
 | 2 | repo 內 11 條既有紅測試：10 條修測試、1 條標記已知產品缺陷 | `1f9dceac` |
 | 3 | 該產品缺陷之修法（consult → 實作 → review R1 → review R2 收斂） | `0f09e30f` |
 
+## 工具：mutation 併發隔離（使用者 2026-08-25 明示授權，唯一一項獲准之工具改造）
+
+`scripts/mutation_worktree.py`（新，入版控）—— 每個執行者在自己的 **git worktree 副本**內改檔，
+主 repo 零觸碰 ⇒ 三家委員可**平行**跑 mutation，不必排隊。
+`scripts/verify_mutation.sh` 改為薄殼委派它；**CLI 與 stdout 判詞字串逐字不變**（委員報告會引用）。
+`handoffs/*_mutations.py` 之 import 改指 `scripts/`。
+
+掛載策略（實測導出，非臆測）：ignored 之**檔**用複製（可寫、不外洩），**目錄**用符號連結；
+`.claude/gate/` 強制複製（治理測試會寫它，連結會穿透回主 repo）；`.claude/tmp/` 跳過（實測 21 GB）。
+路徑 fail-closed：`<檔>` 為絕對路徑或含 `..` ⇒ rc=2（否則 `Path(wt)/"/abs"` 會靜默打回主 repo）。
+
+⚠️ `handoffs/*.py` 由 **`.git/info/exclude:21`（本機檔，非 `.gitignore`）** 排除 ⇒
+各 epic runner 本身不入版控，只有 `scripts/` 這支 helper 入。
+
 ## 下一步
 
 1. **GAP-3 第二批**＝Task 1.2、1.3、1.4、1.8。其中 Task 1.3 需要第一批已建之
@@ -54,11 +68,7 @@ mutation 判準＝**轉紅之 test 集合逐一等於預期**（多紅少紅皆 
 
 ## 具名殘留（不排工，除非使用者指示）
 
-- **R-MUT-1 mutation runner 非併發安全**：`handoffs/*_mutations.py` 直接改真實 repo 檔案
-  ⇒ 多執行者同時跑會互相破壞 baseline，症狀為「部分條目 pre_rc != 0 未執行 ⇒ NOT-CLOSED」。
-  已於 GAP-3 B1 R5 與 survivor R2 各出現一次；兩次都由無併發重跑證實為假失敗。
-  判讀規則已寫入 runner 檔頭。**未修**：需讓 runner 在隔離 worktree 內操作，屬工具改造。
-  三值理由 `user-ruling`（使用者 2026-08-24 定死不動治理／工具）。owner 主委。
+- ~~**R-MUT-1 mutation runner 非併發安全**~~ → 使用者 2026-08-25 明示授權根治，見上「工具」節。
 - **R-B1-1 全量跑之測試順序污染**：`pytest tests/momentum tests/api` 全量跑時有若干紅，
   單獨跑較少。歸因未實跑證明（需以 stashed 樹全量跑一次，約 64 分鐘）。
   三值理由 `needs-research`。owner 主委。

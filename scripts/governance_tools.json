@@ -117,7 +117,7 @@
     "verify_mutation.sh": {
       "node": "6-驗收證偽",
       "mandatory": true,
-      "why": "改壞→須紅→**trap 保證還原**→須綠。**禁手搓 mutation loop**(手做漏還原會髒工作區)",
+      "why": "改壞→須紅→須綠。改檔在 **git worktree 隔離副本**內(scripts/mutation_worktree.py),主 repo 不被觸碰 ⇒ **併發安全,多委員可平行跑**。**禁手搓 mutation loop**(手做漏還原會髒工作區;就地改則併發互毀 baseline)",
       "cmd": "bash scripts/verify_mutation.sh <檔> <原> <變異> <pytest目標>"
     },
     "mutation_probe_check.sh": {

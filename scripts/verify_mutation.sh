@@ -5,6 +5,12 @@
 #   步驟散、且**還原漏做就髒工作區**(Grok 同輪就踩過 git checkout 意外)。
 #   本腳本用 trap 保證無論中途成功/失敗/被中斷都還原。
 #
+# 🔴 2026-08-25 使用者授權根治「併發不安全」:改檔已移入 **git worktree 隔離副本**
+#   (`scripts/mutation_worktree.py`),**主 repo 一個位元組都不動** ⇒ 三家委員可**平行**跑,
+#   不必排隊。舊版就地改真實檔,併發時互相破壞 baseline,症狀=「部分條目 pre_rc != 0
+#   未執行 ⇒ 整份 NOT-CLOSED」,已實際出現兩次(GAP-3 B1 R5、survivor R2)。
+#   CLI 與 stdout 判詞字串**逐字不變**(委員報告會引用)。
+#
 # 用法:
 #   bash scripts/verify_mutation.sh <檔> <原字串> <變異字串> <pytest目標>
 # 例:
@@ -25,36 +31,8 @@ file="${1:-}"; old="${2:-}"; new="${3:-}"; target="${4:-}"
 py="venv/bin/python"; [ -x "${py}" ] || py="$(command -v python3 || command -v python)"
 [ -n "${py}" ] || { echo "ERROR: 找不到 python" >&2; exit 2; }
 
-bak="$(mktemp -t vmut)" || exit 2
-cp "${file}" "${bak}"
-# 保證還原(成功/失敗/中斷皆然)
-trap 'cp "${bak}" "${file}"; rm -f "${bak}"; echo "[verify_mutation] 已還原 ${file}"' EXIT INT TERM
+[ -f "scripts/mutation_worktree.py" ] || {
+  echo "ERROR: 缺 scripts/mutation_worktree.py(隔離執行環境)" >&2; exit 2; }
 
-# --- 套用變異(字面替換一次;找不到即 fail,不靜默略過) ---
-"${py}" - "${file}" "${old}" "${new}" <<'PY' || exit 2
-import sys
-from pathlib import Path
-p, old, new = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
-s = p.read_text(encoding="utf-8")
-if old not in s:
-    sys.stderr.write("ERROR: 檔內找不到要變異的字串(結構已改?):\n  %r\n" % old); sys.exit(2)
-p.write_text(s.replace(old, new, 1), encoding="utf-8")
-print("[verify_mutation] 已套用變異(替換 1 處)")
-PY
-
-echo "[verify_mutation] === 變異後跑 ${target}(期望:轉紅) ==="
-if "${py}" -m pytest "${target}" -q --tb=line >/dev/null 2>&1; then
-  echo "[verify_mutation] ❌ 變異後測試仍**綠** → 這測試抓不到該抓的(假綠/弱 oracle)" >&2
-  exit 1
-fi
-echo "[verify_mutation] ✓ 變異後轉紅(正確)"
-
-# 還原(trap 也會做;這裡先做以便跑第二次)
-cp "${bak}" "${file}"
-echo "[verify_mutation] === 還原後跑 ${target}(期望:轉綠) ==="
-if ! "${py}" -m pytest "${target}" -q --tb=line >/dev/null 2>&1; then
-  echo "[verify_mutation] ❌ 還原後仍紅 → 測試本身有問題(或還原不完整)" >&2
-  exit 1
-fi
-echo "[verify_mutation] ✅ 通過:變異→紅、還原→綠(此守衛是真 oracle)"
-exit 0
+# 改檔與 pytest 全在隔離副本內完成;主 repo 不被觸碰,故無須 trap 還原。
+exec "${py}" scripts/mutation_worktree.py verify "${file}" "${old}" "${new}" "${target}"

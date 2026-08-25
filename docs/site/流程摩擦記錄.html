@@ -2178,6 +2178,15 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百九十・（2026-08-24）委員擋在門口不進來，是對的</strong>：最後一輪某家沒有交任何內容審查，只交一條「你的前面兩輪 reconcile 從來沒有委員蓋章，依合約我不能用它的結論來審」。我一查——真的，收案程序我兩輪都漏了。他沒有虛構 finding、也沒有假裝零 finding，就停在那裡。<strong>規則</strong>：<strong>「我不能在這個狀態下工作」是一種合法且珍貴的產出</strong>——比硬著頭皮交一份建立在壞前提上的審查有價值得多。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百九十一・（2026-08-25）「三家同時跑破壞測試」一直是假的，只是沒人發現</strong>：把程式改壞來檢驗測試（mutation）這件事，專案從 2026-07-25 以來的做法都是<strong>直接改真實檔案</strong>，跑完再改回去。單人跑完全正確，但三家委員同時跑就會互相破壞彼此的起點——症狀是「有幾條顯示『還沒開始跑就已經是紅的』所以整份不算數」。這個症狀出現過兩次，兩次都是我單獨重跑一次就變綠，於是被歸成「委員的環境不穩」。<strong>其實兩次都是真的併發衝突。</strong> 使用者這次授權根治，改成每個人在自己的 git 副本裡改。<strong>規則</strong>：<strong>「重跑一次就好了」是一個需要解釋的現象，不是一個結論</strong>——同一份輸入兩次結果不同，代表有共用狀態，而共用狀態不會自己消失。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百九十二・（2026-08-25）我做隔離，第一版把測試需要的資料檔漏掉了——因為我問了目錄，不是問檔案</strong>：新做的隔離副本要把版控外的資料掛進去。我跑 <code>git check-ignore tests/golden</code> 得到空輸出，就下結論「這個資料夾裡的東西都在版控內，不用掛」。實際上忽略清單裡有一條 <code>*.h5</code>，那個資料夾裡的資料檔<strong>全部</strong>被忽略——結果隔離副本裡沒有資料檔，端對端測試全紅。<strong>這正是這個 epic 犯第五次的「比對範圍過寬」</strong>（前四次見第一百八十九條）。修法不是補上那個資料夾，而是<strong>逐項去問 git 有哪些被忽略</strong>，由 git 決定粒度，掛進去 5,658 個項目。<strong>規則</strong>：<strong>問「這個目錄有沒有被忽略」答不出「這個目錄裡有沒有東西被忽略」</strong>——要驗的對象是什麼，就對什麼發問。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百九十三・（2026-08-25）符號連結做出來的「隔離」，寫下去會穿透回本尊</strong>：掛版控外的資料時我一律用符號連結（省空間）。但治理測試會<strong>寫</strong> <code>.claude/gate/</code> 裡的權杖檔——連結過去的話，副本裡的寫入會直接改到主 repo，等於沒隔離，而且會污染。判準因此不是「大不大」而是「<strong>會不會被寫</strong>」：會被寫的用複製，其餘用連結；順帶查出 <code>.claude/tmp/</code> 有 <strong>21 GB</strong>，整個跳過不掛。<strong>規則</strong>：<strong>「隔離」要看方向</strong>——唯讀共用可以連結，可寫共用一定要複製，而哪些會被寫必須具名列出、寫清楚這份清單靠人維護（我已寫進程式註解的「誠實邊界」）。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
