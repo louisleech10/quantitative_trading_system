@@ -414,7 +414,8 @@ with IsolatedWorktree(prefix="b4mut_") as wt:
 | `R-A005-1` | `lookahead_registry` 之 `_PRODUCER_SEMANTICS` 表為人工稽核非執跑探針；與 producer 漂移時本閘看不見 | `needs-research` | 主委；**觸發＝下次動到 `CaseSearchEngine` 未來欄計算段時一併做** |
 | `D-002 A-004` | 前端下界**值來源**未接上（`lookaheadLowerBound` 恆 `null`，`search/page.tsx:59-60` 有 `void` 佔位） | `blocked-by` Task 2.1（B5） | 主委；**B5 必辦** |
 | `D-001/D-002 provenance` | `gate.sh register-output` 只收 `handoffs/` 或 `stampable_artifacts.txt` 明列者 ⇒ 對 `docs/*.D-00N.md` 跑 `reconcile_stamps_check.sh` 會報 provenance pending（**非戳記造假**） | `user-ruling` | 主委 |
-| `R-B2-1` | **秒級 t0 之 `event_id` 摩擦**：使用者上傳秒級 `t0` 的 CSV 時，`event_id` 仍須寫 **ms 版**（否則 fail-closed 拒收並列出期望值）。三家一致判**屬 Task 1.5** | `blocked-by` Task 1.5（B4） | 主委；**B4 必辦** |
+| **`R-B4-1`** | **CSV 方言之殘餘前後端差異**：支援之行尾＝**LF／CRLF**；引號內 CR 當資料保留；裸 CR（含舊式 Mac）兩端一致不支援。其他方言／編碼／writer 癖好之殘餘差異**不再逐一開輪**。兜底＝後端永遠是契約權威；前端只做預覽且**不得產出看似合理的假欄名**（該不變式由 mutation `1.5-M5` 鎖住）。R6 由 codex 以 **9,331 個字串窮舉**比對兩端 predicate，`mismatch_count=0` | `user-ruling`（95% 解法就收；三家 R5／R6 一致裁定） | 主委；**觸發＝出現具體且可重跑之使用者實例才重開，不預先開票** |
+| ~~`R-B2-1`~~（B4 已解除） | **秒級 t0 之 `event_id` 摩擦**：使用者上傳秒級 `t0` 的 CSV 時，`event_id` 仍須寫 **ms 版**（否則 fail-closed 拒收並列出期望值）。三家一致判**屬 Task 1.5** | `blocked-by` Task 1.5（B4） | 主委；**B4 必辦** |
 | `R-B2-2` | **執行期 oracle 之 factory-body 繞法**：新斷言綁 `get_event_import_service()` 之回傳；若日後另立第二個工廠且 route 改呼叫它，本閘看不見 | `needs-research`（正解為 route 層之執行期 wiring 探針） | 主委；屬 **B10 全棧接線** |
 | **純 JS 手刻 sha256** | 不經 `crypto.subtle`／`node:crypto` 入口之手刻實作，前端 ④(a) 之封閉枚舉看不見 | `needs-research` | 主委 |
 | **`R-B3-1`** | Task 1.9 ⑤ 之「系統內篩選路徑」**端到端**對證缺席——該 production caller 尚不存在，本批以「函式物件同一性 ＋ 餵入之 `referenced_columns` 非空且相等」鎖住 | `blocked-by` Task 2.1（B5）／Task 4.1（B7） | 主委；**B5 落地時補端到端** |
