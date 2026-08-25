@@ -258,6 +258,32 @@ def test_gap3_csv_import_ast_oracle_import_records_definition_is_unique():
     assert factories == {frozenset({"get_event_import_service"})}, factories
 
 
+def test_gap3_csv_import_runtime_oracle_factory_returns_the_shared_implementation(monkeypatch):
+    """V-3 之**執行期**錨點（CODEX-R2-P2-01）——不再往原始碼形狀加黑名單。
+
+    🔴 R1→R2 連兩輪都在補形狀斷言（先「名稱」、再「`def` 恰一個」），而 codex 每輪都找得到
+    等價寫法（本輪之反例＝保留原 `def`，另以 `import_records = copied_fn` 綁到 subclass，
+    再讓工廠回傳它）。這正是交接 §6.1 明寫的病：**用原始碼形狀證明執行期性質，
+    黑名單永遠列不完**。
+
+    正解是問「執行期到底跑到哪個 function object」：三個 route 都經
+    `get_event_import_service()` 取得 service，故只要斷言**它回來的那個東西**
+    之 `import_records` 就是 `EventImportService` 那一個 function object，
+    assignment／`setattr`／subclass／工廠改回傳 四類繞法一次全關，且不必枚舉它們。
+    """
+    from api.services.case_import_service import EventImportService, get_event_import_service
+
+    # 🔴 本檔之 autouse fixture 會 monkeypatch 掉 service 單例 ⇒ 直接呼叫工廠只會拿到 fixture
+    #    注入的那個物件，斷言就變成「驗 fixture」而不是「驗生產接線」（本測第一版即如此假綠，
+    #    由 mutation `1.2-M4` 之空紅集合抓到）。先把單例清成 None，逼工廠真的走建構路徑。
+    monkeypatch.setattr(svc_mod, "_event_import_service", None)
+    svc = get_event_import_service()
+    assert type(svc) is EventImportService, type(svc)
+    # Python 3：class 上取到的是 plain function；instance 上取到的是 bound method（`__func__` 指回它）
+    assert type(svc).import_records is EventImportService.import_records
+    assert svc.import_records.__func__ is EventImportService.import_records
+
+
 def test_gap3_csv_import_ast_oracle_single_validation_and_unit_detection_site():
     """V-3 ①（含 Task 1.4 覆蓋面）：`import_records` 是**唯一**呼叫 validate 與 t0 單位偵測之處。
 
