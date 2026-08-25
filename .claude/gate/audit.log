@@ -49686,3 +49686,45 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-24T23:02:27Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"129b937b0996d6192938b985b9f4cb7c9019b393f8e3ea788e5ce9ccd6d9b285","cmd_head":"set +e\nbash scripts/completeness_check.sh --single handoffs/20260825-survivor-nsamples-review-codex.md --family codex\nrc=$?\nprintf 'COMPLETENESS_RC=%s\\n' \"$rc\"\nexit \"$rc\""}
 {"actor": "cx_run", "attempt_id": "8541b53a-bc3c-417c-8fcb-392284fa1e42", "cli_rc": "0", "event": "committee_family_result", "event_id": "3751651e-4333-4d84-87f6-6ef811551301", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-review-codex.md", "output_sha256": "2609cd454d160719a9e8f4aa34bce0dd67f799da45d88169ca8c981ebd5db1d7", "producer": "audit_append.sh", "result_state": "success", "round_id": "8842ae0c-2477-44d1-af77-f6d9758883b8", "schema_version": 1, "sequence": 2705, "ts": "2026-08-24T23:04:18Z"}
 {"actor": "cx_run", "attempt_id": "f54d0e6e-eb12-44c8-858b-b3beda356fe3", "cli_rc": "0", "event": "committee_family_result", "event_id": "90451dd8-87c2-4f57-a299-d3264710fbaf", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-review-composer.md", "output_sha256": "faa3b9be5edef1b91973f6a78ee5eb473777742be196993e235fbac4c3336d7b", "producer": "audit_append.sh", "result_state": "success", "round_id": "8842ae0c-2477-44d1-af77-f6d9758883b8", "schema_version": 1, "sequence": 2706, "ts": "2026-08-24T23:04:33Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "6d1461de-58c0-43ef-943b-bb391096b79a", "lock_sha256": "4698bce446639c6769d52b71883d1e000c43463549513da50bd49b67af381006", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "8842ae0c-2477-44d1-af77-f6d9758883b8", "schema_version": 1, "sequence": 2707, "session_id": "20260825-survivornsamples-x-review-r1", "synth_sha256": "0c66410b1144ffd3181323e13d412fbf128c02f9ce9fa6eb7cb9b0ad82fc3398", "ts": "2026-08-24T23:24:38Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260825-SURVIVORNSAMPLES-X-REVIEW-R2", "ts": "2026-08-24T23:25:53Z"}
+=== 2026-08-25 07:25:53 | dispatch ===
+  ts=2026-08-25 07:25:53
+  kind=dispatch
+  intent=survivor_contract 修法 code review R2：GROK-R1-P2-01 之閉合再驗證（只確認不再挖）
+  risk=low
+  facts_asked=grok probe D 是否確認 n_samples_test 現為 null；修法有無弄壞既有 fixture 與非事件保護；七條 mutation 可否重現
+  review_role=closure re-verification only
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260825-SURVIVORNSAMPLES-X-REVIEW-R2", "ts": "2026-08-24T23:26:03Z"}
+=== 2026-08-25 07:26:03 | dispatch ===
+  ts=2026-08-25 07:26:03
+  kind=dispatch
+  intent=survivor_contract 修法 code review R2：GROK-R1-P2-01 之閉合再驗證（只確認不再挖）
+  risk=low
+  facts_asked=grok probe D 是否確認 n_samples_test 現為 null；修法有無弄壞既有 fixture 與非事件保護；七條 mutation 可否重現
+  review_role=closure re-verification only
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260825-survivor-nsamples-review-r2-brief.md", "brief_sha256": "e78eda172e3fa9cce11020970a37dba637fdc51a28c14c30c344f22a11e8e9cb", "brief_sha256_norm": "e78eda172e3fa9cce11020970a37dba637fdc51a28c14c30c344f22a11e8e9cb", "event": "committee_round_open", "event_id": "f44dafd4-f9bc-4eb7-afcb-1ffc2e210095", "expected_outputs": {"codex": "handoffs/20260825-survivor-nsamples-review-r2-codex.md", "composer": "handoffs/20260825-survivor-nsamples-review-r2-composer.md", "grok": "handoffs/20260825-survivor-nsamples-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "d7a73b7f-402b-4709-8e65-bd6d99127a52", "schema_version": 1, "sequence": 2708, "session_name": "20260825-survivornsamples-x-review-r2", "task_id": "20260825-SURVIVORNSAMPLES-X-REVIEW-R2", "ts": "2026-08-24T23:26:07Z"}
+{"actor": "cx_run", "attempt_id": "9bb2420c-76c1-4787-a922-f10609997bdf", "cli_rc": "0", "event": "committee_family_result", "event_id": "2dd25243-7f42-4cd3-8dc1-529ea19cbc50", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-review-r2-grok.md", "output_sha256": "5a944fe1cdee75a0870c13537099af180b16bd2c79c2fdf01aa91bbb413629af", "producer": "audit_append.sh", "result_state": "success", "round_id": "d7a73b7f-402b-4709-8e65-bd6d99127a52", "schema_version": 1, "sequence": 2709, "ts": "2026-08-24T23:30:49Z"}
+{"event":"gate_deny","ts":"2026-08-25T00:08:04Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"459c4f6ecc9140bd4b1b11fc6b60c8476ac7eaec4096fa1826e58e73feb955cb","cmd_head":"set +e\nbash scripts/completeness_check.sh --single handoffs/20260825-survivor-nsamples-review-r2-codex.md --family codex\nrc=$?\nprintf 'COMPLETENESS_RC=%s\\n' \"$rc\"\nexit \"$rc\""}
+{"event":"gate_deny","ts":"2026-08-25T00:08:54Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"02080d5801c2f02e591b080d83b5cdcc82ca821c89944b28d28d0980ad680160","cmd_head":"set +e\nprintf '%s\\n' '--- cleanup verification ---'\ntest ! -e /private/tmp/survivor-r2-codex.0KBP8C && test ! -e /private/tmp/survivor-r2-codex.4zMVGr && test ! -e /private/tmp/survivor-r2-codex.M2uUiz && test ! -e /private/tmp/survivor-r2-codex.hldAco && test ! -e /private/tmp/survivor-r2-codex.jXKlNd && test ! -e /private/tmp/survivor-r2-codex.plZ4iF\nprintf 'TASK_TMP_REMOVED_RC=%s\\n' \"$?\"\ntest -d /private/tmp/claude-501 && test -e /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system\npr"}
+{"actor": "cx_run", "attempt_id": "55e0cbad-1b08-4454-b4dc-391cfa6914c1", "cli_rc": "0", "event": "committee_family_result", "event_id": "7829606c-bb2b-426d-b6c8-801449342618", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-review-r2-codex.md", "output_sha256": "c67e326a35e56d12d391b4dc4efffa213640205151ef1edf8894703a42c2976d", "producer": "audit_append.sh", "result_state": "success", "round_id": "d7a73b7f-402b-4709-8e65-bd6d99127a52", "schema_version": 1, "sequence": 2710, "ts": "2026-08-25T00:09:26Z"}
+{"actor": "cx_run", "attempt_id": "b3932e17-fa50-4e2b-bfdd-452ceee60ddc", "cli_rc": "0", "event": "committee_family_result", "event_id": "29a8b30e-c194-4bf6-8a32-2cdd0a24f6c5", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260825-survivor-nsamples-review-r2-composer.md", "output_sha256": "c7a57f5de51139e9d7bd525f25a1e158a6de8caefa2662b397be0589fdcf23bc", "producer": "audit_append.sh", "result_state": "success", "round_id": "d7a73b7f-402b-4709-8e65-bd6d99127a52", "schema_version": 1, "sequence": 2711, "ts": "2026-08-25T00:24:14Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "820af393-14ab-45e5-bbcd-80ca75c73452", "lock_sha256": "d5ef7d1cb0ad25fda0dfc52f5559ac302fc29e661b14fe154b46a8fe4a3f16be", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "d7a73b7f-402b-4709-8e65-bd6d99127a52", "schema_version": 1, "sequence": 2712, "session_id": "20260825-survivornsamples-x-review-r2", "synth_sha256": "5bcb8d621cf5a652bb14e4b2238e18ab75c407db12c4271b3a968bd1d44a4553", "ts": "2026-08-25T00:36:51Z"}
