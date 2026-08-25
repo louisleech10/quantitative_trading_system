@@ -804,10 +804,57 @@ class EventImportService:
         return records
 
     # ---- 匯入 ----
+    # ---- 答案窗宣告（GAP-3 UX Task 1.9／1.11；判定與投影唯一實作在 momentum，本層只轉呼與轉 4xx） ----
+    ON_MISSING_REJECT = "reject"
+    ON_MISSING_BLOCK = "block"
+
+    @staticmethod
+    def file_columns(content: bytes, filename: str) -> List[str]:
+        """CSV 首列欄名（含未對映欄）；非 CSV 回 `[]`。
+
+        🔴 只供①預設宣告值②引用欄之候選集合——**不**做任何契約檢核（V-3：檢核唯一實作在 momentum）。
+        """
+        if not filename or not str(filename).lower().endswith((".csv", ".txt")):
+            return []
+        head = content.split(b"\n", 1)[0].decode("utf-8-sig", errors="replace")
+        return [c.strip().strip('"').strip("'").strip() for c in head.split(",") if c.strip()]
+
+    def _resolve_lookahead(
+        self, records: List[Dict[str, object]], *, data_columns: List[str],
+        declaration: Optional[Dict[str, object]], on_missing: str,
+    ) -> Dict[str, object]:
+        """轉呼 pipeline 出口；不合規 ⇒ `EventImportRejectedError`（落檔數 0）。"""
+        out = self._pipeline.resolve_lookahead_declaration(
+            records, data_columns=data_columns, declaration=declaration, on_missing=on_missing)
+        if not out["ok"]:
+            raise EventImportRejectedError(EventImportRejected(
+                kind=str(out["kind"]), message=str(out["message"]), detail=dict(out.get("detail") or {})))
+        return dict(out["receipt"])
+
+    def lookahead_declaration_preview(
+        self, content: bytes, filename: str, records: List[Dict[str, object]],
+        batch_defaults: Optional[Dict[str, object]] = None,
+    ) -> Dict[str, object]:
+        """宣告 UI 之預填資料（Task 1.9 ①：預設值＝檔內最大可用 horizon，逐 tf）。"""
+        cols = self.file_columns(content, filename)
+        view = [{**dict(batch_defaults or {}), **r} for r in records]
+        tfs = sorted({str(r["timeframe"]) for r in view if r.get("timeframe") is not None})
+        receipt = self._resolve_lookahead(
+            view, data_columns=cols, declaration=None, on_missing=self.ON_MISSING_BLOCK)
+        return {
+            "timeframes": tfs,
+            "data_columns": cols,
+            "default_window_bars": receipt["default_window_bars"],
+            "requires_declaration": receipt["requires_declaration"],
+            "referenced_columns": receipt["referenced_columns"],
+        }
+
     def import_records(
         self, records: List[Dict[str, object]], *, source_name: Optional[str], upload_bytes: Optional[bytes],
         validate_only: bool, verify_source_digest: bool = False, source_bytes: Optional[bytes] = None,
         batch_defaults: Optional[Dict[str, object]] = None, extra_warnings: Optional[List[str]] = None,
+        lookahead_declaration: Optional[Dict[str, object]] = None, data_columns: Optional[List[str]] = None,
+        on_missing_declaration: Optional[str] = None,
     ) -> EventImportResponse:
         """upload_bytes：事件檔內容（記 `upload_sha256` 供 provenance）。
         source_bytes：契約所指之**來源檔**位元組（CODEX-R2-P1-03）；`verify_source_digest=True` 時以此逐列對證
@@ -823,6 +870,15 @@ class EventImportService:
                 message="偵測到舊三欄格式（symbol/timestamp/Positive_case）；新端點只收 event_import_contract 新 schema，不做靜默轉換",
                 migration_hint=self.migration_hint(columns),
             ))
+        # GAP-3 UX Task 1.9／1.11：答案窗宣告須在 validate **之前**解析——它會就地投影
+        # `label_definition.window.horizon_bars`，而 label_start/end_ms 由該值導出。
+        # 🔴 以 batch_defaults **填補缺值**後之視圖判定（與 validate 之語意一致：列自帶值優先）——
+        #    否則對映路徑之 `label_definition`（含 filters）只住 defaults，引用欄會整批看不見。
+        declaration_view = [{**dict(batch_defaults or {}), **r} for r in records]
+        declaration_receipt = self._resolve_lookahead(
+            declaration_view, data_columns=list(data_columns) if data_columns is not None else columns,
+            declaration=lookahead_declaration,
+            on_missing=on_missing_declaration or self.ON_MISSING_REJECT)
         verify_bytes = (source_bytes if source_bytes is not None else upload_bytes) if verify_source_digest else None
         df, failures = self._pipeline.validate(records, source_bytes=verify_bytes, batch_defaults=batch_defaults)
         digest = _hashlib.sha256(upload_bytes).hexdigest() if upload_bytes is not None else None
@@ -834,6 +890,11 @@ class EventImportService:
                 migration_hint=self.migration_hint(columns) if self.migration_hint(columns)["required_fields_absent"] else None,
             ))
         warnings: List[str] = list(extra_warnings or [])
+        # Task 1.9 ③：宣告深度之投影**在同質檢查之後**才寫入（見 pipeline 出口 docstring）
+        stored_records = df.to_dict("records")
+        if declaration_receipt.get("lookahead_bars_declared"):
+            self._pipeline.apply_lookahead_horizon_projection(
+                stored_records, declaration_receipt["lookahead_bars_declared"])
         import_id = None
         stored_path = None
         if not validate_only:
@@ -845,7 +906,8 @@ class EventImportService:
                 "source_file_sha256": _hashlib.sha256(source_bytes).hexdigest() if source_bytes is not None else None,
                 "imported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "contract_version": str(self._contract.get("version")),
-                "records": df.to_dict("records"),
+                "lookahead_declaration": declaration_receipt,
+                "records": stored_records,
             }
             p = self.storage_dir / f"{import_id}.json"
             p.write_text(_json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str), encoding="utf-8")
@@ -854,6 +916,7 @@ class EventImportService:
             accepted=True, import_id=import_id, n_rows=len(records), n_valid=int(len(df)), failures=[],
             warnings=warnings, upload_sha256=digest, source_digest_verified=bool(verify_source_digest),
             contract_version=str(self._contract.get("version")), stored_path=stored_path,
+            lookahead_declaration=declaration_receipt,
         )
 
     # ---- 查詢 ----
@@ -880,6 +943,20 @@ class EventImportService:
                     logger.warning("event import 檔無法讀取：%s", p)
         return EventImportListResponse(total=len(items), imports=items)
 
+    def _stored_declaration(self, import_id: str) -> Optional[Dict[str, object]]:
+        """落檔之答案窗宣告 receipt（Task 1.9／1.12）。
+
+        🔴 舊批（Task 1.9 上線前落檔）無此鍵 ⇒ 回 `None`，由 momentum 側判定為**不封鎖**
+        （使用者 2026-08-05「面向未來不溯及既往」；不把舊資料補回新規則）。
+        """
+        if not import_id or "/" in import_id or ".." in import_id:
+            return None
+        p = self.storage_dir / f"{import_id}.json"
+        if not p.is_file():
+            return None
+        val = self._load(p).get("lookahead_declaration")
+        return dict(val) if isinstance(val, dict) else None
+
     def get_import(self, import_id: str) -> Optional[EventImportDetailResponse]:
         if not import_id or "/" in import_id or ".." in import_id:
             return None
@@ -898,17 +975,27 @@ class EventImportService:
         if detail is None:
             return None
         records = detail.records
+        declaration = self._stored_declaration(import_id)
         symbols = sorted({str(r["symbol"]) for r in records})
         tfs = sorted({str(r["timeframe"]) for r in records})
         bars = self._pipeline.bars_from_kline_cache(symbols, tfs)
-        res = self._pipeline.run_with_params(
-            records, bars, test_fraction=float(req.test_fraction), embargo_ms=req.embargo_ms,
-            tier_min_test_events=int(req.tier_min_test_events),
-        )
+        # 🔴 Task 1.12（L3）：深度不可證之批**不進切分**，改走 event-study-only executor。
+        #    分派在此發生 ⇒ `split_events` 對該批**根本不會被呼叫**（非「呼叫後再擋」）。
+        split_blocked = self._pipeline.lookahead_split_blocked(declaration)
+        if split_blocked:
+            res = self._pipeline.run_event_study_only_with_params(records, bars)
+        else:
+            res = self._pipeline.run_with_params(
+                records, bars, test_fraction=float(req.test_fraction), embargo_ms=req.embargo_ms,
+                tier_min_test_events=int(req.tier_min_test_events),
+            )
         tables = self._pipeline.analyze_tables(res, bars, horizons=tuple(int(h) for h in req.horizons),
                                                seed=int(req.seed), n_boot=int(req.n_boot))
         payload = {
             "import_id": import_id,
+            "lookahead_declaration": declaration,
+            "capability": ({"split": "unavailable", "reason": self._pipeline.split_blocked_capability_reason()}
+                           if split_blocked else {"split": "ok"}),
             "summary": res.summary,
             "align_failures": res.align_failures.to_dict("records") if not res.align_failures.empty else [],
             "tables": tables,

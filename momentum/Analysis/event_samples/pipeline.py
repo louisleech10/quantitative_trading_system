@@ -19,6 +19,7 @@ from momentum.Analysis.event_samples.dedupe import build_event_manifest
 from momentum.Analysis.event_samples.event_split import split_events
 from momentum.Analysis.event_samples.feature_materialization import materialize_features_at_decision
 from momentum.Analysis.event_samples.import_contract import ContractValidationError, validate_event_import
+from momentum.Analysis.event_samples.lookahead_gate import LookaheadGate, assert_split_allowed
 from momentum.Analysis.event_samples.types import (
     AlignmentConfig, AlignmentReceipts, DedupePolicyConfig, EventManifest, EventSplitConfig, EventSplitPlan,
 )
@@ -50,7 +51,7 @@ class EventPipelineResult:
     receipts: AlignmentReceipts
     align_failures: pd.DataFrame
     manifest: EventManifest
-    split_plan: EventSplitPlan
+    split_plan: Optional[EventSplitPlan]   # None ＝ Task 1.12 之 event-study-only（未執行切分）
     features: Optional[pd.DataFrame]
     feature_manifest_hash: Optional[str]
     feature_failures: Optional[pd.DataFrame]
@@ -119,6 +120,70 @@ class EventSamplePipeline:
 
         return load_condition_engine_contract()
 
+    # ---- GAP-3 UX Task 1.9／1.11／1.12：答案窗宣告與 L3 閘之 R3 出口（api 層不直 import momentum 內部）----
+    @staticmethod
+    def requires_lookahead_declaration(columns, timeframe, *, provenance=None) -> bool:
+        """Task 1.11（L2）：這組**條件引用欄**在該 tf 是否強制使用者宣告深度。"""
+        from momentum.Analysis.event_samples.lookahead_registry import (
+            PROVENANCE_EXTERNAL_UPLOAD, requires_declaration as _impl,
+        )
+
+        return _impl(columns, timeframe, provenance=provenance or PROVENANCE_EXTERNAL_UPLOAD)
+
+    @staticmethod
+    def lookahead_declaration_defaults(data_columns, timeframes) -> Dict[str, int]:
+        """Task 1.9 ①：逐 tf 之預設宣告值＝檔內最大可用 horizon（唯一實作在 lookahead_declaration）。"""
+        from momentum.Analysis.event_samples.lookahead_declaration import default_window_bars_by_timeframe
+
+        return default_window_bars_by_timeframe(data_columns, timeframes)
+
+    @staticmethod
+    def resolve_lookahead_declaration(records, *, data_columns, declaration, on_missing: str) -> Dict[str, Any]:
+        """Task 1.9／1.11：解析宣告、就地投影 `horizon_bars`、算 per-symbol embargo 下界。
+
+        回**純資料**：成功 `{"ok": True, "receipt": {...}}`；不合規
+        `{"ok": False, "kind": str, "message": str, "detail": {...}}`
+        ——例外型別不跨界（R3：api 層不 import momentum 內部型別，亦不得 catch 它）。
+
+        🔴 `timeframe_seconds` 於**本出口**注入（SPEC R22：換算 map 為注入值，非 module 常數之硬引用），
+        api 層因此不需要、也不得自行 import `TIMEFRAME_SECONDS`。
+        """
+        from momentum.core.constants import TIMEFRAME_SECONDS
+        from momentum.Analysis.event_samples.lookahead_declaration import (
+            LookaheadDeclarationError, resolve_declaration,
+        )
+
+        try:
+            outcome = resolve_declaration(records, data_columns=data_columns, declaration=declaration,
+                                          timeframe_seconds=TIMEFRAME_SECONDS, on_missing=on_missing)
+        except LookaheadDeclarationError as exc:
+            return {"ok": False, "kind": exc.kind, "message": str(exc), "detail": exc.detail}
+        return {"ok": True, "receipt": outcome.to_receipt()}
+
+    @staticmethod
+    def apply_lookahead_horizon_projection(rows, lookahead_bars_declared) -> int:
+        """Task 1.9 ③：把 `max(1, depth[該列 tf])` 投影進 `label_definition.window.horizon_bars`。
+
+        🔴 呼叫時機在 `validate()` **之後**（Task 1.8 同質檢查看的是使用者原列，見實作 docstring）。
+        """
+        from momentum.Analysis.event_samples.lookahead_declaration import apply_horizon_projection
+
+        return apply_horizon_projection(rows, lookahead_bars_declared)
+
+    @staticmethod
+    def lookahead_split_blocked(receipt) -> bool:
+        """Task 1.12：落檔批次是否被 L3 封鎖（analyze 之分派依據；回 bool，型別不跨界）。"""
+        from momentum.Analysis.event_samples.lookahead_declaration import gate_from_receipt
+
+        return bool(gate_from_receipt(receipt).blocked)
+
+    @staticmethod
+    def split_blocked_capability_reason() -> str:
+        """Task 1.12 ②：L3 之 capability reason 字面（唯一來源＝契約之具名綁定）。"""
+        from momentum.Analysis.event_samples.lookahead_gate import split_blocked_reason
+
+        return split_blocked_reason()
+
     @staticmethod
     def bars_from_kline_cache(symbols, timeframes, *, cache_path=None) -> Dict[str, Dict[str, pd.DataFrame]]:
         """真實 kline bars（`bars_source.load_bars_from_kline_cache`）；服務端取 bars 的唯一入口。"""
@@ -137,6 +202,18 @@ class EventSamplePipeline:
                                    tier_min_test_events=int(tier_min_test_events)),
         )
         return self.run(records, bars_by_tf, cfg)
+
+    def run_event_study_only_with_params(
+        self, records, bars_by_tf, *, timeframes: Tuple[str, ...] = (), cluster_gap_ms: Optional[int] = None,
+        source_bytes: Optional[bytes] = None,
+    ) -> "EventPipelineResult":
+        """純量參數版 `run_event_study_only`（服務端不 import momentum dataclass——R3/R7）。
+
+        🔴 **不吃 split 參數**：本路徑不切分，收 `test_fraction`／`embargo_ms` 只會讓呼叫端
+        以為切分仍在進行。
+        """
+        cfg = EventPipelineConfig(timeframes=tuple(timeframes), cluster_gap_ms=cluster_gap_ms)
+        return self.run_event_study_only(records, bars_by_tf, cfg, source_bytes=source_bytes)
 
     def analyze_tables(
         self, result: "EventPipelineResult", bars_by_tf: Dict[str, Dict[str, pd.DataFrame]], *,
@@ -233,6 +310,52 @@ class EventSamplePipeline:
         except ContractValidationError as exc:
             return None, list(exc.failures)
 
+    def _prepare(
+        self,
+        records: Union[List[dict], pd.DataFrame],
+        bars_by_tf: Dict[str, Dict[str, pd.DataFrame]],
+        config: EventPipelineConfig,
+        *,
+        source_bytes: Optional[bytes],
+        where: str,
+    ):
+        """validate → align → dedupe（切分**之前**的共用段；兩個 executor 共用同一實作，不各寫一份）。"""
+        events = validate_event_import(records, source_bytes=source_bytes)
+        tfs = tuple(config.timeframes) or tuple(sorted(set(events["timeframe"])))
+        receipts, failures = align_events(events, bars_by_tf, AlignmentConfig(timeframes=tfs))
+        if receipts.event_level.empty:
+            raise ValueError(f"{where}: 全部事件對齊失敗 {n_dropped_by_reason(failures)}（loud）")
+
+        scenarios = sorted(set(events["scenario"]))
+        if len(scenarios) != 1:
+            raise ValueError(f"{where}: 批內 scenario 混值 {scenarios}（去重 policy 須單一）")
+        aligned = events[events["event_id"].isin(set(receipts.event_level["event_id"]))].reset_index(drop=True)
+        manifest = build_event_manifest(
+            receipts, DedupePolicyConfig(cluster_gap_ms=config.cluster_gap_ms, scenario=scenarios[0]), events=aligned,
+        )
+        return events, aligned, receipts, failures, manifest
+
+    @staticmethod
+    def _materialize(config, receipts, bars_by_tf, aligned):
+        if config.feature_config is None:
+            return None, None, None
+        return materialize_features_at_decision(receipts, bars_by_tf, dict(config.feature_config), events=aligned)
+
+    @staticmethod
+    def _base_summary(events, receipts, failures, manifest, features, fhash, ffail) -> Dict[str, Any]:
+        return {
+            "n_input": int(len(events)),
+            "n_aligned": int(len(receipts.event_level)),
+            "n_align_failures": int(len(failures)),
+            "align_failures_by_reason": n_dropped_by_reason(failures),
+            "accounting_ok": int(len(events)) == int(len(receipts.event_level)) + int(len(failures)),
+            "dedupe": {**manifest.summary, "policy": manifest.policy},
+            "features": None if features is None else {
+                "n_rows": int(len(features)), "n_cols": int(features.shape[1]),
+                "n_failures": int(len(ffail)) if ffail is not None else 0, "feature_manifest_hash": fhash,
+            },
+        }
+
     def run(
         self,
         records: Union[List[dict], pd.DataFrame],
@@ -240,47 +363,64 @@ class EventSamplePipeline:
         config: EventPipelineConfig,
         *,
         source_bytes: Optional[bytes] = None,
+        lookahead_gate: Optional[LookaheadGate] = None,
     ) -> EventPipelineResult:
-        """全鏈；匯入不合規 ⇒ raise ContractValidationError（fail-closed，不半套）。"""
-        events = validate_event_import(records, source_bytes=source_bytes)
-        tfs = tuple(config.timeframes) or tuple(sorted(set(events["timeframe"])))
-        receipts, failures = align_events(events, bars_by_tf, AlignmentConfig(timeframes=tfs))
-        if receipts.event_level.empty:
-            raise ValueError(f"EventSamplePipeline.run: 全部事件對齊失敗 {n_dropped_by_reason(failures)}（loud）")
+        """全鏈（含切分）；匯入不合規 ⇒ raise ContractValidationError（fail-closed，不半套）。
 
-        scenarios = sorted(set(events["scenario"]))
-        if len(scenarios) != 1:
-            raise ValueError(f"EventSamplePipeline.run: 批內 scenario 混值 {scenarios}（去重 policy 須單一）")
-        aligned = events[events["event_id"].isin(set(receipts.event_level["event_id"]))].reset_index(drop=True)
-        manifest = build_event_manifest(
-            receipts, DedupePolicyConfig(cluster_gap_ms=config.cluster_gap_ms, scenario=scenarios[0]), events=aligned,
-        )
-        plan = split_events(manifest, config.split)
+        🔴 Task 1.12：`lookahead_gate` 判定封鎖時本方法**直接 raise**——切分是本路徑的固有步驟，
+        不得以「警告後放行」降級。需要出表請改呼叫 `run_event_study_only()`。
+        """
+        assert_split_allowed(lookahead_gate, where="EventSamplePipeline.run")
+        events, aligned, receipts, failures, manifest = self._prepare(
+            records, bars_by_tf, config, source_bytes=source_bytes, where="EventSamplePipeline.run")
+        plan = split_events(manifest, config.split, lookahead_gate=lookahead_gate)
+        features, fhash, ffail = self._materialize(config, receipts, bars_by_tf, aligned)
 
-        features = fhash = ffail = None
-        if config.feature_config is not None:
-            features, fhash, ffail = materialize_features_at_decision(receipts, bars_by_tf, dict(config.feature_config), events=aligned)
-
-        summary = {
-            "n_input": int(len(events)),
-            "n_aligned": int(len(receipts.event_level)),
-            "n_align_failures": int(len(failures)),
-            "align_failures_by_reason": n_dropped_by_reason(failures),
-            "accounting_ok": int(len(events)) == int(len(receipts.event_level)) + int(len(failures)),
-            "dedupe": {**manifest.summary, "policy": manifest.policy},
+        summary = self._base_summary(events, receipts, failures, manifest, features, fhash, ffail)
+        summary.update({
             "split": {k: v for k, v in plan.summary.items() if k != "per_symbol_n"},
             "n_train": int((plan.assignments["split_label"] == "train").sum()) if not plan.assignments.empty else 0,
             "n_test": int((plan.assignments["split_label"] == "test").sum()) if not plan.assignments.empty else 0,
             "n_purged": int(len(plan.purged)),
-            "features": None if features is None else {
-                "n_rows": int(len(features)), "n_cols": int(features.shape[1]),
-                "n_failures": int(len(ffail)) if ffail is not None else 0, "feature_manifest_hash": fhash,
-            },
-        }
+        })
         if not summary["accounting_ok"]:
             raise RuntimeError("EventSamplePipeline.run: 對齊記帳守恆失敗")
         return EventPipelineResult(
             events=aligned, receipts=receipts, align_failures=failures, manifest=manifest, split_plan=plan,
+            features=features, feature_manifest_hash=fhash, feature_failures=ffail, summary=summary,
+        )
+
+    def run_event_study_only(
+        self,
+        records: Union[List[dict], pd.DataFrame],
+        bars_by_tf: Dict[str, Dict[str, pd.DataFrame]],
+        config: EventPipelineConfig,
+        *,
+        source_bytes: Optional[bytes] = None,
+    ) -> EventPipelineResult:
+        """GAP-3 UX Task 1.12（D-7 之 L3）：**不切分**之 executor——深度不可證時的唯一可跑路徑。
+
+        🔴 本方法**不呼叫** `split_events()`／`ic_feed`、不進訓練 ⇒ 無訓練即無洩漏。
+        產出之 `split_plan` 為 `None`（**不是**空的假 plan——以空 plan 冒充未切分是具名之假綠形態）。
+        `run()` 之 `split_events` 為無條件呼叫，故本批必須另立 executor，否則只能在
+        「違反 L3」與「產不出表」之間二選一（SPEC Task 1.12 群集 E）。
+        """
+        events, aligned, receipts, failures, manifest = self._prepare(
+            records, bars_by_tf, config, source_bytes=source_bytes, where="EventSamplePipeline.run_event_study_only")
+        features, fhash, ffail = self._materialize(config, receipts, bars_by_tf, aligned)
+
+        summary = self._base_summary(events, receipts, failures, manifest, features, fhash, ffail)
+        summary.update({
+            "split": None,
+            "n_train": 0,
+            "n_test": 0,
+            "n_purged": 0,
+            "execution_mode": "event_study_only",
+        })
+        if not summary["accounting_ok"]:
+            raise RuntimeError("EventSamplePipeline.run_event_study_only: 對齊記帳守恆失敗")
+        return EventPipelineResult(
+            events=aligned, receipts=receipts, align_failures=failures, manifest=manifest, split_plan=None,
             features=features, feature_manifest_hash=fhash, feature_failures=ffail, summary=summary,
         )
 

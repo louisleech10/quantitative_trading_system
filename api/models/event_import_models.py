@@ -57,6 +57,13 @@ class EventImportResponse(BaseModel):
     source_digest_verified: bool = Field(False, description="是否以上傳內容對證契約 source_file_digest（verify_source_digest）")
     contract_version: Optional[str] = None
     stored_path: Optional[str] = None
+    lookahead_declaration: Optional[Dict[str, Any]] = Field(
+        None,
+        description=("GAP-3 UX Task 1.9／1.11／1.12 之答案窗宣告 receipt："
+                     "requires_declaration／referenced_columns／default_window_bars／declared_window_bars／"
+                     "lookahead_bars_declared（逐 tf map）／acknowledged_unverifiable／embargo_ms_by_symbol／split_blocked。"
+                     "🔴 深度語意住 lookahead_bars_declared；label_definition.window.horizon_bars 之 1 只是 serialization floor"),
+    )
 
 
 class EventImportRejected(BaseModel):
@@ -66,6 +73,8 @@ class EventImportRejected(BaseModel):
     message: str
     failures: List[EventImportFailure] = Field(default_factory=list)
     migration_hint: Optional[Dict[str, Any]] = None
+    detail: Optional[Dict[str, Any]] = Field(
+        None, description="拒收之結構化補充（如 Task 1.9 之 default_window_bars／lowered_timeframes，供 UI 預填）")
 
 
 class EventImportSummary(BaseModel):

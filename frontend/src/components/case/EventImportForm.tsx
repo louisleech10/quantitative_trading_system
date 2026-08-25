@@ -1,7 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { EventImportRejectedError, uploadEventImport } from '@/lib/api';
+import { EventImportRejectedError, fetchLookaheadDeclarationPreview, uploadEventImport } from '@/lib/api';
+import LookaheadDeclarationFields from '@/components/case/LookaheadDeclarationFields';
+import {
+  buildDeclarationPayload,
+  initialDeclaredWindowBars,
+  validateDeclaration,
+  type LookaheadDeclarationPreview,
+} from '@/lib/lookaheadDeclaration';
 import type { EventImportRejected, EventImportResponse } from '@/lib/types';
 
 interface EventImportFormProps {
@@ -19,18 +26,45 @@ export default function EventImportForm({ onImported }: EventImportFormProps) {
   const [result, setResult] = useState<EventImportResponse | null>(null);
   const [rejected, setRejected] = useState<EventImportRejected | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // GAP-3 UX Task 1.9／1.11：答案窗宣告（逐 tf）
+  const [preview, setPreview] = useState<LookaheadDeclarationPreview | null>(null);
+  const [declared, setDeclared] = useState<Record<string, number>>({});
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [declarationProblems, setDeclarationProblems] = useState<string[]>([]);
+
+  const handleFileChange = async (next: File | null) => {
+    setFile(next);
+    setPreview(null);
+    setDeclared({});
+    setAcknowledged(false);
+    setDeclarationProblems([]);
+    if (!next) return;
+    try {
+      const p = await fetchLookaheadDeclarationPreview(next);
+      setPreview(p);
+      setDeclared(initialDeclaredWindowBars(p));
+    } catch {
+      // 預填失敗不擋上傳：後端仍會 fail-closed（未宣告即拒／封鎖切分），前端不自行放行也不自行判定
+      setPreview(null);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file) {
       setError('請先選擇 CSV 或 JSON 檔');
       return;
     }
+    if (preview) {
+      const check = validateDeclaration(declared, acknowledged, preview);
+      setDeclarationProblems(check.problems);
+      if (!check.ok) return;
+    }
     setUploading(true);
     setError(null);
     setResult(null);
     setRejected(null);
     try {
-      const data = await uploadEventImport(file, validateOnly);
+      const data = await uploadEventImport(file, validateOnly, buildDeclarationPayload(declared, acknowledged, preview));
       setResult(data);
       if (data.accepted && onImported) onImported(data);
     } catch (err) {
@@ -53,9 +87,19 @@ export default function EventImportForm({ onImported }: EventImportFormProps) {
           type="file"
           accept=".csv,.json,.txt"
           data-testid="event-import-file"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => void handleFileChange(e.target.files?.[0] ?? null)}
           className="block w-full text-sm text-slate-300 file:mr-3 file:rounded file:border-0 file:bg-sky-500/20 file:px-3 file:py-1.5 file:text-sky-100"
         />
+        {preview && preview.timeframes.length > 0 && (
+          <LookaheadDeclarationFields
+            preview={preview}
+            declared={declared}
+            acknowledged={acknowledged}
+            problems={declarationProblems}
+            onChangeWindow={(tf, value) => setDeclared((prev) => ({ ...prev, [tf]: value }))}
+            onChangeAcknowledged={setAcknowledged}
+          />
+        )}
         <label className="flex items-center gap-2 text-sm text-slate-300">
           <input type="checkbox" checked={validateOnly} onChange={(e) => setValidateOnly(e.target.checked)} />
           僅驗證不落檔

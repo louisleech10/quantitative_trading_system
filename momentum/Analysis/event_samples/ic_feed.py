@@ -14,25 +14,43 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Dict
+from typing import Dict, Optional
 
 import pandas as pd
 
+from momentum.Analysis.event_samples.lookahead_gate import LookaheadGate, capability_unavailable_block
 from momentum.Analysis.event_samples.types import AlignmentReceipts, EventManifest, EventSplitPlan
 
 
 def build_event_ic_inputs(
     manifest: EventManifest,
-    event_split_plan: EventSplitPlan,
+    event_split_plan: Optional[EventSplitPlan],
     events: pd.DataFrame,
     receipts: AlignmentReceipts,
     *,
     timeframe: str,
+    lookahead_gate: Optional[LookaheadGate] = None,
 ) -> Dict:
     """回 dict：capability_status／reason／event_timestamps／event_label_values／label_price_mismatch／n_events。
 
     只取 manifest `in_primary` 事件（dedupe policy）；同一 feature 列被兩事件映射 ⇒ loud（禁默默覆蓋）。
+
+    `lookahead_gate`（GAP-3 UX Task 1.12／D-7 之 L3）：深度不可證之批 ⇒ 條件 IC
+    `capability_status="unavailable"`＋契約之 reason，**不**產出 timestamps／label 值。
+    `None` ＝平台產生器路徑，不開本閘。
     """
+    blocked = capability_unavailable_block(lookahead_gate)
+    if blocked is not None:
+        return {
+            "statistic_kind": "conditional_ic",
+            "sample_scope_kind": "event",
+            "timeframe": timeframe,
+            "n_events": 0,
+            "split_summary": {},
+            **blocked,
+            "event_timestamps": [],
+            "event_label_values": {},
+        }
     t = manifest.table
     keep = t[t["in_primary"]] if "in_primary" in t.columns else t
     ev = events.set_index("event_id")

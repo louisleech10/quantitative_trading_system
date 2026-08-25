@@ -231,6 +231,31 @@ def mapping_failure_reasons(contract: Optional[dict] = None) -> Dict[str, str]:
     return dict(_MAPPING_REASON_KEYS)
 
 
+def capability_unavailable_reason(binding_key: str, contract: Optional[dict] = None) -> str:
+    """能力不可用 reason 之字面出口（GAP-3 UX Task 1.12 驗收④）。
+
+    🔴 呼叫端只給**綁定鍵**（住契約 `capability_reason_bindings`），字面一律由本函式回傳
+    ⇒ `.py`／`.ts` 內對 reason 字面之 grep 恆為 0，字面只住契約檔一處。
+
+    Raises:
+        KeyError: 綁定鍵未登記（fail-closed，不猜）。
+        ValueError: 綁定值不在 `capability_unavailable_reasons` 封閉集合內（漂移 fail-closed）。
+    """
+    c = contract if contract is not None else load_event_import_contract()
+    bindings = c["capability_reason_bindings"]
+    if binding_key not in bindings or binding_key.startswith("_"):
+        raise KeyError(
+            f"capability_reason_bindings 無綁定鍵 {binding_key!r}（已登記："
+            f"{sorted(k for k in bindings if not k.startswith('_'))}）"
+        )
+    value = bindings[binding_key]
+    if value not in set(c["capability_unavailable_reasons"]):
+        raise ValueError(
+            f"綁定鍵 {binding_key!r} 之值不在契約 capability_unavailable_reasons 封閉集合內（漂移 fail-closed）"
+        )
+    return str(value)
+
+
 def normalize_t0_units(records: List[dict], *, contract: Optional[dict] = None) -> None:
     """就地把**可判定單位**之 `t0` 正規化為毫秒（`detect_t0_unit_ms` 之唯一批次呼叫點）。
 

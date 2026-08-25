@@ -979,6 +979,7 @@ export async function exportPdfReport(taskId: string): Promise<Blob> {
 // GAP-3 事件型（B5.2）：匯入批 / 兩張表（後端 /api/v1/case/events*）
 // ============================================================
 import type { EventAnalyzeResponse, EventImportListResponse, EventImportRejected, EventImportResponse } from './types';
+import type { LookaheadDeclarationPayload, LookaheadDeclarationPreview } from './lookaheadDeclaration';
 
 export class EventImportRejectedError extends Error {
   payload: EventImportRejected;
@@ -1009,13 +1010,31 @@ export async function listEventImports(): Promise<EventImportListResponse> {
   return response.json();
 }
 
-export async function uploadEventImport(file: File, validateOnly: boolean): Promise<EventImportResponse> {
+export async function uploadEventImport(
+  file: File,
+  validateOnly: boolean,
+  lookaheadDeclaration?: LookaheadDeclarationPayload | null,
+): Promise<EventImportResponse> {
   const formData = new FormData();
   formData.append('file', file);
+  // GAP-3 UX Task 1.9／1.11：答案窗宣告（逐 tf）；未宣告時不送此欄，由後端決定拒收或封鎖切分
+  if (lookaheadDeclaration) formData.append('lookahead_declaration', JSON.stringify(lookaheadDeclaration));
   const response = await fetch(
     `${API_BASE_URL}${API_PREFIX}/case/import-events?validate_only=${validateOnly ? 'true' : 'false'}`,
     { method: 'POST', body: formData },
   );
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+/** GAP-3 UX Task 1.9 ①：宣告 UI 之預填（逐 tf 預設值＝檔內最大可用 horizon）。 */
+export async function fetchLookaheadDeclarationPreview(file: File): Promise<LookaheadDeclarationPreview> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/import-events/lookahead-declaration`, {
+    method: 'POST',
+    body: formData,
+  });
   if (!response.ok) await parseRejected(response);
   return response.json();
 }

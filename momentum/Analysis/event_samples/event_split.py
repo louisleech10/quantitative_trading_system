@@ -9,11 +9,12 @@ reason／flag 字面＝契約檔 split_purge_reasons／split_loud_flags／degrad
 from __future__ import annotations
 
 import math
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pandas as pd
 
 from momentum.core.constants import TIMEFRAME_SECONDS
+from momentum.Analysis.event_samples.lookahead_gate import LookaheadGate, assert_split_allowed
 from momentum.Analysis.event_samples.types import EventManifest, EventSplitConfig, EventSplitPlan
 
 
@@ -35,8 +36,18 @@ def _cluster_weight(counts: "pd.Series") -> "pd.Series":
     return 1.0 / counts
 
 
-def split_events(manifest: EventManifest, split_config: EventSplitConfig) -> EventSplitPlan:
-    """事件切分：每標的各自按時間切＋緩衝 ≥ 答案窗；interval 跨界 ⇒ purge。"""
+def split_events(
+    manifest: EventManifest,
+    split_config: EventSplitConfig,
+    *,
+    lookahead_gate: Optional[LookaheadGate] = None,
+) -> EventSplitPlan:
+    """事件切分：每標的各自按時間切＋緩衝 ≥ 答案窗；interval 跨界 ⇒ purge。
+
+    `lookahead_gate`（GAP-3 UX Task 1.12／D-7 之 L3）：深度不可證之批 ⇒ **raise**，
+    不得以警告放行（fail-open）。`None` ＝平台產生器路徑，不開本閘（見 `lookahead_gate` 檔頭）。
+    """
+    assert_split_allowed(lookahead_gate, where="split_events")
     t = manifest.table
     for col in ("symbol", "timeframe"):
         if col not in t.columns or t[col].isna().any():

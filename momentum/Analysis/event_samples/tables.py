@@ -89,10 +89,18 @@ def event_forward_return_table(
     manifest: EventManifest,
     receipts: AlignmentReceipts,
     bars_by_tf: Dict[str, Dict[str, pd.DataFrame]],
-    event_split_plan: EventSplitPlan,
+    event_split_plan: Optional[EventSplitPlan],
     table_config: dict,
 ) -> Dict:
     """事件後多 horizon signed 報酬分布表（K5/C7-i；U1；不需反例）。
+
+    🔴 GAP-3 UX Task 1.12（D-7 之 L3）：`event_split_plan` 可為 `None`＝**未執行切分**之
+    event-study-only 路徑（無訓練即無洩漏）。此時
+      ① 每列 `time_cluster_id` 取 `-1`（與既有「不在 cl.index」之值一致）；
+      ② `ci` 一律標 `"unavailable"`、**不得**計算——`_cluster_bootstrap_ci` 依 cluster 重抽樣，
+         全部塞同一個 `-1` 會產生**看似有效但錯誤**的信賴區間；
+      ③ 傳入 `clusters` 為空 DataFrame 之**假** split plan ⇒ raise（不得靜默當成 `None` 走過去，
+         那是「以空 plan 冒充未切分」之假綠形態）。
 
     signed `(exit_h − entry)/entry`：entry＝D1-6 映射（收據 `entry_price_source_*`）、
     exit_h＝entry bar 之後第 h 根錨定 TF bar 之 close（與標籤基準 t₀ close 報酬並排揭露＝D1-4）。
@@ -114,7 +122,12 @@ def event_forward_return_table(
         if col not in t.columns:
             raise ValueError(f"event_forward_return_table: manifest 缺 {col}（build_event_manifest 需帶 events=）")
     ev = receipts.event_level.set_index("event_id")
-    cl = event_split_plan.clusters.set_index("event_id")
+    if event_split_plan is not None and event_split_plan.clusters.empty:
+        raise ValueError(
+            "event_forward_return_table: event_split_plan.clusters 為空 —— 以空 plan 冒充「未執行切分」"
+            "會讓 cluster CI 以單一假簇計算而看似有效；未切分請顯式傳 event_split_plan=None（Task 1.12 ③c）"
+        )
+    cl = event_split_plan.clusters.set_index("event_id") if event_split_plan is not None else None
 
     rows: List[dict] = []
     for rec in t.to_dict("records"):
@@ -140,7 +153,7 @@ def event_forward_return_table(
                 "ret_label_anchor": sign * (exit_close - t0_close) / t0_close,      # 標籤基準（t₀ close）報酬——兩數並排
                 "weight": float(rec.get("uniqueness_weight", 1.0)) if rec.get("in_primary", True) else 0.0,
                 "in_primary": bool(rec.get("in_primary", True)),
-                "time_cluster_id": int(cl.loc[eid, "time_cluster_id"]) if eid in cl.index else -1,
+                "time_cluster_id": int(cl.loc[eid, "time_cluster_id"]) if (cl is not None and eid in cl.index) else -1,
             })
     df = pd.DataFrame(rows)
 
@@ -154,7 +167,9 @@ def event_forward_return_table(
             out[str(h)] = {
                 **_weighted_stats(vals, w[m]),
                 "label_anchor_mean": float(np.average(s["ret_label_anchor"].to_numpy()[m], weights=w[m])) if m.any() else float("nan"),
-                "ci": _cluster_bootstrap_ci(vals, w[m], s["time_cluster_id"].to_numpy()[m], seed=seed, n_boot=n_boot),
+                # Task 1.12 ③：未切分 ⇒ 無 cluster 可重抽樣，一律標 unavailable（禁以 -1 單簇假算）
+                "ci": "unavailable" if event_split_plan is None else
+                      _cluster_bootstrap_ci(vals, w[m], s["time_cluster_id"].to_numpy()[m], seed=seed, n_boot=n_boot),
             }
         return out
 

@@ -128,6 +128,10 @@
     "missing_label_value", "missing_prevalence_disclosure", "one_class_test_segment",
     "split_blocked_unverifiable_lookahead", "label_producer_unsupported_for_declared_semantics"
   ],
+  "capability_reason_bindings": {
+    "_doc": "能力不可用 reason 之**具名綁定**（GAP-3 UX Task 1.12 驗收④）：程式不得硬寫 reason 字面，只能以本表之鍵取值。值須屬 capability_unavailable_reasons 之封閉集合，否則 loader 端 raise（漂移 fail-closed）。鍵名刻意不含其值之任何子字串，故對 reason 字面之 grep 在 .py/.ts 上恆為 0。",
+    "l3_lookahead_unverifiable": "split_blocked_unverifiable_lookahead"
+  },
   "split_purge_reasons": ["interval_crosses_split_boundary"],
   "split_loud_flags": ["insufficient_events_in_test"],
   "degraded_flags": ["single_symbol", "no_cluster_adjustment"],

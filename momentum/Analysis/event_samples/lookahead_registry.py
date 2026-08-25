@@ -129,6 +129,62 @@ def lookahead_resolution(
     return {"lookahead_bars": bars, "requires_declaration": False, "reason": "resolved_from_registry"}
 
 
+def registry_resolvable_columns(
+    columns: Iterable[str],
+    timeframe: str,
+    registry: Optional[Mapping[str, Any]] = None,
+) -> Set[str]:
+    """深度**可**由 registry 導出之欄（`resolve_lookahead_bars` 不回 `None` 者）。
+
+    🔴 只看 registry，不看 provenance——信任邊界請用 `lookahead_resolution()`／`requires_declaration()`。
+    """
+    r = registry if registry is not None else load_lookahead_registry()
+    return {str(c) for c in columns if resolve_lookahead_bars(str(c), timeframe, r) is not None}
+
+
+def declaration_required_columns(
+    columns: Iterable[str],
+    timeframe: str,
+    *,
+    provenance: str = PROVENANCE_EXTERNAL_UPLOAD,
+    registry: Optional[Mapping[str, Any]] = None,
+) -> Set[str]:
+    """GAP-3 UX Task 1.11（D-7 之 L2）：須由使用者宣告深度之欄集合。
+
+    判定**逐欄**委由 `lookahead_resolution()`（L1→L2 交界之唯一實作）——本函式不另寫欄位偵測，
+    故 registry 之兩種「不可解析」（未登記、顯式 `lookahead_unknown`）與 provenance 之信任邊界
+    （`external_upload` ⇒ 欄名不具證據力）自動一致。
+
+    Args:
+        columns: **條件實際引用**之欄位（🔴 不是檔內全部欄；附帶欄不在此列，見 Task 2.1b）。
+        provenance: 封閉集合 `_PROVENANCE_KINDS`；預設 `external_upload`＝不可證即須宣告（fail-closed）。
+    """
+    r = registry if registry is not None else load_lookahead_registry()
+    return {
+        str(c)
+        for c in columns
+        if lookahead_resolution(str(c), timeframe, provenance=provenance, registry=r)["requires_declaration"]
+    }
+
+
+def requires_declaration(
+    columns: Iterable[str],
+    timeframe: str,
+    *,
+    provenance: str = PROVENANCE_EXTERNAL_UPLOAD,
+    registry: Optional[Mapping[str, Any]] = None,
+) -> bool:
+    """GAP-3 UX Task 1.11：是否**強制**使用者宣告答案窗深度（L2）。
+
+    🔴 **不得**因為「其他欄都能解析」就取它們的 max 當全批深度（SPEC Task 1.11「不可做」）
+    ——只要有**任一**引用欄解析不出深度（或來源不可信），整批即須宣告。
+
+    與 Task 2.1b 之 `depth_by_timeframe()` 為**同一條規則的兩種形式**：本函式是不 raise 的謂詞形，
+    `depth_by_timeframe()` 是對同一情形丟 `UnresolvableLookaheadDepth` 的計算形。
+    """
+    return bool(declaration_required_columns(columns, timeframe, provenance=provenance, registry=registry))
+
+
 def unregistered_future_columns(
     columns: Iterable[str],
     registry: Optional[Mapping[str, Any]] = None,

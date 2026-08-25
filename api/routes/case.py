@@ -140,6 +140,14 @@ def _rejected(exc: EventImportRejectedError) -> HTTPException:
 async def import_events_file(
     file: UploadFile = File(..., description="事件檔（CSV／JSON，新 schema）"),
     source_file: Optional[UploadFile] = File(None, description="契約所指之『來源檔』；`verify_source_digest=true` 時以此檔位元組對證"),
+    lookahead_declaration: Optional[str] = Form(
+        None,
+        description=('GAP-3 UX Task 1.9／1.11 之答案窗宣告：JSON 物件 '
+                     '{"declared_window_bars": {timeframe: 正整數}, "acknowledged_unverifiable": bool}。'
+                     '🔴 逐 timeframe 各一值（單一輸入框套用全部 tf ⇒ 拒）；'
+                     '低於檔內最大可用 horizon 須 acknowledged_unverifiable=true。'
+                     '條件引用了深度不可由 registry 驗證之欄位而未宣告 ⇒ 拒收（落檔數 0）'),
+    ),
     validate_only: bool = Query(False),
     verify_source_digest: bool = Query(
         False,
@@ -172,7 +180,9 @@ async def import_events_file(
     try:
         records = svc.parse_upload(content, file.filename or "")
         return svc.import_records(records, source_name=file.filename, upload_bytes=content, validate_only=validate_only,
-                                  verify_source_digest=verify_source_digest, source_bytes=src_bytes)
+                                  verify_source_digest=verify_source_digest, source_bytes=src_bytes,
+                                  lookahead_declaration=_form_json_dict("lookahead_declaration", lookahead_declaration) or None,
+                                  data_columns=svc.file_columns(content, file.filename or "") or None)
     except EventImportRejectedError as exc:
         raise _rejected(exc)
 
@@ -192,9 +202,12 @@ async def import_events_json(request: EventImportJsonRequest):
         ).model_dump())
     body = _json.dumps(request.records, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
     try:
+        # 🔴 JSON 端點**無宣告 UI**（程式化呼叫）⇒ 需宣告而未填時走 Task 1.12 之「落檔但 L3 封鎖切分」，
+        #    不套用 Task 1.11 邊界②之拒收（那條的標的是有宣告 UI 的上傳路徑）。
         return svc.import_records(request.records, source_name=request.source_name, upload_bytes=body,
                                   validate_only=request.validate_only, verify_source_digest=request.verify_source_digest,
-                                  batch_defaults=request.batch_defaults)
+                                  batch_defaults=request.batch_defaults,
+                                  on_missing_declaration=svc.ON_MISSING_BLOCK)
     except EventImportRejectedError as exc:
         raise _rejected(exc)
 
@@ -221,6 +234,12 @@ async def import_events_csv(
     file: UploadFile = File(..., description="使用者自有欄名之 CSV（不必先改成契約欄名）"),
     column_mapping: str = Form(..., description='JSON 物件 {契約欄名: CSV 欄名}；**無預設對映**（A-4′）。缺 ⇒ column_mapping_missing'),
     batch_defaults: Optional[str] = Form(None, description="JSON 物件 {契約欄名: 值}；只**填補缺值**，不覆蓋列自帶值"),
+    lookahead_declaration: Optional[str] = Form(
+        None,
+        description=('GAP-3 UX Task 1.9／1.11 之答案窗宣告：JSON 物件 '
+                     '{"declared_window_bars": {timeframe: 正整數}, "acknowledged_unverifiable": bool}。'
+                     '預設值請先呼叫 /case/import-events/lookahead-declaration 取得（＝檔內最大可用 horizon，逐 tf）'),
+    ),
     validate_only: bool = Query(False),
 ):
     """CSV ＋ 欄名對映匯入（GAP-3 UX Task 1.2）。
@@ -235,7 +254,34 @@ async def import_events_csv(
     try:
         records, warnings = svc.csv_records_from_mapping(content, mapping, defaults)
         return svc.import_records(records, source_name=file.filename, upload_bytes=content,
-                                  validate_only=validate_only, batch_defaults=defaults, extra_warnings=warnings)
+                                  validate_only=validate_only, batch_defaults=defaults, extra_warnings=warnings,
+                                  lookahead_declaration=_form_json_dict("lookahead_declaration", lookahead_declaration) or None,
+                                  data_columns=svc.file_columns(content, file.filename or "") or None)
+    except EventImportRejectedError as exc:
+        raise _rejected(exc)
+
+
+@router.post("/case/import-events/lookahead-declaration")
+async def lookahead_declaration_preview(
+    file: UploadFile = File(..., description="欲上傳之事件檔（CSV／JSON）"),
+    column_mapping: Optional[str] = Form(None, description="CSV 對映（同 /csv 端點）；JSON／契約欄名 CSV 免填"),
+    batch_defaults: Optional[str] = Form(None, description="同 /csv 端點"),
+):
+    """GAP-3 UX Task 1.9 ①：答案窗宣告之**預填**資料（逐 tf 預設值＝檔內最大可用 horizon）。
+
+    宣告 UI 於選檔後呼叫本端點取得：批內 timeframe 清單、逐 tf 預設值、以及是否**強制**宣告
+    （條件引用了深度不可由 registry 驗證之欄位）。🔴 本端點只讀不落檔。
+    """
+    svc = get_event_import_service()
+    content = await file.read()
+    mapping = _form_json_dict("column_mapping", column_mapping)
+    defaults = _form_json_dict("batch_defaults", batch_defaults)
+    try:
+        if mapping:
+            records, _ = svc.csv_records_from_mapping(content, mapping, defaults)
+        else:
+            records = svc.parse_upload(content, file.filename or "")
+        return svc.lookahead_declaration_preview(content, file.filename or "", records, defaults)
     except EventImportRejectedError as exc:
         raise _rejected(exc)
 
