@@ -23,10 +23,18 @@ export interface ParsedCsv {
   columns: ParsedCsvColumn[];
   /** 前 N 列（預設 5）——SPEC Task 1.5「顯示前 5 列預覽與全部欄名」。 */
   previewRows: string[][];
-  /** 全部資料列（不含標頭）。 */
+  /** 全部資料列（不含標頭）；長度一律對齊標頭（短列補空、長列**不截**，見 `raggedRows`）。 */
   rows: string[][];
   /** 出現超過一次的欄名（升冪去重）。 */
   duplicateNames: string[];
+  /**
+   * 欄數與標頭不符之列（0-based 列序 ＋ 實際欄數）。
+   *
+   * 🔴 **不得靜默截斷或補齊就當沒事**（R1 三家共提）：後端 `pd.read_csv` 在「每列都比標頭多一格」
+   * 時會把首欄當 index、**整列左移且零 warning**，`label` 讀到的會是隔壁欄的值。
+   * 後端已改為 fail-closed 拒收；前端在預覽階段就要擋，否則使用者會依錯誤筆數勾下確認。
+   */
+  raggedRows: { row: number; width: number }[];
 }
 
 /** RFC4180 逐字元解析：吃引號內之逗號／換行／跳脫雙引號。 */
@@ -67,7 +75,9 @@ function splitRecords(text: string): string[][] {
  */
 export function parseCsvText(text: string, previewRowLimit = 5): ParsedCsv {
   const records = splitRecords(text.replace(/^﻿/, ''));
-  if (records.length === 0) return { columns: [], previewRows: [], rows: [], duplicateNames: [] };
+  if (records.length === 0) {
+    return { columns: [], previewRows: [], rows: [], duplicateNames: [], raggedRows: [] };
+  }
 
   const header = records[0].map((c) => c.trim());
   const counts = new Map<string, number>();
@@ -77,12 +87,17 @@ export function parseCsvText(text: string, previewRowLimit = 5): ParsedCsv {
     const duplicated = (counts.get(name) ?? 0) > 1;
     return { name, index, duplicated, label: duplicated ? `${name}（第 ${index + 1} 欄）` : name };
   });
-  const rows = records.slice(1).map((r) => header.map((_, i) => (r[i] ?? '')));
+  const dataRecords = records.slice(1);
+  const rows = dataRecords.map((r) => header.map((_, i) => (r[i] ?? '')));
+  const raggedRows = dataRecords
+    .map((r, i) => ({ row: i, width: r.length }))
+    .filter((x) => x.width !== header.length);
   return {
     columns,
     previewRows: rows.slice(0, previewRowLimit),
     rows,
     duplicateNames: [...counts.entries()].filter(([, n]) => n > 1).map(([n]) => n).sort(),
+    raggedRows,
   };
 }
 

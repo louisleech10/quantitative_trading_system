@@ -133,6 +133,30 @@ def _rejected(exc: EventImportRejectedError) -> HTTPException:
     return HTTPException(status_code=422 if exc.payload.kind == "contract_violation" else 400, detail=exc.payload.model_dump())
 
 
+def _assert_source_file_usable(verify: bool, src_bytes: Optional[bytes], content: bytes) -> None:
+    """`verify_source_digest` 之前置條件（JSON 與 CSV 對映**兩條路徑共用同一實作**）。
+
+    🔴 不得為 CSV 路徑另寫一份——兩份必然漂移（V-3 之教訓）。
+    """
+    if verify and src_bytes is not None and src_bytes == content:
+        # CODEX-R4-P1-01：事件檔內含 source_file_digest 欄，對自身取 sha256 恆不自洽 ⇒ 同檔對證在數學上不可能。
+        # 直接以專屬 reason 拒（而非讓使用者收一堆 digest_mismatch），並指出正解＝另附來源檔。
+        raise HTTPException(status_code=400, detail=EventImportRejected(
+            kind="source_file_must_differ_from_event_file",
+            message=("source_file 與事件檔位元組相同：事件檔含 source_file_digest 欄，對自身取 sha256 必不相符（自我指涉）。"
+                     "請附**產生這些事件的來源檔**（/search 匯出者即同時下載的 *.source.json）；"
+                     "若無來源檔可對證，請關閉 verify_source_digest"),
+        ).model_dump())
+    if verify and src_bytes is None:
+        # 顯式引導：自我對證必然失敗，直接說清楚要傳什麼（而非讓使用者拿到一堆 digest_mismatch）
+        raise HTTPException(status_code=400, detail=EventImportRejected(
+            kind="source_file_required_for_verify",
+            message=("verify_source_digest=true 需一併上傳 source_file（契約所指來源檔）；"
+                     "事件檔本身含 source_file_digest 欄，對自己取 sha256 必然不符。"
+                     "由 /search 匯出者：同時下載的 *.source.json 即為該來源檔"),
+        ).model_dump())
+
+
 # ---------------------------------------------------------------------------
 # GAP-3 Task B5.1 — 新 schema 事件匯入（驗證唯一實作在 momentum/；本層透傳）
 # ---------------------------------------------------------------------------
@@ -160,23 +184,7 @@ async def import_events_file(
     svc = get_event_import_service()
     content = await file.read()
     src_bytes = await source_file.read() if source_file is not None else None
-    if verify_source_digest and src_bytes is not None and src_bytes == content:
-        # CODEX-R4-P1-01：事件檔內含 source_file_digest 欄，對自身取 sha256 恆不自洽 ⇒ 同檔對證在數學上不可能。
-        # 直接以專屬 reason 拒（而非讓使用者收一堆 digest_mismatch），並指出正解＝另附來源檔。
-        raise HTTPException(status_code=400, detail=EventImportRejected(
-            kind="source_file_must_differ_from_event_file",
-            message=("source_file 與事件檔位元組相同：事件檔含 source_file_digest 欄，對自身取 sha256 必不相符（自我指涉）。"
-                     "請附**產生這些事件的來源檔**（/search 匯出者即同時下載的 *.source.json）；"
-                     "若無來源檔可對證，請關閉 verify_source_digest"),
-        ).model_dump())
-    if verify_source_digest and src_bytes is None:
-        # 顯式引導：自我對證必然失敗，直接說清楚要傳什麼（而非讓使用者拿到一堆 digest_mismatch）
-        raise HTTPException(status_code=400, detail=EventImportRejected(
-            kind="source_file_required_for_verify",
-            message=("verify_source_digest=true 需一併上傳 source_file（契約所指來源檔）；"
-                     "事件檔本身含 source_file_digest 欄，對自己取 sha256 必然不符。"
-                     "由 /search 匯出者：同時下載的 *.source.json 即為該來源檔"),
-        ).model_dump())
+    _assert_source_file_usable(verify_source_digest, src_bytes, content)
     try:
         records = svc.parse_upload(content, file.filename or "")
         return svc.import_records(records, source_name=file.filename, upload_bytes=content, validate_only=validate_only,
@@ -246,7 +254,24 @@ async def import_events_csv(
                      '缺 ⇒ receipt 記伺服器落檔時間，並以 mapping_provenance.confirmed_at_source '
                      '＝server_received 揭露（伺服器時間不冒充使用者確認時間）'),
     ),
+    source_file: Optional[UploadFile] = File(
+        None,
+        description=('契約所指之**來源檔**（如 /search 一併下載之 *.source.json）。'
+                     '帶入時逐列對證 source_file_digest；未帶 ⇒ receipt 之 '
+                     'mapping_provenance.source_digest_verified＝false（宣告值只證明填了同一串）'),
+    ),
+    derive_event_id: bool = Form(
+        False,
+        description=('GAP-3 UX Task 1.5（殘留 R-B2-1）：為 true 時由後端在 **t0 單位正規化之後**、'
+                     '以契約 event_id_template 之唯一實作逐列產生 event_id（秒級 t0 之 CSV 免手改）。'
+                     '**預設 false**——不推斷（A-4′），須使用者顯式要求'),
+    ),
     validate_only: bool = Query(False),
+    verify_source_digest: bool = Query(
+        False,
+        description=("逐列對證 source_file_digest（需一併上傳 `source_file`）。前置條件與 /import-events "
+                     "共用同一實作；未開啟 ⇒ receipt 之 mapping_provenance.source_digest_verified＝false"),
+    ),
 ):
     """CSV ＋ 欄名對映匯入（GAP-3 UX Task 1.2）。
 
@@ -255,15 +280,19 @@ async def import_events_csv(
     """
     svc = get_event_import_service()
     content = await file.read()
+    src_bytes = await source_file.read() if source_file is not None else None
+    _assert_source_file_usable(verify_source_digest, src_bytes, content)
     mapping = _form_json_dict("column_mapping", column_mapping)
     defaults = _form_json_dict("batch_defaults", batch_defaults)
     try:
         records, warnings = svc.csv_records_from_mapping(content, mapping, defaults)
         return svc.import_records(records, source_name=file.filename, upload_bytes=content,
                                   validate_only=validate_only, batch_defaults=defaults, extra_warnings=warnings,
+                                  verify_source_digest=verify_source_digest, source_bytes=src_bytes,
                                   lookahead_declaration=_form_json_dict("lookahead_declaration", lookahead_declaration) or None,
                                   data_columns=svc.file_columns(content, file.filename or "") or None,
-                                  column_mapping=mapping, mapping_confirmed_at=mapping_confirmed_at)
+                                  column_mapping=mapping, mapping_confirmed_at=mapping_confirmed_at,
+                                  derive_event_id=derive_event_id)
     except EventImportRejectedError as exc:
         raise _rejected(exc)
 

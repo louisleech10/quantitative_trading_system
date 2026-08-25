@@ -1047,6 +1047,7 @@ export async function uploadEventCsvMapping(
   if (submission.batchDefaults) formData.append('batch_defaults', JSON.stringify(submission.batchDefaults));
   if (lookaheadDeclaration) formData.append('lookahead_declaration', JSON.stringify(lookaheadDeclaration));
   formData.append('mapping_confirmed_at', submission.confirmedAt);
+  if (submission.deriveEventId) formData.append('derive_event_id', 'true');
   const response = await fetch(
     `${API_BASE_URL}${API_PREFIX}/case/import-events/csv?validate_only=${submission.validateOnly ? 'true' : 'false'}`,
     { method: 'POST', body: formData },

@@ -15,12 +15,12 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
-        "GAP-3 Task 1.5 CSV 對映 UI > ② 未勾確認 ⇒ 送出時 upload 與 fetch 之呼叫次數皆為 0；勾了才送出一次"
+        "GAP-3 Task 1.5 CSV 對映 UI > ② 未勾確認 ⇒ 真 fetch 呼叫次數為 0（含答案窗預填）；勾了才發生網路動作"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
-        "GAP-3 Task 1.5 CSV 對映 UI > ② 未勾確認 ⇒ 送出時 upload 與 fetch 之呼叫次數皆為 0；勾了才送出一次"
+        "GAP-3 Task 1.5 CSV 對映 UI > ② 未勾確認 ⇒ 真 fetch 呼叫次數為 0（含答案窗預填）；勾了才發生網路動作"
       ],
       "verdict": "PASS"
     },
@@ -67,6 +67,138 @@
       "expected_failed": [
         "GAP-3 Task 1.5 CSV 對映 UI > ①b 只有一個二元欄時，label 下拉仍是「未選」（不得因為只有一個就自動選它）",
         "Task 1.7 可疑欄警示 > ① 3 個二元欄且已選其一 ⇒ 警示另外 2 個（len == 2 且集合相等）；只有一個二元欄時仍不自動選"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.5-M2",
+      "task": "1.5",
+      "desc": "確認前就打答案窗預覽（COMPOSER-R1-P0-01／GROK-R1-P2-01）",
+      "selector": [
+        "VITEST",
+        "gap3_csv"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ② 未勾確認 ⇒ 真 fetch 呼叫次數為 0（含答案窗預填）；勾了才發生網路動作"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ② 未勾確認 ⇒ 真 fetch 呼叫次數為 0（含答案窗預填）；勾了才發生網路動作"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.5-M3",
+      "task": "1.5",
+      "desc": "勾了「由系統產生 ID」卻不送該旗標（CODEX-R1-P1-01）",
+      "selector": [
+        "VITEST",
+        "gap3_csv"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ⑥ 殘留 R-B2-1：秒級 t0 ⇒ 逐列列出契約毫秒版 event_id（逐字相等），並提供由後端產生之選項"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ⑥ 殘留 R-B2-1：秒級 t0 ⇒ 逐列列出契約毫秒版 event_id（逐字相等），並提供由後端產生之選項"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.5-M4",
+      "task": "1.5",
+      "desc": "預覽不再回報欄數不齊（群集 D 前端半）",
+      "selector": [
+        "VITEST",
+        "gap3_csv"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "CSV 預覽解析之對位 > 欄數比標頭多之列：**不截斷**，列進 raggedRows（後端會整批拒收）",
+        "CSV 預覽解析之對位 > 欄數比標頭少之列：補空字串但仍列進 raggedRows（不得靜默當成有值）",
+        "GAP-3 Task 1.5 CSV 對映 UI > ④b 欄數不齊之 CSV ⇒ 預覽即紅字擋下，不得送出（後端會整批拒收）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "CSV 預覽解析之對位 > 欄數比標頭多之列：**不截斷**，列進 raggedRows（後端會整批拒收）",
+        "CSV 預覽解析之對位 > 欄數比標頭少之列：補空字串但仍列進 raggedRows（不得靜默當成有值）",
+        "GAP-3 Task 1.5 CSV 對映 UI > ④b 欄數不齊之 CSV ⇒ 預覽即紅字擋下，不得送出（後端會整批拒收）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.6-M2",
+      "task": "1.6",
+      "desc": "沒對證位元組也宣稱已對證（CODEX-R1-P1-02）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_csv_provenance"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_csv_provenance_records_four_items"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_csv_provenance_records_four_items"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.6-M3",
+      "task": "1.6",
+      "desc": "確認時間改回送出當下（CODEX-R1-P2-04）",
+      "selector": [
+        "VITEST",
+        "gap3_csv"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ②b 送出之 multipart 內容：對映逐鍵相符、確認時間＝**勾選當下**（非送出當下）、URL 命中對映端點"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ②b 送出之 multipart 內容：對映逐鍵相符、確認時間＝**勾選當下**（非送出當下）、URL 命中對映端點"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.2-M5",
+      "task": "1.2",
+      "desc": "reader 拿掉 index_col=False ⇒ 靜默左移（三家共提）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_csv_ragged"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_csv_ragged_long_row_rejected"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_csv_ragged_long_row_rejected"
       ],
       "verdict": "PASS"
     }

@@ -50,7 +50,9 @@ interface Props {
   onImported?: (result: EventImportResponse) => void;
 }
 
-const EMPTY_PARSED: ParsedCsv = { columns: [], previewRows: [], rows: [], duplicateNames: [] };
+const EMPTY_PARSED: ParsedCsv = {
+  columns: [], previewRows: [], rows: [], duplicateNames: [], raggedRows: [],
+};
 
 export default function EventCsvMappingForm({ onImported }: Props) {
   const [file, setFile] = useState<File | null>(null);
@@ -59,6 +61,10 @@ export default function EventCsvMappingForm({ onImported }: Props) {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [defaultsText, setDefaultsText] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  /** 勾選確認之**當下**時間（不是送出時間）——Task 1.6 記的是「你什麼時候確認的」。 */
+  const [confirmedAt, setConfirmedAt] = useState<string | null>(null);
+  /** 殘留 `R-B2-1`：由後端依契約模板產生 `event_id`（opt-in，預設關＝不推斷）。 */
+  const [deriveEventId, setDeriveEventId] = useState(false);
   const [validateOnly, setValidateOnly] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -131,8 +137,11 @@ export default function EventCsvMappingForm({ onImported }: Props) {
 
   const mappingKey = JSON.stringify(columnMapping);
   useEffect(() => {
+    // 🔴 **未勾確認前一個網路動作都不得發生**（SPEC L1581 逐字：`fetch` call count == 0）。
+    //    R1 `COMPOSER-R1-P0-01`：本 effect 原本只看對映是否齊備，於是答案窗預填會在使用者
+    //    確認之前就把檔案 POST 出去；而測試把該 helper mock 掉，完全看不到那次網路動作（假綠）。
     // 答案窗預設值須帶著對映一起問，否則後端看不到 label_definition（含 filters）。
-    const ready = file !== null && parsedDefaults.ok
+    const ready = file !== null && parsedDefaults.ok && confirmed
       && PREVIEW_REQUIRED_FIELDS.every((f) => columnMapping[f] !== undefined || parsedDefaults.value?.[f] !== undefined);
     if (!ready || file === null) { setPreview(null); return; }
     let cancelled = false;
@@ -148,12 +157,14 @@ export default function EventCsvMappingForm({ onImported }: Props) {
       });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file, mappingKey, defaultsText]);
+  }, [file, mappingKey, defaultsText, confirmed]);
 
   const handleFileChange = async (next: File | null) => {
     setFile(next);
     setMapping({});
     setConfirmed(false);
+    setConfirmedAt(null);
+    setDeriveEventId(false);
     setProblems([]);
     setResult(null);
     setRejected(null);
@@ -179,6 +190,11 @@ export default function EventCsvMappingForm({ onImported }: Props) {
     const out: string[] = [];
     if (!file) out.push('請先選擇 CSV 檔');
     if (!parsedDefaults.ok) out.push('批次預設不是合法的 JSON 物件');
+    if (parsed.raggedRows.length > 0) {
+      const head = parsed.raggedRows.slice(0, 3).map((r) => `第 ${r.row + 1} 列（${r.width} 欄）`);
+      out.push(`有 ${parsed.raggedRows.length} 列的欄數與標頭（${parsed.columns.length} 欄）不同：`
+        + `${head.join('、')}。欄數不齊會讓後端整批拒收，也會讓上面的筆數不可信，請先修正 CSV`);
+    }
     if (columnMapping.label === undefined && parsedDefaults.value?.label === undefined) {
       out.push('尚未指定哪一個 CSV 欄是你標好的正反例（label）——平台不猜');
     }
@@ -211,8 +227,10 @@ export default function EventCsvMappingForm({ onImported }: Props) {
         {
           columnMapping,
           batchDefaults: parsedDefaults.value,
-          confirmedAt: new Date().toISOString(),
+          // 勾選當下之時間；理論上不會是 null（`confirmed` 為真才走到這裡），保底用送出時間。
+          confirmedAt: confirmedAt ?? new Date().toISOString(),
           validateOnly,
+          deriveEventId,
         },
         buildDeclarationPayload(declared, acknowledged, preview),
       );
@@ -295,6 +313,14 @@ export default function EventCsvMappingForm({ onImported }: Props) {
             沒對映到的契約欄請用下方「批次預設」補（只填補缺值，不覆蓋列自帶值）。
           </p>
 
+          {parsed.raggedRows.length > 0 && (
+            <p className="text-xs text-rose-200" data-testid="csv-ragged-rows">
+              有 {parsed.raggedRows.length} 列的欄數與標頭（{parsed.columns.length} 欄）不同
+              （{parsed.raggedRows.slice(0, 3).map((r) => `第 ${r.row + 1} 列 ${r.width} 欄`).join('、')}）。
+              這種檔在後端會整批拒收，畫面上的筆數也不可信——請先修正 CSV 再送出。
+            </p>
+          )}
+
           {parsed.duplicateNames.length > 0 && (
             <p className="text-xs text-amber-200" data-testid="csv-duplicate-columns">
               這個檔有重複欄名：{parsed.duplicateNames.join('、')}。下拉以「第 N 欄」區分，
@@ -327,6 +353,20 @@ export default function EventCsvMappingForm({ onImported }: Props) {
                   <li key={m.row}>第 {m.row + 1} 列：{m.given || '（空白）'} → {m.expected}</li>
                 ))}
               </ul>
+              {/* 殘留 R-B2-1 之一鍵修法：不改上傳位元組，由後端在單位正規化後依契約模板產生 */}
+              <label className="mt-2 flex items-start gap-2 text-amber-100">
+                <input
+                  type="checkbox"
+                  checked={deriveEventId}
+                  data-testid="csv-derive-event-id"
+                  onChange={(e) => setDeriveEventId(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  不想改檔的話，勾這個：由系統依契約公式從 symbol／週期／t0 產生 event_id
+                  （時間會先換算成毫秒）。你的檔案原封不動上傳，這批的紀錄檔會註明 ID 是系統產生的。
+                </span>
+              </label>
             </div>
           )}
 
@@ -370,7 +410,11 @@ export default function EventCsvMappingForm({ onImported }: Props) {
                 type="checkbox"
                 checked={confirmed}
                 data-testid="csv-confirm"
-                onChange={(e) => setConfirmed(e.target.checked)}
+                onChange={(e) => {
+                  setConfirmed(e.target.checked);
+                  // 記的是「你何時確認」，不是「何時按送出」（R1 `CODEX-R1-P2-04`）。
+                  setConfirmedAt(e.target.checked ? new Date().toISOString() : null);
+                }}
                 className="mt-1"
               />
               <span>

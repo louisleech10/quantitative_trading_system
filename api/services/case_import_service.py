@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from dateutil import parser as date_parser
 import io
 import logging
+import warnings
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent.parent
@@ -586,6 +587,7 @@ def get_case_import_service() -> CaseImportService:
 # ===========================================================================
 import hashlib as _hashlib
 import json as _json
+import re as _re
 import uuid as _uuid
 
 from api.models.event_import_models import (
@@ -677,8 +679,23 @@ class EventImportService:
     CSV_CHUNK_ROWS = 5000
 
     def _read_csv_chunks(self, content: bytes):
-        """CSV 分塊讀取之**唯一**入口（`parse_upload` 與對映層共用同一 reader 參數）。"""
-        return pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False, chunksize=self.CSV_CHUNK_ROWS)
+        """CSV 分塊讀取之**唯一**入口（`parse_upload` 與對映層共用同一 reader 參數）。
+
+        🔴 **欄數比標頭多的列一律 fail-closed**（R1 三家共提；grok 實跑）：
+        pandas 預設會把第一欄當 index、**整列左移且零 warning** ——標頭五欄、資料六欄時
+        `label` 讀到的是隔壁欄的值（實測 0 翻成 1），使用者在確認畫面看到的筆數與後端 ingest 不同。
+        `index_col=False` 可修正對位，但 pandas 改為**丟棄多出的欄並只發 ParserWarning**
+        ——那仍是靜默資料遺失，故一併升為例外，由呼叫端轉 `parse_error` 拒收。
+        `on_bad_lines="error"` **無效**（實測仍左移），不要改用它。
+
+        誠實邊界：欄數**比標頭少**的列 pandas 靜默補空字串且不發任何 signal，本層擋不住；
+        那些空值由契約層逐欄拒（缺必填／型別），前端則於預覽階段直接擋送出。
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", pd.errors.ParserWarning)
+            for chunk in pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False,
+                                     chunksize=self.CSV_CHUNK_ROWS, index_col=False):
+                yield chunk
 
     # ---- 欄位對映層（GAP-3 UX Task 1.2） ----
     @staticmethod
@@ -823,6 +840,11 @@ class EventImportService:
     #: `mapping_provenance.confirmed_at_source` 之兩值——伺服器時間**不得**冒充使用者確認時間。
     CONFIRMED_AT_CLIENT = "client_declared"
     CONFIRMED_AT_SERVER = "server_received"
+    #: `mapping_provenance.event_id_source` 之兩值（R-B2-1：秒級 t0 之 ID 由後端依契約模板產生）。
+    EVENT_ID_FROM_COLUMN = "csv_column"
+    EVENT_ID_DERIVED = "derived_from_template"
+    #: `confirmed_at` 之可接受字面（UTC ISO-8601，秒精度或帶小數秒；客戶端可偽造，故只驗格式）。
+    _ISO_UTC_RE = _re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$")
 
     @staticmethod
     def _batch_source_file_digest(
@@ -848,21 +870,56 @@ class EventImportService:
             seen.add(text)
         return seen.pop() if len(seen) == 1 else None
 
+    def _derive_event_ids(
+        self, records: List[Dict[str, object]], batch_defaults: Optional[Dict[str, object]],
+    ) -> int:
+        """依契約 `event_id_template` 之**唯一實作**逐列產生 `event_id`（解除殘留 `R-B2-1`）。
+
+        🔴 呼叫時機必須在 `normalize_t0_units()` **之後**——秒級 t0 的摩擦正是「t0 被換算成毫秒，
+        使用者手寫的 ID 還是秒版」。三欄任一缺值之列**原樣保留**（不猜），由契約層逐列拒。
+        🔴 公式不在本層：轉呼 `EventSamplePipeline.canonical_event_id()`（R3 出口），禁手寫第二份。
+        """
+        defaults = batch_defaults or {}
+        derived = 0
+        for r in records:
+            symbol = r.get("symbol") if r.get("symbol") not in (None, "") else defaults.get("symbol")
+            timeframe = r.get("timeframe") if r.get("timeframe") not in (None, "") else defaults.get("timeframe")
+            t0 = r.get("t0") if r.get("t0") not in (None, "") else defaults.get("t0")
+            if symbol in (None, "") or timeframe in (None, "") or not isinstance(t0, int):
+                continue
+            r["event_id"] = self._pipeline.canonical_event_id(
+                symbol, timeframe, t0, contract=self._contract)
+            derived += 1
+        return derived
+
     def _mapping_provenance(
         self, records: List[Dict[str, object]], batch_defaults: Optional[Dict[str, object]], *,
         column_mapping: Dict[str, object], source_file_name: Optional[str],
         confirmed_at: Optional[str], imported_at: str,
+        source_digest_verified: bool, event_id_source: str,
     ) -> Dict[str, object]:
         """Task 1.6：組出對映 provenance 並經契約驗證；不合規 ⇒ 拒收（落檔數 0）。
 
-        四項＝`column_mapping`／來源檔名／`source_file_digest`／確認時間，外加
-        `confirmed_at_source` 揭露確認時間是使用者宣告或伺服器補記。
+        四項＝`column_mapping`／來源檔名／`source_file_digest`／確認時間，外加三個**誠實揭露**欄：
+        `source_digest_verified`（digest 是否真的以位元組對證過）、`event_id_source`
+        （ID 是使用者欄位還是後端依契約模板產生）、`confirmed_at_source`（確認時間是誰給的）。
+        少了它們，receipt 讀起來會像「已對證／使用者確認過」而其實不是（R1 codex BLOCKING）。
         """
+        declared_at = str(confirmed_at).strip() if confirmed_at else ""
+        if declared_at and not self._ISO_UTC_RE.match(declared_at):
+            raise EventImportRejectedError(EventImportRejected(
+                kind="contract_violation",
+                message=("mapping_confirmed_at 須為 UTC ISO-8601（如 2026-08-25T09:30:00Z）；"
+                         f"收到 {declared_at!r}。本欄是使用者聲明之時刻、非可信時鐘，但格式仍須可解析"),
+                detail={"field": "mapping_provenance.confirmed_at", "received": declared_at},
+            ))
         provenance: Dict[str, object] = {
             "column_mapping": {str(k): str(v) for k, v in (column_mapping or {}).items()},
             "source_file_name": str(source_file_name or ""),
-            "confirmed_at": str(confirmed_at) if confirmed_at else imported_at,
-            "confirmed_at_source": self.CONFIRMED_AT_CLIENT if confirmed_at else self.CONFIRMED_AT_SERVER,
+            "source_digest_verified": bool(source_digest_verified),
+            "event_id_source": str(event_id_source),
+            "confirmed_at": declared_at or imported_at,
+            "confirmed_at_source": self.CONFIRMED_AT_CLIENT if declared_at else self.CONFIRMED_AT_SERVER,
         }
         digest = self._batch_source_file_digest(records, batch_defaults)
         if digest is not None:
@@ -918,6 +975,7 @@ class EventImportService:
         lookahead_declaration: Optional[Dict[str, object]] = None, data_columns: Optional[List[str]] = None,
         on_missing_declaration: Optional[str] = None,
         column_mapping: Optional[Dict[str, object]] = None, mapping_confirmed_at: Optional[str] = None,
+        derive_event_id: bool = False,
     ) -> EventImportResponse:
         """upload_bytes：事件檔內容（記 `upload_sha256` 供 provenance）。
         source_bytes：契約所指之**來源檔**位元組（CODEX-R2-P1-03）；`verify_source_digest=True` 時以此逐列對證
@@ -926,6 +984,11 @@ class EventImportService:
         # GAP-3 UX Task 1.4：t0 單位偵測（CSV／JSON **共用**同一函式物件，經 pipeline 出口；R3）。
         # 判不出者原樣保留 ⇒ 下方 validate 以契約既有之單位 reason 逐列拒，不猜預設值。
         self._pipeline.normalize_t0_units(records, contract=self._contract)
+        # 殘留 `R-B2-1`：秒級 t0 之 `event_id` 摩擦。使用者顯式要求時（opt-in，預設關 ⇒ A-4′ 不推斷），
+        # 於**單位正規化之後**由契約之唯一實作逐列產生 ms 版 ID——不改 upload bytes，
+        # 故 `upload_sha256` 與 Task 1.6 之來源 provenance 仍指向使用者實際上傳的那個檔。
+        if derive_event_id:
+            self._derive_event_ids(records, batch_defaults)
         columns = sorted({k for r in records for k in r.keys()}) if records else []
         if self.looks_legacy(columns):
             raise EventImportRejectedError(EventImportRejected(
@@ -965,7 +1028,9 @@ class EventImportService:
         if column_mapping:
             mapping_provenance = self._mapping_provenance(
                 stored_records, batch_defaults, column_mapping=column_mapping,
-                source_file_name=source_name, confirmed_at=mapping_confirmed_at, imported_at=imported_at)
+                source_file_name=source_name, confirmed_at=mapping_confirmed_at, imported_at=imported_at,
+                source_digest_verified=bool(verify_source_digest and source_bytes is not None),
+                event_id_source=self.EVENT_ID_DERIVED if derive_event_id else self.EVENT_ID_FROM_COLUMN)
         import_id = None
         stored_path = None
         if not validate_only:

@@ -2897,6 +2897,11 @@ export interface EventCsvMappingSubmission {
   batchDefaults?: Record<string, unknown> | null;
   confirmedAt: string;
   validateOnly: boolean;
+  /**
+   * 由後端在 t0 單位正規化後依契約模板逐列產生 `event_id`（殘留 `R-B2-1`）。
+   * 🔴 預設 `false`／不送＝不推斷（A-4′）；上傳位元組不因此改變。
+   */
+  deriveEventId?: boolean;
 }
 
 export interface EventImportRejected {
