@@ -66,7 +66,7 @@ export default function LookaheadDeclarationFields({
         ))}
       </div>
 
-      {lowered.length > 0 && (
+      {(preview.requires_declaration || lowered.length > 0) && (
         <label className="flex items-start gap-2 text-sm text-amber-100" data-testid="lookahead-ack-row">
           <input
             type="checkbox"
@@ -76,7 +76,8 @@ export default function LookaheadDeclarationFields({
             className="mt-1"
           />
           <span>
-            我的篩選條件未用到超過所填的根數（{lowered.join('、')}）。
+            我的篩選條件未用到超過所填的根數
+            {lowered.length > 0 ? `（${lowered.join('、')}）` : ''}。
             <strong className="text-amber-200"> {UNVERIFIABLE_DECLARATION_WARNING}</strong>
           </span>
         </label>

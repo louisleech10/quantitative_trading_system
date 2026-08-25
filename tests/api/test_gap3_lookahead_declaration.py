@@ -43,14 +43,18 @@ def _isolated_storage(tmp_path, monkeypatch):
     return svc
 
 
-def _defaults_referencing_custom() -> dict:
-    """batch_defaults：`label_definition.filters` 引用 `my_custom_signal`（＝「被條件引用」）。"""
+def _defaults_with_filters(filters: object) -> dict:
+    """batch_defaults：`label_definition.filters` 帶入指定條件物件（＝「被條件引用」）。"""
     base = make_event(0)
     out = {k: base[k] for k in DEFAULT_FIELDS}
     ld = dict(out["label_definition"])
-    ld["filters"] = {"conditions": [{"column": CUSTOM, "op": ">=", "value": 1}]}
+    ld["filters"] = filters
     out["label_definition"] = ld
     return out
+
+
+def _defaults_referencing_custom() -> dict:
+    return _defaults_with_filters({"conditions": [{"column": CUSTOM, "op": ">=", "value": 1}]})
 
 
 def _csv(n=2) -> bytes:
@@ -64,10 +68,10 @@ def _csv(n=2) -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def _post_csv(declaration=None):
+def _post_csv(declaration=None, defaults=None):
     data = {
         "column_mapping": json.dumps(MAPPING, ensure_ascii=False),
-        "batch_defaults": json.dumps(_defaults_referencing_custom()),
+        "batch_defaults": json.dumps(defaults if defaults is not None else _defaults_referencing_custom()),
     }
     if declaration is not None:
         data["lookahead_declaration"] = json.dumps(declaration)
@@ -116,10 +120,53 @@ def test_lookahead_declaration_02_missing_declaration_is_fail_closed():
 
 
 def test_lookahead_declaration_02b_declared_batch_is_accepted_and_stored():
-    """對照組：填了宣告就過——證明 ② 的紅不是「這條路徑本來就不通」。"""
-    r = _post_csv(declaration={"declared_window_bars": {"12h": 4}, "acknowledged_unverifiable": False})
+    """對照組：填了宣告並勾了聲明就過——證明 ② 的紅不是「這條路徑本來就不通」。"""
+    r = _post_csv(declaration={"declared_window_bars": {"12h": 4}, "acknowledged_unverifiable": True})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["lookahead_declaration"]["lookahead_bars_declared"] == {"12h": 4}
     assert body["lookahead_declaration"]["requires_declaration"] is True
+    assert body["lookahead_declaration"]["acknowledged_unverifiable"] is True
     assert _stored_count() == 1
+
+
+# ── R1 群集 A（CODEX-R1-P1-01＋GROK-R1-P1-01）：引用欄抽不出來 ≠ 沒有引用 ─────
+#    四種真實編碼會讓「字串 ∩ 可見欄」抽出空集合。抽空時若讀成「沒引用欄」即 fail-open：
+#    未知深度欄可在未宣告下直接落檔並進切分。以下逐形態釘死其為 fail-closed。
+# 🔴 id 刻意**不含空白**：mutation runner 由 pytest `-rf` 輸出以空白切 node id，
+#    label 帶空白會讓紀錄下來的 node id 在空白處被截斷，逐一相等之判準因此失真。
+@pytest.mark.parametrize("filters, why", [
+    ({"formula": f"row['{CUSTOM}'] >= 1"}, "欄名只在運算式字串內部_整詞不等"),
+    ({"conditions": [{"field_id": 42, "op": ">=", "value": 1}]}, "以opaque_id引用_根本沒有欄名"),
+    ({"ref": {"path": f"features.{CUSTOM}"}}, "欄名是dotted_path的一段"),
+    ({"conditions": [{"column": "future_4bar_return", "op": ">=", "value": 0}]}, "對映後用契約欄名_可見header是使用者欄名"),
+])
+def test_lookahead_declaration_03_unextractable_filters_are_fail_closed(filters, why):
+    assert _stored_count() == 0
+    r = _post_csv(declaration=None, defaults=_defaults_with_filters(filters))
+    assert r.status_code in (400, 422), f"{why} ⇒ 應 fail-closed，實得 {r.status_code}: {r.text}"
+    assert r.json()["detail"]["kind"] == "lookahead_declaration_required", why
+    assert _stored_count() == 0, why
+
+
+def test_lookahead_declaration_03b_no_filters_does_not_require_declaration():
+    """對照組：沒有任何條件 ⇒ 不強制宣告。
+
+    沒有這條，③ 會被一個「全部都拒收」的實作滿足（那不是 fail-closed，是壞掉）。
+    """
+    base = make_event(0)
+    plain = {k: base[k] for k in DEFAULT_FIELDS}
+    r = _post_csv(declaration=None, defaults=plain)
+    assert r.status_code == 200, r.text
+    assert r.json()["lookahead_declaration"]["requires_declaration"] is False
+    assert _stored_count() == 1
+
+
+# ── R1（CODEX-R1-P1-02）：深度驗不了時，宣告值本身就是不可驗聲明 ⇒ 一律須勾選 ──
+def test_lookahead_declaration_04_unverifiable_declaration_requires_acknowledgement():
+    # 檔內無可解析未來欄 ⇒ 預設 0 ⇒ 任何正值都不算「調低」；若只在調低時要求勾選，
+    # 這條最該勾的路徑反而不必勾（SPEC Task 1.11 ③ 明列勾選為要件）。
+    r = _post_csv(declaration={"declared_window_bars": {"12h": 4}, "acknowledged_unverifiable": False})
+    assert r.status_code in (400, 422), r.text
+    assert r.json()["detail"]["kind"] == "lookahead_declaration_unacknowledged_unverifiable"
+    assert _stored_count() == 0

@@ -119,6 +119,25 @@ def batch_referenced_columns(records: Sequence[Mapping[str, Any]], candidate_col
     return tuple(sorted(out))
 
 
+def batch_has_filters(records: Sequence[Mapping[str, Any]]) -> bool:
+    """該批是否**有**篩選條件（不問內容）。
+
+    🔴 這是 `batch_referenced_columns()` 的 fail-closed 搭檔（R1：`CODEX-R1-P1-01`＋`GROK-R1-P1-01`）。
+    引用欄之抽取靠「字串 ∩ 可見欄」，對三種真實編碼會抽出空集合：
+      ① 欄名只出現在**運算式字串內部**（`"row['my_custom_signal'] >= 1"`）；
+      ② 條件以 **opaque id** 引用（`{"field_id": 42}`）；
+      ③ 欄名為 **dotted path** 之一段（`"features.my_custom_signal"`）；
+      ④ CSV 對映後 `filters` 用**契約欄名**而 `data_columns` 是使用者原始 header。
+    抽不出來 ≠ 沒引用 ⇒ 「有條件但抽不出引用欄」一律當**不可判定**，走強制宣告，
+    **不得**當成「沒有引用欄」而放行。
+    """
+    for rec in records:
+        ld = rec.get("label_definition")
+        if isinstance(ld, Mapping) and ld.get("filters"):
+            return True
+    return False
+
+
 # --------------------------------------------------------------------------- 預設值
 def default_window_bars_by_timeframe(
     data_columns: Iterable[str],
@@ -286,7 +305,9 @@ def resolve_declaration(
     if on_missing not in _ON_MISSING_KINDS:
         raise ValueError(f"未知 on_missing: {on_missing!r}（封閉集合 {_ON_MISSING_KINDS}）")
     r = registry if registry is not None else load_lookahead_registry()
-    cols = [str(c) for c in data_columns]
+    # 候選欄＝可見 header **∪** 對映後之記錄鍵：CSV 對映後 `filters` 可能寫**契約欄名**而 header 是
+    # 使用者原始欄名，只用 header 會抽不到（R1 `CODEX-R1-P1-01` 之實跑反例）。
+    cols = sorted({str(c) for c in data_columns} | {str(k) for rec in records for k in rec.keys()})
     timeframes = sorted({str(rec["timeframe"]) for rec in records if rec.get("timeframe") is not None})
 
     referenced = batch_referenced_columns(records, cols)
@@ -297,9 +318,14 @@ def resolve_declaration(
             f"批內 timeframe {unknown_tfs} 不在 timeframe_seconds（深度換算無定義，fail-closed）",
         )
 
-    needs = any(
-        requires_declaration(referenced, tf, provenance=provenance, registry=r) for tf in timeframes
-    ) if referenced else False
+    # 🔴 fail-closed 兩支（R1 群集 A）：抽得出引用欄 ⇒ 逐 tf 判；**抽不出但有條件** ⇒ 不可判定 ⇒ 強制宣告。
+    #    第二支是必要的：引用欄之抽取有四種已知抽空形態（見 `batch_has_filters` docstring），
+    #    把「抽不出」讀成「沒引用」就是 fail-open。
+    needs = (
+        any(requires_declaration(referenced, tf, provenance=provenance, registry=r) for tf in timeframes)
+        if referenced
+        else batch_has_filters(records)
+    )
     defaults = default_window_bars_by_timeframe(cols, timeframes, r) if timeframes and not unknown_tfs else {}
 
     if declaration is None:
@@ -324,6 +350,16 @@ def resolve_declaration(
         )
 
     declared, ack = _validate_declaration_shape(declaration, timeframes)
+    # 🔴 R1（`CODEX-R1-P1-02`）：L2 被觸發＝深度**本來就驗不了**，此時宣告值本身就是不可驗聲明
+    #    ⇒ 一律要求勾選，與有沒有「調低」無關。原版只在調低時要求，使得
+    #    「檔內無可解析欄（預設 0）＋自訂欄」這條最該勾的路徑反而不必勾（SPEC Task 1.11 ③ 明列勾選為要件）。
+    if needs and not ack:
+        raise LookaheadDeclarationError(
+            "lookahead_declaration_unacknowledged_unverifiable",
+            "本批之深度無法由 registry 驗證（引用了未登記欄，或來源為外部上傳）"
+            "⇒ 宣告值屬**無法驗證的聲明**，須勾選確認：系統無法驗證此深度，錯報將導致資料洩漏",
+            {"referenced_columns": list(referenced), "default_window_bars": defaults},
+        )
     lowered = sorted(tf for tf in timeframes if declared[tf] < int(defaults.get(tf, 0)))
     if lowered and not ack:
         raise LookaheadDeclarationError(

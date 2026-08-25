@@ -132,6 +132,48 @@ def test_gap3_split_blocked_03c_fake_empty_split_plan_raises(records, bars):
                                    {"horizons": list(HORIZONS), "seed": 1, "n_boot": 50})
 
 
+# ── ③c 第二形態（R1 `CODEX-R1-P1-04`）：clusters 有值但沒有任何事件被指派或 purge ──
+def test_gap3_split_blocked_03c2_fake_plan_without_any_assignment_raises(records, bars):
+    """`assignments` 空**且** `purged` 空 ⇒ 該 plan 根本沒切分，卻仍算得出 `ci.status="ok"`。
+
+    🔴 判準刻意用「兩者皆空」：`split_events` 全列跨界時會產出 assignments 空、**purged 非空**
+    的合法 plan，用「assignments 空即 raise」會把它一起擋掉。
+    """
+    res = _study_only(records, bars)
+    eids = list(res.manifest.table["event_id"])
+    fake = EventSplitPlan(
+        assignments=pd.DataFrame(columns=["event_id", "symbol", "split_label"]),
+        purged=pd.DataFrame(columns=["event_id", "reason"]),
+        clusters=pd.DataFrame({"event_id": eids,
+                               "time_cluster_id": list(range(len(eids))),
+                               "cluster_weight": [1.0] * len(eids)}),
+        summary={},
+    )
+    with pytest.raises(ValueError, match="assignments"):
+        event_forward_return_table(res.manifest, res.receipts, bars, fake,
+                                   {"horizons": list(HORIZONS), "seed": 1, "n_boot": 50})
+
+
+def test_gap3_split_blocked_03c3_all_purged_plan_is_still_accepted(records, bars):
+    """對照組：合法的「全部被 purge」plan（assignments 空、purged 非空）**不得**被擋。
+
+    沒有這條，③c2 會被一個過寬的守衛滿足（那不是加固，是弄壞既有合法輸入）。
+    """
+    res = _study_only(records, bars)
+    eids = list(res.manifest.table["event_id"])
+    all_purged = EventSplitPlan(
+        assignments=pd.DataFrame(columns=["event_id", "symbol", "split_label"]),
+        purged=pd.DataFrame({"event_id": eids, "reason": ["interval_crosses_split_boundary"] * len(eids)}),
+        clusters=pd.DataFrame({"event_id": eids,
+                               "time_cluster_id": list(range(len(eids))),
+                               "cluster_weight": [1.0] * len(eids)}),
+        summary={},
+    )
+    out = event_forward_return_table(res.manifest, res.receipts, bars, all_purged,
+                                     {"horizons": list(HORIZONS), "seed": 1, "n_boot": 50})
+    assert out["receipts"]["n_rows"] > 0
+
+
 # ── ④ reason 字面取自契約，且**未**硬寫進 api/ frontend/src/ momentum/ 之 .py/.ts ──
 def _literal_hits(roots, suffixes, needle: str) -> int:
     total = 0

@@ -2867,13 +2867,33 @@ export interface EventImportResponse {
   source_digest_verified: boolean;
   contract_version: string | null;
   stored_path: string | null;
+  /** GAP-3 UX Task 1.9／1.11／1.12：答案窗宣告 receipt（深度語意住 lookahead_bars_declared） */
+  lookahead_declaration?: EventLookaheadDeclarationReceipt | null;
+}
+
+/** GAP-3 UX Task 1.9／1.12：落檔之答案窗宣告與 L3 狀態（後端算，前端只顯示）。 */
+export interface EventLookaheadDeclarationReceipt {
+  requires_declaration: boolean;
+  referenced_columns: string[];
+  default_window_bars: Record<string, number>;
+  declared_window_bars: Record<string, number> | null;
+  /** 逐 timeframe 的真實深度；🔴 深度語意看這個，不是 label_definition.window.horizon_bars */
+  lookahead_bars_declared: Record<string, number> | null;
+  acknowledged_unverifiable: boolean;
+  embargo_ms_by_symbol: Record<string, number>;
+  /** true ⇒ 該批禁進 train/test 切分與條件 IC，只能產事件研究表 */
+  split_blocked: boolean;
 }
 
 export interface EventImportRejected {
-  kind: 'legacy_schema_detected' | 'new_schema_on_legacy_endpoint' | 'contract_violation' | 'parse_error' | string;
+  kind: 'legacy_schema_detected' | 'new_schema_on_legacy_endpoint' | 'contract_violation' | 'parse_error'
+    | 'lookahead_declaration_required' | 'lookahead_declaration_invalid'
+    | 'lookahead_declaration_unacknowledged_lowering' | 'lookahead_declaration_unacknowledged_unverifiable' | string;
   message: string;
   failures: EventImportFailure[];
   migration_hint?: Record<string, unknown> | null;
+  /** 結構化補充（如 default_window_bars／lowered_timeframes），供 UI 預填與說明 */
+  detail?: Record<string, unknown> | null;
 }
 
 /** 表格 capability：ok ⇒ 數值；其他 ⇒ 顯示 reason（不得空白） */

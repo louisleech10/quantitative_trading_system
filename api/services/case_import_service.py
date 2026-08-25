@@ -984,9 +984,22 @@ class EventImportService:
         split_blocked = self._pipeline.lookahead_split_blocked(declaration)
         if split_blocked:
             res = self._pipeline.run_event_study_only_with_params(records, bars)
+            embargo_applied: Optional[int] = None
+            embargo_source = "not_applicable_event_study_only"
         else:
+            # 🔴 R1（`CODEX-R1-P1-03`）：宣告值必須**真的接到 split**，否則 `embargo_ms_by_symbol`
+            #    只是沒人用的數字。原版把 `req.embargo_ms`（預設 None）直傳 ⇒ `split_events` 退回
+            #    `label 窗最大值`；而 `label_return_mode="open_to_close"` 之 label 窗**不隨 horizon 變**
+            #    ⇒ 宣告 20 根、實際只隔 1 根＝洩漏。此處把宣告投影當**下界**套上去。
+            #    保守方向（往上調）永遠允許，故取 max 而非拒收；per-scope embargo 屬 Task 7.0b。
+            declared_lb = max((int(v) for v in (declaration or {}).get("embargo_ms_by_symbol", {}).values()), default=0)
+            requested = int(req.embargo_ms) if req.embargo_ms is not None else 0
+            embargo_applied = max(requested, declared_lb) or None
+            embargo_source = ("lookahead_declaration_lower_bound"
+                              if declared_lb and declared_lb > requested else
+                              "request" if requested else "label_window_max")
             res = self._pipeline.run_with_params(
-                records, bars, test_fraction=float(req.test_fraction), embargo_ms=req.embargo_ms,
+                records, bars, test_fraction=float(req.test_fraction), embargo_ms=embargo_applied,
                 tier_min_test_events=int(req.tier_min_test_events),
             )
         tables = self._pipeline.analyze_tables(res, bars, horizons=tuple(int(h) for h in req.horizons),
@@ -996,6 +1009,7 @@ class EventImportService:
             "lookahead_declaration": declaration,
             "capability": ({"split": "unavailable", "reason": self._pipeline.split_blocked_capability_reason()}
                            if split_blocked else {"split": "ok"}),
+            "embargo": {"applied_ms": embargo_applied, "source": embargo_source},
             "summary": res.summary,
             "align_failures": res.align_failures.to_dict("records") if not res.align_failures.empty else [],
             "tables": tables,

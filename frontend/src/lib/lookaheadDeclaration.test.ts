@@ -65,9 +65,27 @@ describe('答案窗宣告：逐 tf 各一格', () => {
 
   it('逐 tf 各填即通過，送出形狀鍵集恰為批內 tf', () => {
     const declared = { '1h': 72, '12h': 6 };
-    expect(validateDeclaration(declared, false, multiTf).ok).toBe(true);
-    const payload = buildDeclarationPayload(declared, false, multiTf);
+    // multiTf.requires_declaration 為 true ⇒ 仍須勾選（見下一組）
+    expect(validateDeclaration(declared, true, multiTf).ok).toBe(true);
+    const payload = buildDeclarationPayload(declared, true, multiTf);
     expect(Object.keys(payload!.declared_window_bars).sort()).toEqual(['12h', '1h']);
+  });
+});
+
+describe('答案窗宣告：深度驗不了時一律須勾選（R1 CODEX-R1-P1-02）', () => {
+  it('requires_declaration 為 true ⇒ 即使沒調低也要勾', () => {
+    const declared = { '1h': 72, '12h': 6 };   // 皆等於預設，沒有調低
+    expect(loweredTimeframes(declared, multiTf)).toEqual([]);
+    const v = validateDeclaration(declared, false, multiTf);
+    expect(v.ok).toBe(false);
+    expect(v.requiresAcknowledgement).toBe(true);
+    expect(v.problems.join(' ')).toContain(UNVERIFIABLE_DECLARATION_WARNING);
+  });
+
+  it('requires_declaration 為 false 且沒調低 ⇒ 不必勾（否則就是全面擋死，不是 fail-closed）', () => {
+    const v = validateDeclaration({ '12h': 12 }, false, singleTf);
+    expect(v.ok).toBe(true);
+    expect(v.requiresAcknowledgement).toBe(false);
   });
 });
 

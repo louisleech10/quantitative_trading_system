@@ -75,10 +75,16 @@ export function validateDeclaration(
   if (extra.length > 0) problems.push(`${extra.join('、')} 不在這批資料的 timeframe 內`);
 
   const lowered = loweredTimeframes(declared, preview);
-  const requiresAcknowledgement = lowered.length > 0;
+  // 🔴 兩個各自獨立的勾選理由（R1 `CODEX-R1-P1-02`）：
+  //   ① 系統本來就驗不了這批的深度（L2 被觸發）——此時**宣告值本身**就是不可驗聲明；
+  //   ② 使用者把值調到檔內最大可用 horizon 以下。
+  // 原版只有 ②，於是「檔內沒有可解析欄（預設 0）＋自訂欄」這條最該勾的路徑反而不必勾。
+  const requiresAcknowledgement = preview.requires_declaration || lowered.length > 0;
   if (requiresAcknowledgement && !acknowledged) {
     problems.push(
-      `${lowered.join('、')} 的答案窗低於檔內最大可用 horizon；要調低必須勾選聲明（${UNVERIFIABLE_DECLARATION_WARNING}）`,
+      lowered.length > 0
+        ? `${lowered.join('、')} 的答案窗低於檔內最大可用 horizon；要調低必須勾選聲明（${UNVERIFIABLE_DECLARATION_WARNING}）`
+        : `這批引用了系統無法驗證深度的欄位，宣告值屬無法驗證的聲明，必須勾選確認（${UNVERIFIABLE_DECLARATION_WARNING}）`,
     );
   }
   return { ok: problems.length === 0, problems, requiresAcknowledgement };

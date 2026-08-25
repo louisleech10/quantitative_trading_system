@@ -129,6 +129,14 @@ export default function EventImportForm({ onImported }: EventImportFormProps) {
               {JSON.stringify(rejected.migration_hint, null, 2)}
             </pre>
           )}
+          {rejected.detail && Object.keys(rejected.detail).length > 0 && (
+            <pre
+              className="mt-2 max-h-48 overflow-auto rounded bg-slate-900/70 p-2 text-[11px] text-slate-200"
+              data-testid="event-import-rejected-detail"
+            >
+              {JSON.stringify(rejected.detail, null, 2)}
+            </pre>
+          )}
           {rejected.failures.length > 0 && (
             <table className="mt-2 w-full text-[11px]">
               <thead>

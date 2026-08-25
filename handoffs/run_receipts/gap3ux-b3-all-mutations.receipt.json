@@ -158,6 +158,122 @@
         "test_gap3_horizon_declaration_05_depth_formula_is_the_single_exported_function"
       ],
       "verdict": "PASS"
+    },
+    {
+      "id": "1.11-M2",
+      "task": "1.11",
+      "desc": "抽不出引用欄即放行（CODEX-R1-P1-01／GROK-R1-P1-01）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "lookahead_declaration"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_declaration_03_unextractable_filters_are_fail_closed[filters0-\\u6b04\\u540d\\u53ea\\u5728\\u904b\\u7b97\\u5f0f\\u5b57\\u4e32\\u5167\\u90e8_\\u6574\\u8a5e\\u4e0d\\u7b49]",
+        "test_lookahead_declaration_03_unextractable_filters_are_fail_closed[filters1-\\u4ee5opaque_id\\u5f15\\u7528_\\u6839\\u672c\\u6c92\\u6709\\u6b04\\u540d]",
+        "test_lookahead_declaration_03_unextractable_filters_are_fail_closed[filters2-\\u6b04\\u540d\\u662fdotted_path\\u7684\\u4e00\\u6bb5]",
+        "test_lookahead_declaration_03_unextractable_filters_are_fail_closed[filters3-\\u5c0d\\u6620\\u5f8c\\u7528\\u5951\\u7d04\\u6b04\\u540d_\\u53ef\\u898bheader\\u662f\\u4f7f\\u7528\\u8005\\u6b04\\u540d]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_declaration_03_unextractable_filters_are_fail_closed[filters0-\\u6b04\\u540d\\u53ea\\u5728\\u904b\\u7b97\\u5f0f\\u5b57\\u4e32\\u5167\\u90e8_\\u6574\\u8a5e\\u4e0d\\u7b49]",
+        "test_lookahead_declaration_03_unextractable_filters_are_fail_closed[filters1-\\u4ee5opaque_id\\u5f15\\u7528_\\u6839\\u672c\\u6c92\\u6709\\u6b04\\u540d]",
+        "test_lookahead_declaration_03_unextractable_filters_are_fail_closed[filters2-\\u6b04\\u540d\\u662fdotted_path\\u7684\\u4e00\\u6bb5]",
+        "test_lookahead_declaration_03_unextractable_filters_are_fail_closed[filters3-\\u5c0d\\u6620\\u5f8c\\u7528\\u5951\\u7d04\\u6b04\\u540d_\\u53ef\\u898bheader\\u662f\\u4f7f\\u7528\\u8005\\u6b04\\u540d]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.11-M3",
+      "task": "1.11",
+      "desc": "不可驗宣告不必勾選（CODEX-R1-P1-02）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "lookahead_declaration"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_lookahead_declaration_04_unverifiable_declaration_requires_acknowledgement"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_lookahead_declaration_04_unverifiable_declaration_requires_acknowledgement"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.9-M3",
+      "task": "1.9",
+      "desc": "宣告下界未接進 split（CODEX-R1-P1-03）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_horizon_declaration"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_horizon_declaration_07_declared_depth_reaches_split_embargo"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_horizon_declaration_07_declared_depth_reaches_split_embargo"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.12-M5",
+      "task": "1.12",
+      "desc": "移除假 plan 第二形態之守衛（CODEX-R1-P1-04）",
+      "selector": [
+        "tests/momentum/event_samples",
+        "-k",
+        "split_blocked"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_split_blocked_03c2_fake_plan_without_any_assignment_raises"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_split_blocked_03c2_fake_plan_without_any_assignment_raises"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.9-M4",
+      "task": "1.9",
+      "desc": "引用欄永遠不餵進深度函式（CODEX-R1-P2-05）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_horizon_declaration"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_horizon_declaration_05_depth_formula_is_the_single_exported_function"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_horizon_declaration_05_depth_formula_is_the_single_exported_function"
+      ],
+      "verdict": "PASS"
     }
   ]
 }

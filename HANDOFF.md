@@ -16,11 +16,17 @@ GAP-3 事件型 UAT 缺口修補：SPEC 🔒 FROZEN（`4ce3d6d9`）、TODO 🔒 
 延伸檔 D-001（`81cbe7ab`）與 D-002（`51f1a65e`）皆三家 APPROVED。
 42 個 Task 之計數：**10 ✅／1 🔧／31 ⬜**（逐 Task 狀態一律看看板，本檔不重述）。
 
-Task 1.11／1.12／1.9（深度三層防線）之程式碼已寫入 repo，**三家 code review R1 進行中**。
-新檔＝`momentum/Analysis/event_samples/lookahead_gate.py`（L3 閘）與 `lookahead_declaration.py`（L2 宣告解析）；
-契約新增 `capability_reason_bindings`（reason 字面之具名綁定，使 `.py`／`.ts` grep 計數為 0）。
-brief `handoffs/20260825-gap3ux-b3-review-r1-brief.md`；收斂檔將落在
-`handoffs/reconcile/20260825-gap3ux-b3-review-r1/`。
+Task 1.11／1.12／1.9（深度三層防線）之程式碼已寫入 repo；**R1 三家 code review 已收斂，
+6 條 findings 全修，等 R2 閉合輪**。新檔＝`momentum/Analysis/event_samples/lookahead_gate.py`（L3 閘）
+與 `lookahead_declaration.py`（L2 宣告解析）；契約新增 `capability_reason_bindings`
+（reason 字面之具名綁定，使 `.py`／`.ts` grep 計數為 0）。
+
+R1 之三家 Verdict **不一致**（codex BLOCKING／grok 可進／composer 可派工），主委採 codex 嚴格版；
+群集 A–G 之處置、理由與新增殘留全文見收斂檔
+`handoffs/reconcile/20260825-gap3ux-b3-review-r1/synth.md`（`cluster_attribution` 與 `completeness --lock` 皆 rc=0）。
+🔴 群集 C 為**真實洩漏路徑**：宣告之 `embargo_ms_by_symbol` 未接進 split，
+`label_return_mode="open_to_close"` 下宣告 20 根、實際只隔 1 根。
+R2 brief 已備妥：`handoffs/20260825-gap3ux-b3-review-r2-brief.md`（逐字列出原提出方要重跑的反例）。
 
 **其後＝B4＝Task 1.5／1.6／1.7（匯入前端）**。
 看板 `白話說明/GAP-3施工看板.md`；歷史 `白話說明/GAP-3施工進度.md`。
@@ -33,9 +39,9 @@ VERIFY:handoffs/run_receipts/gap3ux-b3-all-mutations.receipt.json
 |---|---|
 | 第一批 mutation | 32 條，`closure: CLOSED`（`gap3ux-b1-all-mutations.receipt.json`） |
 | 第二批 mutation | 14 條，`closure: CLOSED`（`gap3ux-b2-all-mutations.receipt.json`） |
-| 第三批 mutation | **7 條**，`closure: CLOSED`（1.11×1／1.12×4／1.9×2，逐條對應 SPEC 明列之變異） |
-| 第三批驗收 | `lookahead_declaration` 4／`split_blocked` 7／`gap3_horizon_declaration` 7（下限 2／6／5）；vitest 全套 206；`npm --prefix frontend run build` rc=0 |
-| `pytest tests/api tests/momentum/event_samples` | 876 passed／3 failed（**既有債**，名單見交接 §6.5；該節所列 3 個 error 本輪未重現＝順序相依，屬 `R-B1-1`） |
+| 第三批 mutation | **12 條**，`closure: CLOSED`（SPEC 明列之 7 條 ＋ R1 修法之 5 條回歸鎖，各鎖一個群集） |
+| 第三批驗收 | `lookahead_declaration` 10／`split_blocked` 9／`gap3_horizon_declaration` 8（下限 2／6／5）；vitest 全套 208；`npm --prefix frontend run build` rc=0 |
+| `pytest tests/api tests/momentum/event_samples` | 885 passed／3 failed（**既有債**，名單見交接 §6.5；該節所列 3 個 error 本輪未重現＝順序相依，屬 `R-B1-1`） |
 | `python3 scripts/gap3_freeze_golden.py --check` | rc=0（`canonical_sha` 全程不變） |
 
 mutation 判準＝**轉紅之 test 集合逐一等於預期**（多紅少紅皆 FAIL）。

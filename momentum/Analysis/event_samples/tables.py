@@ -127,6 +127,15 @@ def event_forward_return_table(
             "event_forward_return_table: event_split_plan.clusters 為空 —— 以空 plan 冒充「未執行切分」"
             "會讓 cluster CI 以單一假簇計算而看似有效；未切分請顯式傳 event_split_plan=None（Task 1.12 ③c）"
         )
+    # R1（`CODEX-R1-P1-04`）：③c 的第二形態——`clusters` 有值但**沒有任何事件被指派或 purge**，
+    # 等於根本沒切分卻仍會算出 `ci.status="ok"`。判準刻意用 assignments **與** purged 皆空：
+    # 「全部被 purge」是 `split_events` 的合法產出（assignments 空、purged 非空），不得誤擋。
+    if (event_split_plan is not None
+            and event_split_plan.assignments.empty and event_split_plan.purged.empty):
+        raise ValueError(
+            "event_forward_return_table: event_split_plan 之 assignments 與 purged 皆為空 —— 沒有任何事件被"
+            "指派或 purge，該 plan 並未真的執行切分；未切分請顯式傳 event_split_plan=None（Task 1.12 ③c）"
+        )
     cl = event_split_plan.clusters.set_index("event_id") if event_split_plan is not None else None
 
     rows: List[dict] = []

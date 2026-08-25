@@ -117,3 +117,13 @@ class EventAnalyzeResponse(BaseModel):
     tables: Dict[str, Any] = Field(..., description="event_forward_return_table / binary_discrimination_table / all_bars_evaluation（含 capability_status／reason）")
     event_timestamps: List[int] = Field(default_factory=list, description="對齊成功事件之 t0，**epoch ms**（契約單位；非 IC 秒）")
     event_timestamps_ic_seconds: List[int] = Field(default_factory=list, description="同上換算為 bar open **秒**（IC 主線 event_timestamps 單位；GROK-R1-P2-02）")
+    lookahead_declaration: Optional[Dict[str, Any]] = Field(
+        None, description="GAP-3 UX Task 1.9：該批落檔之答案窗宣告 receipt（舊批為 null）")
+    capability: Dict[str, Any] = Field(
+        default_factory=dict,
+        description=("GAP-3 UX Task 1.12：`split` 為 `ok`／`unavailable`；`unavailable` 時 `reason` 取自契約之 "
+                     "capability_unavailable_reasons，該批只走 event-study-only（未執行切分與條件 IC）"))
+    embargo: Dict[str, Any] = Field(
+        default_factory=dict,
+        description=("GAP-3 UX Task 1.9：實際送進切分的 embargo（`applied_ms`）與其來源（`source`）。"
+                     "🔴 宣告深度為**下界**：`source=lookahead_declaration_lower_bound` 表示請求值低於宣告深度而被提高"))
