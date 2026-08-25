@@ -695,8 +695,14 @@ class EventImportService:
         header_width: Optional[int] = None
         bad: List[Tuple[int, int]] = []
         for i, row in enumerate(reader):
-            if len(row) == 1 and not row[0].strip():
-                continue                                   # 整行空白（同 pandas skip_blank_lines）
+            # 整行空白＝跳過（與 pandas `skip_blank_lines` 及前端 `splitRecords` 三端一致）。
+            # 🔴 `csv.reader` 對**真正的空行**回 `[]`、對「只有空白字元的行」回 `[' ']`
+            #    ——兩種都要跳（實測 pandas 兩種都跳）。R3 三家獨立命中：漏了 `[]` 這半
+            #    ⇒ 檔尾或中間留一個空行的合法 CSV 會被誤擋（且與前端相反，變成「前端收、後端擋」）。
+            # 🔴 但 `,`（兩個空欄）**不是**空行：`csv.reader` 回 `['', '']`（2 欄），
+            #    pandas 亦保留為一列空值 ⇒ 不得跳過，否則會把真實的資料列吃掉。
+            if not row or (len(row) == 1 and not row[0].strip()):
+                continue
             if header_width is None:
                 header_width = len(row)
                 continue

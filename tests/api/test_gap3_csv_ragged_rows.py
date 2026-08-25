@@ -158,6 +158,67 @@ def test_gap3_csv_ragged_header_only_not_blocked_by_width_guard(_isolated_storag
     assert _stored_count(_isolated_storage) == 0
 
 
+# ── ⑦ R3 三家共提：空行不得被列寬守衛誤擋（三端行為須一致） ─────────────────
+@pytest.mark.parametrize(
+    "kind,blank",
+    [("middle", "\n\n"), ("trailing", "\n\n"), ("whitespace_only", "\n   \n")],
+    ids=["blank_middle", "blank_trailing", "whitespace_only_line"],
+)
+def test_gap3_csv_ragged_blank_lines_accepted(_isolated_storage, kind, blank):
+    """🔴 R3 `CODEX-R3-P1-01`／`GROK-R3-P1-01`／`COMPOSER-R3-P2-01`：R2 新增之列寬守衛
+    把 `csv.reader` 對空行回傳的 `[]` 當成「0 欄」而拒收。
+
+    那是 R2 才修掉的「前端擋／後端收」之**鏡像**（前端收、後端擋）——編輯器與 Excel 匯出
+    在檔尾留一個空行極常見。三端之正確行為（實測）：pandas 跳過空行**與純空白行**，
+    前端 `splitRecords` 亦跳過，故後端必須一致。
+    """
+    base = make_event(0)
+    lines = [",".join(HEADER)]
+    for i in range(2):
+        t0 = base["t0"] + i * 43200000
+        lines.append(",".join([canonical_event_id("ETHUSDT", "12h", t0), "ETHUSDT", "12h",
+                               str(t0), str(i % 2), DIGEST]))
+    body = "\n".join(lines) + blank if kind != "middle" else \
+        "\n".join([lines[0], lines[1]]) + blank + lines[2] + "\n"
+    r = _post(body.encode("utf-8"))
+    assert r.status_code == 200, r.text
+    assert _stored_count(_isolated_storage) == 1
+
+
+def _with_extra_line(extra: str) -> bytes:
+    """正反例各一 ＋ 一列 `extra`（用來測「什麼算空行」之兩側邊界）。"""
+    base = make_event(0)
+    lines = [",".join(HEADER)]
+    for i in range(2):
+        t0 = base["t0"] + i * 43200000
+        lines.append(",".join([canonical_event_id("ETHUSDT", "12h", t0), "ETHUSDT", "12h",
+                               str(t0), str(i % 2), DIGEST]))
+    lines.append(extra)
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def test_gap3_csv_ragged_short_all_empty_row_still_counts_as_width_violation(_isolated_storage):
+    """🔴 反向護欄：**全空但欄數不對**之列仍是欄數不齊，不得被當成空行放行。
+
+    這是「空行」定義寫太寬時真正會漏掉的東西——把條件寫成「全欄皆空就跳過」，
+    `,,`（6 欄標頭下只有 3 欄、全空）就逃過寬度檢查，退化成靠契約層才擋得住。
+    ⚠️ 第一版反向護欄用的是**欄數正確**之全空列（`,,,,,`），對該變異**沒有鑑別力**
+    ——列寬守衛只做驗證、不做過濾，跳不跳過都不改變 pandas 讀進來的列
+    ⇒ `--record` 錄到空紅集合。改用「短且全空」才驗得到。
+    """
+    r = _post(_with_extra_line(",,"))
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["kind"] == "parse_error"
+    assert _stored_count(_isolated_storage) == 0
+
+
+def test_gap3_csv_ragged_full_width_all_empty_row_is_a_data_row(_isolated_storage):
+    """欄數正確、值全空之列**是資料列**（pandas 保留為一列空值），由契約層逐欄拒。"""
+    r = _post(_with_extra_line(",".join([""] * len(HEADER))))
+    assert r.status_code == 422, r.text
+    assert _stored_count(_isolated_storage) == 0
+
+
 # ── ④ 引號內之 CR 由後端原樣保留（前端預覽解析須一致） ──────────────────────
 def test_gap3_csv_ragged_quoted_cr_preserved_by_backend(_isolated_storage):
     content = ('我的編號,幣種,是不是正例\n"E1\r",ETHUSDT,1\n').encode("utf-8")
