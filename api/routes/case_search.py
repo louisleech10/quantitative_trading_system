@@ -31,6 +31,20 @@ from api.services.standalone_search_service import standalone_search_service as 
 router = APIRouter(prefix="/search", tags=["Case Search"])
 logger = get_logger("api.routes.case_search")
 
+
+def _attach_canonical_source(data) -> None:
+    """GAP-3 UX Task 1.3：就本結果集之**每列完整 CaseData** 產生來源 canonical bytes 與 digest。
+
+    🔴 **不新增 route**：`/search` 匯出流程之服務端入口即本結果端點，回應**增兩鍵**
+    `source_file_text`／`source_file_digest`（SPEC Task 1.3「承載（R13 定案）」）。
+    🔴 序列化唯一實作＝§G S-9 參考實作（經 `momentum.factories` 出口取得；R3），
+    前端**不得**自算 digest。
+    """
+    from momentum.factories import create_event_sample_pipeline  # R3：唯一出口
+
+    cases = [c.model_dump(mode="json") for c in data.cases]
+    data.source_file_text, data.source_file_digest = create_event_sample_pipeline().canonical_source_payload(cases)
+
 @router.post("/execute", response_model=TaskStartResponse)
 async def execute_search(
     request: CaseSearchRequest,
@@ -178,11 +192,13 @@ async def get_task_result(task_id: str):
         if not result_data:
             raise HTTPException(status_code=404, detail="Task results not found")
         
-        return SearchResponse(
+        response = SearchResponse(
             success=True,
             data=result_data
         )
-        
+        _attach_canonical_source(response.data)
+        return response
+
     except HTTPException:
         raise
     except Exception as e:

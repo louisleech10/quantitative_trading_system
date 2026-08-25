@@ -111,14 +111,18 @@ def test_gap3_import_contract_reasons_passthrough_not_reimplemented():
     """API 層不得重複實作契約檢查：failures 字面全來自契約檔；service 檔無自寫 reason 字面。"""
     from momentum.factories import create_event_sample_pipeline
     reasons = set(create_event_sample_pipeline().import_contract()["import_failure_reasons"])
-    bad = [make_event(0, t0=1704067200, label=1), make_event(1, label=0, control_kind="platform_random_bars")]
+    # t0=1704067：兩帶皆不落入（×1000 仍 < ms_magnitude_min）⇒ 單位判不出，維持 invalid_timestamp_unit。
+    # （原用 1704067200＝秒級；GAP-3 UX Task 1.4 起秒級會被偵測並 ×1000，不再是不合法值。）
+    bad = [make_event(0, t0=1704067, label=1), make_event(1, label=0, control_kind="platform_random_bars")]
     r = client.post("/api/v1/case/import-events/json", json={"records": bad})
     assert r.status_code == 422
     got = {f["reason"] for f in r.json()["detail"]["failures"]}
     assert got <= reasons and {"invalid_timestamp_unit", "not_implemented_platform_random_bars"} <= got
     src = (REPO / "api" / "services" / "case_import_service.py").read_text(encoding="utf-8")
     gap3_part = src.split("GAP-3 Task B5.1", 1)[1]
-    for literal in ("invalid_timestamp_unit", "missing_required_field", "enum_violation", "duplicate_event_id"):
+    for literal in ("invalid_timestamp_unit", "missing_required_field", "enum_violation", "duplicate_event_id",
+                    "column_mapping_missing", "column_not_found_in_file", "label_column_not_binary",
+                    "heterogeneous_rows_in_batch"):
         assert literal not in gap3_part, f"API 層不得複列契約 reason 字面：{literal}"
     assert re.search(r"create_event_sample_pipeline\(\)", gap3_part)        # 經 factories 出口消費
     assert "validate_event_import" not in gap3_part and "import_contract import" not in gap3_part   # 不直 import validator（COMPOSER 建議）

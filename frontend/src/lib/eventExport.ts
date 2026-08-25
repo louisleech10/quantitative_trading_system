@@ -5,6 +5,7 @@
  * 使用者匯入前仍可手改；後端 validator 為唯一真相源（本檔不重做檢查）。
  */
 import type { CaseData } from './types';
+import { ruleDigestOf, ruleSummaryText } from './ruleDigest';
 
 export interface EventExportOptions {
   timeframe: string;
@@ -14,27 +15,30 @@ export interface EventExportOptions {
   direction?: 'long' | 'short';
   scenario?: 'A' | 'B' | 'C' | 'two_stage';
   entryPriceSemantic?: 'trigger_open' | 'trigger_close' | 'next_open' | 'decision_bar_open' | 'decision_bar_close';
+  /**
+   * 後端就本結果集算好的來源 canonical 文字（`SearchResultData.source_file_text`）。
+   * 🔴 前端**不得**自行序列化或雜湊——見 `ruleDigest.ts` 檔頭與 SPEC Task 1.3 之 R13 定案。
+   */
+  sourceFileText: string;
+  /** 後端算好的 `source_file_digest`（`sha256(sourceFileText)`）。 */
+  sourceFileDigest: string;
 }
 
-/** 真 SHA-256（WebCrypto）；環境無 subtle ⇒ 拋錯，不做假 hash 退路（CODEX-R1-P1-02）。 */
-export async function sha256Hex(text: string): Promise<string> {
-  const subtle = globalThis.crypto?.subtle;
-  if (!subtle) throw new Error('WebCrypto subtle 不可用：無法計算 source_file_digest（不提供非 SHA-256 退路）');
-  const buf = await subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-/** 來源 canonical bytes：搜尋結果（cases）之 canonical JSON——`source_file_digest` 綁的是這份「來源」，非匯出檔自身。 */
-export function canonicalSourceText(cases: CaseData[]): string {
-  return JSON.stringify(
-    cases.map((c) => ({
-      symbol: c.symbol,
-      timeframe: c.timeframe ?? null,
-      timestamp: c.timestamp,
-      positive_case: (c as CaseData & { positive_case?: unknown }).positive_case ?? null,
-      price_change: typeof c.price_change === 'number' ? c.price_change : null,
-    })),
-  );
+/**
+ * 後端未提供來源 digest 時**fail-closed**：不得退回前端自算，也不得寫入空值。
+ * （舊版於此自算 canonical 五欄子集 ⇒ 刪／改名／改值任一 `future_*` 欄後 digest 不變，
+ *  改名攻擊之證據面未閉合；R6 群集 H。）
+ */
+function requireBackendSource(opts: EventExportOptions): { text: string; digest: string } {
+  const text = opts.sourceFileText;
+  const digest = opts.sourceFileDigest;
+  if (typeof text !== 'string' || !/^[0-9a-f]{64}$/.test(String(digest))) {
+    throw new Error(
+      'source_file_digest 必須由後端提供（SearchResultData.source_file_text／source_file_digest）；'
+      + '前端不得自算。請重新執行搜尋以取得帶 digest 的結果。',
+    );
+  }
+  return { text, digest };
 }
 
 /** timestamp 字串／數字 → epoch ms（秒級自動 ×1000；ISO 字串 Date.parse）。 */
@@ -60,10 +64,9 @@ export function inferDirection(conditions: unknown[]): 'long' | 'short' {
 export async function buildEventContractRecords(cases: CaseData[], opts: EventExportOptions) {
   const horizon = opts.horizonBars ?? 2;
   const direction = opts.direction ?? inferDirection(opts.conditions);
-  const ruleSummary = JSON.stringify({ conditions: opts.conditions, price_change_method: opts.priceChangeMethod, timeframe: opts.timeframe });
-  const ruleDigest = await sha256Hex(ruleSummary);
-  const sourceText = canonicalSourceText(cases);
-  const sourceDigest = await sha256Hex(sourceText);
+  const ruleSummary = ruleSummaryText(opts.conditions, opts.priceChangeMethod, opts.timeframe);
+  const ruleDigest = await ruleDigestOf(ruleSummary);
+  const { text: sourceText, digest: sourceDigest } = requireBackendSource(opts);
   const snapshot = `search:${opts.timeframe}:${new Date().toISOString().slice(0, 10)}`;
   const skipped: { index: number; reason: string }[] = [];
   const records = cases.flatMap((c, i) => {
@@ -114,7 +117,7 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
     n_cases: cases.length,
     n_records: records.length,
     source_file_digest: sourceDigest,
-    source_digest_of: 'canonical JSON of search result cases (symbol,timeframe,timestamp,positive_case,price_change)',
+    source_digest_of: 'backend §G S-9 canonical bytes of full CaseData rows (all own keys, UTF-8 ascending key order)',
     /** 契約所指「來源檔」之內容：其 sha256 === source_file_digest；匯入時以 source_file 一併上傳即可通過 verify（CODEX-R2-P1-03） */
     source_file_text: sourceText,
     verify_note: '要驗 digest：匯入時把同時下載的 *.source.json 放在 source_file 欄並開 verify_source_digest；事件檔自身含 digest 欄，自我對證必然不符',

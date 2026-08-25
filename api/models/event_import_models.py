@@ -18,6 +18,11 @@ class EventImportFailure(BaseModel):
     event_id: Optional[Any] = Field(None, description="事件 ID（缺則 null）")
     field: Optional[str] = Field(None, description="欄位（批次級失敗為 null）")
     reason: str = Field(..., description="契約 reason 字面")
+    message: Optional[str] = Field(
+        None,
+        description=("補充訊息（多數 reason 為 null）。`heterogeneous_rows_in_batch` 以此列出**前 3 個**"
+                     "衝突列號與欄名（Task 1.8）；字面仍以 `reason` 為準"),
+    )
 
 
 class EventImportJsonRequest(BaseModel):
@@ -26,6 +31,11 @@ class EventImportJsonRequest(BaseModel):
     records: List[Dict[str, Any]] = Field(..., description="事件記錄（欄位依 event_import_contract.json）")
     validate_only: bool = Field(False, description="僅驗證不落檔")
     source_name: Optional[str] = Field(None, description="來源名稱（供 provenance；選填）")
+    batch_defaults: Optional[Dict[str, Any]] = Field(
+        None,
+        description=("批次預設（GAP-3 UX Task 1.8）：{契約欄名: 值}，**只填補缺值、不覆蓋列自帶值**。"
+                     "列間自帶互斥值時仍拒（heterogeneous_rows_in_batch）"),
+    )
     verify_source_digest: bool = Field(
         False,
         description=("JSON 端點**不支援**（傳 true ⇒ 400）：契約 source_file_digest 指使用者原始來源檔之 sha256，"

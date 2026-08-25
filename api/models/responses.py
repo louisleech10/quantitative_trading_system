@@ -206,6 +206,18 @@ class SearchResultData(BaseModel):
     """搜索結果數據模型 - 擴充版本"""
     cases: List[CaseData] = Field(..., description="案例列表")
     summary: CaseSummary = Field(..., description="案例摘要")
+
+    # ===== GAP-3 UX Task 1.3：來源 canonical bytes（一律由**後端**計算；前端不得自算）=====
+    source_file_text: Optional[str] = Field(
+        None,
+        description=("本結果集之來源 canonical 文字（§G S-9 exact bytes 之 UTF-8 解碼，**無尾端 newline**）；"
+                     "綁**每列完整 CaseData**，匯出時原樣寫入 *.source.json"),
+    )
+    source_file_digest: Optional[str] = Field(
+        None,
+        description=("`source_file_text` 位元組之 sha256（＝契約 `source_file_digest`）。"
+                     "與 `rule_digest`（綁 search_rule_summary）為兩件事，序列化路徑不共用"),
+    )
     sampling_quality: SamplingQuality = Field(..., description="採樣品質")
     execution_time: float = Field(..., description="執行時間（秒）")
     cache_used: bool = Field(..., description="是否使用了緩存")

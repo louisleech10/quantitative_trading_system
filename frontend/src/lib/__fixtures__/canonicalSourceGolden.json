@@ -1,0 +1,196 @@
+{
+  "_doc": "由 tests/api/test_gap3_source_digest.py 生成，勿手改。digest 一律由後端 §G S-9 參考實作計算；前端只驗「拿到的就是後端算的那一個」。",
+  "target_column": "future_2bar_return",
+  "variants": {
+    "base": {
+      "cases": [
+        {
+          "close": 2050.0,
+          "future_1bar_return": 0.011,
+          "future_2bar_max_drawdown": -0.02,
+          "future_2bar_return": 0.0123,
+          "future_3bar_return": -0.004,
+          "high": 2100.0,
+          "low": 1990.0,
+          "market_phase": "bull",
+          "open": 2000.0,
+          "positive_case": true,
+          "price_change": 2.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T00:00:00Z",
+          "trigger_idx": 10,
+          "volume": 1234.5
+        },
+        {
+          "close": 2020.0,
+          "future_1bar_return": -0.007,
+          "future_2bar_max_drawdown": -0.05,
+          "future_2bar_return": 0.0456,
+          "future_3bar_return": 0.002,
+          "high": 2080.0,
+          "low": 2010.0,
+          "market_phase": "bear",
+          "open": 2050.0,
+          "positive_case": false,
+          "price_change": -1.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T12:00:00Z",
+          "trigger_idx": 11,
+          "volume": 999.0
+        }
+      ],
+      "source_file_digest": "83e1389131befe4f45d252045fdd8cf53804e328379f7bf968c92cb4c400188c",
+      "source_file_text": "[{\"close\":2050.0,\"future_1bar_return\":0.011,\"future_2bar_max_drawdown\":-0.02,\"future_2bar_return\":0.0123,\"future_3bar_return\":-0.004,\"high\":2100.0,\"low\":1990.0,\"market_phase\":\"bull\",\"open\":2000.0,\"positive_case\":true,\"price_change\":2.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T00:00:00Z\",\"trigger_idx\":10,\"volume\":1234.5},{\"close\":2020.0,\"future_1bar_return\":-0.007,\"future_2bar_max_drawdown\":-0.05,\"future_2bar_return\":0.0456,\"future_3bar_return\":0.002,\"high\":2080.0,\"low\":2010.0,\"market_phase\":\"bear\",\"open\":2050.0,\"positive_case\":false,\"price_change\":-1.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T12:00:00Z\",\"trigger_idx\":11,\"volume\":999.0}]"
+    },
+    "changed": {
+      "cases": [
+        {
+          "close": 2050.0,
+          "future_1bar_return": 0.011,
+          "future_2bar_max_drawdown": -0.02,
+          "future_2bar_return": 0.012300001,
+          "future_3bar_return": -0.004,
+          "high": 2100.0,
+          "low": 1990.0,
+          "market_phase": "bull",
+          "open": 2000.0,
+          "positive_case": true,
+          "price_change": 2.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T00:00:00Z",
+          "trigger_idx": 10,
+          "volume": 1234.5
+        },
+        {
+          "close": 2020.0,
+          "future_1bar_return": -0.007,
+          "future_2bar_max_drawdown": -0.05,
+          "future_2bar_return": 0.0456,
+          "future_3bar_return": 0.002,
+          "high": 2080.0,
+          "low": 2010.0,
+          "market_phase": "bear",
+          "open": 2050.0,
+          "positive_case": false,
+          "price_change": -1.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T12:00:00Z",
+          "trigger_idx": 11,
+          "volume": 999.0
+        }
+      ],
+      "source_file_digest": "1eea28e5b3a0bbd7946c93eb7bd967da268450685b90e171e56c549949b346da",
+      "source_file_text": "[{\"close\":2050.0,\"future_1bar_return\":0.011,\"future_2bar_max_drawdown\":-0.02,\"future_2bar_return\":0.012300001,\"future_3bar_return\":-0.004,\"high\":2100.0,\"low\":1990.0,\"market_phase\":\"bull\",\"open\":2000.0,\"positive_case\":true,\"price_change\":2.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T00:00:00Z\",\"trigger_idx\":10,\"volume\":1234.5},{\"close\":2020.0,\"future_1bar_return\":-0.007,\"future_2bar_max_drawdown\":-0.05,\"future_2bar_return\":0.0456,\"future_3bar_return\":0.002,\"high\":2080.0,\"low\":2010.0,\"market_phase\":\"bear\",\"open\":2050.0,\"positive_case\":false,\"price_change\":-1.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T12:00:00Z\",\"trigger_idx\":11,\"volume\":999.0}]"
+    },
+    "deleted": {
+      "cases": [
+        {
+          "close": 2050.0,
+          "future_1bar_return": 0.011,
+          "future_2bar_max_drawdown": -0.02,
+          "future_3bar_return": -0.004,
+          "high": 2100.0,
+          "low": 1990.0,
+          "market_phase": "bull",
+          "open": 2000.0,
+          "positive_case": true,
+          "price_change": 2.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T00:00:00Z",
+          "trigger_idx": 10,
+          "volume": 1234.5
+        },
+        {
+          "close": 2020.0,
+          "future_1bar_return": -0.007,
+          "future_2bar_max_drawdown": -0.05,
+          "future_3bar_return": 0.002,
+          "high": 2080.0,
+          "low": 2010.0,
+          "market_phase": "bear",
+          "open": 2050.0,
+          "positive_case": false,
+          "price_change": -1.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T12:00:00Z",
+          "trigger_idx": 11,
+          "volume": 999.0
+        }
+      ],
+      "source_file_digest": "2c842efa34ac0ff13cd9eaf1fb4b95d4ebf1253f20c2ba2d899ab190362bd7ff",
+      "source_file_text": "[{\"close\":2050.0,\"future_1bar_return\":0.011,\"future_2bar_max_drawdown\":-0.02,\"future_3bar_return\":-0.004,\"high\":2100.0,\"low\":1990.0,\"market_phase\":\"bull\",\"open\":2000.0,\"positive_case\":true,\"price_change\":2.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T00:00:00Z\",\"trigger_idx\":10,\"volume\":1234.5},{\"close\":2020.0,\"future_1bar_return\":-0.007,\"future_2bar_max_drawdown\":-0.05,\"future_3bar_return\":0.002,\"high\":2080.0,\"low\":2010.0,\"market_phase\":\"bear\",\"open\":2050.0,\"positive_case\":false,\"price_change\":-1.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T12:00:00Z\",\"trigger_idx\":11,\"volume\":999.0}]"
+    },
+    "floats": {
+      "cases": [
+        {
+          "close": 2050.0,
+          "future_1bar_return": -0.0,
+          "future_2bar_max_drawdown": 0.30000000000000004,
+          "future_2bar_return": 5e-324,
+          "future_3bar_return": 1.7976931348623157e+308,
+          "high": 2100.0,
+          "low": 1990.0,
+          "market_phase": "多頭é",
+          "open": 2000.0,
+          "positive_case": true,
+          "price_change": 2.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T00:00:00Z",
+          "trigger_idx": 10,
+          "volume": 1234.5
+        }
+      ],
+      "source_file_digest": "4cb055c69ee816d16e3dbadba8561ccc8aa113505e85b264921097881c4a76bf",
+      "source_file_text": "[{\"close\":2050.0,\"future_1bar_return\":-0.0,\"future_2bar_max_drawdown\":0.30000000000000004,\"future_2bar_return\":5e-324,\"future_3bar_return\":1.7976931348623157e+308,\"high\":2100.0,\"low\":1990.0,\"market_phase\":\"多頭é\",\"open\":2000.0,\"positive_case\":true,\"price_change\":2.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T00:00:00Z\",\"trigger_idx\":10,\"volume\":1234.5}]"
+    },
+    "renamed": {
+      "cases": [
+        {
+          "close": 2050.0,
+          "future_1bar_return": 0.011,
+          "future_2bar_max_drawdown": -0.02,
+          "future_2bar_return_renamed": 0.0123,
+          "future_3bar_return": -0.004,
+          "high": 2100.0,
+          "low": 1990.0,
+          "market_phase": "bull",
+          "open": 2000.0,
+          "positive_case": true,
+          "price_change": 2.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T00:00:00Z",
+          "trigger_idx": 10,
+          "volume": 1234.5
+        },
+        {
+          "close": 2020.0,
+          "future_1bar_return": -0.007,
+          "future_2bar_max_drawdown": -0.05,
+          "future_2bar_return_renamed": 0.0456,
+          "future_3bar_return": 0.002,
+          "high": 2080.0,
+          "low": 2010.0,
+          "market_phase": "bear",
+          "open": 2050.0,
+          "positive_case": false,
+          "price_change": -1.5,
+          "symbol": "ETHUSDT",
+          "timeframe": "12h",
+          "timestamp": "2024-01-01T12:00:00Z",
+          "trigger_idx": 11,
+          "volume": 999.0
+        }
+      ],
+      "source_file_digest": "d2404993b608a177b975df6d405e4610b686b5a100557f1742a3bb2fef6e60c2",
+      "source_file_text": "[{\"close\":2050.0,\"future_1bar_return\":0.011,\"future_2bar_max_drawdown\":-0.02,\"future_2bar_return_renamed\":0.0123,\"future_3bar_return\":-0.004,\"high\":2100.0,\"low\":1990.0,\"market_phase\":\"bull\",\"open\":2000.0,\"positive_case\":true,\"price_change\":2.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T00:00:00Z\",\"trigger_idx\":10,\"volume\":1234.5},{\"close\":2020.0,\"future_1bar_return\":-0.007,\"future_2bar_max_drawdown\":-0.05,\"future_2bar_return_renamed\":0.0456,\"future_3bar_return\":0.002,\"high\":2080.0,\"low\":2010.0,\"market_phase\":\"bear\",\"open\":2050.0,\"positive_case\":false,\"price_change\":-1.5,\"symbol\":\"ETHUSDT\",\"timeframe\":\"12h\",\"timestamp\":\"2024-01-01T12:00:00Z\",\"trigger_idx\":11,\"volume\":999.0}]"
+    }
+  }
+}

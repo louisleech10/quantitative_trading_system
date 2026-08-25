@@ -1,0 +1,248 @@
+{
+  "closure": "CLOSED",
+  "closure_doc": "CLOSED＝列出之每一條 mutation 皆「改壞後轉紅之 test 集合逐一等於預期」且「還原後 rc=0」。任一條不符即 NOT-CLOSED。",
+  "all_pass": true,
+  "mutations": [
+    {
+      "id": "1.2-M1",
+      "task": "1.2",
+      "desc": "CSV 路徑另寫一份檢核（V-3 行為 oracle：只有 CSV 那條紅）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_csv_import"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_csv_import_batch_defaults_fill_absent_only",
+        "test_gap3_csv_import_shared_validator_behaviour[csv]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_csv_import_batch_defaults_fill_absent_only",
+        "test_gap3_csv_import_shared_validator_behaviour[csv]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.2-M2",
+      "task": "1.2",
+      "desc": "改壞共用檢核點（V-3②：CSV 與 JSON 兩條同時紅）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_csv_import"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_csv_import_shared_validator_behaviour[csv]",
+        "test_gap3_csv_import_shared_validator_behaviour[json]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_csv_import_shared_validator_behaviour[csv]",
+        "test_gap3_csv_import_shared_validator_behaviour[json]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.4-M1",
+      "task": "1.4",
+      "desc": "移除秒級 ×1000 之保護（邊界①）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_t0_unit_detect"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_t0_unit_detect_seconds_scaled_exact",
+        "test_gap3_t0_unit_detect_shared_by_csv_mapping_path",
+        "test_gap3_t0_unit_detect_shared_by_json_path"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_t0_unit_detect_seconds_scaled_exact",
+        "test_gap3_t0_unit_detect_shared_by_csv_mapping_path",
+        "test_gap3_t0_unit_detect_shared_by_json_path"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.8-M1",
+      "task": "1.8",
+      "desc": "靜默取第一列之值套用全批（邊界①②）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_heterogeneous_rows"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_heterogeneous_rows_direction_rejected_with_first_three_rows",
+        "test_gap3_heterogeneous_rows_label_definition_mixed",
+        "test_gap3_heterogeneous_rows_scenario_mixed_under_batch_defaults"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_heterogeneous_rows_direction_rejected_with_first_three_rows",
+        "test_gap3_heterogeneous_rows_label_definition_mixed",
+        "test_gap3_heterogeneous_rows_scenario_mixed_under_batch_defaults"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.3-M1a",
+      "task": "1.3",
+      "desc": "canonical 來源退回五欄子集（後端側）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_source_digest"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_source_digest_attached_to_search_result_response",
+        "test_gap3_source_digest_changes_on_future_column_mutation[changed]",
+        "test_gap3_source_digest_changes_on_future_column_mutation[deleted]",
+        "test_gap3_source_digest_changes_on_future_column_mutation[renamed]",
+        "test_gap3_source_digest_covers_every_own_key",
+        "test_gap3_source_digest_regenerates_frontend_golden",
+        "test_gap3_source_digest_s9_serialization_rules"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_source_digest_attached_to_search_result_response",
+        "test_gap3_source_digest_changes_on_future_column_mutation[changed]",
+        "test_gap3_source_digest_changes_on_future_column_mutation[deleted]",
+        "test_gap3_source_digest_changes_on_future_column_mutation[renamed]",
+        "test_gap3_source_digest_covers_every_own_key",
+        "test_gap3_source_digest_regenerates_frontend_golden",
+        "test_gap3_source_digest_s9_serialization_rules"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.3-M1b",
+      "task": "1.3",
+      "desc": "canonical 來源退回五欄子集（前端 ①②③）",
+      "selector": [
+        "VITEST",
+        "src/lib/canonicalSourceCoverage.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (b) 之獨立 oracle：收到的 text 本身須符合 §G S-9 之可觀察規則（不是只跟自己對得起來）",
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (c) 含 -0.0／極大極小浮點之 fixture ⇒ (b) 仍成立",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ① 刪除一個 future_* 欄 ⇒ digest 改變（且匯出檔帶的就是後端那一個）",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ①②③ 之前提：四個 variant 之 digest 兩兩相異（塌陷即代表覆蓋面不完整）",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ② 改名一個 future_* 欄 ⇒ digest 改變",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ③ 改值一個 future_* 欄之數值 ⇒ digest 改變"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (b) 之獨立 oracle：收到的 text 本身須符合 §G S-9 之可觀察規則（不是只跟自己對得起來）",
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (c) 含 -0.0／極大極小浮點之 fixture ⇒ (b) 仍成立",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ① 刪除一個 future_* 欄 ⇒ digest 改變（且匯出檔帶的就是後端那一個）",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ①②③ 之前提：四個 variant 之 digest 兩兩相異（塌陷即代表覆蓋面不完整）",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ② 改名一個 future_* 欄 ⇒ digest 改變",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ③ 改值一個 future_* 欄之數值 ⇒ digest 改變"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.3-M2",
+      "task": "1.3",
+      "desc": "前端改為自算 digest（④(a)）",
+      "selector": [
+        "VITEST",
+        "src/lib/canonicalSourceCoverage.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (b) 匯出取得之 source_file_text 之 sha256 逐位元組等於後端 digest",
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (c) 含 -0.0／極大極小浮點之 fixture ⇒ (b) 仍成立",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ① 刪除一個 future_* 欄 ⇒ digest 改變（且匯出檔帶的就是後端那一個）",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ② 改名一個 future_* 欄 ⇒ digest 改變",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ③ 改值一個 future_* 欄之數值 ⇒ digest 改變",
+        "canonicalSourceCoverage — ④(a) 前端不得自算 digest（執行期） > 後端未提供 digest ⇒ fail-closed 拋錯，不退回前端自算",
+        "canonicalSourceCoverage — ④(a) 前端不得自算 digest（執行期） > 跑完整匯出流程後，與 source_file_digest 相關之雜湊呼叫數 == 0（rule_digest 另計）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (b) 匯出取得之 source_file_text 之 sha256 逐位元組等於後端 digest",
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (c) 含 -0.0／極大極小浮點之 fixture ⇒ (b) 仍成立",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ① 刪除一個 future_* 欄 ⇒ digest 改變（且匯出檔帶的就是後端那一個）",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ② 改名一個 future_* 欄 ⇒ digest 改變",
+        "canonicalSourceCoverage — digest 綁完整 CaseData 列 > ③ 改值一個 future_* 欄之數值 ⇒ digest 改變",
+        "canonicalSourceCoverage — ④(a) 前端不得自算 digest（執行期） > 後端未提供 digest ⇒ fail-closed 拋錯，不退回前端自算",
+        "canonicalSourceCoverage — ④(a) 前端不得自算 digest（執行期） > 跑完整匯出流程後，與 source_file_digest 相關之雜湊呼叫數 == 0（rule_digest 另計）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.3-M3a",
+      "task": "1.3",
+      "desc": "後端改用 json.dumps 預設參數（後端側 S-9 規則）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_source_digest"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_source_digest_s9_serialization_rules"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_source_digest_s9_serialization_rules"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.3-M3b",
+      "task": "1.3",
+      "desc": "後端改用 json.dumps 預設參數（前端位元組相等 (b)(c)）",
+      "selector": [
+        "VITEST",
+        "src/lib/canonicalSourceCoverage.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (b) 之獨立 oracle：收到的 text 本身須符合 §G S-9 之可觀察規則（不是只跟自己對得起來）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (b) 之獨立 oracle：收到的 text 本身須符合 §G S-9 之可觀察規則（不是只跟自己對得起來）"
+      ],
+      "verdict": "PASS"
+    }
+  ]
+}

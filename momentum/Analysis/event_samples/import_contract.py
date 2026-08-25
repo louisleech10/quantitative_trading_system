@@ -163,17 +163,131 @@ def _nonempty_str(v: Any) -> bool:
     return isinstance(v, str) and len(v) > 0
 
 
+class T0UnitUndetectedError(ValueError):
+    """t0 單位判不出（GAP-3 UX Task 1.4）。`reason` 字面＝契約既有 `invalid_timestamp_unit`。"""
+
+    reason = "invalid_timestamp_unit"
+
+    def __init__(self, value: Any):
+        self.value = value
+        super().__init__(f"invalid_timestamp_unit: 無法判定 t0 單位（值={value!r}）；不猜預設值")
+
+
+def detect_t0_unit_ms(value: Any, *, contract: Optional[dict] = None) -> int:
+    """t0 單位偵測（GAP-3 UX Task 1.4）——CSV 與 JSON **兩條路徑共用之唯一 exported 函式**。
+
+    判定只有**一條**門檻來源：契約之 `ms_magnitude_min`（禁另立第二條判定路徑）。
+    合法 ms 帶＝``[ms_min, ms_min*1000)``；秒級帶由**同一門檻導出**＝「×1000 後落在 ms 帶」。
+    兩帶依建構互斥（``v >= ms_min`` 與 ``v*1000 < ms_min*1000`` 不可能同時成立）
+    ⇒ 不存在「同時可解為 ms 與秒」之值，無須猜。
+
+    Args:
+        value: t0 原始值（CSV 已由 `_csv_rows_to_records` 之 JSON 解碼轉為 int）。
+        contract: 契約 dict（省略則讀 SoT）。
+
+    Returns:
+        毫秒整數（ms 帶原樣回傳；秒帶 ×1000）。
+
+    Raises:
+        T0UnitUndetectedError: 非整數、或兩帶皆不落入（含落在門檻兩側之模糊值）。**不得猜預設值。**
+    """
+    c = contract if contract is not None else load_event_import_contract()
+    ms_min = int(c["ms_magnitude_min"])
+    ms_max = ms_min * 1000  # 量級像 ns 亦拒（D2-3：單位錯即拒）
+    if not _is_int(value):
+        raise T0UnitUndetectedError(value)
+    v = int(value)
+    if ms_min <= v < ms_max:
+        return v
+    if ms_min <= v * 1000 < ms_max:
+        return v * 1000
+    raise T0UnitUndetectedError(value)
+
+
+def _digest_matches(actual_hex: str, declared_digest: Any) -> bool:
+    """digest 比對之**唯一**判準（大小寫不敏感、非 hex64 一律不符）。"""
+    if not _is_hex64(declared_digest):
+        return False
+    return actual_hex == str(declared_digest).lower()
+
+
+#: Task 1.2 對映層之 reason 具名出口（鍵＝呼叫端用之語意名，值＝契約字面）。
+#: 🔴 值必須落在契約 `import_failure_reasons` 封閉集合內，由 `mapping_failure_reasons()` fail-closed 對證
+#: ⇒ api 層只引用鍵，不複列字面（R7）。
+_MAPPING_REASON_KEYS = {
+    "mapping_missing": "column_mapping_missing",
+    "column_not_found": "column_not_found_in_file",
+    "label_not_binary": "label_column_not_binary",
+}
+
+
+def mapping_failure_reasons(contract: Optional[dict] = None) -> Dict[str, str]:
+    """對映層（Task 1.2）之 reason 字面出口；任一字面不在契約封閉集合內即 raise（漂移 fail-closed）。"""
+    c = contract if contract is not None else load_event_import_contract()
+    closed = set(c["import_failure_reasons"])
+    missing = [v for v in _MAPPING_REASON_KEYS.values() if v not in closed]
+    if missing:
+        raise ValueError(f"對映層 reason 不在契約 import_failure_reasons 封閉集合內：{missing}")
+    return dict(_MAPPING_REASON_KEYS)
+
+
+def normalize_t0_units(records: List[dict], *, contract: Optional[dict] = None) -> None:
+    """就地把**可判定單位**之 `t0` 正規化為毫秒（`detect_t0_unit_ms` 之唯一批次呼叫點）。
+
+    判不出者**原樣保留**，交由 `validate_event_import` 之量級閘以既有 `invalid_timestamp_unit`
+    逐列拒（**不猜預設值**）。CSV 與 JSON 兩路徑皆經此函式 ⇒ 單位判定不會各自演化。
+    """
+    c = contract if contract is not None else load_event_import_contract()
+    for rec in records:
+        if not isinstance(rec, dict) or rec.get("t0") is None:
+            continue
+        try:
+            rec["t0"] = detect_t0_unit_ms(rec["t0"], contract=c)
+        except T0UnitUndetectedError:
+            continue
+
+
+def verify_source_digest(source_bytes: bytes, declared_digest: Any) -> bool:
+    """比對宣告之 `source_file_digest` 與來源檔位元組（GAP-3 UX Task 1.3）。
+
+    🔴 **匯入時不重算 canonical 序列化，只比對**——匯入端拿到的是使用者可能已在 Excel 動過的檔，
+    重算會把「使用者改過」與「序列化不一致」混為一談（SPEC Task 1.3「時序」定案）。
+    """
+    return _digest_matches(hashlib.sha256(source_bytes).hexdigest(), declared_digest)
+
+
+#: Task 1.8 之異質維度（列間須單值，除非 `batch_defaults` 已涵蓋）。
+_HETEROGENEITY_DIMENSIONS = ("direction", "scenario", "label_definition")
+#: Task 1.8：訊息列出之衝突列號上限（SPEC「列出前 3 個衝突列號與欄名」）。
+_HETEROGENEITY_MAX_REPORTED = 3
+
+
+def _dimension_key(value: Any) -> str:
+    """異質比對用之穩定鍵：dict／list 以排序後 JSON 表示，純量以 repr。"""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, default=repr)
+
+
 def validate_event_import(
     records: Union[List[dict], pd.DataFrame],
     *,
     contract: Optional[dict] = None,
     source_bytes: Optional[bytes] = None,
+    batch_defaults: Optional[Mapping[str, Any]] = None,
+    enforce_batch_homogeneity: bool = False,
 ) -> pd.DataFrame:
     """驗證匯入事件；全過 ⇒ 回正規化 DataFrame，否則 raise ContractValidationError。
 
     檢查順序（全部收集後一次 raise）：頂層鍵閉集 → 逐欄型別/枚舉 → ms 量級閘 →
     label_definition 子欄 → 條件必填 T8/T9/T10 → digest 對證（source_bytes 提供時）→
-    批次級（空匯入/重複 event_id/direction 批內單值/二元缺類別）。
+    批次級（空匯入/重複 event_id/direction 批內單值/二元缺類別/異質列）。
+
+    Args:
+        batch_defaults: 批次預設（Task 1.8）；已指定之維度視為已涵蓋，不再判異質。
+        enforce_batch_homogeneity: 是否啟用 Task 1.8 之異質列拒收。
+            🔴 **預設 False，只由使用者匯入路徑（`EventSamplePipeline.validate`）開啟**。
+            理由：SPEC Task 1.8 之標的是「**使用者**宣告之一批 CSV／JSON」；
+            平台產生器（`generator.py`）之 multi-label 批次**刻意**逐列帶不同 `label_definition`
+            （每個 label_id 一組），是另一個 producer，套用同一條會把既有功能整批擋掉。
     """
     c = contract if contract is not None else load_event_import_contract()
     reasons = c["import_failure_reasons"]  # noqa: F841 —— 字面出處；本函式僅使用其中值
@@ -191,11 +305,27 @@ def validate_event_import(
 
     failures: List[Dict[str, Any]] = []
 
-    def fail(row: int, event_id: Any, field: str, reason: str) -> None:
-        failures.append({"row": row, "event_id": event_id, "field": field, "reason": reason})
+    def fail(row: int, event_id: Any, field: str, reason: str, message: Optional[str] = None) -> None:
+        entry: Dict[str, Any] = {"row": row, "event_id": event_id, "field": field, "reason": reason}
+        if message is not None:
+            entry["message"] = message
+        failures.append(entry)
 
     if len(rows) == 0:
         raise ContractValidationError([{"row": None, "event_id": None, "field": None, "reason": "empty_import"}])
+
+    # ---- 批次預設（Task 1.8）：**只填補缺值，絕不覆蓋列自帶值** ----
+    # CSV 與 JSON 兩路徑共用之唯一套用點（V-3 之 AST oracle 涵蓋面）。
+    if batch_defaults:
+        for k in batch_defaults:
+            if k not in allowed:
+                fail(None, None, k, "unknown_field")
+        for r in rows:
+            for k, v in batch_defaults.items():
+                if v is None or k not in allowed:
+                    continue
+                if r.get(k) is None:
+                    r[k] = v
 
     src_digest = hashlib.sha256(source_bytes).hexdigest() if source_bytes is not None else None
 
@@ -272,7 +402,9 @@ def validate_event_import(
         if has("data_snapshot_digest") and not _nonempty_str(r["data_snapshot_digest"]):
             fail(i, eid, "data_snapshot_digest", "type_error")
         if src_digest is not None and has("source_file_digest") and _is_hex64(r["source_file_digest"]):
-            if r["source_file_digest"].lower() != src_digest:
+            # 比對判準唯一實作＝`_digest_matches`（`verify_source_digest` 之同一判準；
+            # 此處用已預算之 src_digest，避免逐列重算整份來源檔 sha256）
+            if not _digest_matches(src_digest, r["source_file_digest"]):
                 fail(i, eid, "source_file_digest", "digest_mismatch")
 
         # ---- 選填欄 ----
@@ -380,6 +512,31 @@ def validate_event_import(
     labels = {int(r["label"]) for r in rows if _is_int(r.get("label")) and int(r.get("label")) in (0, 1)}
     if labels and labels != {0, 1}:
         fail(None, None, "label", "missing_control_group")
+
+    # ---- 異質列顯式拒收（GAP-3 UX Task 1.8／A-5′） ----
+    # 列間於 direction／scenario／label_definition 不一致 ⇒ 拒收。
+    # `batch_defaults` 已於上方**填補缺值**（不覆蓋列自帶值）⇒ 「已涵蓋」之維度在此自然同質；
+    # 反之列**自帶**互斥值時 defaults 不得掩蓋（TODO 邊界②：指定 scenario='A' 而列間混 A／B ⇒ 落檔數 0）。
+    # 🔴 **不自動分批**、**不靜默取第一列之值套用全批**：只指出衝突並拒。
+    # 🔴 比對對象＝**正規化後**之列（`normalized`，與 `rows` 逐列對齊）而非原始列：
+    #    原始列之 `label_definition` 可能有的填了 `label_return_mode`、有的沒填（缺者取契約預設），
+    #    拿原始列比會把「預設值未寫出」誤判成異質，擋掉完全同質的批次（既有測試抓到）。
+    for dim in (_HETEROGENEITY_DIMENSIONS if enforce_batch_homogeneity else ()):
+        present = [(i, r[dim]) for i, r in enumerate(normalized) if dim in r and r[dim] is not None]
+        if len(present) < 2:
+            continue
+        baseline_key = _dimension_key(present[0][1])
+        conflicts = [i for i, v in present[1:] if _dimension_key(v) != baseline_key]
+        if not conflicts:
+            continue
+        reported = conflicts[:_HETEROGENEITY_MAX_REPORTED]
+        msg = (
+            f"heterogeneous_rows_in_batch: 欄 {dim!r} 列間不一致；"
+            f"前 {len(reported)} 個衝突列號＝{reported}（共 {len(conflicts)} 列與首列 {present[0][0]} 不同）。"
+            f"不自動分批、不套用第一列之值；請拆批或以 batch_defaults 指定 {dim!r}"
+        )
+        for row_idx in reported:
+            fail(row_idx, rows[row_idx].get("event_id"), dim, "heterogeneous_rows_in_batch", msg)
 
     if failures:
         raise ContractValidationError(failures)

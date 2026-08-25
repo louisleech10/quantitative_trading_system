@@ -620,6 +620,8 @@ class EventImportService:
 
         self._pipeline = create_event_sample_pipeline()
         self._contract = self._pipeline.import_contract()
+        # 對映層 reason 字面之具名出口（R7：api 層不複列契約字面；字面漂移即 raise）
+        self._mapping_reasons = self._pipeline.mapping_failure_reasons(self._contract)
         project_root = Path(__file__).resolve().parents[2]
         self.storage_dir = Path(storage_dir) if storage_dir else project_root / "data_cache" / "events"
 
@@ -664,7 +666,7 @@ class EventImportService:
                 return [dict(r) for r in records]
             # 分塊解析（TODO B5.1 邊界②：不一次 materialize 整個 DataFrame；上限由 MAX_FILE_SIZE 界定）
             records: List[Dict[str, object]] = []
-            for chunk in pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False, chunksize=self.CSV_CHUNK_ROWS):
+            for chunk in self._read_csv_chunks(content):
                 records.extend(self._csv_rows_to_records(chunk))
             return records
         except EventImportRejectedError:
@@ -673,6 +675,102 @@ class EventImportService:
             raise EventImportRejectedError(EventImportRejected(kind="parse_error", message=f"解析失敗：{exc}")) from exc
 
     CSV_CHUNK_ROWS = 5000
+
+    def _read_csv_chunks(self, content: bytes):
+        """CSV 分塊讀取之**唯一**入口（`parse_upload` 與對映層共用同一 reader 參數）。"""
+        return pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False, chunksize=self.CSV_CHUNK_ROWS)
+
+    # ---- 欄位對映層（GAP-3 UX Task 1.2） ----
+    @staticmethod
+    def _binary_label(raw: object) -> Optional[int]:
+        """label 儲存格 → 0/1；**不猜**（True/yes/Y 等一律不接受，回 None ⇒ 對映層之 `label_not_binary` reason）。"""
+        s = str(raw).strip()
+        return int(s) if s in ("0", "1") else None
+
+    def csv_records_from_mapping(
+        self,
+        content: bytes,
+        column_mapping: Dict[str, str],
+        batch_defaults: Optional[Dict[str, object]] = None,
+    ) -> Tuple[List[Dict[str, object]], List[str]]:
+        """CSV ＋ 使用者欄名對映 → 契約記錄（Task 1.2）。
+
+        🔴 **只做欄位對映**：schema 檢核與落檔一律由呼叫端轉呼 `import_records`（與 JSON 路徑同一函式物件），
+        本方法**不得**內含任何契約檢核。此處只擋三件對映層自身的事——
+        `mapping_missing`／`column_not_found`／`label_not_binary`
+        （字面由 `EventSamplePipeline.mapping_failure_reasons()` 自契約封閉集合取得，本層不複列）。
+
+        Returns:
+            (records, warnings)：warnings 列出**未對映而被忽略**之 CSV 欄（不靜默丟棄）。
+        """
+        if len(content) > self.MAX_FILE_SIZE:
+            raise EventImportRejectedError(EventImportRejected(kind="parse_error", message=f"檔案超過 {self.MAX_FILE_SIZE} bytes"))
+
+        mapping = {str(k).strip(): str(v).strip() for k, v in (column_mapping or {}).items() if str(v).strip()}
+        defaults = dict(batch_defaults or {})
+        if not mapping:
+            raise EventImportRejectedError(EventImportRejected(
+                kind="contract_violation",
+                message="未提供 column_mapping：CSV 欄名與契約欄名之對應須由使用者顯式指定，不做任何預設對映（A-4′）",
+                failures=[EventImportFailure(row=None, event_id=None, field=None, reason=self._mapping_reasons["mapping_missing"],
+                                             message="column_mapping 為空；請逐項指定 {契約欄名: CSV 欄名}")],
+            ))
+        if "label" not in mapping and defaults.get("label") is None:
+            raise EventImportRejectedError(EventImportRejected(
+                kind="contract_violation",
+                message="column_mapping 未指定 label 欄：正反例答案欄是本次匯入之核心宣告，不得由平台猜測",
+                failures=[EventImportFailure(row=None, event_id=None, field="label", reason=self._mapping_reasons["mapping_missing"],
+                                             message="column_mapping 缺 'label'；請指定哪一個 CSV 欄是你標好的正反例")],
+            ))
+
+        label_src = mapping.get("label")
+        records: List[Dict[str, object]] = []
+        bad_label_rows: List[Tuple[int, str]] = []
+        header: Optional[List[str]] = None
+        row_base = 0
+        try:
+            # 分塊：一次只持有一個 chunk（與 parse_upload 同一 reader、同一記憶體特性）
+            for chunk in self._read_csv_chunks(content):
+                if header is None:
+                    header = [str(c) for c in chunk.columns]
+                    missing = [(field, src) for field, src in mapping.items() if src not in header]
+                    if missing:
+                        raise EventImportRejectedError(EventImportRejected(
+                            kind="contract_violation",
+                            message=f"{len(missing)} 個對映指向 CSV 不存在之欄（檔案標頭＝{header}）",
+                            failures=[EventImportFailure(row=None, event_id=None, field=field,
+                                                         reason=self._mapping_reasons["column_not_found"],
+                                                         message=f"契約欄 {field!r} 對映到 CSV 欄 {src!r}，但檔案標頭沒有這個欄名")
+                                      for field, src in missing],
+                        ))
+                if label_src is not None:
+                    for offset, raw in enumerate(chunk[label_src].tolist()):
+                        if str(raw).strip() != "" and self._binary_label(raw) is None:
+                            bad_label_rows.append((row_base + offset, str(raw)))
+                sub = pd.DataFrame({field: chunk[src] for field, src in mapping.items()})
+                records.extend(self._csv_rows_to_records(sub))
+                row_base += len(chunk)
+        except EventImportRejectedError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise EventImportRejectedError(EventImportRejected(kind="parse_error", message=f"解析失敗：{exc}")) from exc
+
+        if header is None:
+            raise EventImportRejectedError(EventImportRejected(kind="parse_error", message="CSV 無資料列"))
+
+        if bad_label_rows:
+            shown = bad_label_rows[:3]
+            raise EventImportRejectedError(EventImportRejected(
+                kind="contract_violation",
+                message=(f"label 欄 {label_src!r} 非二元 0/1：{len(bad_label_rows)} 列不是 '0' 或 '1'（不猜、不轉換）"),
+                failures=[EventImportFailure(row=r, event_id=None, field="label", reason=self._mapping_reasons["label_not_binary"],
+                                             message=f"列 {r} 之 label 值 {v!r} 不是 '0' 或 '1'")
+                          for r, v in shown],
+            ))
+
+        ignored = [c for c in header if c not in set(mapping.values())]
+        warnings = ([f"未對映而忽略之 CSV 欄（{len(ignored)}）：{ignored}"] if ignored else [])
+        return records, warnings
 
     def _csv_rows_to_records(self, df: pd.DataFrame) -> List[Dict[str, object]]:
         """CSV → 記錄：巢狀欄接受 JSON 字串儲存格或 dotted 欄（`label_definition.rule_id`）；數值欄以 JSON 解碼。"""
@@ -709,11 +807,15 @@ class EventImportService:
     def import_records(
         self, records: List[Dict[str, object]], *, source_name: Optional[str], upload_bytes: Optional[bytes],
         validate_only: bool, verify_source_digest: bool = False, source_bytes: Optional[bytes] = None,
+        batch_defaults: Optional[Dict[str, object]] = None, extra_warnings: Optional[List[str]] = None,
     ) -> EventImportResponse:
         """upload_bytes：事件檔內容（記 `upload_sha256` 供 provenance）。
         source_bytes：契約所指之**來源檔**位元組（CODEX-R2-P1-03）；`verify_source_digest=True` 時以此逐列對證
         `source_file_digest`。**必須是與事件檔相異之檔**——事件檔含自身 digest 欄，自我對證恆不自洽
         （路由層以 `source_file_must_differ_from_event_file`／`source_file_required_for_verify` 擋在前面；CODEX-R4-P1-01）。"""
+        # GAP-3 UX Task 1.4：t0 單位偵測（CSV／JSON **共用**同一函式物件，經 pipeline 出口；R3）。
+        # 判不出者原樣保留 ⇒ 下方 validate 以契約既有之單位 reason 逐列拒，不猜預設值。
+        self._pipeline.normalize_t0_units(records, contract=self._contract)
         columns = sorted({k for r in records for k in r.keys()}) if records else []
         if self.looks_legacy(columns):
             raise EventImportRejectedError(EventImportRejected(
@@ -722,16 +824,16 @@ class EventImportService:
                 migration_hint=self.migration_hint(columns),
             ))
         verify_bytes = (source_bytes if source_bytes is not None else upload_bytes) if verify_source_digest else None
-        df, failures = self._pipeline.validate(records, source_bytes=verify_bytes)
+        df, failures = self._pipeline.validate(records, source_bytes=verify_bytes, batch_defaults=batch_defaults)
         digest = _hashlib.sha256(upload_bytes).hexdigest() if upload_bytes is not None else None
         if df is None:
             raise EventImportRejectedError(EventImportRejected(
                 kind="contract_violation",
                 message=f"{len(failures)} 筆契約違規（逐列 reason 見 failures；字面＝event_import_contract.json）",
-                failures=[EventImportFailure(**{k: f.get(k) for k in ("row", "event_id", "field", "reason")}) for f in failures],
+                failures=[EventImportFailure(**{k: f.get(k) for k in ("row", "event_id", "field", "reason", "message")}) for f in failures],
                 migration_hint=self.migration_hint(columns) if self.migration_hint(columns)["required_fields_absent"] else None,
             ))
-        warnings: List[str] = []
+        warnings: List[str] = list(extra_warnings or [])
         import_id = None
         stored_path = None
         if not validate_only:

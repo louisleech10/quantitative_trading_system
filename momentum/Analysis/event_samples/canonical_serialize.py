@@ -76,3 +76,50 @@ def canonical_event_table_bytes(obj: Any) -> bytes:
 def canonical_event_table_sha256(obj: Any) -> str:
     """S-9 第 6 條：canonical bytes 之 sha256 hexdigest（G-2 凍結與比對之唯一計算規則）。"""
     return hashlib.sha256(canonical_event_table_bytes(obj)).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# GAP-3 UX Task 1.3 — `/search` 匯出之「來源」canonical bytes
+# ---------------------------------------------------------------------------
+# 🔴 綁**每列完整 CaseData**（保留所有 own keys 與值，含全部 future_* return／drawdown），
+#    只做固定 key ordering（S-2：UTF-8 升冪），**不改名、不篩欄、不省略**。
+#    只取五欄子集會使「刪除／改名／改值任一 future_* 欄」後 digest 不變
+#    ⇒ 改名攻擊（Task 1.10 之信任邊界）之證據面未閉合。
+# 🔴 序列化一律轉呼上方 S-9 之 `canonical_event_table_bytes`，**不另寫第二份**（S-9 第 7 條）。
+
+
+def _sort_keys_utf8(obj: Any) -> Any:
+    """S-2：遞迴以 **UTF-8 位元組升冪**排序 dict 鍵；list 順序原樣保留、純量原樣回傳。"""
+    if isinstance(obj, dict):
+        keys = sorted(obj.keys(), key=lambda k: str(k).encode("utf-8"))
+        return {str(k): _sort_keys_utf8(obj[k]) for k in keys}
+    if isinstance(obj, (list, tuple)):
+        return [_sort_keys_utf8(v) for v in obj]
+    return obj
+
+
+def _coerce_scalar(obj: Any) -> Any:
+    """S-9 第 2 條之呼叫端責任：numpy 純量等先轉為白名單型別，禁依賴 encoder 隱式轉換。"""
+    if isinstance(obj, dict):
+        return {k: _coerce_scalar(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_coerce_scalar(v) for v in obj]
+    if isinstance(obj, (bool, int, float, str)) or obj is None:
+        return obj
+    item = getattr(obj, "item", None)  # numpy 純量／0-d array
+    if callable(item):
+        try:
+            return _coerce_scalar(item())
+        except (ValueError, TypeError):
+            pass
+    return obj  # 仍非白名單型別 ⇒ 交由 S-9 之 normalize 顯式 raise（fail-closed）
+
+
+def canonical_source_bytes(cases: Any) -> bytes:
+    """`/search` 結果列 → 來源 canonical bytes（Task 1.3；S-9 第 7 條：只轉呼參考實作）。"""
+    return canonical_event_table_bytes(_sort_keys_utf8(_coerce_scalar(list(cases))))
+
+
+def canonical_source_digest(cases: Any) -> str:
+    """`source_file_digest` ＝ `canonical_source_bytes` 之 sha256（一律由**後端**計算）。"""
+    return hashlib.sha256(canonical_source_bytes(cases)).hexdigest()

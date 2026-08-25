@@ -6,8 +6,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -66,6 +67,36 @@ class EventSamplePipeline:
         from momentum.Analysis.event_samples.import_contract import load_event_import_contract
 
         return load_event_import_contract()
+
+    @staticmethod
+    def mapping_failure_reasons(contract: Optional[dict] = None) -> Dict[str, str]:
+        """GAP-3 UX Task 1.2 對映層 reason 之具名出口（R3／R7：api 層只引用鍵，不複列字面）。"""
+        from momentum.Analysis.event_samples.import_contract import mapping_failure_reasons as _impl
+
+        return _impl(contract)
+
+    @staticmethod
+    def normalize_t0_units(records: List[dict], *, contract: Optional[dict] = None) -> None:
+        """GAP-3 UX Task 1.4：就地正規化 `t0` 單位（唯一偵測函式＝`import_contract.detect_t0_unit_ms`）。
+
+        R3：api 層不得直 import momentum 內部 ⇒ CSV 與 JSON 兩路徑皆經本出口取得同一實作。
+        """
+        from momentum.Analysis.event_samples.import_contract import normalize_t0_units as _impl
+
+        _impl(records, contract=contract)
+
+    @staticmethod
+    def canonical_source_payload(cases) -> Tuple[str, str]:
+        """GAP-3 UX Task 1.3：`/search` 結果列 → (`source_file_text`, `source_file_digest`)。
+
+        序列化唯一實作＝`canonical_serialize.canonical_source_bytes`（§G S-9 第 7 條：禁複製邏輯）；
+        `source_file_text` ＝該 exact bytes 之 UTF-8 解碼（**無尾端 newline**）。
+        🔴 與 `rule_digest`（綁 `search_rule_summary`）為兩件事，本出口**不產出** rule_digest。
+        """
+        from momentum.Analysis.event_samples.canonical_serialize import canonical_source_bytes
+
+        raw = canonical_source_bytes(cases)
+        return raw.decode("utf-8"), hashlib.sha256(raw).hexdigest()
 
     @staticmethod
     def condition_engine_contract() -> dict:
@@ -167,11 +198,22 @@ class EventSamplePipeline:
         return rep
 
     def validate(
-        self, records: Union[List[dict], pd.DataFrame], *, source_bytes: Optional[bytes] = None
+        self,
+        records: Union[List[dict], pd.DataFrame],
+        *,
+        source_bytes: Optional[bytes] = None,
+        batch_defaults: Optional[Mapping[str, Any]] = None,
     ) -> Tuple[Optional[pd.DataFrame], List[Dict[str, Any]]]:
-        """不 raise 之驗證：回 (正規化 df | None, failures)。failures 字面＝契約檔（唯一實作在 import_contract）。"""
+        """不 raise 之驗證：回 (正規化 df | None, failures)。failures 字面＝契約檔（唯一實作在 import_contract）。
+
+        `batch_defaults`（Task 1.8）：已指定之維度視為已涵蓋，不再判異質列。
+
+        🔴 本方法＝**使用者匯入路徑**之唯一入口（CSV／JSON 兩端點皆經此）
+        ⇒ Task 1.8 之異質列拒收在此開啟；`run()` 與 `generator.py` 走的是平台產生器路徑，不開。
+        """
         try:
-            return validate_event_import(records, source_bytes=source_bytes), []
+            return validate_event_import(records, source_bytes=source_bytes, batch_defaults=batch_defaults,
+                                         enforce_batch_homogeneity=True), []
         except ContractValidationError as exc:
             return None, list(exc.failures)
 

@@ -4,7 +4,7 @@
 提供案例導入、批量下載等API端點
 """
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException, BackgroundTasks, Query
 from typing import Optional
 
 from ..models.case_models import (
@@ -193,7 +193,49 @@ async def import_events_json(request: EventImportJsonRequest):
     body = _json.dumps(request.records, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
     try:
         return svc.import_records(request.records, source_name=request.source_name, upload_bytes=body,
-                                  validate_only=request.validate_only, verify_source_digest=request.verify_source_digest)
+                                  validate_only=request.validate_only, verify_source_digest=request.verify_source_digest,
+                                  batch_defaults=request.batch_defaults)
+    except EventImportRejectedError as exc:
+        raise _rejected(exc)
+
+
+def _form_json_dict(name: str, raw: Optional[str]) -> dict:
+    """multipart 之 JSON 字串欄 → dict；非 JSON 物件即顯式 400（不猜、不接受陣列/純量）。"""
+    if raw is None or str(raw).strip() == "":
+        return {}
+    import json as _json
+
+    try:
+        val = _json.loads(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=EventImportRejected(
+            kind="parse_error", message=f"{name} 不是合法 JSON：{exc}").model_dump())
+    if not isinstance(val, dict):
+        raise HTTPException(status_code=400, detail=EventImportRejected(
+            kind="parse_error", message=f"{name} 須為 JSON 物件（{{契約欄名: 值}}），實得 {type(val).__name__}").model_dump())
+    return val
+
+
+@router.post("/case/import-events/csv", response_model=EventImportResponse)
+async def import_events_csv(
+    file: UploadFile = File(..., description="使用者自有欄名之 CSV（不必先改成契約欄名）"),
+    column_mapping: str = Form(..., description='JSON 物件 {契約欄名: CSV 欄名}；**無預設對映**（A-4′）。缺 ⇒ column_mapping_missing'),
+    batch_defaults: Optional[str] = Form(None, description="JSON 物件 {契約欄名: 值}；只**填補缺值**，不覆蓋列自帶值"),
+    validate_only: bool = Query(False),
+):
+    """CSV ＋ 欄名對映匯入（GAP-3 UX Task 1.2）。
+
+    🔴 對映層只做欄名對應；**schema 檢核與落檔轉呼與 `/case/import-events` 相同的
+    `EventImportService.import_records`（同一函式物件）**——不得為 CSV 另寫一份檢核邏輯（V-3）。
+    """
+    svc = get_event_import_service()
+    content = await file.read()
+    mapping = _form_json_dict("column_mapping", column_mapping)
+    defaults = _form_json_dict("batch_defaults", batch_defaults)
+    try:
+        records, warnings = svc.csv_records_from_mapping(content, mapping, defaults)
+        return svc.import_records(records, source_name=file.filename, upload_bytes=content,
+                                  validate_only=validate_only, batch_defaults=defaults, extra_warnings=warnings)
     except EventImportRejectedError as exc:
         raise _rejected(exc)
 

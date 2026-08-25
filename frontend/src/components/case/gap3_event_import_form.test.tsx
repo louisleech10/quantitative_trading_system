@@ -9,8 +9,20 @@ import { EventImportRejectedError } from '@/lib/api';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import { buildEventContractRecords, canonicalSourceText, inferDirection, sha256Hex, toEpochMs } from '@/lib/eventExport';
+import { buildEventContractRecords, inferDirection, toEpochMs } from '@/lib/eventExport';
+import { sha256Hex } from '@/lib/ruleDigest';
 import type { CaseData } from '@/lib/types';
+
+/**
+ * GAP-3 UX Task 1.3：`source_file_text`／`source_file_digest` **一律由後端提供**
+ * （`SearchResultData` 之兩鍵），前端不得自算 ⇒ 測試以固定的「後端回應」餵入。
+ * 覆蓋面與位元組相等之驗收在 `src/lib/canonicalSourceCoverage.test.ts`。
+ */
+const BACKEND_SOURCE_TEXT = '[{"close":1.0,"symbol":"ETHUSDT"}]';
+const BACKEND_SOURCE = {
+  sourceFileText: BACKEND_SOURCE_TEXT,
+  sourceFileDigest: createHash('sha256').update(BACKEND_SOURCE_TEXT, 'utf8').digest('hex'),
+};
 
 const uploadMock = vi.fn();
 vi.mock('@/lib/api', async (orig) => {
@@ -82,7 +94,7 @@ describe('GAP-3 /search 匯出組裝器', () => {
       { symbol: 'ETHUSDT', timeframe: '12h', timestamp: 'n/a', positive_case: 1 },
       { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704153600', positive_case: undefined },
     ] as unknown as CaseData[];
-    const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '>=', value: 0.05 }], priceChangeMethod: 'close_to_close' });
+    const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '>=', value: 0.05 }], priceChangeMethod: 'close_to_close', ...BACKEND_SOURCE });
     expect(out.n_records).toBe(2);
     // 整列被剔除者（label_value 缺欄只是不寫該欄、列仍保留）
     expect(out.skipped.filter((s) => !s.reason.includes('label_value_omitted')).map((s) => s.reason))
@@ -99,23 +111,25 @@ describe('GAP-3 /search 匯出組裝器', () => {
     expect(r0.direction).toBe('long');
   });
 
-  it('CODEX-R1-P1-02：source_file_digest＝來源 canonical JSON 之真 SHA-256（對照 node:crypto）；無假 hash 退路', async () => {
+  it('GAP-3 UX Task 1.3：source_file_digest 沿用**後端**提供之值（前端不自算）；rule_digest 仍為真 SHA-256', async () => {
     const cases = [
       { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704067200', positive_case: 1, price_change: 0.052 },
       { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704110400', positive_case: 0, price_change: -0.011 },
     ] as unknown as CaseData[];
-    const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'close_to_close' });
-    const expected = createHash('sha256').update(canonicalSourceText(cases)).digest('hex');
-    expect(out.source_file_digest).toBe(expected);
-    expect(out.records.every((r) => r.source_file_digest === expected)).toBe(true);
+    const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'close_to_close', ...BACKEND_SOURCE });
+    expect(out.source_file_digest).toBe(BACKEND_SOURCE.sourceFileDigest);
+    expect(out.records.every((r) => r.source_file_digest === BACKEND_SOURCE.sourceFileDigest)).toBe(true);
+    // rule_digest（綁 search_rule_summary）與 source_file_digest 是兩件事；前者仍由前端算，且是真 SHA-256
     expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(out.records[0].label_definition.canonical_digest).toHaveLength(64);
     // CODEX-R2-P1-03：companion 來源檔內容即 source_file_text，其 sha256 === source_file_digest（匯入可 verify）
-    expect(out.source_file_text).toBe(canonicalSourceText(cases));
-    expect(createHash('sha256').update(out.source_file_text).digest('hex')).toBe(out.source_file_digest);
+    expect(out.source_file_text).toBe(BACKEND_SOURCE_TEXT);
+    expect(createHash('sha256').update(out.source_file_text, 'utf8').digest('hex')).toBe(out.source_file_digest);
     expect(out.verify_note).toContain('source_file');
-    // 改值 ⇒ digest 變
-    const out2 = await buildEventContractRecords([{ ...cases[0], price_change: 0.06 }, cases[1]] as CaseData[], { timeframe: '12h', conditions: [], priceChangeMethod: 'x' });
-    expect(out2.source_file_digest).not.toBe(expected);
+    // 後端沒給 ⇒ fail-closed（不得退回前端自算、不得寫空值）
+    await expect(buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', sourceFileText: BACKEND_SOURCE_TEXT, sourceFileDigest: '' }))
+      .rejects.toThrow(/前端不得自算/);
+    // 覆蓋面（刪／改名／改值任一 future_* 欄 ⇒ digest 改變）由後端 golden 驅動，見 canonicalSourceCoverage.test.ts
   });
 
   it('CODEX-R2-P1-02：label_value＝同 horizon 之答案窗未來報酬（future_Nbar_return），非觸發根 price_change；short 取負；缺欄不寫並記 skipped', async () => {
@@ -123,16 +137,16 @@ describe('GAP-3 /search 匯出組裝器', () => {
       { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704067200', positive_case: 1, price_change: 0.052, future_2bar_return: 0.031, future_4bar_return: 0.077 },
       { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704110400', positive_case: 0, price_change: -0.011 },
     ] as unknown as CaseData[];
-    const h2 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x' });
+    const h2 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', ...BACKEND_SOURCE });
     expect(h2.records[0].label_value).toBe(0.031);                       // 非 price_change 0.052
     expect('label_value' in h2.records[1]).toBe(false);
     expect(h2.skipped.some((s) => s.reason.includes('future_2bar_return'))).toBe(true);
     expect(h2.label_value_source).toContain('future_2bar_return');
     expect(h2.n_missing_label_value).toBe(1);                            // CODEX-R3-P1-02：缺欄筆數可供匯出前提示
-    const h4 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', horizonBars: 4 });
+    const h4 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', horizonBars: 4, ...BACKEND_SOURCE });
     expect(h4.records[0].label_value).toBe(0.077);                       // 隨 horizon 改欄
     expect(h4.records[0].label_definition.window.horizon_bars).toBe(4);
-    const short = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '<=', value: -0.03 }], priceChangeMethod: 'x' });
+    const short = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '<=', value: -0.03 }], priceChangeMethod: 'x', ...BACKEND_SOURCE });
     expect(short.records[0].direction).toBe('short');
     expect(short.records[0].label_value).toBe(-0.031);
   });

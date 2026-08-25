@@ -531,11 +531,15 @@ export default function SearchPage() {
       { parameter: 'taker_buy_ratio', operator: operators.takerBuyRatio, value: searchParams.takerBuyRatio },
       { parameter: 'price_position', operator: operators.pricePosition, value: searchParams.pricePosition },
     ].filter((c) => c.value !== null && c.value !== undefined);
+    // GAP-3 UX Task 1.3：`source_file_digest` 綁**完整 CaseData 列**且**一律由後端計算**
+    // （`/search` 結果端點回應之兩鍵）。前端只傳遞，不自算、不重新序列化。
     const payload = await buildEventContractRecords(currentResult.cases, {
       timeframe: searchParams.timeframe,
       conditions: ruleConditions,
       priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
       horizonBars: eventHorizonBars,
+      sourceFileText: currentResult.source_file_text ?? '',
+      sourceFileDigest: currentResult.source_file_digest ?? '',
     });
     // CODEX-R3-P1-02：缺該 horizon 之未來報酬欄 ⇒ 該列無 label_value，條件 IC 會 unavailable；匯出前先講清楚
     if (payload.n_missing_label_value > 0) {

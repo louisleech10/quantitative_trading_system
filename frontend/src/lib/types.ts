@@ -139,7 +139,13 @@ export interface SearchResultData {
   sampling_quality: SamplingQuality;
   execution_time: number;
   cache_used: boolean;
-  
+
+  // ===== GAP-3 UX Task 1.3：來源 canonical bytes（一律由後端計算；前端不得自算）=====
+  /** 本結果集之來源 canonical 文字（後端 §G S-9 exact bytes 之 UTF-8 解碼，無尾端 newline）。 */
+  source_file_text?: string;
+  /** `sha256(source_file_text)`＝契約 `source_file_digest`；與 `rule_digest` 為兩件事。 */
+  source_file_digest?: string;
+
   // ===== 新增：參數統計和驗證報告 =====
   parameter_statistics?: ParameterStatistics;
   validation_report?: ParameterValidationReport;

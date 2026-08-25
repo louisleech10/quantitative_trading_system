@@ -34,7 +34,7 @@
 </tr>
 <tr>
 <td><strong>實作</strong></td>
-<td><strong>第一批收斂完成；下一批＝第二批（CSV 匯入主線）</strong></td>
+<td><strong>第二批已落地、待三家審查；下一批＝第三批（深度三層防線）</strong></td>
 </tr>
 <tr>
 <td>Task 總數</td>
@@ -42,7 +42,7 @@
 </tr>
 <tr>
 <td>已完成</td>
-<td><strong>3</strong></td>
+<td><strong>7</strong></td>
 </tr>
 <tr>
 <td>進行中</td>
@@ -50,7 +50,7 @@
 </tr>
 <tr>
 <td>未開工</td>
-<td><strong>38</strong></td>
+<td><strong>34</strong></td>
 </tr>
 </tbody>
 </table></div>
@@ -71,13 +71,30 @@
 結果一模一樣（路徑 383 條對 383 條、測試 6 條紅對 6 條紅，一條不差）。依你「不碰治理」的裁定
 具名記錄、不修。其中 2 條特別典型：它們在等一個<strong>你 2026-08-14 就已經裁掉</strong>的行為。</p>
 <hr />
-<h2 id="下一批要做什麼">下一批要做什麼</h2>
-<p><strong>第二批＝CSV 匯入主線</strong>，四個 Task：讓你<strong>用自己的 CSV 欄名</strong>匯入（1.2）、
-事件編號與指紋改由後端統一算（1.3）、時間戳是秒還是毫秒自動判（1.4）、
-一批裡混了不同方向／情境就直接拒收不亂猜（1.8）。</p>
-<p>🔎 開工前我已經先查過碼，有一個發現值得你知道：<strong>CSV 其實現在就能匯入了</strong>——
-所以第二批的 1.2 不是「加 CSV 功能」，而是「加<strong>欄位對映</strong>」，讓你不必先把 CSV 標頭
-改成系統要的欄名。這個差別決定了要怎麼做，已寫進交接檔免得下次重查。</p>
+<h2 id="第二批做了什麼2026-08-25-落地待三家審查">第二批做了什麼（2026-08-25 落地，待三家審查）</h2>
+<p><strong>第二批＝CSV 匯入主線</strong>，四個 Task 都做完了：</p>
+<ol>
+<li><strong>用你自己的 CSV 欄名匯入</strong>（1.2）——新端點 <code>POST /api/v1/case/import-events/csv</code>。
+你上傳自己的 CSV，再逐項告訴系統「我的『是不是正例』那欄＝系統的 label」，
+<strong>不必先把標頭改成系統要的欄名</strong>。沒對映的欄會被忽略，但會<strong>明講忽略了哪些</strong>，不靜默丟掉。
+🔎 這裡有個開工前查出的事實：<strong>CSV 其實本來就能匯入</strong>——所以 1.2 不是「加 CSV 功能」，
+是「加<strong>欄位對映</strong>」。這個差別決定了做法：<strong>不另寫一條解析路徑</strong>，對映完就交給既有那條。</li>
+<li><strong>事件編號與指紋改由後端統一算</strong>（1.3）——以前前端自己算「來源指紋」，而且只取五個欄，
+所以<strong>刪掉或改名任一個「未來報酬」欄，指紋都不會變</strong>（等於認不出被動過手腳）。
+現在改成後端就<strong>每一列的完整內容</strong>算，前端只負責帶著走，<strong>一次都不准自己算</strong>。</li>
+<li><strong>時間戳是秒還是毫秒自動判</strong>（1.4）——判得出來就轉成毫秒，<strong>判不出來就直接拒絕，不猜</strong>。</li>
+<li><strong>一批裡混了不同方向／情境就拒收</strong>（1.8）——不自動分批、<strong>不拿第一列的值套用全批</strong>，
+而且會指出<strong>前 3 個</strong>衝突在哪幾列。</li>
+</ol>
+<p>✅ <strong>有幾個問題是「把程式故意改壞」才抓出來的</strong>，值得記一下：</p>
+<ul>
+<li>1.8 一開始<strong>擋太兇</strong>：把「預設值沒寫出來」誤判成不一致，還誤擋了系統自己產生的多標籤批次
+（那本來就該逐列不同）。改成只在<strong>你匯入的那條路徑</strong>上檢查。</li>
+<li>前端那組測試<strong>本來會假綠</strong>：後端指紋算法改壞時，前端比對用的基準檔沒有跟著重生，
+測試照樣全綠。修好之後，同一個壞法會讓前端 5 條測試一起轉紅。</li>
+<li>前端另有一個<strong>看不見的死角</strong>：它比的是「自己跟自己對得起來」，所以後端把序列化換掉它察覺不到。
+補上「收到的內容本身還像不像規格」這條獨立檢查後才抓得到。</li>
+</ul>
 <h2 id="批次順序做的順序本表不帶狀態狀態一律看下方逐-task-表">批次順序（做的順序；本表不帶狀態，狀態一律看下方逐 Task 表）</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -168,19 +185,19 @@
 <td><strong>Task 1.2</strong></td>
 <td>新端點 <code>POST /api/v1/case/import-events/csv</code></td>
 <td>Phase 1</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 1.3</strong></td>
 <td><code>event_id</code> 沿用既有 canonical（D-2）</td>
 <td>Phase 1</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 1.4</strong></td>
 <td>t0 單位偵測</td>
 <td>Phase 1</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 1.5</strong></td>
@@ -204,7 +221,7 @@
 <td><strong>Task 1.8</strong></td>
 <td>異質列顯式拒收（A-5′）</td>
 <td>Phase 1</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 1.10</strong></td>

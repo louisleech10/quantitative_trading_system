@@ -13,18 +13,26 @@
 
 GAP-3 事件型 UAT 缺口修補：SPEC 🔒 FROZEN（`4ce3d6d9`）、TODO 🔒 FROZEN v1.0（`afa70967`）、
 延伸檔 D-001（`81cbe7ab`）與 D-002（`51f1a65e`）皆三家 APPROVED。
-42 個 Task 之計數：**3 ✅／1 🔧／38 ⬜**（逐 Task 狀態一律看看板，本檔不重述）。
+42 個 Task 之計數：**7 ✅／1 🔧／34 ⬜**（逐 Task 狀態一律看看板，本檔不重述）。
 
-**下一步＝B2＝Task 1.2／1.3／1.4／1.8**（CSV 匯入主線）。
+B2（Task 1.2／1.3／1.4／1.8，CSV 匯入主線）之實作與 mutation 皆落地，**尚待三家 code review**
+（brief `handoffs/20260825-gap3ux-b2-review-r1-brief.md`）。
+🔴 該 brief 內有兩條 assumed 待三家裁定：①Task 1.3 承載點採 SPEC 之「既有匯出流程服務端入口」
+（`api/routes/case_search.py`）而非 TODO 字面之 `api/routes/case.py`——後者之 `@router` 無一持有 `cases`；
+②`validate_event_import(enforce_batch_homogeneity=…)` 預設關、只由使用者匯入路徑開啟。
+其後為 B3＝Task 1.11／1.12／1.9。
 看板 `白話說明/GAP-3施工看板.md`；歷史 `白話說明/GAP-3施工進度.md`。
 
 ## receipt
 
-VERIFY:handoffs/run_receipts/gap3ux-b1-all-mutations.receipt.json
+VERIFY:handoffs/run_receipts/gap3ux-b2-all-mutations.receipt.json
 
 | 項 | 值 |
 |---|---|
-| 第一批 mutation | 32 條，`closure: CLOSED` |
+| 第二批 mutation | 9 條，`closure: CLOSED`（`handoffs/run_receipts/gap3ux-b2-all-mutations.receipt.json`） |
+| 第二批驗收 | `gap3_csv_import` 13／`gap3_t0_unit_detect` 7／`gap3_heterogeneous_rows` 6／`gap3_source_digest` 12；vitest `canonicalSourceCoverage` 14、全套 198；`npm run build` rc=0 |
+| `pytest tests/api tests/momentum/event_samples` | 849 passed／3 failed／3 errors——6 條**全為既有**，已以 `git stash` 實跑證明改動前後逐字相同 |
+| 第一批 mutation | 32 條，`closure: CLOSED`（`handoffs/run_receipts/gap3ux-b1-all-mutations.receipt.json`） |
 | `survivor_contract` 修法 mutation | 7 條，`handoffs/run_receipts/survivor-nsamples-mutation.receipt.json`，CLOSED |
 | `pytest tests/momentum/event_samples/` | 270 passed |
 | `python3 scripts/gap3_freeze_golden.py --check` | rc=0，`canonical_sha=163c4cec…`（全程不變） |
