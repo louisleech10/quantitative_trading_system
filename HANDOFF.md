@@ -16,23 +16,25 @@ GAP-3 事件型 UAT 缺口修補：SPEC 🔒 FROZEN（`4ce3d6d9`）、TODO 🔒 
 延伸檔 D-001（`81cbe7ab`）與 D-002（`51f1a65e`）皆三家 APPROVED。
 42 個 Task 之計數：**10 ✅／1 🔧／31 ⬜**（逐 Task 狀態一律看看板，本檔不重述）。
 
-Task 1.11／1.12／1.9（深度三層防線）之程式碼已寫入 repo；**已審兩輪（findings 6→3，全修），
-等 R3 閉合輪**。新檔＝`momentum/Analysis/event_samples/lookahead_gate.py`（L3 閘）
-與 `lookahead_declaration.py`（L2 宣告解析）；契約新增 `capability_reason_bindings`
+Task 1.11／1.12／1.9（深度三層防線）**已收斂**：三輪 code review findings **6 → 3 → 0**，
+三家一致可進 B4（本 epic 首次三家一致），**未派 R4**。三個 commit＝
+`b63fc855`（落地）＋`ed426d34`（R1 六條）＋`ed9b3fc4`（R2 三條）。
+新檔＝`momentum/Analysis/event_samples/lookahead_gate.py`（L3 閘）與
+`lookahead_declaration.py`（L2 宣告解析）；契約新增 `capability_reason_bindings`
 （reason 字面之具名綁定，使 `.py`／`.ts` grep 計數為 0）。
 
-處置、理由與新增殘留之全文見兩份收斂檔（`cluster_attribution` 與 `completeness --lock` 皆 rc=0）：
-`handoffs/reconcile/20260825-gap3ux-b3-review-r{1,2}/synth.md`。
+處置、理由與殘留全文見三份收斂檔（`cluster_attribution` 與 `completeness --lock` 皆 rc=0）：
+`handoffs/reconcile/20260825-gap3ux-b3-review-r{1,2,3}/synth.md`。
 
 - **R1**：三家 Verdict 不一致（codex BLOCKING／grok 可進／composer 可派工），主委採 codex 嚴格版。
   🔴 群集 C 為**真實洩漏路徑**：宣告之 embargo 未接進 split，`open_to_close` 下宣告 20 根實際隔 1 根。
-- **R2**：R1 全部反例由**原提出方**逐條重跑確認關閉（章程 §B8）。新增之 `CODEX-R2-P1-01`
-  為 **R1 修補自身引入之缺陷**——`max(embargo_ms_by_symbol.values())` 正是 SPEC §D-3′-a(ii)
-  「明令禁止」逐字所寫之「以單一 batch scalar 冒充 per-scope 下界」（過度 purge）。
-  主委逐字查證 SPEC 後採 codex 判定（grok 未觸及折疊面、composer 亦漏）。
-  修法不提前做 Task 7.0b 之 API，改為「能表達就套用、不能表達就拒絕」。
+- **R2**：R1 全部反例由原提出方確認關閉。新增之 `CODEX-R2-P1-01` 為 **R1 修補自身引入之缺陷**
+  ——`max(embargo_ms_by_symbol.values())` 正是 SPEC §D-3′-a(ii)「明令禁止」逐字所寫之
+  「以單一 batch scalar 冒充 per-scope 下界」（過度 purge）。主委逐字查證 SPEC 後採 codex 判定。
+- **R3**：三家零 finding；R2 兩反例確認關閉。爭議條三家皆判修法為正解——
+  禁令針對的是「**冒充**」，而修法在 divergent 時 raise、不送 scalar。
 
-R3 之第一要務＝codex 重跑其 `embargo_ms_by_symbol` probe（`{'AAA': 14400000, 'BBB': 43200000}` 形態）。
+**下一批＝B4＝Task 1.5／1.6／1.7（匯入前端）**；其前置為 CSV 匯入主線，該批狀態見看板。
 
 **其後＝B4＝Task 1.5／1.6／1.7（匯入前端）**。
 看板 `白話說明/GAP-3施工看板.md`；歷史 `白話說明/GAP-3施工進度.md`。
