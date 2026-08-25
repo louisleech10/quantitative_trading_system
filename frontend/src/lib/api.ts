@@ -978,7 +978,10 @@ export async function exportPdfReport(taskId: string): Promise<Blob> {
 // ============================================================
 // GAP-3 事件型（B5.2）：匯入批 / 兩張表（後端 /api/v1/case/events*）
 // ============================================================
-import type { EventAnalyzeResponse, EventImportListResponse, EventImportRejected, EventImportResponse } from './types';
+import type {
+  EventAnalyzeResponse, EventCsvMappingSubmission, EventImportListResponse,
+  EventImportRejected, EventImportResponse,
+} from './types';
 import type { LookaheadDeclarationPayload, LookaheadDeclarationPreview } from './lookaheadDeclaration';
 
 export class EventImportRejectedError extends Error {
@@ -1027,10 +1030,47 @@ export async function uploadEventImport(
   return response.json();
 }
 
-/** GAP-3 UX Task 1.9 ①：宣告 UI 之預填（逐 tf 預設值＝檔內最大可用 horizon）。 */
-export async function fetchLookaheadDeclarationPreview(file: File): Promise<LookaheadDeclarationPreview> {
+/**
+ * GAP-3 UX Task 1.5／1.6：CSV ＋ 欄名對映匯入（`POST /case/import-events/csv`）。
+ *
+ * 🔴 `column_mapping` 無預設（A-4′）；`mapping_confirmed_at` 即使用者勾選確認之時間，
+ *    後端寫入 receipt 之 `mapping_provenance`（Task 1.6）。
+ */
+export async function uploadEventCsvMapping(
+  file: File,
+  submission: EventCsvMappingSubmission,
+  lookaheadDeclaration?: LookaheadDeclarationPayload | null,
+): Promise<EventImportResponse> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('column_mapping', JSON.stringify(submission.columnMapping));
+  if (submission.batchDefaults) formData.append('batch_defaults', JSON.stringify(submission.batchDefaults));
+  if (lookaheadDeclaration) formData.append('lookahead_declaration', JSON.stringify(lookaheadDeclaration));
+  formData.append('mapping_confirmed_at', submission.confirmedAt);
+  const response = await fetch(
+    `${API_BASE_URL}${API_PREFIX}/case/import-events/csv?validate_only=${submission.validateOnly ? 'true' : 'false'}`,
+    { method: 'POST', body: formData },
+  );
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+/**
+ * GAP-3 UX Task 1.9 ①：宣告 UI 之預填（逐 tf 預設值＝檔內最大可用 horizon）。
+ *
+ * 對映路徑須一併送 `column_mapping`／`batch_defaults`，否則後端看不到 `label_definition`
+ * （含 `filters`），引用欄會整批看不見、預設值算錯。
+ */
+export async function fetchLookaheadDeclarationPreview(
+  file: File,
+  mappingContext?: { columnMapping?: Record<string, string> | null; batchDefaults?: Record<string, unknown> | null },
+): Promise<LookaheadDeclarationPreview> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (mappingContext?.columnMapping && Object.keys(mappingContext.columnMapping).length > 0) {
+    formData.append('column_mapping', JSON.stringify(mappingContext.columnMapping));
+  }
+  if (mappingContext?.batchDefaults) formData.append('batch_defaults', JSON.stringify(mappingContext.batchDefaults));
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/import-events/lookahead-declaration`, {
     method: 'POST',
     body: formData,

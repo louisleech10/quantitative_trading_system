@@ -173,6 +173,14 @@
     "batch": {
       "lookahead_bars_declared": "Mapping[str,int>=0]",
       "analysis_alignment_receipt_hash": "str"
+    },
+    "mapping_provenance": {
+      "column_mapping": "Mapping[str,str]",
+      "source_file_name": "str",
+      "source_file_digest": "str",
+      "confirmed_at": "str",
+      "confirmed_at_source": "str"
     }
-  }
+  },
+  "_mapping_provenance_doc": "GAP-3 UX Task 1.6（SPEC L1588–1601）：CSV 欄名對映路徑之 provenance，使日後可追「這批的正反例是依哪一欄、哪個檔宣告的」。**只記錄，不參與任何計算**。逐欄語意：column_mapping=使用者送出之 {契約欄名: CSV 欄名}；source_file_name=上傳檔之檔名；source_file_digest=本批各列宣告之 required_fields.source_file_digest 之**單一值**（批內不一致或缺 ⇒ 解析為缺值，由 validate_receipt_namespace 以 missing_required_field fail-closed，落檔數 0——SPEC「不得省略 source_file_digest（否則無法對證來源）」）；confirmed_at=Task 1.5 之強制勾選確認時間（UTC ISO-8601）；confirmed_at_source∈{client_declared, server_received}——客戶端未宣告時記伺服器落檔時間並以本欄揭露，不得讓伺服器時間冒充使用者確認時間。本 namespace 只在**對映路徑**寫入（JSON 直傳路徑無對映可追，不寫）。須同步：Task 7.1 讓五維度可選之後，本 namespace 須一併記錄五維度之實際選值。"
 }

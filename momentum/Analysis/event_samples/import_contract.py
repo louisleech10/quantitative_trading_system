@@ -101,6 +101,12 @@ def receipt_type_ok(type_decl: str, value: Any) -> bool:
             type(k) is str and type(v) is int and v >= 0
             for k, v in value.items()
         )
+    if type_decl == "Mapping[str,str]":
+        # GAP-3 UX Task 1.6：`mapping_provenance.column_mapping`（{契約欄名: CSV 欄名}）。
+        # 同樣以 `type(v) is str` 判定——`bool`／數值不得被 coerce 成欄名。
+        if type(value) is not dict:
+            return False
+        return all(type(k) is str and type(v) is str for k, v in value.items())
     raise ValueError(f"receipt_schema 出現未知型別字面: {type_decl!r}（fail-closed，不得放行）")
 
 

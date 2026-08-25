@@ -819,6 +819,68 @@ class EventImportService:
         head = content.split(b"\n", 1)[0].decode("utf-8-sig", errors="replace")
         return [c.strip().strip('"').strip("'").strip() for c in head.split(",") if c.strip()]
 
+    # ---- 對映 provenance（GAP-3 UX Task 1.6；只記錄，不參與任何計算） ----
+    #: `mapping_provenance.confirmed_at_source` 之兩值——伺服器時間**不得**冒充使用者確認時間。
+    CONFIRMED_AT_CLIENT = "client_declared"
+    CONFIRMED_AT_SERVER = "server_received"
+
+    @staticmethod
+    def _batch_source_file_digest(
+        records: List[Dict[str, object]], batch_defaults: Optional[Dict[str, object]],
+    ) -> Optional[str]:
+        """本批之 `source_file_digest` 單一值；**批內不一致或缺值 ⇒ `None`**（＝無法對證來源）。
+
+        🔴 回 `None` 不在本函式報錯：由 `mapping_provenance` 之契約驗證以契約之「缺必填欄」
+        reason fail-closed（reason 字面住契約，本層不複列）。
+        列自帶值優先、`batch_defaults` 補缺——與 `validate` 之語意一致。
+        """
+        default = (batch_defaults or {}).get("source_file_digest")
+        seen: set = set()
+        for r in records:
+            raw = r.get("source_file_digest")
+            if raw is None or (isinstance(raw, str) and not raw.strip()):
+                raw = default
+            if raw is None:
+                return None
+            text = str(raw).strip()
+            if not text:
+                return None
+            seen.add(text)
+        return seen.pop() if len(seen) == 1 else None
+
+    def _mapping_provenance(
+        self, records: List[Dict[str, object]], batch_defaults: Optional[Dict[str, object]], *,
+        column_mapping: Dict[str, object], source_file_name: Optional[str],
+        confirmed_at: Optional[str], imported_at: str,
+    ) -> Dict[str, object]:
+        """Task 1.6：組出對映 provenance 並經契約驗證；不合規 ⇒ 拒收（落檔數 0）。
+
+        四項＝`column_mapping`／來源檔名／`source_file_digest`／確認時間，外加
+        `confirmed_at_source` 揭露確認時間是使用者宣告或伺服器補記。
+        """
+        provenance: Dict[str, object] = {
+            "column_mapping": {str(k): str(v) for k, v in (column_mapping or {}).items()},
+            "source_file_name": str(source_file_name or ""),
+            "confirmed_at": str(confirmed_at) if confirmed_at else imported_at,
+            "confirmed_at_source": self.CONFIRMED_AT_CLIENT if confirmed_at else self.CONFIRMED_AT_SERVER,
+        }
+        digest = self._batch_source_file_digest(records, batch_defaults)
+        if digest is not None:
+            provenance["source_file_digest"] = digest
+        outcome = self._pipeline.validate_receipt_values(
+            "mapping_provenance", provenance, contract=self._contract)
+        if not outcome["ok"]:
+            raise EventImportRejectedError(EventImportRejected(
+                kind="contract_violation",
+                message=("對映 provenance 不合契約（Task 1.6：無法對證『這批是依哪一欄、哪個檔宣告的』）；"
+                         "逐欄 reason 見 failures"),
+                failures=[EventImportFailure(row=None, event_id=None, field=str(f.get("field")),
+                                             reason=str(f.get("reason")),
+                                             message="mapping_provenance 之欄位缺值或型別不符")
+                          for f in outcome["failures"]],
+            ))
+        return provenance
+
     def _resolve_lookahead(
         self, records: List[Dict[str, object]], *, data_columns: List[str],
         declaration: Optional[Dict[str, object]], on_missing: str,
@@ -855,6 +917,7 @@ class EventImportService:
         batch_defaults: Optional[Dict[str, object]] = None, extra_warnings: Optional[List[str]] = None,
         lookahead_declaration: Optional[Dict[str, object]] = None, data_columns: Optional[List[str]] = None,
         on_missing_declaration: Optional[str] = None,
+        column_mapping: Optional[Dict[str, object]] = None, mapping_confirmed_at: Optional[str] = None,
     ) -> EventImportResponse:
         """upload_bytes：事件檔內容（記 `upload_sha256` 供 provenance）。
         source_bytes：契約所指之**來源檔**位元組（CODEX-R2-P1-03）；`verify_source_digest=True` 時以此逐列對證
@@ -895,6 +958,14 @@ class EventImportService:
         if declaration_receipt.get("lookahead_bars_declared"):
             self._pipeline.apply_lookahead_horizon_projection(
                 stored_records, declaration_receipt["lookahead_bars_declared"])
+        imported_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Task 1.6：對映路徑之 provenance——**在落檔之前**驗證（不合規 ⇒ 拒收，落檔數 0）。
+        # JSON 直傳路徑無對映可追，不寫本 namespace。
+        mapping_provenance = None
+        if column_mapping:
+            mapping_provenance = self._mapping_provenance(
+                stored_records, batch_defaults, column_mapping=column_mapping,
+                source_file_name=source_name, confirmed_at=mapping_confirmed_at, imported_at=imported_at)
         import_id = None
         stored_path = None
         if not validate_only:
@@ -904,11 +975,14 @@ class EventImportService:
                 "import_id": import_id, "source_name": source_name, "upload_sha256": digest,
                 "source_digest_verified": bool(verify_source_digest),
                 "source_file_sha256": _hashlib.sha256(source_bytes).hexdigest() if source_bytes is not None else None,
-                "imported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "imported_at": imported_at,
                 "contract_version": str(self._contract.get("version")),
                 "lookahead_declaration": declaration_receipt,
                 "records": stored_records,
             }
+            # 邊界②：只**補**本 namespace，不覆寫 payload 之任何既有欄。
+            if mapping_provenance is not None:
+                payload.setdefault("mapping_provenance", mapping_provenance)
             p = self.storage_dir / f"{import_id}.json"
             p.write_text(_json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str), encoding="utf-8")
             stored_path = str(p)

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import CaseImportForm from "@/components/case/CaseImportForm";
 import BatchDownloadPanel from "@/components/case/BatchDownloadPanel";
 import EventImportForm from "@/components/case/EventImportForm";
+import EventCsvMappingForm from "@/components/case/EventCsvMappingForm";
 import { listEventImports } from "@/lib/api";
 import type { EventImportSummary } from "@/lib/types";
 
@@ -188,6 +189,11 @@ export default function DataPreparationPage() {
               </ul>
             )}
           </div>
+        </div>
+
+        {/* GAP-3 UX Task 1.5／1.6／1.7：自有欄名 CSV ＋ 逐項對映（與上方新契約直傳並列） */}
+        <div className="mt-8">
+          <EventCsvMappingForm onImported={() => setRefreshKey((k) => k + 1)} />
         </div>
 
         {/* Help Section */}

@@ -11,6 +11,33 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <p><strong>這張表回答：五批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
+<h2 id="-第四批程式碼已寫入審查進行中825">🔧 第四批：程式碼已寫入，審查進行中（8/25）</h2>
+<p>第四批＝<strong>匯入前端</strong>，三個 Task。一句話：第二批做了「用你自己的欄名匯入」的<strong>後端</strong>，
+這批做它的<strong>畫面</strong>，並把「這批的正反例是照哪一欄、哪個檔宣告的」存下來備查。</p>
+<ol>
+<li><strong>上傳、預覽、逐項對映的畫面</strong>（1.5）——選檔後就地顯示<strong>前 5 列</strong>和<strong>全部欄名</strong>，
+然後一項一項告訴系統「契約要的 <code>label</code> 是我檔案裡的哪一欄」。
+🔴 <strong>一個欄位都不預設</strong>：所有下拉初始值都是「未選」。平台不猜你的欄位對應。
+送出前先把「<strong>你聲明</strong>的正例 3 筆／反例 4 筆」算給你看，<strong>沒勾確認就一個網路動作都不會發生</strong>。
+文案刻意不寫「label 正確」——語意對不對機器證明不了，只能說這是你聲明的。</li>
+<li><strong>把對映過程存證</strong>（1.6）——四件事寫進該批的紀錄檔：你送的欄位對映、來源檔名、
+來源檔指紋、確認時間。<strong>只記錄，不參與任何計算</strong>。
+🔴 指紋<strong>不得省略</strong>：整批算不出單一來源檔指紋（缺值或批內不一致）就<strong>直接拒收、一筆都不落檔</strong>
+——沒有來源就無從對證。
+另外，確認時間如果不是你按下確認時送來的，紀錄裡會明寫「這是伺服器補記的」，
+不讓伺服器時間冒充你的確認時間。</li>
+<li><strong>可疑欄警示</strong>（1.7）——掃描全部欄位，把「值域只有 0/1 或 true/false」的其他欄列出來提醒
+「這些看起來也像標記，確認一下你選的是哪一個」。
+🔴 <strong>只提醒不阻擋</strong>，也<strong>不會</strong>因為整份檔只有一個這樣的欄就自動幫你選它。</li>
+</ol>
+<p><strong>順帶解掉一條掛著的殘留</strong>（<code>R-B2-1</code>，第二批留下）：你的 CSV 如果時間戳是「秒」，
+系統會把它換算成毫秒，但 <code>event_id</code> 是你自己寫的字串、還是秒版 ⇒ 整批被拒、你得回去改檔再試一次。
+現在畫面在<strong>送出前</strong>就把「這幾列應該寫成什麼」逐字算給你看，照抄回去即可。</p>
+<p><strong>憑什麼說做完</strong>：三個 Task 的驗收命令全部 rc=0（前端 13 條新測試、後端 7 條新測試，
+全套 221 條前端測試與 <code>npm run build</code> 皆通過）；三條破壞測試逐條實跑——
+故意改壞 ⇒ 指定的測試轉紅、還原 ⇒ 轉綠，<strong>紅的是哪幾條也逐一比對過</strong>
+（證據 <code>handoffs/run_receipts/gap3ux-b4-all-mutations.receipt.json</code>）。</p>
+<p><strong>還沒完的是審查</strong>：照規矩派三家（codex／composer／grok）獨立審，我自己不審自己。</p>
 <h2 id="-第三批已收斂825三輪審查-6-3-0三家一致可進第四批">✅ 第三批已收斂（8/25，三輪審查 6 → 3 → 0，三家一致可進第四批）</h2>
 <p>第三批＝<strong>深度三層防線</strong>，三個 Task。整批只處理一個問題：
 <strong>「這個欄位看到多遠的未來」如果系統算不出來，該怎麼辦。</strong></p>

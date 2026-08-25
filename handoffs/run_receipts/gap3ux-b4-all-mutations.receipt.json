@@ -1,0 +1,74 @@
+{
+  "closure": "CLOSED",
+  "closure_doc": "CLOSED＝列出之每一條 mutation 皆「改壞後轉紅之 test 集合逐一等於預期」且「還原後 rc=0」。任一條不符即 NOT-CLOSED。",
+  "all_pass": true,
+  "mutations": [
+    {
+      "id": "1.5-M1",
+      "task": "1.5",
+      "desc": "未勾確認也放行（邊界①之保護被移除）",
+      "selector": [
+        "VITEST",
+        "gap3_csv"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ② 未勾確認 ⇒ 送出時 upload 與 fetch 之呼叫次數皆為 0；勾了才送出一次"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ② 未勾確認 ⇒ 送出時 upload 與 fetch 之呼叫次數皆為 0；勾了才送出一次"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.6-M1",
+      "task": "1.6",
+      "desc": "provenance 缺 digest 不再 fail-closed",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_csv_provenance"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_csv_provenance_missing_digest_fail_closed"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_csv_provenance_missing_digest_fail_closed"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.7-M1",
+      "task": "1.7",
+      "desc": "只有一個二元欄就自動選它（違反 A-4′）",
+      "selector": [
+        "VITEST",
+        "suspiciousBinaryColumns",
+        "gap3_csv"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ①b 只有一個二元欄時，label 下拉仍是「未選」（不得因為只有一個就自動選它）",
+        "Task 1.7 可疑欄警示 > ① 3 個二元欄且已選其一 ⇒ 警示另外 2 個（len == 2 且集合相等）；只有一個二元欄時仍不自動選"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 1.5 CSV 對映 UI > ①b 只有一個二元欄時，label 下拉仍是「未選」（不得因為只有一個就自動選它）",
+        "Task 1.7 可疑欄警示 > ① 3 個二元欄且已選其一 ⇒ 警示另外 2 個（len == 2 且集合相等）；只有一個二元欄時仍不自動選"
+      ],
+      "verdict": "PASS"
+    }
+  ]
+}

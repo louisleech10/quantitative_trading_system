@@ -185,6 +185,28 @@ class EventSamplePipeline:
         return split_blocked_reason()
 
     @staticmethod
+    def validate_receipt_values(namespace: str, values: Mapping[str, Any], *,
+                                contract: Optional[dict] = None) -> Dict[str, Any]:
+        """Task 1.6：receipt namespace 之型別／齊備性驗證出口（R3；回**純資料**）。
+
+        成功 `{"ok": True, "failures": []}`；不合規 `{"ok": False, "failures": [{row,event_id,field,reason}, …]}`
+        ——reason 字面來自契約之封閉集合（`missing_required_field`／`type_error`／`unknown_field`），
+        api 層不得複列，亦不得 catch `ContractValidationError`（例外型別不跨界）。
+
+        🔴 驗證實作**唯一**住 `import_contract.validate_receipt_namespace`（與驗收共用同一函式參考）；
+        本出口只做例外→純資料之轉換，不重寫任何判定。
+        """
+        from momentum.Analysis.event_samples.import_contract import (
+            ContractValidationError as _CVE, validate_receipt_namespace as _impl,
+        )
+
+        try:
+            _impl(namespace, values, contract=contract)
+        except _CVE as exc:
+            return {"ok": False, "failures": [dict(f) for f in exc.failures]}
+        return {"ok": True, "failures": []}
+
+    @staticmethod
     def bars_from_kline_cache(symbols, timeframes, *, cache_path=None) -> Dict[str, Dict[str, pd.DataFrame]]:
         """真實 kline bars（`bars_source.load_bars_from_kline_cache`）；服務端取 bars 的唯一入口。"""
         from momentum.Analysis.event_samples.bars_source import load_bars_from_kline_cache

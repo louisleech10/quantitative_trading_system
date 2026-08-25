@@ -2885,6 +2885,20 @@ export interface EventLookaheadDeclarationReceipt {
   split_blocked: boolean;
 }
 
+/**
+ * GAP-3 UX Task 1.5／1.6：CSV 欄名對映之送出內容。
+ *
+ * `columnMapping` ＝ `{契約欄名: CSV 欄名}`；🔴 **無預設對映**（A-4′），每一項都得使用者自己選。
+ * `confirmedAt` ＝ 使用者勾選「我聲明這是我標好的正反例」之時間（UTC ISO-8601），
+ * 落進 receipt 之 `mapping_provenance`（Task 1.6）。
+ */
+export interface EventCsvMappingSubmission {
+  columnMapping: Record<string, string>;
+  batchDefaults?: Record<string, unknown> | null;
+  confirmedAt: string;
+  validateOnly: boolean;
+}
+
 export interface EventImportRejected {
   kind: 'legacy_schema_detected' | 'new_schema_on_legacy_endpoint' | 'contract_violation' | 'parse_error'
     | 'lookahead_declaration_required' | 'lookahead_declaration_invalid'

@@ -240,6 +240,12 @@ async def import_events_csv(
                      '{"declared_window_bars": {timeframe: 正整數}, "acknowledged_unverifiable": bool}。'
                      '預設值請先呼叫 /case/import-events/lookahead-declaration 取得（＝檔內最大可用 horizon，逐 tf）'),
     ),
+    mapping_confirmed_at: Optional[str] = Form(
+        None,
+        description=('GAP-3 UX Task 1.5／1.6：使用者於對映 UI **勾選確認**之時間（UTC ISO-8601）。'
+                     '缺 ⇒ receipt 記伺服器落檔時間，並以 mapping_provenance.confirmed_at_source '
+                     '＝server_received 揭露（伺服器時間不冒充使用者確認時間）'),
+    ),
     validate_only: bool = Query(False),
 ):
     """CSV ＋ 欄名對映匯入（GAP-3 UX Task 1.2）。
@@ -256,7 +262,8 @@ async def import_events_csv(
         return svc.import_records(records, source_name=file.filename, upload_bytes=content,
                                   validate_only=validate_only, batch_defaults=defaults, extra_warnings=warnings,
                                   lookahead_declaration=_form_json_dict("lookahead_declaration", lookahead_declaration) or None,
-                                  data_columns=svc.file_columns(content, file.filename or "") or None)
+                                  data_columns=svc.file_columns(content, file.filename or "") or None,
+                                  column_mapping=mapping, mapping_confirmed_at=mapping_confirmed_at)
     except EventImportRejectedError as exc:
         raise _rejected(exc)
 
