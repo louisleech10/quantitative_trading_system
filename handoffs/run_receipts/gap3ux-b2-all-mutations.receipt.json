@@ -243,6 +243,99 @@
         "canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界 > (b) 之獨立 oracle：收到的 text 本身須符合 §G S-9 之可觀察規則（不是只跟自己對得起來）"
       ],
       "verdict": "PASS"
+    },
+    {
+      "id": "1.2-M3",
+      "task": "1.2",
+      "desc": "安裝 verbatim copy 之 subclass（CODEX-R1-P2-02）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_csv_import"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_csv_import_ast_oracle_import_records_definition_is_unique"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_csv_import_ast_oracle_import_records_definition_is_unique"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.3-M4",
+      "task": "1.3",
+      "desc": "改壞契約之 event_id 公式（CODEX-R1-P1-01）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_source_digest"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_source_digest_event_id_set_equal_json_export_vs_csv_reimport",
+        "test_gap3_source_digest_event_id_template_is_single_source"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_source_digest_event_id_set_equal_json_export_vs_csv_reimport",
+        "test_gap3_source_digest_event_id_template_is_single_source"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.3-M5",
+      "task": "1.3",
+      "desc": "移除使用者匯入路徑之 canonical event_id 驗證（CODEX-R1-P1-01）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_source_digest"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_source_digest_canonical_event_id_not_enforced_on_platform_path",
+        "test_gap3_source_digest_non_canonical_event_id_rejected[csv]",
+        "test_gap3_source_digest_non_canonical_event_id_rejected[json]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_source_digest_canonical_event_id_not_enforced_on_platform_path",
+        "test_gap3_source_digest_non_canonical_event_id_rejected[csv]",
+        "test_gap3_source_digest_non_canonical_event_id_rejected[json]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "1.3-M4b",
+      "task": "1.3",
+      "desc": "改壞契約之 event_id 公式（前端模板對證）",
+      "selector": [
+        "VITEST",
+        "src/lib/canonicalSourceCoverage.test.ts"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "canonicalSourceCoverage — D-2 event_id 之唯一定義來源（CODEX-R1-P1-01） > 前端模板與契約 `event_id_template` **逐字**相等（改任一側即紅）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "canonicalSourceCoverage — D-2 event_id 之唯一定義來源（CODEX-R1-P1-01） > 前端模板與契約 `event_id_template` **逐字**相等（改任一側即紅）"
+      ],
+      "verdict": "PASS"
     }
   ]
 }

@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.services import case_import_service as svc_mod
 from momentum.factories import create_event_sample_pipeline
-from tests.momentum.event_samples.test_import_contract import make_event
+from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
 client = TestClient(app)
 REPO = Path(__file__).resolve().parents[2]
@@ -56,8 +56,15 @@ def _csv(rows, header=None) -> bytes:
 
 
 def _rows(n=2):
+    """CSV 列；`event_id` 依 D-2 由**唯一實作**產生（Task 1.3；不在測試裡重寫公式）。"""
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id
+
     base = make_event(0)
-    return [[f"ev{i}", "ETHUSDT", "12h", str(base["t0"] + i * 43200000), str(i % 2), f"note{i}"] for i in range(n)]
+    out = []
+    for i in range(n):
+        t0 = base["t0"] + i * 43200000
+        out.append([canonical_event_id("ETHUSDT", "12h", t0), "ETHUSDT", "12h", str(t0), str(i % 2), f"note{i}"])
+    return out
 
 
 def _post_csv(content: bytes, mapping=None, defaults=None, **params):
@@ -90,7 +97,7 @@ def test_gap3_csv_import_user_column_names_accepted_and_stored(_isolated_storage
     body = r.json()
     assert body["accepted"] and body["n_valid"] == 2 and body["import_id"]
     det = client.get(f"/api/v1/case/events/{body['import_id']}").json()
-    assert [rec["event_id"] for rec in det["records"]] == ["ev0", "ev1"]
+    assert [rec["event_id"] for rec in det["records"]] == [r[0] for r in _rows(2)]
     assert [rec["label"] for rec in det["records"]] == [0, 1]
     assert _stored_count() == 1
 
@@ -217,6 +224,38 @@ def test_gap3_csv_import_ast_oracle_shared_entrypoints():
     mapping_layer = _called_attrs(_func(service, "csv_records_from_mapping"))
     for forbidden in ("validate", "validate_event_import", "import_records"):
         assert forbidden not in mapping_layer, f"對映層不得自行檢核／落檔（發現 {forbidden}）"
+
+
+def test_gap3_csv_import_ast_oracle_import_records_definition_is_unique():
+    """V-3 ①強化（CODEX-R1-P2-02）：只比對 attribute 名稱**不足**以證「同一 function object」。
+
+    一份 verbatim copy（例如 `class CsvEventImportService(EventImportService)` 自帶
+    `import_records`）可同時通過舊 AST 與 `1.2-M1/M2`。故錨點改落在**定義面**：
+    全 `api/`＋`momentum/` 之 `def import_records` 須**恰一個**，且其所屬 class 為
+    `EventImportService`；三個 route handler 取得 service 之方式須為同一個工廠呼叫。
+    """
+    defs = []
+    for base in ("api", "momentum"):
+        for path in sorted((REPO / base).rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for cls in ast.walk(tree):
+                if not isinstance(cls, ast.ClassDef):
+                    continue
+                for item in cls.body:
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "import_records":
+                        defs.append((str(path.relative_to(REPO)), cls.name))
+            for node in tree.body:  # module-level def（非 method）亦算一份實作
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "import_records":
+                    defs.append((str(path.relative_to(REPO)), "<module>"))
+    assert defs == [("api/services/case_import_service.py", "EventImportService")], defs
+
+    routes = ast.parse(ROUTES.read_text(encoding="utf-8"))
+    factories = set()
+    for handler in ("import_events_file", "import_events_json", "import_events_csv"):
+        fn = _func(routes, handler)
+        got = {n.func.id for n in ast.walk(fn) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+        factories.add(frozenset(got & {"get_event_import_service", "get_case_import_service"}))
+    assert factories == {frozenset({"get_event_import_service"})}, factories
 
 
 def test_gap3_csv_import_ast_oracle_single_validation_and_unit_detection_site():

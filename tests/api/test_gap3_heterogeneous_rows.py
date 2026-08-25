@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from api.main import app
 from api.services import case_import_service as svc_mod
-from tests.momentum.event_samples.test_import_contract import make_event
+from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
 client = TestClient(app)
 REASON = "heterogeneous_rows_in_batch"

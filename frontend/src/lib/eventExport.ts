@@ -5,6 +5,7 @@
  * 使用者匯入前仍可手改；後端 validator 為唯一真相源（本檔不重做檢查）。
  */
 import type { CaseData } from './types';
+import { canonicalEventId } from './eventId';
 import { ruleDigestOf, ruleSummaryText } from './ruleDigest';
 
 export interface EventExportOptions {
@@ -88,7 +89,8 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
     const labelValue = fwdRaw === null ? null : direction === 'short' ? -fwdRaw : fwdRaw;
     if (fwdRaw === null) skipped.push({ index: i, reason: `missing_${String(futureKey)}_label_value_omitted` });
     return [{
-      event_id: `${c.symbol}:${c.timeframe || opts.timeframe}:${t0}`,
+      // D-2：公式住契約（`event_id_template`），前端只呼叫共用定義來源，禁在此手寫第二份
+      event_id: canonicalEventId(c.symbol, c.timeframe || opts.timeframe, t0),
       symbol: c.symbol,
       timeframe: c.timeframe || opts.timeframe,
       t0,

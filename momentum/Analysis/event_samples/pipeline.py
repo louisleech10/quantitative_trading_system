@@ -69,6 +69,20 @@ class EventSamplePipeline:
         return load_event_import_contract()
 
     @staticmethod
+    def canonical_event_id(symbol, timeframe, t0, *, contract: Optional[dict] = None) -> str:
+        """GAP-3 UX Task 1.3／D-2：`event_id` 之唯一實作出口（R3：api 層不直 import momentum 內部）。"""
+        from momentum.Analysis.event_samples.import_contract import canonical_event_id as _impl
+
+        return _impl(symbol, timeframe, t0, contract=contract)
+
+    @staticmethod
+    def event_id_template(contract: Optional[dict] = None) -> str:
+        """`event_id` 公式之字面 SoT 出口（前端模板由測試對證本值逐字相等）。"""
+        from momentum.Analysis.event_samples.import_contract import event_id_template as _impl
+
+        return _impl(contract)
+
+    @staticmethod
     def mapping_failure_reasons(contract: Optional[dict] = None) -> Dict[str, str]:
         """GAP-3 UX Task 1.2 對映層 reason 之具名出口（R3／R7：api 層只引用鍵，不複列字面）。"""
         from momentum.Analysis.event_samples.import_contract import mapping_failure_reasons as _impl
@@ -209,11 +223,13 @@ class EventSamplePipeline:
         `batch_defaults`（Task 1.8）：已指定之維度視為已涵蓋，不再判異質列。
 
         🔴 本方法＝**使用者匯入路徑**之唯一入口（CSV／JSON 兩端點皆經此）
-        ⇒ Task 1.8 之異質列拒收在此開啟；`run()` 與 `generator.py` 走的是平台產生器路徑，不開。
+        ⇒ Task 1.8 之異質列拒收與 Task 1.3 之 `event_id` identity 契約在此開啟；
+        `run()` 與 `generator.py` 走的是平台產生器路徑，兩者皆不開。
         """
         try:
             return validate_event_import(records, source_bytes=source_bytes, batch_defaults=batch_defaults,
-                                         enforce_batch_homogeneity=True), []
+                                         enforce_batch_homogeneity=True,
+                                         enforce_canonical_event_id=True), []
         except ContractValidationError as exc:
             return None, list(exc.failures)
 

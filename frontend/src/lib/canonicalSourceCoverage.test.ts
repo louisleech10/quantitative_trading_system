@@ -18,6 +18,7 @@ import golden from './__fixtures__/canonicalSourceGolden.json';
 import cryptoExportsGolden from './__fixtures__/node_crypto_exports.golden.json';
 import cryptoReviewManifest from './__fixtures__/node_crypto_review_manifest.json';
 import { buildEventContractRecords } from './eventExport';
+import { EVENT_ID_TEMPLATE, canonicalEventId } from './eventId';
 import { hashEntryCalls, resetHashEntryCalls } from '../test/hashEntrySpy';
 import type { CaseData } from './types';
 
@@ -192,6 +193,28 @@ describe('canonicalSourceCoverage — (b)(c) 位元組相等與浮點邊界', ()
     expect(out.source_file_text).not.toContain('": "');
     expect(out.source_file_text.endsWith('\n')).toBe(false);          // S-9 第 5 條：禁尾端 newline
     expect(out.source_file_text).not.toContain('NaN');                // allow_nan=False：非有限值一律 null
+  });
+});
+
+describe('canonicalSourceCoverage — D-2 event_id 之唯一定義來源（CODEX-R1-P1-01）', () => {
+  const CONTRACT = path.resolve(SRC_ROOT, '../../momentum/Analysis/contracts/event_import_contract.json');
+
+  it('前端模板與契約 `event_id_template` **逐字**相等（改任一側即紅）', () => {
+    const contract = JSON.parse(readFileSync(CONTRACT, 'utf8'));
+    expect(EVENT_ID_TEMPLATE).toBe(contract.event_id_template);
+  });
+
+  it('匯出之 event_id 由共用定義來源產生，且不在 eventExport.ts 內手寫第二份公式', async () => {
+    const out = await exportOf('base');
+    const v = variants.base;
+    out.records.forEach((r, i) => {
+      const c = v.cases[i] as { symbol: string; timeframe: string };
+      expect(r.event_id).toBe(canonicalEventId(c.symbol, c.timeframe, r.t0));
+    });
+    // 錨點落在「有沒有第二份公式」這件事本身：模板字面不得出現在呼叫端模組
+    const exportSrc = readFileSync(path.join(SRC_ROOT, 'lib', 'eventExport.ts'), 'utf8');
+    expect(exportSrc).not.toMatch(/`\$\{[^`]*\}:\$\{[^`]*\}:\$\{[^`]*\}`/);
+    expect(exportSrc).toContain('canonicalEventId(');
   });
 });
 

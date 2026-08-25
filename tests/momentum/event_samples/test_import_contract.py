@@ -22,6 +22,12 @@ TF_MS = 43200000
 
 
 def make_event(n: int = 0, **over) -> dict:
+    """平台／單元層 fixture：`event_id` 用短名 `ev{n}`。
+
+    🔴 **使用者匯入路徑**（API 端點）另有 D-2 canonical 約束（Task 1.3），
+    那一層之 fixture 請用 `canonical_event()`——本函式刻意不改，
+    因為 `validate_event_import` 直呼與 `pipeline.run` 皆**不**強制該約束。
+    """
     e = {
         "event_id": f"ev{n}",
         "symbol": "ETHUSDT",
@@ -43,6 +49,21 @@ def make_event(n: int = 0, **over) -> dict:
         "data_snapshot_digest": "b" * 64,
     }
     e.update(over)
+    return e
+
+
+def canonical_event(n: int = 0, **over) -> dict:
+    """使用者匯入路徑之 fixture：`event_id` 依契約 `event_id_template` 產生（Task 1.3／D-2）。
+
+    公式**不在此重寫**——直接呼叫 `import_contract.canonical_event_id`（唯一實作），
+    否則測試自己就成了第二份副本（CODEX-R1-P1-01 之同型病）。
+    """
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id
+
+    e = make_event(n, **over)
+    e["event_id"] = canonical_event_id(e["symbol"], e["timeframe"], e["t0"])
+    if "event_id" in over:
+        e["event_id"] = over["event_id"]
     return e
 
 

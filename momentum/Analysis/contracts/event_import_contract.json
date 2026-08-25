@@ -2,6 +2,8 @@
   "version": 1,
   "_doc": "GAP-3 事件匯入契約單一真相源（docs/GAP3_EVENT_TODO.md Task B1.0；SPEC=docs/GAP3_EVENT_SPEC.md D1/D2/AR-1/AR-2）。所有事件欄位名／枚舉值／reason 字面／分類門檻只住本檔；SPEC／TODO 之列舉為 genesis 建檔規格，本檔建立後以本檔為準。程式以 import_contract.load_event_import_contract() 讀取，禁複列。誠實邊界：(a) digest 相同不證內容正確，只證與宣告一致；data_snapshot_digest 僅驗格式（kline 對證屬對齊層之外部責任）；(b) v1 不重算使用者 label（一致性探針＝SPEC §N-8 殘留）；(c) 匯入層 T9 的 decision_at 用名目網格 t0−k×TF 推導（crypto 連續 bar 下與實際一致），對齊層以實際 bar 重推導並複驗；(d) direction 批內單值＝U1「一次只研究一向」（同一匯入批出現 long 與 short ⇒ 拒）；(e) 二元任務缺任一類別 ⇒ missing_control_group（fail-closed）。時間戳一律 epoch ms UTC，量級門檻見 ms_magnitude_min。",
   "ms_magnitude_min": 1000000000000,
+  "event_id_template": "{symbol}:{timeframe}:{t0}",
+  "_event_id_template_doc": "GAP-3 UX Task 1.3／D-2：event_id 之**唯一定義來源**（SPEC L1424–1427）。後端唯一實作＝import_contract.canonical_event_id()；前端 frontend/src/lib/eventId.ts 之模板由 vitest 對證本欄逐字相等（禁在任一端手寫第二份公式）。t0 為毫秒整數（單位偵測後之值）。僅**使用者宣告之匯入批次**強制（EventSamplePipeline.validate 開 enforce_canonical_event_id）；平台產生器之 ID 另帶 label 後綴，不受此約束。",
   "required_fields": {
     "event_id": { "type": "str", "doc": "批內唯一識別碼；重複 ⇒ duplicate_event_id" },
     "symbol": { "type": "str", "doc": "標的（如 ETHUSDT）" },

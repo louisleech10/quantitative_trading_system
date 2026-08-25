@@ -59,10 +59,15 @@ def test_analyze_tables_includes_all_bars_event_membership(bars):
 
 
 def test_validate_returns_failures_without_raise():
+    # 🔴 `validate` ＝使用者匯入路徑 ⇒ 強制 D-2 canonical event_id（Task 1.3）
+    # ⇒ 本測之 fixture 用 `canonical_event`；`make_event`（短名 ID）留給不強制的直呼／run 路徑。
+    from tests.momentum.event_samples.test_import_contract import canonical_event
+
     p = create_event_sample_pipeline()
-    df, fails = p.validate([make_event(0, label=1), make_event(1, label=0)])
+    df, fails = p.validate([canonical_event(0, label=1), canonical_event(1, label=0)])
     assert df is not None and fails == []
-    df2, fails2 = p.validate([make_event(0, t0=1704067200, label=1)])
+    # t0=1704067 兩帶皆不落入 ⇒ 單位判不出（1704067200 秒級自 Task 1.4 起會被 ×1000 接受）
+    df2, fails2 = p.validate([canonical_event(0, t0=1704067, label=1)])
     assert df2 is None and {f["reason"] for f in fails2} >= {"invalid_timestamp_unit"}
 
 

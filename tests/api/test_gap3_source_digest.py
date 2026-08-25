@@ -206,6 +206,81 @@ def test_gap3_source_digest_one_byte_change_flips_digest():
     assert hashlib.sha256(flipped.encode("utf-8")).hexdigest() != digest
 
 
+def test_gap3_source_digest_event_id_template_is_single_source(monkeypatch):
+    """D-2（CODEX-R1-P1-01）：`event_id` 公式只住契約，後端只有一份實作。"""
+    import ast
+
+    from momentum.Analysis.event_samples import import_contract as mod
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id, event_id_template
+
+    tpl = event_id_template()
+    assert tpl == "{symbol}:{timeframe}:{t0}"
+    assert canonical_event_id("ETHUSDT", "12h", 1704067200000) == "ETHUSDT:12h:1704067200000"
+    # 契約被改 ⇒ 產出跟著改（證明不是硬編字串）
+    fake = dict(create_event_sample_pipeline().import_contract(), event_id_template="{t0}|{symbol}|{timeframe}")
+    assert canonical_event_id("ETHUSDT", "12h", 1, contract=fake) == "1|ETHUSDT|12h"
+    # 全模組只有一處 `.format(` 於 canonical_event_id 內；沒有第二份手寫拼接
+    tree = ast.parse(Path(mod.__file__).read_text(encoding="utf-8"))
+    holders = [n.name for n in ast.walk(tree)
+               if isinstance(n, ast.FunctionDef)
+               and any(isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "format"
+                       for c in ast.walk(n))]
+    assert holders == ["canonical_event_id"], holders
+
+
+@pytest.mark.parametrize("endpoint", ["json", "csv"])
+def test_gap3_source_digest_non_canonical_event_id_rejected(tmp_path, monkeypatch, endpoint):
+    """D-2 identity 契約：symbol／timeframe／t0 正確但 `event_id` 自訂 ⇒ **拒且落檔數 == 0**。
+
+    🔴 CODEX-R1-P1-01：先前兩端點皆接受任意 `event_id`，下游 split／dedupe／receipt 會把
+    錯誤 identity 當真；「JSON 匯出 vs CSV 回灌集合相等」只證明同一個錯誤輸入被保留。
+    """
+    import io
+
+    from fastapi.testclient import TestClient
+
+    from api.main import app
+    from api.services import case_import_service as svc_mod
+    from tests.momentum.event_samples.test_import_contract import canonical_event
+
+    monkeypatch.setattr(svc_mod, "_event_import_service", svc_mod.EventImportService(storage_dir=tmp_path / "events"))
+    client = TestClient(app)
+
+    good = canonical_event(0, label=1)
+    bad = canonical_event(1, label=0, event_id="my-own-id-001")   # 其餘欄位完全合法
+
+    if endpoint == "json":
+        r = client.post("/api/v1/case/import-events/json", json={"records": [good, bad]})
+    else:
+        header = "eid,sym,tf,ts,ans"
+        body = "\n".join(f"{x['event_id']},{x['symbol']},{x['timeframe']},{x['t0']},{x['label']}" for x in (good, bad))
+        mapping = {"event_id": "eid", "symbol": "sym", "timeframe": "tf", "t0": "ts", "label": "ans"}
+        defaults = {k: good[k] for k in ("decision_offset_bars", "entry_price_semantic", "direction", "scenario",
+                                         "label_definition", "control_kind", "source_file_digest", "data_snapshot_digest")}
+        r = client.post("/api/v1/case/import-events/csv",
+                        files={"file": ("x.csv", io.BytesIO((header + "\n" + body + "\n").encode("utf-8")), "text/csv")},
+                        data={"column_mapping": json.dumps(mapping), "batch_defaults": json.dumps(defaults)})
+
+    assert r.status_code == 422, r.text
+    failures = [f for f in r.json()["detail"]["failures"] if f["field"] == "event_id"]
+    assert len(failures) == 1 and failures[0]["row"] == 1
+    assert failures[0]["reason"] in set(create_event_sample_pipeline().import_contract()["import_failure_reasons"])
+    assert bad["event_id"] in failures[0]["message"] and good["symbol"] in failures[0]["message"]
+    assert client.get("/api/v1/case/events").json()["total"] == 0
+
+
+def test_gap3_source_digest_canonical_event_id_not_enforced_on_platform_path():
+    """平台產生器路徑**不**受 D-2 約束（其 ID 帶 label 後綴）——與 Task 1.8 同型之 scope 收斂。"""
+    from momentum.Analysis.event_samples.import_contract import validate_event_import
+    from tests.momentum.event_samples.test_import_contract import make_event
+
+    rows = [make_event(0, label=1, event_id="ETHUSDT:12h:1738627200000:up5"),
+            make_event(1, label=0, event_id="ETHUSDT:12h:1738670400000:up5")]
+    assert len(validate_event_import(rows)) == 2                       # 預設不強制
+    with pytest.raises(Exception):
+        validate_event_import(rows, enforce_canonical_event_id=True)   # 顯式開啟才拒
+
+
 def test_gap3_source_digest_event_id_set_equal_json_export_vs_csv_reimport(tmp_path, monkeypatch):
     """SPEC Task 1.3 驗證（V-4）：同一批事件之「JSON 匯出檔」與「CSV 回灌」之 `event_id` 集合 `==`。"""
     import io
@@ -214,7 +289,7 @@ def test_gap3_source_digest_event_id_set_equal_json_export_vs_csv_reimport(tmp_p
 
     from api.main import app
     from api.services import case_import_service as svc_mod
-    from tests.momentum.event_samples.test_import_contract import make_event
+    from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
     monkeypatch.setattr(svc_mod, "_event_import_service", svc_mod.EventImportService(storage_dir=tmp_path / "events"))
     client = TestClient(app)

@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.services import case_import_service as svc_mod
 from momentum.factories import create_event_sample_pipeline
-from tests.momentum.event_samples.test_import_contract import make_event
+from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
 client = TestClient(app)
 
@@ -78,7 +78,9 @@ def test_gap3_t0_unit_detect_bands_are_disjoint():
 
 def test_gap3_t0_unit_detect_shared_by_json_path(_isolated_storage):
     """⑤ JSON 路徑：秒級 t0 匯入後落檔為 ms（證偵測已接在共用函式上）。"""
-    recs = [make_event(0, label=1, t0=SECONDS_INPUT), make_event(1, label=0, t0=SECONDS_INPUT + 43200)]
+    # 🔴 D-2 之 `event_id` 以**毫秒** t0 計 ⇒ 秒級輸入之列，其 ID 仍是 ms 版（Task 1.3）
+    recs = [make_event(0, label=1, t0=SECONDS_INPUT, event_id=f"ETHUSDT:12h:{EXPECTED_MS}"),
+            make_event(1, label=0, t0=SECONDS_INPUT + 43200, event_id=f"ETHUSDT:12h:{EXPECTED_MS + 43200000}")]
     r = client.post("/api/v1/case/import-events/json", json={"records": recs})
     assert r.status_code == 200, r.text
     det = client.get(f"/api/v1/case/events/{r.json()['import_id']}").json()
@@ -88,9 +90,14 @@ def test_gap3_t0_unit_detect_shared_by_json_path(_isolated_storage):
 def test_gap3_t0_unit_detect_shared_by_csv_mapping_path(_isolated_storage):
     """⑥ CSV 對映路徑：同一秒級輸入得到**相同**毫秒輸出（兩路徑共用同一偵測函式）。"""
     ev = make_event(0, label=1)
+    # 🔴 D-2 之 `event_id` 以**毫秒** t0 計（Task 1.3）：秒級輸入之列，其 ID 仍是 ms 版
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id
+
     rows = [
-        {"我的id": "ev0", "幣種": "ETHUSDT", "週期": "12h", "秒時間": str(SECONDS_INPUT), "答案": "1"},
-        {"我的id": "ev1", "幣種": "ETHUSDT", "週期": "12h", "秒時間": str(SECONDS_INPUT + 43200), "答案": "0"},
+        {"我的id": canonical_event_id("ETHUSDT", "12h", EXPECTED_MS),
+         "幣種": "ETHUSDT", "週期": "12h", "秒時間": str(SECONDS_INPUT), "答案": "1"},
+        {"我的id": canonical_event_id("ETHUSDT", "12h", EXPECTED_MS + 43200000),
+         "幣種": "ETHUSDT", "週期": "12h", "秒時間": str(SECONDS_INPUT + 43200), "答案": "0"},
     ]
     csv = "我的id,幣種,週期,秒時間,答案\n" + "\n".join(
         ",".join(r[k] for k in ("我的id", "幣種", "週期", "秒時間", "答案")) for r in rows) + "\n"

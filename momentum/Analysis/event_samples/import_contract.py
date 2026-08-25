@@ -247,6 +247,27 @@ def normalize_t0_units(records: List[dict], *, contract: Optional[dict] = None) 
             continue
 
 
+def event_id_template(contract: Optional[dict] = None) -> str:
+    """`event_id` 公式之字面 SoT（契約 `event_id_template`）；前端測試以本值對證 TS 模板。"""
+    c = contract if contract is not None else load_event_import_contract()
+    tpl = c.get("event_id_template")
+    if not isinstance(tpl, str) or not tpl:
+        raise ValueError("契約缺 event_id_template（event_id 之唯一定義來源）")
+    return tpl
+
+
+def canonical_event_id(symbol: Any, timeframe: Any, t0: Any, *, contract: Optional[dict] = None) -> str:
+    """`event_id` 之**唯一**實作（GAP-3 UX Task 1.3／D-2；SPEC L1424–1427）。
+
+    🔴 **不得發明新演算法**（R1 兩家獨立判 BLOCKING）：公式只住契約之 `event_id_template`，
+    前後端各自呼叫**同一定義來源**——前端模板由 vitest 對證本契約欄逐字相等。
+
+    Args:
+        t0: **毫秒整數**（已過 `detect_t0_unit_ms`）。
+    """
+    return event_id_template(contract).format(symbol=symbol, timeframe=timeframe, t0=t0)
+
+
 def verify_source_digest(source_bytes: bytes, declared_digest: Any) -> bool:
     """比對宣告之 `source_file_digest` 與來源檔位元組（GAP-3 UX Task 1.3）。
 
@@ -274,6 +295,7 @@ def validate_event_import(
     source_bytes: Optional[bytes] = None,
     batch_defaults: Optional[Mapping[str, Any]] = None,
     enforce_batch_homogeneity: bool = False,
+    enforce_canonical_event_id: bool = False,
 ) -> pd.DataFrame:
     """驗證匯入事件；全過 ⇒ 回正規化 DataFrame，否則 raise ContractValidationError。
 
@@ -288,6 +310,12 @@ def validate_event_import(
             理由：SPEC Task 1.8 之標的是「**使用者**宣告之一批 CSV／JSON」；
             平台產生器（`generator.py`）之 multi-label 批次**刻意**逐列帶不同 `label_definition`
             （每個 label_id 一組），是另一個 producer，套用同一條會把既有功能整批擋掉。
+        enforce_canonical_event_id: 是否啟用 Task 1.3／D-2 之 `event_id` identity 契約。
+            🔴 **預設 False，同樣只由使用者匯入路徑開啟**（CODEX-R1-P1-01）。
+            理由與上條同型：平台產生器之 ID 帶 label 後綴（如 `…:1738627200000:up5`），
+            非 canonical 四段外之三段式，無條件強制會擋掉既有功能。
+            🔴 **刻意不與 `enforce_batch_homogeneity` 併為單一旗標**：兩者出自不同 SPEC Task
+            （1.3 vs 1.8），合併會使其中一條之 scope 日後被另一條悄悄改動。
     """
     c = contract if contract is not None else load_event_import_contract()
     reasons = c["import_failure_reasons"]  # noqa: F841 —— 字面出處；本函式僅使用其中值
@@ -354,6 +382,21 @@ def validate_event_import(
                 fail(i, eid, "t0", "type_error")
             elif not (ms_min <= int(r["t0"]) < ms_max):
                 fail(i, eid, "t0", "invalid_timestamp_unit")
+
+        # ---- event_id 之 D-2 identity 契約（Task 1.3；只在使用者匯入路徑強制） ----
+        # 🔴 CODEX-R1-P1-01：先前只驗非空字串 ⇒ 使用者可送 symbol／timeframe／t0 正確但
+        #    event_id 任意之列，兩端點皆接受，下游 split／dedupe／receipt 會把錯誤 identity 當真。
+        if (
+            enforce_canonical_event_id
+            and all(has(n) and _nonempty_str(r[n]) for n in ("event_id", "symbol", "timeframe"))
+            and has("t0") and _is_int(r["t0"])
+        ):
+            expected = canonical_event_id(r["symbol"], r["timeframe"], int(r["t0"]), contract=c)
+            if r["event_id"] != expected:
+                fail(i, eid, "event_id", "type_error",
+                     f"event_id 不符契約公式 {event_id_template(c)!r}："
+                     f"期望 {expected!r}，實得 {r['event_id']!r}"
+                     "（D-2：event_id 只由 symbol／timeframe／t0 決定，不得自訂）")
 
         k_off = 0
         if has("decision_offset_bars"):
