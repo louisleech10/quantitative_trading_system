@@ -69,6 +69,25 @@ mutation 判準＝**轉紅之 test 集合逐一等於預期**（多紅少紅皆 
 ## 具名殘留（不排工，除非使用者指示）
 
 - ~~**R-MUT-1 mutation runner 非併發安全**~~ → 使用者 2026-08-25 明示授權根治，見上「工具」節。
+- **R-GOV7-1 G-7 scope 淨差長期紅（383 條，既有債）**：`gov_check --no-probe` 段 4 FAIL。
+  基準 `base_commit: 62787fe4` 在 **567 個 commit 之前**，累積列出 383 條「未宣告即修改」
+  （GAP-2 `marginal_ic.py`、`frontend/` 整批、8/18 handoffs 等）。
+  🔴 **已實證非本次引入**：在 `HEAD~2`（改動前）以隔離 worktree 跑同一條閘，**亦 FAIL 且
+  路徑集合逐一相同（383 vs 383，`comm` 兩向皆空）**。判準要求 trailer 落在**該 commit 自身**
+  ⇒ 前向修不掉，補後續 commit 無效（閘之明文）。
+  三值理由 `user-ruling`（不得碰治理；且與「面向未來不溯及既往」一致）。owner 主委。
+  ⚠️ 連帶效果：段 4 FAIL 後 gov_check **不再往下跑第 5／6 段** ⇒ 全套 pytest 不會經由
+  gov_check 執行，須自行直跑 `pytest tests/governance`。
+- **R-GOV7-2 治理 pytest 6 條長期紅（既有債）**：`pytest tests/governance` ＝
+  **1743 passed / 6 failed**（45m40s）。分兩群：①`test_govb1_contract_matrix` 4 條皆 **G-7 相關**
+  （`t01_f2_frozen_hashes_self_consistent`／`t01_f3_g7_when_committed`／
+  `r6_u1u2u4_g7_worktree_space_quote_paths`／`g7_ambient_m_gate_check_not_red`），與 R-GOV7-1 同源。
+  ②`test_govb1_factkey_hook` 2 條斷言「fact-key 漂移時 pre-push 須拒絕」，但 pre-push 已於
+  **2026-08-14 使用者裁定改跑 `--fast`（刻意不含第 2–4 段）** ⇒ **測試比裁定舊**。
+  🔴 **已實證非本次引入**：於 `HEAD~3`（改動前）隔離 worktree 實跑同這 6 條，**同樣 6 failed**
+  （24m27s，集合逐一相同）。且本次三個 commit 未觸及 `pre-push`／`gov_check.sh`／`govb1_*`／
+  任何 `tests/governance` 檔（`git diff --name-only HEAD~3 HEAD` 為證）。
+  三值理由 `user-ruling`（不得碰治理）。owner 主委。
 - **R-B1-1 全量跑之測試順序污染**：`pytest tests/momentum tests/api` 全量跑時有若干紅，
   單獨跑較少。歸因未實跑證明（需以 stashed 樹全量跑一次，約 64 分鐘）。
   三值理由 `needs-research`。owner 主委。
