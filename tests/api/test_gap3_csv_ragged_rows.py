@@ -219,6 +219,21 @@ def test_gap3_csv_ragged_full_width_all_empty_row_is_a_data_row(_isolated_storag
     assert _stored_count(_isolated_storage) == 0
 
 
+# ── ⑧ R4 `CODEX-R4-P1-01`：舊式 Mac 換行（只有 CR）兩端一致地明說不支援 ──────
+def test_gap3_csv_ragged_lone_cr_line_endings_rejected_with_reason(_isolated_storage):
+    """訊息須說出**真正的原因**（換行格式），不是原生的「unquoted field 有換行字元」。
+
+    前端對同一個檔回空模型並顯示同一件事——舊版前端會把整檔黏成一行、產出
+    看起來很像欄名的東西讓使用者照著對映，那是「前端收／後端擋」的第三個方向。
+    """
+    content = ("我的編號,幣種\rE1,ETHUSDT\r").encode("utf-8")
+    r = _post(content)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["kind"] == "parse_error"
+    assert "換行" in r.json()["detail"]["message"]
+    assert _stored_count(_isolated_storage) == 0
+
+
 # ── ④ 引號內之 CR 由後端原樣保留（前端預覽解析須一致） ──────────────────────
 def test_gap3_csv_ragged_quoted_cr_preserved_by_backend(_isolated_storage):
     content = ('我的編號,幣種,是不是正例\n"E1\r",ETHUSDT,1\n').encode("utf-8")

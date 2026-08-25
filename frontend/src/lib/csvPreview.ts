@@ -28,6 +28,16 @@ export interface ParsedCsv {
   /** 出現超過一次的欄名（升冪去重）。 */
   duplicateNames: string[];
   /**
+   * 檔案用了**只有 `\r`** 的舊式 Mac 換行（unquoted lone CR）。
+   *
+   * 🔴 **不支援，且兩端一致地明說**（R4 `CODEX-R4-P1-01`）：舊版本把 unquoted `\r` 直接丟掉，
+   * 於是整個檔被黏成一行、產出「看起來很合理」的欄名（`a,b\r1,2\r` ⇒ `["a","b1","23","4"]`）
+   * 讓使用者照著對映；後端則以 `parse_error` 拒收 ⇒ 又是一次前端收／後端擋。
+   * 偵測到時本檔回**空模型**（`columns`／`rows` 皆空），UI 因此不會渲染對映區塊，只顯示錯誤。
+   */
+  unsupportedLineEnding: boolean;
+
+  /**
    * 欄數與標頭不符之列（0-based 列序 ＋ 實際欄數）。
    *
    * 🔴 **不得靜默截斷或補齊就當沒事**（R1 三家共提）：後端 `pd.read_csv` 在「每列都比標頭多一格」
@@ -37,13 +47,19 @@ export interface ParsedCsv {
   raggedRows: { row: number; width: number }[];
 }
 
-/** RFC4180 逐字元解析：吃引號內之逗號／換行／跳脫雙引號。 */
-function splitRecords(text: string): string[][] {
+/**
+ * RFC4180 逐字元解析：吃引號內之逗號／換行／跳脫雙引號。
+ *
+ * `loneCr` ＝ 是否出現**未被 `\n` 跟隨**之 unquoted `\r`（舊式 Mac 換行）。
+ * 引號**內**之 `\r` 是資料、原樣保留（後端 pandas 亦保留），不算。
+ */
+function splitRecords(text: string): { records: string[][]; loneCr: boolean } {
   const records: string[][] = [];
   let row: string[] = [];
   let cell = '';
   let quoted = false;
   let touched = false;
+  let loneCr = false;
   const pushCell = () => { row.push(cell); cell = ''; };
   const pushRow = () => { records.push(row); row = []; touched = false; };
 
@@ -60,12 +76,18 @@ function splitRecords(text: string): string[][] {
     }
     if (ch === '"') { quoted = true; continue; }
     if (ch === ',') { pushCell(); continue; }
-    if (ch === '\r') continue;
+    if (ch === '\r') {
+      if (text[i + 1] !== '\n') loneCr = true;   // 舊式 Mac 換行 ⇒ 不支援，交由呼叫端明說
+      continue;                                   // CRLF 之 `\r` 照舊丟棄
+    }
     if (ch === '\n') { pushCell(); pushRow(); continue; }
     cell += ch;
   }
   if (touched || cell !== '' || row.length > 0) { pushCell(); pushRow(); }
-  return records.filter((r) => !(r.length === 1 && r[0].trim() === ''));
+  return {
+    records: records.filter((r) => !(r.length === 1 && r[0].trim() === '')),
+    loneCr,
+  };
 }
 
 /**
@@ -74,10 +96,13 @@ function splitRecords(text: string): string[][] {
  * @param previewRowLimit 預覽列數上限（SPEC 為 5）。
  */
 export function parseCsvText(text: string, previewRowLimit = 5): ParsedCsv {
-  const records = splitRecords(text.replace(/^﻿/, ''));
-  if (records.length === 0) {
-    return { columns: [], previewRows: [], rows: [], duplicateNames: [], raggedRows: [] };
-  }
+  const { records, loneCr } = splitRecords(text.replace(/^﻿/, ''));
+  const empty: ParsedCsv = {
+    columns: [], previewRows: [], rows: [], duplicateNames: [], raggedRows: [],
+    unsupportedLineEnding: loneCr,
+  };
+  // 🔴 舊式 Mac 換行 ⇒ 回空模型：不得產出「看起來很合理」的欄名讓使用者照著對映（R4）。
+  if (loneCr || records.length === 0) return empty;
 
   const header = records[0].map((c) => c.trim());
   const counts = new Map<string, number>();
@@ -98,6 +123,7 @@ export function parseCsvText(text: string, previewRowLimit = 5): ParsedCsv {
     rows,
     duplicateNames: [...counts.entries()].filter(([, n]) => n > 1).map(([n]) => n).sort(),
     raggedRows,
+    unsupportedLineEnding: false,
   };
 }
 

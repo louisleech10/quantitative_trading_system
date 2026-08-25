@@ -58,6 +58,19 @@ describe('CSV 預覽解析之對位', () => {
     expect(parsed.raggedRows).toEqual([]);
   });
 
+  it('舊式 Mac 換行（只有 CR）⇒ 回空模型並標記不支援，不得產出看似合理的欄名', () => {
+    const parsed = parseCsvText('a,b\r1,2\r3,4\r');
+    expect(parsed.unsupportedLineEnding).toBe(true);
+    expect(parsed.columns).toEqual([]);      // 舊版會得到 ['a','b1','23','4'] 這種拼接欄名
+    expect(parsed.rows).toEqual([]);
+  });
+
+  it('CRLF 與引號內之 CR 不得被誤判為舊式 Mac 換行', () => {
+    expect(parseCsvText('a,b\r\n1,2\r\n').unsupportedLineEnding).toBe(false);
+    expect(parseCsvText('a,b\n"x\r",2\n').unsupportedLineEnding).toBe(false);
+    expect(parseCsvText('a,b\n"x\r",2\n').rows[0][0]).toBe('x\r');   // 引號內是資料，原樣保留
+  });
+
   it('重複欄名之下拉字樣逐項可辨（第 N 欄）', () => {
     const parsed = parseCsvText('lab,lab,x\n1,0,9\n');
     expect(parsed.columns.map((c) => c.label)).toEqual(['lab（第 1 欄）', 'lab（第 2 欄）', 'x']);

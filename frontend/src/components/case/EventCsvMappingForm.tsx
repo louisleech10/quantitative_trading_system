@@ -52,6 +52,7 @@ interface Props {
 
 const EMPTY_PARSED: ParsedCsv = {
   columns: [], previewRows: [], rows: [], duplicateNames: [], raggedRows: [],
+  unsupportedLineEnding: false,
 };
 
 export default function EventCsvMappingForm({ onImported }: Props) {
@@ -259,6 +260,15 @@ export default function EventCsvMappingForm({ onImported }: Props) {
         onChange={(e) => void handleFileChange(e.target.files?.[0] ?? null)}
         className="block w-full text-sm text-slate-300 file:mr-3 file:rounded file:border-0 file:bg-sky-500/20 file:px-3 file:py-1.5 file:text-sky-100"
       />
+
+      {parsed.unsupportedLineEnding && (
+        <div className="mt-4 rounded border border-rose-400/40 bg-rose-500/10 p-3 text-sm text-rose-200"
+             data-testid="csv-unsupported-line-ending">
+          這個檔用的是舊式 Mac 換行（每行只有 CR），系統不支援：後端會整批拒收，
+          而畫面上若硬解析會把整個檔黏成一行、產生看起來很像欄名的東西讓你誤選。
+          請用試算表或編輯器另存為一般換行（LF 或 CRLF）後再上傳。
+        </div>
+      )}
 
       {parsed.columns.length > 0 && (
         <div className="mt-4 space-y-4">

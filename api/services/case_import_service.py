@@ -694,7 +694,20 @@ class EventImportService:
         reader = _csv.reader(io.StringIO(text))
         header_width: Optional[int] = None
         bad: List[Tuple[int, int]] = []
-        for i, row in enumerate(reader):
+        try:
+            rows = list(reader)
+        except _csv.Error as exc:
+            # 舊式 Mac 換行（每行只有 CR）會走到這裡。訊息要**說出真正的原因**——
+            # 原生訊息是 "new-line character seen in unquoted field"，使用者看不懂要改什麼。
+            # 🔴 前端對同一個檔亦回空模型並顯示同一件事（R4 `CODEX-R4-P1-01`：
+            #    舊版前端會把整檔黏成一行、產出看似合理的欄名讓使用者照著對映）。
+            raise EventImportRejectedError(EventImportRejected(
+                kind="parse_error",
+                message=("CSV 解析失敗：常見原因是檔案用了**舊式 Mac 換行**（每行只有 CR）"
+                         "或引號沒有成對。請另存為一般換行（LF／CRLF）後再上傳。"
+                         f"（原始訊息：{exc}）"),
+            )) from exc
+        for i, row in enumerate(rows):
             # 整行空白＝跳過（與 pandas `skip_blank_lines` 及前端 `splitRecords` 三端一致）。
             # 🔴 `csv.reader` 對**真正的空行**回 `[]`、對「只有空白字元的行」回 `[' ']`
             #    ——兩種都要跳（實測 pandas 兩種都跳）。R3 三家獨立命中：漏了 `[]` 這半
