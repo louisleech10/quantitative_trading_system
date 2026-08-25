@@ -2916,4 +2916,18 @@ export interface EventAnalyzeResponse {
   event_timestamps: number[];
   /** bar open 秒（IC 主線單位） */
   event_timestamps_ic_seconds?: number[];
+  /** GAP-3 UX Task 1.9：該批落檔之答案窗宣告 receipt（舊批為 null） */
+  lookahead_declaration?: EventLookaheadDeclarationReceipt | null;
+  /** GAP-3 UX Task 1.12：`split` 為 `unavailable` ⇒ 該批只走事件研究，未執行切分與條件 IC */
+  capability?: { split: 'ok' | 'unavailable' | string; reason?: string };
+  /**
+   * GAP-3 UX Task 1.9：**實際**送進切分的隔離寬度。
+   * 🔴 宣告深度是下界：`source === 'lookahead_declaration_lower_bound'` 表示請求值低於宣告深度而被提高
+   * ——UI 顯示隔離寬度時必須讀 `applied_ms`，不是使用者送出的請求值。
+   */
+  embargo?: {
+    applied_ms: number | null;
+    source: 'lookahead_declaration_lower_bound' | 'request' | 'label_window_max'
+      | 'not_applicable_event_study_only' | string;
+  };
 }

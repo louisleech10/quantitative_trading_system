@@ -210,6 +210,65 @@ def test_gap3_horizon_declaration_07_declared_depth_reaches_split_embargo(monkey
     assert a.json()["embargo"]["applied_ms"] >= declared_ms
 
 
+# ── R2（CODEX-R2-P1-01）：不同 scope 的下界不得被折成全批 scalar ────────────
+def _import_two_symbol_batch(declaration):
+    """兩個標的分屬不同 timeframe ⇒ 逐 symbol 之宣告下界不同。"""
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id
+
+    base_t0 = make_event(0)["t0"]
+    lines = [",".join(BASE_HEADER)]
+    for i, (sym, tf) in enumerate((("ETHUSDT", "1h"), ("BTCUSDT", "12h"))):
+        t0 = base_t0 + i * 43200000
+        lines.append(",".join([canonical_event_id(sym, tf, t0), sym, tf, str(t0), str(i % 2)]))
+    content = ("\n".join(lines) + "\n").encode("utf-8")
+    return _post(content, declaration=declaration)
+
+
+def test_gap3_horizon_declaration_08_divergent_scope_bounds_are_fail_closed(monkeypatch):
+    """SPEC §D-3′-a(ii) 明令禁止「以單一 batch scalar 冒充 per-scope 下界」。
+
+    取 max ⇒ 窗較小的標的被過度 purge（§C0：過度 purge 亦是錯誤）；取 min ⇒ 洩漏。
+    兩者皆錯 ⇒ 拒絕分析，且**在做任何工作之前**（斷言切分未被呼叫）。
+    """
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from momentum.core.constants import TIMEFRAME_SECONDS as TFS
+
+    r = _import_two_symbol_batch({"declared_window_bars": {"1h": 4, "12h": 2}})
+    assert r.status_code == 200, r.text
+    bounds = r.json()["lookahead_declaration"]["embargo_ms_by_symbol"]
+    assert bounds == {"ETHUSDT": 4 * TFS["1h"] * 1000, "BTCUSDT": 2 * TFS["12h"] * 1000}
+    assert len(set(bounds.values())) == 2, "fixture 失效：兩個標的的下界必須不同，否則本條沒有鑑別力"
+
+    seen = []
+    real_split = pipeline_mod.split_events
+    monkeypatch.setattr(pipeline_mod, "split_events",
+                        lambda *a, **k: (seen.append(1), real_split(*a, **k))[1])
+    a = client.post(f"/api/v1/case/events/{r.json()['import_id']}/analyze", json={"horizons": [1]})
+    assert a.status_code == 422, a.text
+    assert "Task 7.0b" in a.json()["detail"]["message"]
+    assert seen == [], "拒絕應發生在做任何切分之前"
+
+
+def test_gap3_horizon_declaration_08b_equal_scope_bounds_are_accepted():
+    """對照組：各標的下界**相同**時 scalar 與 per-scope 等價 ⇒ 必須放行。
+
+    沒有這條，⑧ 會被一個「多標的一律拒絕」的實作滿足——那不是 fail-closed，是弄壞功能。
+    """
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id
+
+    base_t0 = make_event(0)["t0"]
+    lines = [",".join(BASE_HEADER)]
+    for i, sym in enumerate(("ETHUSDT", "BTCUSDT")):
+        t0 = base_t0 + i * 43200000
+        lines.append(",".join([canonical_event_id(sym, "12h", t0), sym, "12h", str(t0), str(i % 2)]))
+    r = _post(("\n".join(lines) + "\n").encode("utf-8"), declaration={"declared_window_bars": {"12h": 2}})
+    assert r.status_code == 200, r.text
+    bounds = r.json()["lookahead_declaration"]["embargo_ms_by_symbol"]
+    assert len(set(bounds.values())) == 1
+    svc = svc_mod.get_event_import_service()
+    svc._assert_scope_embargo_expressible(r.json()["lookahead_declaration"])   # 不得 raise
+
+
 def test_gap3_horizon_declaration_06b_single_input_applied_to_all_timeframes_is_fail_closed():
     content = _csv(rows_tf=("1h", "12h"))
     before = _stored_count()

@@ -274,6 +274,28 @@
         "test_gap3_horizon_declaration_05_depth_formula_is_the_single_exported_function"
       ],
       "verdict": "PASS"
+    },
+    {
+      "id": "1.9-M5",
+      "task": "1.9",
+      "desc": "以單一 batch scalar 冒充 per-scope 下界（CODEX-R2-P1-01）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_horizon_declaration"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_horizon_declaration_08_divergent_scope_bounds_are_fail_closed"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_horizon_declaration_08_divergent_scope_bounds_are_fail_closed"
+      ],
+      "verdict": "PASS"
     }
   ]
 }

@@ -365,6 +365,9 @@ with IsolatedWorktree(prefix="b3mut_") as wt:
 | **`R-B2-1`** | **秒級 t0 之 `event_id` 摩擦**：使用者上傳秒級 `t0` 的 CSV 時，`event_id` 仍須寫 **ms 版**（否則 fail-closed 拒收並列出期望值）。三家一致判**屬 Task 1.5（前端對映 UI 應在單位偵測後預填正規化 ID）** | `blocked-by` Task 1.5（B4） | 主委；B4 一併做 |
 | **`R-B2-2`** | **執行期 oracle 之 factory-body 繞法**：新斷言綁 `get_event_import_service()` 之回傳；若日後另立第二個工廠且 route 改呼叫它，本閘看不見（route 之工廠名斷言可再擋一層，但那又是形狀） | `needs-research`（正解為 route 層之執行期 wiring 探針） | 主委；屬 **B10 全棧接線** |
 | **純 JS 手刻 sha256** | 不經 `crypto.subtle`／`node:crypto` 入口之手刻實作，前端 ④(a) 之封閉枚舉看不見 | `needs-research` | 主委 |
+| **`R-B3-1`** | Task 1.9 ⑤ 之「系統內篩選路徑」**端到端**對證缺席——該 production caller 尚不存在，本批以「函式物件同一性 ＋ 餵入之 `referenced_columns` 非空且相等」鎖住 | `blocked-by` Task 2.1（B5）／Task 4.1（B7） | 主委；該批落地時補端到端 |
+| **`R-B3-2`** | `label_definition.filters` 之 wire shape 未凍結 ⇒ 引用欄採「抽不出即強制宣告」之 fail-closed 止血；在 Task 2.2 定案前，帶 `filters` 而抽不出欄名之 CSV 會多要一次宣告 | `blocked-by` Task 2.2（B5） | 主委；B5 收斂時改為精確抽取 |
+| **`R-B3-3`** | 逐 symbol 之 purge 下界（`EventSplitConfig.embargo_ms_by_symbol`）未實作 ⇒ 各 symbol 宣告下界**不一致**之批次一律拒絕分析（fail-closed，不取全批 max——SPEC §D-3′-a(ii) 明令禁止「以單一 batch scalar 冒充 per-scope 下界」）。使用者當前解法＝依 timeframe 拆批 | `blocked-by` Task 7.0b（SPEC 已把該 API 之唯一實作與驗收 ⑨ 鎖在該 Task） | 主委；7.0b 落地時解除 |
 
 ---
 

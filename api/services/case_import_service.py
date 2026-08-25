@@ -967,6 +967,27 @@ class EventImportService:
         return EventImportDetailResponse(summary=self._summary(payload), records=list(payload.get("records") or []))
 
 
+    @staticmethod
+    def _assert_scope_embargo_expressible(declaration: Optional[Dict[str, object]]) -> None:
+        """per-symbol 下界不一致時 fail-closed（SPEC §D-3′-a(ii) 明令禁止之作法的守門）。
+
+        現行 `split_events` 只吃 scalar `embargo_ms`；當各 symbol 的宣告下界**相同**（含單一 symbol）
+        時，scalar 與 per-scope 等價、可安全套用。一旦不同就**無法表達**——
+        取 max 即過度 purge、取 min 即洩漏 ⇒ 兩者皆錯，故拒絕分析而非二選一。
+        """
+        bounds = (declaration or {}).get("embargo_ms_by_symbol") or {}
+        distinct = {int(v) for v in bounds.values()}
+        if len(distinct) <= 1:
+            return
+        raise ValueError(
+            "本批各標的之答案窗宣告導出**不同**的 purge 下界"
+            f"（{ {k: int(v) for k, v in bounds.items()} }），"
+            "而現行切分只接受單一 embargo：取最大會對窗較小的標的過度 purge、取最小會洩漏，"
+            "兩者皆為錯誤，故拒絕分析（fail-closed）。"
+            "逐 symbol 的隔離寬度（EventSplitConfig.embargo_ms_by_symbol）之唯一實作與驗收"
+            "由 SPEC 鎖在 Task 7.0b；在那之前請將此批依 timeframe 拆成各自同質的批次再分析"
+        )
+
     # ---- 分析（B5.2 兩表資料源；統計全在 momentum，本層只組 request/response） ----
     def analyze(self, import_id: str, req) -> Optional[Dict[str, object]]:
         from api.utils.json_serializer import sanitize_for_json
@@ -978,6 +999,14 @@ class EventImportService:
         declaration = self._stored_declaration(import_id)
         symbols = sorted({str(r["symbol"]) for r in records})
         tfs = sorted({str(r["timeframe"]) for r in records})
+        # 🔴 R2（`CODEX-R2-P1-01`）：SPEC §D-3′-a(ii)「明令禁止」逐字寫著
+        #    「以單一 batch scalar `embargo_ms` 冒充 per-scope 下界」——切分本就逐 symbol，
+        #    取全批 max 會對窗較小之 symbol **過度 purge**（§C0：過度 purge 亦是錯誤）。
+        #    per-symbol API（`EventSplitConfig.embargo_ms_by_symbol`）之唯一實作與驗收
+        #    由 SPEC 鎖在 **Task 7.0b ⑨**，本批不提前做半套（雙源正是本 epic 反覆受傷處）。
+        #    ⇒ B3 之立場：**能表達就套用，不能表達就拒絕**，絕不靜默折疊。
+        #    檢查刻意排在載 bars **之前**：不可表達的下界不該先做任何工作。
+        self._assert_scope_embargo_expressible(declaration)
         bars = self._pipeline.bars_from_kline_cache(symbols, tfs)
         # 🔴 Task 1.12（L3）：深度不可證之批**不進切分**，改走 event-study-only executor。
         #    分派在此發生 ⇒ `split_events` 對該批**根本不會被呼叫**（非「呼叫後再擋」）。
@@ -991,7 +1020,9 @@ class EventImportService:
             #    只是沒人用的數字。原版把 `req.embargo_ms`（預設 None）直傳 ⇒ `split_events` 退回
             #    `label 窗最大值`；而 `label_return_mode="open_to_close"` 之 label 窗**不隨 horizon 變**
             #    ⇒ 宣告 20 根、實際只隔 1 根＝洩漏。此處把宣告投影當**下界**套上去。
-            #    保守方向（往上調）永遠允許，故取 max 而非拒收；per-scope embargo 屬 Task 7.0b。
+            #    保守方向（往上調）永遠允許，故取 max 而非拒收。
+            # 🔴 R2：此處之 `max` 只在**各 symbol 下界皆相同**時才會執行到——
+            #    不同值已由 `_assert_scope_embargo_expressible` 在上方擋掉，故不是「全批 max 冒充 per-scope」。
             declared_lb = max((int(v) for v in (declaration or {}).get("embargo_ms_by_symbol", {}).values()), default=0)
             requested = int(req.embargo_ms) if req.embargo_ms is not None else 0
             embargo_applied = max(requested, declared_lb) or None
