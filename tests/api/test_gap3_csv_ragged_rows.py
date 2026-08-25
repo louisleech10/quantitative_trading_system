@@ -234,6 +234,36 @@ def test_gap3_csv_ragged_lone_cr_line_endings_rejected_with_reason(_isolated_sto
     assert _stored_count(_isolated_storage) == 0
 
 
+def test_gap3_csv_ragged_mixed_lf_and_bare_cr_rejected(_isolated_storage):
+    """🔴 R5 `CODEX-R5-P1-01`：LF 檔中混入**一個**裸 CR 亦拒收。
+
+    R4 只讓前端擋（前端判準＝任一 unquoted lone CR），後端卻讀得出來
+    ⇒ 同一類分歧翻面成「前端擋／後端收」。修法＝後端採**逐字同一條**判準。
+    """
+    content = ("我的編號,幣種\nE1,ETHUSDT\r").encode("utf-8")
+    r = _post(content)
+    assert r.status_code == 400, r.text
+    assert "換行" in r.json()["detail"]["message"]
+    assert _stored_count(_isolated_storage) == 0
+
+
+def test_gap3_csv_ragged_quoted_cr_and_crlf_not_rejected(_isolated_storage):
+    """正例對照：引號內之 CR 是資料、CRLF 是合法行尾——兩者都不得被新判準誤擋。"""
+    base = make_event(0)
+    t0 = base["t0"]
+    rows = []
+    for i in range(2):
+        rows.append(",".join([canonical_event_id("ETHUSDT", "12h", t0 + i * 43200000), "ETHUSDT",
+                              "12h", str(t0 + i * 43200000), str(i % 2), DIGEST]))
+    crlf = ("\r\n".join([",".join(HEADER)] + rows) + "\r\n").encode("utf-8")
+    assert _post(crlf).status_code == 200, "CRLF 是合法行尾"
+
+    quoted = ('我的編號,幣種,是不是正例\n"E1\r",ETHUSDT,1\n').encode("utf-8")
+    records, _ = _isolated_storage.csv_records_from_mapping(
+        quoted, {"event_id": "我的編號", "symbol": "幣種", "label": "是不是正例"}, None)
+    assert records[0]["event_id"] == "E1\r"          # 引號內是資料，不觸發新判準
+
+
 # ── ④ 引號內之 CR 由後端原樣保留（前端預覽解析須一致） ──────────────────────
 def test_gap3_csv_ragged_quoted_cr_preserved_by_backend(_isolated_storage):
     content = ('我的編號,幣種,是不是正例\n"E1\r",ETHUSDT,1\n').encode("utf-8")

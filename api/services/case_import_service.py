@@ -679,6 +679,27 @@ class EventImportService:
 
     CSV_CHUNK_ROWS = 5000
 
+    @staticmethod
+    def _has_unquoted_lone_cr(text: str) -> bool:
+        """引號**外**之 `\\r` 且其後不是 `\\n`（舊式 Mac 換行，或 LF 檔中混入的裸 CR）。
+
+        🔴 與前端 `csvPreview.splitRecords()` 之判準**逐字同一條**
+        （R5 `CODEX-R5-P1-01`：R4 只讓前端擋，於是同一類分歧翻面成「前端擋／後端收」
+        ——`label,symbol\\n1,ETHUSDT\\r` 後端讀得出來、前端整個不給用）。
+        引號**內**之 `\\r` 是資料，兩端皆原樣保留。
+        """
+        quoted = False
+        for i, ch in enumerate(text):
+            if quoted:
+                if ch == '"':
+                    quoted = False          # `""` 之第二個引號會在下一圈把 quoted 轉回 True
+                continue
+            if ch == '"':
+                quoted = True
+            elif ch == "\r" and text[i + 1:i + 2] != "\n":
+                return True
+        return False
+
     def _assert_uniform_row_widths(self, content: bytes) -> None:
         """每一資料列之欄數須等於標頭欄數；不等即 `parse_error`（**本層為主要守衛**）。
 
@@ -691,6 +712,13 @@ class EventImportService:
         兩端因此不會出現「畫面擋了後端收」或反過來的落差。
         """
         text = content.decode("utf-8-sig", errors="replace")
+        if self._has_unquoted_lone_cr(text):
+            raise EventImportRejectedError(EventImportRejected(
+                kind="parse_error",
+                message=("CSV 含**不成對的 CR 換行**（舊式 Mac 換行，或 LF 檔中混入的裸 CR）。"
+                         "支援的行尾只有 LF 與 CRLF；引號內的 CR 視為資料、不受此限。"
+                         "請另存為一般換行後再上傳"),
+            ))
         reader = _csv.reader(io.StringIO(text))
         header_width: Optional[int] = None
         bad: List[Tuple[int, int]] = []
