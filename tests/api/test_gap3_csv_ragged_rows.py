@@ -112,14 +112,49 @@ def test_gap3_csv_ragged_even_rows_accepted(_isolated_storage):
 
 
 # ── ③ 短列：本層擋不住（pandas 靜默補空），由契約層逐欄拒 ⇒ 落檔仍為 0 ──────
-def test_gap3_csv_ragged_short_row_falls_through_to_contract_layer(_isolated_storage):
-    """誠實邊界：欄數**比標頭少**時 pandas 補空字串且不發任何 signal。
+def test_gap3_csv_ragged_short_row_rejected(_isolated_storage):
+    """欄數**比標頭少**之列同樣拒收。
 
-    本條釘住「即使如此，落檔數仍為 0」——擋它的是契約層而非 reader，
-    這個分工要有測試寫著，否則日後有人會以為 reader 兩邊都擋得住。
+    pandas 對這種列是靜默補空字串（不 raise、不 warn），擋它的是以 `csv` 標準庫
+    獨立驗列寬的那道守衛——規則只有一條「每列欄數 == 標頭欄數」，長短兩側同一條。
     """
     r = _post(_csv(missing_cells=2))
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["kind"] == "parse_error"
+    assert _stored_count(_isolated_storage) == 0
+
+
+# ── ⑤ R2 `CODEX-R2-P1-02`：**尾端空欄**亦拒收（pandas 對這種列完全靜默） ─────
+def test_gap3_csv_ragged_trailing_empty_is_fail_closed(_isolated_storage):
+    """🔴 `a,b\\n1,2,\\n` 這種「每列多一個空格子」pandas **一聲不吭地吞掉**（不 raise、不 warn）。
+
+    吞掉的雖是空值、不造成錯位，但這代表「欄數不齊」在後端不是一條規則而是三種行為
+    （多非空 ⇒ warning／多一空 ⇒ 靜默／只有某列多 ⇒ error），於是前端擋、後端收 ⇒ 兩端規則不一致。
+    修法＝以 `csv` 標準庫獨立驗列寬（單一規則、與 pandas 版本無關），本條即該守衛之反例。
+    """
+    base = make_event(0)
+    t0 = base["t0"]
+    lines = [",".join(HEADER)]
+    for i in range(2):
+        cells = [canonical_event_id("ETHUSDT", "12h", t0 + i * 43200000), "ETHUSDT", "12h",
+                 str(t0 + i * 43200000), str(i % 2), DIGEST, ""]      # 尾端多一個空格子
+        lines.append(",".join(cells))
+    r = _post(("\n".join(lines) + "\n").encode("utf-8"))
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["kind"] == "parse_error"
+    assert "欄數不齊" in r.json()["detail"]["message"]
+    assert _stored_count(_isolated_storage) == 0
+
+
+# ── ⑥ 只有標頭、沒有資料列 ⇒ 走既有 `empty_import`，列寬守衛不得誤擋 ─────────
+def test_gap3_csv_ragged_header_only_not_blocked_by_width_guard(_isolated_storage):
+    """正例對照之一：沒有資料列時列寬守衛**沒有可比對的列**，不得因此報「欄數不齊」。
+
+    （擋它的是契約層之 `empty_import`——本條要證的是「守衛沒有把合法輸入一起擋掉」。）
+    """
+    r = _post((",".join(HEADER) + "\n").encode("utf-8"))
     assert r.status_code == 422, r.text
+    assert "欄數不齊" not in json.dumps(r.json(), ensure_ascii=False)
     assert _stored_count(_isolated_storage) == 0
 
 

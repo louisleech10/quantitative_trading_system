@@ -63,10 +63,20 @@ A-018 更正 Task 2.2「修改檔案」行之後端序列化函式字面（實�
 - **背景**：`pd.read_csv` 在「**每一列**都比標頭多一格」時會把首欄當 index、**整列左移且零 warning**
   ——`label` 讀到的是隔壁欄的值。B4 R1 三家各自實跑重現（`GROK-R1-P1-01`／
   `COMPOSER-R1-P1-01`／`CODEX-R1-P2-05`）。
-- **定案**：reader 一律帶 `index_col=False` 並把 `ParserWarning` 升為例外 ⇒ 長列拒收（`parse_error`）。
+- **定案（R2 修訂後）**：**主要守衛＝以 `csv` 標準庫獨立驗列寬**
+  （`EventImportService._assert_uniform_row_widths()`）：規則只有一條——
+  **每一資料列之欄數 == 標頭欄數**，長列短列同一條，與 pandas 版本無關；不符即 `parse_error` 拒收。
+  前端 `csvPreview.parseCsvText()` 之 `raggedRows` 用**同一條規則**，兩端因此不會出現
+  「畫面擋了後端收」或反過來的落差。
+- **為何不能只靠 pandas**（R2 `CODEX-R2-P1-02` 實測）：pandas 對同源異常有**三種**行為——
+  每列多一格非空 ⇒ 靜默左移（加 `index_col=False` 後改為 `ParserWarning`）；
+  每列多一格**空的** ⇒ 完全靜默吞掉；只有某一列多 ⇒ `ParserError`。
+  三種行為且依版本而異 ⇒ 不能當規則來源。
+- **後備層保留**：reader 仍帶 `index_col=False` ＋ `ParserWarning` 升例外，
+  以防 `csv` 標準庫與 pandas 對某引號形態 tokenize 不同時退回靜默左移。
   🔴 `on_bad_lines="error"` **無效**（實測仍左移），不得改用它。
-- **誠實邊界**：欄數**比標頭少**之列，pandas 靜默補空字串且無任何 signal，reader 擋不住；
-  那些空值由契約層逐欄拒（落檔仍為 0），前端則於預覽階段直接擋送出。
+- **誠實邊界**：後備層**沒有專屬 mutation**——主要守衛會先攔下同一批輸入，任何只拆後備層的變異
+  都錄不到紅（空紅集合）。要證明後備層仍有作用，見 mutation `1.2-M6`（兩層一起拆）。
 
 ### A-017 — Task 1.3「修改檔案」行之 `api/routes/case.py` 字面
 
@@ -86,13 +96,32 @@ A-018 更正 Task 2.2「修改檔案」行之後端序列化函式字面（實�
   **不變的部分**：序列化規則一律引用 §G S-1..S-9（本 Task 不自訂），
   且**不得**把篩選條件納入 `event_id` 之輸入（D-2）。
 
+### A-019 — 🔴 SPEC Task 1.3 對 `source_file_digest` 之單位敘述**自相矛盾**，以可實作之讀法為準
+
+- **SPEC 原文**（L1427）：「`source_file_digest` ＝上傳 CSV 位元組之 `hashlib.sha256(raw).hexdigest()`。」
+- **同一 Task 下段（L1428–1440）卻寫**：digest 綁 `/search` 之**完整 `CaseData` 列**之遞迴 canonical JSON
+  （依 §G S-9 序列化）——那是**來源檔**（`/search` 匯出時一併下載之 `*.source.json`），
+  不是使用者上傳的那個事件檔。
+- **兩者互斥，且第一種讀法在數學上不可實作**：事件檔**自身含 `source_file_digest` 欄**，
+  對自己取 sha256 恆不自洽。B2 之路由層已為此立了專屬 reason
+  `source_file_must_differ_from_event_file`（`api/routes/case.py`）——**那條守衛的存在本身**
+  就是「上傳檔 digest」讀法不可行的證據。
+- **裁定**：以**可實作且已上線**之讀法為準——`source_file_digest` 綁**來源檔**位元組；
+  上傳事件檔本身之 sha256 另存為 receipt 之 `upload_sha256`（既有欄，未改）。
+  L1427 之字面判為 **doc drift**，比照 D-002 `A-005`（SPEC 對 producer 之敘述與實況不符者以實況為準）。
+- **B4 未改變任何語意**：本批只是把該值**記進** `mapping_provenance`，並新增
+  `source_digest_verified` 揭露它有沒有被位元組對證過。指出此矛盾者＝R2 `CODEX-R2-P1-01`。
+- **殘留**：SPEC 本身之字面未改（凍結文件不就地改）；日後若有人只讀 L1427 仍會誤解，
+  故本條為**必讀之並讀項**。三值理由 `user-ruling`（凍結後修訂一律走延伸檔）。
+
 ## 修訂索引
 
 | 編號 | 標的 | 一句話 | 日期 |
 |---|---|---|---|
 | **A-016** | Task 1.6 provenance | 欄位定案為七欄；三個新增欄皆為「不揭露就會讀成別的意思」；批內單一 digest ⇒ fail-closed | 2026-08-25 |
 | **A-016b** | Task 1.5 `derive_event_id` | 只顯示期望值不算解除 `R-B2-1`；改為後端 opt-in 產生 ID，判準＝送出後後端接受 | 2026-08-25 |
-| **A-016c** | Task 1.2 reader | 欄數不齊之 CSV 一律拒收；`index_col=False` ＋ ParserWarning 升例外（`on_bad_lines` 無效） | 2026-08-25 |
+| **A-016c** | Task 1.2 reader | 欄數不齊之 CSV 一律拒收；主要守衛＝`csv` 標準庫獨立驗列寬（長短同一條、與 pandas 版本無關），reader 參數降為後備 | 2026-08-25 |
+| **A-019** | Task 1.3 digest 語意 | 🔴 SPEC L1427「上傳 CSV 位元組」與同 Task 下段「綁 /search 完整 CaseData」互斥且前者不可實作（事件檔含自身 digest）；以來源檔讀法為準，L1427 判 doc drift | 2026-08-26 |
 | **A-017** | Task 1.3 修改檔案行 | `api/routes/case.py` 字面作廢，實際在 `case_search.py` | 2026-08-25 |
 | **A-018** | Task 2.2 修改檔案行 | 後端序列化函式字面作廢，實際在 `frontend/src/lib/eventExport.ts` | 2026-08-25 |
 

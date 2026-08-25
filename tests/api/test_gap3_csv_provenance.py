@@ -220,6 +220,15 @@ def test_gap3_csv_provenance_confirmed_at_must_be_iso_utc(_isolated_storage):
     ok = _post(_csv(["b" * 64, "b" * 64]), confirmed_at="2026-08-25T09:30:00.123456Z")
     assert ok.status_code == 200, ok.text     # 帶小數秒之合法字面須放行（防過嚴）
 
+    # R2 `CODEX-R2-P2-03`：形狀對但**不存在**之時刻須拒；合法之 `+00:00` 須收（與 `Z` 同義）
+    impossible = _post(_csv(["b" * 64, "b" * 64]), confirmed_at="2026-02-30T25:61:61Z")
+    assert impossible.status_code == 422, impossible.text
+    offset_form = _post(_csv(["b" * 64, "b" * 64]), confirmed_at="2026-08-25T09:30:00+00:00")
+    assert offset_form.status_code == 200, offset_form.text
+    # 非零位移＝不是 UTC ⇒ 拒（本欄語意即「UTC 時刻」）
+    non_utc = _post(_csv(["b" * 64, "b" * 64]), confirmed_at="2026-08-25T09:30:00+08:00")
+    assert non_utc.status_code == 422, non_utc.text
+
 
 # ── ⑥ 契約登記：落檔鍵集 == 契約宣告之欄名（同一 traversal，不另抄清單） ─────
 def test_gap3_csv_provenance_keys_match_contract_registration(_isolated_storage):

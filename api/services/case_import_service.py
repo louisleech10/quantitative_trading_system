@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import pandas as pd
 import numpy as np
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from dateutil import parser as date_parser
 import io
 import logging
@@ -585,6 +585,7 @@ def get_case_import_service() -> CaseImportService:
 # ===========================================================================
 # GAP-3 Task B5.1 — 新 schema 事件匯入（驗證唯一實作在 momentum/ 純函式；本層只解析檔案、透傳、落檔）
 # ===========================================================================
+import csv as _csv
 import hashlib as _hashlib
 import json as _json
 import re as _re
@@ -678,6 +679,40 @@ class EventImportService:
 
     CSV_CHUNK_ROWS = 5000
 
+    def _assert_uniform_row_widths(self, content: bytes) -> None:
+        """每一資料列之欄數須等於標頭欄數；不等即 `parse_error`（**本層為主要守衛**）。
+
+        🔴 為何不靠 pandas（R2 `CODEX-R2-P1-02` 實測）：pandas 對欄數異常之反應**不一致**——
+        每列多一格非空 ⇒ 靜默左移（加 `index_col=False` 後改為 ParserWarning）；
+        每列多一格**空的** ⇒ 完全靜默吞掉；只有某一列多 ⇒ `ParserError`。
+        三種同源異常三種行為，且依 pandas 版本而異 ⇒ 不能當作規則來源。
+        本檔以 `csv` 標準庫獨立 tokenize 一次，得到**單一條、與 pandas 版本無關**的規則：
+        「每列欄數 == 標頭欄數」——前端 `csvPreview.parseCsvText()` 之 `raggedRows` 用的是同一條，
+        兩端因此不會出現「畫面擋了後端收」或反過來的落差。
+        """
+        text = content.decode("utf-8-sig", errors="replace")
+        reader = _csv.reader(io.StringIO(text))
+        header_width: Optional[int] = None
+        bad: List[Tuple[int, int]] = []
+        for i, row in enumerate(reader):
+            if len(row) == 1 and not row[0].strip():
+                continue                                   # 整行空白（同 pandas skip_blank_lines）
+            if header_width is None:
+                header_width = len(row)
+                continue
+            if len(row) != header_width:
+                bad.append((i, len(row)))                   # i＝含標頭之列序（1-based 資料列＝i）
+                if len(bad) >= 3:
+                    break
+        if bad:
+            detail = "、".join(f"第 {r} 列（{w} 欄）" for r, w in bad)
+            raise EventImportRejectedError(EventImportRejected(
+                kind="parse_error",
+                message=(f"CSV 欄數不齊：標頭 {header_width} 欄，但 {detail} 不同。"
+                         "欄數不齊會讓解析結果與你看到的不一致（多出的欄可能被靜默丟棄或整列錯位），"
+                         "故一律拒收；請先修正檔案"),
+            ))
+
     def _read_csv_chunks(self, content: bytes):
         """CSV 分塊讀取之**唯一**入口（`parse_upload` 與對映層共用同一 reader 參數）。
 
@@ -688,9 +723,14 @@ class EventImportService:
         ——那仍是靜默資料遺失，故一併升為例外，由呼叫端轉 `parse_error` 拒收。
         `on_bad_lines="error"` **無效**（實測仍左移），不要改用它。
 
-        誠實邊界：欄數**比標頭少**的列 pandas 靜默補空字串且不發任何 signal，本層擋不住；
-        那些空值由契約層逐欄拒（缺必填／型別），前端則於預覽階段直接擋送出。
+        分層：**主要守衛＝上面的 `_assert_uniform_row_widths()`**（規則單一、與 pandas 版本無關，
+        長列短列同一條）；
+        本層之 `index_col=False` ＋ ParserWarning 升例外為**後備**——萬一 `csv` 標準庫與 pandas
+        對某個引號形態 tokenize 不同，仍不會退回靜默左移。
+        🔴 後備層**刻意沒有專屬 mutation**：主要守衛會先攔下同一批輸入，任何只拆後備層的變異
+        都錄不到紅（空紅集合）。要證明後備層仍有作用，見 mutation `1.2-M6`（兩層一起拆）。
         """
+        self._assert_uniform_row_widths(content)
         with warnings.catch_warnings():
             warnings.simplefilter("error", pd.errors.ParserWarning)
             for chunk in pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False,
@@ -843,8 +883,22 @@ class EventImportService:
     #: `mapping_provenance.event_id_source` 之兩值（R-B2-1：秒級 t0 之 ID 由後端依契約模板產生）。
     EVENT_ID_FROM_COLUMN = "csv_column"
     EVENT_ID_DERIVED = "derived_from_template"
-    #: `confirmed_at` 之可接受字面（UTC ISO-8601，秒精度或帶小數秒；客戶端可偽造，故只驗格式）。
-    _ISO_UTC_RE = _re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$")
+    @staticmethod
+    def _parse_iso_utc(text: str) -> Optional[datetime]:
+        """UTC ISO-8601 字面 → aware datetime；不是合法 UTC 時刻回 `None`。
+
+        🔴 **不得用 regex 代替日期解析**（R2 `CODEX-R2-P2-03` 實測）：形狀對但**不存在**的時刻
+        （`2026-02-30T25:61:61Z`）會通過 regex，而合法之 `+00:00` 反而被擋。
+        `Z` 與 `+00:00` 視為同義（皆為 UTC）；非零位移一律拒——本欄語意即「UTC 時刻」。
+        """
+        raw = str(text).strip()
+        try:
+            parsed = datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+            return None
+        return parsed
 
     @staticmethod
     def _batch_source_file_digest(
@@ -906,11 +960,12 @@ class EventImportService:
         少了它們，receipt 讀起來會像「已對證／使用者確認過」而其實不是（R1 codex BLOCKING）。
         """
         declared_at = str(confirmed_at).strip() if confirmed_at else ""
-        if declared_at and not self._ISO_UTC_RE.match(declared_at):
+        if declared_at and self._parse_iso_utc(declared_at) is None:
             raise EventImportRejectedError(EventImportRejected(
                 kind="contract_violation",
-                message=("mapping_confirmed_at 須為 UTC ISO-8601（如 2026-08-25T09:30:00Z）；"
-                         f"收到 {declared_at!r}。本欄是使用者聲明之時刻、非可信時鐘，但格式仍須可解析"),
+                message=("mapping_confirmed_at 須為**存在的** UTC 時刻（`…Z` 或 `+00:00` 皆可，"
+                         f"如 2026-08-25T09:30:00Z）；收到 {declared_at!r}。"
+                         "本欄是使用者聲明之時刻、非可信時鐘，但仍須是可解析的真實時刻"),
                 detail={"field": "mapping_provenance.confirmed_at", "received": declared_at},
             ))
         provenance: Dict[str, object] = {
