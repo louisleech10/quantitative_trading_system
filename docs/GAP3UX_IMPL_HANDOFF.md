@@ -26,18 +26,20 @@
 🔴 **驗收字面之唯一來源＝SPEC 各 Task 之「驗證」欄**；TODO 只給可執行命令＋條目下限＋SPEC 行號。
 **不得把 SPEC 斷言字面抄成第二份副本**——本 epic 之自傷絕大多數出自副本漂移。
 
-### 前五批已交付什麼（B6／B7 可以直接用）
+### 各批已交付什麼（可直接用）
 
 | Task | 產出 | 可直接 import 的東西 |
 |---|---|---|
 | 1.1 | typed namespace-aware `receipt_schema` | `import_contract.py`：`flatten_receipt_schema()`／`receipt_type_ok()`（含 `Mapping[str,str]`）／`validate_receipt_namespace()`／`capability_unavailable_reason()` |
 | 1.10 | `contracts/future_column_lookahead.json`（**37 個 future 欄，全部以 `future` 開頭**） | `lookahead_registry.py`：`load_lookahead_registry()`／`resolve_lookahead_bars()`／`registry_resolvable_columns()`／`requires_declaration()`／`unregistered_future_columns()` |
-| 2.1b | **唯一** exported 深度函式 | `lookahead_depth.py::depth_by_timeframe()`；前端 `lookaheadDepthLock.ts::withHorizonLowerBoundGuard()` |
+| 2.1b | **唯一** exported 深度函式 | `lookahead_depth.py::depth_by_timeframe()`；前端守衛已於 B7 改名為 `lookaheadDepthLock.ts::withExportLowerBoundGuard()` |
 | 4.2（僅 §G S-9） | canonical bytes 參考實作 | `canonical_serialize.py`：`canonical_event_table_bytes()`／`canonical_event_table_sha256()`／`canonical_source_bytes()` |
 | 1.2／1.3／1.4／1.8 | CSV 對映端點、`event_id` 之 D-2 唯一定義、t0 單位偵測、異質列拒收 | `case.py::import_events_csv`；`EventImportService.csv_records_from_mapping()`／`file_columns()`；`import_contract.canonical_event_id()`／`detect_t0_unit_ms()` |
 | 1.11／1.12／1.9 | L2 強制宣告、L3 閘與 event-study-only executor、答案窗宣告 | `lookahead_gate.py`／`lookahead_declaration.py`；前端 `lookaheadDeclaration.ts`＋`LookaheadDeclarationFields.tsx` |
 | **1.5／1.6／1.7**（B4） | CSV 對映 UI、對映 provenance、可疑欄警示 | `EventCsvMappingForm.tsx`；`csvPreview.ts`（`parseCsvText`／`countDeclaredLabels`）／`suspiciousBinaryColumns.ts`／`eventIdNormalization.ts`；契約新增 `receipt_schema.mapping_provenance`（七欄） |
-| **2.1／2.2／2.3**（B5） | 匯出前篩選、條件寫入 `filters`、即時筆數 | `exportFilter.ts`（`applyExportFilters`／`buildExportFilterSpec`／`nextLowerBoundState`／`exportAllowedUnderBound`／`horizonOptions`）／`exportCounts.ts::computeExportCounts`；契約新增 `label_definition.fields.filters.wire_shape` |
+| **2.1／2.2／2.3**（B5） | 匯出前篩選、條件寫入 `filters`、即時筆數 | `exportFilter.ts`（`applyExportFilters`／`buildExportFilterSpec`／`nextLowerBoundState`／`computeExportCounts`）；契約新增 `label_definition.fields.filters.wire_shape`。🔴 `exportAllowedUnderBound`／`horizonOptions` 已於 B7 刪除，改為 `exportAllowedByLowerBoundState`／`depthMapCoversTimeframes` |
+| **3.1／3.2／3.3**（B6） | 事件批次刪除 | `case_import_service.py::batch_paths()`／`payload_path()`；`EventBatchDeleteDialog.tsx`；`eventBatchReferences.ts` |
+| **4.1／4.1b／4.1c／4.2／4.3**（B7） | 匯出端報酬欄與揭露 | `eventExport.ts`（`ATTACHED_HORIZONS`／`windowHorizonBarsFor`／`EVENT_EXPORT_SCENARIO`／`EVENT_EXPORT_CONTROL_KIND`）／`exportFilter.ts::depthMapCoversTimeframes`／`lookaheadDepthLock.ts::withExportLowerBoundGuard`／`eventContractDocs.ts`（**契約 doc 鏡像＋逐字比對測試之範本**）／`EventTablesPanel.tsx::sanitizeHorizons`；`import_contract.py::_is_finite_num`＋`_ALWAYS_HOMOGENEOUS_DIMENSIONS` |
 
 ### `EventSamplePipeline` 之 R3 出口清單（api 層只能經這些取用 momentum）
 
@@ -48,7 +50,7 @@
 `apply_lookahead_horizon_projection()`／`lookahead_split_blocked()`／`split_blocked_capability_reason()`／
 `run_event_study_only_with_params()`／**B4 新增** `validate_receipt_values()`／**B5 新增** `lookahead_depth()`
 （見 `momentum/Analysis/event_samples/pipeline.py` 之 `@staticmethod` 區）。
-🔴 **B6／B7 若要讓 api 層用到其他 momentum 內部函式，必須在此加出口**——直接
+🔴 **若要讓 api 層用到其他 momentum 內部函式，必須在此加出口**——直接
 `from momentum...import` 會被 `scripts/check_decoupling_imports.py`（R3）在 PostToolUse 當場擋掉。
 🔴 **出口一律回純資料**（dict／bool／str），例外型別不跨界。
 
@@ -172,7 +174,7 @@ B1–B7 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-
 
 ---
 
-## §2B B7 是什麼（Phase 4 全部，五個 Task；4.2 之 S-9 已於 B1 完成）
+## §2B B7 是什麼（Phase 4 全部）—— 🔴 **已收斂，本節保留供追溯**
 
 **B7 ＝ 匯出端之報酬欄與揭露 ＝ Task 4.1、4.1b、4.1c、4.2、4.3。**
 依 §B 拓撲，B7 之前置為 **B1 ＋ Task 2.1b**——皆已完成。
@@ -219,13 +221,98 @@ B1–B7 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-
 4. **4.2**：golden 重凍見 2B.1；**不得因列數變多而改變 `n_eff` 之定義**。
 5. **4.3**：訊息**不得**含「主答案窗」字樣；不得因缺欄而阻擋匯出。
 
-### 2.4 之後的批次（不在本批，僅供排序）
+### 2.4 之後的批次
 
-| 批 | Task | 依賴 |
+| 批 | Task | 依賴 | 狀態 |
+|---|---|---|---|
+| **B8 訊息與表頭** | Phase 5 全部（5.0／5.1／5.2／5.3） | Task 5.0 | ⬜ **下一批，座標見 §2C** |
+| **B9 IC 止血閘** | Phase 6 全部（6.0／6.1／6.2／6.3／6.4） | Task 6.0 | ⬜ **座標見 §2D** |
+| B10 全棧接線 | Phase 7 全部 | B1–B9 | ⬜ |
+
+---
+
+## §2C B8 是什麼（Phase 5 全部，四個 Task）
+
+**B8 ＝ 錯誤訊息與表頭說明。** 依 §B 拓撲，**內部依賴＝ Task 5.0 必須先做**（5.2 讀它）。
+
+> **一句話**：讓使用者看得懂表頭在講什麼、把誤傳檔案的訊息直接給正解、
+> 匯出前主動說清楚每個附帶 horizon 有幾筆算得出來。
+
+### 2C.1 🔴 偵察結論（2026-08-26 主委實跑，**不必重查**）
+
+| 事實 | 位置 | 對 B8 的意義 |
 |---|---|---|
-| B8 訊息與表頭 | Phase 5 全部 | Task 5.0 |
-| B9 IC 止血閘 | Phase 6 全部 | Task 6.0 |
-| B10 全棧接線 | Phase 7 全部 | B1–B9 |
+| **glossary 檔不存在** | `momentum/Analysis/contracts/` 現有六檔：`condition_engine_contract`／`event_import_contract`／`future_column_lookahead`／`ic_report_contract`／`ic_survivor_contract`／`strategy_validation_contract` | 5.0 是**新建** `event_metrics_glossary.json`，不是改既有檔 |
+| **表頭字面現況** | `EventTablesPanel.tsx:67-68` 之 `macro mean`／`micro mean`；`:46` 之 `HorizonRow` 型別＝`{mean, median, win_rate, n, n_effective, ci}`；`:57` 註解記載後端鍵形狀 | 5.2 之 tooltip 掛在**這些 `<th>`**；glossary 的鍵要對得上這裡實際用到的指標 |
+| **SPEC 要求的八鍵** | `macro_mean`／`micro_mean`／`n_eff`／`lift_threshold`／`prevalence_full`／`prevalence_learn`／`signal_frequency`／`tail_excluded` | 後四鍵來自 `all_bars_evaluation` 那張表（同檔 `overall`／`counts` 區），**不要只做報酬表那張** |
+| **訊息組裝唯一點** | `api/routes/case.py::_rejected()`（`:134`；TODO 定案為 `:132`，B4–B7 改動後位移兩行——**用字面錨點，別用行號**） | 5.1 就改這裡；它同時服務 JSON 與 CSV 兩條路徑 ⇒ SPEC「須同步」那條（CSV 端點也要給同一則正解）自動滿足，但**要在測試裡釘住** |
+| 🔴 **5.3 與已完成的 4.3 是同一個訊息區塊** | `search/page.tsx` 之 `missingRows` 段（B7 落地） | 5.3 ＝**擴寫**該訊息：現在只列「缺幾筆」，5.3 要改成「N/M 筆可算、K 筆因尾端不足而缺」。**不得另建第二個確認框** |
+| 前端測試檔名 selector | `eventTableTooltips`（5.2）／`exportHorizonCoverageDialog`（5.3） | 🔴 vitest selector 靠**檔名**匹配，兩個都要新建 |
+
+### 2C.2 B8 四個 Task 之關鍵座標（詳細內容一律回讀 TODO 該 Task 全文）
+
+| Task | TODO 行 | SPEC 行 | 主要落點 | 驗收命令（條目下限） |
+|---|---|---|---|---|
+| **5.0** glossary SoT | `941` | `2052–2067` | 新增 `momentum/Analysis/contracts/event_metrics_glossary.json` | SPEC L2059 之 `python3 -c` 一行 rc=0（八鍵 `>=`）；mutation 1 條 |
+| **5.1** `.source.json` 誤傳正解 | `970` | `2068–2080` | `api/routes/case.py::_rejected()` | `pytest tests/api -q -k source_json_hint`；400 且訊息含 `source_file`；mutation 1 條 |
+| **5.2** 兩表 tooltip | `992` | `2081–2091` | `EventTablesPanel.tsx` 之表頭 | `npm --prefix frontend test -- --run eventTableTooltips` **≥2 條**；mutation 1 條 |
+| **5.3** 缺欄覆蓋率確認框 | `1014` | `2092–2105` | **Task 4.3 之同一訊息組裝處** | `npm --prefix frontend test -- --run exportHorizonCoverageDialog` **≥2 條**；mutation 1 條 |
+
+### 2C.3 B8 之陷阱
+
+1. **5.0**：只放文案與公式指標，**不放數值**；**不得**把定義同時寫在前端（5.2 以 `==` 斷言防漂移）。
+   🔴 驗收是 `set(g) >= {八鍵}`（**成員資格非等值**）——Task 7.5 之後還會加鍵。
+2. **5.1**：只**追加**提示；`legacy_schema_detected` 之 reason 字面**不變**（下游依 reason 判斷）。
+   🔴 **不得**因判別為 source.json 就自動改走 `source_file` 流程（靜默轉換＝契約禁止）。
+3. **5.2**：glossary 缺該鍵 ⇒ 顯示 **fail-closed 佔位**而非空字串（驗收②）。
+   🔴 前端**不得另寫一份定義**——本 epic 之 `eventContractDocs.ts`（B7）是同型作法之範本：
+   鏡像常數 ＋ vitest 讀契約檔逐字 `toBe` 比對。
+4. **5.3**：與 4.3 **合併實作**（4.3 已完成 ⇒ 直接擴寫）；訊息**不得**含「主答案窗」字樣；
+   **不得阻擋匯出**。數字要**精確比對**（`含 3`，不是「含某個數字」）。
+
+---
+
+## §2D B9 是什麼（Phase 6 全部，五個 Task）
+
+**B9 ＝ IC 分析止血閘。** 依 §B 拓撲，**內部依賴＝ Task 6.0 必須先做**（6.1 讀它取 reason 字面）。
+
+> **一句話**：218,369 個特徵的 run 拿去跑 IC 分析會把記憶體吃爆；
+> 這批在**啟動任務之前**擋下來，並且用**可重跑的量測**決定上限值，不是拍腦袋填。
+
+### 2D.1 🔴 偵察結論（2026-08-26 主委實跑，**不必重查**）
+
+| 事實 | 位置 | 對 B9 的意義 |
+|---|---|---|
+| **IC 側契約現有三類 reason** | `ic_report_contract.json` 之 `reasons`：`net_ic_unavailable`／`event_fallback`／`xsec_not_applicable`（實跑確認 `len==3`） | 6.0 加第四類 `analysis_rejected` ⇒ 驗收之 `len(r)==4` 成立；🔴 **不是**加到 `event_import_contract`（那是匯入契約） |
+| **analyze 端點落點** | `api/routes/ic_analysis.py:34` 之 `start_ic_analysis`，body 只有一行 `await ic_analysis_service.start_analysis(request)` | 6.1 之前置檢查要插在**呼叫 service 之前**；TODO 定案落點為此檔（**不是** `api/routes/ic.py`，SPEC L2119 之 mutation 敘述寫的是舊檔名） |
+| **6.4 之取樣時點綁 6.1 之檢查位置** | SPEC L2160–2171 | 🔴 **兩者須同批實作**並以同一測試釘住先後——6.1 若被移到任務啟動之後，6.4 會量到已載入大矩陣的 footprint 而失去意義 |
+| **量測工具已定死** | macOS `sample <pid>` 之 **Physical footprint** 欄 | 🔴 **禁用 `ps rss`**：UAT 實測 RSS 96–400MB vs footprint 7.1GB（macOS 壓縮頁面使 RSS 失真） |
+
+### 2D.2 B9 五個 Task 之關鍵座標
+
+| Task | TODO 行 | SPEC 行 | 主要落點 | 驗收命令（條目下限） |
+|---|---|---|---|---|
+| **6.0** reason 登記處 | `1047` | `2108–2122` | `momentum/Analysis/contracts/ic_report_contract.json` | ①`python3 -c` 一行含 `len(r)==4`；②硬編碼掃描 `== 0`；mutation 1 條 |
+| **6.1** analyze 前置特徵數檢查 | `1073` | `2123–2133` | `api/routes/ic_analysis.py` | `pytest tests/api -q -k ic_feature_cap` **≥3 條**；mutation 1 條 |
+| **6.2** 上限值之量測協定 | `1096` | `2134–2147` | 新增 `scripts/measure_ic_footprint.sh` | receipt **≥3 個量測點**、每點六欄齊全、重跑 2 次 peak 差 `< 20%`；mutation 2 條 |
+| **6.3** 進度回報與狀態區分 | `1125` | `2148–2159` | `api/routes/ic_analysis.py`（progress response）＋前端 | `pytest tests/api -q -k ic_progress_fields` ＋ vitest 兩狀態字串 `!==`；mutation 1 條 |
+| **6.4** 止血閘之存活驗證 | `1148` | `2160–2171` | `tests/api/`；復用 6.2 之腳本 | `pytest tests/api -q -k ic_stop_gate_alive`，條目數 `>=` V-8 所列；mutation 1 條 |
+
+### 2D.3 B9 之陷阱
+
+1. **6.0**：程式與前端一律**由契約檔取字面**；驗收②之硬編碼掃描 `== 0`。
+   🔴 斷言用**成員資格**（`in`）而非等值——Task 7.7 會往同一類再加兩個 reason，
+   寫成 `== ['feature_count_exceeds_cap']` 會在 7.7 上線時假紅。
+2. **6.1**：碼內須註明本 Task 為**過渡止血**，GAP-6 之分塊計算上線後取代。
+   🔴 驗收要斷言**任務未被建立**（task store 筆數不變），**不是只驗 HTTP 400**——
+   只驗狀態碼的話，「先建任務再回 400」也會綠，而那正是要防的事。
+   🔴 **不得**提供「強制略過上限」之開關。
+3. **6.2**：🔴 **禁拍腦袋填數字**；無 receipt 不得寫入設定值。
+   上限＝最小超標點之 `feature_count` **再乘安全係數 0.5**。
+4. **6.3**：階段字串須設計為**可擴充集合**，測試**不得**以固定 enum 窮舉相等斷言鎖死
+   （GAP-6 會細分更多階段；改測試是掩蓋行為變更的常見路徑）。
+   🔴 **不得**以固定假進度值填充（UAT 已證實 `progress==0.12` 卡 15 分鐘之誤導性）。
+5. **6.4**：🔴 **不得在 cap 檢查之前採樣就宣稱通過**（SPEC R1 明列此假綠形態）。
 
 ---
 
@@ -260,10 +347,12 @@ B1–B7 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-
 7. **前後**：`bash scripts/agent_preflight.sh` → 派工 → `bash scripts/agent_postflight.sh`。
 8. **兩輪斷路器**：任何問題自己弄 ≤2 輪仍失敗 ⇒ 立即開委員會，禁 solo 硬幹。
 
-**B1–B5 之實績供校準**：B1 五輪 3→2→10→7→0；B2 兩輪 2→1；B3 三輪 6→3→0；
-**B4 六輪 7→4→4→1→1→0**；**B5 四輪 6→3→1→0**。
+**B1–B7 之實績供校準**：B1 五輪 3→2→10→7→0；B2 兩輪 2→1；B3 三輪 6→3→0；
+**B4 六輪 7→4→4→1→1→0**；**B5 四輪 6→3→1→0**；**B6 六輪 5→2→2→1→兩家零→0**；
+**B7 三輪 7→3→0**（另加 `D-004` 戳記三輪，R1／R2 皆 codex 一家 REJECTED 且兩次都對）。
+⇒ **抓一個估**：三到六輪、findings 個位數、**幾乎每批都有一輪是「另兩家判可收而 codex 抓到真缺陷」**。
 
-### 🔴 B4／B5 學到的六件事（B6／B7 直接沿用，別重踩）
+### 🔴 B4–B7 學到的八件事（下一批直接沿用，別重踩）
 
 1. **「兩家零 finding」不構成放行理由，可重跑的反例才是。**
    B5 R1：composer／grok 都判「可收」，而 codex 五條 P1 主委逐條實跑**全部成立**。
@@ -279,9 +368,18 @@ B1–B7 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-
 5. **重複守衛會使 mutation 失明。**
    兩層守衛涵蓋同一批輸入時，只拆其中一層必然錄到**空紅集合**。
    解法：拆主層與兩層一起拆各一條，**兩者紅集合之差就是後備層的作用範圍**（B4 之 `1.2-M5`／`1.2-M6`）。
-6. **「宣稱大於實作」是本 epic 最常見的自傷。**
-   B4 A-016c 宣稱「一律 fail-closed」而當時只涵蓋一種；B5 註解宣稱「四個顯示點共用」而只有兩個。
-   ⇒ **寫下宣稱前先數一遍實際 caller**。
+6. **「宣稱大於實作」是本 epic 最常見的自傷（累計七次）。**
+   B4 A-016c 宣稱「一律 fail-closed」而當時只涵蓋一種；B5 註解宣稱「四個顯示點共用」而只有兩個；
+   **B7 三次**：D-004 R1 未逐家核對即宣稱「三家一致」而採少數版、
+   D-004 R2 三家一致講過的限制在摘要時整條掉了、
+   review R1 之 brief 宣稱「深度拿不到就擋」而只擋了「有條件」那一半（**三家同時抓到**）。
+   ⇒ **寫下宣稱前先數一遍實際 caller**；**寫「三家一致」前逐家開原文核對那一格**。
+7. 🔴 **列出嫌疑點 ≠ 驗過嫌疑點（B7 新增）。**
+   B7 review R2 之群集 E ＝ R1 修法自身開的破口，而它**正是主委寫進 brief 請委員攻、
+   卻沒先自己打過的嫌疑點**。⇒ 寫進 brief 的攻擊面，自己也要先打一遍再送出去。
+8. 🔴 **型別關卡不能只靠 `npm run build`（B7 新增）。**
+   它**不涵蓋測試檔** ⇒ vitest 是 transpile-only、型別錯照樣全綠。
+   前端收案前固定加跑 `npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json`。
 
 ---
 
@@ -443,6 +541,8 @@ mutation，**要重錨、不是繞過**（B4／B5 各發生一次）。
 | `R-A005-1` | `lookahead_registry` 之 `_PRODUCER_SEMANTICS` 表為人工稽核非執跑探針 | `needs-research` | 主委；**觸發＝下次動到 `CaseSearchEngine` 未來欄計算段時一併做。🔴 B7 不觸發**（只消費、不改 producer） |
 | `R-B2-2` | 執行期 oracle 之 factory-body 繞法：新斷言綁 `get_event_import_service()` 之回傳；若日後另立第二個工廠且 route 改呼叫它，本閘看不見 | `needs-research` | 主委；屬 **B10 全棧接線** |
 | **純 JS 手刻 sha256** | 不經 `crypto.subtle`／`node:crypto` 入口之手刻實作，前端封閉枚舉看不見 | `needs-research` | 主委 |
+| **`R-B7-1`** | `label_value` 仍走 `_is_num` ⇒ **仍收 NaN**（附帶欄已改用 `_is_finite_num` 拒之）。**屬既有行為、非 B7 弱化**——改它會動到 B7 範圍外之既有 caller | `blocked-by` Task 7.0b（label producer 於分析時重寫） | 主委；7.0b 落地時一併收 |
+| **`R-B7-2`** | 前端既有型別錯 6 條：`FactorReturnChart.test.tsx`（4）／`useFeatureFactory.batchDate.test.ts`（2）。`npx tsc --noEmit` 可見，`npm run build` 看不見 | `user-ruling`（面向未來不溯及既往） | 主委；不排工。🔴 **新寫的檔不得再增加此數** |
 | **`R-B3-3`** | 逐 symbol 之 purge 下界（`EventSplitConfig.embargo_ms_by_symbol`）未實作 ⇒ 各 symbol 宣告下界**不一致**之批次一律拒絕分析（fail-closed，不取全批 max——SPEC §D-3′-a(ii) 明令禁止）。使用者當前解法＝依 timeframe 拆批 | `blocked-by` Task 7.0b | 主委；7.0b 落地時解除 |
 | **`R-B4-1`** | **CSV 方言之殘餘前後端差異**：支援之行尾＝**LF／CRLF**；引號內 CR 當資料保留；裸 CR（含舊式 Mac）兩端一致不支援。其他方言／編碼／writer 癖好之殘餘差異**不再逐一開輪**。兜底＝後端永遠是契約權威；前端只做預覽且**不得產出看似合理的假欄名**（由 mutation `1.5-M5` 鎖住）。R6 由 codex 以 **9,331 個字串窮舉**比對兩端 predicate，`mismatch_count=0` | `user-ruling` | 主委；**觸發＝出現具體且可重跑之使用者實例才重開** |
 | **`D-001/D-002/D-003` provenance** | `gate.sh register-output` 只收 `handoffs/` 或 `stampable_artifacts.txt` 明列者 ⇒ 對 `docs/*.D-00N.md` 跑 `reconcile_stamps_check.sh` 會報 provenance pending（**非戳記造假**） | `user-ruling` | 主委 |
@@ -456,14 +556,16 @@ mutation，**要重錨、不是繞過**（B4／B5 各發生一次）。
 | 用途 | 路徑 |
 |---|---|
 | 事件樣本模組 | `momentum/Analysis/event_samples/`：`pipeline.py`／`tables.py`／`event_split.py`／`lookahead_registry.py`／`lookahead_depth.py`／`lookahead_gate.py`／`lookahead_declaration.py`／`import_contract.py`／`canonical_serialize.py`／`condition_engine.py` |
-| 契約（欄位／枚舉／reason 之 SoT） | `momentum/Analysis/contracts/event_import_contract.json`、`future_column_lookahead.json`、`condition_engine.json` |
+| 契約（欄位／枚舉／reason 之 SoT） | `momentum/Analysis/contracts/event_import_contract.json`、`future_column_lookahead.json`、`condition_engine.json`、`ic_report_contract.json`（IC 側；**B9 之 6.0 加 reason 在這裡，不是匯入契約**）；🔴 **B8 之 5.0 要新建** `event_metrics_glossary.json` |
 | case 端點 | `api/routes/case.py`：`import_events_file`／`import_events_json`／`import_events_csv`／`lookahead_declaration_preview`／`lookahead_depth`／`list_event_imports`／`get_event_import`（**3.1 之鄰居**）／`analyze_event_import` |
 | 匯入服務 | `api/services/case_import_service.py::EventImportService`：`parse_upload`／`file_columns`／`csv_records_from_mapping`／`import_records`（落檔唯一點）／`list_imports`／`get_import`／`analyze` |
 | 前端（B6） | `frontend/src/app/data-preparation/page.tsx`（批列表 `event-imports-list`）／`lib/api.ts::listEventImports` |
-| 前端（B7） | `frontend/src/app/search/page.tsx`（匯出面板；`export-gap3-horizon`／`export-gap3-events`／篩選面板）／`lib/eventExport.ts`（`label_value` 與 `horizon_bars` 之落點）／`lib/exportFilter.ts`／`lib/exportCounts.ts` |
+| 前端（B7） | `frontend/src/app/search/page.tsx`（匯出面板；`export-gap3-events`／`export-attached-h{1..12}`／`export-disclosure-*`／`export-no-ic-decay`）／`lib/eventExport.ts`／`lib/exportFilter.ts`／`lib/lookaheadDepthLock.ts`／`lib/eventContractDocs.ts` |
+| **前端（B8 會碰）** | `frontend/src/components/ic-analysis/EventTablesPanel.tsx`（**兩表表頭在此**：`:67-68` macro／micro mean、`:46` `HorizonRow` 型別）；5.3 併入 `search/page.tsx` 之 `missingRows` 段（**Task 4.3 同一處**） |
+| **後端（B9 會碰）** | `api/routes/ic_analysis.py`（`:34` `start_ic_analysis`＝6.1 之前置檢查落點；progress response＝6.3）；`momentum/Analysis/contracts/ic_report_contract.json`（`reasons` 現有三類＝6.0 加第四類） |
 | API 模型 | `api/models/event_import_models.py`（🔴 加 response 鍵必須同步改這裡，否則被 `response_model` 靜默濾掉） |
 | golden | `scripts/gap3_freeze_golden.py`（🔴 **不重凍**：它跑 IC 管線、不碰 `analyze_tables`，4.2 動不到它——實測 `--check` rc=0、`canonical_sha` 未變。定案見 `D-004` 之 **A-022**；commit message **不得**寫「已重凍」。本列原寫「4.2 會讓它合法改變，須 `_write()` 重凍」，為同型誤植，2026-08-26 由 `GROK-R1-P3-02` 抓出後更正） |
-| mutation receipt | `handoffs/run_receipts/gap3ux-b{1,2,3,4,5}-all-mutations.receipt.json`（32／14／13／15／19 條） |
-| mutation runner 範本（**未入版控**） | `handoffs/gap3ux_b5_mutations.py` ＋ `gap3ux_b5_expected.json`（最新，含 page runtime selector）；`gap3ux_b4_mutations.py` |
-| reconcile 收斂檔 | `handoffs/reconcile/20260825-gap3ux-b4-review-r{1,2}/`、`20260826-gap3ux-b4-review-r{3,4,5,6}/`、`20260826-gap3ux-b5-review-r{1,2,3,4}/synth.md` |
+| mutation receipt | `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-all-mutations.receipt.json`（32／14／13／15／19／23／22 條）。🔴 **用前先查 `closure` 欄**（見 §6.4） |
+| mutation runner 範本（**未入版控**） | 🔴 **最新＝`handoffs/gap3ux_b7_mutations.py` ＋ `gap3ux_b7_expected.json`**（含**備份閘**與 page runtime selector，直接複製改）；舊版 `gap3ux_b{4,5}_mutations.py` |
+| reconcile 收斂檔 | `handoffs/reconcile/20260826-gap3ux-b{6-review-r{1..6},7-review-r{1,2,3}}/synth.md`；`20260826-gap3uxtodod004-x-stamp/synth.md`（D-004 戳記，三輪） |
 | 過程與教訓（給使用者） | `白話說明/GAP-3施工看板.md`（進度）、`白話說明/GAP-3施工進度.md`（歷史）、`白話說明/流程摩擦記錄.md` |
