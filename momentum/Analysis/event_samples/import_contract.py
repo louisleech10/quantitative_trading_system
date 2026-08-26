@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import numbers
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Union
@@ -159,6 +160,16 @@ def _is_int(v: Any) -> bool:
 
 def _is_num(v: Any) -> bool:
     return isinstance(v, numbers.Real) and not isinstance(v, bool)
+
+
+def _is_finite_num(v: Any) -> bool:
+    """數值且**有限**（NaN／±Inf 皆拒）。
+
+    🔴 與 `_is_num` 刻意分開：後者是既有欄（如 `label_value`）之判準，本次不動它
+    （改它會動到 B7 範圍外的既有行為）；新增之附帶報酬欄一律用本函式。
+    誠實邊界：`label_value` 目前仍走 `_is_num` ⇒ 仍收 NaN，屬**既有**行為、非本批弱化。
+    """
+    return _is_num(v) and math.isfinite(float(v))
 
 
 def _is_hex64(v: Any) -> bool:
@@ -312,6 +323,19 @@ def verify_source_digest(source_bytes: bytes, declared_digest: Any) -> bool:
 _HETEROGENEITY_DIMENSIONS = ("direction", "scenario", "label_definition")
 #: Task 1.8：訊息列出之衝突列號上限（SPEC「列出前 3 個衝突列號與欄名」）。
 _HETEROGENEITY_MAX_REPORTED = 3
+#: D-004 A-020：**無條件**檢查批內一致性之欄（與 `_HETEROGENEITY_DIMENSIONS` 不同，
+#: 不受 `enforce_batch_homogeneity` 旗標約束）。
+#: 🔴 為什麼不掛在該旗標下：該旗標預設 `False`，掛上去等於預設不檢查＝fail-open。
+#: `lookahead_bars_declared` 是**批次層**屬性（逐列同值只為滿足 SPEC 4.1 驗收④之
+#: `records[0].…` 字面），列間不同值時「該批的深度是多少」沒有定義 ⇒ 一律拒。
+_ALWAYS_HOMOGENEOUS_DIMENSIONS = ("lookahead_bars_declared",)
+#: D-004 A-020：Task 4.1 之附帶報酬欄（h ∈ 1..12）。**逐欄列舉**——契約
+#: `allowed_top_level_keys` 為閉集、無 pattern 機制。
+#: 🔴 本元組只決定「**哪些欄要跑 float 型別檢查**」，**不決定哪些欄合法**——
+#: 合法與否一律由契約之 `optional_fields` 決定（下方以 `name in opt` 過濾）。
+#: 故本元組與契約**不需要同步機制**：契約少列一個 ⇒ 該欄照樣以 `unknown_field` 被拒，
+#: 不會因為這裡列了就放行（若反過來讓本元組決定合法性，就多了一份會漂的副本）。
+_ATTACHED_FUTURE_COLUMNS = tuple(f"future_{h}bar_return" for h in range(1, 13))
 
 
 def _dimension_key(value: Any) -> str:
@@ -494,6 +518,20 @@ def validate_event_import(
             fail(i, eid, "kind_source", "enum_violation")
         if has("meta") and not isinstance(r["meta"], dict):
             fail(i, eid, "meta", "type_error")
+        # ---- D-004 A-020：Task 4.1 之匯出欄（`/search` 匯出檔須能原樣匯回） ----
+        # 🔴 型別判定**共用 `receipt_type_ok` 之同一函式參考**（契約 `receipt_schema_doc` 明令
+        #    「runtime validator 與驗收共用同一函式參考，禁各寫一份」）——在此手寫第二份
+        #    `Mapping[str,int>=0]` 判定，`bool ⊂ int` 那個坑就會只補一邊。
+        if has("lookahead_bars_declared") and not receipt_type_ok(
+            "Mapping[str,int>=0]", r["lookahead_bars_declared"]
+        ):
+            fail(i, eid, "lookahead_bars_declared", "type_error")
+        # 🔴 R1 `CODEX-R1-P2-01`：附帶欄須為**有限**數值——`_is_num` 只排除 bool，
+        #    NaN／±Inf 會被放行並原樣寫進事件檔。`CLAUDE.md` 明禁弱化 NaN/inf 閘，
+        #    而這些欄是給人拿去 Excel 算統計的，NaN/Inf 進去只會安靜污染下游。
+        for name in _ATTACHED_FUTURE_COLUMNS:
+            if name in opt and has(name) and not _is_finite_num(r[name]):
+                fail(i, eid, name, "type_error")
 
         # ---- 條件必填 ----
         if has("reference_symbols"):
@@ -595,8 +633,29 @@ def validate_event_import(
     # 🔴 比對對象＝**正規化後**之列（`normalized`，與 `rows` 逐列對齊）而非原始列：
     #    原始列之 `label_definition` 可能有的填了 `label_return_mode`、有的沒填（缺者取契約預設），
     #    拿原始列比會把「預設值未寫出」誤判成異質，擋掉完全同質的批次（既有測試抓到）。
-    for dim in (_HETEROGENEITY_DIMENSIONS if enforce_batch_homogeneity else ()):
+    # 🔴 D-004 A-020：`_ALWAYS_HOMOGENEOUS_DIMENSIONS` **不受旗標約束**（理由見該常數註解）；
+    #    兩組共用**同一段比對與回報實作**，不另寫一份（第二份必然漂移）。
+    for dim in (
+        (_HETEROGENEITY_DIMENSIONS if enforce_batch_homogeneity else ())
+        + _ALWAYS_HOMOGENEOUS_DIMENSIONS
+    ):
         present = [(i, r[dim]) for i, r in enumerate(normalized) if dim in r and r[dim] is not None]
+        # 🔴 R2 `CODEX-R2-P1-02`：**部分列有、部分列沒有**也是批內不一致。
+        #    舊版之 `len(present) < 2 ⇒ continue` 讓「只有一列帶該鍵」整個溜過去，
+        #    其餘列在 DataFrame 裡變成 `NaN`——那不是「沒宣告」，是**假裝有宣告的批**。
+        #    🔴 只對 `_ALWAYS_HOMOGENEOUS_DIMENSIONS` 套用全有全無：Task 1.8 之三個維度
+        #    由 `batch_defaults` 填補缺值，部分出現是合法中間態，套上去會擋掉正常批次。
+        if dim in _ALWAYS_HOMOGENEOUS_DIMENSIONS and 0 < len(present) < len(normalized):
+            missing = [i for i, r in enumerate(normalized) if dim not in r or r[dim] is None]
+            reported_missing = missing[:_HETEROGENEITY_MAX_REPORTED]
+            msg = (
+                f"heterogeneous_rows_in_batch: 欄 {dim!r} 只出現在部分列（{len(present)}/{len(normalized)}）；"
+                f"前 {len(reported_missing)} 個缺該欄之列號＝{reported_missing}（共 {len(missing)} 列）。"
+                f"該欄為批次層屬性：要嘛整批都帶、要嘛整批都不帶"
+            )
+            for row_idx in reported_missing:
+                fail(row_idx, rows[row_idx].get("event_id"), dim, "heterogeneous_rows_in_batch", msg)
+            continue
         if len(present) < 2:
             continue
         baseline_key = _dimension_key(present[0][1])

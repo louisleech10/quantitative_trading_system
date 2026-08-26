@@ -9,14 +9,18 @@ A-021 定案 Task 4.1 移除主答案窗後之下界守衛改形（保留 fail-c
 `inexpressible`）；A-022 更正 SPEC Task 4.2 驗收條與交接 §2B.1 之「G-2 golden 須重凍」誤植。
 為什麼: A-020 是**凍結後才發現的真衝突**——照 SPEC 字面實作會產出**匯不回去的檔**（實測）；
 A-021 之守衛存廢若不定案，不是留死碼就是讓 `D-002 A-004` 之解除失效；
-A-022 若照抄，B7 會宣稱一件沒發生的事（重凍）。三條皆出自三家 consult 之裁定；🔴 其中 A-021 之子題 (c) 為 **2 vs 1**（非一致），詳見該節之更正說明。
+A-022 若照抄，B7 會宣稱一件沒發生的事（重凍）。三條皆出自三家 consult 之裁定；
+🔴 其中 A-021 之子題 (c) 為 **2 vs 1**（非一致），詳見該節之更正說明；
+🔴 A-020 之初版**漏記三家一致之三項限制**（`future_*` 不進 `ic_feed`／保留 `receipt_schema.batch` 同名鍵／驗批內一致性），
+由戳記輪 R2 之 codex REJECTED 擋下，詳見 A-020 末之「R2 之更正」。
 檔名依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.2（`*.D-NNN.md` 機讀規約）。
 
 ## 觸及面宣告
 
 新增: `event_import_contract.json` 之 `optional_fields` 新增 13 鍵
-（`future_1bar_return`..`future_12bar_return`、`lookahead_bars_declared`）；
-`import_contract.py` 對 `lookahead_bars_declared` 之 `Mapping[str,int>=0]` 型別驗證
+（`future_1bar_return`..`future_12bar_return`、`lookahead_bars_declared`），各帶指定 doc 字面；
+`import_contract.py` 對 `lookahead_bars_declared` 之 `Mapping[str,int>=0]` 型別驗證＋**批內一致性**驗證
+不動: `event_import_contract.json` 之 `receipt_schema.batch.lookahead_bars_declared`（`:180`）**保留不刪**
 覆寫: `event_import_contract.json` 之 `derived_fields.names` **移除** `lookahead_bars_declared`；
 `exportFilter.ts` 之 `exportAllowedUnderBound` 簽章與 `nextLowerBoundState` 之 `inexpressible` 分支；
 `lookaheadDepthLock.ts` 之 `withHorizonLowerBoundGuard` **簽章與職責**（改名 `withExportLowerBoundGuard`，包裹保留）；
@@ -47,25 +51,78 @@ SPEC Task 4.2 驗收條之「G-2 事件 golden 須同步更新」句；交接 `d
   （只寫 `label_value`／`search_rule_summary`／`kind_source`，三者皆在 `optional_fields`）。
   三家 consult 各自實跑複驗「今日匯出檔可匯入」成立 ⇒ 4.1 會**打破既有迴圈**，非既有債。
 - **裁定**（三家一致，採 (a) 改契約；不採「匯出/匯入檔分離」、不採「塞 `meta`」）：
+
+  🔴 **本條初版漏記三家一致之三項限制，由戳記輪 R2 之 codex REJECTED 擋下**——
+  更正說明見本節末之「R2 之更正」。
+
   1. `lookahead_bars_declared` 自 `derived_fields.names` **刪除**，加入 `optional_fields`，
-     型別 `object`；`import_contract.py` 對其做與 receipt 相同之 `Mapping[str,int>=0]` 驗證
-     （`bool` 拒）。🔴 **不得雙登記**（同名不得同時留在兩處）。
+     型別 `object`，**其 doc 字面須含**「逐 timeframe 深度 oracle（`Mapping[str,int>=0]`）；
+     可隨事件列匯入攜帶；**對齊後複製至 `receipt_schema.batch.lookahead_bars_declared`**」
+     （三家 consult 之 doc 字面近乎逐字相同，取其聯集）；
+     `import_contract.py` 對其做與 receipt 相同之 `Mapping[str,int>=0]` 驗證
+     （`bool` 拒、負數拒、非字串鍵拒），**且驗批內一致性**——同批各列該鍵之值須相同，
+     否則拒（codex consult 明列，另兩家未反對 ⇒ 採較嚴版）。
+     🔴 **不得雙登記**（同名不得同時留在 `derived_fields.names` 與 `optional_fields`）。
+     🔴 **`receipt_schema.batch.lookahead_bars_declared` 須保留**（已存在於契約檔 `:180`，
+     型別字面 `Mapping[str,int>=0]`）——那是**第三處**、不在雙登記之禁止範圍；
+     移出 `derived_fields` **不得**連帶把它自 receipt schema 刪掉（三家 consult 皆明列）。
   2. `future_{h}bar_return`（h ∈ 1..12）**逐欄列舉 13−1＝12 鍵**加入 `optional_fields`，
-     各為 `float`。🔴 **不用 pattern**——契約之 `allowed_top_level_keys`
+     各為 `float`，**其 doc 字面須含**「附帶報酬欄；純供 Excel 攜帶；**不進 `ic_feed`**；
+     不參與深度導出／label 判定」（三家 consult 之 doc 字面一致含此四項）。
+     🔴 **不用 pattern**——契約之 `allowed_top_level_keys`
      ＝ `required ∪ optional ∪ conditional` 之**閉集**（`import_contract.py:49-55`），
      無 pattern 機制；為此新增 pattern 屬契約結構變更，超出本次範圍。
-  3. SPEC Task 4.1 之契約欄位**以本延伸檔為準**（SPEC 已 FROZEN，不就地改）。
+  3. 缺該欄仍合法（`optional_fields` 之語意）；`/search` **匯出檔則必帶**
+     `lookahead_bars_declared`（SPEC Task 4.1 ③）。
+  4. SPEC Task 4.1 之契約欄位**以本延伸檔為準**（SPEC 已 FROZEN，不就地改）。
 - **不可做**：不得以靜默放寬 validator（例如把未知欄一律放行）取代登記；
   不得把 `future_*` 或 `lookahead_bars_declared` 納入 `event_id` 之輸入（D-2）；
-  不得讓 `future_*` 參與深度導出（D-7 明禁「由欄位存在與否推斷」）。
-- **驗證**：`pytest tests/momentum/event_samples/ -q -k gap3_attached_columns_contract` **≥4 條**——
+  不得讓 `future_*` 參與深度導出（D-7 明禁「由欄位存在與否推斷」）；
+  🔴 **不得讓 `future_*` 進入 `ic_feed`，不得以它決定任何 horizon**
+  （三家 consult 一致明列；SPEC L1947 亦同字面）；
+  🔴 不得因把該鍵移出 `derived_fields` 而順手刪掉 `receipt_schema.batch` 之同名鍵。
+- **驗證**：`pytest tests/momentum/event_samples/ -q -k gap3_attached_columns_contract` **≥7 條**——
   ①雙列事件加 `lookahead_bars_declared={"12h":0}` 與三個 `future_*` ⇒ `validate_event_import` 通過；
   ②`lookahead_bars_declared` 之值為非 `Mapping[str,int>=0]`（含 `bool`、負數、非字串鍵）⇒ 拒；
   ③`future_*` 之值非 float ⇒ `type_error`；
   ④**防雙登記**：`lookahead_bars_declared` 不得同時出現於 `derived_fields.names`
-  與 `optional_fields`（讀契約檔斷言，非讀碼）。
+  與 `optional_fields`（讀契約檔斷言，非讀碼）；
+  ⑤`receipt_schema.batch.lookahead_bars_declared` 仍存在且型別字面 `== Mapping[str,int>=0]`
+  （讀契約檔斷言；防「移出 derived 時順手刪掉第三處」）；
+  ⑥同批兩列之 `lookahead_bars_declared` 值不相同 ⇒ 拒（批內一致性）；
+  ⑦🔴 **`ic_feed` 隔離之執行期斷言**：事件表帶 `future_1bar_return` 等欄時，
+  `build_event_ic_inputs()` 之回傳**不含任何** `future_` 前綴之鍵，且 `event_label_values`
+  之值逐一 `==` 各列 `label_value`（**實跑比對，非斷言 doc 字面**——doc 是散文，
+  只驗字串等於把限制降級成宣稱）。
 - **mutation**：把 `lookahead_bars_declared` 加回 `derived_fields.names` ⇒ ④轉紅；
-  移除 `optional_fields` 之 `future_7bar_return` ⇒ ①轉紅。還原皆轉綠。
+  移除 `optional_fields` 之 `future_7bar_return` ⇒ ①轉紅；
+  自 `receipt_schema.batch` 刪掉 `lookahead_bars_declared` ⇒ ⑤轉紅；
+  批內一致性檢查改為只驗第一列 ⇒ ⑥轉紅；
+  `build_event_ic_inputs` 改以 `future_1bar_return` 充當 label 值 ⇒ ⑦轉紅。還原皆轉綠。
+
+#### R2 之更正（🔴 主委第六次「宣稱大於實作」，形態與 R1 同型）
+
+R2：composer **APPROVED**、grok **APPROVED**、codex **REJECTED**——**REJECTED 又是對的**。
+codex 之理由逐字：「A-020 未如實收錄 codex consult 明列的限制：`future_*` 僅供 Excel 攜帶、
+不得進 `ic_feed`；D-004 僅禁止其參與深度導出。」
+
+主委逐家回讀 consult 原文後確認**不只 codex 一家這樣裁，而是三家一致**，且漏的不只一條：
+
+| 漏記之限制 | 三家 consult 原文出處 |
+|---|---|
+| `future_*` 之 doc 須含「不進 `ic_feed`」 | codex「附帶欄不進 `ic_feed`、不決定 horizon」／composer `RULING-4` 判準 2 之 doc 字面／grok `RULING-4` 判準 2 之 doc 字面 |
+| `receipt_schema.batch.lookahead_bars_declared` **保留**、對齊後複製至該處 | codex「保留 receipt batch schema；匯入時映射至 receipt」／composer 判準 1 之 doc 字面／grok 判準 1 之末行「**保留**（已存在）」 |
+| validator 須驗**批內一致性** | codex「逐列同值以滿足 `records[0]`，並由 validator 驗型/批內一致性」（另兩家未反對 ⇒ 採較嚴版） |
+| 缺欄仍合法、匯出檔必帶 | codex「缺欄仍合法，匯出檔必帶」 |
+
+🔴 **形態與 R1 完全相同**：R1 是「未逐家交叉核對即宣稱一致」而採了少數版；
+R2 是**同一動作的另一半**——三家一致講了某條限制，主委摘要時整條掉了，卻仍標「三家一致」。
+⇒ **對策不是「下次記得」**：本節之判準字面已逐條標出 consult 原文出處欄，
+下一輪核對者可**逐格回查**，不必依賴主委的摘要。
+
+🔴 **另一件必須寫下來的事**：本輪 composer 與 grok 皆對 A-020 標「一致／如實」，
+但兩家自己的 consult 原文**都**寫了那條 doc 字面 ⇒ **兩家也沒回讀自己的原文**。
+「兩家 APPROVED」因此**不構成**放行理由（B4／B5 之第 1 條教訓在戳記輪同樣成立）。
 
 ### A-021 — Task 4.1 移除主答案窗後，B5 下界守衛之改形（不刪、不留死碼）
 
@@ -137,7 +194,7 @@ SPEC Task 4.2 驗收條之「G-2 事件 golden 須同步更新」句；交接 `d
 ## 驗證（本延伸檔整體）
 
 - `bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_TODO.D-004.md` rc=0
-- `pytest tests/momentum/event_samples/ -q -k gap3_attached_columns_contract` **≥4 條**
+- `pytest tests/momentum/event_samples/ -q -k gap3_attached_columns_contract` **≥7 條**
 - `npm --prefix frontend test -- --run exportFilter` 之下界節四條
 - `python3 scripts/gap3_freeze_golden.py --check` rc=0（`canonical_sha` 不變）
 - 三家 **RECONCILE-STAMP APPROVED**（比照 `D-002`；戳記前不得動契約）
@@ -146,7 +203,7 @@ SPEC Task 4.2 驗收條之「G-2 事件 golden 須同步更新」句；交接 `d
 
 | 代號 | 觸及 | 裁定 | 日期 |
 |---|---|---|---|
-| **A-020** | Task 4.1 之匯出欄 vs 契約 | 🔴 實測 `unknown_field` 拒收 ⇒ 照 SPEC 字面實作會產出**匯不回去的檔**；改契約：`lookahead_bars_declared` 移出 `derived_fields` 入 `optional_fields`、`future_{1..12}bar_return` 逐欄列舉入 `optional_fields`（契約無 pattern 機制） | 2026-08-26 |
+| **A-020** | Task 4.1 之匯出欄 vs 契約 | 🔴 實測 `unknown_field` 拒收 ⇒ 照 SPEC 字面實作會產出**匯不回去的檔**；改契約：`lookahead_bars_declared` 移出 `derived_fields` 入 `optional_fields`（**`receipt_schema.batch` 之同名鍵保留**、驗批內一致性）、`future_{1..12}bar_return` 逐欄列舉入 `optional_fields`（契約無 pattern 機制），兩者 doc 字面須含指定限制（🔴 **`future_*` 不進 `ic_feed`**；初版漏記三家一致之三項限制，由戳記輪 R2 codex REJECTED 擋下） | 2026-08-26 |
 | **A-021** | Task 4.1 移除主答案窗後之下界守衛 | 改形不刪：`declared` 送 0、刪 scalar 比較與 `horizonOptions`、`inexpressible` 改為可匯出（逐列寫入已可表達 per-scope）、🔴 **`proceed` 結構保證保留並改簽章**（非移除；(c) 為 2 vs 1，初版誤採少數版並誤標「三家一致」，由戳記輪 codex REJECTED 擋下） | 2026-08-26 |
 | **A-022** | SPEC Task 4.2 ＋ 交接 §2B.1 之 G-2 重凍句 | 誤植：golden 跑 IC 管線、不碰 `analyze_tables`；實測 `--check` rc=0、sha 未變 ⇒ **不重凍**、commit message 不得寫「已重凍」 | 2026-08-26 |
 
@@ -158,3 +215,9 @@ SPEC Task 4.2 驗收條之「G-2 事件 golden 須同步更新」句；交接 `d
 RECONCILE-STAMP: composer APPROVED 2026-08-26 sha256:2c8780355cc9011ff79ae9f468c611930e336af6a96a6ad1536de8d6cf558c13 task:20260826-GAP3UXTODOD004-X-STAMP-R1
 RECONCILE-STAMP: grok APPROVED 2026-08-26 sha256:2c8780355cc9011ff79ae9f468c611930e336af6a96a6ad1536de8d6cf558c13 task:20260826-GAP3UXTODOD004-X-STAMP-R1
 RECONCILE-STAMP: codex REJECTED 2026-08-26 sha256:2c8780355cc9011ff79ae9f468c611930e336af6a96a6ad1536de8d6cf558c13 task:20260826-GAP3UXTODOD004-X-STAMP-R1 — A-021 記載與 codex consult 裁定不符：codex 原裁定要求保留 withHorizonLowerBoundGuard 包住所有下載副作用並承擔 readiness fail-closed；D-004 卻寫成自 /search 匯出路徑移除。
+RECONCILE-STAMP: composer APPROVED 2026-08-26 sha256:705f4ad0ac7ad4360216f20067d1878d76e2c04789b300def58fab7f4b0421ad task:20260826-GAP3UXTODOD004-X-STAMP-R2
+RECONCILE-STAMP: grok APPROVED 2026-08-26 sha256:705f4ad0ac7ad4360216f20067d1878d76e2c04789b300def58fab7f4b0421ad task:20260826-GAP3UXTODOD004-X-STAMP-R2
+RECONCILE-STAMP: codex REJECTED 2026-08-26 sha256:705f4ad0ac7ad4360216f20067d1878d76e2c04789b300def58fab7f4b0421ad task:20260826-GAP3UXTODOD004-X-STAMP-R2 — A-020 未如實收錄 codex consult 明列的限制：future_* 僅供 Excel 攜帶、不得進 ic_feed；D-004 僅禁止其參與深度導出。
+RECONCILE-STAMP: codex APPROVED 2026-08-26 sha256:12a8fc74a86550f1ea09787419d3c9e504877f695326cf43a74a949a4f955403 task:20260826-GAP3UXTODOD004-X-STAMP-R3
+RECONCILE-STAMP: composer APPROVED 2026-08-26 sha256:12a8fc74a86550f1ea09787419d3c9e504877f695326cf43a74a949a4f955403 task:20260826-GAP3UXTODOD004-X-STAMP-R3
+RECONCILE-STAMP: grok APPROVED 2026-08-26 sha256:12a8fc74a86550f1ea09787419d3c9e504877f695326cf43a74a949a4f955403 task:20260826-GAP3UXTODOD004-X-STAMP-R3

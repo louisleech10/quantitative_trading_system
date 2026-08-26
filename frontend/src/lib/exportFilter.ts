@@ -123,10 +123,18 @@ export function buildExportFilterSpec(
  * 下界仍是 `null`，守衛照樣放行 ⇒ fail-open。`status` 就是用來分辨這兩者的。
  */
 export interface LowerBoundState {
-  status: 'unconstrained' | 'resolved' | 'pending' | 'error' | 'inexpressible';
+  status: 'unconstrained' | 'resolved' | 'pending' | 'error';
   /** 逐 timeframe 之下界（SPEC Task 2.1b 之 derived 值形狀；**不得塌成 scalar**）。 */
   depthByTimeframe: Record<string, number>;
-  /** 可用單一答案窗表達時之下界；`inexpressible`／未解析時為 `null`。 */
+  /**
+   * 可用**單一** scalar 表達時之下界；各 tf 下界不同或未解析時為 `null`。
+   *
+   * 🔴 `D-004 A-021(d)`：`bound === null` **不再**代表「不可匯出」。Task 4.1 之後
+   * `window.horizon_bars` 是**逐列**依該列 tf 由 `depthByTimeframe` 導出，混 TF 已可表達
+   * ⇒ 舊的 `inexpressible` 狀態失去存在理由（它當初存在，是因為單一 scalar 表達不了
+   * 逐 tf 之不同下界，SPEC §D-3′-a(ii) 又禁止取 max 冒充 per-scope 下界）。
+   * 「可不可以匯出」現在只看 `status`，見 `exportAllowedByLowerBoundState()`。
+   */
   bound: number | null;
   error: string | null;
 }
@@ -137,7 +145,12 @@ export const UNCONSTRAINED_LOWER_BOUND: LowerBoundState = {
 
 /** 一次下界查詢之結果。 */
 export type LowerBoundOutcome =
-  | { kind: 'no-conditions' }
+  /**
+   * 沒有篩選條件 ⇒ 沒有下界約束。
+   * 🔴 `depthByTimeframe` **仍由後端提供**（Task 4.1 之匯出檔必帶 `lookahead_bars_declared`）
+   * ——前端不得自行填 0：那是把 `depth_by_timeframe()` 的退化分支複製一份。
+   */
+  | { kind: 'no-conditions'; depthByTimeframe: Record<string, number> }
   | { kind: 'pending' }
   | { kind: 'resolved'; depthByTimeframe: Record<string, number> }
   | { kind: 'error'; message: string };
@@ -147,17 +160,21 @@ export type LowerBoundOutcome =
  *
  * - `no-conditions`：沒有條件就沒有約束 ⇒ `unconstrained`。
  * - `pending`：有條件、還沒拿到下界 ⇒ **擋住**（不是「暫時沒有約束」）。
- * - `resolved`：保留**逐 tf map**；各 tf 下界相同（含單一 tf）時可用單一答案窗表達 ⇒ `bound`；
- *   🔴 **不同時回 `inexpressible` 而非取 max**——取 max 就是 SPEC §D-3′-a(ii) 明令禁止之
- *   「以單一 batch scalar 冒充 per-scope 下界」（B3 R2 已為同型問題裁定過：能表達就套用、
- *   不能表達就拒絕，取 max 對窗較小的 scope 是過度 purge，過度保守亦屬錯誤）。
+ * - `resolved`：保留**逐 tf map**；各 tf 下界相同（含單一 tf）時 `bound` 為該值，
+ *   🔴 **不同時 `bound` 為 `null` 但仍是 `resolved`（可匯出）**——`D-004 A-021(d)`：
+ *   Task 4.1 之後 `window.horizon_bars` **逐列**依該列 tf 寫入，混 TF 已可表達，
+ *   舊的 `inexpressible`（拒絕匯出）失去理由。
+ *   🔴 **仍不得取 max 塞進 `bound`**——那是 SPEC §D-3′-a(ii) 明令禁止之
+ *   「以單一 batch scalar 冒充 per-scope 下界」（對窗較小的 scope 是過度 purge）。
  * - `error`：🔴 **擋住並回報**——算不出下界時當成「沒有約束」就是 fail-open。
  */
 export function nextLowerBoundState(
   previous: LowerBoundState,
   outcome: LowerBoundOutcome,
 ): LowerBoundState {
-  if (outcome.kind === 'no-conditions') return UNCONSTRAINED_LOWER_BOUND;
+  if (outcome.kind === 'no-conditions') {
+    return { ...UNCONSTRAINED_LOWER_BOUND, depthByTimeframe: outcome.depthByTimeframe };
+  }
   if (outcome.kind === 'pending') {
     return { status: 'pending', depthByTimeframe: {}, bound: null, error: null };
   }
@@ -166,14 +183,10 @@ export function nextLowerBoundState(
     const values = Object.values(depth);
     if (values.length === 0) return UNCONSTRAINED_LOWER_BOUND;
     const distinct = [...new Set(values)];
+    // 各 tf 下界不同 ⇒ 仍 `resolved`（可匯出），只是無法以單一 scalar 表達 ⇒ `bound: null`。
+    // 逐 tf 之值一律留在 `depthByTimeframe`（**不得塌成 scalar**）。
     if (distinct.length > 1) {
-      return {
-        status: 'inexpressible',
-        depthByTimeframe: depth,
-        bound: null,
-        error: `本批混了多個 K 線週期且下界不同（${Object.entries(depth)
-          .map(([tf, v]) => `${tf}=${v}`).join('、')}），無法用單一答案窗表達；請依週期分批匯出`,
-      };
+      return { status: 'resolved', depthByTimeframe: depth, bound: null, error: null };
     }
     return { status: 'resolved', depthByTimeframe: depth, bound: distinct[0], error: null };
   }
@@ -186,27 +199,47 @@ export function nextLowerBoundState(
 }
 
 /**
- * 這個狀態下允許匯出嗎？——`false` 時**一定**要擋。
+ * 這個狀態下允許匯出嗎？——`false` 時**一定**要擋（`D-004 A-021(b)`）。
  *
- * 只有兩種情形可以匯出：沒有條件（無約束），或已解析且選值 ≥ 下界。
- * `pending`／`error`／`inexpressible` 一律擋——**系統無法證明安全時不得放行**。
+ * **readiness fail-closed**：只問「系統證明得出這批的深度了嗎」。
+ * `unconstrained`（沒有條件＝沒有約束）與 `resolved`（已導出逐 tf 深度）⇒ 可匯出；
+ * `pending`（還沒拿到）／`error`（算不出來）⇒ 擋——**系統無法證明安全時不得放行**。
+ *
+ * 🔴 **不再比較使用者選值**：Task 4.1 移除主答案窗後 `window.horizon_bars` 由深度導出、
+ * 不再由使用者選 ⇒ 「使用者選太小」這個風險消失，`selectedBars >= bound` 恆真＝死碼。
+ * 🔴 **`bound === null` 不再是擋的理由**（`A-021(d)`）——混 TF 之逐列寫入已可表達 per-scope 下界；
+ * 要擋的是 `pending`／`error`，那才是「算不出來」。
  */
-export function exportAllowedUnderBound(state: LowerBoundState, selectedBars: number): boolean {
-  if (state.status === 'unconstrained') return true;
-  if (state.status !== 'resolved' || state.bound === null) return false;
-  return selectedBars >= state.bound;
+export function exportAllowedByLowerBoundState(state: LowerBoundState): boolean {
+  return state.status === 'unconstrained' || state.status === 'resolved';
 }
 
 /**
- * 答案窗下拉之候選值：固定的 1..12 ＋（下界大於 12 時）下界本身。
+ * 後端回傳之深度 map 是否可信（R1 `CODEX-R1-P1-02`）。
  *
- * 🔴 R1 `CODEX-R1-P1-03`：`future72_*` 在 1h 批之下界是 72，而固定清單只到 12
- * ⇒ 所有選項都被 disable、使用者無路可走且沒有解釋。至少要留一個滿足下界的可選值。
+ * 判準：**恰好覆蓋本批出現的每一個 timeframe**，且每個值都是非負整數。
+ *
+ * 🔴 為什麼要驗：`api.ts` 之型別只是 TS compile-time，執行期拿到什麼都會直接進 state。
+ * 舊版之三個 fail-open：
+ * ①**空 map** ⇒ `nextLowerBoundState` 判為 `unconstrained`（可匯出），而匯出檔的深度宣告是空的；
+ * ②**缺某個 tf** ⇒ 該列 `window.horizon_bars` 被 floor 成 1，**冒充成「深度 0」**；
+ * ③**非法值**（負數／小數／字串）⇒ 直接寫進匯出檔。
+ * 三者都會產出「宣稱帶著深度宣告、實際上沒有」的檔。
  */
-export function horizonOptions(state: LowerBoundState, base: readonly number[]): number[] {
-  const opts = new Set<number>(base);
-  if (state.status === 'resolved' && state.bound !== null) opts.add(state.bound);
-  return [...opts].sort((a, b) => a - b);
+export function depthMapCoversTimeframes(
+  depthByTimeframe: unknown,
+  timeframes: readonly string[],
+): boolean {
+  if (typeof depthByTimeframe !== 'object' || depthByTimeframe === null) return false;
+  const map = depthByTimeframe as Record<string, unknown>;
+  const keys = Object.keys(map);
+  if (keys.length !== timeframes.length) return false;
+  for (const tf of timeframes) {
+    if (!Object.prototype.hasOwnProperty.call(map, tf)) return false;
+    const v = map[tf];
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) return false;
+  }
+  return true;
 }
 
 /**

@@ -584,7 +584,10 @@ function ICAnalysisPageContent() {
             <DegradedBanner />
 
             {/* GAP-3 B5.2：事件型兩表——只在事件模式顯示（U10 不另開頁） */}
-            {config.mode === 'event' && <EventTablesPanel importId={config.event_import_id} />}
+            {/* Task 4.2：IC 設定面板之「Horizon 多選」要真的作用到事件後報酬表 */}
+            {config.mode === 'event' && (
+              <EventTablesPanel importId={config.event_import_id} horizons={config.horizons} />
+            )}
 
             {summaryText && (
               <div className="glass-panel rounded-2xl border border-white/10 p-5">

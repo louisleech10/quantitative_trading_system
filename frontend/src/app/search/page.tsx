@@ -8,13 +8,12 @@ void formatTimestamp;
 import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart, MarketClassPieChart, DifficultyPieChart } from '@/components/ui/PieChart';
 import { useSearchStore } from '@/store/searchStore';
 import { PriceChangeMethod, CaseData } from '@/lib/types';
-import { isHorizonBelowLowerBound, withHorizonLowerBoundGuard } from '@/lib/lookaheadDepthLock';
+import { withExportLowerBoundGuard } from '@/lib/lookaheadDepthLock';
 import { fetchLookaheadDepth } from '@/lib/api';
 import {
   applyExportFilters,
   buildExportFilterSpec,
-  exportAllowedUnderBound,
-  horizonOptions,
+  depthMapCoversTimeframes,
   nextLowerBoundState,
   numericColumnsOf,
   referencedColumnsOf,
@@ -22,6 +21,12 @@ import {
   type ExportFilterCondition,
   type LowerBoundState,
 } from '@/lib/exportFilter';
+import {
+  ATTACHED_HORIZONS,
+  EVENT_EXPORT_CONTROL_KIND,
+  EVENT_EXPORT_SCENARIO,
+} from '@/lib/eventExport';
+import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
 import { computeExportCounts } from '@/lib/exportCounts';
 
 
@@ -65,8 +70,12 @@ export default function SearchPage() {
 
   // 基礎狀態
   const [currentStage, setCurrentStage] = useState<string>('');
-  // GAP-3 匯出：答案窗根數（決定 label_definition.window.horizon_bars 與 label_value 取哪個 future_Nbar_return）
-  const [eventHorizonBars, setEventHorizonBars] = useState<number>(2);
+  // GAP-3 UX Task 4.1 ①：附帶報酬欄（預設全選 1..12）。
+  // 🔴 **純供 Excel 攜帶**——不進 ic_feed、不決定任何 horizon、不參與深度導出。
+  //    改變本清單**不得**影響 lookahead_bars_declared 與 window.horizon_bars（邊界①）。
+  // 🔴 Task 4.1 ② 已移除「主答案窗」單選：答案窗依 §D-3′ 移到 IC 分析層，
+  //    匯出端不再寫 label_value、不再讓使用者選 h。
+  const [attachedHorizons, setAttachedHorizons] = useState<number[]>([...ATTACHED_HORIZONS]);
   // GAP-3 UX Task 2.1b：答案窗下界。值由後端之 depth_by_timeframe() 導出——
   // 🔴 前端**不自算深度**（第二份實作必然漂移）。
   // ✅ B5 已接線（解除 `D-002 A-004`）：Task 2.1 之篩選面板變動時呼叫
@@ -115,25 +124,48 @@ export default function SearchPage() {
     const apply = (outcome: Parameters<typeof nextLowerBoundState>[1]) =>
       setLowerBoundState((prev) => nextLowerBoundState(prev, outcome));
     const referenced = referencedColumnsOf(exportFilters);
-    if (referenced.length === 0) {
-      apply({ kind: 'no-conditions' });
-      return;
-    }
-    // 有條件但還沒拿到下界 ⇒ **先擋住**，不是「暫時沒有約束」
-    apply({ kind: 'pending' });
     const timeframes = [...new Set(exportRows.map((r) => String(r.timeframe ?? searchParams.timeframe)))]
       .filter((tf) => tf && tf !== 'undefined');
-    if (timeframes.length === 0) return;
+    // 🔴 R2 `CODEX-R2-P1-01`：舊版在此**直接 return** ⇒ 狀態停在初始的 `unconstrained`＝可匯出，
+    //    而深度 map 是空的；`windowHorizonBarsFor` 會在 `proceed` 內拋錯，按鈕又是 `void` 呼叫
+    //    ⇒ 使用者按了什麼都沒發生、也沒有任何訊息。**算不出本批週期就要 fail-closed**。
+    if (timeframes.length === 0) {
+      apply({ kind: 'error', message: '這批結果讀不到 K 線週期，無法宣告 lookahead 深度（不會讓你匯出）' });
+      return;
+    }
+    // 🔴 `D-004 A-021(a)`：4.1 移除主答案窗後，匯出路徑之左項一律送 **0**
+    //    （`depth_by_timeframe` ＝ `max(declared, *欄位深度)`；送 0 ⇒ 結果就是純欄位深度）。
+    //    **不得省略鍵**——缺 tf 會在後端 `lookahead_depth.py:66-69` 觸發 KeyError。
+    const declaredWindowBars = Object.fromEntries(timeframes.map((tf) => [tf, 0]));
+    // 🔴 **無條件時也要查**：Task 4.1 之匯出檔必帶 `lookahead_bars_declared`（逐 tf 深度），
+    //    而深度只有後端算得出來。前端在此自填 0 就是把 `depth_by_timeframe()` 的退化分支
+    //    複製第二份（SPEC Task 2.1b 明禁）。代價＝沒有條件的批次也要等這支 API 回來；
+    //    拿不到 ⇒ 擋（寫不出宣告值就不該產出宣稱帶著它的檔）。
+    // 🔴 **R1 三家一致之 P1**：`pending` 必須**無條件**先打上。舊版只在 `referenced.length > 0`
+    //    時打 ⇒ 無條件批次在 API 飛的那段時間狀態仍是初始的 `unconstrained`＝**可匯出**，
+    //    會產出 `lookahead_bars_declared: {}` 的檔；清掉條件後的第二輪還會沿用**過期 map**。
+    //    這是主委「拿不到 ⇒ 擋」之宣稱與實作不符（宣稱大於實作）。
+    apply({ kind: 'pending' });
     let cancelled = false;
     fetchLookaheadDepth({
       referenced_columns: referenced,
-      // 匯出路徑之左項＝使用者當下選的答案窗根數（逐 tf 同值；SPEC Task 2.1b 左項不含 floor）
-      declared_window_bars: Object.fromEntries(timeframes.map((tf) => [tf, eventHorizonBars])),
+      declared_window_bars: declaredWindowBars,
       timeframes,
     })
       .then((res) => {
         if (cancelled) return;
-        apply({ kind: 'resolved', depthByTimeframe: res.depth_by_timeframe });
+        // 🔴 `CODEX-R1-P1-02`：回傳之 map 須**恰好覆蓋本批 timeframe 且值為非負整數**；
+        //    空 map／缺鍵／非法值一律轉 `error`（擋），不得放行後由 floor 冒充深度。
+        if (!depthMapCoversTimeframes(res.depth_by_timeframe, timeframes)) {
+          apply({
+            kind: 'error',
+            message: `深度端點之回傳未覆蓋本批週期（需 ${timeframes.join('、')}），無法宣告 lookahead 深度`,
+          });
+          return;
+        }
+        apply(referenced.length === 0
+          ? { kind: 'no-conditions', depthByTimeframe: res.depth_by_timeframe }
+          : { kind: 'resolved', depthByTimeframe: res.depth_by_timeframe });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -141,7 +173,7 @@ export default function SearchPage() {
       });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [referencedKey, exportRows, eventHorizonBars, searchParams.timeframe]);
+  }, [referencedKey, exportRows, searchParams.timeframe]);
 
   const parseSymbolsInput = (input: string): string[] =>
     input
@@ -576,19 +608,14 @@ export default function SearchPage() {
       alert('沒有搜索結果可以匯出');
       return;
     }
-    // 🔴 B5 R1 `CODEX-R1-P1-01`：**系統無法證明安全時不得放行**。
-    //    `pending`（還沒拿到下界）／`error`（算不出來）／`inexpressible`（混 TF 且下界不同）
-    //    三者都必須擋在這裡——舊版只看 `bound`，而那三種情形之 `bound` 都是 `null`，
-    //    於是守衛把它們一律讀成「沒有約束」而放行。
-    if (!exportAllowedUnderBound(lowerBoundState, eventHorizonBars)) {
-      alert(lowerBoundState.error
-        ?? '尚未取得答案窗下界（系統還無法證明這批條件安全），請稍候或修正條件後再匯出');
-      return undefined;
-    }
-    // GAP-3 UX Task 2.1b：答案窗不得低於導出下界。
+    // GAP-3 UX Task 2.1b／`D-004 A-021(c)`：**readiness fail-closed**。
+    // 🔴 `pending`（還沒拿到深度）／`error`（算不出來）⇒ 一個網路動作都不許發生。
+    //    判定與訊息都住在守衛裡（**單一實作**）——B5 時 page 另有一份前置比較，
+    //    兩層涵蓋同一批輸入會讓 mutation 失明（只拆一層必然錄到空紅集合）。
     // 🔴 整段匯出邏輯**包在 proceed 內**——「阻擋早於任何網路動作」因此是結構上保證的事實，
     //    不是需要用原始碼形狀去檢查的性質（GROK-R3-P2-01 等三條之修法）。
-    return withHorizonLowerBoundGuard(eventHorizonBars, lookaheadLowerBound, {
+    //    **不得**退回裸 `if (…) return;` 後接長串 `await`（B5 R3 已否定之形狀）。
+    return withExportLowerBoundGuard(lowerBoundState, {
       notify: alert,
       proceed: async () => {
     const { buildEventContractRecords } = await import('@/lib/eventExport');
@@ -618,17 +645,23 @@ export default function SearchPage() {
       timeframe: searchParams.timeframe,
       conditions: ruleConditions,
       priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
-      horizonBars: eventHorizonBars,
+      attachedHorizons,
+      lookaheadBarsDeclared: lowerBoundState.depthByTimeframe,
       sourceFileText: currentResult.source_file_text ?? '',
       sourceFileDigest: currentResult.source_file_digest ?? '',
       filters: buildExportFilterSpec(exportFilters),
     });
-    // CODEX-R3-P1-02：缺該 horizon 之未來報酬欄 ⇒ 該列無 label_value，條件 IC 會 unavailable；匯出前先講清楚
-    if (payload.n_missing_label_value > 0) {
+    // GAP-3 UX Task 4.3：缺欄確認框**逐附帶 horizon** 列出缺幾筆。
+    // 🔴 匯出端已無「答案窗缺欄」這件事（`label_value` 不在匯出檔內）⇒ 只剩附帶欄一類；
+    //    訊息**不得**出現「主答案窗」字樣。缺欄**不阻擋匯出**（使用者仍可按確定）。
+    const missingRows = Object.entries(payload.missing_by_horizon);
+    if (missingRows.length > 0) {
+      const lines = missingRows
+        .map(([h, n]) => `　future_${h}bar_return：${n}/${payload.n_records} 筆缺`)
+        .join('\n');
       const proceed = window.confirm(
-        `${payload.n_missing_label_value}/${payload.n_records} 筆缺 future_${eventHorizonBars}bar_return，` +
-        `這些事件不會帶 label_value ⇒ 匯入後「條件 IC」會顯示 unavailable（missing_label_value）。\n\n` +
-        `建議改選有資料的答案窗（1–12 根），或先重跑搜尋。仍要匯出嗎？`,
+        `以下附帶報酬欄有缺值，缺的那幾筆就不會帶該欄（其他欄不受影響）：\n${lines}\n\n`
+        + '附帶欄只是給你在 Excel 裡看的，不影響匯入、也不決定任何分析用的答案窗。仍要匯出嗎？',
       );
       if (!proceed) return;
     }
@@ -1775,10 +1808,11 @@ export default function SearchPage() {
                   正在確認這些條件需要多寬的答案窗；確認完成前不會讓你匯出。
                 </p>
               )}
-              {(lowerBoundState.status === 'error' || lowerBoundState.status === 'inexpressible') && (
+              {/* 🔴 `D-004 A-021(d)`：`inexpressible`（混 TF 且下界不同）已不是錯誤狀態——
+                  4.1 之後 horizon_bars 逐列依該列 tf 寫入，混 TF 可以匯出。剩下的只有 error。 */}
+              {lowerBoundState.status === 'error' && (
                 <p className="mt-1 text-[11px] text-rose-200" data-testid="export-lower-bound-error">
-                  {lowerBoundState.status === 'inexpressible' ? '無法匯出：' : '無法導出答案窗下界：'}
-                  {lowerBoundState.error}
+                  無法導出答案窗下界：{lowerBoundState.error}
                 </p>
               )}
               {Object.keys(lowerBoundState.depthByTimeframe).length > 1 && (
@@ -1787,6 +1821,76 @@ export default function SearchPage() {
                     .map(([tf, v]) => `${tf}=${v}`).join('、')}
                 </p>
               )}
+
+              {/* ── GAP-3 UX Task 4.1 ①：附帶報酬欄多選（預設全選 1..12） ───────────── */}
+              <div className="mt-4 rounded border border-slate-800 bg-slate-900/40 p-3" data-testid="export-attached-columns">
+                <p className="text-sm text-slate-200">
+                  附帶報酬欄（純供 Excel 分析攜帶）
+                  <span className="ml-2 text-[11px] text-slate-400">
+                    勾選的每個 h 會在匯出檔加一欄 future_{'{h}'}bar_return
+                  </span>
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ATTACHED_HORIZONS.map((h) => (
+                    <label key={h} className="flex items-center gap-1 text-xs text-slate-300">
+                      <input
+                        type="checkbox"
+                        data-testid={`export-attached-h${h}`}
+                        checked={attachedHorizons.includes(h)}
+                        onChange={(e) => setAttachedHorizons((prev) => (e.target.checked
+                          ? [...new Set([...prev, h])].sort((a, b) => a - b)
+                          : prev.filter((v) => v !== h)))}
+                      />
+                      {h}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── GAP-3 UX Task 4.1b：匯出時揭露四件現行完全未告知的事 ──────────────
+                  🔴 四段皆由**實際設定**導出，禁寫死；白話取自契約 `_doc`（鏡像＋比對測試）。 */}
+              <div className="mt-3 rounded border border-sky-900/60 bg-sky-950/30 p-3 text-[11px] text-slate-300" data-testid="export-disclosure">
+                <p className="text-xs font-medium text-sky-100">這批匯出實際會帶什麼（你沒選過但一直存在的設定）</p>
+                <p className="mt-1" data-testid="export-disclosure-scenario">
+                  本批 scenario ＝ <strong>{EVENT_EXPORT_SCENARIO}</strong> — {EVENT_CONTRACT_DOCS.scenario}
+                </p>
+                <div className="mt-1" data-testid="export-disclosure-depth">
+                  {/* 🔴 顯示 `lookahead_bars_declared`（真實深度），**不是** window.horizon_bars
+                      ——後者有下限 1 之 floor，深度 0 會顯示成 1（§D-3′-a(i)）。
+                      🔴 批內多 TF ⇒ **逐 tf 各一行**，不得塌成單一 scalar。 */}
+                  {Object.keys(lowerBoundState.depthByTimeframe).length === 0 ? (
+                    <span data-testid="export-disclosure-depth-pending">lookahead 深度：尚未取得（取得前不會讓你匯出）</span>
+                  ) : (
+                    Object.entries(lowerBoundState.depthByTimeframe).map(([tf, n]) => (
+                      <div key={tf} data-testid={`export-disclosure-depth-${tf}`}>
+                        lookahead 深度（{tf}）＝ <strong>{n}</strong> 根，來源＝你的篩選條件引用到的欄位
+                        {referencedColumnsOf(exportFilters).length > 0
+                          ? `：${referencedColumnsOf(exportFilters).join('、')}`
+                          : '：無（沒有設篩選條件）'}
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="mt-1" data-testid="export-disclosure-purge">
+                  {Object.entries(lowerBoundState.depthByTimeframe).map(([tf, n]) => (
+                    <div key={tf} data-testid={`export-disclosure-purge-${tf}`}>
+                      本批之 purge 下界（事件事實層，{tf}）＝ <strong>{n}</strong> 根——
+                      這個深度來自你的 label 定義最遠引用到 t0 之後第幾根。
+                      條件 IC 分析時之實際 purge 另取本次答案窗，<strong>取兩者較大者</strong>。
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1" data-testid="export-disclosure-control-kind">
+                  control_kind ＝ <strong>{EVENT_EXPORT_CONTROL_KIND}</strong> — {EVENT_CONTRACT_DOCS.control_kind}
+                </p>
+              </div>
+
+              {/* ── GAP-3 UX Task 4.1c：明文標示本批不提供 IC decay ───────────────── */}
+              <p className="mt-2 text-[11px] text-amber-200/90" data-testid="export-no-ic-decay">
+                條件 IC decay 曲線（一次分析同時得到多個 h 的 IC）非本批交付；附帶的 future_* 欄不進入 ic_feed。
+                要看不同答案窗，請於 IC 分析頁改答案窗重跑分析——同一批事件事實可以重複分析。
+                一次得到整條 decay 曲線待 GAP-6 之 IC-Analysis 整體處理。
+              </p>
             </div>
 
             {/* CSV 導出按鈕 */}
@@ -1798,29 +1902,14 @@ export default function SearchPage() {
                 <Download className="w-5 h-5" />
                 導出CSV檔案
               </button>
-              <label className="ml-3 flex items-center gap-2 text-sm text-slate-300">
-                答案窗
-                <select
-                  data-testid="export-gap3-horizon"
-                  value={eventHorizonBars}
-                  onChange={(e) => setEventHorizonBars(Number(e.target.value))}
-                  className="rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-200"
-                >
-                  {/* 🔴 下界大於 12 時（如 1h 批引用 future72_*）必須有可選值滿足它，
-                      否則所有選項都被鎖、使用者無路可走（R1 `CODEX-R1-P1-03`）。 */}
-                  {horizonOptions(lowerBoundState, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).map((h) => (
-                    <option
-                      key={h}
-                      value={h}
-                      disabled={isHorizonBelowLowerBound(h, lookaheadLowerBound)}
-                    >
-                      {h} 根{isHorizonBelowLowerBound(h, lookaheadLowerBound) ? '（低於下界，鎖定）' : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <button
-                onClick={() => void exportSearchResultsToEventJson()}
+                // 🔴 R2 `CODEX-R2-P1-01`：`void` 會把 `proceed` 內拋出的錯**整個吞掉**
+                //    ⇒ 使用者按了什麼都沒發生。任何未預期之錯都要看得見。
+                onClick={() => {
+                  exportSearchResultsToEventJson().catch((err: unknown) => {
+                    alert(`匯出失敗：${err instanceof Error ? err.message : String(err)}`);
+                  });
+                }}
                 data-testid="export-gap3-events"
                 className="ml-3 flex items-center gap-2 px-6 py-3 bg-sky-500/20 text-sky-100 border border-sky-400/40 rounded-lg font-medium hover:bg-sky-500/30 transition-colors"
                 title="匯出 GAP-3 事件契約 JSON＋來源檔（可手改後到「數據準備」以新契約匯入）"

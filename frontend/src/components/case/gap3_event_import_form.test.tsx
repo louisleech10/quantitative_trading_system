@@ -22,6 +22,9 @@ const BACKEND_SOURCE_TEXT = '[{"close":1.0,"symbol":"ETHUSDT"}]';
 const BACKEND_SOURCE = {
   sourceFileText: BACKEND_SOURCE_TEXT,
   sourceFileDigest: createHash('sha256').update(BACKEND_SOURCE_TEXT, 'utf8').digest('hex'),
+  // 🔴 Task 4.1 ③／R1 `CODEX-R1-P1-02`：深度宣告 map 為**必填**——缺該列 tf 之鍵會拋錯，
+  //    不再靜默 floor 成 1（那個 1 會冒充成「深度 0」）。本檔 fixture 皆為 12h。
+  lookaheadBarsDeclared: { '12h': 0 },
 };
 
 const uploadMock = vi.fn();
@@ -96,15 +99,17 @@ describe('GAP-3 /search 匯出組裝器', () => {
     ] as unknown as CaseData[];
     const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '>=', value: 0.05 }], priceChangeMethod: 'close_to_close', ...BACKEND_SOURCE });
     expect(out.n_records).toBe(2);
-    // 整列被剔除者（label_value 缺欄只是不寫該欄、列仍保留）
-    expect(out.skipped.filter((s) => !s.reason.includes('label_value_omitted')).map((s) => s.reason))
+    // 整列被剔除者（附帶欄缺值只是不寫該欄、列仍保留——見 `missing_by_horizon`）
+    expect(out.skipped.map((s) => s.reason))
       .toEqual(['unparseable_timestamp', 'missing_positive_case_flag']);
     const r0 = out.records[0];
     expect(r0.t0).toBe(1704067200000);
     expect(r0.label).toBe(1);
     expect(out.records[1].t0).toBe(Date.parse('2024-01-01T12:00:00Z'));
     expect(out.records[1].label).toBe(0);
-    expect(r0.label_definition.window.horizon_bars).toBe(2);
+    // 🔴 Task 4.1 ③：`horizon_bars` 由該列 tf 之宣告深度導出（下限 1）。
+    //    本例未傳 `lookaheadBarsDeclared` ⇒ 深度視為 0 ⇒ floor 後為 1（**不是**舊的預設 2）。
+    expect(r0.label_definition.window.horizon_bars).toBe(1);
     expect(r0.label_definition.canonical_digest).toHaveLength(64);
     expect(r0.source_file_digest).toHaveLength(64);
     expect(r0.control_kind).toBe('user_labeled_same_trigger');
@@ -127,28 +132,37 @@ describe('GAP-3 /search 匯出組裝器', () => {
     expect(createHash('sha256').update(out.source_file_text, 'utf8').digest('hex')).toBe(out.source_file_digest);
     expect(out.verify_note).toContain('source_file');
     // 後端沒給 ⇒ fail-closed（不得退回前端自算、不得寫空值）
-    await expect(buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', sourceFileText: BACKEND_SOURCE_TEXT, sourceFileDigest: '' }))
-      .rejects.toThrow(/前端不得自算/);
+    await expect(buildEventContractRecords(cases, {
+      timeframe: '12h', conditions: [], priceChangeMethod: 'x',
+      sourceFileText: BACKEND_SOURCE_TEXT, sourceFileDigest: '',
+      lookaheadBarsDeclared: { '12h': 0 },   // R2 `CODEX-R2-P2-03`：必填欄，漏傳只有 tsc 看得到
+    })).rejects.toThrow(/前端不得自算/);
     // 覆蓋面（刪／改名／改值任一 future_* 欄 ⇒ digest 改變）由後端 golden 驅動，見 canonicalSourceCoverage.test.ts
   });
 
-  it('CODEX-R2-P1-02：label_value＝同 horizon 之答案窗未來報酬（future_Nbar_return），非觸發根 price_change；short 取負；缺欄不寫並記 skipped', async () => {
+  it('🔴 Task 4.1 ②（覆蓋 CODEX-R2-P1-02）：匯出端**不再寫 `label_value`**——答案窗已移到 IC 分析層', async () => {
+    // 歷史：本條原本驗「`label_value` 取同 horizon 之 `future_Nbar_return`、short 取負」。
+    // R8 依 §D-3′ 撤回主答案窗 ⇒ 匯出端不再有答案窗這件事，`label_value` 於**分析時**才由後端算。
+    // 這條保留下來當**回歸**：任何形式的 `label_value`（含 null／0／改名新欄）都不得回到匯出檔。
     const cases = [
       { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704067200', positive_case: 1, price_change: 0.052, future_2bar_return: 0.031, future_4bar_return: 0.077 },
       { symbol: 'ETHUSDT', timeframe: '12h', timestamp: '1704110400', positive_case: 0, price_change: -0.011 },
     ] as unknown as CaseData[];
-    const h2 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', ...BACKEND_SOURCE });
-    expect(h2.records[0].label_value).toBe(0.031);                       // 非 price_change 0.052
-    expect('label_value' in h2.records[1]).toBe(false);
-    expect(h2.skipped.some((s) => s.reason.includes('future_2bar_return'))).toBe(true);
-    expect(h2.label_value_source).toContain('future_2bar_return');
-    expect(h2.n_missing_label_value).toBe(1);                            // CODEX-R3-P1-02：缺欄筆數可供匯出前提示
-    const h4 = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', horizonBars: 4, ...BACKEND_SOURCE });
-    expect(h4.records[0].label_value).toBe(0.077);                       // 隨 horizon 改欄
-    expect(h4.records[0].label_definition.window.horizon_bars).toBe(4);
+    const out = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [], priceChangeMethod: 'x', ...BACKEND_SOURCE });
+    // **逐列**驗（不是只看第一列）
+    for (const r of out.records) expect('label_value' in r).toBe(false);
+    // 附帶欄照樣帶（原值，不因 direction 取負——附帶欄沒有 label 語意）
+    // 🔴 附帶欄是動態鍵（`...attachedColumns`）⇒ 推導型別看不到它們，取值須經 Record 視角。
+    const cols = (r: (typeof out.records)[number]) => r as unknown as Record<string, number>;
+    expect(cols(out.records[0]).future_2bar_return).toBe(0.031);
+    expect(cols(out.records[0]).future_4bar_return).toBe(0.077);
     const short = await buildEventContractRecords(cases, { timeframe: '12h', conditions: [{ parameter: 'price_change', operator: '<=', value: -0.03 }], priceChangeMethod: 'x', ...BACKEND_SOURCE });
     expect(short.records[0].direction).toBe('short');
-    expect(short.records[0].label_value).toBe(-0.031);
+    expect(cols(short.records[0]).future_2bar_return).toBe(0.031);       // short 也不取負
+    for (const r of short.records) expect('label_value' in r).toBe(false);
+    // 缺附帶欄 ⇒ 逐 horizon 計數（Task 4.3），**不**再走 skipped
+    expect(out.missing_by_horizon[2]).toBe(1);
+    expect(out.skipped).toEqual([]);
   });
 
   it('方向推斷：price_change <= 或負值 ⇒ short；toEpochMs 邊界', () => {
@@ -160,13 +174,16 @@ describe('GAP-3 /search 匯出組裝器', () => {
   });
 });
 
-describe('GAP-3 /search 匯出頁面接線（CODEX-R3-P1-02）', () => {
-  it('答案窗可選、缺 label_value 先提示、同時下載來源檔', () => {
+describe('GAP-3 /search 匯出頁面接線（B7 改形後）', () => {
+  it('附帶欄多選、缺附帶欄先提示、同時下載來源檔；主答案窗已不存在', () => {
     const src = readFileSync(resolve(__dirname, '../../app/search/page.tsx'), 'utf-8');
-    expect(src).toContain('export-gap3-horizon');                       // horizon 選單
-    expect(src).toContain('horizonBars: eventHorizonBars');             // 傳入匯出器
-    expect(src).toContain('payload.n_missing_label_value > 0');         // 缺欄提示
-    expect(src).toContain('missing_label_value');
+    // 🔴 Task 4.1 ②：主答案窗之 select 與其傳參皆已移除
+    expect(src).not.toContain('export-gap3-horizon');
+    expect(src).not.toContain('horizonBars: eventHorizonBars');
+    expect(src).toContain('export-attached-columns');                   // 附帶欄多選
+    expect(src).toContain('attachedHorizons,');                         // 傳入匯出器
+    expect(src).toContain('lookaheadBarsDeclared: lowerBoundState.depthByTimeframe');
+    expect(src).toContain('payload.missing_by_horizon');                // Task 4.3 缺欄提示
     expect(src).toContain('.source.json');                              // companion 來源檔
     expect(src).toContain('payload.source_file_text');
   });

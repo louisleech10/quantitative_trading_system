@@ -77,7 +77,20 @@
     "event_shape": { "type": "str", "doc": "值 'interval' 觸發 conditional_required.event_interval（T10）" },
     "label_kind": { "type": "str" },
     "event_type_tag": { "type": "str", "doc": "自由標籤" },
-    "meta": { "type": "object", "doc": "自由欄；不得用以補 conditional_required 之洞（R1 X5）" }
+    "meta": { "type": "object", "doc": "自由欄；不得用以補 conditional_required 之洞（R1 X5）" },
+    "lookahead_bars_declared": { "type": "object", "doc": "GAP-3 UX D-004 A-020：逐 timeframe 深度 oracle（Mapping[str,int>=0]）；可隨事件列匯入攜帶；對齊後複製至 receipt_schema.batch.lookahead_bars_declared。型別錯 ⇒ type_error；同批各列須同值，列間不一致 ⇒ heterogeneous_rows_in_batch（無條件檢查，不受 enforce_batch_homogeneity 約束）" },
+    "future_1bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_2bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_3bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_4bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_5bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_6bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_7bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_8bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_9bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_10bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_11bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
+    "future_12bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" }
   },
   "conditional_required": {
     "reference_symbols": {
@@ -110,8 +123,7 @@
       "observed_through_ms", "feature_cutoff_ms", "decision_at_ms", "entry_at_ms", "label_start_ms", "label_end_ms",
       "event_known_at_decision", "entry_after_label_start",
       "dedupe_cluster_id", "overlap_set_hash", "uniqueness_weight", "time_cluster_id", "cluster_weight",
-      "counterexample_kind_effective", "platform_suggested_kind",
-      "lookahead_bars_declared"
+      "counterexample_kind_effective", "platform_suggested_kind"
     ],
     "counterexample_kind_effective_enum": ["a_trigger_no_follow", "b_range", "c_drop", "unclassifiable"]
   },

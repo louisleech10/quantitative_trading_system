@@ -1,0 +1,364 @@
+{
+  "epic": "gap3ux-b7",
+  "mode": "verify",
+  "n_mutations": 22,
+  "results": [
+    {
+      "id": "4.1-M1",
+      "task": "4.1",
+      "desc": "匯出端恢復寫 label_value（Task 4.1「不可做」）",
+      "rc": 1,
+      "red": [
+        "GAP-3 /search 匯出組裝器 > 🔴 Task 4.1 ②（覆蓋 CODEX-R2-P1-02）：匯出端**不再寫 `label_value`**——答案窗已移到 IC 分析層",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ② `label_value` 不在匯出檔內——**逐列**驗，不是只看第一列"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "GAP-3 /search 匯出組裝器 > 🔴 Task 4.1 ②（覆蓋 CODEX-R2-P1-02）：匯出端**不再寫 `label_value`**——答案窗已移到 IC 分析層",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ② `label_value` 不在匯出檔內——**逐列**驗，不是只看第一列"
+      ]
+    },
+    {
+      "id": "4.1-M2",
+      "task": "4.1",
+      "desc": "把「主答案窗」控制項加回",
+      "rc": 1,
+      "red": [
+        "GAP-3 /search 匯出頁面接線（B7 改形後） > 附帶欄多選、缺附帶欄先提示、同時下載來源檔；主答案窗已不存在",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ③ 匯出面板**不存在**「主答案窗」控制項",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ④ 主答案窗之 <select> 已不存在（Task 4.1 ②：匯出端不再讓使用者選 h）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "GAP-3 /search 匯出頁面接線（B7 改形後） > 附帶欄多選、缺附帶欄先提示、同時下載來源檔；主答案窗已不存在",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ③ 匯出面板**不存在**「主答案窗」控制項",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ④ 主答案窗之 <select> 已不存在（Task 4.1 ②：匯出端不再讓使用者選 h）"
+      ]
+    },
+    {
+      "id": "4.1-M3",
+      "task": "4.1",
+      "desc": "window.horizon_bars 改讀附帶欄之 max",
+      "rc": 1,
+      "red": [
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ④ `lookahead_bars_declared` ＝後端深度端點之回傳 map；`horizon_bars` 由**同一 exported 函式**導出",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ⑤ 改變附帶欄之選擇 ⇒ `lookahead_bars_declared` 與 `horizon_bars` **皆不變**",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ⑥ 深度 0 之 floor：`lookahead_bars_declared[1h] === 0` 且 `window.horizon_bars === 1`（**刻意不等**）",
+        "Task 4.1c — 明文標示本批不提供 IC decay > 🔴 邊界①：改附帶欄之選擇 ⇒ `window.horizon_bars` **不變**（附帶欄不是答案窗）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ④ `lookahead_bars_declared` ＝後端深度端點之回傳 map；`horizon_bars` 由**同一 exported 函式**導出",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ⑤ 改變附帶欄之選擇 ⇒ `lookahead_bars_declared` 與 `horizon_bars` **皆不變**",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ⑥ 深度 0 之 floor：`lookahead_bars_declared[1h] === 0` 且 `window.horizon_bars === 1`（**刻意不等**）",
+        "Task 4.1c — 明文標示本批不提供 IC decay > 🔴 邊界①：改附帶欄之選擇 ⇒ `window.horizon_bars` **不變**（附帶欄不是答案窗）"
+      ]
+    },
+    {
+      "id": "4.1-M4",
+      "task": "4.1",
+      "desc": "lookahead_bars_declared 也套 floor（兩者刻意不等之保護消失）",
+      "rc": 1,
+      "red": [
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ⑥ 深度 0 之 floor：`lookahead_bars_declared[1h] === 0` 且 `window.horizon_bars === 1`（**刻意不等**）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ⑥ 深度 0 之 floor：`lookahead_bars_declared[1h] === 0` 且 `window.horizon_bars === 1`（**刻意不等**）"
+      ]
+    },
+    {
+      "id": "4.1b-M1",
+      "task": "4.1b",
+      "desc": "揭露區塊少一段（scenario）",
+      "rc": 1,
+      "red": [
+        "Task 4.1b — 匯出時揭露每個選項在動什麼 > ① 四段皆出現：scenario／lookahead 深度＋來源／purge 下界＋取較大者／control_kind",
+        "Task 4.1b — 匯出時揭露每個選項在動什麼 > ② `control_kind` 之顯示值 == 匯出檔實際寫入之值（防寫死漂移）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.1b — 匯出時揭露每個選項在動什麼 > ① 四段皆出現：scenario／lookahead 深度＋來源／purge 下界＋取較大者／control_kind",
+        "Task 4.1b — 匯出時揭露每個選項在動什麼 > ② `control_kind` 之顯示值 == 匯出檔實際寫入之值（防寫死漂移）"
+      ]
+    },
+    {
+      "id": "4.1c-M1",
+      "task": "4.1c",
+      "desc": "horizon_bars 改隨附帶欄之最小值",
+      "rc": 1,
+      "red": [
+        "GAP-3 /search 匯出組裝器 > t0 為 ms（秒級自動 ×1000、ISO 可解）；label 取正反例；缺標記者列 skipped",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ④ `lookahead_bars_declared` ＝後端深度端點之回傳 map；`horizon_bars` 由**同一 exported 函式**導出",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ⑤ 改變附帶欄之選擇 ⇒ `lookahead_bars_declared` 與 `horizon_bars` **皆不變**",
+        "Task 4.1c — 明文標示本批不提供 IC decay > 🔴 邊界①：改附帶欄之選擇 ⇒ `window.horizon_bars` **不變**（附帶欄不是答案窗）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "GAP-3 /search 匯出組裝器 > t0 為 ms（秒級自動 ×1000、ISO 可解）；label 取正反例；缺標記者列 skipped",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ④ `lookahead_bars_declared` ＝後端深度端點之回傳 map；`horizon_bars` 由**同一 exported 函式**導出",
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ⑤ 改變附帶欄之選擇 ⇒ `lookahead_bars_declared` 與 `horizon_bars` **皆不變**",
+        "Task 4.1c — 明文標示本批不提供 IC decay > 🔴 邊界①：改附帶欄之選擇 ⇒ `window.horizon_bars` **不變**（附帶欄不是答案窗）"
+      ]
+    },
+    {
+      "id": "4.2-M1",
+      "task": "4.2",
+      "desc": "analyze 忽略傳入 horizons、恆用 (1,2,4)",
+      "rc": 1,
+      "red": [
+        "test_gap3_horizon_curve_rejects_empty_and_nonpositive_and_duplicate",
+        "test_gap3_horizon_curve_row_count_equals_len_horizons"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_horizon_curve_rejects_empty_and_nonpositive_and_duplicate",
+        "test_gap3_horizon_curve_row_count_equals_len_horizons"
+      ]
+    },
+    {
+      "id": "4.2-M2",
+      "task": "4.2",
+      "desc": "前端不傳 horizons（回到 B7 之前）",
+      "rc": 1,
+      "red": [
+        "Task 4.2 — 前端把選定之 horizon 集合送進事件表 API > ① 選 [1,3,7] ⇒ POST body 恰為該陣列（不是後端預設 [1,2,4]）",
+        "Task 4.2 — 前端把選定之 horizon 集合送進事件表 API > ④ 改變 horizon 集合 ⇒ 真的重打 API（否則使用者改了選擇卻看到舊表）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.2 — 前端把選定之 horizon 集合送進事件表 API > ① 選 [1,3,7] ⇒ POST body 恰為該陣列（不是後端預設 [1,2,4]）",
+        "Task 4.2 — 前端把選定之 horizon 集合送進事件表 API > ④ 改變 horizon 集合 ⇒ 真的重打 API（否則使用者改了選擇卻看到舊表）"
+      ]
+    },
+    {
+      "id": "4.3-M1",
+      "task": "4.3",
+      "desc": "缺欄訊息改成一句總計（不逐 horizon）",
+      "rc": 1,
+      "red": [
+        "Task 4.3 — 缺欄確認框逐 horizon 列出 > ① 訊息含**每一個**缺欄附帶 horizon 之筆數數字（逐 horizon，非一句總計）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.3 — 缺欄確認框逐 horizon 列出 > ① 訊息含**每一個**缺欄附帶 horizon 之筆數數字（逐 horizon，非一句總計）"
+      ]
+    },
+    {
+      "id": "A020-M1",
+      "task": "A-020",
+      "desc": "lookahead_bars_declared 加回 derived_fields（雙登記）",
+      "rc": 1,
+      "red": [
+        "test_gap3_attached_columns_contract_no_double_registration"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_attached_columns_contract_no_double_registration"
+      ]
+    },
+    {
+      "id": "A020-M2",
+      "task": "A-020",
+      "desc": "移除 optional_fields 之 future_7bar_return",
+      "rc": 1,
+      "red": [
+        "test_gap3_attached_columns_contract_accepts_declared_and_future_columns",
+        "test_gap3_attached_columns_contract_future_columns_never_reach_ic_feed",
+        "test_gap3_attached_columns_contract_rejects_non_float_future_column"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_attached_columns_contract_accepts_declared_and_future_columns",
+        "test_gap3_attached_columns_contract_future_columns_never_reach_ic_feed",
+        "test_gap3_attached_columns_contract_rejects_non_float_future_column"
+      ]
+    },
+    {
+      "id": "A020-M3",
+      "task": "A-020",
+      "desc": "自 receipt_schema.batch 刪掉同名鍵",
+      "rc": 1,
+      "red": [
+        "test_gap3_attached_columns_contract_receipt_batch_key_preserved"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_attached_columns_contract_receipt_batch_key_preserved"
+      ]
+    },
+    {
+      "id": "A020-M4",
+      "task": "A-020",
+      "desc": "批內一致性只驗第一列",
+      "rc": 1,
+      "red": [
+        "test_gap3_attached_columns_contract_rejects_batch_inconsistent_declared"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_attached_columns_contract_rejects_batch_inconsistent_declared"
+      ]
+    },
+    {
+      "id": "A020-M5",
+      "task": "A-020",
+      "desc": "ic_feed 改以 future_1bar_return 充當 label 值",
+      "rc": 1,
+      "red": [
+        "test_gap3_attached_columns_contract_future_columns_never_reach_ic_feed"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_attached_columns_contract_future_columns_never_reach_ic_feed"
+      ]
+    },
+    {
+      "id": "A021-M1",
+      "task": "A-021",
+      "desc": "pending 改為允許匯出（fail-open）",
+      "rc": 1,
+      "red": [
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤b `pending`（深度還沒回來）⇒ 呼叫次數 == 0",
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤d 🔴 R1 三家一致 P1：**無篩選條件**且深度 in-flight ⇒ 呼叫次數 == 0",
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤e 🔴 R1 `GROK-R1-P1-01`：清掉條件後第二輪 in-flight ⇒ 不得沿用**過期** map",
+        "GAP-3 B5 /search 匯出前篩選之執行期接線 > ②b 下界還沒回來（pending）⇒ 匯出同樣被擋",
+        "Task 2.1 匯出前篩選 > ⑪ 🔴 readiness fail-closed：證明得出深度才放行（`D-004 A-021(b)`）",
+        "gap3 export lower-bound guard — 擋（readiness 未就緒） > pending（還沒拿到深度） ⇒ proceed 一次都沒被呼叫、fetch call count == 0",
+        "gap3 export lower-bound guard — 擋（readiness 未就緒） > 阻擋文案隨 state 改變（防守衛硬編一個字串）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤b `pending`（深度還沒回來）⇒ 呼叫次數 == 0",
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤d 🔴 R1 三家一致 P1：**無篩選條件**且深度 in-flight ⇒ 呼叫次數 == 0",
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤e 🔴 R1 `GROK-R1-P1-01`：清掉條件後第二輪 in-flight ⇒ 不得沿用**過期** map",
+        "GAP-3 B5 /search 匯出前篩選之執行期接線 > ②b 下界還沒回來（pending）⇒ 匯出同樣被擋",
+        "Task 2.1 匯出前篩選 > ⑪ 🔴 readiness fail-closed：證明得出深度才放行（`D-004 A-021(b)`）",
+        "gap3 export lower-bound guard — 擋（readiness 未就緒） > pending（還沒拿到深度） ⇒ proceed 一次都沒被呼叫、fetch call count == 0",
+        "gap3 export lower-bound guard — 擋（readiness 未就緒） > 阻擋文案隨 state 改變（防守衛硬編一個字串）"
+      ]
+    },
+    {
+      "id": "A021-M2",
+      "task": "A-021",
+      "desc": "混 TF 不同深度改回擋住（inexpressible）",
+      "rc": 1,
+      "red": [
+        "GAP-3 B5 /search 匯出前篩選之執行期接線 > ④ 🔴 混 TF 且逐 tf 下界不同 ⇒ 顯示逐週期下界、**可匯出**，且送入完整逐 tf map（不得取 max 冒充）",
+        "Task 2.1 匯出前篩選 > ⑩ 下界狀態機（`D-002 A-004` 之決策本體）：四種情形之 status 與 bound"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "GAP-3 B5 /search 匯出前篩選之執行期接線 > ④ 🔴 混 TF 且逐 tf 下界不同 ⇒ 顯示逐週期下界、**可匯出**，且送入完整逐 tf map（不得取 max 冒充）",
+        "Task 2.1 匯出前篩選 > ⑩ 下界狀態機（`D-002 A-004` 之決策本體）：四種情形之 status 與 bound"
+      ]
+    },
+    {
+      "id": "A021-M3",
+      "task": "A-021",
+      "desc": "把 page 之 proceed 包裹真的拆成裸 if（主委不預測紅集合）",
+      "rc": 1,
+      "red": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ① 匯出處理器把工作委派給守衛，且**恰一處**（誘餌會被這條抓到）",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ② 守衛之引數逐字為 (lowerBoundState, {notify, proceed})——`A-021(c)` 之新簽章",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ③ 該函式內**每一個** await 都落在 proceed 之內（阻擋早於網路動作＝結構保證）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ① 匯出處理器把工作委派給守衛，且**恰一處**（誘餌會被這條抓到）",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ② 守衛之引數逐字為 (lowerBoundState, {notify, proceed})——`A-021(c)` 之新簽章",
+        "gap3 lookahead depth lock — search/page.tsx 接線 > ③ 該函式內**每一個** await 都落在 proceed 之內（阻擋早於網路動作＝結構保證）"
+      ]
+    },
+    {
+      "id": "R1-M1",
+      "task": "R1-P1",
+      "desc": "無條件路徑不打 pending（三家一致 P1 之修法可證偽性）",
+      "rc": 1,
+      "red": [
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤d 🔴 R1 三家一致 P1：**無篩選條件**且深度 in-flight ⇒ 呼叫次數 == 0",
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤e 🔴 R1 `GROK-R1-P1-01`：清掉條件後第二輪 in-flight ⇒ 不得沿用**過期** map"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤d 🔴 R1 三家一致 P1：**無篩選條件**且深度 in-flight ⇒ 呼叫次數 == 0",
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤e 🔴 R1 `GROK-R1-P1-01`：清掉條件後第二輪 in-flight ⇒ 不得沿用**過期** map"
+      ]
+    },
+    {
+      "id": "R1-M2",
+      "task": "R1-P1",
+      "desc": "拿掉深度回傳之覆蓋性檢查（CODEX-R1-P1-02）",
+      "rc": 1,
+      "red": [
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤f 🔴 R1 `CODEX-R1-P1-02`：深度回傳未覆蓋本批週期（空 map／缺鍵／非法值）⇒ 擋"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤f 🔴 R1 `CODEX-R1-P1-02`：深度回傳未覆蓋本批週期（空 map／缺鍵／非法值）⇒ 擋"
+      ]
+    },
+    {
+      "id": "R1-M3",
+      "task": "R1-P2",
+      "desc": "附帶欄改回 _is_num（放行 NaN／±Inf；CODEX-R1-P2-01）",
+      "rc": 1,
+      "red": [
+        "test_gap3_attached_columns_contract_rejects_non_finite_future_column[-inf]",
+        "test_gap3_attached_columns_contract_rejects_non_finite_future_column[inf]",
+        "test_gap3_attached_columns_contract_rejects_non_finite_future_column[nan]"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_attached_columns_contract_rejects_non_finite_future_column[-inf]",
+        "test_gap3_attached_columns_contract_rejects_non_finite_future_column[inf]",
+        "test_gap3_attached_columns_contract_rejects_non_finite_future_column[nan]"
+      ]
+    },
+    {
+      "id": "R2-M1",
+      "task": "R2-P1",
+      "desc": "timeframes 為空時靜默 return（CODEX-R2-P1-01）",
+      "rc": 1,
+      "red": [
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤g 🔴 R2 `CODEX-R2-P1-01`：結果集讀不到週期（`timeframes` 為空）⇒ 擋，且看得見原因"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "A-021 驗收⑤ — page runtime：未就緒時匯出組裝器一次都不被呼叫 > ⑤g 🔴 R2 `CODEX-R2-P1-01`：結果集讀不到週期（`timeframes` 為空）⇒ 擋，且看得見原因"
+      ]
+    },
+    {
+      "id": "R2-M2",
+      "task": "R2-P1",
+      "desc": "拿掉『全有全無』檢查（CODEX-R2-P1-02：部分列帶 map ⇒ NaN）",
+      "rc": 1,
+      "red": [
+        "test_gap3_attached_columns_contract_rejects_partially_present_declared"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_attached_columns_contract_rejects_partially_present_declared"
+      ]
+    }
+  ],
+  "baseline_after_restore": {
+    "export": {
+      "rc": 0,
+      "red": []
+    },
+    "tables": {
+      "rc": 0,
+      "red": []
+    },
+    "contract": {
+      "rc": 0,
+      "red": []
+    },
+    "horizon": {
+      "rc": 0,
+      "red": []
+    }
+  },
+  "closure": "CLOSED"
+}

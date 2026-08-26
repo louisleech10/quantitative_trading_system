@@ -1,80 +1,35 @@
 /**
- * GAP-3 UX Task 2.1b — 答案窗下界鎖定（前端側）之驗收。
+ * GAP-3 UX Task 2.1b ＋ `D-004 A-021(c)` — 匯出前 readiness 守衛之驗收。
  *
- * SPEC 驗收①之後半：「嘗試設低於下界 ⇒ 前端阻擋且 `fetch` call count `== 0`」。
- * 深度 7 之導出由 pytest 側（`gap3_lookahead_depth`）驗；本檔驗**鎖定行為**。
+ * 🔴 **B7 改形**：本檔原本驗「使用者選的答案窗低於導出下界 ⇒ 擋」。Task 4.1 移除主答案窗後
+ *    那個比較恆真＝死碼（`A-021(b)`），守衛職責改為 **readiness fail-closed**：
+ *    「系統還證明不出這批的深度（`pending`／`error`）⇒ 一個網路動作都不許發生」。
+ *    受保護的整段仍包在 `proceed` 內，故仍以 **`proceed` 呼叫次數**直接驗，不必猜原始碼長相。
  *
- * 🔴 R3 修法：阻擋不再測「一個與 page 同形態的替身」，而是測 page **實際呼叫的那個函式**
- *    `withHorizonLowerBoundGuard`——受保護的整段包在 `proceed` 內，
- *    「未達下界時網路動作不會發生」因此可用 `proceed` 呼叫次數直接驗，不必猜原始碼長相。
+ * 🔴 保留的反假綠設計（B5 R3／R4 三家提出，改形後同樣適用）：
+ *    ①**對照組**（可放行時 `proceed` 真的被呼叫且回其結果）——否則「恆擋」也會全綠；
+ *    ②notify 收到的字串**逐字**等於文案函式之輸出——否則守衛只要 `notify('任何字')` 就綠；
+ *    ③不同 state ⇒ 不同文案（防守衛硬編一個字串）。
  */
 import { describe, expect, it, vi } from 'vitest';
-import {
-  clampHorizonToLowerBound,
-  horizonLowerBoundMessage,
-  isHorizonBelowLowerBound,
-  withHorizonLowerBoundGuard,
-} from './lookaheadDepthLock';
+import { exportLowerBoundBlockMessage, withExportLowerBoundGuard } from './lookaheadDepthLock';
+import { UNCONSTRAINED_LOWER_BOUND, type LowerBoundState } from './exportFilter';
 
-describe('gap3 lookahead depth lock — 判定', () => {
-  // 🔴 CODEX-R4-P2-05：舊版只有 (5,7) 一組嚴格小於 ⇒ 實作改成
-  //    `return selectedBars === 5 && lowerBound === 7` 仍全綠。改為多組覆蓋。
-  it.each([
-    [5, 7],
-    [1, 2],
-    [11, 12],
-    [0, 1],
-    [3, 100],
-  ])('低於下界即阻擋（選 %i、下界 %i）', (selected, bound) => {
-    expect(isHorizonBelowLowerBound(selected, bound)).toBe(true);
-  });
-
-  it.each([
-    [7, 7],
-    [12, 7],
-    [2, 1],
-    [1, 1],
-    [100, 3],
-  ])('等於或高於下界皆放行（選 %i、下界 %i；保守方向永遠允許）', (selected, bound) => {
-    expect(isHorizonBelowLowerBound(selected, bound)).toBe(false);
-  });
-
-  it('尚無下界（null／undefined）⇒ 無約束，不得誤擋', () => {
-    expect(isHorizonBelowLowerBound(1, null)).toBe(false);
-    expect(isHorizonBelowLowerBound(1, undefined)).toBe(false);
-  });
-
-  it('夾值只往上，永不往下', () => {
-    expect(clampHorizonToLowerBound(5, 7)).toBe(7);
-    expect(clampHorizonToLowerBound(12, 7)).toBe(12);
-    expect(clampHorizonToLowerBound(3, null)).toBe(3);
-  });
+const state = (over: Partial<LowerBoundState>): LowerBoundState => ({
+  status: 'resolved', depthByTimeframe: {}, bound: null, error: null, ...over,
 });
 
-describe('gap3 lookahead depth lock — 阻擋文案', () => {
-  // 🔴 COMPOSER-R3-P2-01／GROK-R3-P3-01：原本只驗 `toContain('7')`。
-  //    「17 根」含子字串「7」；`String(lowerBound)` 也含。兩種掏空文案的壞法都能全綠。
-  //    改為**逐字**比對整串，並另驗「換一個下界會得到不同字串」（防硬編碼）。
-  const expected = (n: number) =>
-    `篩選條件引用之未來欄最遠看到第 ${n} 根，答案窗不得低於 ${n} 根` +
-    `（低於此值＝答案窗內已含條件看過的未來資料）。可以往上調，不能往下調。`;
+const PENDING = state({ status: 'pending' });
+const ERROR = state({ status: 'error', error: '後端 500' });
+const RESOLVED = state({ status: 'resolved', depthByTimeframe: { '12h': 6 }, bound: 6 });
+const RESOLVED_MIXED = state({ status: 'resolved', depthByTimeframe: { '1h': 72, '12h': 6 } });
 
-  it('文案逐字相等（不是「含有那個數字」）', () => {
-    expect(horizonLowerBoundMessage(7)).toBe(expected(7));
-  });
-
-  it('不同下界 ⇒ 不同文案（防硬編碼／忽略參數）', () => {
-    expect(horizonLowerBoundMessage(17)).toBe(expected(17));
-    expect(horizonLowerBoundMessage(7)).not.toBe(horizonLowerBoundMessage(17));
-  });
-
-  it('不得出現不可機械證明之「label 正確」字樣', () => {
-    expect(horizonLowerBoundMessage(7)).not.toContain('label 正確');
-  });
-});
-
-describe('gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的那個函式）', () => {
-  it('選 5、下界 7 ⇒ proceed 一次都沒被呼叫、fetch call count == 0', async () => {
+describe('gap3 export lower-bound guard — 擋（readiness 未就緒）', () => {
+  // 🔴 兩種未就緒各驗一次：只驗 pending 的話，把守衛寫成 `status === 'pending'` 仍全綠。
+  it.each([
+    ['pending（還沒拿到深度）', PENDING],
+    ['error（算不出深度）', ERROR],
+  ])('%s ⇒ proceed 一次都沒被呼叫、fetch call count == 0', async (_label, s) => {
     const fetchSpy = vi.fn();
     const notify = vi.fn();
     const proceed = vi.fn(async () => {
@@ -82,47 +37,50 @@ describe('gap3 lookahead depth lock — 守衛之行為（page 實際呼叫的�
       return 'sent' as const;
     });
 
-    const r = await withHorizonLowerBoundGuard(5, 7, { notify, proceed });
+    const r = await withExportLowerBoundGuard(s, { notify, proceed });
 
     expect(r).toBeUndefined();
     expect(proceed).toHaveBeenCalledTimes(0);
     expect(fetchSpy).toHaveBeenCalledTimes(0);
     expect(notify).toHaveBeenCalledTimes(1);
-    // 🔴 CODEX-R4-P2-04／GROK-R4-P2-02：舊版只驗 `toContain('7')`
-    //    ⇒ 把守衛改成 `deps.notify('7')` 或 `deps.notify(String(lowerBound))`（根本不呼叫
-    //      文案函式）都仍全綠——「守衛送出正確阻擋文案」被兩個代理物代替：
-    //      「文案函式本身字面正確」＋「notify 的字串裡有那個數字」。
-    //    改為驗**配線本身**：notify 收到的須逐字等於文案函式對同一下界之輸出。
-    expect(notify.mock.calls[0][0]).toBe(horizonLowerBoundMessage(7));
+    // 驗**配線本身**：notify 收到的須逐字等於文案函式對同一 state 之輸出
+    // （只驗 `toContain` 的話，`notify('錯誤')` 之類掏空文案的寫法照樣綠）。
+    expect(notify.mock.calls[0][0]).toBe(exportLowerBoundBlockMessage(s));
   });
 
-  it('阻擋文案之配線隨下界改變（防守衛硬編一個字串）', async () => {
+  it('阻擋文案隨 state 改變（防守衛硬編一個字串）', async () => {
     const notify = vi.fn();
     const proceed = vi.fn(async () => 'sent' as const);
 
-    await withHorizonLowerBoundGuard(1, 17, { notify, proceed });
+    await withExportLowerBoundGuard(ERROR, { notify, proceed });
+    await withExportLowerBoundGuard(PENDING, { notify, proceed });
 
     expect(proceed).toHaveBeenCalledTimes(0);
-    expect(notify.mock.calls[0][0]).toBe(horizonLowerBoundMessage(17));
-    expect(notify.mock.calls[0][0]).not.toBe(horizonLowerBoundMessage(7));
+    expect(notify.mock.calls[0][0]).toBe(exportLowerBoundBlockMessage(ERROR));
+    expect(notify.mock.calls[1][0]).toBe(exportLowerBoundBlockMessage(PENDING));
+    expect(notify.mock.calls[0][0]).not.toBe(notify.mock.calls[1][0]);
   });
 
-  it('對照組：選 7、下界 7 ⇒ proceed 被呼叫且回其結果（防「恆擋型假保證」）', async () => {
+  it('error 之原因會被帶出來（不是吞掉換成通用句）', () => {
+    expect(exportLowerBoundBlockMessage(ERROR)).toBe('後端 500');
+    expect(exportLowerBoundBlockMessage(PENDING)).toContain('尚未取得');
+  });
+});
+
+describe('gap3 export lower-bound guard — 放行（對照組；防「恆擋型假保證」）', () => {
+  it.each([
+    ['unconstrained（沒有條件）', UNCONSTRAINED_LOWER_BOUND],
+    ['resolved（單一 tf）', RESOLVED],
+    // 🔴 `A-021(d)`：混 TF 且下界不同（舊 `inexpressible`）**現在可以匯出**——
+    //    4.1 之後 horizon_bars 逐列依該列 tf 寫入，per-scope 已可表達。
+    ['resolved（混 TF、bound 為 null）', RESOLVED_MIXED],
+  ])('%s ⇒ proceed 被呼叫一次且回其結果', async (_label, s) => {
     const notify = vi.fn();
     const proceed = vi.fn(async () => 'sent' as const);
 
-    const r = await withHorizonLowerBoundGuard(7, 7, { notify, proceed });
+    const r = await withExportLowerBoundGuard(s, { notify, proceed });
 
     expect(r).toBe('sent');
-    expect(proceed).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledTimes(0);
-  });
-
-  it('尚無下界（null）⇒ 放行（防把「還沒接上值」誤擋成阻擋）', async () => {
-    const notify = vi.fn();
-    const proceed = vi.fn(async () => 'sent' as const);
-
-    expect(await withHorizonLowerBoundGuard(1, null, { notify, proceed })).toBe('sent');
     expect(proceed).toHaveBeenCalledTimes(1);
     expect(notify).toHaveBeenCalledTimes(0);
   });

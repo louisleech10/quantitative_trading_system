@@ -1,60 +1,46 @@
 /**
- * GAP-3 UX Task 2.1b — 答案窗下界之**鎖定**（前端側）。
+ * GAP-3 UX Task 2.1b — 匯出前之下界守衛（前端側）。
  *
  * 🔴 **本檔不計算深度。** 深度公式之唯一權威實作是
  * `momentum/Analysis/event_samples/lookahead_depth.py::depth_by_timeframe()`；
  * 在 TS 重寫一份＝第二份副本，兩條路徑必然漂移（SPEC Task 2.1b「本批唯一權威定義」）。
- * 本檔只做**比較與阻擋**：拿到後端導出之下界，決定「這個選值可不可以送出」。
  *
- * 語意：使用者可**往上**調（保守方向永遠允許），**不得**調低於導出值
- * ——那等於明知條件用到第 7 根卻只隔 5 根。
+ * 🔴 **`D-004 A-021(c)` 之改形（B7／Task 4.1）**：本檔原本的職責是「比較使用者選的答案窗與
+ * 導出下界」。Task 4.1 移除主答案窗後，`window.horizon_bars` **由深度導出**而非使用者選
+ * ⇒ 那個比較恆真＝死碼，已隨 `exportAllowedUnderBound` 一併移除。
+ * 但守衛**本體不刪**，職責改為 **readiness fail-closed**：
+ * 「系統還證明不出這批的深度（`pending`／`error`）時，一個網路動作都不許發生」。
+ * 三家 consult 之 `RULING-3(c)` 為 **2 vs 1**（codex＋grok 裁保留、composer 裁移除），取多數且較嚴版。
  */
+import { exportAllowedByLowerBoundState, type LowerBoundState } from './exportFilter';
 
-/** 該選值是否低於導出下界（＝必須阻擋送出）。下界為 null／undefined ⇒ 尚無約束。 */
-export function isHorizonBelowLowerBound(
-  selectedBars: number,
-  lowerBound: number | null | undefined,
-): boolean {
-  if (lowerBound === null || lowerBound === undefined) return false;
-  return selectedBars < lowerBound;
-}
-
-/** 把選值夾到下界之上（只往上夾，永不往下）。 */
-export function clampHorizonToLowerBound(
-  selectedBars: number,
-  lowerBound: number | null | undefined,
-): number {
-  if (lowerBound === null || lowerBound === undefined) return selectedBars;
-  return selectedBars < lowerBound ? lowerBound : selectedBars;
-}
-
-/** 阻擋原因文案（未達下界時顯示；不得說「label 正確」之類不可機械證明之語）。 */
-export function horizonLowerBoundMessage(lowerBound: number): string {
+/** 擋下時顯示的原因（`error` 有值就用它，否則用 readiness 的通用說法）。 */
+export function exportLowerBoundBlockMessage(state: LowerBoundState): string {
   return (
-    `篩選條件引用之未來欄最遠看到第 ${lowerBound} 根，答案窗不得低於 ${lowerBound} 根` +
-    `（低於此值＝答案窗內已含條件看過的未來資料）。可以往上調，不能往下調。`
+    state.error
+    ?? '尚未取得答案窗下界（系統還無法證明這批條件安全），請稍候或修正條件後再匯出'
   );
 }
 
 /**
- * 匯出前之下界守衛：**未達下界時，`proceed` 一次都不會被呼叫**。
+ * 匯出前之 readiness 守衛：**未就緒時，`proceed` 一次都不會被呼叫**。
  *
- * 🔴 為什麼是這個形狀（GROK-R3-P2-01／CODEX-R3-P2-01／-02 三條合併之修法）：
+ * 🔴 為什麼是這個形狀（GROK-R3-P2-01／CODEX-R3-P2-01／-02 三條合併之修法，B7 續用）：
  * 先前 page 內是「`if (…) return;` 之後接一長串匯出邏輯」，那種形狀**只能用原始碼 AST 檢查**，
  * 而 AST 檢查鎖的是「第一個命中」「子樹裡任一個 return」——三家各自用誘餌守衛、
  * 巢狀 return、把真守衛移到 `await` 之後，都能讓 AST 全綠而執行期照樣先做網路重活。
  *
- * ⇒ 改成**把要保護的整段包進 `proceed`**。這樣「阻擋早於任何網路動作」不再是需要被檢查的性質，
+ * ⇒ **把要保護的整段包進 `proceed`**。這樣「阻擋早於任何網路動作」不再是需要被檢查的性質，
  * 而是**結構上保證**的事實：`proceed` 沒被呼叫，裡面的 `await` 就不可能發生。
- * 於是本函式可以用**真正的行為測試**驗（`proceed` 呼叫次數 `== 0`），不必再猜原始碼長相。
+ * 🔴 **不得**把它退回成裸 `if (…) return;` 後接長串 `await`——那正是 B5 R3 已否定、
+ * 可被 AST 繞過的形狀（grok 於 consult 輪明列此警告）。
  */
-export async function withHorizonLowerBoundGuard<T>(
-  selectedBars: number,
-  lowerBound: number | null | undefined,
+export async function withExportLowerBoundGuard<T>(
+  state: LowerBoundState,
   deps: { notify: (message: string) => void; proceed: () => Promise<T> },
 ): Promise<T | undefined> {
-  if (isHorizonBelowLowerBound(selectedBars, lowerBound)) {
-    deps.notify(horizonLowerBoundMessage(lowerBound as number));
+  if (!exportAllowedByLowerBoundState(state)) {
+    deps.notify(exportLowerBoundBlockMessage(state));
     return undefined;
   }
   return deps.proceed();

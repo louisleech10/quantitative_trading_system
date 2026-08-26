@@ -51,7 +51,8 @@ async function exportOf(name: string) {
     timeframe: '12h',
     conditions: RULE_CONDITIONS,
     priceChangeMethod: 'close_to_close',
-    horizonBars: 2,
+    // Task 4.1 ③／R1 `CODEX-R1-P1-02`：深度宣告 map 為必填（缺該列 tf 之鍵會拋錯）
+    lookaheadBarsDeclared: { '12h': 0 },
     sourceFileText: v.source_file_text,
     sourceFileDigest: v.source_file_digest,
   });
@@ -105,6 +106,7 @@ describe('canonicalSourceCoverage — ④(a) 前端不得自算 digest（執行�
     const v = variants.base;
     await expect(buildEventContractRecords(v.cases as unknown as CaseData[], {
       timeframe: '12h', conditions: [], priceChangeMethod: 'x', sourceFileText: '', sourceFileDigest: '',
+      lookaheadBarsDeclared: { '12h': 0 },
     })).rejects.toThrow(/後端/);
     expect(hashEntryCalls().filter((c) => c.input === v.source_file_text)).toHaveLength(0);
   });

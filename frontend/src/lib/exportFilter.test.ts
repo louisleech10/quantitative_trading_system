@@ -9,8 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyExportFilters,
   buildExportFilterSpec,
-  exportAllowedUnderBound,
-  horizonOptions,
+  exportAllowedByLowerBoundState,
   isUsableCondition,
   nextLowerBoundState,
   numericColumnsOf,
@@ -108,8 +107,10 @@ describe('Task 2.1 匯出前篩選', () => {
       status: 'resolved', depthByTimeframe: { '12h': 7 }, bound: 7, error: null,
     };
 
-    // 沒有條件就沒有約束
-    expect(nextLowerBoundState(resolved7, { kind: 'no-conditions' })).toEqual(UNCONSTRAINED_LOWER_BOUND);
+    // 沒有條件就沒有約束；🔴 但深度 map **仍由後端提供**（Task 4.1 之匯出檔必帶
+    // `lookahead_bars_declared`）——前端自填 0 就是把 `depth_by_timeframe()` 的退化分支複製一份。
+    expect(nextLowerBoundState(resolved7, { kind: 'no-conditions', depthByTimeframe: { '12h': 0 } }))
+      .toEqual({ ...UNCONSTRAINED_LOWER_BOUND, depthByTimeframe: { '12h': 0 } });
 
     // 有條件、還沒拿到下界 ⇒ pending（不是「暫時沒有約束」）
     expect(nextLowerBoundState(UNCONSTRAINED_LOWER_BOUND, { kind: 'pending' }).status).toBe('pending');
@@ -119,51 +120,48 @@ describe('Task 2.1 匯出前篩選', () => {
       { kind: 'resolved', depthByTimeframe: { '1h': 6, '12h': 6 } }))
       .toEqual({ status: 'resolved', depthByTimeframe: { '1h': 6, '12h': 6 }, bound: 6, error: null });
 
-    // 🔴 逐 tf 下界**不同** ⇒ inexpressible，**不得**取 max 冒充 per-scope 下界
+    // 🔴 `D-004 A-021(d)`：逐 tf 下界**不同** ⇒ 仍 `resolved`（**可匯出**）——
+    //    4.1 之後 `window.horizon_bars` 逐列依該列 tf 寫入，per-scope 已可表達，
+    //    舊的 `inexpressible`（拒絕匯出）失去理由。
+    //    🔴 但仍**不得**取 max 塞進 `bound`（那是 §D-3′-a(ii) 明禁之 per-scope 冒充）。
     const mixed = nextLowerBoundState(UNCONSTRAINED_LOWER_BOUND,
       { kind: 'resolved', depthByTimeframe: { '1h': 72, '12h': 6 } });
-    expect(mixed.status).toBe('inexpressible');
-    expect(mixed.bound).toBe(null);                       // 不是 72
+    expect(mixed.status).toBe('resolved');
+    expect(mixed.bound).toBe(null);                       // 不是 72，也不是 6
     expect(mixed.depthByTimeframe).toEqual({ '1h': 72, '12h': 6 });   // map 保留，不塌平
-    expect(mixed.error).toContain('1h=72');
+    expect(mixed.error).toBe(null);                       // 不再是錯誤狀態
 
     // 🔴 算不出下界 ⇒ error，且 map 與 bound 沿用前值（但 status 已不是 resolved ⇒ 擋）
     const err = nextLowerBoundState(resolved7, { kind: 'error', message: 'boom' });
     expect(err).toEqual({ status: 'error', depthByTimeframe: { '12h': 7 }, bound: 7, error: 'boom' });
   });
 
-  it('⑪ 🔴 系統無法證明安全時不得放行：只有 unconstrained 與 resolved 且達標才可匯出', () => {
-    expect(exportAllowedUnderBound(UNCONSTRAINED_LOWER_BOUND, 1)).toBe(true);
+  it('⑪ 🔴 readiness fail-closed：證明得出深度才放行（`D-004 A-021(b)`）', () => {
+    expect(exportAllowedByLowerBoundState(UNCONSTRAINED_LOWER_BOUND)).toBe(true);
 
     const resolved7: LowerBoundState = {
       status: 'resolved', depthByTimeframe: { '12h': 7 }, bound: 7, error: null,
     };
-    expect(exportAllowedUnderBound(resolved7, 6)).toBe(false);
-    expect(exportAllowedUnderBound(resolved7, 7)).toBe(true);
-    expect(exportAllowedUnderBound(resolved7, 12)).toBe(true);
+    expect(exportAllowedByLowerBoundState(resolved7)).toBe(true);
 
-    // ⚠️ 這三種之 bound 都是 null——舊版只看 bound 就會把它們讀成「沒有約束」而放行
-    for (const status of ['pending', 'error', 'inexpressible'] as const) {
-      expect(exportAllowedUnderBound(
-        { status, depthByTimeframe: {}, bound: null, error: 'x' }, 12)).toBe(false);
+    // 🔴 `bound === null` **不再是擋的理由**：混 TF（各 tf 深度不同）已可逐列表達 ⇒ 放行。
+    expect(exportAllowedByLowerBoundState({
+      status: 'resolved', depthByTimeframe: { '1h': 72, '12h': 6 }, bound: null, error: null,
+    })).toBe(true);
+
+    // ⚠️ 這兩種才是「算不出來」——舊版只看 bound 就會把它們讀成「沒有約束」而放行
+    for (const status of ['pending', 'error'] as const) {
+      expect(exportAllowedByLowerBoundState(
+        { status, depthByTimeframe: {}, bound: null, error: 'x' })).toBe(false);
     }
   });
 
-  it('⑫ 下界大於固定清單上限時，至少要有一個可選值滿足它（不得所有選項都被鎖）', () => {
-    const base = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    expect(horizonOptions(UNCONSTRAINED_LOWER_BOUND, base)).toEqual(base);
-
-    const bound72: LowerBoundState = {
-      status: 'resolved', depthByTimeframe: { '1h': 72 }, bound: 72, error: null,
-    };
-    const opts = horizonOptions(bound72, base);
-    expect(opts).toContain(72);
-    expect(opts.some((h) => h >= 72)).toBe(true);
-    expect(opts).toEqual([...base, 72]);                 // 只多那一個，不亂加
-
-    // pending／error 不得偷偷加選項（那會讓使用者以為有可選的合法值）
-    expect(horizonOptions({ status: 'pending', depthByTimeframe: {}, bound: null, error: null }, base))
-      .toEqual(base);
+  it('⑫ 🔴 `horizonOptions` 已移除（`A-021(e)`：4.1 後無 caller＝死碼）', async () => {
+    // 判準＝**讀模組之 export 面**，不是 grep 原始碼（後者連註解裡的字樣都會命中）。
+    const mod = await import('./exportFilter');
+    expect(Object.keys(mod)).not.toContain('horizonOptions');
+    // 對照：同模組其他 export 仍在——否則「模組載不到」也會讓上一行綠。
+    expect(Object.keys(mod)).toContain('exportAllowedByLowerBoundState');
   });
 
   it('⑨ 契約形狀：無可用條件 ⇒ null（不寫空殼）；有條件 ⇒ version/combinator/conditions', () => {

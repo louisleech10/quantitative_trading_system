@@ -34,7 +34,7 @@
 </tr>
 <tr>
 <td><strong>實作</strong></td>
-<td><strong>第六批已收斂</strong>（六輪審查 5 → 2 → 2 → 1 → 兩家零 → <strong>0</strong>）；<strong>第七批已開工，卡在一份契約修訂文件的核可</strong></td>
+<td><strong>第七批已收斂</strong>（三輪審查 7 → 3 → <strong>0</strong>，三家一致可收）；下一批＝第八批（訊息與表頭）</td>
 </tr>
 <tr>
 <td>Task 總數</td>
@@ -42,15 +42,15 @@
 </tr>
 <tr>
 <td>已完成</td>
-<td><strong>19</strong></td>
+<td><strong>24</strong></td>
 </tr>
 <tr>
 <td>進行中</td>
-<td><strong>1</strong></td>
+<td><strong>0</strong></td>
 </tr>
 <tr>
 <td>未開工</td>
-<td><strong>22</strong></td>
+<td><strong>18</strong></td>
 </tr>
 </tbody>
 </table></div>
@@ -71,33 +71,40 @@
 結果一模一樣（路徑 383 條對 383 條、測試 6 條紅對 6 條紅，一條不差）。依你「不碰治理」的裁定
 具名記錄、不修。其中 2 條特別典型：它們在等一個<strong>你 2026-08-14 就已經裁掉</strong>的行為。</p>
 <hr />
-<h2 id="現在卡在哪第七批">現在卡在哪（第七批）</h2>
-<p><strong>第七批＝匯出檔的報酬欄與揭露</strong>（Phase 4 全部）：匯出檔改成可以帶多個「未來 N 根報酬」欄
-給你在 Excel 裡自己分析；匯出面板不再要你先選一個「主答案窗」；
-並且把四件你以前從來沒被告知的事寫在畫面上。</p>
-<p><strong>開工前的偵察查出兩件會擋住施工的事，已經交三家裁定完畢：</strong></p>
+<h2 id="第七批做了什麼2026-08-26已收斂">第七批做了什麼（2026-08-26，已收斂）</h2>
+<p><strong>第七批＝匯出檔的報酬欄與揭露</strong>（Phase 4 全部，5 個 Task）。三句話：</p>
 <ol>
-<li>🔴 <strong>照規格字面做，會做出一個「匯不回去」的檔</strong>。規格要求匯出的每一列帶上
-「未來 N 根報酬」與「看多遠」這兩種欄位，但<strong>契約的驗證器實測會把它們當成不認得的欄位擋掉</strong>。
-而 <code>/search</code> 匯出的檔<strong>本來就是拿來匯回系統的</strong>。三家一致裁定：<strong>先改契約</strong>，
-走一份修訂文件（<code>D-004</code>）。</li>
-<li><strong>移除「主答案窗」之後，上一批做的下界守衛有一半會變成沒用的死碼</strong>。
-三家一致裁定：<strong>改形狀、不刪掉</strong>——因為其中「算不出下界就不准匯出」那一半仍然必要。</li>
+<li><strong>匯出檔可以帶多個「未來 N 根報酬」欄</strong>（預設 1..12 全帶，可自己勾），純粹給你在 Excel 裡分析。
+它們<strong>不會</strong>進到 IC 分析、<strong>不會</strong>決定任何分析用的答案窗——這點現在寫死在契約的欄位說明裡，
+而且有一條<strong>實際跑一遍</strong>的檢查在守（不是只檢查那句話有沒有寫）。</li>
+<li><strong>匯出面板不再要你先選「主答案窗」</strong>，匯出檔也不再寫 <code>label_value</code>。
+答案窗改到 IC 分析頁去設——<strong>同一批事件可以重複分析，不必重新匯出</strong>。</li>
+<li><strong>把四件你以前完全沒被告知的事寫在畫面上</strong>：這批的 scenario 是什麼、
+lookahead 深度是幾根、purge 下界是幾根、<code>control_kind</code> 是什麼（那個值一直是寫死的，你從沒選過）。
+多個 K 線週期時<strong>逐個週期各顯示一行</strong>，不會被壓成一個數字。</li>
 </ol>
-<p><strong>另外糾正了一條交接文件的錯誤宣稱</strong>：交接說「第七批會讓那份 golden 基準合法改變、必須重凍」。
-我去查了才發現<strong>那份基準跑的是 IC 分析、根本不碰要改的那張表</strong>，實測也證實<strong>沒有改變</strong>。
-所以<strong>不重凍</strong>，也不會在紀錄裡寫「已重凍」——照抄一句沒查證的話去宣稱一件沒發生的事，
-正是這個專案我已經犯過的毛病。</p>
-<p><strong>目前卡在</strong>：那份修訂文件（<code>D-004</code>）要三家核可才能動契約。第一輪核可 <strong>Codex 打了回票，而且他是對的</strong>——
-我把三家中<strong>只有一家</strong>的意見寫成「三家一致」，採到了少數且較弱的那個版本。
-已改成多數且較嚴的版本、並補上一條「真的按下匯出、數它有沒有發出請求」的執行期驗收。
-改完之後文件的雜湊變了，<strong>第一輪的三個核可章全部失效</strong>，要重跑一輪。</p>
-<blockquote>
-<p>🔴 這是我在這個專案第 5 次「講的比做的滿」。前四次是「宣稱的保護大於實際的保護」，
-這次是新形態：<strong>沒有逐家核對就宣稱一致</strong>。核可輪把它擋下來了——這正是它存在的理由。</p>
-</blockquote>
-<p><strong>已經做完的部分</strong>：「事件後報酬表要算哪些 N」的後端驗收 4 條（釘死「只改要算哪些、
-不改計算式、不改有效樣本數的定義」）。</p>
+<p><strong>另外</strong>：IC 分析頁的「Horizon 多選」以前<strong>根本沒接到</strong>事件後報酬表（後端永遠收到預設值 <code>[1,2,4]</code>），
+現在真的接上了。</p>
+<h3 id="這一批被抓到什麼">這一批被抓到什麼</h3>
+<p>三輪審查：<strong>7 條 → 3 條 → 0 條</strong>，三家一致可收。<strong>其中 8 條是我自己弄出來的</strong>：</p>
+<p>🔴 <strong>第一輪三家同時抓到同一條</strong>：我在派工單裡宣稱「深度算不出來就不讓你匯出」，
+實際上只擋了「有設篩選條件」那一半——<strong>沒設條件的時候，在後端還沒回覆的那幾秒鐘照樣能匯出</strong>，
+匯出的檔會宣稱帶著深度宣告、實際上是空的。三家各自寫了程式去按那個按鈕，都按成功了。
+這是我在這個專案第 <strong>7</strong> 次「講的比做的滿」。</p>
+<p>🔴 <strong>第二輪 Codex 又抓到三條，而且另外兩家都說可以收了</strong>。最有意思的一條是
+<strong>我第一輪的修法自己造出來的新破口</strong>：我把「缺深度就報錯」改成會拋錯之後，
+「讀不到 K 線週期」那條路徑就變成——按下匯出什麼都沒發生，錯誤被程式吞掉、
+使用者連訊息都看不到。<strong>而這個嫌疑點是我自己寫在派工單上請他們攻的，我列了卻沒自己先打一遍。</strong></p>
+<p>另外兩條：一批事件裡<strong>只有部分列帶深度宣告</strong>時系統會放行（其餘列變成 <code>NaN</code>，等於「假裝有宣告」）；
+以及我漏改一個呼叫點，<strong>前端測試不做型別檢查所以照樣全綠</strong>——這讓我發現一個方法論漏洞：
+我一直拿「建置成功」當型別關卡，<strong>但它不檢查測試檔</strong>。此後前端收案前固定多跑一道完整型別檢查。</p>
+<p><strong>第三輪三家零缺陷</strong>，而且都附了實際跑過的證據（包含我請他們攻的三個點：按取消會不會誤彈錯誤、
+一進頁面會不會誤顯示紅字、新的檢查會不會誤擋到別的東西——全部實跑確認沒問題）。</p>
+<p><strong>破壞測試 22 條全部通過</strong>（故意改壞 ⇒ 對應檢查轉紅；還原 ⇒ 轉綠）。</p>
+<p><strong>還有一條我糾正的錯誤宣稱</strong>：交接文件說「第七批會讓那份 golden 基準合法改變、必須重凍」。
+查了才發現<strong>那份基準跑的是 IC 分析、根本不碰要改的那張表</strong>，實測也證實<strong>沒有改變</strong>。
+所以<strong>不重凍</strong>，紀錄裡也不會寫「已重凍」。同一句話在交接文件裡還有第二處，
+是第三家在審查時抓出來的——我開工時就看到了卻說「稍後一併修」，結果拖到被抓。</p>
 <hr />
 <h2 id="第六批做了什麼2026-08-26已收斂">第六批做了什麼（2026-08-26，已收斂）</h2>
 <p><strong>第六批＝刪除</strong>，三個 Task。一句話：<strong>讓你刪掉一批匯錯的事件，而且不留半個孤兒檔</strong>。</p>
@@ -514,31 +521,31 @@ Grok 再寫臨時測試證明：A 刪除失敗回來時，錯誤訊息「刪除�
 <td><strong>Task 4.1</strong></td>
 <td>匯出檔之附帶 <code>future_*</code> 欄；移除匯出端之答案窗與 <code>label_value</code>（D-3′）</td>
 <td>Phase 4</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 4.1b</strong></td>
 <td>匯出時揭露每個選項在動什麼</td>
 <td>Phase 4</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 4.1c</strong></td>
 <td>明文標示本批不提供 IC decay</td>
 <td>Phase 4</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 4.2</strong></td>
-<td>事件後報酬表顯示完整曲線（拆兩半：序列化規則這半做了，曲線那半排在後面的批次）</td>
+<td>事件後報酬表顯示完整曲線（序列化規則＋前端接線都做完了）</td>
 <td>Phase 4</td>
-<td>🔧</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 4.3</strong></td>
 <td>缺欄確認框逐 horizon 列出</td>
 <td>Phase 4</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 5.0</strong></td>

@@ -54,7 +54,10 @@ describe('GAP-3 事件模式入口', () => {
     expect(src.includes("config.mode === 'event'")).toBe(true);
     expect(src.includes('<EventImportPicker')).toBe(true);
     const page = readFileSync(resolve(__dirname, '../../app/ic-analysis/page.tsx'), 'utf-8');
-    expect(page.includes("config.mode === 'event' && <EventTablesPanel")).toBe(true);
+    expect(page.includes("config.mode === 'event' && (")).toBe(true);
+    expect(page.includes('<EventTablesPanel')).toBe(true);
+    // Task 4.2：面板要真的收到使用者選的 horizon 集合（此前恆不傳 ⇒ 後端永遠用預設 [1,2,4]）
+    expect(page.includes('horizons={config.horizons}')).toBe(true);
   });
 
   it('CODEX-R1-P1-01：useICAnalysis /analyze payload 序列化 event_timestamps（事件模式且非空）', () => {

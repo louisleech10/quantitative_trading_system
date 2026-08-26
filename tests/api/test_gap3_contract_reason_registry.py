@@ -111,11 +111,25 @@ def test_gap3_contract_reason_registry_06_baseline_fixture_byte_faithful() -> No
     assert "tests" not in inspect.getsource(load_event_import_contract)
 
 
-# ── ⑦ 兩個新登記欄（derived 欄 vs batch receipt 欄，名稱已由 R12 正名） ─────
+# ── ⑦ 新登記欄（🔴 D-004 A-020 後：optional 匯入欄 ＋ batch receipt 欄） ─────
 def test_gap3_contract_reason_registry_07_new_registered_fields(pre: dict, now: dict) -> None:
-    assert set(now["derived_fields"]["names"]) - set(pre["derived_fields"]["names"]) == {
-        "lookahead_bars_declared"
-    }
+    """🔴 **D-004 A-020 改寫**（三家 APPROVED）：`lookahead_bars_declared` 已自
+    `derived_fields.names` **移出**、改列 `optional_fields`。
+
+    原因：SPEC Task 4.1 要求 `/search` 匯出記錄帶該欄，而 `derived_fields.doc` 逐字
+    「匯入檔出現任一 ⇒ unknown_field」⇒ 照 SPEC 字面實作會產出**匯不回去的檔**（實測）。
+
+    🔴 **不得雙登記**（derived ∩ optional 須為空），但 `receipt_schema.batch` 之同名鍵
+    是**第三處**、須保留——三家 consult 皆明列「移出 derived 但保留 receipt batch schema，
+    對齊後複製至該處」。下面三條就是分別釘住這三件事。
+    """
+    # ① 移出後 derived 不再有新增欄（相對 baseline）
+    assert set(now["derived_fields"]["names"]) - set(pre["derived_fields"]["names"]) == set()
+    assert "lookahead_bars_declared" not in now["derived_fields"]["names"]
+    # ② 改列於 optional（可隨事件列匯入攜帶）
+    assert "lookahead_bars_declared" in now["optional_fields"]
+    assert set(now["derived_fields"]["names"]) & set(now["optional_fields"]) == set()
+    # ③ receipt batch 之同名鍵**保留**（第三處，不在雙登記禁止範圍）
     assert "analysis_alignment_receipt_hash" not in now["derived_fields"]["names"]
     flat = set(flatten_receipt_schema(now["receipt_schema"]))
     assert {"batch.lookahead_bars_declared", "batch.analysis_alignment_receipt_hash"} <= flat

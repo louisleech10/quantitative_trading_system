@@ -7,8 +7,26 @@ import type { EventAnalyzeResponse, EventTableStatus } from '@/lib/types';
 
 interface EventTablesPanelProps {
   importId?: string;
+  /**
+   * GAP-3 UX Task 4.2：要算哪些 horizon（來自 IC 設定面板之「Horizon 多選」）。
+   *
+   * 🔴 不傳 ⇒ 後端用預設 `[1, 2, 4]`（`event_import_models.py:123`）——B7 之前
+   * 這裡**恆不傳**，於是使用者在 IC 面板選的 horizon 對事件後報酬表完全沒作用。
+   * 🔴 **只改要算哪些 horizon**，不改每個 horizon 之計算式、不改 `n_eff` 之定義。
+   * 🔴 空／重複／非正整數一律**不傳**（fail-closed 回後端預設，不送出無意義的請求）。
+   */
+  horizons?: number[];
   /** 測試／外部注入用；不給則依 importId 自行呼叫後端 */
   data?: EventAnalyzeResponse | null;
+}
+
+/** 送給後端之 horizon 集合；不合法（空／重複後為空／非正整數）⇒ `undefined`＝用後端預設。 */
+export function sanitizeHorizons(horizons: number[] | undefined): number[] | undefined {
+  if (!horizons) return undefined;
+  const clean = [...new Set(horizons)]
+    .filter((h) => Number.isInteger(h) && h > 0)
+    .sort((a, b) => a - b);
+  return clean.length > 0 ? clean : undefined;
 }
 
 function statusLabel(t: EventTableStatus | undefined): { ok: boolean; text: string } {
@@ -152,7 +170,7 @@ function AllBarsTable({ table }: { table: EventTableStatus | undefined }) {
  * GAP-3 B5.2：事件模式專屬表（事件後報酬表／正反例辨別表／全 K 線驗證）。
  * 只在事件模式掛載；後端 unavailable／not_computed 一律顯示原因，不顯示空白；前端不重算任何統計。
  */
-export default function EventTablesPanel({ importId, data }: EventTablesPanelProps) {
+export default function EventTablesPanel({ importId, horizons, data }: EventTablesPanelProps) {
   const [resp, setResp] = useState<EventAnalyzeResponse | null>(data ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +187,9 @@ export default function EventTablesPanel({ importId, data }: EventTablesPanelPro
     let cancelled = false;
     setLoading(true);
     setError(null);
-    analyzeEventImport(importId)
+    // Task 4.2：把使用者在 IC 面板選的 horizon 集合真的送出去（此前恆送 `{}`）。
+    const wanted = sanitizeHorizons(horizons);
+    analyzeEventImport(importId, wanted ? { horizons: wanted } : {})
       .then((r) => {
         // GAP-3 UX Task 3.3：記下「這批真的被拿去分析過」——**成功之後**才記，不是選取當下。
         // 判準與其誠實邊界見 `@/lib/eventBatchReferences`（PENDING-RULING）。
@@ -186,7 +206,9 @@ export default function EventTablesPanel({ importId, data }: EventTablesPanelPro
     return () => {
       cancelled = true;
     };
-  }, [importId, data]);
+    // `horizons` 以正規化後之字面入依賴，避免每次 render 之新陣列參考造成重打 API
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importId, data, JSON.stringify(sanitizeHorizons(horizons) ?? null)]);
 
   if (!importId && !resp) {
     return (

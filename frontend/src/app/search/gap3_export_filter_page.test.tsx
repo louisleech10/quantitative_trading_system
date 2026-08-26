@@ -7,7 +7,7 @@
  *
  * 🔴 斷言一律是**執行期事實**（呼叫次數、送出的 payload），不看原始碼長相（§6.2）。
  */
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
@@ -57,7 +57,10 @@ beforeEach(() => {
   seedResult();
   buildRecordsMock.mockResolvedValue({
     records: [], skipped: [], n_cases: 0, n_records: 0,
-    source_file_digest: 'a'.repeat(64), source_file_text: '[]', n_missing_label_value: 0,
+    source_file_digest: 'a'.repeat(64), source_file_text: '[]',
+    // Task 4.3：逐附帶 horizon 之缺欄計數（取代舊的 `n_missing_label_value`）。
+    // 🔴 刻意不在 page 側寫 `?? {}` 容錯——欄位真的不見時應該當場炸，不是靜默跳過確認框。
+    missing_by_horizon: {}, attached_horizons: [], lookahead_bars_declared: {},
   });
   vi.stubGlobal('alert', vi.fn());
   vi.stubGlobal('confirm', vi.fn(() => true));
@@ -128,7 +131,7 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
     });
   });
 
-  it('④ 🔴 混 TF 且逐 tf 下界不同 ⇒ 顯示逐週期下界並擋住匯出（不得取 max 冒充）', async () => {
+  it('④ 🔴 混 TF 且逐 tf 下界不同 ⇒ 顯示逐週期下界、**可匯出**，且送入完整逐 tf map（不得取 max 冒充）', async () => {
     useSearchStore.setState({
       currentResult: {
         cases: [
@@ -148,23 +151,36 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
     await waitFor(() => expect(screen.getByTestId('export-lower-bound-map')).toBeTruthy());
     expect(screen.getByTestId('export-lower-bound-map').textContent).toContain('1h=72');
     expect(screen.getByTestId('export-lower-bound-map').textContent).toContain('12h=6');
-    expect(screen.getByTestId('export-lower-bound-error').textContent).toContain('無法用單一答案窗表達');
 
+    // 🔴 `D-004 A-021(d)`：混 TF 且下界不同**現在可以匯出**（4.1 後 horizon_bars 逐列依該列 tf 寫入）。
+    //    改形前這裡是「擋住」；擋的理由（單一 scalar 表達不了 per-scope）已隨逐列寫入消失。
     fireEvent.click(screen.getByTestId('export-gap3-events'));
-    await waitFor(() => expect(alert).toHaveBeenCalled());
-    expect(buildRecordsMock).toHaveBeenCalledTimes(0);
+    await waitFor(() => expect(buildRecordsMock).toHaveBeenCalledTimes(1));
+    expect(alert).not.toHaveBeenCalled();
+    // 🔴 但**不得**塌成 scalar：送進組裝器的必須是完整逐 tf map（取 max 冒充會被這條抓到）
+    const [, opts] = buildRecordsMock.mock.calls[0] as [CaseData[], { lookaheadBarsDeclared?: Record<string, number> }];
+    expect(opts.lookaheadBarsDeclared).toEqual({ '1h': 72, '12h': 6 });
   });
 
-  it('⑤ 下界為 72 時，答案窗下拉必須有一個可選（未被 disable）之值滿足它', async () => {
-    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 72 } });
+  it('⑤ 🔴 沒有任何篩選條件時也會查深度，且該 map 真的送進匯出組裝器（Task 4.1 ③）', async () => {
+    // 改形前這裡驗的是「下界 72 時答案窗下拉要有可選值」——主答案窗已移除（`A-021(e)`）。
+    // 換成釘住新的必要條件：匯出檔必帶 `lookahead_bars_declared`，而它只有後端算得出來
+    // ⇒ **無條件時也要查**，且前端不得自填 0。
+    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 0 } });
     render(<SearchPage />);
-    addCondition('future_2bar_return', '0.5');
 
-    await waitFor(() => expect(screen.getByTestId('export-lower-bound')).toBeTruthy());
-    const options = within(screen.getByTestId('export-gap3-horizon')).getAllByRole('option');
-    const enabled = options.filter((o) => !(o as HTMLOptionElement).disabled);
-    expect(enabled.length).toBeGreaterThan(0);
-    expect(enabled.map((o) => (o as HTMLOptionElement).value)).toContain('72');
+    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    const payload = depthMock.mock.calls.at(-1)![0] as {
+      referenced_columns: string[]; declared_window_bars: Record<string, number>;
+    };
+    expect(payload.referenced_columns).toEqual([]);
+    // `A-021(a)`：匯出路徑之左項一律送 0，且**不得省略鍵**（缺 tf 後端會 KeyError）
+    expect(payload.declared_window_bars).toEqual({ '1h': 0 });
+
+    fireEvent.click(screen.getByTestId('export-gap3-events'));
+    await waitFor(() => expect(buildRecordsMock).toHaveBeenCalledTimes(1));
+    const [, opts] = buildRecordsMock.mock.calls[0] as [CaseData[], { lookaheadBarsDeclared?: Record<string, number> }];
+    expect(opts.lookaheadBarsDeclared).toEqual({ '1h': 0 });
   });
 
   it('⑦ 🔴 CSV 匯出也套同一組條件（R2 `CODEX-R2-P1-01`：面板就在按鈕上方，不能只有事件 JSON 套）', async () => {

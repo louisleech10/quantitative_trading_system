@@ -39,7 +39,8 @@ async function build(filters: ReturnType<typeof buildExportFilterSpec>) {
     timeframe: '12h',
     conditions: [],
     priceChangeMethod: 'close_to_close',
-    horizonBars: 2,
+    // Task 4.1 ③／R1 `CODEX-R1-P1-02`：深度宣告 map 為必填（缺該列 tf 之鍵會拋錯）
+    lookaheadBarsDeclared: { '12h': 0 },
     sourceFileText: SOURCE_TEXT,
     sourceFileDigest: SOURCE_DIGEST,
     filters,
