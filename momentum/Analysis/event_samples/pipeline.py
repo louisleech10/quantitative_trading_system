@@ -185,6 +185,46 @@ class EventSamplePipeline:
         return split_blocked_reason()
 
     @staticmethod
+    def lookahead_depth(referenced_columns, declared_window_bars, timeframes) -> Dict[str, Any]:
+        """Task 2.1b／2.1：由**篩選條件引用之欄**導出逐 tf 答案窗下界（R3 出口；回純資料）。
+
+        成功 `{"ok": True, "depth_by_timeframe": {tf: int}}`；
+        不可導出 `{"ok": False, "kind": str, "message": str}`——例外型別不跨界。
+
+        🔴 深度公式之唯一實作＝`lookahead_depth.depth_by_timeframe()`（SPEC Task 2.1b
+        「本批唯一權威定義，禁第二份」）。本出口只做例外→純資料之轉換，**不重算任何東西**；
+        前端亦不得在 TS 重寫一份（`D-002 A-004` 之理由）。
+        🔴 `referenced_columns` **只放篩選條件實際引用之欄**，不得混入 Task 4.1 之附帶欄
+        （SPEC Task 2.1b 覆蓋風險：附帶欄與 label 判定無關，納入會過度 purge）。
+        """
+        from momentum.Analysis.event_samples.lookahead_depth import (
+            UnresolvableLookaheadDepth, depth_by_timeframe,
+        )
+        # 🔴 系統內篩選路徑之二分（SPEC Task 2.1b：欄位級標註解析條件引用之欄）：
+        #   ①**看起來是未來欄**（含未登記者）⇒ 交給唯一深度函式——登記者算出根數，
+        #     未登記者由該函式 fail-closed（新增未來欄之 PR 須先登記，不得以放寬本閘消紅）；
+        #   ②**根本不是未來欄**（`price_change`／`volume_multiplier` 等當下欄）⇒ 深度 0，不進 max。
+        # 少了②，篩選面板最常見的用法（篩當下欄）會每次都 422——當下欄本來就沒有前視，
+        # 硬要它「宣告深度」是把 fail-closed 用在不存在的風險上。
+        # 🔴 這裡**刻意不另加**「未登記未來欄」之前置檢查：那與深度函式對同一批輸入同結果
+        #    ＝重複守衛，只拆其中一層必然錄到空紅集合（B4 之教訓，已實際踩過一次）。
+        # 🔴 欄名前綴之判準對**系統自產欄**成立（provenance=system_generated）；外部上傳之欄名
+        #    不具證據力，故本出口**只供系統內篩選路徑**——CSV 上傳一律走 Task 1.11 之 L2。
+        cols = [str(c) for c in referenced_columns]
+        future_cols = [c for c in cols if c.lower().startswith("future")]
+
+        try:
+            depth = depth_by_timeframe(future_cols, declared_window_bars, timeframes)
+        except UnresolvableLookaheadDepth as exc:
+            return {"ok": False, "kind": "lookahead_depth_unresolvable", "message": str(exc)}
+        except KeyError as exc:
+            return {"ok": False, "kind": "lookahead_declaration_invalid",
+                    "message": f"declared_window_bars 缺 timeframe 之鍵：{exc}"}
+        except ValueError as exc:
+            return {"ok": False, "kind": "lookahead_declaration_invalid", "message": str(exc)}
+        return {"ok": True, "depth_by_timeframe": {str(k): int(v) for k, v in depth.items()}}
+
+    @staticmethod
     def validate_receipt_values(namespace: str, values: Mapping[str, Any], *,
                                 contract: Optional[dict] = None) -> Dict[str, Any]:
         """Task 1.6：receipt namespace 之型別／齊備性驗證出口（R3；回**純資料**）。

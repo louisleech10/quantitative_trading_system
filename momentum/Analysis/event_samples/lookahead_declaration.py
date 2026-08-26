@@ -96,13 +96,48 @@ def _strings_in(node: Any, out: Set[str]) -> None:
             _strings_in(v, out)
 
 
-def filters_referenced_columns(filters: Any, candidate_columns: Iterable[str]) -> Set[str]:
-    """`label_definition.filters` 所引用之欄（∩ 可見欄集合）。
+def canonical_filter_columns(filters: Any) -> Optional[Set[str]]:
+    """符合契約 `label_definition.filters.wire_shape` 時，回**精確**之引用欄集合；否則 `None`。
 
-    🔴 不預設 `filters` 之物件形狀（Task 2.2 才定案）；以「字串出現 ∩ 候選欄」判定引用。
+    GAP-3 UX Task 2.2（B5）解除具名殘留 `R-B3-2`：形狀凍結前只能靠「字串 ∩ 可見欄」猜，
+    抽不出來就強制宣告（多要一次宣告）。形狀凍結後，符合該形狀者可**逐條讀 `conditions[].column`**，
+    不必再猜也不必多要宣告。
+
+    🔴 回 `None` 與回 `set()` **意義不同**：`None`＝「這不是我認得的形狀」（呼叫端須走 fail-closed
+    的舊路徑），`set()`＝「認得，而且它真的沒有引用任何欄」。混為一談就會把外部產生的任意形狀
+    當成「沒有引用欄」而放行——那正是 B3 R1 抓到的 fail-open。
+    """
+    if not isinstance(filters, Mapping):
+        return None
+    if filters.get("version") != 1:
+        return None
+    conditions = filters.get("conditions")
+    if not isinstance(conditions, (list, tuple)):
+        return None
+    out: Set[str] = set()
+    for cond in conditions:
+        if not isinstance(cond, Mapping):
+            return None                      # 有一條認不得 ⇒ 整個物件不算符合形狀
+        column = cond.get("column")
+        if not isinstance(column, str) or not column:
+            return None
+        out.add(column)
+    return out
+
+
+def filters_referenced_columns(filters: Any, candidate_columns: Iterable[str]) -> Set[str]:
+    """`label_definition.filters` 所引用之欄。
+
+    符合契約 wire_shape 者 ⇒ **精確抽取**（不與可見欄取交集：條件引用了什麼就是什麼，
+    即使該欄不在本批可見欄裡——那代表宣告與資料不一致，應由深度解析層 fail-closed，
+    不該在這裡被交集悄悄抹掉）。
+    其他形狀 ⇒ 沿用「字串出現 ∩ 候選欄」之保守猜法（搭配 `batch_has_filters()` 之 fail-closed）。
     """
     if not filters:
         return set()
+    exact = canonical_filter_columns(filters)
+    if exact is not None:
+        return exact
     found: Set[str] = set()
     _strings_in(filters, found)
     return {str(c) for c in candidate_columns if str(c) in found}
@@ -136,6 +171,28 @@ def batch_has_filters(records: Sequence[Mapping[str, Any]]) -> bool:
         if isinstance(ld, Mapping) and ld.get("filters"):
             return True
     return False
+
+
+def batch_filters_are_canonical(records: Sequence[Mapping[str, Any]]) -> bool:
+    """整批之 `filters` 是否**全部**符合契約 wire_shape（Task 2.2 定案之形狀）。
+
+    GAP-3 UX Task 2.2（B5）解除 `R-B3-2`：符合該形狀時「抽不出引用欄」不再是**抽取失敗**，
+    而是**已知事實**（那個 `conditions` 真的沒有引用任何欄）⇒ 不必再多要一次宣告。
+    🔴 只要有**一列**之 filters 不符形狀，整批仍走 fail-closed——外部產生之 filters
+    可以是任意形狀，不得因為本形狀存在就假設全部都長這樣。
+    """
+    seen = False
+    for rec in records:
+        ld = rec.get("label_definition")
+        if not isinstance(ld, Mapping):
+            continue
+        filters = ld.get("filters")
+        if not filters:
+            continue
+        seen = True
+        if canonical_filter_columns(filters) is None:
+            return False
+    return seen
 
 
 # --------------------------------------------------------------------------- 預設值
@@ -321,10 +378,13 @@ def resolve_declaration(
     # 🔴 fail-closed 兩支（R1 群集 A）：抽得出引用欄 ⇒ 逐 tf 判；**抽不出但有條件** ⇒ 不可判定 ⇒ 強制宣告。
     #    第二支是必要的：引用欄之抽取有四種已知抽空形態（見 `batch_has_filters` docstring），
     #    把「抽不出」讀成「沒引用」就是 fail-open。
+    # 🔴 B5／`R-B3-2`：第二支多了一個例外——`filters` **全部符合契約 wire_shape** 時，
+    #    「沒有引用欄」是抽取器**讀得懂而得出**的結論，不是抽不出來；此時不再多要一次宣告。
+    #    任一列不符形狀即回到原本的 fail-closed（外部 filters 可以是任意形狀）。
     needs = (
         any(requires_declaration(referenced, tf, provenance=provenance, registry=r) for tf in timeframes)
         if referenced
-        else batch_has_filters(records)
+        else (batch_has_filters(records) and not batch_filters_are_canonical(records))
     )
     defaults = default_window_bars_by_timeframe(cols, timeframes, r) if timeframes and not unknown_tfs else {}
 
@@ -413,7 +473,9 @@ __all__ = [
     "DeclarationOutcome",
     "LookaheadDeclarationError",
     "apply_horizon_projection",
+    "batch_filters_are_canonical",
     "batch_referenced_columns",
+    "canonical_filter_columns",
     "default_window_bars_by_timeframe",
     "embargo_ms_by_symbol",
     "filters_referenced_columns",

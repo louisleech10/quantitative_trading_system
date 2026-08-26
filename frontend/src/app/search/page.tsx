@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics, formatTimestamp } from '@/lib/searchResultUtils';
@@ -9,6 +9,16 @@ import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart, Marke
 import { useSearchStore } from '@/store/searchStore';
 import { PriceChangeMethod, CaseData } from '@/lib/types';
 import { isHorizonBelowLowerBound, withHorizonLowerBoundGuard } from '@/lib/lookaheadDepthLock';
+import { fetchLookaheadDepth } from '@/lib/api';
+import {
+  applyExportFilters,
+  buildExportFilterSpec,
+  nextLowerBoundState,
+  numericColumnsOf,
+  referencedColumnsOf,
+  type ExportFilterCondition,
+} from '@/lib/exportFilter';
+import { computeExportCounts } from '@/lib/exportCounts';
 
 
 
@@ -54,10 +64,13 @@ export default function SearchPage() {
   // GAP-3 匯出：答案窗根數（決定 label_definition.window.horizon_bars 與 label_value 取哪個 future_Nbar_return）
   const [eventHorizonBars, setEventHorizonBars] = useState<number>(2);
   // GAP-3 UX Task 2.1b：答案窗下界。值由後端之 depth_by_timeframe() 導出——
-  // 🔴 前端**不自算深度**（第二份實作必然漂移）。篩選面板（Task 2.1／B5）接上後由它餵；
-  // 在那之前恆為 null＝尚無約束，鎖定機制本身已可運作且受測。
+  // 🔴 前端**不自算深度**（第二份實作必然漂移）。
+  // ✅ B5 已接線（解除 `D-002 A-004`）：Task 2.1 之篩選面板變動時呼叫
+  //    `POST /case/lookahead-depth`，把該批 timeframe 之下界餵進來；無條件時回到 null＝尚無約束。
   const [lookaheadLowerBound, setLookaheadLowerBound] = useState<number | null>(null);
-  void setLookaheadLowerBound;
+  // GAP-3 UX Task 2.1：匯出前篩選條件（面板只讀搜尋結果，不改任何原始欄位值）
+  const [exportFilters, setExportFilters] = useState<ExportFilterCondition[]>([]);
+  const [lowerBoundError, setLowerBoundError] = useState<string | null>(null);
   
   // 搜索參數狀態
   const [searchParams, setSearchParams] = useState<SimpleSearchRequest>({
@@ -75,6 +88,57 @@ export default function SearchPage() {
   });
 
   const [symbolsInput, setSymbolsInput] = useState('');
+
+  // ── GAP-3 UX Task 2.1／2.1b／2.3（B5） ────────────────────────────────────
+  const exportRows = React.useMemo(
+    () => (currentResult?.cases ?? []) as unknown as Record<string, unknown>[],
+    [currentResult],
+  );
+  /** 只有數值欄可篩（SPEC 邊界①：字串欄不得出現在可選清單）。 */
+  const filterableColumns = React.useMemo(() => numericColumnsOf(exportRows), [exportRows]);
+  /** 🔴 Task 2.3：四個顯示點之**唯一**計數來源。 */
+  const exportCounts = React.useMemo(
+    () => computeExportCounts(exportRows, exportFilters),
+    [exportRows, exportFilters],
+  );
+
+  const referencedKey = JSON.stringify(referencedColumnsOf(exportFilters));
+  useEffect(() => {
+    // 解除 `D-002 A-004`：下界之**值**由後端 depth_by_timeframe() 導出，前端不自算。
+    // 🔴 三種情形之處置一律由 `nextLowerBoundState()` 決定（決策本體在純函式裡，可單獨測）。
+    const apply = (outcome: Parameters<typeof nextLowerBoundState>[1]) => {
+      setLookaheadLowerBound((prevBound) => {
+        const next = nextLowerBoundState({ bound: prevBound, error: null }, outcome);
+        setLowerBoundError(next.error);
+        return next.bound;
+      });
+    };
+    const referenced = referencedColumnsOf(exportFilters);
+    if (referenced.length === 0) {
+      apply({ kind: 'no-conditions' });
+      return;
+    }
+    const timeframes = [...new Set(exportRows.map((r) => String(r.timeframe ?? searchParams.timeframe)))]
+      .filter((tf) => tf && tf !== 'undefined');
+    if (timeframes.length === 0) return;
+    let cancelled = false;
+    fetchLookaheadDepth({
+      referenced_columns: referenced,
+      // 匯出路徑之左項＝使用者當下選的答案窗根數（逐 tf 同值；SPEC Task 2.1b 左項不含 floor）
+      declared_window_bars: Object.fromEntries(timeframes.map((tf) => [tf, eventHorizonBars])),
+      timeframes,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        apply({ kind: 'resolved', depthByTimeframe: res.depth_by_timeframe });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        apply({ kind: 'error', message: err instanceof Error ? err.message : '無法導出答案窗下界' });
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [referencedKey, exportRows, eventHorizonBars, searchParams.timeframe]);
 
   const parseSymbolsInput = (input: string): string[] =>
     input
@@ -533,13 +597,19 @@ export default function SearchPage() {
     ].filter((c) => c.value !== null && c.value !== undefined);
     // GAP-3 UX Task 1.3：`source_file_digest` 綁**完整 CaseData 列**且**一律由後端計算**
     // （`/search` 結果端點回應之兩鍵）。前端只傳遞，不自算、不重新序列化。
-    const payload = await buildEventContractRecords(currentResult.cases, {
+    // GAP-3 UX Task 2.1／2.2：先套用匯出前篩選（只選列，不改任何欄位值），
+    // 再把條件本身寫進 label_definition.filters。
+    const filteredCases = applyExportFilters(
+      currentResult.cases as unknown as Record<string, unknown>[], exportFilters,
+    ) as unknown as CaseData[];
+    const payload = await buildEventContractRecords(filteredCases, {
       timeframe: searchParams.timeframe,
       conditions: ruleConditions,
       priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
       horizonBars: eventHorizonBars,
       sourceFileText: currentResult.source_file_text ?? '',
       sourceFileDigest: currentResult.source_file_digest ?? '',
+      filters: buildExportFilterSpec(exportFilters),
     });
     // CODEX-R3-P1-02：缺該 horizon 之未來報酬欄 ⇒ 該列無 label_value，條件 IC 會 unavailable；匯出前先講清楚
     if (payload.n_missing_label_value > 0) {
@@ -1570,6 +1640,124 @@ export default function SearchPage() {
                 </>
               );
             })()}
+
+            {/* GAP-3 UX Task 2.1／2.3：匯出前篩選面板＋即時筆數 */}
+            <div className="mt-6 glass-panel rounded-xl p-4 border border-slate-800/80" data-testid="export-filter-panel">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-slate-100">匯出前篩選</h4>
+                <button
+                  type="button"
+                  data-testid="export-filter-add"
+                  onClick={() => setExportFilters((prev) => [
+                    ...prev, { column: '', op: '>=' as const, value: undefined },
+                  ])}
+                  className="px-3 py-1 text-sm rounded border border-sky-400/40 bg-sky-500/20 text-sky-100"
+                >
+                  ＋ 加一條條件
+                </button>
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">
+                只能篩數值欄；多條件是「而且」的關係。面板只挑要匯出哪些列，
+                <strong className="text-slate-200">不會改動任何欄位的值</strong>。
+              </p>
+
+              {exportFilters.length > 0 && (
+                <div className="mt-3 space-y-2" data-testid="export-filter-conditions">
+                  {exportFilters.map((cond, idx) => (
+                    <div key={idx} className="flex flex-wrap items-center gap-2 text-sm" data-testid="export-filter-row">
+                      <select
+                        data-testid={`export-filter-column-${idx}`}
+                        value={cond.column}
+                        onChange={(e) => setExportFilters((prev) => prev.map(
+                          (c, i) => (i === idx ? { ...c, column: e.target.value } : c)))}
+                        className="rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
+                      >
+                        <option value="">未選欄位</option>
+                        {filterableColumns.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                      <select
+                        data-testid={`export-filter-op-${idx}`}
+                        value={cond.op}
+                        onChange={(e) => setExportFilters((prev) => prev.map(
+                          (c, i) => (i === idx
+                            ? { column: c.column, op: e.target.value as ExportFilterCondition['op'] }
+                            : c)))}
+                        className="rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
+                      >
+                        <option value=">=">≥</option>
+                        <option value="<=">≤</option>
+                        <option value="between">介於</option>
+                      </select>
+                      {cond.op === 'between' ? (
+                        <>
+                          <input
+                            type="number" step="any" placeholder="下限"
+                            data-testid={`export-filter-min-${idx}`}
+                            value={cond.range?.[0] ?? ''}
+                            onChange={(e) => setExportFilters((prev) => prev.map((c, i) => (i === idx
+                              ? { ...c, range: [Number(e.target.value), c.range?.[1] ?? Number.NaN] as [number, number] }
+                              : c)))}
+                            className="w-24 rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
+                          />
+                          <input
+                            type="number" step="any" placeholder="上限"
+                            data-testid={`export-filter-max-${idx}`}
+                            value={cond.range?.[1] ?? ''}
+                            onChange={(e) => setExportFilters((prev) => prev.map((c, i) => (i === idx
+                              ? { ...c, range: [c.range?.[0] ?? Number.NaN, Number(e.target.value)] as [number, number] }
+                              : c)))}
+                            className="w-24 rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
+                          />
+                        </>
+                      ) : (
+                        <input
+                          type="number" step="any" placeholder="數值"
+                          data-testid={`export-filter-value-${idx}`}
+                          value={cond.value ?? ''}
+                          onChange={(e) => setExportFilters((prev) => prev.map((c, i) => (i === idx
+                            ? { ...c, value: Number(e.target.value) } : c)))}
+                          className="w-28 rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        data-testid={`export-filter-remove-${idx}`}
+                        onClick={() => setExportFilters((prev) => prev.filter((_, i) => i !== idx))}
+                        className="px-2 py-1 text-xs rounded border border-slate-700 text-slate-300"
+                      >
+                        移除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Task 2.3：四個顯示點之唯一計數來源 */}
+              <p className="mt-3 text-sm text-slate-200" data-testid="export-counts">
+                將匯出 <strong data-testid="export-count-n">{exportCounts.N}</strong> 筆
+                （原 <strong data-testid="export-count-m">{exportCounts.M}</strong> 筆）／
+                你聲明的正例 <strong data-testid="export-count-x">{exportCounts.X}</strong>／
+                反例 <strong data-testid="export-count-y">{exportCounts.Y}</strong>
+                {exportCounts.droppedUnreadableLabel > 0 && (
+                  <span className="text-amber-200" data-testid="export-count-unreadable">
+                    （另有 {exportCounts.droppedUnreadableLabel} 筆沒有正反例標記，不會被匯出）
+                  </span>
+                )}
+              </p>
+
+              {lookaheadLowerBound !== null && (
+                <p className="mt-1 text-[11px] text-amber-200" data-testid="export-lower-bound">
+                  你的條件引用了未來欄，答案窗下界鎖定在 {lookaheadLowerBound} 根（可往上調，不能往下調）。
+                </p>
+              )}
+              {lowerBoundError && (
+                <p className="mt-1 text-[11px] text-rose-200" data-testid="export-lower-bound-error">
+                  無法導出答案窗下界：{lowerBoundError}
+                </p>
+              )}
+            </div>
 
             {/* CSV 導出按鈕 */}
             <div className="mt-6 flex justify-center">

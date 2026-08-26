@@ -99,6 +99,24 @@ class EventImportDetailResponse(BaseModel):
     records: List[Dict[str, Any]]
 
 
+class LookaheadDepthRequest(BaseModel):
+    """GAP-3 UX Task 2.1／2.1b（B5，解除 `D-002 A-004`）：由篩選條件導出逐 tf 答案窗下界。
+
+    🔴 `referenced_columns` **只放篩選條件實際引用之欄**；Task 4.1 之附帶欄不得混入
+    （SPEC Task 2.1b 覆蓋風險：附帶欄與 label 判定無關，納入會過度 purge）。
+    🔴 深度公式不在前端算——`lookahead_depth.depth_by_timeframe()` 是唯一實作，
+    在 TS 重寫一份就是第二份副本（`D-002 A-004` 之理由）。
+    """
+
+    referenced_columns: List[str] = Field(default_factory=list, description="篩選條件引用之欄名")
+    declared_window_bars: Dict[str, int] = Field(..., description="{timeframe: 使用者宣告之答案窗根數}")
+    timeframes: List[str] = Field(..., description="批內出現之 timeframe 集合")
+
+
+class LookaheadDepthResponse(BaseModel):
+    depth_by_timeframe: Dict[str, int] = Field(..., description="{timeframe: 下界根數}；使用者不得調低於此")
+
+
 class EventAnalyzeRequest(BaseModel):
     """對一筆匯入跑 validate→align→dedupe→split＋兩張表（純透傳；統計在 momentum）。"""
 

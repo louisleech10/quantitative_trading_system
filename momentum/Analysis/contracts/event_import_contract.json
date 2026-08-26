@@ -41,7 +41,13 @@
         },
         "filters": {
           "type": "object",
-          "doc": "GAP-3 UX Task 1.1／D-6：Phase 2 匯出前篩選之條件物件；Task 2.2 只寫其值，序列化依 §G S-1..S-9。不參與 event_id 之輸入（違反 D-2）"
+          "doc": "GAP-3 UX Task 1.1／D-6：Phase 2 匯出前篩選之條件物件；Task 2.2 只寫其值，序列化依 §G S-1..S-9。不參與 event_id 之輸入（違反 D-2）",
+          "wire_shape": {
+            "version": 1,
+            "combinator": "AND",
+            "conditions": [{ "column": "str", "op": "one of >= | <= | between", "value": "float（op 為 between 時省略）", "range": "[float, float]（僅 op 為 between）" }]
+          },
+          "wire_shape_doc": "GAP-3 UX Task 2.2（B5）定案之形狀（解除具名殘留 R-B3-2）。凍結前 L2 對「有 filters 但抽不出欄名」一律強制宣告（fail-closed 止血）；本形狀凍結後，`lookahead_declaration.filters_referenced_columns()` 對**符合本形狀**者改為精確抽取（讀 conditions[].column），不符者維持原「字串 ∩ 可見欄 ＋ 抽不出即強制宣告」之 fail-closed 路徑——外部產生之 filters 仍可能是任意形狀，不得因為本形狀存在就假設所有 filters 都長這樣。combinator 目前只有 AND（SPEC Task 2.1「多條件 AND」）；日後若加 OR 須同批更新抽取器與本欄。"
         }
       },
       "doc": "不含 entry 語意（R1 X11）"

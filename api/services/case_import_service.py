@@ -1040,6 +1040,12 @@ class EventImportService:
             ))
         return provenance
 
+    def lookahead_depth(
+        self, referenced_columns: List[str], declared_window_bars: Dict[str, int], timeframes: List[str],
+    ) -> Dict[str, object]:
+        """Task 2.1／2.1b：轉呼 pipeline 出口（回純資料；本層不算深度、不複列 reason 字面）。"""
+        return dict(self._pipeline.lookahead_depth(referenced_columns, declared_window_bars, timeframes))
+
     def _resolve_lookahead(
         self, records: List[Dict[str, object]], *, data_columns: List[str],
         declaration: Optional[Dict[str, object]], on_missing: str,

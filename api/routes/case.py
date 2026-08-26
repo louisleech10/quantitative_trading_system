@@ -28,6 +28,8 @@ from ..models.event_import_models import (
     EventImportListResponse,
     EventImportRejected,
     EventImportResponse,
+    LookaheadDepthRequest,
+    LookaheadDepthResponse,
 )
 from ..services.batch_download_service import get_batch_download_service
 from ..utils.case_storage import get_case_storage_manager
@@ -320,6 +322,25 @@ async def lookahead_declaration_preview(
         return svc.lookahead_declaration_preview(content, file.filename or "", records, defaults)
     except EventImportRejectedError as exc:
         raise _rejected(exc)
+
+
+@router.post("/case/lookahead-depth", response_model=LookaheadDepthResponse)
+async def lookahead_depth(request: LookaheadDepthRequest):
+    """GAP-3 UX Task 2.1／2.1b（B5）：由**篩選條件引用之欄**導出逐 tf 答案窗下界。
+
+    `/search` 之篩選面板在條件變動後呼叫本端點取得下界，餵給前端之
+    `withHorizonLowerBoundGuard()`——**解除具名殘留 `D-002 A-004`**
+    （在此之前 `lookaheadLowerBound` 恆為 `null`，B1 交付的鎖定機制在生產上等於死碼）。
+
+    🔴 本端點只讀不落檔，且**不算深度**——轉呼 `EventSamplePipeline.lookahead_depth()`
+    出口（其唯一實作在 momentum）。前端不得在 TS 重寫一份。
+    """
+    out = get_event_import_service().lookahead_depth(
+        list(request.referenced_columns), dict(request.declared_window_bars), list(request.timeframes))
+    if not out["ok"]:
+        raise HTTPException(status_code=422, detail=EventImportRejected(
+            kind=str(out["kind"]), message=str(out["message"])).model_dump())
+    return LookaheadDepthResponse(depth_by_timeframe=out["depth_by_timeframe"])
 
 
 @router.get("/case/events", response_model=EventImportListResponse)

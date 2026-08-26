@@ -7,6 +7,7 @@
 import type { CaseData } from './types';
 import { canonicalEventId } from './eventId';
 import { ruleDigestOf, ruleSummaryText } from './ruleDigest';
+import type { ExportFilterSpec } from './exportFilter';
 
 export interface EventExportOptions {
   timeframe: string;
@@ -23,6 +24,15 @@ export interface EventExportOptions {
   sourceFileText: string;
   /** 後端算好的 `source_file_digest`（`sha256(sourceFileText)`）。 */
   sourceFileDigest: string;
+  /**
+   * GAP-3 UX Task 2.2：匯出前篩選條件，寫進 `label_definition.filters`（契約已登記之欄）。
+   *
+   * 🔴 **不得納入 `event_id` 之輸入**（D-2：同事件跨批 id 必須相同）。
+   * 🔴 形狀之唯一定義來源＝契約 `label_definition.fields.filters.wire_shape`；
+   *    由 `exportFilter.buildExportFilterSpec()` 產生，本檔不自訂形狀。
+   * 無條件時傳 `null`／不傳 ⇒ **不寫該鍵**（`filters` 存在與否本身有語意）。
+   */
+  filters?: ExportFilterSpec | null;
 }
 
 /**
@@ -105,6 +115,9 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
         canonical_digest: ruleDigest,
         window: { horizon_bars: horizon },
         label_return_mode: 'close_to_close',
+        // Task 2.2：條件為空時**不寫該鍵**（`filters` 存在與否本身有語意——後端 L2 據此判斷有無條件）。
+        // 🔴 `event_id` 於本物件**之外**產生（見上），故篩選條件不可能進入 ID 之輸入（D-2）。
+        ...(opts.filters ? { filters: opts.filters } : {}),
       },
       control_kind: 'user_labeled_same_trigger',
       source_file_digest: sourceDigest,

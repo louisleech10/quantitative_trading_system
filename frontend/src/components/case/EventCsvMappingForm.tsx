@@ -14,6 +14,7 @@ import {
   type LookaheadDeclarationPreview,
 } from '@/lib/lookaheadDeclaration';
 import { columnValues, countDeclaredLabels, parseCsvText, type ParsedCsv } from '@/lib/csvPreview';
+import { computeExportCounts } from '@/lib/exportCounts';
 import { scanBinaryColumns } from '@/lib/suspiciousBinaryColumns';
 import { inspectEventIdNormalization } from '@/lib/eventIdNormalization';
 import type { EventImportRejected, EventImportResponse } from '@/lib/types';
@@ -108,11 +109,25 @@ export default function EventCsvMappingForm({ onImported }: Props) {
   }, [defaultsText]);
 
   const labelColumnName = columnNameOf('label');
-  const labelCounts = useMemo(
-    () => countDeclaredLabels(columnValues(parsed, columnIndexOf('label'))),
+  /**
+   * 🔴 Task 2.3：正例／反例之筆數一律由 `computeExportCounts()` 算——它是
+   * Task 1.5 上傳確認、2.1 篩選面板、4.1b／7.3 動態揭露之**同一組事實的唯一來源**。
+   * 這裡把「CSV 的 label 儲存格」轉成該函式吃的形狀（判讀規則仍是 `0`／`1` 不猜）。
+   */
+  const labelCounts = useMemo(() => {
+    const cells = columnValues(parsed, columnIndexOf('label'));
+    const raw = countDeclaredLabels(cells);
+    const counts = computeExportCounts(
+      cells.map((cell) => ({ cell })),
+      [],
+      (row) => {
+        const s = String((row as { cell: string }).cell).trim();
+        return s === '1' ? true : s === '0' ? false : null;
+      },
+    );
+    return { positive: counts.X, negative: counts.Y, blank: raw.blank, unreadable: raw.unreadable };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [parsed, mapping],
-  );
+  }, [parsed, mapping]);
 
   /** Task 1.7：可疑欄警示（只警示不阻擋、不持久化）。 */
   const binaryScan = useMemo(

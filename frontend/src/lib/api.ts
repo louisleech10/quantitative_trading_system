@@ -1057,6 +1057,26 @@ export async function uploadEventCsvMapping(
 }
 
 /**
+ * GAP-3 UX Task 2.1／2.1b（B5）：由篩選條件引用之欄導出逐 tf 答案窗下界。
+ *
+ * 🔴 深度**不在前端算**——`depth_by_timeframe()` 是唯一實作（`D-002 A-004`）；
+ *    本函式只是把條件送過去、把下界拿回來。
+ */
+export async function fetchLookaheadDepth(payload: {
+  referenced_columns: string[];
+  declared_window_bars: Record<string, number>;
+  timeframes: string[];
+}): Promise<{ depth_by_timeframe: Record<string, number> }> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/lookahead-depth`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+/**
  * GAP-3 UX Task 1.9 ①：宣告 UI 之預填（逐 tf 預設值＝檔內最大可用 horizon）。
  *
  * 對映路徑須一併送 `column_mapping`／`batch_defaults`，否則後端看不到 `label_definition`
