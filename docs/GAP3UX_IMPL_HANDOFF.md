@@ -7,7 +7,10 @@
 
 ## §0 一句話狀態
 
-**SPEC 🔒 凍結、TODO 🔒 凍結 v1.0；B1–B5 皆已收斂並蓋章；下一步＝B6（Phase 3 刪除）＋ B7（Phase 4 匯出端報酬欄）。**
+**SPEC 🔒 凍結、TODO 🔒 凍結 v1.0；B1–B6 皆已收斂；B7 已開工但卡在延伸檔 `D-004` 之戳記輪 R2。**
+
+🔴 **接手第一件事：派 `D-004` 戳記輪 R2**（brief 已寫好可直接派，見 §2B.0）。
+戳記通過前**不得動契約、不得開 Task 4.1**。
 
 | 文件 | 路徑 | 狀態 | commit |
 |---|---|---|---|
@@ -16,10 +19,11 @@
 | TODO 延伸檔 D-001（**須並讀**） | `docs/GAP3_EVENT_UX_TODO.D-001.md` | ✅ 三家 APPROVED | `81cbe7ab` |
 | TODO 延伸檔 D-002（**須並讀**，A-002..A-015） | `docs/GAP3_EVENT_UX_TODO.D-002.md` | ✅ 三家 APPROVED | `51f1a65e` |
 | TODO 延伸檔 D-003（**須並讀**，A-016..A-019） | `docs/GAP3_EVENT_UX_TODO.D-003.md` | ⬜ **尚未過戳記輪**（見 §5） | `09884811` |
-| 施工看板（給使用者看） | `白話說明/GAP-3施工看板.md` | 16 ✅／1 🔧／25 ⬜ | 每批收尾更新 |
+| TODO 延伸檔 D-004（**須並讀**，A-020..A-022） | `docs/GAP3_EVENT_UX_TODO.D-004.md` | ⬜ **戳記輪 R2 待派**（見 §2B.0） | 未 commit |
+| 施工看板（給使用者看） | `白話說明/GAP-3施工看板.md` | 19 ✅／1 🔧／22 ⬜ | 每批收尾更新 |
 
 🔴 **層級**：**操作依據＝TODO；語意權威＝SPEC（衝突以 SPEC 為準並回報）；
-讀 TODO 必須並讀 D-001／D-002／D-003**（凍結後修訂只走延伸檔，不就地改 TODO）。
+讀 TODO 必須並讀 D-001／D-002／D-003／D-004**（凍結後修訂只走延伸檔，不就地改 TODO）。
 🔴 **驗收字面之唯一來源＝SPEC 各 Task 之「驗證」欄**；TODO 只給可執行命令＋條目下限＋SPEC 行號。
 **不得把 SPEC 斷言字面抄成第二份副本**——本 epic 之自傷絕大多數出自副本漂移。
 
@@ -54,26 +58,26 @@
 ## §1 開工前稽核（逐條跑，全部要對；不對先修再開工）
 
 ```bash
-git log --oneline -5                            # 期望最新為 B5 收斂之 docs commit
+git log --oneline -5                            # 期望最新為 B6 收斂之 docs commit（b2055ac8）
 bash scripts/debt_ledger.sh --has-open          # 期望 rc=0（無未清委員會債）
 bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_TODO.md        # 期望 rc=0
 bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_TODO.D-003.md  # 期望 rc=0
 grep -c '^### Task ' docs/GAP3_EVENT_UX_TODO.md # 期望 42
 python3 scripts/gap3_freeze_golden.py --check   # 期望 rc=0，canonical_sha=163c4cec…（本條約 15 秒）
-venv/bin/python -m pytest tests/momentum/event_samples/ -q            # 期望 279 passed
+venv/bin/python -m pytest tests/momentum/event_samples/ -q            # 期望 283 passed（B7 新增 4 條 horizon_curve）
 venv/bin/python -m pytest tests/api -q -k "gap3_csv or gap3_export_filter or lookahead_declaration or gap3_horizon or gap3_import or gap3_t0_unit or gap3_heterogeneous or gap3_source_digest or gap3_contract_reason or gap3_lookahead"   # 期望 164 passed
-npm --prefix frontend test -- --run             # 期望 45 files／269 passed
+npm --prefix frontend test -- --run             # 期望 47 files／288 passed
 npm --prefix frontend run build                 # 期望 rc=0
 ```
 
-B1–B5 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5}-all-mutations.receipt.json`
-（32／14／13／15／19 條），皆 `closure: CLOSED`。**不需重跑**，除非你改了那幾批的產出。
+B1–B6 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6}-all-mutations.receipt.json`
+（32／14／13／15／19／23 條），皆 `closure: CLOSED`。**不需重跑**，除非你改了那幾批的產出。
 
-🔴 **B7 會讓上表第 6 條（golden）之期望值合法改變**——見 §2B.3。
+🔴 **上表第 6 條（golden）之期望值 `163c4cec…` 不會因 B7 改變**——原交接宣稱「4.2 會讓它合法改變」已於 2026-08-26 實測推翻，定案見 `D-004` 之 A-022。
 
 ---
 
-## §2 B6 是什麼（Phase 3 全部，三個 Task）
+## §2 B6 是什麼（Phase 3 全部，三個 Task）—— 🔴 **已收斂（2026-08-26，commit `b2055ac8`），本節保留供追溯**
 
 **B6 ＝ 事件批次刪除 ＝ Task 3.1（DELETE 端點）、3.2（前端刪除鈕與二次確認）、3.3（已被引用之警語）。**
 依 §B 拓撲，B6 **無前置依賴**。
@@ -115,6 +119,61 @@ B1–B5 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5}-all-
 
 ---
 
+## §2B.0 🔴 B7 之現況（2026-08-26；**先讀這節再讀 §2B**）
+
+B7 已開工。**開工偵察查出兩件會擋住實作的事，已派 consult 輪並取得四題裁定**
+（`handoffs/reconcile/20260826-gap3ux-b7-consult-r1/synth.md`，兩道機檢 rc=0、債已清）：
+
+| 題 | 裁定 |
+|---|---|
+| `RULING-4` 匯出記錄要帶的 `future_{h}bar_return` 與 `lookahead_bars_declared`，契約 validator **實測皆以 `unknown_field` 拒收** ⇒ 照 SPEC 字面實作會產出**匯不回去的檔** | **改契約**，走延伸檔 `D-004`（不採雙檔分離、不採塞 `meta`） |
+| `RULING-3` Task 4.1 移除主答案窗後，B5 之下界守衛有一半變死碼 | **改形不刪**（五子題見 `D-004 A-021`） |
+| 交接原 §2B.1 之「G-2 golden 會合法改變」 | **確認為錯**，不重凍（見 `D-004 A-022`；§2B.1 該列已更正） |
+| Task 4.2 | 後端已具備；**前端未接線**（`EventTablesPanel` 不帶 `horizons`） |
+
+### 已完成
+
+- `tests/momentum/event_samples/test_gap3_horizon_curve.py` —— Task 4.2 之後端驗收
+  **4 條 passed**（下限 3），釘死「只改算哪些 h、不改計算式、不改 `n_eff` 定義」。**未 commit**。
+- `docs/GAP3_EVENT_UX_TODO.D-004.md` —— 三條修訂 A-020／A-021／A-022，`doc_format_precheck` rc=0。
+
+### 🔴 卡在哪：`D-004` 戳記輪 R2
+
+R1 結果：composer **APPROVED**、grok **APPROVED**、codex **REJECTED**——**REJECTED 是對的**。
+`RULING-3(c)`（`withHorizonLowerBoundGuard` 存廢）實為 **2 vs 1**：
+codex 與 grok 皆裁「**保留** `proceed` 結構保證、改簽章」，只有 composer 裁「移除」。
+主委逐字採了 composer 的表格又把整條標成「三家一致」⇒ **採了少數且較弱的那一版**。
+🔴 **本 epic 主委第五次「宣稱大於實作」**，形態是新的：**未逐家交叉核對即宣稱一致**
+（前四次是「宣稱的保護大於實際的保護」）。
+
+已改：(c) 改為保留包裹、改名 `withExportLowerBoundGuard(state, {notify, proceed})`、
+職責改為 **readiness fail-closed**；收錄 grok 之警告「**不得**退回裸 `if (…) return;` 後接長串
+`await`」（B5 R3 已否定、可被 AST 繞過之形狀）；**新增驗收⑤（page runtime 執行期計數）
+＋對應 mutation**，因為 (c) 的價值是結構保證、只驗述詞抓不到拆包裹。
+
+⇒ D-004 之 body 雜湊改變，**R1 三份戳記全部作廢**。
+
+**要派的東西（都已寫好）**：
+
+| 項 | 值 |
+|---|---|
+| brief | `handoffs/20260826-gap3ux-todo-d004-stamp-brief.md`（已改寫為 R2，`doc_format_precheck` rc=0） |
+| 機械標的 | `handoffs/reconcile/20260826-gap3uxtodod004-x-stamp/synth.md`（rc=0） |
+| session 名 | `20260826-gap3uxtodod004-x-stamp-r2` |
+| task-id | `20260826-GAP3UXTODOD004-X-STAMP-R2` |
+| D-004 body 雜湊 | `705f4ad0ac7ad4360216f20067d1878d76e2c04789b300def58fab7f4b0421ad` |
+| 機械標的 body 雜湊 | `6112f0c5f2c269532f5ff7ec767950c8d63c3d70484c66a51a507d4c5997996a` |
+
+🔴 **session 名與 `--task-id` 必須是同一串的大小寫對應**——R1 首次派工即因此被
+命名規約 fail-closed 擋下（用了 `…-todo-d004-stamp` 對 `…GAP3UXTODOD004-X-STAMP-R1`）。
+
+### 戳記通過後的實作順序
+
+**`D-004` 三家 APPROVED → 改契約 → Task 4.1 → 4.1b → 4.1c → 4.3 → 4.2 前端。**
+🔴 契約改動之落點與判準字面**全文在 `D-004` 之 A-020／A-021**，本節不複述（避免副本漂移）。
+
+---
+
 ## §2B B7 是什麼（Phase 4 全部，五個 Task；4.2 之 S-9 已於 B1 完成）
 
 **B7 ＝ 匯出端之報酬欄與揭露 ＝ Task 4.1、4.1b、4.1c、4.2、4.3。**
@@ -130,7 +189,7 @@ B1–B5 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5}-all-
 | 🔴 **Task 4.1 與 B5 直接相撞** | B5 把下界守衛整套綁在匯出面板之 `eventHorizonBars`（`exportAllowedUnderBound`／`withHorizonLowerBoundGuard`／`horizonOptions`／`export-gap3-horizon` select） | **4.1 要移除的正是那個「主答案窗」單選**。移除後 `window.horizon_bars` ＝ `max(1, lookahead_bars_declared[該列 tf])`＝**由深度導出**而非使用者選 ⇒「使用者選太小」這個風險消失，**B5 守衛的存在理由必須重新裁定**。🔴 **在 brief 具名請三家裁**：不得默默刪掉（那會讓 `D-002 A-004` 之解除失效），也不得留一個守不住任何東西的死碼 |
 | `label_value` 現況寫在三處 | `eventExport.ts`：`:112` 寫入欄位、`:139` `n_missing_label_value`、`:140` `label_value_source`、`:141` `note` | 4.1「不得以任何形式寫入 `label_value`」⇒ 這四處要一起清；`skipped` 之 `missing_*_label_value_omitted` reason 亦然 |
 | `analyze_tables` 之 horizons 預設 | `pipeline.py:282`：`horizons: Tuple[int, ...] = (1, 2, 4)` | 4.2 改由呼叫端傳入；**只改要算哪些 horizon，不改每個 horizon 之計算式** |
-| 🔴 **G-2 golden 會合法改變** | `scripts/gap3_freeze_golden.py`（現行 `canonical_sha=163c4cec…`；`--check` 比 canonical_sha exact＋summary_table 逐列 abs≤1e-12） | 4.2 改列數 ⇒ golden **必然不符**。這是 **D-4 所稱之受管變更**：須以 `_write()` 重凍、**並在 commit message 說明**，且重凍**須以 §G S-9 參考實作重算**（`canonical_serialize.py`，B1 已交付）。🔴 **不得靜默重凍**；也不要以為是自己弄壞了 |
+| ~~G-2 golden 會合法改變~~ 🔴 **本列原為錯誤宣稱，2026-08-26 實測推翻** | `scripts/gap3_freeze_golden.py` 之 `_run` 來自 `scripts/gap2_freeze_golden.py`，跑的是 `tests.momentum.helpers.ichc_run.run_analyze`（**IC 分析**管線，`ic_gatekeeper` case） | 它**不呼叫** `analyze_tables`／`event_forward_return_table`，而 4.2 動的正是後者 ⇒ **4.2 不會讓 golden 改變**。實測：加完 4 條 `-k horizon_curve` 後 `--check` rc=0、`canonical_sha=163c4cec…` **未變**；三家 consult 一致複驗成立。🔴 **不重凍、commit message 不得寫「已重凍」**。定案見 `docs/GAP3_EVENT_UX_TODO.D-004.md` 之 **A-022**（SPEC Task 4.2 之該句亦判為誤植） |
 | 附帶欄之來源 | `CaseData` 之 `future_{1..12}bar_return`（`types.ts:49-60`）；registry 之 37 個 future 欄全部以 `future` 開頭 | 4.1 之多選預設**全選 1..12**；🔴 **附帶欄不得納入深度 `max`**（SPEC Task 2.1b 覆蓋風險：過度 purge 會吃掉訓練樣本）。B5 之 `referencedColumnsOf()` 只回條件引用欄，**維持該分界即可**，不要把附帶欄混進去 |
 | `control_kind` 現為寫死 | `eventExport.ts` 之 `control_kind: 'user_labeled_same_trigger'` | 4.1b 第 5 段要揭露它；邊界②＝顯示值 `==` 匯出檔實際值（防寫死漂移） |
 | `R-A005-1` **不觸發** | 該殘留之觸發條件＝動到 `CaseSearchEngine` 之**未來欄計算段** | B7 只**消費** future 欄、不改 producer ⇒ 不觸發。**在 brief 寫明這個判斷**，免得誤以為要一併做 |
@@ -285,7 +344,9 @@ mutation，**要重錨、不是繞過**（B4／B5 各發生一次）。
 | 2 | 動過 `scripts/` ⇒ 收 epic 前跑 `bash scripts/gov_check.sh --no-probe`（丟背景，十分鐘級） | 收 epic 前 | ✅ 2026-08-25 已跑；**B2–B5 皆未動 `scripts/`**。若 B6／B7 動了需重跑 |
 | 3 | **GAP-3 之 UAT B 段簽字**仍在使用者手上（`docs/GAP3_UAT_CHECKLIST.md`） | 使用者 | ⬜ **未簽字不收案** |
 | 4 | 根目錄 `.probe_ic{,2,3}.sh` 三個 untracked 檔為更早批次殘留 | 隨時 | ⬜ 要清可直接刪 |
-| 5 | `handoffs/run_receipts/gap3ux-b{3,4,5}-record*.json` 為 `--record` 之暫存 receipt | 隨時 | ⬜ untracked，可刪 |
+| 5 | `handoffs/run_receipts/gap3ux-b{3,4,5,6}-record*.json` 為 `--record` 之暫存 receipt | 隨時 | ⬜ untracked，可刪 |
+| 6 | 根目錄檔名為 `--only` 之檔（內容為某委員誤寫之 mutation receipt） | 隨時 | ⬜ untracked、無害，可刪 |
+| 7 | **`D-004` 之戳記輪 R2** | **開 Task 4.1 前**（阻塞） | ⬜ brief 與機械標的皆已寫好，見 §2B.0 |
 
 ---
 

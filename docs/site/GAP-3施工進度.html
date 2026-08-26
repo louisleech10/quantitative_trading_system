@@ -11,6 +11,34 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <p><strong>這張表回答：各批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
+<h2 id="-第七批開工卡在契約修訂之核可826">🔧 第七批開工，卡在契約修訂之核可（8/26）</h2>
+<p><strong>第七批＝匯出端之報酬欄與揭露</strong>（Task 4.1／4.1b／4.1c／4.2／4.3）。開工偵察查出兩件擋住實作的事，
+已派 consult 輪取得<strong>四題裁定</strong>（<code>handoffs/reconcile/20260826-gap3ux-b7-consult-r1/synth.md</code>）：</p>
+<ul>
+<li>🔴 <strong><code>RULING-4</code>：照 SPEC 字面實作會產出「匯不回去的檔」</strong>。SPEC Task 4.1 要求匯出記錄帶
+<code>future_{h}bar_return</code> 與 <code>lookahead_bars_declared</code>，而契約 validator <strong>實測兩者皆以
+<code>unknown_field</code> 拒收</strong>（前者未登記、後者屬 <code>derived_fields</code> 且該節 doc 明寫「匯入檔出現 ⇒ unknown_field」）；
+而 <code>/search</code> 匯出之檔<strong>就是拿來匯入的</strong>。三家一致裁定＝<strong>改契約</strong>，走延伸檔 <code>D-004</code>
+（不採雙檔分離、不採塞 <code>meta</code>）。契約<strong>無 pattern 機制</strong> ⇒ <code>future_*</code> 須<strong>逐欄列舉 12 鍵</strong>。</li>
+<li><strong><code>RULING-3</code>：移除主答案窗後，B5 下界守衛半數變死碼</strong>。三家一致裁定＝<strong>改形不刪</strong>
+（<code>declared</code> 送 0／刪 scalar 比較／<code>inexpressible</code> 改為可匯出／刪 <code>horizonOptions</code>），
+而「算不出下界即不得匯出」之 fail-closed <strong>保留</strong>（<code>D-002 A-004</code> 不失效）。</li>
+<li><strong>交接 §2B.1 之「4.2 會讓 G-2 golden 合法改變」經實測確認為錯</strong>：golden 跑
+<code>run_analyze</code>（<strong>IC 管線</strong>）、不碰 <code>analyze_tables</code>；<code>--check</code> rc=0、sha 未變 ⇒ <strong>不重凍</strong>。</li>
+<li><strong>Task 4.2 後端已具備、前端未接線</strong>（<code>EventTablesPanel</code> 不帶 <code>horizons</code> ⇒ 恆用預設 <code>[1,2,4]</code>）。</li>
+</ul>
+<p><strong>已完成</strong>：<code>test_gap3_horizon_curve.py</code> 4 條（下限 3），釘死「只改算哪些 h、不改計算式、
+不改 <code>n_eff</code> 定義」；<code>D-004</code> 三條修訂（A-020／A-021／A-022）。</p>
+<p>🔴 <strong>卡在 <code>D-004</code> 戳記輪</strong>：R1 ＝ composer／grok APPROVED、<strong>codex REJECTED——且 codex 是對的</strong>。
+<code>RULING-3(c)</code>（<code>withHorizonLowerBoundGuard</code> 存廢）實為 <strong>2 vs 1</strong>：codex 與 grok 皆裁
+「<strong>保留</strong> <code>proceed</code> 結構保證、改簽章」，只有 composer 裁「移除」。主委逐字採了 composer 的表格
+又把整條標成「三家一致」⇒ <strong>採了少數且較弱的那一版</strong>。
+<strong>本 epic 主委第五次「宣稱大於實作」</strong>，形態是新的：<strong>未逐家交叉核對即宣稱一致</strong>。
+已改為多數且較嚴之版本、收錄 grok 之「不得退回裸 <code>if (…) return;</code>」警告（B5 R3 已否定之形狀）、
+並<strong>新增 page runtime 驗收⑤</strong>（真的按匯出 ⇒ <code>buildEventContractRecords</code> 呼叫次數 <code>== 0</code>）
+＋對應 mutation——因為 (c) 的價值是結構保證，只驗述詞抓不到拆包裹。
+⇒ body 雜湊改變，<strong>R1 三份戳記全部作廢，須跑 R2</strong>（brief 已改寫完成）。</p>
+<hr />
 <h2 id="-第六批已收斂826六輪審查-5-2-2-1-兩家零-0三家一致可收">✅ 第六批已收斂（8/26，六輪審查 5 → 2 → 2 → 1 → 兩家零 → 0，三家一致可收）</h2>
 <p><strong>第六批＝刪除</strong>，三個 Task。一句話：<strong>讓你刪掉一批匯錯的事件，而且不留半個孤兒檔</strong>。</p>
 <p><strong>做了什麼</strong></p>

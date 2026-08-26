@@ -2,6 +2,38 @@
 
 **這張表回答：各批做到哪、憑什麼說做完、審查抓到什麼。** 規格與清單都凍結了（`docs/GAP3_EVENT_SPEC.md`／`docs/GAP3_EVENT_TODO.md`），施工照單做；改不動的凍結文件有修訂時走延伸檔 `docs/GAP3_EVENT_TODO.D-001.md`（不就地改）。
 
+## 🔧 第七批開工，卡在契約修訂之核可（8/26）
+
+**第七批＝匯出端之報酬欄與揭露**（Task 4.1／4.1b／4.1c／4.2／4.3）。開工偵察查出兩件擋住實作的事，
+已派 consult 輪取得**四題裁定**（`handoffs/reconcile/20260826-gap3ux-b7-consult-r1/synth.md`）：
+
+- 🔴 **`RULING-4`：照 SPEC 字面實作會產出「匯不回去的檔」**。SPEC Task 4.1 要求匯出記錄帶
+  `future_{h}bar_return` 與 `lookahead_bars_declared`，而契約 validator **實測兩者皆以
+  `unknown_field` 拒收**（前者未登記、後者屬 `derived_fields` 且該節 doc 明寫「匯入檔出現 ⇒ unknown_field」）；
+  而 `/search` 匯出之檔**就是拿來匯入的**。三家一致裁定＝**改契約**，走延伸檔 `D-004`
+  （不採雙檔分離、不採塞 `meta`）。契約**無 pattern 機制** ⇒ `future_*` 須**逐欄列舉 12 鍵**。
+- **`RULING-3`：移除主答案窗後，B5 下界守衛半數變死碼**。三家一致裁定＝**改形不刪**
+  （`declared` 送 0／刪 scalar 比較／`inexpressible` 改為可匯出／刪 `horizonOptions`），
+  而「算不出下界即不得匯出」之 fail-closed **保留**（`D-002 A-004` 不失效）。
+- **交接 §2B.1 之「4.2 會讓 G-2 golden 合法改變」經實測確認為錯**：golden 跑
+  `run_analyze`（**IC 管線**）、不碰 `analyze_tables`；`--check` rc=0、sha 未變 ⇒ **不重凍**。
+- **Task 4.2 後端已具備、前端未接線**（`EventTablesPanel` 不帶 `horizons` ⇒ 恆用預設 `[1,2,4]`）。
+
+**已完成**：`test_gap3_horizon_curve.py` 4 條（下限 3），釘死「只改算哪些 h、不改計算式、
+不改 `n_eff` 定義」；`D-004` 三條修訂（A-020／A-021／A-022）。
+
+🔴 **卡在 `D-004` 戳記輪**：R1 ＝ composer／grok APPROVED、**codex REJECTED——且 codex 是對的**。
+`RULING-3(c)`（`withHorizonLowerBoundGuard` 存廢）實為 **2 vs 1**：codex 與 grok 皆裁
+「**保留** `proceed` 結構保證、改簽章」，只有 composer 裁「移除」。主委逐字採了 composer 的表格
+又把整條標成「三家一致」⇒ **採了少數且較弱的那一版**。
+**本 epic 主委第五次「宣稱大於實作」**，形態是新的：**未逐家交叉核對即宣稱一致**。
+已改為多數且較嚴之版本、收錄 grok 之「不得退回裸 `if (…) return;`」警告（B5 R3 已否定之形狀）、
+並**新增 page runtime 驗收⑤**（真的按匯出 ⇒ `buildEventContractRecords` 呼叫次數 `== 0`）
+＋對應 mutation——因為 (c) 的價值是結構保證，只驗述詞抓不到拆包裹。
+⇒ body 雜湊改變，**R1 三份戳記全部作廢，須跑 R2**（brief 已改寫完成）。
+
+---
+
 ## ✅ 第六批已收斂（8/26，六輪審查 5 → 2 → 2 → 1 → 兩家零 → 0，三家一致可收）
 
 **第六批＝刪除**，三個 Task。一句話：**讓你刪掉一批匯錯的事件，而且不留半個孤兒檔**。
