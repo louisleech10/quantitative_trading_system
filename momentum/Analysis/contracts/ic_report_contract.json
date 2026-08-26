@@ -12,8 +12,10 @@
   "reasons": {
     "net_ic_unavailable": ["turnover_disabled"],
     "event_fallback": ["insufficient_events"],
-    "xsec_not_applicable": ["cross_sectional_mode"]
+    "xsec_not_applicable": ["cross_sectional_mode"],
+    "analysis_rejected": ["feature_count_exceeds_cap"]
   },
+  "_reasons_doc": "GAP-3 UX Task 6.0：analysis_rejected＝分析請求在**啟動任務之前**即被拒的原因分類。程式與前端一律由本檔取字面（經 momentum.factories.ic_report_reason；api／frontend 內硬寫該字串之數須為 0）。🔴 消費端一律以**成員資格**斷言（`'x' in reasons['analysis_rejected']`），不得寫等值——Task 7.7 會往同一分類再加兩個 reason，寫成等值會在那時假紅。",
   "split_method": ["holdout", "full_sample_fallback"],
   "removed_config_keys": [
     ["performance", "max_features_for_correlation"],

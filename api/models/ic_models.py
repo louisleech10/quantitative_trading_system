@@ -190,6 +190,12 @@ class ICTaskStatusResponse(BaseModel):
     # LA-1 B3：completed 時可帶 root 紅標（optional，舊 client 相容）
     analysis_status: Optional[str] = None
     oos_guarantees: Optional[bool] = None
+    # GAP-3 UX Task 6.3：這個 run 有幾個特徵。
+    # 🔴 **必須在此宣告**，否則 service 塞了值也會被 `response_model` 靜默濾掉、前端永遠看不到
+    #    （本 epic §4.2 之假綠實例第 5 條）。
+    # 🔴 `current_stage` 為**可擴充集合**，不是固定 enum：GAP-6 之分塊計算會細分更多階段，
+    #    測試不得以窮舉相等斷言鎖死（改測試是掩蓋行為變更的常見路徑）。
+    feature_count: Optional[int] = None
 
 
 class ICTopFeaturesRequest(BaseModel):

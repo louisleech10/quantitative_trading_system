@@ -747,6 +747,52 @@ def load_ic_config(**kwargs: Any) -> Any:
     return _load_ic_config(**kwargs)
 
 
+def resolve_run_feature_count(
+    *, config_hash: Optional[str] = None, symbol: Optional[str] = None,
+    timeframe: Optional[str] = None,
+) -> Optional[int]:
+    """GAP-3 UX Task 6.1／6.3：解析某個 run 有幾個特徵（**只讀 registry，絕不開 HDF5**）。
+
+    解析**只認 `config_hash`**；解析不出來回 `None`——**呼叫端自己決定要擋還是要放**，
+    本函式不替它決定。
+
+    🔴 **刻意沒有 (symbol, timeframe) 之 fallback**：`find_latest` 取的是該 symbol/tf 的
+    **最新**一筆，未必是使用者當下要分析的那個 run。實測 `BTCUSDT/12h` 的最新一筆是
+    **15** 個特徵，而同一組合下另有 **218,369** 的 run ⇒ 用它當閘門的輸入會拿**別的 run**
+    的數字去守，比不守更糟（會放行真正該擋的那個）。寧可回 `None` 讓呼叫端顯式處理。
+    🔴 不碰 HDF5 是硬性要求：Task 6.4 要證明「止血閘擋下時未載入大矩陣」，
+      檢查路徑上只要開過特徵檔，那個證明就沒有意義了。
+    """
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    del symbol, timeframe  # 見上：刻意不參與解析，保留參數只為呼叫端可讀性
+    if not config_hash:
+        return None
+    entry = FeatureRegistry().find_by_config_hash(config_hash)
+    if entry is None:
+        return None
+    count = entry.get("feature_count")
+    return int(count) if isinstance(count, int) else None
+
+
+def ic_report_reason(category: str, index: int = 0) -> str:
+    """GAP-3 UX Task 6.0：IC 側契約之 reason 字面出口（api 層唯一取用點）。
+
+    🔴 R3：api 不得直 `from momentum.Analysis...import`；字面亦**不得**在 api／frontend 硬寫
+    （驗收②以機械掃描該字串出現數 == 0）。本出口回**純字串**。
+    """
+    from momentum.Analysis.ic_config_schema import contract_reason as _impl
+
+    return _impl(category, index)
+
+
+def ic_report_reasons(category: str) -> tuple:
+    """同上，回該分類之完整 reason 清單（保序 tuple）；供成員資格斷言使用。"""
+    from momentum.Analysis.ic_config_schema import contract_reasons as _impl
+
+    return _impl(category)
+
+
 def get_ml_pipeline_config_class():
     """Return MLPipelineConfig class for type construction."""
     from momentum.FeatureEngineering.ml_pipeline_config import MLPipelineConfig

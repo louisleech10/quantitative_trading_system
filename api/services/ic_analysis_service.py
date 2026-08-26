@@ -32,12 +32,26 @@ from momentum.factories import (
     create_ic_artifact_writer,
     create_ic_reporter,
     create_kline_storage_manager,
+    resolve_run_feature_count,
     sanitize_factor_returns,
 )
 from momentum.core.contracts import ICResult
 
 
 logger = get_logger("api.ic_analysis_service")
+
+
+def _resolve_feature_count(request) -> Optional[int]:
+    """GAP-3 UX Task 6.3：取這個 run 的特徵數（唯一實作在 momentum，經 factories 出口；R3）。
+
+    🔴 解析失敗回 `None`——**不填假值**。UAT 已證實填充值比沒有更誤導
+    （`progress==0.12` 卡 15 分鐘，使用者以為還在動）。
+    """
+    return resolve_run_feature_count(
+        config_hash=(getattr(request, "config_hash", None) or "").strip() or None,
+        symbol=getattr(request, "symbol", None),
+        timeframe=getattr(request, "timeframe", None),
+    )
 
 FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
 
@@ -75,6 +89,8 @@ class ICAnalysisService:
             "req_symbol": request.symbol,
             "req_timeframe": request.timeframe,
             "req_config_hash": (request.config_hash or "").strip() or None,
+            # GAP-3 UX Task 6.3：這個 run 有幾個特徵（只讀 registry；解析不出來就是 None，不填假值）。
+            "feature_count": _resolve_feature_count(request),
         }
 
         with self._lock:
@@ -314,6 +330,10 @@ class ICAnalysisService:
                 "current_step": task_info.get("current_step"),
                 "applied_tier": task_info.get("applied_tier", "intermediate"),
                 "error": task_info.get("error"),
+                # GAP-3 UX Task 6.3：這個 run 的特徵數。
+                # 🔴 沒有就給 None，**不填假值**——UAT 已證實「progress==0.12 卡 15 分鐘」
+                #    這種填充值比沒有更誤導（使用者以為在動）。
+                "feature_count": task_info.get("feature_count"),
             }
             # LA-1 B3-ENUM-01：completed 時鏡像 root 紅標（fail-closed normalize）
             result = task_info.get("result")

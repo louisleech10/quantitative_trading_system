@@ -561,6 +561,25 @@ def contract_enum(name: str) -> frozenset:
     raise KeyError(f"contract node is not an enum list: {name}")
 
 
+def contract_reasons(category: str) -> tuple:
+    """取 `reasons` 之某分類（保序 tuple）；未知分類 raise KeyError（不 fallback）。
+
+    GAP-3 UX Task 6.0：reason 字面之**唯一**取用點。api 層與前端一律經此取字面
+    （再經 `momentum.factories.ic_report_reason` 出口；R3 禁 api 直 import momentum 內部），
+    **不得硬寫**——硬寫之數由 Task 6.0 之驗收②機械掃描為 0。
+    """
+    reasons = load_report_contract()["reasons"]
+    value = reasons[category]
+    if not isinstance(value, list) or not value:
+        raise ContractValidationError(f"reasons['{category}'] 須為非空 list，實得 {value!r}")
+    return tuple(value)
+
+
+def contract_reason(category: str, index: int = 0) -> str:
+    """取某分類之第 index 個 reason 字面（預設第一個）。"""
+    return contract_reasons(category)[index]
+
+
 def validate_report_against_contract(report: Any) -> None:
     """契約 validator 唯一邊界的實體（消費點＝ic_reporter.generate_json_report 出口）。
 
