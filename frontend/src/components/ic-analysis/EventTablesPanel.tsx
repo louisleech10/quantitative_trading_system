@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { EventImportRejectedError, analyzeEventImport } from '@/lib/api';
+import { recordImportReference } from '@/lib/eventBatchReferences';
 import type { EventAnalyzeResponse, EventTableStatus } from '@/lib/types';
 
 interface EventTablesPanelProps {
@@ -170,6 +171,9 @@ export default function EventTablesPanel({ importId, data }: EventTablesPanelPro
     setError(null);
     analyzeEventImport(importId)
       .then((r) => {
+        // GAP-3 UX Task 3.3：記下「這批真的被拿去分析過」——**成功之後**才記，不是選取當下。
+        // 判準與其誠實邊界見 `@/lib/eventBatchReferences`（PENDING-RULING）。
+        recordImportReference(importId);
         if (!cancelled) setResp(r);
       })
       .catch((err) => {

@@ -4,7 +4,7 @@
 提供案例導入、批量下載等API端點
 """
 
-from fastapi import APIRouter, File, Form, UploadFile, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException, BackgroundTasks, Query, Response
 from typing import Optional
 
 from ..models.case_models import (
@@ -354,6 +354,18 @@ async def get_event_import(import_id: str):
     if out is None:
         raise HTTPException(status_code=404, detail=f"event import {import_id!r} not found")
     return out
+
+
+@router.delete("/case/events/{import_id}", status_code=204)
+async def delete_event_import(import_id: str):
+    """GAP-3 UX Task 3.1：刪除該批事件與其全部落檔產物，**不留孤兒檔**。
+
+    🔴 不存在之 `import_id` ⇒ **404（非 500）**。
+    🔴 只刪該批；**不連帶刪 kline 快取或 Feature Library**，亦**不提供「刪除全部」端點**。
+    """
+    if not get_event_import_service().delete_import(import_id):
+        raise HTTPException(status_code=404, detail=f"event import {import_id!r} not found")
+    return Response(status_code=204)
 
 
 @router.post("/case/events/{import_id}/analyze", response_model=EventAnalyzeResponse)

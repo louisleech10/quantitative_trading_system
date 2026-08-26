@@ -1013,6 +1013,20 @@ export async function listEventImports(): Promise<EventImportListResponse> {
   return response.json();
 }
 
+/**
+ * GAP-3 UX Task 3.1：刪除一整批事件（含其全部落檔產物）。
+ *
+ * 成功為 204 No Content ⇒ **不解析 body**。不存在之批 ⇒ 後端回 404，於此拋出。
+ * 🔴 一次只收一個 `importId`——契約上不存在「刪除全部」之呼叫形狀。
+ */
+export async function deleteEventImport(importId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}${API_PREFIX}/case/events/${encodeURIComponent(importId)}`,
+    { method: 'DELETE' },
+  );
+  if (!response.ok) await parseRejected(response);
+}
+
 export async function uploadEventImport(
   file: File,
   validateOnly: boolean,

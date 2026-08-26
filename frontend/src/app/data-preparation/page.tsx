@@ -5,7 +5,9 @@ import CaseImportForm from "@/components/case/CaseImportForm";
 import BatchDownloadPanel from "@/components/case/BatchDownloadPanel";
 import EventImportForm from "@/components/case/EventImportForm";
 import EventCsvMappingForm from "@/components/case/EventCsvMappingForm";
-import { listEventImports } from "@/lib/api";
+import EventBatchDeleteDialog from "@/components/case/EventBatchDeleteDialog";
+import { deleteEventImport, listEventImports } from "@/lib/api";
+import { forgetImportReference, isImportReferenced, referencedImportIds } from "@/lib/eventBatchReferences";
 import type { EventImportSummary } from "@/lib/types";
 
 export default function DataPreparationPage() {
@@ -14,6 +16,11 @@ export default function DataPreparationPage() {
   const [isClearing, setIsClearing] = useState(false);
   const [eventImports, setEventImports] = useState<EventImportSummary[]>([]);
   const [eventImportsError, setEventImportsError] = useState<string | null>(null);
+  // GAP-3 UX Task 3.2／3.3：待確認刪除之批（null ⇒ 確認框未開）
+  const [pendingDelete, setPendingDelete] = useState<EventImportSummary | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [referenced, setReferenced] = useState<Set<string>>(() => new Set<string>());
 
   // GAP-3 B5.2：已匯入事件批（新契約）
   useEffect(() => {
@@ -21,6 +28,29 @@ export default function DataPreparationPage() {
       .then((r) => setEventImports(r.imports))
       .catch((err) => setEventImportsError(err instanceof Error ? err.message : '載入事件批失敗'));
   }, [refreshKey]);
+
+  // GAP-3 UX Task 3.3：引用紀錄之讀取（判準與來源見 `@/lib/eventBatchReferences`；PENDING-RULING）
+  useEffect(() => {
+    setReferenced(referencedImportIds());
+  }, [refreshKey]);
+
+  const handleDeleteConfirmed = async () => {
+    if (!pendingDelete) return;
+    const importId = pendingDelete.import_id;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await deleteEventImport(importId);
+      // 該批已不存在 ⇒ 一併移除其引用紀錄，不留指向不存在批之紀錄
+      forgetImportReference(importId);
+      setPendingDelete(null);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : '刪除事件批失敗');
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   // 頁面加載時獲取當前案例數
   useEffect(() => {
@@ -182,11 +212,33 @@ export default function DataPreparationPage() {
             {eventImports.length > 0 && (
               <ul className="space-y-1 text-sm text-slate-200">
                 {eventImports.map((it) => (
-                  <li key={it.import_id} className="font-mono text-xs">
-                    {it.import_id} · {it.symbols.join('/')} {it.timeframes.join('/')} · {it.n_events} 筆 · {it.imported_at}
+                  <li key={it.import_id} className="flex items-center justify-between gap-2 font-mono text-xs">
+                    <span>
+                      {it.import_id} · {it.symbols.join('/')} {it.timeframes.join('/')} · {it.n_events} 筆 · {it.imported_at}
+                    </span>
+                    {/* GAP-3 UX Task 3.2：刪除入口**只在批列表**提供（邊界②） */}
+                    <button
+                      type="button"
+                      data-testid={`event-batch-delete-open-${it.import_id}`}
+                      onClick={() => { setDeleteError(null); setPendingDelete(it); }}
+                      className="shrink-0 rounded border border-rose-400/40 px-2 py-0.5 text-rose-200 hover:bg-rose-500/10"
+                    >
+                      刪除
+                    </button>
                   </li>
                 ))}
               </ul>
+            )}
+            {/* Task 3.2／3.3：二次確認框（不得以 window.confirm 帶過）。警語由 3.3 之判準決定是否顯示。 */}
+            {pendingDelete && (
+              <EventBatchDeleteDialog
+                batch={pendingDelete}
+                isReferenced={isImportReferenced(pendingDelete.import_id, referenced)}
+                busy={deleteBusy}
+                errorMessage={deleteError}
+                onCancel={() => { setPendingDelete(null); setDeleteError(null); }}
+                onConfirm={handleDeleteConfirmed}
+              />
             )}
           </div>
         </div>

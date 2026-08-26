@@ -589,6 +589,7 @@ import csv as _csv
 import hashlib as _hashlib
 import json as _json
 import re as _re
+import shutil as _shutil
 import uuid as _uuid
 
 from api.models.event_import_models import (
@@ -1156,7 +1157,10 @@ class EventImportService:
             # 邊界②：只**補**本 namespace，不覆寫 payload 之任何既有欄。
             if mapping_provenance is not None:
                 payload.setdefault("mapping_provenance", mapping_provenance)
-            p = self.storage_dir / f"{import_id}.json"
+            # 🔴 落檔路徑經 `payload_path()`（Task 3.1 之唯一實作）——寫入端與刪除端共用同一條，
+            #    否則 3.1 之「殘留檔數 == 0」會在某天因兩邊各自漂移而變成假綠。
+            p = self.payload_path(import_id)
+            assert p is not None  # import_id 由本方法生成，形狀受控；None 代表生成規則被改壞
             p.write_text(_json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str), encoding="utf-8")
             stored_path = str(p)
         return EventImportResponse(
@@ -1190,25 +1194,74 @@ class EventImportService:
                     logger.warning("event import 檔無法讀取：%s", p)
         return EventImportListResponse(total=len(items), imports=items)
 
+    def payload_path(self, import_id: str) -> Optional[Path]:
+        """該批之事件檔路徑；`import_id` 不合法 ⇒ `None`。
+
+        🔴 **本方法為 `import_id` → 路徑之唯一實作**（Task 3.1）。落檔端（`import_records`）、
+        三個讀取端與刪除端**共用同一條 path traversal 防護**——TODO Task 3.1 明令刪除端
+        「沿用同一條防護，不要另寫」。分成兩份寫的話，兩份會各自漂移。
+        """
+        if not import_id or "/" in import_id or "\\" in import_id or ".." in import_id:
+            return None
+        return self.storage_dir / f"{import_id}.json"
+
+    def batch_paths(self, import_id: str) -> List[Path]:
+        """該批之**全部**落檔路徑（存在者），供 Task 3.1 刪除與殘留斷言共用。
+
+        🔴 以「`<import_id>.` 前綴之檔」＋「`<import_id>/` 目錄」**枚舉**，而非寫死單一檔名：
+        TODO Task 3.1 要求刪除範圍隨 Phase 1／2 新增之產物**同步擴張**。現況下 Phase 1 之
+        receipt（`mapping_provenance`／`lookahead_declaration`）與 Phase 2 之 `filters` 都住在
+        事件檔**同一個 payload 內**，故此處只會回一個檔；日後若有人把 receipt 拆成
+        `<import_id>.receipt.json` 或 `<import_id>/` 目錄，本枚舉**自動涵蓋**，
+        不必回頭改刪除端（同步擴張是結構保證，不是紀律）。
+
+        前綴後強制帶 `.`／目錄名強制全等，故不同批之 id 不會互相命中。
+        """
+        p = self.payload_path(import_id)
+        if p is None or not self.storage_dir.is_dir():
+            return []
+        out: List[Path] = []
+        prefix = f"{import_id}."
+        for child in sorted(self.storage_dir.iterdir()):
+            if child.is_file() and child.name.startswith(prefix):
+                out.append(child)
+            elif child.is_dir() and child.name == import_id:
+                out.append(child)
+        return out
+
+    def delete_import(self, import_id: str) -> bool:
+        """刪除該批事件與其全部落檔產物；不存在（或 id 不合法）⇒ `False`（路由層轉 404）。
+
+        🔴 **不連帶刪 kline 快取或 Feature Library**（TODO Task 3.1「邊界」）——本方法只動
+        `self.storage_dir` 之下、且經 `batch_paths()` 枚舉出的路徑。
+        🔴 **不提供「刪除全部」**：本方法一次只收一個 `import_id`。
+        """
+        p = self.payload_path(import_id)
+        if p is None or not p.is_file():
+            return False
+        for target in self.batch_paths(import_id):
+            if target.is_dir():
+                _shutil.rmtree(target)
+            else:
+                target.unlink()
+        logger.info("event import 已刪除：%s", import_id)
+        return True
+
     def _stored_declaration(self, import_id: str) -> Optional[Dict[str, object]]:
         """落檔之答案窗宣告 receipt（Task 1.9／1.12）。
 
         🔴 舊批（Task 1.9 上線前落檔）無此鍵 ⇒ 回 `None`，由 momentum 側判定為**不封鎖**
         （使用者 2026-08-05「面向未來不溯及既往」；不把舊資料補回新規則）。
         """
-        if not import_id or "/" in import_id or ".." in import_id:
-            return None
-        p = self.storage_dir / f"{import_id}.json"
-        if not p.is_file():
+        p = self.payload_path(import_id)
+        if p is None or not p.is_file():
             return None
         val = self._load(p).get("lookahead_declaration")
         return dict(val) if isinstance(val, dict) else None
 
     def get_import(self, import_id: str) -> Optional[EventImportDetailResponse]:
-        if not import_id or "/" in import_id or ".." in import_id:
-            return None
-        p = self.storage_dir / f"{import_id}.json"
-        if not p.is_file():
+        p = self.payload_path(import_id)
+        if p is None or not p.is_file():
             return None
         payload = self._load(p)
         return EventImportDetailResponse(summary=self._summary(payload), records=list(payload.get("records") or []))
