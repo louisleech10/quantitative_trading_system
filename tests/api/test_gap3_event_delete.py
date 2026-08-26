@@ -255,6 +255,37 @@ def test_gap3_event_delete_symlink_dir_is_unlinked_not_followed(_isolated_storag
     assert outside.is_dir()
 
 
+def test_gap3_event_delete_broken_symlink_sidecar_is_removed(_isolated_storage):
+    """🔴 R2 群集 F（`CODEX-R2-P2-01`）：指向不存在 target 的**斷掉的連結**也屬該批，須一併刪。
+
+    `is_file()` 與 `is_dir()` 對 broken symlink **皆回 False** ⇒ 以型別分流的枚舉會漏掉它：
+    ①事件檔還在時 ⇒ 端點回 204 但該連結留在磁碟（違反「殘留 == 0」）；
+    ②該連結是唯一殘留時 ⇒ `delete_import` 回 False ⇒ 永遠 404、永久刪不掉。
+    """
+    svc = _isolated_storage
+    import_id = _import_batch()
+    broken = svc.storage_dir / f"{import_id}.receipt.json"
+    broken.symlink_to(svc.storage_dir / "target-does-not-exist.json")
+    assert broken.is_symlink() and not broken.is_file() and not broken.is_dir()
+
+    assert client.delete(f"/api/v1/case/events/{import_id}").status_code == 204
+    assert not broken.is_symlink(), "斷掉的連結沒被刪掉（殘留）"
+    assert _residue(svc.storage_dir, import_id) == []
+
+
+def test_gap3_event_delete_lone_broken_symlink_is_not_a_permanent_404(_isolated_storage):
+    """🔴 R2 群集 F 之第二形態：只剩斷掉的連結時，不得變成永久 404。"""
+    svc = _isolated_storage
+    import_id = "20260826T000000Z-deadbeef"
+    svc.storage_dir.mkdir(parents=True, exist_ok=True)
+    lone = svc.storage_dir / f"{import_id}.receipt.json"
+    lone.symlink_to(svc.storage_dir / "nope.json")
+
+    assert client.delete(f"/api/v1/case/events/{import_id}").status_code == 204
+    assert not lone.is_symlink()
+    assert _residue(svc.storage_dir, import_id) == []
+
+
 def test_gap3_event_delete_residue_predicate_excludes_lookalike_names(_isolated_storage):
     """🔴 R1 群集 D（`CODEX-R1-P2-04`）：僅檔名碰巧含 id 者**不算**該批殘留。
 

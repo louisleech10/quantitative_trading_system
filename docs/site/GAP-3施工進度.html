@@ -65,6 +65,25 @@
 先把畫面更新完，所以第二次點擊時 state 已經是新的了）。我補了一條用原生點擊、
 不讓畫面先更新的測試，現在「拿掉守衛」弄紅兩條、「改用 state」只弄紅新那條，
 <strong>差集正好是那條新測試的作用範圍</strong>。原本那句話是宣稱，現在才是證明。</p>
+<p><strong>第二輪審查（閉合輪，8/26）：五條全關，但又抓到兩條</strong></p>
+<p>R1 五條由<strong>原提出方 Codex 逐條重跑自己的 probe</strong> 確認關閉（章程 §B8，不憑「已修」信任），
+另兩家獨立複驗一致。Composer／Grok 亦交代 R1 漏抓成因，逐字＝
+<strong>「依綠燈與修法說明收斂，未跑孤兒／symlink／同 tick／範圍限定的反例」</strong>。
+🔴 主委把它<strong>變成機械項</strong>寫進往後同型批次之 brief：對每一條「存在／範圍／時序」性質，
+各給一個<strong>實跑反例</strong>，不得以綠燈與修法敘述代替（與三件套 RECHECK 並列）。</p>
+<p>本輪 Codex 新提兩條，主委實跑複驗皆成立：</p>
+<ul>
+<li><strong>群集 F：斷掉的符號連結漏枚舉</strong>。<code>is_file()</code> 與 <code>is_dir()</code> 對它<strong>皆回 False</strong> ⇒ 以型別分流的
+枚舉看不見它。兩形態皆成立：事件檔還在時回 204 但連結殘留；它是唯一殘留時<strong>永遠 404、
+永久刪不掉</strong>。修法＝ownership 只看名字不看型別，型別只在刪除分支才區分。
+與 R1 群集 E 守<strong>不同側</strong>（E＝正常連結之刪除方式、F＝斷連結之枚舉可見性），紅集合不相交。</li>
+<li><strong>群集 G：跨批 settle 競態</strong>。確認 A（在途）→ 取消 → 開 B ⇒ A 的回應無條件關掉 B 的確認框。
+🔴 <strong>這是主委 R1 修法自己引入的相鄰缺陷——本專案第七次同型</strong>：R1 的 in-flight 守衛
+只想到同一批的重入，沒想到跨批的先後回應。修法兩件事＝settle 前比對開著的批；
+防重入改成<strong>以批為單位</strong>（全域一把鎖會讓 B 被靜默擋掉，那是把競態換成更難察覺的問題）。</li>
+</ul>
+<p>另有兩條 mutation 的字面錨點被本輪修法改掉，runner <strong>fail-loud 當場擋下</strong>，主委重錨——不是繞過。
+破壞測試 18 → <strong>20 條</strong>。</p>
 <p><strong>RULING-1 三家一致裁定</strong>：採「本瀏覽器曾成功分析過」為判準（選項 1），
 判準字面用 Codex 的逐字版；Codex 另附條件＝文案必須揭露「本機」範圍（已納入群集 C）。
 「改由伺服器端記錄」（選項 2）三家一致判為<strong>越出這批的範圍、要走修訂延伸檔</strong>，本批不採。</p>

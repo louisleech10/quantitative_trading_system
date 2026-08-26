@@ -21,8 +21,11 @@ export default function DataPreparationPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [referenced, setReferenced] = useState<Set<string>>(() => new Set<string>());
-  // 刪除是否在途（見 handleDeleteConfirmed 之註解——state 守不住同一 tick 的重入）
-  const deleteInFlightRef = useRef(false);
+  // 在途中的批（見 handleDeleteConfirmed 之註解——state 守不住同一 tick 的重入）
+  const deleteInFlightIdsRef = useRef<Set<string>>(new Set());
+  // 確認框**現在顯示的是哪一批**。在途結果只能作用於它，否則 A 的回應會關掉 B 的框
+  // （R2 `CODEX-R2-P2-02`）。用 ref 而非 state：settle 時要讀的是**當下**的值。
+  const openBatchIdRef = useRef<string | null>(null);
 
   // GAP-3 B5.2：已匯入事件批（新契約）
   useEffect(() => {
@@ -36,28 +39,48 @@ export default function DataPreparationPage() {
     setReferenced(referencedImportIds());
   }, [refreshKey]);
 
+  /** 開啟某批之確認框（同步 `openBatchIdRef`，讓在途結果知道自己還該不該作用）。 */
+  const openDeleteDialog = (it: EventImportSummary) => {
+    openBatchIdRef.current = it.import_id;
+    setDeleteError(null);
+    setDeleteBusy(deleteInFlightIdsRef.current.has(it.import_id));
+    setPendingDelete(it);
+  };
+
+  const closeDeleteDialog = () => {
+    openBatchIdRef.current = null;
+    setPendingDelete(null);
+    setDeleteError(null);
+  };
+
   const handleDeleteConfirmed = async () => {
     if (!pendingDelete) return;
+    const importId = pendingDelete.import_id;
     // 🔴 R1 群集 B（`CODEX-R1-P1-02`）：確認鍵**刻意保持可按**（B4 教訓，設 disabled 會讓
     //    fireEvent.click 什麼都不觸發、測試恆綠），因此重入必須由 handler 自己擋。
     //    用 `useRef` 而**不是** `deleteBusy` state：同一 tick 內連點兩次時 state 尚未更新，
-    //    守不住；第二個請求會收 404，其錯誤還會寫進已經關閉的確認框。
-    if (deleteInFlightRef.current) return;
-    deleteInFlightRef.current = true;
-    const importId = pendingDelete.import_id;
+    //    守不住（此宣稱由 mutation `R1B-M2` 與測試 ⑧ 機械證明，不是風格偏好）。
+    // 🔴 R2（`CODEX-R2-P2-02`）：守衛**以批為單位**。守成全域的話，使用者在 A 在途時取消、
+    //    改刪 B，B 會被靜默擋掉；而不守的話 A 的回應會關掉 B 的確認框。
+    if (deleteInFlightIdsRef.current.has(importId)) return;
+    deleteInFlightIdsRef.current.add(importId);
     setDeleteBusy(true);
     setDeleteError(null);
     try {
       await deleteEventImport(importId);
       // 該批已不存在 ⇒ 一併移除其引用紀錄，不留指向不存在批之紀錄
       forgetImportReference(importId);
-      setPendingDelete(null);
+      // 🔴 只有「確認框現在顯示的仍是這一批」時才動它的 UI 狀態。
+      //    列表刷新則無條件做——那批確實不見了，跟畫面上開著哪一批無關。
+      if (openBatchIdRef.current === importId) closeDeleteDialog();
       setRefreshKey((k) => k + 1);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : '刪除事件批失敗');
+      if (openBatchIdRef.current === importId) {
+        setDeleteError(err instanceof Error ? err.message : '刪除事件批失敗');
+      }
     } finally {
-      deleteInFlightRef.current = false;
-      setDeleteBusy(false);
+      deleteInFlightIdsRef.current.delete(importId);
+      if (openBatchIdRef.current === importId) setDeleteBusy(false);
     }
   };
 
@@ -229,7 +252,7 @@ export default function DataPreparationPage() {
                     <button
                       type="button"
                       data-testid={`event-batch-delete-open-${it.import_id}`}
-                      onClick={() => { setDeleteError(null); setPendingDelete(it); }}
+                      onClick={() => openDeleteDialog(it)}
                       className="shrink-0 rounded border border-rose-400/40 px-2 py-0.5 text-rose-200 hover:bg-rose-500/10"
                     >
                       刪除
@@ -245,7 +268,7 @@ export default function DataPreparationPage() {
                 isReferenced={isImportReferenced(pendingDelete.import_id, referenced)}
                 busy={deleteBusy}
                 errorMessage={deleteError}
-                onCancel={() => { setPendingDelete(null); setDeleteError(null); }}
+                onCancel={closeDeleteDialog}
                 onConfirm={handleDeleteConfirmed}
               />
             )}

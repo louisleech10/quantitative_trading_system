@@ -1224,9 +1224,12 @@ class EventImportService:
         out: List[Path] = []
         prefix = f"{import_id}."
         for child in sorted(self.storage_dir.iterdir()):
-            if child.is_file() and child.name.startswith(prefix):
-                out.append(child)
-            elif child.is_dir() and child.name == import_id:
+            # 🔴 ownership **只看名字，不看型別**（R2 `CODEX-R2-P2-02` 之姊妹條 `P2-01`）：
+            #    原本以 `is_file()`／`is_dir()` 分流會**漏掉 broken symlink**——指向不存在之
+            #    target 時兩者皆 False ⇒ 不被枚舉 ⇒ 刪除回 204 但該連結留在磁碟；
+            #    若該連結是唯一殘留，`delete_import` 更會永遠回 False（404，永久刪不掉）。
+            #    純名字判準同時涵蓋檔、目錄、正常連結與斷掉的連結；型別只在**刪除分支**才需要區分。
+            if child.name == import_id or child.name.startswith(prefix):
                 out.append(child)
         return out
 

@@ -233,6 +233,62 @@ describe('GAP-3 Task 3.2 事件批刪除之二次確認', () => {
     await waitFor(() => expect(deleteCalls()).toHaveLength(1));
   });
 
+  it('⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框', async () => {
+    // `CODEX-R2-P2-02`：`handleDeleteConfirmed` 捕獲了 importId，但 settle 時無條件
+    // `setPendingDelete(null)` ⇒ A 的成功回應會把使用者正在看的 B 關掉；錯誤同理會寫進 B 的框。
+    // 修法＝settle 前比對 `openBatchIdRef`。本條同時釘住「取消 A 之後仍可刪 B」（守衛以批為單位）。
+    const BATCH_B: EventImportSummary = { ...BATCH, import_id: '20260826T000000Z-bbbbbbbb', n_events: 4 };
+    let release: (() => void) | null = null;
+    const gate = new Promise<void>((r) => { release = () => r(); });
+    calls = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = (init?.method ?? 'GET').toUpperCase();
+        calls.push({ url, method });
+        if (method === 'DELETE') {
+          if (url.includes(BATCH.import_id)) await gate;   // A 卡住
+          return new Response(null, { status: 204 });
+        }
+        if (url.includes('/case/events')) {
+          return new Response(JSON.stringify({ total: 2, imports: [BATCH, BATCH_B] }), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ total: 0 }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+
+    render(<DataPreparationPage />);
+    await screen.findByTestId(`event-batch-delete-open-${BATCH.import_id}`);
+
+    // 確認 A（在途）→ 取消 → 開 B
+    fireEvent.click(screen.getByTestId(`event-batch-delete-open-${BATCH.import_id}`));
+    await screen.findByTestId('event-batch-delete-dialog');
+    fireEvent.click(screen.getByTestId('event-batch-delete-confirm'));
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    fireEvent.click(screen.getByTestId('event-batch-delete-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('event-batch-delete-dialog')).toBeNull());
+
+    fireEvent.click(screen.getByTestId(`event-batch-delete-open-${BATCH_B.import_id}`));
+    await screen.findByTestId('event-batch-delete-dialog');
+    expect(screen.getByTestId('event-batch-delete-import-id').textContent).toBe(BATCH_B.import_id);
+
+    // A 這時才回來——不得動到 B 的框
+    release!();
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    expect(screen.getByTestId('event-batch-delete-dialog')).toBeTruthy();
+    expect(screen.getByTestId('event-batch-delete-import-id').textContent).toBe(BATCH_B.import_id);
+
+    // 且 B 仍刪得掉（守衛以批為單位，不是全域一把鎖）
+    fireEvent.click(screen.getByTestId('event-batch-delete-confirm'));
+    await waitFor(() => expect(deleteCalls()).toHaveLength(2));
+    expect(deleteCalls()[1].url).toContain(BATCH_B.import_id);
+  });
+
   it('⑥ 刪除失敗 ⇒ 確認框留著並顯示錯誤，不假成功', async () => {
     installFetch(404);
     await renderWithBatch();
