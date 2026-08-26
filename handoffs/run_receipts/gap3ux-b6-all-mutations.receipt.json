@@ -26,6 +26,7 @@
         "test_gap3_event_delete_residue_predicate_excludes_lookalike_names",
         "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts",
         "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed",
+        "test_gap3_event_delete_symlinked_storage_root_current_behavior",
         "test_gap3_event_delete_then_get_returns_404"
       ],
       "restored_rc": 0,
@@ -41,6 +42,7 @@
         "test_gap3_event_delete_residue_predicate_excludes_lookalike_names",
         "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts",
         "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed",
+        "test_gap3_event_delete_symlinked_storage_root_current_behavior",
         "test_gap3_event_delete_then_get_returns_404"
       ],
       "verdict": "PASS"
@@ -135,13 +137,15 @@
       "mutated_rc": 1,
       "mutated_failed": [
         "test_gap3_event_delete_only_targets_that_batch",
-        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names"
+        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names",
+        "test_gap3_event_delete_symlinked_storage_root_current_behavior"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
         "test_gap3_event_delete_only_targets_that_batch",
-        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names"
+        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names",
+        "test_gap3_event_delete_symlinked_storage_root_current_behavior"
       ],
       "verdict": "PASS"
     },
@@ -164,6 +168,7 @@
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑩ 🔴 R3 群集 H：A 在途時開 B ⇒ B 的確認鍵不得顯示「刪除中…」",
         "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
       ],
       "restored_rc": 0,
@@ -175,6 +180,7 @@
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑩ 🔴 R3 群集 H：A 在途時開 B ⇒ B 的確認鍵不得顯示「刪除中…」",
         "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
       ],
       "verdict": "PASS"
@@ -199,6 +205,7 @@
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑩ 🔴 R3 群集 H：A 在途時開 B ⇒ B 的確認鍵不得顯示「刪除中…」",
         "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
       ],
       "restored_rc": 0,
@@ -211,6 +218,7 @@
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑩ 🔴 R3 群集 H：A 在途時開 B ⇒ B 的確認鍵不得顯示「刪除中…」",
         "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
       ],
       "verdict": "PASS"
@@ -512,12 +520,64 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
-        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框"
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑩ 🔴 R3 群集 H：A 在途時開 B ⇒ B 的確認鍵不得顯示「刪除中…」"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
-        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框"
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑨ 🔴 R2 群集 G：確認 A 後取消、改開 B ⇒ A 的回應不得關掉 B 的確認框",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑩ 🔴 R3 群集 H：A 在途時開 B ⇒ B 的確認鍵不得顯示「刪除中…」"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R3H-M1",
+      "task": "3.2",
+      "desc": "拿掉 busy 同步 ⇒ 殘值誤顯示在別批（GROK-R3-P3-01）",
+      "selector": [
+        "VITEST",
+        "eventBatchDeleteConfirm",
+        "eventBatchDeleteWarning"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑩ 🔴 R3 群集 H：A 在途時開 B ⇒ B 的確認鍵不得顯示「刪除中…」"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑩ 🔴 R3 群集 H：A 在途時開 B ⇒ B 的確認鍵不得顯示「刪除中…」"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R3I-M1",
+      "task": "3.1",
+      "desc": "刪除溢出到同目錄之無關檔（RULING-2 之真邊界）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_event_delete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_event_delete_only_targets_that_batch",
+        "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts",
+        "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed",
+        "test_gap3_event_delete_symlinked_storage_root_current_behavior"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_event_delete_only_targets_that_batch",
+        "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts",
+        "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed",
+        "test_gap3_event_delete_symlinked_storage_root_current_behavior"
       ],
       "verdict": "PASS"
     }

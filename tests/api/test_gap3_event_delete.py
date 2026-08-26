@@ -286,6 +286,35 @@ def test_gap3_event_delete_lone_broken_symlink_is_not_a_permanent_404(_isolated_
     assert _residue(svc.storage_dir, import_id) == []
 
 
+def test_gap3_event_delete_symlinked_storage_root_current_behavior(tmp_path, monkeypatch):
+    """🔴 **PENDING-RULING（`RULING-2`，R4 brief 具名請三家裁）**：`storage_dir` **本身**是 symlink 時之行為。
+
+    本條**不宣稱對錯**，只把現行行為釘死，讓它可見、不會靜默漂移：
+    跟隨 symlink 化的儲存根（POSIX 標準語意，`rm data_cache/events/x.json` 亦然），
+    刪除**只**作用於該批之檔，同目錄下無關檔完好。
+
+    爭點（三家分歧）：codex 判 P1「違反刪除邊界」；grok 於前一輪實跑後判安全。
+    主委複驗之事實＝TODO 邊界字面「只刪該批；不連帶刪 kline 快取或 Feature Library」
+    **未被違反**（無關檔存活），故爭的是「跟隨 symlink 化的根算不算缺陷」這個判斷，不是事實。
+    🔴 若三家裁定要 fail-closed，改的是產品碼與本條之期望值，**不是刪掉本條**。
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    events = tmp_path / "events"
+    events.symlink_to(outside, target_is_directory=True)
+    svc = svc_mod.EventImportService(storage_dir=events)
+    monkeypatch.setattr(svc_mod, "_event_import_service", svc)
+
+    import_id = _import_batch()
+    unrelated = outside / "unrelated-other-file.json"
+    unrelated.write_text("{}", encoding="utf-8")
+    assert (outside / f"{import_id}.json").is_file(), "前置失敗：批未落進 symlink 之 target"
+
+    assert client.delete(f"/api/v1/case/events/{import_id}").status_code == 204
+    assert not (outside / f"{import_id}.json").exists(), "現行行為＝跟隨 symlink 化的根（本條記錄之，非背書）"
+    assert unrelated.is_file(), "刪除溢出到同目錄之無關檔——這才是真正的邊界違反"
+
+
 def test_gap3_event_delete_residue_predicate_excludes_lookalike_names(_isolated_storage):
     """🔴 R1 群集 D（`CODEX-R1-P2-04`）：僅檔名碰巧含 id 者**不算**該批殘留。
 

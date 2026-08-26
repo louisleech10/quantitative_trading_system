@@ -84,6 +84,36 @@
 </ul>
 <p>另有兩條 mutation 的字面錨點被本輪修法改掉，runner <strong>fail-loud 當場擋下</strong>，主委重錨——不是繞過。
 破壞測試 18 → <strong>20 條</strong>。</p>
+<p><strong>第三輪審查（8/26）：新設的規矩當輪見效，另有一條交三家裁</strong></p>
+<p>R2 兩條由原提出方 codex 重跑確認閉合。本輪兩件新事：</p>
+<ul>
+<li>
+<p><strong>群集 H（已修）：<code>deleteBusy</code> 是廉價綠燈</strong>。它是<strong>單一布林</strong>，而在途的批可以有多個；
+取消後會殘留 true，靠 <code>openDeleteDialog()</code> 一行同步修正——<strong>但沒有任何官方測試斷言那一行</strong>。
+🔴 grok <strong>實跑 mutation</strong>（刪掉那行 ⇒ confirm 套件仍 9 passed）＋臨時 probe 證明
+「A 在途 → 取消 → 開 B ⇒ B 誤顯刪除中…」。這正是主委 brief 必答 7 自問的「廉價綠燈」，
+他給的是實證不是意見。補測試 ⑩（含「A 自己在途時<strong>應該</strong>顯示」之前置，避免斷言恆真）
+＋ mutation <code>R3H-M1</code>；本條紅集合恰為 <code>{⑩}</code>，證明 ⑩ 是那行的唯一守衛。
+⇒ <strong>本輪新設之常設條款 5（存在／範圍／時序之判斷必附實跑反例，不得以綠燈代替）當輪見效</strong>，
+已納為往後同型批次之常設條款。</p>
+</li>
+<li>
+<p><strong>群集 I（<code>RULING-2</code>，交三家裁，裁定前不收案）：symlink 化之儲存根</strong>。
+codex 判 P1 BLOCKING：<code>storage_dir</code> <strong>本身</strong>是 symlink 時，刪除會跟隨它、刪掉 target 內之批檔。
+主委實跑複驗<strong>事實成立</strong>，但<strong>同目錄之無關檔完好</strong> ⇒ TODO 邊界字面
+「只刪該批；不連帶刪 kline 快取或 Feature Library」<strong>未被違反</strong>。
+爭的是「跟隨 symlink 化的根算不算缺陷」這個<strong>判斷</strong>：它是 POSIX 標準語意
+（<code>rm</code> 行為相同）、fail-closed 會破壞「儲存目錄連到大容量磁碟」之正當運維做法、
+威脅模型需攻擊者已能寫入 <code>data_cache/</code> 且受害檔名須恰為 <code>%Y%m%dT%H%M%SZ-&lt;8 hex&gt;.json</code>。
+grok 於 R2 實跑後判<strong>安全</strong>、codex 判 <strong>P1</strong>——<strong>兩家都有實證，分歧在判斷不在事實</strong>
+⇒ 依「別自己決定」與 RULING-1 之前例具名交裁。
+本輪仍做兩件事（不預判方向）：①測試把<strong>現行行為明文釘死</strong>（標 PENDING-RULING、
+明說「記錄之，非背書」）②mutation <code>R3I-M1</code> 鎖住<strong>真正的</strong>邊界違反（溢出到無關檔）——
+三家不論怎麼裁，溢出永遠必須紅。
+🔴 併更正記錄：R2 synth 引用之「storage-dir-symlink 安全」其行為描述有誤，已於 R3 synth 更正。</p>
+</li>
+</ul>
+<p>破壞測試 20 → <strong>22 條</strong>。</p>
 <p><strong>RULING-1 三家一致裁定</strong>：採「本瀏覽器曾成功分析過」為判準（選項 1），
 判準字面用 Codex 的逐字版；Codex 另附條件＝文案必須揭露「本機」範圍（已納入群集 C）。
 「改由伺服器端記錄」（選項 2）三家一致判為<strong>越出這批的範圍、要走修訂延伸檔</strong>，本批不採。</p>
