@@ -12,6 +12,19 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = Field(default=False, validation_alias="DEBUG")  # 關閉 reload 以避免 sklearn 導入問題
     
+    # GAP-3 UX Task 6.1／6.2：IC 分析之特徵數上限（**過渡止血**，GAP-6 之分塊計算上線後取代）。
+    #
+    # 🔴 這個數字**不是拍腦袋填的**，導出自實跑量測 receipt
+    #    `handoffs/run_receipts/gap3ux-b9-footprint.receipt.json`：
+    #    量測階梯 15／1,348／161,031／218,369，工具＝macOS `sample` 之 Physical footprint
+    #    （**禁 `ps rss`**——同一時刻實測 RSS 72MB vs footprint 5.7GB，差 79 倍）。
+    #    最小超標點＝**161,031**（peak 4.62GB，超過本機 8GB 之一半），重跑兩次 peak 差 0%。
+    #    上限 ＝ 最小超標點 × 安全係數 0.5 ＝ **80,515**。
+    # 🔴 改這個數字**必須**同時更新那份 receipt——無 receipt 不得寫入設定值（Task 6.2 之死線）。
+    ic_analysis_max_features: int = Field(
+        default=80515, validation_alias="IC_ANALYSIS_MAX_FEATURES",
+    )
+
     # API設定
     api_prefix: str = "/api/v1"
     host: str = Field(default="127.0.0.1", validation_alias="API_HOST")

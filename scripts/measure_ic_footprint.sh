@@ -33,6 +33,11 @@ TOOL_LITERAL="sample:Physical footprint"
 
 config_hash=""; feature_count=""; symbol=""; timeframe=""; out=""
 interval_sec="2"; max_sec="900"; api="http://127.0.0.1:8000"
+# 🔴 安全閥：peak 超過「機器 RAM × 本比例」即**主動停掉分析**並記為超標點。
+#    規格本就寫「採樣至任務結束**或被 kill**」——首版漏了 kill 那半，實測時
+#    腳本停止採樣後任務仍在跑、footprint 一路爬到 5.7G/8G，是我手動殺掉的。
+#    在 8GB 機器上預設 0.5（＝4GB）：再往上就進入 swap 風險區，量下去只是把機器推爆。
+kill_ratio="0.5"
 
 usage() {
   sed -n '2,32p' "$0" >&2
@@ -49,6 +54,7 @@ while [ "$#" -gt 0 ]; do
     --interval-sec)  [ "$#" -ge 2 ] || usage; interval_sec="$2"; shift 2 ;;
     --max-sec)       [ "$#" -ge 2 ] || usage; max_sec="$2"; shift 2 ;;
     --api)           [ "$#" -ge 2 ] || usage; api="$2"; shift 2 ;;
+    --kill-ratio)    [ "$#" -ge 2 ] || usage; kill_ratio="$2"; shift 2 ;;
     -h|--help)       usage ;;
     *) echo "ERROR: 未知參數 $1" >&2; usage ;;
   esac
@@ -65,7 +71,18 @@ mem_bytes="$(sysctl -n hw.memsize 2>/dev/null || echo 0)"
 [ "${mem_bytes}" -gt 0 ] 2>/dev/null || { echo "ERROR: 取不到 hw.memsize（非 macOS？本協定綁 macOS sample）" >&2; exit 2; }
 
 # ---- ② pid（單一，不得混進程）----
-pids="$(pgrep -f 'run_api\.py' || true)"
+# 🔴 必須挑出真正的 **python** 進程：`pgrep -f 'run_api\.py'` 會連**包裝用的 shell**一起抓
+#    （`/bin/zsh -c … venv/bin/python run_api.py` 的命令列同時含 python 與 run_api.py）
+#    ⇒ 實測得到兩個 pid、本腳本誤判「多進程」而拒測；而量到 shell 的 footprint 毫無意義。
+#    判準改為看**執行檔名**（`ps -o comm=`），不是看命令列字串。
+pids=""
+for _p in $(pgrep -f 'run_api\.py' 2>/dev/null || true); do
+  case "$(ps -o comm= -p "${_p}" 2>/dev/null)" in
+    *[Pp]ython*) pids="${pids}${_p}
+" ;;
+  esac
+done
+pids="$(printf '%s' "${pids}")"
 n_pids="$(printf '%s\n' "${pids}" | grep -c '[0-9]' || true)"
 if [ "${n_pids}" != "1" ]; then
   echo "ERROR: 期望**恰好一個** run_api.py 進程，實得 ${n_pids} 個：${pids}" >&2
@@ -104,6 +121,9 @@ task_id="$(printf '%s' "${resp}" | sed -E 's/.*"task_id" *: *"([^"]*)".*/\1/')"
 started="$(date +%s)"
 peak="${baseline}"
 n_samples=0
+exceeded="false"
+kill_at="$(awk -v m="${mem_bytes}" -v r="${kill_ratio}" 'BEGIN{printf "%d", m*r}')"
+echo "[measure] 安全閥：peak 超過 ${kill_at} bytes（RAM × ${kill_ratio}）即停止分析並記為超標點"
 while : ; do
   now="$(date +%s)"
   elapsed=$(( now - started ))
@@ -112,6 +132,14 @@ while : ; do
   if [ -n "${cur}" ]; then
     n_samples=$(( n_samples + 1 ))
     [ "${cur}" -gt "${peak}" ] 2>/dev/null && peak="${cur}"
+    # 🔴 安全閥：超過門檻即**主動停掉分析**，不把機器推爆才記錄
+    if [ "${peak}" -gt "${kill_at}" ] 2>/dev/null; then
+      exceeded="true"
+      echo "[measure] 🔴 peak=${peak} 超過 ${kill_at} ⇒ 記為**超標點**並停止該分析"
+      [ -n "${task_id}" ] && curl -sS -m 5 -X DELETE "${api}/api/v1/ic/task/${task_id}" >/dev/null 2>&1
+      kill -TERM "${pid}" 2>/dev/null
+      break
+    fi
   else
     echo "[measure] pid ${pid} 已消失（可能被 OOM kill）；停止採樣"
     break
@@ -131,8 +159,8 @@ total_sec=$(( $(date +%s) - started ))
 mkdir -p "$(dirname "${out}")"
 [ -f "${out}" ] || printf '{"epic":"gap3ux-b9","task":"6.2","tool":"%s","points":[]}\n' "${TOOL_LITERAL}" > "${out}"
 
-point="$(printf '{"machine":{"model":"%s","ram_bytes":%s},"pid":%s,"baseline_footprint_bytes":%s,"peak_footprint_bytes":%s,"sampling":{"interval_sec":%s,"total_sec":%s,"n_samples":%s},"feature_count":%s,"tool":"%s","task_id":"%s"}' \
-  "${model}" "${mem_bytes}" "${pid}" "${baseline}" "${peak}" "${interval_sec}" "${total_sec}" "${n_samples}" "${feature_count}" "${TOOL_LITERAL}" "${task_id}")"
+point="$(printf '{"machine":{"model":"%s","ram_bytes":%s},"pid":%s,"baseline_footprint_bytes":%s,"peak_footprint_bytes":%s,"sampling":{"interval_sec":%s,"total_sec":%s,"n_samples":%s},"feature_count":%s,"tool":"%s","task_id":"%s","exceeded":%s,"kill_threshold_bytes":%s}' \
+  "${model}" "${mem_bytes}" "${pid}" "${baseline}" "${peak}" "${interval_sec}" "${total_sec}" "${n_samples}" "${feature_count}" "${TOOL_LITERAL}" "${task_id}" "${exceeded}" "${kill_at}")"
 
 tmp_out="$(mktemp -t icfpreceipt)"
 jq --argjson p "${point}" '.points += [$p]' "${out}" > "${tmp_out}" && mv "${tmp_out}" "${out}"

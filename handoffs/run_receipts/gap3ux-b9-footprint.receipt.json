@@ -1,0 +1,102 @@
+{
+  "epic": "gap3ux-b9",
+  "task": "6.2",
+  "tool": "sample:Physical footprint",
+  "points": [
+    {
+      "machine": {
+        "model": "MacBookAir10,1",
+        "ram_bytes": 8589934592
+      },
+      "pid": 34164,
+      "baseline_footprint_bytes": 684090982,
+      "peak_footprint_bytes": 684090982,
+      "sampling": {
+        "interval_sec": 3,
+        "total_sec": 2,
+        "n_samples": 1
+      },
+      "feature_count": 15,
+      "tool": "sample:Physical footprint",
+      "task_id": "159721e6-4e1f-4025-b948-12b922f474c1",
+      "exceeded": false,
+      "kill_threshold_bytes": 4294967296
+    },
+    {
+      "machine": {
+        "model": "MacBookAir10,1",
+        "ram_bytes": 8589934592
+      },
+      "pid": 34581,
+      "baseline_footprint_bytes": 684195840,
+      "peak_footprint_bytes": 684195840,
+      "sampling": {
+        "interval_sec": 3,
+        "total_sec": 1,
+        "n_samples": 1
+      },
+      "feature_count": 1348,
+      "tool": "sample:Physical footprint",
+      "task_id": "ae47540e-c84c-437c-8b51-e46b4faeab09",
+      "exceeded": false,
+      "kill_threshold_bytes": 4294967296
+    },
+    {
+      "machine": {
+        "model": "MacBookAir10,1",
+        "ram_bytes": 8589934592
+      },
+      "pid": 34912,
+      "baseline_footprint_bytes": 684195840,
+      "peak_footprint_bytes": 4617089843,
+      "sampling": {
+        "interval_sec": 3,
+        "total_sec": 12,
+        "n_samples": 3
+      },
+      "feature_count": 161031,
+      "tool": "sample:Physical footprint",
+      "task_id": "19576fb2-89f4-440c-9620-987ba3f9e21c",
+      "exceeded": true,
+      "kill_threshold_bytes": 4294967296
+    },
+    {
+      "machine": {
+        "model": "MacBookAir10,1",
+        "ram_bytes": 8589934592
+      },
+      "pid": 35359,
+      "baseline_footprint_bytes": 683881267,
+      "peak_footprint_bytes": 4831838208,
+      "sampling": {
+        "interval_sec": 3,
+        "total_sec": 16,
+        "n_samples": 4
+      },
+      "feature_count": 218369,
+      "tool": "sample:Physical footprint",
+      "task_id": "36fdcbea-115d-4a79-9fd5-2ed3ca9d59a6",
+      "exceeded": true,
+      "kill_threshold_bytes": 4294967296
+    },
+    {
+      "machine": {
+        "model": "MacBookAir10,1",
+        "ram_bytes": 8589934592
+      },
+      "pid": 36686,
+      "baseline_footprint_bytes": 684090982,
+      "peak_footprint_bytes": 4617089843,
+      "sampling": {
+        "interval_sec": 3,
+        "total_sec": 11,
+        "n_samples": 3
+      },
+      "feature_count": 161031,
+      "tool": "sample:Physical footprint",
+      "task_id": "a7e75f28-0453-4286-aa17-cc6764ce0a39",
+      "exceeded": true,
+      "kill_threshold_bytes": 4294967296
+    }
+  ]
+}

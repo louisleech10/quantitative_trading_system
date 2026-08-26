@@ -23,6 +23,7 @@ from api.models.ic_models import (
     ICTaskStatusResponse,
     ICRefilterRequest,
 )
+from api.core.config import settings
 from api.services.ic_analysis_service import ic_analysis_service
 from momentum.factories import load_ic_config
 
@@ -31,9 +32,54 @@ router = APIRouter(prefix="/api/v1/ic")
 logger = get_logger("api.routes.ic_analysis")
 
 
+def _reject_when_over_feature_cap(request: ICAnalyzeRequest) -> None:
+    """GAP-3 UX Task 6.1：**啟動任務之前**擋下特徵數超量之分析請求。
+
+    🔴 **本 Task 為過渡止血**：GAP-6 之分塊計算上線後由該機制取代，本函式屆時**一併刪除**
+    （SPEC Task 6.1「存活至 GAP-6」）。不得留著空跑而成為永遠通過的假綠。
+
+    🔴 **必須擋在 `ic_analysis_service.start_analysis` 之前**——Task 6.4 要證明
+    「擋下時未載入大矩陣」，那個證明綁定「cap 檢查在任務建立之前」這個位置；
+    檢查若被移到任務啟動之後，6.4 會量到已載入大矩陣之 footprint 而失去意義。
+
+    🔴 解析不出特徵數 ⇒ **放行**（不擋）。理由是實查的：分析只有兩條路走得成——
+      ①帶 `config_hash` ⇒ registry 一定查得到（查不到時 service 自己就 `raise run not found`）；
+      ②呼叫端直接給 `features_path`（golden replay／artifact 重放）⇒ 那是已知該 run 的內部呼叫端。
+      擋住第二條會弄壞 golden replay 這個既有消費端。
+      **具名破口**：API 呼叫端硬塞 `features_path` 指向大 run 可繞過本閘；因本 Task 是過渡止血、
+      且該路徑非使用者介面之路徑，接受之並具名記錄（見 `docs/GAP3UX_IMPL_HANDOFF.md` 殘留表）。
+
+    🔴 **不提供「強制略過上限」之開關**（SPEC Task 6.1「不可做」）。
+    """
+    from momentum.factories import ic_report_reason, resolve_run_feature_count
+
+    feature_count = resolve_run_feature_count(
+        config_hash=(request.config_hash or "").strip() or None,
+    )
+    if feature_count is None:
+        return
+    cap = int(settings.ic_analysis_max_features)
+    if feature_count <= cap:
+        return
+    raise HTTPException(status_code=400, detail={
+        # reason 字面由契約取得（Task 6.0）；本層**不得**硬寫
+        "reason": ic_report_reason("analysis_rejected"),
+        "message": (
+            f"這個 run 有 {feature_count} 個特徵，超過目前上限 {cap}；"
+            f"直接分析會把記憶體吃爆，因此在啟動任務之前就擋下來。"
+            f"上限由實跑量測導出（見 handoffs/run_receipts/gap3ux-b9-footprint.receipt.json）；"
+            f"請先縮減特徵數再分析。分塊計算上線後本限制會取消。"
+        ),
+        "feature_count": feature_count,
+        "cap": cap,
+    })
+
+
 @router.post("/analyze", response_model=ICAnalyzeResponse)
 async def start_ic_analysis(request: ICAnalyzeRequest):
     """Start IC analysis task."""
+    # Task 6.1：**在呼叫 service 之前**，任務尚未建立
+    _reject_when_over_feature_cap(request)
     try:
         return await ic_analysis_service.start_analysis(request)
     except ValueError as exc:
