@@ -2187,6 +2187,18 @@ PostToolUse 的解耦檢查立刻拒絕（R3：route/service 須經 factories）
 <blockquote>
 <p><strong>一百九十三・（2026-08-25）符號連結做出來的「隔離」，寫下去會穿透回本尊</strong>：掛版控外的資料時我一律用符號連結（省空間）。但治理測試會<strong>寫</strong> <code>.claude/gate/</code> 裡的權杖檔——連結過去的話，副本裡的寫入會直接改到主 repo，等於沒隔離，而且會污染。判準因此不是「大不大」而是「<strong>會不會被寫</strong>」：會被寫的用複製，其餘用連結；順帶查出 <code>.claude/tmp/</code> 有 <strong>21 GB</strong>，整個跳過不掛。<strong>規則</strong>：<strong>「隔離」要看方向</strong>——唯讀共用可以連結，可寫共用一定要複製，而哪些會被寫必須具名列出、寫清楚這份清單靠人維護（我已寫進程式註解的「誠實邊界」）。</p>
 </blockquote>
+<blockquote>
+<p><strong>一百九十四・（2026-08-27）我把每個指標的定義寫成在「重述公式」，九條裡全錯</strong>：詞彙表要給你看每個欄位是什麼意思。我讀程式碼<strong>推論</strong>出每條的算式再寫成白話——三家審查抓出九條錯的。例如我寫「n_eff 是把重疊事件降權後的有效樣本數」，但畫面那一欄其實是等權的、<strong>永遠等於 n</strong>；我寫「prevalence_full 的分母是全部 K 線」，實際分母是<strong>有標記的那些</strong>；同一條 <code>n_test</code> 我<strong>改了三次才對</strong>。<strong>規則</strong>：<strong>定義若要重述公式，那句話就是一個獨立的宣稱，必須跟算式一樣被實跑驗證</strong>——「讀了程式碼再寫成白話」不算驗證。修法不是改字，是每條補一個<strong>把定義釘在真實算式上</strong>的測試，算式一改就先紅。三家還修正了我的歸因：病根只講對一半，另一半是<strong>審查方法本身沒跑不對稱反例探針</strong>。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百九十五・（2026-08-27）我為了讓測試變綠而加的保護，讓那條測試靜默失效</strong>：有條檢查在兩個數字相同時沒有鑑別力，我加了「相同就跳過」的保護讓它變綠。結果破壞測試錄到<strong>空的紅集合</strong>——把程式改壞了，沒有任何測試轉紅。<strong>因為那個保護正好在改壞的情況下觸發、把唯一的斷言跳過去了。</strong> 這個 session 同型的「樣本沒覆蓋到邊界」發生<strong>三次</strong>。<strong>規則</strong>：<strong>樣本退化時要 fail-loud，不准靜默略過</strong>——「條件不成立就跳過」寫起來像謹慎，實際效果是把檢查關掉而沒人知道。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百九十六・（2026-08-27）我三次把輸出截斷，於是拿不到失敗的證據</strong>：①驗證程式中途失敗、報告根本沒被覆寫，而我只讀最後六行、把錯誤整段截掉，看到的是<strong>上一輪的舊報告</strong>，差點據此宣稱全數通過；②跑全套測試只留最後八行，於是 25 條紅的清單整個丟失，事後無從判斷是不是我造成的；③把測試輸出直接接給 grep，結果 <code>rc=4</code>（路徑打錯、一條都沒跑）看起來像「跑完沒事」。<strong>規則</strong>：<strong>跑測試一律先導檔、再從檔案讀</strong>，並顯式檢查回傳碼；<code>tail</code> 是給人看的，不是給判斷用的。我把這條寫進交接鐵律之後<strong>又犯了兩次</strong>——所以它不能只是文件，得變成固定動作。</p>
+</blockquote>
+<blockquote>
+<p><strong>一百九十七・（2026-08-27）四輪審查全程沒存檔，一個檔的實作整段消失</strong>：這一批從第一輪到第四輪 review 跑了四輪都沒有 commit。期間某個檔案的內容回到了上一次提交的版本，整段實作憑空不見——是第三家審查員複驗時發現的（同一條驗收命令，前段 10 個通過、後段變成 10 個失敗）。<strong>我一開始歸因為「執行端違反合約跑了 git checkout」，並且當成事實講了出來。</strong> 後來查證：機制<strong>無法判定</strong>，而另一種同樣合理的可能是<strong>我的破壞測試程式少了工作區隔離</strong>（前六批都有、我照抄的那份範本已經掉了而交接沒記），三家並行複驗時在共用工作區互相污染。<strong>規則兩條</strong>：①<strong>派審查之前先存檔</strong>——合約擋不住已經發生的事，先 commit 才是我能自己控制的那一半；②<strong>歸因要跟證據一樣嚴</strong>——可觀察的事實是「內容回到了上一版」，其餘都是推論，不該用肯定句寫出來。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
