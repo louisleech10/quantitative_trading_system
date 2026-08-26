@@ -42,15 +42,34 @@ def _import_batch(n: int = 2, source_name: str = "unit") -> str:
     return import_id
 
 
+def _owned_by(name: str, import_id: str) -> bool:
+    """本測試檔**獨立**的 ownership predicate：這個名字屬於該批嗎？
+
+    🔴 R1 群集 D（`CODEX-R1-P2-04`）：原本用 `rglob(f"*{import_id}*")` 掃整棵樹，
+    會把 `note-<id>-backup.txt` 這種**僅檔名碰巧含 id** 的檔算成殘留 ⇒ 正確的刪除實作被**誤紅**
+    （§6.1 之「比對範圍過寬」第 8 次）。改為與產品命名契約同樣精確：
+    `<id>.json`／`<id>.` 前綴之檔／名為 `<id>` 之目錄。
+
+    🔴 **刻意不呼叫產品之 `batch_paths()`**——那會讓 baseline 側與被測側自我配對
+    （`D-002 A-013` 同型假綠：產品判準改壞時，斷言也跟著改壞而恆綠）。
+    這裡重寫一份，代價是兩份要一起維護，換來的是它真的能否證產品。
+    """
+    return name == f"{import_id}.json" or name.startswith(f"{import_id}.") or name == import_id
+
+
 def _residue(storage_dir: Path, import_id: str) -> list[str]:
     """該 `import_id` 在磁碟上的**全部**殘留（檔與目錄）。
 
-    🔴 以 `rglob(f"*{import_id}*")` 掃**整棵**儲存樹，不是只問那一個已知檔名——
-    「殘留檔數 == 0」若只問已知檔名，日後新增的產物一律漏檢（假綠）。
+    掃**整棵**儲存樹（不是只問那一個已知檔名——只問已知檔名的話，日後新增的產物一律漏檢），
+    但以 `_owned_by()` 過濾，避免掃法過寬而誤紅。
     """
     if not storage_dir.is_dir():
         return []
-    return sorted(str(p.relative_to(storage_dir)) for p in storage_dir.rglob(f"*{import_id}*"))
+    return sorted(
+        str(p.relative_to(storage_dir))
+        for p in storage_dir.rglob("*")
+        if _owned_by(p.name, import_id) or _owned_by(p.parent.name, import_id)
+    )
 
 
 # ---------------------------------------------------------------- 邊界①
@@ -191,3 +210,63 @@ def test_gap3_event_delete_is_not_idempotent_second_call_is_404(_isolated_storag
     import_id = _import_batch()
     assert client.delete(f"/api/v1/case/events/{import_id}").status_code == 204
     assert client.delete(f"/api/v1/case/events/{import_id}").status_code == 404
+
+
+# ---------------------------------------------------------------- R1 群集之回歸
+
+
+def test_gap3_event_delete_orphan_artifact_without_payload_is_deletable(_isolated_storage):
+    """🔴 R1 群集 A（`CODEX-R1-P1-01`）：只剩孤兒產物、事件檔已不在時，**仍刪得掉**。
+
+    修法＝存在判準改為 `batch_paths()` 非空，與刪除範圍**同源**。
+    原本以「事件檔存在」為判準 ⇒ 這種狀態會永遠回 404、孤兒永久殘留，
+    正是 Task 3.1 立意（不留孤兒檔）之反面。
+    """
+    svc = _isolated_storage
+    import_id = _import_batch()
+    # 種下 per-batch 孤兒，再讓事件檔消失（模擬「刪一半」或日後拆檔後的中間態）
+    (svc.storage_dir / f"{import_id}.receipt.json").write_text('{"mapping_provenance": {}}', encoding="utf-8")
+    payload_path = svc.payload_path(import_id)
+    assert payload_path is not None
+    payload_path.unlink()
+    assert len(_residue(svc.storage_dir, import_id)) == 1, "前置失敗：孤兒未種成"
+
+    assert client.delete(f"/api/v1/case/events/{import_id}").status_code == 204
+    assert _residue(svc.storage_dir, import_id) == []
+
+
+def test_gap3_event_delete_symlink_dir_is_unlinked_not_followed(_isolated_storage):
+    """🔴 R1 群集 E（`CODEX-R1-P2-05`）：同名 symlink 目錄 ⇒ 端點不得 500，且不得跟隨連結刪到外部。
+
+    `Path.is_dir()` 對 symlink-to-dir 回 `True`，`shutil.rmtree` 對其拋
+    `OSError: Cannot call rmtree on a symbolic link`。修法＝先判 `is_symlink()` 一律 `unlink()`。
+    """
+    svc = _isolated_storage
+    import_id = _import_batch()
+    outside = svc.storage_dir.parent / "outside_dir"
+    outside.mkdir(parents=True, exist_ok=True)
+    (outside / "secret.txt").write_text("s", encoding="utf-8")
+    (svc.storage_dir / import_id).symlink_to(outside, target_is_directory=True)
+
+    resp = client.delete(f"/api/v1/case/events/{import_id}")
+    assert resp.status_code == 204, resp.text
+    assert _residue(svc.storage_dir, import_id) == []
+    assert (outside / "secret.txt").is_file(), "跟隨了連結，刪到儲存區之外"
+    assert outside.is_dir()
+
+
+def test_gap3_event_delete_residue_predicate_excludes_lookalike_names(_isolated_storage):
+    """🔴 R1 群集 D（`CODEX-R1-P2-04`）：僅檔名碰巧含 id 者**不算**該批殘留。
+
+    這條同時釘住兩件事：①刪除端不得誤刪它（正確性）②殘留斷言不得誤紅它（可證偽性）。
+    """
+    svc = _isolated_storage
+    import_id = _import_batch()
+    lookalike = svc.storage_dir / f"note-{import_id}-backup.txt"
+    lookalike.write_text("x", encoding="utf-8")
+
+    assert _residue(svc.storage_dir, import_id) == [f"{import_id}.json"], "殘留判準把碰巧同名者算進來了"
+
+    assert client.delete(f"/api/v1/case/events/{import_id}").status_code == 204
+    assert _residue(svc.storage_dir, import_id) == []
+    assert lookalike.is_file(), "誤刪了僅檔名碰巧含 id 的無關檔"

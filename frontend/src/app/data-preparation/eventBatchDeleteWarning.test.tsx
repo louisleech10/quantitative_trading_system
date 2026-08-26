@@ -154,6 +154,27 @@ describe('GAP-3 Task 3.3 已被引用批次之警語', () => {
     expect(ids.size).toBe(1);
   });
 
+  it('⑦ 🔴 R1 群集 C：警語須揭露「本機」範圍，且未被引用時不得作反向宣稱', async () => {
+    // `CODEX-R1-P1-03`：現行來源只在這個瀏覽器有效；全域語氣的文案是「說了一件不成立的事」，
+    // 比恆不顯示更糟。故顯示時必須帶範圍限定語；不顯示時則不得說「這批沒有被引用」。
+    seedReferences([REFERENCED.import_id]);
+    installFetch([REFERENCED, FRESH]);
+    render(<DataPreparationPage />);
+
+    const refDialog = await openDialogFor(REFERENCED);
+    expect(refDialog.textContent).toContain(WARNING);
+    expect(refDialog.textContent).toContain('這個瀏覽器');
+
+    fireEvent.click(screen.getByTestId('event-batch-delete-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('event-batch-delete-dialog')).toBeNull());
+
+    const freshDialog = await openDialogFor(FRESH);
+    expect(freshDialog.textContent).not.toContain(WARNING);
+    // 反向宣稱之禁令：不得出現「沒有被引用／未被引用」這類本機紀錄證明不了的斷言
+    expect(freshDialog.textContent).not.toContain('沒有被引用');
+    expect(freshDialog.textContent).not.toContain('未被引用');
+  });
+
   it('⑥ 引用紀錄含其他批之 id ⇒ 本批不得因此顯示警語（不是「有任何紀錄就顯示」）', async () => {
     seedReferences([REFERENCED.import_id, 'some-other-batch']);
     installFetch([FRESH]);

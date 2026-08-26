@@ -19,8 +19,11 @@
         "test_gap3_event_delete_is_not_idempotent_second_call_is_404",
         "test_gap3_event_delete_leaves_zero_residue_on_disk",
         "test_gap3_event_delete_only_targets_that_batch",
+        "test_gap3_event_delete_orphan_artifact_without_payload_is_deletable",
         "test_gap3_event_delete_removes_stored_phase1_receipt_from_payload",
+        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names",
         "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts",
+        "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed",
         "test_gap3_event_delete_then_get_returns_404"
       ],
       "restored_rc": 0,
@@ -29,8 +32,11 @@
         "test_gap3_event_delete_is_not_idempotent_second_call_is_404",
         "test_gap3_event_delete_leaves_zero_residue_on_disk",
         "test_gap3_event_delete_only_targets_that_batch",
+        "test_gap3_event_delete_orphan_artifact_without_payload_is_deletable",
         "test_gap3_event_delete_removes_stored_phase1_receipt_from_payload",
+        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names",
         "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts",
+        "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed",
         "test_gap3_event_delete_then_get_returns_404"
       ],
       "verdict": "PASS"
@@ -48,12 +54,18 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
-        "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts"
+        "test_gap3_event_delete_is_not_idempotent_second_call_is_404",
+        "test_gap3_event_delete_orphan_artifact_without_payload_is_deletable",
+        "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts",
+        "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
-        "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts"
+        "test_gap3_event_delete_is_not_idempotent_second_call_is_404",
+        "test_gap3_event_delete_orphan_artifact_without_payload_is_deletable",
+        "test_gap3_event_delete_scope_expands_with_phase1_and_phase2_artifacts",
+        "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed"
       ],
       "verdict": "PASS"
     },
@@ -114,12 +126,14 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
-        "test_gap3_event_delete_only_targets_that_batch"
+        "test_gap3_event_delete_only_targets_that_batch",
+        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
-        "test_gap3_event_delete_only_targets_that_batch"
+        "test_gap3_event_delete_only_targets_that_batch",
+        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names"
       ],
       "verdict": "PASS"
     },
@@ -139,6 +153,8 @@
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ① 未確認 ⇒ DELETE 之 fetch call count == 0（開了確認框、按了取消，都不得發出請求）",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ③ 確認 ⇒ 發出且只發出一次 DELETE，URL 指向該批",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ④ 不得以 window.confirm 帶過：確認框為可測元件，且全程未呼叫 window.confirm",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE",
         "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
       ],
       "restored_rc": 0,
@@ -147,6 +163,8 @@
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ① 未確認 ⇒ DELETE 之 fetch call count == 0（開了確認框、按了取消，都不得發出請求）",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ③ 確認 ⇒ 發出且只發出一次 DELETE，URL 指向該批",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ④ 不得以 window.confirm 帶過：確認框為可測元件，且全程未呼叫 window.confirm",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE",
         "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
       ],
       "verdict": "PASS"
@@ -168,6 +186,8 @@
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ④ 不得以 window.confirm 帶過：確認框為可測元件，且全程未呼叫 window.confirm",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑤ 🔴 確認鍵刻意保持可按（非 disabled）——否則 ①「0 次」會是恆真的假綠",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑥ 刪除失敗 ⇒ 確認框留著並顯示錯誤，不假成功",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE",
         "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
       ],
       "restored_rc": 0,
@@ -177,6 +197,8 @@
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ④ 不得以 window.confirm 帶過：確認框為可測元件，且全程未呼叫 window.confirm",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑤ 🔴 確認鍵刻意保持可按（非 disabled）——否則 ①「0 次」會是恆真的假綠",
         "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑥ 刪除失敗 ⇒ 確認框留著並顯示錯誤，不假成功",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE",
         "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
       ],
       "verdict": "PASS"
@@ -218,14 +240,16 @@
       "mutated_failed": [
         "GAP-3 Task 3.3 已被引用批次之警語 > ① 被引用之批 ⇒ 確認框含警語字面",
         "GAP-3 Task 3.3 已被引用批次之警語 > ③ 🔴 逐批不得塌平：兩批共存時，只有被引用的那一批顯示警語",
-        "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
+        "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流",
+        "GAP-3 Task 3.3 已被引用批次之警語 > ⑦ 🔴 R1 群集 C：警語須揭露「本機」範圍，且未被引用時不得作反向宣稱"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
         "GAP-3 Task 3.3 已被引用批次之警語 > ① 被引用之批 ⇒ 確認框含警語字面",
         "GAP-3 Task 3.3 已被引用批次之警語 > ③ 🔴 逐批不得塌平：兩批共存時，只有被引用的那一批顯示警語",
-        "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流"
+        "GAP-3 Task 3.3 已被引用批次之警語 > ④ 有警語時**仍可刪**——警語不改動確認流程之控制流",
+        "GAP-3 Task 3.3 已被引用批次之警語 > ⑦ 🔴 R1 群集 C：警語須揭露「本機」範圍，且未被引用時不得作反向宣稱"
       ],
       "verdict": "PASS"
     },
@@ -245,7 +269,8 @@
         "GAP-3 Task 3.3 已被引用批次之警語 > ② 未被引用之批 ⇒ **不顯示**該警語（鑑別力）",
         "GAP-3 Task 3.3 已被引用批次之警語 > ③ 🔴 逐批不得塌平：兩批共存時，只有被引用的那一批顯示警語",
         "GAP-3 Task 3.3 已被引用批次之警語 > ⑤ malformed 引用紀錄 probe：畸形形狀／型別冒充 ⇒ 一律當作未被引用，不崩、不誤顯示",
-        "GAP-3 Task 3.3 已被引用批次之警語 > ⑥ 引用紀錄含其他批之 id ⇒ 本批不得因此顯示警語（不是「有任何紀錄就顯示」）"
+        "GAP-3 Task 3.3 已被引用批次之警語 > ⑥ 引用紀錄含其他批之 id ⇒ 本批不得因此顯示警語（不是「有任何紀錄就顯示」）",
+        "GAP-3 Task 3.3 已被引用批次之警語 > ⑦ 🔴 R1 群集 C：警語須揭露「本機」範圍，且未被引用時不得作反向宣稱"
       ],
       "restored_rc": 0,
       "restored_failed": [],
@@ -253,7 +278,8 @@
         "GAP-3 Task 3.3 已被引用批次之警語 > ② 未被引用之批 ⇒ **不顯示**該警語（鑑別力）",
         "GAP-3 Task 3.3 已被引用批次之警語 > ③ 🔴 逐批不得塌平：兩批共存時，只有被引用的那一批顯示警語",
         "GAP-3 Task 3.3 已被引用批次之警語 > ⑤ malformed 引用紀錄 probe：畸形形狀／型別冒充 ⇒ 一律當作未被引用，不崩、不誤顯示",
-        "GAP-3 Task 3.3 已被引用批次之警語 > ⑥ 引用紀錄含其他批之 id ⇒ 本批不得因此顯示警語（不是「有任何紀錄就顯示」）"
+        "GAP-3 Task 3.3 已被引用批次之警語 > ⑥ 引用紀錄含其他批之 id ⇒ 本批不得因此顯示警語（不是「有任何紀錄就顯示」）",
+        "GAP-3 Task 3.3 已被引用批次之警語 > ⑦ 🔴 R1 群集 C：警語須揭露「本機」範圍，且未被引用時不得作反向宣稱"
       ],
       "verdict": "PASS"
     },
@@ -298,6 +324,140 @@
       "restored_failed": [],
       "expected_failed": [
         "GAP-3 Task 3.3 已被引用批次之警語 > ⑤ malformed 引用紀錄 probe：畸形形狀／型別冒充 ⇒ 一律當作未被引用，不崩、不誤顯示"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R1A-M1",
+      "task": "3.1",
+      "desc": "存在判準退回只問事件檔 ⇒ 孤兒刪不掉（CODEX-R1-P1-01）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_event_delete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_event_delete_orphan_artifact_without_payload_is_deletable"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_event_delete_orphan_artifact_without_payload_is_deletable"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R1B-M1",
+      "task": "3.2",
+      "desc": "防重入拿掉 ⇒ 連點送出多次（CODEX-R1-P1-02）",
+      "selector": [
+        "VITEST",
+        "eventBatchDeleteConfirm",
+        "eventBatchDeleteWarning"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）",
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R1B-M2",
+      "task": "3.2",
+      "desc": "防重入改用 state ⇒ 同一 tick 守不住（次佳修法之否證）",
+      "selector": [
+        "VITEST",
+        "eventBatchDeleteConfirm",
+        "eventBatchDeleteWarning"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 3.2 事件批刪除之二次確認 > ⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R1C-M1",
+      "task": "3.3",
+      "desc": "警語退回全域語氣、不揭露本機範圍（CODEX-R1-P1-03）",
+      "selector": [
+        "VITEST",
+        "eventBatchDeleteConfirm",
+        "eventBatchDeleteWarning"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 Task 3.3 已被引用批次之警語 > ⑦ 🔴 R1 群集 C：警語須揭露「本機」範圍，且未被引用時不得作反向宣稱"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 Task 3.3 已被引用批次之警語 > ⑦ 🔴 R1 群集 C：警語須揭露「本機」範圍，且未被引用時不得作反向宣稱"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R1D-M1",
+      "task": "3.1",
+      "desc": "ownership 判準放寬成子字串 ⇒ 誤刪碰巧同名者（CODEX-R1-P2-04）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_event_delete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_event_delete_residue_predicate_excludes_lookalike_names"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R1E-M1",
+      "task": "3.1",
+      "desc": "拿掉 symlink 分支 ⇒ rmtree 拋 OSError ⇒ 500（CODEX-R1-P2-05）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_event_delete"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_event_delete_symlink_dir_is_unlinked_not_followed"
       ],
       "verdict": "PASS"
     }

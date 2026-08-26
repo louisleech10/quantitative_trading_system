@@ -15,6 +15,15 @@ import type { EventImportSummary } from "@/lib/types";
  */
 export const REFERENCED_WARNING = "引用它的分析結果將無法重現";
 
+/**
+ * 🔴 R1 群集 C（`CODEX-R1-P1-03`）：引用紀錄之現行來源只在**這個瀏覽器**有效
+ * （判準與誠實邊界見 `@/lib/eventBatchReferences`）。原文案「這批事件已被引用」是**全域語氣**，
+ * 換裝置／清快取時使用者會以為「沒被引用」——那是**說了一件不成立的事**，
+ * 比「什麼都不說」更糟。故顯示時必須帶上範圍限定語。
+ * 反向（未被引用）**不加任何宣稱**：不能說「這批沒有被引用」，因為本機紀錄證明不了那件事。
+ */
+export const REFERENCED_SCOPE_PREFIX = "在這個瀏覽器上，這批事件曾被拿去分析";
+
 export interface EventBatchDeleteDialogProps {
   batch: EventImportSummary;
   /** 該批是否已被引用（判準與來源見 `@/lib/eventBatchReferences`）。 */
@@ -60,7 +69,8 @@ export default function EventBatchDeleteDialog({
           data-testid="event-batch-delete-referenced-warning"
           className="mt-3 rounded border border-amber-400/40 bg-amber-500/10 p-2 text-xs text-amber-100"
         >
-          這批事件已被引用：刪除後，{REFERENCED_WARNING}。仍可刪除。
+          {REFERENCED_SCOPE_PREFIX}：刪除後，{REFERENCED_WARNING}。仍可刪除。
+          （這筆紀錄只存在於這台裝置的瀏覽器；在別的裝置上分析過的話，這裡看不到。）
         </p>
       )}
 

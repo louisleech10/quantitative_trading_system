@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import CaseImportForm from "@/components/case/CaseImportForm";
 import BatchDownloadPanel from "@/components/case/BatchDownloadPanel";
 import EventImportForm from "@/components/case/EventImportForm";
@@ -21,6 +21,8 @@ export default function DataPreparationPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [referenced, setReferenced] = useState<Set<string>>(() => new Set<string>());
+  // 刪除是否在途（見 handleDeleteConfirmed 之註解——state 守不住同一 tick 的重入）
+  const deleteInFlightRef = useRef(false);
 
   // GAP-3 B5.2：已匯入事件批（新契約）
   useEffect(() => {
@@ -36,6 +38,12 @@ export default function DataPreparationPage() {
 
   const handleDeleteConfirmed = async () => {
     if (!pendingDelete) return;
+    // 🔴 R1 群集 B（`CODEX-R1-P1-02`）：確認鍵**刻意保持可按**（B4 教訓，設 disabled 會讓
+    //    fireEvent.click 什麼都不觸發、測試恆綠），因此重入必須由 handler 自己擋。
+    //    用 `useRef` 而**不是** `deleteBusy` state：同一 tick 內連點兩次時 state 尚未更新，
+    //    守不住；第二個請求會收 404，其錯誤還會寫進已經關閉的確認框。
+    if (deleteInFlightRef.current) return;
+    deleteInFlightRef.current = true;
     const importId = pendingDelete.import_id;
     setDeleteBusy(true);
     setDeleteError(null);
@@ -48,6 +56,7 @@ export default function DataPreparationPage() {
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : '刪除事件批失敗');
     } finally {
+      deleteInFlightRef.current = false;
       setDeleteBusy(false);
     }
   };

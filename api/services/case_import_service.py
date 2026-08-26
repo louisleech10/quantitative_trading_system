@@ -1160,7 +1160,8 @@ class EventImportService:
             # 🔴 落檔路徑經 `payload_path()`（Task 3.1 之唯一實作）——寫入端與刪除端共用同一條，
             #    否則 3.1 之「殘留檔數 == 0」會在某天因兩邊各自漂移而變成假綠。
             p = self.payload_path(import_id)
-            assert p is not None  # import_id 由本方法生成，形狀受控；None 代表生成規則被改壞
+            if p is None:  # import_id 由本方法生成，形狀受控；None 代表生成規則被改壞
+                raise RuntimeError(f"生成之 import_id 不通過路徑防護：{import_id!r}")  # 顯式 raise，`python -O` 下不會被移除
             p.write_text(_json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str), encoding="utf-8")
             stored_path = str(p)
         return EventImportResponse(
@@ -1232,18 +1233,25 @@ class EventImportService:
     def delete_import(self, import_id: str) -> bool:
         """刪除該批事件與其全部落檔產物；不存在（或 id 不合法）⇒ `False`（路由層轉 404）。
 
+        🔴 **存在判準＝`batch_paths()` 非空，與刪除範圍同源**（R1 群集 A，`CODEX-R1-P1-01`）。
+        原本以「事件檔存在」為判準，兩者不同源 ⇒ 只剩 `<id>.receipt.json` 之孤兒會回 404
+        且**永久刪不掉**，正是 3.1 立意（不留孤兒檔）之反面。
         🔴 **不連帶刪 kline 快取或 Feature Library**（TODO Task 3.1「邊界」）——本方法只動
         `self.storage_dir` 之下、且經 `batch_paths()` 枚舉出的路徑。
         🔴 **不提供「刪除全部」**：本方法一次只收一個 `import_id`。
         """
-        p = self.payload_path(import_id)
-        if p is None or not p.is_file():
+        targets = self.batch_paths(import_id)
+        if not targets:
             return False
-        for target in self.batch_paths(import_id):
-            if target.is_dir():
-                _shutil.rmtree(target)
-            else:
+        for target in targets:
+            # 🔴 symlink 一律 unlink、**不跟隨**（R1 群集 E，`CODEX-R1-P2-05`）：
+            #    `Path.is_dir()` 對 symlink-to-dir 回 True，而 `rmtree` 對 symlink 會拋
+            #    `OSError: Cannot call rmtree on a symbolic link` ⇒ 端點 500、該批留在磁碟。
+            #    先判 `is_symlink()` 亦確保不會經由連結刪到 `storage_dir` 之外。
+            if target.is_symlink() or not target.is_dir():
                 target.unlink()
+            else:
+                _shutil.rmtree(target)
         logger.info("event import 已刪除：%s", import_id)
         return True
 

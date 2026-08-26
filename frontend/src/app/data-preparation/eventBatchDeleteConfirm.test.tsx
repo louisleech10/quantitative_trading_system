@@ -145,6 +145,94 @@ describe('GAP-3 Task 3.2 事件批刪除之二次確認', () => {
     expect(confirmBtn.disabled).toBe(false);
   });
 
+  it('⑦ 🔴 R1 群集 B：連點兩次確認 ⇒ 仍只發出一次 DELETE（防重入）', async () => {
+    // `CODEX-R1-P1-02`：確認鍵刻意保持可按（B4 教訓），因此重入必須由 handler 自己擋。
+    // 用**延遲**的 DELETE 回應把「在途」這段時間拉開，再於同一 tick 內連點兩次。
+    let release: (() => void) | null = null;
+    const gate = new Promise<void>((r) => { release = () => r(); });
+    calls = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = (init?.method ?? 'GET').toUpperCase();
+        calls.push({ url, method });
+        if (method === 'DELETE') {
+          await gate;
+          return new Response(null, { status: 204 });
+        }
+        if (url.includes('/case/events')) {
+          return new Response(JSON.stringify({ total: 1, imports: [BATCH] }), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ total: 0 }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+
+    await renderWithBatch();
+    fireEvent.click(screen.getByTestId(`event-batch-delete-open-${BATCH.import_id}`));
+    const confirmBtn = (await screen.findByTestId('event-batch-delete-confirm')) as HTMLButtonElement;
+
+    fireEvent.click(confirmBtn);
+    fireEvent.click(confirmBtn);
+    fireEvent.click(confirmBtn);
+
+    // 確認鍵**仍然可按**——防重入不得靠 disabled（否則 ①「0 次」會變恆真的假綠）
+    expect(confirmBtn.disabled).toBe(false);
+    expect(deleteCalls()).toHaveLength(1);
+
+    release!();
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+  });
+
+  it('⑧ 🔴 同一 tick 內連續兩次點擊（不經 act flush）⇒ 仍只發出一次 DELETE', async () => {
+    // 為什麼要這條：⑦ 用 `fireEvent`，而 testing-library 會把每次事件包進 `act()` 並**立即 flush**
+    // state ⇒ 第二次點擊時 `deleteBusy` 已是 true，**用 state 守也會過**。
+    // 也就是說 ⑦ 分不出「ref 守」和「state 守」。主委原本宣稱「state 守不住」，
+    // 而 mutation `R1B-M2` 錄到**空紅集合**，正是那個宣稱在 ⑦ 之下不成立的證據。
+    // 本條改用原生 `.click()`（不經 act flush）製造真正的同一 tick 重入，
+    // 這才是 ref 與 state 會分岔的地方。
+    let release: (() => void) | null = null;
+    const gate = new Promise<void>((r) => { release = () => r(); });
+    calls = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = (init?.method ?? 'GET').toUpperCase();
+        calls.push({ url, method });
+        if (method === 'DELETE') {
+          await gate;
+          return new Response(null, { status: 204 });
+        }
+        if (url.includes('/case/events')) {
+          return new Response(JSON.stringify({ total: 1, imports: [BATCH] }), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ total: 0 }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+
+    await renderWithBatch();
+    fireEvent.click(screen.getByTestId(`event-batch-delete-open-${BATCH.import_id}`));
+    const confirmBtn = (await screen.findByTestId('event-batch-delete-confirm')) as HTMLButtonElement;
+
+    // 🔴 同一同步區塊、不經 act：兩次點擊之間**沒有** re-render，state 仍是舊值
+    confirmBtn.click();
+    confirmBtn.click();
+
+    expect(deleteCalls()).toHaveLength(1);
+
+    release!();
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+  });
+
   it('⑥ 刪除失敗 ⇒ 確認框留著並顯示錯誤，不假成功', async () => {
     installFetch(404);
     await renderWithBatch();
