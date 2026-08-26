@@ -55,8 +55,21 @@ describe('Task 2.3 即時筆數', () => {
 
   it('④ 空輸入不報錯，四個數字皆為 0', () => {
     expect(computeExportCounts([], [])).toEqual({
-      N: 0, M: 0, X: 0, Y: 0, filteredOut: 0, droppedByFilters: 0, droppedUnreadableLabel: 0,
+      N: 0, M: 0, X: 0, Y: 0, filteredOut: 0,
+      keptByFilters: 0, droppedByFilters: 0, droppedUnreadableLabel: 0,
     });
+  });
+
+  it('④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同', () => {
+    const c = computeExportCounts(ROWS, []);
+    expect(c.keptByFilters).toBe(6);       // 六列都通過（無條件）⇒ CSV 六筆
+    expect(c.N).toBe(5);                   // 其中一列沒標記 ⇒ 事件 JSON 五筆
+    expect(c.keptByFilters - c.N).toBe(c.droppedUnreadableLabel);
+
+    const filtered = computeExportCounts(ROWS, [{ column: 'price_change', op: '>=', value: 2.0 }]);
+    expect(filtered.keptByFilters).toBe(4);
+    expect(filtered.N).toBe(3);
+    expect(filtered.keptByFilters - filtered.N).toBe(filtered.droppedUnreadableLabel);
   });
 
   it('⑤ 判讀規則：true／1 為正、false／0 為反，其餘不猜', () => {

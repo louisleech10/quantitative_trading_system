@@ -1758,7 +1758,9 @@ export default function SearchPage() {
                 反例 <strong data-testid="export-count-y">{exportCounts.Y}</strong>
                 {exportCounts.droppedUnreadableLabel > 0 && (
                   <span className="text-amber-200" data-testid="export-count-unreadable">
-                    （另有 {exportCounts.droppedUnreadableLabel} 筆沒有正反例標記，不會被匯出）
+                    （另有 {exportCounts.droppedUnreadableLabel} 筆沒有正反例標記——
+                    事件 JSON 不收它們，<strong data-testid="export-count-csv">CSV 仍會含
+                    {exportCounts.keptByFilters} 筆</strong>，因為 CSV 是原始結果、不該因少一個旗標就丟整列）
                   </span>
                 )}
               </p>

@@ -33,6 +33,14 @@ export interface ExportCounts {
   Y: number;
   /** 沒進到匯出的筆數；`N + filteredOut == M` 恆成立。 */
   filteredOut: number;
+  /**
+   * 通過條件之列數＝**CSV 匯出**之筆數。
+   *
+   * 🔴 與 `N` 不同是**正常的**（R3 `CODEX-R3-P1-01`）：事件契約 JSON 必須有正反例標記，
+   * 沒標記的列會被 `eventExport` 跳過；CSV 是原始搜尋結果之匯出，**不該因為少一個旗標
+   * 就把整列丟掉**。兩個數字不同時要**同時顯示**，不能只給一個讓使用者對不上。
+   */
+  keptByFilters: number;
   /** `filteredOut` 之拆解：被條件濾掉的。 */
   droppedByFilters: number;
   /** `filteredOut` 之拆解：通過條件但**標記無法判讀**而不會被匯出的（不猜，且要顯示出來）。 */
@@ -84,6 +92,7 @@ export function computeExportCounts(
     X,
     Y,
     filteredOut: M - N,                  // 邊界①：依建構成立
+    keptByFilters: kept.length,
     droppedByFilters: M - kept.length,
     droppedUnreadableLabel,
   };

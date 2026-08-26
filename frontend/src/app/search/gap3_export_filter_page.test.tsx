@@ -197,6 +197,48 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
     expect(dataLines[0]).not.toContain('2024-01-01 01:00:00');
   });
 
+  it('⑧ 🔴 有列缺正反例標記時：CSV 筆數與事件 JSON 筆數**不同且都要顯示**（R3 `CODEX-R3-P1-01`）', async () => {
+    // 事件契約 JSON 必須有標記 ⇒ 少一列；CSV 是原始結果 ⇒ 不該因少一個旗標就丟整列。
+    // 兩個數字不同是正常的，**只顯示一個讓使用者對不上**才是缺陷。
+    useSearchStore.setState({
+      currentResult: {
+        cases: [
+          ...(CASES as unknown as Record<string, unknown>[]),
+          { symbol: 'ETHUSDT', timeframe: '1h', timestamp: '2024-01-01 02:00:00',
+            positive_case: null, price_change: 5.0, future_2bar_return: 2.2 },
+        ] as unknown as CaseData[],
+        source_file_text: '[]', source_file_digest: 'a'.repeat(64),
+      } as unknown as SearchResultData,
+      isLoading: false, error: null,
+    });
+    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
+
+    const blobs: string[] = [];
+    vi.stubGlobal('URL', {
+      createObjectURL: (b: Blob & { _text?: string }) => { blobs.push(b._text ?? ''); return 'blob:x'; },
+      revokeObjectURL: () => {},
+    });
+    const RealBlob = globalThis.Blob;
+    vi.stubGlobal('Blob', class extends RealBlob {
+      _text: string;
+      constructor(parts: BlobPart[], opts?: BlobPropertyBag) {
+        super(parts, opts);
+        this._text = String(parts[0] ?? '');
+      }
+    });
+
+    render(<SearchPage />);
+    // 三列全部通過（無條件）：事件 JSON 收 2 筆（有標記者），CSV 收 3 筆
+    expect(screen.getByTestId('export-count-n').textContent).toBe('2');
+    expect(screen.getByTestId('export-count-csv').textContent).toContain('3');
+
+    fireEvent.click(screen.getByText('導出CSV檔案'));
+    await waitFor(() => expect(blobs.length).toBeGreaterThan(0));
+    const dataLines = blobs[0].split('\n').filter((l) => l.trim().length > 0).slice(1);
+    expect(dataLines.length).toBe(3);              // CSV 就是畫面說的 CSV 筆數
+    expect(dataLines.some((l) => l.includes('2024-01-01 02:00:00'))).toBe(true);   // 無標記那列仍在
+  });
+
   it('⑥ Task 2.3：畫面上的筆數就是 computeExportCounts 的結果（同一組事實）', async () => {
     depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
     render(<SearchPage />);

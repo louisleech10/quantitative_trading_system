@@ -41,13 +41,15 @@
       "mutated_rc": 1,
       "mutated_failed": [
         "Task 2.1 匯出前篩選 > ② 條件為空 ⇒ 匯出筆數 == 原筆數（不得因面板存在而改變預設行為）",
-        "Task 2.3 即時筆數 > ② X + Y == N（無標記者不塞進 X 或 Y，而是單獨計數並排除）"
+        "Task 2.3 即時筆數 > ② X + Y == N（無標記者不塞進 X 或 Y，而是單獨計數並排除）",
+        "Task 2.3 即時筆數 > ④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
         "Task 2.1 匯出前篩選 > ② 條件為空 ⇒ 匯出筆數 == 原筆數（不得因面板存在而改變預設行為）",
-        "Task 2.3 即時筆數 > ② X + Y == N（無標記者不塞進 X 或 Y，而是單獨計數並排除）"
+        "Task 2.3 即時筆數 > ② X + Y == N（無標記者不塞進 X 或 Y，而是單獨計數並排除）",
+        "Task 2.3 即時筆數 > ④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同"
       ],
       "verdict": "PASS"
     },
@@ -110,13 +112,15 @@
       "mutated_rc": 1,
       "mutated_failed": [
         "Task 2.3 即時筆數 > ① N + 被濾掉數 == M（含條件與不含條件兩種）",
-        "Task 2.3 即時筆數 > ③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）"
+        "Task 2.3 即時筆數 > ③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）",
+        "Task 2.3 即時筆數 > ④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
         "Task 2.3 即時筆數 > ① N + 被濾掉數 == M（含條件與不含條件兩種）",
-        "Task 2.3 即時筆數 > ③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）"
+        "Task 2.3 即時筆數 > ③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）",
+        "Task 2.3 即時筆數 > ④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同"
       ],
       "verdict": "PASS"
     },
@@ -135,14 +139,16 @@
       "mutated_failed": [
         "Task 2.3 即時筆數 > ① N + 被濾掉數 == M（含條件與不含條件兩種）",
         "Task 2.3 即時筆數 > ② X + Y == N（無標記者不塞進 X 或 Y，而是單獨計數並排除）",
-        "Task 2.3 即時筆數 > ③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）"
+        "Task 2.3 即時筆數 > ③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）",
+        "Task 2.3 即時筆數 > ④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
         "Task 2.3 即時筆數 > ① N + 被濾掉數 == M（含條件與不含條件兩種）",
         "Task 2.3 即時筆數 > ② X + Y == N（無標記者不塞進 X 或 Y，而是單獨計數並排除）",
-        "Task 2.3 即時筆數 > ③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）"
+        "Task 2.3 即時筆數 > ③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）",
+        "Task 2.3 即時筆數 > ④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同"
       ],
       "verdict": "PASS"
     },
@@ -441,6 +447,31 @@
       "restored_failed": [],
       "expected_failed": [
         "test_gap3_export_filter_validator_rejects_bool_impersonating_int[bool_version]"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R3-M1",
+      "task": "2.3",
+      "desc": "CSV 筆數謊報成事件 JSON 的 N（CODEX-R3-P1-01）",
+      "selector": [
+        "VITEST",
+        "exportFilter",
+        "exportCounts",
+        "gap3_export_filter_page"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 B5 /search 匯出前篩選之執行期接線 > ⑧ 🔴 有列缺正反例標記時：CSV 筆數與事件 JSON 筆數**不同且都要顯示**（R3 `CODEX-R3-P1-01`）",
+        "Task 2.3 即時筆數 > ④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 B5 /search 匯出前篩選之執行期接線 > ⑧ 🔴 有列缺正反例標記時：CSV 筆數與事件 JSON 筆數**不同且都要顯示**（R3 `CODEX-R3-P1-01`）",
+        "Task 2.3 即時筆數 > ④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同"
       ],
       "verdict": "PASS"
     }
