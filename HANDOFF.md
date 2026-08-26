@@ -13,7 +13,7 @@
 
 GAP-3 事件型 UAT 缺口修補：SPEC 🔒 FROZEN（`4ce3d6d9`）、TODO 🔒 FROZEN v1.0（`afa70967`）、
 延伸檔 D-001（`81cbe7ab`）與 D-002（`51f1a65e`）皆三家 APPROVED。
-42 個 Task 之計數：**13 ✅／1 🔧／28 ⬜**（逐 Task 狀態一律看看板）。
+42 個 Task 之計數：**16 ✅／1 🔧／25 ⬜**（逐 Task 狀態一律看看板）。
 
 Task 1.11／1.12／1.9（深度三層防線）之三輪 code review findings **6 → 3 → 0**，三家一致、未派 R4。
 commit＝`b63fc855`＋`ed426d34`＋`ed9b3fc4`＋`6f7063e4`。過程與裁定理由見三份收斂檔
@@ -25,9 +25,12 @@ commit＝`8e0f8023`＋`c0ac22e0`＋`2ebab25d`＋`09884811`＋`cb9617ba`＋`07968
 殘留 `R-B2-1` 於本批解除（`derive_event_id` opt-in，後端於單位正規化後依契約模板產生 ID）；
 新增具名殘留 `R-B4-1`（CSV 方言之殘餘前後端差異，`user-ruling`，全文見交接 §7.3）。
 
-**當前批＝B5（Task 2.1／2.2／2.3 匯出前篩選）**，前置皆已滿足。
-🔴 B5 有**必辦之殘留解除**：`D-002 A-004`（下界值來源未接線，接上前 B1 的鎖定是死碼）、
-`R-B3-1`、`R-B3-2`。`blocked-by` 指的就是這批，做完卻沒解除＝殘留變偷懶。
+Task 2.1／2.2／2.3（匯出前篩選）之四輪 code review findings **6 → 3 → 1 → 0**，三家一致、未派 R5。
+commit＝`464616c9`＋`ef23147c`＋`4fccc3c8`＋`44385797`。收斂檔
+`handoffs/reconcile/20260826-gap3ux-b5-review-r{1,2,3,4}/synth.md`（兩道機檢皆 rc=0）。
+三條必辦殘留 `D-002 A-004`／`R-B3-1`／`R-B3-2` **皆已解除**且各有 mutation 守住。
+
+**下一批＝B6（Phase 3 刪除）**，無前置依賴。其後 B7（Phase 4 匯出端報酬欄，依賴 B1＋Task 2.1b）。
 🔴 **B5 之 Task 2.2 落點與 TODO 字面不同**（實際在 `frontend/src/lib/eventExport.ts`），
 須在 brief 具名回報請三家裁，收 epic 前走延伸檔 D-003 更正。
 
@@ -35,13 +38,13 @@ commit＝`8e0f8023`＋`c0ac22e0`＋`2ebab25d`＋`09884811`＋`cb9617ba`＋`07968
 
 ## receipt
 
-VERIFY:handoffs/run_receipts/gap3ux-b4-all-mutations.receipt.json
+VERIFY:handoffs/run_receipts/gap3ux-b5-all-mutations.receipt.json
 
 | 項 | 值 |
 |---|---|
-| mutation | 32／14／13／**15** 條（前四批），皆 `closure: CLOSED` |
-| 第四批驗收 | `gap3_csv_provenance` 10（下限 2）／`gap3_csv_ragged` 16（新增）／vitest `gap3_csv` 23（下限 5）／`suspiciousBinaryColumns` 4（下限 2） |
-| 全套 | `pytest tests/api tests/momentum/event_samples` 912 passed／3 failed（**既有債**，名單見交接 §6.5）；vitest 41 檔 235 條；build rc=0；`gap3_freeze_golden --check` rc=0 |
+| mutation | 32／14／13／15／**19** 條（前五批），皆 `closure: CLOSED` |
+| 第五批驗收 | `gap3_export_filter` 32／vitest `exportFilter` 18＋`exportCounts` 6＋`exportFilterPersist` 5＋`gap3_export_filter_page` 8 |
+| 全套 | `pytest tests/api tests/momentum/event_samples` 944 passed／3 failed（**既有債**，名單見交接 §6.5）；vitest 45 檔 269 條；build rc=0；`gap3_freeze_golden --check` rc=0 |
 
 mutation 判準＝**轉紅之 test 集合逐一等於預期**（多紅少紅皆 FAIL）。
 🔴 `--record` 出現 `紅=[]` 一律當作假綠信號，先查根因（交接 §4.2 有五個實例）。
@@ -50,7 +53,7 @@ mutation 判準＝**轉紅之 test 集合逐一等於預期**（多紅少紅皆 
 
 **全文一律見 `docs/GAP3UX_IMPL_HANDOFF.md` §7.2／§7.3**（本檔不複列，避免副本漂移）。
 代號：`R-GOV7-1`／`R-GOV7-2`／`R-B1-1`／`R-A005-1`／~~`R-B2-1`~~（第四批已解除）／`R-B2-2`／**`R-B4-1`**／
-`R-B3-1`／`R-B3-2`／`R-B3-3`／`D-002 A-004`／`D-001-D-002 provenance`／純 JS 手刻 sha256
+~~`R-B3-1`~~／~~`R-B3-2`~~／`R-B3-3`／~~`D-002 A-004`~~（三條皆第五批已解除）／`D-001-D-002 provenance`／純 JS 手刻 sha256
 ＋ SPEC 末節 `F-1..F-4` ＋ TODO R3 reconcile 四條。
 
 ## 三條鐵律（違反即返工）
