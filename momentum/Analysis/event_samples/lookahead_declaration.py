@@ -98,10 +98,17 @@ def _strings_in(node: Any, out: Set[str]) -> None:
 
 
 def _is_finite_number(value: Any) -> bool:
-    """有限實數；`bool` 明確排除（`True` 是 `int` 的子類，會讓 `1` 與 `True` 混為一談）。"""
+    """有限實數；`bool` 明確排除（`True` 是 `int` 的子類，會讓 `1` 與 `True` 混為一談）。
+
+    🔴 `int` **不轉 float**（R2 `CODEX-R2-P1-02`）：Python 的 int 沒有上限，`10**309` 是
+    合法 JSON 整數，但 `float(10**309)` 會丟 `OverflowError` ——那個例外會一路穿出去變成 500，
+    而本函式的契約是「不合規就回 False」，不是「丟例外」。任何 int 依定義都是有限的。
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
-    return math.isfinite(float(value))
+    if isinstance(value, int):
+        return True
+    return math.isfinite(value)
 
 
 def canonical_filter_columns(filters: Any) -> Optional[Set[str]]:
@@ -125,7 +132,10 @@ def canonical_filter_columns(filters: Any) -> Optional[Set[str]]:
     #    ——抽取集合與實際引用集合分離，正是本函式要防的事。
     if set(filters.keys()) != {"version", "combinator", "conditions"}:
         return None
-    if filters.get("version") != 1 or filters.get("combinator") != "AND":
+    # 🔴 `type(v) is int` 而非 `!= 1`（R2 `CODEX-R2-P2-01`）：`True == 1` 為真，
+    #    `version: true` 會被當成版本 1 而放行。與契約 `receipt_type_ok` 之判定同一條紀律。
+    version = filters.get("version")
+    if type(version) is not int or version != 1 or filters.get("combinator") != "AND":
         return None
     conditions = filters.get("conditions")
     if not isinstance(conditions, (list, tuple)):

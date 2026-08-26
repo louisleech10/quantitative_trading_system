@@ -345,13 +345,11 @@
       "pre_failed": [],
       "mutated_rc": 1,
       "mutated_failed": [
-        "test_gap3_export_filter_non_canonical_shape_is_not_trusted[combinator_or]",
         "test_gap3_export_filter_non_canonical_shape_is_not_trusted[top_level_extra_key]"
       ],
       "restored_rc": 0,
       "restored_failed": [],
       "expected_failed": [
-        "test_gap3_export_filter_non_canonical_shape_is_not_trusted[combinator_or]",
         "test_gap3_export_filter_non_canonical_shape_is_not_trusted[top_level_extra_key]"
       ],
       "verdict": "PASS"
@@ -376,6 +374,73 @@
       "restored_failed": [],
       "expected_failed": [
         "GAP-3 B5 /search 匯出前篩選之執行期接線 > ① 條件變動 ⇒ 真的呼叫下界端點，且送出的 referenced_columns 只含條件引用之欄"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R2-M1",
+      "task": "2.1",
+      "desc": "CSV 匯出忽略篩選條件（CODEX-R2-P1-01）",
+      "selector": [
+        "VITEST",
+        "exportFilter",
+        "exportCounts",
+        "gap3_export_filter_page"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "GAP-3 B5 /search 匯出前篩選之執行期接線 > ⑦ 🔴 CSV 匯出也套同一組條件（R2 `CODEX-R2-P1-01`：面板就在按鈕上方，不能只有事件 JSON 套）"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "GAP-3 B5 /search 匯出前篩選之執行期接線 > ⑦ 🔴 CSV 匯出也套同一組條件（R2 `CODEX-R2-P1-01`：面板就在按鈕上方，不能只有事件 JSON 套）"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R2-M2",
+      "task": "2.2",
+      "desc": "巨大整數又被轉 float ⇒ OverflowError（CODEX-R2-P1-02）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_export_filter"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_export_filter_validator_does_not_raise_on_huge_int"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_export_filter_validator_does_not_raise_on_huge_int"
+      ],
+      "verdict": "PASS"
+    },
+    {
+      "id": "R2-M3",
+      "task": "2.2",
+      "desc": "version: true 被當成版本 1（CODEX-R2-P2-01）",
+      "selector": [
+        "tests/api",
+        "-k",
+        "gap3_export_filter"
+      ],
+      "pre_rc": 0,
+      "pre_failed": [],
+      "mutated_rc": 1,
+      "mutated_failed": [
+        "test_gap3_export_filter_validator_rejects_bool_impersonating_int[bool_version]"
+      ],
+      "restored_rc": 0,
+      "restored_failed": [],
+      "expected_failed": [
+        "test_gap3_export_filter_validator_rejects_bool_impersonating_int[bool_version]"
       ],
       "verdict": "PASS"
     }

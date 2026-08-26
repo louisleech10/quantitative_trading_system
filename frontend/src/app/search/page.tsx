@@ -695,7 +695,11 @@ export default function SearchPage() {
       };
 
       // 生成CSV內容
-      const csvRows = currentResult.cases.map((case_: CaseData) => [
+      // 🔴 R2 `CODEX-R2-P1-01`：篩選面板與「將匯出 N 筆」就在這個按鈕上方，
+      //    CSV 卻取全量 ⇒ 使用者看到 N、拿到 M。兩個匯出鈕都套同一組條件才一致。
+      const csvRows = applyExportFilters(
+        currentResult.cases as unknown as Record<string, unknown>[], exportFilters,
+      ).map((row) => row as unknown as CaseData).map((case_: CaseData) => [
         // 基本資訊
         case_.symbol || '',
         case_.timestamp || '',

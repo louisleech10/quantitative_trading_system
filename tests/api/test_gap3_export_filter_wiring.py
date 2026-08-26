@@ -71,6 +71,42 @@ def test_gap3_export_filter_hidden_column_in_extra_key_is_not_silently_ignored()
     assert batch_filters_are_canonical([{"label_definition": {"filters": hidden}}]) is False
 
 
+@pytest.mark.parametrize(
+    "filters,why",
+    [
+        ({"version": True, "combinator": "AND",
+          "conditions": [{"column": "a", "op": ">=", "value": 1}]},
+         "🔴 `True == 1` 為真 ⇒ 用 `!= 1` 比較會把 version:true 當成版本 1（R2 `CODEX-R2-P2-01`）"),
+        ({"version": 1, "combinator": "AND",
+          "conditions": [{"column": "a", "op": ">=", "value": True}]},
+         "bool 不是數值——不得讓 True 冒充 1"),
+    ],
+    ids=["bool_version", "bool_value"],
+)
+def test_gap3_export_filter_validator_rejects_bool_impersonating_int(filters, why):
+    assert canonical_filter_columns(filters) is None, why
+
+
+def test_gap3_export_filter_validator_does_not_raise_on_huge_int():
+    """🔴 R2 `CODEX-R2-P1-02`：`10**309` 是**合法**的 JSON 整數，但 `float()` 會 `OverflowError`。
+
+    本函式之契約是「不合規回 `None`」，不是「丟例外」——那個例外會一路穿出去變成 500。
+    修法是「int 不轉 float」（任何 int 依定義都是有限的），所以這條 filters 應被**正常接受**，
+    而不是被拒收：拒收它等於把「數字太大」當成「形狀不對」，語意是錯的。
+    """
+    filters = {"version": 1, "combinator": "AND",
+               "conditions": [{"column": "future_2bar_return", "op": ">=", "value": 10 ** 309}]}
+    assert canonical_filter_columns(filters) == {"future_2bar_return"}   # 不得 raise、不得回 None
+
+    # 走完整 API 路徑亦不得 500
+    r = client.post("/api/v1/case/lookahead-depth", json={
+        "referenced_columns": sorted(canonical_filter_columns(filters)),
+        "declared_window_bars": {"12h": 2},
+        "timeframes": ["12h"],
+    })
+    assert r.status_code == 200, r.text
+
+
 def test_gap3_export_filter_canonical_shape_accepts_both_ops():
     """正例對照（防「恆 None 型假保證」）：兩種 op 之合法形狀都要認得。"""
     ge = {"version": 1, "combinator": "AND",

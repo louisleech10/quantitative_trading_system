@@ -167,6 +167,36 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
     expect(enabled.map((o) => (o as HTMLOptionElement).value)).toContain('72');
   });
 
+  it('⑦ 🔴 CSV 匯出也套同一組條件（R2 `CODEX-R2-P1-01`：面板就在按鈕上方，不能只有事件 JSON 套）', async () => {
+    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
+    const blobs: string[] = [];
+    vi.stubGlobal('URL', {
+      createObjectURL: (b: Blob & { _text?: string }) => { blobs.push(b._text ?? ''); return 'blob:x'; },
+      revokeObjectURL: () => {},
+    });
+    // jsdom 的 Blob 讀不回內容 ⇒ 攔在建構處把文字留下來
+    const RealBlob = globalThis.Blob;
+    vi.stubGlobal('Blob', class extends RealBlob {
+      _text: string;
+      constructor(parts: BlobPart[], opts?: BlobPropertyBag) {
+        super(parts, opts);
+        this._text = String(parts[0] ?? '');
+      }
+    });
+
+    render(<SearchPage />);
+    addCondition('price_change', '0');            // 兩列裡只有第一列（3.2 ≥ 0）通過
+    await waitFor(() => expect(screen.getByTestId('export-count-n').textContent).toBe('1'));
+
+    fireEvent.click(screen.getByText('導出CSV檔案'));
+    await waitFor(() => expect(blobs.length).toBeGreaterThan(0));
+    const dataLines = blobs[0].split('\n').filter((l) => l.trim().length > 0).slice(1);
+    expect(dataLines.length).toBe(1);              // 畫面說 1 筆，檔案裡就是 1 筆
+    // 留下來的必須是**通過條件**那一列（第一列），不是隨便留一列
+    expect(dataLines[0]).toContain('2024-01-01 00:00:00');
+    expect(dataLines[0]).not.toContain('2024-01-01 01:00:00');
+  });
+
   it('⑥ Task 2.3：畫面上的筆數就是 computeExportCounts 的結果（同一組事實）', async () => {
     depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
     render(<SearchPage />);
