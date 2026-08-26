@@ -9,11 +9,14 @@ import { describe, expect, it } from 'vitest';
 import {
   applyExportFilters,
   buildExportFilterSpec,
+  exportAllowedUnderBound,
+  horizonOptions,
   isUsableCondition,
   nextLowerBoundState,
   numericColumnsOf,
   referencedColumnsOf,
   rowPassesCondition,
+  UNCONSTRAINED_LOWER_BOUND,
   type ExportFilterCondition,
   type LowerBoundState,
 } from '@/lib/exportFilter';
@@ -100,23 +103,67 @@ describe('Task 2.1 匯出前篩選', () => {
     ])).toEqual(['future_2bar_return', 'price_change']);
   });
 
-  it('⑩ 下界狀態機（`D-002 A-004` 之決策本體）：無條件 ⇒ null；resolved ⇒ 取最嚴；error ⇒ **保留現值**', () => {
-    const had: LowerBoundState = { bound: 7, error: null };
+  it('⑩ 下界狀態機（`D-002 A-004` 之決策本體）：四種情形之 status 與 bound', () => {
+    const resolved7: LowerBoundState = {
+      status: 'resolved', depthByTimeframe: { '12h': 7 }, bound: 7, error: null,
+    };
 
-    // 沒有條件就沒有約束——是 null，不是 0，也不是沿用舊值
-    expect(nextLowerBoundState(had, { kind: 'no-conditions' })).toEqual({ bound: null, error: null });
+    // 沒有條件就沒有約束
+    expect(nextLowerBoundState(resolved7, { kind: 'no-conditions' })).toEqual(UNCONSTRAINED_LOWER_BOUND);
 
-    // 逐 tf 下界不同時取最嚴者（往上調永遠允許，往下調才是危險方向）
-    expect(nextLowerBoundState({ bound: null, error: null },
-      { kind: 'resolved', depthByTimeframe: { '1h': 72, '12h': 6 } })).toEqual({ bound: 72, error: null });
-    expect(nextLowerBoundState(had,
-      { kind: 'resolved', depthByTimeframe: {} })).toEqual({ bound: null, error: null });
+    // 有條件、還沒拿到下界 ⇒ pending（不是「暫時沒有約束」）
+    expect(nextLowerBoundState(UNCONSTRAINED_LOWER_BOUND, { kind: 'pending' }).status).toBe('pending');
 
-    // 🔴 算不出下界時**不得**當成「沒有約束」——那會讓使用者在系統無法證明安全時把答案窗調到任意小
-    expect(nextLowerBoundState(had, { kind: 'error', message: 'boom' }))
-      .toEqual({ bound: 7, error: 'boom' });
-    expect(nextLowerBoundState({ bound: null, error: null }, { kind: 'error', message: 'boom' }))
-      .toEqual({ bound: null, error: 'boom' });
+    // 逐 tf 下界**相同**（含單一 tf）⇒ 可用單一答案窗表達
+    expect(nextLowerBoundState(UNCONSTRAINED_LOWER_BOUND,
+      { kind: 'resolved', depthByTimeframe: { '1h': 6, '12h': 6 } }))
+      .toEqual({ status: 'resolved', depthByTimeframe: { '1h': 6, '12h': 6 }, bound: 6, error: null });
+
+    // 🔴 逐 tf 下界**不同** ⇒ inexpressible，**不得**取 max 冒充 per-scope 下界
+    const mixed = nextLowerBoundState(UNCONSTRAINED_LOWER_BOUND,
+      { kind: 'resolved', depthByTimeframe: { '1h': 72, '12h': 6 } });
+    expect(mixed.status).toBe('inexpressible');
+    expect(mixed.bound).toBe(null);                       // 不是 72
+    expect(mixed.depthByTimeframe).toEqual({ '1h': 72, '12h': 6 });   // map 保留，不塌平
+    expect(mixed.error).toContain('1h=72');
+
+    // 🔴 算不出下界 ⇒ error，且 map 與 bound 沿用前值（但 status 已不是 resolved ⇒ 擋）
+    const err = nextLowerBoundState(resolved7, { kind: 'error', message: 'boom' });
+    expect(err).toEqual({ status: 'error', depthByTimeframe: { '12h': 7 }, bound: 7, error: 'boom' });
+  });
+
+  it('⑪ 🔴 系統無法證明安全時不得放行：只有 unconstrained 與 resolved 且達標才可匯出', () => {
+    expect(exportAllowedUnderBound(UNCONSTRAINED_LOWER_BOUND, 1)).toBe(true);
+
+    const resolved7: LowerBoundState = {
+      status: 'resolved', depthByTimeframe: { '12h': 7 }, bound: 7, error: null,
+    };
+    expect(exportAllowedUnderBound(resolved7, 6)).toBe(false);
+    expect(exportAllowedUnderBound(resolved7, 7)).toBe(true);
+    expect(exportAllowedUnderBound(resolved7, 12)).toBe(true);
+
+    // ⚠️ 這三種之 bound 都是 null——舊版只看 bound 就會把它們讀成「沒有約束」而放行
+    for (const status of ['pending', 'error', 'inexpressible'] as const) {
+      expect(exportAllowedUnderBound(
+        { status, depthByTimeframe: {}, bound: null, error: 'x' }, 12)).toBe(false);
+    }
+  });
+
+  it('⑫ 下界大於固定清單上限時，至少要有一個可選值滿足它（不得所有選項都被鎖）', () => {
+    const base = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    expect(horizonOptions(UNCONSTRAINED_LOWER_BOUND, base)).toEqual(base);
+
+    const bound72: LowerBoundState = {
+      status: 'resolved', depthByTimeframe: { '1h': 72 }, bound: 72, error: null,
+    };
+    const opts = horizonOptions(bound72, base);
+    expect(opts).toContain(72);
+    expect(opts.some((h) => h >= 72)).toBe(true);
+    expect(opts).toEqual([...base, 72]);                 // 只多那一個，不亂加
+
+    // pending／error 不得偷偷加選項（那會讓使用者以為有可選的合法值）
+    expect(horizonOptions({ status: 'pending', depthByTimeframe: {}, bound: null, error: null }, base))
+      .toEqual(base);
   });
 
   it('⑨ 契約形狀：無可用條件 ⇒ null（不寫空殼）；有條件 ⇒ version/combinator/conditions', () => {

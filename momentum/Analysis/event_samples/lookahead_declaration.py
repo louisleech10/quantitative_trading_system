@@ -24,6 +24,7 @@ L1（Task 1.10 registry）解析不出深度時，L2 **強制使用者宣告**�
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Set, Tuple
 
@@ -96,6 +97,13 @@ def _strings_in(node: Any, out: Set[str]) -> None:
             _strings_in(v, out)
 
 
+def _is_finite_number(value: Any) -> bool:
+    """有限實數；`bool` 明確排除（`True` 是 `int` 的子類，會讓 `1` 與 `True` 混為一談）。"""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(float(value))
+
+
 def canonical_filter_columns(filters: Any) -> Optional[Set[str]]:
     """符合契約 `label_definition.filters.wire_shape` 時，回**精確**之引用欄集合；否則 `None`。
 
@@ -109,15 +117,37 @@ def canonical_filter_columns(filters: Any) -> Optional[Set[str]]:
     """
     if not isinstance(filters, Mapping):
         return None
-    if filters.get("version") != 1:
+    # 🔴 **精確**驗證（R1 `CODEX-R1-P1-04`）：鍵集固定、`combinator` 只有 AND、`op` 為封閉枚舉、
+    #    每種 op 之值形狀固定、數值須有限、**不得有多餘鍵**。
+    #    寬鬆版之實際反例：`{"version":1,"combinator":"OR",
+    #    "conditions":[{"column":"future_2bar_return","op":"bogus","expr":"future_999bar_return"}]}`
+    #    會被判為「形狀已認得」，而藏在 `expr` 裡的 `future_999bar_return` 完全看不見
+    #    ——抽取集合與實際引用集合分離，正是本函式要防的事。
+    if set(filters.keys()) != {"version", "combinator", "conditions"}:
+        return None
+    if filters.get("version") != 1 or filters.get("combinator") != "AND":
         return None
     conditions = filters.get("conditions")
     if not isinstance(conditions, (list, tuple)):
         return None
+
     out: Set[str] = set()
     for cond in conditions:
         if not isinstance(cond, Mapping):
             return None                      # 有一條認不得 ⇒ 整個物件不算符合形狀
+        op = cond.get("op")
+        if op in (">=", "<="):
+            if set(cond.keys()) != {"column", "op", "value"} or not _is_finite_number(cond.get("value")):
+                return None
+        elif op == "between":
+            if set(cond.keys()) != {"column", "op", "range"}:
+                return None
+            rng = cond.get("range")
+            if (not isinstance(rng, (list, tuple)) or len(rng) != 2
+                    or not all(_is_finite_number(v) for v in rng) or rng[0] > rng[1]):
+                return None
+        else:
+            return None
         column = cond.get("column")
         if not isinstance(column, str) or not column:
             return None

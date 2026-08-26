@@ -114,37 +114,99 @@ export function buildExportFilterSpec(
   };
 }
 
-/** 答案窗下界之狀態（`bound` 為 `null` ＝尚無約束）。 */
+/**
+ * 答案窗下界之狀態。
+ *
+ * 🔴 `status` 與 `bound` **不可互相取代**（R1 `CODEX-R1-P1-01`）：
+ * `bound === null` 有兩種完全相反的意思——「沒有條件所以沒有約束」（可匯出）
+ * 與「有條件但算不出下界」（**必須擋住**）。舊版只留 `bound`，於是初次查詢失敗時
+ * 下界仍是 `null`，守衛照樣放行 ⇒ fail-open。`status` 就是用來分辨這兩者的。
+ */
 export interface LowerBoundState {
+  status: 'unconstrained' | 'resolved' | 'pending' | 'error' | 'inexpressible';
+  /** 逐 timeframe 之下界（SPEC Task 2.1b 之 derived 值形狀；**不得塌成 scalar**）。 */
+  depthByTimeframe: Record<string, number>;
+  /** 可用單一答案窗表達時之下界；`inexpressible`／未解析時為 `null`。 */
   bound: number | null;
   error: string | null;
 }
 
+export const UNCONSTRAINED_LOWER_BOUND: LowerBoundState = {
+  status: 'unconstrained', depthByTimeframe: {}, bound: null, error: null,
+};
+
 /** 一次下界查詢之結果。 */
 export type LowerBoundOutcome =
   | { kind: 'no-conditions' }
+  | { kind: 'pending' }
   | { kind: 'resolved'; depthByTimeframe: Record<string, number> }
   | { kind: 'error'; message: string };
 
 /**
  * 由查詢結果決定下一個下界狀態（Task 2.1b／`D-002 A-004` 之**決策本體**）。
  *
- * 三種情形各自的正確處置：
- * - `no-conditions`：沒有條件就沒有約束 ⇒ `null`（不是 0，也不是沿用舊值）。
- * - `resolved`：逐 tf 下界取**最嚴**者（往上調永遠允許，往下調才是危險方向）。
- * - `error`：🔴 **保留現值並回報錯誤**——算不出下界時當成「沒有約束」就是 fail-open，
- *   那會讓使用者在系統無法證明安全的情況下把答案窗調到任意小。
+ * - `no-conditions`：沒有條件就沒有約束 ⇒ `unconstrained`。
+ * - `pending`：有條件、還沒拿到下界 ⇒ **擋住**（不是「暫時沒有約束」）。
+ * - `resolved`：保留**逐 tf map**；各 tf 下界相同（含單一 tf）時可用單一答案窗表達 ⇒ `bound`；
+ *   🔴 **不同時回 `inexpressible` 而非取 max**——取 max 就是 SPEC §D-3′-a(ii) 明令禁止之
+ *   「以單一 batch scalar 冒充 per-scope 下界」（B3 R2 已為同型問題裁定過：能表達就套用、
+ *   不能表達就拒絕，取 max 對窗較小的 scope 是過度 purge，過度保守亦屬錯誤）。
+ * - `error`：🔴 **擋住並回報**——算不出下界時當成「沒有約束」就是 fail-open。
  */
 export function nextLowerBoundState(
   previous: LowerBoundState,
   outcome: LowerBoundOutcome,
 ): LowerBoundState {
-  if (outcome.kind === 'no-conditions') return { bound: null, error: null };
-  if (outcome.kind === 'resolved') {
-    const bounds = Object.values(outcome.depthByTimeframe);
-    return { bound: bounds.length > 0 ? Math.max(...bounds) : null, error: null };
+  if (outcome.kind === 'no-conditions') return UNCONSTRAINED_LOWER_BOUND;
+  if (outcome.kind === 'pending') {
+    return { status: 'pending', depthByTimeframe: {}, bound: null, error: null };
   }
-  return { bound: previous.bound, error: outcome.message };
+  if (outcome.kind === 'resolved') {
+    const depth = outcome.depthByTimeframe;
+    const values = Object.values(depth);
+    if (values.length === 0) return UNCONSTRAINED_LOWER_BOUND;
+    const distinct = [...new Set(values)];
+    if (distinct.length > 1) {
+      return {
+        status: 'inexpressible',
+        depthByTimeframe: depth,
+        bound: null,
+        error: `本批混了多個 K 線週期且下界不同（${Object.entries(depth)
+          .map(([tf, v]) => `${tf}=${v}`).join('、')}），無法用單一答案窗表達；請依週期分批匯出`,
+      };
+    }
+    return { status: 'resolved', depthByTimeframe: depth, bound: distinct[0], error: null };
+  }
+  return {
+    status: 'error',
+    depthByTimeframe: previous.depthByTimeframe,
+    bound: previous.bound,
+    error: outcome.message,
+  };
+}
+
+/**
+ * 這個狀態下允許匯出嗎？——`false` 時**一定**要擋。
+ *
+ * 只有兩種情形可以匯出：沒有條件（無約束），或已解析且選值 ≥ 下界。
+ * `pending`／`error`／`inexpressible` 一律擋——**系統無法證明安全時不得放行**。
+ */
+export function exportAllowedUnderBound(state: LowerBoundState, selectedBars: number): boolean {
+  if (state.status === 'unconstrained') return true;
+  if (state.status !== 'resolved' || state.bound === null) return false;
+  return selectedBars >= state.bound;
+}
+
+/**
+ * 答案窗下拉之候選值：固定的 1..12 ＋（下界大於 12 時）下界本身。
+ *
+ * 🔴 R1 `CODEX-R1-P1-03`：`future72_*` 在 1h 批之下界是 72，而固定清單只到 12
+ * ⇒ 所有選項都被 disable、使用者無路可走且沒有解釋。至少要留一個滿足下界的可選值。
+ */
+export function horizonOptions(state: LowerBoundState, base: readonly number[]): number[] {
+  const opts = new Set<number>(base);
+  if (state.status === 'resolved' && state.bound !== null) opts.add(state.bound);
+  return [...opts].sort((a, b) => a - b);
 }
 
 /**

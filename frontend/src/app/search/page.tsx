@@ -13,10 +13,14 @@ import { fetchLookaheadDepth } from '@/lib/api';
 import {
   applyExportFilters,
   buildExportFilterSpec,
+  exportAllowedUnderBound,
+  horizonOptions,
   nextLowerBoundState,
   numericColumnsOf,
   referencedColumnsOf,
+  UNCONSTRAINED_LOWER_BOUND,
   type ExportFilterCondition,
+  type LowerBoundState,
 } from '@/lib/exportFilter';
 import { computeExportCounts } from '@/lib/exportCounts';
 
@@ -67,10 +71,12 @@ export default function SearchPage() {
   // 🔴 前端**不自算深度**（第二份實作必然漂移）。
   // ✅ B5 已接線（解除 `D-002 A-004`）：Task 2.1 之篩選面板變動時呼叫
   //    `POST /case/lookahead-depth`，把該批 timeframe 之下界餵進來；無條件時回到 null＝尚無約束。
-  const [lookaheadLowerBound, setLookaheadLowerBound] = useState<number | null>(null);
+  // 🔴 狀態不只是一個數字：`bound === null` 有兩種相反的意思（沒有條件／算不出來），
+  //    只留數字會讓「算不出來」被當成「沒有約束」而放行（R1 `CODEX-R1-P1-01`）。
+  const [lowerBoundState, setLowerBoundState] = useState<LowerBoundState>(UNCONSTRAINED_LOWER_BOUND);
+  const lookaheadLowerBound = lowerBoundState.bound;
   // GAP-3 UX Task 2.1：匯出前篩選條件（面板只讀搜尋結果，不改任何原始欄位值）
   const [exportFilters, setExportFilters] = useState<ExportFilterCondition[]>([]);
-  const [lowerBoundError, setLowerBoundError] = useState<string | null>(null);
   
   // 搜索參數狀態
   const [searchParams, setSearchParams] = useState<SimpleSearchRequest>({
@@ -105,19 +111,16 @@ export default function SearchPage() {
   const referencedKey = JSON.stringify(referencedColumnsOf(exportFilters));
   useEffect(() => {
     // 解除 `D-002 A-004`：下界之**值**由後端 depth_by_timeframe() 導出，前端不自算。
-    // 🔴 三種情形之處置一律由 `nextLowerBoundState()` 決定（決策本體在純函式裡，可單獨測）。
-    const apply = (outcome: Parameters<typeof nextLowerBoundState>[1]) => {
-      setLookaheadLowerBound((prevBound) => {
-        const next = nextLowerBoundState({ bound: prevBound, error: null }, outcome);
-        setLowerBoundError(next.error);
-        return next.bound;
-      });
-    };
+    // 🔴 各情形之處置一律由 `nextLowerBoundState()` 決定（決策本體在純函式裡，可單獨測）。
+    const apply = (outcome: Parameters<typeof nextLowerBoundState>[1]) =>
+      setLowerBoundState((prev) => nextLowerBoundState(prev, outcome));
     const referenced = referencedColumnsOf(exportFilters);
     if (referenced.length === 0) {
       apply({ kind: 'no-conditions' });
       return;
     }
+    // 有條件但還沒拿到下界 ⇒ **先擋住**，不是「暫時沒有約束」
+    apply({ kind: 'pending' });
     const timeframes = [...new Set(exportRows.map((r) => String(r.timeframe ?? searchParams.timeframe)))]
       .filter((tf) => tf && tf !== 'undefined');
     if (timeframes.length === 0) return;
@@ -572,6 +575,15 @@ export default function SearchPage() {
     if (!currentResult || !currentResult.cases || currentResult.cases.length === 0) {
       alert('沒有搜索結果可以匯出');
       return;
+    }
+    // 🔴 B5 R1 `CODEX-R1-P1-01`：**系統無法證明安全時不得放行**。
+    //    `pending`（還沒拿到下界）／`error`（算不出來）／`inexpressible`（混 TF 且下界不同）
+    //    三者都必須擋在這裡——舊版只看 `bound`，而那三種情形之 `bound` 都是 `null`，
+    //    於是守衛把它們一律讀成「沒有約束」而放行。
+    if (!exportAllowedUnderBound(lowerBoundState, eventHorizonBars)) {
+      alert(lowerBoundState.error
+        ?? '尚未取得答案窗下界（系統還無法證明這批條件安全），請稍候或修正條件後再匯出');
+      return undefined;
     }
     // GAP-3 UX Task 2.1b：答案窗不得低於導出下界。
     // 🔴 整段匯出邏輯**包在 proceed 內**——「阻擋早於任何網路動作」因此是結構上保證的事實，
@@ -1747,14 +1759,26 @@ export default function SearchPage() {
                 )}
               </p>
 
-              {lookaheadLowerBound !== null && (
+              {lowerBoundState.status === 'resolved' && lookaheadLowerBound !== null && (
                 <p className="mt-1 text-[11px] text-amber-200" data-testid="export-lower-bound">
                   你的條件引用了未來欄，答案窗下界鎖定在 {lookaheadLowerBound} 根（可往上調，不能往下調）。
                 </p>
               )}
-              {lowerBoundError && (
+              {lowerBoundState.status === 'pending' && (
+                <p className="mt-1 text-[11px] text-slate-300" data-testid="export-lower-bound-pending">
+                  正在確認這些條件需要多寬的答案窗；確認完成前不會讓你匯出。
+                </p>
+              )}
+              {(lowerBoundState.status === 'error' || lowerBoundState.status === 'inexpressible') && (
                 <p className="mt-1 text-[11px] text-rose-200" data-testid="export-lower-bound-error">
-                  無法導出答案窗下界：{lowerBoundError}
+                  {lowerBoundState.status === 'inexpressible' ? '無法匯出：' : '無法導出答案窗下界：'}
+                  {lowerBoundState.error}
+                </p>
+              )}
+              {Object.keys(lowerBoundState.depthByTimeframe).length > 1 && (
+                <p className="mt-1 text-[11px] font-mono text-slate-400" data-testid="export-lower-bound-map">
+                  逐週期下界：{Object.entries(lowerBoundState.depthByTimeframe)
+                    .map(([tf, v]) => `${tf}=${v}`).join('、')}
                 </p>
               )}
             </div>
@@ -1776,7 +1800,9 @@ export default function SearchPage() {
                   onChange={(e) => setEventHorizonBars(Number(e.target.value))}
                   className="rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-200"
                 >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+                  {/* 🔴 下界大於 12 時（如 1h 批引用 future72_*）必須有可選值滿足它，
+                      否則所有選項都被鎖、使用者無路可走（R1 `CODEX-R1-P1-03`）。 */}
+                  {horizonOptions(lowerBoundState, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).map((h) => (
                     <option
                       key={h}
                       value={h}

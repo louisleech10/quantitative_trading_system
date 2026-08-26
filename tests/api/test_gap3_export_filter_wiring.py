@@ -55,18 +55,64 @@ def test_gap3_export_filter_canonical_shape_extracts_exact_columns():
     assert filters_referenced_columns(CANONICAL_FILTERS, []) == {"future72_max_drawdown", "price_change"}
 
 
+def test_gap3_export_filter_hidden_column_in_extra_key_is_not_silently_ignored():
+    """🔴 R1 `CODEX-R1-P1-04` 之核心反例：多餘鍵裡藏著另一個未來欄。
+
+    寬鬆版會回 `{'future_2bar_return'}` 並宣稱「形狀已認得」——`future_999bar_return`
+    完全看不見，抽取集合與實際引用集合因此分離。精確版必須回 `None`（不認得），
+    讓呼叫端走 fail-closed 的舊路徑。
+    """
+    hidden = {
+        "version": 1, "combinator": "AND",
+        "conditions": [{"column": "future_2bar_return", "op": ">=", "value": 1,
+                        "expr": "future_999bar_return"}],
+    }
+    assert canonical_filter_columns(hidden) is None
+    assert batch_filters_are_canonical([{"label_definition": {"filters": hidden}}]) is False
+
+
+def test_gap3_export_filter_canonical_shape_accepts_both_ops():
+    """正例對照（防「恆 None 型假保證」）：兩種 op 之合法形狀都要認得。"""
+    ge = {"version": 1, "combinator": "AND",
+          "conditions": [{"column": "a", "op": ">=", "value": 1.5}]}
+    le = {"version": 1, "combinator": "AND",
+          "conditions": [{"column": "b", "op": "<=", "value": -2}]}
+    between = {"version": 1, "combinator": "AND",
+               "conditions": [{"column": "c", "op": "between", "range": [1, 2]}]}
+    assert canonical_filter_columns(ge) == {"a"}
+    assert canonical_filter_columns(le) == {"b"}
+    assert canonical_filter_columns(between) == {"c"}
+    assert canonical_filter_columns({"version": 1, "combinator": "AND", "conditions": []}) == set()
+
+
 # ── R-B3-2 ②：不符形狀 ⇒ 回 None，呼叫端須走 fail-closed 舊路徑 ─────────────
 @pytest.mark.parametrize(
     "bad",
     [
-        {"version": 2, "conditions": []},                       # 版本不認得
-        {"version": 1, "conditions": {"not": "a list"}},        # conditions 不是 list
-        {"version": 1, "conditions": [{"field_id": 42}]},       # 條目沒有 column
-        {"version": 1, "conditions": [{"column": ""}]},         # column 是空字串
-        {"expr": "row['my_signal'] >= 1"},                      # 外部產生之任意形狀
+        {"version": 2, "combinator": "AND", "conditions": []},          # 版本不認得
+        {"version": 1, "combinator": "AND", "conditions": {"no": "t"}},  # conditions 不是 list
+        {"version": 1, "combinator": "AND", "conditions": [{"field_id": 42}]},   # 條目沒有 column
+        {"version": 1, "combinator": "AND",
+         "conditions": [{"column": "", "op": ">=", "value": 1}]},        # column 是空字串
+        {"expr": "row['my_signal'] >= 1"},                               # 外部產生之任意形狀
         "not-an-object",
+        # 🔴 以下六種是 R1 `CODEX-R1-P1-04` 之反例族：寬鬆版把它們全當成「形狀已認得」
+        {"version": 1, "combinator": "OR",
+         "conditions": [{"column": "future_2bar_return", "op": ">=", "value": 1}]},   # OR 未支援
+        {"version": 1, "combinator": "AND",
+         "conditions": [{"column": "a", "op": "bogus", "value": 1}]},                 # op 不在枚舉
+        {"version": 1, "combinator": "AND",
+         "conditions": [{"column": "a", "op": ">=", "value": 1, "expr": "future_999bar_return"}]},  # 多餘鍵藏欄名
+        {"version": 1, "combinator": "AND", "conditions": [{"column": "a", "op": ">="}]},   # 缺 value
+        {"version": 1, "combinator": "AND",
+         "conditions": [{"column": "a", "op": "between", "range": [2, 1]}]},          # 區間反了
+        {"version": 1, "combinator": "AND",
+         "conditions": [{"column": "a", "op": ">=", "value": float("nan")}]},         # 非有限數
+        {"version": 1, "combinator": "AND", "conditions": [], "extra": 1},            # 頂層多餘鍵
     ],
-    ids=["bad_version", "conditions_not_list", "no_column", "empty_column", "opaque_expr", "not_mapping"],
+    ids=["bad_version", "conditions_not_list", "no_column", "empty_column", "opaque_expr", "not_mapping",
+         "combinator_or", "bogus_op", "extra_key_hiding_column", "missing_value", "reversed_range",
+         "nan_value", "top_level_extra_key"],
 )
 def test_gap3_export_filter_non_canonical_shape_is_not_trusted(bad):
     """🔴 回 `None`（不認得）與回 `set()`（認得且真的沒引用）**意義不同**。
