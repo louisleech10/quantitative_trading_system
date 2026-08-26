@@ -7,9 +7,14 @@
 
 ## §0 一句話狀態
 
-**SPEC 🔒 凍結、TODO 🔒 凍結 v1.0；B1–B7 皆已收斂；`D-004` 三家 APPROVED。下一批＝B8（Phase 5 訊息與表頭）。**
+**SPEC 🔒 凍結、TODO 🔒 凍結 v1.0；B1–B8 皆已收斂；`D-004` 三家 APPROVED。下一批＝B9（Phase 6 IC 止血閘）。**
 
-🔴 **接手第一件事：照 §1 跑開工前稽核**（期望值已更新為 B7 收斂後之值），再讀 §2C（B8 是什麼）。
+🔴 **接手第一件事：照 §1 跑開工前稽核**（期望值已更新為 B8 收斂後之值），再讀 §2D（B9 是什麼）。
+
+🔴 **B8 新增兩條鐵律，開工前先讀（§3 之第 9、10 條）**：
+① **派 review 前先 commit**；② **mutation runner 必須同時有 `IsolatedWorktree` 與備份閘**。
+兩者都是 B8 付了代價才知道的：B8 四輪 review 全程未 commit，加上 runner 缺隔離，
+導致一個檔的實作在委員並行複驗期間回到 HEAD、整段消失。
 
 | 文件 | 路徑 | 狀態 | commit |
 |---|---|---|---|
@@ -64,19 +69,21 @@ bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_TODO.md        # 期望 r
 bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_TODO.D-003.md  # 期望 rc=0
 grep -c '^### Task ' docs/GAP3_EVENT_UX_TODO.md # 期望 42
 venv/bin/python scripts/gap3_freeze_golden.py --check   # 期望 rc=0，canonical_sha=163c4cec…（約 15 秒）
-venv/bin/python -m pytest tests/momentum/event_samples/ -q            # 期望 299 passed
-venv/bin/python -m pytest tests/api -q -k "gap3_csv or gap3_export_filter or lookahead_declaration or gap3_horizon or gap3_import or gap3_t0_unit or gap3_heterogeneous or gap3_source_digest or gap3_contract_reason or gap3_lookahead or gap3_event_delete"   # 期望 179 passed
-npm --prefix frontend test -- --run             # 期望 54 files／310 passed
+venv/bin/python -m pytest tests/momentum/event_samples/ -q            # 期望 313 passed
+venv/bin/python -m pytest tests/api -q -k "gap3_csv or gap3_export_filter or lookahead_declaration or gap3_horizon or gap3_import or gap3_t0_unit or gap3_heterogeneous or gap3_source_digest or gap3_contract_reason or gap3_lookahead or gap3_event_delete or source_json_hint"   # 期望 189 passed（🔴 B8 起 -k 多了 source_json_hint）
+npm --prefix frontend test -- --run             # 期望 57 files／327 passed
 npm --prefix frontend run build                 # 期望 rc=0
-npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json   # 期望：GAP-3 相關檔 0 錯（另有 6 條既有債，見 §7.3）
+npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json   # 期望：GAP-3 相關檔 0 錯（另有 **8 行**既有債，見 §7.3）
 ```
 
 🔴 **golden 一律用 `venv/bin/python`**——系統 `python3` 缺 `numba`，codex 於 B7 R1 踩過。
 🔴 **`npm run build` 不涵蓋測試檔**（B7 R2 `CODEX-R2-P2-03`）⇒ 型別關卡要靠上列最後一條。
 
-B1–B7 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-all-mutations.receipt.json`
-（32／14／13／15／19／23／22 條），皆 `closure: CLOSED`。**不需重跑**，除非你改了那幾批的產出。
+B1–B8 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1..8}-all-mutations.receipt.json`
+（32／14／13／15／19／23／22／**19** 條），皆 `closure: CLOSED`。**不需重跑**，除非你改了那幾批的產出。
 🔴 **跑之前先查 `grep -o '"closure": "[A-Z]*"' <receipt>`**——委員複驗會覆寫它（見 §6.4）。
+🔴 **B8 起 runner 會在開跑前先 `unlink` 目標 receipt**：中止就沒有檔、下游 `jq` 必定 fail-loud，
+不再可能讀到上一輪的舊 receipt（B8 主委差點就這樣宣稱通過，見 §6.4）。
 
 🔴 **上表之 golden 期望值 `163c4cec…` 不因 B7 改變**——原交接宣稱「4.2 會讓它合法改變」已於
 2026-08-26 實測推翻，定案見 `D-004` 之 A-022（**不重凍**；同型誤植在本檔曾有兩處，皆已更正）。
@@ -225,13 +232,37 @@ B1–B7 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-
 
 | 批 | Task | 依賴 | 狀態 |
 |---|---|---|---|
-| **B8 訊息與表頭** | Phase 5 全部（5.0／5.1／5.2／5.3） | Task 5.0 | ⬜ **下一批，座標見 §2C** |
-| **B9 IC 止血閘** | Phase 6 全部（6.0／6.1／6.2／6.3／6.4） | Task 6.0 | ⬜ **座標見 §2D** |
+| **B8 訊息與表頭** | Phase 5 全部（5.0／5.1／5.2／5.3） | Task 5.0 | ✅ **已收斂**（`ebd77b87`；五輪 5→1→4→2→0） |
+| **B9 IC 止血閘** | Phase 6 全部（6.0／6.1／6.2／6.3／6.4） | Task 6.0 | ⬜ **下一批，座標見 §2D** |
 | B10 全棧接線 | Phase 7 全部 | B1–B9 | ⬜ |
 
 ---
 
-## §2C B8 是什麼（Phase 5 全部，四個 Task）
+## §2C B8 是什麼（Phase 5 全部，四個 Task）—— 🔴 **已收斂（2026-08-27，commit `ebd77b87`），本節保留供追溯**
+
+### 2C.0 B8 之收斂結果
+
+**Task 5.0／5.1／5.2／5.3 皆 ✅。** 五輪 code review：**5 → 1 → 4 → 2 → 0**（三家全員）。
+mutation **19 條**全 PASS、`closure: CLOSED`（隔離環境下重跑）。
+
+🔴 **本批之九條自傷，全部同一種病：glossary 的 definition 在重述公式，而我是讀碼推論寫出來的。**
+`n_eff`（micro 區其實等權、恆等於 n）／`prevalence_full`（分母是 n_labeled 不是 n_total）／
+`n_eligible`＋`n_unknown`（漏 warmup 與 grid 連續、且「重複」永遠不會出現在 n_unknown）／
+`horizon`（自**進場**根起算，非事件錨定根）／`macro_mean`（是保留集 × uniqueness 加權）／
+`n_test`（三者交集；**前後改了三次**）。
+⇒ 修法不只改字：每條被指出的定義都補上**把它釘在真實算式上**的測試，算式一改先紅。
+
+🔴 **三家對病根的修正（我原本只講對一半）**：codex／composer 皆指出「定義重述公式」只是一半，
+另一半是**審查方法本身沒跑不對稱反例探針**——R3 那輪 codex／grok 判可收，正是因為只對
+`formula_ref` 路徑讀碼。⇒ 定案＝**收窄定義 ＋ 保留算式綁定 ＋ 審查必跑不對稱探針**，三者缺一。
+
+🔴 **另有一次工作區事故**：`import_contract.py` 之未 commit 實作整段回到 HEAD
+（由 composer 複驗時發現）。**機制未判定**——可觀察事實只有「內容回到 HEAD」；
+主委初判「執行端違約 `git checkout`」已**撤回**（過度宣稱），grok 提出至少同樣合理的機制＝
+**B8 runner 缺 `IsolatedWorktree`、三家在共用樹並行跑 mutation**，那是主委自己的缺陷。
+兩條 assumed（災損只有一檔／重打逐字相同）三家**明標無法 post-hoc 證明**，列具名殘留。
+
+### 2C.1 原始偵察與座標（保留供追溯）
 
 **B8 ＝ 錯誤訊息與表頭說明。** 依 §B 拓撲，**內部依賴＝ Task 5.0 必須先做**（5.2 讀它）。
 
@@ -349,7 +380,12 @@ B1–B7 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-
 
 **B1–B7 之實績供校準**：B1 五輪 3→2→10→7→0；B2 兩輪 2→1；B3 三輪 6→3→0；
 **B4 六輪 7→4→4→1→1→0**；**B5 四輪 6→3→1→0**；**B6 六輪 5→2→2→1→兩家零→0**；
-**B7 三輪 7→3→0**（另加 `D-004` 戳記三輪，R1／R2 皆 codex 一家 REJECTED 且兩次都對）。
+**B7 三輪 7→3→0**（另加 `D-004` 戳記三輪，R1／R2 皆 codex 一家 REJECTED 且兩次都對）；
+**B8 五輪 5→1→4→2→0**（🔴 **非單調**：R3 跳回 4 是因為主委首次請三家**獨立重掃全部 21 條 definition**
+＝新開的攻擊面，不是修法退步；R4 之 2 條是工作區事故及其下游）。
+🔴 **B8 之角色反轉值得記**：R1／R3 是另兩家判可收而 **codex** 抓到真缺陷；R4 反過來是 codex／grok
+零 finding 而 **composer 抓到一條 P0**。⇒ `兩家零 finding 不構成放行理由` 對**任何一家**都成立，
+不是針對特定家族——三家都當過那個唯一發現問題的人。
 ⇒ **抓一個估**：三到六輪、findings 個位數、**幾乎每批都有一輪是「另兩家判可收而 codex 抓到真缺陷」**。
 
 ### 🔴 B4–B7 學到的八件事（下一批直接沿用，別重踩）
@@ -380,6 +416,19 @@ B1–B7 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-
 8. 🔴 **型別關卡不能只靠 `npm run build`（B7 新增）。**
    它**不涵蓋測試檔** ⇒ vitest 是 transpile-only、型別錯照樣全綠。
    前端收案前固定加跑 `npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json`。
+9. 🔴 **派 review 前先 commit（B8 新增，付過代價）。**
+   B8 從 R1 到 R4 跑了**四輪 review 全程未 commit**，期間 `import_contract.py` 之整段實作
+   回到 HEAD、憑空消失（composer 複驗時才發現）。委員合約本就禁對 tracked 檔 `git checkout`，
+   但**合約擋不住已經發生的事**；先 commit 是把「可還原的基準」從髒工作區換成不可變物件
+   ——那是主控端唯一能自己控制的一半。
+10. 🔴 **mutation runner 必須同時具備 `IsolatedWorktree` 與備份閘（B8 新增）。**
+   B1–B6 之 runner 皆有隔離；**B7 之範本已經掉了隔離而交接沒記**，B8 照抄 ⇒ 缺陷延續兩批。
+   缺隔離的後果：三家並行複驗時在共用工作樹上互相污染（實測到同一個檔同時殘留兩個變異標記、
+   假 `closure=OPEN`、baseline 殘紅）。**複製範本前先 `grep IsolatedWorktree`。**
+11. 🔴 **讀執行結果不要 `tail` 掉失敗訊號（B8 新增）。**
+    B8 有一次 runner 在第 5 條 crash（錨點失效），receipt 未被覆寫，而主委只讀 `tail -6`
+    ⇒ 看到的是**上一輪的舊 receipt**，差點據此宣稱全數通過。
+    固定顯式檢查三個訊號：`runner_rc`、`grep -c Traceback`、`n_mutations == len(MUTATIONS)`。
 
 ---
 
@@ -437,7 +486,7 @@ mutation，**要重錨、不是繞過**（B4／B5 各發生一次）。
 | # | 事項 | 何時 | 狀態 |
 |---|---|---|---|
 | 1 | **延伸檔 D-003 之戳記輪**（A-016..A-019 四條修訂，含 SPEC L1427 digest 語意之 doc drift 裁定） | 收 epic 前 | ⬜ **未過戳記**；不擋 B6／B7，但收 epic 前須補（比照 D-002 之作法） |
-| 2 | 動過 `scripts/` ⇒ 收 epic 前跑 `bash scripts/gov_check.sh --no-probe`（丟背景，十分鐘級） | 收 epic 前 | ✅ 2026-08-25 已跑；**B2–B5 皆未動 `scripts/`**。若 B6／B7 動了需重跑 |
+| 2 | 動過 `scripts/` ⇒ 收 epic 前跑 `bash scripts/gov_check.sh --no-probe`（丟背景，十分鐘級） | 收 epic 前 | ✅ 2026-08-25 已跑；**B2–B8 皆未動 `scripts/`**（B8 只動 `handoffs/` 之 runner，未入版控）。若 B9 動了需重跑 |
 | 3 | **GAP-3 之 UAT B 段簽字**仍在使用者手上（`docs/GAP3_UAT_CHECKLIST.md`） | 使用者 | ⬜ **未簽字不收案** |
 | 4 | 根目錄 `.probe_ic{,2,3}.sh` 三個 untracked 檔為更早批次殘留 | 隨時 | ⬜ 要清可直接刪 |
 | 5 | `handoffs/run_receipts/gap3ux-b{3,4,5,6}-record*.json` 為 `--record` 之暫存 receipt | 隨時 | ⬜ untracked，可刪 |
@@ -542,7 +591,10 @@ mutation，**要重錨、不是繞過**（B4／B5 各發生一次）。
 | `R-B2-2` | 執行期 oracle 之 factory-body 繞法：新斷言綁 `get_event_import_service()` 之回傳；若日後另立第二個工廠且 route 改呼叫它，本閘看不見 | `needs-research` | 主委；屬 **B10 全棧接線** |
 | **純 JS 手刻 sha256** | 不經 `crypto.subtle`／`node:crypto` 入口之手刻實作，前端封閉枚舉看不見 | `needs-research` | 主委 |
 | **`R-B7-1`** | `label_value` 仍走 `_is_num` ⇒ **仍收 NaN**（附帶欄已改用 `_is_finite_num` 拒之）。**屬既有行為、非 B7 弱化**——改它會動到 B7 範圍外之既有 caller | `blocked-by` Task 7.0b（label producer 於分析時重寫） | 主委；7.0b 落地時一併收 |
-| **`R-B7-2`** | 前端既有型別錯 6 條：`FactorReturnChart.test.tsx`（4）／`useFeatureFactory.batchDate.test.ts`（2）。`npx tsc --noEmit` 可見，`npm run build` 看不見 | `user-ruling`（面向未來不溯及既往） | 主委；不排工。🔴 **新寫的檔不得再增加此數** |
+| **`R-B7-2`** | 前端既有型別錯 **8 行**：`FactorReturnChart.test.tsx`（4）／`useFeatureFactory.batchDate.test.ts`（**4**，兩行各兩個錯）。`npx tsc --noEmit` 可見，`npm run build` 看不見。⚠️ 本欄原記「6 條」為**計數誤植**，2026-08-27 實測更正（三家 R2／R4 皆回報 8） | `user-ruling`（面向未來不溯及既往） | 主委；不排工。🔴 **新寫的檔不得再增加此數** |
+| **`R-B8-1`** | Task 5.0 之 21 條 definition **應收窄**為白話語意＋判讀陷阱，計算細節交 `formula_ref`；並保留算式綁定、審查必跑不對稱探針。三家 R4 表態 codex(B)／grok(B)／composer(C)，實質共識如前述 | `blocked-by` Task 7.5（該 Task 本就會動 glossary，一併改成本最低） | 主委；三家皆明示**不阻擋 B8 收斂** |
+| **`R-B8-2`** | glossary 之後設欄（`_doc`／`_version`／`formula_ref`）隨 build-time import 進 client bundle（`page-*.js`，`_doc` ≈540 字元）。無機密 | `user-ruling`（R2 三家一致：拆檔會破壞「SoT 單檔」，代價 > 幾百字元） | 主委；不排工 |
+| **`R-B8-3`** | 工作區 revert 事故之兩條**無法 post-hoc 證明**的假設：①「災損只有 `import_contract.py` 一個檔」——post-commit 後無法重播「還原後又被編輯覆蓋」之中間態；②「主委由對話紀錄重打之內容與事故前**逐字**相同」——無備份可比對，只有行為等價（19 條 mutation ＋ 型別 probe）佐證 | `needs-research` | 主委；**觸發＝日後在 Task 5.1 相關碼發現與定義不符之行為時，回頭查此條** |
 | **`R-B3-3`** | 逐 symbol 之 purge 下界（`EventSplitConfig.embargo_ms_by_symbol`）未實作 ⇒ 各 symbol 宣告下界**不一致**之批次一律拒絕分析（fail-closed，不取全批 max——SPEC §D-3′-a(ii) 明令禁止）。使用者當前解法＝依 timeframe 拆批 | `blocked-by` Task 7.0b | 主委；7.0b 落地時解除 |
 | **`R-B4-1`** | **CSV 方言之殘餘前後端差異**：支援之行尾＝**LF／CRLF**；引號內 CR 當資料保留；裸 CR（含舊式 Mac）兩端一致不支援。其他方言／編碼／writer 癖好之殘餘差異**不再逐一開輪**。兜底＝後端永遠是契約權威；前端只做預覽且**不得產出看似合理的假欄名**（由 mutation `1.5-M5` 鎖住）。R6 由 codex 以 **9,331 個字串窮舉**比對兩端 predicate，`mismatch_count=0` | `user-ruling` | 主委；**觸發＝出現具體且可重跑之使用者實例才重開** |
 | **`D-001/D-002/D-003` provenance** | `gate.sh register-output` 只收 `handoffs/` 或 `stampable_artifacts.txt` 明列者 ⇒ 對 `docs/*.D-00N.md` 跑 `reconcile_stamps_check.sh` 會報 provenance pending（**非戳記造假**） | `user-ruling` | 主委 |
@@ -566,6 +618,6 @@ mutation，**要重錨、不是繞過**（B4／B5 各發生一次）。
 | API 模型 | `api/models/event_import_models.py`（🔴 加 response 鍵必須同步改這裡，否則被 `response_model` 靜默濾掉） |
 | golden | `scripts/gap3_freeze_golden.py`（🔴 **不重凍**：它跑 IC 管線、不碰 `analyze_tables`，4.2 動不到它——實測 `--check` rc=0、`canonical_sha` 未變。定案見 `D-004` 之 **A-022**；commit message **不得**寫「已重凍」。本列原寫「4.2 會讓它合法改變，須 `_write()` 重凍」，為同型誤植，2026-08-26 由 `GROK-R1-P3-02` 抓出後更正） |
 | mutation receipt | `handoffs/run_receipts/gap3ux-b{1,2,3,4,5,6,7}-all-mutations.receipt.json`（32／14／13／15／19／23／22 條）。🔴 **用前先查 `closure` 欄**（見 §6.4） |
-| mutation runner 範本（**未入版控**） | 🔴 **最新＝`handoffs/gap3ux_b7_mutations.py` ＋ `gap3ux_b7_expected.json`**（含**備份閘**與 page runtime selector，直接複製改）；舊版 `gap3ux_b{4,5}_mutations.py` |
+| mutation runner 範本（**未入版控**） | 🔴 **最新＝`handoffs/gap3ux_b8_mutations.py` ＋ `gap3ux_b8_expected.json`**——它是目前**唯一同時具備三件**者：`IsolatedWorktree` 隔離、備份閘、開跑前 `unlink` receipt。⚠️ **`gap3ux_b7_mutations.py` 缺隔離**（本欄舊版曾把它標為「最新範本」而沒記這件事，B8 照抄 ⇒ 缺陷延續兩批）；`gap3ux_b{1..6}` 有隔離但無後兩者。**複製任何範本前先 `grep -c "IsolatedWorktree\|_BACKED_UP\|out_path.unlink"`，三者缺一就補。** |
 | reconcile 收斂檔 | `handoffs/reconcile/20260826-gap3ux-b{6-review-r{1..6},7-review-r{1,2,3}}/synth.md`；`20260826-gap3uxtodod004-x-stamp/synth.md`（D-004 戳記，三輪） |
 | 過程與教訓（給使用者） | `白話說明/GAP-3施工看板.md`（進度）、`白話說明/GAP-3施工進度.md`（歷史）、`白話說明/流程摩擦記錄.md` |

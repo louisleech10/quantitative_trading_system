@@ -14,7 +14,26 @@
 GAP-3 事件型 UAT 缺口修補：SPEC 🔒 FROZEN（`4ce3d6d9`）、TODO 🔒 FROZEN v1.0（`afa70967`）、
 延伸檔 D-001（`81cbe7ab`）、D-002（`51f1a65e`）、**D-004**（Phase 4 之契約修補，A-020／A-021／A-022）
 皆三家 APPROVED；D-003（`09884811`）尚未過戳記（收 epic 前補）。
-42 個 Task 之計數：**24 ✅／0 🔧／18 ⬜**（逐 Task 狀態一律看看板）。
+42 個 Task 之計數：**28 ✅／0 🔧／14 ⬜**（逐 Task 狀態一律看看板）。
+
+Task 5.0／5.1／5.2／5.3（訊息與表頭）之**五輪** code review findings **5 → 1 → 4 → 2 → 0**，
+三家一致收；commit `ebd77b87`；mutation 19 條 `closure: CLOSED`（隔離環境重跑）。
+收斂檔在 `handoffs/reconcile/20260827-gap3ux-b8-review-r{1..5}/synth.md`（兩道機檢皆 rc=0）。
+🔴 收斂**非單調**：第三輪跳回 4 條，是因為主委首次請三家**獨立重掃全部 21 條 definition**
+＝新開的攻擊面，不是修法退步。
+
+🔴 **該批九條自傷同一種病**：詞彙表之 definition 在**重述公式**，而主委是讀碼推論寫的、
+沒有一條實跑驗證過（`n_eff` 實為等權恆等於 n／`prevalence_full` 分母是 n_labeled／
+`horizon` 自進場根起算／`macro_mean` 是保留集×uniqueness 加權／`n_test` 為三者交集且改了三次）。
+修法＝每條補**把定義釘在真實算式上**的測試，算式一改先紅。
+**三家修正主委判斷**：病根只講對一半，另一半是**審查方法本身沒跑不對稱反例探針**。
+
+🔴 **一次工作區事故**：`import_contract.py` 之未 commit 實作整段回到 HEAD（composer 複驗時發現）。
+**機制未判定**——主委初判「執行端違約 `git checkout`」屬過度宣稱、**已撤回**；
+grok 查出該批 runner 缺 `IsolatedWorktree`（B7 範本已退化而交接沒記，缺陷延續兩批）
+＝主委自身缺陷，已補隔離並在隔離環境重跑全部 mutation。
+**新增兩條鐵律**（見唯一入口 §3 第 9、10 條）：**派 review 前先 commit**；
+**runner 須同時具備隔離＋備份閘＋開跑前刪 receipt**。
 
 前六批之 code review 輪數與 findings 收斂：第三批 **6 → 3 → 0**、第四批 **7 → 4 → 4 → 1 → 1 → 0**、
 第五批 **6 → 3 → 1 → 0**、第六批 **5 → 2 → 2 → 1 → 兩家零 → 0**，皆三家一致收；
