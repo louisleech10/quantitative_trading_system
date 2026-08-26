@@ -343,6 +343,62 @@ describe('GAP-3 Task 3.2 事件批刪除之二次確認', () => {
     expect(screen.getByTestId('event-batch-delete-confirm').textContent).not.toContain('刪除中');
   });
 
+  it('⑪ 🔴 R4 群集 J：A 刪除失敗在途 → 取消 → 開 B ⇒ A 的錯誤不得畫進 B 的確認框', async () => {
+    // `COMPOSER-R4-P3-01`／`GROK-R4-P3-01`（兩家**獨立**得出同一結論，各自實跑）：
+    // R2 之 settle 修法在 `catch` 也加了 `openBatchIdRef === importId` 閘，但**沒有任何官方
+    // 測試斷言那個閘**——拿掉後 confirm+warning 18 條仍全綠（與群集 H 同型的廉價綠燈）。
+    // 🔴 這正是主委在 R4 brief 必答 3 自問的「errorMessage 是不是下一個 deleteBusy」：答案是是。
+    // ⑥ 只驗**同批**失敗會顯示錯誤，涵蓋不到跨批的 settle 序列。
+    const BATCH_B: EventImportSummary = { ...BATCH, import_id: '20260826T000000Z-dddddddd', n_events: 2 };
+    let release: (() => void) | null = null;
+    const gate = new Promise<void>((r) => { release = () => r(); });
+    calls = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = (init?.method ?? 'GET').toUpperCase();
+        calls.push({ url, method });
+        if (method === 'DELETE') {
+          if (url.includes(BATCH.import_id)) {
+            await gate;
+            return new Response(null, { status: 404 });   // A 在途、且**失敗**
+          }
+          return new Response(null, { status: 204 });
+        }
+        if (url.includes('/case/events')) {
+          return new Response(JSON.stringify({ total: 2, imports: [BATCH, BATCH_B] }), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ total: 0 }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+
+    render(<DataPreparationPage />);
+    await screen.findByTestId(`event-batch-delete-open-${BATCH.import_id}`);
+
+    fireEvent.click(screen.getByTestId(`event-batch-delete-open-${BATCH.import_id}`));
+    await screen.findByTestId('event-batch-delete-dialog');
+    fireEvent.click(screen.getByTestId('event-batch-delete-confirm'));
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+
+    fireEvent.click(screen.getByTestId('event-batch-delete-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('event-batch-delete-dialog')).toBeNull());
+
+    fireEvent.click(screen.getByTestId(`event-batch-delete-open-${BATCH_B.import_id}`));
+    await screen.findByTestId('event-batch-delete-dialog');
+    expect(screen.queryByTestId('event-batch-delete-error')).toBeNull();
+
+    // A 這時才失敗回來——錯誤不得落在 B 身上
+    release!();
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    expect(screen.getByTestId('event-batch-delete-import-id').textContent).toBe(BATCH_B.import_id);
+    expect(screen.queryByTestId('event-batch-delete-error')).toBeNull();
+  });
+
   it('⑥ 刪除失敗 ⇒ 確認框留著並顯示錯誤，不假成功', async () => {
     installFetch(404);
     await renderWithBatch();

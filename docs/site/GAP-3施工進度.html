@@ -114,6 +114,24 @@ grok 於 R2 實跑後判<strong>安全</strong>、codex 判 <strong>P1</strong>�
 </li>
 </ul>
 <p>破壞測試 20 → <strong>22 條</strong>。</p>
+<p><strong>第四輪審查（8/26）：<code>RULING-2</code> 定案，另抓到同型的第二個</strong></p>
+<ul>
+<li><strong><code>RULING-2</code> ＝ ①（維持現狀，跟隨指向目錄的 root symlink），三家一致</strong>。
+🔴 codex <strong>自行撤回</strong>其 R3 之 P1，逐字理由＝「跟隨指向目錄的 root symlink 是<strong>既有 storage 語義</strong>；
+拒絕它會使 <code>import</code>／<code>list</code>／<code>delete</code> 三者語義不一致」——與主委 R3 之獨立分析一致。
+測試 docstring 已由 <code>PENDING-RULING</code> 改寫為<strong>已裁定行為</strong>（措辭採 codex 提供之版本），
+並補記裁定經過與「<strong>本裁定不放寬 batch ownership 邊界</strong>」之限定（溢出仍由 <code>R3I-M1</code> 鎖住）。</li>
+<li><strong>群集 H CLOSED</strong>：由原提出方 grok 重跑其 mutation probe 確認。</li>
+<li><strong>群集 J（新）：<code>setDeleteError</code> 之比對閘無回歸鎖</strong>。
+🔴 composer 與 grok <strong>兩家獨立</strong>得出同一結論且各自實跑：R2 之 settle 修法把<strong>成功側</strong>鎖住了、
+<strong>失敗側</strong>沒有——拿掉 <code>catch</code> 之比對閘後 confirm+warning <strong>18 條仍全綠</strong>。
+grok 之 probe 證明無閘時 <code>刪除失敗：HTTP 404</code> 會畫在 <strong>B 的</strong>確認框上。
+🔴 <strong>這正是主委在 R4 brief 必答 3 自問的「<code>errorMessage</code> 是不是下一個 <code>deleteBusy</code>」</strong>——
+答案是<strong>是</strong>，本 epic 第八次「修法自身之相鄰面」。
+補測試 ⑪ ＋ mutation <code>R4J-M1</code>；紅集合<strong>恰為 <code>{⑪}</code></strong>，與兩家預期逐字一致，
+且與 <code>R2G-M1</code>（成功側）<strong>不相交</strong> ⇒ 非重複守衛。</li>
+</ul>
+<p>破壞測試 22 → <strong>23 條</strong>。四輪 findings：<strong>5 → 2 → 2 → 1</strong>。</p>
 <p><strong>RULING-1 三家一致裁定</strong>：採「本瀏覽器曾成功分析過」為判準（選項 1），
 判準字面用 Codex 的逐字版；Codex 另附條件＝文案必須揭露「本機」範圍（已納入群集 C）。
 「改由伺服器端記錄」（選項 2）三家一致判為<strong>越出這批的範圍、要走修訂延伸檔</strong>，本批不採。</p>

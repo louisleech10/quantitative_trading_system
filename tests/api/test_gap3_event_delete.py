@@ -286,17 +286,19 @@ def test_gap3_event_delete_lone_broken_symlink_is_not_a_permanent_404(_isolated_
     assert _residue(svc.storage_dir, import_id) == []
 
 
-def test_gap3_event_delete_symlinked_storage_root_current_behavior(tmp_path, monkeypatch):
-    """🔴 **PENDING-RULING（`RULING-2`，R4 brief 具名請三家裁）**：`storage_dir` **本身**是 symlink 時之行為。
+def test_gap3_event_delete_symlinked_storage_root_ruled_behavior(tmp_path, monkeypatch):
+    """**已裁定行為（`RULING-2` ＝ ①，2026-08-26 三家一致）**：`storage_dir` **本身**是 symlink 時。
 
-    本條**不宣稱對錯**，只把現行行為釘死，讓它可見、不會靜默漂移：
-    跟隨 symlink 化的儲存根（POSIX 標準語意，`rm data_cache/events/x.json` 亦然），
-    刪除**只**作用於該批之檔，同目錄下無關檔完好。
+    當 `storage_dir` 本身是指向目錄的 symlink 時，服務**依配置跟隨該根**；
+    DELETE **只**刪該 `import_id` 的擁有路徑（exact ／ `<id>.` 前綴 ／ 同名目錄），
+    同目錄之無關檔、kline 快取、Feature Library 一律保留。
+    **這是已裁定行為，不是 PENDING-RULING。**
 
-    爭點（三家分歧）：codex 判 P1「違反刪除邊界」；grok 於前一輪實跑後判安全。
-    主委複驗之事實＝TODO 邊界字面「只刪該批；不連帶刪 kline 快取或 Feature Library」
-    **未被違反**（無關檔存活），故爭的是「跟隨 symlink 化的根算不算缺陷」這個判斷，不是事實。
-    🔴 若三家裁定要 fail-closed，改的是產品碼與本條之期望值，**不是刪掉本條**。
+    裁定經過：codex 於 R3 判 P1「違反刪除邊界」，grok 於 R2 實跑後判安全 ⇒ 判斷分歧、事實一致
+    （主委 probe 確認無關檔完好 ⇒ TODO 邊界字面未被違反）。R4 三家一致裁 ①，codex 撤回其 P1，
+    理由＝跟隨指向目錄的 root symlink 是**既有 storage 語義**（POSIX；`rm` 行為相同），
+    對它 fail-closed 會使 import／list／delete 三者語義不一致。
+    🔴 本裁定**不放寬** batch ownership 邊界——溢出到無關檔仍是錯的，由 `R3I-M1` 鎖住。
     """
     outside = tmp_path / "outside"
     outside.mkdir()
