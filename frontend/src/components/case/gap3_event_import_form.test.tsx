@@ -183,7 +183,10 @@ describe('GAP-3 /search 匯出頁面接線（B7 改形後）', () => {
     expect(src).toContain('export-attached-columns');                   // 附帶欄多選
     expect(src).toContain('attachedHorizons,');                         // 傳入匯出器
     expect(src).toContain('lookaheadBarsDeclared: lowerBoundState.depthByTimeframe');
-    expect(src).toContain('payload.missing_by_horizon');                // Task 4.3 缺欄提示
+    // Task 4.3 ＋ 5.3：**同一個**確認框之訊息組裝（5.3 擴寫後改由 `horizonCoverageLines` 產行）
+    // 🔴 行為本身由 `exportMissingColumnDialog`／`exportHorizonCoverageDialog` 之執行期測試守住；
+    //    此處只是頁面接線 smoke，錨點跟著實際呼叫走。
+    expect(src).toContain('horizonCoverageLines(payload)');
     expect(src).toContain('.source.json');                              // companion 來源檔
     expect(src).toContain('payload.source_file_text');
   });

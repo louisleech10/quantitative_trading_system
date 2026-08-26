@@ -1,0 +1,109 @@
+{
+  "_doc": "GAP-3 UX Task 5.0 — 事件型表格之指標詞彙單一真相源（SoT）。前端 tooltip 之文案由 `frontend/src/lib/eventMetricsGlossary.ts` **build-time import 本檔當場導出**（不是複製一份鏡像常數——`CODEX-R1-P1-01`：鏡像的 production bundle 根本不讀本檔，改了字畫面照樣顯示舊文案），另有 vitest 掃描確保前端原始碼不出現任何 definition 副本。本檔只放文案與公式指標，**不放任何數值**。頂層鍵即指標鍵（供 SPEC L2059 之 `set(g) >= {...}` 直接斷言）；以 `_` 起首者為後設欄、非指標——這是唯一的排除規則，不得改成逐一列舉的黑名單。鍵集為開放集：Task 7.5 之分組標籤與 not_computed 狀態文字須追加進來，故消費端一律以成員資格斷言，不得寫等值。🔴 definition 之內容正確性由 `tests/momentum/event_samples/test_metrics_glossary.py` 的算式綁定條目守住（R1 群集 A：首版三條定義都是讀算式**推論**出來的，全部寫錯）。",
+  "_version": 1,
+  "horizon": {
+    "term": "horizon（答案窗根數）",
+    "definition": "從**進場那根 K 線**往後推幾根 K 線；報酬表逐 horizon 各一列。進場根由 entry_price_semantic 決定：trigger_open 時就是事件錨定的那根，next_open 則是它的下一根——所以 horizon 的起點未必是事件本身那根。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::event_forward_return_table（exit_idx = entry_idx + h）"
+  },
+  "macro_mean": {
+    "term": "macro mean（symbol 等權平均）",
+    "definition": "先在每個 symbol 內，對**主要保留集**的事件以 uniqueness 權重平均（scenario C 的保留集是每個去重叢集只留最早那筆，其餘權重為 0、不進這個數字），再對 symbol 等權平均。所以它的筆數會少於 micro 那一欄，且某個 symbol 事件特別多也不會因此佔比較大。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::event_forward_return_table（per_symbol＝block(g, weighted=True)，權重取自 in_primary × uniqueness_weight）"
+  },
+  "micro_mean": {
+    "term": "micro mean（事件等權平均）",
+    "definition": "把全部事件放在一起等權平均；事件多的 symbol 在這個數字裡佔比自然較大。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::_weighted_stats（sensitivity_micro）"
+  },
+  "median": {
+    "term": "median（加權中位數）",
+    "definition": "依權重累積到一半時所對應的報酬值；不是把數列排序取正中間那筆。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::_weighted_stats"
+  },
+  "win_rate": {
+    "term": "win_rate（勝率）",
+    "definition": "報酬大於零的事件所佔的權重比例；等權時即為正報酬事件數除以事件數。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::_weighted_stats"
+  },
+  "n": {
+    "term": "n（事件筆數）",
+    "definition": "納入該 horizon 統計的事件筆數，未經任何加權。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::_weighted_stats"
+  },
+  "n_eff": {
+    "term": "n_eff（有效樣本數）",
+    "definition": "權重總和。本表的 micro 區是事件等權（權重全為 1），所以這一欄目前恆等於 n；把時間上重疊的事件降權後的有效樣本數另存於 uniqueness_weighted，還沒有顯示在這張表上。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::_weighted_stats（sensitivity_micro＝block(df, weighted=False) ⇒ n_effective == n）"
+  },
+  "auc": {
+    "term": "AUC（ROC 曲線下面積）",
+    "definition": "隨機各取一個正例與一個反例，模型分數把正例排在前面的機率；0.5 等於亂猜。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::binary_discrimination_table"
+  },
+  "pr_auc": {
+    "term": "PR-AUC（精確率—召回率曲線下面積）",
+    "definition": "average_precision_score；它的基準線等於這批資料的正例比率，所以不同批之間不可直接互比。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::binary_discrimination_table"
+  },
+  "n_test": {
+    "term": "n（test）",
+    "definition": "辨別表實際用到的事件筆數＝「決策時間落在切分點之後」∩「有分數」∩「有標記」**三者的交集**；任一項缺的事件不會進這個數字，所以它可能小於測試段的事件總數。purge 與 embargo 拿掉的是切分點之前的**訓練側**事件，不影響這個交集。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::binary_discrimination_table（idx = scores_oos.index ∩ labels.index ∩ test_ids）"
+  },
+  "auc_in_band": {
+    "term": "AUC 落置亂帶內",
+    "definition": "把標記隨機打亂多次會得到的 AUC 分布區間；觀測值落在區間內，代表這個結果與亂猜不可區分。",
+    "formula_ref": "momentum/Analysis/event_samples/baseline.py::permutation_oracle"
+  },
+  "n_total": {
+    "term": "n_total（全 K 線根數）",
+    "definition": "評估區間內的全部 K 線根數；它是這一列各項計數的總分母（n_total = n_eligible + n_unknown + tail_excluded），但**不是** prevalence_full 的分母。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars"
+  },
+  "n_eligible": {
+    "term": "n_eligible（可評估根數）",
+    "definition": "同時通過 warmup_ok、label_window_complete、grid_continuous、prices_finite_positive 四項檢查，因而可以評估的 K 線根數（判準字面與 manifest 的 eligibility 欄相同）。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::_is_eligible"
+  },
+  "n_labeled": {
+    "term": "n_labeled（有標記根數）",
+    "definition": "可評估、且決策點分數為有限值，因而真的算出標記的 K 線根數。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars"
+  },
+  "tail_excluded": {
+    "term": "tail_excluded（尾端不足而排除）",
+    "definition": "因為資料尾端剩下的 K 線不夠走完答案窗而被排除的根數；它不是資料有問題，是還沒到能揭曉答案的時候。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars"
+  },
+  "n_unknown": {
+    "term": "n_unknown（其他不可評估）",
+    "definition": "不是尾端不足、而是其他原因被排除的根數：warmup 不足（決策點落在資料開頭之前）、K 線缺根（相鄰開盤時間差不等於該週期）、或參考價不是正的有限數。整批含重複 K 線時會直接拒收整批，不會計進這裡。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::_is_eligible"
+  },
+  "prevalence_full": {
+    "term": "prevalence_full（全 K 線基率）",
+    "definition": "以**已標記根數**（n_labeled）為分母的正例比率——分母不是 n_total。相對於 case-control 抽樣的 prevalence_learn，它才是接近真實市場的發生率。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars（metrics 之 prev_full = yv.mean()，yv 取自已標記列）"
+  },
+  "prevalence_learn": {
+    "term": "prevalence_learn（學習樣本基率）",
+    "definition": "case-control 抽樣所得學習樣本裡的正例比率；它被抽樣設計刻意抬高，與 prevalence_full 不同是正常的，兩者必須並排看。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars（metrics）"
+  },
+  "lift_threshold": {
+    "term": "lift_threshold（門檻提升倍數）",
+    "definition": "通過門檻者的正例比率除以 prevalence_full；1.0 代表與整體基率沒有差別，也就是這個門檻沒有帶來資訊。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars（metrics）"
+  },
+  "precision": {
+    "term": "precision（精確率）",
+    "definition": "通過門檻者當中真的是正例的比率，即 TP 除以 TP 加 FP。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars（metrics）"
+  },
+  "signal_frequency": {
+    "term": "signal_frequency（訊號密度）",
+    "definition": "通過門檻的根數佔已標記根數的比率，代表這條規則多常發出訊號。",
+    "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars（metrics）"
+  }
+}

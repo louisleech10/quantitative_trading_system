@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { EventImportRejectedError, analyzeEventImport } from '@/lib/api';
 import { recordImportReference } from '@/lib/eventBatchReferences';
+import { metricTooltip } from '@/lib/eventMetricsGlossary';
 import type { EventAnalyzeResponse, EventTableStatus } from '@/lib/types';
 
 interface EventTablesPanelProps {
@@ -45,6 +46,20 @@ function fmt(v: unknown, digits = 4): string {
 
 type HorizonRow = { mean?: number; median?: number; win_rate?: number; n?: number; n_effective?: number; ci?: unknown };
 
+/**
+ * GAP-3 UX Task 5.2：表頭 ＋ tooltip（文案唯一來源＝Task 5.0 之 glossary，經 `metricTooltip`）。
+ *
+ * 🔴 只加 tooltip，**不改標籤字面、不改數值與版面**（Task 5.2 邊界）。
+ * `title` 屬性為原生 tooltip：不需額外元件、不改排版，且測試可直接讀 `title` 斷言（執行期，非原始碼形狀）。
+ */
+function MetricLabel({ metricKey, label }: { metricKey: string; label: string }) {
+  return (
+    <span title={metricTooltip(metricKey)} data-testid={`event-metric-${metricKey}`}>
+      {label}
+    </span>
+  );
+}
+
 function ForwardReturnTable({ table }: { table: EventTableStatus }) {
   const st = statusLabel(table);
   if (!st.ok) {
@@ -63,13 +78,13 @@ function ForwardReturnTable({ table }: { table: EventTableStatus }) {
     <table className="w-full text-xs" data-testid="event-fwd-table">
       <thead>
         <tr className="text-slate-400">
-          <th className="text-left">horizon</th>
-          <th className="text-right">macro mean</th>
-          <th className="text-right">micro mean</th>
-          <th className="text-right">median</th>
-          <th className="text-right">win_rate</th>
-          <th className="text-right">n</th>
-          <th className="text-right">n_eff</th>
+          <th className="text-left"><MetricLabel metricKey="horizon" label="horizon" /></th>
+          <th className="text-right"><MetricLabel metricKey="macro_mean" label="macro mean" /></th>
+          <th className="text-right"><MetricLabel metricKey="micro_mean" label="micro mean" /></th>
+          <th className="text-right"><MetricLabel metricKey="median" label="median" /></th>
+          <th className="text-right"><MetricLabel metricKey="win_rate" label="win_rate" /></th>
+          <th className="text-right"><MetricLabel metricKey="n" label="n" /></th>
+          <th className="text-right"><MetricLabel metricKey="n_eff" label="n_eff" /></th>
         </tr>
       </thead>
       <tbody>
@@ -101,13 +116,13 @@ function DiscriminationTable({ table }: { table: EventTableStatus }) {
   const o = (table.overall ?? {}) as Record<string, unknown>;
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-200" data-testid="event-disc-table">
-      <dt className="text-slate-400">AUC</dt>
+      <dt className="text-slate-400"><MetricLabel metricKey="auc" label="AUC" /></dt>
       <dd className="font-mono">{fmt(o.auc)}</dd>
-      <dt className="text-slate-400">PR-AUC</dt>
+      <dt className="text-slate-400"><MetricLabel metricKey="pr_auc" label="PR-AUC" /></dt>
       <dd className="font-mono">{fmt(o.pr_auc)}</dd>
-      <dt className="text-slate-400">n（test）</dt>
+      <dt className="text-slate-400"><MetricLabel metricKey="n_test" label="n（test）" /></dt>
       <dd className="font-mono">{fmt(o.n, 0)}</dd>
-      <dt className="text-slate-400">AUC 落置亂帶內</dt>
+      <dt className="text-slate-400"><MetricLabel metricKey="auc_in_band" label="AUC 落置亂帶內" /></dt>
       <dd className="font-mono">{String(o.auc_in_band ?? '—')}</dd>
     </dl>
   );
@@ -142,19 +157,23 @@ function AllBarsTable({ table }: { table: EventTableStatus | undefined }) {
         {manifest.eligibility ? <p className="text-slate-500">eligibility：{String(manifest.eligibility)}</p> : null}
       </div>
       <p className="text-[11px] text-slate-400">
-        n_total {fmt(counts.n_total, 0)}／eligible {fmt(counts.n_eligible, 0)}／labeled {fmt(counts.n_labeled, 0)}／tail_excluded {fmt(counts.n_tail_excluded, 0)}／unknown {fmt(counts.n_unknown, 0)}
+        <MetricLabel metricKey="n_total" label="n_total" /> {fmt(counts.n_total, 0)}／
+        <MetricLabel metricKey="n_eligible" label="eligible" /> {fmt(counts.n_eligible, 0)}／
+        <MetricLabel metricKey="n_labeled" label="labeled" /> {fmt(counts.n_labeled, 0)}／
+        <MetricLabel metricKey="tail_excluded" label="tail_excluded" /> {fmt(counts.n_tail_excluded, 0)}／
+        <MetricLabel metricKey="n_unknown" label="unknown" /> {fmt(counts.n_unknown, 0)}
       </p>
       {overallOk ? (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
-          <dt className="text-slate-400">prevalence_full</dt>
+          <dt className="text-slate-400"><MetricLabel metricKey="prevalence_full" label="prevalence_full" /></dt>
           <dd className="font-mono">{fmt(o.prevalence_full)}</dd>
-          <dt className="text-slate-400">prevalence_learn</dt>
+          <dt className="text-slate-400"><MetricLabel metricKey="prevalence_learn" label="prevalence_learn" /></dt>
           <dd className="font-mono">{fmt(o.prevalence_learn)}</dd>
-          <dt className="text-slate-400">lift_threshold</dt>
+          <dt className="text-slate-400"><MetricLabel metricKey="lift_threshold" label="lift_threshold" /></dt>
           <dd className="font-mono">{fmt(o.lift_threshold)}</dd>
-          <dt className="text-slate-400">precision</dt>
+          <dt className="text-slate-400"><MetricLabel metricKey="precision" label="precision" /></dt>
           <dd className="font-mono">{fmt(o.precision)}</dd>
-          <dt className="text-slate-400">signal_frequency</dt>
+          <dt className="text-slate-400"><MetricLabel metricKey="signal_frequency" label="signal_frequency" /></dt>
           <dd className="font-mono">{fmt(o.signal_frequency, 5)}</dd>
         </dl>
       ) : (

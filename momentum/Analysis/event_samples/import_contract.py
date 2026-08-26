@@ -319,6 +319,80 @@ def verify_source_digest(source_bytes: bytes, declared_digest: Any) -> bool:
     return _digest_matches(hashlib.sha256(source_bytes).hexdigest(), declared_digest)
 
 
+# ---------------------------------------------------------------------------
+# GAP-3 UX Task 5.1 — `.source.json` 誤傳之判別與正解提示
+# ---------------------------------------------------------------------------
+#: `/search` 匯出之來源對證檔（`*.source.json`）之形狀標記。
+#: 來源檔＝`canonical_source_bytes(cases)`＝`CaseData.model_dump(mode="json")` 之陣列
+#: ⇒ **每一列**都帶這五個鍵（`model_dump` 連 None 欄一起輸出）。
+#: 🔴 判準用**全部五個鍵、且逐列都要有**：只看三個鍵會把 legacy 事件檔一併命中，
+#:    那時提示會指向錯的正解（legacy 檔的正解是改 schema，不是改放 `source_file` 欄）。
+_SOURCE_FILE_MARKER_KEYS = frozenset({"symbol", "timeframe", "timestamp", "positive_case", "price_change"})
+
+#: 各標記鍵之**期望型別**（`CaseData.model_dump(mode="json")` 之實際形態）。
+#: 🔴 只看鍵在不在會讓「型別明顯不對」的畸形 JSON 也命中，使用者收到一個對他毫無用處的正解
+#:    （`CODEX-R3-P2-04` 之反例：`symbol` 是 dict、`price_change` 是 list、五鍵全 null 皆命中）。
+#:    型別取自 `api/models/responses.py::CaseData`：`symbol` 必填 str、`timestamp` 必填（序列化為 ISO 字串）、
+#:    `price_change` 必填 float；`timeframe`／`positive_case` 為 Optional。
+_SOURCE_FILE_MARKER_VALIDATORS = {
+    "symbol": lambda v: isinstance(v, str) and v != "",
+    "timeframe": lambda v: v is None or isinstance(v, str),
+    "timestamp": lambda v: isinstance(v, str) and v != "",
+    "positive_case": lambda v: v is None or isinstance(v, bool),
+    "price_change": _is_num,
+}
+
+#: 排除鍵：來源對證檔＝`/search` 結果列，結構上**沒有** `event_id`（那是匯入契約才有的身分欄）。
+#: 🔴 沒有這條排除，一個**合法新 schema 事件檔**只要殘留 `timestamp`／`positive_case`／
+#:    `price_change`（使用者從 /search 另存時很容易留著）就會被判成來源檔，
+#:    於是他收到「請改放到 source_file 欄」——而真正的正解是**移掉那幾個非契約欄**。
+#:    給錯正解比不給更糟。2026-08-27 主委自打攻擊面時實測命中，非委員抓。
+_SOURCE_FILE_EXCLUDE_KEY = "event_id"
+
+#: 追加在既有拒收訊息尾端之正解（SPEC Task 5.1「內容」之字面）。
+#: 🔴 只**追加**——`legacy_schema_detected` 之 reason 字面不變（下游依 reason 判斷）。
+SOURCE_FILE_MISUPLOAD_HINT = (
+    "此為來源對證檔，請改放在 `source_file` 欄並勾選 `verify_source_digest`"
+)
+
+
+def looks_like_canonical_source_file(content: Union[bytes, str]) -> bool:
+    """這份上傳內容是不是 `/search` 一併下載的來源對證檔（`*.source.json`）？
+
+    判準＝可解析為 JSON 陣列、非空、每一列皆為物件、**每一列**都含
+    `symbol`／`timeframe`／`timestamp`／`positive_case`／`price_change` 五鍵、
+    **每一鍵之值型別皆符合** `CaseData` 之序列化形態（`_SOURCE_FILE_MARKER_VALIDATORS`），
+    且**沒有任何一列**帶 `event_id`（見 `_SOURCE_FILE_EXCLUDE_KEY`）。
+
+    🔴 只判形狀與型別、**不做任何轉換**——判別為來源檔時仍照原路徑拒收，
+    只是把正解追加到訊息裡（自動改走 `source_file` 流程＝契約禁止之靜默轉換）。
+    """
+    raw = content.decode("utf-8-sig", errors="replace") if isinstance(content, (bytes, bytearray)) else str(content)
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(parsed, list) or not parsed:
+        return False
+    return all(_row_looks_like_canonical_source(row) for row in parsed)
+
+
+def _row_looks_like_canonical_source(row: Any) -> bool:
+    """單列是否為來源對證檔之列：五鍵齊、型別對、無 `event_id`。"""
+    if not isinstance(row, dict):
+        return False
+    if _SOURCE_FILE_EXCLUDE_KEY in row:
+        return False
+    if not _SOURCE_FILE_MARKER_KEYS <= set(row):
+        return False
+    return all(check(row[name]) for name, check in sorted(_SOURCE_FILE_MARKER_VALIDATORS.items()))
+
+
+def source_file_misupload_hint(content: Union[bytes, str]) -> Optional[str]:
+    """來源對證檔誤傳之正解提示；不是來源檔 ⇒ `None`（呼叫端不追加任何字）。"""
+    return SOURCE_FILE_MISUPLOAD_HINT if looks_like_canonical_source_file(content) else None
+
+
 #: Task 1.8 之異質維度（列間須單值，除非 `batch_defaults` 已涵蓋）。
 _HETEROGENEITY_DIMENSIONS = ("direction", "scenario", "label_definition")
 #: Task 1.8：訊息列出之衝突列號上限（SPEC「列出前 3 個衝突列號與欄名」）。

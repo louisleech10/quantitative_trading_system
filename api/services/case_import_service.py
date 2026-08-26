@@ -645,6 +645,13 @@ class EventImportService:
     def looks_new_schema(self, columns: List[str]) -> bool:
         return {"event_id", "t0", "label"} <= self._canon_cols(columns)
 
+    def source_file_misupload_hint(self, content: object) -> Optional[str]:
+        """GAP-3 UX Task 5.1：上傳內容為 `*.source.json` ⇒ 正解提示；否則 None。
+
+        判別與字面之唯一實作在 momentum（經 pipeline 出口；R3）——本層只透傳，不自寫判準。
+        """
+        return self._pipeline.source_file_misupload_hint(content)
+
     def migration_hint(self, columns: List[str]) -> Dict[str, object]:
         cols = {str(c).strip() for c in columns}
         return {

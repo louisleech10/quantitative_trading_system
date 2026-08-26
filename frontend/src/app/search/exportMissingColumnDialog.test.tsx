@@ -88,10 +88,28 @@ describe('Task 4.3 — 缺欄確認框逐 horizon 列出', () => {
     await waitFor(() => expect(confirmMock).toHaveBeenCalled());
 
     const msg = String(confirmMock.mock.calls[0][0]);
-    expect(msg).toContain('future_3bar_return：1/2');
-    expect(msg).toContain('future_7bar_return：2/2');
-    // 不缺的那個不該被列出來（否則「全部列出來」也會讓上面兩條綠）
-    expect(msg).not.toContain('future_1bar_return');
+    // 🔴 逐 horizon 之缺筆數**各自不同**（1 vs 2）——一句總計或共用同一個數字都會讓本條紅
+    expect(msg).toContain('future_3bar_return：1/2 筆可算、1 筆');
+    expect(msg).toContain('future_7bar_return：0/2 筆可算、2 筆');
+  });
+
+  /**
+   * 🔴 **本條原為「不缺的欄不列出來」**（4.3 時的恆跳／恆列鑑別力保護）。
+   * Task 5.3 之 SPEC L2092–2105 明令「現行只在缺…時跳，**改為**匯出前主動顯示」
+   * ⇒ 不缺的欄**現在必須也列出來**，原斷言與 5.3 直接相斥、只能擇一。
+   * 鑑別力改由「不缺者之數字必須是 M/M、0 筆」承接：實作若把每行寫死成同一段文字，本條紅。
+   */
+  it('①b 不缺的附帶欄也會被列出，且數字為全數可算（5.3 擴寫後之鑑別力）', async () => {
+    render(<SearchPage />);
+    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    selectOnly([1, 3, 7]);
+
+    fireEvent.click(screen.getByTestId('export-gap3-events'));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+
+    const msg = String(confirmMock.mock.calls[0][0]);
+    expect(msg).toContain('future_1bar_return：2/2 筆可算、0 筆');
+    expect(msg).not.toContain('future_2bar_return');   // 沒勾的欄仍不列
   });
 
   it('② 訊息**不得**含「主答案窗」字樣（該概念已隨 4.1 移除）', async () => {
@@ -131,10 +149,15 @@ describe('Task 4.3 — 缺欄確認框逐 horizon 列出', () => {
     expect(blobs.length).toBe(0);
   });
 
-  it('⑤ 沒有任何缺欄 ⇒ 不跳確認框（防「恆跳」而失去鑑別力）', async () => {
+  /**
+   * 🔴 **本條原為「沒有任何缺欄 ⇒ 不跳確認框」**。Task 5.3 把顯示時機改成**主動**
+   * （匯出前一律告訴使用者每個附帶欄各有幾筆可算）⇒ 「不缺就不跳」與 5.3 直接相斥。
+   * 「防恆跳」之鑑別力改綁**唯一還說得通的空集合**：一個附帶欄都沒勾，就沒有東西可講。
+   */
+  it('⑤ 一個附帶欄都沒勾 ⇒ 不跳確認框（防「恆跳」而失去鑑別力）', async () => {
     render(<SearchPage />);
     await waitFor(() => expect(depthMock).toHaveBeenCalled());
-    selectOnly([1, 2]);                       // 這兩欄兩列都有
+    selectOnly([]);
 
     fireEvent.click(screen.getByTestId('export-gap3-events'));
     await waitFor(() => expect(blobs.length).toBeGreaterThan(0));

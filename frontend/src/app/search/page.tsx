@@ -25,6 +25,7 @@ import {
   ATTACHED_HORIZONS,
   EVENT_EXPORT_CONTROL_KIND,
   EVENT_EXPORT_SCENARIO,
+  horizonCoverageLines,
 } from '@/lib/eventExport';
 import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
 import { computeExportCounts } from '@/lib/exportCounts';
@@ -651,16 +652,16 @@ export default function SearchPage() {
       sourceFileDigest: currentResult.source_file_digest ?? '',
       filters: buildExportFilterSpec(exportFilters),
     });
-    // GAP-3 UX Task 4.3：缺欄確認框**逐附帶 horizon** 列出缺幾筆。
+    // GAP-3 UX Task 4.3 ＋ 5.3：**同一個**確認框（5.3 是 4.3 的擴寫，不另建第二個）。
+    // 4.3＝逐附帶 horizon 列出筆數；5.3＝改為**主動顯示**每個附帶欄各有幾筆可算、幾筆缺，
+    // 使用者不必自己去湊時間點才知道（SPEC L2092–2105：「現行只在缺…時跳，**改為**主動顯示」）。
     // 🔴 匯出端已無「答案窗缺欄」這件事（`label_value` 不在匯出檔內）⇒ 只剩附帶欄一類；
     //    訊息**不得**出現「主答案窗」字樣。缺欄**不阻擋匯出**（使用者仍可按確定）。
-    const missingRows = Object.entries(payload.missing_by_horizon);
-    if (missingRows.length > 0) {
-      const lines = missingRows
-        .map(([h, n]) => `　future_${h}bar_return：${n}/${payload.n_records} 筆缺`)
-        .join('\n');
+    const coverageLines = horizonCoverageLines(payload);
+    if (coverageLines.length > 0) {
       const proceed = window.confirm(
-        `以下附帶報酬欄有缺值，缺的那幾筆就不會帶該欄（其他欄不受影響）：\n${lines}\n\n`
+        `每個附帶報酬欄各有幾筆算得出來（不必自己去湊案例時間點）：\n${coverageLines.join('\n')}\n\n`
+        + '算不出來的那幾筆就不會帶該欄，其他欄與其他列都不受影響。'
         + '附帶欄只是給你在 Excel 裡看的，不影響匯入、也不決定任何分析用的答案窗。仍要匯出嗎？',
       );
       if (!proceed) return;

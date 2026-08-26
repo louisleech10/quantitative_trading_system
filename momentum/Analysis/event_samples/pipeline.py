@@ -101,6 +101,17 @@ class EventSamplePipeline:
         _impl(records, contract=contract)
 
     @staticmethod
+    def source_file_misupload_hint(content) -> Optional[str]:
+        """GAP-3 UX Task 5.1：上傳內容若為 `*.source.json`，回正解提示字串；否則 `None`。
+
+        R3：api 層不得直 import momentum 內部 ⇒ 判別與字面皆經本出口取得同一實作
+        （JSON／CSV 兩條上傳路徑共用，不得為其中一條另寫一份）。
+        """
+        from momentum.Analysis.event_samples.import_contract import source_file_misupload_hint as _impl
+
+        return _impl(content)
+
+    @staticmethod
     def canonical_source_payload(cases) -> Tuple[str, str]:
         """GAP-3 UX Task 1.3：`/search` 結果列 → (`source_file_text`, `source_file_digest`)。
 

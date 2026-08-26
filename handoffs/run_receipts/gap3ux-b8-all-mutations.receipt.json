@@ -1,0 +1,305 @@
+{
+  "epic": "gap3ux-b8",
+  "mode": "verify",
+  "n_mutations": 19,
+  "results": [
+    {
+      "id": "5.0-M1",
+      "task": "5.0",
+      "desc": "glossary 移除 lift_threshold 鍵",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_covers_spec_keys",
+        "test_gap3_metrics_glossary_loader_covers_spec_keys"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_metrics_glossary_covers_spec_keys",
+        "test_gap3_metrics_glossary_loader_covers_spec_keys"
+      ]
+    },
+    {
+      "id": "5.0-M2",
+      "task": "5.0",
+      "desc": "loader 對缺 definition 改 fail-open",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_loader_fail_closed_on_missing_definition"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_metrics_glossary_loader_fail_closed_on_missing_definition"
+      ]
+    },
+    {
+      "id": "5.1-M1",
+      "task": "5.1",
+      "desc": "拒收訊息不再追加正解",
+      "rc": 1,
+      "red": [
+        "test_gap3_source_json_hint_on_csv_endpoint",
+        "test_gap3_source_json_hint_on_event_upload_endpoint",
+        "test_gap3_source_json_hint_two_endpoints_share_one_literal"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_source_json_hint_on_csv_endpoint",
+        "test_gap3_source_json_hint_on_event_upload_endpoint",
+        "test_gap3_source_json_hint_two_endpoints_share_one_literal"
+      ]
+    },
+    {
+      "id": "5.1-M2",
+      "task": "5.1",
+      "desc": "判別放寬成三鍵（legacy 檔也命中）",
+      "rc": 1,
+      "red": [
+        "test_gap3_source_json_hint_detector_shape_only",
+        "test_gap3_source_json_hint_not_shown_for_legacy_json_file"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_source_json_hint_detector_shape_only",
+        "test_gap3_source_json_hint_not_shown_for_legacy_json_file"
+      ]
+    },
+    {
+      "id": "5.1-M3",
+      "task": "5.1",
+      "desc": "拿掉 event_id 排除（新 schema 檔會收到錯的正解）",
+      "rc": 1,
+      "red": [
+        "test_gap3_source_json_hint_not_shown_for_new_schema_with_leftover_columns"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_source_json_hint_not_shown_for_new_schema_with_leftover_columns"
+      ]
+    },
+    {
+      "id": "5.0-M3",
+      "task": "5.0",
+      "desc": "micro 區改成加權（n_eff definition 之宣稱失效）",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_macro_uses_primary_retained_set",
+        "test_gap3_metrics_glossary_n_eff_claim_binds_to_equal_weight_micro"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_metrics_glossary_macro_uses_primary_retained_set",
+        "test_gap3_metrics_glossary_n_eff_claim_binds_to_equal_weight_micro"
+      ]
+    },
+    {
+      "id": "5.0-M4",
+      "task": "5.0",
+      "desc": "拿掉重複 K 線之整批拒收（n_unknown definition 之宣稱失效）",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_duplicate_bars_reject_batch_not_counted_in_unknown"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_metrics_glossary_duplicate_bars_reject_batch_not_counted_in_unknown"
+      ]
+    },
+    {
+      "id": "5.0-M5",
+      "task": "5.0",
+      "desc": "purge 先判、兩側都吃（n_test definition 之宣稱失效）",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_n_test_is_three_way_intersection",
+        "test_gap3_metrics_glossary_purge_removes_train_side_only"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_metrics_glossary_n_test_is_three_way_intersection",
+        "test_gap3_metrics_glossary_purge_removes_train_side_only"
+      ]
+    },
+    {
+      "id": "5.0-M6",
+      "task": "5.0",
+      "desc": "horizon 窗末改由 t0 起算",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_horizon_counts_from_entry_bar"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_metrics_glossary_horizon_counts_from_entry_bar"
+      ]
+    },
+    {
+      "id": "5.0-M7",
+      "task": "5.0",
+      "desc": "macro 之 per-symbol 改不加權（保留集失效）",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_macro_uses_primary_retained_set"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_metrics_glossary_macro_uses_primary_retained_set"
+      ]
+    },
+    {
+      "id": "5.0-M8",
+      "task": "5.0",
+      "desc": "n_test 不取三者交集",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_n_test_is_three_way_intersection"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_metrics_glossary_n_test_is_three_way_intersection"
+      ]
+    },
+    {
+      "id": "5.1-M4",
+      "task": "5.1",
+      "desc": "拿掉標記鍵之型別驗證（畸形 payload 又命中）",
+      "rc": 1,
+      "red": [
+        "test_gap3_source_json_hint_rejects_wrong_marker_types"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_source_json_hint_rejects_wrong_marker_types"
+      ]
+    },
+    {
+      "id": "5.2-M1",
+      "task": "5.2",
+      "desc": "表頭掛錯 glossary 鍵（接線斷）",
+      "rc": 1,
+      "red": [
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ① 逐表頭之 tooltip 文字逐字等於 glossary 之 definition",
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ② 三張表之表頭都掛上了 tooltip（漏掛一個表頭＝本條紅）",
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ⑤ 標籤字面未被改動（Task 5.2 邊界：只加 tooltip，不改版面）",
+        "Task 5.2 邊界② — glossary 缺鍵之 fail-closed 佔位 > ② 同一畫面上沒被抽掉的表頭仍是正常定義（證明佔位不是恆顯示）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ① 逐表頭之 tooltip 文字逐字等於 glossary 之 definition",
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ② 三張表之表頭都掛上了 tooltip（漏掛一個表頭＝本條紅）",
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ⑤ 標籤字面未被改動（Task 5.2 邊界：只加 tooltip，不改版面）",
+        "Task 5.2 邊界② — glossary 缺鍵之 fail-closed 佔位 > ② 同一畫面上沒被抽掉的表頭仍是正常定義（證明佔位不是恆顯示）"
+      ]
+    },
+    {
+      "id": "5.2-M2",
+      "task": "5.2",
+      "desc": "缺鍵改回空字串（fail-open）",
+      "rc": 1,
+      "red": [
+        "Task 5.2 邊界② — glossary 缺鍵之 fail-closed 佔位 > ① 缺鍵之表頭顯示佔位（含鍵名），**不是**空字串"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 5.2 邊界② — glossary 缺鍵之 fail-closed 佔位 > ① 缺鍵之表頭顯示佔位（含鍵名），**不是**空字串"
+      ]
+    },
+    {
+      "id": "5.2-M3",
+      "task": "5.2",
+      "desc": "前端複製一份 definition（第二份副本）",
+      "rc": 1,
+      "red": [
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ③ 前端原始碼不得出現任何 definition 副本（唯一來源＝glossary JSON）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ③ 前端原始碼不得出現任何 definition 副本（唯一來源＝glossary JSON）"
+      ]
+    },
+    {
+      "id": "5.2-M4",
+      "task": "5.2",
+      "desc": "tooltip 根本沒掛上去（title 為 null）",
+      "rc": 1,
+      "red": [
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ① 逐表頭之 tooltip 文字逐字等於 glossary 之 definition",
+        "Task 5.2 邊界② — glossary 缺鍵之 fail-closed 佔位 > ① 缺鍵之表頭顯示佔位（含鍵名），**不是**空字串",
+        "Task 5.2 邊界② — glossary 缺鍵之 fail-closed 佔位 > ② 同一畫面上沒被抽掉的表頭仍是正常定義（證明佔位不是恆顯示）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ① 逐表頭之 tooltip 文字逐字等於 glossary 之 definition",
+        "Task 5.2 邊界② — glossary 缺鍵之 fail-closed 佔位 > ① 缺鍵之表頭顯示佔位（含鍵名），**不是**空字串",
+        "Task 5.2 邊界② — glossary 缺鍵之 fail-closed 佔位 > ② 同一畫面上沒被抽掉的表頭仍是正常定義（證明佔位不是恆顯示）"
+      ]
+    },
+    {
+      "id": "5.2-M5",
+      "task": "5.2",
+      "desc": "n_eff 欄改讀 uniqueness_weighted（definition 之欄位綁定失效）",
+      "rc": 1,
+      "red": [
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ⑥ n_eff 欄顯示的是等權之 micro 值，不是降權後的 uniqueness_weighted"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 5.2 — 事件型表格表頭 tooltip 取自 glossary > ⑥ n_eff 欄顯示的是等權之 micro 值，不是降權後的 uniqueness_weighted"
+      ]
+    },
+    {
+      "id": "5.3-M1",
+      "task": "5.3",
+      "desc": "覆蓋率訊息塌成一句總計",
+      "rc": 1,
+      "red": [
+        "Task 4.3 — 缺欄確認框逐 horizon 列出 > ① 訊息含**每一個**缺欄附帶 horizon 之筆數數字（逐 horizon，非一句總計）",
+        "Task 4.3 — 缺欄確認框逐 horizon 列出 > ①b 不缺的附帶欄也會被列出，且數字為全數可算（5.3 擴寫後之鑑別力）",
+        "Task 5.3 — 匯出前主動顯示每個附帶 horizon 之可算／缺筆數 > ① 尾端 3 筆不足 ⇒ 訊息逐字含「2/5 筆可算、3 筆因資料尾端不足而缺」（數字精確比對）",
+        "Task 5.3 — 匯出前主動顯示每個附帶 horizon 之可算／缺筆數 > ③ 主動顯示：**全部欄都算得出來**時仍然顯示，且逐行為 5/5、0 筆缺"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.3 — 缺欄確認框逐 horizon 列出 > ① 訊息含**每一個**缺欄附帶 horizon 之筆數數字（逐 horizon，非一句總計）",
+        "Task 4.3 — 缺欄確認框逐 horizon 列出 > ①b 不缺的附帶欄也會被列出，且數字為全數可算（5.3 擴寫後之鑑別力）",
+        "Task 5.3 — 匯出前主動顯示每個附帶 horizon 之可算／缺筆數 > ① 尾端 3 筆不足 ⇒ 訊息逐字含「2/5 筆可算、3 筆因資料尾端不足而缺」（數字精確比對）",
+        "Task 5.3 — 匯出前主動顯示每個附帶 horizon 之可算／缺筆數 > ③ 主動顯示：**全部欄都算得出來**時仍然顯示，且逐行為 5/5、0 筆缺"
+      ]
+    },
+    {
+      "id": "5.3-M2",
+      "task": "5.3",
+      "desc": "只列有缺的欄（回到 5.3 之前）",
+      "rc": 1,
+      "red": [
+        "Task 4.3 — 缺欄確認框逐 horizon 列出 > ①b 不缺的附帶欄也會被列出，且數字為全數可算（5.3 擴寫後之鑑別力）",
+        "Task 5.3 — 匯出前主動顯示每個附帶 horizon 之可算／缺筆數 > ① 尾端 3 筆不足 ⇒ 訊息逐字含「2/5 筆可算、3 筆因資料尾端不足而缺」（數字精確比對）",
+        "Task 5.3 — 匯出前主動顯示每個附帶 horizon 之可算／缺筆數 > ③ 主動顯示：**全部欄都算得出來**時仍然顯示，且逐行為 5/5、0 筆缺"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.3 — 缺欄確認框逐 horizon 列出 > ①b 不缺的附帶欄也會被列出，且數字為全數可算（5.3 擴寫後之鑑別力）",
+        "Task 5.3 — 匯出前主動顯示每個附帶 horizon 之可算／缺筆數 > ① 尾端 3 筆不足 ⇒ 訊息逐字含「2/5 筆可算、3 筆因資料尾端不足而缺」（數字精確比對）",
+        "Task 5.3 — 匯出前主動顯示每個附帶 horizon 之可算／缺筆數 > ③ 主動顯示：**全部欄都算得出來**時仍然顯示，且逐行為 5/5、0 筆缺"
+      ]
+    }
+  ],
+  "baseline_after_restore": {
+    "glossary": {
+      "rc": 0,
+      "red": []
+    },
+    "hint": {
+      "rc": 0,
+      "red": []
+    },
+    "tooltip": {
+      "rc": 0,
+      "red": []
+    },
+    "dialog": {
+      "rc": 0,
+      "red": []
+    }
+  },
+  "closure": "CLOSED"
+}

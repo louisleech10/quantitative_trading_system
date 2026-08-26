@@ -126,6 +126,50 @@ export function windowHorizonBarsFor(
   return Math.max(1, declared);
 }
 
+/** Task 5.3：單一附帶 horizon 之覆蓋率（可算／缺／分母）。 */
+export interface HorizonCoverage {
+  horizon: number;
+  /** 該欄真的有有限數值、算得出來的筆數 */
+  computable: number;
+  /** 分母＝實際進到匯出檔的列數（`n_records`；被 skip 的列不在其中） */
+  total: number;
+  /** 算不出來的筆數＝`total - computable` */
+  missing: number;
+}
+
+/**
+ * GAP-3 UX Task 5.3：**逐一**列出每個附帶 horizon 的可算與缺筆數。
+ *
+ * 🔴 與 Task 4.3 之差別：4.3 只列「有缺的那幾個」，本函式列**全部附帶 horizon**——
+ * SPEC Task 5.3 之「現行確認框只在缺…時跳，**改為**匯出前主動顯示」即針對這一點：
+ * 使用者不必自己去湊時間點，才知道某個 h 到底算不算得出來。
+ *
+ * 抽成純函式而不寫在 page 的事件處理器裡，是因為錨在處理器裡的決策無法被獨立測到
+ * （本 epic §4.2 第 6 條之教訓：錨點落在無測試涵蓋處 ⇒ mutation 錄到空紅集合）。
+ */
+export function horizonCoverage(payload: {
+  attached_horizons: readonly number[];
+  missing_by_horizon: Record<number, number>;
+  n_records: number;
+}): HorizonCoverage[] {
+  const total = payload.n_records;
+  return [...payload.attached_horizons].sort((a, b) => a - b).map((horizon) => {
+    const missing = payload.missing_by_horizon[horizon] ?? 0;
+    return { horizon, computable: total - missing, total, missing };
+  });
+}
+
+/** Task 5.3：覆蓋率 → 確認框逐行文字（一個附帶 horizon 一行）。 */
+export function horizonCoverageLines(payload: {
+  attached_horizons: readonly number[];
+  missing_by_horizon: Record<number, number>;
+  n_records: number;
+}): string[] {
+  return horizonCoverage(payload).map(
+    (c) => `　future_${c.horizon}bar_return：${c.computable}/${c.total} 筆可算、${c.missing} 筆因資料尾端不足而缺`,
+  );
+}
+
 export async function buildEventContractRecords(cases: CaseData[], opts: EventExportOptions) {
   const attached = [...(opts.attachedHorizons ?? ATTACHED_HORIZONS)];
   const declaredMap = opts.lookaheadBarsDeclared;

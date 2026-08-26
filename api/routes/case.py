@@ -131,8 +131,20 @@ def _csv_header(content: bytes, filename: str) -> Optional[list]:
     return [c.strip().strip('"') for c in first.split(",")]
 
 
-def _rejected(exc: EventImportRejectedError) -> HTTPException:
-    return HTTPException(status_code=422 if exc.payload.kind == "contract_violation" else 400, detail=exc.payload.model_dump())
+def _rejected(exc: EventImportRejectedError, *, svc=None, content=None) -> HTTPException:
+    """拒收 → HTTPException（**三條上傳路徑之唯一訊息組裝點**）。
+
+    GAP-3 UX Task 5.1：帶了 `svc`＋`content` 時，若該內容其實是 `/search` 一併下載的
+    來源對證檔（`*.source.json`），在訊息**尾端追加**正解。
+    🔴 只追加訊息：`kind`（reason 字面）與狀態碼**都不變**——下游依 reason 判斷，
+      且判別為來源檔**不得**自動改走 `source_file` 流程（靜默轉換＝契約禁止）。
+    🔴 判準與提示字面皆非本層自寫，經 service → pipeline 出口取 momentum 之唯一實作（R3）。
+    """
+    detail = exc.payload.model_dump()
+    hint = svc.source_file_misupload_hint(content) if (svc is not None and content is not None) else None
+    if hint:
+        detail["message"] = f"{detail['message']}；{hint}"
+    return HTTPException(status_code=422 if exc.payload.kind == "contract_violation" else 400, detail=detail)
 
 
 def _assert_source_file_usable(verify: bool, src_bytes: Optional[bytes], content: bytes) -> None:
@@ -194,7 +206,7 @@ async def import_events_file(
                                   lookahead_declaration=_form_json_dict("lookahead_declaration", lookahead_declaration) or None,
                                   data_columns=svc.file_columns(content, file.filename or "") or None)
     except EventImportRejectedError as exc:
-        raise _rejected(exc)
+        raise _rejected(exc, svc=svc, content=content)
 
 
 @router.post("/case/import-events/json", response_model=EventImportResponse)
@@ -219,7 +231,7 @@ async def import_events_json(request: EventImportJsonRequest):
                                   batch_defaults=request.batch_defaults,
                                   on_missing_declaration=svc.ON_MISSING_BLOCK)
     except EventImportRejectedError as exc:
-        raise _rejected(exc)
+        raise _rejected(exc, svc=svc, content=body)
 
 
 def _form_json_dict(name: str, raw: Optional[str]) -> dict:
@@ -296,7 +308,7 @@ async def import_events_csv(
                                   column_mapping=mapping, mapping_confirmed_at=mapping_confirmed_at,
                                   derive_event_id=derive_event_id)
     except EventImportRejectedError as exc:
-        raise _rejected(exc)
+        raise _rejected(exc, svc=svc, content=content)
 
 
 @router.post("/case/import-events/lookahead-declaration")
@@ -321,7 +333,7 @@ async def lookahead_declaration_preview(
             records = svc.parse_upload(content, file.filename or "")
         return svc.lookahead_declaration_preview(content, file.filename or "", records, defaults)
     except EventImportRejectedError as exc:
-        raise _rejected(exc)
+        raise _rejected(exc, svc=svc, content=content)
 
 
 @router.post("/case/lookahead-depth", response_model=LookaheadDepthResponse)
