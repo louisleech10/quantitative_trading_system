@@ -2,7 +2,7 @@
 
 **這張表回答：各批做到哪、憑什麼說做完、審查抓到什麼。** 規格與清單都凍結了（`docs/GAP3_EVENT_SPEC.md`／`docs/GAP3_EVENT_TODO.md`），施工照單做；改不動的凍結文件有修訂時走延伸檔 `docs/GAP3_EVENT_TODO.D-001.md`（不就地改）。
 
-## 🔧 第六批實作完成、審查中（8/26）
+## ✅ 第六批已收斂（8/26，六輪審查 5 → 2 → 2 → 1 → 兩家零 → 0，三家一致可收）
 
 **第六批＝刪除**，三個 Task。一句話：**讓你刪掉一批匯錯的事件，而且不留半個孤兒檔**。
 
@@ -135,6 +135,31 @@ R2 兩條由原提出方 codex 重跑確認閉合。本輪兩件新事：
   且與 `R2G-M1`（成功側）**不相交** ⇒ 非重複守衛。
 
 破壞測試 22 → **23 條**。四輪 findings：**5 → 2 → 2 → 1**。
+
+**第五輪（8/26）：quorum 不足，非產品問題**
+
+composer 因執行端基礎設施失敗無產出（runlog 逐字＝`Connection lost` 重試 3 次 →
+`RetriableError: [resource_exhausted]` → `rc=1`）；同輪 codex 與 grok 用**同一條**
+`committee_run.sh` 呼叫皆正常完成 ⇒ 非編排端調用問題。兩家皆**零 finding**。
+🔴 造成死結：`debt_clear` 正確 fail-closed（`roster 集合不相等`），而清債被擋又使
+`gate.sh` 發不出 token。**主委未改治理碼**（使用者明令不碰），改走 `gate.sh:556`
+錯誤訊息本身指出之第二條路——工具設計內之逃生口
+`--abandon --kind collection-failed`（枚舉本就有這一種），理由欄逐字引 runlog，
+銷帳後重派 **R6 三家全員**。
+
+**第六輪（8/26）：三家一致零 finding、可收 B6**
+
+群集 J 由**原提出方 composer 首次完整審**並重跑 R4 probe：baseline 19 passed →
+ungated `catch` ⇒ 1 failed／18 passed（唯一紅＝⑪）→ 還原 19 passed；
+`R4J-M1` 之 receipt／expected／ungated 實跑**三者恰為 `{⑪}`**。codex 與 grok 獨立複驗同結論。
+三家亦實跑排除第三個同型塌平（codex 另做反向驗證：把 `finally` 之 `Set.delete` 加上
+錯誤的 open-dialog 閘後 probe 轉紅 ⇒ 現行寫法不是恰好碰對）。
+
+🔴 **主委第四次「宣稱大於實作」，由 composer 當場糾正**：R5／R6 brief 之 assumed 寫
+「`R4J-M1`／`R2G-M1`／`R3H-M1` 三者兩兩不相交」，實際 `R2G∩R3H={⑩}`
+（兩者都會使 ⑩ 之「A 在途」前置失效，**設計上就該相交**）。
+正確說法＝「`R4J` 與另兩者不相交」。只出現在 brief、未進產品碼或 `_why`
+（`_R4J-M1_why` 原文只宣稱與 `R2G-M1` 不相交，該句正確），仍具名記錄。
 
 **RULING-1 三家一致裁定**：採「本瀏覽器曾成功分析過」為判準（選項 1），
 判準字面用 Codex 的逐字版；Codex 另附條件＝文案必須揭露「本機」範圍（已納入群集 C）。

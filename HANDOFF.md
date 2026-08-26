@@ -19,16 +19,18 @@ GAP-3 事件型 UAT 缺口修補：SPEC 🔒 FROZEN（`4ce3d6d9`）、TODO 🔒 
 第五批 **6 → 3 → 1 → 0**，皆三家一致收；收斂檔在 `handoffs/reconcile/2026082{5,6}-gap3ux-b{3,4,5}-review-r*/synth.md`
 （兩道機檢皆 rc=0）。第五批另解除三條必辦殘留（`D-002 A-004`／`R-B3-1`／`R-B3-2`），各有 mutation 守住。
 
-Task 3.1／3.2／3.3（事件批次刪除）之實作與驗收在最新一個 `feat(gap3ux)` commit，**code review 尚未派出**。
-刪除範圍以 `batch_paths()` 枚舉而非寫死檔名（同步擴張成為結構保證）；path traversal 防護抽成
-`payload_path()` 之唯一實作，落檔端與讀取／刪除端共用。R1 brief＝`handoffs/20260826-gap3ux-b6-review-r1-brief.md`。
+Task 3.1／3.2／3.3（事件批次刪除）之六輪 code review findings **5 → 2 → 2 → 1 → 兩家零 → 0**，
+三家一致可收。收斂檔在 `handoffs/reconcile/20260826-gap3ux-b6-review-r{1,2,3,4,5,6}/synth.md`
+（兩道機檢皆 rc=0）。R5 因 composer 執行端 `resource_exhausted` 無產出而 quorum 不足，
+依工具設計內逃生口 `--abandon --kind collection-failed` 銷帳後重派 R6 三家全員收尾——
+**未改治理碼**。
 
-🔴 **`RULING-1` 待三家裁**：Task 3.3 之「已被引用」在現況下**無伺服器端資料來源**
-（`event_import_id` 不存在於 `api/`／`momentum/`；`analyze()` 不落檔；`ic_survivors_*` 以 case_id 為鍵）。
-主委落地之臨時案標 PENDING-RULING，並把資料來源與確認框切開（元件只吃 `isReferenced` prop）
-⇒ 改裁只需換 provider。四個候選與取捨已寫在 R1 brief。
+兩件交裁的事皆已三家一致定案：`RULING-1` ＝ 選項 1（本瀏覽器曾成功分析過，
+判準字面採 codex 逐字版，附「文案須揭露本機範圍」之條件）；
+`RULING-2` ＝ ①（跟隨指向目錄的 root symlink＝既有 storage 語義；codex 撤回其 P1），
+**該裁定不放寬 batch ownership 邊界**，溢出仍由 `R3I-M1` 鎖住。
 
-**下一批＝B7（Phase 4 匯出端報酬欄與揭露）**，須待 B6 收斂後才開。
+**下一批＝B7（Phase 4 匯出端報酬欄與揭露）**。
 🔴 **B7 開工前必讀的兩件事**：① Task 4.1 要移除匯出面板之「主答案窗」單選，而第五批的下界守衛
 整套綁在它上面 ⇒ 守衛之存廢須在 brief 具名請三家重新裁定（不得默默刪，也不得留死碼）。
 ② Task 4.2 會讓 G-2 golden **合法**改變（D-4 之受管變更，須以 §G S-9 參考實作重凍並在 commit message 說明）。
@@ -41,9 +43,9 @@ VERIFY:handoffs/run_receipts/gap3ux-b6-all-mutations.receipt.json
 
 | 項 | 值 |
 |---|---|
-| mutation | 32／14／13／15／19／**12** 條（六批），皆 `closure: CLOSED` |
-| 本批驗收 | `pytest tests/api -q -k gap3_event_delete` 9（下限 4）；vitest `eventBatchDeleteConfirm` 6＋`eventBatchDeleteWarning` 7（下限 2／2） |
-| 全套 | `pytest tests/api tests/momentum/event_samples` 953 passed／3 failed（**既有債**，名單見交接 §6.5）；vitest 47 檔 282 條；build rc=0；`gap3_freeze_golden --check` rc=0 |
+| mutation | 32／14／13／15／19／**23** 條（六批），皆 `closure: CLOSED` |
+| 本批驗收 | `pytest tests/api -q -k gap3_event_delete` 15（下限 4）；vitest `eventBatchDeleteConfirm` 11＋`eventBatchDeleteWarning` 8（下限 2／2） |
+| 全套 | `pytest tests/api tests/momentum/event_samples` 959 passed／3 failed（**既有債**，名單見交接 §6.5）；vitest 47 檔 288 條；build rc=0；`gap3_freeze_golden --check` rc=0（sha 未變） |
 
 mutation 判準＝**轉紅之 test 集合逐一等於預期**（多紅少紅皆 FAIL）。
 🔴 `--record` 出現 `紅=[]` 一律當作假綠信號，先查根因（交接 §4.2 有九個實例；本批又抓到兩條）。

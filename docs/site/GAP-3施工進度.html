@@ -11,7 +11,7 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <p><strong>這張表回答：各批做到哪、憑什麼說做完、審查抓到什麼。</strong> 規格與清單都凍結了（<code>docs/GAP3_EVENT_SPEC.md</code>／<code>docs/GAP3_EVENT_TODO.md</code>），施工照單做；改不動的凍結文件有修訂時走延伸檔 <code>docs/GAP3_EVENT_TODO.D-001.md</code>（不就地改）。</p>
-<h2 id="-第六批實作完成審查中826">🔧 第六批實作完成、審查中（8/26）</h2>
+<h2 id="-第六批已收斂826六輪審查-5-2-2-1-兩家零-0三家一致可收">✅ 第六批已收斂（8/26，六輪審查 5 → 2 → 2 → 1 → 兩家零 → 0，三家一致可收）</h2>
 <p><strong>第六批＝刪除</strong>，三個 Task。一句話：<strong>讓你刪掉一批匯錯的事件，而且不留半個孤兒檔</strong>。</p>
 <p><strong>做了什麼</strong></p>
 <ol>
@@ -132,6 +132,26 @@ grok 之 probe 證明無閘時 <code>刪除失敗：HTTP 404</code> 會畫在 <s
 且與 <code>R2G-M1</code>（成功側）<strong>不相交</strong> ⇒ 非重複守衛。</li>
 </ul>
 <p>破壞測試 22 → <strong>23 條</strong>。四輪 findings：<strong>5 → 2 → 2 → 1</strong>。</p>
+<p><strong>第五輪（8/26）：quorum 不足，非產品問題</strong></p>
+<p>composer 因執行端基礎設施失敗無產出（runlog 逐字＝<code>Connection lost</code> 重試 3 次 →
+<code>RetriableError: [resource_exhausted]</code> → <code>rc=1</code>）；同輪 codex 與 grok 用<strong>同一條</strong>
+<code>committee_run.sh</code> 呼叫皆正常完成 ⇒ 非編排端調用問題。兩家皆<strong>零 finding</strong>。
+🔴 造成死結：<code>debt_clear</code> 正確 fail-closed（<code>roster 集合不相等</code>），而清債被擋又使
+<code>gate.sh</code> 發不出 token。<strong>主委未改治理碼</strong>（使用者明令不碰），改走 <code>gate.sh:556</code>
+錯誤訊息本身指出之第二條路——工具設計內之逃生口
+<code>--abandon --kind collection-failed</code>（枚舉本就有這一種），理由欄逐字引 runlog，
+銷帳後重派 <strong>R6 三家全員</strong>。</p>
+<p><strong>第六輪（8/26）：三家一致零 finding、可收 B6</strong></p>
+<p>群集 J 由<strong>原提出方 composer 首次完整審</strong>並重跑 R4 probe：baseline 19 passed →
+ungated <code>catch</code> ⇒ 1 failed／18 passed（唯一紅＝⑪）→ 還原 19 passed；
+<code>R4J-M1</code> 之 receipt／expected／ungated 實跑<strong>三者恰為 <code>{⑪}</code></strong>。codex 與 grok 獨立複驗同結論。
+三家亦實跑排除第三個同型塌平（codex 另做反向驗證：把 <code>finally</code> 之 <code>Set.delete</code> 加上
+錯誤的 open-dialog 閘後 probe 轉紅 ⇒ 現行寫法不是恰好碰對）。</p>
+<p>🔴 <strong>主委第四次「宣稱大於實作」，由 composer 當場糾正</strong>：R5／R6 brief 之 assumed 寫
+「<code>R4J-M1</code>／<code>R2G-M1</code>／<code>R3H-M1</code> 三者兩兩不相交」，實際 <code>R2G∩R3H={⑩}</code>
+（兩者都會使 ⑩ 之「A 在途」前置失效，<strong>設計上就該相交</strong>）。
+正確說法＝「<code>R4J</code> 與另兩者不相交」。只出現在 brief、未進產品碼或 <code>_why</code>
+（<code>_R4J-M1_why</code> 原文只宣稱與 <code>R2G-M1</code> 不相交，該句正確），仍具名記錄。</p>
 <p><strong>RULING-1 三家一致裁定</strong>：採「本瀏覽器曾成功分析過」為判準（選項 1），
 判準字面用 Codex 的逐字版；Codex 另附條件＝文案必須揭露「本機」範圍（已納入群集 C）。
 「改由伺服器端記錄」（選項 2）三家一致判為<strong>越出這批的範圍、要走修訂延伸檔</strong>，本批不採。</p>
