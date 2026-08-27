@@ -21,7 +21,9 @@
         "test_gap3_ic_feature_cap_reason_membership_not_equality",
         "test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
+        "test_gap3_matrix_duplicate_symbol_last_is_big_must_block",
+        "test_gap3_matrix_full_analysis_big_features_path_must_block"
       ],
       "verdict": "PASS",
       "expected": [
@@ -37,7 +39,9 @@
         "test_gap3_ic_feature_cap_reason_membership_not_equality",
         "test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
+        "test_gap3_matrix_duplicate_symbol_last_is_big_must_block",
+        "test_gap3_matrix_full_analysis_big_features_path_must_block"
       ]
     },
     {
@@ -68,7 +72,8 @@
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
+        "test_gap3_matrix_duplicate_symbol_last_is_big_must_block"
       ],
       "verdict": "PASS",
       "expected": [
@@ -81,7 +86,8 @@
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
+        "test_gap3_matrix_duplicate_symbol_last_is_big_must_block"
       ]
     },
     {
@@ -99,7 +105,8 @@
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
+        "test_gap3_matrix_duplicate_symbol_last_is_big_must_block"
       ],
       "verdict": "PASS",
       "expected": [
@@ -112,7 +119,8 @@
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
+        "test_gap3_matrix_duplicate_symbol_last_is_big_must_block"
       ]
     },
     {
@@ -122,12 +130,16 @@
       "rc": 1,
       "red": [
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
-        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest"
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
+        "test_gap3_matrix_duplicate_symbol_last_is_big_must_block",
+        "test_gap3_matrix_resolver_equals_loader_plan"
       ],
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
-        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest"
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
+        "test_gap3_matrix_duplicate_symbol_last_is_big_must_block",
+        "test_gap3_matrix_resolver_equals_loader_plan"
       ]
     },
     {
@@ -168,13 +180,15 @@
       "red": [
         "test_gap3_ic_feature_cap_explicit_features_path_not_false_blocked",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
-        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash"
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
+        "test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed"
       ],
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_feature_cap_explicit_features_path_not_false_blocked",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
-        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash"
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
+        "test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed"
       ]
     },
     {
@@ -282,11 +296,13 @@
       "desc": "閘門不看 symbols-only 的逐標的 latest（橫截面隱式繞過）",
       "rc": 1,
       "red": [
-        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional"
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_matrix_resolver_equals_loader_plan"
       ],
       "verdict": "PASS",
       "expected": [
-        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional"
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_matrix_resolver_equals_loader_plan"
       ]
     },
     {
@@ -323,11 +339,13 @@
       "desc": "明確 features_path 仍併 latest 取 max（誤擋復活）",
       "rc": 1,
       "red": [
-        "test_gap3_ic_feature_cap_explicit_features_path_not_false_blocked"
+        "test_gap3_ic_feature_cap_explicit_features_path_not_false_blocked",
+        "test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed"
       ],
       "verdict": "PASS",
       "expected": [
-        "test_gap3_ic_feature_cap_explicit_features_path_not_false_blocked"
+        "test_gap3_ic_feature_cap_explicit_features_path_not_false_blocked",
+        "test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed"
       ]
     },
     {
@@ -443,12 +461,14 @@
       "rc": 1,
       "red": [
         "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
-        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest"
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
+        "test_gap3_matrix_resolver_equals_loader_plan"
       ],
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
-        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest"
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
+        "test_gap3_matrix_resolver_equals_loader_plan"
       ]
     },
     {

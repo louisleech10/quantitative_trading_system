@@ -437,6 +437,185 @@ def test_gap3_ic_feature_cap_duplicate_symbol_uses_last_hash_like_loader(
     assert spy_start_analysis != [], "請求沒有抵達 service ⇒ 被閘門擋掉了"
 
 
+# ── 收案判準 D：請求形狀**雙向**探針矩陣 ────────────────────────────────────
+# 🔴 三家 consult 一致（`20260828-gap3ux-b9-consult-r1`）：B9 之收案判準由「三家零 finding」
+#    改為**每一種請求形狀都有 under-block（該擋）與 over-block（不該擋）各一條**。
+#    理由：五輪 finding 數 10→3→4→5→3 非單調，證明每輪是在**擴攻擊面**而非品質退步；
+#    對一個「存活至 GAP-6、上線即刪」的過渡止血閘，無限輪 review 的 ROI 為負。
+#    本節補齊矩陣中原本只有單向的六格——**單向的格子正是前五輪缺陷的藏身處**。
+
+def test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed(spy_start_analysis, monkeypatch):
+    """矩陣：longitudinal「hash ＋ path 衝突」之 **over-block** 側。
+
+    service 在有 `features_path` 時載入的**就是它**（entry 只用來補 meta），
+    所以「大 hash ＋ 小 path」必須放行。反向（小 hash ＋ 大 path 須擋）由
+    `..._reads_features_path_not_just_hash` 守住。
+    """
+    from momentum import factories
+
+    monkeypatch.setattr(factories, "feature_count_from_features_file",
+                        lambda p, **_kw: 10 if p else None)
+    r = client.post(f"{API}/analyze", json={
+        "symbol": "BTCUSDT", "timeframe": "12h",
+        "config_hash": BIG_RUN_CONFIG_HASH,                 # 218,369，遠超 cap
+        "features_path": "/tmp/pretend-small-features.h5",  # 實際會載入的是這個
+    })
+    assert r.status_code != 400, f"大 hash 蓋過了實際會載入的小 path：{r.text}"
+    assert spy_start_analysis != [], "請求沒有抵達 service ⇒ 被閘門擋掉了"
+
+
+def test_gap3_matrix_cross_sectional_runs_all_small_allowed(spy_start_analysis, inject_latest_run):
+    """矩陣：`cross_sectional_runs` 之 **over-block** 側——全部在 cap 以內須放行。"""
+    a = inject_latest_run("ICGATEA", 100)
+    b = inject_latest_run("ICGATEB", 200)
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h",
+        "cross_sectional_runs": [
+            {"symbol": "ICGATEA", "config_hash": a["config_hash"]},
+            {"symbol": "ICGATEB", "config_hash": b["config_hash"]},
+        ],
+    })
+    assert r.status_code != 400, f"全部在 cap 以內卻被擋：{r.text}"
+    assert spy_start_analysis != [], "請求沒有抵達 service"
+
+
+def test_gap3_matrix_symbols_only_all_small_allowed(spy_start_analysis, inject_latest_run):
+    """矩陣：`symbols`-only 之 **over-block** 側——逐標的 latest 皆小須放行。"""
+    inject_latest_run("ICGATEA", 100)
+    inject_latest_run("ICGATEB", 200)
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h", "symbols": ["ICGATEA", "ICGATEB"],
+    })
+    assert r.status_code != 400, f"逐標的 latest 皆小卻被擋：{r.text}"
+    assert spy_start_analysis != [], "請求沒有抵達 service"
+
+
+def test_gap3_matrix_empty_hash_with_small_latest_allowed(spy_start_analysis, inject_latest_run):
+    """矩陣：空字串 hash 之 **over-block** 側——退回 latest 後若在 cap 以內須放行。
+
+    沒有這條，「空 hash 一律擋」也會讓 `..._cross_run_empty_hash_means_latest` 變綠。
+    """
+    inject_latest_run("ICGATEA", 100)
+    inject_latest_run("ICGATEB", 200)
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h",
+        "cross_sectional_runs": [
+            {"symbol": "ICGATEA", "config_hash": ""},
+            {"symbol": "ICGATEB", "config_hash": ""},
+        ],
+    })
+    assert r.status_code != 400, f"空 hash 退回的小 latest 被擋：{r.text}"
+    assert spy_start_analysis != [], "請求沒有抵達 service"
+
+
+def test_gap3_matrix_duplicate_symbol_last_is_big_must_block(spy_start_analysis, inject_latest_run):
+    """矩陣：同 symbol 重複之 **under-block** 側——**最後那筆**大時必須擋。
+
+    與 `..._duplicate_symbol_uses_last_hash_like_loader`（最後那筆小 ⇒ 放行）成對。
+    兩條一起才證明判準是「取最後那筆」，而不是「重複就放行」或「重複就擋」。
+    """
+    cap = int(settings.ic_analysis_max_features)
+    small = inject_latest_run("ICGATEDUP", 100)
+    big = inject_latest_run("ICGATEDUP", cap + 4_000)
+    other = inject_latest_run("ICGATEOTHER", 100)
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h",
+        "cross_sectional_runs": [
+            {"symbol": "ICGATEDUP", "config_hash": small["config_hash"]},   # 被覆蓋
+            {"symbol": "ICGATEDUP", "config_hash": big["config_hash"]},     # loader 實際用這筆
+            {"symbol": "ICGATEOTHER", "config_hash": other["config_hash"]},
+        ],
+    })
+    assert r.status_code == 400, f"最後那筆超標卻放行：{r.text}"
+    assert r.json()["detail"]["feature_count"] == cap + 4_000
+    assert spy_start_analysis == [], "任務被啟動了"
+
+
+def test_gap3_matrix_full_analysis_big_features_path_must_block(monkeypatch):
+    """矩陣：`/full-analysis` 之 **under-block** 側——它唯一會載入的東西超標時必須擋。
+
+    與 `..._full_analysis_does_not_resolve_latest`（不得替它查 registry）成對：
+    一條證明「不看它不會載入的」，一條證明「看它真的會載入的」。
+    """
+    from momentum import factories
+
+    calls = []
+
+    async def spy_full(request):
+        calls.append(request)
+        return {"task_id": "gap3-full-observed", "status": "running"}
+
+    monkeypatch.setattr(svc_mod.ic_analysis_service, "start_full_analysis", spy_full)
+    monkeypatch.setattr(factories, "feature_count_from_features_file",
+                        lambda p, **_kw: 999_999 if p else None)
+    r = client.post(f"{API}/full-analysis", json={
+        "features_path": "/tmp/pretend-huge-features.h5",
+        "labels_path": "/tmp/pretend-labels.h5",
+    })
+    assert r.status_code == 400, f"/full-analysis 的大 features_path 沒被擋：{r.text}"
+    assert calls == [], "任務被啟動了 ⇒ 閘門沒擋在它前面"
+
+
+def test_gap3_matrix_resolver_equals_loader_plan(inject_latest_run, monkeypatch):
+    """🔴 **雙路徑比對**（consult `COMPOSER-R1` RULING-4 步驟 2）：
+    同一 request 下，閘門解析用的 `(symbol → config_hash)` 必須**逐一等於**
+    `_plan_cross_sectional_load` 交給 `load_multi` 的那一份。
+
+    這是 R5 兩條 P1 的直接防線：它們的病根就是「兩處各推導一次」。
+    本條不驗數字大小，只驗**兩邊看的是同一組 run**——不等即 FAIL。
+    """
+    from api.models.ic_models import CrossRunRef, ICAnalyzeRequest
+
+    inject_latest_run("ICGATEA", 100)
+    inject_latest_run("ICGATEB", 200)
+    service = svc_mod.ic_analysis_service
+
+    cases = [
+        ICAnalyzeRequest(mode="cross_sectional", timeframe="12h",
+                         symbols=["ICGATEA", "ICGATEB"]),
+        ICAnalyzeRequest(mode="cross_sectional", timeframe="12h",
+                         cross_sectional_runs=[CrossRunRef(symbol="ICGATEA", config_hash=""),
+                                               CrossRunRef(symbol="ICGATEB", config_hash="")]),
+        ICAnalyzeRequest(mode="cross_sectional", timeframe="12h",
+                         cross_sectional_runs=[CrossRunRef(symbol="ICGATEA", config_hash="h1"),
+                                               CrossRunRef(symbol="ICGATEA", config_hash="h2"),
+                                               CrossRunRef(symbol="ICGATEB", config_hash="h3")]),
+    ]
+    library = service._feature_library  # noqa: SLF001
+    for req in cases:
+        # ── loader 側：`load_multi` 以 symbol 為 key ⇒ 實際選擇＝去重後該 key 的值
+        symbols_resolved, config_hashes = service._plan_cross_sectional_load(req)  # noqa: SLF001
+        loader_view = {
+            sym: ((config_hashes or {}).get(sym) or "").strip() or None
+            for sym in dict.fromkeys(symbols_resolved)
+        }
+
+        # ── 閘門側：**實際觀測**解析器去查了哪些 run（不是重算一次——那會是恆真斷言）
+        observed = {}
+        real_get, real_latest = library.get_entry, library.find_latest_materialized
+
+        def spy_get(symbol, timeframe, config_hash, _r=real_get):
+            observed[symbol] = config_hash
+            return _r(symbol, timeframe, config_hash)
+
+        def spy_latest(symbol, timeframe, _r=real_latest):
+            observed[symbol] = None          # 未指定 run ⇒ 走 latest
+            return _r(symbol, timeframe)
+
+        monkeypatch.setattr(library, "get_entry", spy_get)
+        monkeypatch.setattr(library, "find_latest_materialized", spy_latest)
+        try:
+            service.resolve_planned_feature_count(req)
+        finally:
+            monkeypatch.setattr(library, "get_entry", real_get)
+            monkeypatch.setattr(library, "find_latest_materialized", real_latest)
+
+        assert observed == loader_view, (
+            f"閘門實際查的 run 與 loader 會載入的不同：\n"
+            f"  閘門={observed}\n  loader={loader_view}\n  request={req}"
+        )
+
+
 def test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest(monkeypatch):
     """🔴 `CODEX-R4-P1-02`：latest 解析**不得只信 registry 的 `feature_count`**。
 
