@@ -40,7 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
-import { icFeatureCountLabel, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
+import { icFeatureCountLabel, icPollFailed, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
 import { isSectionStatus } from "@/lib/types";
 import type { SectionStatusObject } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
@@ -535,13 +535,13 @@ function ICAnalysisPageContent() {
                   className="border-cyan-400/40 text-cyan-200"
                   data-testid="ic-task-status-label"
                 >
-                  {icTaskStatusLabel({ status, pollFailed: Boolean(error) })}
+                  {icTaskStatusLabel({ status, pollFailed: icPollFailed({ status, error }) })}
                 </Badge>
               </div>
               <Progress value={Math.round(progress * 100)} />
               <div className="text-xs text-slate-400 flex items-center gap-2">
                 <Activity className="w-4 h-4" />
-                {icTaskStatusLabel({ status, pollFailed: Boolean(error), currentStage })}
+                {icTaskStatusLabel({ status, pollFailed: icPollFailed({ status, error }), currentStage })}
               </div>
               {/* Task 6.3：特徵數；解析不到就明說未知，不填假數字 */}
               <div className="text-xs text-slate-500" data-testid="ic-task-feature-count">

@@ -62,14 +62,24 @@ def _reject_when_over_feature_cap(request) -> None:
     #    「小 hash ＋ 實際大 `features_path`」可以**低報**。取 max 讓兩條路都守得住，
     #    且不必信任呼叫端宣稱的是哪一個。
     #    🔴 檔案側只讀 HDF5 header 之 shape，**不載入矩陣**（Task 6.4 之硬性要求）。
+    timeframe = getattr(request, "timeframe", None)
     candidates = [
         resolve_run_feature_count(
             config_hash=(request.config_hash or "").strip() or None,
             symbol=getattr(request, "symbol", None),
-            timeframe=getattr(request, "timeframe", None),
+            timeframe=timeframe,
         ),
         feature_count_from_features_file(getattr(request, "features_path", None)),
     ]
+    # 🔴 `CODEX-R2-P1-01`：**橫截面請求帶的是 per-symbol 的一組 run**（`cross_sectional_runs`），
+    #    首版只看單一 `config_hash` ⇒ 兩個各自超標的 run 一起送進來會被整組放行，
+    #    而分析端會把它們一起載入。逐筆解析並取**最大值**（保守：任一筆超標即擋整組）。
+    for ref in (getattr(request, "cross_sectional_runs", None) or []):
+        candidates.append(resolve_run_feature_count(
+            config_hash=(getattr(ref, "config_hash", "") or "").strip() or None,
+            symbol=getattr(ref, "symbol", None),
+            timeframe=timeframe,
+        ))
     known = [c for c in candidates if isinstance(c, int)]
     feature_count = max(known) if known else None
     if feature_count is None:

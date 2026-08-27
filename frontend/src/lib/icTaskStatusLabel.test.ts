@@ -11,6 +11,7 @@ import {
   IC_LABEL_NO_RESPONSE,
   IC_LABEL_RUNNING,
   icFeatureCountLabel,
+  icPollFailed,
   icTaskStatusLabel,
 } from './icTaskStatusLabel';
 
@@ -41,6 +42,23 @@ describe('Task 6.3 — 前端區分「後端無回應」與「任務執行中」
     expect(label).toContain('gap6_chunked_stage_42');
     // 終態原樣顯示，不另造詞
     expect(icTaskStatusLabel({ status: 'completed' })).toBe('completed');
+  });
+
+  it('⑥ 🔴 任務失敗 ≠ 後端無回應（R2 兩家一致抓到的接線缺陷）', () => {
+    // `useICAnalysis` 在 status==='failed' 時**也會** setError ⇒ 直接用 Boolean(error) 會誤判
+    expect(icPollFailed({ status: 'failed', error: 'IC analysis failed' })).toBe(false);
+    expect(icPollFailed({ status: 'completed', error: 'x' })).toBe(false);
+    // 真的輪詢失敗（任務還在跑，但拿不到狀態）
+    expect(icPollFailed({ status: 'running', error: 'polling failed' })).toBe(true);
+    expect(icPollFailed({ status: 'running', error: null })).toBe(false);
+
+    // 端到端：失敗的任務必須顯示終態，**不得**顯示「後端無回應」
+    const failedLabel = icTaskStatusLabel({
+      status: 'failed',
+      pollFailed: icPollFailed({ status: 'failed', error: 'IC analysis failed' }),
+    });
+    expect(failedLabel).toBe('failed');
+    expect(failedLabel).not.toBe(IC_LABEL_NO_RESPONSE);
   });
 
   it('⑤ 特徵數未知時明說不知道，**不填假數字**', () => {

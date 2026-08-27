@@ -793,7 +793,22 @@ def feature_count_from_features_file(features_path: Optional[str]) -> Optional[i
         return None
     path = Path(features_path)
     if not path.is_file():
-        return None
+        # 🔴 `GROK-R2-P2-01`：`features_path` **未必是檔案路徑**——公開 API 也吃
+        #    `parquet:<SYMBOL>:<config_hash>` 這種識別字串。首版只認檔案 ⇒ `is_file()` 為假
+        #    就回 None，繞過復活。改為：把字串切開，任一段命中 registry 之 `config_hash`
+        #    就取該 hash 之**最大** feature_count（跨標的取 max＝保守，寧可多擋不可少擋）。
+        from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+        tokens = {t.strip() for t in str(features_path).replace("/", ":").split(":") if t.strip()}
+        if not tokens:
+            return None
+        counts = [
+            int(e["feature_count"])
+            for e in FeatureRegistry().list_all()
+            if str(e.get("config_hash") or "").strip() in tokens
+            and isinstance(e.get("feature_count"), int)
+        ]
+        return max(counts) if counts else None
     try:
         import h5py
 

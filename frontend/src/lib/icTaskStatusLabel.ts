@@ -45,6 +45,23 @@ export function icTaskStatusLabel(input: IcTaskStatusInput): string {
   return status;   // completed／failed 等終態原樣顯示，不另造詞
 }
 
+/**
+ * 由 store 之 `(status, error)` 判斷「這個 error 是**輪詢失敗**，還是**任務自己失敗**」。
+ *
+ * 🔴 `CODEX-R2-P1-02`＋`GROK-R2-P1-01`（兩家一致）：`useICAnalysis` 在
+ * `status === 'failed'` 時**也會** `setError(...)`，於是 page 若直接寫
+ * `pollFailed: Boolean(error)`，任務失敗會被顯示成「後端無回應」——**兩個完全不同的處置**
+ * （前者去看後端，後者看任務的錯誤訊息）被混成同一句話，正是本 Task 要消滅的東西。
+ *
+ * 🔴 純函式本身當初是對的，**錯在接線**；而我的測試只測了純函式。
+ * 故把這個對映也做成純函式並直接測它——接線不再有未被覆蓋的判斷。
+ */
+export function icPollFailed(input: { status?: string | null; error?: string | null }): boolean {
+  if (!input.error) return false;
+  // 終態（failed／completed）之 error 屬於任務本身，不是輪詢問題
+  return input.status !== 'failed' && input.status !== 'completed';
+}
+
 /** Task 6.3：特徵數之顯示；**解析不到就明說不知道**，不填假數字。 */
 export function icFeatureCountLabel(featureCount: number | null | undefined): string {
   return typeof featureCount === 'number' && Number.isFinite(featureCount)

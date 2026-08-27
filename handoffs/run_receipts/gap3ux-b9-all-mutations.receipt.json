@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b9",
   "mode": "verify",
-  "n_mutations": 11,
+  "n_mutations": 14,
   "results": [
     {
       "id": "6.0-M1",
@@ -9,6 +9,8 @@
       "desc": "契約移除 analysis_rejected 分類",
       "rc": 1,
       "red": [
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
@@ -19,6 +21,8 @@
       ],
       "verdict": "PASS",
       "expected": [
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
@@ -47,6 +51,8 @@
       "desc": "cap 檢查移到任務啟動之後",
       "rc": 1,
       "red": [
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
@@ -54,6 +60,8 @@
       ],
       "verdict": "PASS",
       "expected": [
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
@@ -66,6 +74,8 @@
       "desc": "拿掉 cap 檢查",
       "rc": 1,
       "red": [
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
@@ -73,10 +83,51 @@
       ],
       "verdict": "PASS",
       "expected": [
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
         "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+      ]
+    },
+    {
+      "id": "6.1-M4",
+      "task": "6.1",
+      "desc": "閘門不看 cross_sectional_runs（橫截面繞過）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs"
+      ]
+    },
+    {
+      "id": "6.1-M5",
+      "task": "6.1",
+      "desc": "features_path 只認檔案（識別字串繞過）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file"
+      ]
+    },
+    {
+      "id": "6.3-M5",
+      "task": "6.3",
+      "desc": "接線把任務失敗當成輪詢失敗",
+      "rc": 1,
+      "red": [
+        "Task 6.3 — 前端區分「後端無回應」與「任務執行中」 > ⑥ 🔴 任務失敗 ≠ 後端無回應（R2 兩家一致抓到的接線缺陷）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 6.3 — 前端區分「後端無回應」與「任務執行中」 > ⑥ 🔴 任務失敗 ≠ 後端無回應（R2 兩家一致抓到的接線缺陷）"
       ]
     },
     {
@@ -85,10 +136,12 @@
       "desc": "閘門不看 features_path（繞過復活）",
       "rc": 1,
       "red": [
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash"
       ],
       "verdict": "PASS",
       "expected": [
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash"
       ]
     },

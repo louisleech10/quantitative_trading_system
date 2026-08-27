@@ -136,6 +136,51 @@ def test_gap3_ic_feature_cap_reads_features_path_not_just_hash(spy_start_analysi
     assert spy_start_analysis == [], "任務被啟動了 ⇒ 閘門沒擋住這條路"
 
 
+def test_gap3_ic_feature_cap_covers_cross_sectional_runs(spy_start_analysis):
+    """🔴 `CODEX-R2-P1-01`：橫截面請求帶的是 **per-symbol 的一組 run**，也必須被閘門看見。
+
+    首版只看單一 `config_hash` ⇒ 兩個各自超標的 run 一起送進來會被整組放行。
+    判準＝逐筆解析取**最大值**（任一筆超標即擋整組）。
+    """
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h",
+        "cross_sectional_runs": [
+            {"symbol": "BTCUSDT", "config_hash": "a6a998593c3c55aa54e5d6fa537114b4"},  # 15
+            {"symbol": "BTCUSDT", "config_hash": BIG_RUN_CONFIG_HASH},                  # 218369
+        ],
+    })
+    assert r.status_code == 400, f"橫截面請求繞過了閘門：{r.text}"
+    assert r.json()["detail"]["feature_count"] == 218369, "取的不是逐筆最大值"
+    assert spy_start_analysis == [], "任務被啟動了 ⇒ 閘門沒擋住橫截面這條路"
+
+
+def test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file(spy_start_analysis):
+    """🔴 `GROK-R2-P2-01`：`features_path` **未必是檔案路徑**（如 `parquet:SYM:<hash>`）。
+
+    首版只認檔案 ⇒ `is_file()` 為假就放行，繞過復活。
+    """
+    from momentum.factories import feature_count_from_features_file
+
+    # 🔴 該 hash 在 registry 對到**多筆**（不同標的）⇒ 本函式刻意取**跨標的最大值**：
+    #    寧可多擋不可少擋。故斷言的是「等於那些筆的 max」，不是某一筆。
+    import json as _json
+
+    entries = _json.loads(
+        (REPO / "data_cache" / "features" / "registry.json").read_text(encoding="utf-8"))
+    same_hash = [e["feature_count"] for e in entries
+                 if str(e.get("config_hash") or "").strip() == BIG_RUN_CONFIG_HASH
+                 and isinstance(e.get("feature_count"), int)]
+    assert same_hash, "本機 registry 無該 hash，無法做正向對照"
+    got = feature_count_from_features_file(f"parquet:BTCUSDT:{BIG_RUN_CONFIG_HASH}")
+    assert got == max(same_hash), f"識別字串形式未取跨標的最大值（得 {got}，應為 {max(same_hash)}）"
+    r = client.post(f"{API}/analyze", json={
+        "symbol": "BTCUSDT", "timeframe": "12h",
+        "features_path": f"parquet:BTCUSDT:{BIG_RUN_CONFIG_HASH}",
+    })
+    assert r.status_code == 400, f"識別字串形式繞過了閘門：{r.text}"
+    assert spy_start_analysis == []
+
+
 def test_gap3_ic_feature_cap_features_file_reads_metadata_only():
     """檔案側解析**只讀 HDF5 header 之 shape**，不載入矩陣（Task 6.4 之硬性要求）。"""
     from momentum.factories import feature_count_from_features_file
