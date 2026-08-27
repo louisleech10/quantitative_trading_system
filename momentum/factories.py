@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, List
@@ -813,7 +814,58 @@ def resolve_latest_run_feature_count(
     return int(count) if isinstance(count, int) else None
 
 
-def feature_count_from_features_file(features_path: Optional[str]) -> Optional[int]:
+def feature_count_from_manifest(manifest_path: Optional[str]) -> Optional[int]:
+    """GAP-3 UX Task 6.1：從 registry entry 指的 manifest 讀 `total_features`（**只讀 JSON**）。
+
+    🔴 出生事故（`CODEX-R4-P1-02`）：latest 解析原本**只信 registry 的 `feature_count`**。
+      registry 是產生時寫入的中繼資料，會過期／低報；低報時閘門就放行一個實際超量的 artifact。
+      codex 用**真 manifest**（`total_features=218369`）配 stub registry（`15`）打出反例。
+
+    🔴 **與 grok 的「本機 12/12 一致」不矛盾**：那證明的是**現在剛好對**，
+      本函式要的是**錯了會被發現**。資料狀態會漂，程式性質不會——
+      本 epic 反覆出現的正是這個區別。
+
+    🔴 只讀 manifest JSON（數 KB），**不開 HDF5**（Task 6.4 之硬性要求）。
+    """
+    if not manifest_path:
+        return None
+    path = Path(manifest_path)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    if not path.is_file():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    total = manifest.get("total_features") if isinstance(manifest, dict) else None
+    return int(total) if isinstance(total, int) else None
+
+
+def feature_count_from_registry_entry(entry: Optional[Dict[str, Any]]) -> Optional[int]:
+    """GAP-3 UX Task 6.1：一個 registry entry 的特徵數＝**registry 與 manifest 取大**。
+
+    取大而非取 registry：registry 低報時會放行超量 run（`CODEX-R4-P1-02`）；
+    取大是保守側——寧可多擋（使用者看得到 400 並可覆寫設定）不可少擋（OOM 打死行程）。
+    """
+    if not entry:
+        return None
+    counts = [
+        c
+        for c in (
+            entry.get("feature_count"),
+            feature_count_from_manifest(entry.get("hdf5_relative_path")),
+        )
+        if isinstance(c, int)
+    ]
+    return max(counts) if counts else None
+
+
+def feature_count_from_features_file(
+    features_path: Optional[str],
+    *, symbol: Optional[str] = None, timeframe: Optional[str] = None,
+) -> Optional[int]:
     """GAP-3 UX Task 6.1：從特徵檔**只讀中繼資料**取欄數（**不載入矩陣**）。
 
     🔴 為什麼需要它（`CODEX-R1-P1-01` ＋ `GROK-R1-P1-01`，兩家一致要求本批補）：
@@ -850,9 +902,22 @@ def feature_count_from_features_file(features_path: Optional[str]) -> Optional[i
         #    先前一律跨標的取 max ⇒ 會把被選標的的合法小 run 誤報成另一標的的大 run（false-block）。
         #    只要識別字串裡的某個 token 命中登記中的 symbol，就把範圍收斂到那個標的；
         #    真正無 scope 的參照（只有 hash）才維持跨標的 max。
-        scoped = [e for e in hits if str(e.get("symbol") or "").strip() in tokens]
-        chosen = scoped or hits
-        return max(int(e["feature_count"]) for e in chosen)
+        # 🔴 `CODEX-R4-P2-02`：**只收斂 symbol 不夠**——同一個 hash 可跨 timeframe，
+        #    `parquet:BTCUSDT:<hash>` 會挑到 1h 的大 run 去擋 12h 的小 run（誤擋）。
+        #    呼叫端知道自己要哪個 timeframe／symbol 時一併傳進來收斂；
+        #    識別字串自帶的 token 仍然有效（兩者取交集，先窄後寬）。
+        def _scoped(rows, key, wanted):
+            picked = [e for e in rows if str(e.get(key) or "").strip() == str(wanted)]
+            return picked or rows
+
+        chosen = hits
+        if timeframe:
+            chosen = _scoped(chosen, "timeframe", timeframe)
+        if symbol:
+            chosen = _scoped(chosen, "symbol", symbol)
+        by_token = [e for e in chosen if str(e.get("symbol") or "").strip() in tokens]
+        chosen = by_token or chosen
+        return max(feature_count_from_registry_entry(e) or 0 for e in chosen) or None
     try:
         import h5py
 

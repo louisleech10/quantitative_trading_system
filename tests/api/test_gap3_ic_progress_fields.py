@@ -80,6 +80,36 @@ def test_gap3_ic_progress_fields_no_fake_value_when_unresolvable():
     assert svc_mod._resolve_feature_count(_Req()) is None, "解析不到卻填了假值"
 
 
+def test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis():
+    """🔴 `CODEX-R4-P2-01`：`feature_count` 原本只在「顯式帶 hash 的 `/analyze`」才有值
+    ⇒ **隱式 latest 與所有 `/full-analysis`** 一律回 `None`，欄位在最常見的兩種用法下是空的。
+
+    根因是解析器只認 `config_hash`；結構修正後改用
+    `ICAnalysisService.resolve_planned_feature_count`——與止血閘、與實際載入路徑同一支。
+    另 `/full-analysis` 之 `task_info` 原本**根本沒有這個鍵**，一併補上。
+    """
+    from api.services.ic_analysis_service import ic_analysis_service
+
+    class _Implicit:
+        mode = "longitudinal"
+        symbol = "BTCUSDT"
+        timeframe = "12h"
+        config_hash = None          # 不指定 ⇒ service 會挑 latest
+        features_path = None
+        symbols = None
+        cross_sectional_runs = None
+
+    got = svc_mod._resolve_feature_count(_Implicit())
+    assert isinstance(got, int), "隱式 latest 的任務仍回 None ⇒ Task 6.3 的欄位是空的"
+    assert got == ic_analysis_service.resolve_planned_feature_count(_Implicit()), \
+        "進度欄位與止血閘用的不是同一支解析 ⇒ 兩者會再次不同步"
+
+    # `/full-analysis` 之 task_info 必須含此鍵（缺鍵與值為 None 是兩件事）
+    import inspect
+    source = inspect.getsource(svc_mod.ICAnalysisService.start_full_analysis)
+    assert '"feature_count"' in source, "/full-analysis 的 task_info 沒有 feature_count 鍵"
+
+
 def test_gap3_ic_progress_fields_resolver_reads_registry_only():
     """🔴 解析器只讀 registry、**不開 HDF5**——Task 6.4 要證明「擋下時未載入大矩陣」。
 

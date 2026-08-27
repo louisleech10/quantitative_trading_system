@@ -42,16 +42,18 @@ logger = get_logger("api.ic_analysis_service")
 
 
 def _resolve_feature_count(request) -> Optional[int]:
-    """GAP-3 UX Task 6.3：取這個 run 的特徵數（唯一實作在 momentum，經 factories 出口；R3）。
+    """GAP-3 UX Task 6.3：取這個 run 的特徵數。
 
-    🔴 解析失敗回 `None`——**不填假值**。UAT 已證實填充值比沒有更誤導
+    🔴 `CODEX-R4-P2-01`：本函式原本只呼叫 `resolve_run_feature_count`（只認顯式 hash）
+      ⇒ **隱式 latest 與所有 `/full-analysis`** 的任務一律回 `None`，
+      Task 6.3 的欄位在最常見的兩種用法下都是空的。
+      改為委派 `ICAnalysisService.resolve_planned_feature_count`——
+      **與止血閘、與實際載入路徑同一支解析**。
+
+    🔴 解析失敗仍回 `None`——**不填假值**。UAT 已證實填充值比沒有更誤導
     （`progress==0.12` 卡 15 分鐘，使用者以為還在動）。
     """
-    return resolve_run_feature_count(
-        config_hash=(getattr(request, "config_hash", None) or "").strip() or None,
-        symbol=getattr(request, "symbol", None),
-        timeframe=getattr(request, "timeframe", None),
-    )
+    return ic_analysis_service.resolve_planned_feature_count(request)
 
 FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
 
@@ -65,6 +67,86 @@ class ICAnalysisService:
         self._lock = threading.Lock()
         self._last_task_id: Optional[str] = None
         self._feature_library = create_feature_library()
+
+    def resolve_planned_feature_count(self, request) -> Optional[int]:
+        """GAP-3 UX Task 6.1／6.3：**這次分析實際會載入的那些 run** 有幾個特徵。
+
+        🔴 **本方法存在的理由＝B9 四輪 review 的共同根因**。
+          止血閘原本在 `api/routes/ic_analysis.py` 裡**手抄了一份與本 service 平行的解析**：
+          閘門把候選塞成一袋取 `max()`，而本 service 走的是**互斥分支**；
+          閘門每次請求 `FeatureRegistry()` 重讀磁碟，而本 service 的 `_feature_library`
+          在**行程啟動時**建好、registry 只讀一次。兩份邏輯、兩份快照，於是四輪抓到四種不同步：
+
+          | 輪次 | 形態 | finding |
+          |---|---|---|
+          | R1 | 袋子少一味（`features_path`）⇒ **該擋沒擋** | `CODEX-R1-P1-01`／`GROK-R1-P1-01` |
+          | R2 | 袋子少一味（`cross_sectional_runs`）⇒ 該擋沒擋 | `CODEX-R2-P1-01` |
+          | R3 | 袋子少一味（隱式 latest ×2）⇒ 該擋沒擋 | 三家一致 |
+          | R4 | 袋子**多**一味 ⇒ **不該擋卻擋**；且兩份 registry 不同步 | `CODEX-R4-P1-01`／`P1-03` |
+
+          修法不是再補一味，是**刪掉那份手抄邏輯**：由「決定要載入什麼的人」回答「它有多大」。
+          鏡像因此成為**結構性質**，不再需要人工維護。
+
+        🔴 **分支必須與 `_run_analysis`／`_run_full_analysis` 逐條對齊**（見下方逐段註解）；
+          改動其一未改另一，等於把本方法退化回手抄副本。
+        🔴 解析不出來回 `None`——**呼叫端自己決定要擋還是要放**，本方法不替它決定。
+        🔴 全程只讀 registry（記憶體）與 manifest（數 KB JSON），**不開 HDF5**
+          （Task 6.4 之硬性要求：止血閘擋下時不得已載入大矩陣）。
+        """
+        from momentum.factories import (
+            feature_count_from_features_file,
+            feature_count_from_registry_entry,
+        )
+
+        timeframe = getattr(request, "timeframe", None)
+
+        # ── 橫截面：對齊 `_run_analysis` 之 `mode == "cross_sectional"` 分支 ──
+        #    該分支走 `load_multi`，**完全不看**頂層 `features_path`／`config_hash`
+        #    ⇒ 閘門也不得把它們算進來（`CODEX-R4-P1-01` 之後半）。
+        if getattr(request, "mode", "longitudinal") == "cross_sectional":
+            if not timeframe:
+                return None
+            cross_runs = list(getattr(request, "cross_sectional_runs", None) or [])
+            if cross_runs:
+                entries = [
+                    self._feature_library.get_entry(
+                        getattr(ref, "symbol", None), timeframe,
+                        (getattr(ref, "config_hash", "") or "").strip(),
+                    )
+                    for ref in cross_runs
+                ]
+            elif getattr(request, "symbols", None):
+                # `config_hashes=None` ⇒ `load_multi` 逐標的取 latest
+                entries = [
+                    self._feature_library.find_latest_materialized(sym, timeframe)
+                    for sym in request.symbols
+                ]
+            else:
+                return None
+            counts = [c for c in (feature_count_from_registry_entry(e) for e in entries)
+                      if isinstance(c, int)]
+            # 任一標的超標即擋整組——橫截面本來就把它們一起載入，擋掉一筆不會降低峰值
+            return max(counts) if counts else None
+
+        # ── longitudinal：對齊 `_run_analysis` 之 else 分支 ──
+        #    該分支的最終載入對象是 `features_path`；呼叫端**明確給了** `features_path` 時，
+        #    entry 只用來補 meta、**不參與載入** ⇒ 閘門不得再把 latest 算進來
+        #    （`CODEX-R4-P1-01`：小 `features_path` 被不相干的大 latest 誤擋）。
+        features_path = getattr(request, "features_path", None)
+        symbol = getattr(request, "symbol", None)
+        if features_path:
+            return feature_count_from_features_file(
+                features_path, symbol=symbol, timeframe=timeframe,
+            )
+        if not (symbol and timeframe):
+            return None
+        config_hash = (getattr(request, "config_hash", None) or "").strip()
+        entry = (
+            self._feature_library.get_entry(symbol, timeframe, config_hash)
+            if config_hash
+            else self._feature_library.find_latest_materialized(symbol, timeframe)
+        )
+        return feature_count_from_registry_entry(entry)
 
     async def start_analysis(self, request: ICAnalyzeRequest) -> Dict[str, str]:
         """Start IC analysis task."""
@@ -828,6 +910,9 @@ class ICAnalysisService:
             "analyzer": analyzer,
             "applied_tier": (request.feature_tiers.active_preset if request.feature_tiers else "intermediate"),
             "created_at": datetime.now().isoformat(),
+            # 🔴 `CODEX-R4-P2-01`：`/full-analysis` 的 task_info 原本**沒有這個欄位**
+            #    ⇒ Task 6.3 的特徵數在整個 full-analysis 路徑上一律回 None。
+            "feature_count": _resolve_feature_count(request),
         }
 
         with self._lock:

@@ -61,56 +61,14 @@ def _reject_when_over_feature_cap(request) -> None:
 
     🔴 **不提供「強制略過上限」之開關**（SPEC Task 6.1「不可做」）。
     """
-    from momentum.factories import (
-        feature_count_from_features_file,
-        ic_report_reason,
-        resolve_latest_run_feature_count,
-        resolve_run_feature_count,
-    )
+    from momentum.factories import ic_report_reason
 
-    # 🔴 **兩個來源都要看，取最大值**（`CODEX-R1-P1-01`＋`GROK-R1-P1-01`，兩家一致）：
-    #    只認 `config_hash` 時，呼叫端直接給 `features_path` 就能繞過；更糟的是
-    #    「小 hash ＋ 實際大 `features_path`」可以**低報**。取 max 讓兩條路都守得住，
-    #    且不必信任呼叫端宣稱的是哪一個。
-    #    🔴 檔案側只讀 HDF5 header 之 shape，**不載入矩陣**（Task 6.4 之硬性要求）。
-    timeframe = getattr(request, "timeframe", None)
-    candidates = [
-        resolve_run_feature_count(
-            config_hash=(request.config_hash or "").strip() or None,
-            symbol=getattr(request, "symbol", None),
-            timeframe=timeframe,
-        ),
-        feature_count_from_features_file(getattr(request, "features_path", None)),
-    ]
-    # 🔴 `CODEX-R2-P1-01`：**橫截面請求帶的是 per-symbol 的一組 run**（`cross_sectional_runs`），
-    #    首版只看單一 `config_hash` ⇒ 兩個各自超標的 run 一起送進來會被整組放行，
-    #    而分析端會把它們一起載入。逐筆解析並取**最大值**（保守：任一筆超標即擋整組）。
-    cross_runs = list(getattr(request, "cross_sectional_runs", None) or [])
-    for ref in cross_runs:
-        candidates.append(resolve_run_feature_count(
-            config_hash=(getattr(ref, "config_hash", "") or "").strip() or None,
-            symbol=getattr(ref, "symbol", None),
-            timeframe=timeframe,
-        ))
-
-    # 🔴 R3 三家一致（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／`GROK-R3-P1-01`＋`P1-02`）：
-    #    **省略 `config_hash` 時 service 自己會挑 latest**，那條路徑對上面所有候選都是隱形的。
-    #    閘門必須鏡像 service 的解析，否則「不指定 run」就是一個公開的繞過方式。
-    #    兩種形態各自對應 service 的一個分支：
-    #      · longitudinal 無 hash ⇒ `find_latest_materialized(symbol, timeframe)`
-    #      · cross_sectional 只給 `symbols` ⇒ `load_multi(config_hashes=None)` ⇒ 逐標的 latest
-    #    逐標的解析後併入候選取 max（保守：任一標的超標即擋整組，因為橫截面本來就一起載入）。
-    has_explicit_hash = bool((request.config_hash or "").strip())
-    if not has_explicit_hash:
-        candidates.append(resolve_latest_run_feature_count(
-            symbol=getattr(request, "symbol", None), timeframe=timeframe,
-        ))
-    if not cross_runs:
-        for sym in (getattr(request, "symbols", None) or []):
-            candidates.append(resolve_latest_run_feature_count(symbol=sym, timeframe=timeframe))
-
-    known = [c for c in candidates if isinstance(c, int)]
-    feature_count = max(known) if known else None
+    # 🔴 **本層不得再自行解析**（`CODEX-R4-P1-01`／`P1-03`）。這裡原本有一段手抄的、
+    #    與 service 平行的解析：把候選塞成一袋取 `max()`，而 service 走互斥分支；
+    #    且此處每次 `FeatureRegistry()` 重讀磁碟，而 service 的 registry 在行程啟動時就讀好。
+    #    兩份邏輯、兩份快照 ⇒ 四輪 review 抓到四種不同步（少一味＝該擋沒擋；多一味＝誤擋）。
+    #    現在由「決定要載入什麼的人」回答「它有多大」，鏡像成為結構性質而非人工維護的副本。
+    feature_count = ic_analysis_service.resolve_planned_feature_count(request)
     if feature_count is None:
         return
     cap = int(settings.ic_analysis_max_features)
@@ -120,10 +78,15 @@ def _reject_when_over_feature_cap(request) -> None:
         # reason 字面由契約取得（Task 6.0）；本層**不得**硬寫
         "reason": ic_report_reason("analysis_rejected"),
         "message": (
-            f"這個 run 有 {feature_count} 個特徵，超過目前上限 {cap}；"
+            # 🔴 **不得叫使用者去做他沒有介面可做的事**（2026-08-27 使用者裁定）。
+            #    原文為「請先縮減特徵數再分析」——本專案沒有任何縮減特徵數的介面，
+            #    那句話把「系統暫時做不到」寫成了「你操作錯了」，是一條死路。
+            f"這個 run 有 {feature_count} 個特徵，本機一次載得下的上限是 {cap}；"
             f"直接分析會把記憶體吃爆，因此在啟動任務之前就擋下來。"
-            f"上限由實跑量測導出（見 handoffs/run_receipts/gap3ux-b9-footprint.receipt.json）；"
-            f"請先縮減特徵數再分析。分塊計算上線後本限制會取消。"
+            f"上限由實跑量測導出（見 handoffs/run_receipts/gap3ux-b9-footprint.receipt.json），"
+            f"綁本機記憶體大小。"
+            f"這個 run 目前無法分析——分塊計算（GAP-6）上線後本限制會取消；"
+            f"在那之前請改用特徵數較少的 run。"
         ),
         "feature_count": feature_count,
         "cap": cap,

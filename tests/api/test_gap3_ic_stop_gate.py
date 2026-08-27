@@ -31,6 +31,52 @@ REPO = Path(__file__).resolve().parents[2]
 BIG_RUN_CONFIG_HASH = "e53e22906c35363757f4cd49d27f973e"
 
 
+def _registry_entries():
+    """讀本機 registry 原始內容（測試之對照基準；不經任何被測程式碼）。"""
+    return json.loads(
+        (REPO / "data_cache" / "features" / "registry.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def inject_latest_run(tmp_path):
+    """把一筆**完全受控**的 run 注入 service 那份 registry 快照，離開時還原。
+
+    🔴 **為什麼不能用本機現有的 run 當前提**（實際踩到兩次）：
+      ① 止血閘讀的是 `ic_analysis_service._feature_library` 的快照，
+         而 `resolve_latest_run_feature_count` 會**新建 registry 重讀磁碟**——
+         拿後者算前提、用前者驗行為，兩者在全套跑時會分岔。
+         這正是 `CODEX-R4-P1-03` 那個缺陷的鏡像：**我修好了產品碼，卻把同一個錯留在測試裡**。
+      ② 更根本的問題是 `pytest tests/api` **會實際改寫** `data_cache/features/registry.json`
+         （實查：跑完後 BTCUSDT/12h 的 latest 變成一筆指向 `pytest-of-louis/pytest-2770/…`
+         暫存目錄、只有 15 個特徵的新 entry）。任何以「本機 latest 超過 cap」為前提的斷言
+         都會因此在單跑時綠、全套時紅。**測試不得依賴會被測試自己改動的環境狀態。**
+
+    manifest 由本 fixture 現寫（`total_features` 自訂），故 `is_materialized` 為真且數字可控。
+    """
+    library = svc_mod.ic_analysis_service._feature_library  # noqa: SLF001
+    registry = library._registry  # noqa: SLF001
+    original = list(registry._entries)  # noqa: SLF001
+    counter = {"n": 0}
+
+    def _inject(symbol: str, feature_count: int, *, timeframe: str = "12h"):
+        counter["n"] += 1
+        manifest = tmp_path / f"m{counter['n']}" / "feature_manifest.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(json.dumps({"total_features": feature_count}), encoding="utf-8")
+        entry = {
+            "symbol": symbol, "timeframe": timeframe,
+            "config_hash": f"injected{counter['n']:02d}",
+            "feature_count": feature_count,
+            "hdf5_relative_path": str(manifest),
+            "last_generated_at": 1_900_000_000 + counter["n"],
+        }
+        registry._entries = list(registry._entries) + [entry]  # noqa: SLF001
+        return entry
+
+    yield _inject
+    registry._entries = original  # noqa: SLF001
+
+
 def _task_count() -> int:
     service = svc_mod.ic_analysis_service
     with service._lock:  # noqa: SLF001 — 邊界①要求斷言 store 筆數，只能走 store
@@ -125,7 +171,7 @@ def test_gap3_ic_feature_cap_reads_features_path_not_just_hash(spy_start_analysi
 
     # 以替身模擬「檔案側算出超量」，避免測試依賴本機是否存在某個大特徵檔
     monkeypatch.setattr(factories, "feature_count_from_features_file",
-                        lambda p: 999_999 if p else None)
+                        lambda p, **_kw: 999_999 if p else None)
     r = client.post(f"{API}/analyze", json={
         "symbol": "BTCUSDT", "timeframe": "12h",
         "config_hash": "a6a998593c3c55aa54e5d6fa537114b4",   # 只有 15 個特徵的小 hash
@@ -193,7 +239,7 @@ def test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file(spy_start_
     assert spy_start_analysis == []
 
 
-def test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal(spy_start_analysis):
+def test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal(spy_start_analysis, inject_latest_run):
     """🔴 R3 三家一致（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／`GROK-R3-P1-02`）：
     **省略 `config_hash` 時 service 自己會挑 latest**，閘門必須看得到那一個 run。
 
@@ -201,55 +247,42 @@ def test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal(spy_start_analy
     service 走 `find_latest_materialized` 把 latest 載進來。三家各自實跑同一組對照：
     不帶 hash ⇒ 200 且 `start_analysis` 被呼叫；補上 hash ⇒ 400、`calls=0`。
     """
-    from momentum.factories import resolve_latest_run_feature_count
-
     cap = int(settings.ic_analysis_max_features)
-    latest = resolve_latest_run_feature_count(symbol="BTCUSDT", timeframe="12h")
-    assert isinstance(latest, int) and latest > cap, (
-        f"本機 BTCUSDT/12h 之 latest（{latest}）未超過 cap（{cap}），無法做正向對照"
-    )
-    r = client.post(f"{API}/analyze", json={"symbol": "BTCUSDT", "timeframe": "12h"})
+    latest = cap + 5_000
+    inject_latest_run("ICGATEBIG", latest)
+    r = client.post(f"{API}/analyze", json={"symbol": "ICGATEBIG", "timeframe": "12h"})
     assert r.status_code == 400, f"省略 config_hash 就繞過了閘門：{r.text}"
     assert r.json()["detail"]["feature_count"] == latest, "擋下時報的不是 service 會載入的那個 run"
     assert spy_start_analysis == [], "任務被啟動了 ⇒ 隱式 latest 這條路沒被擋住"
 
 
-def test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional(spy_start_analysis):
+def test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional(spy_start_analysis, inject_latest_run):
     """🔴 `GROK-R3-P1-01`／`COMPOSER-R3-P1-01`：橫截面只給 `symbols`（不帶 `cross_sectional_runs`）
     時，service 以 `config_hashes=None` 呼叫 `load_multi` ⇒ **逐標的 latest**。
 
     R2 只封了 `cross_sectional_runs`，同一端點的 `symbols`-only 形態仍開著。
     判準＝逐標的解析 latest 取 max（任一標的超標即擋整組——橫截面本來就一起載入）。
     """
-    from momentum.factories import resolve_latest_run_feature_count
-
     cap = int(settings.ic_analysis_max_features)
-    per_symbol = {s: resolve_latest_run_feature_count(symbol=s, timeframe="12h")
-                  for s in ("BTCUSDT", "ETHUSDT")}
-    known = [c for c in per_symbol.values() if isinstance(c, int)]
-    assert known and max(known) > cap, f"本機 12h 之 latest 皆未超 cap，無法做正向對照：{per_symbol}"
+    big = cap + 7_000
+    inject_latest_run("ICGATESMALL", 100)
+    inject_latest_run("ICGATEBIG", big)
     r = client.post(f"{API}/analyze", json={
-        "mode": "cross_sectional", "timeframe": "12h", "symbols": ["BTCUSDT", "ETHUSDT"],
+        "mode": "cross_sectional", "timeframe": "12h", "symbols": ["ICGATESMALL", "ICGATEBIG"],
     })
     assert r.status_code == 400, f"symbols-only 橫截面繞過了閘門：{r.text}"
-    assert r.json()["detail"]["feature_count"] == max(known), "取的不是逐標的 latest 之最大值"
+    assert r.json()["detail"]["feature_count"] == big, "取的不是逐標的 latest 之最大值"
     assert spy_start_analysis == [], "任務被啟動了 ⇒ symbols-only 這條路沒被擋住"
 
 
-def test_gap3_ic_feature_cap_implicit_latest_under_cap_still_allowed(spy_start_analysis):
+def test_gap3_ic_feature_cap_implicit_latest_under_cap_still_allowed(spy_start_analysis, inject_latest_run):
     """**反向對照**：latest 在 cap 以內時，省略 `config_hash` 仍必須放行。
 
     🔴 沒有這條，「閘門把所有不帶 hash 的請求一律擋掉」也會讓上面兩條變綠——
     那是把止血閘做成了拒絕服務。本條釘住「擋的是超量，不是『沒指定 run』」。
     """
-    from momentum.factories import resolve_latest_run_feature_count
-
-    cap = int(settings.ic_analysis_max_features)
-    latest = resolve_latest_run_feature_count(symbol="ETHUSDT", timeframe="12h")
-    assert isinstance(latest, int) and latest <= cap, (
-        f"本機 ETHUSDT/12h 之 latest（{latest}）不在 cap（{cap}）以內，無法做反向對照"
-    )
-    client.post(f"{API}/analyze", json={"symbol": "ETHUSDT", "timeframe": "12h"})
+    inject_latest_run("ICGATESMALL", 100)
+    client.post(f"{API}/analyze", json={"symbol": "ICGATESMALL", "timeframe": "12h"})
     assert spy_start_analysis != [], "cap 以內的隱式 latest 被擋掉了 ⇒ 閘門擋的是『沒指定 run』而非『超量』"
 
 
@@ -274,6 +307,167 @@ def test_gap3_ic_feature_cap_identifier_keeps_symbol_scope(monkeypatch):
     # 真正無 scope 的參照（只有 hash）維持跨標的 max＝保守
     assert feature_count_from_features_file("sharedhash") == 900, \
         "無 symbol scope 時不該收斂到某一筆——那會低報"
+
+
+def test_gap3_ic_feature_cap_explicit_features_path_not_false_blocked(
+        spy_start_analysis, monkeypatch, inject_latest_run):
+    """🔴 `CODEX-R4-P1-01`：呼叫端**明確給了** `features_path` 時，service 載入的就是它，
+    entry 只用來補 meta ⇒ 閘門**不得**再把不相干的 latest 算進來取 max（誤擋）。
+
+    這是 R1–R3 那個病的**另一面**：前三輪是袋子少一味（該擋沒擋），本條是袋子多一味（不該擋卻擋）。
+    codex RECHECK：`file=10, latest=90000` ⇒ 舊碼 `decision=BLOCK feature_count=90000`。
+    """
+    from momentum import factories
+    cap = int(settings.ic_analysis_max_features)
+    inject_latest_run("ICGATEBIG", cap + 5_000)
+    # 明確指向一個「小」的 features_path：閘門若仍把 latest 算進去就會誤擋
+    monkeypatch.setattr(factories, "feature_count_from_features_file",
+                        lambda p, **_kw: 10 if p else None)
+    r = client.post(f"{API}/analyze", json={
+        "symbol": "ICGATEBIG", "timeframe": "12h",
+        "features_path": "/tmp/pretend-small-features.h5",
+    })
+    assert r.status_code != 400, f"明確給小 features_path 卻被不相干的 latest 誤擋：{r.text}"
+    assert spy_start_analysis != [], "請求沒有抵達 service ⇒ 被閘門擋掉了"
+
+
+def test_gap3_ic_feature_cap_cross_sectional_ignores_top_level_features_path(spy_start_analysis, monkeypatch):
+    """🔴 `CODEX-R4-P1-01` 之後半：橫截面走 `load_multi`，**完全不看**頂層 `features_path`
+    ⇒ 閘門也不得把它算進來。
+
+    釘的是「閘門的候選集合＝service 該分支實際會用的東西」，不是「所有欄位一起取 max」。
+    """
+    from momentum import factories
+
+    monkeypatch.setattr(factories, "feature_count_from_features_file",
+                        lambda p, **_kw: 999_999 if p else None)
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h",
+        "cross_sectional_runs": [
+            {"symbol": "BTCUSDT", "config_hash": "a6a998593c3c55aa54e5d6fa537114b4"},  # 15
+            {"symbol": "ETHUSDT", "config_hash": "a6a998593c3c55aa54e5d6fa537114b4"},
+        ],
+        "features_path": "/tmp/irrelevant-huge.h5",
+    })
+    assert r.status_code != 400, f"橫截面被 service 根本不看的 features_path 誤擋：{r.text}"
+    assert spy_start_analysis != [], "請求沒有抵達 service ⇒ 被閘門擋掉了"
+
+
+def test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest(monkeypatch):
+    """🔴 `CODEX-R4-P1-02`：latest 解析**不得只信 registry 的 `feature_count`**。
+
+    registry 是產生時寫的中繼資料，會過期／低報；低報時閘門就放行實際超量的 artifact。
+    codex 用真 manifest（`total_features`）配 stub registry（15）打出反例。
+    判準＝registry 與 manifest **取大**（保守側）。
+    """
+    from momentum.factories import feature_count_from_registry_entry
+
+    manifest = None
+    for entry in _registry_entries():
+        rel = str(entry.get("hdf5_relative_path") or "")
+        if rel and (REPO / rel).is_file() and isinstance(entry.get("feature_count"), int):
+            manifest = (rel, entry["feature_count"])
+            break
+    assert manifest, "本機無可用 manifest，無法做正向對照"
+    rel, real_count = manifest
+    # registry 低報成 15，manifest 仍是真值 ⇒ 必須取到真值
+    got = feature_count_from_registry_entry({"feature_count": 15, "hdf5_relative_path": rel})
+    assert got == real_count, f"registry 低報時未由 manifest 糾正（得 {got}，manifest 為 {real_count}）"
+    # manifest 讀不到時退回 registry，不憑空造值
+    assert feature_count_from_registry_entry(
+        {"feature_count": 15, "hdf5_relative_path": "/no/such/manifest.json"}) == 15
+    assert feature_count_from_registry_entry(None) is None
+
+
+def test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot():
+    """🔴 `CODEX-R4-P1-03`：閘門與 service **必須讀同一份 registry 快照**。
+
+    這**不是**極窄的競態（composer R4 之判語，經複驗推翻）：
+    `ic_analysis_service` 是模組級單例，`_feature_library` 在**行程啟動時**建好、registry 只讀一次；
+    而閘門原本每次請求 `FeatureRegistry()` 重讀磁碟 ⇒ 兩份快照在**整個行程生命期**持續不同步。
+    觸發條件正是本專案主要流程：跑完 Feature Factory 產生新 run、沒重啟後端就去分析。
+
+    判準＝閘門解析出來的數字，來自 **service 自己那個 `_feature_library`**：
+    改動該實例的 registry，閘門的答案必須跟著改。
+    """
+    service = svc_mod.ic_analysis_service
+    registry = service._feature_library._registry  # noqa: SLF001 — 本條要證明的就是「同一個實例」
+
+    class _Req:
+        mode = "longitudinal"
+        symbol = "GATEPROBE"
+        timeframe = "12h"
+        config_hash = None
+        features_path = None
+        symbols = None
+        cross_sectional_runs = None
+
+    # 🔴 判準必須可證偽：注入一筆**只存在於 service 這份記憶體快照**的 entry
+    #    （磁碟上的 registry.json 沒有它）。解析器若改用自己新建的 `FeatureRegistry()`
+    #    重讀磁碟，就看不到它 ⇒ 回 None ⇒ 本條紅。
+    #    manifest 指向一個真實存在的檔案，否則 `is_materialized` 為假、latest 不會選到它。
+    real_manifest = next(
+        (str(e["hdf5_relative_path"]) for e in _registry_entries()
+         if str(e.get("hdf5_relative_path") or "") and (REPO / str(e["hdf5_relative_path"])).is_file()),
+        None,
+    )
+    assert real_manifest, "本機無可用 manifest，無法做正向對照"
+
+    fake = {"symbol": "GATEPROBE", "timeframe": "12h", "config_hash": "probe",
+            "feature_count": 90_000, "hdf5_relative_path": real_manifest,
+            "last_generated_at": 9_999_999_999}
+    original = list(registry._entries)  # noqa: SLF001
+    try:
+        registry._entries = original + [fake]  # noqa: SLF001
+        got = service.resolve_planned_feature_count(_Req())
+        assert got is not None, (
+            "解析器看不到只存在於 service 記憶體快照的 entry "
+            "⇒ 它讀的是自己新建的 registry，與 service 實際會載入的不是同一份"
+        )
+        assert got >= 90_000, f"解析到的不是那筆注入的 entry：{got}"
+    finally:
+        registry._entries = original  # noqa: SLF001
+    # 還原後必須解析不出（證明上面的成功不是來自別處）
+    assert service.resolve_planned_feature_count(_Req()) is None
+
+
+def test_gap3_ic_feature_cap_identifier_scopes_by_timeframe(monkeypatch):
+    """🔴 `CODEX-R4-P2-02`：識別字串只用 symbol 收斂**不夠**——同一 hash 可跨 timeframe。
+
+    `parquet:BTCUSDT:<hash>` 會挑到 1h 的大 run 去擋 12h 的小 run（誤擋）。
+    codex RECHECK：`identifier_count=90000 expected_12h_count=10`。
+    """
+    from momentum.FeatureEngineering import feature_registry as reg_mod
+    from momentum.factories import feature_count_from_features_file
+
+    rows = [
+        {"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": "shared", "feature_count": 90_000},
+        {"symbol": "BTCUSDT", "timeframe": "12h", "config_hash": "shared", "feature_count": 10},
+    ]
+    monkeypatch.setattr(reg_mod.FeatureRegistry, "list_all", lambda self: list(rows))
+    assert feature_count_from_features_file(
+        "parquet:BTCUSDT:shared", symbol="BTCUSDT", timeframe="12h") == 10, \
+        "識別字串未用 timeframe 收斂 ⇒ 12h 的小 run 會被 1h 的大 run 誤擋"
+    assert feature_count_from_features_file(
+        "parquet:BTCUSDT:shared", symbol="BTCUSDT", timeframe="1h") == 90_000
+    # 呼叫端沒給 scope 時維持跨範圍 max＝保守
+    assert feature_count_from_features_file("parquet:BTCUSDT:shared") == 90_000
+
+
+def test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action():
+    """🔴 使用者裁定（2026-08-27）：錯誤訊息**不得叫使用者去做他沒有介面可做的事**。
+
+    原文為「請先縮減特徵數再分析」——本專案沒有任何縮減特徵數的介面，
+    那句話把「系統暫時做不到」寫成了「你操作錯了」，是一條死路。
+    """
+    r = client.post(f"{API}/analyze", json={
+        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": BIG_RUN_CONFIG_HASH,
+    })
+    assert r.status_code == 400
+    message = r.json()["detail"]["message"]
+    assert "請先縮減特徵數" not in message, "訊息仍指向一個沒有介面可做的操作"
+    assert "無法分析" in message, "訊息未明講這個 run 目前做不到"
+    assert "GAP-6" in message, "訊息未指出限制何時會取消"
 
 
 def test_gap3_ic_feature_cap_features_file_reads_metadata_only():
