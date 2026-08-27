@@ -38,39 +38,46 @@ def _task_count() -> int:
 
 
 @pytest.fixture(autouse=True)
-def _never_actually_run_analysis(monkeypatch):
-    """🔴 **本檔一律不真的跑分析**——替身只把任務放進 store 就回。
+def spy_start_analysis(monkeypatch):
+    """記錄 `start_analysis` **有沒有被呼叫過**；被呼叫時**照實往下走**（不假裝成功）。
 
-    為什麼必須這樣：本檔驗的是**閘門的位置**（在建任務之前還是之後），
-    而不是分析本身。若讓它真的跑，`6.1-M1` 那條變異（把閘門移到任務啟動之後）
-    會讓 218,369 特徵的分析真的啟動，測試就在那裡乾等——實測卡住十分鐘、
-    最後由主委手動終止（2026-08-27）。替身讓「位置錯了 ⇒ 任務先被建立」
-    這個判準**在一秒內**就得到答案，且不會吃掉機器的記憶體。
+    🔴 **不是替身、不吞掉呼叫**：`CODEX-R1-P1-03` 指出我原本的 autouse 替身讓
+    `start_analysis` 根本不執行 ⇒ 不建 analyzer、不開 HDF5，於是 Task 6.4 的
+    「擋下時未載入大矩陣」變成**恆真**——用一個快測試換掉了真證據。
+    現在改成純觀測：閘門正常時 `start_analysis` **一次都不會被呼叫**（那才是要證明的事），
+    所以也不會有分析啟動、不會卡、不會吃記憶體。
     """
     service = svc_mod.ic_analysis_service
+    calls = []
 
-    async def fake_start(request):
-        task_id = "gap3-stop-gate-stub"
+    async def spy(request):
+        calls.append(request)
+        # 記錄之後建一筆任務就回，**不跑真的分析**（那是十分鐘級、GB 級記憶體）。
+        # 🔴 這樣**不會**變成假綠，因為判準不是「有沒有爆記憶體」而是 `calls == []`：
+        #    閘門正常 ⇒ 本函式一次都不會被呼叫；閘門失效 ⇒ `calls` 非空 ⇒ 立刻紅。
+        #    `CODEX-R1-P1-03` 當初抓的是「只看記憶體差」——那才是替身能矇混的地方。
+        task_id = "gap3-stop-gate-observed"
         with service._lock:  # noqa: SLF001
             service._tasks[task_id] = {"task_id": task_id, "status": "running", "progress": 0.0}
         return {"task_id": task_id, "status": "running"}
 
-    monkeypatch.setattr(service, "start_analysis", fake_start)
-    yield
+    monkeypatch.setattr(service, "start_analysis", spy)
+    yield calls
     with service._lock:  # noqa: SLF001
-        service._tasks.pop("gap3-stop-gate-stub", None)
+        service._tasks.pop("gap3-stop-gate-observed", None)
 
 
-def test_gap3_ic_feature_cap_rejects_big_run_without_creating_task():
-    """邊界①：超量 ⇒ 400 且**任務未被建立**。
+def test_gap3_ic_feature_cap_rejects_big_run_without_creating_task(spy_start_analysis):
+    """邊界①：超量 ⇒ 400 且**任務未被建立**，且 `start_analysis` **一次都沒被呼叫**。
 
-    🔴 替身會在被呼叫時**真的**把任務放進 store ⇒ 閘門若移到 service 之後，
-    這條的 `_task_count() == before` 立刻失敗。判準因此與「分析跑不跑得完」無關。
+    🔴 第三個斷言是 `CODEX-R1-P1-03` 之後補的：只驗「任務數不變」時，
+    「呼叫了 service、但 service 內部提前失敗」也會綠——那不是閘門擋下的。
     """
     before = _task_count()
     r = client.post(f"{API}/analyze", json={
         "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": BIG_RUN_CONFIG_HASH,
     })
+    assert spy_start_analysis == [], "start_analysis 被呼叫了 ⇒ 閘門沒擋在它前面"
     assert r.status_code == 400, r.text
     detail = r.json()["detail"]
     assert detail["feature_count"] > detail["cap"]
@@ -128,8 +135,22 @@ def test_gap3_ic_feature_cap_value_is_backed_by_measurement_receipt():
     assert exceeded, "receipt 內沒有任何超標點 ⇒ 上限無從導出"
     assert settings.ic_analysis_max_features <= min(exceeded) * 0.5
 
+    # 🔴 `CODEX-R1-P1-04`：SPEC 要求「同一 run 重跑 2 次之 peak 差 < 20%」，
+    #    而我原本只是**手算過**、沒寫進任何斷言——把第二個 peak 改成 1e9 照樣會過。
+    #    這裡真的算一次；且**必須存在**至少一組重跑，否則等於沒驗重現性。
+    by_count = {}
+    for p in points:
+        by_count.setdefault(p["feature_count"], []).append(float(p["peak_footprint_bytes"]))
+    repeated = {k: v for k, v in by_count.items() if len(v) >= 2}
+    assert repeated, "receipt 內沒有任何 run 被量兩次 ⇒ 重現性未驗（SPEC 6.2 邊界②）"
+    for count, peaks in sorted(repeated.items()):
+        lo, hi = min(peaks), max(peaks)
+        assert lo > 0
+        diff_pct = (hi - lo) / lo * 100.0
+        assert diff_pct < 20.0, f"feature_count={count} 之重跑 peak 差 {diff_pct:.1f}% >= 20%"
 
-def test_gap3_ic_stop_gate_alive_no_big_matrix_loaded():
+
+def test_gap3_ic_stop_gate_alive_no_big_matrix_loaded(spy_start_analysis):
     """Task 6.4：擋下時**未載入大矩陣**。
 
     🔴 取樣時點綁 6.1 之檢查位置：本測試在**同一個行程**內量請求前後之 footprint。
@@ -153,6 +174,9 @@ def test_gap3_ic_stop_gate_alive_no_big_matrix_loaded():
     after_response = rss_kb()
 
     assert _task_count() == before_tasks          # ①任務未建立
+    # 🔴 `CODEX-R1-P1-03` 之後補：**證明分析路徑一步都沒走**。
+    #    原本只看記憶體差，而我當時的替身讓 service 根本不執行 ⇒ 該斷言恆真、是假綠。
+    assert spy_start_analysis == [], "start_analysis 被呼叫了 ⇒ 本條之『未載入大矩陣』無意義"
     assert os.getpid() > 0                        # ②單一 pid（本行程自身）
     # ③未載入大矩陣：該 run 的量測 peak 為 GB 級；擋下之路徑不得有可觀增長。
     # 🔴 這裡用 `ru_maxrss` 而非 `sample`：本條要驗的是「**這個行程**在被擋的路徑上有沒有長大」，

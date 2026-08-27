@@ -18,6 +18,8 @@ interface ICAnalysisState {
   status: ICAnalysisStatus;
   progress: number;
   currentStage: string | null;
+  /** GAP-3 UX Task 6.3：這個 run 有幾個特徵；解析不到為 null（**不填假值**）。 */
+  featureCount: number | null;
   error: string | null;
   report: ICReport | null;
   selectedFeature: string | null;
@@ -38,6 +40,7 @@ interface ICAnalysisState {
   updateConfig: (patch: Partial<ICAnalysisConfig>) => void;
   setTask: (taskId: string | null, status?: ICAnalysisStatus) => void;
   setProgress: (progress: number, currentStage?: string | null) => void;
+  setFeatureCount: (featureCount: number | null) => void;
   setStatus: (status: ICAnalysisStatus) => void;
   setReport: (report: ICReport | null) => void;
   setError: (error: string | null) => void;
@@ -198,6 +201,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   status: 'idle',
   progress: 0,
   currentStage: null,
+  featureCount: null,
   error: null,
   report: null,
   selectedFeature: null,
@@ -251,6 +255,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
       currentStage: null,
     }),
   setProgress: (progress, currentStage) => set({ progress, currentStage }),
+  setFeatureCount: (featureCount) => set({ featureCount }),
   setStatus: (status) => set({ status }),
   setReport: (report) => set({ report }),
   setError: (error) => set({ error }),

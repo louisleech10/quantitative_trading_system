@@ -136,7 +136,15 @@ while : ; do
     if [ "${peak}" -gt "${kill_at}" ] 2>/dev/null; then
       exceeded="true"
       echo "[measure] 🔴 peak=${peak} 超過 ${kill_at} ⇒ 記為**超標點**並停止該分析"
-      [ -n "${task_id}" ] && curl -sS -m 5 -X DELETE "${api}/api/v1/ic/task/${task_id}" >/dev/null 2>&1
+      # 🔴 `CODEX-R1-P1-05`：首版在此呼叫 `DELETE /api/v1/ic/task/{id}`——**那個路由不存在**
+      #    （只有 GET）。呼叫失敗被 `>/dev/null` 吞掉，看起來像有取消、其實什麼都沒做。
+      #    現行 API **沒有**取消任務的端點，所以唯一能停下分析的手段就是停掉那個行程。
+      #    這是**已知且刻意**的粗暴手段，理由與代價寫在這裡而不是靠讀者猜：
+      #      ·代價＝連同該後端行程一起結束，量測腳本因此每個量測點都自己重開一次後端；
+      #      ·替代方案＝先做取消端點，但那超出 Task 6.2 的範圍（本 Task 只定義量測協定）。
+      #    ⇒ 具名殘留：`MEASURE-CANCEL-1`（見交接殘留表）。
+      echo "[measure] ⚠️ API 無取消任務之端點 ⇒ 只能停掉整個後端行程（pid=${pid}）；"
+      echo "[measure]    量測階梯每點都會重開後端，故不影響其餘量測點。"
       kill -TERM "${pid}" 2>/dev/null
       break
     fi

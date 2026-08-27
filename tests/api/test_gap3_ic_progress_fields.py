@@ -96,7 +96,27 @@ def test_gap3_ic_progress_fields_resolver_reads_registry_only():
     with_count = [e for e in registry if isinstance(e.get("feature_count"), int) and e.get("config_hash")]
     if not with_count:
         pytest.skip("本機 registry 無帶 feature_count 之登記，無法做正向對照")
-    entry = with_count[0]
-    assert resolve_run_feature_count(config_hash=entry["config_hash"]) == entry["feature_count"]
-    # 只給 symbol/timeframe（無 hash）⇒ 一律 None，不猜
-    assert resolve_run_feature_count(symbol=entry.get("symbol"), timeframe=entry.get("timeframe")) is None
+    # 🔴 `CODEX-R1-P1-02`：同一個 `config_hash` 在真實 registry 裡**會對到多個標的**
+    #    （實查 `4a8a0b37…` 對到 BTCUSDT/ETHUSDT/BCHUSDT，feature_count 各為 437066/437110/437210）。
+    #    只比對 hash 並取第一筆 ⇒ 閘門會拿**別的標的**的數字去守。以下逐一釘住：
+    from collections import Counter
+
+    hash_counts = Counter(e["config_hash"] for e in with_count)
+    unique = [e for e in with_count if hash_counts[e["config_hash"]] == 1]
+    ambiguous = [e for e in with_count if hash_counts[e["config_hash"]] > 1]
+
+    # ① 帶 symbol＋timeframe ⇒ 精準解析（含歧義 hash）
+    for entry in (unique[:1] + ambiguous[:1]):
+        assert resolve_run_feature_count(
+            config_hash=entry["config_hash"],
+            symbol=entry["symbol"], timeframe=entry["timeframe"],
+        ) == entry["feature_count"], f"{entry['symbol']}/{entry['timeframe']} 解析錯誤"
+
+    # ② 歧義 hash 只給 hash ⇒ **不猜**，回 None
+    if ambiguous:
+        assert resolve_run_feature_count(config_hash=ambiguous[0]["config_hash"]) is None, (
+            "同一 hash 對到多個標的時仍回了一個值 ⇒ 閘門會拿別的 run 的數字去守")
+
+    # ③ 只給 symbol/timeframe（無 hash）⇒ 一律 None，不猜
+    assert resolve_run_feature_count(
+        symbol=with_count[0].get("symbol"), timeframe=with_count[0].get("timeframe")) is None

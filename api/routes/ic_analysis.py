@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/v1/ic")
 logger = get_logger("api.routes.ic_analysis")
 
 
-def _reject_when_over_feature_cap(request: ICAnalyzeRequest) -> None:
+def _reject_when_over_feature_cap(request) -> None:
     """GAP-3 UX Task 6.1：**啟動任務之前**擋下特徵數超量之分析請求。
 
     🔴 **本 Task 為過渡止血**：GAP-6 之分塊計算上線後由該機制取代，本函式屆時**一併刪除**
@@ -55,6 +55,8 @@ def _reject_when_over_feature_cap(request: ICAnalyzeRequest) -> None:
 
     feature_count = resolve_run_feature_count(
         config_hash=(request.config_hash or "").strip() or None,
+        symbol=getattr(request, "symbol", None),
+        timeframe=getattr(request, "timeframe", None),
     )
     if feature_count is None:
         return
@@ -212,6 +214,10 @@ async def get_deep_analysis_result(task_id: str):
 @router.post("/full-analysis", response_model=ICAnalyzeResponse)
 async def start_full_analysis(request: ICFullAnalysisRequest):
     """Start one-shot full analysis workflow."""
+    # Task 6.1：🔴 **本端點原本完全沒套閘門**（`CODEX-R1-P1-01`）——只擋 `/analyze`
+    # 等於留了一扇同樣會把記憶體吃爆的門。閘門要擋的是「啟動分析任務」這件事，
+    # 不是某一個 URL，所以**每個會啟動任務的入口都要套**。
+    _reject_when_over_feature_cap(request)
     try:
         return await ic_analysis_service.start_full_analysis(request)
     except ValueError as exc:

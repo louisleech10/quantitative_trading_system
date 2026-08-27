@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     #    （**禁 `ps rss`**——同一時刻實測 RSS 72MB vs footprint 5.7GB，差 79 倍）。
     #    最小超標點＝**161,031**（peak 4.62GB，超過本機 8GB 之一半），重跑兩次 peak 差 0%。
     #    上限 ＝ 最小超標點 × 安全係數 0.5 ＝ **80,515**。
+    # 🔴 **這個數字綁機器，不是演算法的性質**（`CODEX-R1-P1-05`）：「超標」定義為
+    #    peak > 機器 RAM × 0.5，而本機 RAM 為 8GB。換一台 32GB 的機器重跑，最小超標點
+    #    會往上移、上限也會跟著變。這對**過渡止血**是可接受的（目的就是「別把這台機器吃爆」），
+    #    但**不得**把 80515 當成「這個演算法的固有上限」。
+    #    部署到不同機器時請以 `IC_ANALYSIS_MAX_FEATURES` 覆寫，並重跑量測產生該機器的 receipt。
     # 🔴 改這個數字**必須**同時更新那份 receipt——無 receipt 不得寫入設定值（Task 6.2 之死線）。
     ic_analysis_max_features: int = Field(
         default=80515, validation_alias="IC_ANALYSIS_MAX_FEATURES",

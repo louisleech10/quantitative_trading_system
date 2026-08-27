@@ -753,22 +753,24 @@ def resolve_run_feature_count(
 ) -> Optional[int]:
     """GAP-3 UX Task 6.1／6.3：解析某個 run 有幾個特徵（**只讀 registry，絕不開 HDF5**）。
 
-    解析**只認 `config_hash`**；解析不出來回 `None`——**呼叫端自己決定要擋還是要放**，
-    本函式不替它決定。
+    解析**必須有 `config_hash`**；`symbol`／`timeframe` 給了就一併比對。
+    解析不出來回 `None`——**呼叫端自己決定要擋還是要放**，本函式不替它決定。
 
-    🔴 **刻意沒有 (symbol, timeframe) 之 fallback**：`find_latest` 取的是該 symbol/tf 的
-    **最新**一筆，未必是使用者當下要分析的那個 run。實測 `BTCUSDT/12h` 的最新一筆是
-    **15** 個特徵，而同一組合下另有 **218,369** 的 run ⇒ 用它當閘門的輸入會拿**別的 run**
-    的數字去守，比不守更糟（會放行真正該擋的那個）。寧可回 `None` 讓呼叫端顯式處理。
+    🔴 **沒有「取最新」之 fallback**：`find_latest` 取的是該 symbol/tf 的**最新**一筆，
+      未必是使用者當下要分析的那個 run。實測 `BTCUSDT/12h` 的最新一筆是 **15** 個特徵，
+      而同一組合下另有 **218,369** 的 run ⇒ 用它當閘門的輸入會拿**別的 run** 的數字去守，
+      比不守更糟（會放行真正該擋的那個）。
+    🔴 **`symbol`／`timeframe` 必須參與比對**：同一個 `config_hash` 可能對到多個標的
+      （`CODEX-R1-P1-02`）；只比對 hash 並取第一筆會污染 cap 與進度顯示。
+      多筆相符時 registry 回 `None`（歧義不猜）。
     🔴 不碰 HDF5 是硬性要求：Task 6.4 要證明「止血閘擋下時未載入大矩陣」，
       檢查路徑上只要開過特徵檔，那個證明就沒有意義了。
     """
     from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 
-    del symbol, timeframe  # 見上：刻意不參與解析，保留參數只為呼叫端可讀性
     if not config_hash:
         return None
-    entry = FeatureRegistry().find_by_config_hash(config_hash)
+    entry = FeatureRegistry().find_by_config_hash(config_hash, symbol=symbol, timeframe=timeframe)
     if entry is None:
         return None
     count = entry.get("feature_count")

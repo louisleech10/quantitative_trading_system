@@ -40,7 +40,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
-import { isSectionStatus } from '@/lib/types';
+import { icFeatureCountLabel, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
+import { isSectionStatus } from "@/lib/types";
 import type { SectionStatusObject } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
@@ -54,6 +55,7 @@ function ICAnalysisPageContent() {
     status,
     progress,
     currentStage,
+    featureCount,
     error,
     report,
     selectedFeature,
@@ -527,14 +529,23 @@ function ICAnalysisPageContent() {
             <div className="flex flex-col gap-3 min-w-[240px]">
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>任務狀態</span>
-                <Badge variant="outline" className="border-cyan-400/40 text-cyan-200">
-                  {status === 'running' ? '分析中' : status === 'completed' ? '完成' : status}
+                {/* GAP-3 UX Task 6.3：「後端無回應」與「任務執行中」必須是**兩個不同的字串** */}
+                <Badge
+                  variant="outline"
+                  className="border-cyan-400/40 text-cyan-200"
+                  data-testid="ic-task-status-label"
+                >
+                  {icTaskStatusLabel({ status, pollFailed: Boolean(error) })}
                 </Badge>
               </div>
               <Progress value={Math.round(progress * 100)} />
               <div className="text-xs text-slate-400 flex items-center gap-2">
                 <Activity className="w-4 h-4" />
-                {currentStage ? `目前階段: ${currentStage}` : '等待分析啟動'}
+                {icTaskStatusLabel({ status, pollFailed: Boolean(error), currentStage })}
+              </div>
+              {/* Task 6.3：特徵數；解析不到就明說未知，不填假數字 */}
+              <div className="text-xs text-slate-500" data-testid="ic-task-feature-count">
+                {icFeatureCountLabel(featureCount)}
               </div>
             </div>
           </div>

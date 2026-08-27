@@ -127,19 +127,33 @@ class FeatureRegistry:
             if item.get("symbol") == symbol and item.get("timeframe") == timeframe
         ]
 
-    def find_by_config_hash(self, config_hash: str) -> Optional[Dict[str, Any]]:
-        """GAP-3 UX Task 6.1／6.3：以 `config_hash` 取單筆登記（無 ⇒ None）。
+    def find_by_config_hash(
+        self, config_hash: str, symbol: Optional[str] = None,
+        timeframe: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """GAP-3 UX Task 6.1／6.3：以 `config_hash`（＋可選 symbol／timeframe）取單筆登記。
 
         🔴 **只讀 registry 這份 JSON，不碰 HDF5**——Task 6.4 要證明「止血閘擋下來時
         沒有載入大矩陣」，任何在檢查路徑上開啟特徵檔的作法都會讓那個證明失效。
+
+        🔴 **同一個 `config_hash` 可能對到多個 symbol／timeframe**（同一組特徵設定套在不同標的）。
+        首版只比對 `config_hash` 並取**第一筆**，會拿到別的 symbol 的 `feature_count`
+        ⇒ 閘門與進度顯示都被污染（`CODEX-R1-P1-02`）。
+        給了 symbol／timeframe 就必須一併相符；**多筆相符時回 `None`**（不猜），
+        由呼叫端顯式處理歧義。
         """
         wanted = (config_hash or "").strip()
         if not wanted:
             return None
-        for item in self._entries:
-            if str(item.get("config_hash") or "").strip() == wanted:
-                return item
-        return None
+        matches = [
+            item for item in self._entries
+            if str(item.get("config_hash") or "").strip() == wanted
+            and (symbol is None or item.get("symbol") == symbol)
+            and (timeframe is None or item.get("timeframe") == timeframe)
+        ]
+        if len(matches) != 1:
+            return None          # 0 筆＝查不到；>1 筆＝歧義，一律不猜
+        return matches[0]
 
     def find_latest(self, symbol: str, timeframe: str) -> Optional[Dict[str, Any]]:
         matches = self.find(symbol, timeframe)

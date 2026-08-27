@@ -63,6 +63,7 @@ export function useICAnalysis() {
   const {
     setTask,
     setProgress,
+    setFeatureCount,
     setStatus,
     setError,
     setReport,
@@ -102,9 +103,12 @@ export function useICAnalysis() {
         progress: number;
         current_stage?: string | null;
         error?: string | null;
+        feature_count?: number | null;   // GAP-3 UX Task 6.3
       }>(`/task/${taskId}`);
       setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed');
       setProgress(status.progress ?? 0, status.current_stage ?? null);
+      // Task 6.3：解析不到就是 null，**不填假值**
+      setFeatureCount(typeof status.feature_count === "number" ? status.feature_count : null);
 
       if (status.status === 'failed') {
         terminalRef.current = true;
@@ -118,7 +122,7 @@ export function useICAnalysis() {
 
       return status;
     },
-    [clearTimers, fetchResult, setError, setProgress, setStatus]
+    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount]
   );
 
   const startPolling = useCallback(
