@@ -41,7 +41,7 @@ from momentum.core.contracts import ICResult
 logger = get_logger("api.ic_analysis_service")
 
 
-def _resolve_feature_count(request) -> Optional[int]:
+def _resolve_feature_count(request, *, entrypoint: str = "analyze") -> Optional[int]:
     """GAP-3 UX Task 6.3：取這個 run 的特徵數。
 
     🔴 `CODEX-R4-P2-01`：本函式原本只呼叫 `resolve_run_feature_count`（只認顯式 hash）
@@ -53,7 +53,7 @@ def _resolve_feature_count(request) -> Optional[int]:
     🔴 解析失敗仍回 `None`——**不填假值**。UAT 已證實填充值比沒有更誤導
     （`progress==0.12` 卡 15 分鐘，使用者以為還在動）。
     """
-    return ic_analysis_service.resolve_planned_feature_count(request)
+    return ic_analysis_service.resolve_planned_feature_count(request, entrypoint=entrypoint)
 
 FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
 
@@ -68,7 +68,7 @@ class ICAnalysisService:
         self._last_task_id: Optional[str] = None
         self._feature_library = create_feature_library()
 
-    def resolve_planned_feature_count(self, request) -> Optional[int]:
+    def resolve_planned_feature_count(self, request, *, entrypoint: str = "analyze") -> Optional[int]:
         """GAP-3 UX Task 6.1／6.3：**這次分析實際會載入的那些 run** 有幾個特徵。
 
         🔴 **本方法存在的理由＝B9 四輪 review 的共同根因**。
@@ -99,6 +99,20 @@ class ICAnalysisService:
         )
 
         timeframe = getattr(request, "timeframe", None)
+
+        # ── `/full-analysis`：對齊 `_run_full_analysis` ──
+        #    🔴 **它與 `/analyze` 走的不是同一條載入路徑**：`_run_full_analysis` 直接把
+        #    `request.features_path` 餵給 `analyzer.analyze`，**從不碰 registry**
+        #    （沒有 `get_entry`／`find_latest_materialized`／`load_multi`）。
+        #    因此對它去查 latest 會擋掉一個根本不會載入任何 registry run 的請求——
+        #    那正是 `CODEX-R4-P1-01` 那一族的誤擋，只是換我自己在結構修正時犯。
+        #    **主委自攻抓到，未進 review**；記在這裡是因為它示範了本方法的維護風險：
+        #    「鏡像 service」只有在**逐個入口**對齊時才成立，多一個入口就多一份對齊責任。
+        if entrypoint == "full_analysis":
+            return feature_count_from_features_file(
+                getattr(request, "features_path", None),
+                symbol=getattr(request, "symbol", None), timeframe=timeframe,
+            )
 
         # ── 橫截面：對齊 `_run_analysis` 之 `mode == "cross_sectional"` 分支 ──
         #    該分支走 `load_multi`，**完全不看**頂層 `features_path`／`config_hash`
@@ -912,7 +926,7 @@ class ICAnalysisService:
             "created_at": datetime.now().isoformat(),
             # 🔴 `CODEX-R4-P2-01`：`/full-analysis` 的 task_info 原本**沒有這個欄位**
             #    ⇒ Task 6.3 的特徵數在整個 full-analysis 路徑上一律回 None。
-            "feature_count": _resolve_feature_count(request),
+            "feature_count": _resolve_feature_count(request, entrypoint="full_analysis"),
         }
 
         with self._lock:

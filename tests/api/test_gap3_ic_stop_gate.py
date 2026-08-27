@@ -353,6 +353,32 @@ def test_gap3_ic_feature_cap_cross_sectional_ignores_top_level_features_path(spy
     assert spy_start_analysis != [], "請求沒有抵達 service ⇒ 被閘門擋掉了"
 
 
+def test_gap3_ic_feature_cap_full_analysis_does_not_resolve_latest(spy_start_analysis, inject_latest_run):
+    """🔴 `/full-analysis` 與 `/analyze` **走的不是同一條載入路徑**，閘門必須分開對齊。
+
+    `_run_full_analysis` 直接把 `request.features_path` 餵給 `analyzer.analyze`，
+    **從不碰 registry**（沒有 `get_entry`／`find_latest_materialized`／`load_multi`）。
+    因此對它去查 latest 會擋掉一個根本不會載入任何 registry run 的請求——
+    那正是 `CODEX-R4-P1-01` 那一族的誤擋，只是換**主委自己**在結構修正時犯。
+    **本條由主委自攻抓到、未進 review**；它示範了 `resolve_planned_feature_count` 的維護風險：
+    「鏡像 service」只有在**逐個入口**對齊時才成立，多一個入口就多一份對齊責任。
+    """
+    cap = int(settings.ic_analysis_max_features)
+    inject_latest_run("ICGATEBIG", cap + 5_000)
+    # 🔴 **本請求刻意不帶 `features_path`**：帶了的話 longitudinal 分支也會優先用它，
+    #    於是「拿掉入口分支」這個變異不改變行為 ⇒ 錄到**空紅集合**（實際發生過一次）。
+    #    只有在「有 symbol／timeframe、無 features_path」時，兩條分支的行為才分岔：
+    #    正確碼回 None（放行），錯誤碼去查 latest 並擋下。
+    r = client.post(f"{API}/full-analysis", json={
+        "symbol": "ICGATEBIG", "timeframe": "12h",
+        "labels_path": "/tmp/pretend-labels.h5",
+    })
+    detail = r.json().get("detail") if r.status_code == 400 else None
+    assert not (isinstance(detail, dict) and "cap" in detail), (
+        f"/full-analysis 被一個它根本不會載入的 latest 擋掉了：{r.text}"
+    )
+
+
 def test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest(monkeypatch):
     """🔴 `CODEX-R4-P1-02`：latest 解析**不得只信 registry 的 `feature_count`**。
 

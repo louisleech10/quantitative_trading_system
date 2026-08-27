@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b9",
   "mode": "verify",
-  "n_mutations": 26,
+  "n_mutations": 27,
   "results": [
     {
       "id": "6.0-M1",
@@ -354,10 +354,12 @@
       "desc": "解析器改用自己新建的 registry（與 service 快照不同步）",
       "rc": 1,
       "red": [
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
         "test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot"
       ],
       "verdict": "PASS",
       "expected": [
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
         "test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot"
       ]
     },
@@ -411,6 +413,19 @@
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis"
+      ]
+    },
+    {
+      "id": "6.1-M15",
+      "task": "6.1",
+      "desc": "full-analysis 也去查 latest（擋掉它不會載入的 run）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_full_analysis_does_not_resolve_latest"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_full_analysis_does_not_resolve_latest"
       ]
     }
   ],

@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/v1/ic")
 logger = get_logger("api.routes.ic_analysis")
 
 
-def _reject_when_over_feature_cap(request) -> None:
+def _reject_when_over_feature_cap(request, *, entrypoint: str = "analyze") -> None:
     """GAP-3 UX Task 6.1：**啟動任務之前**擋下特徵數超量之分析請求。
 
     🔴 **本 Task 為過渡止血**：GAP-6 之分塊計算上線後由該機制取代，本函式屆時**一併刪除**
@@ -68,7 +68,8 @@ def _reject_when_over_feature_cap(request) -> None:
     #    且此處每次 `FeatureRegistry()` 重讀磁碟，而 service 的 registry 在行程啟動時就讀好。
     #    兩份邏輯、兩份快照 ⇒ 四輪 review 抓到四種不同步（少一味＝該擋沒擋；多一味＝誤擋）。
     #    現在由「決定要載入什麼的人」回答「它有多大」，鏡像成為結構性質而非人工維護的副本。
-    feature_count = ic_analysis_service.resolve_planned_feature_count(request)
+    feature_count = ic_analysis_service.resolve_planned_feature_count(
+        request, entrypoint=entrypoint)
     if feature_count is None:
         return
     cap = int(settings.ic_analysis_max_features)
@@ -233,7 +234,7 @@ async def start_full_analysis(request: ICFullAnalysisRequest):
     # Task 6.1：🔴 **本端點原本完全沒套閘門**（`CODEX-R1-P1-01`）——只擋 `/analyze`
     # 等於留了一扇同樣會把記憶體吃爆的門。閘門要擋的是「啟動分析任務」這件事，
     # 不是某一個 URL，所以**每個會啟動任務的入口都要套**。
-    _reject_when_over_feature_cap(request)
+    _reject_when_over_feature_cap(request, entrypoint="full_analysis")
     try:
         return await ic_analysis_service.start_full_analysis(request)
     except ValueError as exc:
