@@ -68,6 +68,31 @@ class ICAnalysisService:
         self._last_task_id: Optional[str] = None
         self._feature_library = create_feature_library()
 
+    @staticmethod
+    def _plan_cross_sectional_load(request):
+        """橫截面模式下**實際會餵給 `load_multi` 的 `(symbols, config_hashes)`**。
+
+        🔴 **本方法是止血閘與實際載入的唯一共用來源**。R5 兩家各自打出一條反例，
+          證明「把選擇規則在兩處各推導一次」即使搬進同一個 class 也不夠：
+
+          | ID | 方向 | 原因 |
+          |---|---|---|
+          | `COMPOSER-R5-P1-01` | 該擋沒擋 | 逐筆 `config_hash` 為**空字串**時，解析器 `get_entry(…, "")` 回 `None` 放行；而 `load_multi` 看到 falsy hash 會走 `find_latest` ⇒ 實際載入 161,031 |
+          | `CODEX-R5-P1-01` | 不該擋卻擋 | 同一 symbol 出現兩次時，loader 以 **symbol 為 dict key**（後者覆蓋前者），而解析器對每一筆取 max ⇒ 誤擋 |
+
+          兩者都是「重新推導」而非「共用」的必然結果。改成本方法之後，
+          兩條規則（**dict 去重、後者勝** ／ **空 hash 視同未指定**）各只存在一份。
+        """
+        runs = list(getattr(request, "cross_sectional_runs", None) or [])
+        if runs:
+            # 🔴 逐字沿用 loader 原本的 dict comprehension 語意：同 symbol **後者覆蓋前者**
+            config_hashes = {item.symbol: item.config_hash for item in runs}
+            symbols_resolved = [item.symbol for item in runs]
+            return symbols_resolved, config_hashes
+        if getattr(request, "symbols", None):
+            return list(request.symbols), None
+        return None, None
+
     def resolve_planned_feature_count(self, request, *, entrypoint: str = "analyze") -> Optional[int]:
         """GAP-3 UX Task 6.1／6.3：**這次分析實際會載入的那些 run** 有幾個特徵。
 
@@ -120,23 +145,22 @@ class ICAnalysisService:
         if getattr(request, "mode", "longitudinal") == "cross_sectional":
             if not timeframe:
                 return None
-            cross_runs = list(getattr(request, "cross_sectional_runs", None) or [])
-            if cross_runs:
-                entries = [
-                    self._feature_library.get_entry(
-                        getattr(ref, "symbol", None), timeframe,
-                        (getattr(ref, "config_hash", "") or "").strip(),
-                    )
-                    for ref in cross_runs
-                ]
-            elif getattr(request, "symbols", None):
-                # `config_hashes=None` ⇒ `load_multi` 逐標的取 latest
-                entries = [
-                    self._feature_library.find_latest_materialized(sym, timeframe)
-                    for sym in request.symbols
-                ]
-            else:
+            symbols_resolved, config_hashes = self._plan_cross_sectional_load(request)
+            if symbols_resolved is None:
                 return None
+            # 🔴 **逐字鏡像 `load_multi` 的行為**（`CODEX-R5-P1-01`＋`COMPOSER-R5-P1-01`）：
+            #    ① 以 symbol 去重（dict key 語意；同 symbol 只會被載入一次、且用最後那筆 hash）
+            #    ② hash 為 falsy（含**空字串**）⇒ 該標的走 `find_latest_materialized`，
+            #       與 `feature_library.load(config_hash=None)` 之 `if config_hash:` 一致
+            entries = []
+            for sym in dict.fromkeys(symbols_resolved):
+                raw = (config_hashes or {}).get(sym)
+                run_hash = raw.strip() if isinstance(raw, str) else ""
+                entries.append(
+                    self._feature_library.get_entry(sym, timeframe, run_hash)
+                    if run_hash
+                    else self._feature_library.find_latest_materialized(sym, timeframe)
+                )
             counts = [c for c in (feature_count_from_registry_entry(e) for e in entries)
                       if isinstance(c, int)]
             # 任一標的超標即擋整組——橫截面本來就把它們一起載入，擋掉一筆不會降低峰值
@@ -239,13 +263,8 @@ class ICAnalysisService:
                 if not request.timeframe:
                     raise ValueError("timeframe is required for cross_sectional mode")
 
-                if request.cross_sectional_runs:
-                    symbols_resolved = [item.symbol for item in request.cross_sectional_runs]
-                    config_hashes = {item.symbol: item.config_hash for item in request.cross_sectional_runs}
-                elif request.symbols:
-                    symbols_resolved = list(request.symbols)
-                    config_hashes = None
-                else:
+                symbols_resolved, config_hashes = self._plan_cross_sectional_load(request)
+                if symbols_resolved is None:
                     raise ValueError("cross_sectional mode requires cross_sectional_runs or symbols")
 
                 if len(symbols_resolved) < 2:

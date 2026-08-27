@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b9",
   "mode": "verify",
-  "n_mutations": 27,
+  "n_mutations": 29,
   "results": [
     {
       "id": "6.0-M1",
@@ -12,6 +12,7 @@
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
         "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
         "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
         "test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
@@ -27,6 +28,7 @@
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
         "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
         "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
         "test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
@@ -60,6 +62,7 @@
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
         "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
         "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
@@ -72,6 +75,7 @@
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
         "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
         "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
@@ -89,6 +93,7 @@
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
         "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
         "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
@@ -101,6 +106,7 @@
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
         "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
         "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
@@ -115,11 +121,13 @@
       "desc": "閘門不看 cross_sectional_runs（橫截面繞過）",
       "rc": 1,
       "red": [
-        "test_gap3_ic_feature_cap_covers_cross_sectional_runs"
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest"
       ],
       "verdict": "PASS",
       "expected": [
-        "test_gap3_ic_feature_cap_covers_cross_sectional_runs"
+        "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest"
       ]
     },
     {
@@ -426,6 +434,34 @@
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_feature_cap_full_analysis_does_not_resolve_latest"
+      ]
+    },
+    {
+      "id": "6.1-M16",
+      "task": "6.1",
+      "desc": "逐筆空字串 hash 不視同未指定（該擋沒擋）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest"
+      ]
+    },
+    {
+      "id": "6.1-M17",
+      "task": "6.1",
+      "desc": "橫截面不以 symbol 去重（用不會被載入的那筆去擋）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_duplicate_symbol_uses_last_hash_like_loader"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_duplicate_symbol_uses_last_hash_like_loader"
       ]
     }
   ],

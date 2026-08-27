@@ -353,7 +353,8 @@ def test_gap3_ic_feature_cap_cross_sectional_ignores_top_level_features_path(spy
     assert spy_start_analysis != [], "請求沒有抵達 service ⇒ 被閘門擋掉了"
 
 
-def test_gap3_ic_feature_cap_full_analysis_does_not_resolve_latest(spy_start_analysis, inject_latest_run):
+def test_gap3_ic_feature_cap_full_analysis_does_not_resolve_latest(
+        spy_start_analysis, inject_latest_run, monkeypatch):
     """🔴 `/full-analysis` 與 `/analyze` **走的不是同一條載入路徑**，閘門必須分開對齊。
 
     `_run_full_analysis` 直接把 `request.features_path` 餵給 `analyzer.analyze`，
@@ -365,18 +366,75 @@ def test_gap3_ic_feature_cap_full_analysis_does_not_resolve_latest(spy_start_ana
     """
     cap = int(settings.ic_analysis_max_features)
     inject_latest_run("ICGATEBIG", cap + 5_000)
+
+    # 🔴 `CODEX-R5-P2-01`：本條原本只斷言「400 的 detail 不含 cap」，
+    #    於是 full-analysis **非同步失敗**（`features_path=None` 傳給 analyzer）時它照樣綠——
+    #    綠燈證明不了「閘門放行了」。改成觀測 stub ＋ **無條件斷言請求確實抵達 service**。
+    calls = []
+
+    async def spy_full(request):
+        calls.append(request)
+        return {"task_id": "gap3-full-observed", "status": "running"}
+
+    monkeypatch.setattr(svc_mod.ic_analysis_service, "start_full_analysis", spy_full)
+
     # 🔴 **本請求刻意不帶 `features_path`**：帶了的話 longitudinal 分支也會優先用它，
     #    於是「拿掉入口分支」這個變異不改變行為 ⇒ 錄到**空紅集合**（實際發生過一次）。
-    #    只有在「有 symbol／timeframe、無 features_path」時，兩條分支的行為才分岔：
-    #    正確碼回 None（放行），錯誤碼去查 latest 並擋下。
+    #    只有在「有 symbol／timeframe、無 features_path」時，兩條分支的行為才分岔。
     r = client.post(f"{API}/full-analysis", json={
         "symbol": "ICGATEBIG", "timeframe": "12h",
         "labels_path": "/tmp/pretend-labels.h5",
     })
-    detail = r.json().get("detail") if r.status_code == 400 else None
-    assert not (isinstance(detail, dict) and "cap" in detail), (
-        f"/full-analysis 被一個它根本不會載入的 latest 擋掉了：{r.text}"
-    )
+    assert calls != [], f"/full-analysis 被一個它根本不會載入的 latest 擋掉了：{r.text}"
+    assert r.status_code == 200, f"閘門放行但請求未成功建立任務：{r.text}"
+
+
+def test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest(spy_start_analysis, inject_latest_run):
+    """🔴 `COMPOSER-R5-P1-01`（**該擋沒擋**）：逐筆 `config_hash` 為**空字串**時，
+    `load_multi` 看到 falsy hash 會走 `find_latest`，閘門必須跟著走同一條。
+
+    原碼 `get_entry(sym, tf, "")` 回 `None` ⇒ 所有候選解析不出 ⇒ 放行，
+    而實際載入的是 latest（本機 161,031 > cap）。
+    這是「解析器與 loader 不等價」的第三種形態——前兩種在 R4。
+    """
+    cap = int(settings.ic_analysis_max_features)
+    inject_latest_run("ICGATEBIG", cap + 9_000)
+    inject_latest_run("ICGATESMALL", 100)
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h",
+        "cross_sectional_runs": [
+            {"symbol": "ICGATESMALL", "config_hash": ""},
+            {"symbol": "ICGATEBIG", "config_hash": ""},
+        ],
+    })
+    assert r.status_code == 400, f"空字串 hash 繞過了閘門：{r.text}"
+    assert r.json()["detail"]["feature_count"] == cap + 9_000, "空 hash 未被視同『未指定 run』"
+    assert spy_start_analysis == [], "任務被啟動了 ⇒ 空 hash 這條路沒被擋住"
+
+
+def test_gap3_ic_feature_cap_duplicate_symbol_uses_last_hash_like_loader(
+        spy_start_analysis, inject_latest_run):
+    """🔴 `CODEX-R5-P1-01`（**不該擋卻擋**）：同一 symbol 在 `cross_sectional_runs` 出現兩次時，
+    `load_multi` 收到的是 **symbol-keyed dict**（後者覆蓋前者）⇒ 實際只載入最後那筆。
+
+    閘門若對每一筆取 max，就會用一個**根本不會被載入**的 run 去擋 ⇒ 誤擋。
+    codex RECHECK：`resolver_planned_count=80516` 而 `actual_loaded_keys={'BTCUSDT': 'small'}`。
+    判準＝以 symbol 去重、取最後那筆（逐字沿用 loader 的 dict comprehension 語意）。
+    """
+    cap = int(settings.ic_analysis_max_features)
+    big = inject_latest_run("ICGATEDUP", cap + 3_000)
+    small = inject_latest_run("ICGATEDUP", 100)
+    other = inject_latest_run("ICGATEOTHER", 100)
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h",
+        "cross_sectional_runs": [
+            {"symbol": "ICGATEDUP", "config_hash": big["config_hash"]},     # 會被下一筆覆蓋
+            {"symbol": "ICGATEDUP", "config_hash": small["config_hash"]},   # loader 實際用這筆
+            {"symbol": "ICGATEOTHER", "config_hash": other["config_hash"]},
+        ],
+    })
+    assert r.status_code != 400, f"用一個不會被載入的 run 誤擋了：{r.text}"
+    assert spy_start_analysis != [], "請求沒有抵達 service ⇒ 被閘門擋掉了"
 
 
 def test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest(monkeypatch):
