@@ -37,8 +37,36 @@ def _task_count() -> int:
         return len(service._tasks)
 
 
+@pytest.fixture(autouse=True)
+def _never_actually_run_analysis(monkeypatch):
+    """🔴 **本檔一律不真的跑分析**——替身只把任務放進 store 就回。
+
+    為什麼必須這樣：本檔驗的是**閘門的位置**（在建任務之前還是之後），
+    而不是分析本身。若讓它真的跑，`6.1-M1` 那條變異（把閘門移到任務啟動之後）
+    會讓 218,369 特徵的分析真的啟動，測試就在那裡乾等——實測卡住十分鐘、
+    最後由主委手動終止（2026-08-27）。替身讓「位置錯了 ⇒ 任務先被建立」
+    這個判準**在一秒內**就得到答案，且不會吃掉機器的記憶體。
+    """
+    service = svc_mod.ic_analysis_service
+
+    async def fake_start(request):
+        task_id = "gap3-stop-gate-stub"
+        with service._lock:  # noqa: SLF001
+            service._tasks[task_id] = {"task_id": task_id, "status": "running", "progress": 0.0}
+        return {"task_id": task_id, "status": "running"}
+
+    monkeypatch.setattr(service, "start_analysis", fake_start)
+    yield
+    with service._lock:  # noqa: SLF001
+        service._tasks.pop("gap3-stop-gate-stub", None)
+
+
 def test_gap3_ic_feature_cap_rejects_big_run_without_creating_task():
-    """邊界①：超量 ⇒ 400 且**任務未被建立**。"""
+    """邊界①：超量 ⇒ 400 且**任務未被建立**。
+
+    🔴 替身會在被呼叫時**真的**把任務放進 store ⇒ 閘門若移到 service 之後，
+    這條的 `_task_count() == before` 立刻失敗。判準因此與「分析跑不跑得完」無關。
+    """
     before = _task_count()
     r = client.post(f"{API}/analyze", json={
         "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": BIG_RUN_CONFIG_HASH,
@@ -84,6 +112,9 @@ def test_gap3_ic_feature_cap_value_is_backed_by_measurement_receipt():
     receipt = REPO / "handoffs" / "run_receipts" / "gap3ux-b9-footprint.receipt.json"
     assert receipt.exists(), "上限值必須有量測 receipt 佐證（Task 6.2 之死線）"
     data = json.loads(receipt.read_text(encoding="utf-8"))
+    # 🔴 頂層與逐點**都要**驗工具字面：receipt 兩處各有一個 `tool`，只驗其中一處時
+    #    改另一處不會被察覺（mutation `6.2-M1` 首次錄到空紅集合就是打在頂層那處）。
+    assert data["tool"] == "sample:Physical footprint", "禁以 ps rss 當量測值（頂層）"
     points = data["points"]
     assert len(points) >= 3, f"量測點須 >= 3，實得 {len(points)}"
     for p in points:                              # 六欄齊全
@@ -130,23 +161,11 @@ def test_gap3_ic_stop_gate_alive_no_big_matrix_loaded():
     assert growth_mb < 256, f"擋下時記憶體成長 {growth_mb:.1f}MB ⇒ 疑似已載入特徵矩陣"
 
 
-def test_gap3_ic_stop_gate_alive_small_run_still_creates_task(monkeypatch):
+def test_gap3_ic_stop_gate_alive_small_run_still_creates_task():
     """邊界②：小 run ⇒ 不被擋，且任務**確實被建立**（筆數 +1）。
 
     🔴 對照組：沒有這條的話，「把所有請求都擋掉」也會讓邊界①全綠。
-    以替身取代 service 之實際分析（本條驗的是閘門放行與建任務，不是跑完分析）。
     """
-    service = svc_mod.ic_analysis_service
-    created = {}
-
-    async def fake_start(request):
-        task_id = "gap3-stop-gate-small"
-        with service._lock:  # noqa: SLF001
-            service._tasks[task_id] = {"task_id": task_id, "status": "running", "progress": 0.0}
-        created["id"] = task_id
-        return {"task_id": task_id, "status": "running"}
-
-    monkeypatch.setattr(service, "start_analysis", fake_start)
     before = _task_count()
     r = client.post(f"{API}/analyze", json={
         "symbol": "BTCUSDT", "timeframe": "12h",
@@ -154,5 +173,3 @@ def test_gap3_ic_stop_gate_alive_small_run_still_creates_task(monkeypatch):
     })
     assert r.status_code == 200, r.text
     assert _task_count() == before + 1, "小 run 未建立任務 ⇒ 閘門誤擋"
-    with service._lock:  # noqa: SLF001
-        service._tasks.pop(created.get("id"), None)

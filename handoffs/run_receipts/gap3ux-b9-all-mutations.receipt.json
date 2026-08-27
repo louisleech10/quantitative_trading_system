@@ -1,0 +1,136 @@
+{
+  "epic": "gap3ux-b9",
+  "mode": "verify",
+  "n_mutations": 8,
+  "results": [
+    {
+      "id": "6.0-M1",
+      "task": "6.0",
+      "desc": "契約移除 analysis_rejected 分類",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
+        "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
+        "test_gap3_ic_feature_cap_reason_membership_not_equality",
+        "test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract",
+        "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
+        "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
+        "test_gap3_ic_feature_cap_reason_membership_not_equality",
+        "test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract",
+        "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+      ]
+    },
+    {
+      "id": "6.0-M2",
+      "task": "6.0",
+      "desc": "api 層硬寫 reason 字面",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend"
+      ]
+    },
+    {
+      "id": "6.1-M1",
+      "task": "6.1/6.4",
+      "desc": "cap 檢查移到任務啟動之後",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
+        "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
+        "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+      ]
+    },
+    {
+      "id": "6.1-M2",
+      "task": "6.1",
+      "desc": "拿掉 cap 檢查",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
+        "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
+        "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
+        "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+      ]
+    },
+    {
+      "id": "6.2-M1",
+      "task": "6.2",
+      "desc": "量測工具改回 ps rss",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_value_is_backed_by_measurement_receipt"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_value_is_backed_by_measurement_receipt"
+      ]
+    },
+    {
+      "id": "6.2-M2",
+      "task": "6.2",
+      "desc": "量測點數 < 3",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_value_is_backed_by_measurement_receipt"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_value_is_backed_by_measurement_receipt"
+      ]
+    },
+    {
+      "id": "6.3-M1",
+      "task": "6.3",
+      "desc": "response model 移除 feature_count",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_progress_fields_exposes_feature_count"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_progress_fields_exposes_feature_count"
+      ]
+    },
+    {
+      "id": "6.3-M2",
+      "task": "6.3",
+      "desc": "解析不到時填假值",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_progress_fields_no_fake_value_when_unresolvable"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_progress_fields_no_fake_value_when_unresolvable"
+      ]
+    }
+  ],
+  "baseline_after_restore": {
+    "gate": {
+      "rc": 0,
+      "red": []
+    }
+  },
+  "closure": "CLOSED"
+}

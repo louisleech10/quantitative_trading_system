@@ -88,6 +88,31 @@
 - **FU-2 cache close all-NaN carrier index 對齊**：kline `RangeIndex` vs features `DatetimeIndex` 對不齊。
   **是票 A／票 B 的硬前置**（全 NaN carrier 上無法接真歸因）。
 
+### 🔴 票 MEM-RSS：Feature Factory 之記憶體閘以 RSS 為判準，在 macOS 上可能**漏擋**（2026-08-27 登記；**不插隊**，使用者裁定先做完 B9／IC-Analysis）
+
+**觸發**：GAP-3 B9 之 Task 6.2 實跑量測時，同一時刻實測 **RSS 72MB vs Physical footprint 5.7GB（差 79 倍）**。
+機制：macOS 之 memory compression 會把不常碰的頁**就地壓縮**，壓縮後**不再算 resident**
+⇒ 記憶體壓力愈大、RSS 反而愈小，**方向是反的**。
+
+**受影響之處（讀碼所得，逐條可查）**：
+- `momentum/FeatureEngineering/feature_factory.py:2215`
+  `if float(ic_memory.peak_rss_gb) > peak_budget_gb: raise MemoryError(...)`
+  ——**這是會真的擋下執行的閘**，判準為 RSS ⇒ 真正快爆時 `peak_rss_gb` 反而變小、閘門讓它過去。
+- `feature_factory.py::_check_ic_memory_budget_after_raw_persist`
+  以 `rss_before - rss_after` 當「gc 釋放了多少」⇒ 頁面只是被**壓縮**時也會得出好看的正數。
+- `memmap_utils.py:213` 之 RSS 僅供 log，不做決策 ⇒ 不受影響（但同樣會誤導讀 log 的人）。
+
+🔴 **誠實邊界**：以上為**讀碼＋機制推論**，**未對 Feature Factory 實跑對照量測**。
+要斷定「該閘實際漏擋過」，須拿真實大 run 同時量 RSS 與 footprint 對照。
+另：Linux 無預設記憶體壓縮，影響顯著較小（RSS 僅少了 swap 部分）——**本票之嚴重度綁 macOS**。
+
+**修法（順序不得顛倒）**：①先做對照量測，**證明現行閘會漏擋**；②再把判準換成
+macOS＝`sample`／`footprint` 之 Physical footprint、Linux＝`smaps_rollup` 或 cgroup 統計；
+③保留 `_available_ram_gb()`（判系統可用 RAM，不受本問題影響）。
+🔴 **先證明再改**——那是一道會 `raise` 的閘，憑推論就動它可能把正常的 run 擋掉。
+
+**可複用**：`scripts/measure_ic_footprint.sh`（B9 產出，已含單一 pid 判定與安全閥）。
+
 ---
 
 ## 測試策略（2026-08-14 使用者定：「邊走邊建立」）

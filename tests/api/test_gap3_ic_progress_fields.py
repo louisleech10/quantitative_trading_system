@@ -69,6 +69,16 @@ def test_gap3_ic_progress_fields_no_fake_value_when_unresolvable():
     assert resolve_run_feature_count(config_hash="no-such-hash") is None
     assert resolve_run_feature_count(config_hash=None) is None
 
+    # 🔴 **service 端的 helper 也要驗**：上面兩條驗的是 momentum 那支函式，
+    #    而任務裡實際填值的是 `ic_analysis_service._resolve_feature_count`。
+    #    只驗前者時，把後者改成「解析不到就填 0」不會被察覺（mutation `6.3-M2` 實測）。
+    class _Req:
+        config_hash = "no-such-hash-at-all"
+        symbol = "BTCUSDT"
+        timeframe = "12h"
+
+    assert svc_mod._resolve_feature_count(_Req()) is None, "解析不到卻填了假值"
+
 
 def test_gap3_ic_progress_fields_resolver_reads_registry_only():
     """🔴 解析器只讀 registry、**不開 HDF5**——Task 6.4 要證明「擋下時未載入大矩陣」。
