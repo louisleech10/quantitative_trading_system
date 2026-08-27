@@ -777,6 +777,40 @@ def resolve_run_feature_count(
     return int(count) if isinstance(count, int) else None
 
 
+def feature_count_from_features_file(features_path: Optional[str]) -> Optional[int]:
+    """GAP-3 UX Task 6.1：從特徵檔**只讀中繼資料**取欄數（**不載入矩陣**）。
+
+    🔴 為什麼需要它（`CODEX-R1-P1-01` ＋ `GROK-R1-P1-01`，兩家一致要求本批補）：
+      閘門原本只認 `config_hash`，於是呼叫端直接給 `features_path`（或更糟——
+      「小 hash ＋ 實際大 features_path」）就能低報、繞過止血閘並啟動大 run。
+      首版把這個破口只寫成具名殘留，grok 明確反對：「應在本批補上而非只具名」。
+
+    🔴 **只讀 shape，不讀資料**：`h5py` 之 `dataset.shape` 取自檔案 header，
+      不會把矩陣讀進記憶體（實測毫秒級），因此不違反 Task 6.4 之「擋下時未載入大矩陣」。
+      取 `features` 資料集之第二維＝特徵數；讀不到就回 `None`，**不猜**。
+    """
+    if not features_path:
+        return None
+    path = Path(features_path)
+    if not path.is_file():
+        return None
+    try:
+        import h5py
+
+        with h5py.File(str(path), "r") as handle:
+            found: List[int] = []
+
+            def visit(_name: str, obj) -> None:
+                if isinstance(obj, h5py.Dataset) and _name.rsplit("/", 1)[-1] == "features":
+                    if len(obj.shape) == 2:
+                        found.append(int(obj.shape[1]))
+
+            handle.visititems(visit)
+        return max(found) if found else None
+    except Exception:  # noqa: BLE001 — 讀不到就當作解析不出來，不讓量測工具的問題變成閘門的問題
+        return None
+
+
 def ic_report_reason(category: str, index: int = 0) -> str:
     """GAP-3 UX Task 6.0：IC 側契約之 reason 字面出口（api 層唯一取用點）。
 

@@ -51,13 +51,27 @@ def _reject_when_over_feature_cap(request) -> None:
 
     🔴 **不提供「強制略過上限」之開關**（SPEC Task 6.1「不可做」）。
     """
-    from momentum.factories import ic_report_reason, resolve_run_feature_count
-
-    feature_count = resolve_run_feature_count(
-        config_hash=(request.config_hash or "").strip() or None,
-        symbol=getattr(request, "symbol", None),
-        timeframe=getattr(request, "timeframe", None),
+    from momentum.factories import (
+        feature_count_from_features_file,
+        ic_report_reason,
+        resolve_run_feature_count,
     )
+
+    # 🔴 **兩個來源都要看，取最大值**（`CODEX-R1-P1-01`＋`GROK-R1-P1-01`，兩家一致）：
+    #    只認 `config_hash` 時，呼叫端直接給 `features_path` 就能繞過；更糟的是
+    #    「小 hash ＋ 實際大 `features_path`」可以**低報**。取 max 讓兩條路都守得住，
+    #    且不必信任呼叫端宣稱的是哪一個。
+    #    🔴 檔案側只讀 HDF5 header 之 shape，**不載入矩陣**（Task 6.4 之硬性要求）。
+    candidates = [
+        resolve_run_feature_count(
+            config_hash=(request.config_hash or "").strip() or None,
+            symbol=getattr(request, "symbol", None),
+            timeframe=getattr(request, "timeframe", None),
+        ),
+        feature_count_from_features_file(getattr(request, "features_path", None)),
+    ]
+    known = [c for c in candidates if isinstance(c, int)]
+    feature_count = max(known) if known else None
     if feature_count is None:
         return
     cap = int(settings.ic_analysis_max_features)

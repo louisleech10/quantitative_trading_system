@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b9",
   "mode": "verify",
-  "n_mutations": 10,
+  "n_mutations": 11,
   "results": [
     {
       "id": "6.0-M1",
@@ -10,6 +10,7 @@
       "rc": 1,
       "red": [
         "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_reason_membership_not_equality",
         "test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract",
@@ -19,6 +20,7 @@
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_reason_membership_not_equality",
         "test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract",
@@ -45,12 +47,14 @@
       "desc": "cap 檢查移到任務啟動之後",
       "rc": 1,
       "red": [
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
         "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
       ],
       "verdict": "PASS",
       "expected": [
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
         "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
@@ -62,15 +66,30 @@
       "desc": "拿掉 cap 檢查",
       "rc": 1,
       "red": [
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
         "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
       ],
       "verdict": "PASS",
       "expected": [
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
         "test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
         "test_gap3_ic_stop_gate_alive_no_big_matrix_loaded"
+      ]
+    },
+    {
+      "id": "6.1-M3",
+      "task": "6.1",
+      "desc": "閘門不看 features_path（繞過復活）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_reads_features_path_not_just_hash"
       ]
     },
     {

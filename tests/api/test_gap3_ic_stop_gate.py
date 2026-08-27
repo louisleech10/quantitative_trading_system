@@ -96,22 +96,58 @@ def test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded():
     assert r.json()["detail"]["reason"] == ic_report_reason("analysis_rejected")
 
 
-def test_gap3_ic_feature_cap_unresolvable_is_allowed_through():
-    """解析不出特徵數 ⇒ **不擋**（本閘只擋「已知超量」）。
+def test_gap3_ic_feature_cap_unresolvable_is_allowed_through(spy_start_analysis):
+    """解析不出特徵數且**無 `features_path`** ⇒ 不被本閘擋（本閘只擋「已知超量」）。
 
-    🔴 具名破口：API 呼叫端硬塞 `features_path` 指向大 run 可繞過本閘。
-    因本 Task 為過渡止血、且該路徑非使用者介面之路徑，接受並具名記錄。
-    本條同時是那個決策的**載體**：若日後改成 fail-closed，這裡會紅、逼人回來看理由。
+    🔴 `GROK-R1-P2-01`：本條原本寫成
+       `assert detail.get("reason") != "..." or True` ——**恆真、證明不了任何事**；
+       且成功路徑為 200 時整個 `if status_code == 400` 區塊根本不執行。
+       改為**無條件斷言**：不論回什麼碼，都必須證明「閘門放行了」＝
+       `start_analysis` 確實被呼叫到（那才是『沒被 cap 擋下』的證據）。
     """
     r = client.post(f"{API}/analyze", json={
         "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": "no-such-hash-at-all",
     })
-    # 不是被 cap 擋掉的 400（可能因別的原因失敗，但 reason 不會是 cap）
-    if r.status_code == 400:
-        detail = r.json().get("detail")
-        if isinstance(detail, dict):
-            assert detail.get("reason") != "feature_count_exceeds_cap" or True
-            assert "cap" not in detail, f"未解析出特徵數卻被 cap 擋下：{detail}"
+    # 🔴 無條件：閘門放行 ⇒ 請求必定抵達 service（之後是否失敗與本閘無關）
+    assert spy_start_analysis != [], "閘門把『解析不出特徵數』的請求擋掉了 ⇒ 與本 Task 之決策不符"
+    detail = r.json().get("detail")
+    if isinstance(detail, dict):
+        assert "cap" not in detail, f"未解析出特徵數卻被 cap 擋下：{detail}"
+
+
+def test_gap3_ic_feature_cap_reads_features_path_not_just_hash(spy_start_analysis, monkeypatch):
+    """🔴 `CODEX-R1-P1-01`＋`GROK-R1-P1-01`：`features_path` 這條路也必須被閘門看見。
+
+    兩家一致要求本批修（不接受只具名）。最惡形態是「**小 hash ＋ 實際大 `features_path`**」
+    ——宣稱一個小 run、實際載入大的。故閘門取兩個來源之**最大值**。
+    """
+    from momentum import factories
+
+    # 以替身模擬「檔案側算出超量」，避免測試依賴本機是否存在某個大特徵檔
+    monkeypatch.setattr(factories, "feature_count_from_features_file",
+                        lambda p: 999_999 if p else None)
+    r = client.post(f"{API}/analyze", json={
+        "symbol": "BTCUSDT", "timeframe": "12h",
+        "config_hash": "a6a998593c3c55aa54e5d6fa537114b4",   # 只有 15 個特徵的小 hash
+        "features_path": "/tmp/pretend-big-features.h5",
+    })
+    assert r.status_code == 400, f"小 hash＋大 features_path 繞過了閘門：{r.text}"
+    assert r.json()["detail"]["feature_count"] == 999_999, "取的不是兩者最大值"
+    assert spy_start_analysis == [], "任務被啟動了 ⇒ 閘門沒擋住這條路"
+
+
+def test_gap3_ic_feature_cap_features_file_reads_metadata_only():
+    """檔案側解析**只讀 HDF5 header 之 shape**，不載入矩陣（Task 6.4 之硬性要求）。"""
+    from momentum.factories import feature_count_from_features_file
+
+    sample = sorted((REPO / "data_cache" / "features").glob("*.h5"))
+    if not sample:
+        pytest.skip("本機無特徵檔可做正向對照")
+    count = feature_count_from_features_file(str(sample[0]))
+    assert isinstance(count, int) and count > 0, "讀不到欄數 ⇒ 檔案側解析形同虛設"
+    # 讀不到／不存在一律 None，不猜
+    assert feature_count_from_features_file("/no/such/file.h5") is None
+    assert feature_count_from_features_file(None) is None
 
 
 def test_gap3_ic_feature_cap_value_is_backed_by_measurement_receipt():
