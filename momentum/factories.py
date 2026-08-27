@@ -777,6 +777,42 @@ def resolve_run_feature_count(
     return int(count) if isinstance(count, int) else None
 
 
+def resolve_latest_run_feature_count(
+    *, symbol: Optional[str] = None, timeframe: Optional[str] = None,
+) -> Optional[int]:
+    """GAP-3 UX Task 6.1：解析**省略 `config_hash` 時 service 會實際載入的那個 run** 的特徵數。
+
+    🔴 **為什麼它與 `resolve_run_feature_count` 的「沒有 latest fallback」不衝突**——
+      兩者處理的是**不同情境**，這個區別是 R3 三家一致 finding 的核心：
+      · 呼叫端**有給** `config_hash` ⇒ 該 hash 就是要分析的 run，此時再去取 latest
+        會拿到**別的** run 的數字（實測 `BTCUSDT/12h` 最新一筆是 15 個特徵，
+        而同組合另有 218,369）⇒ 用它守門比不守更糟。故該函式**刻意不做** fallback。
+      · 呼叫端**沒給** `config_hash` ⇒ service 自己會走 `find_latest_materialized`
+        並載入那個 run。此時 latest **就是**要分析的 run，閘門必須看它，
+        否則整條路徑對閘門完全隱形。
+
+    🔴 出生事故（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／`GROK-R3-P1-01`＋`P1-02`，**三家一致**）：
+      閘門原本在「所有候選都解析不出」時放行，而 `{"symbol":"BCHUSDT","timeframe":"12h"}`
+      與 `{"mode":"cross_sectional","symbols":[...]}` 兩種 payload 正好落在這個洞裡——
+      三家各自實跑：不帶 hash ⇒ 200 且 `start_analysis` 被呼叫，本機 latest 為
+      161,031／161,092（cap 80,515）；同一請求補上 hash ⇒ 400、`calls=0`。
+
+    🔴 **必須用 `find_latest_materialized` 而非 `find_latest`**：service 用的是前者
+      （會跳過 `deleting` 與 manifest 不存在的 orphan 登記）。閘門要**鏡像 service 的解析**，
+      用不同的挑選規則就會守到別的 run。
+    🔴 仍然只讀 registry 與 manifest 的 `is_file()`，**不開 HDF5**（Task 6.4 之硬性要求）。
+    """
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    if not symbol or not timeframe:
+        return None
+    entry = FeatureRegistry().find_latest_materialized(str(symbol), str(timeframe))
+    if entry is None:
+        return None
+    count = entry.get("feature_count")
+    return int(count) if isinstance(count, int) else None
+
+
 def feature_count_from_features_file(features_path: Optional[str]) -> Optional[int]:
     """GAP-3 UX Task 6.1：從特徵檔**只讀中繼資料**取欄數（**不載入矩陣**）。
 
@@ -802,13 +838,21 @@ def feature_count_from_features_file(features_path: Optional[str]) -> Optional[i
         tokens = {t.strip() for t in str(features_path).replace("/", ":").split(":") if t.strip()}
         if not tokens:
             return None
-        counts = [
-            int(e["feature_count"])
+        hits = [
+            e
             for e in FeatureRegistry().list_all()
             if str(e.get("config_hash") or "").strip() in tokens
             and isinstance(e.get("feature_count"), int)
         ]
-        return max(counts) if counts else None
+        if not hits:
+            return None
+        # 🔴 `CODEX-R3-P2-02`：識別字串 `parquet:<SYMBOL>:<config_hash>` **自己帶了 symbol**，
+        #    先前一律跨標的取 max ⇒ 會把被選標的的合法小 run 誤報成另一標的的大 run（false-block）。
+        #    只要識別字串裡的某個 token 命中登記中的 symbol，就把範圍收斂到那個標的；
+        #    真正無 scope 的參照（只有 hash）才維持跨標的 max。
+        scoped = [e for e in hits if str(e.get("symbol") or "").strip() in tokens]
+        chosen = scoped or hits
+        return max(int(e["feature_count"]) for e in chosen)
     try:
         import h5py
 

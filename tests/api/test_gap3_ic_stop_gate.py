@@ -161,24 +161,119 @@ def test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file(spy_start_
     """
     from momentum.factories import feature_count_from_features_file
 
-    # 🔴 該 hash 在 registry 對到**多筆**（不同標的）⇒ 本函式刻意取**跨標的最大值**：
-    #    寧可多擋不可少擋。故斷言的是「等於那些筆的 max」，不是某一筆。
+    # 🔴 該 hash 在 registry 對到**多筆**（不同標的）。
+    #    R2 首版一律取跨標的 max；`CODEX-R3-P2-02` 判定那是缺陷——識別字串**自己帶了 symbol**，
+    #    取別的標的的數字等於把被選 run 的合法小值誤報成大值（false-block）。
+    #    故本條現在釘的是「帶 symbol ⇒ 取該標的自己的數字」；
+    #    「無 symbol scope ⇒ 跨標的 max」由 `..._identifier_keeps_symbol_scope` 以替身 registry 釘住。
     import json as _json
 
     entries = _json.loads(
         (REPO / "data_cache" / "features" / "registry.json").read_text(encoding="utf-8"))
-    same_hash = [e["feature_count"] for e in entries
+    same_hash = [e for e in entries
                  if str(e.get("config_hash") or "").strip() == BIG_RUN_CONFIG_HASH
                  and isinstance(e.get("feature_count"), int)]
     assert same_hash, "本機 registry 無該 hash，無法做正向對照"
+    btc = [e["feature_count"] for e in same_hash if e.get("symbol") == "BTCUSDT"]
+    assert btc, "本機 registry 之該 hash 無 BTCUSDT 筆，無法做 symbol scope 對照"
     got = feature_count_from_features_file(f"parquet:BTCUSDT:{BIG_RUN_CONFIG_HASH}")
-    assert got == max(same_hash), f"識別字串形式未取跨標的最大值（得 {got}，應為 {max(same_hash)}）"
+    assert got == max(btc), f"識別字串未取被選標的自己的數字（得 {got}，應為 {max(btc)}）"
+    assert got > int(settings.ic_analysis_max_features), "本機該 run 未超 cap，無法續驗閘門擋下"
+    # 🔴 **必須顯式帶一個小 `config_hash`**，否則本條測不到它該測的東西：
+    #    R3 之後閘門在「沒帶 hash」時會去解析 latest（本機 BTCUSDT/12h latest 為 161,031 > cap），
+    #    於是即使閘門**完全不看** `features_path` 也照樣回 400 ⇒ 這條測試變成無法證偽。
+    #    實際被抓到過：`6.1-M3`（閘門不看 features_path）的紅集合因此從兩條縮成一條。
     r = client.post(f"{API}/analyze", json={
         "symbol": "BTCUSDT", "timeframe": "12h",
+        "config_hash": "a6a998593c3c55aa54e5d6fa537114b4",   # 只有 15 個特徵的小 hash
         "features_path": f"parquet:BTCUSDT:{BIG_RUN_CONFIG_HASH}",
     })
     assert r.status_code == 400, f"識別字串形式繞過了閘門：{r.text}"
+    assert r.json()["detail"]["feature_count"] == max(btc), "擋下時報的不是識別字串解析出的數字"
     assert spy_start_analysis == []
+
+
+def test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal(spy_start_analysis):
+    """🔴 R3 三家一致（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／`GROK-R3-P1-02`）：
+    **省略 `config_hash` 時 service 自己會挑 latest**，閘門必須看得到那一個 run。
+
+    這條路徑對 R2 之前的所有候選都是隱形的：候選全部解析不出 ⇒ 放行 ⇒
+    service 走 `find_latest_materialized` 把 latest 載進來。三家各自實跑同一組對照：
+    不帶 hash ⇒ 200 且 `start_analysis` 被呼叫；補上 hash ⇒ 400、`calls=0`。
+    """
+    from momentum.factories import resolve_latest_run_feature_count
+
+    cap = int(settings.ic_analysis_max_features)
+    latest = resolve_latest_run_feature_count(symbol="BTCUSDT", timeframe="12h")
+    assert isinstance(latest, int) and latest > cap, (
+        f"本機 BTCUSDT/12h 之 latest（{latest}）未超過 cap（{cap}），無法做正向對照"
+    )
+    r = client.post(f"{API}/analyze", json={"symbol": "BTCUSDT", "timeframe": "12h"})
+    assert r.status_code == 400, f"省略 config_hash 就繞過了閘門：{r.text}"
+    assert r.json()["detail"]["feature_count"] == latest, "擋下時報的不是 service 會載入的那個 run"
+    assert spy_start_analysis == [], "任務被啟動了 ⇒ 隱式 latest 這條路沒被擋住"
+
+
+def test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional(spy_start_analysis):
+    """🔴 `GROK-R3-P1-01`／`COMPOSER-R3-P1-01`：橫截面只給 `symbols`（不帶 `cross_sectional_runs`）
+    時，service 以 `config_hashes=None` 呼叫 `load_multi` ⇒ **逐標的 latest**。
+
+    R2 只封了 `cross_sectional_runs`，同一端點的 `symbols`-only 形態仍開著。
+    判準＝逐標的解析 latest 取 max（任一標的超標即擋整組——橫截面本來就一起載入）。
+    """
+    from momentum.factories import resolve_latest_run_feature_count
+
+    cap = int(settings.ic_analysis_max_features)
+    per_symbol = {s: resolve_latest_run_feature_count(symbol=s, timeframe="12h")
+                  for s in ("BTCUSDT", "ETHUSDT")}
+    known = [c for c in per_symbol.values() if isinstance(c, int)]
+    assert known and max(known) > cap, f"本機 12h 之 latest 皆未超 cap，無法做正向對照：{per_symbol}"
+    r = client.post(f"{API}/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h", "symbols": ["BTCUSDT", "ETHUSDT"],
+    })
+    assert r.status_code == 400, f"symbols-only 橫截面繞過了閘門：{r.text}"
+    assert r.json()["detail"]["feature_count"] == max(known), "取的不是逐標的 latest 之最大值"
+    assert spy_start_analysis == [], "任務被啟動了 ⇒ symbols-only 這條路沒被擋住"
+
+
+def test_gap3_ic_feature_cap_implicit_latest_under_cap_still_allowed(spy_start_analysis):
+    """**反向對照**：latest 在 cap 以內時，省略 `config_hash` 仍必須放行。
+
+    🔴 沒有這條，「閘門把所有不帶 hash 的請求一律擋掉」也會讓上面兩條變綠——
+    那是把止血閘做成了拒絕服務。本條釘住「擋的是超量，不是『沒指定 run』」。
+    """
+    from momentum.factories import resolve_latest_run_feature_count
+
+    cap = int(settings.ic_analysis_max_features)
+    latest = resolve_latest_run_feature_count(symbol="ETHUSDT", timeframe="12h")
+    assert isinstance(latest, int) and latest <= cap, (
+        f"本機 ETHUSDT/12h 之 latest（{latest}）不在 cap（{cap}）以內，無法做反向對照"
+    )
+    client.post(f"{API}/analyze", json={"symbol": "ETHUSDT", "timeframe": "12h"})
+    assert spy_start_analysis != [], "cap 以內的隱式 latest 被擋掉了 ⇒ 閘門擋的是『沒指定 run』而非『超量』"
+
+
+def test_gap3_ic_feature_cap_identifier_keeps_symbol_scope(monkeypatch):
+    """🔴 `CODEX-R3-P2-02`：識別字串 `parquet:<SYMBOL>:<hash>` **自己帶了 symbol**，
+    先前一律跨標的取 max ⇒ 會把被選標的的**合法小 run** 誤報成另一標的的大 run（false-block）。
+
+    本條用替身 registry 構造 codex 指定的對照（同一 hash、兩個標的、一大一小），
+    不依賴本機資料現況：帶 symbol 時取該標的自己的數字，無 symbol scope 時才取 max。
+    """
+    from momentum.FeatureEngineering import feature_registry as reg_mod
+    from momentum.factories import feature_count_from_features_file
+
+    rows = [
+        {"symbol": "BTCUSDT", "timeframe": "12h", "config_hash": "sharedhash", "feature_count": 100},
+        {"symbol": "BCHUSDT", "timeframe": "12h", "config_hash": "sharedhash", "feature_count": 900},
+    ]
+    monkeypatch.setattr(reg_mod.FeatureRegistry, "list_all", lambda self: list(rows))
+    assert feature_count_from_features_file("parquet:BTCUSDT:sharedhash") == 100, \
+        "識別字串帶了 symbol 卻仍取跨標的 max ⇒ 合法小 run 會被誤擋"
+    assert feature_count_from_features_file("parquet:BCHUSDT:sharedhash") == 900
+    # 真正無 scope 的參照（只有 hash）維持跨標的 max＝保守
+    assert feature_count_from_features_file("sharedhash") == 900, \
+        "無 symbol scope 時不該收斂到某一筆——那會低報"
 
 
 def test_gap3_ic_feature_cap_features_file_reads_metadata_only():

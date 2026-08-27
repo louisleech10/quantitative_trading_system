@@ -597,6 +597,11 @@ mutation，**要重錨、不是繞過**（B4／B5 各發生一次）。
 | **`R-B8-3`** | 工作區 revert 事故之兩條**無法 post-hoc 證明**的假設：①「災損只有 `import_contract.py` 一個檔」——post-commit 後無法重播「還原後又被編輯覆蓋」之中間態；②「主委由對話紀錄重打之內容與事故前**逐字**相同」——無備份可比對，只有行為等價（19 條 mutation ＋ 型別 probe）佐證 | `needs-research` | 主委；**觸發＝日後在 Task 5.1 相關碼發現與定義不符之行為時，回頭查此條** |
 | **`R-B3-3`** | 逐 symbol 之 purge 下界（`EventSplitConfig.embargo_ms_by_symbol`）未實作 ⇒ 各 symbol 宣告下界**不一致**之批次一律拒絕分析（fail-closed，不取全批 max——SPEC §D-3′-a(ii) 明令禁止）。使用者當前解法＝依 timeframe 拆批 | `blocked-by` Task 7.0b | 主委；7.0b 落地時解除 |
 | **`R-B4-1`** | **CSV 方言之殘餘前後端差異**：支援之行尾＝**LF／CRLF**；引號內 CR 當資料保留；裸 CR（含舊式 Mac）兩端一致不支援。其他方言／編碼／writer 癖好之殘餘差異**不再逐一開輪**。兜底＝後端永遠是契約權威；前端只做預覽且**不得產出看似合理的假欄名**（由 mutation `1.5-M5` 鎖住）。R6 由 codex 以 **9,331 個字串窮舉**比對兩端 predicate，`mismatch_count=0` | `user-ruling` | 主委；**觸發＝出現具體且可重跑之使用者實例才重開** |
+| **`R-B9-1`** | IC 止血閘之上限 **80,515 綁本機 8GB**（＝最小超標點 161,031 × 0.5，導出自 `handoffs/run_receipts/gap3ux-b9-footprint.receipt.json`）。換機器須覆寫 `IC_ANALYSIS_MAX_FEATURES` 並重跑量測 | `user-ruling`（過渡止血，GAP-6 分塊計算上線即整條刪除） | 主委；不排工 |
+| **`R-B9-2`** | 量測之安全閥在 peak > RAM×0.5 時 `kill -TERM`，故 receipt 記的是「多快撞到 4GB」而非真實最終 peak（UAT 觀測為 7.1GB）；3 秒採樣對 1–2 秒之小 run 解析度不足 | `blocked-by` 本機 8GB 實體限制 | 主委；換大記憶體機器時重跑 |
+| **`MEASURE-CANCEL-1`** | IC 分析**無取消任務端點** ⇒ 量測腳本之安全閥只能 `kill` 整個後端行程，無法只停該任務 | `blocked-by`（端點不存在，屬 IC-Analysis 主線範圍） | 主委；IC-Analysis 主線補端點時解除 |
+| **`R-B9-3`** | 閘門之**最後一個具名破口**：呼叫端硬塞一個 registry 查不到、HDF5 header 也讀不出的 `features_path` 指向大 run。R3 之後其餘路徑（顯式 hash／`cross_sectional_runs`／識別字串／隱式 latest ×2）皆已覆蓋 | `user-ruling`（過渡止血；該路徑非使用者介面之路徑，擋住它會弄壞 golden replay 這個既有消費端） | 主委；不排工 |
+| **`R-B9-4`** | Task 6.3 之接線回歸證據為**原始碼層斷言**（`page.tsx` 兩處 call-site 走 `icPollFailed`），不是 render 整頁的 runtime 測試。`CODEX-R3-P2-03` 要求後者 | `needs-research`（render 整個 ic-analysis 頁需先評估其 store／chart 依賴之 mock 成本與 flakiness） | 主委；**觸發＝下次動 ic-analysis 頁面時一併評估** |
 | **`D-001/D-002/D-003` provenance** | `gate.sh register-output` 只收 `handoffs/` 或 `stampable_artifacts.txt` 明列者 ⇒ 對 `docs/*.D-00N.md` 跑 `reconcile_stamps_check.sh` 會報 provenance pending（**非戳記造假**） | `user-ruling` | 主委 |
 
 **已解除（不要再當殘留看）**：`R-B2-1`（B4）／`D-002 A-004`、`R-B3-1`、`R-B3-2`（B5）。

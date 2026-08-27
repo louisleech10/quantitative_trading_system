@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b9",
   "mode": "verify",
-  "n_mutations": 14,
+  "n_mutations": 18,
   "results": [
     {
       "id": "6.0-M1",
@@ -10,6 +10,8 @@
       "rc": 1,
       "red": [
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
@@ -22,6 +24,8 @@
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_literal_not_hardcoded_in_api_or_frontend",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
@@ -52,6 +56,8 @@
       "rc": 1,
       "red": [
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
@@ -61,6 +67,8 @@
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
@@ -75,6 +83,8 @@
       "rc": 1,
       "red": [
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
@@ -84,6 +94,8 @@
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
         "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
         "test_gap3_ic_feature_cap_reads_features_path_not_just_hash",
         "test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
@@ -110,11 +122,13 @@
       "desc": "features_path 只認檔案（識別字串繞過）",
       "rc": 1,
       "red": [
-        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file"
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
+        "test_gap3_ic_feature_cap_identifier_keeps_symbol_scope"
       ],
       "verdict": "PASS",
       "expected": [
-        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file"
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
+        "test_gap3_ic_feature_cap_identifier_keeps_symbol_scope"
       ]
     },
     {
@@ -225,6 +239,60 @@
       "verdict": "PASS",
       "expected": [
         "test_gap3_ic_progress_fields_no_fake_value_when_unresolvable"
+      ]
+    },
+    {
+      "id": "6.1-M6",
+      "task": "6.1",
+      "desc": "閘門不看 longitudinal 的隱式 latest（省略 hash 繞過）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal"
+      ]
+    },
+    {
+      "id": "6.1-M7",
+      "task": "6.1",
+      "desc": "閘門不看 symbols-only 的逐標的 latest（橫截面隱式繞過）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional"
+      ]
+    },
+    {
+      "id": "6.1-M8",
+      "task": "6.1",
+      "desc": "識別字串丟掉自帶的 symbol scope（合法小 run 被誤擋）",
+      "rc": 1,
+      "red": [
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
+        "test_gap3_ic_feature_cap_identifier_keeps_symbol_scope"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
+        "test_gap3_ic_feature_cap_identifier_keeps_symbol_scope"
+      ]
+    },
+    {
+      "id": "6.3-M6",
+      "task": "6.3",
+      "desc": "page 接線改回 Boolean(error)（純函式全綠但畫面錯）",
+      "rc": 1,
+      "red": [
+        "Task 6.3 — 前端區分「後端無回應」與「任務執行中」 > ⑦ 🔴 page 的兩處 call-site 確實走 icPollFailed（R3 CODEX-R3-P2-03：接線本身要有回歸證據）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 6.3 — 前端區分「後端無回應」與「任務執行中」 > ⑦ 🔴 page 的兩處 call-site 確實走 icPollFailed（R3 CODEX-R3-P2-03：接線本身要有回歸證據）"
       ]
     }
   ],

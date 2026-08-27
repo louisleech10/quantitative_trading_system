@@ -5,6 +5,8 @@
  * 🔴 階段字串為可擴充集合 ⇒ 本檔**不得**以固定 enum 窮舉相等斷言鎖死
  *（GAP-6 會細分更多階段；改測試是掩蓋行為變更的常見路徑）。
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   IC_LABEL_IDLE,
@@ -59,6 +61,24 @@ describe('Task 6.3 — 前端區分「後端無回應」與「任務執行中」
     });
     expect(failedLabel).toBe('failed');
     expect(failedLabel).not.toBe(IC_LABEL_NO_RESPONSE);
+  });
+
+  it('⑦ 🔴 page 的兩處 call-site 確實走 icPollFailed（R3 CODEX-R3-P2-03：接線本身要有回歸證據）', () => {
+    // 🔴 為什麼需要這條：`⑥` 測的是純函式 `icPollFailed`，而 R2 抓到的缺陷在
+    //    **page.tsx 的接線**——把 page 改回 `pollFailed: Boolean(error)`，⑥ 依然全綠。
+    //    codex 指出這是回歸證據缺口（非「現在是錯的」）。
+    //    具名殘留：這是**原始碼層**的接線斷言，不是 render 整頁的 runtime 測試；
+    //    render 整個 ic-analysis 頁需先評估其 store／chart 依賴的 mock 成本與 flakiness
+    //    ⇒ 殘留理由＝needs-research，記於 `docs/GAP3UX_IMPL_HANDOFF.md` 殘留表。
+    const source = readFileSync(
+      resolve(__dirname, '../app/ic-analysis/page.tsx'),
+      'utf-8',
+    );
+    const wired = source.match(/pollFailed:\s*icPollFailed\(/g) ?? [];
+    expect(wired.length).toBeGreaterThanOrEqual(2);
+    // 兩件處置完全相反的事不得再被混成同一句話
+    expect(source).not.toMatch(/pollFailed:\s*Boolean\(\s*error\s*\)/);
+    expect(source).not.toMatch(/pollFailed:\s*!!\s*error/);
   });
 
   it('⑤ 特徵數未知時明說不知道，**不填假數字**', () => {

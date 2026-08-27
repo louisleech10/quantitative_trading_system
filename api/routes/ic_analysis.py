@@ -42,18 +42,29 @@ def _reject_when_over_feature_cap(request) -> None:
     「擋下時未載入大矩陣」，那個證明綁定「cap 檢查在任務建立之前」這個位置；
     檢查若被移到任務啟動之後，6.4 會量到已載入大矩陣之 footprint 而失去意義。
 
-    🔴 解析不出特徵數 ⇒ **放行**（不擋）。理由是實查的：分析只有兩條路走得成——
-      ①帶 `config_hash` ⇒ registry 一定查得到（查不到時 service 自己就 `raise run not found`）；
-      ②呼叫端直接給 `features_path`（golden replay／artifact 重放）⇒ 那是已知該 run 的內部呼叫端。
-      擋住第二條會弄壞 golden replay 這個既有消費端。
-      **具名破口**：API 呼叫端硬塞 `features_path` 指向大 run 可繞過本閘；因本 Task 是過渡止血、
-      且該路徑非使用者介面之路徑，接受之並具名記錄（見 `docs/GAP3UX_IMPL_HANDOFF.md` 殘留表）。
+    🔴 **本閘的責任＝鏡像 service 會實際載入哪個 run**，而不是「看看請求上有沒有寫特徵數」。
+      這句話是 R3 三家一致 finding（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／
+      `GROK-R3-P1-01`＋`P1-02`）換來的。**原本這裡寫著「分析只有兩條路走得成」——那是錯的**，
+      而且錯得很具體：`{"symbol":"BCHUSDT","timeframe":"12h"}`（省略 `config_hash`）與
+      `{"mode":"cross_sectional","symbols":[...]}`（不帶 `cross_sectional_runs`）兩種 payload，
+      閘門的候選全部解析不出 ⇒ 放行，而 service 隨後自己走 `find_latest_materialized`／
+      `load_multi` 載入本機 latest（實測 161,031／161,092，cap 為 80,515）。
+      三家各自實跑同一組對照：不帶 hash ⇒ 200 且 `start_analysis` 被呼叫；補上 hash ⇒ 400、`calls=0`。
+      UI 因 `ICConfigPanel` 強制選 run 而不會走到，**裸 API 與腳本會**。
+
+    🔴 解析不出特徵數 ⇒ **放行**（不擋）。這條**仍然保留**，但適用面已收窄到它原本該有的範圍：
+      呼叫端給了 `features_path`（golden replay／artifact 重放）而該檔又讀不出 shape 時。
+      擋住它會弄壞 golden replay 這個既有消費端。
+      **具名破口**：API 呼叫端硬塞 `features_path` 指向一個 registry 查不到、header 也讀不出的
+      大 run 可繞過本閘；因本 Task 是過渡止血且該路徑非使用者介面之路徑，接受之並具名記錄
+      （見 `docs/GAP3UX_IMPL_HANDOFF.md` 殘留表）。
 
     🔴 **不提供「強制略過上限」之開關**（SPEC Task 6.1「不可做」）。
     """
     from momentum.factories import (
         feature_count_from_features_file,
         ic_report_reason,
+        resolve_latest_run_feature_count,
         resolve_run_feature_count,
     )
 
@@ -74,12 +85,30 @@ def _reject_when_over_feature_cap(request) -> None:
     # 🔴 `CODEX-R2-P1-01`：**橫截面請求帶的是 per-symbol 的一組 run**（`cross_sectional_runs`），
     #    首版只看單一 `config_hash` ⇒ 兩個各自超標的 run 一起送進來會被整組放行，
     #    而分析端會把它們一起載入。逐筆解析並取**最大值**（保守：任一筆超標即擋整組）。
-    for ref in (getattr(request, "cross_sectional_runs", None) or []):
+    cross_runs = list(getattr(request, "cross_sectional_runs", None) or [])
+    for ref in cross_runs:
         candidates.append(resolve_run_feature_count(
             config_hash=(getattr(ref, "config_hash", "") or "").strip() or None,
             symbol=getattr(ref, "symbol", None),
             timeframe=timeframe,
         ))
+
+    # 🔴 R3 三家一致（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／`GROK-R3-P1-01`＋`P1-02`）：
+    #    **省略 `config_hash` 時 service 自己會挑 latest**，那條路徑對上面所有候選都是隱形的。
+    #    閘門必須鏡像 service 的解析，否則「不指定 run」就是一個公開的繞過方式。
+    #    兩種形態各自對應 service 的一個分支：
+    #      · longitudinal 無 hash ⇒ `find_latest_materialized(symbol, timeframe)`
+    #      · cross_sectional 只給 `symbols` ⇒ `load_multi(config_hashes=None)` ⇒ 逐標的 latest
+    #    逐標的解析後併入候選取 max（保守：任一標的超標即擋整組，因為橫截面本來就一起載入）。
+    has_explicit_hash = bool((request.config_hash or "").strip())
+    if not has_explicit_hash:
+        candidates.append(resolve_latest_run_feature_count(
+            symbol=getattr(request, "symbol", None), timeframe=timeframe,
+        ))
+    if not cross_runs:
+        for sym in (getattr(request, "symbols", None) or []):
+            candidates.append(resolve_latest_run_feature_count(symbol=sym, timeframe=timeframe))
+
     known = [c for c in candidates if isinstance(c, int)]
     feature_count = max(known) if known else None
     if feature_count is None:
