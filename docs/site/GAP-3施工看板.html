@@ -34,7 +34,7 @@
 </tr>
 <tr>
 <td><strong>實作</strong></td>
-<td><strong>第九批已收案</strong>（8/28）。Phase 6 五個 Task 全部完成，42 個裡做完 <strong>33</strong> 個</td>
+<td><strong>第十批施工中</strong>（8/28）。42 個裡做完 <strong>34</strong> 個（新完成 Task 7.0），另 1 個做到一半</td>
 </tr>
 <tr>
 <td>Task 總數</td>
@@ -42,18 +42,65 @@
 </tr>
 <tr>
 <td>已完成</td>
-<td><strong>33</strong></td>
+<td><strong>34</strong></td>
 </tr>
 <tr>
 <td>進行中</td>
-<td><strong>0</strong></td>
+<td><strong>1</strong>（Task 7.0b，最大的一個）</td>
 </tr>
 <tr>
 <td>未開工</td>
-<td><strong>9</strong></td>
+<td><strong>7</strong></td>
 </tr>
 </tbody>
 </table></div>
+<h2 id="-第十批最後一批現在在做什麼">🔧 第十批（最後一批）現在在做什麼</h2>
+<p>這批叫「<strong>全棧接線</strong>」，九個 Task，是 GAP-3 的最後一批。意思是：
+<strong>後端早就做好了的東西，前端一個都沒接上</strong>。舉例——匯出事件時有五個設定
+（情境／對照組怎麼來／用哪個價格進場／報酬怎麼算／決策往前挪幾根），
+後端五個都認得，但前端從頭到尾一個都沒傳，全部走寫死的預設值。</p>
+<p><strong>已完成 Task 7.0</strong>：把那五個設定變成「可以傳」的參數（還沒有畫面，畫面是下一個 Task）。
+順便修正一個預設值——原本進場價預設是「觸發那根的開盤」，但分析層根本不支援這個組合，
+等於<strong>預設值本身就是個算不出答案的設定</strong>。改成「觸發那根的收盤」。
+這不影響任何已經算出來的數字（匯出檔早就不寫答案了），變的只有宣告欄的字面。</p>
+<p><strong>進行中 Task 7.0b</strong>：這是本批最大的一個，它補的是一個<strong>現在就存在的洞</strong>——
+你從搜尋頁匯出的事件批，裡面<strong>沒有「答案」</strong>（每個事件後來到底漲跌多少）。
+匯出端已經不寫了，分析端又還沒開始算，所以<strong>條件 IC 對真實批次目前根本跑不起來</strong>。
+7.0b 就是把「算答案」這件事搬到分析當下做。</p>
+<h3 id="-這批第一天就撞到的兩件事都不是程式-bug是規格本身的問題">🔴 這批第一天就撞到的兩件事（都不是程式 bug，是規格本身的問題）</h3>
+<p><strong>一、我的偵察猜錯兩件事，被三家審查員當場打穿。</strong> 開工前要先查清楚程式現在長什麼樣，
+我列了六個「我沒查但我猜是這樣」的項目——其中<strong>兩個猜反了</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>我猜的</th>
+<th>實際</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>分析流程裡已經有「事件」這條分支，只是接法可能不乾淨</td>
+<td><strong>連那條分支都不存在</strong>，要從零建</td>
+</tr>
+<tr>
+<td>報酬表還沒有分組結構</td>
+<td><strong>早就有了</strong>，我要做的是加一組進去，不是新建</td>
+</tr>
+</tbody>
+</table></div>
+<p>第二個特別危險：照我原本的理解做下去，會<strong>多做一個結構出來</strong>，直接違反規格明文。</p>
+<p><strong>二、規格自己跟自己打架。</strong> 規格一邊要求「做空的事件，答案要帶負號」，
+一邊又把函式的參數表和資料結構都寫死成「拿不到多空方向」。<strong>照字面實作必然做不出來。</strong></p>
+<p>這件事不是形式問題。我實跑確認：<strong>下游沒有任何一層會補這個負號</strong>。
+所以如果答案不帶負號，做空批次算出來的 IC<strong>符號整個是反的</strong>——
+數字看起來完全正常，方向卻是錯的，而且沒有任何一關會攔下來。</p>
+<p>三家審查員獨立查證後一致判定「必須開修訂檔」。我開了 <code>D-005</code>，把方向做成<strong>批次層</strong>的一個值
+（因為契約本來就禁止一批裡混多空），而不是掛在每一列上。
+其中一家（grok）主張掛在每一列，我沒採納——<strong>理由是程式證據不是票數</strong>：
+規格自己的分類表就把「方向」歸在批次層，而且契約既然已經禁止混方向，
+做成逐列反而<strong>造出一個「寫得出來但不合法」的狀態</strong>。
+我把 grok 的異議具名保留，並寫死了失效條件：哪天如果放寬「一批不能混多空」，
+這個決定就失效、要改回逐列。</p>
 <p>✅ <strong>第九批已收案</strong>（8/28，IC 分析的「記憶體止血閘」）。這批要做的事很單純：
 <strong>在 IC 分析啟動之前先看一眼這個 run 有幾個特徵，太多就直接擋下來</strong>，
 不要等它把記憶體吃爆才發現。上限是實跑量出來的（不是猜的）：本機 8GB，
@@ -683,13 +730,13 @@ Grok 再寫臨時測試證明：A 刪除失敗回來時，錯誤訊息「刪除�
 <td><strong>Task 7.0</strong></td>
 <td>前置：擴 <code>EventExportOptions</code> 補齊五維度</td>
 <td>Phase 7</td>
-<td>⬜</td>
+<td>✅</td>
 </tr>
 <tr>
 <td><strong>Task 7.0b</strong></td>
 <td>分析時 <code>label_value</code> producer 與其 wiring</td>
 <td>Phase 7</td>
-<td>⬜</td>
+<td>🔧</td>
 </tr>
 <tr>
 <td><strong>Task 7.1</strong></td>
