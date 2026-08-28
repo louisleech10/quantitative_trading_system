@@ -288,6 +288,13 @@ export function dimensionDefaultConflicts(
   mappedFields: readonly string[],
 ): string[] {
   const out: string[] = [];
+  // 🔴 R4 `CODEX-R4-P2-01`：契約之 `decision_offset_bars` 為 `int`。
+  //    非整數**顯式擋下並說出原因**，不由 clamp 靜默截成整數——後者會讓使用者
+  //    以為自己填的是 1.9 而系統收了 1，且永遠看不到契約那條拒絕。
+  const k = values.decision_offset_bars;
+  if (k !== '' && k !== undefined && !Number.isInteger(k)) {
+    out.push(`decision_offset_bars 必須是整數（契約 event_import_contract.json 之 type: int）；收到 ${k}`);
+  }
   for (const dim of EVENT_DIMENSIONS) {
     if (values[dim] === '' || values[dim] === undefined) continue;
     const inTyped = dim === NESTED_DIM
@@ -314,12 +321,19 @@ export function dimensionDefaultConflicts(
  * clamp 而非 raise：本函式在 `onChange` 上，raise 會讓使用者按鍵時整頁炸掉；
  * 鎖定路徑之 `readOnly` 才是第一層，本函式是**程式化設值**那條路的第二層。
  * 非有限值（`NaN`／空字串轉數字）⇒ 回下界，不讓 `NaN` 流進 state。
+ *
+ * 🔴 **本函式只夾範圍，不管整數性**（R4 `CODEX-R4-P2-01`）：
+ * 原版寫了 `Math.trunc`，於是在自由路徑上 `0.5 → 0`、`1.9 → 1`——**靜默改值**。
+ * 契約之 `decision_offset_bars` 是 `int`，而 `buildEventContractRecords` 已用
+ * `Number.isInteger(k)` **顯式拒絕**小數 ⇒ 前端先偷偷截掉，使用者就永遠看不到那個拒絕，
+ * 兩端於是各有一套規則（B4 R5 已為同型付過代價）。整數性交給既有之 fail-closed 與
+ * 送出前的可見阻擋，本函式不代勞。
  */
 export function clampDecisionOffset(
   value: number, range: { min: number; max: number | null },
 ): number {
   if (!Number.isFinite(value)) return range.min;
-  const lower = Math.max(Math.trunc(value), range.min);
+  const lower = Math.max(value, range.min);
   return range.max === null ? lower : Math.min(lower, range.max);
 }
 

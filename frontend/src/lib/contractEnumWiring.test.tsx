@@ -30,6 +30,7 @@ import {
   acceptedValues,
   contractDecisionOffsetMin,
   dimensionBatchDefaults,
+  dimensionDefaultConflicts,
   selectable,
 } from '@/lib/eventDimensions';
 import {
@@ -194,6 +195,37 @@ describe('Task 7.2 ③ 非 enum 欄 — decision_offset_bars', () => {
     );
     // state → 送給後端的批次預設（`dimensionBatchDefaults` 是 CSV 匯入路徑之唯一組裝點）
     expect(dimensionBatchDefaults(current, undefined).decision_offset_bars).toBe(3);
+  });
+
+  it('🔴 R4 `CODEX-R4-P2-01`：小數 `k` **不得被靜默截斷**，且送出前顯式擋下', () => {
+    let current: EventDimensionValues = { ...UNSET };
+    render(
+      <EventDimensionFields
+        path="/data-preparation" values={current} allowUnset
+        onChange={(next) => { current = next; }}
+      />,
+    );
+    fireEvent.change(screen.getByTestId('event-dim-decision_offset_bars'), { target: { value: '1.9' } });
+    // 原缺陷：`Math.trunc` 讓 1.9 靜默變成 1——使用者以為填了 1.9、系統收了 1，
+    // 而契約那條「必須是 int」的拒絕永遠不會被看到。
+    expect(current.decision_offset_bars).toBe(1.9);
+    // 取而代之：送出前**顯式**擋下並說出原因
+    const problems = dimensionDefaultConflicts(current, undefined, []);
+    expect(problems.some((p) => /整數/.test(p) && /decision_offset_bars/.test(p))).toBe(true);
+    // over 向：整數不得被這條誤擋
+    expect(dimensionDefaultConflicts({ ...current, decision_offset_bars: 3 }, undefined, [])).toEqual([]);
+  });
+
+  it('🔴 R4 over：鎖定路徑之 clamp 只夾範圍（`5` ⇒ `0`），不改變整數性判準', () => {
+    let current: EventDimensionValues = { ...UNSET, decision_offset_bars: 0 };
+    render(
+      <EventDimensionFields
+        path="/search" values={current} onChange={(next) => { current = next; }}
+      />,
+    );
+    // `readOnly` 擋使用者；本條走的是程式化設值那層
+    fireEvent.change(screen.getByTestId('event-dim-decision_offset_bars'), { target: { value: '5' } });
+    expect(current.decision_offset_bars).toBe(0);
   });
 });
 

@@ -4,55 +4,62 @@
 
 ## 現在在哪
 
-**GAP-3 事件型 UAT 缺口修補**：42 Task 之**程式已全部落地**。
-**B10（Phase 7 全棧接線，9 Task）**——`7.0／7.0b／7.7` 已收案（R1／R2 兩輪 review 收斂）；
-本 session 補完 **`7.1／7.2／7.3／7.4／7.5／7.6`**，53 條 mutation `closure=CLOSED`。
-🔴 **下一步＝派 R3 三家 code review**（brief 已寫好：`handoffs/GAP3UX-B10-REVIEW-R3-BRIEF.md`）。
-唯一入口 `docs/GAP3UX_IMPL_HANDOFF.md`；白話看板 `白話說明/GAP-3施工看板.md`。
+**GAP-3 事件型 UAT 缺口修補**：42 Task **全部落地且四輪 review 全數收斂**。
+**B10（Phase 7 全棧接線，9 Task）**——`7.0／7.0b／7.7` 經 R1／R2 收案；
+`7.1–7.6` 經 **R3（八條 findings 全成立、全修）** 與 **R4 閉合輪（原提出方逐條 CLOSED）** 收斂。
+**58 條 mutation `closure=CLOSED`**。
+🔴 **下一步＝使用者 UAT B 段 13 項簽字**（未簽不收案）＋ 動過 `scripts/` 故須跑一次
+`gov_check.sh --no-probe`。唯一入口 `docs/GAP3UX_IMPL_HANDOFF.md`；白話看板 `白話說明/GAP-3施工看板.md`。
 
 ## B10 進度
 
 | Task | 狀態 | 已跑之驗收 |
 |---|---|---|
-| 7.0／7.0b／7.7 | ✅ 已收案 | R1／R2 收斂，34 條 mutation |
-| **7.1** | 🔧 待 R3 | vitest `eventContractOptions` **17**（下限 10） |
-| **7.2** | 🔧 待 R3 | vitest `contractEnumWiring` **16**（下限 14；兩檔） |
-| **7.3** | 🔧 待 R3 | vitest `eventExportDisclosure` **6**（下限 3）＋ 4.1b legacy **5** 仍綠 |
-| **7.4** | 🔧 待 R3 | vitest `eventIcDecayDisclosure` **4** ＋ SPEC `grep -c "IC decay"` = 6 |
-| **7.5** | 🔧 待 R3 | pytest `-k return_table_by_label` **13**（下限 10）＋ vitest `eventTablesPanelByLabel` **4**（下限 3） |
-| **7.6** | 🔧 待 R3 | pytest `-k event_batch_detail_dims` **7**（下限 3）＋ vitest `icEventBatchDisclosure` **9**（下限 7） |
+| 7.0／7.0b／7.7 | ✅ 已收案 | R1／R2 收斂 |
+| **7.1–7.6** | ✅ **R3＋R4 收斂** | vitest `eventContractOptions` 18／`contractEnumWiring` 20／`eventExportDisclosure` 8＋legacy 5／`eventIcDecayDisclosure` 4／`eventTablesPanelByLabel` 4／`icEventBatchDisclosure` 11；pytest `-k return_table_by_label` 13／`-k event_batch_detail_dims` 7 |
 
-**mutation：53 條 `closure=CLOSED`**（34 舊 ＋ 7.1×2／7.2×4／7.3×1／7.4×1／7.5×6／7.6×5），
+**mutation：58 條 `closure=CLOSED`**（34 舊 ＋ 7.1–7.6 之 19 ＋ R3 之 4 ＋ R4 之 1），
 verdict 全 PASS、紅集合逐一等於、六個 baseline 還原後皆 rc=0 且空紅。
 receipt `handoffs/run_receipts/gap3ux-b10-all-mutations.receipt.json`。
 
-## 🔴 接手第一件事
+## 四輪 review 之收斂
 
-1. 照 `docs/GAP3UX_IMPL_HANDOFF.md` **§1** 跑稽核。**期望值已更新**：
-   event_samples **345**（原 332）／vitest **68 檔 410**（原 61／351）／
-   `tests/api -k` 189＋44＋39＝272 不變＋新增 `-k event_batch_detail_dims` **7**／
-   golden `163c4cec…` 不變／TODO Task 數 42 不變／tsc 僅 **8 行**既有債。
-2. **派 R3**：`handoffs/GAP3UX-B10-REVIEW-R3-BRIEF.md`（三家全員 codex＋composer＋grok；
-   實作者不自審）。派工流程見 `docs/GAP3UX_IMPL_HANDOFF.md` §3。
+**R3（八條 findings，三家，全部成立全部修）**：
+- **群集 A（P1，三家一致）**：裁定 A 之「鎖 k=0」只有 HTML `min`/`max` 提示，
+  輸入未 `readOnly`、`onChange` 未 clamp ⇒ 使用者真的能讓落檔／payload 帶 `k=3`。
+  🔴 **我自己把錯的性質釘住了**——⑤ 原本寫 `expect(input.readOnly).toBe(false)`。
+- **群集 B（P2，codex＋grok 各自命中）**：`page.tsx` 註解宣稱由 `SEARCH_DISCLOSURE_FIELDS`
+  選欄而 JSX 硬編七段（本 epic **第八次**「宣稱大於實作」）。
+- **群集 C（P2）**：前端**其實能** import 契約 JSON ⇒ 我 brief 猜錯；但**實作不改**
+  （改了會讓 `7.2-M1` 變 false negative），只更正理由陳述。
+- **群集 D（P2）**：裁定 A 宣稱的使用者路徑 `/data-preparation` 沒有機械閘。
+- **群集 E（P2）**：註解檔名錯。
 
-## 本批之三個主委裁定（R3 須請三家攻；全文在 brief）
+**R4 閉合輪（原提出方重跑自己的反例）**：R3 八條**全數 CLOSED**
+（codex 逐條複驗，`R3-M1..M4` 紅集合 2／3／4／2），composer 與 grok **零 finding**。
+codex 新增 **`CODEX-R4-P2-01`（P2）並已修**：`clampDecisionOffset` 之 `Math.trunc`
+讓 `1.9` **靜默變成 1**，而契約是 `int`、後端已 `Number.isInteger` 顯式拒絕
+⇒ 前端先截掉，使用者永遠看不到那條拒絕。**這是 R3 修法自己引入的相鄰缺陷**（同型第六次）。
+修法：clamp 只夾範圍、加 `step={1}`、送出前顯式阻擋、探針兩條、mutation `R4-M1`。
 
-1. **裁定 A**：`decision_offset_bars` 於 `/search`／`/ic-analysis` 鎖 0（SPEC 7.1 L2864）
-   與 7.2 ③「輸入 k ⇒ 落檔 === k」**互斥** ⇒ ③ 落在函式層 round-trip ＋ `/data-preparation`。
-2. **裁定 B**：混批 `control_kind` 回 `null` **不取第一列**——實查
-   `_HETEROGENEITY_DIMENSIONS` 不含 `control_kind`，SPEC 7.6 之「異質即 Task 1.8 拒收」
-   對該欄**不成立**，而 7.5 明禁多數決。另加 `batch_fact_notes.control_kind_values`
-   使「混批」與「沒宣告」可分辨（不破壞驗收①之封閉五鍵）。
-3. **裁定 C**：**保留**既有之全批 macro／micro 表，三組另外垂直排在其下
-   （`primary_macro` 是批次層統計、不屬任何一組）。若三家判 SPEC 要求取代，即為 finding。
+🔴 **我在 R4 brief 具名請委員代打的那格，codex 回答了**：單拆 `readOnly` 而留 clamp
+**不會紅** ⇒ `R3-M1` 之「兩層一起拆」成立。那原本是我對自己 mutation 設計的宣稱、我沒自己驗。
+
+## 本批之三個主委裁定（三家已審）
+
+1. **裁定 A**（`k` 鎖 0 與 7.2 ③ 互斥 ⇒ ③ 落函式層＋`/data-preparation`）：
+   **實作被判 under-block**（群集 A），裁定本身未被推翻，已補兩層 fail-closed。
+2. **裁定 B**（混批 `control_kind` 回 `null` ＋ `batch_fact_notes`）：三家**不升格 finding**。
+3. **裁定 C**（保留全批 macro／micro 表）：三家**不升格 finding**——composer 明載
+   SPEC 原文無「必須移除舊表」之逐字要求。
 
 ## 本批自己抓到的三個問題（皆非產品碼）
 
-- 🔴 **`7.2-M1` 錄到空紅集合**：我把真契約注入生產元件 ⇒ UI 與期望值**兩側同源**，
-  「契約改了而 UI 沒跟」永遠不紅。改為「元件走鏡像、期望值走真契約」後才錄到紅。
-- **`tsc` 抓到我測試檔的重複鍵**：其餘四維度被 `...UNSET` 灌成空字串而測試照樣綠
-  （`npm run build` **不涵蓋測試檔**，§3 第 8 條）。
-- **新文案撞既有斷言**：4.1c 禁「重新匯出」四字。**沒有放寬既有守衛**，改自己措辭為「不必再匯出一次」。
+- 🔴 **`7.2-M1` 錄到空紅集合**：我把真契約注入生產元件 ⇒ UI 與期望值**兩側同源**。
+- **`tsc` 抓到我測試檔的重複鍵**（`npm run build` **不涵蓋測試檔**，§3 第 8 條）。
+- **新文案撞既有斷言**（4.1c 禁「重新匯出」四字）：**沒有放寬既有守衛**，改自己措辭。
+- 🔴 **`7.3-M1` 之字面錨點被群集 B 的修訂改掉，runner 當場 fail-loud**（非靜默跳過）
+  ——B8 付過代價換來的設計正確生效；重新對錨後紅集合逐字相同。
 
 ## 工具面：mutation runner 之潛伏缺陷已修
 
@@ -69,8 +76,10 @@ numba 快取（`**/__pycache__/*.py39.nbi`，跑過測試就髒）產生二進�
 
 ## 待辦
 
-- [ ] 🔴 **派 R3 三家 code review** ＋ reconcile ＋ 閉合輪（由原提出方重跑自己的反例）
-- [ ] **收 epic 前**：使用者 **UAT B 段 13 項簽字**（未簽不收案）
+- [x] ~~R3 三家 code review ＋ reconcile ＋ R4 閉合輪~~ ✅ **已收斂**
+      （`handoffs/reconcile/20260828-gap3ux-b10-review-r{3,4}/synth.md`；兩輪 attribution／
+      completeness 皆 rc=0、債皆已清）
+- [ ] 🔴 **收 epic 前之唯一阻塞**：使用者 **UAT B 段 13 項簽字**（未簽不收案）
 - [ ] 本批**動過 `scripts/`**（`mutation_worktree.py`／`agent_postflight.sh`／新 `clean_agent_tmp.sh`）
       ⇒ 收 epic 前跑 `bash scripts/gov_check.sh --no-probe`（**丟背景**，十分鐘級）
 - [ ] repo 外之磁碟清理（我權限被擋，指令已給使用者）：`com.apple.wallpaper/aerials` 11G、

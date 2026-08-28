@@ -107,12 +107,16 @@ export default function EventDimensionFields({
         {/* 🔴 R3 群集 A（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／`GROK-R3-P1-01`，三家一致）：
             HTML 之 `min`／`max` **只是提示**，使用者打字照樣送得出 `k>0`，
             而 `buildEventContractRecords` 只擋 `k < min` ⇒ 鎖 0 的路徑上真的會落檔 `k=3`。
-            兩層都補：`readOnly` 讓使用者改不動、`onChange` clamp 讓程式化設值也進不來。 */}
+            兩層都補：`readOnly` 讓使用者改不動、`onChange` clamp 讓程式化設值也進不來。
+            🔴 R4 `CODEX-R4-P2-01`：clamp **只夾範圍、不截小數**——契約是 `int`，
+            靜默把 `1.9` 變成 `1` 會讓後端那條顯式拒絕永遠不會被使用者看到。
+            `step={1}` 讓瀏覽器把小數標為 invalid；真正的拒絕在送出前之阻擋清單與契約 validator。 */}
         <input
           type="number"
           data-testid="event-dim-decision_offset_bars"
           value={values.decision_offset_bars}
           min={range.min}
+          step={1}
           readOnly={range.locked}
           {...(range.max !== null ? { max: range.max } : {})}
           onChange={(e) => onChange({

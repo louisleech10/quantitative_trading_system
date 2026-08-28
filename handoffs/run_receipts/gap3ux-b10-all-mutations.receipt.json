@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b10",
   "mode": "verify",
-  "n_mutations": 57,
+  "n_mutations": 58,
   "results": [
     {
       "id": "7.0-M1",
@@ -799,12 +799,14 @@
       "rc": 1,
       "red": [
         "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入",
-        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 under（R3 群集 A，三家一致之 P1 反例）：在 /search 把 k 改成 3 ⇒ 落檔仍為 0"
+        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 under（R3 群集 A，三家一致之 P1 反例）：在 /search 把 k 改成 3 ⇒ 落檔仍為 0",
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R4 over：鎖定路徑之 clamp 只夾範圍（`5` ⇒ `0`），不改變整數性判準"
       ],
       "verdict": "PASS",
       "expected": [
         "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入",
-        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 under（R3 群集 A，三家一致之 P1 反例）：在 /search 把 k 改成 3 ⇒ 落檔仍為 0"
+        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 under（R3 群集 A，三家一致之 P1 反例）：在 /search 把 k 改成 3 ⇒ 落檔仍為 0",
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R4 over：鎖定路徑之 clamp 只夾範圍（`5` ⇒ `0`），不改變整數性判準"
       ]
     },
     {
@@ -850,12 +852,27 @@
       "rc": 1,
       "red": [
         "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入",
-        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R3 群集 D：**解鎖路徑之 UI→payload 回合**——在 /data-preparation 打 k=3 ⇒ 批次預設帶 3"
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R3 群集 D：**解鎖路徑之 UI→payload 回合**——在 /data-preparation 打 k=3 ⇒ 批次預設帶 3",
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R4 `CODEX-R4-P2-01`：小數 `k` **不得被靜默截斷**，且送出前顯式擋下"
       ],
       "verdict": "PASS",
       "expected": [
         "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入",
-        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R3 群集 D：**解鎖路徑之 UI→payload 回合**——在 /data-preparation 打 k=3 ⇒ 批次預設帶 3"
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R3 群集 D：**解鎖路徑之 UI→payload 回合**——在 /data-preparation 打 k=3 ⇒ 批次預設帶 3",
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R4 `CODEX-R4-P2-01`：小數 `k` **不得被靜默截斷**，且送出前顯式擋下"
+      ]
+    },
+    {
+      "id": "R4-M1",
+      "task": "R4/P2-01",
+      "desc": "clamp 改回 Math.trunc（小數被靜默截斷）⇒ 整數性探針紅",
+      "rc": 1,
+      "red": [
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R4 `CODEX-R4-P2-01`：小數 `k` **不得被靜默截斷**，且送出前顯式擋下"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R4 `CODEX-R4-P2-01`：小數 `k` **不得被靜默截斷**，且送出前顯式擋下"
       ]
     }
   ],
