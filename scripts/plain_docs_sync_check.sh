@@ -78,6 +78,11 @@ _watched_for() {
     # 2026-08-22 加入 `docs/GAP3_EVENT_UX_SPEC.md`：UAT 缺口修補 SPEC 之每輪修訂都要讓看板跟著動，
     #   否則使用者看到的仍是 B1–B5 收案時的狀態（＝摩擦八十二之同一病）。
     "GAP-3施工進度.md")              echo "momentum/Analysis/event_samples/ momentum/Analysis/contracts/event_import_contract.json tests/momentum/event_samples/ scripts/gap3_freeze_golden.py docs/GAP3_EVENT_TODO.md docs/GAP3_EVENT_TODO.D-001.md docs/GAP3_EVENT_UX_SPEC.md" ;;
+    # GAP-3 驗收清單（2026-08-29）：使用者照著點的那份。盯**使用者看得到的那一層**——
+    #   前端三頁與匯出／維度模組、事件匯入 route 與模型、技術版 UAT 清單。
+    #   🔴 為什麼要盯前端：這份寫的是「你應該看到什麼」，畫面改了而清單沒改 ⇒ 使用者照著做會失敗，
+    #   而那正是 B5 那份的下場（`label_value` 與答案窗選擇器被移除卻沒人回來改清單）。
+    "GAP-3驗收清單.md")              echo "frontend/src/app/search/ frontend/src/app/data-preparation/ frontend/src/app/ic-analysis/ frontend/src/lib/eventExport.ts frontend/src/lib/eventDimensions.ts frontend/src/lib/eventFieldFormatters.ts frontend/src/components/case/ frontend/src/components/ic-analysis/ api/routes/case.py api/models/event_import_models.py docs/GAP3_UAT_CHECKLIST.md" ;;
     # GAP-3 事件型討論文檔（2026-08-19；使用者：「先寫成一個文檔，討論就修改文檔」）：盯缺口 registry 與 consult 收斂檔；
     #   日後 GAP-3 SPEC 出現時把 SPEC 路徑加進來（SPEC 定版前本檔是討論的唯一落點）。
     "GAP-3事件型討論.md")            echo "docs/IC_QUANT_GAP_REGISTRY.md handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md handoffs/20260819-gap3-recon-BRIEF.md" ;;

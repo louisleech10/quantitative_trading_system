@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAP-3 驗收清單 — 照著做就好</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-3驗收清單.md</span></nav>
+<main>
+<h1 id="gap-3-驗收清單-照著做就好">GAP-3 驗收清單 — 照著做就好</h1>
+<blockquote>
+<p><strong>這份是給你照著操作的。</strong> 每一項都有三欄：<strong>你做什麼</strong> → <strong>你應該看到什麼</strong> → <strong>如果不是這樣代表什麼</strong>。
+全部通過並簽字，GAP-3 才算收案（這是你自己定的規矩：未簽不收案）。</p>
+<p>🔴 <strong>這是重寫版（8/29）</strong>，不是 8/22 那份。舊版有兩項<strong>現在照做會失敗</strong>——
+不是程式壞了，是那兩件事被規格改掉了：</p>
+<ul>
+<li>舊版說「匯出前先選答案窗 N 根」→ <strong>那個選項已移除</strong>，答案窗改在 IC 分析頁決定</li>
+<li>舊版說「匯出檔裡每筆含 <code>label_value</code>」→ <strong>匯出檔已經不寫答案</strong>，答案改在分析當下才算</li>
+</ul>
+<p>技術版在 <code>docs/GAP3_UAT_CHECKLIST.md</code>（簽字欄在那份，A 段機械檢查也在那份）。</p>
+</blockquote>
+<hr />
+<h2 id="開始之前">開始之前</h2>
+<p>開兩個終端機視窗：</p>
+<pre><code class="language-bash"># 視窗 1：後端
+source venv/bin/activate &amp;&amp; python run_api.py
+
+# 視窗 2：前端
+cd frontend &amp;&amp; npm run dev
+</code></pre>
+<p>瀏覽器開 <code>http://localhost:3000</code>。</p>
+<p><strong>要準備的東西</strong>：一份你自己標好正反例的 CSV（B6 會用到）。沒有也可以——B1–B5 會產生一份，
+你把它轉成 CSV 就能用。</p>
+<hr />
+<h2 id="第一段把事件匯出來search">第一段：把事件匯出來（<code>/search</code>）</h2>
+<h3 id="b1-跑一次搜尋">B1 ── 跑一次搜尋</h3>
+<p><strong>你做什麼</strong>：開 <code>/search</code>，設好條件，按搜尋。</p>
+<p><strong>應該看到</strong>：結果列表出現。往下捲，底部有一整區匯出面板，裡面<strong>由上而下</strong>依序是：
+匯出前篩選 → 筆數 → 附帶報酬欄 → <strong>這批事件的五個設定</strong> → <strong>這批匯出實際會帶什麼</strong> →
+IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約 JSON」）。</p>
+<p><strong>不是這樣代表什麼</strong>：如果只看到兩顆按鈕、中間那幾區都沒有，代表你開的是舊版前端——
+重新 <code>npm run dev</code>。</p>
+<hr />
+<h3 id="b2-匯出前篩選與筆數">B2 ── 匯出前篩選與筆數</h3>
+<p><strong>你做什麼</strong>：在「匯出前篩選」按「新增條件」，挑一個數值欄（例如 <code>price_change</code>），
+設一個門檻。再按一次「新增條件」加第二條。</p>
+<p><strong>應該看到</strong>：</p>
+<ul>
+<li>每加一條，上方筆數即時變：<code>將匯出 N 筆（原 M 筆）／你聲明的正例 X／反例 Y</code></li>
+<li><strong><code>X + Y</code> 要等於 <code>N</code></strong>（如果有些列沒有正反例標記，會另外顯示「另有 Z 筆沒有標記」，
+而且會告訴你 CSV 仍然會含那幾筆、事件 JSON 不會）</li>
+<li>把條件全部刪掉 ⇒ <code>N</code> 回到 <code>M</code></li>
+</ul>
+<p><strong>不是這樣代表什麼</strong>：如果 <code>X + Y ≠ N</code> 而且沒有任何說明，那是計數錯誤，記下來告訴我。</p>
+<p>🔴 <strong>這一項要特別看</strong>：篩選面板<strong>只挑選要匯出哪幾列，不會改任何欄位的值</strong>。
+如果你看到某一欄的數字因為加了篩選而變了，那是嚴重缺陷。</p>
+<hr />
+<h3 id="b3-這批事件的五個設定新的">B3 ── 這批事件的五個設定（<strong>新的</strong>）</h3>
+<p><strong>你做什麼</strong>：找到「這批事件的五個設定」那一區，<strong>每一個下拉都點開看看</strong>。</p>
+<p><strong>應該看到</strong>：五個控制項——<code>scenario</code>／<code>control_kind</code>／<code>entry_price_semantic</code>／
+<code>label_return_mode</code>／<code>decision_offset_bars</code>。而且：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>你會看到</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scenario</code> 只有 <strong>C</strong> 能選，<code>A</code>／<code>B</code>／<code>two_stage</code> 是灰的，<strong>而且下面寫著為什麼</strong></td>
+<td>那三種是「預測型」，需要另外一套產生答案的東西，本批沒做</td>
+</tr>
+<tr>
+<td><code>control_kind</code> 有三個能選，<code>platform_random_bars</code> 是灰的並寫著 <code>not_implemented_platform_random_bars</code></td>
+<td>契約層就恆拒這個值</td>
+</tr>
+<tr>
+<td><code>entry_price_semantic</code> 只有 <code>trigger_close</code> 能選</td>
+<td>分析層目前只支援這一種組合</td>
+</tr>
+<tr>
+<td><code>label_return_mode</code> 只有 <code>close_to_close</code> 能選</td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>decision_offset_bars</code> 是數字框但<strong>打不進去</strong>（唯讀），固定 0，旁邊寫著理由</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>每個下拉底下都有一行白話說明</td>
+<td>那行字是從契約檔直接取的，不是另外寫的</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>試著違規</strong>：把游標點進 <code>decision_offset_bars</code> 打 <code>3</code>。</p>
+<p><strong>應該看到</strong>：<strong>打不進去</strong>（唯讀）。</p>
+<p>🔴 <strong>不是這樣代表什麼</strong>：如果你真的把它改成 3 了，那就是三家審查員在 R3 抓到的那個缺陷復活了
+（我宣稱鎖死卻只加了提示屬性）。記下來告訴我。</p>
+<hr />
+<h3 id="b4-這批匯出實際會帶什麼七項新的">B4 ── 這批匯出實際會帶什麼（<strong>七項，新的</strong>）</h3>
+<p><strong>你做什麼</strong>：看「這批匯出實際會帶什麼（你沒選過但一直存在的設定）」那一區。</p>
+<p><strong>應該看到 七行</strong>：<code>scenario</code> / <code>control_kind</code> / 進場價語意 / 報酬算法 / 決策位移 /
+lookahead 深度 / purge 下界。而且：</p>
+<ul>
+<li><strong>每一行都是活的</strong>：回到 B3 把 <code>control_kind</code> 換一個值，這一區的那一行<strong>當場跟著變</strong></li>
+<li><strong>深度和 purge 是逐個週期各一行</strong>：如果你的結果含 1h 和 12h 兩種週期，
+就會看到 <code>lookahead 深度（1h）＝…</code> 和 <code>lookahead 深度（12h）＝…</code> <strong>兩行</strong>，不是一行</li>
+<li>深度那行會告訴你<strong>來源</strong>是哪幾個欄位（就是你在 B2 設篩選時引用到的欄）</li>
+<li>沒設任何篩選時，深度那行會寫「來源＝…：無（沒有設篩選條件）」</li>
+</ul>
+<p><strong>不是這樣代表什麼</strong>：如果換了設定但那一區文字不動，代表它顯示的是寫死的預設值而不是你的實際設定
+——那是「說一套做一套」，記下來。</p>
+<hr />
+<h3 id="b5-匯出事件契約-json">B5 ── 匯出事件契約 JSON</h3>
+<p><strong>你做什麼</strong>：按「匯出事件契約 JSON」。</p>
+<p><strong>應該看到</strong>：</p>
+<ol>
+<li>可能先跳一個確認框，逐個附帶欄告訴你「future_1bar_return：X/Y 筆可算、Z 筆因資料尾端不足而缺」
+—— <strong>缺欄不會擋你匯出</strong>，按確定即可</li>
+<li>下載<strong>兩個檔</strong>：
+<ul>
+<li><code>gap3_events_&lt;日期&gt;.json</code> —— 事件本體</li>
+<li><code>gap3_events_&lt;日期&gt;.source.json</code> —— 來源檔（它的 sha256 就是每筆的 <code>source_file_digest</code>）</li>
+</ul>
+</li>
+</ol>
+<p><strong>打開那個 JSON 檢查</strong>（用任何文字編輯器）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>應該有</th>
+<th>應該<strong>沒有</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_id</code>、<code>symbol</code>、<code>timeframe</code>、<code>t0</code>（13 位數的毫秒）、<code>label</code>（0 或 1）</td>
+<td>🔴 <strong><code>label_value</code></strong>（答案）——匯出檔<strong>不寫答案</strong>了</td>
+</tr>
+<tr>
+<td><code>scenario</code>、<code>control_kind</code>、<code>entry_price_semantic</code>、<code>decision_offset_bars</code>、<code>direction</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>label_definition</code>（裡面有 <code>window.horizon_bars</code>、<code>label_return_mode</code>、<code>filters</code>）</td>
+<td></td>
+</tr>
+<tr>
+<td><code>lookahead_bars_declared</code>（逐週期的深度）</td>
+<td></td>
+</tr>
+<tr>
+<td><code>future_1bar_return</code> 之類的附帶欄（純供你在 Excel 看）</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong><code>label_value</code> 不在裡面是對的，不是漏掉</strong>。答案改在 IC 分析當下才算——
+這樣同一批事件可以用不同的答案窗重複分析，不必重新匯出。</p>
+<p><strong>如果你沒設任何篩選條件</strong>：按下去應該會<strong>被擋住</strong>並跳訊息說深度還沒取得——
+等一兩秒再按就會成功。那是刻意的：拿不到深度就不讓你匯出。</p>
+<hr />
+<h3 id="b6-ic-decay-的邊界說明">B6 ── IC decay 的邊界說明</h3>
+<p><strong>你做什麼</strong>：看匯出面板最底下那段黃字。</p>
+<p><strong>應該看到</strong>：它明白告訴你四件事——decay 曲線<strong>不是</strong>本批交付、附帶的 <code>future_*</code> 欄
+<strong>不會</strong>進 IC 計算、要換答案窗請去 IC 分析頁改、<strong>不必再匯出一次</strong>、整條曲線等 GAP-6。</p>
+<p><strong>不是這樣代表什麼</strong>：如果它叫你「重新匯出」來換答案窗，那是錯的（那正是這段話要否定的事）。</p>
+<hr />
+<h2 id="第二段把事件匯進系統data-preparation">第二段：把事件匯進系統（<code>/data-preparation</code>）</h2>
+<h3 id="b7-用-json-匯入先只驗證">B7 ── 用 JSON 匯入（先只驗證）</h3>
+<p><strong>你做什麼</strong>：開 <code>/data-preparation</code> → 「匯入事件（GAP-3 新契約）」→ 選 B5 下載的
+<code>gap3_events_*.json</code> → <strong>勾「僅驗證不落檔」</strong> → 送出。</p>
+<p><strong>應該看到</strong>：「驗證通過 N 筆（未落檔）」。</p>
+<p><strong>故意弄錯</strong>：把 JSON 裡某一筆的 <code>label</code> 改成 <code>2</code> 再上傳。</p>
+<p><strong>應該看到</strong>：<strong>逐列的拒收原因表格</strong>（哪一列、哪個欄位、什麼原因），<strong>不是</strong>空白畫面、
+<strong>不是</strong> 500 錯誤。</p>
+<hr />
+<h3 id="b8-真的匯進去">B8 ── 真的匯進去</h3>
+<p><strong>你做什麼</strong>：取消「僅驗證」，再送出一次。</p>
+<p><strong>應該看到</strong>：顯示 <code>import_id</code>；右側「已匯入事件批」列表多出這一批，
+每列有 <code>import_id</code>／筆數／匯入時間／symbols／timeframes。</p>
+<hr />
+<h3 id="b9-用-csv-逐欄對映匯入新的">B9 ── 用 CSV 逐欄對映匯入（<strong>新的</strong>）</h3>
+<p><strong>你做什麼</strong>：用「CSV 欄名對映匯入」那一區，選一份你自己的 CSV。</p>
+<p><strong>應該看到</strong>（依序）：</p>
+<ol>
+<li><strong>前 5 列預覽</strong> ＋ 全部欄名</li>
+<li>一組下拉，讓你把 CSV 的欄對到契約欄（<code>symbol</code>／<code>timeframe</code>／<code>t0</code>／<code>label</code>…）
+—— 🔴 <strong>每一個下拉的初始值都是「未選」</strong>，系統<strong>不會</strong>幫你猜哪一欄是 label</li>
+<li><strong>這批的五個設定</strong>（同 B3，但這裡 <code>scenario</code> <strong>四個值全部可選</strong>）</li>
+<li>「批次預設（JSON 物件）」文字框</li>
+<li>「你聲明的正例 X 筆／反例 Y 筆」＋<strong>一個必須勾的確認框</strong></li>
+</ol>
+<p><strong>試著違規一</strong>：<strong>不要勾</strong>那個確認框，直接按「匯入」。</p>
+<p><strong>應該看到</strong>：被擋下來並列出原因，而且<strong>完全沒有任何網路請求發出</strong>（開瀏覽器開發者工具的
+Network 分頁看，應該一片空白）。</p>
+<p><strong>試著違規二</strong>：在「這批的五個設定」選了 <code>scenario = A</code>，<strong>同時</strong>在「批次預設」文字框裡
+也寫 <code>{&quot;scenario&quot;: &quot;B&quot;}</code>。</p>
+<p><strong>應該看到</strong>：被擋下來，訊息說 <code>scenario</code> 同時由兩個地方給值、請只留一個來源
+—— 🔴 <strong>系統不會替你決定誰優先</strong>。</p>
+<p><strong>試著違規三</strong>：把 <code>decision_offset_bars</code> 打成 <code>1.9</code>。</p>
+<p><strong>應該看到</strong>：被擋下來，說必須是整數。🔴 <strong>不應該</strong>看到它自己變成 <code>1</code>
+（那是 R4 抓到的「靜默改值」缺陷）。</p>
+<hr />
+<h3 id="b10-答案窗宣告">B10 ── 答案窗宣告</h3>
+<p><strong>你做什麼</strong>：B9 對映齊全並勾了確認之後，往下看「答案窗宣告」那一區。</p>
+<p><strong>應該看到</strong>：逐個週期各一個輸入框，預設值是該檔案能支援的<strong>最大</strong>深度；
+下方列出你的條件引用到哪些未來欄。</p>
+<p><strong>試著違規</strong>：把某個週期的數字<strong>調低</strong>。</p>
+<p><strong>應該看到</strong>：出現一個<strong>必須勾選</strong>的聲明（大意是「我知道這樣可能不可驗證」），不勾就送不出去。</p>
+<hr />
+<h3 id="b11-舊格式擋得住">B11 ── 舊格式擋得住</h3>
+<p><strong>你做什麼</strong>：拿一份舊的三欄 CSV（<code>symbol</code>／<code>timestamp</code>／<code>Positive_case</code>）丟進「匯入事件」。</p>
+<p><strong>應該看到</strong>：拒收，原因 <code>legacy_schema_detected</code>，<strong>並附欄位對照的搬遷提示</strong>。</p>
+<p><strong>反過來</strong>：把 B5 的新 JSON 轉成 CSV 丟進舊的「導入案例」。</p>
+<p><strong>應該看到</strong>：拒收，原因 <code>new_schema_on_legacy_endpoint</code>，訊息指向新端點。</p>
+<p>🔴 <strong>兩個方向都要試</strong>——只試一個方向的話，一個「永遠拒收」的實作也會看起來正常。</p>
+<hr />
+<h3 id="b12-刪掉一批事件新的">B12 ── 刪掉一批事件（<strong>新的</strong>）</h3>
+<p><strong>你做什麼</strong>：在「已匯入事件批」列表，對某一批按刪除。</p>
+<p><strong>應該看到</strong>：確認框，裡面有：</p>
+<ul>
+<li>「確定要刪除這批事件嗎？此操作無法撤銷。」</li>
+<li>該批的 <code>import_id</code>、<strong>筆數</strong>、<strong>匯入時間</strong></li>
+<li>如果這批在<strong>這台瀏覽器上</strong>曾被拿去分析過，會多一段黃色警語：
+「在這個瀏覽器上，這批事件曾被拿去分析：刪除後，引用它的分析結果將無法重現。仍可刪除。」
+並註明這筆紀錄只存在本機</li>
+</ul>
+<p><strong>先按取消</strong>：列表沒有任何變化，<strong>而且沒有發出刪除請求</strong>（Network 分頁確認）。</p>
+<p><strong>再按確定</strong>：該批從列表消失。</p>
+<p><strong>驗殘留</strong>：</p>
+<pre><code class="language-bash">ls data_cache/events/ | grep &lt;剛才那個 import_id&gt;
+</code></pre>
+<p><strong>應該看到</strong>：空的（一個檔都不剩）。</p>
+<hr />
+<h2 id="第三段拿事件去分析ic-analysis">第三段：拿事件去分析（<code>/ic-analysis</code>）</h2>
+<h3 id="b13-切到事件模式">B13 ── 切到事件模式</h3>
+<p><strong>你做什麼</strong>：開 <code>/ic-analysis</code>，分析模式選「Event-Driven 模式」。</p>
+<p><strong>應該看到</strong>：出現「從已匯入案例選事件（GAP-3）」下拉。
+沒匯入過任何批的話，顯示「尚未匯入任何事件批——請先到『數據準備』用新契約匯入。」</p>
+<hr />
+<h3 id="b14-選一批批次事實-vs-分析參數新的這是這批最重要的觀念">B14 ── 選一批：批次事實 vs 分析參數（<strong>新的，這是這批最重要的觀念</strong>）</h3>
+<p><strong>你做什麼</strong>：下拉選 B8 匯入的那批。</p>
+<p><strong>應該看到 兩個分開的區塊</strong>：</p>
+<p><strong>區塊一「這批事件的事實（不可在這裡改）」</strong>——五行：
+<code>scenario</code>／<code>control_kind</code>／<code>direction</code>／<code>t0</code>（筆數＋最早最晚時間）／<code>label</code>（正反例各幾筆）。</p>
+<p><strong>試著違規</strong>：想辦法點進去改任何一行。</p>
+<p><strong>應該看到</strong>：<strong>改不了</strong>——那一區裡連一個可以打字或下拉的元件都沒有。</p>
+<p><strong>區塊二「這次分析要用的參數（只影響這一次分析，不會寫回事件批）」</strong>——四項：</p>
+<ul>
+<li><strong>答案窗 <code>horizon_bars</code></strong>：可以自由填任意正整數，🔴 <strong>初始值一定是 <code>1</code></strong></li>
+<li><code>entry_price_semantic</code>／<code>label_return_mode</code>：只有一個值能選，其餘灰掉並寫理由</li>
+<li><code>decision_offset_bars</code>：唯讀鎖 0</li>
+</ul>
+<p>🔴 <strong><code>horizon_bars</code> 初始值必須是 1</strong>。如果你匯入的那批 <code>label_definition.window.horizon_bars</code>
+是 3，這裡<strong>還是要顯示 1</strong>——那個 3 是「深度宣告」不是「答案窗」，兩件事不能混用。</p>
+<hr />
+<h3 id="b15-改分析參數不會動到事件批">B15 ── 改分析參數不會動到事件批</h3>
+<p><strong>你做什麼</strong>：把答案窗改成 <code>7</code>，跑一次分析。跑完之後回到 <code>/data-preparation</code>，
+查看同一批的內容。</p>
+<p><strong>應該看到</strong>：那批的 <code>label_definition.window.horizon_bars</code> <strong>沒有變</strong>（還是原本的值）。</p>
+<p>🔴 <strong>不是這樣代表什麼</strong>：如果它被改成 7，代表分析參數回寫了事件批——
+那會讓「同一批事實」隨著每次分析而改變，是這一整套分層要防的事。</p>
+<hr />
+<h3 id="b16-事件後報酬表正反全體三組新的">B16 ── 事件後報酬表：正／反／全體三組（<strong>新的</strong>）</h3>
+<p><strong>你做什麼</strong>：跑完分析後，看「事件後報酬表」。</p>
+<p><strong>應該看到</strong>：<strong>三組垂直排列</strong>——</p>
+<ol>
+<li><strong>正例組（label = 1）</strong></li>
+<li><strong>反例組（label = 0）</strong></li>
+<li><strong>全體組（正＋反）</strong></li>
+</ol>
+<p>每組各有一張表，逐個 horizon 一列，欄位是 mean／median／win_rate／n／n_eff。
+表頭每個欄位名都可以滑上去看它的白話定義。</p>
+<p><strong>檢查一件事</strong>：正例組的 <code>n</code> ＋ 反例組的 <code>n</code>，應該等於全體組的 <code>n</code>。</p>
+<p><strong>如果你匯入的那批 <code>control_kind</code> 不只一種</strong>（例如你手動混了兩種來源的反例）：</p>
+<p><strong>應該看到</strong>：全體組<strong>不給數字</strong>，而是顯示 <code>not_computed：mixed_control_kind_in_batch</code>，
+滑上去會告訴你「平台不取多數決，要看全體組請把不同來源的反例分成不同批」。
+🔴 <strong>正例組與反例組仍然正常顯示</strong>——<code>control_kind</code> 只影響全體組。</p>
+<p><strong>不是這樣代表什麼</strong>：如果全體組給了一張空表（全是 0 或 <code>—</code>）而不是原因，那是錯的
+——空表會讓你以為「算出來就是 0」。</p>
+<hr />
+<h3 id="b17-條件-ic-真的算得出來這是本批補的洞">B17 ── 條件 IC 真的算得出來（<strong>這是本批補的洞</strong>）</h3>
+<p><strong>你做什麼</strong>：在同一批上跑分析，找報告裡的「條件 IC」段。</p>
+<p><strong>應該看到</strong>：有數值。</p>
+<p>🔴 <strong>背景</strong>：在這批之前，從 <code>/search</code> 匯出的事件<strong>永遠</strong>算不出條件 IC——
+因為匯出檔不含答案，而分析端也還沒開始算，兩頭都沒有。
+現在答案在分析當下由後端產生，所以這條路才通。</p>
+<p><strong>如果顯示 <code>unavailable：missing_label_value</code></strong>：代表你用的是<strong>手動 CSV 匯入</strong>而且沒帶答案欄
+——那是正常的（系統只照抄你給的），不是缺陷。</p>
+<hr />
+<h3 id="b18-特徵-run-沒涵蓋事件期會被擋新的">B18 ── 特徵 run 沒涵蓋事件期會被擋（<strong>新的</strong>）</h3>
+<p><strong>你做什麼</strong>：選一個<strong>時間範圍明顯比事件期短</strong>的特徵 run（例如事件在 2024 年，
+run 只涵蓋 2025 年），按開始分析。</p>
+<p><strong>應該看到</strong>：<strong>被擋下來</strong>，訊息說特徵 run 的時間範圍不涵蓋事件期。</p>
+<p><strong>反過來也要試</strong>：選一個<strong>確實涵蓋</strong>事件期的 run。</p>
+<p><strong>應該看到</strong>：<strong>正常跑起來</strong>。</p>
+<p>🔴 <strong>兩個方向都要試</strong>——只試前者的話，一個「永遠擋」的實作也會看起來正常。</p>
+<hr />
+<h3 id="b19-特徵太多會在啟動前被擋新的">B19 ── 特徵太多會在啟動前被擋（<strong>新的</strong>）</h3>
+<p><strong>你做什麼</strong>：如果你手上有超過 <strong>80,515</strong> 個特徵的 run，選它並按開始分析。</p>
+<p><strong>應該看到</strong>：<strong>在任務啟動之前</strong>就被擋下來，訊息會告訴你：
+這個 run 有幾個特徵、上限是多少、為什麼擋（記憶體會爆）、
+上限是實跑量測出來的、以及<strong>這個 run 目前無法分析</strong>。</p>
+<p>🔴 <strong>訊息不應該叫你「去縮減特徵數」</strong>——系統沒有提供那個介面，那樣講等於指路到死巷。</p>
+<p><strong>沒有那麼大的 run 就跳過這項</strong>，註明「無可用樣本」即可。</p>
+<hr />
+<h3 id="b20-切回全域模式">B20 ── 切回全域模式</h3>
+<p><strong>你做什麼</strong>：分析模式切回「Global」。</p>
+<p><strong>應該看到</strong>：事件下拉與所有事件專屬區塊消失；全域分析照常運作、結果與以前一致。</p>
+<hr />
+<h2 id="簽字">簽字</h2>
+<p>全部做完後，把結果填在這裡（或直接告訴我哪幾項不對）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項</th>
+<th>通過？</th>
+<th>備註</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1 搜尋與匯出面板</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B2 篩選與筆數</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B3 五個設定（含唯讀鎖）</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B4 七項揭露（含逐週期）</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B5 匯出兩個檔（<strong>不含</strong> <code>label_value</code>）</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B6 IC decay 邊界說明</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B7 JSON 匯入（僅驗證＋逐列拒收）</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B8 真的匯入</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B9 CSV 逐欄對映（三種違規）</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B10 答案窗宣告</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B11 舊格式雙向擋</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B12 刪除一批（含殘留檢查）</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B13 切事件模式</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B14 事實 vs 參數兩區</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B15 參數不回寫</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B16 三組報酬表</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B17 條件 IC 算得出來</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B18 run 涵蓋期雙向</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B19 特徵數上限</td>
+<td>☐</td>
+<td></td>
+</tr>
+<tr>
+<td>B20 切回全域</td>
+<td>☐</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>簽字</strong>：＿＿＿＿＿＿（日期）　<strong>GAP-3 收案：是／否</strong></p>
+<hr />
+<h2 id="已知還沒做的不是缺陷是具名擱置的">已知還沒做的（不是缺陷，是具名擱置的）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>你會遇到什麼</th>
+<th>為什麼現在不做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>事件模式的「正反例辨別表」永遠顯示 <code>not_computed：no_model_scores_in_event_pipeline</code></td>
+<td>它需要模型分數，而分數來自 ML 層——那一層在成熟度地圖上是「不完整」。<code>/pending-features</code> 有占位說明</td>
+</tr>
+<tr>
+<td>匯入超大檔沒有背景處理（現在是 50MB 上限）</td>
+<td>你裁定過：記錄型不設效能門檻，要設得先改規格</td>
+</tr>
+<tr>
+<td><code>tests/api</code> 有幾條紅的測試</td>
+<td>那幾條在 GAP-3 之前就紅了，屬別的模組，另開票</td>
+</tr>
+</tbody>
+</table></div>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3驗收清單.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
