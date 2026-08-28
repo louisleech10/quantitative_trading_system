@@ -41,8 +41,15 @@
 2. **manifest 缺 `time_range` 鍵**與 legacy `{None,None}` **同等 fail-closed**
    （實掃 14 份有 2 份缺鍵；SPEC ⑤ 只裁定了後者）。
 3. **`D-005` A-024** 把 `⑧(a)` 前綴保留判準由「全域」改「逐 namespace ＋ 三條」。
-   實跑證明舊式等於「非末端 namespace 永遠不能加欄」，與 D-6 直接互斥；
-   改形後**多抓一種**壞法（namespace 重排）。
+   實跑證明舊式等於「非末端 namespace 永遠不能加欄」，與 D-6 直接互斥。
+   🔴 **`ERRATA-D005-A024`（grok 於戳記輪指出，我採納）**：我在 A-024 與交接寫
+   「改形後**多抓一種**壞法（namespace 重排）」——**講過頭了**：舊的全域前綴判準
+   **本來就擋得住** ns 重排。正確說法＝「**一處必要的放寬**（非末端 ns 尾端加欄，
+   D-6 必需）**＋ 把舊式隱含的 ns 序性質顯式化**，其餘等強」。
+   grok 判不構成 REJECTED，三家戳記維持；**不重開戳記輪**（改 D-005 body 會使
+   三家戳記之 hash 全數作廢，代價遠大於一句措辭）。
+   ⚠️ 同輪 composer **照抄了我的錯誤說法**（其 sentinel 寫「淨效果為更嚴」），
+   只有 grok 獨立驗算 ⇒ 「兩家同意」在這一格不構成證據。
 
 ## 收案判準（B9 之後改寫，**不要退回舊判準**）
 
@@ -64,7 +71,13 @@ B10 至今每個 Task 都逐格補了 over 條（見 §2E.3 表）。
 ## 待辦
 
 - [ ] **B10 續做**：7.0b／7.7 收尾 → 7.1 → 7.2 → registry ＋ 4.1c 抽常數 → 7.6 → 7.3 → 7.4 → 7.5
-- [ ] **`D-005` 戳記輪**（A-023／A-024）——與已欠的 **`D-003` 戳記輪同批派**，省一輪
+- [x] ~~**`D-003` ＋ `D-005` 戳記輪**~~ ✅ **2026-08-28 三家全數 APPROVED**（合併一輪）。
+      戳記 append 於兩份 D 檔本身，body 雜湊經實跑對證未變
+      （`18abd9ad…5775`／`1994fdfa…b6b7`）。收斂檔
+      `handoffs/reconcile/20260828-gap3uxtodod305-x-stamp-r1/synth.md`。
+      🔴 銷帳走 `debt_clear --abandon --kind collection-failed`（設計內逃生口，**未改治理碼**）：
+      composer 交件之兩個章節標題被 completeness checker 判為畸形 finding ID，
+      屬**交件格式瑕疵非結論問題**；六行戳記與雜湊對證獨立於此 bookkeeping。
 - [ ] **收 epic 前**：使用者 **UAT B 段 13 項簽字**（未簽不收案）
 - [ ] 本批**未動 `scripts/`** ⇒ 暫不需跑 `gov_check.sh --no-probe`；動了再跑
 - [ ] 清舊批殘留：`.probe_ic{,2,3}.sh`、根目錄檔名為 `--only` 之檔、`*-record*.receipt.json`
