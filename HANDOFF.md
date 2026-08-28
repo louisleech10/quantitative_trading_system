@@ -94,6 +94,14 @@ Task 7.5 已補三個分組標籤＋兩個 `not_computed` 文字進 `event_metri
 
 ## 給下一個 session 的坑
 
+- 🔴 **動到 `scripts/` 的 commit 要帶 `Governance-Scope: out-of-epic <理由>` trailer**
+  （與 `Co-Authored-By:` **同一段**，見 `govb1_final_gate.sh:347,420`）。
+  **本批三個 `scripts/` 改動都沒帶** ⇒ 進了 G-7 的淨差清單。已 push 之 commit
+  前向補不了（要改歷史），下批**在寫 commit message 當下就加**。
+  🔴 **誠實邊界**：G-7 現列 18 個路徑，其中 **5 個是本批的**
+  （`agent_postflight.sh`／`clean_agent_tmp.sh`／`mutation_worktree.py` 三個真的 out-of-epic、
+  以及兩個 GAP-3 測試檔——後者屬 epic 內但不在 `govb1_scope.manifest`）。
+  其餘 13 個是更早期累積（GAP-2 時代檔案）。**不要把本批這 5 個也算進 `R-GOV7-1` 的既有帳**。
 - 🔴 **`.nbi` 是被版控的**：跑完測試 `git status` 會多出 22 個 numba 快取改動。
   commit 前先 `git checkout --` 還原，否則會把快取雜訊混進 commit。
 - 🔴 **前端測試不得把真契約注入生產元件**：那會讓「契約漂移」類的機械閘永遠不紅（本批實證）。
