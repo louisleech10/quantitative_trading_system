@@ -1,0 +1,123 @@
+{
+  "epic": "gap3ux-b10",
+  "mode": "verify",
+  "n_mutations": 7,
+  "results": [
+    {
+      "id": "7.0-M1",
+      "task": "7.0",
+      "desc": "decision_offset_bars 改回寫死",
+      "rc": 1,
+      "red": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ⑤ `decisionOffsetBars`：傳非預設 `3` ⇒ 頂層 `decision_offset_bars` === 3（非 enum 欄，型別為 number）",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ⑤ `decisionOffsetBars`：傳非預設 `3` ⇒ 頂層 `decision_offset_bars` === 3（非 enum 欄，型別為 number）",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值"
+      ]
+    },
+    {
+      "id": "7.0-M2",
+      "task": "7.0",
+      "desc": "control_kind 改回寫死",
+      "rc": 1,
+      "red": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ② `controlKind`：傳非預設 `platform_same_trigger_rule` ⇒ 頂層 `control_kind` === 所傳值"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ② `controlKind`：傳非預設 `platform_same_trigger_rule` ⇒ 頂層 `control_kind` === 所傳值"
+      ]
+    },
+    {
+      "id": "7.0-M3",
+      "task": "7.0",
+      "desc": "label_return_mode 改回寫死",
+      "rc": 1,
+      "red": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ④ `labelReturnMode`：傳非預設 `open_to_horizon_close` ⇒ **巢狀** `label_definition.label_return_mode` === 所傳值，且**不得**出現在頂層",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ④ `labelReturnMode`：傳非預設 `open_to_horizon_close` ⇒ **巢狀** `label_definition.label_return_mode` === 所傳值，且**不得**出現在頂層",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值"
+      ]
+    },
+    {
+      "id": "7.0-M4",
+      "task": "7.0",
+      "desc": "label_return_mode 寫到頂層（位置錯、schema 仍過）",
+      "rc": 1,
+      "red": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ④ `labelReturnMode`：傳非預設 `open_to_horizon_close` ⇒ **巢狀** `label_definition.label_return_mode` === 所傳值，且**不得**出現在頂層"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ④ `labelReturnMode`：傳非預設 `open_to_horizon_close` ⇒ **巢狀** `label_definition.label_return_mode` === 所傳值，且**不得**出現在頂層"
+      ]
+    },
+    {
+      "id": "7.0-M5",
+      "task": "7.0",
+      "desc": "entry_price_semantic 預設改回 trigger_open",
+      "rc": 1,
+      "red": [
+        "Task 7.0 ⑦ — 五維度全部不傳 ⇒ 值 === 預設；`counterexample_kind` 不出現 > ⑦ 不傳任何維度 ⇒ 五欄為 `C`／`user_labeled_same_trigger`／**`trigger_close`**／`close_to_close`／`0`",
+        "Task 7.0 ⑦ — 五維度全部不傳 ⇒ 值 === 預設；`counterexample_kind` 不出現 > ⑦b `entry_price_semantic` 之預設已依 §F-3′ 由 `trigger_open` 改為 `trigger_close`（回歸；改回去須紅）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.0 ⑦ — 五維度全部不傳 ⇒ 值 === 預設；`counterexample_kind` 不出現 > ⑦ 不傳任何維度 ⇒ 五欄為 `C`／`user_labeled_same_trigger`／**`trigger_close`**／`close_to_close`／`0`",
+        "Task 7.0 ⑦ — 五維度全部不傳 ⇒ 值 === 預設；`counterexample_kind` 不出現 > ⑦b `entry_price_semantic` 之預設已依 §F-3′ 由 `trigger_open` 改為 `trigger_close`（回歸；改回去須紅）"
+      ]
+    },
+    {
+      "id": "7.0-M6",
+      "task": "7.0",
+      "desc": "匯出端復活 label_value（兩層守衛同時驗）",
+      "rc": 1,
+      "red": [
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ② `label_value` 不在匯出檔內——**逐列**驗，不是只看第一列",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧b **over 向對照**：F-1′ 之三元組 `(trigger_close, close_to_close, k=0)` 同樣照常成功（證明⑧不是「因為不支援才成功」）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value > ② `label_value` 不在匯出檔內——**逐列**驗，不是只看第一列",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧b **over 向對照**：F-1′ 之三元組 `(trigger_close, close_to_close, k=0)` 同樣照常成功（證明⑧不是「因為不支援才成功」）"
+      ]
+    },
+    {
+      "id": "7.0-M7",
+      "task": "7.0",
+      "desc": "五維度全部忽略 opts（全拆對照）",
+      "rc": 1,
+      "red": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ③ `entryPriceSemantic`：傳非預設 `next_open` ⇒ 頂層 `entry_price_semantic` === 所傳值",
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ⑤ `decisionOffsetBars`：傳非預設 `3` ⇒ 頂層 `decision_offset_bars` === 3（非 enum 欄，型別為 number）",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ③ `entryPriceSemantic`：傳非預設 `next_open` ⇒ 頂層 `entry_price_semantic` === 所傳值",
+        "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ⑤ `decisionOffsetBars`：傳非預設 `3` ⇒ 頂層 `decision_offset_bars` === 3（非 enum 欄，型別為 number）",
+        "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值"
+      ]
+    }
+  ],
+  "baseline_after_restore": {
+    "opts": {
+      "rc": 0,
+      "red": []
+    },
+    "label_value": {
+      "rc": 0,
+      "red": []
+    }
+  },
+  "closure": "CLOSED"
+}

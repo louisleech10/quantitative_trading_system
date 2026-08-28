@@ -1,7 +1,8 @@
 /**
  * GAP-3 B5.2：把 /search 結果組成事件契約（event_import_contract.json）新 schema 記錄。
  * 純組裝、不算統計；欄位語意：t0＝觸發根 open（ms UTC）、label＝正反例標記、direction 由條件方向推、
- * scenario 預設 C（確認型）、entry_price_semantic 預設 trigger_open、label_definition 由搜尋條件摘要＋digest 組。
+ * scenario 預設 C（確認型）、entry_price_semantic 預設 trigger_close（Task 7.0 依 §F-3′ 更正）、
+ * label_definition 由搜尋條件摘要＋digest 組。
  * 使用者匯入前仍可手改；後端 validator 為唯一真相源（本檔不重做檢查）。
  */
 import type { CaseData } from './types';
@@ -13,14 +14,30 @@ import type { ExportFilterSpec } from './exportFilter';
 export const ATTACHED_HORIZONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 /**
- * `/search` 匯出之 `scenario` 與 `control_kind` 預設值。
+ * `/search` 匯出之**五個批次維度**之預設值。
  *
  * 🔴 Task 4.1b **邊界②（防寫死漂移）**：揭露區塊顯示的值必須 `==` 匯出檔實際寫入的值。
  * 兩處各寫一份字面就會漂 ⇒ **常數是唯一來源**，組裝與顯示都讀它。
  * （`control_kind` 使用者從未選過、亦不知其存在——4.1b 就是為了把它講出來。）
+ *
+ * 🔴 **Task 7.0（本批）新增後三個常數**：原本 `decision_offset_bars`／`label_return_mode`
+ * 之預設是**寫死在 `buildEventContractRecords` 的物件字面裡**，Task 7.3 的揭露區要顯示它們時
+ * 只能再抄一份字面 ⇒ 就是 4.1b 已經付過代價的那個病。故一併提成常數。
  */
 export const EVENT_EXPORT_SCENARIO = 'C' as const;
 export const EVENT_EXPORT_CONTROL_KIND = 'user_labeled_same_trigger' as const;
+/**
+ * 🔴 **Task 7.0 依 §F-3′ 把預設由 `trigger_open` 改為 `trigger_close`**（D-4 合法變更）。
+ *
+ * 為什麼可以改而不算改壞：匯出端自 Task 4.1 ② 起**已不寫 `label_value`**
+ * ⇒ 本欄純為**宣告**，沒有任何數值依它計算 ⇒ 改的只有宣告欄字面，
+ * **G-2 事件 golden 為 byte 級不變**（golden 跑 IC 管線、不碰匯出端）。
+ * 🔴 §F-1′ 之支援矩陣為 `(trigger_close, close_to_close, k=0)`——舊預設 `trigger_open`
+ * 落在矩陣外，等於「預設值本身就是分析層不支援的組合」，那才是原本的錯。
+ */
+export const EVENT_EXPORT_ENTRY_PRICE_SEMANTIC = 'trigger_close' as const;
+export const EVENT_EXPORT_LABEL_RETURN_MODE = 'close_to_close' as const;
+export const EVENT_EXPORT_DECISION_OFFSET_BARS = 0 as const;
 
 export interface EventExportOptions {
   timeframe: string;
@@ -44,8 +61,31 @@ export interface EventExportOptions {
    */
   lookaheadBarsDeclared: Record<string, number>;
   direction?: 'long' | 'short';
+  /**
+   * ── Task 7.0：**五個批次維度**（`scenario`／`controlKind`／`entryPriceSemantic`／
+   * `labelReturnMode`／`decisionOffsetBars`）之參數化。 ─────────────────────────────
+   *
+   * 🔴 型別之值域一律**照契約 `enum` 全集**寫（`event_import_contract.json`），
+   *    **不是** `accepted` 子集：哪些值在哪個路徑可選是 **Task 7.1 的 `selectable(path, dim)`**
+   *    的事，把契約恆拒值從型別裡拿掉會讓 7.1 連「顯示為 disabled ＋ 理由」都做不到
+   *    （契約 `rejected_with_reason` 之字面就無處可掛）。
+   * 🔴 本 Task **只做型別與參數化，不加 UI、不動後端**（SPEC Task 7.0 邊界）。
+   * 🔴 **不含 `counterexampleKind`**：那是**逐列選填欄**，不是批次維度（R5 群集 G）。
+   */
   scenario?: 'A' | 'B' | 'C' | 'two_stage';
   entryPriceSemantic?: 'trigger_open' | 'trigger_close' | 'next_open' | 'decision_bar_open' | 'decision_bar_close';
+  /** 契約 `enum` 四值；`platform_random_bars` 為契約恆拒（`not_implemented_platform_random_bars`）。 */
+  controlKind?: 'user_labeled_same_trigger' | 'user_labeled_other' | 'platform_same_trigger_rule' | 'platform_random_bars';
+  /**
+   * 🔴 **寫入路徑為巢狀**：`label_definition.label_return_mode`，**不是頂層**。
+   * 寫錯位置會使契約 schema 檢核通過但語意落在錯的物件（SPEC Task 7.0「不可做」）。
+   */
+  labelReturnMode?: 'open_to_close' | 'open_to_horizon_close' | 'close_to_close';
+  /**
+   * 契約為 `type: int, min: 0`（**非 enum**）⇒ Task 7.2 ③ 對它另立一層驗收
+   * （有可輸入控制項／`-1` fail-closed／`k` 落檔 `=== k`），不走 enum 減法。
+   */
+  decisionOffsetBars?: number;
   /**
    * 後端就本結果集算好的來源 canonical 文字（`SearchResultData.source_file_text`）。
    * 🔴 前端**不得**自行序列化或雜湊——見 `ruleDigest.ts` 檔頭與 SPEC Task 1.3 之 R13 定案。
@@ -213,8 +253,9 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
       symbol: c.symbol,
       timeframe: rowTimeframe,
       t0,
-      decision_offset_bars: 0,
-      entry_price_semantic: opts.entryPriceSemantic ?? 'trigger_open',
+      // Task 7.0：五維度全部走 `opts.X ?? <常數>`；預設值除 §F-3′ 之 entry_price_semantic 外一律不動。
+      decision_offset_bars: opts.decisionOffsetBars ?? EVENT_EXPORT_DECISION_OFFSET_BARS,
+      entry_price_semantic: opts.entryPriceSemantic ?? EVENT_EXPORT_ENTRY_PRICE_SEMANTIC,
       direction,
       scenario: opts.scenario ?? EVENT_EXPORT_SCENARIO,
       label,
@@ -226,12 +267,13 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
         canonical_digest: ruleDigest,
         // 🔴 由**該列自己的 tf** 導出，不是全批單一 scalar（§D-3′-a(ii) 禁 per-scope 冒充）。
         window: { horizon_bars: windowHorizonBarsFor(rowTimeframe, declaredMap) },
-        label_return_mode: 'close_to_close',
+        // 🔴 Task 7.0：**巢狀**路徑（`label_definition.label_return_mode`），刻意不放頂層。
+        label_return_mode: opts.labelReturnMode ?? EVENT_EXPORT_LABEL_RETURN_MODE,
         // Task 2.2：條件為空時**不寫該鍵**（`filters` 存在與否本身有語意——後端 L2 據此判斷有無條件）。
         // 🔴 `event_id` 於本物件**之外**產生（見上），故篩選條件不可能進入 ID 之輸入（D-2）。
         ...(opts.filters ? { filters: opts.filters } : {}),
       },
-      control_kind: EVENT_EXPORT_CONTROL_KIND,
+      control_kind: opts.controlKind ?? EVENT_EXPORT_CONTROL_KIND,
       source_file_digest: sourceDigest,
       data_snapshot_digest: snapshot,
       search_rule_summary: ruleSummary,
