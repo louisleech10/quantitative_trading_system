@@ -94,13 +94,71 @@ def _reject_when_over_feature_cap(request, *, entrypoint: str = "analyze") -> No
     })
 
 
+#: Task 7.0b ③：只給 `event_import_id` 時，`horizon_bars` 之缺省為**字面常數 1**。
+#  🔴 **禁**以匯出檔／已落檔批之 `label_definition.window.horizon_bars` 種子化——
+#  §D-3′-a 已裁定該欄語意為 D-7 深度宣告，分析層**禁止**讀成答案窗；
+#  既有批之該欄殘值為 3，種子化即等於靜默給錯預設答案窗。
+_DEFAULT_ANALYSIS_HORIZON_BARS = 1
+
+
+def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
+    """GAP-3 UX Task 7.0b ③(a)：以 `request.event_import_id` 查出該批已落檔 records。
+
+    🔴 **為什麼查在 route 而不是 service**：Rule 4 禁 `api/services/*` 互相 import
+    （`check_decoupling_imports.py` 之 R4 掃 AST，連函式內的 lazy import 也擋），
+    而事件批住在 `api/services/case_import_service.py`。route **不在** R4 掃描範圍。
+    ⇒ 這是「服務端查出、同一次分析內原子完成」在本 repo 之解耦規則下的落地形；
+    **具名偏差**：SPEC 之編排草圖把查詢畫在 `_run_analysis` 內。
+
+    🔴 三元組初始值取該批之 **F-0 種子**（匯出宣告值），`horizon_bars` 取常數 1。
+    """
+    if not request.event_import_id:
+        return None
+    from api.services.case_import_service import get_event_import_service
+
+    detail = get_event_import_service().get_import(request.event_import_id)
+    if detail is None:
+        raise HTTPException(
+            status_code=404, detail=f"event import {request.event_import_id!r} not found",
+        )
+    records = [dict(r) for r in (detail.records or [])]
+    if not records:
+        raise HTTPException(
+            status_code=422,
+            detail={"kind": "empty_event_batch",
+                    "message": f"事件批 {request.event_import_id!r} 沒有任何 records"},
+        )
+    seed = records[0]
+    spec = dict(request.event_label_spec or {})
+    spec.setdefault("horizon_bars", _DEFAULT_ANALYSIS_HORIZON_BARS)
+    spec.setdefault("entry_price_semantic", seed.get("entry_price_semantic"))
+    spec.setdefault("decision_offset_bars", seed.get("decision_offset_bars"))
+    spec.setdefault(
+        "label_return_mode",
+        (seed.get("label_definition") or {}).get("label_return_mode"),
+    )
+    declared = seed.get("lookahead_bars_declared")
+    return {
+        "records": records,
+        "event_label_spec": spec,
+        "lookahead_bars_declared": dict(declared) if isinstance(declared, dict) else {},
+    }
+
+
 @router.post("/analyze", response_model=ICAnalyzeResponse)
 async def start_ic_analysis(request: ICAnalyzeRequest):
     """Start IC analysis task."""
     # Task 6.1：**在呼叫 service 之前**，任務尚未建立
     _reject_when_over_feature_cap(request)
     try:
-        return await ic_analysis_service.start_analysis(request)
+        # 🔴 **非事件呼叫端之呼叫形狀逐字不變**（SPEC：legacy 路徑行為完全不變）：
+        #    沒有 `event_import_id` 時**連 keyword 都不傳**，而不是傳 `event_batch=None`。
+        #    差別看似無關緊要，但既有測試以 spy 包住 `start_analysis` 並比對呼叫形狀，
+        #    多一個 keyword 就會讓那些 spy 全數 `TypeError`——實際踩到 10 條紅。
+        event_batch = _resolve_event_batch(request)
+        if event_batch is None:
+            return await ic_analysis_service.start_analysis(request)
+        return await ic_analysis_service.start_analysis(request, event_batch=event_batch)
     except ValueError as exc:
         logger.error("Invalid IC analysis request: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))

@@ -160,6 +160,37 @@ def check_feature_run_coverage(
         )
 
 
+def _feature_run_time_range(*candidates: Optional[str]) -> Optional[Dict[str, Optional[str]]]:
+    """由 feature run 之路徑找出 `feature_manifest.json` 並原樣取出 `time_range`。
+
+    🔴 **為什麼在 service 自己讀，而不是由 route 傳進來**：Task 7.7 要對證的是
+    「**這次分析實際會載入的那個 run**」是否涵蓋事件期。若由外層先猜一個 run 再傳進來，
+    就得複製一份 service 的 run 選擇邏輯——那正是 B9 花了五輪才修完的病
+    （閘門與 loader 各算各的，於是每一輪冒出一種新的不一致）。
+    這裡直接吃 service 自己已經解析完的 `features_path`／`meta_path`，**沒有第二份選擇邏輯**。
+
+    🔴 **原樣取出、不轉型別**（Task 7.7 ①）：manifest 實測為 epoch 秒之數字字串。
+    找不到 manifest ⇒ 回 `None`，由 gate 判 `feature_coverage_unknown_legacy_run`（fail-closed）。
+    """
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate)
+        for base in (path if path.is_dir() else path.parent, path.parent.parent):
+            manifest = base / "feature_manifest.json"
+            if not manifest.is_file():
+                continue
+            try:
+                payload = json.loads(manifest.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return None
+            raw = payload.get("time_range") if isinstance(payload, dict) else None
+            if isinstance(raw, dict):
+                return {"start": raw.get("start"), "end": raw.get("end")}
+            return None
+    return None
+
+
 def _resolve_feature_count(request, *, entrypoint: str = "analyze") -> Optional[int]:
     """GAP-3 UX Task 6.3：取這個 run 的特徵數。
 
@@ -305,8 +336,103 @@ class ICAnalysisService:
         )
         return feature_count_from_registry_entry(entry)
 
-    async def start_analysis(self, request: ICAnalyzeRequest) -> Dict[str, str]:
-        """Start IC analysis task."""
+    @staticmethod
+    def _run_event_label_stages(
+        request: ICAnalyzeRequest,
+        event_batch: Dict[str, Any],
+        *,
+        features_path: Optional[str],
+        meta_path: Optional[str],
+    ) -> Dict[str, Any]:
+        """GAP-3 UX Task 7.0b ④ ＋ 7.7 ③ 之**五階段編排**（§D-3′-a（iii）之落地點）。
+
+        🔴 **本方法是事件分支的唯一入口**，只在 `request.event_import_id` 存在時被呼叫
+        ⇒ cross-sectional 與純特徵 longitudinal **不會**經過這裡（over 向：不得誤擋）。
+
+        🔴 **`timeframe_seconds` 在這裡建構一次**，並以**同一物件**傳給 purge 與 feature-run gate
+        （驗收以 `is` 比對）。禁各自建構、禁 gate 內直讀 `momentum/core/constants.py`。
+
+        階段（逐字對應 §D-3′-a（iii)）：
+        2. `prepare_analysis_windows` — 唯一產生 receipt 與 hash 之處，**只呼叫一次**
+        3a. `check_feature_run_coverage` — 批次級 pass/fail，**不產生 event-id 子集**
+        3b. `apply_event_coverage` — 回**新**物件（`replace`），同 token 同 hash
+        4. `project_purge` — tuple → read-only Mapping，用完即棄
+        5. `resolve_label_value_at_analyze` — 吃階段 2 之**物件**，不重跑 `align_events`
+
+        回純資料 dict：`event_timestamps`／`event_label_values`／`prepared`／`purge`／`reason`。
+        """
+        from momentum.factories import create_event_sample_pipeline
+
+        pipeline = create_event_sample_pipeline()
+        records = tuple(event_batch.get("records") or ())
+        if not records:
+            raise ValueError(
+                f"event_import_id={request.event_import_id!r} 之批次沒有任何 records（fail-closed）"
+            )
+        spec = event_batch.get("event_label_spec")
+        symbols = sorted({str(r["symbol"]) for r in records})
+        timeframes = sorted({str(r["timeframe"]) for r in records})
+
+        # 🔴 **建構一次**：下面兩個 consumer 拿到的是**同一個** dict 物件。
+        timeframe_seconds = pipeline.timeframe_seconds_for(timeframes)
+        bars_by_tf = pipeline.bars_from_kline_cache(symbols, timeframes)
+
+        prepared0 = pipeline.prepare_analysis_windows(          # 階段 2（spy: call_count == 1）
+            records, bars_by_tf,
+            event_label_spec=spec,
+            event_import_id=request.event_import_id,
+            lookahead_bars_declared=event_batch.get("lookahead_bars_declared") or {},
+            timeframe_seconds=timeframe_seconds,
+        )
+        check_feature_run_coverage(                              # 階段 3a（批次級 pass/fail）
+            timeframe_seconds=timeframe_seconds,                 # 🔴 同一物件
+            feature_manifest_time_range=_feature_run_time_range(features_path, meta_path),
+            event_windows=prepared0.windows,
+        )
+        # 階段 3b：本批 3a 為批次級，不剔除任何列 ⇒ allowed 維持全集（`replace` 仍產生新身分）。
+        prepared1 = pipeline.apply_event_coverage(prepared0, prepared0.allowed_event_ids)
+        purge = pipeline.project_purge(prepared1.purge_lower_bound_ms_by_symbol)  # 階段 4
+        result = pipeline.resolve_label_value_at_analyze(         # 階段 5
+            prepared1, bars_by_tf, event_label_spec=spec,
+        )
+        if not result.supported:
+            raise ValueError(
+                f"事件分析不支援本批之報酬語意（reason={result.reason}）"
+                "——F-1′ 支援矩陣為 (trigger_close, close_to_close, k=0)"
+            )
+        # 🔴 `label_value is None`（尾端不足）之 eid **不進 IC**，且**不填 0**。
+        per_tf = {(p.event_id, p.timeframe): p.feature_cutoff_ms for p in prepared1.per_tf}
+        ts_map: Dict[int, float] = {}
+        for w in prepared1.windows:
+            value = result.label_values.get(w.event_id)
+            if value is None:
+                continue
+            cutoff = per_tf.get((w.event_id, w.timeframe))
+            if cutoff is None:
+                continue
+            ts_map[int(cutoff)] = float(value)
+        return {
+            "event_timestamps": sorted(ts_map),
+            "event_label_values": ts_map,
+            "prepared": prepared1,
+            "purge": purge,
+            "analysis_alignment_receipt_hash": prepared1.analysis_alignment_receipt_hash,
+            "prepared_token": prepared1.prepared_token,
+        }
+
+    async def start_analysis(
+        self,
+        request: ICAnalyzeRequest,
+        *,
+        event_batch: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, str]:
+        """Start IC analysis task.
+
+        🔴 `event_batch`（GAP-3 Task 7.0b）由 **route 層**以 `request.event_import_id` 查出
+        並傳入——**不是** service 自己查。理由：Rule 4 禁 service 互相 import，
+        而事件批住在 `api/services/case_import_service.py`。route 不在 R4 掃描範圍。
+        形狀＝`{"records": [...], "lookahead_bars_declared": {...}, "event_label_spec": {...}}`。
+        """
         task_id = str(uuid.uuid4())
         config_override = self._build_config_override(request)
         analyzer = create_ic_analyzer(config_override)
@@ -337,7 +463,9 @@ class ICAnalysisService:
             self._last_task_id = task_id
 
         logger.info("IC analysis task started: %s", task_id)
-        asyncio.create_task(self._run_analysis(task_id, analyzer, request, config_override))
+        asyncio.create_task(
+            self._run_analysis(task_id, analyzer, request, config_override, event_batch=event_batch)
+        )
 
         return {"task_id": task_id, "status": "running"}
 
@@ -347,6 +475,8 @@ class ICAnalysisService:
         analyzer: Any,
         request: ICAnalyzeRequest,
         config_override: Optional[Dict[str, Any]],
+        *,
+        event_batch: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Run IC analysis in background."""
 
@@ -476,6 +606,32 @@ class ICAnalysisService:
                 if not labels_path:
                     kline_reader = create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR)
 
+                # ── GAP-3 UX Task 7.0b ④：事件分支之五階段編排（唯一取得點） ──────
+                # 🔴 **只在 `event_import_id` 存在時進入**——這個 guard 就是 over 向的保護：
+                #    cross-sectional（上方分支）與純特徵 longitudinal 都不會走到這裡。
+                event_label_values = None
+                event_timestamps = request.event_timestamps or None
+                if request.event_import_id:
+                    if event_batch is None:
+                        raise ValueError(
+                            f"event_import_id={request.event_import_id!r} 但未取得該批 records"
+                            "——route 層須先查出並傳入（Rule 4 禁 service 互相 import）"
+                        )
+                    staged = self._run_event_label_stages(
+                        request, event_batch,
+                        features_path=features_path, meta_path=meta_path,
+                    )
+                    event_timestamps = staged["event_timestamps"]
+                    event_label_values = staged["event_label_values"]
+                    with self._lock:
+                        info = self._tasks.get(task_id)
+                        if info:
+                            # 揭露本次分析用的 receipt 身分（Task 7.0b ⑩ 之可追溯性）
+                            info["analysis_alignment_receipt_hash"] = staged[
+                                "analysis_alignment_receipt_hash"
+                            ]
+                            info["prepared_token"] = staged["prepared_token"]
+
                 report = await asyncio.to_thread(
                     analyzer.analyze,
                     features_path=features_path,
@@ -484,7 +640,8 @@ class ICAnalysisService:
                     config_override=config_override,
                     progress_callback=progress_callback,
                     kline_reader=kline_reader,
-                    event_timestamps=request.event_timestamps or None,
+                    event_timestamps=event_timestamps,
+                    event_label_values=event_label_values,
                 )
 
             with self._lock:
