@@ -13,16 +13,17 @@
 
 | Task | 狀態 | 已跑之驗收 |
 |---|---|---|
-| 7.0 | ✅ | vitest `eventExportOptions` 10；mutation 7 條 `CLOSED`；golden 未變 |
-| 7.0b | 🔧 約六成 | `-k analysis_label_producer` **19**；event_samples **332** |
-| 7.7 | 🔧 約七成 | `-k feature_coverage_gate` **18**；vitest `runInfoTimeRange` **3** |
+| 7.0 | ✅ | vitest `eventExportOptions` 10；golden 未變 |
+| 7.0b | 🔧 約八成 | `-k analysis_label_producer` **19**／`-k event_analysis_horizon_purge` **13** |
+| 7.7 | 🔧 約八成 | `-k feature_coverage_gate` **18**；vitest `runInfoTimeRange` **3** |
 | 7.1／7.2／7.3／7.4／7.5／7.6 | ⬜ | — |
 
-**7.0b／7.7 尚缺**：`_run_analysis` 事件分支之五階段編排（含 route 層以 `event_import_id`
-解析 records——Rule 4 禁 service 互相 import，故解析須在 route 做）、`ic_feed` 只吃
-`prepared1`、前端 `useICAnalysis`／`api.ts` 停送 `event_timestamps`、
-`-k event_analysis_horizon_purge` ≥5、7.7 之 ⑫⑬（decision_at 映射，依賴該編排）、
-以及**整批 mutation**。
+**mutation：23 條 `closure=CLOSED`**（7＋10＋6），verdict 全 PASS、紅集合逐一等於、
+六個 baseline 還原後皆空紅。receipt `handoffs/run_receipts/gap3ux-b10-all-mutations.receipt.json`。
+
+**7.0b／7.7 尚缺**：`ic_feed` 只吃 `prepared1`、前端 `useICAnalysis`／`api.ts` 停送
+`event_timestamps`（7.0b ⑫ 之 vitest `icEventAnalysisRequest` ≥3 依賴它）、
+7.7 之 ⑫⑬（decision_at 映射）、SPEC ⑦ 要求移除前端之 `eventT0MsToIcTimestamps`。
 
 ## 🔴 接手第一件事
 
@@ -100,5 +101,15 @@ B9 之 `R-B9-1..5`／`MEASURE-CANCEL-1` 不變。
   「執行端跑驗收時主控端不得動檔」。各 Task 用 `-k` 選擇器，既有無關紅不擋。
 - 🔴 **`flatten_receipt_schema` 是跨 namespace 攤平**：往任何非末端 namespace 加欄
   都會弄紅 `⑧(a)`。`_EVENT_COLS` 與契約之新欄一律 **append 在該 namespace 尾端**。
-- `git commit -F` 每次走權限分類器約 13 秒；`npm run build`／`gap3_freeze_golden.py`
-  被哨兵報 A 類卡頓是**誤報**（那是指令本身的真實執行時間）。
+- `git commit -F` 每次走權限分類器約 13 秒；`npm run build`／`gap3_freeze_golden.py`／
+  mutation runner 被哨兵報 A 類卡頓是**誤報**（那是指令本身的真實執行時間）。
+- 🔴 **`--record` 在本批抓到我四個問題，沒有一個是產品碼的**——寫 mutation 時逐條防：
+  ①變異寫成**語法錯誤** ⇒ pytest 收集階段 ERROR（訊息無 `::`）⇒ 紅集合正則抓不到、看似空紅；
+  ②**錨點放錯層**（保護不在你改的那層）；
+  ③**fixture 把兩個欄位設同值** ⇒ 「用哪一個」不可分辨；
+  ④**fixture 挑在多層守衛重疊的角落** ⇒ 拆一層還有第二層撐著（B4 之 `1.2-M5/M6` 同型）。
+- 🔴 **vitest 是 transpile-only**：純型別欄位刪除**永遠錄不到紅**。型別面的守衛是
+  `npx tsc --noEmit`（收案前固定關卡），不是 mutation 面。
+- 🔴 **「宣告了」不等於「執行期有」**：本批補的 `feature_coverage_gate_01c` 就是因為
+  原本只驗 model 宣告與 manifest 檔、**兩條都沒經過 `list_runs()`**，
+  把 service 那一半拿掉全部測試照樣綠。加欄時務必有一條**走真實產出路徑**的斷言。
