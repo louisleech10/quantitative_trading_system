@@ -51414,3 +51414,39 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "02cfeb10-cb65-471b-92f2-3fb3106497d6", "cli_rc": "0", "event": "committee_family_result", "event_id": "7c96ed2c-48ff-4894-a898-1707877703d7", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260828-briefmethodconsult-r1-codex.md", "output_sha256": "0052f08ddc99ce49552e3707a0fff7c5b0beb4b4fd7d199503283419d993730e", "producer": "audit_append.sh", "result_state": "success", "round_id": "05ed3999-7482-423f-a627-7aa861e1688a", "schema_version": 1, "sequence": 2911, "ts": "2026-08-27T23:33:36Z"}
 {"event":"gate_deny","ts":"2026-08-27T23:33:58Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"3f5615fba37df45d652ddcb9493fd8c61f35e82dbe5086a005084464eed795a3","cmd_head":"for f in codex composer grok; do echo \"═══════ $f ═══════\"; awk '/^## [A-Z]+-R1-P/{id=$2} /^\\*\\*斷言\\*\\*/{if(id){print id\" | \"substr($0,11,170); id=\"\"}}' handoffs/20260828-briefmethodconsult-r1-$f.md; done"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "3587d912-3df5-4e50-bc65-e8e61cec1248", "lock_sha256": "d9e18ff2a6753990f96635912104ab8b64f1a44676079a67484941da02880a1c", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "05ed3999-7482-423f-a627-7aa861e1688a", "schema_version": 1, "sequence": 2912, "session_id": "20260828-briefmethod-x-consult-r1", "synth_sha256": "a16a837796ba1b1ecb5c443227f0fa9b58373e3b6153dfb103efbbe97a437b8a", "ts": "2026-08-27T23:36:47Z"}
+{"event":"gate_deny","ts":"2026-08-28T01:56:09Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"02c97a375eb4d9a0ffbe8e36a6f4b96641fec2a8986ccf64160fcc1af68507ed","cmd_head":"bash scripts/gate.sh dispatch --task-id 20260828-BRIEFMETHOD-X-CONSULT-R2 --risk low --intent \"諮詢輪 R2：設計 templates/BRIEF_REVIEW_TEMPLATE.md 的欄位與機械判準（使用者裁定要做強制欄，但須先與委員討論格式與內容）\" --facts-asked \"骨架缺什麼/多什麼；我沒查的欄如何機械判定非空且防廢話填法；各 brief-kind 強制欄；與既有範本權責切分；兩階段盲化可行性；落地點\" --review-role \"consultant（設計判斷，不改碼）\" -"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260828-BRIEFMETHOD-X-CONSULT-R2", "ts": "2026-08-28T01:56:15Z"}
+=== 2026-08-28 09:56:15 | dispatch ===
+  ts=2026-08-28 09:56:15
+  kind=dispatch
+  intent=諮詢輪 R2：設計 templates/BRIEF_REVIEW_TEMPLATE.md 的欄位與機械判準
+  risk=low
+  facts_asked=骨架缺什麼/多什麼；我沒查的欄如何機械判定非空且防廢話；各 kind 強制欄；與既有範本權責切分；兩階段盲化可行性；落地點
+  review_role=consultant（設計判斷，不改碼）
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260828-BRIEFMETHOD-X-CONSULT-R2", "ts": "2026-08-28T01:56:24Z"}
+=== 2026-08-28 09:56:24 | dispatch ===
+  ts=2026-08-28 09:56:24
+  kind=dispatch
+  intent=諮詢輪 R2：設計 templates/BRIEF_REVIEW_TEMPLATE.md 的欄位與機械判準
+  risk=low
+  facts_asked=骨架缺什麼/多什麼；我沒查的欄如何機械判定非空且防廢話；各 kind 強制欄；與既有範本權責切分；兩階段盲化可行性；落地點
+  review_role=consultant（設計判斷，不改碼）
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/BRIEF-TEMPLATE-CONSULT-R2-BRIEF.md", "brief_sha256": "eded00ef245b7ef6efa48304861b315d6d031fb7311909abaef3d6212a8d9696", "brief_sha256_norm": "eded00ef245b7ef6efa48304861b315d6d031fb7311909abaef3d6212a8d9696", "event": "committee_round_open", "event_id": "770db848-d343-4298-b7b7-56822ecc82b4", "expected_outputs": {"codex": "handoffs/20260828-brieftemplate-r2-codex.md", "composer": "handoffs/20260828-brieftemplate-r2-composer.md", "grok": "handoffs/20260828-brieftemplate-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "05ecd0f0-23aa-4a5d-b24c-c8f3e27c24f6", "schema_version": 1, "sequence": 2913, "session_name": "20260828-briefmethod-x-consult-r2", "task_id": "20260828-BRIEFMETHOD-X-CONSULT-R2", "ts": "2026-08-28T01:56:34Z"}
