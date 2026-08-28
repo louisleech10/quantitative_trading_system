@@ -159,6 +159,12 @@ async def start_ic_analysis(request: ICAnalyzeRequest):
         if event_batch is None:
             return await ic_analysis_service.start_analysis(request)
         return await ic_analysis_service.start_analysis(request, event_batch=event_batch)
+    except HTTPException:
+        # 🔴 `COMPOSER-R1-P1-04`／`CODEX-R1-P2-04`：`HTTPException` 繼承 `Exception`
+        #    ⇒ 下面那個 `except Exception` 會把 `_resolve_event_batch` 拋的 **404 吞成 500**。
+        #    實跑確認：帶不存在的 `event_import_id` 得到 500，body 裡才寫著「404: ... not found」。
+        #    ⇒ 這裡必須先原樣放行，否則所有「我方刻意設計的 HTTP 狀態碼」都會被降級成 500。
+        raise
     except ValueError as exc:
         logger.error("Invalid IC analysis request: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))
@@ -293,6 +299,19 @@ async def start_full_analysis(request: ICFullAnalysisRequest):
     # 等於留了一扇同樣會把記憶體吃爆的門。閘門要擋的是「啟動分析任務」這件事，
     # 不是某一個 URL，所以**每個會啟動任務的入口都要套**。
     _reject_when_over_feature_cap(request, entrypoint="full_analysis")
+    # 🔴 **三家全員（`CODEX-R1-P1-01`／`COMPOSER-R1-P1-03`／`GROK-R1-P1-03`）**：
+    #    `ICFullAnalysisRequest` 繼承 `ICAnalyzeRequest` ⇒ 它**收得下** `event_import_id`，
+    #    但 `_run_full_analysis` **不跑五階段、不跑 coverage 閘**，只把 `event_timestamps` 透傳
+    #    ⇒ 使用者以為做了事件分析，實際上那個欄位被**靜默忽略**。
+    #    ⇒ fail-closed：本端點本批不支援事件批，明說拒絕，不默默照跑。
+    if getattr(request, "event_import_id", None):
+        raise HTTPException(status_code=400, detail={
+            "kind": "event_batch_not_supported_on_full_analysis",
+            "message": (
+                "/full-analysis 本批不支援事件批（event_import_id）——該端點不跑 GAP-3 之五階段"
+                "編排與 feature-run 涵蓋閘。請改用 POST /api/v1/ic/analyze。"
+            ),
+        })
     try:
         return await ic_analysis_service.start_full_analysis(request)
     except ValueError as exc:

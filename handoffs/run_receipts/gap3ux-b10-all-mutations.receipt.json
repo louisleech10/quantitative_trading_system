@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b10",
   "mode": "verify",
-  "n_mutations": 26,
+  "n_mutations": 33,
   "results": [
     {
       "id": "7.0-M1",
@@ -273,7 +273,11 @@
         "test_feature_coverage_gate_06_per_row_timeframe_not_batch_scalar",
         "test_feature_coverage_gate_07_mixed_tf_matches_per_row_evaluation",
         "test_feature_coverage_gate_08_unknown_timeframe_uses_injected_keyset",
-        "test_feature_coverage_gate_10_epoch_second_strings_parse"
+        "test_feature_coverage_gate_09_legacy_none_pair",
+        "test_feature_coverage_gate_09b_over_present_keys_pass[present0]",
+        "test_feature_coverage_gate_09b_over_present_keys_pass[present1]",
+        "test_feature_coverage_gate_10_epoch_second_strings_parse",
+        "test_feature_coverage_gate_11_out_of_range_epoch_rejected"
       ],
       "verdict": "PASS",
       "expected": [
@@ -283,7 +287,11 @@
         "test_feature_coverage_gate_06_per_row_timeframe_not_batch_scalar",
         "test_feature_coverage_gate_07_mixed_tf_matches_per_row_evaluation",
         "test_feature_coverage_gate_08_unknown_timeframe_uses_injected_keyset",
-        "test_feature_coverage_gate_10_epoch_second_strings_parse"
+        "test_feature_coverage_gate_09_legacy_none_pair",
+        "test_feature_coverage_gate_09b_over_present_keys_pass[present0]",
+        "test_feature_coverage_gate_09b_over_present_keys_pass[present1]",
+        "test_feature_coverage_gate_10_epoch_second_strings_parse",
+        "test_feature_coverage_gate_11_out_of_range_epoch_rejected"
       ]
     },
     {
@@ -375,6 +383,97 @@
       "verdict": "PASS",
       "expected": [
         "GAP-3 事件模式入口 > 🔴 `eventT0MsToIcTimestamps` 已自 `api.ts` **移除**（Task 7.7 ⑦），不得復活"
+      ]
+    },
+    {
+      "id": "R1-M1",
+      "task": "群集A",
+      "desc": "/full-analysis 之事件批 guard 移除（靜默忽略復活）",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_r1_full_analysis_rejects_event_batch"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_r1_full_analysis_rejects_event_batch"
+      ]
+    },
+    {
+      "id": "R1-M2",
+      "task": "群集A",
+      "desc": "橫截面 ＋ 事件批之 validator 移除",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_r1_cross_sectional_rejects_event_batch"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_r1_cross_sectional_rejects_event_batch"
+      ]
+    },
+    {
+      "id": "R1-M3",
+      "task": "群集F",
+      "desc": "HTTPException 被降級成 500（404 消失）",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_r1_missing_import_is_404_not_500"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_r1_missing_import_is_404_not_500"
+      ]
+    },
+    {
+      "id": "R1-M4",
+      "task": "群集D",
+      "desc": "不一致之 per-symbol purge 改為取 max（per-scope 冒充復活）",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed"
+      ]
+    },
+    {
+      "id": "R1-M5",
+      "task": "群集E",
+      "desc": "同一 feature 列改回靜默覆蓋",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud"
+      ]
+    },
+    {
+      "id": "R1-M6",
+      "task": "群集E",
+      "desc": "對齊後零窗改為靜默出空表",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_r1_all_alignment_failed_is_loud"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_r1_all_alignment_failed_is_loud"
+      ]
+    },
+    {
+      "id": "R1-M7",
+      "task": "群集B",
+      "desc": "gate 收到 timeframe_seconds 之副本（值同、身分不同）",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_timeframe_seconds_identity"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_timeframe_seconds_identity"
       ]
     }
   ],

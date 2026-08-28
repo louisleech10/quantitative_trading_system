@@ -255,6 +255,7 @@ def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):
     class _Req:
         event_import_id = "imp-1"
         event_timestamps = None
+        timeframe = "12h"  # 階段 4 之 ms→列數換算要用它（R1 修法後新增）
 
     out = svc.ICAnalysisService._run_event_label_stages(
         _Req(), batch,
@@ -277,6 +278,285 @@ def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):
     t0_seconds = {int(r["t0"]) // 1000 for r in records}
     assert not (set(out["event_timestamps"]) & t0_seconds), \
         "送進 IC 的時間戳不得等於「t0 ÷ 1000」——那正是被移除的前端映射之形狀"
+
+
+def test_event_analysis_horizon_purge_r1_full_analysis_rejects_event_batch(client):
+    """R1 三家全員：`/full-analysis` 收到 `event_import_id` ⇒ **400 明說拒絕**，不靜默忽略。
+
+    🔴 原本 `ICFullAnalysisRequest` 繼承該欄位、收得下，但 `_run_full_analysis`
+    **不跑五階段、不跑 coverage 閘** ⇒ 使用者以為做了事件分析，實際上那個欄位被丟掉。
+    「靜默忽略」比「明說不支援」危險得多：前者會產出一份看起來正常但語意錯誤的報告。
+    """
+    r = client.post("/api/v1/ic/full-analysis", json={
+        "symbol": "ETHUSDT", "timeframe": "12h", "config_hash": "abc",
+        "labels_path": "/tmp/x.h5", "event_import_id": "imp-1",
+    })
+    assert r.status_code == 400, r.text
+    assert "event_batch_not_supported_on_full_analysis" in r.text
+
+
+def test_event_analysis_horizon_purge_r1_cross_sectional_rejects_event_batch(client):
+    """R1 三家全員：`mode=cross_sectional` ＋ `event_import_id` ⇒ 拒收（同上理由）。"""
+    r = client.post("/api/v1/ic/analyze", json={
+        "mode": "cross_sectional", "timeframe": "12h",
+        "symbols": ["ETHUSDT", "BTCUSDT"], "event_import_id": "imp-1",
+    })
+    assert r.status_code == 422, r.text
+    assert "cross_sectional" in r.text
+
+
+def test_event_analysis_horizon_purge_r1_missing_import_is_404_not_500(client):
+    """`COMPOSER-R1-P1-04`／`CODEX-R1-P2-04`：不存在之批次 ⇒ **404**，不是 500。
+
+    🔴 根因：`HTTPException` 繼承 `Exception`，route 的 `except Exception` 把我刻意設計的
+    404 吞成 500。所有「我方設計的狀態碼」都會被這樣降級——不是只有這一個。
+    """
+    r = client.post("/api/v1/ic/analyze", json={
+        "symbol": "ETHUSDT", "timeframe": "12h", "config_hash": "abc",
+        "event_import_id": "definitely-not-there",
+    })
+    assert r.status_code == 404, r.text
+
+
+def test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed(monkeypatch):
+    """`CODEX-R1-P1-02` 之修法：各 symbol purge 下界**不一致** ⇒ fail-closed，不取 max。
+
+    🔴 取 max 折成全域 scalar **正是 §D-3′-a(ii) 明令禁止**的 per-scope 冒充
+    （本 epic 在 B3／B5 各犯過一次）。IC 切分器只接受列數之全域 scalar embargo，
+    所以「能表達就套用、不能表達就拒絕」是唯一不違規的解——這是 B3 的既有先例。
+    """
+    from api.services import ic_analysis_service as svc
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from tests.momentum.event_samples.helpers import load_bars, make_event
+
+    bars = load_bars("ETHUSDT", ("12h",))
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "bars_from_kline_cache",
+        staticmethod(lambda symbols, timeframes, **kw: bars),
+    )
+    # 兩個 symbol、窗寬不同 ⇒ 下界必不一致（bars 只有 ETHUSDT，另一個會對齊失敗，
+    # 故改以 lookahead 宣告製造差異：兩個 tf 不同深度，但只有一個 tf 有事件 ⇒ 用兩批比對）
+    fake_rows = (
+        pipeline_mod.EventSamplePipeline.project_purge,  # 佔位，確保 import 生效
+    )
+    assert fake_rows  # 防 lint
+
+    class _Req:
+        event_import_id = "imp-1"
+        event_timestamps = None
+        timeframe = "12h"
+
+    real_prepare = pipeline_mod.EventSamplePipeline.prepare_analysis_windows
+
+    def prepare_with_divergent_purge(*a, **kw):
+        from dataclasses import replace as _replace
+        from momentum.Analysis.event_samples.label_value_from_case import SymbolPurgeRow
+        prepared = real_prepare(*a, **kw)
+        return _replace(prepared, purge_lower_bound_ms_by_symbol=(
+            SymbolPurgeRow(symbol="AAAUSDT", purge_lower_bound_ms=H12_MS),
+            SymbolPurgeRow(symbol="BBBUSDT", purge_lower_bound_ms=9 * H12_MS),
+        ))
+
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "prepare_analysis_windows",
+        staticmethod(prepare_with_divergent_purge),
+    )
+    batch = {
+        "records": [
+            make_event(0, t0=T0 + 100 * H12_MS, label=1, direction="long"),
+            make_event(1, t0=T0 + 110 * H12_MS, label=0, direction="long"),
+        ],
+        "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": "trigger_close",
+                             "label_return_mode": "close_to_close", "decision_offset_bars": 0},
+        "lookahead_bars_declared": {"12h": 0},
+    }
+    with pytest.raises(ValueError, match="purge 下界不一致"):
+        svc.ICAnalysisService._run_event_label_stages(
+            _Req(), batch,
+            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+            meta_path=None,
+        )
+
+
+def test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud(monkeypatch):
+    """`CODEX-R1-P1-03`：兩事件映射到**同一個 feature 列** ⇒ raise，不得靜默覆蓋。
+
+    🔴 原本這裡是 `ts_map[key] = value`，後到的**靜默蓋掉**先到的——等於默默丟掉一個事件，
+    而且丟哪一個取決於迭代順序。`ic_feed.py:79-81` 對同一情形本來就 raise
+    （「禁默默覆蓋；請先 dedupe」），我這條路徑繞過 `ic_feed` 就把那道保護一起繞掉了。
+    """
+    from api.services import ic_analysis_service as svc
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from tests.momentum.event_samples.helpers import load_bars, make_event
+
+    bars = load_bars("ETHUSDT", ("12h",))
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "bars_from_kline_cache",
+        staticmethod(lambda symbols, timeframes, **kw: bars),
+    )
+
+    class _Req:
+        event_import_id = "imp-1"
+        event_timestamps = None
+        timeframe = "12h"
+
+    same_t0 = T0 + 100 * H12_MS
+    batch = {
+        # 🔴 **同一個 t0、不同 event_id** ⇒ 兩者之 feature cutoff 必然相同
+        "records": [
+            make_event(0, t0=same_t0, label=1, direction="long"),
+            make_event(1, t0=same_t0, label=0, direction="long"),
+        ],
+        "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": "trigger_close",
+                             "label_return_mode": "close_to_close", "decision_offset_bars": 0},
+        "lookahead_bars_declared": {"12h": 0},
+    }
+    with pytest.raises(ValueError, match="映射到同一個 feature 列"):
+        svc.ICAnalysisService._run_event_label_stages(
+            _Req(), batch,
+            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+            meta_path=None,
+        )
+
+
+def test_event_analysis_horizon_purge_r1_all_alignment_failed_is_loud(monkeypatch):
+    """`CODEX-R1-P1-03` 之另一半：全批對齊失敗 ⇒ **raise**，不得靜默出一張空表。
+
+    🔴 **這條是我自己的 mutation 抓出來的缺口**：R1 修法時我加了 `if not prepared1.windows: raise`
+    這道守衛，卻**沒寫任何測試**——`R1-M6`（把它改回靜默）錄到空紅集合，才發現。
+    加了守衛沒加測試，等於下一個人可以無聲地把它拿掉。
+
+    構造方式：`t0` 刻意不落在任何 12h bar 的 open 上（偏移一小時）
+    ⇒ `align_events` 判 `no_boundary_match`，全批無 `WindowRow`。
+    """
+    from api.services import ic_analysis_service as svc
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from tests.momentum.event_samples.helpers import load_bars, make_event
+
+    bars = load_bars("ETHUSDT", ("12h",))
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "bars_from_kline_cache",
+        staticmethod(lambda symbols, timeframes, **kw: bars),
+    )
+
+    class _Req:
+        event_import_id = "imp-1"
+        event_timestamps = None
+        timeframe = "12h"
+
+    off_grid = T0 + 100 * H12_MS + H1_MS  # 偏移一小時 ⇒ 不是 12h bar 的 open
+    batch = {
+        "records": [
+            make_event(0, t0=off_grid, label=1, direction="long"),
+            make_event(1, t0=off_grid + 10 * H12_MS, label=0, direction="long"),
+        ],
+        "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": "trigger_close",
+                             "label_return_mode": "close_to_close", "decision_offset_bars": 0},
+        "lookahead_bars_declared": {"12h": 0},
+    }
+    with pytest.raises(ValueError, match="沒有任何可用窗"):
+        svc.ICAnalysisService._run_event_label_stages(
+            _Req(), batch,
+            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+            meta_path=None,
+        )
+
+
+def test_event_analysis_horizon_purge_timeframe_seconds_identity(monkeypatch):
+    """SPEC R26／⑥(d)：purge 與 feature-run gate 收到**同一個** `timeframe_seconds` 物件（`is`）。
+
+    🔴 這條是 R1 由 **composer 與 grok 兩家獨立**指出的缺口，而我自己在 brief 的
+    `assumed` 段就已自陳「沒有寫 `is` 斷言把它釘住」——寫出來但沒補，兩家都抓了。
+    🔴 為什麼「內容相同」不夠：`timeframe_seconds` 是**注入**的，若哪天有人在其中一側
+    改成 `dict(timeframe_seconds)` 或重新 `timeframe_seconds_for(...)` 建一份，
+    內容一樣但**兩份會各自演化**——那正是 B9 花五輪修的「閘門與 loader 各算各的」同型病。
+    只有身分比對擋得住。
+    """
+    from api.services import ic_analysis_service as svc
+    from momentum.Analysis.event_samples import label_value_from_case as lvfc
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from tests.momentum.event_samples.helpers import load_bars, make_event
+
+    bars = load_bars("ETHUSDT", ("12h",))
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "bars_from_kline_cache",
+        staticmethod(lambda symbols, timeframes, **kw: bars),
+    )
+
+    seen: dict = {}
+    real_purge = lvfc.purge_lower_bound_rows
+    real_gate = svc.check_feature_run_coverage
+
+    def spy_purge(*a, **kw):
+        seen["purge"] = kw["timeframe_seconds"]
+        return real_purge(*a, **kw)
+
+    def spy_gate(**kw):
+        seen["gate"] = kw["timeframe_seconds"]
+        return real_gate(**kw)
+
+    monkeypatch.setattr(lvfc, "purge_lower_bound_rows", spy_purge)
+    monkeypatch.setattr(svc, "check_feature_run_coverage", spy_gate)
+
+    class _Req:
+        event_import_id = "imp-1"
+        event_timestamps = None
+        timeframe = "12h"
+
+    svc.ICAnalysisService._run_event_label_stages(
+        _Req(),
+        {
+            "records": [
+                make_event(0, t0=T0 + 100 * H12_MS, label=1, direction="long"),
+                make_event(1, t0=T0 + 110 * H12_MS, label=0, direction="long"),
+            ],
+            "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": "trigger_close",
+                                 "label_return_mode": "close_to_close", "decision_offset_bars": 0},
+            "lookahead_bars_declared": {"12h": 0},
+        },
+        features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+        meta_path=None,
+    )
+    assert "purge" in seen and "gate" in seen, "兩個 consumer 都必須真的被呼叫到"
+    assert seen["purge"] is seen["gate"], "兩處收到的 timeframe_seconds 必須是**同一個物件**"
+    # 🔴 **over 向對照**：內容相等但身分不同時，`is` 必須為 False——證明本條不是恆真
+    assert not (dict(seen["purge"]) is seen["gate"])
+
+
+def test_event_analysis_horizon_purge_14abd_coverage_filter_semantics():
+    """SPEC ⑭(a)(b)(d) 之語意——**對 `apply_event_coverage` 直接驗**。
+
+    🔴 **具名邊界（composer／grok R1 兩家指出）**：現行 live 路徑之 3a
+    （`check_feature_run_coverage`）是**批次級 pass/fail**、不產生 event-id 子集
+    ⇒ 編排層永遠傳全集，⑭(a)(b)(d) 在 live 路徑上**不可證偽**。
+    本條把該語意拉到 `apply_event_coverage` 這一層直接驗——**這不等於 live 路徑有守到**，
+    差額已具名為 `R-B10-2`。之所以仍要有這條：GAP-6 之分塊計算會讓 3a 產生子集，
+    屆時語意必須已經是對的。
+    """
+    from momentum.Analysis.event_samples.label_value_from_case import (
+        PreparedAnalysisWindows, apply_event_coverage,
+    )
+
+    base = PreparedAnalysisWindows(
+        supported=True,
+        windows=(win("evA", start=T0, end=T0 + H12_MS), win("evB", start=T0, end=T0 + H12_MS)),
+        analysis_alignment_receipt_hash="h",
+        per_tf=(), normalized_spec_bytes=b"{}",
+        allowed_event_ids=frozenset({"evA", "evB"}),
+        purge_lower_bound_ms_by_symbol=(), prepared_token="tok",
+        reason=None, direction_sign=1,
+    )
+    # (a)(b)：剔除後之 allowed 就是後續 manifest／split 之唯一定義域
+    kept = apply_event_coverage(base, frozenset({"evA"}))
+    assert kept.allowed_event_ids == frozenset({"evA"})
+    assert kept.prepared_token == base.prepared_token       # 身分攜帶
+    assert kept.windows == base.windows                     # windows 本身不被剔除，濾的是 allowed
+    # (d)：allowed 為**空** ⇒ 仍回一個合法物件（由編排層走 loud），不是靜默出空表
+    empty = apply_event_coverage(base, frozenset())
+    assert empty.allowed_event_ids == frozenset()
+    assert empty.prepared_token == base.prepared_token
+    # 🔴 **over 向**：不剔除任何列時兩者 allowed 相等（證明上面不是「總是變空」）
+    assert apply_event_coverage(base, base.allowed_event_ids).allowed_event_ids == base.allowed_event_ids
 
 
 def test_event_analysis_horizon_purge_12_decision_at_mapping_k3_vs_k0(monkeypatch):

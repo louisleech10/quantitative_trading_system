@@ -162,6 +162,13 @@ def test_feature_coverage_gate_05_right_bound_includes_label_window():
             event_windows=[win("ev0", decision=T0, end=T0 + 5 * DAY)],
         )
     assert ei.value.reason == "feature_coverage_insufficient"
+    # 🔴 **over 向對照（`GROK-R1-P2-01` 指出本格原本只有 under）**：
+    #    右界剛好等於 `label_end` ⇒ **須放行**（`<=` 是閉區間，不得多擋一根）
+    check_feature_run_coverage(
+        timeframe_seconds=TF_SECONDS,
+        feature_manifest_time_range=rng(secs(T0 - DAY), secs(T0 + 5 * DAY)),
+        event_windows=[win("ev0", decision=T0, end=T0 + 5 * DAY)],
+    )
 
 
 # ── ⑥⑦ 逐列用該列自己的 tf（非批內 max／min） ──────────────────────────────
@@ -247,6 +254,13 @@ def test_feature_coverage_gate_09_legacy_none_pair():
             event_windows=[win("ev0", decision=T0, end=T0 + DAY)],
         )
     assert ei.value.reason == "feature_coverage_unknown_legacy_run"
+    # 🔴 **over 向對照（`GROK-R1-P2-01`）**：兩端皆為合法值 ⇒ 須放行。
+    #    少了這條，一個「凡是 legacy 分支就擋」的過寬實作也會綠。
+    check_feature_run_coverage(
+        timeframe_seconds=TF_SECONDS,
+        feature_manifest_time_range=rng(secs(T0 - DAY), secs(T0 + 10 * DAY)),
+        event_windows=[win("ev0", decision=T0, end=T0 + DAY)],
+    )
 
 
 @pytest.mark.parametrize("missing", [None, {}, {"start": secs(T0)}, "not-a-dict"])
@@ -263,6 +277,24 @@ def test_feature_coverage_gate_09b_missing_key_same_as_legacy(missing):
             event_windows=[win("ev0", decision=T0, end=T0 + DAY)],
         )
     assert ei.value.reason == "feature_coverage_unknown_legacy_run"
+
+
+@pytest.mark.parametrize("present", [
+    {"start": secs(T0 - DAY), "end": secs(T0 + 10 * DAY)},
+    {"start": secs(T0 - DAY), "end": secs(T0 + 10 * DAY), "extra_key": "ignored"},
+])
+def test_feature_coverage_gate_09b_over_present_keys_pass(present):
+    """🔴 **09b 之 over 向對照（`GROK-R1-P2-01`）**：鍵齊全且值合法 ⇒ **須放行**。
+
+    第二個 param 刻意多帶一個無關鍵——**多餘鍵不得使 gate 誤判為畸形**
+    （三件套之 ②malformed probe：多餘鍵藏東西是一種攻法，但「因為多一個鍵就整批擋掉」
+    是另一種錯，兩者都要驗）。
+    """
+    check_feature_run_coverage(
+        timeframe_seconds=TF_SECONDS,
+        feature_manifest_time_range=present,
+        event_windows=[win("ev0", decision=T0, end=T0 + DAY)],
+    )
 
 
 def test_feature_coverage_gate_09c_tz_naive_iso_rejected():
@@ -308,6 +340,13 @@ def test_feature_coverage_gate_11_out_of_range_epoch_rejected():
             event_windows=[win("ev0", decision=T0, end=T0 + DAY)],
         )
     assert ei.value.reason == "feature_coverage_unknown_timestamp_format"
+    # 🔴 **⑪ 之 over 向對照（`GROK-R1-P2-01`）**：**剛好在界內**之大數字須放行。
+    #    `4102444799` = 2100-01-01 前一秒；少了這條，一個「數字太大就擋」的過寬實作也會綠。
+    check_feature_run_coverage(
+        timeframe_seconds=TF_SECONDS,
+        feature_manifest_time_range={"start": secs(T0 - DAY), "end": "4102444799"},
+        event_windows=[win("ev0", decision=T0, end=T0 + DAY)],
+    )
 
 
 # ── 空窗：不是錯誤 ────────────────────────────────────────────────────────

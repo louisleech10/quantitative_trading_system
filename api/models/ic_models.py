@@ -206,6 +206,14 @@ class ICAnalyzeRequest(BaseModel):
                 "event_import_id 與 event_timestamps 不得同時給定（GAP-3 Task 7.0b）"
                 "——兩者都在指定要分析哪些事件，同時給就有兩個真相源"
             )
+        # 🔴 **三家全員之 R1 finding**：`_run_analysis` 之 cross-sectional 分支在事件五階段
+        #    **之前**就早退 ⇒ 帶 `event_import_id` 的橫截面請求會**靜默忽略**該欄位。
+        #    ⇒ fail-closed，不讓「以為做了事件分析、其實沒有」這件事發生。
+        if self.event_import_id is not None and self.mode == "cross_sectional":
+            raise ValueError(
+                "cross_sectional 模式本批不支援事件批（event_import_id）"
+                "——橫截面分支不跑 GAP-3 之五階段編排與 feature-run 涵蓋閘"
+            )
         return self
 
 

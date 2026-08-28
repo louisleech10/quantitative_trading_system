@@ -70,10 +70,9 @@ describe('GAP-3 事件模式入口', () => {
     expect(page.includes('horizons={config.horizons}')).toBe(true);
   });
 
-  it('CODEX-R1-P1-01：useICAnalysis /analyze payload 序列化 event_timestamps（事件模式且非空）', () => {
-    const hook = readFileSync(resolve(__dirname, '../../hooks/useICAnalysis.ts'), 'utf-8');
-    const payloadBlock = hook.slice(hook.indexOf('const payload = {'), hook.indexOf("requestJson<{ task_id: string; status: string }>('/analyze'"));
-    expect(payloadBlock).toContain('event_timestamps:');
-    expect(payloadBlock).toContain("config.mode === 'event' && config.event_timestamps && config.event_timestamps.length > 0");
-  });
+  // 🔴 **`COMPOSER-R1-P2-01` 指出並已改**：本條原本是**原始碼形狀**斷言
+  //    （`readFileSync` ＋ `toContain('event_timestamps:')`），與 §6.2「不要用原始碼形狀
+  //    證明執行期性質」直接牴觸——`grep` 到那個字串不代表它真的被序列化進 payload。
+  //    執行期的等價驗收已移到 `frontend/src/hooks/icEventAnalysisRequest.test.ts`
+  //    （攔真的 HTTP body，含 legacy 路徑之 over 向）。本處不再保留第二份形狀斷言。
 });

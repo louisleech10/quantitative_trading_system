@@ -392,6 +392,22 @@ class ICAnalysisService:
         # 階段 3b：本批 3a 為批次級，不剔除任何列 ⇒ allowed 維持全集（`replace` 仍產生新身分）。
         prepared1 = pipeline.apply_event_coverage(prepared0, prepared0.allowed_event_ids)
         purge = pipeline.project_purge(prepared1.purge_lower_bound_ms_by_symbol)  # 階段 4
+        # 🔴 **`CODEX-R1-P1-02`：階段 4 原本只算不用**——`purge` 存進 local 就沒人消費，
+        #    `split_events` 也從未被呼叫 ⇒ **per-symbol purge 對本次分析完全沒有作用**。
+        #    根因是單位與粒度都對不上：IC 切分器用的是**列數之全域 scalar** embargo
+        #    （`ic_filter_orchestrator._split_rows` 之 `purge_gap`／`embargo`），
+        #    而這裡算出來的是**毫秒之 per-symbol** 下界。
+        #    🔴 取 max 折成 scalar **正是 §D-3′-a(ii) 明令禁止**的 per-scope 冒充
+        #    （本 epic 在 B3／B5 各犯過一次）⇒ 採 B3 之既有先例：
+        #    **能表達就套用、不能表達就拒絕**，不默默取 max。
+        distinct = {row.purge_lower_bound_ms for row in prepared1.purge_lower_bound_ms_by_symbol}
+        if len(distinct) > 1:
+            raise ValueError(
+                "各 symbol 之 purge 下界不一致（"
+                f"{sorted(distinct)}）——IC 切分器只接受全域 scalar embargo，"
+                "取 max 會對窗較小之 symbol 過度 purge、取 min 會洩漏，兩者皆為 §D-3′-a(ii) 所禁。"
+                "請依 timeframe 拆批後再分析（殘留 R-B10-1）。"
+            )
         result = pipeline.resolve_label_value_at_analyze(         # 階段 5
             prepared1, bars_by_tf, event_label_spec=spec,
         )
@@ -400,18 +416,55 @@ class ICAnalysisService:
                 f"事件分析不支援本批之報酬語意（reason={result.reason}）"
                 "——F-1′ 支援矩陣為 (trigger_close, close_to_close, k=0)"
             )
+        # 🔴 **對齊後一個窗都不剩 ⇒ loud**（`CODEX-R1-P1-03`）：靜默出一張空表，
+        #    使用者會看到一份「分析完成但什麼都沒有」的報告，而真正的原因是全批對齊失敗。
+        if not prepared1.windows:
+            raise ValueError(
+                f"事件批 {request.event_import_id!r} 對齊後沒有任何可用窗"
+                "（全批對齊失敗或全被 coverage 剔除）——不產出空表"
+            )
+
         # 🔴 `label_value is None`（尾端不足）之 eid **不進 IC**，且**不填 0**。
         per_tf = {(p.event_id, p.timeframe): p.feature_cutoff_ms for p in prepared1.per_tf}
         ts_map: Dict[int, float] = {}
+        owner: Dict[int, str] = {}
         for w in prepared1.windows:
             value = result.label_values.get(w.event_id)
             if value is None:
                 continue
             cutoff = per_tf.get((w.event_id, w.timeframe))
             if cutoff is None:
-                continue
-            ts_map[int(cutoff)] = float(value)
+                raise ValueError(
+                    f"事件 {w.event_id} 無 {w.timeframe} 之 per-TF 收據——不得靜默略過"
+                )
+            key = int(cutoff)
+            # 🔴 **兩事件映射到同一個 feature 列 ⇒ raise**（`CODEX-R1-P1-03`）：
+            #    原本這裡是 `ts_map[key] = value`，後到的會**靜默覆蓋**先到的
+            #    ——那等於默默丟掉一個事件，而且丟哪一個取決於迭代順序。
+            #    `ic_feed.py:79-81` 對同一情形本來就 raise（`禁默默覆蓋；請先 dedupe`），
+            #    我這條路徑繞過了 `ic_feed` 就把那道保護一起繞掉了。
+            if key in owner:
+                raise ValueError(
+                    f"事件 {owner[key]} 與 {w.event_id} 映射到同一個 feature 列 {key}"
+                    "（禁默默覆蓋；請先 dedupe）"
+                )
+            owner[key] = w.event_id
+            ts_map[key] = float(value)
+
+        # 階段 4 之**實際套用**：各 symbol 下界一致（上面已 fail-closed 擋掉不一致），
+        # 換算成 IC 切分器要的**列數**（無條件進位——不足一列也要整列擋住）。
+        purge_ms = distinct.pop() if distinct else 0
+        tf = str(request.timeframe or (prepared1.windows[0].timeframe if prepared1.windows else ""))
+        seconds = timeframe_seconds.get(tf)
+        if seconds is None:
+            raise ValueError(
+                f"分析用 timeframe {tf!r} 不在注入之 timeframe_seconds 鍵集"
+                f"（{sorted(timeframe_seconds)}）——無法把 purge 下界換算成列數"
+            )
+        purge_rows = -(-int(purge_ms) // (int(seconds) * 1000))  # ceil division
         return {
+            "purge_ms": int(purge_ms),
+            "purge_rows": int(purge_rows),
             "event_timestamps": sorted(ts_map),
             "event_label_values": ts_map,
             "prepared": prepared1,
@@ -623,6 +676,13 @@ class ICAnalysisService:
                     )
                     event_timestamps = staged["event_timestamps"]
                     event_label_values = staged["event_label_values"]
+                    # 🔴 階段 4 **真的套用**（`CODEX-R1-P1-02`：原本只算不用）：
+                    #    把 per-symbol purge 下界換算成列數後注入 IC 切分器之 `embargo`。
+                    #    只在**現行值較小**時提高——不得因為事件分析而放寬既有設定。
+                    config_override = dict(config_override or {})
+                    config_override["embargo"] = max(
+                        int(config_override.get("embargo") or 0), int(staged["purge_rows"]),
+                    )
                     with self._lock:
                         info = self._tasks.get(task_id)
                         if info:

@@ -732,7 +732,17 @@ mutation，**要重錨、不是繞過**（B4／B5 各發生一次）。
 | **`R-B9-4`** | Task 6.3 之接線回歸證據為**原始碼層斷言**（`page.tsx` 兩處 call-site 走 `icPollFailed`），不是 render 整頁的 runtime 測試。`CODEX-R3-P2-03` 要求後者 | `needs-research`（render 整個 ic-analysis 頁需先評估其 store／chart 依賴之 mock 成本與 flakiness） | 主委；**觸發＝下次動 ic-analysis 頁面時一併評估** |
 | **`D-001/D-002/D-003` provenance** | `gate.sh register-output` 只收 `handoffs/` 或 `stampable_artifacts.txt` 明列者 ⇒ 對 `docs/*.D-00N.md` 跑 `reconcile_stamps_check.sh` 會報 provenance pending（**非戳記造假**） | `user-ruling` | 主委 |
 
-**已解除（不要再當殘留看）**：`R-B2-1`（B4）／`D-002 A-004`、`R-B3-1`、`R-B3-2`（B5）。
+### B10 新增之三條具名殘留（皆出自 R1 三家 review）
+
+| 代號 | 內容 | 三值理由 | owner／觸發 |
+|---|---|---|---|
+| **`R-B10-1`** | **各 symbol 之 purge 下界不一致時，事件分析 fail-closed 拒絕**（不取 max、不取 min）。根因是單位與粒度都對不上：IC 切分器用的是**列數之全域 scalar** embargo（`ic_filter_orchestrator._split_rows` 之 `purge_gap`／`embargo`），而 §D-3′-a(ii) 算出來的是**毫秒之 per-symbol** 下界。取 max 折成 scalar 正是該節**明令禁止**之 per-scope 冒充（本 epic 在 B3／B5 各犯過一次）⇒ 採 B3 之既有先例「能表達就套用、不能表達就拒絕」。**使用者當前解法＝依 timeframe 拆批**（與已解除之 `R-B3-3` 同一解法） | `blocked-by`：IC 切分器之 embargo 為全域列數 scalar；要支援 per-symbol 須改 `ic_filter_orchestrator` 之切分模型，屬 **IC-Analysis 主線**範圍 | 主委；**觸發＝IC 切分器支援 per-symbol embargo 時** |
+| **`R-B10-2`** | SPEC ⑭(a)(b)(d)（真剔除列後之 manifest／split 配對、空 allowed ⇒ loud unavailable）在 **live 路徑上不可證偽**：3a（`check_feature_run_coverage`）是**批次級 pass/fail**、不產生 event-id 子集 ⇒ `_run_event_label_stages` 恆傳全集給 `apply_event_coverage`。本批之驗收是對 `apply_event_coverage` **直接驗語意**（`test_..._14abd_coverage_filter_semantics`），**不等於** live 路徑有守到。R1 由 composer／grok **兩家獨立**指出 | `blocked-by` GAP-6：分塊計算上線後 3a 才會產生 event-id 子集，屆時 live 路徑才有剔除可驗 | 主委；**觸發＝任何讓 3a 產生子集之機制上線時** |
+| **`R-B10-3`** | TODO 7.0b 之「修改檔案」列了 `ic_feed.py（只吃 prepared1）`，**本批未改該檔**。IC 分析鏈現在**根本不經過它**（`_run_event_label_stages` 直接由 `prepared1.windows`＋`per_tf` 組出餵給 analyzer，因為 SPEC ⑩(ii″) 之 `is prepared1` 身分比對禁不起「拆回 DataFrame 再組回來」）；它現存的唯一 consumer 是匯入端之 `EventImportService.analyze`（表格鏈），**那條鏈沒有 prepared** | `blocked-by`：換簽章會逼表格鏈也要有一個它拿不到的物件 | 主委；**觸發＝表格鏈也接上分析時 producer 時** |
+
+**已解除（不要再當殘留看）**：`R-B2-1`（B4）／`D-002 A-004`、`R-B3-1`、`R-B3-2`（B5）／
+🔴 **`R-B3-3`（B10：`EventSplitConfig.embargo_ms_by_symbol` 已實作，per-symbol 下界可表達）**
+——但**新的邊界移到了 `R-B10-1`**：可表達不等於 IC 切分器吃得下。
 
 ---
 
