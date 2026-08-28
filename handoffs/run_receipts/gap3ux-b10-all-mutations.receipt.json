@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b10",
   "mode": "verify",
-  "n_mutations": 7,
+  "n_mutations": 23,
   "results": [
     {
       "id": "7.0-M1",
@@ -107,6 +107,236 @@
         "Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值） > ⑤ `decisionOffsetBars`：傳非預設 `3` ⇒ 頂層 `decision_offset_bars` === 3（非 enum 欄，型別為 number）",
         "Task 7.0 ⑧ — 非 F-1′ 三元組：匯出照常成功、無 `label_value`、宣告即事實 > ⑧ 傳 `(trigger_open, open_to_close, k=2)`（非 F-1′）⇒ 匯出成功、逐列不含 `label_value`、宣告欄忠實等於所傳值"
       ]
+    },
+    {
+      "id": "7.0b-M1",
+      "task": "7.0b/A-023",
+      "desc": "event_direction_sign 對 short 回 +1",
+      "rc": 1,
+      "red": [
+        "test_analysis_label_producer_02_short_is_exact_negation",
+        "test_analysis_label_producer_a023_direction_good_values_accepted[short--1]",
+        "test_analysis_label_producer_a023_direction_sign_in_hash",
+        "test_analysis_label_producer_a023_mixed_direction_rejected"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_analysis_label_producer_02_short_is_exact_negation",
+        "test_analysis_label_producer_a023_direction_good_values_accepted[short--1]",
+        "test_analysis_label_producer_a023_direction_sign_in_hash",
+        "test_analysis_label_producer_a023_mixed_direction_rejected"
+      ]
+    },
+    {
+      "id": "7.0b-M2",
+      "task": "7.0b/A-023",
+      "desc": "乘號從 producer 拿掉（模擬選項甲）",
+      "rc": 1,
+      "red": [
+        "test_analysis_label_producer_02_short_is_exact_negation"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_analysis_label_producer_02_short_is_exact_negation"
+      ]
+    },
+    {
+      "id": "7.0b-M3",
+      "task": "7.0b/A-023",
+      "desc": "direction_sign 自 hash 輸入移除",
+      "rc": 1,
+      "red": [
+        "test_analysis_label_producer_a023_direction_sign_in_hash"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_analysis_label_producer_a023_direction_sign_in_hash"
+      ]
+    },
+    {
+      "id": "7.0b-M4",
+      "task": "7.0b/A-023",
+      "desc": "批內方向一致性檢查移除",
+      "rc": 1,
+      "red": [
+        "test_analysis_label_producer_a023_mixed_direction_rejected"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_analysis_label_producer_a023_mixed_direction_rejected"
+      ]
+    },
+    {
+      "id": "7.0b-M5",
+      "task": "7.0b",
+      "desc": "尾端不足者夾到最後一根而非丟棄（V-M 邊界①）",
+      "rc": 1,
+      "red": [
+        "test_analysis_label_producer_07_tail_insufficient_absent_not_zero"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_analysis_label_producer_07_tail_insufficient_absent_not_zero"
+      ]
+    },
+    {
+      "id": "7.0b-M6",
+      "task": "7.0b",
+      "desc": "spec 位元組綁定移除（h7 prepare / h3 resolve 可通）",
+      "rc": 1,
+      "red": [
+        "test_analysis_label_producer_spec_binding_h7_prepare_h3_resolve"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_analysis_label_producer_spec_binding_h7_prepare_h3_resolve"
+      ]
+    },
+    {
+      "id": "7.0b-M7",
+      "task": "7.0b",
+      "desc": "coverage 回全新物件（token 重生）",
+      "rc": 1,
+      "red": [
+        "test_analysis_label_producer_coverage_replace_keeps_identity"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_analysis_label_producer_coverage_replace_keeps_identity"
+      ]
+    },
+    {
+      "id": "7.0b-M8",
+      "task": "7.0b",
+      "desc": "purge 改為全批取 max（per-scope 冒充）",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_09_symbol_without_window_kept",
+        "test_event_analysis_horizon_purge_09d_per_symbol_not_batch_scalar"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_09_symbol_without_window_kept",
+        "test_event_analysis_horizon_purge_09d_per_symbol_not_batch_scalar"
+      ]
+    },
+    {
+      "id": "7.0b-M9",
+      "task": "7.0b",
+      "desc": "project_purge 靜默折疊重複 symbol",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_09f_duplicate_symbol_raises"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_09f_duplicate_symbol_raises"
+      ]
+    },
+    {
+      "id": "7.7-M1",
+      "task": "7.7",
+      "desc": "左界改用 label_start（≈min(t0)）之 fail-open 窗口",
+      "rc": 1,
+      "red": [
+        "test_feature_coverage_gate_04_left_bound_uses_decision_at_not_t0"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_feature_coverage_gate_04_left_bound_uses_decision_at_not_t0"
+      ]
+    },
+    {
+      "id": "7.7-M2",
+      "task": "7.7",
+      "desc": "manifest 缺 time_range 鍵改為放行",
+      "rc": 1,
+      "red": [
+        "test_feature_coverage_gate_09b_missing_key_same_as_legacy[None]",
+        "test_feature_coverage_gate_09b_missing_key_same_as_legacy[not-a-dict]"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_feature_coverage_gate_09b_missing_key_same_as_legacy[None]",
+        "test_feature_coverage_gate_09b_missing_key_same_as_legacy[not-a-dict]"
+      ]
+    },
+    {
+      "id": "7.7-M3",
+      "task": "7.7",
+      "desc": "時間戳解析改為先 ISO 後數字（R5 版之假紅）",
+      "rc": 1,
+      "red": [
+        "test_feature_coverage_gate_03_fully_covered_passes",
+        "test_feature_coverage_gate_04_left_bound_uses_decision_at_not_t0",
+        "test_feature_coverage_gate_05_right_bound_includes_label_window",
+        "test_feature_coverage_gate_06_per_row_timeframe_not_batch_scalar",
+        "test_feature_coverage_gate_07_mixed_tf_matches_per_row_evaluation",
+        "test_feature_coverage_gate_08_unknown_timeframe_uses_injected_keyset",
+        "test_feature_coverage_gate_10_epoch_second_strings_parse"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_feature_coverage_gate_03_fully_covered_passes",
+        "test_feature_coverage_gate_04_left_bound_uses_decision_at_not_t0",
+        "test_feature_coverage_gate_05_right_bound_includes_label_window",
+        "test_feature_coverage_gate_06_per_row_timeframe_not_batch_scalar",
+        "test_feature_coverage_gate_07_mixed_tf_matches_per_row_evaluation",
+        "test_feature_coverage_gate_08_unknown_timeframe_uses_injected_keyset",
+        "test_feature_coverage_gate_10_epoch_second_strings_parse"
+      ]
+    },
+    {
+      "id": "7.7-M4",
+      "task": "7.7",
+      "desc": "gate 直讀 module 常數而非注入之 map",
+      "rc": 1,
+      "red": [
+        "test_feature_coverage_gate_08_unknown_timeframe_uses_injected_keyset"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_feature_coverage_gate_08_unknown_timeframe_uses_injected_keyset"
+      ]
+    },
+    {
+      "id": "7.7-M5",
+      "task": "7.7",
+      "desc": "RunInfo 拿掉 time_range（response_model 靜默濾欄）",
+      "rc": 1,
+      "red": [
+        "test_feature_coverage_gate_01_runinfo_declares_time_range"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_feature_coverage_gate_01_runinfo_declares_time_range"
+      ]
+    },
+    {
+      "id": "7.7-M6",
+      "task": "7.7",
+      "desc": "service 不再帶出 time_range（型別宣告了但執行期沒有）",
+      "rc": 1,
+      "red": [
+        "test_feature_coverage_gate_01c_list_runs_actually_carries_time_range"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_feature_coverage_gate_01c_list_runs_actually_carries_time_range"
+      ]
+    },
+    {
+      "id": "7.0b-M5b",
+      "task": "7.0b",
+      "desc": "尾端不足：**兩層一起拆**（夾窗 ＋ 放寬三段鏈）",
+      "rc": 1,
+      "red": [
+        "test_analysis_label_producer_07_tail_insufficient_absent_not_zero"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_analysis_label_producer_07_tail_insufficient_absent_not_zero"
+      ]
     }
   ],
   "baseline_after_restore": {
@@ -115,6 +345,22 @@
       "red": []
     },
     "label_value": {
+      "rc": 0,
+      "red": []
+    },
+    "alp": {
+      "rc": 0,
+      "red": []
+    },
+    "fcg": {
+      "rc": 0,
+      "red": []
+    },
+    "eahp": {
+      "rc": 0,
+      "red": []
+    },
+    "rtr": {
       "rc": 0,
       "red": []
     }

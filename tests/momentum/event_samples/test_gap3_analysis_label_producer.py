@@ -178,9 +178,14 @@ def test_analysis_label_producer_07_tail_insufficient_absent_not_zero(bars):
     """
     df = bars["ETHUSDT"]["12h"]
     last_open = int(df["open_time_ms"].to_numpy()[-1])
+    # 🔴 **刻意取「倒數第三根」而不是最後一根**：t0 落在最後一根時，
+    #    `label_start == label_end` 會讓三段鏈與 `entry_at < label_end` **兩條額外的不變式**
+    #    也一起擋住它 ⇒ 針對主守衛的 mutation 會錄到空紅集合（重複守衛使 mutation 失明）。
+    #    往內移兩根之後，h=5 仍然不足（只剩 2 根），但**只有主守衛擋得住**——
+    #    這樣「尾端不足要丟棄」這條保護才有可證偽性。實測：M5 由空紅變為紅。
     recs = [
         make_event(0, t0=T0_100, label=1, direction="long"),
-        make_event(1, t0=last_open, label=0, direction="long"),  # 尾端：答案窗必不足
+        make_event(1, t0=last_open - 2 * H12, label=0, direction="long"),  # 尾端：答案窗必不足
     ]
     p = prep(bars, recs, spec(h=5))
     r = resolve_label_value_at_analyze(p, bars, event_label_spec=spec(h=5))

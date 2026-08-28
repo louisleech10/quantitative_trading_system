@@ -29,11 +29,19 @@ DAY = 86400_000
 T0 = 1704067200000  # 2024-01-01 00:00 UTC（ms）
 
 
-def win(eid: str, *, tf: str = "12h", decision: int, end: int) -> WindowRow:
+def win(eid: str, *, tf: str = "12h", decision: int, end: int,
+        label_start: int | None = None) -> WindowRow:
+    """🔴 `label_start_ms` **預設與 `decision_at_ms` 不同**（預設＝t0，即 decision 之後）。
+
+    首版把兩者設成同值，結果「左界用 `decision_at` 還是用 `label_start`」這件事在 fixture 裡
+    **不可分辨**——mutation 把左界改成 `label_start` 時 rc=0、錄到空紅集合。
+    真實資料裡 `k>0` 時 `decision_at < t0 <= label_start`，fixture 必須反映這個差距，
+    否則 ④ 那條「左界回歸」根本沒有鑑別力。
+    """
     return WindowRow(
         event_id=eid, symbol="ETHUSDT", timeframe=tf,
         decision_at_ms=decision, entry_at_ms=decision,
-        label_start_ms=decision, label_end_ms=end,
+        label_start_ms=T0 if label_start is None else label_start, label_end_ms=end,
     )
 
 
@@ -50,6 +58,23 @@ def secs(ms: int) -> str:
 
 def test_feature_coverage_gate_01_runinfo_declares_time_range():
     assert "time_range" in RunInfo.model_fields
+
+
+def test_feature_coverage_gate_01c_list_runs_actually_carries_time_range():
+    """🔴 **service 真的把 `time_range` 帶出來**（不是只有 model 宣告了）。
+
+    這條是 mutation 抓出來的**真實覆蓋缺口**：原本 ① 只驗 `RunInfo.model_fields`、
+    ①b 直接讀 manifest 檔，**兩條都沒有經過 `list_runs()`**
+    ⇒ 把 `_browse_metadata_for_run` 的 `time_range` 整個拿掉，全部測試照樣綠。
+    型別宣告不會讓任何東西在執行期出現——這正是 §4.2 假綠形態 5 的另一面。
+    """
+    from api.services.feature_factory_service import feature_factory_service
+
+    rows = feature_factory_service.list_runs()
+    if not rows:
+        pytest.skip("本機 registry 無 run，無法對證")
+    assert all("time_range" in row for row in rows), \
+        "list_runs() 的每一列都必須帶 time_range 鍵（值可為 None，但鍵不得缺）"
 
 
 def test_feature_coverage_gate_01b_real_manifest_values_are_strings_or_none():
