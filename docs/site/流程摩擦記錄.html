@@ -120,6 +120,32 @@
 </tr>
 </tbody>
 </table></div>
+<h3 id="-補記829uat-驗收清單過期了整整五批沒有任何東西喊">🔴 補記（8/29）：UAT 驗收清單<strong>過期了整整五批</strong>，沒有任何東西喊</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>類</th>
+<th>事件</th>
+<th>耗損</th>
+<th>處置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B</strong></td>
+<td><code>docs/GAP3_UAT_CHECKLIST.md</code> 的 B 段寫於 8/22（B5 收案），之後 <strong>B6–B10 五批</strong>把使用者看得到的那一層改掉大半，<strong>其中兩項照做必失敗</strong>（叫使用者「選答案窗再匯出」——該選擇器已移除；說「匯出檔含 <code>label_value</code>」——已不寫）。<strong>五批之間沒有任何機制喊過</strong></td>
+<td>若使用者真的照著驗，會在第二項就卡住並以為是程式壞了</td>
+<td>重寫為 <code>白話說明/GAP-3驗收清單.md</code>（20 項），並<strong>為它登記 WATCHED 盯前端三頁</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>為什麼會發生</strong>：<code>plain_docs_sync_check.sh</code> 的 WATCHED 表裡<strong>根本沒有這份清單</strong>——
+它是 <code>docs/</code> 底下的技術檔，不在受管的白話說明資料夾內，於是「畫面改了、清單沒改」
+這件事在機制上是<strong>不可見的</strong>。這與摩擦第八十二條（機制存在但沒接到現在的批次上）同型：
+<strong>守衛存在不等於守衛涵蓋你以為它涵蓋的東西</strong>。</p>
+<p><strong>修法</strong>：把使用者照著點的那份放進 <code>白話說明/</code>（受管資料夾），
+WATCHED 盯 <code>frontend/src/app/{search,data-preparation,ic-analysis}/</code> 與相關模組
+——畫面改了而清單沒改，下一次 <code>gov_check</code> 就會紅。</p>
 <h3 id="這次唯一算得上機制救了我的一件">這次唯一算得上「機制救了我」的一件</h3>
 <p><code>7.3-M1</code> 那條破壞測試的字面錨點，被同批另一個修訂改掉了。
 <strong>runner 當場報「錨點失效」而不是靜默跳過</strong>——如果它安靜地略過那條，
