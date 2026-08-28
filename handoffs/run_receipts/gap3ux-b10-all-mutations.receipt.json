@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b10",
   "mode": "verify",
-  "n_mutations": 33,
+  "n_mutations": 34,
   "results": [
     {
       "id": "7.0-M1",
@@ -474,6 +474,19 @@
       "verdict": "PASS",
       "expected": [
         "test_event_analysis_horizon_purge_timeframe_seconds_identity"
+      ]
+    },
+    {
+      "id": "R2-M1",
+      "task": "R2",
+      "desc": "深度宣告改回只讀逐列欄（真實批次拿到空 dict）",
+      "rc": 1,
+      "red": [
+        "test_event_analysis_horizon_purge_r2_declaration_from_batch_receipt"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_event_analysis_horizon_purge_r2_declaration_from_batch_receipt"
       ]
     }
   ],

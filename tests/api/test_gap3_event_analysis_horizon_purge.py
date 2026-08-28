@@ -419,6 +419,57 @@ def test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud(monkeypatch):
         )
 
 
+def test_event_analysis_horizon_purge_r2_declaration_from_batch_receipt(monkeypatch):
+    """`CODEX-R2-P1-01`：深度宣告是**批次層 receipt**，不是逐列欄——真實批次上首版整個跑不完。
+
+    🔴 首版只讀 `records[0]["lookahead_bars_declared"]`，而 import writer 把它寫在 payload
+    **頂層** `lookahead_declaration`；`get_import()` 又只回 `summary + records`
+    ⇒ 對真實批次（codex 實測 780 列）拿到 `{}`，producer 隨即 fail-closed。
+    🔴 **這正是我在 brief「我沒查的」第 5 列自己列出來的那件事**——列出來了，但沒去打。
+
+    本條驗三件：① 只有批次 receipt 有值時，仍取得到；② 兩者皆缺 ⇒ **422 明說拒絕**，
+    不是讓它到背景才炸；③ **over 向**：只有逐列欄有值時（`/search` 匯出之 Task 4.1 ③）仍取得到。
+    """
+    from api.routes import ic_analysis as route
+    # 🔴 route 是在**函式內**做 lazy import（Rule 4 之解法），所以要 patch **來源模組**，
+    #    patch route 這個模組上的同名屬性沒有用——它根本沒有那個屬性。
+    from api.services import case_import_service as cis
+
+    class _Detail:
+        records = [{"symbol": "ETHUSDT", "timeframe": "12h", "t0": T0,
+                    "entry_price_semantic": "trigger_close", "decision_offset_bars": 0,
+                    "label_definition": {"label_return_mode": "close_to_close"}}]
+
+    class _Svc:
+        def __init__(self, receipt):
+            self._receipt = receipt
+
+        def get_import(self, _id):
+            return _Detail()
+
+        def _stored_declaration(self, _id):
+            return self._receipt
+
+    class _Req:
+        event_import_id = "imp-1"
+        event_label_spec = None
+
+    # ① 批次 receipt 有值 ⇒ 取得到
+    monkeypatch.setattr(cis, "get_event_import_service",
+                        lambda: _Svc({"lookahead_bars_declared": {"12h": 4}}))
+    assert route._resolve_event_batch(_Req())["lookahead_bars_declared"] == {"12h": 4}
+
+    # ② 兩者皆缺 ⇒ 422（不是讓它到背景才炸）
+    monkeypatch.setattr(cis, "get_event_import_service", lambda: _Svc(None))
+    with pytest.raises(Exception) as ei:
+        route._resolve_event_batch(_Req())
+    assert "missing_lookahead_declaration" in str(ei.value)
+
+    # ③ 🔴 **over 向**：只有逐列欄有值（`/search` 匯出之形態）⇒ 仍取得到，不得誤擋
+    _Detail.records[0]["lookahead_bars_declared"] = {"12h": 6}
+    assert route._resolve_event_batch(_Req())["lookahead_bars_declared"] == {"12h": 6}
+
+
 def test_event_analysis_horizon_purge_r1_all_alignment_failed_is_loud(monkeypatch):
     """`CODEX-R1-P1-03` 之另一半：全批對齊失敗 ⇒ **raise**，不得靜默出一張空表。
 

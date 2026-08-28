@@ -4,8 +4,10 @@
 
 ## 現在在哪
 
-**GAP-3 事件型 UAT 缺口修補**：42 Task 中已完成 **34** 個（Task 7.0 ✅）。
-**B10（Phase 7 全棧接線，9 個 Task）施工中**——偵察已收斂、7.0 收案、7.0b 與 7.7 過半。
+**GAP-3 事件型 UAT 缺口修補**：42 Task 中已完成 **36** 個。
+**B10（Phase 7 全棧接線，9 個 Task）進行中**——偵察已收斂；
+**Task 7.0／7.0b／7.7 已收案**（兩輪 review、34 條 mutation `CLOSED`）；
+🔴 **下一步＝Task 7.1–7.6 六個**（使用者指定由新 session 接手）。
 唯一入口 `docs/GAP3UX_IMPL_HANDOFF.md`（**§1 稽核 → §2E 座標表**）；
 白話看板 `白話說明/GAP-3施工看板.md`。
 
@@ -13,23 +15,27 @@
 
 | Task | 狀態 | 已跑之驗收 |
 |---|---|---|
-| 7.0 | ✅ | vitest `eventExportOptions` 10；golden 未變 |
-| 7.0b | 🔧 約八成 | `-k analysis_label_producer` **19**／`-k event_analysis_horizon_purge` **13** |
-| 7.7 | 🔧 約八成 | `-k feature_coverage_gate` **18**；vitest `runInfoTimeRange` **3** |
-| 7.1／7.2／7.3／7.4／7.5／7.6 | ⬜ | — |
+| **7.0** | ✅ | vitest `eventExportOptions` 10 |
+| **7.0b** | ✅ | `-k analysis_label_producer` **19**／`-k event_analysis_horizon_purge` **23**／vitest `icEventAnalysisRequest` **5** |
+| **7.7** | ✅ | `-k feature_coverage_gate` **21**／vitest `runInfoTimeRange` **3** |
+| 7.1／7.2／7.3／7.4／7.5／7.6 | ⬜ | **下個 session 接手** |
 
-**mutation：23 條 `closure=CLOSED`**（7＋10＋6），verdict 全 PASS、紅集合逐一等於、
-六個 baseline 還原後皆空紅。receipt `handoffs/run_receipts/gap3ux-b10-all-mutations.receipt.json`。
+**mutation：34 條 `closure=CLOSED`**（7.0×7＋7.0b×11＋7.7×7＋R1×7＋R2×1＋M5b），
+verdict 全 PASS、紅集合逐一等於、六個 baseline 還原後皆空紅。
+receipt `handoffs/run_receipts/gap3ux-b10-all-mutations.receipt.json`。
 
-**7.0b／7.7 尚缺**：`ic_feed` 只吃 `prepared1`、前端 `useICAnalysis`／`api.ts` 停送
-`event_timestamps`（7.0b ⑫ 之 vitest `icEventAnalysisRequest` ≥3 依賴它）、
-7.7 之 ⑫⑬（decision_at 映射）、SPEC ⑦ 要求移除前端之 `eventT0MsToIcTimestamps`。
+**兩輪 review 皆已收斂**：R1 十四條 findings（三家）全部成立、全部修訂；
+R2 閉合輪由**原提出方**逐條確認 CLOSED，另抓一條新 P1（真實批次跑不完）並已修。
+收斂檔 `handoffs/reconcile/20260828-gap3ux-b10-review-r{1,2}/synth.md`。
 
 ## 🔴 接手第一件事
 
 1. 照 `docs/GAP3UX_IMPL_HANDOFF.md` **§1** 跑稽核。🔴 **期望值已變**：
-   event_samples **332**（原 313）、gap3 api **189**（不變）、vitest **60 檔／347**（原 58／334）、
-   新增 `-k analysis_label_producer` **19**、`-k feature_coverage_gate` **18**。
+   event_samples **332**（原 313）、vitest **61 檔／351**（原 58／334）、
+   `pytest tests/api -k "<十八項選擇器>"` **272**、golden `163c4cec…` 不變、Task 數 42 不變。
+   新增之三個選擇器：`-k analysis_label_producer` **19**／`-k feature_coverage_gate` **21**／
+   `-k event_analysis_horizon_purge` **23**。
+   🔴 vitest 由 352 降為 **351** 是**刪掉一條原始碼形狀假驗收**所致（見 R1 群集 G），不是回歸。
    golden `163c4cec…` **不變**、TODO Task 數 **42** 不變。
 2. 讀 **§2E**（座標表已填，2026-08-28 Claude ＋三委員平行偵察，17 條 findings 全成立）。
 3. 讀 `docs/GAP3_EVENT_UX_TODO.D-005.md`（**未過戳記**，見「待辦」）。
@@ -71,7 +77,10 @@ B10 至今每個 Task 都逐格補了 over 條（見 §2E.3 表）。
 
 ## 待辦
 
-- [ ] **B10 續做**：7.0b／7.7 收尾 → 7.1 → 7.2 → registry ＋ 4.1c 抽常數 → 7.6 → 7.3 → 7.4 → 7.5
+- [ ] 🔴 **B10 續做（下個 session 之唯一任務）**：`7.1 → 7.2 → [抽 formatter registry ＋
+      4.1c 常數] → 7.6 → 7.3 → 7.4 → 7.5`。**7.0／7.0b／7.7 已收案，不必重做**。
+      🔴 順序不可照 TODO 之「—」：§2E 已查出四條隱藏依賴邊（`7.3←7.6`／`7.6←7.1`／
+      `7.7←7.0b`／`7.4←4.1c 抽常數`），照 TODO 順序做會卡住。
 - [x] ~~**`D-003` ＋ `D-005` 戳記輪**~~ ✅ **2026-08-28 三家全數 APPROVED**（合併一輪）。
       戳記 append 於兩份 D 檔本身，body 雜湊經實跑對證未變
       （`18abd9ad…5775`／`1994fdfa…b6b7`）。收斂檔

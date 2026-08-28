@@ -137,11 +137,30 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
         "label_return_mode",
         (seed.get("label_definition") or {}).get("label_return_mode"),
     )
-    declared = seed.get("lookahead_bars_declared")
+    # 🔴 **`CODEX-R2-P1-01`（閉合輪抓到，真實批次跑不起來）**：深度宣告是**批次層 receipt**，
+    #    住在 payload 的**頂層** `lookahead_declaration`，**不是**每一列上。
+    #    首版只讀 `records[0]["lookahead_bars_declared"]` ⇒ 對真實批次（實測 780 列）拿到 `{}`，
+    #    producer 隨即 fail-closed（`缺 timeframe '12h'`）⇒ **事件分析在真實資料上根本跑不完**。
+    #    這正是我在 brief「我沒查的」第 5 列自己列出來的那件事——列出來了，但沒去打。
+    #    ⇒ 順序：批次 receipt（權威）→ 逐列欄（`/search` 匯出之 Task 4.1 ③ 會寫）→ fail-closed。
+    receipt = get_event_import_service()._stored_declaration(request.event_import_id)
+    declared = (receipt or {}).get("lookahead_bars_declared")
+    if not isinstance(declared, dict) or not declared:
+        row_level = seed.get("lookahead_bars_declared")
+        declared = row_level if isinstance(row_level, dict) and row_level else None
+    if not declared:
+        raise HTTPException(status_code=422, detail={
+            "kind": "missing_lookahead_declaration",
+            "message": (
+                f"事件批 {request.event_import_id!r} 沒有答案窗深度宣告"
+                "（批次 receipt 之 lookahead_bars_declared 與逐列欄皆缺）——"
+                "purge 下界無從導出，故不進行分析。請重新匯入並填寫深度宣告。"
+            ),
+        })
     return {
         "records": records,
         "event_label_spec": spec,
-        "lookahead_bars_declared": dict(declared) if isinstance(declared, dict) else {},
+        "lookahead_bars_declared": dict(declared),
     }
 
 
