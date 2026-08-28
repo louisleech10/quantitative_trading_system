@@ -308,32 +308,101 @@ mutation **19 條**全 PASS、`closure: CLOSED`（隔離環境下重跑）。
 
 **B10 ＝ 全棧接線**，TODO 標籤皆為 `票 #3-全棧`。這是 GAP-3 的最後一批。
 
-| Task | 標題 | 已知依賴 |
+| Task | 標題 | **真實**依賴（偵察後更正；**不是** TODO 的「—」） |
 |---|---|---|
-| 7.0 | 前置：擴 `EventExportOptions` 補齊五維度 | — |
-| 7.0b | 分析時 `label_value` producer 與其 wiring | — |
-| 7.1 | 五維度全部接出前端 | **依賴 7.0** |
-| 7.2 | 機械閘：可操作選項集合＝`selectable(path,dim)` 且選值真的傳到落檔 | **依賴 7.0／7.1** |
-| 7.3 | 動態揭露本批設定 | — |
-| 7.4 | 條件 IC decay 之邊界揭露 | — |
-| 7.5 | 事件後報酬表正／反／全體三組 | — |
-| 7.6 | IC 分析頁：批次事實欄唯讀揭露 ＋ 分析參數可設定 | — |
-| 7.7 | Feature run `time_range` 與事件期之對證 | — |
+| 7.0 | 前置：擴 `EventExportOptions` 補齊五維度 | 無（唯一可先動的） |
+| 7.0b | 分析時 `label_value` producer 與其 wiring | 無，但**範圍遠大於 TODO 清單**（見 2E.1 群集 D） |
+| 7.1 | 五維度全部接出前端 | **7.0** |
+| 7.2 | 機械閘：`selectable(path,dim)` ＋ 選值真的傳到落檔 | **7.0／7.1** |
+| 7.3 | 動態揭露本批設定 | 🔴 **7.6**（formatter registry 由 7.6 定義）＋ 4.1c 抽常數 |
+| 7.4 | 條件 IC decay 之邊界揭露 | 🔴 **4.1c 抽成 exported 常數**（現為 JSX 行內字串） |
+| 7.5 | 事件後報酬表正／反／全體三組 | 4.2（已完成）＋ **5.0 glossary 先登記**＋ 2.3 筆數守恆 |
+| 7.6 | IC 分析頁：批次事實欄唯讀揭露 ＋ 分析參數可設定 | 🔴 **7.1**（`EVENT_DIM_PATH_EXCLUSIONS`） |
+| 7.7 | Feature run `time_range` 與事件期之對證 | 🔴 **7.0b**（同一 `timeframe_seconds` 物件之 `is` 比對） |
 
-### 2E.1 🔴 座標偵察**未做**（不得假裝有）
+**定案實作順序**：
+`7.0 → 7.0b → 7.1 → 7.2 → [抽 formatter registry ＋ 4.1c 常數] → 7.6 → 7.3 → 7.4 → 7.5 → 7.7`
 
-B1–B9 的 §2A–§2D 都附了「關鍵座標」與「陷阱」表，那是**上一個 session 先做過偵察**才寫得出來。
-**B10 沒有。** 本節刻意不填座標，因為填了就是我編的。
+### 2E.1 ✅ 座標偵察**已做**（2026-08-28，Claude ＋ 三委員平行；`49f98ed2`）
 
-**接手第一件事＝做偵察**，且依規約 **Claude 與三委員平行各做一份**（`feedback_recon_joint_with_committee`），
-不是 Claude 先產、委員後審。偵察至少要回答：
-1. `EventExportOptions` 現有幾個維度、缺哪五個？（7.0 的「五維度」是哪五個，TODO 有寫，但**現況**要查）
-2. `label_value` 目前在哪裡產生、被誰消費？（7.0b 會解除殘留 `R-B7-1` 與 `R-B3-3`）
-3. Task 7.5 動 glossary ⇒ 會一併收 `R-B8-1`（definition 收窄），該殘留的三家表態見 §7.3
-4. Task 7.7 會往 `analysis_rejected` 同類再加兩個 reason ⇒ **既有斷言用成員資格（`in`）而非等值**，
-   別把它改成等值（§2D.3 已記，B10 仍適用）
-5. Task 7.2 的「機械閘」要求 `selectable(path,dim)` 是**封閉可導出集合**——
-   這與 B9 收案判準同源，先讀 `templates/BRIEF_REVIEW_TEMPLATE.md` §2 再設計
+收斂檔＝`handoffs/reconcile/20260828-gap3ux-b10-consult-r1/synth.md`
+（三家 **17 條 findings 全部成立**，主委逐條實跑複驗，**無一條被推翻**；八個群集 A–H）。
+主委獨立版＝該檔之群集敘述；委員原文在 `sources/`。
+
+🔴 **主委原本猜錯的兩件事（先記自己錯的）**：
+① 猜「`_run_analysis` 已有事件分支、只是 `timeframe_seconds` 可能多處建構」——**連分支都沒有**（三家一致）；
+② 猜「`event_forward_return_table` 尚無 `strata` 頂層鍵」——**已存在**（兩家獨立打穿）。
+照錯誤基準開工會新建第九頂層鍵，直接違反 Task 7.5 要點 1。
+
+#### 五題之答案
+
+1. **`EventExportOptions`**（`frontend/src/lib/eventExport.ts:25-67`）現有 **11 欄**。五個批次維度中
+   `scenario?`／`entryPriceSemantic?` 已是可選參數，**缺** `controlKind`／`labelReturnMode`／`decisionOffsetBars`。
+   落檔寫死於 **`:216`**（`decision_offset_bars: 0`）／**`:229`**（`label_return_mode`，**巢狀**）／
+   **`:234`**（`control_kind`）＋ **`:217`**（`entry_price_semantic` 預設 `trigger_open`，§F-3′ 要改 `trigger_close`）
+   ⇒ **實際要動四處，不是 TODO 說的三處**。生產 caller 唯一，在 `search/page.tsx:645-654`，五維度**一個都沒傳**。
+   🔴 **TODO 的行號 `:9-17`／`:92`／`:102`／`:104`／`:522-525` 全數過時**（群集 H）——
+   實作與 review 一律引用**符號名 ＋ 本表行號**，不引用 TODO 行號；**不就地改 FROZEN TODO**。
+2. **`label_value`**：producer **只有** `event_samples/generator.py:212`（合成產生器）；
+   consumer＝`ic_feed.py:66-80`（缺 ⇒ `missing_label_value`）→ `ic_filter_orchestrator.py:2877-2906`；
+   validator＝`import_contract.py:583`（走 `_is_num`，仍收 NaN＝`R-B7-1`）；匯出端已不寫（`eventExport.ts:197-198`）。
+   🔴 ⇒ **真實使用者路徑目前沒有任何 producer**：從 `/search` 匯出的批次不含 `label_value`，
+   CSV 不自帶就永遠 `missing_label_value` ⇒ **條件 IC 對真實批次現在是不可用的**。7.0b 是**補洞，不是搬家**。
+3. **glossary**（`event_metrics_glossary.json`）實有 **21 條** definition ＋ `_doc`／`_version`，
+   **無** `positive`／`negative`／`all` 分組標籤、**無**兩個 `not_computed` 文字
+   ⇒ 7.5「須同步 (c)」**不是空操作**，`R-B8-1` 的觸發點確實在此。
+   `ic_report_contract.json` 之 `report_sections` 現有 7 鍵，**無 `event_return_table`** ⇒ 7.5 要點 3 為真實新增。
+4. **`analysis_rejected`**：B9 已預先用**成員資格**斷言（`tests/api/test_gap3_ic_feature_cap.py:26-27`，
+   檔頭第 6–7 行明寫為 7.7 預留）⇒ **7.7 不必改既有斷言**。
+   🔴 但本節原文說「再加**兩個** reason」**是錯的**——SPEC L3337-3338 定死最終集合為**五個**：
+   `feature_count_exceeds_cap`／`feature_coverage_insufficient`／`feature_coverage_unknown_legacy_run`／
+   `feature_coverage_unknown_timeframe`／`feature_coverage_unknown_timestamp_format`（＝**加四個**）。
+5. **`selectable(path,dim)`**：兩側皆可導出——契約側 `accepted(dim)`＝`accepted` 鍵或 `enum` 全集
+   （實測：`scenario` enum4 無 accepted；`control_kind` enum4／accepted3／`rejected_with_reason`；
+   `entry_price_semantic` enum5；`label_return_mode` enum3 **住 `required_fields.label_definition.fields`**；
+   `decision_offset_bars` 為 `int, min 0`，**非 enum**）；排除側＝單一具名常數 `EVENT_DIM_PATH_EXCLUSIONS`
+   （SPEC L2854-2860 五列封閉）。🔴 **難點在 UI 側**：「可操作選項集合」須由 **render 後的 DOM 查詢**導出
+   （`getAllByRole('option')` 濾 `disabled`），**不得**在測試裡另寫期望清單（TODO 7.2「不可做」明禁）。
+
+#### 逐 Task 座標（主委＋三家實跑；**詳細內容一律回讀 TODO／SPEC 該 Task 全文**）
+
+| Task | 落點（**實查行號**） | 現況 | 與 TODO 之落差 |
+|---|---|---|---|
+| **7.0** | `eventExport.ts:25-67`（型別）／`:216`,`:217`,`:229`,`:234`（落檔）／caller `search/page.tsx:645-654` | 兩維度已參數化、三處寫死 | 行號全過時；實動**四處** |
+| **7.0b** | **新建** `event_samples/label_value_from_case.py`＋**SPEC L2487 指名之新檔** `event_samples/keys.py`；`alignment.py:21-27`（`_EVENT_COLS` **無 `symbol`／`timeframe`**）；`ic_analysis_service.py:225`（`_run_analysis`）；`event_split.py`；`ic_feed.py`；**`api/models/ic_models.py`**（加 `event_import_id`＋`event_label_spec`，SPEC L2609）；**`useICAnalysis.ts`／`lib/api.ts`**（停送 `event_timestamps`，SPEC L3364-3387） | 🔴 **事件分支不存在**：全檔 `timeframe_seconds`／`prepare_analysis_windows`／`check_feature_run_coverage` 字面數皆 **0**；`mode` 僅 `longitudinal｜cross_sectional`；`event_import_id` 在 `api/`／`momentum/` **完全不存在** | TODO「修改檔案」清單**漏 4 類檔**（見群集 D）；另有**第二條旁路** `_run_full_analysis:1001` 亦傳 raw `event_timestamps` |
+| **7.1** | **新建** `frontend/src/lib/eventDimensions.ts`；`search/page.tsx`／`/data-preparation` | `selectable`／`EVENT_DIM_PATH_EXCLUSIONS` 皆不存在 | 無 |
+| **7.2** | **新建** `frontend/src/lib/__tests__/contractEnumWiring.test.ts` | 不存在 | TODO 只列 under 向；**over 向缺**（見 2E.3） |
+| **7.3** | `search/page.tsx:1853-1888`（4.1b 揭露區，六個 testid） | **已有半套**：`-scenario`／`-depth`／`-depth-pending`／`-depth-{tf}`／`-purge-{tf}`／`-control-kind` | TODO 要點 2 說「原清單漏掉 `control_kind`」——對**現況不成立**（`:1884` 已有）；缺的是進場價／報酬算法／決策位移三項＋ registry 化 |
+| **7.4** | `search/page.tsx:1889-1893`（4.1c 文案） | **JSX 行內字串，非 exported 常數** | 「同一參考」斷言**須先抽常數** |
+| **7.5** | `tables.py:193-208`（`strata` **已存在**，四子鍵）／`dedupe.py:114-115`（`ctx_cols` **無 `control_kind`**）／`ic_report_contract.json`／`EventTablesPanel.tsx:72-73`（**只讀 `sensitivity_micro`，完全不讀 `strata`**） | 頂層恰 8 鍵✓；無 `by_label` | 7.5 ＝**擴充既有 `strata`**，不是新建 |
+| **7.6** | `case.py:364-368`（route 只轉呼）／**`case_import_service.py:1280-1285`（真正 producer）**／**`event_import_models.py:80-99`（`EventImportSummary` 只有 `direction`／`scenario`，缺六鍵）**／`ic-analysis/page.tsx`（957 行，**完全無**批次揭露區，只有 `:600` 一行 `EventTablesPanel`） | 全缺 | TODO 只列 route ⇒ 只改 route 必被 `response_model` **靜默濾欄** |
+| **7.7** | `feature_factory_models.py:116-133`（`RunInfo` 19 欄，**無 `time_range`**）／`feature_factory_service.py:811-836`（`list_runs`）＋`:764-800`（`_browse_metadata_for_run`）／`routes/feature_factory.py:60-62`／`frontend/src/lib/types.ts`／`ic_analysis_service.py`（新建 gate） | 全鏈零實作 | 🔴 **manifest 前提不完整**：實掃 14 份，**12 份**有 `time_range`（epoch **秒**字串），**2 份缺鍵**（`BTCUSDT/1h/cfg_batch_ret`、`ETHUSDT/1h/cfg_batch_ret`）——SPEC L3310-3312 只裁定 `{None,None}`，**未裁缺鍵** |
+
+#### 陷阱（逐條是本輪實跑抓到的）
+
+1. 🔴 **7.0b／7.7 的事件編排是 net-new**。掛 gate 時**只在 `request.event_import_id` 存在時進入**，
+   否則會誤擋 cross-sectional（`:262-304`）與純特徵 longitudinal（`:306-369`）。
+   另**必須同時處理** `_run_full_analysis:1001` 這條旁路，否則可繞過 receipt-derived `decision_at`。
+2. 🔴 **`api/` 不得直接 import 新模組**：R3 只認 `momentum.factories.create_event_sample_pipeline()`
+   之 `@staticmethod` 出口（現有 20 個，**無**這兩個新函式）⇒ **7.0b 須先加 R3 出口**，TODO 未提此步。
+3. 🔴 **7.6 只改 route 會靜默失效**：`EventImportSummary` 沒宣告的鍵會被 `response_model` 濾掉（§4.2 形態 5）。
+4. 🔴 **7.5 邊界② 是真實風險**：`EventTablesPanel` **從未讀過 `strata`**，後端全綠仍可能前端只顯示舊單表。
+5. 🔴 **7.7 之 `_browse_metadata_for_run:790-793`** 只在 `feature_count`／`row_count`／`quality_status`
+   任一為空時才讀 manifest ⇒ 把 `time_range` 掛在該分支內會**間歇性拿不到值**；須另行無條件讀取。
+6. 🔴 **7.0b 邊界② 會假紅**：`h=3` vs `h=7` 之 `label_values` 「不相同」在 flat-close 序列下兩者同為 `0.0`
+   ⇒ fixture 須顯式非平坦且手算 expected（`CODEX-R1-P2-06`）。
+7. **7.0 之 `entry_price_semantic` 預設改動**屬 D-4 合法變更，**須在 commit message 說明**；
+   同批要驗「其餘四維度維持預設 ⇒ G-2 golden byte 級不變」，否則假綠。
+
+#### 本輪之主委裁定（**非 SPEC 字面**，批末 review 須請三家攻）
+
+- **裁定 1（群集 F）**：manifest **缺 `time_range` 鍵**與 `{"start":None,"end":None}` **同等處置**，
+  同用 reason `feature_coverage_unknown_legacy_run`。理由：兩者資訊量相同（都拿不到區間），
+  分兩個 reason 只讓前端多一種字面；且 §C0 只能更嚴，缺鍵放行才是弱化。
+- **裁定 2（群集 D）**：TODO 7.0b／7.6 之「修改檔案」清單不足以落地 SPEC 所定交付，
+  **不開 D-005 延伸檔**——缺的是操作清單、不是判準修訂（判準字面 SPEC L2487／L2593／L2609／L3364 皆已有），
+  而開延伸檔要再付一輪戳記，B10 已欠 D-003 戳記。改為在本表逐檔列出並於 commit message 引用 SPEC 行號。
+  **若批末 review 三家認為不足，再升 D-005。**
 
 ### 2E.2 B10 之收案判準（沿用 B9 之改寫，**不要退回舊判準**）
 
@@ -346,6 +415,20 @@ B1–B9 的 §2A–§2D 都附了「關鍵座標」與「陷阱」表，那是**
 
 🔴 **B9 五輪的病根**：我只測「該擋的有沒有擋住」，從沒測「不該擋的有沒有被誤擋」——
 前五輪的缺陷**全部藏在只有單向對照的格子裡**。B10 的 7.2 是機械閘，同一個坑會再出現。
+
+### 2E.3 🔴 本批之雙向矩陣缺口（偵察輪確立；**實作時逐格補 over 條**）
+
+TODO／SPEC 對下列格子**只寫了 under 向**。收案判準①要求每格兩向各一條可重跑測試 ⇒ over 條由本批補。
+
+| Task | under（TODO 已有） | **over（TODO 缺，本批須補）** |
+|---|---|---|
+| 7.2 ③ | `decision_offset_bars = -1` ⇒ fail-closed | `k = 0` 與正整數 ⇒ 須成功且落檔 `=== k` |
+| 7.2 ① | 契約加第 5 個 `scenario` 值而未改 UI ⇒ 須紅 | `/data-preparation` 之 `scenario` **四值全部可操作**（不得被 `/search` 之排除誤及） |
+| 7.7 | run 不涵蓋事件期 ⇒ fail-closed | 現存 12/14 之 **epoch 秒字串 run 須放行**（SPEC 驗證⑩已有此條）；缺鍵 2/14 之處置見裁定 1 |
+| 7.0b | h 與匯入宣告不同 ⇒ 拒絕 | **非退化** fixture 下 `h=3`／`h=7` 皆成功且值不同（`CODEX-R1-P2-06`） |
+| 7.6 | 批次事實欄無可輸入控制項 | 分析參數區**必須**有可輸入控制項 |
+| 7.0b 編排 | 事件批走五階段 | cross-sectional／純特徵 longitudinal **不得**被誤擋 |
+| 7.5 | `control_kind` 混批 ⇒ `not_computed` | `positive`／`negative` 兩組在三種 `control_kind` 下 byte 級相同（TODO 邊界①已有）✓ |
 
 ## §2D B9 是什麼（Phase 6 全部，五個 Task）
 
