@@ -50,6 +50,86 @@
 </tbody>
 </table></div>
 <hr />
+<h2 id="2026-08-2829gap-3-第十批-b10-後半段task-7176">2026-08-28／29（GAP-3 第十批 B10 後半段：Task 7.1–7.6）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>類</th>
+<th>事件</th>
+<th>次數</th>
+<th>耗損</th>
+<th>已有票？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B</strong></td>
+<td>🔴 <strong>破壞測試的隔離機制整個起不來</strong>——複製工作區時漏了 <code>--binary</code>，碰上 repo 裡<strong>被版控的</strong> numba 快取（跑過測試就變髒）就直接失敗</td>
+<td>1</td>
+<td>一次 runner 全掛；<strong>前九批都僥倖沒踩到</strong></td>
+<td>🔨 已修（<code>mutation_worktree.py</code>）</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td><code>.claude/tmp</code> 累積到 <strong>20G</strong> 從沒清過，其中單一目錄 9.5G 是<strong>遞迴巢狀</strong>（委員複製隔離樹時沒排除 <code>.claude/</code>，把整包 <code>.claude/tmp</code> 套進 <code>iso/.claude/</code>，一層疊一層）</td>
+<td>累積 291 個</td>
+<td>磁碟見底、測試因空間不足轉紅</td>
+<td>🔨 已修（新增 <code>clean_agent_tmp.sh</code> 掛進 <code>agent_postflight.sh</code>，派工後必跑）</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td><strong>磁碟空間量測誤導</strong>：<code>df</code> 顯示只剩 732Mi 而幾分鐘後自己變回 13Gi——macOS 的 purgeable 空間尚未回收</td>
+<td>1</td>
+<td>我一度以為是自己產生的檔，花了幾輪查證</td>
+<td>⬜ 不開票（外部行為，記著即可）</td>
+</tr>
+<tr>
+<td><strong>A</strong></td>
+<td><code>rm</code> 在專案目錄外被權限層擋掉（三種寫法都試過）</td>
+<td>3</td>
+<td>改為把指令交給使用者自己跑</td>
+<td>⬜ 不開票（護欄正確，不該繞）</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>🔴 <strong>我自己寫的測試在保護缺陷本身</strong>：宣稱某欄「鎖死為 0」，卻寫了 <code>expect(input.readOnly).toBe(false)</code></td>
+<td>1</td>
+<td>三家審查同時抓到，一輪修訂</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>🔴 <strong>宣稱大於實作，第八次</strong>：註解說「本頁欄位由那份常數決定」，實際是七段手寫、連 import 都沒有</td>
+<td>1</td>
+<td>兩家獨立命中</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>🔴 <strong>修法自己開新破口，第六次</strong>：為了擋 A 加的夾值函式順手截掉小數，讓後端那條顯式拒絕永遠不會被看到</td>
+<td>1</td>
+<td>閉合輪又多一條 finding</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>派工單「我沒查的」第一列<strong>猜錯</strong>（以為前端不能直接讀契約檔，其實可以）</td>
+<td>1</td>
+<td>審查員推翻；但兩家同時指出<strong>知道也不能改</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="這次唯一算得上機制救了我的一件">這次唯一算得上「機制救了我」的一件</h3>
+<p><code>7.3-M1</code> 那條破壞測試的字面錨點，被同批另一個修訂改掉了。
+<strong>runner 當場報「錨點失效」而不是靜默跳過</strong>——如果它安靜地略過那條，
+我會拿著一份少一條的 receipt 宣稱全數通過。
+那個 fail-loud 是第八批付過代價才加上去的。</p>
+<h3 id="值得記的一個作法">值得記的一個作法</h3>
+<p>我在閉合輪的派工單裡，<strong>把一條自己沒驗證的宣稱具名交出去請委員代打</strong>
+（「兩層防護必須一起拆才錄得到紅」）。委員實跑後確認成立。
+比起自己說了算，這個成本很低而且真的會得到答案——往後同型的自我宣稱都該這樣處理。</p>
+<hr />
 <h2 id="2026-08-05第-0-批-b3-期間">2026-08-05（第 0 批 B3 期間）</h2>
 <div class="table-wrap"><table>
 <thead>
