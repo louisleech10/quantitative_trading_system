@@ -257,6 +257,85 @@ class EventSamplePipeline:
             return {"ok": False, "failures": [dict(f) for f in exc.failures]}
         return {"ok": True, "failures": []}
 
+    # ── GAP-3 UX Task 7.0b：分析時 label producer 之 R3 出口 ────────────────────
+    # 🔴 **具名例外**：交接檔之 R3 慣例寫「出口一律回純資料，例外型別不跨界」，
+    #    而下面三個出口會讓 `PreparedAnalysisWindows`（frozen dataclass）**跨界到 api 層**。
+    #    這是刻意的、不是漏看：SPEC Task 7.0b ⑩(ii″) 要求 manifest／split／materialize／
+    #    `ic_feed` 四處收到的物件**皆 `is prepared1`**——那是**身分**比對，dict 往返做不到。
+    #    實查 `scripts/check_decoupling_imports.py`：R3 是 **import 規則 ＋ manifest 白名單**，
+    #    **不驗回傳型別** ⇒ 機械閘不會紅。慣例確實被破，故在此與模組檔頭兩處具名。
+    #    ⚠️ 例外只涵蓋這三個出口與 `PreparedAnalysisWindows`／`AnalysisLabelResult` 兩個型別；
+    #    不得據此推廣到其他出口。
+
+    @staticmethod
+    def prepare_analysis_windows(records, bars_by_tf, *, event_label_spec, event_import_id,
+                                 lookahead_bars_declared, timeframe_seconds):
+        """Task 7.0b 階段 2 之 R3 出口（回 `PreparedAnalysisWindows`；見上方具名例外）。"""
+        from momentum.Analysis.event_samples.label_value_from_case import (
+            prepare_analysis_windows as _impl,
+        )
+
+        return _impl(
+            records, bars_by_tf,
+            event_label_spec=event_label_spec,
+            event_import_id=event_import_id,
+            lookahead_bars_declared=lookahead_bars_declared,
+            timeframe_seconds=timeframe_seconds,
+        )
+
+    @staticmethod
+    def resolve_label_value_at_analyze(prepared, bars_by_tf, *, event_label_spec):
+        """Task 7.0b 階段 5 之 R3 出口（回 `AnalysisLabelResult`）。"""
+        from momentum.Analysis.event_samples.label_value_from_case import (
+            resolve_label_value_at_analyze as _impl,
+        )
+
+        return _impl(prepared, bars_by_tf, event_label_spec=event_label_spec)
+
+    @staticmethod
+    def apply_event_coverage(prepared, allowed_event_ids):
+        """Task 7.0b 階段 3b 之 R3 出口（`dataclasses.replace`，回**新**物件、同 token 同 hash）。"""
+        from momentum.Analysis.event_samples.label_value_from_case import (
+            apply_event_coverage as _impl,
+        )
+
+        return _impl(prepared, allowed_event_ids)
+
+    @staticmethod
+    def timeframe_seconds_for(timeframes) -> Dict[str, int]:
+        """Task 7.0b／7.7 之 `timeframe_seconds` **建構出口**（回純資料）。
+
+        🔴 SPEC 定死「於匯入驗證通過後、prepare 之前**建構一次**，並以**同一物件**傳入
+        `purge_lower_bound_ms` 與 feature-run gate（驗收以 `is` 比對）」。
+        本出口存在的理由是讓 api 層**不必** import `momentum/core/constants.py::TIMEFRAME_SECONDS`
+        ——那個常數是**建構素材**，SPEC 明禁 gate 內直讀它。由這裡建一次、回一個 dict，
+        呼叫端把**同一個 dict** 往下傳，`is` 比對才有東西可比。
+
+        缺鍵 ⇒ raise（不補預設）：不認得的 timeframe 無法換算 ms，猜一個等於算錯。
+        """
+        from momentum.core.constants import TIMEFRAME_SECONDS
+
+        out: Dict[str, int] = {}
+        for tf in timeframes:
+            key = str(tf)
+            if key not in TIMEFRAME_SECONDS:
+                raise ValueError(
+                    f"timeframe_seconds_for: 不認得的 timeframe {key!r}（fail-closed，不補預設）"
+                )
+            out[key] = int(TIMEFRAME_SECONDS[key])
+        return out
+
+    @staticmethod
+    def project_purge(purge_rows) -> Mapping[str, int]:
+        """Task 7.0b 階段 4 之 R3 出口：`tuple[SymbolPurgeRow, ...]` → read-only `Mapping[str,int]`。
+
+        🔴 這個出口**回純資料**（read-only Mapping），與上面三個不同——
+        它是投影的邊界，本來就不該讓 receipt 型別跨過來。
+        """
+        from momentum.Analysis.event_samples.label_value_from_case import project_purge as _impl
+
+        return _impl(purge_rows)
+
     @staticmethod
     def bars_from_kline_cache(symbols, timeframes, *, cache_path=None) -> Dict[str, Dict[str, pd.DataFrame]]:
         """真實 kline bars（`bars_source.load_bars_from_kline_cache`）；服務端取 bars 的唯一入口。"""

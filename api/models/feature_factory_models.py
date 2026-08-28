@@ -131,6 +131,12 @@ class RunInfo(BaseModel):
     row_count: Optional[int] = None
     quality_status: Optional[str] = None
     training_timeframes: Optional[List[str]] = None
+    #: 🔴 GAP-3 UX Task 7.7 ①：feature run 之時間範圍，形狀與 manifest **同形**。
+    #  型別依實碼裁定＝`Dict[str, Optional[str]]`（`_resolve_l7_v2_time_range` 之回傳型別），
+    #  實測現存 manifest 皆為 **epoch 秒之數字字串**，**不是** epoch 毫秒整數。
+    #  🔴 只改本 model 不夠：`response_model` 沒宣告的鍵會被**靜默濾掉**，
+    #  service 那端亦須帶出（見 `feature_factory_service._browse_metadata_for_run`）。
+    time_range: Optional[Dict[str, Optional[str]]] = None
 
 
 class EnsureBrowseResponse(BaseModel):

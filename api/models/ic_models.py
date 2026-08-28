@@ -152,6 +152,22 @@ class ICAnalyzeRequest(BaseModel):
         None,
         description="Event timestamps for filtering",
     )
+    # ── GAP-3 UX Task 7.0b ③：事件批之分析時 transport ────────────────────────
+    # 🔴 **不另開端點**（SPEC 之三選一裁決）：另開端點會讓 `label_value` 經前端往返一趟，
+    #    前端就可能以 h=3 取得值卻以 h=7 送出分析 ⇒ purge 與 label 分屬不同 h。
+    #    §D-3′-a（iii）之五階段**必須在同一次分析內原子完成**，跨請求即無法保證。
+    event_import_id: Optional[str] = Field(
+        None,
+        description="GAP-3 事件批 id；給定時走事件分析分支（後端自行查出該批已落檔 records）",
+    )
+    event_label_spec: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "GAP-3 分析參數，欄集恰四鍵 "
+            "{horizon_bars, entry_price_semantic, label_return_mode, decision_offset_bars}；"
+            "只作用於本次分析，**不回寫**事件批"
+        ),
+    )
     feature_filter: Optional[FeatureFilterConfig] = Field(None, description="Feature pre-filter config")
     deep_analysis: bool = Field(False, description="Enable deep analysis after main IC workflow")
     deep_analysis_config: Optional[DeepAnalysisRequest] = Field(
@@ -167,6 +183,29 @@ class ICAnalyzeRequest(BaseModel):
     def _reject_net_ic_override(self) -> "ICAnalyzeRequest":
         """T-F12 雙入口:ICAnalyzeRequest.config_override 亦拒 net_ic_analysis 整節。"""
         _reject_net_ic_analysis_in_config_override(self.config_override)
+        return self
+
+    @model_validator(mode="after")
+    def _gap3_event_transport_invariants(self) -> "ICAnalyzeRequest":
+        """GAP-3 UX Task 7.0b ③ 之兩條 transport 不變式。
+
+        ① `event_label_spec` 存在而 `event_import_id` 缺 ⇒ 400（SPEC 驗收 ⑪）。
+           理由：spec 是「對哪一批做什麼分析」的後半，沒有前半就沒有意義；
+           放行的話會靜默套到某個**預設批**上，而使用者以為自己指定了。
+        ② `event_import_id` 與 `event_timestamps` **互斥** ⇒ 同時給 400（SPEC L3370）。
+           理由：兩者都在說「要分析哪些事件」，同時給就有兩個真相源。
+           legacy 非事件呼叫端只帶 `event_timestamps`、不帶 `event_import_id`，**行為不變**。
+        """
+        if self.event_label_spec is not None and self.event_import_id is None:
+            raise ValueError(
+                "event_label_spec 需搭配 event_import_id（GAP-3 Task 7.0b ③）"
+                "——只給分析參數而不說對哪一批，會靜默套到預設批上"
+            )
+        if self.event_import_id is not None and self.event_timestamps:
+            raise ValueError(
+                "event_import_id 與 event_timestamps 不得同時給定（GAP-3 Task 7.0b）"
+                "——兩者都在指定要分析哪些事件，同時給就有兩個真相源"
+            )
         return self
 
 

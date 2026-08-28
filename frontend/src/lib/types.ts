@@ -615,6 +615,16 @@ export interface RunInfo extends RunIdentity {
   feature_count?: number | null;
   row_count?: number | null;
   quality_status?: string | null;
+  /**
+   * GAP-3 UX Task 7.7 ①：feature run 之時間範圍，形狀與後端 manifest **同形**。
+   *
+   * 🔴 值為**字串**（實測現存 manifest 皆為 epoch **秒之數字字串**，例 `"1704067200"`），
+   *    **不是** epoch 毫秒整數——前端不得自行轉型別或比較大小，
+   *    涵蓋判定一律由後端 `check_feature_run_coverage()` 做。
+   * 🔴 舊 run 可能是 `{start: null, end: null}` 或整個鍵不存在（實掃 14 份 manifest 有 2 份缺鍵）；
+   *    兩者後端都判 `feature_coverage_unknown_legacy_run` 而 fail-closed。
+   */
+  time_range?: { start: string | null; end: string | null } | null;
 }
 export interface EnsureBrowseResponse extends RunIdentity {
   browse_task_id: string;

@@ -40,6 +40,125 @@ from momentum.core.contracts import ICResult
 
 logger = get_logger("api.ic_analysis_service")
 
+#: 合理性上界＝2100-01-01（epoch 秒）。超出即判 parse failure（SPEC Task 7.7 ④ 之字面）。
+_EPOCH_SECONDS_UPPER_BOUND = 4102444800
+
+
+class FeatureRunCoverageError(ValueError):
+    """Task 7.7 之 fail-closed 例外。`reason` 取自 `ic_report_contract.reasons.analysis_rejected`。"""
+
+    def __init__(self, reason: str, message: str):
+        self.reason = reason
+        super().__init__(f"{reason}: {message}")
+
+
+def _parse_time_range_endpoint(value: Any) -> int:
+    """`time_range` 之單一端點字串 → epoch ms。**解析順序寫死：先數字後 ISO**（SPEC 7.7 ④）。
+
+    🔴 為什麼順序不能反：現存非 legacy manifest 的 `time_range` 是 **epoch 秒之數字字串**
+    （實測 12/14 份如此，例 `{"start": "1704067200", ...}`）。先試 `fromisoformat` 會對它直接
+    raise ⇒ **全部現存 run 都會被判成 parse failure**。R5 版就是這樣寫的，三家全員以真實
+    manifest 打穿。
+
+    🔴 tz-naive ISO ⇒ fail-closed，**不當成 UTC**：把 naive 當 UTC 是個假設，
+    假設錯了整個覆蓋判斷會偏移，而偏移多少取決於使用者的時區——看不出來也修不掉。
+    """
+    if not isinstance(value, str):
+        raise FeatureRunCoverageError(
+            "feature_coverage_unknown_timestamp_format",
+            f"time_range 端點須為字串，實得 {type(value).__name__}",
+        )
+    s = value.strip()
+    body = s[1:] if s.startswith("-") else s
+    if body.isdigit():
+        seconds = int(s)
+        if not (0 < seconds < _EPOCH_SECONDS_UPPER_BOUND):
+            raise FeatureRunCoverageError(
+                "feature_coverage_unknown_timestamp_format",
+                f"epoch 秒 {seconds} 落在合理範圍外（0, {_EPOCH_SECONDS_UPPER_BOUND}）",
+            )
+        return seconds * 1000
+    try:
+        parsed = datetime.fromisoformat(s)
+    except ValueError as exc:
+        raise FeatureRunCoverageError(
+            "feature_coverage_unknown_timestamp_format",
+            f"既非十進位數字字串亦非 ISO 格式：{s!r}（{exc}）",
+        ) from exc
+    if parsed.tzinfo is None:
+        raise FeatureRunCoverageError(
+            "feature_coverage_unknown_timestamp_format",
+            f"ISO 字串 {s!r} 為 tz-naive——不得假設為 UTC（假設錯誤會使覆蓋判斷整體偏移）",
+        )
+    return int(parsed.timestamp() * 1000)
+
+
+def check_feature_run_coverage(
+    *,
+    timeframe_seconds: Dict[str, int],
+    feature_manifest_time_range: Optional[Dict[str, Optional[str]]],
+    event_windows,
+) -> None:
+    """Task 7.7 ③：特徵 run 是否涵蓋事件期。不涵蓋即 **fail-closed**（非警告）。
+
+    🔴 **唯一入口、keyword-only**：禁 `args[N]`、禁第二入口、禁掛在 pipeline 上當替身。
+    🔴 `timeframe_seconds` 是**注入之 map**——SPEC 明禁在本函式內直讀
+    `momentum/core/constants.py::TIMEFRAME_SECONDS`。呼叫端建構一次、以**同一物件**
+    同時傳給 purge 與本 gate，驗收以 `is` 比對。
+
+    containment（批內全部列皆須成立）：
+    ```
+    run_start_ms <= min_e decision_at_ms(e)   且   max_e label_end_ms(e) <= run_end_ms
+    ```
+    🔴 左界用 `decision_at_ms` **而非** `min(t0)`：IC 之特徵截止規則是
+    `max_close_ms <= decision_at`，`decision_offset_bars = k > 0` 時 `decision_at < t0`
+    ⇒ 用 `min(t0)` 會放行「run 根本沒涵蓋決策時點」的批次，那是個 fail-open 窗口。
+    """
+    windows = tuple(event_windows)
+    if not windows:
+        # 沒有窗就沒有東西要涵蓋。這不是錯誤——上游已對「全部對齊失敗」有自己的 loud 路徑。
+        return
+
+    # ② 逐列用**該列自己的** timeframe；批內多 TF 允許，但任一列不在注入之鍵集 ⇒ 整批擋。
+    for w in windows:
+        if w.timeframe not in timeframe_seconds:
+            raise FeatureRunCoverageError(
+                "feature_coverage_unknown_timeframe",
+                f"事件 {w.event_id} 之 timeframe {w.timeframe!r} 不在注入之 timeframe_seconds 鍵集"
+                f"（{sorted(timeframe_seconds)}）",
+            )
+
+    # ⑤ legacy run：`{"start": None, "end": None}`。
+    # 🔴 **缺鍵與 `None` 同等處置**（`D-005` 之偵察輪裁定 1）：實掃 14 份 manifest 有 2 份
+    #    完全沒有 `time_range` 鍵，而 SPEC ⑤ 只裁定了 `{None, None}`。兩者資訊量相同
+    #    （都拿不到區間），分成兩個 reason 只會讓前端多一種要處理的字面；
+    #    且 §C0 只能更嚴，缺鍵放行才是弱化。
+    if not isinstance(feature_manifest_time_range, dict):
+        raise FeatureRunCoverageError(
+            "feature_coverage_unknown_legacy_run",
+            "feature run manifest 無 time_range（缺鍵或非 dict）——無法對證涵蓋範圍",
+        )
+    start_raw = feature_manifest_time_range.get("start")
+    end_raw = feature_manifest_time_range.get("end")
+    if start_raw is None or end_raw is None:
+        raise FeatureRunCoverageError(
+            "feature_coverage_unknown_legacy_run",
+            f"feature run 之 time_range 為 legacy 形（start={start_raw!r} end={end_raw!r}）"
+            "——不得視為『涵蓋全部』而放行",
+        )
+
+    run_start_ms = _parse_time_range_endpoint(start_raw)
+    run_end_ms = _parse_time_range_endpoint(end_raw)
+
+    required_start = min(int(w.decision_at_ms) for w in windows)
+    required_end = max(int(w.label_end_ms) for w in windows)
+    if run_start_ms > required_start or required_end > run_end_ms:
+        raise FeatureRunCoverageError(
+            "feature_coverage_insufficient",
+            f"特徵 run 之區間 [{run_start_ms}, {run_end_ms}] 未涵蓋事件期 "
+            f"[{required_start}, {required_end}]（左界比 decision_at、右界比含答案窗之 label_end）",
+        )
+
 
 def _resolve_feature_count(request, *, entrypoint: str = "analyze") -> Optional[int]:
     """GAP-3 UX Task 6.3：取這個 run 的特徵數。

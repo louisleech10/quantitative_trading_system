@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 import pandas as pd
 
@@ -73,6 +73,14 @@ class EventSplitConfig:
     embargo_ms: Optional[int] = None
     bucket_ms: Optional[int] = None
     tier_min_test_events: int = 1
+    #: 🔴 **GAP-3 UX Task 7.0b（§D-3′-a（ii）之唯一 API）**：逐 symbol 之 purge 下界。
+    #  事件分析路徑**必傳且非空**；非事件之既有 caller 留 `None`，**行為完全不變**
+    #  （走現行 `embargo_ms or window.max()` 分支）——這是**新增一條路徑**，不是改既有語意。
+    #  🔴 **與 `embargo_ms` 互斥**：兩者同時非 `None` ⇒ fail-closed。
+    #  不做「以哪個為優先」的隱含規則——那種規則寫下來的當天沒人記得，出錯時也看不出來。
+    #  🔴 值由 `label_value_from_case.project_purge()` 於**呼叫當下**投影產生，用完即棄；
+    #  **不得**掛回 `PreparedAnalysisWindows`（那會讓該物件的「禁可變容器」失效）。
+    embargo_ms_by_symbol: Optional[Mapping[str, int]] = None
 
 
 @dataclass(frozen=True)

@@ -799,6 +799,19 @@ class FeatureFactoryService:
             if quality_status in (None, ""):
                 quality_status = manifest.get("quality_status", manifest.get("run_status"))
 
+        # 🔴 GAP-3 UX Task 7.7 ①：`time_range` **由 manifest 原樣帶出，禁在本層轉型別**。
+        #    manifest 實測為 epoch **秒之數字字串**（`{"start": "1704067200", ...}`），
+        #    在這裡轉成 int 或 ISO，gate 那端就得反猜原本是什麼型別。
+        # 🔴 **必須無條件讀 manifest**，不能沿用上面那個
+        #    「feature_count／row_count／quality_status 任一為空時才讀」的分支——
+        #    那三欄多半已在 registry entry 裡，於是那個分支多數時候不會執行，
+        #    `time_range` 就會**間歇性拿不到值**（有時有、有時沒有），比穩定拿不到更難查。
+        time_range: Optional[Dict[str, Optional[str]]] = None
+        if browse_path:
+            raw = self._manifest_metadata(Path(browse_path)).get("time_range")
+            if isinstance(raw, dict):
+                time_range = {"start": raw.get("start"), "end": raw.get("end")}
+
         return {
             "browse_task_id": browse_task_id,
             "browse_ready": browse_ready,
@@ -806,6 +819,7 @@ class FeatureFactoryService:
             "feature_count": feature_count,
             "row_count": row_count,
             "quality_status": quality_status,
+            "time_range": time_range,
         }
 
     def list_runs(self) -> List[Dict[str, Any]]:

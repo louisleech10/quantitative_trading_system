@@ -57,6 +57,19 @@ def split_events(
     if not (0.0 < split_config.test_fraction < 1.0):
         raise ValueError(f"split_events: test_fraction 須在 (0,1)：{split_config.test_fraction}")
 
+    # 🔴 GAP-3 UX Task 7.0b（§D-3′-a（ii））：`embargo_ms` 與 `embargo_ms_by_symbol` **互斥**。
+    #    不做「以哪個為優先」之隱含規則——那種規則寫下來的當天就沒人記得，出錯時也看不出來。
+    by_symbol = split_config.embargo_ms_by_symbol
+    if by_symbol is not None and split_config.embargo_ms is not None:
+        raise ValueError(
+            "split_events: `embargo_ms` 與 `embargo_ms_by_symbol` 不得同時給定（fail-closed）"
+            "——事件分析路徑一律用後者，非事件之既有 caller 用前者"
+        )
+    if by_symbol is not None and not by_symbol:
+        raise ValueError(
+            "split_events: `embargo_ms_by_symbol` 給定但為空——事件分析路徑必傳且非空（fail-closed）"
+        )
+
     assign_rows: List[dict] = []
     purge_rows: List[dict] = []
     insufficient: List[str] = []
@@ -67,7 +80,26 @@ def split_events(
         n = len(g)
         per_symbol_n[symbol] = int(n)
         window = (g["label_end_ms"] - g["label_start_ms"]).astype("int64")
-        embargo = split_config.embargo_ms if split_config.embargo_ms is not None else int(window.max())
+        if by_symbol is not None:
+            # 🔴 **逐 symbol 檢核，缺一即 fail-closed，不得跳過或補預設**（§D-3′-a（ii)）：
+            #    ① 本次 split 的每個 symbol 都必須是 map 的鍵；② 值須為 `int >= 0`。
+            #    補預設等於讓「這個 symbol 的下界沒算出來」偽裝成「下界是 0」，
+            #    而 0 會讓 train/test 之間完全沒有緩衝——那正是這條路徑要防的事。
+            if symbol not in by_symbol:
+                raise ValueError(
+                    f"split_events: `embargo_ms_by_symbol` 缺 symbol {symbol!r}（fail-closed，不補預設）"
+                )
+            raw = by_symbol[symbol]
+            if not isinstance(raw, int) or isinstance(raw, bool) or raw < 0:
+                raise ValueError(
+                    f"split_events: `embargo_ms_by_symbol[{symbol!r}]` 須為 int >= 0，實得 {raw!r}"
+                )
+            embargo = int(raw)
+        else:
+            embargo = split_config.embargo_ms if split_config.embargo_ms is not None else int(window.max())
+        # ③ 值須 >= 該 symbol 之答案窗（既有不變式；深度側之下限已由呼叫端之
+        #    `purge_lower_bound_ms` 併入，本層看不到深度，故此處只驗得到窗寬那一半——
+        #    這是**具名邊界**，不是漏檢。
         if embargo < int(window.max()):
             raise ValueError(f"split_events: embargo_ms({embargo}) < 最大答案窗({int(window.max())})——緩衝須 ≥ 答案窗")
 

@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, replace
+from types import MappingProxyType
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
@@ -376,7 +377,7 @@ def purge_lower_bound_rows(
     )
 
 
-def project_purge(rows: Sequence[SymbolPurgeRow]) -> Dict[str, int]:
+def project_purge(rows: Sequence[SymbolPurgeRow]) -> Mapping[str, int]:
     """`tuple[SymbolPurgeRow, ...]` → `EventSplitConfig.embargo_ms_by_symbol` 之 Mapping。
 
     🔴 **唯一合法取值路徑**（R16 具名）：不具名的話，實作者會自己發明一條，
@@ -393,7 +394,9 @@ def project_purge(rows: Sequence[SymbolPurgeRow]) -> Dict[str, int]:
                 "dict 會靜默折疊重複列，等式比對抓不到，故在此 raise"
             )
         seen[row.symbol] = int(row.purge_lower_bound_ms)
-    return seen
+    # 🔴 回 read-only view（§D-3′-a（ii) 之偽碼逐字）：投影只在呼叫 `split_events` 之當下產生、
+    #    用完即棄。回可變 dict 會讓「不得掛回 `PreparedAnalysisWindows`」這條只剩紀律。
+    return MappingProxyType(seen)
 
 
 def _batch_direction_sign(records: Tuple[Mapping[str, Any], ...]) -> int:
