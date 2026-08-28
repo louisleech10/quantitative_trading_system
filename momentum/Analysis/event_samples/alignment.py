@@ -16,12 +16,23 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
+from momentum.Analysis.event_samples.keys import event_scope_key, event_trigger_timeframe
 from momentum.Analysis.event_samples.types import AlignmentConfig, AlignmentReceipts
 
+#: 🔴 **GAP-3 UX Task 7.0b 擴充 `symbol`／`timeframe`**（SPEC L2487–2500，先改契約 D-6）。
+#  為什麼收據本身要帶這兩欄：`WindowRow` 之 scope 必須與 `event_split` 之 `groupby("symbol")`
+#  同源，而 purge 下界是 per-symbol 的。若讓下游各自回頭去 events 表查一次，
+#  「alignment 成功的那一列」與「查表拿到的那一列」在 coverage 過濾後就可能不是同一批
+#  ——那正是 §D-3′-a（ii) 禁止的 per-scope 冒充。值一律經 `keys.py` 之兩個 accessor 取得。
+#  🔴 **兩欄一律 append 在尾端，不得插進中間**：`flatten_receipt_schema` 之驗收
+#  （`tests/api/test_gap3_contract_reason_registry.py::…_08a_flatten_prefix_preserved`）
+#  斷言新 schema 之攤平名單須**前綴保留** migration 前的順序。插中間會直接弄紅它——
+#  實際踩過一次，不是推測。
 _EVENT_COLS = [
     "event_id", "t0_ms", "decision_offset_bars", "decision_at_ms", "entry_at_ms",
     "entry_price_source_bar_open_ms", "entry_price_source_field",
     "label_start_ms", "label_end_ms", "entry_after_label_start",
+    "symbol", "timeframe",
 ]
 _PER_TF_COLS = ["event_id", "timeframe", "feature_cutoff_ms", "last_bar_open_ms", "last_bar_close_ms", "row_id"]
 
@@ -123,10 +134,12 @@ def align_events(
     for rec in events.to_dict("records"):
         eid = rec["event_id"]
         try:
-            tf = rec["timeframe"]
+            # 🔴 Task 7.0b：scope／觸發 TF 一律經 `keys.py` 之唯一取值點，不在此自寫第二份。
+            tf = event_trigger_timeframe(rec)
+            symbol = event_scope_key(rec)
             t0 = int(rec["t0"])
             k = int(rec.get("decision_offset_bars", 0))
-            anchor = bars_of(rec["symbol"], tf)
+            anchor = bars_of(symbol, tf)
             ot = anchor["open_time_ms"].to_numpy()
             ct = anchor["close_time_ms"].to_numpy()
 
@@ -182,7 +195,7 @@ def align_events(
             tfs = tuple(config.timeframes) or (tf,)
             tf_batch: List[dict] = []
             for sub_tf in tfs:
-                sub = bars_of(rec["symbol"], sub_tf)
+                sub = bars_of(symbol, sub_tf)
                 sub_ct = sub["close_time_ms"].to_numpy()
                 idx = _select_cutoff_idx(sub_ct, decision_at)
                 if idx < 0:
@@ -197,7 +210,9 @@ def align_events(
                 })
 
             ev_rows.append({
-                "event_id": eid, "t0_ms": t0, "decision_offset_bars": k,
+                # 🔴 Task 7.0b：`symbol`／`timeframe` 與下游 groupby／purge 同源（見 `keys.py`）。
+                "event_id": eid, "symbol": symbol, "timeframe": tf,
+                "t0_ms": t0, "decision_offset_bars": k,
                 "decision_at_ms": decision_at, "entry_at_ms": entry_at,
                 "entry_price_source_bar_open_ms": int(ot[entry_idx]),
                 "entry_price_source_field": field,

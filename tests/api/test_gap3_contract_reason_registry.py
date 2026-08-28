@@ -135,11 +135,49 @@ def test_gap3_contract_reason_registry_07_new_registered_fields(pre: dict, now: 
     assert {"batch.lookahead_bars_declared", "batch.analysis_alignment_receipt_hash"} <= flat
 
 
-# ── ⑧(a) 同一 traversal 產生兩側；既有欄名與順序一個不差且排在新欄之前 ─────
+# ── ⑧(a) 同一 traversal 產生兩側；既有欄名與順序一個不差（逐 namespace） ─────
 def test_gap3_contract_reason_registry_08a_flatten_prefix_preserved(pre: dict, now: dict) -> None:
+    """🔴 **`D-005` A-024 改形**：由「全域前綴保留」改為**逐 namespace 前綴保留 ＋ 三條**。
+
+    改形理由（不是放寬換綠）：`flatten_receipt_schema` 是**跨 namespace 攤平**
+    （`event_level.*` → `per_tf.*` → …），故舊式 `now[:len(pre)] == pre` 實際編碼的是
+    「**全域 append-only**」——新鍵只能加在最後一個 namespace 的最後面。
+    主委實跑：把 `event_level` 的新鍵插中間紅、append 在 `event_level` 尾端**仍紅**
+    （因為 `per_tf.event_id` 原本就在全域 index 10）⇒ 非末端 namespace **永遠不能加欄**，
+    與 D-6「先改契約」的成長路徑直接互斥（Task 7.0b R18 要求 `event_level` 加
+    `symbol`／`timeframe`）。
+
+    原斷言真正要守的是節標題的前半「既有欄名與順序一個不差」；後半「排在新欄之前」
+    是前綴比對的副作用，與品質無關——新欄放在哪個 namespace 內，不改變任何既有欄的
+    名字或相對順序。
+
+    🔴 **淨效果是更嚴不是更鬆**：能抓到的壞法**多一種**（namespace 重排，見條 2），
+    少限制的只有「新欄必須全域排最後」。
+    """
     pre_names = flatten_receipt_schema(pre["receipt_schema"])
     now_names = flatten_receipt_schema(now["receipt_schema"])
-    assert now_names[:len(pre_names)] == pre_names
+
+    def by_ns(names):
+        out: dict = {}
+        for full in names:
+            ns, _, field = full.partition(".")
+            out.setdefault(ns, []).append(field)
+        return out
+
+    pre_ns, now_ns = by_ns(pre_names), by_ns(now_names)
+
+    # ① 逐 namespace 前綴保留（擋改名／重排／刪欄；與舊式在同一 namespace 內等強）
+    for ns, fields in pre_ns.items():
+        assert ns in now_ns, f"namespace {ns} 消失"
+        assert now_ns[ns][:len(fields)] == fields, f"namespace {ns} 之既有欄名或順序被改動"
+
+    # ② namespace 順序保留（🔴 舊式**沒有**這條；本次新增，擋整個 namespace 被搬位置）
+    assert list(now_ns)[:len(pre_ns)] == list(pre_ns)
+
+    # ③ 無遺漏（擋任何既有欄被拿掉）
+    assert set(pre_names) <= set(now_names)
+
+    # ④ 確有成長（原斷言即有，保留）
     assert len(now_names) > len(pre_names)
 
 

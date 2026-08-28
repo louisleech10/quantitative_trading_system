@@ -24,10 +24,19 @@ class AlignmentConfig:
 
 @dataclass(frozen=True)
 class AlignmentReceipts:
-    """兩層對齊收據（SPEC D2-4／R3 Z1；欄名字面＝契約檔 receipt_schema）。"""
+    """兩層對齊收據（SPEC D2-4／R3 Z1；欄名字面＝契約檔 receipt_schema）。
+
+    🔴 **GAP-3 UX Task 7.0b 增 `analysis_alignment_receipt_hash`**（SPEC ③(d)）：
+    分析時 receipt 之識別碼，字面已登記於契約 `receipt_schema.batch`。
+    預設 `None` ＝**匯入／平台產生器路徑**（那些路徑不產生分析時 receipt）；
+    只有 `prepare_analysis_windows` 會填它。
+    🔴 **不得**在下游看到 `None` 就自己算一個補上——那就是「各自重算出巧合相同之值」，
+    正是 SPEC ⑩ 第二條斷言要擋的形態。拿不到就是拿不到，往上報。
+    """
 
     event_level: pd.DataFrame
     per_tf: pd.DataFrame
+    analysis_alignment_receipt_hash: Optional[str] = None
 
 
 @dataclass(frozen=True)

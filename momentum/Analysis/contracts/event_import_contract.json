@@ -178,7 +178,9 @@
       "entry_price_source_field": "str",
       "label_start_ms": "int",
       "label_end_ms": "int",
-      "entry_after_label_start": "bool"
+      "entry_after_label_start": "bool",
+      "symbol": "str",
+      "timeframe": "str"
     },
     "per_tf": {
       "event_id": "str",
