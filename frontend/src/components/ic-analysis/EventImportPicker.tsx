@@ -1,19 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { eventT0MsToIcTimestamps, getEventImport, listEventImports } from '@/lib/api';
+import { listEventImports } from '@/lib/api';
 import type { EventImportSummary } from '@/lib/types';
 
 interface EventImportPickerProps {
   value?: string;
-  onPick: (importId: string, icTimestamps: number[]) => void;
+  /** 🔴 Task 7.7 ⑦：只回傳 `importId`——時間戳映射改由後端依 receipt 產生。 */
+  onPick: (importId: string) => void;
   /** 測試注入：略過後端列表 */
   imports?: EventImportSummary[];
 }
 
 /**
  * GAP-3 B5.2「從已匯入案例選事件」入口（S3.9-5）：只在事件模式渲染。
- * 選一批 ⇒ 以該批 t0（ms→秒）帶入 IC 主線 event_timestamps；未匯入任何事件 ⇒ empty state。
+ *
+ * 🔴 **Task 7.7 ⑦ 改寫**：選一批 ⇒ 只把 `event_import_id` 交出去。
+ * 舊版是「以該批 t0（ms→秒）帶入 IC 主線 `event_timestamps`」——那個映射用的是**原始 t0**，
+ * 而正確的 feature sample key 是 receipt 之 `decision_at_ms`；`decision_offset_bars > 0` 時
+ * 兩者不同，差額會把特徵取樣點推到**決策時點之後**。映射已移到後端依 receipt 產生。
+ * 未匯入任何事件 ⇒ empty state。
  */
 export default function EventImportPicker({ value, onPick, imports }: EventImportPickerProps) {
   const [items, setItems] = useState<EventImportSummary[]>(imports ?? []);
@@ -42,17 +48,14 @@ export default function EventImportPicker({ value, onPick, imports }: EventImpor
     };
   }, [imports]);
 
-  const handleChange = async (importId: string) => {
-    if (!importId) {
-      onPick('', []);
-      return;
-    }
-    try {
-      const detail = await getEventImport(importId);
-      onPick(importId, eventT0MsToIcTimestamps(detail.records));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '讀取事件批失敗');
-    }
+  const handleChange = (importId: string) => {
+    // 🔴 **GAP-3 UX Task 7.7 ⑦：選批只回傳 `importId`，不再自算時間戳。**
+    //    舊版在這裡呼叫 `getEventImport()` 把整批 records 抓下來、再 `t0 ÷ 1000`
+    //    當成 IC 的 `event_timestamps`——那個映射用的是**原始 t0**，
+    //    而 §D-3a 定的是 receipt 之 `decision_at_ms`。`k > 0` 時兩者不同，
+    //    差額正好把特徵取樣點推到**決策時點之後**（＝洩漏）。
+    //    現在後端拿 `event_import_id` 自己查 records、自己依 receipt 產映射。
+    onPick(importId);
   };
 
   return (

@@ -3,10 +3,19 @@
 純函式：由 manifest＋收據＋匯入表產 `event_timestamps`（＝錨定 TF 之 feature_cutoff bar open，
 即決策前最後一根已收盤 bar 的特徵列）＋`event_label_values`（{ms: label_value}）。
 條件 IC 只吃連續 `label_value`（缺任一 ⇒ capability unavailable:missing_label_value）。
-🔴 「v1 不重算」是**版本限制、非能力限制**：`docs/GAP3_EVENT_UX_SPEC.md` §D-3′ 已裁定
-答案窗屬 IC 分析層、`label_value` 於**分析時**由後端 producer 計算並餵入本模組
-（落點＝該 SPEC 之 Task 7.0b）。**該路徑尚未實作**——`build_event_ic_inputs` 現行行為仍為
-「不重算」，此註記只是避免把版本現況誤讀為設計上限。
+🔴 **Task 7.0b 已落地（2026-08-28），但走的是另一條路，請勿誤讀本模組**：
+分析時 producer 完成後，IC 分析路徑（`api/services/ic_analysis_service.py::_run_event_label_stages`）
+**不經過本模組**——它直接由 `PreparedAnalysisWindows` 之 `windows` ＋ `per_tf` 組出
+`{feature_cutoff_ms: label_value}` 餵給 `analyzer.analyze(event_label_values=...)`。
+理由：SPEC ⑩(ii″) 要求四處收到的物件**皆 `is prepared1`**（身分比對），
+而本模組的簽章吃的是 manifest／receipts／DataFrame，把 prepared 拆回 DataFrame 再組回來
+就等於**新增一次重組**，`is` 比對必然失效。
+⇒ **本模組現行的唯一 consumer 是匯入端之 `EventImportService.analyze`（表格鏈），
+不是 IC 分析鏈。** 「v1 不重算」對**那條鏈**仍然成立；它不是設計上限，
+只是那條鏈沒有分析時 producer。
+🔴 **具名偏差**：TODO 7.0b 之「修改檔案」列了 `ic_feed.py（只吃 prepared1）`，
+本批**未改本檔**。改法會是把它的簽章換成吃 `PreparedAnalysisWindows`，
+但那會讓匯入端表格鏈也被迫走 prepared——那條鏈根本沒有 prepared。留待 review 裁。
 `label_return_mode ≠ close_to_close` ⇒ `label_price_mismatch=true` 揭露。
 """
 

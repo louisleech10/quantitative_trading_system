@@ -271,10 +271,13 @@ export default function ICConfigPanel({
               onChange={(event) => updateConfig({ event_query: event.target.value })}
               rows={4}
             />
+            {/* 🔴 Task 7.7 ⑦：選批**只**寫 `event_import_id`，並顯式清掉 `event_timestamps`。
+                後端已定死兩者互斥（同時給 ⇒ 422，兩個真相源）；
+                若換批時把舊的時間戳留著，下一次送出就會撞上那道閘。 */}
             <EventImportPicker
               value={config.event_import_id}
-              onPick={(importId, timestamps) =>
-                updateConfig({ event_import_id: importId || undefined, event_timestamps: timestamps.length ? timestamps : undefined })
+              onPick={(importId) =>
+                updateConfig({ event_import_id: importId || undefined, event_timestamps: undefined })
               }
             />
           </>

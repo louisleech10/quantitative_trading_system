@@ -1,13 +1,13 @@
 /**
  * GAP-3 B5.2（W9）：事件模式入口——EventImportPicker 只在 event 模式出現；未匯入任何事件批 ⇒ empty state；
- * 選批 ⇒ 以 t0(ms)→秒 帶入 event_timestamps。
+ * 🔴 Task 7.7 ⑦ 起：選批**只**交出 importId，映射由後端依 receipt 產生。
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import EventImportPicker from '@/components/ic-analysis/EventImportPicker';
-import { eventT0MsToIcTimestamps } from '@/lib/api';
+
 import type { EventImportSummary } from '@/lib/types';
 
 vi.mock('@/lib/api', async (orig) => {
@@ -35,18 +35,28 @@ describe('GAP-3 事件模式入口', () => {
     expect(screen.queryByTestId('event-import-select')).toBeNull();
   });
 
-  it('有事件批 ⇒ 下拉可選；選批後 onPick 收到 ms→秒 timestamps（壞值剔除）', async () => {
+  it('🔴 **Task 7.7 ⑦ 改寫**：選批後 onPick **只**收到 importId，不再收時間戳', async () => {
+    // 歷史：本條原本斷言 `onPick('imp-1', [1704067200, 1704110400])`——
+    // 也就是前端把整批 records 抓下來、`t0 ÷ 1000` 當成 IC 的 event_timestamps。
+    // 那個映射用的是**原始 t0**，而正確的 feature sample key 是 receipt 之 decision_at_ms；
+    // `decision_offset_bars > 0` 時兩者不同，差額會把特徵取樣點推到**決策時點之後**（洩漏）。
+    // 保留本條為**回歸**：任何形式的「前端自算時間戳」都不得回來。
     const onPick = vi.fn();
     render(<EventImportPicker imports={IMPORTS} onPick={onPick} />);
     const select = screen.getByTestId('event-import-select') as HTMLSelectElement;
     expect(select.options.length).toBe(2);
     fireEvent.change(select, { target: { value: 'imp-1' } });
     await waitFor(() => expect(onPick).toHaveBeenCalled());
-    expect(onPick).toHaveBeenCalledWith('imp-1', [1704067200, 1704110400]);
+    expect(onPick).toHaveBeenCalledWith('imp-1');
+    expect(onPick.mock.calls[0]).toHaveLength(1);  // 🔴 第二個引數不得復活
   });
 
-  it('t0 橋接：ms ÷1000 取整、非數值剔除', () => {
-    expect(eventT0MsToIcTimestamps([{ t0: 1704067200000 }, { t0: '1704110400000' }, { t0: null }, { t0: -5 }])).toEqual([1704067200, 1704110400]);
+  it('🔴 `eventT0MsToIcTimestamps` 已自 `api.ts` **移除**（Task 7.7 ⑦），不得復活', async () => {
+    const api = await import('@/lib/api');
+    expect('eventT0MsToIcTimestamps' in api).toBe(false);
+    // 連改名復活都擋：任何把 t0 直接換算成 IC 時間戳的匯出都不該存在
+    const src = readFileSync(resolve(__dirname, '../../lib/api.ts'), 'utf-8');
+    expect(src.includes('export function eventT0MsToIcTimestamps')).toBe(false);
   });
 
   it('ICAnalysisConfig 型別含 event_import_id（頁面接線：只在 event 模式掛 picker）', () => {

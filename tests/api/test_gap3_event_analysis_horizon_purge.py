@@ -265,3 +265,58 @@ def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):
     assert out["event_label_values"], "應產出至少一個 label_value"
     # 🔴 token 為非決定性 ⇒ 它出現在輸出代表確實是「同一次呼叫」傳下來的，不是重算
     assert out["prepared_token"] == out["prepared"].prepared_token
+
+    # ⑭(c)：餵進 IC 的鍵集 ⊆ allowed_event_ids（以 per_tf 之 cutoff 反查 event_id）
+    prepared = out["prepared"]
+    cutoff_to_eid = {p.feature_cutoff_ms: p.event_id for p in prepared.per_tf}
+    fed_eids = {cutoff_to_eid[ts] for ts in out["event_timestamps"] if ts in cutoff_to_eid}
+    assert fed_eids <= set(prepared.allowed_event_ids), "餵進 IC 的 event_id 不得超出 allowed"
+    assert fed_eids, "對照：至少有一個 eid 真的被餵進去（防空集合恆成立）"
+
+    # 🔴 **feature sample key 取自 receipt 之 per-TF cutoff，不是原始 t0**（Task 7.7 ⑦／⑫ 之核心）
+    t0_seconds = {int(r["t0"]) // 1000 for r in records}
+    assert not (set(out["event_timestamps"]) & t0_seconds), \
+        "送進 IC 的時間戳不得等於「t0 ÷ 1000」——那正是被移除的前端映射之形狀"
+
+
+def test_event_analysis_horizon_purge_12_decision_at_mapping_k3_vs_k0(monkeypatch):
+    """Task 7.7 ⑫：`decision_offset_bars = 3` 之批次 ⇒ 每列之 feature cutoff `<= decision_at < t0`；
+    `k = 0` 之批次為**對照組**（`decision_at == t0`），證明本條既非恆真也非恆假。
+
+    🔴 k=3 落在 F-1′ 支援矩陣**之外**（分析層不算 label_value），但 **windows 仍會產生**
+    ——這正是 SPEC 驗收 ④ 要求的：k 的映射必須看得出來確實生效了。
+    """
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from tests.momentum.event_samples.helpers import load_bars, make_event
+
+    bars = load_bars("ETHUSDT", ("12h",))
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "bars_from_kline_cache",
+        staticmethod(lambda symbols, timeframes, **kw: bars),
+    )
+
+    def prepared_for(k: int):
+        recs = [
+            make_event(0, t0=T0 + 100 * H12_MS, label=1, direction="long"),
+            make_event(1, t0=T0 + 110 * H12_MS, label=0, direction="long"),
+        ]
+        return pipeline_mod.EventSamplePipeline.prepare_analysis_windows(
+            recs, bars,
+            event_label_spec={"horizon_bars": 2, "entry_price_semantic": "trigger_close",
+                              "label_return_mode": "close_to_close", "decision_offset_bars": k},
+            event_import_id="imp-1",
+            lookahead_bars_declared={"12h": 0},
+            timeframe_seconds={"12h": 43200},
+        ), {r["event_id"]: int(r["t0"]) for r in recs}
+
+    p3, t0_by_id = prepared_for(3)
+    assert p3.windows, "k=3 之批次仍須產出 windows（否則本條無從斷言）"
+    cutoffs3 = {p.event_id: p.feature_cutoff_ms for p in p3.per_tf}
+    for w in p3.windows:
+        assert w.decision_at_ms < t0_by_id[w.event_id], "k=3 ⇒ decision_at 須早於 t0"
+        assert cutoffs3[w.event_id] <= w.decision_at_ms, "feature cutoff 不得晚於 decision_at"
+
+    # 🔴 **對照組**：k=0 ⇒ decision_at == t0（證明上面那條不是恆真）
+    p0, _ = prepared_for(0)
+    for w in p0.windows:
+        assert w.decision_at_ms == t0_by_id[w.event_id], "k=0 ⇒ decision_at 應等於 t0"

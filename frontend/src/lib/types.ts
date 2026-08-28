@@ -1975,9 +1975,28 @@ export interface ICAnalysisConfig {
   mode: 'global' | 'event' | 'cross_sectional';
   cross_sectional_symbols?: string[];
   event_query?: string;
+  /**
+   * legacy 事件路徑之時間戳。
+   * 🔴 **選了 `event_import_id` 時不得同時送**（後端定死互斥 ⇒ 422，兩個真相源）。
+   * 🔴 Task 7.7 ⑦ 起，選批**不再**寫入本欄——映射由後端依 receipt 之 `decision_at_ms` 產生。
+   */
   event_timestamps?: number[];
-  /** GAP-3 B5.2：從已匯入事件批（/case/events）選事件；選定後 event_timestamps 由該批 t0 帶入 */
+  /** GAP-3 B5.2：從已匯入事件批（/case/events）選事件。Task 7.0b ③ 起**直接送到後端**。 */
   event_import_id?: string;
+  /**
+   * GAP-3 UX Task 7.0b ③：分析參數，**只作用於本次分析、不回寫事件批**。
+   *
+   * 🔴 `horizon_bars` 之缺省為**字面常數 `1`**——**禁**以匯出檔／已落檔批之
+   * `label_definition.window.horizon_bars` 種子化：該欄語意為 D-7 深度宣告，
+   * 分析層禁止讀成答案窗（既有批之殘值為 `3`，種子化＝靜默給錯預設答案窗）。
+   * 其餘三鍵之初始值由**後端**取該批 F-0 種子，前端不猜。
+   */
+  event_label_spec?: {
+    horizon_bars: number;
+    entry_price_semantic?: string;
+    label_return_mode?: string;
+    decision_offset_bars?: number;
+  };
   horizons: number[];
   thresholds: {
     ic_mean_min: number;

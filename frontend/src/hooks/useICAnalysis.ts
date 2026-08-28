@@ -284,11 +284,28 @@ export function useICAnalysis() {
         feature_tiers: effectiveConfig.feature_tiers,
         feature_filter: hasFeatureFilter ? normalizedFeatureFilter : undefined,
         event_query: config.mode === 'event' ? config.event_query?.trim() || undefined : undefined,
-        // GAP-3 B5.2：從已匯入案例選事件 ⇒ 帶 event_timestamps（bar open 秒；picker 已 ms→秒）
-        event_timestamps:
-          config.mode === 'event' && config.event_timestamps && config.event_timestamps.length > 0
-            ? config.event_timestamps
-            : undefined,
+        // ── GAP-3 UX Task 7.0b ③：選了事件批 ⇒ 送 `event_import_id` ＋ `event_label_spec` ──
+        // 🔴 **此時不得再送 `event_timestamps`**：後端定死兩者互斥（同時給 ⇒ 422），
+        //    因為兩者都在說「要分析哪些事件」，同時給就有兩個真相源。
+        // 🔴 前端**不再自算時間戳**（Task 7.7 ⑦）：映射改由後端依 receipt 之
+        //    `decision_at_ms` 產生。原本前端用的是**原始 t0**，`k > 0` 時會把特徵取樣點
+        //    推到決策時點之後。
+        ...(config.mode === 'event' && config.event_import_id
+          ? {
+              event_import_id: config.event_import_id,
+              // 🔴 `horizon_bars` 缺省為**字面常數 1**，**禁**以匯出檔之
+              //    `label_definition.window.horizon_bars` 種子化——那欄的語意是 D-7 深度宣告，
+              //    分析層禁止讀成答案窗；既有批之殘值為 3，種子化＝靜默給錯預設答案窗。
+              //    三元組之初始值由**後端**取該批 F-0 種子，前端不猜。
+              event_label_spec: config.event_label_spec ?? { horizon_bars: 1 },
+            }
+          : {
+              // legacy 非事件批路徑（例如只用 `event_query` 篩）行為不變。
+              event_timestamps:
+                config.mode === 'event' && config.event_timestamps && config.event_timestamps.length > 0
+                  ? config.event_timestamps
+                  : undefined,
+            }),
       };
 
       const result = await requestJson<{ task_id: string; status: string }>('/analyze', {

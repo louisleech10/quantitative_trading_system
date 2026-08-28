@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b10",
   "mode": "verify",
-  "n_mutations": 23,
+  "n_mutations": 26,
   "results": [
     {
       "id": "7.0-M1",
@@ -336,6 +336,45 @@
       "verdict": "PASS",
       "expected": [
         "test_analysis_label_producer_07_tail_insufficient_absent_not_zero"
+      ]
+    },
+    {
+      "id": "7.0b-M10",
+      "task": "7.0b/⑫",
+      "desc": "有 import_id 時仍送 event_timestamps（互斥被打破）",
+      "rc": 1,
+      "red": [
+        "Task 7.0b ⑫ — 選批後之 /analyze payload > ③ 選了事件批 ⇒ payload **不得**同時帶 `event_timestamps`（後端定死互斥 ⇒ 422）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.0b ⑫ — 選批後之 /analyze payload > ③ 選了事件批 ⇒ payload **不得**同時帶 `event_timestamps`（後端定死互斥 ⇒ 422）"
+      ]
+    },
+    {
+      "id": "7.0b-M11",
+      "task": "7.0b/③",
+      "desc": "horizon_bars 以匯出殘值 3 種子化",
+      "rc": 1,
+      "red": [
+        "Task 7.0b ⑫ — 選批後之 /analyze payload > ② 只給 import_id ⇒ `event_label_spec.horizon_bars === 1`（**字面常數**，非匯出之深度欄值）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.0b ⑫ — 選批後之 /analyze payload > ② 只給 import_id ⇒ `event_label_spec.horizon_bars === 1`（**字面常數**，非匯出之深度欄值）"
+      ]
+    },
+    {
+      "id": "7.7-M7",
+      "task": "7.7/⑦",
+      "desc": "前端自算時間戳之橋接函式復活",
+      "rc": 1,
+      "red": [
+        "GAP-3 事件模式入口 > 🔴 `eventT0MsToIcTimestamps` 已自 `api.ts` **移除**（Task 7.7 ⑦），不得復活"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "GAP-3 事件模式入口 > 🔴 `eventT0MsToIcTimestamps` 已自 `api.ts` **移除**（Task 7.7 ⑦），不得復活"
       ]
     }
   ],

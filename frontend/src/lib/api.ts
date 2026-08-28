@@ -1133,10 +1133,14 @@ export async function getEventImport(importId: string): Promise<{ summary: Event
   return response.json();
 }
 
-/** GAP-3 事件 t0 為 epoch ms；IC 主線 event_timestamps 為 bar open 秒（row_index）⇒ 橋接時 ÷1000。 */
-export function eventT0MsToIcTimestamps(records: Record<string, unknown>[]): number[] {
-  return records
-    .map((r) => Number(r.t0))
-    .filter((v) => Number.isFinite(v) && v > 0)
-    .map((ms) => Math.floor(ms / 1000));
-}
+// 🔴 **GAP-3 UX Task 7.7 ⑦：`eventT0MsToIcTimestamps` 已移除，不得復活。**
+//
+// 它把**原始 `t0` ÷1000** 當成 IC 主線的 `event_timestamps`。但 §D-3a 已裁定
+// 每列 feature sample key 須為 receipt 之 `decision_at_ms`／`last_bar_open_ms`，
+// **不是原始 t0** ⇒ `decision_offset_bars = k > 0` 時，這個映射會把特徵取樣點推到
+// **決策時點之後**，與 `ic_feed.py` 的 `feature_cutoff_rule = max_close_ms_le_decision_at`
+// 直接互斥——也就是說它會讓「決策當下看不到的資料」進到特徵裡。
+//
+// 現行做法：前端只送 `event_import_id` ＋ `event_label_spec`，映射由**後端**於分析時
+// 依 receipt 產生（`ic_analysis_service._run_event_label_stages`）。
+// 前端**不得**持有或傳送 `label_value`，也不得自算時間戳。
