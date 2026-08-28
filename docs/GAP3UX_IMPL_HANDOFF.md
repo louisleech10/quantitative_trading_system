@@ -7,9 +7,9 @@
 
 ## §0 一句話狀態
 
-**SPEC 🔒 凍結、TODO 🔒 凍結 v1.0；B1–B8 皆已收斂；`D-004` 三家 APPROVED。下一批＝B9（Phase 6 IC 止血閘）。**
+**SPEC 🔒 凍結、TODO 🔒 凍結 v1.0；第一批到第九批皆已結案；`D-004` 三家 APPROVED。下一批＝B10（Phase 7 全棧接線，**9 個 Task**）。**
 
-🔴 **接手第一件事：照 §1 跑開工前稽核**（期望值已更新為 B8 收斂後之值），再讀 §2D（B9 是什麼）。
+🔴 **接手第一件事：照 §1 跑開工前稽核**（期望值已更新為第九批結案後之實測值），再讀 §2E（B10 是什麼）。
 
 🔴 **B8 新增兩條鐵律，開工前先讀（§3 之第 9、10 條）**：
 ① **派 review 前先 commit**；② **mutation runner 必須同時有 `IsolatedWorktree` 與備份閘**。
@@ -71,7 +71,8 @@ grep -c '^### Task ' docs/GAP3_EVENT_UX_TODO.md # 期望 42
 venv/bin/python scripts/gap3_freeze_golden.py --check   # 期望 rc=0，canonical_sha=163c4cec…（約 15 秒）
 venv/bin/python -m pytest tests/momentum/event_samples/ -q            # 期望 313 passed
 venv/bin/python -m pytest tests/api -q -k "gap3_csv or gap3_export_filter or lookahead_declaration or gap3_horizon or gap3_import or gap3_t0_unit or gap3_heterogeneous or gap3_source_digest or gap3_contract_reason or gap3_lookahead or gap3_event_delete or source_json_hint"   # 期望 189 passed（🔴 B8 起 -k 多了 source_json_hint）
-npm --prefix frontend test -- --run             # 期望 57 files／327 passed
+venv/bin/python -m pytest tests/api -q -k "gap3_matrix or ic_feature_cap or ic_stop_gate_alive or ic_progress_fields"   # 期望 39 passed（🔴 B9 之止血閘＋雙向形狀矩陣）
+npm --prefix frontend test -- --run             # 期望 58 files／334 passed（🔴 B9 起 +1 檔 icTaskStatusLabel）
 npm --prefix frontend run build                 # 期望 rc=0
 npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json   # 期望：GAP-3 相關檔 0 錯（另有 **8 行**既有債，見 §7.3）
 ```
@@ -233,8 +234,8 @@ B1–B8 之 mutation receipt 為 `handoffs/run_receipts/gap3ux-b{1..8}-all-mutat
 | 批 | Task | 依賴 | 狀態 |
 |---|---|---|---|
 | **B8 訊息與表頭** | Phase 5 全部（5.0／5.1／5.2／5.3） | Task 5.0 | ✅ **已收斂**（`ebd77b87`；五輪 5→1→4→2→0） |
-| **B9 IC 止血閘** | Phase 6 全部（6.0／6.1／6.2／6.3／6.4） | Task 6.0 | ⬜ **下一批，座標見 §2D** |
-| B10 全棧接線 | Phase 7 全部 | B1–B9 | ⬜ |
+| **B9 IC 止血閘** | Phase 6 全部（6.0／6.1／6.2／6.3／6.4） | Task 6.0 | ✅ **已結案**（`01870c1a`→`fbf2f643`；五輪 10→3→4→5→3＋兩輪 consult；mutation 29 條 CLOSED） |
+| **B10 全棧接線** | Phase 7 全部（7.0／7.0b／7.1／7.2／7.3／7.4／7.5／7.6／7.7） | B1–B9 | ⬜ **下一批，見 §2E** |
 
 ---
 
@@ -302,6 +303,49 @@ mutation **19 條**全 PASS、`closure: CLOSED`（隔離環境下重跑）。
    **不得阻擋匯出**。數字要**精確比對**（`含 3`，不是「含某個數字」）。
 
 ---
+
+## §2E B10 是什麼（Phase 7 全部，**九個** Task）
+
+**B10 ＝ 全棧接線**，TODO 標籤皆為 `票 #3-全棧`。這是 GAP-3 的最後一批。
+
+| Task | 標題 | 已知依賴 |
+|---|---|---|
+| 7.0 | 前置：擴 `EventExportOptions` 補齊五維度 | — |
+| 7.0b | 分析時 `label_value` producer 與其 wiring | — |
+| 7.1 | 五維度全部接出前端 | **依賴 7.0** |
+| 7.2 | 機械閘：可操作選項集合＝`selectable(path,dim)` 且選值真的傳到落檔 | **依賴 7.0／7.1** |
+| 7.3 | 動態揭露本批設定 | — |
+| 7.4 | 條件 IC decay 之邊界揭露 | — |
+| 7.5 | 事件後報酬表正／反／全體三組 | — |
+| 7.6 | IC 分析頁：批次事實欄唯讀揭露 ＋ 分析參數可設定 | — |
+| 7.7 | Feature run `time_range` 與事件期之對證 | — |
+
+### 2E.1 🔴 座標偵察**未做**（不得假裝有）
+
+B1–B9 的 §2A–§2D 都附了「關鍵座標」與「陷阱」表，那是**上一個 session 先做過偵察**才寫得出來。
+**B10 沒有。** 本節刻意不填座標，因為填了就是我編的。
+
+**接手第一件事＝做偵察**，且依規約 **Claude 與三委員平行各做一份**（`feedback_recon_joint_with_committee`），
+不是 Claude 先產、委員後審。偵察至少要回答：
+1. `EventExportOptions` 現有幾個維度、缺哪五個？（7.0 的「五維度」是哪五個，TODO 有寫，但**現況**要查）
+2. `label_value` 目前在哪裡產生、被誰消費？（7.0b 會解除殘留 `R-B7-1` 與 `R-B3-3`）
+3. Task 7.5 動 glossary ⇒ 會一併收 `R-B8-1`（definition 收窄），該殘留的三家表態見 §7.3
+4. Task 7.7 會往 `analysis_rejected` 同類再加兩個 reason ⇒ **既有斷言用成員資格（`in`）而非等值**，
+   別把它改成等值（§2D.3 已記，B10 仍適用）
+5. Task 7.2 的「機械閘」要求 `selectable(path,dim)` 是**封閉可導出集合**——
+   這與 B9 收案判準同源，先讀 `templates/BRIEF_REVIEW_TEMPLATE.md` §2 再設計
+
+### 2E.2 B10 之收案判準（沿用 B9 之改寫，**不要退回舊判準**）
+
+🔴 **禁用「三家零 finding」當停輪條件**（`20260828-gap3ux-b9-consult-r1` 三家一致廢止）。
+改用可列完的判準：
+① **雙向矩陣**——每種輸入形態都有 under（該擋擋住）與 over（**不該擋沒被擋**）各一條可重跑測試；
+② mutation `closure=CLOSED` 且紅集合**逐一等於**；
+③ 具名殘留皆有三值理由；
+④ 上輪 P0／P1 原反例 CLOSED **且**本輪對矩陣雙向探針無新 P0／P1。
+
+🔴 **B9 五輪的病根**：我只測「該擋的有沒有擋住」，從沒測「不該擋的有沒有被誤擋」——
+前五輪的缺陷**全部藏在只有單向對照的格子裡**。B10 的 7.2 是機械閘，同一個坑會再出現。
 
 ## §2D B9 是什麼（Phase 6 全部，五個 Task）
 

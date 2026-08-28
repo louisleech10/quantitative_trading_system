@@ -51459,3 +51459,43 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-08-28T02:04:40Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"516e6f4c83245b139d66010e511190dbcda6ef55a8ab87134d6c4f86bbee45c9","cmd_head":"find . -type f -name 'completeness_check.sh' -print0 -quit | xargs -0 -n1 sh -c 'exec \"$0\" --single handoffs/20260828-brieftemplate-r2-codex.md --family codex'"}
 {"actor": "cx_run", "attempt_id": "207ebeec-a891-493e-a9cc-39873ba910e8", "cli_rc": "0", "event": "committee_family_result", "event_id": "e15f113a-b393-46b2-b733-fd4a1772e98d", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260828-brieftemplate-r2-codex.md", "output_sha256": "e5a20a0cdd2d17486872540080d0a711611392a30979fb049e5a956b0035e799", "producer": "audit_append.sh", "result_state": "success", "round_id": "05ecd0f0-23aa-4a5d-b24c-c8f3e27c24f6", "schema_version": 1, "sequence": 2916, "ts": "2026-08-28T02:06:02Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "61a337bc-73aa-453c-b119-bc90baa9bc8c", "lock_sha256": "d0e8a3f0d0c8f0bee0a8f90818d99918617284c8f501edb7e925400680885abe", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "05ecd0f0-23aa-4a5d-b24c-c8f3e27c24f6", "schema_version": 1, "sequence": 2917, "session_id": "20260828-briefmethod-x-consult-r2", "synth_sha256": "0a31d37116028c4ea89c747a22de3cee3a1f6e20260a59b909ff19531cbc17a8", "ts": "2026-08-28T02:07:38Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260828-BRIEFGATE-X-CONSULT-R1", "ts": "2026-08-28T02:53:27Z"}
+=== 2026-08-28 10:53:27 | dispatch ===
+  ts=2026-08-28 10:53:27
+  kind=dispatch
+  intent=兩題裁定：①『我沒查的』閘能否綁上而不付 20+ fixture 代價 ②我對使用者的宣稱能否機械化（使用者：不能機械就不用硬做）
+  risk=low
+  facts_asked=A-E 之外的綁法；13→9→16 是方法問題還是耦合本質；第二題有無封閉可導出近似；不做時殘留怎麼寫；有無不靠機械也不靠紀律的第三類做法
+  review_role=consultant（裁定，不改碼）
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260828-BRIEFGATE-X-CONSULT-R1", "ts": "2026-08-28T02:53:34Z"}
+=== 2026-08-28 10:53:35 | dispatch ===
+  ts=2026-08-28 10:53:35
+  kind=dispatch
+  intent=兩題裁定：①『我沒查的』閘能否綁上而不付 20+ fixture 代價 ②我對使用者的宣稱能否機械化
+  risk=low
+  facts_asked=A-E 之外的綁法；13→9→16 是方法問題還是耦合本質；第二題有無封閉可導出近似；不做時殘留怎麼寫；有無第三類做法
+  review_role=consultant（裁定，不改碼）
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/BRIEF-GATE-CONSULT-R1-BRIEF.md", "brief_sha256": "3a0fdce47704de9c1fea56a7379eaa70d45639d8be6e584baf2c0bc31a1ed2a3", "brief_sha256_norm": "3a0fdce47704de9c1fea56a7379eaa70d45639d8be6e584baf2c0bc31a1ed2a3", "event": "committee_round_open", "event_id": "f9ea6127-df0f-4a2d-b30b-211bc2d36e54", "expected_outputs": {"codex": "handoffs/20260828-briefgate-r1-codex.md", "composer": "handoffs/20260828-briefgate-r1-composer.md", "grok": "handoffs/20260828-briefgate-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8b4690eb-d86e-4a1c-825b-5e9af89feaa0", "schema_version": 1, "sequence": 2918, "session_name": "20260828-briefgate-x-consult-r1", "task_id": "20260828-BRIEFGATE-X-CONSULT-R1", "ts": "2026-08-28T02:53:45Z"}
+{"event":"gate_deny","ts":"2026-08-28T03:09:39Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"8f3b61e00c6bb515a0f9380887253c08e828dc75449e0fa42b20256170aa209b","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260828-briefgate-r1-codex.md --family codex; rc=$?; printf 'COMPLETENESS_RC=%s\\n' \"$rc\"; exit \"$rc\""}
+{"actor": "cx_run", "attempt_id": "b00ef084-3ebb-48f8-a95d-9d9935503123", "cli_rc": "0", "event": "committee_family_result", "event_id": "e4d7ce49-5e48-4811-8654-eb39a71b4ab1", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260828-briefgate-r1-grok.md", "output_sha256": "2cad66355d6669413dd0a33aa3be8dc4ad4971027f0ef22cfd51918d2d75b5d6", "producer": "audit_append.sh", "result_state": "success", "round_id": "8b4690eb-d86e-4a1c-825b-5e9af89feaa0", "schema_version": 1, "sequence": 2919, "ts": "2026-08-28T03:10:03Z"}
+{"actor": "cx_run", "attempt_id": "7a900cc0-0a44-47e1-b68d-a9a8b3b9ade0", "cli_rc": "0", "event": "committee_family_result", "event_id": "1084b424-e889-44fc-8766-8dec0e8d92c7", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260828-briefgate-r1-codex.md", "output_sha256": "bdc604fe891dd9296507cef180d8309a90d4e45f644c70e90b8fb90bbf8c8ef6", "producer": "audit_append.sh", "result_state": "success", "round_id": "8b4690eb-d86e-4a1c-825b-5e9af89feaa0", "schema_version": 1, "sequence": 2920, "ts": "2026-08-28T03:12:59Z"}
+{"actor": "cx_run", "attempt_id": "d3b2fc14-e93e-412e-b9dd-0b649aa86a9a", "cli_rc": "0", "event": "committee_family_result", "event_id": "ec36f73d-f122-4714-b02a-095df8ef7543", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260828-briefgate-r1-composer.md", "output_sha256": "7ef182d49bc985f884bce8e3f4b938376820ed49ad29bb41f2726d74048d41d9", "producer": "audit_append.sh", "result_state": "success", "round_id": "8b4690eb-d86e-4a1c-825b-5e9af89feaa0", "schema_version": 1, "sequence": 2921, "ts": "2026-08-28T03:36:13Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "e2ecb7ff-9816-4759-ba61-0f26a004d12d", "lock_sha256": "b5a2e7298d7e43b0330cbb9e2b1a9e81a1bb8e03c9a663ae44fd92905e97bc22", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "8b4690eb-d86e-4a1c-825b-5e9af89feaa0", "schema_version": 1, "sequence": 2922, "session_id": "20260828-briefgate-x-consult-r1", "synth_sha256": "04d46188ae39dce0eb2550c1d0d4822f882fb11a6e073873db4eaee130295379", "ts": "2026-08-28T03:39:04Z"}
