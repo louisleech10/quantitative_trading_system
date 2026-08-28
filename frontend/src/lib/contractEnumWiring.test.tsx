@@ -19,7 +19,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import EventDimensionFields, { type EventDimensionValues } from '@/components/case/EventDimensionFields';
 import {
@@ -29,6 +29,7 @@ import {
   type EventDimPath,
   acceptedValues,
   contractDecisionOffsetMin,
+  dimensionBatchDefaults,
   selectable,
 } from '@/lib/eventDimensions';
 import {
@@ -108,12 +109,16 @@ describe('Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(pat
     expect(ui.length).toBe(expected.length);   // 長度亦相等 ⇒ 重複值湊不出來
   });
 
-  it('`decision_offset_bars`（非 enum）之可輸入範圍由契約 `min` 導出，且控制項非唯讀', () => {
+  it('`decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入', () => {
     renderPath('/search');
-    const input = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
-    expect(input.readOnly).toBe(false);
-    expect(input.disabled).toBe(false);
-    expect(input.min).toBe(String(contractDecisionOffsetMin(CONTRACT)));
+    const locked = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
+    expect(locked.min).toBe(String(contractDecisionOffsetMin(CONTRACT)));
+    expect(locked.readOnly).toBe(true);          // R3 群集 A：鎖 0 之路徑
+    cleanup();
+    renderPath('/data-preparation', true);
+    const free = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
+    expect(free.readOnly).toBe(false);           // over 向：解鎖路徑不得被連坐
+    expect(free.min).toBe(String(contractDecisionOffsetMin(CONTRACT)));
   });
 });
 
@@ -168,6 +173,27 @@ describe('Task 7.2 ③ 非 enum 欄 — decision_offset_bars', () => {
       expect(out.records).toHaveLength(1);
       expect((out.records[0] as Record<string, unknown>).decision_offset_bars, `k=${k}`).toBe(k);
     }
+  });
+
+  it('🔴 R3 群集 D：**解鎖路徑之 UI→payload 回合**——在 /data-preparation 打 k=3 ⇒ 批次預設帶 3', () => {
+    // `GROK-R3-P2-02`：③ 原本只有函式層，而裁定 A 把「輸入 k ⇒ 落檔 === k」的
+    // 使用者路徑指向 /data-preparation ⇒ 那條路徑本身必須有機械閘，否則裁定 A 是空頭支票。
+    let current: EventDimensionValues = { ...UNSET };
+    const { rerender } = render(
+      <EventDimensionFields
+        path="/data-preparation" values={current} allowUnset
+        onChange={(next) => { current = next; }}
+      />,
+    );
+    const input = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
+    expect(input.readOnly).toBe(false);                       // 正向對照：這條路徑真的是解鎖的
+    fireEvent.change(input, { target: { value: '3' } });
+    expect(current.decision_offset_bars).toBe(3);             // UI → state
+    rerender(
+      <EventDimensionFields path="/data-preparation" values={current} allowUnset onChange={() => {}} />,
+    );
+    // state → 送給後端的批次預設（`dimensionBatchDefaults` 是 CSV 匯入路徑之唯一組裝點）
+    expect(dimensionBatchDefaults(current, undefined).decision_offset_bars).toBe(3);
   });
 });
 

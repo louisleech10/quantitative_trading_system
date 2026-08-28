@@ -15,6 +15,7 @@ import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
 import {
   type EnumEventDimension,
   type EventDimPath,
+  clampDecisionOffset,
   decisionOffsetRange,
   dimOptions,
 } from '@/lib/eventDimensions';
@@ -103,17 +104,23 @@ export default function EventDimensionFields({
       {/* `decision_offset_bars` 是 `int, min 0`，不是 enum ⇒ 數值控制項；範圍由 `decisionOffsetRange` 給。 */}
       <label className="block text-sm text-slate-200">
         <span className="block mb-1">decision_offset_bars（決策位移 k）</span>
+        {/* 🔴 R3 群集 A（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／`GROK-R3-P1-01`，三家一致）：
+            HTML 之 `min`／`max` **只是提示**，使用者打字照樣送得出 `k>0`，
+            而 `buildEventContractRecords` 只擋 `k < min` ⇒ 鎖 0 的路徑上真的會落檔 `k=3`。
+            兩層都補：`readOnly` 讓使用者改不動、`onChange` clamp 讓程式化設值也進不來。 */}
         <input
           type="number"
           data-testid="event-dim-decision_offset_bars"
           value={values.decision_offset_bars}
           min={range.min}
+          readOnly={range.locked}
           {...(range.max !== null ? { max: range.max } : {})}
           onChange={(e) => onChange({
             ...values,
-            // 清空＝未選（只在 `allowUnset` 之路徑有意義）；否則一律轉數字，
-            // 非法輸入交給 `buildEventContractRecords` 之契約下界檢查 fail-closed，本檔不自行判定。
-            decision_offset_bars: e.target.value === '' && allowUnset ? '' : Number(e.target.value),
+            // 清空＝未選（只在 `allowUnset` 之路徑有意義）；否則一律轉數字後**夾到本路徑之範圍內**。
+            decision_offset_bars: e.target.value === '' && allowUnset
+              ? ''
+              : clampDecisionOffset(Number(e.target.value), range),
           })}
           className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
         />

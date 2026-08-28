@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import {
-  EVENT_FIELD_FORMATTERS, IC_BATCH_FACT_FIELDS, SEARCH_DISCLOSURE_FIELDS,
+  EVENT_FIELD_FORMATTERS, IC_BATCH_FACT_FIELDS, SEARCH_DISCLOSURE_FIELDS, searchDisclosureLines,
 } from '@/lib/eventFieldFormatters';
 import type { CaseData, SearchResultData } from '@/lib/types';
 
@@ -96,12 +96,59 @@ describe('Task 7.3 ③ — 兩頁共用同一 registry，欄集各自選取', ()
       '/ic-analysis': read('../../components/ic-analysis/EventBatchDisclosurePanel.tsx'),
     };
     for (const [name, src] of Object.entries(pages)) {
-      expect(src, `${name} 未 import 共用 registry`).toMatch(
-        /import\s*\{[^}]*EVENT_FIELD_FORMATTERS[^}]*\}\s*from\s*'@\/lib\/eventFieldFormatters'/,
+      // 🔴 R3 群集 B 後：`/search` 改為經**同一模組**之 `searchDisclosureLines` 取用 registry
+      //    （`/ic-analysis` 仍直接用 `EVENT_FIELD_FORMATTERS`）⇒ 判準改為「來自同一模組」，
+      //    而不是「一定要 import 那個特定符號」。
+      expect(src, `${name} 未自共用模組取用 registry`).toMatch(
+        /import\s*\{[\s\S]*?\}\s*from\s*'@\/lib\/eventFieldFormatters'/,
       );
-      // 🔴 同時禁止「自己再寫一份 formatter」：本頁不得出現 `const EVENT_FIELD_FORMATTERS =`
+      // 🔴 禁止「自己再寫一份 formatter」：本頁不得出現 `const EVENT_FIELD_FORMATTERS =`
       expect(src, `${name} 自己宣告了第二份 registry`).not.toMatch(/const\s+EVENT_FIELD_FORMATTERS\s*=/);
     }
+    // 🔴 執行期補強（原始碼正則之誠實邊界，見 brief「我沒查的」第五列）：
+    //    `/search` 之揭露文字**逐字**等於 registry 之輸出，由本檔 ② 驗；
+    //    IC 頁同樣由 `icEventBatchDisclosure` ① 驗。兩者合起來才排除「re-export 再包一層」。
+    expect(typeof EVENT_FIELD_FORMATTERS.scenario).toBe('function');
+  });
+
+  it('🔴 R3 群集 B：DOM 之揭露節點集合**由常數導出**（拿掉一欄 ⇒ 該節點消失）', async () => {
+    render(<SearchPage />);
+    await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
+    // 實際 render 出來的 testid 集合
+    const actual = new Set(
+      Array.from(screen.getByTestId('export-disclosure').querySelectorAll('[data-testid]'))
+        .map((el) => el.getAttribute('data-testid')!),
+    );
+    // 期望值由**常數**導出（不是人工清單）：一欄至少貢獻一個節點
+    const expected = new Set(
+      SEARCH_DISCLOSURE_FIELDS.flatMap((f) => searchDisclosureLines(f, {
+        dims: {
+          scenario: 'C', control_kind: 'user_labeled_same_trigger',
+          entry_price_semantic: 'trigger_close', label_return_mode: 'close_to_close',
+          decision_offset_bars: 0,
+        },
+        depthByTimeframe: { '1h': 2 },
+        referencedColumns: [],
+      })).map((l) => l.testid),
+    );
+    expect(actual).toEqual(expected);
+    // 正向對照：欄集真的有七欄，且每欄都在 DOM 裡留下痕跡（不是兩邊都空而相等）
+    expect(SEARCH_DISCLOSURE_FIELDS.length).toBe(7);
+    expect(actual.size).toBeGreaterThanOrEqual(SEARCH_DISCLOSURE_FIELDS.length);
+  });
+
+  it('🔴 R3 群集 B：欄集加了沒接線的欄 ⇒ **fail-loud**，不靜默少顯示一項', () => {
+    expect(() => searchDisclosureLines(
+      'direction' as (typeof SEARCH_DISCLOSURE_FIELDS)[number],
+      {
+        dims: {
+          scenario: 'C', control_kind: 'user_labeled_same_trigger',
+          entry_price_semantic: 'trigger_close', label_return_mode: 'close_to_close',
+          decision_offset_bars: 0,
+        },
+        depthByTimeframe: {}, referencedColumns: [],
+      },
+    )).toThrow(/尚未接線/);
   });
 
   it('③(b) 兩頁之欄集**不相等**，且交集非空（共用的是 registry，不是欄集）', () => {

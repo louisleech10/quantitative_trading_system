@@ -78,6 +78,20 @@ describe('Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度
     expect(opts.controlKind).toBe('user_labeled_other');
   });
 
+  it('🔴 under（R3 群集 A，三家一致之 P1 反例）：在 /search 把 k 改成 3 ⇒ 落檔仍為 0', async () => {
+    // 原缺陷：`min`／`max` 只是提示，`fireEvent.change` 送得進去，而組裝器只擋 `k < 契約 min`
+    // ⇒ UI 文案說「鎖定為 0」而匯出檔裡是 3。修法為 `readOnly` ＋ `onChange` clamp 兩層。
+    render(<SearchPage />);
+    await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
+    const k = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
+    expect(k.readOnly).toBe(true);                       // 第一層：使用者改不動
+    fireEvent.change(k, { target: { value: '3' } });     // 第二層：程式化設值也要被夾回
+    fireEvent.click(screen.getByTestId('export-gap3-events'));
+    await waitFor(() => expect(buildRecordsMock).toHaveBeenCalledTimes(1));
+    const opts = buildRecordsMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(opts.decisionOffsetBars).toBe(0);
+  });
+
   it('🔴 over：使用者不動 UI ⇒ 五鍵仍逐一傳出，且值等於 Task 7.0 之預設（不得因此不傳）', async () => {
     render(<SearchPage />);
     // 就緒訊號＝深度已回、揭露區已逐 tf 顯示（無篩選條件時不會出現 `export-lower-bound`）

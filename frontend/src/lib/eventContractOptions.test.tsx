@@ -77,13 +77,24 @@ describe('Task 7.1 ①~⑤ — 每維度之可操作 UI 選項集合 == selectab
     expect(ui.length).toBe(expected.length);
   });
 
-  it('⑤ `decision_offset_bars` 非 enum：有控制項，且 /search 之可輸入範圍鎖定契約下界（SPEC L2864）', () => {
+  it('⑤ `decision_offset_bars` 非 enum：/search 之可輸入範圍**鎖定**契約下界（SPEC L2864）', () => {
     renderPath('/search');
     const input = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
     const min = contractDecisionOffsetMin(CONTRACT);
     expect(input.min).toBe(String(min));
     expect(input.max).toBe(String(min));
+    // 🔴 R3 群集 A：本條原本寫 `readOnly === false`——那把**不該有的性質釘住了**。
+    //    SPEC L2864 說本路徑「鎖定為 0」，而 `min`／`max` 只是提示、擋不住輸入
+    //    ⇒ 鎖定路徑必須 `readOnly`。「有可輸入且非唯讀之控制項」之驗收改落 `/data-preparation`（下一條）。
+    expect(input.readOnly).toBe(true);
+  });
+
+  it('🔴 over：`decision_offset_bars` 於 /data-preparation **非唯讀**（鎖定只在該兩條路徑）', () => {
+    renderPath('/data-preparation', true);
+    const input = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
     expect(input.readOnly).toBe(false);
+    expect(input.disabled).toBe(false);
+    expect(input.max).toBe('');       // 無上界：只受契約 `min` 限制
   });
 });
 

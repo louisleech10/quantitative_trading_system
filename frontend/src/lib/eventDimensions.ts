@@ -7,9 +7,13 @@
  *   - `accepted(dim)` 由**契約**導出（`accepted` 鍵；無該鍵者取 `enum` 全集）；
  *   - `pathExclusions` 由**單一具名常數** `EVENT_DIM_PATH_EXCLUSIONS` 導出（SPEC L2854–2860 五列封閉）。
  *
- * 🔴 **契約在前端的取得方式**（沿用本 repo 既有作法，見 `eventContractDocs.ts`／`eventId.ts`）：
- * 契約沒有對前端開放的端點 ⇒ 本檔持一份**與契約同形狀**的鏡像片段 `EVENT_DIM_CONTRACT_MIRROR`，
- * 由 `eventDimensions.test.ts` **讀契約 JSON 逐鍵比對**，漂移即轉紅。
+ * 🔴 **為什麼是鏡像而不是直接 import 契約 JSON**（R3 群集 C 更正）：
+ * **不是**因為做不到——`frontend/tsconfig.json` 有 `resolveJsonModule: true`，
+ * `eventMetricsGlossary.ts` 就是直接 `import` 契約檔的（`CODEX-R3-P2-01` 推翻了我原本的說法）。
+ * 鏡像是**刻意的雙源設計**：Task 7.2 之機械閘要能在「契約改了而 UI 沒跟」時轉紅，
+ * 而那要求 **UI 側與期望值側來源不同**。兩邊都讀真契約 ⇒ 契約變異時兩側同動、
+ * `7.2-M1` 直接變成 false negative（本批第一版就是這樣，當場錄到**空紅集合**）。
+ * 漂移由 `eventContractOptions.test.tsx` 之「契約鏡像防漂移」逐鍵比對守住。
  * 因為鏡像與契約**同形狀**，`acceptedValues()` 這支存取器對兩者都適用
  * ⇒ Task 7.2 之機械閘可以把**真契約**餵進來算 `selectable()`，
  * 而 UI 走鏡像 ⇒ 「契約加了第 5 個 `scenario` 值而 UI 沒跟」會讓 7.2 ① 直接轉紅
@@ -58,7 +62,8 @@ export interface EventDimContractNode {
 /**
  * 契約之**同形狀鏡像片段**。
  * 🔴 這裡的每一個值都逐字取自 `momentum/Analysis/contracts/event_import_contract.json`，
- *    由 `eventDimensions.test.ts` 對證；**改契約而沒改這裡，測試會紅**。
+ *    由 `eventContractOptions.test.tsx` 之「契約鏡像防漂移」對證；**改契約而沒改這裡，測試會紅**。
+ *    （R3 群集 E `COMPOSER-R3-P2-01`：原本寫成不存在的 `eventDimensions.test.ts`。）
  */
 export const EVENT_DIM_CONTRACT_MIRROR = {
   required_fields: {
@@ -296,6 +301,26 @@ export function dimensionDefaultConflicts(
     }
   }
   return out;
+}
+
+/**
+ * 🔴 **R3 群集 A**：把 `k` 夾進該路徑之合法範圍。
+ *
+ * 為什麼要有這支（三家一致之 P1）：HTML 之 `min`／`max` **只是提示**，
+ * `fireEvent.change` 與使用者打字都能送出範圍外的值；而 `buildEventContractRecords`
+ * 只擋 `k < min`（契約下界），**擋不到「本路徑鎖 0 但傳了 3」**
+ * ⇒ 鎖 0 的路徑上真的會落檔 `k=3`，UI 文案說鎖 0 而檔案裡不是。
+ *
+ * clamp 而非 raise：本函式在 `onChange` 上，raise 會讓使用者按鍵時整頁炸掉；
+ * 鎖定路徑之 `readOnly` 才是第一層，本函式是**程式化設值**那條路的第二層。
+ * 非有限值（`NaN`／空字串轉數字）⇒ 回下界，不讓 `NaN` 流進 state。
+ */
+export function clampDecisionOffset(
+  value: number, range: { min: number; max: number | null },
+): number {
+  if (!Number.isFinite(value)) return range.min;
+  const lower = Math.max(Math.trunc(value), range.min);
+  return range.max === null ? lower : Math.min(lower, range.max);
 }
 
 /**

@@ -32,7 +32,11 @@ import {
   horizonCoverageLines,
 } from '@/lib/eventExport';
 import EventDimensionFields, { type EventDimensionValues } from '@/components/case/EventDimensionFields';
-import { EVENT_FIELD_FORMATTERS, EVENT_IC_DECAY_DISCLOSURE } from '@/lib/eventFieldFormatters';
+import {
+  EVENT_IC_DECAY_DISCLOSURE,
+  SEARCH_DISCLOSURE_FIELDS,
+  searchDisclosureLines,
+} from '@/lib/eventFieldFormatters';
 import { computeExportCounts } from '@/lib/exportCounts';
 
 
@@ -1887,44 +1891,16 @@ export default function SearchPage() {
                      其 testid 一併保留 ⇒ `eventExportDisclosureLegacy.test.tsx` 仍是「4.1b ⊆ 7.3」之執行期證明。 */}
               <div className="mt-3 rounded border border-sky-900/60 bg-sky-950/30 p-3 text-[11px] text-slate-300" data-testid="export-disclosure">
                 <p className="text-xs font-medium text-sky-100">這批匯出實際會帶什麼（你沒選過但一直存在的設定）</p>
-                <p className="mt-1" data-testid="export-disclosure-scenario">
-                  {EVENT_FIELD_FORMATTERS.scenario(eventDims.scenario)}
-                </p>
-                <p className="mt-1" data-testid="export-disclosure-control-kind">
-                  {EVENT_FIELD_FORMATTERS.control_kind(eventDims.control_kind)}
-                </p>
-                <p className="mt-1" data-testid="export-disclosure-entry-price-semantic">
-                  {EVENT_FIELD_FORMATTERS.entry_price_semantic(eventDims.entry_price_semantic)}
-                </p>
-                <p className="mt-1" data-testid="export-disclosure-label-return-mode">
-                  {EVENT_FIELD_FORMATTERS.label_return_mode(eventDims.label_return_mode)}
-                </p>
-                <p className="mt-1" data-testid="export-disclosure-decision-offset-bars">
-                  {EVENT_FIELD_FORMATTERS.decision_offset_bars(Number(eventDims.decision_offset_bars))}
-                </p>
-                <div className="mt-1" data-testid="export-disclosure-depth">
-                  {/* 🔴 批內多 TF ⇒ **逐 tf 各一行**，不得塌成單一 scalar（§D-3′-a(ii)）。 */}
-                  {Object.keys(lowerBoundState.depthByTimeframe).length === 0 ? (
-                    <span data-testid="export-disclosure-depth-pending">lookahead 深度：尚未取得（取得前不會讓你匯出）</span>
-                  ) : (
-                    Object.entries(lowerBoundState.depthByTimeframe).map(([tf, n]) => (
-                      <div key={tf} data-testid={`export-disclosure-depth-${tf}`}>
-                        {EVENT_FIELD_FORMATTERS.lookahead_depth({
-                          timeframe: tf, bars: n, referencedColumns: referencedColumnsOf(exportFilters),
-                        })}
-                      </div>
-                    ))
-                  )}
-                </div>
-                <div className="mt-1" data-testid="export-disclosure-purge">
-                  {Object.entries(lowerBoundState.depthByTimeframe).map(([tf, n]) => (
-                    <div key={tf} data-testid={`export-disclosure-purge-${tf}`}>
-                      {EVENT_FIELD_FORMATTERS.purge_bars({
-                        timeframe: tf, bars: n, referencedColumns: referencedColumnsOf(exportFilters),
-                      })}
-                    </div>
-                  ))}
-                </div>
+                {/* 🔴 R3 群集 B：**真的**由 `SEARCH_DISCLOSURE_FIELDS` 迭代產生。
+                    原本是逐欄手寫七段、連 import 都沒有 ⇒ 往常數加欄不會改變任何 DOM，
+                    而註解卻宣稱「本頁只選取自己的欄集」——那就是 7.3 要滅的第二份欄集。 */}
+                {SEARCH_DISCLOSURE_FIELDS.flatMap((field) => searchDisclosureLines(field, {
+                  dims: eventDims,
+                  depthByTimeframe: lowerBoundState.depthByTimeframe,
+                  referencedColumns: referencedColumnsOf(exportFilters),
+                })).map((line) => (
+                  <p className="mt-1" key={line.testid} data-testid={line.testid}>{line.text}</p>
+                ))}
               </div>
 
               {/* ── GAP-3 UX Task 7.4（＝ 4.1c 之同一文案來源）：條件 IC decay 之邊界揭露 ─── */}

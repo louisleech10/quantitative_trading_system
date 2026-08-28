@@ -24,7 +24,7 @@ import {
   IC_BATCH_FACT_FIELDS,
   type EventFieldKey,
 } from '@/lib/eventFieldFormatters';
-import { decisionOffsetRange, dimOptions } from '@/lib/eventDimensions';
+import { clampDecisionOffset, decisionOffsetRange, dimOptions } from '@/lib/eventDimensions';
 import type { EventImportDetail, ICAnalysisConfig } from '@/lib/types';
 
 /** 分析參數之 `horizon_bars` 初始值——**字面常數**，不由任何落檔欄種子化。 */
@@ -157,13 +157,24 @@ export default function EventBatchDisclosurePanel({
 
         <label className="mt-2 block text-xs text-slate-200">
           <span className="mb-1 block">decision_offset_bars（本批鎖定為 {kRange.min}）</span>
+          {/* 🔴 R3 群集 A（三家一致）：與 `/search` 同型——`min`／`max` 只是提示。
+              本頁之 `k` 會進 `event_label_spec` 送去分析，繞過後直接撞 §F-2′ 之 fail-closed，
+              使用者只會看到「分析被拒絕」而不知道是自己那格改出來的。兩層都補。
+              🔴 種子值亦須 clamp：既有批之 `declaration_seeds.decision_offset_bars` 可能是 2
+              （舊批宣告過非 F-1′ 之值），直接當初始值會讓本頁一載入就處在鎖定範圍外。 */}
           <input
             type="number"
             data-testid="ic-param-decision-offset-bars"
             min={kRange.min}
+            readOnly={kRange.locked}
             {...(kRange.max !== null ? { max: kRange.max } : {})}
-            value={spec.decision_offset_bars ?? detail.declaration_seeds.decision_offset_bars ?? kRange.min}
-            onChange={(e) => onChangeLabelSpec({ ...spec, decision_offset_bars: Number(e.target.value) })}
+            value={clampDecisionOffset(
+              spec.decision_offset_bars ?? detail.declaration_seeds.decision_offset_bars ?? kRange.min,
+              kRange,
+            )}
+            onChange={(e) => onChangeLabelSpec({
+              ...spec, decision_offset_bars: clampDecisionOffset(Number(e.target.value), kRange),
+            })}
             className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
           />
           {kRange.locked && (

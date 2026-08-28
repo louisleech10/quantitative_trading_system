@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b10",
   "mode": "verify",
-  "n_mutations": 53,
+  "n_mutations": 57,
   "results": [
     {
       "id": "7.0-M1",
@@ -790,6 +790,72 @@
       "verdict": "PASS",
       "expected": [
         "Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」 > ⑦ 🔴 既有批之 `window.horizon_bars === 3` 且使用者未改 ⇒ h `=== 1`（**非** 3），面板與 payload 兩層皆是"
+      ]
+    },
+    {
+      "id": "R3-M1",
+      "task": "群集A",
+      "desc": "/search 之 k 鎖（readOnly＋clamp）兩層一起拆 ⇒ under 探針紅",
+      "rc": 1,
+      "red": [
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入",
+        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 under（R3 群集 A，三家一致之 P1 反例）：在 /search 把 k 改成 3 ⇒ 落檔仍為 0"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入",
+        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 under（R3 群集 A，三家一致之 P1 反例）：在 /search 把 k 改成 3 ⇒ 落檔仍為 0"
+      ]
+    },
+    {
+      "id": "R3-M2",
+      "task": "群集A",
+      "desc": "IC 面板之 k 鎖拆除（含種子 clamp）⇒ 面板 under 探針紅",
+      "rc": 1,
+      "red": [
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > ⑤ 三元組之**可操作**選項集合 == §F-1′ 之唯一三元組；其餘 disabled 且顯示理由",
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > 🔴 under（R3 群集 A）：把分析參數之 k 改成 3 ⇒ 送出之 `event_label_spec` 仍為 0",
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > 🔴 under（R3 群集 A）：既有批之種子 `k=2` 也要被夾回 0（載入當下就不能落在鎖定範圍外）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > ⑤ 三元組之**可操作**選項集合 == §F-1′ 之唯一三元組；其餘 disabled 且顯示理由",
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > 🔴 under（R3 群集 A）：把分析參數之 k 改成 3 ⇒ 送出之 `event_label_spec` 仍為 0",
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > 🔴 under（R3 群集 A）：既有批之種子 `k=2` 也要被夾回 0（載入當下就不能落在鎖定範圍外）"
+      ]
+    },
+    {
+      "id": "R3-M3",
+      "task": "群集B",
+      "desc": "揭露區改回硬編欄集（少一欄）⇒ DOM 集合閘紅",
+      "rc": 1,
+      "red": [
+        "Task 4.1b — 匯出時揭露每個選項在動什麼 > ① 四段皆出現：scenario／lookahead 深度＋來源／purge 下界＋取較大者／control_kind",
+        "Task 4.1b — 匯出時揭露每個選項在動什麼 > ④ 🔴 批內多 TF ⇒ **逐 tf 各一行**，不得塌成單一 scalar",
+        "Task 7.3 ① — 揭露七項且全部由實際設定導出 > 七項欄集皆有對應之顯示節點（含 4.1b 原本沒有的三項）",
+        "Task 7.3 ③ — 兩頁共用同一 registry，欄集各自選取 > 🔴 R3 群集 B：DOM 之揭露節點集合**由常數導出**（拿掉一欄 ⇒ 該節點消失）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 4.1b — 匯出時揭露每個選項在動什麼 > ① 四段皆出現：scenario／lookahead 深度＋來源／purge 下界＋取較大者／control_kind",
+        "Task 4.1b — 匯出時揭露每個選項在動什麼 > ④ 🔴 批內多 TF ⇒ **逐 tf 各一行**，不得塌成單一 scalar",
+        "Task 7.3 ① — 揭露七項且全部由實際設定導出 > 七項欄集皆有對應之顯示節點（含 4.1b 原本沒有的三項）",
+        "Task 7.3 ③ — 兩頁共用同一 registry，欄集各自選取 > 🔴 R3 群集 B：DOM 之揭露節點集合**由常數導出**（拿掉一欄 ⇒ 該節點消失）"
+      ]
+    },
+    {
+      "id": "R3-M4",
+      "task": "群集D/over",
+      "desc": "連 /data-preparation 也鎖死 k ⇒ 解鎖路徑之 round-trip 紅",
+      "rc": 1,
+      "red": [
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入",
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R3 群集 D：**解鎖路徑之 UI→payload 回合**——在 /data-preparation 打 k=3 ⇒ 批次預設帶 3"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入",
+        "Task 7.2 ③ 非 enum 欄 — decision_offset_bars > 🔴 R3 群集 D：**解鎖路徑之 UI→payload 回合**——在 /data-preparation 打 k=3 ⇒ 批次預設帶 3"
       ]
     }
   ],

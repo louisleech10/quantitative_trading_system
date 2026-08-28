@@ -112,6 +112,85 @@ export const SEARCH_DISCLOSURE_FIELDS: readonly EventFieldKey[] = [
   'decision_offset_bars', 'lookahead_depth', 'purge_bars',
 ];
 
+/** `searchDisclosureLines` 之輸入：本批之實際設定（**全部**由呼叫端傳入，本模組不讀 store）。 */
+export interface SearchDisclosureContext {
+  dims: {
+    scenario: string;
+    control_kind: string;
+    entry_price_semantic: string;
+    label_return_mode: string;
+    decision_offset_bars: number | '';
+  };
+  /** 逐 timeframe 之真實深度（後端回傳）；空 map ＝ 尚未取得。 */
+  depthByTimeframe: Record<string, number>;
+  referencedColumns: readonly string[];
+}
+
+/**
+ * 🔴 **R3 群集 B**（`CODEX-R3-P2-02`＋`GROK-R3-P2-01`，兩家獨立命中）：
+ * 把 `/search` 揭露區之欄集**真的**由 `SEARCH_DISCLOSURE_FIELDS` 驅動。
+ *
+ * 原缺陷：`page.tsx` 之註解宣稱「本頁只選取自己的欄集」，但 JSX 是**逐欄手寫**七段、
+ * 連 import 都沒有 ⇒ 往常數加欄不會改變任何 DOM，而 IC 頁確實是 `.map` 驅動、兩頁不對稱。
+ * 這正是 7.3 要滅的「第二份欄集」——**宣稱大於實作**（本 epic 最常見之自傷）。
+ *
+ * 逐 timeframe 之欄（`lookahead_depth`／`purge_bars`）一個欄位會產生**多行**，
+ * 故回傳陣列而非單一字串；`testid` 一併由本函式決定，頁面不再自己拼。
+ */
+export function searchDisclosureLines(
+  field: EventFieldKey, ctx: SearchDisclosureContext,
+): { testid: string; text: string }[] {
+  const f = EVENT_FIELD_FORMATTERS;
+  switch (field) {
+    case 'scenario':
+      return [{ testid: 'export-disclosure-scenario', text: f.scenario(ctx.dims.scenario) }];
+    case 'control_kind':
+      return [{ testid: 'export-disclosure-control-kind', text: f.control_kind(ctx.dims.control_kind) }];
+    case 'entry_price_semantic':
+      return [{
+        testid: 'export-disclosure-entry-price-semantic',
+        text: f.entry_price_semantic(ctx.dims.entry_price_semantic),
+      }];
+    case 'label_return_mode':
+      return [{
+        testid: 'export-disclosure-label-return-mode',
+        text: f.label_return_mode(ctx.dims.label_return_mode),
+      }];
+    case 'decision_offset_bars':
+      return [{
+        testid: 'export-disclosure-decision-offset-bars',
+        text: f.decision_offset_bars(Number(ctx.dims.decision_offset_bars)),
+      }];
+    case 'lookahead_depth': {
+      const tfs = Object.keys(ctx.depthByTimeframe);
+      // 🔴 尚未取得深度**不是**「深度為 0」——顯式講出來，且該狀態下匯出本來就被守衛擋住。
+      if (tfs.length === 0) {
+        return [{
+          testid: 'export-disclosure-depth-pending',
+          text: 'lookahead 深度：尚未取得（取得前不會讓你匯出）',
+        }];
+      }
+      // 🔴 逐 tf 各一行，不得塌成單一 scalar（§D-3′-a(ii)）
+      return tfs.map((tf) => ({
+        testid: `export-disclosure-depth-${tf}`,
+        text: f.lookahead_depth({
+          timeframe: tf, bars: ctx.depthByTimeframe[tf], referencedColumns: ctx.referencedColumns,
+        }),
+      }));
+    }
+    case 'purge_bars':
+      return Object.keys(ctx.depthByTimeframe).map((tf) => ({
+        testid: `export-disclosure-purge-${tf}`,
+        text: f.purge_bars({
+          timeframe: tf, bars: ctx.depthByTimeframe[tf], referencedColumns: ctx.referencedColumns,
+        }),
+      }));
+    default:
+      // 欄集加了新欄卻沒在此對應 ⇒ **fail-loud**，不靜默少顯示一項（那正是 7.3 要防的）
+      throw new Error(`searchDisclosureLines: 欄位 ${field} 尚未接線`);
+  }
+}
+
 /**
  * `/ic-analysis` 之**批次事實欄**欄集（Task 7.6 三分表之封閉集合）。
  * 🔴 `direction` 歸批次事實（決定 short 取負、是 §G G-3 之 golden input），**不**進 `event_label_spec`。

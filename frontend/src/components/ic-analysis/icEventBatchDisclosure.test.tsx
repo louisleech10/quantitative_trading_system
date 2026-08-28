@@ -117,6 +117,27 @@ describe('Task 7.6 ③⑤ — 唯讀 vs 可設定', () => {
     const k = screen.getByTestId('ic-param-decision-offset-bars') as HTMLInputElement;
     expect(k.min).toBe('0');
     expect(k.max).toBe('0');
+    // 🔴 R3 群集 A：`min`／`max` 只是提示，鎖定路徑必須 `readOnly`，且程式化設值要被夾回
+    expect(k.readOnly).toBe(true);
+  });
+
+  it('🔴 under（R3 群集 A）：把分析參數之 k 改成 3 ⇒ 送出之 `event_label_spec` 仍為 0', () => {
+    let spec: ICAnalysisConfig['event_label_spec'];
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" labelSpec={undefined} detail={detailFixture()}
+        onChangeLabelSpec={(next) => { spec = next; }}
+      />,
+    );
+    fireEvent.change(screen.getByTestId('ic-param-decision-offset-bars'), { target: { value: '3' } });
+    expect(spec?.decision_offset_bars).toBe(0);
+  });
+
+  it('🔴 under（R3 群集 A）：既有批之種子 `k=2` 也要被夾回 0（載入當下就不能落在鎖定範圍外）', () => {
+    const d = detailFixture();
+    d.declaration_seeds.decision_offset_bars = 2;   // 舊批宣告過非 F-1′ 之值
+    render(<EventBatchDisclosurePanel importId="imp-1" labelSpec={undefined} onChangeLabelSpec={() => {}} detail={d} />);
+    expect((screen.getByTestId('ic-param-decision-offset-bars') as HTMLInputElement).value).toBe('0');
   });
 });
 
