@@ -2878,6 +2878,37 @@ export interface EventImportListResponse {
   imports: EventImportSummary[];
 }
 
+/**
+ * GAP-3 UX Task 7.6：事件批 detail 之**批次事實欄**（封閉五鍵，SPEC R11 定死 wire shape）。
+ *
+ * 🔴 `t0`／`label` 為**逐列陣列**（按 `event_id` UTF-8 升冪），元素鍵集**互不含對方**；
+ *    前端**不得**由此另算一份 t0 語意（只做摘要顯示，見 `eventFieldFormatters.ts`）。
+ * 🔴 `control_kind` 為 `null` 有兩種意思（批內混值／該批無此欄）
+ *    ⇒ 兩者之區分在 `batch_fact_notes.control_kind_values`，不要只看 `null`。
+ */
+export interface EventBatchFacts {
+  scenario: string | null;
+  control_kind: string | null;
+  direction: string | null;
+  t0: { event_id: string; t0_ms: number }[];
+  label: { event_id: string; label: number }[];
+}
+
+/** 批次宣告種子（F-0）；分析參數區之初始值來源，**不計入**批次事實欄之鍵集。 */
+export interface EventDeclarationSeeds {
+  entry_price_semantic: string | null;
+  label_return_mode: string | null;
+  decision_offset_bars: number | null;
+}
+
+export interface EventImportDetail {
+  summary: EventImportSummary;
+  records: Record<string, unknown>[];
+  batch_facts: EventBatchFacts;
+  declaration_seeds: EventDeclarationSeeds;
+  batch_fact_notes: { control_kind_values: string[] };
+}
+
 export interface EventImportFailure {
   row: number | null;
   event_id: string | number | null;

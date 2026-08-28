@@ -8,6 +8,7 @@
 import type { CaseData } from './types';
 import { canonicalEventId } from './eventId';
 import { ruleDigestOf, ruleSummaryText } from './ruleDigest';
+import { contractDecisionOffsetMin } from './eventDimensions';
 import type { ExportFilterSpec } from './exportFilter';
 
 /** Task 4.1：附帶報酬欄之候選 h（1..12）；預設全選。 */
@@ -210,7 +211,42 @@ export function horizonCoverageLines(payload: {
   );
 }
 
+/**
+ * GAP-3 UX **Task 7.1**：UI 之五維度取值（契約欄名，snake_case）→ `EventExportOptions` 之對應鍵。
+ *
+ * 🔴 對映**只住這裡一份**：呼叫端展開本函式之回傳即可，逐鍵手寫 `scenario: dims.scenario`
+ *    正是「漏傳其中一個」之發生處（Task 7.2 ② 之 mutation (c)）。
+ */
+export function eventDimsToExportOptions(dims: {
+  scenario: string;
+  control_kind: string;
+  entry_price_semantic: string;
+  label_return_mode: string;
+  /** `''`（未選）在本路徑不合法；不在此靜默補預設，交給契約下界檢查 fail-closed。 */
+  decision_offset_bars: number | '';
+}): Required<Pick<EventExportOptions,
+  'scenario' | 'controlKind' | 'entryPriceSemantic' | 'labelReturnMode' | 'decisionOffsetBars'>> {
+  return {
+    scenario: dims.scenario as NonNullable<EventExportOptions['scenario']>,
+    controlKind: dims.control_kind as NonNullable<EventExportOptions['controlKind']>,
+    entryPriceSemantic: dims.entry_price_semantic as NonNullable<EventExportOptions['entryPriceSemantic']>,
+    labelReturnMode: dims.label_return_mode as NonNullable<EventExportOptions['labelReturnMode']>,
+    decisionOffsetBars: dims.decision_offset_bars as number,
+  };
+}
+
 export async function buildEventContractRecords(cases: CaseData[], opts: EventExportOptions) {
+  // 🔴 Task 7.2 ③：`decision_offset_bars` 是唯一之**非 enum** 維度 ⇒ enum validator 守不到它。
+  //    契約為 `int, min: 0`；數值輸入框可以打出 `-1`／小數 ⇒ 在**組裝前** fail-closed。
+  //    這不是重做後端檢查（本檔檔頭之原則不變）：負 k 會把決策錨點移到 t0 **之後**，
+  //    落檔後每一列都帶著一個語意上不存在的決策時點，比整批拒收難查得多。
+  const k = opts.decisionOffsetBars ?? EVENT_EXPORT_DECISION_OFFSET_BARS;
+  const kMin = contractDecisionOffsetMin();
+  if (!Number.isInteger(k) || k < kMin) {
+    throw new Error(
+      `decision_offset_bars 必須是 >= ${kMin} 的整數（契約 event_import_contract.json 之 min）；收到 ${String(k)}`,
+    );
+  }
   const attached = [...(opts.attachedHorizons ?? ATTACHED_HORIZONS)];
   const declaredMap = opts.lookaheadBarsDeclared;
   const direction = opts.direction ?? inferDirection(opts.conditions);

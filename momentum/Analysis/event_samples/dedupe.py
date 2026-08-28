@@ -110,7 +110,13 @@ def build_event_manifest(
         "uniqueness_weight": weights,
     })
     if events is not None:
-        ctx_cols = [c for c in ("event_id", "symbol", "timeframe", "label", "scenario", "direction") if c in events.columns]
+        # 🔴 GAP-3 UX Task 7.5：`control_kind` 之**唯一傳遞點**＝本 merge 清單。
+        #    表格層一律由 `manifest.table` 取用；**禁止**另建第二份事件索引，
+        #    也**禁止**在表格層寫死或讀不到時當 `None` 放行（SPEC Task 7.5 要點4）。
+        ctx_cols = [
+            c for c in ("event_id", "symbol", "timeframe", "label", "scenario", "direction", "control_kind")
+            if c in events.columns
+        ]
         table = table.merge(events[ctx_cols], on="event_id", how="left", validate="one_to_one")
 
     # ---- 兩種 policy 的保留集 ----

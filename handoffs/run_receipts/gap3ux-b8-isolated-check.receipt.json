@@ -1,0 +1,45 @@
+{
+  "epic": "gap3ux-b8",
+  "mode": "record",
+  "n_mutations": 2,
+  "results": [
+    {
+      "id": "5.0-M1",
+      "task": "5.0",
+      "desc": "glossary 移除 lift_threshold 鍵",
+      "rc": 1,
+      "red": [
+        "test_gap3_metrics_glossary_covers_spec_keys",
+        "test_gap3_metrics_glossary_loader_covers_spec_keys"
+      ]
+    },
+    {
+      "id": "5.1-M4",
+      "task": "5.1",
+      "desc": "拿掉標記鍵之型別驗證（畸形 payload 又命中）",
+      "rc": 1,
+      "red": [
+        "test_gap3_source_json_hint_rejects_wrong_marker_types"
+      ]
+    }
+  ],
+  "baseline_after_restore": {
+    "glossary": {
+      "rc": 0,
+      "red": []
+    },
+    "hint": {
+      "rc": 0,
+      "red": []
+    },
+    "tooltip": {
+      "rc": 0,
+      "red": []
+    },
+    "dialog": {
+      "rc": 0,
+      "red": []
+    }
+  },
+  "closure": "OPEN"
+}

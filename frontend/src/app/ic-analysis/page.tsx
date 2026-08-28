@@ -35,6 +35,7 @@ import DegradedBanner from '@/components/ic-analysis/DegradedBanner';
 import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
 import MarginalICTable from '@/components/ic-analysis/MarginalICTable';
 import EventTablesPanel from '@/components/ic-analysis/EventTablesPanel';
+import EventBatchDisclosurePanel from '@/components/ic-analysis/EventBatchDisclosurePanel';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -596,6 +597,15 @@ function ICAnalysisPageContent() {
 
             {/* GAP-3 B5.2：事件型兩表——只在事件模式顯示（U10 不另開頁） */}
             {/* Task 4.2：IC 設定面板之「Horizon 多選」要真的作用到事件後報酬表 */}
+            {/* GAP-3 UX Task 7.6：批次事實欄唯讀揭露 ＋ 分析參數區（只作用於本次分析、不回寫） */}
+            {config.mode === 'event' && config.event_import_id && (
+              <EventBatchDisclosurePanel
+                importId={config.event_import_id}
+                labelSpec={config.event_label_spec}
+                onChangeLabelSpec={(next) => setConfig({ ...config, event_label_spec: next })}
+              />
+            )}
+
             {config.mode === 'event' && (
               <EventTablesPanel importId={config.event_import_id} horizons={config.horizons} />
             )}

@@ -94,9 +94,75 @@ class EventImportListResponse(BaseModel):
     imports: List[EventImportSummary]
 
 
+class EventT0Row(BaseModel):
+    """GAP-3 UX Task 7.6（SPEC R11 定死之 wire shape）：`t0` 欄之逐列元素，**恰兩鍵**。"""
+
+    event_id: str
+    t0_ms: int
+
+
+class EventLabelRow(BaseModel):
+    """`label` 欄之逐列元素，**恰兩鍵**；不得含 `t0_ms`（欄位語意不得重疊）。"""
+
+    event_id: str
+    label: int
+
+
+class EventBatchFacts(BaseModel):
+    """Task 7.6 三分表之**批次事實欄**（封閉五鍵；IC 分析頁**唯讀**揭露對象）。
+
+    🔴 鍵集**恰為** `{scenario, control_kind, direction, t0, label}`——驗收①之集合相等對象。
+    🔴 `t0`／`label` 為**逐列**陣列（按 `event_id` UTF-8 升冪），**禁止**以 scalar 冒充整批
+       （只回第一列或 `min(t0)` 皆屬此禁）。
+    """
+
+    scenario: Optional[str] = Field(None, description="批內單值；Task 1.8 對本欄強制同質")
+    control_kind: Optional[str] = Field(
+        None,
+        description=(
+            "批內單值時為該值；**批內 distinct > 1 或缺 ⇒ null**。"
+            "🔴 Task 1.8 之同質檢查**不涵蓋本欄**（`_HETEROGENEITY_DIMENSIONS` 只有 direction/scenario/"
+            "label_definition），而 Task 7.5 明文允許混批且**明禁多數決** ⇒ 取第一列即隱性多數決，故回 null；"
+            "混批與缺值之區分見同層之 `batch_fact_notes.control_kind_values`（不計入本物件之鍵集）。"
+        ),
+    )
+    direction: Optional[str] = Field(None, description="批內單值；決定 short 取負，**不可**在 IC 頁修改")
+    t0: List[EventT0Row] = Field(default_factory=list)
+    label: List[EventLabelRow] = Field(default_factory=list)
+
+
+class EventDeclarationSeeds(BaseModel):
+    """Task 7.6 三分表之**批次宣告種子（F-0）**；顯示於分析參數區作為初始值。
+
+    🔴 **不計入**批次事實欄之集合相等（驗收②）。
+    🔴 `horizon_bars` **不在此**——分析參數之 `h` 初始值為字面常數 `1`，
+       **禁止**以匯出檔之 `label_definition.window.horizon_bars` 種子化（§D-3′-a 已裁定）。
+    """
+
+    entry_price_semantic: Optional[str] = None
+    label_return_mode: Optional[str] = None
+    decision_offset_bars: Optional[int] = None
+
+
+class EventBatchFactNotes(BaseModel):
+    """批次事實欄之**誠實補充**（刻意放在 `EventBatchFacts` **之外**，不破壞其封閉五鍵）。
+
+    🔴 存在理由：`control_kind` 之 `null` 有**兩種相反的意思**（批內混值／該批沒這個欄），
+       只留 null 會讓「混批」被讀成「沒宣告」——本 epic 已為同型 fail-open 付過兩次代價
+       （B5 `LowerBoundState` 之 `bound === null`）。本欄給出 distinct 值全集，兩者因此可分辨。
+    """
+
+    control_kind_values: List[str] = Field(
+        default_factory=list, description="批內 `control_kind` 之 distinct 值（升冪）；空＝該批無此欄")
+
+
 class EventImportDetailResponse(BaseModel):
     summary: EventImportSummary
     records: List[Dict[str, Any]]
+    # 🔴 Task 7.6：只改 route 不改本模型會被 `response_model` **靜默濾欄**（§4.2 假綠形態 5）。
+    batch_facts: EventBatchFacts = Field(default_factory=EventBatchFacts)
+    declaration_seeds: EventDeclarationSeeds = Field(default_factory=EventDeclarationSeeds)
+    batch_fact_notes: EventBatchFactNotes = Field(default_factory=EventBatchFactNotes)
 
 
 class LookaheadDepthRequest(BaseModel):

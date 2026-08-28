@@ -34,23 +34,23 @@
 </tr>
 <tr>
 <td><strong>實作</strong></td>
-<td><strong>第十批進行中</strong>（8/28）。42 個裡做完 <strong>36</strong> 個。本輪完成 Task <strong>7.0／7.0b／7.7</strong>（含兩輪審查、34 條破壞測試全過）；Task 7.1–7.6 交下個 session</td>
+<td><strong>第十批（最後一批）程式已全部寫完</strong>（8/28）。42 個 Task <strong>全部落地</strong>；本輪補完 Task <strong>7.1–7.6</strong>。<strong>尚未收案</strong>——還缺三家審查與您的 UAT 簽字</td>
 </tr>
 <tr>
 <td>Task 總數</td>
 <td><strong>42</strong></td>
 </tr>
 <tr>
-<td>已完成</td>
-<td><strong>36</strong>（Task 7.0／7.0b／7.7 皆已收案）</td>
+<td>程式已完成</td>
+<td><strong>42</strong>（7.0／7.0b／7.7 已收案；7.1–7.6 待審查）</td>
 </tr>
 <tr>
-<td>進行中</td>
-<td><strong>0</strong></td>
+<td>待三家審查</td>
+<td><strong>6</strong>（Task 7.1–7.6）</td>
 </tr>
 <tr>
 <td>未開工</td>
-<td><strong>6</strong>（Task 7.1–7.6，下個 session 接手）</td>
+<td><strong>0</strong></td>
 </tr>
 </tbody>
 </table></div>
@@ -146,6 +146,72 @@
 <p>還有一個要記的：其中一條我改了<strong>三次</strong>才讓它真的可證偽。原因是我把測試資料放在一個
 「好幾層保護剛好重疊」的極端位置——拆掉第一層，第二層還撐著，所以看不出來。
 往內移一點之後只剩一層擋，這條保護才真的被測到。</p>
+<h3 id="後半段task-7176把那五個設定真的搬到畫面上">後半段（Task 7.1–7.6）：把那五個設定真的搬到畫面上</h3>
+<p>前半段（7.0）只是讓那五個設定「<strong>可以</strong>被傳」，後半段是讓你<strong>看得到、改得動</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Task</th>
+<th>白話</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>7.1</strong></td>
+<td>匯出頁與匯入頁各長出五個下拉。<strong>不能選的值不是藏起來，是灰掉並寫出為什麼</strong>——例如「A／B 情境」在匯出頁灰掉，理由是那兩種的答案要靠預測，本批沒做出產生答案的東西</td>
+</tr>
+<tr>
+<td><strong>7.2</strong></td>
+<td>一道<strong>機械閘</strong>：畫面上「真的能點」的選項集合，必須等於系統算出來的合法集合；而且<strong>選了之後真的要傳到檔案裡</strong>。第二層是重點——上一批的病就是「畫面有、但沒傳」</td>
+</tr>
+<tr>
+<td><strong>7.3</strong></td>
+<td>匯出前把七項設定全部講出來（原本只講四項），而且每一句都由<strong>當下實際的設定</strong>產生，不是寫死的字</td>
+</tr>
+<tr>
+<td><strong>7.4</strong></td>
+<td>明講「這批不提供 IC decay 曲線」，並告訴你換答案窗要去哪裡改（不必再匯出一次）</td>
+</tr>
+<tr>
+<td><strong>7.5</strong></td>
+<td>事件後報酬表由<strong>一組</strong>變成<strong>正例／反例／全體三組</strong>垂直排列。全體組會依「反例是怎麼來的」決定算不算得出來，<strong>算不出來就講原因，不給你一張空表</strong></td>
+</tr>
+<tr>
+<td><strong>7.6</strong></td>
+<td>IC 分析頁分成兩區：<strong>這批事件的事實（只能看，不能改）</strong> 與 <strong>這次分析的參數（可以改，而且不會寫回去）</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>7.6 這個拆分是這批最重要的觀念</strong>：以前「批次設定」跟「分析參數」混在一起，
+於是改一個分析參數就可能把事件批本身改掉——那會讓同一批事實隨著分析而變。
+現在事實欄在畫面上<strong>連可以打字的框都沒有</strong>（測試直接驗 DOM 裡沒有輸入元件），
+分析參數則另外一區，改了只作用於這一次分析。</p>
+<h3 id="這半批我自己抓到的三個問題都不是產品程式的錯">這半批我自己抓到的三個問題（都不是產品程式的錯）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>問題</th>
+<th>怎麼被抓到</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>我寫的機械閘<strong>根本不會紅</strong> —— 我讓測試把真契約塞進畫面元件，於是「契約改了、畫面沒跟」時<strong>兩邊一起變</strong>，永遠測不出來</td>
+<td>破壞測試錄到<strong>空紅集合</strong></td>
+</tr>
+<tr>
+<td>我的測試資料把其餘四個設定灌成空字串 —— 測試照樣綠，但落檔的四個欄位是非法值</td>
+<td>型別檢查（<code>tsc</code>）當場抓到；<code>npm run build</code> <strong>看不到測試檔</strong>，所以只跑 build 會漏掉</td>
+</tr>
+<tr>
+<td>我的新文案寫了「不需重新匯出」，撞到既有的一條斷言（那條禁止「重新匯出」四個字出現）</td>
+<td>既有測試轉紅。<strong>我沒有去放寬那條斷言</strong>，而是改自己的措辭成「不必再匯出一次」——為了讓自己的新東西過關去鬆綁既有守衛，正是這個 epic 反覆付過代價的形態</td>
+</tr>
+</tbody>
+</table></div>
+<p>還有一個工具面的潛伏缺陷被踩出來：破壞測試的隔離機制<strong>整個起不來</strong>，
+因為 repo 裡有被版控的 numba 快取檔（跑過測試就變髒），而複製工作區時漏了 <code>--binary</code> 參數。
+前九批都僥倖沒踩到。已修。</p>
 <p>✅ <strong>第九批已收案</strong>（8/28，IC 分析的「記憶體止血閘」）。這批要做的事很單純：
 <strong>在 IC 分析啟動之前先看一眼這個 run 有幾個特徵，太多就直接擋下來</strong>，
 不要等它把記憶體吃爆才發現。上限是實跑量出來的（不是猜的）：本機 8GB，

@@ -75,6 +75,9 @@ function ForwardReturnTable({ table }: { table: EventTableStatus }) {
   const horizons = ((table.horizons as number[] | undefined) ?? Object.keys(micro).map(Number)).map(String);
   if (horizons.length === 0) return <p className="text-sm text-slate-400">（表無資料）</p>;
   return (
+    <>
+    {/* 全批 macro／micro（既有）。🔴 Task 7.5 之三組**另外**垂直排在下方——
+        保留這張是因為 `primary_macro`（symbol 等權）是批次層統計，不屬於任何一組。 */}
     <table className="w-full text-xs" data-testid="event-fwd-table">
       <thead>
         <tr className="text-slate-400">
@@ -101,6 +104,94 @@ function ForwardReturnTable({ table }: { table: EventTableStatus }) {
         ))}
       </tbody>
     </table>
+    <ByLabelTables table={table} />
+    </>
+  );
+}
+
+/**
+ * GAP-3 UX **Task 7.5 ⑪** — 事件後報酬表之**正／反／全體三組，垂直排列**。
+ *
+ * 🔴 資料一律讀 `strata.by_label`（後端 Task 7.5 之產出），**不是** `sensitivity_micro`
+ *    ——後端全綠而前端仍顯示舊的單一組，就是「靜默失效」（SPEC ⑪ 之病因）。
+ * 🔴 `all` 為 `not_computed` 時**顯示其 `reason`，不顯示空表**；reason 字面由後端契約給，前端不寫死。
+ * 🔴 分組**不改變**任何統計定義：`n_eff`／bootstrap 都是後端算的，前端一格都不重算。
+ */
+/**
+ * 三組之顯示順序與其 glossary 鍵。
+ * 🔴 **標題文字不寫在這裡**——`metricKey` 指向 `event_metrics_glossary.json` 之條目，
+ *    tooltip 由 Task 5.2 之 `metricTooltip()` 當場導出（Task 7.5「須同步 (c)②」：
+ *    新增之分組標籤與 `not_computed` 狀態文字須先登記 glossary，否則 5.2 無可比對來源）。
+ */
+const BY_LABEL_GROUPS: readonly { key: string; label: string; metricKey: string }[] = [
+  { key: 'positive', label: '正例組（label = 1）', metricKey: 'by_label_positive' },
+  { key: 'negative', label: '反例組（label = 0）', metricKey: 'by_label_negative' },
+  { key: 'all', label: '全體組（正＋反）', metricKey: 'by_label_all' },
+];
+
+type GroupBlock = Record<string, HorizonRow> | { status?: string; reason?: string };
+
+function ByLabelTables({ table }: { table: EventTableStatus }) {
+  const strata = (table.strata ?? {}) as Record<string, unknown>;
+  const byLabel = strata.by_label as Record<string, GroupBlock> | undefined;
+  if (!byLabel) {
+    return (
+      <p className="text-sm text-amber-200" data-testid="event-fwd-by-label-missing">
+        後端未回傳 strata.by_label（正／反／全體三組）——請確認後端版本
+      </p>
+    );
+  }
+  const horizons = ((table.horizons as number[] | undefined) ?? []).map(String);
+  return (
+    <div className="mt-3 space-y-3" data-testid="event-fwd-by-label">
+      {BY_LABEL_GROUPS.map(({ key, label, metricKey }) => {
+        const group = byLabel[key];
+        const status = (group as { status?: string })?.status;
+        const reason = (group as { reason?: string })?.reason;
+        return (
+          <div key={key} data-testid={`event-fwd-group-${key}`}>
+            <p className="text-xs text-slate-300">
+              <MetricLabel metricKey={metricKey} label={label} />
+            </p>
+            {status ? (
+              // not_computed ⇒ 顯示 reason（不是空表）；reason 之白話同樣掛 glossary
+              <p className="text-xs text-amber-200" data-testid={`event-fwd-group-${key}-not-computed`}>
+                {status}：
+                {reason ? <MetricLabel metricKey={reason} label={reason} /> : '（後端未給 reason）'}
+              </p>
+            ) : (
+              <table className="w-full text-xs" data-testid={`event-fwd-group-${key}-table`}>
+                <thead>
+                  <tr className="text-slate-400">
+                    <th className="text-left"><MetricLabel metricKey="horizon" label="horizon" /></th>
+                    <th className="text-right"><MetricLabel metricKey="micro_mean" label="mean" /></th>
+                    <th className="text-right"><MetricLabel metricKey="median" label="median" /></th>
+                    <th className="text-right"><MetricLabel metricKey="win_rate" label="win_rate" /></th>
+                    <th className="text-right"><MetricLabel metricKey="n" label="n" /></th>
+                    <th className="text-right"><MetricLabel metricKey="n_eff" label="n_eff" /></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {horizons.map((h) => {
+                    const row = (group as Record<string, HorizonRow>)[h];
+                    return (
+                      <tr key={h} className="text-slate-200" data-testid={`event-fwd-group-${key}-row-${h}`}>
+                        <td>{h}</td>
+                        <td className="text-right font-mono">{fmt(row?.mean)}</td>
+                        <td className="text-right font-mono">{fmt(row?.median)}</td>
+                        <td className="text-right font-mono">{fmt(row?.win_rate, 3)}</td>
+                        <td className="text-right font-mono">{fmt(row?.n, 0)}</td>
+                        <td className="text-right font-mono">{fmt(row?.n_effective, 2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 {
   "epic": "gap3ux-b10",
   "mode": "verify",
-  "n_mutations": 34,
+  "n_mutations": 53,
   "results": [
     {
       "id": "7.0-M1",
@@ -487,6 +487,309 @@
       "verdict": "PASS",
       "expected": [
         "test_event_analysis_horizon_purge_r2_declaration_from_batch_receipt"
+      ]
+    },
+    {
+      "id": "7.1-M1",
+      "task": "7.1",
+      "desc": "pathExclusions 清空 ⇒ ⑧紅",
+      "rc": 1,
+      "red": [
+        "Task 7.1 ⑧ — /search 之 scenario 限制只在該路徑 > /search 之 A／B／two_stage 皆 disabled 且顯示排除理由"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.1 ⑧ — /search 之 scenario 限制只在該路徑 > /search 之 A／B／two_stage 皆 disabled 且顯示排除理由"
+      ]
+    },
+    {
+      "id": "7.1-M2",
+      "task": "7.1",
+      "desc": "排除搬進元件內的 if（常數不再是唯一來源）⇒ ⑨紅",
+      "rc": 1,
+      "red": [
+        "Task 7.1 ①~⑤ — 每維度之可操作 UI 選項集合 == selectable(path, dim) > `scenario` 於 /search",
+        "Task 7.1 ⑧ — /search 之 scenario 限制只在該路徑 > /search 之 A／B／two_stage 皆 disabled 且顯示排除理由",
+        "Task 7.1 ⑨ — EVENT_DIM_PATH_EXCLUSIONS 之內容（集合相等，不用計數字面） > 內容集合相等於 SPEC L2854–2860 之五列",
+        "Task 7.1 ⑨ — EVENT_DIM_PATH_EXCLUSIONS 之內容（集合相等，不用計數字面） > 🔴 排除之值必須是契約裡真的存在的值（打錯字不會靜默變成「沒排除」）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.1 ①~⑤ — 每維度之可操作 UI 選項集合 == selectable(path, dim) > `scenario` 於 /search",
+        "Task 7.1 ⑧ — /search 之 scenario 限制只在該路徑 > /search 之 A／B／two_stage 皆 disabled 且顯示排除理由",
+        "Task 7.1 ⑨ — EVENT_DIM_PATH_EXCLUSIONS 之內容（集合相等，不用計數字面） > 內容集合相等於 SPEC L2854–2860 之五列",
+        "Task 7.1 ⑨ — EVENT_DIM_PATH_EXCLUSIONS 之內容（集合相等，不用計數字面） > 🔴 排除之值必須是契約裡真的存在的值（打錯字不會靜默變成「沒排除」）"
+      ]
+    },
+    {
+      "id": "7.2-M1",
+      "task": "7.2",
+      "desc": "契約新增第 5 個 scenario 值而不改 UI ⇒ ①紅",
+      "rc": 1,
+      "red": [
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `scenario`（/search）",
+        "Task 7.2 路徑對照 — 同一維度之限制只在該路徑成立 > 🔴 over：`scenario` 於 /data-preparation 四值**全部**可操作（不得被 /search 之排除誤及）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `scenario`（/search）",
+        "Task 7.2 路徑對照 — 同一維度之限制只在該路徑成立 > 🔴 over：`scenario` 於 /data-preparation 四值**全部**可操作（不得被 /search 之排除誤及）"
+      ]
+    },
+    {
+      "id": "7.2-M2",
+      "task": "7.2",
+      "desc": "恆拒／排除值改成 enabled 湊數 ⇒ ①紅",
+      "rc": 1,
+      "red": [
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `control_kind`（/search）",
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `entry_price_semantic`（/search）",
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `label_return_mode`（/search）",
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `scenario`（/search）",
+        "Task 7.2 路徑對照 — 同一維度之限制只在該路徑成立 > 🔴 over：`entry_price_semantic` 於 /data-preparation 為契約 enum 全集，/search 只剩 F-1′ 之一值"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `control_kind`（/search）",
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `entry_price_semantic`（/search）",
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `label_return_mode`（/search）",
+        "Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(path, dim) > `scenario`（/search）",
+        "Task 7.2 路徑對照 — 同一維度之限制只在該路徑成立 > 🔴 over：`entry_price_semantic` 於 /data-preparation 為契約 enum 全集，/search 只剩 F-1′ 之一值"
+      ]
+    },
+    {
+      "id": "7.2-M3",
+      "task": "7.2",
+      "desc": "呼叫端 page.tsx 漏傳 controlKind ⇒ ②紅",
+      "rc": 1,
+      "red": [
+        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 over：使用者不動 UI ⇒ 五鍵仍逐一傳出，且值等於 Task 7.0 之預設（不得因此不傳）",
+        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 五個 camelCase 維度鍵**全部**出現在 opts，且值來自 UI 狀態而非寫死預設"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 over：使用者不動 UI ⇒ 五鍵仍逐一傳出，且值等於 Task 7.0 之預設（不得因此不傳）",
+        "Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度 > 🔴 五個 camelCase 維度鍵**全部**出現在 opts，且值來自 UI 狀態而非寫死預設"
+      ]
+    },
+    {
+      "id": "7.2-M4",
+      "task": "7.2",
+      "desc": "label_return_mode 改回寫死 ⇒ ②紅",
+      "rc": 1,
+      "red": [
+        "Task 7.2 ② round-trip 層 — 選非預設值 ⇒ 落檔記錄之對應路徑 === 所選值 > `label_return_mode` 傳進去就要落到檔裡"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.2 ② round-trip 層 — 選非預設值 ⇒ 落檔記錄之對應路徑 === 所選值 > `label_return_mode` 傳進去就要落到檔裡"
+      ]
+    },
+    {
+      "id": "7.3-M1",
+      "task": "7.3",
+      "desc": "揭露改讀預設常數而非實際選值 ⇒ 邊界①紅",
+      "rc": 1,
+      "red": [
+        "Task 7.3 ① — 揭露七項且全部由實際設定導出 > ① 改任一維度 ⇒ 顯示字串隨之改變（前後 `!==`）",
+        "Task 7.3 ① — 揭露七項且全部由實際設定導出 > ② 顯示值逐字等於共用 formatter 之輸出（本頁不另寫一份文案）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.3 ① — 揭露七項且全部由實際設定導出 > ① 改任一維度 ⇒ 顯示字串隨之改變（前後 `!==`）",
+        "Task 7.3 ① — 揭露七項且全部由實際設定導出 > ② 顯示值逐字等於共用 formatter 之輸出（本頁不另寫一份文案）"
+      ]
+    },
+    {
+      "id": "7.4-M1",
+      "task": "7.4",
+      "desc": "附帶欄清單去動 window.horizon_bars ⇒ 邊界①紅",
+      "rc": 1,
+      "red": [
+        "Task 7.4 — 條件 IC decay 之邊界揭露 > 邊界① 選附帶欄 `[1,3,7]` ⇒ `label_definition.window.horizon_bars` **不變**"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.4 — 條件 IC decay 之邊界揭露 > 邊界① 選附帶欄 `[1,3,7]` ⇒ `label_definition.window.horizon_bars` **不變**"
+      ]
+    },
+    {
+      "id": "7.5-M1",
+      "task": "7.5",
+      "desc": "三組改掛第九頂層鍵 ⇒ ①紅",
+      "rc": 1,
+      "red": [
+        "test_return_table_by_label_01_top_level_still_eight_keys",
+        "test_return_table_by_label_11_manifest_column_does_not_leak_into_output",
+        "test_return_table_by_label_13_g2_golden_byte_frozen"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_return_table_by_label_01_top_level_still_eight_keys",
+        "test_return_table_by_label_11_manifest_column_does_not_leak_into_output",
+        "test_return_table_by_label_13_g2_golden_byte_frozen"
+      ]
+    },
+    {
+      "id": "7.5-M2",
+      "task": "7.5",
+      "desc": "control_kind 移出 manifest merge 清單 ⇒ ⑧紅",
+      "rc": 1,
+      "red": [
+        "test_return_table_by_label_01_top_level_still_eight_keys",
+        "test_return_table_by_label_02_group_keys_exact",
+        "test_return_table_by_label_03_row_counts_equal_horizons",
+        "test_return_table_by_label_04_same_trigger_all_computable_and_n_adds_up",
+        "test_return_table_by_label_05_platform_same_trigger_rule_is_computable",
+        "test_return_table_by_label_06_user_labeled_other_not_computed",
+        "test_return_table_by_label_07_mixed_control_kind_not_majority",
+        "test_return_table_by_label_08_control_kind_in_manifest_columns",
+        "test_return_table_by_label_10_pos_neg_byte_identical_across_control_kinds",
+        "test_return_table_by_label_11_manifest_column_does_not_leak_into_output",
+        "test_return_table_by_label_12_independent_hand_oracle",
+        "test_return_table_by_label_13_g2_golden_byte_frozen"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_return_table_by_label_01_top_level_still_eight_keys",
+        "test_return_table_by_label_02_group_keys_exact",
+        "test_return_table_by_label_03_row_counts_equal_horizons",
+        "test_return_table_by_label_04_same_trigger_all_computable_and_n_adds_up",
+        "test_return_table_by_label_05_platform_same_trigger_rule_is_computable",
+        "test_return_table_by_label_06_user_labeled_other_not_computed",
+        "test_return_table_by_label_07_mixed_control_kind_not_majority",
+        "test_return_table_by_label_08_control_kind_in_manifest_columns",
+        "test_return_table_by_label_10_pos_neg_byte_identical_across_control_kinds",
+        "test_return_table_by_label_11_manifest_column_does_not_leak_into_output",
+        "test_return_table_by_label_12_independent_hand_oracle",
+        "test_return_table_by_label_13_g2_golden_byte_frozen"
+      ]
+    },
+    {
+      "id": "7.5-M3",
+      "task": "7.5",
+      "desc": "前端仍讀 sensitivity_micro ⇒ ⑪紅",
+      "rc": 1,
+      "red": [
+        "Task 7.5 ⑪ — EventTablesPanel 讀 strata.by_label 並垂直排列三組 > ②各組之數值來自**該組自己的** by_label 區塊（不是共用 sensitivity_micro）",
+        "Task 7.5 ⑪ — EventTablesPanel 讀 strata.by_label 並垂直排列三組 > ③`all` 為 not_computed ⇒ 顯示其 reason，**不顯示空表**",
+        "Task 7.5 ⑪ — EventTablesPanel 讀 strata.by_label 並垂直排列三組 > ④後端沒給 by_label ⇒ 明說沒拿到，**不得**默默退回顯示單一組"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.5 ⑪ — EventTablesPanel 讀 strata.by_label 並垂直排列三組 > ②各組之數值來自**該組自己的** by_label 區塊（不是共用 sensitivity_micro）",
+        "Task 7.5 ⑪ — EventTablesPanel 讀 strata.by_label 並垂直排列三組 > ③`all` 為 not_computed ⇒ 顯示其 reason，**不顯示空表**",
+        "Task 7.5 ⑪ — EventTablesPanel 讀 strata.by_label 並垂直排列三組 > ④後端沒給 by_label ⇒ 明說沒拿到，**不得**默默退回顯示單一組"
+      ]
+    },
+    {
+      "id": "7.5-M4",
+      "task": "7.5",
+      "desc": "批內多值改取多數決 ⇒ ⑦紅",
+      "rc": 1,
+      "red": [
+        "test_return_table_by_label_07_mixed_control_kind_not_majority"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_return_table_by_label_07_mixed_control_kind_not_majority"
+      ]
+    },
+    {
+      "id": "7.5-M5",
+      "task": "7.5",
+      "desc": "not_computed 改回空統計塊 ⇒ ⑥紅",
+      "rc": 1,
+      "red": [
+        "test_return_table_by_label_06_user_labeled_other_not_computed",
+        "test_return_table_by_label_07_mixed_control_kind_not_majority"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_return_table_by_label_06_user_labeled_other_not_computed",
+        "test_return_table_by_label_07_mixed_control_kind_not_majority"
+      ]
+    },
+    {
+      "id": "7.5-M6",
+      "task": "7.5",
+      "desc": "platform_same_trigger_rule 當成 other ⇒ ⑤紅",
+      "rc": 1,
+      "red": [
+        "test_return_table_by_label_05_platform_same_trigger_rule_is_computable"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "test_return_table_by_label_05_platform_same_trigger_rule_is_computable"
+      ]
+    },
+    {
+      "id": "7.6-M1",
+      "task": "7.6",
+      "desc": "揭露文案改成前端寫死 ⇒ ①紅",
+      "rc": 1,
+      "red": [
+        "Task 7.6 ①② — 批次事實欄之揭露文案由共用 formatter 產生 > ① 各段文字皆出現，且**逐字**等於共用 registry 之輸出（不是本頁另寫一份）"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.6 ①② — 批次事實欄之揭露文案由共用 formatter 產生 > ① 各段文字皆出現，且**逐字**等於共用 registry 之輸出（不是本頁另寫一份）"
+      ]
+    },
+    {
+      "id": "7.6-M2",
+      "task": "7.6",
+      "desc": "批次事實欄改成可編輯 ⇒ ③紅",
+      "rc": 1,
+      "red": [
+        "Task 7.6 ①② — 批次事實欄之揭露文案由共用 formatter 產生 > ① 各段文字皆出現，且**逐字**等於共用 registry 之輸出（不是本頁另寫一份）",
+        "Task 7.6 ①② — 批次事實欄之揭露文案由共用 formatter 產生 > ② 改批次之任一事實欄 ⇒ 顯示字串 `!==` 前值",
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > ③ 批次事實欄之 DOM 節點**無**任何可輸入控制項"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.6 ①② — 批次事實欄之揭露文案由共用 formatter 產生 > ① 各段文字皆出現，且**逐字**等於共用 registry 之輸出（不是本頁另寫一份）",
+        "Task 7.6 ①② — 批次事實欄之揭露文案由共用 formatter 產生 > ② 改批次之任一事實欄 ⇒ 顯示字串 `!==` 前值",
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > ③ 批次事實欄之 DOM 節點**無**任何可輸入控制項"
+      ]
+    },
+    {
+      "id": "7.6-M3",
+      "task": "7.6",
+      "desc": "三元組開放 F-1′ 以外之值 ⇒ ⑤紅",
+      "rc": 1,
+      "red": [
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > ⑤ 三元組之**可操作**選項集合 == §F-1′ 之唯一三元組；其餘 disabled 且顯示理由"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.6 ③⑤ — 唯讀 vs 可設定 > ⑤ 三元組之**可操作**選項集合 == §F-1′ 之唯一三元組；其餘 disabled 且顯示理由"
+      ]
+    },
+    {
+      "id": "7.6-M4",
+      "task": "7.6",
+      "desc": "分析參數回寫事件批 ⇒ ⑥紅",
+      "rc": 1,
+      "red": [
+        "Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」 > ⑥ 改分析參數**不回寫**事件批：對 `/case/events/` 只有 GET，且重查之 records 不變"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」 > ⑥ 改分析參數**不回寫**事件批：對 `/case/events/` 只有 GET，且重查之 records 不變"
+      ]
+    },
+    {
+      "id": "7.6-M5",
+      "task": "7.6",
+      "desc": "面板之 h 以匯出 window.horizon_bars 種子化 ⇒ ⑦紅",
+      "rc": 1,
+      "red": [
+        "Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」 > ⑦ 🔴 既有批之 `window.horizon_bars === 3` 且使用者未改 ⇒ h `=== 1`（**非** 3），面板與 payload 兩層皆是"
+      ],
+      "verdict": "PASS",
+      "expected": [
+        "Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」 > ⑦ 🔴 既有批之 `window.horizon_bars === 3` 且使用者未改 ⇒ h `=== 1`（**非** 3），面板與 payload 兩層皆是"
       ]
     }
   ],

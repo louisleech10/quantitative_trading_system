@@ -24,10 +24,15 @@ import {
 import {
   ATTACHED_HORIZONS,
   EVENT_EXPORT_CONTROL_KIND,
+  EVENT_EXPORT_DECISION_OFFSET_BARS,
+  EVENT_EXPORT_ENTRY_PRICE_SEMANTIC,
+  EVENT_EXPORT_LABEL_RETURN_MODE,
   EVENT_EXPORT_SCENARIO,
+  eventDimsToExportOptions,
   horizonCoverageLines,
 } from '@/lib/eventExport';
-import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
+import EventDimensionFields, { type EventDimensionValues } from '@/components/case/EventDimensionFields';
+import { EVENT_FIELD_FORMATTERS, EVENT_IC_DECAY_DISCLOSURE } from '@/lib/eventFieldFormatters';
 import { computeExportCounts } from '@/lib/exportCounts';
 
 
@@ -87,6 +92,15 @@ export default function SearchPage() {
   const lookaheadLowerBound = lowerBoundState.bound;
   // GAP-3 UX Task 2.1：匯出前篩選條件（面板只讀搜尋結果，不改任何原始欄位值）
   const [exportFilters, setExportFilters] = useState<ExportFilterCondition[]>([]);
+  // GAP-3 UX Task 7.1：五個批次維度**可見可改**；初始值＝Task 7.0 之常數
+  // （⇒ 使用者不動 UI 時匯出結果與 7.0 逐位元相同，SPEC 邊界②之 golden 不變由此成立）。
+  const [eventDims, setEventDims] = useState<EventDimensionValues>({
+    scenario: EVENT_EXPORT_SCENARIO,
+    control_kind: EVENT_EXPORT_CONTROL_KIND,
+    entry_price_semantic: EVENT_EXPORT_ENTRY_PRICE_SEMANTIC,
+    label_return_mode: EVENT_EXPORT_LABEL_RETURN_MODE,
+    decision_offset_bars: EVENT_EXPORT_DECISION_OFFSET_BARS,
+  });
   
   // 搜索參數狀態
   const [searchParams, setSearchParams] = useState<SimpleSearchRequest>({
@@ -651,6 +665,9 @@ export default function SearchPage() {
       sourceFileText: currentResult.source_file_text ?? '',
       sourceFileDigest: currentResult.source_file_digest ?? '',
       filters: buildExportFilterSpec(exportFilters),
+      // 🔴 Task 7.1：五維度**逐一**由 UI 狀態傳入。漏傳任一個都會讓落檔悄悄退回
+      //    `eventExport.ts` 的預設值（介面有、沒傳）——Task 7.2 ② 之機械閘即守這件事。
+      ...eventDimsToExportOptions(eventDims),
     });
     // GAP-3 UX Task 4.3 ＋ 5.3：**同一個**確認框（5.3 是 4.3 的擴寫，不另建第二個）。
     // 4.3＝逐附帶 horizon 列出筆數；5.3＝改為**主動顯示**每個附帶欄各有幾筆可算、幾筆缺，
@@ -1848,26 +1865,53 @@ export default function SearchPage() {
                 </div>
               </div>
 
-              {/* ── GAP-3 UX Task 4.1b：匯出時揭露四件現行完全未告知的事 ──────────────
-                  🔴 四段皆由**實際設定**導出，禁寫死；白話取自契約 `_doc`（鏡像＋比對測試）。 */}
+              {/* ── GAP-3 UX Task 7.1：五個批次維度**可見可改** ─────────────────────
+                  🔴 可操作集合由 `selectable(path, dim)` 導出（契約 ∖ 具名排除常數），
+                     本頁不知道任何值域；`/search` 之限制**只在此路徑**成立。 */}
+              <div className="mt-4 rounded border border-slate-800 bg-slate-900/40 p-3" data-testid="export-event-dimensions">
+                <p className="mb-2 text-sm text-slate-200">
+                  這批事件的五個設定
+                  <span className="ml-2 text-[11px] text-slate-400">
+                    預設維持現行；灰掉的值旁邊寫了為什麼這條路徑不開放
+                  </span>
+                </p>
+                <EventDimensionFields path="/search" values={eventDims} onChange={setEventDims} />
+              </div>
+
+              {/* ── GAP-3 UX Task 7.3：動態揭露本批設定（**取代** Task 4.1b 之獨立實作）─────
+                  🔴 每一段都由 **Task 7.6 之欄位級 formatter registry** 產生，本頁只**選取自己的欄集**
+                     （`SEARCH_DISCLOSURE_FIELDS`）；不得寫成硬編欄集之面板級 formatter
+                     ——IC 分析頁欄集不同，面板級共用會逼其中一頁多顯示或少顯示。
+                  🔴 值一律取自**使用者實際選的** `eventDims`／實際回傳之深度 map，禁寫死。
+                  🔴 4.1b 之四項（scenario／深度／purge／control_kind）為本欄集之真子集，
+                     其 testid 一併保留 ⇒ `eventExportDisclosureLegacy.test.tsx` 仍是「4.1b ⊆ 7.3」之執行期證明。 */}
               <div className="mt-3 rounded border border-sky-900/60 bg-sky-950/30 p-3 text-[11px] text-slate-300" data-testid="export-disclosure">
                 <p className="text-xs font-medium text-sky-100">這批匯出實際會帶什麼（你沒選過但一直存在的設定）</p>
                 <p className="mt-1" data-testid="export-disclosure-scenario">
-                  本批 scenario ＝ <strong>{EVENT_EXPORT_SCENARIO}</strong> — {EVENT_CONTRACT_DOCS.scenario}
+                  {EVENT_FIELD_FORMATTERS.scenario(eventDims.scenario)}
+                </p>
+                <p className="mt-1" data-testid="export-disclosure-control-kind">
+                  {EVENT_FIELD_FORMATTERS.control_kind(eventDims.control_kind)}
+                </p>
+                <p className="mt-1" data-testid="export-disclosure-entry-price-semantic">
+                  {EVENT_FIELD_FORMATTERS.entry_price_semantic(eventDims.entry_price_semantic)}
+                </p>
+                <p className="mt-1" data-testid="export-disclosure-label-return-mode">
+                  {EVENT_FIELD_FORMATTERS.label_return_mode(eventDims.label_return_mode)}
+                </p>
+                <p className="mt-1" data-testid="export-disclosure-decision-offset-bars">
+                  {EVENT_FIELD_FORMATTERS.decision_offset_bars(Number(eventDims.decision_offset_bars))}
                 </p>
                 <div className="mt-1" data-testid="export-disclosure-depth">
-                  {/* 🔴 顯示 `lookahead_bars_declared`（真實深度），**不是** window.horizon_bars
-                      ——後者有下限 1 之 floor，深度 0 會顯示成 1（§D-3′-a(i)）。
-                      🔴 批內多 TF ⇒ **逐 tf 各一行**，不得塌成單一 scalar。 */}
+                  {/* 🔴 批內多 TF ⇒ **逐 tf 各一行**，不得塌成單一 scalar（§D-3′-a(ii)）。 */}
                   {Object.keys(lowerBoundState.depthByTimeframe).length === 0 ? (
                     <span data-testid="export-disclosure-depth-pending">lookahead 深度：尚未取得（取得前不會讓你匯出）</span>
                   ) : (
                     Object.entries(lowerBoundState.depthByTimeframe).map(([tf, n]) => (
                       <div key={tf} data-testid={`export-disclosure-depth-${tf}`}>
-                        lookahead 深度（{tf}）＝ <strong>{n}</strong> 根，來源＝你的篩選條件引用到的欄位
-                        {referencedColumnsOf(exportFilters).length > 0
-                          ? `：${referencedColumnsOf(exportFilters).join('、')}`
-                          : '：無（沒有設篩選條件）'}
+                        {EVENT_FIELD_FORMATTERS.lookahead_depth({
+                          timeframe: tf, bars: n, referencedColumns: referencedColumnsOf(exportFilters),
+                        })}
                       </div>
                     ))
                   )}
@@ -1875,22 +1919,17 @@ export default function SearchPage() {
                 <div className="mt-1" data-testid="export-disclosure-purge">
                   {Object.entries(lowerBoundState.depthByTimeframe).map(([tf, n]) => (
                     <div key={tf} data-testid={`export-disclosure-purge-${tf}`}>
-                      本批之 purge 下界（事件事實層，{tf}）＝ <strong>{n}</strong> 根——
-                      這個深度來自你的 label 定義最遠引用到 t0 之後第幾根。
-                      條件 IC 分析時之實際 purge 另取本次答案窗，<strong>取兩者較大者</strong>。
+                      {EVENT_FIELD_FORMATTERS.purge_bars({
+                        timeframe: tf, bars: n, referencedColumns: referencedColumnsOf(exportFilters),
+                      })}
                     </div>
                   ))}
                 </div>
-                <p className="mt-1" data-testid="export-disclosure-control-kind">
-                  control_kind ＝ <strong>{EVENT_EXPORT_CONTROL_KIND}</strong> — {EVENT_CONTRACT_DOCS.control_kind}
-                </p>
               </div>
 
-              {/* ── GAP-3 UX Task 4.1c：明文標示本批不提供 IC decay ───────────────── */}
+              {/* ── GAP-3 UX Task 7.4（＝ 4.1c 之同一文案來源）：條件 IC decay 之邊界揭露 ─── */}
               <p className="mt-2 text-[11px] text-amber-200/90" data-testid="export-no-ic-decay">
-                條件 IC decay 曲線（一次分析同時得到多個 h 的 IC）非本批交付；附帶的 future_* 欄不進入 ic_feed。
-                要看不同答案窗，請於 IC 分析頁改答案窗重跑分析——同一批事件事實可以重複分析。
-                一次得到整條 decay 曲線待 GAP-6 之 IC-Analysis 整體處理。
+                {EVENT_IC_DECAY_DISCLOSURE}
               </p>
             </div>
 

@@ -16,6 +16,75 @@ from sklearn.metrics import average_precision_score, confusion_matrix, roc_auc_s
 
 from momentum.Analysis.event_samples.baseline import permutation_oracle
 from momentum.Analysis.event_samples.types import AlignmentReceipts, EventManifest, EventSplitPlan, OracleConfig
+from momentum.Analysis.ic_config_schema import load_report_contract
+
+
+# ---------------------------------------------------------------------------
+# Task 7.5：事件後報酬表之正／反／全體三組（`strata.by_label`）
+# ---------------------------------------------------------------------------
+def _event_return_table_contract() -> Dict:
+    """表格層 reason／鍵集之**唯一**字面來源＝`ic_report_contract.json` 之
+    `report_sections.event_return_table`。
+
+    🔴 缺該節 ⇒ **raise**（fail-closed）：退回硬編字面就是第二份副本，
+       而 SPEC Task 7.5 要點3 明令「程式與前端一律由該檔取字面」。
+    ⚠️ 本節為**表格層** reason，**不得**與 Task 6.0 之 `reasons.analysis_rejected` 混用。
+    """
+    sections = load_report_contract().get("report_sections") or {}
+    node = sections.get("event_return_table")
+    if not isinstance(node, dict):
+        raise ValueError(
+            "ic_report_contract.json 缺 report_sections.event_return_table —— "
+            "Task 7.5 之兩個 not_computed reason 須先登記契約（§C 契約唯一真相源）"
+        )
+    return node
+
+
+def _not_computed(reason_key: str) -> Dict[str, str]:
+    """`not_computed` 狀態塊（§G S-7a：**恰兩鍵**）；reason 字面自契約取，不硬寫。"""
+    node = _event_return_table_contract()
+    reasons = list(node.get("not_computed_reasons") or [])
+    if reason_key not in reasons:
+        raise ValueError(f"reason {reason_key!r} 未登記於契約之 not_computed_reasons（{reasons}）")
+    status_keys = list(node.get("group_status_object_keys") or [])
+    if status_keys != ["status", "reason"]:
+        raise ValueError(f"契約之 group_status_object_keys 非 ['status','reason']：{status_keys}")
+    return {"status": "not_computed", "reason": reason_key}
+
+
+def _by_label_groups(df: pd.DataFrame, manifest_table: pd.DataFrame, block) -> Dict:
+    """`positive`／`negative`／`all` 三組（鍵集固定，不多不少）。
+
+    🔴 `control_kind` **只影響 `all`**——`positive`／`negative` 兩組在三種 `control_kind`
+       下必須 byte 級相同（SPEC 驗收⑩），故本函式對它們不看 `control_kind`。
+    🔴 `control_kind` 一律由 `manifest.table` 取用（Task 7.5 要點4 之唯一傳遞點）；
+       欄不存在 ⇒ **raise**，不得「讀不到就當 None 放行」。
+    """
+    node = _event_return_table_contract()
+    group_keys = list(node.get("group_keys") or [])
+    if group_keys != ["positive", "negative", "all"]:
+        raise ValueError(f"契約之 group_keys 非 ['positive','negative','all']：{group_keys}")
+    if "control_kind" not in manifest_table.columns:
+        raise ValueError(
+            "event_forward_return_table: manifest 缺 control_kind —— Task 7.5 之唯一傳遞點是 "
+            "build_event_manifest 之 merge 清單（dedupe.py）；讀不到時**不得**當 None 放行"
+        )
+    labels = pd.to_numeric(df["label"], errors="coerce")
+    groups: Dict = {
+        "positive": block(df[labels == 1], True),
+        "negative": block(df[labels == 0], True),
+    }
+    kinds = sorted({str(v) for v in manifest_table["control_kind"].dropna().tolist()})
+    if len(kinds) > 1:
+        groups["all"] = _not_computed("mixed_control_kind_in_batch")   # 🔴 **不取多數決**
+    elif len(kinds) == 0:
+        raise ValueError("event_forward_return_table: 批內 control_kind 全空——契約必填欄，不得放行")
+    elif kinds[0] == "user_labeled_other":
+        groups["all"] = _not_computed("control_kind_not_comparable")
+    else:
+        # `user_labeled_same_trigger`／`platform_same_trigger_rule` ⇒ 同觸發，正常計算
+        groups["all"] = block(df, True)
+    return groups
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +226,8 @@ def event_forward_return_table(
             rows.append({
                 "event_id": eid, "horizon": h,
                 "symbol": rec["symbol"], "direction": rec["direction"], "scenario": rec.get("scenario"),
+                # Task 7.5：三組分層之依據；`label` 已在 manifest merge 清單內，`control_kind` 本批新增
+                "label": rec.get("label"), "control_kind": rec.get("control_kind"),
                 "period": pd.Timestamp(int(r["t0_ms"]), unit="ms", tz="UTC").strftime("%Y-%m"),
                 "ret_entry": sign * (exit_close - entry_price) / entry_price,       # 實際進場持有報酬
                 "ret_label_anchor": sign * (exit_close - t0_close) / t0_close,      # 標籤基準（t₀ close）報酬——兩數並排
@@ -195,6 +266,8 @@ def event_forward_return_table(
         "by_direction": {d: block(g, True) for d, g in df.groupby("direction")},
         "by_scenario": {str(sc): block(g, True) for sc, g in df.groupby("scenario", dropna=False)},
         "by_period": {p: block(g, True) for p, g in df.groupby("period")},
+        # Task 7.5：正／反／全體三組。🔴 掛在**既有** `strata` 之下，**不新增第九頂層鍵**。
+        "by_label": _by_label_groups(df, t, block),
     }
     return {
         "statistic_kind": "event_return",

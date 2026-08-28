@@ -123,7 +123,12 @@ class IsolatedWorktree:
             raise RuntimeError(f"git worktree add 失敗: {last.stderr}") from last
 
         # 未提交之 tracked 改動：不套的話驗到的是舊碼（假綠來源）
-        diff = _git("diff", "HEAD").stdout
+        # 🔴 `--binary` 為必要（2026-08-28 實測）：repo 內有**被版控的** numba 快取
+        #    （`**/__pycache__/*.py39.nbi`），跑過測試就變髒。少了 `--binary` 時 `git diff`
+        #    只產生 "Binary files differ" 之 stub，`git apply` 直接失敗
+        #    （`cannot apply binary patch … without full index line`）⇒ **整個 runner 起不來**。
+        #    這是潛伏缺陷：只有在 `.nbi` 恰好是髒的時候才會炸，B1–B10 前九輪都僥倖沒踩到。
+        diff = _git("diff", "HEAD", "--binary").stdout
         if diff.strip():
             proc = subprocess.run(
                 ["git", "apply", "--whitespace=nowarn", "-"],

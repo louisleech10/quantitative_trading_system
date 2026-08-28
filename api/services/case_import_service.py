@@ -593,8 +593,9 @@ import shutil as _shutil
 import uuid as _uuid
 
 from api.models.event_import_models import (
-    EventImportDetailResponse, EventImportFailure, EventImportListResponse, EventImportRejected,
-    EventImportResponse, EventImportSummary,
+    EventBatchFactNotes, EventBatchFacts, EventDeclarationSeeds, EventImportDetailResponse,
+    EventImportFailure, EventImportListResponse, EventImportRejected, EventImportResponse,
+    EventImportSummary, EventLabelRow, EventT0Row,
 )
 
 LEGACY_COLUMNS = frozenset({"symbol", "timestamp", "positive_case"})
@@ -1277,12 +1278,55 @@ class EventImportService:
         val = self._load(p).get("lookahead_declaration")
         return dict(val) if isinstance(val, dict) else None
 
+    @staticmethod
+    def _single_value(recs: List[Dict[str, object]], field: str) -> Optional[str]:
+        """批內單值 ⇒ 該值；缺／混值 ⇒ `None`（**不取第一列、不取多數決**）。
+
+        🔴 取第一列是隱性多數決之更差版本（取樣一列）——SPEC Task 7.5 對 `control_kind`
+           **明禁多數決**；`direction`／`scenario` 由 Task 1.8 保證單值，走同一條實作即可。
+        """
+        values = {str(r.get(field)) for r in recs if r.get(field) is not None}
+        return values.pop() if len(values) == 1 else None
+
+    def _batch_facts(self, recs: List[Dict[str, object]]) -> EventBatchFacts:
+        """Task 7.6 驗收①之**批次事實欄**（封閉五鍵；逐列欄按 `event_id` UTF-8 升冪）。"""
+        rows = sorted(recs, key=lambda r: str(r.get("event_id")))
+        return EventBatchFacts(
+            scenario=self._single_value(recs, "scenario"),
+            control_kind=self._single_value(recs, "control_kind"),
+            direction=self._single_value(recs, "direction"),
+            # 🔴 兩個陣列各自只帶自己那兩鍵：`t0` 之元素不得含 `label`，反之亦然
+            #    （否則 t0 之 formatter 讀得到 label，欄位語意重疊；SPEC R11）。
+            t0=[EventT0Row(event_id=str(r.get("event_id")), t0_ms=int(r.get("t0"))) for r in rows],
+            label=[EventLabelRow(event_id=str(r.get("event_id")), label=int(r.get("label"))) for r in rows],
+        )
+
     def get_import(self, import_id: str) -> Optional[EventImportDetailResponse]:
         p = self.payload_path(import_id)
         if p is None or not p.is_file():
             return None
         payload = self._load(p)
-        return EventImportDetailResponse(summary=self._summary(payload), records=list(payload.get("records") or []))
+        recs = list(payload.get("records") or [])
+        # 🔴 種子取自**該批落檔記錄之實際值**（驗收③），不是前端預設常數。
+        #    `label_return_mode` 住 `label_definition` 之內，不是頂層。
+        lds = [r.get("label_definition") or {} for r in recs]
+        lrm = {str(d.get("label_return_mode")) for d in lds if isinstance(d, dict) and d.get("label_return_mode")}
+        k_raw = self._single_value(recs, "decision_offset_bars")
+        return EventImportDetailResponse(
+            summary=self._summary(payload),
+            records=recs,
+            batch_facts=self._batch_facts(recs),
+            declaration_seeds=EventDeclarationSeeds(
+                entry_price_semantic=self._single_value(recs, "entry_price_semantic"),
+                label_return_mode=lrm.pop() if len(lrm) == 1 else None,
+                decision_offset_bars=int(k_raw) if k_raw is not None and k_raw.lstrip("-").isdigit() else None,
+            ),
+            batch_fact_notes=EventBatchFactNotes(
+                control_kind_values=sorted({
+                    str(r.get("control_kind")) for r in recs if r.get("control_kind") is not None
+                }),
+            ),
+        )
 
 
     @staticmethod

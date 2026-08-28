@@ -48,7 +48,13 @@
     "turnover_analysis": { "status_object_keys": ["status", "reason"] },
     "coverage_analysis": { "status_object_keys": ["status", "reason"] },
     "net_ic_analysis": { "status_object_keys": ["status", "reason"] },
-    "marginal_ic": { "status_object_keys": ["status", "reason"] }
+    "marginal_ic": { "status_object_keys": ["status", "reason"] },
+    "event_return_table": {
+      "_doc": "GAP-3 UX Task 7.5：事件後報酬表之正／反／全體三組（strata.by_label）。本節為**表格層** reason 之唯一登記處；⚠️ 不得與 Task 6.0 之 reasons.analysis_rejected（IC 分析入口之拒絕原因）混用，兩者語意不同。程式與前端一律由本檔取字面，硬編碼數須為 0。",
+      "group_keys": ["positive", "negative", "all"],
+      "not_computed_reasons": ["control_kind_not_comparable", "mixed_control_kind_in_batch"],
+      "group_status_object_keys": ["status", "reason"]
+    }
   },
   "metadata": {
     "event_filter_keys": ["fallback", "reason"],

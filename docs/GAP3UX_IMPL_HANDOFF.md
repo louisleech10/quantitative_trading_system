@@ -69,10 +69,11 @@ bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_TODO.md        # 期望 r
 bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_TODO.D-003.md  # 期望 rc=0
 grep -c '^### Task ' docs/GAP3_EVENT_UX_TODO.md # 期望 42
 venv/bin/python scripts/gap3_freeze_golden.py --check   # 期望 rc=0，canonical_sha=163c4cec…（約 15 秒）
-venv/bin/python -m pytest tests/momentum/event_samples/ -q            # 期望 313 passed
+venv/bin/python -m pytest tests/momentum/event_samples/ -q            # 期望 332 passed（🔴 B10 之 7.0b 起；含 -k analysis_label_producer 19）
 venv/bin/python -m pytest tests/api -q -k "gap3_csv or gap3_export_filter or lookahead_declaration or gap3_horizon or gap3_import or gap3_t0_unit or gap3_heterogeneous or gap3_source_digest or gap3_contract_reason or gap3_lookahead or gap3_event_delete or source_json_hint"   # 期望 189 passed（🔴 B8 起 -k 多了 source_json_hint）
+venv/bin/python -m pytest tests/api -q -k "feature_coverage_gate or event_analysis_horizon_purge"   # 期望 44 passed（🔴 B10 之 7.0b／7.7 新增，21＋23）
 venv/bin/python -m pytest tests/api -q -k "gap3_matrix or ic_feature_cap or ic_stop_gate_alive or ic_progress_fields"   # 期望 39 passed（🔴 B9 之止血閘＋雙向形狀矩陣）
-npm --prefix frontend test -- --run             # 期望 58 files／334 passed（🔴 B9 起 +1 檔 icTaskStatusLabel）
+npm --prefix frontend test -- --run             # 期望 61 files／351 passed（🔴 B10 之 7.0／7.0b／7.7 收案後之實測）
 npm --prefix frontend run build                 # 期望 rc=0
 npx --prefix frontend tsc --noEmit -p frontend/tsconfig.json   # 期望：GAP-3 相關檔 0 錯（另有 **8 行**既有債，見 §7.3）
 ```

@@ -78,4 +78,11 @@ if [ -n "$porcelain" ]; then echo "$porcelain"; else echo "（無）"; fi
 
 bash scripts/verify_hooks_health.sh || { echo "POSTFLIGHT ❌ verify hooks health failed"; fail=1; }
 
+# 清理：委員／治理隔離工作樹（`.claude/tmp/**/`）不會自清。
+#   2026-08-28 實測累積到 **20 GB**（單一目錄 9.5 GB——委員複製隔離樹時沒排除 `.claude/`，
+#   把整包 `.claude/tmp` 套進 `iso/.claude/`，一層疊一層）。掛在這裡是因為
+#   派工後**一定**會跑 postflight ⇒ 機械強制，不靠「記得要清」。
+#   🔴 **刻意不計入 `fail`**：清不掉是磁碟衛生問題，不是派工違規，不該擋住驗收。
+bash scripts/clean_agent_tmp.sh || echo "POSTFLIGHT ⚠️ .claude/tmp 未清乾淨（不擋驗收，但請人工查看）"
+
 exit "$fail"

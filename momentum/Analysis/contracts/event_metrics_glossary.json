@@ -105,5 +105,30 @@
     "term": "signal_frequency（訊號密度）",
     "definition": "通過門檻的根數佔已標記根數的比率，代表這條規則多常發出訊號。",
     "formula_ref": "momentum/Analysis/event_samples/all_bars_eval.py::evaluate_all_bars（metrics）"
+  },
+  "by_label_positive": {
+    "term": "正例組（label = 1）",
+    "definition": "只取這批裡你標成正例的那些事件，各自跑完所有 horizon。這一組的統計不受 control_kind 影響——反例是誰、怎麼來的，都不會改變正例自己的報酬。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::_by_label_groups（block(df[label == 1], True)）"
+  },
+  "by_label_negative": {
+    "term": "反例組（label = 0）",
+    "definition": "只取這批裡你標成反例的那些事件，各自跑完所有 horizon。同樣不受 control_kind 影響。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::_by_label_groups（block(df[label == 0], True)）"
+  },
+  "by_label_all": {
+    "term": "全體組（正＋反）",
+    "definition": "正例與反例合在一起算。只有在正反例來自**同一個觸發條件**時這個合併才有意義，所以它會依 control_kind 決定算不算得出來；算不出來時顯示原因，不會給你一張空表。",
+    "formula_ref": "momentum/Analysis/event_samples/tables.py::_by_label_groups（control_kind 決定是否 block(df, True)）"
+  },
+  "control_kind_not_comparable": {
+    "term": "全體組不可比（control_kind_not_comparable）",
+    "definition": "這批的反例是 user_labeled_other——它們不是同一個觸發條件下的對照，把正反例合起來平均等於把兩個不同母體混在一起，所以全體組不計算。正例組與反例組仍然照常顯示。",
+    "formula_ref": "momentum/Analysis/contracts/ic_report_contract.json（report_sections.event_return_table.not_computed_reasons）"
+  },
+  "mixed_control_kind_in_batch": {
+    "term": "批內 control_kind 不只一種（mixed_control_kind_in_batch）",
+    "definition": "這批事件的 control_kind 有兩種以上，代表反例的來源不一致。平台**不取多數決**（那會讓少數那群被靜默併進去），所以全體組不計算並顯示這個原因。要看全體組，請把不同來源的反例分成不同批。",
+    "formula_ref": "momentum/Analysis/contracts/ic_report_contract.json（report_sections.event_return_table.not_computed_reasons）"
   }
 }

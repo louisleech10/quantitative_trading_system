@@ -979,7 +979,7 @@ export async function exportPdfReport(taskId: string): Promise<Blob> {
 // GAP-3 事件型（B5.2）：匯入批 / 兩張表（後端 /api/v1/case/events*）
 // ============================================================
 import type {
-  EventAnalyzeResponse, EventCsvMappingSubmission, EventImportListResponse,
+  EventAnalyzeResponse, EventCsvMappingSubmission, EventImportDetail, EventImportListResponse,
   EventImportRejected, EventImportResponse,
 } from './types';
 import type { LookaheadDeclarationPayload, LookaheadDeclarationPreview } from './lookaheadDeclaration';
@@ -1127,7 +1127,11 @@ export async function analyzeEventImport(
   return response.json();
 }
 
-export async function getEventImport(importId: string): Promise<{ summary: EventImportListResponse['imports'][number]; records: Record<string, unknown>[] }> {
+/**
+ * 事件批 detail。🔴 Task 7.6 起另含 `batch_facts`／`declaration_seeds`／`batch_fact_notes`
+ * ——型別由 `EventImportDetail` 承載，不再就地寫 inline 形狀（inline 形狀不會有人同步）。
+ */
+export async function getEventImport(importId: string): Promise<EventImportDetail> {
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/events/${encodeURIComponent(importId)}`);
   if (!response.ok) await parseRejected(response);
   return response.json();

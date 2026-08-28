@@ -17,6 +17,8 @@ import { columnValues, countDeclaredLabels, parseCsvText, type ParsedCsv } from 
 import { computeExportCounts } from '@/lib/exportCounts';
 import { scanBinaryColumns } from '@/lib/suspiciousBinaryColumns';
 import { inspectEventIdNormalization } from '@/lib/eventIdNormalization';
+import EventDimensionFields, { type EventDimensionValues } from '@/components/case/EventDimensionFields';
+import { dimensionBatchDefaults, dimensionDefaultConflicts } from '@/lib/eventDimensions';
 import type { EventImportRejected, EventImportResponse } from '@/lib/types';
 
 /**
@@ -76,6 +78,14 @@ export default function EventCsvMappingForm({ onImported }: Props) {
   const [preview, setPreview] = useState<LookaheadDeclarationPreview | null>(null);
   const [declared, setDeclared] = useState<Record<string, number>>({});
   const [acknowledged, setAcknowledged] = useState(false);
+  /**
+   * GAP-3 UX Task 7.1：五個批次維度之下拉。
+   * 🔴 初始值一律**未選**（A-4′）：本頁之 `scenario`／`control_kind` 也可以由 CSV 欄對映，
+   *    帶預設值會靜默蓋掉對映；未選＝不寫該鍵 ⇒ 既有匯入流程逐位元不變。
+   */
+  const [dims, setDims] = useState<EventDimensionValues>({
+    scenario: '', control_kind: '', entry_price_semantic: '', label_return_mode: '', decision_offset_bars: '',
+  });
 
   const columnIndexOf = (field: string): number => {
     const raw = mapping[field];
@@ -107,6 +117,17 @@ export default function EventCsvMappingForm({ onImported }: Props) {
       return { ok: false, value: null };
     }
   }, [defaultsText]);
+
+  /**
+   * 送給後端之批次預設 ＝「JSON 文字框」∪「Task 7.1 之五維度下拉（已選者）」。
+   * 🔴 兩者同時給同一欄時**不合併也不擇一**，由 `submitProblems()` 阻擋（見 `dimensionDefaultConflicts`）。
+   */
+  const effectiveDefaults = useMemo((): Record<string, unknown> | null => {
+    if (!parsedDefaults.ok) return null;
+    const merged = dimensionBatchDefaults(dims, parsedDefaults.value ?? undefined);
+    return Object.keys(merged).length > 0 ? merged : null;
+  }, [parsedDefaults, dims]);
+  const dimsKey = JSON.stringify(dims);
 
   const labelColumnName = columnNameOf('label');
   /**
@@ -158,10 +179,10 @@ export default function EventCsvMappingForm({ onImported }: Props) {
     //    確認之前就把檔案 POST 出去；而測試把該 helper mock 掉，完全看不到那次網路動作（假綠）。
     // 答案窗預設值須帶著對映一起問，否則後端看不到 label_definition（含 filters）。
     const ready = file !== null && parsedDefaults.ok && confirmed
-      && PREVIEW_REQUIRED_FIELDS.every((f) => columnMapping[f] !== undefined || parsedDefaults.value?.[f] !== undefined);
+      && PREVIEW_REQUIRED_FIELDS.every((f) => columnMapping[f] !== undefined || effectiveDefaults?.[f] !== undefined);
     if (!ready || file === null) { setPreview(null); return; }
     let cancelled = false;
-    fetchLookaheadDeclarationPreview(file, { columnMapping, batchDefaults: parsedDefaults.value })
+    fetchLookaheadDeclarationPreview(file, { columnMapping, batchDefaults: effectiveDefaults })
       .then((p) => {
         if (cancelled) return;
         setPreview(p);
@@ -173,7 +194,7 @@ export default function EventCsvMappingForm({ onImported }: Props) {
       });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file, mappingKey, defaultsText, confirmed]);
+  }, [file, mappingKey, defaultsText, dimsKey, confirmed]);
 
   const handleFileChange = async (next: File | null) => {
     setFile(next);
@@ -211,7 +232,8 @@ export default function EventCsvMappingForm({ onImported }: Props) {
       out.push(`有 ${parsed.raggedRows.length} 列的欄數與標頭（${parsed.columns.length} 欄）不同：`
         + `${head.join('、')}。欄數不齊會讓後端整批拒收，也會讓上面的筆數不可信，請先修正 CSV`);
     }
-    if (columnMapping.label === undefined && parsedDefaults.value?.label === undefined) {
+    out.push(...dimensionDefaultConflicts(dims, parsedDefaults.value ?? undefined, Object.keys(columnMapping)));
+    if (columnMapping.label === undefined && effectiveDefaults?.label === undefined) {
       out.push('尚未指定哪一個 CSV 欄是你標好的正反例（label）——平台不猜');
     }
     for (const field of MAPPABLE_CONTRACT_FIELDS) {
@@ -242,7 +264,7 @@ export default function EventCsvMappingForm({ onImported }: Props) {
         file,
         {
           columnMapping,
-          batchDefaults: parsedDefaults.value,
+          batchDefaults: effectiveDefaults,
           // 勾選當下之時間；理論上不會是 null（`confirmed` 為真才走到這裡），保底用送出時間。
           confirmedAt: confirmedAt ?? new Date().toISOString(),
           validateOnly,
@@ -394,6 +416,19 @@ export default function EventCsvMappingForm({ onImported }: Props) {
               </label>
             </div>
           )}
+
+          {/* ── GAP-3 UX Task 7.1：五個批次維度（本路徑之 selectable 由同一常數導出）────
+              🔴 CSV 匯入路徑之 `scenario` **四值全開**（label 由使用者自帶，系統只照抄）
+                 ⇒ `/search` 之限制是**路徑級**的，不是把系統寫死於單一 scenario。 */}
+          <div className="rounded border border-slate-800 bg-slate-900/40 p-3" data-testid="csv-event-dimensions">
+            <p className="mb-2 text-sm text-slate-200">
+              這批的五個設定
+              <span className="ml-2 text-[11px] text-slate-400">
+                不選就不寫該鍵（可以改用下方 JSON 或 CSV 欄對映提供；兩邊都給會擋下來）
+              </span>
+            </p>
+            <EventDimensionFields path="/data-preparation" values={dims} onChange={setDims} allowUnset />
+          </div>
 
           <label className="block text-sm text-slate-200">
             <span className="block mb-1">批次預設（JSON 物件；補齊沒對映到的契約欄）</span>
