@@ -26,8 +26,54 @@ cd frontend && npm run dev
 
 瀏覽器開 `http://localhost:3000`。
 
-**要準備的東西**：一份你自己標好正反例的 CSV（B6 會用到）。沒有也可以——B1–B5 會產生一份，
-你把它轉成 CSV 就能用。
+---
+
+## 🔴 樣本檔已經幫你準備好了（不必自己生）
+
+四個檔在 **`uat_samples/`**，內容**全部由真實 K 線導出**（`data_cache/feature_klines/kline_cache.h5`），
+沒有一個數字是編的：
+
+| 檔 | 是什麼 | 哪幾項會用到 |
+|---|---|---|
+| `events_ok.json` | 60 筆 ETHUSDT 12h 事件（正例 25／反例 35），**全在 2024-07 之後** | B7、B8、B13–B18 |
+| `events_mixed_control_kind.json` | 同上，但**故意混兩種 `control_kind`** | **B16**（讓「全體組算不出來」看得到） |
+| `events_mapping.csv` | 欄名**故意不是**契約欄名（`幣種`／`週期`／`進場時間_毫秒`／`我的標記`／`當根收盤`） | **B9**（練逐欄對映） |
+| `events_legacy_3col.csv` | 舊三欄格式（`symbol`／`timestamp`／`Positive_case`） | **B11**（驗舊格式擋得住） |
+
+**`label` 是怎麼來的**：往後第 3 根 K 線的收盤比這一根高 ⇒ 1，否則 0。
+規則寫在 JSON 的 `_label_rule` 欄裡，你可以自己用 Excel 對。
+🔴 這是**我幫你聲明的**，不是系統判斷的——系統從來不替你決定哪些是正例。
+
+**要重新產生**（例如你想改時間範圍或筆數）：
+```bash
+venv/bin/python scripts/gen_uat_samples.py          # 重產
+venv/bin/python scripts/gen_uat_samples.py --check  # 只檢查現有樣本還過不過契約
+```
+
+**我已經實際打過端點驗證**（不是只跑 validator）：
+`events_ok.json` 與 `events_mixed_control_kind.json` 都是 **HTTP 200、60/60 通過**；
+`events_mapping.csv` 用上面那組對映 **60/60 通過**；
+`events_legacy_3col.csv` 被 **HTTP 400 `legacy_schema_detected`** 擋下並附搬遷提示。
+所以你照著做**應該會成功**——不成功就是真的有問題，記下來告訴我。
+
+---
+
+## 🔴 你的 Feature run 現況（會影響 B18／B19）
+
+我清掉了 registry 裡 7 筆**指向已不存在檔案**的死條目（19 → 12 筆，備份在
+`data_cache/features/registry.json.bak-*`）。現在選單裡每一筆都真的有檔：
+
+| 特徵數 | Symbol/TF | config_hash 前 8 碼 | 涵蓋期 | 拿來做什麼 |
+|---|---|---|---|---|
+| **15** | ETHUSDT 12h | `abc9b9fe` | 2024-01-01 → **2026-04-27** | ✅ **跑分析用這個**（B13–B17） |
+| **15** | ETHUSDT 12h | `be993398` | 2024-01-01 → **2024-06-25** | ✅ **B18 的「應該被擋」那側** |
+| 15 | ETHUSDT 12h | `1ab3fe2f` | 2024-05-01 → 2026-04-27 | 備用 |
+| 161k／218k／437k | BTC・ETH・BCH | — | — | ⛔ 超過上限 80,515 ⇒ **B19 的樣本** |
+
+🔴 **誠實邊界**：能跑分析的只有 **15 個特徵**的那三個 run。
+**驗「跑不跑得起來、畫面顯不顯示」完全夠用**（這正是你這階段要的），
+但 IC 數字不會有統計意義——要有意義的數字，得另外跑一個特徵數 < 80,515 且涵蓋 2024-01～2026-04
+的 Feature Factory run，現在沒有這種 run。
 
 ---
 
@@ -151,12 +197,12 @@ lookahead 深度 / purge 下界。而且：
 
 ### B7 ── 用 JSON 匯入（先只驗證）
 
-**你做什麼**：開 `/data-preparation` → 「匯入事件（GAP-3 新契約）」→ 選 B5 下載的
-`gap3_events_*.json` → **勾「僅驗證不落檔」** → 送出。
+**你做什麼**：開 `/data-preparation` → 「匯入事件（GAP-3 新契約）」→ 選
+**`uat_samples/events_ok.json`**（或你在 B5 自己下載的那個）→ **勾「僅驗證不落檔」** → 送出。
 
-**應該看到**：「驗證通過 N 筆（未落檔）」。
+**應該看到**：「驗證通過 **60** 筆（未落檔）」。
 
-**故意弄錯**：把 JSON 裡某一筆的 `label` 改成 `2` 再上傳。
+**故意弄錯**：複製一份 `events_ok.json`，把裡面某一筆的 `label` 改成 `2` 再上傳。
 
 **應該看到**：**逐列的拒收原因表格**（哪一列、哪個欄位、什麼原因），**不是**空白畫面、
 **不是** 500 錯誤。
@@ -174,7 +220,33 @@ lookahead 深度 / purge 下界。而且：
 
 ### B9 ── 用 CSV 逐欄對映匯入（**新的**）
 
-**你做什麼**：用「CSV 欄名對映匯入」那一區，選一份你自己的 CSV。
+**你做什麼**：用「CSV 欄名對映匯入」那一區，選 **`uat_samples/events_mapping.csv`**。
+
+那個檔的欄名**故意不是**契約欄名，所以你會真的用到對映功能。這樣對：
+
+| 契約欄 | 選這個 CSV 欄 |
+|---|---|
+| `symbol` | `幣種` |
+| `timeframe` | `週期` |
+| `t0` | `進場時間_毫秒` |
+| `label` | `我的標記` |
+| （`當根收盤` 不用對映） | — 送出後會提示「未對映而忽略之 CSV 欄（1）」，那是正常的 |
+
+「批次預設（JSON 物件）」貼這一段（補齊 CSV 裡沒有的契約欄）：
+
+```json
+{"direction": "long", "scenario": "C", "entry_price_semantic": "trigger_close",
+ "control_kind": "user_labeled_same_trigger", "decision_offset_bars": 0,
+ "source_file_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+ "data_snapshot_digest": "uat-sample",
+ "label_definition": {"rule_id": "uat", "canonical_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                      "window": {"horizon_bars": 3}, "label_return_mode": "close_to_close"}}
+```
+
+⚠️ 上面那兩串 `aaa…`／`ccc…` 是**佔位用的假 digest**（契約只驗格式是 64 位十六進位）。
+真實流程請走 B5 的匯出，那條路的 digest 由後端算。
+
+🔴 **`scenario` 有兩個地方可以給**（下拉／這段 JSON）——**只給一個**，兩邊都給會被擋（見下方違規二）。
 
 **應該看到**（依序）：
 1. **前 5 列預覽** ＋ 全部欄名
@@ -217,11 +289,12 @@ Network 分頁看，應該一片空白）。
 
 ### B11 ── 舊格式擋得住
 
-**你做什麼**：拿一份舊的三欄 CSV（`symbol`／`timestamp`／`Positive_case`）丟進「匯入事件」。
+**你做什麼**：把 **`uat_samples/events_legacy_3col.csv`**（舊三欄格式）丟進「匯入事件」。
 
-**應該看到**：拒收，原因 `legacy_schema_detected`，**並附欄位對照的搬遷提示**。
+**應該看到**：拒收，原因 `legacy_schema_detected`，訊息說「不做靜默轉換」，
+**並附欄位對照的搬遷提示**（會列出缺哪些必填欄）。
 
-**反過來**：把 B5 的新 JSON 轉成 CSV 丟進舊的「導入案例」。
+**反過來**：把 `events_ok.json` 轉成 CSV 丟進舊的「導入案例」。
 
 **應該看到**：拒收，原因 `new_schema_on_legacy_endpoint`，訊息指向新端點。
 
@@ -281,8 +354,17 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 - `entry_price_semantic`／`label_return_mode`：只有一個值能選，其餘灰掉並寫理由
 - `decision_offset_bars`：唯讀鎖 0
 
-🔴 **`horizon_bars` 初始值必須是 1**。如果你匯入的那批 `label_definition.window.horizon_bars`
-是 3，這裡**還是要顯示 1**——那個 3 是「深度宣告」不是「答案窗」，兩件事不能混用。
+🔴 **`horizon_bars` 初始值必須是 1**。
+
+**這一項樣本剛好踩得到**：`events_ok.json` 裡每筆的
+`label_definition.window.horizon_bars` **就是 3**（樣本的 label 規則用第 3 根）。
+所以這裡如果顯示 **3**，代表它拿深度宣告去當答案窗了——**那是缺陷**。
+應該顯示 **1**：那個 3 是「這批事件的 label 最遠看到第幾根」（深度宣告），
+不是「這次分析要用多長的答案窗」，兩件事不能混用。
+
+**區塊一那五行應該顯示**（對照 `events_ok.json`）：
+`scenario ＝ C`／`control_kind ＝ user_labeled_same_trigger`／`direction ＝ long`／
+`t0：60 筆，最早 2024-07-01…最晚 2025-12-14…`／`label：正例 25 筆／反例 35 筆`。
 
 ---
 
@@ -312,7 +394,8 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 
 **檢查一件事**：正例組的 `n` ＋ 反例組的 `n`，應該等於全體組的 `n`。
 
-**如果你匯入的那批 `control_kind` 不只一種**（例如你手動混了兩種來源的反例）：
+**要看「算不出來」那條路**：另外匯入 **`uat_samples/events_mixed_control_kind.json`**
+（那份故意混了兩種 `control_kind`），選它再分析一次。
 
 **應該看到**：全體組**不給數字**，而是顯示 `not_computed：mixed_control_kind_in_batch`，
 滑上去會告訴你「平台不取多數決，要看全體組請把不同來源的反例分成不同批」。
@@ -340,14 +423,18 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 
 ### B18 ── 特徵 run 沒涵蓋事件期會被擋（**新的**）
 
-**你做什麼**：選一個**時間範圍明顯比事件期短**的特徵 run（例如事件在 2024 年，
-run 只涵蓋 2025 年），按開始分析。
+**你做什麼**（樣本事件全在 2024-07 之後，所以這兩個 run 剛好一擋一放）：
+
+**先試「應該被擋」那側**——選 ETHUSDT 12h、config_hash 開頭 **`be993398`** 的 run
+（它只涵蓋到 **2024-06-25**），按開始分析。
 
 **應該看到**：**被擋下來**，訊息說特徵 run 的時間範圍不涵蓋事件期。
 
-**反過來也要試**：選一個**確實涵蓋**事件期的 run。
+**再試「應該放行」那側**——改選 **`abc9b9fe`**（涵蓋到 2026-04-27），按開始分析。
 
 **應該看到**：**正常跑起來**。
+
+🔴 **兩個方向都要試**——只試前者的話，一個「永遠擋」的實作也會看起來正常。
 
 🔴 **兩個方向都要試**——只試前者的話，一個「永遠擋」的實作也會看起來正常。
 
@@ -355,7 +442,7 @@ run 只涵蓋 2025 年），按開始分析。
 
 ### B19 ── 特徵太多會在啟動前被擋（**新的**）
 
-**你做什麼**：如果你手上有超過 **80,515** 個特徵的 run，選它並按開始分析。
+**你做什麼**：選任何一個 **161k／218k／437k** 的 run（都超過上限 **80,515**），按開始分析。
 
 **應該看到**：**在任務啟動之前**就被擋下來，訊息會告訴你：
 這個 run 有幾個特徵、上限是多少、為什麼擋（記憶體會爆）、
@@ -363,7 +450,7 @@ run 只涵蓋 2025 年），按開始分析。
 
 🔴 **訊息不應該叫你「去縮減特徵數」**——系統沒有提供那個介面，那樣講等於指路到死巷。
 
-**沒有那麼大的 run 就跳過這項**，註明「無可用樣本」即可。
+**這一項你手上有現成樣本，不能跳過。**
 
 ---
 
