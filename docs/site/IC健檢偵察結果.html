@@ -323,6 +323,32 @@ R7 的「保守性驗證」部分收回成清單驗收項；R8 被抓出「不�
 <strong>2026-08-19 追記（前端占位）</strong>：需要前端但先不做的殘留（G1-R3／G1-R1／G2-R1／G2-R8／GAP-3 事件匯入 UI）已有側欄「前端待補完」占位頁 <code>/pending-features</code> 與原位置灰卡殼；registry 為權威、頁面由測試機檢一致。
 <strong>2026-08-21 追記（GAP-3 B5）</strong>：缺口票 #3 施工到第 5 批（API＋前端三頁落地、等三家審查＋使用者 UAT 簽字）；registry「GAP-3 殘留」新增 G3-R9（辨別表接真實分數：blocked-by ML 層）、G3-R10（大檔串流：user-ruling W10 記錄型）、G3-R11（<code>tests/api</code> 既有紅 7 條：blocked-by 非 GAP-3 模組）；<code>/pending-features</code> 之「GAP-3 開發前討論題」占位已改為 G3-R9／R10 真實殘留。</p>
 </blockquote>
+<hr />
+<h2 id="2026-08-31-新增兩條登記gap-3-驗收時抓到非偵察產物">2026-08-31 新增兩條登記（GAP-3 驗收時抓到，非偵察產物）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>代號</th>
+<th>是什麼</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>G3-D1</code></strong></td>
+<td><strong>缺陷</strong>：匯出前篩選只有一組條件、同時套用正例與反例。條件引用 <code>future_*</code> 欄時兩類<strong>同時</strong>被結果截斷 ⇒ 反例不再是對照組、報酬表三組皆正、條件 IC 建立在照結果挑過的樣本上</td>
+<td>修法方向使用者已裁（正反例獨立條件／深度直接問／purge 取大），<strong>排程未定</strong>；動 SPEC Task 2.1／2.1b／1.9 須走 <code>D-006</code></td>
+</tr>
+<tr>
+<td><strong><code>G3-D2</code></strong></td>
+<td><strong>交付未完成</strong>：<code>/search</code> 五維度中三類值永久灰著不算交付（<code>scenario</code> A／B／two_stage、<code>control_kind</code> 之 <code>platform_random_bars</code>、三元組其餘值與 <code>k&gt;0</code>）</td>
+<td>使用者裁定「不接受永久灰著」⇒ 驗收 B3 在三者完成前記未完成</td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>這兩條與本檔其餘內容的性質不同</strong>：其餘是<strong>偵察</strong>得到的缺口（做之前就知道要做），
+這兩條是<strong>驗收時實際操作才發現的</strong>——前者是規劃的產物，後者是「照著用才會撞到」的東西。
+全文見 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/IC健檢偵察結果.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

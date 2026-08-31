@@ -517,6 +517,30 @@
 <p><strong>2026-08-19 晚（第 1 版）</strong>：建檔。委員討論輪（Codex／Grok／我；Composer 被 Cursor 額度擋）收斂；你在彈窗揭露主要設想是 A／B 而非委員分析的 C。</p>
 </li>
 </ul>
+<hr />
+<h2 id="2026-08-31-驗收回饋兩件要改設計的事">2026-08-31 驗收回饋：兩件要改設計的事</h2>
+<p>你照驗收清單實際操作後提出的，兩件都已登記（<code>G3-D1</code>／<code>G3-D2</code>）。</p>
+<h3 id="一匯出前篩選要拆成正例反例兩組g3-d1">一、匯出前篩選要拆成正例／反例兩組（<code>G3-D1</code>）</h3>
+<p><strong>你的論點</strong>：反例的篩選方式和正例一定不一樣，這兩個是獨立系統，條件絕對不能共用。</p>
+<p><strong>查證後成立</strong>，而且比「不能共用」更嚴重：條件只要引用 <code>future_*</code> 欄，
+正反例會<strong>同時</strong>被結果截斷——反例不再是對照組，報酬表會三組都正、看起來「都贏」，
+條件 IC 也建立在照結果挑過的樣本上。畫面上沒有任何提示。</p>
+<p>而搜尋階段<strong>本來就是分開的</strong>（<code>search_task_service.py:184</code> 有 <code>negative_conditions</code>），
+是匯出前篩選把它們壓回同一組。</p>
+<p><strong>你裁定的修法</strong>：</p>
+<ol>
+<li>正例與反例各自獨立的篩選條件</li>
+<li>篩選<strong>不再兼差推導答案窗深度</strong>——改成直接問你「哪個 timeframe 的第幾根 bar 用來區分正反例」</li>
+<li>purge ＝ 正例深度與反例深度<strong>取大者</strong></li>
+</ol>
+<p>🔴 <strong>這個設計還解掉一個現行擋不住的洞</strong>：如果你在系統外標記（例如用 Excel 依未來報酬標），
+篩選面板裡什麼都沒有 ⇒ 現行推不出深度、<strong>purge 會是 0</strong>，而且沒有任何東西會喊。
+直接問就沒有這個破口。</p>
+<p>而且現行把深度推導綁在篩選上，等於<strong>逼你為了宣告深度而去篩未來欄</strong>——制度在鼓勵那個壞動作。</p>
+<h3 id="二灰色項目要真的做出來g3-d2">二、灰色項目要真的做出來（<code>G3-D2</code>）</h3>
+<p><strong>你的裁定</strong>：五個設定裡灰掉的三類值不接受永久灰著，要列入驗收。</p>
+<p>⇒ 驗收 B3 在三者全部交付前一律記未完成，「正確地灰掉並寫了理由」是這一批的交付，
+<strong>不是那一項的終點</strong>。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3事件型討論.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
