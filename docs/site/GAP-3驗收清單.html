@@ -11,8 +11,11 @@
 <main>
 <h1 id="gap-3-驗收清單-照著做就好">GAP-3 驗收清單 — 照著做就好</h1>
 <blockquote>
-<p><strong>這份是給你照著操作的。</strong> 每一項都有三欄：<strong>你做什麼</strong> → <strong>你應該看到什麼</strong> → <strong>如果不是這樣代表什麼</strong>。
-全部通過並簽字，GAP-3 才算收案（這是你自己定的規矩：未簽不收案）。</p>
+<p><strong>這份是給你照著操作的。</strong> 每一項都有三欄：<strong>你做什麼</strong> → <strong>你應該看到什麼</strong> → <strong>如果不是這樣代表什麼</strong>。</p>
+<p>🔴 <strong>2026-08-31 起，B3 必定不會過</strong>——你裁定灰色項目要真的做出來、不接受永久灰著。
+所以這份清單現在的用途是<strong>驗這一批做的東西對不對</strong>，
+<strong>不是</strong>「全部打勾就結案」。結案條件已改變，見下方兩處標紅的待辦
+（匯出前篩選之設計缺陷、五個設定之灰色項目）。</p>
 <p>🔴 <strong>這是重寫版（8/29）</strong>，不是 8/22 那份。舊版有兩項<strong>現在照做會失敗</strong>——
 不是程式壞了，是那兩件事被規格改掉了：</p>
 <ul>
@@ -138,51 +141,48 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 重新 <code>npm run dev</code>。</p>
 <hr />
 <h3 id="b2-匯出前篩選與筆數">B2 ── 匯出前篩選與筆數</h3>
-<h3 id="-先讀這兩件事不然你會踩到2026-08-31-使用者實測回報">🔴 先讀這兩件事，不然你會踩到（2026-08-31 使用者實測回報）</h3>
-<p><strong>一、數字填「小數」不是「百分比」。</strong>
-<code>price_change</code> 的實際算式是 <code>(close − open) / open</code>（<code>case_search_engine.py:1257</code>），
-<strong>沒有乘 100</strong>。所以：</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>你想篩</th>
-<th>要填</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>漲幅 ≥ 3%</td>
-<td><code>0.03</code>（<strong>不是</strong> <code>3</code>）</td>
-</tr>
-<tr>
-<td>未來 1 根報酬 ≥ 1%</td>
-<td><code>0.01</code></td>
-</tr>
-</tbody>
-</table></div>
-<p>⚠️ <strong>搜尋頁上方那個「價格變化」輸入框卻是百分比</strong>（填 3 代表 3%）。
-兩個框單位不同、畫面上沒提示——這是既有的介面陷阱，不是你操作錯。</p>
-<p><strong>二、篩選會同時砍掉正例和反例，而且很可能把反例砍光。</strong>
-篩選只做「留下哪幾列」，<strong>完全不看正反例標記</strong>（<code>exportFilter.ts:88-95</code>）。
-所以如果你用「漲幅」或「未來報酬」當條件——反例本來就是漲不上去的那些——<strong>反例會被整批砍掉</strong>，
-匯出檔只剩正例，匯入時會被契約以 <code>missing_control_group</code> 拒收（二元任務缺一個類別）。</p>
-<p>✅ <strong>正確用法＝限縮母體</strong>：成交量區間、波動度區間這類「跟答案無關」的欄。
-❌ <strong>錯誤用法＝拿答案來篩</strong>：<code>price_change</code>、<code>future_*bar_return</code>。</p>
-<p>🔴 <strong>怎麼自保</strong>：加條件時盯著上方那行 <code>你聲明的正例 X／反例 Y</code>，
-<strong>任何一邊掉到 0 或掉得很誇張，就是篩壞了</strong>。</p>
+<p><strong>數字填小數，不是百分比。</strong> 漲幅 3% 填 <code>0.03</code>。
+（<code>price_change = (close − open) / open</code>，沒有乘 100。⚠️ 搜尋頁上方那個「價格變化」框<strong>卻是百分比</strong>，
+兩個框單位不同、畫面沒提示——這是既有介面陷阱，已列入待修。）</p>
+<p>🔴 <strong>這一項驗收時，篩選條件只用 t0 當下就知道的欄</strong>（成交量、波動度、價格結構）。
+<strong>不要用 <code>future_*</code> 開頭的任何欄</strong>——原因與待修事項見本項最後一段。</p>
 <hr />
-<p><strong>你做什麼</strong>：在「匯出前篩選」按「新增條件」，挑一個<strong>跟答案無關</strong>的數值欄
+<p><strong>你做什麼</strong>：在「匯出前篩選」按「新增條件」，挑一個 t0 可觀測的數值欄
 （例如 <code>volume_multiplier</code>），門檻用小數。再按一次「新增條件」加第二條。</p>
 <p><strong>應該看到</strong>：</p>
 <ul>
 <li>每加一條，上方筆數即時變：<code>將匯出 N 筆（原 M 筆）／你聲明的正例 X／反例 Y</code></li>
-<li><strong><code>X + Y</code> 要等於 <code>N</code></strong>（如果有些列沒有正反例標記，會另外顯示「另有 Z 筆沒有標記」，
-而且會告訴你 CSV 仍然會含那幾筆、事件 JSON 不會）</li>
+<li><strong><code>X + Y</code> 要等於 <code>N</code></strong>（若有列沒有正反例標記，會另外顯示「另有 Z 筆沒有標記」，
+並告訴你 CSV 仍會含那幾筆、事件 JSON 不會）</li>
 <li>把條件全部刪掉 ⇒ <code>N</code> 回到 <code>M</code></li>
+<li>篩選<strong>只挑要匯出哪幾列，不改任何欄位的值</strong></li>
 </ul>
-<p><strong>不是這樣代表什麼</strong>：如果 <code>X + Y ≠ N</code> 而且沒有任何說明，那是計數錯誤，記下來告訴我。</p>
-<p>🔴 <strong>這一項要特別看</strong>：篩選面板<strong>只挑選要匯出哪幾列，不會改任何欄位的值</strong>。
-如果你看到某一欄的數字因為加了篩選而變了，那是嚴重缺陷。</p>
+<p><strong>不是這樣代表什麼</strong>：</p>
+<ul>
+<li><code>X + Y ≠ N</code> 且無說明 ⇒ 計數錯誤</li>
+<li>某欄的數字因為加了篩選而改變 ⇒ 嚴重缺陷</li>
+</ul>
+<hr />
+<h3 id="-本項已知的設計缺陷2026-08-31-使用者裁定驗收時避開不是驗它">🔴 本項已知的設計缺陷（2026-08-31 使用者裁定；<strong>驗收時避開，不是驗它</strong>）</h3>
+<p><strong>缺陷</strong>：匯出前篩選<strong>只有一組條件、同時套用在正例與反例上</strong>。
+搜尋階段本來就分開（<code>search_task_service.py:184</code> 有 <code>negative_conditions</code>），
+是匯出前篩選把它們壓回同一組。</p>
+<p><strong>後果</strong>：條件一旦引用 <code>future_*</code> 欄，正例與反例會<strong>同時</strong>被結果截斷
+——反例不再是對照組，三組報酬表會三組皆正，看起來「都贏」；
+條件 IC 也建立在被結果挑過的樣本上（range restriction ＋ collider bias，偏誤方向不可預測）。
+畫面上沒有任何提示。</p>
+<p><strong>已裁定的修法方向</strong>（使用者定）：</p>
+<ol>
+<li>正例與反例<strong>各自獨立</strong>的篩選條件，絕不共用</li>
+<li>匯出前篩選<strong>不再兼差推導答案窗深度</strong>；深度改為<strong>直接問使用者</strong>
+「哪個 timeframe 的第幾根 bar 用來區分正反例」</li>
+<li><strong>purge ＝ 正例深度與反例深度取大者</strong></li>
+</ol>
+<p><strong>為什麼直接問比推導好</strong>：現行由篩選條件反推深度（Task 2.1b），
+程式自己記著四種抽不出引用欄的失敗形態，抽不出來最後還是要問使用者；
+而且使用者若在系統外標記（例如用 Excel 依未來報酬標），篩選面板裡什麼都沒有
+⇒ <strong>推不出深度、purge 會是 0</strong>，沒有任何東西會喊。直接問沒有這個破口。</p>
+<p><strong>排程</strong>：見 <code>docs/IC_QUANT_GAP_REGISTRY.md</code> 之 GAP-3 缺陷登記。</p>
 <hr />
 <h3 id="b3-這批事件的五個設定新的">B3 ── 這批事件的五個設定（<strong>新的</strong>）</h3>
 <p><strong>你做什麼</strong>：找到「這批事件的五個設定」那一區，<strong>每一個下拉都點開看看</strong>。</p>
@@ -226,37 +226,40 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 <p><strong>應該看到</strong>：<strong>打不進去</strong>（唯讀）。</p>
 <p>🔴 <strong>不是這樣代表什麼</strong>：如果你真的把它改成 3 了，那就是三家審查員在 R3 抓到的那個缺陷復活了
 （我宣稱鎖死卻只加了提示屬性）。記下來告訴我。</p>
-<h3 id="這些灰色項目什麼時候才會開2026-08-31-補使用者問">這些灰色項目<strong>什麼時候才會開</strong>（2026-08-31 補；使用者問）</h3>
-<p>不是「還沒接線」，是<strong>接了也沒人能保證算得對</strong>。三種各有各的解鎖條件：</p>
+<h3 id="-灰色項目必須完成不接受永久灰著2026-08-31-使用者裁定">🔴 灰色項目<strong>必須完成，不接受永久灰著</strong>（2026-08-31 使用者裁定）</h3>
+<p>灰掉是<strong>現在</strong>的狀態，不是終局。以下三項全部要做出來，並列入本項驗收：</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>灰掉的</th>
-<th>解鎖要先有什麼</th>
-<th>排在哪</th>
+<th>要完成的</th>
+<th>完成的定義</th>
+<th>現在缺什麼</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>scenario</code> 的 <strong>A／B／two_stage</strong></td>
-<td>一套<strong>獨立的 label producer 與 provenance</strong>。這條路的 label 現在由 t0 條件產生（＝確認型「事情已經發生」）；A／B 是<strong>預測型</strong>，事件在未來，答案得另外算，而且要能追溯它怎麼來的</td>
-<td><strong>沒有排程</strong>。要先有「預測型事件」這個 epic，現在連票都還沒開</td>
+<td><code>scenario</code> 之 <strong>A／B／two_stage</strong></td>
+<td>三個值在 <code>/search</code> <strong>可選</strong>，選了之後匯出檔的 <code>label</code> 是<strong>該情境自己的 label producer</strong> 算出來的，且可追溯來源</td>
+<td>沒有預測型的 label producer 與 provenance。現行 label 一律來自 t0 條件（確認型）</td>
 </tr>
 <tr>
-<td><code>control_kind</code> 的 <strong>platform_random_bars</strong></td>
-<td>由<strong>契約</strong>恆拒（SPEC §N-7 解除前），不是路徑限制 ⇒ 它在<strong>每一頁</strong>都灰。要開得先改契約並定義「隨機對照組怎麼抽才不會偷看未來」</td>
-<td><strong>沒有排程</strong>，登記在 SPEC §N-7</td>
+<td><code>control_kind</code> 之 <strong>platform_random_bars</strong></td>
+<td>該值<strong>可選</strong>，且平台能自動抽出隨機對照組</td>
+<td>抽樣契約與 estimand <strong>未定義</strong>。委員會判定當時那版「時間分離隨機反例」是廢設計，禁隱式 fallback</td>
 </tr>
 <tr>
-<td><code>entry_price_semantic</code> 另外四值、<code>label_return_mode</code> 另外兩值、<code>k &gt; 0</code></td>
-<td><strong>逐組合的 exact golden</strong>（§G G-3 之 analysis-label golden 擴充）。現在只有 <code>(trigger_close, close_to_close, k=0)</code> 這一組被 golden 驗過</td>
-<td>這個<strong>最近</strong>：只要有人願意為某個組合建 golden 就能開，工作量是「一組一個 golden＋驗收」</td>
+<td><code>entry_price_semantic</code> 其餘四值、<code>label_return_mode</code> 其餘兩值、<code>decision_offset_bars &gt; 0</code></td>
+<td>該值<strong>可選</strong>且分析層算得出對應的 <code>label_value</code></td>
+<td>每個組合都要有自己的 exact golden，現在只有 <code>(trigger_close, close_to_close, k=0)</code> 那一組有</td>
 </tr>
 </tbody>
 </table></div>
-<p>🔴 <strong>為什麼寧可灰掉也不先開</strong>：沒有 golden 的組合一旦可選，你會拿到
-<strong>沒有任何 oracle 驗過的 <code>label_value</code></strong> 直接餵進條件 IC——數字會出來、看起來正常、但沒人知道對不對。
-規格把這條寫成 §F-2′：偏離支援矩陣就 fail-closed，寧可不給也不給錯的。</p>
+<p><strong>驗收怎麼算過</strong>：本項在三者<strong>全部可選且有各自的 golden／producer</strong> 之前，
+一律記為 <strong>未完成</strong>——即使畫面正確地把它們灰掉並寫了理由。
+「正確地灰掉」是這一批的交付，<strong>不是這一項的終點</strong>。</p>
+<p><strong>排程</strong>：三項的難度差很多——三元組最近（一組一個 golden 就能開）、
+<code>platform_random_bars</code> 要先有委員會定出抽樣契約、A／B 要一整個預測型事件的 epic。
+逐項登記在 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>。</p>
 <hr />
 <h3 id="b4-這批匯出實際會帶什麼七項新的">B4 ── 這批匯出實際會帶什麼（<strong>七項，新的</strong>）</h3>
 <p><strong>你做什麼</strong>：看「這批匯出實際會帶什麼（你沒選過但一直存在的設定）」那一區。</p>
@@ -564,7 +567,7 @@ Network 分頁看，應該一片空白）。</p>
 <tr>
 <td>B3 五個設定（含唯讀鎖）</td>
 <td>☐</td>
-<td></td>
+<td>🔴 <strong>本項現在必定未完成</strong>：三類灰色項目未交付（見 B3 內文），畫面正確不算過</td>
 </tr>
 <tr>
 <td>B4 七項揭露（含逐週期）</td>

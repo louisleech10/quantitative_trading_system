@@ -79,7 +79,20 @@ numba 快取（`**/__pycache__/*.py39.nbi`，跑過測試就髒）產生二進�
 - [x] ~~R3 三家 code review ＋ reconcile ＋ R4 閉合輪~~ ✅ **已收斂**
       （`handoffs/reconcile/20260828-gap3ux-b10-review-r{3,4}/synth.md`；兩輪 attribution／
       completeness 皆 rc=0、債皆已清）
-- [ ] 🔴 **收 epic 前之唯一阻塞**：使用者 **UAT B 段 13 項簽字**（未簽不收案）
+- [ ] 🔴 **UAT 進行中，已抓到兩件事，收案條件因此改變**（見 `docs/IC_QUANT_GAP_REGISTRY.md`
+      之 **`G3-D1`／`G3-D2`**；使用者照 `白話說明/GAP-3驗收清單.md` 走到 B5）
+  - **`G3-D1`（缺陷，方向已裁）**：匯出前篩選只有一組條件、同時套用正反例
+    ⇒ 條件引用 `future_*` 時兩類同時被結果截斷、反例不再是對照組，畫面無提示。
+    修法：①正反例各自獨立條件 ②篩選不再兼差推導深度、改直接問使用者
+    「哪個 timeframe 的第幾根」 ③purge ＝ 正反例深度取大者。
+    **動 SPEC Task 2.1／2.1b／1.9 ⇒ 須走延伸檔 `D-006`；排程未定**
+    （使用者尚未在「擋在收案前／另開票＋先止血／只止血」之間裁定）。
+  - **`G3-D2`（交付未完成）**：五維度中三類值永久灰著**不算交付**——使用者裁定要真的做出來。
+    ⇒ **UAT B3 在三者完成前一律記未完成**，畫面正確地灰掉不算過。
+  - 🔴 **已修並 push 之 UAT 缺陷**：兩階段搜尋之 `/two-stage/combined/{a}/{b}` 漏附
+    `source_file_digest`（Task 1.3 只掛在 `/search/task/{id}/result` 一條上）
+    ⇒ 使用者按匯出必然被前端 fail-closed 擋下。已補**機械閘**（AST 枚舉所有回傳
+    `SearchResponse` 之 GET route）；該閘第一版是子字串比對＝廉價綠燈，實測不紅，已改。
 - [ ] 本批**動過 `scripts/`**（`mutation_worktree.py`／`agent_postflight.sh`／新 `clean_agent_tmp.sh`）
       ⇒ 收 epic 前跑 `bash scripts/gov_check.sh --no-probe`（**丟背景**，十分鐘級）
 - [ ] repo 外之磁碟清理（我權限被擋，指令已給使用者）：`com.apple.wallpaper/aerials` 11G、
