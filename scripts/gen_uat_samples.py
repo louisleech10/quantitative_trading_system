@@ -129,6 +129,12 @@ def _write_json(path: Path, records: list, note: str) -> None:
             f"label = 1 若 close[t0 + {LABEL_H} 根] > close[t0]，否則 0。"
             f"時間與價格全部取自 {KLINE.relative_to(REPO)} 之真實 K 線，未造假。"
         ),
+        "_readme_numbers": (
+            f"🔴 **本樣本的數字不可作為結論**：label 就是用第 {LABEL_H} 根的報酬正負定義的，"
+            f"所以事件後報酬表在 h={LABEL_H} 那一列，正例組必然為正、反例組必然為負"
+            f"——那是定義出來的，不是發現（同義反覆）。有資訊的是 h≠{LABEL_H} 的列。"
+            f"本樣本的用途是驗『跑得動、畫面顯示對不對』，不是驗訊號。"
+        ),
         "records": records,
         "source_name": path.name,
     }

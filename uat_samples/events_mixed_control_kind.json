@@ -1,6 +1,7 @@
 {
   "_readme": "GAP-3 UAT 樣本：批內故意混兩種 control_kind。匯入並分析後，事件後報酬表之「全體組」應顯示 not_computed：mixed_control_kind_in_batch，而正例組與反例組仍正常顯示（驗收清單 B16）。",
   "_label_rule": "label = 1 若 close[t0 + 3 根] > close[t0]，否則 0。時間與價格全部取自 data_cache/feature_klines/kline_cache.h5 之真實 K 線，未造假。",
+  "_readme_numbers": "🔴 **本樣本的數字不可作為結論**：label 就是用第 3 根的報酬正負定義的，所以事件後報酬表在 h=3 那一列，正例組必然為正、反例組必然為負——那是定義出來的，不是發現（同義反覆）。有資訊的是 h≠3 的列。本樣本的用途是驗『跑得動、畫面顯示對不對』，不是驗訊號。",
   "records": [
     {
       "event_id": "ETHUSDT:12h:1719792000000",
