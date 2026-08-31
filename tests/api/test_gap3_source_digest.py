@@ -340,3 +340,114 @@ def test_gap3_source_digest_regenerates_frontend_golden():
     digests = [v["source_file_digest"] for v in out["variants"].values()]
     assert json.loads(GOLDEN.read_text(encoding="utf-8"))["variants"]["base"]["source_file_digest"] == digests[0]
     assert len(set(digests)) == len(digests), "五個 variant 之 digest 須兩兩相異"
+
+
+# ---------------------------------------------------------------------------
+def test_gap3_source_digest_present_on_live_http_route(monkeypatch):
+    """🔴 **走真的 HTTP route**，不是直呼 `_attach_canonical_source`。
+
+    為什麼補這條（2026-08-29 使用者 UAT B5 回報「匯出失敗：source_file_digest 必須由後端提供」）：
+    上一條測試只證明**那個函式**會算出 digest，**沒有證明 route 真的呼叫它**——
+    「宣告了不等於執行期有」是本 epic 反覆踩的同一個坑（交接 §6.2）。
+    route 若哪天把 `_attach_canonical_source(response.data)` 那行刪掉／搬到早退分支之後，
+    上一條照樣綠，而使用者按匯出必然失敗（前端 fail-closed，見 `eventExport.ts::requireBackendSource`）。
+
+    本條把 search service 換成回傳固定結果的替身 ⇒ 只測 route 之接線，不跑真實搜尋。
+    """
+    from fastapi.testclient import TestClient
+
+    from api.main import app
+    from api.models.responses import SearchResultData
+    from api.routes import case_search as route_mod
+
+    class _Info:
+        class _S:
+            value = "completed"
+        status = _S()
+
+    result = SearchResultData(
+        cases=_base_cases(),
+        summary={"total_cases": 2, "positive_cases": 1, "negative_cases": 1, "unique_symbols": 1,
+                 "time_range": {"start": "2024-01-01", "end": "2024-01-02"},
+                 "market_phase_distribution": {"bull": 1, "bear": 1}},
+        sampling_quality={"time_separation_score": 1.0, "symbol_diversity_score": 1.0,
+                          "market_phase_balance": 1.0, "overall_quality_score": 1.0},
+        execution_time=0.1,
+        cache_used=False,
+    )
+    monkeypatch.setattr(route_mod.search_service, "get_task_status", lambda _t: _Info(), raising=False)
+    monkeypatch.setattr(route_mod.search_service, "get_task_result", lambda _t: result, raising=False)
+
+    body = TestClient(app).get("/api/v1/search/task/probe-task/result").json()
+    data = body["data"]
+    # 🔴 斷言的是**回應 JSON**（response_model 過濾之後），不是 python 物件——
+    #    模型沒宣告該欄時會被靜默濾掉（§4.2 假綠形態 5），那種漏法只有讀 JSON 才看得到。
+    assert isinstance(data.get("source_file_text"), str) and data["source_file_text"] != ""
+    digest = data.get("source_file_digest")
+    assert isinstance(digest, str) and len(digest) == 64
+    # 前端之 fail-closed 判準逐字相同（`eventExport.ts::requireBackendSource` 的正則）
+    assert all(ch in "0123456789abcdef" for ch in digest)
+    assert hashlib.sha256(data["source_file_text"].encode("utf-8")).hexdigest() == digest
+
+
+# ---------------------------------------------------------------------------
+def test_gap3_source_digest_every_search_result_route_attaches_digest():
+    """🔴 **機械枚舉**：所有回傳 `SearchResultData` 給匯出流程的 route，都必須帶兩鍵。
+
+    出生事故（2026-08-31 使用者 UAT B5）：Task 1.3 只把 `_attach_canonical_source`
+    掛在 `/search/task/{id}/result` 一條上，而前端**兩階段搜尋**走的是
+    `/two-stage/combined/{pos}/{neg}` ⇒ 那條回應缺兩鍵，使用者按匯出必然被前端
+    fail-closed 擋下。**後端有實作、前端有守衛，中間沒接上。**
+
+    🔴 判準刻意是**從 app 之 route 表導出**，不是人工列舉兩條路徑——
+    人工清單的下場就是這次：新增 route 的人不會回來加一行。
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from api.main import app
+    from api.models.responses import SearchResponse
+
+    def _calls_attach(src: str) -> bool:
+        """🔴 判準是 **AST 上真的有一個呼叫節點**，不是原始碼含該字串。
+
+        第一版寫成子字串比對，結果 `from .case_search import _attach_canonical_source`
+        這一行就足以讓它通過——把呼叫刪掉、只留 import，閘照樣綠（實測）。
+        那正是本 epic 反覆記名之「廉價綠燈」。
+        """
+        tree = ast.parse(textwrap.dedent(src))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            name = fn.id if isinstance(fn, ast.Name) else getattr(fn, "attr", None)
+            if name == "_attach_canonical_source":
+                return True
+        return False
+
+    def _returns_result(src: str) -> bool:
+        return "SearchResponse(" in src
+
+    offenders = []
+    for route in app.routes:
+        endpoint = getattr(route, "endpoint", None)
+        if endpoint is None or getattr(route, "response_model", None) is not SearchResponse:
+            continue
+        if "GET" not in (getattr(route, "methods", None) or set()):
+            continue
+        src = inspect.getsource(endpoint)
+        if _returns_result(src) and not _calls_attach(src):
+            offenders.append(getattr(route, "path", str(route)))
+
+    # 正向對照：真的有掃到 route（全部被過濾掉時 `offenders == []` 會空洞地通過）
+    assert any(
+        getattr(r, "response_model", None) is SearchResponse
+        and "GET" in (getattr(r, "methods", None) or set())
+        for r in app.routes
+    ), "沒有掃到任何回傳 SearchResponse 之 GET route——過濾條件寫壞了"
+
+    assert offenders == [], (
+        "下列 route 回傳 SearchResultData 但沒有附 source_file_digest ⇒ "
+        f"使用者在該路徑按匯出必然失敗：{offenders}"
+    )

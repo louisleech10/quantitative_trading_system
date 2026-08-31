@@ -39,6 +39,15 @@ def _attach_canonical_source(data) -> None:
     `source_file_text`／`source_file_digest`（SPEC Task 1.3「承載（R13 定案）」）。
     🔴 序列化唯一實作＝§G S-9 參考實作（經 `momentum.factories` 出口取得；R3），
     前端**不得**自算 digest。
+
+    🔴 **凡是回傳 `SearchResultData` 給匯出流程的 route，都必須呼叫本函式**
+    （2026-08-31 使用者 UAT B5 實測踩到）：原本只掛在
+    `/search/task/{id}/result` 一條上，而前端**兩階段搜尋**走的是
+    `/two-stage/combined/{pos}/{neg}` —— 那條沒掛 ⇒ 回應缺兩鍵 ⇒ 使用者按匯出必然看到
+    「source_file_digest 必須由後端提供」。**後端有實作、前端有守衛，中間沒接上**
+    （「兩端有但沒連＝靜默失效」之同型；本 epic 記名第 N 次）。
+    ⇒ 新增回傳該型別之 route 時**一併呼叫**；`tests/api/test_gap3_source_digest.py` 之
+    `..._every_search_result_route_attaches_digest` 會機械枚舉所有這類 route 並要求全數帶兩鍵。
     """
     from momentum.factories import create_event_sample_pipeline  # R3：唯一出口
 

@@ -138,8 +138,41 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 重新 <code>npm run dev</code>。</p>
 <hr />
 <h3 id="b2-匯出前篩選與筆數">B2 ── 匯出前篩選與筆數</h3>
-<p><strong>你做什麼</strong>：在「匯出前篩選」按「新增條件」，挑一個數值欄（例如 <code>price_change</code>），
-設一個門檻。再按一次「新增條件」加第二條。</p>
+<h3 id="-先讀這兩件事不然你會踩到2026-08-31-使用者實測回報">🔴 先讀這兩件事，不然你會踩到（2026-08-31 使用者實測回報）</h3>
+<p><strong>一、數字填「小數」不是「百分比」。</strong>
+<code>price_change</code> 的實際算式是 <code>(close − open) / open</code>（<code>case_search_engine.py:1257</code>），
+<strong>沒有乘 100</strong>。所以：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>你想篩</th>
+<th>要填</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>漲幅 ≥ 3%</td>
+<td><code>0.03</code>（<strong>不是</strong> <code>3</code>）</td>
+</tr>
+<tr>
+<td>未來 1 根報酬 ≥ 1%</td>
+<td><code>0.01</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>⚠️ <strong>搜尋頁上方那個「價格變化」輸入框卻是百分比</strong>（填 3 代表 3%）。
+兩個框單位不同、畫面上沒提示——這是既有的介面陷阱，不是你操作錯。</p>
+<p><strong>二、篩選會同時砍掉正例和反例，而且很可能把反例砍光。</strong>
+篩選只做「留下哪幾列」，<strong>完全不看正反例標記</strong>（<code>exportFilter.ts:88-95</code>）。
+所以如果你用「漲幅」或「未來報酬」當條件——反例本來就是漲不上去的那些——<strong>反例會被整批砍掉</strong>，
+匯出檔只剩正例，匯入時會被契約以 <code>missing_control_group</code> 拒收（二元任務缺一個類別）。</p>
+<p>✅ <strong>正確用法＝限縮母體</strong>：成交量區間、波動度區間這類「跟答案無關」的欄。
+❌ <strong>錯誤用法＝拿答案來篩</strong>：<code>price_change</code>、<code>future_*bar_return</code>。</p>
+<p>🔴 <strong>怎麼自保</strong>：加條件時盯著上方那行 <code>你聲明的正例 X／反例 Y</code>，
+<strong>任何一邊掉到 0 或掉得很誇張，就是篩壞了</strong>。</p>
+<hr />
+<p><strong>你做什麼</strong>：在「匯出前篩選」按「新增條件」，挑一個<strong>跟答案無關</strong>的數值欄
+（例如 <code>volume_multiplier</code>），門檻用小數。再按一次「新增條件」加第二條。</p>
 <p><strong>應該看到</strong>：</p>
 <ul>
 <li>每加一條，上方筆數即時變：<code>將匯出 N 筆（原 M 筆）／你聲明的正例 X／反例 Y</code></li>
@@ -193,6 +226,37 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 <p><strong>應該看到</strong>：<strong>打不進去</strong>（唯讀）。</p>
 <p>🔴 <strong>不是這樣代表什麼</strong>：如果你真的把它改成 3 了，那就是三家審查員在 R3 抓到的那個缺陷復活了
 （我宣稱鎖死卻只加了提示屬性）。記下來告訴我。</p>
+<h3 id="這些灰色項目什麼時候才會開2026-08-31-補使用者問">這些灰色項目<strong>什麼時候才會開</strong>（2026-08-31 補；使用者問）</h3>
+<p>不是「還沒接線」，是<strong>接了也沒人能保證算得對</strong>。三種各有各的解鎖條件：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>灰掉的</th>
+<th>解鎖要先有什麼</th>
+<th>排在哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scenario</code> 的 <strong>A／B／two_stage</strong></td>
+<td>一套<strong>獨立的 label producer 與 provenance</strong>。這條路的 label 現在由 t0 條件產生（＝確認型「事情已經發生」）；A／B 是<strong>預測型</strong>，事件在未來，答案得另外算，而且要能追溯它怎麼來的</td>
+<td><strong>沒有排程</strong>。要先有「預測型事件」這個 epic，現在連票都還沒開</td>
+</tr>
+<tr>
+<td><code>control_kind</code> 的 <strong>platform_random_bars</strong></td>
+<td>由<strong>契約</strong>恆拒（SPEC §N-7 解除前），不是路徑限制 ⇒ 它在<strong>每一頁</strong>都灰。要開得先改契約並定義「隨機對照組怎麼抽才不會偷看未來」</td>
+<td><strong>沒有排程</strong>，登記在 SPEC §N-7</td>
+</tr>
+<tr>
+<td><code>entry_price_semantic</code> 另外四值、<code>label_return_mode</code> 另外兩值、<code>k &gt; 0</code></td>
+<td><strong>逐組合的 exact golden</strong>（§G G-3 之 analysis-label golden 擴充）。現在只有 <code>(trigger_close, close_to_close, k=0)</code> 這一組被 golden 驗過</td>
+<td>這個<strong>最近</strong>：只要有人願意為某個組合建 golden 就能開，工作量是「一組一個 golden＋驗收」</td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>為什麼寧可灰掉也不先開</strong>：沒有 golden 的組合一旦可選，你會拿到
+<strong>沒有任何 oracle 驗過的 <code>label_value</code></strong> 直接餵進條件 IC——數字會出來、看起來正常、但沒人知道對不對。
+規格把這條寫成 §F-2′：偏離支援矩陣就 fail-closed，寧可不給也不給錯的。</p>
 <hr />
 <h3 id="b4-這批匯出實際會帶什麼七項新的">B4 ── 這批匯出實際會帶什麼（<strong>七項，新的</strong>）</h3>
 <p><strong>你做什麼</strong>：看「這批匯出實際會帶什麼（你沒選過但一直存在的設定）」那一區。</p>
@@ -256,6 +320,23 @@ lookahead 深度 / purge 下界。而且：</p>
 這樣同一批事件可以用不同的答案窗重複分析，不必重新匯出。</p>
 <p><strong>如果你沒設任何篩選條件</strong>：按下去應該會<strong>被擋住</strong>並跳訊息說深度還沒取得——
 等一兩秒再按就會成功。那是刻意的：拿不到深度就不讓你匯出。</p>
+<h3 id="-2026-08-31-你在這一項抓到一個真缺陷已修">🔴 2026-08-31 你在這一項抓到一個真缺陷（已修）</h3>
+<p>你看到的錯誤：</p>
+<blockquote>
+<p>匯出失敗：source_file_digest 必須由後端提供…前端不得自算。請重新執行搜尋以取得帶 digest 的結果。</p>
+</blockquote>
+<p><strong>不是你的操作問題，也不是後端沒重啟。</strong> 從你的 log 查出來的：</p>
+<p>後端算 digest 的那一步（Task 1.3）<strong>只掛在 <code>/search/task/{id}/result</code> 一條路上</strong>，
+而你用的是<strong>兩階段搜尋</strong>，前端走的是另一條
+<code>GET /api/v1/two-stage/combined/{正例任務}/{反例任務}</code>——<strong>那條沒掛</strong>。
+⇒ 回應少了兩個鍵 ⇒ 前端的 fail-closed 守衛正確地擋下來。</p>
+<p><strong>「後端有實作、前端有守衛，中間沒接上」</strong>——這是本 epic 記名過的同型缺陷，
+而我先前補的那條測試只驗了<strong>一條</strong> route，剛好驗到有掛的那條。</p>
+<p><strong>修法兩件</strong>：①兩階段那條也呼叫<strong>同一個實作</strong>（不另寫一份）；
+②加一道<strong>機械閘</strong>：從 app 的 route 表<strong>枚舉</strong>所有回傳搜尋結果的 GET route，
+逐條要求真的呼叫過那個函式——用 AST 找<strong>呼叫節點</strong>，不是找字串
+（我第一版寫成找字串，結果只留 <code>import</code> 就能矇混過關，實測不紅，已改）。</p>
+<p><strong>你要做的</strong>：重啟後端、重整頁面、重跑搜尋，再按一次匯出。這次應該會下載兩個檔。</p>
 <hr />
 <h3 id="b6-ic-decay-的邊界說明">B6 ── IC decay 的邊界說明</h3>
 <p><strong>你做什麼</strong>：看匯出面板最底下那段黃字。</p>

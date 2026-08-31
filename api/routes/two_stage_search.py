@@ -398,7 +398,16 @@ async def get_combined_results(positive_task_id: str, negative_task_id: str):
         if not combined_results:
             logger.warning(f"combined_results evaluated as falsy, raising 404")
             raise HTTPException(status_code=404, detail="No results found")
-        
+
+        # 🔴 GAP-3 UX Task 1.3：本 route 亦回傳 `SearchResultData` 給 `/search` 之匯出流程，
+        #    故**同樣**要帶 `source_file_text`／`source_file_digest`。
+        #    原本只有 `/search/task/{id}/result` 掛了這一步，而前端兩階段搜尋走的是**本條**
+        #    ⇒ 使用者按「匯出事件契約 JSON」必然被前端 fail-closed 擋下
+        #    （`eventExport.ts::requireBackendSource`）。2026-08-31 UAT B5 實測踩到。
+        #    🔴 呼叫的是 `case_search` 之**同一個實作**，不在此另寫一份（第二份必漂移）。
+        from .case_search import _attach_canonical_source
+
+        _attach_canonical_source(combined_results)
         return SearchResponse(success=True, data=combined_results)
         
     except HTTPException:
