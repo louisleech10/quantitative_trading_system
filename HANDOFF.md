@@ -1,34 +1,33 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-01｜狀態：GAP-3 UAT 進行中（使用者驗到 B12），程式面 42 Task 全數落地**
+**更新：2026-09-02｜狀態：GAP-3 UAT 進行中（使用者驗到 B12），程式面 42 Task 全數落地**
 
-## 現在的阻塞＝使用者驗收，不是實作
-- B1–B12 使用者已走過並在 `白話說明/GAP-3驗收清單.md` 標記；**下一步是 B13–B20**。
-- 收 epic 之條件已改變（見下方 D 票），**不是「簽字即收案」**。
+## 現在的阻塞＝使用者驗收 ＋ 兩張已裁定未動工的票
+- B1–B12 已走過；**B2 現已作廢不必驗**（見 `G3-D1`）。下一步＝ B13–B20。
+- 收 epic 之條件已改變，**不是「簽字即收案」**。
 
-## 驗收抓到的票（唯一權威＝`docs/IC_QUANT_GAP_REGISTRY.md`）
+## 票（唯一權威＝`docs/IC_QUANT_GAP_REGISTRY.md`）
 | 票 | 狀態 |
 |---|---|
-| `G3-D1` 匯出前篩選正反例共用一組條件 | **OPEN**。修法方向使用者已裁（正反例獨立條件／深度改直接問使用者／purge 取大者）；動 SPEC Task 2.1／2.1b／1.9 須開延伸檔 `D-006`。**排程待使用者裁定**：擋在結案前／另開票＋先止血／只止血 |
-| `G3-D2` 五維度三類值永久灰著 | **OPEN**。使用者裁定不接受永久灰著 ⇒ UAT B3 在三者全交付前一律記未完成 |
-| `G3-D3` 匯出 CSV 無法回灌 | CLOSED（本批） |
-| `G3-D4` 後端 dotted 還原漏 `lookahead_bars_declared` | CLOSED（本批；mutation 已驗可證偽） |
-| `G3-D5` 答案窗預填一個驗證自己會拒的 0 | CLOSED（本批） |
+| `G3-D1` | **OPEN・已改判**（2026-09-02）：不是改成兩組條件，而是**整區移除匯出前篩選**。理由＝CSV 已可回灌、深度改為匯入時直接問。動已凍結 SPEC Task 2.1／2.1b／2.2／2.3／1.9 ⇒ **須開延伸檔 `D-006`（未開工）** |
+| `G3-D2` | **OPEN**：五維度三類值不接受永久灰著；UAT B3 在三者全交付前記未完成 |
+| `KLINE-1` | **OPEN（新）**：批量 K 線下載拆獨立版面。🔴 實測發現 K 線下載有**兩條獨立鏈**——`batch_download_service`→`data_cache/`（849KB）與 `feature_kline_service`→`data_cache/feature_klines/`（9.9MB, 2026-04-28），互不共用。真正的題目是「要不要合成一條」 |
+| `G3-D3`…`D9` | CLOSED（D3/D4/D5 於 9/1；D6/D7/D8/D9 於 9/2） |
 
-## 本批（commit：feat(gap3) 契約 CSV）做了什麼
-- `/search`「導出CSV檔案（可回灌）」改契約欄名 CSV：新 `frontend/src/lib/eventContractCsv.ts`、
-  `eventExport.ts` 加 `includeUnlabeled`；零對映可直接上傳。
-- 後端 `_nested_fields()` 改**從契約導出**（原手寫清單漏欄）。
-- 答案窗宣告在「檔內無可解析未來欄」時留空、改寫提示。
-- `gen_uat_samples.py` 加第五個樣本 `uat_samples/events_contract.csv`，且**產出前讓後端自己收一次**。
-- B12 turbopack 已修並**用 `npm run dev` 實跑驗過**（`/ic-analysis` 200）。
+## 9/2 這批做了什麼
+- **票號不入使用者可見層**：檔名 `events_*`、UI 與後端訊息去票號；新增機械閘 `noTicketIdInUi.test.ts`。
+  連帶修掉一條 `toContain('GAP-6')` 假斷言（釘死錯的性質，同 R3 `readOnly` 那型）。
+- **`meta.` 改補集**（原手寫 24 欄白名單漏 drawdown）——與 9/1 的 `G3-D4` 同型重犯。
+- **契約 CSV 走錯區**於選檔當下攔下；前後端判準逐字對證。
+- **`[object Object]`**：新增 `lib/httpError.ts`，31 個呼叫點全改。
 
 ## 已知紅／不要誤判
-- `tests/api` 既有紅 4 條（batch_alias／ichc_event_timestamps／progress_rss_fields×2）。
-  後兩條**只在整包跑時紅、單跑 7 passed**＝event-loop 污染，已用 `--ignore` 排除法確認與本批無關（`G3-R11`）。
-- `tsc --noEmit` 8 行既有債（FactorReturnChart.test／useFeatureFactory.batchDate.test），非本批。
+- `tests/api` 既有紅 4 條（batch_alias／ichc_event_timestamps／progress_rss_fields×2；
+  後兩條只在整包跑時紅、單跑 7 passed＝event-loop 污染，見 `G3-R11`）。
+- `tsc --noEmit` 8 行既有債（FactorReturnChart.test／useFeatureFactory.batchDate.test）。
 
 ## 下一步（依序）
-1. 等使用者驗 B13–B20 的回報。
-2. 使用者裁定 `G3-D1` 排程後，開 `D-006` 走完整管線（SPEC 延伸＋TODO＋三家 adversarial）。
-3. `G3-D2` (c) 最近可做：逐組合 exact golden（§G G-3 擴充）。
+1. 等使用者驗 B13–B20。
+2. 開 `D-006`（移除匯出前篩選）走完整管線：Claude 起草 SPEC 延伸＋TODO → 三家 adversarial。
+   逐項判定 `export-count-*` 與下界守衛去留（匯出仍需 `lookahead_bars_declared`）。
+3. `KLINE-1` 先止血（拿掉作廢圖表連結、區塊改名），合鏈設計需先盤 `data_cache/` 那條的活下游。
