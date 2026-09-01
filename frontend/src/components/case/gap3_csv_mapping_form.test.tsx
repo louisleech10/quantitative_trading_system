@@ -258,6 +258,33 @@ describe('GAP-3 Task 1.5 CSV 對映 UI', () => {
     expect(listed).toBe('flag');                       // 集合相等，不是 toContain
   });
 
+  it('⑨ 🔴 契約欄名之 CSV 走錯區 ⇒ **選檔當下**就警示，且送出被擋（`G3-D8`）', async () => {
+    // 出生事故 2026-09-02 使用者 UAT B10：使用者把 /search 匯出的契約 CSV 丟進這一區、
+    // 把下拉**全部選滿**再送出，得到「99 筆契約違規／列 0／label_definition／
+    // missing_required_field」——因為對映路徑只保留下拉指定的欄，而巢狀欄沒得選。
+    // 後端拒收是對的；缺的是**在使用者做那一輪對映之前**告訴他走錯區。
+    render(<EventCsvMappingForm />);
+    const contractCsv = [
+      'event_id,symbol,timeframe,t0,label,label_definition.window.horizon_bars',
+      'ETHUSDT:12h:1704067200000,ETHUSDT,12h,1704067200000,1,3',
+    ].join('\n');
+    await pick(contractCsv, 'events_2026-09-02.csv');
+
+    // ① 選檔當下就看得到（不必先做任何對映）
+    const hint = screen.getByTestId('contract-csv-wrong-section').textContent ?? '';
+    expect(hint).toContain('不需要做欄位對映');
+    expect(hint).toContain('匯入事件');
+
+    // ② 就算把下拉全部選滿、勾了確認，送出仍被擋——且**沒有任何上傳請求發出**
+    map('event_id', 0); map('symbol', 1); map('timeframe', 2); map('t0', 3); map('label', 4);
+    fireEvent.click(screen.getByTestId('csv-confirm'));
+    const before = fetchUrls().length;
+    fireEvent.click(screen.getByTestId('csv-mapping-submit'));
+    await waitFor(() => expect(screen.getByTestId('csv-mapping-problems')).toBeTruthy());
+    // 🔴 以**執行期呼叫**斷言（同本檔邊界①之判準）：擋住＝上傳端點一次都沒被打
+    expect(fetchUrls().slice(before).filter((u) => u.includes('/case/import-events'))).toEqual([]);
+  });
+
   it('⑧ 防漂移：可對映欄清單／ID 模板／單位門檻逐字等於契約檔', () => {
     const derived = Object.entries(CONTRACT.required_fields as Record<string, { type: string }>)
       .filter(([, spec]) => spec.type !== 'object')

@@ -10,6 +10,7 @@ import {
   GroupFeatureCoverageResponsePayload,
   FeatureRegistryEntry,
 } from '@/lib/types';
+import { httpErrorMessage } from '@/lib/httpError';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -127,7 +128,7 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body?.detail || response.statusText);
+        throw new Error(httpErrorMessage(body, response.statusText));
       }
 
       const data = (await response.json()) as GroupCoverageResponsePayload;
@@ -165,7 +166,7 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body?.detail || response.statusText);
+        throw new Error(httpErrorMessage(body, response.statusText));
       }
 
       const data = (await response.json()) as GroupFeatureCoverageResponsePayload;

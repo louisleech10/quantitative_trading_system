@@ -698,9 +698,9 @@ export default function SearchPage() {
       link.click();
       URL.revokeObjectURL(url);
     };
-    download(JSON.stringify(payload, null, 2), `gap3_events_${stamp}.json`, 'application/json;charset=utf-8;');
+    download(JSON.stringify(payload, null, 2), `events_${stamp}.json`, 'application/json;charset=utf-8;');
     // 同時下載「來源檔」：其 sha256 === 每列 source_file_digest；匯入時放 source_file 欄即可通過 verify
-    download(payload.source_file_text, `gap3_events_${stamp}.source.json`, 'application/json;charset=utf-8;');
+    download(payload.source_file_text, `events_${stamp}.source.json`, 'application/json;charset=utf-8;');
       },
     });
   };
@@ -765,14 +765,18 @@ export default function SearchPage() {
 
         // 🔴 `meta.` 之內容＝**該列自己的**非契約欄；逐列取，不跨列共用。
         //    只帶原始數值（不轉百分比）——與篩選面板同一套單位，避免「兩個框單位不同」那個陷阱。
-        const META_KEYS = [
-          'timestamp', 'trigger_idx', 'open', 'high', 'low', 'close', 'volume',
-          'price_change', 'market_phase', 'closing_strength', 'price_position',
-          'volume_multiplier', 'taker_buy_ratio', 'hour_of_day', 'day_of_week',
-          'past_3day_max_volatility', 'past_3day_direction', 'past_3day_volume_cv',
-          'volatility_class', 'direction_class', 'volume_class',
-          'market_class', 'market_class_name', 'difficulty_level',
-        ] as const;
+        //
+        // 🔴 **不得改回白名單**（2026-09-02 使用者 UAT：`future_*bar_max_drawdown` 整批不見了）：
+        //    原版是手寫 24 個欄名的 `META_KEYS`，於是搜尋結果新增／改名的欄一律**靜默消失**，
+        //    而使用者要靠這些欄在 Excel 裡篩正反例。規則改為**可導出的補集**：
+        //    「該列所有欄 − 已由契約欄承載者」。與後端 `_nested_fields()` 同一次修法
+        //    （手寫清單漏項，見 `G3-D4`）——這是第二次踩，故兩端都不再留清單。
+        /**
+         * 原始欄 → 已承載它的契約欄。**唯一目的是避免同一件事出現兩個欄**，
+         * 不是拿來過濾內容的白名單（每加一筆都要能說出「哪個契約欄已經表達了它」）。
+         * `timestamp` 刻意**不列入**：契約的 `t0` 是 epoch 毫秒，人在 Excel 裡讀不了。
+         */
+        const SUPERSEDED_BY_CONTRACT_FIELD: Record<string, string> = { positive_case: 'label' };
         // 逐列對齊：`buildEventContractRecords` 會跳過無法解析 t0／無正反例標記之列，
         // 故以 `event_id` 對回原始列，不用位置索引（位置對不上就會張冠李戴）。
         const byEventId = new Map<string, Record<string, unknown>>();
@@ -786,8 +790,14 @@ export default function SearchPage() {
         }
         const extras = (payload.records as Record<string, unknown>[]).map((rec) => {
           const src = byEventId.get(String(rec.event_id)) ?? {};
+          const contractKeys = new Set(Object.keys(rec));
           const out: Record<string, unknown> = {};
-          for (const k of META_KEYS) if (src[k] !== undefined) out[k] = src[k];
+          for (const [k, v] of Object.entries(src)) {
+            if (v === undefined) continue;
+            if (contractKeys.has(k)) continue;                    // 已是契約頂層欄，不重複輸出
+            if (SUPERSEDED_BY_CONTRACT_FIELD[k] !== undefined) continue;
+            out[k] = v;
+          }
           return out;
         });
 
@@ -796,7 +806,7 @@ export default function SearchPage() {
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
         const link = document.createElement('a');
         link.href = url;
-        link.download = `gap3_events_${stamp}.csv`;
+        link.download = `events_${stamp}.csv`;
         link.click();
         URL.revokeObjectURL(url);
       },
@@ -1900,7 +1910,7 @@ export default function SearchPage() {
                 }}
                 data-testid="export-gap3-events"
                 className="ml-3 flex items-center gap-2 px-6 py-3 bg-sky-500/20 text-sky-100 border border-sky-400/40 rounded-lg font-medium hover:bg-sky-500/30 transition-colors"
-                title="匯出 GAP-3 事件契約 JSON＋來源檔（可手改後到「數據準備」以新契約匯入）"
+                title="匯出事件契約 JSON＋來源檔（可手改後到「數據準備」匯入）"
               >
                 <Download className="w-5 h-5" />
                 匯出事件契約 JSON

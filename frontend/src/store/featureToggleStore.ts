@@ -7,6 +7,7 @@ import type {
   FeatureToggleSummaryResponse,
   FeatureToggleResponse,
 } from '@/lib/types';
+import { httpErrorMessage } from '@/lib/httpError';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -34,7 +35,7 @@ function buildError(error: unknown, fallback: string): string {
 
 async function parseError(response: Response, fallback: string): Promise<Error> {
   const payload = await response.json().catch(() => ({}));
-  return new Error(payload?.detail || fallback);
+  return new Error(httpErrorMessage(payload, fallback));
 }
 
 export const useFeatureToggleStore = create<FeatureToggleState>((set, get) => ({

@@ -60,7 +60,7 @@ export default function EventImportPicker({ value, onPick, imports }: EventImpor
 
   return (
     <div className="space-y-1" data-testid="event-import-picker">
-      <label className="text-xs text-slate-300">從已匯入案例選事件（GAP-3）</label>
+      <label className="text-xs text-slate-300">從已匯入案例選事件</label>
       {loading && <p className="text-xs text-slate-500">載入事件批…</p>}
       {error && <p className="text-xs text-rose-300" data-testid="event-import-picker-error">{error}</p>}
       {!loading && !error && items.length === 0 && (

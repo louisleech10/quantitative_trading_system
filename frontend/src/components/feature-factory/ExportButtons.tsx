@@ -5,6 +5,7 @@ import { Download } from 'lucide-react';
 import { FeatureFactoryConfig } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { exportChartToPNG } from '@/lib/exportUtils';
+import { httpErrorMessage } from '@/lib/httpError';
 
 interface ExportButtonsProps {
   config: FeatureFactoryConfig | null;
@@ -45,7 +46,7 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
         let message = `下載失敗 (${response.status})`;
         try {
           const payload = await response.json();
-          message = payload?.detail || message;
+          message = httpErrorMessage(payload, message);
         } catch {
           // no-op
         }

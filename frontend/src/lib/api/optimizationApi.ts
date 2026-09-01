@@ -7,6 +7,7 @@ import type {
   OptimizationTaskStatusResponse,
   TaskType,
 } from '@/lib/types/optimization'
+import { httpErrorMessage } from '../httpError'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -15,7 +16,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
     let detail = response.statusText
     try {
       const payload = await response.json()
-      detail = payload?.detail || payload?.error?.message || detail
+      detail = httpErrorMessage(payload, detail)
     } catch {
       // ignore json parse failure
     }
@@ -90,7 +91,7 @@ export async function exportOptimizationResult(
     let detail = response.statusText
     try {
       const payload = await response.json()
-      detail = payload?.detail || payload?.error?.message || detail
+      detail = httpErrorMessage(payload, detail)
     } catch {
       // ignore json parse failure
     }

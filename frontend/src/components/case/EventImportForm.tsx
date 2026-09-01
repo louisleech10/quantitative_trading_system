@@ -77,7 +77,7 @@ export default function EventImportForm({ onImported }: EventImportFormProps) {
 
   return (
     <div className="glass-panel rounded-xl p-6 border border-slate-800/80" data-testid="event-import-form">
-      <h3 className="text-lg font-bold text-slate-100 mb-1">匯入事件（GAP-3 新契約）</h3>
+      <h3 className="text-lg font-bold text-slate-100 mb-1">匯入事件</h3>
       <p className="text-xs text-slate-400 mb-4">
         正反例外部標好後以新 schema 匯入（每列含 <code className="font-mono">event_id / t0(ms) / label / label_definition / control_kind …</code>）。
         舊三欄 CSV 請用上方「導入案例」；兩者不互轉。

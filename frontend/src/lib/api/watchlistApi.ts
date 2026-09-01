@@ -1,4 +1,5 @@
 import type { WatchlistEntry } from '@/lib/types';
+import { httpErrorMessage } from '../httpError';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1';
@@ -20,7 +21,7 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    const message = error?.detail || error?.message || 'Watchlist API request failed';
+    const message = httpErrorMessage(error, 'Watchlist API request failed');
     throw new Error(message);
   }
 

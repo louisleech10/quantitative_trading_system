@@ -20,6 +20,7 @@ import { inspectEventIdNormalization } from '@/lib/eventIdNormalization';
 import EventDimensionFields, { type EventDimensionValues } from '@/components/case/EventDimensionFields';
 import { dimensionBatchDefaults, dimensionDefaultConflicts } from '@/lib/eventDimensions';
 import type { EventImportRejected, EventImportResponse } from '@/lib/types';
+import { CONTRACT_CSV_WRONG_SECTION_HINT, looksContractCsv } from '@/lib/contractCsvDetect';
 
 /**
  * GAP-3 UX Task 1.5 — CSV 上傳／預覽／逐項對映 UI（SPEC L1578–1587）。
@@ -226,6 +227,11 @@ export default function EventCsvMappingForm({ onImported }: Props) {
   const submitProblems = (): string[] => {
     const out: string[] = [];
     if (!file) out.push('請先選擇 CSV 檔');
+    // 🔴 走錯區要在**做完對映之前**就講（2026-09-02 UAT B10）：契約欄名之 CSV
+    //    在這一區送出，必然因巢狀欄被丟掉而整批拒收，而使用者已經先做完一輪下拉。
+    if (parsed.columns.length > 0 && looksContractCsv(parsed.columns.map((c) => c.name))) {
+      out.push(CONTRACT_CSV_WRONG_SECTION_HINT);
+    }
     if (!parsedDefaults.ok) out.push('批次預設不是合法的 JSON 物件');
     if (parsed.raggedRows.length > 0) {
       const head = parsed.raggedRows.slice(0, 3).map((r) => `第 ${r.row + 1} 列（${r.width} 欄）`);
@@ -284,7 +290,7 @@ export default function EventCsvMappingForm({ onImported }: Props) {
 
   return (
     <div className="glass-panel rounded-xl p-6 border border-slate-800/80" data-testid="event-csv-mapping-form">
-      <h3 className="text-lg font-bold text-slate-100 mb-1">用自己的欄名匯入事件 CSV（GAP-3）</h3>
+      <h3 className="text-lg font-bold text-slate-100 mb-1">用自己的欄名匯入事件 CSV</h3>
       <p className="text-xs text-slate-400 mb-4">
         不必先把標頭改成契約欄名：選檔後逐項指定「契約欄 ← 你的 CSV 欄」即可。
         預覽與警示由瀏覽器就地解析，「契約檢核一律在後端」（不符會逐列告訴你原因）。
@@ -305,6 +311,16 @@ export default function EventCsvMappingForm({ onImported }: Props) {
           而畫面上若硬解析會把整個檔黏成一行、產生看起來很像欄名的東西讓你誤選。
           請用試算表或編輯器另存為一般換行（LF 或 CRLF）後再上傳。
         </div>
+      )}
+
+      {/* 🔴 選檔當下就講「走錯區」——不是等使用者把下拉全部選滿、送出後才由後端拒收。 */}
+      {parsed.columns.length > 0 && looksContractCsv(parsed.columns.map((c) => c.name)) && (
+        <p
+          data-testid="contract-csv-wrong-section"
+          className="mb-3 rounded border border-amber-400/40 bg-amber-500/10 p-3 text-xs text-amber-100"
+        >
+          {CONTRACT_CSV_WRONG_SECTION_HINT}
+        </p>
       )}
 
       {parsed.columns.length > 0 && (

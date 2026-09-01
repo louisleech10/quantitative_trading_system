@@ -236,7 +236,7 @@ export default function DataPreparationPage() {
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
           <EventImportForm onImported={() => setRefreshKey((k) => k + 1)} />
           <div className="glass-panel rounded-xl p-6 border border-slate-800/80" data-testid="event-imports-list">
-            <h4 className="font-bold text-slate-100 mb-2">已匯入事件批（GAP-3）</h4>
+            <h4 className="font-bold text-slate-100 mb-2">已匯入事件批</h4>
             {eventImportsError && <p className="text-sm text-rose-300">{eventImportsError}</p>}
             {!eventImportsError && eventImports.length === 0 && (
               <p className="text-sm text-slate-400">尚無事件批。匯入後可在「IC 分析 → Event-Driven 模式」選用。</p>

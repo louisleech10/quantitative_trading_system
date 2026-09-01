@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import { ICFeatureInfo, ICReport } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2 } from 'lucide-react';
+import { httpErrorMessage } from '@/lib/httpError';
 
 interface ExportButtonsProps {
   taskId?: string | null;
@@ -67,7 +68,7 @@ export default function ExportButtons({ taskId, report, summaryTable, targetId }
       const response = await fetch(url);
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.detail || payload?.error || `${format} 匯出失敗`);
+        throw new Error(httpErrorMessage(payload, `${format} 匯出失敗`));
       }
 
       const blob = await response.blob();

@@ -101,7 +101,10 @@ export type EventFieldKey = keyof typeof EVENT_FIELD_FORMATTERS;
 export const EVENT_IC_DECAY_DISCLOSURE =
   '條件 IC decay 曲線（一次分析同時得到多個 h 的 IC）非本批交付；附帶的 future_* 欄不進入 ic_feed。'
   + '要看不同答案窗，請於 IC 分析頁改答案窗重跑分析——同一批事件事實可以重複分析，不必再匯出一次。'
-  + '一次得到整條 decay 曲線待 GAP-6 之 IC-Analysis 整體處理。';
+  // 🔴 原文寫「待 GAP-6 之 IC-Analysis 整體處理」——`GAP-6` 是**我們的施工票號**，
+  //    使用者看到只會困惑（2026-09-02 使用者：「以後使用者哪知道什麼是 GAP3？」）。
+  //    票號留在上方註解供追溯，畫面上只講「還沒做、之後會做」。
+  + '一次得到整條 decay 曲線是之後的工作，目前還沒有。';
 
 /**
  * `/search` 匯出面板之欄集（Task 7.3 要點1 之七項）。

@@ -31,6 +31,7 @@ import {
   OrphanScanResponse,
 } from '@/lib/types';
 import { normalizeWarmupInsufficient } from '@/lib/warmupInsufficient';
+import { httpErrorMessage } from '@/lib/httpError';
 
 type BatchConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
 type BatchPayload = Partial<BatchTaskStatus> & Record<string, unknown>;
@@ -981,7 +982,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.detail || payload?.error || response.statusText);
+        throw new Error(httpErrorMessage(payload, response.statusText));
       }
       const payload = await response.json() as {
         batch_id: string;
@@ -1062,7 +1063,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.detail || payload?.error || response.statusText);
+        throw new Error(httpErrorMessage(payload, response.statusText));
       }
 
       const payload = (await response.json()) as {
@@ -1109,7 +1110,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       const response = await fetch(`${API_BASE_URL}${API_PREFIX}/batch/${taskId}`);
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        const message = payload?.detail || payload?.error || response.statusText;
+        const message = httpErrorMessage(payload, response.statusText);
         if (response.status >= 500) {
           set({ error: message });
           await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));

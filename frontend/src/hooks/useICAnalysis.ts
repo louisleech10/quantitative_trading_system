@@ -7,6 +7,7 @@ import {
   ICReport,
 } from '@/lib/types';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
+import { httpErrorMessage } from '@/lib/httpError';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
@@ -23,7 +24,7 @@ const requestJson = async <T>(path: string, options?: RequestInit): Promise<T> =
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload?.detail || payload?.error || response.statusText);
+    throw new Error(httpErrorMessage(payload, response.statusText));
   }
 
   return response.json();

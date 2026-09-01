@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Download } from 'lucide-react';
+import { httpErrorMessage } from '@/lib/httpError';
 
 interface ExportButtonProps {
   modelTaskId: string;
@@ -29,7 +30,7 @@ export default function ExportButton({ modelTaskId, scope, availableFormats }: E
       const response = await fetch(url);
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.detail || '匯出失敗');
+        throw new Error(httpErrorMessage(payload, '匯出失敗'));
       }
 
       const blob = await response.blob();

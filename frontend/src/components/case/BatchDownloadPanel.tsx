@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { httpErrorMessage } from '@/lib/httpError';
 
 const SUPPORTED_TIMEFRAMES = [
   { value: "1m", label: "1 分鐘" },
@@ -143,7 +144,7 @@ export default function BatchDownloadPanel({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Download failed");
+        throw new Error(httpErrorMessage(errorData, "Download failed"));
       }
 
       const data = await response.json();

@@ -293,6 +293,56 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
     expect(dataLines.some((l) => l.includes('2024-01-01 02:00:00'))).toBe(true);   // 無標記那列仍在
   });
 
+  it('⑨ 🔴 CSV 之 `meta.` 帶**該列所有**非契約欄，不是手寫白名單（`G3-D6`）', async () => {
+    // 出生事故 2026-09-02 使用者 UAT：`meta.` 原本由 24 個欄名的 META_KEYS 挑，
+    // 於是 `future_*bar_max_drawdown` 這類欄在匯出時**靜默消失**——而使用者正是要靠
+    // 它們在 Excel 裡篩正反例。本條釘住「補集規則」：改回任何形式的清單即紅。
+    useSearchStore.setState({
+      currentResult: {
+        cases: [{
+          symbol: 'ETHUSDT', timeframe: '1h', timestamp: '2024-01-01 00:00:00', positive_case: true,
+          price_change: 3.2, future_2bar_return: 1.1,
+          future_2bar_max_drawdown: -0.8,        // 舊白名單沒有它
+          some_brand_new_column: 'x',            // 將來新增的欄也必須自動帶上
+        }] as unknown as CaseData[],
+        source_file_text: '[]', source_file_digest: 'a'.repeat(64),
+      } as unknown as SearchResultData,
+      isLoading: false, error: null,
+    });
+    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
+
+    const blobs: string[] = [];
+    const RealURL = globalThis.URL;
+    vi.stubGlobal('URL', Object.assign(
+      function URLStub(...a: ConstructorParameters<typeof URL>) { return new RealURL(...a); } as unknown as typeof URL,
+      RealURL,
+      {
+        createObjectURL: (b: Blob & { _text?: string }) => { blobs.push(b._text ?? ''); return 'blob:x'; },
+        revokeObjectURL: () => {},
+      },
+    ));
+    const RealBlob = globalThis.Blob;
+    vi.stubGlobal('Blob', class extends RealBlob {
+      _text: string;
+      constructor(parts: BlobPart[], opts?: BlobPropertyBag) { super(parts, opts); this._text = String(parts[0] ?? ''); }
+    });
+
+    await useRealRecordBuilder();
+    render(<SearchPage />);
+    await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('export-contract-csv'));
+    await waitFor(() => expect(blobs.length).toBeGreaterThan(0));
+
+    const header = blobs[0].split('\n')[0].split(',');
+    expect(header, '回撤欄不得靜默消失').toContain('meta.future_2bar_max_drawdown');
+    expect(header, '將來新增的欄要自動帶上，不必改程式').toContain('meta.some_brand_new_column');
+    // 🔴 over：答案只有 `label` 一欄——`positive_case` 已由契約的 `label` 承載，不得再出現
+    expect(header.some((c) => /positive_case/i.test(c)), '兩個答案欄必然造成誤會').toBe(false);
+    // 契約頂層欄不得被複製一份到 meta.
+    expect(header).not.toContain('meta.symbol');
+    expect(header).toContain('meta.timestamp');   // t0 是 epoch ms，人讀不了 ⇒ 原始時間字串要留
+  });
+
   it('⑥ Task 2.3：畫面上的筆數就是 computeExportCounts 的結果（同一組事實）', async () => {
     depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
     render(<SearchPage />);

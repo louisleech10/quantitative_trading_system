@@ -39,6 +39,7 @@ import {
   loadOptunaConfig,
   saveOptunaConfig,
 } from "@/components/strategy-test/OptunaConfigPanel";
+import { httpErrorMessage } from '@/lib/httpError';
 
 interface SignalPoint {
   timestamp: number;
@@ -485,7 +486,7 @@ function StrategyTestPageContent() {
 
       if (!createResponse.ok) {
         const errorData = await createResponse.json().catch(() => ({}));
-        throw new Error(errorData.detail || errorData.message || "創建優化任務失敗");
+        throw new Error(httpErrorMessage(errorData, "創建優化任務失敗"));
       }
 
       const createData = await createResponse.json();
@@ -500,7 +501,7 @@ function StrategyTestPageContent() {
 
       if (!startResponse.ok) {
         const errorData = await startResponse.json().catch(() => ({}));
-        throw new Error(errorData.detail || errorData.message || "啟動優化任務失敗");
+        throw new Error(httpErrorMessage(errorData, "啟動優化任務失敗"));
       }
 
       toast.success("優化任務已啟動！");
@@ -579,11 +580,7 @@ function StrategyTestPageContent() {
             ).join('; ');
             message = `驗證失敗: ${errorDetails}`;
           } else {
-            message =
-              errorData.detail ||
-              errorData.message ||
-              errorData.error?.message ||
-              message;
+            message = httpErrorMessage(errorData, message);
           }
         } catch {
           if (chartResponse.status) {
@@ -747,11 +744,7 @@ function StrategyTestPageContent() {
                 ).join('; ');
                 message = `驗證失敗: ${errorDetails}`;
               } else {
-                message =
-                  errorData.error?.message ||
-                  errorData.detail ||
-                  errorData.message ||
-                  message;
+                message = httpErrorMessage(errorData, message);
               }
             } catch {
               message = errorText || message;

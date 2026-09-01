@@ -29,6 +29,7 @@ import TestModeSelector, {
 import ParameterRangeInput, {
   type EMAParameters,
 } from "@/components/strategy/ParameterRangeInput";
+import { httpErrorMessage } from '@/lib/httpError';
 
 /**
  * 策略配置狀態
@@ -151,11 +152,7 @@ export default function StrategyDemoPage() {
         const errorText = await response.text().catch(() => "");
         try {
           const errorData = JSON.parse(errorText || "{}");
-          message =
-            errorData.detail ||
-            errorData.message ||
-            errorData.error?.message ||
-            message;
+          message = httpErrorMessage(errorData, message);
         } catch {
           if (response.status) {
             message = `HTTP ${response.status}: ${errorText || message}`;

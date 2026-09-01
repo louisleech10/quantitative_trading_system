@@ -91,7 +91,13 @@ async def import_cases_from_csv(
     if _header is not None and get_event_import_service().looks_new_schema(_header):
         raise HTTPException(status_code=400, detail=EventImportRejected(
             kind="new_schema_on_legacy_endpoint",
-            message="偵測到 GAP-3 新 schema（event_id/t0/label…）；請改投 /api/v1/case/import-events，本端點只收舊三欄格式",
+            # 🔴 訊息是**給使用者讀的**：不寫施工票號、不寫 API 路徑
+            #    （2026-09-02 使用者：「以後使用者哪知道什麼是 GAP3？」）。
+            #    端點路徑改放結構化 `detail.endpoint`——除錯與前端導向仍拿得到，
+            #    但不出現在畫面文字裡。
+            message="這是事件契約格式的檔（含 event_id／t0／label…）；這一區只收舊三欄格式"
+                    "（symbol／timestamp／Positive_case）。請改用「匯入事件」那一區上傳。",
+            detail={"endpoint": "/api/v1/case/import-events", "ui_section": "匯入事件"},
         ).model_dump())
 
     try:

@@ -31,6 +31,7 @@ import type {
   TopFalsePositivesResponse,
   RollingAUCResponse
 } from '@/lib/patternTypes';
+import { httpErrorMessage } from '../httpError';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1';
@@ -57,7 +58,7 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    const message = error.detail || error.message || 'API request failed';
+    const message = httpErrorMessage(error, 'API request failed');
     throw new APIError(response.status, message);
   }
 

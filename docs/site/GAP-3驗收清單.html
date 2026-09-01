@@ -146,7 +146,17 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 <p><strong>不是這樣代表什麼</strong>：如果只看到兩顆按鈕、中間那幾區都沒有，代表你開的是舊版前端——
 重新 <code>npm run dev</code>。</p>
 <hr />
-<h3 id="b2-匯出前篩選與筆數">B2 ── 匯出前篩選與筆數</h3>
+<h3 id="b2-匯出前篩選與筆數-這一整區即將移除不必驗">B2 ── 匯出前篩選與筆數 ⚠️ <strong>這一整區即將移除，不必驗</strong></h3>
+<blockquote>
+<p>🔴 <strong>2026-09-02 你已裁定：匯出前篩選整個拿掉。</strong>
+理由是你自己講的：「上傳都有要填答案窗了，那在 /search 的新增條件都不用了吧，
+使用者直接 CSV 篩選就好」。CSV 現在可以回灌（B9-1），在 Excel 篩選本來就更強；
+而答案窗深度改成匯入時直接問你，篩選也就沒有存在的理由了。</p>
+<p><strong>⇒ 這一項現在跳過。</strong> 移除還沒做（要動已凍結的規格，走延伸檔 <code>D-006</code>），
+所以畫面上暫時還看得到那一區——<strong>看到它不代表沒事，是還沒拆</strong>。</p>
+<p>下面的舊內容保留只為說明「為什麼要拆」，<strong>不是要你照著驗</strong>。</p>
+</blockquote>
+<hr />
 <p><strong>數字填小數，不是百分比。</strong> 漲幅 3% 填 <code>0.03</code>。
 （<code>price_change = (close − open) / open</code>，沒有乘 100。⚠️ 搜尋頁上方那個「價格變化」框<strong>卻是百分比</strong>，
 兩個框單位不同、畫面沒提示——這是既有介面陷阱，已列入待修。）</p>
@@ -189,6 +199,10 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 而且使用者若在系統外標記（例如用 Excel 依未來報酬標），篩選面板裡什麼都沒有
 ⇒ <strong>推不出深度、purge 會是 0</strong>，沒有任何東西會喊。直接問沒有這個破口。</p>
 <p><strong>排程</strong>：見 <code>docs/IC_QUANT_GAP_REGISTRY.md</code> 之 GAP-3 缺陷登記。</p>
+<blockquote>
+<p>🔴 <strong>上面那三條修法方向已於 2026-09-02 被你自己的新裁定取代</strong>：不是「改成兩組條件」，
+而是<strong>整區移除</strong>。第 2、3 點（深度直接問、purge 取大者）仍然成立，那是移除之後的做法。</p>
+</blockquote>
 <hr />
 <h3 id="b3-這批事件的五個設定新的">B3 ── 這批事件的五個設定（<strong>新的</strong>）</h3>
 <p><strong>你做什麼</strong>：找到「這批事件的五個設定」那一區，<strong>每一個下拉都點開看看</strong>。</p>
@@ -289,8 +303,8 @@ lookahead 深度 / purge 下界。而且：</p>
 —— <strong>缺欄不會擋你匯出</strong>，按確定即可</li>
 <li>下載<strong>兩個檔</strong>：
 <ul>
-<li><code>gap3_events_&lt;日期&gt;.json</code> —— 事件本體</li>
-<li><code>gap3_events_&lt;日期&gt;.source.json</code> —— 來源檔（它的 sha256 就是每筆的 <code>source_file_digest</code>）</li>
+<li><code>events_&lt;日期&gt;.json</code> —— 事件本體</li>
+<li><code>events_&lt;日期&gt;.source.json</code> —— 來源檔（它的 sha256 就是每筆的 <code>source_file_digest</code>）</li>
 </ul>
 </li>
 </ol>
@@ -397,6 +411,15 @@ lookahead 深度 / purge 下界。而且：</p>
 <p>🔴 <strong>沒跑搜尋也想驗這條</strong>：用 <strong><code>uat_samples/events_contract.csv</code></strong>，那是同一種格式的離線樣本
 （<code>scripts/gen_uat_samples.py</code> 產生時已讓<strong>後端自己</strong>解析回契約列並過 validator 才交出）。</p>
 <h4 id="b9-2-用-csv-逐欄對映匯入選做手上的檔不是本系統匯出的才需要">B9-2 ── 用 CSV 逐欄對映匯入（<strong>選做</strong>：手上的檔不是本系統匯出的才需要）</h4>
+<blockquote>
+<p>🔴 <strong>2026-09-02 依你的回報修好一件</strong>：你把 <code>/search</code> 匯出的<strong>契約 CSV</strong> 丟進這一區、
+把下拉全部選滿後送出，得到「99 筆契約違規／<code>label_definition</code>／<code>missing_required_field</code>」。
+真因是這一區<strong>只保留你在下拉指定的欄</strong>，而下拉只有契約的頂層欄——
+<code>label_definition.window.horizon_bars</code> 這種巢狀欄根本沒得選，於是被丟掉。
+<strong>後端拒收是對的</strong>，錯在沒人在你做完那一輪對映<strong>之前</strong>告訴你走錯區。
+現在：選到契約格式的檔，<strong>當下就會出現橘色警示</strong>並擋住送出，叫你改用上面那一區。
+⇒ 這一區只給「欄名不是契約欄名」的檔用。</p>
+</blockquote>
 <p><strong>你做什麼</strong>：用「CSV 欄名對映匯入」那一區，選 <strong><code>uat_samples/events_mapping.csv</code></strong>。</p>
 <p>那個檔的欄名<strong>故意不是</strong>契約欄名，所以你會真的用到對映功能。這樣對：</p>
 <div class="table-wrap"><table>
@@ -501,6 +524,12 @@ Network 分頁看，應該一片空白）。</p>
 <p><strong>你做什麼</strong>：把 <strong><code>uat_samples/events_legacy_3col.csv</code></strong>（舊三欄格式）丟進「匯入事件」。</p>
 <p><strong>應該看到</strong>：拒收，原因 <code>legacy_schema_detected</code>，訊息說「不做靜默轉換」，
 <strong>並附欄位對照的搬遷提示</strong>（會列出缺哪些必填欄）。</p>
+<blockquote>
+<p>🔴 <strong>2026-09-02 依你的回報修好</strong>：你回報這一項「都是出現 <code>[object Object]</code>」。
+成因是前端把後端回的<strong>結構化錯誤物件</strong>直接當字串印。現在會顯示真正的原因，
+例如「<code>new_schema_on_legacy_endpoint</code>：這是事件契約格式的檔…請改用「匯入事件」那一區上傳」。
+同一個寫法在前端有 <strong>31 處</strong>，已全部改走同一支 <code>httpErrorMessage()</code>。</p>
+</blockquote>
 <p><strong>反過來</strong>：把新格式的 CSV 丟進<strong>舊的</strong>「導入案例」。</p>
 <p>用 <strong><code>uat_samples/events_contract.csv</code></strong> 就好（那已經是 CSV，不必自己轉）。
 如果你想用自己的檔：<code>/search</code> 的「導出CSV檔案（可回灌）」出來的就是同一種格式。</p>

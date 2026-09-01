@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { httpErrorMessage } from '@/lib/httpError';
 
 interface CaseImportFormProps {
   onImportSuccess?: (result: ImportResult) => void;
@@ -63,7 +64,7 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
           const contentType = response.headers.get("content-type");
           if (contentType && contentType.includes("application/json")) {
             const errorData = await response.json();
-            errorMessage = errorData.detail || JSON.stringify(errorData);
+            errorMessage = httpErrorMessage(errorData, JSON.stringify(errorData));
           } else {
             const text = await response.text();
             if (text) {

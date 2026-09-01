@@ -613,7 +613,7 @@ export async function calculateSignalDensity(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || `HTTP ${response.status}: 信號密度計算失敗`);
+      throw new Error(httpErrorMessage(error, `HTTP ${response.status}: 信號密度計算失敗`));
     }
 
     const data: SignalDensityResponse = await response.json();
@@ -667,7 +667,7 @@ export async function previewTrainingWindow(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || `HTTP ${response.status}: 預覽訓練窗口失敗`);
+      throw new Error(httpErrorMessage(error, `HTTP ${response.status}: 預覽訓練窗口失敗`));
     }
 
     const data: TrainingWindowPreview = await response.json();
@@ -759,7 +759,7 @@ export async function fetchOptimizationResult(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || `HTTP ${response.status}: 獲取優化結果失敗`);
+      throw new Error(httpErrorMessage(error, `HTTP ${response.status}: 獲取優化結果失敗`));
     }
 
     const data: OptimizationResult = await response.json();
@@ -790,7 +790,7 @@ export async function fetchParameterImportance(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || `HTTP ${response.status}: 獲取參數重要性失敗`);
+      throw new Error(httpErrorMessage(error, `HTTP ${response.status}: 獲取參數重要性失敗`));
     }
 
     const data: ImportanceAnalysisResponse = await response.json();
@@ -821,7 +821,7 @@ export async function fetchOptimizationHistory(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || `HTTP ${response.status}: 獲取優化歷史失敗`);
+      throw new Error(httpErrorMessage(error, `HTTP ${response.status}: 獲取優化歷史失敗`));
     }
 
     const data: OptimizationHistoryResponse = await response.json();
@@ -852,7 +852,7 @@ export async function fetchParamSpace(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || `HTTP ${response.status}: 獲取參數空間失敗`);
+      throw new Error(httpErrorMessage(error, `HTTP ${response.status}: 獲取參數空間失敗`));
     }
 
     const data: ParamSpaceResponse = await response.json();
@@ -883,7 +883,7 @@ export async function fetchStabilityAnalysis(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || `HTTP ${response.status}: 獲取穩定性分析失敗`);
+      throw new Error(httpErrorMessage(error, `HTTP ${response.status}: 獲取穩定性分析失敗`));
     }
 
     const data: StabilityAnalysis = await response.json();
@@ -930,7 +930,7 @@ export async function compareOptimizationResults(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || `HTTP ${response.status}: 對比優化結果失敗`);
+      throw new Error(httpErrorMessage(error, `HTTP ${response.status}: 對比優化結果失敗`));
     }
 
     const data: ComparisonResult = await response.json();
@@ -983,6 +983,7 @@ import type {
   EventImportRejected, EventImportResponse,
 } from './types';
 import type { LookaheadDeclarationPayload, LookaheadDeclarationPreview } from './lookaheadDeclaration';
+import { httpErrorMessage } from './httpError';
 
 export class EventImportRejectedError extends Error {
   payload: EventImportRejected;

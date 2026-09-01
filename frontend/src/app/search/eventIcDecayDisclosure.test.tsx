@@ -63,12 +63,20 @@ describe('Task 7.4 — 條件 IC decay 之邊界揭露', () => {
     expect(screen.getByTestId('export-no-ic-decay').textContent).toBe(EVENT_IC_DECAY_DISCLOSURE);
   });
 
-  it('文案講齊四件事：decay 曲線非本批交付／future_* 不進 ic_feed／到 IC 分析頁改答案窗／GAP-6', () => {
+  it('文案講齊四件事：decay 曲線非本批交付／future_* 不進 ic_feed／到 IC 分析頁改答案窗／之後才會做', () => {
     expect(EVENT_IC_DECAY_DISCLOSURE).toContain('decay');
     expect(EVENT_IC_DECAY_DISCLOSURE).toContain('非本批交付');
     expect(EVENT_IC_DECAY_DISCLOSURE).toContain('不進入 ic_feed');
     expect(EVENT_IC_DECAY_DISCLOSURE).toContain('IC 分析頁改答案窗');
-    expect(EVENT_IC_DECAY_DISCLOSURE).toContain('GAP-6');
+    // 🔴 第四件事＝「這件事還沒做、之後會做」。**原本這一條斷言的是 `toContain('GAP-6')`**，
+    //    也就是硬性要求畫面上出現我們的施工票號——那把錯的性質釘死了
+    //    （2026-09-02 使用者：「以後使用者哪知道什麼是 GAP3？」）。
+    //    這不是放寬守衛：要講的事一件沒少，只是改成守「有沒有講到」而不是「有沒有寫票號」。
+    expect(EVENT_IC_DECAY_DISCLOSURE).toContain('之後');
+  });
+
+  it('🔴 文案**不得**含施工票號（全域閘見 `lib/noTicketIdInUi.test.ts`，此處再釘一次）', () => {
+    expect(EVENT_IC_DECAY_DISCLOSURE).not.toMatch(/\bGAP[-_]?\d\b/);
   });
 
   it('邊界② 文案**不得**把重新匯出講成換答案窗之手段，且仍要講明「不必再匯出一次」', () => {

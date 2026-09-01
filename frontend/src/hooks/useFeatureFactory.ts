@@ -22,6 +22,7 @@ import {
 } from '@/lib/types';
 import { normalizeWarmupInsufficient } from '@/lib/warmupInsufficient';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
+import { httpErrorMessage } from '@/lib/httpError';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1/features';
@@ -37,7 +38,7 @@ const requestJson = async <T>(path: string, options?: RequestInit): Promise<T> =
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload?.detail || payload?.error || response.statusText);
+    throw new Error(httpErrorMessage(payload, response.statusText));
   }
 
   return response.json();

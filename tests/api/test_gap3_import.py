@@ -89,7 +89,13 @@ def test_gap3_import_new_schema_on_legacy_endpoint_rejected_explicitly():
     csv = "event_id,symbol,timeframe,t0,label\n" + f"{ev['event_id']},{ev['symbol']},{ev['timeframe']},{ev['t0']},1\n"
     r = client.post("/api/v1/case/import", files={"file": ("new.csv", csv.encode(), "text/csv")}, params={"validate_only": "true"})
     assert r.status_code == 400
-    assert r.json()["detail"]["kind"] == "new_schema_on_legacy_endpoint" and "import-events" in r.json()["detail"]["message"]
+    body = r.json()["detail"]
+    assert body["kind"] == "new_schema_on_legacy_endpoint"
+    # 🔴 正解「在哪」分兩層：**訊息**指向使用者看得懂的區塊名，**detail** 帶機器可讀端點。
+    #    原本這一條要求訊息裡出現 `import-events`（API 路徑）——那是寫給程式看的字，
+    #    使用者讀到只會困惑（2026-09-02 使用者 UAT）。要講的事一件沒少，只是分了層。
+    assert "匯入事件" in body["message"], body["message"]
+    assert body["detail"]["endpoint"] == "/api/v1/case/import-events", body["detail"]
 
 
 def test_gap3_import_mixed_columns_rejected_listing_missing_fields():

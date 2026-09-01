@@ -48,6 +48,48 @@
 </tr>
 </tbody>
 </table></div>
+<h3 id="92-你又列了六件四件已修兩件你已裁定">9/2 你又列了六件：<strong>四件已修，兩件你已裁定</strong></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>你說什麼</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>G3-D9</code></td>
+<td>「檔名為何是 GAP3_event？以後使用者哪知道什麼是 GAP3？」</td>
+<td><strong>已修</strong>。匯出檔名改 <code>events_&lt;日期&gt;</code>；畫面標題、tooltip、後端拒收訊息全部去票號。連 B6 那段揭露裡的「待 GAP-6 處理」也一起清掉（那句你原本看得到）。<strong>加了機械閘</strong>：以後票號再混進使用者可見層，測試就紅</td>
+</tr>
+<tr>
+<td><code>G3-D6</code></td>
+<td>「<code>future_xbar_drawdown</code> 怎麼都沒了？」</td>
+<td><strong>已修，是我造成的回歸</strong>。欄名是 <code>future_Nbar_max_drawdown</code>；我做契約 CSV 時用了<strong>手寫的 24 個欄名清單</strong>決定哪些欄要帶，沒列到它。改成「契約欄以外<strong>全部</strong>帶上」，以後新增欄也自動跟著走</td>
+</tr>
+<tr>
+<td><code>G3-D8</code></td>
+<td>「B10 上傳 /search 的 CSV、下拉都選起來，還是 99 筆契約違規」</td>
+<td><strong>已修</strong>。你走的是「逐欄對映」那一區，它只保留下拉指定的欄，而巢狀欄沒得選 ⇒ 被丟掉。後端拒收是對的，錯在沒人<strong>在你做完對映之前</strong>講。現在選到契約格式的檔就當場警示並擋住</td>
+</tr>
+<tr>
+<td><code>G3-D7</code></td>
+<td>「B11 導入都出現 <code>[object Object]</code>」</td>
+<td><strong>已修</strong>。前端把後端的結構化錯誤物件當字串印。同寫法有 <strong>31 處</strong>，全部改走同一支函式</td>
+</tr>
+<tr>
+<td><code>G3-D1</code></td>
+<td>「匯出前篩選都不用了吧，直接 CSV 篩選就好」</td>
+<td><strong>你裁定：整區移除</strong>。還沒動手——那要改已凍結的規格，走延伸檔。<strong>驗收 B2 現在跳過</strong></td>
+</tr>
+<tr>
+<td><code>KLINE-1</code></td>
+<td>「案例CSV導入其實是批量K線下載，要保留還是拆開？」</td>
+<td><strong>你裁定：另開票拆成獨立版面</strong>。🔴 我查出比拆頁更根本的事：K 線下載現在有<strong>兩條各自獨立的鏈</strong>——<code>/data-preparation</code> 那條寫 <code>data_cache/</code>，而 <strong>Feature Factory 頁自己另有一個下載面板</strong>寫 <code>data_cache/feature_klines/</code>。<strong>兩份快取、日期差四個月、互不共用</strong>。所以真正要決定的是「這兩條要不要合成一條」</td>
+</tr>
+</tbody>
+</table></div>
 <h3 id="91-驗收又抓到三件都已經修好推上去了">9/1 驗收又抓到三件，<strong>都已經修好推上去了</strong></h3>
 <p>你做到 B9–B12 時回報的：</p>
 <div class="table-wrap"><table>
