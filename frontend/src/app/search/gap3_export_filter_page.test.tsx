@@ -46,6 +46,18 @@ function seedResult() {
   });
 }
 
+/**
+ * 讓 `buildEventContractRecords` 走**真實實作**（預設 mock 回傳空 records，那對
+ * 「檔案內容對不對」的測試是假前提：CSV 自 2026-09-01 起由該函式產出契約列，
+ * 空 records ⇒ 空檔 ⇒ 測到的是 mock 不是產品）。呼叫次數證據仍在（同一支 mock）。
+ */
+async function useRealRecordBuilder() {
+  const real = await vi.importActual<typeof import('@/lib/eventExport')>('@/lib/eventExport');
+  buildRecordsMock.mockImplementation(
+    (...a: unknown[]) => (real.buildEventContractRecords as (...x: never[]) => unknown)(...(a as never[])),
+  );
+}
+
 /** 加一條條件並填欄位／運算子／值。 */
 function addCondition(column: string, value: string) {
   fireEvent.click(screen.getByTestId('export-filter-add'));
@@ -186,10 +198,18 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
   it('⑦ 🔴 CSV 匯出也套同一組條件（R2 `CODEX-R2-P1-01`：面板就在按鈕上方，不能只有事件 JSON 套）', async () => {
     depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
     const blobs: string[] = [];
-    vi.stubGlobal('URL', {
-      createObjectURL: (b: Blob & { _text?: string }) => { blobs.push(b._text ?? ''); return 'blob:x'; },
-      revokeObjectURL: () => {},
-    });
+    // 🔴 **只覆寫兩個靜態方法，保留真的 `URL` 建構子**：整個換掉會讓
+    //    動態 import 之 `new URL(...)` 炸成 `URL is not a constructor`，
+    //    而那個錯會被匯出鈕的 `.catch` 吞成一句 alert ⇒ 看起來像「沒產出檔案」。
+    const RealURL = globalThis.URL;
+    vi.stubGlobal('URL', Object.assign(
+      function URLStub(...a: ConstructorParameters<typeof URL>) { return new RealURL(...a); } as unknown as typeof URL,
+      RealURL,
+      {
+        createObjectURL: (b: Blob & { _text?: string }) => { blobs.push(b._text ?? ''); return 'blob:x'; },
+        revokeObjectURL: () => {},
+      },
+    ));
     // jsdom 的 Blob 讀不回內容 ⇒ 攔在建構處把文字留下來
     const RealBlob = globalThis.Blob;
     vi.stubGlobal('Blob', class extends RealBlob {
@@ -200,11 +220,16 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
       }
     });
 
+    await useRealRecordBuilder();
     render(<SearchPage />);
     addCondition('price_change', '0');            // 兩列裡只有第一列（3.2 ≥ 0）通過
     await waitFor(() => expect(screen.getByTestId('export-count-n').textContent).toBe('1'));
 
-    fireEvent.click(screen.getByText('導出CSV檔案'));
+    // 🔴 CSV 匯出自 2026-09-01 起改為**契約 CSV**，帶 `lookahead_bars_declared`
+    //    ⇒ 與事件 JSON 一樣受下界守衛保護（拿不到深度就不匯出）。
+    //    先等深度就緒再按，否則按下去會被守衛正確地擋掉。
+    await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('export-contract-csv'));
     await waitFor(() => expect(blobs.length).toBeGreaterThan(0));
     const dataLines = blobs[0].split('\n').filter((l) => l.trim().length > 0).slice(1);
     expect(dataLines.length).toBe(1);              // 畫面說 1 筆，檔案裡就是 1 筆
@@ -230,10 +255,18 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
     depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
 
     const blobs: string[] = [];
-    vi.stubGlobal('URL', {
-      createObjectURL: (b: Blob & { _text?: string }) => { blobs.push(b._text ?? ''); return 'blob:x'; },
-      revokeObjectURL: () => {},
-    });
+    // 🔴 **只覆寫兩個靜態方法，保留真的 `URL` 建構子**：整個換掉會讓
+    //    動態 import 之 `new URL(...)` 炸成 `URL is not a constructor`，
+    //    而那個錯會被匯出鈕的 `.catch` 吞成一句 alert ⇒ 看起來像「沒產出檔案」。
+    const RealURL = globalThis.URL;
+    vi.stubGlobal('URL', Object.assign(
+      function URLStub(...a: ConstructorParameters<typeof URL>) { return new RealURL(...a); } as unknown as typeof URL,
+      RealURL,
+      {
+        createObjectURL: (b: Blob & { _text?: string }) => { blobs.push(b._text ?? ''); return 'blob:x'; },
+        revokeObjectURL: () => {},
+      },
+    ));
     const RealBlob = globalThis.Blob;
     vi.stubGlobal('Blob', class extends RealBlob {
       _text: string;
@@ -243,12 +276,17 @@ describe('GAP-3 B5 /search 匯出前篩選之執行期接線', () => {
       }
     });
 
+    await useRealRecordBuilder();
     render(<SearchPage />);
     // 三列全部通過（無條件）：事件 JSON 收 2 筆（有標記者），CSV 收 3 筆
     expect(screen.getByTestId('export-count-n').textContent).toBe('2');
     expect(screen.getByTestId('export-count-csv').textContent).toContain('3');
 
-    fireEvent.click(screen.getByText('導出CSV檔案'));
+    // 🔴 CSV 匯出自 2026-09-01 起改為**契約 CSV**，帶 `lookahead_bars_declared`
+    //    ⇒ 與事件 JSON 一樣受下界守衛保護（拿不到深度就不匯出）。
+    //    先等深度就緒再按，否則按下去會被守衛正確地擋掉。
+    await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('export-contract-csv'));
     await waitFor(() => expect(blobs.length).toBeGreaterThan(0));
     const dataLines = blobs[0].split('\n').filter((l) => l.trim().length > 0).slice(1);
     expect(dataLines.length).toBe(3);              // CSV 就是畫面說的 CSV 筆數

@@ -349,6 +349,36 @@ R7 的「保守性驗證」部分收回成清單驗收項；R8 被抓出「不�
 <p>🔴 <strong>這兩條與本檔其餘內容的性質不同</strong>：其餘是<strong>偵察</strong>得到的缺口（做之前就知道要做），
 這兩條是<strong>驗收時實際操作才發現的</strong>——前者是規劃的產物，後者是「照著用才會撞到」的東西。
 全文見 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>。</p>
+<h2 id="2026-09-01-再新增三條同樣是驗收時撞到的都已修">2026-09-01 再新增三條（同樣是驗收時撞到的，<strong>都已修</strong>）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>代號</th>
+<th>是什麼</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>G3-D3</code></strong></td>
+<td><code>/search</code> 匯出的 CSV 用展示欄名 ⇒ 在 Excel 標好正反例後<strong>回不去</strong>（要逐欄對映＋手寫含兩個 64 位 hex digest 的批次預設 JSON）</td>
+<td><strong>CLOSED</strong>：改為契約欄名 CSV，零對映可直接上傳</td>
+</tr>
+<tr>
+<td><strong><code>G3-D4</code></strong></td>
+<td>後端還原 CSV 巢狀欄用<strong>手寫</strong>欄名清單，漏了 <code>lookahead_bars_declared</code> ⇒ 上面那條會整批被拒</td>
+<td><strong>CLOSED</strong>：改從契約導出（<code>type==&quot;object&quot;</code> 之欄）</td>
+</tr>
+<tr>
+<td><strong><code>G3-D5</code></strong></td>
+<td>答案窗宣告預填了一個驗證自己會拒的 <code>0</code></td>
+<td><strong>CLOSED</strong>：該情況改留空＋改寫提示</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>這三條再一次印證上面那句話</strong>：<code>G3-D4</code> 是<strong>只有真的把匯出檔拿去上傳</strong>才會現形的——
+它不在任何偵察清單上，也不在四輪審查的任何一條 finding 裡。
+抓到它的不是人，是<strong>樣本產生器裡新加的一道「產出前先讓後端自己收一次」檢查</strong>。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/IC健檢偵察結果.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

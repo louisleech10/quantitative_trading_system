@@ -48,6 +48,38 @@
 </tr>
 </tbody>
 </table></div>
+<h3 id="91-驗收又抓到三件都已經修好推上去了">9/1 驗收又抓到三件，<strong>都已經修好推上去了</strong></h3>
+<p>你做到 B9–B12 時回報的：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>你看到什麼</th>
+<th>已修成什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>G3-D3</code></td>
+<td>「/search 的 JSON 我完全無法篩選正反例」「批次預設 JSON 我根本看不懂也沒辦法自己寫」</td>
+<td><strong><code>/search</code> 的「導出CSV檔案（可回灌）」改成契約欄位</strong>：Excel 篩完、改完 <code>label</code> 就能<strong>直接上傳</strong>，不用做欄位對映、不用寫任何 JSON。分析欄（市場階段、波動度…）放在 <code>meta.</code> 開頭那些欄，照樣可以拿來篩</td>
+</tr>
+<tr>
+<td><code>G3-D4</code></td>
+<td>（還沒被你撞到就先攔下了）</td>
+<td>後端收 CSV 時有一份<strong>手寫</strong>的欄名清單漏了一欄，會讓上面那條<strong>整批被拒</strong>。已改成<strong>從契約自動導出</strong>。抓到它的是我在樣本產生器加的「產出前先讓後端自己收一次」檢查</td>
+</tr>
+<tr>
+<td><code>G3-D5</code></td>
+<td>「B10 把數字調低…沒出現；輸入 0 會出現須為正整數」</td>
+<td>你那個檔沒有未來欄 ⇒ 後端預設是 <code>0</code>，畫面卻<strong>把這個 0 預填進去</strong>，而驗證自己又拒收 0。已改成<strong>留空</strong>，並把提示改寫成「請填你用來區分正反例的最遠 bar 數」</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>B12 的 Build Error 也修好了</strong>，而且這次是<strong>真的把 <code>npm run dev</code> 跑起來驗</strong>的
+（之前只跑 <code>npm run build</code>，那條路徑碰不到那個錯——這就是為什麼漏掉）。</p>
+<p><strong>驗收清單已同步改寫</strong>：B9 拆成 B9-1（主路徑，零對映）與 B9-2（選做的逐欄對映）；
+B10 補上兩種情況各該看到什麼；B11 補上反向要用哪個檔。可以接著驗 B13–B20。</p>
 <h3 id="-驗收已經抓到兩件事gap-3-不能照原計畫結案831">🔴 驗收已經抓到兩件事，GAP-3 不能照原計畫結案（8/31）</h3>
 <p><strong>一、匯出前篩選是設計缺陷（<code>G3-D1</code>）。</strong> 它只有一組條件、同時套用在正例和反例上。
 條件只要引用 <code>future_*</code> 欄，兩類會<strong>同時</strong>被結果截斷——反例不再是對照組，

@@ -31,10 +31,20 @@ export interface LookaheadDeclarationPayload {
 export const UNVERIFIABLE_DECLARATION_WARNING =
   '系統無法驗證此深度，錯報將導致資料洩漏';
 
-/** 逐 tf 之初始值＝後端給的預設（檔內最大可用 horizon）；**不得**自行給更小的值。 */
+/**
+ * 逐 tf 之初始值＝後端給的預設（檔內最大可用 horizon）；**不得**自行給更小的值。
+ *
+ * 🔴 預設 `< 1`（＝檔內沒有任何可解析的未來欄）之 tf **留空不預填**（2026-09-01 UAT B10）：
+ * 原本一律填入後端的 `0`，而 `validateDeclaration` 自己就拒收 `0`（「須為正整數」）
+ * ⇒ 畫面一開就帶著一個系統保證會拒絕的值，使用者既不能「調低」也看不出該填什麼。
+ * 留空之後走的是「尚未填寫」那條訊息，指向的動作才是對的：這個數字只有你知道。
+ */
 export function initialDeclaredWindowBars(preview: LookaheadDeclarationPreview): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const tf of preview.timeframes) out[tf] = preview.default_window_bars[tf] ?? 0;
+  for (const tf of preview.timeframes) {
+    const d = preview.default_window_bars[tf] ?? 0;
+    if (d >= 1) out[tf] = d;
+  }
   return out;
 }
 

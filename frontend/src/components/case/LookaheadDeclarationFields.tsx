@@ -60,7 +60,11 @@ export default function LookaheadDeclarationFields({
               className="w-24 rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-sm text-slate-100"
             />
             <span className="text-xs text-slate-400">
-              根（檔內最大可用 {preview.default_window_bars[tf] ?? 0}）
+              {/* 🔴 檔內沒有可解析的未來欄時不得寫「最大可用 0」（2026-09-01 UAT B10）：
+                  那讀起來像「填 0 就好」，但 0 會被驗證拒收。此時該講的是「只有你知道」。 */}
+              {(preview.default_window_bars[tf] ?? 0) >= 1
+                ? `根（檔內最大可用 ${preview.default_window_bars[tf]}）`
+                : '根（檔內沒有可解析的未來欄；請填你用來區分正反例的最遠 bar 數）'}
             </span>
           </label>
         ))}

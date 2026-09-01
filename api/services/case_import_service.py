@@ -599,7 +599,26 @@ from api.models.event_import_models import (
 )
 
 LEGACY_COLUMNS = frozenset({"symbol", "timestamp", "positive_case"})
-_NESTED_FIELDS = ("label_definition", "meta", "source_model", "event_interval", "reference_symbols")
+
+
+def _nested_fields(contract: Dict[str, object]) -> frozenset:
+    """CSV dotted 欄可還原成巢狀物件的欄名集合＝**契約裡 type=="object" 的欄**。
+
+    🔴 這裡刻意**從契約導出**而不是手寫清單（原本是手寫 tuple）：
+    `lookahead_bars_declared` 加進契約時沒人記得同步這份清單，結果 `/search` 匯出之
+    CSV（每列必帶 `lookahead_bars_declared.<tf>`）回灌時整批 `unknown_field` 被拒
+    ——一份「看起來是契約欄」卻上傳不了的檔。契約新增 object 欄時本集合自動跟上。
+    `list` 型別之欄（如 `reference_symbols`）不在此列：dotted 還原只產生 dict。
+    """
+    names = set()
+    for group in ("required_fields", "optional_fields", "conditional_required"):
+        spec = contract.get(group)
+        if not isinstance(spec, dict):
+            continue
+        for name, meta in spec.items():
+            if isinstance(meta, dict) and meta.get("type") == "object":
+                names.add(str(name))
+    return frozenset(names)
 
 
 class EventImportRejectedError(ValueError):
@@ -888,6 +907,7 @@ class EventImportService:
     def _csv_rows_to_records(self, df: pd.DataFrame) -> List[Dict[str, object]]:
         """CSV → 記錄：巢狀欄接受 JSON 字串儲存格或 dotted 欄（`label_definition.rule_id`）；數值欄以 JSON 解碼。"""
         records: List[Dict[str, object]] = []
+        nested = _nested_fields(self._contract)
         cols = list(df.columns)
         for row_t in df.itertuples(index=False, name=None):
             row = dict(zip(cols, row_t))
@@ -902,7 +922,7 @@ class EventImportService:
                     val = _json.loads(raw)
                 except (ValueError, TypeError):
                     val = raw
-                if "." in key and key.split(".", 1)[0] in _NESTED_FIELDS:
+                if "." in key and key.split(".", 1)[0] in nested:
                     top, sub = key.split(".", 1)
                     target = rec.setdefault(top, {})
                     if isinstance(target, dict):

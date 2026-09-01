@@ -103,6 +103,19 @@ export interface EventExportOptions {
    * 無條件時傳 `null`／不傳 ⇒ **不寫該鍵**（`filters` 存在與否本身有語意）。
    */
   filters?: ExportFilterSpec | null;
+  /**
+   * 🔴 **可回灌 CSV 專用**（2026-09-01 使用者裁定）：把**沒有正反例標記**的列也產出來，
+   * 其 `label` 為 `null`（CSV 落成空欄）。
+   *
+   * 為什麼要這個選項：匯入端對「缺 `label`」是**整批拒收**（實測 HTTP 422、逐列 reason），
+   * 所以 CSV 若把未標記的列**丟掉**，使用者根本看不到它們、也就**無從補標記**
+   * ——而「自己決定哪些是正例」正是本 epic 的核心前提。留在檔案裡、`label` 空著，
+   * 使用者在 Excel 補完就能整份上傳；沒補的話匯入訊息會逐列指名是哪幾列。
+   * 這也讓 R3 `CODEX-R3-P1-01` 之裁定（「CSV 不該因少一個旗標就丟整列」）繼續成立。
+   *
+   * 🔴 **JSON 匯出不得開這個選項**：契約要求 `label` 必填，帶 `null` 的 JSON 必然被拒。
+   */
+  includeUnlabeled?: boolean;
 }
 
 /**
@@ -265,10 +278,13 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
     }
     const pc = (c as CaseData & { positive_case?: boolean | number }).positive_case;
     const label = pc === true || pc === 1 ? 1 : pc === false || pc === 0 ? 0 : null;
-    if (label === null) {
+    if (label === null && !opts.includeUnlabeled) {
       skipped.push({ index: i, reason: 'missing_positive_case_flag' });
       return [];
     }
+    // 🔴 `includeUnlabeled` 之下仍記入 `skipped`：那一列**確實**還不能匯入，
+    //    只是我們把它留在檔案裡讓使用者去補 `label`（見該選項之說明）。
+    if (label === null) skipped.push({ index: i, reason: 'missing_positive_case_flag' });
     // Task 4.1 ①：附帶報酬欄——**原值攜帶**（不依 direction 取負；那是 label 語意，附帶欄沒有 label 語意）。
     // 🔴 匯出端**不再寫 `label_value`**（Task 4.1 ②，含不得寫 null／0／另立新欄）：
     //    答案窗已依 §D-3′ 移到 IC 分析層，`label_value` 於分析時才由後端 producer 計算。

@@ -2353,6 +2353,25 @@ purge 取正反例兩者較大。<strong>既簡單又沒有那個破口</strong>
 篩選就不需要碰未來欄，我先前擔心的選擇偏誤來源直接消失。</p>
 <p>🔴 值得記的是<strong>制度層的觀察</strong>：現行設計把深度推導綁在篩選上，
 等於<strong>逼使用者為了宣告深度而去篩未來欄</strong>——制度在鼓勵那個壞動作。</p>
+<hr />
+<h2 id="2026-09-01gap-3-uat-b9b12兩件我自己造成的摩擦">2026-09-01（GAP-3 UAT B9–B12：兩件我自己造成的摩擦）</h2>
+<h3 id="一我把測試裡的-mock-留著於是新寫的測試綠得沒有意義">一、我把測試裡的 mock 留著，於是新寫的測試「綠得沒有意義」</h3>
+<p>改完 <code>/search</code> 的 CSV 匯出之後，兩條既有測試變紅，我花了<strong>六個往返</strong>在猜錯方向
+（先懷疑 Blob 替身抓不到文字、再懷疑 URL 替身、再懷疑深度還沒就緒），
+最後印出實際內容才發現：那個測試檔在最上面把 <code>buildEventContractRecords</code> <strong>整支 mock 掉</strong>了
+（原本只是拿它的呼叫次數當「匯出有沒有發生」的證據），而 CSV 改版後正好開始用它
+⇒ 產出的檔案是空的。</p>
+<p>🔴 <strong>值得記的不是那六個往返，是那個 mock 本身</strong>：它讓「檔案內容對不對」這件事
+<strong>在測試裡不可能為真</strong>。如果不是我改版撞上，這個檔會一直綠著、一直沒在驗它宣稱在驗的東西。
+<strong>修法</strong>＝在需要驗內容的那兩條裡改成委派真實實作（<code>vi.importActual</code>），呼叫次數證據不變。</p>
+<p><strong>分類</strong>：假綠（測試設計）。與「宣稱大於實作」同一家族，只是這次宣稱的人是測試自己。</p>
+<h3 id="二只跑-build-沒跑-dev於是-b12-的錯我從頭到尾看不到">二、只跑 <code>build</code> 沒跑 <code>dev</code>，於是 B12 的錯我從頭到尾看不到</h3>
+<p>使用者回報 <code>/ic-analysis</code> 出現 Build Error，我先前<strong>每一次驗證都只跑 <code>npm run build</code></strong>。
+Next 15 的 <code>dev</code> 走 turbopack、<code>build</code> 走 webpack，兩者對跨根 import 的判準不同
+⇒ 那條路徑我一次都沒走過。</p>
+<p>🔴 <strong>判準</strong>：使用者實際會用的是 <code>dev</code>。<strong>驗收要驗使用者走的那條路</strong>，不是我方便驗的那條。
+本次已實跑 <code>dev</code> 確認 <code>/ic-analysis</code> 與 <code>/search</code> 皆 HTTP 200，並補 <code>devBuildParity.test.ts</code>
+釘住「<code>dev</code> 不得再帶 <code>--turbopack</code>」。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

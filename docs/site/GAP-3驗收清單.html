@@ -36,7 +36,7 @@ cd frontend &amp;&amp; npm run dev
 <p>瀏覽器開 <code>http://localhost:3000</code>。</p>
 <hr />
 <h2 id="-樣本檔已經幫你準備好了不必自己生">🔴 樣本檔已經幫你準備好了（不必自己生）</h2>
-<p>四個檔在 <strong><code>uat_samples/</code></strong>，內容<strong>全部由真實 K 線導出</strong>（<code>data_cache/feature_klines/kline_cache.h5</code>），
+<p>五個檔在 <strong><code>uat_samples/</code></strong>，內容<strong>全部由真實 K 線導出</strong>（<code>data_cache/feature_klines/kline_cache.h5</code>），
 沒有一個數字是編的：</p>
 <div class="table-wrap"><table>
 <thead>
@@ -58,9 +58,14 @@ cd frontend &amp;&amp; npm run dev
 <td><strong>B16</strong>（讓「全體組算不出來」看得到）</td>
 </tr>
 <tr>
+<td><code>events_contract.csv</code></td>
+<td><strong>契約欄名</strong>之 CSV ＋ <code>meta.</code> 分析欄 ⇒ <strong>零對映</strong>直接上傳；與 <code>/search</code>「導出CSV檔案（可回灌）」同格式</td>
+<td><strong>B9-1</strong>（主路徑）、B11 反向</td>
+</tr>
+<tr>
 <td><code>events_mapping.csv</code></td>
 <td>欄名<strong>故意不是</strong>契約欄名（<code>幣種</code>／<code>週期</code>／<code>進場時間_毫秒</code>／<code>我的標記</code>／<code>當根收盤</code>）</td>
-<td><strong>B9</strong>（練逐欄對映）</td>
+<td><strong>B9-2</strong>（選做：練逐欄對映）</td>
 </tr>
 <tr>
 <td><code>events_legacy_3col.csv</code></td>
@@ -78,6 +83,7 @@ venv/bin/python scripts/gen_uat_samples.py --check  # 只檢查現有樣本還�
 </code></pre>
 <p><strong>我已經實際打過端點驗證</strong>（不是只跑 validator）：
 <code>events_ok.json</code> 與 <code>events_mixed_control_kind.json</code> 都是 <strong>HTTP 200、60/60 通過</strong>；
+<code>events_contract.csv</code> 由<strong>後端自己</strong>解析回契約列並過 validator（產生時就檢查，不過就不交檔）；
 <code>events_mapping.csv</code> 用上面那組對映 <strong>60/60 通過</strong>；
 <code>events_legacy_3col.csv</code> 被 <strong>HTTP 400 <code>legacy_schema_detected</code></strong> 擋下並附搬遷提示。
 所以你照著做<strong>應該會成功</strong>——不成功就是真的有問題，記下來告訴我。</p>
@@ -132,7 +138,7 @@ venv/bin/python scripts/gen_uat_samples.py --check  # 只檢查現有樣本還�
 的 Feature Factory run，現在沒有這種 run。</p>
 <hr />
 <h2 id="第一段把事件匯出來search">第一段：把事件匯出來（<code>/search</code>）</h2>
-<h3 id="b1-跑一次搜尋">B1 ── 跑一次搜尋</h3>
+<h3 id="b1-跑一次搜尋-ｏｋ">B1 ── 跑一次搜尋 [ＯＫ]</h3>
 <p><strong>你做什麼</strong>：開 <code>/search</code>，設好條件，按搜尋。</p>
 <p><strong>應該看到</strong>：結果列表出現。往下捲，底部有一整區匯出面板，裡面<strong>由上而下</strong>依序是：
 匯出前篩選 → 筆數 → 附帶報酬欄 → <strong>這批事件的五個設定</strong> → <strong>這批匯出實際會帶什麼</strong> →
@@ -261,7 +267,7 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 <code>platform_random_bars</code> 要先有委員會定出抽樣契約、A／B 要一整個預測型事件的 epic。
 逐項登記在 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>。</p>
 <hr />
-<h3 id="b4-這批匯出實際會帶什麼七項新的">B4 ── 這批匯出實際會帶什麼（<strong>七項，新的</strong>）</h3>
+<h3 id="b4-這批匯出實際會帶什麼七項新的ｏｋ">B4 ── 這批匯出實際會帶什麼（<strong>七項，新的</strong>）[ＯＫ]</h3>
 <p><strong>你做什麼</strong>：看「這批匯出實際會帶什麼（你沒選過但一直存在的設定）」那一區。</p>
 <p><strong>應該看到 七行</strong>：<code>scenario</code> / <code>control_kind</code> / 進場價語意 / 報酬算法 / 決策位移 /
 lookahead 深度 / purge 下界。而且：</p>
@@ -341,14 +347,14 @@ lookahead 深度 / purge 下界。而且：</p>
 （我第一版寫成找字串，結果只留 <code>import</code> 就能矇混過關，實測不紅，已改）。</p>
 <p><strong>你要做的</strong>：重啟後端、重整頁面、重跑搜尋，再按一次匯出。這次應該會下載兩個檔。</p>
 <hr />
-<h3 id="b6-ic-decay-的邊界說明">B6 ── IC decay 的邊界說明</h3>
+<h3 id="b6-ic-decay-的邊界說明-ok">B6 ── IC decay 的邊界說明 [OK].</h3>
 <p><strong>你做什麼</strong>：看匯出面板最底下那段黃字。</p>
 <p><strong>應該看到</strong>：它明白告訴你四件事——decay 曲線<strong>不是</strong>本批交付、附帶的 <code>future_*</code> 欄
 <strong>不會</strong>進 IC 計算、要換答案窗請去 IC 分析頁改、<strong>不必再匯出一次</strong>、整條曲線等 GAP-6。</p>
 <p><strong>不是這樣代表什麼</strong>：如果它叫你「重新匯出」來換答案窗，那是錯的（那正是這段話要否定的事）。</p>
 <hr />
 <h2 id="第二段把事件匯進系統data-preparation">第二段：把事件匯進系統（<code>/data-preparation</code>）</h2>
-<h3 id="b7-用-json-匯入先只驗證">B7 ── 用 JSON 匯入（先只驗證）</h3>
+<h3 id="b7-用-json-匯入先只驗證ok">B7 ── 用 JSON 匯入（先只驗證）[OK]</h3>
 <p><strong>你做什麼</strong>：開 <code>/data-preparation</code> → 「匯入事件（GAP-3 新契約）」→ 選
 <strong><code>uat_samples/events_ok.json</code></strong>（或你在 B5 自己下載的那個）→ <strong>勾「僅驗證不落檔」</strong> → 送出。</p>
 <p><strong>應該看到</strong>：「驗證通過 <strong>60</strong> 筆（未落檔）」。</p>
@@ -356,12 +362,41 @@ lookahead 深度 / purge 下界。而且：</p>
 <p><strong>應該看到</strong>：<strong>逐列的拒收原因表格</strong>（哪一列、哪個欄位、什麼原因），<strong>不是</strong>空白畫面、
 <strong>不是</strong> 500 錯誤。</p>
 <hr />
-<h3 id="b8-真的匯進去">B8 ── 真的匯進去</h3>
+<h3 id="b8-真的匯進去-ok">B8 ── 真的匯進去 [OK]</h3>
 <p><strong>你做什麼</strong>：取消「僅驗證」，再送出一次。</p>
 <p><strong>應該看到</strong>：顯示 <code>import_id</code>；右側「已匯入事件批」列表多出這一批，
 每列有 <code>import_id</code>／筆數／匯入時間／symbols／timeframes。</p>
 <hr />
-<h3 id="b9-用-csv-逐欄對映匯入新的">B9 ── 用 CSV 逐欄對映匯入（<strong>新的</strong>）</h3>
+<h3 id="b9-用-csv-匯入">B9 ── 用 CSV 匯入</h3>
+<blockquote>
+<p>🔴 <strong>2026-09-01 依你的回報改過</strong>：你說「我根本也看不懂也沒辦法自己寫批次預設 JSON」。
+現在 <strong>B9-1 是主路徑</strong>：<code>/search</code> 匯出的 CSV 已含契約欄，<strong>零對映、不必寫任何 JSON</strong>。
+底下的 B9-2（逐欄對映）改成<strong>選做</strong>——只有當你手上的檔不是本系統匯出的才需要。</p>
+</blockquote>
+<h4 id="b9-1-search-匯出的-csvexcel-篩完直接上傳主路徑">B9-1 ── <code>/search</code> 匯出的 CSV，Excel 篩完直接上傳（<strong>主路徑</strong>）</h4>
+<p><strong>你做什麼</strong>：</p>
+<ol>
+<li>回 <code>/search</code>，按 <strong>「導出CSV檔案（可回灌）」</strong>（不是 B5 那顆 JSON）。</li>
+<li>用 Excel／Numbers 打開它，<strong>只改 <code>label</code> 那一欄</strong>（<code>1</code> ＝正例，<code>0</code> ＝反例，
+<strong>留白</strong> ＝這列還沒決定）。要刪列也可以，整列刪掉即可。</li>
+<li>存回 CSV，到 <code>/data-preparation</code> 的 <strong>「匯入事件（GAP-3 新契約）」</strong> 直接上傳。</li>
+</ol>
+<p><strong>應該看到</strong>：</p>
+<ul>
+<li>檔案裡的欄名就是<strong>契約欄名本身</strong>（<code>symbol</code>／<code>timeframe</code>／<code>t0</code>／<code>label</code>／
+<code>label_definition.window.horizon_bars</code>／<code>lookahead_bars_declared.12h</code>…）
+⇒ 上傳時<strong>不用做任何欄位對映</strong>，也<strong>不用</strong>填「批次預設（JSON 物件）」。</li>
+<li>另外一批 <code>meta.</code> 開頭的欄（<code>meta.timestamp</code>／<code>meta.price_change</code>／<code>meta.market_phase</code>…）
+⇒ 那是<strong>給你在 Excel 裡篩選用的</strong>分析欄，上傳時會被接受但不進契約判定。</li>
+<li>上傳後：正例／反例筆數與你在 Excel 裡的數字一致。</li>
+</ul>
+<p><strong>試著違規</strong>：把某一列的 <code>label</code> 留白（不填 1 也不填 0）再上傳。</p>
+<p><strong>應該看到</strong>：<strong>整批被拒</strong>，並指出是哪一列缺 <code>label</code>
+—— 🔴 匯入是<strong>全有全無</strong>，不會默默丟掉那列自己收下其餘的。
+（所以匯出的 CSV 才會把未標記的列也帶給你：要嘛補完，要嘛刪掉，你自己決定。）</p>
+<p>🔴 <strong>沒跑搜尋也想驗這條</strong>：用 <strong><code>uat_samples/events_contract.csv</code></strong>，那是同一種格式的離線樣本
+（<code>scripts/gen_uat_samples.py</code> 產生時已讓<strong>後端自己</strong>解析回契約列並過 validator 才交出）。</p>
+<h4 id="b9-2-用-csv-逐欄對映匯入選做手上的檔不是本系統匯出的才需要">B9-2 ── 用 CSV 逐欄對映匯入（<strong>選做</strong>：手上的檔不是本系統匯出的才需要）</h4>
 <p><strong>你做什麼</strong>：用「CSV 欄名對映匯入」那一區，選 <strong><code>uat_samples/events_mapping.csv</code></strong>。</p>
 <p>那個檔的欄名<strong>故意不是</strong>契約欄名，所以你會真的用到對映功能。這樣對：</p>
 <div class="table-wrap"><table>
@@ -414,33 +449,65 @@ lookahead 深度 / purge 下界。而且：</p>
 <li>「批次預設（JSON 物件）」文字框</li>
 <li>「你聲明的正例 X 筆／反例 Y 筆」＋<strong>一個必須勾的確認框</strong></li>
 </ol>
-<p><strong>試著違規一</strong>：<strong>不要勾</strong>那個確認框，直接按「匯入」。</p>
+<p><strong>試著違規一</strong>：<strong>不要勾</strong>那個確認框，直接按「匯入」。[OK]</p>
 <p><strong>應該看到</strong>：被擋下來並列出原因，而且<strong>完全沒有任何網路請求發出</strong>（開瀏覽器開發者工具的
 Network 分頁看，應該一片空白）。</p>
 <p><strong>試著違規二</strong>：在「這批的五個設定」選了 <code>scenario = A</code>，<strong>同時</strong>在「批次預設」文字框裡
-也寫 <code>{&quot;scenario&quot;: &quot;B&quot;}</code>。</p>
+也寫 <code>{&quot;scenario&quot;: &quot;B&quot;}</code>。[OK]</p>
 <p><strong>應該看到</strong>：被擋下來，訊息說 <code>scenario</code> 同時由兩個地方給值、請只留一個來源
-—— 🔴 <strong>系統不會替你決定誰優先</strong>。</p>
+—— 🔴 <strong>系統不會替你決定誰優先</strong>。[OK]</p>
 <p><strong>試著違規三</strong>：把 <code>decision_offset_bars</code> 打成 <code>1.9</code>。</p>
 <p><strong>應該看到</strong>：被擋下來，說必須是整數。🔴 <strong>不應該</strong>看到它自己變成 <code>1</code>
 （那是 R4 抓到的「靜默改值」缺陷）。</p>
 <hr />
 <h3 id="b10-答案窗宣告">B10 ── 答案窗宣告</h3>
 <p><strong>你做什麼</strong>：B9 對映齊全並勾了確認之後，往下看「答案窗宣告」那一區。</p>
-<p><strong>應該看到</strong>：逐個週期各一個輸入框，預設值是該檔案能支援的<strong>最大</strong>深度；
-下方列出你的條件引用到哪些未來欄。</p>
-<p><strong>試著違規</strong>：把某個週期的數字<strong>調低</strong>。</p>
+<p><strong>應該看到</strong>：逐個週期各一個輸入框。<strong>預設值分兩種情況</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>你的檔</th>
+<th>輸入框</th>
+<th>右邊寫什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>有</strong> <code>future_*bar_return</code> 欄（例如 <code>/search</code> 匯出的 CSV、<code>events_ok.json</code>）</td>
+<td>預填該檔能支援的<strong>最大</strong>深度</td>
+<td>「根（檔內最大可用 N）」</td>
+</tr>
+<tr>
+<td><strong>沒有</strong>這種欄（例如 <code>uat_samples/events_mapping.csv</code>）</td>
+<td><strong>留空</strong></td>
+<td>「根（檔內沒有可解析的未來欄；請填你用來區分正反例的最遠 bar 數）」</td>
+</tr>
+</tbody>
+</table></div>
+<p>下方列出你的條件引用到哪些未來欄。</p>
+<p><strong>試著違規（只在第一種情況做得到）</strong>：把某個週期的數字<strong>調低</strong>。</p>
 <p><strong>應該看到</strong>：出現一個<strong>必須勾選</strong>的聲明（大意是「我知道這樣可能不可驗證」），不勾就送不出去。</p>
+<p><strong>第二種情況要試的是這個</strong>：什麼都不填直接送出。</p>
+<p><strong>應該看到</strong>：擋下並說「<strong>尚未填寫</strong> 12h 的答案窗」
+—— 🔴 <strong>不應該</strong>看到「須為正整數，目前是 0」。</p>
+<blockquote>
+<p>2026-09-01 你在這一項回報：「把某個週期的數字調低…沒出現；輸入 0 會出現…須為正整數」。
+原因是你用的 <code>events_mapping.csv</code> 裡沒有任何未來欄 ⇒ 後端給的預設是 <code>0</code>，
+而畫面<strong>直接把這個 0 預填進去</strong>，但驗證自己又拒收 0 ⇒ 你既無法「調低」，
+也看不出到底該填什麼。<strong>已修</strong>：這種情況改成留空＋改寫提示文字（見上表）。</p>
+</blockquote>
 <hr />
 <h3 id="b11-舊格式擋得住">B11 ── 舊格式擋得住</h3>
 <p><strong>你做什麼</strong>：把 <strong><code>uat_samples/events_legacy_3col.csv</code></strong>（舊三欄格式）丟進「匯入事件」。</p>
 <p><strong>應該看到</strong>：拒收，原因 <code>legacy_schema_detected</code>，訊息說「不做靜默轉換」，
 <strong>並附欄位對照的搬遷提示</strong>（會列出缺哪些必填欄）。</p>
-<p><strong>反過來</strong>：把 <code>events_ok.json</code> 轉成 CSV 丟進舊的「導入案例」。</p>
+<p><strong>反過來</strong>：把新格式的 CSV 丟進<strong>舊的</strong>「導入案例」。</p>
+<p>用 <strong><code>uat_samples/events_contract.csv</code></strong> 就好（那已經是 CSV，不必自己轉）。
+如果你想用自己的檔：<code>/search</code> 的「導出CSV檔案（可回灌）」出來的就是同一種格式。</p>
 <p><strong>應該看到</strong>：拒收，原因 <code>new_schema_on_legacy_endpoint</code>，訊息指向新端點。</p>
 <p>🔴 <strong>兩個方向都要試</strong>——只試一個方向的話，一個「永遠拒收」的實作也會看起來正常。</p>
 <hr />
-<h3 id="b12-刪掉一批事件新的">B12 ── 刪掉一批事件（<strong>新的</strong>）</h3>
+<h3 id="b12-刪掉一批事件新的ok">B12 ── 刪掉一批事件（<strong>新的</strong>）[OK]</h3>
 <p><strong>你做什麼</strong>：在「已匯入事件批」列表，對某一批按刪除。</p>
 <p><strong>應該看到</strong>：確認框，裡面有：</p>
 <ul>

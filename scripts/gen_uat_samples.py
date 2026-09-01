@@ -141,6 +141,44 @@ def _write_json(path: Path, records: list, note: str) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _flatten(obj: dict, prefix: str = "") -> dict:
+    """與 `frontend/src/lib/eventContractCsv.ts::flatten` 同規則：巢狀 → 點路徑。"""
+    out: dict = {}
+    for k, v in obj.items():
+        key = f"{prefix}.{k}" if prefix else k
+        if isinstance(v, dict):
+            out.update(_flatten(v, key))
+        else:
+            out[key] = v
+    return out
+
+
+def _cell(v: object) -> str:
+    """與 `eventContractCsv.ts::cell` 同規則（陣列走 JSON 字面、必要時引用）。"""
+    if v is None:
+        return ""
+    s = json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else str(v)
+    return '"' + s.replace('"', '""') + '"' if any(c in s for c in ',"\n\r') else s
+
+
+def _write_contract_csv(path: Path, records: list, extras: list) -> None:
+    """⑤ 契約欄名 CSV：**零對映**可直接上傳，`meta.` 欄留給 Excel 篩選（B9 主路徑）。
+
+    與 `/search`「導出CSV檔案（可回灌）」產出的是同一種格式；這份只是離線備用，
+    好讓沒跑搜尋時也能驗 B9。
+    """
+    rows = []
+    for i, rec in enumerate(records):
+        flat = _flatten(rec)
+        for k, v in extras[i].items():
+            flat[f"meta.{k}"] = v
+        rows.append(flat)
+    names = sorted({k for r in rows for k in r},
+                   key=lambda n: (1 if n.startswith("meta.") else 0, n))
+    lines = [",".join(names)] + [",".join(_cell(r.get(n)) for n in names) for r in rows]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="只驗現有樣本是否仍過契約")
@@ -205,10 +243,29 @@ def main() -> int:
             iso = datetime.fromtimestamp(r["t0_s"], tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             w.writerow([SYMBOL, iso, "True" if r["label"] == 1 else "False"])
 
+    # ⑤ 契約欄名 CSV ⇒ 零對映直接上傳（B9 主路徑；與 /search 匯出同格式）
+    _write_contract_csv(
+        out / "events_contract.csv",
+        ok,
+        [{"timestamp": datetime.fromtimestamp(r["t0_s"], tz=timezone.utc)
+                              .strftime("%Y-%m-%d %H:%M:%S"),
+          "close": f"{r['close']:.2f}"} for r in rows],
+    )
+
     span = (datetime.fromtimestamp(rows[0]["t0_s"], tz=timezone.utc).strftime("%Y-%m-%d"),
             datetime.fromtimestamp(rows[-1]["t0_s"], tz=timezone.utc).strftime("%Y-%m-%d"))
     n_pos = sum(r["label"] for r in rows)
-    print(f"✓ 產生 4 個樣本於 {out}/")
+    # 🔴 產出前先讓**後端自己**把這份 CSV 解回契約列並過 validator——
+    #    不然交出去的是一份「看起來像契約」但上傳會被拒的檔（B9 就是被這種檔卡住的）。
+    import pandas as pd  # noqa: PLC0415 —— 只有這一段要用
+    from api.services.case_import_service import EventImportService  # noqa: PLC0415
+
+    parsed = EventImportService()._csv_rows_to_records(
+        pd.read_csv(out / "events_contract.csv", dtype=str).where(lambda d: d.notna(), None)
+    )
+    validate_event_import(parsed)
+
+    print(f"✓ 產生 5 個樣本於 {out}/")
     print(f"  事件 {len(rows)} 筆（正例 {n_pos}／反例 {len(rows) - n_pos}），"
           f"{SYMBOL} {TIMEFRAME}，{span[0]} → {span[1]}")
     print("  events_ok.json / events_mixed_control_kind.json 皆已通過契約 validator")

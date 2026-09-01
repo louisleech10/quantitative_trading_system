@@ -30,7 +30,9 @@ import {
   EVENT_EXPORT_SCENARIO,
   eventDimsToExportOptions,
   horizonCoverageLines,
+  toEpochMs,
 } from '@/lib/eventExport';
+import { canonicalEventId } from '@/lib/eventId';
 import EventDimensionFields, { type EventDimensionValues } from '@/components/case/EventDimensionFields';
 import {
   EVENT_IC_DECAY_DISCLOSURE,
@@ -703,140 +705,102 @@ export default function SearchPage() {
     });
   };
 
-  // CSV導出函數
-  const exportSearchResultsToCSV = () => {
+  /**
+   * CSV 導出 —— 🔴 **改為「可直接回灌」之契約 CSV**（2026-09-01 使用者裁定）。
+   *
+   * 病因（使用者 UAT B9）：舊版用展示用欄名（`Timestamp`／`Positive_Case`／`Price_Change_%`），
+   * 與契約欄名、型別、單位全對不上 ⇒ 使用者在 Excel 標好正反例後**回不去**：
+   * 要逐欄對映，還要手寫含兩個 64 位 hex digest 的批次預設 JSON。
+   * 而「自己決定哪些是正例」正是本 epic 的核心前提。
+   *
+   * 🔴 **與 JSON 匯出走同一條路**（同一個 `buildEventContractRecords`）⇒ 兩種匯出不可能漂移；
+   *    也因此**同樣受下界守衛保護**（拿不到深度就不讓匯出），不再是「CSV 可以繞過」。
+   * 🔴 非契約之分析欄放進 `meta.`（契約自由欄）：Excel 裡照樣看得到、篩得動，
+   *    且不會被 `unknown_field` 拒收。
+   * 🔴 答案只有 `label` 一欄（0／1）；不再另寫 `Positive_Case`——
+   *    兩欄並存時使用者改一個、系統讀另一個，是必然的誤會來源。
+   */
+  const exportSearchResultsToCSV = async () => {
     if (!currentResult || !currentResult.cases || currentResult.cases.length === 0) {
       alert('沒有搜索結果可以導出');
       return;
     }
+    return withExportLowerBoundGuard(lowerBoundState, {
+      notify: alert,
+      proceed: async () => {
+        const { buildEventContractRecords } = await import('@/lib/eventExport');
+        const { buildEventContractCsv } = await import('@/lib/eventContractCsv');
+        const ruleConditions = [
+          {
+            parameter: 'price_change',
+            operator: operators.priceChange,
+            value: operators.priceChange === 'BETWEEN'
+              ? [rangeValues.priceChange.min, rangeValues.priceChange.max]
+              : searchParams.priceChange,
+            unit: 'percent',
+          },
+          { parameter: 'volume_multiplier', operator: operators.volumeMultiplier, value: searchParams.volumeMultiplier },
+          { parameter: 'closing_strength', operator: operators.closingStrength, value: searchParams.closingStrength },
+          { parameter: 'taker_buy_ratio', operator: operators.takerBuyRatio, value: searchParams.takerBuyRatio },
+          { parameter: 'price_position', operator: operators.pricePosition, value: searchParams.pricePosition },
+        ].filter((c) => c.value !== null && c.value !== undefined);
 
-    try {
-      // CSV標題行 - 包含所有20個參數
-      const headers = [
-        // 基本資訊
-        'Symbol', 'Timestamp', 'Trigger_Index', 'Open', 'High', 'Low', 'Close', 'Volume', 
-        'Price_Change_%', 'Market_Phase', 'Timeframe',
-        // 基礎觸發條件參數
-        'Closing_Strength', 'Price_Position', 'Volume_Multiplier', 'Taker_Buy_Ratio',
-        // 未來收益參數 (12個)
-        'Future_1Bar_Return_%', 'Future_2Bar_Return_%', 'Future_3Bar_Return_%', 'Future_4Bar_Return_%',
-        'Future_5Bar_Return_%', 'Future_6Bar_Return_%', 'Future_7Bar_Return_%', 'Future_8Bar_Return_%',
-        'Future_9Bar_Return_%', 'Future_10Bar_Return_%', 'Future_11Bar_Return_%', 'Future_12Bar_Return_%',
-        // 未來回撤參數 (12個)  
-        'Future_1Bar_Drawdown_%', 'Future_2Bar_Drawdown_%', 'Future_3Bar_Drawdown_%', 'Future_4Bar_Drawdown_%',
-        'Future_5Bar_Drawdown_%', 'Future_6Bar_Drawdown_%', 'Future_7Bar_Drawdown_%', 'Future_8Bar_Drawdown_%',
-        'Future_9Bar_Drawdown_%', 'Future_10Bar_Drawdown_%', 'Future_11Bar_Drawdown_%', 'Future_12Bar_Drawdown_%',
-        // 時間描述參數
-        'Hour_Of_Day', 'Day_Of_Week',
-        // ===== 改寫：分類特徵參數 (9個) =====
-        // 數值參數 (3個)
-        'Past_3Day_Max_Volatility_%', 'Past_3Day_Direction_%', 'Past_3Day_Volume_CV',
-        // 分類參數 (6個)
-        'Volatility_Class', 'Direction_Class', 'Volume_Class',
-        'Market_Class', 'Market_Class_Name', 'Difficulty_Level',
-        // 正反例標記
-        'Positive_Case'
-      ].join(',');
+        const filtered = applyExportFilters(
+          currentResult.cases as unknown as Record<string, unknown>[], exportFilters,
+        ) as unknown as CaseData[];
+        const payload = await buildEventContractRecords(filtered, {
+          timeframe: searchParams.timeframe,
+          conditions: ruleConditions,
+          priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
+          attachedHorizons,
+          lookaheadBarsDeclared: lowerBoundState.depthByTimeframe,
+          sourceFileText: currentResult.source_file_text ?? '',
+          sourceFileDigest: currentResult.source_file_digest ?? '',
+          filters: buildExportFilterSpec(exportFilters),
+          ...eventDimsToExportOptions(eventDims),
+          // 🔴 CSV 帶**全部**列（未標記者 `label` 留空給你在 Excel 補）——
+          //    丟掉那些列等於剝奪你補標記的機會，而匯入端對缺 label 是整批拒收。
+          includeUnlabeled: true,
+        });
 
-      // 格式化函數
-      const formatNumber = (value: number | undefined | null, decimals: number = 4): string => {
-        if (value === null || value === undefined || Number.isNaN(value)) return '';
-        return Number(value).toFixed(decimals);
-      };
+        // 🔴 `meta.` 之內容＝**該列自己的**非契約欄；逐列取，不跨列共用。
+        //    只帶原始數值（不轉百分比）——與篩選面板同一套單位，避免「兩個框單位不同」那個陷阱。
+        const META_KEYS = [
+          'timestamp', 'trigger_idx', 'open', 'high', 'low', 'close', 'volume',
+          'price_change', 'market_phase', 'closing_strength', 'price_position',
+          'volume_multiplier', 'taker_buy_ratio', 'hour_of_day', 'day_of_week',
+          'past_3day_max_volatility', 'past_3day_direction', 'past_3day_volume_cv',
+          'volatility_class', 'direction_class', 'volume_class',
+          'market_class', 'market_class_name', 'difficulty_level',
+        ] as const;
+        // 逐列對齊：`buildEventContractRecords` 會跳過無法解析 t0／無正反例標記之列，
+        // 故以 `event_id` 對回原始列，不用位置索引（位置對不上就會張冠李戴）。
+        const byEventId = new Map<string, Record<string, unknown>>();
+        for (const row of filtered as unknown as Record<string, unknown>[]) {
+          const t0 = toEpochMs(row.timestamp as string | number | null | undefined);
+          if (t0 === null) continue;
+          byEventId.set(
+            canonicalEventId(String(row.symbol), String(row.timeframe || searchParams.timeframe), t0),
+            row,
+          );
+        }
+        const extras = (payload.records as Record<string, unknown>[]).map((rec) => {
+          const src = byEventId.get(String(rec.event_id)) ?? {};
+          const out: Record<string, unknown> = {};
+          for (const k of META_KEYS) if (src[k] !== undefined) out[k] = src[k];
+          return out;
+        });
 
-      const formatPercentage = (value: number | undefined | null): string => {
-        if (value === null || value === undefined || Number.isNaN(value)) return '';
-        return (Number(value) * 100).toFixed(5);  // 🔥 改為5位小數以顯示連續市場中的細微差異
-      };
-
-      // 生成CSV內容
-      // 🔴 R2 `CODEX-R2-P1-01`：篩選面板與「將匯出 N 筆」就在這個按鈕上方，
-      //    CSV 卻取全量 ⇒ 使用者看到 N、拿到 M。兩個匯出鈕都套同一組條件才一致。
-      const csvRows = applyExportFilters(
-        currentResult.cases as unknown as Record<string, unknown>[], exportFilters,
-      ).map((row) => row as unknown as CaseData).map((case_: CaseData) => [
-        // 基本資訊
-        case_.symbol || '',
-        case_.timestamp || '',
-        case_.trigger_idx || '',
-        formatNumber(case_.open),
-        formatNumber(case_.high), 
-        formatNumber(case_.low),
-        formatNumber(case_.close),
-        formatNumber(case_.volume),
-        formatPercentage(case_.price_change),
-        case_.market_phase || '',
-        case_.timeframe || '',
-        // 基礎觸發條件參數
-        formatNumber(case_.closing_strength),
-        formatNumber(case_.price_position),
-        formatNumber(case_.volume_multiplier),
-        formatNumber(case_.taker_buy_ratio),
-        // 未來收益參數
-        formatPercentage(case_.future_1bar_return),
-        formatPercentage(case_.future_2bar_return),
-        formatPercentage(case_.future_3bar_return),
-        formatPercentage(case_.future_4bar_return),
-        formatPercentage(case_.future_5bar_return),
-        formatPercentage(case_.future_6bar_return),
-        formatPercentage(case_.future_7bar_return),
-        formatPercentage(case_.future_8bar_return),
-        formatPercentage(case_.future_9bar_return),
-        formatPercentage(case_.future_10bar_return),
-        formatPercentage(case_.future_11bar_return),
-        formatPercentage(case_.future_12bar_return),
-        // 未來回撤參數
-        formatPercentage(case_.future_1bar_max_drawdown),
-        formatPercentage(case_.future_2bar_max_drawdown),
-        formatPercentage(case_.future_3bar_max_drawdown),
-        formatPercentage(case_.future_4bar_max_drawdown),
-        formatPercentage(case_.future_5bar_max_drawdown),
-        formatPercentage(case_.future_6bar_max_drawdown),
-        formatPercentage(case_.future_7bar_max_drawdown),
-        formatPercentage(case_.future_8bar_max_drawdown),
-        formatPercentage(case_.future_9bar_max_drawdown),
-        formatPercentage(case_.future_10bar_max_drawdown),
-        formatPercentage(case_.future_11bar_max_drawdown),
-        formatPercentage(case_.future_12bar_max_drawdown),
-        // 時間描述參數
-        case_.hour_of_day !== undefined && case_.hour_of_day !== null ? case_.hour_of_day : '',
-        case_.day_of_week !== undefined && case_.day_of_week !== null ? case_.day_of_week : '',
-        // ===== 改寫：分類特徵參數 (9個) =====
-        // 數值參數 (3個)
-        formatNumber(case_.past_3day_max_volatility, 2),
-        formatNumber(case_.past_3day_direction, 2),
-        formatNumber(case_.past_3day_volume_cv, 4),
-        // 分類參數 (6個)
-        case_.volatility_class || '',
-        case_.direction_class || '',
-        case_.volume_class || '',
-        case_.market_class || '',
-        case_.market_class_name || '',
-        case_.difficulty_level || '',
-        // 正反例標記
-        (() => {
-          const positiveCase = (case_ as CaseData & { positive_case?: boolean | number }).positive_case;
-          return positiveCase !== undefined ? (positiveCase ? '1' : '0') : '';
-        })()
-      ].join(','));
-
-      // 組合完整CSV內容
-      const csvContent = [headers, ...csvRows].join('\n');
-
-      // 創建並下載文件
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `case_search_results_${new Date().toISOString().slice(0, 10)}.csv`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-
-      console.log(`CSV導出成功：${currentResult.cases.length} 個案例`);
-    } catch (error) {
-      console.error('CSV導出失敗:', error);
-      alert('CSV導出失敗，請查看控制台錯誤信息');
-    }
+        const csv = buildEventContractCsv(payload.records as Record<string, unknown>[], extras);
+        const stamp = new Date().toISOString().slice(0, 10);
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `gap3_events_${stamp}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+    });
   };
 
   // 渲染正例欄位輸入框
@@ -1912,11 +1876,19 @@ export default function SearchPage() {
             {/* CSV 導出按鈕 */}
             <div className="mt-6 flex justify-center">
               <button
-                onClick={exportSearchResultsToCSV}
+                // 🔴 `void` 會把 `proceed` 內拋出的錯整個吞掉 ⇒ 使用者按了什麼都沒發生
+                //    （B5 `CODEX-R2-P1-01` 已為 JSON 鈕修過同一條，本鈕改 async 後同樣適用）
+                onClick={() => {
+                  exportSearchResultsToCSV().catch((err: unknown) => {
+                    alert(`匯出失敗：${err instanceof Error ? err.message : String(err)}`);
+                  });
+                }}
+                data-testid="export-contract-csv"
                 className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-400 transition-colors"
+                title="匯出可直接回灌的 CSV：欄名就是契約欄名，你在 Excel 改完 label 就能直接上傳"
               >
                 <Download className="w-5 h-5" />
-                導出CSV檔案
+                導出CSV檔案（可回灌）
               </button>
               <button
                 // 🔴 R2 `CODEX-R2-P1-01`：`void` 會把 `proceed` 內拋出的錯**整個吞掉**

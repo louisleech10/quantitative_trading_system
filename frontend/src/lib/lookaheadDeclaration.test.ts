@@ -37,6 +37,18 @@ describe('答案窗宣告：預設值', () => {
     // 小時命名欄在不同 tf 之根數不同 ⇒ 預設值本來就逐 tf 不同
     expect(initialDeclaredWindowBars(multiTf)).toEqual({ '1h': 72, '12h': 6 });
   });
+
+  it('🔴 檔內無可解析未來欄（預設 0）⇒ **留空不預填**，且送出時報「尚未填寫」而非「須為正整數」', () => {
+    // 出生事故 2026-09-01 UAT B10：預填 0 ⇒ 畫面一開就帶著一個驗證自己會拒的值。
+    const noFuture: LookaheadDeclarationPreview = {
+      ...singleTf, default_window_bars: { '12h': 0 }, requires_declaration: true,
+    };
+    expect(initialDeclaredWindowBars(noFuture)).toEqual({});
+    const v = validateDeclaration(initialDeclaredWindowBars(noFuture), true, noFuture);
+    expect(v.ok).toBe(false);
+    expect(v.problems.join(' ')).toContain('尚未填寫');
+    expect(v.problems.join(' ')).not.toContain('須為正整數');
+  });
 });
 
 describe('答案窗宣告：調低須勾選聲明', () => {
