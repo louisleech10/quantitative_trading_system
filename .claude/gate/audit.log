@@ -52363,3 +52363,39 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"actor": "cx_run", "attempt_id": "f7e67ff9-48ec-46f0-828a-4053ad65aa7c", "cli_rc": "1", "event": "committee_family_result", "event_id": "9fad406f-a293-4803-9b11-6e87c838faa7", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-review-r2-composer.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "f00c8209-bdc9-498d-9995-78dbe713b0f9", "schema_version": 1, "sequence": 3015, "ts": "2026-09-02T23:08:18Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-REVIEW-R3", "ts": "2026-09-02T23:08:36Z"}
+=== 2026-09-03 07:08:36 | dispatch ===
+  ts=2026-09-03 07:08:36
+  kind=dispatch
+  intent=G3-D2 D-001 review r3 閉合輪：codex 確認 R2 六條 P1 關閉；grok／composer 獵新；composer 補 R1 閉合
+  risk=low
+  facts_asked=r2 reconcile（codex＋grok；composer 兩次失敗 DEGRADE）；dext rc=0；commit d52fe79d
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-REVIEW-R3", "ts": "2026-09-02T23:10:05Z"}
+=== 2026-09-03 07:10:05 | dispatch ===
+  ts=2026-09-03 07:10:05
+  kind=dispatch
+  intent=G3-D2 D-001 review r3 閉合輪二：codex 確認 R2 六條；composer 補 R1／R2 對讀；grok 獵新
+  risk=low
+  facts_asked=r2 reconcile（codex＋grok；composer DEGRADE）；dext rc=0；commit d52fe79d
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2-X-REVIEW-R3-BRIEF.md", "brief_sha256": "9d2565389cb83e6bd95167b255f3e723edebf9d46f583002d8d1da6fedcef55e", "brief_sha256_norm": "9d2565389cb83e6bd95167b255f3e723edebf9d46f583002d8d1da6fedcef55e", "event": "committee_round_open", "event_id": "a9b83863-5046-475a-89ed-aa3a92949e72", "expected_outputs": {"codex": "handoffs/20260903-gap3d2-x-review-r3-codex.md", "composer": "handoffs/20260903-gap3d2-x-review-r3-composer.md", "grok": "handoffs/20260903-gap3d2-x-review-r3-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8e29036f-93d4-4e02-88fe-f84e86065954", "schema_version": 1, "sequence": 3016, "session_name": "20260903-gap3d2-x-review-r3", "task_id": "20260903-GAP3D2-X-REVIEW-R3", "ts": "2026-09-02T23:10:10Z"}
