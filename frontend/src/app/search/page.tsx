@@ -94,6 +94,10 @@ export default function SearchPage() {
   const [declPreviewError, setDeclPreviewError] = useState<string | null>(null);
   const [declared, setDeclared] = useState<Record<string, number>>({});
   const [declAcknowledged, setDeclAcknowledged] = useState(false);
+  // 🔴 R2 review（CODEX-R2-P1-01）：區分**使用者明填**與**系統預填**。只有使用者親手填過的 tf 才在附帶欄改變時保留
+  //    （驗證⑤）；系統預填的值跟著新 preview 走——附帶欄全取消後預設變 0 ⇒ 該框**回到留空**，0 須使用者明填。
+  //    否則「全選→預填 12→全取消」會留著一個使用者從未填過的 12 放行匯出。
+  const declTouchedRef = React.useRef<Set<string>>(new Set());
   const declState: ExportDeclarationState = { preview: declPreview, declared, acknowledged: declAcknowledged };
   // GAP-3 UX Task 7.1：五個批次維度**可見可改**；初始值＝Task 7.0 之常數
   // （⇒ 使用者不動 UI 時匯出結果與 7.0 逐位元相同，SPEC 邊界②之 golden 不變由此成立）。
@@ -149,6 +153,7 @@ export default function SearchPage() {
     setDeclPreview(null);
     setDeclared({});
     setDeclAcknowledged(false);
+    declTouchedRef.current = new Set();
   }, [currentResult]);
 
   useEffect(() => {
@@ -167,9 +172,17 @@ export default function SearchPage() {
       .then((p) => {
         if (cancelled) return;
         setDeclPreview(p);
-        // 🔴 Task 1.9′ 驗證⑤：只補**尚未宣告**之 tf 的預設值；已宣告值不因附帶欄／預設改變而被覆寫。
-        //    預設 `< 1` 者留空不預填（`0` 須使用者明填，留白≠0）。
-        setDeclared((prev) => ({ ...initialDeclaredWindowBars(p), ...prev }));
+        // 🔴 Task 1.9′ 驗證⑤＋R2 `CODEX-R2-P1-01`：使用者**明填**過的 tf 不因附帶欄／預設改變而被覆寫；
+        //    系統**預填**的 tf 跟著新預設走——預設 `< 1` 者回到留空（`0` 須使用者明填，留白≠0）。
+        setDeclared((prev) => {
+          const init = initialDeclaredWindowBars(p);
+          const next: Record<string, number> = { ...prev };
+          for (const tf of p.timeframes) {
+            if (declTouchedRef.current.has(tf)) continue;
+            if (tf in init) next[tf] = init[tf]; else delete next[tf];
+          }
+          return next;
+        });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -1699,12 +1712,15 @@ export default function SearchPage() {
                     declared={declared}
                     acknowledged={declAcknowledged}
                     problems={validateDeclaration(declared, declAcknowledged, declPreview).problems}
-                    onChangeWindow={(tf, value) => setDeclared((prev) => {
-                      const next = { ...prev };
-                      // 留白（NaN）＝尚未填寫，不寫成 0（0 須明填）
-                      if (Number.isNaN(value)) delete next[tf]; else next[tf] = value;
-                      return next;
-                    })}
+                    onChangeWindow={(tf, value) => {
+                      declTouchedRef.current.add(tf);          // 使用者親手動過 ⇒ 之後預設改變不覆寫
+                      setDeclared((prev) => {
+                        const next = { ...prev };
+                        // 留白（NaN）＝尚未填寫，不寫成 0（0 須明填）
+                        if (Number.isNaN(value)) delete next[tf]; else next[tf] = value;
+                        return next;
+                      });
+                    }}
                     onChangeAcknowledged={setDeclAcknowledged}
                   />
                 ) : declPreviewError ? (

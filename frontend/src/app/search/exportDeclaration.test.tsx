@@ -262,7 +262,7 @@ describe('Task 1.9′ — /search 匯出端答案窗宣告框', () => {
 
   it('R1-P1-01（codex）：附帶欄改變後 preview 重取失敗 ⇒ 舊 preview 作廢，匯出被擋（不得用過期預設放行）', async () => {
     render(<SearchPage />);
-    await declareFromPreview({ '1h': 12 });
+    await declareFromPreview({ '1h': 9 });      // 使用者**明填** 9（≠預填 12 ⇒ 真的觸發 onChange；低於預設 ⇒ 勾選）
     previewMock.mockRejectedValueOnce(new Error('preview endpoint down'));
     fireEvent.click(screen.getByTestId('export-attached-h12'));
     await waitFor(() => expect(screen.getByTestId('export-declaration-error')).toBeTruthy());
@@ -275,9 +275,39 @@ describe('Task 1.9′ — /search 匯出端答案窗宣告框', () => {
     previewMock.mockResolvedValue(previewOf({ '1h': 11 }));
     fireEvent.click(screen.getByTestId('export-attached-h11'));
     await waitFor(() => expect(screen.getByTestId('lookahead-declaration')).toBeTruthy());
-    expect((screen.getByTestId('lookahead-window-1h') as HTMLInputElement).value).toBe('12');
+    expect((screen.getByTestId('lookahead-window-1h') as HTMLInputElement).value).toBe('9');   // 明填值不被新預設 11 覆寫
+    const ack = screen.getByTestId('lookahead-acknowledge') as HTMLInputElement;
+    if (!ack.checked) fireEvent.click(ack);
     const records = await exportJson();
-    for (const r of records) expect(r.lookahead_bars_declared).toEqual({ '1h': 12 });
+    for (const r of records) expect(r.lookahead_bars_declared).toEqual({ '1h': 9 });
+  });
+
+  it('R2-P1-01（codex）：附帶欄全取消 ⇒ 系統預填的值回到留空、匯出被擋；明填 0 才放行；使用者明填值仍不被覆寫', async () => {
+    render(<SearchPage />);
+    await waitFor(() => expect(screen.getByTestId('lookahead-declaration')).toBeTruthy());
+    expect((screen.getByTestId('lookahead-window-1h') as HTMLInputElement).value).toBe('12');   // 系統預填
+    // 全取消附帶欄 ⇒ 後端預設 0 ⇒ 預填值作廢、留空
+    previewMock.mockResolvedValue(previewOf({ '1h': 0 }));
+    for (const h of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) fireEvent.click(screen.getByTestId(`export-attached-h${h}`));
+    await waitFor(() => expect((screen.getByTestId('lookahead-window-1h') as HTMLInputElement).value).toBe(''));
+    fireEvent.click(screen.getByTestId('export-gap3-events'));
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    expect(createObjectURL).toHaveBeenCalledTimes(0);
+    expect(buildSpy).toHaveBeenCalledTimes(0);
+    // 明填 0 ⇒ 放行，且深度為 0
+    await declareFromPreview({ '1h': 0 });
+    let records = await exportJson();
+    for (const r of records) expect((r.lookahead_bars_declared as Record<string, number>)['1h']).toBe(0);
+    // 使用者明填過的值：再勾回附帶欄（預設回 12）也**不**被覆寫（驗證⑤）
+    blobs.length = 0;
+    createObjectURL.mockClear();
+    previewMock.mockResolvedValue(previewOf({ '1h': 12 }));
+    fireEvent.click(screen.getByTestId('export-attached-h12'));
+    await waitFor(() => expect(previewMock.mock.calls.length).toBeGreaterThan(2));
+    expect((screen.getByTestId('lookahead-window-1h') as HTMLInputElement).value).toBe('0');
+    await declareFromPreview({ '1h': 0 });   // 0 低於預設 12 ⇒ 須勾選
+    records = await exportJson();
+    for (const r of records) expect((r.lookahead_bars_declared as Record<string, number>)['1h']).toBe(0);
   });
 
   it('⑦ /search 與匯入頁取用同一 exported validateDeclaration（執行期探針＋來源對證）', async () => {

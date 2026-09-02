@@ -43,6 +43,7 @@ R 實作批（Task 1.9′＋Phase 2 退役＋Task 1.11 後端謂詞＋validator 
 | `GROK-R1-P1-02` `resolve_declaration` 仍把可解析引用欄餵 `depth_by_timeframe` 取 max（宣告 5 落檔 72） | `referenced_for_depth` 恆 `()`＋assert `depth == declared`；新測試（引用 `future72_close_return`、宣告 5／12／0 ⇒ 落檔＝宣告）；`test_gap3_horizon_declaration_05` 改寫為 R 版 |
 | `GROK-R1-P2-01` 攜帶值自動勾選擴到 CSV | `import_records(carried_declaration_acknowledged=)` 只在 JSON 直傳路由傳 True；CSV／對映攜帶值不自動勾選（低於預設須表單勾）；殘留 `R35-L2-ACK` 收窄回 JSON 直傳 |
 | `CODEX-R1-P2-03` 兩路由文案仍寫「正整數」 | description 改「非負整數（0 ＝未用未來資訊，須明填）」＋一律宣告語句 |
+| `CODEX-R2-P1-01`（R2 閉合輪反向抓到）系統預填值在附帶欄全取消後仍留存放行 | `page.tsx` 以 `declTouchedRef` 區分使用者明填／系統預填：未明填之 tf 跟新預設走（`<1` ⇒ 回到留空），明填之 tf 保留（驗證⑤）；page 測試「全選→預填 12→全取消 ⇒ 留空、擋；明填 0 ⇒ 匯出 0；再勾回附帶欄明填值不覆寫」。R1-P1-01 之測試改為明填 9（同值 change 不觸發 onChange，屬預填） |
 
 ---
 
