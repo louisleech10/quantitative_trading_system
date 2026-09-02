@@ -1,5 +1,13 @@
 # GAP3_EVENT_UX_TODO — D 延伸 004（B7 開工前之契約修補）
 
+> ## 🔴 本檔已因 R 重開而失效（SUPERSEDED-BY-R，2026-09-02）
+>
+> **失效依據**：`docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1（R ⇒ 所有延伸檔失效；安全閥①全量作廢）。
+> 觸發：`docs/GAP3_EVENT_UX_SPEC.md` R35-R（§D **D-8**）。
+> **處置**：A-020／A-022 **併回本體**（Task 4.1／4.2；契約之匯出欄與 golden 誤植更正已生效）；
+> **A-021 移植**：`withExportLowerBoundGuard` 改名 `withExportDeclarationGuard`，`proceed` 結構保證不變（Task 1.9′）。
+> 本檔不得再作為任何派工之授權來源。
+
 BASE: docs/GAP3_EVENT_UX_TODO.md @ afa70967
 PREDECESSOR: docs/GAP3_EVENT_UX_TODO.D-003.md
 

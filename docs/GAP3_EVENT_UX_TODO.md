@@ -1,6 +1,12 @@
 # GAP-3 事件型 UAT 缺口修補 TODO（v1.0 **FROZEN 2026-08-24**｜基於 `docs/GAP3_EVENT_UX_SPEC.md` FROZEN 2026-08-24）
 
-> 🔒 **FROZEN（2026-08-24）**——**42 Task 定版，可據以派工。**
+> ## 🔴 R 重開（2026-09-02；隨 `docs/GAP3_EVENT_UX_SPEC.md` R35-R；依 `FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1）
+> 本檔就地修訂（R 為「原檔重跑完整對抗審」，非延伸檔）：Phase 2 四 Task ⛔ RETIRED、新增 **Task 1.9′**、
+> Task 1.9／1.10／1.11／4.1／4.1b／7.3 與 §B 批次表同步；`docs/GAP3_EVENT_UX_TODO.D-001.md`…`D-005.md`
+> **全部 `SUPERSEDED-BY-R`**，內容依 SPEC 檔頭「逐節落點表」併回本檔。裁定本體＝SPEC §D **D-8**。
+> **42 Task 之計數改為 39 有效 ＋ 4 退役 ＋ 1 新增**；本檔之 R1–R3 對抗審履歷與戳記**作廢**，待 R-R1 重審。
+>
+> 🔒 **FROZEN（2026-08-24）**——**42 Task 定版，可據以派工。**（⛔ 2026-09-02 起由上列 R 重開取代其效力）
 > 後續修訂走延伸檔 `docs/GAP3_EVENT_UX_TODO_AMENDMENTS.md`，**不就地改本檔**。
 >
 > **對抗審履歷（三輪，輪次上限）**：
@@ -103,11 +109,11 @@ Retryable：rate_limit／timeout；Non-retryable：invalid_symbol／logic／data
 |---|---|---|---|---|
 | **B1 契約與深度根基** | 1.1、1.10 | 無 | 兩者皆為**唯讀增量之根**：1.1 定 reason／derived 欄／typed receipt schema，1.10 定 lookahead registry。後續每個 Phase 都讀它們；先落地才能讓其餘 Task 的 fail-closed 有依據 | 中 |
 | **B2 CSV 匯入主線** | 1.2、1.3、1.4、1.8 | B1 | 同一端點之解析鏈（收檔→digest→單位→異質列），共用同一 schema 檢核函式；拆開會讓 V-3 之共用性 oracle 無法一次驗 | 中 |
-| **B3 深度三層防線** | 1.11、1.12、1.9 | B1、B2、**Task 2.1b**（🔴 CODEX-R2-P1-04：1.9 呼叫 `depth_by_timeframe`，該 helper 由 **Task 2.1b** 建立）| L2（強制宣告）→L3（禁進切分）→L2 之 UI（答案窗宣告）為同一條 D-7 防線，且 1.9 明文依賴 1.10／1.11 | 大 |
+| **B3 深度三層防線** | 1.11、1.12、1.9 | B1、B2（⛔ R 重開：原依賴 **Task 2.1b** 之 `depth_by_timeframe` 已退役，1.9 改直接取宣告 map）| L2（強制宣告）→L3（禁進切分）→L2 之 UI（答案窗宣告）為同一條 D-7 防線，且 1.9 明文依賴 1.10／1.11 | 大 |
 | **B4 匯入前端** | 1.5、1.6、1.7 | B2 | 同一頁面之上傳／預覽／對映／provenance／可疑欄警示，共用同一 React 元件樹 | 中 |
-| **B5 匯出前篩選** | Phase 2 全部 | B1 | 見 Part 2 | — |
+| ~~**B5 匯出前篩選**~~ | ~~Phase 2 全部~~ | — | ⛔ **R 重開退役（D-8）**；已落地實作依 SPEC Phase 2 退役清單移除；**Task 1.9′**（匯出端宣告框）併入 **B3** | — |
 | **B6 刪除** | Phase 3 全部 | 無 | 見 Part 2 | — |
-| **B7 匯出端報酬欄** | Phase 4 全部 | B1、**Task 2.1b**（🔴 Task 4.1 亦消費 `depth_by_timeframe`）| 見 Part 2 | — |
+| **B7 匯出端報酬欄** | Phase 4 全部 | B1、**Task 1.9′**（⛔ R 重開：Task 4.1 ③ 之深度改消費宣告 map；原 2.1b 已退役）| 見 Part 2 | — |
 | **B8 訊息與表頭** | Phase 5 全部 | Task 5.0（同批內最先做） | 見 Part 2 | — |
 | **B9 IC 止血閘** | Phase 6 全部 | Task 6.0（同批內最先做） | 見 Part 2 | — |
 | **B10 全棧接線** | Phase 7 全部 | B1–B9 | 見 Part 2；🔴 **批內強制順序**：`7.0 → 7.1 → 7.2`；且 **7.6 之 formatter registry 須先於 7.3**（7.3 只選取自己的欄集，registry 由 7.6 定義）；`4.2 → 7.5`（同一表格）；`4.1b → 7.3`（後者取代前者，取代前須逐項比對 4.1b ⊆ 7.3） | — |
@@ -119,9 +125,9 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 其**建立 Task 必須先做**，不得因批次編號較後而延後：
 | 產物 | 唯一建立 Task | 消費者 | 處置 |
 |---|---|---|---|
-| `depth_by_timeframe()`（唯一深度函式） | **Task 2.1b**（B5） | Task 1.9（B3）、Task 4.1（B7） | 🔴 **Task 2.1b 提前至 B1 一併做**；B5 其餘 Task 不變 |
+| ~~`depth_by_timeframe()`（唯一深度函式）~~ | ~~**Task 2.1b**（B5）~~ | ~~Task 1.9（B3）、Task 4.1（B7）~~ | ⛔ **R 重開退役（D-8）**：深度不再導出；Task 1.9／1.9′ 直接寫宣告 map，共用 **validator**（`validateDeclaration`／`parse_lookahead_declaration`）而非深度函式 |
 | `canonical_serialize.py`（§G S-9 參考實作） | **Task 4.2**（B7） | Task 1.3（B2）、Task 7.5（B10） | 🔴 **Task 4.2 之 S-9 建立部分提前至 B1**；其 horizon 曲線部分留 B7 |
-⇒ **B1 之實際內容為：Task 1.1、1.10、2.1b、4.2（僅 S-9 參考實作部分）**。
+⇒ **B1 之實際內容為：Task 1.1、1.10、4.2（僅 S-9 參考實作部分）**（⛔ R 重開：原列 2.1b 已退役；D-001 A-001 據此改寫併回）。
 
 ---
 
@@ -185,7 +191,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   （①–⑧，字面見 SPEC L1350–1401；⑧(c) 之五個反例含 `bool`）。
   **mutation 六條**（SPEC L1402–1407）逐條實跑轉紅、還原轉綠，receipt 入 commit message。
 - **存活至**：Phase 6。
-- **覆蓋風險**：**無**——契約為唯讀增量；Phase 2 之 Task 2.2 只寫 `filters` 之值，
+- **覆蓋風險**：**無**——契約為唯讀增量；~~Phase 2 之 Task 2.2 只寫 `filters` 之值~~（⛔ R 重開：Phase 2 已退役，`filters` 鍵保留但**無寫入者**），
   Phase 6 之 Task 6.0 另建 IC 側 reason 檔而不併入本檔，Phase 7 動的是 `label_definition` 其他鍵。
 
 ### Task 1.2 — 新端點 `POST /api/v1/case/import-events/csv`（`票 #3-5`）
@@ -352,7 +358,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   **mutation**：改為「只有一個二元欄就自動選它」⇒ ①須紅。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**（不寫入任何持久產物）。
-  🔴 **須同步**：Phase 2 之篩選作用於**系統內搜尋結果**（欄位由系統產生），
+  🔴 **須同步**（⛔ R 重開：Phase 2 已退役，本條失效、保留供追溯）：Phase 2 之篩選作用於**系統內搜尋結果**（欄位由系統產生），
   **不得**與本掃描合併為同一實作——合併後所有值域落在 `{0,1}` 之系統旗標欄都會被列為可疑，
   警示失去鑑別力（本 Task 之「`len == 2`」即會鬆脫）。
 
@@ -411,11 +417,11 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
        須帶 producer/schema/digest 綁定，否則無論欄名是否命中 registry，
        皆走 Task 1.11 之 L2 並依 1.12 之 L3 決定可否切分。
   5. 換算為 **exported 函式** `resolve_lookahead_bars(column: str, timeframe: str) -> int | None`
-     ——Task 1.9／1.11／2.1b 皆呼叫它，禁各自實作。
+     ——Task 1.9／1.11／1.9′（預設值候選）皆呼叫它，禁各自實作（2.1b 已隨 R 重開退役）。
 - **修改檔案**：新增 `momentum/Analysis/contracts/future_column_lookahead.json`；
   新增 `momentum/Analysis/event_samples/lookahead_registry.py`
   （`load_lookahead_registry()`／`resolve_lookahead_bars()`／`unregistered_future_columns()`）
-  **既有 caller**：無（新模組）；Task 1.9／1.11／1.12／2.1b 為其消費端。
+  **既有 caller**：無（新模組）；Task 1.9／1.9′／1.11／1.12 為其消費端（2.1b 已退役）。
 - **不可做**：不得以欄名字串樣式**推測**深度；不得漏登 `*_max_drawdown` 與 `future72_*`。
 - **邊界**：
   ① 上傳 CSV 之欄名為 `future_4bar_return` 但**無 provenance** ⇒ `requires_declaration == True`
@@ -444,7 +450,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   - ⑤ `pytest tests/api -q -k lookahead_rename_attack` **≥2 條**（見邊界①②）
   - **mutation 三條**（SPEC L1680–1683）
 - **存活至**：**Phase 7（終）**。
-- **覆蓋風險**：**無**——1.11／1.12／2.1b 皆只讀不改。
+- **覆蓋風險**：**無**——1.11／1.12／1.9′ 皆只讀不改（2.1b 已退役）。
   🔴 **須同步**：Phase 4 之 Task 4.1、Phase 7 之 Task 7.5 若引入任何新未來欄，
   **須先在本 registry 登記**；未登記時驗證② `== set()` 會紅，該紅為 fail-closed 之預期行為，
   **不得以放寬 validator 或加白名單消紅**。
@@ -469,7 +475,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **驗證**：`pytest tests/api -q -k lookahead_declaration` **≥2 條**（見邊界①②）；
   **mutation**：改為「忽略無法解析之欄」⇒ ①須紅。
 - **存活至**：**Phase 7（終）**。
-- **覆蓋風險**：**無**——L2 與 Task 2.1b 之「全部可解析」路徑為**互斥分支**，非覆蓋關係。
+- **覆蓋風險**（R 重開 D-8 改寫）：L2 自本 R 起**一律觸發**（兩路徑皆須宣告；原「與 Task 2.1b 互斥分支」已隨 Phase 2 退役而不存在）；UI 與 validator 即 Task 1.9／1.9′ 之同一份，本 Task 不另建。
   🔴 **須同步**：日後若任一 Phase 允許使用者自訂欄名進入篩選條件，
   該 Phase 須同批擴充本 Task 之宣告 UI，否則自訂欄會落入「無人負責宣告深度」之縫隙。
 
@@ -528,8 +534,8 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   1. 預設取**檔內最大可用 horizon**（有 `future_1..12` ⇒ 預設 12）；
      可往下調但**須勾選**「我的篩選條件未用到超過第 N 根」之聲明，
      UI 明示**此為無法驗證的聲明**；欄位接受**任意正整數**（不限 1..12）。
-  2. 宣告值經 Task 2.1b 之 `depth(tf)` **逐 tf** 解析後寫入 derived 欄
-     `lookahead_bars_declared`（**map，非 scalar**）。
+  2. 🔴 R 重開（D-8）：宣告值**即**寫入 derived 欄 `lookahead_bars_declared`（**map，非 scalar**；
+     `lookahead_bars_declared[tf] = declared_window_bars[tf]`），**不再**經 Task 2.1b 之 `depth(tf)` 解析（該 Task 已退役）。
   3. 以 `max(1, lookahead_bars_declared[該列 timeframe])` 寫入
      `label_definition.window.horizon_bars`（契約下限之投影）。
      🔴 **逐列**取該列自己的 `timeframe`（批內可有多 TF，「該批所屬 tf」無唯一值）。
@@ -549,16 +555,50 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **驗證**：`pytest tests/api -q -k gap3_horizon_declaration` **≥5 條**——
   ①預設 `== 12`；②見邊界①；③宣告 `== 4` 之單一 1h 批 ⇒
   `embargo_ms_by_symbol` 值 `== 4 * TIMEFRAME_SECONDS['1h'] * 1000`；
-  ④宣告 20（>12）⇒ 接受；⑤**深度公式一致性**——CSV 路徑與系統內篩選路徑對同一組輸入
-  回傳**相同** depth（呼叫**同一 exported 函式**，非各自實作）；
+  ④宣告 20（>12）⇒ 接受；⑤**宣告 validator 一致性**（R 重開改寫）——CSV 匯入路徑與 `/search` 匯出路徑（Task 1.9′）
+  對同一組宣告輸入回傳**相同** `lookahead_bars_declared`（呼叫**同一 exported validator**，非各自實作）；
   ⑥多 TF 批 ⇒ `declared_window_bars` 與 `lookahead_bars_declared` **鍵集皆恰為 `{'1h','12h'}`**。
   **mutation 兩條**（SPEC L1786–1787）。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**——與 `/search` 路徑（Task 4.1 ③）為**同一欄位、同一寫入點**，
-  兩路徑須呼叫 Task 2.1b 之同一深度函式。
-  🔴 **須同步**：Task 2.1b 對系統內篩選路徑**鎖定下界且不可調低**，
-  與本 Task「可調低但須勾選聲明」為**兩條路徑之不同規則** ⇒ 實作須以批次來源分派；
-  統一為寬鬆版即 fail-open，統一為嚴格版則 CSV 路徑無法上傳。
+  兩路徑呼叫同一宣告 validator（R 重開；原「Task 2.1b 之同一深度函式」已退役）。
+  🔴 **須同步**（R 重開改寫）：原「系統內篩選路徑鎖定不可調低 vs CSV 可調低但須聲明」之分派**已無對象**——
+  Task 1.9′ 使 `/search` 匯出路徑與本 Task **同一規則、同一 validator**；實作**不得**再依批次來源分派規則。
+
+---
+
+### Task 1.9′ — `/search` 匯出端答案窗宣告框（D-8；R 重開新增，取代 Task 2.1b 之導出路徑）（`票 #3-0(b)`）
+
+- **依賴**：Task 1.9（同一元件與 validator）、Task 1.10（預設值候選）
+- **SPEC ref**：Task 1.9′（Phase 1 末）　**目標**：`/search` 兩條匯出（事件契約 JSON、可回灌 CSV）匯出前收集逐 tf 宣告，
+  寫入 `lookahead_bars_declared`（map）並投影 `window.horizon_bars`；缺宣告 ⇒ 匯出不發生。
+- **輸入**：搜尋結果之 timeframe 集合＋附帶 `future_*` 欄之最大可用 horizon（逐 tf；預設值候選）＋使用者宣告
+  **輸出**：`declared_window_bars`／`lookahead_bars_declared`（map）、`horizon_bars`（int）、UI 揭露用之宣告 state
+- **實作要點**：
+  1. 重用 `LookaheadDeclarationFields`（Task 1.9）於匯出面板：批內每個 `timeframe` 各一輸入框；單一 tf 退化為一框。
+  2. 預設＝附帶欄之最大可用 horizon（逐 tf；由 Task 1.10 registry 換算，**只作預設候選，不作深度導出**）；
+     無任何附帶 `future_*` 欄 ⇒ **留空不預填**（走「尚未填寫」，同 G3-D5 修法）。
+  3. 可調低但須勾選不可驗聲明；文案明示「填正例與反例兩邊判定所用之最遠者」（使用者 2026-08-31 裁定：purge 取兩者較大）。
+  4. 守衛 `withExportLowerBoundGuard` **改形**為 `withExportDeclarationGuard(state, {notify, proceed})`——
+     保留 D-004 A-021／D-002 A-010 之 `proceed` 結構保證；缺 map／缺 tf 鍵／非 int／`< 0`／調低未勾 ⇒ 不呼叫 `proceed`。
+  5. `lookahead_bars_declared = declared_window_bars`（逐鍵複製；**不與任何欄位取 max**）；`horizon_bars = max(1, ·)` 逐列投影。
+  6. Task 7.3 揭露之深度自本 Task 之 state 讀取；移除 `referencedColumnsOf(exportFilters)` 輸入。
+  7. 前端 validator 唯一＝`frontend/src/lib/lookaheadDeclaration.ts::validateDeclaration`；後端 `parse_lookahead_declaration` 不動。
+- **修改檔案**：`frontend/src/app/search/page.tsx`（宣告區塊＋守衛改形＋揭露輸入）；`frontend/src/lib/eventExport.ts`
+  （`lookaheadBarsDeclared` 改自宣告 state）；`frontend/src/lib/lookaheadDeclaration.ts`（若需 `initialDeclaredWindowBars` 之匯出端 preview adapter）
+  **既有 caller**：`/search` 匯出流程（JSON／CSV）、Task 7.3 揭露
+- **不可做**：不得由附帶欄或欄名推斷深度；不得在 `proceed` 外匯出；不得另寫第二份 validator；不得以 `1` 默認缺鍵 tf。
+- **邊界**：① 未宣告任一 tf ⇒ 匯出不發生（`URL.createObjectURL`／`fetch` call count `== 0`）。
+  ② 調低未勾聲明 ⇒ 同①；勾選後 ⇒ 匯出且逐列 `lookahead_bars_declared` 深度相等於宣告 map。
+  ③ 附帶欄選擇改變 ⇒ 已宣告 map 與 `window.horizon_bars` 皆不變。
+- **風險緩解**：RISK-(a)——匯出端無宣告即匯出＝D-7 L2 在匯出端 fail-open（三家 consult P0）。
+- **驗證**：`npx vitest run exportDeclaration` **≥7 條**（SPEC Task 1.9′ ①–⑦）；
+  `pytest tests/api -q -k gap3_csv_roundtrip` 對匯出 CSV 之 `lookahead_bars_declared.<tf>` 回灌 `==` 宣告值。
+  **mutation 四條**（SPEC Task 1.9′）：匯出動作移到 `proceed` 外 ⇒ ①②紅；缺鍵 tf 以 `1` 默認 ⇒ ①紅；
+  CSV 路徑另組 map ⇒ ⑥紅；自寫第二份 validator ⇒ ⑦紅。receipt 入 commit message。
+- **存活至**：Phase 7（終）。
+- **覆蓋風險**：取代 Phase 2 Task 2.1b 之 `/search` 深度來源；Task 4.1 ③ 寫入點不變。
+  🔴 **須同步**：Task 1.9 之「可調低但須聲明」自本 Task 起兩路徑相同；Task 7.3 之深度來源改本 Task。
 
 ---
 
@@ -570,7 +610,17 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **前端**：`npx vitest run gap3_csv canonicalSourceCoverage` ＋ `npm run build`
 - 🔴 **Phase Gate**：上列三層 rc=0，**且** V-1／V-1b／V-1c／V-2／V-3／V-4／V-12 之
   對應 Task 驗證條目全綠，**且**本 Phase 全部 mutation 逐條實跑轉紅並還原轉綠（receipt 入 commit）。
-## Phase 2 — 匯出前篩選（依賴：Task 1.1 之契約欄位定案；**不依賴** Task 1.2 端點）
+## ~~Phase 2 — 匯出前篩選~~　⛔ **R 重開退役（2026-09-02，SPEC D-8）**
+
+> ⛔ **本 Phase 全部 Task 退役，不再實作、不再驗收**；原文保留供追溯，下方條文**不具效力**。
+> 已落地實作之退役清單（CROSS-FILE）：`frontend/src/lib/exportFilter.ts`＋`.test.ts`、`exportFilterPersist.test.ts`、
+> `lookaheadDepthLock.ts`＋`.test.ts`＋`.page.test.ts`、`frontend/src/app/search/page.tsx` 之篩選面板／`exportFilters` state／
+> `export-count-n`／`nextLowerBoundState`、`eventExportGuardRuntime.test.tsx` 與 `gap3_export_filter_page.test.tsx`（改寫為宣告框測試）、
+> `api/routes/case.py` 之 `POST /case/lookahead-depth`、`momentum/Analysis/event_samples/lookahead_depth.py` 之導出路徑、
+> `EventSamplePipeline.lookahead_depth()`；`gap3_event_import_form.test.tsx` 對 `lowerBoundState` 之斷言。
+> **保留**：`computeExportCounts`（Task 1.5 仍用；拆掉其對 `exportFilter` 之 import，空條件＝恆等）、
+> `lookahead_declaration.py`／`lookahead_gate.py`／`lookahead_registry.py`。
+> 取代者：**Task 1.9′**（Phase 1，B3）。
 
 **目標**：讓使用者在 `/search` 匯出前先篩掉不要的列，並把「答案窗宣告」從
 **不可驗的使用者聲明**變成**機器可證事實**。
@@ -579,7 +629,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 > 🔴 **定位（D-7 改正）**：Phase 2 不是「方便功能」——它是本批**唯一**能把答案窗宣告機械化的路徑。
 > 系統內篩選時系統確知使用者引用了哪些 `future_N` 欄，可自動導出下界。
 
-### Task 2.1 — `/search` 匯出前篩選面板（`票 #3-0(a)`）
+### Task 2.1 — `/search` 匯出前篩選面板（`票 #3-0(a)`）　⛔ RETIRED（D-8）
 
 - **SPEC ref**：L1799–1810　**目標**：對搜尋結果任一**數值**欄設 `>=`／`<=`／區間，多條件 AND。
 - **輸入**：搜尋結果列＋使用者條件　**輸出**：條件物件（供 2.1b／2.2／2.3 消費）
@@ -602,7 +652,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   🔴 **須同步**：Task 4.1 決定**哪些欄**、Task 7.1 決定**用什麼語意算**、本 Task 決定**哪些列**，
   三者疊加不互相覆蓋，但**須共用 2.3 之同一計數函式**。
 
-### Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）（`票 #3-0(a)`）
+### Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）（`票 #3-0(a)`）　⛔ RETIRED（D-8；深度來源改 Task 1.9／1.9′ 宣告）
 
 - **SPEC ref**：L1811–1864　**目標**：依 Task 1.10 registry 解析條件引用之**所有**欄位，
   取最大深度為答案窗**下界並鎖定**，使用者**不得調低**。
@@ -652,7 +702,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **覆蓋風險**：**無**——完全依賴 Task 1.10 registry（存活至 Phase 7（終）且只增不改）。
   🔴 **須同步**：Task 4.1 之附帶欄多選**不得**納入 `max`，此區分須以邊界②之測試釘死。
 
-### Task 2.2 — 篩選條件寫入 `label_definition.filters`（`票 #3-0(a)`）
+### Task 2.2 — 篩選條件寫入 `label_definition.filters`（`票 #3-0(a)`）　⛔ RETIRED（D-8；契約鍵保留、匯出端不再寫入）
 
 - **SPEC ref**：L1865–1879　**目標**：把篩選條件寫進 Task 1.1 已登記之 `filters` 欄。
 - **輸入**：條件物件　**輸出**：匯出檔之 `label_definition.filters`
@@ -676,7 +726,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**。🔴 **須同步**：Phase 7 五維度與本欄須在**同一序列化點**寫出並依 §G。
 
-### Task 2.3 — 即時筆數顯示（`票 #3-0(a)`）
+### Task 2.3 — 即時筆數顯示（`票 #3-0(a)`）　⛔ RETIRED（D-8；`computeExportCounts` 保留供 Task 1.5；`/search` 只顯示 M／X／Y）
 
 - **SPEC ref**：L1880–1891　**目標**：顯示「將匯出 N 筆（原 M 筆）／你聲明的正例 X／反例 Y」。
 - **輸入**：條件物件＋搜尋結果　**輸出**：純顯示（無持久產物）
@@ -702,7 +752,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 
 ---
 
-**Phase 2 測試（三層）＋ Phase Gate**
+**Phase 2 測試（三層）＋ Phase Gate**　⛔ RETIRED（D-8；隨 Phase 2 退役，不再執行）
 
 - **單元**：`pytest tests/api -q -k gap3_lookahead_depth`
 - **前端**：`npx vitest run exportFilter` ＋ 筆數守恆斷言 ＋ `npm run build`
@@ -734,7 +784,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **驗證**：`pytest tests/api -q -k gap3_event_delete` **≥4 條**（含邊界①②）。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（刪後 `GET` status_code `== 404`。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：Phase 6。
-- **覆蓋風險**：**無**。🔴 **須同步**：Phase 1 之 receipt 與 Phase 2 之 `filters` 皆屬「該批 artifact」
+- **覆蓋風險**：**無**。🔴 **須同步**：Phase 1 之 receipt 與 ~~Phase 2 之 `filters`~~（⛔ R 重開：Phase 2 已退役，不再產生）皆屬「該批 artifact」
   ⇒ 刪除範圍須隨這兩個 Phase 新增之產物同步擴張，否則 Task 3.3 之警語與實況不符。
 
 ### Task 3.2 — 前端刪除鈕與二次確認（`票 #3-4`）
@@ -799,7 +849,7 @@ Gate＝V-5 對應條目全綠 ＋ 落檔殘留 `== 0`。
 
 - **SPEC ref**：L1940–1978　**目標**：三件事——加附帶欄多選、移除主答案窗與 `label_value`、
   釐清 `horizon_bars` 與 `lookahead_bars_declared` 之關係。
-- **輸入**：使用者之附帶欄選擇＋深度導出結果
+- **輸入**：使用者之附帶欄選擇＋Task 1.9′ 之宣告 map（R 重開：原「深度導出結果」已退役）
   **輸出**：匯出檔（含 `future_{h}bar_return` 諸欄、`lookahead_bars_declared` map、
   `label_definition.window.horizon_bars`）
 - **實作要點**：
@@ -824,11 +874,11 @@ Gate＝V-5 對應條目全綠 ＋ 落檔殘留 `== 0`。
 - **風險緩解**：RISK-(a)——`label_value` 留在匯出端會讓「換 h 需重匯出」之錯誤心智模型復活。
 - **驗證**：`npx vitest run eventExportHorizonColumns` **≥6 條**（①–⑥，SPEC L1957–1972）；
   其中②之 `'label_value' in records[0] === false` 須**逐列**斷言（非只第一列）；
-  ④須**呼叫同一 exported 深度函式比對，非寫死數字**。
+  ④須**以 Task 1.9′ 宣告框送出之 `declared_window_bars` map（經同一 exported validator）比對，非寫死數字**（R 重開：原「深度導出函式」已退役）。
   **mutation 四條**（SPEC L1973–1976）。
 - **存活至**：**Phase 7（終）**。
 - **覆蓋風險**：本 Task **刻意覆蓋** R1 版之 (a) 方案（見 §D-3 撤回理由）。
-  🔴 **須同步**：兩路徑（CSV 宣告 vs `/search` 導出）仍須呼叫 **Task 2.1b 之同一深度函式**。
+  🔴 **須同步**（R 重開）：兩路徑（CSV 宣告 vs `/search` 宣告，Task 1.9／1.9′）呼叫**同一宣告 validator**；原「Task 2.1b 之同一深度函式」已退役。
 
 ### Task 4.1b — 匯出時揭露每個選項在動什麼（`票 #3-1`）
 
@@ -837,7 +887,7 @@ Gate＝V-5 對應條目全綠 ＋ 落檔殘留 `== 0`。
 - **實作要點**：
   1. 🔴 下列四段**皆由實際設定導出，禁寫死**；缺任一段即視為未完成。
   2. **scenario ＝ {實際值} — {契約 doc 之白話}**。
-  3. **lookahead 深度 ＝ {N} 根，來源＝{引用之欄位清單}**——`N` 取自
+  3. **lookahead 深度 ＝ {N} 根，來源＝使用者宣告（Task 1.9′；R 重開 D-8，原「引用之欄位清單」已退役）**——`N` 取自
      `lookahead_bars_declared[本批 timeframe]`；C 無品質過濾時為 **0**；
      批內多 TF ⇒ **逐 tf 各顯示一行**。
      🔴 **不得**顯示 `window.horizon_bars`（有 floor，深度 0 會顯示成 1）。
@@ -1421,7 +1471,7 @@ Gate＝V-8／V-9 對應條目全綠 ＋ 量測 receipt 六欄齊全且重跑差�
 - **輸入**：本批實際設定　**輸出**：UI 文案
 - **實作要點**：
   1. 顯示：scenario／**`control_kind`**／進場價／報酬算法／決策位移／
-     lookahead 深度（來源：欄位清單）／purge 將為 N 根。
+     lookahead 深度（來源：**使用者宣告**，逐 tf；R 重開 D-8——自 Task 1.9′ 之宣告 state 讀取，**禁**殘留對 `exportFilters`／2.1b map 之讀取）／purge 將為 N 根。
   2. 🔴 `control_kind` 為必列項——4.1b 宣稱本 Task 為其嚴格超集，
      而原清單**漏掉它** ⇒ 取代後 UI 反而少揭露一項。
   3. 🔴 文案須來自 **Task 7.6 內容②所定義之欄位級 formatter registry**（每欄一個 formatter），

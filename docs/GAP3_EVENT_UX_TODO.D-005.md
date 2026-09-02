@@ -1,5 +1,12 @@
 # GAP3_EVENT_UX_TODO — D 延伸 005（Task 7.0b 之 `label_value` 符號通道）
 
+> ## 🔴 本檔已因 R 重開而失效（SUPERSEDED-BY-R，2026-09-02）
+>
+> **失效依據**：`docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1（R ⇒ 所有延伸檔失效；安全閥①全量作廢）。
+> 觸發：`docs/GAP3_EVENT_UX_SPEC.md` R35-R（§D **D-8**）。
+> **處置**：A-023（`PreparedAnalysisWindows.direction_sign`）**併回本體**（Task 7.0b；與 2.1b 無關，內容不變）。
+> 本檔不得再作為任何派工之授權來源。
+
 BASE: docs/GAP3_EVENT_UX_TODO.md @ afa70967
 PREDECESSOR: docs/GAP3_EVENT_UX_TODO.D-004.md
 

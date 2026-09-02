@@ -48,6 +48,43 @@
 </tr>
 </tbody>
 </table></div>
+<h3 id="92-深夜你離線時規格r-重開修訂稿已寫好正送三家對抗審">9/2 深夜（你離線時）：規格「R 重開」修訂稿已寫好，正送三家對抗審</h3>
+<p>白話版（規格本體是 <code>docs/GAP3_EVENT_UX_SPEC.md</code> R35-R，裁定編號 D-8）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>改什麼</th>
+<th>白話</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>拿掉 <code>/search</code> 的「匯出前篩選」整區</td>
+<td>你裁定的。<code>/search</code> 只負責把搜尋結果<strong>全部</strong>匯出成可回灌 CSV／JSON，正反例你在 Excel 篩</td>
+</tr>
+<tr>
+<td>答案窗深度改成「你自己填」</td>
+<td>以前是系統從篩選條件推出來的；篩選沒了就推不出。改成：<strong>建立這批事件時</strong>（在 <code>/search</code> 匯出前，或用 CSV 匯入時）跳同一個框，每個 timeframe 填「我判斷正反例最遠用到第幾根」。填的是<strong>正例跟反例兩邊的最遠者</strong>（你 8/31 說的 purge 取大）</td>
+</tr>
+<tr>
+<td>匯出前沒填就不讓匯出</td>
+<td>三家委員抓到的洞：拆掉篩選卻沒補這個框，匯出檔就會缺深度。所以這一條是硬的</td>
+</tr>
+<tr>
+<td>purge 算法不變</td>
+<td>只換「深度從哪來」，隔離寬度的公式一個字沒動</td>
+</tr>
+<tr>
+<td>五份補充修訂作廢再併回</td>
+<td>程序規定 R 重開就得這樣；哪一條併去哪、哪一條因為篩選拆掉而自然關閉，規格檔頭有一張表</td>
+</tr>
+<tr>
+<td>舊的「即時筆數」保留一半</td>
+<td>「將匯出 N 筆」那種跟篩選綁的數字拿掉；「原 M 筆／正例 X／反例 Y」留著，匯入頁也還在用同一支函式</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>你要不要做什麼</strong>：不用。三家審完、修完、蓋章後我才會動程式；動完會更新驗收清單，B2 那一項會整個消失，B5／B6 會多一個「填答案窗」的步驟。</p>
 <h3 id="92-你又列了六件四件已修兩件你已裁定">9/2 你又列了六件：<strong>四件已修，兩件你已裁定</strong></h3>
 <div class="table-wrap"><table>
 <thead>

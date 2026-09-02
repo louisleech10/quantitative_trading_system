@@ -24,7 +24,50 @@
 #7 為回答性問題（已答，見 §N）；**#8/#10 之殘留於 R4 撤回，改為本批 Task 7.7**（見 §N 與下表群集 C）；
 #9b 規模防護本體排入 GAP-6。
 
-**版本**：R34-landing（收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+> ## 🔴 R 重開（2026-09-02，依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1；**非 D 延伸**）
+>
+> **為何是 R 而非 D**：使用者 2026-09-02 裁定（原話）「上傳都有要填答案窗了，那 G3-D1 這在 /search 的
+> 新增條件都不用了吧，使用者直接 CSV 篩選就好」⇒ **整區移除 `/search` 匯出前篩選**。
+> 這推翻了本檔 **§A `A-1`（已確認：「匯出前篩選與上傳自篩 CSV 兩者都做」）** 與 **Phase 2 之定位字面**
+> （「本批唯一能把答案窗宣告變成機器可證事實的路徑」）＝§2.1「既有設計被證偽」；§2.2「與原檔互斥 ⇒ 不是 D」。
+> 三家 consult 一致（`handoffs/reconcile/20260902-gap3ux-x-consult-r1/synth.md`，本機留存；
+> `CODEX-R1-P0-01`／`COMPOSER-R1-P0-01`／`GROK-R1-P0-01`）。使用者離線 ⇒ 依 §2.1「爭議預設 R」。
+>
+> **效力**：本檔 R1–R34 之戳記**作廢**；`docs/GAP3_EVENT_UX_TODO.D-001.md`…`D-005.md` **全部
+> `SUPERSEDED-BY-R`**（v2.0 安全閥①：全量作廢，不做只作廢重疊者），內容依下表併回；
+> 本檔須**重跑完整對抗審**（whole-body；依賴閉包只作必讀 focus，**未列入者仍受審、仍重簽**）。
+>
+> **本次 R 之變更（裁定本體＝§D **D-8**）**：
+> ① **Phase 2 退役**（Task 2.1／2.1b／2.2／2.3 標 ⛔ RETIRED；`/case/lookahead-depth` 端點與前端
+>    `exportFilter*`／`lookaheadDepthLock*`／篩選面板退役；`label_definition.filters` 不再由匯出端寫入）。
+> ② **答案窗深度之唯一來源改為「使用者於批次建立時之逐 tf 宣告」**（`declared_window_bars` map），
+>    兩條路徑同一規則、同一 validator：CSV 匯入（Task 1.9）與 **`/search` 匯出（新 Task 1.9′）**；
+>    `lookahead_bars_declared[tf] = declared_window_bars[tf]`，**不再與條件引用欄取 max**（無條件可引用）。
+> ③ **匯出端 fail-closed 等價替代**：`withExportLowerBoundGuard` 改形為 `withExportDeclarationGuard`
+>    （保留 D-004 A-021 之 `proceed` 結構保證），缺 map／缺 tf／非 int／調低未勾聲明 ⇒ 匯出不發生。
+> ④ **purge 規則不變**（§D-3′-a（ii）權威式原樣），只換其 `lookahead_bars_declared` 之來源；
+>    使用者 8/31 裁定「purge ＝ 正反例篩選深度取大者」以**宣告框文案**承載（使用者填的是兩者之最遠者）。
+> ⑤ Task 1.5／2.3 之 `computeExportCounts` **保留**（1.5 仍用，空條件＝恆等）；`/search` 改顯示 M／X／Y。
+> ⑥ Task 4.1③／4.1b／7.3 之「深度來源」改為「使用者宣告」；§V V-12 改寫；Task 1.11 之 L2 由
+>    「未知欄才觸發」改為「一律宣告」（L1 registry 保留供揭露與 rename 攻擊防護）。
+>
+> 🔴 **D-001…D-005 逐節落點表（併回完整性之唯一憑據；R 對抗審須逐列核）**：
+>
+> | 延伸檔 | 條目 | 落點／處置 |
+> |---|---|---|
+> | D-001 | A-001（§B B1 列含 2.1b、4.2 S-9） | **改寫**：B1 ＝ 1.1、1.10、4.2（S-9）；2.1b 退役 ⇒ 自 B1 移除（TODO §B） |
+> | D-002 | A-002／A-003／A-005／A-006／A-008／A-009／A-011／A-012／A-013（S-9 驗收數、捨入向上、1.10 單位、對照組、AST 綁定、CPython 例外、負例、參數面、共用 traversal） | **併回本體**（TODO 對應 Task 之驗證欄；與 2.1b 無關，內容不變） |
+> | D-002 | A-004／A-007／A-010／A-014（2.1b 前端下界值來源／真實呼叫點／行為級驗收／文案子字串） | **自然關閉（Phase 2 退役）**；A-010 之「把匯出包進 `proceed`」結構保證**移植**至 Task 1.9′ 之守衛 |
+> | D-003 | A-016／A-017／A-019（mapping_provenance 七欄、1.3 檔案字面、digest 單位讀法） | **併回本體**（Task 1.6／1.3） |
+> | D-003 | A-018（Task 2.2 後端序列化函式字面） | **自然關閉（Task 2.2 退役）** |
+> | D-004 | A-020（匯出欄納入契約）／A-022（G-2 golden 誤植） | **併回本體**（Task 4.1／4.2） |
+> | D-004 | A-021（下界守衛改形、不刪不留死碼） | **移植**：守衛改名為 `withExportDeclarationGuard`，`proceed` 結構保證不變（Task 1.9′） |
+> | D-005 | A-023（`PreparedAnalysisWindows.direction_sign`） | **併回本體**（Task 7.0b） |
+>
+> ⚠️ 本表為主委首版；P16 R 先例（`20260804-p16-r-reopen`）三家命中「宣稱併回、實際只併一半」，
+> R 對抗審 R-R1 須逐列以 grep 對證落點存在。
+
+**版本**：R35-R（**R 重開**，2026-09-02；前版 R34-landing 之收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
 → R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 → R29 8 條 findings（**composer 降至 1 條**；兩件跨包衝突已解除）；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
 🔴 **`ERRATA-R30-01`——R30 輪之 `-landing` 字樣不代表有內容落地**：R30 輪（ledger round
@@ -104,7 +147,7 @@ S-9 尾端 newline 禁用（2:1）／S-9 章節編號（2:1）／`by_label` 鍵�
 | A（＝R3 遺留 **D**） | Task 7.2 只驗集合、可被 disabled 湊過、無 round-trip；`enum`(4) vs `accepted`(3) 基準不明 | 新增 **Task 7.0**（先擴 `EventExportOptions`）；改寫 **Task 7.1／7.2** 為三層驗證，比對基準＝`selectable(path,dim)`；**V-11 改為純引用**（R5 consult 裁，見 §V 書寫規則） |
 | B（＝R3 遺留 **F**） | G-2 canonical serialization 未定義 ⇒ 不可位元組級證偽 | **§G 新增 S-1..S-8**；Task 2.2 改為純引用 |
 | C（＝R3 遺留 **E**） | IC 分析頁與 Feature Library `time_range` 對證缺口；且檔頭禁殘留而 §N 仍殘留 | 新增 **Task 7.6／7.7**、**V-14／V-15**；**§N 之 #8／#10 殘留撤回** |
-| D（＝R3 遺留 **G**） | A／B 之 label 來源與機械深度未定義 | **Task 7.1「邊界」**加路徑級限制（`/search` 本批只開 C／two_stage）；**深度公式**落 Task 2.1b，由 1.9／V-12 引用 |
+| D（＝R3 遺留 **G**） | A／B 之 label 來源與機械深度未定義 | **Task 7.1「邊界」**加路徑級限制（`/search` 本批只開 C／two_stage）；**深度公式**落 Task 2.1b，由 1.9／V-12 引用（⛔ R 重開後：2.1b 退役，深度＝Task 1.9／1.9′ 之使用者宣告，見 D-8） |
 | E（**新面**） | D-7 L3 之「不進 split 但仍可產表」與實碼呼叫鏈矛盾 | **Task 1.12** 增 `run_event_study_only()` 契約＋`ci` 標 unavailable |
 | F（**新面**） | `control_kind` 未進 manifest ⇒ Task 7.5 分組讀不到 | **Task 7.5** 明定唯一傳遞點＋混值 fail-closed＋`not_computed` schema |
 | G（**新面**） | registry 可被改名攻擊繞過 | **Task 1.10** 增信任邊界（系統產生欄 vs 外部上傳欄）＋改名 mutation |
@@ -215,11 +258,11 @@ D-7 明訂 `scenario=C` 且無品質過濾時 lookahead 深度 **＝ 0**
   在不同 tf 之根數不同，批次 scalar 在混 TF 批次沒有唯一值）。
   單一 TF 批次退化為單鍵 map。**型別與非負性須機械驗收**（Task 1.1 ⑧）。
 - 🔴 **所有下游一律讀 `lookahead_bars_declared`，不得讀 `window.horizon_bars` 當深度**：
-  Task 2.1b 之深度公式、Task 4.1 ③ 之匯出寫入、Task 4.1b 之 UI 揭露、
+  Task 1.9／1.9′ 之宣告寫入（R 重開；原 Task 2.1b 之深度公式已退役）、Task 4.1 ③ 之匯出寫入、Task 4.1b 之 UI 揭露、
   本節（ii）之 purge 式、§G G-3 之 golden。深度 > 0 時兩值相等。
 - **receipt 缺該欄 ⇒ fail-closed**，不得以 `1` 默認替代。
 - ⚠️ 主委 R8 版原寫「寫 1 屬保守偏差、可接受」——**該說法被 CODEX-R9-P1-03 推翻**：
-  把 1 當真實深度會使 UI／purge／golden 互相不一致，且違反 Task 2.1b「過度 purge 亦屬錯誤」。
+  把 1 當真實深度會使 UI／purge／golden 互相不一致，且違反 §C0「過度 purge 亦屬錯誤」（原引 Task 2.1b，該 Task 已隨 R 重開退役）。
   ⇒ 改為「floor 只影響序列化欄位，深度語意另有其欄」。
 
 **（ii）purge 下界 —— 裁定：逐列解析深度為 ms、逐 split scope 取 max、per-scope embargo**
@@ -230,8 +273,9 @@ D-7 明訂 `scenario=C` 且無品質過濾時 lookahead 深度 **＝ 0**
 
 **權威式（本節為唯一定義；Task 7.0b／§G G-3 只引用）**：
 ```
-# 逐 timeframe 解析之深度（bars）；來源＝Task 2.1b 之 bars_of()，本節不另立公式
-lookahead_bars_declared : Mapping[timeframe -> int >= 0]     # 批內每個出現過的 tf 各一值
+# 逐 timeframe 之深度（bars）；🔴 R 重開（D-8）：來源＝**使用者逐 tf 宣告** declared_window_bars[tf]
+#   （Task 1.9 匯入端／Task 1.9′ 匯出端，同一 validator），不再由條件引用欄導出（Task 2.1b 已退役）
+lookahead_bars_declared : Mapping[timeframe -> int >= 0]     # 批內每個出現過的 tf 各一值 ＝ declared_window_bars
 
 lookahead_depth_ms(e) = lookahead_bars_declared[e.timeframe] * timeframe_seconds[e.timeframe] * 1000
 #   🔴 R22（COMPOSER-R22-P1-02）：`timeframe_seconds` ＝ **注入之 map**
@@ -317,7 +361,7 @@ purge_lower_bound_ms(scope) = max over e in scope of max( lookahead_depth_ms(e),
 （CODEX-R10-P0-01；**主委 R9 之裁決在此半邊是錯的，已推翻**）。
 主委 R9 在兩份補丁包間裁「換算採**批次層深度** × 逐列 tf」，理由是「D-7 只定義批次層深度」。
 **該裁決錯誤**，碼證：`case_search_engine.py:1385-1387,1522-1533` 之 `future72_*` 為**小時**命名欄，
-Task 2.1b 之 `bars_of(c, tf) = c.lookahead_hours ÷ hours_per_bar(tf)` ⇒
+（原）Task 2.1b 之 `bars_of(c, tf) = c.lookahead_hours ÷ hours_per_bar(tf)`（⛔ R 重開後該 Task 退役；本段保留為 map 型別之**歷史論證**，Task 1.10 registry 之換算規則仍有效）⇒
 同一個 `future72_*` 欄在 **1h 線 ＝ 72 根、12h 線 ＝ 6 根**（receipt：
 `python3 -c "from momentum.core.constants import TIMEFRAME_SECONDS;print(72*3600//TIMEFRAME_SECONDS['1h'],72*3600//TIMEFRAME_SECONDS['12h'])"` → `72 6`）。
 ⇒ **「批次層深度」在混 TF 批次中根本沒有唯一值**；把單一 bars 數乘上逐列 tf，
@@ -341,8 +385,8 @@ bar 命名欄（`future_4bar_return`）則本就逐 tf 不同（1h 得 4h、12h 
 - 🔴 **R11：左項 `declared_window_bars` 亦為逐 tf（CODEX-R11-P0-01）**——
   R10 版把輸出定為 map 卻把左項留成單一值，混 TF 時無唯一單位語意。
   ⇒ 使用者宣告之答案窗根數亦以 `Mapping[timeframe -> int >= 0]` 表達
-  （單一 TF 批次退化為單鍵；CSV 上傳時由 Task 1.9 之 UI 逐 tf 收集或以同值填滿）。
-  Task 2.1b 之 `depth(tf)` 左項取 `declared_window_bars[tf]`。
+  （單一 TF 批次退化為單鍵；CSV 上傳由 Task 1.9、`/search` 匯出由 Task 1.9′ 之同一 UI 逐 tf 收集或以同值填滿）。
+  🔴 R 重開（D-8）：`lookahead_bars_declared[tf] = declared_window_bars[tf]`（原 Task 2.1b 之 `depth(tf)=max(宣告, 引用欄)` 已退役；無條件可引用）。
 - **禁止**用 run 之 tf、批內 `max/min/平均 tf`（同 Task 7.7 ②）。
   🔴 **R22 更正單位來源**：秒數一律取自**注入之 `timeframe_seconds` map**；
   `momentum/core/constants.py:6` 之 `TIMEFRAME_SECONDS` 僅為該 map 之**建構素材**，
@@ -354,7 +398,7 @@ bar 命名欄（`future_4bar_return`）則本就逐 tf 不同（1h 得 4h、12h 
   `for symbol, g in t.groupby("symbol", sort=True)`；`:58-61` 之 `window`／`embargo`
   皆在該 group 內計算）。R9 主委裁決點（per-symbol vs 全批 `max_e`）**經 R10 三家覆核維持**：
   切分本就逐 symbol，洩漏只發生在同 symbol 時間軸內；取全批 max 會對窗較小之 symbol
-  **過度 purge**，違反 Task 2.1b「過度保守亦屬錯誤」。
+  **過度 purge**，違反 §C0「過度保守亦屬錯誤」（原引 Task 2.1b，已退役）。
 
 🔴 **R10 規格階段鎖定唯一實作路徑（R9 之「TODO 二擇一」已撤回）**
 
@@ -757,7 +801,7 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 > **lookahead 深度 ＝ 該批 label 定義所引用之最遠未來根數（逐 timeframe 各一值）**
 > ——🔴 **R11 明確化**：「根數」隨 timeframe 而變（小時命名欄尤然），
 > 故本通則之量化形態為 `Mapping[tf -> bars]`，其唯一 oracle ＝ `lookahead_bars_declared`；
-> 承載式見 Task 2.1b、ms 換算與 purge 下界見 §D-3′-a（ii）。
+> 🔴 R 重開（D-8）：承載＝使用者逐 tf 宣告（Task 1.9／1.9′；原 Task 2.1b 承載式已退役）、ms 換算與 purge 下界見 §D-3′-a（ii）。
 > ——不論該條件在語意上是「事件本身」還是「品質過濾」。
 > **purge 必須 ≥ 此深度。**
 
@@ -767,7 +811,7 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 使用者確認：以「選 t0 漲跌 ＋ 自行篩 future 1-12」即可構成預測型事件（label 由未來條件決定）
 ⇒ **機制相同、僅語意不同**，現有工具已足以表達，缺的是前端沒把 `scenario` 接出來（見 Phase 7）。
 
-**UI 揭露須動態**：顯示「本批 scenario＝X、lookahead 深度＝N、來源＝<引用之欄位清單>」，
+**UI 揭露須動態**：顯示「本批 scenario＝X、lookahead 深度＝N、來源＝使用者宣告（逐 tf；R 重開 D-8，原「引用之欄位清單」已退役）」，
 **禁寫死任何固定文案**（主委原擬之「正反例由 t0 條件決定、不看未來」僅對 C 成立，對 A/B 全錯）。
 
 **處置（三層）**：
@@ -807,11 +851,37 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 
 ---
 
+**D-8（R 重開，2026-09-02；出自使用者裁定，非委員 finding；類別經三家 consult 一致判 R）
+匯出前篩選整區移除；答案窗深度之唯一來源改為使用者逐 tf 宣告；purge 取宣告與答案窗之較大者**
+
+- **裁定本體（使用者原話）**：2026-09-02「上傳都有要填答案窗了，那 G3-D1 這在 /search 的新增條件都不用了吧，
+  使用者直接 CSV 篩選就好」；2026-08-31「我反例的篩選方式和正例一定不一樣，這兩個篩選可以說是獨立系統，
+  所以正反案例篩選條件絕對不能共用。如果匯出前篩選只是要知道後續要用幾根 Bar 去 Purge／切分／Train 分割等，
+  那為何不只接給使用者輸入最大使用了哪個 timeframe 的第幾根 Bar 做案例區分，而且 Purge 就是正反案例篩選取大的 Bar 數做使用」。
+- **證偽之既有設計**：§A `A-1`（「兩者都做」）；Phase 2 定位「唯一能把答案窗宣告變成機器可證事實的路徑」
+  ——後者之前提（系統確知使用者引用了哪些欄）在使用者於系統外標記時**不成立**（篩選面板為空 ⇒ 深度 0、purge 0 而無人喊；
+  `G3-D1`），且 Task 2.1b 自記四種抽不出引用欄之失敗形態、抽不出仍要問使用者 ⇒ 機器可證性名實不符。
+- **三條規則**：
+  ① `/search` 匯出面板**無**篩選；匯出＝搜尋結果**全部**列（含未標記者，`label` 留空供 Excel 補）。正反例判定在系統外完成。
+  ② 答案窗深度＝使用者於**批次建立時**逐 tf 宣告（`declared_window_bars` map）；CSV 匯入（Task 1.9）與 `/search` 匯出（Task 1.9′）
+     **同一元件、同一 validator、同一規則**（預設＝檔內／結果內最大可用 horizon；可調低但須勾不可驗聲明；接受任意正整數；缺即 fail-closed）。
+     `lookahead_bars_declared[tf] = declared_window_bars[tf]`——**不再與任何欄位取 max**（無條件可引用；附帶欄不得參與）。
+  ③ purge 權威式（§D-3′-a（ii））**不變**；使用者裁定「取正反例篩選深度之較大者」由宣告框文案承載
+     （「填正例與反例兩邊判定所用之最遠者」），不新增契約欄。
+- **D-7 三層之對應**：L1 registry **保留**（供揭露預設值候選、rename 攻擊防護與 Task 7.7）；L2 由「未知欄才觸發」改為**一律宣告**
+  （Task 1.11 改寫）；L3 不變（Task 1.12）。
+- **落點（§P；`scripts/spec_ruling_task_sync.sh` 對證）**：Task 1.9（改寫）、**Task 1.9′（新增）**、Phase 2 全部（⛔ RETIRED）、
+  Task 1.11（改寫）、Task 4.1 ③④／4.1b／7.3（深度來源改宣告）、§V V-12（改寫）。
+- **殘餘風險（三值具名）**：`user-ruling`——宣告勝過推導（機器可證性不再宣稱）；`needs-research`——匯出端宣告框之預設值候選
+  只能來自附帶欄，使用者未附帶任何 `future_*` 欄時預設為空（留空不預填，走「尚未填寫」）；若日後允許無深度匯出 ⇒ `blocked-by` L3 直至補宣告。
+- **併回**：D-001…D-005 之落點表見檔頭。
+
 ## §A 假設與待使用者確認
 
 | # | 假設 | 狀態 |
 |---|---|---|
-| A-1 | #0 採 (c)：匯出前篩選 **與** 上傳自篩 CSV 兩者都做，先做上傳 | 已確認 |
+| ~~A-1~~ | #0 採 (c)：匯出前篩選 **與** 上傳自篩 CSV 兩者都做，先做上傳 | ⛔ **2026-09-02 使用者裁定推翻（R 重開，見檔頭與 D-8）**：匯出前篩選整區移除；只剩「上傳自篩 CSV」一條路 |
+| A-1′ | `/search` 只負責把搜尋結果**全部**匯出成可回灌 CSV／JSON；正反例篩選由使用者於系統外（Excel）完成；答案窗深度由使用者於**批次建立時逐 tf 直接宣告**（CSV 匯入與 `/search` 匯出同一規則）；purge 取宣告深度與分析答案窗之較大者 | ✅ **已確認**——使用者 2026-09-02 原話「上傳都有要填答案窗了，那 G3-D1 這在 /search 的新增條件都不用了吧，使用者直接 CSV 篩選就好」＋ 2026-08-31「不然只接給使用者輸入最大使用了哪個 timeframe 的第幾根 Bar 做案例區分，而且 Purge 就是正反案例篩選取大的 Bar 數做使用」 |
 | A-2 | #9a 止血閘採「直接擋下」而非「警告後容許硬跑」 | 已確認 |
 | A-3 | #9b 排入 GAP-6 | 已確認 |
 | A-4' | `label` 為**使用者聲明**，系統不推斷、不預設、不宣稱其正確；未指定 ⇒ fail-closed | R1 三家一致，已改寫（§D-1） |
@@ -1624,7 +1694,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 邊界：只拒收並指出衝突；不自動分批。
 - 不可做：不得靜默取第一列之值套用全批。
 
-**Task 1.10 — 欄位級 `lookahead_bars` 契約（D-7 之 L1；Task 1.9／2.1b 之前置）**
+**Task 1.10 — 欄位級 `lookahead_bars` 契約（D-7 之 L1；Task 1.9／1.9′ 預設值候選與 Task 7.7 之前置；原「2.1b 之前置」已隨 R 重開退役）**
 - 內容：新建 `momentum/Analysis/contracts/future_column_lookahead.json`，
   登記搜尋結果**每一個**未來欄之 `lookahead_bars`：
   🔴 **兩套命名並存、單位不同**（GROK-R3-P1-01 抓出主委原寫死 72 之錯誤，實查證屬實）：
@@ -1675,7 +1745,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   把 `future_max_return` 改標成 `lookahead_bars: 12`（猜一個深度）⇒ ④；
   把外部上傳欄改成「名稱命中 registry 即直接解析」⇒ ⑤。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：registry 為 D-7 三層防線之根（L1），Task 1.11（L2）／1.12（L3）／2.1b 皆只讀它、
+- 覆蓋風險：registry 為 D-7 三層防線之根（L1），Task 1.11（L2）／1.12（L3）／1.9′（預設值候選）皆只讀它（2.1b 已退役）、
   無一改寫它——「存活至 Phase 7（終）」即由此而來 ⇒ 不被覆蓋。**須同步**：Phase 4 之 Task 4.1
   引入附帶 `future_*` 欄、Phase 7 之 Task 7.5 分組報酬表若引入任何新的未來欄，皆須**先**在本
   registry 登記；未登記時 Task 1.10 驗證②之「未登記集合 `== set()`」會紅，該紅為 fail-closed 之
@@ -1693,8 +1763,9 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   ②未填宣告即送出 ⇒ fail-closed（落檔數 `== 0`）
   **mutation**：改為「忽略無法解析之欄」⇒ ①須紅。
 - 存活至：Phase 7（終）。
-- 覆蓋風險：L2 之強制宣告只在「registry 解析不出深度」時觸發；Phase 2 之 Task 2.1b 走的是
-  「條件引用之欄位全部可解析」之機器可證路徑，兩者為**互斥分支**而非覆蓋關係 ⇒ 不被覆蓋。
+- 覆蓋風險（R 重開 D-8 改寫）：L2 之強制宣告自本 R 起**一律觸發**（兩路徑皆須宣告；原「只在 registry 解析不出深度時觸發」
+  與 Task 2.1b 之「機器可證互斥分支」已隨 Phase 2 退役而不存在）⇒ 本 Task 之觸發面**擴大為全部批次**，
+  其 UI 與 validator 即 Task 1.9／1.9′ 之同一份，本 Task 不另建。
   **須同步**：Task 7.1「邊界」已限定只接出後端既有能力、不新增後端未支援之值，故 Phase 7 不擴大
   本 Task 之觸發面；日後若任一 Phase 允許使用者自訂欄名進入篩選條件，該 Phase 須同批擴充本 Task
   之宣告 UI，否則自訂欄會落入「無人負責宣告深度」之縫隙而被 L3 一律擋死。
@@ -1751,8 +1822,8 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 **Task 1.9 — 答案窗宣告與 purge 下界（D-7 之 L2 使用者介面；依賴 Task 1.10／1.11）**
 - 內容：CSV 上傳時，答案窗**預設取檔內最大可用 horizon**（有 `future_1..12` ⇒ 預設 12）；
   可往下調但須勾選「我的篩選條件未用到超過第 N 根」之聲明，UI 明示**此為無法驗證的聲明**；
-  欄位接受**任意正整數**（不限 1..12）。宣告值經 Task 2.1b 之 `depth(tf)` 逐 tf 解析後
-  寫入 derived 欄 **`lookahead_bars_declared`**（map；R10 修正，見 §D-3′-a（i）），
+  欄位接受**任意正整數**（不限 1..12）。🔴 R 重開（D-8）：宣告值**即** derived 欄
+  **`lookahead_bars_declared`**（map；逐 tf 直接取 `declared_window_bars[tf]`，不再經 Task 2.1b 解析——該 Task 已退役），
   並以 `max(1, lookahead_bars_declared[該列 timeframe])` 寫入
   `label_definition.window.horizon_bars`（契約下限之投影；
   🔴 **R9 修正**：R8 版只寫後者，會把真實深度 0 讀成 1，見 §D-3′-a（i）。
@@ -1772,31 +1843,68 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
     `declared_window_bars` 與 `lookahead_bars_declared` **鍵集皆恰為 `{'1h','12h'}`**；
     以單一輸入框套用全部 tf ⇒ fail-closed
   ④宣告 20（>12）⇒ 接受（不限 1..12）
-  ⑤**深度公式一致性**（R4 群集 D）：本 Task 之 purge 寬度須由 **Task 2.1b 之同一式**導出——
-    斷言 CSV 路徑與系統內篩選路徑對同一組（宣告 window、引用欄集合）輸入回傳**相同** depth
-    （呼叫同一 exported 函式，非各自實作）。兩路徑之差別只在「可否調低」，不在公式。
+  ⑤**宣告 validator 一致性**（R4 群集 D；R 重開改寫）：CSV 匯入路徑與 `/search` 匯出路徑（Task 1.9′）
+    對同一組宣告輸入回傳**相同** `lookahead_bars_declared`，且呼叫**同一 exported** validator
+    （`validateDeclaration`／`parse_lookahead_declaration`），非各自實作。兩路徑規則**相同**（皆可調低但須聲明）。
   **mutation（兩條，皆須紅）**：把預設值改回 1 ⇒ ①；
-  讓 CSV 路徑另寫一份深度計算（不呼叫同一函式）⇒ ⑤。
+  讓任一路徑另寫一份 validator（不呼叫同一函式）⇒ ⑤。
 - 存活至：Phase 6。
 - 覆蓋風險：本 Task 之宣告值寫入 `label_definition.window.horizon_bars`，與 `/search` 路徑
   （Task 4.1 ③）之深度宣告為**同一欄位、同一寫入點**（R8 改寫：Phase 4 之「主答案窗」已依
-  §D-3′ 移除，該欄不再有第二種語意）⇒ 兩路徑須呼叫 Task 2.1b 之同一深度函式；
+  §D-3′ 移除，該欄不再有第二種語意）⇒ 兩路徑須呼叫**同一宣告 validator**（R 重開；原「Task 2.1b 之同一深度函式」已退役）；
   Task 4.1「不可做」已明令附帶欄多選不得改變該欄之來源。
-  **須同步**：Phase 2 之 Task 2.1b 對系統內篩選路徑**鎖定下界且不可調低**，
-  與本 Task 之「可調低但須勾選聲明」為兩條路徑之不同規則 ⇒ 實作須以批次來源（CSV 匯入 vs
-  系統內篩選）分派；統一為寬鬆版即 fail-open（機器可證的下界被聲明繞過），統一為嚴格版則 CSV
-  路徑無法上傳（CSV 無條件可解析）。
+  **須同步**（R 重開改寫）：原「系統內篩選路徑鎖定下界且不可調低 vs CSV 可調低但須聲明」之分派**已無對象**
+  ——Task 1.9′ 使 `/search` 匯出路徑與本 Task **同一規則、同一 validator**；實作**不得**再依批次來源分派規則。
 - 邊界：只管「宣告多遠」與其 purge 連動；不改 `event_split.py` 之 purge 演算法。
 - 不可做：不得以「檔內有哪些 future_N 欄」推斷實際用到第幾根（D-7：偵測不可能）；
   不得給小於檔內最大 horizon 的預設值。
 
-### Phase 2 — 匯出前篩選（依賴：Task 1.1 之契約欄位定案；**不依賴** Task 1.2 端點）　【#0(a)】
+**Task 1.9′ — `/search` 匯出端答案窗宣告框（D-8；R 重開新增；取代 Task 2.1b 之導出路徑）**
+- 內容：`/search` 兩條匯出（事件契約 JSON、可回灌 CSV）**匯出前**顯示與 Task 1.9 **同一元件**
+  （`LookaheadDeclarationFields`）之逐 tf 宣告框：批內出現之每個 `timeframe` 各一個輸入框；
+  預設值＝該搜尋結果**附帶** `future_*` 欄之最大可用 horizon（逐 tf；來源＝Task 1.10 registry 之揭露用途，
+  ——不是深度導出）；可往下調但須勾選「我的正反例判定未用到超過第 N 根」之聲明（N ≥ 1 之整數），UI 明示此為無法驗證的聲明，
+  並明示「**填正例與反例兩邊判定所用之最遠者**」（使用者 2026-08-31：purge 取兩者較大）；
+  欄位接受任意正整數。宣告值即 `lookahead_bars_declared`（map），投影規則同 Task 1.9（`max(1, ·)` 入 `window.horizon_bars`）。
+  🔴 **守衛**：`withExportLowerBoundGuard` 改形為 **`withExportDeclarationGuard(state, {notify, proceed})`**
+  ——保留 D-004 A-021／D-002 A-010 之 **`proceed` 結構保證**（匯出動作只存在於 `proceed` 內，
+  守衛外不可能發生匯出）；缺 map／批內某 tf 無鍵／非 int／`< 0`／調低未勾聲明 ⇒ **不呼叫 `proceed`**、
+  `fetch`／下載 call count `== 0`。兩條匯出共用同一守衛實例。
+  🔴 **validator 唯一**：前端 `lookaheadDeclaration.ts::validateDeclaration`／後端
+  `lookahead_declaration.py::parse_lookahead_declaration` 與 Task 1.9 **同一份**，禁第二份實作。
+- 驗證：`npx vitest run exportDeclaration` ≥6 條——
+  ①批內 `{1h,12h}` ⇒ 恰兩個輸入框（`data-testid=lookahead-window-1h`／`-12h`），單一 tf 退化為一個
+  ②不填任一 tf 即按匯出 ⇒ `proceed` 未呼叫、`URL.createObjectURL` call count `== 0`、`fetch` call count `== 0`
+  ③調低於預設且未勾聲明 ⇒ 同②；勾選後 ⇒ 匯出成功且 `records[i].lookahead_bars_declared` 深度相等於宣告 map（逐列同值）
+  ④宣告 `{1h: 20}`（>12）⇒ 接受；`records[i].label_definition.window.horizon_bars === Math.max(1, 20)`
+  ⑤附帶欄選擇改變 ⇒ 宣告 map 與 `window.horizon_bars` **皆不變**（附帶欄只影響預設值之候選，不影響已宣告值）
+  ⑥JSON 與 CSV 兩條匯出對同一宣告產出**相同** `lookahead_bars_declared`（逐鍵 `==`）
+  ⑦`/search` 頁與匯入頁取用**同一 exported** `validateDeclaration` 參考（斷言同一函式物件）
+  **mutation（四條，皆須紅）**：把匯出動作移到 `proceed` 外 ⇒ ②③；守衛對缺鍵 tf 以 `1` 默認 ⇒ ②；
+  CSV 路徑另寫一份 map 組裝 ⇒ ⑥；前端自寫第二份 validator ⇒ ⑦。
+- 存活至：Phase 7（終）。
+- 覆蓋風險：本 Task **取代** Phase 2 Task 2.1b 對 `/search` 路徑之深度來源；Task 4.1 ③ 之寫入點不變、
+  只換來源；Task 7.3 揭露之「lookahead 深度」自本 Task 之宣告讀取（**禁**殘留對 `exportFilters`／2.1b map 之讀取）。
+  **須同步**：Task 1.9 之「可調低但須聲明」規則自本 Task 起**兩路徑相同**（原「系統內篩選鎖定不可調低」之分派已無對象）。
+- 邊界：只管宣告與 fail-closed 守衛；不改 `event_split.py`；不做任何欄位掃描導出。
+- 不可做：不得由附帶欄或任何欄名**推斷**深度（D-7：偵測不可能）；不得給小於預設之預設值；不得在 `proceed` 外匯出。
 
-> **定位（D-7 改正）**：Phase 2 不是「方便功能」——它是本批唯一能把
-> 「答案窗宣告」從**不可驗的使用者聲明**變成**機器可證事實**的路徑。
-> 系統內篩選時，系統確知使用者引用了哪些 `future_N` 欄，可自動導出下界。
+### ~~Phase 2 — 匯出前篩選~~　⛔ **R 重開退役（2026-09-02，D-8）**　【#0(a) 作廢】
 
-**Task 2.1 — /search 匯出前篩選面板**
+> ⛔ **本 Phase 全部 Task 退役，不再實作、不再驗收**；原文保留供追溯（下方條文**不具效力**）。
+> 退役理由（D-8）：使用者裁定匯出前篩選整區移除；深度來源改為使用者宣告（Task 1.9／1.9′）。
+> 已落地之實作依 CROSS-FILE 退役清單移除：`frontend/src/lib/{exportFilter,lookaheadDepthLock}.ts`（＋測試）、
+> `exportFilterPersist.test.ts`、`page.tsx` 篩選面板與 `export-count-n`、`api/routes/case.py` 之
+> `/case/lookahead-depth`、`momentum/Analysis/event_samples/lookahead_depth.py` 之導出路徑；
+> **保留**：`computeExportCounts`（Task 1.5 仍用，空條件＝恆等；`/search` 改顯示 M／X／Y）、
+> `lookahead_declaration.py`／`lookahead_gate.py`／`lookahead_registry.py`。
+> `label_definition.filters` 契約鍵**保留但匯出端不再寫入**（既為 optional；匯入端接受缺鍵）。
+>
+> ~~**定位（D-7 改正）**：Phase 2 不是「方便功能」——它是本批唯一能把「答案窗宣告」從不可驗的使用者聲明
+> 變成機器可證事實的路徑。~~ ⛔ 此定位已被證偽：使用者於系統外標記時篩選面板為空 ⇒ 推不出深度、purge 為 0 而無人喊；
+> 且 2.1b 自記四種抽不出引用欄之失敗形態，抽不出仍要問使用者（`G3-D1`）。
+
+**Task 2.1 — /search 匯出前篩選面板**　⛔ RETIRED（D-8）
 - 內容：對搜尋結果任一數值欄設 `>=`／`<=`／區間，多條件 AND。
 - 驗證：`npx vitest run exportFilter` ≥6 條；含「篩選後筆數 `==` 手算筆數」之數值斷言。
 - 存活至：Phase 6。
@@ -1808,7 +1916,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 邊界：只篩**數值**欄；字串欄不在本 Task。
 - 不可做：不得在篩選中改動任何原始欄位值。
 
-**Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）**
+**Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）**　⛔ RETIRED（D-8；深度來源改 Task 1.9／1.9′ 宣告；`depth_by_timeframe()` 導出路徑與 `/case/lookahead-depth` 退役）
 - 內容：系統內篩選時，**依 Task 1.10 之欄位級標註**解析條件引用之**所有**欄位
   （含 `*_max_drawdown`／`future72_*`／任何登記欄），取其最大深度為答案窗**下界並鎖定**，
   使用者**不得調低**（與 CSV 路徑之「可調低但需聲明」不同——此處是機器可證，不需聲明）。
@@ -1862,7 +1970,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 邊界：只導出下界；使用者可往上調（保守方向永遠允許）。
 - 不可做：不得允許調低於導出值（那等於明知條件用到第 7 根卻只隔 5 根）。
 
-**Task 2.2 — 篩選條件寫入 label_definition.filters**
+**Task 2.2 — 篩選條件寫入 label_definition.filters**　⛔ RETIRED（D-8；契約鍵保留、匯出端不再寫入）
 - 內容：把篩選條件寫進契約已登記之 `label_definition.filters`（Task 1.1 已加）。
 - 驗證：匯出檔 `label_definition.filters` 與送出條件深度相等（`==`）；
   且 `filters` 鍵存在於契約 `label_definition.fields`（防漂移斷言）。
@@ -1877,7 +1985,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 邊界：只記錄條件，不改變 `label` 值本身。
 - 不可做：不得把篩選條件納入 `event_id` 之輸入（會使同事件跨批 id 不同，違反 D-2）。
 
-**Task 2.3 — 即時筆數顯示**
+**Task 2.3 — 即時筆數顯示**　⛔ RETIRED（D-8；`computeExportCounts` 保留供 Task 1.5，`/search` 只顯示 M／X／Y、無篩選耦合）
 - 內容：顯示「將匯出 N 筆（原 M 筆）／你聲明的正例 X／反例 Y」。
 - 驗證：vitest 斷言 `N + 被濾掉數 == M` 且 `X + Y == N`。
 - 存活至：Phase 6。
@@ -1955,8 +2063,8 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   ①附帶選 `[1,3,7]` ⇒ 匯出檔含 `future_{1,3,7}bar_return` 三欄
   ②`'label_value' in records[0]` `=== false`（**每一列皆然**，非只驗第一列）
   ③匯出面板**不存在**「主答案窗」控制項（以 testing-library `queryBy*` 斷言為 `null`）
-  ④`records[0].lookahead_bars_declared` **深度相等**於執行 Task 1.10／2.1b 之深度導出函式
-    對同一輸入之回傳 map（**呼叫同一 exported 函式比對，非寫死數字**），
+  ④`records[0].lookahead_bars_declared` **深度相等**於 Task 1.9′ 宣告框送出之 `declared_window_bars` map
+    （R 重開：原「Task 1.10／2.1b 深度導出函式」已退役；**以同一 exported validator 之回傳比對，非寫死數字**），
     且 `records[0].label_definition.window.horizon_bars ===
     Math.max(1, records[0].lookahead_bars_declared[records[0].timeframe])`
   ⑤附帶欄之選擇改變 ⇒ ④所斷言之 `lookahead_bars_declared` 與 `window.horizon_bars`
@@ -1970,8 +2078,8 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 覆蓋風險：本 Task **覆蓋** R1 版之 (a) 方案（刻意，見 §D-3 撤回理由）。
   **須同步**：Task 1.9 之覆蓋風險原寫「本 Task 之宣告值…與 Phase 4 之『主答案窗』為**同一欄位**」
   ——「主答案窗」已移除 ⇒ 該處已改寫為「與 `/search` 路徑之深度宣告為同一欄位、同一寫入點」。
-  兩路徑（CSV 宣告 vs `/search` 導出）仍須呼叫 Task 2.1b 之同一深度函式。
-- 邊界：附帶欄 h ∈ 1..12；附帶欄只是攜帶，不參與 label 判定、不參與深度導出。
+  兩路徑（CSV 宣告 vs `/search` 宣告）呼叫同一宣告 validator（R 重開；原「Task 2.1b 之同一深度函式」已退役）。
+- 邊界：附帶欄 h ∈ 1..12；附帶欄只是攜帶，不參與 label 判定、不參與深度（只作 Task 1.9′ 預設值之候選）。
 - 不可做：不得在匯出端以任何形式寫入 `label_value`（含寫 `null`、寫 `0`、
   或另立 `label_value_status` 之類新欄——新欄須先改契約，D-6）；
   不得把附帶欄之 `max` 當成 lookahead 深度（那是 D-7 明禁之「由欄位存在與否推斷」）。
@@ -1979,7 +2087,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 **Task 4.1b — 匯出時揭露每個選項在動什麼（使用者 2026-08-22：「我不知道有什麼東西」；R8 依 §D-3′ 改寫③）**
 - 內容：匯出面板明文顯示三件現行完全未告知之事實：
   ① **本批 scenario ＝ {實際值} — {契約 doc 之白話}**（由實際設定導出，**禁寫死**）
-  ② **lookahead 深度 ＝ {N} 根，來源＝{引用之欄位清單}**——`N` 取自 derived 欄
+  ② **lookahead 深度 ＝ {N} 根，來源＝使用者宣告（Task 1.9′；R 重開 D-8）**——`N` 取自 derived 欄
     **`lookahead_bars_declared[本批之 timeframe]`**（依 D-7 通則導出；C 無品質過濾時為 **0**；
     批內多 TF 時**逐 tf 各顯示一行**，不得只顯示其中一個）；
     🔴 **不得**顯示 `label_definition.window.horizon_bars`（該欄有下限 1 之 floor，
@@ -2957,8 +3065,8 @@ R7 版之驗收⑥（reason 取自 `import_failure_reasons`）亦隨 F-2′ 之�
 
 **Task 7.3 — 動態揭露本批設定（取代原擬之固定文案）**
 - 內容：匯出前顯示「本批：scenario＝X／**control_kind＝C**／進場價＝Y／報酬算法＝Z／
-  決策位移＝K／lookahead 深度＝N（來源：<欄位清單>）／purge 將為 N 根」，
-  **全部由實際設定導出**。
+  決策位移＝K／lookahead 深度＝N（來源：**使用者宣告**，逐 tf；R 重開 D-8，原「引用欄位清單」已退役）／purge 將為 N 根」，
+  **全部由實際設定導出**；深度自 Task 1.9′ 之宣告 state 讀取，**禁**殘留對 `exportFilters`／2.1b map 之讀取。
   🔴 `control_kind` 為 R7 群集 D 補入：Task 4.1b 之覆蓋風險宣稱本 Task 為其**嚴格超集**
   並要求 7.3 上線時移除 4.1b 之獨立實作，但本清單原**漏掉 4.1b 明列之 `control_kind`**
   ⇒ 取代後 UI 反而不再揭露該批 control kind（codex 命中）。
@@ -3439,7 +3547,7 @@ t0 formatter 讀得到 label、label formatter 讀得到 t0（欄位語意重疊
 | V-16 | 分析時 producer 之支援矩陣、purge 下界（含逐列 ms 換算與 per-scope 聚合）、分析時 receipt 之唯一性、前端不持有 `label_value`（D-3′／D-3a／F-1′／F-2′／F-4′） | **執行 Task 7.0b 之驗證欄全部條目**；§V 不重述支援矩陣、purge 公式與階段清單 | Task 7.0b 之命令皆 rc=0 且條目數 `>=` 其所列；purge 下界之唯一定義見 §D-3′-a（ii）、階段之唯一定義見 §D-3′-a（iii） |
 | V-17 | IC 分析頁：批次事實欄唯讀、分析參數可設定且不回寫（D-3′） | **執行 Task 7.6 之驗證欄全部條目**；§V 不重述斷言字面 | Task 7.6 之命令皆 rc=0 且條目數 `>=` 其所列 |
 | V-11 | 五維度全接出、不可漂移、且**選值真的傳到落檔**（Phase 7） | **執行 Task 7.2 之驗證欄全部條目**（三層＋其 mutation）；§V 不重述任何斷言字面 | `npx vitest run contractEnumWiring` rc=0 且用例數 `>=` Task 7.2 所列；集合層之唯一基準 ＝ Task 7.1 定義之 `selectable(path, dim)` |
-| V-12 | lookahead 深度由標註導出、未知即擋（D-7 之 L1/L2/L3） | **執行 Task 1.10／1.11／1.12／2.1b 之驗證欄全部條目**；§V 不重述深度公式與 fixture 條文 | 各該 Task 之命令皆 rc=0；深度公式之唯一定義見 Task 2.1b，改名攻擊之判準見 Task 1.10。🔴 **R8 邊界**：本列只管**深度導出**；深度與分析時 h 合成 purge 下界之 `max` 式屬 §D-3′-a（ii），由 **V-16** 承接，兩列不重疊 |
+| V-12 | lookahead 深度由**使用者宣告**、缺即擋（D-7 之 L1/L2/L3；R 重開 D-8 改寫） | **執行 Task 1.10／1.11／1.12／1.9／1.9′ 之驗證欄全部條目**；§V 不重述 fixture 條文 | 各該 Task 之命令皆 rc=0；深度之唯一來源＝Task 1.9／1.9′ 之宣告（原 Task 2.1b 已退役），改名攻擊之判準見 Task 1.10。🔴 **R8 邊界**：本列只管**深度導出**；深度與分析時 h 合成 purge 下界之 `max` 式屬 §D-3′-a（ii），由 **V-16** 承接，兩列不重疊 |
 | V-14 | IC 分析頁揭露該批五維度 | **執行 Task 7.6 之驗證欄全部條目**；§V 不重述斷言字面 | `pytest tests/api -q -k event_batch_detail_dims` 與 `npx vitest run icEventBatchDisclosure` 皆 rc=0 且條目數 `>=` Task 7.6 所列 |
 | V-15 | 特徵覆蓋對證 fail-closed | **執行 Task 7.7 之驗證欄全部條目**；§V 不重述 containment 邊界公式 | `pytest tests/api -q -k feature_coverage_gate` rc=0 且條目數 `>=` Task 7.7 所列；containment 之唯一定義見 Task 7.7 |
 | V-13 | 報酬表正／反／全體三組 | **執行 Task 7.5 之驗證欄全部條目**；§V 不重述斷言字面 | `pytest tests/momentum/event_samples/ -q -k return_table_by_label` rc=0 且條目數 `>=` Task 7.5 所列 |

@@ -1,5 +1,16 @@
 # GAP3_EVENT_UX_TODO — D 延伸 002（B1 實作期之修訂）
 
+> ## 🔴 本檔已因 R 重開而失效（SUPERSEDED-BY-R，2026-09-02）
+>
+> **失效依據**：`docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1——R 重開 ⇒ 原檔所有延伸檔一併失效、
+> 戳記作廢；v2.0 安全閥①「全量作廢，不做只作廢重疊者」。觸發本次 R：`docs/GAP3_EVENT_UX_SPEC.md` R35-R（§D **D-8**，
+> 使用者 2026-09-02 裁定移除匯出前篩選；三家 consult `20260902-gap3ux-x-consult-r1` 一致判 R）。
+>
+> **本檔內容之處置（落點表見 SPEC 檔頭）**：A-002／A-003／A-005／A-006／A-008／A-009／A-011／A-012／A-013
+> **併回本體**（與 2.1b 無關，內容不變）；**A-004／A-007／A-010／A-014 自然關閉（Phase 2 退役）**，
+> 其中 A-010 之「把匯出包進 `proceed`」結構保證**移植**至 Task 1.9′ 之 `withExportDeclarationGuard`。
+> 本檔不得再作為任何派工之授權來源。
+
 BASE: docs/GAP3_EVENT_UX_TODO.md @ afa70967
 PREDECESSOR: docs/GAP3_EVENT_UX_TODO.D-001.md
 

@@ -1,5 +1,13 @@
 # GAP3_EVENT_UX_TODO — D 延伸 001（凍結後第一份修訂）
 
+> ## 🔴 本檔已因 R 重開而失效（SUPERSEDED-BY-R，2026-09-02）
+>
+> **失效依據**：`docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1（R ⇒ 所有延伸檔失效；安全閥①全量作廢）。
+> 觸發：`docs/GAP3_EVENT_UX_SPEC.md` R35-R（§D **D-8**，使用者 2026-09-02 裁定移除匯出前篩選）。
+> **處置**：A-001（§B B1 列含 2.1b、4.2 S-9）**改寫併回**——B1 ＝ 1.1、1.10、4.2（S-9）；2.1b 退役故自 B1 移除
+> （見 TODO §B 之 B1 列與其後之「B1 之實際內容」句）。
+> 本檔不得再作為任何派工之授權來源。
+
 BASE: docs/GAP3_EVENT_UX_TODO.md @ afa70967
 PREDECESSOR: none
 
