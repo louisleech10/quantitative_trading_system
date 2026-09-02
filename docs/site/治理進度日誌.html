@@ -3025,6 +3025,9 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 <blockquote>
 <p><strong>2026-09-02 追記八十六（R2／R3 閉合；<code>G3-D1</code> 結案）</strong>：R2 三家對 R1 六條全判 CLOSED、composer 接受五個設計決定與「自動勾選收窄」；codex 反向再抓一條 P1——附帶欄全選時系統預填 12、全取消後預設變 0 但預填值留著、守衛照放，違反「0 須明填」。修法：把「使用者親手填的」和「系統預填的」分開記，預填的跟著新預設走（回到留空），親手填的才保留（commit <code>dd4baa2c</code>）。R3 codex 重跑 CLOSED、composer／grok 反向無新 P0／P1 ⇒ 三家皆判可結。<code>G3-D1</code> 程式面 CLOSED；剩使用者側 UAT（B2 改寫版／B5／B10）。這條 epic 從 9/1 深夜使用者一句「上傳都要填答案窗了，篩選就不用了吧」到今天結案：consult → R 重開三輪規格審 → 三家戳記 → 實作 → 三輪 code review，共 8 輪委員會、6 個 commit。</p>
 </blockquote>
+<blockquote>
+<p><strong>2026-09-02 追記八十七（使用者回來驗 B13–B20：一晚抓出八張票 D10–D17，全部當場修、逐票 commit）</strong>：B15 一按就撞 <code>G3-D10</code>（coverage 閘去物化暫存檔旁找 manifest，任何註冊 run 都跑不了）＋<code>G3-D11</code>（任務秒失敗、畫面停「執行中」）；修完跑完出現「Failed to fetch」＝<code>G3-D12</code>（refilter 回應含 NaN 500）；使用者依清單找不到條件 IC 標記 ⇒ 挖出最要緊的 <strong><code>G3-D13</code>：事件模式根本沒開</strong>（後端只在舊「送時間戳」路徑開 event filter，B10 改送 <code>event_import_id</code> 後沒跟上，整份「事件模式」報告其實是全樣本 IC）；修好後條件 IC 真跑，立刻撞 <strong><code>G3-D14</code></strong>（survivor 落檔要六鍵 event_context，五階段路徑沒產）；再跑完又兩件：<code>G3-D15</code>（摘要 API 對 icir 全 None 排序炸）與 <code>G3-D16</code>（前端 refilter 無限迴圈、後端每秒落檔兩次、單日 104 次）；最後使用者自己選 BTC＋ETH 那批撞出 <strong><code>G3-D17</code></strong>（跨 symbol 事件被拿 ETH 特徵算，正確性缺陷）。B18–B20 使用者驗 OK。🔴 <strong>自我檢討</strong>：D13／D14／D17 三條正確性缺陷都是 B10 的東西，三輪 code review、26 條 mutation 全綠——因為沒有一條測試讓事件批<strong>真的跑到底</strong>（只測 transport 層互斥、purge 數值、閘本體）。「端點綠 ≠ 全鏈綠」這句 B5 就寫過，B10 又犯一次。另登記殘留 <code>G3-R12</code>（小樣本 IC Mean 顯示 <code>--</code>）。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
