@@ -143,20 +143,22 @@ def test_gap3_horizon_declaration_05_depth_formula_is_the_single_exported_functi
         return out
 
     monkeypatch.setattr(decl_mod, "depth_by_timeframe", spy)
-    # 🔴 R1（`CODEX-R1-P2-05`）：fixture 必須讓**引用欄非空**，否則
-    #    「把 referenced_for_depth 改成 ()」這個變異算出同值、探針仍被呼叫一次 ⇒ 兩條斷言都綠（假綠）。
+    # 🔴 R 重開 D-8 規則②（R1 review `GROK-R1-P1-02`）：深度＝宣告逐鍵複製，**不再與引用欄取 max**。
+    #    R 前本條要求「引用欄真的餵進同一式做 max」；R 後恰相反——fixture 仍讓引用欄非空（`future_4bar_return`，
+    #    12h 可解析為 4），宣告 12 而**餵進唯一投影函式的引用集合必須為空**，落檔深度 == 宣告。
+    #    mutation：把 `referenced_for_depth` 改回餵可解析欄 ⇒ 本條紅（referenced 非空）。
     referencing = _defaults({"conditions": [{"column": "future_4bar_return", "op": ">=", "value": 0}]})
     r = _post(_csv(extra_columns=FUTURE_COLUMNS),
               declaration={"declared_window_bars": {"12h": 12}, "acknowledged_unverifiable": True},
               defaults=referencing)
     assert r.status_code == 200, r.text
 
-    assert len(calls) == 1, "CSV 路徑未呼叫唯一深度函式（＝另寫了一份計算）"
+    assert len(calls) == 1, "CSV 路徑未呼叫唯一投影函式（＝另寫了一份計算）"
     call = calls[0]
-    # 未調低 ⇒ 條件引用之可解析欄必須**真的餵進**同一式做 max，不得清空
-    assert call["referenced"] == ["future_4bar_return"], "CSV 路徑沒把引用欄餵進唯一深度函式"
-    assert call["out"] == real(call["referenced"], call["declared"], call["timeframes"])
+    assert call["referenced"] == [], "R 後引用欄不得再餵進深度函式（D-8：不與任何欄位取 max）"
+    assert call["out"] == call["declared"] == {"12h": 12}
     assert r.json()["lookahead_declaration"]["lookahead_bars_declared"] == call["out"]
+    assert r.json()["lookahead_declaration"]["referenced_columns"] == ["future_4bar_return"]   # 仍進 receipt 供揭露
 
 
 # ── ⑥ 多 TF 批：鍵集恰為兩個 tf；單一輸入框套用全部 tf ⇒ fail-closed ───────

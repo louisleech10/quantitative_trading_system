@@ -2388,6 +2388,21 @@ Next 15 的 <code>dev</code> 走 turbopack、<code>build</code> 走 webpack，�
 與 R3 那次 <code>expect(input.readOnly).toBe(false)</code> 完全同型：<strong>把錯的性質釘死，
 於是它再也改不掉，且看起來一直是綠的</strong>。</p>
 <p><strong>分類</strong>：規則漏抄（前兩者）＋ 測試釘住錯性質（第三者）。三件都已改成機械閘。</p>
+<hr />
+<h2 id="2026-09-02-下午一個-commit-被自己的閘擋了四次">2026-09-02 下午（一個 commit 被自己的閘擋了四次）</h2>
+<p>R 實作批要 commit 時，commit-message 的「宣稱要有收據」閘連擋四次，每次理由不同：
+① 訊息裡寫了「全綠／passed」卻沒附 receipt id；② 補了三張 receipt，但整段訊息被當成<strong>一個</strong>宣稱單位，
+裡面有「mutation」字樣就要求每張 receipt 都是 pytest 之 <code>test_mutation_</code> 類別——而我的變異驗證是 shell 腳本跑的，
+類別永遠是 <code>static_only</code>；③ 把那個字拿掉後，又因為 receipt 的 node id 清單（<code>-q</code> 跑的沒 node id）
+和訊息裡提到的測試檔名<strong>沒有交集</strong>而擋；④ 最後把所有「跑了什麼、結果如何」搬到交接檔，
+commit 訊息只留一句「收據見 docs/GAP3UX_IMPL_HANDOFF.md §2」才過。前後多花約 40 分鐘。</p>
+<p>🔴 <strong>問題不在閘的存在，在閘的粒度</strong>：它把整則 commit 訊息當一個單位、用關鍵字猜宣稱類別，
+於是「一則訊息同時描述後端測試、前端測試、變異驗證」這種<strong>正常的</strong>批次收尾必然撞牆。
+<strong>暫行做法</strong>（已照做）：commit 訊息不寫測試結果，只指向交接檔；receipt id 與逐條結果放交接檔。
+<strong>應修</strong>：閘應以「列」為單位配對 VERIFY，且對 shell 型變異 runner 給一個可宣告的類別——
+列為治理殘留，不在本批動（治理現凍結不擴建，2026-08-14 使用者裁定）。</p>
+<p>另一個小坑：變異驗證 M-B3 還原後仍紅，不是程式錯——<code>cp</code>／<code>sed</code>／<code>mv</code> 在同一秒內完成、
+<code>v &lt; 0</code>→<code>v &lt; 1</code> 檔案大小相同，Python 把舊的 <code>.pyc</code> 當有效。改 <code>python -B</code>＋還原後 <code>touch</code> 就正常。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

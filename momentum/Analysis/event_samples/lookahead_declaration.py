@@ -512,16 +512,13 @@ def resolve_declaration(
             {"lowered_timeframes": lowered, "default_window_bars": defaults, "declared_window_bars": declared},
         )
 
-    # 🔴 調低＝使用者聲明「未用到那些欄」⇒ 該批之引用欄不再納入 max（否則調低永遠無效）；
-    #    未調低時把可解析欄一併餵進去，讓同一式在兩種情形都做**真正的** max（交叉檢查，非儀式）。
+    # 🔴 R 重開 D-8 規則②（R1 review `GROK-R1-P1-02`）：`lookahead_bars_declared[tf] = declared_window_bars[tf]`
+    #    ——**不再與任何欄位取 max**。R 前「未調低時把可解析引用欄餵進 max」會讓使用者宣告 5 而落檔 72
+    #    （宣告 oracle 與 purge 寬度對使用者不可見地漂移）。`referenced` 只留在 receipt 供揭露／勾選判定。
+    #    `depth_by_timeframe` 以空引用集呼叫＝逐 tf 鍵集／非負檢查之投影（本體保留，不再有 max 語意）。
     referenced_for_depth: Tuple[str, ...] = ()
-    if not lowered:
-        resolvable: Set[str] = set()
-        for tf in timeframes:
-            resolvable |= registry_resolvable_columns(referenced, tf, r)
-        referenced_for_depth = tuple(sorted(resolvable))
-
     depth = depth_by_timeframe(referenced_for_depth, declared, timeframes, registry=r)
+    assert dict(depth) == {tf: int(declared[tf]) for tf in timeframes}, "D-8 規則②：深度須逐鍵等於宣告"
     # 🔴 本函式**不**就地投影 `horizon_bars`：投影須發生在 Task 1.8 之批次同質檢查**之後**，
     #    否則多 TF 批（1.9 ⑥）之逐 tf 不同 horizon 會被 `label_definition` 同質維度誤判為異質列。
     #    投影由呼叫端於 validate 後呼叫 `apply_horizon_projection()`（見其 docstring）。

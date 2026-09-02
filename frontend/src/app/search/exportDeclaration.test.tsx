@@ -244,6 +244,42 @@ describe('Task 1.9′ — /search 匯出端答案窗宣告框', () => {
     expect(Object.keys(a)).toEqual(['1h']);
   });
 
+  it('R1-P1-01（grok／codex）：preview 欄集只含勾選之附帶欄；結果列自帶的 future72_* 不得進預設候選', async () => {
+    seed([caseRow({ future72_close_return: 0.5, future24_close: 1 }),
+      caseRow({ timestamp: '2024-01-01 01:00:00', positive_case: false, future72_close_return: 0.1 })]);
+    render(<SearchPage />);
+    await waitFor(() => expect(previewMock).toHaveBeenCalled());
+    const arg = previewMock.mock.calls[0][0] as { columns: string[] };
+    expect(arg.columns.every((c) => /^future_\d+bar_return$/.test(c))).toBe(true);
+    expect(arg.columns).not.toContain('future72_close_return');
+    expect(arg.columns).not.toContain('future24_close');
+    // 取消勾選 h=12 ⇒ 重取時欄集也跟著少一欄（候選只跟勾選走）
+    fireEvent.click(screen.getByTestId('export-attached-h12'));
+    await waitFor(() => expect(previewMock.mock.calls.length).toBeGreaterThan(1));
+    const arg2 = previewMock.mock.calls[previewMock.mock.calls.length - 1][0] as { columns: string[] };
+    expect(arg2.columns).not.toContain('future_12bar_return');
+  });
+
+  it('R1-P1-01（codex）：附帶欄改變後 preview 重取失敗 ⇒ 舊 preview 作廢，匯出被擋（不得用過期預設放行）', async () => {
+    render(<SearchPage />);
+    await declareFromPreview({ '1h': 12 });
+    previewMock.mockRejectedValueOnce(new Error('preview endpoint down'));
+    fireEvent.click(screen.getByTestId('export-attached-h12'));
+    await waitFor(() => expect(screen.getByTestId('export-declaration-error')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('export-gap3-events'));
+    fireEvent.click(screen.getByTestId('export-contract-csv'));
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    expect(createObjectURL).toHaveBeenCalledTimes(0);
+    expect(buildSpy).toHaveBeenCalledTimes(0);
+    // 重取成功後才恢復（已宣告值保留）
+    previewMock.mockResolvedValue(previewOf({ '1h': 11 }));
+    fireEvent.click(screen.getByTestId('export-attached-h11'));
+    await waitFor(() => expect(screen.getByTestId('lookahead-declaration')).toBeTruthy());
+    expect((screen.getByTestId('lookahead-window-1h') as HTMLInputElement).value).toBe('12');
+    const records = await exportJson();
+    for (const r of records) expect(r.lookahead_bars_declared).toEqual({ '1h': 12 });
+  });
+
   it('⑦ /search 與匯入頁取用同一 exported validateDeclaration（執行期探針＋來源對證）', async () => {
     render(<SearchPage />);
     await declareFromPreview({ '1h': 4 });

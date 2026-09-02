@@ -34,6 +34,16 @@ R 實作批（Task 1.9′＋Phase 2 退役＋Task 1.11 後端謂詞＋validator 
 | 值域 | Task 1.9′／R35 | 後端 `_validate_declaration_shape`：`v < 0` 拒（0 合法、須明填）；前端 `validateDeclaration` 同；`LookaheadDeclarationFields` `min={0}` | 留白＝缺鍵 ⇒ 鍵集不符而拒，不得默認 0 |
 | 揭露 | Task 7.3 | `eventFieldFormatters.ts`：`lookahead_depth` 文案改「來源＝你在匯出前宣告的值」；`EventDepthRow`／`SearchDisclosureContext` 移除 `referencedColumns` | 深度自宣告 state 讀取；未填 ⇒ 「尚未宣告」 |
 
+### §1b R1 code review（session `20260902-gap3ux-b11-review-r1`）之修法（同日落地）
+
+| finding | 修法落點 |
+|---|---|
+| `GROK-R1-P1-01`／`CODEX-R1-P2-02` 匯出端預設候選欄集把結果列全部鍵送去（含系統內部 `future72_*`）⇒ 1h 預設被拉到 72 | `page.tsx` preview 欄集改**只送勾選之附帶 `future_{h}bar_return`**；page 測試：列自帶 `future72_*` 時欄集不含它、取消勾選後同步變少 |
+| `CODEX-R1-P1-01` preview 重取失敗留舊 preview 放行 | catch ⇒ `setDeclPreview(null)`（守衛據此擋）、宣告值保留；page 測試：先成功→改附帶欄→端點拒 ⇒ 兩鈕皆擋、重取成功後恢復 |
+| `GROK-R1-P1-02` `resolve_declaration` 仍把可解析引用欄餵 `depth_by_timeframe` 取 max（宣告 5 落檔 72） | `referenced_for_depth` 恆 `()`＋assert `depth == declared`；新測試（引用 `future72_close_return`、宣告 5／12／0 ⇒ 落檔＝宣告）；`test_gap3_horizon_declaration_05` 改寫為 R 版 |
+| `GROK-R1-P2-01` 攜帶值自動勾選擴到 CSV | `import_records(carried_declaration_acknowledged=)` 只在 JSON 直傳路由傳 True；CSV／對映攜帶值不自動勾選（低於預設須表單勾）；殘留 `R35-L2-ACK` 收窄回 JSON 直傳 |
+| `CODEX-R1-P2-03` 兩路由文案仍寫「正整數」 | description 改「非負整數（0 ＝未用未來資訊，須明填）」＋一律宣告語句 |
+
 ---
 
 ## §2 測試與驗證（接手前先跑一次）

@@ -1101,7 +1101,7 @@ class EventImportService:
         return dict(self._pipeline.preview_lookahead_declaration(columns, timeframes))
 
     @staticmethod
-    def _declaration_from_rows(records: List[Dict[str, object]]) -> Optional[Dict[str, object]]:
+    def _declaration_from_rows(records: List[Dict[str, object]], *, acknowledged: bool) -> Optional[Dict[str, object]]:
         """JSON 直傳／列內攜帶之宣告（SPEC Task 1.11：列內 `lookahead_bars_declared` 視為 Task 1.9′ 攜帶之宣告）。
 
         規則：**每一列**皆須帶該欄且**批內同值** ⇒ 導出 `{declared_window_bars: 該 map, acknowledged_unverifiable: True}`；
@@ -1111,7 +1111,10 @@ class EventImportService:
         鍵集是否恰為批內 tf 集合、值是否為非負整數，由 `resolve_declaration` 之同一 validator 判。
 
         🔴 具名殘留 `R35-L2-ACK`（needs-research）：契約無 `acknowledged_unverifiable` 欄，JSON 直傳無法複驗
-        匯出端之勾選 provenance；此處視攜帶之宣告為已於匯出端勾選（匯出守衛不勾不放行）。新增契約欄須 D-6。
+        匯出端之勾選 provenance；**只有 JSON 直傳**（無宣告 UI）視攜帶之宣告為已於匯出端勾選（`acknowledged=True`）。
+        CSV／對映路徑有宣告 UI ⇒ 攜帶值只當「宣告值」、**不自動勾選**（`acknowledged=False`）：低於檔內
+        `default_window_bars` 或引用驗不了的欄時，仍須使用者在表單勾選——否則手改檔內 map 即可繞過勾選
+        （R1 review `GROK-R1-P2-01`）。新增契約欄須 D-6。
         """
         maps = [r.get("lookahead_bars_declared") for r in records]
         present = [m for m in maps if m is not None]
@@ -1120,7 +1123,7 @@ class EventImportService:
         first = present[0]
         if not isinstance(first, dict) or any(m != first for m in present[1:]):
             return None
-        return {"declared_window_bars": dict(first), "acknowledged_unverifiable": True}
+        return {"declared_window_bars": dict(first), "acknowledged_unverifiable": bool(acknowledged)}
 
     def import_records(
         self, records: List[Dict[str, object]], *, source_name: Optional[str], upload_bytes: Optional[bytes],
@@ -1128,7 +1131,7 @@ class EventImportService:
         batch_defaults: Optional[Dict[str, object]] = None, extra_warnings: Optional[List[str]] = None,
         lookahead_declaration: Optional[Dict[str, object]] = None, data_columns: Optional[List[str]] = None,
         column_mapping: Optional[Dict[str, object]] = None, mapping_confirmed_at: Optional[str] = None,
-        derive_event_id: bool = False,
+        derive_event_id: bool = False, carried_declaration_acknowledged: bool = False,
     ) -> EventImportResponse:
         """upload_bytes：事件檔內容（記 `upload_sha256` 供 provenance）。
         source_bytes：契約所指之**來源檔**位元組（CODEX-R2-P1-03）；`verify_source_digest=True` 時以此逐列對證
@@ -1163,7 +1166,11 @@ class EventImportService:
         #    皆無 ⇒ `lookahead_declaration_required`。
         #    列內不齊（部分缺／列間不同值）且無表單宣告 ⇒ 先跑契約 validate 讓其「列間不一致」reason 逐列現形。
         #    空批 ⇒ 沒有 tf 可宣告，同樣先跑 validate（由契約以 `empty_import` 拒，落檔 0；不在此以鍵集不符誤報）。
-        carried = self._declaration_from_rows(declaration_view) if declaration_view else None
+        # 只有 JSON 直傳路由（無宣告 UI）顯式傳 `carried_declaration_acknowledged=True`；檔案／對映路徑有宣告 UI
+        # ⇒ 攜帶值不自動勾選（見 `_declaration_from_rows` docstring）。不以「有無 data_columns」推斷路徑——
+        # JSON **檔**上傳之 `file_columns` 為空，推斷會把它誤當直傳而自動勾選。
+        carried = (self._declaration_from_rows(declaration_view, acknowledged=carried_declaration_acknowledged)
+                   if declaration_view else None)
         declaration = lookahead_declaration
         rows_partially_carry = declaration is None and carried is None \
             and any(r.get("lookahead_bars_declared") is not None for r in declaration_view)

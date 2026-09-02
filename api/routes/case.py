@@ -189,10 +189,10 @@ async def import_events_file(
     lookahead_declaration: Optional[str] = Form(
         None,
         description=('GAP-3 UX Task 1.9／1.11 之答案窗宣告：JSON 物件 '
-                     '{"declared_window_bars": {timeframe: 正整數}, "acknowledged_unverifiable": bool}。'
+                     '{"declared_window_bars": {timeframe: 非負整數（0 ＝未用未來資訊，須明填）}, "acknowledged_unverifiable": bool}。'
                      '🔴 逐 timeframe 各一值（單一輸入框套用全部 tf ⇒ 拒）；'
                      '低於檔內最大可用 horizon 須 acknowledged_unverifiable=true。'
-                     '條件引用了深度不可由 registry 驗證之欄位而未宣告 ⇒ 拒收（落檔數 0）'),
+                     'R 重開後每批一律須宣告（表單或列內攜帶皆無 ⇒ 拒收，落檔數 0）；引用驗不了的欄或調低須 acknowledged_unverifiable=true'),
     ),
     validate_only: bool = Query(False),
     verify_source_digest: bool = Query(
@@ -237,7 +237,8 @@ async def import_events_json(request: EventImportJsonRequest):
         #    導出規則住 service（批內同值、每個出現之 tf 皆有鍵）。
         return svc.import_records(request.records, source_name=request.source_name, upload_bytes=body,
                                   validate_only=request.validate_only, verify_source_digest=request.verify_source_digest,
-                                  batch_defaults=request.batch_defaults)
+                                  batch_defaults=request.batch_defaults,
+                                  carried_declaration_acknowledged=True)   # 殘留 R35-L2-ACK：只此路由自動視為已勾選
     except EventImportRejectedError as exc:
         raise _rejected(exc, svc=svc, content=body)
 
@@ -267,7 +268,7 @@ async def import_events_csv(
     lookahead_declaration: Optional[str] = Form(
         None,
         description=('GAP-3 UX Task 1.9／1.11 之答案窗宣告：JSON 物件 '
-                     '{"declared_window_bars": {timeframe: 正整數}, "acknowledged_unverifiable": bool}。'
+                     '{"declared_window_bars": {timeframe: 非負整數（0 ＝未用未來資訊，須明填）}, "acknowledged_unverifiable": bool}。'
                      '預設值請先呼叫 /case/import-events/lookahead-declaration 取得（＝檔內最大可用 horizon，逐 tf）'),
     ),
     mapping_confirmed_at: Optional[str] = Form(

@@ -260,6 +260,45 @@ def test_gap3_declaration_mandatory_acknowledgement_flag_matches_backend_rejecti
     assert upload(opaque, True).status_code == 200
 
 
+# ── R1 review 修法（GROK-R1-P1-02）：深度＝宣告逐鍵複製，引用欄不再抬高 ─────────────────
+def test_gap3_declaration_mandatory_declared_depth_is_never_raised_by_referenced_columns():
+    """canonical filters 引用 `future72_close_return`（1h ⇒ registry 72 根）而使用者宣告 5（已勾）⇒ 落檔仍 5，不是 72。"""
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id
+    recs = _records(lookahead_bars_declared=None)
+    for i, r in enumerate(recs):
+        r["timeframe"] = "1h"
+        r["event_id"] = canonical_event_id("ETHUSDT", "1h", r["t0"])
+        r["label_definition"] = {**dict(r["label_definition"]),
+                                 "filters": {"version": 1, "combinator": "AND",
+                                             "conditions": [{"column": "future72_close_return", "op": ">=", "value": 0.0}]}}
+    for declared in (5, 12, 0):
+        r = _upload_contract_csv(recs, json.dumps({"declared_window_bars": {"1h": declared}, "acknowledged_unverifiable": True}))
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["lookahead_declaration"]["lookahead_bars_declared"] == {"1h": declared}, body["lookahead_declaration"]
+        det = client.get(f"{API}/case/events/{body['import_id']}").json()
+        assert all(rec["lookahead_bars_declared"] == {"1h": declared} for rec in det["records"])
+        assert all(rec["label_definition"]["window"]["horizon_bars"] == max(1, declared) for rec in det["records"])
+
+
+# ── R1 review 修法（GROK-R1-P2-01）：攜帶值自動勾選只限 JSON 直傳 ────────────────────────
+def test_gap3_declaration_mandatory_carried_map_auto_ack_only_on_json_direct():
+    """檔內有 future_12 欄（預設 12）而列內攜帶 {12h: 3}、無表單：CSV 路徑 ⇒ 拒（調低未勾）；JSON 直傳 ⇒ 收（殘留 R35-L2-ACK）。"""
+    recs = _records(lookahead_bars_declared={"12h": 3})
+    for r in recs:
+        r["future_12bar_return"] = 0.01
+    c = _upload_contract_csv(recs)
+    assert c.status_code in (400, 422), c.text
+    assert c.json()["detail"]["kind"] == "lookahead_declaration_unacknowledged_lowering"
+    assert _stored_count() == 0
+    j = _post_json(recs)
+    assert j.status_code == 200, j.text
+    assert j.json()["lookahead_declaration"]["lookahead_bars_declared"] == {"12h": 3}
+    # 表單勾選後 CSV 路徑亦收
+    ok = _upload_contract_csv(recs, json.dumps({"declared_window_bars": {"12h": 3}, "acknowledged_unverifiable": True}))
+    assert ok.status_code == 200, ok.text
+
+
 def test_gap3_declaration_mandatory_retired_depth_endpoint_is_gone():
     """Phase 2 退役：`/case/lookahead-depth` 不再存在（深度不由篩選條件導出）。"""
     r = client.post(f"{API}/case/lookahead-depth",

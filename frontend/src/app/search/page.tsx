@@ -135,9 +135,11 @@ export default function SearchPage() {
       .filter((tf) => tf && tf !== 'undefined'),
     [exportRows, searchParams.timeframe],
   );
-  // 預填資料之輸入：搜尋結果欄 ∪ 將附帶之 `future_{h}bar_return` 欄（只影響**預設候選**，不影響已宣告值）
+  // 預填資料之輸入：**只有**使用者勾選、且會寫進匯出檔之附帶 `future_{h}bar_return` 欄（只影響**預設候選**，不影響已宣告值）。
+  // 🔴 R1 review（GROK-R1-P1-01／CODEX-R1-P2-02）：不得把搜尋結果列的全部鍵送去——結果列恆帶系統內部的
+  //    `future72_*`／`future24_*` 等欄（使用者在本頁看不到、也不會匯出），會把 1h 預設拉到 72，
+  //    使用者照預設填就高估 purge；填真實的 12 反而被當成「調低」而多要一次勾選。
   const previewInputKey = JSON.stringify({
-    cols: [...new Set(exportRows.flatMap((r) => Object.keys(r)))].sort(),
     attached: [...attachedHorizons].sort((a, b) => a - b),
     tfs: exportTimeframes,
   });
@@ -154,12 +156,12 @@ export default function SearchPage() {
     // 🔴 拿不到 preview ⇒ 守衛擋（`exportDeclarationBlockMessage`），不以任何預設深度代替。
     // 🔴 附帶欄改變只會**重取預設候選**：既有 preview 與已宣告值在重取期間保留（驗證⑤），
     //    不在此清空——清空會讓「改附帶欄後立刻匯出」被當成「尚未取得」而擋住。
-    const { cols, attached, tfs } = JSON.parse(previewInputKey) as { cols: string[]; attached: number[]; tfs: string[] };
+    const { attached, tfs } = JSON.parse(previewInputKey) as { attached: number[]; tfs: string[] };
     setDeclPreviewError(null);
     if (tfs.length === 0) return;
     let cancelled = false;
     fetchLookaheadDeclarationPreviewColumns({
-      columns: [...cols, ...attached.map((h) => `future_${h}bar_return`)],
+      columns: attached.map((h) => `future_${h}bar_return`),
       timeframes: tfs,
     })
       .then((p) => {
@@ -171,6 +173,9 @@ export default function SearchPage() {
       })
       .catch((err) => {
         if (cancelled) return;
+        // 🔴 R1 review（CODEX-R1-P1-01）：重取失敗 ⇒ 舊 preview **作廢**（守衛據此擋），不得留著舊 preview 放行——
+        //    否則「先成功、改附帶欄後端點拒」這條路徑會用過期預設放行匯出。已宣告值保留（重取成功後再驗）。
+        setDeclPreview(null);
         setDeclPreviewError(err instanceof Error ? err.message : '無法取得答案窗預填資料');
       });
     return () => { cancelled = true; };
