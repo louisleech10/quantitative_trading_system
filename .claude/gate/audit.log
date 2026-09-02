@@ -52304,3 +52304,4 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"actor": "cx_run", "attempt_id": "dbec855c-dc44-4186-997b-bada960524ef", "cli_rc": "0", "event": "committee_family_result", "event_id": "97bc14bb-abd0-41a4-82a8-100d24c75a3f", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-review-r1-composer.md", "output_sha256": "bee26114998874fba67d9eee0723cebffe27791f30389cdf949a4b4223031c9b", "producer": "audit_append.sh", "result_state": "success", "round_id": "9f647a31-6864-47a1-a56c-b23bc8b147a4", "schema_version": 1, "sequence": 3009, "ts": "2026-09-02T22:43:43Z"}
