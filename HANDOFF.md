@@ -29,12 +29,15 @@
 - `tsc --noEmit` 8 行既有債（FactorReturnChart.test／useFeatureFactory.batchDate.test）。
 
 ## 🔴 進行中（2026-09-02，使用者離線期間）
-- **三家 consult 已派**：session `20260902-gap3ux-x-consult-r1`／task `20260902-GAP3UX-X-CONSULT-R1`／
-  round_id `521c3a6a-8b1c-4ba1-baa3-c0e212bc24e8`（債已開，**收斂前不得派新工**）。
-  brief `handoffs/20260902-gap3ux-d006-class-consult-BRIEF.md`；產出 `handoffs/20260902-gap3ux-x-consult-r1-{codex,composer,grok}.md`。
-  題目：移除匯出前篩選依 `FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1 是 **R 重開**（推翻 FROZEN A-1／Phase 2）還是可作 D；
-  R 之最小可執行範圍；D-001…D-005 效力（三份引用 2.1b）。分歧預設 R。
-- 接回流程：`reconcile_build.sh` → 讀三檔 → synth → `debt_clear.sh --round-id … --session …` → 依 verdict 起草 R／D 文件。
+- consult `20260902-gap3ux-x-consult-r1` 已收斂＋銷帳（synth 本機 `handoffs/reconcile/20260902-gap3ux-x-consult-r1/`）：**R 重開**。
+- **R 修訂稿已落地並 commit**（`32d35c7f`；SPEC R35-R 疊加於 `R34-landing` 收據、TODO、D-001…D-005 `SUPERSEDED-BY-R`）。
+  派審前閘 `gap3ux_pre_review.sh <patch> --diff-base 003d4846` VERIFY:20260902T023726Z-gap3ux-r35-pre-review；
+  patch `handoffs/patches/20260902-gap3ux-r35-reopen-draft.md`。
+- **三家對抗審 R35 已派**：session `20260902-gap3ux-x-review-r35`／task `20260902-GAP3UX-X-REVIEW-R35`／
+  round_id `ddb90849-e42d-4bc1-98ca-5caa0d6cbb7c`（債已開，**收斂前不得派新工**）。
+  brief `handoffs/20260902-gap3ux-r-reopen-review-BRIEF.md`；產出 `handoffs/20260902-gap3ux-x-review-r35-{codex,composer,grok}.md`。
+- 接回流程：`reconcile_build.sh 20260902-gap3ux-x-review-r35 --mode review <三檔>` → 填群集／處置 → attribution＋completeness →
+  `debt_clear.sh` → 依 finding 修 SPEC／TODO → 閉合輪（原提出方重跑反例）→ 三家戳記 → **才進實作**（Task 1.9′＋退役清單）。
 
 ## 下一步（依序）
 1. 等使用者驗 B13–B20。

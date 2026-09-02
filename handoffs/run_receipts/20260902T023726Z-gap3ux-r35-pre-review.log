@@ -1,0 +1,10 @@
+[gap3ux_pre_review] 標的：docs/GAP3_EVENT_UX_SPEC.md
+  ✓ doc_format_precheck          rc=0
+  ✓ spec_ruling_task_sync        rc=0
+  ✓ spec_v_task_ref_check        rc=0
+  ✓ quant_standard_check         rc=0
+  ✓ spec_count_audit             rc=0
+  ✓ spec_header_round            rc=0
+[gap3ux_pre_review] 補丁包 locus 對證（3 份）
+  ✓ patch_locus_check            rc=0
+[gap3ux_pre_review] ✅ 全綠，可派審
