@@ -1,0 +1,54 @@
+下載回傳 20 列；欄位=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'taker_buy_volume', 'taker_ratio', 'quote_volume', 'number_of_trades']
+寫入檔: /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/d0cad2a2-3b96-4473-86b3-4e222bd071b4/scratchpad/ff_dl_e2e_ihzzdqs7/kline_cache.h5 存在: True
+新寫 dtype : [('timestamp', '<i8'), ('open', '<f4'), ('high', '<f4'), ('low', '<f4'), ('close', '<f4'), ('volume', '<f4'), ('taker_buy_volume', '<f4'), ('taker_ratio', '<f4'), ('quote_volume', '<f4'), ('number_of_trades', '<i4')]
+現有 dtype : [('timestamp', '<i8'), ('open', '<f4'), ('high', '<f4'), ('low', '<f4'), ('close', '<f4'), ('volume', '<f4'), ('taker_buy_volume', '<f4'), ('taker_ratio', '<f4'), ('quote_volume', '<f4'), ('number_of_trades', '<i4')]
+dtype 完全相同: True | shape: (20,) | compression: gzip
+新寫 attrs keys: ['data_checksum', 'data_source', 'is_complete', 'last_updated', 'time_range_end', 'time_range_start', 'timeframe', 'total_bars']
+現有 attrs keys: ['data_checksum', 'data_source', 'is_complete', 'last_updated', 'time_range_end', 'time_range_start', 'timeframe', 'total_bars']
+與現有檔重疊 20 根：
+  open               相等 20/20
+  high               相等 20/20
+  low                相等 20/20
+  close              相等 20/20
+  volume             相等 20/20
+  taker_buy_volume   相等 20/20
+  taker_ratio        相等 20/20
+  quote_volume       相等 20/20
+  number_of_trades   相等 20/20
+read_klines 讀回: ((20, 10), ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'taker_buy_volume', 'taker_ratio', 'quote_volume', 'number_of_trades'], {'timestamp': 'int64', 'open': 'float32', 'high': 'float32', 'low': 'float32', 'close': 'float32', 'volume': 'float32', 'taker_buy_volume': 'float32', 'taker_ratio': 'float32', 'quote_volume': 'float32', 'number_of_trades': 'int32'})
+2026-09-02 09:22:44,854 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-09-02 09:22:44,959] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-02 09:22:44,959 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+2026-09-02 09:22:46,308 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/d0cad2a2-3b96-4473-86b3-4e222bd071b4/scratchpad/ff_dl_e2e_ihzzdqs7/kline_cache.h5
+2026-09-02 09:22:46,308 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-02 09:22:46,308 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-02 09:22:46,351 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.binance.com:443
+2026-09-02 09:22:46,418 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-02 09:22:46,419 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-02 09:22:46,419 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-02 09:22:46,419 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-02 09:22:46,463 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-02 09:22:46,463 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Binance API ping successful
+2026-09-02 09:22:46,463 - momentum.DataExtraction.kline_download_service.KlineDownloadService - DEBUG - Provider 'binance' health check OK
+2026-09-02 09:22:46,463 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Downloading ETHUSDT 12h from binance (2025-12-01 00:00:00 to 2025-12-10 23:59:59)
+2026-09-02 09:22:46,463 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Starting download: ETHUSDT 12h from 2025-12-01 00:00:00 to 2025-12-10 23:59:59 (estimated ~19 klines in ~1 batches)
+2026-09-02 09:22:46,463 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [100%] Batch 1/1: 2025-12-01 00:00 to 2025-12-10 23:59
+2026-09-02 09:22:46,463 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-02 09:22:46,508 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1765411199000&interval=12h&limit=1000&startTime=1764547200000&symbol=ETHUSDT HTTP/1.1" 200 1249
+2026-09-02 09:22:46,508 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 20 klines from Binance API
+2026-09-02 09:22:46,509 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [100%] Batch 1: downloaded 20 klines, total: 20 | 最後K線(UTC): 2025-12-10 12:00, 下一批次(UTC): 2025-12-11 00:00
+2026-09-02 09:22:46,522 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Download completed: 20 klines in 1 batches
+2026-09-02 09:22:46,524 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - DataFrame validation passed: 20 rows, 10 columns
+2026-09-02 09:22:46,527 - momentum.DataExtraction.kline_storage - WARNING - HDF5 file not found: /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/d0cad2a2-3b96-4473-86b3-4e222bd071b4/scratchpad/ff_dl_e2e_ihzzdqs7/kline_cache.h5
+2026-09-02 09:22:46,536 - h5py._conv - DEBUG - Creating converter from 5 to 3
+2026-09-02 09:22:46,536 - momentum.DataExtraction.kline_storage - INFO - HDF5 structure created successfully
+2026-09-02 09:22:46,539 - momentum.DataExtraction.kline_storage - DEBUG - Atomically renamed temp dataset to 'data'
+2026-09-02 09:22:46,544 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 20 bars are continuous
+2026-09-02 09:22:46,544 - momentum.DataExtraction.kline_storage - INFO - Read 20 klines from ETHUSDT/12h in 0.004s
+2026-09-02 09:22:46,545 - h5py._conv - DEBUG - Creating converter from 3 to 5
+2026-09-02 09:22:46,545 - momentum.DataExtraction.kline_storage - DEBUG - ✓ Verification passed for ETHUSDT/12h
+2026-09-02 09:22:46,546 - momentum.DataExtraction.kline_storage - INFO - Updated cache index: ETHUSDT/12h (add)
+2026-09-02 09:22:46,546 - momentum.DataExtraction.kline_storage - INFO - ✅ Successfully wrote 20 klines to ETHUSDT/12h (verified)
+2026-09-02 09:22:46,546 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Saved 20 klines to storage (symbol=ETHUSDT, timeframe=12h)
+2026-09-02 09:22:46,546 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Successfully downloaded 20 klines in 0.06s (337.4 klines/s)
+2026-09-02 09:22:46,553 - momentum.DataExtraction.kline_storage - INFO - Read 20 klines from ETHUSDT/12h in 0.002s

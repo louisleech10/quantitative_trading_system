@@ -86,7 +86,7 @@
 <tr>
 <td><code>KLINE-1</code></td>
 <td>「案例CSV導入其實是批量K線下載，要保留還是拆開？」</td>
-<td><strong>你裁定：另開票拆成獨立版面</strong>。🔴 我查出比拆頁更根本的事：K 線下載現在有<strong>兩條各自獨立的鏈</strong>——<code>/data-preparation</code> 那條寫 <code>data_cache/</code>，而 <strong>Feature Factory 頁自己另有一個下載面板</strong>寫 <code>data_cache/feature_klines/</code>。<strong>兩份快取、日期差四個月、互不共用</strong>。所以真正要決定的是「這兩條要不要合成一條」</td>
+<td><strong>你 9/2 稍晚改裁：<code>/data-preparation</code> 那塊舊的「導入案例 CSV → 批量 K 線下載」註解之後移除；<code>/search</code> 和 FF 頁的下載按現況保留。</strong> 我先驗了三件事才讓你決定：FF 頁那條下載鏈現在真的能用（真打 Binance、寫暫存、讀回，與你現有檔逐 bit 相同）；FF／IC／事件分析全都只讀 <code>feature_klines/</code>；<code>/search</code> 自己讀寫另一份 <code>data_cache/kline_cache.h5</code>，跟 FF 頁互不相干。只有 <code>/data-preparation</code> 那塊是「程式碼跟 FF 頁同一套、寫的檔卻跟 <code>/search</code> 同一個」——兩邊各沾一半，這就是它模糊的原因。〔以下為改裁前的紀錄〕原裁定：另開票拆成獨立版面。🔴 我查出比拆頁更根本的事：K 線下載現在有<strong>兩條各自獨立的鏈</strong>——<code>/data-preparation</code> 那條寫 <code>data_cache/</code>，而 <strong>Feature Factory 頁自己另有一個下載面板</strong>寫 <code>data_cache/feature_klines/</code>。<strong>兩份快取、日期差四個月、互不共用</strong>。所以真正要決定的是「這兩條要不要合成一條」</td>
 </tr>
 </tbody>
 </table></div>
