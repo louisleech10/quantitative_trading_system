@@ -3028,6 +3028,9 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 <blockquote>
 <p><strong>2026-09-02 追記八十七（使用者回來驗 B13–B20：一晚抓出八張票 D10–D17，全部當場修、逐票 commit）</strong>：B15 一按就撞 <code>G3-D10</code>（coverage 閘去物化暫存檔旁找 manifest，任何註冊 run 都跑不了）＋<code>G3-D11</code>（任務秒失敗、畫面停「執行中」）；修完跑完出現「Failed to fetch」＝<code>G3-D12</code>（refilter 回應含 NaN 500）；使用者依清單找不到條件 IC 標記 ⇒ 挖出最要緊的 <strong><code>G3-D13</code>：事件模式根本沒開</strong>（後端只在舊「送時間戳」路徑開 event filter，B10 改送 <code>event_import_id</code> 後沒跟上，整份「事件模式」報告其實是全樣本 IC）；修好後條件 IC 真跑，立刻撞 <strong><code>G3-D14</code></strong>（survivor 落檔要六鍵 event_context，五階段路徑沒產）；再跑完又兩件：<code>G3-D15</code>（摘要 API 對 icir 全 None 排序炸）與 <code>G3-D16</code>（前端 refilter 無限迴圈、後端每秒落檔兩次、單日 104 次）；最後使用者自己選 BTC＋ETH 那批撞出 <strong><code>G3-D17</code></strong>（跨 symbol 事件被拿 ETH 特徵算，正確性缺陷）。B18–B20 使用者驗 OK。🔴 <strong>自我檢討</strong>：D13／D14／D17 三條正確性缺陷都是 B10 的東西，三輪 code review、26 條 mutation 全綠——因為沒有一條測試讓事件批<strong>真的跑到底</strong>（只測 transport 層互斥、purge 數值、閘本體）。「端點綠 ≠ 全鏈綠」這句 B5 就寫過，B10 又犯一次。另登記殘留 <code>G3-R12</code>（小樣本 IC Mean 顯示 <code>--</code>）。</p>
 </blockquote>
+<blockquote>
+<p><strong>2026-09-02 追記八十八（GAP-3 UAT 全部驗畢；<code>G3-D2</code> 排程裁定）</strong>：使用者補驗 B2（改寫版）／B5／B10 通過 ⇒ B1–B20 全數驗畢（B3 依 <code>G3-D2</code> 記未完成）。使用者裁定下一件＝<code>G3-D2</code> 三組灰項，順序 (a) scenario A／B／two_stage → (c) 三元組其餘值 → (b) <code>platform_random_bars</code>。開工交接 <code>docs/GAP3D2_KICKOFF_HANDOFF.md</code> 已寫（SoT 指標、現況、主委初判「(a) 內含 (c) 子集」、白話閘題），新 session 從唯讀 consult 開工。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
