@@ -3022,6 +3022,9 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 <blockquote>
 <p><strong>2026-09-02 追記八十五（R 實作批 R1 review：兩家各抓兩條 P1，全部採納已修；派 R2 閉合）</strong>：codex 3 條（1 P1＋2 P2）、grok 3 條（2 P1＋1 P2）、composer 零 finding；三家對我自陳的五個設計決定 A–E 全判可接受（grok 對 C 附 P2）。四條 P1／P2 都是「實作沒把 D-8 做到底」，不是規格問題：①匯出端預設候選把搜尋結果列的<strong>全部</strong>鍵送去算，結果列自帶系統內部的 <code>future72_*</code>，1h 預設被拉到 72（grok、codex 兩家獨立命中）——改成只送使用者勾選的附帶欄；②改附帶欄後 preview 重取失敗時舊 preview 留著、守衛照放（codex）——改成失敗即作廢；③後端未調低時仍把可解析引用欄餵進深度函式取 max，使用者宣告 5 落檔 72（grok）——這條最要緊，正是 D-8 規則②「不與任何欄位取 max」的字面違反；改成逐鍵複製並加 assert，一條 R 前語意的舊測試（要求引用欄真的餵進去）改寫成 R 版；④攜帶值自動勾選我擴到了 CSV 路徑（grok P2）——收窄回 JSON 直傳路由，CSV 手改檔內 map 低於預設仍須表單勾選。另 codex 抓到兩個路由文案還寫「正整數」。修法後後端子集 655 綠、前端子集 225 綠，commit <code>7e0a7a94</code>；R1 之債已清；閉合輪 R2 已派。🔴 自我檢討：③是我在 R35 已經把 SPEC 改成「不取 max」之後，實作時沒回頭刪那段 max 邏輯——文件改了、碼沒改，與 B5 時「宣稱大於實作」同型。</p>
 </blockquote>
+<blockquote>
+<p><strong>2026-09-02 追記八十六（R2／R3 閉合；<code>G3-D1</code> 結案）</strong>：R2 三家對 R1 六條全判 CLOSED、composer 接受五個設計決定與「自動勾選收窄」；codex 反向再抓一條 P1——附帶欄全選時系統預填 12、全取消後預設變 0 但預填值留著、守衛照放，違反「0 須明填」。修法：把「使用者親手填的」和「系統預填的」分開記，預填的跟著新預設走（回到留空），親手填的才保留（commit <code>dd4baa2c</code>）。R3 codex 重跑 CLOSED、composer／grok 反向無新 P0／P1 ⇒ 三家皆判可結。<code>G3-D1</code> 程式面 CLOSED；剩使用者側 UAT（B2 改寫版／B5／B10）。這條 epic 從 9/1 深夜使用者一句「上傳都要填答案窗了，篩選就不用了吧」到今天結案：consult → R 重開三輪規格審 → 三家戳記 → 實作 → 三輪 code review，共 8 輪委員會、6 個 commit。</p>
+</blockquote>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

@@ -524,7 +524,7 @@ Grok 再寫臨時測試證明：A 刪除失敗回來時，錯誤訊息「刪除�
 | **Task 1.11** | 未知欄強制宣告（D-7 之 L2） | Phase 1 | ✅ |
 | **Task 1.12** | 不可證則禁進切分（D-7 之 L3） | Phase 1 | ✅ |
 | **Task 1.9** | 答案窗宣告與 purge 下界（D-7 之 L2 使用者介面） | Phase 1 | ✅ |
-| **Task 1.9′** | `/search` 匯出端答案窗宣告框（R 重開新增，取代 2.1b 之導出路徑） | Phase 1 | 🔧 已落地，待三家 review |
+| **Task 1.9′** | `/search` 匯出端答案窗宣告框（R 重開新增，取代 2.1b 之導出路徑） | Phase 1 | ✅（三輪 review 收斂 9/2） |
 | **Task 2.1** | `/search` 匯出前篩選面板 | Phase 2 | ⛔ 退役（R 重開 D-8；程式已拆） |
 | **Task 2.1b** | 由篩選條件自動導出答案窗下界（D-7 第 2 層） | Phase 2 | ⛔ 退役（端點與前端導出已拆；`depth_by_timeframe()` 本體保留） |
 | **Task 2.2** | 篩選條件寫入 `label_definition.filters` | Phase 2 | ⛔ 退役（契約鍵保留、匯出端不再寫） |
