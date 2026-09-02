@@ -245,7 +245,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
      **匯入時不重算**，只比對（`verify_source_digest`）。
 - **修改檔案**：
   - `frontend/src/lib/eventExport.ts`：`canonicalSourceText`（改為呼叫後端取得，不自算）
-  - 🔴 **定案（R2 主委實跑）**：`api/routes/export.py` 之路由為 `/{model_task_id}`＝**模型匯出**，**不是** case 匯出鏈 ⇒ 不改該檔。case 側之 `source_file` 處理現於 `api/routes/case.py:142-147`（匯入端）。`/search` 匯出目前**由前端組檔、後端無對應 route**⇒ 本 Task 之服務端入口＝**在 `api/routes/case.py` 既有 case 鏈內新增一個回應欄位承載點**（不新增 route，見「不可做」），其 handler 名於開工時以 `grep -n '@router' api/routes/case.py` 定位並記入 commit message
+  - 🔴 **定案（R2 主委實跑）**：`api/routes/export.py` 之路由為 `/{model_task_id}`＝**模型匯出**，**不是** case 匯出鏈 ⇒ 不改該檔。case 側之 `source_file` 處理現於 `api/routes/case.py:142-147`（匯入端）。🔴 R 重開併回 D-003 A-017：`/search` 端之承載點＝`api/routes/case_search.py::_attach_canonical_source`（repo 實況；`two_stage_search.py` 亦呼叫同一函式），本行原「`api/routes/case.py`」字面作廢。`/search` 匯出目前**由前端組檔、後端無對應 route**⇒ 本 Task 之服務端入口＝**在 `api/routes/case.py` 既有 case 鏈內新增一個回應欄位承載點**（不新增 route，見「不可做」），其 handler 名於開工時以 `grep -n '@router' api/routes/case.py` 定位並記入 commit message
   - `momentum/Analysis/event_samples/import_contract.py`：新增 `verify_source_digest()`
   - 🔴 S-9 參考實作＝`momentum/Analysis/event_samples/canonical_serialize.py::canonical_event_table_bytes()`——**其建立屬 Task 4.2**，依 §B 之跨批單點依賴表**已提前至 B1**；本 Task（B2）開工時該檔**必須已存在**，不存在即停批（GROK-R2-P1-04）
   - **既有 caller**：`frontend/src/app/search/page.tsx`（匯出按鈕鏈）
@@ -321,10 +321,12 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 ### Task 1.6 — 對映 provenance 落檔（D-1）（`票 #3-5`）
 
 - **SPEC ref**：L1588–1601　**目標**：可追「這批的正反例是依哪一欄、哪個檔宣告的」。
-- **輸入**：`column_mapping`、來源檔名、`source_file_digest`、確認時間
-  **輸出**：寫入該批 receipt
+- **輸入**（🔴 R 重開併回 D-003 A-016：**七欄**）：`column_mapping`／`source_file_name`／`source_file_digest`／
+  `source_digest_verified`／`event_id_source`／`confirmed_at`／`confirmed_at_source`
+  **輸出**：寫入該批 receipt 之 `mapping_provenance`
 - **實作要點**：
-  1. 於落檔時把四項寫入 receipt（**只記錄，不參與任何計算**）。
+  1. 於落檔時把七欄寫入 receipt（**只記錄，不參與任何計算**）；**批內單一 digest invariant**：各列宣告之
+     `source_file_digest` 須解析出單一值，不一致或缺 ⇒ `missing_required_field` fail-closed、落檔 0。
   2. `source_file_digest` **不得省略**（否則無法對證來源）。
   3. receipt 欄位型別依 Task 1.1 之 typed `receipt_schema`。
 - **修改檔案**：`api/services/case_import_service.py::EventImportService`（落檔路徑）
@@ -332,8 +334,9 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **不可做**：不得省略 `source_file_digest`。
 - **邊界**：① 未帶 digest ⇒ fail-closed。② receipt 已存在時**不覆寫**既有欄。
 - **風險緩解**：RISK-(a)。
-- **驗證**：`pytest tests/api -q -k gap3_csv_provenance` **≥2 條**；
-  `receipt['column_mapping']['label'] ==` 送出值。
+- **驗證**：`pytest tests/api -q -k gap3_csv_provenance` **≥4 條**（SPEC Task 1.6 ①–④）；
+  `receipt['column_mapping']['label'] ==` 送出值；`mapping_provenance` 鍵集 `==` 契約七鍵；未附來源檔 ⇒ `source_digest_verified == False`；
+  批內兩個 digest ⇒ 落檔 `== 0`。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（未帶 digest ⇒ fail-closed。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：**無**（receipt 為只增欄位之記錄檔）。
@@ -397,11 +400,13 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   1. 🔴 **兩套命名、單位不同，不得寫死常數**：
      - **bar 命名**（`future_{N}bar_return`／`future_{N}bar_max_drawdown`）：
        `N` 就是根數 ⇒ 存 `lookahead_bars = N`。
-     - **小時命名**（`future{H}_close_return`／`future72_max_return`／`future72_max_drawdown`，
-       H ∈ {1,2,4,6,24,48,72}）：`H` 是**小時** ⇒ 存 `lookahead_hours = H`、
-       **禁存固定 bar 數**；執行期以 `H ÷ 每根小時數` 換算
-       （`case_search_engine.py:1385-1387` 之 `periods_{H}h`；12h 線 ⇒ `future72_*` 為 **6 根**，
-       1h 線 ⇒ **72 根**）。
+     - 🔴 **R 重開併回 D-002 A-005**：`future{N}_close_return`，**N ∈ {1,2,4,6}** ＝ `shift(-N)`（`case_search_engine.py:1379-1385`）
+       ⇒ **bar 命名**、`kind: bar`、`lookahead_bars = N`（原文誤列為小時；照原文登記會在 12h 線低估六倍）。
+     - **小時命名**（`future{H}_close_return` 之 **H ∈ {24,48,72}**／`future72_max_return`／`future72_max_drawdown`）：
+       `H` 是**小時** ⇒ 存 `lookahead_hours = H`、**禁存固定 bar 數**；執行期以 `H ÷ 每根小時數` 換算
+       （`case_search_engine.py:1385-1387` 之 `periods_{H}h`；12h 線 ⇒ `future72_*` 為 **6 根**，1h 線 ⇒ **72 根**）；
+       🔴 **R 重開併回 D-002 A-003**：捨入＝**向上取整**（registry `hours_to_bars_rounding: "ceil"`，loader 對該值 fail-closed；
+       驗收⑦ `test_lookahead_registry_complete_07_hours_to_bars_is_ceil`）。
      - **無數字之 legacy 欄**（`future_max_return`／`future_max_drawdown` 等）：
        深度不可由欄名導出 ⇒ 顯式標 `lookahead_unknown: true`，走 L2／L3，
        **不得給任何預設深度**。
@@ -457,7 +462,10 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 
 ### Task 1.11 — 未知欄強制宣告（D-7 之 L2）（`票 #3-0(b)`）
 
-- **SPEC ref**：L1687–1703　**目標**：registry 解析不出深度時，**強制使用者宣告**，不得靜默取 max。
+- **SPEC ref**：Task 1.11（R 重開改寫）　**目標**：🔴 **全部批次一律強制宣告**（R 前為「registry 解析不出深度時才強制」；
+  R 後 `referenced=∅` 會使條件式恆假而 fail-open——三家 R35 P0）；不得靜默取 max。
+  後端 `resolve_declaration` 之 `needs` **恆為 True**；CSV／對映缺 `declared_window_bars` ⇒ reject；
+  JSON 直傳：列內 `lookahead_bars_declared` 須批內同值且每個出現之 tf 皆有鍵，整批缺欄 ⇒ **reject**（不再 block）。
 - **輸入**：解析後之欄集合＋registry　**輸出**：`requires_declaration: bool` ＋宣告值
 - **實作要點**：
   1. 若出現無法由 Task 1.10 registry 解析深度之 `future*` 欄或自訂欄
@@ -472,7 +480,9 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **邊界**：① fixture 含 `my_custom_signal` 欄且被條件引用 ⇒ `requires_declaration == True`。
   ② 未填宣告即送出 ⇒ fail-closed，**落檔數 `== 0`**。
 - **風險緩解**：RISK-(a)。
-- **驗證**：`pytest tests/api -q -k lookahead_declaration` **≥2 條**（見邊界①②）；
+- **驗證**：`pytest tests/api -q -k lookahead_declaration` **≥4 條**（SPEC Task 1.11 ①–④：含「全系統產生欄、全可解析、無 filters」
+  仍 `requires_declaration == True`；JSON 直傳整批缺欄 ⇒ 422、落檔 `== 0`；兩列不同值 ⇒ `heterogeneous_rows_in_batch`）；
+  **mutation 三條**（`needs` 改回條件式／JSON 缺欄改回 block／忽略無法解析之欄）皆須紅；
   **mutation**：改為「忽略無法解析之欄」⇒ ①須紅。
 - **存活至**：**Phase 7（終）**。
 - **覆蓋風險**（R 重開 D-8 改寫）：L2 自本 R 起**一律觸發**（兩路徑皆須宣告；原「與 Task 2.1b 互斥分支」已隨 Phase 2 退役而不存在）；UI 與 validator 即 Task 1.9／1.9′ 之同一份，本 Task 不另建。
@@ -486,7 +496,8 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **輸入**：批次之 `requires_declaration` 與宣告值　**輸出**：批次狀態
   `split_blocked_unverifiable_lookahead` ＋ event-study-only 執行路徑
 - **實作要點**：
-  1. 未填 L2 宣告、或宣告與 registry 衝突 ⇒ `split_events` 與 `ic_feed` **皆拒**。
+  1. 未填 L2 宣告、或宣告與 registry 衝突 ⇒ `split_events` 與 `ic_feed` **皆拒**
+     （🔴 R 重開：兩路徑缺宣告於匯入時已由 Task 1.11 reject；本 L3 為分析時第二道，對 R 前落檔之舊批仍須擋）。
   2. 🔴 **新增 executor `run_event_study_only()`**——**不呼叫** `split_events`／`ic_feed`、
      不進訓練。理由：現碼 `pipeline.py:178` 之 `run()` **無條件**呼叫 `split_events`，
      照現有呼叫鏈只能在「違反 L3」與「產不出表」之間二選一。
@@ -533,7 +544,8 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **實作要點**：
   1. 預設取**檔內最大可用 horizon**（有 `future_1..12` ⇒ 預設 12）；
      可往下調但**須勾選**「我的篩選條件未用到超過第 N 根」之聲明，
-     UI 明示**此為無法驗證的聲明**；欄位接受**任意正整數**（不限 1..12）。
+     UI 明示**此為無法驗證的聲明**；欄位接受**任意非負整數**（不限 1..12；🔴 R35：`0` ＝「未用任何未來資訊」須明填、留白≠0，
+     前後端 validator 之 `v < 1` 改 `v < 0`）。
   2. 🔴 R 重開（D-8）：宣告值**即**寫入 derived 欄 `lookahead_bars_declared`（**map，非 scalar**；
      `lookahead_bars_declared[tf] = declared_window_bars[tf]`），**不再**經 Task 2.1b 之 `depth(tf)` 解析（該 Task 已退役）。
   3. 以 `max(1, lookahead_bars_declared[該列 timeframe])` 寫入
@@ -578,6 +590,9 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   1. 重用 `LookaheadDeclarationFields`（Task 1.9）於匯出面板：批內每個 `timeframe` 各一輸入框；單一 tf 退化為一框。
   2. 預設＝附帶欄之最大可用 horizon（逐 tf；由 Task 1.10 registry 換算，**只作預設候選，不作深度導出**）；
      無任何附帶 `future_*` 欄 ⇒ **留空不預填**（走「尚未填寫」，同 G3-D5 修法）。
+     🔴 wire path（R35 `CODEX-R35-P1-04`／`COMPOSER-R35-P2-02`）：新增 `POST /api/v1/case/lookahead-declaration/preview-columns`
+     （輸入＝欄名集合＋timeframe 集合；回 `LookaheadDeclarationPreview`）；唯一實作＝`lookahead_declaration.py::preview_from_columns`
+     （與匯入端 preview 同一函式）；前端只顯示，**禁**在 TS 重寫換算表。
   3. 可調低但須勾選不可驗聲明；文案明示「填正例與反例兩邊判定所用之最遠者」（使用者 2026-08-31 裁定：purge 取兩者較大）。
   4. 守衛 `withExportLowerBoundGuard` **改形**為 `withExportDeclarationGuard(state, {notify, proceed})`——
      保留 D-004 A-021／D-002 A-010 之 `proceed` 結構保證；缺 map／缺 tf 鍵／非 int／`< 0`／調低未勾 ⇒ 不呼叫 `proceed`。
@@ -598,7 +613,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   **mutation 四條**（SPEC Task 1.9′）：匯出動作移到 `proceed` 外 ⇒ ①②紅；缺鍵 tf 以 `1` 默認 ⇒ ①紅；
   CSV 路徑另組 map ⇒ ⑥紅；自寫第二份 validator ⇒ ⑦紅。receipt 入 commit message。
 - **存活至**：Phase 7（終）。
-- **覆蓋風險**：取代 Phase 2 Task 2.1b 之 `/search` 深度來源；Task 4.1 ③ 寫入點不變。
+- **覆蓋風險**：取代 Phase 2 Task 2.1b（已退役）之 `/search` 深度來源；Task 4.1 ③ 寫入點不變。
   🔴 **須同步**：Task 1.9 之「可調低但須聲明」自本 Task 起兩路徑相同；Task 7.3 之深度來源改本 Task。
 
 ---
@@ -634,6 +649,8 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 
 ### Task 2.1 — `/search` 匯出前篩選面板（`票 #3-0(a)`）　⛔ RETIRED（D-8）
 
+> ⛔ 以下原文不具效力（R 重開退役）。
+
 - **SPEC ref**：L1799–1810　**目標**：對搜尋結果任一**數值**欄設 `>=`／`<=`／區間，多條件 AND。
 - **輸入**：搜尋結果列＋使用者條件　**輸出**：條件物件（供 2.1b／2.2／2.3 消費）
 - **實作要點**：
@@ -656,6 +673,8 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
   三者疊加不互相覆蓋，但**須共用 2.3 之同一計數函式**。
 
 ### Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）（`票 #3-0(a)`）　⛔ RETIRED（D-8；深度來源改 Task 1.9／1.9′ 宣告）
+
+> ⛔ 以下原文不具效力（R 重開退役）。
 
 - **SPEC ref**：L1811–1864　**目標**：依 Task 1.10 registry 解析條件引用之**所有**欄位，
   取最大深度為答案窗**下界並鎖定**，使用者**不得調低**。
@@ -707,6 +726,8 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 
 ### Task 2.2 — 篩選條件寫入 `label_definition.filters`（`票 #3-0(a)`）　⛔ RETIRED（D-8；契約鍵保留、匯出端不再寫入）
 
+> ⛔ 以下原文不具效力（R 重開退役）。
+
 - **SPEC ref**：L1865–1879　**目標**：把篩選條件寫進 Task 1.1 已登記之 `filters` 欄。
 - **輸入**：條件物件　**輸出**：匯出檔之 `label_definition.filters`
 - **實作要點**：
@@ -730,6 +751,8 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 - **覆蓋風險**：**無**。🔴 **須同步**：Phase 7 五維度與本欄須在**同一序列化點**寫出並依 §G。
 
 ### Task 2.3 — 即時筆數顯示（`票 #3-0(a)`）　⛔ RETIRED（D-8；`computeExportCounts` 保留供 Task 1.5；`/search` 只顯示 M／X／Y）
+
+> ⛔ 以下原文不具效力（R 重開退役）。
 
 - **SPEC ref**：L1880–1891　**目標**：顯示「將匯出 N 筆（原 M 筆）／你聲明的正例 X／反例 Y」。
 - **輸入**：條件物件＋搜尋結果　**輸出**：純顯示（無持久產物）
@@ -944,18 +967,19 @@ Gate＝V-5 對應條目全綠 ＋ 落檔殘留 `== 0`。
   1. `analyze_tables` 之 `horizons` 改由呼叫端傳入（現碼預設 `(1,2,4)`，`pipeline.py:98`）。
   2. **只改要算哪些 horizon**；**不改**每個 horizon 之計算式。
   3. 🔴 本 Task 一併建立 **§G S-9 參考實作**
-     `canonical_serialize.py::canonical_event_table_bytes`，並附 S-9 之 6 條驗收。
+     `canonical_serialize.py::canonical_event_table_bytes`，並附 S-9 之 **≥7 條**驗收（🔴 R 重開併回 D-002 A-002：
+     ⑦＝`horizons=[1,3,3,7]` 重複 h 須 `raise ValueError`；原「6 條」作廢）。
 - **修改檔案**：`momentum/Analysis/event_samples/pipeline.py`（`analyze_tables` 呼叫點，:98）；
   `momentum/Analysis/event_samples/tables.py`；
   新增 `momentum/Analysis/event_samples/canonical_serialize.py`
   **既有 caller**：`pipeline.py::run()`、`run_event_study_only()`（Task 1.12）
 - **不可做**：不得因列數變多而改變 `n_eff` 之定義。
 - **邊界**：① 列數 `== len(horizons)`。
-  ② 🔴 **G-2 事件 golden 須同步更新並在 commit message 說明**
-     （D-4：這是**合法的數值輸出變更**，**不得靜默重凍**）；
-     重凍**須以 S-9 參考實作重算**，禁另寫序列化。
-- **風險緩解**：RISK-(a)——golden 重凍為受管變更。
-- **驗證**：`pytest tests/momentum/event_samples/ -q -k horizon_curve` **≥3 條** ＋ S-9 之 6 條驗收。
+  ② 🔴 **R 重開併回 D-004 A-022**：~~G-2 事件 golden 須同步更新~~ ⇒ **不重凍**——`gap3_freeze_golden.py` 跑 IC 管線、
+     不呼叫 `analyze_tables`；驗收＝`python3 scripts/gap3_freeze_golden.py --check` rc=0 且 `canonical_sha` 不變。
+- **風險緩解**：RISK-(a)——若日後 golden 真變，另依 D-4 實測說明，不預設重凍。
+- **驗證**：`pytest tests/momentum/event_samples/ -q -k horizon_curve` **≥3 條** ＋ S-9 之 **≥7 條**驗收（含⑦）
+  ＋ `python3 scripts/gap3_freeze_golden.py --check` rc=0。
   🔴 **mutation（V-M；本 Task 之可證偽性）**：移除或反轉本 Task「邊界①」所述之保護（列數 `== len(horizons)`。）⇒ 邊界① 之斷言**須轉紅**；還原後轉綠。receipt 路徑入 commit message。
 - **存活至**：Phase 6。
 - **覆蓋風險**：改變 `analyze_tables` 預設值之呼叫形態（**刻意**，已由 G-2 守）。
@@ -984,8 +1008,8 @@ Gate＝V-5 對應條目全綠 ＋ 落檔殘留 `== 0`。
 ---
 
 **Phase 4 測試＋Gate**：`npx vitest run eventExportHorizonColumns` ＋
-`pytest tests/momentum/event_samples/ -q -k horizon_curve` ＋ S-9 六條；
-Gate＝V-6 對應條目全綠 ＋ G-2 golden 重凍已於 commit message 說明。
+`pytest tests/momentum/event_samples/ -q -k horizon_curve` ＋ S-9 **≥7 條**（R 重開併回 D-002 A-002）；
+Gate＝V-6 對應條目全綠 ＋ `python3 scripts/gap3_freeze_golden.py --check` rc=0 且 sha 不變（R 重開併回 D-004 A-022：**不重凍**）。
 ## Phase 5 — 錯誤訊息與表頭說明（依賴：Task 5.0）
 
 **目標**：使用者看得懂每個指標與每則錯誤在講什麼。
@@ -1321,7 +1345,9 @@ Gate＝V-8／V-9 對應條目全綠 ＋ 量測 receipt 六欄齊全且重跑差�
          prepared_token: str                   # 綁定本次 prepare 之 token
          reason: str | None                    # 不支援時＝F-2′ 之 reason；支援時為 None
      ```
-  2. `PreparedAnalysisWindows` 欄集**恰如** SPEC L2378–2396：
+  2. `PreparedAnalysisWindows` 欄集**恰如** SPEC Task 7.0b 之列舉（🔴 R 重開併回 D-005 A-023：**增第十欄 `.direction_sign: int`**，
+     恰 +1／-1，來源 `keys.py::event_direction_sign(record)`；signed 公式只在 producer、須進 `analysis_alignment_receipt_hash`；
+     三驗收＋四 mutation 見 SPEC Task 7.0b 欄集下之「A-023 要件」；`WindowRow` 維持七鍵、normalizer 維持四鍵）：
      `.supported`／`.windows: tuple[WindowRow, ...]`（**不是 dict**）／
      `.analysis_alignment_receipt_hash: str`（決定性）／`.per_tf: tuple[PerTfRow, ...]`／
      `.normalized_spec_bytes: bytes`（相等判定＝**bytes 相等**，非 `dict==`、非 `json.dumps`）／

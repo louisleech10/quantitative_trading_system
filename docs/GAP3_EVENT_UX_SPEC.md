@@ -55,19 +55,26 @@
 >
 > | 延伸檔 | 條目 | 落點／處置 |
 > |---|---|---|
-> | D-001 | A-001（§B B1 列含 2.1b、4.2 S-9） | **改寫**：B1 ＝ 1.1、1.10、4.2（S-9）；2.1b 退役 ⇒ 自 B1 移除（TODO §B） |
-> | D-002 | A-002／A-003／A-005／A-006／A-008／A-009／A-011／A-012／A-013（S-9 驗收數、捨入向上、1.10 單位、對照組、AST 綁定、CPython 例外、負例、參數面、共用 traversal） | **併回本體**（TODO 對應 Task 之驗證欄；與 2.1b 無關，內容不變） |
-> | D-002 | A-004／A-007／A-010／A-014（2.1b 前端下界值來源／真實呼叫點／行為級驗收／文案子字串） | **自然關閉（Phase 2 退役）**；A-010 之「把匯出包進 `proceed`」結構保證**移植**至 Task 1.9′ 之守衛 |
-> | D-003 | A-016／A-017／A-019（mapping_provenance 七欄、1.3 檔案字面、digest 單位讀法） | **併回本體**（Task 1.6／1.3） |
+> | D-001 | A-001（§B B1 列含 2.1b、4.2 S-9） | **改寫**：B1 ＝ 1.1、1.10、4.2（S-9）；2.1b 退役 ⇒ 自 B1 移除（TODO §B B1 列＋「B1 之實際內容」句；R35 三家對證：成立） |
+> | D-002 | A-002（S-9 ≥7 條、⑦ 重複 h raise） | **併回**：Task 4.2 驗證（SPEC「≥7 條」；TODO Task 4.2 與 Phase 4 Gate 同步）——R35 前為假（仍寫 6 條），已修 |
+> | D-002 | A-003（小時→根數 `ceil`） | **併回**：Task 1.10 內容「換算捨入方向＝向上取整；registry `hours_to_bars_rounding: "ceil"`」——R35 前 SPEC 沉默，已補 |
+> | D-002 | A-005（`future{1,2,4,6}_close_return` 為 bar 命名） | **併回**：Task 1.10 內容第一子點（以 producer `shift(-N)` 為準）——R35 前 SPEC 仍列為小時命名（**P0**），已修 |
+> | D-002 | A-006／A-008／A-009／A-011／A-012／A-013（S-9 對照組、AST 綁定、CPython 例外、負例、參數面、共用 traversal） | **併回本體**（各對應 Task 之驗證欄既有條文；R35 三家未逐條證偽，標「未全證」——閉合輪對證） |
+> | D-002 | A-004／A-007／A-010／A-014（2.1b 前端下界值來源／真實呼叫點／行為級驗收／文案子字串） | **自然關閉（Phase 2 退役）**；A-010 之「把匯出包進 `proceed`」結構保證**移植**至 Task 1.9′ 之守衛（R35 三家對證：成立） |
+> | D-003 | A-016（`mapping_provenance` 七欄＋批內單一 digest invariant） | **併回**：Task 1.6 內容與驗證①–④——R35 前仍四項（**P1**），已修 |
+> | D-003 | A-017（Task 1.3 承載點＝`api/routes/case_search.py`） | **併回**：TODO Task 1.3「修改檔案」——已修 |
+> | D-003 | A-019（digest 單位互斥） | **併回**：Task 1.3 舊句劃掉、以 `/search` 完整 CaseData canonical digest 為唯一定義——已修 |
 > | D-003 | A-018（Task 2.2 後端序列化函式字面） | **自然關閉（Task 2.2 退役）** |
-> | D-004 | A-020（匯出欄納入契約）／A-022（G-2 golden 誤植） | **併回本體**（Task 4.1／4.2） |
-> | D-004 | A-021（下界守衛改形、不刪不留死碼） | **移植**：守衛改名為 `withExportDeclarationGuard`，`proceed` 結構保證不變（Task 1.9′） |
-> | D-005 | A-023（`PreparedAnalysisWindows.direction_sign`） | **併回本體**（Task 7.0b） |
+> | D-004 | A-020（匯出欄納入契約） | **併回本體**（契約 `optional_fields` 之 `future_{h}bar_return`×12 與 `lookahead_bars_declared`；Task 4.1）——R35 三家對證：契約側成立 |
+> | D-004 | A-022（G-2 不重凍） | **併回**：Task 4.2 驗證改「`gap3_freeze_golden.py --check` rc=0 且 sha 不變、不重凍」——R35 前仍寫重凍（**P2**），已修 |
+> | D-004 | A-021（下界守衛改形、不刪不留死碼） | **移植**：守衛改名為 `withExportDeclarationGuard`，`proceed` 結構保證不變（Task 1.9′；R35 三家對證：成立） |
+> | D-005 | A-023（`PreparedAnalysisWindows.direction_sign`） | **併回**：Task 7.0b 欄集第十欄＋要件①–④（signed 公式／hash 綁定／三驗收／四 mutation）——R35 前欄集無該欄（**P0**），已修 |
+> | D-005 | **A-024**（⑧(a) 前綴判準改逐 namespace） | **併回**：Task 1.1 驗收 ⑧(a) 四條並列判準——R35 前**整條漏列於本表**（GROK-R35-P1-01），已補 |
 >
-> ⚠️ 本表為主委首版；P16 R 先例（`20260804-p16-r-reopen`）三家命中「宣稱併回、實際只併一半」，
-> R 對抗審 R-R1 須逐列以 grep 對證落點存在。
+> ⚠️ 本表首版為主委手寫、未逐列 grep 對證——R35 三家全部命中「宣稱併回、本體無字」（與 P16 群 1 同型）；
+> 上表「已修」各列之落點於閉合輪由原提出方重跑 grep 對證。
 
-**版本**：R34-landing（🔴 **R 重開修訂稿（R35-R）疊加於本輪之上，待 R-R1 對抗審**；本行依 `gap3ux_header_round_check.sh` 保留最後落地輪之收據形式；收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R35-landing（🔴 **R 重開**；R35 全檔對抗審 23 findings（codex 9／composer 7／grok 7）**全部採納已落地**，待 R36 閉合輪＋三家戳記；收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
 → R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 → R29 8 條 findings（**composer 降至 1 條**；兩件跨包衝突已解除）；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
 🔴 **`ERRATA-R30-01`——R30 輪之 `-landing` 字樣不代表有內容落地**：R30 輪（ledger round
@@ -238,7 +245,7 @@ IC 分析的頁面，而不是 `/search` 吧」。
 - 分析層**禁止**把匯出檔之 `window.horizon_bars` 讀為答案窗；
   答案窗只能來自本次 `event_label_spec`（見 D-3a）。
 - `/search` 之 `label` 由 t0 條件判定（`scenario=C`、無品質過濾）⇒ 該欄之值為 **lookahead 深度**，
-  依 D-7 由實際引用之欄位導出，**不得**沿用「使用者選的答案窗」當它的值。
+  🔴 R 重開（D-8）：由**使用者於匯出前逐 tf 宣告**（Task 1.9′），**不得**由任何欄位推導（原「依 D-7 由實際引用之欄位導出」已退役）。
 
 🔴 **R9 已裁定（原「待 R9 裁定」之兩項，三家皆有回覆；以下為裁定後之權威條文）**：
 
@@ -817,11 +824,12 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 **處置（三層）**：
 1. **CSV 上傳路徑**：答案窗**預設取檔內最大可用 horizon**（保守）；使用者可往下調，
    但須明確勾選「我的篩選條件未用到超過第 N 根」之聲明，UI 明示此為**無法驗證的聲明**。
-2. **系統內篩選路徑（Phase 2）**：系統確知使用者用了哪些欄 ⇒ **自動導出 `max(N)` 並鎖定**，
-   使用者不得調低。**這使 Phase 2 的定位從「方便」升級為「把不可驗聲明轉成機器可證事實」**
-   （原 SPEC 把 Phase 2 當錦上添花，定位錯誤，本版改正）。
-3. 答案窗欄位接受**任意正整數**，不限 1..12（使用者：「12 根也是我自己訂的，沒有理論根據，
-   會不會用到 12 根以外也有可能」）。
+2. ~~**系統內篩選路徑（Phase 2）**：系統確知使用者用了哪些欄 ⇒ 自動導出 `max(N)` 並鎖定，使用者不得調低。
+   這使 Phase 2 的定位從「方便」升級為「把不可驗聲明轉成機器可證事實」。~~
+   ⛔ **已由 D-8 廢止（R 重開，2026-09-02）**：Phase 2 退役；`/search` 匯出路徑改走與第 1 點**同一**宣告框
+   （Task 1.9′），規則同第 1 點（可調低但須聲明）。
+3. 答案窗欄位接受**任意非負整數**，不限 1..12（使用者：「12 根也是我自己訂的，沒有理論根據，
+   會不會用到 12 根以外也有可能」；🔴 R35：`0` ＝「未用任何未來資訊」須明填、留白≠0）。
 
 🔴 **D-7 之 R8 增訂｜分析時答案窗（出處＝`-arch-analyze-time-label.md` §3；不削弱既有 L1／L2／L3）**
 
@@ -1366,7 +1374,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
      登記 **`lookahead_bars_declared`**——`derived_fields.names` 加該名，
      `receipt_schema` 加其欄位與**型別 `Mapping[timeframe -> int >= 0]`**（逐 tf 一值，
      **非 scalar**；理由見 §D-3′-a（ii）之 R10 修正）。
-     語意＝**該批 label 定義所引用之最遠未來根數之真實值**（D-7 通則，逐 tf 解析），
+     語意＝**使用者宣告之最遠未來根數**（R 重開 D-8：兩路徑之逐 tf 宣告；原「label 定義所引用之最遠未來根數之真實值」之導出已退役），
      與 `label_definition.window.horizon_bars` **不同**（後者下限為 1，深度 0 時只是
      serialization floor，見 §D-3′-a（i））。
      receipt 缺該欄 ⇒ fail-closed，**不得**以 `1` 默認替代。
@@ -1442,6 +1450,14 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
         `pre_names = flatten(pre['receipt_schema'])`（改前為 list 形態）與
         `now_names = flatten(now['receipt_schema'])`（改後為 dict 形態）；
         斷言 `now_names[:len(pre_names)] == pre_names`
+        🔴 **R 重開併回 D-005 A-024（R 首版落點表漏列）**：上式為**全域** append-only，會讓非末端 namespace（如 `event_level`）
+        永遠不能加欄（A-023 之 `direction_sign` 即被它擋）⇒ ⑧(a) 改為**四條並列、全部須成立**（本處為唯一權威字面）：
+        (1) **逐 namespace 前綴保留**：對 `pre` 之每個 namespace `ns`，`now[ns]` 之攤平名單須以 `pre[ns]` 之攤平名單為前綴；
+        (2) **namespace 順序保留**：`now` 之 namespace 出現序須以 `pre` 之 namespace 序為前綴（原式沒有；新增，擋整個 namespace 搬位）；
+        (3) **無遺漏**：`set(pre_names) <= set(now_names)`；(4) **確有成長**：`len(now_names) > len(pre_names)`。
+        淨效果：多抓一種壞法（namespace 重排），少限制的只有「新欄必須全域排最後」這件與品質無關的事。
+        mutation：把 `event_level` 內任兩個既有鍵對調 ⇒ (1) 紅；把 `per_tf` 整個搬到 `event_level` 前 ⇒ (2) 紅；刪任一既有鍵 ⇒ (3) 紅；
+        over 向：在 `event_level` **尾端**加新鍵 ⇒ 四條皆綠（那正是 A-023 要做的事）。
         （**既有欄名與順序一個不差、且都排在新欄之前**）
     (b) `now['receipt_schema']` 之每個 namespace 之值為 `{欄名: 型別}`（非 list）；
         `now['receipt_schema']['batch']['lookahead_bars_declared']` 之型別宣告為
@@ -1495,7 +1511,10 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 **Task 1.3 — event_id 沿用既有 canonical（D-2）**
 - 內容：`event_id` ＝ `` `${symbol}:${timeframe}:${t0}` ``，與 `eventExport.ts:88` **同一實作**
   （抽為共用函式，前後端各自呼叫同一定義來源）。
-  `source_file_digest` ＝上傳 CSV 位元組之 `hashlib.sha256(raw).hexdigest()`。
+  ~~`source_file_digest` ＝上傳 CSV 位元組之 `hashlib.sha256(raw).hexdigest()`。~~
+  🔴 R 重開併回 D-003 A-019：上句與下段互斥，**以下段為唯一定義**——`source_file_digest` 綁 `/search` 之完整 `CaseData` 列之
+  canonical bytes（§G S-9）並**由後端計算**；上傳 CSV 路徑之 digest 由使用者自檔攜帶、匯入端以 companion 來源檔對證
+  （Task 1.6 之 `source_digest_verified`）。
   🔴 **`/search` 路徑之 `canonicalSourceText` 須綁完整 `CaseData`（R6 群集 H；R5 群集 H 之未閉合半邊）**：
   現行只取五欄（symbol／timeframe／timestamp／positive_case／price_change，`eventExport.ts:27-37`）
   ⇒ 刪除、改名或改值任一 `future_*` 欄後 digest **不變**，改名攻擊（Task 1.10 之信任邊界）之證據面未閉合。
@@ -1657,10 +1676,15 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 不可做：不得預設任何欄位對映（A-4'）；文案禁用「label 正確」字樣（D-1）。
 
 **Task 1.6 — 對映 provenance 落檔（D-1）**
-- 內容：把 `column_mapping`、來源檔名、`source_file_digest`、確認時間寫入該批 receipt，
-  使日後可追「這批的正反例是依哪一欄、哪個檔宣告的」。
-- 驗證：`pytest tests/api -q -k gap3_csv_provenance` ≥2 條；
-  斷言 receipt 之 `column_mapping.label ==` 送出值。
+- 內容（🔴 R 重開併回 D-003 A-016）：`mapping_provenance` 為**七欄**寫入該批 receipt：
+  `column_mapping`／`source_file_name`／`source_file_digest`／**`source_digest_verified`**（未附 companion 來源檔時為 `false`
+  ——宣告值只證明使用者填了同一串）／**`event_id_source`**（`csv_column`｜`derived_from_template`）／`confirmed_at`／
+  **`confirmed_at_source`**（`client_declared`｜`server_received`）；使日後可追「這批的正反例是依哪一欄、哪個檔宣告的」。
+  **批內單一 digest invariant**：對映路徑落檔時各列宣告之 `source_file_digest` 須解析出**單一值**；批內不一致或缺 ⇒ 視為缺值
+  ⇒ `missing_required_field` fail-closed、落檔數 0。
+- 驗證：`pytest tests/api -q -k gap3_csv_provenance` ≥4 條；
+  ①receipt 之 `column_mapping.label ==` 送出值；②receipt 之 `mapping_provenance` 鍵集 `==` 契約 `receipt_schema.mapping_provenance` 七鍵；
+  ③未附來源檔 ⇒ `source_digest_verified == False`；④批內兩個不同 `source_file_digest` ⇒ 落檔數 `== 0`。
 - 存活至：Phase 6。
 - 覆蓋風險：receipt 為只增欄位之記錄檔，Phase 2..7 只讀不改；Phase 2 之 `filters` 與 Phase 7 之
   五維度均寫入 `label_definition` 而非本 receipt ⇒ 本 Task 之既有欄位不被覆蓋。
@@ -1700,11 +1724,15 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   登記搜尋結果**每一個**未來欄之 `lookahead_bars`：
   🔴 **兩套命名並存、單位不同**（GROK-R3-P1-01 抓出主委原寫死 72 之錯誤，實查證屬實）：
   - **bar 命名**（`future_{N}bar_return`／`future_{N}bar_max_drawdown`）：`N` **就是根數** ⇒ `lookahead_bars = N`
-  - **小時命名**（`future{H}_close_return`／`future72_max_return`／`future72_max_drawdown`，
-    H ∈ {1,2,4,6,24,48,72}）：`H` 是**小時**，實際根數 ＝ `H ÷ 每根小時數`
-    （`case_search_engine.py:1385-1387` 之 `periods_{H}h`；12h 線 ⇒ `future72_*` 為 **6 根**，
-    1h 線 ⇒ **72 根**）⇒ `lookahead_bars` **與 timeframe 相依，不得寫死常數**。
-  ⇒ registry 對小時命名欄須存 `lookahead_hours` 並於執行期換算，**禁存固定 bar 數**。
+  - 🔴 **R 重開併回 D-002 A-005（GROK-R35-P0-02；以 producer 為準）**：`future{N}_close_return`，**N ∈ {1,2,4,6}**
+    ＝ `df['close'].shift(-N)`（`case_search_engine.py:1379-1385`）⇒ **根數**，`kind: bar`、`lookahead_bars = N`，
+    與 timeframe 無關（原文誤列為小時命名；照原文登記會在 12h 線把 `future6_close_return` 讀成 1 根、低估六倍）。
+  - **小時命名**（`future{H}_close_return` 之 **H ∈ {24,48,72}**／`future72_max_return`／`future72_max_drawdown`）：
+    `H` 是**小時**，實際根數 ＝ `H ÷ 每根小時數`（`case_search_engine.py:1385-1387` 之 `periods_{H}h`；
+    12h 線 ⇒ `future72_*` 為 **6 根**，1h 線 ⇒ **72 根**）⇒ `lookahead_bars` **與 timeframe 相依，不得寫死常數**。
+  ⇒ registry 對小時命名欄須存 `lookahead_hours` 並於執行期換算，**禁存固定 bar 數**；
+  🔴 **R 重開併回 D-002 A-003：換算捨入方向＝向上取整**（`ceil`；registry 存 `hours_to_bars_rounding: "ceil"`，
+  loader 對該值 fail-closed）——依 §C0 只准往保守方向解讀（`future24_*` 在 12h 線為 2 根；整除情形不受影響）。
   ⚠️ **另註**：`periods_72h` 亦被用於**過去 3 天 lookback**（`:1028-1046`），
   與未來欄同名不同義，登記時**不得混淆**（主委原將其誤認為未來欄）。
   盤點來源＝`case_search_engine.py:669-697`（CaseData 欄位）＋`:946-947`（擴展欄），不得遺漏。
@@ -1755,14 +1783,23 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 不可做：不得以欄名字串樣式**推測**深度（推測即可被改名偽造，見 L2）；
   不得漏登 `*_max_drawdown` 與 `future72_*`（R2 三家指出之實際繞法）。
 
-**Task 1.11 — 未知欄強制宣告（D-7 之 L2）**
-- 內容：解析欄位時若出現**無法由 Task 1.10 registry 解析深度**之 `future*` 欄或自訂欄
-  ⇒ **不得靜默採用可解析欄之 max**，改為**強制使用者填寫宣告 ＋ 勾選不可驗聲明**；
-  UI 明示「系統無法驗證此深度，錯報將導致資料洩漏」。
-- 驗證（`pytest tests/api -q -k lookahead_declaration` ≥2 條）：fixture 含 `my_custom_signal` 欄且被條件引用 ⇒
-  ①不得自動放行（斷言 `requires_declaration == True`）
-  ②未填宣告即送出 ⇒ fail-closed（落檔數 `== 0`）
-  **mutation**：改為「忽略無法解析之欄」⇒ ①須紅。
+**Task 1.11 — 強制宣告（D-7 之 L2；R 重開 D-8 改寫為「一律宣告」）**
+- 內容（R 重開改寫）：**全部批次**於建立時（CSV 匯入＝Task 1.9；`/search` 匯出＝Task 1.9′）皆須
+  逐 tf 宣告答案窗；後端 `resolve_declaration` 之 `needs` **恆為 True**（R 前之條件式
+  `any(requires_declaration…) if referenced else (batch_has_filters and not canonical)` **刪除**——
+  R 後 `referenced=∅`、`batch_has_filters=False` 會使其恆假而 fail-open，三家 R35 P0）。
+  缺 `declared_window_bars`（任一出現之 tf 無鍵）⇒ CSV／對映路徑 **reject**（`lookahead_declaration_required`）。
+  **JSON 直傳**：列內 `lookahead_bars_declared` 視為 Task 1.9′ 攜帶之宣告——須**批內同值**且**每個出現之 tf 皆有鍵**
+  （不齊 ⇒ `heterogeneous_rows_in_batch`／缺鍵 ⇒ reject）；整批缺該欄 ⇒ **reject**（R 前之 `ON_MISSING_BLOCK` 改為拒收）。
+  仍保留 R 前之語意一項：對無法由 Task 1.10 registry 解析之欄，UI 額外明示「系統無法驗證此深度，錯報將導致資料洩漏」。
+  🔴 具名殘留 `R35-L2-ACK`（`needs-research`）：JSON 直傳無法複驗匯出端之 `acknowledged_unverifiable` provenance
+  （契約無該欄；新增欄須 D-6）。
+- 驗證（`pytest tests/api -q -k lookahead_declaration` ≥4 條）：
+  ①fixture 含 `my_custom_signal` 欄 ⇒ `requires_declaration == True`
+  ②🔴 fixture **全為系統產生欄、全可解析、無 `filters`** ⇒ `requires_declaration == True`（R 後不得因「無需宣告」放行）
+  ③未填宣告即送出（CSV／對映）⇒ fail-closed（落檔數 `== 0`）
+  ④JSON 直傳整批缺 `lookahead_bars_declared` ⇒ 拒收（HTTP 422，落檔數 `== 0`）；批內兩列該欄不同值 ⇒ `heterogeneous_rows_in_batch`
+  **mutation（三條，皆須紅）**：把 `needs` 改回條件式 ⇒ ②③；JSON 直傳缺欄改回 block ⇒ ④；改為「忽略無法解析之欄」⇒ ①。
 - 存活至：Phase 7（終）。
 - 覆蓋風險（R 重開 D-8 改寫）：L2 之強制宣告自本 R 起**一律觸發**（兩路徑皆須宣告；原「只在 registry 解析不出深度時觸發」
   與 Task 2.1b 之「機器可證互斥分支」已隨 Phase 2 退役而不存在）⇒ 本 Task 之觸發面**擴大為全部批次**，
@@ -1774,7 +1811,8 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 不可做：不得因為「其他欄都能解析」就用它們的 max 當全批深度。
 
 **Task 1.12 — 不可證則禁進切分（D-7 之 L3）**
-- 內容：若使用者**未填** L2 之宣告、或宣告與 registry 衝突 ⇒ 該批**禁止進入
+- 內容（🔴 R 重開 D-8：兩路徑缺宣告於**匯入時已 reject**（Task 1.11），本 L3 為分析時之第二道——對 R 前落檔、
+  `lookahead_bars_declared` 缺欄或缺鍵之舊批仍須擋）：若使用者**未填** L2 之宣告、或宣告與 registry 衝突 ⇒ 該批**禁止進入
   train/test 切分與條件 IC**（`split_events` 與 `ic_feed` 皆拒），僅允許事件研究表
   （無訓練即無洩漏）。批次狀態標 `split_blocked_unverifiable_lookahead`（登記處見「須同步」）。
   🔴 **event-study-only 執行路徑（R4 群集 E；CODEX-R4-P0-02）**：R3 版只寫「仍可產出」，
@@ -1823,7 +1861,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 **Task 1.9 — 答案窗宣告與 purge 下界（D-7 之 L2 使用者介面；依賴 Task 1.10／1.11）**
 - 內容：CSV 上傳時，答案窗**預設取檔內最大可用 horizon**（有 `future_1..12` ⇒ 預設 12）；
   可往下調但須勾選「我的篩選條件未用到超過第 N 根」之聲明，UI 明示**此為無法驗證的聲明**；
-  欄位接受**任意正整數**（不限 1..12）。🔴 R 重開（D-8）：宣告值**即** derived 欄
+  欄位接受**任意非負整數**（不限 1..12；🔴 R35：`0` ＝「未用任何未來資訊」須明填、留白≠0，validator `v < 0` 才拒）。🔴 R 重開（D-8）：宣告值**即** derived 欄
   **`lookahead_bars_declared`**（map；逐 tf 直接取 `declared_window_bars[tf]`，不再經 Task 2.1b 解析——該 Task 已退役），
   並以 `max(1, lookahead_bars_declared[該列 timeframe])` 寫入
   `label_definition.window.horizon_bars`（契約下限之投影；
@@ -1864,7 +1902,11 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 內容：`/search` 兩條匯出（事件契約 JSON、可回灌 CSV）**匯出前**顯示與 Task 1.9 **同一元件**
   （`LookaheadDeclarationFields`）之逐 tf 宣告框：批內出現之每個 `timeframe` 各一個輸入框；
   預設值＝該搜尋結果**附帶** `future_*` 欄之最大可用 horizon（逐 tf；來源＝Task 1.10 registry 之揭露用途，
-  ——不是深度導出）；可往下調但須勾選「我的正反例判定未用到超過第 N 根」之聲明（N ≥ 1 之整數），UI 明示此為無法驗證的聲明，
+  ——不是深度導出；🔴 預設值之 wire path（CODEX-R35-P1-04）＝新增 `POST /api/v1/case/lookahead-declaration/preview-columns`，
+  輸入＝搜尋結果之欄名集合＋timeframe 集合，回 `LookaheadDeclarationPreview`；**唯一實作**＝
+  `lookahead_declaration.py::preview_from_columns`（與匯入端 preview 同一函式），前端只顯示、**禁**在 TS 重寫換算表）；
+  可往下調但須勾選「我的正反例判定未用到超過第 N 根」之聲明（🔴 R35 裁定：N 為**非負整數**，`0` ＝「未用任何未來資訊」
+  須**明填**、留白≠0，前後端 validator 之 `v < 1` 改 `v < 0`，Task 1.9 同步），UI 明示此為無法驗證的聲明，
   並明示「**填正例與反例兩邊判定所用之最遠者**」（使用者 2026-08-31：purge 取兩者較大）；
   欄位接受任意正整數。宣告值即 `lookahead_bars_declared`（map），投影規則同 Task 1.9（`max(1, ·)` 入 `window.horizon_bars`）。
   🔴 **守衛**：`withExportLowerBoundGuard` 改形為 **`withExportDeclarationGuard(state, {notify, proceed})`**
@@ -1873,7 +1915,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   `fetch`／下載 call count `== 0`。兩條匯出共用同一守衛實例。
   🔴 **validator 唯一**：前端 `lookaheadDeclaration.ts::validateDeclaration`／後端
   `lookahead_declaration.py::parse_lookahead_declaration` 與 Task 1.9 **同一份**，禁第二份實作。
-- 驗證：`npx vitest run exportDeclaration` ≥6 條——
+- 驗證：`npx vitest run exportDeclaration` ≥7 條——
   ①批內 `{1h,12h}` ⇒ 恰兩個輸入框（`data-testid=lookahead-window-1h`／`-12h`），單一 tf 退化為一個
   ②不填任一 tf 即按匯出 ⇒ `proceed` 未呼叫、`URL.createObjectURL` call count `== 0`、`fetch` call count `== 0`
   ③調低於預設且未勾聲明 ⇒ 同②；勾選後 ⇒ 匯出成功且 `records[i].lookahead_bars_declared` 深度相等於宣告 map（逐列同值）
@@ -1909,6 +1951,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 > 且 2.1b 自記四種抽不出引用欄之失敗形態，抽不出仍要問使用者（`G3-D1`）。
 
 **Task 2.1 — /search 匯出前篩選面板**　⛔ RETIRED（D-8）
+> ⛔ 以下原文不具效力（R 重開退役）。
 - 內容：對搜尋結果任一數值欄設 `>=`／`<=`／區間，多條件 AND。
 - 驗證：`npx vitest run exportFilter` ≥6 條；含「篩選後筆數 `==` 手算筆數」之數值斷言。
 - 存活至：Phase 6。
@@ -1921,6 +1964,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 不可做：不得在篩選中改動任何原始欄位值。
 
 **Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）**　⛔ RETIRED（D-8；深度來源改 Task 1.9／1.9′ 宣告；`/case/lookahead-depth` 端點與前端導出退役；`depth_by_timeframe()` 本體保留為匯入端投影，`referenced_columns` 恆為空集）
+> ⛔ 以下原文不具效力（R 重開退役）。
 - 內容：系統內篩選時，**依 Task 1.10 之欄位級標註**解析條件引用之**所有**欄位
   （含 `*_max_drawdown`／`future72_*`／任何登記欄），取其最大深度為答案窗**下界並鎖定**，
   使用者**不得調低**（與 CSV 路徑之「可調低但需聲明」不同——此處是機器可證，不需聲明）。
@@ -1975,6 +2019,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 不可做：不得允許調低於導出值（那等於明知條件用到第 7 根卻只隔 5 根）。
 
 **Task 2.2 — 篩選條件寫入 label_definition.filters**　⛔ RETIRED（D-8；契約鍵保留、匯出端不再寫入）
+> ⛔ 以下原文不具效力（R 重開退役）。
 - 內容：把篩選條件寫進契約已登記之 `label_definition.filters`（Task 1.1 已加）。
 - 驗證：匯出檔 `label_definition.filters` 與送出條件深度相等（`==`）；
   且 `filters` 鍵存在於契約 `label_definition.fields`（防漂移斷言）。
@@ -1990,6 +2035,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 不可做：不得把篩選條件納入 `event_id` 之輸入（會使同事件跨批 id 不同，違反 D-2）。
 
 **Task 2.3 — 即時筆數顯示**　⛔ RETIRED（D-8；`computeExportCounts` 保留供 Task 1.5，`/search` 只顯示 M／X／Y、無篩選耦合）
+> ⛔ 以下原文不具效力（R 重開退役）。
 - 內容：顯示「將匯出 N 筆（原 M 筆）／你聲明的正例 X／反例 Y」。
 - 驗證：vitest 斷言 `N + 被濾掉數 == M` 且 `X + Y == N`。
 - 存活至：Phase 6。
@@ -2092,12 +2138,12 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 內容：匯出面板明文顯示三件現行完全未告知之事實：
   ① **本批 scenario ＝ {實際值} — {契約 doc 之白話}**（由實際設定導出，**禁寫死**）
   ② **lookahead 深度 ＝ {N} 根，來源＝使用者宣告（Task 1.9′；R 重開 D-8）**——`N` 取自 derived 欄
-    **`lookahead_bars_declared[本批之 timeframe]`**（依 D-7 通則導出；C 無品質過濾時為 **0**；
+    **`lookahead_bars_declared[本批之 timeframe]`**（R 重開 D-8：使用者宣告；C 未用未來資訊時**明填 0**；
     批內多 TF 時**逐 tf 各顯示一行**，不得只顯示其中一個）；
     🔴 **不得**顯示 `label_definition.window.horizon_bars`（該欄有下限 1 之 floor，
     深度 0 時會顯示成 1，見 §D-3′-a（i））
-  ③ **本批之 purge 下界（事件事實層）＝ {N} 根**，並說明「此深度來自你的 label 定義最遠引用到
-    t0 之後第幾根」。🔴 **R8 增訂**：同時明示「條件 IC 分析時之實際 purge 另取本次答案窗，
+  ③ **本批之 purge 下界（事件事實層）＝ {N} 根**，並說明「此深度來自你宣告的最遠根數（正反例兩邊之較大者）」
+    （R 重開 D-8；原「來自你的 label 定義最遠引用到 t0 之後第幾根」之導出敘述已退役）。🔴 **R8 增訂**：同時明示「條件 IC 分析時之實際 purge 另取本次答案窗，
     取兩者較大者」——公式之權威在 §D-3′-a（ii），本欄只揭露、不重述式子
   ④ 本批 `control_kind` 之值與白話意思（現由 `eventExport.ts:104` 寫死 `user_labeled_same_trigger`，
     使用者從未選過亦不知其存在）。
@@ -2137,10 +2183,11 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 內容：`analyze_tables` 之 `horizons` 由呼叫端傳入（現碼預設 `(1,2,4)`，`pipeline.py:98`），
   前端可選要看的 horizon 集合。
 - 驗證：`pytest tests/momentum/event_samples/ -q -k horizon_curve` ≥3 條；列數 `== len(horizons)`；
-  **且 G-2 事件 golden 須同步更新並在 commit message 說明**（D-4：這是**合法的數值輸出變更**，
-  不得靜默重凍）；重凍**須以 §G S-9 之參考實作重算**
-  （`canonical_serialize.py::canonical_event_table_bytes`），禁另寫序列化。
-  本 Task 一併建該參考實作並附 S-9 之 6 條驗收（見 §G S-9 驗收）。
+  🔴 **R 重開併回 D-004 A-022**：~~G-2 事件 golden 須同步更新~~ ⇒ **不重凍**——`scripts/gap3_freeze_golden.py` 跑的是 IC 分析管線
+  （`ichc_run.run_analyze`），不呼叫 `analyze_tables`／`event_forward_return_table`；驗收改為
+  `python3 scripts/gap3_freeze_golden.py --check` rc=0 且 `canonical_sha` **不變**。若日後 golden 真變，另依 D-4 實測說明，不預設重凍。
+  本 Task 一併建 §G S-9 參考實作（`canonical_serialize.py::canonical_event_table_bytes`）並附 S-9 之
+  🔴 **≥7 條**驗收（R 重開併回 D-002 A-002；⑦＝`horizons=[1,3,3,7]` 重複 h 須 `raise ValueError`，見 §G S-9 驗收）。
 - 存活至：Phase 6。
 - 覆蓋風險：改變 `analyze_tables` 預設值之呼叫形態（**刻意**，已由 G-2 守）。
 - 邊界：只改要算哪些 horizon；**不改**每個 horizon 之計算式。
@@ -2516,6 +2563,18 @@ CSV 匯入路徑不經本矩陣（使用者自帶 `label_value`），但仍須�
   #                                              #（原「欄集恰如下」漏列本欄，與 (γ) 互斥）
   #    .prepared_token: str                      # **非決定性**：每次呼叫都不同
   #    .reason: str | None
+  #    .direction_sign: int                      # 🔴 R 重開併回 D-005 A-023：恰 +1（long）或 -1（short），
+  #                                              #   批次 scalar；來源＝keys.py::event_direction_sign(record)
+  #                                              #   （第三個 accessor，同檔同紀律）；WindowRow 維持恰七鍵、
+  #                                              #   event_label_spec normalizer 維持恰四鍵（皆不動）
+  # 🔴 A-023 要件（併回本體，原文在 D-005，該檔已 SUPERSEDED-BY-R）：
+  #   ① 階段 5 之 signed 值 = direction_sign * (close[label_end_ms] - close[label_start_ms]) / close[label_start_ms]
+  #      —— 乘號**只在 producer**，consumer（ic_filter_orchestrator／ic_feed）不再乘第二次
+  #   ② direction_sign **須進** analysis_alignment_receipt_hash 之輸入（同批 long／short 兩次 prepare 之 hash 不相等）
+  #   ③ 驗收（三條）：short 批 label_value == -x（atol=0）；long／short hash 不相等；event_direction_sign 對非法值 raise
+  #   ④ mutation（四條，皆須紅）：short 回 +1 ⇒ ②；乘號移到 consumer ⇒ producer 級 mutation 打不到 ⇒ ③；
+  #      direction_sign 自 hash 輸入移除 ⇒ hash 相等斷言紅；accessor 接受第三值 ⇒ raise 斷言紅
+  #   ⑤ A-024（同檔第二條；R 首版落點表漏列）：驗收 ⑧(a) 之前綴保留判準改為**逐 namespace**（見 Task 1.1 ⑧(a) 之 R 註）
 
   # 階段 5（materialize values）：吃階段 2 之**物件**，**不得**重跑 align_events
   # 🔴 R12（CODEX-R12-P1-05）：`event_label_spec` 須與 prepared 綁定——
