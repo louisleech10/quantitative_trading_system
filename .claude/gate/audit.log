@@ -52501,3 +52501,43 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-STAMP-R2", "ts": "2026-09-02T23:49:31Z"}
+=== 2026-09-03 07:49:31 | dispatch ===
+  ts=2026-09-03 07:49:31
+  kind=dispatch
+  intent=G3-D2 D-001 戳記輪 r2：codex 復核判準 3；composer 補件
+  risk=low
+  facts_asked=§N 三值理由 awk 無輸出；body hash 未變 7dbcbd0c…
+  review_role=stamp；append 至 stamp-target ## 戳記
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2-X-STAMP-R2-BRIEF.md", "brief_sha256": "e8735f8352d11514f1310014b96e585291b445b2dc3f2bf20482e6926ad975fb", "brief_sha256_norm": "e8735f8352d11514f1310014b96e585291b445b2dc3f2bf20482e6926ad975fb", "event": "committee_round_open", "event_id": "f8b676de-f84d-479a-999a-09e23cb5d773", "expected_outputs": {"codex": "handoffs/20260903-gap3d2-x-stamp-r2-codex.md", "composer": "handoffs/20260903-gap3d2-x-stamp-r2-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "af94a45c-8fc3-471c-8e8d-7e7b9d1cf254", "schema_version": 1, "sequence": 3031, "session_name": "20260903-gap3d2-x-stamp-r2", "task_id": "20260903-GAP3D2-X-STAMP-R2", "ts": "2026-09-02T23:49:36Z"}
+{"actor": "cx_run", "attempt_id": "ffbf9275-5628-4283-ba48-ce15fa91836d", "cli_rc": "1", "event": "committee_family_result", "event_id": "e67028f9-8cd3-465b-95f0-56f30bb3fa6a", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-stamp-r2-composer.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "af94a45c-8fc3-471c-8e8d-7e7b9d1cf254", "schema_version": 1, "sequence": 3032, "ts": "2026-09-02T23:51:02Z"}
+{"event":"gate_deny","ts":"2026-09-02T23:51:27Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"0f2e22a6a9581d4b09fbef63ea050522bdcae9ecbfbd11f518f504b779d74f74","cmd_head":"printf '%s\\n' '--- criterion 3: §N three-value reasons ---' && awk '/^## §N/{p=1;next} /^## 戳記/{p=0} p && /^- \\*\\*/ {r=($0 ~ /為何現在不做:/); v=($0 ~ /(user-ruling|needs-research|blocked-by):/); if(!r||!v) print NR \":\" $0}' docs/GAP3_EVENT_UX_SPEC.D-001.md && printf '%s\\n' '--- criterion 5: body hash ---' && bash scripts/reconcile_body_hash.sh handoffs/reconcile/20260903-gap3d2-x-review-r4/synth.md && printf '%s\\n' '--- D-001 template ---' && bash scripts/template_check.sh dext docs/GAP3_EVENT_"}
+{"event":"gate_deny","ts":"2026-09-02T23:54:53Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"c66798e694cdf5db36f1b44625294000473f06b43c2e6bfb4c785a0f86f33941","cmd_head":"printf '%s\\n' '--- final stamp exactness ---' && grep -nFx 'RECONCILE-STAMP: codex APPROVED 2026-09-03 sha256:7dbcbd0c954fc4c815a7fe2a319607d970c4f6d70ec14efd39b2677b7ae562bf task:20260903-GAP3D2-X-STAMP-R2' handoffs/reconcile/20260903-gap3d2-x-review-r4/synth.md && test \"$(grep -c '^RECONCILE-STAMP:' handoffs/reconcile/20260903-gap3d2-x-review-r4/synth.md)\" -eq 3 && printf '%s\\n' 'STAMP_EXACTNESS=PASS' && printf '%s\\n' '--- final body hash ---' && test \"$(head -n 41 handoffs/reconcile/20260903-gap3d2-x-rev"}
+{"actor": "cx_run", "attempt_id": "f6deba77-fecc-4bbc-a084-2c12485d5e3c", "cli_rc": "0", "event": "committee_family_result", "event_id": "cf9ec595-3506-4502-adc8-243af0afaa6b", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-stamp-r2-codex.md", "output_sha256": "1cbd680c02c45c8e9670fb5aa2f953d66615667854488a0aeca6a2396c6864c9", "producer": "audit_append.sh", "result_state": "success", "round_id": "af94a45c-8fc3-471c-8e8d-7e7b9d1cf254", "schema_version": 1, "sequence": 3033, "ts": "2026-09-02T23:55:28Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260903-gap3d2-x-review-r4/synth.md", "output_sha256": "62a2228260321ccecfdf70361e4db33de912c94b34b1d760c4f26f419a119dda", "task_id": "20260903-GAP3D2-X-STAMP-R2", "ts": "2026-09-02T23:55:29Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "585b64ee-f989-4e1f-8612-24736637d02f", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "composer 第六次 CLI 失敗（模型不可用）；codex APPROVED 已交件", "round_id": "af94a45c-8fc3-471c-8e8d-7e7b9d1cf254", "schema_version": 1, "sequence": 3034, "ts": "2026-09-02T23:55:58Z", "zero_findings_verified": ""}
+=== 2026-09-03 07:56:04 | artifact ===
+  ts=2026-09-03 07:56:04
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_UX_TODO.D-006.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=dext 延伸檔（BASE/PREDECESSOR/改什麼/為什麼/觸及面/內容/戳記）；§0 全域規則=filled；§B 批次策略=filled（五 phase 五批）；每 Task 驗證／邊界／存活至／覆蓋風險／不可做=filled；票歸屬=G3-D2
+  spec=
+  todo=
+  manifest=

@@ -203,4 +203,9 @@ PREDECESSOR: none
 - **codex 異議：契約 `decision_offset_bars` 改 optional（legacy-only）** — `為何現在不做: user-ruling:2026-09-03 委員共識採較嚴（保留必填 default 0；§C0 禁放寬 fail-closed）`；觸發：使用者裁定「欄位須消失」；登記處：GAP-3 殘留。
 
 ## 戳記
-（三家 RECONCILE-STAMP 於對抗審收斂後 append；格式依 `templates/COMMITTEE_FINDING_TEMPLATE.md`。）
+（戳記本體落在終輪收斂檔 `handoffs/reconcile/20260903-gap3d2-x-review-r4/synth.md`（本機，gitignore）之 `## 戳記`；此處為鏡像。body sha256 `7dbcbd0c954fc4c815a7fe2a319607d970c4f6d70ec14efd39b2677b7ae562bf`。）
+
+RECONCILE-STAMP: grok APPROVED 2026-09-03 sha256:7dbcbd0c954fc4c815a7fe2a319607d970c4f6d70ec14efd39b2677b7ae562bf task:20260903-GAP3D2-X-STAMP-R1
+RECONCILE-STAMP: codex BLOCKED 2026-09-03 sha256:7dbcbd0c954fc4c815a7fe2a319607d970c4f6d70ec14efd39b2677b7ae562bf task:20260903-GAP3D2-X-STAMP-R1
+RECONCILE-STAMP: codex APPROVED 2026-09-03 sha256:7dbcbd0c954fc4c815a7fe2a319607d970c4f6d70ec14efd39b2677b7ae562bf task:20260903-GAP3D2-X-STAMP-R2
+（composer：R2／R3／R4／STAMP-R1／STAMP-R2 連六次 CLI 失敗（`read ETIMEDOUT`／`read ECONNRESET`／`Cannot use this model: composer-2.5`），戳記**待補**——`DEGRADE-COMPOSER-01..04`；codex 與 grok 已代對讀 composer R1 四條皆 CLOSED。三家戳記齊全前，本檔狀態＝**兩家 APPROVED、一家待補**，不得宣稱 FROZEN。）
