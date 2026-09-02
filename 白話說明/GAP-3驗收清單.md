@@ -521,7 +521,11 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 >   現在連上就會先拉一次現況，失敗會立刻顯示紅字。
 > 事件批用 B8 匯進去的那批（`events_ok.json`）就對了。
 > ③ 分析 **completed** 後畫面多一行紅字「Failed to fetch」——那是調門檻時的重篩（refilter）回應含 NaN 被後端 500 掉
->   （票 `G3-D12`，已修；重啟後端）。分析結果本身沒壞，B16／B17 照驗。
+>   （票 `G3-D12`，已修；重啟後端）。
+> ④ 🔴 **B17 你在結果 JSON 找不到 `statistic_kind` 那些標記——不是找錯地方，是事件模式根本沒開**（票 `G3-D13`）：
+>   後端只在舊的「送時間戳」路徑開事件濾鏡，B10 改成送 `event_import_id` 後沒跟著開，於是 `metadata.event_filter.mode` 是 `"none"`、
+>   整份報告是**全樣本 IC**（只多了 purge）。已修一行＋回歸測試。**重啟後端後 B15–B17 要重跑**：
+>   重跑後 `metadata.event_filter` 應有 `mode`≠`none`、`statistic_kind: "conditional_ic"`、`n_timestamps_requested: 60`。
 
 ### B13 ── 切到事件模式 [OK]
 

@@ -1719,9 +1719,13 @@ class ICAnalysisService:
                     "query": request.event_query,
                 }
             })
-        elif request.event_timestamps:
+        elif request.event_timestamps or getattr(request, "event_import_id", None):
             # GAP-3 B5.2（CODEX-R1-P1-01）：只給 timestamps（從已匯入案例選事件）亦須啟用 event filter，
-            # 否則 orchestrator 因 enabled=False 直接回 mode=none、事件被靜默丟棄
+            # 否則 orchestrator 因 enabled=False 直接回 mode=none、事件被靜默丟棄。
+            # 🔴 UAT B17（2026-09-02，票 `G3-D13`）：B10 把前端改成只送 `event_import_id`（與 timestamps 互斥）後，
+            #    這裡沒跟著加 ⇒ 五階段編排算出 timestamps／label 也餵進 analyzer，但 stage3 因 enabled=False
+            #    回 `mode=none`——整份「事件模式」報告其實是全樣本 IC（只多了 purge embargo），
+            #    `statistic_kind` 等條件 IC 標記全部不存在，畫面與 `analysis_status=ok_oos` 卻看不出來。
             override = self._deep_merge(override, {"event_filter": {"enabled": True}})
 
         if request.feature_filter:

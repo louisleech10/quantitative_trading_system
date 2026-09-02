@@ -214,6 +214,29 @@ def test_event_analysis_horizon_purge_11c_legacy_timestamps_only_still_accepted(
     assert r.status_code != 422, r.text
 
 
+# ── G3-D13（UAT B17）：event_import_id 路徑必須啟用 event_filter，否則 stage3 回 mode=none＝全樣本 IC ──
+
+def test_event_analysis_horizon_purge_12_import_id_enables_event_filter():
+    """🔴 B10 把前端改成只送 `event_import_id`（與 timestamps 互斥）後，`_build_config_override` 只對
+    `event_query`／`event_timestamps` 開 `event_filter.enabled`。結果：五階段算出的 timestamps／label 餵進 analyzer，
+    但 orchestrator stage3 因 enabled=False 直接回 `mode=none`——「事件模式」報告其實是全樣本 IC，
+    `statistic_kind=conditional_ic` 等標記全部不存在（使用者 2026-09-02 在結果 JSON 找不到）。
+
+    under：`event_import_id` ⇒ enabled True；對照：`event_timestamps` 路徑仍 True；兩者皆無 ⇒ 不得憑空開啟。
+    mutation：把條件改回只看 `event_timestamps` ⇒ 第一條紅。
+    """
+    from api.models.ic_models import ICAnalyzeRequest
+    from api.routes.ic_analysis import ic_analysis_service
+
+    def enabled(req) -> bool:
+        ov = ic_analysis_service._build_config_override(req) or {}
+        return bool((ov.get("event_filter") or {}).get("enabled"))
+
+    assert enabled(ICAnalyzeRequest(symbol="ETHUSDT", timeframe="12h", event_import_id="imp-1")) is True
+    assert enabled(ICAnalyzeRequest(symbol="ETHUSDT", timeframe="12h", event_timestamps=[T0])) is True
+    assert enabled(ICAnalyzeRequest(symbol="ETHUSDT", timeframe="12h")) is False
+
+
 # ── ⑩(i) single-pass：prepare 只被呼叫一次 ──────────────────────────────────
 
 def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):

@@ -11,6 +11,7 @@
 | `G3-D3`…`D9` | CLOSED |
 | `G3-D10`／`D11` | **CLOSED（2026-09-02 晚，UAT B15）**：coverage 閘對註冊 run 誤判 legacy（manifest 找錯目錄）；任務秒失敗時 WS 錯過通知、畫面停「執行中」。兩端各修一處＋測試；使用者須重啟後端重做 B15（run 選 `abc9b9fe`） |
 | `G3-D12` | **CLOSED（2026-09-02 晚，UAT B16）**：分析完成後「Failed to fetch」＝`/ic/refilter` 回原始 dict 含 NaN／inf ⇒ 500；改走 `get_result()` 同一出口＋回歸測試 |
+| `G3-D13` | **CLOSED（2026-09-02 晚，UAT B17）**🔴 正確性：`event_import_id` 路徑未開 `event_filter.enabled` ⇒ 事件模式報告實為全樣本 IC（`mode=none`）。一行修＋回歸測試；**B15–B17 須重跑**。教訓：B10 三輪 review 無一條斷言 `event_filter.mode`／`statistic_kind` |
 
 ## 這條 epic 最終落地了什麼（細節＝`docs/GAP3UX_IMPL_HANDOFF.md` §1／§1b／§2）
 - `/search` 匯出面板：篩選整區拆除；答案窗宣告框（與匯入頁同一元件／validator／守衛形狀）；預設候選只取勾選之附帶欄、系統預填與使用者明填分開記；preview 重取失敗即作廢。
