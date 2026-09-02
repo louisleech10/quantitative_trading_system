@@ -52461,3 +52461,43 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-STAMP-R1", "ts": "2026-09-02T23:37:35Z"}
+=== 2026-09-03 07:37:35 | dispatch ===
+  ts=2026-09-03 07:37:35
+  kind=dispatch
+  intent=G3-D2 D-001 戳記輪 r1：三家 RECONCILE-STAMP（review r1–r4 收斂）
+  risk=low
+  facts_asked=r4 兩家全 CLOSED 無新 P0/P1；body sha 7dbcbd0c…；composer 需補 R1 對讀
+  review_role=stamp；append 至 stamp-target ## 戳記
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2-X-STAMP-R1-BRIEF.md", "brief_sha256": "5b58494689292c773342e131ab566ef398fc5da1906638b9416a4e0b938409cb", "brief_sha256_norm": "5b58494689292c773342e131ab566ef398fc5da1906638b9416a4e0b938409cb", "event": "committee_round_open", "event_id": "48276fbe-9322-4f5b-8419-1edd86596957", "expected_outputs": {"codex": "handoffs/20260903-gap3d2-x-stamp-r1-codex.md", "composer": "handoffs/20260903-gap3d2-x-stamp-r1-composer.md", "grok": "handoffs/20260903-gap3d2-x-stamp-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "f10955ca-9913-4726-9b68-f5ec92075a1e", "schema_version": 1, "sequence": 3026, "session_name": "20260903-gap3d2-x-stamp-r1", "task_id": "20260903-GAP3D2-X-STAMP-R1", "ts": "2026-09-02T23:37:40Z"}
+{"actor": "cx_run", "attempt_id": "bcf95deb-3254-450e-a628-410170d01abd", "cli_rc": "1", "event": "committee_family_result", "event_id": "91a1ea53-834b-41da-84d9-cba2ced9cf2c", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-stamp-r1-composer.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "f10955ca-9913-4726-9b68-f5ec92075a1e", "schema_version": 1, "sequence": 3027, "ts": "2026-09-02T23:38:06Z"}
+{"actor": "cx_run", "attempt_id": "839232d1-523e-4776-a139-fe1823f19ea7", "cli_rc": "0", "event": "committee_family_result", "event_id": "9084fcc7-4238-4730-a42d-ab9561b4f8b2", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-stamp-r1-grok.md", "output_sha256": "537a8a3eb5a000235ec6efe36b1ac4c20b05152c9a476d72abab014c47dbc5d9", "producer": "audit_append.sh", "result_state": "success", "round_id": "f10955ca-9913-4726-9b68-f5ec92075a1e", "schema_version": 1, "sequence": 3028, "ts": "2026-09-02T23:40:36Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260903-gap3d2-x-review-r4/synth.md", "output_sha256": "ea6ae79e87d65f151a877405d87e8769b3b6362f6ca6ca71fe38ff694d087a8a", "task_id": "20260903-GAP3D2-X-STAMP-R1", "ts": "2026-09-02T23:40:37Z"}
+{"actor": "cx_run", "attempt_id": "abcd7542-62ec-46de-868f-28fb694f8f79", "cli_rc": "0", "event": "committee_family_result", "event_id": "1a7c667b-a2e6-456c-985b-287ff6dc9bdf", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-stamp-r1-codex.md", "output_sha256": "2ea2c7b35769ba35adf6314d86e9e3c386dc01dc33eb9384f61c077bc7f70769", "producer": "audit_append.sh", "result_state": "success", "round_id": "f10955ca-9913-4726-9b68-f5ec92075a1e", "schema_version": 1, "sequence": 3029, "ts": "2026-09-02T23:48:14Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "8d312f72-ac1d-4f67-a161-e1fe01cc47aa", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "composer 第五次 read ETIMEDOUT；codex BLOCKED、grok APPROVED 已交件", "round_id": "f10955ca-9913-4726-9b68-f5ec92075a1e", "schema_version": 1, "sequence": 3030, "ts": "2026-09-02T23:48:28Z", "zero_findings_verified": ""}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-STAMP-R2", "ts": "2026-09-02T23:49:16Z"}
+=== 2026-09-03 07:49:16 | dispatch ===
+  ts=2026-09-03 07:49:16
+  kind=dispatch
+  intent=G3-D2 D-001 戳記輪 r2：codex 復核（§N L201 三值理由已補）＋composer 補件；grok 戳記已 APPROVED 沿用
+  risk=low
+  facts_asked=codex STAMP-R1 唯一 FAIL＝判準 3（§N 一條缺三值理由）；已修
+  review_role=stamp；append 至 stamp-target ## 戳記
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

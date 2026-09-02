@@ -198,7 +198,7 @@ PREDECESSOR: none
 - **反例種類自動分類接入報表分組** — `為何現在不做: user-ruling:2026-09-03 裁定③（第二期）`；觸發：本票五 phase 收斂後；登記處：GAP-3 殘留。
 - **既有 4 批 `scenario=B`（2026-09-01 UAT 夾具，`rule_id=uat`）無 `label_origin`** — `為何現在不做: user-ruling:2026-08-05 面向未來不溯及既往（舊資料不合新規預設封存非遷移）`；處置：可繼續分析（讀路徑 `label_origin=null`）、**重匯入必拒** `conditional_required_missing`（loud）；觸發：使用者要求遷移；登記處：GAP-3 殘留（R1 GROK-R1-P2-01）。
 - **`_receipt_hash` 現行碼形狀與原檔 §D-3′-a（iii）code fence 既有分叉**（`batch`／`event_level`／`per_tf` vs `event_import_id`／`direction_sign`／`normalized_spec_bytes`／`windows`／`per_tf`）— `為何現在不做: blocked-by:原檔（iii）為 FROZEN 字面，改寫其 fence 屬原檔本體修訂；本檔以 D4.1 code fence 覆寫為唯一權威、不回改原檔`；觸發：原檔下次 R；登記處：GAP-3 殘留（R1 GROK-R1-P1-03）。
-- **`B ∧ event_known_at_decision=true ⇒ fail-closed`（consult 群 4）** — 在 D2-2 下為真空約束（恆 False），本檔**不**實作該斷言，留待 `G3-R13`（R1 GROK 5a）。
+- **`B ∧ event_known_at_decision=true ⇒ fail-closed`（consult 群 4）** — `為何現在不做: blocked-by:G3-R13（D2-2 單一表示法下 event_known_at_decision 恆 False，該斷言為真空約束、無可證偽實例；待使用者裁定 C 之收盤後決策語意並重開 D2-2 後才有非真空實例）`；觸發：`G3-R13` 裁定「要」；登記處：GAP-3 殘留（R1 GROK 5a；R1 STAMP CODEX-R1-P2-01）。
 - **可行域內未被凍結 golden／固定網格覆蓋之 `(k,h)` 無 exact 凍結值** — `為何現在不做: needs-research:無限（可行域）輸入域無法逐點凍結；現以獨立 raw-bar 期望表 oracle＋seeded 隨機抽樣 property 層保證同型正確，未見更強之可行方法`；觸發：委員會給出可行之逐點 oracle；登記處：GAP-3 殘留（R2 CODEX-R2-P1-01）。
 - **codex 異議：契約 `decision_offset_bars` 改 optional（legacy-only）** — `為何現在不做: user-ruling:2026-09-03 委員共識採較嚴（保留必填 default 0；§C0 禁放寬 fail-closed）`；觸發：使用者裁定「欄位須消失」；登記處：GAP-3 殘留。
 
