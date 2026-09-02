@@ -1,5 +1,8 @@
 "use client";
 
+// DEPRECATED（2026-09-02 使用者裁定「註解之後移除」）：舊三欄「導入案例 CSV」。
+// 它餵的是 data_cache/kline_cache.h5 那條批量下載鏈；Feature Factory／IC／事件分析都不讀那份。
+// 事件匯入請用 EventImportForm／EventCsvMappingForm。本註解不改行為；移除另走票。
 import { useState } from "react";
 import { httpErrorMessage } from '@/lib/httpError';
 

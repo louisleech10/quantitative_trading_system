@@ -1,5 +1,8 @@
 "use client";
 
+// DEPRECATED（2026-09-02 使用者裁定「註解之後移除」）：以舊案例為中心的批量 K 線下載面板。
+// 寫 data_cache/kline_cache.h5；給特徵計算用的下載面板是 feature-factory/FeatureKlineDownloadPanel
+// （寫 data_cache/feature_klines/，FF／IC／事件分析只讀那份）。本註解不改行為；移除另走票。
 import { useState, useEffect } from "react";
 import { httpErrorMessage } from '@/lib/httpError';
 

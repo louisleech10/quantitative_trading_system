@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/louis/Desktop/quantitative_trading_system/venv/bin/python
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 6 items
+
+tests/api/test_feature_kline_download_chain.py::test_feature_kline_download_chain_writes_canonical_hdf5 PASSED [ 16%]
+tests/api/test_feature_kline_download_chain.py::test_feature_kline_download_chain_values_survive_roundtrip PASSED [ 33%]
+tests/api/test_feature_kline_download_chain.py::test_feature_kline_download_chain_trims_beyond_end_date PASSED [ 50%]
+tests/api/test_feature_kline_download_chain.py::test_feature_kline_download_chain_fail_closed_on_bad_provider_frame PASSED [ 66%]
+tests/api/test_feature_kline_download_chain.py::test_feature_kline_download_chain_listing_sees_new_symbol PASSED [ 83%]
+tests/api/test_feature_kline_download_chain.py::test_feature_kline_download_chain_matches_real_feature_klines_file PASSED [100%]
+
+============================== 6 passed in 0.12s ===============================

@@ -530,6 +530,11 @@ Network 分頁看，應該一片空白）。</p>
 例如「<code>new_schema_on_legacy_endpoint</code>：這是事件契約格式的檔…請改用「匯入事件」那一區上傳」。
 同一個寫法在前端有 <strong>31 處</strong>，已全部改走同一支 <code>httpErrorMessage()</code>。</p>
 </blockquote>
+<blockquote>
+<p>🔴 <strong>2026-09-02 起，<code>/data-preparation</code> 上面那塊舊的「導入案例／批量 K 線下載」會有一條橘色橫幅</strong>，
+寫著它已停止維護、之後會整區移除（你當天裁定的）。<strong>橫幅只是提醒，功能沒變</strong>——這一項的
+「反過來」仍然照做，拒收訊息也照樣會出現。</p>
+</blockquote>
 <p><strong>反過來</strong>：把新格式的 CSV 丟進<strong>舊的</strong>「導入案例」。</p>
 <p>用 <strong><code>uat_samples/events_contract.csv</code></strong> 就好（那已經是 CSV，不必自己轉）。
 如果你想用自己的檔：<code>/search</code> 的「導出CSV檔案（可回灌）」出來的就是同一種格式。</p>

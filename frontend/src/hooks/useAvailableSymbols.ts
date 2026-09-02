@@ -3,6 +3,12 @@
  * 
  * 從後端 /api/v1/case/list 動態載入可用的交易對列表
  * 用於交易對多選選擇器，支援加密貨幣、台股、美股等任意資產類型
+ *
+ * 🔴 注意（2026-09-02）：/api/v1/case/list 屬 /data-preparation 之**舊**「導入案例」區塊，
+ * 該區塊已標記淘汰、之後會移除。本 hook 目前被 feature-factory/BatchGenerationPanel
+ * （「加入已導入案例的 symbol」按鈕，三個 symbol 來源之一）與 strategy-test 使用；
+ * 移除舊區塊時須把這裡改接 /api/v1/feature-data/kline/list（已下載之 feature_klines），
+ * 否則會變成靜默空清單。本註解不改行為。
  * 
  * @returns {Object} symbols - 可用交易對陣列
  * @returns {boolean} isLoading - 載入狀態

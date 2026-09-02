@@ -45,6 +45,9 @@ batch_download_service = get_batch_download_service()
 case_storage = get_case_storage_manager()
 
 
+# DEPRECATED（2026-09-02 使用者裁定「註解之後移除」，票 KLINE-1）：舊三欄「導入案例」→ 批量 K 線下載鏈之入口。
+# 寫的是 data_cache/kline_cache.h5；Feature Factory／IC／事件分析只讀 data_cache/feature_klines/，兩者互不相干。
+# 本註解不改任何行為；移除另走票。同檔之 /case/import-events*／/case/events*／lookahead-* 為事件契約，**必留**。
 @router.post("/case/import", response_model=CaseImportResponse)
 async def import_cases_from_csv(
     file: UploadFile = File(...),
@@ -401,6 +404,7 @@ async def analyze_event_import(import_id: str, request: EventAnalyzeRequest):
     return out
 
 
+# DEPRECATED（KLINE-1）：舊案例清單。🔴 移除前須先處理仍在呼叫的前端：hooks/useAvailableSymbols（FF BatchGenerationPanel、strategy-test）、chart、charts。
 @router.get("/case/list", response_model=CaseListResponse)
 async def get_case_list():
     """
@@ -423,6 +427,7 @@ async def get_case_list():
         raise HTTPException(status_code=500, detail=f"Failed to retrieve cases: {str(e)}")
 
 
+# DEPRECATED（KLINE-1）：舊案例計數，只供 /data-preparation 舊區塊。
 @router.get("/case/count")
 async def get_case_count():
     """
@@ -446,6 +451,7 @@ async def get_case_count():
         raise HTTPException(status_code=500, detail=f"Failed to retrieve case count: {str(e)}")
 
 
+# DEPRECATED（KLINE-1）：以舊案例為中心的批量 K 線下載（batch_download_service）。給特徵計算用的 K 線下載入口＝/api/v1/feature-data/kline/download（Feature Factory 頁）。
 @router.post("/kline/batch-download")
 async def start_batch_download(
     request: BatchDownloadRequest,
@@ -492,6 +498,7 @@ async def start_batch_download(
         )
 
 
+# DEPRECATED（KLINE-1）：與 /kline/batch-download 成對。
 @router.get("/kline/download-status/{task_id}", response_model=DownloadProgress)
 async def get_download_status(task_id: str):
     """
@@ -520,6 +527,7 @@ async def get_download_status(task_id: str):
     return progress
 
 
+# DEPRECATED（KLINE-1）：清空舊案例；只供 /data-preparation 舊區塊。
 @router.delete("/case/clear-all")
 async def clear_all_cases():
     """

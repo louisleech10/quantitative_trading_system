@@ -2,6 +2,13 @@
 批量K線下載服務
 
 提供批量下載案例K線數據的異步功能
+
+🔴 DEPRECATED（2026-09-02 使用者裁定「註解之後移除」，票 KLINE-1）：
+本服務以**舊案例**為中心下載 K 線，寫 data_cache/kline_cache.h5（settings.kline_cache_dir）。
+Feature Factory／IC／事件分析**只讀** data_cache/feature_klines/（由 feature_kline_service 寫），
+兩者互不相干。寫入格式與 feature_kline_service 相同（同一組工廠），差別只在目標目錄與抓取區間。
+本註解不改任何行為；移除另走票，屆時須一併處理 case_storage 之下游
+（pattern_analysis／xgboost_batch／optuna／signal_analysis，依成熟度地圖皆未跑過）。
 """
 
 import sys

@@ -204,6 +204,22 @@ export default function DataPreparationPage() {
           </div>
         </div>
 
+        {/* 🔴 舊區塊已標記淘汰（2026-09-02 使用者裁定「註解之後移除」）：
+            「導入案例 CSV → 批量 K 線下載」寫的是 data_cache/kline_cache.h5，
+            而 Feature Factory／IC／事件分析讀的全是 data_cache/feature_klines/——
+            兩邊互不相干。本橫幅只揭露、不改任何行為；移除另走票。 */}
+        <div
+          className="mb-6 rounded-xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100"
+          data-testid="legacy-case-import-deprecated"
+        >
+          <p className="font-semibold">⚠️ 下面這一區（導入案例 CSV／批量 K 線下載）已停止維護，之後會整區移除。</p>
+          <p className="mt-1 text-amber-200/90">
+            它下載的 K 線存在另一份快取，Feature Factory、IC 分析與事件分析<strong>都不會讀到</strong>。
+            要下載給特徵計算用的 K 線，請到 <strong>Feature Factory 頁</strong>的「K 線下載」；
+            要匯入事件，請用本頁下方的「匯入事件」。
+          </p>
+        </div>
+
         {/* Two-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column: CSV Import */}

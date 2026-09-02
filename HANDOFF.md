@@ -11,7 +11,7 @@
 |---|---|
 | `G3-D1` | **OPEN・已改判**（2026-09-02）：不是改成兩組條件，而是**整區移除匯出前篩選**。理由＝CSV 已可回灌、深度改為匯入時直接問。動已凍結 SPEC Task 2.1／2.1b／2.2／2.3／1.9 ⇒ **須開延伸檔 `D-006`（未開工）** |
 | `G3-D2` | **OPEN**：五維度三類值不接受永久灰著；UAT B3 在三者全交付前記未完成 |
-| `KLINE-1` | **OPEN・9/2 二次改裁**：`/data-preparation` 舊區塊「導入案例 CSV → 批量 K 線下載」**註解之後移除**；`/search`（自己讀寫 `data_cache/kline_cache.h5`）與 FF 頁（寫 `feature_klines/`，FF／IC／事件全只讀它）**按現況保留、不合鏈**。FF 頁下載鏈 e2e 收據 VERIFY:20260902T012246Z-ff-kline-download-e2e（真下載、寫暫存、dtype/attrs 同現有檔、20 根九欄逐 bit 相等）；該鏈**無自動化測試**（待補）。🔴 移除前提：舊 `/case/list` 仍被 FF `BatchGenerationPanel`（三個 symbol 來源之一）、`chart`／`charts`／`strategy-test` 頁呼叫。移除＝大任務（`routes/case.py` 與 GAP-3 端點同檔），走完整管線 |
+| `KLINE-1` | **OPEN・9/2 二次改裁**：`/data-preparation` 舊區塊「導入案例 CSV → 批量 K 線下載」**註解之後移除**；`/search`（自己讀寫 `data_cache/kline_cache.h5`）與 FF 頁（寫 `feature_klines/`，FF／IC／事件全只讀它）**按現況保留、不合鏈**。FF 頁下載鏈 e2e 收據 VERIFY:20260902T012246Z-ff-kline-download-e2e（真下載、寫暫存、dtype/attrs 同現有檔、20 根九欄逐 bit 相等）；該鏈之自動化測試見下方「9/2 這批做了什麼」。**「註解」步驟已做**（`/data-preparation` 舊區塊橫幅＋六個舊 route／兩個元件／service／hook 之 DEPRECATED 註記，零行為改動）。🔴 移除前提：舊 `/case/list` 仍被 FF `BatchGenerationPanel`（三個 symbol 來源之一）、`chart`／`charts`／`strategy-test` 頁呼叫。移除＝大任務（`routes/case.py` 與 GAP-3 端點同檔），走完整管線 |
 | `G3-D3`…`D9` | CLOSED（D3/D4/D5 於 9/1；D6/D7/D8/D9 於 9/2） |
 
 ## 9/2 這批做了什麼
@@ -20,6 +20,8 @@
 - **`meta.` 改補集**（原手寫 24 欄白名單漏 drawdown）——與 9/1 的 `G3-D4` 同型重犯。
 - **契約 CSV 走錯區**於選檔當下攔下；前後端判準逐字對證。
 - **`[object Object]`**：新增 `lib/httpError.ts`，31 個呼叫點全改。
+- **FF 下載鏈補測試** `tests/api/test_feature_kline_download_chain.py`（離線 stub 只換 HTTP，轉換／寫入走產品碼）VERIFY:20260902T014330Z-ff-kline-download-chain-tests
+- **`/data-preparation` 舊區塊標 deprecated**（橫幅＋註記，零行為改動；`KLINE-1` 之「註解」步）。
 
 ## 已知紅／不要誤判
 - `tests/api` 既有紅 4 條（batch_alias／ichc_event_timestamps／progress_rss_fields×2；
