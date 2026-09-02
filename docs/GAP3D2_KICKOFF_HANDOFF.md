@@ -12,6 +12,11 @@
   - (c) `entry_price_semantic` 其餘四值、`label_return_mode` 其餘兩值、`decision_offset_bars > 0`
   - (b) `control_kind` 之 `platform_random_bars`
 - GAP-3 UAT B1–B20 已由使用者全部驗畢（B3 依本票記未完成）；D10–D17 八票已修已推（`docs/IC_QUANT_GAP_REGISTRY.md`）。
+- 🔴 **使用者主目標＝B 預測型**（8/19–8/20 原話：用 t₀ 之前的指標預測 t₀ 會不會漲 ≥5%，在 t₀ open 買；進場可提前 k 根）。
+  GAP-3 交付的是 **C 確認型**全鏈；使用者 2026-09-02 深夜才知道主目標未在其中（見 `白話說明/流程摩擦記錄.md` 同日）。
+  ⇒ 本票 (a) 的 B 是**第一優先**，A／two_stage 其次；白話文件每一步都要明講「B 做到哪了」。
+- **可重用（情境無關）**：事件匯入契約與對映、PIT 對齊（`decision_at_ms`／`entry_at_ms`／`label_start_ms`／`label_end_ms`）、宣告與 purge（D-8）、去重（`_POLICY_BY_SCENARIO` 已含 A／B）、條件 IC 五階段、survivor 六鍵、UI 五維度與揭露。
+  **缺**：B 之決策時點＝t₀ open（`trigger_open`＋`k≥0` 之 label golden）、`scenario` 解灰與 provenance、揭露文案隨情境變、§3.1「全部 K 線驗證」（是否屬本票＝consult 必答）。
 
 ## §1 任務大小與流程（依 CLAUDE.md 分派表）
 

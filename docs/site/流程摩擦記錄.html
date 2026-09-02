@@ -2403,6 +2403,18 @@ commit 訊息只留一句「收據見 docs/GAP3UX_IMPL_HANDOFF.md §2」才過�
 列為治理殘留，不在本批動（治理現凍結不擴建，2026-08-14 使用者裁定）。</p>
 <p>另一個小坑：變異驗證 M-B3 還原後仍紅，不是程式錯——<code>cp</code>／<code>sed</code>／<code>mv</code> 在同一秒內完成、
 <code>v &lt; 0</code>→<code>v &lt; 1</code> 檔案大小相同，Python 把舊的 <code>.pyc</code> 當有效。改 <code>python -B</code>＋還原後 <code>touch</code> 就正常。</p>
+<hr />
+<h2 id="2026-09-02-深夜使用者我一直以為整個-gap-3-是以-ab-為主建造現在才知道只做了-c">2026-09-02 深夜（使用者：「我一直以為整個 GAP-3 是以 A／B 為主建造，現在才知道只做了 C」）</h2>
+<p><strong>事實</strong>：使用者 8/19–8/20 說的主目標是 <strong>B 預測型</strong>（t₀ 開盤買、預測這根會不會漲）；finlab 那種事件後報酬表是 <strong>C</strong>。
+SPEC 對抗審 R3／R4 時因「A／B 之 label 來源未定義」把 <code>/search</code> 的 <code>scenario</code> 鎖成<strong>只開 C</strong>（SPEC L157、L3039，§F-1′ 支援矩陣只有
+<code>(trigger_close, close_to_close, k=0)</code>），A／B 排到 8/31 的「灰色項目必須完成」票（<code>G3-D2</code>）。這個決定<strong>在規格文件裡有、在白話文件裡沒有當標題講</strong>：
+<code>接下來要做什麼.md</code> 寫的是「42 個 Task 全部完成」、看板打勾、驗收清單只在 B3 的灰項表裡提了一句「現行 label 一律來自 t0 條件（確認型）」。
+使用者驗收整整兩天，是到最後一項問「我的事件型屬於哪種」才知道自己的主目標還沒做。</p>
+<p><strong>分類</strong>：範圍決定沒有翻譯成白話（不是規格錯，是「做了什麼／沒做什麼」的頭條沒講）。
+<strong>判準</strong>：白話「接下來要做什麼」的現況段，<strong>必須</strong>列「這批做到哪一種情境、使用者的主目標在不在裡面」；
+任何在對抗審裡把使用者原始目標<strong>延後</strong>的裁定（本例 R3／R4 的路徑級限制），當輪就要在白話文件用一句話講出來並讓使用者否決——
+這正是「否決點須彈窗」那條規則要防的事，當時沒當成否決點。
+<strong>補救</strong>：<code>docs/GAP3D2_KICKOFF_HANDOFF.md</code> §0 加註「使用者主目標＝B」；(a) 排第一。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
