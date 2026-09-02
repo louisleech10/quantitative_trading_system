@@ -1,50 +1,28 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-02｜狀態：GAP-3 UAT 進行中（使用者驗到 B12），程式面 42 Task 全數落地**
-
-## 現在的阻塞＝使用者驗收 ＋ 兩張已裁定未動工的票
-- B1–B12 已走過；**B2 現已作廢不必驗**（見 `G3-D1`）。下一步＝ B13–B20。
-- 收 epic 之條件已改變，**不是「簽字即收案」**。
+**更新：2026-09-02｜狀態：GAP-3 R 重開規格層已收斂，戳記輪派工中；UAT 停在 B12（使用者離線）**
 
 ## 票（唯一權威＝`docs/IC_QUANT_GAP_REGISTRY.md`）
 | 票 | 狀態 |
 |---|---|
-| `G3-D1` | **OPEN・已改判**（2026-09-02）：不是改成兩組條件，而是**整區移除匯出前篩選**。理由＝CSV 已可回灌、深度改為匯入時直接問。動已凍結 SPEC Task 2.1／2.1b／2.2／2.3／1.9 ⇒ **須開延伸檔 `D-006`（未開工）** |
+| `G3-D1` | **OPEN・R 重開**：整區移除匯出前篩選（D-8）；SPEC `R36-landing`（commit `f4efec9f`）＋TODO 已過 R35 全檔對抗審→R36→R37 閉合（八條全 CLOSED、三家判可戳記）。五份 `D-00*` 延伸檔 `SUPERSEDED-BY-R` |
 | `G3-D2` | **OPEN**：五維度三類值不接受永久灰著；UAT B3 在三者全交付前記未完成 |
-| `KLINE-1` | **OPEN・9/2 二次改裁**：`/data-preparation` 舊區塊「導入案例 CSV → 批量 K 線下載」**註解之後移除**；`/search`（自己讀寫 `data_cache/kline_cache.h5`）與 FF 頁（寫 `feature_klines/`，FF／IC／事件全只讀它）**按現況保留、不合鏈**。FF 頁下載鏈 e2e 收據 VERIFY:20260902T012246Z-ff-kline-download-e2e（真下載、寫暫存、dtype/attrs 同現有檔、20 根九欄逐 bit 相等）；該鏈之自動化測試見下方「9/2 這批做了什麼」。**「註解」步驟已做**（`/data-preparation` 舊區塊橫幅＋六個舊 route／兩個元件／service／hook 之 DEPRECATED 註記，零行為改動）。🔴 移除前提：舊 `/case/list` 仍被 FF `BatchGenerationPanel`（三個 symbol 來源之一）、`chart`／`charts`／`strategy-test` 頁呼叫。移除＝大任務（`routes/case.py` 與 GAP-3 端點同檔），走完整管線 |
-| `G3-D3`…`D9` | CLOSED（D3/D4/D5 於 9/1；D6/D7/D8/D9 於 9/2） |
+| `KLINE-1` | **OPEN・9/2 二次改裁**：`/data-preparation` 舊區塊已標 deprecated（零行為改動），移除票待開（大任務）；`/search` 與 FF 頁按現況保留。FF 鏈 VERIFY:20260902T012246Z-ff-kline-download-e2e、VERIFY:20260902T014330Z-ff-kline-download-chain-tests |
+| `G3-D3`…`D9` | CLOSED |
 
-## 9/2 這批做了什麼
-- **票號不入使用者可見層**：檔名 `events_*`、UI 與後端訊息去票號；新增機械閘 `noTicketIdInUi.test.ts`。
-  連帶修掉一條 `toContain('GAP-6')` 假斷言（釘死錯的性質，同 R3 `readOnly` 那型）。
-- **`meta.` 改補集**（原手寫 24 欄白名單漏 drawdown）——與 9/1 的 `G3-D4` 同型重犯。
-- **契約 CSV 走錯區**於選檔當下攔下；前後端判準逐字對證。
-- **`[object Object]`**：新增 `lib/httpError.ts`，31 個呼叫點全改。
-- **FF 下載鏈補測試** `tests/api/test_feature_kline_download_chain.py`（離線 stub 只換 HTTP，轉換／寫入走產品碼）VERIFY:20260902T014330Z-ff-kline-download-chain-tests
-- **`/data-preparation` 舊區塊標 deprecated**（橫幅＋註記，零行為改動；`KLINE-1` 之「註解」步）。
+## 🔴 進行中：戳記輪 `20260902-gap3ux-x-stamp-r1`（task `20260902-GAP3UX-X-STAMP-R1`）
+- stamp-target＝`handoffs/reconcile/20260902-gap3ux-x-review-r37/synth.md`（已用 `reconcile_add_stamp_section.sh` 加戳記區；body sha `6b5636d5…`）；brief `handoffs/20260902-gap3ux-r37-STAMP-BRIEF.md`；預期產出 `handoffs/20260902-gap3ux-x-stamp-r1-{codex,composer,grok}.md`；派工 log `/tmp/stamp_r1.log`。
+- 收回後：`reconcile_stamps_check.sh <synth>` rc=0 → 銷帳（`reconcile_build`／`debt_clear`）→ SPEC 版本行改凍結（注意 `gap3ux_header_round_check.sh` 規則）。任一家 BLOCKED ⇒ 處理理由後開 stamp-r2。
+- R35／R36／R37 synth 皆只在本機（`handoffs/*` 被 `.git/info/exclude` 排除，claim 閘擋 `-f`）。
+
+## 戳記後才進實作批（依 SPEC R36-landing）
+Task 1.9′（`/search` 匯出端答案窗宣告框、`withExportDeclarationGuard` 保留 `proceed`）＋Phase 2 退役清單（`exportFilter*`／`lookaheadDepthLock*`／`page.tsx` 篩選面板與 `export-count-n`／`/case/lookahead-depth` 端點與 `EventImportService.lookahead_depth()`；保留 `computeExportCounts`、`lookahead_declaration/gate/registry.py`、`depth_by_timeframe()`）＋Task 1.11 後端 `needs` 恆 True／JSON 直傳缺欄 reject／批內同值＋validator `v<1`→`v<0`（0 須明填）＋`POST /api/v1/case/lookahead-declaration/preview-columns`（唯一實作 `preview_from_columns`）。驗收含 `CODEX-R35-P1-02/03/04` 三條 mutation。之後：驗收清單（B2 消失、B5/B6 加答案窗）、施工看板重產、`docs/GAP3UX_IMPL_HANDOFF.md` 重寫。
 
 ## 已知紅／不要誤判
-- `tests/api` 既有紅 4 條（batch_alias／ichc_event_timestamps／progress_rss_fields×2；
-  後兩條只在整包跑時紅、單跑 7 passed＝event-loop 污染，見 `G3-R11`）。
-- `tsc --noEmit` 8 行既有債（FactorReturnChart.test／useFeatureFactory.batchDate.test）。
-
-## 🔴 進行中（2026-09-02，使用者離線期間）
-- consult `20260902-gap3ux-x-consult-r1` 已收斂＋銷帳（synth 本機 `handoffs/reconcile/20260902-gap3ux-x-consult-r1/`）：**R 重開**。
-- **R 修訂稿已落地並 commit**（`32d35c7f`；SPEC R35-R 疊加於 `R34-landing` 收據、TODO、D-001…D-005 `SUPERSEDED-BY-R`）。
-  派審前閘 `gap3ux_pre_review.sh <patch> --diff-base 003d4846` VERIFY:20260902T023726Z-gap3ux-r35-pre-review；
-  patch `handoffs/patches/20260902-gap3ux-r35-reopen-draft.md`。
-- **R35 對抗審已收斂＋銷帳**（session `20260902-gap3ux-x-review-r35`；synth 本機 `handoffs/reconcile/20260902-gap3ux-x-review-r35/`）：
-  23 findings 全採納，修訂已 commit `50c8d2ae`。P0＝Task 1.11「一律宣告」只改覆蓋風險未改內容與後端 `needs` 謂詞；
-  併回表多列「宣稱併回、本體無字」（A-023／A-024／A-005／A-016／A-002／A-003／A-019／A-022）。裁定：宣告值為非負整數（0 須明填）；
-  匯出端預設值走新端點 `POST /case/lookahead-declaration/preview-columns`；SPEC 版本行改 `R35-landing`。
-- **閉合輪 R36 已收斂＋銷帳**（session `20260902-gap3ux-x-review-r36`；synth 本機）：規格層 20 CLOSED／3 PARTIAL；
-  codex 另 3 條「程式未改」轉實作批驗收條件（後端 `needs` 恆 True＋JSON reject／validator `v<0`／`preview_from_columns` 端點）；
-  4 條新 finding（Task 1.10 驗證④漏改／「正整數」殘字面×2／Task 1.11 邊界殘句／CROSS-FILE 漏列交接檔）皆已修。
-- **下一步＝R37 閉合輪**（只驗 3 PARTIAL＋4 新條；brief `handoffs/20260902-gap3ux-r36-closure-BRIEF.md`）→ 全 CLOSED →
-  三家 `RECONCILE-STAMP`（stamp 派工，target＝R37 synth）→ **才進實作**。
+- `tests/api` 既有紅 4 條（batch_alias／ichc_event_timestamps／progress_rss_fields×2，後兩條為 event-loop 污染，見 `G3-R11`）；`tsc --noEmit` 8 行既有債。
+- 具名殘留：`GOV-DOC-STATUS-1`（v2 檔頭狀態行過期）。
 
 ## 下一步（依序）
-1. 等使用者驗 B13–B20。
-2. 🔴 consult 已收斂（`handoffs/reconcile/20260902-gap3ux-x-consult-r1/synth.md`）：**R 重開，非 D**；全檔對抗審；五份延伸檔 `SUPERSEDED-BY-R` 併回；R 本體必含匯出端深度來源設計。下一步＝主委起草 R brief＋修訂稿 → 三家 adversarial。
-   逐項判定 `export-count-*` 與下界守衛去留（匯出仍需 `lookahead_bars_declared`；兩條匯出路徑之值來源目前唯一是 2.1b 導出之 state）。
-3. `KLINE-1`：先「註解」（deprecation 標示，不改行為）→ 再開移除票走完整管線；順手補 FF 下載鏈的 e2e 測試（真 provider、寫暫存目錄、比 dtype/attrs）。
+1. 收戳記輪 → 實作批（Claude 自任實作；review 三家全員）。
+2. 使用者回來後驗 B13–B20。
+3. `KLINE-1` 移除票走完整管線。
