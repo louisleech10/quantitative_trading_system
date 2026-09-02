@@ -52420,3 +52420,44 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-REVIEW-R4", "ts": "2026-09-02T23:23:06Z"}
+=== 2026-09-03 07:23:06 | dispatch ===
+  ts=2026-09-03 07:23:06
+  kind=dispatch
+  intent=G3-D2 D-001 review r4 閉合輪三：codex 確認 R3-P1-01、grok 確認 R3 兩條、composer 補 R1–R3 對讀
+  risk=low
+  facts_asked=r3 reconcile（codex＋grok；composer DEGRADE-02）；dext rc=0
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2-X-REVIEW-R4-BRIEF.md", "brief_sha256": "7ccd603344435eaea8f634c5e73a3ced1c5fb72cbfdfc7108f56fe0b8acf00d3", "brief_sha256_norm": "7ccd603344435eaea8f634c5e73a3ced1c5fb72cbfdfc7108f56fe0b8acf00d3", "event": "committee_round_open", "event_id": "68b68c1b-86d1-4d99-9a96-7e72f06449bd", "expected_outputs": {"codex": "handoffs/20260903-gap3d2-x-review-r4-codex.md", "composer": "handoffs/20260903-gap3d2-x-review-r4-composer.md", "grok": "handoffs/20260903-gap3d2-x-review-r4-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "3e591c88-96bb-4a91-bb67-74f572155acf", "schema_version": 1, "sequence": 3021, "session_name": "20260903-gap3d2-x-review-r4", "task_id": "20260903-GAP3D2-X-REVIEW-R4", "ts": "2026-09-02T23:23:11Z"}
+{"event":"gate_deny","ts":"2026-09-02T23:23:55Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"02f948279008dd02981499c1d57eb5ae1b29eb7457d69db7a9f2f5d9d9e4b5dd","cmd_head":"wc -l docs/GAP3_EVENT_UX_SPEC.D-001.md handoffs/reconcile/20260903-gap3d2-x-review-r1/synth.md handoffs/reconcile/20260903-gap3d2-x-review-r2/synth.md handoffs/reconcile/20260903-gap3d2-x-review-r3/synth.md; rg --files handoffs | rg -i 'gap3d2.*(review-r3|review-r[123]).*(codex|grok|composer)|gap3d2.*review-r3' | sort; git status --short; git log -5 --oneline --decorate -- docs/GAP3_EVENT_UX_SPEC.D-001.md"}
+{"event":"gate_deny","ts":"2026-09-02T23:24:06Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"0e45f9200dfe0f15e2cd65bb46de660e6ad34bd7223cd72c86dfaf9799c4815a","cmd_head":"rg --files handoffs | rg -i 'gap3d2.*(review-r3|review-r[123]).*(codex|grok|composer)|gap3d2.*review-r3' | sort"}
+{"actor": "cx_run", "attempt_id": "f1e64e57-414b-4f9c-9455-2608ffc799c7", "cli_rc": "1", "event": "committee_family_result", "event_id": "55308164-bc4e-4a3f-bd70-cbbae6eed73e", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-review-r4-composer.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "3e591c88-96bb-4a91-bb67-74f572155acf", "schema_version": 1, "sequence": 3022, "ts": "2026-09-02T23:24:22Z"}
+{"actor": "cx_run", "attempt_id": "2918e65e-e43e-4960-bc3f-503a6ee3a114", "cli_rc": "0", "event": "committee_family_result", "event_id": "d5514e32-0a2c-4a86-a0af-50d1ceee0a15", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-review-r4-grok.md", "output_sha256": "3048b99af32dc7b285942183c5287fde50d87392253fec31461f61f076d5342b", "producer": "audit_append.sh", "result_state": "success", "round_id": "3e591c88-96bb-4a91-bb67-74f572155acf", "schema_version": 1, "sequence": 3023, "ts": "2026-09-02T23:27:52Z"}
+{"actor": "cx_run", "attempt_id": "fc0f5470-98eb-4be0-9273-5cab325b1f77", "cli_rc": "0", "event": "committee_family_result", "event_id": "cfcc10d3-dc44-480c-bac1-962a6cfadaac", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-review-r4-codex.md", "output_sha256": "3255d1d514b6c2c23ce59e3787620c4173782fc61154e06b7a014babfae86c8a", "producer": "audit_append.sh", "result_state": "success", "round_id": "3e591c88-96bb-4a91-bb67-74f572155acf", "schema_version": 1, "sequence": 3024, "ts": "2026-09-02T23:35:29Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "81fd5cfe-6105-48f1-b2b6-07fba9834ac3", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "composer 第四輪 read ECONNRESET；codex/grok 已交件", "round_id": "3e591c88-96bb-4a91-bb67-74f572155acf", "schema_version": 1, "sequence": 3025, "ts": "2026-09-02T23:35:40Z", "zero_findings_verified": ""}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-STAMP-R1", "ts": "2026-09-02T23:36:07Z"}
+=== 2026-09-03 07:36:07 | dispatch ===
+  ts=2026-09-03 07:36:07
+  kind=dispatch
+  intent=G3-D2 D-001 戳記輪 r1：三家 RECONCILE-STAMP（review r1–r4 收斂；composer 需先補 R1 四條對讀）
+  risk=low
+  facts_asked=r4：codex／grok 自家全 CLOSED、各 1 P2 已寫回；composer 連四輪網路失敗
+  review_role=stamp；append 至 D-001 ## 戳記
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
