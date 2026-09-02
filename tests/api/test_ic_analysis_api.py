@@ -150,6 +150,36 @@ def test_ic_refilter(ic_analysis_task: dict) -> None:
     assert "summary_table" in data
 
 
+def test_ic_refilter_nan_inf_are_json_safe(ic_analysis_task: dict, monkeypatch) -> None:
+    """G3-D12（UAT B16）：refilter 回 analyzer 原始 dict 含 NaN／inf ⇒ 曾 500「Out of range float values」⇒ 瀏覽器 Failed to fetch。
+
+    refilter 須與 `/result` 走同一出口（非有限值 → null），mutation：改回 `return report` ⇒ 本條紅。
+    """
+    import math
+
+    from api.routes.ic_analysis import ic_analysis_service
+
+    task_id = ic_analysis_task["task_id"]
+    analyzer = ic_analysis_service.get_analyzer(task_id)
+    assert analyzer is not None
+    real = analyzer.refilter
+
+    def refilter_with_nonfinite(thresholds):
+        report = dict(real(thresholds))
+        report["_probe"] = {"nan": float("nan"), "inf": float("inf"), "neg_inf": -math.inf, "ok": 1.5}
+        return report
+
+    monkeypatch.setattr(analyzer, "refilter", refilter_with_nonfinite)
+    response = client.post(f"/api/v1/ic/refilter?task_id={task_id}", json={"thresholds": {"icir_min": -1.0}})
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert "summary_table" in data
+    assert data["_probe"] == {"nan": None, "inf": None, "neg_inf": None, "ok": 1.5}
+    # 與 /result 同一出口：兩者對同一 task 之 summary_table 逐字相同
+    result = client.get(f"/api/v1/ic/result/{task_id}").json()
+    assert result["summary_table"] == data["summary_table"]
+
+
 def test_ic_export_csv(ic_analysis_task: dict) -> None:
     task_id = ic_analysis_task["task_id"]
     response = client.get(f"/api/v1/ic/export-csv/{task_id}")

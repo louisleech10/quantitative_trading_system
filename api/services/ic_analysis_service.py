@@ -1670,7 +1670,11 @@ class ICAnalysisService:
             if task_info:
                 task_info["result"] = report
 
-        return report
+        # 🔴 UAT B16（2026-09-02，票 `G3-D12`）：原本直接回 analyzer 的原始 dict，內含 NaN／inf（例如 decay 擬合失敗、
+        #    survivors=0 時的統計）⇒ JSONResponse 500「Out of range float values」⇒ 瀏覽器只看到 Failed to fetch。
+        #    `/result` 走 `get_result()`（`_to_json_compatible` 把非有限值轉 null＋F2 sanitizer）而沒事；
+        #    refilter 必須走**同一出口**，不得另一份序列化規則。
+        return self.get_result(task_id)
 
     def register_notification_callback(
         self,

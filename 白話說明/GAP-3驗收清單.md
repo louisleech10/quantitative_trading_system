@@ -520,6 +520,8 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 > ② 畫面停在「任務執行中」不動——任務其實 0.1 秒內就失敗了，通知比畫面訂閱早一步發出、之後沒人再說（票 `G3-D11`）。
 >   現在連上就會先拉一次現況，失敗會立刻顯示紅字。
 > 事件批用 B8 匯進去的那批（`events_ok.json`）就對了。
+> ③ 分析 **completed** 後畫面多一行紅字「Failed to fetch」——那是調門檻時的重篩（refilter）回應含 NaN 被後端 500 掉
+>   （票 `G3-D12`，已修；重啟後端）。分析結果本身沒壞，B16／B17 照驗。
 
 ### B13 ── 切到事件模式 [OK]
 
@@ -562,19 +564,26 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 
 ---
 
-### B15 ── 改分析參數不會動到事件批
+### B15 ── 改分析參數不會動到事件批 [OK]
 
-**你做什麼**：把答案窗改成 `7`，跑一次分析。跑完之後回到 `/data-preparation`，
-查看同一批的內容。
+**你做什麼**：把答案窗改成 `7`，跑一次分析。跑完之後看**同一批事件本身**有沒有被改到——
+`/data-preparation` 的清單只列 import_id／幣種／筆數，看不到內容，所以直接用瀏覽器開這個網址
+（把 `<import_id>` 換成你在清單上看到的那串）：
 
-**應該看到**：那批的 `label_definition.window.horizon_bars` **沒有變**（還是原本的值）。
+```
+http://localhost:8000/api/v1/case/events/<import_id>
+```
+
+**應該看到**：`records[0].label_definition.window.horizon_bars` **沒有變**（樣本是 `3`），
+`lookahead_bars_declared` 也沒變；分析用的 7 只留在 IC 分析頁那次的結果裡。
+（也可以在 `/ic-analysis` 重新選這批：區塊一「這批事件的事實」不會出現 7。）
 
 🔴 **不是這樣代表什麼**：如果它被改成 7，代表分析參數回寫了事件批——
 那會讓「同一批事實」隨著每次分析而改變，是這一整套分層要防的事。
 
 ---
 
-### B16 ── 事件後報酬表：正／反／全體三組（**新的**）
+### B16 ── 事件後報酬表：正／反／全體三組（**新的**）[OK]
 
 > 🔴 **用 `uat_samples/` 那份時，這一項的數字是同義反覆，不要當結論。**
 > 我產樣本時的 label 規則是「往後第 3 根收盤比較高 ⇒ 正例」。
@@ -609,9 +618,19 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 
 ### B17 ── 條件 IC 真的算得出來（**這是本批補的洞**）
 
-**你做什麼**：在同一批上跑分析，找報告裡的「條件 IC」段。
+**你做什麼**：在同一批上跑分析（B15 那次就算）。畫面上**沒有**一段叫「條件 IC」——事件模式下，
+IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由分析當下產生）。要確認它「真的是條件 IC而不是全樣本 IC」，
+看結果 JSON 的機械標記：分析頁結果區的**匯出按鈕 → JSON**（下載完整報告；或直接開
+`http://localhost:8000/api/v1/ic/result/<task_id>`，task id 在後端 log 的 `IC analysis task completed: …`）。
 
-**應該看到**：有數值。
+**應該看到**：
+- `metadata.event_filter.statistic_kind` 是 `"conditional_ic"`，`label_source` 是 `"event_label_value"`，`sample_scope_kind` 是 `"event"`
+- `metadata.event_filter.n_timestamps_requested` 等於這批事件數（樣本 60），不是整段 K 線的筆數
+- IC 結果表有數值（15 個特徵各一列）
+
+🔴 **如果 `metadata.conditional_ic.capability_status` 是 `"unavailable"`、reason `insufficient_events`**：
+代表這批事件數少於下限，系統**明講**它退回了全樣本 IC——那不是缺陷，是刻意的 loud fallback；
+但那份報告的 IC **不能**當條件 IC 解讀。樣本 60 筆應該不會撞到。
 
 🔴 **背景**：在這批之前，從 `/search` 匯出的事件**永遠**算不出條件 IC——
 因為匯出檔不含答案，而分析端也還沒開始算，兩頭都沒有。
