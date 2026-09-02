@@ -245,7 +245,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
      **匯入時不重算**，只比對（`verify_source_digest`）。
 - **修改檔案**：
   - `frontend/src/lib/eventExport.ts`：`canonicalSourceText`（改為呼叫後端取得，不自算）
-  - 🔴 **定案（R2 主委實跑）**：`api/routes/export.py` 之路由為 `/{model_task_id}`＝**模型匯出**，**不是** case 匯出鏈 ⇒ 不改該檔。case 側之 `source_file` 處理現於 `api/routes/case.py:142-147`（匯入端）。🔴 R 重開併回 D-003 A-017：`/search` 端之承載點＝`api/routes/case_search.py::_attach_canonical_source`（repo 實況；`two_stage_search.py` 亦呼叫同一函式），本行原「`api/routes/case.py`」字面作廢。`/search` 匯出目前**由前端組檔、後端無對應 route**⇒ 本 Task 之服務端入口＝**在 `api/routes/case.py` 既有 case 鏈內新增一個回應欄位承載點**（不新增 route，見「不可做」），其 handler 名於開工時以 `grep -n '@router' api/routes/case.py` 定位並記入 commit message
+  - 🔴 **定案（R2 主委實跑）**：`api/routes/export.py` 之路由為 `/{model_task_id}`＝**模型匯出**，**不是** case 匯出鏈 ⇒ 不改該檔。~~case 側之 `source_file` 處理現於 `api/routes/case.py:142-147`（匯入端）~~（R36：該句只描述匯入端，**不是**本 Task 之承載點，劃掉以免與下句並列兩檔名）。🔴 R 重開併回 D-003 A-017：`/search` 端之承載點＝`api/routes/case_search.py::_attach_canonical_source`（repo 實況；`two_stage_search.py` 亦呼叫同一函式），本行原「`api/routes/case.py`」字面作廢。`/search` 匯出目前**由前端組檔、後端無對應 route**⇒ 本 Task 之服務端入口＝**在 `api/routes/case.py` 既有 case 鏈內新增一個回應欄位承載點**（不新增 route，見「不可做」），其 handler 名於開工時以 `grep -n '@router' api/routes/case.py` 定位並記入 commit message
   - `momentum/Analysis/event_samples/import_contract.py`：新增 `verify_source_digest()`
   - 🔴 S-9 參考實作＝`momentum/Analysis/event_samples/canonical_serialize.py::canonical_event_table_bytes()`——**其建立屬 Task 4.2**，依 §B 之跨批單點依賴表**已提前至 B1**；本 Task（B2）開工時該檔**必須已存在**，不存在即停批（GROK-R2-P1-04）
   - **既有 caller**：`frontend/src/app/search/page.tsx`（匯出按鈕鏈）
@@ -629,7 +629,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 ## ~~Phase 2 — 匯出前篩選~~　⛔ **R 重開退役（2026-09-02，SPEC D-8）**
 
 > ⛔ **本 Phase 全部 Task 退役，不再實作、不再驗收**；原文保留供追溯，下方條文**不具效力**。
-> 已落地實作之退役清單（CROSS-FILE）：`frontend/src/lib/exportFilter.ts`＋`.test.ts`、`exportFilterPersist.test.ts`、
+> 已落地實作之退役清單（CROSS-FILE；含 `docs/GAP3UX_IMPL_HANDOFF.md`——R 前交接，已加作廢 banner、下一批開工前重寫，R36 補列）：`frontend/src/lib/exportFilter.ts`＋`.test.ts`、`exportFilterPersist.test.ts`、
 > `lookaheadDepthLock.ts`＋`.test.ts`＋`.page.test.ts`、`frontend/src/app/search/page.tsx` 之篩選面板／`exportFilters` state／
 > `export-count-n`／`nextLowerBoundState`、`eventExportGuardRuntime.test.tsx` 與 `gap3_export_filter_page.test.tsx`（改寫為宣告框測試）、
 > `api/routes/case.py` 之 `POST /case/lookahead-depth` 與 `EventImportService.lookahead_depth()`（前端導出端點）；

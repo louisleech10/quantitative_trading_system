@@ -37,9 +37,11 @@
   23 findings 全採納，修訂已 commit `50c8d2ae`。P0＝Task 1.11「一律宣告」只改覆蓋風險未改內容與後端 `needs` 謂詞；
   併回表多列「宣稱併回、本體無字」（A-023／A-024／A-005／A-016／A-002／A-003／A-019／A-022）。裁定：宣告值為非負整數（0 須明填）；
   匯出端預設值走新端點 `POST /case/lookahead-declaration/preview-columns`；SPEC 版本行改 `R35-landing`。
-- **閉合輪 R36**（brief-kind closure；session `20260902-gap3ux-x-review-r36`；brief `handoffs/20260902-gap3ux-r35-closure-BRIEF.md`）：
-  原提出方重跑自己每條 RECHECK 判 CLOSED／OPEN／PARTIAL、併回表逐列附本體行號 → reconcile → 三家 `RECONCILE-STAMP`
-  → **才進實作**（Task 1.9′＋Phase 2 退役清單＋Task 1.11 後端謂詞＋validator `v<0`）。
+- **閉合輪 R36 已收斂＋銷帳**（session `20260902-gap3ux-x-review-r36`；synth 本機）：規格層 20 CLOSED／3 PARTIAL；
+  codex 另 3 條「程式未改」轉實作批驗收條件（後端 `needs` 恆 True＋JSON reject／validator `v<0`／`preview_from_columns` 端點）；
+  4 條新 finding（Task 1.10 驗證④漏改／「正整數」殘字面×2／Task 1.11 邊界殘句／CROSS-FILE 漏列交接檔）皆已修。
+- **下一步＝R37 閉合輪**（只驗 3 PARTIAL＋4 新條；brief `handoffs/20260902-gap3ux-r36-closure-BRIEF.md`）→ 全 CLOSED →
+  三家 `RECONCILE-STAMP`（stamp 派工，target＝R37 synth）→ **才進實作**。
 
 ## 下一步（依序）
 1. 等使用者驗 B13–B20。

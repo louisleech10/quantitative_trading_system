@@ -74,7 +74,7 @@
 > ⚠️ 本表首版為主委手寫、未逐列 grep 對證——R35 三家全部命中「宣稱併回、本體無字」（與 P16 群 1 同型）；
 > 上表「已修」各列之落點於閉合輪由原提出方重跑 grep 對證。
 
-**版本**：R35-landing（🔴 **R 重開**；R35 全檔對抗審 23 findings（codex 9／composer 7／grok 7）**全部採納已落地**，待 R36 閉合輪＋三家戳記；收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
+**版本**：R36-landing（🔴 **R 重開**；R35 全檔對抗審 23 findings（codex 9／composer 7／grok 7）全部採納已落地；R36 閉合輪 20 CLOSED／3 PARTIAL＋4 條相鄰漏改已修，待 R37 閉合＋三家戳記；收斂履歷：R1 24 → R2 7 → R3 18 → R4 19 → R5 13 → R6 15 → R7 12
 → R8 17 → R9 14 → R10 11 → R11 20 → R12 15 → R13 14 → R14 18 → R15 10 → R16 9
 → R17 12 → R18 8 → R19 8 → R20 12 → R21 14 → R22 9 → R23 11 → R24 8 內容＋1 流程 P0 → R25 13 → R26 15 → R27 15 → R28 12 → R29 8 條 findings（**composer 降至 1 條**；兩件跨包衝突已解除）；**P0=0**；**(N)=0 連十四輪**；🔴 R27 判 (丙)、R28 判「新法尚未有效」⇒ 改採 `scripts/gap3ux_apply_patch.py` 全行對證（must_exist 不再由主委自選）；🔴 R20／R21／R22 三輪之治理裁定（停止新建機制／條件②′／主委不得自我歸類＋②′(2) 換指標）皆見角色卡）。
 🔴 **`ERRATA-R30-01`——R30 輪之 `-landing` 字樣不代表有內容落地**：R30 輪（ledger round
@@ -784,7 +784,7 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
     `H` 是**小時**，存 `lookahead_hours = 72`，實際根數 ＝ `H ÷ 每根小時數`（12h 線 ⇒ **6 根**、
     1h 線 ⇒ 72 根）⇒ **禁止在任何地方寫死 `bars = 72`**
   掃描改**讀標註**而非猜欄名。辨識須涵蓋大小寫、`Return`／`Drawdown`、蛇形與 `%` 後綴。
-- **L2 未知欄 ⇒ 強制宣告**：出現無法解析深度之 `future*` 或自訂欄 ⇒
+- **L2 強制宣告**（🔴 R 重開 D-8：**一律觸發**、兩路徑皆須宣告；下述「未知欄」自 R 後只是額外警語之條件，本段為 R 前之觸發敘述）：出現無法解析深度之 `future*` 或自訂欄 ⇒
   **不得靜默採用偏小 max**，改為強制使用者填寫宣告＋不可驗聲明（Task 1.9）。
 - **L3 算不出來 ⇒ 擋在切分外**：仍無法證明 lookahead 深度者，該批**禁止進入
   train/test 切分與條件 IC**，只允許看事件研究表（無訓練即無洩漏）。
@@ -805,7 +805,7 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 
 **唯一通則（取代原本的分段描述）**：
 
-> **lookahead 深度 ＝ 該批 label 定義所引用之最遠未來根數（逐 timeframe 各一值）**
+> **lookahead 深度 ＝ 該批 label 定義所引用之最遠未來根數（逐 timeframe 各一值）**——🔴 R 重開後其**值**由使用者宣告承載（D-8；系統不再推導）
 > ——🔴 **R11 明確化**：「根數」隨 timeframe 而變（小時命名欄尤然），
 > 故本通則之量化形態為 `Mapping[tf -> bars]`，其唯一 oracle ＝ `lookahead_bars_declared`；
 > 🔴 R 重開（D-8）：承載＝使用者逐 tf 宣告（Task 1.9／1.9′；原 Task 2.1b 承載式已退役）、ms 換算與 purge 下界見 §D-3′-a（ii）。
@@ -872,7 +872,7 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
 - **三條規則**：
   ① `/search` 匯出面板**無**篩選；匯出＝搜尋結果**全部**列（含未標記者，`label` 留空供 Excel 補）。正反例判定在系統外完成。
   ② 答案窗深度＝使用者於**批次建立時**逐 tf 宣告（`declared_window_bars` map）；CSV 匯入（Task 1.9）與 `/search` 匯出（Task 1.9′）
-     **同一元件、同一 validator、同一規則**（預設＝檔內／結果內最大可用 horizon；可調低但須勾不可驗聲明；接受任意正整數；缺即 fail-closed）。
+     **同一元件、同一 validator、同一規則**（預設＝檔內／結果內最大可用 horizon；可調低但須勾不可驗聲明；接受任意**非負整數**（`0` ＝未用未來資訊，須明填、留白≠0；R36 更正殘留字面）；缺即 fail-closed）。
      `lookahead_bars_declared[tf] = declared_window_bars[tf]`——**不再與任何欄位取 max**（`label_definition.filters` 無寫入者 ⇒
      `depth_by_timeframe()` 之 `referenced_columns` 恆為空集，函式本體保留作匯入端之逐 tf 驗證投影；附帶欄不得參與）。
   ③ purge 權威式（§D-3′-a（ii））**不變**；使用者裁定「取正反例篩選深度之較大者」由宣告框文案承載
@@ -1759,7 +1759,10 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   ④**registry 內容正確性**（R7 群集 F；codex：R6 版只驗「未登記集合 `== set()`」，
     **未驗登記的深度對不對**）：以實跑盤出之全部 `future*` 欄名逐欄對證單位與深度——
     `future_{N}bar_*` ⇒ `lookahead_bars == N`；
-    `future{H}_*` ⇒ `lookahead_hours == H` 且**無** `lookahead_bars` 鍵；
+    🔴 R36 更正（GROK-R36-P1-01；R35 修 A-005 時漏改本驗收）：`future{N}_close_return`，**N ∈ {1,2,4,6}** ⇒ `kind == "bar"`、
+    `lookahead_bars == N`、**無** `lookahead_hours` 鍵；
+    小時命名 `future{H}_*`（H 為 24、48 或 72）⇒ `lookahead_hours == H` 且**無** bar 數鍵（本行刻意不與根數鍵同列：SYNC-FORBID 之防寫死 72 規則）；
+    ⑦（R36 新增，D-002 A-003）換算捨入：`hours_to_bars(24, '12h') == 2`（ceil；非 floor 之 2 亦非 int 除之 2——以 `hours_to_bars(1, '12h') == 1` 區分，floor 得 0）；
     🔴 **無數字之 legacy 欄**（`future_max_return`／`future_max_drawdown` 等）
     ⇒ 其深度**不可由欄名導出** ⇒ registry 須顯式標 `lookahead_unknown: true`，
     並依 D-7 之 L2／L3 走強制宣告與禁進切分，**不得**給任何預設深度。
@@ -1807,8 +1810,8 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   **須同步**：Task 7.1「邊界」已限定只接出後端既有能力、不新增後端未支援之值，故 Phase 7 不擴大
   本 Task 之觸發面；日後若任一 Phase 允許使用者自訂欄名進入篩選條件，該 Phase 須同批擴充本 Task
   之宣告 UI，否則自訂欄會落入「無人負責宣告深度」之縫隙而被 L3 一律擋死。
-- 邊界：只處理「解析不出深度」的情形。
-- 不可做：不得因為「其他欄都能解析」就用它們的 max 當全批深度。
+- 邊界（R36 更正殘句）：**全部批次皆須宣告**；「解析不出深度」之欄只是**額外加警語**之條件，不是觸發條件。
+- 不可做：不得因為「其他欄都能解析」就用它們的 max 當全批深度；不得因「無條件引用欄」而免宣告。
 
 **Task 1.12 — 不可證則禁進切分（D-7 之 L3）**
 - 內容（🔴 R 重開 D-8：兩路徑缺宣告於**匯入時已 reject**（Task 1.11），本 L3 為分析時之第二道——對 R 前落檔、
@@ -1908,7 +1911,8 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   可往下調但須勾選「我的正反例判定未用到超過第 N 根」之聲明（🔴 R35 裁定：N 為**非負整數**，`0` ＝「未用任何未來資訊」
   須**明填**、留白≠0，前後端 validator 之 `v < 1` 改 `v < 0`，Task 1.9 同步），UI 明示此為無法驗證的聲明，
   並明示「**填正例與反例兩邊判定所用之最遠者**」（使用者 2026-08-31：purge 取兩者較大）；
-  欄位接受任意正整數。宣告值即 `lookahead_bars_declared`（map），投影規則同 Task 1.9（`max(1, ·)` 入 `window.horizon_bars`）。
+  欄位接受任意**非負整數**（`0` 須明填、留白≠0；R36 更正殘留字面）。宣告值即 `lookahead_bars_declared`（map），投影規則同 Task 1.9
+  （`max(1, ·)` 入 `window.horizon_bars`——serialization floor，與宣告 oracle `0` 刻意分層）。
   🔴 **守衛**：`withExportLowerBoundGuard` 改形為 **`withExportDeclarationGuard(state, {notify, proceed})`**
   ——保留 D-004 A-021／D-002 A-010 之 **`proceed` 結構保證**（匯出動作只存在於 `proceed` 內，
   守衛外不可能發生匯出）；缺 map／批內某 tf 無鍵／非 int／`< 0`／調低未勾聲明 ⇒ **不呼叫 `proceed`**、
@@ -1919,7 +1923,9 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
   ①批內 `{1h,12h}` ⇒ 恰兩個輸入框（`data-testid=lookahead-window-1h`／`-12h`），單一 tf 退化為一個
   ②不填任一 tf 即按匯出 ⇒ `proceed` 未呼叫、`URL.createObjectURL` call count `== 0`、`fetch` call count `== 0`
   ③調低於預設且未勾聲明 ⇒ 同②；勾選後 ⇒ 匯出成功且 `records[i].lookahead_bars_declared` 深度相等於宣告 map（逐列同值）
-  ④宣告 `{1h: 20}`（>12）⇒ 接受；`records[i].label_definition.window.horizon_bars === Math.max(1, 20)`
+  ④宣告 `{1h: 20}`（>12）⇒ 接受；`records[i].label_definition.window.horizon_bars === Math.max(1, 20)`；
+    🔴 R36 增 `0` 案例：宣告 `{1h: 0}`（明填）⇒ 接受，`records[i].lookahead_bars_declared['1h'] === 0` 且 `window.horizon_bars === 1`；
+    留白（未填）⇒ 走②之擋（留白≠0）
   ⑤附帶欄選擇改變 ⇒ 宣告 map 與 `window.horizon_bars` **皆不變**（附帶欄只影響預設值之候選，不影響已宣告值）
   ⑥JSON 與 CSV 兩條匯出對同一宣告產出**相同** `lookahead_bars_declared`（逐鍵 `==`）
   ⑦`/search` 頁與匯入頁取用**同一 exported** `validateDeclaration` 參考（斷言同一函式物件）
@@ -1936,7 +1942,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 
 > ⛔ **本 Phase 全部 Task 退役，不再實作、不再驗收**；原文保留供追溯（下方條文**不具效力**）。
 > 退役理由（D-8）：使用者裁定匯出前篩選整區移除；深度來源改為使用者宣告（Task 1.9／1.9′）。
-> 已落地之實作依 CROSS-FILE 退役清單移除：`frontend/src/lib/{exportFilter,lookaheadDepthLock}.ts`（＋測試）、
+> 已落地之實作依 CROSS-FILE 退役清單移除（並同步 `docs/GAP3UX_IMPL_HANDOFF.md`——R 前交接，已加作廢 banner、下一批開工前重寫；R36 補列）：`frontend/src/lib/{exportFilter,lookaheadDepthLock}.ts`（＋測試）、
 > `exportFilterPersist.test.ts`、`page.tsx` 篩選面板與 `export-count-n`、`api/routes/case.py` 之
 > `/case/lookahead-depth` 與 `EventImportService.lookahead_depth()`（2.1b 之**前端導出端點**）；
 > 🔴 **`lookahead_depth.py::depth_by_timeframe()` 本體保留**——它是匯入端 L2（`lookahead_declaration.py` →
