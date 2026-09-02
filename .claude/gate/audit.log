@@ -52229,3 +52229,37 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"actor": "cx_run", "attempt_id": "f0c0ebf5-4073-4f39-9852-3c486cdc6a1d", "cli_rc": "0", "event": "committee_family_result", "event_id": "60cbf322-7e4d-4788-9ba7-51700ce3d8bc", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-consult-r1-codex.md", "output_sha256": "13f1e3c9fc70ebb2d71972d58c21d0f503527872a5ff42ab4bf91e7d9694d61a", "producer": "audit_append.sh", "result_state": "success", "round_id": "6810e862-7640-4990-a54e-22c27d464963", "schema_version": 1, "sequence": 3002, "ts": "2026-09-02T16:38:41Z"}
 {"actor": "cx_run", "attempt_id": "ae940bf5-d69f-4a6d-9439-fecd24087f07", "cli_rc": "0", "event": "committee_family_result", "event_id": "cd9bed1d-e232-4e5a-9dd4-9cddefe2228f", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-consult-r1-composer.md", "output_sha256": "5f836a251ff848edd1617a6e9ec1c386f7119d032c379ffb298397eead752668", "producer": "audit_append.sh", "result_state": "success", "round_id": "6810e862-7640-4990-a54e-22c27d464963", "schema_version": 1, "sequence": 3003, "ts": "2026-09-02T16:49:56Z"}
+=== 2026-09-03 00:56:01 | artifact ===
+  ts=2026-09-03 00:56:01
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_UX_SPEC.D-001.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=dext 延伸檔（FROZEN_DOC_AMENDMENT_PROCEDURE_V2 §2.2 錨點：BASE/PREDECESSOR/改什麼/為什麼/觸及面宣告/內容/戳記）；§RISK=filled(a,b,d)；§A=filled(FACT-RECEIPT 探針)；§G Golden 狀態=filled(逐組合 exact golden 檔＋hash)；§P 五 phase=filled；§V mutation=filled；§R=filled；§N 殘留=filled(G3-R13/兩段計算/A future-outcome/scan_max)
+  spec=
+  todo=
+  manifest=
+{"event":"gate_deny","ts":"2026-09-02T17:03:40Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"d5e3e58d758631cde5e9112adad63cf24a0b8357c2c2f2f55601efa4a6976a24","cmd_head":"bash scripts/new_brief.sh review handoffs/20260903-GAP3D2-X-REVIEW-R1-BRIEF.md \"G3-D2 D-001 延伸檔 adversarial review R1\" >/dev/null 2>&1; cat > handoffs/20260903-GAP3D2-X-REVIEW-R1-BRIEF.md <<'EOF'\n# G3-D2 D-001 延伸檔 adversarial review R1\n\nbrief-kind: review\ntask-id: 20260903-GAP3D2-X-REVIEW-R1\nfindings-round: R1\n標的 commit: eba9e389（D-001 為工作區新檔，尚未 commit；以檔案內容為準）\n\n## 範本\n照 `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` 全文執行（§0 挑戰前"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-REVIEW-R1", "ts": "2026-09-02T17:04:30Z"}
+=== 2026-09-03 01:04:30 | dispatch ===
+  ts=2026-09-03 01:04:30
+  kind=dispatch
+  intent=G3-D2 D-001 延伸檔 adversarial review r1（三家全員）
+  risk=low
+  facts_asked=D-001 §A 八條 FACT-RECEIPT；brief 前提五條 assumed 皆附否證觀測；五列我沒查的
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

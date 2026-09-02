@@ -1,5 +1,7 @@
 # GAP-3 事件型 UAT 缺口修補 — SPEC
 
+延伸: D-001 docs/GAP3_EVENT_UX_SPEC.D-001.md
+
 <!-- SYNC-FORBID: 正反例由 \*\*t0 條件\*\*決定 -->
 <!-- SYNC-FORBID: 掃描條件引用之 `future_\{N\}bar_return` 欄 -->
 <!-- SYNC-FORBID: lookahead_bars.*=.*72 -->

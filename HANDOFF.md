@@ -1,26 +1,24 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-03 00:40｜狀態：`G3-D2` 灰色項目——開工稽核完成、consult r1 已派（三家跑中）、主委版已寫；使用者離線（委員共識決）**
+**更新：2026-09-03 01:40｜狀態：`G3-D2` consult r1 已收斂（commit `eba9e389`）；D 延伸 `docs/GAP3_EVENT_UX_SPEC.D-001.md` 已起草（dext 機檢 PASS）；adversarial review r1 派工中；使用者離線（委員共識決）**
 
 ## 票（唯一權威＝`docs/IC_QUANT_GAP_REGISTRY.md`）
 | 票 | 狀態 |
 |---|---|
-| `G3-D2` | **進行中**：大任務完整管線。session `20260903-gap3d2-x-consult-r1`（round `6810e862`）；brief `handoffs/20260903-GAP3D2-X-CONSULT-R1-BRIEF.md`；主委版 `handoffs/20260903-gap3d2-x-consult-r1-claude.md`；探針 `handoffs/20260903-gap3d2-probe-triplets.{py,receipt.txt}` |
-| `G3-D1`／`D3`…`D17` | CLOSED |
-| `KLINE-1` | OPEN（可穿插） |
+| `G3-D2` | **進行中**：consult 收斂 `handoffs/reconcile/20260903-gap3d2-x-consult-r1/synth.md`（本機；九群集）→ D-001 五 phase（D1 B→D2 A→D3 two_stage→D4 (c)＋k→D5 (b)）→ review session `20260903-gap3d2-x-review-r1`（brief `handoffs/20260903-GAP3D2-X-REVIEW-R1-BRIEF.md`）|
+| `G3-R13` | **新登記**：C「收盤後決策」在 D2-2 不可表示；user-ruling 待使用者裁 |
+| `G3-D1`／`D3`…`D17` | CLOSED；`KLINE-1` OPEN（可穿插） |
 
-## 本 session 開工稽核補正（已寫入 `docs/GAP3D2_KICKOFF_HANDOFF.md` §3 末）
-- 🔴 連續網格別名：open 語意之 `label_start_ms` 被 `_close_at` 命中為 t₀−1 close（靜默錯價）⇒ (c) 缺口在 producer 取價，不只 golden。
-- `all_bars_eval.py` 已存在（缺模型分數 G3-R9）；`event_known_at_decision` 契約有、碼零實作；`ret_entry`／`ret_label_anchor` 並排已在事件後報酬表。
-- 既有 9 批：5 批 (C,k=0)、**4 批 (B,k=1)**（CSV 路徑）；k 改制須揭露「批次記錄 k／本次分析 k」。
+## 委員共識已決、待使用者醒後否決（白話：`白話說明/接下來要做什麼.md` 頭條）
+(甲) C 名實：本票只改揭露＋`event_known_at_decision`，不改 D2-2；(乙) 契約 `decision_offset_bars` 保留必填恆 0（codex 異議＝optional）；(丙) k 掃描軟上限 10（判斷值）。
 
-## 下一步（consult 回來後）
-1. `bash scripts/reconcile_build.sh 20260903-gap3d2-x-consult-r1 --mode discovery <三家檔> <claude 檔>` → 群集／處置 → attribution → completeness → `debt_clear.sh --round-id 6810e862-7640-4990-a54e-22c27d464963 --session 20260903-gap3d2-x-consult-r1`。
-2. 白話裁決題寫入 `白話說明/接下來要做什麼.md`（頭條＝主目標 B 之交付有多少是改名／多少是做東西；C 不可表示之殘留 G3-R13）；使用者離線 ⇒ 委員共識決並具名，醒後可否決。
-3. SPEC：主委傾向 D 延伸 `docs/GAP3_EVENT_UX_SPEC.D-001.md`（gate artifact）→ 三家 adversarial → 戳記 → TODO → 實作（Claude）→ 三家 review。
-4. 派工命名 `<YYYYMMDD>-gap3d2-<batch>-<kind>-r<N>`，**task-id＝session 大寫**（本 session 已被擋一次）。
+## 下一步
+1. review r1 三家回來 → `reconcile_build … --mode review` → attribution／completeness → debt_clear → 原提出方閉合輪 → 三家 RECONCILE-STAMP（append 至 D-001 `## 戳記`）。
+2. TODO（`templates/TODO_GENERATION_PROMPT.md`；配 `docs/GAP3_EVENT_UX_TODO.D-006.md`？——注意 TODO 延伸檔已 D-001…D-005 SUPERSEDED-BY-R，編號不重用 ⇒ 用 D-006）→ 三家 review → 實作（Claude 自任，逐 phase）→ 三家 code review。
+3. 派工命名 `<YYYYMMDD>-gap3d2-<batch>-<kind>-r<N>`，**task-id＝session 大寫**；派前 `gate.sh dispatch` 先 mint token（hook 需 fresh token 才放 committee_run）；commit 含 scope 外路徑須 `Governance-Scope:` trailer（最末段）。
 
 ## 已知紅／不要誤判
+- `handoffs/` 為 gitignore：委員產物與 reconcile 只在本機。
+- consult round `6810e862` 被 committee_run 自動 abandon（composer ETIMEDOUT），composer 以 cx_run 同 round 重跑成功；reconcile 四來源 completeness PASS；`debt_clear` 對 ABANDONED 拒銷（已無 open debt，不擋派工）。
 - `tests/api` 既有紅（G3-R11）；`test_ic_deep_analysis` 並行 ERROR 單跑綠；`tsc --noEmit` 8 行既有債。
-- 具名殘留：`R35-L2-ACK`、`MUT-CSV-MAP`、`G3-R12`、`GOV-DOC-STATUS-1`。
-- 債開著時，Bash 指令含家族名會被 gate 當 dispatch 擋（前 session 踩過）。
+- 具名殘留：`R35-L2-ACK`、`MUT-CSV-MAP`、`G3-R12`、`G3-R13`、`GOV-DOC-STATUS-1`。
