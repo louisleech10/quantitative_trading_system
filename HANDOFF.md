@@ -13,6 +13,7 @@
 | `G3-D12` | **CLOSED（2026-09-02 晚，UAT B16）**：分析完成後「Failed to fetch」＝`/ic/refilter` 回原始 dict 含 NaN／inf ⇒ 500；改走 `get_result()` 同一出口＋回歸測試 |
 | `G3-D13` | **CLOSED（2026-09-02 晚，UAT B17）**🔴 正確性：`event_import_id` 路徑未開 `event_filter.enabled` ⇒ 事件模式報告實為全樣本 IC（`mode=none`）。一行修＋回歸測試；**B15–B17 須重跑**。教訓：B10 三輪 review 無一條斷言 `event_filter.mode`／`statistic_kind` |
 | `G3-D14` | **CLOSED（2026-09-02 晚，UAT B17）**：D13 之後條件 IC 真跑，survivor 落檔要 v2 六鍵 `event_context`，五階段路徑沒產 ⇒ fail-closed。補 `ic_feed.event_context_from_windows`（唯一實作）→ pipeline 出口 → `analyze(event_context=)`；10i 測試加六鍵斷言 |
+| `G3-D15` | **CLOSED（2026-09-02 晚）**：`/ic/summary` 對 degraded run（`icir` 全 None）排序 `None < None` ⇒ 500；非有限值排最後＋測試 |
 
 ## 這條 epic 最終落地了什麼（細節＝`docs/GAP3UX_IMPL_HANDOFF.md` §1／§1b／§2）
 - `/search` 匯出面板：篩選整區拆除；答案窗宣告框（與匯入頁同一元件／validator／守衛形狀）；預設候選只取勾選之附帶欄、系統預填與使用者明填分開記；preview 重取失敗即作廢。

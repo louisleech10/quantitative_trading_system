@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import math
+
 import pandas as pd
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -652,11 +654,15 @@ def _resolve_filtered_path(metadata: Dict[str, Any]) -> Path:
 
 def _build_summary(report: Dict[str, Any]) -> str:
     summary_table = report.get("summary_table", []) if isinstance(report, dict) else []
-    top_features = sorted(
-        summary_table,
-        key=lambda item: item.get("icir", float("-inf")),
-        reverse=True,
-    )[:5]
+
+    def _icir_key(item: Dict[str, Any]) -> float:
+        # 🔴 UAT B15（2026-09-02，票 `G3-D15`）：degraded／full-sample 或樣本極少時 `icir` 鍵**存在但為 None**
+        #    （`get(..., -inf)` 對「鍵在、值 None」無效）⇒ `None < None` TypeError ⇒ `/ic/summary` 500 ⇒ 畫面紅字。
+        #    非有限值一律排最後，不當成數字。
+        v = item.get("icir")
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)) else float("-inf")
+
+    top_features = sorted(summary_table, key=_icir_key, reverse=True)[:5]
 
     lines = [
         "# IC Gatekeeper Summary",

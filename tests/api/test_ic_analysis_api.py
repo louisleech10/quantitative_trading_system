@@ -150,6 +150,25 @@ def test_ic_refilter(ic_analysis_task: dict) -> None:
     assert "summary_table" in data
 
 
+def test_ic_summary_tolerates_none_icir() -> None:
+    """G3-D15（UAT B15）：degraded run 之 summary_table 每列 `icir` 鍵存在但為 None ⇒ 曾 `None < None` TypeError ⇒ /ic/summary 500。
+
+    None／NaN 排最後、不當數字；mutation：把 key 改回 `item.get("icir", -inf)` ⇒ 本條紅（TypeError）。
+    """
+    from api.routes.ic_analysis import _build_summary
+
+    report = {"summary_table": [
+        {"feature_name": "f_none_a", "icir": None, "ic_mean": None},
+        {"feature_name": "f_good", "icir": 0.9, "ic_mean": 0.02},
+        {"feature_name": "f_none_b", "icir": None, "ic_mean": None},
+        {"feature_name": "f_nan", "icir": float("nan"), "ic_mean": 0.0},
+        {"feature_name": "f_low", "icir": -0.1, "ic_mean": -0.01},
+    ]}
+    text = _build_summary(report)
+    assert isinstance(text, str) and "IC Gatekeeper Summary" in text
+    assert text.index("f_good") < text.index("f_low")     # 有限值仍照 icir 由高到低
+
+
 def test_ic_refilter_nan_inf_are_json_safe(ic_analysis_task: dict, monkeypatch) -> None:
     """G3-D12（UAT B16）：refilter 回 analyzer 原始 dict 含 NaN／inf ⇒ 曾 500「Out of range float values」⇒ 瀏覽器 Failed to fetch。
 

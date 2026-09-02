@@ -530,6 +530,8 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 >   （票 `G3-D14`）：條件 IC 落檔時要的六鍵身分，五階段路徑沒產。已補；**再重啟後端一次**。
 >   另外 60 筆事件會觸發「full-sample fallback」（訓練 56／測試 4 列不夠做 OOS），畫面會標 `analysis_status` 為 degraded——
 >   那是樣本太少的**誠實標示**，不是缺陷；驗「跑不跑得起來、標記在不在」就好。
+> ⑥ 跑完後紅字「'<' not supported between instances of 'NoneType' and 'NoneType'」＝摘要 API 對「每個特徵 icir 都是 None」
+>   的 degraded 結果排序時炸掉（票 `G3-D15`，已修；再重啟後端）。結果本身沒壞。
 
 ### B13 ── 切到事件模式 [OK]
 

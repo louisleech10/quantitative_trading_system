@@ -604,7 +604,9 @@ JSON 直傳（B7／B8 那條）沒有這個框，就直接用檔內每筆帶的�
 ⑤ ④修好後你再跑，紅字變成「build_survivor_output: conditional_ic run requires event_context (v2 six keys)」——同一根因的第二面
 （票 <code>G3-D14</code>）：條件 IC 落檔時要的六鍵身分，五階段路徑沒產。已補；<strong>再重啟後端一次</strong>。
 另外 60 筆事件會觸發「full-sample fallback」（訓練 56／測試 4 列不夠做 OOS），畫面會標 <code>analysis_status</code> 為 degraded——
-那是樣本太少的<strong>誠實標示</strong>，不是缺陷；驗「跑不跑得起來、標記在不在」就好。</p>
+那是樣本太少的<strong>誠實標示</strong>，不是缺陷；驗「跑不跑得起來、標記在不在」就好。
+⑥ 跑完後紅字「'&lt;' not supported between instances of 'NoneType' and 'NoneType'」＝摘要 API 對「每個特徵 icir 都是 None」
+的 degraded 結果排序時炸掉（票 <code>G3-D15</code>，已修；再重啟後端）。結果本身沒壞。</p>
 </blockquote>
 <h3 id="b13-切到事件模式-ok">B13 ── 切到事件模式 [OK]</h3>
 <p><strong>你做什麼</strong>：開 <code>/ic-analysis</code>，分析模式選「Event-Driven 模式」。</p>
