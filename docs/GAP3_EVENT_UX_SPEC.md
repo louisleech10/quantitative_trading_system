@@ -865,7 +865,8 @@ train 段末尾事件的答案會落進 test 區間 ⇒ **靜默洩漏，現行�
   ① `/search` 匯出面板**無**篩選；匯出＝搜尋結果**全部**列（含未標記者，`label` 留空供 Excel 補）。正反例判定在系統外完成。
   ② 答案窗深度＝使用者於**批次建立時**逐 tf 宣告（`declared_window_bars` map）；CSV 匯入（Task 1.9）與 `/search` 匯出（Task 1.9′）
      **同一元件、同一 validator、同一規則**（預設＝檔內／結果內最大可用 horizon；可調低但須勾不可驗聲明；接受任意正整數；缺即 fail-closed）。
-     `lookahead_bars_declared[tf] = declared_window_bars[tf]`——**不再與任何欄位取 max**（無條件可引用；附帶欄不得參與）。
+     `lookahead_bars_declared[tf] = declared_window_bars[tf]`——**不再與任何欄位取 max**（`label_definition.filters` 無寫入者 ⇒
+     `depth_by_timeframe()` 之 `referenced_columns` 恆為空集，函式本體保留作匯入端之逐 tf 驗證投影；附帶欄不得參與）。
   ③ purge 權威式（§D-3′-a（ii））**不變**；使用者裁定「取正反例篩選深度之較大者」由宣告框文案承載
      （「填正例與反例兩邊判定所用之最遠者」），不新增契約欄。
 - **D-7 三層之對應**：L1 registry **保留**（供揭露預設值候選、rename 攻擊防護與 Task 7.7）；L2 由「未知欄才觸發」改為**一律宣告**
@@ -1895,7 +1896,10 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 > 退役理由（D-8）：使用者裁定匯出前篩選整區移除；深度來源改為使用者宣告（Task 1.9／1.9′）。
 > 已落地之實作依 CROSS-FILE 退役清單移除：`frontend/src/lib/{exportFilter,lookaheadDepthLock}.ts`（＋測試）、
 > `exportFilterPersist.test.ts`、`page.tsx` 篩選面板與 `export-count-n`、`api/routes/case.py` 之
-> `/case/lookahead-depth`、`momentum/Analysis/event_samples/lookahead_depth.py` 之導出路徑；
+> `/case/lookahead-depth` 與 `EventImportService.lookahead_depth()`（2.1b 之**前端導出端點**）；
+> 🔴 **`lookahead_depth.py::depth_by_timeframe()` 本體保留**——它是匯入端 L2（`lookahead_declaration.py` →
+> `pipeline.py:228`）寫入 `lookahead_bars_declared` 之唯一路徑；R 後其 `referenced_columns` **恆為空集**
+> （`label_definition.filters` 無寫入者）⇒ 退化為 `declared_window_bars` 之逐 tf 驗證投影，**不再有 max 語意**；
 > **保留**：`computeExportCounts`（Task 1.5 仍用，空條件＝恆等；`/search` 改顯示 M／X／Y）、
 > `lookahead_declaration.py`／`lookahead_gate.py`／`lookahead_registry.py`。
 > `label_definition.filters` 契約鍵**保留但匯出端不再寫入**（既為 optional；匯入端接受缺鍵）。
@@ -1916,7 +1920,7 @@ fixture 須同時含：非 ASCII（`é`）、`"`、`\`、控制字元、`NaN`／
 - 邊界：只篩**數值**欄；字串欄不在本 Task。
 - 不可做：不得在篩選中改動任何原始欄位值。
 
-**Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）**　⛔ RETIRED（D-8；深度來源改 Task 1.9／1.9′ 宣告；`depth_by_timeframe()` 導出路徑與 `/case/lookahead-depth` 退役）
+**Task 2.1b — 由篩選條件自動導出答案窗下界（D-7 第 2 層）**　⛔ RETIRED（D-8；深度來源改 Task 1.9／1.9′ 宣告；`/case/lookahead-depth` 端點與前端導出退役；`depth_by_timeframe()` 本體保留為匯入端投影，`referenced_columns` 恆為空集）
 - 內容：系統內篩選時，**依 Task 1.10 之欄位級標註**解析條件引用之**所有**欄位
   （含 `*_max_drawdown`／`future72_*`／任何登記欄），取其最大深度為答案窗**下界並鎖定**，
   使用者**不得調低**（與 CSV 路徑之「可調低但需聲明」不同——此處是機器可證，不需聲明）。

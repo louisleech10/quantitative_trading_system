@@ -125,7 +125,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 其**建立 Task 必須先做**，不得因批次編號較後而延後：
 | 產物 | 唯一建立 Task | 消費者 | 處置 |
 |---|---|---|---|
-| ~~`depth_by_timeframe()`（唯一深度函式）~~ | ~~**Task 2.1b**（B5）~~ | ~~Task 1.9（B3）、Task 4.1（B7）~~ | ⛔ **R 重開退役（D-8）**：深度不再導出；Task 1.9／1.9′ 直接寫宣告 map，共用 **validator**（`validateDeclaration`／`parse_lookahead_declaration`）而非深度函式 |
+| ~~`depth_by_timeframe()`（唯一深度函式）~~ | ~~**Task 2.1b**（B5）~~ | ~~Task 1.9（B3）、Task 4.1（B7）~~ | ⛔ **R 重開（D-8）**：`/search` 端之導出**退役**；`depth_by_timeframe()` **本體保留**為匯入端投影（`referenced_columns` 恆空 ⇒ 等於宣告 map）；Task 1.9／1.9′ 共用 **validator**（`validateDeclaration`／`parse_lookahead_declaration`），前端不算深度 |
 | `canonical_serialize.py`（§G S-9 參考實作） | **Task 4.2**（B7） | Task 1.3（B2）、Task 7.5（B10） | 🔴 **Task 4.2 之 S-9 建立部分提前至 B1**；其 horizon 曲線部分留 B7 |
 ⇒ **B1 之實際內容為：Task 1.1、1.10、4.2（僅 S-9 參考實作部分）**（⛔ R 重開：原列 2.1b 已退役；D-001 A-001 據此改寫併回）。
 
@@ -428,7 +428,7 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
      （不得因名稱命中 registry 而放行）。
   ② 同欄名但來自 `/search` 之系統產生批（有 provenance）⇒ 深度直接解析 `== 4`。
 - **風險緩解**：RISK-(a)——這是 D-7 三層防線之根；名稱可偽造，故以 provenance 為判定依據。
-- **驗證**（`pytest tests/momentum/event_samples/ -q -k lookahead_registry_complete` ＋ `pytest tests/api -q -k lookahead_rename_attack` **≥2 條**；🔴 深度導出之 `gap3_lookahead_depth` 屬 **Task 2.1b**，本 Task 不共用該 selector）：
+- **驗證**（`pytest tests/momentum/event_samples/ -q -k lookahead_registry_complete` ＋ `pytest tests/api -q -k lookahead_rename_attack` **≥2 條**；🔴 深度導出之 `gap3_lookahead_depth` 原屬 **Task 2.1b**（⛔ R 重開後該 Task 退役；該 selector 之測試依 CROSS-FILE 退役清單處置），本 Task 不共用該 selector）：
   - ① `m['future_4bar_max_drawdown']['lookahead_bars'] == 4`；
     `m['future72_max_return']['lookahead_hours'] == 72` 且**無** `lookahead_bars` 鍵；
     換算對 `'12h'` 回 `6`、對 `'1h'` 回 `72`（精確 `==`）
@@ -583,7 +583,8 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
      保留 D-004 A-021／D-002 A-010 之 `proceed` 結構保證；缺 map／缺 tf 鍵／非 int／`< 0`／調低未勾 ⇒ 不呼叫 `proceed`。
   5. `lookahead_bars_declared = declared_window_bars`（逐鍵複製；**不與任何欄位取 max**）；`horizon_bars = max(1, ·)` 逐列投影。
   6. Task 7.3 揭露之深度自本 Task 之 state 讀取；移除 `referencedColumnsOf(exportFilters)` 輸入。
-  7. 前端 validator 唯一＝`frontend/src/lib/lookaheadDeclaration.ts::validateDeclaration`；後端 `parse_lookahead_declaration` 不動。
+  7. 前端 validator 唯一＝`frontend/src/lib/lookaheadDeclaration.ts::validateDeclaration`；後端 `parse_lookahead_declaration`
+     與 `depth_by_timeframe()`（匯入端投影，`referenced_columns` 恆空）不動。
 - **修改檔案**：`frontend/src/app/search/page.tsx`（宣告區塊＋守衛改形＋揭露輸入）；`frontend/src/lib/eventExport.ts`
   （`lookaheadBarsDeclared` 改自宣告 state）；`frontend/src/lib/lookaheadDeclaration.ts`（若需 `initialDeclaredWindowBars` 之匯出端 preview adapter）
   **既有 caller**：`/search` 匯出流程（JSON／CSV）、Task 7.3 揭露
@@ -616,8 +617,10 @@ receipt 路徑入 commit message。未附 receipt ⇒ 不得開下一批。
 > 已落地實作之退役清單（CROSS-FILE）：`frontend/src/lib/exportFilter.ts`＋`.test.ts`、`exportFilterPersist.test.ts`、
 > `lookaheadDepthLock.ts`＋`.test.ts`＋`.page.test.ts`、`frontend/src/app/search/page.tsx` 之篩選面板／`exportFilters` state／
 > `export-count-n`／`nextLowerBoundState`、`eventExportGuardRuntime.test.tsx` 與 `gap3_export_filter_page.test.tsx`（改寫為宣告框測試）、
-> `api/routes/case.py` 之 `POST /case/lookahead-depth`、`momentum/Analysis/event_samples/lookahead_depth.py` 之導出路徑、
-> `EventSamplePipeline.lookahead_depth()`；`gap3_event_import_form.test.tsx` 對 `lowerBoundState` 之斷言。
+> `api/routes/case.py` 之 `POST /case/lookahead-depth` 與 `EventImportService.lookahead_depth()`（前端導出端點）；
+> `gap3_event_import_form.test.tsx` 對 `lowerBoundState` 之斷言。
+> 🔴 **`lookahead_depth.py::depth_by_timeframe()` 本體保留**（匯入端 L2 之唯一寫入路徑：`lookahead_declaration.py` →
+> `pipeline.py:228`）；R 後 `label_definition.filters` 無寫入者 ⇒ 其 `referenced_columns` 恆為空集，退化為宣告之逐 tf 驗證投影。
 > **保留**：`computeExportCounts`（Task 1.5 仍用；拆掉其對 `exportFilter` 之 import，空條件＝恆等）、
 > `lookahead_declaration.py`／`lookahead_gate.py`／`lookahead_registry.py`。
 > 取代者：**Task 1.9′**（Phase 1，B3）。
