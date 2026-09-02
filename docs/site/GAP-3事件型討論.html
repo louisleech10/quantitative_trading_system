@@ -481,6 +481,9 @@
 <h2 id="8-討論紀錄新的寫上面只記改了什麼">§8 討論紀錄（新的寫上面；只記「改了什麼」）</h2>
 <ul>
 <li>
+<p><strong>2026-09-02 稍晚（第 16 版）</strong>：你裁定「整區移除匯出前篩選」之後，三家委員 consult 一致判定這是 <strong>R 重開</strong>而非補充修訂——因為它推翻了本檔 §3 與 SPEC §A <code>A-1</code> 所記、你 8/20 前後確認過的「匯出前篩選與上傳自篩 CSV <strong>兩者都做</strong>」。本檔 §7 之 <strong>U／J／K 條目此輪未改</strong>（改的是 SPEC 層的處置方式）；但要記一筆：<strong>「兩者都做」這條設計裁定已被你 9/2 的裁定取代</strong>，SPEC 重開後本檔對應敘述須同步（列入 R 之 CROSS-FILE）。另一個被抓到的洞：<code>/search</code> 匯出檔的答案窗深度目前只有篩選面板一個來源，拆篩選前必須先設計替代（宣告框或改流程）。</p>
+</li>
+<li>
 <p><strong>2026-09-02（第 15 版）</strong>：與本檔設計相關的一項事實釐清——<code>/search</code>（事件流程的起點）讀寫的是 <code>data_cache/kline_cache.h5</code>，而 IC／事件分析讀的是 <code>data_cache/feature_klines/</code>；兩份在重疊區間逐 bit 相同，但<strong>涵蓋期會分岔</strong>（<code>/search</code> 缺什麼自己補，<code>feature_klines/</code> 只有你在 FF 頁下載過的）。這解釋了 B18「run 涵蓋期」閘為何會擋：不是資料不一致，是 FF 頁還沒下載到那段。使用者同日裁定 <code>/data-preparation</code> 舊區塊註解後移除（<code>KLINE-1</code>）。<strong>未觸及</strong>任何 U／J／K 條目。</p>
 </li>
 <li>

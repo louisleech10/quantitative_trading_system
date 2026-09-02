@@ -28,8 +28,16 @@
   後兩條只在整包跑時紅、單跑 7 passed＝event-loop 污染，見 `G3-R11`）。
 - `tsc --noEmit` 8 行既有債（FactorReturnChart.test／useFeatureFactory.batchDate.test）。
 
+## 🔴 進行中（2026-09-02，使用者離線期間）
+- **三家 consult 已派**：session `20260902-gap3ux-x-consult-r1`／task `20260902-GAP3UX-X-CONSULT-R1`／
+  round_id `521c3a6a-8b1c-4ba1-baa3-c0e212bc24e8`（債已開，**收斂前不得派新工**）。
+  brief `handoffs/20260902-gap3ux-d006-class-consult-BRIEF.md`；產出 `handoffs/20260902-gap3ux-x-consult-r1-{codex,composer,grok}.md`。
+  題目：移除匯出前篩選依 `FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1 是 **R 重開**（推翻 FROZEN A-1／Phase 2）還是可作 D；
+  R 之最小可執行範圍；D-001…D-005 效力（三份引用 2.1b）。分歧預設 R。
+- 接回流程：`reconcile_build.sh` → 讀三檔 → synth → `debt_clear.sh --round-id … --session …` → 依 verdict 起草 R／D 文件。
+
 ## 下一步（依序）
 1. 等使用者驗 B13–B20。
-2. 開 `D-006`（移除匯出前篩選）走完整管線：Claude 起草 SPEC 延伸＋TODO → 三家 adversarial。
-   逐項判定 `export-count-*` 與下界守衛去留（匯出仍需 `lookahead_bars_declared`）。
+2. 🔴 consult 已收斂（`handoffs/reconcile/20260902-gap3ux-x-consult-r1/synth.md`）：**R 重開，非 D**；全檔對抗審；五份延伸檔 `SUPERSEDED-BY-R` 併回；R 本體必含匯出端深度來源設計。下一步＝主委起草 R brief＋修訂稿 → 三家 adversarial。
+   逐項判定 `export-count-*` 與下界守衛去留（匯出仍需 `lookahead_bars_declared`；兩條匯出路徑之值來源目前唯一是 2.1b 導出之 state）。
 3. `KLINE-1`：先「註解」（deprecation 標示，不改行為）→ 再開移除票走完整管線；順手補 FF 下載鏈的 e2e 測試（真 provider、寫暫存目錄、比 dtype/attrs）。
