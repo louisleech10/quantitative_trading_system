@@ -343,8 +343,15 @@ class ICAnalysisService:
         *,
         features_path: Optional[str],
         meta_path: Optional[str],
+        feature_manifest_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """GAP-3 UX Task 7.0b ④ ＋ 7.7 ③ 之**五階段編排**（§D-3′-a（iii）之落地點）。
+
+        `feature_manifest_path`：registry 條目之 `hdf5_relative_path`（＝該 run 的 `feature_manifest.json`）。
+        🔴 UAT B15（2026-09-02，票 `G3-D10`）：註冊 run 之 `features_path` 是物化暫存檔
+        `data_cache/reports/ic_ingest_cache/*.h5`，附近沒有 manifest ⇒ coverage 閘一律誤判為 legacy run 而擋掉
+        **所有**註冊 run。故 manifest 路徑由 registry 條目直接給，列為第一候選；`features_path`／`meta_path` 仍保留
+        供 artifact 重放（呼叫端自帶 h5 者）。
 
         🔴 **本方法是事件分支的唯一入口**，只在 `request.event_import_id` 存在時被呼叫
         ⇒ cross-sectional 與純特徵 longitudinal **不會**經過這裡（over 向：不得誤擋）。
@@ -386,7 +393,7 @@ class ICAnalysisService:
         )
         check_feature_run_coverage(                              # 階段 3a（批次級 pass/fail）
             timeframe_seconds=timeframe_seconds,                 # 🔴 同一物件
-            feature_manifest_time_range=_feature_run_time_range(features_path, meta_path),
+            feature_manifest_time_range=_feature_run_time_range(feature_manifest_path, features_path, meta_path),
             event_windows=prepared0.windows,
         )
         # 階段 3b：本批 3a 為批次級，不剔除任何列 ⇒ allowed 維持全集（`replace` 仍產生新身分）。
@@ -611,6 +618,7 @@ class ICAnalysisService:
                 features_path = request.features_path
                 meta_path = request.meta_path
                 resolved_config_hash: Optional[str] = config_hash
+                feature_manifest_hint: Optional[str] = None   # registry 條目之 manifest 路徑（G3-D10）
 
                 if symbol and timeframe:
                     if config_hash:
@@ -638,6 +646,8 @@ class ICAnalysisService:
                             )
                             resolved_config_hash = str(entry.get("config_hash") or "")
 
+                    if entry:
+                        feature_manifest_hint = str(entry.get("hdf5_relative_path") or "") or None
                     if entry and not features_path:
                         features_path, meta_path = self._materialize_features_for_ic(
                             symbol,
@@ -673,6 +683,7 @@ class ICAnalysisService:
                     staged = self._run_event_label_stages(
                         request, event_batch,
                         features_path=features_path, meta_path=meta_path,
+                        feature_manifest_path=feature_manifest_hint,
                     )
                     event_timestamps = staged["event_timestamps"]
                     event_label_values = staged["event_label_values"]

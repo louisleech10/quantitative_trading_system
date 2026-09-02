@@ -146,7 +146,7 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 <p><strong>不是這樣代表什麼</strong>：如果只看到兩顆按鈕、中間那幾區都沒有，代表你開的是舊版前端——
 重新 <code>npm run dev</code>。</p>
 <hr />
-<h3 id="b2-匯出前篩選與筆數-改成匯出前先填答案窗新的要驗">B2 ── <s>匯出前篩選與筆數</s> → <strong>改成「匯出前先填答案窗」（新的，要驗）</strong></h3>
+<h3 id="b2-匯出前篩選與筆數-改成匯出前先填答案窗新的要驗-ｏｋ">B2 ── <s>匯出前篩選與筆數</s> → <strong>改成「匯出前先填答案窗」（新的，要驗）</strong> [ＯＫ]</h3>
 <blockquote>
 <p>🔴 <strong>2026-09-02 你裁定匯出前篩選整個拿掉，規格走完 R 重開（三輪審查＋三家蓋章）後，9/2 下午已拆掉。</strong>
 現在 <code>/search</code> 匯出面板上<strong>沒有</strong>「新增條件」，只剩：三個筆數（原 M 筆／正例 X／反例 Y）＋<strong>答案窗宣告框</strong>。
@@ -318,7 +318,7 @@ lookahead 深度 / purge 下界。而且：</p>
 <p><strong>不是這樣代表什麼</strong>：如果換了設定但那一區文字不動，代表它顯示的是寫死的預設值而不是你的實際設定
 ——那是「說一套做一套」，記下來。</p>
 <hr />
-<h3 id="b5-匯出事件契約-json">B5 ── 匯出事件契約 JSON</h3>
+<h3 id="b5-匯出事件契約-json-ｏｋ">B5 ── 匯出事件契約 JSON [ＯＫ]</h3>
 <p><strong>你做什麼</strong>：按「匯出事件契約 JSON」。</p>
 <p><strong>應該看到</strong>：</p>
 <ol>
@@ -404,7 +404,7 @@ lookahead 深度 / purge 下界。而且：</p>
 <p><strong>應該看到</strong>：顯示 <code>import_id</code>；右側「已匯入事件批」列表多出這一批，
 每列有 <code>import_id</code>／筆數／匯入時間／symbols／timeframes。</p>
 <hr />
-<h3 id="b9-用-csv-匯入">B9 ── 用 CSV 匯入</h3>
+<h3 id="b9-用-csv-匯入-ｏｋ">B9 ── 用 CSV 匯入 [ＯＫ]</h3>
 <blockquote>
 <p>🔴 <strong>2026-09-01 依你的回報改過</strong>：你說「我根本也看不懂也沒辦法自己寫批次預設 JSON」。
 現在 <strong>B9-1 是主路徑</strong>：<code>/search</code> 匯出的 CSV 已含契約欄，<strong>零對映、不必寫任何 JSON</strong>。
@@ -506,7 +506,7 @@ Network 分頁看，應該一片空白）。</p>
 <p><strong>應該看到</strong>：被擋下來，說必須是整數。🔴 <strong>不應該</strong>看到它自己變成 <code>1</code>
 （那是 R4 抓到的「靜默改值」缺陷）。</p>
 <hr />
-<h3 id="b10-答案窗宣告">B10 ── 答案窗宣告</h3>
+<h3 id="b10-答案窗宣告-ok">B10 ── 答案窗宣告 [OK]</h3>
 <p><strong>你做什麼</strong>：B9 對映齊全並勾了確認之後，往下看「答案窗宣告」那一區。</p>
 <p><strong>應該看到</strong>：逐個週期各一個輸入框。<strong>預設值分兩種情況</strong>：</p>
 <div class="table-wrap"><table>
@@ -549,7 +549,7 @@ JSON 直傳（B7／B8 那條）沒有這個框，就直接用檔內每筆帶的�
 也看不出到底該填什麼。<strong>已修</strong>：這種情況改成留空＋改寫提示文字（見上表）。</p>
 </blockquote>
 <hr />
-<h3 id="b11-舊格式擋得住">B11 ── 舊格式擋得住</h3>
+<h3 id="b11-舊格式擋得住-ok">B11 ── 舊格式擋得住 [OK]</h3>
 <p><strong>你做什麼</strong>：把 <strong><code>uat_samples/events_legacy_3col.csv</code></strong>（舊三欄格式）丟進「匯入事件」。</p>
 <p><strong>應該看到</strong>：拒收，原因 <code>legacy_schema_detected</code>，訊息說「不做靜默轉換」，
 <strong>並附欄位對照的搬遷提示</strong>（會列出缺哪些必填欄）。</p>
@@ -588,12 +588,20 @@ JSON 直傳（B7／B8 那條）沒有這個框，就直接用檔內每筆帶的�
 <p><strong>應該看到</strong>：空的（一個檔都不剩）。</p>
 <hr />
 <h2 id="第三段拿事件去分析ic-analysis">第三段：拿事件去分析（<code>/ic-analysis</code>）</h2>
-<h3 id="b13-切到事件模式">B13 ── 切到事件模式</h3>
+<blockquote>
+<p>🔴 <strong>9/2 晚你在 B15 撞到的兩件事（都已修，重啟後端再試）</strong>：
+① 選 <code>abc9b9fe</code> 跑分析，後端立刻拒「feature run manifest 無 time_range」——不是 run 的問題，是閘去錯地方找 manifest
+（票 <code>G3-D10</code>）。<strong>B13–B17 一律選 <code>abc9b9fe</code></strong>（涵蓋 2024-01～2026-04，你的樣本事件 2024-06～2025-12 在裡面）。
+② 畫面停在「任務執行中」不動——任務其實 0.1 秒內就失敗了，通知比畫面訂閱早一步發出、之後沒人再說（票 <code>G3-D11</code>）。
+現在連上就會先拉一次現況，失敗會立刻顯示紅字。
+事件批用 B8 匯進去的那批（<code>events_ok.json</code>）就對了。</p>
+</blockquote>
+<h3 id="b13-切到事件模式-ok">B13 ── 切到事件模式 [OK]</h3>
 <p><strong>你做什麼</strong>：開 <code>/ic-analysis</code>，分析模式選「Event-Driven 模式」。</p>
 <p><strong>應該看到</strong>：出現「從已匯入案例選事件（GAP-3）」下拉。
 沒匯入過任何批的話，顯示「尚未匯入任何事件批——請先到『數據準備』用新契約匯入。」</p>
 <hr />
-<h3 id="b14-選一批批次事實-vs-分析參數新的這是這批最重要的觀念">B14 ── 選一批：批次事實 vs 分析參數（<strong>新的，這是這批最重要的觀念</strong>）</h3>
+<h3 id="b14-選一批批次事實-vs-分析參數新的這是這批最重要的觀念ok">B14 ── 選一批：批次事實 vs 分析參數（<strong>新的，這是這批最重要的觀念</strong>）[OK]</h3>
 <p><strong>你做什麼</strong>：下拉選 B8 匯入的那批。</p>
 <p><strong>應該看到 兩個分開的區塊</strong>：</p>
 <p><strong>區塊一「這批事件的事實（不可在這裡改）」</strong>——五行：

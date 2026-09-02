@@ -107,6 +107,19 @@ async def ic_analysis_websocket(
 
     ic_analysis_service.register_notification_callback(task_id, notification_callback)
 
+    # 🔴 UAT B15（2026-09-02，票 `G3-D11`）：任務可能在前端訂閱**之前**就已 failed／completed
+    #    （例如 coverage 閘在啟動後數十毫秒內拒）；那筆通知已經發過、不會再來，前端會永遠停在「執行中」。
+    #    連上時**立刻推一次現況快照**，終態一律補送（前端對 failed／completed 之處理與即時通知同一條路）。
+    snapshot = ic_analysis_service.get_task_status(task_id) or task_status
+    if snapshot.get("status") in ("failed", "completed"):
+        await send_payload({
+            "task_id": task_id,
+            "stage": snapshot.get("current_stage") or snapshot.get("status"),
+            "progress": snapshot.get("progress", 1.0),
+            "message": snapshot.get("error") or "",
+            "status": snapshot.get("status"),
+        })
+
     try:
         heartbeat_task = asyncio.create_task(_send_heartbeat(websocket))
 

@@ -362,3 +362,77 @@ def test_feature_coverage_gate_12_empty_windows_is_not_an_error():
         feature_manifest_time_range=rng(None, None),  # 連 legacy 都不該觸發
         event_windows=[],
     )
+
+
+# ── ⑩ G3-D10（UAT B15）：註冊 run 之 manifest 由 registry 路徑取得，不在物化暫存檔附近找 ──
+
+def test_feature_coverage_gate_10_registry_manifest_path_is_first_candidate(tmp_path: Path):
+    """真路徑形態：`features_path`＝`data_cache/reports/ic_ingest_cache/<sym>_<tf>_<hash>.h5`（附近無 manifest），
+    registry 條目 `hdf5_relative_path`＝`<run_dir>/feature_manifest.json`（有 `time_range`）。
+
+    under：只給物化暫存路徑 ⇒ `None`（＝B15 實際撞到的 legacy 誤判，證明候選順序有鑑別力）；
+    over：manifest 路徑在第一候選 ⇒ 原樣取出 `time_range`。
+    mutation：`_run_event_label_stages` 不傳 `feature_manifest_path` ⇒ 本條 under 側仍綠但 ⑪ 紅。
+    """
+    from api.services.ic_analysis_service import _feature_run_time_range
+
+    run_dir = tmp_path / "features" / "ETHUSDT" / "12h" / "abc9"
+    run_dir.mkdir(parents=True)
+    manifest = run_dir / "feature_manifest.json"
+    manifest.write_text(json.dumps({"time_range": {"start": "1704067200", "end": "1777291200"}}), encoding="utf-8")
+    cache_dir = tmp_path / "reports" / "ic_ingest_cache"
+    cache_dir.mkdir(parents=True)
+    h5 = cache_dir / "ETHUSDT_12h_abc9.h5"
+    h5.write_bytes(b"")
+    meta = cache_dir / "ETHUSDT_12h_abc9_meta.json"
+    meta.write_text("{}", encoding="utf-8")
+
+    assert _feature_run_time_range(str(h5), str(meta)) is None                       # B15 之誤判形態
+    assert _feature_run_time_range(str(manifest), str(h5), str(meta)) == rng("1704067200", "1777291200")
+    assert _feature_run_time_range(None, str(h5), str(meta)) is None
+
+
+def test_feature_coverage_gate_11_service_passes_registry_manifest_to_gate(monkeypatch):
+    """`_run_event_label_stages` 對 gate 之 `feature_manifest_time_range` 來自 `feature_manifest_path`（第一候選）。
+
+    以探針取代 `_feature_run_time_range`，斷言第一個引數就是 registry 之 manifest 路徑。
+    """
+    import api.services.ic_analysis_service as svc_mod
+
+    seen: list = []
+
+    def probe(*candidates):
+        seen.append(tuple(candidates))
+        return rng("1704067200", "1777291200")
+
+    monkeypatch.setattr(svc_mod, "_feature_run_time_range", probe)
+    # 讓其餘階段不真的跑：`prepare_analysis_windows` 之後就 raise，只驗到 gate 之呼叫
+    class _Stop(Exception):
+        pass
+
+    def fake_check(**kw):
+        raise _Stop()
+
+    monkeypatch.setattr(svc_mod, "check_feature_run_coverage", fake_check)
+
+    class _Pipe:
+        def timeframe_seconds_for(self, tfs):
+            return {tf: TF_SECONDS[tf] for tf in tfs}
+
+        def bars_from_kline_cache(self, symbols, tfs):
+            return {}
+
+        def prepare_analysis_windows(self, *a, **kw):
+            class _P:
+                windows = ()
+            return _P()
+
+    monkeypatch.setattr("momentum.factories.create_event_sample_pipeline", lambda: _Pipe())
+    req = type("Req", (), {"event_import_id": "imp-1"})()
+    batch = {"records": ({"symbol": "ETHUSDT", "timeframe": "12h"},), "event_label_spec": None,
+             "lookahead_bars_declared": {"12h": 2}}
+    with pytest.raises(_Stop):
+        svc_mod.ICAnalysisService._run_event_label_stages(
+            req, batch, features_path="data_cache/reports/ic_ingest_cache/x.h5", meta_path=None,
+            feature_manifest_path="data_cache/features/ETHUSDT/12h/abc9/feature_manifest.json")
+    assert seen and seen[0][0] == "data_cache/features/ETHUSDT/12h/abc9/feature_manifest.json"

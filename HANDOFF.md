@@ -9,6 +9,7 @@
 | `G3-D2` | **OPEN**：五維度三類值不接受永久灰著 |
 | `KLINE-1` | **OPEN**：`/data-preparation` 舊區塊已標 deprecated；移除票待開（大任務） |
 | `G3-D3`…`D9` | CLOSED |
+| `G3-D10`／`D11` | **CLOSED（2026-09-02 晚，UAT B15）**：coverage 閘對註冊 run 誤判 legacy（manifest 找錯目錄）；任務秒失敗時 WS 錯過通知、畫面停「執行中」。兩端各修一處＋測試；使用者須重啟後端重做 B15（run 選 `abc9b9fe`） |
 
 ## 這條 epic 最終落地了什麼（細節＝`docs/GAP3UX_IMPL_HANDOFF.md` §1／§1b／§2）
 - `/search` 匯出面板：篩選整區拆除；答案窗宣告框（與匯入頁同一元件／validator／守衛形狀）；預設候選只取勾選之附帶欄、系統預填與使用者明填分開記；preview 重取失敗即作廢。

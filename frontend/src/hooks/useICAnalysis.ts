@@ -155,6 +155,17 @@ export function useICAnalysis() {
 
     const ws = new WebSocket(`${WS_BASE_URL}/ws/ic-analysis/${taskId}`);
 
+    // 🔴 UAT B15（2026-09-02，G3-D11）：任務可能在訂閱前就已 failed／completed（例如 coverage 閘在幾十毫秒內拒），
+    //    那筆通知不會再來；連上時**先拉一次現況**，終態直接收斂，不再永遠顯示「執行中」。
+    //    後端 WS 連上時也會補推終態快照——兩端各守一次，任一端漏了都不會卡死。
+    ws.onopen = () => {
+      void fetchTaskStatus(taskId)
+        .then((s) => {
+          if (s.status === 'failed' || s.status === 'completed') ws.close();
+        })
+        .catch(() => { /* 交給 WS 訊息／輪詢；不在此喊通用錯誤 */ });
+    };
+
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
@@ -220,7 +231,7 @@ export function useICAnalysis() {
     };
 
     wsRef.current = ws;
-  }, [clearTimers, fetchResult, setError, setProgress, setStatus, startPolling]);
+  }, [clearTimers, fetchResult, fetchTaskStatus, setError, setProgress, setStatus, startPolling]);
 
   const startAnalysis = useCallback(
     async (config: ICAnalysisConfig) => {

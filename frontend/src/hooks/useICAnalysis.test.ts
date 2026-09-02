@@ -79,6 +79,7 @@ describe('useICAnalysis progress errors', () => {
     onmessage: ((event: MessageEvent) => void) | null = null;
     onerror: (() => void) | null = null;
     onclose: (() => void) | null = null;
+    onopen: (() => void) | null = null;
 
     constructor(url: string) {
       this.url = url;
@@ -87,6 +88,10 @@ describe('useICAnalysis progress errors', () => {
 
     emitMessage(payload: unknown) {
       this.onmessage?.({ data: JSON.stringify(payload) } as MessageEvent);
+    }
+
+    emitOpen() {
+      this.onopen?.();
     }
 
     emitClose() {
@@ -111,6 +116,32 @@ describe('useICAnalysis progress errors', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+  });
+
+  it('G3-D11：任務在訂閱前已 failed ⇒ 連上時拉一次現況即收斂為 failed，不停在執行中', async () => {
+    vi.useRealTimers();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ task_id: 'task-1', status: 'failed', progress: 1, error: 'feature_coverage_unknown_legacy_run: …' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useICAnalysis());
+
+    act(() => {
+      result.current.connectProgress('task-1');
+    });
+    expect(useICAnalysisStore.getState().status).not.toBe('failed');   // 尚未收到任何訊息
+    await act(async () => {
+      MockWebSocket.instances[0].emitOpen();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalled();
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/task/task-1');
+    expect(useICAnalysisStore.getState().status).toBe('failed');
+    expect(useICAnalysisStore.getState().error).toContain('feature_coverage_unknown_legacy_run');
+    expect(MockWebSocket.instances[0].close).toHaveBeenCalled();
   });
 
   it('sets backend message from failed websocket payload', () => {
