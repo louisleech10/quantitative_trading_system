@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
@@ -295,6 +296,26 @@ class EventSamplePipeline:
                 )
             out[key] = int(TIMEFRAME_SECONDS[key])
         return out
+
+    @staticmethod
+    def event_context_for_analysis(prepared, records) -> Dict[str, str]:
+        """survivor v2 六鍵 `event_context` 之 R3 出口（GAP-3 Task 7.0b 五階段；回純 dict）。
+
+        唯一實作＝`ic_feed.event_context_from_windows`；`label_definition`／`control_kind` 取自本批 records，
+        批內不唯一 ⇒ raise（契約同質檢查本應已擋；此處是第二道）。
+        """
+        from momentum.Analysis.event_samples.ic_feed import event_context_from_windows
+
+        recs = list(records)
+        lds = {json.dumps(r.get("label_definition"), sort_keys=True, separators=(",", ":")) for r in recs}
+        cks = {str(r.get("control_kind")) for r in recs}
+        if len(lds) != 1 or len(cks) != 1:
+            raise ValueError(
+                f"event_context_for_analysis: 批內 label_definition／control_kind 須唯一（得 {len(lds)}／{len(cks)} 組）"
+            )
+        return event_context_from_windows(
+            prepared.windows, label_definition=json.loads(next(iter(lds))), control_kind=next(iter(cks)),
+        )
 
     @staticmethod
     def project_purge(purge_rows) -> Mapping[str, int]:

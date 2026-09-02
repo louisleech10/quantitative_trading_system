@@ -526,6 +526,10 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 >   後端只在舊的「送時間戳」路徑開事件濾鏡，B10 改成送 `event_import_id` 後沒跟著開，於是 `metadata.event_filter.mode` 是 `"none"`、
 >   整份報告是**全樣本 IC**（只多了 purge）。已修一行＋回歸測試。**重啟後端後 B15–B17 要重跑**：
 >   重跑後 `metadata.event_filter` 應有 `mode`≠`none`、`statistic_kind: "conditional_ic"`、`n_timestamps_requested: 60`。
+> ⑤ ④修好後你再跑，紅字變成「build_survivor_output: conditional_ic run requires event_context (v2 six keys)」——同一根因的第二面
+>   （票 `G3-D14`）：條件 IC 落檔時要的六鍵身分，五階段路徑沒產。已補；**再重啟後端一次**。
+>   另外 60 筆事件會觸發「full-sample fallback」（訓練 56／測試 4 列不夠做 OOS），畫面會標 `analysis_status` 為 degraded——
+>   那是樣本太少的**誠實標示**，不是缺陷；驗「跑不跑得起來、標記在不在」就好。
 
 ### B13 ── 切到事件模式 [OK]
 

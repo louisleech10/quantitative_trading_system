@@ -600,7 +600,11 @@ JSON 直傳（B7／B8 那條）沒有這個框，就直接用檔內每筆帶的�
 ④ 🔴 <strong>B17 你在結果 JSON 找不到 <code>statistic_kind</code> 那些標記——不是找錯地方，是事件模式根本沒開</strong>（票 <code>G3-D13</code>）：
 後端只在舊的「送時間戳」路徑開事件濾鏡，B10 改成送 <code>event_import_id</code> 後沒跟著開，於是 <code>metadata.event_filter.mode</code> 是 <code>&quot;none&quot;</code>、
 整份報告是<strong>全樣本 IC</strong>（只多了 purge）。已修一行＋回歸測試。<strong>重啟後端後 B15–B17 要重跑</strong>：
-重跑後 <code>metadata.event_filter</code> 應有 <code>mode</code>≠<code>none</code>、<code>statistic_kind: &quot;conditional_ic&quot;</code>、<code>n_timestamps_requested: 60</code>。</p>
+重跑後 <code>metadata.event_filter</code> 應有 <code>mode</code>≠<code>none</code>、<code>statistic_kind: &quot;conditional_ic&quot;</code>、<code>n_timestamps_requested: 60</code>。
+⑤ ④修好後你再跑，紅字變成「build_survivor_output: conditional_ic run requires event_context (v2 six keys)」——同一根因的第二面
+（票 <code>G3-D14</code>）：條件 IC 落檔時要的六鍵身分，五階段路徑沒產。已補；<strong>再重啟後端一次</strong>。
+另外 60 筆事件會觸發「full-sample fallback」（訓練 56／測試 4 列不夠做 OOS），畫面會標 <code>analysis_status</code> 為 degraded——
+那是樣本太少的<strong>誠實標示</strong>，不是缺陷；驗「跑不跑得起來、標記在不在」就好。</p>
 </blockquote>
 <h3 id="b13-切到事件模式-ok">B13 ── 切到事件模式 [OK]</h3>
 <p><strong>你做什麼</strong>：開 <code>/ic-analysis</code>，分析模式選「Event-Driven 模式」。</p>

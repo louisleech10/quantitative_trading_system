@@ -287,6 +287,16 @@ def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):
     )
     assert calls["n"] == 1, f"prepare 被呼叫 {calls['n']} 次（須恰 1 次）"
     assert out["event_label_values"], "應產出至少一個 label_value"
+    # G3-D14（UAT B17）：survivor v2 六鍵必須由五階段產出（缺 ⇒ build_survivor_output fail-closed）
+    import re
+    from momentum.Analysis.event_samples.ic_feed import DECISION_TIME_RULE, FEATURE_CUTOFF_RULE
+    ctx = out["event_context"]
+    assert set(ctx) == {"event_manifest_hash", "label_definition_hash", "decision_time_rule",
+                        "feature_cutoff_rule", "label_window_rule", "control_kind"}
+    assert re.fullmatch(r"[0-9a-f]{64}", ctx["event_manifest_hash"]) and re.fullmatch(r"[0-9a-f]{64}", ctx["label_definition_hash"])
+    assert ctx["decision_time_rule"] == DECISION_TIME_RULE and ctx["feature_cutoff_rule"] == FEATURE_CUTOFF_RULE
+    assert ctx["label_window_rule"] == "close_to_close:horizon_bars=2"
+    assert ctx["control_kind"] == records[0]["control_kind"]
     # 🔴 token 為非決定性 ⇒ 它出現在輸出代表確實是「同一次呼叫」傳下來的，不是重算
     assert out["prepared_token"] == out["prepared"].prepared_token
 

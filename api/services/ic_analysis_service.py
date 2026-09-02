@@ -469,11 +469,16 @@ class ICAnalysisService:
                 f"（{sorted(timeframe_seconds)}）——無法把 purge 下界換算成列數"
             )
         purge_rows = -(-int(purge_ms) // (int(seconds) * 1000))  # ceil division
+        # 🔴 survivor v2 六鍵（UAT B17 2026-09-02，票 `G3-D14`）：條件 IC run 之 `build_survivor_output` 對此 fail-closed；
+        #    B10 五階段路徑繞過 `ic_feed.build_event_ic_inputs` 也繞掉了它的 event_context ⇒ 補由同一模組之
+        #    `event_context_from_windows`（經 pipeline 出口）產生，不在 service 自寫 hash。
+        event_context = pipeline.event_context_for_analysis(prepared1, records)
         return {
             "purge_ms": int(purge_ms),
             "purge_rows": int(purge_rows),
             "event_timestamps": sorted(ts_map),
             "event_label_values": ts_map,
+            "event_context": event_context,
             "prepared": prepared1,
             "purge": purge,
             "analysis_alignment_receipt_hash": prepared1.analysis_alignment_receipt_hash,
@@ -673,6 +678,7 @@ class ICAnalysisService:
                 # 🔴 **只在 `event_import_id` 存在時進入**——這個 guard 就是 over 向的保護：
                 #    cross-sectional（上方分支）與純特徵 longitudinal 都不會走到這裡。
                 event_label_values = None
+                event_context = None
                 event_timestamps = request.event_timestamps or None
                 if request.event_import_id:
                     if event_batch is None:
@@ -687,6 +693,7 @@ class ICAnalysisService:
                     )
                     event_timestamps = staged["event_timestamps"]
                     event_label_values = staged["event_label_values"]
+                    event_context = staged["event_context"]
                     # 🔴 階段 4 **真的套用**（`CODEX-R1-P1-02`：原本只算不用）：
                     #    把 per-symbol purge 下界換算成列數後注入 IC 切分器之 `embargo`。
                     #    只在**現行值較小**時提高——不得因為事件分析而放寬既有設定。
@@ -713,6 +720,7 @@ class ICAnalysisService:
                     kline_reader=kline_reader,
                     event_timestamps=event_timestamps,
                     event_label_values=event_label_values,
+                    event_context=event_context,
                 )
 
             with self._lock:

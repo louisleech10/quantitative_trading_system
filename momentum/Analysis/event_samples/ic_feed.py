@@ -31,6 +31,49 @@ from momentum.Analysis.event_samples.lookahead_gate import LookaheadGate, capabi
 from momentum.Analysis.event_samples.types import AlignmentReceipts, EventManifest, EventSplitPlan
 
 
+#: survivor v2 六鍵之三條規則字面——**唯一定義處**（`build_event_ic_inputs` 與 `event_context_from_windows` 共用）。
+DECISION_TIME_RULE = "t0_open_minus_k_bars"
+FEATURE_CUTOFF_RULE = "max_close_ms_le_decision_at"
+
+
+def label_window_rule_of(label_definition: Dict) -> str:
+    return f"{label_definition.get('label_return_mode')}:horizon_bars={label_definition['window']['horizon_bars']}"
+
+
+def event_context_from_windows(
+    windows,
+    *,
+    label_definition: Dict,
+    control_kind: str,
+) -> Dict[str, str]:
+    """survivor v2 六鍵 `event_context`——**分析時路徑**（GAP-3 UX Task 7.0b 五階段）之唯一實作。
+
+    `build_event_ic_inputs`（匯入端表格鏈）以 manifest 表算 `event_manifest_hash`；分析時路徑沒有 manifest 表，
+    改以對齊後之 `WindowRow`（`event_id`／`label_start_ms`／`label_end_ms`，按 `event_id` 排序）當事件集合身分。
+    兩者之 rule 字面共用上方常數，不得各寫一份（UAT B17 2026-09-02：五階段路徑漏掉 event_context ⇒
+    `build_survivor_output` fail-closed「conditional_ic run requires event_context」）。
+    """
+    rows = sorted(
+        ({"event_id": str(w.event_id), "label_start_ms": int(w.label_start_ms), "label_end_ms": int(w.label_end_ms)}
+         for w in windows),
+        key=lambda r: r["event_id"],
+    )
+    if not rows:
+        raise ValueError("event_context_from_windows: 沒有任何窗（空事件集合不得產生 event_context）")
+    if not isinstance(label_definition, dict) or "window" not in label_definition:
+        raise ValueError("event_context_from_windows: label_definition 須含 window")
+    manifest_hash = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    ld_canon = json.dumps(label_definition, sort_keys=True, separators=(",", ":"))
+    return {
+        "event_manifest_hash": manifest_hash,
+        "label_definition_hash": hashlib.sha256(ld_canon.encode("utf-8")).hexdigest(),
+        "decision_time_rule": DECISION_TIME_RULE,
+        "feature_cutoff_rule": FEATURE_CUTOFF_RULE,
+        "label_window_rule": label_window_rule_of(label_definition),
+        "control_kind": str(control_kind),
+    }
+
+
 def build_event_ic_inputs(
     manifest: EventManifest,
     event_split_plan: Optional[EventSplitPlan],
@@ -103,9 +146,9 @@ def build_event_ic_inputs(
     event_context = {
         "event_manifest_hash": manifest_hash,
         "label_definition_hash": hashlib.sha256(lds.iloc[0].encode("utf-8")).hexdigest(),
-        "decision_time_rule": "t0_open_minus_k_bars",
-        "feature_cutoff_rule": "max_close_ms_le_decision_at",
-        "label_window_rule": f"{ld.get('label_return_mode')}:horizon_bars={ld['window']['horizon_bars']}",
+        "decision_time_rule": DECISION_TIME_RULE,
+        "feature_cutoff_rule": FEATURE_CUTOFF_RULE,
+        "label_window_rule": label_window_rule_of(ld),
         "control_kind": str(cks.iloc[0]),
     }
     return {
