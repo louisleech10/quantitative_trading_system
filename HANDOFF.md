@@ -15,6 +15,7 @@
 | `G3-D14` | **CLOSED（2026-09-02 晚，UAT B17）**：D13 之後條件 IC 真跑，survivor 落檔要 v2 六鍵 `event_context`，五階段路徑沒產 ⇒ fail-closed。補 `ic_feed.event_context_from_windows`（唯一實作）→ pipeline 出口 → `analyze(event_context=)`；10i 測試加六鍵斷言 |
 | `G3-D15` | **CLOSED（2026-09-02 晚）**：`/ic/summary` 對 degraded run（`icir` 全 None）排序 `None < None` ⇒ 500；非有限值排最後＋測試 |
 | `G3-D16` | **CLOSED（2026-09-02 晚）**：`/ic-analysis` refilter 無限迴圈（effect 依賴 `report`，refilter 回寫 report）；抽 `useAutoRefilter` 只看門檻鍵＋hook 測試 |
+| `G3-D17` | **CLOSED（2026-09-02 晚）**🔴 正確性：多 symbol 事件批對單一 run 以時戳映射 ⇒ 跨 symbol 污染；改只餵同 symbol、他 symbol 具名排除（`events_excluded_by_symbol`）、全空 loud；測試。B18–B20 使用者驗過 OK |
 
 ## 這條 epic 最終落地了什麼（細節＝`docs/GAP3UX_IMPL_HANDOFF.md` §1／§1b／§2）
 - `/search` 匯出面板：篩選整區拆除；答案窗宣告框（與匯入頁同一元件／validator／守衛形狀）；預設候選只取勾選之附帶欄、系統預填與使用者明填分開記；preview 重取失敗即作廢。

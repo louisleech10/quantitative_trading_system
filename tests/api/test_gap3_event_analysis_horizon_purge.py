@@ -237,6 +237,63 @@ def test_event_analysis_horizon_purge_12_import_id_enables_event_filter():
     assert enabled(ICAnalyzeRequest(symbol="ETHUSDT", timeframe="12h")) is False
 
 
+# ── G3-D17（UAT 2026-09-02）：多 symbol 事件批對單一 feature run ⇒ 只餵同 symbol，他 symbol 具名排除 ──
+
+def test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly(monkeypatch):
+    """BTCUSDT 與 ETHUSDT 同 t0 之事件、run 為 ETHUSDT ⇒ 只餵 ETH；BTC 計入 `events_excluded_by_symbol`；
+    不得再拋「映射到同一個 feature 列」（那是跨 symbol 撞時戳，不是重複事件）。
+    over 向：全批都是他 symbol ⇒ loud ValueError（不產空表）。
+    """
+    from api.services import ic_analysis_service as svc
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id
+    from tests.momentum.event_samples.helpers import load_bars, make_event
+
+    eth = load_bars("ETHUSDT", ("12h",))
+    bars = {**eth, "BTCUSDT": eth["ETHUSDT"]}          # BTC 借 ETH 的 bars：只驗接線，不驗數值
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "bars_from_kline_cache",
+        staticmethod(lambda symbols, timeframes, **kw: bars),
+    )
+    t0a, t0b = T0 + 100 * H12_MS, T0 + 110 * H12_MS
+    eth_a = make_event(0, t0=t0a, label=1, direction="long")
+    eth_b = make_event(1, t0=t0b, label=0, direction="long")
+    btc_a = dict(make_event(2, t0=t0a, label=1, direction="long"), symbol="BTCUSDT")
+    btc_a["event_id"] = canonical_event_id("BTCUSDT", "12h", t0a)
+    records = [eth_a, eth_b, btc_a]
+    batch = {
+        "records": records,
+        "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": "trigger_close",
+                             "label_return_mode": "close_to_close", "decision_offset_bars": 0},
+        "lookahead_bars_declared": {"12h": 0},
+    }
+
+    class _Req:
+        event_import_id = "imp-multi"
+        event_timestamps = None
+        timeframe = "12h"
+        symbol = "ETHUSDT"
+
+    out = svc.ICAnalysisService._run_event_label_stages(
+        _Req(), batch,
+        features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5", meta_path=None,
+    )
+    assert out["events_excluded_by_symbol"] == {"BTCUSDT": 1}
+    cutoff_to_eid = {p.feature_cutoff_ms: p.event_id for p in out["prepared"].per_tf}
+    fed = {cutoff_to_eid[ts] for ts in out["event_timestamps"]}
+    assert fed == {eth_a["event_id"], eth_b["event_id"]}, fed   # 只有 ETH 兩筆；BTC 同 t0 者不在、也不撞列
+    assert btc_a["event_id"] not in fed
+
+    class _ReqBtc(_Req):
+        symbol = "BCHUSDT"                              # 批內沒有這個 symbol ⇒ 一筆都不剩
+
+    with pytest.raises(ValueError, match="沒有任何 symbol"):
+        svc.ICAnalysisService._run_event_label_stages(
+            _ReqBtc(), batch,
+            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5", meta_path=None,
+        )
+
+
 # ── ⑩(i) single-pass：prepare 只被呼叫一次 ──────────────────────────────────
 
 def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):

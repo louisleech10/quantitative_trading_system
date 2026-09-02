@@ -432,10 +432,20 @@ class ICAnalysisService:
             )
 
         # 🔴 `label_value is None`（尾端不足）之 eid **不進 IC**，且**不填 0**。
+        # 🔴 UAT（2026-09-02，票 `G3-D17`）：IC 分析對象是**單一 feature run**（`request.symbol`/`timeframe`），
+        #    多 symbol 事件批（例：BTCUSDT＋ETHUSDT 同 t0）若一律以時間戳映射，BTC 事件會被拿 ETH 的特徵列來算
+        #    ——跨 symbol 污染；同一時間戳兩個 symbol 還會撞成「映射到同一列」的誤導訊息。
+        #    規則：只餵 **symbol == run symbol** 的事件；其他 symbol 之事件**具名排除**（計數與 symbol 清單進 receipt／task_info，
+        #    log 警告），一筆都不剩 ⇒ loud。跨 symbol 合併分析屬 registry #4（Pooled/Panel IC）之範圍，本路徑不做。
+        run_symbol = str(getattr(request, "symbol", "") or "") or None
+        excluded_by_symbol: Dict[str, int] = {}
         per_tf = {(p.event_id, p.timeframe): p.feature_cutoff_ms for p in prepared1.per_tf}
         ts_map: Dict[int, float] = {}
         owner: Dict[int, str] = {}
         for w in prepared1.windows:
+            if run_symbol is not None and str(w.symbol) != run_symbol:
+                excluded_by_symbol[str(w.symbol)] = excluded_by_symbol.get(str(w.symbol), 0) + 1
+                continue
             value = result.label_values.get(w.event_id)
             if value is None:
                 continue
@@ -452,11 +462,21 @@ class ICAnalysisService:
             #    我這條路徑繞過了 `ic_feed` 就把那道保護一起繞掉了。
             if key in owner:
                 raise ValueError(
-                    f"事件 {owner[key]} 與 {w.event_id} 映射到同一個 feature 列 {key}"
+                    f"事件 {owner[key]} 與 {w.event_id}（同 symbol {run_symbol or w.symbol}）映射到同一個 feature 列 {key}"
                     "（禁默默覆蓋；請先 dedupe）"
                 )
             owner[key] = w.event_id
             ts_map[key] = float(value)
+        if excluded_by_symbol:
+            logger.warning(
+                "事件批 %s：%d 筆事件之 symbol 不是本次 run 的 %s，已排除（%s）——跨 symbol 合併分析屬 Pooled/Panel IC 票，本路徑不做",
+                request.event_import_id, sum(excluded_by_symbol.values()), run_symbol, excluded_by_symbol,
+            )
+        if not ts_map:
+            raise ValueError(
+                f"事件批 {request.event_import_id!r} 沒有任何 symbol == {run_symbol!r} 且有 label_value 的事件可餵進 IC"
+                f"（排除之 symbol：{excluded_by_symbol or '無'}）——請選同 symbol 的 feature run 或拆批"
+            )
 
         # 階段 4 之**實際套用**：各 symbol 下界一致（上面已 fail-closed 擋掉不一致），
         # 換算成 IC 切分器要的**列數**（無條件進位——不足一列也要整列擋住）。
@@ -479,6 +499,7 @@ class ICAnalysisService:
             "event_timestamps": sorted(ts_map),
             "event_label_values": ts_map,
             "event_context": event_context,
+            "events_excluded_by_symbol": dict(excluded_by_symbol),
             "prepared": prepared1,
             "purge": purge,
             "analysis_alignment_receipt_hash": prepared1.analysis_alignment_receipt_hash,
@@ -709,6 +730,8 @@ class ICAnalysisService:
                                 "analysis_alignment_receipt_hash"
                             ]
                             info["prepared_token"] = staged["prepared_token"]
+                            # G3-D17：被排除的他 symbol 事件計數（loud，不靜默）
+                            info["events_excluded_by_symbol"] = staged["events_excluded_by_symbol"]
 
                 report = await asyncio.to_thread(
                     analyzer.analyze,

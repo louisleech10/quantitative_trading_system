@@ -608,7 +608,11 @@ JSON 直傳（B7／B8 那條）沒有這個框，就直接用檔內每筆帶的�
 ⑥ 跑完後紅字「'&lt;' not supported between instances of 'NoneType' and 'NoneType'」＝摘要 API 對「每個特徵 icir 都是 None」
 的 degraded 結果排序時炸掉（票 <code>G3-D15</code>，已修；再重啟後端）。結果本身沒壞。
 ⑦ 你看到 log「一直重複跳同樣訊息」＝前端在無限重篩（每 0.6 秒打一次 refilter、後端每次重新落檔；票 <code>G3-D16</code>，已修）。
-前端是 dev server 會熱更新，不用重啟；重新整理頁面即可。</p>
+前端是 dev server 會熱更新，不用重啟；重新整理頁面即可。
+⑧ 你選 BTC＋ETH 那批（<code>…4d6d6f5d</code>，99 筆）出現「BTCUSDT… 與 ETHUSDT… 映射到同一個 feature 列」——那不是重複事件，是<strong>跨 symbol 撞時戳</strong>
+（票 <code>G3-D17</code>，正確性缺陷，已修）：IC 分析對象是單一 feature run（ETHUSDT 12h），以前 BTC 事件會被拿 ETH 的特徵來算。
+現在只餵同 symbol 的事件，其他 symbol 具名排除（後端 log 會警告、任務狀態帶 <code>events_excluded_by_symbol</code>）；
+全批都不是這個 symbol 時直接擋。<strong>重啟後端</strong>後再選那批：應跑完，只算 ETH 的那些事件。跨 symbol 合併分析是另一張票（Pooled IC）。</p>
 </blockquote>
 <h3 id="b13-切到事件模式-ok">B13 ── 切到事件模式 [OK]</h3>
 <p><strong>你做什麼</strong>：開 <code>/ic-analysis</code>，分析模式選「Event-Driven 模式」。</p>
@@ -676,7 +680,7 @@ JSON 直傳（B7／B8 那條）沒有這個框，就直接用檔內每筆帶的�
 <p><strong>不是這樣代表什麼</strong>：如果全體組給了一張空表（全是 0 或 <code>—</code>）而不是原因，那是錯的
 ——空表會讓你以為「算出來就是 0」。</p>
 <hr />
-<h3 id="b17-條件-ic-真的算得出來這是本批補的洞">B17 ── 條件 IC 真的算得出來（<strong>這是本批補的洞</strong>）</h3>
+<h3 id="b17-條件-ic-真的算得出來這是本批補的洞ok">B17 ── 條件 IC 真的算得出來（<strong>這是本批補的洞</strong>）[OK]</h3>
 <p><strong>你做什麼</strong>：在同一批上跑分析（B15 那次就算）。畫面上<strong>沒有</strong>一段叫「條件 IC」——事件模式下，
 IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由分析當下產生）。要確認它「真的是條件 IC而不是全樣本 IC」，
 看結果 JSON 的機械標記：分析頁結果區的<strong>匯出按鈕 → JSON</strong>（下載完整報告；或直接開
@@ -730,7 +734,7 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <p><strong>如果顯示 <code>unavailable：missing_label_value</code></strong>：代表你用的是<strong>手動 CSV 匯入</strong>而且沒帶答案欄
 ——那是正常的（系統只照抄你給的），不是缺陷。</p>
 <hr />
-<h3 id="b18-特徵-run-沒涵蓋事件期會被擋新的">B18 ── 特徵 run 沒涵蓋事件期會被擋（<strong>新的</strong>）</h3>
+<h3 id="b18-特徵-run-沒涵蓋事件期會被擋新的ok">B18 ── 特徵 run 沒涵蓋事件期會被擋（<strong>新的</strong>）[OK]</h3>
 <p><strong>你做什麼</strong>（樣本事件全在 2024-07 之後，所以這兩個 run 剛好一擋一放）：</p>
 <p><strong>先試「應該被擋」那側</strong>——選 ETHUSDT 12h、config_hash 開頭 <strong><code>be993398</code></strong> 的 run
 （它只涵蓋到 <strong>2024-06-25</strong>），按開始分析。</p>
@@ -740,7 +744,7 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <p>🔴 <strong>兩個方向都要試</strong>——只試前者的話，一個「永遠擋」的實作也會看起來正常。</p>
 <p>🔴 <strong>兩個方向都要試</strong>——只試前者的話，一個「永遠擋」的實作也會看起來正常。</p>
 <hr />
-<h3 id="b19-特徵太多會在啟動前被擋新的">B19 ── 特徵太多會在啟動前被擋（<strong>新的</strong>）</h3>
+<h3 id="b19-特徵太多會在啟動前被擋新的ok">B19 ── 特徵太多會在啟動前被擋（<strong>新的</strong>）[OK]</h3>
 <p><strong>你做什麼</strong>：選任何一個 <strong>161k／218k／437k</strong> 的 run（都超過上限 <strong>80,515</strong>），按開始分析。</p>
 <p><strong>應該看到</strong>：<strong>在任務啟動之前</strong>就被擋下來，訊息會告訴你：
 這個 run 有幾個特徵、上限是多少、為什麼擋（記憶體會爆）、
@@ -748,7 +752,7 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <p>🔴 <strong>訊息不應該叫你「去縮減特徵數」</strong>——系統沒有提供那個介面，那樣講等於指路到死巷。</p>
 <p><strong>這一項你手上有現成樣本，不能跳過。</strong></p>
 <hr />
-<h3 id="b20-切回全域模式">B20 ── 切回全域模式</h3>
+<h3 id="b20-切回全域模式-ok全域ic還沒驗收過">B20 ── 切回全域模式 [OK,全域IC還沒驗收過]</h3>
 <p><strong>你做什麼</strong>：分析模式切回「Global」。</p>
 <p><strong>應該看到</strong>：事件下拉與所有事件專屬區塊消失；全域分析照常運作、結果與以前一致。</p>
 <hr />
@@ -765,12 +769,12 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <tbody>
 <tr>
 <td>B1 搜尋與匯出面板</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B2 篩選與筆數</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
@@ -780,87 +784,87 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 </tr>
 <tr>
 <td>B4 七項揭露（含逐週期）</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B5 匯出兩個檔（<strong>不含</strong> <code>label_value</code>）</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B6 IC decay 邊界說明</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B7 JSON 匯入（僅驗證＋逐列拒收）</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B8 真的匯入</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B9 CSV 逐欄對映（三種違規）</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B10 答案窗宣告</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B11 舊格式雙向擋</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B12 刪除一批（含殘留檢查）</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B13 切事件模式</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B14 事實 vs 參數兩區</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B15 參數不回寫</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B16 三組報酬表</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B17 條件 IC 算得出來</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B18 run 涵蓋期雙向</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B19 特徵數上限</td>
-<td>☐</td>
+<td>OK</td>
 <td></td>
 </tr>
 <tr>
 <td>B20 切回全域</td>
-<td>☐</td>
+<td>OK,全域IC還沒驗收過</td>
 <td></td>
 </tr>
 </tbody>
