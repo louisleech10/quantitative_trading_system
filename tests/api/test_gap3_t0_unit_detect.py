@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.services import case_import_service as svc_mod
 from momentum.factories import create_event_sample_pipeline
+from tests.api._gap3_declaration import declaration_for_timeframes
 from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
 client = TestClient(app)
@@ -107,7 +108,8 @@ def test_gap3_t0_unit_detect_shared_by_csv_mapping_path(_isolated_storage):
     r = client.post(
         "/api/v1/case/import-events/csv",
         files={"file": ("mine.csv", io.BytesIO(csv.encode("utf-8")), "text/csv")},
-        data={"column_mapping": json.dumps(mapping, ensure_ascii=False), "batch_defaults": json.dumps(defaults)},
+        data={"column_mapping": json.dumps(mapping, ensure_ascii=False), "batch_defaults": json.dumps(defaults),
+              "lookahead_declaration": declaration_for_timeframes(["12h"])},   # R 重開：一律須宣告
     )
     assert r.status_code == 200, r.text
     det = client.get(f"/api/v1/case/events/{r.json()['import_id']}").json()

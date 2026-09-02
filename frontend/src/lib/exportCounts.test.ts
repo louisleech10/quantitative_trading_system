@@ -1,13 +1,11 @@
 /**
- * GAP-3 UX Task 2.3 驗收（`npm --prefix frontend test -- --run exportCounts`）。
+ * GAP-3 UX Task 1.5／4.1b 之筆數計算驗收（`npm --prefix frontend test -- --run exportCounts`）。
  *
- * 判準字面之唯一來源＝SPEC L1880–1891「驗證」欄：
- * ①`N + 被濾掉數 == M`；②`X + Y == N`。**不得以估算值**。
+ * R 重開（SPEC D-8）：匯出前篩選退役 ⇒ 本函式不再接條件；守恆式改為
+ * `X + Y + droppedUnreadableLabel == M` 且 `N == X + Y`。**不得以估算值**。
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { computeExportCounts, searchRowLabel } from '@/lib/exportCounts';
-import * as exportCountsModule from '@/lib/exportCounts';
-import * as exportFilterModule from '@/lib/exportFilter';
 
 const ROWS = [
   { price_change: 3.2, positive_case: true },
@@ -15,61 +13,40 @@ const ROWS = [
   { price_change: 5.5, positive_case: true },
   { price_change: 0.4, positive_case: false },
   { price_change: 7.7, positive_case: true },
-  { price_change: 2.0, positive_case: null },      // 沒有標記 ⇒ 不會被匯出
+  { price_change: 2.0, positive_case: null },      // 沒有標記 ⇒ 不進事件 JSON
 ];
 
-describe('Task 2.3 即時筆數', () => {
-  it('① N + 被濾掉數 == M（含條件與不含條件兩種）', () => {
-    const none = computeExportCounts(ROWS, []);
-    expect(none.N + none.filteredOut).toBe(none.M);
-    expect(none.M).toBe(6);
-
-    const filtered = computeExportCounts(ROWS, [{ column: 'price_change', op: '>=', value: 2.0 }]);
-    expect(filtered.N + filtered.filteredOut).toBe(filtered.M);
-    // 手算：≥2 者為 3.2／5.5／7.7／2.0 共 4 筆；其中 2.0 無標記不匯出 ⇒ N = 3
-    expect(filtered.droppedByFilters).toBe(2);
-    expect(filtered.droppedUnreadableLabel).toBe(1);
-    expect(filtered.N).toBe(3);
-  });
-
-  it('② X + Y == N（無標記者不塞進 X 或 Y，而是單獨計數並排除）', () => {
-    const c = computeExportCounts(ROWS, []);
-    expect(c.X + c.Y).toBe(c.N);
+describe('匯出筆數（無篩選）', () => {
+  it('① X + Y + 無法判讀 == M；N == X + Y', () => {
+    const c = computeExportCounts(ROWS);
+    expect(c.M).toBe(6);
     expect(c.X).toBe(3);
     expect(c.Y).toBe(2);
-    expect(c.N).toBe(5);                 // 6 列裡有 1 列沒標記
     expect(c.droppedUnreadableLabel).toBe(1);
+    expect(c.X + c.Y + c.droppedUnreadableLabel).toBe(c.M);
+    expect(c.N).toBe(c.X + c.Y);
   });
 
-  it('③ 不是估算：逐列改動後數字要跟著逐一改變（抽樣推估會在這裡失準）', () => {
-    for (let cut = -2; cut <= 8; cut += 1) {
-      const c = computeExportCounts(ROWS, [{ column: 'price_change', op: '>=', value: cut }]);
-      const manual = ROWS.filter((r) => r.price_change >= cut);
-      expect(c.droppedByFilters).toBe(ROWS.length - manual.length);
-      expect(c.X).toBe(manual.filter((r) => r.positive_case === true).length);
-      expect(c.Y).toBe(manual.filter((r) => r.positive_case === false).length);
-      expect(c.X + c.Y).toBe(c.N);
-      expect(c.N + c.filteredOut).toBe(c.M);
+  it('② 不是估算：逐列改動後數字要跟著逐一改變', () => {
+    for (let k = 0; k <= ROWS.length; k += 1) {
+      const rows = ROWS.slice(0, k);
+      const c = computeExportCounts(rows);
+      expect(c.M).toBe(k);
+      expect(c.X).toBe(rows.filter((r) => r.positive_case === true).length);
+      expect(c.Y).toBe(rows.filter((r) => r.positive_case === false).length);
+      expect(c.X + c.Y + c.droppedUnreadableLabel).toBe(c.M);
     }
   });
 
-  it('④ 空輸入不報錯，四個數字皆為 0', () => {
-    expect(computeExportCounts([], [])).toEqual({
-      N: 0, M: 0, X: 0, Y: 0, filteredOut: 0,
-      keptByFilters: 0, droppedByFilters: 0, droppedUnreadableLabel: 0,
-    });
+  it('③ 空輸入不報錯，數字皆為 0', () => {
+    expect(computeExportCounts([])).toEqual({ N: 0, M: 0, X: 0, Y: 0, droppedUnreadableLabel: 0 });
   });
 
-  it('④b 🔴 CSV 筆數（通過條件者）與事件 JSON 筆數（N）在有無標記列時本就不同', () => {
-    const c = computeExportCounts(ROWS, []);
-    expect(c.keptByFilters).toBe(6);       // 六列都通過（無條件）⇒ CSV 六筆
+  it('④ 🔴 CSV 筆數（M）與事件 JSON 筆數（N）在有無標記列時本就不同', () => {
+    const c = computeExportCounts(ROWS);
+    expect(c.M).toBe(6);                   // CSV 帶全部列（未標記者 label 留空）
     expect(c.N).toBe(5);                   // 其中一列沒標記 ⇒ 事件 JSON 五筆
-    expect(c.keptByFilters - c.N).toBe(c.droppedUnreadableLabel);
-
-    const filtered = computeExportCounts(ROWS, [{ column: 'price_change', op: '>=', value: 2.0 }]);
-    expect(filtered.keptByFilters).toBe(4);
-    expect(filtered.N).toBe(3);
-    expect(filtered.keptByFilters - filtered.N).toBe(filtered.droppedUnreadableLabel);
+    expect(c.M - c.N).toBe(c.droppedUnreadableLabel);
   });
 
   it('⑤ 判讀規則：true／1 為正、false／0 為反，其餘不猜', () => {
@@ -81,17 +58,12 @@ describe('Task 2.3 即時筆數', () => {
     expect(searchRowLabel({})).toBe(null);
   });
 
-  it('⑥ 計數確實走 Task 2.1 之同一支篩選實作（呼叫探針＋餵入內容）', () => {
-    // 🔴 §6.2：不用「原始碼裡有出現 applyExportFilters」這種形狀斷言，
-    //    改以執行期探針證明它**真的被呼叫**、而且**餵進去的是那些條件**。
-    const spy = vi.spyOn(exportFilterModule, 'applyExportFilters');
-    try {
-      const conditions = [{ column: 'price_change', op: '>=' as const, value: 1 }];
-      exportCountsModule.computeExportCounts(ROWS, conditions);
-      expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy.mock.calls[0][1]).toBe(conditions);
-    } finally {
-      spy.mockRestore();
-    }
+  it('⑥ 自訂判讀器（Task 1.5 之 CSV 儲存格路徑）走同一套守恆式', () => {
+    const cells = ['1', '0', '', 'x', '1'].map((cell) => ({ cell }));
+    const c = computeExportCounts(cells, (row) => {
+      const s = String((row as { cell: string }).cell).trim();
+      return s === '1' ? true : s === '0' ? false : null;
+    });
+    expect(c).toEqual({ N: 3, M: 5, X: 2, Y: 1, droppedUnreadableLabel: 2 });
   });
 });

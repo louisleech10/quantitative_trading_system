@@ -26,6 +26,7 @@ from momentum.Analysis.event_samples.import_contract import (
     flatten_receipt_schema,
     load_event_import_contract,
 )
+from tests.api._gap3_declaration import declaration_for_timeframes
 from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
 client = TestClient(app)
@@ -74,6 +75,8 @@ def _post(content: bytes, *, confirmed_at=CONFIRMED_AT, mapping=None,
     data = {
         "column_mapping": json.dumps(MAPPING if mapping is None else mapping, ensure_ascii=False),
         "batch_defaults": json.dumps(_defaults()),
+        # R 重開（Task 1.11）：全部批次一律須宣告；本檔不測宣告本身
+        "lookahead_declaration": declaration_for_timeframes(["12h"]),
     }
     if confirmed_at is not None:
         data["mapping_confirmed_at"] = confirmed_at

@@ -12,6 +12,7 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareFromPreview, previewOf } from '@/test/lookaheadDeclarationTestUtils';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import type { CaseData, SearchResultData } from '@/lib/types';
@@ -21,7 +22,7 @@ const buildRecordsMock = vi.fn();
 
 vi.mock('@/lib/api', async (orig) => {
   const actual = await orig<typeof import('@/lib/api')>();
-  return { ...actual, fetchLookaheadDepth: (...a: unknown[]) => depthMock(...a) };
+  return { ...actual, fetchLookaheadDeclarationPreviewColumns: (...a: unknown[]) => depthMock(...a) };
 });
 
 vi.mock('@/lib/eventExport', async (orig) => {
@@ -42,7 +43,7 @@ beforeEach(() => {
     } as unknown as SearchResultData,
     isLoading: false, error: null,
   });
-  depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
+  depthMock.mockResolvedValue(previewOf({ '1h': 2 }));
   buildRecordsMock.mockResolvedValue({
     records: [], skipped: [], n_cases: 0, n_records: 0,
     source_file_digest: 'a'.repeat(64), source_file_text: '[]',
@@ -65,7 +66,7 @@ describe('Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度
     render(<SearchPage />);
     await waitFor(() => expect(screen.getByTestId('export-event-dimensions')).toBeTruthy());
     // 就緒訊號＝深度已回、揭露區已逐 tf 顯示（無篩選條件時不會出現 `export-lower-bound`）
-    await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
+    await declareFromPreview();
     // 改動「唯一在 /search 上有多個可選值」之維度 ⇒ 「有傳」與「寫死預設」在這一格可分辨
     fireEvent.change(screen.getByTestId('event-dim-control_kind'), { target: { value: 'user_labeled_other' } });
     fireEvent.click(screen.getByTestId('export-gap3-events'));
@@ -82,7 +83,7 @@ describe('Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度
     // 原缺陷：`min`／`max` 只是提示，`fireEvent.change` 送得進去，而組裝器只擋 `k < 契約 min`
     // ⇒ UI 文案說「鎖定為 0」而匯出檔裡是 3。修法為 `readOnly` ＋ `onChange` clamp 兩層。
     render(<SearchPage />);
-    await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
+    await declareFromPreview();
     const k = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
     expect(k.readOnly).toBe(true);                       // 第一層：使用者改不動
     fireEvent.change(k, { target: { value: '3' } });     // 第二層：程式化設值也要被夾回
@@ -95,7 +96,7 @@ describe('Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度
   it('🔴 over：使用者不動 UI ⇒ 五鍵仍逐一傳出，且值等於 Task 7.0 之預設（不得因此不傳）', async () => {
     render(<SearchPage />);
     // 就緒訊號＝深度已回、揭露區已逐 tf 顯示（無篩選條件時不會出現 `export-lower-bound`）
-    await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
+    await declareFromPreview();
     fireEvent.click(screen.getByTestId('export-gap3-events'));
     await waitFor(() => expect(buildRecordsMock).toHaveBeenCalledTimes(1));
 

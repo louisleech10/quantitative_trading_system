@@ -9,7 +9,6 @@ import type { CaseData } from './types';
 import { canonicalEventId } from './eventId';
 import { ruleDigestOf, ruleSummaryText } from './ruleDigest';
 import { contractDecisionOffsetMin } from './eventDimensions';
-import type { ExportFilterSpec } from './exportFilter';
 
 /** Task 4.1：附帶報酬欄之候選 h（1..12）；預設全選。 */
 export const ATTACHED_HORIZONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -52,9 +51,10 @@ export interface EventExportOptions {
    */
   attachedHorizons?: readonly number[];
   /**
-   * Task 4.1 ③：逐 timeframe 之**真實深度**（後端 `depth_by_timeframe()` 導出之 map）。
+   * Task 4.1 ③：逐 timeframe 之**真實深度**＝使用者於匯出前**宣告**之 `declared_window_bars`
+   * （R 重開 D-8／Task 1.9′：逐鍵複製，**不與任何欄位取 max**；Phase 2 之導出路徑已退役）。
    *
-   * 🔴 前端**不自算**——第二份實作必然漂移（SPEC Task 2.1b）。
+   * 🔴 前端**不推斷**深度——不得由附帶欄或欄名推斷（D-7：偵測不可能）。
    * 🔴 每列之 `label_definition.window.horizon_bars` ＝ `max(1, 本 map[該列 tf])`，
    *    **下限 1 是契約之 serialization floor**；深度 0 時兩者**刻意不相等**（§D-3′-a(i)）。
    * 🔴 **必填**（R1 `CODEX-R1-P1-02`）：Task 4.1 ③要求匯出檔必帶該宣告；
@@ -94,15 +94,6 @@ export interface EventExportOptions {
   sourceFileText: string;
   /** 後端算好的 `source_file_digest`（`sha256(sourceFileText)`）。 */
   sourceFileDigest: string;
-  /**
-   * GAP-3 UX Task 2.2：匯出前篩選條件，寫進 `label_definition.filters`（契約已登記之欄）。
-   *
-   * 🔴 **不得納入 `event_id` 之輸入**（D-2：同事件跨批 id 必須相同）。
-   * 🔴 形狀之唯一定義來源＝契約 `label_definition.fields.filters.wire_shape`；
-   *    由 `exportFilter.buildExportFilterSpec()` 產生，本檔不自訂形狀。
-   * 無條件時傳 `null`／不傳 ⇒ **不寫該鍵**（`filters` 存在與否本身有語意）。
-   */
-  filters?: ExportFilterSpec | null;
   /**
    * 🔴 **可回灌 CSV 專用**（2026-09-01 使用者裁定）：把**沒有正反例標記**的列也產出來，
    * 其 `label` 為 `null`（CSV 落成空欄）。
@@ -321,9 +312,8 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
         window: { horizon_bars: windowHorizonBarsFor(rowTimeframe, declaredMap) },
         // 🔴 Task 7.0：**巢狀**路徑（`label_definition.label_return_mode`），刻意不放頂層。
         label_return_mode: opts.labelReturnMode ?? EVENT_EXPORT_LABEL_RETURN_MODE,
-        // Task 2.2：條件為空時**不寫該鍵**（`filters` 存在與否本身有語意——後端 L2 據此判斷有無條件）。
-        // 🔴 `event_id` 於本物件**之外**產生（見上），故篩選條件不可能進入 ID 之輸入（D-2）。
-        ...(opts.filters ? { filters: opts.filters } : {}),
+        // 🔴 R 重開（SPEC D-8）：Phase 2 退役 ⇒ 匯出端**不再寫** `label_definition.filters`
+        //    （契約鍵保留、匯入端接受缺鍵）；正反例判定在系統外完成，深度由宣告承載。
       },
       control_kind: opts.controlKind ?? EVENT_EXPORT_CONTROL_KIND,
       source_file_digest: sourceDigest,

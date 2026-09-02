@@ -24,7 +24,6 @@ export interface EventLabelRow { event_id: string; label: 0 | 1 }
 export interface EventDepthRow {
   timeframe: string;
   bars: number;
-  referencedColumns: readonly string[];
 }
 
 function isoOf(ms: number): string {
@@ -73,9 +72,10 @@ export const EVENT_FIELD_FORMATTERS = {
    * lookahead 深度：顯示 `lookahead_bars_declared`（**真實深度**），
    * **不是** `window.horizon_bars`——後者有下限 1 之 floor，深度 0 會被顯示成 1（§D-3′-a(i)）。
    */
+  // 🔴 R 重開（SPEC D-8／Task 1.9′）：深度來源＝**你在匯出前宣告的值**（正反例判定所用之最遠者），
+  //    不再由篩選條件引用欄導出（Phase 2 退役）；本行**禁**殘留對 `exportFilters` 之讀取。
   lookahead_depth: (row: EventDepthRow): string =>
-    `lookahead 深度（${row.timeframe}）＝ ${row.bars} 根，來源＝你的篩選條件引用到的欄位`
-    + (row.referencedColumns.length > 0 ? `：${row.referencedColumns.join('、')}` : '：無（沒有設篩選條件）'),
+    `lookahead 深度（${row.timeframe}）＝ ${row.bars} 根，來源＝你在匯出前宣告的值（正反例判定所用之最遠者）`,
 
   /** purge 下界：公式權威在 §D-3′-a(ii)，本欄**只揭露結果**。 */
   purge_bars: (row: EventDepthRow): string =>
@@ -124,9 +124,8 @@ export interface SearchDisclosureContext {
     label_return_mode: string;
     decision_offset_bars: number | '';
   };
-  /** 逐 timeframe 之真實深度（後端回傳）；空 map ＝ 尚未取得。 */
+  /** 逐 timeframe 之真實深度（＝使用者宣告之 `declared_window_bars`）；空 map ＝ 尚未宣告。 */
   depthByTimeframe: Record<string, number>;
-  referencedColumns: readonly string[];
 }
 
 /**
@@ -166,27 +165,23 @@ export function searchDisclosureLines(
       }];
     case 'lookahead_depth': {
       const tfs = Object.keys(ctx.depthByTimeframe);
-      // 🔴 尚未取得深度**不是**「深度為 0」——顯式講出來，且該狀態下匯出本來就被守衛擋住。
+      // 🔴 尚未宣告**不是**「深度為 0」（0 須明填）——顯式講出來，且該狀態下匯出本來就被守衛擋住。
       if (tfs.length === 0) {
         return [{
           testid: 'export-disclosure-depth-pending',
-          text: 'lookahead 深度：尚未取得（取得前不會讓你匯出）',
+          text: 'lookahead 深度：尚未宣告（宣告前不會讓你匯出）',
         }];
       }
       // 🔴 逐 tf 各一行，不得塌成單一 scalar（§D-3′-a(ii)）
       return tfs.map((tf) => ({
         testid: `export-disclosure-depth-${tf}`,
-        text: f.lookahead_depth({
-          timeframe: tf, bars: ctx.depthByTimeframe[tf], referencedColumns: ctx.referencedColumns,
-        }),
+        text: f.lookahead_depth({ timeframe: tf, bars: ctx.depthByTimeframe[tf] }),
       }));
     }
     case 'purge_bars':
       return Object.keys(ctx.depthByTimeframe).map((tf) => ({
         testid: `export-disclosure-purge-${tf}`,
-        text: f.purge_bars({
-          timeframe: tf, bars: ctx.depthByTimeframe[tf], referencedColumns: ctx.referencedColumns,
-        }),
+        text: f.purge_bars({ timeframe: tf, bars: ctx.depthByTimeframe[tf] }),
       }));
     default:
       // 欄集加了新欄卻沒在此對應 ⇒ **fail-loud**，不靜默少顯示一項（那正是 7.3 要防的）

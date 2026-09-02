@@ -146,16 +146,38 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 <p><strong>不是這樣代表什麼</strong>：如果只看到兩顆按鈕、中間那幾區都沒有，代表你開的是舊版前端——
 重新 <code>npm run dev</code>。</p>
 <hr />
-<h3 id="b2-匯出前篩選與筆數-這一整區即將移除不必驗">B2 ── 匯出前篩選與筆數 ⚠️ <strong>這一整區即將移除，不必驗</strong></h3>
+<h3 id="b2-匯出前篩選與筆數-改成匯出前先填答案窗新的要驗">B2 ── <s>匯出前篩選與筆數</s> → <strong>改成「匯出前先填答案窗」（新的，要驗）</strong></h3>
 <blockquote>
-<p>🔴 <strong>2026-09-02 你已裁定：匯出前篩選整個拿掉。</strong>
-理由是你自己講的：「上傳都有要填答案窗了，那在 /search 的新增條件都不用了吧，
-使用者直接 CSV 篩選就好」。CSV 現在可以回灌（B9-1），在 Excel 篩選本來就更強；
-而答案窗深度改成匯入時直接問你，篩選也就沒有存在的理由了。</p>
-<p><strong>⇒ 這一項現在跳過。</strong> 移除還沒做——9/2 三家委員裁定這要走「<strong>R 重開</strong>」
-（整份規格重審，不是加一份補充修訂），所以畫面上暫時還看得到那一區
-——<strong>看到它不代表沒事，是還沒拆</strong>。</p>
-<p>下面的舊內容保留只為說明「為什麼要拆」，<strong>不是要你照著驗</strong>。</p>
+<p>🔴 <strong>2026-09-02 你裁定匯出前篩選整個拿掉，規格走完 R 重開（三輪審查＋三家蓋章）後，9/2 下午已拆掉。</strong>
+現在 <code>/search</code> 匯出面板上<strong>沒有</strong>「新增條件」，只剩：三個筆數（原 M 筆／正例 X／反例 Y）＋<strong>答案窗宣告框</strong>。
+正反例請在 Excel 裡用 CSV 自己篩（B9-1 那條路），篩完改 <code>label</code> 回灌。</p>
+</blockquote>
+<p><strong>你做什麼</strong>：搜尋有結果後，往下看匯出面板的「答案窗宣告」。</p>
+<p><strong>應該看到</strong>：</p>
+<ul>
+<li>這批結果有幾個 K 線週期就有幾個輸入框（通常一個，例如 <code>1h</code>）</li>
+<li>若你勾了附帶欄（預設 1..12 全勾），框裡<strong>預填 12</strong>，右邊寫「根（檔內最大可用 12）」；
+把附帶欄全部取消勾選 ⇒ 換一批搜尋後框會<strong>留空</strong>（沒有可解析的未來欄時不預填，也<strong>不會</strong>幫你填 0）</li>
+<li>文案明講：填<strong>正例與反例兩邊判定所用之最遠者</strong>；未用任何未來資訊請<strong>明填 0</strong>，留白不算 0</li>
+<li>三個筆數：<code>原 M 筆／你聲明的正例 X／反例 Y</code>；沒有標記的列會另外標出（事件 JSON 不收、CSV 仍含）</li>
+</ul>
+<p><strong>試著違規</strong>：</p>
+<ol>
+<li>把框清空，按「匯出事件契約 JSON」⇒ <strong>被擋</strong>，訊息含「尚未填寫」；<strong>沒有任何檔案被下載</strong></li>
+<li>把數字調到預設以下（例如 12 → 3）但不勾聲明 ⇒ <strong>被擋</strong>；勾了聲明 ⇒ 匯出成功</li>
+<li>填 <code>0</code> 並勾聲明 ⇒ 匯出成功；打開 JSON，每筆 <code>lookahead_bars_declared</code> 是 <code>{&quot;1h&quot;: 0}</code>，
+而 <code>label_definition.window.horizon_bars</code> 是 <code>1</code>（下限 1 是序列化底線，兩者<strong>刻意不相等</strong>）</li>
+<li>填 <code>20</code>（比 12 大）⇒ 直接接受，<code>horizon_bars</code> 是 20</li>
+<li>改變附帶欄勾選 ⇒ 你已填的數字<strong>不變</strong></li>
+</ol>
+<p><strong>不是這樣代表什麼</strong>：</p>
+<ul>
+<li>沒填就能匯出 ⇒ 嚴重缺陷（深度缺失會讓 train/test 隔離寬度變 0）</li>
+<li>留白被當成 0 ⇒ 缺陷（0 必須是你明填的）</li>
+<li>JSON 與 CSV 兩種匯出的 <code>lookahead_bars_declared</code> 不一樣 ⇒ 缺陷</li>
+</ul>
+<blockquote>
+<p>下面的舊內容保留只為說明「為什麼拆」，<strong>不是要你照著驗</strong>。</p>
 </blockquote>
 <hr />
 <p><strong>數字填小數，不是百分比。</strong> 漲幅 3% 填 <code>0.03</code>。
@@ -290,7 +312,7 @@ lookahead 深度 / purge 下界。而且：</p>
 <li><strong>每一行都是活的</strong>：回到 B3 把 <code>control_kind</code> 換一個值，這一區的那一行<strong>當場跟著變</strong></li>
 <li><strong>深度和 purge 是逐個週期各一行</strong>：如果你的結果含 1h 和 12h 兩種週期，
 就會看到 <code>lookahead 深度（1h）＝…</code> 和 <code>lookahead 深度（12h）＝…</code> <strong>兩行</strong>，不是一行</li>
-<li>深度那行會告訴你<strong>來源</strong>是哪幾個欄位（就是你在 B2 設篩選時引用到的欄）</li>
+<li>深度那行寫的是你在 B2 <strong>宣告</strong>的值，來源明講「你在匯出前宣告的值」（篩選已拆，不再從欄位推）；沒填時顯示「尚未宣告（宣告前不會讓你匯出）」</li>
 <li>沒設任何篩選時，深度那行會寫「來源＝…：無（沒有設篩選條件）」</li>
 </ul>
 <p><strong>不是這樣代表什麼</strong>：如果換了設定但那一區文字不動，代表它顯示的是寫死的預設值而不是你的實際設定
@@ -327,7 +349,7 @@ lookahead 深度 / purge 下界。而且：</p>
 <td></td>
 </tr>
 <tr>
-<td><code>label_definition</code>（裡面有 <code>window.horizon_bars</code>、<code>label_return_mode</code>、<code>filters</code>）</td>
+<td><code>label_definition</code>（裡面有 <code>window.horizon_bars</code>、<code>label_return_mode</code>；<strong>沒有</strong> <code>filters</code>）</td>
 <td></td>
 </tr>
 <tr>
@@ -342,8 +364,8 @@ lookahead 深度 / purge 下界。而且：</p>
 </table></div>
 <p>🔴 <strong><code>label_value</code> 不在裡面是對的，不是漏掉</strong>。答案改在 IC 分析當下才算——
 這樣同一批事件可以用不同的答案窗重複分析，不必重新匯出。</p>
-<p><strong>如果你沒設任何篩選條件</strong>：按下去應該會<strong>被擋住</strong>並跳訊息說深度還沒取得——
-等一兩秒再按就會成功。那是刻意的：拿不到深度就不讓你匯出。</p>
+<p><strong>先填答案窗（B2）再按</strong>：沒填就會<strong>被擋住</strong>並跳「尚未填寫」——那是刻意的：沒有深度就不讓你匯出。
+（<code>label_definition</code> 裡<strong>不再有</strong> <code>filters</code>——篩選已拆掉，那個鍵匯出端不寫了。）</p>
 <h3 id="-2026-08-31-你在這一項抓到一個真缺陷已修">🔴 2026-08-31 你在這一項抓到一個真缺陷（已修）</h3>
 <p>你看到的錯誤：</p>
 <blockquote>
@@ -508,12 +530,18 @@ Network 分頁看，應該一片空白）。</p>
 </tr>
 </tbody>
 </table></div>
-<p>下方列出你的條件引用到哪些未來欄。</p>
+<blockquote>
+<p>🔴 <strong>9/2 起每一批都必須宣告</strong>（不再只有「系統算不出深度」時才問）。
+<code>/search</code> 匯出的 CSV／JSON 每筆都帶著你匯出時填的 <code>lookahead_bars_declared</code>；
+回灌時這個框<strong>照樣要填</strong>，填的值以你這次填的為準（和檔內帶的不同時會在警告裡告訴你）。
+JSON 直傳（B7／B8 那條）沒有這個框，就直接用檔內每筆帶的值；整批都沒帶 ⇒ 拒收。</p>
+</blockquote>
 <p><strong>試著違規（只在第一種情況做得到）</strong>：把某個週期的數字<strong>調低</strong>。</p>
 <p><strong>應該看到</strong>：出現一個<strong>必須勾選</strong>的聲明（大意是「我知道這樣可能不可驗證」），不勾就送不出去。</p>
 <p><strong>第二種情況要試的是這個</strong>：什麼都不填直接送出。</p>
 <p><strong>應該看到</strong>：擋下並說「<strong>尚未填寫</strong> 12h 的答案窗」
-—— 🔴 <strong>不應該</strong>看到「須為正整數，目前是 0」。</p>
+—— 🔴 <strong>不應該</strong>看到「須為正整數」；<code>0</code> 現在是<strong>合法值</strong>（表示沒用未來資訊），但要你<strong>自己填</strong>。
+再試：填 <code>0</code> 並勾聲明 ⇒ 收；填 <code>-1</code> ⇒ 擋（須為非負整數）。</p>
 <blockquote>
 <p>2026-09-01 你在這一項回報：「把某個週期的數字調低…沒出現；輸入 0 會出現…須為正整數」。
 原因是你用的 <code>events_mapping.csv</code> 裡沒有任何未來欄 ⇒ 後端給的預設是 <code>0</code>，

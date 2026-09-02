@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from api.main import app
 from api.services import case_import_service as svc_mod
+from tests.api._gap3_declaration import declaration_for_timeframes
 from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
 client = TestClient(app)
@@ -66,7 +67,9 @@ def test_gap3_import_csv_with_nested_json_and_dotted_columns():
          "", ld["rule_id"], ld["canonical_digest"], ld["window"]["horizon_bars"], ld["label_return_mode"], ev2["control_kind"], ev2["source_file_digest"], ev2["data_snapshot_digest"]],
     ]
     csv = ",".join(header) + "\n" + "\n".join(",".join(f'"{c}"' if isinstance(c, str) and c.startswith("{") else str(c) for c in row) for row in rows) + "\n"
-    r = client.post("/api/v1/case/import-events", files={"file": ("ev.csv", csv.encode("utf-8"), "text/csv")}, params={"validate_only": "true"})
+    r = client.post("/api/v1/case/import-events", files={"file": ("ev.csv", csv.encode("utf-8"), "text/csv")},
+                    params={"validate_only": "true"},
+                    data={"lookahead_declaration": declaration_for_timeframes([ev["timeframe"]])})  # R 重開：一律須宣告
     assert r.status_code == 200, r.text
     assert r.json()["n_valid"] == 2
 
@@ -100,8 +103,11 @@ def test_gap3_import_new_schema_on_legacy_endpoint_rejected_explicitly():
 
 def test_gap3_import_mixed_columns_rejected_listing_missing_fields():
     """混合新舊欄（有 event_id/t0/label 但缺 label_definition/control_kind…）⇒ 422 逐列 reason＝missing_required_field 指出缺欄。"""
-    recs = [{"event_id": "e0", "symbol": "ETHUSDT", "timeframe": "12h", "t0": 1704067200000, "label": 1, "Positive_case": 1},
-            {"event_id": "e1", "symbol": "ETHUSDT", "timeframe": "12h", "t0": 1704110400000, "label": 0}]
+    # R 重開（Task 1.11）：JSON 直傳之宣告＝列內 `lookahead_bars_declared`；本條測的是缺欄清單，故帶上
+    recs = [{"event_id": "e0", "symbol": "ETHUSDT", "timeframe": "12h", "t0": 1704067200000, "label": 1, "Positive_case": 1,
+             "lookahead_bars_declared": {"12h": 2}},
+            {"event_id": "e1", "symbol": "ETHUSDT", "timeframe": "12h", "t0": 1704110400000, "label": 0,
+             "lookahead_bars_declared": {"12h": 2}}]
     r = client.post("/api/v1/case/import-events/json", json={"records": recs})
     assert r.status_code == 422
     d = r.json()["detail"]

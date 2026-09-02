@@ -8,6 +8,7 @@
  */
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareFromPreview, previewOf } from '@/test/lookaheadDeclarationTestUtils';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import { EVENT_IC_DECAY_DISCLOSURE } from '@/lib/eventFieldFormatters';
@@ -18,7 +19,7 @@ const depthMock = vi.fn();
 
 vi.mock('@/lib/api', async (orig) => {
   const actual = await orig<typeof import('@/lib/api')>();
-  return { ...actual, fetchLookaheadDepth: (...a: unknown[]) => depthMock(...a) };
+  return { ...actual, fetchLookaheadDeclarationPreviewColumns: (...a: unknown[]) => depthMock(...a) };
 });
 
 const CASE_ROW = {
@@ -46,7 +47,7 @@ beforeEach(() => {
     } as unknown as SearchResultData,
     isLoading: false, error: null,
   });
-  depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
+  depthMock.mockResolvedValue(previewOf({ '1h': 2 }));
   vi.stubGlobal('alert', vi.fn());
 });
 

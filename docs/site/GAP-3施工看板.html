@@ -13,8 +13,9 @@
 <blockquote>
 <p>🔴 <strong>2026-09-02 R 重開（你離線時）</strong>：規格走「R 重開」（<code>docs/GAP3_EVENT_UX_SPEC.md</code> R35-R，裁定 D-8）——
 <strong>Phase 2 四個 Task（2.1／2.1b／2.2／2.3）退役、新增 Task 1.9′（<code>/search</code> 匯出端答案窗宣告框）</strong>，
-五份補充修訂（D-001…D-005）全部作廢併回。<strong>R35 三家對抗審已收斂（23 條全採納、已落地），閉合輪進行中。<strong>下方 42 Task 表是 <strong>R 之前</strong>的機械產出，
-在三家對抗審收斂、修訂稿定版後</strong>重產</strong>；在那之前它對 Phase 2 與 1.9′ 的狀態是<strong>過時的</strong>。</p>
+五份補充修訂（D-001…D-005）全部作廢併回。<strong>R35→R36→R37 三輪審查收斂、三家蓋章（9/2 中午）；R 實作批已落地（9/2 下午）：
+Phase 2 四個 Task 之程式已拆、Task 1.9′ 已做、Task 1.11 改成每批一律宣告、0 可填。</strong> 下表對 Phase 2 與 1.9′ 之列已手動更正（見各列註記）；
+整表機械重產待 TODO 之 42→39＋1 Task 清單工具更新（<code>GOV-DOC-STATUS-1</code> 同批）。</p>
 </blockquote>
 <blockquote>
 <p><strong>這份只回答一件事：42 個 Task，哪些做了、哪些沒做、卡在哪。</strong>
@@ -737,28 +738,34 @@ Grok 再寫臨時測試證明：A 刪除失敗回來時，錯誤訊息「刪除�
 <td>✅</td>
 </tr>
 <tr>
+<td><strong>Task 1.9′</strong></td>
+<td><code>/search</code> 匯出端答案窗宣告框（R 重開新增，取代 2.1b 之導出路徑）</td>
+<td>Phase 1</td>
+<td>🔧 已落地，待三家 review</td>
+</tr>
+<tr>
 <td><strong>Task 2.1</strong></td>
 <td><code>/search</code> 匯出前篩選面板</td>
 <td>Phase 2</td>
-<td>✅</td>
+<td>⛔ 退役（R 重開 D-8；程式已拆）</td>
 </tr>
 <tr>
 <td><strong>Task 2.1b</strong></td>
 <td>由篩選條件自動導出答案窗下界（D-7 第 2 層）</td>
 <td>Phase 2</td>
-<td>✅</td>
+<td>⛔ 退役（端點與前端導出已拆；<code>depth_by_timeframe()</code> 本體保留）</td>
 </tr>
 <tr>
 <td><strong>Task 2.2</strong></td>
 <td>篩選條件寫入 <code>label_definition.filters</code></td>
 <td>Phase 2</td>
-<td>✅</td>
+<td>⛔ 退役（契約鍵保留、匯出端不再寫）</td>
 </tr>
 <tr>
 <td><strong>Task 2.3</strong></td>
 <td>即時筆數顯示</td>
 <td>Phase 2</td>
-<td>✅</td>
+<td>⛔ 退役（「將匯出 N 筆」拿掉；原 M／正例／反例三數保留）</td>
 </tr>
 <tr>
 <td><strong>Task 3.1</strong></td>

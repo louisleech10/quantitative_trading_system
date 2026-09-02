@@ -141,7 +141,6 @@ export default function EventCsvMappingForm({ onImported }: Props) {
     const raw = countDeclaredLabels(cells);
     const counts = computeExportCounts(
       cells.map((cell) => ({ cell })),
-      [],
       (row) => {
         const s = String((row as { cell: string }).cell).trim();
         return s === '1' ? true : s === '0' ? false : null;

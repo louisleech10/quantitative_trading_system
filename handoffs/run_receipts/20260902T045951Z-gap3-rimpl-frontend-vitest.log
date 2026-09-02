@@ -1,0 +1,71 @@
+
+ RUN  v4.1.5 /Users/louis/Desktop/quantitative_trading_system/frontend
+
+ ❯ src/lib/noTicketIdInUi.test.ts (2 tests | 1 failed) 5ms
+     × 🔴 掃 frontend/src：非註解行不得含 GAP-N 3ms
+
+ Test Files  1 failed | 67 passed (68)
+      Tests  1 failed | 410 passed (411)
+   Start at  12:59:30
+   Duration  21.19s (transform 4.68s, setup 1.21s, import 26.69s, tests 32.50s, environment 74.00s)
+
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/noTicketIdInUi.test.ts > 使用者可見層不得出現施工票號 > 🔴 掃 frontend/src：非註解行不得含 GAP-N
+Error: ENOENT: no such file or directory, scandir '/Users/louis/Desktop/quantitative_trading_system/src'
+ ❯ walk src/lib/noTicketIdInUi.test.ts:34:22
+     32|
+     33| function walk(dir: string, out: string[] = []): string[] {
+     34|   for (const name of readdirSync(dir)) {
+       |                      ^
+     35|     const p = join(dir, name);
+     36|     if (statSync(p).isDirectory()) { walk(p, out); continue; }
+ ❯ src/lib/noTicketIdInUi.test.ts:70:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

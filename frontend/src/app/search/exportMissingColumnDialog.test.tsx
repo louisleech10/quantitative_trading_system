@@ -9,6 +9,7 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareFromPreview, previewOf } from '@/test/lookaheadDeclarationTestUtils';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import type { CaseData, SearchResultData } from '@/lib/types';
@@ -17,7 +18,7 @@ const depthMock = vi.fn();
 
 vi.mock('@/lib/api', async (orig) => {
   const actual = await orig<typeof import('@/lib/api')>();
-  return { ...actual, fetchLookaheadDepth: (...a: unknown[]) => depthMock(...a) };
+  return { ...actual, fetchLookaheadDeclarationPreviewColumns: (...a: unknown[]) => depthMock(...a) };
 });
 
 const blobs: string[] = [];
@@ -53,7 +54,7 @@ function selectOnly(keep: number[]) {
 
 beforeEach(() => {
   seed();
-  depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 0 } });
+  depthMock.mockResolvedValue(previewOf({ '1h': 0 }));
   blobs.length = 0;
   const RealBlob = globalThis.Blob;
   vi.stubGlobal('Blob', class extends RealBlob {
@@ -81,7 +82,7 @@ afterEach(() => {
 describe('Task 4.3 — 缺欄確認框逐 horizon 列出', () => {
   it('① 訊息含**每一個**缺欄附帶 horizon 之筆數數字（逐 horizon，非一句總計）', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
     selectOnly([1, 3, 7]);                    // future_3 缺 1 筆、future_7 缺 2 筆、future_1 不缺
 
     fireEvent.click(screen.getByTestId('export-gap3-events'));
@@ -101,7 +102,7 @@ describe('Task 4.3 — 缺欄確認框逐 horizon 列出', () => {
    */
   it('①b 不缺的附帶欄也會被列出，且數字為全數可算（5.3 擴寫後之鑑別力）', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
     selectOnly([1, 3, 7]);
 
     fireEvent.click(screen.getByTestId('export-gap3-events'));
@@ -114,7 +115,7 @@ describe('Task 4.3 — 缺欄確認框逐 horizon 列出', () => {
 
   it('② 訊息**不得**含「主答案窗」字樣（該概念已隨 4.1 移除）', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
     selectOnly([7]);
 
     fireEvent.click(screen.getByTestId('export-gap3-events'));
@@ -127,7 +128,7 @@ describe('Task 4.3 — 缺欄確認框逐 horizon 列出', () => {
 
   it('③ 缺欄**不阻擋**匯出：按確定 ⇒ 真的下載（執行期證據，非讀碼）', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
     selectOnly([7]);
 
     // 🔴 送出鍵刻意保持可按——設成 disabled 的話這個 click 什麼都沒觸發、整條測試恆綠（B4 教訓）
@@ -141,7 +142,7 @@ describe('Task 4.3 — 缺欄確認框逐 horizon 列出', () => {
   it('④ 按取消 ⇒ 不下載（對照組：證明 ③ 不是「反正都會下載」）', async () => {
     confirmMock.mockReturnValue(false);
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
     selectOnly([7]);
 
     fireEvent.click(screen.getByTestId('export-gap3-events'));
@@ -156,7 +157,7 @@ describe('Task 4.3 — 缺欄確認框逐 horizon 列出', () => {
    */
   it('⑤ 一個附帶欄都沒勾 ⇒ 不跳確認框（防「恆跳」而失去鑑別力）', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
     selectOnly([]);
 
     fireEvent.click(screen.getByTestId('export-gap3-events'));

@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareFromPreview, previewOf } from '@/test/lookaheadDeclarationTestUtils';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import {
@@ -22,7 +23,7 @@ const blobs: string[] = [];
 
 vi.mock('@/lib/api', async (orig) => {
   const actual = await orig<typeof import('@/lib/api')>();
-  return { ...actual, fetchLookaheadDepth: (...a: unknown[]) => depthMock(...a) };
+  return { ...actual, fetchLookaheadDeclarationPreviewColumns: (...a: unknown[]) => depthMock(...a) };
 });
 
 const CASE_ROW = {
@@ -38,7 +39,7 @@ beforeEach(() => {
     } as unknown as SearchResultData,
     isLoading: false, error: null,
   });
-  depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 2 } });
+  depthMock.mockResolvedValue(previewOf({ '1h': 2 }));
   vi.stubGlobal('alert', vi.fn());
   vi.stubGlobal('confirm', vi.fn(() => true));
   vi.stubGlobal('URL', {
@@ -128,7 +129,6 @@ describe('Task 7.3 ③ — 兩頁共用同一 registry，欄集各自選取', ()
           decision_offset_bars: 0,
         },
         depthByTimeframe: { '1h': 2 },
-        referencedColumns: [],
       })).map((l) => l.testid),
     );
     expect(actual).toEqual(expected);
@@ -146,7 +146,7 @@ describe('Task 7.3 ③ — 兩頁共用同一 registry，欄集各自選取', ()
           entry_price_semantic: 'trigger_close', label_return_mode: 'close_to_close',
           decision_offset_bars: 0,
         },
-        depthByTimeframe: {}, referencedColumns: [],
+        depthByTimeframe: {},
       },
     )).toThrow(/尚未接線/);
   });

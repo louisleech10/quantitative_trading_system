@@ -8,19 +8,16 @@ void formatTimestamp;
 import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart, MarketClassPieChart, DifficultyPieChart } from '@/components/ui/PieChart';
 import { useSearchStore } from '@/store/searchStore';
 import { PriceChangeMethod, CaseData } from '@/lib/types';
-import { withExportLowerBoundGuard } from '@/lib/lookaheadDepthLock';
-import { fetchLookaheadDepth } from '@/lib/api';
+import { fetchLookaheadDeclarationPreviewColumns } from '@/lib/api';
 import {
-  applyExportFilters,
-  buildExportFilterSpec,
-  depthMapCoversTimeframes,
-  nextLowerBoundState,
-  numericColumnsOf,
-  referencedColumnsOf,
-  UNCONSTRAINED_LOWER_BOUND,
-  type ExportFilterCondition,
-  type LowerBoundState,
-} from '@/lib/exportFilter';
+  declaredWindowBarsForExport,
+  initialDeclaredWindowBars,
+  validateDeclaration,
+  withExportDeclarationGuard,
+  type ExportDeclarationState,
+  type LookaheadDeclarationPreview,
+} from '@/lib/lookaheadDeclaration';
+import LookaheadDeclarationFields from '@/components/case/LookaheadDeclarationFields';
 import {
   ATTACHED_HORIZONS,
   EVENT_EXPORT_CONTROL_KIND,
@@ -88,16 +85,16 @@ export default function SearchPage() {
   // 🔴 Task 4.1 ② 已移除「主答案窗」單選：答案窗依 §D-3′ 移到 IC 分析層，
   //    匯出端不再寫 label_value、不再讓使用者選 h。
   const [attachedHorizons, setAttachedHorizons] = useState<number[]>([...ATTACHED_HORIZONS]);
-  // GAP-3 UX Task 2.1b：答案窗下界。值由後端之 depth_by_timeframe() 導出——
-  // 🔴 前端**不自算深度**（第二份實作必然漂移）。
-  // ✅ B5 已接線（解除 `D-002 A-004`）：Task 2.1 之篩選面板變動時呼叫
-  //    `POST /case/lookahead-depth`，把該批 timeframe 之下界餵進來；無條件時回到 null＝尚無約束。
-  // 🔴 狀態不只是一個數字：`bound === null` 有兩種相反的意思（沒有條件／算不出來），
-  //    只留數字會讓「算不出來」被當成「沒有約束」而放行（R1 `CODEX-R1-P1-01`）。
-  const [lowerBoundState, setLowerBoundState] = useState<LowerBoundState>(UNCONSTRAINED_LOWER_BOUND);
-  const lookaheadLowerBound = lowerBoundState.bound;
-  // GAP-3 UX Task 2.1：匯出前篩選條件（面板只讀搜尋結果，不改任何原始欄位值）
-  const [exportFilters, setExportFilters] = useState<ExportFilterCondition[]>([]);
+  // GAP-3 UX Task 1.9′（R 重開 D-8）：匯出端答案窗宣告——深度之**唯一來源**＝使用者逐 tf 宣告
+  //    （`lookahead_bars_declared[tf] = declared_window_bars[tf]`，不與任何欄位取 max）。
+  // 🔴 前端**不推斷深度**：預設值候選由後端 `preview_from_columns` 給（唯一實作，與匯入頁同一函式），
+  //    validator 亦與匯入頁同一份 `validateDeclaration`（Task 1.9′ ⑦）。
+  //    Phase 2 之「篩選條件 → 下界導出」整區已退役（使用者 2026-09-02 裁定）。
+  const [declPreview, setDeclPreview] = useState<LookaheadDeclarationPreview | null>(null);
+  const [declPreviewError, setDeclPreviewError] = useState<string | null>(null);
+  const [declared, setDeclared] = useState<Record<string, number>>({});
+  const [declAcknowledged, setDeclAcknowledged] = useState(false);
+  const declState: ExportDeclarationState = { preview: declPreview, declared, acknowledged: declAcknowledged };
   // GAP-3 UX Task 7.1：五個批次維度**可見可改**；初始值＝Task 7.0 之常數
   // （⇒ 使用者不動 UI 時匯出結果與 7.0 逐位元相同，SPEC 邊界②之 golden 不變由此成立）。
   const [eventDims, setEventDims] = useState<EventDimensionValues>({
@@ -125,76 +122,59 @@ export default function SearchPage() {
 
   const [symbolsInput, setSymbolsInput] = useState('');
 
-  // ── GAP-3 UX Task 2.1／2.1b／2.3（B5） ────────────────────────────────────
+  // ── GAP-3 UX Task 1.9′（匯出端宣告框）＋ Task 1.5 之三個計數 ───────────────────
   const exportRows = React.useMemo(
     () => (currentResult?.cases ?? []) as unknown as Record<string, unknown>[],
     [currentResult],
   );
-  /** 只有數值欄可篩（SPEC 邊界①：字串欄不得出現在可選清單）。 */
-  const filterableColumns = React.useMemo(() => numericColumnsOf(exportRows), [exportRows]);
-  /** 🔴 Task 2.3：四個顯示點之**唯一**計數來源。 */
-  const exportCounts = React.useMemo(
-    () => computeExportCounts(exportRows, exportFilters),
-    [exportRows, exportFilters],
+  /** 🔴 三個數字（原 M／正例 X／反例 Y）之**唯一**計數來源；篩選已退役故無「將匯出 N 筆」。 */
+  const exportCounts = React.useMemo(() => computeExportCounts(exportRows), [exportRows]);
+  /** 批內出現之 timeframe 集合（宣告框逐 tf 各一框；多 TF 批不得以單一框套用全部 tf）。 */
+  const exportTimeframes = React.useMemo(
+    () => [...new Set(exportRows.map((r) => String(r.timeframe ?? searchParams.timeframe)))]
+      .filter((tf) => tf && tf !== 'undefined'),
+    [exportRows, searchParams.timeframe],
   );
+  // 預填資料之輸入：搜尋結果欄 ∪ 將附帶之 `future_{h}bar_return` 欄（只影響**預設候選**，不影響已宣告值）
+  const previewInputKey = JSON.stringify({
+    cols: [...new Set(exportRows.flatMap((r) => Object.keys(r)))].sort(),
+    attached: [...attachedHorizons].sort((a, b) => a - b),
+    tfs: exportTimeframes,
+  });
 
-  const referencedKey = JSON.stringify(referencedColumnsOf(exportFilters));
+  // 換一批搜尋結果 ⇒ 舊宣告與舊 preview 皆作廢（不同批之 tf 集合與內容都可能不同）
   useEffect(() => {
-    // 解除 `D-002 A-004`：下界之**值**由後端 depth_by_timeframe() 導出，前端不自算。
-    // 🔴 各情形之處置一律由 `nextLowerBoundState()` 決定（決策本體在純函式裡，可單獨測）。
-    const apply = (outcome: Parameters<typeof nextLowerBoundState>[1]) =>
-      setLowerBoundState((prev) => nextLowerBoundState(prev, outcome));
-    const referenced = referencedColumnsOf(exportFilters);
-    const timeframes = [...new Set(exportRows.map((r) => String(r.timeframe ?? searchParams.timeframe)))]
-      .filter((tf) => tf && tf !== 'undefined');
-    // 🔴 R2 `CODEX-R2-P1-01`：舊版在此**直接 return** ⇒ 狀態停在初始的 `unconstrained`＝可匯出，
-    //    而深度 map 是空的；`windowHorizonBarsFor` 會在 `proceed` 內拋錯，按鈕又是 `void` 呼叫
-    //    ⇒ 使用者按了什麼都沒發生、也沒有任何訊息。**算不出本批週期就要 fail-closed**。
-    if (timeframes.length === 0) {
-      apply({ kind: 'error', message: '這批結果讀不到 K 線週期，無法宣告 lookahead 深度（不會讓你匯出）' });
-      return;
-    }
-    // 🔴 `D-004 A-021(a)`：4.1 移除主答案窗後，匯出路徑之左項一律送 **0**
-    //    （`depth_by_timeframe` ＝ `max(declared, *欄位深度)`；送 0 ⇒ 結果就是純欄位深度）。
-    //    **不得省略鍵**——缺 tf 會在後端 `lookahead_depth.py:66-69` 觸發 KeyError。
-    const declaredWindowBars = Object.fromEntries(timeframes.map((tf) => [tf, 0]));
-    // 🔴 **無條件時也要查**：Task 4.1 之匯出檔必帶 `lookahead_bars_declared`（逐 tf 深度），
-    //    而深度只有後端算得出來。前端在此自填 0 就是把 `depth_by_timeframe()` 的退化分支
-    //    複製第二份（SPEC Task 2.1b 明禁）。代價＝沒有條件的批次也要等這支 API 回來；
-    //    拿不到 ⇒ 擋（寫不出宣告值就不該產出宣稱帶著它的檔）。
-    // 🔴 **R1 三家一致之 P1**：`pending` 必須**無條件**先打上。舊版只在 `referenced.length > 0`
-    //    時打 ⇒ 無條件批次在 API 飛的那段時間狀態仍是初始的 `unconstrained`＝**可匯出**，
-    //    會產出 `lookahead_bars_declared: {}` 的檔；清掉條件後的第二輪還會沿用**過期 map**。
-    //    這是主委「拿不到 ⇒ 擋」之宣稱與實作不符（宣稱大於實作）。
-    apply({ kind: 'pending' });
+    setDeclPreview(null);
+    setDeclared({});
+    setDeclAcknowledged(false);
+  }, [currentResult]);
+
+  useEffect(() => {
+    // Task 1.9′ 實作要點 2：預設值候選來自後端 `preview_from_columns`（唯一實作；前端禁重寫換算表）。
+    // 🔴 拿不到 preview ⇒ 守衛擋（`exportDeclarationBlockMessage`），不以任何預設深度代替。
+    // 🔴 附帶欄改變只會**重取預設候選**：既有 preview 與已宣告值在重取期間保留（驗證⑤），
+    //    不在此清空——清空會讓「改附帶欄後立刻匯出」被當成「尚未取得」而擋住。
+    const { cols, attached, tfs } = JSON.parse(previewInputKey) as { cols: string[]; attached: number[]; tfs: string[] };
+    setDeclPreviewError(null);
+    if (tfs.length === 0) return;
     let cancelled = false;
-    fetchLookaheadDepth({
-      referenced_columns: referenced,
-      declared_window_bars: declaredWindowBars,
-      timeframes,
+    fetchLookaheadDeclarationPreviewColumns({
+      columns: [...cols, ...attached.map((h) => `future_${h}bar_return`)],
+      timeframes: tfs,
     })
-      .then((res) => {
+      .then((p) => {
         if (cancelled) return;
-        // 🔴 `CODEX-R1-P1-02`：回傳之 map 須**恰好覆蓋本批 timeframe 且值為非負整數**；
-        //    空 map／缺鍵／非法值一律轉 `error`（擋），不得放行後由 floor 冒充深度。
-        if (!depthMapCoversTimeframes(res.depth_by_timeframe, timeframes)) {
-          apply({
-            kind: 'error',
-            message: `深度端點之回傳未覆蓋本批週期（需 ${timeframes.join('、')}），無法宣告 lookahead 深度`,
-          });
-          return;
-        }
-        apply(referenced.length === 0
-          ? { kind: 'no-conditions', depthByTimeframe: res.depth_by_timeframe }
-          : { kind: 'resolved', depthByTimeframe: res.depth_by_timeframe });
+        setDeclPreview(p);
+        // 🔴 Task 1.9′ 驗證⑤：只補**尚未宣告**之 tf 的預設值；已宣告值不因附帶欄／預設改變而被覆寫。
+        //    預設 `< 1` 者留空不預填（`0` 須使用者明填，留白≠0）。
+        setDeclared((prev) => ({ ...initialDeclaredWindowBars(p), ...prev }));
       })
       .catch((err) => {
         if (cancelled) return;
-        apply({ kind: 'error', message: err instanceof Error ? err.message : '無法導出答案窗下界' });
+        setDeclPreviewError(err instanceof Error ? err.message : '無法取得答案窗預填資料');
       });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [referencedKey, exportRows, searchParams.timeframe]);
+  }, [previewInputKey]);
 
   const parseSymbolsInput = (input: string): string[] =>
     input
@@ -629,14 +609,13 @@ export default function SearchPage() {
       alert('沒有搜索結果可以匯出');
       return;
     }
-    // GAP-3 UX Task 2.1b／`D-004 A-021(c)`：**readiness fail-closed**。
-    // 🔴 `pending`（還沒拿到深度）／`error`（算不出來）⇒ 一個網路動作都不許發生。
-    //    判定與訊息都住在守衛裡（**單一實作**）——B5 時 page 另有一份前置比較，
-    //    兩層涵蓋同一批輸入會讓 mutation 失明（只拆一層必然錄到空紅集合）。
+    // GAP-3 UX Task 1.9′ 守衛（承襲 `D-004 A-021(c)` 之 `proceed` 結構保證）：**宣告未通過 ⇒ fail-closed**。
+    // 🔴 缺 preview／缺 map／批內某 tf 無鍵／非 int／`< 0`／調低未勾聲明 ⇒ 一個網路／下載動作都不許發生。
+    //    判定與訊息都住在守衛裡（**單一實作**，只呼叫同一份 `validateDeclaration`）。
     // 🔴 整段匯出邏輯**包在 proceed 內**——「阻擋早於任何網路動作」因此是結構上保證的事實，
     //    不是需要用原始碼形狀去檢查的性質（GROK-R3-P2-01 等三條之修法）。
     //    **不得**退回裸 `if (…) return;` 後接長串 `await`（B5 R3 已否定之形狀）。
-    return withExportLowerBoundGuard(lowerBoundState, {
+    return withExportDeclarationGuard(declState, {
       notify: alert,
       proceed: async () => {
     const { buildEventContractRecords } = await import('@/lib/eventExport');
@@ -657,20 +636,16 @@ export default function SearchPage() {
     ].filter((c) => c.value !== null && c.value !== undefined);
     // GAP-3 UX Task 1.3：`source_file_digest` 綁**完整 CaseData 列**且**一律由後端計算**
     // （`/search` 結果端點回應之兩鍵）。前端只傳遞，不自算、不重新序列化。
-    // GAP-3 UX Task 2.1／2.2：先套用匯出前篩選（只選列，不改任何欄位值），
-    // 再把條件本身寫進 label_definition.filters。
-    const filteredCases = applyExportFilters(
-      currentResult.cases as unknown as Record<string, unknown>[], exportFilters,
-    ) as unknown as CaseData[];
-    const payload = await buildEventContractRecords(filteredCases, {
+    // 🔴 R 重開 D-8 規則①：匯出＝搜尋結果**全部**列（無篩選）；正反例判定在系統外完成。
+    const payload = await buildEventContractRecords(currentResult.cases as CaseData[], {
       timeframe: searchParams.timeframe,
       conditions: ruleConditions,
       priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
       attachedHorizons,
-      lookaheadBarsDeclared: lowerBoundState.depthByTimeframe,
+      // D-8 規則②：`lookahead_bars_declared = declared_window_bars`（逐鍵複製；兩條匯出同一函式）
+      lookaheadBarsDeclared: declaredWindowBarsForExport(declState),
       sourceFileText: currentResult.source_file_text ?? '',
       sourceFileDigest: currentResult.source_file_digest ?? '',
-      filters: buildExportFilterSpec(exportFilters),
       // 🔴 Task 7.1：五維度**逐一**由 UI 狀態傳入。漏傳任一個都會讓落檔悄悄退回
       //    `eventExport.ts` 的預設值（介面有、沒傳）——Task 7.2 ② 之機械閘即守這件事。
       ...eventDimsToExportOptions(eventDims),
@@ -714,7 +689,7 @@ export default function SearchPage() {
    * 而「自己決定哪些是正例」正是本 epic 的核心前提。
    *
    * 🔴 **與 JSON 匯出走同一條路**（同一個 `buildEventContractRecords`）⇒ 兩種匯出不可能漂移；
-   *    也因此**同樣受下界守衛保護**（拿不到深度就不讓匯出），不再是「CSV 可以繞過」。
+   *    也因此**同樣受宣告守衛保護**（沒宣告答案窗就不讓匯出），不再是「CSV 可以繞過」。
    * 🔴 非契約之分析欄放進 `meta.`（契約自由欄）：Excel 裡照樣看得到、篩得動，
    *    且不會被 `unknown_field` 拒收。
    * 🔴 答案只有 `label` 一欄（0／1）；不再另寫 `Positive_Case`——
@@ -725,7 +700,7 @@ export default function SearchPage() {
       alert('沒有搜索結果可以導出');
       return;
     }
-    return withExportLowerBoundGuard(lowerBoundState, {
+    return withExportDeclarationGuard(declState, {
       notify: alert,
       proceed: async () => {
         const { buildEventContractRecords } = await import('@/lib/eventExport');
@@ -745,18 +720,16 @@ export default function SearchPage() {
           { parameter: 'price_position', operator: operators.pricePosition, value: searchParams.pricePosition },
         ].filter((c) => c.value !== null && c.value !== undefined);
 
-        const filtered = applyExportFilters(
-          currentResult.cases as unknown as Record<string, unknown>[], exportFilters,
-        ) as unknown as CaseData[];
+        const filtered = currentResult.cases as CaseData[];   // D-8 規則①：全部列，無篩選
         const payload = await buildEventContractRecords(filtered, {
           timeframe: searchParams.timeframe,
           conditions: ruleConditions,
           priceChangeMethod: String(searchParams.priceChangeMethod ?? ''),
           attachedHorizons,
-          lookaheadBarsDeclared: lowerBoundState.depthByTimeframe,
+          // 🔴 Task 1.9′ 驗證⑥：與 JSON 路徑呼叫**同一函式**組 map（CSV 不得另組一份）
+          lookaheadBarsDeclared: declaredWindowBarsForExport(declState),
           sourceFileText: currentResult.source_file_text ?? '',
           sourceFileDigest: currentResult.source_file_digest ?? '',
-          filters: buildExportFilterSpec(exportFilters),
           ...eventDimsToExportOptions(eventDims),
           // 🔴 CSV 帶**全部**列（未標記者 `label` 留空給你在 Excel 補）——
           //    丟掉那些列等於剝奪你補標記的機會，而匯入端對缺 label 是整批拒收。
@@ -1687,136 +1660,62 @@ export default function SearchPage() {
             })()}
 
             {/* GAP-3 UX Task 2.1／2.3：匯出前篩選面板＋即時筆數 */}
-            <div className="mt-6 glass-panel rounded-xl p-4 border border-slate-800/80" data-testid="export-filter-panel">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-slate-100">匯出前篩選</h4>
-                <button
-                  type="button"
-                  data-testid="export-filter-add"
-                  onClick={() => setExportFilters((prev) => [
-                    ...prev, { column: '', op: '>=' as const, value: undefined },
-                  ])}
-                  className="px-3 py-1 text-sm rounded border border-sky-400/40 bg-sky-500/20 text-sky-100"
-                >
-                  ＋ 加一條條件
-                </button>
-              </div>
+            <div className="mt-6 glass-panel rounded-xl p-4 border border-slate-800/80" data-testid="export-declaration-panel">
+              <h4 className="font-bold text-slate-100">匯出設定</h4>
               <p className="mt-1 text-[11px] text-slate-400">
-                只能篩數值欄；多條件是「而且」的關係。面板只挑要匯出哪些列，
-                <strong className="text-slate-200">不會改動任何欄位的值</strong>。
+                匯出的是搜尋結果的<strong className="text-slate-200">全部</strong>列；正例／反例請在 Excel 裡用 CSV 自己篩、
+                改好 <code>label</code> 後再回灌匯入。匯出前只需要你填一件事：答案窗。
               </p>
 
-              {exportFilters.length > 0 && (
-                <div className="mt-3 space-y-2" data-testid="export-filter-conditions">
-                  {exportFilters.map((cond, idx) => (
-                    <div key={idx} className="flex flex-wrap items-center gap-2 text-sm" data-testid="export-filter-row">
-                      <select
-                        data-testid={`export-filter-column-${idx}`}
-                        value={cond.column}
-                        onChange={(e) => setExportFilters((prev) => prev.map(
-                          (c, i) => (i === idx ? { ...c, column: e.target.value } : c)))}
-                        className="rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
-                      >
-                        <option value="">未選欄位</option>
-                        {filterableColumns.map((name) => (
-                          <option key={name} value={name}>{name}</option>
-                        ))}
-                      </select>
-                      <select
-                        data-testid={`export-filter-op-${idx}`}
-                        value={cond.op}
-                        onChange={(e) => setExportFilters((prev) => prev.map(
-                          (c, i) => (i === idx
-                            ? { column: c.column, op: e.target.value as ExportFilterCondition['op'] }
-                            : c)))}
-                        className="rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
-                      >
-                        <option value=">=">≥</option>
-                        <option value="<=">≤</option>
-                        <option value="between">介於</option>
-                      </select>
-                      {cond.op === 'between' ? (
-                        <>
-                          <input
-                            type="number" step="any" placeholder="下限"
-                            data-testid={`export-filter-min-${idx}`}
-                            value={cond.range?.[0] ?? ''}
-                            onChange={(e) => setExportFilters((prev) => prev.map((c, i) => (i === idx
-                              ? { ...c, range: [Number(e.target.value), c.range?.[1] ?? Number.NaN] as [number, number] }
-                              : c)))}
-                            className="w-24 rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
-                          />
-                          <input
-                            type="number" step="any" placeholder="上限"
-                            data-testid={`export-filter-max-${idx}`}
-                            value={cond.range?.[1] ?? ''}
-                            onChange={(e) => setExportFilters((prev) => prev.map((c, i) => (i === idx
-                              ? { ...c, range: [c.range?.[0] ?? Number.NaN, Number(e.target.value)] as [number, number] }
-                              : c)))}
-                            className="w-24 rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
-                          />
-                        </>
-                      ) : (
-                        <input
-                          type="number" step="any" placeholder="數值"
-                          data-testid={`export-filter-value-${idx}`}
-                          value={cond.value ?? ''}
-                          onChange={(e) => setExportFilters((prev) => prev.map((c, i) => (i === idx
-                            ? { ...c, value: Number(e.target.value) } : c)))}
-                          className="w-28 rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
-                        />
-                      )}
-                      <button
-                        type="button"
-                        data-testid={`export-filter-remove-${idx}`}
-                        onClick={() => setExportFilters((prev) => prev.filter((_, i) => i !== idx))}
-                        className="px-2 py-1 text-xs rounded border border-slate-700 text-slate-300"
-                      >
-                        移除
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Task 2.3：四個顯示點之唯一計數來源 */}
+              {/* 三個數字之唯一計數來源（Task 1.5 同一函式） */}
               <p className="mt-3 text-sm text-slate-200" data-testid="export-counts">
-                將匯出 <strong data-testid="export-count-n">{exportCounts.N}</strong> 筆
-                （原 <strong data-testid="export-count-m">{exportCounts.M}</strong> 筆）／
+                原 <strong data-testid="export-count-m">{exportCounts.M}</strong> 筆／
                 你聲明的正例 <strong data-testid="export-count-x">{exportCounts.X}</strong>／
                 反例 <strong data-testid="export-count-y">{exportCounts.Y}</strong>
                 {exportCounts.droppedUnreadableLabel > 0 && (
                   <span className="text-amber-200" data-testid="export-count-unreadable">
                     （另有 {exportCounts.droppedUnreadableLabel} 筆沒有正反例標記——
                     事件 JSON 不收它們，<strong data-testid="export-count-csv">CSV 仍會含
-                    {exportCounts.keptByFilters} 筆</strong>，因為 CSV 是原始結果、不該因少一個旗標就丟整列）
+                    {exportCounts.M} 筆</strong>，因為 CSV 是原始結果、不該因少一個旗標就丟整列）
                   </span>
                 )}
               </p>
 
-              {lowerBoundState.status === 'resolved' && lookaheadLowerBound !== null && (
-                <p className="mt-1 text-[11px] text-amber-200" data-testid="export-lower-bound">
-                  你的條件引用了未來欄，答案窗下界鎖定在 {lookaheadLowerBound} 根（可往上調，不能往下調）。
+              {/* ── Task 1.9′：答案窗宣告框（與匯入頁**同一元件**、同一 validator） ───────── */}
+              <div className="mt-4" data-testid="export-declaration">
+                <p className="mb-2 text-xs text-amber-200/90">
+                  請填<strong>正例與反例兩邊判定所用之最遠者</strong>（t₀ 之後第幾根；未用任何未來資訊請明填 0，留白不算 0）。
+                  這個值會寫進匯出檔的 lookahead_bars_declared，並決定 train/test 的隔離寬度；
+                  <strong>系統無法驗證此深度，錯報將導致資料洩漏</strong>。
                 </p>
-              )}
-              {lowerBoundState.status === 'pending' && (
-                <p className="mt-1 text-[11px] text-slate-300" data-testid="export-lower-bound-pending">
-                  正在確認這些條件需要多寬的答案窗；確認完成前不會讓你匯出。
-                </p>
-              )}
-              {/* 🔴 `D-004 A-021(d)`：`inexpressible`（混 TF 且下界不同）已不是錯誤狀態——
-                  4.1 之後 horizon_bars 逐列依該列 tf 寫入，混 TF 可以匯出。剩下的只有 error。 */}
-              {lowerBoundState.status === 'error' && (
-                <p className="mt-1 text-[11px] text-rose-200" data-testid="export-lower-bound-error">
-                  無法導出答案窗下界：{lowerBoundState.error}
-                </p>
-              )}
-              {Object.keys(lowerBoundState.depthByTimeframe).length > 1 && (
-                <p className="mt-1 text-[11px] font-mono text-slate-400" data-testid="export-lower-bound-map">
-                  逐週期下界：{Object.entries(lowerBoundState.depthByTimeframe)
-                    .map(([tf, v]) => `${tf}=${v}`).join('、')}
-                </p>
-              )}
+                {declPreview ? (
+                  <LookaheadDeclarationFields
+                    preview={declPreview}
+                    declared={declared}
+                    acknowledged={declAcknowledged}
+                    problems={validateDeclaration(declared, declAcknowledged, declPreview).problems}
+                    onChangeWindow={(tf, value) => setDeclared((prev) => {
+                      const next = { ...prev };
+                      // 留白（NaN）＝尚未填寫，不寫成 0（0 須明填）
+                      if (Number.isNaN(value)) delete next[tf]; else next[tf] = value;
+                      return next;
+                    })}
+                    onChangeAcknowledged={setDeclAcknowledged}
+                  />
+                ) : declPreviewError ? (
+                  <p className="text-[11px] text-rose-200" data-testid="export-declaration-error">
+                    無法取得答案窗預填資料：{declPreviewError}（取得前不會讓你匯出）
+                  </p>
+                ) : exportTimeframes.length === 0 ? (
+                  <p className="text-[11px] text-rose-200" data-testid="export-declaration-error">
+                    這批結果讀不到 K 線週期，無法宣告答案窗（不會讓你匯出）
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-300" data-testid="export-declaration-pending">
+                    正在取得答案窗預填資料；取得前不會讓你匯出。
+                  </p>
+                )}
+              </div>
 
               {/* ── GAP-3 UX Task 4.1 ①：附帶報酬欄多選（預設全選 1..12） ───────────── */}
               <div className="mt-4 rounded border border-slate-800 bg-slate-900/40 p-3" data-testid="export-attached-columns">
@@ -1870,8 +1769,10 @@ export default function SearchPage() {
                     而註解卻宣稱「本頁只選取自己的欄集」——那就是 7.3 要滅的第二份欄集。 */}
                 {SEARCH_DISCLOSURE_FIELDS.flatMap((field) => searchDisclosureLines(field, {
                   dims: eventDims,
-                  depthByTimeframe: lowerBoundState.depthByTimeframe,
-                  referencedColumns: referencedColumnsOf(exportFilters),
+                  // 🔴 Task 1.9′ 覆蓋風險：深度自本頁之**宣告 state** 讀取（只揭露已填之 tf；未填＝尚未宣告）
+                  depthByTimeframe: Object.fromEntries(
+                    exportTimeframes.filter((tf) => Number.isInteger(declared[tf])).map((tf) => [tf, declared[tf]]),
+                  ),
                 })).map((line) => (
                   <p className="mt-1" key={line.testid} data-testid={line.testid}>{line.text}</p>
                 ))}

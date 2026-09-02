@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from momentum.factories import create_event_sample_pipeline
+from tests.api._gap3_declaration import declaration_for_timeframes
 
 REPO = Path(__file__).resolve().parents[2]
 GOLDEN = REPO / "frontend" / "src" / "lib" / "__fixtures__" / "canonicalSourceGolden.json"
@@ -259,7 +260,8 @@ def test_gap3_source_digest_non_canonical_event_id_rejected(tmp_path, monkeypatc
                                          "label_definition", "control_kind", "source_file_digest", "data_snapshot_digest")}
         r = client.post("/api/v1/case/import-events/csv",
                         files={"file": ("x.csv", io.BytesIO((header + "\n" + body + "\n").encode("utf-8")), "text/csv")},
-                        data={"column_mapping": json.dumps(mapping), "batch_defaults": json.dumps(defaults)})
+                        data={"column_mapping": json.dumps(mapping), "batch_defaults": json.dumps(defaults),
+                              "lookahead_declaration": declaration_for_timeframes([good["timeframe"]])})
 
     assert r.status_code == 422, r.text
     failures = [f for f in r.json()["detail"]["failures"] if f["field"] == "event_id"]
@@ -308,7 +310,8 @@ def test_gap3_source_digest_event_id_set_equal_json_export_vs_csv_reimport(tmp_p
                                      "label_definition", "control_kind", "source_file_digest", "data_snapshot_digest")}
     c = client.post("/api/v1/case/import-events/csv",
                     files={"file": ("back.csv", io.BytesIO((header + "\n" + body + "\n").encode("utf-8")), "text/csv")},
-                    data={"column_mapping": json.dumps(mapping), "batch_defaults": json.dumps(defaults)})
+                    data={"column_mapping": json.dumps(mapping), "batch_defaults": json.dumps(defaults),
+                          "lookahead_declaration": declaration_for_timeframes([base["timeframe"]])})
     assert c.status_code == 200, c.text
     csv_ids = {r["event_id"] for r in client.get(f"/api/v1/case/events/{c.json()['import_id']}").json()["records"]}
 

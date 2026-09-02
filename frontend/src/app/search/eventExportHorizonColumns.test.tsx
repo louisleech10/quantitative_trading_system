@@ -8,6 +8,7 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareFromPreview, previewOf } from '@/test/lookaheadDeclarationTestUtils';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import { windowHorizonBarsFor } from '@/lib/eventExport';
@@ -17,7 +18,7 @@ const depthMock = vi.fn();
 
 vi.mock('@/lib/api', async (orig) => {
   const actual = await orig<typeof import('@/lib/api')>();
-  return { ...actual, fetchLookaheadDepth: (...a: unknown[]) => depthMock(...a) };
+  return { ...actual, fetchLookaheadDeclarationPreviewColumns: (...a: unknown[]) => depthMock(...a) };
 });
 
 type Row = Record<string, unknown>;
@@ -77,7 +78,7 @@ function selectOnly(keep: number[]) {
 
 beforeEach(() => {
   seed([caseRow(), caseRow({ timestamp: '2024-01-01 01:00:00', positive_case: false })]);
-  depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 0 } });
+  depthMock.mockResolvedValue(previewOf({ '1h': 0 }));
   stubDownloads();
   vi.stubGlobal('alert', vi.fn());
   vi.stubGlobal('confirm', vi.fn(() => true));
@@ -92,7 +93,7 @@ afterEach(() => {
 describe('Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 label_value', () => {
   it('① 附帶選 [1,3,7] ⇒ 匯出檔含 future_{1,3,7}bar_return 三欄，且**不含**沒選的', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
     selectOnly([1, 3, 7]);
 
     const { records } = await exportAndParse();
@@ -104,7 +105,7 @@ describe('Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 labe
 
   it('② `label_value` 不在匯出檔內——**逐列**驗，不是只看第一列', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
 
     const { records } = await exportAndParse();
     expect(records.length).toBeGreaterThan(1);           // 只有一列的話「逐列」沒有意義
@@ -117,7 +118,7 @@ describe('Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 labe
 
   it('③ 匯出面板**不存在**「主答案窗」控制項', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
     expect(screen.queryByTestId('export-gap3-horizon')).toBeNull();
     // 對照：面板本身在（否則「整個面板沒 render」也會讓上一行綠）
     expect(screen.getByTestId('export-attached-columns')).toBeTruthy();
@@ -125,9 +126,9 @@ describe('Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 labe
 
   it('④ `lookahead_bars_declared` ＝後端深度端點之回傳 map；`horizon_bars` 由**同一 exported 函式**導出', async () => {
     const depth = { '1h': 7 };
-    depthMock.mockResolvedValue({ depth_by_timeframe: depth });
+    depthMock.mockResolvedValue(previewOf(depth));
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
 
     const { records } = await exportAndParse();
     const r0 = records[0];
@@ -145,9 +146,9 @@ describe('Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 labe
 
   it('⑤ 改變附帶欄之選擇 ⇒ `lookahead_bars_declared` 與 `horizon_bars` **皆不變**', async () => {
     const depth = { '1h': 7 };
-    depthMock.mockResolvedValue({ depth_by_timeframe: depth });
+    depthMock.mockResolvedValue(previewOf(depth));
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
 
     selectOnly([1, 2]);
     const a = (await exportAndParse()).records[0];
@@ -165,9 +166,9 @@ describe('Task 4.1 — 匯出檔之附帶 future_* 欄；移除答案窗與 labe
   });
 
   it('⑥ 深度 0 之 floor：`lookahead_bars_declared[1h] === 0` 且 `window.horizon_bars === 1`（**刻意不等**）', async () => {
-    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 0 } });
+    depthMock.mockResolvedValue(previewOf({ '1h': 0 }));
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
 
     const { records } = await exportAndParse();
     const r0 = records[0];

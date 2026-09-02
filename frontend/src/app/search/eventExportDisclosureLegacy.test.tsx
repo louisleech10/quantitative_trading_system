@@ -10,6 +10,7 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareFromPreview, previewOf } from '@/test/lookaheadDeclarationTestUtils';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import type { CaseData, SearchResultData } from '@/lib/types';
@@ -18,7 +19,7 @@ const depthMock = vi.fn();
 
 vi.mock('@/lib/api', async (orig) => {
   const actual = await orig<typeof import('@/lib/api')>();
-  return { ...actual, fetchLookaheadDepth: (...a: unknown[]) => depthMock(...a) };
+  return { ...actual, fetchLookaheadDeclarationPreviewColumns: (...a: unknown[]) => depthMock(...a) };
 });
 
 const blobs: string[] = [];
@@ -42,7 +43,7 @@ function seed(rows: CaseData[]) {
 
 beforeEach(() => {
   seed([caseRow(), caseRow({ timestamp: '2024-01-01 01:00:00', positive_case: false })]);
-  depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 0 } });
+  depthMock.mockResolvedValue(previewOf({ '1h': 0 }));
   blobs.length = 0;
   const RealBlob = globalThis.Blob;
   vi.stubGlobal('Blob', class extends RealBlob {
@@ -68,7 +69,7 @@ afterEach(() => {
 
 describe('Task 4.1b — 匯出時揭露每個選項在動什麼', () => {
   it('① 四段皆出現：scenario／lookahead 深度＋來源／purge 下界＋取較大者／control_kind', async () => {
-    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 7 } });
+    depthMock.mockResolvedValue(previewOf({ '1h': 7 }));
     render(<SearchPage />);
     await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
 
@@ -86,7 +87,7 @@ describe('Task 4.1b — 匯出時揭露每個選項在動什麼', () => {
 
   it('② `control_kind` 之顯示值 == 匯出檔實際寫入之值（防寫死漂移）', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
 
     fireEvent.click(screen.getByTestId('export-gap3-events'));
     await waitFor(() => expect(blobs.length).toBeGreaterThan(0));
@@ -102,12 +103,12 @@ describe('Task 4.1b — 匯出時揭露每個選項在動什麼', () => {
   });
 
   it('③ 深度顯示由實際回傳導出（換一個值 ⇒ 顯示跟著變；防硬編）', async () => {
-    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 3 } });
+    depthMock.mockResolvedValue(previewOf({ '1h': 3 }));
     const first = render(<SearchPage />);
     await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h').textContent).toContain('3'));
     first.unmount();
 
-    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 11 } });
+    depthMock.mockResolvedValue(previewOf({ '1h': 11 }));
     render(<SearchPage />);
     await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h').textContent).toContain('11'));
     expect(screen.getByTestId('export-disclosure-depth-1h').textContent).not.toContain('＝ 3 根');
@@ -118,7 +119,7 @@ describe('Task 4.1b — 匯出時揭露每個選項在動什麼', () => {
       caseRow({ timeframe: '1h' }),
       caseRow({ timeframe: '12h', timestamp: '2024-01-01 01:00:00', positive_case: false }),
     ]);
-    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 72, '12h': 6 } });
+    depthMock.mockResolvedValue(previewOf({ '1h': 72, '12h': 6 }));
     render(<SearchPage />);
 
     await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
@@ -131,8 +132,10 @@ describe('Task 4.1b — 匯出時揭露每個選項在動什麼', () => {
 
   it('⑤ 🔴 深度那段顯示的是 `lookahead_bars_declared`，**不是** `window.horizon_bars`（後者有 floor）', async () => {
     // 深度 0 ⇒ 真實深度顯示 0；若誤顯示 window.horizon_bars 會變成 1。
-    depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 0 } });
+    depthMock.mockResolvedValue(previewOf({ '1h': 0 }));
     render(<SearchPage />);
+    // R 重開：預設 0 不預填（0 須明填）⇒ 由使用者宣告 0 後，揭露才顯示
+    await declareFromPreview({ '1h': 0 });
     await waitFor(() => expect(screen.getByTestId('export-disclosure-depth-1h')).toBeTruthy());
 
     const text = screen.getByTestId('export-disclosure-depth-1h').textContent ?? '';

@@ -64,6 +64,15 @@ def canonical_event(n: int = 0, **over) -> dict:
     e["event_id"] = canonical_event_id(e["symbol"], e["timeframe"], e["t0"])
     if "event_id" in over:
         e["event_id"] = over["event_id"]
+    # 🔴 R 重開（SPEC D-8／Task 1.11）：全部批次一律須宣告答案窗。`/search` 匯出（Task 1.9′）之每列
+    #    都攜帶 `lookahead_bars_declared`（逐 tf map），匯入端視之為宣告；使用者匯入路徑之 fixture
+    #    因此預設帶上（值＝該列 `window.horizon_bars`，與投影 `max(1, ·)` 自洽）。要測「缺宣告」者
+    #    以 `lookahead_bars_declared=None` 覆寫後 `pop`。
+    if "lookahead_bars_declared" not in over:
+        horizon = int((e.get("label_definition") or {}).get("window", {}).get("horizon_bars", 1))
+        e["lookahead_bars_declared"] = {str(e["timeframe"]): horizon}
+    elif over["lookahead_bars_declared"] is None:
+        e.pop("lookahead_bars_declared", None)
     return e
 
 

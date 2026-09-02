@@ -1,0 +1,13 @@
+M-B1 needs->conditional applied_rc=1 restored_rc=0
+M-B2 json-missing->fail-open applied_rc=1 restored_rc=0
+M-B3 v<0->v<1 applied_rc=1 restored_rc=0
+M-B4 preview-second-impl applied_rc=1 restored_rc=0
+M-F1 guard-bypass applied_rc=1 restored_rc=0
+M-F2 missing-tf-defaults-1 applied_rc=1 restored_rc=0
+M-F3 csv-second-map(drift) applied_rc=1 restored_rc=0
+M-F4 second-validator applied_rc=1 restored_rc=0
+ALL_DONE
+M  api/services/case_import_service.py
+M  frontend/src/app/search/page.tsx
+M  frontend/src/lib/lookaheadDeclaration.ts
+M  momentum/Analysis/event_samples/lookahead_declaration.py

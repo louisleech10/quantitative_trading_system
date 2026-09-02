@@ -938,8 +938,7 @@ class EventImportService:
 
     # ---- 匯入 ----
     # ---- 答案窗宣告（GAP-3 UX Task 1.9／1.11；判定與投影唯一實作在 momentum，本層只轉呼與轉 4xx） ----
-    ON_MISSING_REJECT = "reject"
-    ON_MISSING_BLOCK = "block"
+    # 🔴 R 重開（SPEC Task 1.11）：R 前之 `ON_MISSING_BLOCK`（JSON 直傳落檔但 L3 封鎖）已刪——全部批次一律須宣告。
 
     @staticmethod
     def file_columns(content: bytes, filename: str) -> List[str]:
@@ -1069,19 +1068,13 @@ class EventImportService:
             ))
         return provenance
 
-    def lookahead_depth(
-        self, referenced_columns: List[str], declared_window_bars: Dict[str, int], timeframes: List[str],
-    ) -> Dict[str, object]:
-        """Task 2.1／2.1b：轉呼 pipeline 出口（回純資料；本層不算深度、不複列 reason 字面）。"""
-        return dict(self._pipeline.lookahead_depth(referenced_columns, declared_window_bars, timeframes))
-
     def _resolve_lookahead(
         self, records: List[Dict[str, object]], *, data_columns: List[str],
-        declaration: Optional[Dict[str, object]], on_missing: str,
+        declaration: Optional[Dict[str, object]],
     ) -> Dict[str, object]:
-        """轉呼 pipeline 出口；不合規 ⇒ `EventImportRejectedError`（落檔數 0）。"""
+        """轉呼 pipeline 出口；不合規（含**未宣告**）⇒ `EventImportRejectedError`（落檔數 0）。"""
         out = self._pipeline.resolve_lookahead_declaration(
-            records, data_columns=data_columns, declaration=declaration, on_missing=on_missing)
+            records, data_columns=data_columns, declaration=declaration)
         if not out["ok"]:
             raise EventImportRejectedError(EventImportRejected(
                 kind=str(out["kind"]), message=str(out["message"]), detail=dict(out.get("detail") or {})))
@@ -1091,26 +1084,49 @@ class EventImportService:
         self, content: bytes, filename: str, records: List[Dict[str, object]],
         batch_defaults: Optional[Dict[str, object]] = None,
     ) -> Dict[str, object]:
-        """宣告 UI 之預填資料（Task 1.9 ①：預設值＝檔內最大可用 horizon，逐 tf）。"""
+        """匯入端宣告 UI 之預填資料（Task 1.9 ①：預設值＝檔內最大可用 horizon，逐 tf）。
+
+        欄集＝檔內欄 ∪ 對映後記錄鍵（對映路徑之 `label_definition` 只住 defaults，只看 header 會漏）。
+        實作＝`preview_from_columns`（與匯出端 `lookahead_declaration_preview_from_columns` 同一函式）。
+        """
         cols = self.file_columns(content, filename)
         view = [{**dict(batch_defaults or {}), **r} for r in records]
         tfs = sorted({str(r["timeframe"]) for r in view if r.get("timeframe") is not None})
-        receipt = self._resolve_lookahead(
-            view, data_columns=cols, declaration=None, on_missing=self.ON_MISSING_BLOCK)
-        return {
-            "timeframes": tfs,
-            "data_columns": cols,
-            "default_window_bars": receipt["default_window_bars"],
-            "requires_declaration": receipt["requires_declaration"],
-            "referenced_columns": receipt["referenced_columns"],
-        }
+        return dict(self._pipeline.preview_lookahead_declaration(cols, tfs, records=view))
+
+    def lookahead_declaration_preview_from_columns(
+        self, columns: List[str], timeframes: List[str],
+    ) -> Dict[str, object]:
+        """匯出端（Task 1.9′）宣告框之預填資料：只給欄名集合＋timeframe 集合，不落檔、不算深度。"""
+        return dict(self._pipeline.preview_lookahead_declaration(columns, timeframes))
+
+    @staticmethod
+    def _declaration_from_rows(records: List[Dict[str, object]]) -> Optional[Dict[str, object]]:
+        """JSON 直傳／列內攜帶之宣告（SPEC Task 1.11：列內 `lookahead_bars_declared` 視為 Task 1.9′ 攜帶之宣告）。
+
+        規則：**每一列**皆須帶該欄且**批內同值** ⇒ 導出 `{declared_window_bars: 該 map, acknowledged_unverifiable: True}`；
+        整批皆缺 ⇒ `None`（由 `resolve_declaration` 以 `lookahead_declaration_required` 拒收）；
+        部分缺或列間不同值 ⇒ `None` **且**交由契約 validator 以其「列間不一致」reason 逐列拒
+        （該檢查對此欄無條件執行；本層不複列 reason 字面）。
+        鍵集是否恰為批內 tf 集合、值是否為非負整數，由 `resolve_declaration` 之同一 validator 判。
+
+        🔴 具名殘留 `R35-L2-ACK`（needs-research）：契約無 `acknowledged_unverifiable` 欄，JSON 直傳無法複驗
+        匯出端之勾選 provenance；此處視攜帶之宣告為已於匯出端勾選（匯出守衛不勾不放行）。新增契約欄須 D-6。
+        """
+        maps = [r.get("lookahead_bars_declared") for r in records]
+        present = [m for m in maps if m is not None]
+        if not present or len(present) != len(records):
+            return None
+        first = present[0]
+        if not isinstance(first, dict) or any(m != first for m in present[1:]):
+            return None
+        return {"declared_window_bars": dict(first), "acknowledged_unverifiable": True}
 
     def import_records(
         self, records: List[Dict[str, object]], *, source_name: Optional[str], upload_bytes: Optional[bytes],
         validate_only: bool, verify_source_digest: bool = False, source_bytes: Optional[bytes] = None,
         batch_defaults: Optional[Dict[str, object]] = None, extra_warnings: Optional[List[str]] = None,
         lookahead_declaration: Optional[Dict[str, object]] = None, data_columns: Optional[List[str]] = None,
-        on_missing_declaration: Optional[str] = None,
         column_mapping: Optional[Dict[str, object]] = None, mapping_confirmed_at: Optional[str] = None,
         derive_event_id: bool = False,
     ) -> EventImportResponse:
@@ -1138,11 +1154,30 @@ class EventImportService:
         # 🔴 以 batch_defaults **填補缺值**後之視圖判定（與 validate 之語意一致：列自帶值優先）——
         #    否則對映路徑之 `label_definition`（含 filters）只住 defaults，引用欄會整批看不見。
         declaration_view = [{**dict(batch_defaults or {}), **r} for r in records]
+        verify_bytes = (source_bytes if source_bytes is not None else upload_bytes) if verify_source_digest else None
+        # 🔴 R 重開（SPEC Task 1.11）：**全部批次一律須宣告**。宣告來源兩種：
+        #    ① 表單 `lookahead_declaration`（CSV／對映路徑之宣告 UI）；
+        #    ② 列內 `lookahead_bars_declared`（JSON 直傳；Task 1.9′ 匯出時攜帶），批內同值且每列皆帶才算。
+        #    兩者皆有 ⇒ **表單宣告為準**（使用者在宣告框當下所填；列內攜帶值是上一次匯出時的宣告），
+        #    落檔列之 `lookahead_bars_declared` 一律改寫為本次宣告（同一批只有一個深度真相），差異記警語。
+        #    皆無 ⇒ `lookahead_declaration_required`。
+        #    列內不齊（部分缺／列間不同值）且無表單宣告 ⇒ 先跑契約 validate 讓其「列間不一致」reason 逐列現形。
+        #    空批 ⇒ 沒有 tf 可宣告，同樣先跑 validate（由契約以 `empty_import` 拒，落檔 0；不在此以鍵集不符誤報）。
+        carried = self._declaration_from_rows(declaration_view) if declaration_view else None
+        declaration = lookahead_declaration
+        rows_partially_carry = declaration is None and carried is None \
+            and any(r.get("lookahead_bars_declared") is not None for r in declaration_view)
+        if not declaration_view or rows_partially_carry:
+            df0, failures0 = self._pipeline.validate(records, source_bytes=verify_bytes, batch_defaults=batch_defaults)
+            if df0 is None:
+                raise EventImportRejectedError(EventImportRejected(
+                    kind="contract_violation",
+                    message=f"{len(failures0)} 筆契約違規（逐列 reason 見 failures；字面＝event_import_contract.json）",
+                    failures=[EventImportFailure(**{k: f.get(k) for k in ("row", "event_id", "field", "reason", "message")})
+                              for f in failures0]))
         declaration_receipt = self._resolve_lookahead(
             declaration_view, data_columns=list(data_columns) if data_columns is not None else columns,
-            declaration=lookahead_declaration,
-            on_missing=on_missing_declaration or self.ON_MISSING_REJECT)
-        verify_bytes = (source_bytes if source_bytes is not None else upload_bytes) if verify_source_digest else None
+            declaration=declaration if declaration is not None else carried) if declaration_view else {}
         df, failures = self._pipeline.validate(records, source_bytes=verify_bytes, batch_defaults=batch_defaults)
         digest = _hashlib.sha256(upload_bytes).hexdigest() if upload_bytes is not None else None
         if df is None:
@@ -1158,6 +1193,15 @@ class EventImportService:
         if declaration_receipt.get("lookahead_bars_declared"):
             self._pipeline.apply_lookahead_horizon_projection(
                 stored_records, declaration_receipt["lookahead_bars_declared"])
+            # 🔴 單一深度真相：落檔列之 `lookahead_bars_declared` 一律＝本次宣告投影（表單宣告為準；
+            #    列內攜帶值若不同，只記警語不靜默）。
+            depth_map = {str(k): int(v) for k, v in dict(declaration_receipt["lookahead_bars_declared"]).items()}
+            if carried is not None and dict(carried["declared_window_bars"]) != depth_map:
+                warnings.append(
+                    f"列內攜帶之 lookahead_bars_declared {carried['declared_window_bars']} 與本次宣告 {depth_map} 不同；"
+                    "以本次宣告為準寫入落檔列")
+            for rec in stored_records:
+                rec["lookahead_bars_declared"] = dict(depth_map)
         imported_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         # Task 1.6：對映路徑之 provenance——**在落檔之前**驗證（不合規 ⇒ 拒收，落檔數 0）。
         # JSON 直傳路徑無對映可追，不寫本 namespace。

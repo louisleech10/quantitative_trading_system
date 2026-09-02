@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareFromPreview, previewOf } from '@/test/lookaheadDeclarationTestUtils';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import type { CaseData, SearchResultData } from '@/lib/types';
@@ -18,7 +19,7 @@ const depthMock = vi.fn();
 
 vi.mock('@/lib/api', async (orig) => {
   const actual = await orig<typeof import('@/lib/api')>();
-  return { ...actual, fetchLookaheadDepth: (...a: unknown[]) => depthMock(...a) };
+  return { ...actual, fetchLookaheadDeclarationPreviewColumns: (...a: unknown[]) => depthMock(...a) };
 });
 
 const blobs: string[] = [];
@@ -55,7 +56,7 @@ async function exportRecords(): Promise<Record<string, unknown>[]> {
 
 beforeEach(() => {
   seed();
-  depthMock.mockResolvedValue({ depth_by_timeframe: { '1h': 5 } });
+  depthMock.mockResolvedValue(previewOf({ '1h': 5 }));
   blobs.length = 0;
   const RealBlob = globalThis.Blob;
   vi.stubGlobal('Blob', class extends RealBlob {
@@ -101,7 +102,7 @@ describe('Task 4.1c — 明文標示本批不提供 IC decay', () => {
 
   it('🔴 邊界①：改附帶欄之選擇 ⇒ `window.horizon_bars` **不變**（附帶欄不是答案窗）', async () => {
     render(<SearchPage />);
-    await waitFor(() => expect(depthMock).toHaveBeenCalled());
+    await declareFromPreview();
 
     selectOnly([1, 3, 7]);
     const a = (await exportRecords())[0];

@@ -38,12 +38,6 @@ from momentum.Analysis.event_samples.lookahead_registry import (
     resolve_lookahead_bars,
 )
 
-#: 宣告缺失時之兩種處置（見檔尾 `resolve_declaration` docstring）。
-ON_MISSING_REJECT = "reject"
-ON_MISSING_BLOCK = "block"
-_ON_MISSING_KINDS = (ON_MISSING_REJECT, ON_MISSING_BLOCK)
-
-
 class LookaheadDeclarationError(ValueError):
     """宣告缺失或不合規（fail-closed；`kind` 由 api 層轉 4xx，非契約 reason 字面）。"""
 
@@ -256,6 +250,60 @@ def default_window_bars_by_timeframe(
     return out
 
 
+def declaration_is_unverifiable(
+    records: Sequence[Mapping[str, Any]],
+    referenced: Iterable[str],
+    timeframes: Iterable[str],
+    *,
+    provenance: str = PROVENANCE_EXTERNAL_UPLOAD,
+    registry: Optional[Mapping[str, Any]] = None,
+) -> bool:
+    """「宣告值本身是不可驗聲明 ⇒ 須勾選」之**唯一**判定（後端 `resolve_declaration` 與兩端 preview 共用）。
+
+    True ⇔ (a) 引用了 registry 驗不了深度的欄；或 (b) 帶條件但形狀非 canonical（抽不出引用欄＝不可判定，fail-closed）。
+    🔴 與「須宣告」（R 後恆 True）分開：一律宣告 ≠ 一律勾選。前端不得自寫第二份判定——由 preview 之
+    `acknowledgement_required` 承載，否則會出現「後端要求勾選、畫面卻沒有勾選框」之缺口。
+    """
+    r = registry if registry is not None else load_lookahead_registry()
+    ref = sorted({str(c) for c in referenced})
+    tfs = [str(tf) for tf in timeframes]
+    if ref:
+        return any(requires_declaration(ref, tf, provenance=provenance, registry=r) for tf in tfs)
+    return bool(records) and batch_has_filters(records) and not batch_filters_are_canonical(records)
+
+
+def preview_from_columns(
+    data_columns: Iterable[str],
+    timeframes: Iterable[str],
+    *,
+    records: Sequence[Mapping[str, Any]] = (),
+    registry: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """宣告框之**預填資料**（SPEC Task 1.9 ①／Task 1.9′；`LookaheadDeclarationPreview` 之唯一實作）。
+
+    匯入端（`/case/import-events/lookahead-declaration`，欄集＝檔內欄∪對映後記錄鍵）與匯出端
+    （`/case/lookahead-declaration/preview-columns`，欄集＝搜尋結果欄∪附帶欄）**同一函式**——
+    前端只顯示，**禁**在 TS 重寫換算表（`CODEX-R35-P1-04`／`COMPOSER-R35-P2-02`）。
+
+    🔴 `default_window_bars` 只是**預設候選**（registry 之揭露用途），不是深度導出：深度＝使用者宣告
+    （D-8 規則②）。無任何可解析未來欄之 tf 預設 0 ⇒ 前端留空不預填（`initialDeclaredWindowBars`）。
+    🔴 `requires_declaration` 恆 True（Task 1.11「一律宣告」）；`referenced_columns` 只供警語／揭露；
+    `acknowledgement_required`＝`declaration_is_unverifiable(...)`（與後端拒收判定同一函式）——前端勾選列據此顯示。
+    """
+    r = registry if registry is not None else load_lookahead_registry()
+    cols = sorted({str(c) for c in data_columns} | {str(k) for rec in records for k in rec.keys()})
+    tfs = sorted({str(tf) for tf in timeframes})
+    referenced = batch_referenced_columns(records, cols) if records else set()
+    return {
+        "timeframes": tfs,
+        "data_columns": cols,
+        "default_window_bars": default_window_bars_by_timeframe(cols, tfs, r),
+        "requires_declaration": True,
+        "referenced_columns": sorted(referenced),
+        "acknowledgement_required": declaration_is_unverifiable(list(records), referenced, tfs, registry=r),
+    }
+
+
 # --------------------------------------------------------------------------- 投影
 def embargo_ms_by_symbol(
     records: Sequence[Mapping[str, Any]],
@@ -340,7 +388,7 @@ def _validate_declaration_shape(
     if not isinstance(declared, Mapping):
         raise LookaheadDeclarationError(
             "lookahead_declaration_invalid",
-            "lookahead_declaration.declared_window_bars 須為 {timeframe: 正整數} 之物件"
+            "lookahead_declaration.declared_window_bars 須為 {timeframe: 非負整數} 之物件"
             "（🔴 逐 tf 各一值；單一輸入框套用全部 tf 不被接受）",
         )
     keys = {str(k) for k in declared}
@@ -356,10 +404,12 @@ def _validate_declaration_shape(
     by_str = {str(k): v for k, v in declared.items()}
     for tf in sorted(expected):
         v = by_str[tf]
-        if type(v) is not int or v < 1:  # noqa: E721 —— bool 是 int 子類，須用 type() 擋
+        # 🔴 R 重開 D-8／R35：值域為**非負整數**——`0` ＝「未用任何未來資訊」，須**明填**（留白＝缺鍵，
+        #    由上方鍵集檢查拒），不是預設；負數／bool／非 int 一律拒。
+        if type(v) is not int or v < 0:  # noqa: E721 —— bool 是 int 子類，須用 type() 擋
             raise LookaheadDeclarationError(
                 "lookahead_declaration_invalid",
-                f"declared_window_bars[{tf!r}] 須為正整數（任意正整數，不限 1..12；bool 亦拒），實得 {v!r}",
+                f"declared_window_bars[{tf!r}] 須為非負整數（任意非負整數，不限 0..12；0 須明填；bool 亦拒），實得 {v!r}",
             )
         out[tf] = int(v)
     ack = declaration.get("acknowledged_unverifiable", False)
@@ -377,7 +427,6 @@ def resolve_declaration(
     data_columns: Iterable[str],
     declaration: Optional[Mapping[str, Any]],
     timeframe_seconds: Mapping[str, int],
-    on_missing: str = ON_MISSING_REJECT,
     provenance: str = PROVENANCE_EXTERNAL_UPLOAD,
     registry: Optional[Mapping[str, Any]] = None,
 ) -> DeclarationOutcome:
@@ -390,17 +439,15 @@ def resolve_declaration(
         declaration: `{"declared_window_bars": {tf: int}, "acknowledged_unverifiable": bool}`；
             `None` ＝使用者未填。
         timeframe_seconds: 注入之 tf → 秒 map（SPEC R22；不得取 module-level 常數）。
-        on_missing: 需宣告卻未填時之處置——
-            `"reject"`＝有宣告 UI 之路徑（Task 1.11 邊界②：fail-closed，落檔數 0）；
-            `"block"`＝無宣告 UI 之路徑（JSON／平台產生器），落檔但 L3 封鎖切分（Task 1.12）。
         provenance: 信任邊界（預設 `external_upload`：欄名對外部來源不具證據力）。
 
+    🔴 R 重開（SPEC D-8／Task 1.11）：**全部批次一律須宣告**。R 前的 `on_missing="block"`
+    （JSON 直傳「落檔但 L3 封鎖」）已刪除——`declaration is None` 一律 `lookahead_declaration_required`
+    （fail-closed，落檔數 0）；JSON 直傳之宣告由呼叫端自列內 `lookahead_bars_declared` 導出後傳入。
+
     Raises:
-        LookaheadDeclarationError: 需宣告卻未填（`on_missing="reject"`）、宣告形狀不合、
-            或未勾聲明而調低。
+        LookaheadDeclarationError: 未填宣告、宣告形狀不合、或未勾聲明而調低。
     """
-    if on_missing not in _ON_MISSING_KINDS:
-        raise ValueError(f"未知 on_missing: {on_missing!r}（封閉集合 {_ON_MISSING_KINDS}）")
     r = registry if registry is not None else load_lookahead_registry()
     # 候選欄＝可見 header **∪** 對映後之記錄鍵：CSV 對映後 `filters` 可能寫**契約欄名**而 header 是
     # 使用者原始欄名，只用 header 會抽不到（R1 `CODEX-R1-P1-01` 之實跑反例）。
@@ -421,39 +468,34 @@ def resolve_declaration(
     # 🔴 B5／`R-B3-2`：第二支多了一個例外——`filters` **全部符合契約 wire_shape** 時，
     #    「沒有引用欄」是抽取器**讀得懂而得出**的結論，不是抽不出來；此時不再多要一次宣告。
     #    任一列不符形狀即回到原本的 fail-closed（外部 filters 可以是任意形狀）。
-    needs = (
-        any(requires_declaration(referenced, tf, provenance=provenance, registry=r) for tf in timeframes)
-        if referenced
-        else (batch_has_filters(records) and not batch_filters_are_canonical(records))
-    )
+    # 🔴 R 重開 D-8／Task 1.11（三家 R35 P0）：`needs` **恆為 True**——R 前之條件式
+    #    `any(requires_declaration…) if referenced else (batch_has_filters and not canonical)`
+    #    在 R 後 `referenced=∅`、`batch_has_filters=False`（`label_definition.filters` 無寫入者）會恆假
+    #    ⇒ 全部批次免宣告＝L2 在兩條路徑同時 fail-open。深度之唯一來源＝使用者宣告，故一律要。
+    #    `referenced` 仍算出、仍進 receipt：只作「系統無法驗證此深度」之額外警語與揭露，不是觸發條件。
+    # 🔴 上方三支 fail-closed 之設計理由（抽不出／非 canonical）自此失去觸發意義，保留其函式供
+    #    receipt 揭露；不得回退為條件式（mutation：改回條件式 ⇒ Task 1.11 驗證②③須紅）。
+    needs = True
+    # 🔴 「須勾選不可驗聲明」與「須宣告」是兩件事（SPEC Task 1.9 ①／1.11 ③）：宣告一律要；
+    #    **勾選**只在 (a) 引用了 registry 驗不了深度的欄（含抽不出引用欄之非 canonical filters）
+    #    或 (b) 使用者把值調到預設之下時要求。R 前這兩者共用同一個 `needs`，R 後拆開，
+    #    否則「一律宣告」會連帶把每一批都變成「一律勾選」——那不是 SPEC 要的，也會讓勾選失去鑑別力。
+    unverifiable = declaration_is_unverifiable(records, referenced, timeframes, provenance=provenance, registry=r)
     defaults = default_window_bars_by_timeframe(cols, timeframes, r) if timeframes and not unknown_tfs else {}
 
     if declaration is None:
-        if needs and on_missing == ON_MISSING_REJECT:
-            raise LookaheadDeclarationError(
-                "lookahead_declaration_required",
-                "本批之篩選條件引用了深度無法由 registry 驗證之欄位 ⇒ 依 D-7 之 L2 必須宣告答案窗"
-                "（逐 timeframe 各一值）；未宣告一律拒收，不以任何預設深度代替",
-                {"referenced_columns": list(referenced), "default_window_bars": defaults},
-            )
-        gate = (
-            LookaheadGate.blocked_by(
-                "未填答案窗宣告，深度不可證（L2 未完成）", tuple(referenced)
-            )
-            if needs
-            else LookaheadGate.allowed()
-        )
-        return DeclarationOutcome(
-            requires_declaration=needs, referenced_columns=tuple(referenced), default_window_bars=defaults,
-            declared_window_bars=None, lookahead_bars_declared=None, acknowledged_unverifiable=False,
-            embargo_ms_by_symbol={}, gate=gate,
+        raise LookaheadDeclarationError(
+            "lookahead_declaration_required",
+            "本批尚未宣告答案窗（每個 timeframe 各一值；填正例與反例兩邊判定所用之最遠者，"
+            "未用任何未來資訊請明填 0）；未宣告一律拒收，不以任何預設深度代替",
+            {"referenced_columns": list(referenced), "default_window_bars": defaults},
         )
 
     declared, ack = _validate_declaration_shape(declaration, timeframes)
     # 🔴 R1（`CODEX-R1-P1-02`）：L2 被觸發＝深度**本來就驗不了**，此時宣告值本身就是不可驗聲明
     #    ⇒ 一律要求勾選，與有沒有「調低」無關。原版只在調低時要求，使得
     #    「檔內無可解析欄（預設 0）＋自訂欄」這條最該勾的路徑反而不必勾（SPEC Task 1.11 ③ 明列勾選為要件）。
-    if needs and not ack:
+    if unverifiable and not ack:
         raise LookaheadDeclarationError(
             "lookahead_declaration_unacknowledged_unverifiable",
             "本批之深度無法由 registry 驗證（引用了未登記欄，或來源為外部上傳）"
@@ -508,16 +550,16 @@ def gate_from_receipt(receipt: Optional[Mapping[str, Any]]) -> LookaheadGate:
 
 
 __all__ = [
-    "ON_MISSING_BLOCK",
-    "ON_MISSING_REJECT",
     "DeclarationOutcome",
     "LookaheadDeclarationError",
     "apply_horizon_projection",
     "batch_filters_are_canonical",
     "batch_referenced_columns",
     "canonical_filter_columns",
+    "declaration_is_unverifiable",
     "default_window_bars_by_timeframe",
     "embargo_ms_by_symbol",
+    "preview_from_columns",
     "filters_referenced_columns",
     "gate_from_receipt",
     "resolve_declaration",

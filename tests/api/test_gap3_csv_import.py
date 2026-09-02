@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.services import case_import_service as svc_mod
 from momentum.factories import create_event_sample_pipeline
+from tests.api._gap3_declaration import declaration_for_timeframes
 from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
 client = TestClient(app)
@@ -68,7 +69,9 @@ def _rows(n=2):
 
 
 def _post_csv(content: bytes, mapping=None, defaults=None, **params):
-    data = {"column_mapping": json.dumps(MAPPING if mapping is None else mapping, ensure_ascii=False)}
+    data = {"column_mapping": json.dumps(MAPPING if mapping is None else mapping, ensure_ascii=False),
+            # R 重開（Task 1.11）：全部批次一律須宣告；本檔不測宣告本身
+            "lookahead_declaration": declaration_for_timeframes(["12h"])}
     if defaults is not False:
         data["batch_defaults"] = json.dumps(_defaults() if defaults is None else defaults)
     return client.post(

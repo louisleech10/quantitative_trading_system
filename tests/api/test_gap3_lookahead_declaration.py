@@ -149,16 +149,30 @@ def test_lookahead_declaration_03_unextractable_filters_are_fail_closed(filters,
     assert _stored_count() == 0, why
 
 
-def test_lookahead_declaration_03b_no_filters_does_not_require_declaration():
-    """對照組：沒有任何條件 ⇒ 不強制宣告。
+def test_lookahead_declaration_03b_no_filters_still_requires_declaration():
+    """🔴 R 重開（SPEC Task 1.11 驗證②）：**沒有任何條件、全為系統欄** ⇒ 仍強制宣告。
 
-    沒有這條，③ 會被一個「全部都拒收」的實作滿足（那不是 fail-closed，是壞掉）。
+    R 前本條是對照組「無條件 ⇒ 不強制」；R 後 `label_definition.filters` 無寫入者，
+    條件式 `needs` 會恆假而 fail-open（三家 R35 P0）⇒ `needs` 恆 True。
+    mutation：把 `needs` 改回條件式 ⇒ 本條紅（200 而非拒收）。
+    對照（防「全部都拒收」之壞掉實作）：同一批**帶宣告**即 200——見下一條。
     """
     base = make_event(0)
     plain = {k: base[k] for k in DEFAULT_FIELDS}
     r = _post_csv(declaration=None, defaults=plain)
+    assert r.status_code in (400, 422), r.text
+    assert r.json()["detail"]["kind"] == "lookahead_declaration_required"
+    assert _stored_count() == 0
+
+
+def test_lookahead_declaration_03c_no_filters_with_declaration_is_accepted():
+    """對照組：同一「無條件、全系統欄」之批，**帶宣告**即收（證 03b 擋的是缺宣告，不是恆紅）。"""
+    base = make_event(0)
+    plain = {k: base[k] for k in DEFAULT_FIELDS}
+    r = _post_csv(declaration={"declared_window_bars": {"12h": 2}, "acknowledged_unverifiable": True}, defaults=plain)
     assert r.status_code == 200, r.text
-    assert r.json()["lookahead_declaration"]["requires_declaration"] is False
+    assert r.json()["lookahead_declaration"]["requires_declaration"] is True
+    assert r.json()["lookahead_declaration"]["lookahead_bars_declared"] == {"12h": 2}
     assert _stored_count() == 1
 
 

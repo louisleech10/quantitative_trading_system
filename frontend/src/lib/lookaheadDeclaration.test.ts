@@ -19,7 +19,7 @@ const singleTf: LookaheadDeclarationPreview = {
   timeframes: ['12h'],
   data_columns: ['future_1bar_return', 'future_12bar_return'],
   default_window_bars: { '12h': 12 },
-  requires_declaration: false,
+  requires_declaration: true,     // R 重開：每批都要宣告（恆 True）；勾選與否改看 referenced_columns／調低
   referenced_columns: [],
 };
 
@@ -77,7 +77,7 @@ describe('答案窗宣告：逐 tf 各一格', () => {
 
   it('逐 tf 各填即通過，送出形狀鍵集恰為批內 tf', () => {
     const declared = { '1h': 72, '12h': 6 };
-    // multiTf.requires_declaration 為 true ⇒ 仍須勾選（見下一組）
+    // multiTf 引用了驗不了的欄（referenced_columns 非空）⇒ 仍須勾選（見下一組）
     expect(validateDeclaration(declared, true, multiTf).ok).toBe(true);
     const payload = buildDeclarationPayload(declared, true, multiTf);
     expect(Object.keys(payload!.declared_window_bars).sort()).toEqual(['12h', '1h']);
@@ -85,7 +85,7 @@ describe('答案窗宣告：逐 tf 各一格', () => {
 });
 
 describe('答案窗宣告：深度驗不了時一律須勾選（R1 CODEX-R1-P1-02）', () => {
-  it('requires_declaration 為 true ⇒ 即使沒調低也要勾', () => {
+  it('referenced_columns 非空（引用了驗不了的欄）⇒ 即使沒調低也要勾', () => {
     const declared = { '1h': 72, '12h': 6 };   // 皆等於預設，沒有調低
     expect(loweredTimeframes(declared, multiTf)).toEqual([]);
     const v = validateDeclaration(declared, false, multiTf);
@@ -94,7 +94,9 @@ describe('答案窗宣告：深度驗不了時一律須勾選（R1 CODEX-R1-P1-0
     expect(v.problems.join(' ')).toContain(UNVERIFIABLE_DECLARATION_WARNING);
   });
 
-  it('requires_declaration 為 false 且沒調低 ⇒ 不必勾（否則就是全面擋死，不是 fail-closed）', () => {
+  it('沒引用驗不了的欄、也沒調低 ⇒ 不必勾（「一律宣告」≠「一律勾選」，否則勾選失去鑑別力）', () => {
+    // 🔴 R 重開後 requires_declaration 恆 true，但它只表示「要宣告」，不是勾選理由
+    expect(singleTf.requires_declaration).toBe(true);
     const v = validateDeclaration({ '12h': 12 }, false, singleTf);
     expect(v.ok).toBe(true);
     expect(v.requiresAcknowledgement).toBe(false);
@@ -102,10 +104,14 @@ describe('答案窗宣告：深度驗不了時一律須勾選（R1 CODEX-R1-P1-0
 });
 
 describe('答案窗宣告：欄位值', () => {
-  it('接受任意正整數（不限 1..12），拒非正整數', () => {
+  it('接受任意非負整數（R35：0 ＝未用未來資訊，須明填），拒負數／非整數／NaN', () => {
     expect(validateDeclaration({ '12h': 20 }, false, singleTf).ok).toBe(true);
-    expect(validateDeclaration({ '12h': 0 }, true, singleTf).ok).toBe(false);
+    // 🔴 R 重開 D-8／R35 裁定：`0` 合法（但屬調低 ⇒ 須勾選）；留白（缺鍵）才是「尚未填寫」
+    expect(validateDeclaration({ '12h': 0 }, true, singleTf).ok).toBe(true);
+    expect(validateDeclaration({ '12h': 0 }, false, singleTf).ok).toBe(false);
+    expect(validateDeclaration({ '12h': -1 }, true, singleTf).ok).toBe(false);
     expect(validateDeclaration({ '12h': 1.5 }, true, singleTf).ok).toBe(false);
     expect(validateDeclaration({ '12h': Number.NaN }, true, singleTf).ok).toBe(false);
+    expect(validateDeclaration({}, true, singleTf).problems.join(' ')).toContain('尚未填寫');
   });
 });

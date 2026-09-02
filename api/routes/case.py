@@ -28,8 +28,7 @@ from ..models.event_import_models import (
     EventImportListResponse,
     EventImportRejected,
     EventImportResponse,
-    LookaheadDepthRequest,
-    LookaheadDepthResponse,
+    LookaheadDeclarationPreviewColumnsRequest,
 )
 from ..services.batch_download_service import get_batch_download_service
 from ..utils.case_storage import get_case_storage_manager
@@ -233,12 +232,12 @@ async def import_events_json(request: EventImportJsonRequest):
         ).model_dump())
     body = _json.dumps(request.records, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
     try:
-        # 🔴 JSON 端點**無宣告 UI**（程式化呼叫）⇒ 需宣告而未填時走 Task 1.12 之「落檔但 L3 封鎖切分」，
-        #    不套用 Task 1.11 邊界②之拒收（那條的標的是有宣告 UI 的上傳路徑）。
+        # 🔴 R 重開（SPEC Task 1.11）：JSON 直傳**無宣告 UI**，其宣告＝列內 `lookahead_bars_declared`
+        #    （Task 1.9′ 匯出時攜帶）；整批缺該欄 ⇒ **拒收**（R 前「落檔但 L3 封鎖」已刪，三家 R35 P0）。
+        #    導出規則住 service（批內同值、每個出現之 tf 皆有鍵）。
         return svc.import_records(request.records, source_name=request.source_name, upload_bytes=body,
                                   validate_only=request.validate_only, verify_source_digest=request.verify_source_digest,
-                                  batch_defaults=request.batch_defaults,
-                                  on_missing_declaration=svc.ON_MISSING_BLOCK)
+                                  batch_defaults=request.batch_defaults)
     except EventImportRejectedError as exc:
         raise _rejected(exc, svc=svc, content=body)
 
@@ -345,23 +344,17 @@ async def lookahead_declaration_preview(
         raise _rejected(exc, svc=svc, content=content)
 
 
-@router.post("/case/lookahead-depth", response_model=LookaheadDepthResponse)
-async def lookahead_depth(request: LookaheadDepthRequest):
-    """GAP-3 UX Task 2.1／2.1b（B5）：由**篩選條件引用之欄**導出逐 tf 答案窗下界。
+@router.post("/case/lookahead-declaration/preview-columns")
+async def lookahead_declaration_preview_columns(request: LookaheadDeclarationPreviewColumnsRequest):
+    """GAP-3 UX Task 1.9′（R 重開 D-8）：`/search` 匯出端答案窗宣告框之**預填**資料。
 
-    `/search` 之篩選面板在條件變動後呼叫本端點取得下界，餵給前端之
-    `withHorizonLowerBoundGuard()`——**解除具名殘留 `D-002 A-004`**
-    （在此之前 `lookaheadLowerBound` 恆為 `null`，B1 交付的鎖定機制在生產上等於死碼）。
-
-    🔴 本端點只讀不落檔，且**不算深度**——轉呼 `EventSamplePipeline.lookahead_depth()`
-    出口（其唯一實作在 momentum）。前端不得在 TS 重寫一份。
+    輸入＝搜尋結果之欄名集合＋timeframe 集合；回 `LookaheadDeclarationPreview`（與匯入端
+    `/case/import-events/lookahead-declaration` 同形、同一實作 `preview_from_columns`）。
+    🔴 只讀不落檔、**不算深度**：預設值只是 registry 之揭露候選，深度＝使用者宣告。
+    （Phase 2 之 `/case/lookahead-depth` 已於 R 重開退役——深度不再由篩選條件導出。）
     """
-    out = get_event_import_service().lookahead_depth(
-        list(request.referenced_columns), dict(request.declared_window_bars), list(request.timeframes))
-    if not out["ok"]:
-        raise HTTPException(status_code=422, detail=EventImportRejected(
-            kind=str(out["kind"]), message=str(out["message"])).model_dump())
-    return LookaheadDepthResponse(depth_by_timeframe=out["depth_by_timeframe"])
+    return get_event_import_service().lookahead_declaration_preview_from_columns(
+        list(request.columns), list(request.timeframes))
 
 
 @router.get("/case/events", response_model=EventImportListResponse)

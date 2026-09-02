@@ -1,0 +1,73 @@
+============================= test session starts ==============================
+collected 1136 items / 483 deselected / 653 selected
+
+tests/api/test_gap3_contract_csv_guard.py ........                       [  1%]
+tests/api/test_gap3_contract_reason_registry.py ..................       [  3%]
+tests/api/test_gap3_csv_import.py ...............                        [  6%]
+tests/api/test_gap3_csv_provenance.py ..........                         [  7%]
+tests/api/test_gap3_csv_ragged_rows.py ...............                   [ 10%]
+tests/api/test_gap3_csv_roundtrip.py ......                              [ 11%]
+tests/api/test_gap3_declaration_mandatory.py .................           [ 13%]
+tests/api/test_gap3_event_analysis_horizon_purge.py .................... [ 16%]
+...                                                                      [ 17%]
+tests/api/test_gap3_event_batch_detail_dims.py .......                   [ 18%]
+tests/api/test_gap3_event_delete.py ...............                      [ 20%]
+tests/api/test_gap3_feature_coverage_gate.py .....................       [ 23%]
+tests/api/test_gap3_future_column_inventory_drift.py ..                  [ 24%]
+tests/api/test_gap3_heterogeneous_rows.py ......                         [ 24%]
+tests/api/test_gap3_horizon_declaration.py ..........                    [ 26%]
+tests/api/test_gap3_ic_feature_cap.py ....                               [ 27%]
+tests/api/test_gap3_ic_progress_fields.py .....                          [ 27%]
+tests/api/test_gap3_ic_stop_gate.py ..............................       [ 32%]
+tests/api/test_gap3_import.py ................                           [ 34%]
+tests/api/test_gap3_lookahead_declaration.py ...........                 [ 36%]
+tests/api/test_gap3_lookahead_depth.py .........                         [ 37%]
+tests/api/test_gap3_source_digest.py ..................                  [ 40%]
+tests/api/test_gap3_source_json_hint.py ..........                       [ 42%]
+tests/api/test_gap3_t0_unit_detect.py .......                            [ 43%]
+tests/api/test_lookahead_rename_attack.py .........................      [ 47%]
+tests/momentum/event_samples/test_alignment.py .............             [ 49%]
+tests/momentum/event_samples/test_all_bars_eval.py ............          [ 50%]
+tests/momentum/event_samples/test_baseline_oracle.py ...........         [ 52%]
+tests/momentum/event_samples/test_candidate_ledger.py .................. [ 55%]
+.                                                                        [ 55%]
+tests/momentum/event_samples/test_canonical_serialize.py .........       [ 56%]
+tests/momentum/event_samples/test_condition_engine.py .................. [ 59%]
+.........................                                                [ 63%]
+tests/momentum/event_samples/test_counterexample_classifier.py ......... [ 64%]
+.......                                                                  [ 66%]
+tests/momentum/event_samples/test_dedupe.py ........                     [ 67%]
+tests/momentum/event_samples/test_event_split.py .........               [ 68%]
+tests/momentum/event_samples/test_feature_materialization.py .......     [ 69%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py ...... [ 70%]
+.............                                                            [ 72%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py .... [ 73%]
+............                                                             [ 75%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py ........        [ 76%]
+tests/momentum/event_samples/test_gap3_horizon_curve.py ....             [ 76%]
+tests/momentum/event_samples/test_gap3_split_blocked.py .........        [ 78%]
+tests/momentum/event_samples/test_generator_adapters.py ................ [ 80%]
+.....                                                                    [ 81%]
+tests/momentum/event_samples/test_import_contract.py ................... [ 84%]
+.........                                                                [ 85%]
+tests/momentum/event_samples/test_lookahead_registry.py ................ [ 88%]
+...............                                                          [ 90%]
+tests/momentum/event_samples/test_metrics_glossary.py ..............     [ 92%]
+tests/momentum/event_samples/test_mutation_guard.py ............         [ 94%]
+tests/momentum/event_samples/test_pattern_bridge.py ..........           [ 96%]
+tests/momentum/event_samples/test_pipeline.py ......                     [ 96%]
+tests/momentum/event_samples/test_return_table_by_label.py ............. [ 98%]
+                                                                         [ 98%]
+tests/momentum/event_samples/test_tables.py .......                      [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/fastapi/applications.py:1051
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/fastapi/applications.py:1051: PytestCollectionWarning: cannot collect 'test_app' because it is not a function.
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+
+tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_11c_legacy_timestamps_only_still_accepted
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:963: OptimizeWarning: Covariance of the parameters could not be estimated
+    params, _ = optimize.curve_fit(model, x, y, maxfev=2000)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========== 653 passed, 483 deselected, 2 warnings in 77.38s (0:01:17) ==========

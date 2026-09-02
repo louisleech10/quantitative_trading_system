@@ -2,6 +2,7 @@
 
 import {
   UNVERIFIABLE_DECLARATION_WARNING,
+  acknowledgementRequiredByPreview,
   loweredTimeframes,
   type LookaheadDeclarationPreview,
 } from '@/lib/lookaheadDeclaration';
@@ -34,10 +35,11 @@ export default function LookaheadDeclarationFields({
       <div>
         <p className="text-sm font-semibold text-amber-100">答案窗宣告（每個 K 線週期各填一次）</p>
         <p className="text-xs text-amber-200/80">
-          你的正例條件最遠用到 t₀ 之後第幾根？這個值同時決定 train/test 的隔離寬度（purge），
-          {preview.requires_declaration
-            ? '本批引用了系統無法驗證深度的欄位，因此必須宣告。'
-            : '預設已填入檔內最大可用的 horizon。'}
+          你的正例與反例判定最遠用到 t₀ 之後第幾根（填兩邊較遠者）？這個值同時決定 train/test 的隔離寬度（purge）。
+          每一批都必須宣告；未用任何未來資訊請明填 0（留白不算 0）。
+          {acknowledgementRequiredByPreview(preview)
+            ? '本批引用了系統無法驗證深度的欄位（或條件形狀無法解析），宣告後還須勾選確認。'
+            : '有可解析的未來欄時，預設已填入最大可用的 horizon。'}
         </p>
         {preview.referenced_columns.length > 0 && (
           <p className="mt-1 text-[11px] font-mono text-amber-200/70" data-testid="lookahead-referenced-columns">
@@ -52,7 +54,7 @@ export default function LookaheadDeclarationFields({
             <span className="w-16 font-mono text-xs text-slate-300">{tf}</span>
             <input
               type="number"
-              min={1}
+              min={0}
               step={1}
               data-testid={`lookahead-window-${tf}`}
               value={Number.isFinite(declared[tf]) ? declared[tf] : ''}
@@ -70,7 +72,7 @@ export default function LookaheadDeclarationFields({
         ))}
       </div>
 
-      {(preview.requires_declaration || lowered.length > 0) && (
+      {(acknowledgementRequiredByPreview(preview) || lowered.length > 0) && (
         <label className="flex items-start gap-2 text-sm text-amber-100" data-testid="lookahead-ack-row">
           <input
             type="checkbox"
@@ -80,7 +82,7 @@ export default function LookaheadDeclarationFields({
             className="mt-1"
           />
           <span>
-            我的篩選條件未用到超過所填的根數
+            我的正反例判定未用到超過所填的根數
             {lowered.length > 0 ? `（${lowered.join('、')}）` : ''}。
             <strong className="text-amber-200"> {UNVERIFIABLE_DECLARATION_WARNING}</strong>
           </span>

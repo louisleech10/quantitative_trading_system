@@ -165,22 +165,17 @@ class EventImportDetailResponse(BaseModel):
     batch_fact_notes: EventBatchFactNotes = Field(default_factory=EventBatchFactNotes)
 
 
-class LookaheadDepthRequest(BaseModel):
-    """GAP-3 UX Task 2.1／2.1b（B5，解除 `D-002 A-004`）：由篩選條件導出逐 tf 答案窗下界。
+class LookaheadDeclarationPreviewColumnsRequest(BaseModel):
+    """GAP-3 UX Task 1.9′（R 重開 D-8）：`/search` 匯出端答案窗宣告框之**預填**資料請求。
 
-    🔴 `referenced_columns` **只放篩選條件實際引用之欄**；Task 4.1 之附帶欄不得混入
-    （SPEC Task 2.1b 覆蓋風險：附帶欄與 label 判定無關，納入會過度 purge）。
-    🔴 深度公式不在前端算——`lookahead_depth.depth_by_timeframe()` 是唯一實作，
-    在 TS 重寫一份就是第二份副本（`D-002 A-004` 之理由）。
+    輸入＝搜尋結果之欄名集合（含將附帶之 `future_*` 欄）＋批內 timeframe 集合；
+    回應形狀＝匯入端 `/case/import-events/lookahead-declaration` 之同一 `LookaheadDeclarationPreview`。
+    🔴 預設值只是候選（registry 之揭露用途），**不是**深度導出——深度＝使用者宣告；
+    唯一實作＝`lookahead_declaration.py::preview_from_columns`，前端禁在 TS 重寫換算表。
     """
 
-    referenced_columns: List[str] = Field(default_factory=list, description="篩選條件引用之欄名")
-    declared_window_bars: Dict[str, int] = Field(..., description="{timeframe: 使用者宣告之答案窗根數}")
+    columns: List[str] = Field(default_factory=list, description="搜尋結果欄名（含附帶欄）")
     timeframes: List[str] = Field(..., description="批內出現之 timeframe 集合")
-
-
-class LookaheadDepthResponse(BaseModel):
-    depth_by_timeframe: Dict[str, int] = Field(..., description="{timeframe: 下界根數}；使用者不得調低於此")
 
 
 class EventAnalyzeRequest(BaseModel):

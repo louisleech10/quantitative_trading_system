@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.services import case_import_service as svc_mod
 from momentum.Analysis.event_samples.import_contract import canonical_event_id
+from tests.api._gap3_declaration import declaration_for_timeframes
 from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
 
 client = TestClient(app)
@@ -73,7 +74,9 @@ def _post(content: bytes):
         "/api/v1/case/import-events/csv",
         files={"file": ("mine.csv", io.BytesIO(content), "text/csv")},
         data={"column_mapping": json.dumps(MAPPING, ensure_ascii=False),
-              "batch_defaults": json.dumps(_defaults())},
+              "batch_defaults": json.dumps(_defaults()),
+              # R 重開（Task 1.11）：全部批次一律須宣告；本檔不測宣告本身
+              "lookahead_declaration": declaration_for_timeframes(["12h"])},
     )
 
 

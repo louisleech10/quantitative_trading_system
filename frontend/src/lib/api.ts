@@ -1072,17 +1072,17 @@ export async function uploadEventCsvMapping(
 }
 
 /**
- * GAP-3 UX Task 2.1／2.1b（B5）：由篩選條件引用之欄導出逐 tf 答案窗下界。
+ * GAP-3 UX Task 1.9′（R 重開 D-8）：`/search` 匯出端答案窗宣告框之**預填**資料。
  *
- * 🔴 深度**不在前端算**——`depth_by_timeframe()` 是唯一實作（`D-002 A-004`）；
- *    本函式只是把條件送過去、把下界拿回來。
+ * 🔴 預設值只是候選（registry 之揭露用途），**不是**深度導出——深度＝使用者宣告；
+ *    唯一實作在後端 `preview_from_columns`（與匯入端 preview 同一函式），前端**禁**在 TS 重寫換算表。
+ *    Phase 2 之 `/case/lookahead-depth`（由篩選條件導出下界）已退役。
  */
-export async function fetchLookaheadDepth(payload: {
-  referenced_columns: string[];
-  declared_window_bars: Record<string, number>;
+export async function fetchLookaheadDeclarationPreviewColumns(payload: {
+  columns: string[];
   timeframes: string[];
-}): Promise<{ depth_by_timeframe: Record<string, number> }> {
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/lookahead-depth`, {
+}): Promise<LookaheadDeclarationPreview> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/lookahead-declaration/preview-columns`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
