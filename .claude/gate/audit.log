@@ -52263,3 +52263,44 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-REVIEW-R1", "ts": "2026-09-02T17:06:10Z"}
+=== 2026-09-03 01:06:10 | dispatch ===
+  ts=2026-09-03 01:06:10
+  kind=dispatch
+  intent=G3-D2 D-001 延伸檔 adversarial review r1（三家全員）
+  risk=low
+  facts_asked=D-001 §A 八條 FACT-RECEIPT；brief 前提五條 assumed 皆附否證觀測；五列我沒查的
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2-X-REVIEW-R1-BRIEF.md", "brief_sha256": "d2ac98f632f9583c50a729b06916c685bafb6538b7829f45e83d0947707c684d", "brief_sha256_norm": "d2ac98f632f9583c50a729b06916c685bafb6538b7829f45e83d0947707c684d", "event": "committee_round_open", "event_id": "e97b0d0f-db4b-4c84-9698-c2ab0ffb23a5", "expected_outputs": {"codex": "handoffs/20260903-gap3d2-x-review-r1-codex.md", "composer": "handoffs/20260903-gap3d2-x-review-r1-composer.md", "grok": "handoffs/20260903-gap3d2-x-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "9f647a31-6864-47a1-a56c-b23bc8b147a4", "schema_version": 1, "sequence": 3004, "session_name": "20260903-gap3d2-x-review-r1", "task_id": "20260903-GAP3D2-X-REVIEW-R1", "ts": "2026-09-02T17:06:15Z"}
+{"actor": "cx_run", "attempt_id": "7cde244c-5278-4f5b-b03b-9842852a9a73", "cli_rc": "1", "event": "committee_family_result", "event_id": "6d435688-a8dd-4da8-80c0-eabc66d43f33", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-review-r1-composer.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "9f647a31-6864-47a1-a56c-b23bc8b147a4", "schema_version": 1, "sequence": 3005, "ts": "2026-09-02T17:11:07Z"}
+{"actor": "cx_run", "attempt_id": "e5017c8d-22b0-48b0-8b30-51137141d5d3", "cli_rc": "0", "event": "committee_family_result", "event_id": "d8a43802-f01c-4172-99df-f6e6b224b38e", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-review-r1-grok.md", "output_sha256": "1b41d0c4c9ff5a2ea10ac2b7853652e2158b2eebe15ebfb42ab995f8d7986f04", "producer": "audit_append.sh", "result_state": "success", "round_id": "9f647a31-6864-47a1-a56c-b23bc8b147a4", "schema_version": 1, "sequence": 3006, "ts": "2026-09-02T17:13:02Z"}
+{"event":"gate_deny","ts":"2026-09-02T17:24:06Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"a03de0db0e65ff54b21e70dd7d98c3531fa8d30633403a9352d50b8c0e176589","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260903-gap3d2-x-review-r1-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"actor": "cx_run", "attempt_id": "f4f372b1-c7b3-4246-b488-10f54d61adb5", "cli_rc": "0", "event": "committee_family_result", "event_id": "eb314a2d-4151-480f-80e6-73bff6be5c9b", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2-x-review-r1-codex.md", "output_sha256": "1a0a6a6a4ec7def6ed3eab0f5a458e03d8a9f3f4ac22f5802b6969121154d5c4", "producer": "audit_append.sh", "result_state": "success", "round_id": "9f647a31-6864-47a1-a56c-b23bc8b147a4", "schema_version": 1, "sequence": 3007, "ts": "2026-09-02T17:27:15Z"}
+{"event":"gate_deny","ts":"2026-09-02T17:27:31Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"c1238f177c4964d727970ca3c5ecb30db7b60ee22a3700ec2ece02ba780448a0","cmd_head":"bash scripts/cx_run.sh composer handoffs/20260903-GAP3D2-X-REVIEW-R1-BRIEF.md handoffs/20260903-gap3d2-x-review-r1-composer.md"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "73e2fbef-ad9a-4a0f-b854-cdfbe20a66a8", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "composer ETIMEDOUT（第二次）；codex/grok 已交件；composer 將以 cx_run 同 round 重跑後四來源 reconcile（與 consult r1 同處置）", "round_id": "9f647a31-6864-47a1-a56c-b23bc8b147a4", "schema_version": 1, "sequence": 3008, "ts": "2026-09-02T17:28:54Z", "zero_findings_verified": ""}
+{"event": "committee_dispatch", "family": "composer", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-X-REVIEW-R1", "ts": "2026-09-02T22:19:39Z"}
+=== 2026-09-03 06:19:39 | dispatch ===
+  ts=2026-09-03 06:19:39
+  kind=dispatch
+  intent=G3-D2 D-001 review r1：composer 因 ETIMEDOUT 兩次未交件，同 round 單家重跑
+  risk=low
+  facts_asked=同 handoffs/20260903-GAP3D2-X-REVIEW-R1-BRIEF.md
+  review_role=adversarial review 唯讀（composer 補件）
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
