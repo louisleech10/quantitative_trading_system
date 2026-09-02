@@ -640,9 +640,27 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 - `metadata.event_filter.n_timestamps_requested` 等於這批事件數（樣本 60），不是整段 K 線的筆數
 - IC 結果表有數值（15 個特徵各一列）
 
-🔴 **如果 `metadata.conditional_ic.capability_status` 是 `"unavailable"`、reason `insufficient_events`**：
-代表這批事件數少於下限，系統**明講**它退回了全樣本 IC——那不是缺陷，是刻意的 loud fallback；
-但那份報告的 IC **不能**當條件 IC 解讀。樣本 60 筆應該不會撞到。
+🔴 **`metadata.conditional_ic` 這個鍵平常是 `null`／不存在——只有事件數少於下限（30）時才會出現**，
+內容是 `capability_status: "unavailable"`、reason `insufficient_events`，代表系統明講它退回了全樣本 IC（不是缺陷，是刻意的 loud fallback；
+那份報告的 IC 不能當條件 IC 解讀）。樣本 60 筆 ≥ 30，所以你**找不到它是對的**。
+
+**兩個不同的門檻，別混在一起**：
+| 門檻 | 值 | 60 筆事件 | 意思 |
+|---|---|---|---|
+| 條件 IC 可算的最少事件數 `min_events` | 30 | 過 | 上面那個鍵不會出現；`statistic_kind` 是 `conditional_ic` |
+| OOS（out-of-sample，樣本外）切分所需的測試列數 `min_test_rows` | 131 | **不過**（60 筆切成訓練 56／測試 4） | 退回 full-sample：IC 用全部 60 筆算、沒有留一段沒看過的資料驗證 ⇒ `analysis_status: degraded_full_sample`、`oos_guarantees: false`，且每個特徵的 `icir` 都是 null（ICIR 要靠滾動視窗的 IC 序列，60 筆不夠暖機） |
+
+**OOS 是什麼**：IC 分析會把資料切成「訓練段」（拿來挑特徵）和「測試段」（挑完後在沒看過的資料上驗一次）。測試段夠長才能說「這個特徵不是湊巧」。
+事件才 60 筆時測試段只有 4 列，做不了，系統就誠實標成 research-only；畫面上那段黃字就是這件事。
+這階段驗的是「接線通不通、標記在不在」，數字本來就沒有統計意義（見上方「你的 Feature run 現況」）。
+要有意義的數字，事件要多到測試段 ≥131 列（幾百筆事件），那是另一件事。
+
+**IC 表裡 IC Mean／ICIR 是 `--`、t-stat 卻有數字**：IC Mean／ICIR 是用「滾動視窗」的 IC 序列算的（最小視窗 21 日 ≈ 12h 線 42 列），
+60 筆事件不夠一個視窗 ⇒ 空序列 ⇒ `--`；t-stat／P-Value 是把 60 筆一次算相關（pooled）⇒ 有值。接線正確、不是缺陷，
+但畫面沒解釋，已列具名殘留 `G3-R12`（小樣本改報 pooled IC 要動契約欄，另議）。
+
+**這一段只驗 B13–B20**：畫面下方「基礎／中階／高階」深度模組、分位數／衰減等圖表是 IC Gatekeeper 既有功能（GAP-1／GAP-2），
+不在 GAP-3 驗收範圍；60 筆事件也跑不出有意義的圖。
 
 🔴 **背景**：在這批之前，從 `/search` 匯出的事件**永遠**算不出條件 IC——
 因為匯出檔不含答案，而分析端也還沒開始算，兩頭都沒有。
