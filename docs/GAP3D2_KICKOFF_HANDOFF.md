@@ -47,6 +47,15 @@
 - 跨 symbol 事件已於 D17 定為「只餵同 symbol」；Pooled IC 另票。
 - 小樣本 IC Mean 顯示 `--`（G3-R12，needs-research）。
 
+**開工稽核補正（2026-09-03，新 session 實跑；receipt `handoffs/20260903-gap3d2-probe-triplets.receipt.txt`）**：
+- `align_events` **已**支援五種 entry 語意、三種 `label_return_mode`、任意 k≥0 並產窗；不支援組合只在階段 5 扣值（Task 7.0b 驗收④）。
+- 🔴 **連續網格別名**：`open_time(t₀) == close_time(t₀−1)` ⇒ open 語意之 `label_start_ms` 被 `_close_at` 命中為 **t₀−1 之 close**且不報錯（探針：`trigger_open` 組取到 2944.80＝t₀−1 close，`trigger_close` 組取到 2935.31＝t₀ close）。(c) 之機制缺口＝producer 取價，不只 golden。
+- `WindowRow` 恰七鍵、無 `entry_price_source_*`；加鍵即改 `analysis_alignment_receipt_hash`（§G G-3 ⑥）。
+- 契約 `derived_fields.names` 含 `event_known_at_decision`，碼中**零實作**（`grep -rn` 於 `momentum/`、`api/` 無命中）。
+- 「全部 K 線驗證」evaluator 已存在（B2.5 `all_bars_eval.py`，五種 entry 語意皆映射）；缺的是模型分數（G3-R9）⇒ §5 裁定①與碼況一致。
+- 「開盤進場之實際報酬並排」已在事件後報酬表（`tables.py:232-233` `ret_entry`／`ret_label_anchor`）；條件 IC 之 `label_value` 仍只有 close_to_close。
+- k 已同時是契約必填逐列欄（default 0）與分析參數 `event_label_spec.decision_offset_bars`（由 `declaration_seeds` 種子化）；§5 裁定②之落地須裁契約欄處置（consult 3a）。
+
 ## §4 三組的技術關係（🔴 consult 必答；主委初判，可被推翻）
 
 1. **(a) 在技術上內含 (c) 的一部分**：A／B 之決策時點＝t₀ 之 **open**（或更早，`decision_offset_bars > 0`），進場語意＝`trigger_open`／`decision_bar_open`；而這些正是 (c) 的組合。依 SPEC L818「機制相同、僅語意不同」與 R8 註，A／B 之 label 仍由 Task 7.0b 之分析時 producer 算，**缺的是那些組合的 exact golden**＋scenario 語意之 provenance／揭露／去重政策接線。

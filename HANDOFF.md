@@ -1,22 +1,26 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-02 深夜｜狀態：GAP-3 UAT B1–B20 使用者全部驗畢；下一件＝`G3-D2` 灰色項目（順序 (a)→(c)→(b)），新 session 依 `docs/GAP3D2_KICKOFF_HANDOFF.md` 開工**
+**更新：2026-09-03 00:40｜狀態：`G3-D2` 灰色項目——開工稽核完成、consult r1 已派（三家跑中）、主委版已寫；使用者離線（委員共識決）**
 
 ## 票（唯一權威＝`docs/IC_QUANT_GAP_REGISTRY.md`）
 | 票 | 狀態 |
 |---|---|
-| `G3-D1` | CLOSED（R 重開；實作 `c6dd057a`→`7e0a7a94`→`dd4baa2c`；三輪 review 閉合） |
-| `G3-D10`…`D17` | CLOSED（2026-09-02 晚 UAT B13–B20 抓出八票，逐票修＋推；D13／D14／D17 為正確性缺陷，皆 B10 五階段路徑未走到底所致） |
-| `G3-D2` | **OPEN・下一件**：使用者裁 (a) `scenario` A／B／two_stage → (c) 三元組其餘值 → (b) `platform_random_bars`。大任務完整管線；開工交接＝`docs/GAP3D2_KICKOFF_HANDOFF.md`（§4 主委初判：(a) 內含 (c) 子集，consult 必答） |
-| `KLINE-1` | OPEN：`/data-preparation` 舊 K 線下載區塊已標 deprecated；移除票待開（可穿插） |
-| `G3-D3`…`D9` | CLOSED |
+| `G3-D2` | **進行中**：大任務完整管線。session `20260903-gap3d2-x-consult-r1`（round `6810e862`）；brief `handoffs/20260903-GAP3D2-X-CONSULT-R1-BRIEF.md`；主委版 `handoffs/20260903-gap3d2-x-consult-r1-claude.md`；探針 `handoffs/20260903-gap3d2-probe-triplets.{py,receipt.txt}` |
+| `G3-D1`／`D3`…`D17` | CLOSED |
+| `KLINE-1` | OPEN（可穿插） |
 
-## 新 session 開工指令（使用者貼的 prompt 已含；此處備份）
-1. 稽核本檔＋`docs/GAP3D2_KICKOFF_HANDOFF.md` vs repo 實況（git status／registry／`eventDimensions.ts` 灰項常數）。
-2. 唯讀 consult（三家＋主委各完整版）：§4 四題＋§5 白話閘題；session `20260903-gap3d2-x-consult-r1`。
-3. 收斂後白話給使用者裁 → SPEC（延伸檔 vs 新 SPEC 由 consult 判）→ adversarial → 戳記 → TODO → 實作 → review。
+## 本 session 開工稽核補正（已寫入 `docs/GAP3D2_KICKOFF_HANDOFF.md` §3 末）
+- 🔴 連續網格別名：open 語意之 `label_start_ms` 被 `_close_at` 命中為 t₀−1 close（靜默錯價）⇒ (c) 缺口在 producer 取價，不只 golden。
+- `all_bars_eval.py` 已存在（缺模型分數 G3-R9）；`event_known_at_decision` 契約有、碼零實作；`ret_entry`／`ret_label_anchor` 並排已在事件後報酬表。
+- 既有 9 批：5 批 (C,k=0)、**4 批 (B,k=1)**（CSV 路徑）；k 改制須揭露「批次記錄 k／本次分析 k」。
+
+## 下一步（consult 回來後）
+1. `bash scripts/reconcile_build.sh 20260903-gap3d2-x-consult-r1 --mode discovery <三家檔> <claude 檔>` → 群集／處置 → attribution → completeness → `debt_clear.sh --round-id 6810e862-7640-4990-a54e-22c27d464963 --session 20260903-gap3d2-x-consult-r1`。
+2. 白話裁決題寫入 `白話說明/接下來要做什麼.md`（頭條＝主目標 B 之交付有多少是改名／多少是做東西；C 不可表示之殘留 G3-R13）；使用者離線 ⇒ 委員共識決並具名，醒後可否決。
+3. SPEC：主委傾向 D 延伸 `docs/GAP3_EVENT_UX_SPEC.D-001.md`（gate artifact）→ 三家 adversarial → 戳記 → TODO → 實作（Claude）→ 三家 review。
+4. 派工命名 `<YYYYMMDD>-gap3d2-<batch>-<kind>-r<N>`，**task-id＝session 大寫**（本 session 已被擋一次）。
 
 ## 已知紅／不要誤判
-- `tests/api` 既有紅（batch_alias／ichc_event_timestamps／progress_rss_fields×2，見 `G3-R11`）；`test_ic_deep_analysis` 與其他 pytest 並行時 ERROR、單跑綠；`tsc --noEmit` 8 行既有債。
-- 具名殘留：`R35-L2-ACK`、`MUT-CSV-MAP`、`G3-R12`（小樣本 IC Mean 顯示 `--`）、`GOV-DOC-STATUS-1`、看板 42→39＋1 機械重產工具、commit-msg claim 閘以整則訊息為單位。
-- `uat_samples/*拷貝*`、`_tmp_new_schema.csv` 為本機雜物，未納版控。
+- `tests/api` 既有紅（G3-R11）；`test_ic_deep_analysis` 並行 ERROR 單跑綠；`tsc --noEmit` 8 行既有債。
+- 具名殘留：`R35-L2-ACK`、`MUT-CSV-MAP`、`G3-R12`、`GOV-DOC-STATUS-1`。
+- 債開著時，Bash 指令含家族名會被 gate 當 dispatch 擋（前 session 踩過）。
