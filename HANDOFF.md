@@ -33,11 +33,13 @@
 - **R 修訂稿已落地並 commit**（`32d35c7f`；SPEC R35-R 疊加於 `R34-landing` 收據、TODO、D-001…D-005 `SUPERSEDED-BY-R`）。
   派審前閘 `gap3ux_pre_review.sh <patch> --diff-base 003d4846` VERIFY:20260902T023726Z-gap3ux-r35-pre-review；
   patch `handoffs/patches/20260902-gap3ux-r35-reopen-draft.md`。
-- **三家對抗審 R35 已派**：session `20260902-gap3ux-x-review-r35`／task `20260902-GAP3UX-X-REVIEW-R35`／
-  round_id `ddb90849-e42d-4bc1-98ca-5caa0d6cbb7c`（債已開，**收斂前不得派新工**）。
-  brief `handoffs/20260902-gap3ux-r-reopen-review-BRIEF.md`；產出 `handoffs/20260902-gap3ux-x-review-r35-{codex,composer,grok}.md`。
-- 接回流程：`reconcile_build.sh 20260902-gap3ux-x-review-r35 --mode review <三檔>` → 填群集／處置 → attribution＋completeness →
-  `debt_clear.sh` → 依 finding 修 SPEC／TODO → 閉合輪（原提出方重跑反例）→ 三家戳記 → **才進實作**（Task 1.9′＋退役清單）。
+- **R35 對抗審已收斂＋銷帳**（session `20260902-gap3ux-x-review-r35`；synth 本機 `handoffs/reconcile/20260902-gap3ux-x-review-r35/`）：
+  23 findings 全採納，修訂已 commit `50c8d2ae`。P0＝Task 1.11「一律宣告」只改覆蓋風險未改內容與後端 `needs` 謂詞；
+  併回表多列「宣稱併回、本體無字」（A-023／A-024／A-005／A-016／A-002／A-003／A-019／A-022）。裁定：宣告值為非負整數（0 須明填）；
+  匯出端預設值走新端點 `POST /case/lookahead-declaration/preview-columns`；SPEC 版本行改 `R35-landing`。
+- **閉合輪 R36**（brief-kind closure；session `20260902-gap3ux-x-review-r36`；brief `handoffs/20260902-gap3ux-r35-closure-BRIEF.md`）：
+  原提出方重跑自己每條 RECHECK 判 CLOSED／OPEN／PARTIAL、併回表逐列附本體行號 → reconcile → 三家 `RECONCILE-STAMP`
+  → **才進實作**（Task 1.9′＋Phase 2 退役清單＋Task 1.11 後端謂詞＋validator `v<0`）。
 
 ## 下一步（依序）
 1. 等使用者驗 B13–B20。
