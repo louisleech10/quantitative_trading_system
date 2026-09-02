@@ -41,6 +41,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
+import { useAutoRefilter } from '@/hooks/useAutoRefilter';
 import { icFeatureCountLabel, icPollFailed, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
 import { isSectionStatus } from "@/lib/types";
 import type { SectionStatusObject } from '@/lib/types';
@@ -358,28 +359,11 @@ function ICAnalysisPageContent() {
     setSummaryText(report.ai_summary);
   }, [report?.ai_summary]);
 
-  const thresholdsKey = useMemo(
-    () => JSON.stringify(config.thresholds),
-    [config.thresholds]
-  );
-
-  useEffect(() => {
-    if (!taskId || status !== 'completed' || !report) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setIsRefiltering(true);
-      refilter(taskId, config.thresholds)
-        .catch((err) => {
-          const message = err instanceof Error ? err.message : '重新篩選失敗';
-          setError(message);
-        })
-        .finally(() => setIsRefiltering(false));
-    }, 600);
-
-    return () => clearTimeout(timer);
-  }, [config.thresholds, refilter, report, setError, status, taskId, thresholdsKey]);
+  // 🔴 G3-D16：原本把 `report` 放進依賴，refilter 回寫 report ⇒ 無限迴圈（每 600ms 一次）。改由 hook 只看門檻鍵。
+  useAutoRefilter({
+    taskId, status, hasReport: Boolean(report), thresholds: config.thresholds,
+    refilter, setError, setIsRefiltering,
+  });
 
   const handleApplyTransforms = async () => {
     if (!taskId) {

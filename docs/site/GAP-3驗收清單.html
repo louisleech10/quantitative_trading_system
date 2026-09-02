@@ -606,7 +606,9 @@ JSON 直傳（B7／B8 那條）沒有這個框，就直接用檔內每筆帶的�
 另外 60 筆事件會觸發「full-sample fallback」（訓練 56／測試 4 列不夠做 OOS），畫面會標 <code>analysis_status</code> 為 degraded——
 那是樣本太少的<strong>誠實標示</strong>，不是缺陷；驗「跑不跑得起來、標記在不在」就好。
 ⑥ 跑完後紅字「'&lt;' not supported between instances of 'NoneType' and 'NoneType'」＝摘要 API 對「每個特徵 icir 都是 None」
-的 degraded 結果排序時炸掉（票 <code>G3-D15</code>，已修；再重啟後端）。結果本身沒壞。</p>
+的 degraded 結果排序時炸掉（票 <code>G3-D15</code>，已修；再重啟後端）。結果本身沒壞。
+⑦ 你看到 log「一直重複跳同樣訊息」＝前端在無限重篩（每 0.6 秒打一次 refilter、後端每次重新落檔；票 <code>G3-D16</code>，已修）。
+前端是 dev server 會熱更新，不用重啟；重新整理頁面即可。</p>
 </blockquote>
 <h3 id="b13-切到事件模式-ok">B13 ── 切到事件模式 [OK]</h3>
 <p><strong>你做什麼</strong>：開 <code>/ic-analysis</code>，分析模式選「Event-Driven 模式」。</p>

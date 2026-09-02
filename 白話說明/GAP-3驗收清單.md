@@ -532,6 +532,8 @@ ls data_cache/events/ | grep <剛才那個 import_id>
 >   那是樣本太少的**誠實標示**，不是缺陷；驗「跑不跑得起來、標記在不在」就好。
 > ⑥ 跑完後紅字「'<' not supported between instances of 'NoneType' and 'NoneType'」＝摘要 API 對「每個特徵 icir 都是 None」
 >   的 degraded 結果排序時炸掉（票 `G3-D15`，已修；再重啟後端）。結果本身沒壞。
+> ⑦ 你看到 log「一直重複跳同樣訊息」＝前端在無限重篩（每 0.6 秒打一次 refilter、後端每次重新落檔；票 `G3-D16`，已修）。
+>   前端是 dev server 會熱更新，不用重啟；重新整理頁面即可。
 
 ### B13 ── 切到事件模式 [OK]
 
