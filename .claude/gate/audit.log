@@ -52597,3 +52597,39 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "9409f6cc-29ee-4f67-b05e-e6af88dbaaf1", "cli_rc": "0", "event": "committee_family_result", "event_id": "5ed3120f-4539-4ccf-927a-58b62df36711", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2todo-x-review-r1-codex.md", "output_sha256": "438000736b05fbfd2090d172f8a2cc0a6ec4becfaf69d18900731efd371e493e", "producer": "audit_append.sh", "result_state": "success", "round_id": "68971800-b4c2-4fec-a343-c8b38ee71186", "schema_version": 1, "sequence": 3036, "ts": "2026-09-03T00:08:46Z"}
 {"actor": "cx_run", "attempt_id": "190baaa5-f33a-461c-b7dc-78daf636fad7", "cli_rc": "0", "event": "committee_family_result", "event_id": "6be59d0d-4523-498a-973a-ce26ccbc754a", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2todo-x-review-r1-grok.md", "output_sha256": "c7208338dee83bb0a1e08b620c3654ee7e99a6564a8191a5d2e57299c23b2839", "producer": "audit_append.sh", "result_state": "success", "round_id": "68971800-b4c2-4fec-a343-c8b38ee71186", "schema_version": 1, "sequence": 3037, "ts": "2026-09-03T00:09:01Z"}
 {"actor": "cx_run", "attempt_id": "691539a8-5835-4c9d-b0f8-d49e3b932597", "cli_rc": "0", "event": "committee_family_result", "event_id": "579edf87-496e-4e0f-9867-56256561f423", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2todo-x-review-r1-composer.md", "output_sha256": "f35376646c23810b4c3ee1289688778ce9b5b41e6dc3b047a45efd22b4385d12", "producer": "audit_append.sh", "result_state": "success", "round_id": "68971800-b4c2-4fec-a343-c8b38ee71186", "schema_version": 1, "sequence": 3038, "ts": "2026-09-03T00:52:01Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "686f0d4e-33e3-4e63-a784-0b56b96cd818", "lock_sha256": "664e3fd052105f8ccd1939edf04206e4388771c76f4e75580dbf7a9a30a3732d", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "68971800-b4c2-4fec-a343-c8b38ee71186", "schema_version": 1, "sequence": 3039, "session_id": "20260903-gap3d2todo-x-review-r1", "synth_sha256": "aff080cf178eacf0e4c3c52bed9847c7961ad456b92b2869ad7e942e95a6ae4c", "ts": "2026-09-03T00:55:03Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2TODO-X-REVIEW-R2", "ts": "2026-09-03T00:55:09Z"}
+=== 2026-09-03 08:55:09 | dispatch ===
+  ts=2026-09-03 08:55:09
+  kind=dispatch
+  intent=G3-D2 TODO D-006 review r2：codex 補做 1a–8；composer／grok 確認自家 R1 六條 CLOSED；三家復核 D-001 D5.2 戳記後修訂
+  risk=low
+  facts_asked=D-001 stamps check PASS；r1 六群全寫回；dext＋todo PASS
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2TODO-X-REVIEW-R2", "ts": "2026-09-03T00:56:10Z"}
+=== 2026-09-03 08:56:10 | dispatch ===
+  ts=2026-09-03 08:56:10
+  kind=dispatch
+  intent=G3-D2 TODO D-006 review r2：codex 補做語意審；composer／grok 閉合；三家復核 D-001 戳記後修訂
+  risk=low
+  facts_asked=D-001 stamps PASS；r1 六群全寫回；dext＋todo PASS；債 CLOSED
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2-TODO-REVIEW-R2-BRIEF.md", "brief_sha256": "54903499deace1d95b43cfa5424af2d8d0a6c3d9de3080a270476df756a9e40f", "brief_sha256_norm": "54903499deace1d95b43cfa5424af2d8d0a6c3d9de3080a270476df756a9e40f", "event": "committee_round_open", "event_id": "94a34947-cc6f-445b-8c89-4af0e0a7bb26", "expected_outputs": {"codex": "handoffs/20260903-gap3d2todo-x-review-r2-codex.md", "composer": "handoffs/20260903-gap3d2todo-x-review-r2-composer.md", "grok": "handoffs/20260903-gap3d2todo-x-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "dbbcc713-4e75-4acc-9201-cbb4515806ec", "schema_version": 1, "sequence": 3040, "session_name": "20260903-gap3d2todo-x-review-r2", "task_id": "20260903-GAP3D2TODO-X-REVIEW-R2", "ts": "2026-09-03T00:56:15Z"}

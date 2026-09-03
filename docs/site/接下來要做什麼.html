@@ -36,7 +36,8 @@
 <p><strong>抓到一個真 bug（在解灰之前）</strong>：開盤語意的取價會<strong>默默拿前一根的收盤價</strong>當開盤價（連續 K 線下兩個時間戳相等）。要開放 open_to_* 之前必須先修，並用有跳空的 K 線做手算對照。</p>
 <p><strong>規格形式</strong>：走「延伸檔」<code>docs/GAP3_EVENT_UX_SPEC.D-001.md</code>，不重開整份；分五段：B → A → 兩段式 → 其餘進場／報酬語意與 k → 平台隨機對照組。每段三家審完才進下一段。</p>
 <p><strong>進度（9/3 凌晨續）</strong>：延伸檔 <code>docs/GAP3_EVENT_UX_SPEC.D-001.md</code> 已起草並過兩輪對抗審（r1 三家 16 條全修；r2 codex 再抓 6 條全修、grok 零新問題），現在跑第三輪閉合確認。composer 這一晚網路連續逾時，兩輪都靠 codex＋grok 兩家收斂（人數仍達審查門檻），composer 在第三輪補審。審查抓到的重點：把幾何上永遠算不出來的「收盤進場 × 當根 open→close」從可選矩陣剔除；k 的上限改成「由資料本身算出可行範圍」而不是宣稱無限；隨機對照組的抽樣規則寫死（排除觸發前後區間、分層配額不超配、時期必須重疊）。</p>
-<p><strong>下一步</strong>：閉合輪過 → 三家蓋章 → TODO → 我實作（逐段，每段三家審）。技術版：<code>handoffs/reconcile/20260903-gap3d2-x-review-r{1,2}/synth.md</code>。</p>
+<p><strong>進度（9/3 清晨）</strong>：規格延伸檔四輪對抗審收斂後，<strong>三家都蓋章了</strong>（grok、codex 先蓋；composer 網路整晚壞，天亮恢復後在 TODO 審查那輪親筆補蓋）。施工清單（TODO 延伸檔，15 個工項分五段）已起草，第一輪審查抓到 2 條要緊的（k 上限的驗收被我弱化、隨機對照組的標籤算法寫了一條做不到的路徑）都已修，第二輪閉合中。</p>
+<p><strong>下一步</strong>：TODO 閉合＋蓋章 → 我開始實作第一段（B：把 scenario=B 解灰、記來源、開盤進場選項、手算對照機制）→ 三家審碼 → 第二段… 技術版：<code>handoffs/reconcile/20260903-gap3d2{,todo}-x-review-r*/synth.md</code>。</p>
 <hr />
 <h2 id="現況829gap-3-全部做完了只等你簽字">現況（8/29）：<strong>GAP-3 全部做完了，只等你簽字</strong></h2>
 <div class="table-wrap"><table>
