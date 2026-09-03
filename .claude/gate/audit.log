@@ -52558,3 +52558,38 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2TODO-X-REVIEW-R1", "ts": "2026-09-03T00:02:32Z"}
+=== 2026-09-03 08:02:32 | dispatch ===
+  ts=2026-09-03 08:02:32
+  kind=dispatch
+  intent=G3-D2 TODO D-006 adversarial review r1（三家全員）
+  risk=low
+  facts_asked=D-006 dext＋todo 機檢 PASS；14↔14 Task；五批
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2TODO-X-REVIEW-R1", "ts": "2026-09-03T00:02:38Z"}
+=== 2026-09-03 08:02:39 | dispatch ===
+  ts=2026-09-03 08:02:39
+  kind=dispatch
+  intent=G3-D2 TODO D-006 adversarial review r1（三家全員；composer 順帶補 D-001 戳記判定）
+  risk=low
+  facts_asked=D-006 dext＋todo 機檢 PASS；14↔14 Task；五批
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2-TODO-REVIEW-R1-BRIEF.md", "brief_sha256": "4fa290c7708532fac926dd6ffaaab26b4bfd06a8edf3f81f30e3426d205bac9b", "brief_sha256_norm": "4fa290c7708532fac926dd6ffaaab26b4bfd06a8edf3f81f30e3426d205bac9b", "event": "committee_round_open", "event_id": "46126299-b537-44a2-924d-d12c00a7bd8c", "expected_outputs": {"codex": "handoffs/20260903-gap3d2todo-x-review-r1-codex.md", "composer": "handoffs/20260903-gap3d2todo-x-review-r1-composer.md", "grok": "handoffs/20260903-gap3d2todo-x-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "68971800-b4c2-4fec-a343-c8b38ee71186", "schema_version": 1, "sequence": 3035, "session_name": "20260903-gap3d2todo-x-review-r1", "task_id": "20260903-GAP3D2TODO-X-REVIEW-R1", "ts": "2026-09-03T00:02:44Z"}
