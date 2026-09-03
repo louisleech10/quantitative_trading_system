@@ -52655,3 +52655,21 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2TODO-X-REVIEW-R3", "ts": "2026-09-03T01:11:34Z"}
+=== 2026-09-03 09:11:34 | dispatch ===
+  ts=2026-09-03 09:11:34
+  kind=dispatch
+  intent=G3-D2 TODO D-006 review r3 閉合輪：三家確認 R2 兩群 CLOSED；對 D-001 戳記後修訂段給判定
+  risk=low
+  facts_asked=r2 五 ID 全寫回；債 CLOSED；三檔機檢 PASS
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2-TODO-REVIEW-R3-BRIEF.md", "brief_sha256": "25717763bd7606a559e92234b3d5cbfd2e881cd0d7d1f50104c68338b6f83807", "brief_sha256_norm": "25717763bd7606a559e92234b3d5cbfd2e881cd0d7d1f50104c68338b6f83807", "event": "committee_round_open", "event_id": "e6235766-ec5c-488f-a2a8-ed09132bd3f6", "expected_outputs": {"codex": "handoffs/20260903-gap3d2todo-x-review-r3-codex.md", "composer": "handoffs/20260903-gap3d2todo-x-review-r3-composer.md", "grok": "handoffs/20260903-gap3d2todo-x-review-r3-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "15421d72-5473-4b86-a0a4-1785ae979fb4", "schema_version": 1, "sequence": 3045, "session_name": "20260903-gap3d2todo-x-review-r3", "task_id": "20260903-GAP3D2TODO-X-REVIEW-R3", "ts": "2026-09-03T01:11:40Z"}
