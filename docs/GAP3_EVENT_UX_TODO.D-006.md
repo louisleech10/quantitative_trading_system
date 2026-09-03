@@ -3,7 +3,7 @@
 BASE: docs/GAP3_EVENT_UX_TODO.md @ 4dc7bac5
 PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 
-改什麼: 為 SPEC 延伸 D-001 之 14 個 Task（D1.1–D1.6、D2.1、D3.1、D4.1–D4.3、D5.1–D5.4）產生冷啟動可寫碼之施工清單，五 phase＝五批，每批三家 code review 至閉合。
+改什麼: 為 SPEC 延伸 D-001 之 15 個 Task（D1.1–D1.6、D2.1、D3.1、D4.1–D4.3、D5.1–D5.4；R1 更正計數）產生冷啟動可寫碼之施工清單，五 phase＝五批，每批三家 code review 至閉合。
 
 為什麼: `docs/IC_QUANT_GAP_REGISTRY.md` `G3-D2`（user-ruling 2026-08-31／09-02）；SPEC 延伸 `docs/GAP3_EVENT_UX_SPEC.D-001.md` 對抗審 r1–r4 收斂（`handoffs/reconcile/20260903-gap3d2-x-review-r4/synth.md`；grok／codex APPROVED，composer 待補）。
 
@@ -29,7 +29,7 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 | B-D1 | D1.1 D1.2 D1.3 D1.4 D1.5 D1.6 | 無 | B 之可選＋provenance＋golden 機制同一交付 | 大 |
 | B-D2 | D2.1 | B-D1 | A 只差解灰＋未標籤路徑 | 小 |
 | B-D3 | D3.1 | B-D1 | two_stage 同 D2 形態 | 小 |
-| B-D4 | D4.1 D4.2 D4.3 | B-D1（golden loader）、B-D2/B-D3 可平行 | producer 取價＋全矩陣＋k 參數化互相耦合 | 大 |
+| B-D4 | D4.1 D4.2 D4.3 | B-D1（golden loader）；**串行於 B-D3 之後**（R1 P2-03：B-D2／B-D3／B-D4 皆改 `frontend/src/lib/eventDimensions.ts` 與 `eventExport.ts`，平行寫檔必衝突；實際順序 B-D1→B-D2→B-D3→B-D4→B-D5） | producer 取價＋全矩陣＋k 參數化互相耦合 | 大 |
 | B-D5 | D5.1 D5.2 D5.3 D5.4 | B-D4（producer）、B-D1（loader） | 隨機對照組全鏈 | 大 |
 - 批次間 Gate：前批 `pytest` 指定選擇器全綠＋golden `--check` rc=0＋三家 review CLOSED＋commit 推送；後批才動工。
 - 每批派工 prompt：「照 `docs/GAP3_EVENT_UX_TODO.D-006.md` B-D<n> 逐 Task 實作；驗證命令見各 Task；先不 push（review 後 push）」。
@@ -83,7 +83,7 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 ### Task D1.5 — 前端：`/search` 解灰 `B` 與 `trigger_open`；匯出寫 provenance；揭露（`票 G3-D2`）
 - SPEC ref：D-001 D1.5　目標：B 可選、選了會落檔、揭露隨實際設定。
 - 輸入／輸出：`EVENT_DIM_PATH_EXCLUSIONS` → `/search|scenario` 值 `['A','two_stage']`；`/search|entry_price_semantic` 與 `/ic-analysis|entry_price_semantic` 移除 `trigger_open`；匯出 record 增 `label_origin: 'search_positive_case'`、`search_rule_summary`。
-- 實作要點：①`eventDimensions.ts::EVENT_DIM_PATH_EXCLUSIONS` 三筆值更新、理由字串更新（引用 D-001）；②`eventExport.ts::buildEventContractRecords` 增 `label_origin`＝`'search_positive_case'`（scenario ∈ {B, C}）、`search_rule_summary`＝當時搜尋條件 canonical 字串（無條件 ⇒ canonical 空條件字串，非空白）；③`eventFieldFormatters.ts` 增 `label_origin` formatter（欄位級 registry）；④`EventBatchDisclosurePanel.tsx` 批次事實欄增 `label_origin` 顯示（值來自 detail，舊批 null ⇒ 「（未宣告）」）；⑤`EVENT_EXPORT_ENTRY_PRICE_SEMANTIC` 改讀契約 `default`（`contractDefault('entry_price_semantic')`），刪硬編碼字面。
+- 實作要點：①`eventDimensions.ts::EVENT_DIM_PATH_EXCLUSIONS` 三筆值更新、理由字串更新（引用 D-001）；②`eventExport.ts::buildEventContractRecords` 增 `label_origin`＝`'search_positive_case'`（scenario ∈ {B, C}）、`search_rule_summary`＝當時搜尋條件 canonical 字串（無條件 ⇒ canonical 空條件字串，非空白）；③`eventFieldFormatters.ts` 增 `label_origin` formatter（欄位級 registry）；④`EventBatchDisclosurePanel.tsx` 批次事實欄增 `label_origin` 顯示（值來自 detail，舊批 null ⇒ 「（未宣告）」）；⑤`EVENT_EXPORT_ENTRY_PRICE_SEMANTIC` 改讀契約 `default`：**新增** `eventDimensions.ts::contractDefault(dim: EnumEventDimension, contract = EVENT_DIM_CONTRACT_MIRROR): string`（＝`dimContractNode(contract, dim)?.default`，缺 ⇒ throw；`EventDimContractNode` 型別增 `default?: string`；鏡像 `entry_price_semantic.default` 同步）——R1 P2-02：現無此函式，須建於同檔並列入「修改檔案」；刪硬編碼字面。
 - 修改檔案：`frontend/src/lib/eventDimensions.ts`、`eventExport.ts`、`eventFieldFormatters.ts`、`components/ic-analysis/EventBatchDisclosurePanel.tsx`、`lib/types.ts`。　既有 caller：`contractEnumWiring.test.tsx`、`eventContractOptions.test.tsx`、`eventExportOptions.test.ts`、`gap3_event_mode_entry.test.tsx`（更新期望並附 diff）。
 - 不可做：元件內 `if (value === 'A')`；寫死 scenario 文案。
 - 邊界：①`/data-preparation` 不受影響；②舊批 detail 無 `label_origin` ⇒ 顯示（未宣告）。
@@ -94,7 +94,7 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 ### Task D1.6 — 後端揭露：`label_origin` 入 detail 批次事實六鍵；分析揭露 `event_known_at_decision`（`票 G3-D2`）
 - SPEC ref：D-001 D1.6（覆寫 Task 7.6 批次事實欄）　目標：detail 回六鍵 scalar；分析 receipt 揭露 known 值集合。
 - 輸入／輸出：`EventImportDetailResponse.batch_facts` 增 `label_origin: Optional[str]`；`EventBatchFactNotes` 不變；分析 `capability`／揭露 dict 增 `event_known_at_decision_values: list[bool]`。
-- 實作要點：①`api/models/event_import_models.py:159-165` `batch_facts` 模型增 `label_origin`（scalar；`_batch_facts` 以 `_single_value(recs,"label_origin")`，異質 ⇒ Task 1.8 既有拒）；②`api/routes/case.py:366` detail 端點 response_model 已含 → 自動回傳；③`api/services/ic_analysis_service.py::_run_event_label_stages` 揭露 dict 增 `event_known_at_decision_values = sorted({...})`（自 receipts.event_level）；④`frontend/src/lib/types.ts` 對應 TS 型別；⑤`tests/api/test_gap3_event_batch_detail_dims.py` 批次事實欄集合期望改六鍵（附 diff）。
+- 實作要點：①`api/models/event_import_models.py:111-131` `class EventBatchFacts` 增 `label_origin: Optional[str]`（`EventImportDetailResponse.batch_facts: EventBatchFacts` 於 L159-165 引用，勿在該處加欄——R1 P2-01）（scalar；`_batch_facts` 以 `_single_value(recs,"label_origin")`，異質 ⇒ Task 1.8 既有拒）；②`api/routes/case.py:366` detail 端點 response_model 已含 → 自動回傳；③`api/services/ic_analysis_service.py::_run_event_label_stages` 揭露 dict 增 `event_known_at_decision_values = sorted({...})`（自 receipts.event_level）；④`frontend/src/lib/types.ts` 對應 TS 型別；⑤`tests/api/test_gap3_event_batch_detail_dims.py` 批次事實欄集合期望改六鍵（附 diff）。
 - 修改檔案：`api/models/event_import_models.py`（`EventBatchFacts`）、`api/services/case_import_service.py::_batch_facts`、`api/services/ic_analysis_service.py::_run_event_label_stages`、`frontend/src/lib/types.ts`、`tests/api/test_gap3_event_batch_detail_dims.py`。
 - 不可做：scalar 冒充 `t0`／`label`；`label_origin` 進 `event_label_spec`。
 - 邊界：①舊批 ⇒ `label_origin: null`；②`supported=False` 仍列 known 值集合。
@@ -164,11 +164,11 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 - SPEC ref：D-001 D4.3　目標：裁定②落地；既有 (B,k=1) 批不靜默改變。
 - 輸入／輸出：契約 `analysis_params.decision_offset_bars_scan_max{value, example_default:10, doc}`；`EventDeclarationSeeds` 去 `decision_offset_bars`；`EventBatchFactNotes` 增 `decision_offset_bars_record_values: list[int]`；分析揭露 `decision_offset_bars_analysis`、兩上界；`capability_unavailable_reasons` 增 `missing_decision_offset_disclosure`。
 - 實作要點：①契約增鍵；②`api/models/event_import_models.py::EventDeclarationSeeds` 移除欄；`EventBatchFactNotes` 增 `decision_offset_bars_record_values`；`case_import_service.py:1390-1394` 改填；③`api/routes/ic_analysis.py:134-137` `spec.setdefault("decision_offset_bars", 0)`（常數）；④`EventDimensionFields.tsx` 於 `/search`／`/data-preparation` 隱藏 k 控制項（CSV 欄對映表保留 `decision_offset_bars`）；`eventExport.ts` 恆寫 0；⑤`EventBatchDisclosurePanel.tsx:172` 移除 seeds 回退、初始 0、`max=null`、超 `scan_max` 警示、並排「批次記錄 k（record 值集合）／本次分析 k」；⑥`ic_analysis_service`：缺任一揭露欄 ⇒ `unavailable:missing_decision_offset_disclosure`；⑦`tests/api/test_gap3_event_batch_detail_dims.py:28` `SEED_KEYS` 改兩鍵（附 diff）；`frontend/src/lib/types.ts` 同步。
-- 修改檔案：契約；`event_import_models.py`；`case_import_service.py::_declaration_seeds`／`_batch_fact_notes`；`api/routes/ic_analysis.py`；`ic_analysis_service.py`；`EventDimensionFields.tsx`；`EventBatchDisclosurePanel.tsx`；`eventExport.ts`；`types.ts`；測試。
+- 修改檔案：契約；`event_import_models.py`（`EventDeclarationSeeds`／`EventBatchFactNotes`）；`case_import_service.py::get_import` 內聯區塊 L1390–1399（`declaration_seeds=EventDeclarationSeeds(...)`／`batch_fact_notes=EventBatchFactNotes(...)`；無同名私有方法——R1 P2-04；實作時**可**抽成私有方法）；`api/routes/ic_analysis.py`；`ic_analysis_service.py`；`EventDimensionFields.tsx`；`EventBatchDisclosurePanel.tsx`；`eventExport.ts`；`types.ts`；測試。
 - 不可做：改契約 `decision_offset_bars` 必填／default；靜默重設 record k；拒收 CSV k>0（允許＋揭露）。
 - 邊界：①既有 k=1 批 ⇒ 初始 0、揭露 `[1]`；②分析 k > `k_max_feasible_at_h` ⇒ 全批 failures ⇒ `unavailable`。
 - 風險緩解：seeds 銜接清單五處逐一改（D-001 列）。
-- 驗證：pytest：(i) k=1 fixture 初始 `== 0` 且 `decision_offset_bars_record_values == [1]`；(ii) 缺揭露欄 ⇒ `unavailable` reason；(iii) `SEED_KEYS == {entry_price_semantic, label_return_mode}`；vitest：`/search` DOM 無 `event-dim-decision_offset_bars`；`/data-preparation` 對映表仍含該欄；IC 頁雙值並排 DOM。
+- 驗證：pytest：(i) k=1 fixture 初始 `== 0` 且 `decision_offset_bars_record_values == [1]`；(ii) 缺揭露欄 ⇒ `unavailable` reason；(iii) **經分析 API 揭露欄回傳**之 `k_max_feasible_at_h`／`h_max_feasible_at_k` 對真實 kline 三事件手算相等（含一 `decision_bar_open × open_to_horizon_close` 事件證明耦合；R1 COMPOSER/GROK-R1-P1-01：此條為 D-001 D4.3 (iii) 原句，與 D4.2 純函式測試並存、不得互相取代）；(iv) `SEED_KEYS == {entry_price_semantic, label_return_mode}`；vitest：`/search` DOM 無 `event-dim-decision_offset_bars`；`/data-preparation` 對映表仍含該欄；IC 頁雙值並排 DOM。
 - **存活至**：保留。　**覆蓋風險**：無。
 
 ### Phase D4 Gate：golden 全 `--check` rc=0（含 hash 重凍具名）；三檔新測試綠；vitest 綠；三家 review CLOSED；commit＋push。
@@ -177,7 +177,8 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 
 ### Task D5.1 — 契約：`random_control_spec` typed nested schema、estimand、三 reason、`control_kind` 解禁（`票 G3-D2`）
 - SPEC ref：D-001 D5.1　目標：抽樣契約與 wire 唯一。
-- 實作要點：①契約 `receipt_schema.batch.random_control_spec` typed object（每葉 `{type, required}`；`universe`／`strata`／`exclusion` nested；`per_stratum: list[object]`）；`doc` 寫 estimand；②`control_kind.accepted` 增 `platform_random_bars`、刪其 `rejected_with_reason`；③reasons：`random_control_spec_missing`、`random_control_mixed_batch`（import）、`random_control_prevalence_missing`、`random_control_period_mismatch`（capability）；④`import_contract.py::receipt_type_ok` 遞迴（`object`／`list[object]`；既有 leaf 不變）；`validate_event_import(..., random_control_spec: Optional[Mapping]=None)`：`control_kind==platform_random_bars` ⇒ 必填、否則出現 ⇒ mixed；⑤`case_import_service` 落檔 `receipt.batch.random_control_spec`；detail 回傳；⑥鏡像同步。
+- 輸入／輸出：匯入 body `{records, random_control_spec}` → validator 通過之 records＋`receipt.batch.random_control_spec`（原樣落檔、detail 回傳）；契約新增鍵／reason 見實作要點。
+- 實作要點：①契約 `receipt_schema.batch.random_control_spec` typed object（每葉 `{type, required}`；`universe`／`strata`／`exclusion`／**`label_rule{threshold: float, horizon_bars: int}`**（必填；R1 P1-02）nested；`per_stratum: list[object]`）；`import_failure_reasons` 增 `random_control_label_rule_missing`；`doc` 寫 estimand；②`control_kind.accepted` 增 `platform_random_bars`、刪其 `rejected_with_reason`；③reasons：`random_control_spec_missing`、`random_control_mixed_batch`（import）、`random_control_prevalence_missing`、`random_control_period_mismatch`（capability）；④`import_contract.py::receipt_type_ok` 遞迴（`object`／`list[object]`；既有 leaf 不變）；`validate_event_import(..., random_control_spec: Optional[Mapping]=None)`：`control_kind==platform_random_bars` ⇒ 必填、否則出現 ⇒ mixed；⑤`case_import_service` 落檔 `receipt.batch.random_control_spec`；detail 回傳；⑥鏡像同步。
 - 修改檔案：契約；`import_contract.py`（`receipt_type_ok`、`validate_event_import`）；`case_import_service.py`；`event_import_models.py`（detail）；`eventDimensions.ts` 鏡像。
 - 不可做：fallback；逐列欄承載 spec。
 - 邊界：①`n_drawn < n_requested` 允許＋揭露；②跨 symbol universe ⇒ 拒。
@@ -187,7 +188,7 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 
 ### Task D5.2 — 產生器 `random_control.py::sample_random_bars`（`票 G3-D2`）
 - SPEC ref：D-001 D5.2　目標：確定性抽樣純函式，排除區間／配額／period 定死。
-- 實作要點：①`sample_random_bars(bars, spec, trigger_receipts, label_rule) -> (records, receipt)`；②候選＝`all_bars_eval._is_eligible` 之 bar 減排除區間 `[t0_idx − neighborhood, label_end_idx + embargo]`（對每觸發事件取聯集）；③`strata.period` 與觸發期 `[min t0, max label_end]` 無交集 ⇒ raise `random_control_period_mismatch`；④配額：`n_target=min(n_requested, candidate_count)`；floor＋最大餘數（小數降冪、key 升冪）＋cap；不變式 `Σ==n_drawn==n_target`；⑤`rng = numpy.random.default_rng(seed)`，各 stratum 無放回；⑥label＝條件引擎純函式以 `label_definition.canonical_digest` 同一規則評值；record：`control_kind=platform_random_bars`、`label_origin=platform_random`、scenario 同觸發批；⑦receipt：`per_stratum`、`sample_ids_digest`（S-9 sha256 of sorted ids）、`data_snapshot_digest`、`candidate_count`。
+- 實作要點：①`sample_random_bars(bars, spec, trigger_receipts, label_rule) -> (records, receipt)`；②候選＝`all_bars_eval._is_eligible` 之 bar 減排除區間 `[t0_idx − neighborhood, label_end_idx + embargo]`（對每觸發事件取聯集）；③`strata.period` 與觸發期 `[min t0, max label_end]` 無交集 ⇒ raise `random_control_period_mismatch`；④配額：`n_target=min(n_requested, candidate_count)`；floor＋最大餘數（小數降冪、key 升冪）＋cap；不變式 `Σ==n_drawn==n_target`；⑤`rng = numpy.random.default_rng(seed)`，各 stratum 無放回；⑥label（R1 COMPOSER/GROK-R1-P1-02 定死；`canonical_digest` 不可逆、條件引擎無 digest→spec 路徑、`/search` 匯出批無 `filters`）：**唯一**標籤路徑＝`all_bars_eval._label_from_rule(direction_sign, close, i, horizon, threshold)`，其中 `horizon = random_control_spec.label_rule.horizon_bars`、`threshold = random_control_spec.label_rule.threshold`（**契約必填**，D5.1 typed schema 增 `label_rule{threshold: float, horizon_bars: int}`）、`direction_sign` 由觸發批 `direction` 導出；缺 `label_rule` ⇒ `random_control_label_rule_missing`（登記 `import_failure_reasons`）；**不**呼叫 `evaluate_condition`；pytest：同 `label_rule` 兩次評值逐 bar 相等、改 `horizon_bars` ⇒ label 集合改變；record：`control_kind=platform_random_bars`、`label_origin=platform_random`、scenario 同觸發批；⑦receipt：`per_stratum`、`sample_ids_digest`（S-9 sha256 of sorted ids）、`data_snapshot_digest`、`candidate_count`。
 - 修改檔案：新增 `momentum/Analysis/event_samples/random_control.py`；`momentum/factories.py` 不需新出口（服務端經 pipeline 消費）。
 - 不可做：隨機 bar 補入觸發批；合成 bar；`round`。
 - 邊界：①候選 0 ⇒ `unavailable`；②`neighborhood=0, embargo=6` 反例：觸發前一根不得被抽（若落其他觸發後鄰域）。
