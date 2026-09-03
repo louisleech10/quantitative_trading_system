@@ -14,34 +14,56 @@
 你 9/3 交代：「SPEC 和 TODO Frozen 後先停下，寫白話版說明解釋且舉例給我看」——這就是那份。<strong>實作還沒開始</strong>，看完你可以否決任何一條。</p>
 <hr />
 <h2 id="一這票在解什麼">一、這票在解什麼</h2>
-<p><code>/search</code> 匯出事件時有五個設定，其中三類值一直是灰的、點不了：</p>
+<p><code>/search</code> 匯出事件時有五個設定，<strong>每一個</strong>都有灰掉（或鎖死）的值。登記票按「做法」把它們分成三組：</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>設定</th>
-<th>灰掉的值</th>
+<th>現在能選</th>
+<th>灰／鎖住的值</th>
+<th>組</th>
 <th>白話</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>scenario</code>（情境）</td>
+<td>C</td>
 <td><code>A</code>、<code>B</code>、<code>two_stage</code></td>
-<td>只能選 C。你的主目標 B 選不到</td>
+<td>(a)</td>
+<td>你的主目標 B 選不到</td>
 </tr>
 <tr>
-<td>進場價／報酬算法／提前根數</td>
-<td><code>trigger_open</code>、<code>next_open</code>、<code>decision_bar_*</code>；<code>open_to_close</code>、<code>open_to_horizon_close</code>；<code>k &gt; 0</code></td>
-<td>只能「t₀ 收盤進、收盤到收盤算」</td>
-</tr>
-<tr>
-<td><code>control_kind</code>（對照組）</td>
+<td><code>control_kind</code>（對照組來源）</td>
+<td>三個「使用者標／同觸發規則」值</td>
 <td><code>platform_random_bars</code></td>
+<td>(b)</td>
 <td>平台幫你抽隨機 K 線當對照組——一直是「未實作」</td>
+</tr>
+<tr>
+<td><code>entry_price_semantic</code>（進場價）</td>
+<td><code>trigger_close</code></td>
+<td><code>trigger_open</code>、<code>next_open</code>、<code>decision_bar_open</code>、<code>decision_bar_close</code></td>
+<td>(c)</td>
+<td>只能 t₀ 收盤進場</td>
+</tr>
+<tr>
+<td><code>label_return_mode</code>（報酬算法）</td>
+<td><code>close_to_close</code></td>
+<td><code>open_to_close</code>、<code>open_to_horizon_close</code></td>
+<td>(c)</td>
+<td>只能收盤到收盤算</td>
+</tr>
+<tr>
+<td><code>decision_offset_bars</code>（提前 k 根）</td>
+<td>0</td>
+<td>數字欄鎖死，<code>k &gt; 0</code> 填不了</td>
+<td>(c)</td>
+<td>不能提前幾根決策</td>
 </tr>
 </tbody>
 </table></div>
-<p>你 8/31 裁定「不接受永久灰著」，9/2 裁定順序 <strong>(a) 情境 → (c) 進場／報酬／k → (b) 隨機對照組</strong>，都要做到「可選、而且真的算得出數字」。</p>
+<p>(c) 三個設定併一組，是因為它們走同一條機制（分析時算 <code>label_value</code> 那條路徑），開一個就等於要把三個一起開。你 8/31 裁定「不接受永久灰著」，9/2 裁定順序 <strong>(a) 情境 → (c) 進場／報酬／k → (b) 隨機對照組</strong>，都要做到「可選、而且真的算得出數字」。做完後五個設定的灰／鎖全部解除，只剩兩對幾何上永遠算不出來的組合（收盤進場 × 當根開到收）會灰掉並寫理由。</p>
 <hr />
 <h2 id="二開工前先抓到的四件事這些改變了做法">二、開工前先抓到的四件事（這些改變了做法）</h2>
 <ol>
