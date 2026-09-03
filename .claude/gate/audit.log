@@ -52943,3 +52943,39 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"actor": "cx_run", "attempt_id": "0e190e96-0f6b-4bc7-ae80-1d2d26668d89", "cli_rc": "0", "event": "committee_family_result", "event_id": "0043f856-a526-43bd-a366-119cd786fe70", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2v2-x-review-r2-grok.md", "output_sha256": "a0681723db20555f4c376294c6291a77c16388dd19026b3c4b8537739e0c3105", "producer": "audit_append.sh", "result_state": "success", "round_id": "4ae3aa43-e0f5-4230-907c-632d6f82afbf", "schema_version": 1, "sequence": 3077, "ts": "2026-09-03T15:53:31Z"}
+{"actor": "cx_run", "attempt_id": "aa4e51b5-5e7a-4b91-8e4b-99f4149f7a3a", "cli_rc": "0", "event": "committee_family_result", "event_id": "e2272b38-66a7-4ac4-b1ff-9b020171db59", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2v2-x-review-r2-codex.md", "output_sha256": "0f93f96c16e2744327f965fb200452d69c4ff2bf288157a5ebca68c2e703eec1", "producer": "audit_append.sh", "result_state": "success", "round_id": "4ae3aa43-e0f5-4230-907c-632d6f82afbf", "schema_version": 1, "sequence": 3078, "ts": "2026-09-03T16:04:21Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2V2-X-STAMP-R1", "ts": "2026-09-03T16:04:52Z"}
+=== 2026-09-04 00:04:52 | dispatch ===
+  ts=2026-09-04 00:04:52
+  kind=dispatch
+  intent=G3-D2 v2 戳記輪：三家 RECONCILE-STAMP（D-001／D-006 v2；review r1–r2 收斂）
+  risk=low
+  facts_asked=r2：三家 R1 全 CLOSED、無新 P0/P1；兩 P2 已寫回
+  review_role=stamp；append 至 stamp-target ## 戳記
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2V2-X-STAMP-R1", "ts": "2026-09-03T16:05:46Z"}
+=== 2026-09-04 00:05:46 | dispatch ===
+  ts=2026-09-04 00:05:46
+  kind=dispatch
+  intent=G3-D2 v2 戳記輪：三家 RECONCILE-STAMP（D-001／D-006 v2）
+  risk=low
+  facts_asked=r2 三家 R1 全 CLOSED、無新 P0/P1；body sha 5f322471…
+  review_role=stamp；append 至 stamp-target ## 戳記
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2V2-X-STAMP-R1-BRIEF.md", "brief_sha256": "ae6cb2684fd65cdc9f987343f471739256ab125ca940417567d2bfb57b5422c3", "brief_sha256_norm": "ae6cb2684fd65cdc9f987343f471739256ab125ca940417567d2bfb57b5422c3", "event": "committee_round_open", "event_id": "6957d2e4-ef7d-4baa-9bed-bb5efd45709c", "expected_outputs": {"codex": "handoffs/20260903-gap3d2v2-x-stamp-r1-codex.md", "composer": "handoffs/20260903-gap3d2v2-x-stamp-r1-composer.md", "grok": "handoffs/20260903-gap3d2v2-x-stamp-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "1afd4526-2b0e-4074-925a-cd33b12dbd04", "schema_version": 1, "sequence": 3079, "session_name": "20260903-gap3d2v2-x-stamp-r1", "task_id": "20260903-GAP3D2V2-X-STAMP-R1", "ts": "2026-09-03T16:05:51Z"}
