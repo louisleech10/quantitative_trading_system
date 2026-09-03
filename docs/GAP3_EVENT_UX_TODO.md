@@ -1,5 +1,7 @@
 # GAP-3 事件型 UAT 缺口修補 TODO（v1.0 **FROZEN 2026-08-24**｜基於 `docs/GAP3_EVENT_UX_SPEC.md` FROZEN 2026-08-24）
 
+延伸: D-006 docs/GAP3_EVENT_UX_TODO.D-006.md
+
 > ## 🔴 R 重開（2026-09-02；隨 `docs/GAP3_EVENT_UX_SPEC.md` R35-R；依 `FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1）
 > 本檔就地修訂（R 為「原檔重跑完整對抗審」，非延伸檔）：Phase 2 四 Task ⛔ RETIRED、新增 **Task 1.9′**、
 > Task 1.9／1.10／1.11／4.1／4.1b／7.3 與 §B 批次表同步；`docs/GAP3_EVENT_UX_TODO.D-001.md`…`D-005.md`

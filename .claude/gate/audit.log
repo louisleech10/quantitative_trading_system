@@ -52541,3 +52541,20 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2-TODO-REVIEW-R1", "ts": "2026-09-03T00:00:28Z"}
+=== 2026-09-03 08:00:28 | dispatch ===
+  ts=2026-09-03 08:00:28
+  kind=dispatch
+  intent=G3-D2 TODO 延伸檔 D-006 adversarial review r1（三家全員）
+  risk=low
+  facts_asked=D-006 dext 機檢；14 Task 對應 D-001 14 Task；五批
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
