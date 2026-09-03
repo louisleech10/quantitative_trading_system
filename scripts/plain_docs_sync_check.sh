@@ -93,6 +93,9 @@ _watched_for() {
     "GAP-3規格42個Task勾選表.md")    echo "docs/GAP3_EVENT_UX_SPEC.md" ;;
     # R11：凍結進度之白話總覽——盯 SPEC 本體（規格一改，「還差什麼」必須跟著重講）
     "GAP-3還差什麼才算完整.md")      echo "docs/GAP3_EVENT_UX_SPEC.md" ;;
+    # G3-D2 灰色項目白話說明（2026-09-03 使用者：「SPEC 和 TODO Frozen 後先停下，寫白話說明且舉例」）：
+    #   盯 SPEC 延伸 D-001 與 TODO 延伸 D-006——規格或清單一改，白話與範例必須跟著改。
+    "G3-D2灰色項目說明.md")          echo "docs/GAP3_EVENT_UX_SPEC.D-001.md docs/GAP3_EVENT_UX_TODO.D-006.md" ;;
     # 🔴 42 Task 施工看板（2026-08-24 使用者指出「沒有施工進度追蹤」而建）：
     #   由 FROZEN TODO ＋ 其 D 延伸檔**機械產生**（`scratchpad/gen_board2.py`），禁手抄。
     #   盯 TODO 與延伸檔——批次或 Task 一動，看板必須跟著重生，否則使用者看到的是過期批次。

@@ -1,5 +1,7 @@
 # IC 健檢偵察結果（步驟 1＋2 完成版）
 
+> 📌 2026-09-03：`G3-D2` 灰色項目之規格延伸 `docs/GAP3_EVENT_UX_SPEC.D-001.md` 與施工清單延伸 `docs/GAP3_EVENT_UX_TODO.D-006.md` 已凍結（三家戳記）；白話與範例見 [G3-D2灰色項目說明.md](G3-D2灰色項目說明.md)。本檔其餘內容為之前批次之狀態。
+
 2026-08-17 ｜ 四方獨立查證（我＋Codex＋Composer＋Grok），機器收斂零掉項，委員債已清。
 技術版：`handoffs/reconcile/20260817-ichc-x-consult-r1/synth.md`（收斂）＋四份偵察原檔 `handoffs/20260817-ichc-recon-*.md`。
 
