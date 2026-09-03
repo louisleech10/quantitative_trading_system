@@ -238,4 +238,8 @@ RECONCILE-STAMP: grok APPROVED 2026-09-03 sha256:327aadacd751492dbf80fe14f84b47b
 RECONCILE-STAMP: codex APPROVED 2026-09-03 sha256:327aadacd751492dbf80fe14f84b47b02a52fd95d44c0e89e0fcee440b9d7eb3 task:20260903-GAP3D2TODO-X-STAMP-R1
 RECONCILE-STAMP: composer APPROVED 2026-09-03 sha256:327aadacd751492dbf80fe14f84b47b02a52fd95d44c0e89e0fcee440b9d7eb3 task:20260903-GAP3D2TODO-X-STAMP-R1
 （composer 首派 CLI 模型不可用，同 round 重試親筆 APPROVED；`bash scripts/reconcile_stamps_check.sh handoffs/reconcile/20260903-gap3d2todo-x-review-r5/synth.md` → PASS。D-001 戳記後修訂段三家 APPROVED。上列戳記對應 **v1**。）
-🔴 **v2（2026-09-03 使用者白話閘四裁定，於 v1 戳記之後）**：§B 改 B-D0→B-D1→B-D3→B-D4→B-D5（D2 退役）、Phase D0 新增（D4.1 提前）、Phase D1 改預測型（D1.3 四對、D1.4 golden 擴、D1.5 排除值與 k 註記、新 Task D1.7）、D3.1 承接未標籤路徑、D4.3 掃描網格。**v2 須重跑一輪三家 review＋三家戳記**（`20260903-gap3d2v2-x-review-r1`／`…-stamp-r1`），完成前不得視為 FROZEN；依使用者裁定，戳記後停下、實作待放行。
+🔴 **v2（2026-09-03 使用者白話閘四裁定，於 v1 戳記之後）**：§B 改 B-D0→B-D1→B-D3→B-D4→B-D5（D2 退役）、Phase D0 新增（D4.1 提前）、Phase D1 改預測型（D1.3 四對、D1.4 golden 擴、D1.5 排除值與 k 註記、新 Task D1.7）、D3.1 承接未標籤路徑、D4.3 掃描網格。v2 review r1→r2 收斂後三家戳記（終輪收斂檔 `handoffs/reconcile/20260903-gap3d2v2-x-review-r2/synth.md`，body sha256 `5f322471aa214535729a225aee77dd3b7efc0c6d78545d04bff35df343e61425`；`reconcile_stamps_check.sh` PASS）：
+RECONCILE-STAMP: composer APPROVED 2026-09-04 sha256:5f322471aa214535729a225aee77dd3b7efc0c6d78545d04bff35df343e61425 task:20260903-GAP3D2V2-X-STAMP-R1
+RECONCILE-STAMP: grok APPROVED 2026-09-04 sha256:5f322471aa214535729a225aee77dd3b7efc0c6d78545d04bff35df343e61425 task:20260903-GAP3D2V2-X-STAMP-R1
+RECONCILE-STAMP: codex APPROVED 2026-09-04 sha256:5f322471aa214535729a225aee77dd3b7efc0c6d78545d04bff35df343e61425 task:20260903-GAP3D2V2-X-STAMP-R1
+🔒 **v2 FROZEN 2026-09-04**（三家戳記齊全）。依使用者裁定：戳記後停下、實作待放行。
