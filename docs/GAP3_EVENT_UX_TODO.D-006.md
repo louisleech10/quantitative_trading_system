@@ -66,8 +66,8 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 - 輸入／輸出：`label_value_from_case.py` 三個 `SUPPORTED_*` 常數 → `SUPPORTED_MATRIX: frozenset[tuple[str,str,int]]`；`spec_is_supported` 查集合。
 - 實作要點：①`SUPPORTED_MATRIX = frozenset({("trigger_close","close_to_close",0), ("trigger_open","close_to_close",0), ("trigger_open","open_to_close",0), ("trigger_open","open_to_horizon_close",0)})`（裁定② v2；後兩者依賴 B-D0 之 `entry_price_refs` 取價）；②`spec_is_supported(normalized) = (entry, mode, k) in SUPPORTED_MATRIX`；③`resolve_label_value_at_analyze` 取價路徑＝B-D0 版（`open_to_*` 讀 `entry_price_refs`）；④保留舊常數名為別名（deprecation 註解）避免既有 import 斷裂。
 - 修改檔案：`momentum/Analysis/event_samples/label_value_from_case.py::spec_is_supported`、常數區。　既有 caller：`api/services/ic_analysis_service.py::_run_event_label_stages`（不變）。
-- 不可做：不得開放 `open_to_*`；不得在前端另判支援。
-- 邊界：①`(trigger_open, open_to_close, 0)` 仍 `supported=False`、reason `label_producer_unsupported_for_declared_semantics`；②`(trigger_open, close_to_close, 1)` 不支援。
+- 不可做：不得在 B-D0 gate 未過前開放 `open_to_*`（過後四對即唯一矩陣）；不得在前端另判支援。
+- 邊界（v2 R1 COMPOSER-R1-P1-02 更正）：①`(trigger_close, open_to_close, 0)`／`next_open`／`decision_bar_*` 仍 `supported=False`、reason `label_producer_unsupported_for_declared_semantics`（D4.2 矩陣層再處理）；`(trigger_open, open_to_close, 0)` **支援**（依賴 B-D0）；②`(trigger_open, close_to_close, 1)` 不支援（k>0 留 D4）。
 - 風險緩解：既有 `test_analysis_label_producer_03/05` 不動。
 - 驗證：`venv/bin/python -m pytest tests/momentum/event_samples/ -q -k "analysis_label_producer and trigger_open"` ≥5 條（D-001 D1.3 (i)–(v)：close_to_close 兩 entry 值相等；entry_at／hash 不等；`open_to_close` 跳空 bar 手算 `==` 且 `!=` 前一根收盤版；`open_to_horizon_close` 手算；golden `--check` rc=0）。mutation：`SUPPORTED_MATRIX` 移除任一 `trigger_open` 對 ⇒ 對應條紅；B-D0 之 `entry_price_refs` 刪除 ⇒ (iii)(iv) `None`（fail-closed）。
 - **存活至**：P4 擴充同一常數，保留。　**覆蓋風險**：P4 擴充非覆蓋。
@@ -105,22 +105,23 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 - 驗證：`venv/bin/python -m pytest tests/api -q -k "event_batch_detail_dims or event_known"`：(i) 批次事實欄鍵集 `== {scenario, control_kind, direction, t0, label, label_origin}`；(ii) 舊批 fixture `label_origin is None`；(iii) 分析揭露 `event_known_at_decision_values == [False]`。
 - **存活至**：保留。　**覆蓋風險**：無。
 
-### Phase D1 測試＋Gate
-- 單元：D1.1–D1.4 選擇器全綠；golden `--check` rc=0；vitest 三檔綠；`tests/api -k event_batch_detail_dims` 綠。
-- Gate：三家 code review CLOSED；`bash scripts/restore_golden_inventory.sh`；commit＋push。
+### Phase D1 中間檢查（D1.1–D1.6；**非 batch gate**——v2 R1 COMPOSER-R1-P1-04）
+- 單元：D1.1–D1.4 選擇器全綠；golden `--check` rc=0；vitest 三檔綠；`tests/api -k event_batch_detail_dims` 綠。B-D1 之唯一 Gate 在 D1.7 之後。
 
 ### Task D1.7 — IC 分析頁：三種報酬選項＋依深度之預設＋h 初始＝宣告深度（`票 G3-D2`）
 - SPEC ref：D-001 Task D1.7（裁定②③ 2026-09-03）　目標：「量哪段報酬」在 IC 頁選，不綁情境；預設依宣告深度。
 - 輸入／輸出：detail 之 `lookahead_bars_declared` → 初始 `event_label_spec`；UI 三選項 → `entry_price_semantic`／`label_return_mode` 兩欄。
-- 實作要點：①`EventBatchDisclosurePanel.tsx` 分析參數區新增「報酬量法」radio：當根＝`(trigger_open, open_to_close)`、續漲＝`(trigger_close, close_to_close)`、持有＝`(trigger_open, open_to_horizon_close)`；選項只寫入既有兩欄，進階區仍可直接改兩欄（radio 依兩欄反推顯示，非匹配 ⇒ 「自訂」）；②`api/routes/ic_analysis.py` 初始值：`depth = lookahead_bars_declared[trigger_tf]`（缺 tf 鍵 ⇒ `max(values)`）；`depth == 0 ⇒ 當根`；`depth ≥ 1 ⇒ 持有且 horizon_bars 初始＝depth`；刪「常數 1」種子；**仍禁**讀 `window.horizon_bars`；③「當根」下 h 控制項 disabled＋揭露「當根不用 h」；④揭露列「本次量法＝X；h＝N（初始＝宣告深度）」。
+- 實作要點：①`EventBatchDisclosurePanel.tsx` 分析參數區新增「報酬量法」radio：當根＝`(trigger_open, open_to_close)`、續漲＝`(trigger_close, close_to_close)`、持有＝`(trigger_open, open_to_horizon_close)`；選項寫入既有兩欄；🔴 **B-D1 只開三 preset、不開進階直改**（兩欄 select 隱藏；v2 R1 CODEX-R1-P1-03——進階直改於 D4.2 pair-aware `dimOptions(selection)` 後開放）；送出守衛：`(entry, mode)` 不在 `SUPPORTED_MATRIX` 四對 ⇒ 阻擋、`fetch` 0 次；②`api/routes/ic_analysis.py` 初始值（deterministic）：`trigger_tfs = sorted({r["timeframe"]})`；單 tf ⇒ `depth = lookahead_bars_declared.get(tf, 0)`；混 tf ⇒ 不自動選：當根、`horizon_bars=1`、揭露「混合 timeframe 批，請手動設定」；`depth == 0 ⇒ 當根`；`depth ≥ 1 ⇒ 持有且 horizon_bars 初始＝depth`；刪「常數 1」種子；**仍禁**讀 `window.horizon_bars`；③「當根」下 h 控制項 disabled 但 **wire 仍送 `horizon_bars=1`**（四鍵恰四鍵、`h ≥ 1`；v2 R1 CODEX-R1-P1-02／COMPOSER-R1-P1-03），揭露「當根不用 h」；④揭露列「本次量法＝X（預設依宣告深度；續漲需手動選）；h＝N（初始＝宣告深度）」。
 - 修改檔案：`frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx`；`api/routes/ic_analysis.py`（`_seed_event_label_spec`）；`frontend/src/hooks/useICAnalysis.ts`（移除 `{ horizon_bars: 1 }` 常數種子）；`frontend/src/lib/types.ts`。　既有 caller：`icEventAnalysisRequest.test.ts`／`gap3_event_mode_entry.test.tsx`（期望改，附 diff）。
 - 不可做：三選項寫成第二份支援矩陣；讀匯出檔 `window.horizon_bars`。
 - 邊界：①多 tf 深度不同 ⇒ 取觸發 tf；②兩欄被改成非三選項組合 ⇒ radio 顯示「自訂」。
 - 風險緩解：Task 7.0b ③ 之禁讀斷言保留並改期望為「初始＝宣告深度」。
-- 驗證：vitest：三選項 DOM、選「當根」⇒ 兩欄值；pytest `tests/api -q -k ic_event_label_defaults`：深度 0 ⇒ `(trigger_open, open_to_close)`；深度 3 ⇒ `(trigger_open, open_to_horizon_close)` 且 `horizon_bars == 3`；mutation：改讀 `window.horizon_bars` ⇒ 紅。
+- 驗證：vitest：三選項 DOM、選「當根」⇒ 送出 spec 四鍵齊且 `horizon_bars===1`；進階直改 DOM 不存在；偽造 `(trigger_close, open_to_close)` ⇒ `fetch` 0 次；pytest `tests/api -q -k ic_event_label_defaults`：深度 0 單 tf ⇒ `(trigger_open, open_to_close)`、`horizon_bars==1`；深度 3 單 tf ⇒ `(trigger_open, open_to_horizon_close)`、`horizon_bars==3`；混 tf ⇒ 當根、`horizon_bars==1`、揭露含「混合 timeframe」；`horizon_bars` 缺或 0 ⇒ 422；mutation：改讀 `window.horizon_bars` ⇒ 紅。
 - **存活至**：保留。　**覆蓋風險**：無。
 
-### Phase D1 測試＋Gate（含 D1.7）
+### Phase D1 Gate（唯一；含 D1.7）
+- 單元：D1.1–D1.7 全部選擇器綠（含 `ic_event_label_defaults`）；golden `--check` rc=0；vitest 綠。
+- Gate：三家 code review CLOSED；`bash scripts/restore_golden_inventory.sh`；commit＋push。
 
 ## ~~Phase D2 — A~~（⛔ RETIRED 2026-09-03：使用者裁定① A 併入預測型；下列 Task D2.1 不執行，保留供追溯；`search_unlabeled` 定義移至 D3.1）
 
@@ -147,7 +148,7 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 - 不可做：復活／改動 `api/routes/two_stage_search.py`；新設兩段答案窗欄；一段時靜默寫 `stage_count=1`。
 - 邊界：①一段 ⇒ 阻擋；②`two_stage` 批 dedupe `policy_primary=='all_with_uniqueness'`（既有）。
 - 風險緩解：揭露「兩段各自分數尚無」由契約 doc 導出。
-- 驗證：vitest：`selectable('/search','scenario')` 集合相等 `{'A','B','C','two_stage'}`；一段 ⇒ disabled＋理由；pytest：two_stage 批 dedupe summary 政策斷言；深度 0 ⇒ `scenario_depth_inconsistent`。
+- 驗證：vitest：`selectable('/search','scenario')` 集合相等 `{'B','C','two_stage'}`（A 維持排除；v2 R1 COMPOSER-R1-P1-01）；一段 ⇒ disabled＋理由；pytest：two_stage 批 dedupe summary 政策斷言；深度 0 ⇒ `scenario_depth_inconsistent`。
 - **存活至**：保留。　**覆蓋風險**：無。
 
 ### Phase D3 Gate：同 D2。
@@ -179,8 +180,8 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 ### Task D4.3 — k 分析參數化：UI 移除、seeds 不帶 k、雙值揭露、scan_max（`票 G3-D2`）
 - SPEC ref：D-001 D4.3　目標：裁定②（k 不填）與裁定③（k／h 填 m 掃 0～m）落地；record k 不靜默改變。
 - 輸入／輸出：契約 `analysis_params.{decision_offset_bars_scan_max{example_default:10}, scan_grid_max_runs{example_default:121}}`、`capability_unavailable_reasons` 增 `scan_grid_too_large`；`event_label_spec.scan{decision_offset_bars_max?, horizon_bars_max?}`（可選）→ 回應 `scan_results: [{k, h, capability, reason?, ic_summary?, n_events, analysis_alignment_receipt_hash}]`；`EventDeclarationSeeds` 去 `decision_offset_bars`；`EventBatchFactNotes` 增 `decision_offset_bars_record_values: list[int]`；分析揭露 `decision_offset_bars_analysis`、兩上界；`capability_unavailable_reasons` 增 `missing_decision_offset_disclosure`。
-- 實作要點：⓪**掃描網格**：`ic_models.EventLabelSpec` 增可選 `scan: {decision_offset_bars_max: int≥0, horizon_bars_max: int≥1}`；`ic_analysis_service._run_event_label_stages` 外包一層 `_run_scan_grid`：K＝`[0..mk]`（未給 ⇒ `[k]`）、H＝`[1..mh]`（未給 ⇒ `[h]`）；`len(K)*len(H) > scan_grid_max_runs ⇒ unavailable:scan_grid_too_large`；逐格呼叫既有五階段（每格獨立 `prepared_token`／hash），超可行域之格 `capability='unavailable'` 不影響他格；回 `scan_results` 與 `k_max_feasible_at_h`／`h_max_feasible_at_k` 揭露；前端分析參數區 k／h 各有「單值／掃到 m」切換與結果矩陣（行 k、列 h、格＝IC 摘要）；①契約增鍵；②`api/models/event_import_models.py::EventDeclarationSeeds` 移除欄；`EventBatchFactNotes` 增 `decision_offset_bars_record_values`；`case_import_service.py:1390-1394` 改填；③`api/routes/ic_analysis.py:134-137` `spec.setdefault("decision_offset_bars", 0)`（常數）；④`EventDimensionFields.tsx` 於 `/search`／`/data-preparation` 隱藏 k 控制項（CSV 欄對映表保留 `decision_offset_bars`）；`eventExport.ts` 恆寫 0；⑤`EventBatchDisclosurePanel.tsx:172` 移除 seeds 回退、初始 0、`max=null`、超 `scan_max` 警示、並排「批次記錄 k（record 值集合）／本次分析 k」；⑥`ic_analysis_service`：缺任一揭露欄 ⇒ `unavailable:missing_decision_offset_disclosure`；⑦`tests/api/test_gap3_event_batch_detail_dims.py:28` `SEED_KEYS` 改兩鍵（附 diff）；`frontend/src/lib/types.ts` 同步。
-- 修改檔案：契約；`event_import_models.py`（`EventDeclarationSeeds`／`EventBatchFactNotes`）；`case_import_service.py::get_import` 內聯區塊 L1390–1399（`declaration_seeds=EventDeclarationSeeds(...)`／`batch_fact_notes=EventBatchFactNotes(...)`；無同名私有方法——R1 P2-04；實作時**可**抽成私有方法）；`api/routes/ic_analysis.py`；`ic_analysis_service.py`；`EventDimensionFields.tsx`；`EventBatchDisclosurePanel.tsx`；`eventExport.ts`；`types.ts`；測試。
+- 實作要點：⓪**掃描網格（v2 R1 CODEX-R1-P1-04／P1-05、COMPOSER-R1-P1-05 更正）**：`api/models/ic_models.py` 新 typed `EventLabelSpecModel`（恰四鍵，取代 raw `Dict`）與請求頂層 sibling `event_label_scan: Optional[EventLabelScanModel{decision_offset_bars_max: int≥0, horizon_bars_max: int≥1}]`（**不放進** `event_label_spec`——normalizer 多一鍵 fail-closed；`event_label_scan` 存在而 `event_import_id` 缺 ⇒ 400）；`ic_analysis_service._run_scan_grid`：K＝`[0..mk]`（未給 ⇒ `[spec.k]`）、H＝`[1..mh]`（未給 ⇒ `[spec.h]`）；`len(K)*len(H) > scan_grid_max_runs ⇒ unavailable:scan_grid_too_large`；逐格剝離成恰四鍵 spec、以 `asyncio.to_thread` 呼叫既有五階段（每格獨立 `prepared_token`／hash；不得同步跑在 event loop），每格 `per_cell_timeout_s`、整體 `scan_timeout_s`（契約 `analysis_params`），逾時之格 `unavailable:scan_cell_timeout`、保留 partial；進度走既有 `ic_analysis_ws` progress 增 `scan_done/scan_total`；超可行域之格 `unavailable` 不影響他格；回 `scan_results` 與 `k_max_feasible_at_h`／`h_max_feasible_at_k` 揭露；前端分析參數區 k／h 各有「單值／掃到 m」切換與結果矩陣（行 k、列 h、格＝IC 摘要）；⓪b **benchmark 子步（先於凍結 cap）**：`scripts/gap3_scan_benchmark.py` 以真實 ETHUSDT 60 事件 × 12h 量單格耗時，寫 receipt `handoffs/run_receipts/gap3_scan_benchmark.json`，據此把 `scan_grid_max_runs`／兩 timeout 之 `example_default` 由暫定 121 改為實測值並在 commit message 具名；①契約增鍵（含 `per_cell_timeout_s`、`scan_timeout_s`、reason `scan_cell_timeout`）；②`api/models/event_import_models.py::EventDeclarationSeeds` 移除欄；`EventBatchFactNotes` 增 `decision_offset_bars_record_values`；`case_import_service.py:1390-1394` 改填；③`api/routes/ic_analysis.py:134-137` `spec.setdefault("decision_offset_bars", 0)`（常數）；④`EventDimensionFields.tsx` 於 `/search`／`/data-preparation` 隱藏 k 控制項（CSV 欄對映表保留 `decision_offset_bars`）；`eventExport.ts` 恆寫 0；⑤`EventBatchDisclosurePanel.tsx:172` 移除 seeds 回退、初始 0、`max=null`、超 `scan_max` 警示、並排「批次記錄 k（record 值集合）／本次分析 k」；⑥`ic_analysis_service`：缺任一揭露欄 ⇒ `unavailable:missing_decision_offset_disclosure`；⑦`tests/api/test_gap3_event_batch_detail_dims.py:28` `SEED_KEYS` 改兩鍵（附 diff）；`frontend/src/lib/types.ts` 同步。
+- 修改檔案：契約；`api/models/ic_models.py`（`EventLabelSpecModel`／`EventLabelScanModel`；請求 `event_label_scan`）；`api/websocket/ic_analysis_ws.py`（progress 欄）；新增 `scripts/gap3_scan_benchmark.py`；`event_import_models.py`（`EventDeclarationSeeds`／`EventBatchFactNotes`）；`case_import_service.py::get_import` 內聯區塊 L1390–1399（`declaration_seeds=EventDeclarationSeeds(...)`／`batch_fact_notes=EventBatchFactNotes(...)`；無同名私有方法——R1 P2-04；實作時**可**抽成私有方法）；`api/routes/ic_analysis.py`；`ic_analysis_service.py`；`EventDimensionFields.tsx`；`EventBatchDisclosurePanel.tsx`；`eventExport.ts`；`types.ts`；測試。
 - 不可做：改契約 `decision_offset_bars` 必填／default；靜默重設 record k；拒收 CSV k>0（允許＋揭露）。
 - 邊界：①既有 k=1 批 ⇒ 初始 0、揭露 `[1]`；②分析 k > `k_max_feasible_at_h` ⇒ 全批 failures ⇒ `unavailable`。
 - 風險緩解：seeds 銜接清單五處逐一改（D-001 列）。
