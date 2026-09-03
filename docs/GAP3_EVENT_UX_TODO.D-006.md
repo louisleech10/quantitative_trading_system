@@ -219,4 +219,5 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 
 RECONCILE-STAMP: grok APPROVED 2026-09-03 sha256:327aadacd751492dbf80fe14f84b47b02a52fd95d44c0e89e0fcee440b9d7eb3 task:20260903-GAP3D2TODO-X-STAMP-R1
 RECONCILE-STAMP: codex APPROVED 2026-09-03 sha256:327aadacd751492dbf80fe14f84b47b02a52fd95d44c0e89e0fcee440b9d7eb3 task:20260903-GAP3D2TODO-X-STAMP-R1
-（composer：戳記輪 CLI `Cannot use this model: composer-2.5`，**待補**（`DEGRADE-COMPOSER-07`）；兩家 APPROVED＋D-001 修訂段三家 APPROVED（codex／grok 本輪、composer r4）。三家戳記齊全前本檔狀態＝**兩家 APPROVED、一家待補**，不得宣稱 FROZEN。使用者 2026-09-03 裁定：Frozen 後停下、先交白話說明，實作不開工。）
+RECONCILE-STAMP: composer APPROVED 2026-09-03 sha256:327aadacd751492dbf80fe14f84b47b02a52fd95d44c0e89e0fcee440b9d7eb3 task:20260903-GAP3D2TODO-X-STAMP-R1
+（composer 首派 CLI 模型不可用，同 round 重試親筆 APPROVED；`bash scripts/reconcile_stamps_check.sh handoffs/reconcile/20260903-gap3d2todo-x-review-r5/synth.md` → PASS。D-001 戳記後修訂段三家 APPROVED。🔒 **FROZEN 2026-09-03**（三家戳記齊全）。使用者 2026-09-03 裁定：Frozen 後停下、先交白話說明（`白話說明/G3-D2灰色項目說明.md`），實作待使用者放行。）

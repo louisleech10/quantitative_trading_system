@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-03 10:40｜狀態：`G3-D2` SPEC 延伸 D-001 三家戳記齊全；TODO 延伸 D-006 review r1–r5 收斂（r5 零新 finding；D-001 戳記後修訂段 codex／grok／composer(r4) APPROVED）；TODO 戳記輪派工中（session `20260903-gap3d2todo-x-stamp-r1`）。🔴 使用者 2026-09-03 裁定：SPEC／TODO Frozen 後**停下**，先交白話說明＋範例（`白話說明/G3-D2灰色項目說明.md` 已寫），**不派實作**，等使用者點頭。**
+**更新：2026-09-03 11:30｜狀態：`G3-D2` SPEC 延伸 D-001 與 TODO 延伸 D-006 **皆三家戳記齊全＝FROZEN**（stamps check 兩份 PASS）。🔴 依使用者 2026-09-03 裁定**已停下**：白話說明＋範例在 `白話說明/G3-D2灰色項目說明.md`，**實作未開工，等使用者放行**。**
 
 ## 票（唯一權威＝`docs/IC_QUANT_GAP_REGISTRY.md`）
 | 票 | 狀態 |
