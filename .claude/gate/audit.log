@@ -52903,3 +52903,42 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2V2-X-REVIEW-R2", "ts": "2026-09-03T14:45:12Z"}
+=== 2026-09-03 22:45:12 | dispatch ===
+  ts=2026-09-03 22:45:12
+  kind=dispatch
+  intent=G3-D2 v2 review r2 閉合輪：codex／composer 確認 R1 七群；grok 補審 v2
+  risk=low
+  facts_asked=r1 13 ID 全寫回；三檔機檢 PASS
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260903-GAP3D2V2-X-REVIEW-R2-BRIEF.md", "brief_sha256": "03240cf016fa4c6e6185c86aee0d11ff48f232e393f54cb837ac9e03d29b41fc", "brief_sha256_norm": "03240cf016fa4c6e6185c86aee0d11ff48f232e393f54cb837ac9e03d29b41fc", "event": "committee_round_open", "event_id": "11e9b2d2-d0f3-466c-aba1-6d231eda861f", "expected_outputs": {"codex": "handoffs/20260903-gap3d2v2-x-review-r2-codex.md", "composer": "handoffs/20260903-gap3d2v2-x-review-r2-composer.md", "grok": "handoffs/20260903-gap3d2v2-x-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "4ae3aa43-e0f5-4230-907c-632d6f82afbf", "schema_version": 1, "sequence": 3072, "session_name": "20260903-gap3d2v2-x-review-r2", "task_id": "20260903-GAP3D2V2-X-REVIEW-R2", "ts": "2026-09-03T14:45:17Z"}
+{"actor": "cx_run", "attempt_id": "d8105197-68d8-4ee5-aa32-e45dcadc7121", "cli_rc": "1", "event": "committee_family_result", "event_id": "5924f7dd-2c12-4620-9bb9-86afc6af5c0e", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2v2-x-review-r2-codex.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "4ae3aa43-e0f5-4230-907c-632d6f82afbf", "schema_version": 1, "sequence": 3073, "ts": "2026-09-03T14:45:38Z"}
+{"actor": "cx_run", "attempt_id": "3928b316-c2e8-4c2c-9a5b-182d238be1a4", "cli_rc": "0", "event": "committee_family_result", "event_id": "7dd3dfad-9dd0-4f27-84c4-a366e9f07039", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2v2-x-review-r2-composer.md", "output_sha256": "6370377888c359b67d7d704c5c48970d335ed42eb58741ff48284fd09a3cf008", "producer": "audit_append.sh", "result_state": "success", "round_id": "4ae3aa43-e0f5-4230-907c-632d6f82afbf", "schema_version": 1, "sequence": 3074, "ts": "2026-09-03T14:48:33Z"}
+{"actor": "cx_run", "attempt_id": "18184e31-1b52-4d1d-9055-07907560aad6", "cli_rc": "1", "event": "committee_family_result", "event_id": "a42bb4ba-5715-4cba-998d-0cadece1ee57", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2v2-x-review-r2-grok.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "4ae3aa43-e0f5-4230-907c-632d6f82afbf", "schema_version": 1, "sequence": 3075, "ts": "2026-09-03T14:52:34Z"}
+{"abandon_kind": "collection-failed", "actor": "debt_clear", "approver": "claude", "event": "debt_abandon", "event_id": "c2e8ba01-ce22-497e-b35b-0286aeaab920", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "reason": "grok API 500（第二次）；codex 見 runlog；composer 已交件", "round_id": "4ae3aa43-e0f5-4230-907c-632d6f82afbf", "schema_version": 1, "sequence": 3076, "ts": "2026-09-03T15:49:11Z", "zero_findings_verified": ""}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2V2-X-REVIEW-R2", "ts": "2026-09-03T15:49:24Z"}
+=== 2026-09-03 23:49:24 | dispatch ===
+  ts=2026-09-03 23:49:24
+  kind=dispatch
+  intent=G3-D2 v2 review r2：codex（chatgpt backend 404）與 grok（API 500）外部故障未交件，同 round 單家重試
+  risk=low
+  facts_asked=composer R1 七條全 CLOSED、1 P2 已寫回
+  review_role=adversarial review 唯讀（codex／grok 補件）
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
