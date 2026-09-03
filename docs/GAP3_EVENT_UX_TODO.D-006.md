@@ -215,4 +215,8 @@ PREDECESSOR: none（D-001…D-005 已 SUPERSEDED-BY-R；編號不重用）
 ### Phase D5 Gate：D5 全測試綠＋golden rc=0；三家 review CLOSED；registry `G3-D2` 改 CLOSED、`G3-R7` 收回；UAT B3 改「可選項全部通過」待使用者驗；commit＋push。
 
 ## 戳記
-（三家 RECONCILE-STAMP 於 TODO 對抗審收斂後 append。）
+（戳記本體落在終輪收斂檔 `handoffs/reconcile/20260903-gap3d2todo-x-review-r5/synth.md`（本機，gitignore）之 `## 戳記`；此處為鏡像。body sha256 `327aadacd751492dbf80fe14f84b47b02a52fd95d44c0e89e0fcee440b9d7eb3`。review 鏈 r1（13）→ r2（5）→ r3（6）→ r4（5）→ r5（0）。）
+
+RECONCILE-STAMP: grok APPROVED 2026-09-03 sha256:327aadacd751492dbf80fe14f84b47b02a52fd95d44c0e89e0fcee440b9d7eb3 task:20260903-GAP3D2TODO-X-STAMP-R1
+RECONCILE-STAMP: codex APPROVED 2026-09-03 sha256:327aadacd751492dbf80fe14f84b47b02a52fd95d44c0e89e0fcee440b9d7eb3 task:20260903-GAP3D2TODO-X-STAMP-R1
+（composer：戳記輪 CLI `Cannot use this model: composer-2.5`，**待補**（`DEGRADE-COMPOSER-07`）；兩家 APPROVED＋D-001 修訂段三家 APPROVED（codex／grok 本輪、composer r4）。三家戳記齊全前本檔狀態＝**兩家 APPROVED、一家待補**，不得宣稱 FROZEN。使用者 2026-09-03 裁定：Frozen 後停下、先交白話說明，實作不開工。）
