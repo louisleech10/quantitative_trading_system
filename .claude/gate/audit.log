@@ -52845,3 +52845,20 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"actor": "cx_run", "attempt_id": "6f9ecec0-4e57-4fca-bbd1-a508c4676387", "cli_rc": "0", "event": "committee_family_result", "event_id": "8bab3f3f-407d-4de4-a19f-3c7751fd4275", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260903-gap3d2todo-x-stamp-r1-composer.md", "output_sha256": "c4a0ee191ad77ac39bc2bedf17f99126c949c7e67ed1d0bd0583dd330ef85ea8", "producer": "audit_append.sh", "result_state": "success", "round_id": "d55b0afb-b40b-49c7-8f17-53e58df25a92", "schema_version": 1, "sequence": 3066, "ts": "2026-09-03T02:17:00Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260903-gap3d2todo-x-review-r5/synth.md", "output_sha256": "cfc5d527f4cb5704f014974466b83eab9d0dfd53c30d29b068e9ad7c195387cd", "task_id": "20260903-GAP3D2TODO-X-STAMP-R1", "ts": "2026-09-03T02:17:00Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260903-GAP3D2V2-X-REVIEW-R1", "ts": "2026-09-03T13:33:21Z"}
+=== 2026-09-03 21:33:21 | dispatch ===
+  ts=2026-09-03 21:33:21
+  kind=dispatch
+  intent=G3-D2 v2：使用者四裁定修訂 D-001／D-006 之三家 adversarial review r1
+  risk=low
+  facts_asked=四裁定：A 併入預測型／三種報酬選項與依深度預設（D4.1 提前為 D0）／k、h 掃描網格／k 註記；9/1 批為測試檔
+  review_role=adversarial review 唯讀；原提出方閉合制
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
