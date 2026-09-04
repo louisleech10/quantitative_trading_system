@@ -150,10 +150,13 @@ export const EVENT_DIM_PATH_EXCLUSIONS: Readonly<Record<string, EventDimExclusio
   // 🔴 `G3-D2` D1.5（2026-09-04）：`B` 解灰。`A` 仍排除但**理由改了**——
   //    它不是「未交付」，而是**已併入 `B`**（裁定① 2026-09-03）：有無用未來根
   //    由 `lookahead_bars_declared` 之深度宣告區分，不由 scenario 值區分。
+  // 🔴 `G3-D2` D3.1（2026-09-05）：`two_stage` **解灰**——兩段式走「未標籤匯出」路徑
+  //    （`label` 鍵缺席、`label_origin='search_unlabeled'`，補標後以 `user_csv` 匯入）。
+  //    ⇒ 本路徑之排除集合只剩 `A` 一個值。
   '/search|scenario': {
-    values: ['A', 'two_stage'],
+    values: ['A'],
     reason: 'A 已併入預測型（B）；有無用未來根由深度宣告（lookahead_bars_declared）區分，'
-      + '不由 scenario 值區分（裁定① 2026-09-03）。two_stage 之兩段式 label 路徑於 Phase D3 交付',
+      + '不由 scenario 值區分（裁定① 2026-09-03）',
   },
   // 🔴 D1.5：`trigger_open` 自排除集合**移除**（＝解灰為可選）。
   //    其餘三值留待 D4.2（全矩陣＋成對可行域）。

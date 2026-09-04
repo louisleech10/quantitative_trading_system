@@ -120,6 +120,81 @@ export interface EventExportOptions {
    * 🔴 **JSON 匯出不得開這個選項**：契約要求 `label` 必填，帶 `null` 的 JSON 必然被拒。
    */
   includeUnlabeled?: boolean;
+  /**
+   * `G3-D2` D3.1：**兩段式之兩段條件**（每段一個條件陣列）。
+   *
+   * 🔴 `scenario === 'two_stage'` 時**必填且長度恰為 2**，否則匯出阻擋
+   * （`two_stage_requires_two_stages`）。**不得**在只有一段時降級為 A／B，
+   * 也不得靜默寫 `stage_count=1`（SPEC D3.1 邊界③）。
+   * 其他 scenario 忽略本欄。
+   */
+  stageConditions?: readonly (readonly unknown[])[];
+}
+
+/** `G3-D2` D3.1：匯出被前端阻擋時丟這個型別，`reason` 為契約／SPEC 之字面代號。 */
+export class EventExportBlocked extends Error {
+  readonly reason: string;
+
+  constructor(reason: string, message: string) {
+    // 🔴 `message` 由 `twoStageExportBlockReason` 產生時**已含代號**，此處不再加前綴
+    //    ——加了就變成兩處各自組字串，畫面與例外訊息會漂。
+    super(message);
+    this.name = 'EventExportBlocked';
+    this.reason = reason;
+  }
+}
+
+/**
+ * `G3-D2` D3.1：**兩段式匯出之阻擋判定——唯一一份**。
+ *
+ * 🔴 `buildEventContractRecords`（丟 `EventExportBlocked`）與 `/search` 頁
+ * （把匯出鈕 disable 並顯示理由）**共用本函式**。
+ * 若頁面另寫一次 `if (stages.length !== 2)`，那就是第二份判斷——
+ * 兩份遲早會漂（本 epic 已因「同一規則兩份實作」踩過三次）。
+ *
+ * 回 `undefined` ＝ 不阻擋。
+ */
+export function twoStageExportBlockReason(input: {
+  scenario?: string;
+  stageConditions?: readonly (readonly unknown[])[];
+  lookaheadBarsDeclared?: Record<string, number>;
+}): { reason: string; message: string } | undefined {
+  if (input.scenario !== 'two_stage') return undefined;
+  const stages = input.stageConditions ?? [];
+  if (stages.length !== 2) {
+    return {
+      reason: 'two_stage_requires_two_stages',
+      // 代號放在訊息裡（單一來源）：畫面與 `EventExportBlocked.message` 用的是同一份字串。
+      message: `[two_stage_requires_two_stages] scenario=two_stage 需要恰兩段條件，目前 ${stages.length} 段。`
+        + '兩段式的意思就是「先看第一段成立、再看第二段」——只有一段時它不是兩段式，'
+        + '系統不會替你把它當成單段情境送出。請補上第二段（啟用反例條件），或把情境改成 B／C。',
+    };
+  }
+  // 兩段式之事件相對決策必為未來 ⇒ 深度 0 與該情境自相矛盾（匯入端同名 reason 亦拒）。
+  const depths = Object.values(input.lookaheadBarsDeclared ?? {}).map((v) => Number(v) || 0);
+  if (Math.max(0, ...depths) < 1) {
+    return {
+      reason: 'scenario_depth_inconsistent',
+      message: '[scenario_depth_inconsistent] scenario=two_stage 需要至少一個 timeframe 宣告深度 ≥ 1（lookahead_bars_declared）。'
+        + '深度 0 表示「事件在決策當下就已知」，那與兩段式互相矛盾，匯入端也會拒收。',
+    };
+  }
+  return undefined;
+}
+
+/**
+ * `G3-D2` D3.1：two_stage 之未標籤匯出標記。
+ *
+ * 🔴 契約 `optional_fields.label_origin.not_importable` 含本值 ⇒ **直接匯入必拒**。
+ * 這是刻意的：兩段式路徑不產 label，使用者必須在 CSV 自填後改以 `user_csv` 匯入
+ * （`/data-preparation` 之 `batch_defaults`）。寫 `user_csv` 等於替使用者宣告他還沒做的事。
+ */
+export const EVENT_EXPORT_UNLABELED_LABEL_ORIGIN = 'search_unlabeled' as const;
+
+/** D3.1：兩段式之 `search_rule_summary` canonical 形狀（契約 `two_stage_shape` 逐字）。 */
+export function twoStageRuleSummary(stageDigests: readonly string[]): string {
+  // 鍵序固定 stage_count→stages、無空白——契約 `search_rule_summary.two_stage_shape` 之字面。
+  return JSON.stringify({ stage_count: stageDigests.length, stages: [...stageDigests] });
 }
 
 /**
@@ -267,8 +342,27 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
   const attached = [...(opts.attachedHorizons ?? ATTACHED_HORIZONS)];
   const declaredMap = opts.lookaheadBarsDeclared;
   const direction = opts.direction ?? inferDirection(opts.conditions);
+
+  // ── `G3-D2` D3.1：two_stage 之前端阻擋（在組裝**之前**，不產出半成品）───────────
+  //    判定走 `twoStageExportBlockReason`——與 `/search` 頁之 disable 邏輯同一份。
+  const isTwoStage = opts.scenario === 'two_stage';
+  const blocked = twoStageExportBlockReason({
+    scenario: opts.scenario,
+    stageConditions: opts.stageConditions,
+    lookaheadBarsDeclared: declaredMap,
+  });
+  if (blocked) throw new EventExportBlocked(blocked.reason, blocked.message);
+
   const ruleSummary = ruleSummaryText(opts.conditions, opts.priceChangeMethod, opts.timeframe);
   const ruleDigest = await ruleDigestOf(ruleSummary);
+  // D3.1 ②：兩段各自之 canonical digest ⇒ `search_rule_summary` 之 canonical JSON 單一字串。
+  //    🔴 digest 一律走與單段相同的 `ruleSummaryText`＋`ruleDigestOf`，不另寫第二套序列化。
+  const stageDigests = isTwoStage
+    ? await Promise.all((opts.stageConditions ?? []).map(
+      (conds) => ruleDigestOf(ruleSummaryText([...conds], opts.priceChangeMethod, opts.timeframe)),
+    ))
+    : [];
+  const recordRuleSummary = isTwoStage ? twoStageRuleSummary(stageDigests) : ruleSummary;
   const { text: sourceText, digest: sourceDigest } = requireBackendSource(opts);
   const snapshot = `search:${opts.timeframe}:${new Date().toISOString().slice(0, 10)}`;
   const skipped: { index: number; reason: string }[] = [];
@@ -282,7 +376,9 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
     }
     const pc = (c as CaseData & { positive_case?: boolean | number }).positive_case;
     const label = pc === true || pc === 1 ? 1 : pc === false || pc === 0 ? 0 : null;
-    if (label === null && !opts.includeUnlabeled) {
+    // 🔴 D3.1：two_stage **強制**走未標籤路徑——`includeUnlabeled` 不由使用者關掉
+    //    （SPEC 邊界①：`includeUnlabeled=false` 且 two_stage ⇒ 前端強制切為 true 並揭露）。
+    if (label === null && !opts.includeUnlabeled && !isTwoStage) {
       skipped.push({ index: i, reason: 'missing_positive_case_flag' });
       return [];
     }
@@ -314,7 +410,11 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
       entry_price_semantic: opts.entryPriceSemantic ?? EVENT_EXPORT_ENTRY_PRICE_SEMANTIC,
       direction,
       scenario: opts.scenario ?? EVENT_EXPORT_SCENARIO,
-      label,
+      // 🔴 D3.1：two_stage ⇒ `label` **鍵整個缺席**（禁 `null`／`''`／`0`）。
+      //    寫 `null` 會讓 CSV 落成空欄看起來「有這一欄只是沒填」，而 JSON 路徑則會被
+      //    契約當成「有宣告但缺值」；鍵缺席才誠實表達「這條路徑不產 label」。
+      //    （驗證見 vitest：每列 `'label' in record === false`。）
+      ...(isTwoStage ? {} : { label }),
       // Task 4.1 ③：真實深度（逐 tf map）。批次層屬性 ⇒ **逐列同值**（契約驗批內一致性）。
       lookahead_bars_declared: declaredMap,
       ...attachedColumns,
@@ -331,12 +431,15 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
       control_kind: opts.controlKind ?? EVENT_EXPORT_CONTROL_KIND,
       source_file_digest: sourceDigest,
       data_snapshot_digest: snapshot,
-      search_rule_summary: ruleSummary,
+      // D3.1 ②：two_stage ⇒ canonical JSON `{stage_count,stages}`；其餘維持單段文字摘要。
+      search_rule_summary: recordRuleSummary,
       // 🔴 `G3-D2` D1.5：provenance。`/search` 匯出批一律 `search_positive_case`
       //    ——本路徑之 label 由 t0 條件產生（`positive_case` 判定），這就是它的來源。
       //    契約對 `scenario ∈ {A,B,two_stage}` 條件必填；C 批雖不強制，仍照寫，
       //    因為「來源」是事實而非只為過閘（舊批缺欄回 null 是相容路徑，不是目標狀態）。
-      label_origin: EVENT_EXPORT_LABEL_ORIGIN,
+      // 🔴 D3.1：two_stage 不產 label ⇒ provenance 為 `search_unlabeled`（契約
+      //    `not_importable`）。這批**故意**匯不進去，逼使用者補標後改以 `user_csv` 匯入。
+      label_origin: isTwoStage ? EVENT_EXPORT_UNLABELED_LABEL_ORIGIN : EVENT_EXPORT_LABEL_ORIGIN,
       kind_source: 'user',
     }];
   });

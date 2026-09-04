@@ -149,8 +149,10 @@ describe('Task 7.1 ⑨ — EVENT_DIM_PATH_EXCLUSIONS 之內容（集合相等，
     //    集合相等**未放寬**——多排除或少排除任一值仍會紅（本條之防偽價值就在此）。
     //    `/search|label_return_mode` 與 `/ic-analysis|label_return_mode` 之值集合現為**空**，
     //    但鍵保留（刪鍵會讓「從未考慮過」與「考慮過且全開」在碼上無從區分）。
+    // 🔴 `G3-D2` D3.1（2026-09-05）：`two_stage` 解灰 ⇒ `/search|scenario` 只剩 `A`。
+    //    **未放寬**：集合相等，少排除 `A`（或多排除任何值）仍會紅。
     expect(actual).toEqual({
-      '/search|scenario': new Set(['A', 'two_stage']),
+      '/search|scenario': new Set(['A']),
       '/search|entry_price_semantic':
         new Set(['next_open', 'decision_bar_open', 'decision_bar_close']),
       '/search|label_return_mode': new Set([]),
@@ -160,18 +162,19 @@ describe('Task 7.1 ⑨ — EVENT_DIM_PATH_EXCLUSIONS 之內容（集合相等，
     });
   });
 
-  it('🔴 D1.5 解灰之正面驗收：可選集合恰為預期（不只驗排除表，驗導出結果）', () => {
-    // (i) scenario：`B` 與 `C` 可選
-    expect(new Set(selectable('/search', 'scenario'))).toEqual(new Set(['B', 'C']));
+  it('🔴 D1.5／D3.1 解灰之正面驗收：可選集合恰為預期（不只驗排除表，驗導出結果）', () => {
+    // (i) scenario：`B`／`C`／`two_stage` 可選（D3.1 解灰 `two_stage`；SPEC D3.1 驗證第一條）
+    expect(new Set(selectable('/search', 'scenario'))).toEqual(new Set(['B', 'C', 'two_stage']));
     // (ii) entry_price_semantic：`trigger_close` 與 `trigger_open` 可選
     expect(new Set(selectable('/search', 'entry_price_semantic')))
       .toEqual(new Set(['trigger_close', 'trigger_open']));
     // (iii) label_return_mode：三種報酬選項全開（裁定② v2）
     expect(new Set(selectable('/search', 'label_return_mode')))
       .toEqual(new Set(['open_to_close', 'open_to_horizon_close', 'close_to_close']));
-    // 🔴 over 向：`A`／`two_stage` 仍**不可選**（否則「全部解灰」也會讓上面三條綠）
+    // 🔴 over 向：`A` 仍**不可選**（否則「全部解灰」也會讓上面三條綠）。
+    //    D3.1 把 `two_stage` 從這條 over 向移到上面的正面集合——**不是弱化**：
+    //    集合相等那一行仍會在「連 `A` 也解灰」時轉紅。
     expect(selectable('/search', 'scenario')).not.toContain('A');
-    expect(selectable('/search', 'scenario')).not.toContain('two_stage');
     expect(selectable('/search', 'entry_price_semantic')).not.toContain('next_open');
   });
 

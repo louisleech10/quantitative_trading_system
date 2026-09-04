@@ -60,7 +60,17 @@ async function firstRecord(over: Partial<EventExportOptions> = {}) {
 
 describe('Task 7.0 — EventExportOptions 五維度參數化（①–⑤：傳非預設值 ⇒ 落檔忠實等於所傳值）', () => {
   it('① `scenario`：傳非預設 `two_stage` ⇒ 頂層 `scenario` === 所傳值', async () => {
-    const r = await firstRecord({ scenario: 'two_stage' });
+    // 🔴 `G3-D2` D3.1（2026-09-05）：`two_stage` 現在有**前置條件**（兩段條件、深度 ≥1）。
+    //    本條之原意（「傳什麼就落什麼」）不變，只是要先滿足前置條件才走得到落檔那一步。
+    //    深度由 `baseOpts` 之 `lookaheadBarsDeclared: {'1h': 2}` 滿足。
+    //    **這不是放寬**：少給一段仍會被 `two_stage_requires_two_stages` 擋下（另有測試釘住）。
+    const r = await firstRecord({
+      scenario: 'two_stage',
+      stageConditions: [
+        [{ parameter: 'price_change', operator: '>=', value: 3 }],
+        [{ parameter: 'price_change', operator: '<=', value: -3 }],
+      ],
+    });
     expect(r.scenario).toBe('two_stage');
     // 反向對照：不傳時才是預設。同一條裡驗兩向，避免「恆等於所傳值」被恆真實作騙過。
     expect(r.scenario).not.toBe(EVENT_EXPORT_SCENARIO);

@@ -77,7 +77,7 @@
       "not_importable": ["search_unlabeled"],
       "doc": "label 之 provenance（這批的答案是怎麼來的）。search_positive_case=搜尋頁匯出之正例；user_csv=使用者自標 CSV；platform_generator=平台產生器；platform_random=隨機對照組；search_unlabeled=搜尋頁之未標籤匯出（**不可匯入**，只走 two_stage 之未標籤路徑）。🔴 值屬 not_importable ⇒ label_origin_not_importable；scenario ∈ {A,B,two_stage} 而缺本欄 ⇒ conditional_required_missing。**舊批（scenario=C 且無本欄）不受條件必填約束、不補值**，讀路徑回 null"
     },
-    "search_rule_summary": { "type": "str", "doc": "U2 當時搜尋條件摘要" },
+    "search_rule_summary": { "type": "str", "two_stage_shape": "{\"stage_count\":2,\"stages\":[\"<sha256>\",\"<sha256>\"]}", "doc": "U2 當時搜尋條件摘要。🔴 scenario=two_stage 時本欄改為 **canonical JSON 單一字串**，形狀逐字＝two_stage_shape：鍵序固定 stage_count→stages、無空白、stages 為兩段各自條件之 canonical digest（sha256，順序＝第一段在前）。stage_count 恆為 2——只有一段時匯出端即阻擋（two_stage_requires_two_stages），**不得**靜默寫 stage_count=1。🔴 兩段各自之 label_value 未交付（見 scenario.doc 之殘留）：本欄只記「這批是由哪兩段條件產生的」，不承載任何分數。" },
     "event_source": { "type": "str" },
     "observable_family": { "type": "str" },
     "event_origin": { "type": "str", "doc": "值 'model' 觸發 conditional_required.source_model（T9）" },

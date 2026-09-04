@@ -28,6 +28,7 @@ import {
   eventDimsToExportOptions,
   horizonCoverageLines,
   toEpochMs,
+  twoStageExportBlockReason,
 } from '@/lib/eventExport';
 import { canonicalEventId } from '@/lib/eventId';
 import EventDimensionFields, { type EventDimensionValues } from '@/components/case/EventDimensionFields';
@@ -257,6 +258,64 @@ export default function SearchPage() {
     closingStrength: '<=',
     takerBuyRatio: '<=',
     pricePosition: '<='
+  });
+
+  /**
+   * 🔴 `G3-D2` D3.1：兩段式匯出之**第二段**條件（反例）。
+   *
+   * `/search` 頁上唯一的「兩段」來源就是「正例條件 ＋ 反例條件」，
+   * 反例未啟用（`negativeParams.enabled === false`）⇒ 只有一段。
+   * **這裡只組資料、不做判斷**：一段時的阻擋由 `buildEventContractRecords` 丟
+   * `EventExportBlocked('two_stage_requires_two_stages')`——判斷寫在這裡就是第二份清單。
+   *
+   * 🔴 與 `api/routes/two_stage_search.py` **無關**：那支 router 不動不接
+   * （SPEC D3.1 邊界①），它的產物沒有 provenance，不得被匯入為 two_stage 批。
+   * 這裡取的是**使用者在本頁填的條件**，不是那支 router 的輸出。
+   *
+   * 兩條匯出路徑（JSON／CSV）共用本值——不得各寫一份。
+   */
+  /**
+   * 🔴 `G3-D2` D3.1：**第一段**（正例）條件。原本 JSON 與 CSV 兩個匯出 handler
+   * 各自寫了一份**逐字相同**的陣列；D3.1 需要在元件層就知道兩段內容（才能 disable 按鈕），
+   * 順手把那份既有重複收成單一來源。兩個 handler 現在都用本值。
+   */
+  const positiveStageConditions = React.useMemo(() => [
+    {
+      parameter: 'price_change',
+      operator: operators.priceChange,
+      value: operators.priceChange === 'BETWEEN'
+        ? [rangeValues.priceChange.min, rangeValues.priceChange.max]
+        : searchParams.priceChange,
+      unit: 'percent',
+    },
+    { parameter: 'volume_multiplier', operator: operators.volumeMultiplier, value: searchParams.volumeMultiplier },
+    { parameter: 'closing_strength', operator: operators.closingStrength, value: searchParams.closingStrength },
+    { parameter: 'taker_buy_ratio', operator: operators.takerBuyRatio, value: searchParams.takerBuyRatio },
+    { parameter: 'price_position', operator: operators.pricePosition, value: searchParams.pricePosition },
+  ].filter((c) => c.value !== null && c.value !== undefined), [operators, rangeValues, searchParams]);
+
+  const negativeStageConditions = React.useMemo(() => [
+    { parameter: 'price_change', operator: negativeOperators.priceChange, value: negativeParams.priceChange, unit: 'percent' },
+    { parameter: 'volume_multiplier', operator: negativeOperators.volumeMultiplier, value: negativeParams.volumeMultiplier },
+    { parameter: 'closing_strength', operator: negativeOperators.closingStrength, value: negativeParams.closingStrength },
+    { parameter: 'taker_buy_ratio', operator: negativeOperators.takerBuyRatio, value: negativeParams.takerBuyRatio },
+    { parameter: 'price_position', operator: negativeOperators.pricePosition, value: negativeParams.pricePosition },
+  ].filter((c) => c.value !== null && c.value !== undefined), [negativeOperators, negativeParams]);
+
+  /** D3.1：兩段條件之組裝（反例未啟用 ⇒ 只有一段）。兩個 handler 與按鈕 disable 共用。 */
+  const exportStageConditions = negativeParams.enabled
+    ? [positiveStageConditions, negativeStageConditions]
+    : [positiveStageConditions];
+
+  /**
+   * D3.1：匯出是否被阻擋（`undefined` ＝ 不擋）。
+   * 🔴 判定**不在這裡寫**——呼叫 `eventExport.ts` 之 `twoStageExportBlockReason`，
+   * 與 `buildEventContractRecords` 內丟例外用的是同一份。
+   */
+  const exportBlock = twoStageExportBlockReason({
+    scenario: eventDims.scenario,
+    stageConditions: exportStageConditions,
+    lookaheadBarsDeclared: declaredWindowBarsForExport(declState),
   });
 
   // UI 狀態
@@ -638,20 +697,9 @@ export default function SearchPage() {
       proceed: async () => {
     const { buildEventContractRecords } = await import('@/lib/eventExport');
     // 規則摘要（G3：條件自動存；值單位同 UI：% 與倍數）
-    const ruleConditions = [
-      {
-        parameter: 'price_change',
-        operator: operators.priceChange,
-        value: operators.priceChange === 'BETWEEN'
-          ? [rangeValues.priceChange.min, rangeValues.priceChange.max]
-          : searchParams.priceChange,
-        unit: 'percent',
-      },
-      { parameter: 'volume_multiplier', operator: operators.volumeMultiplier, value: searchParams.volumeMultiplier },
-      { parameter: 'closing_strength', operator: operators.closingStrength, value: searchParams.closingStrength },
-      { parameter: 'taker_buy_ratio', operator: operators.takerBuyRatio, value: searchParams.takerBuyRatio },
-      { parameter: 'price_position', operator: operators.pricePosition, value: searchParams.pricePosition },
-    ].filter((c) => c.value !== null && c.value !== undefined);
+    // 🔴 D3.1：改用元件層之 `positiveStageConditions`（原本這裡與 CSV handler 各有一份
+    //    逐字相同的陣列；D3.1 需要在元件層知道兩段內容，順手收成單一來源）。
+    const ruleConditions = positiveStageConditions;
     // GAP-3 UX Task 1.3：`source_file_digest` 綁**完整 CaseData 列**且**一律由後端計算**
     // （`/search` 結果端點回應之兩鍵）。前端只傳遞，不自算、不重新序列化。
     // 🔴 R 重開 D-8 規則①：匯出＝搜尋結果**全部**列（無篩選）；正反例判定在系統外完成。
@@ -667,6 +715,8 @@ export default function SearchPage() {
       // 🔴 Task 7.1：五維度**逐一**由 UI 狀態傳入。漏傳任一個都會讓落檔悄悄退回
       //    `eventExport.ts` 的預設值（介面有、沒傳）——Task 7.2 ② 之機械閘即守這件事。
       ...eventDimsToExportOptions(eventDims),
+      // 🔴 D3.1：兩段條件。反例未啟用 ⇒ 只有一段 ⇒ 由 `buildEventContractRecords` 阻擋。
+      stageConditions: exportStageConditions,
     });
     // GAP-3 UX Task 4.3 ＋ 5.3：**同一個**確認框（5.3 是 4.3 的擴寫，不另建第二個）。
     // 4.3＝逐附帶 horizon 列出筆數；5.3＝改為**主動顯示**每個附帶欄各有幾筆可算、幾筆缺，
@@ -723,20 +773,8 @@ export default function SearchPage() {
       proceed: async () => {
         const { buildEventContractRecords } = await import('@/lib/eventExport');
         const { buildEventContractCsv } = await import('@/lib/eventContractCsv');
-        const ruleConditions = [
-          {
-            parameter: 'price_change',
-            operator: operators.priceChange,
-            value: operators.priceChange === 'BETWEEN'
-              ? [rangeValues.priceChange.min, rangeValues.priceChange.max]
-              : searchParams.priceChange,
-            unit: 'percent',
-          },
-          { parameter: 'volume_multiplier', operator: operators.volumeMultiplier, value: searchParams.volumeMultiplier },
-          { parameter: 'closing_strength', operator: operators.closingStrength, value: searchParams.closingStrength },
-          { parameter: 'taker_buy_ratio', operator: operators.takerBuyRatio, value: searchParams.takerBuyRatio },
-          { parameter: 'price_position', operator: operators.pricePosition, value: searchParams.pricePosition },
-        ].filter((c) => c.value !== null && c.value !== undefined);
+        // 🔴 D3.1：與 JSON handler 同一份（元件層 `positiveStageConditions`）。
+        const ruleConditions = positiveStageConditions;
 
         const filtered = currentResult.cases as CaseData[];   // D-8 規則①：全部列，無篩選
         const payload = await buildEventContractRecords(filtered, {
@@ -752,6 +790,8 @@ export default function SearchPage() {
           // 🔴 CSV 帶**全部**列（未標記者 `label` 留空給你在 Excel 補）——
           //    丟掉那些列等於剝奪你補標記的機會，而匯入端對缺 label 是整批拒收。
           includeUnlabeled: true,
+          // 🔴 D3.1：與 JSON 路徑同一份（`negativeStageConditions` 為元件層單一來源）。
+          stageConditions: exportStageConditions,
         });
 
         // 🔴 `meta.` 之內容＝**該列自己的**非契約欄；逐列取，不跨列共用。
@@ -1815,8 +1855,11 @@ export default function SearchPage() {
                     alert(`匯出失敗：${err instanceof Error ? err.message : String(err)}`);
                   });
                 }}
+                // 🔴 D3.1：兩段式之阻擋 ⇒ 按鈕 disabled（理由顯示在下方）。
+                //    判定來自 `twoStageExportBlockReason`，此處不另寫條件。
+                disabled={exportBlock !== undefined}
                 data-testid="export-contract-csv"
-                className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-400 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="匯出可直接回灌的 CSV：欄名就是契約欄名，你在 Excel 改完 label 就能直接上傳"
               >
                 <Download className="w-5 h-5" />
@@ -1830,13 +1873,21 @@ export default function SearchPage() {
                     alert(`匯出失敗：${err instanceof Error ? err.message : String(err)}`);
                   });
                 }}
+                disabled={exportBlock !== undefined}
                 data-testid="export-gap3-events"
-                className="ml-3 flex items-center gap-2 px-6 py-3 bg-sky-500/20 text-sky-100 border border-sky-400/40 rounded-lg font-medium hover:bg-sky-500/30 transition-colors"
+                className="ml-3 flex items-center gap-2 px-6 py-3 bg-sky-500/20 text-sky-100 border border-sky-400/40 rounded-lg font-medium hover:bg-sky-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="匯出事件契約 JSON＋來源檔（可手改後到「數據準備」匯入）"
               >
                 <Download className="w-5 h-5" />
                 匯出事件契約 JSON
               </button>
+              {/* 🔴 `G3-D2` D3.1：兩段式之阻擋理由。**只顯示、不判斷**（判斷在
+                  `twoStageExportBlockReason`），代號一併顯示以便對照契約／訊息。 */}
+              {exportBlock && (
+                <p className="mt-2 w-full text-xs text-amber-300" data-testid="export-blocked-reason">
+                  {exportBlock.message}
+                </p>
+              )}
             </div>
           </div>
         )}
