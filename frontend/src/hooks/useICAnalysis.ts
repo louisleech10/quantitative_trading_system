@@ -317,11 +317,15 @@ export function useICAnalysis() {
         ...(config.mode === 'event' && config.event_import_id
           ? {
               event_import_id: config.event_import_id,
-              // 🔴 `horizon_bars` 缺省為**字面常數 1**，**禁**以匯出檔之
-              //    `label_definition.window.horizon_bars` 種子化——那欄的語意是 D-7 深度宣告，
-              //    分析層禁止讀成答案窗；既有批之殘值為 3，種子化＝靜默給錯預設答案窗。
-              //    三元組之初始值由**後端**取該批 F-0 種子，前端不猜。
-              event_label_spec: config.event_label_spec ?? { horizon_bars: 1 },
+              // 🔴 **前端不再送任何預設 spec**（`CODEX-R2-P1-03`，B-D1 R2 實跑命中）。
+              //    原版在使用者沒設定時明送 `{ horizon_bars: 1 }`；後端 D1.7 用 `setdefault`
+              //    依宣告深度導出預設，而 `setdefault` **壓不過已存在的鍵**
+              //    ⇒ 宣告深度 3 的批，「持有」實際跑成 h=1，且值合法、沒有測試會紅。
+              //    這就是「兩端都有、但沒接上」——後端邏輯正確卻**不可達**。
+              //    ⇒ 使用者未設定時**整個鍵省略**，由後端導出；有設定才照送。
+              //    （`horizon_bars` 仍**禁**以匯出檔之 `label_definition.window.horizon_bars`
+              //     種子化——那欄語意是 D-7 深度宣告，分析層讀成答案窗即靜默給錯值。）
+              ...(config.event_label_spec ? { event_label_spec: config.event_label_spec } : {}),
             }
           : {
               // legacy 非事件批路徑（例如只用 `event_query` 篩）行為不變。

@@ -106,10 +106,28 @@ def cmd_check(pattern: str) -> int:
         print(f"CHECK: glob 無命中: {pattern!r}（fail-closed）")
         return 1
     bars = _bars()
+    # 🔴 `CODEX-R2-P1(P2)-01`（B-D1 R2）：`--check` 原本只讀 JSON 內既存之 `t0_ms`，
+    #    **不驗它是否還等於 `cases.py` selector 導出之值** ⇒ 有人改了 selector（或 kline
+    #    增量更新使索引指向別的 bar）後重凍，案例會**悄悄失去它宣稱的覆蓋**而 `--check` 全綠。
+    #    ⇒ 在此逐檔對證。selector 解不出來（例如登記處已移除該案例）亦為紅。
+    selector_t0 = {}
+    for item in case_registry.resolved_cases(bars):
+        selector_t0[item["file_name"]] = [int(t) for t in item["meta"]["t0_ms"]]
     rc = 0
     for p in paths:
         try:
             case = load_golden(p)
+            expected_t0 = selector_t0.get(p.name)
+            if expected_t0 is None:
+                print(f"FAIL {p.name}: 不在 cases.py 登記處（凍結檔與登記處已脫鉤）")
+                rc = 1
+                continue
+            if list(case.t0_ms) != expected_t0:
+                print(f"FAIL {p.name}: 凍結之 t0_ms 與登記處 selector 導出值不符"
+                      f"（凍結={list(case.t0_ms)[:3]}… selector={expected_t0[:3]}…）"
+                      "——該案例已失去它宣稱的覆蓋，須確認 selector 意圖後重凍")
+                rc = 1
+                continue
             report = check_golden(case, bars)
         except Exception as exc:  # loader／run 之 fail-closed 一律計為紅
             print(f"FAIL {p.name}: {type(exc).__name__}: {exc}")

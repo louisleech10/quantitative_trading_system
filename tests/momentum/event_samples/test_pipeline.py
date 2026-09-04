@@ -88,8 +88,16 @@ def test_run_loud_on_invalid_mixed_scenario_and_all_failed(bars):
     p = create_event_sample_pipeline()
     with pytest.raises(ContractValidationError):
         p.run([make_event(0, t0=1704067200, label=1), make_event(1, label=0)], bars, EventPipelineConfig())
+    # 🔴 `G3-D2` B-D1 R2：本條驗的是「**混 scenario** 會 loud」，故 A 那列須在
+    #    D1.1 兩條規則上**合法**（帶 `label_origin`、深度 ≥1），否則會先撞
+    #    `conditional_required_missing` 而測不到 `_prepare` 的混值守衛——
+    #    那就變成「隨便一個錯都算過」。（`enforce_batch_homogeneity` 於本路徑為 False，
+    #    新規則照判：`COMPOSER-R2-P2-01`／`GROK-R2-P2-02` 之修正。）
     with pytest.raises(ValueError, match="scenario"):
-        p.run([make_event(0, t0=BASE + 300 * H12, label=1, scenario="A"), make_event(1, t0=BASE + 420 * H12, label=0, scenario="C")],
+        p.run([make_event(0, t0=BASE + 300 * H12, label=1, scenario="A",
+                          label_origin="user_csv", lookahead_bars_declared={"12h": 2}),
+               make_event(1, t0=BASE + 420 * H12, label=0, scenario="C",
+                          label_origin="user_csv", lookahead_bars_declared={"12h": 2})],
               bars, EventPipelineConfig(split=EventSplitConfig(tier_min_test_events=0)))
     with pytest.raises(ValueError, match="全部事件對齊失敗"):
         p.run([make_event(0, t0=BASE + 1, label=1), make_event(1, t0=BASE + 2, label=0)], bars, EventPipelineConfig())

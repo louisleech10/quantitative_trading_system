@@ -128,14 +128,25 @@ export default function EventBatchDisclosurePanel({
       <div data-testid="ic-analysis-params">
         <p className="text-sm text-slate-300">這次分析要用的參數（只影響這一次分析，不會寫回事件批）</p>
         <label className="mt-2 block text-xs text-slate-200">
-          <span className="mb-1 block">答案窗 horizon_bars（任意正整數）</span>
+          <span className="mb-1 block">
+            答案窗 horizon_bars（任意正整數）
+            {currentPreset?.key === 'same_bar' && (
+              <span className="ml-1 text-[11px] text-slate-400" data-testid="ic-param-h-inert">
+                — 「當根」不用 h（送出時固定為 1）
+              </span>
+            )}
+          </span>
+          {/* 🔴 `CODEX-R2-P1-03` 後半：「當根」下 h **不參與計算**，可編輯會讓使用者以為
+              自己改的數字有作用（改了值、結果不變）。⇒ disabled，並在標籤明說原因。
+              wire 仍送 1（inert 哨兵；`event_label_spec` 恆四鍵，缺鍵 normalizer fail-closed）。 */}
           <input
             type="number"
             min={1}
             data-testid="ic-param-horizon-bars"
-            value={spec.horizon_bars}
+            disabled={currentPreset?.key === 'same_bar'}
+            value={currentPreset?.key === 'same_bar' ? 1 : spec.horizon_bars}
             onChange={(e) => onChangeLabelSpec({ ...spec, horizon_bars: Number(e.target.value) })}
-            className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
+            className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 disabled:opacity-50"
           />
         </label>
 

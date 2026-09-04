@@ -225,9 +225,14 @@ describe('Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」', () =>
     expect((screen.getByTestId('ic-param-horizon-bars') as HTMLInputElement).value).toBe('1');
     cleanup();
 
-    // (b) **payload 層**：真的送出去的 body 亦為 1（兩層各有守衛，故兩層都要驗）
+    // (b) **payload 層**：🔴 `CODEX-R2-P1-03` 之修正改變了這一半的形狀——
+    //     前端未設定時**整個鍵省略**（不再送 `{horizon_bars: 1}`），由後端依
+    //     `lookahead_bars_declared` 導出。本條之原意（「不得以匯出檔之 window.horizon_bars=3
+    //     種子化」）**未放寬**：鍵不存在 ⇒ 前端連猜的機會都沒有，比送常數更強；
+    //     「後端也不會讀那個窗欄」由 `tests/api -k ic_event_label_defaults` 之
+    //     `…_never_reads_window_horizon_bars` 釘住（宣告深度 2、窗欄殘值 9 ⇒ h=2）。
     const body = await startWith(baseConfig({ event_import_id: 'imp-1' }));
-    expect((body.event_label_spec as { horizon_bars: number }).horizon_bars).toBe(1);
+    expect('event_label_spec' in (body as Record<string, unknown>)).toBe(false);
   });
 
   it('⑥ 改分析參數**不回寫**事件批：對 `/case/events/` 只有 GET，且重查之 records 不變', async () => {
@@ -374,5 +379,94 @@ describe('G3-D2 D1.7 — 送出守衛', () => {
   it('🔴 只給一半（有 entry 無 mode）⇒ 擋下（半組值會與後端導出的另一半拼成未預期組合）', () => {
     expect(isSubmittableLabelSpec({ horizon_bars: 1, entry_price_semantic: 'trigger_open' })).toBe(false);
     expect(isSubmittableLabelSpec({ horizon_bars: 1, label_return_mode: 'open_to_close' })).toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// B-D1 R2 閉合輪 — 三家 review 命中之缺陷（前端半邊）
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('B-D1 R2 閉合 — CODEX-R2-P1-03：前端不得送預設 spec', () => {
+  it('🔴 未設定 spec ⇒ payload **完全沒有** `event_label_spec` 鍵（讓後端依深度導出）', async () => {
+    sent.length = 0;
+    const { result } = renderHook(() => useICAnalysis());
+    await act(async () => {
+      await result.current.startAnalysis(baseConfig({ event_import_id: 'imp-1' }));
+    });
+    const analyze = sent.filter((s) => s.url.endsWith('/analyze'));
+    expect(analyze).toHaveLength(1);
+    // 🔴 修正前：這裡是 `{ horizon_bars: 1 }`，而後端 `setdefault` 壓不過它
+    //    ⇒ 宣告深度 3 的批「持有」實際跑成 h=1。鍵必須**不存在**，不是存在但為 undefined。
+    expect('event_label_spec' in (analyze[0].body as Record<string, unknown>)).toBe(false);
+  });
+
+  it('🔴 over 向：有設定 spec ⇒ 照原樣送出（證明上一條不是「一律不送」）', async () => {
+    sent.length = 0;
+    const spec = {
+      horizon_bars: 3,
+      entry_price_semantic: 'trigger_open',
+      label_return_mode: 'open_to_horizon_close',
+      decision_offset_bars: 0,
+    };
+    const body = await startWith(baseConfig({ event_import_id: 'imp-1', event_label_spec: spec }));
+    expect(body.event_label_spec).toEqual(spec);
+  });
+});
+
+describe('B-D1 R2 閉合 — CODEX-R2-P1-03 後半：「當根」之 h 不可編輯', () => {
+  it('選「當根」⇒ h 輸入框 disabled 且顯示原因；其他量法可編輯', () => {
+    const { rerender } = render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} onChangeLabelSpec={() => {}}
+        labelSpec={{
+          horizon_bars: 1,
+          entry_price_semantic: 'trigger_open',
+          label_return_mode: 'open_to_close',
+        }}
+      />,
+    );
+    const h = screen.getByTestId('ic-param-horizon-bars') as HTMLInputElement;
+    expect(h.disabled).toBe(true);
+    expect(screen.getByTestId('ic-param-h-inert')).toBeTruthy();
+
+    // 🔴 over 向：「持有」下 h **必須**可編輯（否則就是把整個欄位鎖死）
+    rerender(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} onChangeLabelSpec={() => {}}
+        labelSpec={{
+          horizon_bars: 3,
+          entry_price_semantic: 'trigger_open',
+          label_return_mode: 'open_to_horizon_close',
+        }}
+      />,
+    );
+    expect((screen.getByTestId('ic-param-horizon-bars') as HTMLInputElement).disabled).toBe(false);
+    expect(screen.queryByTestId('ic-param-h-inert')).toBeNull();
+  });
+});
+
+describe('B-D1 R2 閉合 — GROK-R2-P2-03：裁定 5「UI 比支援矩陣嚴」須被具名釘住', () => {
+  it('🔴 `(trigger_open, close_to_close)` 雖在後端矩陣內，UI 守衛**仍拒**', () => {
+    // grok 指出：既有測試（preset 可送／矩陣外不可送／半組擋／兩缺放行）在
+    // 把守衛改成「鏡像後端四對」時**全綠** ⇒ 裁定 5 會靜默消失而 CI 不紅。
+    // 本條就是那個缺的負例：它是矩陣內、非 preset 的那一對。
+    expect(isSubmittableLabelSpec({
+      horizon_bars: 1,
+      entry_price_semantic: 'trigger_open',
+      label_return_mode: 'close_to_close',
+      decision_offset_bars: 0,
+    })).toBe(false);
+    // 🔴 對照：同樣是矩陣內、但**是** preset 的那三對須放行
+    for (const p of RETURN_MEASURE_PRESETS) {
+      expect(isSubmittableLabelSpec({
+        horizon_bars: 1,
+        entry_price_semantic: p.entry_price_semantic,
+        label_return_mode: p.label_return_mode,
+        decision_offset_bars: 0,
+      })).toBe(true);
+    }
+    // 🔴 三個 preset 之外，`RETURN_MEASURE_PRESETS` 不得悄悄長出第四個
+    //    （若日後要放寬到矩陣四對，必須改本條，而不是「順手」改守衛）
+    expect(RETURN_MEASURE_PRESETS).toHaveLength(3);
   });
 });

@@ -402,7 +402,17 @@ _HETEROGENEITY_MAX_REPORTED = 3
 #: 🔴 為什麼不掛在該旗標下：該旗標預設 `False`，掛上去等於預設不檢查＝fail-open。
 #: `lookahead_bars_declared` 是**批次層**屬性（逐列同值只為滿足 SPEC 4.1 驗收④之
 #: `records[0].…` 字面），列間不同值時「該批的深度是多少」沒有定義 ⇒ 一律拒。
-_ALWAYS_HOMOGENEOUS_DIMENSIONS = ("lookahead_bars_declared",)
+#: 🔴 `label_origin` 由 **B-D1 R2 三家全員命中**後加入（`CODEX-R2-P1-01`／`COMPOSER-R2-P1-01`／
+#: `GROK-R2-P2-01`，2026-09-04）。D-001 D1.6 本就寫「wire shape＝scalar（批內常數，異質 ⇒ Task 1.8 拒）」，
+#: 我實作時**只做了逐列 enum 檢查、沒接上同質閘** ⇒ 兩種靜默錯誤同時存在（皆有委員實跑 receipt）：
+#:   ① 部分宣告 `[None, "user_csv"]` ⇒ `_single_value` 回 `"user_csv"`，
+#:      **一列的宣告被當成整批的宣告**；
+#:   ② 混值 `["user_csv", "platform_generator"]` ⇒ `_single_value` 回 `None`，
+#:      UI 顯示「（未宣告）」，與「舊批從未宣告」**不可區分**。
+#: 掛在**無條件**組而非 Task 1.8 旗標組：旗標預設 `False`，掛上去等於預設不檢查＝fail-open
+#: （這正是 `COMPOSER-R2-P2-01`／`GROK-R2-P2-02` 對裁定 1 指出的同型漏洞）。
+#: 全缺（舊批）仍放行——「全有全無」由下方 `0 < len(present) < len(normalized)` 承擔。
+_ALWAYS_HOMOGENEOUS_DIMENSIONS = ("lookahead_bars_declared", "label_origin")
 #: D-004 A-020：Task 4.1 之附帶報酬欄（h ∈ 1..12）。**逐欄列舉**——契約
 #: `allowed_top_level_keys` 為閉集、無 pattern 機制。
 #: 🔴 本元組只決定「**哪些欄要跑 float 型別檢查**」，**不決定哪些欄合法**——
@@ -477,7 +487,12 @@ def validate_event_import(
     #    `conditional_required_missing`，把真正的問題（批本身不該混）蓋掉。
     #    在迴圈**之前**算，因為它是批次層事實，不是逐列事實。
     _batch_scenarios = {r.get("scenario") for r in rows if isinstance(r.get("scenario"), str)}
-    _batch_scenario_mixed = len(_batch_scenarios) > 1
+    # 🔴 **只在 Task 1.8 之拒收「真的會執行」時才跳過**（`COMPOSER-R2-P2-01`／`GROK-R2-P2-02`，
+    #    B-D1 R2 兩家獨立命中）：`enforce_batch_homogeneity` 預設為 `False`，
+    #    原版無條件跳過 ⇒ 走預設之 caller（平台內部直呼、未來新 caller）會讓混批
+    #    **同時**掩護掉 provenance 與深度兩條規則——「先擋混批」的承諾在那條路徑上落空，
+    #    而混值本身也不被擋 ⇒ 兩邊都沒人管。旗標為 False 時照常逐列判。
+    _batch_scenario_mixed = enforce_batch_homogeneity and len(_batch_scenarios) > 1
 
     # ---- 批次預設（Task 1.8）：**只填補缺值，絕不覆蓋列自帶值** ----
     # CSV 與 JSON 兩路徑共用之唯一套用點（V-3 之 AST oracle 涵蓋面）。

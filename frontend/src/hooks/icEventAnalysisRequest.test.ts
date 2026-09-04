@@ -53,18 +53,35 @@ async function startWith(config: ICAnalysisConfig) {
 }
 
 describe('Task 7.0b ⑫ — 選批後之 /analyze payload', () => {
-  it('① 選了事件批 ⇒ payload **含** `event_import_id` 與 `event_label_spec`', async () => {
+  it('① 選了事件批 ⇒ payload 含 `event_import_id`；未設定量法時**不帶** `event_label_spec`', async () => {
     const body = await startWith(baseConfig({ event_import_id: 'imp-1' }));
     expect(body.event_import_id).toBe('imp-1');
-    expect(body.event_label_spec).toBeTruthy();
+    // 🔴 `G3-D2` `CODEX-R2-P1-03`（2026-09-04）：原本這裡斷言 `event_label_spec` 為 truthy，
+    //    而前端為了滿足它而明送 `{horizon_bars: 1}`——後端 D1.7 的依深度預設用 `setdefault`，
+    //    **壓不過已存在的鍵** ⇒ 宣告深度 3 的批「持有」實際跑成 h=1。兩端都對、就是沒接上。
+    //    ⇒ 未設定時該鍵**必須不存在**。有設定時照送（見下方 ①′）。
+    expect('event_label_spec' in (body as Record<string, unknown>)).toBe(false);
   });
 
-  it('② 只給 import_id ⇒ `event_label_spec.horizon_bars === 1`（**字面常數**，非匯出之深度欄值）', async () => {
+  it('①′ 🔴 over 向：有設定量法 ⇒ `event_label_spec` 照原樣送出（證明①不是「一律不送」）', async () => {
+    const spec = {
+      horizon_bars: 3,
+      entry_price_semantic: 'trigger_open',
+      label_return_mode: 'open_to_horizon_close',
+      decision_offset_bars: 0,
+    };
+    const body = await startWith(baseConfig({ event_import_id: 'imp-1', event_label_spec: spec }));
+    expect(body.event_label_spec).toEqual(spec);
+  });
+
+  it('② 只給 import_id ⇒ 前端**不得**以匯出檔之 `window.horizon_bars`（殘值 3）種子化', async () => {
     // 🔴 既有批之 `label_definition.window.horizon_bars` 殘值為 3。
     //    拿它種子化＝靜默給錯預設答案窗——該欄語意是 D-7 深度宣告，分析層禁止讀成答案窗。
+    //    本條之保證**未放寬**、且比原版更強：鍵不存在 ⇒ 前端連猜的機會都沒有。
+    //    「後端也不會讀那個窗欄」由 `tests/api -k ic_event_label_defaults` 之
+    //    `…_never_reads_window_horizon_bars`（宣告深度 2、窗欄殘值 9 ⇒ h=2）釘住。
     const body = await startWith(baseConfig({ event_import_id: 'imp-1' }));
-    expect((body.event_label_spec as { horizon_bars: number }).horizon_bars).toBe(1);
-    expect((body.event_label_spec as { horizon_bars: number }).horizon_bars).not.toBe(3);
+    expect(body).not.toHaveProperty('event_label_spec');
   });
 
   it('③ 選了事件批 ⇒ payload **不得**同時帶 `event_timestamps`（後端定死互斥 ⇒ 422）', async () => {

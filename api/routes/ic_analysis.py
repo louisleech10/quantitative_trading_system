@@ -133,6 +133,25 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
                     "message": f"事件批 {request.event_import_id!r} 沒有任何 records"},
         )
     seed = records[0]
+    # 🔴 **混 `decision_offset_bars` ⇒ fail-closed**（`CODEX-R2-P1-02`，B-D1 R2 實跑命中）：
+    #    契約層允許逐列不同（`decision_offset_bars` 不在同質維度內），而本函式取 `records[0]`
+    #    之 k、`_analysis_copy` 再把它**套用全批** ⇒ 其餘事件被對齊到**錯的決策根**，
+    #    且值合法、沒有任何測試會紅。實測：`records_k=[0, 2]` ⇒ `resolved k=0`，
+    #    第二個事件之 `decision_at` 變成 `t0`（依其宣告應為 `ot[t0_idx-2]`）。
+    #    ⇒ 在能算錯之前先擋。k 之逐批參數化（record 值集合＋分析 k 分離）是 D4.3 的交付；
+    #    在那之前，混 k 批**不進分析**，而不是挑一個 k 蒙混過去。
+    ks = sorted({int(r["decision_offset_bars"]) for r in records
+                 if isinstance(r.get("decision_offset_bars"), int)
+                 and not isinstance(r.get("decision_offset_bars"), bool)})
+    if len(ks) > 1:
+        raise HTTPException(status_code=422, detail={
+            "kind": "mixed_decision_offset_bars",
+            "message": (
+                f"事件批 {request.event_import_id!r} 之 decision_offset_bars 批內不一致（值＝{ks}）。"
+                "分析時只能有一個決策位移；若照第一列取值，其餘事件會被對齊到錯的決策根，"
+                "而算出來的數字仍是合法值、看不出異常。請拆批，或等 k 之分析參數化上線。"
+            ),
+        })
     spec = dict(request.event_label_spec or {})
     # 🔴 **`CODEX-R2-P1-01`（閉合輪抓到，真實批次跑不起來）**：深度宣告是**批次層 receipt**，
     #    住在 payload 的**頂層** `lookahead_declaration`，**不是**每一列上。

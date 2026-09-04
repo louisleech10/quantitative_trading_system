@@ -160,3 +160,73 @@ def test_ic_event_label_defaults_preset_is_inside_supported_matrix(_isolated_sto
     triple = (spec["entry_price_semantic"], spec["label_return_mode"],
               int(spec["decision_offset_bars"]))
     assert triple in SUPPORTED_MATRIX, f"預設三元組 {triple} 不在支援矩陣內"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# B-D1 R2 閉合輪 — codex P1-02／P1-03 之負向測試
+# ══════════════════════════════════════════════════════════════════════════
+
+def test_r2_closure_mixed_decision_offset_bars_is_rejected(_isolated_storage):
+    """`CODEX-R2-P1-02`：批內 `decision_offset_bars` 混值 ⇒ **422 fail-closed**。
+
+    🔴 修正前：route 取 `records[0]` 之 k，`_analysis_copy` 把它套用全批
+    ⇒ 其餘事件被對齊到**錯的決策根**，而算出來的數字合法、沒有測試會紅。
+    codex 實跑：`records_k=[0, 2]` ⇒ `resolved k=0`，第二個事件之 `decision_at` 變成 `t0`
+    （依其宣告應為 `ot[t0_idx-2]`）。
+    """
+    from fastapi import HTTPException
+
+    recs = [
+        make_event(0, label=1, decision_offset_bars=0, lookahead_bars_declared={"12h": 0}),
+        make_event(1, label=0, decision_offset_bars=2, lookahead_bars_declared={"12h": 0}),
+    ]
+    import_id = _store(_isolated_storage, recs, {"12h": 0})
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.status_code == 422
+    assert ei.value.detail["kind"] == "mixed_decision_offset_bars"
+    assert "[0, 2]" in ei.value.detail["message"], "訊息須列出實際的混值集合"
+
+
+def test_r2_closure_uniform_decision_offset_bars_still_accepted(_isolated_storage):
+    """🔴 **over 向**：單值 k（含非 0）仍須通過——證明上一條不是「有 k 就拒」。"""
+    for k in (0, 2):
+        recs = [
+            make_event(i, label=i % 2, decision_offset_bars=k,
+                       lookahead_bars_declared={"12h": 0})
+            for i in range(2)
+        ]
+        import_id = _store(_isolated_storage, recs, {"12h": 0})
+        out = _resolve_event_batch(_Req(import_id))
+        assert out["event_label_spec"]["decision_offset_bars"] == k
+
+
+def test_r2_closure_frontend_omits_spec_so_backend_default_is_reachable(_isolated_storage):
+    """`CODEX-R2-P1-03`：前端**未設定**時整個鍵省略 ⇒ 後端依深度導出之預設**可達**。
+
+    🔴 修正前：hook 明送 `{horizon_bars: 1}`，而後端用 `setdefault` ⇒ 壓不過已存在的鍵
+    ⇒ 宣告深度 3 的批，「持有」實際跑成 h=1。兩端都對、就是沒接上。
+    本條以 route 層釘住「spec 為 None 時導出 h=depth」，前端半邊由 vitest
+    `…_omits_event_label_spec_when_unset` 釘住。
+    """
+    recs = [make_event(i, label=i % 2, lookahead_bars_declared={"12h": 3}) for i in range(2)]
+    import_id = _store(_isolated_storage, recs, {"12h": 3})
+    out = _resolve_event_batch(_Req(import_id, spec=None))
+    assert out["event_label_spec"]["horizon_bars"] == 3
+    assert out["event_label_spec"]["label_return_mode"] == "open_to_horizon_close"
+
+
+def test_r2_closure_frontend_constant_seed_would_defeat_depth_default(_isolated_storage):
+    """🔴 **把缺陷本身釘成測試**：若有人再讓前端送 `{horizon_bars: 1}`，深度預設就失效。
+
+    本條**不是**驗現行行為對，而是把「為什麼前端不能送常數」寫成可執行的證據：
+    同一批、同一深度，spec 給 `{horizon_bars: 1}` 時 h 就是 1（不是 3）。
+    ⇒ 日後看到這條紅，代表有人把常數種子加回去了。
+    """
+    recs = [make_event(i, label=i % 2, lookahead_bars_declared={"12h": 3}) for i in range(2)]
+    import_id = _store(_isolated_storage, recs, {"12h": 3})
+    out = _resolve_event_batch(_Req(import_id, spec={"horizon_bars": 1}))
+    assert out["event_label_spec"]["horizon_bars"] == 1, (
+        "setdefault 壓不過已存在的鍵——這就是 CODEX-R2-P1-03 的機制；"
+        "前端必須省略該鍵，不能送常數"
+    )

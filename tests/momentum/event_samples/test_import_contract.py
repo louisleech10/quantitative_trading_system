@@ -445,3 +445,95 @@ def test_mixed_scenario_batch_does_not_add_new_reasons():
         assert "scenario_depth_inconsistent" not in rs
     else:
         pytest.fail("混值批須被拒收")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# B-D1 R2 閉合輪 — 三家 review 命中之缺陷之負向測試
+#
+# 選擇器：`pytest tests/momentum/event_samples/test_import_contract.py -q -k "r2_closure"`
+# ══════════════════════════════════════════════════════════════════════════
+
+def test_r2_closure_label_origin_mixed_batch_rejected():
+    """`CODEX-R2-P1-01`／`COMPOSER-R2-P1-01`／`GROK-R2-P2-01`（三家全員命中）：
+    批內 `label_origin` **混值** ⇒ `heterogeneous_rows_in_batch`。
+
+    🔴 修正前：混值可落檔，`_single_value` 回 `None`，UI 顯示「（未宣告）」，
+    與「舊批從未宣告」**不可區分**——使用者以為沒 provenance，實際是兩種來源混在一起。
+    """
+    batch = [
+        make_event(0, label=1, scenario="B", label_origin="user_csv",
+                   lookahead_bars_declared={"12h": 0}),
+        make_event(1, label=0, scenario="B", label_origin="platform_generator",
+                   lookahead_bars_declared={"12h": 0}),
+    ]
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch)
+    assert "heterogeneous_rows_in_batch" in reasons_of(ei.value)
+
+
+def test_r2_closure_label_origin_partial_declaration_rejected():
+    """同上之另一半：**部分列有、部分列沒有** ⇒ 亦拒。
+
+    🔴 修正前：`[None, "user_csv"]` 之 `_single_value` 回 `"user_csv"`
+    ⇒ **一列的宣告被當成整批的宣告**（codex 實跑 receipt）。
+    """
+    batch = [
+        make_event(0, label=1, scenario="C"),                      # 無 label_origin
+        make_event(1, label=0, scenario="C", label_origin="user_csv"),
+    ]
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch)
+    assert "heterogeneous_rows_in_batch" in reasons_of(ei.value)
+
+
+def test_r2_closure_label_origin_all_absent_still_accepted():
+    """🔴 **over 向**：整批都沒有 `label_origin`（舊批）**仍須通過**。
+
+    沒有這條，上兩條的修正會把所有既有 C 批擋在門外——那不是修好，是弄壞。
+    """
+    df = validate_event_import([make_event(i, label=i % 2, scenario="C") for i in range(2)])
+    assert len(df) == 2
+
+
+def test_r2_closure_label_origin_uniform_accepted():
+    """🔴 **over 向**：整批同一個 `label_origin` 通過（證明不是「有這欄就拒」）。"""
+    df = validate_event_import([
+        make_event(i, label=i % 2, scenario="B", label_origin="user_csv",
+                   lookahead_bars_declared={"12h": 0})
+        for i in range(2)
+    ])
+    assert len(df) == 2
+
+
+def test_r2_closure_new_rules_apply_when_homogeneity_not_enforced():
+    """`COMPOSER-R2-P2-01`／`GROK-R2-P2-02`：`enforce_batch_homogeneity=False` 時，
+    混 scenario **不得**成為「掩護」——本票兩條新規則照判。
+
+    🔴 修正前：`_batch_scenario_mixed` 無條件為真即跳過兩條規則，而該旗標**預設 False**
+    ⇒ 走預設之 caller 上，混批同時掩護掉 provenance 與深度兩條規則，且混值本身也沒人擋。
+    """
+    batch = [
+        make_event(0, label=1, scenario="A", lookahead_bars_declared={"12h": 0}),  # 缺 label_origin 且深度 0
+        make_event(1, label=0, scenario="C", lookahead_bars_declared={"12h": 0}),
+    ]
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch, enforce_batch_homogeneity=False)
+    rs = reasons_of(ei.value)
+    assert "conditional_required_missing" in rs, "缺 label_origin 須被判"
+    assert "scenario_depth_inconsistent" in rs, "A＋深度 0 須被判"
+
+
+def test_r2_closure_mixed_scenario_still_deferred_when_homogeneity_enforced():
+    """🔴 **對照（裁定 1 之原意保留）**：旗標為 `True` 時仍讓 Task 1.8 先擋，
+    新規則不疊 reason——證明上一條不是把裁定 1 整個推翻。
+    """
+    batch = [
+        make_event(0, label=1, scenario="A", lookahead_bars_declared={"12h": 0}),
+        make_event(1, label=0, scenario="C", lookahead_bars_declared={"12h": 0}),
+    ]
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch, enforce_batch_homogeneity=True)
+    rs = reasons_of(ei.value)
+    assert "heterogeneous_rows_in_batch" in rs
+    assert "conditional_required_missing" not in rs
+    assert "scenario_depth_inconsistent" not in rs
