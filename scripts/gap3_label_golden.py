@@ -41,8 +41,10 @@ GOLDEN_DIR = REPO / "tests" / "golden" / "gap3_label"
 
 
 def _bars():
+    # 🔴 載入 `TFS` 全部 TF（非只 `TF`）：D1.4 起 golden 含 1h 案例，只載 12h 會讓
+    #    那些案例在 `run_case` 內以 KeyError 炸開，而不是給出可讀的 diff。
     from tests.momentum.event_samples.helpers import load_bars
-    return load_bars(case_registry.SYMBOL, (case_registry.TF,))
+    return load_bars(case_registry.SYMBOL, case_registry.TFS)
 
 
 def _write(path: Path, payload: dict) -> None:

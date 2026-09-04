@@ -526,15 +526,27 @@ def _golden_paths():
     return sorted(_Path(p) for p in _glob.glob(str(root / "*.json")))
 
 
+@pytest.fixture(scope="module")
+def golden_bars():
+    """golden 專用 bar 表：TF 清單取自**登記處**（`cases.TFS`），不是本檔的 12h fixture。
+
+    🔴 D1.4 起 golden 含 1h 案例；沿用 12h-only 之 `bars` fixture 會讓那些案例以 KeyError
+    炸開，而 `scripts/gap3_label_golden.py --check` 卻是綠的——兩條路徑載入不同資料，
+    就是「CLI 綠、pytest 紅」這種最難查的不一致。TF 清單只有登記處一份。
+    """
+    from tests.golden.gap3_label import cases as case_registry
+    return load_bars(case_registry.SYMBOL, case_registry.TFS)
+
+
 @pytest.mark.parametrize("golden_path", _golden_paths(), ids=lambda p: p.stem)
-def test_analysis_label_producer_d0_entry_price_ref_golden(golden_path, bars):
+def test_analysis_label_producer_d0_entry_price_ref_golden(golden_path, golden_bars):
     """每個凍結檔逐項 `==`（值／時間戳／`entry_price_ref`／NaN mask／hash／purge）。
 
     🔴 `_golden_paths()` 為空即視為錯誤：glob 打空會讓本條靜默零執行（假綠）。
     """
     from tests.golden.gap3_label.loader import check_golden, load_golden
 
-    report = check_golden(load_golden(golden_path), bars)
+    report = check_golden(load_golden(golden_path), golden_bars)
     assert report.ok, "\n".join(report.diffs)
 
 
@@ -545,3 +557,185 @@ def test_analysis_label_producer_d0_entry_price_ref_golden_set_nonempty():
     names = {p.stem for p in paths}
     assert any("open_to_close" in n for n in names)          # 跳空案例（§G 必含 ①）
     assert any(n.startswith("decision_bar_open") for n in names)   # k>0 之 entry bar
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# `D-001` Task D1.3／D1.4 — 支援矩陣擴充與 golden 覆蓋
+# ══════════════════════════════════════════════════════════════════════════
+
+def _load_golden_json(stem: str) -> dict:
+    import json
+    from pathlib import Path as _Path
+    root = _Path(__file__).resolve().parents[3] / "tests" / "golden" / "gap3_label"
+    return json.loads((root / f"{stem}.json").read_text(encoding="utf-8"))
+
+
+# ── D1.3：四對支援矩陣之語意 ───────────────────────────────────────────────
+
+def test_analysis_label_producer_d13_trigger_open_close_to_close_equals_trigger_close(bars):
+    """(i) `close_to_close` 之值與 entry 語意**無關**（D1-5：錨是 t₀ 的 close，不是 entry）。
+
+    同一批、同 h，`trigger_open` 與 `trigger_close` 之 `label_values` 逐 event `==`（`atol=0`）。
+    """
+    recs = d0_records(bars)
+    a_sp = spec(h=2, entry="trigger_open", mode="close_to_close")
+    b_sp = spec(h=2, entry="trigger_close", mode="close_to_close")
+    pa, pb = prep(bars, recs, a_sp), prep(bars, recs, b_sp)
+    assert pa.supported is True and pb.supported is True, "D1.3 後兩者皆須在矩陣內"
+    ra = resolve_label_value_at_analyze(pa, bars, event_label_spec=a_sp)
+    rb = resolve_label_value_at_analyze(pb, bars, event_label_spec=b_sp)
+    assert set(ra.label_values) == set(rb.label_values) and ra.label_values
+    for eid, v in ra.label_values.items():
+        assert rb.label_values[eid] == v          # atol=0
+
+
+def test_analysis_label_producer_d13_trigger_open_entry_at_and_hash_differ(bars):
+    """(ii) 但兩者之 `entry_at_ms` **不等**、`analysis_alignment_receipt_hash` **不等**。
+
+    值相等而身分不等——沒有這條，上一條就可能是「兩邊其實跑了同一個 spec」。
+    """
+    recs = d0_records(bars)
+    pa = prep(bars, recs, spec(h=2, entry="trigger_open", mode="close_to_close"))
+    pb = prep(bars, recs, spec(h=2, entry="trigger_close", mode="close_to_close"))
+    ea = {w.event_id: w.entry_at_ms for w in pa.windows}
+    eb = {w.event_id: w.entry_at_ms for w in pb.windows}
+    assert ea and all(ea[e] != eb[e] for e in ea), "trigger_open 之 entry_at 須為 bar open，與 close 不同"
+    assert pa.analysis_alignment_receipt_hash != pb.analysis_alignment_receipt_hash
+
+
+def test_analysis_label_producer_d13_matrix_membership_under_and_over(bars):
+    """`SUPPORTED_MATRIX` 之 under／over 兩向：四對在內、鄰近組合在外。
+
+    🔴 **over 向不可省**：只驗「四對為 True」時，把矩陣改成「全部回 True」也會綠。
+    """
+    from momentum.Analysis.event_samples.label_value_from_case import (
+        SUPPORTED_MATRIX, normalize_event_label_spec, spec_is_supported,
+    )
+    assert SUPPORTED_MATRIX == frozenset({
+        ("trigger_close", "close_to_close", 0),
+        ("trigger_open", "close_to_close", 0),
+        ("trigger_open", "open_to_close", 0),
+        ("trigger_open", "open_to_horizon_close", 0),
+    })
+    for entry, mode in [("trigger_close", "close_to_close"), ("trigger_open", "close_to_close"),
+                        ("trigger_open", "open_to_close"), ("trigger_open", "open_to_horizon_close")]:
+        assert spec_is_supported(normalize_event_label_spec(spec(entry=entry, mode=mode))) is True
+    # over 向：矩陣外之鄰近組合須為 False（D1.3 邊界①②）
+    for entry, mode, k in [("trigger_close", "open_to_close", 0),        # 幾何零窗，D4.2 才處理
+                           ("trigger_close", "open_to_horizon_close", 0),
+                           ("next_open", "close_to_close", 0),
+                           ("decision_bar_open", "open_to_horizon_close", 0),
+                           ("trigger_open", "close_to_close", 1)]:       # k>0 留 D4
+        assert spec_is_supported(
+            normalize_event_label_spec(spec(entry=entry, mode=mode, k=k))
+        ) is False, f"({entry}, {mode}, {k}) 不應在 D1 矩陣內"
+
+
+# ── D1.4：golden 覆蓋之可證偽性 ────────────────────────────────────────────
+
+def test_analysis_label_producer_d14_open_to_close_value_invariant_to_h():
+    """`open_to_close` 之起訖皆為 entry bar ⇒ 值**不隨 h 變**：h=1 與 h=3 之 golden 逐位元組相同。
+
+    這條把「h 被誤用進 open_to_close 的窗」釘死——那種錯會算出合法數字。
+    """
+    for direction in ("long", "short"):
+        a = _load_golden_json(f"trigger_open__open_to_close__k0__{direction}__12h__h1")
+        b = _load_golden_json(f"trigger_open__open_to_close__k0__{direction}__12h__h3")
+        assert a["t0_ms"] == b["t0_ms"], "兩檔須為同一組 t0，否則比對無意義"
+        assert set(a["events"]) == set(b["events"]) and a["events"]
+        for eid in a["events"]:
+            assert b["events"][eid]["label_value"] == a["events"][eid]["label_value"]
+            assert b["events"][eid]["label_end_ms"] == a["events"][eid]["label_end_ms"]
+        # 🔴 對照：hash **須不等**（h 進 normalized_spec_bytes ⇒ 身分不同），
+        #    否則本條會與「兩檔其實是同一個 spec」無法區分。
+        assert a["analysis_alignment_receipt_hash"] != b["analysis_alignment_receipt_hash"]
+
+
+def test_analysis_label_producer_d14_golden_covers_required_boundary_cases():
+    """§G「必含案例」逐條指得出守門的檔——缺任一即紅（防止 golden 集合悄悄失去覆蓋）。"""
+    names = {p.stem for p in _golden_paths()}
+    # ① 跳空 bar：至少一個 open_to_close 案例（其 t0 由 gap_bars selector 逐根斷言過）
+    assert "trigger_open__open_to_close__k0__long__12h__h1" in names
+    # ② 資料末端：混合批 ⇒ 2 個 t0 但只有 1 個 event（壞的不在鍵集，非填 0）
+    tail = _load_golden_json("trigger_close__close_to_close__k0__long__12h__h5")
+    assert len(tail["t0_ms"]) == 2 and len(tail["events"]) == 1, "末端案例須為混合批"
+    # ③ k>0 之 warmup：同為混合批
+    warm = _load_golden_json("decision_bar_open__open_to_horizon_close__k2__long__12h__h1")
+    assert len(warm["t0_ms"]) == 2 and len(warm["events"]) == 1, "warmup 案例須為混合批"
+    # ④ next_open：entry_at == label_start（＝收據之 entry_after_label_start 為 true 之機械內容）
+    nxt = _load_golden_json("next_open__close_to_close__k0__long__12h__h1")
+    assert nxt["events"]
+    for v in nxt["events"].values():
+        assert v["entry_at_ms"] == v["label_start_ms"]
+        assert v["entry_price_ref"]["field"] == "open"
+    # ⑤ long／short 成對，且 short == −long
+    for stem in [n for n in names if "__long__" in n]:
+        s = stem.replace("__long__", "__short__")
+        if s not in names:
+            continue
+        a, b = _load_golden_json(stem), _load_golden_json(s)
+        for eid in a["events"]:
+            va, vb = a["events"][eid]["label_value"], b["events"][eid]["label_value"]
+            if va is None or vb is None:
+                continue
+            assert vb == -va, f"{stem}: short 須為 long 之相反數"
+    # 跨 TF：至少一個 1h 案例（證明 golden 機制不綁 12h）
+    assert any(n.endswith("__1h__h1") for n in names), "須有 1h 案例"
+
+
+def test_analysis_label_producer_d14_next_open_receipt_entry_after_label_start(bars):
+    """§G 必含④之**收據側**對證：`next_open × close_to_close` ⇒ `entry_after_label_start` 為 True。
+
+    golden 只凍時間戳；本條直接讀 `align_events` 收據那一欄，兩邊都守才不會有一邊悄悄變。
+    """
+    import pandas as pd
+    from momentum.Analysis.event_samples.alignment import align_events
+    from momentum.Analysis.event_samples.types import AlignmentConfig
+
+    recs = [dict(r) for r in d0_records(bars)]
+    for r in recs:
+        r["entry_price_semantic"] = "next_open"
+        r["label_definition"] = {**r["label_definition"], "label_return_mode": "close_to_close"}
+    receipts, _ = align_events(pd.DataFrame(recs), bars, AlignmentConfig(timeframes=("12h",)))
+    rows = receipts.event_level.to_dict("records")
+    assert rows, "收據不得為空（否則下面的斷言恆真）"
+    for row in rows:
+        assert bool(row["entry_after_label_start"]) is True
+        assert int(row["entry_at_ms"]) == int(row["label_start_ms"])
+        assert row["entry_price_source_field"] == "open"
+
+
+# ── D1.2：`event_known_at_decision` ───────────────────────────────────────
+
+def test_alignment_event_known_at_decision_is_false_for_k0_and_k2(bars):
+    """(i) 真實 kline、k∈{0,2} 兩事件之 `event_known_at_decision` 皆 `False`（D2-2 之等式）。"""
+    from momentum.Analysis.event_samples.alignment import align_events
+    import pandas as pd
+    from momentum.Analysis.event_samples.types import AlignmentConfig
+
+    df = bars["ETHUSDT"]["12h"]
+    ct = df["close_time_ms"].to_numpy()
+    ot = df["open_time_ms"].to_numpy()
+    for k in (0, 2):
+        recs = [dict(r) for r in d0_records(bars)]
+        for r in recs:
+            r["decision_offset_bars"] = k
+        receipts, _ = align_events(pd.DataFrame(recs), bars, AlignmentConfig(timeframes=("12h",)))
+        rows = receipts.event_level.to_dict("records")
+        assert rows, f"k={k} 之收據不得為空"
+        for row in rows:
+            assert bool(row["event_known_at_decision"]) is False
+            # 🔴 **不是恆 False 的斷言**：同時釘住它的定義式，這樣改壞定義才會紅
+            i = int((ot == int(row["t0_ms"])).nonzero()[0][0])
+            assert row["event_known_at_decision"] == bool(int(row["decision_at_ms"]) >= int(ct[i]))
+
+
+def test_alignment_event_known_at_decision_column_registered_in_contract():
+    """契約 `receipt_schema.event_level` 須含本欄且型別為 `bool`；`_EVENT_COLS` 順序前綴不變。"""
+    from momentum.Analysis.event_samples.alignment import _EVENT_COLS
+    from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+
+    schema = load_event_import_contract()["receipt_schema"]["event_level"]
+    assert schema.get("event_known_at_decision") == "bool"
+    assert _EVENT_COLS[-1] == "event_known_at_decision", "須追加於末位（前綴保留）"
+    assert list(schema)[:len(_EVENT_COLS) - 1] == _EVENT_COLS[:-1], "契約與收據欄序須一致"

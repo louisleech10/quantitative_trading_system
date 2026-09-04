@@ -281,3 +281,167 @@ def test_t10_interval_trigger():
     assert "conditional_required_missing" in reasons_of(ei.value)
     batch[0]["event_interval"] = {"start": T0, "end": T0 + TF_MS, "endpoints_inclusive": {"start": True, "end": False}}
     assert len(validate_event_import(batch)) == 2
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# GAP-3 `G3-D2` Task D1.1 — label_origin provenance ／ scenario 深度自洽
+#
+# 選擇器：`pytest tests/momentum/event_samples/test_import_contract.py -q
+#          -k "label_origin or scenario_depth or entry_default"`
+# ══════════════════════════════════════════════════════════════════════════
+
+def _pred(scen: str, **over):
+    """預測型／兩段式之二元批（label 含 0 與 1）。`over` 逐列覆寫。"""
+    return [make_event(i, label=i % 2, scenario=scen, **over) for i in range(2)]
+
+
+# ── (i) A ＋ 深度全 0 ⇒ scenario_depth_inconsistent ────────────────────────
+
+def test_scenario_depth_inconsistent_when_A_declares_zero_depth():
+    """A（事件相對決策為未來）卻宣告深度 0 ⇒ 自相矛盾，拒收。
+
+    🔴 reason 須**恰為** `scenario_depth_inconsistent`，不是「有拒收就算過」——
+    reason 字面是下游 UI 與 registry 的判斷依據。
+    """
+    batch = _pred("A", label_origin="user_csv", lookahead_bars_declared={"12h": 0})
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch)
+    assert "scenario_depth_inconsistent" in reasons_of(ei.value)
+
+
+def test_scenario_depth_inconsistent_applies_to_two_stage_as_well():
+    """two_stage 與 A 同組（兩段之較大者仍須 ≥ 1）。"""
+    batch = _pred("two_stage", label_origin="user_csv", lookahead_bars_declared={"1h": 0, "12h": 0})
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch)
+    assert "scenario_depth_inconsistent" in reasons_of(ei.value)
+
+
+def test_scenario_depth_ok_when_A_declares_positive_depth():
+    """🔴 **over 向對照**：A ＋ 深度 ≥ 1 須**通過**——證明上兩條不是「A 一律拒」。"""
+    batch = _pred("A", label_origin="user_csv", lookahead_bars_declared={"12h": 3})
+    df = validate_event_import(batch)
+    assert len(df) == 2
+
+
+# ── (ii) B ＋ 深度 0 ⇒ 通過 ────────────────────────────────────────────────
+
+def test_scenario_depth_allows_zero_for_B():
+    """B 允許深度 0（裁定①：A 已併入 B，有無用未來根**由深度宣告區分**，不由 scenario 區分）。"""
+    df = validate_event_import(_pred("B", label_origin="search_positive_case",
+                                     lookahead_bars_declared={"12h": 0}))
+    assert len(df) == 2
+
+
+def test_scenario_depth_rule_skipped_when_declaration_absent():
+    """邊界①：`lookahead_bars_declared` **缺欄** ⇒ 本規則不判（reason 留給 D-7 L2 之缺宣告拒收）。
+
+    🔴 這條防的是「搶報 reason」：若本規則對缺宣告也報 `scenario_depth_inconsistent`，
+    真正的問題（沒宣告深度）就被蓋掉，使用者會照著錯的 reason 去改。
+    """
+    df = validate_event_import(_pred("A", label_origin="user_csv"))
+    assert len(df) == 2
+    # 空 map 同視為「未宣告」
+    df2 = validate_event_import(_pred("A", label_origin="user_csv", lookahead_bars_declared={}))
+    assert len(df2) == 2
+
+
+# ── (iii) 預測型缺 label_origin ⇒ conditional_required_missing ─────────────
+
+@pytest.mark.parametrize("scen", ["A", "B", "two_stage"])
+def test_label_origin_conditional_required_for_predictive_scenarios(scen):
+    """A／B／two_stage 缺 `label_origin` ⇒ `conditional_required_missing`。"""
+    batch = _pred(scen, lookahead_bars_declared={"12h": 3})
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch)
+    assert "conditional_required_missing" in reasons_of(ei.value)
+
+
+def test_label_origin_not_required_for_scenario_C_legacy_batches():
+    """🔴 **舊批通則**：`scenario == "C"` 且無 `label_origin` ⇒ **通過**（不補值、不拒收）。
+
+    這是 D-001 §N 之通則（不只針對 9/1 那九批）：讀路徑對缺欄回 `null`。
+    沒有這條，既有 C 批全部匯不進來。
+    """
+    df = validate_event_import([make_event(i, label=i % 2, scenario="C") for i in range(2)])
+    assert len(df) == 2
+
+
+# ── (iv) not_importable ⇒ label_origin_not_importable ─────────────────────
+
+def test_label_origin_search_unlabeled_not_importable():
+    """`search_unlabeled` 屬契約 `not_importable` ⇒ 專屬 reason（不是 `enum_violation`）。"""
+    batch = _pred("B", label_origin="search_unlabeled", lookahead_bars_declared={"12h": 0})
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch)
+    rs = reasons_of(ei.value)
+    assert "label_origin_not_importable" in rs
+    assert "enum_violation" not in rs, "not_importable 之值本身合法，不得同時報 enum_violation"
+
+
+def test_label_origin_enum_violation_for_unknown_value():
+    """枚舉外之值（含空字串，邊界③）⇒ `enum_violation`。"""
+    for bad in ("nope", ""):
+        batch = _pred("B", label_origin=bad, lookahead_bars_declared={"12h": 0})
+        with pytest.raises(ContractValidationError) as ei:
+            validate_event_import(batch)
+        assert "enum_violation" in reasons_of(ei.value), f"{bad!r} 應為 enum_violation"
+
+
+def test_label_origin_importable_values_all_accepted():
+    """🔴 **over 向**：契約 enum 中**非** not_importable 之值全部須可匯入。
+
+    證明上面兩條不是「label_origin 一律拒」；同時讓日後往 enum 加值時，
+    若忘了讓它可匯入，本條會紅。
+    """
+    from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+    spec = load_event_import_contract()["optional_fields"]["label_origin"]
+    ok = [v for v in spec["enum"] if v not in spec["not_importable"]]
+    assert len(ok) >= 4, "非 not_importable 之值應有四個以上（防 enum 被縮小而本條失去覆蓋）"
+    for v in ok:
+        df = validate_event_import(_pred("B", label_origin=v, lookahead_bars_declared={"12h": 0}))
+        assert len(df) == 2, f"{v!r} 應可匯入"
+
+
+# ── (v) validator 不讀 entry_price_semantic.default ───────────────────────
+
+def test_entry_default_declared_in_contract_but_not_used_by_validator():
+    """契約有 `entry_price_semantic.default`（前端誠實預設之唯一來源），
+    但 validator **不得**拿它補缺欄——缺欄仍是 `missing_required_field`。
+
+    🔴 這條同時守兩件事：字面存在（前端讀得到）＋validator 不因此放寬必填。
+    """
+    from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+    node = load_event_import_contract()["required_fields"]["entry_price_semantic"]
+    assert node["default"] == "trigger_close"
+    assert node["default"] in node["enum"]
+
+    batch = [make_event(i, label=i % 2) for i in range(2)]
+    for r in batch:
+        r.pop("entry_price_semantic")
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(batch)
+    assert "missing_required_field" in reasons_of(ei.value)
+
+
+# ── 邊界②：批內 scenario 混值 ⇒ 既有拒收優先，新規則不疊 reason ─────────────
+
+def test_mixed_scenario_batch_does_not_add_new_reasons():
+    """混值批之 reason **不得**含本票兩條新規則（Task 1.8／下游之混值拒收先於它們）。
+
+    🔴 沒有這條，混值批會同時報 `conditional_required_missing`，
+    使用者會去補 `label_origin` 而真正的問題是「這批不該混」。
+    """
+    batch = [
+        make_event(0, label=1, scenario="A", lookahead_bars_declared={"12h": 0}),
+        make_event(1, label=0, scenario="C"),
+    ]
+    try:
+        validate_event_import(batch, enforce_batch_homogeneity=True)
+    except ContractValidationError as e:
+        rs = reasons_of(e)
+        assert "heterogeneous_rows_in_batch" in rs
+        assert "conditional_required_missing" not in rs
+        assert "scenario_depth_inconsistent" not in rs
+    else:
+        pytest.fail("混值批須被拒收")

@@ -1,0 +1,42 @@
+{
+  "case_id": "trigger_close__close_to_close__k0__long__12h__h5",
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "direction": "long",
+  "event_import_id": "golden-trigger_close__close_to_close__k0__long__12h__h5",
+  "event_label_spec": {
+    "horizon_bars": 5,
+    "entry_price_semantic": "trigger_close",
+    "label_return_mode": "close_to_close",
+    "decision_offset_bars": 0
+  },
+  "t0_ms": [
+    1708387200000,
+    1777204800000
+  ],
+  "lookahead_bars_declared": {
+    "12h": 0
+  },
+  "timeframe_seconds": {
+    "12h": 43200
+  },
+  "data_snapshot_digest": "cf13fb5370bed1bb1c5921e1f125bb6f6c2275ff14152386e81c94b075416895",
+  "events": {
+    "ev0": {
+      "label_value": 0.012295070377433975,
+      "label_start_ms": 1708430400000,
+      "label_end_ms": 1708646400000,
+      "decision_at_ms": 1708387200000,
+      "entry_at_ms": 1708430400000,
+      "entry_price_ref": {
+        "bar_open_ms": 1708387200000,
+        "field": "close"
+      }
+    }
+  },
+  "nan_event_ids": [],
+  "analysis_alignment_receipt_hash": "ad540d74b3cf7b64e34e08085439c9a22d478fd2f2cb1cfa9132202f7a18cade",
+  "purge_lower_bound_ms_by_symbol": {
+    "ETHUSDT": 216000000
+  }
+}

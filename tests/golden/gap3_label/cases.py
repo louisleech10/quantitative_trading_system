@@ -12,8 +12,11 @@ from __future__ import annotations
 from typing import Any, Dict, List, Mapping, Tuple
 
 SYMBOL = "ETHUSDT"
+#: 預設 TF（既有案例之 `case_id` 皆含此字串，改動會改檔名 ⇒ 不得更動）。
 TF = "12h"
-TF_SECONDS = {"12h": 43200}
+#: 本登記處用到的全部 TF（`--init`／`--check` 之 bar 載入清單）。
+TFS: Tuple[str, ...] = ("1h", "12h")
+TF_SECONDS = {"1h": 3600, "12h": 43200}
 DECLARED = {"12h": 0}
 
 #: `matrix_pending` 之理由字面。**現行使用者＝k>0 案例**（`decision_bar_open × k=2`）：
@@ -28,28 +31,50 @@ _D0_PENDING = (
 )
 
 
-def _bars_cols(bars):
-    df = bars[SYMBOL][TF]
+def _cols(bars, tf: str):
+    df = bars[SYMBOL][tf]
     return (df["open_time_ms"].to_numpy(), df["open"].to_numpy(), df["close"].to_numpy())
 
 
-def select_t0(selector: str, bars) -> Tuple[int, ...]:
-    """具名 selector → t0 清單。未知 selector ⇒ raise（禁預設）。"""
+def select_t0(selector: str, bars, tf: str = TF) -> Tuple[int, ...]:
+    """具名 selector → t0 清單。未知 selector ⇒ raise（禁預設、禁靜默回空）。
+
+    每個 selector 都在**導出時**斷言它自己的前置條件——否則「這個案例覆蓋了什麼」
+    只存在於檔名，資料一換就悄悄失去覆蓋。
+    """
     kind, _, arg = selector.partition(":")
     n = int(arg)
-    ot, op, cl = _bars_cols(bars)
+    ot, op, cl = _cols(bars, tf)
     if kind == "gap_bars":
+        # §G 必含①：跳空 bar（open(t) != close(t−1)）。open_to_* 與 close_to_close 才分得開。
         out: List[int] = []
         for i in range(95, min(400, len(ot) - 20)):
-            if op[i] != cl[i - 1]:          # 前置：確為跳空 bar
+            if op[i] != cl[i - 1]:
                 out.append(int(ot[i]))
             if len(out) == n:
                 break
         if len(out) != n:
-            raise AssertionError(f"gap_bars:{n} 於真實 kline 指定區間不足")
+            raise AssertionError(f"gap_bars:{n}@{tf} 於真實 kline 指定區間不足")
         return tuple(out)
     if kind == "plain":
         return tuple(int(ot[95 + 10 * i]) for i in range(n))
+    if kind == "tail_mixed":
+        # §G 必含②：資料末端 ⇒ 答案窗超出 ⇒ `label_window_incomplete`。
+        # 🔴 **混合批**（正常事件 ＋ 末端事件）而非全末端：全末端會凍出 `events={}`，
+        #    那種 golden 分不出「末端被正確丟棄」與「整個 producer 壞掉」。
+        #    混合之後，凍結值同時釘住「好的算得出來」與「壞的不在鍵集」。
+        # 🔴 末端取**倒數第三根**而非最後一根：t0 落在最後一根時，三段鏈與
+        #    `entry_at < label_end` 兩條額外不變式也會擋，主守衛之覆蓋就變成不可證偽
+        #    （同 `test_analysis_label_producer_07` 之理由）。
+        if len(ot) < 120:
+            raise AssertionError(f"tail_mixed@{tf} bar 數不足")
+        return (int(ot[100]), int(ot[len(ot) - 3]))
+    if kind == "warmup_mixed":
+        # §G 必含③：資料**起點** ⇒ k>0 時 `t0_idx − k < 0` ⇒ `warmup_insufficient_{tf}`。
+        # 同上：混合批，`ot[0]`（暖身不足）＋ `ot[100]`（正常）。
+        if len(ot) < 120:
+            raise AssertionError(f"warmup_mixed@{tf} bar 數不足")
+        return (int(ot[0]), int(ot[100]))
     raise AssertionError(f"未知 t0 selector: {selector!r}")
 
 
@@ -63,19 +88,19 @@ def _spec(h: int, entry: str, mode: str, k: int) -> Dict[str, Any]:
 
 
 def _case(entry: str, mode: str, k: int, direction: str, h: int, *,
-          selector: str, pending: bool) -> Dict[str, Any]:
-    case_id = f"{entry}__{mode}__k{k}__{direction}__{TF}__h{h}"
+          selector: str, pending: bool, tf: str = TF) -> Dict[str, Any]:
+    case_id = f"{entry}__{mode}__k{k}__{direction}__{tf}__h{h}"
     out: Dict[str, Any] = {
         "case_id": case_id,
         "file_name": f"{case_id}.json",
         "symbol": SYMBOL,
-        "timeframe": TF,
+        "timeframe": tf,
         "direction": direction,
         "event_import_id": f"golden-{case_id}",
         "event_label_spec": _spec(h, entry, mode, k),
         "t0_selector": selector,
-        "lookahead_bars_declared": dict(DECLARED),
-        "timeframe_seconds": dict(TF_SECONDS),
+        "lookahead_bars_declared": {tf: 0},
+        "timeframe_seconds": {tf: TF_SECONDS[tf]},
     }
     if pending:
         out["matrix_pending"] = True
@@ -83,22 +108,51 @@ def _case(entry: str, mode: str, k: int, direction: str, h: int, *,
     return out
 
 
-#: ── Phase D0（Task D4.1）────────────────────────────────────────────────────
-#  ①跳空 bar（§G 必含案例 ①）：`open_to_*` 之基準價與 `close_to_close` 必不同值
-#  ⑤long／short 同價格序列（§G 必含案例 ⑤）：short == −long
-#  k=2（`decision_bar_open`）：證明 entry bar 之 open 取自 t₀−k
+#: ── Phase D0（Task D4.1）＋ Phase D1（Task D1.4）之凍結案例 ─────────────────
+#  §G「必含案例」對照（每條都要指得出是哪一個檔在守）：
+#    ① 跳空 bar                     → 全部 `gap_bars:*` 之案例
+#    ② 資料末端 label_window_incomplete → `trigger_close__close_to_close__k0__long__12h__h5`（NaN mask 非空）
+#    ③ k>0 之 warmup_insufficient    → `decision_bar_open__open_to_horizon_close__k2__long__12h__h1`
+#    ④ next_open 之 entry_after_label_start=true → `next_open__close_to_close__k0__long__12h__h1`
+#    ⑤ long／short 同價格序列，short == −long → 每個 k=0 組合皆成對
 CASES: Tuple[Mapping[str, Any], ...] = (
-    # 既有支援組合（無 pending）——D4.1 之 hash 於本批合法重凍一次，值不變
+    # ── D0 既有（值已凍結，勿改 selector／spec）────────────────────────────
     _case("trigger_close", "close_to_close", 0, "long", 3, selector="plain:4", pending=False),
     _case("trigger_close", "close_to_close", 0, "short", 3, selector="plain:4", pending=False),
     _case("trigger_close", "close_to_close", 0, "long", 1, selector="gap_bars:3", pending=False),
-    # 跳空 bar × open 語意（D0 之主交付）
     _case("trigger_open", "open_to_close", 0, "long", 1, selector="gap_bars:3", pending=False),
     _case("trigger_open", "open_to_close", 0, "short", 1, selector="gap_bars:3", pending=False),
     _case("trigger_open", "open_to_horizon_close", 0, "long", 3, selector="gap_bars:3", pending=False),
     _case("trigger_open", "open_to_horizon_close", 0, "short", 3, selector="gap_bars:3", pending=False),
     _case("decision_bar_open", "open_to_horizon_close", 2, "long", 3, selector="gap_bars:3", pending=True),
     _case("decision_bar_open", "open_to_horizon_close", 2, "short", 3, selector="gap_bars:3", pending=True),
+
+    # ── D1.4 追加：SUPPORTED_MATRIX 四對 × {long,short} × h∈{1,3} 之補齊 ────
+    _case("trigger_close", "close_to_close", 0, "short", 1, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "close_to_close", 0, "long", 1, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "close_to_close", 0, "short", 1, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "close_to_close", 0, "long", 3, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "close_to_close", 0, "short", 3, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "open_to_horizon_close", 0, "long", 1, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "open_to_horizon_close", 0, "short", 1, selector="gap_bars:3", pending=False),
+    # 🔴 `open_to_close` 之 h **不參與計算**（起訖皆為 entry bar）⇒ h=3 之值須與 h=1 **逐位元組相同**。
+    #    這兩個檔的存在就是那條斷言的證據（測試 `…_h_invariance` 直接比對兩檔）。
+    _case("trigger_open", "open_to_close", 0, "long", 3, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "open_to_close", 0, "short", 3, selector="gap_bars:3", pending=False),
+
+    # ── D1.4 追加：§G 必含②③④ ────────────────────────────────────────────
+    # ② 資料末端：h=5 之答案窗超出 ⇒ 部分事件 label_window_incomplete ⇒ NaN mask 非空
+    _case("trigger_close", "close_to_close", 0, "long", 5, selector="tail_mixed:2", pending=False),
+    # ③ k>0 之 warmup：t0 落在資料最前 ⇒ t0_idx − k < 0 ⇒ warmup_insufficient_12h（全批失敗）
+    _case("decision_bar_open", "open_to_horizon_close", 2, "long", 1, selector="warmup_mixed:2", pending=True),
+    # ④ next_open × close_to_close：entry_at == ct[t0] == label_start ⇒ entry_after_label_start=true
+    #    🔴 本組合**不在** SUPPORTED_MATRIX（留 D4.2）⇒ 需 matrix_pending；
+    #    它守的是**收據之時間戳與 entry_price_ref**，不是 label_value。
+    _case("next_open", "close_to_close", 0, "long", 1, selector="gap_bars:3", pending=True),
+
+    # ── D1.4 追加：一組 1h（跨 TF；證明 golden 機制不綁 12h）──────────────
+    _case("trigger_open", "open_to_close", 0, "long", 1, selector="gap_bars:3", pending=False, tf="1h"),
+    _case("trigger_open", "open_to_close", 0, "short", 1, selector="gap_bars:3", pending=False, tf="1h"),
 )
 
 
@@ -107,6 +161,6 @@ def resolved_cases(bars) -> List[Dict[str, Any]]:
     out = []
     for c in CASES:
         meta = {k: v for k, v in c.items() if k not in ("t0_selector", "file_name")}
-        meta["t0_ms"] = list(select_t0(str(c["t0_selector"]), bars))
+        meta["t0_ms"] = list(select_t0(str(c["t0_selector"]), bars, str(c["timeframe"])))
         out.append({"file_name": str(c["file_name"]), "meta": meta})
     return out

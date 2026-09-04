@@ -1,0 +1,44 @@
+{
+  "case_id": "decision_bar_open__open_to_horizon_close__k2__long__12h__h1",
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "direction": "long",
+  "event_import_id": "golden-decision_bar_open__open_to_horizon_close__k2__long__12h__h1",
+  "event_label_spec": {
+    "horizon_bars": 1,
+    "entry_price_semantic": "decision_bar_open",
+    "label_return_mode": "open_to_horizon_close",
+    "decision_offset_bars": 2
+  },
+  "t0_ms": [
+    1704067200000,
+    1708387200000
+  ],
+  "lookahead_bars_declared": {
+    "12h": 0
+  },
+  "timeframe_seconds": {
+    "12h": 43200
+  },
+  "data_snapshot_digest": "cf13fb5370bed1bb1c5921e1f125bb6f6c2275ff14152386e81c94b075416895",
+  "events": {
+    "ev1": {
+      "label_value": 0.022074170045151442,
+      "label_start_ms": 1708300800000,
+      "label_end_ms": 1708387200000,
+      "decision_at_ms": 1708300800000,
+      "entry_at_ms": 1708300800000,
+      "entry_price_ref": {
+        "bar_open_ms": 1708300800000,
+        "field": "open"
+      }
+    }
+  },
+  "nan_event_ids": [],
+  "analysis_alignment_receipt_hash": "8e5b7052b6e34464e767bd8eba4c3c9c80113f28d1f4abd455a9197c9f2d484d",
+  "purge_lower_bound_ms_by_symbol": {
+    "ETHUSDT": 86400000
+  },
+  "matrix_pending": true,
+  "matrix_pending_reason": "k>0 尚不在 SUPPORTED_MATRIX（D1.3 四對皆 k=0）；k>0 之開放為 D-001 Task D4.2 之交付"
+}

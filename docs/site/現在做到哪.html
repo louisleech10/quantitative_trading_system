@@ -32,7 +32,7 @@
 </tr>
 <tr>
 <td><strong>在做第幾段</strong></td>
-<td><strong>第 1 段（B-D1）預測型</strong> — 7 個小任務中做完 3 個</td>
+<td><strong>第 1 段（B-D1）預測型</strong> — 7 個小任務中做完 4 個</td>
 </tr>
 <tr>
 <td><strong>卡住嗎</strong></td>
@@ -67,7 +67,7 @@
 <tr>
 <td><strong>第 1 段</strong></td>
 <td>預測型解灰：契約 provenance／支援矩陣／golden 擴充／前端解灰／IC 頁三種報酬選項</td>
-<td>🔧 <strong>進行中（3/7）</strong></td>
+<td>🔧 <strong>進行中（4/7）</strong></td>
 </tr>
 <tr>
 <td>第 3 段</td>
@@ -114,13 +114,13 @@
 </tr>
 <tr>
 <td>D1.4</td>
-<td><strong>golden 擴充</strong>：把第 0 段建的凍結檔補齊到規格要求的案例（<code>trigger_open × 續漲</code>、1h 混時框、資料末端、k&gt;0 暖身不足…）＋兩條新的破壞測試</td>
-<td>⬜ 下一個</td>
+<td><strong>golden 擴充</strong>：凍結檔由 9 個補到 <strong>23 個</strong>（補齊四種組合 × 多空 × h∈{1,3}、1h 跨時框、資料末端、k&gt;0 暖身不足、<code>next_open</code> 進場晚於答案錨）</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>D1.5</td>
 <td><strong>前端 <code>/search</code> 解灰</strong>：讓你能選「預測型」和「開盤進場」；匯出時寫下答案來源與當時搜尋條件</td>
-<td>⬜</td>
+<td>⬜ 下一個</td>
 </tr>
 <tr>
 <td>D1.6</td>
@@ -136,11 +136,16 @@
 </table></div>
 <p><strong>目前已驗過的</strong>（每完成一個任務就實跑，不是「應該會過」）：</p>
 <ul>
-<li><code>pytest tests/momentum/event_samples/</code> → 365 passed</li>
+<li><code>pytest tests/momentum/event_samples/</code> → <strong>387 passed</strong>（含 D1.1 的 14 條與 D1.3／D1.4 的新測試）</li>
 <li><code>pytest tests/api -k &quot;contract_reason_registry or event_batch_detail_dims&quot;</code> → 25 passed</li>
-<li>golden <code>--check</code> → 9/9 rc=0</li>
-<li><strong>D1.3 關鍵對照</strong>：開放矩陣前後，9 個凍結檔的數字<strong>逐位元組完全相同</strong> → 證明 D1.3 只是解除旗標、沒偷改任何值</li>
+<li>golden <code>--check</code> → <strong>23/23 rc=0</strong></li>
+<li><strong>D1.3 關鍵對照</strong>：開放矩陣前後，凍結檔的數字<strong>逐位元組完全相同</strong> → 證明 D1.3 只是解除旗標、沒偷改任何值</li>
+<li><strong>破壞測試 8 種全紅、還原後全綠</strong>：故意把 short 不取負、答案窗位移一根、矩陣少一對、矩陣全開、
+「已知」欄改成看情境猜、三條契約規則各自拿掉 —— 每一種都被抓到</li>
 </ul>
+<p>🔴 <strong>破壞測試抓到我自己的缺口</strong>：前三條契約規則我一開始<strong>沒寫測試</strong>，
+把規則拿掉測試還是綠的。補了 14 條之後才全紅。這就是為什麼每條規則都要配破壞測試——
+「規則寫了」和「規則壞了會被發現」是兩件事。</p>
 <hr />
 <h2 id="這一段目前踩到的坑已修記在這裡免得重踩">這一段目前踩到的坑（已修，記在這裡免得重踩）</h2>
 <ol>
