@@ -445,30 +445,49 @@ def test_r5_closure_missing_plus_invalid_reports_invalid(_isolated_storage):
         "型別錯（落檔已損壞）比缺（歷史批的合法形狀）嚴重，應優先回報"
 
 
-def test_r5_closure_domain_comes_from_contract_not_hardcoded(_isolated_storage):
+def test_r5_closure_domain_comes_from_contract_not_hardcoded(_isolated_storage, monkeypatch):
     """🔴 **本條釘住的是修法的形狀，不是行為**：值域須**從契約導出**。
 
     R3／R4／R5 三輪都在 route 手刻一條新規則，而契約一直寫著 `{"type": "int", "min": 0}`。
-    本條證明兩件事：① 出口真的讀到契約的 `min`；② 錯誤訊息的字面由該值導出
-    ——契約日後改 `min`，訊息不會過期。
 
-    這條若紅，代表有人把值域改回手寫常數。
+    🔴 **本條的第一版是假的，被 mutation `i2_domain_hardcoded_again` 當場戳破**：
+    當時寫成「取契約的 min（＝0），斷言訊息含 `>=0`」——而手刻的 `{"min": 0}`
+    產生**一模一樣的字面**，所以把值域改回手刻，這條照樣綠。
+    **一條宣稱「證明 X 來自 Y」的測試，若 X 在兩種來源下取值相同，它就什麼也沒證明。**
+
+    ⇒ 正解：把契約的 `min` **改成一個與手刻值不同的數**（2），再看行為跟不跟著變。
+    跟著變 ⇒ 真的在讀契約；不變 ⇒ 有人把它寫死了。
     """
     from fastapi import HTTPException
-    from momentum.factories import create_event_sample_pipeline
+    from momentum.Analysis.event_samples import import_contract as ic_mod
 
-    domain = create_event_sample_pipeline().int_field_domain("decision_offset_bars")
-    assert domain["min"] == 0, "契約對 decision_offset_bars 宣告之 min 應為 0"
+    real = ic_mod.load_event_import_contract()
+    assert real["required_fields"]["decision_offset_bars"]["min"] == 0, \
+        "前提：契約現行 min 為 0（本條靠『把它改成 2』來證明有在讀）"
 
-    def _neg_all(rs):
-        for r in rs:
-            r["decision_offset_bars"] = -1
+    # 🔴 **順序要緊**：匯入層讀的是同一份契約，若先改再匯入，k=1 會在匯入當場被拒
+    #    （第一次寫這條時就是這樣紅的）。⇒ 先以真實契約落檔，再改契約，只讓 route 讀到新值。
+    recs = [
+        make_event(i, label=i % 2, decision_offset_bars=1,
+                   lookahead_bars_declared={"12h": 0})
+        for i in range(2)
+    ]
+    import_id = _store(_isolated_storage, recs, {"12h": 0})
 
-    import_id = _legacy_batch(_isolated_storage, _neg_all)
+    def _fake_contract():
+        import copy
+
+        c = copy.deepcopy(real)
+        c["required_fields"]["decision_offset_bars"]["min"] = 2
+        return c
+
+    monkeypatch.setattr(ic_mod, "load_event_import_contract", _fake_contract)
     with pytest.raises(HTTPException) as ei:
         _resolve_event_batch(_Req(import_id))
-    assert f">={domain['min']}" in ei.value.detail["message"], \
-        "訊息之值域字面須由契約導出，不得手寫"
+    assert ei.value.detail["kind"] == "invalid_decision_offset_bars", \
+        "route 未跟著契約的 min 走 ⇒ 值域被寫死了"
+    assert ">=2" in ei.value.detail["message"], \
+        "訊息之值域字面亦須由契約導出，不得手寫"
 
 
 def test_r5_closure_unknown_field_domain_is_fail_closed():
