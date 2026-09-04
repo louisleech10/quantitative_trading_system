@@ -2494,6 +2494,24 @@ codex 恢復為審碼家族的前提＝停用那個全域 skill，<strong>但那
 <p><strong>判準（往後照做）</strong>：宣布根因前，先自問一句「<strong>這個原因能解釋為什麼以前沒事嗎？</strong>」
 答不出來就不是根因，只能寫成「共因之一」或「待查」。
 尤其<strong>不得</strong>以未證成的根因為理由，要求使用者改動他自己的環境設定。</p>
+<hr />
+<h2 id="2026-09-04b-d1-審碼中我的破壞測試腳本把自己的程式碼改壞了">2026-09-04（B-D1 審碼中）我的破壞測試腳本把自己的程式碼改壞了</h2>
+<p><strong>事實</strong>：B-D1 派三家審碼後約 40 分鐘，工具提示我 <code>label_value_from_case.py</code> 在磁碟上變了。
+一查：D1.6 剛加的那個欄位（第十二欄）<strong>整段不見了</strong>，連同它的函式。工作區被靜默改壞。</p>
+<p><strong>我的第一反應是錯的</strong>：我看到 <code>git stash list</code> 有一筆 <code>review-temp</code>，就宣布「有委員動了 git」。
+查時間戳才發現那筆 stash 是 <strong>8/13</strong> 建的，跟這次無關。<strong>又是一條線索當根因。</strong></p>
+<p><strong>真正的原因是我自己的腳本</strong>：破壞測試腳本會先把原檔備份一份，改壞、跑測試、再從備份還原。
+但那份備份是<strong>第一批破壞測試（16:47）<strong>建的，而我在 <strong>17:14</strong> 才 commit 了 D1.6。
+委員跑腳本時，<code>還原</code> 這一步用那份</strong>比改動還早 27 分鐘</strong>的備份覆蓋現檔 ⇒ D1.6 被回捲。
+腳本自己「看起來成功」（它印 restored），沒有任何東西會紅。</p>
+<p><strong>判準（已治本）</strong>：<strong>還原的權威只能是版控，不能是我自己另存的副本。</strong>
+兩支腳本都改成 <code>git checkout -- &lt;檔&gt;</code> 還原，並在啟動時檢查「目標檔必須與 HEAD 一致」，
+不乾淨就 rc=3 拒跑（否則還原會吃掉使用者未提交的改動）。
+改完重跑：兩批共 15 種破壞全紅、還原後全綠、工作區乾淨。</p>
+<p><strong>為什麼這個坑值得記</strong>：它同時踩到三件事——
+①「備份」這種自建副本會過期，而過期的副本比沒有備份更危險（它會裝成正確狀態）；
+② 派工期間主控端與委員同時動同一批檔，任何非冪等的腳本都會互相污染；
+③ 我又一次看到一條線索就宣布根因（stash），沒先看時間戳。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

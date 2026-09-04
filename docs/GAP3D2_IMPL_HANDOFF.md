@@ -76,6 +76,14 @@
 - 🔴 **派工期間須守檔**：委員會跑本批的 mutation 腳本（就地改生產碼再還原）。收件前後一律
   `shasum -a 256 -c <baseline>` 全檔比對。**建 baseline 時勿用 `| tee x | head -3`**——SIGPIPE 會把
   baseline 截斷（B-D0 踩過，4 行當成 10 行用）。
+- 🔴 **mutation 腳本之還原權威＝版控，不得用自存備份**（2026-09-04 B-D1 事故）：
+  舊版把備份寫成 `handoffs/_b1_bak_*` 且只在**第一次**建立。之後又 commit 了 D1.6，
+  備份仍停在 D1.6 之前 ⇒ 委員跑腳本時 `restore()` 用**過期備份**覆蓋現檔，把 D1.6 整段回捲，
+  而腳本自己印 `restored`、沒有任何東西會紅。
+  **治法**：`git checkout -- <檔>` 還原 ＋ 啟動時檢查「目標檔與 HEAD 一致」，不乾淨即 rc=3 拒跑
+  （否則還原會吃掉未提交改動）。現行 `20260904-gap3d2-b1-mutate{,2}.py` 已是此形。
+  **診斷提示**：工作區突然出現「把某個 commit 的改動整段刪掉」的 diff，先看
+  `ls -l handoffs/_*bak*` 的時間戳 vs 該 commit 時間，別急著怪委員。
 - **`reconcile_cluster_attribution_check.sh`** 對前輪 ID（正文提及、非附錄 heading）誤報「未被引用」＝假警。
 - **completeness**：`## DEGRADE-<FAMILY>-<NN>` 一行一 ID，勿合寫兩家。
 - **commit**：staged 含 `.claude/gate/*.log`／`docs/site/*.html`／交接檔 ⇒ pre-commit G-7 要求 `Governance-Scope: out-of-epic …` 為最末段；`handoffs/` 為 gitignore（委員產物只在本機）；白話新檔須登記 `scripts/plain_docs_sync_check.sh::_watched_for`。
