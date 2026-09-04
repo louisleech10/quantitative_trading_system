@@ -115,7 +115,7 @@
 | 批 | commit | 測試選擇器／rc | golden `--check` | review sessions | 狀態 |
 |---|---|---|---|---|---|
 | B-D0 | `49204458`（2026-09-04；訊息具名「hash 合法改變一次、label_values 逐位元組不變」） | `pytest tests/momentum/event_samples/ -q -k "open_to or entry_price_ref"` **21 passed rc=0**；`pytest tests/momentum/event_samples/ -q` **365 passed rc=0**；`pytest tests/api -q -k "event_analysis or event_batch_detail_dims"` **32 passed rc=0** | `--check "tests/golden/gap3_label/*.json"` **rc=0（9 cases PASS）** | `20260904-gap3d2-b0-review-r1`（composer＋grok 交件，皆 P3-00 零 finding）；`…-r2`（codex 單家重派，未交件，見殘留） | **DONE**（review quorum＝兩家；殘留 `B0-REVIEW-1/2` 待使用者裁定 codex 環境） |
-| B-D1 | — | — | — | — | — |
+| B-D1 | 實作 `6352b6d6..cb22f725`（5 commit）＋R2 閉合 `5adbe126`＋文件 `7eae878f` | `pytest tests/momentum/event_samples/ -q` **407 passed rc=0**；`pytest tests/api -q -k "ic_event_label_defaults or event_batch_detail_dims or horizon_purge or contract_reason_registry"` **69 passed rc=0**；前端 `npx vitest run` **69 檔 433 passed**；`npx tsc --noEmit` **8 行（既有債，無新增）**；`check_decoupling_imports.py --baseline` **BASELINE OK 無新增違反** | `--check "tests/golden/gap3_label/*.json"` **rc=0（23 cases）** | `20260904-gap3d2-b1-review-r2`（**三家全數交件**：codex 4／composer 4／grok 3 findings；verdict 不一致，取聯集全修） | **待 R3 閉合輪**（原提出方複核）。mutation 兩批 **15 種全紅、還原全綠** |
 | B-D3 | — | — | — | — | — |
 | B-D4 | — | — | — | — | — |
 | B-D5 | — | — | — | — | — |
