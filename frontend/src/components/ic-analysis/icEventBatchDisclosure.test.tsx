@@ -201,9 +201,18 @@ async function startWith(config: ICAnalysisConfig) {
 describe('Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」', () => {
   it('④ `horizon_bars` 輸入 `7` ⇒ 送出 payload 之 `event_label_spec.horizon_bars === 7`', async () => {
     let spec: ICAnalysisConfig['event_label_spec'];
+    // 🔴 `CODEX-R3-P2-01` 之後，h input 在**未選量法**時是 disabled ⇒ 真實使用者
+    //    不可能在那個狀態下打字。本條改為從「已選續漲」起跑，才是可達的操作序列。
+    //    （原版以 `labelSpec={undefined}` 對 disabled 欄位 fireEvent，測得到但使用者做不到。）
     render(
       <EventBatchDisclosurePanel
-        importId="imp-1" labelSpec={undefined} detail={detailFixture()}
+        importId="imp-1" detail={detailFixture()}
+        labelSpec={{
+          horizon_bars: 1,
+          entry_price_semantic: 'trigger_close',
+          label_return_mode: 'close_to_close',
+          decision_offset_bars: 0,
+        }}
         onChangeLabelSpec={(next) => { spec = next; }}
       />,
     );
@@ -220,9 +229,17 @@ describe('Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」', () =>
       ((d.records[0].label_definition as { window: { horizon_bars: number } }).window.horizon_bars),
     ).toBe(3);   // 正向對照：fixture 真的帶著那個陷阱值
 
-    // (a) **面板層**：分析參數區顯示的初始值是字面常數 1，不是該批落檔的深度殘值 3
+    // (a) **面板層**：不得顯示該批落檔的深度殘值 3。
+    //     🔴 `CODEX-R3-P2-01` 之修正**收緊**了本斷言：原本期望字面常數 `'1'`，
+    //     但後端在未選量法時會依宣告深度導出（深度 3 就跑 h=3）⇒ 顯示 `1` 本身
+    //     就是數字誤導。現在未選時顯示**空值且 disabled**，並以
+    //     `ic-param-h-backend-derived` 說明由誰決定。
+    //     **原意（不得顯示 3）不但保留，而且更強**：現在連任何數字都不顯示。
     render(<EventBatchDisclosurePanel importId="imp-1" labelSpec={undefined} onChangeLabelSpec={() => {}} detail={d} />);
-    expect((screen.getByTestId('ic-param-horizon-bars') as HTMLInputElement).value).toBe('1');
+    const hInput = screen.getByTestId('ic-param-horizon-bars') as HTMLInputElement;
+    expect(hInput.value).not.toBe('3');   // 本條之原始防線：不得種子化為落檔殘值
+    expect(hInput.value).toBe('');
+    expect(hInput.disabled).toBe(true);
     cleanup();
 
     // (b) **payload 層**：🔴 `CODEX-R2-P1-03` 之修正改變了這一半的形狀——
@@ -497,5 +514,38 @@ describe('B-D1 R3 準備期自查 — 「還沒選」與「選了非法組合」
     );
     expect(screen.getByTestId('ic-param-return-measure-invalid')).toBeTruthy();
     expect(screen.queryByTestId('ic-param-return-measure-unset')).toBeNull();
+  });
+});
+
+describe('B-D1 R3 閉合 — CODEX-R3-P2-01：未選量法時不得顯示會與後端不符的 h', () => {
+  it('🔴 `labelSpec` 未設定 ⇒ h input 為空且 disabled，並說明由後端依深度決定', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+      />,
+    );
+    const h = screen.getByTestId('ic-param-horizon-bars') as HTMLInputElement;
+    // 修正前：value 是 fallback 的 `1`，而後端對宣告深度 3 的批實際跑 h=3 ⇒ 數字誤導。
+    expect(h.value).toBe('');
+    expect(h.disabled).toBe(true);
+    expect(screen.getByTestId('ic-param-h-backend-derived')).toBeTruthy();
+  });
+
+  it('🔴 over 向：選了量法之後 h 可編輯且顯示實際值（不得因上一條把欄位鎖死）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} onChangeLabelSpec={() => {}}
+        labelSpec={{
+          horizon_bars: 5,
+          entry_price_semantic: 'trigger_close',
+          label_return_mode: 'close_to_close',
+          decision_offset_bars: 0,
+        }}
+      />,
+    );
+    const h = screen.getByTestId('ic-param-horizon-bars') as HTMLInputElement;
+    expect(h.value).toBe('5');
+    expect(h.disabled).toBe(false);
+    expect(screen.queryByTestId('ic-param-h-backend-derived')).toBeNull();
   });
 });

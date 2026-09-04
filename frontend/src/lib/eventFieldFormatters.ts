@@ -51,7 +51,11 @@ export const EVENT_FIELD_FORMATTERS = {
   /**
    * `G3-D2` D1.5／D1.6：`label_origin`＝這批的答案是**怎麼來的**（provenance）。
    *
-   * 🔴 批次事實欄，scalar（批內常數；異質 ⇒ Task 1.8 既有拒收）。
+   * 🔴 批次事實欄，scalar（批內常數）。異質 ⇒ 由 `_ALWAYS_HOMOGENEOUS_DIMENSIONS`
+   *    （**無條件**同質組）拒收，**不是** Task 1.8 那個受 `enforce_batch_homogeneity`
+   *    旗標控制的組——該旗標預設 `False`，掛在它底下等於預設不檢查。
+   *    （R2 之三家全員 finding 與 R3 之 grok／composer 皆指出原註解歸屬寫錯；
+   *     歸屬寫錯正是 R2 群集 1 的成因之一，故不留著。）
    * 🔴 **舊批可能沒有這一欄** ⇒ 傳 `null`／`undefined` 時顯示「（未宣告）」而**不是**空字串或猜測值：
    *    猜一個值等於替使用者宣告 provenance，那正是本欄要防的事。
    */

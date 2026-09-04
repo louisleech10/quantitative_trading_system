@@ -140,14 +140,44 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
     #    第二個事件之 `decision_at` 變成 `t0`（依其宣告應為 `ot[t0_idx-2]`）。
     #    ⇒ 在能算錯之前先擋。k 之逐批參數化（record 值集合＋分析 k 分離）是 D4.3 的交付；
     #    在那之前，混 k 批**不進分析**，而不是挑一個 k 蒙混過去。
-    ks = sorted({int(r["decision_offset_bars"]) for r in records
-                 if isinstance(r.get("decision_offset_bars"), int)
-                 and not isinstance(r.get("decision_offset_bars"), bool)})
-    if len(ks) > 1:
+    # 🔴 **R3 閉合輪 `CODEX-R3-P1-01`：首版之過濾把「缺鍵／非 int」列靜默略過**
+    #    ⇒ `[None, 2]` 只蒐集到 `{2}`、`len==1` 不觸發本閘，而下方 `spec.setdefault` 取
+    #    `records[0]`（該列缺鍵）得 `None` ⇒ **宣告 k=2 的那些列被對齊到 k=0 的決策根**。
+    #    codex 實跑：`accepted stored_k=[None, 2] resolved_k=0`。同型錯誤換一條路進來。
+    #    ⇒ 改為 fail-closed：**「缺」本身是一個相異值**，與任何具體 k 併存即為不一致。
+    #    全批皆缺仍放行（由下方 `setdefault` 走契約預設，行為與修正前相同）。
+    #    🔴 **「缺」與「型別錯」必須分開**（本條修法之第一版把兩者併成「缺」，
+    #       結果整批都是 `True` 時 `k_values` 為空而被當成「全缺」放行——我自己的
+    #       over 向測試當場抓到）。缺＝歷史批的合法形狀（全批一致即放行）；
+    #       型別錯＝落檔已損壞，任何情況都不得進分析。
+    k_values = set()
+    k_missing = False
+    k_invalid = []
+    for r in records:
+        v = r.get("decision_offset_bars")
+        if v is None:
+            k_missing = True
+        elif isinstance(v, bool) or not isinstance(v, int):
+            # bool 是 int 的子型別且 `True` 會被當成 1 ⇒ 一律視為型別錯，不是 k=1。
+            k_invalid.append(v)
+        else:
+            k_values.add(int(v))
+    if k_invalid:
+        raise HTTPException(status_code=422, detail={
+            "kind": "invalid_decision_offset_bars",
+            "message": (
+                f"事件批 {request.event_import_id!r} 之 decision_offset_bars 有非整數值"
+                f"（{k_invalid[:3]}）。契約要求本欄為 int>=0；出現其他型別代表落檔已損壞或"
+                "繞過了匯入驗證，分析層不猜測其意圖。"
+            ),
+        })
+    ks = sorted(k_values)
+    if len(ks) > 1 or (ks and k_missing):
+        shown = [*ks, "（缺）"] if k_missing else ks
         raise HTTPException(status_code=422, detail={
             "kind": "mixed_decision_offset_bars",
             "message": (
-                f"事件批 {request.event_import_id!r} 之 decision_offset_bars 批內不一致（值＝{ks}）。"
+                f"事件批 {request.event_import_id!r} 之 decision_offset_bars 批內不一致（值＝{shown}）。"
                 "分析時只能有一個決策位移；若照第一列取值，其餘事件會被對齊到錯的決策根，"
                 "而算出來的數字仍是合法值、看不出異常。請拆批，或等 k 之分析參數化上線。"
             ),

@@ -230,3 +230,127 @@ def test_r2_closure_frontend_constant_seed_would_defeat_depth_default(_isolated_
         "setdefault 壓不過已存在的鍵——這就是 CODEX-R2-P1-03 的機制；"
         "前端必須省略該鍵，不能送常數"
     )
+
+# ══════════════════════════════════════════════════════════════════════════
+# B-D1 R3 閉合輪 — `CODEX-R3-P1-01`：混 k 之「部分缺鍵」路徑
+#
+# 選擇器：`pytest tests/api/test_gap3_ic_event_label_defaults.py -q -k r3_closure`
+#
+# 🔴 **可達性**：`decision_offset_bars` 是契約 `required_fields`，匯入路徑會以
+#    `missing_required_field` 擋下缺鍵列 ⇒ 本缺陷**不可能經由匯入產生**。
+#    codex 之原探針是 stub 掉 `get_event_import_service` 直接打 route。
+#    唯一真實可達路徑＝**繞過匯入驗證的歷史／直寫落檔**（殘留 `B1-LEGACY-1`）。
+#    ⇒ 下列測試以「正常匯入後改寫落檔 JSON」重現該形狀，而不是 stub 服務——
+#      stub 只證明函式邏輯，改寫落檔才證明**真的有一條路能走到這裡**。
+# ══════════════════════════════════════════════════════════════════════════
+
+def _rewrite_stored_records(svc, import_id, mutate):
+    """把已落檔批次的 records 就地改寫（模擬繞過匯入驗證的歷史檔）。"""
+    import json as _json
+
+    p = svc.storage_dir / f"{import_id}.json"
+    payload = _json.loads(p.read_text(encoding="utf-8"))
+    mutate(payload["records"])
+    p.write_text(_json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str),
+                 encoding="utf-8")
+
+
+def _legacy_batch(svc, mutate, k=2):
+    recs = [
+        make_event(i, label=i % 2, decision_offset_bars=k,
+                   lookahead_bars_declared={"12h": 0})
+        for i in range(2)
+    ]
+    import_id = _store(svc, recs, {"12h": 0})
+    _rewrite_stored_records(svc, import_id, mutate)
+    return import_id
+
+
+def test_r3_closure_partial_missing_decision_offset_bars_is_rejected(_isolated_storage):
+    """`CODEX-R3-P1-01`：批內**部分列缺** `decision_offset_bars` ⇒ 亦須 422。
+
+    🔴 R2 之修法只擋「兩個具體值」，過濾式把缺鍵列**靜默略過**
+    ⇒ `[None, 2]` 只蒐到 `{2}`、`len==1` 放行；而 `spec.setdefault` 取 `records[0]`
+    （缺鍵）得 `None` ⇒ 宣告 k=2 的列被對齊到 k=0 的決策根。
+    codex 實跑 receipt：`accepted stored_k=[None, 2] resolved_k=0`。
+    """
+    from fastapi import HTTPException
+
+    import_id = _legacy_batch(_isolated_storage,
+                              lambda rs: rs[0].pop("decision_offset_bars", None))
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.status_code == 422
+    assert ei.value.detail["kind"] == "mixed_decision_offset_bars"
+    assert "（缺）" in ei.value.detail["message"], "訊息須讓使用者看出有列根本沒宣告 k"
+
+
+def test_r3_closure_null_decision_offset_bars_is_rejected(_isolated_storage):
+    """同一形狀之另一半：鍵在但值為 `null`（JSON 直寫最常見的樣子）。"""
+    from fastapi import HTTPException
+
+    def _null_first(rs):
+        rs[0]["decision_offset_bars"] = None
+
+    import_id = _legacy_batch(_isolated_storage, _null_first)
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.detail["kind"] == "mixed_decision_offset_bars"
+
+
+def test_r3_closure_bool_decision_offset_bars_counts_as_missing(_isolated_storage):
+    """🔴 `bool` 是 `int` 的子型別：`True` 不得被當成 `k=1`，也不得被當成「缺」。
+
+    🔴 **本條抓到本輪修法的第一版**：當時把「型別錯」歸進「缺」，於是整批都是 `True`
+    時 `k_values` 為空 ⇒ 走「全批皆缺」那條 over 向而**放行**，`spec` 拿到 `True`。
+    ⇒ 型別錯另立 `invalid_decision_offset_bars`，任何情況都不進分析。
+    """
+    from fastapi import HTTPException
+
+    def _bool_all(rs):
+        for r in rs:
+            r["decision_offset_bars"] = True
+
+    import_id = _legacy_batch(_isolated_storage, _bool_all)
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.detail["kind"] == "invalid_decision_offset_bars"
+
+
+def test_r3_closure_string_decision_offset_bars_is_rejected(_isolated_storage):
+    """同上之另一型別：字串 `"2"` 不得被當成 `k=2`（CSV 直寫最常見的損壞形狀）。"""
+    from fastapi import HTTPException
+
+    def _str_all(rs):
+        for r in rs:
+            r["decision_offset_bars"] = "2"
+
+    import_id = _legacy_batch(_isolated_storage, _str_all)
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.detail["kind"] == "invalid_decision_offset_bars"
+
+
+def test_r3_closure_all_missing_decision_offset_bars_still_accepted(_isolated_storage):
+    """🔴 **over 向**：整批都沒有 `decision_offset_bars` ⇒ **仍須放行**。
+
+    沒有這條，上面三條的修正會把所有沒宣告 k 的歷史批擋在門外——那不是修好，是弄壞。
+    """
+    def _drop_all(rs):
+        for r in rs:
+            r.pop("decision_offset_bars", None)
+
+    import_id = _legacy_batch(_isolated_storage, _drop_all)
+    out = _resolve_event_batch(_Req(import_id))
+    assert out["event_label_spec"]["decision_offset_bars"] in (0, None)
+
+
+def test_r3_closure_uniform_k_survives_rewrite_path(_isolated_storage):
+    """🔴 **over 向之對照**：改寫落檔但保持單值 k ⇒ 仍放行。
+
+    證明上面幾條擋的是「不一致」，不是「經過改寫」這件事本身
+    （否則 `_legacy_batch` 這個 helper 就成了測試的作弊面）。
+    """
+    import_id = _legacy_batch(_isolated_storage, lambda rs: None, k=2)
+    out = _resolve_event_batch(_Req(import_id))
+    assert out["event_label_spec"]["decision_offset_bars"] == 2

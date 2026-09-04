@@ -59,8 +59,12 @@ function factLine(field: EventFieldKey, detail: EventImportDetail): string {
         : EVENT_FIELD_FORMATTERS.control_kind('（未宣告）');
     case 'label_origin':
       // 🔴 D1.6：formatter 自己處理 `null`（顯示「（未宣告）」），此處**不補值**。
-      //    與 `control_kind` 不同：本欄之混值不需另設 notes 欄——契約對
-      //    scenario ∈ {A,B,two_stage} 條件必填且批內同質，混值批在匯入層就被擋。
+      //    與 `control_kind` 不同：本欄之混值不需另設 notes 欄——`label_origin` 屬
+      //    `_ALWAYS_HOMOGENEOUS_DIMENSIONS`（**無條件**同質組，不受
+      //    `enforce_batch_homogeneity` 旗標約束），混值／部分宣告在匯入層即
+      //    `heterogeneous_rows_in_batch` 拒收。
+      //    🔴 這句話在 R2 之前是**錯的**（當時碼裡沒有這道閘，三家全員實跑打穿）；
+      //    現在為真，但**它為真的理由是那次修法**，不是 Task 1.8。
       return EVENT_FIELD_FORMATTERS.label_origin(f.label_origin);
     case 'direction':
       return EVENT_FIELD_FORMATTERS.direction(f.direction ?? '（未宣告）');
@@ -145,16 +149,27 @@ export default function EventBatchDisclosurePanel({
                 — 「當根」不用 h（送出時固定為 1）
               </span>
             )}
+            {!userChoseSpec && (
+              <span className="ml-1 text-[11px] text-slate-400" data-testid="ic-param-h-backend-derived">
+                — 尚未選量法 ⇒ 由後端依這批宣告的深度決定；此處不預填數字
+              </span>
+            )}
           </span>
           {/* 🔴 `CODEX-R2-P1-03` 後半：「當根」下 h **不參與計算**，可編輯會讓使用者以為
               自己改的數字有作用（改了值、結果不變）。⇒ disabled，並在標籤明說原因。
-              wire 仍送 1（inert 哨兵；`event_label_spec` 恆四鍵，缺鍵 normalizer fail-closed）。 */}
+              wire 仍送 1（inert 哨兵；`event_label_spec` 恆四鍵，缺鍵 normalizer fail-closed）。
+              🔴 `CODEX-R3-P2-01`：**未選量法時不得顯示 `1`**——後端會依宣告深度導出
+              （深度 3 就跑 h=3），畫面顯示 1 就是**數字誤導**，比顯示空白更糟。
+              ⇒ 未選時 disabled ＋ 空值 ＋ 標籤說明由誰決定。
+              **刻意不在此依 `detail` 算出深度預設**：那會是後端 D1.7 規則的第二份實作，
+              兩份會漂；正確的長期解是把 route response 之 `event_label_spec` 回灌
+              （codex 原建議之後半，現列為 R4 待議）。 */}
           <input
             type="number"
             min={1}
             data-testid="ic-param-horizon-bars"
-            disabled={currentPreset?.key === 'same_bar'}
-            value={currentPreset?.key === 'same_bar' ? 1 : spec.horizon_bars}
+            disabled={!userChoseSpec || currentPreset?.key === 'same_bar'}
+            value={!userChoseSpec ? '' : (currentPreset?.key === 'same_bar' ? 1 : spec.horizon_bars)}
             onChange={(e) => onChangeLabelSpec({ ...spec, horizon_bars: Number(e.target.value) })}
             className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 disabled:opacity-50"
           />
