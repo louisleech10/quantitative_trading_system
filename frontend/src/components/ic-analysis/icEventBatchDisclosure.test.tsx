@@ -549,3 +549,50 @@ describe('B-D1 R3 閉合 — CODEX-R3-P2-01：未選量法時不得顯示會與�
     expect(screen.queryByTestId('ic-param-h-backend-derived')).toBeNull();
   });
 });
+
+describe('B-D1 R4 閉合 — GROK-R4-P2-01：同一個 h 在面板的**每一處**顯示都不得與後端不符', () => {
+  it('🔴 未選量法 ⇒ window-note 不得寫出具體根數', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+      />,
+    );
+    const note = screen.getByTestId('ic-param-window-note').textContent ?? '';
+    // 修正前：「本次答案窗 ＝ 1 根」——input 改空了，這行還在報 1。
+    expect(note).not.toMatch(/本次答案窗 ＝ \d+ 根/);
+    expect(note).toContain('由後端依這批宣告的深度決定');
+  });
+
+  it('🔴 over 向：選了量法 ⇒ window-note 報出的根數**等於** input 顯示的值', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} onChangeLabelSpec={() => {}}
+        labelSpec={{
+          horizon_bars: 4,
+          entry_price_semantic: 'trigger_close',
+          label_return_mode: 'close_to_close',
+          decision_offset_bars: 0,
+        }}
+      />,
+    );
+    const h = (screen.getByTestId('ic-param-horizon-bars') as HTMLInputElement).value;
+    expect(h).toBe('4');
+    expect(screen.getByTestId('ic-param-window-note').textContent).toContain(`本次答案窗 ＝ ${h} 根`);
+  });
+
+  it('🔴 掃全檔之結論釘住：點 preset 後，畫面顯示的 h 與送出的 h 相同（殘留 B1-DEPTH-1 之邊界）', () => {
+    let spec: ICAnalysisConfig['event_label_spec'];
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined}
+        onChangeLabelSpec={(next) => { spec = next; }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ic-param-return-measure-hold'));
+    // 🔴 這裡送出的是字面常數 1，**不是**該批宣告的深度 3（`detailFixture` 之陷阱值）。
+    //    ⇒ 「依宣告深度之預設」只有在使用者**完全不碰面板**時才拿得到。
+    //    本條**不主張那是對的**，只釘住「顯示＝送出」這件事已成立；
+    //    要不要讓 preset 也跟著深度走，是殘留 `B1-DEPTH-1`（見 R5 brief）。
+    expect(spec?.horizon_bars).toBe(1);
+  });
+});

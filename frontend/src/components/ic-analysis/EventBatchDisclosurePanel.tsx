@@ -254,8 +254,13 @@ export default function EventBatchDisclosurePanel({
         </label>
 
         {/* 🔴 本次答案窗之可算／缺筆數 ＋ 本次 purge 下界（式之權威在 §D-3′-a(ii)，本區只顯示結果） */}
+        {/* 🔴 `GROK-R4-P2-01`：本行是**同一個數字在同一面板的第二處顯示**。
+            `CODEX-R3-P2-01` 的修法只改了 input，這裡仍插值 `spec.horizon_bars`
+            ⇒ 未選量法時照樣寫「本次答案窗 ＝ 1 根」，而後端對宣告深度 3 的批跑 h=3。
+            grok 實跑探針命中。⇒ 未選時不報數字，與 input 同一套說法。 */}
         <p className="mt-2 text-[11px] text-slate-400" data-testid="ic-param-window-note">
-          本次答案窗 ＝ {spec.horizon_bars} 根；這批共 {detail.summary.n_events} 筆事件，
+          本次答案窗 ＝ {userChoseSpec ? `${spec.horizon_bars} 根` : '由後端依這批宣告的深度決定（尚未選量法）'}；
+          這批共 {detail.summary.n_events} 筆事件，
           實際可算／缺的筆數與本次 purge 下界由後端於分析後回報（前端不自算，避免第二份公式）。
         </p>
       </div>

@@ -331,18 +331,48 @@ def test_r3_closure_string_decision_offset_bars_is_rejected(_isolated_storage):
     assert ei.value.detail["kind"] == "invalid_decision_offset_bars"
 
 
-def test_r3_closure_all_missing_decision_offset_bars_still_accepted(_isolated_storage):
-    """🔴 **over 向**：整批都沒有 `decision_offset_bars` ⇒ **仍須放行**。
+def test_r4_closure_all_missing_decision_offset_bars_is_rejected(_isolated_storage):
+    """`CODEX-R4-P1-02`：整批都沒有 `decision_offset_bars` ⇒ **422，不是放行**。
 
-    沒有這條，上面三條的修正會把所有沒宣告 k 的歷史批擋在門外——那不是修好，是弄壞。
+    🔴 **本條是 R3 那條 over 向斷言的更正，不是放寬**。R3 版寫成
+    `assert out[...]["decision_offset_bars"] in (0, None)`——**`None` 也算過**，
+    於是「route 放行、`normalize_event_label_spec` 在深處拋
+    `LabelProducerError ... 須為 int`」這個缺陷被斷言吞掉。codex 實跑
+    `ALL_MISSING_NORMALIZER_PROBE_RC=1` 打穿。
+
+    判準更正：「全批皆缺仍放行」**不是值得保留的既有行為**，它只是把錯誤推到更深處。
+    ⇒ route 當場 422，並在訊息指出這是繞過匯入驗證的落檔。
+    🔴 **寫鬆的 over 向斷言比沒有 over 向更危險**：它看起來有守，其實沒有。
     """
+    from fastapi import HTTPException
+
     def _drop_all(rs):
         for r in rs:
             r.pop("decision_offset_bars", None)
 
     import_id = _legacy_batch(_isolated_storage, _drop_all)
-    out = _resolve_event_batch(_Req(import_id))
-    assert out["event_label_spec"]["decision_offset_bars"] in (0, None)
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.status_code == 422
+    assert ei.value.detail["kind"] == "missing_decision_offset_bars"
+
+
+def test_r4_closure_normal_batch_resolves_k_to_exact_int(_isolated_storage):
+    """🔴 **over 向（改用精確值，不再用 `in (...)`）**：正常批之解析結果**恰為** int。
+
+    這才是 R3 那條想表達卻沒表達到的事：修法不得讓合法批拿到 `None` 或被擋。
+    """
+    for k in (0, 2):
+        recs = [
+            make_event(i, label=i % 2, decision_offset_bars=k,
+                       lookahead_bars_declared={"12h": 0})
+            for i in range(2)
+        ]
+        import_id = _store(_isolated_storage, recs, {"12h": 0})
+        out = _resolve_event_batch(_Req(import_id))
+        got = out["event_label_spec"]["decision_offset_bars"]
+        assert got == k and isinstance(got, int) and not isinstance(got, bool), \
+            f"k={k} 之解析結果須恰為同值 int，實得 {got!r}"
 
 
 def test_r3_closure_uniform_k_survives_rewrite_path(_isolated_storage):

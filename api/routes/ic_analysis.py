@@ -162,6 +162,22 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
             k_invalid.append(v)
         else:
             k_values.add(int(v))
+    #    🔴 **`CODEX-R4-P1-02`（R4 閉合輪）**：全批皆缺時，下方 `spec.setdefault(..., seed.get(...))`
+    #       會留下 `None`，`normalize_event_label_spec` 隨即拋
+    #       `LabelProducerError ... 須為 int` ⇒ 分析在**深處**炸掉，使用者看到的是無關訊息。
+    #       主委原判「全批皆缺仍放行＝保留既有行為」，但那個「既有行為」本身就是壞的；
+    #       且我的 over 向斷言寫成 `in (0, None)`——**`None` 也算過**，剛好把它蓋住。
+    #       ⇒ 在能算錯（或亂噴錯）之前先擋，並在訊息裡指出這是繞過匯入驗證的落檔。
+    if k_missing and not k_values and not k_invalid:
+        raise HTTPException(status_code=422, detail={
+            "kind": "missing_decision_offset_bars",
+            "message": (
+                f"事件批 {request.event_import_id!r} 之 decision_offset_bars **整批都沒有值**。"
+                "該欄為契約 required_fields，正常匯入不可能缺；出現此形狀代表落檔繞過了匯入驗證"
+                "（例如直接寫入 data_cache/events/）。分析層不替它猜一個決策位移——"
+                "猜 0 等於替使用者宣告了一個他沒宣告過的決策根。請重新匯入這批。"
+            ),
+        })
     if k_invalid:
         raise HTTPException(status_code=422, detail={
             "kind": "invalid_decision_offset_bars",
