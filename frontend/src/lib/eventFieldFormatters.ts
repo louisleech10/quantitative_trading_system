@@ -206,5 +206,7 @@ export function searchDisclosureLines(
  * 🔴 `direction` 歸批次事實（決定 short 取負、是 §G G-3 之 golden input），**不**進 `event_label_spec`。
  */
 export const IC_BATCH_FACT_FIELDS: readonly EventFieldKey[] = [
-  'scenario', 'control_kind', 'direction', 't0', 'label',
+  // 🔴 D1.6：`label_origin` 為第六鍵（覆寫 Task 7.6 之原五鍵封閉集合）。
+  //    順序與後端 `EventBatchFacts` 之欄序一致，方便逐欄對讀。
+  'scenario', 'control_kind', 'direction', 'label_origin', 't0', 'label',
 ];

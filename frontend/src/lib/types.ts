@@ -2890,6 +2890,8 @@ export interface EventBatchFacts {
   scenario: string | null;
   control_kind: string | null;
   direction: string | null;
+  /** 這批的答案是怎麼來的（provenance）。批內混值或舊批未宣告 ⇒ `null`（顯示「（未宣告）」）。 */
+  label_origin: string | null;
   t0: { event_id: string; t0_ms: number }[];
   label: { event_id: string; label: number }[];
 }

@@ -52,6 +52,11 @@ function factLine(field: EventFieldKey, detail: EventImportDetail): string {
           + `（${detail.batch_fact_notes.control_kind_values.join('、')}）——`
           + '報酬表之全體組會標為 mixed_control_kind_in_batch，不取多數決'
         : EVENT_FIELD_FORMATTERS.control_kind('（未宣告）');
+    case 'label_origin':
+      // 🔴 D1.6：formatter 自己處理 `null`（顯示「（未宣告）」），此處**不補值**。
+      //    與 `control_kind` 不同：本欄之混值不需另設 notes 欄——契約對
+      //    scenario ∈ {A,B,two_stage} 條件必填且批內同質，混值批在匯入層就被擋。
+      return EVENT_FIELD_FORMATTERS.label_origin(f.label_origin);
     case 'direction':
       return EVENT_FIELD_FORMATTERS.direction(f.direction ?? '（未宣告）');
     case 't0':

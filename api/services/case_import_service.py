@@ -1360,12 +1360,17 @@ class EventImportService:
         return values.pop() if len(values) == 1 else None
 
     def _batch_facts(self, recs: List[Dict[str, object]]) -> EventBatchFacts:
-        """Task 7.6 驗收①之**批次事實欄**（封閉五鍵；逐列欄按 `event_id` UTF-8 升冪）。"""
+        """Task 7.6 驗收①之**批次事實欄**（封閉**六**鍵；逐列欄按 `event_id` UTF-8 升冪）。
+
+        🔴 `label_origin` 由 `D-001` Task D1.6 加入，走**同一支** `_single_value`
+        （批內單值 ⇒ 該值；缺／混值 ⇒ None）——不為它另寫一份取值邏輯。
+        """
         rows = sorted(recs, key=lambda r: str(r.get("event_id")))
         return EventBatchFacts(
             scenario=self._single_value(recs, "scenario"),
             control_kind=self._single_value(recs, "control_kind"),
             direction=self._single_value(recs, "direction"),
+            label_origin=self._single_value(recs, "label_origin"),
             # 🔴 兩個陣列各自只帶自己那兩鍵：`t0` 之元素不得含 `label`，反之亦然
             #    （否則 t0 之 formatter 讀得到 label，欄位語意重疊；SPEC R11）。
             t0=[EventT0Row(event_id=str(r.get("event_id")), t0_ms=int(r.get("t0"))) for r in rows],

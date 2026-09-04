@@ -32,7 +32,7 @@
 </tr>
 <tr>
 <td><strong>在做第幾段</strong></td>
-<td><strong>第 1 段（B-D1）預測型</strong> — 7 個小任務中做完 4 個</td>
+<td><strong>第 1 段（B-D1）預測型</strong> — 7 個小任務中做完 6 個（只剩 D1.7）</td>
 </tr>
 <tr>
 <td><strong>卡住嗎</strong></td>
@@ -67,7 +67,7 @@
 <tr>
 <td><strong>第 1 段</strong></td>
 <td>預測型解灰：契約 provenance／支援矩陣／golden 擴充／前端解灰／IC 頁三種報酬選項</td>
-<td>🔧 <strong>進行中（4/7）</strong></td>
+<td>🔧 <strong>進行中（6/7）</strong></td>
 </tr>
 <tr>
 <td>第 3 段</td>
@@ -119,26 +119,28 @@
 </tr>
 <tr>
 <td>D1.5</td>
-<td><strong>前端 <code>/search</code> 解灰</strong>：讓你能選「預測型」和「開盤進場」；匯出時寫下答案來源與當時搜尋條件</td>
-<td>⬜ 下一個</td>
+<td><strong>前端 <code>/search</code> 解灰</strong>：可選「預測型」與「開盤進場」、三種報酬選項全開；匯出寫下答案來源；預設值改讀契約（不再硬寫）</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>D1.6</td>
-<td><strong>後端揭露</strong>：批次事實欄從五鍵擴到六鍵（多 <code>label_origin</code>）；分析時揭露「事件是否已知」</td>
-<td>⬜</td>
+<td><strong>後端揭露</strong>：批次事實欄五鍵→<strong>六鍵</strong>（多「答案來源」）；分析時揭露「事件在決策當下是否已知」</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>D1.7</td>
 <td><strong>IC 分析頁三種報酬選項</strong>：當根／續漲／持有，預設依你宣告的深度自動選</td>
-<td>⬜</td>
+<td>⬜ 下一個（本段最後一個）</td>
 </tr>
 </tbody>
 </table></div>
 <p><strong>目前已驗過的</strong>（每完成一個任務就實跑，不是「應該會過」）：</p>
 <ul>
-<li><code>pytest tests/momentum/event_samples/</code> → <strong>387 passed</strong>（含 D1.1 的 14 條與 D1.3／D1.4 的新測試）</li>
-<li><code>pytest tests/api -k &quot;contract_reason_registry or event_batch_detail_dims&quot;</code> → 25 passed</li>
+<li><code>pytest tests/momentum/event_samples/</code> → <strong>401 passed</strong></li>
+<li><code>pytest tests/api -k &quot;event_batch_detail_dims or event_analysis or horizon_purge or contract_reason_registry&quot;</code> → <strong>55 passed</strong></li>
+<li>前端 <code>npx vitest run</code> → <strong>69 檔 420 passed</strong></li>
 <li>golden <code>--check</code> → <strong>23/23 rc=0</strong></li>
+<li>解耦閘 <code>check_decoupling_imports.py</code> → <strong>無新增違反</strong></li>
 <li><strong>D1.3 關鍵對照</strong>：開放矩陣前後，凍結檔的數字<strong>逐位元組完全相同</strong> → 證明 D1.3 只是解除旗標、沒偷改任何值</li>
 <li><strong>破壞測試 8 種全紅、還原後全綠</strong>：故意把 short 不取負、答案窗位移一根、矩陣少一對、矩陣全開、
 「已知」欄改成看情境猜、三條契約規則各自拿掉 —— 每一種都被抓到</li>
@@ -151,6 +153,9 @@
 <ol>
 <li><strong>新規則弄紅 4 條既有測試</strong> — 這是規則生效的證明，不是 bug。逐條處理：混情境批次的拒收要讓既有規則先擋（不能被新規則蓋掉）、平台產生器批要補上自己的來源標記。<strong>沒有放寬任何規則</strong>。</li>
 <li><strong>我用 sed 全域取代誤傷兩個凍結檔</strong> — 把 <code>k=2</code> 那兩檔的「暫時放行旗標」一起關掉，它們就被凍成「全部算不出來」。從備份還原、精準改回，並在程式註解裡寫下警訊（重凍後看到「變動鍵＝events」就是出事了）。</li>
+<li><strong>我把票號寫進使用者看得到的說明文字</strong> — 有一條測試專門擋這個（你不該在畫面上看到施工票號），當場被抓。後端契約與前端鏡像一起改掉。</li>
+<li><strong>我在後端服務直接 import 核心模組</strong> — 解耦閘當場擋下（服務只能走出口函式）。改成經由既有的 pipeline 出口取值。</li>
+<li><strong>一句過期的錯誤訊息</strong> — 「目前只支援 (trigger_close, close_to_close, k=0)」在支援組合擴成四種之後就是<strong>錯的</strong>，你照它去改設定會改錯。改成由支援集合自動導出，並加一條測試釘住「訊息會跟著變」。</li>
 </ol>
 <hr />
 <h2 id="這一段的流程走到哪每批固定七步">這一段的流程走到哪（每批固定七步）</h2>
@@ -171,12 +176,12 @@
 <tr>
 <td>2</td>
 <td>實作七個任務＋每個新測試都做破壞驗證</td>
-<td>🔧 3/7</td>
+<td>🔧 6/7</td>
 </tr>
 <tr>
 <td>3</td>
 <td>golden 凍結檔全數通過</td>
-<td>🔧（D1.4 會擴充）</td>
+<td>✅ 23/23</td>
 </tr>
 <tr>
 <td>4</td>

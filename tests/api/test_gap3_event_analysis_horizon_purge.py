@@ -690,6 +690,8 @@ def test_event_analysis_horizon_purge_14abd_coverage_filter_semantics():
         allowed_event_ids=frozenset({"evA", "evB"}),
         purge_lower_bound_ms_by_symbol=(), prepared_token="tok",
         reason=None, direction_sign=1, entry_price_refs=refs,
+        # `D-001` D1.6：批內「事件於決策當下是否已知」之相異值集合（D2-2 下恆 False）。
+        event_known_at_decision_values=(False,),
     )
     # (a)(b)：剔除後之 allowed 就是後續 manifest／split 之唯一定義域
     kept = apply_event_coverage(base, frozenset({"evA"}))
@@ -747,3 +749,112 @@ def test_event_analysis_horizon_purge_12_decision_at_mapping_k3_vs_k0(monkeypatc
     p0, _ = prepared_for(0)
     for w in p0.windows:
         assert w.decision_at_ms == t0_by_id[w.event_id], "k=0 ⇒ decision_at 應等於 t0"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# `D-001` Task D1.6 — 分析揭露 `event_known_at_decision_values`
+# ══════════════════════════════════════════════════════════════════════════
+
+def test_event_analysis_d16_discloses_event_known_at_decision_values(monkeypatch):
+    """分析揭露 dict 須含 `event_known_at_decision_values`，D2-2 下為 `[False]`。
+
+    🔴 **不是恆 [False] 之斷言**：同時釘住「值來自對齊層而非本層寫死」——
+    比對同一批之 `prepared.event_known_at_decision_values`（該欄由 `align_events` 填），
+    並斷言**非空**（空代表對齊層漏寫，那是 loud 而不是正常值）。
+    🔴 **具名邊界**：D-001 D1.6 邊界② 寫「`supported=False` 時仍列本欄」，但該情境在本層
+    **結構上不可達**——`_run_event_label_stages` 於 `not result.supported` 時直接 `raise ValueError`
+    （Task 7.0b 之 fail-closed，早於揭露 dict 之組建）。要讓它可達必須改成「回帶 reason 的 dict」，
+    那是 7.0b 之錯誤契約變更、不在本票範圍。故本條只驗 `supported=True`，
+    並以 `…_d16_unsupported_spec_raises_with_matrix_text` 釘住不支援路徑之實際行為。
+    """
+    from api.services import ic_analysis_service as svc
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from tests.momentum.event_samples.helpers import load_bars, make_event
+
+    bars = load_bars("ETHUSDT", ("12h",))
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "bars_from_kline_cache",
+        staticmethod(lambda symbols, timeframes, **kw: bars),
+    )
+    # t0 取第 100／110 根：離資料起點足夠遠，k=3 之暖身不會失敗（本條要驗的是揭露欄，
+    # 不是暖身守衛——若因暖身全批失敗，`prepared` 會沒有 window 而本條變成空斷言）。
+    recs = [
+        make_event(0, t0=T0 + 100 * H12_MS, label=1, direction="long"),
+        make_event(1, t0=T0 + 110 * H12_MS, label=0, direction="long"),
+    ]
+
+    class _Req:
+        event_import_id = "imp-known"
+        event_timestamps = None
+        timeframe = "12h"
+        symbol = "ETHUSDT"
+
+    # D1.3 之四對皆 k=0；逐對驗揭露欄（不是只驗一組，否則「某一對忘了帶」測不出來）
+    for entry, mode in (("trigger_close", "close_to_close"), ("trigger_open", "close_to_close"),
+                        ("trigger_open", "open_to_close"), ("trigger_open", "open_to_horizon_close")):
+        batch = {
+            "records": recs,
+            "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": entry,
+                                 "label_return_mode": mode, "decision_offset_bars": 0},
+            "lookahead_bars_declared": {"12h": 0},
+        }
+        out = svc.ICAnalysisService._run_event_label_stages(
+            _Req(), batch,
+            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+            meta_path=None,
+        )
+        tag = f"({entry}, {mode})"
+        assert out["prepared"].windows, f"{tag}：須有 window，否則下面之斷言為空"
+        vals = out["event_known_at_decision_values"]
+        assert vals, f"{tag}：揭露欄不得為空（空＝對齊層漏寫，須 loud）"
+        assert vals == [False], f"{tag}：D2-2 單一表示法下恆為 False"
+        # 🔴 值須與 prepared 上的同一欄相等——證明本層只投影、沒有第二份計算
+        assert vals == list(out["prepared"].event_known_at_decision_values)
+        assert out["prepared"].supported is True
+
+
+def test_event_analysis_d16_unsupported_spec_raises_with_matrix_text(monkeypatch):
+    """不支援之組合 ⇒ `ValueError`，訊息之支援域字面**由 `SUPPORTED_MATRIX` 導出**。
+
+    🔴 原本那句寫死「F-1′ 支援矩陣為 (trigger_close, close_to_close, k=0)」，
+    D1.3 把矩陣擴成四對後就成了**過期的錯誤訊息**——使用者照它去改設定會改錯。
+    本條釘住「訊息隨矩陣變」：斷言四對全部出現在訊息裡，且不再出現舊那句寫死字面。
+    """
+    from api.services import ic_analysis_service as svc
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from tests.momentum.event_samples.helpers import load_bars, make_event
+
+    bars = load_bars("ETHUSDT", ("12h",))
+    monkeypatch.setattr(
+        pipeline_mod.EventSamplePipeline, "bars_from_kline_cache",
+        staticmethod(lambda symbols, timeframes, **kw: bars),
+    )
+    recs = [
+        make_event(0, t0=T0 + 100 * H12_MS, label=1, direction="long"),
+        make_event(1, t0=T0 + 110 * H12_MS, label=0, direction="long"),
+    ]
+
+    class _Req:
+        event_import_id = "imp-unsup"
+        event_timestamps = None
+        timeframe = "12h"
+        symbol = "ETHUSDT"
+
+    batch = {
+        "records": recs,
+        # k=3 不在 D1 矩陣內（k>0 留 D4.2）
+        "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": "trigger_close",
+                             "label_return_mode": "close_to_close", "decision_offset_bars": 3},
+        "lookahead_bars_declared": {"12h": 0},
+    }
+    with pytest.raises(ValueError) as ei:
+        svc.ICAnalysisService._run_event_label_stages(
+            _Req(), batch,
+            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+            meta_path=None,
+        )
+    msg = str(ei.value)
+    for pair in ("(trigger_close, close_to_close, k=0)", "(trigger_open, close_to_close, k=0)",
+                 "(trigger_open, open_to_close, k=0)", "(trigger_open, open_to_horizon_close, k=0)"):
+        assert pair in msg, f"錯誤訊息須列出 {pair}"
+    assert "F-1′ 支援矩陣為 (trigger_close, close_to_close, k=0)" not in msg, "舊寫死字面須已移除"

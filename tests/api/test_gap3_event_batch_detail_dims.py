@@ -1,7 +1,8 @@
 """GAP-3 UX Task 7.6 驗收（`-k event_batch_detail_dims`）：事件批 detail 之**批次事實欄**。
 
 SPEC L3133–3140 之①②③：
-- ① 批次事實欄鍵集**集合相等**於 `{scenario, control_kind, direction, t0, label}`
+- ① 批次事實欄鍵集**集合相等**於 `{scenario, control_kind, direction, label_origin, t0, label}`
+  （🔴 `label_origin` 由 `D-001` Task D1.6 於 2026-09-04 加入，覆寫原五鍵）
   （🔴 明列鍵名、不用計數字面——R4 版寫「含六個鍵」，維度六改五時該字面沒同步，三家全員命中）；
   並驗 R11 定死之 wire shape：三個 scalar ＋ 兩個各自兩鍵之陣列、`event_id` 集合相等且升冪。
 - ② detail **另含** F-0 種子三鍵，且**不**計入①之集合相等。
@@ -23,7 +24,10 @@ from tests.momentum.event_samples.test_import_contract import canonical_event as
 client = TestClient(app)
 
 #: SPEC Task 7.6 三分表之**批次事實欄**封閉集合（本檔唯一一份字面；驗收①明令列鍵名）
-BATCH_FACT_KEYS = {"scenario", "control_kind", "direction", "t0", "label"}
+#: 批次事實欄之封閉鍵集。
+#: 🔴 `D-001` Task D1.6（2026-09-04）**覆寫** Task 7.6 之原五鍵：加入 `label_origin`。
+#: 集合相等**未放寬**——少一鍵（`response_model` 漏宣告而被靜默過濾）或多一鍵皆紅。
+BATCH_FACT_KEYS = {"scenario", "control_kind", "direction", "t0", "label", "label_origin"}
 #: 批次宣告種子（F-0）三鍵
 SEED_KEYS = {"entry_price_semantic", "label_return_mode", "decision_offset_bars"}
 
@@ -48,11 +52,16 @@ def _detail(import_id: str) -> dict:
 
 
 def test_event_batch_detail_dims_01_fact_keyset_is_exactly_five(_isolated_storage):
-    """①(a) 批次事實欄鍵集集合相等於五鍵；三個 scalar 欄為 scalar。"""
+    """①(a) 批次事實欄鍵集集合相等於**六**鍵；三個 scalar 欄為 scalar。
+
+    🔴 `D-001` D1.6：`label_origin` 為第六鍵。本 fixture 是 `scenario=C` 之**舊批形態**
+    （不帶 `label_origin`）⇒ 該欄須為 `None`（不補值、不猜），這正是舊批通則。
+    """
     d = _detail(_import([make_event(i, label=i % 2) for i in range(3)]))
     assert set(d["batch_facts"].keys()) == BATCH_FACT_KEYS
     for key in ("scenario", "control_kind", "direction"):
         assert isinstance(d["batch_facts"][key], str), f"{key} 須為 scalar"
+    assert d["batch_facts"]["label_origin"] is None, "舊批（C 且無宣告）須回 null"
 
 
 def test_event_batch_detail_dims_02_row_arrays_shape_and_order(_isolated_storage):
@@ -153,3 +162,46 @@ def test_event_batch_detail_dims_07_single_control_kind_is_not_nulled(_isolated_
     d = _detail(_import([make_event(i, label=i % 2) for i in range(3)]))
     assert d["batch_facts"]["control_kind"] == "user_labeled_same_trigger"
     assert d["batch_fact_notes"]["control_kind_values"] == ["user_labeled_same_trigger"]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# `D-001` Task D1.6 — label_origin 入批次事實六鍵；分析揭露 event_known_at_decision
+#
+# 選擇器：`pytest tests/api -q -k "event_batch_detail_dims or event_known"`
+# ══════════════════════════════════════════════════════════════════════════
+
+def test_event_batch_detail_dims_d16_label_origin_scalar_round_trip(_isolated_storage):
+    """(i) 宣告了 `label_origin` 之批 ⇒ detail 回**同一個 scalar**（不是陣列、不是猜測值）。"""
+    recs = [
+        make_event(i, label=i % 2, scenario="B", label_origin="user_csv",
+                   lookahead_bars_declared={"12h": 2})
+        for i in range(3)
+    ]
+    d = _detail(_import(recs))
+    assert set(d["batch_facts"].keys()) == BATCH_FACT_KEYS
+    assert d["batch_facts"]["label_origin"] == "user_csv"
+    assert isinstance(d["batch_facts"]["label_origin"], str), "須為 scalar，不得以陣列冒充"
+
+
+def test_event_batch_detail_dims_d16_label_origin_null_for_legacy_batch(_isolated_storage):
+    """(ii) 舊批（`scenario=C`、無宣告）⇒ `label_origin is None`。
+
+    🔴 **不補值**是通則：補一個值等於替使用者宣告 provenance。
+    """
+    d = _detail(_import([make_event(i, label=i % 2) for i in range(2)]))
+    assert d["batch_facts"]["label_origin"] is None
+
+
+def test_event_batch_detail_dims_d16_label_origin_not_in_declaration_seeds(_isolated_storage):
+    """🔴 `label_origin` 是**事實**不是**參數**：不得出現在分析參數區之種子裡。
+
+    沒有這條，把它誤放進 `declaration_seeds` 會讓 IC 頁把它顯示成「可改的參數」。
+    """
+    recs = [
+        make_event(i, label=i % 2, scenario="B", label_origin="user_csv",
+                   lookahead_bars_declared={"12h": 2})
+        for i in range(2)
+    ]
+    d = _detail(_import(recs))
+    assert "label_origin" not in d["declaration_seeds"]
+    assert set(d["declaration_seeds"].keys()) == SEED_KEYS

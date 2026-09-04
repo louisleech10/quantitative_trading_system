@@ -318,6 +318,19 @@ class EventSamplePipeline:
         )
 
     @staticmethod
+    def supported_matrix_text() -> str:
+        """§F-1′ 支援矩陣之**人可讀字面**（`G3-D2` D1.3 之 R3 出口）。
+
+        🔴 為什麼要有這個出口：`api/` 不得 import `momentum`（Rule 3；
+        `scripts/check_decoupling_imports.py` 會當場擋）。而錯誤訊息若在 `api/` 手寫
+        支援域字面，矩陣一擴充那句就過期——使用者照著過期訊息去改設定會改錯。
+        本函式回字串而非集合：呼叫端只需要顯示，不需要判定（判定一律走 `spec_is_supported`）。
+        """
+        from momentum.Analysis.event_samples.label_value_from_case import SUPPORTED_MATRIX
+
+        return "、".join(f"({e}, {m}, k={k})" for e, m, k in sorted(SUPPORTED_MATRIX))
+
+    @staticmethod
     def project_purge(purge_rows) -> Mapping[str, int]:
         """Task 7.0b 階段 4 之 R3 出口：`tuple[SymbolPurgeRow, ...]` → read-only `Mapping[str,int]`。
 

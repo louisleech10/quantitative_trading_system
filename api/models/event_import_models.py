@@ -109,11 +109,15 @@ class EventLabelRow(BaseModel):
 
 
 class EventBatchFacts(BaseModel):
-    """Task 7.6 三分表之**批次事實欄**（封閉五鍵；IC 分析頁**唯讀**揭露對象）。
+    """Task 7.6 三分表之**批次事實欄**（封閉**六**鍵；IC 分析頁**唯讀**揭露對象）。
 
-    🔴 鍵集**恰為** `{scenario, control_kind, direction, t0, label}`——驗收①之集合相等對象。
+    🔴 鍵集**恰為** `{scenario, control_kind, direction, t0, label, label_origin}`——
+       驗收①之集合相等對象。`label_origin` 由 `D-001` Task D1.6 **覆寫**原五鍵封閉集合。
     🔴 `t0`／`label` 為**逐列**陣列（按 `event_id` UTF-8 升冪），**禁止**以 scalar 冒充整批
        （只回第一列或 `min(t0)` 皆屬此禁）。
+    🔴 **`response_model` 會過濾未宣告之欄**：這裡漏加一個欄位，端點就靜默丟掉它，
+       而前端只會看到「沒有這個欄」——所以 `tests/api -k event_batch_detail_dims` 的
+       鍵集相等那條是承重測試，不是裝飾。
     """
 
     scenario: Optional[str] = Field(None, description="批內單值；Task 1.8 對本欄強制同質")
@@ -127,6 +131,16 @@ class EventBatchFacts(BaseModel):
         ),
     )
     direction: Optional[str] = Field(None, description="批內單值；決定 short 取負，**不可**在 IC 頁修改")
+    label_origin: Optional[str] = Field(
+        None,
+        description=(
+            "這批的答案是**怎麼來的**（provenance）。批內單值 ⇒ 該值；"
+            "**批內 distinct > 1 或缺 ⇒ null**（與 control_kind 同一處理，禁多數決）。"
+            "🔴 舊批（scenario=C 且無此欄）回 null 是**通則**，不是為某幾批開的例外；"
+            "前端顯示「（未宣告）」而非猜測值。"
+            "🔴 本欄**不得**進 `event_label_spec`，也不可在 IC 頁修改——它是事實不是參數。"
+        ),
+    )
     t0: List[EventT0Row] = Field(default_factory=list)
     label: List[EventLabelRow] = Field(default_factory=list)
 

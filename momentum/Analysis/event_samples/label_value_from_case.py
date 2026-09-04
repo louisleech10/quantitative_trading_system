@@ -213,6 +213,15 @@ class PreparedAnalysisWindows:
     #  用 close 取價會**靜默**取到 t₀−1 的收盤價（別名錯價，值合法故不會紅）。
     #  🔴 **無預設值**：預設空 tuple 會讓「忘了傳」在 `open_to_*` 下靜默變成全 None。
     entry_price_refs: Tuple[EntryPriceRef, ...]
+    #: 🔴 **`D-001` D1.6**（第十二欄）：本批 `event_known_at_decision` 之**相異值集合**（已排序）。
+    #  D2-2 單一表示法下恆為 `(False,)`——但**照實帶**，不是寫死：
+    #  它是揭露欄的資料來源（IC 分析頁要告訴使用者「這批事件在決策當下都還沒發生」）。
+    #
+    #  🔴 為什麼掛在這裡而不是讓服務層自己算：服務層拿不到 `align_events` 的收據
+    #  （`PreparedAnalysisWindows` 是唯一跨界型別，見檔頭 R3 具名例外），要它自己算
+    #  就得在 `api/` 重寫一次 `decision_at >= ct[t0_idx]` ⇒ 第二份實作、必然漂移。
+    #  🔴 **不進 `_receipt_hash`**（`D-001` D1.2 明文）：本欄是 D2-2 的恆等式，不是批次身分。
+    event_known_at_decision_values: Tuple[bool, ...]
 
 
 @dataclass(frozen=True)
@@ -375,6 +384,19 @@ def _refs_from_receipts(event_level: pd.DataFrame) -> Tuple[EntryPriceRef, ...]:
         for r in event_level.to_dict("records")
     ]
     return tuple(sorted(rows, key=lambda e: e.event_id.encode("utf-8")))
+
+
+def _known_at_decision_values(event_level: pd.DataFrame) -> Tuple[bool, ...]:
+    """`event_level` → `event_known_at_decision` 之**相異值集合**（`False` 在前）。
+
+    🔴 **只搬不算**：值由 `align_events` 寫入，本函式不重算 `decision_at >= ct[t0_idx]`。
+    🔴 欄位不存在 ⇒ 回**空 tuple**（不是 `(False,)`）：空與 `(False,)` 語意不同——
+       前者是「這批沒有這項事實」，後者是「這批全部為 False」。填 `(False,)` 會讓
+       「對齊層忘了寫這一欄」看起來像正常結果。
+    """
+    if "event_known_at_decision" not in event_level.columns:
+        return ()
+    return tuple(sorted({bool(v) for v in event_level["event_known_at_decision"].tolist()}))
 
 
 def _per_tf_from_receipts(per_tf: pd.DataFrame) -> Tuple[PerTfRow, ...]:
@@ -552,6 +574,7 @@ def prepare_analysis_windows(
     )
     windows = _windows_from_receipts(receipts.event_level)
     entry_price_refs = _refs_from_receipts(receipts.event_level)
+    known_values = _known_at_decision_values(receipts.event_level)
     per_tf = _per_tf_from_receipts(receipts.per_tf)
     purge_rows = purge_lower_bound_rows(
         windows,
@@ -580,6 +603,7 @@ def prepare_analysis_windows(
         reason=None if supported else UNSUPPORTED_REASON,
         direction_sign=direction_sign,
         entry_price_refs=entry_price_refs,
+        event_known_at_decision_values=known_values,
     )
 
 

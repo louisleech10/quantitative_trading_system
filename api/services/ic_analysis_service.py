@@ -419,9 +419,14 @@ class ICAnalysisService:
             prepared1, bars_by_tf, event_label_spec=spec,
         )
         if not result.supported:
+            # 🔴 支援域字面**不在此硬寫**（`G3-D2` D1.3）：原本寫死
+            #    「(trigger_close, close_to_close, k=0)」，D1.3 把矩陣擴成四對之後那句就是
+            #    **過期的錯誤訊息**——使用者照它去改設定會改錯。
+            #    🔴 走 pipeline 之 R3 出口取字面，**不直接 import `momentum`**
+            #    （`scripts/check_decoupling_imports.py` 當場擋下過一次，不是推測）。
             raise ValueError(
                 f"事件分析不支援本批之報酬語意（reason={result.reason}）"
-                "——F-1′ 支援矩陣為 (trigger_close, close_to_close, k=0)"
+                f"——目前支援之組合：{pipeline.supported_matrix_text()}"
             )
         # 🔴 **對齊後一個窗都不剩 ⇒ loud**（`CODEX-R1-P1-03`）：靜默出一張空表，
         #    使用者會看到一份「分析完成但什麼都沒有」的報告，而真正的原因是全批對齊失敗。
@@ -504,6 +509,10 @@ class ICAnalysisService:
             "purge": purge,
             "analysis_alignment_receipt_hash": prepared1.analysis_alignment_receipt_hash,
             "prepared_token": prepared1.prepared_token,
+            # 🔴 `G3-D2` D1.6：批內「事件於決策當下是否已知」之相異值集合。
+            #    值由對齊層機械導出（`decision_at >= t₀ close`），本層**只投影不重算**。
+            #    D2-2 單一表示法下恆為 `[False]`；空清單代表對齊層沒寫這欄（loud，非正常值）。
+            "event_known_at_decision_values": list(prepared1.event_known_at_decision_values),
         }
 
     async def start_analysis(
