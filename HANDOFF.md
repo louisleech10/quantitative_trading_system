@@ -18,9 +18,9 @@ R3 brief 須逐條列「原 finding → 修法 → 對應新測試 → 請原提
 | `CODEX-R2-P1-01`＋`COMPOSER-R2-P1-01`＋`GROK-R2-P2-01`（三家全員）：`label_origin` 混值／部分宣告可落檔 | 加入 `_ALWAYS_HOMOGENEOUS_DIMENSIONS`（無條件組，非 Task 1.8 旗標組） | `test_import_contract.py -k r2_closure` |
 | `CODEX-R2-P1-02`：混 `decision_offset_bars` 取首列套全批 | route 422 `mixed_decision_offset_bars` | `tests/api -k ic_event_label_defaults` |
 | `CODEX-R2-P1-03`：D1.7 依深度預設不可達（hook 明送常數） | 未設定時整個鍵省略；「當根」h disabled | 同上＋`icEventBatchDisclosure.test.tsx` |
-| `CODEX-R2-P2-01`：`--check` 不驗 selector drift | `--check` 逐檔對證 `resolved_cases` | `scripts/gap3_label_golden.py --check` |
+| `CODEX-R2-P2-01`＋`COMPOSER-R2-P2-03`（同一機制兩面：後者為 `tail_mixed` 之 `ot[len-3]` 隨 cache 漂移）：`--check` 不驗 selector drift | `--check` 逐檔對證 `resolved_cases` | `scripts/gap3_label_golden.py --check` |
 | `COMPOSER-R2-P2-01`＋`GROK-R2-P2-02`：裁定 1 在旗標 False 時落空 | `_batch_scenario_mixed = enforce_batch_homogeneity and mixed` | `-k r2_closure_new_rules_apply_when_homogeneity_not_enforced` |
-| `GROK-R2-P2-03`：裁定 5「UI 比矩陣嚴」無測試釘住 | 加負例＋釘住 preset 恰三個 | `icEventBatchDisclosure.test.tsx` 裁定 5 段 |
+| `GROK-R2-P2-03`＋`COMPOSER-R2-P2-02`（後者為反向：矩陣擴充而 preset 未跟進亦不紅 ⇒ 僅修正向，反向登記殘留 `B1-PRESET-1`）：裁定 5「UI 比矩陣嚴」無測試釘住 | 加負例＋釘住 preset 恰三個 | `icEventBatchDisclosure.test.tsx` 裁定 5 段 |
 
 **R2 已完整收斂**（2026-09-04 補做，勿重做）：`handoffs/reconcile/20260904-gap3d2-b1-review-r2/synth.md`
 六群集＋三條具名殘留（`B1-PRESET-1`／`B1-GOLDEN-2`／`B1-VERIFY-1`）；

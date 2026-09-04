@@ -99,6 +99,16 @@ export default function EventBatchDisclosurePanel({
   // （UI 顯示警示、送出守衛會擋）。**不自動改寫使用者的 spec**——靜默改值會讓
   // 「我明明選了 X」變成「送出的是 Y」。
   const currentPreset = returnMeasurePresetOf(spec.entry_price_semantic, spec.label_return_mode);
+  // 🔴 **R3 準備期自查**：`CODEX-R2-P1-03` 之修法（未設定時省略整個 `event_label_spec` 鍵）
+  //    使「使用者還沒選」也落到 `currentPreset === undefined`，於是畫面顯示紅字
+  //    「送出會被擋下」——**但送出守衛只在 `config.event_label_spec` 為真時才跑**
+  //    （`useICAnalysis.ts` 之條件），未設定時送得出去且後端會依宣告深度導出預設。
+  //    ⇒ 顯示與事實相反。兩種狀態必須分開：
+  //      ① 沒選（`labelSpec === undefined`）＝合法，交給後端導出 → 中性提示；
+  //      ② 選了非 preset 的組合＝真的會被擋 → 紅字警示。
+  //    **刻意不在此依宣告深度算出預設**：那會是後端 D1.7 規則的第二份實作，
+  //    兩份會漂（正是本票一路在防的「兩端都有、但沒接上」之反面）。
+  const userChoseSpec = labelSpec !== undefined;
 
   if (error) {
     return (
@@ -185,10 +195,16 @@ export default function EventBatchDisclosurePanel({
               </label>
             );
           })}
-          {currentPreset === undefined && (
+          {currentPreset === undefined && userChoseSpec && (
             <span className="mt-1 block text-[11px] text-rose-300" data-testid="ic-param-return-measure-invalid">
               目前的組合（{spec.entry_price_semantic ?? '?'} / {spec.label_return_mode ?? '?'}）
               不是可分析的量法，送出會被擋下——請選上面三種其中一種。
+            </span>
+          )}
+          {currentPreset === undefined && !userChoseSpec && (
+            <span className="mt-1 block text-[11px] text-slate-400" data-testid="ic-param-return-measure-unset">
+              尚未選擇報酬量法 ⇒ 送出時由後端依**這批宣告的深度**導出（不會被擋下）。
+              要指定就點上面三種其中一種。
             </span>
           )}
         </fieldset>

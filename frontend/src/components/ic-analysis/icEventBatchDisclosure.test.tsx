@@ -470,3 +470,32 @@ describe('B-D1 R2 閉合 — GROK-R2-P2-03：裁定 5「UI 比支援矩陣嚴」
     expect(RETURN_MEASURE_PRESETS).toHaveLength(3);
   });
 });
+
+describe('B-D1 R3 準備期自查 — 「還沒選」與「選了非法組合」不得共用同一個紅字', () => {
+  it('🔴 `labelSpec` 未設定 ⇒ **不**顯示「送出會被擋下」，改顯示中性提示', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+      />,
+    );
+    // 修正前：這裡是紅字「送出會被擋下」——而 `useICAnalysis` 的守衛在 spec 未設定時
+    // 根本不跑，送得出去且後端會依宣告深度導出預設 ⇒ **畫面與事實相反**。
+    expect(screen.queryByTestId('ic-param-return-measure-invalid')).toBeNull();
+    expect(screen.getByTestId('ic-param-return-measure-unset')).toBeTruthy();
+  });
+
+  it('🔴 over 向：使用者**選了**非 preset 的組合 ⇒ 紅字照舊、不得退化成中性提示', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} onChangeLabelSpec={() => {}}
+        labelSpec={{
+          horizon_bars: 1,
+          entry_price_semantic: 'trigger_close',
+          label_return_mode: 'open_to_close',   // 幾何窗長 0，矩陣外
+        }}
+      />,
+    );
+    expect(screen.getByTestId('ic-param-return-measure-invalid')).toBeTruthy();
+    expect(screen.queryByTestId('ic-param-return-measure-unset')).toBeNull();
+  });
+});
