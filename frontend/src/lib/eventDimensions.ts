@@ -57,6 +57,8 @@ export interface EventDimContractNode {
   rejected_with_reason?: Readonly<Record<string, string>>;
   type?: string;
   min?: number;
+  /** `G3-D2` D1.5：誠實預設之唯一來源（前端禁硬編字面）。見 `contractDefault()`。 */
+  default?: string;
 }
 
 /**
@@ -75,11 +77,17 @@ export const EVENT_DIM_CONTRACT_MIRROR = {
     },
     entry_price_semantic: {
       enum: ['trigger_open', 'trigger_close', 'next_open', 'decision_bar_open', 'decision_bar_close'],
+      // 🔴 `G3-D2` D1.5：鏡像同步契約之 `default`（原檔 §F-3′ 誠實預設之唯一來源）。
+      //    漂移由 `eventContractOptions.test.tsx` 逐鍵比對真契約守住。
+      default: 'trigger_close',
     },
     decision_offset_bars: { type: 'int', min: 0 },
     label_definition: {
       fields: {
-        label_return_mode: { enum: ['open_to_close', 'open_to_horizon_close', 'close_to_close'] },
+        label_return_mode: {
+          enum: ['open_to_close', 'open_to_horizon_close', 'close_to_close'],
+          default: 'close_to_close',
+        },
       },
     },
   },
@@ -139,28 +147,60 @@ const F5_REASON = '該值宣告後，分析層本批不支援以其計算 label_
  * 🔴 新增或移除排除**只能改本常數**並同步 SPEC；散在元件裡的 `if` 是第二份副本。
  */
 export const EVENT_DIM_PATH_EXCLUSIONS: Readonly<Record<string, EventDimExclusion>> = {
+  // 🔴 `G3-D2` D1.5（2026-09-04）：`B` 解灰。`A` 仍排除但**理由改了**——
+  //    它不是「未交付」，而是**已併入 `B`**（裁定① 2026-09-03）：有無用未來根
+  //    由 `lookahead_bars_declared` 之深度宣告區分，不由 scenario 值區分。
   '/search|scenario': {
-    values: ['A', 'B', 'two_stage'],
-    reason: '此路徑之 label 由 t0 條件產生（eventExport.ts 以 positive_case 判定）；'
-      + 'A／B／two_stage 為預測型，事件在未來，需獨立之 label producer 與 provenance，本批未交付',
+    values: ['A', 'two_stage'],
+    reason: 'A 已併入預測型（B）；有無用未來根由深度宣告（lookahead_bars_declared）區分，'
+      + '不由 scenario 值區分（裁定① 2026-09-03）。two_stage 之兩段式 label 路徑於 Phase D3 交付',
   },
+  // 🔴 D1.5：`trigger_open` 自排除集合**移除**（＝解灰為可選）。
+  //    其餘三值留待 D4.2（全矩陣＋成對可行域）。
   '/search|entry_price_semantic': {
-    values: ['trigger_open', 'next_open', 'decision_bar_open', 'decision_bar_close'],
+    values: ['next_open', 'decision_bar_open', 'decision_bar_close'],
     reason: F5_REASON,
   },
+  // 🔴 D1.5：兩個 `open_to_*` 皆移除（三種報酬選項；取價修法已於 B-D0 落地）。
+  //    ⇒ `/search|label_return_mode` 已無任何排除值，但**保留鍵並置空**而非刪鍵：
+  //    刪鍵會讓「這個 (path, dim) 從未被考慮過」與「考慮過且結論是全開」在碼上無從區分。
   '/search|label_return_mode': {
-    values: ['open_to_close', 'open_to_horizon_close'],
+    values: [],
     reason: F5_REASON,
   },
   '/ic-analysis|entry_price_semantic': {
-    values: ['trigger_open', 'next_open', 'decision_bar_open', 'decision_bar_close'],
+    values: ['next_open', 'decision_bar_open', 'decision_bar_close'],
     reason: F5_REASON,
   },
   '/ic-analysis|label_return_mode': {
-    values: ['open_to_close', 'open_to_horizon_close'],
+    values: [],
     reason: F5_REASON,
   },
 };
+
+/**
+ * `G3-D2` D1.5：某維度之**契約宣告預設值**（誠實預設之唯一來源）。
+ *
+ * 🔴 取不到 ⇒ **拋錯，不回退任何字面**。回退等於在前端造出第二份預設值：
+ * 契約把 `default` 從 `trigger_close` 改成別的，UI 會安靜地繼續用舊值，
+ * 而那個舊值仍是合法枚舉 ⇒ 沒有任何測試會紅。這正是本函式取代硬編碼字面的理由。
+ *
+ * 🔴 同時驗 `default ∈ enum/accepted`：契約寫了枚舉外之預設 ⇒ 當場炸，不讓它傳到 UI。
+ */
+export function contractDefault(
+  dim: EnumEventDimension, contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
+): string {
+  const node = dimContractNode(contract, dim);
+  const value = node?.default;
+  if (typeof value !== 'string' || value === '') {
+    throw new Error(`契約之 ${dim} 缺 default（路徑 ${EVENT_DIM_CONTRACT_PATHS[dim].join('.')}.default）`);
+  }
+  const allowed = node?.accepted ?? node?.enum ?? [];
+  if (!allowed.includes(value)) {
+    throw new Error(`契約之 ${dim}.default=${value} 不在其 accepted/enum 內`);
+  }
+  return value;
+}
 
 /** 組出 `EVENT_DIM_PATH_EXCLUSIONS` 之鍵；鍵格式集中在此，避免各處手拼字串。 */
 export function exclusionKey(path: EventDimPath, dim: EventDimension): string {

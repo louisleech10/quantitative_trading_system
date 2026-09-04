@@ -75,7 +75,7 @@
       "type": "str",
       "enum": ["search_positive_case", "user_csv", "platform_generator", "platform_random", "search_unlabeled"],
       "not_importable": ["search_unlabeled"],
-      "doc": "GAP-3 `G3-D2` D1.1：label 之 provenance（這批的答案是怎麼來的）。search_positive_case=/search 匯出之正例；user_csv=使用者自標 CSV；platform_generator=平台產生器；platform_random=隨機對照組（D5）；search_unlabeled=/search 之未標籤匯出（**不可匯入**，只走 two_stage 之未標籤路徑，D3.1）。🔴 值屬 not_importable ⇒ label_origin_not_importable；scenario ∈ {A,B,two_stage} 而缺本欄 ⇒ conditional_required_missing。**舊批（scenario=C 且無本欄）不受條件必填約束、不補值**，讀路徑回 null"
+      "doc": "label 之 provenance（這批的答案是怎麼來的）。search_positive_case=搜尋頁匯出之正例；user_csv=使用者自標 CSV；platform_generator=平台產生器；platform_random=隨機對照組；search_unlabeled=搜尋頁之未標籤匯出（**不可匯入**，只走 two_stage 之未標籤路徑）。🔴 值屬 not_importable ⇒ label_origin_not_importable；scenario ∈ {A,B,two_stage} 而缺本欄 ⇒ conditional_required_missing。**舊批（scenario=C 且無本欄）不受條件必填約束、不補值**，讀路徑回 null"
     },
     "search_rule_summary": { "type": "str", "doc": "U2 當時搜尋條件摘要" },
     "event_source": { "type": "str" },

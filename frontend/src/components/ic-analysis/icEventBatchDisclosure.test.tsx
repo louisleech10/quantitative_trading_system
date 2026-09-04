@@ -111,8 +111,13 @@ describe('Task 7.6 ③⑤ — 唯讀 vs 可設定', () => {
         expect(screen.getByTestId(`ic-param-blocked-${dim}-${o.value}`).textContent).toContain(o.title);
       }
     }
-    expect(new Set(selectable('/ic-analysis', 'entry_price_semantic'))).toEqual(new Set(['trigger_close']));
-    expect(new Set(selectable('/ic-analysis', 'label_return_mode'))).toEqual(new Set(['close_to_close']));
+    // 🔴 `G3-D2` D1.5（2026-09-04）：`trigger_open` 與兩個 `open_to_*` 解灰
+    //    ⇒ 由「各一值」變成 D1 之支援域投影。集合相等**未放寬**：
+    //    多解灰任一值（例如 `next_open`，那要等 D4.2）仍會紅。
+    expect(new Set(selectable('/ic-analysis', 'entry_price_semantic')))
+      .toEqual(new Set(['trigger_open', 'trigger_close']));
+    expect(new Set(selectable('/ic-analysis', 'label_return_mode')))
+      .toEqual(new Set(['open_to_close', 'open_to_horizon_close', 'close_to_close']));
     // `k` 之可輸入範圍鎖定（§F-1′ 之 k=0）
     const k = screen.getByTestId('ic-param-decision-offset-bars') as HTMLInputElement;
     expect(k.min).toBe('0');

@@ -241,13 +241,17 @@ describe('Task 7.2 路徑對照 — 同一維度之限制只在該路徑成立',
     expect(ui.length).toBeGreaterThan(selectable('/search', 'scenario', CONTRACT).length);
   });
 
-  it('🔴 over：`entry_price_semantic` 於 /data-preparation 為契約 enum 全集，/search 只剩 F-1′ 之一值', () => {
+  it('🔴 over：`entry_price_semantic` 於 /data-preparation 為契約 enum 全集，/search 為 D1 之兩值', () => {
     renderPath('/data-preparation', true);
     const prep = enabledOptionValues('event-dim-entry_price_semantic');
     expect(new Set(prep)).toEqual(new Set(acceptedValues('entry_price_semantic', CONTRACT)));
     cleanup();
     renderPath('/search');
-    expect(enabledOptionValues('event-dim-entry_price_semantic')).toEqual(['trigger_close']);
+    // 🔴 `G3-D2` D1.5：`trigger_open` 解灰 ⇒ 由一值變兩值。
+    //    **順序沿用契約 enum 順序**（`selectable` 不另排），故 trigger_open 在前。
+    //    仍為**嚴格相等**（非 toContain）：其餘三值若被誤解灰，本條照樣紅。
+    expect(enabledOptionValues('event-dim-entry_price_semantic'))
+      .toEqual(['trigger_open', 'trigger_close']);
   });
 });
 

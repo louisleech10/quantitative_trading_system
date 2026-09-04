@@ -48,6 +48,18 @@ export const EVENT_FIELD_FORMATTERS = {
   decision_offset_bars: (v: number): string =>
     `決策位移（decision_offset_bars）＝ ${v} 根 — ${EVENT_CONTRACT_DOCS.decision_offset_bars}`,
 
+  /**
+   * `G3-D2` D1.5／D1.6：`label_origin`＝這批的答案是**怎麼來的**（provenance）。
+   *
+   * 🔴 批次事實欄，scalar（批內常數；異質 ⇒ Task 1.8 既有拒收）。
+   * 🔴 **舊批可能沒有這一欄** ⇒ 傳 `null`／`undefined` 時顯示「（未宣告）」而**不是**空字串或猜測值：
+   *    猜一個值等於替使用者宣告 provenance，那正是本欄要防的事。
+   */
+  label_origin: (v: string | null | undefined): string => {
+    const shown = (typeof v === 'string' && v !== '') ? v : '（未宣告）';
+    return `答案來源（label_origin）＝ ${shown} — ${EVENT_CONTRACT_DOCS.label_origin}`;
+  },
+
   /** 批次事實欄（Task 7.6）：批內單值，異質即 Task 1.8 拒收 ⇒ scalar。 */
   direction: (v: string): string =>
     `方向（direction）＝ ${v}——它決定 short 取負，是批次事實，不可在分析頁改`,

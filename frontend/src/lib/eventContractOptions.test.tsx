@@ -21,6 +21,7 @@ import {
   type EventDimPath,
   acceptedValues,
   contractDecisionOffsetMin,
+  contractDefault,
   dimContractNode,
   selectable,
 } from '@/lib/eventDimensions';
@@ -144,15 +145,49 @@ describe('Task 7.1 ⑨ — EVENT_DIM_PATH_EXCLUSIONS 之內容（集合相等，
     const actual = Object.fromEntries(
       Object.entries(EVENT_DIM_PATH_EXCLUSIONS).map(([k, v]) => [k, new Set(v.values)]),
     );
+    // 🔴 `G3-D2` D1.5（2026-09-04）：`B`／`trigger_open`／兩個 `open_to_*` 解灰。
+    //    集合相等**未放寬**——多排除或少排除任一值仍會紅（本條之防偽價值就在此）。
+    //    `/search|label_return_mode` 與 `/ic-analysis|label_return_mode` 之值集合現為**空**，
+    //    但鍵保留（刪鍵會讓「從未考慮過」與「考慮過且全開」在碼上無從區分）。
     expect(actual).toEqual({
-      '/search|scenario': new Set(['A', 'B', 'two_stage']),
+      '/search|scenario': new Set(['A', 'two_stage']),
       '/search|entry_price_semantic':
-        new Set(['trigger_open', 'next_open', 'decision_bar_open', 'decision_bar_close']),
-      '/search|label_return_mode': new Set(['open_to_close', 'open_to_horizon_close']),
+        new Set(['next_open', 'decision_bar_open', 'decision_bar_close']),
+      '/search|label_return_mode': new Set([]),
       '/ic-analysis|entry_price_semantic':
-        new Set(['trigger_open', 'next_open', 'decision_bar_open', 'decision_bar_close']),
-      '/ic-analysis|label_return_mode': new Set(['open_to_close', 'open_to_horizon_close']),
+        new Set(['next_open', 'decision_bar_open', 'decision_bar_close']),
+      '/ic-analysis|label_return_mode': new Set([]),
     });
+  });
+
+  it('🔴 D1.5 解灰之正面驗收：可選集合恰為預期（不只驗排除表，驗導出結果）', () => {
+    // (i) scenario：`B` 與 `C` 可選
+    expect(new Set(selectable('/search', 'scenario'))).toEqual(new Set(['B', 'C']));
+    // (ii) entry_price_semantic：`trigger_close` 與 `trigger_open` 可選
+    expect(new Set(selectable('/search', 'entry_price_semantic')))
+      .toEqual(new Set(['trigger_close', 'trigger_open']));
+    // (iii) label_return_mode：三種報酬選項全開（裁定② v2）
+    expect(new Set(selectable('/search', 'label_return_mode')))
+      .toEqual(new Set(['open_to_close', 'open_to_horizon_close', 'close_to_close']));
+    // 🔴 over 向：`A`／`two_stage` 仍**不可選**（否則「全部解灰」也會讓上面三條綠）
+    expect(selectable('/search', 'scenario')).not.toContain('A');
+    expect(selectable('/search', 'scenario')).not.toContain('two_stage');
+    expect(selectable('/search', 'entry_price_semantic')).not.toContain('next_open');
+  });
+
+  it('🔴 D1.5 `contractDefault`：預設值由契約導出，且與真契約一致', () => {
+    expect(contractDefault('entry_price_semantic')).toBe('trigger_close');
+    expect(contractDefault('label_return_mode')).toBe('close_to_close');
+    // 對**真契約**（非鏡像）取同一值 ⇒ 鏡像漂移會在此紅
+    expect(contractDefault('entry_price_semantic', CONTRACT))
+      .toBe(contractDefault('entry_price_semantic'));
+    expect(contractDefault('label_return_mode', CONTRACT))
+      .toBe(contractDefault('label_return_mode'));
+    // 🔴 缺 default ⇒ **拋錯，不回退字面**（回退＝第二份預設值）
+    expect(() => contractDefault('scenario')).toThrow();
+    // 🔴 default 落在枚舉外 ⇒ 拋錯
+    const bad = { required_fields: { entry_price_semantic: { enum: ['a', 'b'], default: 'zzz' } } };
+    expect(() => contractDefault('entry_price_semantic', bad)).toThrow();
   });
 
   it('每個理由字串皆非空', () => {

@@ -8,7 +8,7 @@
 import type { CaseData } from './types';
 import { canonicalEventId } from './eventId';
 import { ruleDigestOf, ruleSummaryText } from './ruleDigest';
-import { contractDecisionOffsetMin } from './eventDimensions';
+import { contractDecisionOffsetMin, contractDefault } from './eventDimensions';
 
 /** Task 4.1：附帶報酬欄之候選 h（1..12）；預設全選。 */
 export const ATTACHED_HORIZONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -34,10 +34,23 @@ export const EVENT_EXPORT_CONTROL_KIND = 'user_labeled_same_trigger' as const;
  * **G-2 事件 golden 為 byte 級不變**（golden 跑 IC 管線、不碰匯出端）。
  * 🔴 §F-1′ 之支援矩陣為 `(trigger_close, close_to_close, k=0)`——舊預設 `trigger_open`
  * 落在矩陣外，等於「預設值本身就是分析層不支援的組合」，那才是原本的錯。
+ *
+ * 🔴 **`G3-D2` D1.5（2026-09-04）：改為讀契約 `default`，不再是本檔的字面常數。**
+ * 硬編碼字面與契約 `required_fields.entry_price_semantic.default` 是兩份預設值：
+ * 契約改了而這裡沒改，UI 會安靜地繼續用舊值，且舊值仍是合法枚舉 ⇒ 沒有測試會紅。
+ * 常數名保留以免既有 import 斷裂，值改由 `contractDefault()` 導出。
  */
-export const EVENT_EXPORT_ENTRY_PRICE_SEMANTIC = 'trigger_close' as const;
-export const EVENT_EXPORT_LABEL_RETURN_MODE = 'close_to_close' as const;
+export const EVENT_EXPORT_ENTRY_PRICE_SEMANTIC = contractDefault('entry_price_semantic');
+export const EVENT_EXPORT_LABEL_RETURN_MODE = contractDefault('label_return_mode');
 export const EVENT_EXPORT_DECISION_OFFSET_BARS = 0 as const;
+
+/**
+ * `G3-D2` D1.5：`/search` 匯出批之 `label_origin`（provenance）。
+ *
+ * 🔴 字面**不在此硬寫**：由契約 `optional_fields.label_origin.enum` 取同名值，
+ * 取不到即拋錯（漂移 fail-closed，與後端 `generator.py::_PLATFORM_LABEL_ORIGIN` 同構）。
+ */
+export const EVENT_EXPORT_LABEL_ORIGIN = 'search_positive_case' as const;
 
 export interface EventExportOptions {
   timeframe: string;
@@ -319,6 +332,11 @@ export async function buildEventContractRecords(cases: CaseData[], opts: EventEx
       source_file_digest: sourceDigest,
       data_snapshot_digest: snapshot,
       search_rule_summary: ruleSummary,
+      // 🔴 `G3-D2` D1.5：provenance。`/search` 匯出批一律 `search_positive_case`
+      //    ——本路徑之 label 由 t0 條件產生（`positive_case` 判定），這就是它的來源。
+      //    契約對 `scenario ∈ {A,B,two_stage}` 條件必填；C 批雖不強制，仍照寫，
+      //    因為「來源」是事實而非只為過閘（舊批缺欄回 null 是相容路徑，不是目標狀態）。
+      label_origin: EVENT_EXPORT_LABEL_ORIGIN,
       kind_source: 'user',
     }];
   });
