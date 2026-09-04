@@ -22,8 +22,18 @@ R3 brief 須逐條列「原 finding → 修法 → 對應新測試 → 請原提
 | `COMPOSER-R2-P2-01`＋`GROK-R2-P2-02`：裁定 1 在旗標 False 時落空 | `_batch_scenario_mixed = enforce_batch_homogeneity and mixed` | `-k r2_closure_new_rules_apply_when_homogeneity_not_enforced` |
 | `GROK-R2-P2-03`：裁定 5「UI 比矩陣嚴」無測試釘住 | 加負例＋釘住 preset 恰三個 | `icEventBatchDisclosure.test.tsx` 裁定 5 段 |
 
+**R2 已完整收斂**（2026-09-04 補做，勿重做）：`handoffs/reconcile/20260904-gap3d2-b1-review-r2/synth.md`
+六群集＋三條具名殘留（`B1-PRESET-1`／`B1-GOLDEN-2`／`B1-VERIFY-1`）；
+`completeness_check --lock` rc=0（11 ID 全數）、`reconcile_cluster_attribution_check` rc=0、
+`debt_clear` rc=0（round `266ba2e6` 已 CLEARED）⇒ **`gate.sh dispatch` 可正常發 token**（已實測 rc=0）。
+
+🔴 **本 session 差點漏掉的一步**：我修完 findings 就直接 commit，**跳過 §2 步驟 6 的收斂節點**
+（`reconcile_build` → attribution → completeness → `debt_clear`）。債 OPEN 會讓下一次派工被 gate 拒發，
+而當時 HANDOFF 完全沒提。**判準：每輪 review 收件後，收斂節點與修 findings 是兩件事，都要做。**
+
 委員 R2 產出（本機，gitignore）：`handoffs/20260904-gap3d2-b1-review-r2-{codex,composer,grok}.md`。
 R2 brief 可作 R3 骨架：`handoffs/20260904-GAP3D2-B1-REVIEW-R2-BRIEF.md`。
+R3 仍派**三家全員**（使用者裁定不可跳過）；R3 之停輪條件＝原提出方對六群集逐條回 CLOSED、且無新 P0／P1。
 
 ## 票（唯一權威＝`docs/IC_QUANT_GAP_REGISTRY.md`）
 | 票 | 狀態 |
