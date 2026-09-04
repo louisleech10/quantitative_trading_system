@@ -2415,6 +2415,42 @@ SPEC 對抗審 R3／R4 時因「A／B 之 label 來源未定義」把 <code>/sea
 任何在對抗審裡把使用者原始目標<strong>延後</strong>的裁定（本例 R3／R4 的路徑級限制），當輪就要在白話文件用一句話講出來並讓使用者否決——
 這正是「否決點須彈窗」那條規則要防的事，當時沒當成否決點。
 <strong>補救</strong>：<code>docs/GAP3D2_KICKOFF_HANDOFF.md</code> §0 加註「使用者主目標＝B」；(a) 排第一。</p>
+<hr />
+<h2 id="2026-09-04b-d0-派工委員-codex-三度交不出東西而我兩度沒查根因就結案">2026-09-04（B-D0 派工）委員 codex 三度交不出東西，而我兩度沒查根因就結案</h2>
+<p><strong>事實</strong>：B-D0 的三家審碼，composer 與 grok 各約 1–7 小時交件、皆零 finding。
+codex 首派跑了<strong>逾 10 小時</strong>、runlog 941KB，沒有產出檔；我判它「外部端超時」、走
+<code>debt_clear.sh --abandon --kind collection-failed</code> 後單家重派；重派再跑<strong>逾 3 小時</strong>、1.42MB，
+仍無產出，我又要結案。使用者當下問：「為何 Codex 不交件，你也不查原因？」</p>
+<p><strong>查了之後的真根因</strong>（三分鐘就查到，我卻拖了兩輪）：
+全域 agent skill <code>/Users/louis/.agents/skills/gstack/review/SKILL.md</code> 會自動配對「code review」任務，
+把單家 review 劫持成「Detect stack → Select specialists → <strong>Dispatch specialists in parallel</strong> → Red Team」
+的多代理流程。重派輸出裡逐字錄到 <code>collab: SpawnAgent</code> <strong>× 3</strong>（testing／maintainability／performance ＋ red-team）；
+首派 runlog 尾是 <code>SCOPE_*=false</code> ＋ <code>SPECIALIST_STATS: 0 reviews analyzed</code> 之後 <code>hook: PreCompact</code>（撞 context 壓縮）。
+成本呈數量級放大，所以永遠走不到「寫產出檔」那一步。</p>
+<p><strong>我的第二個錯</strong>：abandon 時 <code>--reason</code> 寫「外部端超時」，並在回報裡引用了
+「401／403／429／500 各出現數十次」當證據。覆查後那些<strong>全部是 codex grep 到的檔案內容</strong>
+（<code>RECONCILE-STAMP</code> 的行號、文件裡「Retryable: rate_limit/timeout」的字面），<strong>不是 API 錯誤</strong>。
+我把 grep 命中當成了故障訊號 —— 這正是「實測 &gt; 假設」要防的事，而我連 <code>grep -n</code> 看上下文都沒做。</p>
+<p><strong>第三輪的發現</strong>（修法不在我這一側）：我把禁令寫進 R2 brief 開頭（禁用該 skill、禁 spawn、給時間預算），
+codex 仍被劫持 —— 因為 <strong>skill 內容先於 brief 進它的 context</strong>，brief 文字層壓不住。
+同一 skill 集裡的 <code>greptile-triage</code> 還自述「<strong>not read-only</strong>，AUTO-FIX items are applied directly」，
+也就是它預設<strong>會改碼</strong>；我全程比對 15 個檔的雜湊，確認這次沒被改，但風險是真的。</p>
+<p><strong>分類</strong>：①診斷紀律（宣告故障前必須讀 log 找根因，不能只看「檔案大小不動」）
+②證據品質（引用 log 命中前必須看上下文，<code>grep -c</code> 不等於證據）
+③修法層級（環境層的問題不可能用 prompt 層修）。</p>
+<p><strong>判準（往後照做）</strong>：</p>
+<ul>
+<li>委員逾時要結案前，<strong>先跑三條</strong>：<code>tail</code> runlog 看它最後在做什麼、<code>grep -c &quot;SpawnAgent\|Select specialists&quot;</code>
+看有沒有被 skill 劫持、<code>grep -n -B2 -A2</code> 看錯誤字樣的上下文是真錯誤還是檔案內容。三條都做完才准寫 <code>--reason</code>。</li>
+<li>派工期間主控端<strong>守檔</strong>：委員會跑本批的 mutation 腳本（就地改生產碼再還原），
+收件前後一律 <code>shasum -a 256 -c &lt;baseline&gt;</code> 全檔比對。
+🔴 建 baseline <strong>勿用 <code>| tee x | head -3</code></strong> —— SIGPIPE 會把 baseline 截斷（本次踩到，4 行被當成 10 行用了半天）。</li>
+<li>委員家族「不可用」是<strong>環境事實</strong>，要寫進交接檔 §3 地雷區並具名殘留，不是每次重踩。</li>
+</ul>
+<p><strong>處置</strong>：B-D0 以 composer＋grok 兩家 quorum 收斂（既有裁定：兩正式家族＝review quorum；
+兩家皆零 P0／P1、皆 APPROVE 兩個主委裁定，grok 另自建 raw-bar 期望表 26/26 獨立覆核）。
+codex 恢復為審碼家族的前提＝停用那個全域 skill，<strong>但那是使用者跨所有 AI 工具的個人設定，未經同意不擅改</strong>，
+已列入 <code>HANDOFF.md</code> 待裁定區。殘留代號 <code>B0-REVIEW-1</code>／<code>B0-REVIEW-2</code>／<code>B0-ATTRIB-1</code>。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

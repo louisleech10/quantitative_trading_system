@@ -55,6 +55,17 @@
 - **session 命名**：`<YYYYMMDD>-<epic>-<b<n>|x>-<kind>-r<N>`，kind ∈ {impl, review, stamp, consult, fix}；task-id＝session 大寫；違反 ⇒ 不發 token。
 - **PreToolUse gate**：含 `committee_run`／`cx_run` 或以 `codex|cursor-agent|grok|agy` 開頭之 Bash 指令需 **fresh token（900s）**；債 OPEN 時 `gate.sh dispatch` 拒發 ⇒ 先銷帳或 abandon。**查看檔案的 Bash 指令開頭勿寫家族名**（`for f in codex …` 會被當 dispatch 擋）。
 - **外部故障**：composer（`Cannot use this model: composer-2.5`／`read ETIMEDOUT`／`ECONNRESET`）、codex（chatgpt backend 404）、grok（API 500）整晚輪流出現 ⇒ `bash scripts/debt_clear.sh --abandon --round-id <id> --kind collection-failed --reason … --approver claude` → mint → `ROUND_ID=<id> bash scripts/cx_run.sh <family> <brief> <out>`（背景）。兩正式家族＝review quorum，但**戳記須三家**。
+- 🔴 **codex 目前不可用為 review 家族（2026-09-04 B-D0 實查，三度未交件）**：全域 agent skill
+  `/Users/louis/.agents/skills/gstack/review/SKILL.md` 自動配對「code review」任務，把單家 review 劫持成
+  「Detect stack → Select specialists → Dispatch specialists in parallel → Red Team」多代理 fan-out
+  （實錄 `collab: SpawnAgent` × 3；另一次撞 `hook: PreCompact`），成本呈數量級放大 ⇒ **永不交件**。
+  **在 brief 裡寫禁令壓不住**（skill 內容先於 brief 進 context，R2 實測仍被劫持）。
+  同一 skill 集之 `greptile-triage` 自述「not read-only，AUTO-FIX items are applied directly」⇒ 另有寫入風險
+  （B-D0 實測 15/15 檔雜湊 OK，未被改）。修法＝停用該全域 skill，但那是**使用者個人跨 agent 設定**，
+  須使用者裁定，勿擅改。殘留代號 `B0-REVIEW-1`／`B0-REVIEW-2`。
+- 🔴 **派工期間須守檔**：委員會跑本批的 mutation 腳本（就地改生產碼再還原）。收件前後一律
+  `shasum -a 256 -c <baseline>` 全檔比對。**建 baseline 時勿用 `| tee x | head -3`**——SIGPIPE 會把
+  baseline 截斷（B-D0 踩過，4 行當成 10 行用）。
 - **`reconcile_cluster_attribution_check.sh`** 對前輪 ID（正文提及、非附錄 heading）誤報「未被引用」＝假警。
 - **completeness**：`## DEGRADE-<FAMILY>-<NN>` 一行一 ID，勿合寫兩家。
 - **commit**：staged 含 `.claude/gate/*.log`／`docs/site/*.html`／交接檔 ⇒ pre-commit G-7 要求 `Governance-Scope: out-of-epic …` 為最末段；`handoffs/` 為 gitignore（委員產物只在本機）；白話新檔須登記 `scripts/plain_docs_sync_check.sh::_watched_for`。
@@ -79,7 +90,7 @@
 
 | 批 | commit | 測試選擇器／rc | golden `--check` | review sessions | 狀態 |
 |---|---|---|---|---|---|
-| B-D0 | — | — | — | — | 待開工 |
+| B-D0 | `49204458`（2026-09-04；訊息具名「hash 合法改變一次、label_values 逐位元組不變」） | `pytest tests/momentum/event_samples/ -q -k "open_to or entry_price_ref"` **21 passed rc=0**；`pytest tests/momentum/event_samples/ -q` **365 passed rc=0**；`pytest tests/api -q -k "event_analysis or event_batch_detail_dims"` **32 passed rc=0** | `--check "tests/golden/gap3_label/*.json"` **rc=0（9 cases PASS）** | `20260904-gap3d2-b0-review-r1`（composer＋grok 交件，皆 P3-00 零 finding）；`…-r2`（codex 單家重派，未交件，見殘留） | **DONE**（review quorum＝兩家；殘留 `B0-REVIEW-1/2` 待使用者裁定 codex 環境） |
 | B-D1 | — | — | — | — | — |
 | B-D3 | — | — | — | — | — |
 | B-D4 | — | — | — | — | — |

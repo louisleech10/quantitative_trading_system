@@ -3031,6 +3031,17 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 <blockquote>
 <p><strong>2026-09-02 追記八十八（GAP-3 UAT 全部驗畢；<code>G3-D2</code> 排程裁定）</strong>：使用者補驗 B2（改寫版）／B5／B10 通過 ⇒ B1–B20 全數驗畢（B3 依 <code>G3-D2</code> 記未完成）。使用者裁定下一件＝<code>G3-D2</code> 三組灰項，順序 (a) scenario A／B／two_stage → (c) 三元組其餘值 → (b) <code>platform_random_bars</code>。開工交接 <code>docs/GAP3D2_KICKOFF_HANDOFF.md</code> 已寫（SoT 指標、現況、主委初判「(a) 內含 (c) 子集」、白話閘題），新 session 從唯讀 consult 開工。</p>
 </blockquote>
+<hr />
+<h2 id="日誌追記八十八2026-09-04量化主線-g3-d2-第-0-段完成治理側只多一支腳本">日誌追記八十八（2026-09-04）：量化主線 G3-D2 第 0 段完成；治理側只多一支腳本</h2>
+<p><strong>這一則是量化主線，不是治理施工</strong>（治理已凍結不擴建，2026-08-14 你裁定）。記在這裡是因為
+<code>scripts/</code> 有動 ⇒ 白話同步守衛會把本檔標成過期，而那支守衛的判準是「WATCHED 目錄有變就要交代」。</p>
+<p><strong>治理側實際變動</strong>：只新增一支 <code>scripts/gap3_label_golden.py</code>（label 凍結檔的 freeze／check CLI）。
+沒有動任何 gate／hook／治理腳本，沒有動 <code>docs/GOV*</code>，沒有動 <code>tests/governance/</code>。</p>
+<p><strong>量化側</strong>：<code>G3-D2</code> 五段實作之第 0 段（B-D0，Task D4.1）完成並推上 GitHub（<code>49204458</code>）。
+內容與白話說明見 <a href="G3-D2灰色項目說明.html">G3-D2灰色項目說明.md</a> §六。</p>
+<p><strong>流程上值得記一筆的</strong>（詳情在 <a href="流程摩擦記錄.html">流程摩擦記錄.md</a>）：審碼委員 codex 三度交不出東西，
+根因是你電腦上的全域 agent skill 把「審碼」自動劫持成多代理流程；我兩度沒查根因就想結案，
+是你問了「為何不查原因」才去查的。修法在環境層（停用那個 skill），屬你的個人設定，未經同意不動。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
