@@ -3045,6 +3045,22 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 還寫進五份文件、據此要你改自己的環境設定——<strong>你反問「三家審一兩個月了為何現在才有問題」，一查就不成立</strong>
 （那設定存在兩個多月、前面兩輪同樣載入卻都正常交件）。已全部改成「根因未定＋四個已排除假說」。
 往後判準：宣布根因前先自問「這能解釋為什麼以前沒事嗎？」答不出來就不是根因。</p>
+<hr />
+<h2 id="日誌追記八十九2026-09-04-深夜session-交接治理側只動了兩支-mutation-腳本">日誌追記八十九（2026-09-04 深夜）：session 交接；治理側只動了兩支 mutation 腳本</h2>
+<p><strong>這一則是量化主線之交接紀錄</strong>（治理已凍結不擴建）。記在這裡因為 <code>scripts/</code> 有動，
+而白話同步守衛的判準是「WATCHED 目錄有變就要交代」。</p>
+<p><strong>治理側實際變動</strong>：只改了 <code>handoffs/</code> 底下兩支本批 mutation 驅動（不進 commit）與
+<code>scripts/plain_docs_sync_check.sh</code>（登記新白話檔 <code>現在做到哪.md</code>）、
+<code>scripts/gap3_label_golden.py</code>（<code>--check</code> 加驗 selector drift，來自委員 finding）。
+沒有動任何 gate／hook／治理腳本，沒有動 <code>docs/GOV*</code>、<code>tests/governance/</code>。</p>
+<p><strong>量化側</strong>：<code>G3-D2</code> 第 1 段（B-D1，七個 Task）實作完成、三家審碼交件、六條 findings 已修並 push。
+細節見 <a href="現在做到哪.html">現在做到哪.md</a>；委員抓到什麼的白話版在同檔「三家審碼抓到什麼」節。</p>
+<p><strong>交接</strong>：context 將滿，使用者裁定<strong>開新 session 而非 compact</strong>（compact 摘要會丟掉委員 findings 細節，
+而那正是複核輪要送回原提出方的東西）。<code>HANDOFF.md</code> 已改寫為「新 session 第一件事＝派 R3 閉合輪」，
+附六條 finding → 修法 → 複核選擇器對照表。</p>
+<p><strong>本 session 我犯的錯（都已寫進 <a href="流程摩擦記錄.html">流程摩擦記錄.md</a>）</strong>：
+兩度未查根因就想結案；把 grep 命中當 API 故障證據；查到一條線索就宣布根因並要使用者改環境設定；
+同一支 mutation 腳本兩次沖掉我未提交的修正（第二次是因為清理動作排在前置檢查之前）。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
