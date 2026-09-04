@@ -112,7 +112,9 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
     ⇒ 這是「服務端查出、同一次分析內原子完成」在本 repo 之解耦規則下的落地形；
     **具名偏差**：SPEC 之編排草圖把查詢畫在 `_run_analysis` 內。
 
-    🔴 三元組初始值取該批之 **F-0 種子**（匯出宣告值），`horizon_bars` 取常數 1。
+    🔴 **`G3-D2` D1.7（2026-09-04）改寫初始值規則**：不再取該批 F-0 種子＋常數 1，
+    改為**依宣告深度導出之三種報酬選項預設**（見函式尾段）。`decision_offset_bars`
+    仍取 F-0 種子（k 之參數化留 D4.3）。
     """
     if not request.event_import_id:
         return None
@@ -132,13 +134,6 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
         )
     seed = records[0]
     spec = dict(request.event_label_spec or {})
-    spec.setdefault("horizon_bars", _DEFAULT_ANALYSIS_HORIZON_BARS)
-    spec.setdefault("entry_price_semantic", seed.get("entry_price_semantic"))
-    spec.setdefault("decision_offset_bars", seed.get("decision_offset_bars"))
-    spec.setdefault(
-        "label_return_mode",
-        (seed.get("label_definition") or {}).get("label_return_mode"),
-    )
     # 🔴 **`CODEX-R2-P1-01`（閉合輪抓到，真實批次跑不起來）**：深度宣告是**批次層 receipt**，
     #    住在 payload 的**頂層** `lookahead_declaration`，**不是**每一列上。
     #    首版只讀 `records[0]["lookahead_bars_declared"]` ⇒ 對真實批次（實測 780 列）拿到 `{}`，
@@ -159,10 +154,42 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
                 "purge 下界無從導出，故不進行分析。請重新匯入並填寫深度宣告。"
             ),
         })
+    # ── `G3-D2` D1.7：`event_label_spec` 之初始值依**宣告深度**導出（裁定②③ 2026-09-03）──
+    #
+    # 🔴 **deterministic，無隨機、無「取第一列」之隱性取樣**：
+    #    `trigger_tfs = sorted({r["timeframe"]})` ⇒ 單 tf 才有唯一深度可談。
+    # 🔴 **仍禁讀 `label_definition.window.horizon_bars`**（§D-3′-a）：該欄語意是 D-7 深度宣告，
+    #    分析層讀成答案窗即靜默給錯預設；深度一律取批次 receipt 之 `lookahead_bars_declared`。
+    # 🔴 `setdefault` 語意不變：**請求明確給的值一律優先**，本段只補「沒給」的那些鍵。
+    trigger_tfs = sorted({str(r.get("timeframe")) for r in records if r.get("timeframe")})
+    mixed_tf = len(trigger_tfs) > 1
+    if mixed_tf:
+        # 混 tf 批**不自動選深度**：各 tf 之「一根」長度不同，取任一個都是猜。
+        # ⇒ 退回「當根」（不依賴 h）並揭露，請使用者手動設定。
+        preset_entry, preset_mode, preset_h = "trigger_open", "open_to_close", 1
+        seed_note = "混合 timeframe 批，請手動設定量法與 h（未自動依深度選擇）"
+    else:
+        depth = int(declared.get(trigger_tfs[0], 0)) if trigger_tfs else 0
+        if depth >= 1:
+            # 「持有」：從 t₀ 開盤進場、持有 depth 根到收盤。
+            preset_entry, preset_mode, preset_h = "trigger_open", "open_to_horizon_close", depth
+            seed_note = f"本次量法＝持有（預設依宣告深度；續漲需手動選）；h＝{depth}（初始＝宣告深度）"
+        else:
+            # 「當根」：深度 0 ⇒ 事件當根內的漲跌，與 h 無關。
+            preset_entry, preset_mode, preset_h = "trigger_open", "open_to_close", 1
+            seed_note = "本次量法＝當根（預設依宣告深度；續漲需手動選）；當根不用 h"
+    spec.setdefault("entry_price_semantic", preset_entry)
+    spec.setdefault("label_return_mode", preset_mode)
+    # 🔴 「當根」下 `horizon_bars` **仍送 1**（inert 哨兵）：`event_label_spec` 恆為恰四鍵，
+    #    normalizer 對多一鍵少一鍵皆 fail-closed；`open_to_close` 之值與 h 無關（golden 已斷言）。
+    spec.setdefault("horizon_bars", preset_h)
+    spec.setdefault("decision_offset_bars", seed.get("decision_offset_bars"))
     return {
         "records": records,
         "event_label_spec": spec,
         "lookahead_bars_declared": dict(declared),
+        # 揭露字串由**後端**產生（前端不重組）：它描述的是後端實際採用的初始值規則。
+        "event_label_spec_seed_note": seed_note,
     }
 
 

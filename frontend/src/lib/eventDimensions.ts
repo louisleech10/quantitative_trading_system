@@ -202,6 +202,82 @@ export function contractDefault(
   return value;
 }
 
+/**
+ * `G3-D2` D1.7：IC 分析頁之「報酬量法」三選項（裁定② 2026-09-03）。
+ *
+ * 使用者選的是**白話的量法**，不是兩個枚舉欄；底層仍寫入 `event_label_spec` 之
+ * `entry_price_semantic`／`label_return_mode` 兩欄——**這不是第二份支援矩陣**，
+ * 而是矩陣內三個組合的**具名捷徑**。
+ *
+ * 🔴 **B-D1 只開這三個 preset，不開「進階直改兩欄」**：兩個 select 各自列值會列出
+ * `(trigger_close, open_to_close)` 這種**矩陣外**的組合（幾何上窗長 0），使用者選得到卻算不出來。
+ * 進階直改留待 D4.2 之 pair-aware `dimOptions(selection)` 落地後才開放。
+ */
+export const RETURN_MEASURE_PRESETS = [
+  {
+    key: 'same_bar',
+    label: '當根',
+    hint: '事件那一根的開盤買、同一根收盤賣（不用答案窗 h）',
+    entry_price_semantic: 'trigger_open',
+    label_return_mode: 'open_to_close',
+  },
+  {
+    key: 'follow_through',
+    label: '續漲',
+    hint: '從事件那一根的收盤起算，看之後 h 根的漲跌',
+    entry_price_semantic: 'trigger_close',
+    label_return_mode: 'close_to_close',
+  },
+  {
+    key: 'hold',
+    label: '持有',
+    hint: '事件那一根的開盤買，持有 h 根到收盤',
+    entry_price_semantic: 'trigger_open',
+    label_return_mode: 'open_to_horizon_close',
+  },
+] as const;
+
+export type ReturnMeasurePresetKey = (typeof RETURN_MEASURE_PRESETS)[number]['key'];
+
+/** `(entry, mode)` → preset；不是任何 preset ⇒ `undefined`（送出守衛據此阻擋）。 */
+export function returnMeasurePresetOf(
+  entry: string | undefined, mode: string | undefined,
+): (typeof RETURN_MEASURE_PRESETS)[number] | undefined {
+  return RETURN_MEASURE_PRESETS.find(
+    (p) => p.entry_price_semantic === entry && p.label_return_mode === mode,
+  );
+}
+
+/**
+ * 送出守衛：`event_label_spec` 之 `(entry, mode)` 必須是三個 preset 之一。
+ *
+ * 🔴 **具名邊界（比後端矩陣嚴）**：後端 `SUPPORTED_MATRIX` 有**四**對，本守衛只放行**三**個
+ * preset ⇒ `(trigger_open, close_to_close)` 雖為後端支援組合，在 D1 之 UI 仍被擋。
+ * 這是刻意的：D1 的 UI 根本產不出那一對，能出現只有偽造或程式化設值；
+ * **寧可誤擋一個支援組合，也不要放行一個矩陣外組合**（後者會讓使用者拿到 fail-closed 錯誤）。
+ * D4.2 開放進階直改時，本守衛改為對 pair-aware 之可行域判定。
+ */
+export function isSubmittableLabelSpec(spec: unknown): boolean {
+  if (!spec || typeof spec !== 'object') return false;
+  const s = spec as Record<string, unknown>;
+  const entry = s.entry_price_semantic;
+  const mode = s.label_return_mode;
+
+  // 🔴 **兩欄皆缺 ⇒ 放行**：這不是漏洞，是分工。使用者只改了 h 時，面板產出的 spec
+  //    本來就沒有這兩欄，由**後端**依該批宣告深度導出預設（D1.7 後端半邊）。
+  //    在此擋下等於要求前端自己算深度 ⇒ 第二份預設值規則。
+  const bothAbsent = entry === undefined && mode === undefined;
+  if (!bothAbsent) {
+    // 只給一半也不行：半組值送到後端會與導出的另一半拼成未預期組合。
+    if (typeof entry !== 'string' || typeof mode !== 'string') return false;
+    if (returnMeasurePresetOf(entry, mode) === undefined) return false;
+  }
+  // `horizon_bars` 若有給，須為正整數（「當根」下亦送 1 之 inert 哨兵）。
+  const h = s.horizon_bars;
+  if (h === undefined) return true;
+  return typeof h === 'number' && Number.isInteger(h) && h >= 1;
+}
+
 /** 組出 `EVENT_DIM_PATH_EXCLUSIONS` 之鍵；鍵格式集中在此，避免各處手拼字串。 */
 export function exclusionKey(path: EventDimPath, dim: EventDimension): string {
   return `${path}|${dim}`;

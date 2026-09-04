@@ -9,7 +9,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import EventBatchDisclosurePanel from './EventBatchDisclosurePanel';
 import { EVENT_FIELD_FORMATTERS, IC_BATCH_FACT_FIELDS, SEARCH_DISCLOSURE_FIELDS } from '@/lib/eventFieldFormatters';
-import { selectable } from '@/lib/eventDimensions';
+import { RETURN_MEASURE_PRESETS, isSubmittableLabelSpec, selectable } from '@/lib/eventDimensions';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import type { EventImportDetail, ICAnalysisConfig } from '@/lib/types';
@@ -31,6 +31,8 @@ function detailFixture(over: Partial<EventImportDetail['batch_facts']> = {}): Ev
       scenario: 'C',
       control_kind: 'user_labeled_same_trigger',
       direction: 'long',
+      // `G3-D2` D1.6：第六鍵。本 fixture 為 C 之舊批形態 ⇒ null（顯示「（未宣告）」）。
+      label_origin: null,
       t0: rows.map((r) => ({ event_id: r.event_id, t0_ms: r.t0_ms })),
       label: rows.map((r) => ({ event_id: r.event_id, label: r.label })),
       ...over,
@@ -96,28 +98,35 @@ describe('Task 7.6 ③⑤ — 唯讀 vs 可設定', () => {
     render(<EventBatchDisclosurePanel importId="imp-1" labelSpec={undefined} onChangeLabelSpec={() => {}} detail={detailFixture()} />);
     const params = within(screen.getByTestId('ic-analysis-params'));
     expect(params.queryAllByRole('spinbutton').length).toBeGreaterThan(0);
-    expect(params.queryAllByRole('combobox').length).toBeGreaterThan(0);
+    // 🔴 `G3-D2` D1.7：兩個枚舉 select 改為三選項 radio（combobox → radio）。
+    //    改的是控制項型別，**不是**放寬「參數區必須可輸入」這條。
+    expect(params.queryAllByRole('radio').length).toBeGreaterThan(0);
   });
 
-  it('⑤ 三元組之**可操作**選項集合 == §F-1′ 之唯一三元組；其餘 disabled 且顯示理由', () => {
+  it('⑤ `G3-D2` D1.7：報酬量法為三選項；**不得**出現兩欄之進階直改 select', () => {
     render(<EventBatchDisclosurePanel importId="imp-1" labelSpec={undefined} onChangeLabelSpec={() => {}} detail={detailFixture()} />);
-    for (const dim of ['entry_price_semantic', 'label_return_mode'] as const) {
-      const sel = screen.getByTestId(`ic-param-${dim}`) as HTMLSelectElement;
-      const enabled = Array.from(sel.querySelectorAll('option')).filter((o) => !o.disabled).map((o) => o.value);
-      expect(new Set(enabled)).toEqual(new Set(selectable('/ic-analysis', dim)));
-      // 其餘值 disabled，且各自看得到理由
-      for (const o of Array.from(sel.querySelectorAll('option')).filter((x) => x.disabled)) {
-        expect(o.title).not.toBe('');
-        expect(screen.getByTestId(`ic-param-blocked-${dim}-${o.value}`).textContent).toContain(o.title);
-      }
+    // (a) 三個 preset 都在
+    for (const key of ['same_bar', 'follow_through', 'hold']) {
+      expect(screen.getByTestId(`ic-param-return-measure-${key}`)).toBeTruthy();
     }
-    // 🔴 `G3-D2` D1.5（2026-09-04）：`trigger_open` 與兩個 `open_to_*` 解灰
-    //    ⇒ 由「各一值」變成 D1 之支援域投影。集合相等**未放寬**：
-    //    多解灰任一值（例如 `next_open`，那要等 D4.2）仍會紅。
+    // (b) 🔴 進階直改**不存在**（D-001 D1.7：兩個 select 各自列值會列出矩陣外組合，
+    //     例如 `(trigger_close, open_to_close)` 幾何窗長 0；進階直改留待 D4.2）
+    expect(screen.queryByTestId('ic-param-entry_price_semantic')).toBeNull();
+    expect(screen.queryByTestId('ic-param-label_return_mode')).toBeNull();
+    // (c) 純函式層之可選集合仍為 D1 之支援域投影（解灰之來源未被 UI 改動所遮蔽）
     expect(new Set(selectable('/ic-analysis', 'entry_price_semantic')))
       .toEqual(new Set(['trigger_open', 'trigger_close']));
     expect(new Set(selectable('/ic-analysis', 'label_return_mode')))
       .toEqual(new Set(['open_to_close', 'open_to_horizon_close', 'close_to_close']));
+    // (d) 三個 preset 之三元組**全部**可送出（否則 UI 給了選不了的選項）
+    for (const p of RETURN_MEASURE_PRESETS) {
+      expect(isSubmittableLabelSpec({
+        horizon_bars: 1,
+        entry_price_semantic: p.entry_price_semantic,
+        label_return_mode: p.label_return_mode,
+        decision_offset_bars: 0,
+      })).toBe(true);
+    }
     // `k` 之可輸入範圍鎖定（§F-1′ 之 k=0）
     const k = screen.getByTestId('ic-param-decision-offset-bars') as HTMLInputElement;
     expect(k.min).toBe('0');
@@ -238,5 +247,132 @@ describe('Task 7.6 ④⑥⑦ — 分析參數之送出與「不回寫」', () =>
     expect(
       (again.records[0].label_definition as { window: { horizon_bars: number } }).window.horizon_bars,
     ).toBe(3);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// `D-001` Task D1.7 — 報酬量法三選項＋送出守衛
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('G3-D2 D1.7 — 報酬量法三選項', () => {
+  it('選「當根」⇒ spec 恰四鍵、entry/mode 為 (trigger_open, open_to_close)、h 為 inert 哨兵 1', () => {
+    let spec: ICAnalysisConfig['event_label_spec'];
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" labelSpec={{ horizon_bars: 5 }} detail={detailFixture()}
+        onChangeLabelSpec={(next) => { spec = next; }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ic-param-return-measure-same_bar'));
+    expect(spec?.entry_price_semantic).toBe('trigger_open');
+    expect(spec?.label_return_mode).toBe('open_to_close');
+    // 🔴 「當根」之 h 不參與計算 ⇒ 一律送 1（不是沿用使用者原本的 5）
+    expect(spec?.horizon_bars).toBe(1);
+  });
+
+  it('選「持有」⇒ (trigger_open, open_to_horizon_close)，且 h **保留**使用者原值', () => {
+    let spec: ICAnalysisConfig['event_label_spec'];
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" labelSpec={{ horizon_bars: 5 }} detail={detailFixture()}
+        onChangeLabelSpec={(next) => { spec = next; }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ic-param-return-measure-hold'));
+    expect(spec?.entry_price_semantic).toBe('trigger_open');
+    expect(spec?.label_return_mode).toBe('open_to_horizon_close');
+    expect(spec?.horizon_bars).toBe(5);   // 持有會用到 h ⇒ 不得覆寫成 1
+  });
+
+  it('選「續漲」⇒ (trigger_close, close_to_close)', () => {
+    let spec: ICAnalysisConfig['event_label_spec'];
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" labelSpec={{ horizon_bars: 3 }} detail={detailFixture()}
+        onChangeLabelSpec={(next) => { spec = next; }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ic-param-return-measure-follow_through'));
+    expect(spec?.entry_price_semantic).toBe('trigger_close');
+    expect(spec?.label_return_mode).toBe('close_to_close');
+    expect(spec?.horizon_bars).toBe(3);
+  });
+
+  it('🔴 非 preset 之組合 ⇒ 面板顯示警示（不靜默改寫使用者的值）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} onChangeLabelSpec={() => {}}
+        labelSpec={{
+          horizon_bars: 1,
+          entry_price_semantic: 'trigger_close',
+          label_return_mode: 'open_to_close',   // 幾何窗長 0，矩陣外
+        }}
+      />,
+    );
+    expect(screen.getByTestId('ic-param-return-measure-invalid')).toBeTruthy();
+    // 🔴 對照：合法 preset 下**不得**顯示警示（否則本條恆綠）
+    cleanup();
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} onChangeLabelSpec={() => {}}
+        labelSpec={{
+          horizon_bars: 1,
+          entry_price_semantic: 'trigger_open',
+          label_return_mode: 'open_to_close',
+        }}
+      />,
+    );
+    expect(screen.queryByTestId('ic-param-return-measure-invalid')).toBeNull();
+  });
+});
+
+describe('G3-D2 D1.7 — 送出守衛', () => {
+  it('🔴 偽造 (trigger_close, open_to_close) ⇒ 擋下，`fetch` **0 次**', async () => {
+    const { result } = renderHook(() => useICAnalysis());
+    const before = sent.length;
+    await act(async () => {
+      await expect(result.current.startAnalysis(baseConfig({
+        event_import_id: 'imp-1',
+        event_label_spec: {
+          horizon_bars: 1,
+          entry_price_semantic: 'trigger_close',
+          label_return_mode: 'open_to_close',
+        },
+      }))).rejects.toThrow(/報酬量法/);
+    });
+    expect(sent.filter((s) => s.url.endsWith('/analyze')).length).toBe(0);
+    expect(sent.length).toBe(before);
+  });
+
+  it('🔴 over 向：三個 preset 都送得出去（守衛不是「一律擋」）', async () => {
+    for (const p of RETURN_MEASURE_PRESETS) {
+      cleanup();
+      sent.length = 0;
+      const body = await startWith(baseConfig({
+        event_import_id: 'imp-1',
+        event_label_spec: {
+          horizon_bars: 2,
+          entry_price_semantic: p.entry_price_semantic,
+          label_return_mode: p.label_return_mode,
+          decision_offset_bars: 0,
+        },
+      }));
+      const s = body.event_label_spec as Record<string, unknown>;
+      expect(s.entry_price_semantic).toBe(p.entry_price_semantic);
+      expect(s.label_return_mode).toBe(p.label_return_mode);
+    }
+  });
+
+  it('🔴 兩欄皆缺 ⇒ **放行**（由後端依宣告深度導出，不在前端算第二份預設）', async () => {
+    sent.length = 0;
+    const body = await startWith(baseConfig({
+      event_import_id: 'imp-1', event_label_spec: { horizon_bars: 4 },
+    }));
+    expect((body.event_label_spec as { horizon_bars: number }).horizon_bars).toBe(4);
+  });
+
+  it('🔴 只給一半（有 entry 無 mode）⇒ 擋下（半組值會與後端導出的另一半拼成未預期組合）', () => {
+    expect(isSubmittableLabelSpec({ horizon_bars: 1, entry_price_semantic: 'trigger_open' })).toBe(false);
+    expect(isSubmittableLabelSpec({ horizon_bars: 1, label_return_mode: 'open_to_close' })).toBe(false);
   });
 });

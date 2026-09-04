@@ -24,7 +24,12 @@ import {
   IC_BATCH_FACT_FIELDS,
   type EventFieldKey,
 } from '@/lib/eventFieldFormatters';
-import { clampDecisionOffset, decisionOffsetRange, dimOptions } from '@/lib/eventDimensions';
+import {
+  RETURN_MEASURE_PRESETS,
+  clampDecisionOffset,
+  decisionOffsetRange,
+  returnMeasurePresetOf,
+} from '@/lib/eventDimensions';
 import type { EventImportDetail, ICAnalysisConfig } from '@/lib/types';
 
 /** 分析參數之 `horizon_bars` 初始值——**字面常數**，不由任何落檔欄種子化。 */
@@ -90,6 +95,10 @@ export default function EventBatchDisclosurePanel({
 
   const spec = labelSpec ?? { horizon_bars: IC_ANALYSIS_INITIAL_HORIZON_BARS };
   const kRange = decisionOffsetRange('/ic-analysis');
+  // `G3-D2` D1.7：目前之 `(entry, mode)` 對應哪個報酬量法；不是任一 preset ⇒ `undefined`
+  // （UI 顯示警示、送出守衛會擋）。**不自動改寫使用者的 spec**——靜默改值會讓
+  // 「我明明選了 X」變成「送出的是 Y」。
+  const currentPreset = returnMeasurePresetOf(spec.entry_price_semantic, spec.label_return_mode);
 
   if (error) {
     return (
@@ -130,35 +139,48 @@ export default function EventBatchDisclosurePanel({
           />
         </label>
 
-        {/* 三元組：可操作集合鎖 §F-1′；其餘值 disabled ＋顯示 §F-5′ 之開放前置理由 */}
-        {(['entry_price_semantic', 'label_return_mode'] as const).map((dim) => {
-          const options = dimOptions('/ic-analysis', dim);
-          const value = spec[dim] ?? detail.declaration_seeds[dim] ?? options.find((o) => !o.disabled)?.value ?? '';
-          return (
-            <label key={dim} className="mt-2 block text-xs text-slate-200">
-              <span className="mb-1 block">{dim}（本批之宣告種子為初始值）</span>
-              <select
-                data-testid={`ic-param-${dim}`}
-                value={value}
-                onChange={(e) => onChangeLabelSpec({ ...spec, [dim]: e.target.value })}
-                className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
-              >
-                {options.map((o) => (
-                  <option key={o.value} value={o.value} disabled={o.disabled} title={o.reason}>{o.value}</option>
-                ))}
-              </select>
-              {options.filter((o) => o.disabled).map((o) => (
-                <span
-                  key={o.value}
-                  className="mt-1 block text-[11px] text-amber-200/80"
-                  data-testid={`ic-param-blocked-${dim}-${o.value}`}
-                >
-                  {o.value}：{o.reason}
+        {/* ── `G3-D2` D1.7：報酬量法三選項（取代原本兩個枚舉 select）────────────────
+            🔴 **B-D1 不提供「進階直改兩欄」**：兩個 select 各自列值會列出
+            `(trigger_close, open_to_close)` 這種矩陣外組合（幾何窗長 0），使用者選得到卻算不出來。
+            進階直改留待 D4.2 之 pair-aware `dimOptions(selection)` 落地。
+            ⇒ 本區塊之 DOM **不得**出現 `ic-param-entry_price_semantic`／`ic-param-label_return_mode`。 */}
+        <fieldset className="mt-3" data-testid="ic-param-return-measure">
+          <legend className="mb-1 block text-xs text-slate-200">報酬量法（要量哪一段的漲跌）</legend>
+          <p className="mb-1 text-[11px] text-slate-500">
+            初始值依這批宣告的答案窗深度自動選；想量別段就自己改。
+          </p>
+          {RETURN_MEASURE_PRESETS.map((p) => {
+            const active = currentPreset?.key === p.key;
+            return (
+              <label key={p.key} className="mt-1 flex items-start gap-2 text-xs text-slate-200">
+                <input
+                  type="radio"
+                  name="ic-return-measure"
+                  data-testid={`ic-param-return-measure-${p.key}`}
+                  checked={active}
+                  onChange={() => onChangeLabelSpec({
+                    ...spec,
+                    entry_price_semantic: p.entry_price_semantic,
+                    label_return_mode: p.label_return_mode,
+                    // 「當根」不用 h，但 `event_label_spec` 恆為四鍵 ⇒ 仍送 inert 哨兵 1。
+                    horizon_bars: p.key === 'same_bar' ? 1 : (spec.horizon_bars ?? 1),
+                  })}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">{p.label}</span>
+                  <span className="ml-1 text-[11px] text-slate-400">{p.hint}</span>
                 </span>
-              ))}
-            </label>
-          );
-        })}
+              </label>
+            );
+          })}
+          {currentPreset === undefined && (
+            <span className="mt-1 block text-[11px] text-rose-300" data-testid="ic-param-return-measure-invalid">
+              目前的組合（{spec.entry_price_semantic ?? '?'} / {spec.label_return_mode ?? '?'}）
+              不是可分析的量法，送出會被擋下——請選上面三種其中一種。
+            </span>
+          )}
+        </fieldset>
 
         <label className="mt-2 block text-xs text-slate-200">
           <span className="mb-1 block">decision_offset_bars（本批鎖定為 {kRange.min}）</span>

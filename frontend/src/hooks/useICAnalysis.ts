@@ -8,6 +8,7 @@ import {
 } from '@/lib/types';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { httpErrorMessage } from '@/lib/httpError';
+import { isSubmittableLabelSpec } from '@/lib/eventDimensions';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
@@ -246,6 +247,17 @@ export function useICAnalysis() {
 
       if (!hasLibrarySelection && !hasCrossSectionSelection) {
         throw new Error('請選擇 Run 或橫截面批次');
+      }
+
+      // 🔴 `G3-D2` D1.7 送出守衛：事件批路徑之 `event_label_spec` 若不是三個報酬量法之一，
+      //    **在此擋下、不發 fetch**。理由：矩陣外組合送到後端只會拿到 fail-closed 錯誤，
+      //    使用者看到的是「分析被拒絕」而不知道是量法設定的問題。
+      //    ⚠️ 只在**明確給了** spec 時檢查：沒給時由後端依宣告深度導出預設（D1.7 後端半邊）。
+      if (config.mode === 'event' && config.event_import_id && config.event_label_spec
+          && !isSubmittableLabelSpec(config.event_label_spec)) {
+        throw new Error(
+          '報酬量法不是可分析的組合——請在分析參數區重選「當根／續漲／持有」其中一種',
+        );
       }
 
       const effectiveConfig = useICAnalysisStore.getState().getEffectiveConfig();
