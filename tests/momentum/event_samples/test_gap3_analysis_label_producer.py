@@ -269,3 +269,279 @@ def test_analysis_label_producer_coverage_replace_keeps_identity(bars):
     # 🔴 只能縮不能擴
     with pytest.raises(LabelProducerError, match="不得擴張"):
         apply_event_coverage(p0, p0.allowed_event_ids | {"ev-not-there"})
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# `D-001` Phase D0（Task D4.1）— `entry_price_refs` 側載＋`open_to_*` 取價
+#
+# 選擇器：`pytest tests/momentum/event_samples/ -q -k "open_to or entry_price_ref"`
+#
+# 🔴 **為什麼這一段要 `replace(supported=True)`**：`SUPPORTED_MATRIX` 之開放是
+#    `D-001` Task D1.3 的交付（「D0 過 gate 後四對即 D1 唯一矩陣」），D0 只交付**取價路徑**。
+#    ⇒ 本段以 `dataclasses.replace` 把 `supported` 旗標打開，其餘（windows／refs／hash／
+#    normalized_spec_bytes）**全部是 `prepare_analysis_windows` 對真實 kline 跑出來的真值**，
+#    測到的是 `resolve_label_value_at_analyze` 的**生產路徑**，不是替身。
+#    D1.3 開矩陣後須加一條「移除本旗標覆寫、值逐位元組相同」——見 `docs/GAP3D2_IMPL_HANDOFF.md` §5。
+# ══════════════════════════════════════════════════════════════════════════
+
+from dataclasses import replace  # noqa: E402  （本段專用；置頂會與上方既有 import 區混淆來源）
+
+from momentum.Analysis.event_samples.label_value_from_case import (  # noqa: E402
+    EntryPriceRef,
+    _price_at,
+)
+
+
+def _open_series(bars):
+    df = bars["ETHUSDT"]["12h"]
+    return (df["open_time_ms"].to_numpy(), df["open"].to_numpy(), df["close"].to_numpy())
+
+
+def gap_bar_t0s(bars, n: int = 2, lo: int = 95, hi: int = 200):
+    """回傳 `n` 個**跳空 bar**（`open(t) != close(t−1)`）之 t0（bar open ms）。
+
+    🔴 跳空是**前置條件**而非結論：呼叫端須先斷言不等式成立，否則
+    `open_to_close` 與 `close_to_close` 兩式在連續網格上恰好同值，(i) 失去鑑別力。
+    """
+    ot, op, cl = _open_series(bars)
+    out = []
+    for i in range(max(lo, 3), min(hi, len(ot) - 20)):
+        if op[i] != cl[i - 1]:
+            out.append((i, int(ot[i])))
+        if len(out) == n:
+            break
+    assert len(out) == n, "真實 kline 於指定區間找不到足夠的跳空 bar"
+    return out
+
+
+def d0_records(bars, *, direction: str = "long", n: int = 2):
+    """跳空 bar 上的二元批（label 含 0 與 1）。"""
+    return [
+        make_event(i, t0=t0, label=i % 2, direction=direction)
+        for i, (_idx, t0) in enumerate(gap_bar_t0s(bars, n=n))
+    ]
+
+
+def force_supported(p):
+    """D0 專用：只翻 `supported` 旗標，其餘欄位為真實 prepare 之產物（見本段檔頭）。"""
+    return replace(p, supported=True, reason=None)
+
+
+# ── (i) 跳空 bar：`trigger_open × open_to_close` 手算 ───────────────────────
+
+def test_analysis_label_producer_d0_gap_bar_open_to_close_exact(bars):
+    """(i) `trigger_open × open_to_close` 之值 == `(close[t0]−open[t0])/open[t0]`，
+    且 **!=** `(close[t0]−close[t0−1])/close[t0−1]`（＝修法前會靜默取到的別名值）。"""
+    ot, op, cl = _open_series(bars)
+    sp = spec(h=1, entry="trigger_open", mode="open_to_close")
+    recs = d0_records(bars)
+    p = force_supported(prep(bars, recs, sp))
+    r = resolve_label_value_at_analyze(p, bars, event_label_spec=sp)
+    assert r.supported is True and r.label_values
+
+    by_id = {w.event_id: w for w in p.windows}
+    checked = 0
+    for rec in recs:
+        w = by_id.get(rec["event_id"])
+        if w is None:
+            continue
+        i = int((ot == int(rec["t0"])).nonzero()[0][0])
+        # 前置：本根確為跳空 bar（不成立則下面兩式同值，本條不可證偽）
+        assert op[i] != cl[i - 1], f"idx={i} 非跳空 bar"
+        expect_open = (float(cl[i]) - float(op[i])) / float(op[i])
+        alias_close = (float(cl[i]) - float(cl[i - 1])) / float(cl[i - 1])
+        assert r.label_values[w.event_id] == expect_open       # atol=0
+        assert r.label_values[w.event_id] != alias_close       # 修法前之別名錯價
+        checked += 1
+    assert checked >= 1
+
+
+# ── (ii) `decision_bar_open × open_to_horizon_close, k=2` 基準＝open[t0−2] ──
+
+def test_analysis_label_producer_d0_decision_bar_open_to_horizon_close_k2(bars):
+    """(ii) k=2 之 `decision_bar_open × open_to_horizon_close`：基準價＝`open[t0−2]`、
+    終點＝`close[t0−2+h]`（entry bar 之 open，**不是** t₀ 的任何價）。"""
+    ot, op, cl = _open_series(bars)
+    h = 3
+    sp = spec(h=h, entry="decision_bar_open", mode="open_to_horizon_close", k=2)
+    recs = d0_records(bars)
+    p = force_supported(prep(bars, recs, sp))
+    r = resolve_label_value_at_analyze(p, bars, event_label_spec=sp)
+    assert r.supported is True and r.label_values
+
+    refs = {e.event_id: e for e in p.entry_price_refs}
+    by_id = {w.event_id: w for w in p.windows}
+    checked = 0
+    for rec in recs:
+        w = by_id.get(rec["event_id"])
+        if w is None:
+            continue
+        i = int((ot == int(rec["t0"])).nonzero()[0][0])
+        assert refs[w.event_id].bar_open_ms == int(ot[i - 2])
+        assert refs[w.event_id].field == "open"
+        expect = (float(cl[i - 2 + h]) - float(op[i - 2])) / float(op[i - 2])
+        assert r.label_values[w.event_id] == expect            # atol=0
+        # 對照：若誤用 t₀ 之任一價當基準，值不同（證明上式不是恆真）
+        assert expect != (float(cl[i - 2 + h]) - float(op[i])) / float(op[i])
+        checked += 1
+    assert checked >= 1
+
+
+# ── (iii) mutation：ref.field open↔close 對調 ⇒ 值變 ────────────────────────
+
+def test_analysis_label_producer_d0_entry_price_ref_field_swapped_changes_value(bars):
+    """(iii) 把 `entry_price_ref.field` 由 `open` 換成 `close` ⇒ `label_value` 必變。
+
+    這是「取價真的讀了 ref.field」之可證偽性：若實作把 field 寫死成 `open`，本條變恆等而紅。
+    """
+    sp = spec(h=1, entry="trigger_open", mode="open_to_close")
+    p = force_supported(prep(bars, d0_records(bars), sp))
+    ok = resolve_label_value_at_analyze(p, bars, event_label_spec=sp)
+
+    swapped = replace(p, entry_price_refs=tuple(
+        EntryPriceRef(event_id=e.event_id, bar_open_ms=e.bar_open_ms,
+                      field="close" if e.field == "open" else "open")
+        for e in p.entry_price_refs
+    ))
+    bad = resolve_label_value_at_analyze(swapped, bars, event_label_spec=sp)
+    assert set(ok.label_values) == set(bad.label_values) and ok.label_values
+    assert any(ok.label_values[e] != bad.label_values[e] for e in ok.label_values), \
+        "field 對調後值不變 ⇒ 取價未讀 ref.field（寫死欄位）"
+
+
+# ── (iv) mutation：刪 refs ⇒ None ＋ reason 非空（禁回落 close） ─────────────
+
+def test_analysis_label_producer_d0_entry_price_refs_dropped_is_none(bars):
+    """(iv) refs 被清空 ⇒ open 語意之 `label_value is None` 且 `reason` 非空。
+
+    🔴 **禁回落**：回落 `_close_at(label_start_ms)` 會取到 t₀−1 之 close（連續網格別名），
+    那是一個**合法數字**，於是「refs 沒串進來」永遠不會紅。本條把它釘成 loud。
+    """
+    sp = spec(h=1, entry="trigger_open", mode="open_to_close")
+    p = force_supported(prep(bars, d0_records(bars), sp))
+    dropped = replace(p, entry_price_refs=())
+    r = resolve_label_value_at_analyze(dropped, bars, event_label_spec=sp)
+    assert r.label_values, "鍵集不得為空（否則 None 斷言恆真）"
+    assert all(v is None for v in r.label_values.values())
+    assert r.reason == UNSUPPORTED_REASON
+    # 對照：refs 在時同一批算得出非 None（證明上面不是恆 None）
+    good = resolve_label_value_at_analyze(p, bars, event_label_spec=sp)
+    assert good.reason is None
+    assert any(v is not None for v in good.label_values.values())
+
+
+# ── (v) 改任一 ref 值 ⇒ hash 必變 ──────────────────────────────────────────
+
+def test_analysis_label_producer_d0_entry_price_ref_value_changed_changes_hash(bars):
+    """(v) `entry_price_refs` 進 `_receipt_hash` payload：改一個 ref ⇒ hash 必變。"""
+    from momentum.Analysis.event_samples.label_value_from_case import _receipt_hash
+
+    sp = spec(h=1, entry="trigger_open", mode="open_to_close")
+    p = prep(bars, d0_records(bars), sp)
+    args = dict(event_import_id="imp-1", normalized_spec_bytes=p.normalized_spec_bytes,
+                windows=p.windows, per_tf=p.per_tf, direction_sign=p.direction_sign)
+    base_hash = _receipt_hash(**args, entry_price_refs=p.entry_price_refs)
+    assert base_hash == p.analysis_alignment_receipt_hash    # 生產路徑就是這個 payload
+
+    bumped = (replace(p.entry_price_refs[0], bar_open_ms=p.entry_price_refs[0].bar_open_ms + 1),
+              ) + p.entry_price_refs[1:]
+    assert _receipt_hash(**args, entry_price_refs=bumped) != base_hash
+    swapped_field = (replace(p.entry_price_refs[0], field="close"),) + p.entry_price_refs[1:]
+    assert _receipt_hash(**args, entry_price_refs=swapped_field) != base_hash
+
+
+# ── (v′) 同一批不同 entry 語意 ⇒ hash 不等（refs 進 hash 之語意價值） ────────
+
+def test_analysis_label_producer_d0_entry_price_ref_distinguishes_entry_semantics(bars):
+    """`trigger_open` 與 `trigger_close`（同為 `close_to_close`、同 h）之 hash **不等**。
+
+    兩者之 `windows` 只差 `entry_at_ms`；本條連同 (v) 一起釘住「refs 真的進了 payload」。
+    """
+    recs = d0_records(bars)
+    a = prep(bars, recs, spec(h=2, entry="trigger_open"))
+    b = prep(bars, recs, spec(h=2, entry="trigger_close"))
+    assert a.analysis_alignment_receipt_hash != b.analysis_alignment_receipt_hash
+    assert {e.field for e in a.entry_price_refs} == {"open"}
+    assert {e.field for e in b.entry_price_refs} == {"close"}
+
+
+# ── (vi) 既有 `close_to_close` 值不變（hash 合法變一次） ────────────────────
+
+def test_analysis_label_producer_d0_close_to_close_values_unchanged_by_entry_price_ref(bars):
+    """(vi) `close_to_close` 之基準價**仍**取 `label_start_ms` 之 close，與 refs 無關。
+
+    以「把 refs 換成明顯錯的座標」證明 `close_to_close` 路徑根本沒讀 refs
+    ⇒ 既有值逐位元組不變（獨立手算 oracle 見上方 ①，未改）。
+    """
+    sp = spec()  # trigger_close × close_to_close × k=0（既有支援組合）
+    p = prep(bars, records("long"), sp)
+    r0 = resolve_label_value_at_analyze(p, bars, event_label_spec=sp)
+    tampered = replace(p, entry_price_refs=tuple(
+        EntryPriceRef(event_id=e.event_id, bar_open_ms=e.bar_open_ms + 7 * H12, field="open")
+        for e in p.entry_price_refs
+    ))
+    r1 = resolve_label_value_at_analyze(tampered, bars, event_label_spec=sp)
+    assert r0.label_values == r1.label_values and r0.label_values
+    for w in p.windows:
+        assert r0.label_values[w.event_id] == hand_return(bars, w)   # atol=0
+
+
+# ── refs 之形狀不變式 ＋ `_price_at` 之 under/over 向 ───────────────────────
+
+def test_analysis_label_producer_d0_entry_price_refs_same_order_and_length(bars):
+    """`entry_price_refs` 與 `windows` **同序同長**（排序鍵相同 ⇒ 逐位置對應）。"""
+    p = prep(bars, records("long"), spec())
+    assert len(p.entry_price_refs) == len(p.windows)
+    assert [e.event_id for e in p.entry_price_refs] == [w.event_id for w in p.windows]
+
+
+def test_analysis_label_producer_d0_open_to_star_mismatched_label_start_raises(bars):
+    """`open_to_*` 之 `label_start_ms != entry_at_ms` ⇒ `LabelProducerError`（fail-closed）。"""
+    sp = spec(h=1, entry="trigger_open", mode="open_to_close")
+    p = force_supported(prep(bars, d0_records(bars), sp))
+    broken = replace(p, windows=tuple(
+        replace(w, label_start_ms=w.label_start_ms + 1) for w in p.windows
+    ))
+    with pytest.raises(LabelProducerError, match="entry_at_ms"):
+        resolve_label_value_at_analyze(broken, bars, event_label_spec=sp)
+
+
+def test_analysis_label_producer_d0_entry_price_ref_price_at_lookup(bars):
+    """`_price_at`：命中唯一列回該欄值；找不到／欄位不存在 ⇒ `None`（不猜最近的一根）。"""
+    df = bars["ETHUSDT"]["12h"]
+    ot = df["open_time_ms"].to_numpy()
+    i = 100
+    assert _price_at(df, int(ot[i]), "open") == float(df["open"].to_numpy()[i])
+    assert _price_at(df, int(ot[i]), "close") == float(df["close"].to_numpy()[i])
+    assert _price_at(df, int(ot[i]) + 1, "open") is None          # 不存在之 open_time
+    assert _price_at(df, int(ot[i]), "high") is None              # 欄位不存在
+
+
+# ── golden 掛載（`D-001` D1.4 之 parametrize；D0 先掛，避免凍結檔沒有任何執行者） ──
+
+def _golden_paths():
+    import glob as _glob
+    from pathlib import Path as _Path
+    root = _Path(__file__).resolve().parents[3] / "tests" / "golden" / "gap3_label"
+    return sorted(_Path(p) for p in _glob.glob(str(root / "*.json")))
+
+
+@pytest.mark.parametrize("golden_path", _golden_paths(), ids=lambda p: p.stem)
+def test_analysis_label_producer_d0_entry_price_ref_golden(golden_path, bars):
+    """每個凍結檔逐項 `==`（值／時間戳／`entry_price_ref`／NaN mask／hash／purge）。
+
+    🔴 `_golden_paths()` 為空即視為錯誤：glob 打空會讓本條靜默零執行（假綠）。
+    """
+    from tests.golden.gap3_label.loader import check_golden, load_golden
+
+    report = check_golden(load_golden(golden_path), bars)
+    assert report.ok, "\n".join(report.diffs)
+
+
+def test_analysis_label_producer_d0_entry_price_ref_golden_set_nonempty():
+    """golden 集合非空（釘住上一條之 parametrize 不會被 glob 打空成 0 個 case）。"""
+    paths = _golden_paths()
+    assert len(paths) >= 9, f"golden 檔數不足：{[p.name for p in paths]}"
+    names = {p.stem for p in paths}
+    assert any("open_to_close" in n for n in names)          # 跳空案例（§G 必含 ①）
+    assert any(n.startswith("decision_bar_open") for n in names)   # k>0 之 entry bar

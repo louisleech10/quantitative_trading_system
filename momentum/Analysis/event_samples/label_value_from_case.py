@@ -133,6 +133,23 @@ class PerTfRow:
 
 
 @dataclass(frozen=True)
+class EntryPriceRef:
+    """單一事件之 **entry 基準價座標**（`D-001` Task D4.1）。欄集**恰三鍵**。
+
+    🔴 為什麼是側載（batch 級 tuple）而不是 `WindowRow` 第八鍵：`WindowRow` 之七鍵被
+    §G G-3 之 signature 對證引用，加鍵要同步動 G-3（與 `direction_sign` 同一理由）。
+
+    🔴 為什麼 producer 不自己從 `entry_price_semantic` 推 `(bar, field)`：那會是 D1-6
+    映射的**第二份實作**。值逐字取自 `align_events` 收據之
+    `entry_price_source_bar_open_ms`／`entry_price_source_field`，本模組只搬不算。
+    """
+
+    event_id: str
+    bar_open_ms: int
+    field: str
+
+
+@dataclass(frozen=True)
 class SymbolPurgeRow:
     """逐 symbol 之 purge 下界。欄集**恰兩鍵**，按 `symbol` UTF-8 升冪。
 
@@ -173,6 +190,12 @@ class PreparedAnalysisWindows:
     #  🔴 **無預設值**：沒有方向就不該有 prepared 物件。給預設（例如 `0` 或 `1`）等於
     #     讓「忘了傳」靜默變成一個合法值，而 `0` 會把所有 label 歸零、`1` 會讓 short 反號。
     direction_sign: int
+    #: 🔴 **`D-001` Task D4.1**（第十一欄）：與 `windows` **同序同長**之 entry 基準價座標。
+    #  `open_to_*` 語意之基準價取自這裡，不再回落 `label_start_ms` 那根的 close
+    #  ——在連續 crypto 網格下 `trigger_open` 之 `entry_at == ot[t0_idx] == ct[t0_idx-1]`，
+    #  用 close 取價會**靜默**取到 t₀−1 的收盤價（別名錯價，值合法故不會紅）。
+    #  🔴 **無預設值**：預設空 tuple 會讓「忘了傳」在 `open_to_*` 下靜默變成全 None。
+    entry_price_refs: Tuple[EntryPriceRef, ...]
 
 
 @dataclass(frozen=True)
@@ -316,6 +339,23 @@ def _windows_from_receipts(event_level: pd.DataFrame) -> Tuple[WindowRow, ...]:
     return tuple(sorted(rows, key=lambda w: w.event_id.encode("utf-8")))
 
 
+def _refs_from_receipts(event_level: pd.DataFrame) -> Tuple[EntryPriceRef, ...]:
+    """`event_level` → `tuple[EntryPriceRef, ...]`，按 `event_id` **UTF-8 升冪**。
+
+    🔴 排序鍵與 `_windows_from_receipts` **逐字相同**，這就是「同序同長」之來源；
+    兩者讀同一個 frame，故不會有一邊有、一邊沒有的列。
+    """
+    rows = [
+        EntryPriceRef(
+            event_id=str(r["event_id"]),
+            bar_open_ms=int(r["entry_price_source_bar_open_ms"]),
+            field=str(r["entry_price_source_field"]),
+        )
+        for r in event_level.to_dict("records")
+    ]
+    return tuple(sorted(rows, key=lambda e: e.event_id.encode("utf-8")))
+
+
 def _per_tf_from_receipts(per_tf: pd.DataFrame) -> Tuple[PerTfRow, ...]:
     """`per_tf` → `tuple[PerTfRow, ...]`，按 `(event_id, timeframe)` **UTF-8 升冪**。"""
     rows = [
@@ -424,11 +464,16 @@ def _receipt_hash(
     windows: Tuple[WindowRow, ...],
     per_tf: Tuple[PerTfRow, ...],
     direction_sign: int,
+    entry_price_refs: Tuple[EntryPriceRef, ...],
 ) -> str:
     """分析時 receipt 之 hash。**決定性**：同輸入同值。
 
     🔴 與 `prepared_token` 刻意相反：hash 決定性、token 非決定性。
     只有兩者並用才分得出「同一次呼叫傳下去」與「各自重算出巧合相同的值」。
+
+    🔴 **payload 之唯一合法形狀＝下列六個頂層鍵、此固定序**（`D-001` Task D4.1 code fence，
+    覆寫原檔 §D-3′-a（iii）之三鍵 fence——原檔 fence 與本函式**既有分叉**，非本次造成，
+    已具名於 `D-001` §N）。增鍵／減鍵／改序皆改 hash ⇒ 不得為了「順手」而動。
     """
     payload = {
         "event_import_id": event_import_id,
@@ -443,6 +488,12 @@ def _receipt_hash(
             for w in windows
         ],
         "per_tf": [[p.event_id, p.timeframe, p.feature_cutoff_ms] for p in per_tf],
+        # 🔴 `D-001` D4.1：entry 基準價座標進 hash ⇒ 同一批以不同 entry 語意 prepare
+        #    會得到不同 hash。沒有這鍵，`trigger_open × open_to_close` 與
+        #    `trigger_close × open_to_close` 之 `windows` 若恰好同值就會撞 hash。
+        "entry_price_refs": [
+            [e.event_id, e.bar_open_ms, e.field] for e in entry_price_refs
+        ],
     }
     return canonical_event_table_sha256(payload)
 
@@ -479,6 +530,7 @@ def prepare_analysis_windows(
         events, bars_by_tf, AlignmentConfig(timeframes=tuple(tf_keys))
     )
     windows = _windows_from_receipts(receipts.event_level)
+    entry_price_refs = _refs_from_receipts(receipts.event_level)
     per_tf = _per_tf_from_receipts(receipts.per_tf)
     purge_rows = purge_lower_bound_rows(
         windows,
@@ -495,6 +547,7 @@ def prepare_analysis_windows(
             windows=windows,
             per_tf=per_tf,
             direction_sign=direction_sign,
+            entry_price_refs=entry_price_refs,
         ),
         per_tf=per_tf,
         normalized_spec_bytes=spec_bytes,
@@ -505,6 +558,7 @@ def prepare_analysis_windows(
         prepared_token=token,
         reason=None if supported else UNSUPPORTED_REASON,
         direction_sign=direction_sign,
+        entry_price_refs=entry_price_refs,
     )
 
 
@@ -543,6 +597,23 @@ def _close_at(bars: pd.DataFrame, close_time_ms: int) -> Optional[float]:
     return value if value == value and value > 0 else None  # NaN 自身不等於自身
 
 
+def _price_at(bars: pd.DataFrame, bar_open_ms: int, field: str) -> Optional[float]:
+    """取 `open_time_ms == bar_open_ms` **唯一**那一根的 `field` 欄。
+
+    找不到／不唯一／欄位不存在 ⇒ `None`（**不猜最近的一根、不回落 close**）。
+    🔴 對照 `_close_at` 之索引鍵是 `close_time_ms`；本函式是 `open_time_ms`——
+    兩者在連續網格下**相差一根**，混用即為 D4.1 要根除的別名錯價。
+    """
+    if field not in bars.columns:
+        return None
+    ot = bars["open_time_ms"].to_numpy()
+    matches = (ot == bar_open_ms).nonzero()[0]
+    if len(matches) != 1:
+        return None
+    value = float(bars[field].to_numpy()[int(matches[0])])
+    return value if value == value and value > 0 else None
+
+
 def resolve_label_value_at_analyze(
     prepared,
     bars_by_tf,
@@ -576,6 +647,13 @@ def resolve_label_value_at_analyze(
             reason=prepared.reason or UNSUPPORTED_REASON,
         )
 
+    # 🔴 `D-001` D4.1：取價分派之**唯一**依據＝normalized spec 之 `label_return_mode`。
+    #    不得回頭讀 `entry_price_semantic` 自判 open/close（那是 D1-6 映射的第二份實作，
+    #    映射之唯一實作在 `alignment._entry_mapping`，其結果已逐字搬進 `entry_price_refs`）。
+    mode = normalize_event_label_spec(event_label_spec)["label_return_mode"]
+    refs_by_id = {e.event_id: e for e in prepared.entry_price_refs}
+    missing_ref = False
+
     values: Dict[str, Optional[float]] = {}
     for w in prepared.windows:
         if w.event_id not in prepared.allowed_event_ids:
@@ -585,10 +663,26 @@ def resolve_label_value_at_analyze(
         if bars is None:
             values[w.event_id] = None
             continue
-        # 🔴 支援矩陣鎖 `(trigger_close, close_to_close, k=0)` ⇒ 基準價＝`label_start_ms` 那根的 close
-        #    （即 entry 之 close），終點價＝`label_end_ms` 那根的 close。
-        #    兩個時間戳**皆取自 align_events 之收據**，本函式不自行推導是哪一根。
-        base = _close_at(bars, int(w.label_start_ms))
+        if mode == "close_to_close":
+            # 🔴 基準價＝`label_start_ms` 那根的 close（＝t₀ 之 close，錨與 entry 無關＝D1-5）。
+            #    時間戳取自 align_events 之收據，本函式不自行推導是哪一根。
+            base = _close_at(bars, int(w.label_start_ms))
+        else:
+            # 🔴 `open_to_close`／`open_to_horizon_close`：基準價＝entry bar 之 `field`。
+            #    `alignment` 對兩 mode 皆令 `label_start = entry_at`；不等 ⇒ 上游串錯，
+            #    **fail-closed 而非回落**（回落會取到別名的 t₀−1 close，值合法故永遠不會紅）。
+            if int(w.label_start_ms) != int(w.entry_at_ms):
+                raise LabelProducerError(
+                    f"{w.event_id}: {mode} 之 label_start_ms({w.label_start_ms}) "
+                    f"≠ entry_at_ms({w.entry_at_ms})——收據與 mode 不一致，拒絕取價"
+                )
+            ref = refs_by_id.get(w.event_id)
+            if ref is None:
+                # fail-closed：沒有座標就沒有基準價，**不得**回落 `_close_at`。
+                missing_ref = True
+                values[w.event_id] = None
+                continue
+            base = _price_at(bars, int(ref.bar_open_ms), ref.field)
         end = _close_at(bars, int(w.label_end_ms))
         # 🔴 `D-005` A-023 第 4 條：**乘號在 producer，不在編排層**。
         #    下游（`ic_feed` → `ic_filter_orchestrator`）是純複製，不會補這個乘號；
@@ -603,5 +697,8 @@ def resolve_label_value_at_analyze(
         label_values=values,
         analysis_alignment_receipt_hash=prepared.analysis_alignment_receipt_hash,
         prepared_token=prepared.prepared_token,
-        reason=None,
+        # 🔴 缺 `entry_price_refs` ⇒ 該 eid 之值為 `None` 且 **reason 非空**（loud）。
+        #    字面沿用已登記之 `UNSUPPORTED_REASON`（契約 `capability_unavailable_reasons`
+        #    為封閉集合，本模組不得自寫新字面——新 reason 之登記屬 D1.1 契約票）。
+        reason=UNSUPPORTED_REASON if missing_ref else None,
     )

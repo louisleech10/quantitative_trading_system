@@ -1,0 +1,67 @@
+{
+  "case_id": "trigger_open__open_to_close__k0__short__12h__h1",
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "direction": "short",
+  "event_import_id": "golden-trigger_open__open_to_close__k0__short__12h__h1",
+  "event_label_spec": {
+    "horizon_bars": 1,
+    "entry_price_semantic": "trigger_open",
+    "label_return_mode": "open_to_close",
+    "decision_offset_bars": 0
+  },
+  "t0_ms": [
+    1708171200000,
+    1708214400000,
+    1708430400000
+  ],
+  "lookahead_bars_declared": {
+    "12h": 0
+  },
+  "timeframe_seconds": {
+    "12h": 43200
+  },
+  "data_snapshot_digest": "cf13fb5370bed1bb1c5921e1f125bb6f6c2275ff14152386e81c94b075416895",
+  "events": {
+    "ev0": {
+      "label_value": -0.0019240062739831294,
+      "label_start_ms": 1708171200000,
+      "label_end_ms": 1708214400000,
+      "decision_at_ms": 1708171200000,
+      "entry_at_ms": 1708171200000,
+      "entry_price_ref": {
+        "bar_open_ms": 1708171200000,
+        "field": "open"
+      }
+    },
+    "ev1": {
+      "label_value": -0.0062744016191913715,
+      "label_start_ms": 1708214400000,
+      "label_end_ms": 1708257600000,
+      "decision_at_ms": 1708214400000,
+      "entry_at_ms": 1708214400000,
+      "entry_price_ref": {
+        "bar_open_ms": 1708214400000,
+        "field": "open"
+      }
+    },
+    "ev2": {
+      "label_value": -0.027087523743055907,
+      "label_start_ms": 1708430400000,
+      "label_end_ms": 1708473600000,
+      "decision_at_ms": 1708430400000,
+      "entry_at_ms": 1708430400000,
+      "entry_price_ref": {
+        "bar_open_ms": 1708430400000,
+        "field": "open"
+      }
+    }
+  },
+  "nan_event_ids": [],
+  "analysis_alignment_receipt_hash": "fcb71322b4e1f294bd04ee1cbadcc5cf00b320313e1f2d6d8740b748d8732273",
+  "purge_lower_bound_ms_by_symbol": {
+    "ETHUSDT": 43200000
+  },
+  "matrix_pending": true,
+  "matrix_pending_reason": "Phase D0 只交付取價路徑；SUPPORTED_MATRIX 之開放為 D-001 Task D1.3 之交付"
+}

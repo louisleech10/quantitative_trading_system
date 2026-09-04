@@ -1,0 +1,77 @@
+{
+  "case_id": "trigger_close__close_to_close__k0__long__12h__h3",
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "direction": "long",
+  "event_import_id": "golden-trigger_close__close_to_close__k0__long__12h__h3",
+  "event_label_spec": {
+    "horizon_bars": 3,
+    "entry_price_semantic": "trigger_close",
+    "label_return_mode": "close_to_close",
+    "decision_offset_bars": 0
+  },
+  "t0_ms": [
+    1708171200000,
+    1708603200000,
+    1709035200000,
+    1709467200000
+  ],
+  "lookahead_bars_declared": {
+    "12h": 0
+  },
+  "timeframe_seconds": {
+    "12h": 43200
+  },
+  "data_snapshot_digest": "cf13fb5370bed1bb1c5921e1f125bb6f6c2275ff14152386e81c94b075416895",
+  "events": {
+    "ev0": {
+      "label_value": 0.045683137284181836,
+      "label_start_ms": 1708214400000,
+      "label_end_ms": 1708344000000,
+      "decision_at_ms": 1708171200000,
+      "entry_at_ms": 1708214400000,
+      "entry_price_ref": {
+        "bar_open_ms": 1708171200000,
+        "field": "close"
+      }
+    },
+    "ev1": {
+      "label_value": -0.003321623938632408,
+      "label_start_ms": 1708646400000,
+      "label_end_ms": 1708776000000,
+      "decision_at_ms": 1708603200000,
+      "entry_at_ms": 1708646400000,
+      "entry_price_ref": {
+        "bar_open_ms": 1708603200000,
+        "field": "close"
+      }
+    },
+    "ev2": {
+      "label_value": 0.0837383883252601,
+      "label_start_ms": 1709078400000,
+      "label_end_ms": 1709208000000,
+      "decision_at_ms": 1709035200000,
+      "entry_at_ms": 1709078400000,
+      "entry_price_ref": {
+        "bar_open_ms": 1709035200000,
+        "field": "close"
+      }
+    },
+    "ev3": {
+      "label_value": 0.06985469061820361,
+      "label_start_ms": 1709510400000,
+      "label_end_ms": 1709640000000,
+      "decision_at_ms": 1709467200000,
+      "entry_at_ms": 1709510400000,
+      "entry_price_ref": {
+        "bar_open_ms": 1709467200000,
+        "field": "close"
+      }
+    }
+  },
+  "nan_event_ids": [],
+  "analysis_alignment_receipt_hash": "a8fe82bcc0f6b9848bab2722c33f7310558e8d1657deef65b283737b9f4908da",
+  "purge_lower_bound_ms_by_symbol": {
+    "ETHUSDT": 129600000
+  }
+}

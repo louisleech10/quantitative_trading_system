@@ -675,9 +675,13 @@ def test_event_analysis_horizon_purge_14abd_coverage_filter_semantics():
     屆時語意必須已經是對的。
     """
     from momentum.Analysis.event_samples.label_value_from_case import (
-        PreparedAnalysisWindows, apply_event_coverage,
+        EntryPriceRef, PreparedAnalysisWindows, apply_event_coverage,
     )
 
+    refs = (
+        EntryPriceRef(event_id="evA", bar_open_ms=T0, field="open"),
+        EntryPriceRef(event_id="evB", bar_open_ms=T0, field="open"),
+    )
     base = PreparedAnalysisWindows(
         supported=True,
         windows=(win("evA", start=T0, end=T0 + H12_MS), win("evB", start=T0, end=T0 + H12_MS)),
@@ -685,13 +689,15 @@ def test_event_analysis_horizon_purge_14abd_coverage_filter_semantics():
         per_tf=(), normalized_spec_bytes=b"{}",
         allowed_event_ids=frozenset({"evA", "evB"}),
         purge_lower_bound_ms_by_symbol=(), prepared_token="tok",
-        reason=None, direction_sign=1,
+        reason=None, direction_sign=1, entry_price_refs=refs,
     )
     # (a)(b)：剔除後之 allowed 就是後續 manifest／split 之唯一定義域
     kept = apply_event_coverage(base, frozenset({"evA"}))
     assert kept.allowed_event_ids == frozenset({"evA"})
     assert kept.prepared_token == base.prepared_token       # 身分攜帶
     assert kept.windows == base.windows                     # windows 本身不被剔除，濾的是 allowed
+    # `D-001` D4.1 ⑤：`replace` 原樣攜帶 `entry_price_refs`（refs 與 windows 同序同長，不隨 coverage 縮）
+    assert kept.entry_price_refs == refs
     # (d)：allowed 為**空** ⇒ 仍回一個合法物件（由編排層走 loud），不是靜默出空表
     empty = apply_event_coverage(base, frozenset())
     assert empty.allowed_event_ids == frozenset()
