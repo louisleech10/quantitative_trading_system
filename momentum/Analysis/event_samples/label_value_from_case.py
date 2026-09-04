@@ -70,8 +70,25 @@ from momentum.Analysis.event_samples.types import AlignmentConfig
 # §F-1′ 支援矩陣（封閉）與 §F-2′ reason
 # ---------------------------------------------------------------------------
 
-#: 🔴 本批**只**支援這一個三元組。`horizon_bars` 為**任意正整數**，不受矩陣限制。
-#  三元組以外一律 fail-closed——不是「盡量算」，因為算出來的數字沒有語意對應。
+#: 🔴 §F-1′ 支援矩陣之**唯一**來源（`D-001` Task D1.3）：封閉之 `(entry, mode, k)` 三元組集合。
+#  `horizon_bars` 為**任意正整數**，不參與矩陣判定。
+#  矩陣外一律 fail-closed——不是「盡量算」，因為算出來的數字沒有語意對應。
+#
+#  🔴 為什麼是**單一常數集合**而不是三個純量：後續 phase（D4.2）要把它擴到 13 對 × k∈ℕ，
+#     三個純量表達不了「成對」關係（例如 `(trigger_close, open_to_close)` 幾何上窗長 0 必拒，
+#     而 `(trigger_open, open_to_close)` 合法）。擴充時**只動這個集合**，`spec_is_supported` 不改。
+#
+#  D1 內容＝四對（裁定② v2 之三種報酬選項 ＋ 既有 `trigger_close × close_to_close`）：
+#  後三對之 `open_to_*` 取價依賴 **B-D0（Task D4.1）** 之 `entry_price_refs` 側載。
+SUPPORTED_MATRIX: frozenset = frozenset({
+    ("trigger_close", "close_to_close", 0),        # 既有（本批之前唯一支援者）
+    ("trigger_open", "close_to_close", 0),         # 「續漲」之 entry 變體：取價路徑不變（錨與 entry 無關＝D1-5）
+    ("trigger_open", "open_to_close", 0),          # 「當根」：基準＝t₀ 之 open（依賴 B-D0）
+    ("trigger_open", "open_to_horizon_close", 0),  # 「持有」：基準＝t₀ 之 open、終點＝t₀+h 之 close（依賴 B-D0）
+})
+
+#: **deprecated 別名**（`D-001` D1.3 實作要點④）：保留三個舊常數名避免既有 import 斷裂。
+#  🔴 它們**不再是判定依據**——判定唯一走 `SUPPORTED_MATRIX`。新碼禁用。
 SUPPORTED_ENTRY_PRICE_SEMANTIC = "trigger_close"
 SUPPORTED_LABEL_RETURN_MODE = "close_to_close"
 SUPPORTED_DECISION_OFFSET_BARS = 0
@@ -268,12 +285,16 @@ def normalized_spec_bytes_of(event_label_spec: Any) -> bytes:
 
 
 def spec_is_supported(normalized: Mapping[str, Any]) -> bool:
-    """§F-1′ 支援矩陣。`horizon_bars` **不參與**判定（任意正整數皆可）。"""
+    """§F-1′ 支援矩陣＝查 `SUPPORTED_MATRIX`。`horizon_bars` **不參與**判定（任意正整數皆可）。
+
+    🔴 判定只有這一行：擴充支援域一律改 `SUPPORTED_MATRIX`，**不得**在此加 `or` 分支
+    ——加了就有第二份矩陣，而 UI 之可選集合是由契約導出的，兩份必然漂移。
+    """
     return (
-        normalized["entry_price_semantic"] == SUPPORTED_ENTRY_PRICE_SEMANTIC
-        and normalized["label_return_mode"] == SUPPORTED_LABEL_RETURN_MODE
-        and normalized["decision_offset_bars"] == SUPPORTED_DECISION_OFFSET_BARS
-    )
+        normalized["entry_price_semantic"],
+        normalized["label_return_mode"],
+        int(normalized["decision_offset_bars"]),
+    ) in SUPPORTED_MATRIX
 
 
 # ---------------------------------------------------------------------------

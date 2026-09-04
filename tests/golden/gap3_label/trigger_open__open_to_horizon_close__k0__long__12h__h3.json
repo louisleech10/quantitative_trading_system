@@ -61,7 +61,5 @@
   "analysis_alignment_receipt_hash": "57fb7afc952bf56af2f88f244b5fa50b6e4430d2184a2d6f07ee63c9183efc81",
   "purge_lower_bound_ms_by_symbol": {
     "ETHUSDT": 172800000
-  },
-  "matrix_pending": true,
-  "matrix_pending_reason": "Phase D0 只交付取價路徑；SUPPORTED_MATRIX 之開放為 D-001 Task D1.3 之交付"
+  }
 }

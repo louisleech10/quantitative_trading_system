@@ -40,6 +40,9 @@ _BAR_COLS = ("open_time_ms", "close_time_ms", "open", "close")
 # CODEX-R1-P1-03：平台產生器之 control_kind 寫死為 platform_same_trigger_rule，不可由設定覆寫
 # （user_labeled_* 只得由匯入路徑產生）；字面於 _check_inputs 對契約 accepted 對證。
 PLATFORM_CONTROL_KIND = "platform_same_trigger_rule"
+#: `G3-D2` D1.1：平台產生器批之 `label_origin`。與 `PLATFORM_CONTROL_KIND` 同構——
+#: 字面在此宣告一次，於 `generate_events` 入口對證契約枚舉（不在契約內即 raise，漂移 fail-closed）。
+_PLATFORM_LABEL_ORIGIN = "platform_generator"
 
 
 @dataclass(frozen=True)
@@ -124,9 +127,16 @@ def _check_inputs(spec: ConditionSpec, bars_by_tf: Mapping[str, pd.DataFrame], l
         raise ValueError("generate_events: data_snapshot_digest 必填非空")
     if int(gen_config.decision_offset_bars) < 0:
         raise ValueError("generate_events: decision_offset_bars 須 ≥ 0")
-    accepted = load_event_import_contract()["required_fields"]["control_kind"]["accepted"]
+    contract = load_event_import_contract()
+    accepted = contract["required_fields"]["control_kind"]["accepted"]
     if PLATFORM_CONTROL_KIND not in accepted:
         raise ValueError(f"generate_events: {PLATFORM_CONTROL_KIND!r} 不在契約 control_kind.accepted")
+    # `G3-D2` D1.1：`label_origin` 之字面對證（漂移 fail-closed，與上一條同構）。
+    lo = contract["optional_fields"]["label_origin"]
+    if _PLATFORM_LABEL_ORIGIN not in lo["enum"]:
+        raise ValueError(f"generate_events: {_PLATFORM_LABEL_ORIGIN!r} 不在契約 label_origin.enum")
+    if _PLATFORM_LABEL_ORIGIN in lo["not_importable"]:
+        raise ValueError(f"generate_events: {_PLATFORM_LABEL_ORIGIN!r} 屬 label_origin.not_importable，產生器批無法匯入")
 
 
 def generate_events(
@@ -208,6 +218,12 @@ def generate_events(
                 "entry_price_semantic": gen_config.entry_price_semantic,
                 "direction": gen_config.direction,
                 "scenario": gen_config.scenario,
+                # 🔴 `G3-D2` D1.1：平台產生器批之 provenance。契約 `optional_fields.label_origin`
+                #    對 `scenario ∈ {A,B,two_stage}` 條件必填；產生器可被指定任一 scenario
+                #    （見 `GeneratorConfig.scenario`），故一律標記，**不依 scenario 分支**
+                #    ——分支會讓「產生器批」在 C 之外的 scenario 下變成無 provenance 的批。
+                #    字面取自契約枚舉，不在此硬寫（`_PLATFORM_LABEL_ORIGIN` 於載入時對證）。
+                "label_origin": _PLATFORM_LABEL_ORIGIN,
                 "label": int(y),
                 "label_value": float(sign * (close[i + h] / close[i] - 1.0)),
                 "label_definition": {"rule_id": r.label_id, "canonical_digest": lm["canonical_digest"],

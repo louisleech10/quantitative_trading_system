@@ -471,6 +471,14 @@ def validate_event_import(
     if len(rows) == 0:
         raise ContractValidationError([{"row": None, "event_id": None, "field": None, "reason": "empty_import"}])
 
+    # 🔴 `G3-D2` D1.1 邊界②：**批內 `scenario` 混值時，本票兩條新規則一律不判**。
+    #    理由是 reason 的優先序（D-001 D1.1 邊界②逐字）：混值批之正確 reason 是 Task 1.8 之
+    #    `heterogeneous_rows_in_batch`／下游之混值拒收；新規則若照判，會在同一批疊上
+    #    `conditional_required_missing`，把真正的問題（批本身不該混）蓋掉。
+    #    在迴圈**之前**算，因為它是批次層事實，不是逐列事實。
+    _batch_scenarios = {r.get("scenario") for r in rows if isinstance(r.get("scenario"), str)}
+    _batch_scenario_mixed = len(_batch_scenarios) > 1
+
     # ---- 批次預設（Task 1.8）：**只填補缺值，絕不覆蓋列自帶值** ----
     # CSV 與 JSON 兩路徑共用之唯一套用點（V-3 之 AST oracle 涵蓋面）。
     if batch_defaults:
@@ -590,6 +598,17 @@ def validate_event_import(
                 fail(i, eid, "counterexample_kind", "enum_violation")
         if has("kind_source") and r["kind_source"] not in opt["kind_source"]["enum"]:
             fail(i, eid, "kind_source", "enum_violation")
+        # ---- `G3-D2` D1.1：`label_origin` 之枚舉與 not_importable ----
+        # 🔴 枚舉與 not_importable 清單**一律讀契約**（`opt["label_origin"]`），不得在此硬寫字面
+        #    ——與上方 `counterexample_kind` 同構（那條的 `unclassifiable` 是硬寫的既有債，
+        #    本條不複製該壞法）。
+        if has("label_origin"):
+            v = r["label_origin"]
+            lo_spec = opt["label_origin"]
+            if v not in lo_spec["enum"]:
+                fail(i, eid, "label_origin", "enum_violation")
+            elif v in lo_spec["not_importable"]:
+                fail(i, eid, "label_origin", "label_origin_not_importable")
         if has("meta") and not isinstance(r["meta"], dict):
             fail(i, eid, "meta", "type_error")
         # ---- D-004 A-020：Task 4.1 之匯出欄（`/search` 匯出檔須能原樣匯回） ----
@@ -606,6 +625,28 @@ def validate_event_import(
         for name in _ATTACHED_FUTURE_COLUMNS:
             if name in opt and has(name) and not _is_finite_num(r[name]):
                 fail(i, eid, name, "type_error")
+
+        # ---- `G3-D2` D1.1：scenario 相關之兩條條件規則 ----
+        # 🔴 兩條都**只在 scenario 欄本身合法時**才判：`scenario` 缺欄／枚舉外之列，
+        #    上方既有的 required／enum 檢查已 fail，此處再判會對同一列疊第二個 reason，
+        #    使「哪一條先擋」變得不可預測（D-001 邊界②：Task 1.8 之混值拒收先於本規則）。
+        scen = r.get("scenario")
+        if not _batch_scenario_mixed and scen in req["scenario"]["enum"]:
+            # (a) provenance 條件必填：預測型／兩段式須宣告 label 從哪來。
+            #     🔴 舊批（`scenario == "C"` 且無 `label_origin`）**不受本條約束**——
+            #     這是通則不是特例：讀路徑對缺欄一律回 null（D-001 §N 之 9/1 九批殘留）。
+            if scen in ("A", "B", "two_stage") and r.get("label_origin") is None:
+                fail(i, eid, "label_origin", "conditional_required_missing")
+            # (b) 深度自洽：A／two_stage 之事件相對決策為未來 ⇒ 深度至少 1。
+            #     🔴 `lookahead_bars_declared` **缺欄或空 map ⇒ 不由本條擋**（D-001 邊界①）：
+            #     那是 D-7 L2 之「缺宣告」拒收的定義域，本條若搶著報
+            #     `scenario_depth_inconsistent`，真正的 reason（缺宣告）就被覆蓋掉了。
+            if scen in ("A", "two_stage"):
+                depth_map = r.get("lookahead_bars_declared")
+                if isinstance(depth_map, dict) and depth_map:
+                    vals = [v for v in depth_map.values() if isinstance(v, int) and not isinstance(v, bool)]
+                    if vals and max(vals) < 1:
+                        fail(i, eid, "lookahead_bars_declared", "scenario_depth_inconsistent")
 
         # ---- 條件必填 ----
         if has("reference_symbols"):

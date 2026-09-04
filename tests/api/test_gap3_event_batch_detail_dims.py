@@ -99,6 +99,11 @@ def test_event_batch_detail_dims_05_values_equal_stored_records(_isolated_storag
         make_event(
             i, label=i % 2, scenario="A", control_kind="user_labeled_other",
             entry_price_semantic="next_open", decision_offset_bars=2,
+            # `G3-D2` D1.1：`scenario ∈ {A,B,two_stage}` ⇒ `label_origin` 條件必填。
+            # 本 fixture 走使用者匯入路徑 ⇒ `user_csv`。
+            label_origin="user_csv",
+            # 同票：A／two_stage 須深度 ≥ 1，否則 `scenario_depth_inconsistent`。
+            lookahead_bars_declared={"12h": 2},
             label_definition={
                 "rule_id": "rule-x", "canonical_digest": "c" * 64,
                 "window": {"horizon_bars": 2}, "label_return_mode": "open_to_close",

@@ -93,6 +93,11 @@ _watched_for() {
     "GAP-3規格42個Task勾選表.md")    echo "docs/GAP3_EVENT_UX_SPEC.md" ;;
     # R11：凍結進度之白話總覽——盯 SPEC 本體（規格一改，「還差什麼」必須跟著重講）
     "GAP-3還差什麼才算完整.md")      echo "docs/GAP3_EVENT_UX_SPEC.md" ;;
+    # 🔴 施工流程即時進度（2026-09-04 使用者要求：「白話說明要有施工流程進度，讓我隨時知道進度到哪」）。
+    #   盯**當前施工的實作路徑＋施工清單**：任何一處動了而本檔沒動 ⇒ 使用者看到的進度是過期的，
+    #   而這份檔案存在的唯一理由就是「隨時看得到現在在哪」——過期即等於沒有。
+    #   WATCHED 刻意含 `scripts/`：本票會新增／改動驗收與 golden 腳本，那也是進度。
+    "現在做到哪.md")                 echo "momentum/Analysis/event_samples/ momentum/Analysis/contracts/event_import_contract.json api/routes/ api/services/ frontend/src/lib/eventDimensions.ts frontend/src/components/ic-analysis/ tests/golden/gap3_label/ scripts/ docs/GAP3_EVENT_UX_TODO.D-006.md docs/GAP3_EVENT_UX_SPEC.D-001.md docs/GAP3D2_IMPL_HANDOFF.md" ;;
     # G3-D2 灰色項目白話說明（2026-09-03 使用者：「SPEC 和 TODO Frozen 後先停下，寫白話說明且舉例」）：
     #   盯 SPEC 延伸 D-001 與 TODO 延伸 D-006——規格或清單一改，白話與範例必須跟著改。
     "G3-D2灰色項目說明.md")          echo "docs/GAP3_EVENT_UX_SPEC.D-001.md docs/GAP3_EVENT_UX_TODO.D-006.md" ;;

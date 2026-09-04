@@ -13,7 +13,8 @@
     "entry_price_semantic": {
       "type": "str",
       "enum": ["trigger_open", "trigger_close", "next_open", "decision_bar_open", "decision_bar_close"],
-      "doc": "entry bar/price 唯一映射見 SPEC D1-6；事件頂層欄，不住 label_definition"
+      "default": "trigger_close",
+      "doc": "entry bar/price 唯一映射見 SPEC D1-6；事件頂層欄，不住 label_definition。default 為**前端誠實預設之唯一來源**（原檔 §F-3′；D-001 D1.1 契約字面總表／D4.2 pair 重設亦讀本值），前端禁硬編字面。🔴 validator **不讀** default：本欄仍為 required_fields，缺欄一律 missing_required_field（default 只服務 UI 之初始值與 pair 重設）"
     },
     "direction": {
       "type": "str",
@@ -24,7 +25,7 @@
     "scenario": {
       "type": "str",
       "enum": ["A", "B", "C", "two_stage"],
-      "doc": "A/B 預測型（事件在未來、不進特徵）／C 確認型／兩段式；D2 分路徑鍵"
+      "doc": "D2 分路徑鍵。決策時點恆為 t₀−k 之 open（D2-2 單一表示法）。B＝預測型（原 A 已併入；有無用未來根由 lookahead_bars_declared 之深度宣告區分，非由 scenario 值區分）。C＝確認型，語意上等於深度 0 之事件；🔴 **「收盤後才決策」（decision_at = t₀ close、事件已知可進特徵）在 D2-2 下不可表示**，殘留 G3-R13 待使用者裁定。A／B＝事件相對決策為未來 ⇒ event_known_at_decision=false。two_stage＝兩段式，深度取兩段較大者；**兩段各自之 label_value 未交付**（殘留）"
     },
     "label": { "type": "int", "enum": [0, 1], "doc": "答案欄；1=正例 0=反例" },
     "label_definition": {
@@ -70,6 +71,12 @@
       "doc": "僅使用者填；unclassifiable 不可匯入（⇒ counterexample_kind_not_importable）"
     },
     "kind_source": { "type": "str", "enum": ["user", "platform_auto"], "doc": "分類來源；使用者已標 ⇒ user、平台不重算不回寫" },
+    "label_origin": {
+      "type": "str",
+      "enum": ["search_positive_case", "user_csv", "platform_generator", "platform_random", "search_unlabeled"],
+      "not_importable": ["search_unlabeled"],
+      "doc": "GAP-3 `G3-D2` D1.1：label 之 provenance（這批的答案是怎麼來的）。search_positive_case=/search 匯出之正例；user_csv=使用者自標 CSV；platform_generator=平台產生器；platform_random=隨機對照組（D5）；search_unlabeled=/search 之未標籤匯出（**不可匯入**，只走 two_stage 之未標籤路徑，D3.1）。🔴 值屬 not_importable ⇒ label_origin_not_importable；scenario ∈ {A,B,two_stage} 而缺本欄 ⇒ conditional_required_missing。**舊批（scenario=C 且無本欄）不受條件必填約束、不補值**，讀路徑回 null"
+    },
     "search_rule_summary": { "type": "str", "doc": "U2 當時搜尋條件摘要" },
     "event_source": { "type": "str" },
     "observable_family": { "type": "str" },
@@ -134,7 +141,8 @@
     "direction_mixed_in_batch", "conditional_required_missing", "research_only",
     "digest_mismatch", "label_value_type_error", "counterexample_kind_not_importable",
     "column_mapping_missing", "column_not_found_in_file",
-    "label_column_not_binary", "heterogeneous_rows_in_batch"
+    "label_column_not_binary", "heterogeneous_rows_in_batch",
+    "scenario_depth_inconsistent", "label_origin_not_importable"
   ],
   "alignment_failure_reasons": [
     "invalid_timestamp_unit", "timezone_missing", "missing_bar", "duplicate_bar", "unsorted_bar",
@@ -180,7 +188,8 @@
       "label_end_ms": "int",
       "entry_after_label_start": "bool",
       "symbol": "str",
-      "timeframe": "str"
+      "timeframe": "str",
+      "event_known_at_decision": "bool"
     },
     "per_tf": {
       "event_id": "str",

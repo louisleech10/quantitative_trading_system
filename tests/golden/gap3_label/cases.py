@@ -16,9 +16,15 @@ TF = "12h"
 TF_SECONDS = {"12h": 43200}
 DECLARED = {"12h": 0}
 
-#: Phase D0 之 `matrix_pending` 理由（D1.3 開矩陣後這些條目須移除本旗標並重凍）。
+#: `matrix_pending` 之理由字面。**現行使用者＝k>0 案例**（`decision_bar_open × k=2`）：
+#: D1.3 之 `SUPPORTED_MATRIX` 四對皆 k=0，k>0 之開放留待 **Task D4.2**。
+#: 🔴 loader 之**反向 fail-closed 已實測生效**：D1.3 開矩陣後，四個 k=0 之 `open_to_*` 案例
+#: 仍留著本旗標 ⇒ `--check` 當場 `GoldenError`（4 檔紅），迫使移除並重凍。
+#: 🔴 **移除本旗標時勿全域取代**（2026-09-04 踩過）：`pending=True` 曾被一次 sed 全改成 False，
+#: 連 k=2 那兩檔一起改掉，於是它們被凍成「全 None」（`變動鍵=['events','nan_event_ids']` 即警訊）。
+#: 重凍前後**必須**逐位元組比對備份。
 _D0_PENDING = (
-    "Phase D0 只交付取價路徑；SUPPORTED_MATRIX 之開放為 D-001 Task D1.3 之交付"
+    "k>0 尚不在 SUPPORTED_MATRIX（D1.3 四對皆 k=0）；k>0 之開放為 D-001 Task D4.2 之交付"
 )
 
 
@@ -87,10 +93,10 @@ CASES: Tuple[Mapping[str, Any], ...] = (
     _case("trigger_close", "close_to_close", 0, "short", 3, selector="plain:4", pending=False),
     _case("trigger_close", "close_to_close", 0, "long", 1, selector="gap_bars:3", pending=False),
     # 跳空 bar × open 語意（D0 之主交付）
-    _case("trigger_open", "open_to_close", 0, "long", 1, selector="gap_bars:3", pending=True),
-    _case("trigger_open", "open_to_close", 0, "short", 1, selector="gap_bars:3", pending=True),
-    _case("trigger_open", "open_to_horizon_close", 0, "long", 3, selector="gap_bars:3", pending=True),
-    _case("trigger_open", "open_to_horizon_close", 0, "short", 3, selector="gap_bars:3", pending=True),
+    _case("trigger_open", "open_to_close", 0, "long", 1, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "open_to_close", 0, "short", 1, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "open_to_horizon_close", 0, "long", 3, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "open_to_horizon_close", 0, "short", 3, selector="gap_bars:3", pending=False),
     _case("decision_bar_open", "open_to_horizon_close", 2, "long", 3, selector="gap_bars:3", pending=True),
     _case("decision_bar_open", "open_to_horizon_close", 2, "short", 3, selector="gap_bars:3", pending=True),
 )

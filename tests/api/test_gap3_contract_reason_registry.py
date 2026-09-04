@@ -52,6 +52,10 @@ def test_gap3_contract_reason_registry_01_import_failure_added(pre: dict, now: d
         "column_not_found_in_file",
         "label_column_not_binary",
         "heterogeneous_rows_in_batch",
+        # `G3-D2` D1.1（2026-09-04）：本票新增之兩個 reason。
+        # 🔴 **集合相等未放寬**——多出未登記之 reason 仍會紅（本條之防偽價值就在此）。
+        "scenario_depth_inconsistent",
+        "label_origin_not_importable",
     }
 
 

@@ -33,6 +33,9 @@ _EVENT_COLS = [
     "entry_price_source_bar_open_ms", "entry_price_source_field",
     "label_start_ms", "label_end_ms", "entry_after_label_start",
     "symbol", "timeframe",
+    # 🔴 `G3-D2` D1.2：**追加在末位**（見上方前綴保留之註解——插中間會弄紅
+    #    `…_08a_flatten_prefix_preserved`）。契約 `receipt_schema.event_level` 同步。
+    "event_known_at_decision",
 ]
 _PER_TF_COLS = ["event_id", "timeframe", "feature_cutoff_ms", "last_bar_open_ms", "last_bar_close_ms", "row_id"]
 
@@ -220,6 +223,12 @@ def align_events(
                 # 語意＝entry 不早於 label 錨（>=）：連續 crypto 網格下 next_open 之 entry_at
                 # 恰等於 t0 close（=label_start），SPEC D2-1 明定該組合 ⇒ true，故用 >= 非 >。
                 "entry_after_label_start": bool(entry_at >= label_start),
+                # 🔴 `G3-D2` D1.2：「事件於決策時是否已知」＝`decision_at >= t₀ 之 close`。
+                #    **機械導出、照實寫**：不依 `scenario` 推導（那是使用者宣告，不是事實），
+                #    不猜。D2-2 單一表示法下 `decision_at = ot[t0_idx − k] <= ot[t0_idx] < ct[t0_idx]`
+                #    ⇒ 本欄恆 `False`；恆 False 不代表可以省略——它是 D2-2 的**可證偽等式**，
+                #    哪天 D2-2 被改（見殘留 `G3-R13`），這一欄會自己變 True 而不是靜默不變。
+                "event_known_at_decision": bool(decision_at >= int(ct[t0_idx])),
             })
             tf_rows.extend(tf_batch)
         except _EventFailure as ef:
