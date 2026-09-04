@@ -150,6 +150,21 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
     #       結果整批都是 `True` 時 `k_values` 為空而被當成「全缺」放行——我自己的
     #       over 向測試當場抓到）。缺＝歷史批的合法形狀（全批一致即放行）；
     #       型別錯＝落檔已損壞，任何情況都不得進分析。
+    #    🔴 **R5 閉合輪 `CODEX-R5-P1-01`：只驗型別、沒驗值域** ⇒ 負整數 `-1` 通過本閘
+    #       （它確實是 int），到 `normalize_event_label_spec` 才拋 `須 >= 0`。
+    #       codex 實跑：`negative_all RESOLVED -1`。
+    #       ⇒ **同一病灶第四刀**：R3 型別、R4 缺、R5 值域，每輪手刻一條新規則，
+    #       而契約 `event_import_contract.json` 對該欄一直寫著 `{"type": "int", "min": 0}`。
+    #       **手刻永遠補不完，因為值域是資料、不是程式碼。**
+    #       ⇒ 改為由 `EventSamplePipeline.int_field_domain()`（R3 出口）**從契約導出**，
+    #       契約日後改 `min`／加 `max`，這裡自動跟著改。
+    #       出口一律走 `momentum.factories`（Rule 3；直接 import
+    #       `momentum.Analysis.event_samples.pipeline` 會被 `check_decoupling_imports.py`
+    #       當場擋——本輪實際踩到一次，見 commit 訊息）。
+    from momentum.factories import create_event_sample_pipeline
+
+    k_domain = create_event_sample_pipeline().int_field_domain("decision_offset_bars")
+    k_min, k_max = k_domain["min"], k_domain["max"]
     k_values = set()
     k_missing = False
     k_invalid = []
@@ -159,6 +174,9 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
             k_missing = True
         elif isinstance(v, bool) or not isinstance(v, int):
             # bool 是 int 的子型別且 `True` 會被當成 1 ⇒ 一律視為型別錯，不是 k=1。
+            k_invalid.append(v)
+        elif (k_min is not None and v < k_min) or (k_max is not None and v > k_max):
+            # 值域外＝與型別錯同一類「落檔已損壞」，不另立第四個 kind（三家 R5 判三分已足）。
             k_invalid.append(v)
         else:
             k_values.add(int(v))
@@ -182,9 +200,12 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
         raise HTTPException(status_code=422, detail={
             "kind": "invalid_decision_offset_bars",
             "message": (
-                f"事件批 {request.event_import_id!r} 之 decision_offset_bars 有非整數值"
-                f"（{k_invalid[:3]}）。契約要求本欄為 int>=0；出現其他型別代表落檔已損壞或"
-                "繞過了匯入驗證，分析層不猜測其意圖。"
+                f"事件批 {request.event_import_id!r} 之 decision_offset_bars 有不合契約的值"
+                f"（{k_invalid[:3]}）。契約要求本欄為 int"
+                # 🔴 字面由契約導出，不手寫「>=0」——契約改 min 這句才不會過期。
+                f"{'' if k_min is None else f'>={k_min}'}"
+                f"{'' if k_max is None else f'<={k_max}'}"
+                "；出現其他型別或超出值域代表落檔已損壞或繞過了匯入驗證，分析層不猜測其意圖。"
             ),
         })
     ks = sorted(k_values)

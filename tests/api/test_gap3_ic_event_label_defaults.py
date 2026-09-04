@@ -384,3 +384,99 @@ def test_r3_closure_uniform_k_survives_rewrite_path(_isolated_storage):
     import_id = _legacy_batch(_isolated_storage, lambda rs: None, k=2)
     out = _resolve_event_batch(_Req(import_id))
     assert out["event_label_spec"]["decision_offset_bars"] == 2
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# B-D1 R5 閉合輪 — `CODEX-R5-P1-01`：值域（負值）＋ composer 之「缺＋型別錯」組合
+#
+# 選擇器：`pytest tests/api/test_gap3_ic_event_label_defaults.py -q -k r5_closure`
+# ══════════════════════════════════════════════════════════════════════════
+
+def test_r5_closure_negative_decision_offset_bars_is_rejected(_isolated_storage):
+    """`CODEX-R5-P1-01`：整批負整數 k ⇒ route 當場 422，不得留到 normalizer。
+
+    🔴 修正前：`-1` 是合法 int ⇒ 通過型別過濾、`resolved -1`，
+    到 `normalize_event_label_spec` 才拋 `須 >= 0`。codex 實跑 `negative_all RESOLVED -1`。
+    這是同一病灶第四刀（型別 → 缺 → 值域），故修法改為**從契約導出值域**。
+    """
+    from fastapi import HTTPException
+
+    def _neg_all(rs):
+        for r in rs:
+            r["decision_offset_bars"] = -1
+
+    import_id = _legacy_batch(_isolated_storage, _neg_all)
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.status_code == 422
+    assert ei.value.detail["kind"] == "invalid_decision_offset_bars"
+
+
+def test_r5_closure_mixed_negative_and_valid_is_rejected(_isolated_storage):
+    """同上之混合形狀：一列 `-1`、一列合法 ⇒ 亦須 422（走 invalid，非 mixed）。"""
+    from fastapi import HTTPException
+
+    def _neg_first(rs):
+        rs[0]["decision_offset_bars"] = -1
+
+    import_id = _legacy_batch(_isolated_storage, _neg_first)
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.detail["kind"] == "invalid_decision_offset_bars", \
+        "值域外與型別錯同類，應優先於 mixed 回報"
+
+
+def test_r5_closure_missing_plus_invalid_reports_invalid(_isolated_storage):
+    """composer R5 之建議：**「缺」與「型別錯」同時出現**時之訊息未被釘住。
+
+    主委在 R5 brief 之 assumed 寫「型別錯優先於缺是對的，但沒有測試釘住這個順序」。
+    三家判此為 P2、不阻 B-D3；本輪一併補，不另等一輪。
+    """
+    from fastapi import HTTPException
+
+    def _missing_and_bad(rs):
+        rs[0].pop("decision_offset_bars", None)
+        rs[1]["decision_offset_bars"] = "bad"
+
+    import_id = _legacy_batch(_isolated_storage, _missing_and_bad)
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert ei.value.detail["kind"] == "invalid_decision_offset_bars", \
+        "型別錯（落檔已損壞）比缺（歷史批的合法形狀）嚴重，應優先回報"
+
+
+def test_r5_closure_domain_comes_from_contract_not_hardcoded(_isolated_storage):
+    """🔴 **本條釘住的是修法的形狀，不是行為**：值域須**從契約導出**。
+
+    R3／R4／R5 三輪都在 route 手刻一條新規則，而契約一直寫著 `{"type": "int", "min": 0}`。
+    本條證明兩件事：① 出口真的讀到契約的 `min`；② 錯誤訊息的字面由該值導出
+    ——契約日後改 `min`，訊息不會過期。
+
+    這條若紅，代表有人把值域改回手寫常數。
+    """
+    from fastapi import HTTPException
+    from momentum.factories import create_event_sample_pipeline
+
+    domain = create_event_sample_pipeline().int_field_domain("decision_offset_bars")
+    assert domain["min"] == 0, "契約對 decision_offset_bars 宣告之 min 應為 0"
+
+    def _neg_all(rs):
+        for r in rs:
+            r["decision_offset_bars"] = -1
+
+    import_id = _legacy_batch(_isolated_storage, _neg_all)
+    with pytest.raises(HTTPException) as ei:
+        _resolve_event_batch(_Req(import_id))
+    assert f">={domain['min']}" in ei.value.detail["message"], \
+        "訊息之值域字面須由契約導出，不得手寫"
+
+
+def test_r5_closure_unknown_field_domain_is_fail_closed():
+    """🔴 出口本身之 fail-closed：問一個契約沒有的欄 ⇒ `KeyError`，不得回「無界」。
+
+    回一個無界的 domain 會讓呼叫端**以為驗過了**——那正是本輪要根治的病。
+    """
+    from momentum.factories import create_event_sample_pipeline
+
+    with pytest.raises(KeyError):
+        create_event_sample_pipeline().int_field_domain("no_such_field_in_contract")

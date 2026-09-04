@@ -331,6 +331,36 @@ class EventSamplePipeline:
         return "、".join(f"({e}, {m}, k={k})" for e, m, k in sorted(SUPPORTED_MATRIX))
 
     @staticmethod
+    def int_field_domain(field: str) -> Mapping[str, Any]:
+        """把契約對某個**整數欄**宣告的值域交出來（`G3-D2` R5 之 R3 出口）。
+
+        回 `{"min": <int|None>, "max": <int|None>}`——不含型別字串，因為呼叫端要的是
+        「這個值合不合法」，型別由 Python 自己判。
+
+        🔴 **為什麼要有這個出口（出生事故）**：`decision_offset_bars` 的驗證在
+        `api/routes/ic_analysis.py` 被**逐輪手刻**——R3 補型別過濾、R4 補「整批都缺」、
+        R5 由 codex 打穿「負整數」（`CODEX-R5-P1-01`：`negative_all RESOLVED -1`，
+        到 `normalize_event_label_spec` 才拋 `須 >= 0`）。
+        而契約 `event_import_contract.json` 對該欄寫的一直都是 `{"type": "int", "min": 0}`。
+        **手刻永遠補不完，因為值域是資料、不是程式碼**：契約改了 `min`，手刻那份不會跟著改。
+        ⇒ 改由本出口導出，`min`／`max` 日後在契約異動時自動生效。
+
+        `api/` 不得 import `momentum`（Rule 3；`check_decoupling_imports.py` 會當場擋），
+        故走與 `supported_matrix_text()` 相同的 R3 出口模式。
+
+        未宣告 `min`／`max` 者回 `None`（＝該側無界），呼叫端據此略過該側檢查。
+        欄名不在契約內即 `KeyError`——fail-closed，不回一個「無界」讓呼叫端誤以為驗過了。
+        """
+        from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+
+        contract = load_event_import_contract()
+        for group in ("required_fields", "optional_fields", "conditional_required"):
+            spec = contract.get(group, {}).get(field)
+            if isinstance(spec, dict):
+                return {"min": spec.get("min"), "max": spec.get("max")}
+        raise KeyError(f"int_field_domain: 契約無此欄 {field!r}（required／optional／conditional 皆無）")
+
+    @staticmethod
     def project_purge(purge_rows) -> Mapping[str, int]:
         """Task 7.0b 階段 4 之 R3 出口：`tuple[SymbolPurgeRow, ...]` → read-only `Mapping[str,int]`。
 
