@@ -2417,6 +2417,10 @@ SPEC 對抗審 R3／R4 時因「A／B 之 label 來源未定義」把 <code>/sea
 <strong>補救</strong>：<code>docs/GAP3D2_KICKOFF_HANDOFF.md</code> §0 加註「使用者主目標＝B」；(a) 排第一。</p>
 <hr />
 <h2 id="2026-09-04b-d0-派工委員-codex-三度交不出東西而我兩度沒查根因就結案">2026-09-04（B-D0 派工）委員 codex 三度交不出東西，而我兩度沒查根因就結案</h2>
+<blockquote>
+<p>🔴 <strong>先讀本節末的「追記」</strong>：本節下方那個「根因＝全域 skill 劫持」的結論<strong>已被推翻並收回</strong>。
+保留原文是為了留下我判斷錯誤的過程，不是因為它成立。</p>
+</blockquote>
 <p><strong>事實</strong>：B-D0 的三家審碼，composer 與 grok 各約 1–7 小時交件、皆零 finding。
 codex 首派跑了<strong>逾 10 小時</strong>、runlog 941KB，沒有產出檔；我判它「外部端超時」、走
 <code>debt_clear.sh --abandon --kind collection-failed</code> 後單家重派；重派再跑<strong>逾 3 小時</strong>、1.42MB，
@@ -2451,6 +2455,45 @@ codex 仍被劫持 —— 因為 <strong>skill 內容先於 brief 進它的 cont
 兩家皆零 P0／P1、皆 APPROVE 兩個主委裁定，grok 另自建 raw-bar 期望表 26/26 獨立覆核）。
 codex 恢復為審碼家族的前提＝停用那個全域 skill，<strong>但那是使用者跨所有 AI 工具的個人設定，未經同意不擅改</strong>，
 已列入 <code>HANDOFF.md</code> 待裁定區。殘留代號 <code>B0-REVIEW-1</code>／<code>B0-REVIEW-2</code>／<code>B0-ATTRIB-1</code>。</p>
+<h3 id="追記同日使用者問已經是三家審一兩個月了為何現在會有這問題">追記（同日，使用者問「已經是三家審一兩個月了，為何現在會有這問題？」）</h3>
+<p><strong>這一問把我上面那段的根因判定打掉了。我收回。</strong> 覆查結果：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>我原本的說法</th>
+<th>實查</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全域 skill 劫持＝根因</td>
+<td><strong>不成立</strong>。該 skill 檔案時間 5/25–6/15，存在兩個多月；而且 <code>20260903-gap3d2v2-x-review-r1</code>（命中 18 次）與 <code>20260903-gap3d2todo-x-review-r1</code>（17 次）<strong>同樣載入它，兩輪都正常交件</strong></td>
+</tr>
+<tr>
+<td>撞 context 壓縮所以卡死</td>
+<td><strong>不成立</strong>。<code>todo-r3</code>／<code>todo-r4</code>／<code>v2-r1</code> 都有 <code>hook: PreCompact</code>，全部交件</td>
+</tr>
+<tr>
+<td>輸出量太大</td>
+<td><strong>不成立</strong>。<code>todo-r2</code> 的 runlog 1.7MB 比 B-D0 的 941KB 更大，它交件了</td>
+</tr>
+<tr>
+<td>codex 根本沒做事</td>
+<td><strong>不成立</strong>。它成功跑完我的 mutation 腳本（<code>BASELINE rc=0</code>／<code>RESTORED rc=0</code>），只是最後沒寫產出檔</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>唯一真的只出現在 B-D0 的</strong>是 <code>collab: SpawnAgent</code> × 3，而那只在 R1 的<strong>重派</strong>那一次。</p>
+<p><strong>確定的差異（但這是推測性解釋，我沒有證明它就是原因）</strong>：前面 D-001／D-006 那幾十輪都是
+<strong>審文件</strong>（審 markdown 規格）；B-D0 是這個 epic <strong>第一次審程式碼</strong>——386 行 diff ＋ 10 條驗收命令，
+其中兩支 mutation 驅動各要重跑 pytest 六七次（合計約 15 次 pytest）。單家工作量是前面的數倍。</p>
+<p><strong>我在這件事上犯的第三個錯</strong>：查到一條線索（SpawnAgent × 3）就宣布是根因，還把它寫進
+<code>HANDOFF.md</code>、交接檔 §3、白話四份文件，並據此要使用者去改他的全域設定。
+<strong>一條線索不是根因</strong>——根因要能解釋「為什麼以前不會、現在會」，我那個解釋解釋不了。
+是使用者反問才發現。已全部改成「根因未定＋四個已排除假說＋反證命令」。</p>
+<p><strong>判準（往後照做）</strong>：宣布根因前，先自問一句「<strong>這個原因能解釋為什麼以前沒事嗎？</strong>」
+答不出來就不是根因，只能寫成「共因之一」或「待查」。
+尤其<strong>不得</strong>以未證成的根因為理由，要求使用者改動他自己的環境設定。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

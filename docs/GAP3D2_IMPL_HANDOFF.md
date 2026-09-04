@@ -55,14 +55,24 @@
 - **session 命名**：`<YYYYMMDD>-<epic>-<b<n>|x>-<kind>-r<N>`，kind ∈ {impl, review, stamp, consult, fix}；task-id＝session 大寫；違反 ⇒ 不發 token。
 - **PreToolUse gate**：含 `committee_run`／`cx_run` 或以 `codex|cursor-agent|grok|agy` 開頭之 Bash 指令需 **fresh token（900s）**；債 OPEN 時 `gate.sh dispatch` 拒發 ⇒ 先銷帳或 abandon。**查看檔案的 Bash 指令開頭勿寫家族名**（`for f in codex …` 會被當 dispatch 擋）。
 - **外部故障**：composer（`Cannot use this model: composer-2.5`／`read ETIMEDOUT`／`ECONNRESET`）、codex（chatgpt backend 404）、grok（API 500）整晚輪流出現 ⇒ `bash scripts/debt_clear.sh --abandon --round-id <id> --kind collection-failed --reason … --approver claude` → mint → `ROUND_ID=<id> bash scripts/cx_run.sh <family> <brief> <out>`（背景）。兩正式家族＝review quorum，但**戳記須三家**。
-- 🔴 **codex 目前不可用為 review 家族（2026-09-04 B-D0 實查，三度未交件）**：全域 agent skill
-  `/Users/louis/.agents/skills/gstack/review/SKILL.md` 自動配對「code review」任務，把單家 review 劫持成
-  「Detect stack → Select specialists → Dispatch specialists in parallel → Red Team」多代理 fan-out
-  （實錄 `collab: SpawnAgent` × 3；另一次撞 `hook: PreCompact`），成本呈數量級放大 ⇒ **永不交件**。
-  **在 brief 裡寫禁令壓不住**（skill 內容先於 brief 進 context，R2 實測仍被劫持）。
-  同一 skill 集之 `greptile-triage` 自述「not read-only，AUTO-FIX items are applied directly」⇒ 另有寫入風險
-  （B-D0 實測 15/15 檔雜湊 OK，未被改）。修法＝停用該全域 skill，但那是**使用者個人跨 agent 設定**，
-  須使用者裁定，勿擅改。殘留代號 `B0-REVIEW-1`／`B0-REVIEW-2`。
+- 🔴 **codex 於 B-D0 三度未交件（2026-09-04）；根因未定，勿當已知**。
+  **已排除之假說（皆有反證，不要再重查）**：
+  ① 「全域 skill `~/.agents/skills/gstack/review/` 是新的／才開始劫持」——**否**：該檔 mtime 為 5/25–6/15，
+     且 `20260903-gap3d2v2-x-review-r1`（命中 18 次）與 `20260903-gap3d2todo-x-review-r1`（17 次）
+     **同樣載入它而正常交件**。
+  ② 「撞 `hook: PreCompact` 所以卡死」——**否**：`todo-r3`／`todo-r4`／`v2-r1` 皆有 PreCompact 且交件。
+  ③ 「輸出量太大」——**否**：`todo-r2` runlog 1.7MB > B-D0 之 941KB，且它交件。
+  ④ 「外部 API 故障（401/403/429/500）」——**否**：那些字樣經 `grep -n -B2 -A2` 覆查全是 codex
+     **grep 到的檔案內容**（`RECONCILE-STAMP` 行號、文件裡「Retryable: rate_limit/timeout」字面）。
+  **已知事實**：codex 在 B-D0 確實跑完 mutation 腳本（runlog 有 `BASELINE rc=0`／`RESTORED rc=0`），
+  只是never 寫產出檔；`collab: SpawnAgent` × 3 只在 R1 之**重派**那次出現。
+  **唯一確定的差異（推測性解釋，未證明）**：D-001／D-006 各輪是**文件審查**；B-D0 是本 epic
+  **第一次程式碼審查**——386 行 diff ＋ 10 條驗收命令，其中兩支 mutation 驅動各重跑 pytest 六七次
+  （合計約 15 次 pytest）。工作量數倍於前。
+  **副作用風險（與根因無關但真實）**：同一 skill 集之 `greptile-triage` 自述
+  「not read-only，AUTO-FIX items are applied directly」⇒ 委員可能改碼；B-D0 實測 15/15 檔雜湊 OK。
+  殘留代號 `B0-REVIEW-1`／`B0-REVIEW-2`。**下一批仍派三家**，若 codex 再度未交件，
+  優先查「驗收命令的重量」而非 skill。
 - 🔴 **派工期間須守檔**：委員會跑本批的 mutation 腳本（就地改生產碼再還原）。收件前後一律
   `shasum -a 256 -c <baseline>` 全檔比對。**建 baseline 時勿用 `| tee x | head -3`**——SIGPIPE 會把
   baseline 截斷（B-D0 踩過，4 行當成 10 行用）。

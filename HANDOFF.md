@@ -9,11 +9,13 @@
 | `G3-R13` | 新登記：C「收盤後決策」在 D2-2 不可表示；user-ruling 待使用者裁 |
 | `G3-D1`／`D3`…`D17` | CLOSED；`KLINE-1` OPEN（可穿插） |
 
-## 🔴 待使用者裁定（阻塞 codex 恢復為 review 家族）
-全域 agent skill `/Users/louis/.agents/skills/gstack/review/SKILL.md` 會把 code-review 派工劫持成多代理
-fan-out ⇒ codex 於 B-D0 **三度未交件**（詳情與證據見 `docs/GAP3D2_IMPL_HANDOFF.md` §3）。
+## 🔴 codex 於 B-D0 三度未交件——**根因未定**（勿當已知；四個假說已被反證）
 B-D0 已以 composer＋grok 兩家 quorum 收斂（兩家皆零 P0／P1）。
-**請裁定是否停用該全域 skill**——它是你跨所有 agent 的個人設定，我未擅改。
+🔴 主委曾斷言「全域 gstack review skill 劫持＝根因」，**該斷言已收回**：該 skill 存在兩個多月，
+且 `gap3d2v2-x-review-r1`／`gap3d2todo-x-review-r1` 同樣載入它而正常交件。
+已排除之四個假說與已知事實見 `docs/GAP3D2_IMPL_HANDOFF.md` §3（含反證命令）。
+**下一批（B-D1）照常派三家**；若 codex 再度未交件，優先查「驗收命令的重量」
+（B-D0 是本 epic 第一次程式碼審查：386 行 diff ＋ 兩支 mutation 驅動共約 15 次 pytest）。
 
 ## B-D0 收據摘要（完整見 `docs/GAP3D2_IMPL_HANDOFF.md` §5）
 - `pytest tests/momentum/event_samples/` 365 passed；`-k "open_to or entry_price_ref"` 21 passed；`tests/api -k "event_analysis or event_batch_detail_dims"` 32 passed；golden `--check` 9/9 rc=0

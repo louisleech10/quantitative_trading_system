@@ -3039,9 +3039,12 @@ sharpe 逐位等價；golden 單一 loader）；A1-24 覆寫 A1-23 三項；殘�
 沒有動任何 gate／hook／治理腳本，沒有動 <code>docs/GOV*</code>，沒有動 <code>tests/governance/</code>。</p>
 <p><strong>量化側</strong>：<code>G3-D2</code> 五段實作之第 0 段（B-D0，Task D4.1）完成並推上 GitHub（<code>49204458</code>）。
 內容與白話說明見 <a href="G3-D2灰色項目說明.html">G3-D2灰色項目說明.md</a> §六。</p>
-<p><strong>流程上值得記一筆的</strong>（詳情在 <a href="流程摩擦記錄.html">流程摩擦記錄.md</a>）：審碼委員 codex 三度交不出東西，
-根因是你電腦上的全域 agent skill 把「審碼」自動劫持成多代理流程；我兩度沒查根因就想結案，
-是你問了「為何不查原因」才去查的。修法在環境層（停用那個 skill），屬你的個人設定，未經同意不動。</p>
+<p><strong>流程上值得記一筆的</strong>（詳情在 <a href="流程摩擦記錄.html">流程摩擦記錄.md</a>）：審碼委員 codex 三度交不出東西。
+我犯了三個錯：①兩度沒查根因就想結案（是你問「為何不查原因」才去查）②abandon 理由寫「外部端超時」，
+而我引用的 401／429 全是它 grep 到的檔案內容、不是 API 錯誤 ③查到一條線索（全域 skill）就宣布是根因，
+還寫進五份文件、據此要你改自己的環境設定——<strong>你反問「三家審一兩個月了為何現在才有問題」，一查就不成立</strong>
+（那設定存在兩個多月、前面兩輪同樣載入卻都正常交件）。已全部改成「根因未定＋四個已排除假說」。
+往後判準：宣布根因前先自問「這能解釋為什麼以前沒事嗎？」答不出來就不是根因。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
