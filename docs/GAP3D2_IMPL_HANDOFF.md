@@ -84,6 +84,12 @@
   （否則還原會吃掉未提交改動）。現行 `20260904-gap3d2-b1-mutate{,2}.py` 已是此形。
   **診斷提示**：工作區突然出現「把某個 commit 的改動整段刪掉」的 diff，先看
   `ls -l handoffs/_*bak*` 的時間戳 vs 該 commit 時間，別急著怪委員。
+- 🔴 **清理／還原動作不得早於前置檢查**（2026-09-04 同日**第二次**事故，比第一次嚴重）：
+  改用 `git checkout --` 之後，外層 shell 腳本仍在**迴圈開頭無條件 `restore()`**
+  ⇒ 順序變成「先還原（未提交的修正沒了）→ 再檢查乾淨（此時當然乾淨）→ 通過」，
+  一次沖掉依 review 剛做完、尚未 commit 的**四個檔**之修正。**檢查沒錯，錯在它在清理之後。**
+  **治法**：開場檢查一次，不乾淨即 `exit 3` 拒跑；迴圈內之 restore 只在「本腳本剛套過 mutation」之後。
+  **流程上的推論**：閉合輪之修正**先 commit 再跑 mutation**，不要留在工作區。
 - **`reconcile_cluster_attribution_check.sh`** 對前輪 ID（正文提及、非附錄 heading）誤報「未被引用」＝假警。
 - **completeness**：`## DEGRADE-<FAMILY>-<NN>` 一行一 ID，勿合寫兩家。
 - **commit**：staged 含 `.claude/gate/*.log`／`docs/site/*.html`／交接檔 ⇒ pre-commit G-7 要求 `Governance-Scope: out-of-epic …` 為最末段；`handoffs/` 為 gitignore（委員產物只在本機）；白話新檔須登記 `scripts/plain_docs_sync_check.sh::_watched_for`。

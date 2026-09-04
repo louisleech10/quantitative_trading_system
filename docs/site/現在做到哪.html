@@ -32,7 +32,7 @@
 </tr>
 <tr>
 <td><strong>在做第幾段</strong></td>
-<td><strong>第 1 段（B-D1）預測型</strong> — 7 個小任務<strong>全部完成</strong>，下一步＝三家委員審碼</td>
+<td><strong>第 1 段（B-D1）預測型</strong> — 實作 7/7 完成；三家審碼已交件，3 條 P1＋3 條 P2 已修，待原提出方複核</td>
 </tr>
 <tr>
 <td><strong>卡住嗎</strong></td>
@@ -67,7 +67,7 @@
 <tr>
 <td><strong>第 1 段</strong></td>
 <td>預測型解灰：契約 provenance／支援矩陣／golden 擴充／前端解灰／IC 頁三種報酬選項</td>
-<td>🔧 <strong>實作完成（7/7），待三家審碼</strong></td>
+<td>🔧 <strong>實作完成；審碼 findings 已修，待複核</strong></td>
 </tr>
 <tr>
 <td>第 3 段</td>
@@ -136,9 +136,9 @@
 </table></div>
 <p><strong>目前已驗過的</strong>（每完成一個任務就實跑，不是「應該會過」）：</p>
 <ul>
-<li><code>pytest tests/momentum/event_samples/</code> → <strong>401 passed</strong></li>
-<li><code>pytest tests/api -k &quot;ic_event_label_defaults or event_batch_detail_dims or horizon_purge or contract_reason_registry&quot;</code> → <strong>65 passed</strong></li>
-<li>前端 <code>npx vitest run</code> → <strong>69 檔 428 passed</strong>；<code>tsc --noEmit</code> → 8 行（既有債，<strong>無新增</strong>）</li>
+<li><code>pytest tests/momentum/event_samples/</code> → <strong>407 passed</strong></li>
+<li><code>pytest tests/api -k &quot;ic_event_label_defaults or event_batch_detail_dims or horizon_purge or contract_reason_registry&quot;</code> → <strong>69 passed</strong></li>
+<li>前端 <code>npx vitest run</code> → <strong>69 檔 433 passed</strong>；<code>tsc --noEmit</code> → 8 行（既有債，<strong>無新增</strong>）</li>
 <li>golden <code>--check</code> → <strong>23/23 rc=0</strong></li>
 <li>解耦閘 <code>check_decoupling_imports.py</code> → <strong>無新增違反</strong></li>
 <li><strong>D1.3 關鍵對照</strong>：開放矩陣前後，凍結檔的數字<strong>逐位元組完全相同</strong> → 證明 D1.3 只是解除旗標、沒偷改任何值</li>
@@ -188,17 +188,17 @@
 <tr>
 <td>4</td>
 <td>寫審查派工單</td>
-<td>🔧 下一步</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>5</td>
-<td><strong>三家委員審碼</strong>（codex＋composer＋grok，你已定死不可跳過）</td>
-<td>⬜</td>
+<td><strong>三家委員審碼</strong>（codex＋composer＋grok）</td>
+<td>✅ 三家全交件（codex 4／composer 4／grok 3 條 findings）</td>
 </tr>
 <tr>
 <td>6</td>
 <td>收斂到零阻擋問題</td>
-<td>⬜</td>
+<td>🔧 3 條 P1＋3 條 P2 已修並 commit；待原提出方複核</td>
 </tr>
 <tr>
 <td>7</td>
@@ -207,6 +207,39 @@
 </tr>
 </tbody>
 </table></div>
+<hr />
+<h2 id="三家審碼抓到什麼b-d12026-09-04">三家審碼抓到什麼（B-D1，2026-09-04）</h2>
+<p>三家給的結論<strong>不一致</strong>——codex 判「先修再說」、composer 判「修完可過」、grok 判「可過」。
+我取<strong>聯集全修</strong>（有人認為該修就修，不投票）。</p>
+<p><strong>三條真缺陷（都附委員的實跑證據）</strong>：</p>
+<ol>
+<li>
+<p><strong>「這批答案哪來的」可以混著填而系統不擋</strong>（三家全員命中）</p>
+<ul>
+<li>一半的列填了、一半沒填 ⇒ 系統把「填了的那個」當成<strong>整批</strong>的答案來源</li>
+<li>兩種來源混在一起 ⇒ 畫面顯示「（未宣告）」，跟「這批本來就沒填」<strong>看起來一模一樣</strong></li>
+<li>🔴 我在程式註解裡寫「混值會被匯入層擋下」——<strong>當時那句話是錯的</strong>，委員實跑打穿。已修成真。</li>
+</ul>
+</li>
+<li>
+<p><strong>每列的「決策位移」可以不一樣，而分析只取第一列的值套用全批</strong></p>
+<ul>
+<li>其餘事件會被對齊到<strong>錯的決策根</strong>，算出來的數字仍然合法、看不出異常</li>
+<li>已改成：混值就擋下不分析（要嘛拆批，要嘛等 k 的參數化上線）</li>
+</ul>
+</li>
+<li>
+<p><strong>我上一段做的「依深度自動選量法」根本沒接到畫面上</strong></p>
+<ul>
+<li>前端在使用者沒設定時仍固定送 <code>h=1</code>，後端的預設補值壓不過它</li>
+<li>⇒ 你宣告深度 3 的批，「持有」實際跑成 h=1。<strong>兩端都對，就是沒接上。</strong></li>
+<li>已改成：使用者沒設定時前端<strong>完全不送</strong>那個欄位，交給後端依深度導出</li>
+</ul>
+</li>
+</ol>
+<p><strong>三條較輕的</strong>：凍結檔的 <code>--check</code> 沒驗「t0 是否仍等於登記處導出的值」（改了會悄悄失去覆蓋）；
+「混情境先擋」的承諾在某條路徑上落空；「UI 比後端嚴」這個刻意設計沒有測試釘住（改掉不會紅）。</p>
+<p>全部已修並補上可證偽的測試；破壞測試 15 種仍全紅。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

@@ -2512,6 +2512,19 @@ codex 恢復為審碼家族的前提＝停用那個全域 skill，<strong>但那
 ①「備份」這種自建副本會過期，而過期的副本比沒有備份更危險（它會裝成正確狀態）；
 ② 派工期間主控端與委員同時動同一批檔，任何非冪等的腳本都會互相污染；
 ③ 我又一次看到一條線索就宣布根因（stash），沒先看時間戳。</p>
+<h3 id="追記同日同一支腳本第二次把我的修正沖掉">追記（同日）同一支腳本，第二次把我的修正沖掉</h3>
+<p>上一則我把「還原改用 <code>git checkout --</code>」當成治好了。<strong>沒有。</strong> 一小時後同一支腳本又沖掉一次，
+這次更嚴重：它把我依三家 review 剛做完、<strong>還沒 commit</strong> 的四個檔的修正整批還原掉
+（後端 route、前端 hook、前端面板、契約 validator）。</p>
+<p><strong>為什麼防護沒生效</strong>：我確實加了「目標檔必須乾淨，不乾淨就拒跑」的前置檢查，
+但外層 shell 腳本的<strong>迴圈開頭無條件先呼叫 <code>restore()</code></strong>。順序是：
+先 <code>git checkout --</code>（我的修正沒了）→ 再檢查是否乾淨（此時當然乾淨）→ 通過 → 開始跑。
+<strong>檢查本身沒錯，錯在它跑在清理動作之後。</strong></p>
+<p><strong>判準（第三條，也是最泛用的一條）</strong>：<strong>清理／還原動作不得早於前置檢查。</strong>
+任何「先恢復乾淨狀態再檢查狀態」的腳本，那個檢查一定是裝飾品。
+現行：開場檢查一次不乾淨就整支 exit 3；迴圈內的 restore 只在「本腳本自己剛套過 mutation」之後執行。</p>
+<p><strong>代價</strong>：重做四個檔的修正約十分鐘。<strong>若我當時沒有立刻跑測試</strong>（3 條紅），
+那批修正會靜默消失，而我會以為自己修好了三條 P1 —— 那才是真正危險的地方。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
