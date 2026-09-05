@@ -53677,3 +53677,59 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-09-05T06:00:45Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"b804d54ed0b972567760a977acedcdb16f7b36ca6ce009030a65bf1e0434f0f5","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260905-g7fix-x-consult-r2-codex.md --family codex; check_rc=$?; printf '\\nCHECK_RC=%s\\n' \"$check_rc\"; tail -n 4 handoffs/20260905-g7fix-x-consult-r2-codex.md; printf '\\nTMP_TARGETS_REMAINING=\\n'; find -P /private/tmp -maxdepth 1 -mindepth 1 \\( -name 'g7fix*' -o -name 'codex-g7-*' \\) -print | sort; test -e /private/tmp/claude-501 && echo CLAUDE_501_PRESENT; printf '\\nSTATUS_RELEVANT=\\n'; git status --short --untracked-files=all | sed -n '1,30p'"}
 {"actor": "cx_run", "attempt_id": "bc90153d-334e-4ff2-bc32-5291e03af070", "cli_rc": "0", "event": "committee_family_result", "event_id": "453bd967-fc47-440b-bffe-9aa5e9ce0a0c", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260905-g7fix-x-consult-r2-codex.md", "output_sha256": "c6adfefabe372628194de57121ca28b1e01ab45883c796f8804d81219e1aa602", "producer": "audit_append.sh", "result_state": "success", "round_id": "89f4b6db-65ab-4c3a-90c4-ba5037ba5ea9", "schema_version": 1, "sequence": 3155, "ts": "2026-09-05T06:01:18Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "ccb67da2-15f6-45bc-aef9-24324aafd0eb", "lock_sha256": "02e11c572be9dbd4f24dddb0781959e4dacdeb7bcb79f11f99ac4d5ddc461353", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "89f4b6db-65ab-4c3a-90c4-ba5037ba5ea9", "schema_version": 1, "sequence": 3156, "session_id": "20260905-g7fix-x-consult-r2", "synth_sha256": "31c2a8be048d0348953678f6f2532479730e90ee32ef996f9c3d4a855ff7635b", "ts": "2026-09-05T06:05:06Z"}
+=== 2026-09-05 14:08:04 | artifact ===
+  ts=2026-09-05 14:08:04
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/G7FIX_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled; §A=filled; §C=filled; §G=N/A:不碰數值/特徵/ML路徑,理由登記於§N; §P=filled(6 phases); §V=filled; §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-09-05 14:13:17 | dispatch ===
+  ts=2026-09-05 14:13:17
+  kind=dispatch
+  intent=G-7FIX SPEC adversarial review R1：三家全員審 docs/G7FIX_SPEC.md
+  risk=low
+  facts_asked=漏吃/曲解處置；Phase 依賴序；ASSERT fixture 可建構性；_epic_state 落點與 env 鉤子；dormant 交付形態守衛；allowlist 是否治理擴建；mutation 是否假 mutation；殘留分類
+  review_role=adversarial review（禁改碼、禁改 SPEC）
+  template=n/a: 見 brief handoffs/20260905-G7FIX-SPEC-REVIEW-BRIEF.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260905-G7FIX-X-REVIEW-R1", "ts": "2026-09-05T06:13:23Z"}
+=== 2026-09-05 14:13:23 | dispatch ===
+  ts=2026-09-05 14:13:23
+  kind=dispatch
+  intent=G-7FIX SPEC adversarial review R1：三家全員審 docs/G7FIX_SPEC.md
+  risk=low
+  facts_asked=漏吃/曲解處置；Phase 依賴序；ASSERT fixture 可建構性；_epic_state 落點與 env 鉤子；dormant 交付形態守衛；allowlist 是否治理擴建；mutation 是否假 mutation；殘留分類
+  review_role=adversarial review（禁改碼、禁改 SPEC）
+  template=n/a: 見 brief handoffs/20260905-G7FIX-SPEC-REVIEW-BRIEF.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260905-G7FIX-SPEC-REVIEW-BRIEF.md", "brief_sha256": "9befc66b6471958d2cc573085b1256ce984452078a24cb3a8211f26c20b5ea61", "brief_sha256_norm": "9befc66b6471958d2cc573085b1256ce984452078a24cb3a8211f26c20b5ea61", "event": "committee_round_open", "event_id": "6e82ec69-47f0-4fee-b83f-ff4b0889e9de", "expected_outputs": {"codex": "handoffs/20260905-g7fix-x-review-r1-codex.md", "composer": "handoffs/20260905-g7fix-x-review-r1-composer.md", "grok": "handoffs/20260905-g7fix-x-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "69a4ac3f-dd7c-4b81-ba2c-935bb255d710", "schema_version": 1, "sequence": 3157, "session_name": "20260905-g7fix-x-review-r1", "task_id": "20260905-G7FIX-X-REVIEW-R1", "ts": "2026-09-05T06:13:28Z"}
+{"actor": "cx_run", "attempt_id": "588e2709-2bd3-48a6-860a-cdade69840cc", "cli_rc": "0", "event": "committee_family_result", "event_id": "d05a1c04-e597-42a8-8f56-c2da5332cbb7", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260905-g7fix-x-review-r1-composer.md", "output_sha256": "7fb46605aa67e3a46d3ff954439ccd3b07294d9f1a0d688954838c97290989b4", "producer": "audit_append.sh", "result_state": "success", "round_id": "69a4ac3f-dd7c-4b81-ba2c-935bb255d710", "schema_version": 1, "sequence": 3158, "ts": "2026-09-05T06:15:30Z"}
+{"actor": "cx_run", "attempt_id": "5001fbc8-d3d4-4d65-8e01-16505c471a72", "cli_rc": "0", "event": "committee_family_result", "event_id": "17509400-ec22-4a59-ad99-546bdabe1f72", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260905-g7fix-x-review-r1-grok.md", "output_sha256": "fa3a0905a84582f6cd34b2fa46d7b946fa48ee21ae930a80fe280e30368645da", "producer": "audit_append.sh", "result_state": "success", "round_id": "69a4ac3f-dd7c-4b81-ba2c-935bb255d710", "schema_version": 1, "sequence": 3159, "ts": "2026-09-05T06:20:11Z"}
+{"event":"gate_deny","ts":"2026-09-05T06:24:21Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"91ca14dc2c7b3481c9cbe415f527927b02f69f635adab3497fea80925f49c834","cmd_head":"wc -l handoffs/20260905-g7fix-x-review-r1-codex.md && rg -n '^## CODEX-R1-|^## Verdict|^\\*\\*(斷言|碼證|來源摘要)\\*\\*|^STATUS:' handoffs/20260905-g7fix-x-review-r1-codex.md && bash scripts/completeness_check.sh --single handoffs/20260905-g7fix-x-review-r1-codex.md --family codex; rc=$?; printf 'completeness_rc=%s\\n' \"$rc\""}
+{"event":"gate_deny","ts":"2026-09-05T06:24:46Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"99ccea76e47cf5b63b42682a33b239e61badd376e7a01deea894b58a188f237e","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260905-g7fix-x-review-r1-codex.md --family codex; rc=$?; printf 'completeness_rc=%s\\n' \"$rc\"; exit \"$rc\""}
+{"actor": "cx_run", "attempt_id": "1ee17703-abd0-40d2-bdea-827e30356850", "cli_rc": "0", "event": "committee_family_result", "event_id": "bfe54dc7-53f7-41b8-a427-e553703a02fa", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260905-g7fix-x-review-r1-codex.md", "output_sha256": "99906697afb08648792fcdc5875e61476b38860082aa8ba925284acd95ed1dde", "producer": "audit_append.sh", "result_state": "success", "round_id": "69a4ac3f-dd7c-4b81-ba2c-935bb255d710", "schema_version": 1, "sequence": 3160, "ts": "2026-09-05T06:26:12Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "eda923d8-6a53-48a6-9089-9115c0987657", "lock_sha256": "b719aee5c721359ab2eb261a174aeaf98e58a7578ce826f9fb7a539394be8019", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "69a4ac3f-dd7c-4b81-ba2c-935bb255d710", "schema_version": 1, "sequence": 3161, "session_id": "20260905-g7fix-x-review-r1", "synth_sha256": "aa50cb781e2fe7e8755531c0dff3cf311a423d1a5d18b28cb83516135dcb7dde", "ts": "2026-09-05T06:28:50Z"}

@@ -24,10 +24,19 @@
 
 **新查到的事實**：昂貴 G-7 自 2026-08-14 起**沒在 push 上跑過**（`gov_check.sh:266-267` `--fast` 早退，G-7 在 `:343-350`）。日常摩擦全來自 commit-msg 那支假閘。
 
-## 🔴 下一步＝寫 SPEC
+- **SPEC review R1**（`docs/G7FIX_SPEC.md`）三家全員，18 條含 3 P0，三家一致**不可 freeze**；收斂節點四步全過，債清
+  （`handoffs/reconcile/20260905-g7fix-x-review-r1/synth.md`，群集 1–11）
 
-主委裁定不再開 R3：R2 之 finding 全屬「把規格寫精確」，處置偽碼由三家各自實構後交出（對照表見 synth 群集 γ／ε），非主委發明。
-SPEC 須逐條吃掉 α–ι，並帶 synth 末段列的三條前置查核。
+**SPEC review R1 之三個 P0**（我 brief 標的「我沒查」5 格中有 4 格開出真 finding）：
+- **1**：`active→dormant` 無授權來源，我還把未授權路徑釘成 `rc=0` ⇒ 改為須帶 `ruling:<ID>` 且該 ID 須在 `docs/GOV_ENFORCEMENT_REGISTRY.md` 字面存在
+- **2**：`GOVB1_FROZEN_HASHES` env 鉤子＝重蹈 `GOVB1_FACTKEY_ROOT` 傷疤（三家全員）⇒ 刪除，強制點 `env -u`
+- **3**：dormant × 交付形態守衛我寫「須明確定義」＝定義本體留白（三家全員）⇒ 寫死決策表
+
+SPEC 已依 11 群集改完，`template_check` PASS，具名 mutation 由 6 種補到 **16 種**（前版 §V 稱「≥8」是我的空頭宣稱，被 composer／grok 抓到）。
+
+## 🔴 下一步＝SPEC review R2 閉合輪
+
+閉合輪判定權屬**原提出方**，第三方不得代簽。R2 零 finding 才可 freeze SPEC 並進 TODO。
 
 ## G3-D2 主線（G-7FIX 完成後回來）
 
