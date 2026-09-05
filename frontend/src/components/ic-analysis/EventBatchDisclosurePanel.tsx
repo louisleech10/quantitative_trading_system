@@ -438,13 +438,19 @@ export default function EventBatchDisclosurePanel({
             }。這是**幾何與資料涵蓋**的上界：超過就一定算不出來；沒超過**不保證**每一筆都算得出來。`
             : '上界要分析過才知道（由後端依這批的 bar 表逐事件算），這裡不猜。'}
           {/* 🔴 `CODEX-R1-P2-04`：上界是「對誰」算的必須說出來——這批若含他 symbol 事件，
-              它們不進本次 IC，也不該讓上界看起來比實際母體更嚴而使用者不知情。 */}
-          {disclosure?.bounds_scope_symbol && (
+              它們不進本次 IC，也不該讓上界看起來比實際母體更嚴而使用者不知情。
+              🔴 **`CODEX-R2-P2-03`（R2 閉合）**：原版只在 `bounds_scope_symbol` 為真時顯示
+              ⇒ `null`（＝**沒有指定 run symbol、上界對全批算**）這個語意在畫面上消失，
+              使用者無從分辨「對子集算」與「對全批算」。⇒ 改由 **capability** 決定要不要說，
+              兩種 scope 各有自己的句子；欄位整個缺席（舊 task）才不說。 */}
+          {disclosure?.decision_offset_bars_capability === 'available' && (
             <span data-testid="ic-param-bounds-scope">
-              {' '}（上界只對本次 run 的 {disclosure.bounds_scope_symbol} 事件計算
-              {(disclosure.bounds_scope_excluded_events ?? 0) > 0
-                ? `；另有 ${disclosure.bounds_scope_excluded_events} 筆他 symbol 事件不計入，它們也不進本次 IC`
-                : ''}）
+              {disclosure.bounds_scope_symbol
+                ? `（上界只對本次 run 的 ${disclosure.bounds_scope_symbol} 事件計算${
+                  (disclosure.bounds_scope_excluded_events ?? 0) > 0
+                    ? `；另有 ${disclosure.bounds_scope_excluded_events} 筆他 symbol 事件不計入，它們也不進本次 IC`
+                    : ''}）`
+                : '（上界對**整批**事件計算——本次沒有指定 run symbol，所以沒有排除任何 symbol）'}
             </span>
           )}
         </p>

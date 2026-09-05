@@ -405,3 +405,92 @@ describe('G3-D2 B-D4 R1 閉合 — 新任務啟動即清掉上一次的揭露欄
     vi.unstubAllGlobals();
   });
 });
+
+describe('G3-D2 B-D4 R2 閉合 — codex 三條 P2', () => {
+  class MockWS2 {
+    static instances: MockWS2[] = [];
+    url: string; close = vi.fn(); send = vi.fn();
+    onmessage: ((e: MessageEvent) => void) | null = null;
+    onerror: (() => void) | null = null;
+    onclose: (() => void) | null = null;
+    onopen: (() => void) | null = null;
+    constructor(url: string) { this.url = url; MockWS2.instances.push(this); }
+    emitMessage(payload: unknown) { this.onmessage?.({ data: JSON.stringify(payload) } as MessageEvent); }
+  }
+
+  beforeEach(() => {
+    MockWS2.instances = [];
+    useICAnalysisStore.setState({
+      taskId: null, status: 'idle', progress: 0, currentStage: null,
+      error: null, report: null, eventScanDisclosure: null,
+    });
+    vi.stubGlobal('WebSocket', MockWS2 as unknown as typeof WebSocket);
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('🔴 `CODEX-R2-P2-01`：running 之 `/task` 回應**不得**把 WS 已併入的格數清成 null', async () => {
+    // running 回應：**沒有** event_label_scan（那要跑完才有），只有頂層 scan_done/scan_total
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => (String(url).includes('/task/')
+        ? { task_id: 't', status: 'running', progress: 0.4, scan_done: 4, scan_total: 9 }
+        : {}),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useICAnalysis());
+    act(() => { result.current.connectProgress('t'); });
+
+    // 先由 WS 併入 3/9
+    act(() => {
+      MockWS2.instances[0].emitMessage({
+        event: 'progress',
+        data: { status: 'running', progress: 0.3, scan_done: 3, scan_total: 9 },
+      });
+    });
+    expect(useICAnalysisStore.getState().eventScanDisclosure?.event_label_scan?.scan_done).toBe(3);
+
+    // 再讓 /task 的 running 回應到達（順序交錯）——格數只能前進，不得被清成 null
+    await act(async () => {
+      await result.current.fetchTaskStatus('t');
+    });
+    const scan = useICAnalysisStore.getState().eventScanDisclosure?.event_label_scan;
+    expect(scan, '/task running 回應把掃描進度清掉了').not.toBeNull();
+    expect(scan?.scan_total).toBe(9);
+    expect(scan?.scan_done).toBe(4);
+  });
+
+  it('🔴 `CODEX-R2-P2-02`：`/task` 失敗但 `/result` 成功 ⇒ 報告仍在，且**說出**揭露欄沒拿到', async () => {
+    const fetchMock = vi.fn(async (url: string) => (String(url).includes('/task/')
+      ? { ok: false, statusText: 'Internal Server Error', json: async () => ({ detail: 'boom-task' }) }
+      : { ok: true, json: async () => ({ summary: { ok: true } }) }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useICAnalysis());
+    act(() => { result.current.connectProgress('t'); });
+    await act(async () => {
+      MockWS2.instances[0].emitMessage({
+        event: 'progress', data: { status: 'completed', progress: 1 },
+      });
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
+    expect(useICAnalysisStore.getState().report).not.toBeNull();
+    const err = useICAnalysisStore.getState().error ?? '';
+    expect(err, '降級必須說出來，不得靜默').toContain('揭露欄');
+    expect(err).toContain('boom-task');
+  });
+
+  it('🔴 `CODEX-R2-P2-02` 之另一半：兩端都失敗 ⇒ 顯示錯誤（不得是 unhandled rejection）', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false, statusText: 'Internal Server Error', json: async () => ({ detail: 'boom-both' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useICAnalysis());
+    act(() => { result.current.connectProgress('t'); });
+    await act(async () => {
+      MockWS2.instances[0].emitMessage({
+        event: 'progress', data: { status: 'completed', progress: 1 },
+      });
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
+    expect(useICAnalysisStore.getState().error).toContain('boom-both');
+  });
+});

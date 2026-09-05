@@ -833,3 +833,57 @@ describe('D4.3 全棧連通 — `event_label_scan` 真的進 payload', () => {
     expect('event_label_scan' in (body as Record<string, unknown>)).toBe(false);
   });
 });
+
+describe('D4.2 R2 閉合 — `CODEX-R2-P2-03`：bounds scope 之 null 語意必須說出來', () => {
+  it('🔴 `bounds_scope_symbol` 為 `null`（未指定 run symbol）⇒ 顯示「對整批計算」', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+        disclosure={{
+          decision_offset_bars_capability: 'available',
+          bounds_scope_symbol: null, bounds_scope_excluded_events: 0,
+          k_max_feasible_at_h: 119, h_max_feasible_at_k: 1518,
+          k_bound_status: 'bounded', h_bound_status: 'bounded',
+        }}
+      />,
+    );
+    const text = screen.getByTestId('ic-param-bounds-scope').textContent ?? '';
+    expect(text).toContain('整批');
+    expect(text).toContain('沒有指定 run symbol');
+  });
+
+  it('🔴 有 run symbol ⇒ 顯示「只對該 symbol」與被排除筆數（兩種 scope 各有自己的句子）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+        disclosure={{
+          decision_offset_bars_capability: 'available',
+          bounds_scope_symbol: 'ETHUSDT', bounds_scope_excluded_events: 3,
+          k_max_feasible_at_h: 119, h_max_feasible_at_k: 1518,
+          k_bound_status: 'bounded', h_bound_status: 'bounded',
+        }}
+      />,
+    );
+    const text = screen.getByTestId('ic-param-bounds-scope').textContent ?? '';
+    expect(text).toContain('ETHUSDT');
+    expect(text).toContain('3 筆');
+    expect(text).not.toContain('整批');
+  });
+
+  it('🔴 over 向：capability 非 available（或欄位整組缺席）⇒ **不說**（不對舊 task 亂講）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+        disclosure={{ decision_offset_bars_capability: 'unavailable' }}
+      />,
+    );
+    expect(screen.queryByTestId('ic-param-bounds-scope')).toBeNull();
+    cleanup();
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('ic-param-bounds-scope')).toBeNull();
+  });
+});

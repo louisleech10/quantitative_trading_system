@@ -144,7 +144,10 @@ export function useICAnalysis() {
         h_max_feasible_at_k?: number | null;
         k_bound_status?: string | null;
         h_bound_status?: string | null;
-        event_label_scan?: ICEventScanDisclosure['event_label_scan'];
+        event_label_scan?: ICEventScanDisclosure["event_label_scan"];
+        // `CODEX-R2-P2-01`：掃描**進行中**只有這兩個頂層欄（`event_label_scan` 要跑完才有）
+        scan_done?: number | null;
+        scan_total?: number | null;
       }>(`/task/${taskId}`);
       setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed');
       setProgress(status.progress ?? 0, status.current_stage ?? null);
@@ -152,10 +155,28 @@ export function useICAnalysis() {
       setFeatureCount(typeof status.feature_count === "number" ? status.feature_count : null);
       // 🔴 `G3-D2` D4.2／D4.3：揭露欄**整組**由後端來；任一欄都不在前端補值。
       //    非事件分析路徑（後端不放這些鍵）⇒ 整個物件為 `null`，面板顯示「要分析過才知道」。
+      //
+      // 🔴 **`CODEX-R2-P2-01`（R2 閉合）**：掃描**進行中**的 `/task` 回應**還沒有**
+      //    `event_label_scan`（那只在整個網格跑完才寫），但**有**頂層 `scan_done/scan_total`。
+      //    原版在此把整組設成 `null`／把 `event_label_scan` 設成 `null`
+      //    ⇒ WS 已併入的格數會被 `/task` 的回應**清掉**（`onopen` 之 fetch 與 WS progress
+      //    之順序可交錯）⇒ 使用者看到格數閃退。
+      //    ⇒ 掃描進度改由**頂層兩欄**承接，並與既有結果合併（有結果就保留結果）。
+      const liveScanTotal = typeof status.scan_total === 'number' ? status.scan_total : null;
+      const prevScan = useICAnalysisStore.getState().eventScanDisclosure?.event_label_scan ?? null;
+      const mergedScan = status.event_label_scan ?? (liveScanTotal === null ? null : {
+        scan_total: liveScanTotal,
+        scan_done: typeof status.scan_done === 'number' ? status.scan_done : (prevScan?.scan_done ?? 0),
+        scan_results: prevScan?.scan_results ?? [],
+        capability: prevScan?.capability ?? 'available',
+        reason: prevScan?.reason ?? null,
+        message: prevScan?.message ?? null,
+      });
       setEventScanDisclosure(
         status.decision_offset_bars_capability === undefined
           && status.k_bound_status === undefined
           && status.event_label_scan === undefined
+          && liveScanTotal === null
           ? null
           : {
             decision_offset_bars_capability: status.decision_offset_bars_capability ?? null,
@@ -169,7 +190,7 @@ export function useICAnalysis() {
             h_max_feasible_at_k: status.h_max_feasible_at_k ?? null,
             k_bound_status: status.k_bound_status ?? null,
             h_bound_status: status.h_bound_status ?? null,
-            event_label_scan: status.event_label_scan ?? null,
+            event_label_scan: mergedScan,
           },
       );
 
@@ -264,7 +285,23 @@ export function useICAnalysis() {
             clearTimers();
             // 🔴 **不是** `fetchResult`：那支只設 report、不碰揭露欄。
             //    `fetchTaskStatus` 於 completed 分支會自行呼叫 `fetchResult`，故不重複。
-            void fetchTaskStatus(taskId).catch(() => { void fetchResult(taskId); });
+            //
+            // 🔴 **`CODEX-R2-P2-02`（R2 閉合）：後備路徑不得吞錯**。
+            //    原版 `.catch(() => { void fetchResult(taskId); })` 有兩個洞：
+            //    ①`/task` 的錯誤訊息被丟掉（使用者只看到報告出現、不知道揭露欄為何是空的）；
+            //    ②第二個 `fetchResult` **沒有 catch** ⇒ 兩端都失敗時是 unhandled rejection、畫面全無提示。
+            void fetchTaskStatus(taskId).catch((statusErr) => {
+              const detail = statusErr instanceof Error ? statusErr.message : String(statusErr);
+              void fetchResult(taskId)
+                .then(() => {
+                  // 報告拿到了，但揭露欄沒 hydrate ⇒ **降級**，說出來而不是靜默。
+                  setError(`分析已完成，但讀取分析揭露欄失敗（${detail}）——`
+                    + '上界與掃描結果本次不顯示，重新整理可再試一次');
+                })
+                .catch((resultErr) => {
+                  setError(resultErr instanceof Error ? resultErr.message : String(resultErr));
+                });
+            });
             ws.close();
             return;
           }
