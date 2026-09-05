@@ -145,7 +145,8 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "M12-seed-ignored",
         "momentum/Analysis/event_samples/random_control.py",
-        '    rng = np.random.default_rng(int(spec["seed"]))\n',
+        # R1 閉合後 seed 先經 `_require_int` ⇒ 錨點更新（原 `int(spec["seed"])` 已不存在）
+        "    rng = np.random.default_rng(seed)\n",
         "    rng = np.random.default_rng(0)\n",
         [*PYTEST, T_RC, "-k", "seed_changed_digest_differs or golden_check"],
         "seed 被無視（不同 seed 抽出同一批，決定性宣稱失效）",
