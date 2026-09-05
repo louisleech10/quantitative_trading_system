@@ -171,7 +171,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "momentum/Analysis/event_samples/random_control.py",
         "        if _ab._is_eligible(i, n_rows, horizon, 0, open_, close, open_ms, step_ms) is not None:\n",
         "        if False:\n",
-        [*PYTEST, T_RC, "-k", "golden_check or records_pass_same_validator"],
+        [*PYTEST, T_RC, "-k", "same_eligibility"],
         "候選不再過同一支 eligibility（對照組與處理組分母不同）",
     ),
     Mutation(
@@ -271,7 +271,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "scripts/gap3_label_golden.py",
         "            drift = guard(case, item)\n",
         "            drift = None\n",
-        [*PYTEST, T_RC, "-k", "golden_negative_mutations"],
+        [*PYTEST, T_RC, "-k", "cli_detects_registry_drift"],
         "登記處漂移對證被拿掉（改了 selector 後重凍會靜默失去覆蓋）",
     ),
 

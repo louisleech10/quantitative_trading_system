@@ -441,3 +441,65 @@ def test_d54_golden_loader_fail_closed_on_missing_key(tmp_path):
     p.write_text(_json.dumps(raw), encoding="utf-8")
     with pytest.raises(GoldenError):
         load_golden(p)
+
+
+def test_candidates_go_through_the_same_eligibility(bars, monkeypatch):
+    """🔴 候選須真的過 `_is_eligible`（mutation `M15` 抓到的缺口，2026-09-06）。
+
+    原本只以 golden 的 digest 間接守——但本 golden 之 universe（rows 100–900）
+    **沒有任何不合格的 bar**，把 eligibility 整段拿掉 digest 也不會變 ⇒ 那條守護
+    在這份資料上是不可觀測的。對照組與處理組若用不同的「哪些 bar 算數」，
+    prevalence 差就不是同一個估計量，而症狀是「值仍合法」。
+    ⇒ 改以**執行期事實**驗：逐候選各呼叫一次，且參數為 (horizon, k=0)。
+    """
+    calls = []
+    real = _ab._is_eligible
+
+    def spy(i, n, horizon, k, open_, close, open_ms=None, step_ms=None):
+        calls.append((int(i), int(horizon), int(k)))
+        return real(i, n, horizon, k, open_, close, open_ms, step_ms)
+
+    monkeypatch.setattr(_ab, "_is_eligible", spy)
+    _, receipt = sample_random_bars(bars, _spec(bars), _triggers(bars), scenario="C")
+    assert calls, "eligibility 一次都沒被呼叫（候選沒過同一支分母）"
+    assert {c[1] for c in calls} == {HORIZON}
+    assert {c[2] for c in calls} == {0}
+    # 被呼叫的 index 必為「在 universe∩period 內且未被排除」者之全集
+    assert len({c[0] for c in calls}) >= receipt["candidate_count"]
+
+
+def test_d54_golden_cli_detects_registry_drift(bars, tmp_path):
+    """🔴 `--check` 之登記處漂移對證真的會擋（mutation `M27` 抓到的缺口，2026-09-06）。
+
+    原本只有「凍結值 vs 重跑值」的比對；`cmd_check` 內那道「凍結之 spec 是否仍等於
+    登記處導出值」沒有任何測試 ⇒ 拿掉它不會紅。它擋的是：有人改了 universe 邊界
+    或觸發索引後重凍，案例**悄悄失去它宣稱的覆蓋**（例如不再跨月）而 `--check` 全綠。
+    """
+    import json as _json
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[3]
+    src = _golden_paths()[0]
+    # 🔴 檔名須與登記處相同——否則命中的是「不在登記處」那條，不是漂移對證。
+    dst = tmp_path / src.name
+    raw = _json.loads(src.read_text(encoding="utf-8"))
+    raw["spec"]["exclusion"]["embargo_bars"] = int(raw["spec"]["exclusion"]["embargo_bars"]) + 5
+    dst.write_text(_json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+    proc = subprocess.run(
+        [sys.executable, "scripts/gap3_label_golden.py", "--kind", "random_control",
+         "--check", str(tmp_path / "*.json")],
+        cwd=str(repo), capture_output=True, text=True)
+    assert proc.returncode == 1, proc.stdout
+    assert "凍結之 spec 與登記處導出值不符" in proc.stdout
+
+    # 正向對照：未竄改之同一檔應 PASS（證明上面紅的是漂移，不是「temp 目錄一律紅」）
+    (tmp_path / "clean").mkdir()
+    (tmp_path / "clean" / src.name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    ok = subprocess.run(
+        [sys.executable, "scripts/gap3_label_golden.py", "--kind", "random_control",
+         "--check", str(tmp_path / "clean" / "*.json")],
+        cwd=str(repo), capture_output=True, text=True)
+    assert ok.returncode == 0, ok.stdout
