@@ -99,6 +99,30 @@ export function useICAnalysis() {
     [setReport]
   );
 
+  /**
+   * 🔴 R1 三家全員之 P1 修法（其一）：把 **WS progress 事件**帶的掃描格數併進揭露欄。
+   *
+   * **併入不覆蓋**：`scan_results` 要等終態才有，這裡只更新 `scan_done`／`scan_total`
+   * ⇒ 掃描進行中畫面就能顯示「第幾格／共幾格」，而不是等到最後才一次跳出來。
+   * 尚無 disclosure 物件時（非事件分析或還沒拿到 `/task`）建一個**只有掃描進度**的骨架，
+   * 其餘欄位維持 `null`——**不猜**任何上界。
+   */
+  const mergeScanProgress = useCallback((done: number | null, total: number) => {
+    const prev = useICAnalysisStore.getState().eventScanDisclosure;
+    const prevScan = prev?.event_label_scan ?? null;
+    setEventScanDisclosure({
+      ...(prev ?? {}),
+      event_label_scan: {
+        scan_total: total,
+        scan_done: done ?? prevScan?.scan_done ?? 0,
+        scan_results: prevScan?.scan_results ?? [],
+        capability: prevScan?.capability ?? 'available',
+        reason: prevScan?.reason ?? null,
+        message: prevScan?.message ?? null,
+      },
+    });
+  }, [setEventScanDisclosure]);
+
   const fetchTaskStatus = useCallback(
     async (taskId: string) => {
       const status = await requestJson<{
@@ -114,6 +138,8 @@ export function useICAnalysis() {
         decision_offset_bars_record_values?: number[] | null;
         decision_offset_bars_analysis?: number | null;
         decision_offset_bars_scan_max?: number | null;
+        bounds_scope_symbol?: string | null;
+        bounds_scope_excluded_events?: number | null;
         k_max_feasible_at_h?: number | null;
         h_max_feasible_at_k?: number | null;
         k_bound_status?: string | null;
@@ -137,6 +163,8 @@ export function useICAnalysis() {
             decision_offset_bars_record_values: status.decision_offset_bars_record_values ?? null,
             decision_offset_bars_analysis: status.decision_offset_bars_analysis ?? null,
             decision_offset_bars_scan_max: status.decision_offset_bars_scan_max ?? null,
+            bounds_scope_symbol: status.bounds_scope_symbol ?? null,
+            bounds_scope_excluded_events: status.bounds_scope_excluded_events ?? null,
             k_max_feasible_at_h: status.k_max_feasible_at_h ?? null,
             h_max_feasible_at_k: status.h_max_feasible_at_k ?? null,
             k_bound_status: status.k_bound_status ?? null,
@@ -213,17 +241,30 @@ export function useICAnalysis() {
           if (payload.status) {
             setStatus(payload.status);
           }
+          // 🔴 **R1 三家全員之 P1**（`CODEX-R1-P1-02`／`COMPOSER-R1-P1-01`／`GROK-R1-P1-01`）：
+          //    WS 是**生產預設通道**，輪詢只在重連失敗 ≥3 次後才啟動 ⇒ 快樂路徑上
+          //    `eventScanDisclosure` 永遠停在 WS open 那一刻的值，掃描矩陣與兩上界對使用者不可達。
+          //    這與 `7904c0dd` 要修的「幽靈功能」同病，只是層次從「props 沒傳」移到「store 沒刷新」。
+          //    ⇒ (a) 掃描進度逐格併進 store；(b) 終態改走 `fetchTaskStatus`（它會 hydrate
+          //    整組揭露欄，並在 completed 時自行 `fetchResult`）。
+          if (typeof payload.scan_total === 'number') {
+            mergeScanProgress(payload.scan_done ?? null, payload.scan_total);
+          }
           if (payload.status === 'failed') {
             terminalRef.current = true;
             clearTimers();
             setError(payload.message || payload.error || 'IC analysis failed');
+            // 失敗任務不得留著上一次的上界／矩陣（`CODEX-R1-P2-03`）。
+            setEventScanDisclosure(null);
             ws.close();
             return;
           }
           if (payload.status === 'completed') {
             terminalRef.current = true;
             clearTimers();
-            void fetchResult(taskId);
+            // 🔴 **不是** `fetchResult`：那支只設 report、不碰揭露欄。
+            //    `fetchTaskStatus` 於 completed 分支會自行呼叫 `fetchResult`，故不重複。
+            void fetchTaskStatus(taskId).catch(() => { void fetchResult(taskId); });
             ws.close();
             return;
           }
@@ -265,7 +306,7 @@ export function useICAnalysis() {
     };
 
     wsRef.current = ws;
-  }, [clearTimers, fetchResult, fetchTaskStatus, setError, setProgress, setStatus, startPolling]);
+  }, [clearTimers, fetchResult, fetchTaskStatus, mergeScanProgress, setError, setEventScanDisclosure, setProgress, setStatus, startPolling]);
 
   const startAnalysis = useCallback(
     async (config: ICAnalysisConfig) => {
@@ -378,7 +419,10 @@ export function useICAnalysis() {
         body: JSON.stringify(payload),
       });
 
-      setTask(result.task_id, result.status === 'running' ? 'running' : 'pending');
+      // 🔴 `COMPOSER-R1-P2-01`：新任務啟動即清掉上一次的揭露欄——否則第二次分析在
+      //    首次 /task 回應之前，面板會拿**上一批**的上界與掃描矩陣當成這一批的。
+      setEventScanDisclosure(null);
+      setTask(result.task_id, result.status === "running" ? "running" : "pending");
       setStatus(result.status === 'running' ? 'running' : 'pending');
       retryCountRef.current = 0;
       connectProgress(result.task_id);
@@ -423,7 +467,10 @@ export function useICAnalysis() {
         body: JSON.stringify(payload),
       });
 
-      setTask(result.task_id, result.status === 'running' ? 'running' : 'pending');
+      // 🔴 `COMPOSER-R1-P2-01`：新任務啟動即清掉上一次的揭露欄——否則第二次分析在
+      //    首次 /task 回應之前，面板會拿**上一批**的上界與掃描矩陣當成這一批的。
+      setEventScanDisclosure(null);
+      setTask(result.task_id, result.status === "running" ? "running" : "pending");
       setStatus(result.status === 'running' ? 'running' : 'pending');
       retryCountRef.current = 0;
       connectProgress(result.task_id);

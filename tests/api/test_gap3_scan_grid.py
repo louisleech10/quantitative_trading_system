@@ -54,18 +54,48 @@ class _Req:
 
 
 class _FakeAnalyzer:
-    """只記錄被呼叫幾次並回固定報告；不做任何統計。"""
+    """單格用之 fake analyzer。
 
-    def __init__(self, delay: float = 0.0):
+    🔴 `GROK-R1-P2-02`（R1 閉合）：回傳形狀改為**真實**形狀——計數住 `metadata`，
+    根層只有 `analysis_status`／`oos_guarantees`。原版在根上捏造 `n_features`，
+    正好掩蓋了 `_scan_cell_summary` 於根層取計數（恆取不到）的洞。
+    """
+
+    def __init__(self, delay: float = 0.0, sink: Any = None):
         self.calls: List[Dict[str, Any]] = []
         self.delay = delay
+        self.sink = sink            # 共享 list：記錄「哪一個 analyzer 實例跑了哪一格」
 
     def analyze(self, **kwargs):
         if self.delay:
             import time as _t
             _t.sleep(self.delay)
         self.calls.append(kwargs)
-        return {"analysis_status": "ok_oos", "oos_guarantees": True, "n_features": 3}
+        if self.sink is not None:
+            self.sink.append(id(self))
+        return {
+            "analysis_status": "ok_oos",
+            "oos_guarantees": True,
+            "metadata": {"n_samples": 42, "total_features_evaluated": 7},
+        }
+
+
+class _FakeAnalyzerFactory:
+    """`create_ic_analyzer` 之替身：**每格造一個新實例**（`CODEX-R1-P1-01`）。"""
+
+    def __init__(self, delay: float = 0.0):
+        self.delay = delay
+        self.instances: List[_FakeAnalyzer] = []
+        self.ran_instance_ids: List[int] = []
+
+    def __call__(self, config_override=None):
+        a = _FakeAnalyzer(delay=self.delay, sink=self.ran_instance_ids)
+        self.instances.append(a)
+        return a
+
+    @property
+    def calls(self) -> List[Dict[str, Any]]:
+        return [c for a in self.instances for c in a.calls]
 
 
 def _records(bars, *, t0_idxs=(120, 180, 240), entry="trigger_open",
@@ -102,7 +132,7 @@ def _batch(bars, *, scan=None, entry="trigger_open", mode="open_to_horizon_close
     return batch
 
 
-def _run_grid(analyzer, batch, progress=None):
+def _run_grid(analyzer_factory, batch, progress=None):
     svc = svc_mod.ICAnalysisService()
     events: List[Dict[str, Any]] = []
 
@@ -112,7 +142,7 @@ def _run_grid(analyzer, batch, progress=None):
             progress.append(payload)
 
     out = asyncio.run(svc._run_scan_grid(
-        "task-scan", analyzer, _Req(), batch,
+        "task-scan", analyzer_factory, _Req(), batch,
         features_path=FEATURES_PATH, meta_path=None, feature_manifest_path=None,
         labels_path=None, kline_reader=None, config_override=None,
         progress_callback=_cb,
@@ -124,7 +154,7 @@ def _run_grid(analyzer, batch, progress=None):
 
 def test_scan_grid_shape_is_exactly_nine_cells(bars):
     """`mk=2, mh=3` ⇒ k∈{0,1,2} × h∈{1,2,3} ＝ **9 格**；每格 `(k,h)` 唯一。"""
-    analyzer = _FakeAnalyzer()
+    analyzer = _FakeAnalyzerFactory()
     out, _ = _run_grid(analyzer, _batch(bars, scan={"decision_offset_bars_max": 2,
                                                     "horizon_bars_max": 3}))
     assert out["capability"] == "available" and out["reason"] is None
@@ -143,7 +173,7 @@ def test_scan_grid_each_cell_has_its_own_receipt_hash(bars):
     重用 prepare 之產物會讓「用 k=0 對齊、用 k=2 算值」這種錯配全綠；
     hash 互異就是那件事的可證偽形態。
     """
-    out, _ = _run_grid(_FakeAnalyzer(), _batch(bars, scan={"decision_offset_bars_max": 2,
+    out, _ = _run_grid(_FakeAnalyzerFactory(), _batch(bars, scan={"decision_offset_bars_max": 2,
                                                            "horizon_bars_max": 3}))
     hashes = [c["analysis_alignment_receipt_hash"] for c in out["scan_results"]]
     assert all(h for h in hashes), "每格皆須有 hash"
@@ -157,15 +187,15 @@ def test_scan_grid_mutation_reused_spec_collapses_hashes(bars, monkeypatch):
     """
     real = svc_mod.ICAnalysisService._run_scan_cell
 
-    def _mutated(self, analyzer, request, cell_batch, **kw):
+    def _mutated(self, analyzer_factory, request, cell_batch, **kw):
         frozen = {**cell_batch, "event_label_spec": {
             "horizon_bars": 3, "entry_price_semantic": "trigger_open",
             "label_return_mode": "open_to_horizon_close", "decision_offset_bars": 0,
         }}
-        return real(self, analyzer, request, frozen, **kw)
+        return real(self, analyzer_factory, request, frozen, **kw)
 
     monkeypatch.setattr(svc_mod.ICAnalysisService, "_run_scan_cell", _mutated)
-    out, _ = _run_grid(_FakeAnalyzer(), _batch(bars, scan={"decision_offset_bars_max": 2,
+    out, _ = _run_grid(_FakeAnalyzerFactory(), _batch(bars, scan={"decision_offset_bars_max": 2,
                                                            "horizon_bars_max": 3}))
     hashes = [c["analysis_alignment_receipt_hash"] for c in out["scan_results"]]
     assert len(set(hashes)) == 1, "mutation 未生效 ⇒ 上一條之斷言不可證偽"
@@ -173,7 +203,7 @@ def test_scan_grid_mutation_reused_spec_collapses_hashes(bars, monkeypatch):
 
 def test_scan_grid_axis_defaults_to_single_value_when_max_absent(bars):
     """只給 `horizon_bars_max` ⇒ k 軸維持 spec 之單值（**不是**整條掃）。"""
-    out, _ = _run_grid(_FakeAnalyzer(), _batch(bars, k=2, scan={"horizon_bars_max": 3}))
+    out, _ = _run_grid(_FakeAnalyzerFactory(), _batch(bars, k=2, scan={"horizon_bars_max": 3}))
     assert out["scan_total"] == 3
     assert sorted({c["k"] for c in out["scan_results"]}) == [2]
     assert sorted(c["h"] for c in out["scan_results"]) == [1, 2, 3]
@@ -183,7 +213,7 @@ def test_scan_grid_axis_defaults_to_single_value_when_max_absent(bars):
 
 def test_scan_grid_too_large_is_rejected_without_running_any_cell(bars):
     """`mk=20, mh=20` ⇒ 21×20＝420 > 110（契約上限）⇒ `unavailable`，且**一格都不跑**。"""
-    analyzer = _FakeAnalyzer()
+    analyzer = _FakeAnalyzerFactory()
     out, _ = _run_grid(analyzer, _batch(bars, scan={"decision_offset_bars_max": 20,
                                                     "horizon_bars_max": 20}))
     assert out["capability"] == "unavailable"
@@ -200,7 +230,7 @@ def test_scan_grid_max_runs_comes_from_contract_not_hardcoded(bars):
     params = create_event_sample_pipeline().analysis_params()
     assert params["scan_grid_max_runs"] == 110, "benchmark 凍結值（見 receipt）"
     # 恰好等於上限 ⇒ 放行（邊界之 over 向：不得把 `==` 也擋掉）
-    out, _ = _run_grid(_FakeAnalyzer(), _batch(bars, scan={"decision_offset_bars_max": 10,
+    out, _ = _run_grid(_FakeAnalyzerFactory(), _batch(bars, scan={"decision_offset_bars_max": 10,
                                                            "horizon_bars_max": 10}))
     assert out["capability"] == "available" and out["scan_total"] == 110
 
@@ -215,7 +245,7 @@ def test_scan_grid_infeasible_cell_is_unavailable_without_killing_others(bars):
     該格仍有值（`D-001` D4.2「全批不可行 ⇒ unavailable」）。
     """
     out, _ = _run_grid(
-        _FakeAnalyzer(),
+        _FakeAnalyzerFactory(),
         _batch(bars, t0_idxs=(1, 2), mode="close_to_close", entry="trigger_close", h=1,
                scan={"decision_offset_bars_max": 3, "horizon_bars_max": 1}),
     )
@@ -240,7 +270,7 @@ def test_scan_grid_cell_timeout_keeps_partial_results(bars, monkeypatch):
         staticmethod(lambda: {**real_params, "per_cell_timeout_s": 0.05}),
     )
     # 每格 fake analyzer 睡 0.2s > 0.05s 之單格上限 ⇒ 全部逾時
-    out, _ = _run_grid(_FakeAnalyzer(delay=0.2),
+    out, _ = _run_grid(_FakeAnalyzerFactory(delay=0.2),
                        _batch(bars, scan={"horizon_bars_max": 2}))
     assert out["scan_total"] == 2
     reasons = {c["reason"] for c in out["scan_results"]}
@@ -252,7 +282,7 @@ def test_scan_grid_cell_timeout_keeps_partial_results(bars, monkeypatch):
 
 def test_scan_grid_progress_reports_scan_done_and_total(bars):
     """進度事件須帶 `scan_done`／`scan_total`（走既有 progress 通道，不另開）。"""
-    _, events = _run_grid(_FakeAnalyzer(), _batch(bars, scan={"horizon_bars_max": 3}))
+    _, events = _run_grid(_FakeAnalyzerFactory(), _batch(bars, scan={"horizon_bars_max": 3}))
     scan_events = [e for e in events if "scan_total" in e]
     assert len(scan_events) == 3
     assert [e["scan_done"] for e in scan_events] == [1, 2, 3]
@@ -323,3 +353,106 @@ def test_k_disclosure_reports_both_record_and_analysis_k(bars):
     assert out["decision_offset_bars_record_values"] == [1]
     assert out["decision_offset_bars_analysis"] == 1
     assert "decision_offset_bars_record_values" in out and "decision_offset_bars_analysis" in out
+
+
+# ── R1 閉合：`CODEX-R1-P1-01` 之所有權隔離、`GROK-R1-P2-02` 之投影鍵 ──────────
+
+def test_scan_grid_each_cell_gets_its_own_analyzer(bars):
+    """🔴 `CODEX-R1-P1-01`：每格用**自己的** analyzer 實例（逾時之殘存 worker 碰不到他格）。
+
+    `asyncio.wait_for` 只取消 await、**不會停掉已在跑的 thread**，而
+    `ICFilterOrchestrator` 持有 `_ic_cache`／`_report`／`_filtered_features_df` 等可變欄位
+    ⇒ 共用一個實例時，逾時之格仍會在背景改下一格（與網格後主分析）正在用的狀態。
+    """
+    factory = _FakeAnalyzerFactory()
+    out, _ = _run_grid(factory, _batch(bars, scan={"decision_offset_bars_max": 2,
+                                                   "horizon_bars_max": 3}))
+    assert out["scan_done"] == 9
+    # 9 格 ⇒ 造了 9 個實例，且**每個都只跑一次**（沒有任何實例被兩格共用）
+    assert len(factory.instances) == 9
+    assert len(set(factory.ran_instance_ids)) == 9
+    assert all(len(a.calls) == 1 for a in factory.instances)
+
+
+def test_scan_grid_cell_receives_its_own_embargo_override(bars):
+    """每格之 analyzer 以**該格**的 `config_override`（含 embargo）建構，不是共用一份。"""
+    seen: List[Any] = []
+
+    class _RecordingFactory(_FakeAnalyzerFactory):
+        def __call__(self, config_override=None):
+            seen.append(dict(config_override or {}))
+            return super().__call__(config_override)
+
+    out, _ = _run_grid(_RecordingFactory(), _batch(bars, scan={"horizon_bars_max": 2}))
+    assert out["scan_done"] == 2
+    assert len(seen) == 2
+    assert all("embargo" in o for o in seen), "每格之 override 須帶自己的 embargo"
+
+
+def test_scan_cell_summary_reads_metadata_not_only_root(bars):
+    """🔴 `GROK-R1-P2-02`：計數住 `metadata` 也要取得到（真實 analyzer 之形狀）。"""
+    summarize = svc_mod.ICAnalysisService._scan_cell_summary
+    # 真實形狀：根層只有 status，計數在 metadata
+    real_shape = {
+        "analysis_status": "ok_oos", "oos_guarantees": True,
+        "metadata": {"n_samples": 42, "total_features_evaluated": 7},
+    }
+    got = summarize(real_shape)
+    assert got["n_samples"] == 42
+    assert got["total_features_evaluated"] == 7
+    assert got["analysis_status"] == "ok_oos"
+    # 舊 fake 形狀（根層計數）仍取得到——修法是「逐層取」，不是「改讀另一處」
+    assert summarize({"analysis_status": "ok", "n_features": 3})["n_features"] == 3
+    # 🔴 兩處皆無 ⇒ **不填假值**
+    assert "n_samples" not in (summarize({"analysis_status": "ok"}) or {})
+    assert summarize(None) is None
+
+
+def test_scan_grid_cell_summary_is_populated_from_real_shape(bars):
+    """端到端：格子之 `ic_summary` 真的帶得到計數（原版恆為只有 status）。"""
+    out, _ = _run_grid(_FakeAnalyzerFactory(), _batch(bars, scan={"horizon_bars_max": 2}))
+    for cell in out["scan_results"]:
+        assert cell["ic_summary"]["n_samples"] == 42, f"格 {cell['k']},{cell['h']} 之摘要缺計數"
+
+
+# ── R1 閉合：`CODEX-R1-P2-04` bounds 母體須與實際 IC 母體同源 ────────────────
+
+def test_bounds_scope_is_limited_to_run_symbol(bars):
+    """🔴 他 symbol 之事件**不得**壓低上界——它們也不進本次 IC（具名排除）。
+
+    codex 實跑之反例：ETH-only `k_max=119`，混入一筆 BTC 尾端事件後變 `no_feasible_k`。
+    """
+    eth_only = _batch(bars)
+    base = svc_mod.ICAnalysisService._event_k_disclosure(_Req(), eth_only)
+    assert base["k_bound_status"] == "bounded"
+
+    n = len(bars[SYMBOL][TF])
+    ot = bars[SYMBOL][TF]["open_time_ms"].to_numpy()
+    alien = dict(make_event(99, t0=int(ot[n - 2]), label=1, direction="long"))
+    alien["symbol"] = "BTCUSDT"
+    alien["decision_offset_bars"] = 0
+    alien["entry_price_semantic"] = "trigger_open"
+    alien["label_definition"] = {
+        **dict(alien.get("label_definition") or {}),
+        "label_return_mode": "open_to_horizon_close",
+        "window": {"horizon_bars": 3},
+    }
+    mixed = {**eth_only, "records": [*eth_only["records"], alien]}
+    got = svc_mod.ICAnalysisService._event_k_disclosure(_Req(), mixed)
+
+    # 上界與純 ETH 批**相同**（他 symbol 不計入）
+    assert got["k_max_feasible_at_h"] == base["k_max_feasible_at_h"]
+    assert got["h_max_feasible_at_k"] == base["h_max_feasible_at_k"]
+    # 🔴 且**說出**上界是對誰算的、排除了幾筆（不讓它變成暗知識）
+    assert got["bounds_scope_symbol"] == SYMBOL
+    assert got["bounds_scope_excluded_events"] == 1
+
+
+def test_bounds_scope_without_run_symbol_uses_whole_batch(bars):
+    """over 向：未指定 run symbol ⇒ 對全批算，且 `bounds_scope_symbol` 為 `None`（不謊報）。"""
+    class _NoSymbolReq(_Req):
+        symbol = None
+
+    got = svc_mod.ICAnalysisService._event_k_disclosure(_NoSymbolReq(), _batch(bars))
+    assert got["bounds_scope_symbol"] is None
+    assert got["bounds_scope_excluded_events"] == 0

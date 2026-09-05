@@ -2965,6 +2965,13 @@ export interface ICEventScanDisclosure {
   h_bound_status?: string | null;
   /** 契約 `analysis_params.decision_offset_bars_scan_max`（建議上限；超過只警示不擋）。 */
   decision_offset_bars_scan_max?: number | null;
+  /**
+   * 🔴 `CODEX-R1-P2-04`：兩上界是**對誰**算的。
+   * `bounds_scope_symbol` ＝本次 IC 的 run symbol（`null` ⇒ 未指定、對全批算）；
+   * `bounds_scope_excluded_events` ＝因 symbol 不符而未計入上界的事件筆數。
+   */
+  bounds_scope_symbol?: string | null;
+  bounds_scope_excluded_events?: number | null;
   event_label_scan?: {
     scan_total: number;
     scan_done: number;

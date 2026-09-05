@@ -305,6 +305,10 @@ class ICTaskStatusResponse(BaseModel):
     decision_offset_bars_analysis: Optional[int] = None
     #: 契約 `analysis_params.decision_offset_bars_scan_max`（建議上限；超過只警示不擋）。
     decision_offset_bars_scan_max: Optional[int] = None
+    #: 🔴 `CODEX-R1-P2-04`：兩上界是**對誰**算的（run symbol 之子集）與被排除筆數。
+    #  `None` ⇒ 未指定 run symbol（全批）；`0` ⇒ 有指定但沒東西被排除。
+    bounds_scope_symbol: Optional[str] = None
+    bounds_scope_excluded_events: Optional[int] = None
     #: 兩個**條件上界**（D4.2）：幾何／coverage 上界，**非**全批成功保證。
     k_max_feasible_at_h: Optional[int] = None
     h_max_feasible_at_k: Optional[int] = None

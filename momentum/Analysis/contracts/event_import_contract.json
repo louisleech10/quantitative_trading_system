@@ -170,11 +170,11 @@
     },
     "per_cell_timeout_s": {
       "type": "float", "min": 0.1, "example_default": 60.0,
-      "doc": "單格五階段＋條件 IC 之逾時；逾時之格 unavailable:scan_cell_timeout，其餘格保留 partial。🔴 由 benchmark receipt 導出：五階段 p95 6.6ms ⇒ 逾時只可能由**未量到的條件 IC** 觸發；60 秒約為 p95 之 9000 倍，足以吸收合理的單格 IC，且單格卡死時一分鐘內即切掉"
+      "doc": "單格五階段＋條件 IC 之逾時；逾時之格 unavailable:scan_cell_timeout，其餘格保留 partial。🔴 **本值為判斷值，非實測凍結**（CODEX-R1-P2-05）：benchmark 只量到五階段（p95 6.6ms），**沒有量到每格的條件 IC**，故不得宣稱『60 秒足以吸收合理的單格 IC』。現值＝一個保守的上限，作用是讓卡死的格子一分鐘內被切掉而不是拖垮整個網格。殘留 B4-TIMEOUT-1（needs-research），觸發＝在已物化 feature run 上量到含 analyzer.analyze 的單格 p50/p95/p99"
     },
     "scan_timeout_s": {
       "type": "float", "min": 0.1, "example_default": 900.0,
-      "doc": "整個網格之總逾時；達上限後未跑之格一律 unavailable:scan_cell_timeout，已完成之格保留。🔴 ＝per_cell_timeout_s × 15 ⇒ 即使連續 15 格都跑到單格上限仍會收斂"
+      "doc": "整個網格之總逾時；達上限後未跑之格一律 unavailable:scan_cell_timeout，已完成之格保留。🔴 **同上為判斷值**：＝per_cell_timeout_s × 15（即使連續 15 格都跑到單格上限仍會收斂）。**不宣稱**『正常格足以跑完 110 格』——那需要含條件 IC 的實測，見殘留 B4-TIMEOUT-1"
     }
   },
   "capability_reason_bindings": {

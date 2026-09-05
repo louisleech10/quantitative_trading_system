@@ -542,12 +542,28 @@ class ICAnalysisService:
                 ),
             }
         pipeline = create_event_sample_pipeline()
-        timeframes = sorted({str(r.get("timeframe")) for r in records if r.get("timeframe")})
+        # 🔴 **`CODEX-R1-P2-04`（R1 閉合）：bounds 之母體須與實際 IC 母體同源**。
+        #    首版對**全批** records 算上界，但 longitudinal IC 只餵 `symbol == request.symbol`
+        #    的事件（他 symbol 於 `_run_event_label_stages` 具名排除）⇒ 另一個 symbol 的
+        #    尾端事件會把 `min_e` 壓低，畫面顯示的上界比使用者這次真正跑的母體更嚴。
+        #    codex 實跑：ETH-only `k_max=119`，混入一筆 BTC 尾端事件後變 `no_feasible_k`。
+        #    ⇒ 依 run symbol 過濾；並把**過濾範圍**一併揭露（不讓「上界是對誰算的」變成暗知識）。
+        run_symbol = str(getattr(request, "symbol", "") or "") or None
+        scoped = [r for r in records if run_symbol is None or str(r.get("symbol")) == run_symbol]
+        excluded = len(records) - len(scoped)
+        if not scoped:
+            return {
+                "decision_offset_bars_capability": "unavailable",
+                "decision_offset_bars_reason": (
+                    ICAnalysisService.SCAN_REASON_MISSING_K_DISCLOSURE
+                ),
+            }
+        timeframes = sorted({str(r.get("timeframe")) for r in scoped if r.get("timeframe")})
         bars_by_tf = pipeline.bars_from_kline_cache(
-            sorted({str(r.get("symbol")) for r in records if r.get("symbol")}), timeframes,
+            sorted({str(r.get("symbol")) for r in scoped if r.get("symbol")}), timeframes,
         )
         bounds = pipeline.feasible_bounds(
-            records, bars_by_tf, event_label_spec=spec, timeframes=timeframes,
+            scoped, bars_by_tf, event_label_spec=spec, timeframes=timeframes,
         )
         return {
             "decision_offset_bars_capability": "available",
@@ -558,6 +574,10 @@ class ICAnalysisService:
             "decision_offset_bars_scan_max": int(
                 pipeline.analysis_params()["decision_offset_bars_scan_max"]
             ),
+            # 🔴 上界是**對誰**算的：run symbol 之子集，以及被排除的筆數。
+            #    `None` ⇒ 未指定 run symbol（全批）；`0` ⇒ 有指定但沒東西被排除。
+            "bounds_scope_symbol": run_symbol,
+            "bounds_scope_excluded_events": int(excluded),
             **bounds,
         }
 
@@ -588,17 +608,34 @@ class ICAnalysisService:
 
         🔴 **誠實邊界**：本 dict 是給矩陣格子顯示用的摘要，**不是**權威分析結果；
         權威值仍在該格自己的分析報告裡。不在此計算任何新統計量。
+
+        🔴 **`GROK-R1-P2-02`（R1 閉合）**：首版於 report **根**取 `n_features`／`n_samples`，
+        但真實 `ICFilterOrchestrator.analyze` 把計數放在 `metadata`（見
+        `ic_filter_orchestrator.py` 之 `metadata.n_samples`／`total_features_*`）
+        ⇒ 那兩個根鍵**恆不存在**，格子永遠只有 status。而測試之 fake analyzer 在根上
+        捏造 `n_features` ⇒ 掩蓋這個洞。**修法＝逐層取**：根優先、退到 `metadata`；
+        兩處皆無就是沒有（不填假值）。
         """
         if not isinstance(report, dict):
             return None
-        keys = ("analysis_status", "oos_guarantees", "n_features", "n_samples")
-        out = {k: report[k] for k in keys if k in report}
+        meta = report.get("metadata")
+        meta = meta if isinstance(meta, dict) else {}
+        out: Dict[str, Any] = {}
+        for key in ("analysis_status", "oos_guarantees"):
+            if key in report:
+                out[key] = report[key]
+        # 計數類：真實形狀住 `metadata`；根層是舊 fake 的形狀，兩者都收但**不造值**。
+        for key in ("n_samples", "n_features", "total_features_evaluated"):
+            if key in report:
+                out[key] = report[key]
+            elif key in meta:
+                out[key] = meta[key]
         return out or None
 
     async def _run_scan_grid(
         self,
         task_id: str,
-        analyzer: Any,
+        analyzer_factory: Any,
         request: ICAnalyzeRequest,
         event_batch: Dict[str, Any],
         *,
@@ -617,6 +654,17 @@ class ICAnalysisService:
         驗收以「各格 hash 互異」釘住。
         🔴 **逾時之格 `unavailable` 並保留 partial**：整個網格不因一格慢而全滅。
         🔴 **超出可行域之格 `unavailable` 不影響他格**：那是資料事實，不是請求錯誤。
+
+        🔴 **`CODEX-R1-P1-01`（R1 閉合）：每格用自己的 analyzer**。
+        首版把**同一個** `analyzer` 逐格丟進 `to_thread`；而 `asyncio.wait_for` 的取消
+        **只取消 await，不會停掉已在跑的 thread**（Python 無法從外部殺 thread）。
+        `ICFilterOrchestrator` 持有 `_ic_cache`／`_report`／`_filtered_features_df`／
+        `_current_config` 等**可變欄位** ⇒ 逾時之格仍在背景改那些欄位，而下一格與
+        **網格之後的主分析**用的是同一個物件 ⇒ 跨 k/h 污染，且值合法、不會紅。
+        **修法＝所有權隔離**：本方法收 `analyzer_factory`（而非 analyzer 實例），
+        每格自己造一個、用完即棄。
+        🔴 **誠實邊界**：被遺棄的 worker **仍會跑完**（只是它改的是自己那份、隨後被丟掉）；
+        隔離消除的是**污染**，不是「逾時就真的停下來」。CPU 仍被它佔用到自然結束。
         """
         from momentum.factories import create_event_sample_pipeline
 
@@ -665,7 +713,7 @@ class ICAnalysisService:
                 try:
                     cell = await asyncio.wait_for(
                         asyncio.to_thread(
-                            self._run_scan_cell, analyzer, request, cell_batch,
+                            self._run_scan_cell, analyzer_factory, request, cell_batch,
                             features_path=features_path, meta_path=meta_path,
                             feature_manifest_path=feature_manifest_path,
                             labels_path=labels_path, kline_reader=kline_reader,
@@ -704,7 +752,7 @@ class ICAnalysisService:
 
     def _run_scan_cell(
         self,
-        analyzer: Any,
+        analyzer_factory: Any,
         request: ICAnalyzeRequest,
         cell_batch: Dict[str, Any],
         *,
@@ -715,7 +763,11 @@ class ICAnalysisService:
         kline_reader: Any,
         config_override: Optional[Dict[str, Any]],
     ) -> Dict[str, Any]:
-        """單格：五階段 ＋ 條件 IC（**同步**；由 `_run_scan_grid` 以 `to_thread` 呼叫）。"""
+        """單格：五階段 ＋ 條件 IC（**同步**；由 `_run_scan_grid` 以 `to_thread` 呼叫）。
+
+        🔴 `CODEX-R1-P1-01`：analyzer **由本格自己造**（`analyzer_factory(cell_override)`），
+        用完即棄。逾時之格即使仍在背景跑，改的也只是它自己那一份。
+        """
         staged = self._run_event_label_stages(
             request, cell_batch,
             features_path=features_path, meta_path=meta_path,
@@ -725,6 +777,7 @@ class ICAnalysisService:
         cell_override["embargo"] = max(
             int(cell_override.get("embargo") or 0), int(staged["purge_rows"]),
         )
+        analyzer = analyzer_factory(cell_override)
         report = analyzer.analyze(
             features_path=features_path,
             labels_path=labels_path or "",
@@ -973,8 +1026,10 @@ class ICAnalysisService:
                     #    `missing_decision_offset_disclosure`（fail-closed：沒揭露就不算數）。
                     k_disclosure = self._event_k_disclosure(request, event_batch)
                     if request.event_label_scan is not None:
+                        # 🔴 `CODEX-R1-P1-01`：傳 **factory** 不傳實例——每格自己造 analyzer，
+                        #    逾時之格的殘存 worker 因此碰不到他格與網格後之主分析。
                         scan = await self._run_scan_grid(
-                            task_id, analyzer, request, event_batch,
+                            task_id, create_ic_analyzer, request, event_batch,
                             features_path=features_path, meta_path=meta_path,
                             feature_manifest_path=feature_manifest_hint,
                             labels_path=labels_path, kline_reader=kline_reader,
@@ -1102,6 +1157,7 @@ class ICAnalysisService:
                 "decision_offset_bars_capability", "decision_offset_bars_reason",
                 "decision_offset_bars_record_values", "decision_offset_bars_analysis",
                 "decision_offset_bars_scan_max",
+                "bounds_scope_symbol", "bounds_scope_excluded_events",
                 "k_max_feasible_at_h", "h_max_feasible_at_k",
                 "k_bound_status", "h_bound_status", "event_label_scan",
             ):

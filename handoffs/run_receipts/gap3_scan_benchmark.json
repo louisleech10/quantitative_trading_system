@@ -12,12 +12,12 @@
   },
   "cells_sampled": 18,
   "cell_seconds": {
-    "mean": 0.00618,
-    "p95": 0.006677,
-    "max": 0.008202,
-    "min": 0.00582
+    "mean": 0.006256,
+    "p95": 0.006932,
+    "max": 0.008378,
+    "min": 0.005876
   },
-  "bounds_seconds": 0.000761,
+  "bounds_seconds": 0.000752,
   "bounds_result": {
     "k_max_feasible_at_h": 119,
     "h_max_feasible_at_k": 1518,
@@ -28,7 +28,7 @@
     "k_axis_max": 10,
     "h_axis_max": 10,
     "cells": 110,
-    "stages_only_seconds_at_max": 0.902
+    "stages_only_seconds_at_max": 0.922
   },
   "derived_example_defaults": {
     "decision_offset_bars_scan_max": {
@@ -37,20 +37,20 @@
     },
     "scan_grid_max_runs": {
       "value": 110,
-      "why": "由宣告軸導出：k∈[0,10] 有 11 值 × h∈[1,10] 有 10 值 ＝ 110 格。🔴 **修正暫定值 121 之算術錯誤**：121 假設兩軸各 11 值，但 h 之定義域自 1 起（h=0 無意義）⇒ h 軸只有 10 值。五階段成本於此格數為 0.902 秒（可忽略）"
+      "why": "由宣告軸導出：k∈[0,10] 有 11 值 × h∈[1,10] 有 10 值 ＝ 110 格。🔴 **修正暫定值 121 之算術錯誤**：121 假設兩軸各 11 值，但 h 之定義域自 1 起（h=0 無意義）⇒ h 軸只有 10 值。五階段成本於此格數為 0.922 秒（可忽略）"
     },
     "per_cell_timeout_s": {
       "value": 60.0,
-      "why": "五階段 p95＝0.006677 秒 ⇒ 逾時只可能由**未量到的條件 IC** 觸發。60 秒約為五階段 p95 之 9000 倍，足以吸收合理的單格 IC，且單格卡死時一分鐘內即切掉並標 scan_cell_timeout（保留 partial）"
+      "why": "🔴 **判斷值，非本 benchmark 導出**（CODEX-R1-P2-05）：五階段 p95＝0.006932 秒，而逾時只可能由**未量到的條件 IC** 觸發 ⇒ 本 receipt 無法支撐「60 秒足以吸收合理單格 IC」。現值之作用是讓卡死的格子一分鐘內被切掉（標 scan_cell_timeout、保留 partial）；殘留 B4-TIMEOUT-1（needs-research）"
     },
     "scan_timeout_s": {
       "value": 900.0,
-      "why": "＝per_cell_timeout_s × 15 ⇒ 即使連續 15 格都跑到單格上限仍會收斂；正常格（五階段 0.00618 秒 ＋ 秒級 IC）足以跑完 110 格"
+      "why": "＝per_cell_timeout_s × 15 ⇒ 即使連續 15 格都跑到單格上限仍會收斂。🔴 **不宣稱**「正常格足以跑完 110 格」——那需要含條件 IC 的實測（B4-TIMEOUT-1）"
     }
   },
   "env": {
     "python": "3.9.6",
     "platform": "macOS-26.6.2-arm64-arm-64bit"
   },
-  "generated_at_utc": "2026-09-05T10:27:13Z"
+  "generated_at_utc": "2026-09-05T11:34:14Z"
 }

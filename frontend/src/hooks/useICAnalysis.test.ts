@@ -263,3 +263,145 @@ describe('useICAnalysis progress errors', () => {
     expect(useICAnalysisStore.getState().error).toBe('poll fallback failed');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// `G3-D2` B-D4 **R1 閉合** — WS 快樂路徑之揭露欄回填
+//
+// 🔴 三家全員之 P1（`CODEX-R1-P1-02`／`COMPOSER-R1-P1-01`／`GROK-R1-P1-01`）：
+//    WS 是**生產預設通道**，輪詢只在重連失敗 ≥3 次後才啟動；原版 `ws.onmessage` 之
+//    `completed` 分支只 `fetchResult`（設 report、不碰揭露欄）⇒ 掃描矩陣與兩上界
+//    **在主路徑上永遠到不了畫面**。與 `7904c0dd` 要修的「幽靈功能」同病，
+//    層次從「props 沒傳」移到「store 沒刷新」。
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('G3-D2 B-D4 R1 閉合 — WS 快樂路徑必須 hydrate eventScanDisclosure', () => {
+  class MockWS {
+    static instances: MockWS[] = [];
+    url: string;
+    close = vi.fn();
+    send = vi.fn();
+    onmessage: ((event: MessageEvent) => void) | null = null;
+    onerror: (() => void) | null = null;
+    onclose: (() => void) | null = null;
+    onopen: (() => void) | null = null;
+
+    constructor(url: string) {
+      this.url = url;
+      MockWS.instances.push(this);
+    }
+
+    emitMessage(payload: unknown) {
+      this.onmessage?.({ data: JSON.stringify(payload) } as MessageEvent);
+    }
+  }
+
+  const TASK_STATUS_WITH_SCAN = {
+    task_id: 'task-scan', status: 'completed', progress: 1,
+    decision_offset_bars_capability: 'available',
+    decision_offset_bars_record_values: [0, 2],
+    decision_offset_bars_analysis: 0,
+    k_max_feasible_at_h: 119, h_max_feasible_at_k: 1518,
+    k_bound_status: 'bounded', h_bound_status: 'bounded',
+    bounds_scope_symbol: 'ETHUSDT', bounds_scope_excluded_events: 0,
+    event_label_scan: {
+      scan_total: 2, scan_done: 2, capability: 'available', reason: null,
+      scan_results: [
+        { k: 0, h: 1, capability: 'available', n_events: 3, analysis_alignment_receipt_hash: 'a', ic_summary: {} },
+        { k: 0, h: 2, capability: 'available', n_events: 3, analysis_alignment_receipt_hash: 'b', ic_summary: {} },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    MockWS.instances = [];
+    useICAnalysisStore.setState({
+      taskId: null, status: 'idle', progress: 0, currentStage: null,
+      error: null, report: null, eventScanDisclosure: null,
+    });
+    vi.stubGlobal('WebSocket', MockWS as unknown as typeof WebSocket);
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('🔴 WS `completed` ⇒ 揭露欄被 hydrate（原版只 fetchResult ⇒ 永遠是 null）', async () => {
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => (String(url).includes('/task/')
+        ? TASK_STATUS_WITH_SCAN
+        : { summary: {} }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useICAnalysis());
+
+    act(() => { result.current.connectProgress('task-scan'); });
+    await act(async () => {
+      MockWS.instances[0].emitMessage({
+        event: 'progress',
+        data: { status: 'completed', progress: 1, stage: 'completed' },
+      });
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
+
+    const d = useICAnalysisStore.getState().eventScanDisclosure;
+    expect(d, 'WS 完成後揭露欄不得為 null').not.toBeNull();
+    expect(d?.k_max_feasible_at_h).toBe(119);
+    expect(d?.event_label_scan?.scan_results).toHaveLength(2);
+    // 對照：report 也還是有拉（`fetchTaskStatus` 於 completed 分支會呼叫 `fetchResult`）
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes('/result/'))).toBe(true);
+  });
+
+  it('🔴 WS `progress` 帶 `scan_done/scan_total` ⇒ 進行中就看得到格數（不必等終態）', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })));
+    const { result } = renderHook(() => useICAnalysis());
+    act(() => { result.current.connectProgress('task-scan'); });
+    act(() => {
+      MockWS.instances[0].emitMessage({
+        event: 'progress',
+        data: { status: 'running', progress: 0.5, stage: 'event_label_scan', scan_done: 3, scan_total: 9 },
+      });
+    });
+    const scan = useICAnalysisStore.getState().eventScanDisclosure?.event_label_scan;
+    expect(scan?.scan_done).toBe(3);
+    expect(scan?.scan_total).toBe(9);
+    // 🔴 **不猜上界**：進行中只有格數，其餘欄位不得被填假值
+    expect(useICAnalysisStore.getState().eventScanDisclosure?.k_max_feasible_at_h ?? null).toBeNull();
+  });
+
+  it('🔴 `CODEX-R1-P2-03`：WS `failed` ⇒ 清掉上一次的揭露欄（不得把舊矩陣掛在失敗任務上）', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })));
+    useICAnalysisStore.getState().setEventScanDisclosure({ k_max_feasible_at_h: 42 });
+    const { result } = renderHook(() => useICAnalysis());
+    act(() => { result.current.connectProgress('task-scan'); });
+    act(() => {
+      MockWS.instances[0].emitMessage({
+        event: 'progress',
+        data: { status: 'failed', progress: 1, message: 'boom' },
+      });
+    });
+    expect(useICAnalysisStore.getState().eventScanDisclosure).toBeNull();
+    expect(useICAnalysisStore.getState().error).toBe('boom');
+  });
+});
+
+describe('G3-D2 B-D4 R1 閉合 — 新任務啟動即清掉上一次的揭露欄', () => {
+  it('🔴 `COMPOSER-R1-P2-01`：`startAnalysis` 之後、首次 /task 回應之前，不得殘留舊上界', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true, json: async () => ({ task_id: 'task-new', status: 'pending' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('WebSocket', class { constructor() {} close() {} } as unknown as typeof WebSocket);
+    // 前一次分析留下的值
+    useICAnalysisStore.getState().setEventScanDisclosure({
+      k_max_feasible_at_h: 999, k_bound_status: 'bounded',
+    });
+    const { result } = renderHook(() => useICAnalysis());
+    await act(async () => {
+      await result.current.startAnalysis({
+        ...useICAnalysisStore.getState().config,
+        symbol: 'ETHUSDT', timeframe: '12h', config_hash: 'hash-a',
+      });
+    });
+    expect(useICAnalysisStore.getState().eventScanDisclosure).toBeNull();
+    vi.unstubAllGlobals();
+  });
+});

@@ -169,16 +169,17 @@ def main(argv=None) -> int:
             "per_cell_timeout_s": {
                 "value": 60.0,
                 "why": (
-                    f"五階段 p95＝{round(p95, 6)} 秒 ⇒ 逾時只可能由**未量到的條件 IC** 觸發。"
-                    "60 秒約為五階段 p95 之 9000 倍，足以吸收合理的單格 IC，"
-                    "且單格卡死時一分鐘內即切掉並標 scan_cell_timeout（保留 partial）"
+                    f"🔴 **判斷值，非本 benchmark 導出**（CODEX-R1-P2-05）：五階段 p95＝{round(p95, 6)} 秒，"
+                    "而逾時只可能由**未量到的條件 IC** 觸發 ⇒ 本 receipt 無法支撐「60 秒足以吸收合理單格 IC」。"
+                    "現值之作用是讓卡死的格子一分鐘內被切掉（標 scan_cell_timeout、保留 partial）；"
+                    "殘留 B4-TIMEOUT-1（needs-research）"
                 ),
             },
             "scan_timeout_s": {
                 "value": 900.0,
                 "why": (
-                    "＝per_cell_timeout_s × 15 ⇒ 即使連續 15 格都跑到單格上限仍會收斂；"
-                    f"正常格（五階段 {round(mean, 6)} 秒 ＋ 秒級 IC）足以跑完 {grid_cells} 格"
+                    "＝per_cell_timeout_s × 15 ⇒ 即使連續 15 格都跑到單格上限仍會收斂。"
+                    f"🔴 **不宣稱**「正常格足以跑完 {grid_cells} 格」——那需要含條件 IC 的實測（B4-TIMEOUT-1）"
                 ),
             },
         },

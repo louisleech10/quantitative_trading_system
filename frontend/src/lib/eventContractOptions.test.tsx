@@ -349,9 +349,25 @@ describe('Task 7.1 — 契約鏡像防漂移（前端無契約端點，沿用 ev
       const mirror = dimContractNode(EVENT_DIM_CONTRACT_MIRROR, dim);
       expect(real, `契約路徑 ${EVENT_DIM_CONTRACT_PATHS[dim].join('.')} 應存在`).toBeTruthy();
       expect(mirror).toBeTruthy();
-      for (const key of ['enum', 'accepted', 'rejected_with_reason', 'min'] as const) {
+      // 🔴 `GROK-R1-P2-01`（R1 閉合）：原鍵集只有四個，**不含** `rejected_pairs` 與 `default`
+      //    ⇒ 契約新增／刪除幾何零窗對時，前端鏡像可**靜默漂移**而本測試仍綠，
+      //    「三份表同時守住」不成立（producer↔契約另有測試，但前端那一環會單獨漏）。
+      //    失敗模式：UI 放行後端算不出的新零窗對，或反過來拒收已支援的對。
+      for (const key of [
+        'enum', 'accepted', 'rejected_with_reason', 'min', 'rejected_pairs', 'default',
+      ] as const) {
         expect(mirror![key], `${dim}.${key}`).toEqual(real![key]);
       }
     },
   );
+
+  it('🔴 `GROK-R1-P2-01` 之可證偽性：鏡像之 `rejected_pairs` 改一個字即紅', () => {
+    const real = dimContractNode(CONTRACT, 'label_return_mode');
+    expect(real?.rejected_pairs).toBeTruthy();          // 正向對照：契約真的有這個鍵
+    const drifted = {
+      ...dimContractNode(EVENT_DIM_CONTRACT_MIRROR, 'label_return_mode'),
+      rejected_pairs: { open_to_close: ['trigger_close'] },   // 少一個 entry
+    };
+    expect(drifted.rejected_pairs).not.toEqual(real!.rejected_pairs);
+  });
 });
