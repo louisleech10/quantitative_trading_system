@@ -17,8 +17,13 @@ if [ -z "$py" ] || [ ! -f "$checker" ]; then
 fi
 # G-7 前移（S6.1）：staged 含 scope 外路徑而訊息無 Governance-Scope trailer ⇒ 當場擋。
 # 🔴 放在 exec **之前**：exec 會取代本行程，寫在後面等於永遠不執行。
+# 🔴 2026-09-05 使用者裁定：G-7 改為**不擋**（warn-only）。
+#   理由（實測，非偏好）：G-7 的 51 條 scope 內量化路徑＝0；硬保護集與量化主線零交集；
+#   而它對量化碼的判決恆為「未宣告」（一次全跑列出 501 檔、其中 93 個是量化主線）
+#   ⇒ 恆真的告警不是檢查，是常數。它保護的 GOVB1 是 DRAFT／從未實作／2026-08-14 已擱置。
+#   使用者原話：「commit 和 push GitHub 都要幾秒就上去」。
 if [ -f scripts/g7_trailer_precheck.sh ]; then
-  bash scripts/g7_trailer_precheck.sh "$msg_file" || exit 1
+  bash scripts/g7_trailer_precheck.sh "$msg_file" || true
 fi
 
 exec "$py" "$checker" --commit-msg "$msg_file"

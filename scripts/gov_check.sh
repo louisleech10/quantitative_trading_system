@@ -342,17 +342,32 @@ fi
 #   兩者皆不在＝非 govb1 repo（乾淨 clone／tmp 測試副本）⇒ 本段不適用，略過。
 #   ⇒ 「刪腳本讓檢查消失」這條路被堵死；要繞得連 manifest 一起刪，而那會讓
 #      `_g7_policy` 自己 fail-closed（見 govb1_final_gate.sh 之 `_nonempty G-7`）。
-# 反面由 test_gov_check_cheap_first.py::test_mutation_removing_g7_script_turns_red 釘住。
+#
+# 🔴 **為何改為不擋（2026-09-05 使用者裁定，實測依據）**
+#   ① 覆蓋率零：`--print-scope` 之 51 條中，量化路徑（momentum/ api/ frontend/
+#      tests/momentum tests/api）＝**0 條**；內容為 tests/governance/ 25、scripts/ 18、其餘治理文件。
+#      硬保護集三前綴與 G3-D2 三批實作動過的 25 檔**零交集**。
+#   ② 判決是常數：2026-09-05 一次全跑，本段列出 **501 個「未宣告即修改」**，
+#      其中 **93 個是量化主線**（api/routes/ic_analysis.py 等）。那些檔**不可能**進 GOVB1 scope
+#      （GOVB1 是治理 epic）⇒ 對量化碼恆為「未宣告」。恆真的告警不是檢查。
+#   ③ 它擋住真正有用的：本段 fail 後**第 5、6 段執行次數 = 0**——第 5 段正是全套 pytest。
+#      守著一個 DRAFT／從未實作／2026-08-14 已擱置之 epic 的檢查，攔住了守著產品的檢查。
+#   ④ 成本：本段實測 >4 分鐘（上方註解「約 8 秒」為 2026-08 之過期值；範圍已長到 750 commit，
+#      每條路徑重掃全範圍 ⇒ O(路徑×範圍)）。
+#   使用者原話：「commit 和 push GitHub 都要幾秒就上去」。
+#   🔴 **誠實邊界（具名殘留 R-G7-OFF-1）**：GOVB1 之三個凍結檔
+#      （docs/GOVB1_*／govb1_scope.manifest／govb1_frozen_hashes.txt）自此**無閘保護**。
+#      為何可接受：GOVB1 是 DRAFT、從未實作、已擱置；若日後復工，須在復工票內把本段改回擋。
 if [ -f scripts/govb1_scope.manifest ]; then
   _gc_seg 4 "scope 淨差預檢 (G-7；約 8 秒)…"
   if [ ! -f scripts/govb1_final_gate.sh ]; then
     echo "[gov_check] ✗ 有 govb1_scope.manifest 卻缺 govb1_final_gate.sh → fail-closed" >&2
     _gc_fail 4 "缺 scripts/govb1_final_gate.sh 但 scope manifest 在 ⇒ G-7 覆蓋消失（不得靜默略過）"
-  elif bash scripts/govb1_final_gate.sh --only g7 >/dev/null; then
+  elif bash scripts/govb1_final_gate.sh --only g7 >/dev/null 2>&1; then
     echo "[gov_check] ✓ G-7 scope 淨差 OK"
   else
-    echo "[gov_check] ✗ G-7 scope 淨差未過(見上)" >&2
-    _gc_fail 4 "G-7 scope 淨差未過（跑 bash scripts/govb1_final_gate.sh --only g7 看詳情；out-of-epic 之 commit 須帶 Governance-Scope trailer 且置於訊息最末段）"
+    # 🔴 2026-09-05 使用者裁定：**不擋**（warn-only）。理由見下方「為何改為不擋」。
+    echo "[gov_check] ⚠️ G-7 scope 淨差未過 —— **不擋**（詳情 bash scripts/govb1_final_gate.sh --only g7）" >&2
   fi
 else
   _gc_seg 4 "略過(無 govb1_scope.manifest ⇒ 非 govb1 epic repo，G-7 不適用)"
