@@ -12,7 +12,7 @@
  * 🔴 阻擋判定**只有一份**（`twoStageExportBlockReason`）：`buildEventContractRecords` 丟例外、
  *    `/search` 頁 disable 按鈕，兩邊呼叫同一支。本檔同時釘住「兩邊結論一致」。
  */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildEventContractRecords,
   EventExportBlocked,
@@ -407,5 +407,83 @@ describe('D3.1 R2 閉合 — 群集 F③：兩個 label_origin 常數皆由契�
     // 兩者語意相反：一個可匯入、一個不可
     expect(contract.optional_fields.label_origin.not_importable).toContain(EVENT_EXPORT_UNLABELED_LABEL_ORIGIN);
     expect(contract.optional_fields.label_origin.not_importable).not.toContain(EVENT_EXPORT_LABEL_ORIGIN);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// D3.1 R2 閉合（第二刀）— **證明「導出真的接上了」，不是「值剛好對」**
+//
+// 🔴 第三批 mutation 讓 `f1_reserved_full_hardcode`／`f3_label_origin_hardcoded`／
+//    `f4_label_origin_no_enum_check` **三條都 GREEN**：
+//    我的測試斷言的是「值在契約裡」「導出函式行為正確」，
+//    而**模組層常數有沒有真的呼叫那個導出函式**，沒有任何一條在驗。
+//    把 production 抄成「契約現值之完整 hardcode」時，值逐字相同 ⇒ 全綠。
+//
+// 🔴 **判準再升級**：要證明模組層常數之來源，必須**把來源模組換掉再重新 import**，
+//    看常數跟不跟著變。只餵變異輸入給導出函式，證明的是那個函式，不是那個常數。
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('D3.1 R2 閉合（第二刀）— 模組層常數之來源以「變異契約 + 重新載入」證明', () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock('../../../momentum/Analysis/contracts/event_import_contract.json');
+  });
+
+  it('🔴 契約多一個必填純量欄 ⇒ `RESERVED_SCALAR_CONTRACT_COLUMNS` **必須跟著多**', async () => {
+    const real = (await import('../../../momentum/Analysis/contracts/event_import_contract.json')).default;
+    vi.resetModules();
+    vi.doMock('../../../momentum/Analysis/contracts/event_import_contract.json', () => ({
+      default: {
+        ...(real as Record<string, unknown>),
+        required_fields: {
+          ...(real as { required_fields: Record<string, unknown> }).required_fields,
+          zz_injected_scalar: { type: 'str' },
+        },
+      },
+    }));
+    const fresh = await import('./eventContractCsv');
+    // hardcode 版本（即使逐字抄了契約現值）**不會**有這一欄 ⇒ 這條把它打紅
+    expect(fresh.RESERVED_SCALAR_CONTRACT_COLUMNS).toContain('zz_injected_scalar');
+  });
+
+  it('🔴 契約之 `label_origin.enum` 拿掉 `search_positive_case` ⇒ 載入 `eventExport` **必須拋錯**', async () => {
+    const real = (await import('../../../momentum/Analysis/contracts/event_import_contract.json')).default as {
+      optional_fields: { label_origin: { enum: string[] } };
+    };
+    vi.resetModules();
+    vi.doMock('../../../momentum/Analysis/contracts/event_import_contract.json', () => ({
+      default: {
+        ...(real as unknown as Record<string, unknown>),
+        optional_fields: {
+          ...(real as unknown as { optional_fields: Record<string, unknown> }).optional_fields,
+          label_origin: {
+            ...real.optional_fields.label_origin,
+            enum: real.optional_fields.label_origin.enum.filter((v) => v !== 'search_positive_case'),
+          },
+        },
+      },
+    }));
+    // 硬寫字面（`f3`）或拿掉 enum 檢查（`f4`）時都不會拋 ⇒ 這條把兩者都打紅
+    await expect(import('./eventExport')).rejects.toThrow(/search_positive_case/);
+  });
+
+  it('🔴 契約之 `label_origin.enum` 拿掉 `search_unlabeled` ⇒ 亦須拋錯（兩個常數對稱）', async () => {
+    const real = (await import('../../../momentum/Analysis/contracts/event_import_contract.json')).default as {
+      optional_fields: { label_origin: { enum: string[] } };
+    };
+    vi.resetModules();
+    vi.doMock('../../../momentum/Analysis/contracts/event_import_contract.json', () => ({
+      default: {
+        ...(real as unknown as Record<string, unknown>),
+        optional_fields: {
+          ...(real as unknown as { optional_fields: Record<string, unknown> }).optional_fields,
+          label_origin: {
+            ...real.optional_fields.label_origin,
+            enum: real.optional_fields.label_origin.enum.filter((v) => v !== 'search_unlabeled'),
+          },
+        },
+      },
+    }));
+    await expect(import('./eventExport')).rejects.toThrow(/search_unlabeled/);
   });
 });
