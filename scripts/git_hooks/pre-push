@@ -53,6 +53,12 @@ if ! bash scripts/gov_check.sh "${_GC_MODE}"; then
 fi
 
 echo "pre-push: ✓ 放行 push"
-echo "  🔴 提醒：全套 governance pytest **不再於此執行**。動過 scripts/ 或 tests/governance/ 者，"
-echo "     收 epic 前請自行跑一次 bash scripts/gov_check.sh --no-probe（丟背景）。"
+# 🔴 2026-09-05 收窄（使用者：「要跑那麼久就要記得不要又開來用；之前你就改幾行，
+#   然後一天花十幾小時在跑這種東西」）。
+#   原文寫「動過 scripts/ 或 tests/governance/ 者」——那幾乎涵蓋所有改動，而它每次 push
+#   都跳出來，於是主控端照它跑了 53 分鐘的全套。CLAUDE.md:135 的條件其實窄得多
+#   （「只有動 gate.sh/cx_run.sh 這類共用控制流才需跑全套」）。兩處矛盾 ⇒ 以窄的為準。
+echo "  提醒：全套 governance pytest 不在此執行，且**小時級**（實測 3220s／1749 條）。"
+echo "     🔴 只有動 gate.sh／cx_run.sh／gov_check.sh 這類**共用控制流**才需跑，"
+echo "        且只在**收 epic 前跑一次**（丟背景）。改幾行腳本不必跑。"
 exit 0
