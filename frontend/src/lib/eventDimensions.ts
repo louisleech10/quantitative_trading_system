@@ -57,8 +57,15 @@ export interface EventDimContractNode {
   rejected_with_reason?: Readonly<Record<string, string>>;
   type?: string;
   min?: number;
-  /** `G3-D2` D1.5：誠實預設之唯一來源（前端禁硬編字面）。見 `contractDefault()`。 */
-  default?: string;
+  /**
+   * `G3-D2` D1.5：誠實預設之唯一來源（前端禁硬編字面）。見 `contractDefault()`。
+   *
+   * 🔴 型別為 `string | number`：enum 維度之 default 是字串，而 `decision_offset_bars`
+   * 是 `int` 欄、其契約 default 是**數字 `0`**。原本只宣告 `string` ⇒ 鏡像放不進那個 0，
+   * 於是鏡像少了一個鍵而沒人發現（`GROK-R1-P2-01` 強化鍵集後當場現形）。
+   * `contractDefault()` 仍只接受字串——它服務的是 enum 維度之重設，數值欄不走它。
+   */
+  default?: string | number;
   /**
    * `G3-D2` D4.2：**成對**拒收表 `{label_return_mode 值: [entry_price_semantic 值, ...]}`。
    * 只住 `label_return_mode` 節點（契約以 mode 為鍵）；`entry_price_semantic` 方向由
@@ -87,7 +94,9 @@ export const EVENT_DIM_CONTRACT_MIRROR = {
       //    漂移由 `eventContractOptions.test.tsx` 逐鍵比對真契約守住。
       default: 'trigger_close',
     },
-    decision_offset_bars: { type: 'int', min: 0 },
+    // 🔴 `GROK-R1-P2-01`（R1 閉合）補上 `default`：契約寫著 `"default": 0`，
+    //    而鏡像原本沒有這一鍵——強化後的逐鍵對證當場抓到（這就是它存在的理由）。
+    decision_offset_bars: { type: 'int', min: 0, default: 0 },
     label_definition: {
       fields: {
         label_return_mode: {
