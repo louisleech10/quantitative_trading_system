@@ -961,6 +961,9 @@ export default function SearchPage() {
               ...prev,
               [fieldKey]: e.target.value
             }))}
+            // 🔴 `G3-D2` D3.1 R1（`CODEX-R1-P1-03`）：選 BETWEEN 時值住 `negativeRangeValues`，
+            //    第二段之組法必須跟著走；testid 供 DOM 驗收切到該分支。
+            data-testid={`negative-op-${fieldKey}`}
             className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-sm text-slate-100"
           >
             {OPERATORS.map(op => (
@@ -981,6 +984,7 @@ export default function SearchPage() {
                     min: e.target.value ? parseFloat(e.target.value) : null 
                   }
                 }))}
+                data-testid={`negative-range-min-${fieldKey}`}
                 className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-100"
                 placeholder="最小值"
               />
@@ -994,6 +998,7 @@ export default function SearchPage() {
                     max: e.target.value ? parseFloat(e.target.value) : null 
                   }
                 }))}
+                data-testid={`negative-range-max-${fieldKey}`}
                 className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-100"
                 placeholder="最大值"
               />

@@ -170,3 +170,46 @@ describe('D3.1 呼叫端 — /search 之 two_stage 阻擋真的接到 DOM 上', 
     expect(stages[1].length).toBeGreaterThan(0);   // 🔴 第二段非空——P1-03 之正面驗收
   });
 });
+
+describe('D3.1 R1 閉合 — 反例選 BETWEEN 時第二段仍須非空（`CODEX-R1-P1-03` ②）', () => {
+  it('🔴 反例改 BETWEEN 並只填 range ⇒ 第二段非空、可匯出', async () => {
+    // 🔴 修正前：`negativeStageConditions` 只讀 `negativeParams.priceChange`，
+    //    而 BETWEEN 之值住 `negativeRangeValues` ⇒ 整段被 filter 成 `[]`，
+    //    第二段成空殼（正例那一支有處理 BETWEEN，我複製時漏了——組法不對稱）。
+    render(<SearchPage />);
+    await waitFor(() => expect(screen.getByTestId('export-event-dimensions')).toBeTruthy());
+    await declareFromPreview();
+    selectTwoStage();
+    fireEvent.change(screen.getByTestId('positive-field-priceChange'), { target: { value: '5' } });
+    fireEvent.click(screen.getByTestId('negative-section-header'));
+    fireEvent.change(screen.getByTestId('negative-op-priceChange'), { target: { value: 'BETWEEN' } });
+    fireEvent.change(screen.getByTestId('negative-range-min-priceChange'), { target: { value: '-9' } });
+    fireEvent.change(screen.getByTestId('negative-range-max-priceChange'), { target: { value: '-1' } });
+
+    await waitFor(() => {
+      expect((screen.getByTestId('export-gap3-events') as HTMLButtonElement).disabled).toBe(false);
+    });
+    fireEvent.click(screen.getByTestId('export-gap3-events'));
+    await waitFor(() => expect(buildRecordsMock).toHaveBeenCalledTimes(1));
+    const stages = (buildRecordsMock.mock.calls[0][1] as Record<string, unknown>).stageConditions as unknown[][];
+    expect(stages).toHaveLength(2);
+    expect(stages[1].length).toBeGreaterThan(0);
+    // 第二段之值必須是 range 的兩端，不是 `null`
+    expect((stages[1][0] as { value: unknown }).value).toEqual([-9, -1]);
+  });
+
+  it('🔴 over 向：反例選 BETWEEN 但**沒填** range ⇒ 第二段仍空 ⇒ 擋', async () => {
+    render(<SearchPage />);
+    await waitFor(() => expect(screen.getByTestId('export-event-dimensions')).toBeTruthy());
+    await declareFromPreview();
+    selectTwoStage();
+    fireEvent.change(screen.getByTestId('positive-field-priceChange'), { target: { value: '5' } });
+    fireEvent.click(screen.getByTestId('negative-section-header'));
+    fireEvent.change(screen.getByTestId('negative-op-priceChange'), { target: { value: 'BETWEEN' } });
+    await waitFor(() => {
+      expect((screen.getByTestId('export-gap3-events') as HTMLButtonElement).disabled).toBe(true);
+    });
+    expect(screen.getByTestId('export-blocked-reason').textContent)
+      .toContain('two_stage_requires_two_stages');
+  });
+});

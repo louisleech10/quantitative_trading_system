@@ -154,6 +154,20 @@ export class EventExportBlocked extends Error {
  *
  * 回 `undefined` ＝ 不阻擋。
  */
+/**
+ * 一個條件物件是否**帶得出值**（D3.1 R1：判斷「這一段是不是空的」用）。
+ *
+ * `null`／`undefined` ⇒ 否；陣列（`BETWEEN` 之 `[min, max]`）⇒ 至少一端非 `null` 才算。
+ * 非物件或無 `value` 鍵 ⇒ 否（fail-closed：形狀不認得就不當它是條件）。
+ */
+function hasUsableConditionValue(cond: unknown): boolean {
+  if (cond === null || typeof cond !== 'object') return false;
+  const v = (cond as { value?: unknown }).value;
+  if (v === null || v === undefined) return false;
+  if (Array.isArray(v)) return v.some((x) => x !== null && x !== undefined);
+  return true;
+}
+
 export function twoStageExportBlockReason(input: {
   scenario?: string;
   stageConditions?: readonly (readonly unknown[])[];
@@ -174,7 +188,14 @@ export function twoStageExportBlockReason(input: {
   //    ⇒ `[STAGE_1, []]`／`[[], []]` 且深度 ≥1 時放行，第二段成了空殼：
   //    它仍會產出一個 digest（空條件之 digest），摘要因此聲稱「有兩段」而其實只有一段。
   //    ⇒ 任一段為空即擋。沿用同一個代號（使用者要做的事一樣：把第二段補起來）。
-  const emptyStageIndex = stages.findIndex((s) => s.length === 0);
+  //    🔴 「非空」是**語意**的，不只是 `length > 0`：`BETWEEN` 兩端都沒填時，
+  //       條件物件長成 `{operator:'BETWEEN', value:[null,null]}`——它通過了頁面的
+  //       `.filter(v != null)`（陣列不是 null），卻不表達任何篩選。
+  //       本檔第一版只驗 `length === 0` 而讓它過（我自己的 over 向測試當場抓到）。
+  //       ⇒ 判定改為「該段有沒有**任一個帶得出值**的條件」。
+  //       🔴 只在此判定，**不動** `opts.conditions`／`ruleSummary` 之既有內容——
+  //          那會改變所有既有匯出的 digest，超出 D3.1 範圍。
+  const emptyStageIndex = stages.findIndex((s) => !s.some(hasUsableConditionValue));
   if (emptyStageIndex >= 0) {
     return {
       reason: 'two_stage_requires_two_stages',

@@ -241,11 +241,29 @@ describe('D3.1 R1 閉合 — 群集 A：CSV header 由契約導出，未標籤�
     expect(csv.split('\n')[1].split(',')[header.indexOf('label')]).toBe('1');
   });
 
-  it('🔴 保留欄由**契約**導出，不是人工清單（契約必填純量欄皆在 header 內）', async () => {
+  it('🔴 保留欄由**契約**導出，不是人工清單', async () => {
+    // 🔴 **本條第一版是假的**（mutation `a2_reserved_hardcoded` 首跑 GREEN）：
+    //    當時只寫「遍歷 `RESERVED_SCALAR_CONTRACT_COLUMNS`，檢查 header 都有」——
+    //    把該常數手刻成 `['label']` 時，遍歷一個元素、header 也真的有它 ⇒ 照樣綠。
+    //    **一條宣稱「證明 X 來自 Y」的測試，若 X 在兩種來源下都能滿足斷言，它什麼也沒證明**
+    //    （這條判準是 B-D1 R6 寫下的，我在本批又犯了一次）。
+    //    ⇒ 改為與**真契約**逐鍵集合相等：手刻清單少了其他必填純量欄，當場不等。
     const { buildEventContractCsv, RESERVED_SCALAR_CONTRACT_COLUMNS } = await import('./eventContractCsv');
+    const contract = (await import('../../../momentum/Analysis/contracts/event_import_contract.json')).default as {
+      required_fields: Record<string, { type?: string }>;
+    };
+    const expected = Object.entries(contract.required_fields)
+      .filter(([, spec]) => spec.type !== undefined && spec.type !== 'object')
+      .map(([name]) => name)
+      .sort();
+    expect([...RESERVED_SCALAR_CONTRACT_COLUMNS]).toEqual(expected);
+    // 前提：契約之必填純量欄**不只一個**（否則「集合相等」與「只有 label」無從區分）
+    expect(expected.length).toBeGreaterThan(1);
+    expect(expected).toContain('label');
+
     const out = await buildEventContractRecords([caseRow()], twoStageOpts());
     const header = new Set(buildEventContractCsv(out.records as Record<string, unknown>[], []).split('\n')[0].split(','));
-    for (const name of RESERVED_SCALAR_CONTRACT_COLUMNS) expect(header.has(name)).toBe(true);
+    for (const name of expected) expect(header.has(name)).toBe(true);
     // 物件型必填欄**不得**以容器名出現（它們走點路徑攤平）
     expect(RESERVED_SCALAR_CONTRACT_COLUMNS).not.toContain('label_definition');
     expect(RESERVED_SCALAR_CONTRACT_COLUMNS).not.toContain('lookahead_bars_declared');
