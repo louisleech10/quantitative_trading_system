@@ -1,0 +1,21 @@
+{
+  "receipt_id": "20260905-handoff-audit",
+  "purpose": "session 收尾稽核：驗證 GAP3D2_IMPL_HANDOFF §5 之聲稱與 repo 實況一致",
+  "head": "9a795fa493aabfac820223a2b6a659b3cf6339ef",
+  "date": "2026-09-05",
+  "checks": [
+    {"cmd": "git cat-file -t 49204458 54d8eb8e ef95e9b7 52295c6a ffb7dba7", "result": "全部 commit 存在", "rc": 0},
+    {"cmd": "venv/bin/python -m pytest tests/momentum/event_samples/ -q", "result": "415 passed", "rc": 0, "matches_claim": "§5 B-D3 列記載 415 passed"},
+    {"cmd": "python3 scripts/gap3_label_golden.py --check 'tests/golden/gap3_label/*.json'", "result": "GOLDEN CHECK PASS: 23 case(s)", "rc": 0, "matches_claim": "§5 B-D3 列記載 rc=0 23 cases"},
+    {"cmd": "bash scripts/debt_ledger.sh --has-open", "result": "無開放債", "rc": 0},
+    {"cmd": "git log origin/main..HEAD", "result": "無未推送 commit", "rc": 0}
+  ],
+  "g7fix_counts": {
+    "rounds": 6,
+    "findings_total": 71,
+    "p0_total": 12,
+    "p0_series": [4, 4, 3, 2],
+    "source": "grep -c '^## <FAM>-R<n>-P' handoffs/reconcile/20260905-g7*/synth.md"
+  },
+  "trailer_stats_at_head": {"range_commits": 750, "with_trailer": 566, "touching_hard_protected": 13}
+}
