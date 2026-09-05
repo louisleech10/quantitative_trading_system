@@ -42,6 +42,44 @@ P0 序列 **4→4→3→2**，且每輪 P0 都長在我當輪剛寫的產物裡
 理由＝未經任何一家審查，且動每次 commit 都經過的共用控制流、命中高風險原則 (b) ⇒ 大任務需完整管線；
 使用者 2026-09-05 裁定「還要來回好幾輪就不要做」。量測見上方 receipt 之 `trailer_stats_at_head`。**不做也不擋主線。**
 
+## 🔴 2026-09-05 晚間：G-7 已停用，commit／push 皆秒級（本檔前一版寫於此之前）
+
+使用者裁定停用 G-7。實測依據：其 51 條 scope 內量化路徑＝**0**；一次全跑判 501 個「未宣告」、
+其中 93 個是量化主線（那些檔不可能進 GOVB1 scope）⇒ 判決為**常數**；
+且 `gov_check.sh:378` 之早退設計使它**永久封住第 5 段全套 pytest**（自 2026-08-14 起執行次數 0）。
+
+- `af94041e` G-7 改 warn-only（`gov_check` 第 4 段 `_gc_fail`→warn；`commit-msg` `||exit 1`→`||true`）
+- `59716d87` G-7 **整段停用**（判決是常數，跑它只是每次多付 >4 分鐘）＋修三處過期敘述＋8 條長期紅入登記
+- `5d72feb2` `pre-push` 提醒收窄（原「動過 `scripts/` 就跑全套」害我跑了 53 分鐘，產出為零）
+
+**實測時間**：`commit` 1.03s／`push` 2.53s／`gov_check --fast` 0.83s。
+**首次跑通全套**（8/14 後第一次）：`pytest tests/governance` **1741 passed / 8 failed / 3220.65s（53:40）／1749 條**。
+🔴 那 8 條**非本次改壞**（`govb1_final_gate.sh`／`pre-push` 本 session 未動，`git log` 為空），
+已登記為 `R-G7-OFF-1`／`R-GOVTEST-1`／`R-GOVTEST-2`（`docs/IC_QUANT_GAP_REGISTRY.md`），
+使用者裁定**刻意不修**。
+
+🔴 **給下一個 session 的紀律**：`pytest tests/governance` 是**小時級且不含任何量化測試**。
+只有「動 `gate.sh`／`cx_run.sh`／`gov_check.sh` 這類共用控制流」**且**「收 epic 前」兩條件皆成立才跑一次。
+改幾行腳本只跑對應的 `tests/governance/test_<那支>.py`（秒級）。
+跑之前先問「跑完我打算依結果做什麼」，答不出具體行動就別跑。
+
+## 🔴 稽核抓到的一處不一致（本檔前一版寫錯）
+
+`GAP3D2_IMPL_HANDOFF.md` §5 之 B-D3 列把殘留 `B1-VERIFY-1` 標為「**待使用者裁**」，
+而本檔前一版寫「沒有事等你決定」——**矛盾，前一版是錯的**。
+
+查證後之正確敘述：`B1-VERIFY-1` ＝「全套 `pytest tests/api`／`tests/governance` 未跑」，
+三值理由 `cost`（皆十分鐘級，三家 R3／R4 皆接受），觸發＝**收 epic 前**。
+其中 `tests/api` 已由 codex 於 B-D1 R4 實跑（820 passed／4 既有紅：`batch_alias`、
+`service_wiring event_timestamps`、兩條 `progress_rss`）；**`tests/governance` 仍未跑**。
+
+⇒ 這不是「待使用者裁」，是**到期日在收 epic 前的技術債**，B-D4／B-D5 未完故尚未到期。
+§5 之標註待下批收尾時一併更正。
+
+🔴 **另一個真缺口**：`B1-VERIFY-1` 等八條 B-D1 殘留與三條 B-D3 殘留
+**只寫在 `GAP3D2_IMPL_HANDOFF.md` §5，未登記進 `docs/IC_QUANT_GAP_REGISTRY.md`**，
+違反殘留登記規則（登記處應為該 epic 之權威登記處）。**B-D4 收尾時補登。**
+
 ## 環境現況
 
 開放債為零；無未推送 commit。工作區僅餘兩個 2026-09-01 遺留之 `uat_samples/*拷貝*` 未追蹤檔
