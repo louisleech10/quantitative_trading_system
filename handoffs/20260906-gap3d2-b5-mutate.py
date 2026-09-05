@@ -85,7 +85,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "momentum/Analysis/event_samples/import_contract.py",
         "    if _RANDOM_KIND in control_kinds and not is_random_batch:\n",
         "    if False:\n",
-        [*PYTEST, T_CONTRACT, "-k", "requires_batch_level_spec or mixed"],
+        [*PYTEST, T_CONTRACT, "-k", "mixed_without_spec"],
         "隨機列可搭觸發批偷渡（prevalence 分母不再是無條件基準）",
     ),
     Mutation(
@@ -93,7 +93,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "momentum/Analysis/event_samples/import_contract.py",
         '        if r.get("label_origin") == _RANDOM_ORIGIN and r.get("control_kind") != _RANDOM_KIND:\n',
         "        if False:\n",
-        [*PYTEST, T_CONTRACT, "-k", "label_origin_importable_values_all_accepted or requires_batch_level_spec"],
+        [*PYTEST, T_CONTRACT, "-k", "platform_random_on_trigger_batch"],
         "`label_origin=platform_random` 與 control_kind 脫鉤",
     ),
     Mutation(
@@ -107,7 +107,11 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "M8-control-kind-not-accepted",
         "momentum/Analysis/contracts/event_import_contract.json",
+        # 🔴 錨點須含 `"accepted":` 前綴：同一串值也出現在 `enum` 那行，
+        #    只比對值會命中兩處，連 enum 一起改掉就不是「只收回 accepted」這條 mutation 了。
+        '"accepted": ["user_labeled_same_trigger", "user_labeled_other", '
         '"platform_same_trigger_rule", "platform_random_bars"]',
+        '"accepted": ["user_labeled_same_trigger", "user_labeled_other", '
         '"platform_same_trigger_rule"]',
         [*PYTEST, T_CONTRACT, "-k", "requires_batch_level_spec"],
         "契約把 `platform_random_bars` 收回 accepted（解禁被回捲）",

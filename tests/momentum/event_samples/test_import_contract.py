@@ -255,6 +255,36 @@ def test_platform_random_bars_requires_batch_level_spec():
     assert "random_control_mixed_batch" in reasons_of(ei.value)
 
 
+def test_random_control_kind_mixed_without_spec_is_still_rejected():
+    """🔴 **不帶 spec 的混批也是混批**（mutation `M5` 抓到的缺口，2026-09-06）。
+
+    原本只有「帶 spec 而非全隨機批」那條擋。不帶 spec 的混批既不觸發
+    「全隨機批缺 spec」（它不是全隨機批）也不觸發 spec 分支 ⇒ 隨機列可以
+    **搭著觸發批偷渡**進來，而那正是 estimand 的死法：對照組被混進條件樣本，
+    prevalence 的分母不再是無條件基準，數字照算、沒有任何東西會紅。
+    """
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import([make_random_event(0), make_event(1, label=0)])
+    assert "random_control_mixed_batch" in reasons_of(ei.value)
+
+
+def test_label_origin_platform_random_on_trigger_batch_is_mixed():
+    """🔴 `label_origin=platform_random` 之列其 `control_kind` 須為 `platform_random_bars`
+    （mutation `M6` 抓到的缺口，2026-09-06）。
+
+    原有的 over 向測試把兩者**成對**送出，故那條規則被拿掉也不會紅——
+    它證明的是「成對時可匯入」，不是「拆開時會被擋」。
+    """
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import([
+            make_event(0, label_origin="platform_random", scenario="B",
+                       lookahead_bars_declared={"12h": 0}),
+            make_event(1, label=0, label_origin="platform_random", scenario="B",
+                       lookahead_bars_declared={"12h": 0}),
+        ])
+    assert "random_control_mixed_batch" in reasons_of(ei.value)
+
+
 def test_random_control_spec_on_trigger_batch_is_mixed():
     """非隨機批帶 spec ⇒ `random_control_mixed_batch`（spec 不得掛在觸發批上）。"""
     with pytest.raises(ContractValidationError) as ei:
