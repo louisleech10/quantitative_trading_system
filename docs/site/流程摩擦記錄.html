@@ -2525,6 +2525,72 @@ codex 恢復為審碼家族的前提＝停用那個全域 skill，<strong>但那
 現行：開場檢查一次不乾淨就整支 exit 3；迴圈內的 restore 只在「本腳本自己剛套過 mutation」之後執行。</p>
 <p><strong>代價</strong>：重做四個檔的修正約十分鐘。<strong>若我當時沒有立刻跑測試</strong>（3 條紅），
 那批修正會靜默消失，而我會以為自己修好了三條 P1 —— 那才是真正危險的地方。</p>
+<hr />
+<h2 id="2026-09-05g-7我把一件小事做成機制五輪零產出使用者叫停">2026-09-05（G-7）我把一件小事做成機制，五輪、零產出，使用者叫停</h2>
+<p><strong>分類：新增一類 F ——「我自己把問題放大」</strong>（不是機制擋錯、不是漏擋、不是儀式成本、
+也不是我讀錯訊號；是<strong>我把一個小問題做成了一套機制，然後那套機制自己開始生問題</strong>）。</p>
+<p><strong>起因</strong>：每次 commit 被要求多寫一行 <code>Governance-Scope:</code>（觸發率 76%，564/743）。</p>
+<p><strong>我沒問就開工的那句話</strong>：<strong>「這個檢查今天實際防到什麼？誰在消費它的結論？」</strong>
+事後查證的答案是：它保護的 GOVB1 是 <code>DRAFT</code>、從未實作、2026-08-14 已被裁定擱置；
+而會驗那行字的檢查（<code>gov_check.sh</code> 第 4 段）自 2026-08-14 起就沒在 push 上跑過
+——<code>pre-push:46</code> 固定 <code>--fast</code>，<code>--fast</code> 在 <code>:266-267</code> 早退。
+⇒ <strong>那行字一直在被收，但沒有東西在讀它。</strong> 五輪全部建立在沒問這句上。</p>
+<p><strong>放大的過程</strong>：把「GOVB1 沒在做時別套用」做成 <code>epic_state</code> 狀態機 ⇒
+狀態要契約 → 契約要 parser → parser 要單一來源 → 轉態要防繞過 → 防繞過要讀舊版 blob →
+降級要授權 → 授權要登記 ID → 登記要有順序約束。<strong>每加一層就長出一片新攻擊面。</strong></p>
+<p><strong>量測（這才是關鍵，我當時沒在看）</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>輪次</th>
+<th>findings</th>
+<th>P0</th>
+<th>產品碼行數</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>consult R1</td>
+<td>18</td>
+<td>4</td>
+<td>0</td>
+</tr>
+<tr>
+<td>consult R2</td>
+<td>14</td>
+<td>4</td>
+<td>0</td>
+</tr>
+<tr>
+<td>SPEC review R1</td>
+<td>18</td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr>
+<td>SPEC review R2</td>
+<td>7</td>
+<td>2</td>
+<td>0</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>為什麼有斷路器規則卻沒觸發</strong>：我把收斂判在<strong>每一輪內部</strong>（本輪 finding 都收掉、債清了、
+節點全過），而規則要判的是<strong>跨輪趨勢</strong>。每輪自身都像成功結案 ⇒ 主觀上一直像在前進。</p>
+<p><strong>最後一輪是決定性證據</strong>：三家都確認 R1 的 findings <strong>全部關閉</strong>（grok 六條逐條重跑反例），
+但新產生 6 條、含 2 條 BLOCKING，而<strong>每一條都是我 R1 修法自己生出來的</strong>：
+授權機制變成自己授權自己、我自己造出 forward dependency、我補的新 mutation 又是假的、
+我新增的子行程數上界跟自己的控制流互相矛盾。<strong>關掉的 ≈ 新產生的。</strong></p>
+<p><strong>判準（兩條，已寫進長期記憶）</strong>：</p>
+<ol>
+<li>🔴 <strong>碰治理票，動工前先答「防什麼／誰消費」</strong>；答不出具體消費者就不進管線，直接報給使用者。</li>
+<li>🔴 <strong>停止訊號不只看「P0 連三輪沒降」，還要看「本輪的 P0 是不是在打我上一輪的產出」</strong>
+——後者這次三輪都成立，而我沒自己停，是使用者問「這你能收斂嗎？還是你又發散了？」才停。</li>
+<li>解法開始長出「狀態／契約／轉態／授權／登記」這種層次時，停下來問**「有沒有 20 行的版本」**
+——砍掉狀態機後，同一目標確實只需約 20 行。</li>
+</ol>
+<p><strong>代價</strong>：一整個 session、五輪委員會、64 條 finding，產品碼零行。
+<strong>真正留下的</strong>：TODO 加「路徑」欄（與 G-7 無關，是給實作 agent 看的）＋改掉兩處假敘述。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
