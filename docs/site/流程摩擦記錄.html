@@ -2591,6 +2591,25 @@ codex 恢復為審碼家族的前提＝停用那個全域 skill，<strong>但那
 </ol>
 <p><strong>代價</strong>：一整個 session、五輪委員會、64 條 finding，產品碼零行。
 <strong>真正留下的</strong>：TODO 加「路徑」欄（與 G-7 無關，是給實作 agent 看的）＋改掉兩處假敘述。</p>
+<hr />
+<h2 id="2026-09-05-下午g-7-關閉分類-a假警報-一個更嚴重的衍生問題">2026-09-05 下午（G-7 關閉）分類 A（假警報）＋ 一個更嚴重的衍生問題</h2>
+<p><strong>A 類本體</strong>：G-7 對量化主線的判決<strong>恆為「未宣告即修改」</strong>——一次全跑列出 501 檔、
+其中 93 個是量化主線（<code>api/routes/ic_analysis.py</code> 等）。那些檔<strong>不可能</strong>進 GOVB1 scope
+（GOVB1 是治理 epic），所以這不是「擋錯一次」，是<strong>結構上永遠擋錯</strong>。
+<code>--print-scope</code> 的 51 條裡量化路徑＝0；硬保護集三前綴與 G3-D2 三批動過的 25 檔零交集。</p>
+<p><strong>衍生問題（比 A 類本身嚴重）</strong>：<code>gov_check</code> 第 4 段 fail 之後<strong>直接停</strong>，
+⇒ 第 5 段（全套 pytest）與第 6 段<strong>執行次數 = 0</strong>。
+<strong>一個守著 DRAFT／從未實作／已擱置 epic 的檢查，攔住了守著產品的檢查。</strong>
+這是「假警報」升級成「假警報造成真漏擋」——分類表原本沒有涵蓋這種組合。</p>
+<p><strong>判準（新）</strong>：🔴 <strong>順序性檢查鏈中，任何一段 fail 就停的設計，必須確認「先跑的那段」
+比「後跑的那段」更該擋</strong>。本例正好相反：零價值的段排在唯一有價值的段前面，且會 fail-stop。</p>
+<p><strong>處置</strong>：使用者裁定改為 warn-only（<code>gov_check.sh</code> 第 4 段 <code>_gc_fail</code> → warn；
+<code>commit-msg</code> 之 <code>|| exit 1</code> → <code>|| true</code>）。驗證：不帶 trailer 之 commit <strong>1.03s</strong> 通過、
+push <strong>2.58s</strong>；<code>gov_check --fast</code> 0.83s；targeted pytest 22 passed。
+具名殘留 <code>R-G7-OFF-1</code>（GOVB1 三個凍結檔自此無閘保護；理由＝該 epic 已擱置）。</p>
+<p><strong>順帶抓到本 session 第四處過期敘述</strong>：<code>plain_docs_sync</code> 的提示寫「真正的強制在 pre-push」
+——<code>pre-push</code> 只跑 <code>--fast</code>，而 <code>--fast</code> <strong>不含</strong>白話說明那一段。該提示已不成立。
+（前三處：<code>gov_check.sh:301</code>、E-005 掛載點、G-7 段註解「約 8 秒」實為 &gt;4 分鐘。）</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>

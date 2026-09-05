@@ -49,6 +49,45 @@
 </tbody>
 </table></div>
 <hr />
+<h2 id="95-收尾g-7-已改成不擋commit-1-秒push-26-秒">9/5 收尾：G-7 已改成不擋（commit 1 秒、push 2.6 秒）</h2>
+<p><strong>你的裁定</strong>：「用最快速的方式把會被 G-7 擋改成不擋，以後 commit 和 push GitHub 都要幾秒就上去。」</p>
+<p><strong>為什麼該關</strong>——你問「G-7 對量化主線還有何意義」，我去量了，答案是<strong>負的</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>量測</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G-7 的 51 條保護範圍裡，屬於量化路徑的</td>
+<td><strong>0 條</strong>（全是治理測試與腳本）</td>
+</tr>
+<tr>
+<td>三批量化實作動過的 25 個檔，落在它硬保護集的</td>
+<td><strong>0 個</strong></td>
+</tr>
+<tr>
+<td>它一次全跑判「未宣告即修改」的檔案</td>
+<td><strong>501 個，其中 93 個是量化主線</strong></td>
+</tr>
+<tr>
+<td>它 fail 之後，全套 pytest（第 5 段）執行次數</td>
+<td><strong>0 次</strong></td>
+</tr>
+<tr>
+<td>它自己跑掉的時間</td>
+<td><strong>超過 4 分鐘</strong>（程式碼註解寫「約 8 秒」）</td>
+</tr>
+</tbody>
+</table></div>
+<p>那 93 個量化檔<strong>永遠不可能</strong>進它的保護範圍——它保護的是一個治理項目。所以它對量化碼的答案<strong>恆為「未宣告」</strong>，恆真的警告不是檢查，是常數。</p>
+<p>🔴 <strong>而且它擋住了真正有用的那個</strong>：它一失敗整個檢查就停，害全套測試永遠跑不到。守著一個從未實作、已擱置項目的檢查，攔住了守著你產品的檢查。</p>
+<p><strong>改了什麼</strong>：兩處，各一行——讓它只印警告不擋。
+<strong>驗證</strong>：改完後故意提交一個<strong>不帶那行字</strong>的 commit，<strong>1.03 秒過了</strong>；push <strong>2.58 秒</strong>上 GitHub。</p>
+<p><strong>代價（誠實講）</strong>：那個治理項目的三個凍結檔從現在起沒有閘保護。可接受是因為它是草稿、從未實作、8/14 已被你擱置；哪天真要復工，得在復工的票裡改回來。</p>
+<hr />
 <h2 id="95-插曲g-7-那件事我發散了你叫停">9/5 插曲：G-7 那件事，我發散了，你叫停</h2>
 <p><strong>起因</strong>：你每次 commit 都被要求多寫一行 <code>Governance-Scope:</code>。我去查為什麼，發現那個檢查（代號 G-7）在保護一個叫 GOVB1 的治理項目——<strong>而它從來沒實作過，8/14 就被你裁定擱置了</strong>。更關鍵的是：<strong>會去驗那行字的檢查，8/14 起就沒在 push 上跑過</strong>。等於那行字一直在被收，沒有東西在讀。</p>
 <p><strong>我做錯的</strong>：我沒先問「這東西今天實際防到什麼」，就直接開了完整流程。然後把「沒在做的時候別套用這檢查」這件小事，做成了一個帶守衛的狀態機——狀態要契約、契約要解析器、解析要單一來源、切換要防繞過、防繞過要讀舊版內容、降級要授權、授權要登記……每加一層就長出一片新的破綻給委員打。</p>

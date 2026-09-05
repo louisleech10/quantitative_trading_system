@@ -3083,6 +3083,23 @@ TODO 加「路徑」欄（給實作 agent 看，以後每張 TODO 都要列精�
 你的裁定是「還要來回好幾輪就不要做」，所以不做。</p>
 <p><strong>寫進長期記憶的兩條</strong>：① 碰治理的事，動工前先答「防什麼／誰消費」，答不出來就不進流程
 ② 停止訊號要加一條「<strong>這輪的問題是不是在打我上一輪的產出</strong>」——這次三輪都是，我卻沒自己停。</p>
+<hr />
+<h2 id="2026-09-05-下午-g-7-關閉commit-1-秒push-26-秒">2026-09-05 下午 — G-7 關閉：commit 1 秒、push 2.6 秒</h2>
+<p>延續上一則。你問「G-7 對我現在量化主線還有何意義」，我去量，答案是<strong>負的</strong>：</p>
+<ul>
+<li>它的 51 條保護範圍裡，屬於量化路徑的<strong>一條都沒有</strong>（全是治理測試與腳本）</li>
+<li>三批量化實作動過的 25 個檔，落在它硬保護集的是 <strong>0 個</strong></li>
+<li>它一次全跑判定「未宣告即修改」的有 <strong>501 個檔，其中 93 個是量化主線</strong></li>
+<li>🔴 <strong>而它 fail 之後整個檢查就停</strong>——全套 pytest（第 5 段）執行次數 <strong>0</strong></li>
+<li>它自己花掉 <strong>4 分鐘以上</strong>，而程式碼註解寫「約 8 秒」</li>
+</ul>
+<p>那 93 個量化檔永遠不可能進它的保護範圍（它保護的是治理項目），所以它對量化碼的答案
+恆為「未宣告」。<strong>守著一個從未實作、已擱置項目的檢查，攔住了守著你產品的檢查。</strong></p>
+<p>你裁定改成不擋。改了兩處各一行（<code>gov_check.sh</code> 第 4 段的 fail 改警告、
+<code>commit-msg</code> 的 <code>|| exit 1</code> 改 <code>|| true</code>）。
+驗證方式是<strong>故意提交一個不帶那行字的 commit</strong>：1.03 秒過、push 2.58 秒。</p>
+<p>代價（具名殘留 <code>R-G7-OFF-1</code>）：那個治理項目的三個凍結檔從此無閘保護。
+可接受是因為它是草稿、從未實作、8/14 已被你擱置；若日後復工，須在復工票內改回擋。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/治理進度日誌.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
