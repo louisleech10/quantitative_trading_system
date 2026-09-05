@@ -5,6 +5,7 @@ import {
   FeatureFilterConfig,
   FeatureListItem,
   ICAnalysisConfig,
+  ICEventScanDisclosure,
   ICReport,
   ModuleStatus,
   NetICAnalysisRequest,
@@ -20,6 +21,11 @@ interface ICAnalysisState {
   currentStage: string | null;
   /** GAP-3 UX Task 6.3：這個 run 有幾個特徵；解析不到為 null（**不填假值**）。 */
   featureCount: number | null;
+  /**
+   * `G3-D2` D4.2／D4.3：**後端**回傳之事件分析揭露（兩上界、k 雙值、掃描結果）。
+   * 🔴 尚未分析 ⇒ `null`，前端**不猜數字**（上界之公式住 producer，重算即第二份實作）。
+   */
+  eventScanDisclosure: ICEventScanDisclosure | null;
   error: string | null;
   report: ICReport | null;
   selectedFeature: string | null;
@@ -41,6 +47,7 @@ interface ICAnalysisState {
   setTask: (taskId: string | null, status?: ICAnalysisStatus) => void;
   setProgress: (progress: number, currentStage?: string | null) => void;
   setFeatureCount: (featureCount: number | null) => void;
+  setEventScanDisclosure: (d: ICEventScanDisclosure | null) => void;
   setStatus: (status: ICAnalysisStatus) => void;
   setReport: (report: ICReport | null) => void;
   setError: (error: string | null) => void;
@@ -202,6 +209,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   progress: 0,
   currentStage: null,
   featureCount: null,
+  eventScanDisclosure: null,
   error: null,
   report: null,
   selectedFeature: null,
@@ -256,6 +264,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
     }),
   setProgress: (progress, currentStage) => set({ progress, currentStage }),
   setFeatureCount: (featureCount) => set({ featureCount }),
+  setEventScanDisclosure: (eventScanDisclosure) => set({ eventScanDisclosure }),
   setStatus: (status) => set({ status }),
   setReport: (report) => set({ report }),
   setError: (error) => set({ error }),

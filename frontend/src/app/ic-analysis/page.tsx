@@ -58,6 +58,7 @@ function ICAnalysisPageContent() {
     progress,
     currentStage,
     featureCount,
+    eventScanDisclosure,
     error,
     report,
     selectedFeature,
@@ -587,6 +588,15 @@ function ICAnalysisPageContent() {
                 importId={config.event_import_id}
                 labelSpec={config.event_label_spec}
                 onChangeLabelSpec={(next) => setConfig({ ...config, event_label_spec: next })}
+                /* 🔴 `G3-D2` D4.3：掃描網格與揭露欄必須**接到頁面**才算交付——
+                   元件做好而沒接上就是「兩端都有、但沒接上」（本 epic 已為同型付過兩次代價）。
+                   `null` ⇒ 送出時整個鍵省略（見 `useICAnalysis`）。 */
+                labelScan={config.event_label_scan ?? null}
+                onChangeLabelScan={(next) => setConfig({
+                  ...config,
+                  ...(next ? { event_label_scan: next } : { event_label_scan: undefined }),
+                })}
+                disclosure={eventScanDisclosure}
               />
             )}
 

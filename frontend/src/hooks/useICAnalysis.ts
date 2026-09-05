@@ -4,6 +4,7 @@ import {
   DeepAnalysisResponse,
   FeatureListItem,
   ICAnalysisConfig,
+  ICEventScanDisclosure,
   ICReport,
 } from '@/lib/types';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
@@ -66,6 +67,7 @@ export function useICAnalysis() {
     setTask,
     setProgress,
     setFeatureCount,
+    setEventScanDisclosure,
     setStatus,
     setError,
     setReport,
@@ -106,11 +108,42 @@ export function useICAnalysis() {
         current_stage?: string | null;
         error?: string | null;
         feature_count?: number | null;   // GAP-3 UX Task 6.3
+        // `G3-D2` D4.2／D4.3：事件分析之揭露欄（非事件路徑一律缺席）
+        decision_offset_bars_capability?: string | null;
+        decision_offset_bars_reason?: string | null;
+        decision_offset_bars_record_values?: number[] | null;
+        decision_offset_bars_analysis?: number | null;
+        decision_offset_bars_scan_max?: number | null;
+        k_max_feasible_at_h?: number | null;
+        h_max_feasible_at_k?: number | null;
+        k_bound_status?: string | null;
+        h_bound_status?: string | null;
+        event_label_scan?: ICEventScanDisclosure['event_label_scan'];
       }>(`/task/${taskId}`);
       setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed');
       setProgress(status.progress ?? 0, status.current_stage ?? null);
       // Task 6.3：解析不到就是 null，**不填假值**
       setFeatureCount(typeof status.feature_count === "number" ? status.feature_count : null);
+      // 🔴 `G3-D2` D4.2／D4.3：揭露欄**整組**由後端來；任一欄都不在前端補值。
+      //    非事件分析路徑（後端不放這些鍵）⇒ 整個物件為 `null`，面板顯示「要分析過才知道」。
+      setEventScanDisclosure(
+        status.decision_offset_bars_capability === undefined
+          && status.k_bound_status === undefined
+          && status.event_label_scan === undefined
+          ? null
+          : {
+            decision_offset_bars_capability: status.decision_offset_bars_capability ?? null,
+            decision_offset_bars_reason: status.decision_offset_bars_reason ?? null,
+            decision_offset_bars_record_values: status.decision_offset_bars_record_values ?? null,
+            decision_offset_bars_analysis: status.decision_offset_bars_analysis ?? null,
+            decision_offset_bars_scan_max: status.decision_offset_bars_scan_max ?? null,
+            k_max_feasible_at_h: status.k_max_feasible_at_h ?? null,
+            h_max_feasible_at_k: status.h_max_feasible_at_k ?? null,
+            k_bound_status: status.k_bound_status ?? null,
+            h_bound_status: status.h_bound_status ?? null,
+            event_label_scan: status.event_label_scan ?? null,
+          },
+      );
 
       if (status.status === 'failed') {
         terminalRef.current = true;
@@ -124,7 +157,7 @@ export function useICAnalysis() {
 
       return status;
     },
-    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount]
+    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount, setEventScanDisclosure]
   );
 
   const startPolling = useCallback(
@@ -326,6 +359,10 @@ export function useICAnalysis() {
               //    （`horizon_bars` 仍**禁**以匯出檔之 `label_definition.window.horizon_bars`
               //     種子化——那欄語意是 D-7 深度宣告，分析層讀成答案窗即靜默給錯值。）
               ...(config.event_label_spec ? { event_label_spec: config.event_label_spec } : {}),
+              // 🔴 `G3-D2` D4.3：掃描網格是**請求頂層 sibling**（不在 spec 內）。
+              //    未掃描 ⇒ 整個鍵省略——送 `{}` 在後端仍代表「有掃描」（`is not None`），
+              //    會讓「沒開掃描」變成「掃一個一格的網格」。
+              ...(config.event_label_scan ? { event_label_scan: config.event_label_scan } : {}),
             }
           : {
               // legacy 非事件批路徑（例如只用 `event_query` 篩）行為不變。

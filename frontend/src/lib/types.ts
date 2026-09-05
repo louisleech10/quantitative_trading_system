@@ -1997,6 +1997,14 @@ export interface ICAnalysisConfig {
     label_return_mode?: string;
     decision_offset_bars?: number;
   };
+  /**
+   * `G3-D2` D4.3：k／h 掃描網格之上界（裁定③「填 m 就掃 0～m」，h 自 1 起）。
+   *
+   * 🔴 **請求頂層 sibling，不在 `event_label_spec` 內**——後者恆四鍵，
+   * 多一鍵後端 normalizer 直接 fail-closed。
+   * 未掃描 ⇒ 整個鍵**省略**（送空物件在後端仍代表「有掃描」）。
+   */
+  event_label_scan?: ICEventLabelScan;
   horizons: number[];
   thresholds: {
     ic_mean_min: number;

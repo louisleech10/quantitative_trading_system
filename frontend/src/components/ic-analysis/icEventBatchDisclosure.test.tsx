@@ -796,3 +796,40 @@ describe('D4.3 — 掃描結果矩陣（行 k、列 h）', () => {
     expect(screen.queryByTestId('ic-param-k-over-scan-max')).toBeNull();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// `G3-D2` D4.3 — **全棧連通**：掃描網格與揭露欄真的接到 hook／page
+//
+// 🔴 本段存在的理由：D4.2／D4.3 之元件層測試全綠**不代表**功能可達。
+//    本 epic 已為同型「兩端都有、但沒接上」付過兩次代價
+//    （幽靈 feature_filter；`CODEX-R2-P1-03` 之 `{horizon_bars:1}` 讓後端預設不可達）。
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('D4.3 全棧連通 — `event_label_scan` 真的進 payload', () => {
+  it('🔴 設定掃描 ⇒ 送出 body 之**頂層**有 `event_label_scan`（不在 `event_label_spec` 內）', async () => {
+    const body = await startWith(baseConfig({
+      event_import_id: 'imp-1',
+      event_label_spec: { horizon_bars: 2, entry_price_semantic: 'trigger_open', label_return_mode: 'open_to_horizon_close', decision_offset_bars: 0 },
+      event_label_scan: { decision_offset_bars_max: 2, horizon_bars_max: 3 },
+    }));
+    expect(body.event_label_scan).toEqual({ decision_offset_bars_max: 2, horizon_bars_max: 3 });
+    // 🔴 它**不得**混進 spec——後端 normalizer 對多一鍵 fail-closed
+    expect('event_label_scan' in (body.event_label_spec as Record<string, unknown>)).toBe(false);
+    expect(Object.keys(body.event_label_spec as Record<string, unknown>).sort()).toEqual([
+      'decision_offset_bars', 'entry_price_semantic', 'horizon_bars', 'label_return_mode',
+    ]);
+  });
+
+  it('🔴 沒設定掃描 ⇒ 整個鍵**省略**（送 `{}` 在後端仍代表「有掃描」）', async () => {
+    const body = await startWith(baseConfig({ event_import_id: 'imp-1' }));
+    expect('event_label_scan' in (body as Record<string, unknown>)).toBe(false);
+  });
+
+  it('🔴 非事件路徑 ⇒ 不得出現 `event_label_scan`（legacy 呼叫形狀逐字不變）', async () => {
+    const body = await startWith(baseConfig({
+      mode: 'global', event_import_id: undefined,
+      event_label_scan: { horizon_bars_max: 3 },
+    } as Partial<ICAnalysisConfig>));
+    expect('event_label_scan' in (body as Record<string, unknown>)).toBe(false);
+  });
+});
