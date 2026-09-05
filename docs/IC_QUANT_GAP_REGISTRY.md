@@ -23,6 +23,10 @@
 
 ### GAP-3 殘留（SPEC §N 八條；三值理由；觸發即轉新票——權威登記處，ROADMAP 只放 pointer）
 
+> 🔴 **`G3-D2` 實作批（B-D0…B-D5）之殘留另置於本節末之「G3-D2 實作批殘留」小表**
+> （2026-09-05 補登：B-D0／B-D1／B-D3 之 13 條原本**只寫在**
+> `docs/GAP3D2_IMPL_HANDOFF.md` §5，未登記進本檔，違反「登記處為該 epic 之權威登記處」）。
+
 | # | 項目 | 為何現在不做 | 觸發 |
 |---|---|---|---|
 | G3-R1 | triple-barrier／出場最佳化 | user-ruling:2026-08-19（第一版時間出場）＋blocked-by:回測層不完整 | 使用者提出且回測層成熟 |
@@ -69,6 +73,30 @@
 | Q5 | 共通 pattern 防運氣 | 條件子樣本 IC（`event_filter`，序列型工具可共用）＋GBDT/SHAP/規則抽取＋OOS／跨標的／FDR；規則挑選須接 GAP-1 DSR/PBO |
 
 序列型／事件型**共用**：資料載入、特徵計算、未來報酬、PIT 守衛、IC 函式、bootstrap。**不共用**：樣本組裝（事件清單＋反例）、主統計量、切分/去重、報告契約、前端。
+
+### G3-D2 實作批殘留（B-D0…B-D5；**2026-09-05 補登**）
+
+> 🔴 **補登理由**：下列各條在其批次之 review 收斂輪已由三家逐條接受三值理由，但**只寫進**
+> `docs/GAP3D2_IMPL_HANDOFF.md` §5 之「狀態」欄，未進本檔 ⇒ 從本檔看不到 `G3-D2` 的殘留全貌。
+> 三值理由與各條之出處輪次逐字取自本機收斂檔 `handoffs/reconcile/20260904-gap3d2-b*-review-r*/synth.md`
+> 與 `20260905-gap3d2-b3-review-r*/synth.md`（`handoffs/` 為 gitignore，故理由在此**落檔留存**）。
+
+| # | 批 | 項目 | 為何現在不做（三值） | 觸發 |
+|---|---|---|---|---|
+| B0-REVIEW-1 | B-D0 | codex 於 B-D0 review 三度未交件，根因未定（已排除四個假說：全域 skill／PreCompact／輸出量／外部 API；唯一確定差異＝本 epic 第一次**程式碼**審查，386 行 diff＋10 條驗收命令） | needs-research:根因未定，四個假說皆有反證；不得當「已知環境問題」處理 | codex 再度未交件時優先查「驗收命令的重量」而非 skill |
+| B0-REVIEW-2 | B-D0 | 同一 skill 集之 `greptile-triage` 自述「not read-only，AUTO-FIX items are applied directly」⇒ 委員可能改碼（B-D0 實測 15/15 檔雜湊 OK，未發生） | needs-research:未觀察到實例，但自述文字為真；要判定需逐一稽核 skill 集之寫入面 | 出現任一委員回合後之檔案雜湊不符 |
+| B1-PRESET-1 | B-D1 | 報酬量法 preset 點下後送出之 `horizon_bars` 為 inert 哨兵 `1`，**不隨宣告深度變動**（「依深度預設」只在使用者完全不碰面板時成立） | blocked-by:D4.2 之 pair-aware UI（要讓 preset 依深度變動，前端需有預覽解析結果或後端回灌 shape；未定義 shape 前在面板重做 D1.7 會造出第二份規則） | D4.2 落地後重評；或後端回灌 `event_label_spec` response |
+| B1-GOLDEN-2 | B-D1 | golden `--check` 只證明凍結案例通過，未覆蓋所有 route kind 與 legacy shape 之語意組合；等值 t0 之語意漂移未涵蓋 | needs-research:覆蓋面之封閉集合未定義 | 出現 golden 全綠但真實路徑算錯之事故 |
+| B1-VERIFY-1 | B-D1 | 全套 `pytest tests/api`／`tests/governance` 之終局 rc | cost:兩者皆十分鐘級以上（`tests/governance` 2026-09-05 實測 3220s／1749 條）。🔴 **2026-09-05 更正兩處**：①R4 曾判 `blocked-by:g7`——G-7 已於 2026-09-05 整段停用，該 blocked-by **不再成立**，回到 `cost`；②`GAP3D2_IMPL_HANDOFF` §5 之 B-D3 列曾標「待使用者裁」——**錯的**，它從不需要使用者裁定。**現況**：`tests/api` 已由 codex 於 B-D1 R4 實跑（820 passed／4 既有紅）、`tests/governance` 已於 2026-09-05 跑過（1741 passed／8 failed，8 條已登記為 `R-G7-OFF-1`／`R-GOVTEST-1`／`R-GOVTEST-2`）；但兩次跑的都是 **B-D3 以前**的碼 | 收 epic（B-D5 完工）前各再跑一次 |
+| B1-LEGACY-1 | B-D1 | 繞過匯入驗證之歷史／直寫落檔（`data_cache/events/` 直寫）之涵蓋範圍 | user-ruling:2026-09-04 使用者裁定 9 個歷史測試檔不保留不遷移；其窄裁定**只**涵蓋那批之 `label_origin` 遷移 | 出現非測試檔之直寫落檔 |
+| B1-LEGACY-2 | B-D1 | `decision_offset_bars` 之**讀取面**未逐處閉合（`grep -rn` 於 `api/`／`momentum/` 多處命中；負值 direct-write 反例證實 route 邊界曾有缺口，見 `CODEX-R5-P1-01`） | needs-research:完整 malformed-k inventory 未做；`B1-LEGACY-1` 之窄裁定不能代替 | 收 epic 前，或再出現一次 malformed k 事故 |
+| B1-DEPTH-1 | B-D1 | 面板 preset 之 h 是否應跟著宣告深度走（現為 inert 常數 1；vitest 已把「顯示＝送出」釘住，但不主張那是對的） | needs-research:送出前無後端 preview shape，現階段不在面板複製 D1.7 規則 | 同 `B1-PRESET-1` |
+| B1-KIND-1 | B-D1 | route 層之 422 `kind` 字面（`missing_/mixed_/invalid_decision_offset_bars`）不在契約 `import_failure_reasons` 內——它是 transport taxonomy，不是資料 reason | needs-research:route-level registry 之邊界未定；硬塞進 `event_import_contract.json` 會把兩種語意混成一份 | 收 epic 前定案（另立 route-level registry 或併入契約） |
+| B1-WEAKTEST-1 | B-D1 | 部分既有測試以「掃原始碼字串」代替行為斷言（例：`re.search` 找 `event_timestamps=request...`），改寫等價實作即誤紅 | needs-research:要改成行為斷言需先定義該行為之可觀察面 | 該類測試再度因等價重構而誤紅 |
+| B3-OPTIONAL-COL-1 | B-D3 | CSV 保留欄只涵蓋 `required_fields`；某 optional 欄若日後需「留白給使用者填」則涵蓋不到 | needs-research:三家一致「不保留 optional 符合 optional 語意」，要改須先有真實需求把它升為路徑需求 | 出現需留白給使用者填之 optional 欄 |
+| B3-WIRING-1 | B-D3 | 接線測試擋得住「同模組層常數複製」，擋不住「production 改讀另一檔抄好的常數」（grok 指出之更遠繞法） | needs-research:那已非同構病，需另設計 mutation | 出現跨檔常數複製 |
+| B4-COVERAGE-1 | B-D4 | `feasible_bounds` 之 coverage 條件以**對齊層 per-TF warmup**（首根 close ≤ decision_at）代替 `D-001` 所寫的「階段 3 feature coverage」 | blocked-by:現行階段 3a（`check_feature_run_coverage`）為**批次級 pass/fail、不剔除任何列** ⇒ per-event coverage 恆真，兩者一致；沒有可注入的逐列剔除結果 | 3a 改為逐列剔除時（屆時上界會**高報**，須改吃該剔除結果） |
+| B4-SPECGAP-1 | B-D4 | `D-001` D4.2 寫「既選非法 pair ⇒ 另一維重設為契約 `default`」，但 `entry_price_semantic.default = "trigger_close"` **本身**就在 `open_to_close` 的拒收對裡 ⇒ 該方向無解（實作時被本批之 vitest 當場打穿） | needs-research:實作已細化為兩段（default 合法即用它；否則取契約 enum 順序第一個合法值並揭露原因），但**該細化未經 SPEC 輪審查**——是實作端的判斷，不是 D-001 的條文 | 下次重開 `D-001`（或三家 review 對本細化有異議）時把規則寫回 SPEC |
 
 ## IC 主路徑切分現狀（holdout-only）
 

@@ -2610,6 +2610,38 @@ push <strong>2.58s</strong>；<code>gov_check --fast</code> 0.83s；targeted pyt
 <p><strong>順帶抓到本 session 第四處過期敘述</strong>：<code>plain_docs_sync</code> 的提示寫「真正的強制在 pre-push」
 ——<code>pre-push</code> 只跑 <code>--fast</code>，而 <code>--fast</code> <strong>不含</strong>白話說明那一段。該提示已不成立。
 （前三處：<code>gov_check.sh:301</code>、E-005 掛載點、G-7 段註解「約 8 秒」實為 &gt;4 分鐘。）</p>
+<hr />
+<h2 id="2026-09-05-晚g3-d2-第-4-段分類-ccd-前綴與工具卡頓一次付掉-4-分鐘">2026-09-05 晚（<code>G3-D2</code> 第 4 段）分類 C：<code>cd</code> 前綴與工具卡頓，一次付掉 4 分鐘</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>類</th>
+<th>事件</th>
+<th>次數</th>
+<th>耗損</th>
+<th>已有票？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>C</strong></td>
+<td>權限分類器卡頓：<code>cd ..; pwd</code> 一條指令卡 <strong>114.6 秒</strong>；三次 <code>npx --prefix frontend …</code> 各卡 <strong>18–20 秒</strong>；一次背景 mutation 腳本卡 <strong>101 秒</strong>。合計約 <strong>4 分鐘</strong>乾等</td>
+<td>5</td>
+<td>純等待，指令本身都正常執行</td>
+<td>⬜ 已有記載（<code>CLAUDE.md</code> Gotchas「⏱ 工具呼叫多分鐘卡頓」），本次是再次踩到</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>我用 <code>npx --prefix frontend vitest run --root frontend</code> 跑前端測試，得到一條紅——<strong>那是我的跑法造成的</strong>：有個測試用相對路徑掃 <code>src/</code>，工作目錄在 repo 根就掃不到。改回手冊寫的 <code>cd frontend &amp;&amp; npx vitest run</code> 就 71/71 全綠</td>
+<td>1</td>
+<td>多花一輪查證</td>
+<td>⬜ 不開票（照手冊跑就沒事；記著即可）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>這次沒有假警報、沒有漏擋。</strong> 真正有價值的一次「擋對了」是我自己寫的測試：
+規格說「組合不合法就把另一格改回契約預設值」，測試當場證明<strong>有一個方向的預設值本身就不合法</strong>
+⇒ 規格有洞。那個洞已登記成殘留 <code>B4-SPECGAP-1</code>，不是靠眼睛看出來的。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
