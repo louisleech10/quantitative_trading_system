@@ -298,7 +298,12 @@ fi
 # 🔴 不得宣稱「single-source 已完成」。具名殘留：
 #   ① 生成器不知道的新文件裡憑空手寫第三份副本 ⇒ 擋不到
 #   ② `git push --no-verify` 可繞（與本檔其餘機制同一邊界）
-# 誠實邊界：`--fast` 不跑本段（--fast 之契約＝語法+格式）；push 路徑走 `--no-probe`，會跑。
+# 誠實邊界：`--fast` 不跑本段（--fast 之契約＝語法+格式）。
+# 🔴 2026-09-05 更正：原文寫「push 路徑走 `--no-probe`，會跑」——**那是假的**。
+#   `pre-push:46` 自 2026-08-14 起固定 `_GC_MODE="--fast"`（見該檔註解與 CLAUDE.md 之裁定），
+#   而 `--fast` 於本檔 `:266-267` 早退，**在本段之前就結束**。
+#   ⇒ 本段（與 G-7 段 `:341-350`）**只在手動** `bash scripts/gov_check.sh --no-probe` **時才跑**。
+#   此過期敘述曾於 2026-09-05 誤導主委，使其一度以為昂貴 G-7 仍在 push 上執行。
 _gov_check_factkey() {   # -> rc
   _gc_seg 3 "事實單一來源 (fact-key)…"
   # 🔴 TODO 偽碼寫的是 `${ROOT}/scripts/...`，但本檔無 ROOT 變數且 set -u
