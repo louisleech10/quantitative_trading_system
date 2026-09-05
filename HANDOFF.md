@@ -12,20 +12,22 @@
 - 收斂節點四步全過：歸戶 rc=0（18 條零掉項）／completeness `--lock` PASS／`debt_clear` rc=0
 - 補清上輪殘留：R2 reconcile（`20260905-g7perf-x-consult-r2`）三家 RECONCILE-STAMP 已補齊並 PASS
 
-**三家 Verdict 一致：需修補後派工，不得直接寫 SPEC。** 修補案已逐群集寫進 synth（A–K 共 11 群）。
+- **consult R2**（使用者選的確認輪）三家全員，14 條，收斂節點四步全過，債清
+  （`handoffs/reconcile/20260905-g7fix-x-consult-r2/synth.md`，群集 α–ι）
 
-**四個 P0/BLOCKING（皆打在我的設計上）**：
-- **A**：`epic_state` 不能塞進 `govb1_frozen_hashes.txt`（`_FROZEN_CLOSED_KEYS` 拒未知 key）→ 採「擴封閉集＋enum」
-- **B**（grok 獨家）：dormant 照字面會**立刻恆紅**（三個硬保護路徑已在 `base..HEAD`）→ dormant 不做歷史掃描
-- **C**：轉態豁免被實構穿透三次（改其他凍結鍵／symlink／重複 trailer）→ 改成可驗證 state transition
-- **E**：洞 C 的「命中即擋」字面會**新增死鎖**（那三檔在 manifest 是 allow）→ 寫死判定順序
+**R1 四個 P0（方向錯）**：`epic_state` 塞不進凍結檔／dormant 照字面恆紅（grok 獨家）／轉態豁免被穿透三條／洞 C 命中即擋會死鎖。
+
+**R2 三個 P0（規格不夠精確到能施工）**：
+- **α**：我只擴了**測試端**常數，沒指定 production parser（三支腳本須共用一支）＋需 `_FROZEN_ENUM_KEYS`
+- **β**：🔴 **我的修補案自己新開的洞**——只封 `dormant→active`，沒封 `active→dormant`；frozen 檔在 manifest 是 allow ⇒ 一般 commit 就能關掉整個閘
+- **γ**：old state 讀法（兩家實構補上：`old=git show HEAD:<p>`／`new=git show :<p>`／無 HEAD fail-closed）
 
 **新查到的事實**：昂貴 G-7 自 2026-08-14 起**沒在 push 上跑過**（`gov_check.sh:266-267` `--fast` 早退，G-7 在 `:343-350`）。日常摩擦全來自 commit-msg 那支假閘。
 
-## 🔴 下一步（阻塞於使用者）
+## 🔴 下一步＝寫 SPEC
 
-依「reconcile 最終結論須白話審閱」，已把結論白話報給使用者，**等他決定**：
-(a) 直接寫 SPEC（修補案已在 synth，SPEC 本來就要過三家 review）／(b) 先跑 R2 確認修補案。
+主委裁定不再開 R3：R2 之 finding 全屬「把規格寫精確」，處置偽碼由三家各自實構後交出（對照表見 synth 群集 γ／ε），非主委發明。
+SPEC 須逐條吃掉 α–ι，並帶 synth 末段列的三條前置查核。
 
 ## G3-D2 主線（G-7FIX 完成後回來）
 
