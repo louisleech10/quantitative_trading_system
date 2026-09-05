@@ -1387,7 +1387,14 @@ class EventImportService:
         #    `label_return_mode` 住 `label_definition` 之內，不是頂層。
         lds = [r.get("label_definition") or {} for r in recs]
         lrm = {str(d.get("label_return_mode")) for d in lds if isinstance(d, dict) and d.get("label_return_mode")}
-        k_raw = self._single_value(recs, "decision_offset_bars")
+        # 🔴 `G3-D2` D4.3：k **不再進 seeds**（分析參數不由匯入檔種子化）；改以
+        #    `batch_fact_notes.decision_offset_bars_record_values` 呈現**批內記錄之值集合**。
+        #    `bool` 先排除（`isinstance(True, int)` 為真；`True` 會變成 `1` 混進值集合）。
+        k_values = sorted({
+            int(v) for r in recs
+            for v in (r.get("decision_offset_bars"),)
+            if v is not None and not isinstance(v, bool) and isinstance(v, int)
+        })
         return EventImportDetailResponse(
             summary=self._summary(payload),
             records=recs,
@@ -1395,12 +1402,12 @@ class EventImportService:
             declaration_seeds=EventDeclarationSeeds(
                 entry_price_semantic=self._single_value(recs, "entry_price_semantic"),
                 label_return_mode=lrm.pop() if len(lrm) == 1 else None,
-                decision_offset_bars=int(k_raw) if k_raw is not None and k_raw.lstrip("-").isdigit() else None,
             ),
             batch_fact_notes=EventBatchFactNotes(
                 control_kind_values=sorted({
                     str(r.get("control_kind")) for r in recs if r.get("control_kind") is not None
                 }),
+                decision_offset_bars_record_values=k_values,
             ),
         )
 

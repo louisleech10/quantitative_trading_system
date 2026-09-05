@@ -44,7 +44,14 @@ export const EVENT_EXPORT_CONTROL_KIND = 'user_labeled_same_trigger' as const;
  */
 export const EVENT_EXPORT_ENTRY_PRICE_SEMANTIC = contractDefault('entry_price_semantic');
 export const EVENT_EXPORT_LABEL_RETURN_MODE = contractDefault('label_return_mode');
-export const EVENT_EXPORT_DECISION_OFFSET_BARS = 0 as const;
+/**
+ * 匯出端寫入之 `decision_offset_bars`。
+ *
+ * 🔴 **`G3-D2` D4.3（2026-09-05，裁定②）：匯出端一律寫契約 `min`（＝0），不再由 UI 決定。**
+ * k 已改為**分析參數**（於 IC 分析頁設定），匯出檔裡的它只是一個必填欄位的誠實佔位。
+ * 值取自契約 `decision_offset_bars.min`——寫死 `0` 會在契約改下界時安靜地繼續寫舊值。
+ */
+export const EVENT_EXPORT_DECISION_OFFSET_BARS = contractDecisionOffsetMin();
 
 /**
  * 由契約 `optional_fields.label_origin.enum` 取出同名值；不在 enum 內即**拋錯**。
@@ -427,7 +434,10 @@ export function eventDimsToExportOptions(dims: {
     controlKind: dims.control_kind as NonNullable<EventExportOptions['controlKind']>,
     entryPriceSemantic: dims.entry_price_semantic as NonNullable<EventExportOptions['entryPriceSemantic']>,
     labelReturnMode: dims.label_return_mode as NonNullable<EventExportOptions['labelReturnMode']>,
-    decisionOffsetBars: dims.decision_offset_bars as number,
+    // 🔴 `G3-D2` D4.3：**恆寫常數**，不再讀 UI 之 `dims.decision_offset_bars`。
+    //    k 之控制項已自匯出／匯入畫面移除（改於 IC 分析頁設定）；若這裡仍讀 UI state，
+    //    移除控制項之後那個 state 就成了「沒有人能看到、卻會被寫進檔案」的幽靈值。
+    decisionOffsetBars: EVENT_EXPORT_DECISION_OFFSET_BARS,
   };
 }
 

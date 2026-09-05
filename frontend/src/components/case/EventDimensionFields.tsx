@@ -12,12 +12,14 @@
  */
 
 import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
+import { useState } from 'react';
+
 import {
   type EnumEventDimension,
   type EventDimPath,
-  clampDecisionOffset,
   decisionOffsetRange,
   dimOptions,
+  resolvePairConflict,
 } from '@/lib/eventDimensions';
 
 /**
@@ -63,10 +65,47 @@ export default function EventDimensionFields({
   path, values, onChange, allowUnset = false, contract,
 }: EventDimensionFieldsProps) {
   const range = decisionOffsetRange(path, contract);
+  // 🔴 `G3-D2` D4.2：`pair_rejected` 需要「另一維目前選了什麼」⇒ 兩欄一起餵進去。
+  //    `''`（未選）在 `pairRejectedReason` 內視為未選 ⇒ 不擋。
+  const selection = {
+    entry_price_semantic: values.entry_price_semantic || undefined,
+    label_return_mode: values.label_return_mode || undefined,
+  };
+  // 成對重設之揭露字串（`undefined` ⇒ 本次沒有發生重設）。**不靜默重設**。
+  const [pairReset, setPairReset] = useState<string | undefined>(undefined);
+
+  /** 改一個 enum 維度：先套新值，再解成對衝突（另一維重設為契約 default）。 */
+  const changeEnum = (dim: EnumEventDimension, value: string) => {
+    const next = { ...values, [dim]: value };
+    if (dim !== 'entry_price_semantic' && dim !== 'label_return_mode') {
+      setPairReset(undefined);
+      onChange(next);
+      return;
+    }
+    const outcome = resolvePairConflict(
+      {
+        entry_price_semantic: next.entry_price_semantic || undefined,
+        label_return_mode: next.label_return_mode || undefined,
+      },
+      dim, contract,
+    );
+    setPairReset(outcome.reset?.disclosure);
+    onChange({
+      ...next,
+      entry_price_semantic: outcome.selection.entry_price_semantic ?? next.entry_price_semantic,
+      label_return_mode: outcome.selection.label_return_mode ?? next.label_return_mode,
+    });
+  };
+
   return (
     <div className="space-y-3" data-testid="event-dimension-fields">
+      {pairReset && (
+        <p className="text-[11px] text-amber-200/90" data-testid="event-dim-pair-reset">
+          {pairReset}
+        </p>
+      )}
       {ENUM_DIMS.map((dim) => {
-        const options = dimOptions(path, dim, contract);
+        const options = dimOptions(path, dim, contract, selection);
         const blocked = options.filter((o) => o.disabled);
         return (
           <label key={dim} className="block text-sm text-slate-200">
@@ -74,7 +113,7 @@ export default function EventDimensionFields({
             <select
               data-testid={`event-dim-${dim}`}
               value={values[dim]}
-              onChange={(e) => onChange({ ...values, [dim]: e.target.value })}
+              onChange={(e) => changeEnum(dim, e.target.value)}
               className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
             >
               {/* 「未選」不是契約的值，也**不計入** selectable——它代表「這批不由本控制項決定」。 */}
@@ -101,45 +140,22 @@ export default function EventDimensionFields({
         );
       })}
 
-      {/* `decision_offset_bars` 是 `int, min 0`，不是 enum ⇒ 數值控制項；範圍由 `decisionOffsetRange` 給。 */}
-      <label className="block text-sm text-slate-200">
+      {/* 🔴 `G3-D2` **D4.3**（裁定②④ 2026-09-03）：`decision_offset_bars`（k）**不再由使用者於
+          匯出／匯入時填**——它是**分析參數**，同一批事件可以用不同 k 各分析一次。
+          ⇒ 本控制項整個移除（DOM 不得再有 `event-dim-decision_offset_bars`），
+          只留一句去哪裡設定的指路，以及契約 doc（讓使用者知道這個欄位仍存在於檔案裡）。
+          🔴 **契約欄本身不動**：CSV 欄對映表仍可對映 `decision_offset_bars`
+          （`/data-preparation` 之 `MAPPABLE_CONTRACT_FIELDS`），匯出端一律寫 `0`
+          （`eventExport.ts`），記錄值以獨立揭露欄呈現於分析頁。 */}
+      <div className="block text-sm text-slate-200" data-testid="event-dim-decision_offset_bars-moved">
         <span className="block mb-1">decision_offset_bars（決策位移 k）</span>
-        {/* 🔴 R3 群集 A（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／`GROK-R3-P1-01`，三家一致）：
-            HTML 之 `min`／`max` **只是提示**，使用者打字照樣送得出 `k>0`，
-            而 `buildEventContractRecords` 只擋 `k < min` ⇒ 鎖 0 的路徑上真的會落檔 `k=3`。
-            兩層都補：`readOnly` 讓使用者改不動、`onChange` clamp 讓程式化設值也進不來。
-            🔴 R4 `CODEX-R4-P2-01`：clamp **只夾範圍、不截小數**——契約是 `int`，
-            靜默把 `1.9` 變成 `1` 會讓後端那條顯式拒絕永遠不會被使用者看到。
-            `step={1}` 讓瀏覽器把小數標為 invalid；真正的拒絕在送出前之阻擋清單與契約 validator。 */}
-        <input
-          type="number"
-          data-testid="event-dim-decision_offset_bars"
-          value={values.decision_offset_bars}
-          min={range.min}
-          step={1}
-          readOnly={range.locked}
-          {...(range.max !== null ? { max: range.max } : {})}
-          onChange={(e) => onChange({
-            ...values,
-            // 清空＝未選（只在 `allowUnset` 之路徑有意義）；否則一律轉數字後**夾到本路徑之範圍內**。
-            decision_offset_bars: e.target.value === '' && allowUnset
-              ? ''
-              : clampDecisionOffset(Number(e.target.value), range),
-          })}
-          className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
-        />
+        <span className="block text-[11px] text-amber-200/80">
+          k 於 IC 分析頁設定（同一批事件可用不同 k 各分析一次；此處不填、匯出一律寫 {range.min}）
+        </span>
         <span className="mt-1 block text-[11px] text-slate-400" data-testid="event-dim-doc-decision_offset_bars">
           {EVENT_CONTRACT_DOCS.decision_offset_bars}
         </span>
-        {range.locked && (
-          <span
-            className="mt-1 block text-[11px] text-amber-200/80"
-            data-testid="event-dim-blocked-decision_offset_bars"
-          >
-            k：{range.reason}
-          </span>
-        )}
-      </label>
+      </div>
     </div>
   );
 }

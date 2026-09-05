@@ -25,22 +25,46 @@ import {
   type EventFieldKey,
 } from '@/lib/eventFieldFormatters';
 import {
+  type EnumEventDimension,
   RETURN_MEASURE_PRESETS,
   clampDecisionOffset,
+  contractDecisionOffsetMin,
   decisionOffsetRange,
+  dimOptions,
+  resolvePairConflict,
   returnMeasurePresetOf,
 } from '@/lib/eventDimensions';
-import type { EventImportDetail, ICAnalysisConfig } from '@/lib/types';
+import type {
+  EventImportDetail,
+  ICAnalysisConfig,
+  ICEventLabelScan,
+  ICEventScanDisclosure,
+} from '@/lib/types';
 
 /** 分析參數之 `horizon_bars` 初始值——**字面常數**，不由任何落檔欄種子化。 */
 export const IC_ANALYSIS_INITIAL_HORIZON_BARS = 1;
 
+/**
+ * `G3-D2` D4.3：k 之**建議上限**（超過只警示不擋）。
+ * 🔴 值取自契約 `analysis_params.decision_offset_bars_scan_max`，經由**後端揭露**傳入；
+ *    前端**不硬編**——硬編會在契約改值時安靜地繼續用舊值。
+ *    後端沒給 ⇒ 不顯示警示（沒有依據就不對使用者說話）。
+ */
 interface Props {
   importId?: string;
   labelSpec: ICAnalysisConfig['event_label_spec'];
   onChangeLabelSpec: (next: NonNullable<ICAnalysisConfig['event_label_spec']>) => void;
   /** 測試注入；不給則依 `importId` 自行查 detail。 */
   detail?: EventImportDetail | null;
+  /** `G3-D2` D4.3：k／h 掃描網格（`undefined` ⇒ 單值模式）。 */
+  labelScan?: ICEventLabelScan | null;
+  onChangeLabelScan?: (next: ICEventLabelScan | null) => void;
+  /**
+   * `G3-D2` D4.2／D4.3：**後端**回傳之揭露（兩上界、k 雙值、掃描結果）。
+   * 🔴 前端**不自算**任何一項：上界之公式住 producer 之 `feasible_bounds`，
+   *    在此重算就是第二份實作。沒有揭露 ⇒ 顯示「尚未分析」而不是猜一個數字。
+   */
+  disclosure?: ICEventScanDisclosure | null;
 }
 
 /** 由批次事實欄產生該欄之白話字串；欄集之外的欄一律不顯示（各頁只選自己的欄集）。 */
@@ -81,6 +105,7 @@ function factLine(field: EventFieldKey, detail: EventImportDetail): string {
 
 export default function EventBatchDisclosurePanel({
   importId, labelSpec, onChangeLabelSpec, detail: injected,
+  labelScan = null, onChangeLabelScan, disclosure = null,
 }: Props) {
   const [detail, setDetail] = useState<EventImportDetail | null>(injected ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +138,47 @@ export default function EventBatchDisclosurePanel({
   //    **刻意不在此依宣告深度算出預設**：那會是後端 D1.7 規則的第二份實作，
   //    兩份會漂（正是本票一路在防的「兩端都有、但沒接上」之反面）。
   const userChoseSpec = labelSpec !== undefined;
+
+  // ── `G3-D2` D4.2：進階直改兩欄（pair-aware）────────────────────────────
+  // 🔴 D1 只開三個 preset，理由是「兩個 select 各自列值會列出矩陣外組合」。
+  //    D4.2 之 `pair_rejected` 讓那兩個幾何零窗對在 UI 上**直接 disabled**
+  //    ⇒ 前提消失，進階直改可以開放（`D-001` D1.7 明文「留待 D4.2」）。
+  const [advanced, setAdvanced] = useState(false);
+  const [pairReset, setPairReset] = useState<string | undefined>(undefined);
+  const selection = {
+    entry_price_semantic: spec.entry_price_semantic,
+    label_return_mode: spec.label_return_mode,
+  };
+  const changePairDim = (dim: EnumEventDimension, value: string) => {
+    const next = { ...selection, [dim]: value };
+    const outcome = resolvePairConflict(next, dim);
+    setPairReset(outcome.reset?.disclosure);
+    onChangeLabelSpec({
+      ...spec,
+      entry_price_semantic: outcome.selection.entry_price_semantic,
+      label_return_mode: outcome.selection.label_return_mode,
+      horizon_bars: spec.horizon_bars ?? IC_ANALYSIS_INITIAL_HORIZON_BARS,
+    });
+  };
+
+  // ── `G3-D2` D4.3：k／h 之「單值／掃到 m」切換 ──────────────────────────
+  const kScanOn = labelScan?.decision_offset_bars_max !== undefined
+    && labelScan?.decision_offset_bars_max !== null;
+  const hScanOn = labelScan?.horizon_bars_max !== undefined
+    && labelScan?.horizon_bars_max !== null;
+  const setScan = (patch: Partial<ICEventLabelScan>) => {
+    if (!onChangeLabelScan) return;
+    const next: ICEventLabelScan = { ...(labelScan ?? {}), ...patch };
+    // 兩軸都關掉 ⇒ 整個鍵回 `null`（**不是**送一個空物件：空物件在後端仍代表「有掃描」）。
+    const empty = next.decision_offset_bars_max === undefined
+      && next.horizon_bars_max === undefined;
+    onChangeLabelScan(empty ? null : next);
+  };
+  const kMin = contractDecisionOffsetMin();
+  const analysisK = spec.decision_offset_bars ?? kMin;
+  const recordValues = detail?.batch_fact_notes.decision_offset_bars_record_values ?? [];
+  const scanMax = disclosure?.decision_offset_bars_scan_max ?? null;
+  const scanResult = disclosure?.event_label_scan ?? null;
 
   if (error) {
     return (
@@ -224,34 +290,195 @@ export default function EventBatchDisclosurePanel({
           )}
         </fieldset>
 
-        <label className="mt-2 block text-xs text-slate-200">
-          <span className="mb-1 block">decision_offset_bars（本批鎖定為 {kRange.min}）</span>
-          {/* 🔴 R3 群集 A（三家一致）：與 `/search` 同型——`min`／`max` 只是提示。
-              本頁之 `k` 會進 `event_label_spec` 送去分析，繞過後直接撞 §F-2′ 之 fail-closed，
-              使用者只會看到「分析被拒絕」而不知道是自己那格改出來的。兩層都補。
-              🔴 種子值亦須 clamp：既有批之 `declaration_seeds.decision_offset_bars` 可能是 2
-              （舊批宣告過非 F-1′ 之值），直接當初始值會讓本頁一載入就處在鎖定範圍外。 */}
+        {/* ── `G3-D2` D4.2：進階直改 entry／mode 兩欄（pair-aware）───────────────
+            🔴 兩個幾何零窗對在此**直接 disabled** 並顯示理由（`kind: 'pair_rejected'`），
+            改一維使另一維落入拒收對時，另一維**重設為契約 default** 並揭露。
+            選項與理由全部由 `dimOptions(..., selection)` 導出，本檔不寫第二份清單。 */}
+        <div className="mt-3" data-testid="ic-param-advanced">
+          <button
+            type="button"
+            data-testid="ic-param-advanced-toggle"
+            onClick={() => setAdvanced((v) => !v)}
+            className="text-[11px] text-slate-300 underline underline-offset-2"
+          >
+            {advanced ? '收起進階：直接改兩欄' : '進階：直接改 entry／mode 兩欄'}
+          </button>
+          {advanced && (
+            <div className="mt-2 space-y-2">
+              {pairReset && (
+                <p className="text-[11px] text-amber-200/90" data-testid="ic-param-pair-reset">
+                  {pairReset}
+                </p>
+              )}
+              {(['entry_price_semantic', 'label_return_mode'] as const).map((dim) => {
+                const options = dimOptions('/ic-analysis', dim, undefined, selection);
+                const blocked = options.filter((o) => o.kind === 'pair_rejected');
+                return (
+                  <label key={dim} className="block text-xs text-slate-200">
+                    <span className="mb-1 block">{dim}</span>
+                    <select
+                      data-testid={`ic-param-${dim}`}
+                      value={selection[dim] ?? ''}
+                      onChange={(e) => changePairDim(dim, e.target.value)}
+                      className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
+                    >
+                      {selection[dim] === undefined && <option value="">（尚未選）</option>}
+                      {options.map((o) => (
+                        <option key={o.value} value={o.value} disabled={o.disabled} title={o.reason}>
+                          {o.value}
+                        </option>
+                      ))}
+                    </select>
+                    {blocked.map((o) => (
+                      <span
+                        key={o.value}
+                        className="mt-1 block text-[11px] text-amber-200/80"
+                        data-testid={`ic-param-pair-blocked-${dim}-${o.value}`}
+                      >
+                        {o.value}：{o.reason}
+                      </span>
+                    ))}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── `G3-D2` D4.3：k 之雙值揭露 ＋ 單值／掃描切換 ─────────────────────
+            🔴 **解鎖**（D4.2）：k 已不在支援矩陣內，其上界是**逐事件可行域**，
+            由後端揭露 `k_max_feasible_at_h`；前端不再假裝有一個 `max`，也不再鎖 0。
+            🔴 **不再回退 seeds**（D4.3）：`declaration_seeds.decision_offset_bars` 已移除；
+            初始值＝契約 min 之常數，批內記錄值以獨立欄並排顯示。 */}
+        <label className="mt-3 block text-xs text-slate-200">
+          <span className="mb-1 block">decision_offset_bars（本次分析要用的 k）</span>
           <input
             type="number"
             data-testid="ic-param-decision-offset-bars"
             min={kRange.min}
-            readOnly={kRange.locked}
-            {...(kRange.max !== null ? { max: kRange.max } : {})}
-            value={clampDecisionOffset(
-              spec.decision_offset_bars ?? detail.declaration_seeds.decision_offset_bars ?? kRange.min,
-              kRange,
-            )}
+            step={1}
+            value={analysisK}
+            disabled={kScanOn}
             onChange={(e) => onChangeLabelSpec({
               ...spec, decision_offset_bars: clampDecisionOffset(Number(e.target.value), kRange),
             })}
-            className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
+            className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 disabled:opacity-50"
           />
-          {kRange.locked && (
-            <span className="mt-1 block text-[11px] text-amber-200/80" data-testid="ic-param-blocked-decision_offset_bars">
-              k：{kRange.reason}
+          {/* 並排「批次記錄 k／本次分析 k」——同名不同義，分開講 */}
+          <span className="mt-1 block text-[11px] text-slate-400" data-testid="ic-param-k-dual">
+            批次記錄的 k ＝ {recordValues.length ? recordValues.join('、') : '（這批沒有這個欄）'}
+            ；本次分析的 k ＝ {analysisK}
+            {recordValues.length === 1 && recordValues[0] !== analysisK
+              && '（兩者不同是正常的：記錄是匯入當下的宣告，分析 k 是這一次的參數）'}
+          </span>
+          {scanMax !== null && analysisK > scanMax && (
+            <span className="mt-1 block text-[11px] text-amber-200/80" data-testid="ic-param-k-over-scan-max">
+              k ＝ {analysisK} 超過建議上限 {scanMax}（契約 analysis_params）——**不擋**，
+              但可行的事件會變少，請看下面的上界揭露。
             </span>
           )}
         </label>
+
+        {/* k／h 之「單值／掃到 m」切換（裁定③：填 m 就掃 0～m；h 自 1 起） */}
+        {onChangeLabelScan && (
+          <div className="mt-2 space-y-2" data-testid="ic-param-scan">
+            <label className="flex items-center gap-2 text-xs text-slate-200">
+              <input
+                type="checkbox"
+                data-testid="ic-param-scan-k-toggle"
+                checked={kScanOn}
+                onChange={(e) => setScan({
+                  decision_offset_bars_max: e.target.checked ? analysisK : undefined,
+                })}
+              />
+              <span>k 掃描：0 ～</span>
+              <input
+                type="number"
+                data-testid="ic-param-scan-k-max"
+                min={kMin}
+                step={1}
+                disabled={!kScanOn}
+                value={labelScan?.decision_offset_bars_max ?? ''}
+                onChange={(e) => setScan({ decision_offset_bars_max: Number(e.target.value) })}
+                className="w-20 rounded border border-slate-700 bg-slate-900/70 px-2 py-0.5 text-xs disabled:opacity-50"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-200">
+              <input
+                type="checkbox"
+                data-testid="ic-param-scan-h-toggle"
+                checked={hScanOn}
+                onChange={(e) => setScan({
+                  horizon_bars_max: e.target.checked ? (spec.horizon_bars ?? 1) : undefined,
+                })}
+              />
+              <span>h 掃描：1 ～</span>
+              <input
+                type="number"
+                data-testid="ic-param-scan-h-max"
+                min={1}
+                step={1}
+                disabled={!hScanOn}
+                value={labelScan?.horizon_bars_max ?? ''}
+                onChange={(e) => setScan({ horizon_bars_max: Number(e.target.value) })}
+                className="w-20 rounded border border-slate-700 bg-slate-900/70 px-2 py-0.5 text-xs disabled:opacity-50"
+              />
+            </label>
+          </div>
+        )}
+
+        {/* ── 兩個條件上界（後端揭露；前端不自算）───────────────────────────── */}
+        <p className="mt-2 text-[11px] text-slate-400" data-testid="ic-param-bounds">
+          {disclosure
+            ? `這批在目前設定下的上界：k 最多 ${
+              disclosure.k_bound_status === 'bounded' ? disclosure.k_max_feasible_at_h : '（這個 h 下沒有可行的 k）'
+            }；h 最多 ${
+              disclosure.h_bound_status === 'bounded' ? disclosure.h_max_feasible_at_k
+                : (disclosure.h_bound_status === 'h_inert_for_mode' ? '（這個量法不用 h，沒有上界）' : '（這個 k 下沒有可行的 h）')
+            }。這是**幾何與資料涵蓋**的上界：超過就一定算不出來；沒超過**不保證**每一筆都算得出來。`
+            : '上界要分析過才知道（由後端依這批的 bar 表逐事件算），這裡不猜。'}
+        </p>
+
+        {/* ── 掃描結果矩陣（行 k、列 h）───────────────────────────────────── */}
+        {scanResult && (
+          <div className="mt-2" data-testid="ic-param-scan-result">
+            {scanResult.capability === 'unavailable' ? (
+              <p className="text-[11px] text-rose-300" data-testid="ic-param-scan-rejected">
+                掃描沒有執行：{scanResult.reason}
+                {scanResult.message ? `——${scanResult.message}` : ''}
+              </p>
+            ) : (
+              <>
+                <p className="text-[11px] text-slate-400">
+                  掃描完成 {scanResult.scan_done}/{scanResult.scan_total} 格
+                </p>
+                <div className="mt-1 overflow-x-auto">
+                  <table className="text-[11px] text-slate-200">
+                    <tbody>
+                      {Array.from(new Set(scanResult.scan_results.map((c) => c.k))).map((k) => (
+                        <tr key={k}>
+                          <th className="pr-2 text-left font-normal text-slate-400">k={k}</th>
+                          {scanResult.scan_results.filter((c) => c.k === k).map((c) => (
+                            <td
+                              key={`${c.k}-${c.h}`}
+                              data-testid={`ic-scan-cell-${c.k}-${c.h}`}
+                              className="px-2 py-0.5"
+                              title={c.reason ?? undefined}
+                            >
+                              {c.capability === 'available'
+                                ? `h=${c.h}: ${c.n_events} 筆`
+                                : `h=${c.h}: 不可用`}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* 🔴 本次答案窗之可算／缺筆數 ＋ 本次 purge 下界（式之權威在 §D-3′-a(ii)，本區只顯示結果） */}
         {/* 🔴 `GROK-R4-P2-01`：本行是**同一個數字在同一面板的第二處顯示**。

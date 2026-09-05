@@ -2896,11 +2896,16 @@ export interface EventBatchFacts {
   label: { event_id: string; label: number }[];
 }
 
-/** 批次宣告種子（F-0）；分析參數區之初始值來源，**不計入**批次事實欄之鍵集。 */
+/**
+ * 批次宣告種子（F-0）；分析參數區之初始值來源，**不計入**批次事實欄之鍵集。
+ *
+ * 🔴 `G3-D2` **D4.3**：`decision_offset_bars` **已移除**（裁定②）。k 是分析參數，
+ * 同一批可以用不同 k 各分析一次 ⇒ 拿匯入檔的 k 當初始值等於讓宣告偷偷決定參數。
+ * 批內**記錄**之 k 改由 `batch_fact_notes.decision_offset_bars_record_values` 揭露。
+ */
 export interface EventDeclarationSeeds {
   entry_price_semantic: string | null;
   label_return_mode: string | null;
-  decision_offset_bars: number | null;
 }
 
 export interface EventImportDetail {
@@ -2908,7 +2913,58 @@ export interface EventImportDetail {
   records: Record<string, unknown>[];
   batch_facts: EventBatchFacts;
   declaration_seeds: EventDeclarationSeeds;
-  batch_fact_notes: { control_kind_values: string[] };
+  batch_fact_notes: {
+    control_kind_values: string[];
+    /** `G3-D2` D4.3：批內**記錄**之 k distinct 值（升冪）；空＝該批無此欄（≠ `[0]`）。 */
+    decision_offset_bars_record_values: number[];
+  };
+}
+
+/** `G3-D2` D4.3：k／h 掃描網格之請求上界（請求**頂層 sibling**，不在 `event_label_spec` 內）。 */
+export interface ICEventLabelScan {
+  decision_offset_bars_max?: number;
+  horizon_bars_max?: number;
+}
+
+/** 掃描網格單格之結果（行 k、列 h）。 */
+export interface ICEventScanCell {
+  k: number;
+  h: number;
+  capability: 'available' | 'unavailable';
+  reason?: string | null;
+  n_events: number;
+  analysis_alignment_receipt_hash: string | null;
+  ic_summary?: Record<string, unknown> | null;
+}
+
+/**
+ * `G3-D2` D4.2／D4.3：**後端**回傳之事件分析揭露。
+ *
+ * 🔴 兩個上界為**幾何／coverage 上界**（`D-001` D4.2 誠實邊界）：
+ *    超過 ⇒ 幾何上必失敗；**未超過不保證**零 failures。UI 文案不得寫成成功保證。
+ */
+export interface ICEventScanDisclosure {
+  decision_offset_bars_capability?: string | null;
+  decision_offset_bars_reason?: string | null;
+  /** 批內**記錄**之 k distinct 值（事實）。 */
+  decision_offset_bars_record_values?: number[] | null;
+  /** **本次分析**採用之 k（參數）。與上一欄同名不同義。 */
+  decision_offset_bars_analysis?: number | null;
+  k_max_feasible_at_h?: number | null;
+  h_max_feasible_at_k?: number | null;
+  /** `bounded` ｜ `no_feasible_k` ｜ `no_feasible_h` ｜ `h_inert_for_mode`。 */
+  k_bound_status?: string | null;
+  h_bound_status?: string | null;
+  /** 契約 `analysis_params.decision_offset_bars_scan_max`（建議上限；超過只警示不擋）。 */
+  decision_offset_bars_scan_max?: number | null;
+  event_label_scan?: {
+    scan_total: number;
+    scan_done: number;
+    scan_results: ICEventScanCell[];
+    capability: 'available' | 'unavailable';
+    reason?: string | null;
+    message?: string | null;
+  } | null;
 }
 
 export interface EventImportFailure {

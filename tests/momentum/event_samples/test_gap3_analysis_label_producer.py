@@ -106,27 +106,52 @@ def test_analysis_label_producer_02_short_is_exact_negation(bars):
 
 # ── ③④⑤ 非 F-1′ 三元組 ────────────────────────────────────────────────────
 
-def test_analysis_label_producer_03_next_open_unsupported(bars):
-    """③ `entry_price_semantic='next_open'` ⇒ `supported is False`、`label_values == {}`。"""
+def test_analysis_label_producer_03_next_open_supported_since_d42(bars):
+    """③ **`D-001` D4.2 改寫**：`next_open` 自全矩陣起**已支援**（原斷言為 `supported is False`）。
+
+    🔴 **這不是放寬斷言，是斷言的對象變了**：D1.3 之矩陣只有四對，`next_open` 在外；
+    D4.2 把矩陣擴為 13 對（5 entry × 3 mode 減兩個幾何零窗對），`next_open × close_to_close`
+    在內。原斷言若留著，D4.2 的交付本身就是「讓它變綠的方法只有不交付」。
+    ⇒ 依 `D-006` §0「`03/05` 於 P1–P3 不動，**P4 改時附 diff**」，本輪為 P4，diff 附於 commit。
+
+    **改寫後仍是強斷言**（不是刪掉）：轉為守住 `next_open` 的**取價座標**——
+    entry bar 必須是 `t0_idx + 1`、field 為 `open`。取價錯一根仍是合法數字，
+    只有這條會紅。
+    """
     sp = spec(entry="next_open")
     p = prep(bars, records("long"), sp)
     r = resolve_label_value_at_analyze(p, bars, event_label_spec=sp)
-    assert r.supported is False
-    assert r.label_values == {}
-    assert r.reason == UNSUPPORTED_REASON
+    assert r.supported is True
+    assert r.label_values, "next_open 已在矩陣內 ⇒ 須產出值"
+    assert r.reason is None
+    ot = bars["ETHUSDT"]["12h"]["open_time_ms"].to_numpy()
+    refs = {e.event_id: e for e in p.entry_price_refs}
+    by_id = {w.event_id: w for w in p.windows}
+    assert refs, "next_open 之 entry_price_refs 不得為空"
+    for rec in records("long"):
+        w = by_id.get(rec["event_id"])
+        if w is None:
+            continue
+        t0_idx = int((ot == int(rec["t0"])).nonzero()[0][0])
+        ref = refs[rec["event_id"]]
+        assert ref.field == "open"
+        assert ref.bar_open_ms == int(ot[t0_idx + 1]), "next_open 之 entry bar 須為 t0 的下一根"
 
 
-def test_analysis_label_producer_04_k3_unsupported_but_decision_before_t0(bars):
-    """④ `decision_offset_bars=3` ⇒ 同③；**且**該 eid 之 `WindowRow.decision_at_ms < t0`。
+def test_analysis_label_producer_04_k3_supported_and_decision_before_t0(bars):
+    """④ **`D-001` D4.2 改寫**：`decision_offset_bars=3` 自全矩陣起**已支援**（k 不再入矩陣）。
 
-    🔴 後半是重點：它證明 **k 的映射真的生效了**，不是被忽略。
-    所以 prepare 在不支援時**仍然對齊、仍然產窗**，只有值被扣住。
-    🔴 `windows` 是 tuple ⇒ **禁** `windows[eid][...]` 之 dict API（R15）。
+    🔴 原斷言 `supported is False` 之前提是「矩陣含 k」；D4.2 把 k 移出矩陣、
+    改由**逐事件成對可行域** `feasible(e, k, h)` 限制 ⇒ k=3 本身是合法宣告，
+    只有暖機不足的事件才進 failures。同 03，屬 P4 之對象變更，diff 附於 commit。
+
+    🔴 **原本的重點斷言原樣保留**：該 eid 之 `WindowRow.decision_at_ms < t0`
+    ——它證明 k 的映射真的生效了，不是被忽略。
     """
     sp = spec(k=3)
     p = prep(bars, records("long"), sp)
     r = resolve_label_value_at_analyze(p, bars, event_label_spec=sp)
-    assert r.supported is False and r.label_values == {}
+    assert r.supported is True and r.label_values
     assert p.windows, "k=3 之批次仍須產出 windows（否則本條的後半無從斷言）"
     by_id = {w.event_id: w for w in p.windows}          # 先建 map，不用 id 下標
     for rec in records("long"):
@@ -136,11 +161,22 @@ def test_analysis_label_producer_04_k3_unsupported_but_decision_before_t0(bars):
 
 
 def test_analysis_label_producer_05_open_to_close_unsupported(bars):
-    """⑤ `label_return_mode='open_to_close'` ⇒ 同③。"""
-    sp = spec(mode="open_to_close")
+    """⑤ `(trigger_close, open_to_close)` ⇒ 同③之原形：`supported is False`、值為空。
+
+    🔴 **本條在 D4.2 之後不但不放寬，還變強**：它從「open_to_close 整個 mode 未交付」
+    收斂成「**這一對**幾何上窗長 0，永遠算不出來」，並斷言其**專屬** reason
+    ——換 k、換 h 都不會讓它變可算，故 reason 不得與一般不支援共用字面。
+    """
+    from momentum.Analysis.event_samples.label_value_from_case import (
+        ZERO_LENGTH_LABEL_WINDOW_REASON,
+    )
+    sp = spec(mode="open_to_close")  # spec() 之預設 entry＝trigger_close ⇒ 幾何零窗對
+    assert sp["entry_price_semantic"] == "trigger_close"
     p = prep(bars, records("long"), sp)
     r = resolve_label_value_at_analyze(p, bars, event_label_spec=sp)
     assert r.supported is False and r.label_values == {}
+    assert r.reason == ZERO_LENGTH_LABEL_WINDOW_REASON
+    assert p.reason == ZERO_LENGTH_LABEL_WINDOW_REASON
 
 
 # ── ⑥ 同批不同 h ───────────────────────────────────────────────────────────
@@ -603,32 +639,71 @@ def test_analysis_label_producer_d13_trigger_open_entry_at_and_hash_differ(bars)
     assert pa.analysis_alignment_receipt_hash != pb.analysis_alignment_receipt_hash
 
 
-def test_analysis_label_producer_d13_matrix_membership_under_and_over(bars):
-    """`SUPPORTED_MATRIX` 之 under／over 兩向：四對在內、鄰近組合在外。
+def test_analysis_label_producer_d42_matrix_membership_under_and_over(bars):
+    """`SUPPORTED_PAIRS` 之 under／over 兩向：**13 對**在內、兩個幾何零窗對在外。
 
-    🔴 **over 向不可省**：只驗「四對為 True」時，把矩陣改成「全部回 True」也會綠。
+    🔴 **over 向不可省**：只驗「13 對為 True」時，把矩陣改成「全部回 True」也會綠。
+    🔴 **13 這個數字由 `5×3 − 2` 導出並逐對列出**（`D-001` D4.2）；集合相等而非只驗 `len`
+       ——長度相等而內容錯位的矩陣會通過只驗長度的斷言。
     """
     from momentum.Analysis.event_samples.label_value_from_case import (
-        SUPPORTED_MATRIX, normalize_event_label_spec, spec_is_supported,
+        ENTRY_PRICE_SEMANTICS, LABEL_RETURN_MODES, REJECTED_PAIRS, SUPPORTED_PAIRS,
+        ZERO_LENGTH_LABEL_WINDOW_REASON, normalize_event_label_spec, spec_is_supported,
+        unsupported_reason_for,
     )
-    assert SUPPORTED_MATRIX == frozenset({
-        ("trigger_close", "close_to_close", 0),
-        ("trigger_open", "close_to_close", 0),
-        ("trigger_open", "open_to_close", 0),
-        ("trigger_open", "open_to_horizon_close", 0),
-    })
-    for entry, mode in [("trigger_close", "close_to_close"), ("trigger_open", "close_to_close"),
-                        ("trigger_open", "open_to_close"), ("trigger_open", "open_to_horizon_close")]:
-        assert spec_is_supported(normalize_event_label_spec(spec(entry=entry, mode=mode))) is True
-    # over 向：矩陣外之鄰近組合須為 False（D1.3 邊界①②）
-    for entry, mode, k in [("trigger_close", "open_to_close", 0),        # 幾何零窗，D4.2 才處理
-                           ("trigger_close", "open_to_horizon_close", 0),
-                           ("next_open", "close_to_close", 0),
-                           ("decision_bar_open", "open_to_horizon_close", 0),
-                           ("trigger_open", "close_to_close", 1)]:       # k>0 留 D4
-        assert spec_is_supported(
-            normalize_event_label_spec(spec(entry=entry, mode=mode, k=k))
-        ) is False, f"({entry}, {mode}, {k}) 不應在 D1 矩陣內"
+    rejected = {("trigger_close", "open_to_close"), ("decision_bar_close", "open_to_close")}
+    assert len(ENTRY_PRICE_SEMANTICS) == 5 and len(LABEL_RETURN_MODES) == 3
+    expected = {
+        (e, m) for e in ENTRY_PRICE_SEMANTICS for m in LABEL_RETURN_MODES
+    } - rejected
+    assert SUPPORTED_PAIRS == frozenset(expected)
+    assert len(SUPPORTED_PAIRS) == 13
+    assert {(e, m) for m, es in REJECTED_PAIRS.items() for e in es} == rejected
+
+    # under 向：13 對 × k∈{0,2} 全部 True（k 已不入矩陣）
+    for entry, mode in sorted(expected):
+        for k in (0, 2):
+            sp = normalize_event_label_spec(spec(entry=entry, mode=mode, k=k))
+            assert spec_is_supported(sp) is True, f"({entry}, {mode}, k={k}) 應在矩陣內"
+            assert unsupported_reason_for(sp) is None
+
+    # over 向：兩個幾何零窗對 × k∈{0,2} 全部 False，且 reason 為**專屬**字面
+    for entry, mode in sorted(rejected):
+        for k in (0, 2):
+            sp = normalize_event_label_spec(spec(entry=entry, mode=mode, k=k))
+            assert spec_is_supported(sp) is False, f"({entry}, {mode}, k={k}) 應被幾何拒收"
+            assert unsupported_reason_for(sp) == ZERO_LENGTH_LABEL_WINDOW_REASON
+
+    # over 向之二：枚舉外之值仍為 False（矩陣不得對未知字面 fail-open）
+    for entry, mode in [("trigger_open", "open_to_open"), ("bogus_entry", "close_to_close")]:
+        assert spec_is_supported({
+            "entry_price_semantic": entry, "label_return_mode": mode, "decision_offset_bars": 0,
+        }) is False
+
+
+def test_analysis_label_producer_d42_reasons_registered_in_contract():
+    """producer 之兩個 reason 字面**必須**在契約 `capability_unavailable_reasons` 之封閉集合內。
+
+    🔴 沒有這條，producer 可以自造一個 UI 永遠對不上的 reason 而全綠。
+    """
+    from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+    from momentum.Analysis.event_samples.label_value_from_case import (
+        UNSUPPORTED_REASON as _U, ZERO_LENGTH_LABEL_WINDOW_REASON as _Z,
+    )
+    reasons = set(load_event_import_contract()["capability_unavailable_reasons"])
+    assert _U in reasons and _Z in reasons
+
+
+def test_analysis_label_producer_d42_rejected_pairs_matches_contract():
+    """producer 之 `REJECTED_PAIRS` 與契約 `label_return_mode.rejected_pairs` **逐鍵相等**。
+
+    🔴 兩份表是刻意的（契約給 UI、producer 給後端判定），但**必須同值**；
+       漂移的方向是「UI 讓使用者選得到後端算不出的組合」。
+    """
+    from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+    from momentum.Analysis.event_samples.label_value_from_case import REJECTED_PAIRS
+    node = load_event_import_contract()["required_fields"]["label_definition"]["fields"]["label_return_mode"]
+    assert {m: list(v) for m, v in REJECTED_PAIRS.items()} == node["rejected_pairs"]
 
 
 # ── D1.4：golden 覆蓋之可證偽性 ────────────────────────────────────────────

@@ -515,6 +515,235 @@ class ICAnalysisService:
             "event_known_at_decision_values": list(prepared1.event_known_at_decision_values),
         }
 
+    @staticmethod
+    def _event_k_disclosure(
+        request: ICAnalyzeRequest, event_batch: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """`G3-D2` D4.2／D4.3 之揭露欄：k 雙值 ＋ 兩個條件上界。
+
+        🔴 **雙值分開講**（D4.3）：`decision_offset_bars_record_values` 是**這批當初記錄了什麼**
+        （事實，可能是空清單或多值），`decision_offset_bars_analysis` 是**這次分析用了什麼**
+        （參數）。合成一個數字就會出現「批次寫 1、分析用 0，畫面只寫一個 0」這種誤導。
+        🔴 **缺任一欄 ⇒ `unavailable`**（reason 已登記契約）：揭露缺席時，使用者無從判斷
+        自己看到的 IC 是用哪個 k 算的——那比沒有分析更糟。
+        🔴 上界之公式與誠實邊界住 producer（`feasible_bounds`）；本層**只投影不重算**。
+        """
+        from momentum.factories import create_event_sample_pipeline
+
+        spec = dict(event_batch.get("event_label_spec") or {})
+        records = list(event_batch.get("records") or ())
+        record_values = event_batch.get("decision_offset_bars_record_values")
+        analysis_k = event_batch.get("decision_offset_bars_analysis")
+        if record_values is None or analysis_k is None:
+            return {
+                "decision_offset_bars_capability": "unavailable",
+                "decision_offset_bars_reason": (
+                    ICAnalysisService.SCAN_REASON_MISSING_K_DISCLOSURE
+                ),
+            }
+        pipeline = create_event_sample_pipeline()
+        timeframes = sorted({str(r.get("timeframe")) for r in records if r.get("timeframe")})
+        bars_by_tf = pipeline.bars_from_kline_cache(
+            sorted({str(r.get("symbol")) for r in records if r.get("symbol")}), timeframes,
+        )
+        bounds = pipeline.feasible_bounds(
+            records, bars_by_tf, event_label_spec=spec, timeframes=timeframes,
+        )
+        return {
+            "decision_offset_bars_capability": "available",
+            "decision_offset_bars_reason": None,
+            "decision_offset_bars_record_values": list(record_values),
+            "decision_offset_bars_analysis": int(analysis_k),
+            # 🔴 建議上限亦由**後端**交出：前端硬編會在契約改值時安靜地繼續用舊值。
+            "decision_offset_bars_scan_max": int(
+                pipeline.analysis_params()["decision_offset_bars_scan_max"]
+            ),
+            **bounds,
+        }
+
+    # ── `G3-D2` **D4.3**：k／h 掃描網格（裁定③「填 m 就掃 0～m」）─────────────
+    #
+    # 🔴 **為什麼在 service 而不是 route**：每一格都要跑完整的五階段＋條件 IC，
+    #    是十秒到分鐘級的工作 ⇒ 必須在既有的**背景 task** 內、以 `asyncio.to_thread`
+    #    逐格執行。放在 route 會把 event loop 綁住整個網格的時間。
+
+    #: 掃描格之 capability 字面（皆登記於契約 `capability_unavailable_reasons`）。
+    SCAN_REASON_TOO_LARGE = "scan_grid_too_large"
+    SCAN_REASON_CELL_TIMEOUT = "scan_cell_timeout"
+    SCAN_REASON_MISSING_K_DISCLOSURE = "missing_decision_offset_disclosure"
+
+    @staticmethod
+    def _scan_axes(spec: Dict[str, Any], scan: Optional[Dict[str, Any]]) -> tuple:
+        """`(K, H)` 兩軸。未給該軸之上界 ⇒ 該軸只有 `spec` 的單值（**不是**整條掃）。"""
+        scan = scan or {}
+        mk = scan.get("decision_offset_bars_max")
+        mh = scan.get("horizon_bars_max")
+        k_axis = list(range(0, int(mk) + 1)) if mk is not None else [int(spec["decision_offset_bars"])]
+        h_axis = list(range(1, int(mh) + 1)) if mh is not None else [int(spec["horizon_bars"])]
+        return k_axis, h_axis
+
+    @staticmethod
+    def _scan_cell_summary(report: Any) -> Optional[Dict[str, Any]]:
+        """單格之 IC 摘要**投影**（只取存在的鍵，不發明指標）。
+
+        🔴 **誠實邊界**：本 dict 是給矩陣格子顯示用的摘要，**不是**權威分析結果；
+        權威值仍在該格自己的分析報告裡。不在此計算任何新統計量。
+        """
+        if not isinstance(report, dict):
+            return None
+        keys = ("analysis_status", "oos_guarantees", "n_features", "n_samples")
+        out = {k: report[k] for k in keys if k in report}
+        return out or None
+
+    async def _run_scan_grid(
+        self,
+        task_id: str,
+        analyzer: Any,
+        request: ICAnalyzeRequest,
+        event_batch: Dict[str, Any],
+        *,
+        features_path: Optional[str],
+        meta_path: Optional[str],
+        feature_manifest_path: Optional[str],
+        labels_path: Optional[str],
+        kline_reader: Any,
+        config_override: Optional[Dict[str, Any]],
+        progress_callback: Any,
+    ) -> Dict[str, Any]:
+        """逐格跑五階段＋條件 IC，回 `{"scan_results": [...], "scan_total": n, ...}`。
+
+        🔴 **每格獨立 `prepared_token`／`analysis_alignment_receipt_hash`**：格與格之間
+        不得重用 prepare 之產物——重用會讓「用 k=0 對齊、用 k=2 算值」這種錯配全綠。
+        驗收以「各格 hash 互異」釘住。
+        🔴 **逾時之格 `unavailable` 並保留 partial**：整個網格不因一格慢而全滅。
+        🔴 **超出可行域之格 `unavailable` 不影響他格**：那是資料事實，不是請求錯誤。
+        """
+        from momentum.factories import create_event_sample_pipeline
+
+        params = create_event_sample_pipeline().analysis_params()
+        max_runs = int(params["scan_grid_max_runs"])
+        per_cell_timeout = float(params["per_cell_timeout_s"])
+        total_timeout = float(params["scan_timeout_s"])
+
+        base_spec = dict(event_batch.get("event_label_spec") or {})
+        k_axis, h_axis = self._scan_axes(base_spec, event_batch.get("event_label_scan"))
+        total = len(k_axis) * len(h_axis)
+        if total > max_runs:
+            return {
+                "scan_total": total,
+                "scan_done": 0,
+                "scan_results": [],
+                "capability": "unavailable",
+                "reason": self.SCAN_REASON_TOO_LARGE,
+                "message": (
+                    f"掃描網格 {len(k_axis)}×{len(h_axis)}＝{total} 格，超過上限 {max_runs}"
+                    "（契約 analysis_params.scan_grid_max_runs）——請縮小 k／h 之上界"
+                ),
+            }
+
+        deadline = asyncio.get_running_loop().time() + total_timeout
+        results: List[Dict[str, Any]] = []
+        done = 0
+        for k in k_axis:
+            for h in h_axis:
+                # 🔴 逐格剝離成**恰四鍵** spec（normalizer 對多一鍵 fail-closed）。
+                cell_spec = {
+                    "horizon_bars": int(h),
+                    "entry_price_semantic": base_spec["entry_price_semantic"],
+                    "label_return_mode": base_spec["label_return_mode"],
+                    "decision_offset_bars": int(k),
+                }
+                cell_batch = {**event_batch, "event_label_spec": cell_spec}
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    results.append({
+                        "k": int(k), "h": int(h), "capability": "unavailable",
+                        "reason": self.SCAN_REASON_CELL_TIMEOUT, "n_events": 0,
+                        "analysis_alignment_receipt_hash": None, "ic_summary": None,
+                    })
+                    continue
+                try:
+                    cell = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            self._run_scan_cell, analyzer, request, cell_batch,
+                            features_path=features_path, meta_path=meta_path,
+                            feature_manifest_path=feature_manifest_path,
+                            labels_path=labels_path, kline_reader=kline_reader,
+                            config_override=config_override,
+                        ),
+                        timeout=min(per_cell_timeout, remaining),
+                    )
+                except asyncio.TimeoutError:
+                    cell = {
+                        "capability": "unavailable", "reason": self.SCAN_REASON_CELL_TIMEOUT,
+                        "n_events": 0, "analysis_alignment_receipt_hash": None, "ic_summary": None,
+                    }
+                except Exception as exc:  # noqa: BLE001  逐格 loud，不讓一格炸掉整個網格
+                    logger.warning("scan cell (k=%s, h=%s) 失敗：%s", k, h, exc)
+                    cell = {
+                        "capability": "unavailable", "reason": str(exc)[:200],
+                        "n_events": 0, "analysis_alignment_receipt_hash": None, "ic_summary": None,
+                    }
+                results.append({"k": int(k), "h": int(h), **cell})
+                done += 1
+                progress_callback({
+                    "stage": "event_label_scan",
+                    "stage_name": "event_label_scan",
+                    "progress": done / max(total, 1),
+                    "message": f"掃描網格 {done}/{total}（k={k}, h={h}）",
+                    "scan_done": done,
+                    "scan_total": total,
+                })
+        return {
+            "scan_total": total,
+            "scan_done": done,
+            "scan_results": results,
+            "capability": "available",
+            "reason": None,
+        }
+
+    def _run_scan_cell(
+        self,
+        analyzer: Any,
+        request: ICAnalyzeRequest,
+        cell_batch: Dict[str, Any],
+        *,
+        features_path: Optional[str],
+        meta_path: Optional[str],
+        feature_manifest_path: Optional[str],
+        labels_path: Optional[str],
+        kline_reader: Any,
+        config_override: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """單格：五階段 ＋ 條件 IC（**同步**；由 `_run_scan_grid` 以 `to_thread` 呼叫）。"""
+        staged = self._run_event_label_stages(
+            request, cell_batch,
+            features_path=features_path, meta_path=meta_path,
+            feature_manifest_path=feature_manifest_path,
+        )
+        cell_override = dict(config_override or {})
+        cell_override["embargo"] = max(
+            int(cell_override.get("embargo") or 0), int(staged["purge_rows"]),
+        )
+        report = analyzer.analyze(
+            features_path=features_path,
+            labels_path=labels_path or "",
+            meta_path=meta_path,
+            config_override=cell_override,
+            progress_callback=None,
+            kline_reader=kline_reader,
+            event_timestamps=staged["event_timestamps"],
+            event_label_values=staged["event_label_values"],
+            event_context=staged["event_context"],
+        )
+        return {
+            "capability": "available",
+            "reason": None,
+            "n_events": len(staged["event_timestamps"]),
+            "analysis_alignment_receipt_hash": staged["analysis_alignment_receipt_hash"],
+            "ic_summary": self._scan_cell_summary(report),
+        }
+
     async def start_analysis(
         self,
         request: ICAnalyzeRequest,
@@ -591,6 +820,11 @@ class ICAnalysisService:
                 task_info["current_step"] = current_step
                 task_info["progress"] = progress
                 task_info["status"] = "running"
+                # 🔴 `G3-D2` D4.3：掃描網格之格數進度。**沿用既有 progress 事件**，
+                #    不另開一條通道（前端已有一套訂閱邏輯，兩套必然漂移）。
+                if "scan_total" in payload:
+                    task_info["scan_done"] = payload.get("scan_done")
+                    task_info["scan_total"] = payload.get("scan_total")
 
             notify_payload = {
                 "task_id": task_id,
@@ -600,6 +834,9 @@ class ICAnalysisService:
                 "message": message,
                 "status": "running",
             }
+            if "scan_total" in payload:
+                notify_payload["scan_done"] = payload.get("scan_done")
+                notify_payload["scan_total"] = payload.get("scan_total")
             loop.call_soon_threadsafe(self._notify_callbacks, task_id, notify_payload)
 
         try:
@@ -731,6 +968,21 @@ class ICAnalysisService:
                     config_override["embargo"] = max(
                         int(config_override.get("embargo") or 0), int(staged["purge_rows"]),
                     )
+                    # 🔴 `G3-D2` **D4.2／D4.3**：k 之雙值揭露 ＋ 兩個條件上界。
+                    #    兩者都是**給 UI 看的事實**，不是輸入鎖；缺任一欄 ⇒ capability
+                    #    `missing_decision_offset_disclosure`（fail-closed：沒揭露就不算數）。
+                    k_disclosure = self._event_k_disclosure(request, event_batch)
+                    if request.event_label_scan is not None:
+                        scan = await self._run_scan_grid(
+                            task_id, analyzer, request, event_batch,
+                            features_path=features_path, meta_path=meta_path,
+                            feature_manifest_path=feature_manifest_hint,
+                            labels_path=labels_path, kline_reader=kline_reader,
+                            config_override=config_override,
+                            progress_callback=progress_callback,
+                        )
+                    else:
+                        scan = None
                     with self._lock:
                         info = self._tasks.get(task_id)
                         if info:
@@ -741,6 +993,9 @@ class ICAnalysisService:
                             info["prepared_token"] = staged["prepared_token"]
                             # G3-D17：被排除的他 symbol 事件計數（loud，不靜默）
                             info["events_excluded_by_symbol"] = staged["events_excluded_by_symbol"]
+                            info.update(k_disclosure)
+                            if scan is not None:
+                                info["event_label_scan"] = scan
 
                 report = await asyncio.to_thread(
                     analyzer.analyze,
@@ -836,7 +1091,22 @@ class ICAnalysisService:
                 # 🔴 沒有就給 None，**不填假值**——UAT 已證實「progress==0.12 卡 15 分鐘」
                 #    這種填充值比沒有更誤導（使用者以為在動）。
                 "feature_count": task_info.get("feature_count"),
+                # 🔴 `G3-D2` D4.3：掃描格數進度（未掃 ⇒ None，**不填 0**——0 會被讀成
+                #    「掃了 0 格」，而事實是「這次沒有掃描」）。
+                "scan_done": task_info.get("scan_done"),
+                "scan_total": task_info.get("scan_total"),
             }
+            # 🔴 `G3-D2` D4.2／D4.3 之揭露欄：只在事件分析路徑存在時才出現
+            #    （非事件分析沒有 k 可言，填 None 會讓 UI 以為有這件事）。
+            for key in (
+                "decision_offset_bars_capability", "decision_offset_bars_reason",
+                "decision_offset_bars_record_values", "decision_offset_bars_analysis",
+                "decision_offset_bars_scan_max",
+                "k_max_feasible_at_h", "h_max_feasible_at_k",
+                "k_bound_status", "h_bound_status", "event_label_scan",
+            ):
+                if key in task_info:
+                    payload[key] = task_info[key]
             # LA-1 B3-ENUM-01：completed 時鏡像 root 紅標（fail-closed normalize）
             result = task_info.get("result")
             if isinstance(result, dict) and task_info.get("status") == "completed":

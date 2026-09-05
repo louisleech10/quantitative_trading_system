@@ -23,6 +23,9 @@ import {
   contractDecisionOffsetMin,
   contractDefault,
   dimContractNode,
+  dimOptions,
+  isSubmittableLabelSpec,
+  resolvePairConflict,
   selectable,
 } from '@/lib/eventDimensions';
 import {
@@ -78,24 +81,22 @@ describe('Task 7.1 ①~⑤ — 每維度之可操作 UI 選項集合 == selectab
     expect(ui.length).toBe(expected.length);
   });
 
-  it('⑤ `decision_offset_bars` 非 enum：/search 之可輸入範圍**鎖定**契約下界（SPEC L2864）', () => {
+  it('⑤ 🔴 `G3-D2` D4.3：`decision_offset_bars` 之控制項**已自 /search 移除**，改顯示指路文字', () => {
+    // 原斷言（`/search` 鎖定為契約下界且 `readOnly`）之前提是 k 由匯出畫面填。
+    // 裁定②把 k 改為分析參數 ⇒ 控制項移除；「鎖定」這件事在 DOM 上不再有承載體。
     renderPath('/search');
-    const input = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
-    const min = contractDecisionOffsetMin(CONTRACT);
-    expect(input.min).toBe(String(min));
-    expect(input.max).toBe(String(min));
-    // 🔴 R3 群集 A：本條原本寫 `readOnly === false`——那把**不該有的性質釘住了**。
-    //    SPEC L2864 說本路徑「鎖定為 0」，而 `min`／`max` 只是提示、擋不住輸入
-    //    ⇒ 鎖定路徑必須 `readOnly`。「有可輸入且非唯讀之控制項」之驗收改落 `/data-preparation`（下一條）。
-    expect(input.readOnly).toBe(true);
+    expect(screen.queryByTestId('event-dim-decision_offset_bars')).toBeNull();
+    const moved = screen.getByTestId('event-dim-decision_offset_bars-moved');
+    expect(moved.textContent).toContain('k 於 IC 分析頁設定');
+    expect(moved.textContent).toContain(String(contractDecisionOffsetMin(CONTRACT)));
   });
 
-  it('🔴 over：`decision_offset_bars` 於 /data-preparation **非唯讀**（鎖定只在該兩條路徑）', () => {
+  it('🔴 D4.3 over：`/data-preparation` 亦無 k 控制項，但契約 doc 仍顯示（欄位仍存在於檔案裡）', () => {
     renderPath('/data-preparation', true);
-    const input = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
-    expect(input.readOnly).toBe(false);
-    expect(input.disabled).toBe(false);
-    expect(input.max).toBe('');       // 無上界：只受契約 `min` 限制
+    expect(screen.queryByTestId('event-dim-decision_offset_bars')).toBeNull();
+    expect(screen.getByTestId('event-dim-decision_offset_bars-moved')).toBeTruthy();
+    expect(screen.getByTestId('event-dim-doc-decision_offset_bars').textContent)
+      .not.toBe('');
   });
 });
 
@@ -151,31 +152,131 @@ describe('Task 7.1 ⑨ — EVENT_DIM_PATH_EXCLUSIONS 之內容（集合相等，
     //    但鍵保留（刪鍵會讓「從未考慮過」與「考慮過且全開」在碼上無從區分）。
     // 🔴 `G3-D2` D3.1（2026-09-05）：`two_stage` 解灰 ⇒ `/search|scenario` 只剩 `A`。
     //    **未放寬**：集合相等，少排除 `A`（或多排除任何值）仍會紅。
+    // 🔴 `G3-D2` D4.2（2026-09-05）：兩個 `entry_price_semantic` 之排除集合**清空**
+    //    （後端矩陣擴為 13 對）。仍不可選的兩個組合改由 `kind: 'pair_rejected'` 表達
+    //    ——那是**成對**限制，塞進本表會把「trigger_close 這個值不能用」講錯。
+    //    集合相等**未放寬**：任一路徑多排除或少排除任何值仍會紅。
     expect(actual).toEqual({
       '/search|scenario': new Set(['A']),
-      '/search|entry_price_semantic':
-        new Set(['next_open', 'decision_bar_open', 'decision_bar_close']),
+      '/search|entry_price_semantic': new Set([]),
       '/search|label_return_mode': new Set([]),
-      '/ic-analysis|entry_price_semantic':
-        new Set(['next_open', 'decision_bar_open', 'decision_bar_close']),
+      '/ic-analysis|entry_price_semantic': new Set([]),
       '/ic-analysis|label_return_mode': new Set([]),
     });
   });
 
-  it('🔴 D1.5／D3.1 解灰之正面驗收：可選集合恰為預期（不只驗排除表，驗導出結果）', () => {
+  it('🔴 D1.5／D3.1／D4.2 解灰之正面驗收：可選集合恰為預期（不只驗排除表，驗導出結果）', () => {
     // (i) scenario：`B`／`C`／`two_stage` 可選（D3.1 解灰 `two_stage`；SPEC D3.1 驗證第一條）
     expect(new Set(selectable('/search', 'scenario'))).toEqual(new Set(['B', 'C', 'two_stage']));
-    // (ii) entry_price_semantic：`trigger_close` 與 `trigger_open` 可選
-    expect(new Set(selectable('/search', 'entry_price_semantic')))
-      .toEqual(new Set(['trigger_close', 'trigger_open']));
+    // (ii) entry_price_semantic：D4.2 起**五值全開**（無 selection 時；pair 限制需要 selection）
+    expect(new Set(selectable('/search', 'entry_price_semantic'))).toEqual(new Set([
+      'trigger_open', 'trigger_close', 'next_open', 'decision_bar_open', 'decision_bar_close',
+    ]));
     // (iii) label_return_mode：三種報酬選項全開（裁定② v2）
     expect(new Set(selectable('/search', 'label_return_mode')))
       .toEqual(new Set(['open_to_close', 'open_to_horizon_close', 'close_to_close']));
     // 🔴 over 向：`A` 仍**不可選**（否則「全部解灰」也會讓上面三條綠）。
-    //    D3.1 把 `two_stage` 從這條 over 向移到上面的正面集合——**不是弱化**：
-    //    集合相等那一行仍會在「連 `A` 也解灰」時轉紅。
     expect(selectable('/search', 'scenario')).not.toContain('A');
-    expect(selectable('/search', 'entry_price_semantic')).not.toContain('next_open');
+    // 🔴 D4.2 之 over 向搬家：`next_open` 已解灰 ⇒ 原 over 向改由**成對**限制承擔
+    //    （選了 `open_to_close` 之後，`trigger_close`／`decision_bar_close` 仍不可選）。
+    expect(new Set(selectable('/search', 'entry_price_semantic', undefined,
+      { label_return_mode: 'open_to_close' }))).toEqual(new Set([
+      'trigger_open', 'next_open', 'decision_bar_open',
+    ]));
+  });
+
+  it('🔴 `G3-D2` D4.2：`pair_rejected` **雙向** disabled，且理由由契約導出', () => {
+    // 方向①：選了 entry=trigger_close ⇒ mode=open_to_close 被擋
+    const modes = dimOptions('/search', 'label_return_mode', undefined,
+      { entry_price_semantic: 'trigger_close' });
+    const blockedMode = modes.find((o) => o.value === 'open_to_close');
+    expect(blockedMode?.disabled).toBe(true);
+    expect(blockedMode?.kind).toBe('pair_rejected');
+    expect(blockedMode?.reason).toContain('答案窗長度為 0');
+    // 方向②（反向）：選了 mode=open_to_close ⇒ entry=trigger_close／decision_bar_close 被擋
+    const entries = dimOptions('/search', 'entry_price_semantic', undefined,
+      { label_return_mode: 'open_to_close' });
+    const blockedEntries = entries.filter((o) => o.kind === 'pair_rejected').map((o) => o.value);
+    expect(new Set(blockedEntries)).toEqual(new Set(['trigger_close', 'decision_bar_close']));
+    // 🔴 兩方向之 disabled 集合互為映射（Task 7.2 之 pair 對稱性閘）
+    for (const entry of blockedEntries) {
+      const back = dimOptions('/search', 'label_return_mode', undefined,
+        { entry_price_semantic: entry }).find((o) => o.value === 'open_to_close');
+      expect(back?.kind, `${entry} 之反向`).toBe('pair_rejected');
+    }
+    // over 向：**未選另一維**時不得擋（還沒選就先擋，使用者連進去的路都沒有）
+    expect(dimOptions('/search', 'label_return_mode', undefined, {})
+      .every((o) => o.kind !== 'pair_rejected')).toBe(true);
+    expect(dimOptions('/search', 'label_return_mode')
+      .every((o) => o.kind !== 'pair_rejected')).toBe(true);
+    // over 向②：合法對不得被擋
+    expect(dimOptions('/search', 'label_return_mode', undefined,
+      { entry_price_semantic: 'trigger_open' })
+      .every((o) => o.kind !== 'pair_rejected')).toBe(true);
+  });
+
+  it('🔴 `G3-D2` D4.2：既選非法 pair ⇒ 另一維重設（契約 default 優先；不合法時取 enum 首個可用值）', () => {
+    // 方向①（改 entry 使 mode 落入拒收對）⇒ 重設 mode 為契約 default（D-001 原文之情形）
+    const b = resolvePairConflict(
+      { entry_price_semantic: 'decision_bar_close', label_return_mode: 'open_to_close' },
+      'entry_price_semantic',
+    );
+    expect(b.reset?.dim).toBe('label_return_mode');
+    expect(b.reset?.to).toBe(contractDefault('label_return_mode'));
+    expect(b.reset?.disclosure).toContain('契約預設');
+
+    // 方向②（改 mode 成 open_to_close 而 entry 落入拒收對）⇒ **契約 default 本身不合法**
+    // 🔴 `entry_price_semantic.default = "trigger_close"` 就在 `open_to_close` 的拒收對裡
+    //    ⇒ D-001「重設為契約 default」在這個方向無解（本測試當場打穿）。
+    //    細化規則：取契約 **enum 順序**中第一個合法值，並在揭露字串裡明說原因。
+    const a = resolvePairConflict(
+      { entry_price_semantic: 'trigger_close', label_return_mode: 'open_to_close' },
+      'label_return_mode',
+    );
+    expect(a.reset?.dim).toBe('entry_price_semantic');
+    expect(a.reset?.to).not.toBe(contractDefault('entry_price_semantic'));
+    // 值由契約 enum 順序導出，不是硬編：`enum` 第一個非拒收值
+    const firstLegal = (acceptedValues('entry_price_semantic') as string[])
+      .find((v) => !['trigger_close', 'decision_bar_close'].includes(v));
+    expect(a.reset?.to).toBe(firstLegal);
+    expect(a.selection.entry_price_semantic).toBe(firstLegal);
+    expect(a.reset?.disclosure).toContain('因 pair 拒收已重設');
+    expect(a.reset?.disclosure).toContain('在這個組合下也不合法');
+    // 🔴 重設之後必須真的合法（否則「重設」只是換一個非法值）
+    expect(isSubmittableLabelSpec({
+      horizon_bars: 1,
+      entry_price_semantic: a.selection.entry_price_semantic,
+      label_return_mode: a.selection.label_return_mode,
+      decision_offset_bars: 0,
+    })).toBe(true);
+
+    // over 向：合法組合不得被重設
+    expect(resolvePairConflict(
+      { entry_price_semantic: 'trigger_open', label_return_mode: 'open_to_close' },
+      'label_return_mode',
+    ).reset).toBeUndefined();
+  });
+
+  it('🔴 `G3-D2` D4.2：送出守衛擋 `rejected_pairs`，放行其餘 13 對', () => {
+    for (const entry of ['trigger_close', 'decision_bar_close']) {
+      expect(isSubmittableLabelSpec({
+        horizon_bars: 1, entry_price_semantic: entry, label_return_mode: 'open_to_close',
+        decision_offset_bars: 0,
+      }), `${entry} × open_to_close 應被擋`).toBe(false);
+    }
+    // over 向：13 對全部放行（含 D1 之 UI 曾誤擋的 `(trigger_open, close_to_close)`）
+    let allowed = 0;
+    for (const entry of ['trigger_open', 'trigger_close', 'next_open',
+      'decision_bar_open', 'decision_bar_close']) {
+      for (const mode of ['open_to_close', 'open_to_horizon_close', 'close_to_close']) {
+        const ok = isSubmittableLabelSpec({
+          horizon_bars: 2, entry_price_semantic: entry, label_return_mode: mode,
+          decision_offset_bars: 2,
+        });
+        if (ok) allowed += 1;
+      }
+    }
+    expect(allowed).toBe(13);
   });
 
   it('🔴 D1.5 `contractDefault`：預設值由契約導出，且與真契約一致', () => {

@@ -149,13 +149,17 @@ class EventDeclarationSeeds(BaseModel):
     """Task 7.6 三分表之**批次宣告種子（F-0）**；顯示於分析參數區作為初始值。
 
     🔴 **不計入**批次事實欄之集合相等（驗收②）。
-    🔴 `horizon_bars` **不在此**——分析參數之 `h` 初始值為字面常數 `1`，
+    🔴 `horizon_bars` **不在此**——分析參數之 `h` 初始值依宣告深度導出（D1.7），
        **禁止**以匯出檔之 `label_definition.window.horizon_bars` 種子化（§D-3′-a 已裁定）。
+    🔴 **`G3-D2` D4.3：`decision_offset_bars` 已自本模型移除**（裁定② 2026-09-03）。
+       理由：k 是**分析參數**，同一批可以用不同 k 各分析一次 ⇒ 拿匯入檔的 k 當分析初始值，
+       等於讓「這批當初宣告過 k=1」偷偷決定「這次分析要用 k=1」，而兩者沒有必然關係。
+       批內**記錄**的 k 改由 `EventBatchFactNotes.decision_offset_bars_record_values`
+       以**值集合**呈現（是事實，不是種子），分析用 k 之初始值＝契約 min（常數）。
     """
 
     entry_price_semantic: Optional[str] = None
     label_return_mode: Optional[str] = None
-    decision_offset_bars: Optional[int] = None
 
 
 class EventBatchFactNotes(BaseModel):
@@ -168,6 +172,12 @@ class EventBatchFactNotes(BaseModel):
 
     control_kind_values: List[str] = Field(
         default_factory=list, description="批內 `control_kind` 之 distinct 值（升冪）；空＝該批無此欄")
+    #: 🔴 `G3-D2` D4.3：批內**記錄**之 `decision_offset_bars` distinct 值（升冪）。
+    #  與上一欄同一理由：空清單＝該批沒有這個欄，`[0]`＝全批宣告 0，`[0, 2]`＝批內混值。
+    #  **它不是分析用 k 的初始值**——分析用 k 由使用者於分析頁設定（初始＝契約 min）。
+    decision_offset_bars_record_values: List[int] = Field(
+        default_factory=list,
+        description="批內 `decision_offset_bars` 之 distinct 值（升冪）；空＝該批無此欄")
 
 
 class EventImportDetailResponse(BaseModel):

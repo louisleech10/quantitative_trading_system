@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import pytest
 
+from api.models.ic_models import EventLabelScanModel, EventLabelSpecModel
 from api.routes.ic_analysis import _resolve_event_batch
 from api.services import case_import_service as svc_mod
 from tests.momentum.event_samples.test_import_contract import canonical_event as make_event
@@ -29,11 +30,17 @@ def _isolated_storage(tmp_path, monkeypatch):
 
 
 class _Req:
-    """`_resolve_event_batch` 只讀這兩個欄位。"""
+    """`_resolve_event_batch` 只讀這三個欄位。
 
-    def __init__(self, import_id: str, spec=None):
+    🔴 `G3-D2` D4.3：`event_label_spec` 已 typed（`EventLabelSpecModel`），route 走
+    `.model_dump(exclude_none=True)` ⇒ 本 double 亦須交出 typed 物件，不能再遞 raw dict
+    （遞 dict 會讓測試走一條**生產不存在**的路徑，那正是假綠的來源）。
+    """
+
+    def __init__(self, import_id: str, spec=None, scan=None):
         self.event_import_id = import_id
-        self.event_label_spec = spec
+        self.event_label_spec = None if spec is None else EventLabelSpecModel(**spec)
+        self.event_label_scan = None if scan is None else EventLabelScanModel(**scan)
 
 
 def _store(svc, records, declared):
@@ -153,43 +160,52 @@ def test_ic_event_label_defaults_preset_is_inside_supported_matrix(_isolated_sto
     這正是 Task 7.0 修過的舊病：預設 `trigger_open` 落在當時矩陣外，
     等於「開箱即用的預設值是分析層不支援的組合」。
     """
-    from momentum.Analysis.event_samples.label_value_from_case import SUPPORTED_MATRIX
+    from momentum.Analysis.event_samples.label_value_from_case import (
+        SUPPORTED_PAIRS, normalize_event_label_spec, spec_is_supported,
+    )
 
     out = _batch(_isolated_storage, tfs=["12h", "12h"], declared={"12h": depth})
     spec = out["event_label_spec"]
-    triple = (spec["entry_price_semantic"], spec["label_return_mode"],
-              int(spec["decision_offset_bars"]))
-    assert triple in SUPPORTED_MATRIX, f"預設三元組 {triple} 不在支援矩陣內"
+    pair = (spec["entry_price_semantic"], spec["label_return_mode"])
+    assert pair in SUPPORTED_PAIRS, f"預設對 {pair} 不在支援矩陣內"
+    # 🔴 D4.2 起 k 已不入矩陣 ⇒ 連 k 一起判的唯一入口是 `spec_is_supported`。
+    assert spec_is_supported(normalize_event_label_spec(spec)) is True
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # B-D1 R2 閉合輪 — codex P1-02／P1-03 之負向測試
 # ══════════════════════════════════════════════════════════════════════════
 
-def test_r2_closure_mixed_decision_offset_bars_is_rejected(_isolated_storage):
-    """`CODEX-R2-P1-02`：批內 `decision_offset_bars` 混值 ⇒ **422 fail-closed**。
+def test_d43_mixed_decision_offset_bars_is_disclosed_not_rejected(_isolated_storage):
+    """🔴 **`G3-D2` D4.3 改寫**：批內 k 混值**不再 422**，改為**照實揭露**。
 
-    🔴 修正前：route 取 `records[0]` 之 k，`_analysis_copy` 把它套用全批
-    ⇒ 其餘事件被對齊到**錯的決策根**，而算出來的數字合法、沒有測試會紅。
-    codex 實跑：`records_k=[0, 2]` ⇒ `resolved k=0`，第二個事件之 `decision_at` 變成 `t0`
-    （依其宣告應為 `ot[t0_idx-2]`）。
+    原斷言（`CODEX-R2-P1-02`）之前提是「分析 k 取自 `records[0]` 並套用全批」
+    ⇒ 混值必然讓部分事件對齊到錯的決策根，故 fail-closed。
+    D4.3（裁定②）把分析 k 改為**使用者於分析頁指定、全批一致套用**
+    ⇒ records 之 k 只是**事實**，混值不再能造成錯誤對齊，擋它只會擋掉合法批。
+    原訊息末句「請拆批，或等 k 之分析參數化上線」即預告本次解除。
+
+    **改寫後仍是強斷言**：分析 k 必須是常數 0（不得偷偷取任一列之值），
+    且記錄值集合必須**逐值列出** `[0, 2]`（不得只留一個、不得聚合成單值）。
     """
-    from fastapi import HTTPException
-
     recs = [
         make_event(0, label=1, decision_offset_bars=0, lookahead_bars_declared={"12h": 0}),
         make_event(1, label=0, decision_offset_bars=2, lookahead_bars_declared={"12h": 0}),
     ]
     import_id = _store(_isolated_storage, recs, {"12h": 0})
-    with pytest.raises(HTTPException) as ei:
-        _resolve_event_batch(_Req(import_id))
-    assert ei.value.status_code == 422
-    assert ei.value.detail["kind"] == "mixed_decision_offset_bars"
-    assert "[0, 2]" in ei.value.detail["message"], "訊息須列出實際的混值集合"
+    out = _resolve_event_batch(_Req(import_id))
+    assert out["event_label_spec"]["decision_offset_bars"] == 0, "分析 k 之初始值＝契約 min 常數"
+    assert out["decision_offset_bars_record_values"] == [0, 2], "記錄值須逐值揭露，不得聚合"
+    assert out["decision_offset_bars_analysis"] == 0
 
 
-def test_r2_closure_uniform_decision_offset_bars_still_accepted(_isolated_storage):
-    """🔴 **over 向**：單值 k（含非 0）仍須通過——證明上一條不是「有 k 就拒」。"""
+def test_d43_uniform_decision_offset_bars_does_not_seed_analysis_k(_isolated_storage):
+    """🔴 **`G3-D2` D4.3 改寫**：單值 k（含非 0）**不再種子化**分析 k。
+
+    原斷言是 `spec["decision_offset_bars"] == k`（k 由 records 種子化）。
+    D4.3 之後「這批當初宣告過 k=2」與「這次分析要用 k=2」是兩件事
+    ⇒ 分析 k 恆為契約 min，記錄值以獨立欄呈現。
+    """
     for k in (0, 2):
         recs = [
             make_event(i, label=i % 2, decision_offset_bars=k,
@@ -198,7 +214,11 @@ def test_r2_closure_uniform_decision_offset_bars_still_accepted(_isolated_storag
         ]
         import_id = _store(_isolated_storage, recs, {"12h": 0})
         out = _resolve_event_batch(_Req(import_id))
-        assert out["event_label_spec"]["decision_offset_bars"] == k
+        assert out["event_label_spec"]["decision_offset_bars"] == 0
+        assert out["decision_offset_bars_record_values"] == [k]
+    # over 向：**使用者明給**之 k 仍優先（否則本 Task 等於把 k 鎖死成 0）
+    out = _resolve_event_batch(_Req(import_id, spec={"decision_offset_bars": 3}))
+    assert out["event_label_spec"]["decision_offset_bars"] == 3
 
 
 def test_r2_closure_frontend_omits_spec_so_backend_default_is_reachable(_isolated_storage):
@@ -266,36 +286,29 @@ def _legacy_batch(svc, mutate, k=2):
     return import_id
 
 
-def test_r3_closure_partial_missing_decision_offset_bars_is_rejected(_isolated_storage):
-    """`CODEX-R3-P1-01`：批內**部分列缺** `decision_offset_bars` ⇒ 亦須 422。
+def test_d43_partial_missing_decision_offset_bars_is_disclosed(_isolated_storage):
+    """🔴 **D4.3 改寫**：部分列缺 k ⇒ 不再 422；缺者**不進值集合**（空 ≠ 0）。
 
-    🔴 R2 之修法只擋「兩個具體值」，過濾式把缺鍵列**靜默略過**
-    ⇒ `[None, 2]` 只蒐到 `{2}`、`len==1` 放行；而 `spec.setdefault` 取 `records[0]`
-    （缺鍵）得 `None` ⇒ 宣告 k=2 的列被對齊到 k=0 的決策根。
-    codex 實跑 receipt：`accepted stored_k=[None, 2] resolved_k=0`。
+    原斷言（`CODEX-R3-P1-01`）之危害是「缺鍵列被靜默略過，而 `setdefault` 取 `records[0]`
+    得 `None`」——D4.3 之後 `setdefault` 根本不讀 records ⇒ 該路徑不存在。
+    改寫後守的是**揭露的誠實性**：缺鍵不得被補成 0（那是替使用者宣告他沒宣告過的東西）。
     """
-    from fastapi import HTTPException
-
     import_id = _legacy_batch(_isolated_storage,
                               lambda rs: rs[0].pop("decision_offset_bars", None))
-    with pytest.raises(HTTPException) as ei:
-        _resolve_event_batch(_Req(import_id))
-    assert ei.value.status_code == 422
-    assert ei.value.detail["kind"] == "mixed_decision_offset_bars"
-    assert "（缺）" in ei.value.detail["message"], "訊息須讓使用者看出有列根本沒宣告 k"
+    out = _resolve_event_batch(_Req(import_id))
+    assert out["decision_offset_bars_record_values"] == [2], "缺鍵列不得被補成 0"
+    assert out["event_label_spec"]["decision_offset_bars"] == 0
 
 
-def test_r3_closure_null_decision_offset_bars_is_rejected(_isolated_storage):
-    """同一形狀之另一半：鍵在但值為 `null`（JSON 直寫最常見的樣子）。"""
-    from fastapi import HTTPException
+def test_d43_null_decision_offset_bars_is_disclosed(_isolated_storage):
+    """同一形狀之另一半：鍵在但值為 `null`（JSON 直寫最常見的樣子）⇒ 同樣不計入值集合。"""
 
     def _null_first(rs):
         rs[0]["decision_offset_bars"] = None
 
     import_id = _legacy_batch(_isolated_storage, _null_first)
-    with pytest.raises(HTTPException) as ei:
-        _resolve_event_batch(_Req(import_id))
-    assert ei.value.detail["kind"] == "mixed_decision_offset_bars"
+    out = _resolve_event_batch(_Req(import_id))
+    assert out["decision_offset_bars_record_values"] == [2]
 
 
 def test_r3_closure_bool_decision_offset_bars_counts_as_missing(_isolated_storage):
@@ -343,25 +356,25 @@ def test_r4_closure_all_missing_decision_offset_bars_is_rejected(_isolated_stora
     判準更正：「全批皆缺仍放行」**不是值得保留的既有行為**，它只是把錯誤推到更深處。
     ⇒ route 當場 422，並在訊息指出這是繞過匯入驗證的落檔。
     🔴 **寫鬆的 over 向斷言比沒有 over 向更危險**：它看起來有守，其實沒有。
-    """
-    from fastapi import HTTPException
 
+    🔴 **`G3-D2` D4.3 改寫**：本條之危害（放行後在 `normalize_event_label_spec` 深處
+    炸 `須為 int`）之成因是 `setdefault(..., seed.get(...))` 會留下 `None`；
+    D4.3 之後該處填的是**契約 min 之常數 int** ⇒ 那個深處錯誤在結構上不可能發生。
+    改寫後守的是新的不變式：全批缺 k 仍可分析，且揭露為**空清單**（不是 `[0]`）。
+    """
     def _drop_all(rs):
         for r in rs:
             r.pop("decision_offset_bars", None)
 
     import_id = _legacy_batch(_isolated_storage, _drop_all)
-    with pytest.raises(HTTPException) as ei:
-        _resolve_event_batch(_Req(import_id))
-    assert ei.value.status_code == 422
-    assert ei.value.detail["kind"] == "missing_decision_offset_bars"
+    out = _resolve_event_batch(_Req(import_id))
+    got = out["event_label_spec"]["decision_offset_bars"]
+    assert got == 0 and isinstance(got, int) and not isinstance(got, bool)
+    assert out["decision_offset_bars_record_values"] == [], "全批缺 ⇒ 空清單，不得填 [0]"
 
 
-def test_r4_closure_normal_batch_resolves_k_to_exact_int(_isolated_storage):
-    """🔴 **over 向（改用精確值，不再用 `in (...)`）**：正常批之解析結果**恰為** int。
-
-    這才是 R3 那條想表達卻沒表達到的事：修法不得讓合法批拿到 `None` 或被擋。
-    """
+def test_d43_analysis_k_is_constant_regardless_of_records(_isolated_storage):
+    """🔴 **over 向**：records 之 k 為 0 或 2，分析 k **恆為 0**（常數，非種子）。"""
     for k in (0, 2):
         recs = [
             make_event(i, label=i % 2, decision_offset_bars=k,
@@ -371,19 +384,20 @@ def test_r4_closure_normal_batch_resolves_k_to_exact_int(_isolated_storage):
         import_id = _store(_isolated_storage, recs, {"12h": 0})
         out = _resolve_event_batch(_Req(import_id))
         got = out["event_label_spec"]["decision_offset_bars"]
-        assert got == k and isinstance(got, int) and not isinstance(got, bool), \
-            f"k={k} 之解析結果須恰為同值 int，實得 {got!r}"
+        assert got == 0 and isinstance(got, int) and not isinstance(got, bool), \
+            f"records k={k} 不得種子化分析 k，實得 {got!r}"
 
 
-def test_r3_closure_uniform_k_survives_rewrite_path(_isolated_storage):
-    """🔴 **over 向之對照**：改寫落檔但保持單值 k ⇒ 仍放行。
+def test_d43_uniform_k_survives_rewrite_path(_isolated_storage):
+    """🔴 **對照**：改寫落檔但保持單值 k ⇒ 揭露為 `[2]`、分析 k 仍為 0。
 
-    證明上面幾條擋的是「不一致」，不是「經過改寫」這件事本身
+    證明擋／不擋的判準與「經過改寫」這件事無關
     （否則 `_legacy_batch` 這個 helper 就成了測試的作弊面）。
     """
     import_id = _legacy_batch(_isolated_storage, lambda rs: None, k=2)
     out = _resolve_event_batch(_Req(import_id))
-    assert out["event_label_spec"]["decision_offset_bars"] == 2
+    assert out["decision_offset_bars_record_values"] == [2]
+    assert out["event_label_spec"]["decision_offset_bars"] == 0
 
 
 # ══════════════════════════════════════════════════════════════════════════

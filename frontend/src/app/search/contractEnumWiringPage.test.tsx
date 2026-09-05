@@ -79,14 +79,15 @@ describe('Task 7.2 ② 呼叫端 — /search page 之 opts 逐鍵帶著五維度
     expect(opts.controlKind).toBe('user_labeled_other');
   });
 
-  it('🔴 under（R3 群集 A，三家一致之 P1 反例）：在 /search 把 k 改成 3 ⇒ 落檔仍為 0', async () => {
-    // 原缺陷：`min`／`max` 只是提示，`fireEvent.change` 送得進去，而組裝器只擋 `k < 契約 min`
-    // ⇒ UI 文案說「鎖定為 0」而匯出檔裡是 3。修法為 `readOnly` ＋ `onChange` clamp 兩層。
+  it('🔴 `G3-D2` D4.3：/search 已無 k 控制項，且傳給組裝器之 `decisionOffsetBars` 恆為 0', async () => {
+    // 原條之修法（`readOnly` ＋ clamp 兩層）是在「k 由匯出畫面填」的前提下守住鎖 0；
+    // 裁定②把 k 改為分析參數 ⇒ **控制項整個移除**，第三層保護＝`eventDimsToExportOptions`
+    // 恆寫契約常數（UI state 不再進落檔），本條同時驗這兩件事。
     render(<SearchPage />);
     await declareFromPreview();
-    const k = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
-    expect(k.readOnly).toBe(true);                       // 第一層：使用者改不動
-    fireEvent.change(k, { target: { value: '3' } });     // 第二層：程式化設值也要被夾回
+    expect(screen.queryByTestId('event-dim-decision_offset_bars')).toBeNull();
+    expect(screen.getByTestId('event-dim-decision_offset_bars-moved').textContent)
+      .toContain('k 於 IC 分析頁設定');
     fireEvent.click(screen.getByTestId('export-gap3-events'));
     await waitFor(() => expect(buildRecordsMock).toHaveBeenCalledTimes(1));
     const opts = buildRecordsMock.mock.calls[0][1] as Record<string, unknown>;

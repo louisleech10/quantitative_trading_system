@@ -1,13 +1,13 @@
 {
-  "case_id": "next_open__close_to_close__k0__long__12h__h1",
+  "case_id": "next_open__open_to_close__k0__short__12h__h1",
   "symbol": "ETHUSDT",
   "timeframe": "12h",
-  "direction": "long",
-  "event_import_id": "golden-next_open__close_to_close__k0__long__12h__h1",
+  "direction": "short",
+  "event_import_id": "golden-next_open__open_to_close__k0__short__12h__h1",
   "event_label_spec": {
     "horizon_bars": 1,
     "entry_price_semantic": "next_open",
-    "label_return_mode": "close_to_close",
+    "label_return_mode": "open_to_close",
     "decision_offset_bars": 0
   },
   "t0_ms": [
@@ -24,7 +24,7 @@
   "data_snapshot_digest": "cf13fb5370bed1bb1c5921e1f125bb6f6c2275ff14152386e81c94b075416895",
   "events": {
     "ev0": {
-      "label_value": 0.006270786104385975,
+      "label_value": -0.0062744016191913715,
       "label_start_ms": 1708214400000,
       "label_end_ms": 1708257600000,
       "decision_at_ms": 1708171200000,
@@ -35,7 +35,7 @@
       }
     },
     "ev1": {
-      "label_value": 0.027752033794065975,
+      "label_value": -0.027752033794065975,
       "label_start_ms": 1708257600000,
       "label_end_ms": 1708300800000,
       "decision_at_ms": 1708214400000,
@@ -46,7 +46,7 @@
       }
     },
     "ev2": {
-      "label_value": -0.038380514423344,
+      "label_value": 0.038380514423344,
       "label_start_ms": 1708473600000,
       "label_end_ms": 1708516800000,
       "decision_at_ms": 1708430400000,
@@ -58,7 +58,7 @@
     }
   },
   "nan_event_ids": [],
-  "analysis_alignment_receipt_hash": "5ed1fd767774f99ed522e102b745a21033869cd4c263835ee8d2c9478f5d269c",
+  "analysis_alignment_receipt_hash": "61fd213e393386b5e0bdf4f57ae955361f7be462f8bbb94ab7f0c5f96e8a1eed",
   "purge_lower_bound_ms_by_symbol": {
     "ETHUSDT": 43200000
   }

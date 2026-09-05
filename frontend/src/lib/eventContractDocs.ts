@@ -19,8 +19,10 @@ export const EVENT_CONTRACT_DOCS = {
   // ── Task 7.1（本批）：五維度接出 UI 後，另三個維度也要有白話說明；
   //    「取自契約 `doc` 欄（不另寫）」是 SPEC 明文 ⇒ 沿用同一鏡像機制，不另開第二份文案來源。
   entry_price_semantic: 'entry bar/price 唯一映射見 SPEC D1-6；事件頂層欄，不住 label_definition。default 為**前端誠實預設之唯一來源**（原檔 §F-3′；D-001 D1.1 契約字面總表／D4.2 pair 重設亦讀本值），前端禁硬編字面。🔴 validator **不讀** default：本欄仍為 required_fields，缺欄一律 missing_required_field（default 只服務 UI 之初始值與 pair 重設）',
+  // `G3-D2` D4.2：契約 doc 補上成對限制之指路（鏡像逐字同步，由本檔之測試對證）。
   label_return_mode:
-    'label 錨 mode-scoped 機械唯一（SPEC D1-5）；open_to_* 顯式宣告才合法（白話閘裁決②）',
+    'label 錨 mode-scoped 機械唯一（SPEC D1-5）；open_to_* 顯式宣告才合法（白話閘裁決②）；'
+    + '與 entry_price_semantic 之成對限制見 rejected_pairs',
   decision_offset_bars:
     '決策時點＝t0 往前第 k 根錨定 TF bar 之 open；研究參數非訊號標註（白話閘裁決③）',
   // `G3-D2` D1.5：provenance 欄之白話同樣取自契約 `doc`（不另寫第二份文案來源）。

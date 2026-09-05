@@ -124,8 +124,11 @@ CASES: Tuple[Mapping[str, Any], ...] = (
     _case("trigger_open", "open_to_close", 0, "short", 1, selector="gap_bars:3", pending=False),
     _case("trigger_open", "open_to_horizon_close", 0, "long", 3, selector="gap_bars:3", pending=False),
     _case("trigger_open", "open_to_horizon_close", 0, "short", 3, selector="gap_bars:3", pending=False),
-    _case("decision_bar_open", "open_to_horizon_close", 2, "long", 3, selector="gap_bars:3", pending=True),
-    _case("decision_bar_open", "open_to_horizon_close", 2, "short", 3, selector="gap_bars:3", pending=True),
+    # 🔴 `D-001` D4.2（2026-09-05）：k>0 已移出矩陣、改由逐事件可行域限制
+    #    ⇒ `matrix_pending` **必須移除**（loader 之反向 fail-closed 會擋）。
+    #    值與 hash **不變**：override 只翻 `supported` 旗標，不參與 hash 亦不改 label_value。
+    _case("decision_bar_open", "open_to_horizon_close", 2, "long", 3, selector="gap_bars:3", pending=False),
+    _case("decision_bar_open", "open_to_horizon_close", 2, "short", 3, selector="gap_bars:3", pending=False),
 
     # ── D1.4 追加：SUPPORTED_MATRIX 四對 × {long,short} × h∈{1,3} 之補齊 ────
     _case("trigger_close", "close_to_close", 0, "short", 1, selector="gap_bars:3", pending=False),
@@ -144,15 +147,52 @@ CASES: Tuple[Mapping[str, Any], ...] = (
     # ② 資料末端：h=5 之答案窗超出 ⇒ 部分事件 label_window_incomplete ⇒ NaN mask 非空
     _case("trigger_close", "close_to_close", 0, "long", 5, selector="tail_mixed:2", pending=False),
     # ③ k>0 之 warmup：t0 落在資料最前 ⇒ t0_idx − k < 0 ⇒ warmup_insufficient_12h（全批失敗）
-    _case("decision_bar_open", "open_to_horizon_close", 2, "long", 1, selector="warmup_mixed:2", pending=True),
+    _case("decision_bar_open", "open_to_horizon_close", 2, "long", 1, selector="warmup_mixed:2", pending=False),
     # ④ next_open × close_to_close：entry_at == ct[t0] == label_start ⇒ entry_after_label_start=true
-    #    🔴 本組合**不在** SUPPORTED_MATRIX（留 D4.2）⇒ 需 matrix_pending；
+    #    🔴 D4.2 起本組合**已在矩陣內**（13 對之一）⇒ matrix_pending 移除。
     #    它守的是**收據之時間戳與 entry_price_ref**，不是 label_value。
-    _case("next_open", "close_to_close", 0, "long", 1, selector="gap_bars:3", pending=True),
+    _case("next_open", "close_to_close", 0, "long", 1, selector="gap_bars:3", pending=False),
 
     # ── D1.4 追加：一組 1h（跨 TF；證明 golden 機制不綁 12h）──────────────
     _case("trigger_open", "open_to_close", 0, "long", 1, selector="gap_bars:3", pending=False, tf="1h"),
     _case("trigger_open", "open_to_close", 0, "short", 1, selector="gap_bars:3", pending=False, tf="1h"),
+
+    # ── D4.2 追加：全矩陣之 `open_to_*` 覆蓋（`D-001` D4.2 golden 清單）───────
+    #  範圍＝{trigger_open, next_open, decision_bar_open, decision_bar_close}
+    #        × {open_to_close, open_to_horizon_close} × k∈{0,2} × {long, short} × 12h
+    #  🔴 `decision_bar_close × open_to_close` **不在其中**：它是 `REJECTED_PAIRS` 之一
+    #     （幾何窗長 0）⇒ 凍它等於凍一份「全 None」的檔，而那與 producer 壞掉長得一樣。
+    #     該對之覆蓋走 `test_analysis_label_producer_05`（斷言 supported=False ＋專屬 reason）。
+    #  🔴 h 之取法：`open_to_close` 之 h **不參與計算** ⇒ 只凍 h=1（h 之不變性由既有
+    #     `…_h_invariance` 以 trigger_open 之 h1/h3 兩檔守，不必逐組合重複）；
+    #     `open_to_horizon_close` 之 h 參與 end ⇒ 凍 h=3。
+    #  ── open_to_close × k∈{0,2}（h=1）
+    _case("trigger_open", "open_to_close", 2, "long", 1, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "open_to_close", 2, "short", 1, selector="gap_bars:3", pending=False),
+    _case("next_open", "open_to_close", 0, "long", 1, selector="gap_bars:3", pending=False),
+    _case("next_open", "open_to_close", 0, "short", 1, selector="gap_bars:3", pending=False),
+    _case("next_open", "open_to_close", 2, "long", 1, selector="gap_bars:3", pending=False),
+    _case("next_open", "open_to_close", 2, "short", 1, selector="gap_bars:3", pending=False),
+    _case("decision_bar_open", "open_to_close", 0, "long", 1, selector="gap_bars:3", pending=False),
+    _case("decision_bar_open", "open_to_close", 0, "short", 1, selector="gap_bars:3", pending=False),
+    _case("decision_bar_open", "open_to_close", 2, "long", 1, selector="gap_bars:3", pending=False),
+    _case("decision_bar_open", "open_to_close", 2, "short", 1, selector="gap_bars:3", pending=False),
+    #  ── open_to_horizon_close × k∈{0,2}（h=3）
+    _case("trigger_open", "open_to_horizon_close", 2, "long", 3, selector="gap_bars:3", pending=False),
+    _case("trigger_open", "open_to_horizon_close", 2, "short", 3, selector="gap_bars:3", pending=False),
+    _case("next_open", "open_to_horizon_close", 0, "long", 3, selector="gap_bars:3", pending=False),
+    _case("next_open", "open_to_horizon_close", 0, "short", 3, selector="gap_bars:3", pending=False),
+    _case("next_open", "open_to_horizon_close", 2, "long", 3, selector="gap_bars:3", pending=False),
+    _case("next_open", "open_to_horizon_close", 2, "short", 3, selector="gap_bars:3", pending=False),
+    _case("decision_bar_open", "open_to_horizon_close", 0, "long", 3, selector="gap_bars:3", pending=False),
+    _case("decision_bar_open", "open_to_horizon_close", 0, "short", 3, selector="gap_bars:3", pending=False),
+    _case("decision_bar_close", "open_to_horizon_close", 0, "long", 3, selector="gap_bars:3", pending=False),
+    _case("decision_bar_close", "open_to_horizon_close", 0, "short", 3, selector="gap_bars:3", pending=False),
+    _case("decision_bar_close", "open_to_horizon_close", 2, "long", 3, selector="gap_bars:3", pending=False),
+    _case("decision_bar_close", "open_to_horizon_close", 2, "short", 3, selector="gap_bars:3", pending=False),
+    #  ── 1h 之一組（證明全矩陣不綁 12h；與上方 12h 同 selector 不同網格）
+    _case("decision_bar_open", "open_to_horizon_close", 2, "long", 3,
+          selector="gap_bars:3", pending=False, tf="1h"),
 )
 
 

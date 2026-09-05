@@ -28,8 +28,15 @@ client = TestClient(app)
 #: 🔴 `D-001` Task D1.6（2026-09-04）**覆寫** Task 7.6 之原五鍵：加入 `label_origin`。
 #: 集合相等**未放寬**——少一鍵（`response_model` 漏宣告而被靜默過濾）或多一鍵皆紅。
 BATCH_FACT_KEYS = {"scenario", "control_kind", "direction", "t0", "label", "label_origin"}
-#: 批次宣告種子（F-0）三鍵
-SEED_KEYS = {"entry_price_semantic", "label_return_mode", "decision_offset_bars"}
+#: 批次宣告種子（F-0）之鍵集。
+#: 🔴 `D-001` Task **D4.3**（2026-09-05）**覆寫**原三鍵：`decision_offset_bars` **移除**。
+#:    diff：`{entry_price_semantic, label_return_mode, decision_offset_bars}`
+#:       → `{entry_price_semantic, label_return_mode}`
+#:    理由（裁定②）：k 是**分析參數**，同一批可以用不同 k 各分析一次
+#:    ⇒ 拿匯入檔的 k 當分析初始值＝讓匯入時的宣告偷偷決定分析參數。
+#:    批內**記錄**之 k 改由 `batch_fact_notes.decision_offset_bars_record_values` 揭露（見下方新測試）。
+#:    集合相等**未放寬**：多一鍵（k 被加回去）或少一鍵皆紅。
+SEED_KEYS = {"entry_price_semantic", "label_return_mode"}
 
 
 @pytest.fixture(autouse=True)
@@ -126,7 +133,12 @@ def test_event_batch_detail_dims_05_values_equal_stored_records(_isolated_storag
     assert d["batch_facts"]["direction"] == recs[0]["direction"]
     assert d["declaration_seeds"]["entry_price_semantic"] == "next_open"
     assert d["declaration_seeds"]["label_return_mode"] == "open_to_close"
-    assert d["declaration_seeds"]["decision_offset_bars"] == 2
+    # 🔴 `G3-D2` D4.3：k **不再是種子**，改為「批內記錄之值集合」（事實）。
+    #    diff：`declaration_seeds["decision_offset_bars"] == 2`
+    #       → `batch_fact_notes["decision_offset_bars_record_values"] == [2]`
+    #    仍是精確斷言（值集合逐值相等），非放寬。
+    assert "decision_offset_bars" not in d["declaration_seeds"]
+    assert d["batch_fact_notes"]["decision_offset_bars_record_values"] == [2]
     # 逐列欄以集合相等比對 event_id，並抽驗任兩列之 t0_ms／label
     assert {r["event_id"] for r in d["batch_facts"]["label"]} == {r["event_id"] for r in recs}
     by_id = {r["event_id"]: r for r in recs}

@@ -70,31 +70,51 @@ from momentum.Analysis.event_samples.types import AlignmentConfig
 # §F-1′ 支援矩陣（封閉）與 §F-2′ reason
 # ---------------------------------------------------------------------------
 
-#: 🔴 §F-1′ 支援矩陣之**唯一**來源（`D-001` Task D1.3）：封閉之 `(entry, mode, k)` 三元組集合。
-#  `horizon_bars` 為**任意正整數**，不參與矩陣判定。
-#  矩陣外一律 fail-closed——不是「盡量算」，因為算出來的數字沒有語意對應。
+#: 五個 entry 語意（D1-6 之封閉集合；順序＝契約 `entry_price_semantic.enum`）。
+ENTRY_PRICE_SEMANTICS: Tuple[str, ...] = (
+    "trigger_open", "trigger_close", "next_open", "decision_bar_open", "decision_bar_close",
+)
+#: 三個報酬 mode（順序＝契約 `label_return_mode.enum`）。
+LABEL_RETURN_MODES: Tuple[str, ...] = (
+    "open_to_close", "open_to_horizon_close", "close_to_close",
+)
+
+#: 🔴 **幾何上必拒之對**（`D-001` D4.2；R1 `CODEX-R1-P1-01`／`GROK-R1-P1-01` 實跑確認）。
+#  形狀＝`{mode: (entry, ...)}`，與契約 `label_definition.fields.label_return_mode.rejected_pairs`
+#  **同形狀**（前端鏡像逐鍵對證；本常數與契約之一致性由 `test_gap3_label_feasible_bounds` 守）。
 #
-#  🔴 為什麼是**單一常數集合**而不是三個純量：後續 phase（D4.2）要把它擴到 13 對 × k∈ℕ，
-#     三個純量表達不了「成對」關係（例如 `(trigger_close, open_to_close)` 幾何上窗長 0 必拒，
-#     而 `(trigger_open, open_to_close)` 合法）。擴充時**只動這個集合**，`spec_is_supported` 不改。
-#
-#  D1 內容＝四對（裁定② v2 之三種報酬選項 ＋ 既有 `trigger_close × close_to_close`）：
-#  後三對之 `open_to_*` 取價依賴 **B-D0（Task D4.1）** 之 `entry_price_refs` 側載。
-SUPPORTED_MATRIX: frozenset = frozenset({
-    ("trigger_close", "close_to_close", 0),        # 既有（本批之前唯一支援者）
-    ("trigger_open", "close_to_close", 0),         # 「續漲」之 entry 變體：取價路徑不變（錨與 entry 無關＝D1-5）
-    ("trigger_open", "open_to_close", 0),          # 「當根」：基準＝t₀ 之 open（依賴 B-D0）
-    ("trigger_open", "open_to_horizon_close", 0),  # 「持有」：基準＝t₀ 之 open、終點＝t₀+h 之 close（依賴 B-D0）
+#  為什麼是這兩對：`open_to_close` 令 `label_start = entry_at`、`end_idx = entry_idx`；
+#  當 entry 之 `field == "close"`（`trigger_close`／`decision_bar_close`）時
+#  `entry_at = ct[entry_idx]` 而 `label_end = ct[entry_idx]` ⇒ **窗長 0**
+#  ⇒ 三段鏈 `decision_at <= label_start < label_end` 必然 `no_boundary_match`。
+#  真實 kline 實跑 k∈{0,2} 皆得 0 窗（見 `D-001` D4.2）。
+REJECTED_PAIRS: Mapping[str, Tuple[str, ...]] = MappingProxyType({
+    "open_to_close": ("trigger_close", "decision_bar_close"),
 })
 
-#: **deprecated 別名**（`D-001` D1.3 實作要點④）：保留三個舊常數名避免既有 import 斷裂。
-#  🔴 它們**不再是判定依據**——判定唯一走 `SUPPORTED_MATRIX`。新碼禁用。
-SUPPORTED_ENTRY_PRICE_SEMANTIC = "trigger_close"
-SUPPORTED_LABEL_RETURN_MODE = "close_to_close"
-SUPPORTED_DECISION_OFFSET_BARS = 0
+#: 🔴 §F-1′ 支援矩陣之**唯一**來源（`D-001` Task D4.2）：封閉之 `(entry, mode)` **對**集合。
+#  ＝5 entry × 3 mode 之全積**減去** `REJECTED_PAIRS` ⇒ **13 對**。
+#  🔴 `decision_offset_bars`（k）與 `horizon_bars`（h）**不參與本集合**：
+#     k 只受**契約值域**（`>= 0`，由 normalizer 擋）與**逐事件成對可行域** `feasible(e, k, h)` 限制，
+#     h 同理。把 k 寫進矩陣（D1.3 之舊形狀）表達不了「k 與 h 在 `decision_bar_* × open_to_horizon_close`
+#     下互相耦合」，那正是 D4.2 要交付的東西。
+#
+#  🔴 **本集合以「全積減拒收」導出，不手列 13 條**：手列會與 `REJECTED_PAIRS` 漂移，
+#     而漂移的方向是**多支援一對** ⇒ fail-open。
+SUPPORTED_PAIRS: frozenset = frozenset(
+    (entry, mode)
+    for mode in LABEL_RETURN_MODES
+    for entry in ENTRY_PRICE_SEMANTICS
+    if entry not in REJECTED_PAIRS.get(mode, ())
+)
 
 #: §F-2′ 之 reason。**字面只引用 Task 1.1 之登記處**，本模組不自寫登記祈使句、不自行計數。
 UNSUPPORTED_REASON = "label_producer_unsupported_for_declared_semantics"
+#: 🔴 `D-001` D4.2：幾何零窗之**專屬** reason（登記於契約 `capability_unavailable_reasons`）。
+#  與 `UNSUPPORTED_REASON` 分開的理由：前者是「這個組合永遠算不出來，換 k／h 也沒用」，
+#  後者是「這個組合本批不支援」。合成一個字面會讓 UI 對使用者說錯話
+#  （叫他去調 k，而那一對調到天荒地老都是 0 窗）。
+ZERO_LENGTH_LABEL_WINDOW_REASON = "zero_length_label_window"
 
 #: normalizer 之鍵集與**固定鍵序**（R13 定死）。多一鍵／少一鍵／型別不符 ⇒ fail-closed。
 _SPEC_KEYS: Tuple[str, ...] = (
@@ -294,16 +314,281 @@ def normalized_spec_bytes_of(event_label_spec: Any) -> bytes:
 
 
 def spec_is_supported(normalized: Mapping[str, Any]) -> bool:
-    """§F-1′ 支援矩陣＝查 `SUPPORTED_MATRIX`。`horizon_bars` **不參與**判定（任意正整數皆可）。
+    """§F-1′ 支援矩陣＝查 `SUPPORTED_PAIRS`（`D-001` D4.2）。
 
-    🔴 判定只有這一行：擴充支援域一律改 `SUPPORTED_MATRIX`，**不得**在此加 `or` 分支
-    ——加了就有第二份矩陣，而 UI 之可選集合是由契約導出的，兩份必然漂移。
+    🔴 判定＝**成對** ∧ `k >= 0`；`horizon_bars` 不參與（任意正整數皆可）。
+       `k >= 0` 之下界來自契約（normalizer 已擋負值）；此處再判一次是因為本函式
+       也被 golden loader 與前端對證閘直接呼叫，不保證都走過 normalizer。
+    🔴 擴充支援域一律改 `REJECTED_PAIRS`／兩個 enum tuple，**不得**在此加 `or` 分支
+       ——加了就有第二份矩陣，而 UI 之可選集合是由契約導出的，兩份必然漂移。
+    🔴 **k 的上界不在這裡**：那是逐事件的 `feasible(e, k, h)`（需要 bar 表），
+       支援與否是**批次前**就能答的問題，可行與否要看資料。混在一起會讓
+       「這個語意組合沒交付」與「這批資料的暖機不夠」回同一個 reason。
     """
     return (
-        normalized["entry_price_semantic"],
-        normalized["label_return_mode"],
-        int(normalized["decision_offset_bars"]),
-    ) in SUPPORTED_MATRIX
+        (normalized["entry_price_semantic"], normalized["label_return_mode"]) in SUPPORTED_PAIRS
+        and int(normalized["decision_offset_bars"]) >= 0
+    )
+
+
+def unsupported_reason_for(normalized: Mapping[str, Any]) -> Optional[str]:
+    """不支援之 reason 字面；支援 ⇒ `None`（`D-001` D4.2）。
+
+    兩個字面**互斥**：幾何零窗之兩對回 `ZERO_LENGTH_LABEL_WINDOW_REASON`，
+    其餘不支援情形回 `UNSUPPORTED_REASON`。
+    """
+    if spec_is_supported(normalized):
+        return None
+    entry = normalized["entry_price_semantic"]
+    mode = normalized["label_return_mode"]
+    if entry in REJECTED_PAIRS.get(mode, ()):
+        return ZERO_LENGTH_LABEL_WINDOW_REASON
+    return UNSUPPORTED_REASON
+
+
+# ---------------------------------------------------------------------------
+# `D-001` D4.2：逐事件成對可行域（純函式；以 bar index 閉式算，**不重跑對齊**）
+# ---------------------------------------------------------------------------
+
+def entry_bar_index(entry: str, *, t0_idx: int, k: int) -> int:
+    """D1-6 之 entry bar index（**只算 index，不取價、不判邊界**）。
+
+    🔴 這**不是** `alignment._entry_mapping` 的第二份實作：那支同時回 `field` 並對
+    `next_open` 之越界 raise；本函式只做 index 算術，供可行域閉式使用。
+    兩者之 index 部分逐字相同，一致性由 `test_gap3_label_rawbar_oracle` 之期望表守
+    （該表獨立寫死 `(offset, field)`，兩邊同時錯才會漏）。
+    """
+    if entry in ("trigger_open", "trigger_close"):
+        return t0_idx
+    if entry == "next_open":
+        return t0_idx + 1
+    if entry in ("decision_bar_open", "decision_bar_close"):
+        return t0_idx - k
+    raise LabelProducerError(f"未知之 entry_price_semantic：{entry!r}（封閉集合，不猜）")
+
+
+def end_bar_index(mode: str, *, t0_idx: int, entry_idx: int, h: int) -> int:
+    """三個 mode 之 `end_idx`（逐字對應 `alignment.align_events` 之三分支）。"""
+    if mode == "close_to_close":
+        return t0_idx + h
+    if mode == "open_to_close":
+        return entry_idx
+    if mode == "open_to_horizon_close":
+        return entry_idx + h
+    raise LabelProducerError(f"未知之 label_return_mode：{mode!r}（封閉集合，不猜）")
+
+
+def feasible(
+    event_id: str,
+    k: int,
+    h: int,
+    *,
+    mode: str,
+    entry: str,
+    t0_idx: int,
+    n_bars: int,
+    coverage_ok: bool,
+) -> bool:
+    """逐事件成對可行性謂詞（`D-001` D4.2 之**唯一**定義）。
+
+    `feasible(e, k, h) = (t0_idx − k ≥ 0) ∧ (end_idx(e, k, h) ≤ n_bars − 1) ∧ coverage_ok(e, k)`
+
+    🔴 **不是** k∈ℕ × h∈ℕ，也**不是**兩個獨立區間：`decision_bar_* × open_to_horizon_close`
+    之 `end_idx = t0_idx − k + h` 使 k 與 h **耦合**（k 變大反而讓 end 條件變鬆）。
+    這正是本謂詞取代「兩個 range」的理由。
+
+    🔴 **誠實邊界（`D-001` D4.2 R4 `CODEX-R4-P2-01`／`GROK-R4-P2-01`）**：本謂詞只涵蓋
+    **幾何／coverage** 三條（對應 `warmup_insufficient_*`／`label_window_incomplete`／coverage）。
+    `align_events` 之 `missing_bar`／`nonpositive_reference_price`／`entry_before_decision`／
+    `feature_after_decision` **不納入**：超出上界 ⇒ 幾何上必失敗；在上界內 ⇒ **不保證**零 failures。
+    UI 與驗收文案不得把「≤ 上界」寫成全批成功保證。
+
+    🔴 `next_open` 之 `entry_idx = t0_idx + 1` 也受 `≤ n_bars − 1` 約束——但那條只在
+    `end_idx` 一併涵蓋（`open_to_*` 之 end 由 entry 導出；`close_to_close` 之 end 與 entry 無關，
+    故 `next_open × close_to_close` 於資料末端之 `missing_bar` 屬上列**未涵蓋**之 loud 失敗）。
+    """
+    if h < 1:
+        raise LabelProducerError(f"{event_id}: h 須 >= 1，實得 {h}")
+    if k < 0:
+        raise LabelProducerError(f"{event_id}: k 須 >= 0，實得 {k}")
+    if t0_idx - k < 0:
+        return False
+    entry_idx = entry_bar_index(entry, t0_idx=t0_idx, k=k)
+    if end_bar_index(mode, t0_idx=t0_idx, entry_idx=entry_idx, h=h) > n_bars - 1:
+        return False
+    return bool(coverage_ok)
+
+
+@dataclass(frozen=True)
+class EventGeometry:
+    """`feasible_bounds` 之逐事件輸入（純索引；由 `records` ＋ bar 表導出，不經對齊）。"""
+
+    event_id: str
+    t0_idx: int
+    n_bars: int
+    #: 🔴 coverage 之**上界索引**：`decision_idx >= coverage_min_idx` 才有 per-TF feature cutoff。
+    #  ＝各分析 TF 之首根 `close_time_ms` 在錨定 TF `open_time_ms` 上的 `searchsorted(left)`。
+    coverage_min_idx: int
+
+
+@dataclass(frozen=True)
+class FeasibleBounds:
+    """兩個**條件上界**（`D-001` D4.2）＋其狀態字面。
+
+    🔴 狀態欄是**封閉集合**而不是「用 None 表達三種意思」：`None` 同時要表示
+    「無可行值」與「本 mode 無上界」時，UI 只能猜，而猜錯的方向是**謊報安全**。
+    """
+
+    #: `min_e max{k : feasible(e, k, h_selected)}`；`k_status != "bounded"` 時為 `None`。
+    k_max_feasible_at_h: Optional[int]
+    #: `min_e max{h : feasible(e, k_selected, h)}`；`h_status != "bounded"` 時為 `None`。
+    h_max_feasible_at_k: Optional[int]
+    #: `"bounded"`｜`"no_feasible_k"`（該 h 下全批無可行 k）
+    k_status: str
+    #: `"bounded"`｜`"no_feasible_h"`｜`"h_inert_for_mode"`（`open_to_close`：end 與 h 無關 ⇒ 無幾何上界）
+    h_status: str
+
+
+def _max_feasible_k(g: EventGeometry, h: int, *, mode: str, entry: str) -> Optional[int]:
+    """單事件之 `max{k : feasible(e, k, h)}`；無可行 k ⇒ `None`。**閉式，O(1)**。
+
+    🔴 為什麼一次判定就夠（不是掃描）：三條約束對 k 皆單調——
+    ① `t0_idx − k ≥ 0` 與 ③ coverage 皆在 k **越小越鬆**，故上界 `k_hi = min(t0_idx, t0_idx − coverage_min_idx)`；
+    ② `end_idx ≤ n_bars − 1` 之 `end_idx` 對 k 之斜率為 `0`（非 decision_bar entry，或 `close_to_close`）
+       或 `−1`（`decision_bar_* × open_to_*`）⇒ 在 `k_hi` 處**最鬆**。
+    ⇒ 三條同時在 `k_hi` 最鬆 ⇒ `k_hi` 不可行 ⇒ 任何 k 皆不可行。
+    """
+    k_hi = min(g.t0_idx, g.t0_idx - g.coverage_min_idx)
+    if k_hi < 0:
+        return None
+    if not feasible(g.event_id, k_hi, h, mode=mode, entry=entry,
+                    t0_idx=g.t0_idx, n_bars=g.n_bars, coverage_ok=True):
+        return None
+    return k_hi
+
+
+def _max_feasible_h(g: EventGeometry, k: int, *, mode: str, entry: str) -> Tuple[Optional[int], str]:
+    """單事件之 `(max{h : feasible(e, k, h)}, status)`。
+
+    🔴 「h 是否參與 end」**機械導出**（比較 `end_bar_index` 於 h=1 與 h=2），
+    不是把 `open_to_close` 寫死在條件式裡——寫死就會與 `end_bar_index` 漂移。
+    """
+    if g.t0_idx - k < 0 or k > g.t0_idx - g.coverage_min_idx:
+        return None, "no_feasible_h"
+    entry_idx = entry_bar_index(entry, t0_idx=g.t0_idx, k=k)
+    e1 = end_bar_index(mode, t0_idx=g.t0_idx, entry_idx=entry_idx, h=1)
+    e2 = end_bar_index(mode, t0_idx=g.t0_idx, entry_idx=entry_idx, h=2)
+    if e1 == e2:  # h 不參與 end ⇒ 無幾何上界（值本身亦不隨 h 變）
+        return (None, "h_inert_for_mode") if e1 <= g.n_bars - 1 else (None, "no_feasible_h")
+    # 斜率為 +1 ⇒ `end(h) = e1 + (h − 1)` ⇒ `h <= n_bars − 1 − e1 + 1`
+    h_hi = g.n_bars - 1 - e1 + 1
+    if h_hi < 1:
+        return None, "no_feasible_h"
+    if not feasible(g.event_id, k, h_hi, mode=mode, entry=entry,
+                    t0_idx=g.t0_idx, n_bars=g.n_bars, coverage_ok=True):
+        return None, "no_feasible_h"
+    return h_hi, "bounded"
+
+
+def event_geometries(
+    records,
+    bars_by_tf,
+    *,
+    timeframes: Sequence[str],
+) -> Tuple[EventGeometry, ...]:
+    """`records` ＋ bar 表 → 逐事件之純索引幾何（**不呼叫 `align_events`**）。
+
+    🔴 `t0` 不是錨定 TF 之 bar open ⇒ 該事件**略過**（不猜最近的一根）：那是
+    `no_boundary_match`，屬對齊層 loud 失敗，不在幾何可行域之責任範圍。
+    🔴 `coverage_min_idx` 取**各分析 TF 首根 close** 之最大者在錨定 TF `open_time_ms` 上之
+    `searchsorted(left)`——逐字對應 `align_events` 的 `_select_cutoff_idx(...) < 0 ⇒
+    warmup_insufficient_<sub_tf>`。
+    """
+    out: List[EventGeometry] = []
+    tfs = tuple(str(t) for t in timeframes)
+    for rec in _records_as_tuple(records):
+        symbol = event_scope_key(rec)
+        tf = event_trigger_timeframe(rec)
+        sym_bars = bars_by_tf.get(symbol) or {}
+        anchor = sym_bars.get(tf)
+        if anchor is None or len(anchor) == 0:
+            continue
+        ot = anchor["open_time_ms"].to_numpy()
+        t0 = int(rec["t0"])
+        pos = int(ot.searchsorted(t0))
+        if pos >= len(ot) or int(ot[pos]) != t0:
+            continue  # no_boundary_match：不在幾何可行域之責任範圍
+        first_closes = []
+        for sub_tf in (tfs or (tf,)):
+            sub = sym_bars.get(sub_tf)
+            if sub is None or len(sub) == 0:
+                first_closes = None
+                break
+            first_closes.append(int(sub["close_time_ms"].to_numpy()[0]))
+        if first_closes is None:
+            continue  # missing_bar：同上，loud 失敗不在本函式責任內
+        cov_ms = max(first_closes)
+        out.append(EventGeometry(
+            event_id=str(rec["event_id"]),
+            t0_idx=pos,
+            n_bars=int(len(ot)),
+            coverage_min_idx=int(ot.searchsorted(cov_ms, side="left")),
+        ))
+    return tuple(out)
+
+
+def feasible_bounds(
+    records,
+    bars_by_tf,
+    *,
+    event_label_spec,
+    timeframes: Sequence[str],
+) -> FeasibleBounds:
+    """兩個條件上界（`D-001` D4.2；＝`D-006` D4.2 實作要點②之 `bounds()`）。
+
+    🔴 **函式名與 `D-006` 之 `bounds` 不同**：`bounds` 是模組級通用名，與呼叫端之區域變數
+    衝突風險高；語意與簽章不變（多一個 `timeframes`，因為 coverage 條件是 per-TF 的，
+    `D-006` 之三參數表達不了它——這是**細化不是弱化**）。
+
+    🔴 **不重跑對齊**：只用 `searchsorted` 取 index。
+    🔴 **min over events**：任一事件不可行即拉低全批上界——上界是**給 UI 顯示的建議**，
+       不是輸入鎖（`D-001` 明文）。
+    🔴 **誠實邊界**：coverage 條件以對齊層之 per-TF warmup（首根 close ≤ decision_at）代之。
+       現行階段 3a（`check_feature_run_coverage`）為**批次級 pass/fail、不剔除任何列**
+       ⇒ per-event feature coverage 恆真，兩者一致；日後 3a 若改為逐列剔除，本函式須
+       改吃該剔除結果，否則上界會**高報**。具名殘留 `B4-COVERAGE-1`。
+    """
+    normalized = normalize_event_label_spec(event_label_spec)
+    entry = normalized["entry_price_semantic"]
+    mode = normalized["label_return_mode"]
+    k_sel = int(normalized["decision_offset_bars"])
+    h_sel = int(normalized["horizon_bars"])
+
+    geoms = event_geometries(records, bars_by_tf, timeframes=timeframes)
+    if not geoms:
+        return FeasibleBounds(None, None, "no_feasible_k", "no_feasible_h")
+
+    k_vals = [_max_feasible_k(g, h_sel, mode=mode, entry=entry) for g in geoms]
+    if any(v is None for v in k_vals):
+        k_max, k_status = None, "no_feasible_k"
+    else:
+        k_max, k_status = min(int(v) for v in k_vals), "bounded"
+
+    h_pairs = [_max_feasible_h(g, k_sel, mode=mode, entry=entry) for g in geoms]
+    h_statuses = {s for _, s in h_pairs}
+    if "no_feasible_h" in h_statuses:
+        h_max, h_status = None, "no_feasible_h"
+    elif h_statuses == {"h_inert_for_mode"}:
+        h_max, h_status = None, "h_inert_for_mode"
+    else:
+        # 混合狀態不可能（status 由 mode 決定、全批同 mode）；防禦性 fail-closed。
+        vals = [v for v, s in h_pairs if s == "bounded"]
+        if len(vals) != len(h_pairs):
+            raise LabelProducerError(
+                f"feasible_bounds: 同批 h 狀態不一致（{sorted(h_statuses)}）——mode 應決定狀態，拒絕猜"
+            )
+        h_max, h_status = min(int(v) for v in vals), "bounded"
+    return FeasibleBounds(k_max, h_max, k_status, h_status)
 
 
 # ---------------------------------------------------------------------------
@@ -600,7 +885,9 @@ def prepare_analysis_windows(
         allowed_event_ids=frozenset(w.event_id for w in windows),
         purge_lower_bound_ms_by_symbol=purge_rows,
         prepared_token=token,
-        reason=None if supported else UNSUPPORTED_REASON,
+        # 🔴 `D-001` D4.2：reason 由 `unsupported_reason_for` 導出（幾何零窗之兩對走
+        #    專屬字面 `zero_length_label_window`），**不在此二選一硬寫**。
+        reason=unsupported_reason_for(normalized),
         direction_sign=direction_sign,
         entry_price_refs=entry_price_refs,
         event_known_at_decision_values=known_values,

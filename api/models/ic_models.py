@@ -130,6 +130,39 @@ class CrossRunRef(BaseModel):
     config_hash: str
 
 
+class EventLabelSpecModel(BaseModel):
+    """GAP-3 `event_label_spec` 之 **typed** 形狀（`G3-D2` D4.3；取代原本的 raw `Dict`）。
+
+    🔴 **恰四鍵、禁多鍵**（`model_config.extra="forbid"`）：producer 之
+    `normalize_event_label_spec` 對多一鍵／少一鍵皆 fail-closed，而原本的 `Dict[str, Any]`
+    讓那個 fail-closed 發生在**分析跑到一半**（背景 task 內），使用者看到的是任務失敗
+    而不是 400。typed 之後同一條規則在 request 邊界就講清楚。
+
+    🔴 **四鍵皆為 Optional**：D1.7 之規則是「使用者沒選 ⇒ 後端依宣告深度導出」，
+    route 層才補齊成四鍵。在此設必填會把那條規則變成不可能。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    horizon_bars: Optional[int] = Field(None, ge=1, description="答案窗（bars）；>=1")
+    entry_price_semantic: Optional[str] = Field(None, description="D1-6 之五語意之一")
+    label_return_mode: Optional[str] = Field(None, description="三 mode 之一")
+    decision_offset_bars: Optional[int] = Field(None, ge=0, description="決策位移 k；>=0")
+
+
+class EventLabelScanModel(BaseModel):
+    """GAP-3 k／h 掃描網格之上界（`G3-D2` D4.3，裁定③「填 m 就掃 0～m」）。
+
+    🔴 兩欄皆 optional：只給其中一個 ⇒ 另一維維持 `spec` 之單值（不是「兩個都要掃」）。
+    🔴 `horizon_bars_max >= 1`（h 之定義域自 1 起）、`decision_offset_bars_max >= 0`。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision_offset_bars_max: Optional[int] = Field(None, ge=0, description="k 掃到 m（含）")
+    horizon_bars_max: Optional[int] = Field(None, ge=1, description="h 掃到 m（含）")
+
+
 class ICAnalyzeRequest(BaseModel):
     features_path: Optional[str] = Field(None, description="Path to features HDF5 (deprecated, optional)")
     symbol: Optional[str] = Field(None, description="Feature Library symbol")
@@ -160,12 +193,22 @@ class ICAnalyzeRequest(BaseModel):
         None,
         description="GAP-3 事件批 id；給定時走事件分析分支（後端自行查出該批已落檔 records）",
     )
-    event_label_spec: Optional[Dict[str, Any]] = Field(
+    event_label_spec: Optional["EventLabelSpecModel"] = Field(
         None,
         description=(
             "GAP-3 分析參數，欄集恰四鍵 "
             "{horizon_bars, entry_price_semantic, label_return_mode, decision_offset_bars}；"
             "只作用於本次分析，**不回寫**事件批"
+        ),
+    )
+    # 🔴 `G3-D2` **D4.3**（裁定③；v2 R1 CODEX-R1-P1-04／P1-05、COMPOSER-R1-P1-05 更正）：
+    #    掃描參數是**請求頂層 sibling**，**不在** `event_label_spec` 內——後者恆四鍵，
+    #    多一鍵 `normalize_event_label_spec` 直接 fail-closed。
+    event_label_scan: Optional["EventLabelScanModel"] = Field(
+        None,
+        description=(
+            "GAP-3 k／h 掃描網格：`{decision_offset_bars_max, horizon_bars_max}`；"
+            "給定時對 k∈[0, mk] × h∈[1, mh] 逐格各跑一次五階段，回 `scan_results`"
         ),
     )
     feature_filter: Optional[FeatureFilterConfig] = Field(None, description="Feature pre-filter config")
@@ -206,6 +249,13 @@ class ICAnalyzeRequest(BaseModel):
                 "event_import_id 與 event_timestamps 不得同時給定（GAP-3 Task 7.0b）"
                 "——兩者都在指定要分析哪些事件，同時給就有兩個真相源"
             )
+        # 🔴 `G3-D2` D4.3：`event_label_scan` 與 `event_label_spec` 同一條理由——
+        #    「要掃什麼網格」沒有「對哪一批」就沒有意義。
+        if self.event_label_scan is not None and self.event_import_id is None:
+            raise ValueError(
+                "event_label_scan 需搭配 event_import_id（GAP-3 D4.3）"
+                "——只給掃描網格而不說對哪一批，會靜默套到預設批上"
+            )
         # 🔴 **三家全員之 R1 finding**：`_run_analysis` 之 cross-sectional 分支在事件五階段
         #    **之前**就早退 ⇒ 帶 `event_import_id` 的橫截面請求會**靜默忽略**該欄位。
         #    ⇒ fail-closed，不讓「以為做了事件分析、其實沒有」這件事發生。
@@ -243,6 +293,29 @@ class ICTaskStatusResponse(BaseModel):
     # 🔴 `current_stage` 為**可擴充集合**，不是固定 enum：GAP-6 之分塊計算會細分更多階段，
     #    測試不得以窮舉相等斷言鎖死（改測試是掩蓋行為變更的常見路徑）。
     feature_count: Optional[int] = None
+    # ── `G3-D2` **D4.2／D4.3** 之揭露欄 ─────────────────────────────────────
+    # 🔴 同上一段之理由：**不在此宣告就會被 `response_model` 靜默濾掉**。
+    #    全部 `Optional` 且預設 `None`＝「本次分析沒有這件事」（非事件分析路徑），
+    #    與「有這件事但值為 0／空」可分辨。
+    decision_offset_bars_capability: Optional[str] = None
+    decision_offset_bars_reason: Optional[str] = None
+    #: 批內**記錄**之 k distinct 值（事實）。空清單＝該批沒有這個欄。
+    decision_offset_bars_record_values: Optional[List[int]] = None
+    #: **本次分析**採用之 k（參數）。與上一欄同名不同義，刻意分兩欄。
+    decision_offset_bars_analysis: Optional[int] = None
+    #: 契約 `analysis_params.decision_offset_bars_scan_max`（建議上限；超過只警示不擋）。
+    decision_offset_bars_scan_max: Optional[int] = None
+    #: 兩個**條件上界**（D4.2）：幾何／coverage 上界，**非**全批成功保證。
+    k_max_feasible_at_h: Optional[int] = None
+    h_max_feasible_at_k: Optional[int] = None
+    #: 上界狀態（封閉集合）：`bounded`｜`no_feasible_k`／`no_feasible_h`｜`h_inert_for_mode`。
+    k_bound_status: Optional[str] = None
+    h_bound_status: Optional[str] = None
+    #: k／h 掃描網格之結果（未掃 ⇒ None）。
+    event_label_scan: Optional[Dict[str, Any]] = None
+    #: 掃描進度（未掃 ⇒ None，**不填 0**）。
+    scan_done: Optional[int] = None
+    scan_total: Optional[int] = None
 
 
 class ICTopFeaturesRequest(BaseModel):

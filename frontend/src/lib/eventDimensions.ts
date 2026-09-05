@@ -59,6 +59,12 @@ export interface EventDimContractNode {
   min?: number;
   /** `G3-D2` D1.5：誠實預設之唯一來源（前端禁硬編字面）。見 `contractDefault()`。 */
   default?: string;
+  /**
+   * `G3-D2` D4.2：**成對**拒收表 `{label_return_mode 值: [entry_price_semantic 值, ...]}`。
+   * 只住 `label_return_mode` 節點（契約以 mode 為鍵）；`entry_price_semantic` 方向由
+   * `pairRejectedReason()` **反查**同一張表導出，不另存一份反向表。
+   */
+  rejected_pairs?: Readonly<Record<string, readonly string[]>>;
 }
 
 /**
@@ -87,6 +93,9 @@ export const EVENT_DIM_CONTRACT_MIRROR = {
         label_return_mode: {
           enum: ['open_to_close', 'open_to_horizon_close', 'close_to_close'],
           default: 'close_to_close',
+          // 🔴 `G3-D2` D4.2：成對拒收（幾何窗長 0）。逐字鏡像契約
+          //    `label_definition.fields.label_return_mode.rejected_pairs`。
+          rejected_pairs: { open_to_close: ['trigger_close', 'decision_bar_close'] },
         },
       },
     },
@@ -158,10 +167,14 @@ export const EVENT_DIM_PATH_EXCLUSIONS: Readonly<Record<string, EventDimExclusio
     reason: 'A 已併入預測型（B）；有無用未來根由深度宣告（lookahead_bars_declared）區分，'
       + '不由 scenario 值區分（裁定① 2026-09-03）',
   },
-  // 🔴 D1.5：`trigger_open` 自排除集合**移除**（＝解灰為可選）。
-  //    其餘三值留待 D4.2（全矩陣＋成對可行域）。
+  // 🔴 D4.2（2026-09-05）：其餘三值**全部解灰**——後端 `SUPPORTED_PAIRS` 已為 13 對
+  //    （5 entry × 3 mode 減兩個幾何零窗對）⇒ 路徑排除清空。
+  //    **保留鍵並置空**而非刪鍵：刪鍵會讓「這個 (path, dim) 從未被考慮過」與
+  //    「考慮過且結論是全開」在碼上無從區分（同 `label_return_mode` 之理由）。
+  //    仍不可選的兩個組合改由 `kind: 'pair_rejected'` 表達——它是**成對**限制，
+  //    不是單維度排除，硬塞進本表會把「trigger_close 這個值不能用」講錯。
   '/search|entry_price_semantic': {
-    values: ['next_open', 'decision_bar_open', 'decision_bar_close'],
+    values: [],
     reason: F5_REASON,
   },
   // 🔴 D1.5：兩個 `open_to_*` 皆移除（三種報酬選項；取價修法已於 B-D0 落地）。
@@ -171,8 +184,9 @@ export const EVENT_DIM_PATH_EXCLUSIONS: Readonly<Record<string, EventDimExclusio
     values: [],
     reason: F5_REASON,
   },
+  // 🔴 D4.2：同上，`/ic-analysis` 之三元組排除值一併清空。
   '/ic-analysis|entry_price_semantic': {
-    values: ['next_open', 'decision_bar_open', 'decision_bar_close'],
+    values: [],
     reason: F5_REASON,
   },
   '/ic-analysis|label_return_mode': {
@@ -252,15 +266,20 @@ export function returnMeasurePresetOf(
 }
 
 /**
- * 送出守衛：`event_label_spec` 之 `(entry, mode)` 必須是三個 preset 之一。
+ * 送出守衛：`event_label_spec` 之 `(entry, mode)` 必須在**支援矩陣**內。
  *
- * 🔴 **具名邊界（比後端矩陣嚴）**：後端 `SUPPORTED_MATRIX` 有**四**對，本守衛只放行**三**個
- * preset ⇒ `(trigger_open, close_to_close)` 雖為後端支援組合，在 D1 之 UI 仍被擋。
- * 這是刻意的：D1 的 UI 根本產不出那一對，能出現只有偽造或程式化設值；
- * **寧可誤擋一個支援組合，也不要放行一個矩陣外組合**（後者會讓使用者拿到 fail-closed 錯誤）。
- * D4.2 開放進階直改時，本守衛改為對 pair-aware 之可行域判定。
+ * 🔴 **`G3-D2` D4.2 改寫**：D1 之守衛只放行三個 preset（比後端矩陣嚴），理由是
+ * 「D1 的 UI 產不出其他組合」。D4.2 開放**進階直改兩欄** ⇒ UI 現在產得出全部 13 對，
+ * 守衛必須跟著改成 pair-aware，否則使用者選得到卻送不出去。
+ * 判定＝**兩個枚舉皆為契約 enum 值** ∧ **不是 `rejected_pairs` 之對**
+ * ——與後端 `SUPPORTED_PAIRS`（全積減拒收）逐字同構，由 `contractEnumWiring` 之對證閘守。
+ *
+ * 🔴 **k 不在守衛內**：k 之上界是逐事件可行域（資料決定），前端算不出來；
+ * 超界之後果是該事件 loud 進 failures，不是送出被擋。
  */
-export function isSubmittableLabelSpec(spec: unknown): boolean {
+export function isSubmittableLabelSpec(
+  spec: unknown, contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
+): boolean {
   if (!spec || typeof spec !== 'object') return false;
   const s = spec as Record<string, unknown>;
   const entry = s.entry_price_semantic;
@@ -273,12 +292,17 @@ export function isSubmittableLabelSpec(spec: unknown): boolean {
   if (!bothAbsent) {
     // 只給一半也不行：半組值送到後端會與導出的另一半拼成未預期組合。
     if (typeof entry !== 'string' || typeof mode !== 'string') return false;
-    if (returnMeasurePresetOf(entry, mode) === undefined) return false;
+    if (!acceptedValues('entry_price_semantic', contract).includes(entry)) return false;
+    if (!acceptedValues('label_return_mode', contract).includes(mode)) return false;
+    if (isRejectedPair(entry, mode, contract)) return false;
   }
   // `horizon_bars` 若有給，須為正整數（「當根」下亦送 1 之 inert 哨兵）。
   const h = s.horizon_bars;
-  if (h === undefined) return true;
-  return typeof h === 'number' && Number.isInteger(h) && h >= 1;
+  if (h !== undefined && !(typeof h === 'number' && Number.isInteger(h) && h >= 1)) return false;
+  // `decision_offset_bars` 若有給，須為 >= 契約 min 之整數（值域來自契約，不寫死 0）。
+  const k = s.decision_offset_bars;
+  if (k === undefined) return true;
+  return typeof k === 'number' && Number.isInteger(k) && k >= contractDecisionOffsetMin(contract);
 }
 
 /** 組出 `EVENT_DIM_PATH_EXCLUSIONS` 之鍵；鍵格式集中在此，避免各處手拼字串。 */
@@ -299,6 +323,134 @@ export function pathExclusionReason(
   return row && row.values.includes(value) ? row.reason : undefined;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * `G3-D2` **D4.2**：成對拒收（`kind: 'pair_rejected'`）
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** 判定成對拒收所需之**當前選值**（只用得到兩欄；其餘維度與 pair 無關）。 */
+export interface PairSelection {
+  entry_price_semantic?: string;
+  label_return_mode?: string;
+}
+
+/**
+ * 契約之成對拒收表（唯一取值點）。形狀＝`{mode: [entry, ...]}`。
+ *
+ * 🔴 表**只有一份**（住 `label_return_mode` 節點），反向由本檔反查，
+ *    不另存 `{entry: [mode,...]}`——兩份必然漂移，而漂移的方向是「UI 放行後端算不出的組合」。
+ */
+export function rejectedPairs(
+  contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
+): Readonly<Record<string, readonly string[]>> {
+  return dimContractNode(contract, 'label_return_mode')?.rejected_pairs ?? {};
+}
+
+/** 成對拒收之理由字面（由契約導出，前端不硬編）。 */
+export function pairRejectedReasonText(mode: string, entry: string): string {
+  return `(${entry}, ${mode}) 幾何上答案窗長度為 0（進場價與結算價落在同一根的同一個時點）`
+    + '⇒ 分析層永遠算不出報酬；換 k 或 h 都不會改變這件事';
+}
+
+/**
+ * 🔴 **雙向**判定：某維度之某值在**目前另一維之選值**下是否被成對拒收。
+ *
+ * - `dim === 'label_return_mode'`：`selection.entry_price_semantic ∈ rejected_pairs[value]` ⇒ 拒；
+ * - `dim === 'entry_price_semantic'`：`selection.label_return_mode` 之 pair 含 `value` ⇒ 拒。
+ *
+ * 另一維未選（`undefined`／`''`）⇒ **不拒**：還沒選就先擋，使用者連進入合法組合的路都沒有。
+ */
+export function pairRejectedReason(
+  dim: EnumEventDimension, value: string,
+  contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
+  selection?: PairSelection,
+): string | undefined {
+  if (!selection) return undefined;
+  const table = rejectedPairs(contract);
+  if (dim === 'label_return_mode') {
+    const entry = selection.entry_price_semantic;
+    if (!entry) return undefined;
+    return (table[value] ?? []).includes(entry) ? pairRejectedReasonText(value, entry) : undefined;
+  }
+  if (dim === 'entry_price_semantic') {
+    const mode = selection.label_return_mode;
+    if (!mode) return undefined;
+    return (table[mode] ?? []).includes(value) ? pairRejectedReasonText(mode, value) : undefined;
+  }
+  return undefined;
+}
+
+/** `(entry, mode)` 是否為幾何必拒之對（送出守衛用；**不看** `selection`，看實際要送的兩值）。 */
+export function isRejectedPair(
+  entry: string | undefined, mode: string | undefined,
+  contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
+): boolean {
+  if (!entry || !mode) return false;
+  return (rejectedPairs(contract)[mode] ?? []).includes(entry);
+}
+
+/** 成對重設之結果：新選值 ＋ 給使用者看的揭露字串（`reset === undefined` ⇒ 不需重設）。 */
+export interface PairResetOutcome {
+  selection: PairSelection;
+  reset?: { dim: EnumEventDimension; from: string; to: string; disclosure: string };
+}
+
+/**
+ * 🔴 **既選非法 pair ⇒ 另一維自動重設為契約 `default`** 並回傳揭露字串。
+ *
+ * 為什麼不是「靜默保留非法組合，送出時才擋」：那讓畫面上同時存在兩個看起來都被選中的
+ * 值，而它們合起來不可能送出——使用者要自己推理是哪一個該改。
+ * 為什麼不是「回退到上一個合法值」：上一個值是 UI 的歷史狀態，不是契約的事實；
+ * 重設一律讀契約 `default`（`contractDefault()`），前端不硬編字面。
+ *
+ * `changedDim` ＝使用者**剛改**的維度 ⇒ 保留它、重設另一維。
+ */
+export function resolvePairConflict(
+  selection: PairSelection, changedDim: EnumEventDimension,
+  contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
+): PairResetOutcome {
+  const { entry_price_semantic: entry, label_return_mode: mode } = selection;
+  if (!isRejectedPair(entry, mode, contract)) return { selection };
+  const other: EnumEventDimension = changedDim === 'label_return_mode'
+    ? 'entry_price_semantic' : 'label_return_mode';
+  const from = String(selection[other]);
+  const preferred = contractDefault(other, contract);
+  const withValue = (v: string): PairSelection => ({ ...selection, [other]: v });
+
+  // 🔴 **具名偏離 `D-001` D4.2**（實作時由本檔之 vitest 當場打穿）：
+  //    D-001 寫「另一維自動重設為契約 `default`」，但契約之
+  //    `entry_price_semantic.default = "trigger_close"` **本身就在** `open_to_close`
+  //    的拒收對裡 ⇒ 在「使用者改 mode 成 open_to_close」這個方向上，重設為 default
+  //    會直接落回非法組合。D-001 沒有涵蓋這個方向。
+  //    ⇒ 規則細化為兩段（**皆由契約導出，不硬編任何字面**）：
+  //      ① 契約 `default` 合法 ⇒ 用它（D-001 原意，覆蓋另一個方向）；
+  //      ② 否則 ⇒ 取該維度**契約 enum 順序**中第一個合法值，並在揭露字串裡
+  //         明說「契約預設在這個組合下也不合法，改用第一個可用值」。
+  //    ②仍是**確定性**且**單一來源**（契約 enum 順序），不是猜。
+  let to = preferred;
+  let usedFallback = false;
+  if (isRejectedPair(withValue(to).entry_price_semantic, withValue(to).label_return_mode, contract)) {
+    const legal = acceptedValues(other, contract).find(
+      (v) => !isRejectedPair(withValue(v).entry_price_semantic, withValue(v).label_return_mode, contract),
+    );
+    // 🔴 一個合法值都沒有 ⇒ **fail-closed**：那代表契約把某個 mode 的所有 entry 都拒了，
+    //    是契約自相矛盾，靜默挑一個值會把它藏起來。
+    if (legal === undefined) {
+      throw new Error(
+        `契約之 ${other} 在此組合下無任何合法值（rejected_pairs 拒光整個枚舉）——拒絕猜測`,
+      );
+    }
+    to = legal;
+    usedFallback = true;
+  }
+  const next = withValue(to);
+  const disclosure = `因 pair 拒收已重設：${other} 由 ${from} 改為 ${to}`
+    + (usedFallback
+      ? `（契約預設 ${preferred} 在這個組合下也不合法，故取契約 enum 順序中第一個可用值）`
+      : '（契約預設）')
+    + `。${pairRejectedReasonText(String(mode), String(entry))}`;
+  return { selection: next, reset: { dim: other, from, to, disclosure } };
+}
+
 /**
  * 🔴 **可操作選項集合**＝`accepted(dim) − pathExclusions(path, dim)`。
  *
@@ -306,9 +458,12 @@ export function pathExclusionReason(
  */
 export function selectable(
   path: EventDimPath, dim: EnumEventDimension, contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
+  selection?: PairSelection,
 ): readonly string[] {
   const excluded = new Set(pathExclusions(path, dim));
-  return acceptedValues(dim, contract).filter((v) => !excluded.has(v));
+  return acceptedValues(dim, contract).filter(
+    (v) => !excluded.has(v) && pairRejectedReason(dim, v, contract, selection) === undefined,
+  );
 }
 
 /**
@@ -322,22 +477,35 @@ export function selectable(
 export interface EventDimOption {
   value: string;
   disabled: boolean;
-  kind: 'selectable' | 'contract_rejected' | 'path_excluded';
+  kind: 'selectable' | 'contract_rejected' | 'path_excluded' | 'pair_rejected';
   /** 不可選時之理由（可選時為 `undefined`）。 */
   reason?: string;
 }
 
+/**
+ * `selection` 為**可選**參數（`G3-D2` D4.2）：不給 ⇒ 舊行為（selection-free），
+ * 供 Task 7.2 之 selection-free 機械閘沿用；給了才會出現 `kind: 'pair_rejected'`。
+ *
+ * 🔴 判定順序＝`contract_rejected` → `pair_rejected` → `path_excluded`：
+ *    三者都可能同時成立，而使用者只看得到一句話——先講**最不可能改變**的那個原因
+ *    （契約恆拒 ⇒ 永遠不行；成對拒收 ⇒ 改另一維就行；路徑排除 ⇒ 換頁面就行）。
+ */
 export function dimOptions(
   path: EventDimPath, dim: EnumEventDimension, contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
+  selection?: PairSelection,
 ): readonly EventDimOption[] {
   const node = dimContractNode(contract, dim);
   const all = node?.enum ?? acceptedValues(dim, contract);
-  const ok = new Set(selectable(path, dim, contract));
+  const ok = new Set(selectable(path, dim, contract, selection));
   return all.map((value) => {
     if (ok.has(value)) return { value, disabled: false, kind: 'selectable' as const };
     const rejected = contractRejectedReason(dim, value, contract);
     if (rejected !== undefined) {
       return { value, disabled: true, kind: 'contract_rejected' as const, reason: rejected };
+    }
+    const paired = pairRejectedReason(dim, value, contract, selection);
+    if (paired !== undefined) {
+      return { value, disabled: true, kind: 'pair_rejected' as const, reason: paired };
     }
     return {
       value, disabled: true, kind: 'path_excluded' as const,
@@ -357,7 +525,15 @@ export function decisionOffsetRange(
   path: EventDimPath, contract: unknown = EVENT_DIM_CONTRACT_MIRROR,
 ): { min: number; max: number | null; locked: boolean; reason?: string } {
   const min = contractDecisionOffsetMin(contract);
-  if (path === '/data-preparation') return { min, max: null, locked: false };
+  // 🔴 `G3-D2` **D4.2**：`/ic-analysis` 之 k **解鎖**——k 已不在支援矩陣內，
+  //    其上界是**逐事件成對可行域**（後端 `feasible(e,k,h)` 導出之 `k_max_feasible_at_h`），
+  //    而那是**資料**決定的、前端算不出來 ⇒ 這裡不得再假裝有一個 `max`。
+  //    超出可行域之後果是逐事件 loud 進 failures（不是 400），揭露由後端回報。
+  // 🔴 `G3-D2` **D4.3**：`/search` 之 k 控制項**整個移除**（k 改於分析頁設定），
+  //    但本函式仍回 locked——它同時服務「若有人程式化設值」之 clamp 第二層。
+  if (path === '/data-preparation' || path === '/ic-analysis') {
+    return { min, max: null, locked: false };
+  }
   return { min, max: min, locked: true, reason: F5_REASON };
 }
 

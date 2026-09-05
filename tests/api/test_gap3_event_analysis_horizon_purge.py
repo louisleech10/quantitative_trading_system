@@ -543,6 +543,7 @@ def test_event_analysis_horizon_purge_r2_declaration_from_batch_receipt(monkeypa
     class _Req:
         event_import_id = "imp-1"
         event_label_spec = None
+        event_label_scan = None      # `G3-D2` D4.3：請求頂層 sibling（未掃 ⇒ None）
 
     # ① 批次 receipt 有值 ⇒ 取得到
     monkeypatch.setattr(cis, "get_event_import_service",
@@ -842,9 +843,11 @@ def test_event_analysis_d16_unsupported_spec_raises_with_matrix_text(monkeypatch
 
     batch = {
         "records": recs,
-        # k=3 不在 D1 矩陣內（k>0 留 D4.2）
+        # 🔴 `G3-D2` **D4.2 改寫**：k=3 已**不再**是「矩陣外」（k 已移出矩陣，改由逐事件
+        #    可行域限制）⇒ 原 fixture 不再能觸發不支援。改用**幾何零窗對**
+        #    `(trigger_close, open_to_close)`——那是 D4.2 之後唯一還在矩陣外的形狀。
         "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": "trigger_close",
-                             "label_return_mode": "close_to_close", "decision_offset_bars": 3},
+                             "label_return_mode": "open_to_close", "decision_offset_bars": 3},
         "lookahead_bars_declared": {"12h": 0},
     }
     with pytest.raises(ValueError) as ei:
@@ -854,7 +857,11 @@ def test_event_analysis_d16_unsupported_spec_raises_with_matrix_text(monkeypatch
             meta_path=None,
         )
     msg = str(ei.value)
-    for pair in ("(trigger_close, close_to_close, k=0)", "(trigger_open, close_to_close, k=0)",
-                 "(trigger_open, open_to_close, k=0)", "(trigger_open, open_to_horizon_close, k=0)"):
+    # 訊息須列出**支援對**（13 對之抽樣）而非過期的四元組字面
+    for pair in ("(trigger_close, close_to_close)", "(trigger_open, open_to_close)",
+                 "(next_open, close_to_close)", "(decision_bar_open, open_to_horizon_close)"):
         assert pair in msg, f"錯誤訊息須列出 {pair}"
+    # 且須指出**這一對**為何被拒（專屬 reason，不與一般不支援共用字面）
+    assert "zero_length_label_window" in msg, "訊息須帶幾何零窗之專屬 reason"
     assert "F-1′ 支援矩陣為 (trigger_close, close_to_close, k=0)" not in msg, "舊寫死字面須已移除"
+    assert "k=0)" not in msg, "k 已移出矩陣 ⇒ 訊息不得再把 k 寫進支援對"

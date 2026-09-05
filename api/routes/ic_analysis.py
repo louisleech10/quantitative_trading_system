@@ -186,16 +186,12 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
     #       主委原判「全批皆缺仍放行＝保留既有行為」，但那個「既有行為」本身就是壞的；
     #       且我的 over 向斷言寫成 `in (0, None)`——**`None` 也算過**，剛好把它蓋住。
     #       ⇒ 在能算錯（或亂噴錯）之前先擋，並在訊息裡指出這是繞過匯入驗證的落檔。
+    #    🔴 **`G3-D2` D4.3 起本條不再擋**（裁定②）：分析用 k **不再取自 records**
+    #       ⇒「整批都沒有 k」不會再讓 `setdefault` 留下 `None`，初始值是契約 min 之常數。
+    #       缺欄仍是**事實**，由 `batch_fact_notes.decision_offset_bars_record_values`
+    #       之**空清單**照實呈現（空 ≠ `[0]`）。保留變數供揭露用。
     if k_missing and not k_values and not k_invalid:
-        raise HTTPException(status_code=422, detail={
-            "kind": "missing_decision_offset_bars",
-            "message": (
-                f"事件批 {request.event_import_id!r} 之 decision_offset_bars **整批都沒有值**。"
-                "該欄為契約 required_fields，正常匯入不可能缺；出現此形狀代表落檔繞過了匯入驗證"
-                "（例如直接寫入 data_cache/events/）。分析層不替它猜一個決策位移——"
-                "猜 0 等於替使用者宣告了一個他沒宣告過的決策根。請重新匯入這批。"
-            ),
-        })
+        pass
     if k_invalid:
         raise HTTPException(status_code=422, detail={
             "kind": "invalid_decision_offset_bars",
@@ -208,18 +204,18 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
                 "；出現其他型別或超出值域代表落檔已損壞或繞過了匯入驗證，分析層不猜測其意圖。"
             ),
         })
+    # 🔴 **`G3-D2` D4.3：混 k 之 422 已移除**（裁定②「k 之分析參數化」＝本 Task 之交付）。
+    #    原閘之前提是「分析 k 取自 `records[0]`」⇒ 批內不一致就會有事件被對齊到錯的決策根。
+    #    D4.3 之後分析 k **由使用者於分析頁指定、對全批一致套用**，records 之 k 只是**事實**
+    #    ⇒ 混值不再能造成錯誤對齊，擋它反而擋掉合法批（原訊息末句已預告本次解除）。
+    #    記錄值集合以 `decision_offset_bars_record_values` 揭露，供使用者看見「這批當初宣告了什麼」。
     ks = sorted(k_values)
-    if len(ks) > 1 or (ks and k_missing):
-        shown = [*ks, "（缺）"] if k_missing else ks
-        raise HTTPException(status_code=422, detail={
-            "kind": "mixed_decision_offset_bars",
-            "message": (
-                f"事件批 {request.event_import_id!r} 之 decision_offset_bars 批內不一致（值＝{shown}）。"
-                "分析時只能有一個決策位移；若照第一列取值，其餘事件會被對齊到錯的決策根，"
-                "而算出來的數字仍是合法值、看不出異常。請拆批，或等 k 之分析參數化上線。"
-            ),
-        })
-    spec = dict(request.event_label_spec or {})
+    # 🔴 typed model（D4.3）：`exclude_none=True` 讓「沒給的鍵」不出現，
+    #    下方 `setdefault` 之語意（請求明給者優先）才不變。
+    spec = (
+        request.event_label_spec.model_dump(exclude_none=True)
+        if request.event_label_spec is not None else {}
+    )
     # 🔴 **`CODEX-R2-P1-01`（閉合輪抓到，真實批次跑不起來）**：深度宣告是**批次層 receipt**，
     #    住在 payload 的**頂層** `lookahead_declaration`，**不是**每一列上。
     #    首版只讀 `records[0]["lookahead_bars_declared"]` ⇒ 對真實批次（實測 780 列）拿到 `{}`，
@@ -269,13 +265,26 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
     # 🔴 「當根」下 `horizon_bars` **仍送 1**（inert 哨兵）：`event_label_spec` 恆為恰四鍵，
     #    normalizer 對多一鍵少一鍵皆 fail-closed；`open_to_close` 之值與 h 無關（golden 已斷言）。
     spec.setdefault("horizon_bars", preset_h)
-    spec.setdefault("decision_offset_bars", seed.get("decision_offset_bars"))
+    # 🔴 `G3-D2` D4.3（裁定②）：分析用 k 之初始值＝**契約 min 之常數**，
+    #    **不再**取自該批之 `declaration_seeds.decision_offset_bars`（該欄已移除）。
+    #    理由：「這批當初宣告過 k=1」與「這次分析要用 k=1」沒有必然關係；
+    #    種子化會讓一個匯入時的宣告偷偷決定分析參數，而使用者以為自己在用預設值。
+    spec.setdefault("decision_offset_bars", int(k_min if k_min is not None else 0))
     return {
         "records": records,
         "event_label_spec": spec,
         "lookahead_bars_declared": dict(declared),
         # 揭露字串由**後端**產生（前端不重組）：它描述的是後端實際採用的初始值規則。
         "event_label_spec_seed_note": seed_note,
+        # 🔴 D4.3：批內**記錄**之 k 值集合（事實）與**本次分析**之 k（參數）分開揭露。
+        #    兩者同名不同義，混在一起講就是 D1.7 那類「數字誤導」的來源。
+        "decision_offset_bars_record_values": ks,
+        "decision_offset_bars_analysis": int(spec["decision_offset_bars"]),
+        # 掃描網格（未給 ⇒ None；service 端據此決定單跑或掃格）。
+        "event_label_scan": (
+            request.event_label_scan.model_dump(exclude_none=True)
+            if request.event_label_scan is not None else None
+        ),
     }
 
 

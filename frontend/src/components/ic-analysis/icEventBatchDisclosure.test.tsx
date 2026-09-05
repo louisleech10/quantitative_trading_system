@@ -37,10 +37,15 @@ function detailFixture(over: Partial<EventImportDetail['batch_facts']> = {}): Ev
       label: rows.map((r) => ({ event_id: r.event_id, label: r.label })),
       ...over,
     },
+    // 🔴 `G3-D2` D4.3：`decision_offset_bars` 已自 seeds 移除（k 是分析參數，不由匯入檔種子化）。
     declaration_seeds: {
-      entry_price_semantic: 'trigger_close', label_return_mode: 'close_to_close', decision_offset_bars: 0,
+      entry_price_semantic: 'trigger_close', label_return_mode: 'close_to_close',
     },
-    batch_fact_notes: { control_kind_values: ['user_labeled_same_trigger'] },
+    batch_fact_notes: {
+      control_kind_values: ['user_labeled_same_trigger'],
+      // 批內**記錄**之 k 值集合（事實）；空清單＝該批沒有這個欄。
+      decision_offset_bars_record_values: [0],
+    },
   };
 }
 
@@ -103,19 +108,23 @@ describe('Task 7.6 ③⑤ — 唯讀 vs 可設定', () => {
     expect(params.queryAllByRole('radio').length).toBeGreaterThan(0);
   });
 
-  it('⑤ `G3-D2` D1.7：報酬量法為三選項；**不得**出現兩欄之進階直改 select', () => {
+  it('⑤ `G3-D2` D4.2：報酬量法三選項仍在；進階直改**改為預設收起、展開後才出現**', () => {
     render(<EventBatchDisclosurePanel importId="imp-1" labelSpec={undefined} onChangeLabelSpec={() => {}} detail={detailFixture()} />);
     // (a) 三個 preset 都在
     for (const key of ['same_bar', 'follow_through', 'hold']) {
       expect(screen.getByTestId(`ic-param-return-measure-${key}`)).toBeTruthy();
     }
-    // (b) 🔴 進階直改**不存在**（D-001 D1.7：兩個 select 各自列值會列出矩陣外組合，
-    //     例如 `(trigger_close, open_to_close)` 幾何窗長 0；進階直改留待 D4.2）
+    // (b) 🔴 **D4.2 改寫**：原斷言「進階直改不存在」之理由（兩個 select 會列出矩陣外組合）
+    //     已由 `kind: 'pair_rejected'` 解決 ⇒ 開放，但**預設收起**（preset 仍是主路徑）。
     expect(screen.queryByTestId('ic-param-entry_price_semantic')).toBeNull();
     expect(screen.queryByTestId('ic-param-label_return_mode')).toBeNull();
-    // (c) 純函式層之可選集合仍為 D1 之支援域投影（解灰之來源未被 UI 改動所遮蔽）
-    expect(new Set(selectable('/ic-analysis', 'entry_price_semantic')))
-      .toEqual(new Set(['trigger_open', 'trigger_close']));
+    fireEvent.click(screen.getByTestId('ic-param-advanced-toggle'));
+    expect(screen.getByTestId('ic-param-entry_price_semantic')).toBeTruthy();
+    expect(screen.getByTestId('ic-param-label_return_mode')).toBeTruthy();
+    // (c) 純函式層之可選集合＝D4.2 之全矩陣投影（五值全開；成對限制由 selection 承擔）
+    expect(new Set(selectable('/ic-analysis', 'entry_price_semantic'))).toEqual(new Set([
+      'trigger_open', 'trigger_close', 'next_open', 'decision_bar_open', 'decision_bar_close',
+    ]));
     expect(new Set(selectable('/ic-analysis', 'label_return_mode')))
       .toEqual(new Set(['open_to_close', 'open_to_horizon_close', 'close_to_close']));
     // (d) 三個 preset 之三元組**全部**可送出（否則 UI 給了選不了的選項）
@@ -127,15 +136,16 @@ describe('Task 7.6 ③⑤ — 唯讀 vs 可設定', () => {
         decision_offset_bars: 0,
       })).toBe(true);
     }
-    // `k` 之可輸入範圍鎖定（§F-1′ 之 k=0）
+    // 🔴 `G3-D2` **D4.2 改寫**：k 之輸入**已解鎖**（原斷言 `max === '0'`、`readOnly === true`）。
+    //    改寫理由：k 已不在支援矩陣內，其上界是**逐事件可行域**（資料決定，前端算不出來）
+    //    ⇒ 前端不得再假裝有一個 `max`。下界仍取契約 `min`。
     const k = screen.getByTestId('ic-param-decision-offset-bars') as HTMLInputElement;
     expect(k.min).toBe('0');
-    expect(k.max).toBe('0');
-    // 🔴 R3 群集 A：`min`／`max` 只是提示，鎖定路徑必須 `readOnly`，且程式化設值要被夾回
-    expect(k.readOnly).toBe(true);
+    expect(k.max).toBe('');            // 無上界（不是「上界為 0」）
+    expect(k.readOnly).toBe(false);
   });
 
-  it('🔴 under（R3 群集 A）：把分析參數之 k 改成 3 ⇒ 送出之 `event_label_spec` 仍為 0', () => {
+  it('🔴 D4.2：把分析參數之 k 改成 3 ⇒ 送出之 `event_label_spec` **就是 3**（不再夾回 0）', () => {
     let spec: ICAnalysisConfig['event_label_spec'];
     render(
       <EventBatchDisclosurePanel
@@ -144,14 +154,31 @@ describe('Task 7.6 ③⑤ — 唯讀 vs 可設定', () => {
       />,
     );
     fireEvent.change(screen.getByTestId('ic-param-decision-offset-bars'), { target: { value: '3' } });
+    expect(spec?.decision_offset_bars).toBe(3);
+    // over 向：契約下界仍守住（負值夾回 min，不是靜默接受）
+    fireEvent.change(screen.getByTestId('ic-param-decision-offset-bars'), { target: { value: '-1' } });
     expect(spec?.decision_offset_bars).toBe(0);
   });
 
-  it('🔴 under（R3 群集 A）：既有批之種子 `k=2` 也要被夾回 0（載入當下就不能落在鎖定範圍外）', () => {
+  it('🔴 D4.3：初始 k ＝契約 min 常數；批次記錄之 k 以**獨立欄**並排顯示，不當種子', () => {
     const d = detailFixture();
-    d.declaration_seeds.decision_offset_bars = 2;   // 舊批宣告過非 F-1′ 之值
+    d.batch_fact_notes.decision_offset_bars_record_values = [1];   // 舊批記錄了 k=1
     render(<EventBatchDisclosurePanel importId="imp-1" labelSpec={undefined} onChangeLabelSpec={() => {}} detail={d} />);
+    // 初始值是常數 0——**不是** 1（記錄值不得種子化分析參數）
     expect((screen.getByTestId('ic-param-decision-offset-bars') as HTMLInputElement).value).toBe('0');
+    // 兩個值都要看得到，且分別講清楚是什麼
+    const dual = screen.getByTestId('ic-param-k-dual').textContent ?? '';
+    expect(dual).toContain('批次記錄的 k ＝ 1');
+    expect(dual).toContain('本次分析的 k ＝ 0');
+  });
+
+  it('🔴 D4.3：批內沒有 k 欄 ⇒ 顯示「這批沒有這個欄」，**不得**顯示成 0', () => {
+    const d = detailFixture();
+    d.batch_fact_notes.decision_offset_bars_record_values = [];
+    render(<EventBatchDisclosurePanel importId="imp-1" labelSpec={undefined} onChangeLabelSpec={() => {}} detail={d} />);
+    const dual = screen.getByTestId('ic-param-k-dual').textContent ?? '';
+    expect(dual).toContain('這批沒有這個欄');
+    expect(dual).toContain('本次分析的 k ＝ 0');
   });
 });
 
@@ -463,17 +490,19 @@ describe('B-D1 R2 閉合 — CODEX-R2-P1-03 後半：「當根」之 h 不可編
 });
 
 describe('B-D1 R2 閉合 — GROK-R2-P2-03：裁定 5「UI 比支援矩陣嚴」須被具名釘住', () => {
-  it('🔴 `(trigger_open, close_to_close)` 雖在後端矩陣內，UI 守衛**仍拒**', () => {
-    // grok 指出：既有測試（preset 可送／矩陣外不可送／半組擋／兩缺放行）在
-    // 把守衛改成「鏡像後端四對」時**全綠** ⇒ 裁定 5 會靜默消失而 CI 不紅。
-    // 本條就是那個缺的負例：它是矩陣內、非 preset 的那一對。
+  it('🔴 `G3-D2` D4.2：`(trigger_open, close_to_close)` **改為放行**（裁定 5 之前提已解除）', () => {
+    // 原條釘住的是裁定 5「UI 比支援矩陣嚴」，其**理由**逐字為：
+    // 「D1 的 UI 根本產不出那一對，能出現只有偽造或程式化設值」。
+    // D4.2 開放**進階直改兩欄** ⇒ UI 產得出全部 13 對，該理由消失
+    // ⇒ 守衛改為 pair-aware（擋 `rejected_pairs`、放行其餘 13 對）。
+    // 🔴 **這不是放寬**：擋的對象換成幾何上真的算不出來的那兩對，並在下面逐條釘住。
     expect(isSubmittableLabelSpec({
       horizon_bars: 1,
       entry_price_semantic: 'trigger_open',
       label_return_mode: 'close_to_close',
       decision_offset_bars: 0,
-    })).toBe(false);
-    // 🔴 對照：同樣是矩陣內、但**是** preset 的那三對須放行
+    })).toBe(true);
+    // 🔴 對照①：三個 preset 仍須放行（preset 機制未被 D4.2 取代，只是不再是唯一入口）
     for (const p of RETURN_MEASURE_PRESETS) {
       expect(isSubmittableLabelSpec({
         horizon_bars: 1,
@@ -482,9 +511,19 @@ describe('B-D1 R2 閉合 — GROK-R2-P2-03：裁定 5「UI 比支援矩陣嚴」
         decision_offset_bars: 0,
       })).toBe(true);
     }
-    // 🔴 三個 preset 之外，`RETURN_MEASURE_PRESETS` 不得悄悄長出第四個
-    //    （若日後要放寬到矩陣四對，必須改本條，而不是「順手」改守衛）
     expect(RETURN_MEASURE_PRESETS).toHaveLength(3);
+    // 🔴 對照②（**新的負例**）：兩個幾何零窗對仍被擋——沒有這一段，守衛可以改成「恆放行」而全綠
+    for (const entry of ['trigger_close', 'decision_bar_close']) {
+      expect(isSubmittableLabelSpec({
+        horizon_bars: 1, entry_price_semantic: entry,
+        label_return_mode: 'open_to_close', decision_offset_bars: 0,
+      }), `${entry} × open_to_close`).toBe(false);
+    }
+    // 🔴 對照③：枚舉外之值仍被擋（不得對未知字面 fail-open）
+    expect(isSubmittableLabelSpec({
+      horizon_bars: 1, entry_price_semantic: 'bogus',
+      label_return_mode: 'close_to_close', decision_offset_bars: 0,
+    })).toBe(false);
   });
 });
 
@@ -594,5 +633,166 @@ describe('B-D1 R4 閉合 — GROK-R4-P2-01：同一個 h 在面板的**每一處
     //    本條**不主張那是對的**，只釘住「顯示＝送出」這件事已成立；
     //    要不要讓 preset 也跟著深度走，是殘留 `B1-DEPTH-1`（見 R5 brief）。
     expect(spec?.horizon_bars).toBe(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// `G3-D2` **Task D4.3** — k／h 掃描切換、兩上界揭露、掃描結果矩陣
+//
+// 🔴 **前端一律只顯示後端給的數字**：兩上界之公式住 producer 之 `feasible_bounds`，
+//    在此重算就是第二份實作（本 epic 反覆付過代價的形態）。
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('D4.3 — k／h 掃描之「單值／掃到 m」切換', () => {
+  it('打開 k 掃描 ⇒ 送出 `decision_offset_bars_max`；關掉 ⇒ 整個鍵回 `null`（不是空物件）', () => {
+    let scan: unknown = 'untouched';
+    const { rerender } = render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={{ horizon_bars: 2, decision_offset_bars: 3 }}
+        onChangeLabelSpec={() => {}} labelScan={null}
+        onChangeLabelScan={(next) => { scan = next; }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ic-param-scan-k-toggle'));
+    expect(scan).toEqual({ decision_offset_bars_max: 3 });   // 預設由目前的 k 帶入
+
+    rerender(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={{ horizon_bars: 2, decision_offset_bars: 3 }}
+        onChangeLabelSpec={() => {}} labelScan={{ decision_offset_bars_max: 3 }}
+        onChangeLabelScan={(next) => { scan = next; }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ic-param-scan-k-toggle'));
+    // 🔴 兩軸都關 ⇒ `null`：送空物件到後端仍代表「有掃描」（`event_label_scan is not None`）
+    expect(scan).toBeNull();
+  });
+
+  it('🔴 掃描開啟時 k 之單值輸入 disabled（同一個參數不得有兩個真相源）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={{ horizon_bars: 2 }}
+        onChangeLabelSpec={() => {}} labelScan={{ decision_offset_bars_max: 4 }}
+        onChangeLabelScan={() => {}}
+      />,
+    );
+    expect((screen.getByTestId('ic-param-decision-offset-bars') as HTMLInputElement).disabled)
+      .toBe(true);
+    expect((screen.getByTestId('ic-param-scan-k-max') as HTMLInputElement).value).toBe('4');
+  });
+
+  it('🔴 over：沒有給 `onChangeLabelScan` ⇒ 掃描區塊整個不出現（不顯示點不動的控制項）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('ic-param-scan')).toBeNull();
+  });
+});
+
+describe('D4.3／D4.2 — 兩上界之揭露（前端不自算）', () => {
+  it('沒有揭露 ⇒ 明說「要分析過才知道」，**不猜數字**', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+      />,
+    );
+    const text = screen.getByTestId('ic-param-bounds').textContent ?? '';
+    expect(text).toContain('要分析過才知道');
+    expect(text).not.toMatch(/\d/);            // 一個數字都不得出現
+  });
+
+  it('有揭露 ⇒ 顯示後端給的兩個數字，且**寫明不是成功保證**（誠實邊界）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+        disclosure={{
+          k_max_feasible_at_h: 119, h_max_feasible_at_k: 1518,
+          k_bound_status: 'bounded', h_bound_status: 'bounded',
+        }}
+      />,
+    );
+    const text = screen.getByTestId('ic-param-bounds').textContent ?? '';
+    expect(text).toContain('119');
+    expect(text).toContain('1518');
+    expect(text).toContain('不保證');          // `D-001` D4.2 R4 之誠實邊界
+  });
+
+  it('🔴 `h_inert_for_mode`／`no_feasible_k` 各有自己的說法（不得都顯示成同一句）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+        disclosure={{
+          k_max_feasible_at_h: null, h_max_feasible_at_k: null,
+          k_bound_status: 'no_feasible_k', h_bound_status: 'h_inert_for_mode',
+        }}
+      />,
+    );
+    const text = screen.getByTestId('ic-param-bounds').textContent ?? '';
+    expect(text).toContain('沒有可行的 k');
+    expect(text).toContain('不用 h');
+  });
+});
+
+describe('D4.3 — 掃描結果矩陣（行 k、列 h）', () => {
+  it('逐格渲染，且 `unavailable` 之格顯示為不可用（不是空白）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+        disclosure={{
+          event_label_scan: {
+            scan_total: 4, scan_done: 4, capability: 'available', reason: null,
+            scan_results: [
+              { k: 0, h: 1, capability: 'available', n_events: 7, analysis_alignment_receipt_hash: 'a', ic_summary: {} },
+              { k: 0, h: 2, capability: 'available', n_events: 7, analysis_alignment_receipt_hash: 'b', ic_summary: {} },
+              { k: 1, h: 1, capability: 'available', n_events: 6, analysis_alignment_receipt_hash: 'c', ic_summary: {} },
+              { k: 1, h: 2, capability: 'unavailable', reason: 'scan_cell_timeout', n_events: 0, analysis_alignment_receipt_hash: null, ic_summary: null },
+            ],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByTestId('ic-scan-cell-0-1').textContent).toContain('7 筆');
+    expect(screen.getByTestId('ic-scan-cell-1-2').textContent).toContain('不可用');
+    expect(screen.getByTestId('ic-param-scan-result').textContent).toContain('4/4');
+  });
+
+  it('🔴 `scan_grid_too_large` ⇒ 顯示「沒有執行」與 reason（不得靜默不畫）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={undefined} onChangeLabelSpec={() => {}}
+        disclosure={{
+          event_label_scan: {
+            scan_total: 420, scan_done: 0, capability: 'unavailable',
+            reason: 'scan_grid_too_large', message: '超過上限 110', scan_results: [],
+          },
+        }}
+      />,
+    );
+    const text = screen.getByTestId('ic-param-scan-rejected').textContent ?? '';
+    expect(text).toContain('scan_grid_too_large');
+    expect(text).toContain('110');
+  });
+
+  it('🔴 k 超過建議上限 ⇒ 警示但**不擋**（上限由後端揭露，前端不硬編）', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={{ horizon_bars: 2, decision_offset_bars: 12 }}
+        onChangeLabelSpec={() => {}}
+        disclosure={{ decision_offset_bars_scan_max: 10 }}
+      />,
+    );
+    expect(screen.getByTestId('ic-param-k-over-scan-max').textContent).toContain('10');
+    // over 向：沒超過就不警示
+    cleanup();
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()} labelSpec={{ horizon_bars: 2, decision_offset_bars: 3 }}
+        onChangeLabelSpec={() => {}}
+        disclosure={{ decision_offset_bars_scan_max: 10 }}
+      />,
+    );
+    expect(screen.queryByTestId('ic-param-k-over-scan-max')).toBeNull();
   });
 });

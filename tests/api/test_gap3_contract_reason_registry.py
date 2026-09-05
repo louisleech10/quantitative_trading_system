@@ -77,6 +77,12 @@ def test_gap3_contract_reason_registry_04_capability_reasons_added(pre: dict, no
     assert added == {
         "split_blocked_unverifiable_lookahead",
         "label_producer_unsupported_for_declared_semantics",
+        # 🔴 `G3-D2` **D4.2**：幾何零窗之專屬 reason（與上一條互斥，不共用字面）。
+        "zero_length_label_window",
+        # 🔴 `G3-D2` **D4.3**：掃描網格三個 reason。
+        "scan_grid_too_large",
+        "scan_cell_timeout",
+        "missing_decision_offset_disclosure",
     }
     assert set(pre["capability_unavailable_reasons"]) - set(now["capability_unavailable_reasons"]) == set()
 

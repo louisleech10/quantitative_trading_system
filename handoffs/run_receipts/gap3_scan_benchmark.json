@@ -1,0 +1,56 @@
+{
+  "receipt_id": "gap3_scan_benchmark",
+  "purpose": "D4.3 掃描網格之單格耗時實測（凍結 analysis_params 之 example_default 前置）",
+  "measured": "五階段（prepare→coverage→purge→resolve）之 wall-clock",
+  "not_measured": "每格之條件 IC（analyzer.analyze）——需同 symbol/timeframe 之已物化 feature run，耗時由該 run 的特徵數與列數決定；未量到的那一段由 per_cell_timeout_s／scan_timeout_s 保護",
+  "data": {
+    "kline_cache": "data_cache/feature_klines/kline_cache.h5",
+    "symbol": "ETHUSDT",
+    "timeframe": "12h",
+    "n_events": 60,
+    "n_bars": 1696
+  },
+  "cells_sampled": 18,
+  "cell_seconds": {
+    "mean": 0.00618,
+    "p95": 0.006677,
+    "max": 0.008202,
+    "min": 0.00582
+  },
+  "bounds_seconds": 0.000761,
+  "bounds_result": {
+    "k_max_feasible_at_h": 119,
+    "h_max_feasible_at_k": 1518,
+    "k_status": "bounded",
+    "h_status": "bounded"
+  },
+  "grid": {
+    "k_axis_max": 10,
+    "h_axis_max": 10,
+    "cells": 110,
+    "stages_only_seconds_at_max": 0.902
+  },
+  "derived_example_defaults": {
+    "decision_offset_bars_scan_max": {
+      "value": 10,
+      "why": "建議上限（超過只警示不擋）；沿用 D-001 之判斷值，本次未推翻"
+    },
+    "scan_grid_max_runs": {
+      "value": 110,
+      "why": "由宣告軸導出：k∈[0,10] 有 11 值 × h∈[1,10] 有 10 值 ＝ 110 格。🔴 **修正暫定值 121 之算術錯誤**：121 假設兩軸各 11 值，但 h 之定義域自 1 起（h=0 無意義）⇒ h 軸只有 10 值。五階段成本於此格數為 0.902 秒（可忽略）"
+    },
+    "per_cell_timeout_s": {
+      "value": 60.0,
+      "why": "五階段 p95＝0.006677 秒 ⇒ 逾時只可能由**未量到的條件 IC** 觸發。60 秒約為五階段 p95 之 9000 倍，足以吸收合理的單格 IC，且單格卡死時一分鐘內即切掉並標 scan_cell_timeout（保留 partial）"
+    },
+    "scan_timeout_s": {
+      "value": 900.0,
+      "why": "＝per_cell_timeout_s × 15 ⇒ 即使連續 15 格都跑到單格上限仍會收斂；正常格（五階段 0.00618 秒 ＋ 秒級 IC）足以跑完 110 格"
+    }
+  },
+  "env": {
+    "python": "3.9.6",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "generated_at_utc": "2026-09-05T10:27:13Z"
+}

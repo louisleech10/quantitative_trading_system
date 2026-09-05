@@ -38,7 +38,9 @@
           "type": "str",
           "enum": ["open_to_close", "open_to_horizon_close", "close_to_close"],
           "default": "close_to_close",
-          "doc": "label 錨 mode-scoped 機械唯一（SPEC D1-5）；open_to_* 顯式宣告才合法（白話閘裁決②）"
+          "rejected_pairs": { "open_to_close": ["trigger_close", "decision_bar_close"] },
+          "_rejected_pairs_doc": "D-001 D4.2：**成對**拒收（不是單維度拒收，故不放 rejected_with_reason）。open_to_close 令 label_start=entry_at、end_idx=entry_idx；entry 之取價欄為 close 時 entry_at=ct[entry_idx] 而 label_end=ct[entry_idx] ⇒ 窗長 0 ⇒ 三段鏈 no_boundary_match（真實 kline k∈{0,2} 實跑皆 0 窗）。reason 字面＝capability_unavailable_reasons.zero_length_label_window。形狀＝{mode: [entry,...]}，與 momentum/Analysis/event_samples/label_value_from_case.py::REJECTED_PAIRS 及前端 EVENT_DIM_CONTRACT_MIRROR 三處同形狀，由 pytest／vitest 逐鍵對證。UI 之 disabled 須**雙向**（選了 mode 擋 entry、選了 entry 擋 mode）。",
+          "doc": "label 錨 mode-scoped 機械唯一（SPEC D1-5）；open_to_* 顯式宣告才合法（白話閘裁決②）；與 entry_price_semantic 之成對限制見 rejected_pairs"
         },
         "filters": {
           "type": "object",
@@ -152,8 +154,29 @@
   ],
   "capability_unavailable_reasons": [
     "missing_label_value", "missing_prevalence_disclosure", "one_class_test_segment",
-    "split_blocked_unverifiable_lookahead", "label_producer_unsupported_for_declared_semantics"
+    "split_blocked_unverifiable_lookahead", "label_producer_unsupported_for_declared_semantics",
+    "zero_length_label_window", "scan_grid_too_large", "scan_cell_timeout",
+    "missing_decision_offset_disclosure"
   ],
+  "analysis_params": {
+    "_doc": "D-001 D4.2／D4.3：**分析時**參數（不落檔、不進 event record；與 required_fields 之匯入欄無關）。每個數值鍵皆為 example_default＝舉例可調，非使用者裁定值；UI／config 可覆寫。",
+    "decision_offset_bars_scan_max": {
+      "type": "int", "min": 0, "example_default": 10,
+      "doc": "分析頁 k 掃描之建議上限（超過只警示不擋——裁定③『填 m 就掃 0～m』，真正的硬上限是 scan_grid_max_runs）"
+    },
+    "scan_grid_max_runs": {
+      "type": "int", "min": 1, "example_default": 110,
+      "doc": "k×h 網格總格數硬上限；超過 ⇒ capability unavailable:scan_grid_too_large（不部分執行）。🔴 值由 D4.3 benchmark 子步凍結（receipt: handoffs/run_receipts/gap3_scan_benchmark.json，2026-09-05 實測 ETHUSDT 60 事件×12h，五階段單格 mean 6.1ms／p95 6.6ms／max 8.4ms）。110 ＝ k∈[0,10] 之 11 值 × h∈[1,10] 之 10 值；**修正暫定值 121 之算術錯誤**（121 假設兩軸各 11 值，但 h 定義域自 1 起、h=0 無意義 ⇒ h 軸只有 10 值）"
+    },
+    "per_cell_timeout_s": {
+      "type": "float", "min": 0.1, "example_default": 60.0,
+      "doc": "單格五階段＋條件 IC 之逾時；逾時之格 unavailable:scan_cell_timeout，其餘格保留 partial。🔴 由 benchmark receipt 導出：五階段 p95 6.6ms ⇒ 逾時只可能由**未量到的條件 IC** 觸發；60 秒約為 p95 之 9000 倍，足以吸收合理的單格 IC，且單格卡死時一分鐘內即切掉"
+    },
+    "scan_timeout_s": {
+      "type": "float", "min": 0.1, "example_default": 900.0,
+      "doc": "整個網格之總逾時；達上限後未跑之格一律 unavailable:scan_cell_timeout，已完成之格保留。🔴 ＝per_cell_timeout_s × 15 ⇒ 即使連續 15 格都跑到單格上限仍會收斂"
+    }
+  },
   "capability_reason_bindings": {
     "_doc": "能力不可用 reason 之**具名綁定**（GAP-3 UX Task 1.12 驗收④）：程式不得硬寫 reason 字面，只能以本表之鍵取值。值須屬 capability_unavailable_reasons 之封閉集合，否則 loader 端 raise（漂移 fail-closed）。鍵名刻意不含其值之任何子字串，故對 reason 字面之 grep 在 .py/.ts 上恆為 0。",
     "l3_lookahead_unverifiable": "split_blocked_unverifiable_lookahead"

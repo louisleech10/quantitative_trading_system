@@ -1,12 +1,12 @@
 {
-  "case_id": "decision_bar_open__open_to_horizon_close__k2__short__12h__h3",
+  "case_id": "next_open__open_to_horizon_close__k2__short__12h__h3",
   "symbol": "ETHUSDT",
   "timeframe": "12h",
   "direction": "short",
-  "event_import_id": "golden-decision_bar_open__open_to_horizon_close__k2__short__12h__h3",
+  "event_import_id": "golden-next_open__open_to_horizon_close__k2__short__12h__h3",
   "event_label_spec": {
     "horizon_bars": 3,
-    "entry_price_semantic": "decision_bar_open",
+    "entry_price_semantic": "next_open",
     "label_return_mode": "open_to_horizon_close",
     "decision_offset_bars": 2
   },
@@ -24,41 +24,41 @@
   "data_snapshot_digest": "cf13fb5370bed1bb1c5921e1f125bb6f6c2275ff14152386e81c94b075416895",
   "events": {
     "ev0": {
-      "label_value": 0.007154056740990808,
-      "label_start_ms": 1708084800000,
-      "label_end_ms": 1708257600000,
+      "label_value": -0.057029681903489296,
+      "label_start_ms": 1708214400000,
+      "label_end_ms": 1708387200000,
       "decision_at_ms": 1708084800000,
-      "entry_at_ms": 1708084800000,
+      "entry_at_ms": 1708214400000,
       "entry_price_ref": {
-        "bar_open_ms": 1708084800000,
+        "bar_open_ms": 1708214400000,
         "field": "open"
       }
     },
     "ev1": {
-      "label_value": -0.028335215777607493,
-      "label_start_ms": 1708128000000,
-      "label_end_ms": 1708300800000,
+      "label_value": -0.047053635173390014,
+      "label_start_ms": 1708257600000,
+      "label_end_ms": 1708430400000,
       "decision_at_ms": 1708128000000,
-      "entry_at_ms": 1708128000000,
+      "entry_at_ms": 1708257600000,
       "entry_price_ref": {
-        "bar_open_ms": 1708128000000,
+        "bar_open_ms": 1708257600000,
         "field": "open"
       }
     },
     "ev2": {
-      "label_value": 0.004839988243839266,
-      "label_start_ms": 1708344000000,
-      "label_end_ms": 1708516800000,
+      "label_value": 0.014398968892338295,
+      "label_start_ms": 1708473600000,
+      "label_end_ms": 1708646400000,
       "decision_at_ms": 1708344000000,
-      "entry_at_ms": 1708344000000,
+      "entry_at_ms": 1708473600000,
       "entry_price_ref": {
-        "bar_open_ms": 1708344000000,
+        "bar_open_ms": 1708473600000,
         "field": "open"
       }
     }
   },
   "nan_event_ids": [],
-  "analysis_alignment_receipt_hash": "5d8d21bc4f351316dac6cb84638b6ece713e3c9c9ad22400ca43b63de7a77db5",
+  "analysis_alignment_receipt_hash": "a4bb5eaf6f0eb4009f942f11f9a77721717d930e7157e5538f558775c8d78cf3",
   "purge_lower_bound_ms_by_symbol": {
     "ETHUSDT": 172800000
   }

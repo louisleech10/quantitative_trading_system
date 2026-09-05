@@ -28,7 +28,9 @@ import {
   type EnumEventDimension,
   type EventDimPath,
   acceptedValues,
+  clampDecisionOffset,
   contractDecisionOffsetMin,
+  decisionOffsetRange,
   dimensionBatchDefaults,
   dimensionDefaultConflicts,
   selectable,
@@ -110,16 +112,20 @@ describe('Task 7.2 ① 集合層 — 可操作 UI 選項集合 == selectable(pat
     expect(ui.length).toBe(expected.length);   // 長度亦相等 ⇒ 重複值湊不出來
   });
 
-  it('`decision_offset_bars`（非 enum）之下界由契約 `min` 導出；鎖定路徑 `readOnly`、解鎖路徑可輸入', () => {
-    renderPath('/search');
-    const locked = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
-    expect(locked.min).toBe(String(contractDecisionOffsetMin(CONTRACT)));
-    expect(locked.readOnly).toBe(true);          // R3 群集 A：鎖 0 之路徑
-    cleanup();
-    renderPath('/data-preparation', true);
-    const free = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
-    expect(free.readOnly).toBe(false);           // over 向：解鎖路徑不得被連坐
-    expect(free.min).toBe(String(contractDecisionOffsetMin(CONTRACT)));
+  it('🔴 `G3-D2` D4.3：`decision_offset_bars` 之控制項**已自兩條路徑移除**，只留指路文字', () => {
+    // 原斷言（鎖定路徑 `readOnly`、解鎖路徑可輸入）之前提是「k 由匯出／匯入時填」；
+    // 裁定②把 k 改為**分析參數** ⇒ 控制項移除，DOM 不得再有該輸入框。
+    for (const path of ['/search', '/data-preparation'] as const) {
+      renderPath(path, path === '/data-preparation');
+      expect(screen.queryByTestId('event-dim-decision_offset_bars')).toBeNull();
+      const moved = screen.getByTestId('event-dim-decision_offset_bars-moved');
+      expect(moved.textContent).toContain('k 於 IC 分析頁設定');
+      // 契約 doc 仍顯示（使用者要知道這個欄位仍存在於檔案裡）
+      expect(screen.getByTestId('event-dim-doc-decision_offset_bars')).toBeTruthy();
+      cleanup();
+    }
+    // 值域仍由契約導出（供 clamp 第二層與匯出常數使用）
+    expect(contractDecisionOffsetMin(CONTRACT)).toBe(0);
   });
 });
 
@@ -156,6 +162,14 @@ describe('Task 7.2 ② round-trip 層 — 選非預設值 ⇒ 落檔記錄之對
       [dim]: chosen,
     } as Parameters<typeof eventDimsToExportOptions>[0]);
     const out = await buildEventContractRecords([caseRow()], baseOpts(opts));
+    if (dim === 'decision_offset_bars') {
+      // 🔴 `G3-D2` **D4.3 改寫**：k **恆寫契約 min 常數**，UI 之值不再進落檔。
+      //    原斷言（落檔 === 所選值）之前提是「k 由匯出畫面決定」；控制項移除後，
+      //    仍讀 UI state 就會產生「沒有人能看到、卻會被寫進檔案」的幽靈值。
+      expect(landedValue(out.records[0] as Record<string, unknown>, dim))
+        .toBe(contractDecisionOffsetMin(CONTRACT));
+      return;
+    }
     expect(landedValue(out.records[0] as Record<string, unknown>, dim)).toBe(chosen);
   });
 });
@@ -176,56 +190,38 @@ describe('Task 7.2 ③ 非 enum 欄 — decision_offset_bars', () => {
     }
   });
 
-  it('🔴 R3 群集 D：**解鎖路徑之 UI→payload 回合**——在 /data-preparation 打 k=3 ⇒ 批次預設帶 3', () => {
-    // `GROK-R3-P2-02`：③ 原本只有函式層，而裁定 A 把「輸入 k ⇒ 落檔 === k」的
-    // 使用者路徑指向 /data-preparation ⇒ 那條路徑本身必須有機械閘，否則裁定 A 是空頭支票。
-    let current: EventDimensionValues = { ...UNSET };
-    const { rerender } = render(
-      <EventDimensionFields
-        path="/data-preparation" values={current} allowUnset
-        onChange={(next) => { current = next; }}
-      />,
+  it('🔴 `G3-D2` D4.3：CSV 欄對映路徑仍可帶 k（契約欄不變），但**不再有 UI 控制項**', () => {
+    // 原條（`GROK-R3-P2-02`）走「UI 打 k=3 → state → 批次預設」；D4.3 移除控制項後
+    // 那條 UI 路徑不存在。**契約欄與組裝點不變**——CSV 對映或程式化設值仍會被帶進批次預設，
+    // 這正是「拒收 CSV k>0」被明列為不可做的原因。
+    render(
+      <EventDimensionFields path="/data-preparation" values={UNSET} allowUnset onChange={() => {}} />,
     );
-    const input = screen.getByTestId('event-dim-decision_offset_bars') as HTMLInputElement;
-    expect(input.readOnly).toBe(false);                       // 正向對照：這條路徑真的是解鎖的
-    fireEvent.change(input, { target: { value: '3' } });
-    expect(current.decision_offset_bars).toBe(3);             // UI → state
-    rerender(
-      <EventDimensionFields path="/data-preparation" values={current} allowUnset onChange={() => {}} />,
-    );
-    // state → 送給後端的批次預設（`dimensionBatchDefaults` 是 CSV 匯入路徑之唯一組裝點）
-    expect(dimensionBatchDefaults(current, undefined).decision_offset_bars).toBe(3);
+    expect(screen.queryByTestId('event-dim-decision_offset_bars')).toBeNull();
+    const withK: EventDimensionValues = { ...UNSET, decision_offset_bars: 3 };
+    expect(dimensionBatchDefaults(withK, undefined).decision_offset_bars).toBe(3);
   });
 
-  it('🔴 R4 `CODEX-R4-P2-01`：小數 `k` **不得被靜默截斷**，且送出前顯式擋下', () => {
-    let current: EventDimensionValues = { ...UNSET };
-    render(
-      <EventDimensionFields
-        path="/data-preparation" values={current} allowUnset
-        onChange={(next) => { current = next; }}
-      />,
-    );
-    fireEvent.change(screen.getByTestId('event-dim-decision_offset_bars'), { target: { value: '1.9' } });
-    // 原缺陷：`Math.trunc` 讓 1.9 靜默變成 1——使用者以為填了 1.9、系統收了 1，
-    // 而契約那條「必須是 int」的拒絕永遠不會被看到。
-    expect(current.decision_offset_bars).toBe(1.9);
-    // 取而代之：送出前**顯式**擋下並說出原因
+  it('🔴 R4 `CODEX-R4-P2-01`：小數 `k` **不得被靜默截斷**，且送出前顯式擋下（函式層仍在）', () => {
+    // 原條經由 UI 輸入 `1.9`；控制項移除後，可達路徑是 CSV 對映／程式化設值。
+    // **被守的不變式逐字不變**：小數不得靜默截斷，且送出前顯式擋下並說出原因。
+    const current: EventDimensionValues = { ...UNSET, decision_offset_bars: 1.9 };
     const problems = dimensionDefaultConflicts(current, undefined, []);
     expect(problems.some((p) => /整數/.test(p) && /decision_offset_bars/.test(p))).toBe(true);
     // over 向：整數不得被這條誤擋
     expect(dimensionDefaultConflicts({ ...current, decision_offset_bars: 3 }, undefined, [])).toEqual([]);
   });
 
-  it('🔴 R4 over：鎖定路徑之 clamp 只夾範圍（`5` ⇒ `0`），不改變整數性判準', () => {
-    let current: EventDimensionValues = { ...UNSET, decision_offset_bars: 0 };
-    render(
-      <EventDimensionFields
-        path="/search" values={current} onChange={(next) => { current = next; }}
-      />,
+  it('🔴 R4 over：`clampDecisionOffset` 只夾範圍，不改變整數性判準', () => {
+    // `/search` 之 range 仍為 locked（供程式化設值之第二層）；`/ic-analysis` 已解鎖（D4.2）。
+    expect(clampDecisionOffset(5, decisionOffsetRange('/search', CONTRACT))).toBe(0);
+    expect(clampDecisionOffset(1.9, decisionOffsetRange('/data-preparation', CONTRACT))).toBe(1.9);
+    expect(clampDecisionOffset(-1, decisionOffsetRange('/data-preparation', CONTRACT))).toBe(0);
+    // 🔴 D4.2：`/ic-analysis` 之 k **不再有上界**（上界是逐事件可行域，前端算不出來）
+    expect(decisionOffsetRange('/ic-analysis', CONTRACT)).toEqual(
+      { min: 0, max: null, locked: false },
     );
-    // `readOnly` 擋使用者；本條走的是程式化設值那層
-    fireEvent.change(screen.getByTestId('event-dim-decision_offset_bars'), { target: { value: '5' } });
-    expect(current.decision_offset_bars).toBe(0);
+    expect(clampDecisionOffset(7, decisionOffsetRange('/ic-analysis', CONTRACT))).toBe(7);
   });
 });
 
@@ -241,17 +237,21 @@ describe('Task 7.2 路徑對照 — 同一維度之限制只在該路徑成立',
     expect(ui.length).toBeGreaterThan(selectable('/search', 'scenario', CONTRACT).length);
   });
 
-  it('🔴 over：`entry_price_semantic` 於 /data-preparation 為契約 enum 全集，/search 為 D1 之兩值', () => {
-    renderPath('/data-preparation', true);
-    const prep = enabledOptionValues('event-dim-entry_price_semantic');
-    expect(new Set(prep)).toEqual(new Set(acceptedValues('entry_price_semantic', CONTRACT)));
-    cleanup();
-    renderPath('/search');
-    // 🔴 `G3-D2` D1.5：`trigger_open` 解灰 ⇒ 由一值變兩值。
-    //    **順序沿用契約 enum 順序**（`selectable` 不另排），故 trigger_open 在前。
-    //    仍為**嚴格相等**（非 toContain）：其餘三值若被誤解灰，本條照樣紅。
-    expect(enabledOptionValues('event-dim-entry_price_semantic'))
-      .toEqual(['trigger_open', 'trigger_close']);
+  it('🔴 `G3-D2` D4.2：`entry_price_semantic` 於**兩條路徑皆為契約 enum 全集**（五值全開）', () => {
+    // 原斷言「/search 為 D1 之兩值」之前提是後端矩陣只有四對；D4.2 擴為 13 對
+    // （5 entry × 3 mode 減兩個幾何零窗對）⇒ 路徑排除清空，五值全開。
+    // 仍不可選的兩個組合改由 `kind: 'pair_rejected'` 表達（**成對**，非單維度排除），
+    // 其雙向 disabled 由 `eventContractOptions.test.tsx` 之 pair 專段守。
+    const all = acceptedValues('entry_price_semantic', CONTRACT);
+    for (const path of ['/data-preparation', '/search'] as const) {
+      renderPath(path, path === '/data-preparation');
+      // **嚴格相等**（含順序：`selectable` 沿用契約 enum 順序）
+      expect(enabledOptionValues('event-dim-entry_price_semantic')).toEqual([...all]);
+      cleanup();
+    }
+    // over 向之對照：`scenario` 之路徑差異**仍在**（證明排除機制沒有整個失效）
+    expect(selectable('/search', 'scenario', CONTRACT).length)
+      .toBeLessThan(acceptedValues('scenario', CONTRACT).length);
   });
 });
 

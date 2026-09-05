@@ -326,9 +326,64 @@ class EventSamplePipeline:
         支援域字面，矩陣一擴充那句就過期——使用者照著過期訊息去改設定會改錯。
         本函式回字串而非集合：呼叫端只需要顯示，不需要判定（判定一律走 `spec_is_supported`）。
         """
-        from momentum.Analysis.event_samples.label_value_from_case import SUPPORTED_MATRIX
+        from momentum.Analysis.event_samples.label_value_from_case import (
+            REJECTED_PAIRS, SUPPORTED_PAIRS,
+        )
 
-        return "、".join(f"({e}, {m}, k={k})" for e, m, k in sorted(SUPPORTED_MATRIX))
+        pairs = "、".join(f"({e}, {m})" for e, m in sorted(SUPPORTED_PAIRS))
+        rejected = "、".join(
+            f"({e}, {m})" for m, entries in sorted(REJECTED_PAIRS.items()) for e in sorted(entries)
+        )
+        return f"{pairs}（k>=0、h>=1 任意；幾何零窗必拒：{rejected}）"
+
+    @staticmethod
+    def feasible_bounds(records, bars_by_tf, *, event_label_spec, timeframes):
+        """`D-001` D4.2 兩條件上界之 R3 出口（回**純資料 dict**）。
+
+        🔴 回 dict 而非 `FeasibleBounds`：`api/` 只需要顯示這四個值，不需要判定
+        ⇒ 沒有理由把第二個型別推過解耦邊界（`PreparedAnalysisWindows` 那個具名例外
+        是因為驗收要比 `is` 身分，本欄不是）。
+        """
+        from momentum.Analysis.event_samples.label_value_from_case import (
+            feasible_bounds as _impl,
+        )
+
+        b = _impl(records, bars_by_tf, event_label_spec=event_label_spec, timeframes=timeframes)
+        return {
+            "k_max_feasible_at_h": b.k_max_feasible_at_h,
+            "h_max_feasible_at_k": b.h_max_feasible_at_k,
+            "k_bound_status": b.k_status,
+            "h_bound_status": b.h_status,
+        }
+
+    @staticmethod
+    def analysis_params() -> Dict[str, Any]:
+        """契約 `analysis_params` 之 `example_default` 投影（`G3-D2` D4.3 之 R3 出口）。
+
+        回 `{鍵: 值}`（只取 `example_default`）。`api/` 因此不必 import `momentum`，
+        也不必在服務層寫死 `121`／`60.0` 這種數字——改契約即改行為。
+        缺鍵 ⇒ raise（不補預設）：靜默取一個內建值會讓「契約改了」與「沒改」長得一樣。
+        """
+        from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+
+        node = load_event_import_contract().get("analysis_params")
+        if not isinstance(node, dict):
+            raise KeyError("契約缺 analysis_params（fail-closed，不補預設）")
+        out: Dict[str, Any] = {}
+        for key, spec in node.items():
+            if key.startswith("_") or not isinstance(spec, dict):
+                continue
+            if "example_default" not in spec:
+                raise KeyError(f"契約 analysis_params.{key} 缺 example_default")
+            out[key] = spec["example_default"]
+        return out
+
+    @staticmethod
+    def rejected_label_pairs() -> Dict[str, Any]:
+        """`D-001` D4.2 之幾何必拒對（R3 出口；供契約對證與 API 揭露用，回純資料）。"""
+        from momentum.Analysis.event_samples.label_value_from_case import REJECTED_PAIRS
+
+        return {mode: list(entries) for mode, entries in REJECTED_PAIRS.items()}
 
     @staticmethod
     def int_field_domain(field: str) -> Mapping[str, Any]:
