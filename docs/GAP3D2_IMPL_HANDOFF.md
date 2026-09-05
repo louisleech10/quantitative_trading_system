@@ -130,3 +130,60 @@
 > 🔴 **2026-09-05 補登**：B-D0 兩條、B-D1 八條、B-D3 三條殘留原本**只寫在本表**，
 > 未登記進 `docs/IC_QUANT_GAP_REGISTRY.md`（違反「登記處為該 epic 之權威登記處」）。已補登，
 > 三值理由逐字取自本機收斂檔。日後新增殘留**兩處都要寫**：本表放狀態、registry 放三值與觸發。
+
+---
+
+## §6 B-D5 開工前必知（2026-09-05 B-D4 收工時寫；下一個 session 讀完本節即可開工）
+
+> 🔴 本節是 `HANDOFF.md` 之細節落點（§0 定：HANDOFF 只放指標）。**開工前先照 CLAUDE.md 稽核**
+> ——抽驗本檔與 registry 之聲稱 vs repo 實況（commit 存在性／測試計數／golden case 數／git status），
+> 過時先修再開工。B-D4 收工時之實況見 §5 之 B-D4 列（那些數字是本機實跑，非轉抄）。
+
+### §6.1 一個**尚未答覆的決策點**（不得當成已裁定）
+
+2026-09-05 深夜使用者問「B-D4 那三件自己的判斷要不要三家審查」。查證後回答：
+①②**三家 R1 必答已逐條審過並接受**（8a／6a），③**沒人審過**（見 §6.2）。
+接著我問了一個問題、**使用者尚未回答**：
+
+> **要不要現在重開 `docs/GAP3_EVENT_UX_SPEC.D-001.md`，把 pair 重設之第二順位規則寫回 SPEC？**
+
+我的建議＝**不現在做**：D-001 是 FROZEN 延伸檔，為一條 UI 重設規則重開＋跑三家戳記，
+成本遠大於收益；殘留 `B4-SPECGAP-1` 已釘住觸發（下次重開 D-001 時寫回）。
+三家 R1 皆說「應寫回 SPEC」，但**沒有一家說要現在寫**。
+⇒ 使用者若未再提，照建議走（不重開）並保留殘留；**不得自行認定已裁定**。
+
+### §6.2 B-D4 三件主委判斷之**審查狀態**（逐件不同；已查證，非印象）
+
+| # | 判斷 | 審查狀態 |
+|---|---|---|
+| 1 | `D-001` D4.2 規格洞之補法（default 合法即用它；否則取契約 enum 順序第一個合法值並揭露） | ✅ **三家 R1 必答 8a 皆判可接受**（codex：「可接受為實作端的 fail-closed 細化，但尚未達 strict SPEC conformance」）。**碼已審過**；未做的是 SPEC 回寫（另一條管線） |
+| 2 | `scan_grid_max_runs` 121 → 110 | ✅ **三家 R1 必答 6a 皆確認算術正確**。🔴 6b 有分歧：codex 判兩 timeout「應標 `needs-research`」，composer／grok 判「可作暫定凍結」——**主委採較嚴的 codex 版**（離線分歧採較嚴＋具名殘留 `B4-TIMEOUT-1`）。此為主委裁量，供覆核 |
+| 3 | `CODEX-R2-P3-04` 不修（每格建 analyzer 110 次≈2.8s） | 🔴 **無任何一家審過**——是 R2 交件**之後**才做的判斷。誠實邊界：產出是「不改碼」，故無未經審查之程式；兩條理由可機械查核（①無 wall-time 門檻＝`B4-TIMEOUT-1` 同一件未量之事；②快取 analyzer 會重現 `CODEX-R1-P1-01` 之 stateful 污染——該句是 codex 自己在 P3-04 內文寫的）。**要推翻須走審查輪，不得逕自快取** |
+
+### §6.3 B-D4 造成的**介面變動**（D-006 之 D5.1–D5.4 在 B-D4 之前凍結，下列前提已變）
+
+| # | D-006 D5 寫的 | B-D4 之後的實況 | 對 B-D5 的影響 |
+|---|---|---|---|
+| 1 | D5.1 增 `import_failure_reasons`／`capability_unavailable_reasons` 之新 reason | 契約 `capability_unavailable_reasons` 現有 **9 條**（B-D4 加 `zero_length_label_window`／`scan_grid_too_large`／`scan_cell_timeout`／`missing_decision_offset_disclosure`） | `tests/api/test_gap3_contract_reason_registry.py::…_04` 之 `added ==` **集合相等**斷言要再擴；🔴 **不得**改成 `issuperset`（那是放寬） |
+| 2 | D5.3 之 `EventImportDetailResponse` 增 `receipt_batch` | 同一模型之 `EventBatchFactNotes` 已增 `decision_offset_bars_record_values`；`EventDeclarationSeeds` 已**移除** `decision_offset_bars`（`SEED_KEYS` 現為兩鍵） | 動 detail 模型時**勿把 k 加回 seeds** |
+| 3 | D5.4 之 `gap3_label_golden.py --kind random_control` | 該腳本現守 **46** 個 `gap3_label` 案例（原 23） | 加 `--kind` 時勿讓既有 46 檔改變路徑或值；`--check` 之 rc=0 是 gate |
+| 4 | 契約新增鍵 | 契約已多一個頂層節 `analysis_params`（B-D4 加） | `analysis_params` **不在 D5 scope**，勿順手改 |
+
+🔴 **另一條非 D-006 的實況**：`ic_analysis_service._run_scan_grid` 現以 **`analyzer_factory`**
+（非 analyzer 實例）為參數。B-D5 若在服務層加新分析入口，沿用同一形狀——
+**不要回頭共用單一 analyzer**，那正是 R1 的 P1（`ICFilterOrchestrator` 持有可變欄位）。
+
+### §6.4 B-D5 專屬地雷（除 §3 全部仍適用外）
+
+- 🔴 **前端測試必須在 `frontend` 目錄跑**（`cd frontend && npx vitest run`）——
+  `noTicketIdInUi.test.ts` 以相對路徑掃 `src/`，在 repo 根跑會**假紅**（B-D4 踩過一次）。
+- 🔴 **派工守檔**：委員會會跑 `handoffs/20260905-gap3d2-b4-mutate.py`（就地改生產碼再還原）。
+  B-D4 R1 期間有一次被中斷、`M8` 留在工作區未還原，收件時以 baseline 對證才發現。
+  ⇒ **派工前**建 baseline：`git ls-files <目錄…> | xargs shasum -a 256 > .claude/gate/<batch>_baseline.sha`；
+  **收件後**先 `shasum -a 256 -c` 對證再讀 findings。
+- 🔴 **commit 訊息之 claim 閘**：訊息內不得出現「全綠／綠燈／passed」等字面
+  （`verification_claim_check.py` 之 `STRONG_POLARITY`／`WEAK_POLARITY`），否則 commit 被擋。
+  數字與 rc 一律放本檔 §5。B-D4 因此重寫過三次 commit 訊息。
+- 🔴 **`handoffs/` 為 gitignore**，但 `handoffs/run_receipts/*` 與 `handoffs/*.py` 已進版控。
+- 🔴 **`B1-VERIFY-1` 到期日＝B-D5 完工時**：`tests/api` 與 `tests/governance` 各須再跑一次
+  （上次跑的是 B-D3 以前的碼）。`tests/governance` 為小時級，**丟背景**。
