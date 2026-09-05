@@ -487,3 +487,39 @@ describe('D3.1 R2 閉合（第二刀）— 模組層常數之來源以「變異�
     await expect(import('./eventExport')).rejects.toThrow(/search_unlabeled/);
   });
 });
+
+describe('D3.1 R3 閉合 — 群集 G：另兩個「由契約導出」之常數亦須證明接線（`CODEX-R3-P2-01`）', () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock('./eventDimensions');
+  });
+
+  it('🔴 `contractDefault` 回不同值 ⇒ 兩個常數**必須跟著變**（hardcode 版不會變）', async () => {
+    // 🔴 這是必答 3b「同病掃描」之產物：codex 點名
+    //    `EVENT_EXPORT_ENTRY_PRICE_SEMANTIC`／`EVENT_EXPORT_LABEL_RETURN_MODE`
+    //    宣稱由契約導出，但既有測試只比**現值** ⇒ 改成契約現值 literal 仍全綠。
+    // 🔴 **刻意 mock `eventDimensions` 這個模組，不動 `EVENT_DIM_CONTRACT_MIRROR` 之雙源設計**：
+    //    鏡像之所以存在，是為了讓 Task 7.2 之漂移閘有兩個來源可比
+    //    （`eventDimensions.ts` 檔頭已具名記過「兩邊都讀真契約會讓 7.2 變 false negative」）。
+    //    本條要證明的是「`eventExport` 有沒有真的呼叫 `contractDefault`」，與那個設計無關。
+    const actual = await import('./eventDimensions');
+    vi.resetModules();
+    vi.doMock('./eventDimensions', () => ({
+      ...actual,
+      contractDefault: (dim: string) => (
+        dim === 'entry_price_semantic' ? 'zz_probe_entry' : 'zz_probe_mode'
+      ),
+    }));
+    const fresh = await import('./eventExport');
+    expect(fresh.EVENT_EXPORT_ENTRY_PRICE_SEMANTIC).toBe('zz_probe_entry');
+    expect(fresh.EVENT_EXPORT_LABEL_RETURN_MODE).toBe('zz_probe_mode');
+  });
+
+  it('🔴 over 向：未 mock 時兩者等於真鏡像之 default（證明上一條不是把值寫死成 probe）', async () => {
+    const { contractDefault } = await import('./eventDimensions');
+    const { EVENT_EXPORT_ENTRY_PRICE_SEMANTIC: entry, EVENT_EXPORT_LABEL_RETURN_MODE: mode } =
+      await import('./eventExport');
+    expect(entry).toBe(contractDefault('entry_price_semantic'));
+    expect(mode).toBe(contractDefault('label_return_mode'));
+  });
+});
