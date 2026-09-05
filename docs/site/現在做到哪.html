@@ -32,7 +32,7 @@
 </tr>
 <tr>
 <td><strong>在做第幾段</strong></td>
-<td><strong>第 5 段（B-D5，最後一段）——實作完成，審碼中</strong>。前四段皆已收工</td>
+<td><strong>第 5 段（B-D5，最後一段）——第一輪審碼已閉合，等第二輪</strong>。前四段皆已收工</td>
 </tr>
 <tr>
 <td><strong>卡住嗎</strong></td>
@@ -109,6 +109,31 @@
 <li>凍結檔的「登記處有沒有被偷改」那道守護，本身沒有任何測試。</li>
 </ul>
 <p>四條全部補上之後<strong>第二輪 32/32 全部符合預期</strong>（30 種改壞→紅、2 種只改註解→綠）。</p>
+<h3 id="第-5-段第一輪審碼三家獨立抓到同一個問題我又做了一次幽靈功能">第 5 段第一輪審碼：三家獨立抓到同一個問題——<strong>我又做了一次幽靈功能</strong></h3>
+<p><strong>三家（codex／composer／grok）各自獨立命中同一條</strong>：那道「同一把尺」的閘
+<strong>寫好了、測試全綠、但沒有任何地方會去呼叫它</strong>。使用者按下「產生隨機對照批」之後，
+畫面只會顯示「已產生 20 筆」——<strong>拿不到任何比較結果</strong>。
+「這批 25% vs 隨機 10%」這個唯一有意義的產出，做完了卻沒接出來。</p>
+<p>🔴 <strong>這正是第 4 段付過代價的同一種病</strong>（那次是掃描結果沒接到畫面）。更糟的是：
+我在派工單的「我沒查的」欄位裡<strong>自己寫下了這一條</strong>，卻把它標成「不在範圍內」——
+grok 直接推翻那個分類，指出規格的目標句就是「報表與觸發批並排 prevalence」。</p>
+<p><strong>修法</strong>：加了 <code>POST /case/events/compare-random-control</code>，前端產完對照批<strong>立刻</strong>呼叫並顯示
+「這批正例率 X%（n 筆）｜隨機對照 Y%（m 筆）｜lift Z×」；閘不通過時顯示具名理由，
+且<strong>一個數字都不給</strong>（給了就會有人拿去相減）。分析頁也會標明這批是「無條件隨機」還是
+「條件樣本」——兩者的解讀完全相反，以前看不出來。</p>
+<p><strong>另外三條也修了</strong>：</p>
+<ul>
+<li><strong>codex</strong>：<code>n_requested</code> 填 1.5 會被悄悄變成 1、填 -1 會讓伺服器 500。
+現在非整數／負數一律當場拒絕並回 4xx。（<strong>合法的請求得到與請求不同的結果</strong>，
+這種錯不會有任何東西報警。）</li>
+<li><strong>composer</strong>：那道閘原本拿檔案裡記的報酬值來重算答案——那只證明「答案跟報酬值自洽」，
+<strong>不證明報酬值本身是這條規則算出來的</strong>。composer 給了具體反例。
+現在改成回<strong>真實 K 線</strong>重算，兩項都要對得上。</li>
+<li><strong>composer</strong>：隨機批單獨跑分析時的揭露沒有測試，補上。</li>
+</ul>
+<p><strong>順帶刪掉一段抽象</strong>：我原本為了舊版那條錯路徑切了一個小函式出來，修好之後它<strong>沒有任何呼叫端</strong>了
+——直接移除，不留沒人用的間接層。</p>
+<p>修完之後 mutation 擴到 <strong>37 條、37/37 全部符合預期</strong>。</p>
 <hr />
 <h2 id="95-那兩件已結束的事留指標細節不堆在這">9/5 那兩件已結束的事（留指標，細節不堆在這）</h2>
 <ul>
