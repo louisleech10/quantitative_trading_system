@@ -202,3 +202,72 @@ describe('隨機對照組入口之接線（攔 HTTP body）', () => {
     expect(screen.queryByTestId('ic-random-control-generate')).toBeNull();
   });
 });
+
+// ── R1 閉合：compare 接線（三家獨立命中「閘在測面綠、產品面不可達」）──────────
+
+describe('產完對照批立刻跑規則身分閘並顯示結論', () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  function twoCallFetch(verdict: Record<string, unknown>) {
+    return vi.fn()
+      .mockResolvedValueOnce({
+        ok: true, json: async () => ({ accepted: true, import_id: 'rc-9', n_rows: 20, n_valid: 20 }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => verdict });
+  }
+
+  it('產生後**第二個** request 打 compare 端點，body 帶兩個 import_id', async () => {
+    const fetchMock = twoCallFetch({
+      status: 'ok', reason: null, message: null,
+      trigger_prevalence: 0.25, random_prevalence: 0.1, lift: 2.5,
+      n_trigger: 4, n_random: 20, sample_design: 'unconditional_random',
+      n_requested: 100, n_drawn: 20,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderPanel(detailFixture());
+    fireEvent.click(screen.getByTestId('ic-random-control-generate'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(String(url)).toContain('/case/events/compare-random-control');
+    expect(JSON.parse(String((init as RequestInit).body)))
+      .toEqual({ trigger_import_id: 'imp-1', random_import_id: 'rc-9' });
+
+    const line = await screen.findByTestId('ic-random-control-prevalence');
+    expect(line.textContent).toContain('25.0%');
+    expect(line.textContent).toContain('10.0%');
+    expect(line.textContent).toContain('2.50×');
+    expect(line.textContent).toContain('unconditional_random');
+  });
+
+  it('`unavailable` ⇒ 顯示具名 reason，且**不顯示**任何 prevalence 數字', async () => {
+    vi.stubGlobal('fetch', twoCallFetch({
+      status: 'unavailable', reason: 'random_control_rule_identity_unverifiable',
+      message: '觸發批沒有落檔 receipt.batch.label_rule',
+      trigger_prevalence: null, random_prevalence: null, lift: null,
+      n_trigger: 0, n_random: 0, sample_design: 'unconditional_random',
+      n_requested: 100, n_drawn: 20,
+    }));
+    renderPanel(detailFixture());
+    fireEvent.click(screen.getByTestId('ic-random-control-generate'));
+
+    const note = await screen.findByTestId('ic-random-control-compare-unavailable');
+    expect(note.textContent).toContain('random_control_rule_identity_unverifiable');
+    expect(screen.queryByTestId('ic-random-control-prevalence')).toBeNull();
+  });
+
+  it('`lift` 為 null（對照基準 0）⇒ 寫「無定義」而不是印 0 或 Infinity', async () => {
+    vi.stubGlobal('fetch', twoCallFetch({
+      status: 'ok', reason: null, message: null,
+      trigger_prevalence: 0.5, random_prevalence: 0.0, lift: null,
+      n_trigger: 4, n_random: 20, sample_design: 'unconditional_random',
+      n_requested: 20, n_drawn: 20,
+    }));
+    renderPanel(detailFixture());
+    fireEvent.click(screen.getByTestId('ic-random-control-generate'));
+    const line = await screen.findByTestId('ic-random-control-prevalence');
+    expect(line.textContent).toContain('無定義');
+    expect(line.textContent).not.toContain('Infinity');
+    expect(line.textContent).not.toContain('NaN');
+  });
+});

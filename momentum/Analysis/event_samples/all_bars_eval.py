@@ -82,22 +82,16 @@ def _entry_price(semantic: str, open_: np.ndarray, close: np.ndarray, i: int, k:
     raise ValueError(f"unknown entry_price_semantic {semantic!r}")
 
 
-def label_from_signed_return(signed_return: float, threshold: float) -> int:
-    """標籤判準之**唯一**比較式：已乘方向之報酬 ≥ threshold ⇒ 1。
-
-    🔴 `G3-D2` D5.3：切出本函式是因為**規則身分閘**要「以同一 `label_rule` 重評觸發批
-    每列 label」，而它手上只有落檔之 `label_value`（已是 signed return），沒有 bar 表。
-    若在服務層另寫 `label_value >= threshold`，就會有兩份比較式：一份給產生器、一份給
-    對證器——它們哪天不一致，比對結果就會說謊而沒有人會發現。
-    ⇒ 兩條路徑共用本函式；`_label_from_rule` 只負責「怎麼算出 signed return」。
-    """
-    return int(signed_return >= threshold)
-
-
 def _label_from_rule(direction_sign: float, close: np.ndarray, i: int, horizon: int, threshold: float) -> int:
-    """標籤規則（close_to_close）：dir·(close[i+h]/close[i]−1) ≥ threshold ⇒ 1。"""
+    """標籤規則（close_to_close）：dir·(close[i+h]/close[i]−1) ≥ threshold ⇒ 1。
+
+    🔴 `G3-D2` D5.3 R1 閉合後**維持單一實作**：曾一度把比較式切成
+    `label_from_signed_return` 供規則身分閘重用（閘當時拿落檔之 `label_value` 當
+    signed return）。`COMPOSER-R1-P1-02` 證明那條路本身是錯的——重評必須回 bar 表
+    ⇒ 該抽象失去唯一呼叫端，已移除，不留無人呼叫的間接層。
+    """
     r = direction_sign * (close[i + horizon] / close[i] - 1.0)
-    return label_from_signed_return(r, threshold)
+    return int(r >= threshold)
 
 
 def evaluate_all_bars(

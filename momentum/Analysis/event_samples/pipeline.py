@@ -230,15 +230,18 @@ class EventSamplePipeline:
         return {"ok": True, "failures": []}
 
     @staticmethod
-    def label_from_signed_return(signed_return: float, threshold: float) -> int:
-        """`G3-D2` D5.3：標籤判準之 R3 出口（**與產生器同一函式**）。
+    def recompute_close_to_close(records, bars, *, threshold: float, horizon: int, direction: str):
+        """`G3-D2` D5.3 R1 閉合：以真實 bar 表重算 `close_to_close` label／signed return。
 
-        規則身分閘之 (c) 段要以同一條 `label_rule` 重評觸發批 label；服務層手上只有
-        落檔之 `label_value`（signed return），故走本出口而**不在 api 層寫比較式**。
+        規則身分閘③需要它——拿落檔之 `label_value` 當 signed return 只證明內部自洽，
+        不證明那個值真的是這條規則算出來的（`COMPOSER-R1-P1-02` 之反例）。
+        回純資料 `{event_id: {"label", "signed_return"}}`；算不出之列**不回傳**。
         """
-        from momentum.Analysis.event_samples.all_bars_eval import label_from_signed_return as _impl
+        from momentum.Analysis.event_samples.random_control import (
+            recompute_close_to_close as _impl,
+        )
 
-        return _impl(float(signed_return), float(threshold))
+        return _impl(records, bars, threshold=threshold, horizon=horizon, direction=direction)
 
     @staticmethod
     def sample_random_bars(bars, spec, trigger_receipts, label_rule=None, *, scenario: str):

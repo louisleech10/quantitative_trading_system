@@ -193,8 +193,9 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "M18-label-comparison-inverted",
         "momentum/Analysis/event_samples/all_bars_eval.py",
-        "    return int(signed_return >= threshold)\n",
-        "    return int(signed_return <= threshold)\n",
+        # R1 閉合後 `label_from_signed_return` 已移除（失去唯一呼叫端）⇒ 錨點回到 `_label_from_rule`
+        "    return int(r >= threshold)\n",
+        "    return int(r <= threshold)\n",
         [*PYTEST, T_RC, "-k", "golden_check"],
         "標籤比較式反向（唯一比較式被改壞 ⇒ 兩條路徑一起錯）",
     ),
@@ -299,6 +300,48 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "                    event_import_id: importId, random_control_spec: {},\n",
         ["npx", "vitest", "run", "icRandomControl"],
         "按鈕沒把純函式組出來的 spec 送出（幽靈接線：畫得出來、送出去是空的）",
+    ),
+
+    # ── R1 閉合之四條（三家 findings） ─────────────────────────────────
+    Mutation(
+        "M33-compare-not-wired-frontend",
+        "frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx",
+        "                    setRcCompare(verdict);\n",
+        "                    void verdict;\n",
+        ["npx", "vitest", "run", "icRandomControl"],
+        "R1 三家命中：產完對照批不跑（或不顯示）規則身分閘 ⇒ 使用者拿不到結論",
+    ),
+    Mutation(
+        "M34-sample-design-always-case-control",
+        "api/services/ic_analysis_service.py",
+        '        return RANDOM_SAMPLE_DESIGN if kinds == {"platform_random_bars"} else "case_control"\n',
+        '        return "case_control"\n',
+        [*PYTEST, T_API, "-k", "standalone_ic_analysis_sample_design"],
+        "R1 `GROK-R1-P2-01`：抽樣設計揭露恆為 case_control ⇒ 無條件估計被讀成條件估計",
+    ),
+    Mutation(
+        "M35-int-coercion-restored",
+        "momentum/Analysis/event_samples/random_control.py",
+        "    if type(value) is not int:\n",
+        "    if False:\n",
+        [*PYTEST, T_API, "-k", "rejects_non_exact_int"],
+        "R1 `CODEX-R1-P1-02`：非 exact int 又被靜默 coerce（receipt 與 request 不同）",
+    ),
+    Mutation(
+        "M36-gate3-trusts-label-value",
+        "api/services/ic_analysis_service.py",
+        '            lv_ok = lv is None or float(lv) == got["signed_return"]\n',
+        "            lv_ok = True\n",
+        [*PYTEST, T_API, "-k", "gate3_reads_bar_table"],
+        "R1 `COMPOSER-R1-P1-02`：閘③又回去信任 label_value（與 bar 表不符也放行）",
+    ),
+    Mutation(
+        "M37-gate3-label-check-removed",
+        "api/services/ic_analysis_service.py",
+        '            if got["label"] == int(lab) and lv_ok:\n',
+        "            if True:\n",
+        [*PYTEST, T_API, "-k", "compare_iv_mutation_flipped or gate3_reads_bar_table"],
+        "閘③之重評比對整段失效（宣告與落檔不符也算一致）",
     ),
 
     # ── 對照組（預期綠）────────────────────────────────────────────────

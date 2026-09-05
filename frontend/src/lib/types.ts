@@ -2954,6 +2954,32 @@ export interface RandomControlGenerateRequest {
   random_control_spec: Record<string, unknown>;
 }
 
+/** `G3-D2` D5.3：`POST /case/events/compare-random-control` 之 body。 */
+export interface RandomControlCompareRequest {
+  trigger_import_id: string;
+  random_import_id: string;
+}
+
+/**
+ * 規則身分閘之結論。
+ *
+ * 🔴 `status='unavailable'` 時兩個 prevalence 一律 `null`——**不給半套數字**。
+ *    `reason` 取自後端契約之封閉集合，前端只負責把它翻成白話，**不自寫第二份字面**。
+ */
+export interface RandomControlCompareResult {
+  status: 'ok' | 'unavailable';
+  reason: string | null;
+  message: string | null;
+  trigger_prevalence: number | null;
+  random_prevalence: number | null;
+  lift: number | null;
+  n_trigger: number;
+  n_random: number;
+  sample_design: string;
+  n_requested: number | null;
+  n_drawn: number | null;
+}
+
 /** `G3-D2` D4.3：k／h 掃描網格之請求上界（請求**頂層 sibling**，不在 `event_label_spec` 內）。 */
 export interface ICEventLabelScan {
   decision_offset_bars_max?: number;

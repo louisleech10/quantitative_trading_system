@@ -546,7 +546,22 @@ class ICAnalysisService:
             #    值由對齊層機械導出（`decision_at >= t₀ close`），本層**只投影不重算**。
             #    D2-2 單一表示法下恆為 `[False]`；空清單代表對齊層沒寫這欄（loud，非正常值）。
             "event_known_at_decision_values": list(prepared1.event_known_at_decision_values),
+            # 🔴 `G3-D2` D5.3（R1 三家命中）：本批之**抽樣設計**揭露。
+            #    `D-001` D5.3 邊界④：「隨機批單獨分析允許（其 IC＝無條件 IC 估計，**揭露**）」
+            #    ——沒有這一欄，使用者看不出手上這份 IC 是條件估計還是無條件估計，
+            #    而兩者的解讀完全相反。值由 `control_kind` 機械導出，不由使用者宣告。
+            "event_sample_design": ICAnalysisService._sample_design_of(records),
         }
+
+    @staticmethod
+    def _sample_design_of(records) -> str:
+        """批之抽樣設計（`G3-D2` D5.3）：全批 `platform_random_bars` ⇒ 無條件隨機。
+
+        🔴 **全批一致才算**——混批不存在（`validate_event_import` 已 fail-closed 拒
+        `platform_random_bars` 與其他 kind 同批），故此處不需多數決，也不得取第一列。
+        """
+        kinds = {str(r.get("control_kind")) for r in records if r.get("control_kind") is not None}
+        return RANDOM_SAMPLE_DESIGN if kinds == {"platform_random_bars"} else "case_control"
 
     @staticmethod
     def compare_random_control(trigger_detail: Any, random_detail: Any) -> CompareVerdict:
@@ -637,24 +652,50 @@ class ICAnalysisService:
         # ── ③ 以同一規則重評觸發批 label（宣告 vs 落檔） ──────────────────
         trig_recs = list(getattr(trigger_detail, "records", None) or ())
         threshold = trig_leaves["threshold"]
+        horizon = trig_leaves["horizon_bars"]
+        # 🔴 **從真實 bar 表重算**（R1 `COMPOSER-R1-P1-02`）：舊版拿落檔之 `label_value`
+        #    當 signed return，只證明「`label` 與 `label_value` 內部自洽」，**不證明**
+        #    `label_value` 本身是這條規則算出來的。反例：`label_value=0.03`／`label=1`
+        #    （threshold=0.02）而真實 bar 報酬 `-0.01` ⇒ 閘③放行、prevalence 不可比，
+        #    且契約對 `label_value` 只驗「是數字」，不會有任何東西報錯。
+        symbols = sorted({str(r["symbol"]) for r in trig_recs if r.get("symbol")})
+        timeframes = sorted({str(r["timeframe"]) for r in trig_recs if r.get("timeframe")})
+        if not symbols or not timeframes:
+            return CompareVerdict(
+                status="unavailable", reason="random_control_rule_identity_unverifiable",
+                message="觸發批之列缺 symbol／timeframe，無法回 bar 表重評",
+                sample_design=RANDOM_SAMPLE_DESIGN, n_requested=n_requested, n_drawn=n_drawn,
+            )
+        try:
+            bars = pipeline.bars_from_kline_cache(symbols, timeframes)
+        except (KeyError, FileNotFoundError, ValueError) as exc:
+            return CompareVerdict(
+                status="unavailable", reason="random_control_rule_identity_unverifiable",
+                message=f"讀不到觸發批之 kline（{exc}），無法以 bar 表重評規則",
+                sample_design=RANDOM_SAMPLE_DESIGN, n_requested=n_requested, n_drawn=n_drawn,
+            )
+        recomputed = pipeline.recompute_close_to_close(
+            trig_recs, bars, threshold=threshold, horizon=horizon, direction=str(trig_dir))
         n_checked = 0
         n_agree = 0
         for r in trig_recs:
-            lv = r.get("label_value")
+            eid = str(r.get("event_id"))
             lab = r.get("label")
-            if lv is None or lab is None:
+            got = recomputed.get(eid)
+            if lab is None or got is None:
                 return CompareVerdict(
                     status="unavailable",
                     reason="random_control_rule_identity_unverifiable",
-                    message=(f"觸發批之事件 {r.get('event_id')!r} 缺 label_value／label，"
-                             "無法以宣告之規則重評（不以缺值當通過）"),
+                    message=(f"觸發批之事件 {eid!r} 缺 label 或無法在 bar 表上定位"
+                             "（t0 不在網格上／答案窗不完整）——不以算不出來當成一致"),
                     sample_design=RANDOM_SAMPLE_DESIGN,
                     n_requested=n_requested, n_drawn=n_drawn,
                 )
             n_checked += 1
-            # 🔴 比較式走 pipeline 出口之**同一支** `label_from_signed_return`，
-            #    不在此寫 `lv >= threshold`（第二份實作必然漂移）。
-            if pipeline.label_from_signed_return(float(lv), threshold) == int(lab):
+            # 兩項都要對：①落檔 label ②落檔 label_value（若有）皆須等於 bar 表重算值。
+            lv = r.get("label_value")
+            lv_ok = lv is None or float(lv) == got["signed_return"]
+            if got["label"] == int(lab) and lv_ok:
                 n_agree += 1
         if n_checked == 0:
             return CompareVerdict(
@@ -1227,6 +1268,8 @@ class ICAnalysisService:
                             info["prepared_token"] = staged["prepared_token"]
                             # G3-D17：被排除的他 symbol 事件計數（loud，不靜默）
                             info["events_excluded_by_symbol"] = staged["events_excluded_by_symbol"]
+                            # 🔴 `G3-D2` D5.3：抽樣設計揭露（無條件隨機 vs case-control）。
+                            info["event_sample_design"] = staged["event_sample_design"]
                             info.update(k_disclosure)
                             if scan is not None:
                                 info["event_label_scan"] = scan

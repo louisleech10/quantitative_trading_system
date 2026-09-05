@@ -194,6 +194,35 @@ class RandomControlGenerateRequest(BaseModel):
     random_control_spec: Dict[str, Any] = Field(..., description="抽樣契約（形狀見契約檔）")
 
 
+class RandomControlCompareRequest(BaseModel):
+    """`G3-D2` D5.3（R1 三家命中）：`POST /case/events/compare-random-control` 之 body。"""
+
+    trigger_import_id: str = Field(..., description="觸發批之 import_id")
+    random_import_id: str = Field(..., description="隨機對照批之 import_id")
+
+
+class RandomControlCompareResponse(BaseModel):
+    """規則身分閘之結論（`CompareVerdict` 之 wire 形狀）。
+
+    🔴 `status="unavailable"` 時 `reason` 取自契約 `capability_unavailable_reasons`
+       之封閉集合；前端**不得**自寫第二份 reason 字面。
+    🔴 兩個 prevalence 在 `unavailable` 時一律 `null`——**不給半套數字**：
+       給了就會有人拿去相減。
+    """
+
+    status: str
+    reason: Optional[str] = None
+    message: Optional[str] = None
+    trigger_prevalence: Optional[float] = None
+    random_prevalence: Optional[float] = None
+    lift: Optional[float] = None
+    n_trigger: int = 0
+    n_random: int = 0
+    sample_design: str
+    n_requested: Optional[int] = None
+    n_drawn: Optional[int] = None
+
+
 class LabelRuleModel(BaseModel):
     """`G3-D2` D5.1：標籤規則之**身分**（`close_to_close` 門檻＋答案窗長度）。
 

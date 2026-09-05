@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { createRandomControlBatch, getEventImport } from '@/lib/api';
+import { compareRandomControl, createRandomControlBatch, getEventImport } from '@/lib/api';
 import {
   type RandomControlParams,
   buildRandomControlSpec,
@@ -44,6 +44,7 @@ import type {
   ICAnalysisConfig,
   ICEventLabelScan,
   ICEventScanDisclosure,
+  RandomControlCompareResult,
 } from '@/lib/types';
 
 /** 分析參數之 `horizon_bars` 初始值——**字面常數**，不由任何落檔欄種子化。 */
@@ -123,6 +124,7 @@ export default function EventBatchDisclosurePanel({
   const [rcBusy, setRcBusy] = useState(false);
   const [rcError, setRcError] = useState<string | null>(null);
   const [rcResult, setRcResult] = useState<EventImportResponse | null>(null);
+  const [rcCompare, setRcCompare] = useState<RandomControlCompareResult | null>(null);
 
   useEffect(() => {
     if (injected !== undefined) { setDetail(injected); return; }
@@ -574,11 +576,20 @@ export default function EventBatchDisclosurePanel({
                 if (!importId || !randomSpec.ok) return;
                 setRcBusy(true);
                 setRcError(null);
+                setRcCompare(null);
                 try {
                   const out = await createRandomControlBatch({
                     event_import_id: importId, random_control_spec: randomSpec.spec,
                   });
                   setRcResult(out);
+                  // 🔴 產完**立刻**跑規則身分閘並把結論顯示出來（R1 三家命中之閉合）：
+                  //    只產批不比較，等於做了一個使用者拿不到結論的功能。
+                  if (out.import_id) {
+                    const verdict = await compareRandomControl({
+                      trigger_import_id: importId, random_import_id: out.import_id,
+                    });
+                    setRcCompare(verdict);
+                  }
                 } catch (e: unknown) {
                   setRcError(e instanceof Error ? e.message : '產生對照組失敗');
                 } finally {
@@ -597,6 +608,24 @@ export default function EventBatchDisclosurePanel({
                 {rcResult.n_valid < rcParams.nRequested
                   && `；少於想抽的 ${rcParams.nRequested} 筆——候選被排除區間扣掉了，這是揭露不是錯誤`}）。
               </p>
+            )}
+            {rcCompare && (
+              <div className="text-[11px]" data-testid="ic-random-control-compare">
+                {rcCompare.status === 'ok' ? (
+                  <p className="text-emerald-300" data-testid="ic-random-control-prevalence">
+                    這批事件正例率 <b>{(rcCompare.trigger_prevalence! * 100).toFixed(1)}%</b>
+                    （{rcCompare.n_trigger} 筆）
+                    ｜隨機對照 <b>{(rcCompare.random_prevalence! * 100).toFixed(1)}%</b>
+                    （{rcCompare.n_random} 筆）
+                    ｜lift {rcCompare.lift === null ? '無定義（對照基準為 0）' : `${rcCompare.lift.toFixed(2)}×`}
+                    ｜抽樣設計 {rcCompare.sample_design}
+                  </p>
+                ) : (
+                  <p className="text-amber-200/90" data-testid="ic-random-control-compare-unavailable">
+                    🔴 <b>不並排 prevalence</b>（reason：{rcCompare.reason}）：{rcCompare.message}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )}

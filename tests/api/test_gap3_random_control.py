@@ -285,12 +285,38 @@ def test_random_control_compare_v_prevalence_missing(bars, _isolated_storage):
     assert v.status == "unavailable" and v.reason == "random_control_prevalence_missing"
 
 
-def test_random_control_compare_missing_label_value_is_unverifiable(bars, _isolated_storage):
-    """觸發批缺 `label_value` ⇒ 無法重評 ⇒ `identity_unverifiable`（不以缺值當通過）。"""
+def test_random_control_compare_missing_label_value_still_verifiable(bars, _isolated_storage):
+    """🔴 **本條之期望在 R1 閉合後反轉**（`COMPOSER-R1-P1-02`）。
+
+    舊版閘③拿 `label_value` 當 signed return ⇒ 缺它就無從重評，故回
+    `identity_unverifiable`。新版**回 bar 表重算** ⇒ `label_value` 只是**額外**的
+    一致性對照（有才比），缺它不影響重評能力。
+    🔴 這不是放寬：真正的判準（落檔 `label` 是否等於 bar 表重算值）**一條都沒少**，
+    而且新增了「`label_value` 若存在也必須等於 bar 表重算值」這條原本不存在的檢查
+    （見 `test_random_control_gate3_reads_bar_table_not_label_value`）。
+    """
     t, r = _pair(bars, _isolated_storage,
                  trigger_rule={"threshold": THRESHOLD, "horizon_bars": HORIZON})
     for rec in t.records:
         rec.pop("label_value", None)
+    assert compare(t, r).status == "ok"
+
+
+def test_random_control_compare_missing_label_is_unverifiable(bars, _isolated_storage):
+    """缺 `label`（不是 `label_value`）⇒ 無從比對 ⇒ `identity_unverifiable`（不以缺值當通過）。"""
+    t, r = _pair(bars, _isolated_storage,
+                 trigger_rule={"threshold": THRESHOLD, "horizon_bars": HORIZON})
+    t.records[0].pop("label", None)
+    v = compare(t, r)
+    assert v.status == "unavailable"
+    assert v.reason == "random_control_rule_identity_unverifiable"
+
+
+def test_random_control_compare_t0_off_grid_is_unverifiable(bars, _isolated_storage):
+    """t0 不在 bar 網格上 ⇒ 無法重評 ⇒ 具名不可對證（**不以算不出來當一致**）。"""
+    t, r = _pair(bars, _isolated_storage,
+                 trigger_rule={"threshold": THRESHOLD, "horizon_bars": HORIZON})
+    t.records[0]["t0"] = int(t.records[0]["t0"]) + 1        # 偏一毫秒即不在網格上
     v = compare(t, r)
     assert v.status == "unavailable"
     assert v.reason == "random_control_rule_identity_unverifiable"
@@ -358,3 +384,125 @@ def test_random_control_endpoint_period_mismatch_is_422(bars, _isolated_storage)
     assert r.status_code == 422, r.text
     body = r.text
     assert "random_control_period_mismatch" in body
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 5. R1 閉合：接線、輸入邊界、閘③讀 bar 表、單獨分析
+# ══════════════════════════════════════════════════════════════════════════
+
+def test_random_control_compare_endpoint_is_wired(bars, _isolated_storage):
+    """🔴 R1 三家獨立命中之閉合：`compare_random_control` 有**產品面取用路徑**。
+
+    原本它只有 service 靜態方法、`api/routes` 與 `frontend/src` 零呼叫
+    ⇒ 閘在測面綠、使用者拿不到結論（與 B-D4「WS 不回填揭露欄」同型）。
+    """
+    trig = _trigger_batch(bars)
+    t = client.post("/api/v1/case/import-events/json", json={"records": trig, "source_name": "t"})
+    trigger_id = t.json()["import_id"]
+    r = client.post("/api/v1/case/import-events/random-control",
+                    json={"event_import_id": trigger_id, "random_control_spec": _spec(bars)})
+    assert r.status_code == 200, r.text
+    random_id = r.json()["import_id"]
+
+    c = client.post("/api/v1/case/events/compare-random-control",
+                    json={"trigger_import_id": trigger_id, "random_import_id": random_id})
+    assert c.status_code == 200, c.text
+    body = c.json()
+    # 這批以 JSON 端點匯入 ⇒ 無 `receipt.batch.label_rule` ⇒ 閘① 具名不可對證
+    assert body["status"] == "unavailable"
+    assert body["reason"] == "random_control_rule_identity_unverifiable"
+    assert body["trigger_prevalence"] is None and body["random_prevalence"] is None
+    assert body["sample_design"] == "unconditional_random"
+
+
+def test_random_control_compare_endpoint_404_and_ok_path(bars, _isolated_storage):
+    """不存在之 id ⇒ 404；帶規則身分之批 ⇒ `ok` 且回兩 prevalence。"""
+    r = client.post("/api/v1/case/events/compare-random-control",
+                    json={"trigger_import_id": "nope", "random_import_id": "nope2"})
+    assert r.status_code == 404
+
+    t, rand = _pair(bars, _isolated_storage,
+                    trigger_rule={"threshold": THRESHOLD, "horizon_bars": HORIZON})
+    c = client.post("/api/v1/case/events/compare-random-control",
+                    json={"trigger_import_id": t.summary.import_id,
+                          "random_import_id": rand.summary.import_id})
+    assert c.status_code == 200, c.text
+    body = c.json()
+    assert body["status"] == "ok", body["message"]
+    assert 0.0 <= body["trigger_prevalence"] <= 1.0
+    assert 0.0 <= body["random_prevalence"] <= 1.0
+
+
+def test_random_control_standalone_ic_analysis_sample_design(bars, _isolated_storage):
+    """🔴 D5.3 邊界④：隨機批**單獨**分析時須揭露 `sample_design='unconditional_random'`
+    （`COMPOSER-R1-P2-01`／`GROK-R1-P2-01`：原本該字面只活在未被呼叫的 `CompareVerdict`）。
+
+    以 `_sample_design_of` 之行為驗——它是分析揭露之唯一導出點，值由 `control_kind`
+    機械導出、不由使用者宣告。
+    """
+    trig = _trigger_batch(bars)
+    recs, receipt = _random_batch(bars, trig, _spec(bars))
+    rand = _isolated_storage.import_records(
+        recs, source_name="rc", upload_bytes=None, validate_only=False,
+        random_control_spec=receipt, carried_declaration_acknowledged=True)
+    rand_detail = _isolated_storage.get_import(rand.import_id)
+
+    assert ICAnalysisService._sample_design_of(rand_detail.records) == "unconditional_random"
+    # 正向對照：觸發批必須是 case_control（否則上一行對任何批都成立）
+    assert ICAnalysisService._sample_design_of(trig) == "case_control"
+    # 分析階段真的把它帶出來（欄名固定，前端據此顯示）
+    import inspect
+
+    src = inspect.getsource(ICAnalysisService._run_event_label_stages)
+    assert "event_sample_design" in src
+
+
+def test_random_control_gate3_reads_bar_table_not_label_value(bars, _isolated_storage):
+    """🔴 `COMPOSER-R1-P1-02` 之閉合：閘③以**真實 bar 表**重算，不信任 `label_value`。
+
+    反例（composer 逐字給的）：某列 `label_value` 與 `label` **內部自洽**
+    （0.03 ≥ 0.02 ⇒ 1），但真實 bar 報酬完全不同 ⇒ 舊版閘③會回 `ok`、
+    prevalence 與隨機批不可比，且沒有任何東西會報錯。
+    """
+    trig = _trigger_batch(bars)
+    t = _isolated_storage.import_records(
+        trig, source_name="t", upload_bytes=None, validate_only=False,
+        label_rule={"threshold": THRESHOLD, "horizon_bars": HORIZON})
+    recs, receipt = _random_batch(bars, trig, _spec(bars))
+    rand = _isolated_storage.import_records(
+        recs, source_name="rc", upload_bytes=None, validate_only=False,
+        random_control_spec=receipt, carried_declaration_acknowledged=True)
+    t_detail = _isolated_storage.get_import(t.import_id)
+    rand_detail = _isolated_storage.get_import(rand.import_id)
+
+    # 未竄改 ⇒ ok（正向對照）
+    assert compare(t_detail, rand_detail).status == "ok"
+
+    # 竄改：把某列之 label_value 改成「與 label 自洽但與 bar 表不符」的值
+    victim = next(r for r in t_detail.records if int(r["label"]) == 1)
+    # 與 `label=1` 內部自洽（≥ threshold），但遠離真實 bar 報酬 ⇒ 舊版會放行、新版須擋
+    victim["label_value"] = float(THRESHOLD) + 0.5
+    v = compare(t_detail, rand_detail)
+    assert v.status == "unavailable" and v.reason == "random_control_rule_mismatch", v.message
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("n_requested", 1.5), ("n_requested", True), ("n_requested", -1), ("seed", 1.0)],
+    ids=["float_n", "bool_n", "negative_n", "float_seed"],
+)
+def test_random_control_endpoint_rejects_non_exact_int(bars, _isolated_storage, field, value):
+    """🔴 `CODEX-R1-P1-02` 之閉合：非 exact `int`／負值 ⇒ **4xx**，不得靜默 coerce 或 500。
+
+    原本 `int(1.5)==1`、`int(True)==1` 會讓**合法 JSON 請求得到與請求不同的 receipt**，
+    而 `n_requested=-1` 會丟未被 route 捕捉的 `RuntimeError`（→500）。
+    """
+    trig = _trigger_batch(bars)
+    t = client.post("/api/v1/case/import-events/json", json={"records": trig, "source_name": "t"})
+    trigger_id = t.json()["import_id"]
+    spec = _spec(bars)
+    spec[field] = value
+    r = client.post("/api/v1/case/import-events/random-control",
+                    json={"event_import_id": trigger_id, "random_control_spec": spec})
+    assert 400 <= r.status_code < 500, f"應為 4xx，實得 {r.status_code}: {r.text[:200]}"
+    assert r.status_code != 500

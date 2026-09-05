@@ -130,6 +130,26 @@ def _resolve_label_rule(
     return out
 
 
+def _require_int(value: Any, path: str, *, minimum: Optional[int] = None) -> int:
+    """嚴格取 int（`G3-D2` D5.3 R1 `CODEX-R1-P1-02`）。
+
+    🔴 **不得用 `int(value)`**：`int(1.5) == 1`、`int(True) == 1` 會讓
+    **合法 JSON 請求得到與請求不同的 receipt**——使用者送 `n_requested=1.5`，
+    落檔寫 `1`，而沒有任何一層報錯。契約宣告的是 `int`／`int>=0`，
+    coercion 等於在產生器裡偷偷放寬契約。
+    🔴 `bool` 先排除（`isinstance(True, int)` 為真）。
+    """
+    if type(value) is not int:
+        raise RandomControlError(
+            "random_control_period_mismatch",
+            f"{path} 須為 int（契約字面；禁 coercion），實得 {type(value).__name__} {value!r}")
+    if minimum is not None and value < minimum:
+        raise RandomControlError(
+            "random_control_period_mismatch",
+            f"{path} 須 >= {minimum}，實得 {value}")
+    return value
+
+
 def _month_key(open_ms: int) -> str:
     """bar open（epoch ms, UTC）→ `YYYY-MM`。"""
     return _dt.datetime.fromtimestamp(open_ms / 1000.0, tz=_dt.timezone.utc).strftime("%Y-%m")
@@ -146,8 +166,8 @@ def _exclusion_mask(
     """排除遮罩：`True` ＝該 index 落在某觸發事件之鄰域／答案窗／embargo 內。"""
     mask = np.zeros(n_rows, dtype=bool)
     for r in trigger_rows:
-        t0 = int(r["t0_ms"])
-        end = int(r["label_end_ms"])
+        t0 = _require_int(r["t0_ms"], f"trigger[{r.get('event_id')!r}].t0_ms")
+        end = _require_int(r["label_end_ms"], f"trigger[{r.get('event_id')!r}].label_end_ms")
         t0_pos = int(np.searchsorted(open_ms, t0))
         if t0_pos >= n_rows or int(open_ms[t0_pos]) != t0:
             raise RandomControlError(
@@ -198,6 +218,52 @@ def _allocate(n_target: int, per_key_candidates: List[Tuple[str, int]]) -> Dict[
     if sum(alloc.values()) != n_target:
         raise RuntimeError(f"_allocate: 配額和 {sum(alloc.values())} != n_target {n_target}")
     return alloc
+
+
+def recompute_close_to_close(
+    records: Sequence[Mapping[str, Any]],
+    bars: Mapping[str, Mapping[str, pd.DataFrame]],
+    *,
+    threshold: float,
+    horizon: int,
+    direction: str,
+) -> Dict[str, Dict[str, Any]]:
+    """以**真實 bar 表**重算每列之 signed return 與 label（`close_to_close`）。
+
+    🔴 存在理由（`G3-D2` D5.3 R1 `COMPOSER-R1-P1-02`）：規則身分閘③原本拿落檔之
+    `label_value` 當 signed return 用——那只證明「`label` 與 `label_value` 內部自洽」，
+    **不證明 `label_value` 本身是這條規則算出來的**。反例：某列 `label_value=0.03`、
+    `label=1`（threshold=0.02）而實際 bar 報酬是 `-0.01` ⇒ 閘③放行、prevalence 不可比，
+    而且不會有任何東西報錯。契約對 `label_value` 只驗「是數字」。
+    ⇒ 重評必須回到 bar 表。公式**不在此重寫**：走與產生器**同一支**
+    `all_bars_eval._label_from_rule`。
+
+    回 `{event_id: {"label": int, "signed_return": float}}`；
+    無法定位（t0 不在網格上／答案窗不完整）之列**不回傳**（呼叫端據此 fail-closed，
+    不得把「算不出來」當成「一致」）。
+    """
+    sign = 1.0 if str(direction) == "long" else -1.0
+    out: Dict[str, Dict[str, Any]] = {}
+    for r in records:
+        symbol, tf = str(r.get("symbol")), str(r.get("timeframe"))
+        sym_bars = bars.get(symbol) or {}
+        df = sym_bars.get(tf)
+        if df is None or r.get("t0") is None:
+            continue
+        open_ms = df["open_time_ms"].to_numpy().astype("int64")
+        close = df["close"].to_numpy()
+        t0 = int(r["t0"])
+        pos = int(np.searchsorted(open_ms, t0))
+        if pos >= len(open_ms) or int(open_ms[pos]) != t0:
+            continue
+        if pos + horizon >= len(close):
+            continue
+        signed = float(sign * (close[pos + horizon] / close[pos] - 1.0))
+        out[str(r.get("event_id"))] = {
+            "label": int(_ab._label_from_rule(sign, close, pos, horizon, float(threshold))),
+            "signed_return": signed,
+        }
+    return out
 
 
 def sample_random_bars(
@@ -281,7 +347,8 @@ def sample_random_bars(
     # ---- period 交集（D-001 D5.2；R1 GROK-R1-P2-02） ----
     trig_lo = min(int(r["t0_ms"]) for r in trigger_rows)
     trig_hi = max(int(r["label_end_ms"]) for r in trigger_rows)
-    per_lo, per_hi = int(strata["period"]["start_ms"]), int(strata["period"]["end_ms"])
+    per_lo = _require_int(strata["period"]["start_ms"], "strata.period.start_ms")
+    per_hi = _require_int(strata["period"]["end_ms"], "strata.period.end_ms")
     if per_hi < trig_lo or per_lo > trig_hi:
         raise RandomControlError(
             "random_control_period_mismatch",
@@ -296,15 +363,12 @@ def sample_random_bars(
     n_rows = int(len(df))
     step_ms = int(TIMEFRAME_SECONDS[tf]) * 1000
 
-    neighborhood = int(exclusion["neighborhood_bars"])
-    embargo = int(exclusion["embargo_bars"])
-    if neighborhood < 0 or embargo < 0:
-        raise RandomControlError(
-            "random_control_period_mismatch",
-            f"neighborhood_bars／embargo_bars 須 ≥0，實得 {neighborhood}／{embargo}")
+    neighborhood = _require_int(exclusion["neighborhood_bars"], "exclusion.neighborhood_bars", minimum=0)
+    embargo = _require_int(exclusion["embargo_bars"], "exclusion.embargo_bars", minimum=0)
     excluded = _exclusion_mask(n_rows, open_ms, close_ms, trigger_rows, neighborhood, embargo)
 
-    uni_lo, uni_hi = int(universe["start_ms"]), int(universe["end_ms"])
+    uni_lo = _require_int(universe["start_ms"], "universe.start_ms")
+    uni_hi = _require_int(universe["end_ms"], "universe.end_ms")
     direction = str(strata["direction"])
     sign = 1.0 if direction == "long" else -1.0
 
@@ -324,12 +388,13 @@ def sample_random_bars(
 
     per_key_candidates = sorted((k, len(v)) for k, v in by_key.items())
     candidate_count = sum(c for _, c in per_key_candidates)
-    n_requested = int(spec["n_requested"])
+    n_requested = _require_int(spec["n_requested"], "n_requested", minimum=0)
+    seed = _require_int(spec["seed"], "seed")
     n_target = min(n_requested, candidate_count)
     alloc = _allocate(n_target, per_key_candidates)
 
     # ---- 抽樣（決定性：strata key 升冪 × 單一 rng） ----
-    rng = np.random.default_rng(int(spec["seed"]))
+    rng = np.random.default_rng(seed)
     drawn: List[int] = []
     per_stratum: List[Dict[str, Any]] = []
     for key, cand_n in per_key_candidates:
@@ -398,7 +463,7 @@ def sample_random_bars(
             "embargo_bars": embargo,
         },
         "label_rule": dict(rule),
-        "seed": int(spec["seed"]),
+        "seed": seed,
         "n_requested": n_requested,
         "n_drawn": int(n_drawn),
         "replacement": False,

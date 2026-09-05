@@ -29,8 +29,11 @@ from ..models.event_import_models import (
     EventImportRejected,
     EventImportResponse,
     LookaheadDeclarationPreviewColumnsRequest,
+    RandomControlCompareRequest,
+    RandomControlCompareResponse,
     RandomControlGenerateRequest,
 )
+from ..services.ic_analysis_service import ICAnalysisService
 from ..services.batch_download_service import get_batch_download_service
 from ..utils.case_storage import get_case_storage_manager
 from ..core.logging import get_logger
@@ -277,6 +280,30 @@ async def import_events_random_control(request: RandomControlGenerateRequest):
             carried_declaration_acknowledged=True)
     except EventImportRejectedError as exc:
         raise _rejected(exc, svc=svc)
+
+
+@router.post("/case/events/compare-random-control", response_model=RandomControlCompareResponse)
+async def compare_random_control_batches(request: RandomControlCompareRequest):
+    """`G3-D2` D5.3：觸發批 vs 隨機對照批之 prevalence 並排（規則身分閘四段）。
+
+    🔴 **本端點是 R1 三家獨立命中之閉合**：`compare_random_control` 原本只有 service
+    靜態方法、沒有任何 caller ⇒ 閘在測面綠、**產品面不可達**（與 B-D4「WS 不回填揭露欄」
+    同型）。route 是唯一的取用路徑。
+
+    🔴 **兩份 detail 由 route 撈好交進去**——`ic_analysis_service` 不得 import
+    `case_import_service`（解耦 Rule 4：服務不互 import）。
+    """
+    svc = get_event_import_service()
+    trigger = svc.get_import(request.trigger_import_id)
+    if trigger is None:
+        raise HTTPException(status_code=404,
+                            detail=f"event import {request.trigger_import_id!r} not found")
+    random_batch = svc.get_import(request.random_import_id)
+    if random_batch is None:
+        raise HTTPException(status_code=404,
+                            detail=f"event import {request.random_import_id!r} not found")
+    verdict = ICAnalysisService.compare_random_control(trigger, random_batch)
+    return RandomControlCompareResponse(**verdict.to_dict())
 
 
 def _form_json_dict(name: str, raw: Optional[str]) -> dict:

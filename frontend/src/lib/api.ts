@@ -980,7 +980,8 @@ export async function exportPdfReport(taskId: string): Promise<Blob> {
 // ============================================================
 import type {
   EventAnalyzeResponse, EventCsvMappingSubmission, EventImportDetail, EventImportListResponse,
-  EventImportRejected, EventImportResponse, RandomControlGenerateRequest,
+  EventImportRejected, EventImportResponse,
+  RandomControlCompareRequest, RandomControlCompareResult, RandomControlGenerateRequest,
 } from './types';
 import type { LookaheadDeclarationPayload, LookaheadDeclarationPreview } from './lookaheadDeclaration';
 import { httpErrorMessage } from './httpError';
@@ -1134,6 +1135,23 @@ export async function analyzeEventImport(
  */
 export async function getEventImport(importId: string): Promise<EventImportDetail> {
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/events/${encodeURIComponent(importId)}`);
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+/**
+ * `G3-D2` D5.3：觸發批 vs 隨機對照批之 prevalence 並排（規則身分閘四段）。
+ *
+ * 🔴 這支的存在本身是 R1 三家獨立命中之閉合：閘原本只有 service 方法、沒有取用路徑。
+ */
+export async function compareRandomControl(
+  body: RandomControlCompareRequest,
+): Promise<RandomControlCompareResult> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/events/compare-random-control`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!response.ok) await parseRejected(response);
   return response.json();
 }
