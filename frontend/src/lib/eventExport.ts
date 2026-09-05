@@ -9,6 +9,8 @@ import type { CaseData } from './types';
 import { canonicalEventId } from './eventId';
 import { ruleDigestOf, ruleSummaryText } from './ruleDigest';
 import { contractDecisionOffsetMin, contractDefault } from './eventDimensions';
+// 🔴 D3.1 R2：`label_origin` 之字面由**真契約**導出（見 `labelOriginFromContract`）。
+import contract from '../../../momentum/Analysis/contracts/event_import_contract.json';
 
 /** Task 4.1：附帶報酬欄之候選 h（1..12）；預設全選。 */
 export const ATTACHED_HORIZONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -45,12 +47,31 @@ export const EVENT_EXPORT_LABEL_RETURN_MODE = contractDefault('label_return_mode
 export const EVENT_EXPORT_DECISION_OFFSET_BARS = 0 as const;
 
 /**
- * `G3-D2` D1.5：`/search` 匯出批之 `label_origin`（provenance）。
+ * 由契約 `optional_fields.label_origin.enum` 取出同名值；不在 enum 內即**拋錯**。
  *
- * 🔴 字面**不在此硬寫**：由契約 `optional_fields.label_origin.enum` 取同名值，
- * 取不到即拋錯（漂移 fail-closed，與後端 `generator.py::_PLATFORM_LABEL_ORIGIN` 同構）。
+ * 🔴 `G3-D2` D3.1 R2（`CODEX-R2-P2-02` ③）：`EVENT_EXPORT_LABEL_ORIGIN` 的註解原本就寫著
+ * 「字面不在此硬寫、取不到即拋錯」，**而碼裡就是一個硬寫的字面**——註解與碼不符
+ * （本 epic 已抓過同型：B-D1 R2 群集 1 之 Panel 註解）。
+ * `R-LABEL-SOT` 當時也只對證了 `search_unlabeled` 那一半。⇒ 兩個常數一起改成真的由契約取。
  */
-export const EVENT_EXPORT_LABEL_ORIGIN = 'search_positive_case' as const;
+function labelOriginFromContract(name: string): string {
+  const enumValues = (contract as {
+    optional_fields: { label_origin: { enum: string[] } };
+  }).optional_fields.label_origin.enum;
+  if (!enumValues.includes(name)) {
+    throw new Error(
+      `label_origin '${name}' 不在契約 optional_fields.label_origin.enum 內`
+      + `（現有：${enumValues.join('、')}）。契約改了而這裡沒跟上，fail-closed。`,
+    );
+  }
+  return name;
+}
+
+/**
+ * `G3-D2` D1.5：`/search` 匯出批之 `label_origin`（provenance）。
+ * 值由契約導出（見 `labelOriginFromContract`）。
+ */
+export const EVENT_EXPORT_LABEL_ORIGIN = labelOriginFromContract('search_positive_case');
 
 export interface EventExportOptions {
   timeframe: string;
@@ -162,10 +183,29 @@ export class EventExportBlocked extends Error {
  */
 function hasUsableConditionValue(cond: unknown): boolean {
   if (cond === null || typeof cond !== 'object') return false;
-  const v = (cond as { value?: unknown }).value;
+  return isUsableConditionValue((cond as { value?: unknown }).value);
+}
+
+/**
+ * 單一值是否可用（`G3-D2` D3.1 R2 `CODEX-R2-P2-01`）。
+ *
+ * 🔴 第一版只驗「非 `null`／`undefined`」⇒ codex production probe 得
+ * `empty-string=PASS, NaN=PASS, false=PASS, 0=PASS`：`''`／`NaN`／`false` 都被當成
+ * 「有條件」，第二段因此仍算非空。（grok 補充：`/search` 之寫入是
+ * `e.target.value ? parseFloat(...) : null`，所以那三種**從 UI 走不到**——
+ * 這是**防禦深度**缺口而非使用者路徑缺陷；主委取較嚴版，仍修。）
+ *
+ * 🔴 `0` 是**合法值**（codex 明列），不得因為「falsy」被一起擋掉。
+ * ⇒ 規則：數字須**有限**（排除 `NaN`／`±Infinity`，保留 `0` 與負數）；
+ *    字串須**去空白後非空**；`boolean` 不是本頁條件的值型別 ⇒ 不可用。
+ */
+function isUsableConditionValue(v: unknown): boolean {
   if (v === null || v === undefined) return false;
-  if (Array.isArray(v)) return v.some((x) => x !== null && x !== undefined);
-  return true;
+  if (Array.isArray(v)) return v.some(isUsableConditionValue);
+  if (typeof v === 'number') return Number.isFinite(v);
+  if (typeof v === 'string') return v.trim() !== '';
+  // `boolean` 與其餘型別：本頁之條件值為數值或數值區間，其他型別一律不當成條件。
+  return false;
 }
 
 export function twoStageExportBlockReason(input: {
@@ -238,7 +278,7 @@ export function twoStageExportBlockReason(input: {
  * 這是刻意的：兩段式路徑不產 label，使用者必須在 CSV 自填後改以 `user_csv` 匯入
  * （`/data-preparation` 之 `batch_defaults`）。寫 `user_csv` 等於替使用者宣告他還沒做的事。
  */
-export const EVENT_EXPORT_UNLABELED_LABEL_ORIGIN = 'search_unlabeled' as const;
+export const EVENT_EXPORT_UNLABELED_LABEL_ORIGIN = labelOriginFromContract('search_unlabeled');
 
 /**
  * D3.1：兩段式之 `search_rule_summary` canonical 形狀（契約 `two_stage_shape` 逐字）。

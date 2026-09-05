@@ -172,6 +172,32 @@ describe('D3.1 呼叫端 — /search 之 two_stage 阻擋真的接到 DOM 上', 
 });
 
 describe('D3.1 R1 閉合 — 反例選 BETWEEN 時第二段仍須非空（`CODEX-R1-P1-03` ②）', () => {
+  // 🔴 R2 `CODEX-R2-P2-02` ②：原本 range 寫死 `[-9, -1]` ⇒ 無法證明「值真的來自 UI 輸入」
+  //    （production 若把 range 忽略而回一組固定值，測試照樣綠）。改為**參數化**：
+  //    多組值逐一驅動，斷言落檔之值**逐字等於本次輸入**。
+  it.each([
+    ['-9', '-1', [-9, -1]],
+    ['-4.5', '0', [-4.5, 0]],
+    ['-100', '-50', [-100, -50]],
+  ])('🔴 反例改 BETWEEN 並填 range(%s, %s) ⇒ 第二段之值逐字等於輸入', async (min, max, expected) => {
+    render(<SearchPage />);
+    await waitFor(() => expect(screen.getByTestId('export-event-dimensions')).toBeTruthy());
+    await declareFromPreview();
+    selectTwoStage();
+    fireEvent.change(screen.getByTestId('positive-field-priceChange'), { target: { value: '5' } });
+    fireEvent.click(screen.getByTestId('negative-section-header'));
+    fireEvent.change(screen.getByTestId('negative-op-priceChange'), { target: { value: 'BETWEEN' } });
+    fireEvent.change(screen.getByTestId('negative-range-min-priceChange'), { target: { value: min } });
+    fireEvent.change(screen.getByTestId('negative-range-max-priceChange'), { target: { value: max } });
+    await waitFor(() => {
+      expect((screen.getByTestId('export-gap3-events') as HTMLButtonElement).disabled).toBe(false);
+    });
+    fireEvent.click(screen.getByTestId('export-gap3-events'));
+    await waitFor(() => expect(buildRecordsMock).toHaveBeenCalledTimes(1));
+    const stages = (buildRecordsMock.mock.calls[0][1] as Record<string, unknown>).stageConditions as unknown[][];
+    expect((stages[1][0] as { value: unknown }).value).toEqual(expected);
+  });
+
   it('🔴 反例改 BETWEEN 並只填 range ⇒ 第二段非空、可匯出', async () => {
     // 🔴 修正前：`negativeStageConditions` 只讀 `negativeParams.priceChange`，
     //    而 BETWEEN 之值住 `negativeRangeValues` ⇒ 整段被 filter 成 `[]`，

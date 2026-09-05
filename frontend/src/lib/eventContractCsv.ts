@@ -33,12 +33,18 @@ import contract from '../../../momentum/Analysis/contracts/event_import_contract
  * 物件型欄（`label_definition`／`lookahead_bars_declared`）**不列入**：
  * 它們以點路徑攤平，容器名本身不是合法欄名。
  */
-export const RESERVED_SCALAR_CONTRACT_COLUMNS: readonly string[] = Object.entries(
+export function reservedScalarColumnsOf(
+  requiredFields: Record<string, { type?: string }>,
+): readonly string[] {
+  return Object.entries(requiredFields)
+    .filter(([, spec]) => spec.type !== undefined && spec.type !== 'object')
+    .map(([name]) => name)
+    .sort();
+}
+
+export const RESERVED_SCALAR_CONTRACT_COLUMNS: readonly string[] = reservedScalarColumnsOf(
   (contract as { required_fields: Record<string, { type?: string }> }).required_fields,
-)
-  .filter(([, spec]) => spec.type !== undefined && spec.type !== 'object')
-  .map(([name]) => name)
-  .sort();
+);
 
 /** 巢狀物件 → 點路徑扁平化；陣列與 `null` 視為葉節點（以 JSON 字面存放，解析端會還原）。 */
 function flatten(obj: Record<string, unknown>, prefix = ''): Record<string, unknown> {

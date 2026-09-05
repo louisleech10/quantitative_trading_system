@@ -257,6 +257,20 @@ describe('D3.1 R1 閉合 — 群集 A：CSV header 由契約導出，未標籤�
       .map(([name]) => name)
       .sort();
     expect([...RESERVED_SCALAR_CONTRACT_COLUMNS]).toEqual(expected);
+    // 🔴 **R2 `CODEX-R2-P2-02` ①：上一行仍可被「完整現值 hardcode」繞過**
+    //    （expected 與 production 同讀契約 ⇒ 把 production 抄成同一份字面也會綠）。
+    //    **判準升級**：divergent 必須來自「把**來源本身**換掉」，不是「把值改小」。
+    //    ⇒ 餵一份**變異契約**給導出函式：多一個必填純量欄，結果必須跟著多一欄。
+    const { reservedScalarColumnsOf } = await import('./eventContractCsv');
+    const mutatedRequired = {
+      ...contract.required_fields,
+      zz_probe_scalar: { type: 'str' },
+      zz_probe_object: { type: 'object' },
+    };
+    const fromMutated = reservedScalarColumnsOf(mutatedRequired);
+    expect(fromMutated).toContain('zz_probe_scalar');    // 純量欄跟著出現
+    expect(fromMutated).not.toContain('zz_probe_object'); // 物件欄仍不列入
+    expect(fromMutated.length).toBe(expected.length + 1);
     // 前提：契約之必填純量欄**不只一個**（否則「集合相等」與「只有 label」無從區分）
     expect(expected.length).toBeGreaterThan(1);
     expect(expected).toContain('label');
@@ -340,6 +354,58 @@ describe('D3.1 R1 閉合 — R-LABEL-SOT：label_origin 之字面由契約導出
     expect(contract.optional_fields.label_origin.enum).toContain(EVENT_EXPORT_UNLABELED_LABEL_ORIGIN);
     expect(contract.optional_fields.label_origin.not_importable).toContain(EVENT_EXPORT_UNLABELED_LABEL_ORIGIN);
     // over 向：一般匯出用的那個值**不在** not_importable（否則正常路徑也匯不進去）
+    expect(contract.optional_fields.label_origin.not_importable).not.toContain(EVENT_EXPORT_LABEL_ORIGIN);
+  });
+});
+
+describe('D3.1 R2 閉合 — 群集 E：條件值須「可用」，不只是非 null', () => {
+  const unusable: [string, unknown][] = [
+    ['空字串', ''],
+    ['只有空白', '   '],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['-Infinity', Number.NEGATIVE_INFINITY],
+    ['boolean false', false],
+    ['boolean true', true],
+    ['空陣列', []],
+    ['[null, null]', [null, null]],
+  ];
+  for (const [name, value] of unusable) {
+    it(`🔴 第二段之唯一條件為「${name}」⇒ 視為空段而阻擋`, async () => {
+      // codex production probe（修正前）：empty-string=PASS, NaN=PASS, false=PASS
+      await expect(buildEventContractRecords([caseRow()], twoStageOpts({
+        stageConditions: [STAGE_1, [{ parameter: 'price_change', operator: '<=', value }]],
+      }))).rejects.toMatchObject({ reason: 'two_stage_requires_two_stages' });
+    });
+  }
+
+  const usable: [string, unknown][] = [
+    ['0（合法值，codex 明列不得誤擋）', 0],
+    ['負數', -3],
+    ['小數', 1.5],
+    ['非空字串', 'abc'],
+    ['單端 range [-9, null]', [-9, null]],
+    ['單端 range [null, -1]', [null, -1]],
+  ];
+  for (const [name, value] of usable) {
+    it(`🔴 over 向：第二段之條件為「${name}」⇒ **不得**誤擋`, async () => {
+      const out = await buildEventContractRecords([caseRow()], twoStageOpts({
+        stageConditions: [STAGE_1, [{ parameter: 'price_change', operator: '<=', value }]],
+      }));
+      expect(out.records).toHaveLength(1);
+    });
+  }
+});
+
+describe('D3.1 R2 閉合 — 群集 F③：兩個 label_origin 常數皆由契約導出', () => {
+  it('🔴 兩者皆在契約 enum 內（`search_positive_case` 原本是硬寫字面，註解卻說「不在此硬寫」）', async () => {
+    const contract = (await import('../../../momentum/Analysis/contracts/event_import_contract.json')).default as {
+      optional_fields: { label_origin: { enum: string[]; not_importable: string[] } };
+    };
+    expect(contract.optional_fields.label_origin.enum).toContain(EVENT_EXPORT_LABEL_ORIGIN);
+    expect(contract.optional_fields.label_origin.enum).toContain(EVENT_EXPORT_UNLABELED_LABEL_ORIGIN);
+    // 兩者語意相反：一個可匯入、一個不可
+    expect(contract.optional_fields.label_origin.not_importable).toContain(EVENT_EXPORT_UNLABELED_LABEL_ORIGIN);
     expect(contract.optional_fields.label_origin.not_importable).not.toContain(EVENT_EXPORT_LABEL_ORIGIN);
   });
 });
