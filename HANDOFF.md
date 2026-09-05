@@ -1,46 +1,36 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-05｜狀態：`G3-D2` 實作中，但**目前插隊在 G-7FIX**（使用者指示：四步一起做完，不掛到 B-D4 之後）。**
+**更新：2026-09-05｜狀態：G-7FIX **已轉向並收斂**——第 4 步 ✅ DONE，狀態機整套作廢。下一件＝回 `G3-D2` 主線之 B-D4。**
 
-## 🔴 現在進行中＝G-7FIX（四步）
+## 🔴 G-7FIX 轉向紀錄（使用者 2026-09-05 質疑「你能收斂嗎還是又發散了」）
 
-使用者裁定（2026-09-05）：G-7 的四步處置**現在**跟委員討論每一步怎麼做，然後四步做完；
-**不得**延到 B-D4 之後（原本我把第 4 步掛在 B-D4 是我自己加的相依，已撤銷）。
+**我確實發散了。** 證據：五輪收完（perf R1/R2、consult R1/R2、SPEC review R1），
+**64 條 finding、11 個 P0、產品碼改動零行**；P0 數三輪平盤（4→4→3），
+且每輪 P0 都長在我當輪剛寫的東西裡（consult R2 群集 β、SPEC review R1 群集 1）＝finding 產生器。
 
-**已完成**：
-- consult R1 三家全員（`handoffs/reconcile/20260905-g7fix-x-consult-r1/synth.md`）
-- 收斂節點四步全過：歸戶 rc=0（18 條零掉項）／completeness `--lock` PASS／`debt_clear` rc=0
-- 補清上輪殘留：R2 reconcile（`20260905-g7perf-x-consult-r2`）三家 RECONCILE-STAMP 已補齊並 PASS
+**產生器＝`epic_state` 狀態機**（我把「GOVB1 沒在做時別套 G-7」做成帶守衛轉態謂詞的狀態機，
+每加一層就長出新攻擊面）。**已整套作廢**：`docs/G7FIX_SPEC.md` 不再是有效計畫，
+SPEC review R2（`20260905-g7fix-x-review-r2`）之產出**不採用**，僅跑完清債。
 
-- **consult R2**（使用者選的確認輪）三家全員，14 條，收斂節點四步全過，債清
-  （`handoffs/reconcile/20260905-g7fix-x-consult-r2/synth.md`，群集 α–ι）
+**關鍵事實（使用者問「1/2/3 到底防什麼」後查明）**：G-7 保護的 GOVB1 是 `DRAFT`、
+從未實作、2026-08-14 遭裁定擱置；且會驗 trailer 的檢查自 2026-08-14 起沒在 push 上跑過
+（`gov_check.sh:266-267` `--fast` 早退，G-7 在 `:343-350`）⇒ **trailer 一直被收，沒有東西在讀**。
+⇒ 1/2/3 不是防護，是清掉沒人讀的手續。第 4 步才是唯一純未來收益。
 
-**R1 四個 P0（方向錯）**：`epic_state` 塞不進凍結檔／dormant 照字面恆紅（grok 獨家）／轉態豁免被穿透三條／洞 C 命中即擋會死鎖。
+## ✅ 已完成：第 4 步（TODO「路徑」欄）
 
-**R2 三個 P0（規格不夠精確到能施工）**：
-- **α**：我只擴了**測試端**常數，沒指定 production parser（三支腳本須共用一支）＋需 `_FROZEN_ENUM_KEYS`
-- **β**：🔴 **我的修補案自己新開的洞**——只封 `dormant→active`，沒封 `active→dormant`；frozen 檔在 manifest 是 allow ⇒ 一般 commit 就能關掉整個閘
-- **γ**：old state 讀法（兩家實構補上：`old=git show HEAD:<p>`／`new=git show :<p>`／無 HEAD fail-closed）
+`templates/TODO_GENERATION_PROMPT.md` 加 `- 路徑：` 欄（加欄不換欄、前向適用、**禁被任何 gate 當 scope 來源**、
+無格式閘並具名殘留 `needs-research`）。驗收：範本含該欄規則；`GAP3_EVENT_UX_TODO.D-006` 與
+`GOVB1_INPUT_QUALITY_TODO` 之 `template_check` 皆 rc=0（證明前向適用、不回溯變紅）。
 
-**新查到的事實**：昂貴 G-7 自 2026-08-14 起**沒在 push 上跑過**（`gov_check.sh:266-267` `--fast` 早退，G-7 在 `:343-350`）。日常摩擦全來自 commit-msg 那支假閘。
+## 待使用者決定（不阻塞主線）
 
-- **SPEC review R1**（`docs/G7FIX_SPEC.md`）三家全員，18 條含 3 P0，三家一致**不可 freeze**；收斂節點四步全過，債清
-  （`handoffs/reconcile/20260905-g7fix-x-review-r1/synth.md`，群集 1–11）
+第 1+2 步合併之 20 行清理（`g7_trailer_precheck.sh`：scope 逐路徑判 → 硬保護集；trailer 值改向 gate 取），
+可把 trailer 稅由 **76%（564/743）降到 1.7%（13/746）** 且閘不再說謊。第 3 步砍到只改兩處假敘述。
+使用者尚未表態要不要做；**不做也不擋主線**。
 
-**SPEC review R1 之三個 P0**（我 brief 標的「我沒查」5 格中有 4 格開出真 finding）：
-- **1**：`active→dormant` 無授權來源，我還把未授權路徑釘成 `rc=0` ⇒ 改為須帶 `ruling:<ID>` 且該 ID 須在 `docs/GOV_ENFORCEMENT_REGISTRY.md` 字面存在
-- **2**：`GOVB1_FROZEN_HASHES` env 鉤子＝重蹈 `GOVB1_FACTKEY_ROOT` 傷疤（三家全員）⇒ 刪除，強制點 `env -u`
-- **3**：dormant × 交付形態守衛我寫「須明確定義」＝定義本體留白（三家全員）⇒ 寫死決策表
+## 🔴 下一件＝回 G3-D2 主線 B-D4
 
-SPEC 已依 11 群集改完，`template_check` PASS，具名 mutation 由 6 種補到 **16 種**（前版 §V 稱「≥8」是我的空頭宣稱，被 composer／grok 抓到）。
-
-## 🔴 下一步＝SPEC review R2 閉合輪
-
-閉合輪判定權屬**原提出方**，第三方不得代簽。R2 零 finding 才可 freeze SPEC 並進 TODO。
-
-## G3-D2 主線（G-7FIX 完成後回來）
-
-`B-D0／B-D1／B-D3` 皆 ✅ DONE（B-D3 於 R4 停輪，三家零 finding）。
-下一件＝**B-D4（D4.2 全矩陣 13 對＋D4.3 k 參數化與掃描網格）**；
-唯一入口＝`docs/GAP3D2_IMPL_HANDOFF.md`（收據 §5、流程 §2、地雷 §3、裁定總表 §4），§2 七步不得跳步。
-🔴 D4.3 之 benchmark 子步須**先於**凍結 cap。
+`B-D0／B-D1／B-D3` 皆 ✅ DONE。唯一入口＝`docs/GAP3D2_IMPL_HANDOFF.md`（§2 七步不得跳步、§5 收據、§3 地雷、§4 裁定總表）。
+B-D4＝D4.2 全矩陣 13 對 ＋ D4.3 k 參數化與掃描網格；🔴 D4.3 之 benchmark 子步須**先於**凍結 cap。
+新 TODO 起適用上述「路徑」欄。

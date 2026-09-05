@@ -53733,3 +53733,39 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event":"gate_deny","ts":"2026-09-05T06:24:46Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"99ccea76e47cf5b63b42682a33b239e61badd376e7a01deea894b58a188f237e","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260905-g7fix-x-review-r1-codex.md --family codex; rc=$?; printf 'completeness_rc=%s\\n' \"$rc\"; exit \"$rc\""}
 {"actor": "cx_run", "attempt_id": "1ee17703-abd0-40d2-bdea-827e30356850", "cli_rc": "0", "event": "committee_family_result", "event_id": "bfe54dc7-53f7-41b8-a427-e553703a02fa", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260905-g7fix-x-review-r1-codex.md", "output_sha256": "99906697afb08648792fcdc5875e61476b38860082aa8ba925284acd95ed1dde", "producer": "audit_append.sh", "result_state": "success", "round_id": "69a4ac3f-dd7c-4b81-ba2c-935bb255d710", "schema_version": 1, "sequence": 3160, "ts": "2026-09-05T06:26:12Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "eda923d8-6a53-48a6-9089-9115c0987657", "lock_sha256": "b719aee5c721359ab2eb261a174aeaf98e58a7578ce826f9fb7a539394be8019", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "69a4ac3f-dd7c-4b81-ba2c-935bb255d710", "schema_version": 1, "sequence": 3161, "session_id": "20260905-g7fix-x-review-r1", "synth_sha256": "aa50cb781e2fe7e8755531c0dff3cf311a423d1a5d18b28cb83516135dcb7dde", "ts": "2026-09-05T06:28:50Z"}
+=== 2026-09-05 14:34:28 | dispatch ===
+  ts=2026-09-05 14:34:28
+  kind=dispatch
+  intent=G-7FIX SPEC review R2 閉合輪：三家全員重跑各自 R1 反例判關閉
+  risk=low
+  facts_asked=各家 R1 finding 是否已關閉；修法有無新引入問題；三條 assumed；五格我沒查
+  review_role=closure review（禁改碼、禁改 SPEC；判定權屬原提出方，禁代簽）
+  template=n/a: 見 brief handoffs/20260905-G7FIX-SPEC-REVIEW-R2-BRIEF.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260905-G7FIX-X-REVIEW-R2", "ts": "2026-09-05T06:34:34Z"}
+=== 2026-09-05 14:34:34 | dispatch ===
+  ts=2026-09-05 14:34:34
+  kind=dispatch
+  intent=G-7FIX SPEC review R2 閉合輪：三家全員重跑各自 R1 反例判關閉
+  risk=low
+  facts_asked=各家 R1 finding 是否已關閉；修法有無新引入問題；三條 assumed；五格我沒查
+  review_role=closure review（禁改碼、禁改 SPEC；判定權屬原提出方，禁代簽）
+  template=n/a: 見 brief handoffs/20260905-G7FIX-SPEC-REVIEW-R2-BRIEF.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260905-G7FIX-SPEC-REVIEW-R2-BRIEF.md", "brief_sha256": "941ba5f1363e68915b1ad6e5aabeeca0431e675bbe9b3af2c9cd665fbfa6898e", "brief_sha256_norm": "941ba5f1363e68915b1ad6e5aabeeca0431e675bbe9b3af2c9cd665fbfa6898e", "event": "committee_round_open", "event_id": "65e2f771-361e-4770-a794-1f8d889d474c", "expected_outputs": {"codex": "handoffs/20260905-g7fix-x-review-r2-codex.md", "composer": "handoffs/20260905-g7fix-x-review-r2-composer.md", "grok": "handoffs/20260905-g7fix-x-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "29bf7019-82d6-41ff-8ee0-f175456746d2", "schema_version": 1, "sequence": 3162, "session_name": "20260905-g7fix-x-review-r2", "task_id": "20260905-G7FIX-X-REVIEW-R2", "ts": "2026-09-05T06:34:39Z"}
+{"actor": "cx_run", "attempt_id": "797b6ce9-a4eb-482e-b972-be6d2d6c23cd", "cli_rc": "0", "event": "committee_family_result", "event_id": "4464a8a9-b3fa-42b5-95aa-bbbe6e7ff6bb", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260905-g7fix-x-review-r2-composer.md", "output_sha256": "0b8b62b6bfa220eeb479d7fb7f33198530dd97cd522e737e3eb9b230080458ab", "producer": "audit_append.sh", "result_state": "success", "round_id": "29bf7019-82d6-41ff-8ee0-f175456746d2", "schema_version": 1, "sequence": 3163, "ts": "2026-09-05T06:37:11Z"}
+{"actor": "cx_run", "attempt_id": "78258f7b-842e-4219-a559-6251592c38ef", "cli_rc": "0", "event": "committee_family_result", "event_id": "1e8f2f46-ff48-4d39-89db-f8c80f99f407", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260905-g7fix-x-review-r2-grok.md", "output_sha256": "8298a09f5f4e5422035119b090aba3e541a5f218ae541440d2cb8604f8ee27b4", "producer": "audit_append.sh", "result_state": "success", "round_id": "29bf7019-82d6-41ff-8ee0-f175456746d2", "schema_version": 1, "sequence": 3164, "ts": "2026-09-05T06:43:07Z"}
