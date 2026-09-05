@@ -128,3 +128,19 @@ report `metadata.split_method`（枚舉住 `momentum/Analysis/contracts/ic_repor
 
 > G2-R4（前端表格）**不是殘留**：使用者 2026-08-18 白話閘裁定納入 B5（表格＋`marginal_ic` toggle 預設開）。
 > 🏁 **GAP-2 收案（2026-08-19）**：B1–B5 各三家 code review＋三家 RECONCILE-STAMP（收斂檔 `handoffs/reconcile/20260818-gap2-b1-review-r12`／`20260819-gap2-b{2,3,4,5}-review-r{15,18,21,24}`）；延伸檔 A1-1..A1-11；§V 24 條 mutation 最終實跑 receipts `20260819T031612Z/031810Z/031911Z/032022Z-gap2-B{1..4}-probe.log`；§G-1 改前==改後 golden PASS（A1-10）；殘留 G2-R1／R2／R3／R5／R6／R7／R8。
+
+## 治理測試長期紅登記（2026-09-05；G-7 停用後首次跑通全套才曝出）
+
+> **出生事故**：`pre-push` 於 2026-08-14 改跑 `--fast` 後，全套 `pytest tests/governance` 變成手動關卡；
+> 而手動路徑（`gov_check.sh --no-probe`）被第 4 段 G-7 的**早退**永久封住——G-7 對量化碼**結構性恆紅**
+> （2026-09-05 一次全跑列出 501 個「未宣告即修改」，其中 93 個是量化主線，那些檔不可能進 GOVB1 scope）。
+> ⇒ 第 5 段自 2026-08-14 起**執行次數為 0**。2026-09-05 使用者裁定停用 G-7 後首次跑通：
+> **1741 passed / 8 failed / 3220.65s（53:40）／1749 條**。
+> 🔴 這 8 條**非本次改壞**（`govb1_final_gate.sh` 與 `pre-push` 本 session 皆未改動，`git log` 為空），
+> 是長期紅；**判準**：順序性 fail-stop 鏈中，先跑的段必須比後跑的段更該擋。
+
+| # | 待補完項 | 為何現在不做 | 觸發條件 | 落地時之驗收錨點 |
+|---|---|---|---|---|
+| R-G7-OFF-1 | GOVB1 三個凍結檔（`docs/GOVB1_*`／`govb1_scope.manifest`／`govb1_frozen_hashes.txt`）自 2026-09-05 起**無閘保護** | user-ruling: 2026-09-05 使用者裁定 G-7 停用（覆蓋率零：51 條 scope 內量化路徑 0 條；判決為常數；且其早退封住全套 pytest） | GOVB1 epic 復工 | 復工票內把 `gov_check.sh` 第 4 段改回擋，並重跑本表 R-GOVTEST-1 之四條 |
+| R-GOVTEST-1 | 4 條 G-7 測試長期紅：`test_t01_f2_frozen_hashes_self_consistent`／`test_t01_f3_g7_when_committed`／`test_r6_u1u2u4_g7_worktree_space_quote_paths`／`test_g7_ambient_m_gate_check_not_red` | user-ruling: 2026-09-05 —— 它們斷言 `govb1_final_gate.sh --only g7` rc==0，而 G-7 已被裁定停用且結構性恆紅；在 G-7 復工前修它們＝為已停用機制付工 | 同 R-G7-OFF-1（GOVB1 復工） | 四條轉綠，或隨 G-7 一併退役並刪除 |
+| R-GOVTEST-2 | 4 條 factkey 測試長期紅：`test_t21_assert_clean_fixture_rc_zero`／`test_t22_clean_host_rc_zero`／`test_pre_push_delegation_reaches_factkey_segment`／`test_pre_push_rejects_on_factkey_drift` | blocked-by: 測試內建假設「`pre-push` 之委派鏈會走到 `gov_check` 第 3 段」（見 `tests/governance/test_govb1_factkey_hook.py:9` 之檔頭原文），該假設於 2026-08-14 `pre-push` 改 `--fast` 時失效；修法須先定「fact-key 漂移該在哪一關擋」 | 決定 fact-key 漂移之強制點（維持產出端 hook 即可／或恢復某條 push 檢查） | 四條轉綠，且該強制點有一條 mutation 證明改壞會紅 |

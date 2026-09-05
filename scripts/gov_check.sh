@@ -359,16 +359,11 @@ fi
 #      （docs/GOVB1_*／govb1_scope.manifest／govb1_frozen_hashes.txt）自此**無閘保護**。
 #      為何可接受：GOVB1 是 DRAFT、從未實作、已擱置；若日後復工，須在復工票內把本段改回擋。
 if [ -f scripts/govb1_scope.manifest ]; then
-  _gc_seg 4 "scope 淨差預檢 (G-7；約 8 秒)…"
-  if [ ! -f scripts/govb1_final_gate.sh ]; then
-    echo "[gov_check] ✗ 有 govb1_scope.manifest 卻缺 govb1_final_gate.sh → fail-closed" >&2
-    _gc_fail 4 "缺 scripts/govb1_final_gate.sh 但 scope manifest 在 ⇒ G-7 覆蓋消失（不得靜默略過）"
-  elif bash scripts/govb1_final_gate.sh --only g7 >/dev/null 2>&1; then
-    echo "[gov_check] ✓ G-7 scope 淨差 OK"
-  else
-    # 🔴 2026-09-05 使用者裁定：**不擋**（warn-only）。理由見下方「為何改為不擋」。
-    echo "[gov_check] ⚠️ G-7 scope 淨差未過 —— **不擋**（詳情 bash scripts/govb1_final_gate.sh --only g7）" >&2
-  fi
+  # 🔴 2026-09-05 使用者裁定：**整段跳過**（不只是不擋）。
+  #   為何連跑都不跑：判決是**常數**（對量化碼恆為「未宣告」），既然不擋、也沒人會依它做決定，
+  #   跑它只是每次多付 >4 分鐘。資訊零損失——要看隨時 `bash scripts/govb1_final_gate.sh --only g7`。
+  _gc_seg 4 "scope 淨差預檢 (G-7) —— **已停用**（判決為常數；理由見上方註解）"
+  echo "[gov_check] ⏭  G-7 已停用（如需查看：bash scripts/govb1_final_gate.sh --only g7）"
 else
   _gc_seg 4 "略過(無 govb1_scope.manifest ⇒ 非 govb1 epic repo，G-7 不適用)"
 fi
@@ -381,7 +376,14 @@ fi
 # 🔴 誠實邊界：早退＝這一輪只會看到便宜段的失敗，pytest 的問題要下一輪才知道。
 #   這是刻意取捨——實測本 session 便宜段紅的次數遠多於 pytest 紅的次數。
 if [ "${rc_all}" -ne 0 ]; then
-  _gc_summary "便宜段(第 1–4 段,合計約 10 秒)已失敗 → 早退,不跑 pytest(省約 700 秒)。修好後重跑。"
+  # 🔴 2026-09-05 更正：原文「合計約 10 秒 / 省約 700 秒」皆已過期。
+  #   實測（HEAD 9a795fa4）：pytest tests/governance **3220.65 秒（53:40）／1749 條**。
+  #   秒數與條數是會漂的值，**刻意不再寫死**——要精確值就跑一次看輸出。
+  #   🔴 更重要的教訓（本次抓到）：本早退設計配上一個**結構性恆紅**的便宜段（G-7），
+  #      等於永久封住 pytest。自 2026-08-14 pre-push 改 --fast 起，第 5 段從未執行過，
+  #      期間累積 8 條紅測試無人看見。⇒ 順序性 fail-stop 鏈中，
+  #      **先跑的段必須比後跑的段更該擋**，否則零價值的段會吃掉高價值的段。
+  _gc_summary "便宜段(第 1–4 段)已失敗 → 早退,不跑 pytest(十分鐘級以上)。修好後重跑。"
   exit "${rc_all}"
 fi
 
