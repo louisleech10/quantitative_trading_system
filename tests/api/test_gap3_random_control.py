@@ -506,3 +506,21 @@ def test_random_control_endpoint_rejects_non_exact_int(bars, _isolated_storage, 
                     json={"event_import_id": trigger_id, "random_control_spec": spec})
     assert 400 <= r.status_code < 500, f"應為 4xx，實得 {r.status_code}: {r.text[:200]}"
     assert r.status_code != 500
+
+
+def test_random_control_sample_design_fails_closed_on_mixed_kind():
+    """🔴 `CODEX-R2-P2-01` 之閉合：混到 `platform_random_bars` 之批 ⇒ **raise**，
+    不靜默回 `case_control`。
+
+    原式「不是全隨機就當 case_control」依賴的是**別處**的不變式（validator 的混批拒收）。
+    那條哪天被放寬，抽樣設計就會被靜默標錯——而症狀是「IC 數字看起來很正常、解讀完全相反」。
+    """
+    mixed = [{"control_kind": "platform_random_bars"}, {"control_kind": "user_labeled_same_trigger"}]
+    with pytest.raises(ValueError) as ei:
+        ICAnalysisService._sample_design_of(mixed)
+    assert "platform_random_bars" in str(ei.value)
+    # 兩個正向對照（否則上面對任何輸入都成立）
+    assert ICAnalysisService._sample_design_of(
+        [{"control_kind": "platform_random_bars"}] * 2) == "unconditional_random"
+    assert ICAnalysisService._sample_design_of(
+        [{"control_kind": "user_labeled_same_trigger"}] * 2) == "case_control"

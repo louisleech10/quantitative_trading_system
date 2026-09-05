@@ -271,3 +271,41 @@ describe('產完對照批立刻跑規則身分閘並顯示結論', () => {
     expect(line.textContent).not.toContain('NaN');
   });
 });
+
+describe('產生成功但比較失敗 — 兩段錯誤分開記（R2 CODEX-R2-P2-02）', () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
+  it('compare 4xx ⇒ 顯示「已產好、比較沒跑成」，**不**顯示「產生對照組失敗」', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true, json: async () => ({ accepted: true, import_id: 'rc-8', n_rows: 20, n_valid: 20 }),
+      })
+      .mockResolvedValueOnce({
+        ok: false, status: 404, json: async () => ({ detail: 'event import not found' }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    renderPanel(detailFixture());
+    fireEvent.click(screen.getByTestId('ic-random-control-generate'));
+
+    const err = await screen.findByTestId('ic-random-control-compare-error');
+    expect(err.textContent).toContain('已經產好了');
+    // 產生成功之訊息仍在（批確實落檔了），且**沒有**產生失敗之訊息
+    expect(screen.getByTestId('ic-random-control-result')).toBeTruthy();
+    expect(screen.queryByTestId('ic-random-control-error')).toBeNull();
+  });
+
+  it('產生本身失敗 ⇒ 只有產生錯誤，**不**打 compare（不對不存在的批做比較）', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false, status: 422,
+      json: async () => ({ detail: { kind: 'pipeline_rejected', message: '候選 0' } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderPanel(detailFixture());
+    fireEvent.click(screen.getByTestId('ic-random-control-generate'));
+
+    await screen.findByTestId('ic-random-control-error');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('ic-random-control-compare-error')).toBeNull();
+    expect(screen.queryByTestId('ic-random-control-result')).toBeNull();
+  });
+});

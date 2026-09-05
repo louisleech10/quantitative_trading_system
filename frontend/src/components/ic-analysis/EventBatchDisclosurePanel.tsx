@@ -125,6 +125,8 @@ export default function EventBatchDisclosurePanel({
   const [rcError, setRcError] = useState<string | null>(null);
   const [rcResult, setRcResult] = useState<EventImportResponse | null>(null);
   const [rcCompare, setRcCompare] = useState<RandomControlCompareResult | null>(null);
+  // 🔴 與 `rcError` **分開**（R2 `CODEX-R2-P2-02`）：批產好了但比較失敗，不是「產生失敗」。
+  const [rcCompareError, setRcCompareError] = useState<string | null>(null);
 
   useEffect(() => {
     if (injected !== undefined) { setDetail(injected); return; }
@@ -577,21 +579,31 @@ export default function EventBatchDisclosurePanel({
                 setRcBusy(true);
                 setRcError(null);
                 setRcCompare(null);
+                setRcCompareError(null);
+                let created: EventImportResponse | null = null;
                 try {
-                  const out = await createRandomControlBatch({
+                  created = await createRandomControlBatch({
                     event_import_id: importId, random_control_spec: randomSpec.spec,
                   });
-                  setRcResult(out);
-                  // 🔴 產完**立刻**跑規則身分閘並把結論顯示出來（R1 三家命中之閉合）：
-                  //    只產批不比較，等於做了一個使用者拿不到結論的功能。
-                  if (out.import_id) {
-                    const verdict = await compareRandomControl({
-                      trigger_import_id: importId, random_import_id: out.import_id,
-                    });
-                    setRcCompare(verdict);
-                  }
+                  setRcResult(created);
                 } catch (e: unknown) {
                   setRcError(e instanceof Error ? e.message : '產生對照組失敗');
+                  setRcBusy(false);
+                  return;
+                }
+                // 🔴 產完**立刻**跑規則身分閘並把結論顯示出來（R1 三家命中之閉合）：
+                //    只產批不比較，等於做了一個使用者拿不到結論的功能。
+                // 🔴 **兩段各自的錯誤分開記**（R2 `CODEX-R2-P2-02`）：共用一個 error state 時，
+                //    「批已經產好了、只是比較失敗」會顯示成「產生對照組失敗」——
+                //    使用者據此重按，就會再產一批一模一樣的批。
+                try {
+                  if (created.import_id) {
+                    setRcCompare(await compareRandomControl({
+                      trigger_import_id: importId, random_import_id: created.import_id,
+                    }));
+                  }
+                } catch (e: unknown) {
+                  setRcCompareError(e instanceof Error ? e.message : '比較失敗');
                 } finally {
                   setRcBusy(false);
                 }
@@ -607,6 +619,12 @@ export default function EventBatchDisclosurePanel({
                 已產生對照批 {rcResult.import_id}（落檔 {rcResult.n_valid} 筆
                 {rcResult.n_valid < rcParams.nRequested
                   && `；少於想抽的 ${rcParams.nRequested} 筆——候選被排除區間扣掉了，這是揭露不是錯誤`}）。
+              </p>
+            )}
+            {rcCompareError && (
+              <p className="text-[11px] text-rose-300" data-testid="ic-random-control-compare-error">
+                對照批**已經產好了**（見上一行），但比較沒跑成：{rcCompareError}
+                ——不必重按產生（會再產一批一樣的）。
               </p>
             )}
             {rcCompare && (

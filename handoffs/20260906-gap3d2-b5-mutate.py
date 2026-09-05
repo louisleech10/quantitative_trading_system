@@ -345,6 +345,24 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "閘③之重評比對整段失效（宣告與落檔不符也算一致）",
     ),
 
+    # ── R2 兩條 P2 之閉合 ──────────────────────────────────────────────
+    Mutation(
+        "M38-sample-design-silent-fallback",
+        "api/services/ic_analysis_service.py",
+        '        if "platform_random_bars" in kinds:\n',
+        "        if False:\n",
+        [*PYTEST, T_API, "-k", "sample_design_fails_closed_on_mixed_kind"],
+        "R2 `CODEX-R2-P2-01`：混批又靜默回 case_control（抽樣設計標錯，解讀完全相反）",
+    ),
+    Mutation(
+        "M39-compare-error-merged-back",
+        "frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx",
+        "                  setRcCompareError(e instanceof Error ? e.message : '比較失敗');\n",
+        "                  setRcError(e instanceof Error ? e.message : '產生對照組失敗');\n",
+        ["npx", "vitest", "run", "icRandomControl"],
+        "R2 `CODEX-R2-P2-02`：比較失敗又被顯示成「產生失敗」（使用者會重按而重複產批）",
+    ),
+
     # ── 對照組（預期綠）────────────────────────────────────────────────
     Mutation(
         "M31-control-comment-only",

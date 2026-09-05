@@ -559,9 +559,22 @@ class ICAnalysisService:
 
         🔴 **全批一致才算**——混批不存在（`validate_event_import` 已 fail-closed 拒
         `platform_random_bars` 與其他 kind 同批），故此處不需多數決，也不得取第一列。
+
+        🔴 **不以「不是全隨機就當 case_control」收尾**（R2 `CODEX-R2-P2-01`）：
+        那條 fallback 依賴的是**別處**的不變式（validator 的混批拒收）。哪天那條被放寬，
+        本函式會把混批**靜默**標成條件樣本，而抽樣設計標錯的症狀是「IC 數字看起來很正常、
+        解讀完全相反」。⇒ 混到 `platform_random_bars` 的批一律 raise，讓它在這裡就爆，
+        不要等到有人拿著錯的標籤去解讀。
         """
         kinds = {str(r.get("control_kind")) for r in records if r.get("control_kind") is not None}
-        return RANDOM_SAMPLE_DESIGN if kinds == {"platform_random_bars"} else "case_control"
+        if kinds == {"platform_random_bars"}:
+            return RANDOM_SAMPLE_DESIGN
+        if "platform_random_bars" in kinds:
+            raise ValueError(
+                f"批內 control_kind={sorted(kinds)} 同時含 platform_random_bars 與其他值；"
+                "抽樣設計無單一答案（匯入層本應已拒收混批——若這裡爆了，代表那道閘被放寬了）"
+            )
+        return "case_control"
 
     @staticmethod
     def compare_random_control(trigger_detail: Any, random_detail: Any) -> CompareVerdict:
