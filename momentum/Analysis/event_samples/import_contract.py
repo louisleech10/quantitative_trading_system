@@ -95,6 +95,11 @@ def receipt_type_ok(type_decl: str, value: Any) -> bool:
         return type(value) is int
     if type_decl == "int>=0":
         return type(value) is int and value >= 0
+    if type_decl == "float":
+        # 🔴 `G3-D2` D5.1：`label_rule.threshold`。與 `int` 同樣嚴格（`type(v) is float`）——
+        #    放行 `int` 會讓 `threshold: 0` 與 `threshold: 0.0` 兩種位元組都通過，
+        #    而規則身分閘是**逐葉 `==` 比對**，兩者相等但序列化不同 ⇒ digest 分裂。
+        return type(value) is float
     if type_decl == "Mapping[str,int>=0]":
         if type(value) is not dict:
             return False
@@ -109,6 +114,111 @@ def receipt_type_ok(type_decl: str, value: Any) -> bool:
             return False
         return all(type(k) is str and type(v) is str for k, v in value.items())
     raise ValueError(f"receipt_schema 出現未知型別字面: {type_decl!r}（fail-closed，不得放行）")
+
+
+#: typed node 之容器型別字面（`G3-D2` D5.1）。非容器者一律交 `receipt_type_ok` 判定
+#: （含「未知字面 ⇒ raise」之 fail-closed），故型別判定仍只有一個入口。
+_CONTAINER_TYPE_DECLS = frozenset({"object", "list[object]"})
+
+
+def _decl_type(decl: Any) -> str:
+    """宣告 → 型別字面。leaf＝字串本身；typed node＝其 `type` 鍵。"""
+    if isinstance(decl, Mapping):
+        t = decl.get("type")
+        if type(t) is not str:
+            raise ValueError(f"receipt_schema typed node 缺合法 'type' 字面：{decl!r}（fail-closed）")
+        return t
+    if type(decl) is str:
+        return decl
+    raise ValueError(f"receipt_schema 宣告須為型別字面或 typed node，實得 {type(decl).__name__}（fail-closed）")
+
+
+def _decl_required(decl: Any) -> bool:
+    """鍵級必填語義（`G3-D2` D5.1 之 `required:false`）。
+
+    🔴 leaf（字串宣告）恆必填——既有兩鍵之行為**逐位元組不變**；
+    只有 typed node 能以 `required: false` 宣告「缺席合法」。
+    """
+    if isinstance(decl, Mapping):
+        r = decl.get("required", True)
+        if type(r) is not bool:
+            raise ValueError(f"receipt_schema typed node 之 'required' 須為 bool，實得 {r!r}（fail-closed）")
+        return r
+    return True
+
+
+def _typed_failures(path: str, decl: Any, value: Any) -> List[Dict[str, Any]]:
+    """遞迴驗一個宣告節點；回 failures（`field` 為**葉路徑**）。
+
+    `G3-D2` D5.1：`receipt_schema` 之宣告值有兩種形態——leaf（型別字面字串）與
+    typed node（`{type: object|list[object], required: bool, fields: {…}}`）。
+    容器以外之型別字面一律交 `receipt_type_ok`（同一函式參考；未知字面 ⇒ ValueError）。
+    """
+    t = _decl_type(decl)
+    if t not in _CONTAINER_TYPE_DECLS:
+        if not receipt_type_ok(t, value):
+            return [{"row": None, "event_id": None, "field": path, "reason": "type_error"}]
+        return []
+
+    fields = decl.get("fields") if isinstance(decl, Mapping) else None
+    if not isinstance(fields, Mapping):
+        raise ValueError(f"receipt_schema['{path}'] 之 {t} 節點缺 'fields' 宣告（fail-closed）")
+
+    if t == "list[object]":
+        if type(value) is not list:
+            return [{"row": None, "event_id": None, "field": path, "reason": "type_error"}]
+        out: List[Dict[str, Any]] = []
+        elem_decl = {"type": "object", "required": True, "fields": fields}
+        for i, elem in enumerate(value):
+            out.extend(_typed_failures(f"{path}[{i}]", elem_decl, elem))
+        return out
+
+    # t == "object"
+    if type(value) is not dict:
+        return [{"row": None, "event_id": None, "field": path, "reason": "type_error"}]
+    out = []
+    for name, sub in fields.items():
+        if name not in value:
+            if _decl_required(sub):
+                out.append({"row": None, "event_id": None, "field": f"{path}.{name}",
+                            "reason": "missing_required_field"})
+            continue
+        out.extend(_typed_failures(f"{path}.{name}", sub, value[name]))
+    for name in value:
+        if name not in fields:
+            out.append({"row": None, "event_id": None, "field": f"{path}.{name}", "reason": "unknown_field"})
+    return out
+
+
+def validate_receipt_field(
+    namespace: str,
+    field: str,
+    value: Any,
+    *,
+    contract: Optional[dict] = None,
+) -> None:
+    """驗證**單一** receipt 欄位（`G3-D2` D5.1）；不合即 raise `ContractValidationError`。
+
+    🔴 存在理由（不是 `validate_receipt_namespace` 的弱化版）：`batch` namespace 之
+    `lookahead_bars_declared`／`analysis_alignment_receipt_hash` 是**分析時**才有的值，
+    而 `label_rule`／`random_control_spec` 是**匯入時**就要落檔的值——匯入端拿不到前兩者，
+    整個 namespace 一起驗會恆紅。故切出「逐鍵驗」入口，判定邏輯與 namespace 版
+    **共用同一支** `_typed_failures`，不另寫一份。
+    """
+    c = contract if contract is not None else load_event_import_contract()
+    schema = c["receipt_schema"]
+    if namespace not in schema or not isinstance(schema[namespace], Mapping):
+        raise ContractValidationError(
+            [{"row": None, "event_id": None, "field": namespace, "reason": "unknown_field"}]
+        )
+    declared = schema[namespace]
+    if field not in declared:
+        raise ContractValidationError(
+            [{"row": None, "event_id": None, "field": f"{namespace}.{field}", "reason": "unknown_field"}]
+        )
+    failures = _typed_failures(f"{namespace}.{field}", declared[field], value)
+    if failures:
+        raise ContractValidationError(failures)
 
 
 def validate_receipt_namespace(
@@ -137,14 +247,16 @@ def validate_receipt_namespace(
     failures: List[Dict[str, Any]] = []
     for name in declared:
         if name not in values:
-            failures.append(
-                {"row": None, "event_id": None, "field": f"{namespace}.{name}",
-                 "reason": "missing_required_field"}
-            )
-        elif not receipt_type_ok(declared[name], values[name]):
-            failures.append(
-                {"row": None, "event_id": None, "field": f"{namespace}.{name}", "reason": "type_error"}
-            )
+            # 🔴 `G3-D2` D5.1：**鍵級 `required:false`** ——typed node 顯式宣告可缺席者
+            #    （`batch.label_rule`／`batch.random_control_spec`）缺就是合法，不記 reason。
+            #    leaf 宣告（既有全部欄）恆必填，行為逐位元組不變。
+            if _decl_required(declared[name]):
+                failures.append(
+                    {"row": None, "event_id": None, "field": f"{namespace}.{name}",
+                     "reason": "missing_required_field"}
+                )
+        else:
+            failures.extend(_typed_failures(f"{namespace}.{name}", declared[name], values[name]))
     for name in values:
         if name not in declared:
             failures.append(
@@ -435,6 +547,7 @@ def validate_event_import(
     batch_defaults: Optional[Mapping[str, Any]] = None,
     enforce_batch_homogeneity: bool = False,
     enforce_canonical_event_id: bool = False,
+    random_control_spec: Optional[Mapping[str, Any]] = None,
 ) -> pd.DataFrame:
     """驗證匯入事件；全過 ⇒ 回正規化 DataFrame，否則 raise ContractValidationError。
 
@@ -455,6 +568,11 @@ def validate_event_import(
             非 canonical 四段外之三段式，無條件強制會擋掉既有功能。
             🔴 **刻意不與 `enforce_batch_homogeneity` 併為單一旗標**：兩者出自不同 SPEC Task
             （1.3 vs 1.8），合併會使其中一條之 scope 日後被另一條悄悄改動。
+        random_control_spec: `G3-D2` D5.1 之**批次級 envelope**（非逐列欄）。
+            匯入 API body `{"records": [...], "random_control_spec": {...}}`；收到的一律是
+            **產生器填回後之完整物件**（輸入鍵＋收據鍵），型別以契約
+            `receipt_schema.batch.random_control_spec` 之 typed nested schema 遞迴驗。
+            規則見下方「隨機對照批」段（缺／混批／label_rule 缺）。
     """
     c = contract if contract is not None else load_event_import_contract()
     reasons = c["import_failure_reasons"]  # noqa: F841 —— 字面出處；本函式僅使用其中值
@@ -754,6 +872,54 @@ def validate_event_import(
     labels = {int(r["label"]) for r in rows if _is_int(r.get("label")) and int(r.get("label")) in (0, 1)}
     if labels and labels != {0, 1}:
         fail(None, None, "label", "missing_control_group")
+
+    # ---- 隨機對照批（`G3-D2` D5.1；D-001 Phase D5 Task D5.1） ----
+    # 🔴 `random_control_spec` 是**批次級 envelope**，不是逐列欄——逐列承載會讓同一份抽樣契約
+    #    被複製 N 份，其中任一份被改動都不會被任何人發現（D-001 R1 CODEX-R1-P1-03）。
+    # 規則（三條，皆批次層事實，故放在批次級區塊）：
+    #   ① 批帶 `platform_random_bars` 而缺 spec ⇒ `random_control_spec_missing`
+    #   ② 非隨機批而 spec 出現 ⇒ `random_control_mixed_batch`
+    #   ③ 非隨機批之列帶 `label_origin=platform_random` ⇒ `random_control_mixed_batch`
+    # spec 存在時另以契約 typed schema 遞迴驗（葉路徑進 `field`）。
+    _RANDOM_KIND = "platform_random_bars"
+    _RANDOM_ORIGIN = "platform_random"
+    control_kinds = {r.get("control_kind") for r in rows if r.get("control_kind") is not None}
+    is_random_batch = control_kinds == {_RANDOM_KIND}
+    if is_random_batch and random_control_spec is None:
+        fail(None, None, "control_kind", "random_control_spec_missing",
+             "批內 control_kind 全為 platform_random_bars，但未提供批次級 random_control_spec；"
+             "抽樣契約缺席時無法宣稱這批是隨機對照組")
+    if _RANDOM_KIND in control_kinds and not is_random_batch:
+        # 🔴 **與 spec 的有無無關**：`platform_random_bars` 與其他 kind 同批本身就是混批。
+        #    只在「有 spec」時才擋會留下一條旁路——不帶 spec 的混批既不觸發 ①（不是全隨機批）
+        #    也不觸發 spec 分支，於是隨機列可以搭著觸發批偷渡進來，而那正是 estimand 的死法
+        #    （對照組被混進條件樣本，prevalence 分母不再是無條件基準）。
+        #    Task 7.5 允許 `control_kind` 混批之通則不受影響：本條只針對 `platform_random_bars`。
+        fail(None, None, "control_kind", "random_control_mixed_batch",
+             f"批內 control_kind＝{sorted(str(k) for k in control_kinds)}；"
+             "platform_random_bars 不得與其他 control_kind 同批（隨機對照批須自成一批）")
+    elif random_control_spec is not None and not is_random_batch:
+        fail(None, None, "control_kind", "random_control_mixed_batch",
+             f"提供了 random_control_spec，但批內 control_kind＝{sorted(str(k) for k in control_kinds)}"
+             "（須全為 platform_random_bars）；隨機批與觸發批不得混在同一次匯入")
+    for i, r in enumerate(rows):
+        if r.get("label_origin") == _RANDOM_ORIGIN and r.get("control_kind") != _RANDOM_KIND:
+            fail(i, r.get("event_id"), "label_origin", "random_control_mixed_batch",
+                 "label_origin=platform_random 之列其 control_kind 須為 platform_random_bars")
+    if random_control_spec is not None:
+        if not isinstance(random_control_spec, Mapping):
+            fail(None, None, "random_control_spec", "type_error")
+        elif random_control_spec.get("label_rule") is None:
+            # 🔴 專屬 reason（不吃 typed schema 之泛用 `missing_required_field`）：
+            #    label_rule 缺席等於「這批的答案是怎麼標的沒人知道」，是 D5 的核心失敗模式。
+            fail(None, None, "random_control_spec.label_rule", "random_control_label_rule_missing",
+                 "random_control_spec 缺 label_rule{threshold, horizon_bars}；"
+                 "隨機批之 label 唯一來源即此規則，缺席則無從重現，亦無從與觸發批比對規則身分")
+        else:
+            for f in _typed_failures("batch.random_control_spec",
+                                     c["receipt_schema"]["batch"]["random_control_spec"],
+                                     dict(random_control_spec)):
+                fail(None, None, f["field"], f["reason"])
 
     # ---- 異質列顯式拒收（GAP-3 UX Task 1.8／A-5′） ----
     # 列間於 direction／scenario／label_definition 不一致 ⇒ 拒收。

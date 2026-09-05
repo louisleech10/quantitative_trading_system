@@ -56,6 +56,10 @@ def test_gap3_contract_reason_registry_01_import_failure_added(pre: dict, now: d
         # 🔴 **集合相等未放寬**——多出未登記之 reason 仍會紅（本條之防偽價值就在此）。
         "scenario_depth_inconsistent",
         "label_origin_not_importable",
+        # `G3-D2` D5.1（2026-09-05）：隨機對照批之三個 import reason。
+        "random_control_spec_missing",
+        "random_control_mixed_batch",
+        "random_control_label_rule_missing",
     }
 
 
@@ -83,6 +87,11 @@ def test_gap3_contract_reason_registry_04_capability_reasons_added(pre: dict, no
         "scan_grid_too_large",
         "scan_cell_timeout",
         "missing_decision_offset_disclosure",
+        # 🔴 `G3-D2` **D5.1**：隨機對照組之四個 capability reason。
+        "random_control_prevalence_missing",
+        "random_control_period_mismatch",
+        "random_control_rule_identity_unverifiable",
+        "random_control_rule_mismatch",
     }
     assert set(pre["capability_unavailable_reasons"]) - set(now["capability_unavailable_reasons"]) == set()
 
@@ -222,9 +231,39 @@ def test_gap3_contract_reason_registry_08b_namespaces_are_typed_dicts(now: dict)
     schema = now["receipt_schema"]
     for ns, fields in schema.items():
         assert isinstance(fields, dict), f"receipt_schema['{ns}'] 仍是 list（migration 未完成）"
-        assert all(isinstance(v, str) for v in fields.values())
+        # 🔴 `G3-D2` D5.1：宣告值升為**兩種形態**（leaf 字串／typed node dict）。
+        #    原斷言為 `all(isinstance(v, str))`——**沒有放寬**：leaf 仍必須是字串，
+        #    而 typed node 這條新路徑另加了比原本更嚴的結構要求（`type`／`required` 型別、
+        #    `fields` 非空、遞迴），否則「隨便一個 dict」就能混進 schema。
+        for name, decl in fields.items():
+            if isinstance(decl, str):
+                continue
+            assert isinstance(decl, dict), f"receipt_schema['{ns}']['{name}'] 既非型別字面亦非 typed node"
+            _assert_typed_node(f"{ns}.{name}", decl)
     assert schema["batch"]["lookahead_bars_declared"] == "Mapping[str,int>=0]"
     assert schema["batch"]["analysis_alignment_receipt_hash"] == "str"
+    # 🔴 D5.1：兩個新鍵為 **typed node ＋ 鍵級 `required: false`**（缺席合法之唯一表示法）。
+    for name in ("label_rule", "random_control_spec"):
+        assert schema["batch"][name]["type"] == "object"
+        assert schema["batch"][name]["required"] is False
+    # `label_rule` 之兩葉即規則身分 tuple 之前兩項，型別字面不得漂移。
+    lr = schema["batch"]["label_rule"]["fields"]
+    assert lr["threshold"] == {"type": "float", "required": True, "doc": lr["threshold"]["doc"]}
+    assert lr["horizon_bars"]["type"] == "int" and lr["horizon_bars"]["required"] is True
+    # `random_control_spec.label_rule` 為**必填**（隨機批之 label 唯一來源）。
+    assert schema["batch"]["random_control_spec"]["fields"]["label_rule"]["required"] is True
+
+
+def _assert_typed_node(path: str, decl: dict) -> None:
+    """typed node 之結構不變式（`G3-D2` D5.1）：遞迴、封閉、無「空容器」。"""
+    assert isinstance(decl.get("type"), str), f"{path}: typed node 缺 type 字面"
+    assert isinstance(decl.get("required"), bool), f"{path}: typed node 之 required 須為 bool"
+    if decl["type"] in ("object", "list[object]"):
+        fields = decl.get("fields")
+        assert isinstance(fields, dict) and fields, f"{path}: 容器節點須有非空 fields"
+        for name, sub in fields.items():
+            assert isinstance(sub, dict), f"{path}.{name}: 容器之子節點須為 typed node"
+            _assert_typed_node(f"{path}.{name}", sub)
 
 
 # ── ⑧(c) runtime validator 真的擋得住：五個反例各自 fail-closed ────────────
@@ -291,9 +330,18 @@ def test_gap3_contract_reason_registry_08e2_validator_actually_calls_the_helper(
 
     monkeypatch.setattr(import_contract, "receipt_type_ok", spy)
 
-    values = {"lookahead_bars_declared": {"1h": 0}, "analysis_alignment_receipt_hash": "deadbeef"}
-    import_contract.validate_receipt_namespace("batch", values, contract=now)
+    base = {"lookahead_bars_declared": {"1h": 0}, "analysis_alignment_receipt_hash": "deadbeef"}
+    import_contract.validate_receipt_namespace("batch", base, contract=now)
 
-    declared = now["receipt_schema"]["batch"]
-    assert len(calls) == len(declared)
-    assert {c[0] for c in calls} == set(declared.values())
+    # 🔴 `G3-D2` D5.1：計數對象由「宣告鍵數」改為「**實際被驗的葉數**」。
+    #    原式 `len(declared)` 在 typed node 進場後已無意義（一個鍵可能有 N 個葉，
+    #    也可能因 `required:false` 而 0 個）。**沒有放寬**——新式仍是精確相等，
+    #    且多釘住一件原本沒驗的事：`required:false` 之鍵缺席時**一次都不該被呼叫**。
+    assert [c[0] for c in calls] == ["Mapping[str,int>=0]", "str"]
+
+    # 帶 optional typed node ⇒ 其每個葉各一次（遞迴確實走到底，不是只驗最外層）
+    calls.clear()
+    with_rule = {**base, "label_rule": {"threshold": 0.05, "horizon_bars": 2}}
+    import_contract.validate_receipt_namespace("batch", with_rule, contract=now)
+    assert sorted(c[0] for c in calls) == sorted(["Mapping[str,int>=0]", "str", "float", "int"])
+    assert ("float", 0.05) in calls and ("int", 2) in calls

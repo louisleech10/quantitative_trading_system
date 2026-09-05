@@ -180,6 +180,52 @@ class EventBatchFactNotes(BaseModel):
         description="批內 `decision_offset_bars` 之 distinct 值（升冪）；空＝該批無此欄")
 
 
+class RandomControlGenerateRequest(BaseModel):
+    """`G3-D2` D5.3：`POST /case/import-events/random-control` 之 body。
+
+    🔴 `random_control_spec` 為**批次級 envelope**（`Dict`，不逐列）；其形狀之唯一真相源＝
+       契約 `receipt_schema.batch.random_control_spec`，於落檔前由 validator 遞迴 typed 驗
+       ——**不在此複寫 pydantic 鏡像**（第二份真相源）。
+    🔴 送進來的是**輸入**部分（`universe`／`strata`／`allocation`／`exclusion`／`label_rule`／
+       `seed`／`n_requested`／`replacement`）；收據鍵由產生器填回並覆寫。
+    """
+
+    event_import_id: str = Field(..., description="觸發批之 import_id（對照組依附於它）")
+    random_control_spec: Dict[str, Any] = Field(..., description="抽樣契約（形狀見契約檔）")
+
+
+class LabelRuleModel(BaseModel):
+    """`G3-D2` D5.1：標籤規則之**身分**（`close_to_close` 門檻＋答案窗長度）。
+
+    🔴 兩葉即規則身分 tuple 之前兩項（第三、四項為批之 `direction` 與
+       `label_definition.label_return_mode`，不住本模型）。型別與契約
+       `receipt_schema.batch.label_rule.fields` 逐葉對應，由 pytest 對證。
+    """
+
+    threshold: float
+    horizon_bars: int
+
+
+class EventReceiptBatch(BaseModel):
+    """`G3-D2` D5.1：`receipt.batch` 之**投影**（現行落檔 payload 之 `receipt` 鍵）。
+
+    🔴 兩欄皆 `Optional` 且預設 `None`——舊批沒有 `receipt` 鍵（「面向未來不溯及既往」），
+       缺席是**通則**不是例外；`label_rule is None` 之語意由分析層以
+       `random_control_rule_identity_unverifiable` 明講，不猜。
+    🔴 `random_control_spec` 刻意為 `Dict[str, Any]` 而**不是** pydantic 鏡像模型：
+       契約 `receipt_schema.batch.random_control_spec` 是該 schema 的**唯一真相源**，
+       在此複寫一份 typed model 等於第二份真相源，且 `response_model` 會**靜默濾掉**
+       契約日後新增而模型漏加的鍵（本 epic 已為同型靜默濾欄付過代價）。
+       型別保證來自匯入時之 `validate_receipt_field`，不是來自這個 DTO。
+       （具名偏離 `D-006` D5.3 修改檔案欄之 `RandomControlSpecModel` 字面；
+        `D-001` D5.3 只要求「以 `receipt_batch{label_rule?, random_control_spec?}` 投影回傳」，
+        本形狀符合語意權威。）
+    """
+
+    label_rule: Optional[LabelRuleModel] = None
+    random_control_spec: Optional[Dict[str, Any]] = None
+
+
 class EventImportDetailResponse(BaseModel):
     summary: EventImportSummary
     records: List[Dict[str, Any]]
@@ -187,6 +233,9 @@ class EventImportDetailResponse(BaseModel):
     batch_facts: EventBatchFacts = Field(default_factory=EventBatchFacts)
     declaration_seeds: EventDeclarationSeeds = Field(default_factory=EventDeclarationSeeds)
     batch_fact_notes: EventBatchFactNotes = Field(default_factory=EventBatchFactNotes)
+    #: 🔴 `G3-D2` D5.1／D5.3：批次 receipt 之投影（規則身分＋隨機批抽樣契約）。
+    #  同樣受 `response_model` 靜默濾欄之約束——漏宣告即靜默丟，round-trip 測試擋。
+    receipt_batch: EventReceiptBatch = Field(default_factory=EventReceiptBatch)
 
 
 class LookaheadDeclarationPreviewColumnsRequest(BaseModel):

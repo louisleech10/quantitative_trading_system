@@ -1,0 +1,179 @@
+{
+  "case_id": "7__12h",
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "scenario": "C",
+  "seed": 7,
+  "spec": {
+    "universe": {
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "start_ms": 1708387200000,
+      "end_ms": 1742947200000
+    },
+    "strata": {
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "period": {
+        "start_ms": 1708387200000,
+        "end_ms": 1742947200000
+      },
+      "direction": "long"
+    },
+    "allocation": "proportional_to_candidates",
+    "exclusion": {
+      "trigger_ids_digest": "",
+      "neighborhood_bars": 2,
+      "embargo_bars": 6
+    },
+    "label_rule": {
+      "threshold": 0.02,
+      "horizon_bars": 2
+    },
+    "seed": 7,
+    "n_requested": 40,
+    "replacement": false
+  },
+  "trigger_receipts": [
+    {
+      "event_id": "ETHUSDT:12h:1712707200000",
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "t0_ms": 1712707200000,
+      "label_end_ms": 1712836800000
+    },
+    {
+      "event_id": "ETHUSDT:12h:1721347200000",
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "t0_ms": 1721347200000,
+      "label_end_ms": 1721476800000
+    },
+    {
+      "event_id": "ETHUSDT:12h:1734307200000",
+      "symbol": "ETHUSDT",
+      "timeframe": "12h",
+      "t0_ms": 1734307200000,
+      "label_end_ms": 1734436800000
+    }
+  ],
+  "data_snapshot_digest": "77b1b966ccf76eb29920d7427c4367f5c5ed5f469e5baf4c7b701ec2f2143aa3",
+  "sample_ids_digest": "6589b516dabdcf48d58a3384ad7da31cd158e9b017cac1e1796940e96e763384",
+  "n_drawn": 40,
+  "candidate_count": 768,
+  "per_stratum": [
+    {
+      "key": "ETHUSDT|12h|2024-02|long",
+      "n_candidates": 20,
+      "n_drawn": 1
+    },
+    {
+      "key": "ETHUSDT|12h|2024-03|long",
+      "n_candidates": 62,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-04|long",
+      "n_candidates": 49,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-05|long",
+      "n_candidates": 62,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-06|long",
+      "n_candidates": 60,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-07|long",
+      "n_candidates": 51,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-08|long",
+      "n_candidates": 62,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-09|long",
+      "n_candidates": 60,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-10|long",
+      "n_candidates": 62,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-11|long",
+      "n_candidates": 60,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2024-12|long",
+      "n_candidates": 51,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2025-01|long",
+      "n_candidates": 62,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2025-02|long",
+      "n_candidates": 56,
+      "n_drawn": 3
+    },
+    {
+      "key": "ETHUSDT|12h|2025-03|long",
+      "n_candidates": 51,
+      "n_drawn": 3
+    }
+  ],
+  "labels": {
+    "ETHUSDT:12h:1709164800000": 0,
+    "ETHUSDT:12h:1710849600000": 1,
+    "ETHUSDT:12h:1711022400000": 0,
+    "ETHUSDT:12h:1711627200000": 0,
+    "ETHUSDT:12h:1712016000000": 0,
+    "ETHUSDT:12h:1712361600000": 0,
+    "ETHUSDT:12h:1714089600000": 0,
+    "ETHUSDT:12h:1714521600000": 1,
+    "ETHUSDT:12h:1716768000000": 0,
+    "ETHUSDT:12h:1716897600000": 0,
+    "ETHUSDT:12h:1717502400000": 0,
+    "ETHUSDT:12h:1719230400000": 0,
+    "ETHUSDT:12h:1719748800000": 0,
+    "ETHUSDT:12h:1720396800000": 0,
+    "ETHUSDT:12h:1720526400000": 0,
+    "ETHUSDT:12h:1722427200000": 0,
+    "ETHUSDT:12h:1723636800000": 0,
+    "ETHUSDT:12h:1723723200000": 0,
+    "ETHUSDT:12h:1725019200000": 0,
+    "ETHUSDT:12h:1726444800000": 0,
+    "ETHUSDT:12h:1726531200000": 0,
+    "ETHUSDT:12h:1727697600000": 0,
+    "ETHUSDT:12h:1728648000000": 0,
+    "ETHUSDT:12h:1729339200000": 1,
+    "ETHUSDT:12h:1729555200000": 0,
+    "ETHUSDT:12h:1730808000000": 1,
+    "ETHUSDT:12h:1730937600000": 1,
+    "ETHUSDT:12h:1732536000000": 0,
+    "ETHUSDT:12h:1733097600000": 0,
+    "ETHUSDT:12h:1733227200000": 1,
+    "ETHUSDT:12h:1733961600000": 0,
+    "ETHUSDT:12h:1736899200000": 1,
+    "ETHUSDT:12h:1736985600000": 1,
+    "ETHUSDT:12h:1738238400000": 0,
+    "ETHUSDT:12h:1739404800000": 0,
+    "ETHUSDT:12h:1739836800000": 0,
+    "ETHUSDT:12h:1740268800000": 0,
+    "ETHUSDT:12h:1741305600000": 0,
+    "ETHUSDT:12h:1741564800000": 0,
+    "ETHUSDT:12h:1741824000000": 0
+  },
+  "trigger_ids_digest": "5d239be4d4133b430d4b9ef123d1ba187f37760d74c9792edf02795f398fc063"
+}

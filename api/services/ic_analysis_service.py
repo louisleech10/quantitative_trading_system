@@ -8,7 +8,7 @@ import math
 import threading
 import uuid
 from io import BytesIO
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -42,6 +42,39 @@ logger = get_logger("api.ic_analysis_service")
 
 #: 合理性上界＝2100-01-01（epoch 秒）。超出即判 parse failure（SPEC Task 7.7 ④ 之字面）。
 _EPOCH_SECONDS_UPPER_BOUND = 4102444800
+
+#: `G3-D2` D5.3：隨機對照批之 `sample_design` 揭露字面（觸發批為 `case_control`）。
+RANDOM_SAMPLE_DESIGN = "unconditional_random"
+
+#: 規則身分閘要求觸發批之報酬量法必須是這個值（隨機批固定 `close_to_close`；CODEX-R3-P1-02）。
+_IDENTITY_LABEL_RETURN_MODE = "close_to_close"
+
+
+@dataclass(frozen=True)
+class CompareVerdict:
+    """`G3-D2` D5.3：觸發批 vs 隨機對照批之比較結論。
+
+    `status ∈ {"ok", "unavailable"}`；`unavailable` 時 `reason` 取自契約
+    `capability_unavailable_reasons` 之封閉集合（四個 `random_control_*`）。
+    🔴 **沒有第三種狀態**：比較要嘛成立、要嘛具名不成立。回一個「大概可以參考」
+       的中間態等於把判斷推給使用者，而使用者手上沒有判斷所需的資訊。
+    """
+
+    status: str
+    reason: Optional[str] = None
+    message: Optional[str] = None
+    trigger_prevalence: Optional[float] = None
+    random_prevalence: Optional[float] = None
+    lift: Optional[float] = None
+    n_trigger: int = 0
+    n_random: int = 0
+    sample_design: str = RANDOM_SAMPLE_DESIGN
+    #: 抽樣缺額之揭露（`n_drawn << n_requested` 時必須看得到；`D-001` D5.3 邊界②）。
+    n_requested: Optional[int] = None
+    n_drawn: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 class FeatureRunCoverageError(ValueError):
@@ -514,6 +547,152 @@ class ICAnalysisService:
             #    D2-2 單一表示法下恆為 `[False]`；空清單代表對齊層沒寫這欄（loud，非正常值）。
             "event_known_at_decision_values": list(prepared1.event_known_at_decision_values),
         }
+
+    @staticmethod
+    def compare_random_control(trigger_detail: Any, random_detail: Any) -> CompareVerdict:
+        """`G3-D2` D5.3：觸發批 vs 隨機對照批之 prevalence 並排——**四段規則身分閘**。
+
+        🔴 **本方法是這件事的唯一 owner**（`D-006` D5.3 R4 CODEX-R4-P2-01）：
+        輸入為兩份 `EventImportDetailResponse` DTO，**不 import `case_import_service`**
+        （解耦 Rule 4：服務不互 import）。呼叫端負責把兩份 detail 撈好交進來。
+
+        ## 為什麼要有這道閘
+
+        「觸發樣本的正例率 25%、隨機樣本 10%」這句話只有在**兩邊用同一把尺**時才有意義。
+        兩批若各自用不同的門檻或不同的答案窗長度，數字仍然可以並排、仍然可以相減，
+        但那個差值不代表任何東西——而它看起來跟真的一模一樣。這是最貴的一種錯：
+        **不會報錯、不會是 NaN、只會給出一個有說服力的錯誤結論**。
+
+        ## 四段（`D-001` D5.3 ①–④，順序即優先序）
+
+        ① 觸發批之 `receipt.batch.label_rule` 缺 ⇒ `random_control_rule_identity_unverifiable`。
+           既有批（人工標註／`/search` 匯出）**通常都缺**，這是通則不是例外——
+           `label_rule` 的唯一 wire 是匯入 envelope，舊批當時沒有這個欄位。
+        ② 任一葉不等／`direction` 不同／觸發批之 `label_return_mode != close_to_close`
+           ⇒ `random_control_rule_mismatch`。身分 tuple＝
+           `(threshold, horizon_bars, direction, label_return_mode)`。
+        ③ 相等時**以同一 `label_rule` 重評觸發批每列 label**，一致率 `!= 1.0` ⇒ mismatch。
+           這一段擋的是「宣告的規則」與「實際落檔的答案」不符——宣告是可以亂寫的。
+        ④ 缺任一 prevalence ⇒ `random_control_prevalence_missing`。
+
+        🔴 `label_definition.canonical_digest` **不參與**比較（`D-001` D5.3 邊界①）：
+        隨機批之 digest＝S-9(label_rule)、產生器批之 digest 含 `label_id`／mode／direction，
+        兩者本就不相等，拿來比會恆假。
+        """
+        from momentum.factories import create_event_sample_pipeline
+
+        pipeline = create_event_sample_pipeline()
+
+        def _rb(detail: Any) -> Any:
+            return getattr(detail, "receipt_batch", None)
+
+        trig_rb, rand_rb = _rb(trigger_detail), _rb(random_detail)
+        trig_rule = getattr(trig_rb, "label_rule", None) if trig_rb is not None else None
+        rand_spec = getattr(rand_rb, "random_control_spec", None) if rand_rb is not None else None
+
+        # ── ① 觸發批之規則身分缺席 ────────────────────────────────────────
+        if trig_rule is None:
+            return CompareVerdict(
+                status="unavailable",
+                reason="random_control_rule_identity_unverifiable",
+                message=("觸發批沒有落檔 receipt.batch.label_rule（既有批通常如此）——"
+                         "無從確認兩批用的是同一條標籤規則，故不並排 prevalence。"
+                         "唯一補法＝重新匯入該批時以 label_rule 帶入規則"),
+                sample_design=RANDOM_SAMPLE_DESIGN,
+            )
+        if rand_spec is None or rand_spec.get("label_rule") is None:
+            return CompareVerdict(
+                status="unavailable",
+                reason="random_control_rule_identity_unverifiable",
+                message="隨機批沒有 receipt.batch.random_control_spec.label_rule（抽樣契約缺席）",
+                sample_design=RANDOM_SAMPLE_DESIGN,
+            )
+
+        rand_rule = dict(rand_spec["label_rule"])
+        trig_leaves = {"threshold": float(trig_rule.threshold), "horizon_bars": int(trig_rule.horizon_bars)}
+        rand_leaves = {"threshold": float(rand_rule["threshold"]), "horizon_bars": int(rand_rule["horizon_bars"])}
+        trig_dir = getattr(getattr(trigger_detail, "batch_facts", None), "direction", None)
+        rand_dir = str(rand_spec.get("strata", {}).get("direction")) if rand_spec.get("strata") else None
+        trig_mode = getattr(getattr(trigger_detail, "declaration_seeds", None), "label_return_mode", None)
+        n_requested = rand_spec.get("n_requested")
+        n_drawn = rand_spec.get("n_drawn")
+
+        # ── ② 身分 tuple 逐項比對 ────────────────────────────────────────
+        diffs: List[str] = []
+        if trig_leaves != rand_leaves:
+            diffs.append(f"label_rule 觸發批={trig_leaves} 隨機批={rand_leaves}")
+        if trig_dir is None or rand_dir is None or str(trig_dir) != str(rand_dir):
+            diffs.append(f"direction 觸發批={trig_dir!r} 隨機批={rand_dir!r}")
+        if str(trig_mode) != _IDENTITY_LABEL_RETURN_MODE:
+            diffs.append(
+                f"觸發批 label_return_mode={trig_mode!r}，隨機批固定 {_IDENTITY_LABEL_RETURN_MODE!r}")
+        if diffs:
+            return CompareVerdict(
+                status="unavailable", reason="random_control_rule_mismatch",
+                message="兩批之規則身分不同，prevalence 不可並排：" + "；".join(diffs),
+                sample_design=RANDOM_SAMPLE_DESIGN,
+                n_requested=n_requested, n_drawn=n_drawn,
+            )
+
+        # ── ③ 以同一規則重評觸發批 label（宣告 vs 落檔） ──────────────────
+        trig_recs = list(getattr(trigger_detail, "records", None) or ())
+        threshold = trig_leaves["threshold"]
+        n_checked = 0
+        n_agree = 0
+        for r in trig_recs:
+            lv = r.get("label_value")
+            lab = r.get("label")
+            if lv is None or lab is None:
+                return CompareVerdict(
+                    status="unavailable",
+                    reason="random_control_rule_identity_unverifiable",
+                    message=(f"觸發批之事件 {r.get('event_id')!r} 缺 label_value／label，"
+                             "無法以宣告之規則重評（不以缺值當通過）"),
+                    sample_design=RANDOM_SAMPLE_DESIGN,
+                    n_requested=n_requested, n_drawn=n_drawn,
+                )
+            n_checked += 1
+            # 🔴 比較式走 pipeline 出口之**同一支** `label_from_signed_return`，
+            #    不在此寫 `lv >= threshold`（第二份實作必然漂移）。
+            if pipeline.label_from_signed_return(float(lv), threshold) == int(lab):
+                n_agree += 1
+        if n_checked == 0:
+            return CompareVerdict(
+                status="unavailable", reason="random_control_prevalence_missing",
+                message="觸發批沒有任何事件，無 prevalence 可比",
+                sample_design=RANDOM_SAMPLE_DESIGN, n_requested=n_requested, n_drawn=n_drawn,
+            )
+        if n_agree != n_checked:
+            return CompareVerdict(
+                status="unavailable", reason="random_control_rule_mismatch",
+                message=(f"以宣告之 label_rule 重評觸發批，一致率 {n_agree}/{n_checked} != 1.0"
+                         "——落檔的 label 不是這條規則產出的"),
+                sample_design=RANDOM_SAMPLE_DESIGN, n_requested=n_requested, n_drawn=n_drawn,
+            )
+
+        # ── ④ prevalence ────────────────────────────────────────────────
+        rand_recs = list(getattr(random_detail, "records", None) or ())
+        trig_labels = [int(r["label"]) for r in trig_recs if r.get("label") is not None]
+        rand_labels = [int(r["label"]) for r in rand_recs if r.get("label") is not None]
+        if not trig_labels or not rand_labels:
+            return CompareVerdict(
+                status="unavailable", reason="random_control_prevalence_missing",
+                message=(f"prevalence 缺（觸發批 {len(trig_labels)} 筆、隨機批 {len(rand_labels)} 筆"
+                         "有 label）——空的一側沒有基率"),
+                sample_design=RANDOM_SAMPLE_DESIGN, n_requested=n_requested, n_drawn=n_drawn,
+            )
+        p_trig = sum(trig_labels) / len(trig_labels)
+        p_rand = sum(rand_labels) / len(rand_labels)
+        return CompareVerdict(
+            status="ok",
+            trigger_prevalence=float(p_trig),
+            random_prevalence=float(p_rand),
+            # 🔴 基準為 0 ⇒ lift 無定義，回 None 而**不**回 inf／0（兩者都會被讀成一個數字）。
+            lift=float(p_trig / p_rand) if p_rand > 0 else None,
+            n_trigger=len(trig_labels), n_random=len(rand_labels),
+            sample_design=RANDOM_SAMPLE_DESIGN,
+            n_requested=n_requested, n_drawn=n_drawn,
+        )
 
     @staticmethod
     def _event_k_disclosure(

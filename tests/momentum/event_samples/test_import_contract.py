@@ -52,6 +52,44 @@ def make_event(n: int = 0, **over) -> dict:
     return e
 
 
+def random_control_spec_fixture(**over) -> dict:
+    """`G3-D2` D5.1：契約 `receipt_schema.batch.random_control_spec` 之**最小合法**物件。
+
+    🔴 刻意寫成字面而非由契約反推：本 fixture 同時是「schema 說得出口的形狀真的存在」之證據；
+    由契約反推會讓 schema 改壞時 fixture 跟著改壞，兩邊一起錯而測試全綠。
+    🔴 `threshold` 為 `float` 字面（`0.05` 非 `0`）——契約以 `type(v) is float` 嚴格判定。
+    """
+    spec = {
+        "universe": {"symbol": "ETHUSDT", "timeframe": "12h", "start_ms": T0, "end_ms": T0 + 100 * TF_MS},
+        "strata": {
+            "symbol": "ETHUSDT", "timeframe": "12h",
+            "period": {"start_ms": T0, "end_ms": T0 + 100 * TF_MS},
+            "direction": "long",
+        },
+        "allocation": "proportional_to_candidates",
+        "exclusion": {"trigger_ids_digest": "d" * 64, "neighborhood_bars": 0, "embargo_bars": 0},
+        "label_rule": {"threshold": 0.05, "horizon_bars": 2},
+        "seed": 20260905,
+        "n_requested": 2,
+        "n_drawn": 2,
+        "replacement": False,
+        "candidate_count": 2,
+        "per_stratum": [{"key": "ETHUSDT|12h|2025-01|long", "n_candidates": 2, "n_drawn": 2}],
+        "sample_ids_digest": "e" * 64,
+        "data_snapshot_digest": "b" * 64,
+        "generator_version": "gap3-d5.2-v1",
+    }
+    spec.update(over)
+    return spec
+
+
+def make_random_event(n: int = 0, **over) -> dict:
+    """隨機對照批之單列 fixture（`control_kind`／`label_origin` 成對，缺一即 mixed）。"""
+    e = make_event(n, control_kind="platform_random_bars", label_origin="platform_random")
+    e.update(over)
+    return e
+
+
 def canonical_event(n: int = 0, **over) -> dict:
     """使用者匯入路徑之 fixture：`event_id` 依契約 `event_id_template` 產生（Task 1.3／D-2）。
 
@@ -185,10 +223,106 @@ def test_direction_single_value_per_batch():
     assert "direction_mixed_in_batch" in reasons_of(ei.value)
 
 
-def test_platform_random_bars_always_rejected():
+def test_platform_random_bars_requires_batch_level_spec():
+    """🔴 **既有斷言之目標變更**（`G3-D2` D5.1；原名 `…_always_rejected`）。
+
+    原條文＝「`platform_random_bars` 恆拒」，字面 `not_implemented_platform_random_bars`。
+    D-001 D5.1 解禁該值 ⇒ 「恆拒」不再是契約的意思，**但拒收本身沒有被放寬**：
+    它從「無條件拒」換成「缺抽樣契約就拒」，且多了一條原本不存在的混批拒收。
+    本條把三種情形全部釘住（其中兩條是**新增**的擋，不是移除的擋）：
+      ① 全隨機批＋缺 spec ⇒ `random_control_spec_missing`
+      ② 全隨機批＋合法 spec ⇒ 通過（否則「解禁」只是空話）
+      ③ 隨機列與觸發列混在同一批（帶 spec）⇒ `random_control_mixed_batch`
+    """
+    # ① 缺 spec
     with pytest.raises(ContractValidationError) as ei:
-        validate_event_import([make_event(0, control_kind="platform_random_bars"), make_event(1, label=0)])
-    assert "not_implemented_platform_random_bars" in reasons_of(ei.value)
+        validate_event_import([make_random_event(0), make_random_event(1, label=0)])
+    assert "random_control_spec_missing" in reasons_of(ei.value)
+
+    # ② 帶合法 spec ⇒ 通過
+    df = validate_event_import(
+        [make_random_event(0), make_random_event(1, label=0)],
+        random_control_spec=random_control_spec_fixture(),
+    )
+    assert len(df) == 2
+
+    # ③ 混批
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(
+            [make_random_event(0), make_event(1, label=0)],
+            random_control_spec=random_control_spec_fixture(),
+        )
+    assert "random_control_mixed_batch" in reasons_of(ei.value)
+
+
+def test_random_control_spec_on_trigger_batch_is_mixed():
+    """非隨機批帶 spec ⇒ `random_control_mixed_batch`（spec 不得掛在觸發批上）。"""
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import(
+            [make_event(0), make_event(1, label=0)],
+            random_control_spec=random_control_spec_fixture(),
+        )
+    assert "random_control_mixed_batch" in reasons_of(ei.value)
+
+
+def test_random_control_spec_missing_label_rule():
+    """`label_rule` 缺 ⇒ 專屬 reason（不吃泛用 `missing_required_field`）。"""
+    spec = random_control_spec_fixture()
+    del spec["label_rule"]
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import([make_random_event(0), make_random_event(1, label=0)],
+                              random_control_spec=spec)
+    assert "random_control_label_rule_missing" in reasons_of(ei.value)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "leaf_path"),
+    [
+        (lambda s: s["universe"].__setitem__("symbol", 1), "batch.random_control_spec.universe.symbol"),
+        (lambda s: s["label_rule"].__setitem__("threshold", "x"), "batch.random_control_spec.label_rule.threshold"),
+        # 🔴 `int` 冒充 `float`：`0` 與 `0.0` 序列化成不同位元組，而規則身分閘是逐葉 `==`
+        #    ⇒ 放行 int 會讓「同一條規則」在 digest 上分裂。契約以 `type(v) is float` 嚴格判。
+        (lambda s: s["label_rule"].__setitem__("threshold", 0), "batch.random_control_spec.label_rule.threshold"),
+        (lambda s: s["strata"]["period"].__setitem__("start_ms", 1.5),
+         "batch.random_control_spec.strata.period.start_ms"),
+        (lambda s: s["per_stratum"][0].__setitem__("n_drawn", -1),
+         "batch.random_control_spec.per_stratum[0].n_drawn"),
+    ],
+    ids=["universe_symbol", "label_rule_threshold", "label_rule_int_threshold", "period_start", "per_stratum_elem"],
+)
+def test_random_control_spec_typed_leaf_paths(mutate, leaf_path):
+    """遞迴 typed 驗：葉型別錯 ⇒ failure 之 `field` 為**葉路徑**（不是整包 spec）。
+
+    🔴 只驗「有 raise」對「整個 schema 沒生效」這種壞法也會綠 ⇒ 逐字命中葉路徑。
+    """
+    spec = random_control_spec_fixture()
+    mutate(spec)
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import([make_random_event(0), make_random_event(1, label=0)],
+                              random_control_spec=spec)
+    assert leaf_path in {f["field"] for f in ei.value.failures}
+
+
+def test_random_control_spec_unknown_and_missing_leaf():
+    """未知葉 ⇒ `unknown_field`（帶葉路徑）；缺必填葉 ⇒ `missing_required_field`。"""
+    spec = random_control_spec_fixture()
+    spec["universe"]["not_a_field"] = 1
+    del spec["universe"]["end_ms"]
+    with pytest.raises(ContractValidationError) as ei:
+        validate_event_import([make_random_event(0), make_random_event(1, label=0)],
+                              random_control_spec=spec)
+    got = {(f["field"], f["reason"]) for f in ei.value.failures}
+    assert ("batch.random_control_spec.universe.not_a_field", "unknown_field") in got
+    assert ("batch.random_control_spec.universe.end_ms", "missing_required_field") in got
+
+
+def test_validate_event_import_exposes_random_control_spec_keyword():
+    """wire 鏈 (b)：keyword-only 參數存在（簽章漂移 ⇒ 端點靜默不傳 spec）。"""
+    import inspect
+
+    p = inspect.signature(validate_event_import).parameters["random_control_spec"]
+    assert p.kind is inspect.Parameter.KEYWORD_ONLY
+    assert p.default is None
 
 
 def test_unclassifiable_not_importable():
@@ -399,7 +533,18 @@ def test_label_origin_importable_values_all_accepted():
     ok = [v for v in spec["enum"] if v not in spec["not_importable"]]
     assert len(ok) >= 4, "非 not_importable 之值應有四個以上（防 enum 被縮小而本條失去覆蓋）"
     for v in ok:
-        df = validate_event_import(_pred("B", label_origin=v, lookahead_bars_declared={"12h": 0}))
+        # 🔴 `G3-D2` D5.1：`platform_random` 之**共同必要條件**——它與
+        #    `control_kind=platform_random_bars` 及批次級 `random_control_spec` 成套
+        #    （D-001「觸發批內 label_origin=platform_random ⇒ random_control_mixed_batch」）。
+        #    本條之主張仍是「非 not_importable 之值全部可匯入」，只是對這個值須連同它的
+        #    共同必要條件一起送——**不是**把它豁免掉。缺條件之拒收由
+        #    `test_platform_random_bars_requires_batch_level_spec` ③ 逐字釘住。
+        if v == "platform_random":
+            rows = _pred("B", label_origin=v, lookahead_bars_declared={"12h": 0},
+                         control_kind="platform_random_bars")
+            df = validate_event_import(rows, random_control_spec=random_control_spec_fixture())
+        else:
+            df = validate_event_import(_pred("B", label_origin=v, lookahead_bars_declared={"12h": 0}))
         assert len(df) == 2, f"{v!r} 應可匯入"
 
 

@@ -980,7 +980,7 @@ export async function exportPdfReport(taskId: string): Promise<Blob> {
 // ============================================================
 import type {
   EventAnalyzeResponse, EventCsvMappingSubmission, EventImportDetail, EventImportListResponse,
-  EventImportRejected, EventImportResponse,
+  EventImportRejected, EventImportResponse, RandomControlGenerateRequest,
 } from './types';
 import type { LookaheadDeclarationPayload, LookaheadDeclarationPreview } from './lookaheadDeclaration';
 import { httpErrorMessage } from './httpError';
@@ -1134,6 +1134,26 @@ export async function analyzeEventImport(
  */
 export async function getEventImport(importId: string): Promise<EventImportDetail> {
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/events/${encodeURIComponent(importId)}`);
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+/**
+ * `G3-D2` D5.3：依既有觸發批產一批**隨機對照組**並落檔。
+ *
+ * 🔴 `random_control_spec` 只送**輸入**鍵（universe／strata／allocation／exclusion／
+ *    label_rule／seed／n_requested／replacement）；收據鍵（n_drawn／per_stratum／
+ *    sample_ids_digest…）由後端產生器填回——前端送這些鍵是把產出當輸入，
+ *    後端會以 typed schema 收下並**覆寫**，不會有人發現值被無視。
+ */
+export async function createRandomControlBatch(
+  body: RandomControlGenerateRequest,
+): Promise<EventImportResponse> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/import-events/random-control`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!response.ok) await parseRejected(response);
   return response.json();
 }

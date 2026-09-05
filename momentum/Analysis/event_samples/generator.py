@@ -192,6 +192,17 @@ def generate_events(
         "always_true": bool(n_rows > 0 and len(hits) == n_rows),
         "generator_config": asdict(gen_config),
         "source_file_digest": source_digest,
+        # 🔴 `G3-D2` D5.3：**觸發批之規則身分**（供未來接線餵匯入 envelope 之 `label_rule`）。
+        #    單一 `LabelRule` ⇒ `{threshold, horizon_bars}`；**多規則 ⇒ `None`**（GROK-R3-P2-01）
+        #    ——多規則批沒有單一的「這批的規則」，硬取第一條就是隱性多數決，
+        #    而下游的規則身分閘會拿它當真去比對，得出一個看起來成立的錯誤結論。
+        #    🔴 本欄**只進 provenance，不落檔**：`generate_events` 於 `api/` 無 caller
+        #    （產生器批現無持久化路徑），接線列 §N 殘留 `B5-GENERATOR-WIRE-1`。
+        "label_rule": (
+            {"threshold": float(label_config[0].threshold),
+             "horizon_bars": int(label_config[0].horizon_bars)}
+            if len(label_config) == 1 else None
+        ),
     }
     if prov["always_true"]:
         logger.warning("generate_events: 條件恆真（%s 列全命中）", n_rows)

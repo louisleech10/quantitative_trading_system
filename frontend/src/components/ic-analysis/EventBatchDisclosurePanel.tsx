@@ -18,7 +18,11 @@
  */
 
 import { useEffect, useState } from 'react';
-import { getEventImport } from '@/lib/api';
+import { createRandomControlBatch, getEventImport } from '@/lib/api';
+import {
+  type RandomControlParams,
+  buildRandomControlSpec,
+} from '@/lib/randomControlSpec';
 import {
   EVENT_FIELD_FORMATTERS,
   IC_BATCH_FACT_FIELDS,
@@ -36,6 +40,7 @@ import {
 } from '@/lib/eventDimensions';
 import type {
   EventImportDetail,
+  EventImportResponse,
   ICAnalysisConfig,
   ICEventLabelScan,
   ICEventScanDisclosure,
@@ -109,6 +114,15 @@ export default function EventBatchDisclosurePanel({
 }: Props) {
   const [detail, setDetail] = useState<EventImportDetail | null>(injected ?? null);
   const [error, setError] = useState<string | null>(null);
+  // `G3-D2` D5.3：隨機對照組之使用者參數與送出狀態。
+  // 🔴 預設值皆為**保守的舉例值**（非裁定值）：`neighborhood`／`embargo` 給 0／答案窗長度
+  //    會讓對照組貼著觸發窗，故各給幾根餘裕；`seed` 固定以求可重現。
+  const [rcParams, setRcParams] = useState<RandomControlParams>({
+    nRequested: 100, seed: 20260905, neighborhoodBars: 2, embargoBars: 6, threshold: 0.02,
+  });
+  const [rcBusy, setRcBusy] = useState(false);
+  const [rcError, setRcError] = useState<string | null>(null);
+  const [rcResult, setRcResult] = useState<EventImportResponse | null>(null);
 
   useEffect(() => {
     if (injected !== undefined) { setDetail(injected); return; }
@@ -188,6 +202,9 @@ export default function EventBatchDisclosurePanel({
     );
   }
   if (!detail) return null;
+
+  // `G3-D2` D5.3：抽樣契約由**純函式**組（導出規則不散在 JSX 裡；見 randomControlSpec.ts）。
+  const randomSpec = buildRandomControlSpec(detail, rcParams);
 
   return (
     <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-4" data-testid="ic-batch-disclosure">
@@ -506,6 +523,83 @@ export default function EventBatchDisclosurePanel({
           這批共 {detail.summary.n_events} 筆事件，
           實際可算／缺的筆數與本次 purge 下界由後端於分析後回報（前端不自算，避免第二份公式）。
         </p>
+      </div>
+
+      {/* ── `G3-D2` D5.3：隨機對照組 ───────────────────────────────────── */}
+      <div data-testid="ic-random-control">
+        <h4 className="text-sm font-medium text-slate-200">隨機對照組</h4>
+        <p className="mt-1 text-[11px] text-slate-400" data-testid="ic-random-control-note">
+          從同一段期間、同一個 symbol／timeframe 裡**隨機**挑一批沒有觸發條件的 bar，
+          用同一條標籤規則標答案。它回答的是「隨便挑會有多少比例中」——
+          這批事件的正例率要跟它比才有意義。
+          {randomSpec.ok && !randomSpec.usedBatchLabelRule && (
+            <span className="ml-1 text-amber-200/90" data-testid="ic-random-control-rule-unverifiable">
+              🔴 這批沒有落檔的標籤規則（receipt.batch.label_rule），
+              對照結果會標為「無法確認兩批用同一把尺」——數字仍會算，但不可當作 lift。
+            </span>
+          )}
+        </p>
+        {!randomSpec.ok ? (
+          <p className="mt-2 text-[11px] text-rose-300" data-testid="ic-random-control-blocked">
+            無法產生對照組：{randomSpec.reason}
+          </p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            <div className="flex flex-wrap gap-3">
+              {([
+                ['n_requested', '想抽幾筆', rcParams.nRequested, (v: number) => setRcParams({ ...rcParams, nRequested: v })],
+                ['seed', '亂數種子', rcParams.seed, (v: number) => setRcParams({ ...rcParams, seed: v })],
+                ['neighborhood', '前鄰域（根）', rcParams.neighborhoodBars, (v: number) => setRcParams({ ...rcParams, neighborhoodBars: v })],
+                ['embargo', '後 embargo（根）', rcParams.embargoBars, (v: number) => setRcParams({ ...rcParams, embargoBars: v })],
+              ] as const).map(([key, label, value, onSet]) => (
+                <label key={key} className="text-[11px] text-slate-300">
+                  {label}
+                  <input
+                    type="number"
+                    className="ml-1 w-20 rounded bg-slate-800 px-1 py-0.5 text-slate-100"
+                    data-testid={`ic-random-control-${key}`}
+                    value={value}
+                    min={0}
+                    onChange={(e) => onSet(Number(e.target.value))}
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="rounded bg-sky-700 px-3 py-1 text-xs text-white disabled:opacity-40"
+              data-testid="ic-random-control-generate"
+              disabled={!importId || rcBusy}
+              onClick={async () => {
+                if (!importId || !randomSpec.ok) return;
+                setRcBusy(true);
+                setRcError(null);
+                try {
+                  const out = await createRandomControlBatch({
+                    event_import_id: importId, random_control_spec: randomSpec.spec,
+                  });
+                  setRcResult(out);
+                } catch (e: unknown) {
+                  setRcError(e instanceof Error ? e.message : '產生對照組失敗');
+                } finally {
+                  setRcBusy(false);
+                }
+              }}
+            >
+              {rcBusy ? '產生中…' : '產生隨機對照批'}
+            </button>
+            {rcError && (
+              <p className="text-[11px] text-rose-300" data-testid="ic-random-control-error">{rcError}</p>
+            )}
+            {rcResult && (
+              <p className="text-[11px] text-emerald-300" data-testid="ic-random-control-result">
+                已產生對照批 {rcResult.import_id}（落檔 {rcResult.n_valid} 筆
+                {rcResult.n_valid < rcParams.nRequested
+                  && `；少於想抽的 ${rcParams.nRequested} 筆——候選被排除區間扣掉了，這是揭露不是錯誤`}）。
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

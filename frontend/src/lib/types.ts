@@ -2926,6 +2926,32 @@ export interface EventImportDetail {
     /** `G3-D2` D4.3：批內**記錄**之 k distinct 值（升冪）；空＝該批無此欄（≠ `[0]`）。 */
     decision_offset_bars_record_values: number[];
   };
+  /** `G3-D2` D5.1／D5.3：`receipt.batch` 之投影（舊批兩欄皆 `null`，那是通則不是例外）。 */
+  receipt_batch: EventReceiptBatch;
+}
+
+/** `G3-D2` D5.1：標籤規則之身分（`close_to_close` 門檻＋答案窗長度）。 */
+export interface EventLabelRule {
+  threshold: number;
+  horizon_bars: number;
+}
+
+/**
+ * `G3-D2` D5.1：批次 receipt 之投影。
+ *
+ * 🔴 `random_control_spec` 刻意為寬型別（`Record<string, unknown>`）：其形狀之唯一真相源＝
+ *    後端契約 `receipt_schema.batch.random_control_spec`，在 TS 複寫一份等於第二份真相源
+ *    （契約加葉時 TS 這份不會有人同步）。前端只讀它的少數幾個揭露欄。
+ */
+export interface EventReceiptBatch {
+  label_rule: EventLabelRule | null;
+  random_control_spec: Record<string, unknown> | null;
+}
+
+/** `G3-D2` D5.3：`POST /case/import-events/random-control` 之 body。 */
+export interface RandomControlGenerateRequest {
+  event_import_id: string;
+  random_control_spec: Record<string, unknown>;
 }
 
 /** `G3-D2` D4.3：k／h 掃描網格之請求上界（請求**頂層 sibling**，不在 `event_label_spec` 內）。 */

@@ -330,3 +330,25 @@ def test_event_filter_rejects_selection_predicate_and_mixed():
 
 def test_allowed_filtering_params_contractized():
     assert allowed_filtering_params() == frozenset({"price_change"})
+
+
+# ---- `G3-D2` D5.3：provenance 之 `label_rule`（觸發批規則身分，供未來接線） ----
+def test_provenance_label_rule_single_rule_filled(bars):
+    """單一 `LabelRule` ⇒ provenance 帶 `{threshold, horizon_bars}`（型別亦須對）。"""
+    spec = parse_condition("ret_1 <= -0.02", registry(RULES[:1]), "selection_predicate")
+    _, prov = generate_events(spec, {"12h": bars}, RULES[:1], cfg())
+    assert prov["label_rule"] == {"threshold": 0.01, "horizon_bars": 2}
+    assert type(prov["label_rule"]["threshold"]) is float      # 契約以 type(v) is float 嚴格判定
+    assert type(prov["label_rule"]["horizon_bars"]) is int
+
+
+def test_provenance_label_rule_multi_rule_is_none(bars):
+    """多規則批 ⇒ `None`（**不取第一條**）。
+
+    🔴 取第一條就是隱性多數決：下游之規則身分閘會拿它當「這批的規則」去比對，
+    得出一個看起來成立、實際上只對其中一條規則成立的結論。
+    """
+    spec = parse_condition("ret_1 <= -0.02", registry(), "selection_predicate")
+    _, prov = generate_events(spec, {"12h": bars}, RULES, cfg())
+    assert len(RULES) > 1                                       # 正向對照：真的是多規則
+    assert prov["label_rule"] is None

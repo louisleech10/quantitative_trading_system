@@ -58,9 +58,8 @@
     "control_kind": {
       "type": "str",
       "enum": ["user_labeled_same_trigger", "user_labeled_other", "platform_same_trigger_rule", "platform_random_bars"],
-      "accepted": ["user_labeled_same_trigger", "user_labeled_other", "platform_same_trigger_rule"],
-      "rejected_with_reason": { "platform_random_bars": "not_implemented_platform_random_bars" },
-      "doc": "四值閉集；platform_random_bars 恆拒（SPEC §N-7 解除前）；platform_same_trigger_rule 自 B3.2 起由產生器產出、過同一 validator"
+      "accepted": ["user_labeled_same_trigger", "user_labeled_other", "platform_same_trigger_rule", "platform_random_bars"],
+      "doc": "四值閉集，四值皆 accepted。platform_same_trigger_rule 自 B3.2 起由產生器產出、過同一 validator；platform_random_bars 自 D-001 D5.1 解禁（原 rejected_with_reason.platform_random_bars=not_implemented_platform_random_bars 已移除；該 reason 字面**保留登記**於 import_failure_reasons，因其為封閉集合且 receipt_schema/reason registry 之既有前綴不得刪值）。隨機批之抽樣契約住 receipt_schema.batch.random_control_spec，由 validate_event_import 之 random_control_spec keyword 強制：批帶 platform_random_bars 而缺 spec ⇒ random_control_spec_missing；非隨機批帶 spec 或帶 label_origin=platform_random ⇒ random_control_mixed_batch"
     },
     "source_file_digest": { "type": "str", "format": "sha256_hex64", "doc": "匯入來源檔 sha256；提供 source_bytes 時逐列對證，不符 ⇒ digest_mismatch" },
     "data_snapshot_digest": { "type": "str", "doc": "資料快照識別；僅驗非空字串（誠實邊界 c）" }
@@ -144,7 +143,9 @@
     "digest_mismatch", "label_value_type_error", "counterexample_kind_not_importable",
     "column_mapping_missing", "column_not_found_in_file",
     "label_column_not_binary", "heterogeneous_rows_in_batch",
-    "scenario_depth_inconsistent", "label_origin_not_importable"
+    "scenario_depth_inconsistent", "label_origin_not_importable",
+    "random_control_spec_missing", "random_control_mixed_batch",
+    "random_control_label_rule_missing"
   ],
   "alignment_failure_reasons": [
     "invalid_timestamp_unit", "timezone_missing", "missing_bar", "duplicate_bar", "unsorted_bar",
@@ -156,7 +157,9 @@
     "missing_label_value", "missing_prevalence_disclosure", "one_class_test_segment",
     "split_blocked_unverifiable_lookahead", "label_producer_unsupported_for_declared_semantics",
     "zero_length_label_window", "scan_grid_too_large", "scan_cell_timeout",
-    "missing_decision_offset_disclosure"
+    "missing_decision_offset_disclosure",
+    "random_control_prevalence_missing", "random_control_period_mismatch",
+    "random_control_rule_identity_unverifiable", "random_control_rule_mismatch"
   ],
   "analysis_params": {
     "_doc": "D-001 D4.2／D4.3：**分析時**參數（不落檔、不進 event record；與 required_fields 之匯入欄無關）。每個數值鍵皆為 example_default＝舉例可調，非使用者裁定值；UI／config 可覆寫。",
@@ -197,7 +200,7 @@
     },
     "thresholds_doc": "四門檻全部＝舉例可調（2026-08-20 白話閘裁決①「都只是舉例，沒有一定」），非使用者裁定數值；config/UI 可覆寫"
   },
-  "receipt_schema_doc": "GAP-3 UX Task 1.1／R11：receipt_schema 由「欄名清單」升為 namespace-aware 之 {欄名: 型別}（不攤平）。既有欄名與插入順序照抄，只補型別；新增 batch namespace 承載批次層屬性（非逐列、非逐 TF）。traversal 與型別判定唯一住 momentum/Analysis/event_samples/import_contract.py（flatten_receipt_schema／receipt_type_ok），runtime validator 與驗收共用同一函式參考，禁各寫一份。",
+  "receipt_schema_doc": "GAP-3 UX Task 1.1／R11：receipt_schema 由「欄名清單」升為 namespace-aware 之 {欄名: 型別}（不攤平）。既有欄名與插入順序照抄，只補型別；新增 batch namespace 承載批次層屬性（非逐列、非逐 TF）。traversal 與型別判定唯一住 momentum/Analysis/event_samples/import_contract.py（flatten_receipt_schema／receipt_type_ok），runtime validator 與驗收共用同一函式參考，禁各寫一份。🔴 D-001 D5.1：namespace 內之宣告值有**兩種形態**——(1) leaf＝型別字面字串（既有全部欄，行為逐位元組不變、鍵級恆必填）；(2) typed node＝{type: object|list[object], required: bool, fields: {…}}（可遞迴）。鍵級 required:false ⇒ 該鍵缺席合法且不記 missing_required_field；存在則遞迴 typed 驗，錯誤訊息帶葉路徑（例 batch.random_control_spec.universe.symbol）。flatten_receipt_schema 只攤 namespace 之**頂層鍵名**（不下鑽），故既有 prefix 斷言不受影響。",
   "receipt_schema": {
     "event_level": {
       "event_id": "str",
@@ -224,7 +227,83 @@
     },
     "batch": {
       "lookahead_bars_declared": "Mapping[str,int>=0]",
-      "analysis_alignment_receipt_hash": "str"
+      "analysis_alignment_receipt_hash": "str",
+      "label_rule": {
+        "type": "object",
+        "required": false,
+        "doc": "D-001 D5.1：**觸發批之規則身分**。來源＝匯入 envelope import_records(..., label_rule=)；人工標註／/search 匯出批通常缺（缺＝合法，比較時回 random_control_rule_identity_unverifiable）。存在 ⇒ 遞迴 typed 驗，錯 ⇒ ValueError 含葉路徑。與隨機批 random_control_spec.label_rule 逐葉相等時，prevalence 比較才成立。",
+        "fields": {
+          "threshold": { "type": "float", "required": true, "doc": "close_to_close 報酬門檻（fractional）；型別嚴格 float（type(v) is float），int 不得 coerce" },
+          "horizon_bars": { "type": "int", "required": true, "doc": "答案窗長度（bars）；語意上須 ≥1，由產生器 fail-closed 檢查" }
+        }
+      },
+      "random_control_spec": {
+        "type": "object",
+        "required": false,
+        "doc": "D-001 D5.1：隨機對照批之**抽樣契約＋抽樣收據**（同一物件；產生器輸入之鍵與產生器填回之鍵合起來即本 schema 之全集，validate_event_import 收到的一律是**產生後的完整物件**）。estimand：同 universe 之非觸發 eligible bars 以 label_rule 宣告之規則（all_bars_eval._label_from_rule）自動標 label、同一 producer 算 label_value；回答觸發樣本相對無條件基準之 prevalence／IC lift——**僅當觸發批之 receipt.batch.label_rule 與本物件之 label_rule typed 相等（threshold／horizon_bars 逐葉 ==、direction 同批、觸發批 label_return_mode == close_to_close）時該比較成立**；不回答反例品質、不補足缺失反例。🔴 **分層粒度＝自然月（UTC）**：D-001 D5.2 只寫 strata{symbol,timeframe,period,direction} 而未定義 period 如何產生多個 stratum，D5.4 邊界寫「universe 跨月分層」⇒ 本契約定 period 為 {start_ms,end_ms} 區間、stratum key ＝ symbol|timeframe|YYYY-MM|direction。此為 SPEC 洞之 fail-closed 細化（殘留 B5-SPECGAP-1）。",
+        "fields": {
+          "universe": {
+            "type": "object", "required": true,
+            "doc": "抽樣母體（單 symbol；跨 symbol ⇒ 拒）",
+            "fields": {
+              "symbol": { "type": "str", "required": true },
+              "timeframe": { "type": "str", "required": true },
+              "start_ms": { "type": "int", "required": true },
+              "end_ms": { "type": "int", "required": true }
+            }
+          },
+          "strata": {
+            "type": "object", "required": true,
+            "doc": "分層定義；period 須與觸發批之 [min t0, max label_end] 有交集，否則 random_control_period_mismatch",
+            "fields": {
+              "symbol": { "type": "str", "required": true },
+              "timeframe": { "type": "str", "required": true },
+              "period": {
+                "type": "object", "required": true,
+                "fields": {
+                  "start_ms": { "type": "int", "required": true },
+                  "end_ms": { "type": "int", "required": true }
+                }
+              },
+              "direction": { "type": "str", "required": true, "doc": "取自觸發批之 direction；決定 _label_from_rule 之 direction_sign" }
+            }
+          },
+          "allocation": { "type": "str", "required": true, "doc": "封閉單值 proportional_to_candidates；floor＋最大餘數，禁 round" },
+          "exclusion": {
+            "type": "object", "required": true,
+            "fields": {
+              "trigger_ids_digest": { "type": "str", "required": true, "doc": "S-9 sha256 of sorted 觸發批 event_id" },
+              "neighborhood_bars": { "type": "int>=0", "required": true },
+              "embargo_bars": { "type": "int>=0", "required": true }
+            }
+          },
+          "label_rule": {
+            "type": "object", "required": true,
+            "doc": "**必填**（TODO review r2 三家 P1-01）；缺 ⇒ random_control_label_rule_missing。與觸發批 receipt.batch.label_rule 逐葉比對即規則身分閘",
+            "fields": {
+              "threshold": { "type": "float", "required": true },
+              "horizon_bars": { "type": "int", "required": true }
+            }
+          },
+          "seed": { "type": "int", "required": true, "doc": "numpy.random.default_rng(seed)；同 seed 同 universe ⇒ sample_ids_digest 相等" },
+          "n_requested": { "type": "int>=0", "required": true },
+          "n_drawn": { "type": "int>=0", "required": true, "doc": "n_drawn < n_requested 允許（候選不足）但須揭露" },
+          "replacement": { "type": "bool", "required": true, "doc": "恆 false（無放回）" },
+          "candidate_count": { "type": "int>=0", "required": true, "doc": "排除區間扣除後之候選 bar 數；0 ⇒ unavailable" },
+          "per_stratum": {
+            "type": "list[object]", "required": true,
+            "doc": "逐層配額；Σ n_drawn == n_drawn == min(n_requested, candidate_count)",
+            "fields": {
+              "key": { "type": "str", "required": true },
+              "n_candidates": { "type": "int>=0", "required": true },
+              "n_drawn": { "type": "int>=0", "required": true }
+            }
+          },
+          "sample_ids_digest": { "type": "str", "required": true, "doc": "S-9 sha256 of sorted 抽中 event_id" },
+          "data_snapshot_digest": { "type": "str", "required": true },
+          "generator_version": { "type": "str", "required": true }
+        }
+      }
     },
     "mapping_provenance": {
       "column_mapping": "Mapping[str,str]",

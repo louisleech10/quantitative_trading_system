@@ -29,6 +29,7 @@ from ..models.event_import_models import (
     EventImportRejected,
     EventImportResponse,
     LookaheadDeclarationPreviewColumnsRequest,
+    RandomControlGenerateRequest,
 )
 from ..services.batch_download_service import get_batch_download_service
 from ..utils.case_storage import get_case_storage_manager
@@ -241,6 +242,41 @@ async def import_events_json(request: EventImportJsonRequest):
                                   carried_declaration_acknowledged=True)   # 殘留 R35-L2-ACK：只此路由自動視為已勾選
     except EventImportRejectedError as exc:
         raise _rejected(exc, svc=svc, content=body)
+
+
+@router.post("/case/import-events/random-control", response_model=EventImportResponse)
+async def import_events_random_control(request: RandomControlGenerateRequest):
+    """`G3-D2` D5.3：依既有**觸發批**產一批隨機對照事件並落檔。
+
+    🔴 **不新建 `api/routes/event_import.py`**（`D-001` D5.3；該檔不存在，新建會讓
+    `/case/import-events*` 家族分裂成兩個路由檔）。落檔走**同一支** `import_records`
+    ⇒ 同一 validator、同一儲存路徑、同一刪除範圍，無 profile 分裂。
+
+    流程：讀觸發批 → 以同一支對齊實作取每事件之 `label_end_ms` → `sample_random_bars`
+    → `import_records(records, random_control_spec=receipt)`。
+    """
+    svc = get_event_import_service()
+    trigger = svc.get_import(request.event_import_id)
+    if trigger is None:
+        raise HTTPException(status_code=404,
+                            detail=f"event import {request.event_import_id!r} not found")
+    try:
+        records, receipt = svc.build_random_control_batch(trigger, request.random_control_spec)
+    except EventImportRejectedError as exc:
+        raise _rejected(exc, svc=svc)
+    except (KeyError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=409, detail={"kind": "bars_unavailable", "message": str(exc)})
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"kind": "pipeline_rejected", "message": str(exc)})
+    try:
+        return svc.import_records(
+            records, source_name=f"random_control_of:{request.event_import_id}",
+            upload_bytes=None, validate_only=False,
+            random_control_spec=receipt,
+            # 隨機批之列自帶 `lookahead_bars_declared`（深度＝答案窗長度），走列內宣告路徑。
+            carried_declaration_acknowledged=True)
+    except EventImportRejectedError as exc:
+        raise _rejected(exc, svc=svc)
 
 
 def _form_json_dict(name: str, raw: Optional[str]) -> dict:

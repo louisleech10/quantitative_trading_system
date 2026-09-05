@@ -46,6 +46,9 @@ function detailFixture(over: Partial<EventImportDetail['batch_facts']> = {}): Ev
       // 批內**記錄**之 k 值集合（事實）；空清單＝該批沒有這個欄。
       decision_offset_bars_record_values: [0],
     },
+    // 🔴 `G3-D2` D5.1：本 fixture 為**舊批形態** ⇒ 兩欄皆 null（缺席是通則）。
+    //    「有落檔規則身分」之情形由 `icRandomControl.test.tsx` 覆蓋。
+    receipt_batch: { label_rule: null, random_control_spec: null },
   };
 }
 

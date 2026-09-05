@@ -229,6 +229,55 @@ class EventSamplePipeline:
             return {"ok": False, "failures": [dict(f) for f in exc.failures]}
         return {"ok": True, "failures": []}
 
+    @staticmethod
+    def label_from_signed_return(signed_return: float, threshold: float) -> int:
+        """`G3-D2` D5.3：標籤判準之 R3 出口（**與產生器同一函式**）。
+
+        規則身分閘之 (c) 段要以同一條 `label_rule` 重評觸發批 label；服務層手上只有
+        落檔之 `label_value`（signed return），故走本出口而**不在 api 層寫比較式**。
+        """
+        from momentum.Analysis.event_samples.all_bars_eval import label_from_signed_return as _impl
+
+        return _impl(float(signed_return), float(threshold))
+
+    @staticmethod
+    def sample_random_bars(bars, spec, trigger_receipts, label_rule=None, *, scenario: str):
+        """`G3-D2` D5.2 之 R3 出口；回 `(records, receipt, failure)` **純資料**三元組。
+
+        成功 ⇒ `(records, receipt, None)`；失敗 ⇒ `(None, None, {"reason", "message"})`。
+        `RandomControlError` 是 momentum 專屬型別，依 R3 慣例**不跨界**；但它攜帶的
+        `reason` 是契約封閉集合之值，route 需要它才能回對的 422 字面 ⇒ 以純資料帶出。
+        """
+        from momentum.Analysis.event_samples.random_control import (
+            RandomControlError as _RCE, sample_random_bars as _impl,
+        )
+
+        try:
+            records, receipt = _impl(bars, spec, trigger_receipts, label_rule, scenario=scenario)
+        except _RCE as exc:
+            return None, None, {"reason": exc.reason, "message": str(exc)}
+        return records, receipt, None
+
+    @staticmethod
+    def validate_receipt_field_value(namespace: str, field: str, value: Any, *,
+                                     contract: Optional[dict] = None) -> Dict[str, Any]:
+        """`G3-D2` D5.1：**單一** receipt 欄位之驗證出口（R3；回純資料，形狀同上一支）。
+
+        🔴 匯入端寫 `receipt.batch.label_rule`／`receipt.batch.random_control_spec` 時，
+        同 namespace 之另兩鍵（`lookahead_bars_declared`／`analysis_alignment_receipt_hash`）
+        是**分析時**才有的值 ⇒ 整個 namespace 一起驗會恆紅。判定實作與 namespace 版共用
+        `import_contract._typed_failures`，不重寫。
+        """
+        from momentum.Analysis.event_samples.import_contract import (
+            ContractValidationError as _CVE, validate_receipt_field as _impl,
+        )
+
+        try:
+            _impl(namespace, field, value, contract=contract)
+        except _CVE as exc:
+            return {"ok": False, "failures": [dict(f) for f in exc.failures]}
+        return {"ok": True, "failures": []}
+
     # ── GAP-3 UX Task 7.0b：分析時 label producer 之 R3 出口 ────────────────────
     # 🔴 **具名例外**：交接檔之 R3 慣例寫「出口一律回純資料，例外型別不跨界」，
     #    而下面三個出口會讓 `PreparedAnalysisWindows`（frozen dataclass）**跨界到 api 層**。
@@ -536,6 +585,7 @@ class EventSamplePipeline:
         *,
         source_bytes: Optional[bytes] = None,
         batch_defaults: Optional[Mapping[str, Any]] = None,
+        random_control_spec: Optional[Mapping[str, Any]] = None,
     ) -> Tuple[Optional[pd.DataFrame], List[Dict[str, Any]]]:
         """不 raise 之驗證：回 (正規化 df | None, failures)。failures 字面＝契約檔（唯一實作在 import_contract）。
 
@@ -548,7 +598,8 @@ class EventSamplePipeline:
         try:
             return validate_event_import(records, source_bytes=source_bytes, batch_defaults=batch_defaults,
                                          enforce_batch_homogeneity=True,
-                                         enforce_canonical_event_id=True), []
+                                         enforce_canonical_event_id=True,
+                                         random_control_spec=random_control_spec), []
         except ContractValidationError as exc:
             return None, list(exc.failures)
 

@@ -129,7 +129,11 @@ def test_gap3_import_contract_reasons_passthrough_not_reimplemented():
     r = client.post("/api/v1/case/import-events/json", json={"records": bad})
     assert r.status_code == 422
     got = {f["reason"] for f in r.json()["detail"]["failures"]}
-    assert got <= reasons and {"invalid_timestamp_unit", "not_implemented_platform_random_bars"} <= got
+    # 🔴 `G3-D2` D5.1：`platform_random_bars` 解禁，故該批之 reason 由
+    #    `not_implemented_platform_random_bars`（無條件拒）換成 `random_control_mixed_batch`
+    #    （隨機列與觸發列同批）。本條之主張——「reason 字面全部來自契約、API 層不自寫」——不變，
+    #    受測字面仍是**兩個**且仍取自契約封閉集合（`got <= reasons` 亦未放寬）。
+    assert got <= reasons and {"invalid_timestamp_unit", "random_control_mixed_batch"} <= got
     src = (REPO / "api" / "services" / "case_import_service.py").read_text(encoding="utf-8")
     gap3_part = src.split("GAP-3 Task B5.1", 1)[1]
     for literal in ("invalid_timestamp_unit", "missing_required_field", "enum_violation", "duplicate_event_id",

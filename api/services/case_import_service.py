@@ -594,6 +594,7 @@ import uuid as _uuid
 
 from api.models.event_import_models import (
     EventBatchFactNotes, EventBatchFacts, EventDeclarationSeeds, EventImportDetailResponse,
+    EventReceiptBatch, LabelRuleModel,
     EventImportFailure, EventImportListResponse, EventImportRejected, EventImportResponse,
     EventImportSummary, EventLabelRow, EventT0Row,
 )
@@ -1125,6 +1126,87 @@ class EventImportService:
             return None
         return {"declared_window_bars": dict(first), "acknowledged_unverifiable": bool(acknowledged)}
 
+    @staticmethod
+    def _declared_map(recs: List[Dict[str, object]], timeframes: List[str]) -> Dict[str, int]:
+        """該批落檔列之 `lookahead_bars_declared`（批內同值，Task 1.8 已保證）。
+
+        缺該欄或值不一致 ⇒ raise：對齊層需要它，猜一個等於替使用者宣告答案窗深度。
+        """
+        maps = {str(r.get("lookahead_bars_declared")) for r in recs}
+        if len(maps) != 1 or "None" in maps:
+            raise ValueError(
+                f"觸發批之 lookahead_bars_declared 缺或列間不一致（{sorted(maps)}）；"
+                "答案窗深度是批次層事實，不得推斷")
+        out = {str(k): int(v) for k, v in dict(recs[0]["lookahead_bars_declared"]).items()}
+        missing = [tf for tf in timeframes if tf not in out]
+        if missing:
+            raise ValueError(f"觸發批之 lookahead_bars_declared 缺 timeframe {missing}")
+        return out
+
+    def build_random_control_batch(
+        self, trigger_detail: EventImportDetailResponse, spec: Dict[str, object],
+    ) -> Tuple[List[Dict[str, object]], Dict[str, object]]:
+        """`G3-D2` D5.3：由觸發批 detail ＋ 抽樣契約產出 `(records, receipt)`。
+
+        🔴 `label_end_ms` **不在此重算**：走**同一支**對齊實作（`prepare_analysis_windows`），
+        否則就有第二份答案窗推導，而它算錯時值仍然合法（排除區間變窄 ⇒ 對照組偷到
+        觸發事件的答案窗，prevalence 差被稀釋，沒有任何東西會紅）。
+
+        🔴 本方法**只組裝、不落檔**：落檔一律由 `import_records` 這條唯一路徑做。
+        """
+        recs = list(trigger_detail.records or [])
+        if not recs:
+            raise ValueError("觸發批沒有任何 records，無法產生對照組")
+        symbols = sorted({str(r["symbol"]) for r in recs})
+        timeframes = sorted({str(r["timeframe"]) for r in recs})
+        if len(symbols) != 1 or len(timeframes) != 1:
+            raise ValueError(
+                f"觸發批跨 symbol／timeframe（{symbols}／{timeframes}）；"
+                "隨機對照組之 universe 為單一 symbol×timeframe（D-001 D5.1 邊界②），請先拆批")
+        horizons = {int(r["label_definition"]["window"]["horizon_bars"]) for r in recs}
+        if len(horizons) != 1:
+            raise ValueError(f"觸發批內答案窗長度不一致（{sorted(horizons)}）；無法定出單一對照規則")
+        scenarios = {str(r["scenario"]) for r in recs}
+        if len(scenarios) != 1:
+            raise ValueError(f"觸發批內 scenario 混值（{sorted(scenarios)}）")
+        entry = trigger_detail.declaration_seeds.entry_price_semantic
+        mode = trigger_detail.declaration_seeds.label_return_mode
+        if entry is None or mode is None:
+            raise ValueError("觸發批之 entry_price_semantic／label_return_mode 非單值，無法對齊")
+
+        bars_by_tf = self._pipeline.bars_from_kline_cache(symbols, timeframes)
+        prepared = self._pipeline.prepare_analysis_windows(
+            recs, bars_by_tf,
+            event_label_spec={
+                "horizon_bars": horizons.copy().pop(),
+                "entry_price_semantic": str(entry),
+                "label_return_mode": str(mode),
+                "decision_offset_bars": 0,
+            },
+            event_import_id=str(trigger_detail.summary.import_id),
+            # 🔴 深度宣告取自**該批落檔列自身**（單一真相源）：傳空 map 會讓對齊層
+            #    以 `lookahead_bars_declared 缺 timeframe` fail-closed，而那不是資料的問題，
+            #    是呼叫端沒把批次事實帶過來。
+            lookahead_bars_declared=self._declared_map(recs, timeframes),
+            timeframe_seconds=self._pipeline.timeframe_seconds_for(timeframes),
+        )
+        t0_by_id = {str(r["event_id"]): int(r["t0"]) for r in recs}
+        trigger_receipts = [
+            {"event_id": w.event_id, "symbol": w.symbol, "timeframe": w.timeframe,
+             "t0_ms": t0_by_id[w.event_id], "label_end_ms": int(w.label_end_ms)}
+            for w in prepared.windows if w.event_id in t0_by_id
+        ]
+        if not trigger_receipts:
+            raise ValueError("觸發批對齊後沒有任何可用窗，無從計算排除區間")
+        records, receipt, failure = self._pipeline.sample_random_bars(
+            bars_by_tf, spec, trigger_receipts, scenario=scenarios.pop())
+        if failure is not None:
+            raise EventImportRejectedError(EventImportRejected(
+                kind="contract_violation", message=str(failure["message"]),
+                failures=[EventImportFailure(row=None, event_id=None, field="random_control_spec",
+                                             reason=str(failure["reason"]), message=str(failure["message"]))]))
+        return records, receipt
+
     def import_records(
         self, records: List[Dict[str, object]], *, source_name: Optional[str], upload_bytes: Optional[bytes],
         validate_only: bool, verify_source_digest: bool = False, source_bytes: Optional[bytes] = None,
@@ -1132,11 +1214,23 @@ class EventImportService:
         lookahead_declaration: Optional[Dict[str, object]] = None, data_columns: Optional[List[str]] = None,
         column_mapping: Optional[Dict[str, object]] = None, mapping_confirmed_at: Optional[str] = None,
         derive_event_id: bool = False, carried_declaration_acknowledged: bool = False,
+        random_control_spec: Optional[Dict[str, object]] = None,
+        label_rule: Optional[Dict[str, object]] = None,
     ) -> EventImportResponse:
         """upload_bytes：事件檔內容（記 `upload_sha256` 供 provenance）。
         source_bytes：契約所指之**來源檔**位元組（CODEX-R2-P1-03）；`verify_source_digest=True` 時以此逐列對證
         `source_file_digest`。**必須是與事件檔相異之檔**——事件檔含自身 digest 欄，自我對證恆不自洽
-        （路由層以 `source_file_must_differ_from_event_file`／`source_file_required_for_verify` 擋在前面；CODEX-R4-P1-01）。"""
+        （路由層以 `source_file_must_differ_from_event_file`／`source_file_required_for_verify` 擋在前面；CODEX-R4-P1-01）。
+
+        `G3-D2` D5.1／D5.3 之**匯入 envelope**（兩者同層、皆批次級、皆非逐列欄）：
+        - `random_control_spec`：隨機對照批之抽樣契約＋收據；透傳給 validator（其
+          `control_kind` 規則決定必填／混批），通過後原樣寫入 `receipt.batch.random_control_spec`。
+        - `label_rule`：**觸發批之規則身分**。🔴 這是它的**唯一** wire——`generate_events`
+          在 `api/` 無 caller（產生器批現無持久化路徑），故 receipt 之 `label_rule`
+          只能由匯入端顯式帶入；人工標註／`/search` 匯出批通常沒有，缺席即缺席，
+          分析層以 `random_control_rule_identity_unverifiable` 誠實回報，**不猜、不補**。
+        兩者皆於落檔**之前**以契約 typed schema 逐鍵驗（`validate_receipt_field_value`），
+        不合規 ⇒ 拒收、落檔數 0。"""
         # GAP-3 UX Task 1.4：t0 單位偵測（CSV／JSON **共用**同一函式物件，經 pipeline 出口；R3）。
         # 判不出者原樣保留 ⇒ 下方 validate 以契約既有之單位 reason 逐列拒，不猜預設值。
         self._pipeline.normalize_t0_units(records, contract=self._contract)
@@ -1175,7 +1269,9 @@ class EventImportService:
         rows_partially_carry = declaration is None and carried is None \
             and any(r.get("lookahead_bars_declared") is not None for r in declaration_view)
         if not declaration_view or rows_partially_carry:
-            df0, failures0 = self._pipeline.validate(records, source_bytes=verify_bytes, batch_defaults=batch_defaults)
+            df0, failures0 = self._pipeline.validate(
+                records, source_bytes=verify_bytes, batch_defaults=batch_defaults,
+                random_control_spec=random_control_spec)
             if df0 is None:
                 raise EventImportRejectedError(EventImportRejected(
                     kind="contract_violation",
@@ -1185,7 +1281,9 @@ class EventImportService:
         declaration_receipt = self._resolve_lookahead(
             declaration_view, data_columns=list(data_columns) if data_columns is not None else columns,
             declaration=declaration if declaration is not None else carried) if declaration_view else {}
-        df, failures = self._pipeline.validate(records, source_bytes=verify_bytes, batch_defaults=batch_defaults)
+        df, failures = self._pipeline.validate(
+            records, source_bytes=verify_bytes, batch_defaults=batch_defaults,
+            random_control_spec=random_control_spec)
         digest = _hashlib.sha256(upload_bytes).hexdigest() if upload_bytes is not None else None
         if df is None:
             raise EventImportRejectedError(EventImportRejected(
@@ -1219,6 +1317,26 @@ class EventImportService:
                 source_file_name=source_name, confirmed_at=mapping_confirmed_at, imported_at=imported_at,
                 source_digest_verified=bool(verify_source_digest and source_bytes is not None),
                 event_id_source=self.EVENT_ID_DERIVED if derive_event_id else self.EVENT_ID_FROM_COLUMN)
+        # `G3-D2` D5.1／D5.3：`receipt.batch` 之兩個批次級鍵。
+        # 🔴 **在落檔之前**逐鍵驗（與 Task 1.6 之 provenance 同一紀律：不合規 ⇒ 拒收、落檔數 0）。
+        #    逐鍵而非整 namespace：同 namespace 之 `lookahead_bars_declared`／
+        #    `analysis_alignment_receipt_hash` 是分析時才有的值，匯入端拿不到（見 pipeline 出口）。
+        receipt_batch: Dict[str, object] = {}
+        for _name, _value in (("label_rule", label_rule), ("random_control_spec", random_control_spec)):
+            if _value is None:
+                continue
+            outcome = self._pipeline.validate_receipt_field_value(
+                "batch", _name, dict(_value), contract=self._contract)
+            if not outcome["ok"]:
+                raise EventImportRejectedError(EventImportRejected(
+                    kind="contract_violation",
+                    message=(f"receipt.batch.{_name} 不符契約 typed schema"
+                             f"（{len(outcome['failures'])} 筆；逐葉路徑見 failures）"),
+                    failures=[EventImportFailure(**{k: f.get(k) for k in
+                                                    ("row", "event_id", "field", "reason", "message")})
+                              for f in outcome["failures"]]))
+            receipt_batch[_name] = dict(_value)
+
         import_id = None
         stored_path = None
         if not validate_only:
@@ -1236,6 +1354,10 @@ class EventImportService:
             # 邊界②：只**補**本 namespace，不覆寫 payload 之任何既有欄。
             if mapping_provenance is not None:
                 payload.setdefault("mapping_provenance", mapping_provenance)
+            # 🔴 `G3-D2` D5.1：`receipt` 鍵**只在有內容時才寫**——沒有隨機批／沒有規則身分的
+            #    批次，其 payload 位元組與本票之前**完全相同**（既有 golden／round-trip 不動）。
+            if receipt_batch:
+                payload.setdefault("receipt", {"batch": receipt_batch})
             # 🔴 落檔路徑經 `payload_path()`（Task 3.1 之唯一實作）——寫入端與刪除端共用同一條，
             #    否則 3.1 之「殘留檔數 == 0」會在某天因兩邊各自漂移而變成假綠。
             p = self.payload_path(import_id)
@@ -1395,9 +1517,20 @@ class EventImportService:
             for v in (r.get("decision_offset_bars"),)
             if v is not None and not isinstance(v, bool) and isinstance(v, int)
         })
+        # 🔴 `G3-D2` D5.1：`receipt.batch` 之投影。舊批無 `receipt` 鍵 ⇒ 兩欄皆 None
+        #    （缺席是通則；語意由分析層之 `random_control_rule_identity_unverifiable` 明講）。
+        rb = payload.get("receipt")
+        rb_batch = rb.get("batch") if isinstance(rb, dict) else None
+        rb_batch = rb_batch if isinstance(rb_batch, dict) else {}
+        lr = rb_batch.get("label_rule")
+        rcs = rb_batch.get("random_control_spec")
         return EventImportDetailResponse(
             summary=self._summary(payload),
             records=recs,
+            receipt_batch=EventReceiptBatch(
+                label_rule=LabelRuleModel(**lr) if isinstance(lr, dict) else None,
+                random_control_spec=dict(rcs) if isinstance(rcs, dict) else None,
+            ),
             batch_facts=self._batch_facts(recs),
             declaration_seeds=EventDeclarationSeeds(
                 entry_price_semantic=self._single_value(recs, "entry_price_semantic"),

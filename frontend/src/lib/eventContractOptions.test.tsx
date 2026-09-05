@@ -61,12 +61,18 @@ function enabledOptionValues(testid: string): string[] {
 }
 
 /**
- * 🔴 **刻意不傳 `contract` prop**：元件走**生產組態**（鏡像），期望值那側才餵真契約。
+ * 🔴 **預設刻意不傳 `contract` prop**：元件走**生產組態**（鏡像），期望值那側才餵真契約。
  * 兩側同源的話「契約加值而 UI 沒跟」永遠不會紅（`7.2-M1` 錄到空紅集合之根因）。
+ *
+ * 🔴 `G3-D2` D5.1 起可**顯式**傳一份契約，**唯一用途**＝驅動「契約帶 `rejected_with_reason`
+ * 時 UI 會怎麼做」這種機制型斷言（真契約已無恆拒值）。一般斷言仍須留白，
+ * 否則就退回同源假綠。
  */
-function renderPath(path: EventDimPath, allowUnset = false) {
+function renderPath(path: EventDimPath, contract?: unknown, allowUnset = false) {
   return render(
-    <EventDimensionFields path={path} values={UNSET} onChange={() => {}} allowUnset={allowUnset} />,
+    <EventDimensionFields
+      path={path} values={UNSET} onChange={() => {}} allowUnset={allowUnset} contract={contract}
+    />,
   );
 }
 
@@ -92,7 +98,7 @@ describe('Task 7.1 ①~⑤ — 每維度之可操作 UI 選項集合 == selectab
   });
 
   it('🔴 D4.3 over：`/data-preparation` 亦無 k 控制項，但契約 doc 仍顯示（欄位仍存在於檔案裡）', () => {
-    renderPath('/data-preparation', true);
+    renderPath('/data-preparation', undefined, true);
     expect(screen.queryByTestId('event-dim-decision_offset_bars')).toBeNull();
     expect(screen.getByTestId('event-dim-decision_offset_bars-moved')).toBeTruthy();
     expect(screen.getByTestId('event-dim-doc-decision_offset_bars').textContent)
@@ -101,22 +107,46 @@ describe('Task 7.1 ①~⑤ — 每維度之可操作 UI 選項集合 == selectab
 });
 
 describe('Task 7.1 ⑦ — 契約恆拒者 disabled 且顯示契約 reason 字面', () => {
-  it('`control_kind` 之 platform_random_bars 為 disabled 且帶契約 reason', () => {
+  // 🔴 `G3-D2` D5.1：**既有斷言之目標變更**。原條文以 `control_kind` 為受測對象，
+  //    因為當時它是契約中唯一帶 `rejected_with_reason` 的維度。D5.1 解禁
+  //    `platform_random_bars` 後該鍵整個移除 ⇒ 沿用原式會變成
+  //    `names.length === 0` 的空迴圈假綠（「零個恆拒值全部驗過了」）。
+  //    ⇒ 拆成兩條，**兩條都是實質斷言**：
+  //      ① 機制仍在（以顯式帶 `rejected_with_reason` 之契約驅動，逐字比對 reason）
+  //      ② 契約現況：`control_kind` 零恆拒值，且 `platform_random_bars` 真的可選
+  it('① 機制：契約帶 rejected_with_reason 時，該值 disabled 且顯示契約 reason 逐字', () => {
+    const reason = 'not_implemented_platform_random_bars';
+    const real = CONTRACT as { required_fields: Record<string, Record<string, unknown>> };
+    const withRejection = {
+      ...real,
+      required_fields: {
+        ...real.required_fields,
+        control_kind: {
+          ...real.required_fields.control_kind,
+          accepted: ['user_labeled_same_trigger', 'user_labeled_other', 'platform_same_trigger_rule'],
+          rejected_with_reason: { platform_random_bars: reason },
+        },
+      },
+    };
+    renderPath('/search', withRejection);
+    const select = screen.getByTestId('event-dim-control_kind') as HTMLSelectElement;
+    const opt = Array.from(select.querySelectorAll('option')).find((o) => o.value === 'platform_random_bars');
+    expect(opt, '恆拒值應出現在 UI（顯示為 disabled，不是不顯示）').toBeTruthy();
+    expect(opt!.disabled).toBe(true);
+    expect(opt!.title).toBe(reason);
+    expect(screen.getByTestId('event-dim-blocked-control_kind-platform_random_bars').textContent)
+      .toContain(reason);
+  });
+
+  it('② 現況：真契約之 control_kind 無恆拒值，platform_random_bars 可選', () => {
+    const node = dimContractNode(CONTRACT, 'control_kind');
+    expect(Object.keys(node?.rejected_with_reason ?? {})).toEqual([]);
     renderPath('/search');
     const select = screen.getByTestId('event-dim-control_kind') as HTMLSelectElement;
-    const node = dimContractNode(CONTRACT, 'control_kind');
-    const rejected = node?.rejected_with_reason ?? {};
-    const names = Object.keys(rejected);
-    expect(names.length).toBeGreaterThan(0);   // 正向對照：契約真的有恆拒值（不是路徑打錯）
-    for (const value of names) {
-      const opt = Array.from(select.querySelectorAll('option')).find((o) => o.value === value);
-      expect(opt, `契約恆拒值 ${value} 應出現在 UI（要顯示為 disabled，不是不顯示）`).toBeTruthy();
-      expect(opt!.disabled).toBe(true);
-      expect(opt!.title).toBe(rejected[value]);
-      // 理由亦以可見文字呈現（`title` 之外還要看得到）
-      expect(screen.getByTestId(`event-dim-blocked-control_kind-${value}`).textContent)
-        .toContain(rejected[value]);
-    }
+    const opt = Array.from(select.querySelectorAll('option')).find((o) => o.value === 'platform_random_bars');
+    expect(opt, 'platform_random_bars 應出現在 /search 之 control_kind 選項').toBeTruthy();
+    expect(opt!.disabled).toBe(false);
+    expect(screen.queryByTestId('event-dim-blocked-control_kind-platform_random_bars')).toBeNull();
   });
 });
 
@@ -133,7 +163,7 @@ describe('Task 7.1 ⑧ — /search 之 scenario 限制只在該路徑', () => {
   });
 
   it('🔴 over 向：同一維度在 /data-preparation 之 selectable == 契約 enum 全集（不得被 /search 之排除誤及）', () => {
-    renderPath('/data-preparation', true);
+    renderPath('/data-preparation', undefined, true);
     const ui = enabledOptionValues('event-dim-scenario');
     const all = acceptedValues('scenario', CONTRACT);
     expect(new Set(ui)).toEqual(new Set(all));

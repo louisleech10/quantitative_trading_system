@@ -85,8 +85,12 @@ export const EVENT_DIM_CONTRACT_MIRROR = {
     scenario: { enum: ['A', 'B', 'C', 'two_stage'] },
     control_kind: {
       enum: ['user_labeled_same_trigger', 'user_labeled_other', 'platform_same_trigger_rule', 'platform_random_bars'],
-      accepted: ['user_labeled_same_trigger', 'user_labeled_other', 'platform_same_trigger_rule'],
-      rejected_with_reason: { platform_random_bars: 'not_implemented_platform_random_bars' },
+      // 🔴 `G3-D2` D5.1：`platform_random_bars` 解禁 ⇒ 四值皆 accepted，
+      //    `rejected_with_reason` 整鍵移除（契約端同步）。
+      accepted: [
+        'user_labeled_same_trigger', 'user_labeled_other',
+        'platform_same_trigger_rule', 'platform_random_bars',
+      ],
     },
     entry_price_semantic: {
       enum: ['trigger_open', 'trigger_close', 'next_open', 'decision_bar_open', 'decision_bar_close'],
