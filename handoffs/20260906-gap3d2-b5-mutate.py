@@ -307,16 +307,18 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "M33-compare-not-wired-frontend",
         "frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx",
-        "                    setRcCompare(verdict);\n",
-        "                    void verdict;\n",
+        # R2 P2-02 閉合後改為直接把回傳塞進 state ⇒ 錨點更新（仍呼叫 compare，只是不顯示）
+        "                    setRcCompare(await compareRandomControl({\n",
+        "                    void (await compareRandomControl({\n",
         ["npx", "vitest", "run", "icRandomControl"],
         "R1 三家命中：產完對照批不跑（或不顯示）規則身分閘 ⇒ 使用者拿不到結論",
     ),
     Mutation(
         "M34-sample-design-always-case-control",
         "api/services/ic_analysis_service.py",
-        '        return RANDOM_SAMPLE_DESIGN if kinds == {"platform_random_bars"} else "case_control"\n',
-        '        return "case_control"\n',
+        # R2 P2-01 閉合後拆成三段（含 fail-closed raise）⇒ 錨點改打「隨機批之回傳值」
+        "            return RANDOM_SAMPLE_DESIGN\n",
+        '            return "case_control"\n',
         [*PYTEST, T_API, "-k", "standalone_ic_analysis_sample_design"],
         "R1 `GROK-R1-P2-01`：抽樣設計揭露恆為 case_control ⇒ 無條件估計被讀成條件估計",
     ),
