@@ -170,8 +170,36 @@ export function twoStageExportBlockReason(input: {
         + '系統不會替你把它當成單段情境送出。請補上第二段（啟用反例條件），或把情境改成 B／C。',
     };
   }
+  // 🔴 R1 `CODEX-R1-P1-03`／`GROK-R1-P2-02`：只驗**段數**不驗**段內非空**
+  //    ⇒ `[STAGE_1, []]`／`[[], []]` 且深度 ≥1 時放行，第二段成了空殼：
+  //    它仍會產出一個 digest（空條件之 digest），摘要因此聲稱「有兩段」而其實只有一段。
+  //    ⇒ 任一段為空即擋。沿用同一個代號（使用者要做的事一樣：把第二段補起來）。
+  const emptyStageIndex = stages.findIndex((s) => s.length === 0);
+  if (emptyStageIndex >= 0) {
+    return {
+      reason: 'two_stage_requires_two_stages',
+      message: `[two_stage_requires_two_stages] 第 ${emptyStageIndex + 1} 段沒有任何條件。`
+        + '空的一段會產出一個「空條件」的摘要 digest，看起來像兩段、實際只有一段。'
+        + '請把該段的條件補起來（反例區至少填一個值），或把情境改成 B／C。',
+    };
+  }
   // 兩段式之事件相對決策必為未來 ⇒ 深度 0 與該情境自相矛盾（匯入端同名 reason 亦拒）。
-  const depths = Object.values(input.lookaheadBarsDeclared ?? {}).map((v) => Number(v) || 0);
+  // 🔴 R1 codex 2a：負值／非數字之深度不得被 `Number(v) || 0` 靜默當成 0 而混過去
+  //    ——`Number('abc') || 0 === 0`、`-1` 亦然。深度是契約 `int >= 0`，
+  //    出現不合法值代表宣告本身壞了，與「深度 0」是兩件事，須各自可辨。
+  const rawDepths = Object.values(input.lookaheadBarsDeclared ?? {});
+  const badDepth = rawDepths.find(
+    (v) => typeof v !== 'number' || !Number.isInteger(v) || v < 0,
+  );
+  if (badDepth !== undefined) {
+    return {
+      reason: 'invalid_lookahead_declaration',
+      message: `[invalid_lookahead_declaration] 深度宣告含不合法值（${String(badDepth)}）。`
+        + '契約要求 lookahead_bars_declared 之每個值為 int >= 0；'
+        + '出現其他型別或負值代表宣告本身壞了，系統不會替它猜一個深度。',
+    };
+  }
+  const depths = rawDepths.map((v) => Number(v));
   if (Math.max(0, ...depths) < 1) {
     return {
       reason: 'scenario_depth_inconsistent',
@@ -191,8 +219,23 @@ export function twoStageExportBlockReason(input: {
  */
 export const EVENT_EXPORT_UNLABELED_LABEL_ORIGIN = 'search_unlabeled' as const;
 
-/** D3.1：兩段式之 `search_rule_summary` canonical 形狀（契約 `two_stage_shape` 逐字）。 */
+/**
+ * D3.1：兩段式之 `search_rule_summary` canonical 形狀（契約 `two_stage_shape` 逐字）。
+ *
+ * 🔴 R1 `CODEX-R1-P2-01`：本函式原本直接用 `stageDigests.length`
+ * ⇒ 直呼者可產出 `stage_count: 1` 或 `3`，而契約 `two_stage_shape` 寫死 2 ⇒ 兩者會漂。
+ * 「只靠 builder 的前置 guard」不足——guard 守的是 builder 那條路，不是這個公開入口。
+ * ⇒ 本函式自證恰兩段，fail-closed。
+ */
 export function twoStageRuleSummary(stageDigests: readonly string[]): string {
+  if (stageDigests.length !== 2) {
+    throw new EventExportBlocked(
+      'two_stage_requires_two_stages',
+      `[two_stage_requires_two_stages] twoStageRuleSummary 需要恰兩段 digest，收到 ${stageDigests.length} 段。`
+      + '契約 search_rule_summary.two_stage_shape 之 stage_count 恆為 2；'
+      + '寫出其他數字會讓摘要與契約形狀不符。',
+    );
+  }
   // 鍵序固定 stage_count→stages、無空白——契約 `search_rule_summary.two_stage_shape` 之字面。
   return JSON.stringify({ stage_count: stageDigests.length, stages: [...stageDigests] });
 }

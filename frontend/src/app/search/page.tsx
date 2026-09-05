@@ -295,12 +295,24 @@ export default function SearchPage() {
   ].filter((c) => c.value !== null && c.value !== undefined), [operators, rangeValues, searchParams]);
 
   const negativeStageConditions = React.useMemo(() => [
-    { parameter: 'price_change', operator: negativeOperators.priceChange, value: negativeParams.priceChange, unit: 'percent' },
+    {
+      parameter: 'price_change',
+      operator: negativeOperators.priceChange,
+      // 🔴 R1 `CODEX-R1-P1-03`：本行原本只讀 `negativeParams.priceChange`，
+      //    而 BETWEEN 之值住 `negativeRangeValues`（正例那一支有處理、我複製時漏了）
+      //    ⇒ 使用者選 BETWEEN 只填 range 時，整段被 `.filter()` 濾成 `[]`，
+      //    第二段變空殼卻仍過「兩段」閘。**兩段條件的組法必須對稱。**
+      value: negativeOperators.priceChange === 'BETWEEN'
+        ? [negativeRangeValues.priceChange.min, negativeRangeValues.priceChange.max]
+        : negativeParams.priceChange,
+      unit: 'percent',
+    },
     { parameter: 'volume_multiplier', operator: negativeOperators.volumeMultiplier, value: negativeParams.volumeMultiplier },
     { parameter: 'closing_strength', operator: negativeOperators.closingStrength, value: negativeParams.closingStrength },
     { parameter: 'taker_buy_ratio', operator: negativeOperators.takerBuyRatio, value: negativeParams.takerBuyRatio },
     { parameter: 'price_position', operator: negativeOperators.pricePosition, value: negativeParams.pricePosition },
-  ].filter((c) => c.value !== null && c.value !== undefined), [negativeOperators, negativeParams]);
+  ].filter((c) => c.value !== null && c.value !== undefined),
+  [negativeOperators, negativeParams, negativeRangeValues]);
 
   /** D3.1：兩段條件之組裝（反例未啟用 ⇒ 只有一段）。兩個 handler 與按鈕 disable 共用。 */
   const exportStageConditions = negativeParams.enabled
@@ -911,6 +923,8 @@ export default function SearchPage() {
                 ...prev,
                 [fieldKey]: e.target.value ? parseFloat(e.target.value) : null
               }))}
+              // 🔴 `G3-D2` D3.1：正例條件＝two_stage 之第一段；填了值第一段才非空。
+              data-testid={`positive-field-${fieldKey}`}
               className="col-span-2 px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100 placeholder:text-slate-500"
               placeholder={placeholder}
             />
@@ -992,6 +1006,8 @@ export default function SearchPage() {
                 ...prev,
                 [fieldKey]: e.target.value ? parseFloat(e.target.value) : null
               }))}
+              // 🔴 `G3-D2` D3.1：填了值第二段才非空；testid 供 DOM 驗收驅動。
+              data-testid={`negative-field-${fieldKey}`}
               className="col-span-2 px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-100 placeholder:text-slate-500"
               placeholder={placeholder}
             />
@@ -1212,9 +1228,11 @@ export default function SearchPage() {
 
         {/* 反例搜索設定 */}
         <div className="glass-panel rounded-xl">
-          <div 
+          <div
             className="p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 flex items-center justify-between"
             onClick={() => toggleSection('negative')}
+            // 🔴 `G3-D2` D3.1：反例區＝two_stage 之第二段來源；testid 供 DOM 驗收展開它。
+            data-testid="negative-section-header"
           >
             <h3 className="text-lg font-medium text-slate-100">反例搜索設定</h3>
             {expandedSections.negative ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
@@ -1315,8 +1333,11 @@ export default function SearchPage() {
                         checked={negativeParams.enabled}
                         onChange={(e) => setNegativeParams(prev => ({
                           ...prev,
-                          enabled: e.target.checked 
+                          enabled: e.target.checked
                         }))}
+                        // 🔴 `G3-D2` D3.1：本開關即「第二段存在與否」⇒ two_stage 之匯出阻擋
+                        //    直接由它決定。testid 供 `twoStageExportWiring.test.tsx` 之 DOM 驗收使用。
+                        data-testid="negative-enabled-toggle"
                         className="mr-2 w-4 h-4 text-rose-400 border-white/10 rounded focus:ring-rose-400"
                       />
                       <span className="text-sm text-slate-200 font-medium">
