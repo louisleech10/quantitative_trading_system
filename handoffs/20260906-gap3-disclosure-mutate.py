@@ -75,8 +75,11 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "D4-primary-cell-never-marked",
         PANEL,
+        # R1（`CODEX-R1-P1-02`）閉合後條件加了 `userChoseSpec` 與契約下界 ⇒ 錨點更新
         "                              data-primary={\n"
-        "                                c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars\n"
+        "                                userChoseSpec\n"
+        "                                  && c.k === (spec.decision_offset_bars ?? kRange.min)\n"
+        "                                  && c.h === spec.horizon_bars\n"
         "                                  ? 'true' : undefined\n"
         "                              }\n",
         "                              data-primary={undefined}\n",
@@ -86,8 +89,8 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "D5-primary-note-hardcoded",
         PANEL,
-        "                  主要結果 ＝ k＝{spec.decision_offset_bars ?? 0}、h＝{spec.horizon_bars}\n",
-        "                  主要結果 ＝ k＝0、h＝1\n",
+        "                      主要結果 ＝ k＝{spec.decision_offset_bars ?? kRange.min}、h＝{spec.horizon_bars}\n",
+        "                      主要結果 ＝ k＝0、h＝1\n",
         ["npx", "vitest", "run", "icEventBatchDisclosure"],
         "說明行寫死 k/h（改 spec 之後畫面說謊）",
     ),
@@ -143,6 +146,32 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "      '結果可重現的前提。測試集至少 131 列。改它等於換一組隨機樣本",
         ["npx", "vitest", "run", "eventParamDocs"],
         "文案寫死後端門檻（後端改值時前端安靜地繼續說舊數字）",
+    ),
+
+    # ── R1 閉合之三條（2026-09-06 三家 code review）────────────────────
+    Mutation(
+        "D14-downgrade-backfill-removed",
+        "momentum/Analysis/ic_filter_orchestrator.py",
+        '            if isinstance(meta, dict) and not isinstance(meta.get("oos_downgrade"), dict):\n',
+        "            if False:\n",
+        [*PYTEST, T_OOS, "-k", "annotate_backfills"],
+        "R1 `CODEX-R1-P1-01`：非 fallback 之四條降級分支又回到「沒有原因」",
+    ),
+    Mutation(
+        "D15-backfill-overwrites-rich",
+        "momentum/Analysis/ic_filter_orchestrator.py",
+        '            if isinstance(meta, dict) and not isinstance(meta.get("oos_downgrade"), dict):\n',
+        "            if isinstance(meta, dict):\n",
+        [*PYTEST, T_OOS, "-k", "does_not_overwrite"],
+        "補寫端蓋掉 fallback 的四數字版（優先序失效）",
+    ),
+    Mutation(
+        "D16-primary-note-lies-when-unset",
+        PANEL,
+        "                  {userChoseSpec ? (\n",
+        "                  {true ? (\n",
+        ["npx", "vitest", "run", "icEventBatchDisclosure"],
+        "R1 `CODEX-R1-P1-02`：未選量法時又用本地哨兵報 (k,h)（畫面說謊）",
     ),
 
     # ── 對照組（預期綠）──────────────────────────────────────────────────
