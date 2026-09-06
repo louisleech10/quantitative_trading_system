@@ -131,7 +131,7 @@
 
 ## Phase 2 — 立方體落檔（完成後：每格數據存在磁碟上，可被查詢）
 
-### Task 2.0 — 契約新增三個 `analysis_params` 鍵（`票 —`）
+### Task 2.0 — 契約新增**五個** `analysis_params` 鍵（`票 —`）
 
 `票 —`：契約基線，不對應單一 UAT 票；B26／B27 皆依賴它。
 
@@ -199,14 +199,42 @@
                       if c.get("capability") == "available" else 0 for c in cells]
      total = sum(rows_per_cell)
      tier_a_ok = total <= max_rows and max(rows_per_cell or [0]) <= max_rows_per_cell
-     # Tier B 預算：chart_bytes_per_feature 由**本次 run 第一個非空格實測**得出，不寫死
-     probe = next((c for c, n in zip(cells, rows_per_cell) if n), None)
-     per_feat = (_sizeof({s: probe["report"].get(s) for s in CHART_SECTIONS}) / n_probe
-                 if probe else 0)
-     tier_b_ok = total * per_feat <= chart_max_bytes
+     # 🔴 Tier B：估計只作**預檢**與 fits_hint，判定一律看**實測累加**
+     #    （`COMPOSER-R2-P1-02`／`GROK-R2-P1-02`／`CODEX-R2-P1-01` 三家獨立命中：
+     #     composer 實測三份真實報告之 rolling_ic_series 為 3,225／19,931／26,637 B/特徵，
+     #     差 8 倍——`_sample_rolling_series` 依序列長度抽樣，隨 h 與事件數變動。
+     #     首格偏小 ⇒ 放行超量落盤；偏大 ⇒ 誤擋合法帶。）
+     written_bytes = 0
+     for c, n in zip(cells, rows_per_cell):
+         if not n:
+             continue
+         payload = json.dumps({"k": c["k"], "h": c["h"],
+                               "sections": {x: c["report"][x]
+                                            for x in CHART_SECTIONS if x in c["report"]}},
+                              ensure_ascii=False, sort_keys=False, separators=(",", ":"))
+         written_bytes += len(payload.encode("utf-8"))   # ← 真正的 bytes，不是估計
+         if written_bytes > chart_max_bytes:
+             _remove_tier_b_temp(tmp)                    # 刪掉已寫的，一格都不留
+             tier_b = {"stored": False, "truncated": True,
+                       "reason": "scan_cube_chart_bytes_exceeded",
+                       "requested_bytes": None,          # 已知「至少超過」，不謊報精確值
+                       "max_bytes": chart_max_bytes,
+                       "fits_hint": _fits_hint(written_bytes, n, chart_max_bytes)}
+             break
+         (tmp / f"charts_k{c['k']}_h{c['h']}.json").write_text(payload, encoding="utf-8")
      ```
+     🔴 **RAM 上界＝一格**：逐格序列化、逐格累加，**不得**把全部格同時序列化
+     （110 格 × 300 特徵 ＝ 1,158 MB）。
      🔴 Tier A 不 ok ⇒ **零個 `cell_*.json`**；Tier B 不 ok ⇒ **零個 `charts_*.json`**，
      且 `tier_b.fits_hint` 給出「幾格 × 幾特徵存得下」之具體數字。**兩者互不影響**。
+     🔴 **路徑不變式**（`CODEX-R2-P1-02`／`COMPOSER-R2-P1-03`／`GROK-R2-P1-03` 三家獨立命中）：
+     ```python
+     # 路徑「只在該檔已成功提交之後」才填；未存之層一律 None
+     assert tier_a["stored"] or all(c["path"] is None for c in manifest["cells"])
+     assert tier_b["stored"] or all(c["chart_path"] is None for c in manifest["cells"])
+     ```
+     否則會出現「manifest 宣稱有圖、磁碟無檔」⇒ 前端照 `chart_path` 請求得 404，
+     與 `stored=false` 雙重訊號矛盾。**前端與 API 一律只信 `stored`**。
   3. `metrics` 軸＝第一個 `available` 且 `rows` 非空之格的欄集**減去** `feature_name`；
      全部格皆空 ⇒ `metrics: []`（不發明欄名）。
      `chart_sections` 軸＝該格 report 中**實際存在**的 `CHART_SECTIONS` 子集（不列不存在的節）。
@@ -255,6 +283,17 @@
      `CODEX-R1-P1-06`：原寫「目錄數 > keep 才刪」在恰好 20 個時不刪、寫完變 21，
      與驗收「寫第 21 個後只剩 20」直接矛盾。
      刪除用 `shutil.rmtree`（整個 task 目錄），**不是** `os.remove`。
+  2. 🔴 **publish 之前置條件（Darwin 實測）**：`CODEX-R2-P1-04` 本輪實測
+     `os.replace(src, dst)` 對**非空**目標 ⇒ `OSError: [Errno 66] Directory not empty`；
+     empty/absent ⇒ succeeded。故偽碼必須是：
+     ```python
+     if final.exists():
+         shutil.rmtree(final)      # ← 少這行在 Darwin 直接拋錯
+     os.replace(tmp, final)        # tmp 與 final 須同一 filesystem
+     ```
+  3. 🔴 **prune + publish 須在同一把 root-level 檔案鎖內**：
+     兩個並行 `build_cube` 各讀同一快照、各刪一個、各寫一個 ⇒ 最終 **21** 個目錄
+     （`keep` 不變式被打破）。鎖用 `fcntl.flock` 於 `<root>/.lock`。
   2. 排序依據＝各目錄 `manifest.json` 之 `created_at`；**缺 manifest 或無法解析者排最舊**
      （壞掉的目錄優先清掉，且不因它而中止）。
   3. 於 `build_cube` **寫入前**呼叫；`OSError` 一律 `logger.warning` 後繼續（不擋分析）。
@@ -389,8 +428,25 @@
      `cell`（單格明細＋欄頭排序，已合併原「單指標排行」——`GROK-R1-P3-01`）、
      `feature`（單特徵跨格矩陣）、`charts`（單格單特徵圖表）。
      前兩者共用 `getScanCubeRows`，`charts` 走 `getScanCubeCharts`。
-  4. 🔴 **圖表沿用主分析頁既有元件**（`page.tsx:792-833` 讀的同一批節），
-     **不新寫圖表邏輯、不新算任何數值**（SPEC §C-1／§C-5）。
+  4. 🔴 **圖表沿用主分析頁既有元件**，**不新寫圖表邏輯、不新算任何數值**（SPEC §C-1／§C-5）。
+     🔴 **「沿用」不是介面契約**（`CODEX-R2-P2-03`／`COMPOSER-R2-P2-01`／`GROK-R2-P2-02`
+     三家獨立命中）——下表是契約，實作端照表接，不得自行猜 adapter：
+
+     | 節名 | 元件 | 期望 props 形狀 | 備註 |
+     |---|---|---|---|
+     | `ic_decay` | `ICDecayChart` | `decay[featureName]` | 單特徵切片 |
+     | `quantile_returns` | `QuantileReturnsChart` | `quantile[featureName]` | 單特徵切片 |
+     | `rolling_ic_series` | `RollingICChart` | `series[featureName]` | 單特徵切片；已被上游抽樣 |
+     | `grouped_ic` | `GroupedICBarChart` | 🔴 `groupedIC[group][feature]` **巢狀 map** | **不是**扁平單 feature 物件 |
+     | `marginal_ic` | 表格（非圖） | 單特徵列 | 主頁即以表格呈現 |
+     | `turnover_analysis` | 主頁在 **deep tab**（`page.tsx:858-868`） | 單特徵切片 | 本票**沿用同一元件**，位置改在 cube 內 |
+     | `coverage_analysis` | 🔴 **無 UI consumer**（`types.ts:2263-2273`） | — | **具名標「只表不圖」**：以原始鍵值表呈現，本票**不新寫元件** |
+
+     charts 端點回傳**與主分析 report 同形狀之單 feature 切片**——
+     即 `{"ic_decay": {<feature>: …}, "grouped_ic": {<group>: {<feature>: …}}, …}`，
+     讓上表的元件可直接吃，**不需 adapter**。
+     🔴 `page.tsx:208-218` 之 `sectionSplit` 處理 `SectionStatusObject`（節可能是
+     `{status, reason}` 而非資料）⇒ cube 端點須**原樣**傳遞該形狀，前端沿用同一支 `sectionSplit`。
   3. 文案一律走 `frontend/src/lib/scanCubeDocs.ts`（沿用 `eventParamDocs` 之單一來源慣例）；
      元件內**不得**寫任何說明字面。
   4. 每個可編輯控制項須帶 `data-doc="<鍵>"`（沿用揭露票 R2 之一對一覆蓋閘）。
@@ -455,7 +511,10 @@
 - **Golden**：`scripts/scan_cube_golden.py --check "tests/golden/scan_cube/*.json"`
 - **mutation**：`handoffs/20260907-scancube-mutate.py`（S1–S12 ＋ 對照組）
 - **Phase Gate**：上述五項 rc=0，且 mutation 全部符合預期，才進下一 Phase。
-  🔴 **加一條（`CODEX-R1-P1-09`）**：每個 Phase 收尾須確認該 Phase 之測試
-  **已從 `pytest.skip` 轉為真實斷言**——
-  `venv/bin/python -m pytest tests/api/test_scan_cube.py -q -rs` 之 skip 清單
-  不得再含該 Phase 的 Task。skip 全綠不算通過。
+  🔴 **改為機械閘**（`CODEX-R2-P1-05`／`COMPOSER-R2-P2-02`／`GROK-R2-P1-04` 三家獨立命中：
+  原本的「人工查 `-rs` 清單」不是可執行的 gate，執行端跑前半即可假綠交件）：
+  **`bash scripts/scan_cube_phase_gate.sh <phase>`**，三項任一失敗即 rc≠0：
+  ① 該 Phase 對應之 test id 出現在 `pytest -rs` 的 skip 清單 ⇒ FAIL；
+  ② `scan_cube_golden.py --check` 之 glob 命中 **0 個檔** ⇒ FAIL（空迴圈假綠）；
+  ③ mutation 腳本回報之 `uncovered != 0` ⇒ FAIL（`SKIP` 不計入通過）。
+  **Phase Gate 之通過判準＝此腳本 rc=0，不再是裸 `pytest` 的 rc。**

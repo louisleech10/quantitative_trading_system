@@ -54203,3 +54203,58 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260907-SCANCUBE-X-REVIEW-R2", "ts": "2026-09-06T16:54:38Z"}
+=== 2026-09-07 00:54:38 | dispatch ===
+  ts=2026-09-07 00:54:38
+  kind=dispatch
+  intent=掃描結果瀏覽器 SPEC/TODO R2 閉合輪：原提出方逐條確認 R1 之 21 條，並攻兩層切法是否真解決 P0
+  risk=low
+  facts_asked=R1 每條 CLOSED/OPEN + 重跑反例；兩層切法是否解決 P0/是否過度承諾；三閘初值誤擋；scaffold 可執行性與 skip 假綠
+  review_role=adversarial SPEC/TODO review（禁改碼禁改文件）
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260907-SCANCUBE-X-REVIEW-R2", "ts": "2026-09-06T16:54:43Z"}
+=== 2026-09-07 00:54:43 | dispatch ===
+  ts=2026-09-07 00:54:43
+  kind=dispatch
+  intent=掃描結果瀏覽器 SPEC/TODO R2 閉合輪
+  risk=low
+  facts_asked=R1 逐條 CLOSED/OPEN；兩層切法是否解決 P0；三閘誤擋；scaffold 可執行性
+  review_role=adversarial SPEC/TODO review（禁改碼禁改文件）
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260907-SCANCUBE-X-REVIEW-R2-BRIEF.md", "brief_sha256": "35d31bf31faa2a5b352783aa2723b6b0d14288f243456eb5b6f0fea450419ae6", "brief_sha256_norm": "35d31bf31faa2a5b352783aa2723b6b0d14288f243456eb5b6f0fea450419ae6", "event": "committee_round_open", "event_id": "4855bcd0-bb84-47d1-b1f0-e93a1fa9d3f4", "expected_outputs": {"codex": "handoffs/20260907-scancube-x-review-r2-codex.md", "composer": "handoffs/20260907-scancube-x-review-r2-composer.md", "grok": "handoffs/20260907-scancube-x-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "eaa3e7d5-f55a-4ea3-a0aa-298bfb9c9285", "schema_version": 1, "sequence": 3202, "session_name": "20260907-scancube-x-review-r2", "task_id": "20260907-SCANCUBE-X-REVIEW-R2", "ts": "2026-09-06T16:54:49Z"}
+{"actor": "cx_run", "attempt_id": "1dd1fa93-c315-4e2a-b838-cf03acd53863", "cli_rc": "0", "event": "committee_family_result", "event_id": "c439db50-d77f-45bc-bdd7-f1152b2d102d", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260907-scancube-x-review-r2-composer.md", "output_sha256": "87328aa80b3fb6876f0ca9439fdc760953b753d97fbcf192669f64516ddeee26", "producer": "audit_append.sh", "result_state": "success", "round_id": "eaa3e7d5-f55a-4ea3-a0aa-298bfb9c9285", "schema_version": 1, "sequence": 3203, "ts": "2026-09-06T16:57:20Z"}
+{"actor": "cx_run", "attempt_id": "9f86e6bb-f954-4976-9970-03aacb22966d", "cli_rc": "0", "event": "committee_family_result", "event_id": "c62a000f-b9e8-49ae-a462-bf3e9445b637", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260907-scancube-x-review-r2-grok.md", "output_sha256": "549b7fb1e28869278a9d3d501b66284bb5183182c52f73fe8221cf2c45e16338", "producer": "audit_append.sh", "result_state": "success", "round_id": "eaa3e7d5-f55a-4ea3-a0aa-298bfb9c9285", "schema_version": 1, "sequence": 3204, "ts": "2026-09-06T17:01:30Z"}
+{"actor": "cx_run", "attempt_id": "2f284ddc-de10-408d-a9c5-ffd320bf32ff", "cli_rc": "0", "event": "committee_family_result", "event_id": "5ac78a1e-c8bb-4334-8de3-98c34fcb9a70", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260907-scancube-x-review-r2-codex.md", "output_sha256": "73340edb6ceb2709525e3c8b333b8199d746dee6c5c9b29e9ccceac63fc7d2fa", "producer": "audit_append.sh", "result_state": "success", "round_id": "eaa3e7d5-f55a-4ea3-a0aa-298bfb9c9285", "schema_version": 1, "sequence": 3205, "ts": "2026-09-06T17:07:01Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "d280069f-7a8d-42dc-8344-13c87cc233cc", "lock_sha256": "cfe6a6be43e0a403ee0786a4925e74851315b65fc0b2c386c3778ab1bf509dbc", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "eaa3e7d5-f55a-4ea3-a0aa-298bfb9c9285", "schema_version": 1, "sequence": 3206, "session_id": "20260907-scancube-x-review-r2", "synth_sha256": "764e186a0fa984236df86b3f23988f09744311f3979da3a4287157c7235695bc", "ts": "2026-09-06T17:09:20Z"}
+=== 2026-09-07 01:09:20 | artifact ===
+  ts=2026-09-07 01:09:20
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP3_SCAN_CUBE_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=R2 修訂：D1 圖表完整帶定義; D2 實測累加; D3 path 不變式; D4 phase gate 腳本; D5 rmtree+lock; D6 節→元件映射; D7 措辭統一
+  spec=
+  todo=
+  manifest=

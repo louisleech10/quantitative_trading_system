@@ -82,14 +82,33 @@
 6. 上限值一律住**契約**（`event_import_contract.json` 之 `analysis_params`），前端與後端皆不硬編。
    🔴 既有 schema 為 `{type, min, example_default, doc}`；`pipeline.py:412-431` 對**非 dict** 之 spec
    直接 `continue` ⇒ 新鍵必須照該 schema 寫，否則 loader 靜默略過（`CODEX-R1-P1-03`）。
-7. 🔴 **兩層保存（R1 P0 之裁決）**：
-   - **Tier A（恆存）**＝`summary_table`。463 B/特徵 ⇒ 110 格 × 500 特徵 ≒ **25 MB**。
+7. 🔴 **兩層保存（R1 P0 之裁決；R2 修訂）**：
+   - **Tier A（預設保存）**＝`summary_table`。463 B/特徵 ⇒ 110 格 × 500 特徵 ≒ **25 MB**。
+     🔴 措辭刻意**不是**「恆存」（`GROK-R2-P2-03`）——列數閘失敗時 Tier A 也會整層不存
+     （`tier_a.truncated`），寫成「恆存」會讓 agent 以為該旗標不可能為真。
    - **Tier B（圖表節，預算內才存）**＝`ic_decay`／`quantile_returns`／`rolling_ic_series`／
-     `grouped_ic`／`turnover_analysis`／`coverage_analysis`／`marginal_ic`。36,808 B/特徵。
-     以位元組預算 fail-closed；超出 ⇒ **一格都不存 Tier B**（Tier A 不受影響），
-     畫面明講原因並列出實際數字與「縮小到幾格 × 幾特徵就存得下」。
+     `grouped_ic`／`turnover_analysis`／`coverage_analysis`／`marginal_ic`。
+     超出預算 ⇒ **一格都不存 Tier B**（Tier A 不受影響），畫面明講原因與實際數字。
+   - 🔴 **預算判定＝實測累加，估計只作預檢**（`COMPOSER-R2-P1-02`／`GROK-R2-P1-02`／
+     `CODEX-R2-P1-01` 三家獨立命中）。**不得**用「第一個非空格外推」當判準：
+     composer 實測三份真實報告之 `rolling_ic_series` 為 **3,225／19,931／26,637 B/特徵**
+     （差 8 倍），因 `_sample_rolling_series` 依序列長度抽樣、隨 h 與事件數變動。
+     首格偏小會放行超量落盤，偏大會誤擋合法帶。
+     **正確作法**：逐格序列化到 temp 並**累加真正的 bytes**，一旦超過預算即
+     刪除 temp 之 charts 並標 `tier_b.truncated`。RAM 上界＝**一格**（不同時序列化全部格）。
    - **`correlation_matrix` 具名排除**：per-**pair** 非 per-feature，GAP-6 已登記其無 cap。
      畫面須明講「這一節不在瀏覽器內」，不得靜默省略。
+9. 🔴 **「圖表完整帶」之定義（R2 D1；三家獨立命中）**：
+   契約 `scan_grid_max_runs` 初值為 **110**，而實算 110 格 × 300 特徵 ＝ **1,158 MB**
+   ⇒ **滿格掃描幾乎必然觸發 Tier B fail-closed**。
+   - **本票明確裁定**：**Tier A（指標表）在列數閘內對滿格成立；
+     Tier B（圖表）只在「圖表完整帶」內成立，滿格 110 不保證有圖表。**
+   - **「圖表完整帶」＝ `scan_cube_chart_max_bytes ÷ 實測 per-feature bytes`** 所得之
+     `格數 × 特徵數` 上界。**由執行期實測導出，不寫死**——per-feature bytes 跨報告差 8 倍，
+     寫死一個 `12×300` 就是下一個會過期的常數。
+   - 畫面之 `fits_hint` 須給出**本次實測**之具體上界；白話 B26 須用同一句話講明。
+   - 🔴 **這是使用者主目標的部分未達成**，不得只寫在 SPEC 裡：
+     須在給使用者的回報中列為**頭條**（`feedback_deferred_user_goal_must_headline`）。
 8. 🔴 **本票不解決 OOM，且不得被讀成解決了**（`CODEX-R1-P1-05`／`COMPOSER-R1-P1-01`）。
    所有 cap 限制的是**落檔位元組**，不是 `analyzer.analyze()` 的計算峰值記憶體。
    掃描本身仍可能在寫任何檔案之前就 OOM。此為具名殘留，見 §N。
@@ -182,6 +201,12 @@
   - Tier B 超過 ⇒ **不寫任何 Tier B 檔**，`tier_b.truncated=true` 且
     `fits_hint` 給出「幾格 × 幾特徵可存下」之具體數字。**Tier A 不受影響**。
   - **禁止部分保存**（部分保存＝使用者不知道少了什麼）。
+  - 🔴 **路徑不變式（`CODEX-R2-P1-02`／`COMPOSER-R2-P1-03`／`GROK-R2-P1-03` 三家獨立命中）**：
+    `tier_a.stored is False ⇒ 每個 cells[i].path is None`；
+    `tier_b.stored is False ⇒ 每個 cells[i].chart_path is None`。
+    **路徑只在該檔已成功提交之後才填**。前端與 API **只信 `stored`**，不得以路徑存在與否推論。
+    否則會出現「manifest 宣稱有圖、磁碟無檔」⇒ 照路徑請求得 404，與 `stored=false` 雙重訊號矛盾。
+    此不變式進 Golden 與 mutation `S13`。
 - **驗證（可證偽）** — `tests/api/test_scan_cube.py`：
   - `ASSERT venv/bin/python -m pytest tests/api/test_scan_cube.py -q THEN rc=0`
   - 逐列原樣：斷言 `rows[i] == report["summary_table"][i]`（逐 dict 相等，不是子集）。
@@ -207,6 +232,11 @@
   🔴 `CODEX-R1-P1-06`：原本寫「目錄數 > keep 才刪」，在**恰好 20 個**時不刪、寫完變 21，
   與驗收「寫第 21 個後只剩 20」直接矛盾。
   🔴 **原子性**：先寫 temp dir 再 `os.replace` 成正式名，避免並行時看到半成品。
+  🔴 **`os.replace` 對非空目標目錄在 Darwin 會直接失敗**（`CODEX-R2-P1-04` 本輪實測：
+  nonempty ⇒ `OSError: [Errno 66] Directory not empty`；empty/absent ⇒ succeeded）
+  ⇒ 前置條件必須寫明：**`final` 必須不存在；存在則先 `shutil.rmtree(final)` 再 `os.replace`**。
+  🔴 **並行下 `keep` 不變式需 root-level 鎖**：兩個 build 各讀同一快照、各刪一個、各寫一個
+  ⇒ 最終 21 個。prune＋publish 這一段須在同一把檔案鎖內（`GROK-R2-P2-01`／`CODEX-R2-P1-04`）。
 - **驗證**：`keep=20` 且已有 20 個目錄 ⇒ 寫第 21 個後 `len(list(root.iterdir())) == 20`，
   且**被刪的恰是最舊那一個**（逐名對照，不是只比數量）。
 - **邊界**：①目錄含非預期檔案 ⇒ 只刪整個 task 目錄，不逐檔挑；
@@ -258,8 +288,15 @@
      🔴 必須顯示 §C-4 之限制文字（不同 h 不可比大小），testid `ic-cube-cross-h-warning`。
   3. 🔴 **單格單特徵圖表**（R1 P0 之交付；使用者原話含「圖像」）：
      選定 `(k,h)` ＋ `feature` ⇒ 該 feature-cell 的圖表節。
-     圖表型別**沿用主分析頁既有元件**（`page.tsx:792-833` 讀的同一批節），
-     **不新寫圖表邏輯、不新算任何數值**。Tier B 未保存 ⇒ 顯示 `ic-cube-charts-not-stored`
+     **不新寫圖表邏輯、不新算任何數值**。
+     🔴 **「沿用主分析頁元件」不是介面契約**（`CODEX-R2-P2-03`／`COMPOSER-R2-P2-01`／
+     `GROK-R2-P2-02` 三家獨立命中）——`page.tsx:792-833` **不含** `turnover_analysis`
+     （它在 deep tab `:858-868`）；`coverage_analysis` **無任何 UI consumer**
+     （`types.ts:2263-2273`）；`GroupedICBarChart` 要的是 `groupedIC[group][feature]`
+     **巢狀** map 而非扁平單 feature 物件。
+     ⇒ TODO Task 4.1 必須附「節名 → 元件 → 期望 props 形狀」對照表；
+     charts 端點回傳**與主分析 report 同形狀之單 feature 切片**（不是整節）；
+     `coverage_analysis` 具名標「只表不圖」（本票不新寫元件）。Tier B 未保存 ⇒ 顯示 `ic-cube-charts-not-stored`
      ＋ `fits_hint`，**不是**空圖。
      `correlation_matrix` 不在此（§C-7）⇒ 畫面須有 `ic-cube-corr-excluded` 明講。
 - **篩選**：特徵名子字串、指標欄顯示/隱藏、k/h 多選。
@@ -296,6 +333,14 @@
 
 ## §V 驗證策略與邊界測試目錄
 
+- 🔴 **Phase Gate 必須機械可驗**（`CODEX-R2-P1-05`／`COMPOSER-R2-P2-02`／`GROK-R2-P1-04`
+  三家獨立命中）：原設計允許 Task 0.1 之 placeholder「全 skip 且 rc=0」，
+  而 Gate 只用散文要求人工查 `pytest -rs` ⇒ 執行端跑前半即可假綠交件。
+  新增 `scripts/scan_cube_phase_gate.sh <phase>`，三項任一失敗即 rc≠0：
+  ① 該 Phase 對應之 test id **不得**出現在 `pytest -rs` 之 skip 清單；
+  ② `scan_cube_golden.py --check` 之 glob **非空**（空 glob 一律 rc≠0，防空迴圈假綠）；
+  ③ mutation 腳本之 `uncovered == 0`（`SKIP` 不計入通過）。
+  **Gate 命令改為跑此腳本，不再是裸 `pytest` 的 rc。**
 - **mutation 條件**：RISK-HIT 含 a,d ⇒ **必附 mutation**。各 Task 之 mutation 已逐條列於上方；
   統一由 `handoffs/20260907-scancube-mutate.py` 執行（沿用揭露票之腳本紀律：
   還原權威＝版控、開場檢查 HEAD、逐條還原、對照組 `EXPECT_GREEN`）。
@@ -316,7 +361,9 @@
 
 - Task 1.1／2.1／2.2 皆為新增或單行旗標，回退＝`git revert` 該 commit，無資料遷移。
 - `data_cache/ic_scan_cubes/` 為純新增目錄，刪除即回到本票之前的狀態。
-- 契約新增三個 `analysis_params` 鍵為**純新增**，舊 report 不受影響。
+- 契約新增**五個** `analysis_params` 鍵為**純新增**，舊 report 不受影響
+  （`CODEX-R2-P2-06`／`GROK-R2-P3-01`：原寫「三個」與正文之五鍵矛盾，
+  冷讀本節的 agent 會少建 `scan_cube_keep_tasks`／`scan_cube_page_max`）。
 
 ---
 
