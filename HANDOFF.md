@@ -1,41 +1,32 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-06｜狀態：`G3-D2` **五段全部收工，票已 CLOSED**。等使用者實機 UAT。**
+**更新：2026-09-06 晚｜狀態：「事件分析頁揭露補完」票 R1＋R2 皆已閉合並 push。下一件＝掃描結果瀏覽器（小型帶）。**
 
-## ✅ G3-D2 收案完成
+## 剛完成：揭露補完票 R2
+SPEC=`docs/GAP3_EVENT_DISCLOSURE_SPEC.md`／TODO=`docs/GAP3_EVENT_DISCLOSURE_TODO.md`
+R2（`20260906-gap3disc-x-review-r2`）：codex 4×P1＋2×P2、composer 0（P3-00）、grok 2×P2。
+去重 6 條**全數已修**（commit `beaf0c5d`／`74f2c0db`／`58a0d286`，已 push）。
+R1／R2 委員債皆已 `debt_clear`；reconcile 見 `handoffs/reconcile/20260906-gap3disc-x-review-r{1,2}/synth.md`。
 
-五段串行皆過三家 code review 至閉合：
-B-D0 `49204458`／B-D1 `54d8eb8e`／B-D3 `52295c6a`／B-D4 `bc8c5e1e`／**B-D5 `2538b4f4`**。
-逐批收據（測試選擇器、golden、mutation、review 輪次）＝`docs/GAP3D2_IMPL_HANDOFF.md` §5。
+🔴 **本輪觸發使用者定之「不收斂」停輪條件**（4 條 P1 全打在我 R1 的修法上）。
+我停下來問，使用者裁示逐字：「**問題是你發散或弄出來的，停下來問我也無法解決啊**」
+⇒ **今後這類「我自己弄出來的局部缺陷」不再停下來問，直接修完**。停輪報告仍要寫。
 
-`/search` 五維度之灰／鎖**全部解除**，只剩兩對幾何零窗組合依契約 `rejected_pairs` 灰掉並寫理由。
+## 收案時數字
+`test_gap3_oos_downgrade.py` 28 passed（R1 為 23）；vitest **579／74 檔**（R1 為 572／73）；
+tsc 8 行既有債；mutation **21/21**（`handoffs/20260906-gap3-disclosure-mutate.py`）；
+golden label 46／random_control 2 rc=0；解耦 BASELINE OK。
+既有紅（非本批）：`test_ichc_event_timestamps::…kwarg`（`B1-WEAKTEST-1` 掃字串）、`ic_la1`×2（單跑該檔全過＝測試間污染）。
 
-## 🔴 下一件＝**使用者實機 UAT**（我不能代驗）
+## 下一件（使用者已裁定）
+**掃描結果瀏覽器，目標＝小型帶（數百特徵內）完整呈現「組合×特徵×指標」立方體**，含選擇／篩選。
+🔴 **動工前第一件要驗**：掃描落檔互相覆蓋。**讀碼已定案**（尚未實跑）——
+`_resolve_filtered_path` 只用 symbol+timeframe（`api/services/ic_analysis_service.py:2764`、
+`momentum/Analysis/ic_filter_orchestrator.py:4290`），
+而每格都跑完整 `analyze()`（`_suppress_persist` 只在 fallback 內層為真）⇒ 110 格覆蓋同一檔、最後一格獲勝。
+另：格是循序 `await`，但**逾時之格的 thread 仍會跑完**並寫同一個檔 ⇒ 逾時後有並行寫入競態
+（`CODEX-R1-P1-01` 的 analyzer 隔離擋不到共用落檔路徑）。
+規模事實：報告 546KB@15 特徵；cap=80,515；correlation_matrix O(N²) 無 cap（GAP-6）；漏斗依 2026-07-16 裁定＝IC 完善後才定義。
 
-`白話說明/GAP-3驗收清單.md` 之 **B3** 已由「必定未完成」改為「待你實機驗」。
-其餘 19 項多數先前已 OK。UAT 通過前**不要**在此票上再堆新工作。
-
-## 收案時的終局數字（B-D5 R2 後）
-
-`tests/momentum/event_samples` **532**；`tests/api/test_gap3_random_control.py` **27**；
-`cd frontend && npx vitest run` **546／72 檔**；`tsc --noEmit` **8 行既有債**；
-golden **label 46 ／ random_control 2**（皆 rc=0）；解耦 **BASELINE OK**；
-mutation `handoffs/20260906-gap3d2-b5-mutate.py` **39/39 符合預期**。
-
-**`B1-VERIFY-1` 已履行**：`tests/api` 867 passed／6 failed／3 errors、
-`tests/governance` 1739 passed／10 failed——失敗集合經**父 commit 對等比較**
-（detached worktree ＋ `comm -23`）確認**無一由本 epic 造成**。
-
-## 開放殘留（21 條，皆具三值理由）
-
-`docs/IC_QUANT_GAP_REGISTRY.md`「G3-D2 實作批殘留」表。B-D5 新增四條：
-`B5-SPECGAP-1`／`B5-SINGLECLASS-1`／`B5-GENERATOR-WIRE-1`／`B5-BARPRECOND-1`。
-另新增治理殘留 `R-G7-OFF-2`（2 條 `test_gov_check_cheap_first` 長期紅，係 G-7 停用之 fallout）。
-
-## 環境現況
-
-開放債為零；無未推送 commit。工作區餘 2026-09-01 遺留之三個 `uat_samples/*`、
-九個 `.claude/gate/*baseline*` 未追蹤檔與 `market_data/*` 快取異動——**皆非主線產物，勿順手 commit**。
-另有一個先前既有的 `stash@{0}: review-temp`（非本 session 產生，未動）。
-🔴 紀律：`pytest tests/governance` 小時級（實測 3050s）且不含量化測試，只有「動共用控制流」
-**且**「收 epic 前」兩條件皆成立才跑；**且不得與其他 mutate-restore 型 pytest 並行**（本批踩過）。
+## 環境
+開放債為零。工作區餘 `uat_samples/*`、`.claude/gate/*baseline*`、`market_data/*` 未追蹤異動——**勿 commit**。
