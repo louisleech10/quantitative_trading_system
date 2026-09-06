@@ -71,3 +71,52 @@ describe('DegradedBanner', () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// `GAP3_EVENT_DISCLOSURE` Task 1.3 — 降級之原因與門檻（2026-09-06 UAT B22-9）
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('Task 1.3 — oos_downgrade 之具體原因與門檻', () => {
+  it('🔴 有 oos_downgrade ⇒ 顯示 reason 與三個數字（不只籠統警語）', () => {
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'degraded_full_sample',
+      oos_guarantees: false,
+      metadata: {
+        oos_downgrade: {
+          reason: 'rolling_warmup_insufficient',
+          train_rows: 82,
+          test_rows: 30,
+          min_test_rows: 131,
+        },
+      },
+    } as unknown as ICReport);
+    render(<DegradedBanner />);
+    const el = screen.getByTestId('ic-oos-downgrade');
+    expect(el.textContent).toContain('rolling_warmup_insufficient');
+    expect(el.textContent).toContain('82');
+    expect(el.textContent).toContain('30');
+    expect(el.textContent).toContain('131');
+    // 🔴 必須講清楚「列數 ≠ 事件數」——否則使用者會直接拿事件數去對 131
+    expect(el.textContent).toContain('列數不等於事件數');
+  });
+
+  it('🔴 正向對照：降級但**沒有** oos_downgrade ⇒ 不 render 該行（不得填假值）', () => {
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'degraded_full_sample',
+      oos_guarantees: false,
+    } as ICReport);
+    render(<DegradedBanner />);
+    expect(screen.getByTestId('degraded-banner')).toBeTruthy();
+    expect(screen.queryByTestId('ic-oos-downgrade')).toBeNull();
+  });
+
+  it('🔴 正向對照：ok_oos ⇒ 整個 banner 都不出現（本欄不得讓 banner 恆顯示）', () => {
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'ok_oos',
+      oos_guarantees: true,
+      metadata: { oos_downgrade: null },
+    } as unknown as ICReport);
+    const { container } = render(<DegradedBanner />);
+    expect(container.firstChild).toBeNull();
+  });
+});

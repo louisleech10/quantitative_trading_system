@@ -890,3 +890,175 @@ describe('D4.2 R2 閉合 — `CODEX-R2-P2-03`：bounds scope 之 null 語意必�
     expect(screen.queryByTestId('ic-param-bounds-scope')).toBeNull();
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// `GAP3_EVENT_DISCLOSURE` — 2026-09-06 UAT B21/B22 回報之閉合
+// ══════════════════════════════════════════════════════════════════════════
+
+const SPEC_SAME_BAR = {
+  horizon_bars: 1, entry_price_semantic: 'trigger_open',
+  label_return_mode: 'open_to_close', decision_offset_bars: 0,
+} as const;
+const SPEC_HOLD = {
+  horizon_bars: 3, entry_price_semantic: 'trigger_open',
+  label_return_mode: 'open_to_horizon_close', decision_offset_bars: 0,
+} as const;
+
+function renderWithSpec(
+  spec: unknown,
+  extra: Record<string, unknown> = {},
+) {
+  return render(
+    <EventBatchDisclosurePanel
+      importId="imp-1"
+      detail={detailFixture()}
+      labelSpec={spec as never}
+      onChangeLabelSpec={() => {}}
+      {...extra}
+    />,
+  );
+}
+
+describe('Task 1.1 — 當根（open_to_close）時 h 掃描不適用', () => {
+  it('🔴 選當根 ⇒ h 掃描之勾選與上限皆 disabled，並顯示理由', () => {
+    renderWithSpec(SPEC_SAME_BAR, { labelScan: null, onChangeLabelScan: () => {} });
+    const toggle = screen.getByTestId('ic-param-scan-h-toggle') as HTMLInputElement;
+    const max = screen.getByTestId('ic-param-scan-h-max') as HTMLInputElement;
+    expect(toggle.disabled).toBe(true);
+    expect(max.disabled).toBe(true);
+    expect(screen.getByTestId('ic-param-scan-h-inapplicable')).toBeTruthy();
+  });
+
+  it('正向對照：選「持有」⇒ h 掃描可用且**不**顯示理由（防恆常 disable）', () => {
+    renderWithSpec(SPEC_HOLD, { labelScan: null, onChangeLabelScan: () => {} });
+    expect((screen.getByTestId('ic-param-scan-h-toggle') as HTMLInputElement).disabled).toBe(false);
+    expect(screen.queryByTestId('ic-param-scan-h-inapplicable')).toBeNull();
+  });
+
+  it('正向對照：k 掃描**不受**本規則影響（k 對當根仍有意義）', () => {
+    renderWithSpec(SPEC_SAME_BAR, { labelScan: null, onChangeLabelScan: () => {} });
+    expect((screen.getByTestId('ic-param-scan-k-toggle') as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it('尚未選量法（labelSpec undefined）⇒ **不** disable（還沒決定就鎖會讓人以為壞了）', () => {
+    renderWithSpec(undefined, { labelScan: null, onChangeLabelScan: () => {} });
+    expect((screen.getByTestId('ic-param-scan-h-toggle') as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it('🔴 切到當根時**清掉**既有的 h 上限（留著會送出一個不會被用到的值）', () => {
+    const calls: (unknown)[] = [];
+    const { rerender } = render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()}
+        labelSpec={SPEC_HOLD as never} onChangeLabelSpec={() => {}}
+        labelScan={{ horizon_bars_max: 5 }} onChangeLabelScan={(n) => calls.push(n)}
+      />,
+    );
+    rerender(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()}
+        labelSpec={SPEC_SAME_BAR as never} onChangeLabelSpec={() => {}}
+        labelScan={{ horizon_bars_max: 5 }} onChangeLabelScan={(n) => calls.push(n)}
+      />,
+    );
+    expect(calls.length).toBeGreaterThan(0);
+    // 兩軸都空 ⇒ 整個鍵回 null（既有語意）
+    expect(calls[calls.length - 1]).toBeNull();
+  });
+});
+
+describe('Task 1.2 — 主結果與掃描矩陣之關係', () => {
+  const scanDisclosure = {
+    event_label_scan: {
+      capability: 'available',
+      reason: null,
+      message: null,
+      scan_done: 4,
+      scan_total: 4,
+      scan_results: [
+        { k: 0, h: 1, capability: 'available', n_events: 10, reason: null },
+        { k: 0, h: 2, capability: 'available', n_events: 10, reason: null },
+        { k: 1, h: 1, capability: 'available', n_events: 9, reason: null },
+        { k: 1, h: 2, capability: 'available', n_events: 9, reason: null },
+      ],
+    },
+  };
+
+  function renderScan(spec: unknown) {
+    return render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()}
+        labelSpec={spec as never} onChangeLabelSpec={() => {}}
+        labelScan={{ decision_offset_bars_max: 1, horizon_bars_max: 2 }}
+        onChangeLabelScan={() => {}}
+        disclosure={scanDisclosure as never}
+      />,
+    );
+  }
+
+  it('說明行帶**當前**的 k 與 h（改 spec 之後跟著變，不是寫死字串）', () => {
+    renderScan({ ...SPEC_HOLD, horizon_bars: 2, decision_offset_bars: 1 });
+    const note = screen.getByTestId('ic-scan-primary-note');
+    expect(note.textContent).toContain('k＝1');
+    expect(note.textContent).toContain('h＝2');
+    cleanup();
+    renderScan({ ...SPEC_HOLD, horizon_bars: 1, decision_offset_bars: 0 });
+    const note2 = screen.getByTestId('ic-scan-primary-note');
+    expect(note2.textContent).toContain('k＝0');
+    expect(note2.textContent).toContain('h＝1');
+  });
+
+  it('🔴 矩陣中**恰有一格**被標為主結果，且就是框裡那組 (k,h)', () => {
+    renderScan({ ...SPEC_HOLD, horizon_bars: 2, decision_offset_bars: 1 });
+    const primary = document.querySelectorAll('[data-primary="true"]');
+    expect(primary.length).toBe(1);
+    expect(primary[0].getAttribute('data-testid')).toBe('ic-scan-cell-1-2');
+  });
+
+  it('🔴 主結果落在掃描範圍外 ⇒ 零格標示，且說明行明講（不得靜默）', () => {
+    renderScan({ ...SPEC_HOLD, horizon_bars: 9, decision_offset_bars: 5 });
+    expect(document.querySelectorAll('[data-primary="true"]').length).toBe(0);
+    expect(screen.getByTestId('ic-scan-primary-note').textContent).toContain('不在下表範圍內');
+  });
+
+  it('未開掃描 ⇒ 整區不 render（不得出現孤兒說明行）', () => {
+    renderWithSpec(SPEC_HOLD, { labelScan: null, onChangeLabelScan: () => {} });
+    expect(screen.queryByTestId('ic-scan-primary-note')).toBeNull();
+  });
+});
+
+describe('Task 1.4 — 參數說明文案接線', () => {
+  it('🔴 DOM 實際 render 的 doc 鍵集，等於 EVENT_PARAM_DOCS 扣掉 h_scan_inapplicable', async () => {
+    const { EVENT_PARAM_DOC_KEYS } = await import('@/lib/eventParamDocs');
+    // 🔴 本檔之 `detailFixture` 之 `records` 只有 `label_definition`（是為別條測試設計的），
+    //    缺 symbol／timeframe／t0 ⇒ 隨機對照組那一區會顯示「無法產生」而不 render 三個參數。
+    //    本條要驗的是**六個 doc 全部接上**，故在此補齊 records（不動共用 fixture）。
+    const full = detailFixture();
+    full.records = [
+      { event_id: 'ETHUSDT:12h:1700000000000', symbol: 'ETHUSDT', timeframe: '12h',
+        t0: 1700000000000, label_definition: { window: { horizon_bars: 3 } } },
+      { event_id: 'ETHUSDT:12h:1700043200000', symbol: 'ETHUSDT', timeframe: '12h',
+        t0: 1700043200000, label_definition: { window: { horizon_bars: 3 } } },
+    ];
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={full}
+        labelSpec={SPEC_HOLD as never} onChangeLabelSpec={() => {}}
+        labelScan={null} onChangeLabelScan={() => {}}
+      />,
+    );
+    const rendered = Array.from(document.querySelectorAll('[data-testid^="ic-param-doc-"]'))
+      .map((el) => el.getAttribute('data-testid')!.replace('ic-param-doc-', ''));
+    const expected = EVENT_PARAM_DOC_KEYS.filter((k) => k !== 'h_scan_inapplicable');
+    expect(new Set(rendered)).toEqual(new Set(expected));
+  });
+
+  it('文字**逐字等於** EVENT_PARAM_DOCS（不是另寫一份）', async () => {
+    const { EVENT_PARAM_DOCS } = await import('@/lib/eventParamDocs');
+    renderWithSpec(SPEC_HOLD, { labelScan: null, onChangeLabelScan: () => {} });
+    const el = screen.getByTestId('ic-param-doc-horizon_bars');
+    expect(el.textContent).toBe(
+      `${EVENT_PARAM_DOCS.horizon_bars.what} ${EVENT_PARAM_DOCS.horizon_bars.effect}`,
+    );
+  });
+});

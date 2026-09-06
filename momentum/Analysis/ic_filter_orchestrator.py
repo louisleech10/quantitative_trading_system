@@ -1188,6 +1188,17 @@ class ICFilterOrchestrator:
         report_meta["fit_mode"] = "full_sample"
         report_meta["oos_guarantees"] = False
         report_meta["pit_stats_version"] = PIT_STATS_VERSION
+        # 🔴 `GAP3_EVENT_DISCLOSURE` Task 1.3：把**降級的原因與門檻**帶到 report。
+        #    出生事故（2026-09-06 UAT）：畫面只說「來自 full-sample fallback 或無 holdout 保證」，
+        #    而 `reason`／`train_rows`／`test_rows`／`min_test_rows` 這四個數字**這裡全都有**、
+        #    卻只進了 logger.warning ⇒ 使用者看得到降級、看不到為什麼，也無從判斷該加樣本還是改設定。
+        #    本欄**純新增**：`_resolve_root_status` 讀的鍵集不變，既有判定一字未動。
+        report_meta["oos_downgrade"] = {
+            "reason": str(reason),
+            "train_rows": int(details.get("train_rows", 0)),
+            "test_rows": int(details.get("test_rows", 0)),
+            "min_test_rows": int(details.get("min_test_rows", 0)),
+        }
         report["metadata"] = report_meta
 
         # root 紅標 + pass_class（權威在 wrapper 加註之後）

@@ -828,8 +828,18 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <li>這批如果<strong>混了不同週期</strong>（例如同時有 1h 和 12h 的事件），系統<strong>不會</strong>幫你猜，
 會退回「當根」並明講「混合 timeframe 批，請手動設定」。</li>
 </ul>
+<p><strong>每個要填的數字旁邊都應該有一行說明</strong>（這是 9/6 你回報後補的）：
+「這是什麼」＋「影響什麼」。答案窗（h）那行應該講到<strong>改 h 等於換一個問題、不同 h 的 IC 不能互相比較</strong>。</p>
 <p>🔴 <strong>不是這樣代表什麼</strong>：如果選「當根」而 <code>h</code> 還能改，或送出後跑的 <code>h</code> 不是畫面顯示的那個
 ——那就是「顯示一套、送出另一套」，記下來告訴我。</p>
+<p><strong>🔴 選「當根」時，下面的 h 掃描也要一起變灰</strong>（9/6 你抓到的缺陷，已修）</p>
+<p><strong>你做什麼</strong>：選「當根」，然後看下方「h 掃描」那一列。</p>
+<p><strong>應該看到</strong>：勾選框與數字框<strong>都不能點</strong>，旁邊寫著理由——
+當根只看事件那一根，h 完全不參與計算，掃出來每一格都會是一模一樣的數字。</p>
+<p><strong>還要試</strong>：先選「持有」、勾 h 掃描填 5，再切回「當根」⇒ 那個 5 應該<strong>被清掉</strong>
+（留著的話會送出一個不會被用到的值）。</p>
+<p>🔴 <strong>不是這樣代表什麼</strong>：如果當根時還能勾 h 掃描，你會跑出一張每格都相同的表，
+而且不會有任何提示——那正是這次修的東西沒生效。</p>
 <h3 id="b22-kh掃到-m的網格第-4-段做的">B22 ── k／h「掃到 m」的網格（第 4 段做的）</h3>
 <p><strong>在哪裡</strong>：同一區，「分析參數」下方。</p>
 <p><strong>你做什麼</strong>：勾「掃 k」並填一個上限（例如 3），再勾「掃 h」填 3，然後送出分析。</p>
@@ -844,6 +854,18 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <p>🔴 <strong>誠實邊界（我要先講）</strong>：畫面上那個「這批最多能用多大的 k／h」是<strong>上界</strong>——
 <strong>超過它一定算不出來，但沒超過不保證每一筆都算得出來</strong>（還有別的原因會讓單一事件被剔除）。
 畫面就是這樣寫的，不會寫成保證。</p>
+<p><strong>🔴 主結果跟這張表是什麼關係</strong>（9/6 你問的，已補上說明）</p>
+<p><strong>應該看到</strong>：表格上方有一行寫著「主要結果 ＝ k＝X、h＝Y（分析參數框裡的值）。
+下表是<strong>另外</strong>跑的；沒有勾掃描的那一軸就用框裡的值。」</p>
+<p><strong>還要看</strong>：表格裡<strong>恰有一格</strong>會被框起來並標「（主）」——那一格就是上面主結果的那組 (k,h)。</p>
+<p><strong>兩件容易誤會的事</strong>（我先講清楚）：</p>
+<ol>
+<li><strong>掃描和框裡的值不是獨立的</strong>。你只勾 k 掃描的話，表格是「k 從 0 到你填的數 × h＝框裡那個值」。</li>
+<li><strong>矩陣每一格真的各用各的 k 和 h 算</strong>（不是全部用框裡那個）。你先前看到的那個 k
+是<strong>主結果</strong>的 k——因為之前畫面沒說這件事，所以看起來像每格都一樣。</li>
+</ol>
+<p><strong>故意試</strong>：把框裡的 k 填 5，但 k 掃描只掃到 3 ⇒ 應該<strong>沒有任何一格</strong>被標「（主）」，
+而且上面那行會多一句「主要結果不在下表範圍內」。</p>
 <h3 id="b23-隨機對照組第-5-段做的這是最後一段">B23 ── 隨機對照組（第 5 段做的，這是最後一段）</h3>
 <p><strong>在哪裡</strong>：<code>/ic-analysis</code> → 事件模式 → 選一批 → 面板最下方「<strong>隨機對照組</strong>」。</p>
 <p><strong>它在回答什麼</strong>：你篩出來的這批事件「正例率 25%」——這個數字<strong>單獨看沒有意義</strong>。
@@ -851,7 +873,10 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <strong>隨便挑一批 K 線</strong>的正例率是多少。25% vs 10% 才是訊息；25% vs 24% 就只是市場本來如此。</p>
 <p><strong>你做什麼</strong>：</p>
 <ol>
-<li>四個數字框可以調（想抽幾筆／亂數種子／前鄰域幾根／後 embargo 幾根），先用預設值即可。</li>
+<li>四個數字框可以調（想抽幾筆／亂數種子／前鄰域幾根／後 embargo 幾根），先用預設值即可。
+<strong>三個抽樣參數下面現在各有一行說明</strong>（9/6 你問後補的）——直接看畫面，這裡不重寫一份。
+簡短版：<strong>亂數種子</strong>＝固定它結果才可重現；<strong>前鄰域／後 embargo</strong>＝把貼著事件的 K 線排除掉，
+免得對照組跟事件用到同一段行情。</li>
 <li>按「<strong>產生隨機對照批</strong>」。</li>
 </ol>
 <p><strong>應該看到</strong>（依序兩件事）：</p>
@@ -878,10 +903,15 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <tr>
 <td>🔴「<strong>不並排 prevalence</strong>（reason：<code>random_control_rule_identity_unverifiable</code>）」</td>
 <td>這批<strong>沒有把標籤規則記在檔案裡</strong> ⇒ 無法確認兩批用同一把尺</td>
-<td><strong>既有的批全部都是這種</strong>（那個欄位是第 5 段才有的）。要補只能重新匯入該批時把規則帶進去</td>
+<td><strong>既有的批全部都是這種</strong>（那個欄位是最近才新增的）。要補只能重新匯入該批時把規則帶進去</td>
 </tr>
 </tbody>
 </table></div>
+<blockquote>
+<p><strong>「標籤規則」是什麼</strong>：就是「漲多少算 1」那條規則——<strong>門檻 ＋ 答案窗長度</strong>
+（例如「3 根之內漲 2% 算 1」）。兩批要並排，這兩個數字必須一樣，
+而且方向（做多／做空）與報酬算法也要一樣。</p>
+</blockquote>
 <p>🔴 <strong>這是刻意的</strong>：閘不通過時<strong>一個數字都不給</strong>。給了半套數字，就一定會有人拿去相減。</p>
 <p><strong>其他三種不並排的理由</strong>（比較少見，但你可能撞到）：</p>
 <div class="table-wrap"><table>
@@ -915,6 +945,30 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <li>如果 <code>-1</code> 被接受了、或變成別的數字 → 輸入邊界的檢查沒生效。</li>
 <li>如果比較失敗時顯示的是「<strong>產生</strong>對照組失敗」（但上一行明明說已產好）→ 那是兩段錯誤
 被混在一起了，你會因此重按而重複產批。</li>
+</ul>
+<h3 id="b24-沒有-oos-保證時看得到為什麼96-補的">B24 ── 沒有 OOS 保證時，看得到為什麼（9/6 補的）</h3>
+<p><strong>背景</strong>：你回報 60／115／219 筆三種批<strong>都</strong>出現這段紅字——</p>
+<blockquote>
+<p>⚠ Full-sample research-only（非 OOS 保證）
+analysis_status=degraded_full_sample · oos_guarantees=false</p>
+</blockquote>
+<p><strong>那是預期的</strong>，不是壞掉。但<strong>看不出為什麼</strong>就是缺陷——你無從判斷該加事件還是改設定。</p>
+<p><strong>在哪裡</strong>：<code>/ic-analysis</code> 跑完一個小事件批之後，那段紅字的<strong>下方</strong>。</p>
+<p><strong>你做什麼</strong>：拿一個一兩百筆的事件批跑分析。</p>
+<p><strong>應該看到</strong>：紅字下面多一行<strong>具體</strong>的說明，長這樣——</p>
+<blockquote>
+<p>原因：<code>rolling_warmup_insufficient</code>——訓練 82 列、測試 30 列，
+但滾動 IC 需要測試集至少 131 列。
+要拿到 OOS 保證，得讓<strong>測試集的列數</strong>過門檻。列數不等於事件數——
+事件經對齊與 purge 之後才變成列，兩者沒有固定倍數。</p>
+</blockquote>
+<p>（數字會依你的批而不同；重點是<strong>四樣東西都要有</strong>：原因代號、訓練列數、測試列數、需要的列數。）</p>
+<p>🔴 <strong>為什麼要強調「列數不等於事件數」</strong>：你很可能直覺去想「那我湊 131 筆事件就好」——
+<strong>不是</strong>。事件要先對齊到 K 線、再扣掉 purge 隔離區，才變成列。中間的倍數不固定。</p>
+<p>🔴 <strong>不是這樣代表什麼</strong>：</p>
+<ul>
+<li>如果只有籠統那句紅字、<strong>沒有</strong>下面這行 ⇒ 這次修的東西沒生效。</li>
+<li>如果某次分析<strong>有</strong> OOS 保證（沒出現紅字）卻還是冒出這行 ⇒ 反了，記下來。</li>
 </ul>
 <hr />
 <h2 id="簽字">簽字</h2>
@@ -1042,6 +1096,11 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <td><strong>B23 隨機對照組</strong></td>
 <td>☐ <strong>待驗</strong></td>
 <td>第 5 段做的；同上。<strong>「不並排 prevalence」是正確結果之一</strong>，不是失敗</td>
+</tr>
+<tr>
+<td><strong>B24 沒有 OOS 保證時看得到為什麼</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/6 依你 B22-9 的回報新增；原因＋三個列數都要出現</td>
 </tr>
 </tbody>
 </table></div>

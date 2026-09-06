@@ -1386,6 +1386,10 @@ class ICAnalysisService:
                 "scan_done": task_info.get("scan_done"),
                 "scan_total": task_info.get("scan_total"),
             }
+            # 🔴 `GAP3_EVENT_DISCLOSURE` Task 1.3：降級原因**刻意不進 task status**。
+            #    它住 `report.metadata.oos_downgrade`（orchestrator 之單一寫出點），
+            #    前端之 `DegradedBanner` 已經在讀 `report.metadata`（同 `event_filter` 那條路）
+            #    ⇒ 再開一條 task_info 投影會是沒有消費端的死表面。
             # 🔴 `G3-D2` D4.2／D4.3 之揭露欄：只在事件分析路徑存在時才出現
             #    （非事件分析沒有 k 可言，填 None 會讓 UI 以為有這件事）。
             for key in (

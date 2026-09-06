@@ -23,6 +23,7 @@ import {
   type RandomControlParams,
   buildRandomControlSpec,
 } from '@/lib/randomControlSpec';
+import { EVENT_PARAM_DOCS } from '@/lib/eventParamDocs';
 import {
   EVENT_FIELD_FORMATTERS,
   IC_BATCH_FACT_FIELDS,
@@ -109,6 +110,24 @@ function factLine(field: EventFieldKey, detail: EventImportDetail): string {
   }
 }
 
+/**
+ * 參數說明之**唯一** render 點（`GAP3_EVENT_DISCLOSURE` Task 1.4）。
+ *
+ * 🔴 文字一律取自 `EVENT_PARAM_DOCS`，元件內**不得**寫任何說明字面——
+ *    寫了就會有第二份文案，而「只改一處」是這個 epic 已經付過三次代價的形態。
+ */
+function ParamDoc({ paramKey }: { paramKey: keyof typeof EVENT_PARAM_DOCS }) {
+  const doc = EVENT_PARAM_DOCS[paramKey];
+  if (!doc) return null;
+  return (
+    <p className="mt-1 text-[11px] leading-relaxed text-slate-400" data-testid={`ic-param-doc-${paramKey}`}>
+      {doc.what}
+      {' '}
+      {doc.effect}
+    </p>
+  );
+}
+
 export default function EventBatchDisclosurePanel({
   importId, labelSpec, onChangeLabelSpec, detail: injected,
   labelScan = null, onChangeLabelScan, disclosure = null,
@@ -184,6 +203,28 @@ export default function EventBatchDisclosurePanel({
     && labelScan?.decision_offset_bars_max !== null;
   const hScanOn = labelScan?.horizon_bars_max !== undefined
     && labelScan?.horizon_bars_max !== null;
+  /**
+   * `GAP3_EVENT_DISCLOSURE` Task 1.1：h 掃描是否適用。
+   *
+   * 🔴 判準是**底層 mode**，不是 preset key——進階區可以直接改 mode 而不經 preset，
+   *    用 preset key 判會在那條路徑上漏掉。
+   * 🔴 `open_to_close`（當根）在對齊層是 `end_idx = entry_idx`，**完全不使用 horizon**
+   *    ⇒ 掃 h 會產出 N 個一模一樣的格子。單值 h 早就 disable 了（見下方 `ic-param-horizon-bars`），
+   *    h 掃描卻沒有——同一個理由只擋了一半，2026-09-06 UAT 當場踩到。
+   * 🔴 `labelSpec === undefined`（尚未選量法）⇒ 視為**適用**：還沒決定就 disable
+   *    會讓使用者以為壞了。
+   */
+  const hScanApplicable = !userChoseSpec || spec.label_return_mode !== 'open_to_close';
+  // Task 1.1：切到「當根」時**清掉**既有的 h 上限。留著會讓送出之 `event_label_scan`
+  // 帶一個不會被用到的值——後端照樣照它建一整排格子，而每格結果相同。
+  useEffect(() => {
+    if (!hScanApplicable && hScanOn && onChangeLabelScan) {
+      const next: ICEventLabelScan = { ...(labelScan ?? {}), horizon_bars_max: undefined };
+      onChangeLabelScan(next.decision_offset_bars_max === undefined ? null : next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hScanApplicable, hScanOn]);
+
   const setScan = (patch: Partial<ICEventLabelScan>) => {
     if (!onChangeLabelScan) return;
     const next: ICEventLabelScan = { ...(labelScan ?? {}), ...patch };
@@ -261,6 +302,7 @@ export default function EventBatchDisclosurePanel({
             className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 disabled:opacity-50"
           />
         </label>
+        <ParamDoc paramKey="horizon_bars" />
 
         {/* ── `G3-D2` D1.7：報酬量法三選項（取代原本兩個枚舉 select）────────────────
             🔴 **B-D1 不提供「進階直改兩欄」**：兩個 select 各自列值會列出
@@ -324,6 +366,7 @@ export default function EventBatchDisclosurePanel({
           >
             {advanced ? '收起進階：直接改兩欄' : '進階：直接改 entry／mode 兩欄'}
           </button>
+          <ParamDoc paramKey="advanced_pair" />
           {advanced && (
             <div className="mt-2 space-y-2">
               {pairReset && (
@@ -385,6 +428,7 @@ export default function EventBatchDisclosurePanel({
             })}
             className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 disabled:opacity-50"
           />
+          <ParamDoc paramKey="decision_offset_bars_analysis" />
           {/* 並排「批次記錄 k／本次分析 k」——同名不同義，分開講 */}
           <span className="mt-1 block text-[11px] text-slate-400" data-testid="ic-param-k-dual">
             批次記錄的 k ＝ {recordValues.length ? recordValues.join('、') : '（這批沒有這個欄）'}
@@ -429,6 +473,7 @@ export default function EventBatchDisclosurePanel({
                 type="checkbox"
                 data-testid="ic-param-scan-h-toggle"
                 checked={hScanOn}
+                disabled={!hScanApplicable}
                 onChange={(e) => setScan({
                   horizon_bars_max: e.target.checked ? (spec.horizon_bars ?? 1) : undefined,
                 })}
@@ -439,12 +484,19 @@ export default function EventBatchDisclosurePanel({
                 data-testid="ic-param-scan-h-max"
                 min={1}
                 step={1}
-                disabled={!hScanOn}
+                disabled={!hScanApplicable || !hScanOn}
                 value={labelScan?.horizon_bars_max ?? ''}
                 onChange={(e) => setScan({ horizon_bars_max: Number(e.target.value) })}
                 className="w-20 rounded border border-slate-700 bg-slate-900/70 px-2 py-0.5 text-xs disabled:opacity-50"
               />
             </label>
+            {!hScanApplicable && (
+              <p className="text-[11px] text-amber-200/90" data-testid="ic-param-scan-h-inapplicable">
+                {EVENT_PARAM_DOCS.h_scan_inapplicable.what}
+                {' '}
+                {EVENT_PARAM_DOCS.h_scan_inapplicable.effect}
+              </p>
+            )}
           </div>
         )}
 
@@ -486,6 +538,15 @@ export default function EventBatchDisclosurePanel({
               </p>
             ) : (
               <>
+                {/* Task 1.2：主結果與矩陣之關係。2026-09-06 UAT：使用者以為矩陣每格
+                    都用框裡的 k（實際上後端逐格帶自己的 k），根因是這層關係從沒被說出來。 */}
+                <p className="text-[11px] text-slate-300" data-testid="ic-scan-primary-note">
+                  主要結果 ＝ k＝{spec.decision_offset_bars ?? 0}、h＝{spec.horizon_bars}
+                  （分析參數框裡的值）。下表是**另外**跑的；沒有勾掃描的那一軸就用框裡的值。
+                  {!scanResult.scan_results.some(
+                    (c) => c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars,
+                  ) && '　🔴 主要結果不在下表範圍內。'}
+                </p>
                 <p className="text-[11px] text-slate-400">
                   掃描完成 {scanResult.scan_done}/{scanResult.scan_total} 格
                 </p>
@@ -499,12 +560,21 @@ export default function EventBatchDisclosurePanel({
                             <td
                               key={`${c.k}-${c.h}`}
                               data-testid={`ic-scan-cell-${c.k}-${c.h}`}
-                              className="px-2 py-0.5"
+                              data-primary={
+                                c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars
+                                  ? 'true' : undefined
+                              }
+                              className={`px-2 py-0.5${
+                                c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars
+                                  ? ' rounded border border-sky-400 font-medium text-sky-200' : ''
+                              }`}
                               title={c.reason ?? undefined}
                             >
                               {c.capability === 'available'
                                 ? `h=${c.h}: ${c.n_events} 筆`
                                 : `h=${c.h}: 不可用`}
+                              {c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars
+                                ? '（主）' : ''}
                             </td>
                           ))}
                         </tr>
@@ -568,6 +638,11 @@ export default function EventBatchDisclosurePanel({
                   />
                 </label>
               ))}
+            </div>
+            <div className="space-y-1">
+              <ParamDoc paramKey="seed" />
+              <ParamDoc paramKey="neighborhood_bars" />
+              <ParamDoc paramKey="embargo_bars" />
             </div>
             <button
               type="button"
