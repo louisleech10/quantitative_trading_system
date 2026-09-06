@@ -844,7 +844,12 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <p><strong>在哪裡</strong>：同一區，「分析參數」下方。</p>
 <p><strong>你做什麼</strong>：勾「掃 k」並填一個上限（例如 3），再勾「掃 h」填 3，然後送出分析。</p>
 <p><strong>應該看到</strong>：跑完後多出一張<strong>逐格表格</strong>，每一格是一次獨立的分析（k=0..3 × h=1..3）。
-每格顯示該組合的 IC；跑不出來的格子會標明<strong>為什麼</strong>（例如逾時、或該組合不支援）。</p>
+跑不出來的格子會標明<strong>為什麼</strong>（例如逾時、或該組合不支援）。</p>
+<p>🔴 <strong>誠實更正（9/6，原本這裡寫錯）</strong>：這句原本寫「每格顯示該組合的 <strong>IC</strong>」——<strong>不對</strong>。
+現在每一格顯示的是該組合的<strong>事件筆數</strong>（例如「h=3: 219 筆」），<strong>不是 IC</strong>。
+每格的完整分析確實有算，但<strong>算完就丟</strong>，只留一個摘要。
+「要能看到每個組合、每個特徵的每個數據」是你已經裁定的<strong>下一件工作</strong>（掃描結果瀏覽器），
+不在本清單的驗收範圍內。這裡先照現況寫，不假裝已經有。</p>
 <p><strong>還要看</strong>：</p>
 <ul>
 <li>畫面會<strong>同時</strong>顯示「這批當初記錄的 k」與「這次分析用的 k」——兩個同名不同義的數字。</li>
@@ -962,14 +967,68 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 要拿到 OOS 保證，得讓<strong>測試集的列數</strong>過門檻。列數不等於事件數——
 事件經對齊與 purge 之後才變成列，兩者沒有固定倍數。</p>
 </blockquote>
-<p>（數字會依你的批而不同；重點是<strong>四樣東西都要有</strong>：原因代號、訓練列數、測試列數、需要的列數。）</p>
+<p>（數字會依你的批而不同。）</p>
 <p>🔴 <strong>為什麼要強調「列數不等於事件數」</strong>：你很可能直覺去想「那我湊 131 筆事件就好」——
 <strong>不是</strong>。事件要先對齊到 K 線、再扣掉 purge 隔離區，才變成列。中間的倍數不固定。</p>
+<p>🔴 <strong>有五種降級路徑，只有一種會有列數</strong>（9/6 委員審查後改寫；原本這裡寫「四樣東西都要有」，
+那句話是錯的——另外四種路徑根本沒有列數可報，硬填數字就是造假）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>你看到的原因</th>
+<th>什麼意思</th>
+<th>有列數嗎</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rolling_warmup_insufficient</code></td>
+<td>測試集列數不夠跑滾動 IC</td>
+<td>✅ 有三個列數</td>
+</tr>
+<tr>
+<td><code>insufficient_data</code></td>
+<td>資料太少，切分根本跑不起來</td>
+<td>✅ 有</td>
+</tr>
+<tr>
+<td><code>event_filter_fallback</code></td>
+<td><strong>事件樣本不足，退回全樣本</strong></td>
+<td>❌ 沒有</td>
+</tr>
+<tr>
+<td><code>fit_mode_full_sample</code></td>
+<td>設定裡就指定了全樣本擬合</td>
+<td>❌ 沒有</td>
+</tr>
+<tr>
+<td><code>split_not_applied</code>／<code>no_holdout_evidence</code></td>
+<td>切分沒套用／找不到保留測試集的證據</td>
+<td>❌ 沒有</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>沒有列數的那幾種，畫面應該明講「這條路徑沒有訓練／測試列數可報」，而不是印「0 列」。</strong></p>
+<p>🔴 <strong>特別看 <code>event_filter_fallback</code> 這條</strong>：它的說明<strong>不可以</strong>寫成「沒有保留獨立的測試集」。
+那條路缺的是<strong>事件樣本</strong>，測試集可能好端端地切過了——照那句話去建測試集是白做工。
+（這是 9/6 委員抓到我寫錯的一句話，已改。）</p>
 <p>🔴 <strong>不是這樣代表什麼</strong>：</p>
 <ul>
 <li>如果只有籠統那句紅字、<strong>沒有</strong>下面這行 ⇒ 這次修的東西沒生效。</li>
+<li>如果看到「訓練 0 列、測試 0 列、需要 0 列」⇒ <strong>那是假數字</strong>，記下來告訴我
+（正確行為是明講「沒有列數可報」）。</li>
 <li>如果某次分析<strong>有</strong> OOS 保證（沒出現紅字）卻還是冒出這行 ⇒ 反了，記下來。</li>
 </ul>
+<h3 id="b25-每個要你填的欄位旁邊都有說明96-晚間補的">B25 ── 每個要你填的欄位旁邊都有說明（9/6 晚間補的）</h3>
+<p><strong>背景</strong>：9/6 你在 UAT 逐項問「答案窗是什麼」「k 是什麼」「亂數種子是什麼」。
+第一輪我補了 11 條說明，但<strong>漏了兩個下拉選單</strong>——委員審查時抓到。</p>
+<p><strong>在哪裡</strong>：<code>/ic-analysis</code> → 事件模式 → 選一批 → 「分析參數」→ 展開「<strong>進階：直接改 entry／mode 兩欄</strong>」。</p>
+<p><strong>你做什麼</strong>：展開進階區，看那兩個下拉選單。</p>
+<p><strong>應該看到</strong>：<code>entry_price_semantic</code> 與 <code>label_return_mode</code> <strong>各自下方都有一段說明文字</strong>。</p>
+<p>🔴 <strong>醜話先說</strong>：這兩段文字是<strong>從契約檔逐字搬過來的</strong>，偏技術（會出現 <code>SPEC D1-6</code>、
+<code>rejected_pairs</code> 這種字眼）。<strong>這是刻意的</strong>——同一個概念寫兩份白話，日後只會改一份，
+這個 epic 已經為此付過三次代價。要改成更白話的講法，得去改契約檔本身（兩邊會一起變）。</p>
+<p><strong>不是這樣代表什麼</strong>：如果那兩個下拉選單旁邊<strong>什麼說明都沒有</strong>、只有英文選項 ⇒ 沒生效。</p>
 <hr />
 <h2 id="簽字">簽字</h2>
 <p>全部做完後，把結果填在這裡（或直接告訴我哪幾項不對）：</p>
@@ -1100,7 +1159,12 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 <tr>
 <td><strong>B24 沒有 OOS 保證時看得到為什麼</strong></td>
 <td>☐ <strong>待驗</strong></td>
-<td>9/6 依你 B22-9 的回報新增；原因＋三個列數都要出現</td>
+<td>9/6 依你 B22-9 的回報新增。<strong>9/6 晚間改寫</strong>：五種降級路徑只有兩種有列數，其餘四種應明講「沒有列數可報」——看到「0 列」就是假數字</td>
+</tr>
+<tr>
+<td><strong>B25 每個要填的欄位旁邊都有說明</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/6 委員審查後新增（<code>CODEX-R2-P1-02</code>）。進階區那兩個下拉選單（<code>entry_price_semantic</code>／<code>label_return_mode</code>）旁邊<strong>現在應該有說明文字</strong>；原本只有裸的英文選項</td>
 </tr>
 </tbody>
 </table></div>
