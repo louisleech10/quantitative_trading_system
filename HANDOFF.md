@@ -20,10 +20,13 @@ golden label 46／random_control 2 rc=0；解耦 BASELINE OK。
 
 ## 下一件（使用者已裁定）
 **掃描結果瀏覽器，目標＝小型帶（數百特徵內）完整呈現「組合×特徵×指標」立方體**，含選擇／篩選。
-🔴 **動工前第一件要驗**：掃描落檔互相覆蓋。**讀碼已定案**（尚未實跑）——
-`_resolve_filtered_path` 只用 symbol+timeframe（`api/services/ic_analysis_service.py:2764`、
+🔴 **掃描落檔互相覆蓋＝已實跑證明**（2026-09-06，`handoffs/20260906-probe-scan-overwrite.py`，rc=0；
+該檔被 .gitignore 排除，未進版控）。實跑輸出：
+4 組不同 (k,h) → **相異路徑數＝1**（`data_cache/features/ETHUSDT_12h_filtered.h5`）；
+連寫兩格後檔內只剩 `feat_2_3`，第一格的 `feat_0_1` **已被蓋掉**。
+成因：`_resolve_filtered_path` 只用 symbol+timeframe（`api/services/ic_analysis_service.py:2764`、
 `momentum/Analysis/ic_filter_orchestrator.py:4290`），
-而每格都跑完整 `analyze()`（`_suppress_persist` 只在 fallback 內層為真）⇒ 110 格覆蓋同一檔、最後一格獲勝。
+而每格都跑完整 `analyze()`（`_suppress_persist` 只在 fallback 內層為真）⇒ N 格只留得下最後一格。
 另：格是循序 `await`，但**逾時之格的 thread 仍會跑完**並寫同一個檔 ⇒ 逾時後有並行寫入競態
 （`CODEX-R1-P1-01` 的 analyzer 隔離擋不到共用落檔路徑）。
 規模事實：報告 546KB@15 特徵；cap=80,515；correlation_matrix O(N²) 無 cap（GAP-6）；漏斗依 2026-07-16 裁定＝IC 完善後才定義。
