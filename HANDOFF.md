@@ -1,35 +1,37 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-06 晚｜狀態：「事件分析頁揭露補完」票 R1＋R2 皆已閉合並 push。下一件＝掃描結果瀏覽器（小型帶）。**
+**更新：2026-09-07｜狀態：`SCANCUBE` 五個 Phase 全部完成並 push，等使用者實機驗收 B26／B27。**
 
-## 剛完成：揭露補完票 R2
-SPEC=`docs/GAP3_EVENT_DISCLOSURE_SPEC.md`／TODO=`docs/GAP3_EVENT_DISCLOSURE_TODO.md`
-R2（`20260906-gap3disc-x-review-r2`）：codex 4×P1＋2×P2、composer 0（P3-00）、grok 2×P2。
-去重 6 條**全數已修**（commit `beaf0c5d`／`74f2c0db`／`58a0d286`，已 push）。
-R1／R2 委員債皆已 `debt_clear`；reconcile 見 `handoffs/reconcile/20260906-gap3disc-x-review-r{1,2}/synth.md`。
+## 剛完成：掃描結果瀏覽器（小型帶）
+SPEC=`docs/GAP3_SCAN_CUBE_SPEC.md`／TODO=`docs/GAP3_SCAN_CUBE_TODO.md`（皆 TEMPLATE PASS）
+文件審兩輪：R1 21 條（3×P0）、R2 19 條（0×P0）⇒ **P0 3→0**，收斂後直接進實作。
+commit：`bb402ed6`（文件）→`1563768b`（後端 P1–P3）→`d68f0bcd`（前端 P4）→`cdea55c0`（白話 P5）。
 
-🔴 **本輪觸發使用者定之「不收斂」停輪條件**（4 條 P1 全打在我 R1 的修法上）。
-我停下來問，使用者裁示逐字：「**問題是你發散或弄出來的，停下來問我也無法解決啊**」
-⇒ **今後這類「我自己弄出來的局部缺陷」不再停下來問，直接修完**。停輪報告仍要寫。
+- **P1** 掃描格 `_suppress_persist=True`：修覆蓋（實跑證明 4 組 (k,h) → 相異路徑數 1）與逾時競態。
+- **P2** `momentum/Analysis/scan_cube.py`：Tier A（summary_table，463 B/特徵）＋
+  Tier B（七個圖表節，36,808 B/特徵）；三個 fail-closed 閘；`correlation_matrix` 具名排除。
+  Tier B 預算看**實測累加**不是首格外推（跨報告差 8 倍）。路徑不變式：`stored=False ⇒ path=None`。
+- **P3** `/api/v1/ic/scan-cube/{task_id}/{manifest,rows,charts}`：404／409／400 三種語意分開。
+- **P4** `ScanCubeBrowser.tsx`：三視圖；跨格**無排序按鈕**（SPEC §C-4 禁跨格排名）。
+- **P5** 白話 B26／B27。
+
+## 🔴 使用者主目標之部分未達成（已列為白話頭條）
+滿格 110 格 × 300 特徵之圖表資料 ＝ **1,158 MB** ⇒ **滿格不保證有圖表**，只保證指標表。
+小範圍（約 12 格 × 474 特徵內）圖表齊全。超出時 fail-closed 並回報**當次實測**之 `fits_hint`。
 
 ## 收案時數字
-`test_gap3_oos_downgrade.py` 28 passed（R1 為 23）；vitest **579／74 檔**（R1 為 572／73）；
-tsc 8 行既有債；mutation **21/21**（`handoffs/20260906-gap3-disclosure-mutate.py`）；
-golden label 46／random_control 2 rc=0；解耦 BASELINE OK。
-既有紅（非本批）：`test_ichc_event_timestamps::…kwarg`（`B1-WEAKTEST-1` 掃字串）、`ic_la1`×2（單跑該檔全過＝測試間污染）。
+`test_scan_cube.py` 28／`test_scan_cube_api.py` 12；`tests/api -k "gap3 or event or scan_cube"`
+443 passed／1 failed（`test_ichc_event_timestamps::…kwarg`＝既有債，已用 `git stash` 在父版本重跑同樣紅）；
+前端 vitest **599 passed／75 檔**；tsc 8 行既有債；解耦 `BASELINE OK`；golden 46 rc=0。
 
-## 下一件（使用者已裁定）
-**掃描結果瀏覽器，目標＝小型帶（數百特徵內）完整呈現「組合×特徵×指標」立方體**，含選擇／篩選。
-🔴 **掃描落檔互相覆蓋＝已實跑證明**（2026-09-06，`handoffs/20260906-probe-scan-overwrite.py`，rc=0；
-該檔被 .gitignore 排除，未進版控）。實跑輸出：
-4 組不同 (k,h) → **相異路徑數＝1**（`data_cache/features/ETHUSDT_12h_filtered.h5`）；
-連寫兩格後檔內只剩 `feat_2_3`，第一格的 `feat_0_1` **已被蓋掉**。
-成因：`_resolve_filtered_path` 只用 symbol+timeframe（`api/services/ic_analysis_service.py:2764`、
-`momentum/Analysis/ic_filter_orchestrator.py:4290`），
-而每格都跑完整 `analyze()`（`_suppress_persist` 只在 fallback 內層為真）⇒ N 格只留得下最後一格。
-另：格是循序 `await`，但**逾時之格的 thread 仍會跑完**並寫同一個檔 ⇒ 逾時後有並行寫入競態
-（`CODEX-R1-P1-01` 的 analyzer 隔離擋不到共用落檔路徑）。
-規模事實：報告 546KB@15 特徵；cap=80,515；correlation_matrix O(N²) 無 cap（GAP-6）；漏斗依 2026-07-16 裁定＝IC 完善後才定義。
+## 具名殘留
+`SC-RESID-1` 掃描峰值記憶體（OOM）不在本票（`blocked-by`：需 tier-aware 實跑，本機 8GB）——
+🔴 SPEC §C-8 明文：所有 cap 限的是**落檔位元組**，不是計算峰值。
+`SC-RESID-2` `correlation_matrix`（`blocked-by`：per-pair，另案）。
+`SC-RESID-3` 「選幾格補存圖表」（`needs-research`）。
+`COMPOSER-R1-P2-03`（揭露票）實機頁接線仍待 UAT。
 
 ## 環境
-開放債為零。工作區餘 `uat_samples/*`、`.claude/gate/*baseline*`、`market_data/*` 未追蹤異動——**勿 commit**。
+開放債為零。`scripts/_add_cube_contract_keys.py`、`scripts/_todo_r2_patch.py` 為一次性腳本，
+`rm` 被權限擋下故仍在工作區——**可刪，未進版控**。
+`uat_samples/*`、`.claude/gate/*baseline*`、`market_data/*` 未追蹤異動勿 commit。
