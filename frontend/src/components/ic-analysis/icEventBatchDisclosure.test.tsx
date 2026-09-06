@@ -1099,6 +1099,16 @@ describe('R1 CODEX-P1-04 — 每個 user-editable 數字欄都要有說明（機
         onChangeLabelScan={() => {}}
       />,
     );
+    // 🔴 **進階區預設收合** ⇒ 不展開的話那兩個 `<select>` 根本不在 DOM 裡，
+    //    閘會掃到一個「剛好沒有 select」的畫面而假綠。
+    //    這個洞是 mutation `D20` 當場抓到的（刪掉 `ContractDoc` 竟然不紅）——
+    //    我為了修 `CODEX-R2-P1-02` 而寫的閘，自己第一版就漏了同一種「沒接上」的病。
+    fireEvent.click(screen.getByTestId('ic-param-advanced-toggle'));
+    expect(
+      document.querySelectorAll('select').length,
+      '進階區沒展開——下面的 select 覆蓋檢查會空轉',
+    ).toBeGreaterThanOrEqual(2);
+
     // 🔴 `CODEX-R2-P2-03`／`GROK-R2` 必答 3b：R1 的版本比的是**數量**
     //    （`docCount >= numberInputs.length`），有兩個洞：
     //      ① 加一個無對應欄位的假 doc 就能把數量抬過去（誤報通過）；
