@@ -144,26 +144,37 @@
      🔴 `CODEX-R1-P1-04`：`n_requested`／兩個 scan max 是 user-editable 數字欄，原本沒有說明。
   2. 每鍵之 `what` 一句（這是什麼）、`effect` 一句（影響什麼）。內容依 SPEC §A 之定性：
      `horizon_bars`＝往後看幾根決定答案；影響＝**換 h 等於換問題**，IC 不可跨 h 比較。
-     `decision_offset_bars`＝提前幾根決定；影響＝特徵截止點往前，可用資料變舊，IC 通常變低。
+     `decision_offset_bars_analysis`＝提前幾根決定；影響＝特徵截止點往前，可用資料變舊，IC 通常變低。
      `advanced_pair`＝直接改底層 entry／mode，可組出 preset 沒有的組合；影響＝一般用不到，開放是因為矩陣已全開。
      `seed`／`neighborhood_bars`／`embargo_bars` 見 SPEC §A。
      `h_scan_inapplicable`＝當根只看事件那一根，h 不參與計算，掃出來每格都一樣。
   3. 元件以 `data-testid="ic-param-doc-<key>"` render `what` 與 `effect`。
-- 修改檔案：新增 `frontend/src/lib/eventParamDocs.ts`；`EventBatchDisclosurePanel.tsx`（六處 render，`h_scan_inapplicable` 由 Task 1.1 消費）。　既有 caller：新建無。
+- 修改檔案：新增 `frontend/src/lib/eventParamDocs.ts`；`EventBatchDisclosurePanel.tsx`
+  （九處走 `ParamDoc` render；`h_scan_inapplicable`／`h_inert_same_bar` 由 Task 1.1 之區塊直接消費；
+  兩個 `<select>` 走 `ContractDoc` 取契約鏡像）。　既有 caller：新建無。
 - 路徑：
   - `frontend/src/lib/eventParamDocs.ts`
   - `frontend/src/lib/eventParamDocs.test.ts`
+  - `frontend/src/lib/eventContractDocs.ts`（`ContractDoc` 之文案來源；本 Task 只**消費**不改）
   - `frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx`
 - 不可做：**不得**把契約既有 `doc` 複製進本檔（`entry_price_semantic`／`label_return_mode` 已有 `eventContractDocs.ts` 鏡像，複製即第二份真相源）；不得在本檔寫任何數值門檻（門檻來自後端揭露，見 Task 1.3）。
 - 邊界：
-  1. `/search` 已無 k 控制項 ⇒ 該頁**不得**出現 `ic-param-doc-decision_offset_bars`。
+  1. `/search` 已無 k 控制項 ⇒ 該頁**不得**出現 `ic-param-doc-decision_offset_bars_analysis`。
   2. 契約已有 `doc` 之欄位**不進**本檔——以測試斷言兩邊鍵集**不相交**。
+     🔴 `CODEX-R2-P1-02`：不相交指的是**文案來源**，不是「畫面不顯示」——
+     兩個 `<select>`（`entry_price_semantic`／`label_return_mode`）**必須**在控制項旁顯示說明，
+     文字由 `ContractDoc` 取自 `EVENT_CONTRACT_DOCS`（契約鏡像），testid 同樣是 `ic-param-doc-<欄名>`。
 - 風險緩解：⊘
 - 驗證：`cd frontend && npx vitest run eventParamDocs icEventBatchDisclosure`
-  - `Object.keys(EVENT_PARAM_DOCS).length === 7`，每鍵之 `what`／`effect` 皆非空
-  - 六個 `ic-param-doc-<key>` 皆在 DOM，文字**逐字等於** `EVENT_PARAM_DOCS[key]`（不是 `toContain`）
-  - 鍵集相等：`new Set(Object.keys(EVENT_PARAM_DOCS))` 減去 `h_scan_inapplicable` 後，與 DOM 實際 render 的 `ic-param-doc-*` 集合**相等**（多一個沒顯示、少一個顯示不出來皆紅）
+  - `Object.keys(EVENT_PARAM_DOCS).length === 11`，每鍵之 `what`／`effect` 皆非空
+  - 每個 `ic-param-doc-<key>` 之文字**逐字等於** `EVENT_PARAM_DOCS[key]`（不是 `toContain`）
+  - 鍵集相等：`new Set(Object.keys(EVENT_PARAM_DOCS))` 減去**兩個 inline-only 鍵**
+    （`h_scan_inapplicable`、`h_inert_same_bar`——由 Task 1.1 之區塊直接消費，不走 `ParamDoc`）後，
+    與 DOM 實際 render 的 `ic-param-doc-*` 集合**相等**（多一個沒顯示、少一個顯示不出來皆紅）
   - 不相交：`Object.keys(EVENT_PARAM_DOCS)` ∩ `Object.keys(EVENT_CONTRACT_DOCS)` `=== 0`
+  - 🔴 **一對一覆蓋閘**（`CODEX-R2-P2-03`；取代 R1 之數量比較）：面板內每個
+    `input[type=number]` 與 `<select>` 皆須帶 `data-doc="<鍵>"`，且 `ic-param-doc-<鍵>` 在場。
+    另附**反例測試**證明「多一個無關 doc」在新閘下會紅——舊的 `docCount >= inputCount` 會放行。
 - **存活至**：保留（本檔為 UI 文案之單一來源，後續新參數一律加在此）。
 - **覆蓋風險**：無——Task 1.1 只**消費** `h_scan_inapplicable`，不改寫本檔任何鍵。
 

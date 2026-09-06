@@ -1,6 +1,7 @@
 'use client';
 
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
+import { oosDowngradeDoc } from '@/lib/oosDowngradeDocs';
 import type { ICOosDowngrade } from '@/lib/types';
 
 /**
@@ -27,6 +28,7 @@ export default function DegradedBanner() {
   const hasRowCounts = typeof downgrade?.train_rows === 'number'
     && typeof downgrade?.test_rows === 'number'
     && typeof downgrade?.min_test_rows === 'number';
+  const doc = oosDowngradeDoc(downgrade?.reason);
 
   // 舊 artifact 無欄位 → 不炸、不顯示
   if (status === undefined || status === null) {
@@ -58,22 +60,22 @@ export default function DegradedBanner() {
             <>
               ——訓練 {downgrade.train_rows} 列、測試 {downgrade.test_rows} 列，
               但滾動 IC 需要測試集至少 {downgrade.min_test_rows} 列。
-              <br />
-              <span className="text-rose-200/70">
-                要拿到 OOS 保證，得讓<strong>測試集的列數</strong>過門檻。列數不等於事件數——
-                事件經對齊與 purge 之後才變成列，兩者沒有固定倍數。
-              </span>
             </>
-          ) : (
-            <>
-              。
-              <br />
-              <span className="text-rose-200/70" data-testid="ic-oos-downgrade-no-rows">
-                這條路徑沒有訓練／測試列數可報（列數只有在切分真的跑過才會產生）。
-                它代表本次分析<strong>沒有保留獨立的測試集</strong>，結果不可當 out-of-sample 使用。
-              </span>
-            </>
-          )}
+          ) : null}
+          <br />
+          {/* 🔴 `CODEX-R2-P1-06`：文案**依 reason 分流**（SSOT＝`oosDowngradeDocs.ts`）。
+              R1 的版本寫死一句「沒有保留獨立的測試集」，對 `event_filter_fallback`
+              是假的——那條路可以同時有已套用的 holdout，缺的是事件樣本。 */}
+          <span className="text-rose-200/70" data-testid="ic-oos-downgrade-explain">
+            {doc.what}
+            <br />
+            <strong>怎麼辦：</strong>{doc.next}
+          </span>
+          {!hasRowCounts ? (
+            <span className="block text-rose-200/60" data-testid="ic-oos-downgrade-no-rows">
+              （這條路徑沒有訓練／測試列數可報——列數只有在切分真的跑過才會產生。）
+            </span>
+          ) : null}
         </p>
       )}
       {eventFallback && (

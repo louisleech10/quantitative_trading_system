@@ -819,6 +819,29 @@ def _slice_raw_data_by_mask(
     return sliced_raw
 
 
+def _optional_row_count(value: Any) -> Optional[int]:
+    """列數：有就轉 int，**沒有就是 `None`**——禁以 0 代表「不知道」。
+
+    🔴 `CODEX-R2-P1-01`（2026-09-06 R2）：`oos_downgrade` 的三個列數會直接進畫面。
+    以 0 當缺值 ⇒ 使用者看到「訓練 0 列、測試 0 列、需要 0 列」，
+    這是**假的量化事實**（0 是一個合法且看起來像真的答案），
+    而 `None` 會走前端 `ic-oos-downgrade-no-rows` 分支明講「沒有列數可報」。
+
+    🔴 `_split_fallback_metadata` 的 `details` **也走本 helper**。原本想跳過它
+    （legacy 欄位、無前端消費者），但實跑發現 `int(None)`／`int("n/a")` 會讓
+    整條 fallback **拋例外**——那是潛伏的當機，不是「保守的 0」。
+    既有測試只斷言該欄之**鍵集**，值改為 `None` 不動任何斷言。
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):  # bool 是 int 的子類，會靜默變 0/1
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _split_fallback_metadata(reason: str, details: dict[str, Any]) -> dict[str, Any]:
     """建立 default-ON 回退 metadata，避免 legacy 結果被誤標為 OOS。"""
     return {
@@ -827,10 +850,13 @@ def _split_fallback_metadata(reason: str, details: dict[str, Any]) -> dict[str, 
         "scope": "full_sample_legacy",
         "oos_guarantees": False,
         "reason": reason,
+        # 🔴 `CODEX-R2-P1-01` 之延伸：本欄無前端消費者（既有測試只斷言**鍵集**），
+        #    但 `int(None)`／`int("n/a")` 會讓整條 fallback **拋例外**——
+        #    那是潛伏的當機，不是「保守的 0」。改走同一個 helper，鍵集不變。
         "details": {
-            "train_rows": int(details.get("train_rows", 0)),
-            "test_rows": int(details.get("test_rows", 0)),
-            "min_test_rows": int(details.get("min_test_rows", 0)),
+            "train_rows": _optional_row_count(details.get("train_rows")),
+            "test_rows": _optional_row_count(details.get("test_rows")),
+            "min_test_rows": _optional_row_count(details.get("min_test_rows")),
         },
     }
 
@@ -1141,9 +1167,12 @@ class ICFilterOrchestrator:
         LA-1 B3：logger.warning + 禁內層 persist + root 紅標後唯一寫出。
         """
         details = details or {}
-        train_rows = int(details.get("train_rows", 0))
-        test_rows = int(details.get("test_rows", 0))
-        min_test_rows = int(details.get("min_test_rows", 0))
+        # 🔴 `CODEX-R2-P1-01`：走同一個 helper——log 與 metadata 用**同一組值**。
+        #    舊版在此另做 `int(..., 0)`，於是 log 印 0、metadata 也是 0，
+        #    而缺值與「真的 0 列」在兩處都分不出來；`None` 印成 `None` 才讀得懂。
+        train_rows = _optional_row_count(details.get("train_rows"))
+        test_rows = _optional_row_count(details.get("test_rows"))
+        min_test_rows = _optional_row_count(details.get("min_test_rows"))
         logger.warning(
             "IC full-sample fallback triggered: reason=%s train_rows=%s "
             "test_rows=%s min_test_rows=%s fit_mode=full_sample",
@@ -1193,11 +1222,15 @@ class ICFilterOrchestrator:
         #    而 `reason`／`train_rows`／`test_rows`／`min_test_rows` 這四個數字**這裡全都有**、
         #    卻只進了 logger.warning ⇒ 使用者看得到降級、看不到為什麼，也無從判斷該加樣本還是改設定。
         #    本欄**純新增**：`_resolve_root_status` 讀的鍵集不變，既有判定一字未動。
+        #    🔴 `CODEX-R2-P1-01`：缺鍵一律 `None`，**不得**以 0 填洞。
+        #    R1 我自己立的契約是「未知＝null」，這裡卻還是 `int(details.get(..., 0))`
+        #    ⇒ `details` 不完整時畫面印「訓練 0 列、測試 0 列、需要 0 列」，
+        #    那是一個**看起來像真的假數字**（與 mutation D8 在防的是同一種病，只是換了進入路徑）。
         report_meta["oos_downgrade"] = {
             "reason": str(reason),
-            "train_rows": int(details.get("train_rows", 0)),
-            "test_rows": int(details.get("test_rows", 0)),
-            "min_test_rows": int(details.get("min_test_rows", 0)),
+            "train_rows": train_rows,
+            "test_rows": test_rows,
+            "min_test_rows": min_test_rows,
         }
         report["metadata"] = report_meta
 

@@ -75,13 +75,8 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "D4-primary-cell-never-marked",
         PANEL,
-        # R1（`CODEX-R1-P1-02`）閉合後條件加了 `userChoseSpec` 與契約下界 ⇒ 錨點更新
-        "                              data-primary={\n"
-        "                                userChoseSpec\n"
-        "                                  && c.k === (spec.decision_offset_bars ?? kRange.min)\n"
-        "                                  && c.h === spec.horizon_bars\n"
-        "                                  ? 'true' : undefined\n"
-        "                              }\n",
+        # R2（`GROK-R2-P2-01`／`CODEX-R2-P2-04`）把四份判準收斂成 `isPrimaryCell` ⇒ 錨點更新
+        "                              data-primary={isPrimaryCell(c.k, c.h) ? 'true' : undefined}\n",
         "                              data-primary={undefined}\n",
         ["npx", "vitest", "run", "icEventBatchDisclosure"],
         "矩陣不再標出主結果是哪一格（回到 UAT 當時的狀態）",
@@ -89,7 +84,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "D5-primary-note-hardcoded",
         PANEL,
-        "                      主要結果 ＝ k＝{spec.decision_offset_bars ?? kRange.min}、h＝{spec.horizon_bars}\n",
+        "                      主要結果 ＝ k＝{primaryK}、h＝{spec.horizon_bars}\n",
         "                      主要結果 ＝ k＝0、h＝1\n",
         ["npx", "vitest", "run", "icEventBatchDisclosure"],
         "說明行寫死 k/h（改 spec 之後畫面說謊）",
@@ -115,8 +110,8 @@ MUTATIONS: Tuple[Mutation, ...] = (
     Mutation(
         "D8-downgrade-loses-numbers",
         "momentum/Analysis/ic_filter_orchestrator.py",
-        # 錨點須含 `"reason": str(reason),` 前綴——同一行也出現在 `_split_fallback_metadata`
-        '            "reason": str(reason),\n            "train_rows": int(details.get("train_rows", 0)),\n',
+        # R2（`CODEX-R2-P1-01`）改走 `_optional_row_count` 之區域變數 ⇒ 錨點更新
+        '            "reason": str(reason),\n            "train_rows": train_rows,\n',
         '            "reason": str(reason),\n            "train_rows": 0,\n',
         [*PYTEST, T_OOS],
         "門檻數字被寫死成 0（畫面顯示一個看起來像真的假數字）",
@@ -172,6 +167,48 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "                  {true ? (\n",
         ["npx", "vitest", "run", "icEventBatchDisclosure"],
         "R1 `CODEX-R1-P1-02`：未選量法時又用本地哨兵報 (k,h)（畫面說謊）",
+    ),
+
+    # ── R2 閉合之五條（2026-09-06 三家 code review）─────────────────────
+    Mutation(
+        "D17-unknown-rows-become-zero",
+        "momentum/Analysis/ic_filter_orchestrator.py",
+        "    if value is None:\n        return None\n",
+        "    if value is None:\n        return 0\n",
+        [*PYTEST, T_OOS, "-k", "truthful or incomplete"],
+        "`CODEX-R2-P1-01`：未知列數又變回 0（畫面印「訓練 0 列」這種假數字）",
+    ),
+    Mutation(
+        "D18-bool-rows-coerced",
+        "momentum/Analysis/ic_filter_orchestrator.py",
+        "    if isinstance(value, bool):  # bool 是 int 的子類，會靜默變 0/1\n        return None\n",
+        "    if False:\n        return None\n",
+        [*PYTEST, T_OOS, "-k", "truthful"],
+        "bool 被 `int()` 靜默轉成 0/1（True 會印成「1 列」）",
+    ),
+    Mutation(
+        "D19-primary-ignores-user-choice",
+        PANEL,
+        "    userChoseSpec && cellK === primaryK && cellH === spec.horizon_bars;\n",
+        "    cellK === primaryK && cellH === spec.horizon_bars;\n",
+        ["npx", "vitest", "run", "icEventBatchDisclosure"],
+        "`GROK-R2-P2-01`：未選量法時仍標「（主）」（與同區 note 當場打架）",
+    ),
+    Mutation(
+        "D20-select-doc-removed",
+        PANEL,
+        "                    <ContractDoc field={dim} />\n",
+        "",
+        ["npx", "vitest", "run", "icEventBatchDisclosure"],
+        "`CODEX-R2-P1-02`：兩個 select 又變回裸 enum（一對一覆蓋閘須抓到）",
+    ),
+    Mutation(
+        "D21-control-loses-doc-binding",
+        PANEL,
+        '            data-doc="horizon_bars"\n',
+        "",
+        ["npx", "vitest", "run", "icEventBatchDisclosure"],
+        "`CODEX-R2-P2-03`：控制項不再宣告自己對應哪條說明（閘退回數量比較就抓不到）",
     ),
 
     # ── 對照組（預期綠）──────────────────────────────────────────────────

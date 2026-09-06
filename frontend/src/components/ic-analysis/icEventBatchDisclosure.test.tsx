@@ -1099,16 +1099,49 @@ describe('R1 CODEX-P1-04 — 每個 user-editable 數字欄都要有說明（機
         onChangeLabelScan={() => {}}
       />,
     );
-    const numberInputs = Array.from(
-      document.querySelectorAll('input[type="number"]'),
-    ) as HTMLInputElement[];
-    // 正向對照：真的有數字欄（否則下面的迴圈是空的）
-    expect(numberInputs.length).toBeGreaterThanOrEqual(6);
+    // 🔴 `CODEX-R2-P2-03`／`GROK-R2` 必答 3b：R1 的版本比的是**數量**
+    //    （`docCount >= numberInputs.length`），有兩個洞：
+    //      ① 加一個無對應欄位的假 doc 就能把數量抬過去（誤報通過）；
+    //      ② `<select>` 完全不在 scope 內（漏）。
+    //    ⇒ 改成**一對一**：每個可編輯控制項自己帶 `data-doc="<鍵>"`，
+    //    閘逐個要求 `ic-param-doc-<鍵>` 在場。數量不再是判準。
+    const controls = Array.from(
+      document.querySelectorAll('input[type="number"], select'),
+    ) as HTMLElement[];
+    // 正向對照：真的有控制項（否則下面的迴圈是空的，測試會空轉全綠）
+    expect(controls.length).toBeGreaterThanOrEqual(6);
 
+    const missingAttr = controls
+      .filter((el) => !el.getAttribute('data-doc'))
+      .map((el) => el.getAttribute('data-testid') ?? el.outerHTML.slice(0, 80));
+    // 🔴 沒帶 `data-doc` 就是**沒被納入覆蓋模型**——新增欄位時這裡會紅，
+    //    而不是安靜地被漏掉（R1 那版對新欄位是靜默的）。
+    expect(missingAttr, `這些可編輯控制項沒有 data-doc：${missingAttr.join('、')}`).toEqual([]);
+
+    const missingDoc = controls
+      .map((el) => el.getAttribute('data-doc') as string)
+      .filter((key) => document.querySelector(`[data-testid="ic-param-doc-${key}"]`) === null);
+    expect(missingDoc, `這些欄位的說明不在畫面上：${missingDoc.join('、')}`).toEqual([]);
+  });
+
+  it('🔴 閘擋得住「加一個無關 doc 充數」——這正是 R1 那版被矇過的路徑', () => {
+    // 反例自證：模擬一個「有欄位沒說明、但另外多一個無關 doc」的 DOM。
+    // 舊版 `docCount >= inputCount` 會通過；新版一對一必須紅。
+    document.body.innerHTML = `
+      <input type="number" data-testid="ic-param-real" data-doc="real_field" />
+      <p data-testid="ic-param-doc-unrelated">我跟上面那個欄位無關</p>
+    `;
+    const controls = Array.from(
+      document.querySelectorAll('input[type="number"], select'),
+    ) as HTMLElement[];
     const docCount = document.querySelectorAll('[data-testid^="ic-param-doc-"]').length;
-    // 🔴 說明數不得少於數字欄數——少一個就代表有欄位沒人解釋。
-    //    （說明可多於欄位：`advanced_pair` 解釋的是一個 toggle 不是 number input。）
-    expect(docCount).toBeGreaterThanOrEqual(numberInputs.length);
+    // 舊判準：數量夠 ⇒ 會誤放
+    expect(docCount).toBeGreaterThanOrEqual(controls.length);
+    // 新判準：逐鍵對照 ⇒ 抓到 `real_field` 沒有說明
+    const missingDoc = controls
+      .map((el) => el.getAttribute('data-doc') as string)
+      .filter((key) => document.querySelector(`[data-testid="ic-param-doc-${key}"]`) === null);
+    expect(missingDoc).toEqual(['real_field']);
   });
 
   it('三個原本沒有說明的欄位現在都有（n_requested／兩個掃描上限）', () => {

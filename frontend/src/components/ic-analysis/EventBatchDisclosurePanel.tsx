@@ -24,6 +24,7 @@ import {
   buildRandomControlSpec,
 } from '@/lib/randomControlSpec';
 import { EVENT_PARAM_DOCS } from '@/lib/eventParamDocs';
+import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
 import {
   EVENT_FIELD_FORMATTERS,
   IC_BATCH_FACT_FIELDS,
@@ -128,6 +129,31 @@ function ParamDoc({ paramKey }: { paramKey: keyof typeof EVENT_PARAM_DOCS }) {
   );
 }
 
+/**
+ * 契約欄位之說明（`entry_price_semantic`／`label_return_mode` 兩個 `<select>`）。
+ *
+ * 🔴 `CODEX-R2-P1-02`（2026-09-06 R2）：R1 的覆蓋閘只掃 `input[type=number]`，
+ * 這兩個 `<select>` 因此整個在 scope 外——使用者能改變會左右結果的 entry／mode，
+ * 畫面卻只給裸 enum 值。`advanced_pair` 那條講的是「這個區塊是什麼」，
+ * 不是「這兩個 enum 各自是什麼」。
+ *
+ * 🔴 文字取自 `EVENT_CONTRACT_DOCS`（＝契約 `_doc` 欄之逐字鏡像，另有測試對證），
+ * **不在這裡另寫白話**——SPEC 明文「取自契約 doc 欄（不另寫）」。
+ * 契約文字偏技術，但第二份文案的代價這個 epic 已經付過三次。
+ */
+function ContractDoc({ field }: { field: keyof typeof EVENT_CONTRACT_DOCS }) {
+  const doc = EVENT_CONTRACT_DOCS[field];
+  if (!doc) return null;
+  return (
+    <p
+      className="mt-1 text-[11px] leading-relaxed text-slate-400"
+      data-testid={`ic-param-doc-${field}`}
+    >
+      {doc}
+    </p>
+  );
+}
+
 export default function EventBatchDisclosurePanel({
   importId, labelSpec, onChangeLabelSpec, detail: injected,
   labelScan = null, onChangeLabelScan, disclosure = null,
@@ -215,6 +241,19 @@ export default function EventBatchDisclosurePanel({
    *    會讓使用者以為壞了。
    */
   const hScanApplicable = !userChoseSpec || spec.label_return_mode !== 'open_to_close';
+
+  /**
+   * 「這一格是不是主要結果」——**唯一判定來源**。
+   *
+   * 🔴 `GROK-R2-P2-01`／`CODEX-R2-P2-04`（2026-09-06 R2）：R1 修 `CODEX-R1-P1-02` 時，
+   * 同一個判準在 JSX 裡被抄了**三份**（note、`data-primary`、class），而可見字「（主）」
+   * 是**第四份**——它既沒看 `userChoseSpec`（未選量法時仍印「（主）」，與同區 note
+   * 「不標主要結果」當場打架），k 也還硬編 `?? 0`（契約下界一旦不是 0 就標錯格）。
+   * 判準抄四份必然漏改其中一份 ⇒ 收斂成本函式，四處全部改呼叫它。
+   */
+  const primaryK = spec.decision_offset_bars ?? kRange.min;
+  const isPrimaryCell = (cellK: number, cellH: number): boolean =>
+    userChoseSpec && cellK === primaryK && cellH === spec.horizon_bars;
   // Task 1.1：切到「當根」時**清掉**既有的 h 上限。留著會讓送出之 `event_label_scan`
   // 帶一個不會被用到的值——後端照樣照它建一整排格子，而每格結果相同。
   useEffect(() => {
@@ -296,6 +335,7 @@ export default function EventBatchDisclosurePanel({
             type="number"
             min={1}
             data-testid="ic-param-horizon-bars"
+            data-doc="horizon_bars"
             disabled={!userChoseSpec || currentPreset?.key === 'same_bar'}
             value={!userChoseSpec ? '' : (currentPreset?.key === 'same_bar' ? 1 : spec.horizon_bars)}
             onChange={(e) => onChangeLabelSpec({ ...spec, horizon_bars: Number(e.target.value) })}
@@ -380,8 +420,10 @@ export default function EventBatchDisclosurePanel({
                 return (
                   <label key={dim} className="block text-xs text-slate-200">
                     <span className="mb-1 block">{dim}</span>
+                    <ContractDoc field={dim} />
                     <select
                       data-testid={`ic-param-${dim}`}
+                      data-doc={dim}
                       value={selection[dim] ?? ''}
                       onChange={(e) => changePairDim(dim, e.target.value)}
                       className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100"
@@ -419,6 +461,7 @@ export default function EventBatchDisclosurePanel({
           <input
             type="number"
             data-testid="ic-param-decision-offset-bars"
+            data-doc="decision_offset_bars_analysis"
             min={kRange.min}
             step={1}
             value={analysisK}
@@ -460,6 +503,7 @@ export default function EventBatchDisclosurePanel({
               <input
                 type="number"
                 data-testid="ic-param-scan-k-max"
+                data-doc="decision_offset_bars_scan_max"
                 min={kMin}
                 step={1}
                 disabled={!kScanOn}
@@ -482,6 +526,7 @@ export default function EventBatchDisclosurePanel({
               <input
                 type="number"
                 data-testid="ic-param-scan-h-max"
+                data-doc="horizon_bars_scan_max"
                 min={1}
                 step={1}
                 disabled={!hScanApplicable || !hScanOn}
@@ -550,12 +595,11 @@ export default function EventBatchDisclosurePanel({
                 <p className="text-[11px] text-slate-300" data-testid="ic-scan-primary-note">
                   {userChoseSpec ? (
                     <>
-                      主要結果 ＝ k＝{spec.decision_offset_bars ?? kRange.min}、h＝{spec.horizon_bars}
+                      主要結果 ＝ k＝{primaryK}、h＝{spec.horizon_bars}
                       （分析參數框裡的值）。下表是<strong>另外</strong>跑的；
                       沒有勾掃描的那一軸就用框裡的值。
                       {!scanResult.scan_results.some(
-                        (c) => c.k === (spec.decision_offset_bars ?? kRange.min)
-                          && c.h === spec.horizon_bars,
+                        (c) => isPrimaryCell(c.k, c.h),
                       ) && '　🔴 主要結果不在下表範圍內。'}
                     </>
                   ) : (
@@ -578,16 +622,9 @@ export default function EventBatchDisclosurePanel({
                             <td
                               key={`${c.k}-${c.h}`}
                               data-testid={`ic-scan-cell-${c.k}-${c.h}`}
-                              data-primary={
-                                userChoseSpec
-                                  && c.k === (spec.decision_offset_bars ?? kRange.min)
-                                  && c.h === spec.horizon_bars
-                                  ? 'true' : undefined
-                              }
+                              data-primary={isPrimaryCell(c.k, c.h) ? 'true' : undefined}
                               className={`px-2 py-0.5${
-                                userChoseSpec
-                                  && c.k === (spec.decision_offset_bars ?? kRange.min)
-                                  && c.h === spec.horizon_bars
+                                isPrimaryCell(c.k, c.h)
                                   ? ' rounded border border-sky-400 font-medium text-sky-200' : ''
                               }`}
                               title={c.reason ?? undefined}
@@ -595,8 +632,7 @@ export default function EventBatchDisclosurePanel({
                               {c.capability === 'available'
                                 ? `h=${c.h}: ${c.n_events} 筆`
                                 : `h=${c.h}: 不可用`}
-                              {c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars
-                                ? '（主）' : ''}
+                              {isPrimaryCell(c.k, c.h) ? '（主）' : ''}
                             </td>
                           ))}
                         </tr>
@@ -643,17 +679,18 @@ export default function EventBatchDisclosurePanel({
           <div className="mt-2 space-y-2">
             <div className="flex flex-wrap gap-3">
               {([
-                ['n_requested', '想抽幾筆', rcParams.nRequested, (v: number) => setRcParams({ ...rcParams, nRequested: v })],
-                ['seed', '亂數種子', rcParams.seed, (v: number) => setRcParams({ ...rcParams, seed: v })],
-                ['neighborhood', '前鄰域（根）', rcParams.neighborhoodBars, (v: number) => setRcParams({ ...rcParams, neighborhoodBars: v })],
-                ['embargo', '後 embargo（根）', rcParams.embargoBars, (v: number) => setRcParams({ ...rcParams, embargoBars: v })],
-              ] as const).map(([key, label, value, onSet]) => (
+                ['n_requested', 'n_requested', '想抽幾筆', rcParams.nRequested, (v: number) => setRcParams({ ...rcParams, nRequested: v })],
+                ['seed', 'seed', '亂數種子', rcParams.seed, (v: number) => setRcParams({ ...rcParams, seed: v })],
+                ['neighborhood', 'neighborhood_bars', '前鄰域（根）', rcParams.neighborhoodBars, (v: number) => setRcParams({ ...rcParams, neighborhoodBars: v })],
+                ['embargo', 'embargo_bars', '後 embargo（根）', rcParams.embargoBars, (v: number) => setRcParams({ ...rcParams, embargoBars: v })],
+              ] as const).map(([key, docKey, label, value, onSet]) => (
                 <label key={key} className="text-[11px] text-slate-300">
                   {label}
                   <input
                     type="number"
                     className="ml-1 w-20 rounded bg-slate-800 px-1 py-0.5 text-slate-100"
                     data-testid={`ic-random-control-${key}`}
+                    data-doc={docKey}
                     value={value}
                     min={0}
                     onChange={(e) => onSet(Number(e.target.value))}

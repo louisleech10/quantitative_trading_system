@@ -17,6 +17,9 @@ orchestrator 在觸發 fallback 時**本來就算出來了**——只是只進�
 from __future__ import annotations
 
 import inspect
+import json
+
+import numpy as np
 
 import pytest
 
@@ -44,15 +47,43 @@ def test_oos_downgrade_has_exactly_two_write_sites_with_precedence():
     # 行為面之保證見 `test_annotate_does_not_overwrite_fallback_rich_version`
 
 
-def test_oos_downgrade_carries_the_four_numbers_from_details():
-    """四個鍵齊全且型別正確——缺任一個，畫面就講不出「還差多少」。"""
-    src = inspect.getsource(orch)
-    block_start = src.index('report_meta["oos_downgrade"]')
-    block = src[block_start:block_start + 500]
-    for key in ("reason", "train_rows", "test_rows", "min_test_rows"):
-        assert f'"{key}"' in block, f"oos_downgrade 缺 {key}"
-    # 三個數字一律 int（details 可能帶 numpy 型別；序列化前必須是純 int）
-    assert block.count("int(details.get(") == 3
+def test_oos_downgrade_carries_the_four_numbers_from_details(monkeypatch):
+    """四個鍵齊全、數字是**純 int**（不是 numpy 型別）——缺任一個畫面就講不出「還差多少」。
+
+    🔴 `CODEX-R2-P1-01` 順手修掉的弱測試：本條原本 `count("int(details.get(") == 3`
+    ——**掃原始碼字面**。那既擋不住「三處都寫成 `int(...)` 但取錯鍵」，
+    也會因為任何等價重構而假紅（本次就是這樣紅的）。改成跑一次看實際輸出。
+    `numpy` 是這裡的重點：`np.int64` 進 `json.dumps` 會炸，型別必須在寫入時就轉掉。
+    """
+    inst = orch.ICFilterOrchestrator.__new__(orch.ICFilterOrchestrator)
+    inst._suppress_persist = True
+    inst._in_fallback_rerun = False
+    inst._ic_cache = {}
+    inst._filtered_features_df = None
+    inst._event_identity = None
+    inst._features_path = None
+    monkeypatch.setattr(inst, "analyze", lambda *a, **k: {"metadata": {}}, raising=False)
+
+    report = orch.ICFilterOrchestrator._run_full_sample_fallback(
+        inst, features_path="f.h5", labels_path="l.h5", meta_path=None,
+        config_override=None, progress_callback=None, kline_reader=None,
+        reason="rolling_warmup_insufficient",
+        details={
+            "train_rows": np.int64(82),
+            "test_rows": np.int64(30),
+            "min_test_rows": np.int64(131),
+        },
+    )
+    got = report["metadata"]["oos_downgrade"]
+    assert set(got) == {"reason", "train_rows", "test_rows", "min_test_rows"}
+    assert got == {
+        "reason": "rolling_warmup_insufficient",
+        "train_rows": 82, "test_rows": 30, "min_test_rows": 131,
+    }
+    for key in ("train_rows", "test_rows", "min_test_rows"):
+        assert type(got[key]) is int, f"{key} 不是純 int：{type(got[key])}"
+    # 真的可序列化（numpy 型別漏出來時這行會炸）
+    assert json.loads(json.dumps(got))["train_rows"] == 82
 
 
 def test_resolve_root_status_unchanged_by_this_task():
@@ -160,11 +191,14 @@ def test_fallback_actually_writes_oos_downgrade_into_metadata(monkeypatch):
     assert report["analysis_status"] == "degraded_full_sample"
 
 
-def test_fallback_downgrade_defaults_to_zero_when_details_incomplete(monkeypatch):
-    """`details` 缺鍵 ⇒ 三個數字為 0（**不炸**），但 `reason` 照實帶。
+def test_fallback_downgrade_row_counts_are_null_when_details_incomplete(monkeypatch):
+    """`details` 缺鍵 ⇒ 三個列數為 `None`（**不炸**、**不填 0**），`reason` 照實帶。
 
-    邊界：呼叫端若沒帶齊 details，畫面會顯示「0 列 / 0 列 / 需要 0 列」——
-    那看得出來是壞的；若改成整段不寫，使用者只會回到「不知道為什麼」的原點。
+    🔴 `CODEX-R2-P1-01`：本測試在 R1 時斷言的是三個 `0`，那是**錯的**。
+    當時的理由寫成「0 列看得出來是壞的」——不成立：0 是一個合法的列數，
+    畫面會照印「訓練 0 列、測試 0 列、需要 0 列」，使用者無從分辨那是真的還是缺值，
+    而且會據此去加樣本。這正是 mutation `D8` 在防的假數字，只是換了一條進入路徑。
+    `None` 才誠實：前端有 `ic-oos-downgrade-no-rows` 分支明講「沒有列數可報」。
     """
     inst = orch.ICFilterOrchestrator.__new__(orch.ICFilterOrchestrator)
     inst._suppress_persist = True
@@ -181,8 +215,50 @@ def test_fallback_downgrade_defaults_to_zero_when_details_incomplete(monkeypatch
         reason="some_other_reason", details={},
     )
     assert report["metadata"]["oos_downgrade"] == {
-        "reason": "some_other_reason", "train_rows": 0, "test_rows": 0, "min_test_rows": 0,
+        "reason": "some_other_reason",
+        "train_rows": None, "test_rows": None, "min_test_rows": None,
     }
+
+
+@pytest.mark.parametrize(
+    "details, expected",
+    [
+        ({"train_rows": 82, "test_rows": 30, "min_test_rows": 131},
+         {"train_rows": 82, "test_rows": 30, "min_test_rows": 131}),
+        # 部分缺：有的照帶，缺的走 None——**不得**整組退化成 0
+        ({"train_rows": 82}, {"train_rows": 82, "test_rows": None, "min_test_rows": None}),
+        # 顯式 None
+        ({"train_rows": None, "test_rows": None, "min_test_rows": None},
+         {"train_rows": None, "test_rows": None, "min_test_rows": None}),
+        # 型別壞掉（上游給了字串／bool）⇒ None，不得靜默變成 0 或 1
+        ({"train_rows": "n/a", "test_rows": True, "min_test_rows": [1]},
+         {"train_rows": None, "test_rows": None, "min_test_rows": None}),
+        # 真的是 0 列：0 是**合法值**，必須原樣保留（不可被當成缺值）
+        ({"train_rows": 0, "test_rows": 0, "min_test_rows": 131},
+         {"train_rows": 0, "test_rows": 0, "min_test_rows": 131}),
+    ],
+)
+def test_fallback_downgrade_row_counts_truthful(monkeypatch, details, expected):
+    """列數逐鍵獨立：有值照帶、缺值／壞值走 `None`、真實的 0 保留。
+
+    最後一格是這條修法的**分界**：不能為了避開假 0 就把真 0 也吃掉。
+    """
+    inst = orch.ICFilterOrchestrator.__new__(orch.ICFilterOrchestrator)
+    inst._suppress_persist = True
+    inst._in_fallback_rerun = False
+    inst._ic_cache = {}
+    inst._filtered_features_df = None
+    inst._event_identity = None
+    inst._features_path = None
+    monkeypatch.setattr(inst, "analyze", lambda *a, **k: {"metadata": {}}, raising=False)
+
+    report = orch.ICFilterOrchestrator._run_full_sample_fallback(
+        inst, features_path="f.h5", labels_path="l.h5", meta_path=None,
+        config_override=None, progress_callback=None, kline_reader=None,
+        reason="rolling_warmup_insufficient", details=details,
+    )
+    got = report["metadata"]["oos_downgrade"]
+    assert {k: got[k] for k in expected} == expected
 
 
 # ══════════════════════════════════════════════════════════════════════════
