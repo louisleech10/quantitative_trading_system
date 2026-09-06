@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAP-3 還沒做的事 — 逐條白話</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">GAP-3還沒做的事.md</span></nav>
+<main>
+<h1 id="gap-3-還沒做的事-逐條白話">GAP-3 還沒做的事 — 逐條白話</h1>
+<blockquote>
+<p><strong>這份回答三件事</strong>：是什麼、<strong>為什麼現在不做</strong>、<strong>接下來要怎麼處理</strong>。</p>
+<p>技術版登記在 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>（那邊是給我和委員看的，欄位是三值理由與觸發條件）。
+這份是同一批東西的白話版，<strong>不是另一份清單</strong>——兩邊對不上就是我的錯，以技術版為準。</p>
+<p>🔴 <strong>「為什麼不做」只有三種合法答案</strong>（你 2026-08-17 定的，不准寫「之後再說」）：</p>
+<ul>
+<li><strong>被卡住</strong>（blocked-by）：有個前置條件不在，做了也是白做</li>
+<li><strong>要先研究</strong>（needs-research）：做法本身沒定，硬做會做出一個錯的東西</li>
+<li><strong>你裁定的</strong>（user-ruling）：你說過不做或改順序</li>
+<li>（另有一種 <strong>cost</strong>：太貴而且現在沒有非做不可的理由——已經全部清掉了）</li>
+</ul>
+</blockquote>
+<hr />
+<h2 id="先講結論一件是缺陷其餘是殘留">先講結論：一件是<strong>缺陷</strong>，其餘是<strong>殘留</strong></h2>
+<p><strong>缺陷 = 現在的行為是錯的。殘留 = 現在的行為是對的，只是還沒做到更好。</strong>
+這兩者不能混在一起講，混了你就無從判斷哪個要緊。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>幾條</th>
+<th>會不會影響你現在用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🔴 <strong>缺陷（行為是錯的）</strong></td>
+<td><strong>1 條</strong>（<code>G3-D1</code>）</td>
+<td><strong>會</strong>——見第一節</td>
+</tr>
+<tr>
+<td>這五段做完後留下的殘留</td>
+<td><strong>20 條</strong></td>
+<td>多數不會；有 <strong>5 條</strong>你會<strong>看得到</strong>，列在第二節</td>
+</tr>
+<tr>
+<td>原本就規劃在別張票的</td>
+<td>3 條（<code>G3-R9</code>／<code>R10</code>／<code>R13</code>）＋ 8 條更遠的</td>
+<td>只有 <code>G3-R9</code> 你會在畫面上看到</td>
+</tr>
+<tr>
+<td>治理／測試環境（跟產品無關）</td>
+<td>5 條</td>
+<td>不會</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>✅ <strong>本次已清掉一條</strong>：<code>B1-VERIFY-1</code>（「收 epic 前要把兩套全量測試各再跑一次」）
+已於 2026-09-06 履行——<code>tests/api</code> 867 通過、<code>tests/governance</code> 1739 通過，
+失敗的那些<strong>經對等比較確認全部在動工前就已經在失敗</strong>。這條不再是欠帳。</p>
+</blockquote>
+<hr />
+<h1 id="一-唯一的缺陷-這條你要知道">一、🔴 唯一的缺陷 — 這條你要知道</h1>
+<h2 id="g3-d1-匯出前篩選只有一組條件正反例被同時截斷"><code>G3-D1</code> 匯出前篩選只有一組條件，正反例被同時截斷</h2>
+<p><strong>是什麼</strong>：<code>/search</code> 匯出之前那個「篩選」，<strong>只有一組條件</strong>，而且<strong>同時套用在正例和反例上</strong>。</p>
+<p><strong>為什麼是錯的</strong>：如果你的條件引用了 <code>future_*</code>（未來幾根的報酬）欄，
+那麼<strong>正例和反例會同時被結果截斷</strong>。後果是：</p>
+<ul>
+<li>反例<strong>不再是對照組</strong>（它們也是被結果挑過的）</li>
+<li>三組報酬表會<strong>三組皆正</strong>，看起來「怎麼選都贏」</li>
+<li>條件 IC 建立在<strong>照結果挑過</strong>的樣本上（統計上叫 range restriction ＋ collider bias，
+偏誤方向<strong>不可預測</strong>——不是「偏高」或「偏低」，是不知道往哪偏）</li>
+<li><strong>畫面上完全沒有提示</strong></li>
+</ul>
+<p><strong>為什麼現在不做</strong>：<strong>你已經裁定了修法</strong>（2026-08-31），但那個修法<strong>不小</strong>——</p>
+<ol>
+<li>正例、反例各自獨立條件，<strong>絕不共用</strong></li>
+<li>篩選<strong>不再兼差推導答案窗深度</strong>，改成直接問你「哪個 timeframe 的第幾根 bar 用來區分正反例」</li>
+<li>purge（切分時要隔開的距離）＝ 正反例深度<strong>取大者</strong></li>
+</ol>
+<p>第 2 點是關鍵：現在的深度是<strong>從條件反推</strong>出來的，而我自己記錄過<strong>四種反推不出來</strong>的情形。
+這等於要重做匯出流程的一段規格，不是補一個 if。</p>
+<p><strong>接下來怎麼處理</strong>：這是<strong>下一張票</strong>，不是這張票的殘留。要做的時候：
+先重開 <code>/search</code> 匯出段的規格（正反例雙條件 ＋ 深度改為明問），再走完整流程。
+<strong>在那之前，如果你的篩選條件引用了 <code>future_*</code> 欄，那批事件的 IC 不要當真。</strong></p>
+<hr />
+<h1 id="二你看得到的四條殘留">二、你<strong>看得到</strong>的四條殘留</h1>
+<p>這四條不影響正確性，但你在畫面上會遇到，先講清楚免得你以為是壞掉。</p>
+<h2 id="1-b5-singleclass-1-隨機對照批全是-0會被擋下來">1. <code>B5-SINGLECLASS-1</code> 隨機對照批「全是 0」會被擋下來</h2>
+<p><strong>是什麼</strong>：產隨機對照批時，如果抽出來那批的答案<strong>全部都是 0</strong>（或全部是 1），
+匯入會被拒絕，理由是 <code>missing_control_group</code>。</p>
+<p><strong>為什麼會遇到</strong>：你的事件<strong>越罕見</strong>，隨機抽一批的正例率就越低——低到 0 是很正常的。
+而那正是最需要看 lift 的時候（「隨便挑 0%、我挑的 25%」才是強訊號）。</p>
+<p><strong>為什麼現在不做</strong>：<code>missing_control_group</code> 這條規則的原意是「<strong>使用者標註</strong>的一批要有正反例」。
+隨機對照批算不算例外，<strong>沒有人裁定過</strong>。我可以直接放寬它，但那是<strong>弱化一個既有的檢查</strong>
+——這種事我不自己決定。</p>
+<p><strong>接下來怎麼處理</strong>：<strong>要你或委員會裁一句</strong>：「無條件抽樣批是否豁免 <code>missing_control_group</code>」。
+裁完我改一行。在那之前，如果你撞到，把想抽的筆數調大或把門檻調低就會過。</p>
+<h2 id="2-b4-timeout-1-掃描網格的兩個逾時秒數是我判斷的不是量出來的">2. <code>B4-TIMEOUT-1</code> 掃描網格的兩個逾時秒數<strong>是我判斷的，不是量出來的</strong></h2>
+<p><strong>是什麼</strong>：k/h 掃描網格有兩道保護——單格 60 秒、整體 900 秒逾時。</p>
+<p><strong>為什麼要講</strong>：benchmark 我只量到<strong>五階段</strong>（單格 6.9 毫秒），
+<strong>沒有量到每格的條件 IC</strong>（真正貴的那段）。所以我<strong>不能</strong>說「60 秒足以吸收合理的單格 IC」
+——那句話沒有數據支撐。現在那兩個數字是<strong>保守的上限</strong>，作用是讓卡死的格子一分鐘內被切掉。</p>
+<p><strong>為什麼現在不做</strong>：要量它得先有一個<strong>已物化的 feature run</strong>，在上面跑含 <code>analyzer.analyze</code>
+的單格 p50/p95/p99。那是一次獨立的量測工作。</p>
+<p><strong>接下來怎麼處理</strong>：等你實際跑一次大網格。如果你發現正常的格子被逾時切掉，
+那就是這個數字太小，告訴我，我拿你那次的實測值去凍結它。</p>
+<h2 id="3-b4-orphan-worker-1-逾時的格子不會真的停下來">3. <code>B4-ORPHAN-WORKER-1</code> 逾時的格子<strong>不會真的停下來</strong></h2>
+<p><strong>是什麼</strong>：單格逾時後，畫面會標它 unavailable、其餘格子照常，
+但<strong>那個工作其實還在背景跑</strong>，會佔 CPU 到它自然結束。</p>
+<p><strong>為什麼現在不做</strong>：Python <strong>沒辦法從外面殺掉一個執行緒</strong>（<code>asyncio.wait_for</code> 只取消等待，
+不取消工作本身）。真正的修法是把單格改成<strong>子行程</strong>——那是另一個設計題，會動到整個掃描的架構。</p>
+<p><strong>接下來怎麼處理</strong>：短期沒有動作。如果你掃大網格時感覺機器變慢，這就是原因。
+真要修得排一張「掃描改子行程」的票。</p>
+<h2 id="3b-b4-factory-cost-1-掃描網格有一段固定開銷110-格約-28-秒">3b. <code>B4-FACTORY-COST-1</code> 掃描網格有一段<strong>固定開銷</strong>（110 格約 2.8 秒）</h2>
+<p><strong>是什麼</strong>：掃描網格的每一格都會<strong>自己建一個分析器</strong>。codex 實測：建 110 次共 <strong>2.835 秒</strong>
+（每次 25.8 毫秒），其中 <strong>2.216 秒</strong>花在重讀 YAML 設定檔上（每格都重讀一次）。</p>
+<p><strong>為什麼不直接快取分析器</strong>：因為那會<strong>讓第一輪那個嚴重問題復活</strong>——
+分析器帶著可變狀態，格與格之間共用就會互相污染（逾時的格子會改到別格正在用的東西，
+而算出來的數字仍然合法、不會報錯）。</p>
+<p><strong>為什麼現在不做</strong>：兩個原因。①<strong>沒有已批准的時間門檻</strong>可以據以判斷「2.8 秒算不算高」
+——那要先量到含條件 IC 的整格成本，也就是上面那條 <code>B4-TIMEOUT-1</code>。
+②可行的方向是只快取「<strong>已驗證過的設定</strong>」（用檔案路徑／修改時間／契約版本當 key），
+分析器本身每格照樣新建——那是一個獨立的設計題，不是順手改。</p>
+<p><strong>接下來怎麼處理</strong>：跟 <code>B4-TIMEOUT-1</code> <strong>綁在一起</strong>評估。等你實際跑一次大網格，
+如果覺得慢，兩條一起量、一起修。</p>
+<h2 id="4-g3-r9-事件模式的辨別表顯示沒有模型分數">4. <code>G3-R9</code> 事件模式的「辨別表」顯示「沒有模型分數」</h2>
+<p><strong>是什麼</strong>：<code>/ic-analysis</code> 事件模式的辨別表會顯示
+<code>not_computed：no_model_scores_in_event_pipeline</code>，而不是數字。</p>
+<p><strong>為什麼現在不做</strong>：那張表要的是<strong>模型對每個事件打的分數</strong>，
+而分數來自 ML 層／pattern 橋——<strong>那一層在你的成熟度地圖裡標的是「不完整」</strong>。
+匯入管線本身不產生分數，沒有東西可餵。</p>
+<p><strong>接下來怎麼處理</strong>：等 ML 層那條線做起來。<strong>畫面已經誠實寫出原因</strong>，不是靜默空白。
+<code>/pending-features</code> 頁面有它的占位卡。</p>
+<hr />
+<h1 id="三規格本身有洞我當場補的3-條">三、規格本身有洞、我當場補的（3 條）</h1>
+<p>這三條的共同形態：<strong>規格沒寫到，我實作時當場補了一個 fail-closed 的做法，
+但那個補法沒有經過規格輪的審查</strong>。它們現在<strong>行為是對的</strong>，欠的是「寫回規格」。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>代號</th>
+<th>規格沒寫到什麼</th>
+<th>我補了什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>B4-SPECGAP-1</code></td>
+<td>「選到非法組合就把另一欄重設為契約預設值」——但契約的預設值<strong>本身</strong>就在那個非法組合裡，這方向無解</td>
+<td>預設值合法就用它；不合法就取契約清單裡<strong>第一個</strong>合法值，並在畫面寫明原因</td>
+</tr>
+<tr>
+<td><code>B5-SPECGAP-1</code></td>
+<td>「按 period 分層」——但只給了一個起訖區間，<strong>那樣只會有一層</strong>；同一份規格另一處又寫「跨月分層」</td>
+<td>分層粒度定為<strong>自然月（UTC）</strong>，層的名字是「標的|週期|年-月|方向」</td>
+</tr>
+<tr>
+<td><code>B1-KIND-1</code></td>
+<td>端點回 422 時的 <code>kind</code> 字面（<code>missing_/mixed_/invalid_decision_offset_bars</code>）不在契約的 reason 清單裡</td>
+<td>維持現狀——它是<strong>傳輸層</strong>的分類，不是資料層的 reason，兩者混在一起反而更糟</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>為什麼現在不做</strong>：規格檔（<code>D-001</code>）是<strong>已凍結</strong>的，重開它要跑三家蓋章。
+為了一兩條 UI 規則重開一份凍結規格，成本遠大於收益。</p>
+<p><strong>接下來怎麼處理</strong>：<strong>下次因為別的原因重開那份規格時，順手把這三條寫回去。</strong>
+這不是拖延——它們的行為已經對了、已經有測試守著、理由已經寫在契約檔的註解裡。</p>
+<hr />
+<h1 id="四測試品質的欠帳6-條">四、測試品質的欠帳（6 條）</h1>
+<p>這幾條都是「<strong>測試證明力不足</strong>」，不是「程式有問題」。我列出來是因為
+<strong>測試不夠強 = 以後改壞了不會有人發現</strong>，那是真的風險，只是不是現在的風險。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>代號</th>
+<th>欠什麼</th>
+<th>為什麼現在不做</th>
+<th>怎麼觸發要做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>B1-WEAKTEST-1</code></td>
+<td>有些測試靠<strong>掃原始碼字串</strong>（找某行程式碼在不在），而不是驗行為。等價改寫程式就會誤紅</td>
+<td>要改成行為斷言，得先定義「那個行為在外部<strong>看得到什麼</strong>」——還沒定</td>
+<td>那類測試又因為等價重構誤紅一次</td>
+</tr>
+<tr>
+<td><code>B1-GOLDEN-2</code></td>
+<td>凍結檔只證明<strong>凍結的那些案例</strong>通過，沒有覆蓋所有路徑組合</td>
+<td>「該覆蓋哪些」這個集合<strong>還沒被定義出來</strong>，硬湊會湊出一份看起來很多其實有洞的清單</td>
+<td>出現「凍結檔全綠但真實路徑算錯」的事故</td>
+</tr>
+<tr>
+<td><code>B3-WIRING-1</code></td>
+<td>接線測試擋得住「同一個檔案裡抄一份常數」，擋不住「production 改讀<strong>另一個檔</strong>抄好的常數」</td>
+<td>那已經不是同一種病，要另外設計一種改壞法</td>
+<td>出現跨檔常數複製</td>
+</tr>
+<tr>
+<td><code>B5-BARPRECOND-1</code></td>
+<td>兩支新函式用 <code>searchsorted</code> 定位 K 線，但<strong>沒有自己檢查</strong> K 線表是否已排序、無重複</td>
+<td>生產路徑會<strong>先經過</strong>對齊層的檢查（重複／亂序在那層就被拒），所以現在沒有漏。但如果有人直呼這兩支就沒保護。要修得先決定「這兩支算不算公開入口」——兩種答案的修法不同</td>
+<td>決定了公開性；或出現不經對齊層的呼叫端</td>
+</tr>
+<tr>
+<td><code>B1-LEGACY-2</code></td>
+<td><code>decision_offset_bars</code>（k）的<strong>讀取面</strong>沒有逐處收斂（grep 在多處命中）</td>
+<td>完整盤點的範圍還沒定</td>
+<td>出現因為讀取面不一致而算錯的案例</td>
+</tr>
+<tr>
+<td><code>B4-COVERAGE-1</code></td>
+<td>「這批最多能用多大的 k/h」那個上界，用的是<strong>對齊層的暖機條件</strong>代替規格寫的「特徵涵蓋條件」</td>
+<td>現行的特徵涵蓋檢查是<strong>批次級</strong>的（整批過或不過），拿不到逐事件的答案</td>
+<td>特徵涵蓋檢查改成逐事件</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h1 id="五你裁定過的或被別的東西卡住的5-條">五、你裁定過的、或被別的東西卡住的（5 條）</h1>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>代號</th>
+<th>是什麼</th>
+<th>為什麼不做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>B1-PRESET-1</code>／<code>B1-DEPTH-1</code></td>
+<td>IC 頁的「報酬量法」按下去之後，送出的 <code>h</code> 是固定的 <code>1</code>，<strong>不會跟著你宣告的深度變</strong>（「依深度預設」只在你完全不碰那個面板時成立）</td>
+<td><strong>被卡住</strong>：要讓它跟著變，前端得先能預覽後端的解析結果，否則就是在前端<strong>複製一份</strong>後端規則——那必然漂移</td>
+</tr>
+<tr>
+<td><code>B1-LEGACY-1</code></td>
+<td>繞過匯入驗證、直接寫檔到 <code>data_cache/events/</code> 的那些歷史檔</td>
+<td><strong>你裁定的</strong>（2026-09-04）：9 個歷史測試檔不保留、不遷移</td>
+</tr>
+<tr>
+<td><code>B3-OPTIONAL-COL-1</code></td>
+<td>CSV 匯出時保留的空白欄只涵蓋<strong>必填欄</strong>；某個選填欄如果日後需要「留白給你填」就涵蓋不到</td>
+<td><strong>要先研究</strong>：三家一致認為「選填欄不保留」符合選填的語意。要改得先有一個<strong>真實需求</strong>把它升成必要路徑</td>
+</tr>
+<tr>
+<td><code>G3-R10</code></td>
+<td>事件匯入大檔的串流／分頁／背景 worker（現在是 50MB 上限＋CSV 分塊解析，1 萬筆事件同步對齊約 73 秒）</td>
+<td><strong>你裁定的</strong>：記錄型不私自訂效能門檻；要訂得走規格修訂</td>
+</tr>
+<tr>
+<td><code>G3-R13</code></td>
+<td>「收盤後才決策」這種語意（看完 t₀ 收盤再決定進不進）在現行的單一表示法下<strong>表達不出來</strong></td>
+<td><strong>你裁定的</strong>（2026-09-03，你離線時委員共識）：這張票不改那個表示法，只把揭露改成講真話。<strong>是否真的需要它，等你裁</strong></td>
+</tr>
+<tr>
+<td><code>B5-GENERATOR-WIRE-1</code></td>
+<td>平台<strong>產生器</strong>產出的那種批，它的標籤規則現在會記在 provenance 裡，但<strong>沒有任何地方把它寫進落檔</strong> ⇒ 產生器批拿去跟隨機對照組比，一定回「無法確認兩批用同一把尺」</td>
+<td><strong>被卡住</strong>：<code>generate_events</code> 在 <code>api/</code> 裡<strong>一個呼叫端都沒有</strong>——產生器批目前根本沒有落檔的路徑。等哪天它接上匯入，把 provenance 那個值餵進去就行（一行）</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h1 id="六跟產品無關的治理環境6-條">六、跟產品無關的（治理／環境，6 條）</h1>
+<p>這些不影響你用系統，列出來只是因為它們會讓「全套測試」不是全綠，
+<strong>我不想讓你以為那些紅是產品壞了</strong>。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>代號</th>
+<th>是什麼</th>
+<th>為什麼不做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>G3-R11</code></td>
+<td><code>tests/api</code> 有幾條長期紅（batch_alias／deep cache／model_enhancement／progress_rss 等）</td>
+<td><strong>被卡住</strong>：全部<strong>不是</strong> GAP-3 的模組，另開票處理。其中 progress_rss 兩條只在整包跑時紅、單跑會過，是測試之間的干擾不是產品問題</td>
+</tr>
+<tr>
+<td><code>R-G7-OFF-1</code>／<code>R-G7-OFF-2</code></td>
+<td>你 9/5 裁定停用 G-7 之後，三個治理凍結檔沒有閘保護，另有 2 條測試轉紅</td>
+<td><strong>你裁定的</strong>：G-7 對量化碼的判決恆為「未宣告」＝常數，而且它擋住了真正有用的檢查。修那 2 條紅<strong>等於把 G-7 開回來</strong></td>
+</tr>
+<tr>
+<td><code>R-GOVTEST-1</code>／<code>R-GOVTEST-2</code></td>
+<td>8 條治理測試長期紅（4 條 G-7、4 條 factkey）</td>
+<td><strong>被卡住</strong>：它們內建的假設（「push 會走到某一段檢查」）在 8/14 改成快速模式時就失效了。修法要先決定「這件事該在哪一關擋」</td>
+</tr>
+<tr>
+<td><code>B0-REVIEW-1</code>／<code>B0-REVIEW-2</code></td>
+<td>第 0 段時 codex 三次沒交件（根因至今未定，四個假說都有反證）；同一套工具裡有一個自稱「會直接改碼」的元件</td>
+<td><strong>要先研究</strong>：根因沒找到；後續四段 codex 都正常交件，且每批我都用雜湊對證過<strong>沒有</strong>被改碼</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h1 id="七更遠的原本就規劃在別張票的7-條">七、更遠的（原本就規劃在別張票的，7 條）</h1>
+<p><code>G3-R1</code>～<code>G3-R6</code>、<code>G3-R8</code>、<code>G3-R12</code> 這幾條是<strong>一開始就沒排進這張票</strong>的東西：
+triple-barrier／出場最佳化、多空組合、衍生品與新聞事件、把去重權重接進模型、
+正式的 panel IC、事件研究法（CAR/AAR）、標籤一致性探針、小樣本時 IC 顯示 <code>--</code>。</p>
+<p>它們不是「做到一半」，是<strong>這張票的範圍之外</strong>。要做的時候各自是一張票。</p>
+<hr />
+<h2 id="一句話">一句話</h2>
+<p><strong>要緊的只有一條：<code>G3-D1</code></strong>（篩選條件會同時截斷正反例）。
+其餘 20 條，<strong>現在的行為都是對的</strong>，欠的是更強的測試、把規格補寫回去、
+或是等別的東西先到位。</p>
+<p>有任何一條你覺得該提前做，告訴我它的代號就行。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/GAP-3還沒做的事.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

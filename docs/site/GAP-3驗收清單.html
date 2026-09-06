@@ -12,28 +12,49 @@
 <h1 id="gap-3-驗收清單-照著做就好">GAP-3 驗收清單 — 照著做就好</h1>
 <blockquote>
 <p><strong>這份是給你照著操作的。</strong> 每一項都有三欄：<strong>你做什麼</strong> → <strong>你應該看到什麼</strong> → <strong>如果不是這樣代表什麼</strong>。</p>
-<p>🔴 <strong>2026-09-05（晚）再更新：第 4 段又動了兩個畫面，本清單同樣尚未改寫。</strong>
-①<code>/search</code> 與 <code>/data-preparation</code> 的 <strong><code>decision_offset_bars</code>（k）輸入框已移除</strong>，
-原地改成一句「k 於 IC 分析頁設定」——清單裡任何叫你在匯出／匯入畫面填 k 的步驟都已對不上。
-②IC 分析頁的 k <strong>不再鎖 0</strong>，且多了「掃到 m」的網格模式與兩個上界的揭露。
-③進場價語意與報酬算法<strong>兩欄可以直接改</strong>（原本只有三個 preset），
-其中兩個組合會<strong>灰掉並寫明原因</strong>（買賣同一瞬間、窗長 0）。
-④IC 分析頁多了 <strong>k／h「掃到 m」的勾選</strong>，勾了會一次跑出 k×h 的結果表格。
-⇒ 這四處待第 4 段收案後與下方兩段一併改寫。</p>
+<h2 id="-2026-09-06本清單已對齊現況g3-d2-五段全部收案">🔴 2026-09-06：本清單已對齊現況（<code>G3-D2</code> 五段全部收案）</h2>
+<p>先前累積了四段「尚未改寫、照做會對不上畫面」的警告——<strong>那些已經處理掉了</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>改了什麼</th>
+<th>對應項</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scenario</code> 的 <code>B</code>／<code>two_stage</code> 解灰（只剩 <code>A</code> 灰，因為它併進 B 了）</td>
+<td><strong>B3</strong>（已改寫）</td>
+</tr>
+<tr>
+<td>進場價五個值、報酬算法三個值<strong>全部可選</strong>；只剩兩對幾何零窗組合會灰</td>
+<td><strong>B3</strong>（已改寫）</td>
+</tr>
+<tr>
+<td><code>decision_offset_bars</code>（k）輸入框<strong>從匯出／匯入畫面移除</strong>，改到 IC 分析頁</td>
+<td><strong>B3</strong>（已改寫）</td>
+</tr>
+<tr>
+<td>IC 分析頁的「當根／續漲／持有」三選項</td>
+<td><strong>B21</strong>（新增）</td>
+</tr>
+<tr>
+<td>IC 分析頁的 k／h「掃到 m」網格</td>
+<td><strong>B22</strong>（新增）</td>
+</tr>
+<tr>
+<td>隨機對照組（產批＋prevalence 並排）</td>
+<td><strong>B23</strong>（新增）</td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>B21–B23 在今天之前完全沒有驗收步驟</strong>——三個新畫面做出來了，清單卻只有 B1–B20。
+這是我漏了。現在補齊。</p>
+<p><strong>還沒做的</strong>：<code>G3-D1</code>（匯出前篩選只有一組條件、正反例同時被截斷）<strong>仍未修</strong>，
+逐條說明見 <a href="GAP-3還沒做的事.html">GAP-3還沒做的事.md</a>。</p>
+<p>當前施工進度看 <a href="現在做到哪.html">現在做到哪.md</a>。</p>
 </blockquote>
 <blockquote>
-<p>🔴 <strong>2026-09-05 更新：本清單有兩段已經對不上畫面，尚未改寫。</strong>
-<code>G3-D2</code> 第 1 段把 <code>/search</code> 的「預測型」與「開盤進場」解灰、IC 分析頁改成「當根／續漲／持有」三選項；
-第 3 段（9/5 完成）把 <code>scenario</code> 的 <strong><code>two_stage</code></strong> 也解灰了（兩段條件必填、含未標籤匯出路徑）。
-⇒ <strong>下方第 200 行與第 220 行附近寫「<code>A</code>／<code>B</code>／<code>two_stage</code> 是灰的」那兩段已過時</strong>，
-待第 4 段（全矩陣）收案後一次改寫。<strong>在那之前照舊清單操作會對不上畫面。</strong>
-當前施工進度看 <a href="現在做到哪.html">現在做到哪.md</a>。</p>
-<p>🔴 <strong>2026-09-06 更新</strong>：灰色項目<strong>五段全部做完</strong>（<code>G3-D2</code> 已 CLOSED），
-<strong>B3 不再是「必定不會過」</strong>——它現在是<strong>等你實機驗</strong>。
-五個設定的灰／鎖應全部解除，只剩兩對幾何上算不出來的組合會灰掉並寫明理由；
-<code>decision_offset_bars</code>（k）已移到 IC 分析頁，原位置只留指路文字。
-（原文保留供追溯：「2026-08-31 起，B3 必定不會過——你裁定灰色項目要真的做出來、
-不接受永久灰著」。另一處待辦「匯出前篩選只有一組條件」＝<code>G3-D1</code>，<strong>仍未做</strong>。）</p>
 <p>🔴 <strong>這是重寫版（8/29）</strong>，不是 8/22 那份。舊版有兩項<strong>現在照做會失敗</strong>——
 不是程式壞了，是那兩件事被規格改掉了：</p>
 <ul>
@@ -246,81 +267,70 @@ IC decay 的說明 → 兩顆按鈕（「導出CSV檔案」「匯出事件契約
 </blockquote>
 <hr />
 <h3 id="b3-這批事件的五個設定新的">B3 ── 這批事件的五個設定（<strong>新的</strong>）</h3>
-<p><strong>你做什麼</strong>：找到「這批事件的五個設定」那一區，<strong>每一個下拉都點開看看</strong>。</p>
-<p><strong>應該看到</strong>：五個控制項——<code>scenario</code>／<code>control_kind</code>／<code>entry_price_semantic</code>／
-<code>label_return_mode</code>／<code>decision_offset_bars</code>。而且：</p>
+<blockquote>
+<p>🔴 <strong>本項於 2026-09-06 全部改寫。</strong> 舊版寫「五個值都是灰的、<code>k</code> 唯讀打不進去」——
+那是灰色項目做完<strong>之前</strong>的狀態，現在<strong>五條全部相反</strong>。舊文已刪（留在 git 歷史）。</p>
+</blockquote>
+<p><strong>在哪裡</strong>：<code>/search</code> 頁面，跑完一次搜尋後往下找「這批事件的五個設定」那一區。</p>
+<p><strong>你做什麼</strong>：<strong>每一個下拉都點開看看</strong>，對照下表。</p>
+<p><strong>應該看到</strong>——現在是<strong>四個</strong>下拉（不是五個，<code>k</code> 已經搬走了）：</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>你會看到</th>
-<th>為什麼</th>
+<th>控制項</th>
+<th>現在應該長怎樣</th>
+<th>這代表什麼</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>scenario</code> 只有 <strong>C</strong> 能選，<code>A</code>／<code>B</code>／<code>two_stage</code> 是灰的，<strong>而且下面寫著為什麼</strong></td>
-<td>那三種是「預測型」，需要另外一套產生答案的東西，本批沒做</td>
+<td><code>scenario</code>（情境）</td>
+<td><strong>B</strong>（預測型）、<strong>C</strong>（確認型）、<strong>two_stage</strong>（兩段式）三個都能選；只有 <strong>A</strong> 是灰的，理由寫著「A 已併入預測型（B）」</td>
+<td>你的主目標 B <strong>可以選了</strong>。A 不是沒做，是被併進 B 了——有沒有用未來根由你的深度宣告決定，不再用兩個名字區分</td>
 </tr>
 <tr>
-<td><code>control_kind</code> 有三個能選，<code>platform_random_bars</code> 是灰的並寫著 <code>not_implemented_platform_random_bars</code></td>
-<td>契約層就恆拒這個值</td>
+<td><code>control_kind</code>（對照組來源）</td>
+<td><strong>四個值全部能選</strong>，包含 <code>platform_random_bars</code></td>
+<td>平台隨機對照組已交付（怎麼用見 <strong>B23</strong>）</td>
 </tr>
 <tr>
-<td><code>entry_price_semantic</code> 只有 <code>trigger_close</code> 能選</td>
-<td>分析層目前只支援這一種組合</td>
+<td><code>entry_price_semantic</code>（進場價）</td>
+<td><strong>五個值全部能選</strong>（<code>trigger_open</code>／<code>trigger_close</code>／<code>next_open</code>／<code>decision_bar_open</code>／<code>decision_bar_close</code>）</td>
+<td>進場時點不再只有「t₀ 收盤」</td>
 </tr>
 <tr>
-<td><code>label_return_mode</code> 只有 <code>close_to_close</code> 能選</td>
+<td><code>label_return_mode</code>（報酬算法）</td>
+<td><strong>三個值全部能選</strong>（<code>close_to_close</code>／<code>open_to_close</code>／<code>open_to_horizon_close</code>）</td>
 <td>同上</td>
 </tr>
 <tr>
-<td><code>decision_offset_bars</code> 是數字框但<strong>打不進去</strong>（唯讀），固定 0，旁邊寫著理由</td>
-<td>同上</td>
+<td><s><code>decision_offset_bars</code></s></td>
+<td><strong>這個數字框已經不在了</strong>，原位置只有一句「<strong>k 於 IC 分析頁設定</strong>」</td>
+<td>k 是<strong>分析參數</strong>不是事件屬性：同一批事件可以用不同的 k 各分析一次。匯出時填死它等於綁死這批只能那樣分析</td>
 </tr>
 <tr>
-<td>每個下拉底下都有一行白話說明</td>
-<td>那行字是從契約檔直接取的，不是另外寫的</td>
+<td>每個下拉底下仍有一行白話說明</td>
+<td>那行字直接取自契約檔，不是另外寫的</td>
+<td></td>
 </tr>
 </tbody>
 </table></div>
-<p><strong>試著違規</strong>：把游標點進 <code>decision_offset_bars</code> 打 <code>3</code>。</p>
-<p><strong>應該看到</strong>：<strong>打不進去</strong>（唯讀）。</p>
-<p>🔴 <strong>不是這樣代表什麼</strong>：如果你真的把它改成 3 了，那就是三家審查員在 R3 抓到的那個缺陷復活了
-（我宣稱鎖死卻只加了提示屬性）。記下來告訴我。</p>
-<h3 id="-灰色項目必須完成不接受永久灰著2026-08-31-使用者裁定">🔴 灰色項目<strong>必須完成，不接受永久灰著</strong>（2026-08-31 使用者裁定）</h3>
-<p>灰掉是<strong>現在</strong>的狀態，不是終局。以下三項全部要做出來，並列入本項驗收：</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>要完成的</th>
-<th>完成的定義</th>
-<th>現在缺什麼</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>scenario</code> 之 <strong>A／B／two_stage</strong></td>
-<td>三個值在 <code>/search</code> <strong>可選</strong>，選了之後匯出檔的 <code>label</code> 是<strong>該情境自己的 label producer</strong> 算出來的，且可追溯來源</td>
-<td>沒有預測型的 label producer 與 provenance。現行 label 一律來自 t0 條件（確認型）</td>
-</tr>
-<tr>
-<td><code>control_kind</code> 之 <strong>platform_random_bars</strong></td>
-<td>該值<strong>可選</strong>，且平台能自動抽出隨機對照組</td>
-<td>抽樣契約與 estimand <strong>未定義</strong>。委員會判定當時那版「時間分離隨機反例」是廢設計，禁隱式 fallback</td>
-</tr>
-<tr>
-<td><code>entry_price_semantic</code> 其餘四值、<code>label_return_mode</code> 其餘兩值、<code>decision_offset_bars &gt; 0</code></td>
-<td>該值<strong>可選</strong>且分析層算得出對應的 <code>label_value</code></td>
-<td>每個組合都要有自己的 exact golden，現在只有 <code>(trigger_close, close_to_close, k=0)</code> 那一組有</td>
-</tr>
-</tbody>
-</table></div>
-<p><strong>驗收怎麼算過</strong>：本項在三者<strong>全部可選且有各自的 golden／producer</strong> 之前，
-一律記為 <strong>未完成</strong>——即使畫面正確地把它們灰掉並寫了理由。
-「正確地灰掉」是這一批的交付，<strong>不是這一項的終點</strong>。</p>
-<p><strong>排程</strong>：三項的難度差很多——三元組最近（一組一個 golden 就能開）、
-<code>platform_random_bars</code> 要先有委員會定出抽樣契約、A／B 要一整個預測型事件的 epic。
-逐項登記在 <code>docs/IC_QUANT_GAP_REGISTRY.md</code>。</p>
+<p><strong>🔴 唯一還會灰掉的東西——兩對「幾何上算不出來」的組合</strong></p>
+<p><strong>你做什麼</strong>：<code>label_return_mode</code> 選 <strong><code>open_to_close</code></strong>，然後去點 <code>entry_price_semantic</code>。</p>
+<p><strong>應該看到</strong>：<code>trigger_close</code> 與 <code>decision_bar_close</code> 兩個值<strong>變灰</strong>，
+旁邊寫著理由（關鍵字 <code>zero_length_label_window</code>）。</p>
+<p><strong>為什麼</strong>：<code>open_to_close</code> 的意思是「從進場算到<strong>同一根</strong>的收盤」。
+如果進場價又取「那根的收盤價」，買點和賣點就是<strong>同一個瞬間</strong>——中間長度是 0，
+再怎麼調參數都算不出報酬。這不是沒做，是<strong>幾何上不存在</strong>。</p>
+<p><strong>反過來也要試</strong>：先選 <code>entry_price_semantic = trigger_close</code>，再去點 <code>label_return_mode</code>
+——<code>open_to_close</code> 應該變灰。<strong>兩個方向都要擋</strong>，只擋一邊等於沒擋。</p>
+<p>🔴 <strong>不是這樣代表什麼</strong>：</p>
+<ul>
+<li>如果 <code>A</code> 以外還有值是灰的 → 有東西回捲了，記下來告訴我。</li>
+<li>如果那兩對<strong>沒有</strong>灰掉、讓你選得下去 → 你會拿到一個算不出來的組合，
+而分析頁會回一個看不懂的錯誤。記下來。</li>
+<li>如果 <code>k</code> 的數字框還在 → 第 4 段的搬移沒生效。</li>
+</ul>
 <hr />
 <h3 id="b4-這批匯出實際會帶什麼七項新的ｏｋ">B4 ── 這批匯出實際會帶什麼（<strong>七項，新的</strong>）[ＯＫ]</h3>
 <p><strong>你做什麼</strong>：看「這批匯出實際會帶什麼（你沒選過但一直存在的設定）」那一區。</p>
@@ -774,6 +784,139 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <p><strong>你做什麼</strong>：分析模式切回「Global」。</p>
 <p><strong>應該看到</strong>：事件下拉與所有事件專屬區塊消失；全域分析照常運作、結果與以前一致。</p>
 <hr />
+<h2 id="第四段灰色項目做完後新增的三個畫面b21b23全部是新的">第四段：灰色項目做完後<strong>新增的三個畫面</strong>（B21–B23，全部是新的）</h2>
+<blockquote>
+<p>🔴 這三項在 2026-09-06 之前<strong>完全沒有驗收步驟</strong>——第 1／4／5 段各做出一個新畫面，
+但清單只有 B1–B20。是我漏了，不是你沒看到。</p>
+</blockquote>
+<h3 id="b21-ic-分析頁的報酬量法三選項第-1-段做的">B21 ── IC 分析頁的「報酬量法」三選項（第 1 段做的）</h3>
+<p><strong>在哪裡</strong>：<code>/ic-analysis</code> → 切事件模式 → 選一批 → 「分析參數」區。</p>
+<p><strong>你做什麼</strong>：找到「報酬量法」那一組圓鈕，<strong>三個都點一次</strong>。</p>
+<p><strong>應該看到</strong>：三個選項，各自的白話意思是——</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>選項</th>
+<th>白話</th>
+<th>它算的是</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>當根</strong></td>
+<td>事件那一根，開盤買、收盤賣</td>
+<td>t₀ 開盤 → t₀ 收盤</td>
+</tr>
+<tr>
+<td><strong>續漲</strong></td>
+<td>事件收盤後才進場，抱 h 根</td>
+<td>t₀ 收盤 → t₀+h 收盤</td>
+</tr>
+<tr>
+<td><strong>持有</strong></td>
+<td>事件那根開盤進場，抱 h 根</td>
+<td>t₀ 開盤 → t₀+h 收盤</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>還要看</strong>：</p>
+<ul>
+<li>選「<strong>當根</strong>」時，旁邊的 <code>h</code>（答案窗幾根）<strong>應該變灰不能改</strong>，並寫著「當根不用 h」
+——因為當根就是一根，h 沒有意義。</li>
+<li>你<strong>沒碰過</strong>這個面板時，系統會<strong>依這批宣告的深度</strong>幫你選：深度 0 ⇒ 當根；深度 ≥1 ⇒ 持有、
+且 <code>h</code> 的初始值等於你宣告的深度。</li>
+<li>這批如果<strong>混了不同週期</strong>（例如同時有 1h 和 12h 的事件），系統<strong>不會</strong>幫你猜，
+會退回「當根」並明講「混合 timeframe 批，請手動設定」。</li>
+</ul>
+<p>🔴 <strong>不是這樣代表什麼</strong>：如果選「當根」而 <code>h</code> 還能改，或送出後跑的 <code>h</code> 不是畫面顯示的那個
+——那就是「顯示一套、送出另一套」，記下來告訴我。</p>
+<h3 id="b22-kh掃到-m的網格第-4-段做的">B22 ── k／h「掃到 m」的網格（第 4 段做的）</h3>
+<p><strong>在哪裡</strong>：同一區，「分析參數」下方。</p>
+<p><strong>你做什麼</strong>：勾「掃 k」並填一個上限（例如 3），再勾「掃 h」填 3，然後送出分析。</p>
+<p><strong>應該看到</strong>：跑完後多出一張<strong>逐格表格</strong>，每一格是一次獨立的分析（k=0..3 × h=1..3）。
+每格顯示該組合的 IC；跑不出來的格子會標明<strong>為什麼</strong>（例如逾時、或該組合不支援）。</p>
+<p><strong>還要看</strong>：</p>
+<ul>
+<li>畫面會<strong>同時</strong>顯示「這批當初記錄的 k」與「這次分析用的 k」——兩個同名不同義的數字。</li>
+<li>格數有硬上限 <strong>110</strong>（k 的 11 個值 × h 的 10 個值）。故意填超過時應該明講
+「格數太多」而<strong>不是</strong>只跑一部分。</li>
+</ul>
+<p>🔴 <strong>誠實邊界（我要先講）</strong>：畫面上那個「這批最多能用多大的 k／h」是<strong>上界</strong>——
+<strong>超過它一定算不出來，但沒超過不保證每一筆都算得出來</strong>（還有別的原因會讓單一事件被剔除）。
+畫面就是這樣寫的，不會寫成保證。</p>
+<h3 id="b23-隨機對照組第-5-段做的這是最後一段">B23 ── 隨機對照組（第 5 段做的，這是最後一段）</h3>
+<p><strong>在哪裡</strong>：<code>/ic-analysis</code> → 事件模式 → 選一批 → 面板最下方「<strong>隨機對照組</strong>」。</p>
+<p><strong>它在回答什麼</strong>：你篩出來的這批事件「正例率 25%」——這個數字<strong>單獨看沒有意義</strong>。
+要判斷它有沒有訊息，需要對照：同一段期間、同一個標的、用同一條規則標答案，
+<strong>隨便挑一批 K 線</strong>的正例率是多少。25% vs 10% 才是訊息；25% vs 24% 就只是市場本來如此。</p>
+<p><strong>你做什麼</strong>：</p>
+<ol>
+<li>四個數字框可以調（想抽幾筆／亂數種子／前鄰域幾根／後 embargo 幾根），先用預設值即可。</li>
+<li>按「<strong>產生隨機對照批</strong>」。</li>
+</ol>
+<p><strong>應該看到</strong>（依序兩件事）：</p>
+<ul>
+<li><strong>第一行</strong>：「已產生對照批 <code>&lt;id&gt;</code>（落檔 N 筆）」。
+如果 N <strong>少於</strong>你要的筆數，會<strong>明講</strong>「少於想抽的 M 筆——候選被排除區間扣掉了，
+這是揭露不是錯誤」。抽不滿是正常的。</li>
+<li><strong>第二行</strong>：比較結果。<strong>兩種可能，兩種都算正確</strong>：</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>你看到</th>
+<th>意思</th>
+<th>該怎麼辦</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>「這批事件正例率 X%（n 筆）｜隨機對照 Y%（m 筆）｜lift Z×」</td>
+<td>兩批確認用同一條規則 ⇒ 數字可以並排</td>
+<td>這就是你要的答案</td>
+</tr>
+<tr>
+<td>🔴「<strong>不並排 prevalence</strong>（reason：<code>random_control_rule_identity_unverifiable</code>）」</td>
+<td>這批<strong>沒有把標籤規則記在檔案裡</strong> ⇒ 無法確認兩批用同一把尺</td>
+<td><strong>既有的批全部都是這種</strong>（那個欄位是第 5 段才有的）。要補只能重新匯入該批時把規則帶進去</td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>這是刻意的</strong>：閘不通過時<strong>一個數字都不給</strong>。給了半套數字，就一定會有人拿去相減。</p>
+<p><strong>其他三種不並排的理由</strong>（比較少見，但你可能撞到）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>reason</th>
+<th>白話</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>random_control_rule_mismatch</code></td>
+<td>兩批的門檻／答案窗長度／方向／報酬算法<strong>有一項不同</strong>，或這批落檔的答案跟它自己宣告的規則對不上</td>
+</tr>
+<tr>
+<td><code>random_control_prevalence_missing</code></td>
+<td>有一邊算不出正例率（例如那批是空的）</td>
+</tr>
+<tr>
+<td><code>random_control_period_mismatch</code></td>
+<td>抽樣的期間跟事件的期間沒有交集——不同時期的基準不能拿來對照</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>試著違規（選做）</strong>：把「想抽幾筆」填 <code>-1</code> 或 <code>1.5</code>。</p>
+<p><strong>應該看到</strong>：<strong>當場被拒</strong>（4xx），不是伺服器錯誤、也不是被悄悄改成別的數字。</p>
+<p>🔴 <strong>不是這樣代表什麼</strong>：</p>
+<ul>
+<li>如果按了之後<strong>只顯示「已產生」、沒有第二行</strong> → 比較沒接上，那正是我在第 5 段第一輪
+被三家抓到的問題（做好了沒接出來）。記下來。</li>
+<li>如果 <code>-1</code> 被接受了、或變成別的數字 → 輸入邊界的檢查沒生效。</li>
+<li>如果比較失敗時顯示的是「<strong>產生</strong>對照組失敗」（但上一行明明說已產好）→ 那是兩段錯誤
+被混在一起了，你會因此重按而重複產批。</li>
+</ul>
+<hr />
 <h2 id="簽字">簽字</h2>
 <p>全部做完後，把結果填在這裡（或直接告訴我哪幾項不對）：</p>
 <div class="table-wrap"><table>
@@ -884,6 +1027,21 @@ IC 結果表本身就是條件 IC（只用這批事件的時間點、答案由�
 <td>B20 切回全域</td>
 <td>OK,全域IC還沒驗收過</td>
 <td></td>
+</tr>
+<tr>
+<td><strong>B21 報酬量法三選項</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>第 1 段做的；本清單 9/6 才補上驗收步驟</td>
+</tr>
+<tr>
+<td><strong>B22 k／h 掃描網格</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>第 4 段做的；同上</td>
+</tr>
+<tr>
+<td><strong>B23 隨機對照組</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>第 5 段做的；同上。<strong>「不並排 prevalence」是正確結果之一</strong>，不是失敗</td>
 </tr>
 </tbody>
 </table></div>
