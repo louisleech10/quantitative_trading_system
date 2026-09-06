@@ -28,11 +28,11 @@
 <tbody>
 <tr>
 <td><strong>在做哪一票</strong></td>
-<td>「<strong>事件分析頁揭露補完</strong>」（<code>G3-D2</code> 已結案；這是 9/6 UAT 之後新開的）</td>
+<td>「<strong>掃描結果瀏覽器</strong>」（揭露補完票已收；這是 9/6 你裁定的下一件）</td>
 </tr>
 <tr>
 <td><strong>在做第幾段</strong></td>
-<td>✅ <strong>R1、R2 兩輪審碼都收了</strong>，六條問題全修完</td>
+<td>✅ <strong>五個階段全部做完</strong>（停覆蓋／立方體落檔／查詢 API／前端瀏覽器／白話）</td>
 </tr>
 <tr>
 <td><strong>卡住嗎</strong></td>
@@ -40,10 +40,40 @@
 </tr>
 <tr>
 <td><strong>需要你決定嗎</strong></td>
-<td>🔴 <strong>要你做一件事：實機驗收</strong>（我不能代驗）——清單新增 <strong>B25</strong>、改寫 <strong>B22</strong>／<strong>B24</strong></td>
+<td>🔴 <strong>要你做一件事：實機驗收</strong>——清單新增 <strong>B26</strong>／<strong>B27</strong>。另有<strong>一件你必須知道的限制</strong>，見下方紅字</td>
 </tr>
 </tbody>
 </table></div>
+<hr />
+<h2 id="-你的目標只達成一部分滿格掃描看不到圖表">🔴 你的目標只達成一部分——滿格掃描看不到圖表</h2>
+<p>你要的是「每個特徵的每個數據，在<strong>每個數據表格和圖像</strong>」。我第一版把「<strong>圖像</strong>」整個漏掉了，
+三家審查同時抓到。補上之後我量了真實報告，發現一個硬限制：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>每個特徵佔多少</th>
+<th>滿格 110 × 300 特徵</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>指標表</td>
+<td>約 <strong>0.5 KB</strong></td>
+<td>25 MB ✅ 存得下</td>
+</tr>
+<tr>
+<td><strong>圖表資料</strong></td>
+<td>約 <strong>36 KB</strong>（七十幾倍）</td>
+<td><strong>1 GB 以上</strong> ❌ 存不下</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>所以現在是兩層</strong>：指標表滿格也有；<strong>圖表只有掃描範圍較小時才有</strong>。
+超出時不會安靜地少存，而是明講「圖表沒保存」，並<strong>當場算給你看</strong>縮到多小可以存下。</p>
+<p><strong>這代表</strong>：小範圍掃描（例如 12 格）圖表齊全；滿格 110 就只有指標表。
+不是我省略，是 1 GB 放不下——但你該現在知道這條界線，而不是驗收時才發現圖表是空的。</p>
+<p>要放寬有兩條路（都不在這一批）：加大預算（吃磁碟），或做「你自己選幾格補存圖表」的互動。</p>
 <hr />
 <h2 id="-96-晚間我自己弄出來的問題已經修掉誠實記錄">🔴 9/6 晚間：我自己弄出來的問題，已經修掉（誠實記錄）</h2>
 <p>第二輪審碼開出四個 P1，<strong>四條全部打在我第一輪的修法上</strong>。這觸發了你定的「不收斂就停下來」規則，

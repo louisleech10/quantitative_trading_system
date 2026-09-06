@@ -1029,6 +1029,82 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 <code>rejected_pairs</code> 這種字眼）。<strong>這是刻意的</strong>——同一個概念寫兩份白話，日後只會改一份，
 這個 epic 已經為此付過三次代價。要改成更白話的講法，得去改契約檔本身（兩邊會一起變）。</p>
 <p><strong>不是這樣代表什麼</strong>：如果那兩個下拉選單旁邊<strong>什麼說明都沒有</strong>、只有英文選項 ⇒ 沒生效。</p>
+<h3 id="b26-掃描結果瀏覽器看得到每個組合每個特徵每個數據97-做的">B26 ── 掃描結果瀏覽器：看得到每個組合、每個特徵、每個數據（9/7 做的）</h3>
+<p><strong>背景</strong>：你 9/6 說「算完就是要能完整呈現，不顯示跟只顯示最強的單一特徵一樣都是垃圾資訊」。
+當時的矩陣每格<strong>只有事件筆數</strong>，每格的完整分析算完就丟。這一批把它存下來並做了瀏覽器。</p>
+<p><strong>在哪裡</strong>：<code>/ic-analysis</code> → 事件模式 → 選一批 → 勾 k／h 掃描 → 送出分析 →
+跑完後，掃描矩陣<strong>下方</strong>多一區「<strong>掃描結果瀏覽器</strong>」。</p>
+<p><strong>你做什麼</strong>：勾「掃 k」填 2、勾「掃 h」填 2，送出。跑完後在瀏覽器裡把三種看法都切一遍。</p>
+<p><strong>應該看到（三種看法）</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>看法</th>
+<th>你會看到什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>單格明細</strong></td>
+<td>選一個 k、一個 h ⇒ 該組合下<strong>所有特徵</strong>的一整排指標（IC 平均、ICIR、p 值、勝率、單調性…共 15 欄）。點欄頭可排序</td>
+</tr>
+<tr>
+<td><strong>單特徵跨格</strong></td>
+<td>填一個特徵名、選一個指標 ⇒ 一張 k×h 矩陣，看它在每個組合下的表現</td>
+</tr>
+<tr>
+<td><strong>圖表</strong></td>
+<td>選一個 k、一個 h、填完整特徵名 ⇒ 該特徵在該組合下的 IC 衰減、分位數收益、滾動 IC、分組 IC 等</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>還要看</strong>：</p>
+<ul>
+<li>表格上方寫「共 N 筆，正在看 X–Y」——N 是<strong>篩選後的總數</strong>，不是這頁的筆數。</li>
+<li>有上一頁／下一頁；第一頁時「上一頁」是灰的。</li>
+<li>最下面有一行說明「相關性矩陣不在這個瀏覽器裡」並講原因。</li>
+</ul>
+<p>🔴 <strong>兩件我要先講清楚的</strong></p>
+<p><strong>① 跨格的表不能拿來比大小。</strong> 切到「單特徵跨格」時，畫面上會有一段紅字說明。
+不同的 h 是<strong>不同的問題</strong>（答案窗長度不一樣），它們的 IC 不是同一個東西。
+你在那張表上挑最大的一格，會系統性地高估——格數越多高估越多。
+所以這個瀏覽器<strong>故意不提供</strong>「自動選最佳組合」，跨格視圖也<strong>沒有排序按鈕</strong>（排序只在單格內）。</p>
+<p><strong>② 掃描範圍太大時，圖表會存不下。</strong> 見 <strong>B27</strong>。</p>
+<p><strong>🔴 不是這樣代表什麼</strong>：</p>
+<ul>
+<li>掃描跑完了但<strong>完全沒有</strong>這一區 ⇒ 沒接上，記下來。</li>
+<li>表格是空的、卻<strong>沒有</strong>任何說明 ⇒ 錯的（空表必須伴隨原因）。</li>
+<li>跨格視圖出現排序按鈕、或任何「推薦組合／最佳組合」字樣 ⇒ 錯的，記下來。</li>
+<li>「共 N 筆」的 N 剛好等於這頁的筆數（例如永遠是 50）⇒ 那個數字是假的，記下來。</li>
+</ul>
+<hr />
+<h3 id="b27-掃描範圍太大時會明講而不是給你空白97-做的">B27 ── 掃描範圍太大時，會明講而不是給你空白（9/7 做的）</h3>
+<p><strong>為什麼會有這一項</strong>：實測了真實報告，指標資料每個特徵約 0.5 KB，
+但<strong>圖表資料每個特徵約 36 KB（七十幾倍）</strong>。
+滿格掃描（110 格）配三百個特徵，圖表資料會到 <strong>1 GB 以上</strong>，存不下。</p>
+<p><strong>所以現況是</strong>：</p>
+<ul>
+<li><strong>指標表</strong>：滿格也存得下（除非你的特徵數非常大）。</li>
+<li><strong>圖表</strong>：只有掃描範圍較小時才存得下。</li>
+</ul>
+<p><strong>你做什麼</strong>：故意掃一個大範圍（k 掃到 10、h 掃到 10，配一個特徵多的 run），送出。</p>
+<p><strong>應該看到</strong>：切到「圖表」看法時，出現一段說明——
+「這次掃描的圖表資料沒有保存下來——資料量超過上限。指標表不受影響，仍然完整。」
+下面會給<strong>原因代號</strong>，以及<strong>算給你看的建議規模</strong>，長這樣：</p>
+<blockquote>
+<p>以這次的資料量估，存得下的規模約是：1 格 × 5697 特徵、12 格 × 474 特徵</p>
+</blockquote>
+<p>（數字會依你的資料而不同——那是<strong>當次實際量出來的</strong>，不是寫死的。）</p>
+<p>🔴 <strong>不是這樣代表什麼</strong>：</p>
+<ul>
+<li>圖表區是<strong>空白的圖</strong>、沒有任何說明 ⇒ 錯的，記下來。</li>
+<li>圖表沒存下來，連<strong>指標表也跟著不見</strong> ⇒ 錯的，兩層是分開的。</li>
+<li>說明裡的數字每次都一模一樣（不隨你的資料變）⇒ 那是寫死的，記下來。</li>
+</ul>
+<p><strong>順帶驗一件看不見的事</strong>：以前掃描每一格都會去覆寫同一個匯出檔，110 格互相蓋，
+最後只剩最後一格的殘骸——而匯出功能會把那份殘骸當成主分析的產物。
+現在掃描格<strong>完全不寫</strong>那個檔。你可以這樣驗：<strong>掃描跑完後按匯出</strong>，
+拿到的應該是<strong>主分析</strong>的結果（不是某一格的）。</p>
 <hr />
 <h2 id="簽字">簽字</h2>
 <p>全部做完後，把結果填在這裡（或直接告訴我哪幾項不對）：</p>
@@ -1165,6 +1241,16 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 <td><strong>B25 每個要填的欄位旁邊都有說明</strong></td>
 <td>☐ <strong>待驗</strong></td>
 <td>9/6 委員審查後新增（<code>CODEX-R2-P1-02</code>）。進階區那兩個下拉選單（<code>entry_price_semantic</code>／<code>label_return_mode</code>）旁邊<strong>現在應該有說明文字</strong>；原本只有裸的英文選項</td>
+</tr>
+<tr>
+<td><strong>B26 掃描結果瀏覽器</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/7 做的。三種看法都要切一遍。🔴 跨格視圖<strong>不該</strong>有排序按鈕、也不該有「最佳組合」字樣</td>
+</tr>
+<tr>
+<td><strong>B27 範圍太大時明講不給空白</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/7 做的。🔴 <strong>滿格掃描不保證有圖表</strong>——這是資料量的硬限制，不是缺陷。要驗「有沒有明講＋數字是不是當次算的」</td>
 </tr>
 </tbody>
 </table></div>
