@@ -935,6 +935,21 @@ describe('Task 1.1 — 當根（open_to_close）時 h 掃描不適用', () => {
     expect(screen.queryByTestId('ic-param-scan-h-inapplicable')).toBeNull();
   });
 
+  it('🔴 上限框之 disable **不能只靠 hScanOn**（mutation D2 抓到的缺口）', () => {
+    // 這個狀態真的會出現：切到當根時 `useEffect` 會叫父層清掉 h 上限，
+    // 但父層若沒照做（或還沒 re-render），`hScanOn` 仍為 true。
+    // 此時上限框**必須**因為「當根不適用」而 disable——只判 `!hScanOn` 的話它是可輸入的。
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()}
+        labelSpec={SPEC_SAME_BAR as never} onChangeLabelSpec={() => {}}
+        labelScan={{ horizon_bars_max: 5 }} onChangeLabelScan={() => {}}
+      />,
+    );
+    expect((screen.getByTestId('ic-param-scan-h-max') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByTestId('ic-param-scan-h-toggle') as HTMLInputElement).disabled).toBe(true);
+  });
+
   it('正向對照：k 掃描**不受**本規則影響（k 對當根仍有意義）', () => {
     renderWithSpec(SPEC_SAME_BAR, { labelScan: null, onChangeLabelScan: () => {} });
     expect((screen.getByTestId('ic-param-scan-k-toggle') as HTMLInputElement).disabled).toBe(false);
