@@ -25,6 +25,7 @@ import {
 } from '@/lib/randomControlSpec';
 import { EVENT_PARAM_DOCS } from '@/lib/eventParamDocs';
 import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
+import ScanCubeBrowser from './ScanCubeBrowser';
 import {
   EVENT_FIELD_FORMATTERS,
   IC_BATCH_FACT_FIELDS,
@@ -73,6 +74,14 @@ interface Props {
    *    在此重算就是第二份實作。沒有揭露 ⇒ 顯示「尚未分析」而不是猜一個數字。
    */
   disclosure?: ICEventScanDisclosure | null;
+  /**
+   * `SCANCUBE` Task 4.1：目前這次分析的 task id，供掃描結果瀏覽器取立方體。
+   *
+   * 🔴 由 `page.tsx` 從 `useICAnalysisStore` 讀出後傳入——本元件**不自己讀 store**
+   *    （元件讀 store 會讓它無法在測試中獨立 render，也讓資料流變成兩條）。
+   *    `undefined` ⇒ 瀏覽器區塊不顯示（與「沒有掃描」同一分支）。
+   */
+  taskId?: string;
 }
 
 /** 由批次事實欄產生該欄之白話字串；欄集之外的欄一律不顯示（各頁只選自己的欄集）。 */
@@ -156,7 +165,7 @@ function ContractDoc({ field }: { field: keyof typeof EVENT_CONTRACT_DOCS }) {
 
 export default function EventBatchDisclosurePanel({
   importId, labelSpec, onChangeLabelSpec, detail: injected,
-  labelScan = null, onChangeLabelScan, disclosure = null,
+  labelScan = null, onChangeLabelScan, disclosure = null, taskId,
 }: Props) {
   const [detail, setDetail] = useState<EventImportDetail | null>(injected ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -644,6 +653,14 @@ export default function EventBatchDisclosurePanel({
             )}
           </div>
         )}
+
+        {/* 🔴 `SCANCUBE` Task 4.1：掃描結果瀏覽器，掛在掃描矩陣**下方**。
+            上面那張矩陣只有「每格幾筆事件」；使用者要的是每格每特徵的每個數據。
+            `taskId` 缺席或沒有掃描 ⇒ 元件自己回 null（不是顯示空表）。 */}
+        <ScanCubeBrowser
+          taskId={taskId}
+          hasScan={Boolean(scanResult && scanResult.capability === 'available')}
+        />
 
         {/* 🔴 本次答案窗之可算／缺筆數 ＋ 本次 purge 下界（式之權威在 §D-3′-a(ii)，本區只顯示結果） */}
         {/* 🔴 `GROK-R4-P2-01`：本行是**同一個數字在同一面板的第二處顯示**。

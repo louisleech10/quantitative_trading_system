@@ -3150,3 +3150,90 @@ export interface EventAnalyzeResponse {
       | 'not_applicable_event_study_only' | string;
   };
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// `SCANCUBE` — 掃描結果立方體之型別
+// ══════════════════════════════════════════════════════════════════════════
+
+/** 某一層之 fail-closed 狀態。🔴 `stored` 是唯一權威，**不得**以路徑存在與否推論。 */
+export interface ICScanCubeTier {
+  stored: boolean;
+  truncated: boolean;
+  reason: string | null;
+  max_rows?: number;
+  max_rows_per_cell?: number;
+  requested_rows?: number;
+  max_bytes?: number;
+  observed_bytes?: number;
+  observed_bytes_at_stop?: number;
+  chart_bytes_observed_per_feature?: number;
+  /** 「幾格 × 幾特徵存得下」——由**執行期實測**導出，不是寫死的常數。 */
+  fits_hint?: {
+    bytes_per_feature: number;
+    max_feature_cells: number;
+    examples: { cells: number; features_per_cell: number }[];
+  } | null;
+}
+
+export interface ICScanCubeCell {
+  k: number;
+  h: number;
+  capability: string | null;
+  reason: string | null;
+  n_events: number | null;
+  rows: number;
+  /** 🔴 該層未保存時恆為 `null`（不得填檔名，否則前端會照它請求得 404）。 */
+  path: string | null;
+  chart_path: string | null;
+}
+
+export interface ICScanCubeManifest {
+  task_id: string;
+  symbol: string | null;
+  timeframe: string | null;
+  created_at: string;
+  k_axis: number[];
+  h_axis: number[];
+  metrics: string[];
+  chart_sections: string[];
+  /** 明確告訴使用者「這幾節不在瀏覽器內」，不得靜默省略。 */
+  excluded_sections: string[];
+  tier_a: ICScanCubeTier;
+  tier_b: ICScanCubeTier;
+  cells: ICScanCubeCell[];
+}
+
+export interface ICScanCubeRow {
+  k: number;
+  h: number;
+  feature_name: string;
+  [metric: string]: number | string | null;
+}
+
+export interface ICScanCubeRowsPage {
+  /** 🔴 篩選後的**真實總數**，不是本頁筆數。 */
+  total: number;
+  offset: number;
+  limit: number;
+  rows: ICScanCubeRow[];
+}
+
+export interface ICScanCubeCharts {
+  k: number;
+  h: number;
+  feature_name: string;
+  /** 與主分析 report **同形狀**之單特徵切片（`grouped_ic` 保持 `{group:{feature:…}}` 巢狀）。 */
+  sections: Record<string, unknown>;
+}
+
+/** `scan.cube` 之摘要（掃描回應裡的那一小塊；**不含** rows／sections）。 */
+export interface ICScanCubeSummary {
+  status: 'ok' | 'failed';
+  reason?: string;
+  created_at?: string;
+  metrics?: string[];
+  chart_sections?: string[];
+  excluded_sections?: string[];
+  tier_a?: ICScanCubeTier;
+  tier_b?: ICScanCubeTier;
+}

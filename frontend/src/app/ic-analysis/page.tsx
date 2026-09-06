@@ -597,6 +597,10 @@ function ICAnalysisPageContent() {
                   ...(next ? { event_label_scan: next } : { event_label_scan: undefined }),
                 })}
                 disclosure={eventScanDisclosure}
+                /* 🔴 `SCANCUBE` Task 4.1：`taskId` 之來源＝store。
+                   面板原本沒有這個 prop——不從這裡傳，瀏覽器就永遠拿不到 task
+                   （`CODEX-R1-P1-07`／`COMPOSER-R1-P2-02` 兩家獨立指出這個接線缺口）。 */
+                taskId={taskId ?? undefined}
               />
             )}
 

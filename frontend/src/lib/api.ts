@@ -1187,3 +1187,70 @@ export async function createRandomControlBatch(
 // 現行做法：前端只送 `event_import_id` ＋ `event_label_spec`，映射由**後端**於分析時
 // 依 receipt 產生（`ic_analysis_service._run_event_label_stages`）。
 // 前端**不得**持有或傳送 `label_value`，也不得自算時間戳。
+
+import type {
+  ICScanCubeCharts,
+  ICScanCubeManifest,
+  ICScanCubeRowsPage,
+} from './types';
+
+// ══════════════════════════════════════════════════════════════════════════
+// `SCANCUBE` — 掃描結果立方體
+//
+// 🔴 三個端點的錯誤碼語意各不相同，呼叫端**必須**分開處理，不得一律當成「沒資料」：
+//    · 404 ＝ 找不到這個 task 的立方體
+//    · 409 ＝ 該層 fail-closed 沒保存（detail 帶 reason 與 fits_hint）
+//    · 200 + 空 rows ＝ 篩選後真的沒有
+// ══════════════════════════════════════════════════════════════════════════
+
+/** 該層未保存時由 409 轉成的例外；`info` 帶 reason／fits_hint 供畫面明講。 */
+export class ScanCubeTierNotStored extends Error {
+  constructor(public readonly info: Record<string, unknown>) {
+    super(`scan cube tier not stored: ${String(info?.reason ?? 'unknown')}`);
+    this.name = 'ScanCubeTierNotStored';
+  }
+}
+
+async function _cubeFetch(path: string): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/ic/scan-cube/${path}`);
+  if (response.status === 409) {
+    const body = await response.json().catch(() => ({}));
+    throw new ScanCubeTierNotStored((body?.detail ?? {}) as Record<string, unknown>);
+  }
+  if (!response.ok) await parseRejected(response);
+  return response.json();
+}
+
+export async function getScanCubeManifest(taskId: string): Promise<ICScanCubeManifest> {
+  return _cubeFetch(`${encodeURIComponent(taskId)}/manifest`) as Promise<ICScanCubeManifest>;
+}
+
+export async function getScanCubeRows(
+  taskId: string,
+  params: {
+    k?: number[]; h?: number[]; feature?: string; metric?: string[];
+    sort?: string; offset?: number; limit?: number;
+  } = {},
+): Promise<ICScanCubeRowsPage> {
+  const qs = new URLSearchParams();
+  // 🔴 陣列參數逐值 append（FastAPI 之 `Query(None)` list 形狀），不是 join(',')
+  (params.k ?? []).forEach((v) => qs.append('k', String(v)));
+  (params.h ?? []).forEach((v) => qs.append('h', String(v)));
+  (params.metric ?? []).forEach((v) => qs.append('metric', v));
+  if (params.feature) qs.append('feature', params.feature);
+  if (params.sort) qs.append('sort', params.sort);
+  qs.append('offset', String(params.offset ?? 0));
+  qs.append('limit', String(params.limit ?? 100));
+  return _cubeFetch(
+    `${encodeURIComponent(taskId)}/rows?${qs.toString()}`,
+  ) as Promise<ICScanCubeRowsPage>;
+}
+
+export async function getScanCubeCharts(
+  taskId: string, k: number, h: number, feature: string,
+): Promise<ICScanCubeCharts> {
+  const qs = new URLSearchParams({ k: String(k), h: String(h), feature });
+  return _cubeFetch(
+    `${encodeURIComponent(taskId)}/charts?${qs.toString()}`,
+  ) as Promise<ICScanCubeCharts>;
+}
