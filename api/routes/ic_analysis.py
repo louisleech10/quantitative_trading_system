@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import math
 
@@ -815,3 +815,115 @@ def _build_summary(report: Dict[str, Any]) -> str:
     )
 
     return "\n".join(lines)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# `SCANCUBE` Task 3.1 — 掃描結果立方體之查詢
+#
+# 🔴 prefix ＝ `/api/v1/ic`（本檔 router 之既有前綴）。
+#    SPEC 初版寫成 `/api/ic-analysis/...` 會 404——照它開發等於交付不了
+#    （`CODEX-R1-P1-07` 實證）。
+#
+# 🔴 錯誤碼之語意分界（三者不可混為一談）：
+#    · 404 ＝ 找不到這個 task 的立方體（與「查詢結果為空」不同——後者回 200 + 空 rows）
+#    · 409 ＝ 該層 fail-closed 未保存（不是空頁；空頁會讓使用者以為「真的沒有資料」）
+#    · 400 ＝ 參數不合法（metric 不在白名單／limit 超上限）——**不得靜默夾住**，
+#             靜默夾住會讓使用者以為看到了全部
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def _cube_store():
+    """走 factory（Rule 3）。"""
+    from momentum.factories import create_scan_cube_store
+
+    return create_scan_cube_store()
+
+
+def _cube_root():
+    return _cube_store().DEFAULT_ROOT
+
+
+@router.get("/scan-cube/{task_id}/manifest")
+async def get_scan_cube_manifest(task_id: str) -> Dict[str, Any]:
+    """立方體之 manifest 原樣（含兩層之 stored/truncated 與 fits_hint）。"""
+    store = _cube_store()
+    try:
+        return store.load_manifest(_cube_root(), task_id)
+    except store.CubeNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/scan-cube/{task_id}/rows")
+async def get_scan_cube_rows(
+    task_id: str,
+    k: Optional[List[int]] = Query(None),
+    h: Optional[List[int]] = Query(None),
+    feature: Optional[str] = Query(None),
+    metric: Optional[List[str]] = Query(None),
+    sort: Optional[str] = Query(None, description="<metric>:asc|desc"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1),
+) -> Dict[str, Any]:
+    """Tier A 分頁查詢。`total` 是**篩選後的真實總數**，不是本頁筆數。"""
+    store = _cube_store()
+    root = _cube_root()
+    try:
+        manifest = store.load_manifest(root, task_id)
+    except store.CubeNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    from momentum.factories import create_event_sample_pipeline
+
+    page_max = int(create_event_sample_pipeline().analysis_params()["scan_cube_page_max"])
+    if limit > page_max:
+        raise HTTPException(
+            status_code=400,
+            detail=f"limit={limit} 超過上限 {page_max}（契約 analysis_params.scan_cube_page_max）",
+        )
+
+    allowed = set(manifest.get("metrics") or [])
+    if metric:
+        unknown = [m for m in metric if m not in allowed]
+        if unknown:
+            raise HTTPException(
+                status_code=400,
+                detail=f"未知的 metric：{unknown}；可用＝{sorted(allowed)}",
+            )
+
+    sort_pair = None
+    if sort:
+        field, _, direction = sort.partition(":")
+        direction = direction or "asc"
+        if field not in allowed:
+            raise HTTPException(status_code=400, detail=f"sort 欄位不在 metrics：{field}")
+        if direction not in ("asc", "desc"):
+            raise HTTPException(status_code=400, detail=f"sort 方向須為 asc|desc：{direction}")
+        sort_pair = (field, direction)
+
+    try:
+        return store.query_cube(
+            root, task_id, k=k, h=h, feature=feature, metrics=metric,
+            sort=sort_pair, offset=offset, limit=limit,
+        )
+    except store.CubeTierNotStored as exc:
+        raise HTTPException(status_code=409, detail=exc.info) from exc
+
+
+@router.get("/scan-cube/{task_id}/charts")
+async def get_scan_cube_charts(
+    task_id: str,
+    k: int = Query(...),
+    h: int = Query(...),
+    feature: str = Query(...),
+) -> Dict[str, Any]:
+    """Tier B 之單格單特徵切片（不分頁；一個 feature-cell ≒ 36 KB）。
+
+    回傳**與主分析 report 同形狀**，讓前端既有圖表元件可直接吃。
+    """
+    store = _cube_store()
+    try:
+        return store.load_charts(_cube_root(), task_id, k, h, feature)
+    except store.CubeTierNotStored as exc:
+        raise HTTPException(status_code=409, detail=exc.info) from exc
+    except store.CubeNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

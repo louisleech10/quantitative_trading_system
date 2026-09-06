@@ -5,40 +5,94 @@
   "event_id_template": "{symbol}:{timeframe}:{t0}",
   "_event_id_template_doc": "GAP-3 UX Task 1.3／D-2：event_id 之**唯一定義來源**（SPEC L1424–1427）。後端唯一實作＝import_contract.canonical_event_id()；前端 frontend/src/lib/eventId.ts 之模板由 vitest 對證本欄逐字相等（禁在任一端手寫第二份公式）。t0 為毫秒整數（單位偵測後之值）。僅**使用者宣告之匯入批次**強制（EventSamplePipeline.validate 開 enforce_canonical_event_id）；平台產生器之 ID 另帶 label 後綴，不受此約束。",
   "required_fields": {
-    "event_id": { "type": "str", "doc": "批內唯一識別碼；重複 ⇒ duplicate_event_id" },
-    "symbol": { "type": "str", "doc": "標的（如 ETHUSDT）" },
-    "timeframe": { "type": "str", "doc": "錨定 TF（bar 網格單位；如 12h）" },
-    "t0": { "type": "int", "doc": "事件錨點＝觸發根 open_time（epoch ms UTC；量級 < ms_magnitude_min ⇒ invalid_timestamp_unit）" },
-    "decision_offset_bars": { "type": "int", "min": 0, "default": 0, "doc": "決策時點＝t0 往前第 k 根錨定 TF bar 之 open；研究參數非訊號標註（白話閘裁決③）" },
+    "event_id": {
+      "type": "str",
+      "doc": "批內唯一識別碼；重複 ⇒ duplicate_event_id"
+    },
+    "symbol": {
+      "type": "str",
+      "doc": "標的（如 ETHUSDT）"
+    },
+    "timeframe": {
+      "type": "str",
+      "doc": "錨定 TF（bar 網格單位；如 12h）"
+    },
+    "t0": {
+      "type": "int",
+      "doc": "事件錨點＝觸發根 open_time（epoch ms UTC；量級 < ms_magnitude_min ⇒ invalid_timestamp_unit）"
+    },
+    "decision_offset_bars": {
+      "type": "int",
+      "min": 0,
+      "default": 0,
+      "doc": "決策時點＝t0 往前第 k 根錨定 TF bar 之 open；研究參數非訊號標註（白話閘裁決③）"
+    },
     "entry_price_semantic": {
       "type": "str",
-      "enum": ["trigger_open", "trigger_close", "next_open", "decision_bar_open", "decision_bar_close"],
+      "enum": [
+        "trigger_open",
+        "trigger_close",
+        "next_open",
+        "decision_bar_open",
+        "decision_bar_close"
+      ],
       "default": "trigger_close",
       "doc": "entry bar/price 唯一映射見 SPEC D1-6；事件頂層欄，不住 label_definition。default 為**前端誠實預設之唯一來源**（原檔 §F-3′；D-001 D1.1 契約字面總表／D4.2 pair 重設亦讀本值），前端禁硬編字面。🔴 validator **不讀** default：本欄仍為 required_fields，缺欄一律 missing_required_field（default 只服務 UI 之初始值與 pair 重設）"
     },
     "direction": {
       "type": "str",
-      "enum": ["long", "short"],
+      "enum": [
+        "long",
+        "short"
+      ],
       "batch_single_value": true,
       "doc": "U1 一次只研究一向；同批混值 ⇒ direction_mixed_in_batch"
     },
     "scenario": {
       "type": "str",
-      "enum": ["A", "B", "C", "two_stage"],
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "two_stage"
+      ],
       "doc": "D2 分路徑鍵。決策時點恆為 t₀−k 之 open（D2-2 單一表示法）。B＝預測型（原 A 已併入；有無用未來根由 lookahead_bars_declared 之深度宣告區分，非由 scenario 值區分）。C＝確認型，語意上等於深度 0 之事件；🔴 **「收盤後才決策」（decision_at = t₀ close、事件已知可進特徵）在 D2-2 下不可表示**，殘留 G3-R13 待使用者裁定。A／B＝事件相對決策為未來 ⇒ event_known_at_decision=false。two_stage＝兩段式，深度取兩段較大者；**兩段各自之 label_value 未交付**（殘留）"
     },
-    "label": { "type": "int", "enum": [0, 1], "doc": "答案欄；1=正例 0=反例" },
+    "label": {
+      "type": "int",
+      "enum": [
+        0,
+        1
+      ],
+      "doc": "答案欄；1=正例 0=反例"
+    },
     "label_definition": {
       "type": "object",
       "fields": {
-        "rule_id": { "type": "str" },
-        "canonical_digest": { "type": "str" },
-        "window": { "type": "object", "doc": "答案窗規格；至少含 horizon_bars(int≥1)＝label_end 推導輸入" },
+        "rule_id": {
+          "type": "str"
+        },
+        "canonical_digest": {
+          "type": "str"
+        },
+        "window": {
+          "type": "object",
+          "doc": "答案窗規格；至少含 horizon_bars(int≥1)＝label_end 推導輸入"
+        },
         "label_return_mode": {
           "type": "str",
-          "enum": ["open_to_close", "open_to_horizon_close", "close_to_close"],
+          "enum": [
+            "open_to_close",
+            "open_to_horizon_close",
+            "close_to_close"
+          ],
           "default": "close_to_close",
-          "rejected_pairs": { "open_to_close": ["trigger_close", "decision_bar_close"] },
+          "rejected_pairs": {
+            "open_to_close": [
+              "trigger_close",
+              "decision_bar_close"
+            ]
+          },
           "_rejected_pairs_doc": "D-001 D4.2：**成對**拒收（不是單維度拒收，故不放 rejected_with_reason）。open_to_close 令 label_start=entry_at、end_idx=entry_idx；entry 之取價欄為 close 時 entry_at=ct[entry_idx] 而 label_end=ct[entry_idx] ⇒ 窗長 0 ⇒ 三段鏈 no_boundary_match（真實 kline k∈{0,2} 實跑皆 0 窗）。reason 字面＝capability_unavailable_reasons.zero_length_label_window。形狀＝{mode: [entry,...]}，與 momentum/Analysis/event_samples/label_value_from_case.py::REJECTED_PAIRS 及前端 EVENT_DIM_CONTRACT_MIRROR 三處同形狀，由 pytest／vitest 逐鍵對證。UI 之 disabled 須**雙向**（選了 mode 擋 entry、選了 entry 擋 mode）。",
           "doc": "label 錨 mode-scoped 機械唯一（SPEC D1-5）；open_to_* 顯式宣告才合法（白話閘裁決②）；與 entry_price_semantic 之成對限制見 rejected_pairs"
         },
@@ -48,7 +102,14 @@
           "wire_shape": {
             "version": 1,
             "combinator": "AND",
-            "conditions": [{ "column": "str", "op": "one of >= | <= | between", "value": "float（op 為 between 時省略）", "range": "[float, float]（僅 op 為 between）" }]
+            "conditions": [
+              {
+                "column": "str",
+                "op": "one of >= | <= | between",
+                "value": "float（op 為 between 時省略）",
+                "range": "[float, float]（僅 op 為 between）"
+              }
+            ]
           },
           "wire_shape_doc": "GAP-3 UX Task 2.2（B5）定案之形狀（解除具名殘留 R-B3-2）。凍結前 L2 對「有 filters 但抽不出欄名」一律強制宣告（fail-closed 止血）；本形狀凍結後，`lookahead_declaration.filters_referenced_columns()` 對**符合本形狀**者改為精確抽取（讀 conditions[].column），不符者維持原「字串 ∩ 可見欄 ＋ 抽不出即強制宣告」之 fail-closed 路徑——外部產生之 filters 仍可能是任意形狀，不得因為本形狀存在就假設所有 filters 都長這樣。combinator 目前只有 AND（SPEC Task 2.1「多條件 AND」）；日後若加 OR 須同批更新抽取器與本欄。"
         }
@@ -57,70 +118,202 @@
     },
     "control_kind": {
       "type": "str",
-      "enum": ["user_labeled_same_trigger", "user_labeled_other", "platform_same_trigger_rule", "platform_random_bars"],
-      "accepted": ["user_labeled_same_trigger", "user_labeled_other", "platform_same_trigger_rule", "platform_random_bars"],
+      "enum": [
+        "user_labeled_same_trigger",
+        "user_labeled_other",
+        "platform_same_trigger_rule",
+        "platform_random_bars"
+      ],
+      "accepted": [
+        "user_labeled_same_trigger",
+        "user_labeled_other",
+        "platform_same_trigger_rule",
+        "platform_random_bars"
+      ],
       "doc": "四值閉集，四值皆 accepted。platform_same_trigger_rule 自 B3.2 起由產生器產出、過同一 validator；platform_random_bars 自 D-001 D5.1 解禁（原 rejected_with_reason.platform_random_bars=not_implemented_platform_random_bars 已移除；該 reason 字面**保留登記**於 import_failure_reasons，因其為封閉集合且 receipt_schema/reason registry 之既有前綴不得刪值）。隨機批之抽樣契約住 receipt_schema.batch.random_control_spec，由 validate_event_import 之 random_control_spec keyword 強制：批帶 platform_random_bars 而缺 spec ⇒ random_control_spec_missing；非隨機批帶 spec 或帶 label_origin=platform_random ⇒ random_control_mixed_batch"
     },
-    "source_file_digest": { "type": "str", "format": "sha256_hex64", "doc": "匯入來源檔 sha256；提供 source_bytes 時逐列對證，不符 ⇒ digest_mismatch" },
-    "data_snapshot_digest": { "type": "str", "doc": "資料快照識別；僅驗非空字串（誠實邊界 c）" }
+    "source_file_digest": {
+      "type": "str",
+      "format": "sha256_hex64",
+      "doc": "匯入來源檔 sha256；提供 source_bytes 時逐列對證，不符 ⇒ digest_mismatch"
+    },
+    "data_snapshot_digest": {
+      "type": "str",
+      "doc": "資料快照識別；僅驗非空字串（誠實邊界 c）"
+    }
   },
   "optional_fields": {
-    "label_value": { "type": "float", "doc": "連續 label；statistic_kind=conditional_ic 之條件必填（缺 ⇒ capability unavailable:missing_label_value，D1-3）；型別錯 ⇒ label_value_type_error" },
+    "label_value": {
+      "type": "float",
+      "doc": "連續 label；statistic_kind=conditional_ic 之條件必填（缺 ⇒ capability unavailable:missing_label_value，D1-3）；型別錯 ⇒ label_value_type_error"
+    },
     "counterexample_kind": {
       "type": "str",
-      "enum": ["a_trigger_no_follow", "b_range", "c_drop"],
+      "enum": [
+        "a_trigger_no_follow",
+        "b_range",
+        "c_drop"
+      ],
       "doc": "僅使用者填；unclassifiable 不可匯入（⇒ counterexample_kind_not_importable）"
     },
-    "kind_source": { "type": "str", "enum": ["user", "platform_auto"], "doc": "分類來源；使用者已標 ⇒ user、平台不重算不回寫" },
+    "kind_source": {
+      "type": "str",
+      "enum": [
+        "user",
+        "platform_auto"
+      ],
+      "doc": "分類來源；使用者已標 ⇒ user、平台不重算不回寫"
+    },
     "label_origin": {
       "type": "str",
-      "enum": ["search_positive_case", "user_csv", "platform_generator", "platform_random", "search_unlabeled"],
-      "not_importable": ["search_unlabeled"],
+      "enum": [
+        "search_positive_case",
+        "user_csv",
+        "platform_generator",
+        "platform_random",
+        "search_unlabeled"
+      ],
+      "not_importable": [
+        "search_unlabeled"
+      ],
       "doc": "label 之 provenance（這批的答案是怎麼來的）。search_positive_case=搜尋頁匯出之正例；user_csv=使用者自標 CSV；platform_generator=平台產生器；platform_random=隨機對照組；search_unlabeled=搜尋頁之未標籤匯出（**不可匯入**，只走 two_stage 之未標籤路徑）。🔴 值屬 not_importable ⇒ label_origin_not_importable；scenario ∈ {A,B,two_stage} 而缺本欄 ⇒ conditional_required_missing。**舊批（scenario=C 且無本欄）不受條件必填約束、不補值**，讀路徑回 null"
     },
-    "search_rule_summary": { "type": "str", "two_stage_shape": "{\"stage_count\":2,\"stages\":[\"<sha256>\",\"<sha256>\"]}", "doc": "U2 當時搜尋條件摘要。🔴 scenario=two_stage 時本欄改為 **canonical JSON 單一字串**，形狀逐字＝two_stage_shape：鍵序固定 stage_count→stages、無空白、stages 為兩段各自條件之 canonical digest（sha256，順序＝第一段在前）。stage_count 恆為 2——只有一段時匯出端即阻擋（two_stage_requires_two_stages），**不得**靜默寫 stage_count=1。🔴 兩段各自之 label_value 未交付（見 scenario.doc 之殘留）：本欄只記「這批是由哪兩段條件產生的」，不承載任何分數。" },
-    "event_source": { "type": "str" },
-    "observable_family": { "type": "str" },
-    "event_origin": { "type": "str", "doc": "值 'model' 觸發 conditional_required.source_model（T9）" },
-    "event_shape": { "type": "str", "doc": "值 'interval' 觸發 conditional_required.event_interval（T10）" },
-    "label_kind": { "type": "str" },
-    "event_type_tag": { "type": "str", "doc": "自由標籤" },
-    "meta": { "type": "object", "doc": "自由欄；不得用以補 conditional_required 之洞（R1 X5）" },
-    "lookahead_bars_declared": { "type": "object", "doc": "GAP-3 UX D-004 A-020：逐 timeframe 深度 oracle（Mapping[str,int>=0]）；可隨事件列匯入攜帶；對齊後複製至 receipt_schema.batch.lookahead_bars_declared。型別錯 ⇒ type_error；同批各列須同值，列間不一致 ⇒ heterogeneous_rows_in_batch（無條件檢查，不受 enforce_batch_homogeneity 約束）" },
-    "future_1bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_2bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_3bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_4bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_5bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_6bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_7bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_8bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_9bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_10bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_11bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" },
-    "future_12bar_return": { "type": "float", "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定" }
+    "search_rule_summary": {
+      "type": "str",
+      "two_stage_shape": "{\"stage_count\":2,\"stages\":[\"<sha256>\",\"<sha256>\"]}",
+      "doc": "U2 當時搜尋條件摘要。🔴 scenario=two_stage 時本欄改為 **canonical JSON 單一字串**，形狀逐字＝two_stage_shape：鍵序固定 stage_count→stages、無空白、stages 為兩段各自條件之 canonical digest（sha256，順序＝第一段在前）。stage_count 恆為 2——只有一段時匯出端即阻擋（two_stage_requires_two_stages），**不得**靜默寫 stage_count=1。🔴 兩段各自之 label_value 未交付（見 scenario.doc 之殘留）：本欄只記「這批是由哪兩段條件產生的」，不承載任何分數。"
+    },
+    "event_source": {
+      "type": "str"
+    },
+    "observable_family": {
+      "type": "str"
+    },
+    "event_origin": {
+      "type": "str",
+      "doc": "值 'model' 觸發 conditional_required.source_model（T9）"
+    },
+    "event_shape": {
+      "type": "str",
+      "doc": "值 'interval' 觸發 conditional_required.event_interval（T10）"
+    },
+    "label_kind": {
+      "type": "str"
+    },
+    "event_type_tag": {
+      "type": "str",
+      "doc": "自由標籤"
+    },
+    "meta": {
+      "type": "object",
+      "doc": "自由欄；不得用以補 conditional_required 之洞（R1 X5）"
+    },
+    "lookahead_bars_declared": {
+      "type": "object",
+      "doc": "GAP-3 UX D-004 A-020：逐 timeframe 深度 oracle（Mapping[str,int>=0]）；可隨事件列匯入攜帶；對齊後複製至 receipt_schema.batch.lookahead_bars_declared。型別錯 ⇒ type_error；同批各列須同值，列間不一致 ⇒ heterogeneous_rows_in_batch（無條件檢查，不受 enforce_batch_homogeneity 約束）"
+    },
+    "future_1bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_2bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_3bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_4bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_5bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_6bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_7bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_8bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_9bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_10bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_11bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    },
+    "future_12bar_return": {
+      "type": "float",
+      "doc": "附帶報酬欄；純供 Excel 攜帶；不進 ic_feed；不參與深度導出／label 判定"
+    }
   },
   "conditional_required": {
     "reference_symbols": {
       "trigger": "field_present_nonempty",
       "type": "list",
-      "item_fields": ["symbol", "timeframe", "alignment_rule", "snapshot_digest"],
-      "item_types": { "symbol": "str", "timeframe": "str", "alignment_rule": "str", "snapshot_digest": "str" },
+      "item_fields": [
+        "symbol",
+        "timeframe",
+        "alignment_rule",
+        "snapshot_digest"
+      ],
+      "item_types": {
+        "symbol": "str",
+        "timeframe": "str",
+        "alignment_rule": "str",
+        "snapshot_digest": "str"
+      },
       "doc": "T8 跨標的參照；出現即全欄必填且逐欄驗型（禁 coercion；CODEX-R1-P1-03），缺 ⇒ conditional_required_missing、型錯 ⇒ type_error"
     },
     "source_model": {
       "trigger": "event_origin == 'model'",
       "type": "object",
-      "item_fields": ["model_id", "version", "artifact_digest", "split_plan_hash", "feature_manifest_hash", "available_at"],
-      "item_types": { "model_id": "str", "version": "str", "artifact_digest": "str", "split_plan_hash": "str", "feature_manifest_hash": "str", "available_at": "int_ms" },
+      "item_fields": [
+        "model_id",
+        "version",
+        "artifact_digest",
+        "split_plan_hash",
+        "feature_manifest_hash",
+        "available_at"
+      ],
+      "item_types": {
+        "model_id": "str",
+        "version": "str",
+        "artifact_digest": "str",
+        "split_plan_hash": "str",
+        "feature_manifest_hash": "str",
+        "available_at": "int_ms"
+      },
       "rule": "available_at(ms) <= decision_at_nominal(= t0 - decision_offset_bars×TF_ms) 否則 reason=research_only 拒（R2 C7；M12 看住）",
       "doc": "T9 模型產事件之 availability receipt；逐欄驗型"
     },
     "event_interval": {
       "trigger": "event_shape == 'interval'",
       "type": "object",
-      "item_fields": ["start", "end", "endpoints_inclusive"],
-      "item_types": { "start": "int_ms", "end": "int_ms", "endpoints_inclusive": "object{start:bool,end:bool}" },
+      "item_fields": [
+        "start",
+        "end",
+        "endpoints_inclusive"
+      ],
+      "item_types": {
+        "start": "int_ms",
+        "end": "int_ms",
+        "endpoints_inclusive": "object{start:bool,end:bool}"
+      },
       "rule": "start < end",
       "doc": "T10 區間事件；start/end epoch ms（量級閘同 t0）、endpoints_inclusive={start:bool,end:bool}；逐欄驗型"
     }
@@ -128,75 +321,179 @@
   "derived_fields": {
     "doc": "對齊/組樣本寫入 receipt/manifest，非匯入欄；匯入檔出現任一 ⇒ unknown_field",
     "names": [
-      "observed_through_ms", "feature_cutoff_ms", "decision_at_ms", "entry_at_ms", "label_start_ms", "label_end_ms",
-      "event_known_at_decision", "entry_after_label_start",
-      "dedupe_cluster_id", "overlap_set_hash", "uniqueness_weight", "time_cluster_id", "cluster_weight",
-      "counterexample_kind_effective", "platform_suggested_kind"
+      "observed_through_ms",
+      "feature_cutoff_ms",
+      "decision_at_ms",
+      "entry_at_ms",
+      "label_start_ms",
+      "label_end_ms",
+      "event_known_at_decision",
+      "entry_after_label_start",
+      "dedupe_cluster_id",
+      "overlap_set_hash",
+      "uniqueness_weight",
+      "time_cluster_id",
+      "cluster_weight",
+      "counterexample_kind_effective",
+      "platform_suggested_kind"
     ],
-    "counterexample_kind_effective_enum": ["a_trigger_no_follow", "b_range", "c_drop", "unclassifiable"]
+    "counterexample_kind_effective_enum": [
+      "a_trigger_no_follow",
+      "b_range",
+      "c_drop",
+      "unclassifiable"
+    ]
   },
   "import_failure_reasons": [
-    "missing_required_field", "unknown_field", "enum_violation", "type_error",
-    "invalid_timestamp_unit", "duplicate_event_id", "empty_import",
-    "missing_control_group", "not_implemented_platform_random_bars",
-    "direction_mixed_in_batch", "conditional_required_missing", "research_only",
-    "digest_mismatch", "label_value_type_error", "counterexample_kind_not_importable",
-    "column_mapping_missing", "column_not_found_in_file",
-    "label_column_not_binary", "heterogeneous_rows_in_batch",
-    "scenario_depth_inconsistent", "label_origin_not_importable",
-    "random_control_spec_missing", "random_control_mixed_batch",
+    "missing_required_field",
+    "unknown_field",
+    "enum_violation",
+    "type_error",
+    "invalid_timestamp_unit",
+    "duplicate_event_id",
+    "empty_import",
+    "missing_control_group",
+    "not_implemented_platform_random_bars",
+    "direction_mixed_in_batch",
+    "conditional_required_missing",
+    "research_only",
+    "digest_mismatch",
+    "label_value_type_error",
+    "counterexample_kind_not_importable",
+    "column_mapping_missing",
+    "column_not_found_in_file",
+    "label_column_not_binary",
+    "heterogeneous_rows_in_batch",
+    "scenario_depth_inconsistent",
+    "label_origin_not_importable",
+    "random_control_spec_missing",
+    "random_control_mixed_batch",
     "random_control_label_rule_missing"
   ],
   "alignment_failure_reasons": [
-    "invalid_timestamp_unit", "timezone_missing", "missing_bar", "duplicate_bar", "unsorted_bar",
-    "no_boundary_match", "feature_after_decision", "entry_before_decision", "label_window_incomplete",
-    "nonpositive_reference_price", "nan_or_inf_feature", "reference_symbol_unavailable",
-    "warmup_insufficient_{tf}", "tf_boundary_ambiguous"
+    "invalid_timestamp_unit",
+    "timezone_missing",
+    "missing_bar",
+    "duplicate_bar",
+    "unsorted_bar",
+    "no_boundary_match",
+    "feature_after_decision",
+    "entry_before_decision",
+    "label_window_incomplete",
+    "nonpositive_reference_price",
+    "nan_or_inf_feature",
+    "reference_symbol_unavailable",
+    "warmup_insufficient_{tf}",
+    "tf_boundary_ambiguous"
   ],
   "capability_unavailable_reasons": [
-    "missing_label_value", "missing_prevalence_disclosure", "one_class_test_segment",
-    "split_blocked_unverifiable_lookahead", "label_producer_unsupported_for_declared_semantics",
-    "zero_length_label_window", "scan_grid_too_large", "scan_cell_timeout",
+    "missing_label_value",
+    "missing_prevalence_disclosure",
+    "one_class_test_segment",
+    "split_blocked_unverifiable_lookahead",
+    "label_producer_unsupported_for_declared_semantics",
+    "zero_length_label_window",
+    "scan_grid_too_large",
+    "scan_cell_timeout",
     "missing_decision_offset_disclosure",
-    "random_control_prevalence_missing", "random_control_period_mismatch",
-    "random_control_rule_identity_unverifiable", "random_control_rule_mismatch"
+    "random_control_prevalence_missing",
+    "random_control_period_mismatch",
+    "random_control_rule_identity_unverifiable",
+    "random_control_rule_mismatch"
   ],
   "analysis_params": {
     "_doc": "D-001 D4.2／D4.3：**分析時**參數（不落檔、不進 event record；與 required_fields 之匯入欄無關）。每個數值鍵皆為 example_default＝舉例可調，非使用者裁定值；UI／config 可覆寫。",
     "decision_offset_bars_scan_max": {
-      "type": "int", "min": 0, "example_default": 10,
+      "type": "int",
+      "min": 0,
+      "example_default": 10,
       "doc": "分析頁 k 掃描之建議上限（超過只警示不擋——裁定③『填 m 就掃 0～m』，真正的硬上限是 scan_grid_max_runs）"
     },
     "scan_grid_max_runs": {
-      "type": "int", "min": 1, "example_default": 110,
+      "type": "int",
+      "min": 1,
+      "example_default": 110,
       "doc": "k×h 網格總格數硬上限；超過 ⇒ capability unavailable:scan_grid_too_large（不部分執行）。🔴 值由 D4.3 benchmark 子步凍結（receipt: handoffs/run_receipts/gap3_scan_benchmark.json，2026-09-05 實測 ETHUSDT 60 事件×12h，五階段單格 mean 6.1ms／p95 6.6ms／max 8.4ms）。110 ＝ k∈[0,10] 之 11 值 × h∈[1,10] 之 10 值；**修正暫定值 121 之算術錯誤**（121 假設兩軸各 11 值，但 h 定義域自 1 起、h=0 無意義 ⇒ h 軸只有 10 值）"
     },
     "per_cell_timeout_s": {
-      "type": "float", "min": 0.1, "example_default": 60.0,
+      "type": "float",
+      "min": 0.1,
+      "example_default": 60.0,
       "doc": "單格五階段＋條件 IC 之逾時；逾時之格 unavailable:scan_cell_timeout，其餘格保留 partial。🔴 **本值為判斷值，非實測凍結**（CODEX-R1-P2-05）：benchmark 只量到五階段（p95 6.6ms），**沒有量到每格的條件 IC**，故不得宣稱『60 秒足以吸收合理的單格 IC』。現值＝一個保守的上限，作用是讓卡死的格子一分鐘內被切掉而不是拖垮整個網格。殘留 B4-TIMEOUT-1（needs-research），觸發＝在已物化 feature run 上量到含 analyzer.analyze 的單格 p50/p95/p99"
     },
     "scan_timeout_s": {
-      "type": "float", "min": 0.1, "example_default": 900.0,
+      "type": "float",
+      "min": 0.1,
+      "example_default": 900.0,
       "doc": "整個網格之總逾時；達上限後未跑之格一律 unavailable:scan_cell_timeout，已完成之格保留。🔴 **同上為判斷值**：＝per_cell_timeout_s × 15（即使連續 15 格都跑到單格上限仍會收斂）。**不宣稱**『正常格足以跑完 110 格』——那需要含條件 IC 的實測，見殘留 B4-TIMEOUT-1"
+    },
+    "scan_cube_max_rows": {
+      "type": "int",
+      "min": 1,
+      "example_default": 120000,
+      "doc": "掃描結果立方體 Tier A（summary_table 指標）之**總列數**上限。實測 463 bytes/列（handoffs/20260907-probe-report-sections.py，讀真實報告 data_cache/reports/ic_report_ic_gatekeeper.json）⇒ 120000 列 ≒ 55 MB。超過即整層 fail-closed 不寫，manifest.tier_a.truncated=true（禁止部分保存）。🔴 初值由 60000 上調：契約滿格 scan_grid_max_runs=110 × 500 特徵 ＝ 55000 列，已逼近舊值而會誤擋合法小型帶（GROK-R1-P2-01）"
+    },
+    "scan_cube_max_rows_per_cell": {
+      "type": "int",
+      "min": 1,
+      "example_default": 5000,
+      "doc": "Tier A **單格**列數上限。與總列數閘各自獨立：防「1 格 × 60000 特徵」這種總量合法但單檔巨大的形態（COMPOSER-R1-P1-01）。超過同樣整層不寫"
+    },
+    "scan_cube_chart_max_bytes": {
+      "type": "int",
+      "min": 1,
+      "example_default": 209715200,
+      "doc": "Tier B（七個圖表節：ic_decay／quantile_returns／rolling_ic_series／grouped_ic／turnover_analysis／coverage_analysis／marginal_ic）之位元組預算，預設 200 MB。🔴 判定看**實測累加**不是估計：實測 per-feature 為 36,808 bytes，且跨報告差 8 倍（rolling_ic_series 為 3,225／19,931／26,637 B/特徵，因 _sample_rolling_series 依序列長度抽樣）⇒ 用「第一格外推」會放行超量或誤擋（COMPOSER-R2-P1-02）。超過即整層不寫（Tier A 不受影響），並給 fits_hint。🔴 滿格 110 × 300 特徵 ＝ 1,158 MB ⇒ **滿格不保證有圖表**（SPEC §C-9）"
+    },
+    "scan_cube_keep_tasks": {
+      "type": "int",
+      "min": 1,
+      "example_default": 20,
+      "doc": "data_cache/ic_scan_cubes/ 保留最近幾個 task 目錄。每次分析都是新 uuid4（不存在同 id 重跑覆蓋），故靠本值控制累積。寫入前修剪到 keep-1，語意＝寫完之後恰為 keep（CODEX-R1-P1-06）"
+    },
+    "scan_cube_page_max": {
+      "type": "int",
+      "min": 1,
+      "example_default": 500,
+      "doc": "立方體查詢端點 /rows 之單頁上限。請求超過此值 ⇒ 400（**不得靜默夾住**——靜默夾住會讓使用者以為看到全部）"
     }
   },
   "capability_reason_bindings": {
     "_doc": "能力不可用 reason 之**具名綁定**（GAP-3 UX Task 1.12 驗收④）：程式不得硬寫 reason 字面，只能以本表之鍵取值。值須屬 capability_unavailable_reasons 之封閉集合，否則 loader 端 raise（漂移 fail-closed）。鍵名刻意不含其值之任何子字串，故對 reason 字面之 grep 在 .py/.ts 上恆為 0。",
     "l3_lookahead_unverifiable": "split_blocked_unverifiable_lookahead"
   },
-  "split_purge_reasons": ["interval_crosses_split_boundary"],
-  "split_loud_flags": ["insufficient_events_in_test"],
-  "degraded_flags": ["single_symbol", "no_cluster_adjustment"],
+  "split_purge_reasons": [
+    "interval_crosses_split_boundary"
+  ],
+  "split_loud_flags": [
+    "insufficient_events_in_test"
+  ],
+  "degraded_flags": [
+    "single_symbol",
+    "no_cluster_adjustment"
+  ],
   "counterexample_classifier_config": {
     "doc": "SPEC AR-2/R2 Y2 定形；direction-aware signed return、錨＝t0 close；僅 label=0 且 counterexample_kind 缺值時執行；同時滿足多條 ⇒ unclassifiable（不猜）。R0 = dir·(close_t0−open_t0)/open_t0；Rw = dir·(close_labelEnd−close_t0)/close_t0。a: R0≥trigger_threshold ∧ Rw≤follow_threshold；b: |R0|≤range_threshold；c: R0≤−drop_threshold。",
     "unit": "fractional_return",
     "anchor": "t0_close",
     "auto_c_enabled": true,
     "thresholds": {
-      "trigger_threshold": { "value": 0.05, "example_default": true },
-      "follow_threshold": { "value": 0.0, "example_default": true },
-      "range_threshold": { "value": 0.01, "example_default": true },
-      "drop_threshold": { "value": 0.05, "example_default": true }
+      "trigger_threshold": {
+        "value": 0.05,
+        "example_default": true
+      },
+      "follow_threshold": {
+        "value": 0.0,
+        "example_default": true
+      },
+      "range_threshold": {
+        "value": 0.01,
+        "example_default": true
+      },
+      "drop_threshold": {
+        "value": 0.05,
+        "example_default": true
+      }
     },
     "thresholds_doc": "四門檻全部＝舉例可調（2026-08-20 白話閘裁決①「都只是舉例，沒有一定」），非使用者裁定數值；config/UI 可覆寫"
   },
@@ -233,8 +530,16 @@
         "required": false,
         "doc": "D-001 D5.1：**觸發批之規則身分**。來源＝匯入 envelope import_records(..., label_rule=)；人工標註／/search 匯出批通常缺（缺＝合法，比較時回 random_control_rule_identity_unverifiable）。存在 ⇒ 遞迴 typed 驗，錯 ⇒ ValueError 含葉路徑。與隨機批 random_control_spec.label_rule 逐葉相等時，prevalence 比較才成立。",
         "fields": {
-          "threshold": { "type": "float", "required": true, "doc": "close_to_close 報酬門檻（fractional）；型別嚴格 float（type(v) is float），int 不得 coerce" },
-          "horizon_bars": { "type": "int", "required": true, "doc": "答案窗長度（bars）；語意上須 ≥1，由產生器 fail-closed 檢查" }
+          "threshold": {
+            "type": "float",
+            "required": true,
+            "doc": "close_to_close 報酬門檻（fractional）；型別嚴格 float（type(v) is float），int 不得 coerce"
+          },
+          "horizon_bars": {
+            "type": "int",
+            "required": true,
+            "doc": "答案窗長度（bars）；語意上須 ≥1，由產生器 fail-closed 檢查"
+          }
         }
       },
       "random_control_spec": {
@@ -243,65 +548,157 @@
         "doc": "D-001 D5.1：隨機對照批之**抽樣契約＋抽樣收據**（同一物件；產生器輸入之鍵與產生器填回之鍵合起來即本 schema 之全集，validate_event_import 收到的一律是**產生後的完整物件**）。estimand：同 universe 之非觸發 eligible bars 以 label_rule 宣告之規則（all_bars_eval._label_from_rule）自動標 label、同一 producer 算 label_value；回答觸發樣本相對無條件基準之 prevalence／IC lift——**僅當觸發批之 receipt.batch.label_rule 與本物件之 label_rule typed 相等（threshold／horizon_bars 逐葉 ==、direction 同批、觸發批 label_return_mode == close_to_close）時該比較成立**；不回答反例品質、不補足缺失反例。🔴 **分層粒度＝自然月（UTC）**：D-001 D5.2 只寫 strata{symbol,timeframe,period,direction} 而未定義 period 如何產生多個 stratum，D5.4 邊界寫「universe 跨月分層」⇒ 本契約定 period 為 {start_ms,end_ms} 區間、stratum key ＝ symbol|timeframe|YYYY-MM|direction。此為 SPEC 洞之 fail-closed 細化（殘留 B5-SPECGAP-1）。",
         "fields": {
           "universe": {
-            "type": "object", "required": true,
+            "type": "object",
+            "required": true,
             "doc": "抽樣母體（單 symbol；跨 symbol ⇒ 拒）",
             "fields": {
-              "symbol": { "type": "str", "required": true },
-              "timeframe": { "type": "str", "required": true },
-              "start_ms": { "type": "int", "required": true },
-              "end_ms": { "type": "int", "required": true }
+              "symbol": {
+                "type": "str",
+                "required": true
+              },
+              "timeframe": {
+                "type": "str",
+                "required": true
+              },
+              "start_ms": {
+                "type": "int",
+                "required": true
+              },
+              "end_ms": {
+                "type": "int",
+                "required": true
+              }
             }
           },
           "strata": {
-            "type": "object", "required": true,
+            "type": "object",
+            "required": true,
             "doc": "分層定義；period 須與觸發批之 [min t0, max label_end] 有交集，否則 random_control_period_mismatch",
             "fields": {
-              "symbol": { "type": "str", "required": true },
-              "timeframe": { "type": "str", "required": true },
+              "symbol": {
+                "type": "str",
+                "required": true
+              },
+              "timeframe": {
+                "type": "str",
+                "required": true
+              },
               "period": {
-                "type": "object", "required": true,
+                "type": "object",
+                "required": true,
                 "fields": {
-                  "start_ms": { "type": "int", "required": true },
-                  "end_ms": { "type": "int", "required": true }
+                  "start_ms": {
+                    "type": "int",
+                    "required": true
+                  },
+                  "end_ms": {
+                    "type": "int",
+                    "required": true
+                  }
                 }
               },
-              "direction": { "type": "str", "required": true, "doc": "取自觸發批之 direction；決定 _label_from_rule 之 direction_sign" }
+              "direction": {
+                "type": "str",
+                "required": true,
+                "doc": "取自觸發批之 direction；決定 _label_from_rule 之 direction_sign"
+              }
             }
           },
-          "allocation": { "type": "str", "required": true, "doc": "封閉單值 proportional_to_candidates；floor＋最大餘數，禁 round" },
+          "allocation": {
+            "type": "str",
+            "required": true,
+            "doc": "封閉單值 proportional_to_candidates；floor＋最大餘數，禁 round"
+          },
           "exclusion": {
-            "type": "object", "required": true,
+            "type": "object",
+            "required": true,
             "fields": {
-              "trigger_ids_digest": { "type": "str", "required": true, "doc": "S-9 sha256 of sorted 觸發批 event_id" },
-              "neighborhood_bars": { "type": "int>=0", "required": true },
-              "embargo_bars": { "type": "int>=0", "required": true }
+              "trigger_ids_digest": {
+                "type": "str",
+                "required": true,
+                "doc": "S-9 sha256 of sorted 觸發批 event_id"
+              },
+              "neighborhood_bars": {
+                "type": "int>=0",
+                "required": true
+              },
+              "embargo_bars": {
+                "type": "int>=0",
+                "required": true
+              }
             }
           },
           "label_rule": {
-            "type": "object", "required": true,
+            "type": "object",
+            "required": true,
             "doc": "**必填**（TODO review r2 三家 P1-01）；缺 ⇒ random_control_label_rule_missing。與觸發批 receipt.batch.label_rule 逐葉比對即規則身分閘",
             "fields": {
-              "threshold": { "type": "float", "required": true },
-              "horizon_bars": { "type": "int", "required": true }
+              "threshold": {
+                "type": "float",
+                "required": true
+              },
+              "horizon_bars": {
+                "type": "int",
+                "required": true
+              }
             }
           },
-          "seed": { "type": "int", "required": true, "doc": "numpy.random.default_rng(seed)；同 seed 同 universe ⇒ sample_ids_digest 相等" },
-          "n_requested": { "type": "int>=0", "required": true },
-          "n_drawn": { "type": "int>=0", "required": true, "doc": "n_drawn < n_requested 允許（候選不足）但須揭露" },
-          "replacement": { "type": "bool", "required": true, "doc": "恆 false（無放回）" },
-          "candidate_count": { "type": "int>=0", "required": true, "doc": "排除區間扣除後之候選 bar 數；0 ⇒ unavailable" },
+          "seed": {
+            "type": "int",
+            "required": true,
+            "doc": "numpy.random.default_rng(seed)；同 seed 同 universe ⇒ sample_ids_digest 相等"
+          },
+          "n_requested": {
+            "type": "int>=0",
+            "required": true
+          },
+          "n_drawn": {
+            "type": "int>=0",
+            "required": true,
+            "doc": "n_drawn < n_requested 允許（候選不足）但須揭露"
+          },
+          "replacement": {
+            "type": "bool",
+            "required": true,
+            "doc": "恆 false（無放回）"
+          },
+          "candidate_count": {
+            "type": "int>=0",
+            "required": true,
+            "doc": "排除區間扣除後之候選 bar 數；0 ⇒ unavailable"
+          },
           "per_stratum": {
-            "type": "list[object]", "required": true,
+            "type": "list[object]",
+            "required": true,
             "doc": "逐層配額；Σ n_drawn == n_drawn == min(n_requested, candidate_count)",
             "fields": {
-              "key": { "type": "str", "required": true },
-              "n_candidates": { "type": "int>=0", "required": true },
-              "n_drawn": { "type": "int>=0", "required": true }
+              "key": {
+                "type": "str",
+                "required": true
+              },
+              "n_candidates": {
+                "type": "int>=0",
+                "required": true
+              },
+              "n_drawn": {
+                "type": "int>=0",
+                "required": true
+              }
             }
           },
-          "sample_ids_digest": { "type": "str", "required": true, "doc": "S-9 sha256 of sorted 抽中 event_id" },
-          "data_snapshot_digest": { "type": "str", "required": true },
-          "generator_version": { "type": "str", "required": true }
+          "sample_ids_digest": {
+            "type": "str",
+            "required": true,
+            "doc": "S-9 sha256 of sorted 抽中 event_id"
+          },
+          "data_snapshot_digest": {
+            "type": "str",
+            "required": true
+          },
+          "generator_version": {
+            "type": "str",
+            "required": true
+          }
         }
       }
     },

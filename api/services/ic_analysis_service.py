@@ -975,12 +975,61 @@ class ICAnalysisService:
                     "scan_done": done,
                     "scan_total": total,
                 })
+        # 🔴 `SCANCUBE` Task 2.3：**三步驟，順序不可調換**。
+        #    ① 落檔（此時還需要 report）② 立刻剝除 ③ 只把摘要放進回傳
+        cube = self._build_scan_cube(task_id, request, results)
+        for cell in results:
+            cell.pop("report", None)  # ← 少這行，GB 級 report 會進 HTTP status
+
         return {
             "scan_total": total,
             "scan_done": done,
             "scan_results": results,
             "capability": "available",
             "reason": None,
+            # 🔴 只有摘要：**不含** rows／sections（那是 GB 級，走 /scan-cube 端點）
+            "cube": cube,
+        }
+
+    def _build_scan_cube(
+        self, task_id: str, request: ICAnalyzeRequest, results: list[dict],
+    ) -> Dict[str, Any]:
+        """把每格的 report 落成立方體；回傳給前端的**摘要**（不含資料本體）。
+
+        🔴 落檔失敗**不得**讓掃描結果消失：掃描本身已經跑完了，
+        把它一起丟掉是拿使用者的計算時間去賠一個寫檔錯誤。
+        """
+        # 🔴 走 factory（Rule 3）——直接 `from momentum.Analysis.scan_cube import …`
+        #    會被 `check_decoupling_imports.py` 判為**新增** R3 違反。
+        #    本檔既有那幾條 `momentum.Analysis.ic_reporter` 直 import 在 baseline 裡是技術債，
+        #    不是可以照抄的先例。
+        from momentum.factories import create_event_sample_pipeline, create_scan_cube_store
+
+        scan_cube = create_scan_cube_store()
+        try:
+            params = create_event_sample_pipeline().analysis_params()
+            manifest = scan_cube.build_cube(
+                task_id,
+                getattr(request, "symbol", None),
+                getattr(request, "timeframe", None),
+                results,
+                max_rows=int(params["scan_cube_max_rows"]),
+                max_rows_per_cell=int(params["scan_cube_max_rows_per_cell"]),
+                chart_max_bytes=int(params["scan_cube_chart_max_bytes"]),
+                keep_tasks=int(params["scan_cube_keep_tasks"]),
+            )
+        except Exception as exc:  # noqa: BLE001  落檔失敗 loud 但不吃掉掃描結果
+            logger.error("scan cube 落檔失敗 task=%s: %s", task_id, exc, exc_info=True)
+            return {"status": "failed", "reason": str(exc)[:200]}
+
+        return {
+            "status": "ok",
+            "created_at": manifest["created_at"],
+            "metrics": manifest["metrics"],
+            "chart_sections": manifest["chart_sections"],
+            "excluded_sections": manifest["excluded_sections"],
+            "tier_a": manifest["tier_a"],
+            "tier_b": manifest["tier_b"],
         }
 
     def _run_scan_cell(
@@ -1011,6 +1060,17 @@ class ICAnalysisService:
             int(cell_override.get("embargo") or 0), int(staged["purge_rows"]),
         )
         analyzer = analyzer_factory(cell_override)
+        # 🔴 `SCANCUBE` Task 1.1：掃描格是**研究掃描**，不是決策產物 ⇒ 不寫 survivor artifact。
+        #    實跑證明（`handoffs/20260906-probe-scan-overwrite.py`，rc=0）：
+        #    `_resolve_filtered_path` 只用 symbol+timeframe、**不含 k/h**
+        #    ⇒ 4 組不同 (k,h) 落到同一路徑，N 格覆蓋同一檔、最後一格獲勝；
+        #    且逾時之格的 thread 仍會跑完（`_run_scan_grid` docstring 自陳），
+        #    它跑完時也會寫 ⇒ 並行寫競態。每格自己造 analyzer 的隔離**擋不到**這個，
+        #    因為落檔路徑是行程全域的。
+        #    🔴 停寫而非「路徑帶 k/h」：該 h5 是 survivor artifact，有 export 消費者
+        #    （`assert_filtered_export_fresh` 比對 provenance）；寫 110 份競爭性 artifact
+        #    比覆蓋更糟——下游無從知道該讀哪一份。每格的**數據**改由立方體保存。
+        analyzer._suppress_persist = True
         report = analyzer.analyze(
             features_path=features_path,
             labels_path=labels_path or "",
@@ -1028,6 +1088,13 @@ class ICAnalysisService:
             "n_events": len(staged["event_timestamps"]),
             "analysis_alignment_receipt_hash": staged["analysis_alignment_receipt_hash"],
             "ic_summary": self._scan_cell_summary(report),
+            # 🔴 `SCANCUBE` Task 2.3：**只在行程內傳遞**，供 `build_cube` 落檔用。
+            #    `_run_scan_grid` 在 `build_cube` 之後**立刻 pop 掉**——
+            #    `_run_analysis` 會把整個 `scan` 放進 `info["event_label_scan"]`，
+            #    而 `get_task_status` 逐鍵放進 HTTP payload
+            #    ⇒ 不剝除就會把 GB 級 report 推進 status API
+            #    （`CODEX-R1-P1-02`／`GROK-R1-P1-01` 兩家獨立命中）。
+            "report": report,
         }
 
     async def start_analysis(

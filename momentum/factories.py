@@ -452,6 +452,22 @@ def create_ic_analyzer(config: Optional[dict] = None) -> "ICFilterOrchestrator":
     return ICFilterOrchestrator(ic_config)
 
 
+def create_scan_cube_store() -> Any:
+    """掃描結果立方體之讀寫（`SCANCUBE`）。
+
+    🔴 走 factory 而非 service 直接 `from momentum.Analysis.scan_cube import …`：
+    Rule 3「Services use factories」；直接 import 會被
+    `scripts/check_decoupling_imports.py` 判為新增 R3 違反（既有那些在 baseline 裡是技術債，
+    不是可以照抄的先例）。
+
+    回傳模組本身——本模組是**純函式集合**（`build_cube`／`query_cube`／`load_charts`），
+    沒有狀態、不需要實例化；包成類別只是為了滿足形式，那是多餘的一層。
+    """
+    from momentum.Analysis import scan_cube
+
+    return scan_cube
+
+
 def create_factor_return_analyzer(config: Optional[dict] = None) -> "FactorReturnAnalyzer":
     from momentum.Analysis.factor_return_analyzer import FactorReturnAnalyzer
 
