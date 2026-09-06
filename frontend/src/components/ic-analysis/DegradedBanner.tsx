@@ -1,6 +1,7 @@
 'use client';
 
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
+import type { ICOosDowngrade } from '@/lib/types';
 
 /**
  * LA-1 B3：degraded full-sample 紅標 banner。
@@ -21,9 +22,11 @@ export default function DegradedBanner() {
   //    出生事故（2026-09-06 UAT）：使用者對 60／115／219 筆三種事件批都看到這個 banner，
   //    但看不出是為什麼、也看不出還差多少 ⇒ 無從判斷該加樣本還是改設定。
   //    這四個數字後端本來就算出來了（只進了 logger.warning），本欄把它們帶到畫面。
-  const downgrade = report?.metadata?.oos_downgrade as
-    | { reason?: string; train_rows?: number; test_rows?: number; min_test_rows?: number }
-    | undefined;
+  const downgrade = report?.metadata?.oos_downgrade as ICOosDowngrade | undefined;
+  // 三個列數**同時**存在才顯示——只有 full-sample fallback 那條路會產生它們。
+  const hasRowCounts = typeof downgrade?.train_rows === 'number'
+    && typeof downgrade?.test_rows === 'number'
+    && typeof downgrade?.min_test_rows === 'number';
 
   // 舊 artifact 無欄位 → 不炸、不顯示
   if (status === undefined || status === null) {
@@ -48,13 +51,29 @@ export default function DegradedBanner() {
       {downgrade?.reason && (
         <p data-testid="ic-oos-downgrade" className="text-sm text-rose-200/90">
           原因：<code className="bg-slate-900/50 px-1 rounded">{downgrade.reason}</code>
-          ——訓練 {downgrade.train_rows} 列、測試 {downgrade.test_rows} 列，
-          但滾動 IC 需要測試集至少 {downgrade.min_test_rows} 列。
-          <br />
-          <span className="text-rose-200/70">
-            要拿到 OOS 保證，得讓**測試集的列數**過門檻。列數不等於事件數——
-            事件經對齊與 purge 之後才變成列，兩者沒有固定倍數。
-          </span>
+          {/* 🔴 `R1` 閉合：只有 full-sample fallback 那條路有列數；其餘四條分支
+              （事件樣本不足／config 直設 full_sample／split 未套用／無 holdout 證據）
+              **沒有**列數可報 ⇒ 那時不得印 `null 列`，改講這個 reason 的意思。 */}
+          {hasRowCounts ? (
+            <>
+              ——訓練 {downgrade.train_rows} 列、測試 {downgrade.test_rows} 列，
+              但滾動 IC 需要測試集至少 {downgrade.min_test_rows} 列。
+              <br />
+              <span className="text-rose-200/70">
+                要拿到 OOS 保證，得讓<strong>測試集的列數</strong>過門檻。列數不等於事件數——
+                事件經對齊與 purge 之後才變成列，兩者沒有固定倍數。
+              </span>
+            </>
+          ) : (
+            <>
+              。
+              <br />
+              <span className="text-rose-200/70" data-testid="ic-oos-downgrade-no-rows">
+                這條路徑沒有訓練／測試列數可報（列數只有在切分真的跑過才會產生）。
+                它代表本次分析<strong>沒有保留獨立的測試集</strong>，結果不可當 out-of-sample 使用。
+              </span>
+            </>
+          )}
         </p>
       )}
       {eventFallback && (

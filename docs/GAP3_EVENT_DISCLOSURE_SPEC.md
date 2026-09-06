@@ -61,7 +61,9 @@ RISK-HIT: b
 
 **Task 1.3 — `degraded_full_sample` 之原因與門檻投影到畫面**
 - 目標：使用者看得到「為什麼沒有 OOS 保證」與「還差多少」。　檔案：`momentum/Analysis/ic_filter_orchestrator.py`（**只讀**，把既有 fallback details 寫進 report metadata 之既有節點）、`api/services/ic_analysis_service.py`（投影進揭露 dict）、`frontend/src/components/ic-analysis/`（顯示）。
-- 改法：①orchestrator 之 full-sample fallback 路徑已持有 `reason`／`train_rows`／`test_rows`／`min_test_rows`（見 §A receipt），將其寫入 `metadata["oos_downgrade"] = {reason, train_rows, test_rows, min_test_rows}`；**判定規則不動**。②`ic_analysis_service` 把該節點原樣投影至 task_info 之 `oos_downgrade`。③前端在既有的 `Full-sample research-only` 警語**之下**加一行具體說明。
+- 改法（🔴 **R1 修訂**，見下）：①判定實作收斂為單一函式 `_downgrade_branch(meta) -> Optional[str]`，`_resolve_root_status` 成為其薄包裝（**分支順序與判準逐字不變**）；②full-sample fallback 路徑寫入含四個數字之 `metadata["oos_downgrade"]`；③`_annotate_root_status_and_pass_class` 於**任何**降級且該鍵缺席時補寫 `{reason: <branch>, train_rows: null, test_rows: null, min_test_rows: null}`；④前端 `DegradedBanner` 讀 `report.metadata.oos_downgrade`，三個列數**同時為數字**才顯示列數段，否則顯示 reason 與其意義。
+  - 🔴 **R1 `CODEX-R1-P1-01`／`COMPOSER-R1-P2-02` 修訂**：原改法只覆蓋 full-sample fallback 一條路，而 `event_filter.fallback`／`fit_mode=full_sample`／`split` 未套用／無 holdout 證據**四條分支**同樣降級卻無原因 ⇒ 畫面退回籠統警語。修法見 ③。
+  - 🔴 **R1 `CODEX-R1-P2-06`／`GROK-R1-P2-01` 修訂**：原改法要求投影至 `task_info`。**實作刻意不投影**——`DegradedBanner` 已讀 `report.metadata`（同 `event_filter` 那條路），再開一條會是**沒有消費端的死表面**。本 SPEC 從 metadata-only 為唯一 contract；`frontend/src/lib/types.ts` 之 `ICOosDowngrade` 型別仍須存在（三個列數為 `number | null`）。
 - **驗證（可證偽）**：`venv/bin/python -m pytest tests/api -q -k "oos_downgrade or degraded"` 全綠，且逐條：
   - 對一個**真實**小事件批（115 筆）跑分析 ⇒ `oos_downgrade.reason == "rolling_warmup_insufficient"` 且 `min_test_rows == 131` 且 `test_rows < min_test_rows`
   - 正向對照：足夠大的樣本 ⇒ `analysis_status == "ok_oos"` 且 `oos_downgrade is None`（**不得**恆常出現）
@@ -72,9 +74,15 @@ RISK-HIT: b
 
 **Task 1.4 — 參數說明文案（h／k／進階區／隨機對照三參數）**
 - 目標：每個使用者要填的數字旁邊都說得出「這是什麼、影響什麼」。　檔案：新增 `frontend/src/lib/eventParamDocs.ts`；`EventBatchDisclosurePanel.tsx` 引用。
-- 改法：單一檔匯出 `EVENT_PARAM_DOCS`（鍵＝參數名，值＝`{what, effect}` 兩句），涵蓋：`horizon_bars`、`decision_offset_bars`、`advanced_pair`（進階直改 entry／mode）、`seed`、`neighborhood_bars`、`embargo_bars`。元件以 `data-testid="ic-param-doc-<key>"` render。
-- **驗證（可證偽）**：vitest：①六個鍵各自有非空 `what` 與 `effect`；②六個 `ic-param-doc-<key>` 皆出現在 DOM 且文字等於 `EVENT_PARAM_DOCS` 之值（**逐字相等**，不是「包含」）；③`EVENT_PARAM_DOCS` 之鍵集與元件實際 render 的集合**相等**（多一個沒顯示、少一個顯示不出來皆紅）。
-- **邊界（≥2）**：①`k` 之控制項在 `/search` 已移除 ⇒ 該頁不得出現 `ic-param-doc-decision_offset_bars`；②文案不得與契約 `doc` 重複——契約已有 `doc` 的欄位（`entry_price_semantic`／`label_return_mode`）**不進**本檔。
+- 改法：單一檔匯出 `EVENT_PARAM_DOCS`（鍵＝參數名，值＝`{what, effect}` 兩句），元件以 `data-testid="ic-param-doc-<key>"` render。
+  🔴 **R1 `CODEX-R1-P1-03` 修訂**：k 之鍵名為 **`decision_offset_bars_analysis`**，不是 `decision_offset_bars`
+  ——後者是**契約欄位**（匯入時記錄的 k），其 `doc` 住 `eventContractDocs.ts`；本檔講的是**本次分析用的 k**
+  （B-D4 已把兩者分開，面板以 `ic-param-k-dual` 並排）。同名即第二份真相源。
+  🔴 **R1 `CODEX-R1-P1-04` 修訂**：鍵集擴為 **11 個**，補齊三個原本沒有說明的 user-editable 數字欄
+  （`n_requested`／`decision_offset_bars_scan_max`／`horizon_bars_scan_max`），
+  並拆 `h_inert_same_bar`（單值 h 欄之後果）與 `h_scan_inapplicable`（h 掃描之後果）——同源但後果不同。
+- **驗證（可證偽）**：vitest：①每鍵各自有非空且互異之 `what`／`effect`；②每個 `ic-param-doc-<key>` 之文字**逐字等於** `EVENT_PARAM_DOCS` 之值（不是「包含」）；③DOM 實際 render 之鍵集與 `EVENT_PARAM_DOCS` 扣掉兩個 inline-only 鍵後**相等**；④🔴 **R1 新增之覆蓋閘**：面板內**每一個** `input[type=number]` 都必須有對應之說明（以 DOM 掃描斷言，不靠人工維護鍵表）。
+- **邊界（≥2）**：①`k` 之控制項在 `/search` 已移除 ⇒ 該頁不得出現 `ic-param-doc-decision_offset_bars_analysis`；②文案不得與契約 `doc` 重複——兩邊鍵集**不相交**，由測試機械對證。
 - **存活至**：保留。　**覆蓋風險**：無。
 - 不可做：不得把契約既有 `doc` 複製一份進本檔（第二份真相源）；不得在本檔寫任何數值門檻（門檻來自後端揭露）。
 

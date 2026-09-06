@@ -274,7 +274,7 @@ export default function EventBatchDisclosurePanel({
             答案窗 horizon_bars（任意正整數）
             {currentPreset?.key === 'same_bar' && (
               <span className="ml-1 text-[11px] text-slate-400" data-testid="ic-param-h-inert">
-                — 「當根」不用 h（送出時固定為 1）
+                — {EVENT_PARAM_DOCS.h_inert_same_bar.what}
               </span>
             )}
             {!userChoseSpec && (
@@ -497,6 +497,8 @@ export default function EventBatchDisclosurePanel({
                 {EVENT_PARAM_DOCS.h_scan_inapplicable.effect}
               </p>
             )}
+            <ParamDoc paramKey="decision_offset_bars_scan_max" />
+            <ParamDoc paramKey="horizon_bars_scan_max" />
           </div>
         )}
 
@@ -540,12 +542,28 @@ export default function EventBatchDisclosurePanel({
               <>
                 {/* Task 1.2：主結果與矩陣之關係。2026-09-06 UAT：使用者以為矩陣每格
                     都用框裡的 k（實際上後端逐格帶自己的 k），根因是這層關係從沒被說出來。 */}
+                {/* 🔴 `CODEX-R1-P1-02` 之閉合：**未選量法時不得報 (k,h)**。
+                    未選時 `useICAnalysis` 會整個省略 `event_label_spec`，由後端依這批
+                    宣告的深度導出——前端手上那個 `{horizon_bars: 1}` 只是本地哨兵，
+                    印出來會與實際送出的值不同（畫面說謊）。k 亦不得以 `?? 0` 硬編，
+                    下界唯一來自契約。 */}
                 <p className="text-[11px] text-slate-300" data-testid="ic-scan-primary-note">
-                  主要結果 ＝ k＝{spec.decision_offset_bars ?? 0}、h＝{spec.horizon_bars}
-                  （分析參數框裡的值）。下表是**另外**跑的；沒有勾掃描的那一軸就用框裡的值。
-                  {!scanResult.scan_results.some(
-                    (c) => c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars,
-                  ) && '　🔴 主要結果不在下表範圍內。'}
+                  {userChoseSpec ? (
+                    <>
+                      主要結果 ＝ k＝{spec.decision_offset_bars ?? kRange.min}、h＝{spec.horizon_bars}
+                      （分析參數框裡的值）。下表是<strong>另外</strong>跑的；
+                      沒有勾掃描的那一軸就用框裡的值。
+                      {!scanResult.scan_results.some(
+                        (c) => c.k === (spec.decision_offset_bars ?? kRange.min)
+                          && c.h === spec.horizon_bars,
+                      ) && '　🔴 主要結果不在下表範圍內。'}
+                    </>
+                  ) : (
+                    <span data-testid="ic-scan-primary-unknown">
+                      主要結果之 (k, h) <strong>由後端依這批宣告的深度決定</strong>（你尚未選量法）
+                      ——因此下表**不標**主要結果是哪一格。選了量法之後才會標。
+                    </span>
+                  )}
                 </p>
                 <p className="text-[11px] text-slate-400">
                   掃描完成 {scanResult.scan_done}/{scanResult.scan_total} 格
@@ -561,11 +579,15 @@ export default function EventBatchDisclosurePanel({
                               key={`${c.k}-${c.h}`}
                               data-testid={`ic-scan-cell-${c.k}-${c.h}`}
                               data-primary={
-                                c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars
+                                userChoseSpec
+                                  && c.k === (spec.decision_offset_bars ?? kRange.min)
+                                  && c.h === spec.horizon_bars
                                   ? 'true' : undefined
                               }
                               className={`px-2 py-0.5${
-                                c.k === (spec.decision_offset_bars ?? 0) && c.h === spec.horizon_bars
+                                userChoseSpec
+                                  && c.k === (spec.decision_offset_bars ?? kRange.min)
+                                  && c.h === spec.horizon_bars
                                   ? ' rounded border border-sky-400 font-medium text-sky-200' : ''
                               }`}
                               title={c.reason ?? undefined}
@@ -640,6 +662,7 @@ export default function EventBatchDisclosurePanel({
               ))}
             </div>
             <div className="space-y-1">
+              <ParamDoc paramKey="n_requested" />
               <ParamDoc paramKey="seed" />
               <ParamDoc paramKey="neighborhood_bars" />
               <ParamDoc paramKey="embargo_bars" />

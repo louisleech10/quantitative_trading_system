@@ -1233,29 +1233,47 @@ class ICFilterOrchestrator:
         return report
 
     @staticmethod
+    def _downgrade_branch(report_meta: dict) -> Optional[str]:
+        """觸發降級的**分支代號**；`None` ⇒ 未降級（`ok_oos`）。
+
+        🔴 本函式是 root 狀態判定之**唯一**實作，`_resolve_root_status` 只是它的薄包裝。
+        分支順序與判準**逐字沿用**改寫前之 `_resolve_root_status`（行為不變，由
+        `test_resolve_root_status_behaviour_is_baseline` 之參數化守住）。
+
+        🔴 為什麼要回「分支代號」而不只回 bool（`CODEX-R1-P1-01`／`COMPOSER-R1-P2-02`）：
+        揭露層要告訴使用者**為什麼**沒有 OOS 保證。原本只有 full-sample fallback 那條路
+        會寫 `oos_downgrade`，其餘四條分支（含事件樣本不足）降級了卻沒有原因可顯示，
+        畫面退回籠統警語——那正是本票要修的病，只是漏了四條路。
+        ⇒ 分支代號由**同一份判定**產出，不另寫第二份條件。
+        """
+        meta = report_meta or {}
+        if meta.get("oos_guarantees") is False:
+            return "meta_oos_guarantees_false"
+        if meta.get("fit_mode") == "full_sample":
+            return "fit_mode_full_sample"
+        # ICHC Task 4.1：事件樣本不足回退全樣本 → 即使 holdout 已 applied 仍判 degraded
+        event_meta = meta.get("event_filter")
+        if isinstance(event_meta, dict) and event_meta.get("fallback") is True:
+            return "event_filter_fallback"
+        split = meta.get("ic_train_test_split")
+        if isinstance(split, dict):
+            if split.get("oos_guarantees") is False or split.get("applied") is False:
+                return "split_not_applied"
+            if split.get("applied") is True and split.get("oos_guarantees") is not False:
+                return None
+        if meta.get("oos_guarantees") is True:
+            return None
+        return "no_holdout_evidence"
+
+    @staticmethod
     def _resolve_root_status(report_meta: dict) -> tuple[str, bool]:
         """由 metadata 推 root analysis_status / oos_guarantees。
 
         OOS 宣稱 iff analysis_status=="ok_oos"（G-A2）。
+        判定實作住 `_downgrade_branch`（單一來源）；本函式只做 branch → (status, bool)。
         """
-        meta = report_meta or {}
-        if meta.get("oos_guarantees") is False:
-            return "degraded_full_sample", False
-        if meta.get("fit_mode") == "full_sample":
-            return "degraded_full_sample", False
-        # ICHC Task 4.1：事件樣本不足回退全樣本 → 即使 holdout 已 applied 仍判 degraded
-        event_meta = meta.get("event_filter")
-        if isinstance(event_meta, dict) and event_meta.get("fallback") is True:
-            return "degraded_full_sample", False
-        split = meta.get("ic_train_test_split")
-        if isinstance(split, dict):
-            if split.get("oos_guarantees") is False or split.get("applied") is False:
-                return "degraded_full_sample", False
-            if split.get("applied") is True and split.get("oos_guarantees") is not False:
-                return "ok_oos", True
-        if meta.get("oos_guarantees") is True:
-            return "ok_oos", True
-        return "degraded_full_sample", False
+        branch = ICFilterOrchestrator._downgrade_branch(report_meta)
+        return ("ok_oos", True) if branch is None else ("degraded_full_sample", False)
 
     @staticmethod
     def _annotate_root_status_and_pass_class(
@@ -1267,6 +1285,21 @@ class ICFilterOrchestrator:
         """寫 root 紅標 + summary_table/filter_log pass_class（G-A2）。"""
         report["analysis_status"] = analysis_status
         report["oos_guarantees"] = bool(oos_guarantees)
+        # 🔴 `CODEX-R1-P1-01`／`COMPOSER-R1-P2-02` 之閉合：**任何**降級都要有具名原因。
+        #    原本只有 full-sample fallback 那條路寫 `oos_downgrade`，其餘四條分支
+        #    （`event_filter.fallback`／`fit_mode=full_sample`／`split` 未套用／無 holdout 證據）
+        #    降級了卻沒有原因，畫面退回籠統警語。
+        #    🔴 **只在缺席時補**：fallback 路徑已寫入含四個數字的版本，不得覆蓋成無數字版。
+        #    🔴 列數未知時填 `None`（**不是 0**）——0 會被讀成「訓練 0 列」這種假事實。
+        if analysis_status != "ok_oos":
+            meta = report.get("metadata")
+            if isinstance(meta, dict) and not isinstance(meta.get("oos_downgrade"), dict):
+                meta["oos_downgrade"] = {
+                    "reason": ICFilterOrchestrator._downgrade_branch(meta) or "unknown",
+                    "train_rows": None,
+                    "test_rows": None,
+                    "min_test_rows": None,
+                }
         pass_class = (
             "oos" if analysis_status == "ok_oos" else "full_sample_research_only"
         )

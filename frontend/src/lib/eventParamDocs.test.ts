@@ -8,20 +8,30 @@ import { describe, expect, it } from 'vitest';
 import { EVENT_PARAM_DOCS, EVENT_PARAM_DOC_KEYS } from '@/lib/eventParamDocs';
 import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
 
+/**
+ * 🔴 R1（`CODEX-R1-P1-04`）後由 7 擴為 11：補齊三個 user-editable 數字欄
+ * （`n_requested`／兩個掃描上限），並拆 `h_inert_same_bar`（單值 h 欄之後果）
+ * 與 `h_scan_inapplicable`（h 掃描之後果）——同源但後果不同。
+ */
 const EXPECTED_KEYS = [
   'horizon_bars',
   'decision_offset_bars_analysis',
   'advanced_pair',
+  'n_requested',
+  'decision_offset_bars_scan_max',
+  'horizon_bars_scan_max',
   'seed',
   'neighborhood_bars',
   'embargo_bars',
+  'h_inert_same_bar',
   'h_scan_inapplicable',
 ];
 
+
 describe('EVENT_PARAM_DOCS', () => {
-  it('鍵集**恰為**七個（多一個沒 render、少一個顯示不出來，皆須紅）', () => {
+  it('鍵集**恰為** 11 個（多一個沒 render、少一個顯示不出來，皆須紅）', () => {
     expect(new Set(EVENT_PARAM_DOC_KEYS)).toEqual(new Set(EXPECTED_KEYS));
-    expect(EVENT_PARAM_DOC_KEYS.length).toBe(7);
+    expect(EVENT_PARAM_DOC_KEYS.length).toBe(11);
   });
 
   it('每鍵之 what／effect 皆非空，且不是同一句話', () => {

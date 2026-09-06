@@ -92,20 +92,25 @@
 
 ### Task 1.3 — `degraded_full_sample` 之原因與門檻投影到畫面（`票 UAT-B22-9`）
 - SPEC ref：Task 1.3　目標：使用者看得到「為什麼沒有 OOS 保證」與「還差多少列」。
-- 輸入 / 輸出：`ic_filter_orchestrator` 之 fallback details（`reason`／`train_rows`／`test_rows`／`min_test_rows`）→ `metadata["oos_downgrade"]` → task_info `oos_downgrade` → 前端一行說明。
+- 輸入 / 輸出：降級分支（`_downgrade_branch`）＋ fallback details → `metadata["oos_downgrade"]` → 前端一行說明。
+  🔴 **R1 修訂**（`CODEX-R1-P2-06`／`GROK-R1-P2-01`）：**不經 task_info**。`DegradedBanner` 已讀
+  `report.metadata`（同 `event_filter` 那條路），再開一條投影會是沒有消費端的死表面。metadata 為唯一 contract。
 - 實作要點：
   1. `momentum/Analysis/ic_filter_orchestrator.py` 之 full-sample fallback 段（現行只 `logger.warning`，見 SPEC §A receipt）：
      於 `fallback_override` 組裝**之後**、rerun **之前**，把
      `{"reason": reason, "train_rows": train_rows, "test_rows": test_rows, "min_test_rows": min_test_rows}`
-     暫存於 `self._oos_downgrade`；於 `_report` 產生後寫入 `report["metadata"]["oos_downgrade"]`。
-     **`_resolve_root_status` 一字不改**（它讀的鍵與本鍵無關）。
-  2. `api/services/ic_analysis_service.py`：於既有寫 task_info 之區塊（與 `event_sample_design` 同處）加
-     `info["oos_downgrade"] = (report.get("metadata") or {}).get("oos_downgrade")`。
-     `ok_oos` 時該鍵為 `None`（**不得**寫成空 dict——空 dict 與「沒有降級」在前端分不出來）。
-  3. `frontend/src/lib/types.ts` 增 `ICOosDowngrade { reason: string; train_rows: number; test_rows: number; min_test_rows: number }`；
-     既有 `Full-sample research-only` 警語區塊**之下**加 `data-testid="ic-oos-downgrade"` 一行：
-     `原因：${reason}｜訓練 ${train_rows} 列、測試 ${test_rows} 列，但滾動 IC 需要至少 ${min_test_rows} 列。`
-- 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py`（fallback 段 ＋ `_report` 組裝）；`api/services/ic_analysis_service.py`（task_info 投影）；`frontend/src/lib/types.ts`；顯示該警語之元件。　既有 caller：讀 task_info 之前端 hook（`useICAnalysis`）——新增鍵不影響既有欄。
+     寫入 `report["metadata"]["oos_downgrade"]`。
+  2. 🔴 **R1 新增**：判定收斂為單一函式 `_downgrade_branch(meta) -> Optional[str]`，
+     `_resolve_root_status` 改為其薄包裝（**分支順序與判準逐字不變**，由既有參數化基線測試守）。
+     於 `_annotate_root_status_and_pass_class`（root 紅標之唯一寫出點）補：降級且該鍵缺席時
+     寫 `{reason: <branch>, train_rows: null, test_rows: null, min_test_rows: null}`。
+     **只在缺席時補**——fallback 已寫的四數字版不得被覆蓋。
+  3. `frontend/src/lib/types.ts` 增 `ICOosDowngrade { reason: string; train_rows: number | null; … }`
+     （三個列數可為 `null`：只有 fallback 那條路產生列數）；
+     `DegradedBanner` 於警語**之下**加 `data-testid="ic-oos-downgrade"`：
+     三個列數**同時為數字**才顯示列數段，否則顯示 reason 與其意義（`ic-oos-downgrade-no-rows`）。
+- 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py`（`_downgrade_branch`／`_resolve_root_status`／fallback 段／`_annotate_root_status_and_pass_class`）；`frontend/src/lib/types.ts`；`DegradedBanner.tsx`。　既有 caller：`_resolve_root_status` 之既有呼叫端（簽章不變）。
+  🔴 **不動** `api/services/ic_analysis_service.py`——R1 裁定 metadata 為唯一 contract。
 - 路徑：
   - `momentum/Analysis/ic_filter_orchestrator.py`
   - `api/services/ic_analysis_service.py`
@@ -130,8 +135,13 @@
 - SPEC ref：Task 1.4　目標：每個使用者要填的數字旁邊都說得出「這是什麼、影響什麼」。
 - 輸入 / 輸出：無輸入（靜態）→ `EVENT_PARAM_DOCS: Record<string, {what: string; effect: string}>`。
 - 實作要點：
-  1. 新建 `frontend/src/lib/eventParamDocs.ts`，匯出 `EVENT_PARAM_DOCS`，鍵**恰為七個**：
-     `horizon_bars`／`decision_offset_bars`／`advanced_pair`／`seed`／`neighborhood_bars`／`embargo_bars`／`h_scan_inapplicable`。
+  1. 新建 `frontend/src/lib/eventParamDocs.ts`，匯出 `EVENT_PARAM_DOCS`，鍵**恰為 11 個**（R1 修訂後）：
+     `horizon_bars`／**`decision_offset_bars_analysis`**／`advanced_pair`／`n_requested`／
+     `decision_offset_bars_scan_max`／`horizon_bars_scan_max`／`seed`／`neighborhood_bars`／
+     `embargo_bars`／`h_inert_same_bar`／`h_scan_inapplicable`。
+     🔴 `CODEX-R1-P1-03`：k 之鍵**帶 `_analysis` 後綴**——契約已有同名 `decision_offset_bars.doc`
+     （匯入欄位之 k），同名即第二份真相源。
+     🔴 `CODEX-R1-P1-04`：`n_requested`／兩個 scan max 是 user-editable 數字欄，原本沒有說明。
   2. 每鍵之 `what` 一句（這是什麼）、`effect` 一句（影響什麼）。內容依 SPEC §A 之定性：
      `horizon_bars`＝往後看幾根決定答案；影響＝**換 h 等於換問題**，IC 不可跨 h 比較。
      `decision_offset_bars`＝提前幾根決定；影響＝特徵截止點往前，可用資料變舊，IC 通常變低。

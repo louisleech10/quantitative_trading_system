@@ -1064,7 +1064,7 @@ describe('Task 1.4 — 參數說明文案接線', () => {
     );
     const rendered = Array.from(document.querySelectorAll('[data-testid^="ic-param-doc-"]'))
       .map((el) => el.getAttribute('data-testid')!.replace('ic-param-doc-', ''));
-    const expected = EVENT_PARAM_DOC_KEYS.filter((k) => k !== 'h_scan_inapplicable');
+    const expected = EVENT_PARAM_DOC_KEYS.filter((k) => !['h_scan_inapplicable','h_inert_same_bar'].includes(k));
     expect(new Set(rendered)).toEqual(new Set(expected));
   });
 
@@ -1075,5 +1075,129 @@ describe('Task 1.4 — 參數說明文案接線', () => {
     expect(el.textContent).toBe(
       `${EVENT_PARAM_DOCS.horizon_bars.what} ${EVENT_PARAM_DOCS.horizon_bars.effect}`,
     );
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// R1 閉合（2026-09-06 三家 code review）
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('R1 CODEX-P1-04 — 每個 user-editable 數字欄都要有說明（機械覆蓋閘）', () => {
+  it('🔴 面板內每一個 input[type=number] 都有對應說明；靠 DOM 掃描，不靠人工維護鍵表', () => {
+    const full = detailFixture();
+    full.records = [
+      { event_id: 'a', symbol: 'ETHUSDT', timeframe: '12h', t0: 1700000000000,
+        label_definition: { window: { horizon_bars: 3 } } },
+      { event_id: 'b', symbol: 'ETHUSDT', timeframe: '12h', t0: 1700043200000,
+        label_definition: { window: { horizon_bars: 3 } } },
+    ];
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={full}
+        labelSpec={SPEC_HOLD as never} onChangeLabelSpec={() => {}}
+        labelScan={{ decision_offset_bars_max: 3, horizon_bars_max: 3 }}
+        onChangeLabelScan={() => {}}
+      />,
+    );
+    const numberInputs = Array.from(
+      document.querySelectorAll('input[type="number"]'),
+    ) as HTMLInputElement[];
+    // 正向對照：真的有數字欄（否則下面的迴圈是空的）
+    expect(numberInputs.length).toBeGreaterThanOrEqual(6);
+
+    const docCount = document.querySelectorAll('[data-testid^="ic-param-doc-"]').length;
+    // 🔴 說明數不得少於數字欄數——少一個就代表有欄位沒人解釋。
+    //    （說明可多於欄位：`advanced_pair` 解釋的是一個 toggle 不是 number input。）
+    expect(docCount).toBeGreaterThanOrEqual(numberInputs.length);
+  });
+
+  it('三個原本沒有說明的欄位現在都有（n_requested／兩個掃描上限）', () => {
+    const full = detailFixture();
+    full.records = [
+      { event_id: 'a', symbol: 'ETHUSDT', timeframe: '12h', t0: 1700000000000,
+        label_definition: { window: { horizon_bars: 3 } } },
+      { event_id: 'b', symbol: 'ETHUSDT', timeframe: '12h', t0: 1700043200000,
+        label_definition: { window: { horizon_bars: 3 } } },
+    ];
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={full}
+        labelSpec={SPEC_HOLD as never} onChangeLabelSpec={() => {}}
+        labelScan={null} onChangeLabelScan={() => {}}
+      />,
+    );
+    for (const k of ['n_requested', 'decision_offset_bars_scan_max', 'horizon_bars_scan_max']) {
+      expect(screen.getByTestId(`ic-param-doc-${k}`), `缺 ${k} 之說明`).toBeTruthy();
+    }
+  });
+});
+
+describe('R1 CODEX-P1-02 — 未選量法時不得報主結果 (k,h)', () => {
+  const scanDisc = {
+    event_label_scan: {
+      capability: 'available', reason: null, message: null,
+      scan_done: 2, scan_total: 2,
+      scan_results: [
+        { k: 0, h: 1, capability: 'available', n_events: 10, reason: null },
+        { k: 0, h: 2, capability: 'available', n_events: 10, reason: null },
+      ],
+    },
+  };
+
+  it('🔴 labelSpec undefined ⇒ 說明行改講「由後端決定」，且**零格**被標主結果', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()}
+        labelSpec={undefined} onChangeLabelSpec={() => {}}
+        labelScan={{ horizon_bars_max: 2 }} onChangeLabelScan={() => {}}
+        disclosure={scanDisc as never}
+      />,
+    );
+    expect(screen.getByTestId('ic-scan-primary-unknown')).toBeTruthy();
+    expect(document.querySelectorAll('[data-primary="true"]').length).toBe(0);
+    // 不得出現寫死的 k=0/h=1
+    expect(screen.getByTestId('ic-scan-primary-note').textContent).not.toContain('k＝0');
+  });
+
+  it('正向對照：選了量法 ⇒ 照常報 (k,h) 並標一格', () => {
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()}
+        labelSpec={{ ...SPEC_HOLD, horizon_bars: 2, decision_offset_bars: 0 } as never}
+        onChangeLabelSpec={() => {}}
+        labelScan={{ horizon_bars_max: 2 }} onChangeLabelScan={() => {}}
+        disclosure={scanDisc as never}
+      />,
+    );
+    expect(screen.queryByTestId('ic-scan-primary-unknown')).toBeNull();
+    expect(document.querySelectorAll('[data-primary="true"]').length).toBe(1);
+  });
+});
+
+describe('R1 COMPOSER-P2-01 — 只掃一軸時主格仍唯一', () => {
+  it('只掃 k（h 用框裡的值）⇒ 恰一格被標', () => {
+    const disc = {
+      event_label_scan: {
+        capability: 'available', reason: null, message: null,
+        scan_done: 3, scan_total: 3,
+        scan_results: [
+          { k: 0, h: 3, capability: 'available', n_events: 10, reason: null },
+          { k: 1, h: 3, capability: 'available', n_events: 9, reason: null },
+          { k: 2, h: 3, capability: 'available', n_events: 8, reason: null },
+        ],
+      },
+    };
+    render(
+      <EventBatchDisclosurePanel
+        importId="imp-1" detail={detailFixture()}
+        labelSpec={{ ...SPEC_HOLD, horizon_bars: 3, decision_offset_bars: 1 } as never}
+        onChangeLabelSpec={() => {}}
+        labelScan={{ decision_offset_bars_max: 2 }} onChangeLabelScan={() => {}}
+        disclosure={disc as never}
+      />,
+    );
+    const primary = document.querySelectorAll('[data-primary="true"]');
+    expect(primary.length).toBe(1);
+    expect(primary[0].getAttribute('data-testid')).toBe('ic-scan-cell-1-3');
   });
 });

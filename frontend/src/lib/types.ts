@@ -2930,6 +2930,21 @@ export interface EventImportDetail {
   receipt_batch: EventReceiptBatch;
 }
 
+/**
+ * 沒有 OOS 保證時之**具名原因**（`GAP3_EVENT_DISCLOSURE` Task 1.3）。
+ *
+ * 🔴 三個列數為 `number | null`：**只有** full-sample fallback 那條路會產生它們；
+ *    其餘四條降級分支（事件樣本不足／config 直設 `fit_mode=full_sample`／
+ *    `split` 未套用／無 holdout 證據）只有 `reason`。
+ *    後端在列數未知時填 `null`（**不是 0**）——0 會被讀成「訓練 0 列」這種假事實。
+ */
+export interface ICOosDowngrade {
+  reason: string;
+  train_rows: number | null;
+  test_rows: number | null;
+  min_test_rows: number | null;
+}
+
 /** `G3-D2` D5.1：標籤規則之身分（`close_to_close` 門檻＋答案窗長度）。 */
 export interface EventLabelRule {
   threshold: number;

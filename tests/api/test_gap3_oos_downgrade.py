@@ -23,24 +23,25 @@ import pytest
 from momentum.Analysis import ic_filter_orchestrator as orch
 
 
-def test_oos_downgrade_written_at_the_single_fallback_point():
-    """🔴 `oos_downgrade` 之寫出點**恰為一處**，且就在 fallback 之 metadata 組裝段。
+def test_oos_downgrade_has_exactly_two_write_sites_with_precedence():
+    """🔴 **本條之前提於 R1 被我自己的修法改掉，已誠實改寫。**
 
-    多處寫出＝多份真相源；本欄之值來自該處的 `reason`／`details`，
-    在別處補寫必然拿不到同一組數字。
+    改寫前：斷言「寫出點恰為一處」。
+    改寫後：`CODEX-R1-P1-01` 的修法需要**第二個**寫出點（root 紅標處補寫非 fallback 分支），
+    所以「唯一寫出點」不再是對的不變式。真正該守的是**優先序**：
+    fallback 的四數字版**先寫**，補寫端**只在缺席時**動作。
+
+    ⚠️ 舊式在改寫後其實仍會綠（補寫用的是 `meta[...]` 而非 `report_meta[...]`，字串計數仍為 1）
+    ——那是靠技術細節矇混，不是真的在守那條規則。故整條換掉。
     """
     src = inspect.getsource(orch)
-    assert src.count('report_meta["oos_downgrade"]') == 1
-
-    fallback_src = inspect.getsource(orch.ICFilterOrchestrator._rerun_full_sample_fallback) \
-        if hasattr(orch.ICFilterOrchestrator, "_rerun_full_sample_fallback") else None
-    if fallback_src is None:
-        # 函式名可能不同——退而求其次：確認它與 `ic_train_test_split` 的 fallback 寫在同一段
-        idx_downgrade = src.index('report_meta["oos_downgrade"]')
-        idx_split = src.index('report_meta["ic_train_test_split"] = _split_fallback_metadata')
-        assert abs(idx_downgrade - idx_split) < 2000, "兩者應在同一個 metadata 組裝段"
-    else:
-        assert 'report_meta["oos_downgrade"]' in fallback_src
+    # 兩個寫出點：fallback 的富版 ＋ root 紅標處的補寫
+    assert src.count('"oos_downgrade"] = ') == 2
+    # 補寫端必須有「缺席才寫」的守衛（否則會蓋掉富版）
+    annotate_src = inspect.getsource(
+        orch.ICFilterOrchestrator._annotate_root_status_and_pass_class)
+    assert 'not isinstance(meta.get("oos_downgrade"), dict)' in annotate_src
+    # 行為面之保證見 `test_annotate_does_not_overwrite_fallback_rich_version`
 
 
 def test_oos_downgrade_carries_the_four_numbers_from_details():
@@ -83,17 +84,15 @@ def test_resolve_root_status_behaviour_is_baseline(meta, expect_status):
     assert status == expect_status
 
 
-def test_oos_downgrade_absent_when_no_fallback():
-    """🔴 沒有降級 ⇒ 不得有本欄（**不得**寫空 dict）。
+def test_oos_downgrade_never_initialised_as_empty_dict():
+    """🔴 不得寫空 dict——空 dict 與「沒有降級」在前端分不出來。
 
-    空 dict 與「沒有降級」在前端分不出來——那正是本票要修的那種
-    「看得到結果、看不到為什麼」的反面：看得到一個欄位、但它什麼都沒說。
-    以 `_resolve_root_status` 之 `ok_oos` 路徑為代表：該路徑不經 fallback 段，
-    故 metadata 內不會有本鍵。
+    （R1 後本條之標題與敘述已修正：本鍵**不再**只在 fallback 段被寫，
+    非 fallback 分支由 root 紅標處補寫；不變的是「不得無條件初始化」。
+    「`ok_oos` 不寫本欄」之行為由 `test_annotate_writes_nothing_when_ok_oos` 守。）
     """
     src = inspect.getsource(orch)
-    # 本鍵只在 fallback 段被寫；全檔沒有「無條件初始化為 {}」之寫法
-    assert 'report_meta.setdefault("oos_downgrade"' not in src
+    assert 'setdefault("oos_downgrade"' not in src
     assert '"oos_downgrade": {}' not in src
 
 
@@ -184,3 +183,82 @@ def test_fallback_downgrade_defaults_to_zero_when_details_incomplete(monkeypatch
     assert report["metadata"]["oos_downgrade"] == {
         "reason": "some_other_reason", "train_rows": 0, "test_rows": 0, "min_test_rows": 0,
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# R1 閉合：CODEX-R1-P1-01／COMPOSER-R1-P2-02
+#   ——**任何**降級分支都要有具名原因，不只 full-sample fallback 那一條
+# ══════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.parametrize(
+    ("meta", "expect_branch"),
+    [
+        ({"oos_guarantees": False}, "meta_oos_guarantees_false"),
+        ({"fit_mode": "full_sample"}, "fit_mode_full_sample"),
+        ({"event_filter": {"fallback": True}}, "event_filter_fallback"),
+        ({"ic_train_test_split": {"applied": False}}, "split_not_applied"),
+        ({"ic_train_test_split": {"oos_guarantees": False}}, "split_not_applied"),
+        ({}, "no_holdout_evidence"),
+        ({"ic_train_test_split": {"applied": True, "oos_guarantees": True}}, None),
+        ({"oos_guarantees": True}, None),
+    ],
+    ids=["oos_false", "full_sample", "event_fallback", "split_not_applied",
+         "split_oos_false", "empty", "split_ok", "oos_true"],
+)
+def test_downgrade_branch_covers_every_path(meta, expect_branch):
+    """🔴 每一條降級分支都要回一個**具名**代號（`None` 只留給真的沒降級）。
+
+    出生事故（`CODEX-R1-P1-01`）：首版只有 full-sample fallback 那條路寫 `oos_downgrade`，
+    其餘四條分支降級了卻沒有原因 ⇒ 畫面退回籠統警語，而那正是本票要修的病。
+    """
+    assert orch.ICFilterOrchestrator._downgrade_branch(meta) == expect_branch
+
+
+def test_resolve_root_status_is_thin_wrapper_of_single_judgment():
+    """🔴 判定只有**一份**實作：`_resolve_root_status` 之結果必須恆等於
+    「`_downgrade_branch` 是否為 None」。
+
+    兩份條件必然漂移；本條把「薄包裝」這件事釘成可證偽的等式。
+    """
+    metas = [
+        {"oos_guarantees": False}, {"fit_mode": "full_sample"},
+        {"event_filter": {"fallback": True}}, {"ic_train_test_split": {"applied": False}},
+        {"ic_train_test_split": {"applied": True, "oos_guarantees": True}},
+        {"oos_guarantees": True}, {}, {"ic_train_test_split": "not-a-dict"},
+    ]
+    for m in metas:
+        status, oos = orch.ICFilterOrchestrator._resolve_root_status(m)
+        branch = orch.ICFilterOrchestrator._downgrade_branch(m)
+        assert (status == "ok_oos") is (branch is None), m
+        assert oos is (branch is None), m
+
+
+def test_annotate_backfills_downgrade_for_non_fallback_paths():
+    """🔴 非 fallback 之降級路徑，在 root 紅標寫出點被**補上**具名原因。
+
+    列數為 `None`（**不是 0**）——0 會被讀成「訓練 0 列」這種假事實。
+    """
+    report = {"metadata": {"event_filter": {"fallback": True}}}
+    orch.ICFilterOrchestrator._annotate_root_status_and_pass_class(
+        report, analysis_status="degraded_full_sample", oos_guarantees=False)
+    dg = report["metadata"]["oos_downgrade"]
+    assert dg["reason"] == "event_filter_fallback"
+    assert dg["train_rows"] is None and dg["test_rows"] is None and dg["min_test_rows"] is None
+
+
+def test_annotate_does_not_overwrite_fallback_rich_version():
+    """🔴 **只在缺席時補**：fallback 已寫入的四數字版不得被無數字版蓋掉。"""
+    rich = {"reason": "rolling_warmup_insufficient",
+            "train_rows": 82, "test_rows": 30, "min_test_rows": 131}
+    report = {"metadata": {"fit_mode": "full_sample", "oos_downgrade": dict(rich)}}
+    orch.ICFilterOrchestrator._annotate_root_status_and_pass_class(
+        report, analysis_status="degraded_full_sample", oos_guarantees=False)
+    assert report["metadata"]["oos_downgrade"] == rich
+
+
+def test_annotate_writes_nothing_when_ok_oos():
+    """正向對照：`ok_oos` ⇒ 不得補寫本欄（否則 banner 會顯示不該有的降級說明）。"""
+    report = {"metadata": {"oos_guarantees": True}}
+    orch.ICFilterOrchestrator._annotate_root_status_and_pass_class(
+        report, analysis_status="ok_oos", oos_guarantees=True)
+    assert "oos_downgrade" not in report["metadata"]

@@ -120,3 +120,39 @@ describe('Task 1.3 — oos_downgrade 之具體原因與門檻', () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+describe('R1 閉合 — 有 reason 但沒有列數（非 fallback 之四條降級分支）', () => {
+  it('🔴 列數為 null ⇒ **不得**印「null 列」，改講這個 reason 的意思', () => {
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'degraded_full_sample',
+      oos_guarantees: false,
+      metadata: {
+        oos_downgrade: {
+          reason: 'event_filter_fallback',
+          train_rows: null, test_rows: null, min_test_rows: null,
+        },
+      },
+    } as unknown as ICReport);
+    render(<DegradedBanner />);
+    const el = screen.getByTestId('ic-oos-downgrade');
+    expect(el.textContent).toContain('event_filter_fallback');
+    expect(el.textContent).not.toContain('null');
+    expect(screen.getByTestId('ic-oos-downgrade-no-rows')).toBeTruthy();
+  });
+
+  it('正向對照：三個列數齊全 ⇒ 顯示列數段，且**不**顯示「沒有列數」那段', () => {
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'degraded_full_sample',
+      oos_guarantees: false,
+      metadata: {
+        oos_downgrade: {
+          reason: 'rolling_warmup_insufficient',
+          train_rows: 82, test_rows: 30, min_test_rows: 131,
+        },
+      },
+    } as unknown as ICReport);
+    render(<DegradedBanner />);
+    expect(screen.getByTestId('ic-oos-downgrade').textContent).toContain('131');
+    expect(screen.queryByTestId('ic-oos-downgrade-no-rows')).toBeNull();
+  });
+});
