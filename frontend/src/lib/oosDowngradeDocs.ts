@@ -43,9 +43,23 @@ export const OOS_DOWNGRADE_DOCS: Record<string, OosDowngradeDoc> = {
     what: '資料列數太少，切分本身跑不起來。',
     next: '加長資料期間或降低取樣頻率（例如 1h 改 15m），讓總列數足以切分。',
   },
+  /**
+   * 🔴 這條只在**設定檔真的寫死 full_sample** 時才會出現（正常情況不會）。
+   * 出生事故（UAT，2026-09-07）：使用者問「哪裡可以設定 fit_mode，我沒看到啊」——
+   * 答案是**畫面上沒有**，那個值只存在於 `config/ic_config.yaml`，
+   * 而且該檔註解明寫「orchestrator 注入、禁改成 global 預設」＝它本來就不是設定項。
+   * 原文案叫使用者「把 fit_mode 改回 PIT」，等於指了一條**沒有介面**的路
+   *（與 B23「重新匯入時帶 label_rule」卻沒有任何路由傳它，是同一種病）。
+   */
   fit_mode_full_sample: {
-    what: '設定裡直接指定了全樣本擬合（`fit_mode=full_sample`）——這是請求的結果，不是資料不足。',
-    next: '把 `fit_mode` 改回 PIT／expanding，就會恢復 OOS 保證。',
+    what:
+      '設定檔裡把擬合模式寫死成全樣本（`fit_mode=full_sample`）——'
+      + '這是設定造成的，不是資料不足。',
+    next:
+      '🔴 這個值**畫面上沒有開關**（它平常由系統自己推導：切分成功用 train_mask、'
+      + '切分關閉用 pit_expanding、切分失敗才退回 full_sample）。'
+      + '若真要改，只能編輯 config/ic_config.yaml 的 preprocessing.fit_mode 改回 unset '
+      + '並重啟後端——但正常情況不該有人去設它。',
   },
   /**
    * 🔴 與上一條是**兩件相反的事**（UAT，2026-09-07）。
