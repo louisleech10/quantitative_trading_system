@@ -26,9 +26,17 @@ codex：「A 為堵洞而改…實質收斂成 B＋D 的較大改動面」⇒ A 
   codex：不做 D ＝ event_id 錯配進條件 IC ＝**錯誤輸出**。
 - P3 期間自動對齊＋丟失事件 ID 揭露；P4 進度＋記憶體 WARN（**不得擋**）；P5 purge/embargo 揭露。
 
+## B0 完成（2026-09-08）
+Task 0.2 golden 重做：`handoffs/20260907-probe-split-baseline.py --write` → 9 組（8 ok＋1 skip），
+含 stage0 預載（`horizon_source=column_parse`）、`split_row_fingerprint`、`retained_event_ids`；
+sha256=`e378c706…ba7201`，重跑對證 True。
+Task 0.1 scaffold：`scripts/evtalign_phase_gate.sh`、`handoffs/20260907-evtalign-mutate.py`、
+三個 placeholder 測試（`pytest.skip`）。實測 rc 直接取：phase 0 PASS；phase 1 rc=1（2 skip＋UNCOVERED=5）＝預期。
+🔴 mutate 首版把 pytest rc=5（沒收集到測試）當「紅」⇒ B3 假 PASS；已改為 rc=5 計 UNCOVERED、紅只認 rc=1。
+
 ## 下一步（依 TODO §B）
-**B0**：Task 0.1 scaffold ＋ **Task 0.2 golden 重做**（首版 `f01550db…` 已作廢：須加
-`split_row_fingerprint`、`retained_event_ids`、事件路徑案例）→ **B1**：Task 1.1＋2.1 同批 → R3。
+**B1**：Task 1.1（B，`_coterminalize_close` 接 stage0 `:2790`＋stage2 `:2923`）＋Task 2.1（D）同批實作，
+覆寫三個 placeholder，mutate 錨點改真實字串，`bash scripts/evtalign_phase_gate.sh 1` 須 rc=0 → R3。
 
 ## 具名殘留
 `EA-RESID-1` preprocessing 峰值記憶體（17 GB／8 GB）｜`EA-RESID-2` 橫截面無守衛（模組未完工，**非缺陷**）
