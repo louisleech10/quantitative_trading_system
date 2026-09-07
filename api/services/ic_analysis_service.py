@@ -414,7 +414,20 @@ class ICAnalysisService:
         timeframes = sorted({str(r["timeframe"]) for r in records})
 
         # 🔴 **建構一次**：下面兩個 consumer 拿到的是**同一個** dict 物件。
-        timeframe_seconds = pipeline.timeframe_seconds_for(timeframes)
+        # 🔴 UAT（2026-09-07）：鍵集必須含**分析用 timeframe**，不能只有事件批宣告的那些。
+        #    使用者拿 12h 的事件批配 1h 的特徵 run 分析，被
+        #    「分析用 timeframe '1h' 不在注入之 timeframe_seconds 鍵集（['12h']）」擋死。
+        #    那是過嚴：`purge_ms` 是**時間長度**（與 timeframe 無關），
+        #    換算成 1h 的列數只是「同樣一段時間等於幾根 1h」——完全合法，
+        #    而且對齊層在這之前就已經把事件成功映射到 1h 的特徵列上了。
+        #    跨週期分析（粗週期事件 × 細週期特徵）本來就是這個系統支援的用法。
+        #    fail-closed 不變：不認得的 timeframe 仍由 `timeframe_seconds_for` raise，
+        #    這裡只是把「要換算的那個 tf」也放進待建構清單，不是補預設值。
+        # `getattr` 而非直取：本函式的既有測試用最小假 request（無 `timeframe` 屬性），
+        # 直取會把那些測試變成 AttributeError——那不是行為變更，是我打破了它們的前提。
+        analysis_tf = str(getattr(request, "timeframe", None) or "").strip()
+        tf_inputs = sorted(set(timeframes) | ({analysis_tf} if analysis_tf else set()))
+        timeframe_seconds = pipeline.timeframe_seconds_for(tf_inputs)
         bars_by_tf = pipeline.bars_from_kline_cache(symbols, timeframes)
 
         prepared0 = pipeline.prepare_analysis_windows(          # 階段 2（spy: call_count == 1）
