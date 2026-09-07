@@ -3046,6 +3046,15 @@ export interface ICEventScanDisclosure {
     capability: 'available' | 'unavailable';
     reason?: string | null;
     message?: string | null;
+    /**
+     * `SCANCUBE`：立方體之**就緒訊號＋摘要**（後端在 `build_cube` 之後才填）。
+     *
+     * 🔴 這一欄是掃描結果瀏覽器唯一可靠的「可以去抓了」訊號。
+     *    UAT（2026-09-07）：瀏覽器原本以「有沒有掃描結果」當觸發，
+     *    而掃描**進行中**就已經有結果 ⇒ 抓 manifest 得 404、狀態卡住不再重抓。
+     *    立方體是在整個網格跑完之後才寫的，所以只有本欄能代表「寫好了」。
+     */
+    cube?: ICScanCubeSummary | null;
   } | null;
 }
 

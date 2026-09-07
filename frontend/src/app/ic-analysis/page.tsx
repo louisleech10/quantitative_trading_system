@@ -266,6 +266,20 @@ function ICAnalysisPageContent() {
 
   useEffect(() => {
     fetchRuns().catch(() => undefined);
+
+    // 🔴 UAT（2026-09-07）：使用者在 Feature Factory 生了新的 ETHUSDT 1h 特徵，
+    //    回到本頁卻在 Run 選單看不到——因為上面那行**只在掛載時跑一次**，
+    //    而使用者是在另一個分頁／另一次操作裡生成的，本頁沒有任何重抓途徑。
+    //    （後端沒問題：`/api/v1/features/runs` 當下就回 `browse_ready=true`、437,110 特徵。）
+    //    ⇒ 回到本頁（分頁重新可見或視窗取得焦點）時重抓一次。
+    const refetch = () => { fetchRuns().catch(() => undefined); };
+    const onVisible = () => { if (document.visibilityState === 'visible') refetch(); };
+    window.addEventListener('focus', refetch);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', refetch);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [fetchRuns]);
 
   useEffect(() => {

@@ -51,6 +51,9 @@ function manifest(over: Record<string, unknown> = {}) {
   };
 }
 
+/** 立方體之就緒訊號。🔴 沒有它，元件**不會**去抓 manifest（見 Props.cube 之註解）。 */
+const CUBE_OK = { status: 'ok' as const, created_at: '2026-09-07T00:00:00Z' };
+
 function page(n = 3, total = 3) {
   return {
     total, offset: 0, limit: 50,
@@ -87,7 +90,7 @@ describe('接線', () => {
   });
 
   it('有 taskId 且有掃描 ⇒ 取 manifest 並顯示', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => expect(screen.getByTestId('ic-cube')).toBeTruthy());
     expect(mockManifest).toHaveBeenCalledWith('t1');
   });
@@ -96,7 +99,7 @@ describe('接線', () => {
 describe('分頁', () => {
   it('顯示「共 N 筆，正在看 X–Y」，且 N 用的是 total 不是本頁筆數', async () => {
     mockRows.mockResolvedValue({ ...page(50, 1200), limit: 50 });
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => {
       const text = screen.getByTestId('ic-cube-paging').textContent || '';
       expect(text).toContain('1200');
@@ -107,14 +110,14 @@ describe('分頁', () => {
 
   it('最後一頁時「下一頁」為 disabled', async () => {
     mockRows.mockResolvedValue(page(3, 3));
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => {
       expect((screen.getByTestId('ic-cube-next') as HTMLButtonElement).disabled).toBe(true);
     });
   });
 
   it('第一頁時「上一頁」為 disabled', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => {
       expect((screen.getByTestId('ic-cube-prev') as HTMLButtonElement).disabled).toBe(true);
     });
@@ -123,7 +126,7 @@ describe('分頁', () => {
 
 describe('跨格視圖', () => {
   it('🔴 必須顯示跨 h 之比較限制', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-view'));
     fireEvent.change(screen.getByTestId('ic-cube-view'), { target: { value: 'feature' } });
 
@@ -134,7 +137,7 @@ describe('跨格視圖', () => {
   });
 
   it('🔴 不得提供跨格排名／自動選最佳格', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-view'));
     fireEvent.change(screen.getByTestId('ic-cube-view'), { target: { value: 'feature' } });
 
@@ -149,7 +152,7 @@ describe('跨格視圖', () => {
   });
 
   it('跨格矩陣有 k×h 個格子', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-view'));
     fireEvent.change(screen.getByTestId('ic-cube-view'), { target: { value: 'feature' } });
     await waitFor(() => {
@@ -164,7 +167,7 @@ describe('跨格視圖', () => {
 
 describe('單格視圖之排序', () => {
   it('點欄頭會帶 sort 參數，且只在單格內排（不跨格）', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-sort-icir'));
     fireEvent.click(screen.getByTestId('ic-cube-sort-icir'));
 
@@ -178,7 +181,7 @@ describe('單格視圖之排序', () => {
   });
 
   it('再點一次切換升冪', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-sort-icir'));
     fireEvent.click(screen.getByTestId('ic-cube-sort-icir'));
     await waitFor(() => screen.getByTestId('ic-cube-sort-icir'));
@@ -195,7 +198,7 @@ describe('fail-closed 之呈現', () => {
     mockManifest.mockResolvedValue(manifest({
       tier_a: { stored: false, truncated: true, reason: 'scan_cube_rows_exceeded' },
     }));
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => {
       const el = screen.getByTestId('ic-cube-not-saved');
       expect(el.textContent).toContain('scan_cube_rows_exceeded');
@@ -213,7 +216,7 @@ describe('fail-closed 之呈現', () => {
         },
       },
     }));
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-view'));
     fireEvent.change(screen.getByTestId('ic-cube-view'), { target: { value: 'charts' } });
 
@@ -230,20 +233,20 @@ describe('fail-closed 之呈現', () => {
     mockManifest.mockResolvedValue(manifest({
       tier_b: { stored: false, truncated: true, reason: 'scan_cube_chart_bytes_exceeded' },
     }));
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => expect(screen.getByTestId('ic-cube-cell-table')).toBeTruthy());
   });
 
   it('查詢時才發現未保存（409）⇒ 同樣走 not-saved 分支', async () => {
     mockRows.mockRejectedValue(new ScanCubeTierNotStored({ reason: 'scan_cube_rows_exceeded' }));
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => expect(screen.getByTestId('ic-cube-not-saved')).toBeTruthy());
   });
 });
 
 describe('圖表視圖', () => {
   it('沒填特徵名 ⇒ 提示，不發請求', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-view'));
     fireEvent.change(screen.getByTestId('ic-cube-view'), { target: { value: 'charts' } });
     await waitFor(() => expect(screen.getByTestId('ic-cube-charts-pick-feature')).toBeTruthy());
@@ -251,7 +254,7 @@ describe('圖表視圖', () => {
   });
 
   it('填了特徵名 ⇒ 取該格該特徵之節並逐節列出', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-view'));
     fireEvent.change(screen.getByTestId('ic-cube-feature'), { target: { value: 'feat_0' } });
     fireEvent.change(screen.getByTestId('ic-cube-view'), { target: { value: 'charts' } });
@@ -266,7 +269,7 @@ describe('圖表視圖', () => {
 
 describe('被排除的節', () => {
   it('🔴 `correlation_matrix` 之排除必須明講，不得靜默省略', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => {
       const el = screen.getByTestId('ic-cube-corr-excluded');
       expect(el.textContent).toContain('correlation_matrix');
@@ -276,7 +279,7 @@ describe('被排除的節', () => {
 
 describe('說明覆蓋閘（沿用揭露票 R2 之一對一模型）', () => {
   it('🔴 每個可編輯控制項都要帶 `data-doc` 且對應說明在場', async () => {
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-cell-table'));
 
     const controls = Array.from(
@@ -309,7 +312,7 @@ describe('說明覆蓋閘（沿用揭露票 R2 之一對一模型）', () => {
 describe('UAT B26 — 立方體還沒產生時的呈現', () => {
   it('🔴 「not found」是「尚未產生」不是「壞掉」——給重試按鈕，不給紅字', async () => {
     mockManifest.mockRejectedValue(new Error('scan cube not found: abc-123'));
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => expect(screen.getByTestId('ic-cube-missing')).toBeTruthy());
     expect(screen.queryByTestId('ic-cube-error')).toBeNull();
     expect(screen.getByTestId('ic-cube-retry')).toBeTruthy();
@@ -317,7 +320,7 @@ describe('UAT B26 — 立方體還沒產生時的呈現', () => {
 
   it('按重試會重新讀取；成功後「尚未產生」消失', async () => {
     mockManifest.mockRejectedValueOnce(new Error('scan cube not found: abc-123'));
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => screen.getByTestId('ic-cube-retry'));
 
     mockManifest.mockResolvedValue(manifest());
@@ -328,8 +331,32 @@ describe('UAT B26 — 立方體還沒產生時的呈現', () => {
 
   it('真正的錯誤仍走紅字（不被「尚未產生」吃掉）', async () => {
     mockManifest.mockRejectedValue(new Error('Internal Server Error'));
-    render(<ScanCubeBrowser taskId="t1" />);
+    render(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
     await waitFor(() => expect(screen.getByTestId('ic-cube-error')).toBeTruthy());
     expect(screen.queryByTestId('ic-cube-missing')).toBeNull();
+  });
+});
+
+describe('UAT（2026-09-07）— 就緒訊號', () => {
+  it('🔴 `cube` 還沒到 ⇒ **不抓** manifest（抓了必然 404，然後狀態卡死）', () => {
+    render(<ScanCubeBrowser taskId="t1" cube={null} />);
+    expect(mockManifest).not.toHaveBeenCalled();
+    expect(screen.getByTestId('ic-cube-pending')).toBeTruthy();
+  });
+
+  it('🔴 `cube` 由 null 變成 ok ⇒ 會重新去抓（這正是使用者卡住的那一步）', async () => {
+    const { rerender } = render(<ScanCubeBrowser taskId="t1" cube={null} />);
+    expect(mockManifest).not.toHaveBeenCalled();
+
+    rerender(<ScanCubeBrowser taskId="t1" cube={CUBE_OK} />);
+    await waitFor(() => expect(mockManifest).toHaveBeenCalledWith('t1'));
+    expect(screen.queryByTestId('ic-cube-pending')).toBeNull();
+  });
+
+  it('落檔失敗 ⇒ 明講失敗，不假裝還在等', () => {
+    render(<ScanCubeBrowser taskId="t1" cube={{ status: 'failed', reason: 'disk full' }} />);
+    const el = screen.getByTestId('ic-cube-build-failed');
+    expect(el.textContent).toContain('disk full');
+    expect(mockManifest).not.toHaveBeenCalled();
   });
 });

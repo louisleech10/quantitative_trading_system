@@ -660,6 +660,8 @@ export default function EventBatchDisclosurePanel({
         <ScanCubeBrowser
           taskId={taskId}
           hasScan={Boolean(scanResult && scanResult.capability === 'available')}
+          /* 🔴 就緒訊號：立方體是網格跑完才寫的，`scanResult` 存在**不代表**寫好了。 */
+          cube={scanResult?.cube}
         />
 
         {/* 🔴 本次答案窗之可算／缺筆數 ＋ 本次 purge 下界（式之權威在 §D-3′-a(ii)，本區只顯示結果） */}

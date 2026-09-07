@@ -5,7 +5,7 @@
 """
 
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException, BackgroundTasks, Query, Response
-from typing import Optional
+from typing import Dict, Optional
 
 from ..models.case_models import (
     CaseImportRequest,
@@ -159,6 +159,31 @@ def _rejected(exc: EventImportRejectedError, *, svc=None, content=None) -> HTTPE
     return HTTPException(status_code=422 if exc.payload.kind == "contract_violation" else 400, detail=detail)
 
 
+def _envelope_label_rule(content: bytes) -> Optional[Dict[str, object]]:
+    """從上傳之 JSON envelope 取 `label_rule`（`{threshold, horizon_bars}`）；沒有就回 `None`。
+
+    🔴 **只認結構化的 `label_rule`**，不認 `_label_rule`。
+    後者在 UAT 樣本檔裡是**散文說明**（「label = 1 若 close[t0+3根] > close[t0]」），
+    與 `_readme` 同屬底線開頭的註解欄；把它當規則身分讀進來就是拿一段人類文字冒充
+    可逐葉比對的 tuple——那正是規則身分閘要防的事。
+
+    缺席**仍然合法**（人工標註／`/search` 匯出批通常沒有）；缺席時隨機對照組只是
+    不並排 prevalence（`random_control_rule_identity_unverifiable`），不擋匯入。
+
+    型別不合（不是 dict）⇒ 回 `None` 交給下游契約 validator 決定，本層不猜、不轉型。
+    """
+    import json as _j  # 本檔之 `_json` 是各函式內的區域 import，模組層取不到
+
+    try:
+        payload = _j.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None  # CSV 或壞 JSON：不是本函式的事，解析錯誤由 parse_upload 報
+    if not isinstance(payload, dict):
+        return None
+    rule = payload.get("label_rule")
+    return rule if isinstance(rule, dict) else None
+
+
 def _assert_source_file_usable(verify: bool, src_bytes: Optional[bytes], content: bytes) -> None:
     """`verify_source_digest` 之前置條件（JSON 與 CSV 對映**兩條路徑共用同一實作**）。
 
@@ -216,6 +241,13 @@ async def import_events_file(
         return svc.import_records(records, source_name=file.filename, upload_bytes=content, validate_only=validate_only,
                                   verify_source_digest=verify_source_digest, source_bytes=src_bytes,
                                   lookahead_declaration=_form_json_dict("lookahead_declaration", lookahead_declaration) or None,
+                                  # 🔴 UAT B23（2026-09-07）：`label_rule` 從**上傳檔之 envelope** 讀。
+                                  #    這是使用者實際走的路徑（UI 走本端點，不走 JSON body 那支）——
+                                  #    我第一次修 B23 只接了 JSON body 端點，等於接在使用者摸不到的地方。
+                                  #    使用者原話「匯入裡面都有 label_rule 啊」指的是樣本檔裡的 `_label_rule`：
+                                  #    那是**底線開頭的散文說明**（同 `_readme`，會被忽略），
+                                  #    不是閘需要的結構化 `{threshold, horizon_bars}`。名字像、作用完全不同。
+                                  label_rule=_envelope_label_rule(content),
                                   data_columns=svc.file_columns(content, file.filename or "") or None)
     except EventImportRejectedError as exc:
         raise _rejected(exc, svc=svc, content=content)

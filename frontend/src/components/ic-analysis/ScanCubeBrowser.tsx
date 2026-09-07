@@ -41,6 +41,7 @@ import type {
   ICScanCubeCharts,
   ICScanCubeManifest,
   ICScanCubeRow,
+  ICScanCubeSummary,
 } from '@/lib/types';
 
 type ViewMode = 'cell' | 'feature' | 'charts';
@@ -49,6 +50,16 @@ interface Props {
   taskId?: string;
   /** 沒有掃描（單值模式）時不傳／傳 false ⇒ 整個區塊不 render。 */
   hasScan?: boolean;
+  /**
+   * 立方體之就緒訊號＋摘要（後端在 `build_cube` **之後**才填）。
+   *
+   * 🔴 UAT（2026-09-07）：本元件原本以「有沒有掃描結果」當觸發條件，但掃描
+   *    **進行中**就已經有結果 ⇒ 那時抓 manifest 必然 404，而 `taskId`／`hasScan`
+   *    之後都不再變 ⇒ effect 不再跑，「還沒有立方體資料」就永遠留在畫面上。
+   *    使用者實機看到的正是這個：4/4 格都跑完了、後端 API 也回 200，畫面卻說沒有。
+   *    ⇒ 觸發條件改成本欄；`status==='failed'` 時直接講落檔失敗，不假裝在等。
+   */
+  cube?: ICScanCubeSummary | null;
 }
 
 /** 文案之唯一 render 點；元件內不得另寫說明字面。 */
@@ -63,7 +74,7 @@ function CubeDoc({ docKey }: { docKey: keyof typeof SCAN_CUBE_DOCS }) {
   );
 }
 
-export default function ScanCubeBrowser({ taskId, hasScan = true }: Props) {
+export default function ScanCubeBrowser({ taskId, hasScan = true, cube }: Props) {
   const [manifest, setManifest] = useState<ICScanCubeManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** 立方體還沒寫出來（≠ 壞掉）。見下方 catch 之註解。 */
@@ -90,6 +101,9 @@ export default function ScanCubeBrowser({ taskId, hasScan = true }: Props) {
   // ── manifest ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!taskId || !hasScan) { setManifest(null); return; }
+    // 🔴 立方體是整個網格跑完才寫的；`cube` 沒到就還不能抓（抓了必然 404）。
+    if (cube === undefined || cube === null) { setManifest(null); setMissing(false); return; }
+    if (cube.status === 'failed') { setManifest(null); return; }
     let cancelled = false;
     getScanCubeManifest(taskId)
       .then((m) => {
@@ -114,7 +128,7 @@ export default function ScanCubeBrowser({ taskId, hasScan = true }: Props) {
         else setError(msg);
       });
     return () => { cancelled = true; };
-  }, [taskId, hasScan, reloadNonce]);
+  }, [taskId, hasScan, reloadNonce, cube]);
 
   // ── rows（cell／feature 兩個視圖共用，只是參數不同）────────────────────
   const loadRows = useCallback(async () => {
@@ -179,6 +193,19 @@ export default function ScanCubeBrowser({ taskId, hasScan = true }: Props) {
 
       {error && (
         <p className="mt-1 text-[11px] text-rose-300" data-testid="ic-cube-error">{error}</p>
+      )}
+
+      {cube?.status === 'failed' && (
+        <p className="mt-1 text-[11px] text-rose-300" data-testid="ic-cube-build-failed">
+          立方體落檔失敗，所以沒有資料可看（掃描本身的結果不受影響，仍在上面那張表）。
+          原因：<code>{cube.reason ?? '未提供'}</code>
+        </p>
+      )}
+
+      {cube === null && (
+        <p className="mt-1 text-[11px] text-slate-400" data-testid="ic-cube-pending">
+          掃描還在跑，跑完才會產生可瀏覽的資料。
+        </p>
       )}
 
       {missing && (

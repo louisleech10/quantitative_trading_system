@@ -623,9 +623,19 @@ class ICAnalysisService:
             return CompareVerdict(
                 status="unavailable",
                 reason="random_control_rule_identity_unverifiable",
+                # 🔴 UAT B23（2026-09-07）：原文只說「以 label_rule 帶入規則」，使用者回
+                #    「匯入裡面都有 label_rule 啊」——他看到的是樣本檔的 `_label_rule`，
+                #    那是**底線開頭的散文說明**（同 `_readme`，被忽略）。名字像、作用完全不同。
+                #    而且當時**沒有任何路由傳這個參數**，照著做也做不到。兩者皆已修。
+                #    ⇒ 訊息改成講清楚「要放哪裡、長什麼樣、跟你看到的那個差在哪」。
                 message=("觸發批沒有落檔 receipt.batch.label_rule（既有批通常如此）——"
                          "無從確認兩批用的是同一條標籤規則，故不並排 prevalence。"
-                         "唯一補法＝重新匯入該批時以 label_rule 帶入規則"),
+                         "補法＝重新匯入該批，在**事件檔最外層**（與 records 同層）加一個結構化欄位："
+                         'label_rule = {"threshold": 0.0, "horizon_bars": 3}'
+                         "（threshold 是門檻、horizon_bars 是答案窗長度，依你這批實際的規則填）。"
+                         "🔴 注意與 `_label_rule` 不同：底線開頭那個是給人看的文字說明，"
+                         "系統一律忽略；要有作用的是**沒有底線**的 label_rule。"
+                         "範例見 uat_samples/events_ok.json"),
                 sample_design=RANDOM_SAMPLE_DESIGN,
             )
         if rand_spec is None or rand_spec.get("label_rule") is None:
