@@ -92,7 +92,12 @@
   且 `tests/golden/evtalign/split_baseline.json` 之組合數 `>= 6`；
   每筆皆含上述六個欄位（缺任一 ⇒ rc≠0）。
 - **存活至**：永久（B1–B5 每批收尾都要對照它）。
-- **覆蓋風險**：無——後續只讀不寫。
+- **覆蓋風險**：🔴 **首版 golden 已作廢重做**（R2 `CODEX-R2-P1-05`／`COMPOSER-R2-P1-03`／
+  `GROK-R2-P1-02` **三家**：六欄位在「端點不變但中段列被刪」時全部不變，
+  且未涵蓋事件路徑與保留之 event IDs）。
+  **必須增**：`split_row_fingerprint`（train/test 列索引集合之 sha256）、
+  `retained_event_ids`、**事件路徑之案例**。
+  已跑之 `sha256 = f01550db…` **不得**當基線使用。
 
 ---
 
@@ -104,8 +109,9 @@
 - 輸入 / 輸出：
   輸入＝`feature_data`、`target_data`、`spec`、`close`、
   **新增** `label_kind: Literal["forward_return","event_given"]`、
-  **新增** `bars_after_target_end: int`（🔴 由呼叫端顯式傳入，
-  守衛內**不得**自行推測——`COMPOSER-R1-P0-01`）。
+  🔴 **不新增剩餘根數參數**（R2 `CODEX-R2-P0-02`）：由 `close.index` 與
+  `target.index` 之差**推導**。參數化會變成可偽造的 scalar（傳 0 ⇒ L2 不啟動）。
+  `label_kind` **不由呼叫端傳**，由 `info["label_source"]` 導出（`CODEX-R2-P0-03` 等三家）。
   輸出＝`AlignmentReport`（欄位新增 `label_kind`、`tail_expectation`、`oracle_checked`）。
 - 實作要點：
   1. **L0 分派**：
@@ -179,10 +185,12 @@
   2. 呼叫點：stage3 覆寫（`:3042`）**之後**加一次
      `validate_alignment(..., label_kind="event_given")`。
      🔴 `COMPOSER-R1-P0-02`：現況 stage2（`:2923`）與 stage0（`:2790`）都在覆寫之前。
-  3. 覆寫**前**那次驗證：`label_kind="forward_return"` 照舊
-     （它驗的是主線 label，全域模式**確實**用它——三家盤點證實）。
-     🔴 事件模式下該次不得因鷹架之 tail_nan 而否決整個分析 ⇒
-     事件模式傳入之 `bars_after_target_end` 與 L2 依 Task 1.1 之規則處理。
+  3. 🔴 **事件模式下，覆寫前那條序列不驗**（R2 `GROK-R2-P0-02` 修正）。
+     我 R1 寫「覆寫前照舊跑 forward_return」——那正是 SPEC §C-6 禁的
+     「驗一個即將被丟棄的東西」，且在截短＋非 oracle 型別下會**重現原本的擋死**。
+     判準由 `label_source` 決定（producer-set）：
+     `event_label_value` ⇒ 覆寫前**不驗**、覆寫後以 `event_given` 驗；
+     主線 ⇒ 照舊以 `forward_return` 驗（全域模式該序列**就是**最終 label）。
 - 修改檔案：`momentum/core/contracts.py::_validate_event_given`；
   `momentum/Analysis/ic_filter_orchestrator.py::_apply_event_filter`（覆寫後加驗證）。
   既有 caller：`_stage3_event_filter`。
@@ -242,7 +250,11 @@
   2. 🔴 **必須揭露丟掉的事件數與 ID**（`COMPOSER-R1-P2-01`／`GROK-R1-P1-02`：
      「禁靜默裁切」與「只報根數」**不等價**——根數不告訴使用者少了哪些事件）。
   3. 交集為空 ⇒ fail-closed，訊息含三者各自的期間。
-- 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py::analyze`（交集計算與 metadata）。
+- 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py::analyze`（交集計算與 metadata）；
+  🔴 **`api/services/ic_analysis_service.py` 之 batch-level containment gate**
+  （R2 `CODEX-R2-P1-06`：該 gate 會在交集**之前**就 raise ⇒
+  「部分事件被丟後成功並揭露 IDs」永遠到不了，需求與控制流互斥）。
+  ⇒ 該 gate 須改為在交集**之後**判定，或改為 warn＋揭露。
   既有 caller：`_run_analysis`。
 - 路徑：
   - `momentum/Analysis/ic_filter_orchestrator.py`
@@ -284,7 +296,9 @@
   ③回報頻率須可驗（測試斷言呼叫次數在合理區間，不是每列一次）。
 - 風險緩解：⊘
 - 驗證：`venv/bin/python -m pytest tests/api/test_stage_progress.py -q` rc=0；
-  斷言長階段之中間回報次數 `>= 3` 且 `<= 總特徵數 / 100`（既要有、又不能洗版）；
+  斷言中間回報次數 `>= 3` 且 `<= max(3, ceil(總特徵數 / 100))`
+  （🔴 R2 `CODEX-R2-P1-10`：原式在測試資料 < 300 特徵時**無整數解**，驗收不可執行）；
+  上界須以 **≥300 特徵之 fixture** 另驗；
   mutation `A8`：把 WARN 改成 raise ⇒ 「不得阻擋」之測試紅。
 - **存活至**：永久。
 - **覆蓋風險**：無。

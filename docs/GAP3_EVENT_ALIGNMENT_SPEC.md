@@ -109,6 +109,30 @@
    模式分支決定「**用哪份資料／算什麼統計量**」＝合法；
    模式分支決定「**要不要驗、驗哪一份**」＝違反本條。
 
+7. 🔴 **推導，不要相信（R2 之核心裁決）**
+
+   R2 三家開出 **6 個 P0**（R1 為 3 個），六條同一個形狀：
+   **我把守衛所需的每個判準都做成「呼叫端傳進來」，
+   於是整套保護建立在「呼叫端誠實」之上——而那不是安全性質。**
+
+   | 我做成參數的 | 偽造方式 | 後果 |
+   |---|---|---|
+   | `label_kind` | 標成 `event_given` | **整段跳過 L1／L2** ⇒ 零保護 |
+   | `bars_available_after_last_target_row` | 傳 0 | **L2 不啟動** |
+   | `close` | 傳污染版 | L2 對它**自洽 PASS** |
+
+   ⇒ **本票之設計規則**（實作與 review 逐條對照）：
+   - **能從既有參數推導的，不准當參數傳。**
+     例：剩餘根數＝`close.index` 與 `target.index` 之差 ⇒ **刪掉該參數**。
+   - **不能推導的，必須綁到產生者**（producer-set，非 caller-set）。
+     例：`label_kind` 由 orchestrator 已在寫的 `info["label_source"]` 導出。
+   - **綁不了的，fail-closed。** 缺 `label_source` ⇒ raise，**不得預設成任一種**。
+   - **外部資料要綁指紋。** `close` 必須是產生該 label 的同一份，以 fingerprint 比對。
+
+   🔴 **誠實邊界**：指紋只把信任邊界從「呼叫端」推到「label 產生時」，
+   **不證明**原始 K 線本身沒問題——那是資料品質的另一條線，本票**明文不宣稱涵蓋**
+   （`EA-RESID-4`）。
+
 ---
 
 ## §G Golden / Baseline
@@ -166,9 +190,28 @@
   `ORACLE_RETURN_KINDS`，stage2 傳 `close=None` ⇒ 若同時放寬 L1，
   該組合變成「無 L1 辨識 ∪ 無 L2」＝**零保護**）。
   ⇒ 實作上：截短且無 oracle ⇒ 明確 raise，訊息指明「請提供 close 或改用有 oracle 的 return_type」。
-- **`bars_available_after_last_target_row` 之來源必須寫進 API 契約**
-  （`COMPOSER-R1-P0-01`）：現行 `validate_alignment` 只收 feature/target/spec/optional close，
-  實作者可能用錯資料源。⇒ 由**呼叫端顯式傳入**，不得在守衛內自行推測。
+- 🔴 **剩餘根數：刪掉參數，改由 `close` 推導**（R2 修訂）。
+  R1 我依 `COMPOSER-R1-P0-01`「不得在守衛內推測」改成參數傳入——
+  **但正確答案不是『傳進來』，是『從已有的 `close` 算』**：
+  `close` 與 `target` 都已在參數列，剩餘根數就是兩者索引的差。
+  `CODEX-R2-P0-02`／`GROK-R2-P2-02` 指出參數化後它變成**可偽造的 scalar**
+  （傳 0 ⇒ L2 不啟動）。⇒ **不新增此參數**；
+  `target.index` 非 `close.index` 之子集 ⇒ **fail-closed raise**。
+  副效果：`CODEX-R2-P1-09`（新增 required 參數會破壞既有 caller）一併消失。
+- 🔴 **`label_kind` 由 producer 綁定，不由呼叫端指定**（`CODEX-R2-P0-03`／
+  `GROK-R2-P0-01`／`COMPOSER-R2-P1-01` **三家獨立命中**）：
+  由 orchestrator **已經在寫**的 `info["label_source"]`（`event_label_value` vs 主線）機械導出。
+  缺 `label_source` ⇒ **raise，不得預設**。
+  `event_given` 分支另要求 `label_source == "event_label_value"`
+  ——否則「標成 event_given 就免驗」。
+- 🔴 **L2 之 `close` 必須綁指紋**（`CODEX-R2-P0-01`／`GROK-R2-P2-01`）：
+  label 落檔時記 `close_fingerprint`，驗證時比對；不符或缺席 ⇒ raise。
+  否則 oracle 只證「與呼叫端給的 close 自洽」，污染的 close 會自洽 PASS。
+- 🔴 **`event_given` 加第四項檢查：逐事件三元組綁定**（`CODEX-R2-P0-04`／
+  `COMPOSER-R2-P1-02`／`GROK-R2-P1-01` **三家獨立命中**）：
+  「有值／有限／index 相符」在**整批平移一格**或 `event_id` 錯配時**全部通過**。
+  ⇒ 增「`(event_id, timestamp, label_value)` 三元組須與事件批 receipt 逐筆相符」——
+  不是只比 key 集合。現行檢查只用了 timestamp，把 `event_id` 丟掉了。
 - **coverage 地板一併改用同一期望值來源**（`GROK-R1-P2-01`：`contracts.py:964-966`
   仍用 `spec.lag`，與新期望值不一致）。
 - **驗證（可證偽）** — `tests/momentum/test_alignment_tail_nan.py`：
