@@ -1,37 +1,40 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-07｜狀態：`SCANCUBE` 五個 Phase 全部完成並 push，等使用者實機驗收 B26／B27。**
+**更新：2026-09-07 深夜｜狀態：`EVTALIGN` SPEC 已過 R1 修訂；使用者睡覺中，依離線規則自行續走。**
 
-## 剛完成：掃描結果瀏覽器（小型帶）
-SPEC=`docs/GAP3_SCAN_CUBE_SPEC.md`／TODO=`docs/GAP3_SCAN_CUBE_TODO.md`（皆 TEMPLATE PASS）
-文件審兩輪：R1 21 條（3×P0）、R2 19 條（0×P0）⇒ **P0 3→0**，收斂後直接進實作。
-commit：`bb402ed6`（文件）→`1563768b`（後端 P1–P3）→`d68f0bcd`（前端 P4）→`cdea55c0`（白話 P5）。
+## 使用者最後的指示（逐字）
+> 「那這個修正後的排序改SPEC。B26/B27等上述完成後再驗收。我要先睡了」
 
-- **P1** 掃描格 `_suppress_persist=True`：修覆蓋（實跑證明 4 組 (k,h) → 相異路徑數 1）與逾時競態。
-- **P2** `momentum/Analysis/scan_cube.py`：Tier A（summary_table，463 B/特徵）＋
-  Tier B（七個圖表節，36,808 B/特徵）；三個 fail-closed 閘；`correlation_matrix` 具名排除。
-  Tier B 預算看**實測累加**不是首格外推（跨報告差 8 倍）。路徑不變式：`stored=False ⇒ path=None`。
-- **P3** `/api/v1/ic/scan-cube/{task_id}/{manifest,rows,charts}`：404／409／400 三種語意分開。
-- **P4** `ScanCubeBrowser.tsx`：三視圖；跨格**無排序按鈕**（SPEC §C-4 禁跨格排名）。
-- **P5** 白話 B26／B27。
+⇒ **B26／B27 驗收暫緩**（掃描結果瀏覽器已完成並可用，等 EVTALIGN 收完再驗）。
+⇒ 依 `feedback_offline_committee_decides`：不停不問，取捨交委員／碼證，做到 commit+push。
 
-## 🔴 使用者主目標之部分未達成（已列為白話頭條）
-滿格 110 格 × 300 特徵之圖表資料 ＝ **1,158 MB** ⇒ **滿格不保證有圖表**，只保證指標表。
-小範圍（約 12 格 × 474 特徵內）圖表齊全。超出時 fail-closed 並回報**當次實測**之 `fits_hint`。
+## 當前票：`EVTALIGN`（事件對齊守衛）
+SPEC=`docs/GAP3_EVENT_ALIGNMENT_SPEC.md`（TEMPLATE PASS）。TODO **尚未寫**。
+R1（`20260907-evtalign-x-review-r1`）：19 條、**3 個獨立 P0**，三家一致「不可照 SPEC 開工」。
+債已 `debt_clear`；reconcile 見 `handoffs/reconcile/20260907-evtalign-x-review-r1/synth.md`。
 
-## 收案時數字
-`test_scan_cube.py` 28／`test_scan_cube_api.py` 12；`tests/api -k "gap3 or event or scan_cube"`
-443 passed／1 failed（`test_ichc_event_timestamps::…kwarg`＝既有債，已用 `git stash` 在父版本重跑同樣紅）；
-前端 vitest **599 passed／75 檔**；tsc 8 行既有債；解耦 `BASELINE OK`；golden 46 rc=0。
+🔴 **R1 最重要的結果：我的核心修法會放行 look-ahead。**
+`max(0, lag − 剩餘根數)` 在截短時期望值為 0，未 shift 的洩漏也是 0 ⇒ 通過。
+已整條重寫為三層：L0 依 `label_kind` 分派／L1 尾端 NaN（同尾強度不變）／
+L2 oracle（**截短時必須**，拿不到 ⇒ fail-closed raise）。
+
+## 優先序（使用者 2026-09-07 裁定）
+1. **期間守衛**（探針證**全域模式今天就有地雷**）2. 鷹架（事件模式，60 天）
+3. 期間自動對齊＋丟失事件揭露 4. 進度可見＋記憶體 WARN（**不得新增阻擋閘**）
+5. purge/embargo 揭露（由「安全」降為「揭露」）
 
 ## 具名殘留
-`SC-RESID-1` 掃描峰值記憶體（OOM）不在本票（`blocked-by`：需 tier-aware 實跑，本機 8GB）——
-🔴 SPEC §C-8 明文：所有 cap 限的是**落檔位元組**，不是計算峰值。
-`SC-RESID-2` `correlation_matrix`（`blocked-by`：per-pair，另案）。
-`SC-RESID-3` 「選幾格補存圖表」（`needs-research`）。
-`COMPOSER-R1-P2-03`（揭露票）實機頁接線仍待 UAT。
+`EA-RESID-1` preprocessing 峰值記憶體（實機 17 GB／8 GB、swap 15.6 GB）｜`needs-research`
+`EA-RESID-2` 橫截面無 `validate_alignment`｜`blocked-by`：模組未完工，**不是缺陷**（使用者當面更正）
+
+## 下一步
+寫 `docs/GAP3_EVENT_ALIGNMENT_TODO.md` → 派 R2 由原提出方確認 → 才進實作。
+🔴 **實作前必補**：`ASSUME-2`（`effective_horizon`／`purge_gap` 不受影響）**尚未實跑**。
+
+## 已完成並可用（等使用者驗收）
+`SCANCUBE` 掃描結果瀏覽器五 Phase 全完成；立方體實測正確（`8473641c` 60 列／14 指標）。
+🔴 已知限制：**滿格 110 格不保證有圖表**（1,158 MB），已列為白話頭條。
 
 ## 環境
-開放債為零。`scripts/_add_cube_contract_keys.py`、`scripts/_todo_r2_patch.py` 為一次性腳本，
-`rm` 被權限擋下故仍在工作區——**可刪，未進版控**。
-`uat_samples/*`、`.claude/gate/*baseline*`、`market_data/*` 未追蹤異動勿 commit。
+開放債為零。`scripts/_add_cube_contract_keys.py`、`scripts/_todo_r2_patch.py` 為一次性腳本
+（`rm` 被權限擋下，未進版控，可刪）。`uat_samples/*`、`market_data/*` 未追蹤異動勿 commit。
