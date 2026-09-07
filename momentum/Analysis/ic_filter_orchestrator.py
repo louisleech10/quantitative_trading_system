@@ -69,6 +69,9 @@ from momentum.core.contracts import (
     split_per_symbol,
     validate_alignment,
     validate_split_pair_integrity,
+    LABEL_KIND_EVENT_GIVEN,
+    derive_label_kind,
+    validate_consumed_label,
 )
 from momentum.core.protocols import IKlineReader
 from momentum.factories import create_label_generator
@@ -232,6 +235,22 @@ def _alignment_spec(metadata: Optional[dict], horizon: int) -> AlignmentSpec:
         lag=int(horizon),
         freq=_alignment_freq_from_metadata(metadata),
     )
+
+
+def _coterminalize_close(close: pd.Series, feature_index: pd.Index) -> pd.Series:
+    """EVTALIGN Task 1.1（B）：label 生成前把 close 裁到 feature 尾——守衛 `validate_alignment` 一字不改。
+
+    K 線比特徵長（結尾多出 N 根）是正常情形（使用者：「K線比特徵多也很合理吧」），但 label 由
+    **整條** close 生成再 reindex 到 feature index 時，feature 尾端 lag 列會有真值 ⇒
+    守衛「尾端 NaN 必須＝lag」誤擋。裁切把截短情形**化約為同尾情形**：label 逐值相同
+    （`handoffs/20260908-probe-option-b-trim.py` rc=0），少掉的 lag 列正是同尾本來就沒有的。
+    裁切依據 `feature_index[-1]` 從既有參數**推導**（SPEC §C-7），不新增任何參數；
+    stage0（預載 labels 之 oracle close）與 stage2（生成 close）**兩個呼叫點都接**，
+    防「一點 derive、一點仍信參數」漂移。K 線尾早於 feature 尾 ⇒ 本式 no-op，交守衛照舊判定。
+    """
+    if len(feature_index) == 0:
+        raise AlignmentViolationError("feature_index is empty; cannot coterminalize close")
+    return close.loc[close.index <= feature_index[-1]]
 
 
 def _resolve_metadata_symbol_allowlist(
@@ -913,6 +932,7 @@ class ICFilterOrchestrator:
         *,
         event_timestamps: Optional[list] = None,
         event_label_values: Optional[dict] = None,
+        event_label_owners: Optional[dict] = None,
         event_context: Optional[dict] = None,
     ) -> dict:
         """主入口：執行完整八階段流水線。
@@ -970,6 +990,7 @@ class ICFilterOrchestrator:
                     details=split_result.details or {},
                     event_timestamps=event_timestamps,
                     event_label_values=event_label_values,
+                    event_label_owners=event_label_owners,
                     event_context=event_context,
                 )
             train_plan, test_plan = split_result
@@ -1034,6 +1055,7 @@ class ICFilterOrchestrator:
             features_df, label_series, metadata, config, kline_reader,
             event_timestamps=event_timestamps,
             event_label_values=event_label_values,
+            event_label_owners=event_label_owners,
         )
         if event_info.get("conditional_ic_abandoned"):
             # CODEX-R2-P1-04（GROK-R1-P1-01 方案②之下游消費）：事件不足 ⇒ 條件 IC 明確 unavailable，
@@ -1100,6 +1122,7 @@ class ICFilterOrchestrator:
                 details=ic_results.get("details") or {},
                 event_timestamps=event_timestamps,
                 event_label_values=event_label_values,
+                event_label_owners=event_label_owners,
                 event_context=event_context,
             )
 
@@ -1168,6 +1191,7 @@ class ICFilterOrchestrator:
         *,
         event_timestamps: Optional[list] = None,
         event_label_values: Optional[dict] = None,
+        event_label_owners: Optional[dict] = None,
         event_context: Optional[dict] = None,
     ) -> dict:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
@@ -1214,6 +1238,7 @@ class ICFilterOrchestrator:
                 kline_reader=kline_reader,
                 event_timestamps=event_timestamps,
                 event_label_values=event_label_values,  # GAP-3 B2.3：A′ 透傳亦保留事件 label（禁靜默丟）
+                event_label_owners=event_label_owners,
                 event_context=event_context,
             )
         finally:
@@ -2786,6 +2811,7 @@ class ICFilterOrchestrator:
                             raw_data["close"].to_numpy(copy=False),
                             index=close_index,
                         )
+                        close = _coterminalize_close(close, feature_index)  # stage0
             _rk = active_config.labels.return_type
             report = validate_alignment(
                 normalized_features,
@@ -2898,6 +2924,15 @@ class ICFilterOrchestrator:
             raw_data["close"].to_numpy(copy=False),
             index=close_index,
         )
+        if features_df is None:
+            feature_index = close_index
+            features_for_gate = pd.DataFrame(index=feature_index)
+        else:
+            feature_index = _normalize_ic_time_index(features_df.index, "features_df")
+            features_for_gate = features_df.copy(deep=False)
+            features_for_gate.index = feature_index
+        # EVTALIGN Task 1.1（B）：生成 label **之前**裁到 feature 尾（見 _coterminalize_close）
+        close = _coterminalize_close(close, feature_index)  # stage2
         labels_cfg = config.labels
         horizon = _resolve_effective_label_horizon(config, None)
 
@@ -2908,15 +2943,8 @@ class ICFilterOrchestrator:
             labels_cfg.return_type,
         )
         labels_df = pd.DataFrame(
-            {f"return_{horizon}": label_series}, index=close_index
+            {f"return_{horizon}": label_series}, index=close.index
         )
-        if features_df is None:
-            feature_index = close_index
-            features_for_gate = pd.DataFrame(index=feature_index)
-        else:
-            feature_index = _normalize_ic_time_index(features_df.index, "features_df")
-            features_for_gate = features_df.copy(deep=False)
-            features_for_gate.index = feature_index
 
         labels_for_gate = labels_df.reindex(feature_index)
         label_series = labels_for_gate[f"return_{horizon}"]
@@ -2948,6 +2976,7 @@ class ICFilterOrchestrator:
         *,
         event_timestamps: Optional[list] = None,
         event_label_values: Optional[dict] = None,
+        event_label_owners: Optional[dict] = None,
     ) -> tuple[pd.DataFrame, pd.Series, dict]:
         event_cfg = config.event_filter
         # GAP-2 Task 4.1：事件身分於 pop timestamps **之前**以 request 原始輸入計算（不可變；refilter 沿用）
@@ -3026,24 +3055,48 @@ class ICFilterOrchestrator:
             raise AlignmentViolationError("event filter produced no timestamps overlapping features")
         filtered_features = normalized_features.loc[selected_index]
         filtered_label = normalized_label.loc[selected_index]
+        label_source: str
         if event_label_values is not None:
             # GAP-3 Task B2.3：條件 IC 只吃事件連續 label_value（SPEC D1-3）；選中之每一 timestamp
             # 必須有 label_value（缺 ⇒ loud，不回退主線 return_N——D1-5 禁以 decision 列 join）。
             # 不傳 ⇒ 本分支不執行，既有 stage 語意與報告鍵逐位元組不變（§G-1 golden 看住）。
+            # EVTALIGN Task 2.1：缺值／非有限（CODEX-R1-P2-05）之檢查已**提升為契約**
+            # `validate_event_given`，於覆寫**之後**對實際被消費的序列執行；這裡只做覆寫本身
+            # （缺 key 先以 NaN 佔位，契約必先以「missing」loud，NaN 不會流出）。
             idx_ms = (selected_index.asi8 // 10**6).astype("int64")
-            missing = [int(t) for t in idx_ms if int(t) not in event_label_values]
-            if missing:
-                raise AlignmentViolationError(
-                    f"event_label_values missing for {len(missing)} selected timestamps (first={missing[:3]})"
-                )
-            vals = np.asarray([float(event_label_values[int(t)]) for t in idx_ms], dtype=float)
-            if not np.isfinite(vals).all():  # CODEX-R1-P2-05：label 覆寫須有限值閘（inf/NaN loud）
-                raise AlignmentViolationError("event_label_values contain non-finite values")
+            vals = np.asarray(
+                [float(event_label_values[int(t)]) if int(t) in event_label_values else np.nan for t in idx_ms],
+                dtype=float,
+            )
             filtered_label = pd.Series(vals, index=filtered_label.index, name=filtered_label.name)
             info = dict(info)
-            info["label_source"] = "event_label_value"
+            label_source = "event_label_value"
+            info["label_source"] = label_source
             info["statistic_kind"] = "conditional_ic"
             info["sample_scope_kind"] = "event"
+        else:
+            # 未覆寫 ⇒ 被消費的是 stage0／stage2 已過 validate_alignment 之序列的 .loc 限制；
+            # 產生者＝本函式（上方 .loc），故 label_source 在此由產生分支寫定，非預設。
+            label_source = "mainline_return_N"
+        # ── EVTALIGN Task 2.1（D）：驗**實際被消費**的那條（COMPOSER-R1-P0-02：舊碼三個呼叫點
+        #    全在覆寫之前，覆寫後無再驗）。契約由 label_source 導出（§C-7 綁產生者；缺席 raise），
+        #    分派依「資料是什麼」非依 mode（§C-6 判準），三種模式同一條路徑。
+        #    forward_return 路徑不寫任何新報告鍵——§G-1 golden 逐位元組不變。
+        label_kind = derive_label_kind(label_source)
+        consumed = validate_consumed_label(
+            filtered_features,
+            filtered_label,
+            label_kind=label_kind,
+            expected_values=event_label_values,
+            event_owners=event_label_owners,
+            source_series=normalized_label,
+        )
+        if label_kind == LABEL_KIND_EVENT_GIVEN:
+            info["label_kind"] = label_kind
+            info["consumed_event_count"] = int(consumed["checked_samples"])
+            # {event_id: label_value}——只有 producer 傳 owners 時才綁得出；service 端再對自己的
+            # 逐事件 label 來源逐筆比對（三元組 (event_id, timestamp, label_value) 之最後一腿）。
+            info["consumed_event_labels"] = dict(consumed["consumed_event_labels"])
         return filtered_features, filtered_label, info
 
     def _apply_feature_filter(

@@ -85,6 +85,51 @@ class FeatureRunCoverageError(ValueError):
         super().__init__(f"{reason}: {message}")
 
 
+def _find_event_filter_info(node: Any) -> Optional[Dict[str, Any]]:
+    """在報告 metadata 樹中找 `event_filter` dict（stage3 event_info 之落點）。"""
+    if isinstance(node, dict):
+        hit = node.get("event_filter")
+        if isinstance(hit, dict):
+            return hit
+        for value in node.values():
+            found = _find_event_filter_info(value)
+            if found is not None:
+                return found
+    return None
+
+
+def _assert_event_triple_bound(staged: Dict[str, Any], report: Any) -> None:
+    """EVTALIGN Task 2.1（D）：`(event_id, timestamp, label_value)` 三元組之**最後一腿**，fail-closed。
+
+    orchestrator 以 `event_label_owners` 把每個被消費列綁到恰一個 event_id，並回報
+    `consumed_event_labels = {event_id: 被消費的 label}`。本函式拿它對本 service **自己**的逐事件
+    label 來源（`event_label_by_id`，與 owners 同一迴圈產生）逐筆回比：
+    多一個 id／少回報／值不同 ⇒ raise。R2 三家指出「timestamp→value 三檢查容許事件值旋轉或
+    event_id 錯配」——旋轉會讓某 id 的被消費值 ≠ 產生值，在此現形。
+    事件不足 fallback（`label_source=mainline_return_N`）沒有被消費之事件 label，已由
+    `conditional_ic_abandoned` loud 揭露，此處不重複判。
+    """
+    if not isinstance(report, dict):
+        raise ValueError("IC report is not a dict; cannot bind event triple")
+    info = _find_event_filter_info(report.get("metadata"))
+    if info is None:
+        raise ValueError("event-mode report lacks metadata.event_filter; cannot bind event triple")
+    if info.get("label_source") != "event_label_value":
+        return
+    consumed = info.get("consumed_event_labels")
+    if not isinstance(consumed, dict) or not consumed:
+        raise ValueError(
+            "event-mode report lacks consumed_event_labels; cannot bind (event_id, timestamp, label_value)"
+        )
+    by_id: Dict[str, float] = staged["event_label_by_id"]
+    for eid, val in consumed.items():
+        src = by_id.get(str(eid))
+        if src is None:
+            raise ValueError(f"consumed event_id {eid!r} was not produced by this event batch")
+        if float(src) != float(val):
+            raise ValueError(f"event {eid!r}: consumed label {val!r} != produced label {src!r}")
+
+
 def _parse_time_range_endpoint(value: Any) -> int:
     """`time_range` 之單一端點字串 → epoch ms。**解析順序寫死：先數字後 ISO**（SPEC 7.7 ④）。
 
@@ -493,6 +538,7 @@ class ICAnalysisService:
         per_tf = {(p.event_id, p.timeframe): p.feature_cutoff_ms for p in prepared1.per_tf}
         ts_map: Dict[int, float] = {}
         owner: Dict[int, str] = {}
+        by_id: Dict[str, float] = {}  # EVTALIGN Task 2.1：逐事件 label 來源，供 analyze 後三元組回綁
         for w in prepared1.windows:
             if run_symbol is not None and str(w.symbol) != run_symbol:
                 excluded_by_symbol[str(w.symbol)] = excluded_by_symbol.get(str(w.symbol), 0) + 1
@@ -518,6 +564,7 @@ class ICAnalysisService:
                 )
             owner[key] = w.event_id
             ts_map[key] = float(value)
+            by_id[str(w.event_id)] = float(value)
         if excluded_by_symbol:
             logger.warning(
                 "事件批 %s：%d 筆事件之 symbol 不是本次 run 的 %s，已排除（%s）——跨 symbol 合併分析屬 Pooled/Panel IC 票，本路徑不做",
@@ -549,6 +596,11 @@ class ICAnalysisService:
             "purge_rows": int(purge_rows),
             "event_timestamps": sorted(ts_map),
             "event_label_values": ts_map,
+            # EVTALIGN Task 2.1（D）：(event_id, timestamp, label_value) 三元組之產生者側資料。
+            # owners 讓 orchestrator 把每個被消費列綁到恰一個事件；by_id 讓本 service 在 analyze 後
+            # 對 orchestrator 回報之 {event_id: 被消費 label} 逐筆回比（_assert_event_triple_bound）。
+            "event_label_owners": dict(owner),
+            "event_label_by_id": by_id,
             "event_context": event_context,
             "events_excluded_by_symbol": dict(excluded_by_symbol),
             "prepared": prepared1,
@@ -1103,8 +1155,10 @@ class ICAnalysisService:
             kline_reader=kline_reader,
             event_timestamps=staged["event_timestamps"],
             event_label_values=staged["event_label_values"],
+            event_label_owners=staged["event_label_owners"],
             event_context=staged["event_context"],
         )
+        _assert_event_triple_bound(staged, report)
         return {
             "capability": "available",
             "reason": None,
@@ -1321,6 +1375,7 @@ class ICAnalysisService:
                 # 🔴 **只在 `event_import_id` 存在時進入**——這個 guard 就是 over 向的保護：
                 #    cross-sectional（上方分支）與純特徵 longitudinal 都不會走到這裡。
                 event_label_values = None
+                event_label_owners = None
                 event_context = None
                 event_timestamps = request.event_timestamps or None
                 if request.event_import_id:
@@ -1336,6 +1391,7 @@ class ICAnalysisService:
                     )
                     event_timestamps = staged["event_timestamps"]
                     event_label_values = staged["event_label_values"]
+                    event_label_owners = staged["event_label_owners"]
                     event_context = staged["event_context"]
                     # 🔴 階段 4 **真的套用**（`CODEX-R1-P1-02`：原本只算不用）：
                     #    把 per-symbol purge 下界換算成列數後注入 IC 切分器之 `embargo`。
@@ -1387,8 +1443,11 @@ class ICAnalysisService:
                     kline_reader=kline_reader,
                     event_timestamps=event_timestamps,
                     event_label_values=event_label_values,
+                    event_label_owners=event_label_owners,
                     event_context=event_context,
                 )
+                if request.event_import_id:
+                    _assert_event_triple_bound(staged, report)
 
             with self._lock:
                 task_info = self._tasks.get(task_id)

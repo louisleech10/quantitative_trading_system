@@ -13,9 +13,10 @@
 3. 每條跑完立即還原。
 4. 對照組 `EXPECT_GREEN` 證明腳本沒把所有東西都弄紅。
 
-## 🔴 scaffold 狀態（Task 0.1）
-B1–B3 之錨點字串指向**尚未存在**的生產碼 ⇒ 全部 `SKIP`，UNCOVERED=3。
-Task 1.1／2.1 實作時把錨點改成真實字串；phase gate 之 UNCOVERED 必須降到 0 才算通過。
+## Phase 1（Task 1.1＋2.1 已實作，錨點＝真實字串）
+B1 helper no-op／B2 只接 stage2／B3 動守衛／D1 值比對拿掉／D2 缺 label_source 預設／
+D3 service 三元組值比對拿掉／A4 對 event_given 套尾端 NaN 契約 ⇒ 各自對應測試必紅；
+C0 只改註解 ⇒ 全綠（對照組，證明腳本不是把所有東西都弄紅）。
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ PY = str(REPO / "venv" / "bin" / "python")
 PYTEST = [PY, "-m", "pytest", "-q", "-x", "-p", "no:logging", "-p", "no:cacheprovider"]
 ORCH = "momentum/Analysis/ic_filter_orchestrator.py"
 CONTRACTS = "momentum/core/contracts.py"
+SERVICE = "api/services/ic_analysis_service.py"
 
 
 @dataclass(frozen=True)
@@ -55,9 +57,8 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     Mutation(
         "B2-only-stage2-wired", 1, ORCH,
-        # 錨點＝stage0 之呼叫（實作時以真實字串取代）
-        "        close = _coterminalize_close(close, feature_index)  # stage0\n",
-        "        pass  # stage0 coterminalize removed\n",
+        "                        close = _coterminalize_close(close, feature_index)  # stage0\n",
+        "                        pass  # stage0 coterminalize removed\n",
         [*PYTEST, "tests/momentum/test_close_coterminalize.py", "-k", "both_call_sites"],
         "只接 stage2 不接 stage0 ⇒ 兩呼叫點 spy 測試應紅（三家：一點 derive、一點仍信參數）",
     ),
@@ -70,23 +71,49 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     # ── Phase 1：Task 2.1（D）──────────────────────────────────────────
     Mutation(
-        "D1-event-triple-unbound", 1, ORCH,
-        # 錨點＝三元組綁定（實作時以真實字串取代）
-        "            _assert_event_triple_bound(",
-        "            (lambda *a, **k: None)(",
+        "D1-event-value-binding-removed", 1, CONTRACTS,
+        "    if not np.array_equal(got, expected):\n",
+        "    if not np.array_equal(got, expected) and False:\n",
         [*PYTEST, "tests/api/test_event_label_alignment.py", "-k", "shifted"],
-        "拿掉三元組綁定 ⇒ 整批平移一格之案例應紅（R2 三家：現行三檢查抓不到）",
+        "拿掉被消費值 vs 產生者值之逐筆比對 ⇒ 整批平移一格之案例應紅（R2 三家：現行三檢查抓不到）",
     ),
     Mutation(
-        "D2-label-source-defaulted", 1, ORCH,
-        '        label_source = info.get("label_source")\n',
-        '        label_source = info.get("label_source") or "event_label_value"\n',
+        "D2-label-source-defaulted", 1, CONTRACTS,
+        '    if label_source is None:\n        raise AlignmentViolationError(\n'
+        '            "label_source missing: cannot derive label_kind (producer must set it; no default)"\n'
+        '        )\n',
+        '    if label_source is None:\n        label_source = "event_label_value"\n',
         [*PYTEST, "tests/api/test_event_label_alignment.py", "-k", "missing_source"],
         "缺 label_source 時預設成 event_given ⇒ fail-closed 測試應紅（§C-7：綁不了的不得預設）",
     ),
+    Mutation(
+        "D3-service-triple-value-check-removed", 1, SERVICE,
+        "        if float(src) != float(val):\n",
+        "        if float(src) != float(val) and False:\n",
+        [*PYTEST, "tests/api/test_event_label_alignment.py", "-k", "triple_bound"],
+        "service 端 event_id→值回綁拿掉 ⇒ 旋轉案例應紅",
+    ),
+    Mutation(
+        "A4-event-given-forced-tail-contract", 1, CONTRACTS,
+        "    if label_kind == LABEL_KIND_EVENT_GIVEN:\n        if expected_values is None:\n",
+        "    if label_kind == LABEL_KIND_EVENT_GIVEN:\n"
+        "        if _count_structural_tail_nans(_alignment_values(target_data)) != 1:\n"
+        '            raise AlignmentViolationError("target trailing NaN count must equal lag: forced")\n'
+        "        if expected_values is None:\n",
+        [*PYTEST, "tests/api/test_event_label_alignment.py", "-k", "dense"],
+        "對 event_given 套 forward_return 尾端契約 ⇒ 同尾合法密集 label 應紅（GROK-R1-P0-02）",
+    ),
+    # ── 對照組：只改註解，全部測試必須仍綠 ──────────────────────────────
+    Mutation(
+        "C0-comment-only-control", 1, ORCH,
+        "        # EVTALIGN Task 1.1（B）：生成 label **之前**裁到 feature 尾（見 _coterminalize_close）\n",
+        "        # EVTALIGN Task 1.1（B）：生成 label **之前**裁到 feature 尾（見 _coterminalize_close）(control)\n",
+        [*PYTEST, "tests/momentum/test_close_coterminalize.py", "tests/api/test_event_label_alignment.py"],
+        "對照組：只改註解 ⇒ 全綠，證明腳本不是把所有東西都弄紅",
+    ),
 )
 
-EXPECT_GREEN: set = set()  # scaffold 期無對照組；實作時加入「只改註解」之 control
+EXPECT_GREEN: set = {"C0-comment-only-control"}
 
 
 def _run(cmd: List[str], cwd: Path) -> int:

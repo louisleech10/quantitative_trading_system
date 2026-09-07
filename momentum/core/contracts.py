@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from enum import Enum
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 import hashlib
 import json
@@ -1014,6 +1014,145 @@ def validate_alignment(
         gap_count=gap_count,
         gap_rate=gap_rate,
         checked_samples=checked_samples,
+    )
+
+
+# ── EVTALIGN Task 2.1（D）：驗證對象＝實際被消費的 label；契約由 label_source 綁定 ──────────
+# 🔴 `validate_alignment` 本體一字不改（Task 1.1 以 sha256 釘住）：它是 forward_return 之
+#    「全序列」契約（尾端 NaN＝lag、覆蓋率、close oracle），只在 label **產生點**
+#    （stage0 預載／stage2 生成）呼叫。事件模式覆寫後之 label 是逐事件給定值，天生
+#    tail_nans=0（GROK-R1-P0-02），套 forward_return 契約會誤判 ⇒ 依 label_kind 分派契約。
+#    分派鍵由**產生者**寫的 label_source 導出（SPEC §C-7：不能推導的綁產生者；綁不了的
+#    fail-closed，缺席不得預設）。分派依「資料是什麼」，不是依 mode（§C-6 判準）。
+LABEL_KIND_FORWARD_RETURN = "forward_return"
+LABEL_KIND_EVENT_GIVEN = "event_given"
+LABEL_KIND_BY_SOURCE: Dict[str, str] = {
+    "mainline_return_N": LABEL_KIND_FORWARD_RETURN,
+    "event_label_value": LABEL_KIND_EVENT_GIVEN,
+}
+
+
+def derive_label_kind(label_source: Optional[str]) -> str:
+    """由產生者寫入之 `label_source` 導出 `label_kind`；缺席／未知 ⇒ raise，**不得預設**。"""
+    if label_source is None:
+        raise AlignmentViolationError(
+            "label_source missing: cannot derive label_kind (producer must set it; no default)"
+        )
+    kind = LABEL_KIND_BY_SOURCE.get(str(label_source))
+    if kind is None:
+        raise AlignmentViolationError(
+            f"unknown label_source {label_source!r}; known={sorted(LABEL_KIND_BY_SOURCE)}"
+        )
+    return kind
+
+
+def _consumed_pair_index(feature_data: Any, target_data: Any) -> tuple[pd.Index, pd.Index]:
+    feature_index = _normalize_alignment_index(
+        _extract_alignment_index(feature_data, "timestamp", "feature_data"), "feature_data"
+    )
+    target_index = _normalize_alignment_index(
+        _extract_alignment_index(target_data, "timestamp", "target_data"), "target_data"
+    )
+    if len(feature_index) == 0 or len(target_index) == 0:
+        raise AlignmentViolationError("feature_data and target_data must be non-empty")
+    if not feature_index.equals(target_index):
+        raise AlignmentViolationError("feature and target timestamps must match exactly")
+    return feature_index, target_index
+
+
+def validate_event_given(
+    feature_data: Any,
+    target_data: Any,
+    *,
+    expected_values: Mapping[int, float],
+    event_owners: Optional[Mapping[int, str]] = None,
+) -> Dict[str, Any]:
+    """`event_given` 契約：index 與 features 逐值相等／每個 timestamp 有產生者之值／值有限／
+    被消費之值與產生者 `expected_values` **逐筆相等**；給 `event_owners`（{epoch_ms: event_id}）
+    時再綁 event_id：每個被消費列恰有一個事件、同一事件不得佔兩列。
+
+    由 `ic_filter_orchestrator._apply_event_filter` 之內聯檢查提升而來（Task 2.1 要點 3）；
+    「missing」「non-finite」訊息沿用（既有測試以 match= 比對）。**沒有**尾端 NaN 語意。
+    """
+    _, target_index = _consumed_pair_index(feature_data, target_data)
+    idx_ms = (target_index.asi8 // 10**6).astype("int64")
+    missing = [int(t) for t in idx_ms if int(t) not in expected_values]
+    if missing:
+        raise AlignmentViolationError(
+            f"event_label_values missing for {len(missing)} selected timestamps (first={missing[:3]})"
+        )
+    got = _alignment_values(target_data).to_numpy(dtype="float64", copy=False)
+    if not np.isfinite(got).all():
+        raise AlignmentViolationError("event_label_values contain non-finite values")
+    expected = np.asarray([float(expected_values[int(t)]) for t in idx_ms], dtype="float64")
+    if not np.array_equal(got, expected):
+        bad = int(np.flatnonzero(got != expected)[0])
+        raise AlignmentViolationError(
+            f"consumed label mismatches producer value at {target_index[bad]}: "
+            f"expected {expected[bad]}, got {got[bad]}"
+        )
+    consumed: Dict[str, float] = {}
+    if event_owners is not None:
+        for t, v in zip(idx_ms, got):
+            eid = event_owners.get(int(t))
+            if eid is None:
+                raise AlignmentViolationError(f"no event_id bound to consumed timestamp {int(t)}")
+            if str(eid) in consumed:
+                raise AlignmentViolationError(f"event_id {eid!r} bound to more than one consumed row")
+            consumed[str(eid)] = float(v)
+    return {
+        "label_kind": LABEL_KIND_EVENT_GIVEN,
+        "checked_samples": int(len(got)),
+        "consumed_event_labels": consumed,
+    }
+
+
+def validate_consumed_label(
+    feature_data: Any,
+    target_data: Any,
+    *,
+    label_kind: str,
+    expected_values: Optional[Mapping[int, float]] = None,
+    event_owners: Optional[Mapping[int, str]] = None,
+    source_series: Optional[pd.Series] = None,
+) -> Dict[str, Any]:
+    """依 `label_kind` 分派「被消費 label」之契約。
+
+    - `event_given` ⇒ `validate_event_given`（必須給產生者之 `expected_values` 才綁得住）。
+    - `forward_return` ⇒ 被消費序列必須是產生點已過 `validate_alignment` 之 `source_series`
+      的**值保持限制**（列 ⊆ 來源、逐值相等含 NaN 位置）——不得對子集重套尾端 NaN 契約。
+    """
+    if label_kind == LABEL_KIND_EVENT_GIVEN:
+        if expected_values is None:
+            raise AlignmentViolationError(
+                "event_given label requires the producer's expected_values to bind against"
+            )
+        return validate_event_given(
+            feature_data, target_data, expected_values=expected_values, event_owners=event_owners
+        )
+    if label_kind == LABEL_KIND_FORWARD_RETURN:
+        if source_series is None:
+            raise AlignmentViolationError(
+                "forward_return consumed label requires the validated source_series"
+            )
+        _, target_index = _consumed_pair_index(feature_data, target_data)
+        source_index = _normalize_alignment_index(
+            _extract_alignment_index(source_series, "timestamp", "source_series"), "source_series"
+        )
+        if not target_index.isin(source_index).all():
+            raise AlignmentViolationError("consumed label rows are not a subset of the validated source")
+        source = pd.Series(
+            _alignment_values(source_series).to_numpy(dtype="float64", copy=False), index=source_index
+        )
+        expected = source.loc[target_index].to_numpy(dtype="float64", copy=False)
+        got = _alignment_values(target_data).to_numpy(dtype="float64", copy=False)
+        if not np.array_equal(got, expected, equal_nan=True):
+            raise AlignmentViolationError(
+                "consumed label is not a value-preserving restriction of the validated source"
+            )
+        return {"label_kind": LABEL_KIND_FORWARD_RETURN, "checked_samples": int(len(got))}
+    raise AlignmentViolationError(
+        f"unknown label_kind {label_kind!r}; known={[LABEL_KIND_FORWARD_RETURN, LABEL_KIND_EVENT_GIVEN]}"
     )
 
 
