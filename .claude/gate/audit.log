@@ -54258,3 +54258,54 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+=== 2026-09-07 22:26:27 | artifact ===
+  ts=2026-09-07 22:26:27
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_ALIGNMENT_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(a,d); §A=filled(4 FACT-RECEIPT); §C=filled; §G=filled; §P=filled; §V=filled; §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260907-EVTALIGN-X-REVIEW-R1", "ts": "2026-09-07T14:30:22Z"}
+=== 2026-09-07 22:30:22 | dispatch ===
+  ts=2026-09-07 22:30:22
+  kind=dispatch
+  intent=事件對齊守衛 SPEC adversarial R1：攻 look-ahead 守衛改法是否放寬保護；逐模式盤點『驗了就丟』之同型缺陷
+  risk=high
+  facts_asked=新判準會否放過洩漏/誤擋；effective_horizon 與 purge_gap 是否受影響；跨模式(global/cross_sectional/event)是否都有驗了就丟的中間值；不擋只顯示進度之取捨是否負責任
+  review_role=adversarial SPEC review（禁改碼禁改文件）
+  template=n/a: 用 brief
+  adversarial=waived: 本輪即為 adversarial 本身（SPEC 尚未實作，無前輪 finding 可引）
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260907-EVTALIGN-X-REVIEW-R1", "ts": "2026-09-07T14:30:28Z"}
+=== 2026-09-07 22:30:28 | dispatch ===
+  ts=2026-09-07 22:30:28
+  kind=dispatch
+  intent=事件對齊守衛 SPEC adversarial R1
+  risk=high
+  facts_asked=守衛改法是否放寬保護；purge_gap 是否受影響；跨模式驗了就丟之盤點；不擋只顯示進度之取捨
+  review_role=adversarial SPEC review（禁改碼禁改文件）
+  template=n/a: 用 brief
+  adversarial=waived: 本輪即為 adversarial 本身
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260907-EVTALIGN-X-REVIEW-R1-BRIEF.md", "brief_sha256": "6bcb0375c57f478a4f653f82db624470ece745b0c4f55e27e2ec570a2766de47", "brief_sha256_norm": "6bcb0375c57f478a4f653f82db624470ece745b0c4f55e27e2ec570a2766de47", "event": "committee_round_open", "event_id": "62726414-1920-422d-a3f7-5ff9219aa7ec", "expected_outputs": {"codex": "handoffs/20260907-evtalign-x-review-r1-codex.md", "composer": "handoffs/20260907-evtalign-x-review-r1-composer.md", "grok": "handoffs/20260907-evtalign-x-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8449d8d4-f651-4b2d-8824-4a2dad5cb835", "schema_version": 1, "sequence": 3207, "session_name": "20260907-evtalign-x-review-r1", "task_id": "20260907-EVTALIGN-X-REVIEW-R1", "ts": "2026-09-07T14:30:34Z"}
