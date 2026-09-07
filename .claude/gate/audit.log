@@ -54436,3 +54436,38 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260908-EVTALIGN-X-CONSULT-R1", "ts": "2026-09-07T23:16:54Z"}
+=== 2026-09-08 07:16:54 | dispatch ===
+  ts=2026-09-08 07:16:54
+  kind=dispatch
+  intent=EVTALIGN 路線共識決（consult，唯讀）：A 重寫守衛走 R3／B 不動守衛、label 生成前裁 close 同尾／C 擋 run 選單／D 事件模式衛生修正——三家各給 Verdict
+  risk=low
+  facts_asked=B 之裁切是否動到 purge/embargo/event 對齊；B 少 lag 個樣本是保守還是錯；A 第三輪預期 P0 形狀；D 是否必要；各家改變立場之證據
+  review_role=committee consult（禁改碼禁改文件）
+  template=templates/COMMITTEE_SEMANTIC_REVIEW_TEMPLATE.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260908-EVTALIGN-X-CONSULT-R1", "ts": "2026-09-07T23:17:01Z"}
+=== 2026-09-08 07:17:01 | dispatch ===
+  ts=2026-09-08 07:17:01
+  kind=dispatch
+  intent=EVTALIGN 路線共識決（consult，唯讀）
+  risk=low
+  facts_asked=B 之裁切是否動到 purge/embargo；B 少 lag 樣本是保守還是錯；A 第三輪預期 P0；D 是否必要
+  review_role=committee consult（禁改碼禁改文件）
+  template=templates/COMMITTEE_SEMANTIC_REVIEW_TEMPLATE.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260908-EVTALIGN-X-CONSULT-R1-BRIEF.md", "brief_sha256": "3f8d1a9f262e96d69ef41ddaec67eece960e3a150f695f7dcaf6a00c1ced4c31", "brief_sha256_norm": "3f8d1a9f262e96d69ef41ddaec67eece960e3a150f695f7dcaf6a00c1ced4c31", "event": "committee_round_open", "event_id": "c10e0480-f598-462d-9cbf-7f300f335de3", "expected_outputs": {"codex": "handoffs/20260908-evtalign-x-consult-r1-codex.md", "composer": "handoffs/20260908-evtalign-x-consult-r1-composer.md", "grok": "handoffs/20260908-evtalign-x-consult-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "f895e083-8f63-4a57-b855-fe25f485ac65", "schema_version": 1, "sequence": 3217, "session_name": "20260908-evtalign-x-consult-r1", "task_id": "20260908-EVTALIGN-X-CONSULT-R1", "ts": "2026-09-07T23:17:06Z"}
