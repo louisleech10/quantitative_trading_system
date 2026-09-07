@@ -54,7 +54,22 @@ function formatRunLeafLabel(run: RunInfo): string {
   return `${base} · ${primary}(+${training.join(',')})`;
 }
 
-function groupRunsByBatch(runs: RunInfo[]): { key: string; label: string; items: RunInfo[] }[] {
+/**
+ * 把 run 依「批次 × 週期」分組。
+ *
+ * 🔴 `minItems` 之由來（UAT，2026-09-07）：使用者生了一個 `ETHUSDT 1h`（無 batch_id）
+ *    卻在單一 run 選單裡**選不到**。根因＝本函式尾端原本無條件
+ *    `.filter(items.length >= 2)`，而那條是為**橫截面模式**設的
+ *    （橫截面至少要兩個 symbol 才成立），卻同時套用在單一 run 選單上。
+ *    實測：13 個 browse_ready 的 run 中，只有 `__ungrouped__::1h`（n=1）被丟掉，
+ *    正是使用者那一個。
+ *    ⇒ 門檻改成參數：單一 run 模式 `minItems=1`（一個也是合法選項），
+ *      橫截面模式維持 `2`。
+ */
+function groupRunsByBatch(
+  runs: RunInfo[],
+  minItems = 2,
+): { key: string; label: string; items: RunInfo[] }[] {
   const buckets = new Map<string, RunInfo[]>();
   for (const run of runs) {
     const batchId = run.batch_id || '__ungrouped__';
@@ -77,7 +92,7 @@ function groupRunsByBatch(runs: RunInfo[]): { key: string; label: string; items:
         items,
       };
     })
-    .filter((group) => group.items.length >= 2);
+    .filter((group) => group.items.length >= minItems);
 }
 
 export default function ICConfigPanel({
@@ -96,15 +111,24 @@ export default function ICConfigPanel({
 }: ICConfigPanelProps) {
   const horizonValues = useMemo(() => config.horizons.map((value) => String(value)), [config.horizons]);
   const browseReadyRuns = useMemo(() => runs.filter((run) => run.browse_ready), [runs]);
-  const batchGroups = useMemo(() => groupRunsByBatch(browseReadyRuns), [browseReadyRuns]);
+  // 🔴 兩個用途、兩個門檻（見 `groupRunsByBatch` 之註解）：
+  //    單一 run 選單＝每一個 browse_ready 的 run 都是合法選項（`minItems=1`）；
+  //    橫截面批次選單＝至少兩個 symbol 才成立（`minItems=2`）。
+  const batchGroups = useMemo(() => groupRunsByBatch(browseReadyRuns, 1), [browseReadyRuns]);
+  const crossSectionalGroups = useMemo(
+    () => groupRunsByBatch(browseReadyRuns, 2), [browseReadyRuns],
+  );
+  // 🔴 批次選單專供**橫截面**用 ⇒ 必須讀 `crossSectionalGroups`（≥2 symbol）。
+  //    讀成 `batchGroups`（≥1）會讓單一 symbol 的批看起來可以做橫截面，
+  //    但橫截面在一個 symbol 上不成立——那是把上面那個修法的副作用漏到這裡。
   const batchOptions = useMemo(
     () =>
-      batchGroups.map((group) => ({
+      crossSectionalGroups.map((group) => ({
         value: group.key,
         label: group.label,
         symbolCount: group.items.length,
       })),
-    [batchGroups],
+    [crossSectionalGroups],
   );
 
   const selectedRunKey = config.config_hash
@@ -163,7 +187,8 @@ export default function ICConfigPanel({
   };
 
   const handleSelectBatch = (batchKey: string) => {
-    const group = batchGroups.find((item) => item.key === batchKey);
+    // 同上：批次選取是橫截面路徑，找的必須是 ≥2 那一組
+    const group = crossSectionalGroups.find((item) => item.key === batchKey);
     if (!group || group.items.length === 0) {
       return;
     }
