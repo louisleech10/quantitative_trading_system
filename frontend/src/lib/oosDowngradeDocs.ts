@@ -47,6 +47,20 @@ export const OOS_DOWNGRADE_DOCS: Record<string, OosDowngradeDoc> = {
     what: '設定裡直接指定了全樣本擬合（`fit_mode=full_sample`）——這是請求的結果，不是資料不足。',
     next: '把 `fit_mode` 改回 PIT／expanding，就會恢復 OOS 保證。',
   },
+  /**
+   * 🔴 與上一條是**兩件相反的事**（UAT，2026-09-07）。
+   * 上一條＝你要求全樣本；本條＝資料不足、系統被迫退回全樣本。
+   * 原本兩者共用上一條的文案，等於對第二種情況說「這是你要求的」，
+   * 使用者會跑去改一個他根本沒設過的設定。
+   */
+  fit_mode_full_sample_forced: {
+    what:
+      '資料量不夠切出獨立的測試集，所以系統退回用全部樣本擬合。'
+      + '🔴 這**不是**你設定的，是資料不足造成的。',
+    next:
+      '要拿回 OOS 保證，得讓資料變多：加長資料期間、或改用頻率較高的週期（例如 12h 改 1h），'
+      + '事件模式下也可以放寬事件條件讓筆數增加。改設定沒有用——你沒有設過全樣本。',
+  },
   split_not_applied: {
     what: '請求了訓練／測試切分，但實際上沒有套用。',
     next: '看 `metadata.ic_train_test_split.reason` 找出被擋下的原因，那裡有具體的失敗理由。',

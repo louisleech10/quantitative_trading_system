@@ -424,3 +424,56 @@ def test_reason_refinement_never_relaxes_the_verdict(meta):
     """
     status, oos = orch.ICFilterOrchestrator._resolve_root_status(meta)
     assert status == "degraded_full_sample" and oos is False
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# UAT（2026-09-07）：`fit_mode=full_sample` 的兩種來源不可共用一句話
+# ══════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.parametrize(
+    "meta, expected",
+    [
+        # 被迫（資料不足退回）——使用者沒設過任何東西
+        ({"oos_guarantees": False, "fit_mode": "full_sample",
+          "fit_mode_source": "fallback"}, "fit_mode_full_sample_forced"),
+        # 主動要求（研究用途）
+        ({"oos_guarantees": False, "fit_mode": "full_sample"}, "fit_mode_full_sample"),
+        ({"fit_mode": "full_sample", "fit_mode_source": "fallback"},
+         "fit_mode_full_sample_forced"),
+    ],
+)
+def test_forced_full_sample_is_distinguished_from_requested(meta, expected):
+    """🔴 「被迫退回」與「你要求的」是相反的兩件事，下一步也相反。
+
+    出生事故（UAT，2026-09-07）：使用者跑 ETHUSDT 事件分析，畫面說
+    「設定裡直接指定了全樣本擬合——這是請求的結果，不是資料不足」，
+    並叫他「把 fit_mode 改回 PIT」。但他從沒設過 fit_mode——
+    那個值是 fallback 自己寫的，真正原因就是資料不足。
+    把**結果**當成**原因**講，方向剛好相反，使用者會去改一個不存在的設定。
+    """
+    assert orch.ICFilterOrchestrator._downgrade_branch(meta) == expected
+
+
+def test_fallback_stamps_fit_mode_source(monkeypatch):
+    """fallback 必須留下來源標記，否則顯示層只能用猜的。"""
+    inst = orch.ICFilterOrchestrator.__new__(orch.ICFilterOrchestrator)
+    inst._suppress_persist = True
+    inst._in_fallback_rerun = False
+    inst._ic_cache = {}
+    inst._filtered_features_df = None
+    inst._event_identity = None
+    inst._features_path = None
+    monkeypatch.setattr(inst, "analyze", lambda *a, **k: {"metadata": {}}, raising=False)
+
+    report = orch.ICFilterOrchestrator._run_full_sample_fallback(
+        inst, features_path="f.h5", labels_path="l.h5", meta_path=None,
+        config_override=None, progress_callback=None, kline_reader=None,
+        reason="insufficient_data",
+        details={"train_rows": 80, "test_rows": 12, "min_test_rows": 131},
+    )
+    meta = report["metadata"]
+    assert meta["fit_mode"] == "full_sample"
+    assert meta["fit_mode_source"] == "fallback"
+    # 這條路徑仍以 split 自己記的 reason 為準（比 fit_mode 更具體）
+    assert orch.ICFilterOrchestrator._downgrade_branch(meta) == "insufficient_data"

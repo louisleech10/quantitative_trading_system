@@ -1224,6 +1224,13 @@ class ICFilterOrchestrator:
         report_meta.pop("scope", None)
         report_meta["ic_train_test_split"] = _split_fallback_metadata(reason, details)
         report_meta["fit_mode"] = "full_sample"
+        # 🔴 UAT（2026-09-07）：`fit_mode=full_sample` 有**兩種**來源，語意完全相反——
+        #    ①使用者／設定**主動要求**全樣本擬合（研究用途，合理）
+        #    ②資料不足 ⇒ 系統**被迫**退回全樣本（不是誰要求的）
+        #    只看 `fit_mode` 分不出來，於是畫面對②說了「這是請求的結果，不是資料不足」
+        #    ——把**結果**當成**原因**講給使用者聽，方向剛好相反。
+        #    ⇒ 留一個明確的來源標記，讓顯示層不必用猜的。
+        report_meta["fit_mode_source"] = "fallback"
         report_meta["oos_guarantees"] = False
         report_meta["pit_stats_version"] = PIT_STATS_VERSION
         # 🔴 `GAP3_EVENT_DISCLOSURE` Task 1.3：把**降級的原因與門檻**帶到 report。
@@ -1293,6 +1300,11 @@ class ICFilterOrchestrator:
         if isinstance(event_meta, dict) and event_meta.get("fallback") is True:
             return "event_filter_fallback"
         if meta.get("fit_mode") == "full_sample":
+            # 🔴 分辨「誰要求的」：`fallback` ⇒ 是資料不足**被迫**退回，
+            #    不是使用者的設定。兩者的下一步完全不同（加樣本 vs 改設定），
+            #    講錯方向會讓使用者去改一個他根本沒設過的東西。
+            if meta.get("fit_mode_source") == "fallback":
+                return "fit_mode_full_sample_forced"
             return "fit_mode_full_sample"
         if isinstance(split, dict) and (
             split.get("applied") is False or split.get("oos_guarantees") is False
@@ -1326,7 +1338,13 @@ class ICFilterOrchestrator:
             #    ⇒ **判定不動**（本分支仍然命中、仍然 degraded），只把 reason 挖深。
             return ICFilterOrchestrator._specific_reason(meta) or "meta_oos_guarantees_false"
         if meta.get("fit_mode") == "full_sample":
-            return "fit_mode_full_sample"
+            # 與 `_specific_reason` 同一套判準（被迫 vs 主動要求，見該處註解）。
+            # 兩處必須一致，否則同一份 metadata 走不同入口會得到不同說法。
+            return (
+                "fit_mode_full_sample_forced"
+                if meta.get("fit_mode_source") == "fallback"
+                else "fit_mode_full_sample"
+            )
         # ICHC Task 4.1：事件樣本不足回退全樣本 → 即使 holdout 已 applied 仍判 degraded
         event_meta = meta.get("event_filter")
         if isinstance(event_meta, dict) and event_meta.get("fallback") is True:
