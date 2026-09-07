@@ -297,6 +297,32 @@
 |---|---|---|---|
 | `EA-RESID-1` | preprocessing 之峰值記憶體（實機 17 GB／8 GB 實體、swap 15.6 GB） | `needs-research` | 需量出「特徵數 × 列數」之記憶體曲線；本票只做**可視性**（§C-4：使用者明講不要擋），真正的分塊處理另開票 |
 | `EA-RESID-2` | **橫截面路徑從未呼叫 `validate_alignment`** | `blocked-by` | 依使用者 2026-08-17 之模組成熟度裁定（只 Feature Factory 完整、IC 進行中、**其餘不完整**），橫截面屬「其餘」⇒ **未完工的模組沒有守衛不是缺陷**。使用者 2026-09-07 當面更正我把它排成「比鷹架更嚴重」是錯的。**該模組實作時必須補**，不進本票 |
+| `EA-RESID-3` | `_validate_expected_frequency` 對 **tz-aware** 索引拋 `TypeError` 而非其設計之 `TimestampDiscontinuityError` | `blocked-by` | 🔴 **執行 Task 0.2 時實測撞到**（`ic_filter_orchestrator.py:335`）：`_coerce_timestamp_array` 對 tz-aware 回 **object 陣列** ⇒ `np.diff` 得 object ⇒ `diffs <= np.timedelta64(0,"ns")` 型別不合。**現行資料為 tz-naive**（`_normalize_ic_time_index` 對 int64 epoch 秒走 `to_datetime(unit="s")`）故**未觸發**；但該函式對已是 tz-aware 之 `DatetimeIndex` **原樣保留 tz** ⇒ 一旦上游改存 tz-aware，守衛會以錯誤的例外型別炸掉。**屬潛伏脆弱點，非現行 bug**；不進本票（本票不碰時間索引正規化），待接觸該路徑之票處理 |
+
+### 切分基線之執行 receipt（TODO `Task 0.2`；2026-09-08，實作前先跑）
+
+`venv/bin/python handoffs/20260907-probe-split-baseline.py --write` → rc=0；
+重跑對證 `與既有 golden 相同？ **True**`、rc=0。
+golden＝`tests/golden/evtalign/split_baseline.json`，
+`sha256 = f01550dbedd1547f1eb1d09343f9fcef4890c68dd96b81127d0fa123f2b107ea`。
+
+| case | purge | embargo | train | test |
+|---|---|---|---|---|
+| `h2_emb0_n500` | 2 | 0 | 400 | 98 |
+| `h2_emb12_n500` | 2 | 12 | 400 | 86 |
+| `h5_emb0_n500` | 5 | 0 | 400 | 95 |
+| `h5_emb12_n500` | 5 | 12 | 400 | 83 |
+| `h12_emb0_n500` | 12 | 0 | 400 | 88 |
+| `h12_emb12_n500` | 12 | 12 | 400 | 76 |
+| `h5_emb0_n40_insufficient` | — | — | skipped: `train/test rows below min_test_rows` | |
+
+🔴 **這組數字證實 §N 之 C6 更正**：`purge` 隨 h 變（2／5／12），`embargo` 獨立
+（0／12），且 `test_rows` 隨兩者**相加**遞減 ⇒ 總隔離＝`purge + embargo`，
+事件之 lookahead 經 embargo 進來後隔離只會**偏大**。**不是洩漏**。
+
+🔴 **誠實邊界**：本基線只跑 `_build_holdout_split_plan`（純函式），
+**不跑完整 analyze**（8 GB 機器上是十分鐘級）⇒ 只覆蓋切分計畫本身，
+不覆蓋 stage1 之後；`embargo` 以參數化涵蓋，不等於跑過真實事件批。
 
 ### 🔴 逐模式盤點（Task 2.2 之產出；R1 三家獨立查證，結論一致）
 

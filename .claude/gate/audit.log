@@ -54363,3 +54363,56 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260907-evtalign-x-review-r1/synth.md", "output_sha256": "8ba56421f5c90fd08437f889bdfc61185a72fe409512ec547384f607be8f27aa", "task_id": "20260907-EVTALIGN-X-REVIEW-R2", "ts": "2026-09-07T22:24:02Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260907-EVTALIGN-X-REVIEW-R2", "ts": "2026-09-07T22:24:19Z"}
+=== 2026-09-08 06:24:19 | dispatch ===
+  ts=2026-09-08 06:24:19
+  kind=dispatch
+  intent=EVTALIGN SPEC/TODO R2 閉合輪（唯讀審查，禁改碼）：確認 R1 之 19 條；攻三層設計是否仍有洩漏縫隙
+  risk=low
+  facts_asked=R1 逐條 CLOSED；三層是否仍漏/誤擋；event_given 三檢查是否足夠；Task 0.2 基線欄位；ORACLE_RETURN_KINDS 涵蓋率與退路
+  review_role=adversarial SPEC/TODO review（禁改碼禁改文件）
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260907-EVTALIGN-X-REVIEW-R2", "ts": "2026-09-07T22:24:26Z"}
+=== 2026-09-08 06:24:26 | dispatch ===
+  ts=2026-09-08 06:24:26
+  kind=dispatch
+  intent=EVTALIGN SPEC/TODO R2 閉合輪（唯讀審查）
+  risk=low
+  facts_asked=R1 逐條 CLOSED；三層是否仍漏/誤擋；event_given 三檢查；Task 0.2 基線欄位；ORACLE 涵蓋率
+  review_role=adversarial SPEC/TODO review（禁改碼禁改文件）
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260907-EVTALIGN-X-REVIEW-R2-BRIEF.md", "brief_sha256": "077be8fd9b54ae4ab9a6ab23a34893a1d7931051362e1d7711bc6abba9eaf80d", "brief_sha256_norm": "077be8fd9b54ae4ab9a6ab23a34893a1d7931051362e1d7711bc6abba9eaf80d", "event": "committee_round_open", "event_id": "7fc479df-6b8e-4184-9730-ca71c9130f04", "expected_outputs": {"codex": "handoffs/20260907-evtalign-x-review-r2-codex.md", "composer": "handoffs/20260907-evtalign-x-review-r2-composer.md", "grok": "handoffs/20260907-evtalign-x-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "5ec695cd-ae0f-4747-814b-eebf975a7ed7", "schema_version": 1, "sequence": 3212, "session_name": "20260907-evtalign-x-review-r2", "task_id": "20260907-EVTALIGN-X-REVIEW-R2", "ts": "2026-09-07T22:24:31Z"}
+{"actor": "cx_run", "attempt_id": "c15458c8-e950-49df-8b5d-14470746f906", "cli_rc": "0", "event": "committee_family_result", "event_id": "78503e60-7777-4873-859e-96c9ae1e18d7", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260907-evtalign-x-review-r2-composer.md", "output_sha256": "c336a3b293a240457afa273289b628c1f86df4b13fd3aeb28912707930c17ddd", "producer": "audit_append.sh", "result_state": "success", "round_id": "5ec695cd-ae0f-4747-814b-eebf975a7ed7", "schema_version": 1, "sequence": 3213, "ts": "2026-09-07T22:26:42Z"}
+=== 2026-09-08 06:27:25 | artifact ===
+  ts=2026-09-08 06:27:25
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_ALIGNMENT_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=登記 EA-RESID-3（tz-aware 索引使 _validate_expected_frequency 拋 TypeError）＋ Task 0.2 已完成之 receipt
+  spec=
+  todo=
+  manifest=
