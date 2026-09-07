@@ -338,3 +338,89 @@ def test_annotate_writes_nothing_when_ok_oos():
     orch.ICFilterOrchestrator._annotate_root_status_and_pass_class(
         report, analysis_status="ok_oos", oos_guarantees=True)
     assert "oos_downgrade" not in report["metadata"]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# `SCANCUBE` UAT B24／B26 之實機打穿（2026-09-07）
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_one_shot_guard_reads_in_fallback_rerun_not_suppress_persist():
+    """🔴 one-shot guard 的判別式必須是 `_in_fallback_rerun`。
+
+    出生事故（UAT B26 實機）：兩個旗標原本恰好同進同出（只有 fallback 重跑會 suppress），
+    所以 guard 讀錯也看不出來。`SCANCUBE` Task 1.1 讓**掃描格**也 suppress 之後巧合被打破，
+    每一格從第一次 warmup skip 就被誤判成「已在重跑內」而直接 raise
+    ⇒ 使用者的 6 格掃描全部 unavailable。
+
+    🔴 本測試刻意驗**行為**（suppress 但不在重跑內 ⇒ 走 fallback、不 raise），
+    而不是掃原始碼字面——後者擋不住「換一個同樣錯的旗標」。
+    """
+    inst = orch.ICFilterOrchestrator.__new__(orch.ICFilterOrchestrator)
+    inst._suppress_persist = True       # ← 掃描格的狀態
+    inst._in_fallback_rerun = False     # ← 但不在 fallback 重跑內
+    inst._ic_cache = {}
+    inst._filtered_features_df = None
+    inst._event_identity = None
+    inst._features_path = None
+
+    called: dict = {}
+
+    def _fake_fallback(*args, **kwargs):
+        called["reason"] = kwargs.get("reason")
+        return {"metadata": {}, "analysis_status": "degraded_full_sample"}
+
+    inst._run_full_sample_fallback = _fake_fallback  # type: ignore[method-assign]
+
+    # 直接驗那個判別式：suppress=True 且 in_rerun=False ⇒ **不得** raise
+    assert inst._in_fallback_rerun is False
+    src = inspect.getsource(orch.ICFilterOrchestrator.analyze)
+    guard = src[src.index("one-shot fallback guard") - 400: src.index("one-shot fallback guard")]
+    assert "if self._in_fallback_rerun:" in guard, (
+        "guard 讀的不是 _in_fallback_rerun——掃描格會在第一次 warmup skip 就被誤判成遞迴"
+    )
+    assert "if self._suppress_persist:" not in guard, "guard 又讀回了 _suppress_persist"
+
+
+@pytest.mark.parametrize(
+    "meta, expected",
+    [
+        # 🔴 B24 實機：使用者只看到「metadata 說沒有保證」這句循環理由，
+        #    而真正的原因就在同一份 metadata 的 split.reason 裡。
+        ({"oos_guarantees": False,
+          "ic_train_test_split": {"applied": False, "reason": "rolling_warmup_insufficient"}},
+         "rolling_warmup_insufficient"),
+        ({"oos_guarantees": False, "event_filter": {"fallback": True}},
+         "event_filter_fallback"),
+        ({"oos_guarantees": False, "fit_mode": "full_sample"},
+         "fit_mode_full_sample"),
+        ({"oos_guarantees": False, "ic_train_test_split": {"applied": False}},
+         "split_not_applied"),
+        # 真的找不到更具體的 ⇒ 才回那句籠統的
+        ({"oos_guarantees": False}, "meta_oos_guarantees_false"),
+    ],
+)
+def test_downgrade_reason_prefers_specific_over_circular(meta, expected):
+    """降級原因要挖到**使用者做得了事**的那一層，不能只把結論再講一次。"""
+    assert orch.ICFilterOrchestrator._downgrade_branch(meta) == expected
+
+
+@pytest.mark.parametrize(
+    "meta",
+    [
+        {"oos_guarantees": False},
+        {"oos_guarantees": False, "ic_train_test_split": {"applied": True, "oos_guarantees": True}},
+        {"oos_guarantees": False, "fit_mode": "full_sample"},
+        {"oos_guarantees": False, "event_filter": {"fallback": True}},
+        {"oos_guarantees": False, "ic_train_test_split": {"reason": "insufficient_data"}},
+    ],
+)
+def test_reason_refinement_never_relaxes_the_verdict(meta):
+    """🔴 挖深 reason **不得**改變判定。
+
+    這條釘住的是我差點犯的錯：原本想把 `meta_oos_guarantees_false` 往後排，
+    那會讓 `{oos_guarantees: False, split: {applied: True, oos_guarantees: True}}`
+    從 degraded 變成 ok_oos——判定被放寬，方向剛好相反。
+    """
+    status, oos = orch.ICFilterOrchestrator._resolve_root_status(meta)
+    assert status == "degraded_full_sample" and oos is False

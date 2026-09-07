@@ -66,6 +66,9 @@ function CubeDoc({ docKey }: { docKey: keyof typeof SCAN_CUBE_DOCS }) {
 export default function ScanCubeBrowser({ taskId, hasScan = true }: Props) {
   const [manifest, setManifest] = useState<ICScanCubeManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 立方體還沒寫出來（≠ 壞掉）。見下方 catch 之註解。 */
+  const [missing, setMissing] = useState(false);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [view, setView] = useState<ViewMode>('cell');
 
   const [selK, setSelK] = useState<number | null>(null);
@@ -93,15 +96,25 @@ export default function ScanCubeBrowser({ taskId, hasScan = true }: Props) {
         if (cancelled) return;
         setManifest(m);
         setError(null);
+        setMissing(false);
         setSelK((prev) => (prev ?? m.k_axis[0] ?? null));
         setSelH((prev) => (prev ?? m.h_axis[0] ?? null));
         setMetric((prev) => prev || m.metrics[0] || '');
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : '讀取立方體失敗');
+        if (cancelled) return;
+        // 🔴 UAT B26（2026-09-07）：使用者看到一句生的「scan cube not found: <uuid>」。
+        //    那是**兩種完全不同的情況**共用一句話：
+        //      ① 立方體還沒寫出來（掃描剛跑完、或這次分析在本功能上線前跑的）
+        //      ② 真的壞了
+        //    ①很常見且會自己好，把它當硬錯誤顯示既嚇人又沒有出路
+        //    ⇒ 分開處理：①給「尚未產生」＋可按的重試；②才是紅字。
+        const msg = e instanceof Error ? e.message : '讀取立方體失敗';
+        if (/not found/i.test(msg)) { setMissing(true); setError(null); }
+        else setError(msg);
       });
     return () => { cancelled = true; };
-  }, [taskId, hasScan]);
+  }, [taskId, hasScan, reloadNonce]);
 
   // ── rows（cell／feature 兩個視圖共用，只是參數不同）────────────────────
   const loadRows = useCallback(async () => {
@@ -166,6 +179,23 @@ export default function ScanCubeBrowser({ taskId, hasScan = true }: Props) {
 
       {error && (
         <p className="mt-1 text-[11px] text-rose-300" data-testid="ic-cube-error">{error}</p>
+      )}
+
+      {missing && (
+        <div className="mt-1 text-[11px] text-slate-300" data-testid="ic-cube-missing">
+          <p>
+            這次分析還沒有立方體資料。常見原因：掃描剛跑完、資料還在寫；
+            或這次分析是在這個功能上線之前跑的。
+          </p>
+          <button
+            type="button"
+            data-testid="ic-cube-retry"
+            onClick={() => setReloadNonce((n) => n + 1)}
+            className="mt-1 rounded border border-slate-700 px-2 py-0.5 text-slate-200"
+          >
+            重新讀取
+          </button>
+        </div>
       )}
 
       {/* ── 視圖切換 ─────────────────────────────────────────────────── */}

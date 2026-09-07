@@ -42,6 +42,18 @@ class EventImportJsonRequest(BaseModel):
                      "而本端點的位元組是 request body 本身，兩者必然不符（CODEX-R2-P1-03）。"
                      "需對證請改用檔案端點並上傳該來源檔。"),
     )
+    label_rule: Optional["LabelRuleModel"] = Field(
+        None,
+        description=(
+            "`G3-D2` D5.1：這批的**規則身分**（`close_to_close` 門檻＋答案窗長度）。"
+            "🔴 帶了它，隨機對照組才並排得出 prevalence——否則分析層只能回"
+            "`random_control_rule_identity_unverifiable`（無從確認兩批用同一把尺）。"
+            "🔴 **本欄是 UAT B23 之閉合**（2026-09-07）：`import_records` 早就有這個參數，"
+            "但**沒有任何路由傳它**（`grep label_rule api/routes/case.py` ＝ 0）"
+            "⇒ 畫面叫使用者「重新匯入時帶入 label_rule」，而那條路根本不存在。"
+            "缺席仍然合法（人工標註批通常沒有），只是比較不成立。"
+        ),
+    )
 
 
 class EventImportResponse(BaseModel):

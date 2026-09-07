@@ -1075,7 +1075,16 @@ class ICFilterOrchestrator:
         if ic_results.get("status") == "skipped":
             # ICHC R5 one-shot guard：fallback 重跑內再觸發＝設計不變式被破壞
             # （holdout off 後 stage4 不應再 skip）——fail-closed 禁遞迴。
-            if self._suppress_persist:
+            #
+            # 🔴 判別式必須是 `_in_fallback_rerun`，**不是** `_suppress_persist`
+            #    （`SCANCUBE` UAT B26 實機打穿，2026-09-07）：
+            #    這兩個旗標原本恰好同進同出（只有 fallback 重跑會 suppress），
+            #    所以讀錯也看不出來——本函式 `:1198` 的註解甚至已經寫明該用前者。
+            #    `SCANCUBE` Task 1.1 讓**掃描格**也 suppress（研究掃描不寫 survivor artifact）
+            #    之後巧合被打破：每一格從第一次 warmup skip 就被誤判成「已在重跑內」而直接 raise
+            #    ⇒ 使用者的 6 格掃描**全部 unavailable**，掃描等於白跑。
+            #    教訓＝旗標一物二用；`_suppress_persist` 只該回答「要不要落檔」。
+            if self._in_fallback_rerun:
                 raise RuntimeError(
                     "one-shot fallback guard: rolling_warmup_insufficient hit again "
                     "inside fallback rerun (invariant: holdout-off skips no warmup)"
@@ -1266,6 +1275,32 @@ class ICFilterOrchestrator:
         return report
 
     @staticmethod
+    def _specific_reason(meta: dict) -> Optional[str]:
+        """在 metadata 裡找一個**比「沒有保證」更有用**的原因；找不到回 `None`。
+
+        🔴 **只影響 reason 字串，不影響任何判定**——呼叫端已經決定要降級了，
+        本函式只是替那個決定找一句使用者做得了事的說明。
+
+        優先序＝**由具體到籠統**：切分自己記的 reason（如 `rolling_warmup_insufficient`，
+        它連列數都有）> 事件樣本不足 > 設定直指全樣本 > 切分未套用。
+        """
+        split = meta.get("ic_train_test_split")
+        if isinstance(split, dict):
+            reason = split.get("reason")
+            if isinstance(reason, str) and reason.strip():
+                return reason.strip()
+        event_meta = meta.get("event_filter")
+        if isinstance(event_meta, dict) and event_meta.get("fallback") is True:
+            return "event_filter_fallback"
+        if meta.get("fit_mode") == "full_sample":
+            return "fit_mode_full_sample"
+        if isinstance(split, dict) and (
+            split.get("applied") is False or split.get("oos_guarantees") is False
+        ):
+            return "split_not_applied"
+        return None
+
+    @staticmethod
     def _downgrade_branch(report_meta: dict) -> Optional[str]:
         """觸發降級的**分支代號**；`None` ⇒ 未降級（`ok_oos`）。
 
@@ -1281,7 +1316,15 @@ class ICFilterOrchestrator:
         """
         meta = report_meta or {}
         if meta.get("oos_guarantees") is False:
-            return "meta_oos_guarantees_false"
+            # 🔴 `meta_oos_guarantees_false` 是**循環理由**（「metadata 說沒有保證」＝把結論
+            #    再講一次），使用者看了不知道該做什麼——`SCANCUBE` UAT B24 實機打穿：
+            #    畫面只給這一句，而真正的原因（滾動 IC 暖身不足）就在同一份 metadata 裡。
+            #
+            # 🔴 **不可以只把本分支往後排**：那會讓
+            #    `{oos_guarantees: False, ic_train_test_split: {applied: True, oos_guarantees: True}}`
+            #    這組從 degraded 變成 ok_oos——判定被放寬，方向錯了。
+            #    ⇒ **判定不動**（本分支仍然命中、仍然 degraded），只把 reason 挖深。
+            return ICFilterOrchestrator._specific_reason(meta) or "meta_oos_guarantees_false"
         if meta.get("fit_mode") == "full_sample":
             return "fit_mode_full_sample"
         # ICHC Task 4.1：事件樣本不足回退全樣本 → 即使 holdout 已 applied 仍判 degraded

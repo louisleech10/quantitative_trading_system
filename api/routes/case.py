@@ -242,6 +242,12 @@ async def import_events_json(request: EventImportJsonRequest):
         return svc.import_records(request.records, source_name=request.source_name, upload_bytes=body,
                                   validate_only=request.validate_only, verify_source_digest=request.verify_source_digest,
                                   batch_defaults=request.batch_defaults,
+                                  # 🔴 UAT B23 閉合（2026-09-07）：`label_rule` 之**唯一** wire。
+                                  #    service 早有這個參數，但**沒有任何路由傳它**
+                                  #    ⇒ 畫面叫使用者「重新匯入時帶入 label_rule」而那條路不存在。
+                                  #    這是本 epic 第四個「兩端都有、中間沒接上」。
+                                  label_rule=(request.label_rule.model_dump()
+                                              if request.label_rule is not None else None),
                                   carried_declaration_acknowledged=True)   # 殘留 R35-L2-ACK：只此路由自動視為已勾選
     except EventImportRejectedError as exc:
         raise _rejected(exc, svc=svc, content=body)

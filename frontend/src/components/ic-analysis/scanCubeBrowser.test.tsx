@@ -305,3 +305,31 @@ describe('說明覆蓋閘（沿用揭露票 R2 之一對一模型）', () => {
     }
   });
 });
+
+describe('UAT B26 — 立方體還沒產生時的呈現', () => {
+  it('🔴 「not found」是「尚未產生」不是「壞掉」——給重試按鈕，不給紅字', async () => {
+    mockManifest.mockRejectedValue(new Error('scan cube not found: abc-123'));
+    render(<ScanCubeBrowser taskId="t1" />);
+    await waitFor(() => expect(screen.getByTestId('ic-cube-missing')).toBeTruthy());
+    expect(screen.queryByTestId('ic-cube-error')).toBeNull();
+    expect(screen.getByTestId('ic-cube-retry')).toBeTruthy();
+  });
+
+  it('按重試會重新讀取；成功後「尚未產生」消失', async () => {
+    mockManifest.mockRejectedValueOnce(new Error('scan cube not found: abc-123'));
+    render(<ScanCubeBrowser taskId="t1" />);
+    await waitFor(() => screen.getByTestId('ic-cube-retry'));
+
+    mockManifest.mockResolvedValue(manifest());
+    fireEvent.click(screen.getByTestId('ic-cube-retry'));
+    await waitFor(() => expect(screen.queryByTestId('ic-cube-missing')).toBeNull());
+    expect(mockManifest).toHaveBeenCalledTimes(2);
+  });
+
+  it('真正的錯誤仍走紅字（不被「尚未產生」吃掉）', async () => {
+    mockManifest.mockRejectedValue(new Error('Internal Server Error'));
+    render(<ScanCubeBrowser taskId="t1" />);
+    await waitFor(() => expect(screen.getByTestId('ic-cube-error')).toBeTruthy());
+    expect(screen.queryByTestId('ic-cube-missing')).toBeNull();
+  });
+});
