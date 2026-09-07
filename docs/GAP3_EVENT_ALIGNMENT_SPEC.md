@@ -45,12 +45,23 @@
     後端常駐 **17 GB**／實體 8 GB、swap 用 15.6 GB、瞬時 CPU 3.3%
     ⇒ 該階段靠 swap 撐過，非正常狀態。（Claude 實測 2026-09-07）
 
-- **假設（未驗，請 adversarial 攻）**
-  - `ASSUME-1`：把守衛之期望值改為「依剩餘 K 線根數推導」後，**同尾情形下強度完全不變**。
-    否證觀測＝存在一組同尾資料，改法後 tail_nans 檢查放過了原本會擋的洩漏。
+- **R1 裁決（三家 adversarial 之結果，非本人推論）**
+  - 🔴 `ASSUME-1`：**已推翻**（`CODEX-R1-P0-01`／`GROK-R1-P0-01`）。
+    我原提的 `max(0, lag − 剩餘根數)` **會放行真正的 look-ahead**——
+    截短時期望值為 0，而**未 shift 的 target 也是 0** ⇒ 通過。
+    tail-NaN 只證「尾端容量」，不證「每個 label 真的是 `t+lag`」。
+    ⇒ Task 1.1 整條重寫為三層設計（L0 分派／L1 結構／L2 oracle）。
+  - 🔴 **新發現（我沒想到的）**：`excess`／`risk_adjusted` 不在 `ORACLE_RETURN_KINDS`，
+    stage2 傳 `close=None` ⇒ 若同時放寬 L1，該組合成為
+    「無 L1 辨識 ∪ 無 L2 oracle」＝**零保護**（`COMPOSER-R1-P0-03`／`GROK-R1-P1-01`）。
+  - 🔴 **新發現**：若對事件 label 套 forward-return 契約，**同尾**之合法密集 label
+    （`tail_nans=0`）會被誤判 ⇒ 用新紅燈換掉舊鷹架（`GROK-R1-P0-02`）。
+
+- **仍未驗（請 R2 攻）**
   - `ASSUME-2`：`effective_horizon`／`purge_gap` 之語意**不因本票改動**。
     否證觀測＝改後某條路徑之 purge 列數與改前不同。
-    🔴 探針已明文標「本支沒有測那條路徑」——這是本票最需要被攻的地方。
+    🔴 探針明文標「沒有測那條路徑」；`CODEX-R1-P1-03` 亦判「無法接受『不受影響』」。
+    ⇒ Task 1.1／2.1 之驗收已增「改前／改後逐項對照」，但**尚未實跑**。
 
 - **待使用者確認**：無（技術決策依 CLAUDE.md 走委員會）。
 
@@ -115,57 +126,98 @@
 
 ## §P Phase 與依賴
 
-| Phase | 內容 | 依賴 |
-|---|---|---|
-| **P1** | 守衛期望值改為依剩餘 K 線推導；同尾強度不變之證明 | 無 |
-| **P2** | 事件模式不驗即將被丟棄的鷹架（驗真正被用的 label） | P1 |
-| **P3** | 期間自動對齊（系統處理，不要使用者手動） | P1 |
-| **P4** | 進度可見（stage 內細分＋預估），取代「動手前擋下」 | 無 |
+🔴 **優先序依使用者 2026-09-07 之裁定重排**（原順序把「鷹架」排第一是錯的）：
+實測 `handoffs/20260907-probe-guard-vs-scaffold.py`（rc=0）證明
+**沒有鷹架的全域模式，在「特徵期間比 K 線短」時照樣被守衛擋死**
+⇒ 期間守衛打到的是**已經在用的模式**，比只在事件模式的鷹架急迫。
+
+| Phase | 內容 | 依賴 | 為何是這個順序 |
+|---|---|---|---|
+| **P1** | 對齊守衛三層設計（L0 分派／L1 結構／L2 oracle） | 無 | 全域模式**今天就有地雷**（探針 rc=0） |
+| **P2** | 事件模式不驗即將被丟棄的鷹架 | P1 | 60 天；不影響數值（探針證）但擋流程 |
+| **P3** | 期間自動對齊 ＋ **丟失事件之揭露** | P1 | 使用者原話④「太蠢了，是缺陷吧」 |
+| **P4** | 進度可見 ＋ **記憶體 WARN（非阻擋）** | 無 | 使用者原話①「可以跑的話，幹嘛擋?」 |
+| **P5** | purge／embargo 之**揭露** | P1 | 由 R1 之 C6 降級而來——不是安全項 |
 
 ---
 
 ## 逐項 Task 明細
 
-### Task 1.1 — 對齊守衛之期望值依剩餘 K 線推導（`票 UAT-3`）
+### Task 1.1 — 對齊守衛之**三層設計**（`票 UAT-3`）
 
-- **目標**：`K 線比特徵多`（常態）不再被誤判為違規。
-- **修法**：`expected_tail_nan = max(0, lag - bars_available_after_last_target_row)`。
-  同尾 ⇒ `bars_available = 0` ⇒ `expected = lag`（**與現行完全相同**）。
+🔴 **本 Task 於 R1 被三家打穿後整條重寫。**
+初稿的 `expected_tail_nan = max(0, lag − 剩餘根數)` **會放行真正的 look-ahead**
+（`CODEX-R1-P0-01`／`GROK-R1-P0-01`）：截短時期望值為 0，而**未 shift 的 target 也是 0**
+⇒ 通過。tail-NaN 只證「尾端容量」，不證「每個 label 真的是 `t+lag`」。
+
+- **目標**：`K 線比特徵多`（常態、三模式皆會遇到）不再被誤判為違規，
+  **且不得因此損失任何洩漏辨識力**。
+- **修法＝三層，缺一不可**：
+
+  | 層 | 內容 | 何時適用 |
+  |---|---|---|
+  | **L0 分派** | 依 `label_kind` 選契約：`forward_return` ／ `event_given` | 一律 |
+  | **L1 結構** | forward_return 之尾端 NaN；**同尾**時 `== lag`（強度**完全不變**） | 同尾 |
+  | **L2 值證明** | oracle：由 `close` 重算 label 逐值比對 | **截短時必須** |
+
+  🔴 **截短不是「放寬」，是把證明責任從 L1 移到 L2。**
+  🔴 **拿不到 L2 ⇒ fail-closed raise，不得靜默降級**
+  （`COMPOSER-R1-P0-03`／`GROK-R1-P1-01`：`excess`／`risk_adjusted` 不在
+  `ORACLE_RETURN_KINDS`，stage2 傳 `close=None` ⇒ 若同時放寬 L1，
+  該組合變成「無 L1 辨識 ∪ 無 L2」＝**零保護**）。
+  ⇒ 實作上：截短且無 oracle ⇒ 明確 raise，訊息指明「請提供 close 或改用有 oracle 的 return_type」。
+- **`bars_available_after_last_target_row` 之來源必須寫進 API 契約**
+  （`COMPOSER-R1-P0-01`）：現行 `validate_alignment` 只收 feature/target/spec/optional close，
+  實作者可能用錯資料源。⇒ 由**呼叫端顯式傳入**，不得在守衛內自行推測。
+- **coverage 地板一併改用同一期望值來源**（`GROK-R1-P2-01`：`contracts.py:964-966`
+  仍用 `spec.lag`，與新期望值不一致）。
 - **驗證（可證偽）** — `tests/momentum/test_alignment_tail_nan.py`：
   - `ASSERT venv/bin/python -m pytest tests/momentum/test_alignment_tail_nan.py -q THEN rc=0`
-  - **同尾**：期望值仍為 `lag`；把 target 改成未 shift（洩漏）⇒ 仍 raise。
-  - **截短**：剩餘 503 根 ⇒ 期望 0，通過；若剩餘 2 根而 lag=5 ⇒ 期望 3。
-  - mutation `A1`：把推導改回硬相等 ⇒ 截短案例紅；`A2`：改成永遠回 0 ⇒ 同尾洩漏案例紅。
-- **邊界**：①剩餘根數 > lag ⇒ 期望 0；②剩餘根數為 0（同尾）⇒ 期望 lag；
-  ③target index 不是 close index 之子集 ⇒ **fail-closed raise**（不猜）。
+  - **同尾 ＋ 洩漏**（target 未 shift）⇒ **仍 raise**（L1 強度不變）。
+  - **截短 ＋ 洩漏**（target 未 shift、剩餘根數 > lag）⇒ **必須 raise**
+    🔴 這格就是打穿初稿的那一格；初稿會通過。
+  - **截短 ＋ 正確**（真的 shift 過）⇒ 通過（由 L2 證明）。
+  - **截短 ＋ 無 oracle** ⇒ **raise**（不得靜默通過）。
+  - 剩餘 2 根而 lag=5 ⇒ L1 期望 3（探針情境 C 已實算）。
+  - mutation `A1`：刪 L2 ⇒ 「截短＋洩漏」紅；`A2`：L1 改成永遠回 0 ⇒ 「同尾＋洩漏」紅；
+    `A3`：無 oracle 時改成靜默通過 ⇒ 「截短＋無 oracle」紅。
+- **邊界**：①剩餘 > lag；②剩餘 = 0（同尾）；③target index 非 close index 之子集 ⇒ fail-closed raise。
 - **存活至**：永久。
 - **覆蓋風險**：無。
-- **不可做**：不得移除 tail_nan 檢查本身；不得以「事件模式就跳過」了事（那會讓全域模式失去保護）。
+- **不可做**：不得移除 tail_nan 檢查；不得在無 oracle 時放行；
+  不得以 mode 分支替代 `label_kind` 分派（§C-6 判準）。
 
-### Task 2.1 — **任何模式**都只驗實際被使用的 label（`票 UAT-2`）
+### Task 2.1 — 驗證對象＝**實際被消費**的那條；契約依 `label_kind` 分派（`票 UAT-2`）
+
+🔴 **R1 修訂**：初稿寫「對最終 label 呼叫同一個 `validate_alignment`」——
+`GROK-R1-P0-02` 指出那會**用新紅燈換掉舊鷹架**：事件 label 是逐事件給定值，
+天生 `tail_nans=0`，套 forward-return 契約在**同尾**時會被誤判違規。
 
 - **目標**：不再讓一個**不影響輸出數字**的中間值擋死分析（探針 rc=0 已證），
-  且此原則**不限事件模式**（§C-6）。
-- 🔴 **範圍（使用者追加後放大）**：本 Task 不是「事件模式特例」。要建立的是一條
-  **跨模式不變式**：`validate_alignment` 的輸入必須是**下游真正消費的那條 series**。
-  現況是事件模式先造一條全域 horizon 的鷹架、驗它、然後整條丟掉換成事件 label——
-  驗了一個沒人用的東西，還讓它有權否決整個分析。
-  **同樣的形態若存在於 global／cross_sectional，一併修**（見 Task 2.2 之盤點）。
-- **修法**：`validate_alignment` 對**最終**label 執行；若某模式必須先造中間序列，
-  該序列**不得**成為否決依據。
-  🔴 **不得直接跳過驗證**——每種模式各自的 label 都需要對齊保證，只是驗對的那條。
-  🔴 **不得用模式分支把本 Task 縮成單一模式的特例**（§C-6 之判準）：
-  「要不要驗、驗哪一份」不得因模式而異；「用哪份資料、算什麼統計量」則本來就該不同。
-  事件模式既有的 `event_label_values` 覆寫、`conditional_ic` 標記等分支**照留**。
+  **也不製造新的誤判**。
+- **修法**：
+  1. 引入 `label_kind`：`forward_return`（往後看 h 根的報酬）／
+     `event_given`（逐事件給定之 label，**沒有**尾端 NaN 語意）。
+  2. `validate_alignment` 依 `label_kind` **分派契約**，
+     🔴 **不是**依 mode 分支（§C-6 判準：分派依「資料是什麼」，不是「誰在跑」）。
+  3. `event_given` 之契約＝「每個選中 timestamp 有值／值有限／index 與 features 相符」
+     ——該檢查**已存在**於 `ic_filter_orchestrator.py:3033-3041`（`missing` 清單 ＋
+     `np.isfinite(vals).all()`），本 Task 是把它**提升為正式契約並移到驗證層**，不是新寫一套。
+  4. 驗證的呼叫點必須在**覆寫之後**（`COMPOSER-R1-P0-02`：現況 stage2 `:2923` 與
+     stage0 `:2790` 都在 stage3 覆寫 `:3042` 之前，覆寫後無再驗）。
 - **驗證（可證偽）** — `tests/api/test_event_label_alignment.py`：
   - `ASSERT venv/bin/python -m pytest tests/api/test_event_label_alignment.py -q THEN rc=0`
-  - 事件 label 與 feature index 不對齊 ⇒ 仍 raise（保護沒被拿掉）。
+  - 事件 label 與 feature index 不對齊 ⇒ **仍 raise**（保護沒被拿掉）。
+  - **同尾**事件模式之合法密集 label（`tail_nans=0`）⇒ **通過**（不得誤判）。
   - 鷹架之 tail_nan 不再影響事件模式之通過與否。
+  - mutation `A4`：把 `event_given` 也套 forward_return 契約 ⇒ 同尾合法案例紅。
 - **邊界**：①`event_label_values` 缺任一 timestamp ⇒ 維持現行 loud raise；
   ②非事件模式 ⇒ 行為逐位元組不變。
 - **存活至**：永久。
 - **覆蓋風險**：無。
-- **不可做**：不得因此改動 `effective_horizon`／`purge_gap`（§C-2）。
+- **不可做**：不得因此改動 `effective_horizon`／`purge_gap`（§C-2）；
+  🔴 不得用模式分支把本 Task 縮成單一模式的特例（§C-6 之判準）：
+  「要不要驗、驗哪一份」不得因模式而異；「用哪份資料、算什麼統計量」則本來就該不同。
 
 ### Task 2.2 — 盤點**所有模式**是否存在「驗了就丟」的中間值（`票 UAT-2`）
 
@@ -244,3 +296,34 @@
 | 代號 | 內容 | 三值理由 | 接下來 |
 |---|---|---|---|
 | `EA-RESID-1` | preprocessing 之峰值記憶體（實機 17 GB／8 GB 實體、swap 15.6 GB） | `needs-research` | 需量出「特徵數 × 列數」之記憶體曲線；本票只做**可視性**（§C-4：使用者明講不要擋），真正的分塊處理另開票 |
+| `EA-RESID-2` | **橫截面路徑從未呼叫 `validate_alignment`** | `blocked-by` | 依使用者 2026-08-17 之模組成熟度裁定（只 Feature Factory 完整、IC 進行中、**其餘不完整**），橫截面屬「其餘」⇒ **未完工的模組沒有守衛不是缺陷**。使用者 2026-09-07 當面更正我把它排成「比鷹架更嚴重」是錯的。**該模組實作時必須補**，不進本票 |
+
+### 🔴 逐模式盤點（Task 2.2 之產出；R1 三家獨立查證，結論一致）
+
+| 模式 | 被驗的 series | 被 IC 消費的 series | 同一份？ | 判定 |
+|---|---|---|---|---|
+| **global**（`labels_df` 有） | stage0 `label_series`（`:2790-2796`） | stage4 同引用（`:2883-2885`→`:1067`） | ✅ **是** | 無鷹架 |
+| **global**（`labels_df` 無） | stage2 `return_{horizon}`（`:2921-2928`） | stage4 同 series（`:2938`→`:1067`） | ✅ **是** | 無鷹架——**那條序列就是最終 label** |
+| **event** | stage2 鷹架 或 stage0 預載（`:2923`／`:2790`） | stage3 覆寫後 `filtered_label`（`:3042`→`:1067`） | ❌ **否** | 🔴 **同型缺陷（本票主病灶）** |
+| **cross_sectional** | **無**（從未呼叫 `validate_alignment`） | `numeric_df[label_col]` 直接進分組 IC（`:1503-1511`） | ⚠️ N/A | 不是鷹架，是**守衛缺席** ⇒ `EA-RESID-2` |
+
+**同型形態之其他候選（R1 三家主動找出，我原本沒列）**：
+- `split_context.effective_horizon` 與事件 label 語意脫鉤 ⇒ 見下方 C6-揭露項。
+- stage0 預載 label 後被事件覆寫 ⇒ 與主病灶同型，一併由 Task 2.1 涵蓋。
+- `insufficient_events` 退回主線 `return_N`（`:3010-3021`）⇒ **已 loud**
+  （`conditional_ic_abandoned`），非靜默，不列缺陷。
+- `fit_mode`／`oos_guarantees`、feature_filter ⇒ 三家判**無**同型 bug。
+
+### 🔴 C6 之嚴重度更正（我先前對使用者說錯，在此留底）
+
+我曾對使用者說「`purge` 用全域 h 算，與你設的 h 無關」，**聽起來像會洩漏**。查完**不是**：
+
+| 成分 | 來源 | 碼證 |
+|---|---|---|
+| `purge_gap` | 全域 `effective_horizon`（YAML 之 5） | `ic_filter_orchestrator.py:957` |
+| `embargo` | `max(config.embargo, 事件 purge_rows)` ← **依事件算** | `api/services/ic_analysis_service.py:1345` |
+| **總隔離** | `effective_purge + effective_embargo`（**相加**） | `ic_filter_orchestrator.py:378` |
+
+⇒ 事件之 lookahead **有**被涵蓋，隔離只會**偏大（保守）**，不會偏小 ⇒ **不是安全問題**。
+**真正的問題是報告誤導**：只給一個 `purge_gap: 5`，使用者會以為它跟自己設的 h 有關。
+⇒ 由「🔶 中（安全）」**降為低（揭露）**，交付物＝報告分開列出兩塊來源（Phase P5）。
