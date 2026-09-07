@@ -23,9 +23,9 @@
 
 | Batch | 含 Task | 依賴 | 合併理由 | 規模 |
 |---|---|---|---|---|
-| **B0** | 0.1, 0.2 | 無 | scaffold ＋ **先把 `ASSUME-2` 實跑掉**（三家判「無法接受未驗」） | 小 |
-| **B1** | 1.1 | B0 | 守衛三層是全票的地基，且**全域模式今天就有地雷** | 中 |
-| **B2** | 2.1, 2.2 | B1 | 同一個 `label_kind` 分派機制，分開做會寫成兩套 | 中 |
+| **B0** | 0.1, 0.2 | 無 | scaffold ＋ **先把 `ASSUME-2` 實跑掉**（三家判「無法接受未驗」；golden 重做版含 fingerprint） | 小 |
+| **B1** | 1.1, 2.1 | B0 | **B＋D 同批**（codex：不做 D ＝ 錯誤輸出進條件 IC）；兩者共用 `label_source` | 中 |
+| **B2** | 2.2 | B1 | 跨模式不變式，需 B1 定案之呼叫點 | 小 |
 | **B3** | 3.1 | B1 | 需要守衛先能接受截短 | 中 |
 | **B4** | 4.1 | 無 | 與守衛無耦合，可平行 | 小 |
 | **B5** | 5.1 | B1 | 揭露項，需 B1 定案之欄位 | 小 |
@@ -76,7 +76,8 @@
   輸出＝`tests/golden/evtalign/split_baseline.json`（改**前**之值）。
 - 實作要點：
   1. 逐組合實跑，收集 `effective_horizon`／`purge_gap`／`embargo`／
-     `train_time_bounds`／`test_time_bounds`／保留之 event IDs。
+     `train_time_bounds`／`test_time_bounds`／**`split_row_fingerprint`**（train/test 列索引集合之 sha256）／
+     **`retained_event_ids`**；且須含**事件路徑**之案例（R2 三家：六欄在「端點不變但中段列被刪」時全不變）。
   2. 以 `json.dumps(..., sort_keys=True)` 落檔並記 `sha256`。
   3. **本 Task 不改任何生產碼**——只記錄現況。
 - 修改檔案：新建 `handoffs/20260907-probe-split-baseline.py`；
@@ -103,70 +104,46 @@
 
 ## Phase 1 — 對齊守衛三層（完成後：截短不再誤擋，且洩漏仍被擋）
 
-### Task 1.1 — `validate_alignment` 之 L0／L1／L2（`票 UAT-3`）
+### Task 1.1 — **不動守衛**：label 生成前把 `close` 裁到 feature 尾（`票 UAT-3`）
 
-- SPEC ref：Task 1.1　目標：`K 線比特徵多`不再誤判，**且不損失任何洩漏辨識力**。
-- 輸入 / 輸出：
-  輸入＝`feature_data`、`target_data`、`spec`、`close`、
-  **新增** `label_kind: Literal["forward_return","event_given"]`、
-  🔴 **不新增剩餘根數參數**（R2 `CODEX-R2-P0-02`）：由 `close.index` 與
-  `target.index` 之差**推導**。參數化會變成可偽造的 scalar（傳 0 ⇒ L2 不啟動）。
-  `label_kind` **不由呼叫端傳**，由 `info["label_source"]` 導出（`CODEX-R2-P0-03` 等三家）。
-  輸出＝`AlignmentReport`（欄位新增 `label_kind`、`tail_expectation`、`oracle_checked`）。
+🔴 consult（2026-09-08）三家共識 **B＋D**，三層設計刪除。守衛 `validate_alignment` **一字不改**。
+
+- SPEC ref：Task 1.1（B）　目標：截短不再誤擋，守衛強度完全不變，**不新增任何參數**。
+- 輸入 / 輸出：輸入＝`close: pd.Series`、`feature_index: pd.Index`；輸出＝裁切後之 `close`。
 - 實作要點：
-  1. **L0 分派**：
+  1. 新建單一 helper（住 orchestrator，因兩個呼叫點都在該檔）：
      ```python
-     if label_kind == "event_given":
-         return _validate_event_given(feature_index, target_values, spec)
-     # 以下為 forward_return 之契約
+     def _coterminalize_close(close: pd.Series, feature_index: pd.Index) -> pd.Series:
+         if len(feature_index) == 0:
+             raise AlignmentViolationError("feature_index is empty; cannot coterminalize close")
+         return close.loc[close.index <= feature_index[-1]]
      ```
-     🔴 依 `label_kind`（資料是什麼），**不是**依 mode（誰在跑）——SPEC §C-6 判準。
-  2. **L1 結構**：
-     ```python
-     expected_tail = max(0, spec.lag - int(bars_after_target_end))
-     if tail_nans != expected_tail:
-         raise AlignmentViolationError(...)
-     ```
-     同尾（`bars_after_target_end == 0`）⇒ `expected_tail == spec.lag`，**與現行完全相同**。
-  3. **L2 值證明（截短時必須）**：
-     ```python
-     if bars_after_target_end > 0:          # 截短 ⇒ L1 失去辨識力
-         if close is None or return_kind not in _ORACLE_RETURN_KINDS:
-             raise AlignmentViolationError(
-                 "截短窗（target 之後尚有 K 線）必須以 oracle 逐值證明 target 為 t+lag；"
-                 f"但 return_kind={return_kind!r} 無 oracle 或未提供 close。"
-                 "請提供 close，或改用有 oracle 的 return_type"
-             )
-         _assert_oracle_matches(...)        # 既有 oracle 段，改為**必跑**且**全量**
-     ```
-     🔴 既有 oracle 是抽樣（`sample_size=64`）；截短時**必須全量**——
-     抽樣在洩漏只影響部分列時會漏掉（本 Task 之新增要求）。
-  4. **coverage 地板**改用同一個 `expected_tail`（`GROK-R1-P2-01`：
-     `contracts.py:964-966` 現仍用 `spec.lag`）。
-- 修改檔案：`momentum/core/contracts.py::validate_alignment`（新增兩參數與三層）、
-  `::_validate_event_given`（新建）、`::_assert_oracle_matches`（由既有 oracle 段抽出）；
-  `momentum/Analysis/ic_filter_orchestrator.py::_stage2_label_generation`（傳入新參數）。
-  既有 caller：`_stage2_label_generation`（`:2923`）、`:2790` 兩處，**皆須傳新參數**。
+     🔴 K 線尾**早於** feature 尾（K 線反而比特徵短）⇒ 此式為 no-op，交既有守衛照舊判定；本票不改該情形。
+  2. 🔴 **兩個呼叫點都接**（三家獨立命中；composer：防「一點 derive、一點仍信參數」漂移）：
+     - `_stage2_label_generation`（`:2902-2929`）：`close = _coterminalize_close(close, feature_index)`
+       **在** `generate_returns_by_type` 之前。
+     - `_stage0_ingestion` 預載 labels 路徑（`:2776-2796`）：同一支 helper，同一位置語意。
+  3. **不得**碰 `momentum/core/contracts.py`。
+- 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py::_coterminalize_close`（新建）、
+  `::_stage2_label_generation`、`::_stage0_ingestion`。既有 caller：`analyze`（不需改）。
 - 路徑：
-  - `momentum/core/contracts.py`
   - `momentum/Analysis/ic_filter_orchestrator.py`
-  - `tests/momentum/test_alignment_tail_nan.py`
+  - `tests/momentum/test_close_coterminalize.py`
   - `tests/golden/evtalign/`
-- 不可做：不得移除 tail_nan 檢查；不得在無 oracle 時放行；
-  不得以 mode 分支替代 `label_kind` 分派；不得讓 oracle 在截短時仍是抽樣。
-- 邊界：
-  1. **同尾＋洩漏**（target 未 shift）⇒ 仍 raise（L1 強度不變）。
-  2. **截短＋洩漏** ⇒ raise（由 L2 抓）🔴 這格是打穿初稿的那一格。
-  3. **截短＋無 oracle** ⇒ raise（不得靜默通過）。
-  4. `bars_after_target_end` 為負或非整數 ⇒ fail-closed raise。
-- 風險緩解：Task 0.2 之基線（改前／改後逐項對照）。
-- 驗證：`venv/bin/python -m pytest tests/momentum/test_alignment_tail_nan.py -q` rc=0。通過條件：
-  - 四個邊界各一格，**逐格斷言 raise / not raise**。
-  - 同尾之既有測試全部維持通過（Baseline-2）。
-  - 切分基線：`effective_horizon`／`purge_gap`／`embargo`／bounds 與
-    `tests/golden/evtalign/split_baseline.json` **逐值 `==`**（`atol=0`）。
-  - mutation `A1` 刪 L2 ⇒ 邊界 2 紅；`A2` L1 恆回 0 ⇒ 邊界 1 紅；
-    `A3` 無 oracle 改靜默通過 ⇒ 邊界 3 紅；`A5` oracle 改回抽樣 ⇒ 部分列洩漏之案例紅。
+- 不可做：**不得改 `validate_alignment` 任何一行**；不得新增參數；不得做成 mode 分支；
+  不得只改 stage2。
+- 邊界：①同尾 ⇒ no-op，label 逐位元組不變；②截短 ⇒ 化約為同尾；
+  ③`feature_index` 空 ⇒ raise；④K 線尾早於 feature 尾 ⇒ no-op、守衛照舊。
+- 風險緩解：Task 0.2（重做版）之 golden 改前／改後逐值對照。
+- 驗證：`venv/bin/python -m pytest tests/momentum/test_close_coterminalize.py -q` rc=0。通過條件：
+  - 截短案例之 label 與同尾案例 **逐值 `==`**（NaN 位置與數值皆同）；主委探針
+    `handoffs/20260908-probe-option-b-trim.py` rc=0 為前導證據。
+  - `inspect.getsource(validate_alignment)` 之 sha256 與改前 **相同**（守衛未動）。
+  - spy 斷言 stage0 與 stage2 各恰呼叫 `_coterminalize_close` 一次。
+  - `effective_horizon`／`purge_gap`／`embargo`／`split_row_fingerprint`／`retained_event_ids`
+    與 golden 逐值 `==`。
+  - mutation `B1`：helper 改 no-op ⇒ 截短案例紅；`B2`：只改 stage2 ⇒ spy 測試紅；
+    `B3`：動 `validate_alignment` 任一字 ⇒ sha256 測試紅。
 - **存活至**：永久。
 - **覆蓋風險**：無。
 

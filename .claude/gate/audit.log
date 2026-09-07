@@ -54471,3 +54471,23 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"actor": "committee_run", "brief_path": "handoffs/20260908-EVTALIGN-X-CONSULT-R1-BRIEF.md", "brief_sha256": "3f8d1a9f262e96d69ef41ddaec67eece960e3a150f695f7dcaf6a00c1ced4c31", "brief_sha256_norm": "3f8d1a9f262e96d69ef41ddaec67eece960e3a150f695f7dcaf6a00c1ced4c31", "event": "committee_round_open", "event_id": "c10e0480-f598-462d-9cbf-7f300f335de3", "expected_outputs": {"codex": "handoffs/20260908-evtalign-x-consult-r1-codex.md", "composer": "handoffs/20260908-evtalign-x-consult-r1-composer.md", "grok": "handoffs/20260908-evtalign-x-consult-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "f895e083-8f63-4a57-b855-fe25f485ac65", "schema_version": 1, "sequence": 3217, "session_name": "20260908-evtalign-x-consult-r1", "task_id": "20260908-EVTALIGN-X-CONSULT-R1", "ts": "2026-09-07T23:17:06Z"}
+{"actor": "cx_run", "attempt_id": "6562c4a2-dbc8-417e-8d19-47b8519a2910", "cli_rc": "0", "event": "committee_family_result", "event_id": "e955efde-92fc-4ff9-98a7-7996902a2736", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260908-evtalign-x-consult-r1-composer.md", "output_sha256": "eb4f9e3b4e742fab32ba1ea321b79539b44c8e4103a7453e88c8badca68930c6", "producer": "audit_append.sh", "result_state": "success", "round_id": "f895e083-8f63-4a57-b855-fe25f485ac65", "schema_version": 1, "sequence": 3218, "ts": "2026-09-07T23:19:07Z"}
+{"actor": "cx_run", "attempt_id": "84935280-163f-4f00-90ef-0cc68f9814cc", "cli_rc": "0", "event": "committee_family_result", "event_id": "c236f72c-b1e5-4d67-845c-97f33debf84d", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260908-evtalign-x-consult-r1-grok.md", "output_sha256": "05b866a5ae93e5f084c67ef7b68fef76370990787fe38fbaaf2d179ee47df185", "producer": "audit_append.sh", "result_state": "success", "round_id": "f895e083-8f63-4a57-b855-fe25f485ac65", "schema_version": 1, "sequence": 3219, "ts": "2026-09-07T23:22:23Z"}
+{"actor": "cx_run", "attempt_id": "4e7d9b2d-307d-47ea-91fe-8dbd07ad4cbd", "cli_rc": "0", "event": "committee_family_result", "event_id": "b4b1cb5d-fd72-443a-9243-1b502d2011b1", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260908-evtalign-x-consult-r1-codex.md", "output_sha256": "e295e818456095c3146e4547258389499a4c0dbdc6e345a0f2c874c067c00b86", "producer": "audit_append.sh", "result_state": "success", "round_id": "f895e083-8f63-4a57-b855-fe25f485ac65", "schema_version": 1, "sequence": 3220, "ts": "2026-09-07T23:23:58Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "417b3e1e-4888-4db2-adb2-bcc9f3714618", "lock_sha256": "b29d2c72a0c0a76ed7b4744539e9e4f597dc94dbda904c8f0914a363a329f785", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "f895e083-8f63-4a57-b855-fe25f485ac65", "schema_version": 1, "sequence": 3221, "session_id": "20260908-evtalign-x-consult-r1", "synth_sha256": "f73013d54f2526ab22829e5c3f33e14dcbdbe237e8a8a5da6dfb42ff79fd7dc3", "ts": "2026-09-07T23:25:38Z"}
+=== 2026-09-08 07:25:38 | artifact ===
+  ts=2026-09-08 07:25:38
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_ALIGNMENT_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=consult 共識 B＋D：Task 1.1 三層刪除改為裁 close 同尾（兩呼叫點單一 helper）；Task 2.1 升必要配套；§C-7 保留為不新增參數之依據
+  spec=
+  todo=
+  manifest=

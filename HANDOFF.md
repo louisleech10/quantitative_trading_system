@@ -1,40 +1,43 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-07 深夜｜狀態：`EVTALIGN` SPEC 已過 R1 修訂；使用者睡覺中，依離線規則自行續走。**
+**更新：2026-09-08 早｜狀態：`EVTALIGN` 路線由三家共識裁定 **B＋D**；SPEC/TODO 已改，尚未實作。**
 
-## 使用者最後的指示（逐字）
+## 使用者最後兩條指示（逐字）
 > 「那這個修正後的排序改SPEC。B26/B27等上述完成後再驗收。我要先睡了」
+> 「你跟委員討論決定共識看要怎麼做」
 
-⇒ **B26／B27 驗收暫緩**（掃描結果瀏覽器已完成並可用，等 EVTALIGN 收完再驗）。
-⇒ 依 `feedback_offline_committee_decides`：不停不問，取捨交委員／碼證，做到 commit+push。
+⇒ B26／B27 驗收暫緩至 EVTALIGN 收完。路線已由 consult 共識決定，**不再問使用者**。
 
-## 當前票：`EVTALIGN`（事件對齊守衛）
-SPEC=`docs/GAP3_EVENT_ALIGNMENT_SPEC.md`（TEMPLATE PASS）。TODO **尚未寫**。
-R1（`20260907-evtalign-x-review-r1`）：19 條、**3 個獨立 P0**，三家一致「不可照 SPEC 開工」。
-債已 `debt_clear`；reconcile 見 `handoffs/reconcile/20260907-evtalign-x-review-r1/synth.md`。
+## 當前票：`EVTALIGN`
+SPEC=`docs/GAP3_EVENT_ALIGNMENT_SPEC.md`／TODO=`docs/GAP3_EVENT_ALIGNMENT_TODO.md`（皆 TEMPLATE PASS）。
 
-🔴 **R1 最重要的結果：我的核心修法會放行 look-ahead。**
-`max(0, lag − 剩餘根數)` 在截短時期望值為 0，未 shift 的洩漏也是 0 ⇒ 通過。
-已整條重寫為三層：L0 依 `label_kind` 分派／L1 尾端 NaN（同尾強度不變）／
-L2 oracle（**截短時必須**，拿不到 ⇒ fail-closed raise）。
+**審查軌跡**：R1 19 條（3 P0）→ R2 19 條（**6 P0**，變差）→ consult 三家一致 **B＋D**。
+R2 六個 P0 同一形狀＝「每個判準都做成呼叫端傳入，可偽造」。
+codex：「A 為堵洞而改…實質收斂成 B＋D 的較大改動面」⇒ A 之終點就是 B＋D。
+三輪債皆 `debt_clear`；收斂檔 `handoffs/reconcile/2026090{7,8}-evtalign-x-*/synth.md`。
 
-## 優先序（使用者 2026-09-07 裁定）
-1. **期間守衛**（探針證**全域模式今天就有地雷**）2. 鷹架（事件模式，60 天）
-3. 期間自動對齊＋丟失事件揭露 4. 進度可見＋記憶體 WARN（**不得新增阻擋閘**）
-5. purge/embargo 揭露（由「安全」降為「揭露」）
+## 裁定的路線
+- **B**（Task 1.1）：**不動 `validate_alignment` 任何一行**。label 生成前把 `close` 裁到 feature 尾
+  （`_coterminalize_close`，單一 helper），**stage0 `:2790` 與 stage2 `:2923` 兩呼叫點都接**。
+  不新增任何參數 ⇒ R2 之「可偽造」形狀無從產生。
+  前提已實跑：`handoffs/20260908-probe-option-b-trim.py` rc=0（裁切把截短化約為同尾，label 逐位元組相同）。
+- **D**（Task 2.1，**B 之必要配套**）：驗實際被消費的 label；`label_kind` 由 producer 之 `label_source` 導出；
+  `event_given` 加 `(event_id, timestamp, label_value)` 三元組逐筆綁定。
+  codex：不做 D ＝ event_id 錯配進條件 IC ＝**錯誤輸出**。
+- P3 期間自動對齊＋丟失事件 ID 揭露；P4 進度＋記憶體 WARN（**不得擋**）；P5 purge/embargo 揭露。
+
+## 下一步（依 TODO §B）
+**B0**：Task 0.1 scaffold ＋ **Task 0.2 golden 重做**（首版 `f01550db…` 已作廢：須加
+`split_row_fingerprint`、`retained_event_ids`、事件路徑案例）→ **B1**：Task 1.1＋2.1 同批 → R3。
 
 ## 具名殘留
-`EA-RESID-1` preprocessing 峰值記憶體（實機 17 GB／8 GB、swap 15.6 GB）｜`needs-research`
-`EA-RESID-2` 橫截面無 `validate_alignment`｜`blocked-by`：模組未完工，**不是缺陷**（使用者當面更正）
+`EA-RESID-1` preprocessing 峰值記憶體（17 GB／8 GB）｜`EA-RESID-2` 橫截面無守衛（模組未完工，**非缺陷**）
+`EA-RESID-3` `_validate_expected_frequency` 對 tz-aware 拋 `TypeError`（潛伏，現行 naive）
+`EA-RESID-4` close 指紋不證原始 K 線品質｜`EA-RESID-5` `excess`/`risk_adjusted` 無 oracle（B 下不再阻擋，但登記）
 
-## 下一步
-寫 `docs/GAP3_EVENT_ALIGNMENT_TODO.md` → 派 R2 由原提出方確認 → 才進實作。
-🔴 **實作前必補**：`ASSUME-2`（`effective_horizon`／`purge_gap` 不受影響）**尚未實跑**。
-
-## 已完成並可用（等使用者驗收）
-`SCANCUBE` 掃描結果瀏覽器五 Phase 全完成；立方體實測正確（`8473641c` 60 列／14 指標）。
-🔴 已知限制：**滿格 110 格不保證有圖表**（1,158 MB），已列為白話頭條。
+## 已完成待驗收
+`SCANCUBE` 五 Phase 全完成，立方體實測正確。限制：滿格 110 格不保證圖表（已列白話頭條）。
 
 ## 環境
-開放債為零。`scripts/_add_cube_contract_keys.py`、`scripts/_todo_r2_patch.py` 為一次性腳本
-（`rm` 被權限擋下，未進版控，可刪）。`uat_samples/*`、`market_data/*` 未追蹤異動勿 commit。
+開放債為零。`scripts/_add_cube_contract_keys.py`、`scripts/_todo_r2_patch.py` 為一次性腳本（可刪）。
+`uat_samples/*`、`market_data/*` 未追蹤異動勿 commit。

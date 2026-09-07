@@ -57,7 +57,15 @@
   - 🔴 **新發現**：若對事件 label 套 forward-return 契約，**同尾**之合法密集 label
     （`tail_nans=0`）會被誤判 ⇒ 用新紅燈換掉舊鷹架（`GROK-R1-P0-02`）。
 
-- **仍未驗（請 R2 攻）**
+- **consult 裁決（2026-09-08，三家一致，非數人頭）**
+  - 🔴 路線＝**B＋D**。A（重寫守衛）之終點就是 B＋D 但改動面更大（codex 必答 4）；
+    C（擋 run 選單）違使用者目標③④。三層設計刪除，守衛**一字不改**。
+  - B 之兩條 assumed 已實跑成立：`handoffs/20260908-probe-option-b-trim.py` rc=0
+    （裁切把截短化約為同尾：label 逐位元組相同、tail_nan=lag、切分不吃 close）；
+    codex 另以真實 `create_label_generator()` 對照 rc=0。
+  - 三家共同要求：同尾化涵蓋 **stage0（`:2790`）與 stage2（`:2923`）兩呼叫點**、單一 helper。
+
+- **仍未驗（R3 前須補）**
   - `ASSUME-2`：`effective_horizon`／`purge_gap` 之語意**不因本票改動**。
     否證觀測＝改後某條路徑之 purge 列數與改前不同。
     🔴 探針明文標「沒有測那條路徑」；`CODEX-R1-P1-03` 亦判「無法接受『不受影響』」。
@@ -157,8 +165,8 @@
 
 | Phase | 內容 | 依賴 | 為何是這個順序 |
 |---|---|---|---|
-| **P1** | 對齊守衛三層設計（L0 分派／L1 結構／L2 oracle） | 無 | 全域模式**今天就有地雷**（探針 rc=0） |
-| **P2** | 事件模式不驗即將被丟棄的鷹架 | P1 | 60 天；不影響數值（探針證）但擋流程 |
+| **P1** | **B**：不動守衛，label 生成前把 close 裁到 feature 尾（兩呼叫點、單一 helper） | 無 | 全域模式**今天就有地雷**（探針 rc=0）；三家共識 |
+| **P2** | **D**：驗實際被消費的 label，`label_source` 綁定＋三元組 | P1 | **B 之必要配套**（codex：不做 D ＝ 錯誤輸出進條件 IC） |
 | **P3** | 期間自動對齊 ＋ **丟失事件之揭露** | P1 | 使用者原話④「太蠢了，是缺陷吧」 |
 | **P4** | 進度可見 ＋ **記憶體 WARN（非阻擋）** | 無 | 使用者原話①「可以跑的話，幹嘛擋?」 |
 | **P5** | purge／embargo 之**揭露** | P1 | 由 R1 之 C6 降級而來——不是安全項 |
@@ -167,70 +175,53 @@
 
 ## 逐項 Task 明細
 
-### Task 1.1 — 對齊守衛之**三層設計**（`票 UAT-3`）
+### Task 1.1 — **不動守衛**：label 生成前把 `close` 裁到 feature 尾（`票 UAT-3`）
 
-🔴 **本 Task 於 R1 被三家打穿後整條重寫。**
-初稿的 `expected_tail_nan = max(0, lag − 剩餘根數)` **會放行真正的 look-ahead**
-（`CODEX-R1-P0-01`／`GROK-R1-P0-01`）：截短時期望值為 0，而**未 shift 的 target 也是 0**
-⇒ 通過。tail-NaN 只證「尾端容量」，不證「每個 label 真的是 `t+lag`」。
+🔴 **本 Task 於 consult（2026-09-08）依三家共識 B＋D 整條重寫。**
+R1 打穿「放寬 tail-NaN」；R2 打穿「三層＋呼叫端參數」（6 個 P0 同一形狀＝可偽造）。
+codex 必答 4：「若 A 為堵洞而改成 producer binding、index 推導、close provenance、event receipt，
+**它實質收斂成 B＋D 的較大改動面**」⇒ A 的終點就是 B＋D。三層設計**刪除**。
 
-- **目標**：`K 線比特徵多`（常態、三模式皆會遇到）不再被誤判為違規，
-  **且不得因此損失任何洩漏辨識力**。
-- **修法＝三層，缺一不可**：
-
-  | 層 | 內容 | 何時適用 |
-  |---|---|---|
-  | **L0 分派** | 依 `label_kind` 選契約：`forward_return` ／ `event_given` | 一律 |
-  | **L1 結構** | forward_return 之尾端 NaN；**同尾**時 `== lag`（強度**完全不變**） | 同尾 |
-  | **L2 值證明** | oracle：由 `close` 重算 label 逐值比對 | **截短時必須** |
-
-  🔴 **截短不是「放寬」，是把證明責任從 L1 移到 L2。**
-  🔴 **拿不到 L2 ⇒ fail-closed raise，不得靜默降級**
-  （`COMPOSER-R1-P0-03`／`GROK-R1-P1-01`：`excess`／`risk_adjusted` 不在
-  `ORACLE_RETURN_KINDS`，stage2 傳 `close=None` ⇒ 若同時放寬 L1，
-  該組合變成「無 L1 辨識 ∪ 無 L2」＝**零保護**）。
-  ⇒ 實作上：截短且無 oracle ⇒ 明確 raise，訊息指明「請提供 close 或改用有 oracle 的 return_type」。
-- 🔴 **剩餘根數：刪掉參數，改由 `close` 推導**（R2 修訂）。
-  R1 我依 `COMPOSER-R1-P0-01`「不得在守衛內推測」改成參數傳入——
-  **但正確答案不是『傳進來』，是『從已有的 `close` 算』**：
-  `close` 與 `target` 都已在參數列，剩餘根數就是兩者索引的差。
-  `CODEX-R2-P0-02`／`GROK-R2-P2-02` 指出參數化後它變成**可偽造的 scalar**
-  （傳 0 ⇒ L2 不啟動）。⇒ **不新增此參數**；
-  `target.index` 非 `close.index` 之子集 ⇒ **fail-closed raise**。
-  副效果：`CODEX-R2-P1-09`（新增 required 參數會破壞既有 caller）一併消失。
-- 🔴 **`label_kind` 由 producer 綁定，不由呼叫端指定**（`CODEX-R2-P0-03`／
-  `GROK-R2-P0-01`／`COMPOSER-R2-P1-01` **三家獨立命中**）：
-  由 orchestrator **已經在寫**的 `info["label_source"]`（`event_label_value` vs 主線）機械導出。
-  缺 `label_source` ⇒ **raise，不得預設**。
-  `event_given` 分支另要求 `label_source == "event_label_value"`
-  ——否則「標成 event_given 就免驗」。
-- 🔴 **L2 之 `close` 必須綁指紋**（`CODEX-R2-P0-01`／`GROK-R2-P2-01`）：
-  label 落檔時記 `close_fingerprint`，驗證時比對；不符或缺席 ⇒ raise。
-  否則 oracle 只證「與呼叫端給的 close 自洽」，污染的 close 會自洽 PASS。
-- 🔴 **`event_given` 加第四項檢查：逐事件三元組綁定**（`CODEX-R2-P0-04`／
-  `COMPOSER-R2-P1-02`／`GROK-R2-P1-01` **三家獨立命中**）：
-  「有值／有限／index 相符」在**整批平移一格**或 `event_id` 錯配時**全部通過**。
-  ⇒ 增「`(event_id, timestamp, label_value)` 三元組須與事件批 receipt 逐筆相符」——
-  不是只比 key 集合。現行檢查只用了 timestamp，把 `event_id` 丟掉了。
-- **coverage 地板一併改用同一期望值來源**（`GROK-R1-P2-01`：`contracts.py:964-966`
-  仍用 `spec.lag`，與新期望值不一致）。
-- **驗證（可證偽）** — `tests/momentum/test_alignment_tail_nan.py`：
-  - `ASSERT venv/bin/python -m pytest tests/momentum/test_alignment_tail_nan.py -q THEN rc=0`
-  - **同尾 ＋ 洩漏**（target 未 shift）⇒ **仍 raise**（L1 強度不變）。
-  - **截短 ＋ 洩漏**（target 未 shift、剩餘根數 > lag）⇒ **必須 raise**
-    🔴 這格就是打穿初稿的那一格；初稿會通過。
-  - **截短 ＋ 正確**（真的 shift 過）⇒ 通過（由 L2 證明）。
-  - **截短 ＋ 無 oracle** ⇒ **raise**（不得靜默通過）。
-  - 剩餘 2 根而 lag=5 ⇒ L1 期望 3（探針情境 C 已實算）。
-  - mutation `A1`：刪 L2 ⇒ 「截短＋洩漏」紅；`A2`：L1 改成永遠回 0 ⇒ 「同尾＋洩漏」紅；
-    `A3`：無 oracle 時改成靜默通過 ⇒ 「截短＋無 oracle」紅。
-- **邊界**：①剩餘 > lag；②剩餘 = 0（同尾）；③target index 非 close index 之子集 ⇒ fail-closed raise。
+- **目標**：`K 線比特徵多`（常態）不再被誤判為違規，**守衛一字不改、強度完全不變**。
+- **修法（B）**：守衛假設「target 與 close 同尾」是個**好的不變式**——與其放寬守衛遷就資料，
+  在算 label **之前**把 `close` 裁到 feature 期間：
+  ```python
+  def _coterminalize_close(close: pd.Series, feature_index: pd.Index) -> pd.Series:
+      """把 close 裁到 feature 尾，使守衛之「同尾」不變式成立。不新增任何參數。"""
+      return close.loc[close.index <= feature_index[-1]]
+  ```
+  之後 `generate_returns(close, horizon)` 之尾端 `lag` 個 NaN 自然出現，`validate_alignment` **不改**。
+- 🔴 **兩個呼叫點、單一 helper**（三家獨立命中）：
+  `_stage2_label_generation`（`:2923`）**與** `_stage0_ingestion` 之預載 labels 路徑（`:2790`）
+  皆對 `close` 呼叫 `validate_alignment`；只改 stage2 ⇒ 預載＋截短路徑仍紅。
+  兩處**必須呼叫同一支 `_coterminalize_close`**（composer：防「一點 derive、一點仍信參數」漂移）。
+  composer 誠實註記：UAT 當次 `labels_df=None`，stage0 不在 hot path——但不涵蓋就是下一個 60 天鷹架。
+- **§C-7「推導，不要相信」在此的體現**：裁切依據是 `feature_index[-1]`，**從既有參數推導**，
+  **不新增任何可偽造之參數** ⇒ R2 六個 P0 之形狀在本設計下**無從產生**。
+- **驗證（可證偽）** — `tests/momentum/test_close_coterminalize.py`：
+  - `ASSERT venv/bin/python -m pytest tests/momentum/test_close_coterminalize.py -q THEN rc=0`
+  - **同尾**：裁切為 no-op，label 逐位元組不變（Baseline-2）。
+  - **截短**：裁切後之 label 與「同一 feature 期間之同尾資料」算出之 label **逐值 `==`**
+    （NaN 位置與數值皆同；主委探針 `20260908-probe-option-b-trim.py` rc=0，
+    codex 另以真實 `create_label_generator()` 對照 rc=0）。
+  - **守衛不改**：`git diff` 之 `momentum/core/contracts.py::validate_alignment` **為空**
+    （測試以 `inspect.getsource` sha256 對照改前）。
+  - **兩呼叫點**：以 spy 斷言 stage0 與 stage2 各恰呼叫 `_coterminalize_close` 一次。
+  - **切分不受影響**：`effective_horizon`／`purge_gap`／`embargo`／`split_row_fingerprint`／
+    `retained_event_ids` 與 Task 0.2（重做版）之 golden **逐值 `==`**。
+  - mutation `B1`：裁切改為 no-op ⇒ 截短案例紅；`B2`：只改 stage2 不改 stage0 ⇒ 兩呼叫點測試紅；
+    `B3`：動了 `validate_alignment` 任一字 ⇒ sha256 測試紅。
+- **邊界**：①同尾 ⇒ no-op；②截短 ⇒ 化約為同尾；③`feature_index` 空 ⇒ fail-closed raise；
+  ④`close` 尾早於 feature 尾（K 線反而比特徵短）⇒ **不裁切**，交由既有守衛照舊判定（本票不改該情形）。
 - **存活至**：永久。
 - **覆蓋風險**：無。
-- **不可做**：不得移除 tail_nan 檢查；不得在無 oracle 時放行；
-  不得以 mode 分支替代 `label_kind` 分派（§C-6 判準）。
+- **不可做**：**不得改 `validate_alignment` 任何一行**；不得新增參數；不得把裁切做成 mode 分支
+  （裁切在 label 生成前，與 mode 無關）。
 
-### Task 2.1 — 驗證對象＝**實際被消費**的那條；契約依 `label_kind` 分派（`票 UAT-2`）
+### Task 2.1 — （D，**B 之必要配套**）驗證對象＝實際被消費的那條；契約由 `label_source` 綁定（`票 UAT-2`）
+
+🔴 **consult 升級**：codex 必答 5：「不做 D…現行 timestamp→value 三檢查容許事件值旋轉或 event_id 錯配，
+**錯誤 label 會進條件 IC。這是錯誤輸出，不只是『不乾淨』**」⇒ D 與 B 同批，不是可延後的衛生項。
 
 🔴 **R1 修訂**：初稿寫「對最終 label 呼叫同一個 `validate_alignment`」——
 `GROK-R1-P0-02` 指出那會**用新紅燈換掉舊鷹架**：事件 label 是逐事件給定值，
