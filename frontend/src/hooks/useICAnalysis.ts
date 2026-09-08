@@ -28,7 +28,9 @@ const requestJson = async <T>(path: string, options?: RequestInit): Promise<T> =
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(httpErrorMessage(payload, response.statusText));
+    const err = new Error(httpErrorMessage(payload, response.statusText)) as Error & { status?: number };
+    err.status = response.status;   // 呼叫端據此判「任務已不存在（404）」等終態，停止輪詢
+    throw err;
   }
 
   return response.json();
@@ -227,11 +229,20 @@ export function useICAnalysis() {
       setError(null);
       pollIntervalRef.current = setInterval(() => {
         void fetchTaskStatus(taskId).catch((err) => {
+          // UAT（2026-09-08）：後端重啟後記憶體任務消失 ⇒ /task 回 404；原本每 2 秒無限輪詢、後端 log 被 404 洗版。
+          // 404 是終態：停止輪詢、標 failed、明講原因，不再重試。
+          if ((err as { status?: number })?.status === 404) {
+            terminalRef.current = true;
+            clearTimers();
+            setStatus('failed');
+            setError('這個任務在後端已不存在（後端重啟或任務被清除）；請重新送出分析');
+            return;
+          }
           setError(err instanceof Error ? err.message : 'IC analysis polling failed');
         });
       }, 2000);
     },
-    [fetchTaskStatus, setError]
+    [clearTimers, fetchTaskStatus, setError, setStatus]
   );
 
   const connectProgress = useCallback((taskId: string) => {
@@ -256,7 +267,18 @@ export function useICAnalysis() {
         .then((s) => {
           if (s.status === 'failed' || s.status === 'completed') ws.close();
         })
-        .catch(() => { /* 交給 WS 訊息／輪詢；不在此喊通用錯誤 */ });
+        .catch((err) => {
+          // 404＝任務已不存在（後端重啟）：終態，關 WS、不重連、不輪詢
+          if ((err as { status?: number })?.status === 404) {
+            terminalRef.current = true;
+            clearTimers();
+            setStatus('failed');
+            setError('這個任務在後端已不存在（後端重啟或任務被清除）；請重新送出分析');
+            ws.onclose = null;
+            ws.close();
+          }
+          /* 其餘交給 WS 訊息／輪詢；不在此喊通用錯誤 */
+        });
     };
 
     ws.onmessage = (event) => {
