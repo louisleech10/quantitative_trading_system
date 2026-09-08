@@ -74,8 +74,16 @@ Task 5.1：service `_inject_isolation_source`（事件路徑、切分已套用�
 落點改 service 之理由見 TODO 5.1 要點 3）；前端 `IsolationNote`／`icIsolation.ts`。另補 B3 前端 `PeriodAlignmentBanner`／
 `icPeriodAlignment.ts`；驗收清單新增 **B28／B29／B30**。`tests/api/test_isolation_disclosure.py` 5 條；mutation A12／A13。
 
+B5 commit `411e9b90`；gate 1–5 全 PASS（`d398b194`）；B5 後 service 既有 124 passed。
+
+## R4 進行中（2026-09-08）
+session `20260908-evtalign-x-review-r4`、task-id `20260908-EVTALIGN-X-REVIEW-R4`；brief `handoffs/20260908-EVTALIGN-X-REVIEW-R4-BRIEF.md`；
+產出 `handoffs/20260908-evtalign-x-review-r4-{codex,composer,grok}.md`。**接回流程**：`reconcile_build.sh <session> <三檔>` → 填群集 →
+`reconcile_cluster_attribution_check` → `completeness_check --lock <session>/sources.lock` → 修 finding → `reconcile_build --mode review --rebuild`
+→ `debt_clear --session <session> --round-id <id>` → `gate.sh register-output` 三檔再 commit。
+
 ## 下一步
-commit → `evtalign_phase_gate.sh 3／4／5` → **R4** 三家 review（B3–B5 之碼）→ 依 finding 修 → 使用者 B26–B30 驗收。
+R4 收斂＋修 finding → 使用者 UAT **B26–B31**（`白話說明/GAP-3驗收清單.md`）。
 
 ## 具名殘留
 `EA-RESID-1` preprocessing 峰值記憶體（17 GB／8 GB）｜`EA-RESID-2` 橫截面無守衛（模組未完工，**非缺陷**）
