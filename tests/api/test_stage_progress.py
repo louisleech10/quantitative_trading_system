@@ -37,12 +37,13 @@ def _preprocessor() -> DataPreprocessor:
     return DataPreprocessor(load_ic_config().preprocessing.model_dump())
 
 
-@pytest.mark.parametrize("n_cols", [14, 157, 350, 1000])
+@pytest.mark.parametrize("n_cols", [1, 2, 3, 14, 157, 350, 1000])
 def test_progress_report_count_within_bounds_not_hot_loop(n_cols):
     calls: list[dict] = []
     _preprocessor().preprocess(_df(n_cols), None, fit_mode="full_sample", progress=calls.append)
     n = len(calls)
-    assert 3 <= n <= max(3, math.ceil(n_cols / 100)), f"n_cols={n_cols}: 回報 {n} 次"
+    # CODEX-R4-P2-01：total < 3 時每欄一次（不補假回報）⇒ 下界 min(3, total)
+    assert min(3, n_cols) <= n <= max(3, math.ceil(n_cols / 100)), f"n_cols={n_cols}: 回報 {n} 次"
     assert calls[-1]["done"] == calls[-1]["total"] == n_cols
     assert all(set(c) >= {"sub_step", "done", "total", "elapsed_seconds", "eta_seconds", "eta_state"} for c in calls)
     assert [c["done"] for c in calls] == sorted(c["done"] for c in calls)
@@ -60,6 +61,23 @@ def test_first_report_is_estimating_no_fake_eta():
     assert calls[-1]["eta_state"] == "done" and calls[-1]["eta_seconds"] == 0.0
     mid = [c for c in calls if 0 < c["done"] < c["total"]]
     assert all((c["eta_state"] == "estimating") == (c["eta_seconds"] is None) for c in mid)
+
+
+def test_progress_done_counts_only_processed_columns(monkeypatch):
+    """CODEX-R4-P2-02：回報時 `done` 必須等於**已處理完**的欄數（含 skip），不得在處理前先報。"""
+    pre = _preprocessor()
+    processed: list[str] = []
+    real = pre._clip_series
+
+    def spy(series, *a, **k):
+        processed.append(str(series.name))
+        return real(series, *a, **k)
+
+    monkeypatch.setattr(pre, "_clip_series", spy)
+    seen: list[tuple[int, int]] = []
+    pre.preprocess(_df(9), None, fit_mode="full_sample", progress=lambda p: seen.append((p["done"], len(processed))))
+    assert seen and all(done == n_processed for done, n_processed in seen), seen
+    assert seen[-1] == (9, 9)
 
 
 def test_progress_hook_exception_does_not_break_preprocess():

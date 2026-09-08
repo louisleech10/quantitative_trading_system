@@ -44,7 +44,8 @@ def _progress_interval(total: int) -> int:
     """EVTALIGN Task 4.1：中間回報間隔——**不進 hot loop**。
 
     <300 欄 ⇒ 約 3 次（`ceil(total/3)` 欄一次）；≥300 欄 ⇒ 每 100 欄一次。
-    ⇒ 回報次數 ∈ [3, max(3, ceil(total/100))]（TODO Task 4.1 驗收式；R2 `CODEX-R2-P1-10` 修正後有整數解）。
+    ⇒ 回報次數 ∈ [min(3, total), max(3, ceil(total/100))]（TODO Task 4.1 驗收式；R2 `CODEX-R2-P1-10` 修正後有整數解；
+    🔴 `CODEX-R4-P2-01`：total < 3 時不可能有 3 次**有意義**的回報——每欄一次（1／2 次），不補假回報）。
     """
     total = max(int(total), 1)
     if total >= 300:
@@ -237,10 +238,14 @@ class DataPreprocessor:
         interval = _progress_interval(total)
         started = time.monotonic()
         reports = 0
-        for pos, column in enumerate(clipped.columns, start=1):
+        def _after_column(pos: int) -> None:
+            # 🔴 CODEX-R4-P2-02：回報必須在該欄**處理完成後**發出，`done` 才是「已處理欄數」（首版在處理前發、高估一欄）。
+            nonlocal reports
             if progress is not None and (pos % interval == 0 or pos == total):
                 reports += 1
                 _emit_progress(progress, "winsorize", pos, total, started, reports)
+
+        for pos, column in enumerate(clipped.columns, start=1):
             series = clipped[column]
             # type-feature 為靜態屬性：metadata/category 優先；禁以完整未來序列翻轉分支
             if self._column_is_type_feature(
@@ -251,6 +256,7 @@ class DataPreprocessor:
                 fit_mode=mode,
             ):
                 skipped.append(column)
+                _after_column(pos)
                 continue
 
             clipped[column] = self._clip_series(
@@ -262,6 +268,7 @@ class DataPreprocessor:
                 fit_mode=mode,
             )
             winsorized.append(column)
+            _after_column(pos)
 
         return clipped, {"winsorized": winsorized, "skipped": skipped, "fit_mode": mode}
 

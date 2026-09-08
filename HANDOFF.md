@@ -76,14 +76,14 @@ Task 5.1：service `_inject_isolation_source`（事件路徑、切分已套用�
 
 B5 commit `411e9b90`；gate 1–5 全 PASS（`d398b194`）；B5 後 service 既有 124 passed。
 
-## R4 進行中（2026-09-08）
-session `20260908-evtalign-x-review-r4`、task-id `20260908-EVTALIGN-X-REVIEW-R4`；brief `handoffs/20260908-EVTALIGN-X-REVIEW-R4-BRIEF.md`；
-產出 `handoffs/20260908-evtalign-x-review-r4-{codex,composer,grok}.md`。**接回流程**：`reconcile_build.sh <session> <三檔>` → 填群集 →
-`reconcile_cluster_attribution_check` → `completeness_check --lock <session>/sources.lock` → 修 finding → `reconcile_build --mode review --rebuild`
-→ `debt_clear --session <session> --round-id <id>` → `gate.sh register-output` 三檔再 commit。
+## R4 完成（2026-09-08）
+composer／grok 判可合併、零 finding；codex 兩條 P2（第 4 段進度回報：欄數<3 回報不足；回報在處理前發、done 高估一欄）⇒ 已修
+（`_after_column` 於處理後發；下界改 `min(3,total)`；`tests/api/test_stage_progress.py` 加 n∈{1,2,3} 與 done＝已處理欄數 spy，rc=0）。
+三家一致 B5 落點維持 service。reconcile `handoffs/reconcile/20260908-evtalign-x-review-r4/synth.md`（F1／F2）；debt 已清。
 
 ## 下一步
-R4 收斂＋修 finding → 使用者 UAT **B26–B31**（`白話說明/GAP-3驗收清單.md`）。
+**使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
+UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
 
 ## 具名殘留
 `EA-RESID-1` preprocessing 峰值記憶體（17 GB／8 GB）｜`EA-RESID-2` 橫截面無守衛（模組未完工，**非缺陷**）
