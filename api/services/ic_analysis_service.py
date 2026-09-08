@@ -36,6 +36,7 @@ from momentum.factories import (
     sanitize_factor_returns,
 )
 from momentum.core.contracts import ICResult
+from momentum.core.exceptions import AnalysisCancelled
 
 
 logger = get_logger("api.ic_analysis_service")
@@ -1380,6 +1381,9 @@ class ICAnalysisService:
         loop = asyncio.get_running_loop()
 
         def progress_callback(payload: Dict[str, Any]) -> None:
+            if loop.is_closed():
+                # 伺服器已關閉（Ctrl+C）：不再推送、不再洗版，讓分析執行緒在此回報點協作式中止
+                raise AnalysisCancelled("server event loop closed; aborting analysis at progress checkpoint")
             stage_name = payload.get("stage_name") or payload.get("stage")
             progress = float(payload.get("progress", 0.0))
             message = payload.get("message")

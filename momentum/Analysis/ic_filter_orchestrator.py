@@ -48,6 +48,7 @@ from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
 from momentum.Analysis.ic_config_schema import FeatureFilterSchema, ICConfig
 from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedResult
 from momentum.core.exceptions import (
+    AnalysisCancelled,
     InsufficientDataError,
     InvalidInputError,
     ModuleUnavailableError,
@@ -4751,6 +4752,9 @@ class ICFilterOrchestrator:
             payload.update(extra)
         try:
             self._progress_callback(payload)
+        except AnalysisCancelled:
+            # 呼叫端（service）要求協作式中止（例：伺服器已關閉）——**不吞**，讓分析在此回報點停下
+            raise
         except Exception as exc:  # noqa: BLE001
             logger.warning("Progress callback failed: %s", exc)
 

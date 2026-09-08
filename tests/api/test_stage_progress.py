@@ -144,6 +144,26 @@ def test_service_stores_sub_progress_and_dedupes_warnings():
     assert "status" not in task_info                  # WARN 不改 status、不擋
 
 
+def test_report_progress_propagates_cancel_but_swallows_other_callback_errors():
+    """UAT 2026-09-08：後端 Ctrl+C 後 loop 已關，分析仍跑完並洗版。callback 拋 AnalysisCancelled ⇒ 不吞、分析停下；其他例外照舊只記 warning。"""
+    from momentum.core.exceptions import AnalysisCancelled
+
+    o = ICFilterOrchestrator(load_ic_config())
+
+    def cancel(_):
+        raise AnalysisCancelled("server closed")
+
+    o._progress_callback = cancel
+    with pytest.raises(AnalysisCancelled):
+        o._report_progress(1, "preprocessing", 0.1, "x")
+
+    def boom(_):
+        raise RuntimeError("ui gone")
+
+    o._progress_callback = boom
+    o._report_progress(1, "preprocessing", 0.1, "x")   # 不得 raise
+
+
 def test_ws_payload_forwards_sub_progress_and_warning_fields():
     """UAT B29（2026-09-08 實機）：WS 只轉發固定欄位 ⇒ 前端永遠看不到 sub_progress。轉發集合須與 task_info 那條同源。"""
     from api.services.ic_analysis_service import _ws_stage_progress_fields
