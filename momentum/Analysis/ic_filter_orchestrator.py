@@ -70,6 +70,7 @@ from momentum.core.contracts import (
     validate_alignment,
     validate_split_pair_integrity,
     LABEL_KIND_EVENT_GIVEN,
+    AlignmentReport,
     derive_label_kind,
     validate_consumed_label,
 )
@@ -957,10 +958,14 @@ class ICFilterOrchestrator:
         self._current_config_hash = self._hash_config(config)
         self._current_config = config  # 本次 effective config（provenance ic_method／label_return_type 取此，非建構時 config）
         self._event_context = dict(event_context) if event_context else None  # GAP-3 B2.4：survivor v2 六鍵來源
+        # EVTALIGN Task 2.1：stage0／stage2 鷹架之 AlignmentViolationError 於 event_label_values 提供時延後，
+        # 由 stage3 依「該序列是否真被消費」裁定 raise 或降為診斷（每次 analyze 重置；fallback 重跑亦重置）。
+        self._deferred_scaffold_violation: Optional[AlignmentViolationError] = None
 
         self._report_progress(0, "ingestion", 0.02, "loading inputs")
         features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
-            features_path, labels_path, meta_path, config=config, kline_reader=kline_reader
+            features_path, labels_path, meta_path, config=config, kline_reader=kline_reader,
+            defer_alignment_error=event_label_values is not None,
         )
 
         split_context: Optional[dict] = None
@@ -1047,7 +1052,8 @@ class ICFilterOrchestrator:
 
         self._report_progress(2, "label_generation", 0.25, "aligning labels")
         label_series, labels_df = self._stage2_label_generation(
-            labels_df, metadata, config, kline_reader, features_df=features_df
+            labels_df, metadata, config, kline_reader, features_df=features_df,
+            defer_alignment_error=event_label_values is not None,
         )
 
         self._report_progress(3, "event_filter", 0.35, "applying event filter")
@@ -2778,6 +2784,8 @@ class ICFilterOrchestrator:
         meta_path: Optional[str],
         config: Optional[ICConfig] = None,
         kline_reader: Optional[IKlineReader] = None,
+        *,
+        defer_alignment_error: bool = False,
     ) -> tuple[pd.DataFrame, Optional[pd.DataFrame], dict, dict]:
         features_df, features_meta = self._load_features_hdf5(features_path)
         labels_df = self._load_labels_hdf5(labels_path)
@@ -2813,13 +2821,20 @@ class ICFilterOrchestrator:
                         )
                         close = _coterminalize_close(close, feature_index)  # stage0
             _rk = active_config.labels.return_type
-            report = validate_alignment(
-                normalized_features,
-                label_series,
-                _alignment_spec(meta, horizon),
-                close=close if _rk in ORACLE_RETURN_KINDS else None,
-                return_kind=_rk,
-            )
+            report: Optional[AlignmentReport] = None
+            try:
+                report = validate_alignment(
+                    normalized_features,
+                    label_series,
+                    _alignment_spec(meta, horizon),
+                    close=close if _rk in ORACLE_RETURN_KINDS else None,
+                    return_kind=_rk,
+                )
+            except AlignmentViolationError as exc:
+                # EVTALIGN Task 2.1：同 stage2——預載 label 亦可能在 stage3 被覆寫丟棄；延後由 stage3 裁定。
+                if not defer_alignment_error:
+                    raise
+                self._deferred_scaffold_violation = exc
             features_df = _assign_datetime_index_preserving_values(
                 features_df, feature_index, "features_df"
             )
@@ -2832,7 +2847,7 @@ class ICFilterOrchestrator:
             "input_features": int(features_df.shape[1]),
             "removed_nan_features": removed_nan,
         }
-        if labels_df is not None and not labels_df.empty:
+        if labels_df is not None and not labels_df.empty and report is not None:
             stage0_log["alignment_report"] = {
                 "gap_count": int(report.gap_count),
                 "gap_rate": float(report.gap_rate),
@@ -2896,6 +2911,8 @@ class ICFilterOrchestrator:
         config: ICConfig,
         kline_reader: Optional[IKlineReader],
         features_df: Optional[pd.DataFrame] = None,
+        *,
+        defer_alignment_error: bool = False,
     ) -> tuple[pd.Series, pd.DataFrame]:
         # LA-2 DEC-1：winsorized fail-closed — 必須在 preloaded early return 之前，
         # 使 preloaded labels 與 generate 路徑皆擋（與 LabelGenerator / schema 同 reason）。
@@ -2948,13 +2965,22 @@ class ICFilterOrchestrator:
 
         labels_for_gate = labels_df.reindex(feature_index)
         label_series = labels_for_gate[f"return_{horizon}"]
-        validate_alignment(
-            features_for_gate,
-            label_series,
-            _alignment_spec(metadata, horizon),
-            close=close if labels_cfg.return_type in ORACLE_RETURN_KINDS else None,
-            return_kind=labels_cfg.return_type,
-        )
+        try:
+            validate_alignment(
+                features_for_gate,
+                label_series,
+                _alignment_spec(metadata, horizon),
+                close=close if labels_cfg.return_type in ORACLE_RETURN_KINDS else None,
+                return_kind=labels_cfg.return_type,
+            )
+        except AlignmentViolationError as exc:
+            # EVTALIGN Task 2.1（R3 三家一致，D5 閉合）：這條序列**可能**在 stage3 被 event label 覆寫丟棄。
+            # 「要不要當硬閘」不在此決定——延後到 stage3 得知它是否被消費時再裁：
+            # 被覆寫 ⇒ 只作診斷（info 揭露）；未被覆寫（事件不足 fallback／filter 未啟用）⇒ 原樣 raise。
+            # 判準是「資料是否將被替換」（event_label_values is not None），不是 mode 字串（§C-6）。
+            if not defer_alignment_error:
+                raise
+            self._deferred_scaffold_violation = exc
         if features_df is not None:
             normalized_features = _assign_datetime_index_preserving_values(
                 features_df, feature_index, "features_df"
@@ -2965,6 +2991,22 @@ class ICFilterOrchestrator:
         )
         label_series = labels_df[f"return_{horizon}"]
         return label_series, labels_df
+
+    def _settle_deferred_scaffold(self, *, scaffold_consumed: bool, info: Optional[dict]) -> None:
+        """EVTALIGN Task 2.1（R3 D5 閉合）：裁定 stage0／stage2 延後的鷹架 `AlignmentViolationError`。
+
+        鷹架被消費（未被 event label 覆寫）⇒ 原樣 raise——它就是最終 label，保護不得因事件模式而少；
+        鷹架被覆寫丟棄 ⇒ 不擋，但把訊息寫進 `info["scaffold_alignment_deferred"]` 揭露（驗的是被消費的那條，見
+        `validate_consumed_label`）。每次呼叫後清空。
+        """
+        pending = getattr(self, "_deferred_scaffold_violation", None)
+        self._deferred_scaffold_violation = None
+        if pending is None:
+            return
+        if scaffold_consumed and pending is not None:
+            raise pending
+        if info is not None:
+            info["scaffold_alignment_deferred"] = str(pending)
 
     def _stage3_event_filter(
         self,
@@ -2985,6 +3027,8 @@ class ICFilterOrchestrator:
             list(event_timestamps) if (event_cfg.enabled and event_timestamps is not None) else None,
         )
         if not event_cfg.enabled:
+            # 鷹架未被覆寫 ⇒ 它就是被消費的序列 ⇒ 延後之違規在此原樣 raise
+            self._settle_deferred_scaffold(scaffold_consumed=True, info=None)
             return features_df, label_series, {"mode": "none"}
 
         query = event_cfg.query
@@ -3047,6 +3091,8 @@ class ICFilterOrchestrator:
                 info["label_source"] = "mainline_return_N"
                 info["conditional_ic_abandoned"] = True
                 info["statistic_kind"] = "conditional_ic_unavailable"
+            # 事件不足 ⇒ 全樣本續算用的正是鷹架序列 ⇒ 延後之違規在此原樣 raise（不得因事件模式而放行）
+            self._settle_deferred_scaffold(scaffold_consumed=True, info=None)
             return features_df, label_series, info
 
         filtered_index = _normalize_ic_time_index(filtered_df.index, "filtered_events")
@@ -3078,6 +3124,8 @@ class ICFilterOrchestrator:
             # 未覆寫 ⇒ 被消費的是 stage0／stage2 已過 validate_alignment 之序列的 .loc 限制；
             # 產生者＝本函式（上方 .loc），故 label_source 在此由產生分支寫定，非預設。
             label_source = "mainline_return_N"
+        # 延後之鷹架違規在此裁定：覆寫 ⇒ 鷹架被丟棄，只留診斷；未覆寫 ⇒ 鷹架被消費，原樣 raise
+        self._settle_deferred_scaffold(scaffold_consumed=(label_source != "event_label_value"), info=info)
         # ── EVTALIGN Task 2.1（D）：驗**實際被消費**的那條（COMPOSER-R1-P0-02：舊碼三個呼叫點
         #    全在覆寫之前，覆寫後無再驗）。契約由 label_source 導出（§C-7 綁產生者；缺席 raise），
         #    分派依「資料是什麼」非依 mode（§C-6 判準），三種模式同一條路徑。

@@ -162,12 +162,15 @@
   2. 呼叫點：stage3 覆寫（`:3042`）**之後**加一次
      `validate_alignment(..., label_kind="event_given")`。
      🔴 `COMPOSER-R1-P0-02`：現況 stage2（`:2923`）與 stage0（`:2790`）都在覆寫之前。
-  3. 🔴 **事件模式下，覆寫前那條序列不驗**（R2 `GROK-R2-P0-02` 修正）。
-     我 R1 寫「覆寫前照舊跑 forward_return」——那正是 SPEC §C-6 禁的
-     「驗一個即將被丟棄的東西」，且在截短＋非 oracle 型別下會**重現原本的擋死**。
-     判準由 `label_source` 決定（producer-set）：
-     `event_label_value` ⇒ 覆寫前**不驗**、覆寫後以 `event_given` 驗；
-     主線 ⇒ 照舊以 `forward_return` 驗（全域模式該序列**就是**最終 label）。
+  3. 🔴 **鷹架（覆寫前那條序列）之違規延後裁定**（R2 `GROK-R2-P0-02` → R3 三家一致 `CODEX/COMPOSER/GROK-R3-P1-01` 定案）。
+     我 R1 寫「覆寫前照舊跑 forward_return」——那正是 SPEC §C-6 禁的「驗一個即將被丟棄的東西」，
+     且在截短＋非 oracle 型別／K 線中段缺根下會**重現原本的擋死**。R2 改寫成「覆寫前**不驗**」又漏了反面：
+     事件不足 fallback 或 filter 未啟用時，鷹架**就是**被消費的序列，不驗＝少一道保護。
+     **定案**：`event_label_values is not None` 時，stage0／stage2 之 `validate_alignment` 違規**不 raise、暫存**
+     （`_deferred_scaffold_violation`）；stage3 得知該序列是否真被消費後裁定（`_settle_deferred_scaffold`）：
+     覆寫 ⇒ 降為診斷 `info["scaffold_alignment_deferred"]`、覆寫後以 `event_given` 驗；
+     未覆寫（事件不足／filter 未啟用）⇒ 原樣 raise。判準是「**資料是否將被替換**」，不是 mode 字串（§C-6 判準）。
+     `event_label_values` 未提供 ⇒ 行為逐位元組不變。mutation `E1`（改回直接 raise）／`E2`（未覆寫不再 raise）證紅。
 - 修改檔案：`momentum/core/contracts.py::_validate_event_given`；
   `momentum/Analysis/ic_filter_orchestrator.py::_apply_event_filter`（覆寫後加驗證）。
   既有 caller：`_stage3_event_filter`。

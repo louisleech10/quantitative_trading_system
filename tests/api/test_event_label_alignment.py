@@ -190,3 +190,82 @@ def test_e2e_event_path_reports_event_given_kind_and_consumed_labels():
     assert all(consumed[owners[t]] == lv[t] for t in lv if owners[t] in consumed)
     # service 端最後一腿：回綁產生者之逐事件 label
     _assert_event_triple_bound({"event_label_by_id": {owners[t]: lv[t] for t in lv}}, report)
+
+
+# ───────────── R3 D5 閉合：鷹架違規延後裁定（三家一致 CODEX/COMPOSER/GROK-R3-P1-01）─────────────
+
+_BASE_S, _STEP_S, _N_FEAT, _N_CLOSE = 1_704_067_200, 43_200, 157, 200
+_GAP = range(60, 72)  # close 中段缺 12 根 ⇒ 鷹架覆蓋率紅（grok R3 反例形態）
+_META = {"symbol": "BTCUSDT", "timeframe": "12h", "f1": {"name": "f1", "category": "trend", "layer": 1}}
+
+
+class _GapReader:
+    def read_klines(self, _s, _t):
+        keep = [i for i in range(_N_CLOSE) if i not in _GAP]
+        idx = pd.Index(_BASE_S + np.asarray(keep, dtype=np.int64) * _STEP_S, name="timestamp")
+        return pd.DataFrame({"close": np.linspace(100.0, 200.0, _N_CLOSE)[keep]}, index=idx)
+
+
+def _feat_df() -> pd.DataFrame:
+    idx = pd.Index(_BASE_S + np.arange(_N_FEAT, dtype=np.int64) * _STEP_S, name="timestamp")
+    return pd.DataFrame({"f1": np.arange(_N_FEAT, dtype=np.float64)}, index=idx)
+
+
+def _config(event_enabled: bool, min_events: int):
+    from momentum.Analysis.ic_config_schema import ICConfig, load_ic_config
+
+    data = load_ic_config().model_dump()
+    data["event_filter"] = {**data.get("event_filter", {}), "enabled": event_enabled, "min_events": min_events}
+    return ICConfig.model_validate(data)
+
+
+def _scaffold_with_deferred_violation(config):
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    o = ICFilterOrchestrator(config)
+    features = _feat_df()
+    label, _ = o._stage2_label_generation(None, _META, config, _GapReader(), features_df=features, defer_alignment_error=True)
+    assert o._deferred_scaffold_violation is not None and "coverage too low" in str(o._deferred_scaffold_violation)
+    return o, features, label
+
+
+def _event_inputs(features: pd.DataFrame, rows=range(100, 130)) -> tuple[list, dict]:
+    ms = (pd.to_datetime(features.index, unit="s").asi8[list(rows)] // 10**6).astype("int64")
+    return [int(t) for t in ms], {int(t): float(0.01 * (i + 1)) for i, t in enumerate(ms)}
+
+
+def test_scaffold_violation_is_immediate_without_defer_flag():
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    config = _config(False, 1)
+    with pytest.raises(AlignmentViolationError, match="coverage too low"):
+        ICFilterOrchestrator(config)._stage2_label_generation(None, _META, config, _GapReader(), features_df=_feat_df())
+
+
+def test_scaffold_violation_deferred_when_overridden_by_event_labels():
+    """鷹架紅（K 線缺口）但事件 label 合法 ⇒ 不擋；info 揭露延後訊息；被消費的那條以 event_given 驗。"""
+    config = _config(True, 5)
+    o, features, label = _scaffold_with_deferred_violation(config)
+    ts, lv = _event_inputs(features)
+    f_out, l_out, info = o._stage3_event_filter(
+        features, label, _META, config, _GapReader(), event_timestamps=ts, event_label_values=lv
+    )
+    assert info["label_source"] == "event_label_value" and info["label_kind"] == "event_given"
+    assert "coverage too low" in info["scaffold_alignment_deferred"]
+    assert len(l_out) == len(ts) and np.array_equal(l_out.to_numpy(), np.asarray([lv[t] for t in sorted(lv)]))
+    assert o._deferred_scaffold_violation is None
+
+
+def test_scaffold_violation_reraised_when_consumed():
+    """鷹架未被覆寫（filter 未啟用／事件不足 fallback）⇒ 它就是最終 label ⇒ 原樣 raise，不因事件模式放行。"""
+    # ① filter 未啟用
+    config = _config(False, 5)
+    o, features, label = _scaffold_with_deferred_violation(config)
+    ts, lv = _event_inputs(features)
+    with pytest.raises(AlignmentViolationError, match="coverage too low"):
+        o._stage3_event_filter(features, label, _META, config, _GapReader(), event_timestamps=ts, event_label_values=lv)
+    # ② 事件不足 ⇒ mainline_return_N fallback 消費鷹架
+    config = _config(True, 1000)
+    o, features, label = _scaffold_with_deferred_violation(config)
+    with pytest.raises(AlignmentViolationError, match="coverage too low"):
+        o._stage3_event_filter(features, label, _META, config, _GapReader(), event_timestamps=ts, event_label_values=lv)

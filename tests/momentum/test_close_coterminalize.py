@@ -128,6 +128,37 @@ def test_both_call_sites_invoke_coterminalize_exactly_once(monkeypatch):
     assert len(features_df) == N_FEAT and labels_out is not None and "alignment_report" in stage0_log
 
 
+def test_stage0_preloaded_labels_from_longer_close_still_raise_and_coterminal_preload_passes(monkeypatch):
+    """R3 `CODEX/COMPOSER-R3-P1-02`：stage0 只裁 oracle close、不重生預載 label——證明這是 fail-closed 而非漏洞：
+    預載 label 若由更長 K 線離線生成，reindex 到 feature 後尾端 lag 列有真值 ⇒ 守衛（未動）raise；
+    同尾生成之預載 ⇒ 通過且 payload 逐位元組不變。"""
+    from momentum.factories import create_label_generator
+
+    config = load_ic_config()
+    horizon = int(_resolve_effective_label_horizon(config, None))
+    orchestrator = ICFilterOrchestrator(config)
+    feat_index = pd.Index(BASE_S + np.arange(N_FEAT, dtype=np.int64) * STEP_S, name="timestamp")
+    monkeypatch.setattr(orchestrator, "_load_features_hdf5", lambda _p: (_features(), {}))
+    monkeypatch.setattr(orchestrator, "_load_meta_json", lambda _p: dict(_META))
+
+    # 「長 K 線離線生成」之預載：尾端 lag 列有真值
+    close_full = pd.Series(_CLOSE_FULL, index=pd.to_datetime(BASE_S + np.arange(N_CLOSE) * STEP_S, unit="s"))
+    long_labels = create_label_generator().generate_returns_by_type(close_full, horizon, config.labels.return_type)
+    df_long = pd.DataFrame({f"return_{horizon}": long_labels.iloc[:N_FEAT].to_numpy()}, index=feat_index)
+    assert int(df_long.iloc[-horizon:].isna().sum().iloc[0]) == 0
+    monkeypatch.setattr(orchestrator, "_load_labels_hdf5", lambda _p: df_long)
+    with pytest.raises(AlignmentViolationError, match="trailing NaN count must equal lag"):
+        orchestrator._stage0_ingestion("f", "l", "m", config=config, kline_reader=_Reader(N_CLOSE))
+
+    # 同尾生成之預載：通過，payload 逐位元組不變
+    _, df_coterm = orchestrator._stage2_label_generation(None, _META, config, _Reader(N_FEAT), features_df=_features())
+    df_pre = pd.DataFrame({df_coterm.columns[0]: df_coterm.to_numpy().ravel()}, index=feat_index)
+    before = hashlib.sha256(df_pre.to_numpy().tobytes()).hexdigest()
+    monkeypatch.setattr(orchestrator, "_load_labels_hdf5", lambda _p: df_pre)
+    _, labels_out, _, log = orchestrator._stage0_ingestion("f", "l", "m", config=config, kline_reader=_Reader(N_CLOSE))
+    assert hashlib.sha256(labels_out.to_numpy().tobytes()).hexdigest() == before and "alignment_report" in log
+
+
 def test_guard_untouched_sha256_pinned():
     src = inspect.getsource(validate_alignment)
     assert hashlib.sha256(src.encode("utf-8")).hexdigest() == GUARD_SHA256, (

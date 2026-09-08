@@ -103,6 +103,21 @@ MUTATIONS: Tuple[Mutation, ...] = (
         [*PYTEST, "tests/api/test_event_label_alignment.py", "-k", "dense"],
         "對 event_given 套 forward_return 尾端契約 ⇒ 同尾合法密集 label 應紅（GROK-R1-P0-02）",
     ),
+    # ── Phase 1：R3 D5 閉合（GROK-R3-P2-01：mutation 對「鷹架硬閘」須有紅錨）───
+    Mutation(
+        "E1-scaffold-hard-gate-restored", 1, ORCH,
+        "            if not defer_alignment_error:\n                raise\n            self._deferred_scaffold_violation = exc\n",
+        "            raise\n",
+        [*PYTEST, "tests/api/test_event_label_alignment.py", "-k", "deferred_when_overridden"],
+        "stage2 鷹架改回直接 raise ⇒ 「事件 label 覆寫＋K 線缺口」案例應紅（驗了就丟）",
+    ),
+    Mutation(
+        "E2-deferred-reraise-removed", 1, ORCH,
+        "        if scaffold_consumed and pending is not None:\n            raise pending\n",
+        "        if False:\n            raise pending\n",
+        [*PYTEST, "tests/api/test_event_label_alignment.py", "-k", "reraised_when_consumed"],
+        "未覆寫（事件不足／filter 未啟用）時不再 raise ⇒ 鷹架被消費卻放行之案例應紅",
+    ),
     # ── 對照組：只改註解，全部測試必須仍綠 ──────────────────────────────
     Mutation(
         "C0-comment-only-control", 1, ORCH,

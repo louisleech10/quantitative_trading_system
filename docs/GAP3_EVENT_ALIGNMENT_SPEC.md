@@ -239,6 +239,10 @@ codex 必答 4：「若 A 為堵洞而改成 producer binding、index 推導、c
      `np.isfinite(vals).all()`），本 Task 是把它**提升為正式契約並移到驗證層**，不是新寫一套。
   4. 驗證的呼叫點必須在**覆寫之後**（`COMPOSER-R1-P0-02`：現況 stage2 `:2923` 與
      stage0 `:2790` 都在 stage3 覆寫 `:3042` 之前，覆寫後無再驗）。
+  5. 🔴 **鷹架違規延後裁定**（R3 三家一致，2026-09-08）：覆寫前之 stage0／stage2 驗證在
+     `event_label_values` 提供時**不直接 raise 而暫存**，由 stage3 依「該序列是否真被消費」裁定——
+     被覆寫 ⇒ 降為診斷揭露；未被覆寫（事件不足 fallback／filter 未啟用）⇒ 原樣 raise。
+     判準＝「資料是否將被替換」（§C-6 合法），非 mode 字串。細節見 TODO Task 2.1 要點 3。
 - **驗證（可證偽）** — `tests/api/test_event_label_alignment.py`：
   - `ASSERT venv/bin/python -m pytest tests/api/test_event_label_alignment.py -q THEN rc=0`
   - 事件 label 與 feature index 不對齊 ⇒ **仍 raise**（保護沒被拿掉）。
@@ -331,6 +335,7 @@ codex 必答 4：「若 A 為堵洞而改成 producer binding、index 推導、c
 |---|---|---|---|
 | `EA-RESID-1` | preprocessing 之峰值記憶體（實機 17 GB／8 GB 實體、swap 15.6 GB） | `needs-research` | 需量出「特徵數 × 列數」之記憶體曲線；本票只做**可視性**（§C-4：使用者明講不要擋），真正的分塊處理另開票 |
 | `EA-RESID-2` | **橫截面路徑從未呼叫 `validate_alignment`** | `blocked-by` | 依使用者 2026-08-17 之模組成熟度裁定（只 Feature Factory 完整、IC 進行中、**其餘不完整**），橫截面屬「其餘」⇒ **未完工的模組沒有守衛不是缺陷**。使用者 2026-09-07 當面更正我把它排成「比鷹架更嚴重」是錯的。**該模組實作時必須補**，不進本票 |
+| `EA-RESID-6` | 四條**既有**紅測試（B1 之前即紅，`097dae40` worktree A/B 證實）：`test_ichc_p2_golden::test_feature_set_and_config_exact`（receipt 凍於 8/17、`ICConfig` schema 改於 8/27）、`test_ic_1a_cut1_golden`／`test_ic_persist_redirect_golden_ab`（reporter stub 缺 `analysis_status` kwarg，7/16 起）、`test_ichc_event_timestamps…kwarg` | `needs-research` | 屬 ICHC 票之 receipt 重凍與 stub 更新，非本票；🔴 主委 R3 前曾把該批 rc=1 誤報為通過（見 reconcile R3 E4），本票之驗收命令改列**逐檔**狀態 |
 | `EA-RESID-3` | `_validate_expected_frequency` 對 **tz-aware** 索引拋 `TypeError` 而非其設計之 `TimestampDiscontinuityError` | `blocked-by` | 🔴 **執行 Task 0.2 時實測撞到**（`ic_filter_orchestrator.py:335`）：`_coerce_timestamp_array` 對 tz-aware 回 **object 陣列** ⇒ `np.diff` 得 object ⇒ `diffs <= np.timedelta64(0,"ns")` 型別不合。**現行資料為 tz-naive**（`_normalize_ic_time_index` 對 int64 epoch 秒走 `to_datetime(unit="s")`）故**未觸發**；但該函式對已是 tz-aware 之 `DatetimeIndex` **原樣保留 tz** ⇒ 一旦上游改存 tz-aware，守衛會以錯誤的例外型別炸掉。**屬潛伏脆弱點，非現行 bug**；不進本票（本票不碰時間索引正規化），待接觸該路徑之票處理 |
 
 ### 切分基線之執行 receipt（TODO `Task 0.2`；2026-09-08，實作前先跑）
