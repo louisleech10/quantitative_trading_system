@@ -174,7 +174,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "A11-fake-eta-on-first-report", 4, "momentum/Analysis/data_preprocessor.py",
         "    if reports >= 2 and done > 0 and done < total and elapsed > 0:\n",
         "    if done > 0 and done < total and elapsed >= 0:\n",
-        [*PYTEST, "tests/api/test_stage_progress.py", "-k", "first_report_estimating"],
+        [*PYTEST, "tests/api/test_stage_progress.py", "-k", "first_report_is_estimating"],
         "第一次回報就給 ETA（假 ETA）⇒ estimating 測試應紅",
     ),
     # ── Phase 5：Task 5.1 隔離區揭露 ──────────────────────────────────────
