@@ -87,7 +87,15 @@ composer／grok 判可合併、零 finding；codex 兩條 P2（第 4 段進度�
 規則與 stage4 同一份 `_rolling_warmup_min_rows`）＋降級原因即時推送（`fallback_reason`）＋`POST /task/{id}/cancel`＋前端取消鈕／
 紅字說明＋`ICTaskStatusResponse` 補 `sub_progress/warnings/fallback/cancel_requested`（response_model 會濾掉未宣告欄）。
 
+## EVTWARMUP（2026-09-08 晚，使用者裁定「同意方向＋修第二個 bug」）
+consult R1 三家一致（`handoffs/reconcile/20260908-evtwarmup-x-consult-r1/synth.md` W1–W4）：事件路徑豁免 bar-rolling warmup、
+OOS＝K 線 holdout 上測試段事件 pooled IC＋HAC、`min_test_events`(30) loud、ICIR 降診斷；timeframe 接線另票 `docs/TFWINDOW_SPEC.md`。
+SPEC/TODO：`docs/EVTWARMUP_SPEC.md`／`docs/EVTWARMUP_TODO.md`（R1 review 3P0/9P1/5P2 全文件層，已依 synth V1–V6 修：
+status 維持兩值方案 B、分流兩段判、ICIR 消費端列全、揭露只寫事件路徑、icir 缺值 None）。改前 golden `tests/golden/evtwarmup/baseline.json`。
+SPEC/TODO 第二輪審查派出中（session `20260908-evtwarmup-x-review-r2`）；通過後實作第一批（Task 1.1／1.2／2.1）→ 第二批（TFWINDOW Task 3.1）。
+
 ## 下一步
+第二輪收斂 → 實作第一批 → gate → code review → 使用者 UAT B26–B31＋B32／B33。
 **使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
 UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
 
