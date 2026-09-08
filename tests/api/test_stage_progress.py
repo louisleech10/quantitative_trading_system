@@ -239,7 +239,9 @@ def test_real_fixture_analyze_emits_sub_progress_within_bounds():
 
     payloads: list[dict] = []
     report = run_analyze(None, progress_callback=payloads.append)
-    subs = [p for p in payloads if "sub_total" in p]
+    subs = [p for p in payloads if "sub_total" in p and p.get("stage_name") == "preprocessing"]
+    stage4 = [p for p in payloads if "sub_total" in p and p.get("stage_name") == "ic_calculation"]
+    assert stage4 and all(p["eta_state"] == "estimating" for p in stage4)   # stage4 子步驟檢查點（取消點）存在、不給假 ETA
     n_feat = int(report["metadata"]["total_features_input"])
     # fallback 重跑會再跑一次 preprocessing ⇒ 上界乘以 analyze 次數（以 stage 0 之回報次數推得）
     runs = max(1, sum(1 for p in payloads if p.get("stage") == 0))

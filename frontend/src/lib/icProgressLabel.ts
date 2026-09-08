@@ -45,7 +45,7 @@ export function icFallbackLabel(fb: ICTaskFallback | null | undefined): string |
   const nums = d && typeof d.test_rows === 'number' && typeof d.min_test_rows === 'number'
     ? `（測試段 ${d.test_rows} 列 < 需要 ${d.min_test_rows} 列）`
     : '';
-  return `切分不足，改以全樣本重跑（無 OOS 保證）：${why}${nums}。這不是卡住，是從頭再跑一次。`;
+  return `切分不足，改以全樣本模式跑（無 OOS 保證）：${why}${nums}。已在預處理前判定，直接改跑，不會重跑一輪。`;
 }
 
 /** WARN 只揭露、不擋（使用者：「可以跑的話，幹嘛擋?」）。未知代碼原樣顯示，不吞掉。 */

@@ -9,7 +9,7 @@ describe('icFallbackLabel（降級重跑即時說明）', () => {
   it('有列數就講差多少；未知原因原樣顯示', () => {
     const s = icFallbackLabel({ reason: 'rolling_warmup_insufficient', details: { train_rows: 66, test_rows: 13, min_test_rows: 131 } })!;
     expect(s).toContain('測試段 13 列 < 需要 131 列');
-    expect(s).toContain('不是卡住');
+    expect(s).toContain('不會重跑一輪');
     expect(icFallbackLabel({ reason: 'weird' })).toContain('weird');
   });
 });

@@ -118,6 +118,8 @@ function ICAnalysisPageContent() {
   const [summaryText, setSummaryText] = useState<string>('');
   const [featuresError, setFeaturesError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [cancelRequested, setCancelRequested] = useState(false);
+  useEffect(() => { setCancelRequested(false); }, [taskId]);   // 新任務重置取消狀態
   const [isRefiltering, setIsRefiltering] = useState(false);
   const [isDeepRunning, setIsDeepRunning] = useState(false);
   const [neutralizationMode, setNeutralizationMode] = useState<'none' | 'beta_neutral' | 'vol_neutral'>('none');
@@ -570,10 +572,14 @@ function ICAnalysisPageContent() {
                 <button
                   type="button"
                   data-testid="ic-task-cancel"
-                  className="text-xs self-start rounded border border-slate-500/50 px-2 py-1 text-slate-300 hover:border-rose-400/60 hover:text-rose-200"
-                  onClick={() => { void cancelAnalysis(taskId).catch((e) => setError(e instanceof Error ? e.message : '取消失敗')); }}
+                  disabled={cancelRequested}
+                  className="text-xs self-start rounded border border-slate-500/50 px-2 py-1 text-slate-300 hover:border-rose-400/60 hover:text-rose-200 disabled:opacity-60"
+                  onClick={() => {
+                    setCancelRequested(true);   // UAT：按了沒回饋會被當「沒反應」而狂按；立刻顯示狀態、禁止重送
+                    void cancelAnalysis(taskId).catch((e) => { setCancelRequested(false); setError(e instanceof Error ? e.message : '取消失敗'); });
+                  }}
                 >
-                  取消分析（在下一個進度回報點停止）
+                  {cancelRequested ? '取消已送出，等下一個進度回報點停止…' : '取消分析（在下一個進度回報點停止）'}
                 </button>
               )}
               {/* EVTALIGN Task 4.1：WARN 只揭露不擋（例：記憶體吃緊照跑） */}

@@ -3170,6 +3170,17 @@ class ICFilterOrchestrator:
         label_series = labels_df[f"return_{horizon}"]
         return label_series, labels_df
 
+    _STAGE4_SUBSTEPS = 5
+
+    def _stage4_checkpoint(self, name: str, idx: int) -> None:
+        """stage4 子計算邊界之進度回報（同時是協作式取消點）；ETA 不估（子步驟耗時差異大，不給假數字）。"""
+        frac = (idx - 1) / self._STAGE4_SUBSTEPS
+        self._report_progress(
+            4, "ic_calculation", 0.55 + 0.15 * frac, f"ic_calculation {name} {idx}/{self._STAGE4_SUBSTEPS}",
+            extra={"sub_step": name, "sub_done": idx, "sub_total": self._STAGE4_SUBSTEPS,
+                   "eta_seconds": None, "eta_state": "estimating"},
+        )
+
     def _rolling_warmup_min_rows(self, config: ICConfig, effective_horizon: int) -> int:
         """stage4 與預檢共用的**同一條**規則：max(依週期換算之 rolling 視窗) ＋ effective_horizon。"""
         adjusted = self._ic_engine._adjust_rolling_windows(config.ic_calculation.rolling_windows)
@@ -3503,6 +3514,8 @@ class ICFilterOrchestrator:
                     },
                 }
 
+        # UAT 2026-09-08：stage4 各子計算之間設回報點（進度可見＋協作式取消點）；39k 特徵時每段仍是分鐘級。
+        self._stage4_checkpoint("ic", 1)
         ic_values = self._ic_engine.compute_ic(features_for_ic, label_for_ic, method)
         rolling_features = features_df
         rolling_label = label_series
@@ -3519,6 +3532,7 @@ class ICFilterOrchestrator:
                 allowed_mask,
             )
             rolling_test_mask = test_mask_arr[allowed_mask]
+        self._stage4_checkpoint("rolling_ic", 2)
         rolling_ic_full = self._ic_engine.compute_rolling_ic(
             rolling_features, rolling_label, rolling_windows, rolling_stride, method
         )
@@ -3534,6 +3548,7 @@ class ICFilterOrchestrator:
             if split_context is not None
             else rolling_ic_full
         )
+        self._stage4_checkpoint("icir_autocorr", 3)
         icir = self._ic_engine.compute_icir(rolling_ic)
         ic_autocorr = self._ic_engine.compute_ic_autocorrelation(rolling_ic)
 
@@ -3558,6 +3573,7 @@ class ICFilterOrchestrator:
         if config.report.include_decay_analysis and raw_data_for_ic is not None:
             close = raw_data_for_ic.get("close")
             if close is not None:
+                self._stage4_checkpoint("ic_decay", 4)
                 ic_decay = self._ic_engine.compute_ic_decay(
                     features_for_ic,
                     close,
@@ -3567,6 +3583,7 @@ class ICFilterOrchestrator:
                 )
 
         if raw_data_for_ic is not None and config.report.include_regime_analysis:
+            self._stage4_checkpoint("grouped_ic", 5)
             grouped_ic = self._ic_engine.compute_grouped_ic(
                 features_for_ic,
                 label_for_ic,
