@@ -320,6 +320,12 @@ class ICTaskStatusResponse(BaseModel):
     #: 掃描進度（未掃 ⇒ None，**不填 0**）。
     scan_done: Optional[int] = None
     scan_total: Optional[int] = None
+    # ── EVTALIGN Task 4.1／UAT 2026-09-08：階段內進度、WARN、降級原因（即時）、取消 ──
+    # 🔴 不在此宣告就會被 response_model 靜默濾掉（前端輪詢路徑永遠看不到）。
+    sub_progress: Optional[Dict[str, Any]] = None
+    warnings: List[Dict[str, Any]] = Field(default_factory=list)
+    fallback: Optional[Dict[str, Any]] = None
+    cancel_requested: bool = False
 
 
 class ICTopFeaturesRequest(BaseModel):

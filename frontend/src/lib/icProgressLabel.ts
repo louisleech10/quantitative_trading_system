@@ -1,4 +1,4 @@
-import type { ICSubProgress, ICTaskWarning } from '@/lib/types';
+import type { ICSubProgress, ICTaskFallback, ICTaskWarning } from '@/lib/types';
 
 /**
  * EVTALIGN Task 4.1：階段內進度之顯示文字。
@@ -28,6 +28,25 @@ const WARNING_TEXT: Record<string, string> = {
   memory_pressure_observed:
     '記憶體吃緊（處理程序用量超過實體記憶體或 swap 持續增長）。分析**照跑**、不會中止；只是會變慢。想快一點可以縮小特徵數或時間範圍。',
 };
+
+const FALLBACK_TEXT: Record<string, string> = {
+  rolling_warmup_insufficient: '留出測試段的列數不足以跑 rolling IC 視窗',
+  insufficient_data: '資料列數不足以切出訓練／測試段',
+};
+
+/**
+ * 降級重跑的即時說明（UAT 2026-09-08：以前重跑期間只看到「又一次 preprocessing」，像卡住）。
+ * 有列數就一併講清楚「差多少」；沒有就不編數字。
+ */
+export function icFallbackLabel(fb: ICTaskFallback | null | undefined): string | null {
+  if (!fb || !fb.reason) return null;
+  const why = FALLBACK_TEXT[fb.reason] ?? fb.reason;
+  const d = fb.details;
+  const nums = d && typeof d.test_rows === 'number' && typeof d.min_test_rows === 'number'
+    ? `（測試段 ${d.test_rows} 列 < 需要 ${d.min_test_rows} 列）`
+    : '';
+  return `切分不足，改以全樣本重跑（無 OOS 保證）：${why}${nums}。這不是卡住，是從頭再跑一次。`;
+}
 
 /** WARN 只揭露、不擋（使用者：「可以跑的話，幹嘛擋?」）。未知代碼原樣顯示，不吞掉。 */
 export function icTaskWarningLabel(w: ICTaskWarning): string {

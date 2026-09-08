@@ -410,7 +410,7 @@ def _resolve_effective_label_horizon(
     default_horizon = int(config.global_settings.default_horizon)
     resolved = default_horizon if default_horizon in horizons else int(horizons[0])
     logger.warning(
-        "Falling back to configured label horizon because labels_df is unavailable",
+        "No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)",
         extra={"horizon_source": "default_fallback", "effective_horizon": resolved},
     )
     return resolved
@@ -1141,6 +1141,25 @@ class ICFilterOrchestrator:
                 "test_time_bounds": [str(value) for value in test_plan.time_bounds],
                 "index_kind": train_plan.index_kind,
             }
+            # UAT 2026-09-08（使用者：「為何要跑完才知道不足，要重跑第二次?」）：stage4 之 rolling warmup 檢查
+            # 只依賴「測試段列數／視窗／horizon」，切分計畫做完就全部已知 ⇒ 在預處理**之前**先判，
+            # 不足直接走全樣本，不再白跑一輪 39k 特徵的預處理。stage4 那條檢查保留為安全網（規則同一份）。
+            precheck = self._precheck_rolling_warmup(features_df, config, split_context, event_timestamps)
+            if precheck is not None:
+                return self._run_full_sample_fallback(
+                    features_path,
+                    labels_path,
+                    meta_path,
+                    config_override,
+                    progress_callback,
+                    kline_reader,
+                    reason="rolling_warmup_insufficient",
+                    details=precheck,
+                    event_timestamps=event_timestamps,
+                    event_label_values=event_label_values,
+                    event_label_owners=event_label_owners,
+                    event_context=event_context,
+                )
 
         self._report_progress(1, "preprocessing", 0.12, "preprocessing features")
         fit_mode, fit_mask = self._resolve_stage1_fit(
@@ -1333,6 +1352,15 @@ class ICFilterOrchestrator:
             train_rows,
             test_rows,
             min_test_rows,
+        )
+        # UAT 2026-09-08：降級原因原本只在最後寫進報告，重跑期間畫面只見「又一次 preprocessing」⇒ 即時推到進度通道
+        self._report_progress(
+            0, "fallback", 0.02,
+            f"切分不足（{reason}）：改以全樣本重跑（無 OOS 保證）",
+            extra={
+                "fallback_reason": reason,
+                "fallback_details": {"train_rows": train_rows, "test_rows": test_rows, "min_test_rows": min_test_rows},
+            },
         )
 
         fallback_override = deepcopy(config_override) if config_override else {}
@@ -3142,6 +3170,45 @@ class ICFilterOrchestrator:
         label_series = labels_df[f"return_{horizon}"]
         return label_series, labels_df
 
+    def _rolling_warmup_min_rows(self, config: ICConfig, effective_horizon: int) -> int:
+        """stage4 與預檢共用的**同一條**規則：max(依週期換算之 rolling 視窗) ＋ effective_horizon。"""
+        adjusted = self._ic_engine._adjust_rolling_windows(config.ic_calculation.rolling_windows)
+        return int(max(adjusted)) + int(effective_horizon)
+
+    def _precheck_rolling_warmup(
+        self,
+        features_df: pd.DataFrame,
+        config: ICConfig,
+        split_context: dict,
+        event_timestamps: Optional[list],
+    ) -> Optional[dict]:
+        """切分後、預處理前的 rolling warmup 預檢；不足回 details（同 stage4 之三鍵），足夠回 None。
+
+        事件模式下 stage4 實際拿到的是「落在測試段的事件列」，故此處以事件時間戳 ∩ 測試段計數
+        （事件若在 stage3 對齊時被丟，stage4 安全網仍會擋——本預檢只會少擋、不會多擋）。
+        """
+        test_mask = np.asarray(split_context["test_mask"], dtype=bool)
+        train_mask = np.asarray(split_context["train_mask"], dtype=bool)
+        test_rows = int(test_mask.sum())
+        if event_timestamps:
+            ts_arr = np.asarray(list(event_timestamps))
+            if np.issubdtype(ts_arr.dtype, np.number):
+                max_abs = float(np.nanmax(np.abs(ts_arr.astype(float)))) if len(ts_arr) else 0.0
+                event_index = pd.to_datetime(ts_arr, unit="ms" if max_abs >= 1e12 else "s", errors="raise")
+            else:
+                event_index = pd.to_datetime(ts_arr, errors="raise")
+            feature_index = _normalize_ic_time_index(features_df.index, "features_df")
+            test_rows = int(np.isin(feature_index[test_mask].asi8, pd.DatetimeIndex(event_index).asi8).sum())
+        min_required = self._rolling_warmup_min_rows(config, int(split_context.get("effective_horizon", 0)))
+        if test_rows >= min_required:
+            return None
+        return {
+            "train_rows": int(train_mask.sum()),
+            "test_rows": test_rows,
+            "min_test_rows": min_required,
+            "decided_at": "precheck_before_preprocessing",
+        }
+
     def _settle_deferred_scaffold(self, *, scaffold_consumed: bool, info: Optional[dict]) -> None:
         """EVTALIGN Task 2.1（R3 D5 閉合）：裁定 stage0／stage2 延後的鷹架 `AlignmentViolationError`。
 
@@ -3422,10 +3489,7 @@ class ICFilterOrchestrator:
         )
 
         if split_context is not None:
-            adjusted_windows = self._ic_engine._adjust_rolling_windows(rolling_windows)
-            min_required = max(adjusted_windows) + int(
-                split_context.get("effective_horizon", 0)
-            )
+            min_required = self._rolling_warmup_min_rows(config, int(split_context.get("effective_horizon", 0)))
             if len(features_for_ic) < min_required:
                 return {
                     "status": "skipped",
@@ -4740,7 +4804,8 @@ class ICFilterOrchestrator:
         self, stage: int, stage_name: str, progress: float, message: str,
         extra: Optional[dict] = None,
     ) -> None:
-        if self._progress_callback is None:
+        # fallback 等路徑可能在未經 analyze() 設定 callback 前被直接呼叫（測試亦如此）⇒ 缺屬性視同 None
+        if getattr(self, "_progress_callback", None) is None:
             return
         payload = {
             "stage": stage,

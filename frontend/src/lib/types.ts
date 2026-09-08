@@ -3262,3 +3262,9 @@ export interface ICTaskWarning {
   code: string;
   detail?: Record<string, unknown> | null;
 }
+
+/** 降級重跑（全樣本、無 OOS 保證）之原因；後端於重跑**當下**推送，reason 與報告 `metadata.oos_downgrade.reason` 同一枚舉。 */
+export interface ICTaskFallback {
+  reason: string;
+  details?: { train_rows?: number | null; test_rows?: number | null; min_test_rows?: number | null } | null;
+}

@@ -7,13 +7,14 @@ import {
   ICAnalysisConfig,
   ICEventScanDisclosure,
   ICSubProgress,
+  ICTaskFallback,
   ICTaskWarning,
   ICReport,
   ModuleStatus,
   NetICAnalysisRequest,
 } from '@/lib/types';
 
-type ICAnalysisStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed';
+type ICAnalysisStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 interface ICAnalysisState {
   config: ICAnalysisConfig;
@@ -27,6 +28,8 @@ interface ICAnalysisState {
   subProgress: ICSubProgress | null;
   /** EVTALIGN Task 4.1：後端 WARN（例：memory_pressure_observed）；只揭露不擋。 */
   taskWarnings: ICTaskWarning[];
+  /** 降級重跑（全樣本、無 OOS）之原因——重跑**當下**即揭露；沒有降級 ⇒ null。 */
+  taskFallback: ICTaskFallback | null;
   /**
    * `G3-D2` D4.2／D4.3：**後端**回傳之事件分析揭露（兩上界、k 雙值、掃描結果）。
    * 🔴 尚未分析 ⇒ `null`，前端**不猜數字**（上界之公式住 producer，重算即第二份實作）。
@@ -55,6 +58,7 @@ interface ICAnalysisState {
   setFeatureCount: (featureCount: number | null) => void;
   setSubProgress: (subProgress: ICSubProgress | null) => void;
   setTaskWarnings: (warnings: ICTaskWarning[]) => void;
+  setTaskFallback: (fallback: ICTaskFallback | null) => void;
   setEventScanDisclosure: (d: ICEventScanDisclosure | null) => void;
   setStatus: (status: ICAnalysisStatus) => void;
   setReport: (report: ICReport | null) => void;
@@ -219,6 +223,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   featureCount: null,
   subProgress: null,
   taskWarnings: [],
+  taskFallback: null,
   eventScanDisclosure: null,
   error: null,
   report: null,
@@ -273,11 +278,13 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
       currentStage: null,
       subProgress: null,
       taskWarnings: [],
+      taskFallback: null,
     }),
   setProgress: (progress, currentStage) => set({ progress, currentStage }),
   setFeatureCount: (featureCount) => set({ featureCount }),
   setSubProgress: (subProgress) => set({ subProgress }),
   setTaskWarnings: (taskWarnings) => set({ taskWarnings }),
+  setTaskFallback: (taskFallback) => set({ taskFallback }),
   setEventScanDisclosure: (eventScanDisclosure) => set({ eventScanDisclosure }),
   setStatus: (status) => set({ status }),
   setReport: (report) => set({ report }),

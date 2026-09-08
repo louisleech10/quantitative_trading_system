@@ -7,6 +7,7 @@ import {
   ICEventScanDisclosure,
   ICReport,
   ICSubProgress,
+  ICTaskFallback,
   ICTaskWarning,
 } from '@/lib/types';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
@@ -73,6 +74,7 @@ export function useICAnalysis() {
     setFeatureCount,
     setSubProgress,
     setTaskWarnings,
+    setTaskFallback,
     setEventScanDisclosure,
     setStatus,
     setError,
@@ -157,8 +159,10 @@ export function useICAnalysis() {
         // EVTALIGN Task 4.1：階段內進度與 WARN（未到 ⇒ null／[]）
         sub_progress?: ICSubProgress | null;
         warnings?: ICTaskWarning[];
+        fallback?: ICTaskFallback | null;
       }>(`/task/${taskId}`);
-      setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed');
+      setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed' | 'cancelled');
+      setTaskFallback(status.fallback ?? null);
       setProgress(status.progress ?? 0, status.current_stage ?? null);
       // Task 6.3：解析不到就是 null，**不填假值**
       setFeatureCount(typeof status.feature_count === "number" ? status.feature_count : null);
@@ -206,10 +210,10 @@ export function useICAnalysis() {
           },
       );
 
-      if (status.status === 'failed') {
+      if (status.status === 'failed' || status.status === 'cancelled') {
         terminalRef.current = true;
         clearTimers();
-        setError(status.error || 'IC analysis failed');
+        setError(status.error || (status.status === 'cancelled' ? '已取消' : 'IC analysis failed'));
       } else if (status.status === 'completed') {
         terminalRef.current = true;
         clearTimers();
@@ -218,8 +222,13 @@ export function useICAnalysis() {
 
       return status;
     },
-    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount, setSubProgress, setTaskWarnings, setEventScanDisclosure]
+    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount, setSubProgress, setTaskWarnings, setTaskFallback, setEventScanDisclosure]
   );
+
+  /** 協作式取消：後端在下一個進度回報點停（預處理每 100 個特徵一點、其餘為階段邊界），狀態變 cancelled。 */
+  const cancelAnalysis = useCallback(async (taskId: string) => {
+    await requestJson<{ task_id: string; status: string }>(`/task/${taskId}/cancel`, { method: 'POST' });
+  }, []);
 
   const startPolling = useCallback(
     (taskId: string) => {
@@ -314,6 +323,18 @@ export function useICAnalysis() {
               message: payload.message ?? null,
             });
           }
+          if (typeof payload.fallback_reason === 'string' && payload.fallback_reason) {
+            // 降級重跑當下就顯示原因（不等報告）；上一輪的階段內進度歸零
+            setTaskFallback({ reason: payload.fallback_reason, details: payload.fallback_details ?? null });
+            setSubProgress(null);
+          }
+          if (payload.status === 'cancelled') {
+            terminalRef.current = true;
+            clearTimers();
+            setError(payload.message || '已取消');
+            ws.close();
+            return;
+          }
           if (typeof payload.warning === 'string' && payload.warning) {
             const prev = useICAnalysisStore.getState().taskWarnings;
             if (!prev.some((w) => w.code === payload.warning)) {
@@ -392,7 +413,7 @@ export function useICAnalysis() {
     };
 
     wsRef.current = ws;
-  }, [clearTimers, fetchResult, fetchTaskStatus, mergeScanProgress, setError, setEventScanDisclosure, setProgress, setStatus, setSubProgress, setTaskWarnings, startPolling]);
+  }, [clearTimers, fetchResult, fetchTaskStatus, mergeScanProgress, setError, setEventScanDisclosure, setProgress, setStatus, setSubProgress, setTaskWarnings, setTaskFallback, startPolling]);
 
   const startAnalysis = useCallback(
     async (config: ICAnalysisConfig) => {
@@ -635,5 +656,6 @@ export function useICAnalysis() {
     refilter,
     applyTransforms,
     connectProgress,
+    cancelAnalysis,
   };
 }

@@ -45,7 +45,7 @@ import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
 import { useAutoRefilter } from '@/hooks/useAutoRefilter';
 import { icFeatureCountLabel, icPollFailed, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
-import { icSubProgressLabel, icTaskWarningLabel } from "@/lib/icProgressLabel";
+import { icFallbackLabel, icSubProgressLabel, icTaskWarningLabel } from "@/lib/icProgressLabel";
 import { isSectionStatus } from "@/lib/types";
 import type { SectionStatusObject } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
@@ -63,6 +63,7 @@ function ICAnalysisPageContent() {
     featureCount,
     subProgress,
     taskWarnings,
+    taskFallback,
     eventScanDisclosure,
     error,
     report,
@@ -107,6 +108,7 @@ function ICAnalysisPageContent() {
     refilter,
     applyTransforms,
     connectProgress,
+    cancelAnalysis,
   } = useICAnalysis();
   const runs = useFeatureFactoryStore((state) => state.runs);
   const fetchRuns = useFeatureFactoryStore((state) => state.fetchRuns);
@@ -557,6 +559,22 @@ function ICAnalysisPageContent() {
                 <div className="text-xs text-slate-400" data-testid="ic-task-sub-progress">
                   {icSubProgressLabel(subProgress)}
                 </div>
+              )}
+              {/* UAT 2026-09-08：降級重跑當下就講原因（不是卡住）；取消為協作式，下一個回報點停 */}
+              {icFallbackLabel(taskFallback) && (
+                <div className="text-xs text-rose-200 border border-rose-400/30 rounded px-2 py-1" data-testid="ic-task-fallback">
+                  {icFallbackLabel(taskFallback)}
+                </div>
+              )}
+              {(status === 'running' || status === 'pending') && taskId && (
+                <button
+                  type="button"
+                  data-testid="ic-task-cancel"
+                  className="text-xs self-start rounded border border-slate-500/50 px-2 py-1 text-slate-300 hover:border-rose-400/60 hover:text-rose-200"
+                  onClick={() => { void cancelAnalysis(taskId).catch((e) => setError(e instanceof Error ? e.message : '取消失敗')); }}
+                >
+                  取消分析（在下一個進度回報點停止）
+                </button>
               )}
               {/* EVTALIGN Task 4.1：WARN 只揭露不擋（例：記憶體吃緊照跑） */}
               {taskWarnings.map((w) => (

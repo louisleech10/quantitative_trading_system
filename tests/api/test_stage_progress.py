@@ -179,6 +179,61 @@ def test_ws_payload_forwards_sub_progress_and_warning_fields():
     assert task_info["sub_progress"]["total"] == out["sub_total"]              # 兩條通道同源
 
 
+def test_precheck_rolling_warmup_uses_same_rule_as_stage4_and_counts_event_rows_in_test():
+    """UAT 2026-09-08：切分後、預處理前先判 warmup；事件模式以「事件 ∩ 測試段」計數；規則與 stage4 同一份。"""
+    config = load_ic_config()
+    o = ICFilterOrchestrator(config)
+    n = 400
+    idx = pd.Index(1_704_067_200 + np.arange(n, dtype=np.int64) * 43_200, name="timestamp")
+    features = pd.DataFrame({"f1": np.arange(n, dtype=float)}, index=idx)
+    test_mask = np.zeros(n, dtype=bool)
+    test_mask[-80:] = True
+    ctx = {"train_mask": ~test_mask, "test_mask": test_mask, "effective_horizon": 5}
+    min_required = o._rolling_warmup_min_rows(config, 5)
+    assert min_required == max(o._ic_engine._adjust_rolling_windows(config.ic_calculation.rolling_windows)) + 5
+    out = o._precheck_rolling_warmup(features, config, ctx, None)
+    if 80 < min_required:
+        assert out == {"train_rows": n - 80, "test_rows": 80, "min_test_rows": min_required, "decided_at": "precheck_before_preprocessing"}
+    else:
+        assert out is None
+    # 事件模式：只有 3 個事件落在測試段 ⇒ test_rows=3 ⇒ 不足
+    ev = [int(idx[-1]) * 1000, int(idx[-2]) * 1000, int(idx[-3]) * 1000, int(idx[10]) * 1000]  # ms
+    out_ev = o._precheck_rolling_warmup(features, config, ctx, ev)
+    assert out_ev is not None and out_ev["test_rows"] == 3
+    # 測試段夠大 ⇒ None（不誤擋）
+    big_mask = np.zeros(n, dtype=bool)
+    big_mask[-(min_required + 1):] = True
+    assert o._precheck_rolling_warmup(features, config, {"train_mask": ~big_mask, "test_mask": big_mask, "effective_horizon": 5}, None) is None
+
+
+def test_fallback_reason_is_pushed_live_and_ws_forwards_it():
+    """降級重跑原因即時進 task_info／WS，不等報告；sub_progress 歸零。"""
+    from api.services.ic_analysis_service import _ws_stage_progress_fields
+
+    payload = {"stage": 0, "stage_name": "fallback", "progress": 0.02, "message": "切分不足…",
+               "fallback_reason": "rolling_warmup_insufficient",
+               "fallback_details": {"train_rows": 66, "test_rows": 13, "min_test_rows": 131}}
+    task_info = {"sub_progress": {"done": 5}}
+    _apply_stage_progress(task_info, payload, payload["message"])
+    assert task_info["fallback"] == {"reason": "rolling_warmup_insufficient", "details": payload["fallback_details"]}
+    assert task_info["sub_progress"] is None
+    assert _ws_stage_progress_fields(payload) == {"fallback_reason": payload["fallback_reason"], "fallback_details": payload["fallback_details"]}
+
+
+def test_cancel_task_states():
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    svc = ICAnalysisService()
+    assert svc.cancel_task("nope") is None
+    with svc._lock:
+        svc._tasks["t1"] = {"task_id": "t1", "status": "running"}
+        svc._tasks["t2"] = {"task_id": "t2", "status": "completed"}
+    assert svc.cancel_task("t1") == "cancel_requested" and svc._tasks["t1"]["cancel_requested"] is True
+    assert svc.cancel_task("t2") == "already_terminal"
+    st = svc.get_task_status("t1")
+    assert st["cancel_requested"] is True and st["fallback"] is None and st["warnings"] == []
+
+
 def test_real_fixture_analyze_emits_sub_progress_within_bounds():
     from tests.momentum.helpers.ichc_run import run_analyze
 

@@ -148,9 +148,16 @@ def _apply_stage_progress(task_info: Dict[str, Any], payload: Dict[str, Any], me
         code = str(payload["warning"])
         if not any(w.get("code") == code for w in warnings_list):
             warnings_list.append({"code": code, "detail": payload.get("warning_detail")})
+    if payload.get("fallback_reason"):
+        # 降級重跑**當下**就揭露（不等報告）；sub_progress 歸零，避免上一輪的「完成」殘留誤導
+        task_info["fallback"] = {"reason": str(payload["fallback_reason"]), "details": payload.get("fallback_details")}
+        task_info["sub_progress"] = None
 
 
-_WS_STAGE_PROGRESS_KEYS = ("sub_step", "sub_done", "sub_total", "eta_seconds", "eta_state", "warning", "warning_detail")
+_WS_STAGE_PROGRESS_KEYS = (
+    "sub_step", "sub_done", "sub_total", "eta_seconds", "eta_state", "warning", "warning_detail",
+    "fallback_reason", "fallback_details",
+)
 
 
 def _ws_stage_progress_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1384,6 +1391,10 @@ class ICAnalysisService:
             if loop.is_closed():
                 # 伺服器已關閉（Ctrl+C）：不再推送、不再洗版，讓分析執行緒在此回報點協作式中止
                 raise AnalysisCancelled("server event loop closed; aborting analysis at progress checkpoint")
+            with self._lock:
+                if (self._tasks.get(task_id) or {}).get("cancel_requested"):
+                    # 使用者按了取消：協作式，在下一個回報點停（預處理每 100 欄一點；其餘為階段邊界）
+                    raise AnalysisCancelled("cancelled by user")
             stage_name = payload.get("stage_name") or payload.get("stage")
             progress = float(payload.get("progress", 0.0))
             message = payload.get("message")
@@ -1647,6 +1658,19 @@ class ICAnalysisService:
 
             logger.info("IC analysis task completed: %s", task_id)
 
+        except AnalysisCancelled as exc:
+            logger.info("IC analysis task cancelled: %s (%s)", task_id, exc)
+            with self._lock:
+                task_info = self._tasks.get(task_id)
+                if task_info:
+                    task_info["status"] = "cancelled"
+                    task_info["current_stage"] = "cancelled"
+                    task_info["error"] = f"已取消：{exc}"
+            self._notify_callbacks(task_id, {
+                "task_id": task_id, "stage": "cancelled", "progress": task_info.get("progress", 0.0) if task_info else 0.0,
+                "message": f"已取消：{exc}", "status": "cancelled",
+            })
+            return
         except Exception as exc:
             logger.error("IC analysis task failed: %s", exc, exc_info=True)
 
@@ -1665,6 +1689,21 @@ class ICAnalysisService:
                 "message": str(exc),
                 "status": "failed",
             })
+
+    def cancel_task(self, task_id: str) -> Optional[str]:
+        """要求協作式取消：回傳 None（無此任務）／"already_terminal"／"cancel_requested"。
+
+        Python 殺不掉正在算的執行緒，只能在下一個進度回報點停（預處理每 100 欄一點、其餘為階段邊界）；
+        取消後狀態變 `cancelled`（非 failed）。
+        """
+        with self._lock:
+            task_info = self._tasks.get(task_id)
+            if not task_info:
+                return None
+            if task_info.get("status") in ("completed", "failed", "cancelled"):
+                return "already_terminal"
+            task_info["cancel_requested"] = True
+            return "cancel_requested"
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get task status."""
@@ -1691,6 +1730,9 @@ class ICAnalysisService:
                 # EVTALIGN Task 4.1：階段內進度與 WARN（未到／沒有 ⇒ None／[]，不填假值）
                 "sub_progress": task_info.get("sub_progress"),
                 "warnings": list(task_info.get("warnings") or []),
+                # 降級重跑之原因（進行中即有；沒有降級 ⇒ None）
+                "fallback": task_info.get("fallback"),
+                "cancel_requested": bool(task_info.get("cancel_requested")),
             }
             # 🔴 `GAP3_EVENT_DISCLOSURE` Task 1.3：降級原因**刻意不進 task status**。
             #    它住 `report.metadata.oos_downgrade`（orchestrator 之單一寫出點），

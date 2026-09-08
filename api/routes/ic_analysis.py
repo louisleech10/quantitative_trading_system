@@ -331,6 +331,18 @@ async def get_task_status(task_id: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.post("/task/{task_id}/cancel")
+async def cancel_task(task_id: str):
+    """要求取消 IC 分析（協作式：在下一個進度回報點停；預處理每 100 欄一點，其餘為階段邊界）。"""
+    outcome = ic_analysis_service.cancel_task(task_id)
+    if outcome is None:
+        raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+    if outcome == "already_terminal":
+        raise HTTPException(status_code=409, detail="任務已結束，無法取消")
+    return {"task_id": task_id, "status": "cancel_requested",
+            "note": "將在下一個進度回報點停止（預處理每 100 個特徵一點，其餘為階段邊界）"}
+
+
 @router.get("/result/{task_id}")
 async def get_result(task_id: str, schema_version: Optional[int] = Query(None)):
     """Get IC analysis result."""

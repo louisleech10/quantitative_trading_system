@@ -81,6 +81,12 @@ composer／grok 判可合併、零 finding；codex 兩條 P2（第 4 段進度�
 （`_after_column` 於處理後發；下界改 `min(3,total)`；`tests/api/test_stage_progress.py` 加 n∈{1,2,3} 與 done＝已處理欄數 spy，rc=0）。
 三家一致 B5 落點維持 service。reconcile `handoffs/reconcile/20260908-evtalign-x-review-r4/synth.md`（F1／F2）；debt 已清。
 
+## UAT 實機修補（2026-09-08 晚，使用者在線）
+① 兩個 next dev 互蓋 `.next`（環境，非碼）②WS 未轉發 `sub_*`（`6bdda097`）③`/task` 404 終態（`0a6a56b1`）
+④Ctrl+C 後協作式中止 `AnalysisCancelled`（`2b96a899`）⑤rolling warmup **預檢**移到預處理前（`_precheck_rolling_warmup`，
+規則與 stage4 同一份 `_rolling_warmup_min_rows`）＋降級原因即時推送（`fallback_reason`）＋`POST /task/{id}/cancel`＋前端取消鈕／
+紅字說明＋`ICTaskStatusResponse` 補 `sub_progress/warnings/fallback/cancel_requested`（response_model 會濾掉未宣告欄）。
+
 ## 下一步
 **使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
 UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
