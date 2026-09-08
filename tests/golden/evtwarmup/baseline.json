@@ -1,0 +1,73 @@
+{
+ "event_run": {
+  "analysis_status": "degraded_full_sample",
+  "event_filter_label_source": "event_label_value",
+  "event_filter_tier": "low_confidence",
+  "ic_train_test_split": {
+   "applied": false,
+   "details": {
+    "min_test_rows": 131,
+    "test_rows": 13,
+    "train_rows": 1356
+   },
+   "oos_guarantees": false,
+   "reason": "rolling_warmup_insufficient",
+   "requested": true,
+   "scope": "full_sample_legacy"
+  },
+  "n_summary_rows": 14,
+  "oos_downgrade": {
+   "min_test_rows": 131,
+   "reason": "rolling_warmup_insufficient",
+   "test_rows": 13,
+   "train_rows": 1356
+  },
+  "oos_guarantees": false
+ },
+ "facts": {
+  "adjusted_windows_1h": [
+   252,
+   756,
+   1512
+  ],
+  "adjusted_windows_default": [
+   21,
+   63,
+   126
+  ],
+  "engine_timeframe_attr": null,
+  "engine_timeframe_key_present": false,
+  "icir_min": 0.5,
+  "min_events": 30,
+  "reference_tf": "12h"
+ },
+ "global_run": {
+  "analysis_status": "ok_oos",
+  "event_filter_label_source": null,
+  "event_filter_tier": null,
+  "ic_train_test_split": {
+   "applied": true,
+   "effective_horizon": 5,
+   "embargo": 0,
+   "expected_freq": "0 days 12:00:00",
+   "index_kind": "positional",
+   "oos_guarantees": true,
+   "purge_gap": 5,
+   "requested": true,
+   "scope": "train_test_holdout",
+   "test_rows": 335,
+   "test_time_bounds": [
+    "2025-11-11 12:00:00",
+    "2026-04-27 12:00:00"
+   ],
+   "train_rows": 1356,
+   "train_time_bounds": [
+    "2024-01-01 00:00:00",
+    "2025-11-08 12:00:00"
+   ]
+  },
+  "n_summary_rows": 14,
+  "oos_downgrade": null,
+  "oos_guarantees": true
+ }
+}
