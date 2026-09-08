@@ -86,6 +86,38 @@ def test_precheck_event_conditional_skips_bar_warmup_but_global_keeps_it():
     assert o._precheck_rolling_warmup(features, config, dict(ctx), ev, event_conditional=False) is not None
 
 
+def test_precheck_mainline_keeps_bar_rows_even_with_timestamps():
+    """R4 CODEX-R4-P2-02：主線（event_conditional=False）給了 timestamps 也不得以事件交集覆蓋 bar 列數。"""
+    config = _config(False)
+    o = ICFilterOrchestrator(config)
+    n = 200
+    idx = pd.Index(1_704_067_200 + np.arange(n, dtype=np.int64) * 43_200, name="timestamp")
+    features = pd.DataFrame({"f1": np.arange(n, dtype=float)}, index=idx)
+    test_mask = np.zeros(n, dtype=bool)
+    test_mask[-50:] = True
+    ctx = {"train_mask": ~test_mask, "test_mask": test_mask, "effective_horizon": 5}
+    ev = [int(idx[i]) * 1000 for i in range(n - 3, n)]
+    out = o._precheck_rolling_warmup(features, config, ctx, ev, event_conditional=False)
+    assert out is not None and out["test_rows"] == 50 and ctx["test_events"] is None
+    ctx2 = dict(ctx)
+    assert o._precheck_rolling_warmup(features, config, ctx2, ev, event_conditional=True) is None and ctx2["test_events"] == 3
+
+
+def test_refilter_uses_same_scores_helper_as_analyze():
+    """R4 CODEX-R4-P1-01：analyze 與 refilter 之 stage6 分數字典同源——事件路徑 ic_mean、全域 icir。"""
+    import inspect
+
+    o = ICFilterOrchestrator(load_ic_config())
+    stage5 = {"summary_table": [{"feature_name": "a", "ic_mean": 0.1, "icir": None}, {"feature_name": "b", "ic_mean": 0.2, "icir": 0.9}]}
+    icir = {"a": {"icir": 9.0}, "b": {"icir": 0.9}}
+    ev_scores, ev_tb = o._redundancy_scores({"label_source": "event_label_value"}, stage5, icir)
+    gl_scores, gl_tb = o._redundancy_scores({"label_source": "mainline_return_N"}, stage5, icir)
+    assert ev_scores == {"a": 0.1, "b": 0.2} and ev_tb == "ic_mean"
+    assert gl_scores is icir and gl_tb is None
+    src = inspect.getsource(ICFilterOrchestrator.refilter)
+    assert "_redundancy_scores(" in src and 'self._ic_cache["icir"],\n            metadata' not in src
+
+
 # ───────────── Task 1.2：min_test_events 地板（真實 la0 fixture）─────────────
 
 def _event_run(n_events: int, min_events: int = 30, min_test_events: int = 30) -> dict:
@@ -137,6 +169,17 @@ def test_min_test_events_floor_disabled_gives_oos():
     m = rep["metadata"]
     assert m["ic_train_test_split"]["applied"] is True and m["ic_train_test_split"]["oos_guarantees"] is True
     assert "oos_downgrade" not in m and rep["analysis_status"] == "ok_oos"
+
+
+def test_event_path_without_split_still_discloses_window_and_icir_role():
+    """R4 CODEX-R4-P2-03：ic_train_test_split=False 之事件 run 仍須有 ic_window_disclosure（與切分無關）。"""
+    lv, owners = _event_inputs(80)
+    rep = run_analyze({"ic_train_test_split": False, "event_filter": {"enabled": True, "min_events": 30, "min_test_events": 30}},
+                      event_timestamps=list(lv), event_label_values=lv, event_label_owners=owners, event_context=CTX)
+    m = rep["metadata"]
+    assert m["event_filter"]["label_source"] == "event_label_value"
+    assert m["ic_window_disclosure"]["icir_role"] == "diagnostic" and m["tiebreaker_effective"] == "ic_mean"
+    assert "oos_downgrade" not in m or m["oos_downgrade"].get("reason") != "insufficient_test_events"
 
 
 def test_abandoned_conditional_path_is_not_flagged_insufficient_test_events():

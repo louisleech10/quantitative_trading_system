@@ -1248,13 +1248,15 @@ class ICFilterOrchestrator:
                         "IC holdout kept but test-segment events insufficient: test_events=%s min_test_events=%s "
                         "(oos_guarantees=false; no full-sample rerun)", test_events, min_test_events,
                     )
-                # 事件路徑視窗尺度揭露（只事件路徑寫；全域待 TFWINDOW 重凍 golden 時一併進）
-                metadata = dict(metadata)
-                metadata["ic_window_disclosure"] = {
-                    "window_unit": "bars_unadjusted",
-                    "timeframe_adjustment": "not_applied",
-                    "icir_role": "diagnostic",
-                }
+        # 事件路徑視窗尺度揭露——與切分無關（R4 CODEX-R4-P2-03：ic_train_test_split=False 亦須揭露）；
+        # 只事件路徑寫；全域待 TFWINDOW 重凍 golden 時一併進
+        if self._is_event_conditional_consumed(event_info):
+            metadata = dict(metadata)
+            metadata["ic_window_disclosure"] = {
+                "window_unit": "bars_unadjusted",
+                "timeframe_adjustment": "not_applied",
+                "icir_role": "diagnostic",
+            }
 
         features_df, metadata, feature_filter_info = self._apply_feature_filter(
             features_df, metadata, config.feature_filter
@@ -1318,15 +1320,10 @@ class ICFilterOrchestrator:
         self._report_progress(6, "redundancy", 0.82, "removing redundancy")
         # EVTWARMUP Task 2.1：事件路徑 ICIR 多為非有限（redundancy `_score_value` 會給 -inf）⇒ tiebreaker 改吃 ic_mean；
         # 全域路徑一字不改（redundancy_filter.py 不改，改呼叫端傳的分數字典）。
-        redundancy_scores = ic_results["icir"]
-        if self._is_event_conditional_consumed(event_info):
-            redundancy_scores = {
-                str(row.get("feature_name")): row.get("ic_mean")
-                for row in (stage5_results.get("summary_table") or [])
-                if isinstance(row, dict)
-            }
+        redundancy_scores, tiebreaker_effective = self._redundancy_scores(event_info, stage5_results, ic_results["icir"])
+        if tiebreaker_effective is not None:
             metadata = dict(metadata)
-            metadata["tiebreaker_effective"] = "ic_mean"
+            metadata["tiebreaker_effective"] = tiebreaker_effective
         stage6_results = self._stage6_redundancy(
             features_df,
             stage5_results["passed_features"],
@@ -2176,10 +2173,14 @@ class ICFilterOrchestrator:
             metadata=metadata,
         )
 
+        # EVTWARMUP（R4 CODEX-R4-P1-01）：refilter 與首跑同一 helper——事件路徑吃 ic_mean，全域吃 icir
+        refilter_scores, _tb = self._redundancy_scores(
+            self._ic_cache.get("event_info", {}), stage5_results, self._ic_cache["icir"]
+        )
         stage6_results = self._stage6_redundancy(
             self._ic_cache["features_df"],
             stage5_results["passed_features"],
-            self._ic_cache["icir"],
+            refilter_scores,
             metadata,
             split_context=split_context,
         )
@@ -3241,6 +3242,23 @@ class ICFilterOrchestrator:
         """stage3 之後：只認產生者標記 `label_source == "event_label_value"`（事件不足棄條件後為 mainline ⇒ False）。"""
         return bool(event_info) and event_info.get("label_source") == "event_label_value"
 
+    def _redundancy_scores(
+        self, event_info: Optional[dict], stage5_results: dict, icir_scores: dict
+    ) -> tuple[dict, Optional[str]]:
+        """stage6 冗餘之分數字典（analyze／refilter **同一**入口，R4 `CODEX-R4-P1-01`）。
+
+        事件條件 IC 路徑：ICIR 多為非有限（`redundancy_filter._score_value` 會給 -inf）⇒ 改吃 stage5 summary 之 `ic_mean`，
+        回 `("ic_mean")` 供 `metadata.tiebreaker_effective`；全域路徑：原樣 `icir_scores`、回 None（不寫鍵）。
+        """
+        if not self._is_event_conditional_consumed(event_info):
+            return icir_scores, None
+        scores = {
+            str(row.get("feature_name")): row.get("ic_mean")
+            for row in ((stage5_results or {}).get("summary_table") or [])
+            if isinstance(row, dict)
+        }
+        return scores, "ic_mean"
+
     def _rolling_warmup_min_rows(self, config: ICConfig, effective_horizon: int) -> int:
         """stage4 與預檢共用的**同一條**規則：max(依週期換算之 rolling 視窗) ＋ effective_horizon。"""
         adjusted = self._ic_engine._adjust_rolling_windows(config.ic_calculation.rolling_windows)
@@ -3265,7 +3283,8 @@ class ICFilterOrchestrator:
         test_mask = np.asarray(split_context["test_mask"], dtype=bool)
         train_mask = np.asarray(split_context["train_mask"], dtype=bool)
         test_rows = int(test_mask.sum())
-        if event_timestamps:
+        # R4 CODEX-R4-P2-02：只有事件條件 IC 路徑才以「事件 ∩ 測試段」計數；主線（disabled／空值／棄條件）保留 bar 列數
+        if event_timestamps and event_conditional:
             ts_arr = np.asarray(list(event_timestamps))
             if np.issubdtype(ts_arr.dtype, np.number):
                 max_abs = float(np.nanmax(np.abs(ts_arr.astype(float)))) if len(ts_arr) else 0.0
