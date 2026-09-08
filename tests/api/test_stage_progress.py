@@ -144,6 +144,21 @@ def test_service_stores_sub_progress_and_dedupes_warnings():
     assert "status" not in task_info                  # WARN 不改 status、不擋
 
 
+def test_ws_payload_forwards_sub_progress_and_warning_fields():
+    """UAT B29（2026-09-08 實機）：WS 只轉發固定欄位 ⇒ 前端永遠看不到 sub_progress。轉發集合須與 task_info 那條同源。"""
+    from api.services.ic_analysis_service import _ws_stage_progress_fields
+
+    payload = {"stage": 1, "stage_name": "preprocessing", "progress": 0.1, "message": "m",
+               "sub_step": "winsorize", "sub_done": 100, "sub_total": 39373, "eta_seconds": None, "eta_state": "estimating",
+               "warning": "memory_pressure_observed", "warning_detail": {"reason": "swap_growth"}}
+    out = _ws_stage_progress_fields(payload)
+    assert out == {k: payload[k] for k in ("sub_step", "sub_done", "sub_total", "eta_seconds", "eta_state", "warning", "warning_detail")}
+    assert _ws_stage_progress_fields({"stage": 1, "progress": 0.1}) == {}     # 沒有就不補 None
+    task_info: dict = {}
+    _apply_stage_progress(task_info, payload, "m")
+    assert task_info["sub_progress"]["total"] == out["sub_total"]              # 兩條通道同源
+
+
 def test_real_fixture_analyze_emits_sub_progress_within_bounds():
     from tests.momentum.helpers.ichc_run import run_analyze
 

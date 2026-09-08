@@ -149,6 +149,18 @@ def _apply_stage_progress(task_info: Dict[str, Any], payload: Dict[str, Any], me
             warnings_list.append({"code": code, "detail": payload.get("warning_detail")})
 
 
+_WS_STAGE_PROGRESS_KEYS = ("sub_step", "sub_done", "sub_total", "eta_seconds", "eta_state", "warning", "warning_detail")
+
+
+def _ws_stage_progress_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """EVTALIGN Task 4.1：orchestrator progress payload 中要**原樣轉發到 WebSocket** 的階段內進度／WARN 欄位。
+
+    只轉發存在的鍵（沒有就不補 None——前端以 `typeof sub_total === 'number'` 判斷）。與 `_apply_stage_progress`（寫 task_info）
+    是同一組來源欄位，兩條通道不得漂移。
+    """
+    return {k: payload[k] for k in _WS_STAGE_PROGRESS_KEYS if k in payload}
+
+
 def _inject_isolation_source(staged: Dict[str, Any], report: Any) -> None:
     """EVTALIGN Task 5.1：事件分析之隔離區兩塊來源分開揭露 → `report.metadata.isolation`。
 
@@ -1400,6 +1412,8 @@ class ICAnalysisService:
             if "scan_total" in payload:
                 notify_payload["scan_done"] = payload.get("scan_done")
                 notify_payload["scan_total"] = payload.get("scan_total")
+            # EVTALIGN Task 4.1（UAT B29 實機抓到）：WS 是前端正常路徑的唯一來源，sub_*／warning 不轉發 ⇒ 畫面永遠看不到
+            notify_payload.update(_ws_stage_progress_fields(payload))
             loop.call_soon_threadsafe(self._notify_callbacks, task_id, notify_payload)
 
         try:
