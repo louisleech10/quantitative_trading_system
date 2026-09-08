@@ -25,5 +25,6 @@
   ],
   "freeze_ts": "2026-09-08T00:23:07Z",
   "closure_state": "FROZEN",
-  "mode": "discovery"
+  "mode": "review",
+  "round_id": "eab4c673-a625-425e-9c31-695d7156da41"
 }
