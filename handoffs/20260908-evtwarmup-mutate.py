@@ -65,7 +65,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
              [*PYTEST, T, "-k", "global_run_unchanged or abandoned"], "全域／棄條件也標 icir_role=diagnostic ⇒ 全域 threshold 斷言紅"),
     # ── Phase 3：TFWINDOW Task 3.1 ─────────────────────────────────────────
     Mutation("T1-timeframe-injection-removed", 3, ORCH,
-             '        _tf_adjust = self._ic_engine.set_timeframe(metadata.get("timeframe") if isinstance(metadata, dict) else None)\n',
+             '        _tf_adjust = self._ic_engine.set_timeframe(\n            metadata.get("timeframe") if isinstance(metadata, dict) else None,\n            reference_tf=config.ic_calculation.icir.reference_tf,\n        )\n',
              '        _tf_adjust = "applied"\n',
              [*PYTEST, "tests/api/test_tfwindow.py", "-k", "window_keys"], "注入拿掉 ⇒ 1h 視窗鍵仍 [21,63,126] ⇒ 主 gate 紅（引擎層測試仍綠）"),
     Mutation("T2-missing-timeframe-fake-applied", 3, "momentum/Analysis/ic_engine.py",

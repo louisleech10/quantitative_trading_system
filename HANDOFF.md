@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-09 凌晨｜狀態：EVTALIGN 五批＋EVTWARMUP 兩批（含 TFWINDOW）皆已實作 commit；code review R5 進行中；使用者 UAT B26–B33 待驗。**
+**更新：2026-09-09 凌晨｜狀態：EVTALIGN 五批＋EVTWARMUP 兩批（含 TFWINDOW）實作完成；TFWINDOW code review R5 四條已修（`26076e40`）、債清；使用者 UAT B26–B33 待驗。**
 
 ## 使用者最後兩條指示（逐字）
 > 「那這個修正後的排序改SPEC。B26/B27等上述完成後再驗收。我要先睡了」
@@ -110,11 +110,16 @@ B1 commit `39b48531`＋`1a2cfd90`（M6 紅錨補強）；`evtwarmup_phase_gate.s
 ②1h golden 值比對用 canonical-JSON sha 代替 `atol=1e-12`。`test_oos_applied_true_when_sufficient` 1h fixture 760→8500 根（門檻 1517）。
 既有紅：`test_ic_1a_cut1_oos::test_flag_toggles_path` 於 HEAD~1 亦紅（未登記，R5 必答 7 裁定是否登記）。
 gate 3 PASS（T1／T2 紅、C1 綠；`handoffs/run_receipts/tfwindow_mutate_phase3.log`）。白話 B33 已寫。
-**code review R5 派出中**（session `20260909-evtwarmup-x-review-r5`，brief `handoffs/20260909-EVTWARMUP-X-REVIEW-R5-BRIEF.md`，債 round `4f359ce8`）。
+**R5 完成**（`handoffs/reconcile/20260909-evtwarmup-x-review-r5/synth.md` Z1–Z5；債清）：grok 零 finding、composer 2 P2、codex 2 P1＋2 P2，無 P0，
+四條皆我自造、已修（commit `26076e40`）：①探針對照已被 `--write` 覆蓋的 pre ⇒ 改對照不可變 `tests/golden/tfwindow/gap2_pre_disclosure.sha`；
+②`0h`／`-1h`／`infh`／`nanh` 被當 applied ⇒ 合法＝有限正數，非法 reference 第四值 `not_applied:invalid_reference_tf`；
+③`config_override` 改 `reference_tf` 未進引擎 ⇒ `set_timeframe(tf, reference_tf=)`；④1h golden 加鎖 status／reason／split 列數／特徵名。
+SPEC 邊界③④改寫（analyze 層切分先 fail-closed、引擎層才 `not_applied:*`；三家一致）；殘留 `TW-RESID-2`（pinned-sha 代 atol）、`TW-RESID-3`（`test_flag_toggles_path` 既有紅）。
+codex 反例期望 `[2,5,11]` 實為 `[2,5,10]`（126/12=10.5 半偶捨入，既有行為）。mutation T3／T4 加入 phase 3。
 
 ## 下一步
-R5 收斂（`reconcile_build.sh 20260909-evtwarmup-x-review-r5 <三檔>` → synth → `debt_clear.sh` → `gate.sh register-output`）＋修 finding
-→ 使用者 UAT B26–B33（後端須重啟才吃新碼）→ EVTWARMUP 收案（UAT＋EW-RESID-1..6＋TW-RESID-1 登記）。
+gate 3 重跑 receipt（`handoffs/run_receipts/tfwindow_gate3_r5.log`）→ push → **使用者 UAT B26–B33**（後端須重啟才吃新碼）
+→ EVTWARMUP 收案 stamp 輪（三家以 R5 同一反例複驗：probe rc、`0h`／`infh` 注入、override `reference_tf=1h`）＋ EW-RESID-1..6／TW-RESID-1..3 登記。
 **使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
 UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
 
