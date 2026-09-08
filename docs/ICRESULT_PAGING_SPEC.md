@@ -1,121 +1,136 @@
-# ICRESULT_PAGING — IC 結果分頁與按需載入 — SPEC
+# ICRESULT_PAGING — IC 結果分頁與按需載入 — SPEC（R1 修訂）
 
-> 來源 PLAN/診斷：UAT 2026-09-09（使用者：「網頁顯示 30K 多的特徵，整個網頁很慢，幾乎不會動」）　|　日期：2026-09-09　|　對應 TODO：`docs/ICRESULT_PAGING_TODO.md`
+> 來源 PLAN/診斷：UAT 2026-09-09（使用者：「網頁顯示 30K 多的特徵，整個網頁很慢，幾乎不會動」）　|　日期：2026-09-09（R1 修訂）　|　對應 TODO：`docs/ICRESULT_PAGING_TODO.md`
+> R1 修訂來源：`handoffs/reconcile/20260909-icresultpaging-x-review-r1/synth.md`（三家：P0＝G-4∩G-5 互斥；P1＝白名單來源／refilter 世代／排序語意／匯出重做／G-1 canonical≠raw）。
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大。
-- **命中高風險原則**：(b) 跨模組共用路徑——`GET /result/{task_id}` 為前端、匯出、golden replay、`test_ic1d_baseline`／survivor 契約測試之共用出口；改動面橫跨 `api/routes`＋`api/services`＋`api/models`＋`frontend`。不命中 (a)(d)：**不改任何數值、不改報告落檔、不改 orchestrator**——只改搬運方式。
+- **命中高風險原則**：(b) 跨模組共用路徑——`GET /result/{task_id}` 為前端、匯出、golden replay、`test_ic1d_baseline`、survivor 契約測試之共用出口；改動面橫跨 `api/routes`＋`api/services`＋`api/models`＋`frontend`。不命中 (a)(d)：**不改任何數值、不改報告落檔、不改 orchestrator**——只改搬運方式。
 - **RISK-HIT 宣告**（機檢依據，缺行 FAIL）：
 RISK-HIT: b
 - 命中 (a) 或 (d) → 否；§G 仍填（改前==改後之位元組級／集合級對照是本票唯一防假綠手段）。
 
 ## §A 假設與待使用者確認（事故：拿推論代替問人）
-- **已核實事實**（FACT-RECEIPT 七條如下，主委實跑 2026-09-09）：
-  - FACT-RECEIPT: `ls -la data_cache/reports/ic_report_ic_gatekeeper.json` → 印出 `118894891`（118.9 MB；Claude 實跑 2026-09-09）
-  - FACT-RECEIPT: `jq -c '{st:(.summary_table|length), rs:(.rolling_ic_series|length)}'` → 印出 `{"st":39346,"rs":39346}`（Claude 實跑 2026-09-09）
-  - FACT-RECEIPT: 各段 `jq -c ".<k>" | wc -c` → `turnover_analysis 50938089`、`ic_decay 16436560`、`summary_table 14544874`、`grouped_ic 9745300`、`quantile_returns 8679685`、`metadata 8417776`、`rolling_ic_series 3643397`、`coverage_analysis 3644737`、`filter_log 3282725`、`correlation_matrix 28`（Claude 實跑 2026-09-09）
-  - FACT-RECEIPT: `jq -r '.metadata | keys | length'` → 印出 `39398`；前 12 大鍵＝`selection_scope 3273340` 之後全是 per-feature 描述子（`{category,layer,name}` 各 111 bytes × 39,346）（Claude 實跑 2026-09-09）⇒ **metadata 被 per-feature 描述子扁平污染**，光 metadata 就 8.4 MB
-  - FACT-RECEIPT: `grep -n 'sortedData.map' frontend/src/components/ic-analysis/ICSummaryTable.tsx` → 印出 `360:                {sortedData.map((item, index) => {`；`selectedFeatures.includes(item.feature_name)` 逐列（Claude 實跑 2026-09-09）⇒ 全量 DOM＋O(n²) 勾選
-  - FACT-RECEIPT: `grep -n 'requestJson<ICReport>' frontend/src/hooks/useICAnalysis.ts` → 印出 `103: … /result/${taskId}` 與 `598: … /refilter?task_id=`（Claude 實跑 2026-09-09）⇒ 前端兩處吃整份報告
-  - FACT-RECEIPT: `api/services/ic_analysis_service.py:1789` `if not settings.ic_response_v2 or schema_version != 2: return normalized` 且 `api/core/config.py:76` `ic_response_v2: bool = Field(default=False, …)`（Claude 讀碼 2026-09-09）⇒ 既有 `schema_version=2` top-N 路徑**預設關閉且前端從未呼叫**；其回應只有 `top_n_summary`＋`artifact_uri`，不含圖表所需各段 ⇒ 不能直接拿來當本票解
-  - FACT-RECEIPT: `grep 'report?\.' frontend/src/app/ic-analysis/page.tsx` → 頁面消費 11 段：`summary_table`／`filter_log`／`metadata`／`ic_decay`／`quantile_returns`／`grouped_ic`／`turnover_analysis`／`rolling_ic_series`／`correlation_matrix`／`marginal_ic`／`cross_sectional_symbol_ic`；per-feature 四段（decay／quantile／turnover／rolling）皆以 `activeFeature` 取單鍵（Claude 實跑 2026-09-09）
+- **已核實事實**（FACT-RECEIPT 十條如下，主委實跑 2026-09-09）：
+  - FACT-RECEIPT: `ls -la data_cache/reports/ic_report_ic_gatekeeper.json` → 印出 `118894891`（118.9 MB）
+  - FACT-RECEIPT: `jq -c '{st:(.summary_table|length), rs:(.rolling_ic_series|length)}'` → 印出 `{"st":39346,"rs":39346}`
+  - FACT-RECEIPT: 各段 `jq -c ".<k>" | wc -c` → `turnover_analysis 50938089`、`ic_decay 16436560`、`summary_table 14544874`、`grouped_ic 9745300`、`quantile_returns 8679685`、`metadata 8417776`、`rolling_ic_series 3643397`、`coverage_analysis 3644737`、`filter_log 3282725`、`correlation_matrix 28`
+  - FACT-RECEIPT: `jq -r '.metadata | keys | length'` → 印出 `39398`；`selection_scope 3273340` bytes（鍵 `base_universe_hash,evaluated_features,method,n_tests,scope_id,split_label,universe_features`，兩 list 各 ~39k），其餘全是 per-feature 描述子（`{category,layer,name}` × 39,346）
+  - FACT-RECEIPT: `jq -c '[.filter_log[] | to_entries[] | select(.value|type=="object" or type=="array") | .key] | unique'` → 印出 `["consumed_event_labels","output_features","per_bar_validity","removed_features","removed_nan_features","skipped_winsorization","split_mask","winsorized_features"]`（`winsorized_features` array 1637874 bytes）
+  - FACT-RECEIPT: `venv/bin/python handoffs/_light_size_probe.py`（刪七段含 `grouped_ic`、metadata 顯式保留鍵、`selection_scope`／`filter_log` 集合值→計數、`summary_page` 首頁 50 列）→ 印出 `light_bytes 28019`（`summary_page 19446`、`metadata 7932`、`marginal_ic 1208`）
+  - FACT-RECEIPT: `grep -rhoE 'metadata[?]?\.[a-zA-Z_]+' frontend/src`（排除 test）→ IC 相關鍵：`oos_downgrade`、`period_alignment`、`isolation`、`ic_window_disclosure`、`event_filter`、`n_timestamps`、`n_symbols`、`mode`、`ic_train_test_split`、`survivor_output`、`compute_warnings`；後端 `survivor_contract.py:598,615` 讀 `selection_scope.scope_id`；service 讀 `symbol`／`timeframe`／`config_hash`／`period_alignment`／`isolation`／`ic_train_test_split`
+  - FACT-RECEIPT: `grep -n 'task_info\["result"\] =' api/services/ic_analysis_service.py` → `:1623`／`:2339`／`:2631`（refilter）⇒ completed 後 result **會被替換**，需世代戳
+  - FACT-RECEIPT: `frontend/src/components/ic-analysis/ICSummaryTable.tsx:91-106` `getSortValue` 非有限值→`-Infinity`、tie 回 0 無次鍵；`jq '[.summary_table[].icir]|map(select(.!=null))|length'` → `0`（39k run icir 全 null）⇒ 現行前端首列＝輸入序首列
+  - FACT-RECEIPT: `api/routes/ic_analysis.py:649-687` 既有 `GET /export/{task_id}/{format}`（`json`／`ai_json`／`csv_summary`／`csv_detailed`／`markdown`／`hdf5`），`ExportButtons.tsx:47-66` 已組該 URL；`summaryTable` prop 只用於 PNG 按鈕 disable
 - **待使用者確認**：`待確認：無`（技術取捨依 `feedback_delegate_technical_decisions` 交委員會；使用者已於 2026-09-09 白話段知悉方向：「後端只回摘要層、表格分頁、點到才拉、落檔不動」）。
 - **已確認結果**：`2026-09-09 使用者提出 UAT 症狀並要求修正；方向由 Claude 白話說明，未否決`。
 
 ## §C 約束（不重抄，引用 + 只列本任務相關）
 - 解耦 7 條；R4 服務不互 import；R7 DTO 不跨界（新回應模型放 `api/models/ic_models.py`，service 只回 dict）。
 - **不變式（本票紅線）**：
-  1. `GET /result/{task_id}`（無 `view` 參數）**位元組級不變**——golden replay、`test_ic1d_baseline`、survivor／contract 測試、匯出皆走此路，不得動。
-  2. 落檔 `ic_report_*.json` 與 orchestrator／reporter **一行不改**（`RISK-HIT: b` 不含 a/d 的憑據）。
-  3. 分頁／單特徵端點回的值必須是**同一份** `task_info["result"]` 的投影（不重算、不讀檔、不另存）；重組後與全量報告 **集合相等**（§G）。
+  1. `GET /result/{task_id}`（無 `view` 參數）**原始 HTTP body 位元組級不變**（G-1 以 raw bytes sha 驗，canonical sha 只作輔助；R1 `CODEX-R1-P1-04`）。
+  2. 落檔 `ic_report_*.json` 與 orchestrator／reporter **一行不改**。
+  3. 分頁／單特徵／light 端點回的值必須是**同一份** `task_info["result"]` 的投影（不重算、不讀檔、不另存）；重組後與全量報告 **集合相等**（§G）。
   4. 排序／篩選欄位**白名單**（封閉集合，機檢），非白名單 ⇒ 400；禁 eval／getattr 動態欄位。
   5. 前端**不得**在 light 視圖下靜默補值：缺段 ⇒ 顯示「按需載入中／不適用」，不填 0／[]。
-- 既有 caller／下游：`useICAnalysis.fetchResult`（`:103`）、`refilter`（`:598`）、`ExportButtons`（吃 `report.module_statuses`＋`summaryTable` prop）、`ScanCubeBrowser`（獨立端點，不動）、deep-analysis（獨立端點，不動）。
-- **新資料結構單一真相源**：分頁回應 schema 與白名單放 `api/models/ic_models.py`（pydantic）＋ `momentum/Analysis/contracts/ic_result_paging_contract.json`（白名單欄位、預設 `limit`、上限）；SPEC 只 pointer，不在散文列舉欄位。
+  6. **light 投影規則為封閉集合，全部住 contract JSON**（R1 P0）：(i) `drop_sections`（七段：`summary_table`／`ic_decay`／`quantile_returns`／`turnover_analysis`／`coverage_analysis`／`rolling_ic_series`／`grouped_ic`——`grouped_ic` 由 Task 1.2 單特徵投影供圖；R1 `GROK-R1-P2-02`）；(ii) `metadata` 只保留 `metadata_keep_keys`（**顯式列舉**＝前端＋後端消費者聯集，見 §A receipt；**不得**由 fixture 推導；R1 `CODEX-R1-P1-02`／`GROK-R1-P1-01`）；(iii) `collection_to_count_paths`（`filter_log.*`、`metadata.selection_scope`）：list／dict 值一律替換為 `<key>_count`（int），標量原樣；(iv) 加 `view`、`total_features`、`result_revision`、`summary_page`。
+  7. **結果世代戳**（R1 `CODEX-R1-P1-03`／`COMPOSER-R1-P1-02`／`GROK-R1-P2-01`）：service 對 `task_info["result"]` 每次寫入（完成／refilter／其他寫點）經單一 helper 遞增 `task_info["result_revision"]`（int，從 1 起）；light／summary／feature 回應皆帶 `result_revision`；summary／feature 請求可帶 `revision`，不符 ⇒ 409（回 `{current_revision}`）；前端 refilter 成功後 abort 所有進行中 summary／feature 請求並以新 revision 重拉。
+  8. **排序契約**（R1 `CODEX-R1-P1-04`／`COMPOSER-R1-P1-01`／`GROK-R1-P1-03`）：住 contract `sort_policy`——數值欄 comparator：缺值（None／NaN／±inf）**兩方向皆沉底**；主鍵依 `order`；並列 ⇒ 次鍵 `feature_name` 升冪（字串）；`sort_by=feature_name` 純字串比較。**明文宣告：分頁序取代前端本地序，允許與舊前端 stable 序不同**（含 icir 全 null 時首列改變）；`get_top_features`／`_sort_artifact_rows` 不動。
+- 既有 caller／下游：`useICAnalysis.fetchResult`（`:103`）、`refilter`（`:598`）、`ExportButtons`（匯出走 `/export/{id}/{format}` **不改**；R1 `CODEX-R1-P1-05`／`COMPOSER-R1-P1-03`／`GROK-R1-P1-02`）、`ScanCubeBrowser`（獨立端點，不動）、deep-analysis（獨立端點，不動）、`schema_version=2`（`IC_RESPONSE_V2`）並存：`view=light` 與 `schema_version=2` 同時給 ⇒ 400；flag on／off × view 有／無之四格矩陣測試。
+- **新資料結構單一真相源**：`momentum/Analysis/contracts/ic_result_paging_contract.json`（`sort_fields`、`order_values`、`limit_default`、`limit_max`、`drop_sections`、`metadata_keep_keys`、`collection_to_count_paths`、`per_feature_sections`、`sort_policy`）＋`api/models/ic_models.py`（pydantic 回應模型，由 contract 載入常數）；SPEC／TODO 只 pointer，不在散文第二次列舉。
 
 ## §G Golden / Baseline
 - **feature/kline 條件**：不涉 feature／kline 生成計算——略過三方 kline 簽核（§N）。
-- **凍結時機 / reference 設定**：動工前以 `tests/momentum/helpers/ichc_run.run_analyze`（ETHUSDT 12h la0 fixture）產一份全量報告存進 service 之 `task_info["result"]`（測試用 fake task），並以 `tests/golden/icresult_paging/full_report_projection.json` 凍結：`summary_table` 列數＋`feature_name` 集合 sha256＋各段鍵集 sha256＋整份 canonical sha（沿 `ichc_run.canonical_sha`）。
-- **baseline 內容**：
-  - B-1 預設 `/result` 回應 canonical sha（改前）；
-  - B-2 per-feature 四段＋`coverage_analysis` 之 `{feature: canonical sha(value)}` 對照表（抽樣 200 特徵＋全量 feature 集合 sha）。
+- **凍結時機 / reference 設定**：動工前以 `tests/momentum/helpers/ichc_run.run_analyze`（ETHUSDT 12h la0 fixture，14 特徵）產全量報告存進 fake task，凍結 `tests/golden/icresult_paging/full_report_projection.json`：`summary_rows`、`feature_set_sha256`、`section_key_sha256{段:sha}`、**全部**特徵之 `feature_samples{name:{段:sha}}`（fixture 小，不抽樣；R1 必答 6）、`raw_body_sha256`（TestClient `response.content`）、`report_canonical_sha`、`sort_golden`（`icir` desc／asc 前 5 列 `feature_name`＋人工構造 4 列並列 fixture 之雙向序）、`filter_log_light`（投影後全文）。
 - **通過條件（可證偽）**：
-  - G-1 改後預設 `/result` canonical sha == B-1（位元組級不變）。
-  - G-2 `/result/{id}/summary` 以 `limit=max` 逐頁抓完並依 `feature_name` 排序 == 全量 `summary_table` 依同鍵排序（列數、每列 dict 相等）。
-  - G-3 對 B-2 每個抽樣特徵，`/result/{id}/feature/{name}` 回的各段 == 全量報告該段 `[name]`（canonical sha 相等）。
-  - G-4 `view=light` 回應：`summary_table` 缺席或僅含首頁、per-feature 四段與 metadata per-feature 描述子缺席；其餘段（`filter_log`／`metadata` 非描述子鍵／`grouped_ic` 摘要／`marginal_ic`／`correlation_matrix`／`cross_sectional_*`／`module_statuses`／`analysis_status`／`oos_guarantees`）與全量報告**逐鍵相等**。
-  - G-5 尺寸：對 39,346 特徵之實機報告（`data_cache/reports/ic_report_ic_gatekeeper.json` 載入為 fake task），`view=light` 回應 canonical JSON ≤ **2 MB**；`summary?limit=50` ≤ 100 KB；`feature/{name}` ≤ 2 MB。超出即 FAIL 並列出最大段。
+  - G-1 改後預設 `/result` **raw body sha256 == golden `raw_body_sha256`**；canonical sha 亦相等（輔助）。
+  - G-2a 無篩選：`/summary` 以 `limit=limit_max` 逐頁抓完（同一 `result_revision`）並依 `feature_name` 排序 == 全量 `summary_table` 依同鍵排序（列數、每列 dict 相等）。G-2b 有篩選（`q`／`pass_class`）：逐頁串接 == 對同參數一次 `paginate_summary(limit=10**9)` 之結果（同 revision）。
+  - G-3 對 golden 每個特徵，`/feature/{name}` 各段 == 全量報告該段 `[name]`（canonical sha 相等）；`grouped_ic` 投影為 `{group: value_for_feature}`。
+  - G-4 `view=light`：(a) `drop_sections` 各段**缺席**；(b) `metadata` 鍵集 ⊆ `metadata_keep_keys` 且對 fixture 中存在者逐鍵相等（`selection_scope` 依 (iii) 投影後相等）；(c) `filter_log` == golden `filter_log_light`；(d) 其餘頂層段（`marginal_ic`／`correlation_matrix`／`cross_sectional_*`／`module_statuses`／`analysis_status`／`oos_guarantees`／`version`／`diversification_metrics`）逐鍵相等；(e) `summary_page` == `paginate_summary(sort_by=icir, order=desc, offset=0, limit=limit_default)`。
+  - G-5 尺寸（受控 artifact，**非 skip**）：對 `data_cache/reports/ic_report_ic_gatekeeper.json` 載入 fake task，light canonical JSON ≤ **262144 bytes**（實測 28019）、`summary?limit=50` ≤ 102400、任一 `feature/{name}` ≤ 2097152。artifact 缺席 ⇒ 測試 **FAIL 並標 `blocked-by:artifact`**（不 skip；R1 `CODEX-R1-P2-01`）；receipt `handoffs/run_receipts/icresult_size_budget.log`。
+  - G-6 排序：fixture `icir` desc／asc 首 5 列 `feature_name` == golden `sort_golden`；4 列並列 fixture（A、B 同有限值且 A<B 名序；C、D 為 None）：desc 序 == `[A,B,C,D]`、asc 序 == `[A,B,C,D]`（缺值兩向沉底、並列以名升冪）；另 3 列 fixture（A=0.5、B=0.9、C=None）：desc == `[B,A,C]`、asc == `[A,B,C]`。
+  - G-7 世代：TestClient 交錯（取 page1 → refilter → 取 page2 帶舊 `revision`）⇒ 409；不帶 `revision` ⇒ 回新 revision 且 `total` 為新值。
 
 ## §P Phase 與依賴
 
 ### Phase 1 — 後端投影端點（依賴：無）
-**Task 1.1 — summary 分頁端點**
-- 目標：`GET /result/{task_id}/summary?sort_by=&order=&offset=&limit=&pass_class=&q=` 回 `{total, offset, limit, sort_by, order, rows}`，只投影 `task_info["result"]["summary_table"]`。　檔案：`api/routes/ic_analysis.py::get_result_summary_page`、`api/services/ic_analysis_service.py::ICAnalysisService.get_result_summary_page`、`api/models/ic_models.py::ICSummaryPageResponse`、`momentum/Analysis/contracts/ic_result_paging_contract.json`（`sort_fields` 白名單、`limit_default=50`、`limit_max=500`、`q` 為 `feature_name` 子字串不分大小寫）。　既有 caller：新建無 caller。
-- 改法：service 讀 result → 白名單驗 `sort_by`（預設 `icir`）→ 排序 key 用既有 `_finite_or_neg_inf` 語意（None／NaN 沉底，與 `get_top_features` 一致）→ `pass_class`／`q` 篩選 → 切片。全程純函式 `paginate_summary(rows, params) -> page`（可單測，不碰 lock 以外狀態）。
-- **驗證**：`ASSERT venv/bin/python -m pytest tests/api/test_icresult_paging.py -k summary_page THEN rc=0`；G-2；`ASSERT curl /result/<id>/summary?sort_by=evil WHEN task=completed THEN rc=400`（以 TestClient 斷言 status 400）。
-- **邊界**：①result 尚未產生（running）⇒ 404 同 `/result`；②`offset ≥ total` ⇒ `rows=[]`、`total` 正確；③`limit>limit_max` ⇒ clamp 至 `limit_max` 並在回應 `limit` 回真值；④`icir` 全 None（事件路徑）⇒ 排序不拋、順序穩定（次鍵 `feature_name`）；⑤`q` 無命中 ⇒ `total=0`。
+**Task 1.0 — `result_revision` 世代戳**
+- 目標：`task_info["result"]` 每個寫點經單一 helper 遞增 `result_revision`；`/task/{id}` 回該值。　檔案：`api/services/ic_analysis_service.py::_set_result(task_info, report) -> int`（三寫點 `:1623`／`:2339`／`:2631` 改經 helper）；`api/models/ic_models.py::ICTaskStatusResponse.result_revision: Optional[int]`。　既有 caller：三寫點。
+- 改法：源碼守衛測試鎖「`task_info["result"] = ` 直接賦值出現次數 == 0（只准 helper 內一處）」。
+- **驗證**：`ASSERT venv/bin/python -m pytest tests/api/test_icresult_paging.py -k revision THEN rc=0`；G-7；源碼守衛計數 == 0。
+- **邊界**：①未完成 ⇒ `result_revision=None`；②refilter 失敗不遞增；③兩次 refilter ⇒ 3。
 - **存活至**：永久。　**覆蓋風險**：無。
-- 不可做：不讀 parquet artifact、不重算任何指標、不快取到檔案、不加 offset 以外的游標機制。
+- 不可做：不做 ETag／Cache-Control；不持久化 revision。
+
+**Task 1.1 — summary 分頁端點**
+- 目標：`GET /result/{task_id}/summary?sort_by=&order=&offset=&limit=&pass_class=&q=&revision=` 回 `{total, offset, limit, sort_by, order, result_revision, rows}`。　檔案：`api/services/ic_result_projection.py::paginate_summary`（純函式）、`api/services/ic_analysis_service.py::get_result_summary_page`、`api/routes/ic_analysis.py::get_result_summary_page`、`api/models/ic_models.py::ICSummaryPageResponse`。　既有 caller：新建無 caller。
+- 改法：白名單驗 `sort_by`／`order` → `sort_policy` comparator（§C-8）→ `pass_class` 精確／`q` 子字串不分大小寫 → 切片；`revision` 不符 ⇒ 409。
+- **驗證**：`ASSERT venv/bin/python -m pytest tests/api/test_icresult_paging.py -k summary_page THEN rc=0`；G-2a／G-2b／G-6；TestClient `sort_by=evil` ⇒ 400；`limit=99999` ⇒ 回 `limit == limit_max`。
+- **邊界**：①running ⇒ 404；②`offset ≥ total` ⇒ `rows=[]`；③`limit>limit_max` ⇒ clamp；④`icir` 全 None ⇒ 全部並列 ⇒ 依 `feature_name` 升冪（**有意行為變更**）；⑤`q` 無命中 ⇒ `total=0`；⑥`sort_by=feature_name` 字串序；⑦`revision` 不符 ⇒ 409。
+- **存活至**：永久。　**覆蓋風險**：無。
+- 不可做：不讀 parquet artifact、不重算、不快取到檔、不做游標。
 
 **Task 1.2 — 單特徵詳情端點**
-- 目標：`GET /result/{task_id}/feature/{feature_name}` 回該特徵之 `ic_decay`／`quantile_returns`／`turnover_analysis`／`coverage_analysis`／`rolling_ic_series`／`grouped_ic`（若為 per-feature map 則取該鍵；若為 SectionStatus 物件則原樣透傳）＋`summary_row`。　檔案：同 1.1 之 route／service；模型 `ICFeatureDetailResponse`。　既有 caller：新建無 caller。
-- 改法：純函式 `project_feature(report, name) -> dict`；`name` 不存在 ⇒ 404；段缺席 ⇒ 該鍵 `null`（不填 `{}`）。
+- 目標：`GET /result/{task_id}/feature/{feature_name}?revision=` 回 contract `per_feature_sections` 各段（`grouped_ic`→`{group: value}`）＋`summary_row`＋`result_revision`。　檔案：`api/services/ic_result_projection.py::project_feature`；route／service／模型 `ICFeatureDetailResponse`。　既有 caller：新建無 caller。
+- 改法：SectionStatus 物件透傳；缺 ⇒ `null`；`name` 不存在 ⇒ 404。
 - **驗證**：G-3；`ASSERT venv/bin/python -m pytest tests/api/test_icresult_paging.py -k feature_detail THEN rc=0`。
-- **邊界**：①特徵名含 URL 特殊字元（`-`／`_`／`.`／空白）⇒ path 解碼後精確匹配；②段為 SectionStatus（xsec 不適用）⇒ 透傳物件；③`rolling_ic_series[name]` 三窗皆空（1h fallback）⇒ 回空陣列不拋。
+- **邊界**：①特殊字元名精確匹配；②段為 SectionStatus ⇒ 透傳；③三窗皆空 ⇒ 空陣列；④`revision` 不符 ⇒ 409。
 - **存活至**：永久。　**覆蓋風險**：無。
-- 不可做：不做多特徵批次端點（前端一次只看一個）；不回整份 grouped_ic。
+- 不可做：不做批次；不回整份 grouped_ic。
 
 **Task 1.3 — `view=light` 摘要視圖**
-- 目標：`GET /result/{task_id}?view=light` 回全量報告**去除** per-feature 四段＋`coverage_analysis`＋`summary_table`（改為 `summary_page`＝1.1 首頁，`limit=50`，`sort_by=icir`）＋ metadata per-feature 描述子（只保留 `ic_result_paging_contract.json::metadata_keep_keys` 白名單鍵——封閉集合，機檢），並加 `view:"light"`、`total_features`。無 `view` ⇒ 行為不變（G-1）。　檔案：route `get_result`（加 `view: Optional[Literal["light"]]`）、service `project_light_view(report) -> dict`。　既有 caller：`useICAnalysis.fetchResult`／`refilter`（Phase 2 改）。
-- 改法：純函式；`deny_factor_in_ok_oos` 仍先跑（出口守衛不變）；`schema_version=2` 與 `view=light` 互斥（同時給 ⇒ 400）。
-- **驗證**：G-1、G-4、G-5；`ASSERT venv/bin/python -m pytest tests/api/test_icresult_paging.py -k light_view THEN rc=0`；`ASSERT venv/bin/python -m pytest tests/momentum/Analysis/test_gap2_golden.py tests/api/test_survivor_contract.py -q THEN rc=0`（既有出口不變）。
-- **邊界**：①report 為 `{"raw": …}` 非 dict ⇒ light 回 400（不猜）；②metadata 白名單鍵缺席 ⇒ 不補；③`summary_table` 空 ⇒ `summary_page.total=0`。
+- 目標：`GET /result/{task_id}?view=light` 依 §C-6 四條規則投影；無 `view` ⇒ G-1。　檔案：`api/services/ic_result_projection.py::project_light_view(report, contract)`；service `get_result(task_id, schema_version, view)`；route `get_result(view: Optional[Literal["light"]] = Query(None))`。　既有 caller：`useICAnalysis.fetchResult`／`refilter`（Phase 2a 改）。
+- 改法：`deny_factor_in_ok_oos` 先跑；`{"raw":…}` ⇒ 400；`view=light`＋`schema_version=2` ⇒ 400；投影純函式只讀 contract。
+- **驗證**：G-1、G-4、G-5；`ASSERT venv/bin/python -m pytest tests/api/test_icresult_paging.py -k light_view THEN rc=0`；`ASSERT venv/bin/python -m pytest tests/momentum/Analysis/test_gap2_golden.py tests/api/test_survivor_contract.py -q THEN rc=0`；v2 矩陣：`ASSERT TestClient GET /result/{id} WHEN IC_RESPONSE_V2=true schema_version=2 view=light THEN rc=400`；`ASSERT TestClient GET /result/{id} WHEN IC_RESPONSE_V2=false schema_version=2 view=none THEN rc=200`（回全量，既有行為）。
+- **邊界**：①`{"raw":…}` ⇒ 400；②保留鍵缺席不補；③`summary_table` 空 ⇒ `summary_page.total=0`；④`filter_log` 某 stage 無集合鍵 ⇒ 原樣。
 - **存活至**：永久。　**覆蓋風險**：無。
-- 不可做：不改預設回應一個 byte；不把 light 設為預設。
+- 不可做：不改預設回應一個 byte；不把 light 設預設；不在 light 內補值。
 
-### Phase 2 — 前端改吃投影（依賴：Phase 1）
-**Task 2.1 — hook／store 改 light＋分頁＋單特徵**
-- 目標：`fetchResult`／`refilter` 改打 `view=light`；新增 `fetchSummaryPage(params)`／`fetchFeatureDetail(name)`；store 加 `summaryPage`、`featureDetail`、`selectedFeatureSet: Set<string>`。　檔案：`frontend/src/hooks/useICAnalysis.ts`、`frontend/src/store/icAnalysisStore.ts`、`frontend/src/lib/types.ts`（`ICReportLight`、`ICSummaryPage`、`ICFeatureDetail`）。　既有 caller：`page.tsx`、`ExportButtons`、`ICSummaryTable`。
-- 改法：`activeFeature` 變更 ⇒ 拉 `feature/{name}`（去抖 150 ms、AbortController 取消前一請求）；圖表 props 改讀 `featureDetail`；`summaryTable` 消費者改讀 `summaryPage.rows`。
-- **驗證**：`ASSERT (cd frontend && npx vitest run src/hooks src/store) THEN rc=0`；`npx tsc --noEmit` 錯誤數 == 既有 8（不增）。
-- **邊界**：①切換特徵時上一請求未回 ⇒ 取消，不覆蓋新特徵；②`feature` 404 ⇒ 圖表區顯示「此特徵無詳情」不填假資料；③refilter 後 `summaryPage` 重置到第 1 頁。
+### Phase 2a — 前端表格切換（依賴：Phase 1）
+**Task 2.1 — hook／store／types 改 light＋分頁＋單特徵**
+- 目標：`fetchResult`／`refilter` 改 `view=light`；新增 `fetchSummaryPage`／`fetchFeatureDetail`（帶 `revision`）；store 持 `reportLight`、`summaryPage`、`featureDetail`、`resultRevision`、`selectedFeatureSet: Set<string>`。　檔案：`frontend/src/hooks/useICAnalysis.ts`、`frontend/src/store/icAnalysisStore.ts`、`frontend/src/lib/types.ts`。　既有 caller：`page.tsx`、`ExportButtons`、`ICSummaryTable`。
+- 改法：回應 `view !== 'light'` ⇒ `setError('後端版本過舊')` 不吃全量；refilter 成功 ⇒ abort 全部進行中 summary／feature 請求、`resultRevision` 更新、offset 歸 0；409 ⇒ 以回應 `current_revision` 重拉一次，再 409 ⇒ 顯示錯誤不迴圈。
+- **驗證**：`ASSERT (cd frontend && npx vitest run src/hooks src/store) THEN rc=0`；`npx tsc --noEmit -p tsconfig.json` 之 `error TS` 計數 == 8。
+- **邊界**：①切換特徵時前請求未回 ⇒ abort；②detail 404 ⇒ 「此特徵無詳情」；③409 重拉一次上限。
 - **存活至**：永久。　**覆蓋風險**：無。
-- 不可做：不在前端做任何排序／篩選（全交後端）；不保留整份報告在 store。
+- 不可做：不在前端排序／篩選；不保留整份報告；不 polyfill 舊後端。
 
-**Task 2.2 — 表格分頁化**
-- 目標：`ICSummaryTable` 改為伺服器分頁（每頁 50，可切 100／200），排序按鈕改觸發 API `sort_by/order`，搜尋框接 `q`，`pass_class` 篩選接 API；勾選改 `Set`。　檔案：`frontend/src/components/ic-analysis/ICSummaryTable.tsx`、`page.tsx`。　既有 caller：`page.tsx`（`onSelectFeatures` 全選＝當頁全選，並顯示「已選 N／共 total」）。
-- 改法：移除 `sortedData` 全量排序；DOM 列數 ≤ `limit`。
-- **驗證**：vitest：render 39,346 列 fake page 回應（`total=39346, rows=50`）⇒ DOM `<tr>` 數 == 51（含表頭）；勾選 200 次 ⇒ 每次 O(1)（以 `Set.has` spy 斷言不呼叫 `Array.includes`）；`ICSummaryTable.icirNull.test.tsx` 既有斷言不變。
-- **邊界**：①`total=0` ⇒ 空狀態文案；②最後一頁不足 50 列；③排序切換時 offset 歸 0。
+**Task 2.2 — 表格伺服器分頁**
+- 目標：`ICSummaryTable` 只畫當頁列；排序／搜尋／pass_class 走 API；勾選 O(1)。　檔案：`frontend/src/components/ic-analysis/ICSummaryTable.tsx`、`page.tsx`。　既有 caller：`page.tsx`（全選＝當頁）。
+- 改法：移除 `sortedData`／`getSortValue`；分頁列 50|100|200；搜尋 300 ms 去抖。
+- **驗證**：vitest：`total=39346, rows=50` ⇒ DOM `<tr>` == 51；`Array.prototype.includes` spy 於 200 次勾選呼叫 == 0；排序點擊 ⇒ `onParamsChange` 收 `offset:0`；`ICSummaryTable.icirNull.test.tsx` 斷言不改。
+- **邊界**：①`total=0` 空狀態；②末頁不足；③排序切換 offset 歸 0。
 - **存活至**：永久。　**覆蓋風險**：無。
-- 不可做：不引入虛擬捲動套件（分頁已足；`package.json` 無 tanstack-virtual，禁為此加依賴）。
+- 不可做：不加虛擬捲動依賴；不在前端保留全量列。
 
-**Task 2.3 — 匯出與其餘消費者**
-- 目標：`ExportButtons` 匯出改走後端既有匯出端點或 `summary?limit=limit_max` 逐頁串接（不用 store 的整份報告）；`FilterFunnelChart`／`DegradedBanner`／`IsolationNote`／`PeriodAlignmentBanner`／`MarginalICTable`／`CorrelationHeatmap`／xsec 面板改讀 light 報告（這些段 light 已含，G-4）。　檔案：各元件 props 型別由 `ICReport` 放寬為 `ICReportLight`。
-- **驗證**：`ASSERT (cd frontend && npx vitest run src/components/ic-analysis) THEN rc=0`（既有元件測試斷言不改）；`npx tsc --noEmit -p tsconfig.json` 之 `error TS` 計數 == 8（既有值，不增）；匯出 39,346 列 fake page 串接 ⇒ 匯出列數 == 39346。
-- **邊界**：匯出 39,346 列時逐頁 79 次請求 ⇒ 顯示進度，不凍 UI。
+### Phase 2b — 圖表與其餘消費者（依賴：Phase 2a）
+**Task 2.3 — 圖表改吃 featureDetail；匯出不動**
+- 目標：per-feature 圖表（`ICDecayChart`／`QuantileReturnChart`／`TurnoverTimeSeriesChart`／`RollingICChart`／`GroupedICBarChart`／`RegimeRadarChart`）由 `page.tsx` 餵 `featureDetail`；其餘讀 `report` 的元件 props 型別放寬為 `ICReportLight | ICReport`；`ExportButtons` **維持** `/export/{id}/{format}`，只把 `summaryTable` prop（PNG disable）改 `summaryPage.total > 0`。　檔案：`page.tsx`、各元件。　既有 caller：`page.tsx`。
+- **驗證**：`ASSERT (cd frontend && npx vitest run src/components/ic-analysis) THEN rc=0`（既有斷言不改）；`npx tsc --noEmit -p tsconfig.json` `error TS` == 8；後端 `ASSERT venv/bin/python -m pytest tests/api -k export THEN rc=0`（匯出既有測試不改）。
+- **邊界**：①`featureDetail` 未到 ⇒ 圖表「載入中」；②light 缺 `marginal_ic`（不應發生，G-4d）⇒ `SectionStatusNotice`。
 - **存活至**：永久。　**覆蓋風險**：無。
-- 不可做：不改匯出檔格式。
+- 不可做：不改匯出格式；不做逐頁匯出；不動 `ScanCubeBrowser`／deep-analysis。
 
-### Phase 3 — 實機驗收（依賴：Phase 2）
+### Phase 3 — 實機驗收（依賴：Phase 2b）
 **Task 3.1 — 39k 實機 UAT B34**
 - 目標：使用者以同一份 39,346 特徵 run 開頁面：首屏 ≤ 3 秒可互動、翻頁／排序 ≤ 1 秒、點特徵圖表 ≤ 2 秒。　檔案：`白話說明/GAP-3驗收清單.md` B34。
-- **驗證**：使用者實機（`blocked-by:使用者`）；Claude 端 `ASSERT venv/bin/python -m pytest tests/api/test_icresult_paging.py -k size_budget THEN rc=0`（以 `data_cache/reports/ic_report_ic_gatekeeper.json` 載入 fake task，light ≤ 2097152 bytes、summary?limit=50 ≤ 102400 bytes）。
-- **邊界**：後端未重啟 ⇒ 前端打 `view=light` 得整份（舊碼忽略 query）⇒ 前端偵測 `view!=="light"` 顯示「後端版本過舊」而非靜默吃全量。
+- **驗證**：使用者實機（`blocked-by:使用者`）；Claude 端 `ASSERT venv/bin/python -m pytest tests/api/test_icresult_paging.py -k size_budget THEN rc=0`（G-5 receipt `light_bytes=` ≤ 262144）。
+- **邊界**：後端未重啟 ⇒ 前端「後端版本過舊」而非靜默吃全量。
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：不以縮小特徵數當通過。
 
 ## §V 驗證策略與邊界測試目錄
-- **mutation 條件**：RISK-HIT 不含 a/d，但 G-1～G-4 宣稱「投影＝全量」屬正確性主張 ⇒ 附 mutation（`handoffs/<date>-icresult-paging-mutate.py`）：P1 分頁切片 off-by-one（`rows[offset:offset+limit]`→`rows[offset+1:…]`）⇒ G-2 紅；P2 白名單放寬（`sort_by` 任意）⇒ 400 測試紅；P3 `project_feature` 取錯段（`ic_decay`←`quantile_returns`）⇒ G-3 紅；P4 light 忘刪 `turnover_analysis` ⇒ G-5 紅；P5 light 誤刪 `filter_log` ⇒ G-4 紅；P6 預設 `/result` 誤套 light ⇒ G-1 紅；C0 只改註解 ⇒ 綠。
-- 測試層級：單元（純函式 `paginate_summary`／`project_feature`／`project_light_view`）、整合（TestClient 路由＋fake task）、Golden（G-1～G-5）、前端 vitest。可獨立 `pytest tests/api/test_icresult_paging.py`。
-- **防假綠**：既有 `/result` 測試斷言一條不改；`ICSummaryTable.icirNull.test.tsx` 斷言不改。
-- **邊界目錄**：空 summary_table ✓(1.1⑤／1.3③)；`icir` 全 None ✓(1.1④)；特殊字元特徵名 ✓(1.2①)；SectionStatus 段 ✓(1.2②)；running 未完成 ✓(1.1①)；後端舊版 ✓(3.1)；大尺度 39k ✓(G-5)。
+- **mutation 條件**：RISK-HIT 不含 a/d，但 G-1～G-7 為正確性主張 ⇒ 附 mutation（`handoffs/<date>-icresult-paging-mutate.py --phase 1`）：P1 切片 off-by-one ⇒ G-2a 紅；P2 白名單放寬 ⇒ 400 測試紅；P3 `project_feature` 段錯位 ⇒ G-3 紅；P4 light 忘刪 `turnover_analysis` ⇒ G-4a／G-5 紅；P5 light 誤刪 `marginal_ic` ⇒ G-4d 紅；P6 預設 `/result` 誤套 light ⇒ G-1 紅；P7 缺值置頂（comparator 改）⇒ G-6 紅；P8 revision 不遞增 ⇒ G-7 紅；P9 `filter_log` 集合值未轉計數 ⇒ G-4c 紅；C0 只改註解 ⇒ 綠。
+- 測試層級：單元（純函式）、整合（TestClient＋fake task）、Golden（G-1～G-7）、尺寸（受控 artifact，缺席 FAIL 非 skip）、前端 vitest。
+- **防假綠**：既有 `/result` 測試斷言一條不改；`ICSummaryTable.icirNull.test.tsx` 斷言不改；`sort_golden` 由 contract comparator 產生並經三家 R2 審（**不**由改前前端序推導；分頁序是新契約）。
+- **邊界目錄**：空 summary_table ✓；`icir` 全 None ✓；特殊字元名 ✓；SectionStatus 段 ✓；running ✓；後端舊版 ✓；refilter 交錯 ✓(G-7)；大尺度 39k ✓(G-5)；v2 flag 矩陣 ✓(1.3)。
 
 ## §R 回退
-- Phase 1 純新增端點＋`view` 參數，預設路徑不變，可單獨 revert；Phase 2 單一 commit revert 即回全量模式。無 feature flag（正確化＋預設不變，符合 `feedback_no_default_off_after_validation`）。
+- Phase 1 純新增端點＋`view`／`revision` 參數，預設路徑不變，可單獨 revert；Phase 2a／2b 各一 commit revert 即回全量模式。無 feature flag。
 
 ## §N N/A 登記
 - §G 三方 kline 簽核子項：N/A — 不碰 feature／kline／IC 計算；golden 為報告投影對照。
 - 殘留：`IP-RESID-1` metadata 被 39,346 個 per-feature 描述子扁平污染（reporter 寫入面）— `為何現在不做: blocked-by:改 reporter 會動落檔格式與 gap2／ic1d golden（命中 a），須另票走三方簽核`；觸發：下一次 reporter 改版；登記處：`docs/IC_QUANT_GAP_REGISTRY.md`。
 - 殘留：`IP-RESID-2` `turnover_analysis` 每特徵含全長 `time_series`（51 MB 主因）落檔量 — `為何現在不做: blocked-by:同 IP-RESID-1（落檔格式）`；觸發：同上。
-- 殘留：`IP-RESID-3` 既有 `schema_version=2`（`IC_RESPONSE_V2`）top-N 路徑與本票 light 視圖並存 — `為何現在不做: user-ruling:2026-06-25 IC Phase1 決策「API 現在版本化（top-N＋artifact URI）」為既定契約，本票不合併亦不刪`；觸發：v2 契約消費者出現時統一。
+- 殘留：`IP-RESID-3` 既有 `schema_version=2`（`IC_RESPONSE_V2`）top-N 路徑與 light 並存 — `為何現在不做: user-ruling:2026-06-25 IC Phase1 決策「API 現在版本化（top-N＋artifact URI）」為既定契約；R1 三家裁「並存＋precedence 矩陣測試」（Task 1.3），不合併亦不刪`；觸發：v2 契約消費者出現時統一。
+- 殘留：`IP-RESID-4` `FilterFunnelChart` 讀 `values.input/output` 而實機 `filter_log` stage 鍵為 `input_features/output_features` 等（改前即如此）— `為何現在不做: needs-research:確認各 stage 實際鍵名與圖表期望的對應（改前行為，非本票引入）`；觸發：B34 UAT 漏斗空白。
