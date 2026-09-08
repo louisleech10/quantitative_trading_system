@@ -463,7 +463,9 @@ def test_irregular_timestamps_still_fail_closed(tmp_path: Path) -> None:
 @pytest.mark.ic_persist_redirect
 @pytest.mark.usefixtures("ic_persist_redirect")
 def test_oos_applied_true_when_sufficient(tmp_path: Path) -> None:
-    features = _real_btc_frame(limit=760)
+    # TFWINDOW（2026-09-09）：1h run 之 rolling 視窗依週期換算為 252/756/1512 ⇒ warmup 門檻 1517 根；
+    # 原 limit=760（測試段 152 根）之「充足」前提失效，改 8500 根使測試段 ≥ 門檻（TW-RESID-1 之測試面體現）。
+    features = _real_btc_frame(limit=8500)
     labels = pd.DataFrame({"return_5": _return_label(features)}, index=features.index)
     features_path, labels_path, meta_path = _write_ic_inputs(tmp_path, features, labels)
 

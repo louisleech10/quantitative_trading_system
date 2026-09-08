@@ -77,6 +77,22 @@ class ICEngine:
 
         self._grouped_config = self._config.get("grouped_analysis", {})
 
+    def set_timeframe(self, timeframe: Optional[str]) -> str:
+        """TFWINDOW Task 3.1：由 run 之 `metadata.timeframe` 注入，讓 `_adjust_rolling_windows` 在生產路徑生效。
+
+        回傳揭露值：`applied`／`not_applied:missing_timeframe`／`not_applied:invalid_timeframe`（fail-loud，不假換算）。
+        出生事故：`ICEngine(config.ic_calculation.model_dump())` 從無 `timeframe` 鍵 ⇒ 12h 設計的 [21,63,126] 直接套 1h run。
+        """
+        if not timeframe:
+            self._timeframe = None
+            return "not_applied:missing_timeframe"
+        if self._parse_timeframe_hours(str(timeframe)) is None:
+            self._timeframe = None
+            logger.warning("Invalid timeframe for rolling windows: %s", timeframe)
+            return "not_applied:invalid_timeframe"
+        self._timeframe = str(timeframe)
+        return "applied"
+
     def compute_ic(
         self,
         features_df: pd.DataFrame,

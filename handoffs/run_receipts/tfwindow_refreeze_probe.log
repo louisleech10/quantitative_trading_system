@@ -1,0 +1,77 @@
+2026-09-09 00:40:27,783 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-09-09 00:40:27,895] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-09 00:40:27,895 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+[2026-09-09 00:40:29,802] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 00:40:29,802 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 00:40:29,803 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 00:40:29,812 - h5py._conv - DEBUG - Creating converter from 3 to 5
+2026-09-09 00:40:29,819 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:40:29,819 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.006s
+[2026-09-09 00:40:29,822] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:40:29,822 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:40:29,822] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:40:29,822 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:40:29,848] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 00:40:29,848 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 00:40:29,851 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:40:29,851 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+[2026-09-09 00:40:29,852] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:40:29,852 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:40:30,207] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=14
+2026-09-09 00:40:30,207 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=14
+2026-09-09 00:40:30,210 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:40:30,210 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 00:40:30,338] INFO momentum.Analysis.ic_engine: Decay: 4/14 fit warnings summarized (low_r2=4)
+2026-09-09 00:40:30,338 - momentum.Analysis.ic_engine - INFO - Decay: 4/14 fit warnings summarized (low_r2=4)
+[2026-09-09 00:40:36,374] INFO momentum.Analysis.redundancy_filter: Redundancy filter completed: method=greedy input=2 output=2
+2026-09-09 00:40:36,374 - momentum.Analysis.redundancy_filter - INFO - Redundancy filter completed: method=greedy input=2 output=2
+[2026-09-09 00:40:39,370] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+2026-09-09 00:40:39,370 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+2026-09-09 00:40:39,372 - h5py._conv - DEBUG - Creating converter from 5 to 3
+[2026-09-09 00:40:39,373] INFO momentum.Analysis.ic_reporter: Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmplzr3yksj/features/ETHUSDT_12h_filtered.h5
+2026-09-09 00:40:39,373 - momentum.Analysis.ic_reporter - INFO - Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmplzr3yksj/features/ETHUSDT_12h_filtered.h5
+[2026-09-09 00:40:39,419] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmplzr3yksj/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:40:39,419 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmplzr3yksj/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 00:40:39,422] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmplzr3yksj/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 00:40:39,422 - momentum.Analysis.ic_reporter - INFO - IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmplzr3yksj/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 00:40:39,467] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmplzr3yksj/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:40:39,467 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmplzr3yksj/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 00:40:39,644] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 00:40:39,644 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 00:40:39,644 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 00:40:39,655 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 00:40:39,655 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.008s
+[2026-09-09 00:40:39,656] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:40:39,656 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:40:39,656] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:40:39,656 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:40:39,662] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 00:40:39,662 - momentum.Analysis.ic_filter_orchestrator - WARNING - IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 00:40:39,670 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 00:40:39,670 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.006s
+[2026-09-09 00:40:39,685] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+2026-09-09 00:40:39,685 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+2026-09-09 00:40:39,691 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 00:40:39,691 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.006s
+[2026-09-09 00:40:39,693] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:40:39,693 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:40:40,577] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=15
+2026-09-09 00:40:40,577 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=15
+2026-09-09 00:40:40,585 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 00:40:40,585 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.007s
+[2026-09-09 00:40:41,492] INFO momentum.Analysis.ic_engine: Decay: 15/15 fit warnings summarized (insufficient_points=15)
+2026-09-09 00:40:41,492 - momentum.Analysis.ic_engine - INFO - Decay: 15/15 fit warnings summarized (insufficient_points=15)
+[2026-09-09 00:40:41,552] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:40:41,552 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:41:35,759] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+2026-09-09 00:41:35,759 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+[2026-09-09 00:41:35,932] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_62a7h1qk/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:41:35,932 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_62a7h1qk/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 00:41:35,937] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_62a7h1qk/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 00:41:35,937 - momentum.Analysis.ic_reporter - INFO - IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_62a7h1qk/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 00:41:36,103] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_62a7h1qk/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:41:36,103 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_62a7h1qk/reports/ic_report_ic_gatekeeper.json
+pre=163c4cecb100 live=363ae1ceebb6 live_minus_disclosure=163c4cecb100
+disclosure={"window_unit": "bars", "timeframe": "12h", "reference_tf": "12h", "timeframe_adjustment": "applied", "adjusted_windows": [21, 63, 126], "icir_role": "threshold"}
+DIFF_ONLY_DISCLOSURE=YES
+WROTE /Users/louis/Desktop/quantitative_trading_system/tests/golden/tfwindow/rolling_keys_1h.json keys=[] status=degraded_full_sample

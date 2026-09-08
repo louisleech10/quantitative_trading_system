@@ -1201,6 +1201,23 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 <li><strong>全域</strong>（非事件）分析的結果數字跟之前不一樣 ⇒ 錯的，這批不該動全域。</li>
 </ul>
 <hr />
+<h3 id="b33-1-小時-k-的-rolling-視窗會自動換算99-做的evtwarmup-第二批-tfwindow">B33 ── 1 小時 K 的 rolling 視窗會自動換算（9/9 做的，EVTWARMUP 第二批 TFWINDOW）</h3>
+<p><strong>為什麼會有這一項</strong>：設定檔的 rolling 視窗（21／63／126 根）是以 12 小時 K 為基準寫的。以前引擎不知道這次 run 是幾小時 K，
+1 小時 K 也照 21 根算，等於只看不到一天。現在會依 run 的週期自動換算（1h ⇒ 252／756／1512 根），而且報告一定寫出有沒有換算。</p>
+<p><strong>你做什麼</strong>：分別用一份 12h 特徵檔與一份 1h 特徵檔各跑一次<strong>全域</strong>分析（不需事件檔）。</p>
+<p><strong>應該看到</strong>：</p>
+<ol>
+<li>12h 那次：「隔離區怎麼來的」區塊多一行「rolling 視窗已依本 run 週期換算（21／63／126 根）；ICIR 為篩選門檻」，其餘數字與之前完全一樣。</li>
+<li>1h 那次：同一行寫「（252／756／1512 根）」；rolling IC 圖的視窗標籤是 252／756／1512。</li>
+<li>1h 短歷史（測試段不到約 1517 根）會出現「切分不足…改以全樣本」的降級橫幅——<strong>這是預期</strong>（門檻跟著視窗一起變大），不是本批的錯（<code>TW-RESID-1</code>）。</li>
+</ol>
+<p><strong>🔴 不是這樣代表什麼</strong>：</p>
+<ul>
+<li>1h 那次視窗標籤仍是 21／63／126 ⇒ 沒接上，記下來。</li>
+<li>那一行寫「<strong>未</strong>依本 run 週期換算」⇒ 特徵檔的 meta 缺 <code>timeframe</code> 或格式不對，把檔名記下來。</li>
+<li>12h 那次的排名或數字變了 ⇒ 錯的，這批對 12h 只該多一行揭露。</li>
+</ul>
+<hr />
 <h2 id="簽字">簽字</h2>
 <p>全部做完後，把結果填在這裡（或直接告訴我哪幾項不對）：</p>
 <div class="table-wrap"><table>
@@ -1371,6 +1388,11 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 <td><strong>B32 事件分析不再被暖機門檻降級</strong></td>
 <td>☐ <strong>待驗</strong></td>
 <td>9/8 深夜做的（EVTWARMUP 第一批）。事件 &lt;30 時橫幅寫「測試段事件不足」不是 Full-sample；ICIR 是 <code>--</code> 但特徵不全滅；全域數字不變</td>
+</tr>
+<tr>
+<td><strong>B33 1h K 的 rolling 視窗自動換算</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/9 做的（EVTWARMUP 第二批 TFWINDOW）。1h 視窗變 252／756／1512 根且報告揭露；12h 只多一行揭露、數字不變；1h 短歷史降級為預期</td>
 </tr>
 </tbody>
 </table></div>

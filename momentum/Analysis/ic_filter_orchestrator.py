@@ -1082,6 +1082,19 @@ class ICFilterOrchestrator:
             metadata = dict(metadata)
             metadata["period_alignment"] = dict(_pa)
 
+        # ── TFWINDOW Task 3.1：rolling 視窗依 run 週期換算（reference_tf=12h）——由 metadata.timeframe 注入引擎；
+        #    缺／非法 ⇒ 不換算並 fail-loud 揭露（不假換算）。全路徑寫 ic_window_disclosure（gap2 golden 已依 §G 重凍，diff 只含此鍵）。
+        _tf_adjust = self._ic_engine.set_timeframe(metadata.get("timeframe") if isinstance(metadata, dict) else None)
+        metadata = dict(metadata)
+        metadata["ic_window_disclosure"] = {
+            "window_unit": "bars",
+            "timeframe": metadata.get("timeframe"),
+            "reference_tf": config.ic_calculation.icir.reference_tf,
+            "timeframe_adjustment": _tf_adjust,
+            "adjusted_windows": [int(w) for w in self._ic_engine._adjust_rolling_windows(list(config.ic_calculation.rolling_windows))],
+            "icir_role": "threshold",
+        }
+
         split_context: Optional[dict] = None
         if config.ic_train_test_split:
             expected_freq = _resolve_expected_freq(metadata)
@@ -1253,9 +1266,8 @@ class ICFilterOrchestrator:
         if self._is_event_conditional_consumed(event_info):
             metadata = dict(metadata)
             metadata["ic_window_disclosure"] = {
-                "window_unit": "bars_unadjusted",
-                "timeframe_adjustment": "not_applied",
-                "icir_role": "diagnostic",
+                **dict(metadata.get("ic_window_disclosure") or {}),
+                "icir_role": "diagnostic",   # 事件路徑：ICIR 只作診斷（EVTWARMUP Task 2.1）
             }
 
         features_df, metadata, feature_filter_info = self._apply_feature_filter(

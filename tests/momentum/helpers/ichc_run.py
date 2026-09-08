@@ -18,9 +18,9 @@ H5_GLOB = "ETHUSDT_12h_*_a0_tail2000.h5"
 KLINE_CACHE_DIR = "data_cache/feature_klines"
 
 
-def fixture_paths() -> tuple[Path, Path]:
-    matches = sorted(LA0_INPUTS.glob(H5_GLOB))
-    assert matches, f"fixture 缺席：{LA0_INPUTS}/{H5_GLOB}"
+def fixture_paths(h5_glob: str = H5_GLOB) -> tuple[Path, Path]:
+    matches = sorted(LA0_INPUTS.glob(h5_glob))
+    assert matches, f"fixture 缺席：{LA0_INPUTS}/{h5_glob}"
     h5 = matches[0]
     meta = h5.with_name(h5.stem + "_meta.json")
     assert meta.exists(), f"meta 缺席：{meta}"
@@ -35,10 +35,19 @@ def run_analyze(
     event_context: Optional[dict] = None,       # GAP-3 B2.4：survivor v2 六鍵（透傳）
     event_label_owners: Optional[dict] = None,  # EVTALIGN Task 2.1：{epoch_ms: event_id}（透傳；None ⇒ 不綁 id）
     progress_callback: Optional[Any] = None,    # EVTALIGN Task 4.1：進度 spy（透傳；None ⇒ 原行為）
+    h5_glob: str = H5_GLOB,                     # TFWINDOW：可指定 1h fixture（BTCUSDT_1h_*_a0_tail2000.h5）
+    meta_override: Optional[dict] = None,       # TFWINDOW：覆蓋 meta（例：拿掉 timeframe），None ⇒ 原檔
 ) -> dict:
     from momentum.factories import create_ic_analyzer, create_kline_storage_manager
 
-    h5, meta = fixture_paths()
+    h5, meta = fixture_paths(h5_glob)
+    if meta_override is not None:
+        import json as _json
+        merged = {**_json.loads(meta.read_text(encoding="utf-8")), **meta_override}
+        merged = {k: v for k, v in merged.items() if v is not None}
+        tmp_meta = Path(tempfile.mkdtemp(prefix="ichc_meta_")) / meta.name
+        tmp_meta.write_text(_json.dumps(merged), encoding="utf-8")
+        meta = tmp_meta
     orchestrator = create_ic_analyzer()
     tmp = Path(sidefx_dir) if sidefx_dir else Path(tempfile.mkdtemp(prefix="ichc_b4_sidefx_"))
     reporter = orchestrator._reporter

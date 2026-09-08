@@ -6,7 +6,7 @@ SPEC：`docs/EVTWARMUP_SPEC.md`（R2 修訂）　TODO：`docs/EVTWARMUP_TODO.md`
 - min_test_events：13 事件 ⇒ holdout 仍套用、`fit_mode=train_mask`、`oos_guarantees=false`、reason `insufficient_test_events`、status 仍兩值
 - (e′)：values 非空＋enabled 但 `n_events<min_events`（棄條件）⇒ **不**寫 `insufficient_test_events`
 - icir：事件路徑不以 `icir_min` 剔除、tiebreaker 改 ic_mean、`get_top_features`／reporter 排序 None-safe、三個序列化入口無 `NaN` 字面
-- global：探針 `global_run` 逐鍵 == 改前 golden；全域報告無 `ic_window_disclosure`／`tiebreaker_effective`
+- global：探針 `global_run` 逐鍵 == 改前 golden；全域報告 `ic_window_disclosure.icir_role=="threshold"`（TFWINDOW 後）、無 `tiebreaker_effective`
 """
 
 from __future__ import annotations
@@ -143,7 +143,9 @@ def test_min_test_events_floor_keeps_holdout_and_flags_reason(event_report_80):
     assert m.get("fit_mode") == "train_mask", m.get("fit_mode")               # 沒有 full-sample 重跑
     assert m.get("fit_mode_source") != "fallback"
     assert m["event_filter"]["label_source"] == "event_label_value"
-    assert m["ic_window_disclosure"] == {"window_unit": "bars_unadjusted", "timeframe_adjustment": "not_applied", "icir_role": "diagnostic"}
+    # TFWINDOW（B2）後：全路徑鍵集固定，事件路徑 icir_role 覆蓋為 diagnostic
+    assert m["ic_window_disclosure"]["icir_role"] == "diagnostic"
+    assert m["ic_window_disclosure"]["timeframe_adjustment"] == "applied" and m["ic_window_disclosure"]["window_unit"] == "bars"
     assert m["tiebreaker_effective"] == "ic_mean"
     assert len(event_report_80["summary_table"]) >= 1
     # ICIR 不作事件路徑門檻：removed["icir"] 必空、且被跳過者列入 icir_skipped_event_path（mutation M6 之紅錨）
@@ -188,7 +190,7 @@ def test_abandoned_conditional_path_is_not_flagged_insufficient_test_events():
     m = rep["metadata"]
     assert m["conditional_ic"]["capability_status"] == "unavailable"
     assert (m.get("oos_downgrade") or {}).get("reason") != "insufficient_test_events"
-    assert "ic_window_disclosure" not in m and "tiebreaker_effective" not in m
+    assert m["ic_window_disclosure"]["icir_role"] == "threshold" and "tiebreaker_effective" not in m   # 棄條件走主線 ⇒ threshold
     assert m["event_filter"]["label_source"] == "mainline_return_N"
 
 
@@ -275,4 +277,6 @@ def test_global_run_unchanged_vs_golden():
         "n_summary_rows": len(rep.get("summary_table") or []),
     }
     assert live == golden
-    assert "ic_window_disclosure" not in m and "tiebreaker_effective" not in m
+    assert "tiebreaker_effective" not in m
+    # TFWINDOW（B2）後全域亦寫 ic_window_disclosure，但 icir_role 必為 threshold（事件路徑才是 diagnostic）
+    assert m["ic_window_disclosure"]["icir_role"] == "threshold"

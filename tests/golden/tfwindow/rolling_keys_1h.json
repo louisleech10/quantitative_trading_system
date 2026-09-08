@@ -1,0 +1,27 @@
+{
+  "window_keys": [
+    "window_1512",
+    "window_252",
+    "window_756"
+  ],
+  "lengths": {
+    "window_1512": 484,
+    "window_252": 872,
+    "window_756": 620
+  },
+  "values_sha256": "718ec703618aa4d360d966935a5d068c3f2b4144d644ffff333e0b697ef55806",
+  "n_features": 15,
+  "analysis_status": "degraded_full_sample",
+  "ic_window_disclosure": {
+    "window_unit": "bars",
+    "timeframe": "1h",
+    "reference_tf": "12h",
+    "timeframe_adjustment": "applied",
+    "adjusted_windows": [
+      252,
+      756,
+      1512
+    ],
+    "icir_role": "threshold"
+  }
+}

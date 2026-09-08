@@ -67,3 +67,10 @@
 - mutation 腳本：`handoffs/20260908-evtwarmup-mutate.py`（phase 1：M1–M11＋C0，定義見 SPEC §V；phase 3：T1 注入拿掉、T2 缺 timeframe 假換算、C1 註解）。
 - Gate：`scripts/evtwarmup_phase_gate.sh <1|3>`（同 `evtalign_phase_gate.sh` 型：skip=0、golden 非空、UNCOVERED=0）。
 - 驗收後：`白話說明/GAP-3驗收清單.md` 新增 B32（事件分析 34 事件不再降級成全樣本；橫幅寫「測試段事件不足」而非「Full-sample」）與 B33（TFWINDOW 後 1h 視窗鍵 ×12 且報告揭露）。
+
+### 落地註記（對應 3.1，2026-09-09）
+- 落地：`ICEngine.set_timeframe()` 回傳三值揭露；`analyze` 於 period_alignment 後注入並對**全路徑**寫 `metadata.ic_window_disclosure`（事件路徑後段只覆蓋 `icir_role="diagnostic"`）。
+- gap2 golden 重凍 receipt：`handoffs/run_receipts/tfwindow_refreeze_probe.log`——live 報告刪 `ic_window_disclosure` 後 canonical sha `163c4cec…` == pre ⇒ `DIFF_ONLY_DISCLOSURE=YES`，再 `--write`（新 sha `363ae1ce…`）。
+- 1h golden：`tests/golden/tfwindow/rolling_keys_1h.json`（鍵 `window_252/756/1512`、每視窗序列長度、值 sha256；1h fixture 落 `degraded_full_sample`＝`TW-RESID-1` 預期）。
+- SPEC §G 之 `atol=1e-12` 比對以「值序列 canonical JSON sha256」實作（決定性 run 下等價；若日後跨平台浮點漂移出現，改為逐值 `np.allclose`，屬 needs-research）。
+- `test_evtwarmup::test_global_run_unchanged_vs_golden` 依 SPEC 改為「全域有 disclosure 且 `icir_role=="threshold"`」；mutation M8 重定義為「全域也標 diagnostic ⇒ 紅」。

@@ -59,10 +59,23 @@ MUTATIONS: Tuple[Mutation, ...] = (
              "                if icir_gate:\n                    removed[\"icir\"].append(name)\n                    continue\n",
              "                if False:\n                    removed[\"icir\"].append(name)\n                    continue\n",
              [*PYTEST, T, "-k", "icir_not_a_gate"], "跳過擴到全域 ⇒ 全域 icir 門檻測試紅"),
-    Mutation("M8-window-disclosure-on-global", 1, ORCH,
+    Mutation("M8-icir-role-diagnostic-on-global", 1, ORCH,
              '        if self._is_event_conditional_consumed(event_info):\n            metadata = dict(metadata)\n            metadata["ic_window_disclosure"] = {',
              '        if True:\n            metadata = dict(metadata)\n            metadata["ic_window_disclosure"] = {',
-             [*PYTEST, T, "-k", "global_run_unchanged or abandoned"], "全域也寫 ic_window_disclosure ⇒ golden／棄條件案例紅"),
+             [*PYTEST, T, "-k", "global_run_unchanged or abandoned"], "全域／棄條件也標 icir_role=diagnostic ⇒ 全域 threshold 斷言紅"),
+    # ── Phase 3：TFWINDOW Task 3.1 ─────────────────────────────────────────
+    Mutation("T1-timeframe-injection-removed", 3, ORCH,
+             '        _tf_adjust = self._ic_engine.set_timeframe(metadata.get("timeframe") if isinstance(metadata, dict) else None)\n',
+             '        _tf_adjust = "applied"\n',
+             [*PYTEST, "tests/api/test_tfwindow.py", "-k", "window_keys"], "注入拿掉 ⇒ 1h 視窗鍵仍 [21,63,126] ⇒ 主 gate 紅（引擎層測試仍綠）"),
+    Mutation("T2-missing-timeframe-fake-applied", 3, "momentum/Analysis/ic_engine.py",
+             '        if not timeframe:\n            self._timeframe = None\n            return "not_applied:missing_timeframe"\n',
+             '        if not timeframe:\n            self._timeframe = self._reference_tf\n            return "applied"\n',
+             [*PYTEST, "tests/api/test_tfwindow.py", "-k", "engine_set_timeframe"], "缺 timeframe 假換算 ⇒ 引擎層揭露測試紅（analyze 層缺 tf 於切分先 fail-closed）"),
+    Mutation("C1-comment-only-control-phase3", 3, ORCH,
+             "        # ── TFWINDOW Task 3.1：rolling 視窗依 run 週期換算（reference_tf=12h）",
+             "        # ── TFWINDOW Task 3.1：rolling 視窗依 run 週期換算（reference_tf=12h）(control)",
+             [*PYTEST, "tests/api/test_tfwindow.py"], "對照組：只改註解 ⇒ 全綠"),
     Mutation("M12-refilter-uses-cached-icir", 1, ORCH,
              '        refilter_scores, _tb = self._redundancy_scores(\n            self._ic_cache.get("event_info", {}), stage5_results, self._ic_cache["icir"]\n        )\n',
              '        refilter_scores = self._ic_cache["icir"]\n',
@@ -87,7 +100,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
 # M4（stage4 分流改看 enabled）與 M9（地板改用預檢真值）之錨點與 M3／M5 共用同一 predicate 函式，
 # 由 M3 涵蓋（predicate 改壞 ⇒ stage4 與地板同時受影響）。M9 另以案例 (e′) 行為測試守住。
 
-EXPECT_GREEN = {"C0-comment-only-control"}
+EXPECT_GREEN = {"C0-comment-only-control", "C1-comment-only-control-phase3"}
 
 
 def _run(cmd: List[str]) -> int:
