@@ -1106,6 +1106,65 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 現在掃描格<strong>完全不寫</strong>那個檔。你可以這樣驗：<strong>掃描跑完後按匯出</strong>，
 拿到的應該是<strong>主分析</strong>的結果（不是某一格的）。</p>
 <hr />
+<h3 id="b28-期間不一致系統自己處理98-做的evtalign-第-3-段">B28 ── 期間不一致，系統自己處理（9/8 做的，EVTALIGN 第 3 段）</h3>
+<p><strong>為什麼會有這一項</strong>：你原話「選了一個時間區間的事件…還要手動重新生成特徵，手動K線對齊，這太蠢了，是缺陷吧」。
+以前只要事件批的期間超出特徵 run 的期間，整批就被擋、要你回頭重生特徵。</p>
+<p><strong>現況</strong>：</p>
+<ul>
+<li>特徵比 K 線長的<strong>頭／尾</strong>列自動裁掉（沒有 K 線就算不出 label）。</li>
+<li>落在特徵 run 期間<strong>外</strong>的事件自動剔除，<strong>列出被剔除的事件 ID</strong>。</li>
+<li>只有「完全沒有交集」才擋，而且訊息會寫出特徵／K 線／事件三者各自的期間。</li>
+</ul>
+<p><strong>你做什麼</strong>：拿一個事件批，配一個期間<strong>只涵蓋其中一部分事件</strong>的 feature run（例如事件批橫跨 2024 全年、run 只有下半年），送出分析。</p>
+<p><strong>應該看到</strong>：</p>
+<ol>
+<li>分析<strong>成功</strong>（不再被「特徵 run 未涵蓋事件期」擋下）。</li>
+<li>報告上方出現一個<strong>藍色</strong>「期間對齊」區塊，寫「有 N 個事件沒有進分析：落在特徵 run 的期間之外。事件 ID：…」——<strong>ID 要一個一個列出來</strong>。</li>
+<li>若特徵比 K 線長，同一區塊會寫「開頭 X 根、結尾 Y 根已自動裁掉」與「實際分析區間」。</li>
+<li>事件批<strong>全部</strong>都在 run 期間外 ⇒ 仍然擋，訊息含「無交集」與各期間。</li>
+</ol>
+<p><strong>🔴 不是這樣代表什麼</strong>：</p>
+<ul>
+<li>只寫「丟了 N 個」沒有 ID ⇒ 錯的，記下來。</li>
+<li>期間明明不一致卻<strong>沒有</strong>任何藍色區塊 ⇒ 沒接上，記下來。</li>
+<li>期間完全一致卻出現「裁 0 根」之類的區塊 ⇒ 錯的（沒裁就不該出現）。</li>
+</ul>
+<hr />
+<h3 id="b29-跑很久的時候看得到做到哪98-做的evtalign-第-4-段">B29 ── 跑很久的時候看得到做到哪（9/8 做的，EVTALIGN 第 4 段）</h3>
+<p><strong>為什麼會有這一項</strong>：你原話「可以跑的話，幹嘛擋? 但我只是不知確切的狀態進行式是什麼」。</p>
+<p><strong>你做什麼</strong>：選一個特徵多的 run（幾百個以上）跑 IC 分析，盯著上方「任務狀態」那一小塊。</p>
+<p><strong>應該看到</strong>：</p>
+<ol>
+<li>進度條下面多一行「winsorize 100/350（剩餘 約 40 秒）」這種字，數字會往上走。</li>
+<li><strong>一開始</strong>那一兩次會寫「剩餘 預估中」——那是刻意的：資料還不夠，<strong>不給假的估計</strong>。</li>
+<li>記憶體吃緊時（例如你同時開很多東西），會出現一則<strong>琥珀色警告</strong>「記憶體吃緊…分析照跑、不會中止」——<strong>分析要繼續跑到完</strong>，不能因為這則警告停下來。記憶體正常時<strong>不該</strong>出現這則。</li>
+</ol>
+<p><strong>🔴 不是這樣代表什麼</strong>：</p>
+<ul>
+<li>「剩餘」永遠是同一個數字、或第一秒就給出精確秒數 ⇒ 假 ETA，記下來。</li>
+<li>出現記憶體警告後分析中止 ⇒ 錯的（設計是只警告不擋），記下來。</li>
+<li>特徵很多卻整段預處理都沒有「n/總數」那一行 ⇒ 沒接上，記下來。</li>
+</ul>
+<hr />
+<h3 id="b30-事件分析的-label-驗的是真正用到的那條98-做的evtalign-第-12-段這一項主要靠測試你看得到的是不再誤擋">B30 ── 事件分析的 label 驗的是真正用到的那條（9/8 做的，EVTALIGN 第 1／2 段；這一項主要靠測試，你看得到的是「不再誤擋」）</h3>
+<p><strong>為什麼會有這一項</strong>：你那次遇到的 <code>AlignmentViolationError…expected 5, got 0</code>。根因是系統先算一條「往後看 5 根」的鷹架 label 拿去驗，
+驗完就丟掉、換成你事件批自己的 label——驗的和用的不是同一條，而且 K 線比特徵長時鷹架必定驗不過。</p>
+<p><strong>現況</strong>：K 線自動裁到特徵尾（鷹架不再誤擋）；驗證改對「實際拿去算 IC 的那條」做；事件 label 逐筆綁回事件 ID；
+三種模式（全域有／無預載 label、事件）都有一條機械測試盯著「被驗的＝被用的」。</p>
+<p><strong>你做什麼</strong>：用你之前那組會出 <code>expected 5, got 0</code> 的設定（12h 事件批配 1h 特徵 run）再跑一次。</p>
+<p><strong>應該看到</strong>：分析成功；報告裡條件 IC 的 <code>label_source</code> 是 <code>event_label_value</code>。不再出現那個錯誤。</p>
+<p><strong>🔴 不是這樣代表什麼</strong>：同樣設定仍出現 <code>trailing NaN count must equal lag</code> ⇒ 沒修到，把完整訊息貼給我。</p>
+<hr />
+<h3 id="b31-隔離區拆成兩塊講98-做的evtalign-第-5-段">B31 ── 隔離區拆成兩塊講（9/8 做的，EVTALIGN 第 5 段）</h3>
+<p><strong>為什麼會有這一項</strong>：你問「切分 horizon 與事件 label 脫鉤…purge 用全域 h 算，與你設的 h 無關」是什麼意思。
+這<strong>不是洩漏</strong>（兩塊相加只會更保守），但報告以前只給一個數字，看不出哪塊是哪來的。</p>
+<p><strong>你做什麼</strong>：跑一次<strong>事件</strong>分析（有事件批、切分有套用）。</p>
+<p><strong>應該看到</strong>：報告上方一個灰色「隔離區怎麼來的」區塊，三行：
+<code>purge N 根：由全域 default_horizon 決定（與你在事件 label 設的 h 無關）</code>／
+<code>embargo M 根：由事件的 look-ahead 換算成列數</code>（或「沿用設定檔的 embargo」）／
+<code>總隔離 N+M 根＝purge＋embargo</code>。</p>
+<p><strong>🔴 不是這樣代表什麼</strong>：兩塊被合成一個數字、或 N+M 算錯 ⇒ 錯的；非事件分析出現這個區塊 ⇒ 錯的（設計上只有事件分析才有）。</p>
+<hr />
 <h2 id="簽字">簽字</h2>
 <p>全部做完後，把結果填在這裡（或直接告訴我哪幾項不對）：</p>
 <div class="table-wrap"><table>
@@ -1251,6 +1310,26 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 <td><strong>B27 範圍太大時明講不給空白</strong></td>
 <td>☐ <strong>待驗</strong></td>
 <td>9/7 做的。🔴 <strong>滿格掃描不保證有圖表</strong>——這是資料量的硬限制，不是缺陷。要驗「有沒有明講＋數字是不是當次算的」</td>
+</tr>
+<tr>
+<td><strong>B28 期間不一致系統自己處理</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/8 做的（EVTALIGN 第 3 段）。要驗：分析成功＋藍色區塊<strong>逐一列出</strong>被剔除事件 ID；期間一致時不該出現該區塊</td>
+</tr>
+<tr>
+<td><strong>B29 跑很久看得到做到哪</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/8 做的（第 4 段）。要驗：n/總數往上走、開頭「預估中」不給假 ETA；記憶體警告只警告不中止</td>
+</tr>
+<tr>
+<td><strong>B30 事件 label 驗的是真正用到的那條</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/8 做的（第 1／2 段）。用你之前出 <code>expected 5, got 0</code> 的設定重跑應成功</td>
+</tr>
+<tr>
+<td><strong>B31 隔離區拆成兩塊講</strong></td>
+<td>☐ <strong>待驗</strong></td>
+<td>9/8 做的（第 5 段）。事件分析報告上方灰色區塊三行；非事件分析不該出現</td>
 </tr>
 </tbody>
 </table></div>

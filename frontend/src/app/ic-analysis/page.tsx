@@ -32,6 +32,8 @@ import CrossSectionalICHeatmap from '@/components/ic-analysis/CrossSectionalICHe
 import CrossSymbolValidationPanel from '@/components/ic-analysis/CrossSymbolValidationPanel';
 import PartialFailureBanner from '@/components/ic-analysis/PartialFailureBanner';
 import DegradedBanner from '@/components/ic-analysis/DegradedBanner';
+import PeriodAlignmentBanner from '@/components/ic-analysis/PeriodAlignmentBanner';
+import IsolationNote from '@/components/ic-analysis/IsolationNote';
 import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
 import MarginalICTable from '@/components/ic-analysis/MarginalICTable';
 import EventTablesPanel from '@/components/ic-analysis/EventTablesPanel';
@@ -612,6 +614,10 @@ function ICAnalysisPageContent() {
             </div>
 
             <DegradedBanner />
+            {/* EVTALIGN Task 3.1：期間自動對齊揭露（只在真裁／真丟時後端才寫鍵） */}
+            <PeriodAlignmentBanner />
+            {/* EVTALIGN Task 5.1：隔離區兩塊來源（事件分析且切分已套用時後端才寫鍵） */}
+            <IsolationNote />
 
             {/* GAP-3 B5.2：事件型兩表——只在事件模式顯示（U10 不另開頁） */}
             {/* Task 4.2：IC 設定面板之「Horizon 多選」要真的作用到事件後報酬表 */}

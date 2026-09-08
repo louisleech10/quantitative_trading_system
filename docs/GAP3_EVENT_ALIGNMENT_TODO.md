@@ -314,6 +314,12 @@
   1. `purge.source = "global_default_horizon"`、`embargo.source = "event_lookahead"`
      （或 `config_embargo`，取實際生效者）。
   2. 前端於降級／切分說明處顯示兩塊來源，不再只給一個數字。
+  3. 🔴 **落地形狀（B5，2026-09-08）——落點改在 service，不在 orchestrator**：`_inject_isolation_source(staged, report)`
+     於事件路徑 analyze 後，由 `metadata.ic_train_test_split`（orchestrator 唯一數字來源）組 `metadata.isolation`，
+     `embargo.source` 依 `purge_rows > 原 config embargo` 判 `event_lookahead`／`config_embargo`（附兩個原值）。
+     理由：`test_gap2_golden` 等對**整份報告**取 canonical sha，orchestrator 對所有切分 run 新增鍵會弄紅既有 golden；
+     而混淆點只在事件模式（purge 用全域 h、與事件 label 之 h 無關）。前端 `IsolationNote`（`icIsolation.ts`）獨立顯示，
+     不塞進 DegradedBanner（非降級的事件 run 也要看得到）。
 - 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py`（metadata 新增 `isolation`）；
   `frontend/src/components/ic-analysis/DegradedBanner.tsx`（顯示）。
   既有 caller：報告消費端。

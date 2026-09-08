@@ -177,6 +177,21 @@ MUTATIONS: Tuple[Mutation, ...] = (
         [*PYTEST, "tests/api/test_stage_progress.py", "-k", "first_report_estimating"],
         "第一次回報就給 ETA（假 ETA）⇒ estimating 測試應紅",
     ),
+    # ── Phase 5：Task 5.1 隔離區揭露 ──────────────────────────────────────
+    Mutation(
+        "A12-isolation-total-miscomputed", 5, SERVICE,
+        '        "total_bars": purge_bars + embargo_bars,\n',
+        '        "total_bars": purge_bars,\n',
+        [*PYTEST, "tests/api/test_isolation_disclosure.py", "-k", "total_equals_sum"],
+        "total 不等於 purge＋embargo ⇒ 相加斷言應紅",
+    ),
+    Mutation(
+        "A13-embargo-source-hardcoded", 5, SERVICE,
+        '            "source": "event_lookahead" if purge_rows > before else "config_embargo",\n',
+        '            "source": "config_embargo",\n',
+        [*PYTEST, "tests/api/test_isolation_disclosure.py", "-k", "source_reflects"],
+        "embargo 來源寫死 ⇒ 來源反映事件 look-ahead 之測試應紅",
+    ),
     # ── 對照組：只改註解，全部測試必須仍綠 ──────────────────────────────
     Mutation(
         "C0-comment-only-control", 1, ORCH,

@@ -149,6 +149,45 @@ def _apply_stage_progress(task_info: Dict[str, Any], payload: Dict[str, Any], me
             warnings_list.append({"code": code, "detail": payload.get("warning_detail")})
 
 
+def _inject_isolation_source(staged: Dict[str, Any], report: Any) -> None:
+    """EVTALIGN Task 5.1：事件分析之隔離區兩塊來源分開揭露 → `report.metadata.isolation`。
+
+    使用者混淆點（三家 R1 點名）：`purge_gap` 用**全域 default_horizon** 算，與事件 label 設的 h 無關；
+    `embargo` 則是本 service 以事件 look-ahead（`purge_rows`）抬高後的值。兩塊**相加**＝總隔離（保守，非洩漏）。
+    數字**全部取自** orchestrator 已寫的 `metadata.ic_train_test_split`（單一來源、不重算、不改算法）；本函式只補
+    「來源」：`purge_rows > 原 config embargo` ⇒ `event_lookahead`，否則 `config_embargo`。
+    🔴 只在事件路徑呼叫（有 staged），且切分未套用（無 `ic_train_test_split.applied`）⇒ 不寫鍵（邊界①：不顯示 0）。
+    非事件 run 不寫此鍵 ⇒ 既有 golden（整份報告 canonical sha）逐位元組不變；與 TODO「orchestrator 新增」之落點不同，
+    理由即此（golden `test_gap2_golden` 對整份報告取 sha）。
+    """
+    if not isinstance(report, dict):
+        return
+    metadata = report.get("metadata")
+    split = metadata.get("ic_train_test_split") if isinstance(metadata, dict) else None
+    if not isinstance(split, dict) or not split.get("applied"):
+        return
+    purge_bars = int(split.get("purge_gap") or 0)
+    embargo_bars = int(split.get("embargo") or 0)
+    purge_rows = int(staged.get("purge_rows") or 0)
+    before = int(staged.get("embargo_before_event") or 0)
+    metadata["isolation"] = {
+        "purge": {
+            "bars": purge_bars,
+            "source": "global_default_horizon",
+            "effective_horizon": split.get("effective_horizon"),
+            "note": "由全域 default_horizon 決定，與事件 label 之 h 無關",
+        },
+        "embargo": {
+            "bars": embargo_bars,
+            "source": "event_lookahead" if purge_rows > before else "config_embargo",
+            "event_purge_rows": purge_rows,
+            "config_embargo": before,
+        },
+        "total_bars": purge_bars + embargo_bars,
+        "note": "總隔離＝purge＋embargo（相加，只會偏保守）",
+    }
+
+
 def _inject_period_alignment(staged: Dict[str, Any], report: Any) -> None:
     """EVTALIGN Task 3.1：把 service 端之期間對齊揭露（丟掉的事件 ID）併進 `report.metadata.period_alignment`。
 
@@ -1220,6 +1259,7 @@ class ICAnalysisService:
             feature_manifest_path=feature_manifest_path,
         )
         cell_override = dict(config_override or {})
+        staged["embargo_before_event"] = int(cell_override.get("embargo") or 0)  # EVTALIGN Task 5.1：揭露來源用
         cell_override["embargo"] = max(
             int(cell_override.get("embargo") or 0), int(staged["purge_rows"]),
         )
@@ -1249,6 +1289,7 @@ class ICAnalysisService:
         )
         _assert_event_triple_bound(staged, report)
         _inject_period_alignment(staged, report)
+        _inject_isolation_source(staged, report)
         return {
             "capability": "available",
             "reason": None,
@@ -1489,6 +1530,7 @@ class ICAnalysisService:
                     #    把 per-symbol purge 下界換算成列數後注入 IC 切分器之 `embargo`。
                     #    只在**現行值較小**時提高——不得因為事件分析而放寬既有設定。
                     config_override = dict(config_override or {})
+                    staged["embargo_before_event"] = int(config_override.get("embargo") or 0)  # EVTALIGN Task 5.1
                     config_override["embargo"] = max(
                         int(config_override.get("embargo") or 0), int(staged["purge_rows"]),
                     )
@@ -1541,6 +1583,7 @@ class ICAnalysisService:
                 if request.event_import_id:
                     _assert_event_triple_bound(staged, report)
                     _inject_period_alignment(staged, report)
+                    _inject_isolation_source(staged, report)
 
             with self._lock:
                 task_info = self._tasks.get(task_id)

@@ -67,8 +67,15 @@ Task 4.1：`DataPreprocessor.preprocess(progress=)`（winsorize 迴圈每 `_prog
 orchestrator `_stage1_progress_hook`＋`_memory_pressure`（psutil；WARN 一次不擋）；service `_apply_stage_progress`→`/task` 之
 `sub_progress`／`warnings`；前端 store／hook／`icProgressLabel.ts`／頁面顯示。`tests/api/test_stage_progress.py` 12 條；vitest 4 條；mutation A8／A10／A11。
 
+B3＋B4 commit `ae71dbb6`（既有測試：B3 後 226/1 紅＝EA-RESID-6；B4 後 134 passed）。
+
+## B5 完成（2026-09-08）
+Task 5.1：service `_inject_isolation_source`（事件路徑、切分已套用時由 `ic_train_test_split` 組 `metadata.isolation`；
+落點改 service 之理由見 TODO 5.1 要點 3）；前端 `IsolationNote`／`icIsolation.ts`。另補 B3 前端 `PeriodAlignmentBanner`／
+`icPeriodAlignment.ts`；驗收清單新增 **B28／B29／B30**。`tests/api/test_isolation_disclosure.py` 5 條；mutation A12／A13。
+
 ## 下一步
-commit B3＋B4 → `evtalign_phase_gate.sh 3` 與 `4` → **B5** Task 5.1 purge/embargo 兩塊來源揭露 → R4 三家 review → 使用者 B26/B27 驗收。
+commit → `evtalign_phase_gate.sh 3／4／5` → **R4** 三家 review（B3–B5 之碼）→ 依 finding 修 → 使用者 B26–B30 驗收。
 
 ## 具名殘留
 `EA-RESID-1` preprocessing 峰值記憶體（17 GB／8 GB）｜`EA-RESID-2` 橫截面無守衛（模組未完工，**非缺陷**）
