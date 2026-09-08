@@ -25,6 +25,8 @@ RISK-HIT: a,d
 ## §G Golden / Baseline
 - 改前：`tests/golden/evtwarmup/baseline.json::facts.adjusted_windows_default=[21,63,126]`；整份報告 golden `test_gap2_golden`（canonical sha256；12h fixture：因 `reference_tf=12h` ⇒ 因子 1 ⇒ **12h run sha256 逐位元組不變**——這是本票的 over 向對照）。
 - 改後 1h golden：`tests/golden/tfwindow/rolling_keys_1h.json`＝1h fixture 之 rolling 鍵集＋每視窗序列長度＋序列值 sha256；通過條件：鍵集 `==`、長度 `==`、值 sha256 `==`（float 比對 `atol=1e-12`）。
+- 測試層級（R1 `COMPOSER-R1-P2-02`／`GROK-R1-P2-02`）：`tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_ic_rolling_warmup` 直呼 `_stage4_ic_calculation`＝**引擎層回歸**（保留、不改期望鍵）；`tests/api/test_tfwindow.py` 經 `analyze` ＝**接線主 gate**；mutation「注入拿掉」須使主 gate 紅而引擎層測試仍綠。
+- 12h 整份 golden：因子 1 ⇒ 數值逐位元組不變，但全域報告**新增** `ic_window_disclosure` 鍵 ⇒ 依本 §G 重凍，重凍 diff 只准含該鍵（R1 `CODEX-R1-P1-04`：揭露鍵與 byte-locked 投影之衝突在此票解，B1 不寫全域鍵）。
 - 改後：新增 1h fixture 之 rolling 鍵集 golden（`window_252/756/1512`）與 warmup 門檻 receipt；`tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_ic_rolling_warmup` 之 `window_5` 類斷言依 fixture 週期重算（不得刪測試換綠）。
 - 通過條件：12h run 逐鍵不變；1h run 視窗鍵＝原鍵×12；缺 timeframe ⇒ 不變＋揭露。
 

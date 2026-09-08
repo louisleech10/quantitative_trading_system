@@ -1,68 +1,69 @@
-# EVTWARMUP／TFWINDOW TODO　（DRAFT／基於 `docs/EVTWARMUP_SPEC.md`＋`docs/TFWINDOW_SPEC.md`／2026-09-08）
+# EVTWARMUP／TFWINDOW TODO　（DRAFT／基於 `docs/EVTWARMUP_SPEC.md`（R1 修訂）＋`docs/TFWINDOW_SPEC.md`／2026-09-08）
 
 ## §0 全域規則與約束（執行端讀完即可遵守，不必回讀 SPEC）
 - 解耦 7 條；`momentum/` 不 import `api/`；service 不互 import；config 單一來源（`config/ic_config.yaml`＋schema）。
-- 不可違反原則：不弱化 NaN／inf gate；不改 IC／HAC／FDR 公式；不擅改輸出大小；全域路徑逐位元組不變（SPEC §C-2）。
-- **分流鍵＝產生者標記**（SPEC §C-3）：`event_label_values is not None`（analyze 入口，與 EVTALIGN `defer_alignment_error` 同鍵）或 `event_info.label_source == "event_label_value"`；**禁**用 `event_filter.enabled`。
-- 防假綠：不得放寬既有斷言；reason 枚舉只**新增**值；mutation 腳本 rc=5 計 UNCOVERED（沿 `handoffs/20260907-evtalign-mutate.py`）。
+- 不可違反原則：不弱化 NaN／inf gate；不改 IC／HAC／FDR 公式；不擅改輸出大小；**全域路徑逐位元組不變＝B1 不對全域報告新增任何 metadata 鍵**（SPEC §C-2、§C-7）。
+- **分流兩段判**（SPEC §C-3）：預檢 `bool(event_label_values) and config.event_filter.enabled`；stage4 之後 `event_info.get("label_source") == "event_label_value"`。禁 `is not None`、禁只看 `enabled`。
+- **`analysis_status` 兩值不擴**（SPEC §C-4）：`_downgrade_branch`／`_resolve_root_status`／`normalize_analysis_status`／survivor／TS union 不改；區分靠 `oos_downgrade.reason`。
+- 防假綠：不得放寬既有斷言；`test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline` 不改；reason 枚舉只新增；mutation rc=5 計 UNCOVERED。
 - 引用 SPEC §A 之 FACT-RECEIPT（`tests/golden/evtwarmup/baseline.json`），不整段複製。
-- 兩票 golden 互斥：**Batch 1（EVTWARMUP）收案並 commit 後**才可開 Batch 2（TFWINDOW）；禁同 commit。
+- 兩票 golden 互斥：**B1 收案 commit 後**才可開 B2（TFWINDOW）；禁同 commit。
 
 ## §B 批次執行策略
 | Batch | 含 Task | 依賴 | 合併理由 | 規模 |
 |---|---|---|---|---|
 | B1 | 1.1、1.2、2.1 | 無 | 同一分流鍵、同一 golden（event_run 預期變更） | 中 |
 | B2 | 3.1 | B1 收案 | 獨立 golden（1h 視窗 ×12），與 B1 互斥 | 中 |
-- 批次 Gate：B1 ⇒ `pytest tests/api/test_evtwarmup.py` rc=0＋`handoffs/20260908-probe-evtwarmup-baseline.py` 之 `global_run` 逐鍵不變＋mutation M1–M5 紅／C0 綠；B2 ⇒ `pytest tests/api/test_tfwindow.py` rc=0＋`test_gap2_golden` rc=0。
+- 批次 Gate：B1 ⇒ `pytest tests/api/test_evtwarmup.py` rc=0＋探針 `global_run` 逐鍵不變＋`test_gap2_golden`／`test_ic1d_baseline` rc=0＋mutation M1–M8 紅／C0 綠（`scripts/evtwarmup_phase_gate.sh 1`）；B2 ⇒ `pytest tests/api/test_tfwindow.py` rc=0＋`test_gap2_golden` rc=0（`scripts/evtwarmup_phase_gate.sh 3`）。
 - 派工：實作＝Claude 主委自任（ORCH §1）；review＝codex＋composer＋grok 全員 adversarial。
 
 ## Phase 1 — 事件路徑豁免 bar-rolling warmup（完成後：34 個測試段事件不再被降級成全樣本）
 
 ### Task 1.1 — 預檢與 stage4 安全網之事件分流（`SPEC Task 1.1`）
 - 目標：事件條件 IC 路徑不以 `max(window)+horizon` 列數擋 holdout；全域一字不改。
-- 檔案：`momentum/Analysis/ic_filter_orchestrator.py`：新 `_is_event_conditional_path(event_label_values) -> bool`；`analyze` 於切分後呼叫 `_precheck_rolling_warmup(..., event_conditional=...)`；`_stage4_ic_calculation` 之 skip 區塊同分流；`split_context["test_events"]`＝事件 ∩ 測試段計數（已有計算，搬成欄位）。既有 caller：`analyze`。
-- 實作要點：分流真 ⇒ 預檢回 `None`；stage4 不回 `skipped`；`split_context["test_events"]` 供 Task 1.2。
-- 驗證：`venv/bin/python -m pytest tests/api/test_evtwarmup.py -k precheck -q` rc=0；斷言（a）事件路徑 34 事件 ⇒ `_precheck_rolling_warmup` 回 `None`（b）全域路徑 34 列 ⇒ 回 details（c）`event_label_values` 給了但 `event_filter.enabled=False` ⇒ 走主線 ⇒ 回 details。golden：`test_global_run_unchanged` 逐鍵 `==` `baseline.json::global_run`。
-- 邊界：①事件時間戳全不在測試段 ⇒ `test_events=0`，不 fallback（交 Task 1.2 揭露）；②`event_label_values={}` 空 dict ⇒ 視同 None（主線）；③fallback 重跑（`_in_fallback_rerun`）內分流仍成立。
+- 檔案：`momentum/Analysis/ic_filter_orchestrator.py`：新 `_is_event_conditional_precheck(event_label_values, config) -> bool`（`bool(values) and config.event_filter.enabled`）、`_is_event_conditional_consumed(event_info) -> bool`（`label_source == "event_label_value"`）；`_precheck_rolling_warmup(features_df, config, split_context, event_timestamps, *, event_conditional)`（真 ⇒ 回 `None`，仍寫 `split_context["test_events"]`）；`_stage4_ic_calculation(..., event_info)` skip 區塊：`if split_context is not None and not self._is_event_conditional_consumed(event_info)`；`analyze` 傳入 `event_info`。既有 caller：`analyze`、`_run_full_sample_fallback`（重跑 analyze，predicate 自然重算）。
+- 實作要點：`split_context["test_events"]`＝`event_timestamps ∩ feature_index[test_mask]` 計數（現有邏輯搬成欄位，非事件路徑為 None）。
+- 驗證：`venv/bin/python -m pytest tests/api/test_evtwarmup.py -k precheck -q` rc=0；斷言（a）values 非空＋`enabled=True`＋測試段 34 事件 ⇒ precheck `None` 且 `split_context["test_events"]==34`（b）全域 34 列 ⇒ details（c）values 非空＋`enabled=False` ⇒ details（d）`values={}` ⇒ details（e）values 非空＋enabled 但 `n_events < min_events` ⇒ stage4 `event_info.label_source=="mainline_return_N"` ⇒ 仍回 `skipped`；golden `test_global_run_unchanged`：探針 `global_run` 逐鍵 `==` `baseline.json`。
+- 邊界：①事件全不在測試段 ⇒ `test_events=0`、precheck `None`（Task 1.2 揭露）；②fallback 重跑內 predicate 仍成立（`_in_fallback_rerun` 不影響）；③scan cube 每格各自判定。
 - **存活至**：永久。
 - **覆蓋風險**：無。
-- 不可做：不動 `_rolling_warmup_min_rows` 公式；不以 `event_filter.enabled` 分流；不碰 `_run_full_sample_fallback` 語意。
+- 不可做：不動 `_rolling_warmup_min_rows` 公式；不以 `enabled` 單獨分流；不用 `is not None`；不碰 `_run_full_sample_fallback` 語意。
 
-### Task 1.2 — `min_test_events` 統計地板＋loud 揭露（`SPEC Task 1.2`）
-- 目標：測試段事件數 < 地板 ⇒ holdout 仍套用、點 IC 照算，但 `oos_guarantees=false`、`oos_downgrade.reason="insufficient_test_events"`；不 full-sample 重跑。
-- 檔案：`momentum/Analysis/ic_config_schema.py::EventFilterConfig.min_test_events: int = 30`；`config/ic_config.yaml` 加 `min_test_events: 30`；`momentum/Analysis/contracts/ic_report_contract.json::reasons` 加 `insufficient_test_events`（單一真相源，SPEC 不列舉第二份）；orchestrator `analyze`（分流後判定、寫 `metadata["oos_downgrade"]`、`metadata["ic_train_test_split"]["oos_guarantees"]=False`）；`momentum/Analysis/ic_reporter.py::normalize_analysis_status`（新值 `degraded_insufficient_test_events` 之正規化，禁被吃成 `degraded_full_sample`）；`api/services/ic_analysis_service.py` 之 root 紅標鏡像；前端 `frontend/src/lib/oosDowngradeDocs.ts` 文案＋`DegradedBanner` 顯示 `test_events/min_test_events`。
-- 實作要點：判定式 `is_event_path and split_context["test_events"] < cfg.event_filter.min_test_events`；`fit_mode` 維持 `train_mask`；`_inject_root_oos` 讀新 reason。
-- 驗證：`venv/bin/python -m pytest tests/api/test_evtwarmup.py -k min_test_events -q` rc=0；斷言 13 事件（la0 fixture）⇒ `oos_downgrade.reason == "insufficient_test_events"`、`ic_train_test_split.applied is True`、`fit_mode == "train_mask"`、`analysis_status != "degraded_full_sample"`；≥30 事件 ⇒ `oos_guarantees is True`；`tests/api/test_gap3_oos_downgrade.py` 枚舉測試新增值後 rc=0；前端 `oosDowngradeDocs.test.ts` 新 reason 有文案。
-- 邊界：①事件總數 < `min_events` ⇒ 既有 `insufficient_events` 路徑（`conditional_ic_abandoned`）不變；②測試段 0 事件 ⇒ `insufficient_test_events`，不 raise；③`min_test_events=0` ⇒ 恆通過（逃生口）；④scan cube 每格各自判定，格 reason 字串新增值。
+### Task 1.2 — `min_test_events` 統計地板＋loud 揭露（兩值 status）（`SPEC Task 1.2`）
+- 目標：測試段事件數 < 地板 ⇒ holdout 仍套用、點 IC 照算，`oos_guarantees=false`、`oos_downgrade={reason:"insufficient_test_events", test_events, min_test_events}`；status 由既有 `_downgrade_branch` 落 `degraded_full_sample`（不新增值）。
+- 檔案：`momentum/Analysis/ic_config_schema.py::EventFilterConfig.min_test_events: int = 30`；`config/ic_config.yaml::event_filter.min_test_events: 30`；`ic_filter_orchestrator.py::analyze`（切分後、預檢後：`if event_conditional and split_context["test_events"] < cfg.event_filter.min_test_events:` 寫 `metadata["ic_train_test_split"]["oos_guarantees"]=False`、`metadata["oos_downgrade"]={...}`；`fit_mode` 維持 `train_mask`；**不**呼叫 fallback）；`momentum/Analysis/contracts/ic_report_contract.json`：`reasons.oos_downgrade`＝`oosDowngradeDocs.ts` 既有 8 鍵＋`insufficient_test_events`，`notes.pass_class`：「`oos_guarantees` 之鏡像，不表 fit 範圍」；前端 `frontend/src/lib/oosDowngradeDocs.ts`（新鍵文案：holdout 仍套用、無 OOS 保證、差多少事件）、`DegradedBanner.tsx`（依 reason 分主標；`insufficient_test_events` ⇒「測試段事件不足（holdout 仍套用、無 OOS 保證）」＋`test_events/min_test_events`）、`oosDowngradeDocs.test.ts`（讀契約 `reasons.oos_downgrade` 對證文案鍵集）、`DegradedBanner.test.tsx`（新 reason 主標不含「Full-sample」）。
+- 實作要點：`_downgrade_branch` 讀 `ic_train_test_split.oos_guarantees=False` ⇒ 既有分支落 degraded——**不改該函式**；`_inject_root_oos` 不改；survivor `build_survivor_output` 不改（status 仍兩值）。
+- 驗證：`venv/bin/python -m pytest tests/api/test_evtwarmup.py -k min_test_events -q` rc=0；13 事件（la0）⇒ SPEC §G `event_run` 全部斷言（`applied is True`、`oos_guarantees is False`、`reason=="insufficient_test_events"`、`test_events==13`、`min_test_events==30`、`analysis_status=="degraded_full_sample"`、`fit_mode=="train_mask"`）；≥30 事件 ⇒ `oos_guarantees is True` 且 `oos_downgrade is None`；`pytest tests/api/test_gap3_oos_downgrade.py -q` rc=0（基線不改）；`pytest tests/momentum/Analysis/test_survivor_contract.py -q` rc=0；vitest 兩檔綠。
+- 邊界：①事件總數 < `min_events` ⇒ 既有 `insufficient_events`／`conditional_ic_abandoned` 不變；②測試段 0 事件 ⇒ `insufficient_test_events`，不 raise；③`min_test_events=0` ⇒ 恆通過（逃生口）；④survivor 對此 run 不 raise；⑤scan cube 格 reason 新值透傳（`scan_cube.py` 不拒枚舉）。
 - **存活至**：永久。
 - **覆蓋風險**：無。
-- 不可做：地板不寫死在碼；不改 `min_events` 語意；不在 SPEC／TODO 列舉 reason 枚舉第二份。
+- 不可做：不加第三個 status 值；地板不寫死；不改 `min_events` 語意；不在 SPEC／TODO 列舉 reason 第二份。
 
-## Phase 2 — ICIR 降為診斷（完成後：豁免 warmup 不會讓特徵因 ICIR NaN 全滅）
+## Phase 2 — ICIR 降為診斷（完成後：豁免 warmup 不會讓特徵因 ICIR NaN 全滅或炸掉）
 
-### Task 2.1 — 事件路徑跳過 `icir_min`；tiebreaker fallback；視窗揭露（`SPEC Task 2.1`）
-- 目標：事件路徑 `_apply_thresholds` 不以 `icir_min` 剔除；stage6 tiebreaker 缺 ICIR 走 `ic_mean`；報告揭露視窗尺度。
-- 檔案：`ic_filter_orchestrator.py::_apply_thresholds(..., icir_gate: bool=True)`（事件路徑傳 False，`removed["icir"]` 改記 `removed["icir_skipped_event_path"]=[...]`）；stage6 冗餘之 tiebreaker（`config.redundancy.tiebreaker == "icir"` 且值 NaN ⇒ `ic_mean`，記 `metadata["tiebreaker_effective"]`）；`metadata["ic_window_disclosure"]={"window_unit":"bars_unadjusted","timeframe_adjustment":"not_applied","icir_role":"diagnostic"|"threshold"}`（全域亦寫，值不同）；前端 `IsolationNote` 旁一行（`icIsolation.ts` 加 `windowDisclosureLine`）。
-- 實作要點：`icir_role` 由分流決定；全域路徑 `icir_min` 行為位元組不變（`removed["icir"]` 鍵保留）。
-- 驗證：`venv/bin/python -m pytest tests/api/test_evtwarmup.py -k icir -q` rc=0；斷言事件路徑 34 事件 ⇒ `len(passed) >= 1`（不全滅）且 `removed["icir_skipped_event_path"]` 列出 ICIR NaN 之特徵；全域路徑 ⇒ `removed["icir"]` 與改前相同（golden `global_run.n_summary_rows` 不變）；`ic_window_disclosure` 兩路徑皆存在且 `timeframe_adjustment == "not_applied"`。
-- 邊界：①事件路徑 ICIR 部分有值 ⇒ 仍不篩（一致）；②tiebreaker 設 `ic_mean` ⇒ 不受影響；③全域 ⇒ 不變。
+### Task 2.1 — 事件路徑跳過 `icir_min`；ICIR 消費端安全化；事件路徑視窗揭露（`SPEC Task 2.1`）
+- 目標：事件路徑 `_apply_thresholds` 不以 `icir_min` 剔除；stage6 冗餘 tiebreaker 事件路徑改 `ic_mean`；reporter 排序對 None／NaN ICIR 不 raise；事件路徑報告揭露視窗尺度。
+- 檔案：`ic_filter_orchestrator.py::_apply_thresholds(..., icir_gate: bool=True)`（事件路徑 False；`removed["icir_skipped_event_path"]=[...]`，`removed["icir"]` 鍵保留為空）；`_stage6_redundancy` 呼叫端：事件路徑 `tiebreaker="ic_mean"`，`metadata["tiebreaker_effective"]`（**只事件路徑寫**）；`momentum/Analysis/ic_reporter.py` 三處（`:409`／`:576`／`:656`）排序 key 改 `_finite_or_neg_inf(item.get("icir"))`（None／NaN／非數 ⇒ `-inf`）；事件路徑 summary `icir` 缺值寫 `float("nan")`；`metadata["ic_window_disclosure"]={window_unit:"bars_unadjusted", timeframe_adjustment:"not_applied", icir_role:"diagnostic"}`（**只事件路徑**）；前端 `frontend/src/lib/icIsolation.ts::windowDisclosureLine`＋`IsolationNote.tsx` 一行＋`icIsolation.test.ts`。
+- 實作要點：`redundancy_filter.py` 不改；全域路徑 `_apply_thresholds` 位元組不變（`icir_gate=True` 預設）。
+- 驗證：`venv/bin/python -m pytest tests/api/test_evtwarmup.py -k icir -q` rc=0；事件路徑 34 事件 ⇒ `len(passed) >= 1`、`removed["icir_skipped_event_path"]` 非空、`metadata["tiebreaker_effective"]=="ic_mean"`、reporter `save_report` 不 raise；`_finite_or_neg_inf(None) == -inf`；全域路徑 ⇒ `removed["icir"]` 與改前相同、`pytest tests/momentum/Analysis/test_gap2_golden.py -q` rc=0、探針 `global_run` 無 `ic_window_disclosure`／`tiebreaker_effective`。
+- 邊界：①事件路徑 ICIR 部分有值 ⇒ 仍不篩；②config tiebreaker 已是 `ic_mean` ⇒ 不受影響；③reporter 遇舊 artifact `icir=None` ⇒ 不 raise。
 - **存活至**：永久。
-- **覆蓋風險**：B2 後 `timeframe_adjustment` 值改 `applied`（欄位保留）；不合併理由＝golden 互斥。
-- 不可做：不移除全域 `icir_min`；不改 ICIR 公式；不把揭露當成修正（B2 才是修正）。
+- **覆蓋風險**：B2 後全域亦寫 `ic_window_disclosure`（範圍擴大、欄位保留）；不合併理由＝golden 互斥。
+- 不可做：不移除全域 `icir_min`；不改 ICIR 公式；不改 `redundancy_filter._score_value`；不對全域報告新增鍵。
 
 ## Phase 3 — TFWINDOW：rolling 視窗依 run 週期換算（完成後：1h run 的 63 視窗＝31.5 天而非 2.6 天）（依賴：B1 收案）
 
 ### Task 3.1 — 建引擎時注入 run timeframe（`TFWINDOW SPEC Task 3.1`）
-- 目標：`_adjust_rolling_windows` 於生產路徑生效；缺 timeframe fail-loud。
-- 檔案：`momentum/Analysis/ic_engine.py::ICEngine.set_timeframe(tf: Optional[str])`（新；設 `_timeframe`）；`ic_filter_orchestrator.py::analyze` stage0 後 `self._ic_engine.set_timeframe(metadata.get("timeframe"))`；`metadata["ic_window_disclosure"]` 改 `timeframe_adjustment="applied"|"not_applied:missing_timeframe"|"not_applied:invalid_timeframe"`＋`adjusted_windows`；`tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_ic_rolling_warmup` 依 fixture 週期重算期望鍵（不刪）。
-- 實作要點：`set_timeframe` 只設屬性；`_adjust_rolling_windows` 不動；12h fixture 因子 1 ⇒ 整份報告 sha256 不變（over 向對照）。
-- 驗證：`venv/bin/python -m pytest tests/api/test_tfwindow.py -q` rc=0；斷言 1h 案例 rolling 鍵集 `== {"window_252","window_756","window_1512"}`；缺 timeframe ⇒ 鍵集不變且 `timeframe_adjustment == "not_applied:missing_timeframe"`；`pytest tests/momentum/Analysis/test_gap2_golden.py -q` rc=0（12h sha256 不變）；新 golden `tests/golden/tfwindow/rolling_keys_1h.json` 值 sha256 `==`。
-- 邊界：①12h ⇒ 不變；②1h ⇒ ×12；③timeframe 缺；④非法字串 ⇒ `logger.warning`＋`not_applied:invalid_timeframe`；⑤1h 短歷史 run（<1517 測試列）⇒ 全域 fallback 增多，白話揭露（`TW-RESID-1`）。
+- 目標：`_adjust_rolling_windows` 於生產路徑生效；缺 timeframe fail-loud；全域報告此時起寫 `ic_window_disclosure`。
+- 檔案：`momentum/Analysis/ic_engine.py::ICEngine.set_timeframe(tf: Optional[str]) -> None`（只設 `_timeframe`）；`ic_filter_orchestrator.py::analyze`（stage0 後 `self._ic_engine.set_timeframe(metadata.get("timeframe"))`；`metadata["ic_window_disclosure"]` 全路徑寫：`timeframe_adjustment="applied"|"not_applied:missing_timeframe"|"not_applied:invalid_timeframe"`＋`adjusted_windows`）；`scripts/gap2_freeze_golden.py`＋`tests/golden/gap2/*`：12h fixture 因子 1 ⇒ 數值不變但**新增鍵** ⇒ 依 §G 重凍並在 commit 訊息列出唯一差異＝新鍵；`tests/golden/tfwindow/rolling_keys_1h.json`（新）；`tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_ic_rolling_warmup`＝引擎層回歸（保留，不刪、不改期望鍵——它直呼 stage4 不經注入）；主 gate＝`tests/api/test_tfwindow.py`（經 `analyze`）。
+- 實作要點：`_adjust_rolling_windows` 不動；1h fixture（`tests/golden/la0/inputs/BTCUSDT_1h_*`）鍵集 `window_252/756/1512`。
+- 驗證：`venv/bin/python -m pytest tests/api/test_tfwindow.py -q` rc=0；1h 案例 rolling 鍵集 `== {"window_252","window_756","window_1512"}`；缺 timeframe ⇒ 鍵集 `== {"window_21","window_63","window_126"}` 且 `timeframe_adjustment=="not_applied:missing_timeframe"`；mutation M9（注入拿掉 ⇒ `-k window_keys` 紅、`test_oos_ic_rolling_warmup` 仍綠——證明主 gate 在接線）；12h：`pytest tests/momentum/Analysis/test_gap2_golden.py -q` rc=0（重凍後）且重凍 diff 只含 `ic_window_disclosure` 鍵；1h golden 值 sha256 `==`（`atol=1e-12`）。
+- 邊界：①12h ⇒ 視窗不變；②1h ⇒ ×12；③timeframe 缺；④非法字串 ⇒ `logger.warning`＋`not_applied:invalid_timeframe`；⑤1h 短歷史 run（<1517 測試列）⇒ 全域 fallback 增多，白話揭露（`TW-RESID-1`）。
 - **存活至**：永久。
 - **覆蓋風險**：無。
-- 不可做：不改 `reference_tf` 預設；不縮視窗；不做預設關閉 flag（正確化不藏 flag 後）。
+- 不可做：不改 `reference_tf` 預設；不縮視窗；不做預設關閉 flag；不刪 `test_oos_ic_rolling_warmup`。
 
 ## Phase 測試與 Gate
-- mutation 腳本：`handoffs/20260908-evtwarmup-mutate.py`（phase 1：M1 分流刪除、M2 分流改 `event_filter.enabled`、M3 地板判定刪除、M4 事件路徑套回 `icir_min`、M5 跳過擴到全域、C0 註解；phase 3：M6 注入刪除、M7 缺 timeframe 假換算、C1 註解）。
-- Gate：`bash scripts/evtalign_phase_gate.sh` 之同型腳本 `scripts/evtwarmup_phase_gate.sh`（phase 1／3：skip=0、golden 非空、UNCOVERED=0）。
-- 驗收後：白話說明更新 `GAP-3驗收清單.md` 新增 B32（事件分析不再因 34 事件降級；報告寫 `insufficient_test_events` 而非全樣本）與 B33（TFWINDOW 後 1h 視窗鍵 ×12 且揭露）。
+- mutation 腳本：`handoffs/20260908-evtwarmup-mutate.py`（phase 1：M1–M8＋C0，定義見 SPEC §V；phase 3：M9 注入拿掉、M10 缺 timeframe 假換算、C1 註解）。
+- Gate：`scripts/evtwarmup_phase_gate.sh <1|3>`（同 `evtalign_phase_gate.sh` 型：skip=0、golden 非空、UNCOVERED=0）。
+- 驗收後：`白話說明/GAP-3驗收清單.md` 新增 B32（事件分析 34 事件不再降級成全樣本；橫幅寫「測試段事件不足」而非「Full-sample」）與 B33（TFWINDOW 後 1h 視窗鍵 ×12 且報告揭露）。
