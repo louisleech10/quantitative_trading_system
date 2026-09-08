@@ -1618,6 +1618,7 @@ class ICAnalysisService:
                 task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "completed"
+                    task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["progress"] = 1.0
                     task_info["result"] = report
 
@@ -1664,6 +1665,7 @@ class ICAnalysisService:
                 task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "cancelled"
+                    task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["current_stage"] = "cancelled"
                     task_info["error"] = f"已取消：{exc}"
             self._notify_callbacks(task_id, {
@@ -1678,6 +1680,7 @@ class ICAnalysisService:
                 task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "failed"
+                    task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["progress"] = 1.0
                     task_info["current_stage"] = "failed"
                     task_info["error"] = str(exc)
@@ -2174,6 +2177,7 @@ class ICAnalysisService:
                 task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "completed"
+                    task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["current_stage"] = "deep_analysis"
                     task_info["current_step"] = "completed"
                     task_info["progress"] = 1.0
@@ -2194,6 +2198,7 @@ class ICAnalysisService:
                 task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "failed"
+                    task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["current_stage"] = "deep_analysis"
                     task_info["current_step"] = "failed"
                     task_info["progress"] = 1.0
@@ -2327,6 +2332,7 @@ class ICAnalysisService:
                 task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "completed"
+                    task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["current_stage"] = "completed"
                     task_info["current_step"] = "completed"
                     task_info["progress"] = 1.0
@@ -2384,6 +2390,7 @@ class ICAnalysisService:
                 task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "failed"
+                    task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["current_stage"] = "failed"
                     task_info["current_step"] = "failed"
                     task_info["progress"] = 1.0

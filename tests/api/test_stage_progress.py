@@ -180,7 +180,7 @@ def test_ws_payload_forwards_sub_progress_and_warning_fields():
 
 
 def test_precheck_rolling_warmup_uses_same_rule_as_stage4_and_counts_event_rows_in_test():
-    """UAT 2026-09-08：切分後、預處理前先判 warmup；事件模式以「事件 ∩ 測試段」計數；規則與 stage4 同一份。"""
+    """UAT 2026-09-08：切分後、預處理前先判 warmup；規則與 stage4 同一份；事件條件路徑只記 test_events 不擋（EVTWARMUP）。"""
     config = load_ic_config()
     o = ICFilterOrchestrator(config)
     n = 400
@@ -196,10 +196,15 @@ def test_precheck_rolling_warmup_uses_same_rule_as_stage4_and_counts_event_rows_
         assert out == {"train_rows": n - 80, "test_rows": 80, "min_test_rows": min_required, "decided_at": "precheck_before_preprocessing"}
     else:
         assert out is None
-    # 事件模式：只有 3 個事件落在測試段 ⇒ test_rows=3 ⇒ 不足
+    # EVTWARMUP Task 1.1（R4 CODEX-R4-P2-02 後的契約）：有事件戳但**非**事件條件路徑 ⇒ 仍以 bar 列數判（80）、test_events=None；
+    # 事件條件路徑（event_conditional=True）⇒ 不以 bar warmup 擋（回 None），只記 test_events=事件 ∩ 測試段=3 供地板
     ev = [int(idx[-1]) * 1000, int(idx[-2]) * 1000, int(idx[-3]) * 1000, int(idx[10]) * 1000]  # ms
-    out_ev = o._precheck_rolling_warmup(features, config, ctx, ev)
-    assert out_ev is not None and out_ev["test_rows"] == 3
+    ctx_ev = dict(ctx)
+    out_ev = o._precheck_rolling_warmup(features, config, ctx_ev, ev)
+    assert out_ev is not None and out_ev["test_rows"] == 80 and ctx_ev["test_events"] is None
+    ctx_ev2 = dict(ctx)
+    assert o._precheck_rolling_warmup(features, config, ctx_ev2, ev, event_conditional=True) is None
+    assert ctx_ev2["test_events"] == 3
     # 測試段夠大 ⇒ None（不誤擋）
     big_mask = np.zeros(n, dtype=bool)
     big_mask[-(min_required + 1):] = True
@@ -247,3 +252,16 @@ def test_real_fixture_analyze_emits_sub_progress_within_bounds():
     runs = max(1, sum(1 for p in payloads if p.get("stage") == 0))
     assert 3 <= len(subs) <= runs * max(3, math.ceil(n_feat / 100))
     assert subs[0]["eta_state"] == "estimating" and all(p["stage_name"] == "preprocessing" for p in subs)
+
+
+def test_terminal_status_clears_sub_progress_in_service_source():
+    """UAT 2026-09-09：跑完仍顯示「grouped_ic 5/5（剩餘 預估中）」——每個終態寫出點（completed／failed／cancelled）
+    都必須緊接著把 sub_progress 歸 None（源碼守衛：寫出點數 == 歸零點數，缺一即紅）。"""
+    import re
+    from pathlib import Path
+
+    src = Path("api/services/ic_analysis_service.py").read_text(encoding="utf-8")
+    writes = re.findall(r'^( *)task_info\["status"\] = "(completed|failed|cancelled)"\n( *)task_info\["sub_progress"\] = None', src, flags=re.M)
+    total = len(re.findall(r'^ *task_info\["status"\] = "(completed|failed|cancelled)"$', src, flags=re.M))
+    assert total >= 3
+    assert len(writes) == total, f"終態寫出點 {total} 處，但只有 {len(writes)} 處緊接 sub_progress=None"

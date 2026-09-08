@@ -167,7 +167,9 @@ export function useICAnalysis() {
       // Task 6.3：解析不到就是 null，**不填假值**
       setFeatureCount(typeof status.feature_count === "number" ? status.feature_count : null);
       // EVTALIGN Task 4.1：後端沒送就是 null／[]，不補假 ETA、不補假警告
-      setSubProgress(status.sub_progress ?? null);
+      // 終態（completed／failed／cancelled）不留上一子步驟殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
+      const terminal = status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled';
+      setSubProgress(terminal ? null : (status.sub_progress ?? null));
       setTaskWarnings(Array.isArray(status.warnings) ? status.warnings : []);
       // 🔴 `G3-D2` D4.2／D4.3：揭露欄**整組**由後端來；任一欄都不在前端補值。
       //    非事件分析路徑（後端不放這些鍵）⇒ 整個物件為 `null`，面板顯示「要分析過才知道」。
