@@ -194,20 +194,25 @@ def test_feature_coverage_gate_06_per_row_timeframe_not_batch_scalar():
 
 
 def test_feature_coverage_gate_07_mixed_tf_matches_per_row_evaluation():
-    """⑦ 批內混 1h 與 12h ⇒ 結果與逐列單獨計算一致（此處：12h 那列決定整批被擋）。"""
+    """⑦ 批內混 1h 與 12h ⇒ 結果與逐列單獨計算一致。
+
+    🔴 EVTALIGN Task 3.1（2026-09-08）語意變更：原本 12h 那列決定**整批被擋**；現在**逐事件**——
+    1h 被涵蓋、12h 超出 ⇒ 不 raise，12h 進 `dropped`（ID 揭露），呼叫端據此縮集合。
+    全部事件都超出才 fail-closed（見 `tests/api/test_period_auto_align.py`）。
+    """
     end_1h = T0 + 4 * 3600_000
     end_12h = T0 + 4 * 43200_000
     run = rng(secs(T0 - DAY), secs(end_1h))
-    with pytest.raises(FeatureRunCoverageError) as ei:
-        check_feature_run_coverage(
-            timeframe_seconds=TF_SECONDS,
-            feature_manifest_time_range=run,
-            event_windows=[
-                win("ev1h", tf="1h", decision=T0, end=end_1h),
-                win("ev12h", tf="12h", decision=T0, end=end_12h),
-            ],
-        )
-    assert ei.value.reason == "feature_coverage_insufficient"
+    cov = check_feature_run_coverage(
+        timeframe_seconds=TF_SECONDS,
+        feature_manifest_time_range=run,
+        event_windows=[
+            win("ev1h", tf="1h", decision=T0, end=end_1h),
+            win("ev12h", tf="12h", decision=T0, end=end_12h),
+        ],
+    )
+    assert cov.evaluated and cov.covered_event_ids == ("ev1h",)
+    assert cov.dropped == (("ev12h", "outside_feature_run"),)
     # over 向：把右界拉到蓋得住 12h ⇒ 混批放行（證明混批本身不是被擋的理由）
     check_feature_run_coverage(
         timeframe_seconds=TF_SECONDS,

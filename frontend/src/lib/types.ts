@@ -3246,3 +3246,19 @@ export interface ICScanCubeSummary {
   tier_a?: ICScanCubeTier;
   tier_b?: ICScanCubeTier;
 }
+
+/** EVTALIGN Task 4.1：階段內進度（後端 `/task` 之 `sub_progress`）。`eta_state==='estimating'` ⇒ 顯示「預估中」，不填假 ETA。 */
+export interface ICSubProgress {
+  step: string | null;
+  done: number | null;
+  total: number | null;
+  eta_seconds: number | null;
+  eta_state: 'estimating' | 'ok' | 'done' | null;
+  message?: string | null;
+}
+
+/** EVTALIGN Task 4.1：後端 WARN（例：`memory_pressure_observed`）——只揭露、不擋。 */
+export interface ICTaskWarning {
+  code: string;
+  detail?: Record<string, unknown> | null;
+}

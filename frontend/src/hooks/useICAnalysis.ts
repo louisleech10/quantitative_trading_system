@@ -6,6 +6,8 @@ import {
   ICAnalysisConfig,
   ICEventScanDisclosure,
   ICReport,
+  ICSubProgress,
+  ICTaskWarning,
 } from '@/lib/types';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { httpErrorMessage } from '@/lib/httpError';
@@ -67,6 +69,8 @@ export function useICAnalysis() {
     setTask,
     setProgress,
     setFeatureCount,
+    setSubProgress,
+    setTaskWarnings,
     setEventScanDisclosure,
     setStatus,
     setError,
@@ -148,11 +152,17 @@ export function useICAnalysis() {
         // `CODEX-R2-P2-01`：掃描**進行中**只有這兩個頂層欄（`event_label_scan` 要跑完才有）
         scan_done?: number | null;
         scan_total?: number | null;
+        // EVTALIGN Task 4.1：階段內進度與 WARN（未到 ⇒ null／[]）
+        sub_progress?: ICSubProgress | null;
+        warnings?: ICTaskWarning[];
       }>(`/task/${taskId}`);
       setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed');
       setProgress(status.progress ?? 0, status.current_stage ?? null);
       // Task 6.3：解析不到就是 null，**不填假值**
       setFeatureCount(typeof status.feature_count === "number" ? status.feature_count : null);
+      // EVTALIGN Task 4.1：後端沒送就是 null／[]，不補假 ETA、不補假警告
+      setSubProgress(status.sub_progress ?? null);
+      setTaskWarnings(Array.isArray(status.warnings) ? status.warnings : []);
       // 🔴 `G3-D2` D4.2／D4.3：揭露欄**整組**由後端來；任一欄都不在前端補值。
       //    非事件分析路徑（後端不放這些鍵）⇒ 整個物件為 `null`，面板顯示「要分析過才知道」。
       //
@@ -206,7 +216,7 @@ export function useICAnalysis() {
 
       return status;
     },
-    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount, setEventScanDisclosure]
+    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount, setSubProgress, setTaskWarnings, setEventScanDisclosure]
   );
 
   const startPolling = useCallback(
@@ -270,6 +280,23 @@ export function useICAnalysis() {
           //    整組揭露欄，並在 completed 時自行 `fetchResult`）。
           if (typeof payload.scan_total === 'number') {
             mergeScanProgress(payload.scan_done ?? null, payload.scan_total);
+          }
+          // EVTALIGN Task 4.1：階段內進度（沿用同一 progress 事件；後端 `_report_progress` 之 extra 欄）
+          if (typeof payload.sub_total === 'number') {
+            setSubProgress({
+              step: payload.sub_step ?? null,
+              done: typeof payload.sub_done === 'number' ? payload.sub_done : null,
+              total: payload.sub_total,
+              eta_seconds: typeof payload.eta_seconds === 'number' ? payload.eta_seconds : null,
+              eta_state: payload.eta_state ?? null,
+              message: payload.message ?? null,
+            });
+          }
+          if (typeof payload.warning === 'string' && payload.warning) {
+            const prev = useICAnalysisStore.getState().taskWarnings;
+            if (!prev.some((w) => w.code === payload.warning)) {
+              setTaskWarnings([...prev, { code: payload.warning, detail: payload.warning_detail ?? null }]);
+            }
           }
           if (payload.status === 'failed') {
             terminalRef.current = true;
@@ -343,7 +370,7 @@ export function useICAnalysis() {
     };
 
     wsRef.current = ws;
-  }, [clearTimers, fetchResult, fetchTaskStatus, mergeScanProgress, setError, setEventScanDisclosure, setProgress, setStatus, startPolling]);
+  }, [clearTimers, fetchResult, fetchTaskStatus, mergeScanProgress, setError, setEventScanDisclosure, setProgress, setStatus, setSubProgress, setTaskWarnings, startPolling]);
 
   const startAnalysis = useCallback(
     async (config: ICAnalysisConfig) => {

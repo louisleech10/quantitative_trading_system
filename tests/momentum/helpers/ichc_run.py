@@ -34,6 +34,7 @@ def run_analyze(
     event_label_values: Optional[dict] = None,  # GAP-3 B2.3：條件 IC 事件 label（透傳；None ⇒ 原行為）
     event_context: Optional[dict] = None,       # GAP-3 B2.4：survivor v2 六鍵（透傳）
     event_label_owners: Optional[dict] = None,  # EVTALIGN Task 2.1：{epoch_ms: event_id}（透傳；None ⇒ 不綁 id）
+    progress_callback: Optional[Any] = None,    # EVTALIGN Task 4.1：進度 spy（透傳；None ⇒ 原行為）
 ) -> dict:
     from momentum.factories import create_ic_analyzer, create_kline_storage_manager
 
@@ -64,6 +65,7 @@ def run_analyze(
         labels_path="",
         meta_path=str(meta.resolve()),
         config_override=config_override,
+        progress_callback=progress_callback,
         kline_reader=kline_reader,
         event_timestamps=event_timestamps,
         event_label_values=event_label_values,

@@ -130,6 +130,42 @@ def _assert_event_triple_bound(staged: Dict[str, Any], report: Any) -> None:
             raise ValueError(f"event {eid!r}: consumed label {val!r} != produced label {src!r}")
 
 
+def _apply_stage_progress(task_info: Dict[str, Any], payload: Dict[str, Any], message: Any) -> None:
+    """EVTALIGN Task 4.1：把 orchestrator 之階段內進度（`sub_*`／ETA）與 WARN 寫進 task_info。
+
+    - `sub_progress`：`{step, done, total, eta_seconds, eta_state, message}`；`eta_state=="estimating"` ⇒ 前端顯示「預估中」，**不填假 ETA**。
+    - `warnings`：`{code, detail}` 去重 append；🔴 WARN 只揭露、不改 status、不擋（§C-4）。
+    """
+    if "sub_total" in payload:
+        task_info["sub_progress"] = {
+            "step": payload.get("sub_step"), "done": payload.get("sub_done"),
+            "total": payload.get("sub_total"), "eta_seconds": payload.get("eta_seconds"),
+            "eta_state": payload.get("eta_state"), "message": message,
+        }
+    if payload.get("warning"):
+        warnings_list = task_info.setdefault("warnings", [])
+        code = str(payload["warning"])
+        if not any(w.get("code") == code for w in warnings_list):
+            warnings_list.append({"code": code, "detail": payload.get("warning_detail")})
+
+
+def _inject_period_alignment(staged: Dict[str, Any], report: Any) -> None:
+    """EVTALIGN Task 3.1：把 service 端之期間對齊揭露（丟掉的事件 ID）併進 `report.metadata.period_alignment`。
+
+    orchestrator 端（feature ∩ kline 之裁切）若已寫同鍵則合併，不覆蓋。
+    🔴 只在**有事件被丟**時寫鍵——沒丟任何事件且 orchestrator 亦未裁切時不新增鍵（§G-1 golden 逐位元組不變）。
+    """
+    pa = staged.get("period_alignment")
+    if not isinstance(report, dict) or not isinstance(pa, dict):
+        return
+    if int((pa.get("dropped_events") or {}).get("count") or 0) == 0 and "period_alignment" not in (report.get("metadata") or {}):
+        return
+    metadata = report.setdefault("metadata", {})
+    merged = dict(metadata.get("period_alignment") or {})
+    merged.update({k: v for k, v in pa.items()})
+    metadata["period_alignment"] = merged
+
+
 def _parse_time_range_endpoint(value: Any) -> int:
     """`time_range` 之單一端點字串 → epoch ms。**解析順序寫死：先數字後 ISO**（SPEC 7.7 ④）。
 
@@ -171,13 +207,48 @@ def _parse_time_range_endpoint(value: Any) -> int:
     return int(parsed.timestamp() * 1000)
 
 
+@dataclass(frozen=True)
+class FeatureRunCoverage:
+    """`check_feature_run_coverage` 之結果（EVTALIGN Task 3.1）。
+
+    `evaluated=False` ⇒ 沒有窗、什麼都沒判（呼叫端沿用 prepared 之全集）。
+    `covered_event_ids`／`dropped`：逐事件分類；`dropped` 為 `(event_id, reason)`，
+    reason 目前只有 `outside_feature_run`。
+    """
+
+    evaluated: bool
+    run_start_ms: Optional[int]
+    run_end_ms: Optional[int]
+    covered_event_ids: tuple
+    dropped: tuple
+
+    def disclosure(self) -> Dict[str, Any]:
+        """`metadata.period_alignment` 之 service 端部分——🔴 丟掉的事件**必列 ID**（`COMPOSER-R1-P2-01`／`GROK-R1-P1-02`：只報數不等價）。"""
+        dropped_ids = sorted(str(eid) for eid, _ in self.dropped)
+        return {
+            "feature_run": {"start_ms": self.run_start_ms, "end_ms": self.run_end_ms},
+            "dropped_events": {
+                "count": len(dropped_ids),
+                "ids": sorted(dropped_ids),
+                "reason": "outside_feature_run",
+            },
+            "covered_event_count": len(self.covered_event_ids),
+        }
+
+
 def check_feature_run_coverage(
     *,
     timeframe_seconds: Dict[str, int],
     feature_manifest_time_range: Optional[Dict[str, Optional[str]]],
     event_windows,
-) -> None:
-    """Task 7.7 ③：特徵 run 是否涵蓋事件期。不涵蓋即 **fail-closed**（非警告）。
+) -> FeatureRunCoverage:
+    """Task 7.7 ③ → EVTALIGN Task 3.1：特徵 run 對事件期之涵蓋，**逐事件**判定。
+
+    🔴 語意變更（2026-09-08，R2 `CODEX-R2-P1-06`＋使用者原話④「還要手動重新生成特徵…太蠢了，是缺陷吧」）：
+    原本是**批次級** pass/fail——任一事件超出 run 區間就整批 raise，使用者得回頭重生特徵。
+    現在：超出 run 區間的事件**逐一剔除並揭露 ID**（呼叫端以 `apply_event_coverage` 縮集合、
+    `period_alignment.dropped_events` 進報告），只有**全部**事件都不在區間內才 fail-closed。
+    legacy run（無 time_range）與未知 timeframe 仍 fail-closed（無區間可對證，不能靜默放行）。
 
     🔴 **唯一入口、keyword-only**：禁 `args[N]`、禁第二入口、禁掛在 pipeline 上當替身。
     🔴 `timeframe_seconds` 是**注入之 map**——SPEC 明禁在本函式內直讀
@@ -195,7 +266,7 @@ def check_feature_run_coverage(
     windows = tuple(event_windows)
     if not windows:
         # 沒有窗就沒有東西要涵蓋。這不是錯誤——上游已對「全部對齊失敗」有自己的 loud 路徑。
-        return
+        return FeatureRunCoverage(False, None, None, (), ())
 
     # ② 逐列用**該列自己的** timeframe；批內多 TF 允許，但任一列不在注入之鍵集 ⇒ 整批擋。
     for w in windows:
@@ -228,14 +299,24 @@ def check_feature_run_coverage(
     run_start_ms = _parse_time_range_endpoint(start_raw)
     run_end_ms = _parse_time_range_endpoint(end_raw)
 
-    required_start = min(int(w.decision_at_ms) for w in windows)
-    required_end = max(int(w.label_end_ms) for w in windows)
-    if run_start_ms > required_start or required_end > run_end_ms:
+    # 逐事件：左界比 decision_at、右界比含答案窗之 label_end（閉區間）
+    covered: list = []
+    dropped: list = []
+    for w in windows:
+        if run_start_ms <= int(w.decision_at_ms) and int(w.label_end_ms) <= run_end_ms:
+            covered.append(str(w.event_id))
+        else:
+            dropped.append((str(w.event_id), "outside_feature_run"))
+    if not covered:
+        required_start = min(int(w.decision_at_ms) for w in windows)
+        required_end = max(int(w.label_end_ms) for w in windows)
         raise FeatureRunCoverageError(
             "feature_coverage_insufficient",
-            f"特徵 run 之區間 [{run_start_ms}, {run_end_ms}] 未涵蓋事件期 "
-            f"[{required_start}, {required_end}]（左界比 decision_at、右界比含答案窗之 label_end）",
+            f"特徵 run 之區間 [{run_start_ms}, {run_end_ms}] 與事件期 "
+            f"[{required_start}, {required_end}] 無交集——{len(windows)} 筆事件全部落在 run 之外"
+            f"（左界比 decision_at、右界比含答案窗之 label_end；被丟 ID 前 5 筆：{[e for e, _ in dropped[:5]]}）",
         )
+    return FeatureRunCoverage(True, run_start_ms, run_end_ms, tuple(covered), tuple(dropped))
 
 
 def _feature_run_time_range(*candidates: Optional[str]) -> Optional[Dict[str, Optional[str]]]:
@@ -482,13 +563,19 @@ class ICAnalysisService:
             lookahead_bars_declared=event_batch.get("lookahead_bars_declared") or {},
             timeframe_seconds=timeframe_seconds,
         )
-        check_feature_run_coverage(                              # 階段 3a（批次級 pass/fail）
+        coverage = check_feature_run_coverage(                   # 階段 3a（EVTALIGN Task 3.1：逐事件）
             timeframe_seconds=timeframe_seconds,                 # 🔴 同一物件
             feature_manifest_time_range=_feature_run_time_range(feature_manifest_path, features_path, meta_path),
             event_windows=prepared0.windows,
         )
-        # 階段 3b：本批 3a 為批次級，不剔除任何列 ⇒ allowed 維持全集（`replace` 仍產生新身分）。
-        prepared1 = pipeline.apply_event_coverage(prepared0, prepared0.allowed_event_ids)
+        # 階段 3b：落在 run 區間外的事件在此剔除（縮集合），ID 進 period_alignment 揭露；
+        # 沒有窗（evaluated=False）⇒ 沿用全集（`replace` 仍產生新身分）。
+        allowed = (
+            frozenset(coverage.covered_event_ids) & prepared0.allowed_event_ids
+            if coverage.evaluated else prepared0.allowed_event_ids
+        )
+        prepared1 = pipeline.apply_event_coverage(prepared0, allowed)
+        period_alignment = coverage.disclosure() if coverage.evaluated else None
         purge = pipeline.project_purge(prepared1.purge_lower_bound_ms_by_symbol)  # 階段 4
         # 🔴 **`CODEX-R1-P1-02`：階段 4 原本只算不用**——`purge` 存進 local 就沒人消費，
         #    `split_events` 也從未被呼叫 ⇒ **per-symbol purge 對本次分析完全沒有作用**。
@@ -601,6 +688,8 @@ class ICAnalysisService:
             # 對 orchestrator 回報之 {event_id: 被消費 label} 逐筆回比（_assert_event_triple_bound）。
             "event_label_owners": dict(owner),
             "event_label_by_id": by_id,
+            # EVTALIGN Task 3.1：service 端期間對齊揭露（丟掉的事件 ID）；analyze 後併入 report.metadata
+            "period_alignment": period_alignment,
             "event_context": event_context,
             "events_excluded_by_symbol": dict(excluded_by_symbol),
             "prepared": prepared1,
@@ -1159,6 +1248,7 @@ class ICAnalysisService:
             event_context=staged["event_context"],
         )
         _assert_event_triple_bound(staged, report)
+        _inject_period_alignment(staged, report)
         return {
             "capability": "available",
             "reason": None,
@@ -1255,6 +1345,8 @@ class ICAnalysisService:
                 if "scan_total" in payload:
                     task_info["scan_done"] = payload.get("scan_done")
                     task_info["scan_total"] = payload.get("scan_total")
+                # EVTALIGN Task 4.1：階段內進度（done/total＋ETA）沿用同一通道；記憶體 WARN 進 warnings（去重）
+                _apply_stage_progress(task_info, payload, message)
 
             notify_payload = {
                 "task_id": task_id,
@@ -1448,6 +1540,7 @@ class ICAnalysisService:
                 )
                 if request.event_import_id:
                     _assert_event_triple_bound(staged, report)
+                    _inject_period_alignment(staged, report)
 
             with self._lock:
                 task_info = self._tasks.get(task_id)
@@ -1534,6 +1627,9 @@ class ICAnalysisService:
                 #    「掃了 0 格」，而事實是「這次沒有掃描」）。
                 "scan_done": task_info.get("scan_done"),
                 "scan_total": task_info.get("scan_total"),
+                # EVTALIGN Task 4.1：階段內進度與 WARN（未到／沒有 ⇒ None／[]，不填假值）
+                "sub_progress": task_info.get("sub_progress"),
+                "warnings": list(task_info.get("warnings") or []),
             }
             # 🔴 `GAP3_EVENT_DISCLOSURE` Task 1.3：降級原因**刻意不進 task status**。
             #    它住 `report.metadata.oos_downgrade`（orchestrator 之單一寫出點），

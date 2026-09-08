@@ -43,6 +43,7 @@ import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
 import { useAutoRefilter } from '@/hooks/useAutoRefilter';
 import { icFeatureCountLabel, icPollFailed, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
+import { icSubProgressLabel, icTaskWarningLabel } from "@/lib/icProgressLabel";
 import { isSectionStatus } from "@/lib/types";
 import type { SectionStatusObject } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
@@ -58,6 +59,8 @@ function ICAnalysisPageContent() {
     progress,
     currentStage,
     featureCount,
+    subProgress,
+    taskWarnings,
     eventScanDisclosure,
     error,
     report,
@@ -547,6 +550,22 @@ function ICAnalysisPageContent() {
               <div className="text-xs text-slate-500" data-testid="ic-task-feature-count">
                 {icFeatureCountLabel(featureCount)}
               </div>
+              {/* EVTALIGN Task 4.1：階段內進度（done/total＋ETA）；後端沒送就不渲染，預估不出顯示「預估中」 */}
+              {icSubProgressLabel(subProgress) && (
+                <div className="text-xs text-slate-400" data-testid="ic-task-sub-progress">
+                  {icSubProgressLabel(subProgress)}
+                </div>
+              )}
+              {/* EVTALIGN Task 4.1：WARN 只揭露不擋（例：記憶體吃緊照跑） */}
+              {taskWarnings.map((w) => (
+                <div
+                  key={w.code}
+                  className="text-xs text-amber-200 border border-amber-400/30 rounded px-2 py-1"
+                  data-testid={`ic-task-warning-${w.code}`}
+                >
+                  {icTaskWarningLabel(w)}
+                </div>
+              ))}
             </div>
           </div>
         </div>

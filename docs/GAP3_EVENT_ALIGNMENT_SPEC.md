@@ -289,8 +289,15 @@ codex 必答 4：「若 A 為堵洞而改成 producer binding、index 推導、c
 - **存活至**：永久。
 - **覆蓋風險**：無。
 - **不可做**：不得靜默裁切；不得要求使用者手動重生特徵。
+- **落地（B3，2026-09-08）**：`metadata.period_alignment` 兩層來源——orchestrator（feature ∩ K 線之
+  `used`／`trimmed_bars`）與 service（`dropped_events.{count,ids,reason}`，逐事件涵蓋取代原批次級 gate）；
+  🔴 零裁切且零丟事件時**不新增鍵**（§G-1 golden 逐位元組不變），裁了／丟了就必揭露。細節見 TODO Task 3.1 要點 4。
 
 ### Task 4.1 — 進度可見（`票 UAT-1`）
+
+> **落地（B4，2026-09-08）**：preprocessing 之 `done/total`＋ETA（估不出 ⇒「預估中」，不給假 ETA）沿既有 progress 通道；
+> 記憶體壓力 ⇒ `memory_pressure_observed` **WARN 一次、不擋**；`/task` 回 `sub_progress`／`warnings`，前端顯示。
+> 回報次數 ∈ [3, max(3, ceil(n/100))]（不進 hot loop）。細節見 TODO Task 4.1 要點 4。
 
 - **目標**：使用者原話「我只是不知確切的狀態進行式是什麼」。
 - **修法**：preprocessing 等長階段回報**階段內進度**（已處理特徵數／總數）與預估剩餘時間。

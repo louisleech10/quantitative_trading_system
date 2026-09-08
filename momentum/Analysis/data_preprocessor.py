@@ -9,7 +9,9 @@ LA-0 B4 / P0-3：fit_mode 四出口
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+import math
+import time
+from typing import Callable, Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -38,8 +40,45 @@ _MAD_K = 3.5
 _ZSCORE_K = 3.0
 
 
+def _progress_interval(total: int) -> int:
+    """EVTALIGN Task 4.1：中間回報間隔——**不進 hot loop**。
+
+    <300 欄 ⇒ 約 3 次（`ceil(total/3)` 欄一次）；≥300 欄 ⇒ 每 100 欄一次。
+    ⇒ 回報次數 ∈ [3, max(3, ceil(total/100))]（TODO Task 4.1 驗收式；R2 `CODEX-R2-P1-10` 修正後有整數解）。
+    """
+    total = max(int(total), 1)
+    if total >= 300:
+        return 100
+    return max(1, math.ceil(total / 3))
+
+
+def _emit_progress(progress: Callable[[dict], None], sub_step: str, done: int, total: int,
+                   started: float, reports: int) -> None:
+    """組 payload 並呼叫 hook；ETA 至少兩次回報後才估，否則 `estimating`（**不給假 ETA**）。hook 例外不得炸主流程。"""
+    elapsed = time.monotonic() - started
+    eta: Optional[float] = None
+    state = "estimating"
+    if reports >= 2 and done > 0 and done < total and elapsed > 0:
+        eta = elapsed / done * (total - done)
+        state = "ok"
+    elif done >= total:
+        eta, state = 0.0, "done"
+    try:
+        progress({
+            "sub_step": sub_step, "done": int(done), "total": int(total),
+            "elapsed_seconds": float(elapsed), "eta_seconds": eta, "eta_state": state,
+        })
+    except Exception as exc:  # noqa: BLE001  回報失敗不得影響計算
+        logger.warning("preprocess progress hook failed: %s", exc)
+
+
 class DataPreprocessor:
     """Stage 1: 數據預處理 — Winsorization, 缺失值處理, 標準化."""
+
+    @staticmethod
+    def progress_interval(total: int) -> int:
+        """對外暴露之回報間隔（測試以此對證回報次數之上下界）。"""
+        return _progress_interval(total)
 
     def __init__(self, config: dict):
         self._config = config or {}
@@ -93,7 +132,12 @@ class DataPreprocessor:
         metadata: Optional[dict] = None,
         fit_mask: Optional[np.ndarray] = None,
         fit_mode: Optional[str] = None,
+        progress: Optional[Callable[[dict], None]] = None,
     ) -> tuple[pd.DataFrame, dict]:
+        """`progress`（EVTALIGN Task 4.1）：長迴圈之中間回報 hook，payload＝
+        `{"sub_step","done","total","elapsed_seconds","eta_seconds"|None,"eta_state"}`；
+        🔴 不進 hot loop：每 `_progress_interval(total)` 欄一次（<300 欄約 3 次；≥300 欄每 100 欄一次）。
+        ETA 至少兩次回報後才估，估不出來 `eta_state="estimating"`、`eta_seconds=None`——**不給假 ETA**。"""
         if features_df is None or features_df.empty:
             raise ValueError("features_df is empty")
 
@@ -124,6 +168,7 @@ class DataPreprocessor:
                 metadata=metadata,
                 fit_mask=fit_mask,
                 fit_mode=mode,
+                progress=progress,
             )
             log["winsorized_features"] = winsor_log["winsorized"]
             log["skipped_winsorization"] = winsor_log["skipped"]
@@ -177,6 +222,7 @@ class DataPreprocessor:
         metadata: Optional[dict] = None,
         fit_mask: Optional[np.ndarray] = None,
         fit_mode: Optional[str] = None,
+        progress: Optional[Callable[[dict], None]] = None,
     ) -> tuple[pd.DataFrame, dict]:
         mode = self.resolve_fit_mode(fit_mode=fit_mode, fit_mask=fit_mask)
         method = method.lower()
@@ -187,7 +233,14 @@ class DataPreprocessor:
         skipped: list[str] = []
         clipped = df.copy()
 
-        for column in clipped.columns:
+        total = int(clipped.shape[1])
+        interval = _progress_interval(total)
+        started = time.monotonic()
+        reports = 0
+        for pos, column in enumerate(clipped.columns, start=1):
+            if progress is not None and (pos % interval == 0 or pos == total):
+                reports += 1
+                _emit_progress(progress, "winsorize", pos, total, started, reports)
             series = clipped[column]
             # type-feature 為靜態屬性：metadata/category 優先；禁以完整未來序列翻轉分支
             if self._column_is_type_feature(

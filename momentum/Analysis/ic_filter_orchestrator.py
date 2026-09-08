@@ -238,6 +238,103 @@ def _alignment_spec(metadata: Optional[dict], horizon: int) -> AlignmentSpec:
     )
 
 
+def _memory_snapshot() -> Optional[dict]:
+    """EVTALIGN Task 4.1：{rss, phys_total, swap_used}（bytes）；取不到 ⇒ None（不擋、不猜）。"""
+    try:
+        import psutil  # 延遲載入：非 hot path，且缺套件時退化為不觀測
+
+        proc = psutil.Process()
+        return {
+            "rss": int(proc.memory_info().rss),
+            "phys_total": int(psutil.virtual_memory().total),
+            "swap_used": int(psutil.swap_memory().used),
+        }
+    except Exception:  # noqa: BLE001
+        return None
+
+
+_SWAP_GROWTH_WARN_BYTES = 1 << 30  # swap 自 analyze 起增長 ≥ 1 GB ⇒ 視為 thrash 徵兆
+
+
+def _memory_pressure(baseline: Optional[dict]) -> Optional[dict]:
+    """RSS 超過實體記憶體，或 swap 自基線增長 ≥ 1 GB ⇒ 回傳觀測值（供 WARN）；否則 None。**不 raise。**
+
+    實測依據（SPEC Task 4.1）：17 GB RSS／8 GB 實體、swap 15.6 GB、CPU 3.3% ＝ thrash。
+    """
+    now = _memory_snapshot()
+    if now is None:
+        return None
+    rss_over = now["rss"] > now["phys_total"]
+    swap_growth = now["swap_used"] - int((baseline or {}).get("swap_used", now["swap_used"]))
+    if not rss_over and swap_growth < _SWAP_GROWTH_WARN_BYTES:
+        return None
+    return {
+        "rss_bytes": now["rss"], "phys_total_bytes": now["phys_total"],
+        "swap_used_bytes": now["swap_used"], "swap_growth_bytes": int(max(swap_growth, 0)),
+        "reason": "rss_exceeds_physical" if rss_over else "swap_growth",
+    }
+
+
+def _intersect_features_with_kline_period(
+    features_df: pd.DataFrame,
+    meta: Optional[dict],
+    kline_reader: Optional[IKlineReader],
+    *,
+    event_period_ms: Optional[tuple] = None,
+) -> tuple[pd.DataFrame, Optional[dict]]:
+    """EVTALIGN Task 3.1：分析區間＝feature 期間 ∩ K 線期間；裁掉的根數與採用區間**揭露**，禁靜默。
+
+    使用者原話④：「還要手動重新生成特徵，手動K線對齊，這太蠢了，是缺陷吧」⇒ 期間不一致由系統處理。
+    - feature 超出 K 線頭／尾的列**無法算 label**（沒有 close），裁掉並記 `trimmed_bars.head/tail`。
+    - K 線超出 feature 的部分由 `_coterminalize_close`（Task 1.1）處理，不在此。
+    - 交集為空 ⇒ fail-closed，訊息含 feature／K 線／（若知）事件三者期間。
+    - 沒有 K 線來源（無 reader 或 meta 缺 symbol/timeframe）⇒ 不裁、回 None（預載 label 路徑各自判定）。
+    回傳 `(features_df, period_alignment | None)`；`period_alignment` 之 `trimmed_bars` 皆 0 表示同尾同頭。
+    """
+    if kline_reader is None or not meta:
+        return features_df, None
+    symbol = meta.get("symbol")
+    timeframe = meta.get("timeframe")
+    if not symbol or not timeframe:
+        return features_df, None
+    raw = kline_reader.read_klines(symbol, timeframe)
+    if raw is None or raw.empty:
+        return features_df, None
+    kline_index = _normalize_frame_time_index(raw, "raw_data")
+    feature_index = _normalize_ic_time_index(features_df.index, "features_df")
+    k_start, k_end = kline_index[0], kline_index[-1]
+    keep = np.asarray((feature_index >= k_start) & (feature_index <= k_end))
+    kept = np.flatnonzero(keep)
+    feature_period = {"start": str(feature_index[0]), "end": str(feature_index[-1]), "bars": int(len(feature_index))}
+    kline_period = {"start": str(k_start), "end": str(k_end), "bars": int(len(kline_index))}
+    if kept.size == 0:
+        ev = ""
+        if event_period_ms:
+            ev = (f"；事件期間 [{pd.Timestamp(int(event_period_ms[0]), unit='ms')}, "
+                  f"{pd.Timestamp(int(event_period_ms[1]), unit='ms')}]")
+        raise AlignmentViolationError(
+            f"feature 期間 [{feature_period['start']}, {feature_period['end']}] 與 K 線期間 "
+            f"[{kline_period['start']}, {kline_period['end']}] 無交集{ev}——系統無法對齊"
+            "（請確認選到的 feature run 與 K 線快取是同一 symbol/timeframe；不是要你重生特徵）"
+        )
+    head = int(kept[0])
+    tail = int(len(keep) - 1 - kept[-1])
+    period_alignment = {
+        "used": {"start": str(feature_index[kept[0]]), "end": str(feature_index[kept[-1]]), "bars": int(kept.size)},
+        "trimmed_bars": {"head": head, "tail": tail},
+        "feature_period": feature_period,
+        "kline_period": kline_period,
+    }
+    if event_period_ms:
+        period_alignment["event_period"] = {
+            "start": str(pd.Timestamp(int(event_period_ms[0]), unit="ms")),
+            "end": str(pd.Timestamp(int(event_period_ms[1]), unit="ms")),
+        }
+    if head or tail:
+        features_df = features_df.iloc[kept]
+    return features_df, period_alignment
+
+
 def _coterminalize_close(close: pd.Series, feature_index: pd.Index) -> pd.Series:
     """EVTALIGN Task 1.1（B）：label 生成前把 close 裁到 feature 尾——守衛 `validate_alignment` 一字不改。
 
@@ -961,12 +1058,28 @@ class ICFilterOrchestrator:
         # EVTALIGN Task 2.1：stage0／stage2 鷹架之 AlignmentViolationError 於 event_label_values 提供時延後，
         # 由 stage3 依「該序列是否真被消費」裁定 raise 或降為診斷（每次 analyze 重置；fallback 重跑亦重置）。
         self._deferred_scaffold_violation: Optional[AlignmentViolationError] = None
+        self._period_alignment: Optional[dict] = None  # EVTALIGN Task 3.1：stage0 寫入
+        self._memory_baseline = _memory_snapshot()  # EVTALIGN Task 4.1：WARN 之比較基線（swap 增長）
+        self._memory_warned = False
+        event_period_ms: Optional[tuple] = None
+        if event_timestamps:
+            _ev = np.asarray(list(event_timestamps))
+            if np.issubdtype(_ev.dtype, np.number) and len(_ev):
+                _mx = float(np.nanmax(np.abs(_ev.astype(float))))
+                _scale = 1 if _mx >= 1e12 else 1000
+                event_period_ms = (int(np.nanmin(_ev) * _scale), int(np.nanmax(_ev) * _scale))
 
         self._report_progress(0, "ingestion", 0.02, "loading inputs")
         features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
             features_path, labels_path, meta_path, config=config, kline_reader=kline_reader,
             defer_alignment_error=event_label_values is not None,
+            event_period_ms=event_period_ms,
         )
+        _pa = self._period_alignment
+        if _pa and (int(_pa["trimmed_bars"]["head"]) or int(_pa["trimmed_bars"]["tail"])):
+            # 🔴 只在真的裁了才寫鍵：零裁切之報告逐位元組不變（§G-1 golden）；裁了就必揭露（禁靜默）
+            metadata = dict(metadata)
+            metadata["period_alignment"] = dict(_pa)
 
         split_context: Optional[dict] = None
         if config.ic_train_test_split:
@@ -2786,12 +2899,20 @@ class ICFilterOrchestrator:
         kline_reader: Optional[IKlineReader] = None,
         *,
         defer_alignment_error: bool = False,
+        event_period_ms: Optional[tuple] = None,
     ) -> tuple[pd.DataFrame, Optional[pd.DataFrame], dict, dict]:
         features_df, features_meta = self._load_features_hdf5(features_path)
         labels_df = self._load_labels_hdf5(labels_path)
         meta = self._load_meta_json(meta_path)
         if features_meta and not meta:
             meta = features_meta
+
+        # EVTALIGN Task 3.1：feature ∩ K 線期間（系統自己對齊；裁掉的根數揭露）。
+        # 在切分計畫之前做 ⇒ split／purge 都建立在實際分析區間上。
+        features_df, period_alignment = _intersect_features_with_kline_period(
+            features_df, meta, kline_reader, event_period_ms=event_period_ms
+        )
+        self._period_alignment = period_alignment
 
         if labels_df is not None and not labels_df.empty:
             active_config = config or self._config
@@ -2902,6 +3023,34 @@ class ICFilterOrchestrator:
             metadata,
             fit_mask=fit_mask,
             fit_mode=fit_mode,
+            progress=self._stage1_progress_hook,
+        )
+
+    # ── EVTALIGN Task 4.1：階段內進度 ＋ 記憶體 WARN（非阻擋）──────────────────────
+    def _stage1_progress_hook(self, sub: dict) -> None:
+        """preprocessing 之中間回報：`done/total`＋ETA（估不出 ⇒ `estimating`），並附記憶體壓力 WARN。
+
+        🔴 §C-4／使用者原話①「可以跑的話，幹嘛擋?」：記憶體壓力**只 WARN、不 raise、不擋**；
+        正常時**不發**（不製造噪音）；每次 analyze 至多發一次（`_memory_warned`）。
+        """
+        done, total = int(sub.get("done", 0)), max(int(sub.get("total", 1)), 1)
+        frac = min(max(done / total, 0.0), 1.0)
+        eta = sub.get("eta_seconds")
+        eta_txt = "預估中" if sub.get("eta_state") == "estimating" else (
+            f"約 {int(round(float(eta)))} 秒" if eta is not None else "預估中"
+        )
+        extra = {
+            "sub_step": sub.get("sub_step"), "sub_done": done, "sub_total": total,
+            "eta_seconds": eta, "eta_state": sub.get("eta_state"),
+        }
+        pressure = _memory_pressure(getattr(self, "_memory_baseline", None))
+        if pressure is not None and not getattr(self, "_memory_warned", False):
+            self._memory_warned = True
+            extra["warning"] = "memory_pressure_observed"
+            extra["warning_detail"] = pressure
+        self._report_progress(
+            1, "preprocessing", 0.05 + 0.15 * frac,
+            f"preprocessing {sub.get('sub_step')} {done}/{total}（ETA {eta_txt}）", extra=extra,
         )
 
     def _stage2_label_generation(
@@ -4587,7 +4736,8 @@ class ICFilterOrchestrator:
         return names
 
     def _report_progress(
-        self, stage: int, stage_name: str, progress: float, message: str
+        self, stage: int, stage_name: str, progress: float, message: str,
+        extra: Optional[dict] = None,
     ) -> None:
         if self._progress_callback is None:
             return
@@ -4597,6 +4747,8 @@ class ICFilterOrchestrator:
             "progress": progress,
             "message": message,
         }
+        if extra:
+            payload.update(extra)
         try:
             self._progress_callback(payload)
         except Exception as exc:  # noqa: BLE001

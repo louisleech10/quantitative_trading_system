@@ -55,8 +55,20 @@ Task 2.2 `tests/momentum/test_validated_series_is_used_series.py`：四情境（
 cross_sectional=not_applicable 具名 EA-RESID-2）spy 斷言「最後被驗的 series ＝ 進 stage4 的 series」；5 條 rc=0。
 mutation phase 2：A6a（global 驗 A 用 B）／A6b（event 驗 A 用 B）。
 
+B2 commit `a8a6f3f5`；`evtalign_phase_gate.sh 2` rc=0（A6a／A6b 紅）。
+
+## B3 完成（2026-09-08）
+Task 3.1：orchestrator `_intersect_features_with_kline_period`（stage0、切分前；`metadata.period_alignment` 只在真裁時寫）；
+service `check_feature_run_coverage` 改逐事件（回 `FeatureRunCoverage`；`dropped_events.ids` 揭露、全丟才 fail-closed），
+`_inject_period_alignment` 併進報告。`tests/api/test_period_auto_align.py` 8 條；coverage_gate ⑦ 改新語意；mutation A7／A8／A9。
+
+## B4 完成（2026-09-08）
+Task 4.1：`DataPreprocessor.preprocess(progress=)`（winsorize 迴圈每 `_progress_interval` 欄回報，ETA 兩次後才估）；
+orchestrator `_stage1_progress_hook`＋`_memory_pressure`（psutil；WARN 一次不擋）；service `_apply_stage_progress`→`/task` 之
+`sub_progress`／`warnings`；前端 store／hook／`icProgressLabel.ts`／頁面顯示。`tests/api/test_stage_progress.py` 12 條；vitest 4 條；mutation A8／A10／A11。
+
 ## 下一步
-commit B2 → `evtalign_phase_gate.sh 2` → **B3** Task 3.1 期間自動對齊＋丟失事件 ID 揭露（先讀 service containment gate 之控制流，R2 D8）→ B4 進度／記憶體 WARN → B5 purge/embargo 揭露 → R4 三家 review → 使用者 B26/B27 驗收。
+commit B3＋B4 → `evtalign_phase_gate.sh 3` 與 `4` → **B5** Task 5.1 purge/embargo 兩塊來源揭露 → R4 三家 review → 使用者 B26/B27 驗收。
 
 ## 具名殘留
 `EA-RESID-1` preprocessing 峰值記憶體（17 GB／8 GB）｜`EA-RESID-2` 橫截面無守衛（模組未完工，**非缺陷**）

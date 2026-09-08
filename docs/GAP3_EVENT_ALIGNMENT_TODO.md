@@ -230,6 +230,15 @@
   2. 🔴 **必須揭露丟掉的事件數與 ID**（`COMPOSER-R1-P2-01`／`GROK-R1-P1-02`：
      「禁靜默裁切」與「只報根數」**不等價**——根數不告訴使用者少了哪些事件）。
   3. 交集為空 ⇒ fail-closed，訊息含三者各自的期間。
+  4. 🔴 **落地形狀（B3，2026-09-08）**：兩層——
+     - orchestrator `_intersect_features_with_kline_period`（stage0，在切分計畫之前）：feature ∩ K 線，
+       `period_alignment = {used:{start,end,bars}, trimmed_bars:{head,tail}, feature_period, kline_period, event_period?}`；
+       **只在 head/tail 任一 >0 時寫進 `metadata.period_alignment`**（零裁切之報告逐位元組不變，§G-1）。
+       K 線超出 feature 的部分由 Task 1.1 `_coterminalize_close` 處理，不重複。
+     - service `check_feature_run_coverage` 改為**逐事件**分類（回 `FeatureRunCoverage`）：超出 run 區間之事件
+       以 `apply_event_coverage` 縮集合，`period_alignment.dropped_events = {count, ids, reason}` 於 analyze 後
+       由 `_inject_period_alignment` 併進報告（零丟事件不新增鍵）；**全部**超出才 `feature_coverage_insufficient`。
+       legacy run／未知 timeframe 仍 fail-closed。既有 `test_gap3_feature_coverage_gate` ⑦ 依新語意改寫。
 - 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py::analyze`（交集計算與 metadata）；
   🔴 **`api/services/ic_analysis_service.py` 之 batch-level containment gate**
   （R2 `CODEX-R2-P1-06`：該 gate 會在交集**之前**就 raise ⇒
@@ -265,6 +274,13 @@
      **不 raise、不擋**（§C-4：使用者明講「可以跑的話，幹嘛擋?」）。
      實測依據：17 GB／8 GB 實體、swap 15.6 GB、CPU 3.3% ＝ thrash。
   3. 回報頻率**不得進 hot loop**：每 N 個特徵或每 M 秒一次，取較稀疏者。
+  4. 🔴 **落地形狀（B4，2026-09-08）**：`DataPreprocessor.preprocess(progress=…)` → `winsorize` 迴圈每
+     `_progress_interval(total)` 欄回報一次（<300 欄 `ceil(total/3)`；≥300 欄 100）⇒ 次數 ∈ [3, max(3, ceil(n/100))]；
+     M 秒節流未另加（回報上限已 ≤ ceil(n/100)，非 hot loop）。ETA 至少兩次回報後才估，否則 `eta_state="estimating"`／`eta_seconds=None`。
+     orchestrator `_stage1_progress_hook` 走既有 `_report_progress`（新增 `extra`）附 `sub_step/sub_done/sub_total/eta_*`；
+     記憶體由 `_memory_pressure`（psutil；RSS＞實體 或 swap 自 analyze 起增長 ≥1 GB）⇒ payload `warning=memory_pressure_observed`
+     **一次**、不 raise。service `_apply_stage_progress` 寫 `task_info.sub_progress`／`warnings`（去重），`/task` 回傳；
+     前端 store `subProgress`／`taskWarnings`、`icProgressLabel.ts`（預估中／約 N 秒；WARN 文案「照跑不擋」）、頁面顯示。
 - 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py::_stage1_preprocessing`（中間回報）；
   `api/services/ic_analysis_service.py`（WARN 透傳）。既有 caller：`progress_callback`。
 - 路徑：

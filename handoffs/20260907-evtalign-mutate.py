@@ -133,6 +133,50 @@ MUTATIONS: Tuple[Mutation, ...] = (
         [*PYTEST, "tests/momentum/test_validated_series_is_used_series.py", "-k", "event"],
         "event 覆寫後回傳與已驗序列不同的 series ⇒ event 情境應紅",
     ),
+    # ── Phase 3：Task 3.1 期間自動對齊（TODO A7：ids 改只回 count ⇒ 紅；裁切拿掉 ⇒ 紅）──
+    Mutation(
+        "A7-dropped-ids-count-only", 3, SERVICE,
+        '                "ids": sorted(dropped_ids),\n',
+        '                "ids": [],\n',
+        [*PYTEST, "tests/api/test_period_auto_align.py", "-k", "dropped_ids"],
+        "丟掉的事件只報 count 不報 ID ⇒ 揭露測試應紅（只報根數不等價）",
+    ),
+    Mutation(
+        "A8-feature-trim-removed", 3, ORCH,
+        "    if head or tail:\n        features_df = features_df.iloc[kept]\n",
+        "    if False:\n        features_df = features_df.iloc[kept]\n",
+        [*PYTEST, "tests/api/test_period_auto_align.py", "-k", "trimmed"],
+        "算了 trimmed_bars 卻沒真的裁 ⇒ 裁切測試應紅（揭露與行為脫鉤）",
+    ),
+    Mutation(
+        "A9-all-dropped-not-failclosed", 3, SERVICE,
+        "    if not covered:\n        required_start",
+        "    if False:\n        required_start",
+        [*PYTEST, "tests/api/test_period_auto_align.py", "-k", "all_dropped"],
+        "全部事件超出 run 仍放行 ⇒ fail-closed 測試應紅",
+    ),
+    # ── Phase 4：Task 4.1 進度＋記憶體 WARN ──────────────────────────────
+    Mutation(
+        "A8-memory-warn-becomes-raise", 4, ORCH,
+        '            extra["warning"] = "memory_pressure_observed"\n',
+        '            raise MemoryError("memory_pressure_observed")\n',
+        [*PYTEST, "tests/api/test_stage_progress.py", "-k", "not_blocking"],
+        "WARN 改成 raise ⇒ 「不得阻擋」測試應紅（§C-4）",
+    ),
+    Mutation(
+        "A10-progress-hot-loop", 4, "momentum/Analysis/data_preprocessor.py",
+        "    if total >= 300:\n        return 100\n    return max(1, math.ceil(total / 3))\n",
+        "    return 1\n",
+        [*PYTEST, "tests/api/test_stage_progress.py", "-k", "count_within_bounds"],
+        "每欄都回報（hot loop）⇒ 回報次數上界測試應紅",
+    ),
+    Mutation(
+        "A11-fake-eta-on-first-report", 4, "momentum/Analysis/data_preprocessor.py",
+        "    if reports >= 2 and done > 0 and done < total and elapsed > 0:\n",
+        "    if done > 0 and done < total and elapsed >= 0:\n",
+        [*PYTEST, "tests/api/test_stage_progress.py", "-k", "first_report_estimating"],
+        "第一次回報就給 ETA（假 ETA）⇒ estimating 測試應紅",
+    ),
     # ── 對照組：只改註解，全部測試必須仍綠 ──────────────────────────────
     Mutation(
         "C0-comment-only-control", 1, ORCH,
