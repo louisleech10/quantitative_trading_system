@@ -48,8 +48,15 @@ A/B（`097dae40` worktree）證實四條在 B1 前就紅（reporter stub 缺 kwa
 TODO 2.1 要點 3／SPEC Task 2.1 要點 5 改寫；P1-02（stage0 預載）以 fail-closed 測試閉合；mutation 加 E1／E2。
 新測試 18 條 rc=0；template_check 兩份 PASS；reconcile `handoffs/reconcile/20260908-evtalign-x-review-r3/synth.md`。
 
+R3 修法 commit `ba408826`；`evtalign_phase_gate.sh 1` rc=0（mutation 10/10）；debt 已清（lock 升 review，`27030457`）。
+
+## B2 完成（2026-09-08）
+Task 2.2 `tests/momentum/test_validated_series_is_used_series.py`：四情境（global_with_labels／global_without_labels／event／
+cross_sectional=not_applicable 具名 EA-RESID-2）spy 斷言「最後被驗的 series ＝ 進 stage4 的 series」；5 條 rc=0。
+mutation phase 2：A6a（global 驗 A 用 B）／A6b（event 驗 A 用 B）。
+
 ## 下一步
-commit R3 修法 → `evtalign_phase_gate.sh 1`（mutation 10 條）→ `debt_clear` → **B2** Task 2.2 跨模式不變式 → B3 期間自動對齊。
+commit B2 → `evtalign_phase_gate.sh 2` → **B3** Task 3.1 期間自動對齊＋丟失事件 ID 揭露（先讀 service containment gate 之控制流，R2 D8）→ B4 進度／記憶體 WARN → B5 purge/embargo 揭露 → R4 三家 review → 使用者 B26/B27 驗收。
 
 ## 具名殘留
 `EA-RESID-1` preprocessing 峰值記憶體（17 GB／8 GB）｜`EA-RESID-2` 橫截面無守衛（模組未完工，**非缺陷**）

@@ -369,7 +369,11 @@ golden＝`tests/golden/evtalign/split_baseline.json`，
 |---|---|---|---|---|
 | **global**（`labels_df` 有） | stage0 `label_series`（`:2790-2796`） | stage4 同引用（`:2883-2885`→`:1067`） | ✅ **是** | 無鷹架 |
 | **global**（`labels_df` 無） | stage2 `return_{horizon}`（`:2921-2928`） | stage4 同 series（`:2938`→`:1067`） | ✅ **是** | 無鷹架——**那條序列就是最終 label** |
-| **event** | stage2 鷹架 或 stage0 預載（`:2923`／`:2790`） | stage3 覆寫後 `filtered_label`（`:3042`→`:1067`） | ❌ **否** | 🔴 **同型缺陷（本票主病灶）** |
+| **event** | stage2 鷹架 或 stage0 預載（`:2923`／`:2790`） | stage3 覆寫後 `filtered_label`（`:3042`→`:1067`） | ❌ **否** | 🔴 **同型缺陷（本票主病灶）**；**B1 後**：覆寫後以 `validate_consumed_label(event_given)` 驗，鷹架違規延後裁定（Task 2.1 要點 5） |
+
+**機械化（B2，2026-09-08）**：`tests/momentum/test_validated_series_is_used_series.py` 以 spy 對上表四情境逐一斷言
+「最後被驗的 series ＝ 進 `_stage4_ic_calculation` 的 series」（event 情境並斷言最後一次驗證為 `event_given`、鷹架≠被消費）；
+cross_sectional 以「源碼確無守衛呼叫」留痕（補守衛時轉紅）。mutation phase 2 `A6a`／`A6b` 證紅。
 | **cross_sectional** | **無**（從未呼叫 `validate_alignment`） | `numeric_df[label_col]` 直接進分組 IC（`:1503-1511`） | ⚠️ N/A | 不是鷹架，是**守衛缺席** ⇒ `EA-RESID-2` |
 
 **同型形態之其他候選（R1 三家主動找出，我原本沒列）**：

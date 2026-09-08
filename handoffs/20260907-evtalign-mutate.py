@@ -118,6 +118,21 @@ MUTATIONS: Tuple[Mutation, ...] = (
         [*PYTEST, "tests/api/test_event_label_alignment.py", "-k", "reraised_when_consumed"],
         "未覆寫（事件不足／filter 未啟用）時不再 raise ⇒ 鷹架被消費卻放行之案例應紅",
     ),
+    # ── Phase 2：Task 2.2 跨模式不變式（SPEC A3／TODO A6：插入「驗 A 用 B」⇒ 該情境紅）──
+    Mutation(
+        "A6a-global-consumes-unvalidated", 2, ORCH,
+        '            return features_df, label_series, {"mode": "none"}\n',
+        '            return features_df, label_series + 1e-9, {"mode": "none"}\n',
+        [*PYTEST, "tests/momentum/test_validated_series_is_used_series.py", "-k", "global"],
+        "global 路徑回傳與已驗序列不同的 series ⇒ 兩個 global 情境應紅",
+    ),
+    Mutation(
+        "A6b-event-consumes-unvalidated", 2, ORCH,
+        "        return filtered_features, filtered_label, info\n",
+        "        return filtered_features, filtered_label + 1e-9, info\n",
+        [*PYTEST, "tests/momentum/test_validated_series_is_used_series.py", "-k", "event"],
+        "event 覆寫後回傳與已驗序列不同的 series ⇒ event 情境應紅",
+    ),
     # ── 對照組：只改註解，全部測試必須仍綠 ──────────────────────────────
     Mutation(
         "C0-comment-only-control", 1, ORCH,
