@@ -28,7 +28,7 @@
 <tbody>
 <tr>
 <td><strong>在做哪一票</strong></td>
-<td>「<strong>事件暖機門檻修正</strong>」（EVTWARMUP，9/8 深夜你同意方向後開的）：三家 consult 一致 → SPEC/TODO 三輪審查 → <strong>第一批已實作</strong>（事件路徑豁免 K 線 rolling 暖機、測試段最少 30 個事件、ICIR 降為診斷）→ 接著 code review。第二批＝視窗依週期換算（第二個 bug）。前一票 EVTALIGN 五段全完成待你驗收</td>
+<td>「<strong>事件暖機門檻修正</strong>」（EVTWARMUP）：<strong>兩批都做完了</strong>——第一批（事件路徑豁免 K 線 rolling 暖機、測試段最少 30 個事件、ICIR 降為診斷）9/8 深夜做完並過三家 code review；第二批（第二個 bug：rolling 視窗依 K 線週期自動換算，1h ⇒ 252／756／1512 根，報告一定寫出有沒有換算）9/9 凌晨做完，三家 code review 進行中。你醒來要做的：<strong>B26–B33 驗收</strong>（<code>GAP-3驗收清單.md</code>），先重啟後端才吃得到新碼</td>
 </tr>
 <tr>
 <td><strong>在做第幾段</strong></td>

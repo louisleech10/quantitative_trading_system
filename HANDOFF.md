@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-08 早｜狀態：`EVTALIGN` 路線由三家共識裁定 **B＋D**；SPEC/TODO 已改，尚未實作。**
+**更新：2026-09-09 凌晨｜狀態：EVTALIGN 五批＋EVTWARMUP 兩批（含 TFWINDOW）皆已實作 commit；code review R5 進行中；使用者 UAT B26–B33 待驗。**
 
 ## 使用者最後兩條指示（逐字）
 > 「那這個修正後的排序改SPEC。B26/B27等上述完成後再驗收。我要先睡了」
@@ -100,11 +100,21 @@ SPEC/TODO 三輪審查（R1 3P0／R2 1P0／R3 1P1，全文件層）皆收斂、�
 發現既有 `long_short_spread` 等欄位落檔為 JSON `NaN` 字面（改前即如此）⇒ `EW-RESID-5`。
 
 B1 commit `39b48531`＋`1a2cfd90`（M6 紅錨補強）；`evtwarmup_phase_gate.sh 1` PASS（9 紅＋C0 綠）；既有 278/280（2 紅＝EW-RESID-6）；
-前端 250＋27。**code review R4 派出中**（session `20260908-evtwarmup-x-review-r4`，brief `handoffs/20260908-EVTWARMUP-X-REVIEW-R4-BRIEF.md`）。
+前端 250＋27。R4 三條（codex P1 refilter 同源、P2 預檢主線列數、P2 split=False 揭露）已修，commit `7a1dd8f0`，gate 1 PASS（12 mutation），債清。
+
+## EVTWARMUP 第二批 TFWINDOW Task 3.1 完成（2026-09-09，commit `a17b57e7`，已 push）
+`ICEngine.set_timeframe()` 三值揭露；`analyze` 於 period_alignment 後注入 `metadata.timeframe`，**全路徑**寫 `ic_window_disclosure`
+（事件路徑覆蓋 `icir_role=diagnostic`）。gap2 golden 重凍：刪該鍵後 sha == 舊 golden（`handoffs/run_receipts/tfwindow_refreeze_probe.log`
+`DIFF_ONLY_DISCLOSURE=YES`）。1h golden `tests/golden/tfwindow/rolling_keys_1h.json`（`window_252/756/1512`，落 `degraded_full_sample`＝TW-RESID-1 預期）。
+🔴 兩處與 SPEC 措辭有落差，已交 R5 裁定：①缺／非法 timeframe 在 analyze 層於切分先 `ValueError` fail-closed，`not_applied:*` 只在引擎層可觀測；
+②1h golden 值比對用 canonical-JSON sha 代替 `atol=1e-12`。`test_oos_applied_true_when_sufficient` 1h fixture 760→8500 根（門檻 1517）。
+既有紅：`test_ic_1a_cut1_oos::test_flag_toggles_path` 於 HEAD~1 亦紅（未登記，R5 必答 7 裁定是否登記）。
+gate 3 PASS（T1／T2 紅、C1 綠；`handoffs/run_receipts/tfwindow_mutate_phase3.log`）。白話 B33 已寫。
+**code review R5 派出中**（session `20260909-evtwarmup-x-review-r5`，brief `handoffs/20260909-EVTWARMUP-X-REVIEW-R5-BRIEF.md`，債 round `4f359ce8`）。
 
 ## 下一步
-R4 收斂＋修 finding → 第二批 TFWINDOW（`docs/TFWINDOW_SPEC.md` Task 3.1：`ICEngine.set_timeframe`、analyze 注入 `metadata.timeframe`、
-全域 `ic_window_disclosure`、gap2 golden 重凍且 diff 只准該鍵、`tests/api/test_tfwindow.py`、1h golden）→ gate 3 → review → 使用者 UAT B26–B33。
+R5 收斂（`reconcile_build.sh 20260909-evtwarmup-x-review-r5 <三檔>` → synth → `debt_clear.sh` → `gate.sh register-output`）＋修 finding
+→ 使用者 UAT B26–B33（後端須重啟才吃新碼）→ EVTWARMUP 收案（UAT＋EW-RESID-1..6＋TW-RESID-1 登記）。
 **使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
 UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
 
