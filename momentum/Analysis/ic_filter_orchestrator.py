@@ -4314,6 +4314,8 @@ class ICFilterOrchestrator:
             "coverage": [],
             "long_short_spread": [],
         }
+        if not icir_gate:
+            removed["icir_skipped_event_path"] = []   # 事件路徑必有此鍵（診斷欄；即使無人走到 ICIR 檢查）
 
         for row in summary_table:
             name = row.get("feature_name")

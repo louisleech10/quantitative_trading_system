@@ -114,6 +114,22 @@ def test_min_test_events_floor_keeps_holdout_and_flags_reason(event_report_80):
     assert m["ic_window_disclosure"] == {"window_unit": "bars_unadjusted", "timeframe_adjustment": "not_applied", "icir_role": "diagnostic"}
     assert m["tiebreaker_effective"] == "ic_mean"
     assert len(event_report_80["summary_table"]) >= 1
+    # ICIR 不作事件路徑門檻：removed["icir"] 必空、且被跳過者列入 icir_skipped_event_path（mutation M6 之紅錨）
+    thr = _find_key(event_report_80, "stage5_thresholds") or {}
+    removed = thr.get("removed_features") or {}
+    assert removed.get("icir", []) == [], removed
+    assert "icir_skipped_event_path" in removed, removed.keys()
+
+
+def _find_key(node, key):
+    if isinstance(node, dict):
+        if key in node:
+            return node[key]
+        for v in node.values():
+            r = _find_key(v, key)
+            if r is not None:
+                return r
+    return None
 
 
 def test_min_test_events_floor_disabled_gives_oos():
