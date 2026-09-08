@@ -99,8 +99,12 @@ SPEC/TODO 三輪審查（R1 3P0／R2 1P0／R3 1P1，全文件層）皆收斂、�
 `tests/api/test_evtwarmup.py` 10 條；mutation `handoffs/20260908-evtwarmup-mutate.py`（M1–M11 含併項）；gate `scripts/evtwarmup_phase_gate.sh`。
 發現既有 `long_short_spread` 等欄位落檔為 JSON `NaN` 字面（改前即如此）⇒ `EW-RESID-5`。
 
+B1 commit `39b48531`＋`1a2cfd90`（M6 紅錨補強）；`evtwarmup_phase_gate.sh 1` PASS（9 紅＋C0 綠）；既有 278/280（2 紅＝EW-RESID-6）；
+前端 250＋27。**code review R4 派出中**（session `20260908-evtwarmup-x-review-r4`，brief `handoffs/20260908-EVTWARMUP-X-REVIEW-R4-BRIEF.md`）。
+
 ## 下一步
-既有測試通過 → commit → `evtwarmup_phase_gate.sh 1` → code review（三家）→ 第二批 TFWINDOW → 使用者 UAT B26–B32。
+R4 收斂＋修 finding → 第二批 TFWINDOW（`docs/TFWINDOW_SPEC.md` Task 3.1：`ICEngine.set_timeframe`、analyze 注入 `metadata.timeframe`、
+全域 `ic_window_disclosure`、gap2 golden 重凍且 diff 只准該鍵、`tests/api/test_tfwindow.py`、1h golden）→ gate 3 → review → 使用者 UAT B26–B33。
 **使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
 UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
 
