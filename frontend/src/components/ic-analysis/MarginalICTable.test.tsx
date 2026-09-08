@@ -73,6 +73,19 @@ describe('MarginalICTable', () => {
     expect(screen.getByTestId('marginal-ic-degraded').textContent).toContain('full_sample_research_only');
   });
 
+  it('EVTWARMUP：reason=insufficient_test_events → 主句「測試段事件不足」、不含 Full-sample', async () => {
+    const { useICAnalysisStore } = await import('@/store/icAnalysisStore');
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'degraded_full_sample', oos_guarantees: false,
+      metadata: { oos_downgrade: { reason: 'insufficient_test_events', test_events: 13, min_test_events: 30, train_rows: null, test_rows: null, min_test_rows: null } },
+    } as unknown as import('@/lib/types').ICReport);
+    render(<MarginalICTable section={okSection({ oos_guarantees: false, pass_class: 'full_sample_research_only' })} />);
+    const text = screen.getByTestId('marginal-ic-degraded').textContent ?? '';
+    expect(text).toContain('測試段事件不足');
+    expect(text.toLowerCase()).not.toContain('full-sample');
+    useICAnalysisStore.getState().setReport(null);
+  });
+
   it('空 survivors → 無倖存者列；節缺席 → 不渲染', () => {
     render(<MarginalICTable section={okSection({ per_feature: {}, composite: { status: 'not_applicable', reason: 'no_survivors' } })} />);
     expect(screen.getByTestId('marginal-ic-empty')).toBeTruthy();

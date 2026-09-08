@@ -2041,7 +2041,8 @@ export interface ICFeatureInfo {
   feature_name: string;
   ic_mean: number;
   ic_std?: number;
-  icir: number;
+  /** EVTWARMUP：事件路徑 rolling 視窗 > 事件數時為 null（診斷欄，不進門檻）；UI 顯示 `--`。 */
+  icir: number | null;
   /** HAC raw p；舊 report / 不可用時可為 null（CODEX-6） */
   p_value?: number | null;
   /** BH FDR q（p_value_adj）；舊 report 可缺欄 */
@@ -2943,6 +2944,9 @@ export interface ICOosDowngrade {
   train_rows: number | null;
   test_rows: number | null;
   min_test_rows: number | null;
+  /** EVTWARMUP `insufficient_test_events`：測試段事件數與地板（其他 reason 缺席） */
+  test_events?: number | null;
+  min_test_events?: number | null;
 }
 
 /** `G3-D2` D5.1：標籤規則之身分（`close_to_close` 門檻＋答案窗長度）。 */

@@ -1,7 +1,7 @@
 'use client';
 
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
-import { isolationLines, readIsolation } from '@/lib/icIsolation';
+import { isolationLines, readIsolation, windowDisclosureLine } from '@/lib/icIsolation';
 
 /**
  * EVTALIGN Task 5.1：隔離區（purge／embargo）兩塊來源分開揭露。
@@ -10,8 +10,10 @@ import { isolationLines, readIsolation } from '@/lib/icIsolation';
  */
 export default function IsolationNote() {
   const report = useICAnalysisStore((s) => s.report);
-  const lines = isolationLines(readIsolation(report?.metadata));
-  if (!lines) return null;
+  const isoLines = isolationLines(readIsolation(report?.metadata));
+  const windowLine = windowDisclosureLine(report?.metadata);
+  if (!isoLines && !windowLine) return null;
+  const lines = [...(isoLines ?? []), ...(windowLine ? [windowLine] : [])];
   return (
     <div
       data-testid="isolation-note"

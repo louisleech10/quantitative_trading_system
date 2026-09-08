@@ -14,6 +14,24 @@ afterEach(() => {
 });
 
 describe('DegradedBanner', () => {
+  it('EVTWARMUP：insufficient_test_events → 主標「測試段事件不足」、不含 Full-sample、顯示 13/30', () => {
+    useICAnalysisStore.getState().setReport({
+      analysis_status: 'degraded_full_sample',
+      oos_guarantees: false,
+      metadata: {
+        oos_downgrade: { reason: 'insufficient_test_events', test_events: 13, min_test_events: 30,
+          train_rows: 1356, test_rows: 335, min_test_rows: null },
+        ic_train_test_split: { applied: true, oos_guarantees: false },
+      },
+    } as unknown as ICReport);
+    render(<DegradedBanner />);
+    const title = screen.getByTestId('degraded-banner-title').textContent ?? '';
+    expect(title).toContain('測試段事件不足');
+    expect(title.toLowerCase()).not.toContain('full-sample');
+    expect(screen.getByText('13')).toBeTruthy();
+    expect(screen.getByText('30')).toBeTruthy();
+  });
+
   it('degraded → render banner', () => {
     useICAnalysisStore.getState().setReport({
       analysis_status: 'degraded_full_sample',

@@ -19,6 +19,15 @@ from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
+def _finite_or_neg_inf(value: Any) -> float:
+    """排序 key：None／NaN／inf／非數 ⇒ -inf（EVTWARMUP Task 2.1：事件路徑 icir 可為 None，禁 TypeError）。"""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return float("-inf")
+    return v if math.isfinite(v) else float("-inf")
+
 # OOS 宣稱關鍵字（degraded 出口禁出現未降級文案）
 _OOS_CLAIM_MARKERS = (
     "oos-passed",
@@ -406,7 +415,7 @@ class ICReporter:
         summary_table = report.get("summary_table", [])
         top_features = sorted(
             summary_table,
-            key=lambda item: item.get("icir", float("-inf")),
+            key=lambda item: _finite_or_neg_inf(item.get("icir")),
             reverse=True,
         )[:5]
 
@@ -573,7 +582,7 @@ class ICReporter:
         top_n = int(self._config.get("ai_json_top_n", 30))
         top_features = sorted(
             summary_table,
-            key=lambda item: item.get("icir", float("-inf")),
+            key=lambda item: _finite_or_neg_inf(item.get("icir")),
             reverse=True,
         )[:top_n]
 
@@ -597,11 +606,22 @@ class ICReporter:
         )
         if degraded:
             risk_warnings = list(risk_warnings or [])
-            risk_warnings.insert(
-                0,
-                "RESEARCH-ONLY: full-sample fallback — not OOS-validated; "
-                "do not treat top_features as out-of-sample passed.",
-            )
+            # EVTWARMUP Task 1.2（R2 CODEX-R2-P1-04）：降級警語依 reason 分文案——
+            # `insufficient_test_events` 是 holdout 已套用、只是測試段事件不足，不是 full-sample fallback。
+            _reason = ((report.get("metadata") or {}).get("oos_downgrade") or {}).get("reason") if isinstance(report, dict) else None
+            if _reason == "insufficient_test_events":
+                _dg = (report.get("metadata") or {}).get("oos_downgrade") or {}
+                warning = (
+                    "RESEARCH-ONLY: holdout applied but test-segment events insufficient "
+                    f"({_dg.get('test_events')} < {_dg.get('min_test_events')}) — not OOS-validated; "
+                    "do not treat top_features as out-of-sample passed."
+                )
+            else:
+                warning = (
+                    "RESEARCH-ONLY: full-sample fallback — not OOS-validated; "
+                    "do not treat top_features as out-of-sample passed."
+                )
+            risk_warnings.insert(0, warning)
 
         payload = {
             "version": report.get("version", "1.0") if isinstance(report, dict) else "1.0",
@@ -653,7 +673,7 @@ class ICReporter:
         summary_table = report.get("summary_table", []) if isinstance(report, dict) else []
         top_features = sorted(
             summary_table,
-            key=lambda item: item.get("icir", float("-inf")),
+            key=lambda item: _finite_or_neg_inf(item.get("icir")),
             reverse=True,
         )[:10]
         # F2: envelope unwrap + sanitizer(ok 放行 / legacy 擋)
@@ -927,7 +947,9 @@ class ICReporter:
                 sanitized.append(item)
                 continue
             row = dict(item)
-            for key in ("p_value", "t_stat", "p_value_adj"):
+            # EVTWARMUP Task 2.1：事件路徑 rolling 視窗 > 事件數 ⇒ icir／ic_mean 可能非有限；
+            # `save_report`／`export_all`／scan cube 之 json.dump 皆未禁 NaN，會落成非法 JSON `NaN` ⇒ producer 端轉 null。
+            for key in ("p_value", "t_stat", "p_value_adj", "icir", "ic_mean"):
                 if key in row:
                     row[key] = self._jsonable_scalar(row.get(key))
             sanitized.append(row)

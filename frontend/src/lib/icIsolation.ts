@@ -32,3 +32,24 @@ export function isolationLines(iso: ICIsolation | null | undefined): string[] | 
     `總隔離 ${total} 根＝purge＋embargo（相加，只會偏保守，不是洩漏）`,
   ];
 }
+
+/** EVTWARMUP Task 2.1：`metadata.ic_window_disclosure`（事件路徑；TFWINDOW 後全域亦有）。沒鍵 ⇒ null。 */
+export interface ICWindowDisclosure {
+  window_unit?: string;
+  timeframe_adjustment?: string;
+  icir_role?: 'diagnostic' | 'threshold' | string;
+  adjusted_windows?: number[];
+}
+
+export function windowDisclosureLine(metadata: Record<string, unknown> | undefined | null): string | null {
+  const raw = metadata?.ic_window_disclosure;
+  if (!raw || typeof raw !== 'object') return null;
+  const d = raw as ICWindowDisclosure;
+  const adj = d.timeframe_adjustment === 'applied'
+    ? `rolling 視窗已依本 run 週期換算${Array.isArray(d.adjusted_windows) ? `（${d.adjusted_windows.join('／')} 根）` : ''}`
+    : `rolling 視窗**未**依本 run 週期換算（沿用設定檔 12h 基準的根數；${d.timeframe_adjustment ?? 'not_applied'}）`;
+  const role = d.icir_role === 'diagnostic'
+    ? 'ICIR 在本次分析只作診斷、不當篩選門檻'
+    : 'ICIR 為篩選門檻';
+  return `${adj}；${role}。`;
+}

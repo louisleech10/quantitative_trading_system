@@ -66,6 +66,9 @@ class EventFilterConfig(BaseModel):
     enabled: bool = False
     query: Optional[str] = None
     min_events: int = 30
+    #: EVTWARMUP Task 1.2：holdout 測試段內至少幾個**事件**才給 OOS 保證（統計地板，非 rolling warmup）。
+    #  不足 ⇒ holdout 仍套用、點 IC 照算，但 oos_guarantees=false、reason=insufficient_test_events。0 ⇒ 停用（逃生口）。
+    min_test_events: int = 30
 
     class SampleSizeTiers(BaseModel):
         sufficient: int = 200

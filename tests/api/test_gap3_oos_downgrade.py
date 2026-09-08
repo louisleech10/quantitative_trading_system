@@ -26,20 +26,20 @@ import pytest
 from momentum.Analysis import ic_filter_orchestrator as orch
 
 
-def test_oos_downgrade_has_exactly_two_write_sites_with_precedence():
-    """🔴 **本條之前提於 R1 被我自己的修法改掉，已誠實改寫。**
+def test_oos_downgrade_has_exactly_three_write_sites_with_precedence():
+    """🔴 **本條之前提於 R1 被我自己的修法改掉，已誠實改寫；EVTWARMUP（2026-09-08）再加第三處。**
 
     改寫前：斷言「寫出點恰為一處」。
-    改寫後：`CODEX-R1-P1-01` 的修法需要**第二個**寫出點（root 紅標處補寫非 fallback 分支），
-    所以「唯一寫出點」不再是對的不變式。真正該守的是**優先序**：
-    fallback 的四數字版**先寫**，補寫端**只在缺席時**動作。
-
-    ⚠️ 舊式在改寫後其實仍會綠（補寫用的是 `meta[...]` 而非 `report_meta[...]`，字串計數仍為 1）
-    ——那是靠技術細節矇混，不是真的在守那條規則。故整條換掉。
+    R1：`CODEX-R1-P1-01` 需要**第二個**寫出點（root 紅標處補寫非 fallback 分支）。
+    EVTWARMUP Task 1.2（`COMPOSER-R2-P1-02`）：**第三個**寫出點＝analyze 內事件 `min_test_events` 地板
+    （`insufficient_test_events`），且只在 `"oos_downgrade" not in metadata` 時寫。
+    真正該守的是**優先序**：fallback 富版 > analyze 事件地板 > annotate 缺席補寫；後兩者皆須「缺席才寫」守衛。
     """
     src = inspect.getsource(orch)
-    # 兩個寫出點：fallback 的富版 ＋ root 紅標處的補寫
-    assert src.count('"oos_downgrade"] = ') == 2
+    # 三個寫出點：fallback 富版 ＋ analyze 事件地板 ＋ root 紅標處的補寫
+    assert src.count('"oos_downgrade"] = ') == 3
+    analyze_src = inspect.getsource(orch.ICFilterOrchestrator.analyze)
+    assert 'if "oos_downgrade" not in metadata' in analyze_src, "事件地板寫出點必須有缺席守衛（不得蓋掉 fallback 富版）"
     # 補寫端必須有「缺席才寫」的守衛（否則會蓋掉富版）
     annotate_src = inspect.getsource(
         orch.ICFilterOrchestrator._annotate_root_status_and_pass_class)

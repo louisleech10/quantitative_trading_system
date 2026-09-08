@@ -92,10 +92,15 @@ consult R1 三家一致（`handoffs/reconcile/20260908-evtwarmup-x-consult-r1/sy
 OOS＝K 線 holdout 上測試段事件 pooled IC＋HAC、`min_test_events`(30) loud、ICIR 降診斷；timeframe 接線另票 `docs/TFWINDOW_SPEC.md`。
 SPEC/TODO：`docs/EVTWARMUP_SPEC.md`／`docs/EVTWARMUP_TODO.md`（R1 review 3P0/9P1/5P2 全文件層，已依 synth V1–V6 修：
 status 維持兩值方案 B、分流兩段判、ICIR 消費端列全、揭露只寫事件路徑、icir 缺值 None）。改前 golden `tests/golden/evtwarmup/baseline.json`。
-SPEC/TODO 第二輪審查派出中（session `20260908-evtwarmup-x-review-r2`）；通過後實作第一批（Task 1.1／1.2／2.1）→ 第二批（TFWINDOW Task 3.1）。
+SPEC/TODO 三輪審查（R1 3P0／R2 1P0／R3 1P1，全文件層）皆收斂、債清；R3 三家 R2 全 CLOSED。
+**第一批已實作**（`_is_event_conditional_precheck`／`_consumed` 兩段分流；`min_test_events`（stage3 後判、第三寫出點）；
+`_apply_thresholds(icir_gate)`；stage6 事件路徑 ic_mean 分數字典；`_finite_or_neg_inf` 排序；serializer icir／ic_mean→null；
+契約 `reasons.oos_downgrade`；前端 DegradedBanner／MarginalICTable 依 reason、types null、IsolationNote 視窗揭露）。
+`tests/api/test_evtwarmup.py` 10 條；mutation `handoffs/20260908-evtwarmup-mutate.py`（M1–M11 含併項）；gate `scripts/evtwarmup_phase_gate.sh`。
+發現既有 `long_short_spread` 等欄位落檔為 JSON `NaN` 字面（改前即如此）⇒ `EW-RESID-5`。
 
 ## 下一步
-第二輪收斂 → 實作第一批 → gate → code review → 使用者 UAT B26–B31＋B32／B33。
+既有測試通過 → commit → `evtwarmup_phase_gate.sh 1` → code review（三家）→ 第二批 TFWINDOW → 使用者 UAT B26–B32。
 **使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
 UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
 

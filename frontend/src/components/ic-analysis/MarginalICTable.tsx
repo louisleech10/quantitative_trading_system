@@ -3,7 +3,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import SectionStatusNotice from '@/components/ic-analysis/SectionStatusNotice';
 import { isMarginalICSection } from '@/lib/types';
-import type { MarginalICSection, SectionStatusObject } from '@/lib/types';
+import type { ICOosDowngrade, MarginalICSection, SectionStatusObject } from '@/lib/types';
+import { useICAnalysisStore } from '@/store/icAnalysisStore';
 
 /**
  * GAP-2 Task 5.1 — 邊際 IC／多因子組合唯讀表格（B5 最小鏡像；使用者 2026-08-18 白話閘裁定：表格＋toggle 預設開）。
@@ -46,6 +47,11 @@ export default function MarginalICTable({
   const rows = Object.entries(section.per_feature);
   const composite = section.composite;
   const degraded = section.oos_guarantees === false;
+  // EVTWARMUP Task 1.2（R2 CODEX-R2-P1-04）：降級主句依 reason——事件不足是 holdout 已套用，不是 full-sample
+  const downgradeReason = (useICAnalysisStore((s) => s.report)?.metadata?.oos_downgrade as ICOosDowngrade | undefined)?.reason;
+  const degradedText = downgradeReason === 'insufficient_test_events'
+    ? '⚠ 測試段事件不足（holdout 仍套用、無 OOS 保證）'
+    : '⚠ Full-sample research-only（非 OOS 保證）';
 
   return (
     <Card className="glass-panel" data-testid="marginal-ic-table">
@@ -59,7 +65,7 @@ export default function MarginalICTable({
             data-testid="marginal-ic-degraded"
             className="rounded-xl border border-rose-400/50 bg-rose-500/10 p-2 text-xs text-rose-100"
           >
-            ⚠ Full-sample research-only（非 OOS 保證）：pass_class={section.pass_class ?? '—'}
+            {degradedText}：pass_class={section.pass_class ?? '—'}
           </div>
         )}
       </CardHeader>

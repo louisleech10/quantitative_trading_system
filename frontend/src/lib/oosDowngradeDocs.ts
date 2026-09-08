@@ -87,6 +87,12 @@ export const OOS_DOWNGRADE_DOCS: Record<string, OosDowngradeDoc> = {
     what: '報告裡找不到任何「保留了獨立測試集」的證據——沒有切分紀錄，也沒有 OOS 標記。',
     next: '開啟 `ic_train_test_split` 重跑；在那之前這份結果只能當研究用。',
   },
+  // EVTWARMUP Task 1.2：holdout **有**套用、點 IC 也在測試段事件上算了，只是測試段裡的事件太少、統計上撐不起 OOS 保證。
+  // 🔴 不是 full-sample fallback：沒有重跑、沒有用全樣本擬合。
+  insufficient_test_events: {
+    what: '切分有做、測試段的 IC 也算了，但落在測試段裡的事件數低於統計地板（min_test_events），無法宣稱樣本外保證。',
+    next: '拉長事件批的時間範圍或增加事件數，讓最後 20% 的測試段裡有足夠事件；或調整 config 的 min_test_events（0＝停用地板，只在研究用途時這麼做）。',
+  },
 };
 
 /** 認不得的 reason：只承認降級，不編解釋。 */

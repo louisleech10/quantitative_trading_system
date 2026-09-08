@@ -44,12 +44,30 @@ export default function DegradedBanner() {
       className="glass-panel rounded-2xl border border-rose-400/50 bg-rose-500/10 p-4 text-rose-100 space-y-1"
       role="alert"
     >
-      <div className="font-medium">⚠ Full-sample research-only（非 OOS 保證）</div>
-      <p className="text-sm text-rose-200/90">
-        analysis_status=<code className="bg-slate-900/50 px-1 rounded">{status}</code>
-        {oos === false ? ' · oos_guarantees=false' : ''}
-        。此結果來自 full-sample fallback 或無 holdout 保證，不可當 out-of-sample 通過特徵使用。
-      </p>
+      {/* EVTWARMUP Task 1.2：依 reason 分主標——insufficient_test_events 是 holdout 已套用、測試段事件不足，不是 full-sample */}
+      {downgrade?.reason === 'insufficient_test_events' ? (
+        <>
+          <div className="font-medium" data-testid="degraded-banner-title">
+            ⚠ 測試段事件不足（holdout 仍套用、無 OOS 保證）
+          </div>
+          <p className="text-sm text-rose-200/90">
+            切分有做、測試段的 IC 也在事件上算了，但落在測試段的事件只有{' '}
+            <code className="bg-slate-900/50 px-1 rounded">{String(downgrade.test_events ?? '—')}</code>
+            {' '}個，低於地板{' '}
+            <code className="bg-slate-900/50 px-1 rounded">{String(downgrade.min_test_events ?? '—')}</code>
+            ，統計上撐不起樣本外保證；沒有重跑、沒有用全樣本擬合。
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="font-medium" data-testid="degraded-banner-title">⚠ Full-sample research-only（非 OOS 保證）</div>
+          <p className="text-sm text-rose-200/90">
+            analysis_status=<code className="bg-slate-900/50 px-1 rounded">{status}</code>
+            {oos === false ? ' · oos_guarantees=false' : ''}
+            。此結果來自 full-sample fallback 或無 holdout 保證，不可當 out-of-sample 通過特徵使用。
+          </p>
+        </>
+      )}
       {downgrade?.reason && (
         <p data-testid="ic-oos-downgrade" className="text-sm text-rose-200/90">
           原因：<code className="bg-slate-900/50 px-1 rounded">{downgrade.reason}</code>

@@ -33,6 +33,7 @@ event_filter:
   enabled: false  # 是否啟用事件過濾
   query: null  # 事件條件
   min_events: 30  # 最低事件數
+  min_test_events: 30  # EVTWARMUP：holdout 測試段內最少事件數（統計地板；不足 ⇒ 無 OOS 保證但仍算；0=停用）
   sample_size_tiers:
     sufficient: 200  # 樣本充分
     marginal: 100  # 樣本邊界

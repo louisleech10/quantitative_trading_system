@@ -24,7 +24,7 @@ from momentum.Analysis.data_preprocessor import DataPreprocessor
 from momentum.Analysis.event_filter import EventFilter
 from momentum.Analysis.factor_combiner import combine_factors
 from momentum.Analysis.ic_engine import ICEngine
-from momentum.Analysis.ic_reporter import ICReporter
+from momentum.Analysis.ic_reporter import ICReporter, _finite_or_neg_inf
 from momentum.Analysis.marginal_ic import MarginalICParams, compute_marginal_ic
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
 from momentum.Analysis.pit_stats import PIT_STATS_VERSION
@@ -1144,7 +1144,10 @@ class ICFilterOrchestrator:
             # UAT 2026-09-08（使用者：「為何要跑完才知道不足，要重跑第二次?」）：stage4 之 rolling warmup 檢查
             # 只依賴「測試段列數／視窗／horizon」，切分計畫做完就全部已知 ⇒ 在預處理**之前**先判，
             # 不足直接走全樣本，不再白跑一輪 39k 特徵的預處理。stage4 那條檢查保留為安全網（規則同一份）。
-            precheck = self._precheck_rolling_warmup(features_df, config, split_context, event_timestamps)
+            precheck = self._precheck_rolling_warmup(
+                features_df, config, split_context, event_timestamps,
+                event_conditional=self._is_event_conditional_precheck(event_label_values, config),
+            )
             if precheck is not None:
                 return self._run_full_sample_fallback(
                     features_path,
@@ -1219,6 +1222,39 @@ class ICFilterOrchestrator:
                 "train_rows": int(train_mask.sum()),
                 "test_rows": int(test_mask.sum()),
             }
+            # ── EVTWARMUP Task 1.2：min_test_events 統計地板（只在 stage3 之後、只認產生者標記；R2 GROK-R2-P0-01）
+            if self._is_event_conditional_consumed(event_info):
+                # stage3 後 features_df 只剩實際被消費之事件列 ⇒ 測試段事件數＝test_mask 命中數
+                test_events = int(test_mask.sum())
+                split_context["test_events"] = test_events
+                min_test_events = int(config.event_filter.min_test_events)
+                if test_events < min_test_events:
+                    metadata = dict(metadata)
+                    split_meta = dict(metadata.get("ic_train_test_split") or {})
+                    split_meta["oos_guarantees"] = False
+                    split_meta["test_events"] = test_events
+                    split_meta["min_test_events"] = min_test_events
+                    metadata["ic_train_test_split"] = split_meta
+                    if "oos_downgrade" not in metadata:  # 第三寫出點；fallback 富版（若有）優先
+                        metadata["oos_downgrade"] = {
+                            "reason": "insufficient_test_events",
+                            "test_events": test_events,
+                            "min_test_events": min_test_events,
+                            "train_rows": int(train_mask.sum()),
+                            "test_rows": int(test_mask.sum()),
+                            "min_test_rows": None,
+                        }
+                    logger.warning(
+                        "IC holdout kept but test-segment events insufficient: test_events=%s min_test_events=%s "
+                        "(oos_guarantees=false; no full-sample rerun)", test_events, min_test_events,
+                    )
+                # 事件路徑視窗尺度揭露（只事件路徑寫；全域待 TFWINDOW 重凍 golden 時一併進）
+                metadata = dict(metadata)
+                metadata["ic_window_disclosure"] = {
+                    "window_unit": "bars_unadjusted",
+                    "timeframe_adjustment": "not_applied",
+                    "icir_role": "diagnostic",
+                }
 
         features_df, metadata, feature_filter_info = self._apply_feature_filter(
             features_df, metadata, config.feature_filter
@@ -1232,6 +1268,7 @@ class ICFilterOrchestrator:
             config,
             kline_reader,
             split_context=split_context,
+            event_info=event_info,
         )
         if ic_results.get("status") == "skipped":
             # ICHC R5 one-shot guard：fallback 重跑內再觸發＝設計不變式被破壞
@@ -1279,10 +1316,21 @@ class ICFilterOrchestrator:
         )
 
         self._report_progress(6, "redundancy", 0.82, "removing redundancy")
+        # EVTWARMUP Task 2.1：事件路徑 ICIR 多為非有限（redundancy `_score_value` 會給 -inf）⇒ tiebreaker 改吃 ic_mean；
+        # 全域路徑一字不改（redundancy_filter.py 不改，改呼叫端傳的分數字典）。
+        redundancy_scores = ic_results["icir"]
+        if self._is_event_conditional_consumed(event_info):
+            redundancy_scores = {
+                str(row.get("feature_name")): row.get("ic_mean")
+                for row in (stage5_results.get("summary_table") or [])
+                if isinstance(row, dict)
+            }
+            metadata = dict(metadata)
+            metadata["tiebreaker_effective"] = "ic_mean"
         stage6_results = self._stage6_redundancy(
             features_df,
             stage5_results["passed_features"],
-            ic_results["icir"],
+            redundancy_scores,
             metadata,
             split_context=split_context,
         )
@@ -2900,9 +2948,10 @@ class ICFilterOrchestrator:
         table = self._report.get("summary_table", [])
         if not table:
             return []
+        # EVTWARMUP Task 2.1（R2 CODEX-R2-P1-01）：事件路徑 icir 可為 None ⇒ 排序 key 須 None／NaN 安全
         ordered = sorted(
             table,
-            key=lambda item: item.get(sort_by, float("-inf")),
+            key=lambda item: _finite_or_neg_inf(item.get(sort_by)),
             reverse=True,
         )
         return ordered[:n]
@@ -3181,6 +3230,17 @@ class ICFilterOrchestrator:
                    "eta_seconds": None, "eta_state": "estimating"},
         )
 
+    # ── EVTWARMUP Task 1.1：事件條件 IC 之分流（兩段判；SPEC §C-3）──────────────────
+    @staticmethod
+    def _is_event_conditional_precheck(event_label_values: Optional[dict], config: ICConfig) -> bool:
+        """stage3 之前（尚無 label_source）：`bool(values) and event_filter.enabled`；空 dict／filter 未啟用 ⇒ 主線。"""
+        return bool(event_label_values) and bool(config.event_filter.enabled)
+
+    @staticmethod
+    def _is_event_conditional_consumed(event_info: Optional[dict]) -> bool:
+        """stage3 之後：只認產生者標記 `label_source == "event_label_value"`（事件不足棄條件後為 mainline ⇒ False）。"""
+        return bool(event_info) and event_info.get("label_source") == "event_label_value"
+
     def _rolling_warmup_min_rows(self, config: ICConfig, effective_horizon: int) -> int:
         """stage4 與預檢共用的**同一條**規則：max(依週期換算之 rolling 視窗) ＋ effective_horizon。"""
         adjusted = self._ic_engine._adjust_rolling_windows(config.ic_calculation.rolling_windows)
@@ -3192,11 +3252,15 @@ class ICFilterOrchestrator:
         config: ICConfig,
         split_context: dict,
         event_timestamps: Optional[list],
+        *,
+        event_conditional: bool = False,
     ) -> Optional[dict]:
         """切分後、預處理前的 rolling warmup 預檢；不足回 details（同 stage4 之三鍵），足夠回 None。
 
         事件模式下 stage4 實際拿到的是「落在測試段的事件列」，故此處以事件時間戳 ∩ 測試段計數
         （事件若在 stage3 對齊時被丟，stage4 安全網仍會擋——本預檢只會少擋、不會多擋）。
+        EVTWARMUP Task 1.1：`event_conditional=True`（預檢分流真）⇒ **不以 bar-rolling warmup 擋**，只記
+        `split_context["test_events"]` 供地板；規則本身（`_rolling_warmup_min_rows`）不動。
         """
         test_mask = np.asarray(split_context["test_mask"], dtype=bool)
         train_mask = np.asarray(split_context["train_mask"], dtype=bool)
@@ -3210,6 +3274,11 @@ class ICFilterOrchestrator:
                 event_index = pd.to_datetime(ts_arr, errors="raise")
             feature_index = _normalize_ic_time_index(features_df.index, "features_df")
             test_rows = int(np.isin(feature_index[test_mask].asi8, pd.DatetimeIndex(event_index).asi8).sum())
+            split_context["test_events"] = test_rows
+        else:
+            split_context["test_events"] = None
+        if event_conditional:
+            return None
         min_required = self._rolling_warmup_min_rows(config, int(split_context.get("effective_horizon", 0)))
         if test_rows >= min_required:
             return None
@@ -3487,6 +3556,7 @@ class ICFilterOrchestrator:
         config: ICConfig,
         kline_reader: Optional[IKlineReader],
         split_context: Optional[dict] = None,
+        event_info: Optional[dict] = None,
     ) -> dict:
         method = config.global_settings.default_method
         rolling_windows = config.ic_calculation.rolling_windows
@@ -3499,7 +3569,8 @@ class ICFilterOrchestrator:
             test_mask,
         )
 
-        if split_context is not None:
+        # EVTWARMUP Task 1.1：事件條件 IC（產生者標記 label_source=event_label_value）不以 bar-rolling warmup 擋
+        if split_context is not None and not self._is_event_conditional_consumed(event_info):
             min_required = self._rolling_warmup_min_rows(config, int(split_context.get("effective_horizon", 0)))
             if len(features_for_ic) < min_required:
                 return {
@@ -3785,6 +3856,8 @@ class ICFilterOrchestrator:
             config.thresholds,
             alpha_effective,
             fdr_enabled=fdr_enabled,
+            # EVTWARMUP Task 2.1：事件路徑 ICIR 為診斷欄，不作硬門檻（全域 icir_gate=True 一字不改）
+            icir_gate=not self._is_event_conditional_consumed(event_info),
         )
         threshold_log = {
             **threshold_log,
@@ -4224,8 +4297,13 @@ class ICFilterOrchestrator:
         alpha_effective: float,
         *,
         fdr_enabled: bool = True,
+        icir_gate: bool = True,
     ) -> tuple[list[str], dict]:
-        """門檻過濾；p 閘消費 p_value_adj（FDR on）或 p_value（FDR off）。"""
+        """門檻過濾；p 閘消費 p_value_adj（FDR on）或 p_value（FDR off）。
+
+        `icir_gate=False`（EVTWARMUP Task 2.1，事件條件 IC 路徑）：ICIR 不作剔除門檻，只記錄到
+        `removed["icir_skipped_event_path"]`（診斷）；全域路徑預設 True，行為不變。
+        """
         passed: list[str] = []
         removed: dict[str, list[str]] = {
             "ic_mean": [],
@@ -4246,8 +4324,10 @@ class ICFilterOrchestrator:
                 removed["ic_mean"].append(name)
                 continue
             if not self._passes_threshold(row.get("icir"), thresholds.icir_min):
-                removed["icir"].append(name)
-                continue
+                if icir_gate:
+                    removed["icir"].append(name)
+                    continue
+                removed.setdefault("icir_skipped_event_path", []).append(name)  # 記錄、不剔除
             p_field = "p_value_adj" if fdr_enabled else "p_value"
             if not self._passes_threshold(
                 row.get(p_field), alpha_effective, inverse=True

@@ -12,6 +12,17 @@
   "reasons": {
     "net_ic_unavailable": ["turnover_disabled"],
     "event_fallback": ["insufficient_events"],
+    "oos_downgrade": [
+      "event_filter_fallback",
+      "rolling_warmup_insufficient",
+      "insufficient_data",
+      "fit_mode_full_sample",
+      "fit_mode_full_sample_forced",
+      "split_not_applied",
+      "meta_oos_guarantees_false",
+      "no_holdout_evidence",
+      "insufficient_test_events"
+    ],
     "xsec_not_applicable": ["cross_sectional_mode"],
     "analysis_rejected": [
       "feature_count_exceeds_cap",

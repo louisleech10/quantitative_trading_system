@@ -77,3 +77,16 @@ describe('oosDowngradeDocs — 鍵集對後端 reason 機械對證', () => {
     );
   });
 });
+
+describe('oosDowngradeDocs — 與契約 reasons.oos_downgrade（SSOT）鍵集一致（EVTWARMUP）', () => {
+  it('契約鍵集 == 前端文案鍵集（少一邊就是漂移）', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const contractPath = path.resolve(__dirname, '../../../momentum/Analysis/contracts/ic_report_contract.json');
+    const contract = JSON.parse(fs.readFileSync(contractPath, 'utf-8')) as { reasons: Record<string, string[]> };
+    const contractKeys = [...contract.reasons.oos_downgrade].sort();
+    const { OOS_DOWNGRADE_REASON_KEYS } = await import('./oosDowngradeDocs');
+    expect([...OOS_DOWNGRADE_REASON_KEYS].sort()).toEqual(contractKeys);
+    expect(contractKeys).toContain('insufficient_test_events');
+  });
+});
