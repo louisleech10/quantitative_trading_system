@@ -1084,7 +1084,11 @@ class ICFilterOrchestrator:
 
         # ── TFWINDOW Task 3.1：rolling 視窗依 run 週期換算（reference_tf=12h）——由 metadata.timeframe 注入引擎；
         #    缺／非法 ⇒ 不換算並 fail-loud 揭露（不假換算）。全路徑寫 ic_window_disclosure（gap2 golden 已依 §G 重凍，diff 只含此鍵）。
-        _tf_adjust = self._ic_engine.set_timeframe(metadata.get("timeframe") if isinstance(metadata, dict) else None)
+        #    reference_tf 以 effective config（含 config_override）同步進引擎（R5 CODEX-R5-P2-03）。
+        _tf_adjust = self._ic_engine.set_timeframe(
+            metadata.get("timeframe") if isinstance(metadata, dict) else None,
+            reference_tf=config.ic_calculation.icir.reference_tf,
+        )
         metadata = dict(metadata)
         metadata["ic_window_disclosure"] = {
             "window_unit": "bars",

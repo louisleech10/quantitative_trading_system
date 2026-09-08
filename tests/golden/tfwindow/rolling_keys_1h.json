@@ -10,8 +10,31 @@
     "window_756": 620
   },
   "values_sha256": "718ec703618aa4d360d966935a5d068c3f2b4144d644ffff333e0b697ef55806",
+  "features": [
+    "avg-price_1h_Lag_5",
+    "close-volume_12h_volume_OBV_Lag_3",
+    "close-volume_12h_volume_OBV_Mean_W13",
+    "close_12h_cycle_HT-PHASOR-InPhase_Max_W5",
+    "close_12h_cycle_HT-SINE-LeadSine_Rank_W8",
+    "close_12h_cycle_HT-SINE-LeadSine_Skew_W34",
+    "close_12h_cycle_HT-SINE-Sine_Skew_W34",
+    "close_12h_cycle_HT-SINE-Sine_Slope_W89",
+    "close_12h_momentum_APO_12-26-0_Slope_W55",
+    "close_12h_momentum_APO_5-21-0_Std_W89",
+    "close_12h_momentum_APO_8-34-0_Range_W5",
+    "close_12h_momentum_CMO_13_Range_W34",
+    "close_12h_momentum_PPO_12-26-0_Kurt_W5",
+    "close_1h_trend_BBANDS-Upper_34_Skew_W8",
+    "hlc_12h_momentum_MINUS-DI_233_ZScore_W13"
+  ],
   "n_features": 15,
   "analysis_status": "degraded_full_sample",
+  "oos_downgrade_reason": "rolling_warmup_insufficient",
+  "split_details": {
+    "train_rows": 1600,
+    "test_rows": 395,
+    "min_test_rows": 1517
+  },
   "ic_window_disclosure": {
     "window_unit": "bars",
     "timeframe": "1h",

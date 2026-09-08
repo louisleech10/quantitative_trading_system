@@ -40,7 +40,7 @@ RISK-HIT: a,d
 - 檔案：`ic_filter_orchestrator.py::analyze`（stage0 後以 `metadata.timeframe` 重建／設定 `self._ic_engine._timeframe`，或 `ICEngine.set_timeframe()` 新方法）；`ic_config_schema.py::ICCalculationConfig`（不加欄；timeframe 來自 run 而非 config）；報告 `ic_window_disclosure.timeframe_adjustment="applied"`＋`adjusted_windows`。
 - 改法：stage0 讀 meta ⇒ `tf = metadata.get("timeframe")`；有 ⇒ 注入；無 ⇒ 揭露 `not_applied:missing_timeframe`。
 - **驗證**：`ASSERT venv/bin/python -m pytest tests/api/test_tfwindow.py THEN rc=0`；`ASSERT venv/bin/python handoffs/20260908-probe-evtwarmup-baseline.py WHEN target=global_run THEN rc=0`（12h 不變）；1h 案例 rolling 鍵集 `== {window_252, window_756, window_1512}`。
-- **邊界**：①12h run ⇒ 視窗不變；②1h run ⇒ ×12；③timeframe 缺 ⇒ 不變＋揭露；④timeframe 非法字串 ⇒ 既有 `logger.warning` 路徑＋揭露 `not_applied:invalid_timeframe`。
+- **邊界**（R5 三家裁定改寫，2026-09-09）：①12h run ⇒ 視窗不變；②1h run ⇒ ×12；③④timeframe 缺／非法字串：**`analyze` 層**於切分前之 `_resolve_expected_freq` 既有 fail-closed（`ValueError("Unsupported or missing timeframe for IC split")`），永遠到不了視窗換算，報告不產出 `not_applied:*`（不得為了揭露而放寬切分）；**引擎層直呼** `set_timeframe()` 才回 `not_applied:missing_timeframe`／`not_applied:invalid_timeframe`／`not_applied:invalid_reference_tf`（`logger.warning`＋視窗不變）。⑤語意非法（`0h`／負／`inf`／`nan`；R5 `CODEX-R5-P1-02`）⇒ 與④同；「合法」＝可解析且有限正數。⑥`config_override` 改 `reference_tf` ⇒ 引擎以 effective reference 換算，揭露 `adjusted_windows` 必等於實際 rolling 鍵（R5 `CODEX-R5-P2-03`）。
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：不得改 `reference_tf` 預設；不得為了讓 1h 短 run 過門檻而縮視窗；不得靜默換算不揭露。
 
@@ -55,3 +55,5 @@ RISK-HIT: a,d
 ## §N N/A 登記
 - 三方 kline 簽核子項：不需要 — 不碰 kline／特徵生成（golden 本體已填）。
 - 殘留：`TW-RESID-1` 1h 短歷史 run 因門檻 ×12 而 fallback 增多 — `為何現在不做: user-ruling:2026-09-08 三家「正確化方向，接受並揭露」`；觸發：UAT 出現非預期 fallback 時檢討 `rolling_windows` 預設；登記處：`docs/IC_QUANT_GAP_REGISTRY.md`。
+- 殘留：`TW-RESID-2` 1h golden 值比對以「值序列 canonical-JSON sha256」取代 §G 原文 `atol=1e-12`（pinned-sha 契約；決定性 fixture 下等價，但跨平台浮點／BLAS 漂移會假紅）— `為何現在不做: needs-research:R5 CODEX-R5-P2-04／GROK 裁「固定 interpreter＋data 下可接受」；本專案無 CI、單機執行，漂移證據尚無`；觸發：他機跑 `test_1h_golden_rolling_keys_values` 假紅 ⇒ 改逐值 `np.allclose(atol=1e-12)`。
+- 殘留：`TW-RESID-3` `tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_toggles_path` 既有紅（`7a1dd8f0` worktree 同紅；ICHC 小 fixture＋1h meta 之 fixture 債，非本票接線缺陷）— `為何現在不做: blocked-by:修復屬 ICHC 測試面，超出 Task 3.1 scope；三家一致非本票新回歸`；觸發：ICHC 測試面整理票。

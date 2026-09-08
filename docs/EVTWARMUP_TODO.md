@@ -74,3 +74,4 @@
 - 1h golden：`tests/golden/tfwindow/rolling_keys_1h.json`（鍵 `window_252/756/1512`、每視窗序列長度、值 sha256；1h fixture 落 `degraded_full_sample`＝`TW-RESID-1` 預期）。
 - SPEC §G 之 `atol=1e-12` 比對以「值序列 canonical JSON sha256」實作（決定性 run 下等價；若日後跨平台浮點漂移出現，改為逐值 `np.allclose`，屬 needs-research）。
 - `test_evtwarmup::test_global_run_unchanged_vs_golden` 依 SPEC 改為「全域有 disclosure 且 `icir_role=="threshold"`」；mutation M8 重定義為「全域也標 diagnostic ⇒ 紅」。
+- R5 修補（2026-09-09）：`set_timeframe(tf, reference_tf=)` 以 effective config 同步 reference（`CODEX-R5-P2-03`）；語意非法（`0h`／負／inf／nan）與非法 reference 皆 `not_applied:*`（`CODEX-R5-P1-02`，第四值 `not_applied:invalid_reference_tf`）；探針改對照不可變 `tests/golden/tfwindow/gap2_pre_disclosure.sha`（`CODEX-R5-P1-01`／`COMPOSER-R5-P2-01`）；1h golden 加鎖 features／status／reason／split 列數（`CODEX-R5-P2-04`）；SPEC 邊界③④改寫（`COMPOSER-R5-P2-02`）；殘留 `TW-RESID-2`／`TW-RESID-3` 登記 SPEC §N；mutation T3／T4。

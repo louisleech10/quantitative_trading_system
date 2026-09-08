@@ -77,21 +77,35 @@ class ICEngine:
 
         self._grouped_config = self._config.get("grouped_analysis", {})
 
-    def set_timeframe(self, timeframe: Optional[str]) -> str:
+    def set_timeframe(self, timeframe: Optional[str], reference_tf: Optional[str] = None) -> str:
         """TFWINDOW Task 3.1：由 run 之 `metadata.timeframe` 注入，讓 `_adjust_rolling_windows` 在生產路徑生效。
 
-        回傳揭露值：`applied`／`not_applied:missing_timeframe`／`not_applied:invalid_timeframe`（fail-loud，不假換算）。
+        回傳揭露值：`applied`／`not_applied:missing_timeframe`／`not_applied:invalid_timeframe`／
+        `not_applied:invalid_reference_tf`（fail-loud，不假換算）。
+        `reference_tf` 由呼叫端以 **effective** config 傳入（R5 CODEX-R5-P2-03：`config_override` 改了 reference 而引擎仍用建構時值）。
+        「合法」＝可解析且為有限正數（R5 CODEX-R5-P1-02：`0h`／`-1h`／`infh`／`nanh` 曾被視為 applied ⇒ 視窗全 1 或拋例外）。
         出生事故：`ICEngine(config.ic_calculation.model_dump())` 從無 `timeframe` 鍵 ⇒ 12h 設計的 [21,63,126] 直接套 1h run。
         """
+        if reference_tf is not None:
+            self._reference_tf = str(reference_tf)
         if not timeframe:
             self._timeframe = None
             return "not_applied:missing_timeframe"
-        if self._parse_timeframe_hours(str(timeframe)) is None:
+        if not self._is_valid_timeframe_hours(self._parse_timeframe_hours(str(timeframe))):
             self._timeframe = None
             logger.warning("Invalid timeframe for rolling windows: %s", timeframe)
             return "not_applied:invalid_timeframe"
+        if not self._is_valid_timeframe_hours(self._parse_timeframe_hours(str(self._reference_tf or ""))):
+            self._timeframe = None
+            logger.warning("Invalid reference_tf for rolling windows: %s", self._reference_tf)
+            return "not_applied:invalid_reference_tf"
         self._timeframe = str(timeframe)
         return "applied"
+
+    @staticmethod
+    def _is_valid_timeframe_hours(hours: Optional[float]) -> bool:
+        """可解析且有限正數才算合法（`0h`／負／inf／nan 一律非法）。"""
+        return hours is not None and np.isfinite(hours) and hours > 0
 
     def compute_ic(
         self,
@@ -1352,7 +1366,7 @@ class ICEngine:
 
         reference = self._parse_timeframe_hours(self._reference_tf)
         current = self._parse_timeframe_hours(self._timeframe)
-        if reference is None or current is None or current == 0:
+        if not (self._is_valid_timeframe_hours(reference) and self._is_valid_timeframe_hours(current)):
             logger.warning("Invalid timeframe for rolling windows: %s", self._timeframe)
             return windows
 

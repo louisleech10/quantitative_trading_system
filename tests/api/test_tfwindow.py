@@ -84,6 +84,7 @@ def test_1h_golden_rolling_keys_values(report_1h):
 
 
 def _golden_payload(report: dict) -> dict:
+    """1h golden 鎖：rolling 鍵集＋每視窗長度＋值序列 sha＋特徵名＋fallback 狀態／原因／列數（R5 CODEX-R5-P2-04）。"""
     rolling = report.get("rolling_ic_series") or {}
     keys = sorted(_rolling_keys(report))
     lengths = {}
@@ -94,9 +95,19 @@ def _golden_payload(report: dict) -> dict:
             seq = windows.get(k) or []
             lengths.setdefault(k, len(seq))
             h.update(json.dumps(seq, sort_keys=True, default=str).encode("utf-8"))
-    return {"window_keys": keys, "lengths": lengths, "values_sha256": h.hexdigest(), "n_features": len(rolling)}
-
-
+    meta = report.get("metadata") or {}
+    split = meta.get("ic_train_test_split") or {}
+    return {
+        "window_keys": keys,
+        "lengths": lengths,
+        "values_sha256": h.hexdigest(),
+        "features": sorted(rolling),
+        "n_features": len(rolling),
+        "analysis_status": report.get("analysis_status"),
+        "oos_downgrade_reason": (meta.get("oos_downgrade") or {}).get("reason"),
+        "split_details": dict(split.get("details") or {}),
+        "ic_window_disclosure": meta.get("ic_window_disclosure"),
+    }
 def test_missing_timeframe_fails_closed_before_stage4():
     """邊界③（analyze 層）：meta 缺 timeframe ⇒ 切分先 fail-closed（ValueError），永遠到不了視窗換算——
     `not_applied:missing_timeframe` 只在引擎層可觀測（見 test_engine_set_timeframe_adjusts_windows_and_discloses）。"""
@@ -108,3 +119,34 @@ def test_invalid_timeframe_fails_closed_before_stage4():
     """邊界④（analyze 層）：非法字串同上 fail-closed；`not_applied:invalid_timeframe` 只在引擎層可觀測。"""
     with pytest.raises(ValueError, match="Unsupported or missing timeframe"):
         run_analyze(None, h5_glob=H5_1H, meta_override={"timeframe": "bad"})
+
+
+def test_1h_golden_locks_fallback_and_features(report_1h):
+    """R5 CODEX-R5-P2-04：golden 也鎖 status／reason／split 列數／特徵名（防空 feature 或狀態變更假綠）。"""
+    payload = _golden_payload(report_1h)
+    golden = json.loads(GOLDEN_1H.read_text(encoding="utf-8"))
+    for k in ("features", "n_features", "analysis_status", "oos_downgrade_reason", "split_details", "ic_window_disclosure"):
+        assert payload[k] == golden[k], k
+    assert golden["n_features"] > 0 and golden["window_keys"]
+
+
+def test_engine_rejects_semantic_invalid_timeframes():
+    """R5 CODEX-R5-P1-02：0h／負／inf／nan 可解析但語意非法 ⇒ not_applied:invalid_timeframe、視窗不變；非法 reference 亦 fail-loud。"""
+    e = _engine()
+    base = [21, 63, 126]
+    for bad in ("0h", "-1h", "infh", "nanh", "0d"):
+        assert e.set_timeframe(bad) == "not_applied:invalid_timeframe", bad
+        assert e._adjust_rolling_windows(base) == base, bad
+    assert e.set_timeframe("1h", reference_tf="bad") == "not_applied:invalid_reference_tf"
+    assert e._adjust_rolling_windows(base) == base
+    assert e.set_timeframe("1h", reference_tf="0h") == "not_applied:invalid_reference_tf"
+    assert e.set_timeframe("1h", reference_tf="12h") == "applied" and e._adjust_rolling_windows(base) == [252, 756, 1512]
+
+
+def test_config_override_reference_tf_reaches_engine():
+    """R5 CODEX-R5-P2-03：config_override 改 reference_tf ⇒ 揭露之 adjusted_windows 必須等於實際 rolling 鍵（引擎同步 effective reference）。"""
+    rep = run_analyze({"ic_calculation": {"icir": {"reference_tf": "1h"}}})
+    d = rep["metadata"]["ic_window_disclosure"]
+    assert d["reference_tf"] == "1h" and d["timeframe"] == "12h" and d["timeframe_adjustment"] == "applied"
+    assert d["adjusted_windows"] == [2, 5, 10]   # 126/12=10.5 ⇒ Python round 半偶 ⇒ 10（既有 _adjust_rolling_windows 行為，非本票改動）
+    assert _rolling_keys(rep) == {f"window_{w}" for w in d["adjusted_windows"]}
