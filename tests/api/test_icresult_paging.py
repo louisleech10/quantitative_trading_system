@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -524,3 +525,22 @@ def test_set_result_does_not_hold_lock_during_normalize(fixture_report, monkeypa
     ic_analysis_service._set_result(info, copy.deepcopy(fixture_report))
     assert seen["locked_during_normalize"] is False
     assert info["result_revision"] == 1
+
+
+def test_cache_key_distinguishes_none_and_empty_string(contract):
+    """B1 review CODEX-R1-P1-01：pass_class=None（不篩）與 ""（精確空字串）不得共用快取 key。"""
+    rows = [{"feature_name": "keep", "icir": 0.5, "pass_class": "oos"}, {"feature_name": "empty", "icir": 0.4, "pass_class": ""}]
+    kw = dict(sort_by="icir", sort_order="desc", offset=0, limit=10, contract=contract, task_id="none-vs-empty", revision=1)
+    assert proj.paginate_summary(rows, pass_class=None, **kw)["total"] == 2
+    assert proj.paginate_summary(rows, pass_class="", **kw)["total"] == 1
+    assert proj.paginate_summary(rows, search=None, **kw)["total"] == 2 and proj.paginate_summary(rows, search="", **kw)["total"] == 2
+    proj.sort_index_cache(contract).invalidate_task("none-vs-empty")
+
+
+def test_size_probe_blocked_on_setup_failure(monkeypatch):
+    """B1 review CODEX-R1-P1-02：app import／外部連線失敗 ⇒ 仍恰一行 SIZE_GATE=BLOCKED、rc=2（三態唯一文法）。"""
+    env = dict(os.environ, ICRESULT_PROBE_FORCE_SETUP_FAIL="1")
+    out = subprocess.run([sys.executable, str(REPO / "handoffs/20260909-probe-icresult-size.py")], cwd=str(REPO), capture_output=True, text=True, env=env)
+    lines = [ln for ln in out.stdout.splitlines() if ln.startswith("SIZE_GATE=")]
+    assert lines == ["SIZE_GATE=BLOCKED"] and out.returncode == 2
+    assert any(ln.startswith("SIZE_REASON=setup failed") for ln in out.stdout.splitlines())

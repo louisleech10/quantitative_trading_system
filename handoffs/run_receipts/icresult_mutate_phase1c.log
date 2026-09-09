@@ -1,0 +1,22 @@
+PASS P1-slice-off-by-one rc=1（期望 紅）— 切片 off-by-one ⇒ G-2a 紅
+PASS P2-sort-whitelist-relaxed rc=1（期望 紅）— 白名單放寬 ⇒ 400 測試紅
+PASS P3-feature-section-swapped rc=1（期望 紅）— project_feature 段錯位 ⇒ G-3 紅
+PASS P4-light-keeps-turnover rc=1（期望 紅）— light 忘刪 turnover ⇒ G-4a 紅
+PASS P5-light-drops-marginal rc=1（期望 紅）— light 誤刪 marginal_ic ⇒ G-4d 紅
+PASS P6-default-result-uses-light rc=1（期望 紅）— 預設 /result 誤套 light ⇒ G-1 紅
+PASS P7-missing-values-on-top rc=1（期望 紅）— 缺值置頂 ⇒ G-6 紅
+PASS P8-revision-not-incremented rc=1（期望 紅）— revision 不遞增 ⇒ G-7 紅
+PASS P9-counts-not-applied rc=1（期望 紅）— 集合值未轉計數 ⇒ G-4c 紅
+PASS P10-snapshot-rereads-result rc=1（期望 紅）— 投影改重讀 self._tasks 而非 snapshot ⇒ G-7b sentinel 紅
+PASS P11-funnel-keys-reversed rc=1（期望 紅）— 候選鍵序反轉 ⇒ G-8 紅
+PASS P12-funnel-after-counts rc=1（期望 紅）— funnel 在計數後算 ⇒ stage5 變 null 紅
+PASS P13-dict-count-uses-len rc=1（期望 紅）— dict 含 count 改取 len ⇒ stage5 變 2 紅
+PASS P14-cache-key-without-revision rc=1（期望 紅）— 快取 key 不含 revision ⇒ 紅
+PASS P15-projection-renormalizes rc=1（期望 紅）— 投影路徑重跑全樹正規化 ⇒ spy 紅
+PASS P16-cache-index-python-list rc=1（期望 紅）— 索引改 Python list ⇒ 容量測試紅
+PASS C0-comment-only-control rc=0（期望 綠）— 對照組：只改註解 ⇒ 全綠
+
+RESTORED clean=True []
+SUMMARY pass=17 fail=0 skip=0 / 17
+UNCOVERED=0
+mut_rc=0

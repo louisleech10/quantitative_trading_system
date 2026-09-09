@@ -111,6 +111,10 @@ def sort_index_cache(contract: Mapping[str, Any]) -> _SortIndexCache:
         return _CACHE
 
 
+def _key_part(v: Optional[str]) -> str:
+    return "\x00None" if v is None else v
+
+
 def _filtered_positions(rows: List[Mapping[str, Any]], pass_class: Optional[str], search: Optional[str]) -> List[int]:
     needle = search.lower() if search else None
     out: List[int] = []
@@ -144,7 +148,8 @@ def paginate_summary(rows: List[Mapping[str, Any]], *, sort_by: str, sort_order:
         return build_sort_index(rows, sort_by=sort_by, sort_order=sort_order, pass_class=pass_class, search=search, contract=contract)
 
     if task_id is not None and revision is not None:
-        key = (task_id, revision, sort_by, sort_order, pass_class or "", search or "")
+        # None（不篩）與 ""（精確空字串）語意不同，不得合併成同一 key（B1 review CODEX-R1-P1-01）
+        key = (task_id, revision, sort_by, sort_order, _key_part(pass_class), _key_part(search))
         ordered = sort_index_cache(contract).get_or_build(key, _build)
     else:
         ordered = _build()

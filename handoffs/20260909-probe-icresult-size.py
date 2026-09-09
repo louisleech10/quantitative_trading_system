@@ -40,6 +40,16 @@ def main() -> int:
         from api.services import ic_result_projection as proj  # B1 才存在
     except Exception as exc:  # noqa: BLE001
         return _emit(token, "BLOCKED", f"projection missing ({type(exc).__name__})", [], receipt)
+    try:
+        return _run(mode, token, receipt)
+    except Exception as exc:  # noqa: BLE001 — 任何 setup 失敗（app import／外部連線）皆轉 BLOCKED，維持三態唯一文法（B1 review CODEX-R1-P1-02）
+        return _emit(token, "BLOCKED", f"setup failed ({type(exc).__name__}: {str(exc)[:80]})", [], receipt)
+
+
+def _run(mode: str, token: str, receipt: Path) -> int:
+    import os as _os
+    if _os.environ.get("ICRESULT_PROBE_FORCE_SETUP_FAIL"):
+        raise RuntimeError("forced setup failure (test)")
     from api.models.ic_models import load_ic_result_paging_contract
     from api.services.ic_analysis_service import ic_analysis_service
     from fastapi.testclient import TestClient
