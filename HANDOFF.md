@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-09 中午｜狀態：EVTALIGN／EVTWARMUP／TFWINDOW／ICRESULT_PAGING 皆已實作 commit 且 code review 收斂；唯一待辦＝使用者 UAT B26–B34（後端須重啟）。**
+**更新：2026-09-09 晚｜狀態：四票皆 commit＋review 收斂；UAT 中抓出事件型 label 三缺陷（h 未揭露／purge 未換算／CSV 0-1 未被用）⇒ 下一票 EVTLABEL（見下方 🔴 段），做完才重驗 B26–B34。**
 
 ## 使用者最後兩條指示（逐字）
 > 「那這個修正後的排序改SPEC。B26/B27等上述完成後再驗收。我要先睡了」
@@ -135,6 +135,16 @@ B2 review R2（synth M1–M2，債清）：composer／grok「可合併、可進 
 ## UAT 2026-09-09 晚（使用者在線）兩條實機修補
 ① IC service 之 registry 為啟動時快照 ⇒ 啟動後新生成的 FF run 一律「run not found」⇒ 解析 run 前 `reload_registry()`（`39377e29`）。
 ② 事件 run（165 事件、1h 視窗 1512）rolling 序列全空 ⇒ `summary_table.ic_mean` 全 NaN ⇒ `ic_mean_min` 把 5909 特徵**全部砍光**（EVTWARMUP 只豁免 ICIR 漏了 ic_mean）⇒ 回退為 pooled point IC＋`ic_mean_source` 揭露（`1c692029`）；全域 golden 位元組不動。
+
+## 🔴 EVTLABEL（2026-09-09 晚使用者裁定；下一張票，尚未開 SPEC）
+使用者原始主目標（逐字精神）：「我在外面標好正反例（標的＋t₀＋0/1）匯入，平台找 t₀ 前能分開正反例的特徵，餵 ML」。
+實況（實機 log＋CSV 逐筆比對）：B 預測型能跑，但 label 由批次規則從 K 線**重算成報酬**，CSV 的 `label 0/1` 完全沒被用；
+這次 run 用的 h=1（等於 CSV `future_1bar_return`，**單位＝事件週期 12h**，＝特徵 1h 的第 12 根）、k／進場價／算法**報告沒揭露**；
+切分 purge_gap=5 是**特徵週期 1h 根數**未依 label 視窗換算（embargo 144 蓋過才沒洩漏）。使用者：「一開始不顧我的想法做 C，現在做了 A/B 又說沒有正反例可以算」——主目標被規則擠掉且沒頭條講，是我的錯。
+**裁定順序（使用者 2026-09-09）**：①報告＋隔離區揭露實際 label 規則 (h,k,entry,mode,h 單位＝事件週期)（小）→ ③UI 在事件 h 旁標單位（小）
+→ ②purge 依 label 視窗換算到特徵週期（中，命中 (a)，SPEC＋三家審）→ ④「匯入標籤模式」：IC 直接對 0/1 算（rank-biserial／Mann-Whitney＋FDR），報酬版留第二欄，倖存者帶標籤來源（大，完整管線）
+→ **全部做完才重新驗收 B26–B34＋新增項目**。併成一票 EVTLABEL 三 Phase；gate artifact token 已為 `docs/EVTLABEL_SPEC.md` 開過一次（900s 已過期，要重開）。
+事實 receipt：`data_cache/reports/ic_report_ic_gatekeeper.json`（21:08 事件 run，165 事件，label_source=event_label_value）；CSV `~/Downloads/events_2026-09-09.csv`（scenario=B×165、label 1×136／0×29、rule close_to_close h=12）。
 
 ## 下一步
 **使用者 UAT B26–B34**（後端須重啟；B34＝39k 結果頁）→ UAT 通過後 ICRESULT_PAGING／EVTWARMUP 各開 stamp 輪（三家 RECONCILE-STAMP）結案。
