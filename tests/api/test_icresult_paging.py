@@ -170,7 +170,7 @@ def _install_task(task_id: str, report: dict) -> dict:
     with ic_analysis_service._lock:
         info = {"task_id": task_id, "status": "completed", "progress": 1.0}
         ic_analysis_service._tasks[task_id] = info
-        ic_analysis_service._set_result(info, copy.deepcopy(report))
+    ic_analysis_service._set_result(info, copy.deepcopy(report))  # lock 外（GROK-R1-P1-01）
     return info
 
 
@@ -438,8 +438,7 @@ def test_revision_mid_projection_uses_old_snapshot_g7b(client, task, fixture_rep
         snap = orig_snap(task_id)
         if fired["n"] == 0:
             fired["n"] += 1
-            with ic_analysis_service._lock:
-                ic_analysis_service._set_result(ic_analysis_service._tasks[task_id], _sentinel_report(fixture_report))
+            ic_analysis_service._set_result(ic_analysis_service._tasks[task_id], _sentinel_report(fixture_report))
         return snap
 
     monkeypatch.setattr(ic_analysis_service, "_snapshot_result", snap_then_refilter)
@@ -458,8 +457,7 @@ def test_cache_hit_and_revision_invalidation(client, task, fixture_report, monke
     url = f"{API}/result/{tid}/summary?limit=5&sort_by=icir&sort_order=desc"
     client.get(url); client.get(url)
     assert calls["n"] == 1
-    with ic_analysis_service._lock:
-        ic_analysis_service._set_result(info, copy.deepcopy(fixture_report))
+    ic_analysis_service._set_result(info, copy.deepcopy(fixture_report))
     client.get(url)
     assert calls["n"] == 2
     assert (tid, 1, "icir", "desc", "", "") not in proj.sort_index_cache({"sort_index_cache": {"max_keys_per_task": 8, "max_tasks_process_wide": 32}}).keys_for(tid)
@@ -500,3 +498,29 @@ def test_cache_key_includes_revision(fixture_report, contract, monkeypatch):
     proj.paginate_summary(rows, revision=2, **kw)
     assert calls["n"] == 2
     proj.sort_index_cache(contract).invalidate_task("rev-key-task")
+
+
+def test_sort_golden_feature_name_desc_is_reverse_string_order(client, task, golden, contract):
+    """B1 review GROK-R1-P2-01：字串欄 desc ＝ Python 字串序反轉（前綴名 close/close_sma/close_sma_20 不得錯序）。"""
+    tid, _ = task
+    desc = client.get(f"{API}/result/{tid}/summary?limit=5&sort_by=feature_name&sort_order=desc").json()
+    assert [r["feature_name"] for r in desc["rows"]] == golden["sort_golden"]["feature_name_desc_top5"]
+    rows = [{"feature_name": n} for n in ["close", "close_sma", "close_sma_20", "a", "ab"]]
+    got = [r["feature_name"] for r in proj.paginate_summary(rows, sort_by="feature_name", sort_order="desc", offset=0, limit=10, contract=contract)["rows"]]
+    assert got == sorted([r["feature_name"] for r in rows], reverse=True) == golden["sort_golden"]["prefix_desc"]
+
+
+def test_set_result_does_not_hold_lock_during_normalize(fixture_report, monkeypatch):
+    """B1 review GROK-R1-P1-01：normalize＋守衛在 lock 外；lock 內只賦值。"""
+    seen = {"locked_during_normalize": None}
+    orig = ic_analysis_service._to_json_compatible
+
+    def spy(*a, **k):
+        seen["locked_during_normalize"] = ic_analysis_service._lock.locked()
+        return orig(*a, **k)
+
+    monkeypatch.setattr(ic_analysis_service, "_to_json_compatible", spy)
+    info = {"task_id": "lock-probe", "status": "completed"}
+    ic_analysis_service._set_result(info, copy.deepcopy(fixture_report))
+    assert seen["locked_during_normalize"] is False
+    assert info["result_revision"] == 1

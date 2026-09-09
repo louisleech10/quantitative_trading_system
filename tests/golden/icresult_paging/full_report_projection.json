@@ -160,6 +160,20 @@
    "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13",
    "close_12h_momentum_APO_12-26-0"
   ],
+  "feature_name_desc_top5": [
+   "volume_12h_trend_MAVP_21_TsArgmin_W5",
+   "hlc_12h_momentum_ADXR_89_Abs",
+   "close_12h_momentum_APO_34-89-0_Abs",
+   "close_12h_momentum_APO_21-55-0_Momentum_L144",
+   "close_12h_momentum_APO_13-55-0_Momentum_L144"
+  ],
+  "prefix_desc": [
+   "close_sma_20",
+   "close_sma",
+   "close",
+   "ab",
+   "a"
+  ],
   "four_desc": [
    "A",
    "B",

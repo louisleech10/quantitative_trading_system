@@ -28,15 +28,11 @@ def _missing(v: Any) -> bool:
     return True
 
 
-def _rev(s: str) -> Tuple[int, ...]:
-    return tuple(-ord(c) for c in s)
-
-
 def sort_key(row: Mapping[str, Any], field: str, sort_order: str, contract: Mapping[str, Any]) -> Tuple:
     """缺值兩向沉底；主鍵依 sort_order；並列以 feature_name 升冪；字串欄純字串序。"""
     name = str(row.get("feature_name", ""))
     if field in contract["sort_policy"]["string_fields"]:
-        return (0, name if sort_order == "asc" else _rev(name), name)
+        return (0, name, name)  # 字串欄由 build_sort_index 以 reverse 處理 desc；此鍵只供 asc／tie-break
     v = row.get(field)
     if _missing(v):
         return (1, 0.0, name)  # 兩向沉底
@@ -129,7 +125,11 @@ def _filtered_positions(rows: List[Mapping[str, Any]], pass_class: Optional[str]
 
 def build_sort_index(rows: List[Mapping[str, Any]], *, sort_by: str, sort_order: str, pass_class: Optional[str], search: Optional[str], contract: Mapping[str, Any]) -> np.ndarray:
     positions = _filtered_positions(rows, pass_class, search)
-    order = sorted(positions, key=lambda i: sort_key(rows[i], sort_by, sort_order, contract))
+    if sort_by in contract["sort_policy"]["string_fields"]:
+        # §C-8「純字串比較」＝ Python 字串序；desc 即 reverse（B1 review GROK-R1-P2-01：字元碼取負會讓前綴名錯序）
+        order = sorted(positions, key=lambda i: str(rows[i].get("feature_name", "")), reverse=(sort_order == "desc"))
+    else:
+        order = sorted(positions, key=lambda i: sort_key(rows[i], sort_by, sort_order, contract))
     idx = np.asarray(order, dtype=np.int32)
     return idx
 

@@ -48,9 +48,9 @@ def main() -> int:
     contract = load_ic_result_paging_contract()
     report = json.loads(ARTIFACT.read_text(encoding="utf-8"))
     with ic_analysis_service._lock:
-        info = {"status": "completed", "progress": 1.0}
+        info = {"task_id": TASK_ID, "status": "completed", "progress": 1.0}
         ic_analysis_service._tasks[TASK_ID] = info
-        ic_analysis_service._set_result(info, report)  # type: ignore[attr-defined]
+    ic_analysis_service._set_result(info, report)  # lock 外（GROK-R1-P1-01）
     try:
         with TestClient(app) as client:
             first = client.get(f"/api/v1/ic/result/{TASK_ID}/summary?limit=50&sort_by=icir&sort_order=desc").json()

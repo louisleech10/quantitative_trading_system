@@ -48,7 +48,7 @@ def _missing(v: Any) -> bool:
 def sort_key(row: Dict[str, Any], field: str, sort_order: str, contract: Dict[str, Any]) -> Tuple:
     name = str(row.get("feature_name", ""))
     if field in contract["sort_policy"]["string_fields"]:
-        return (0, name if sort_order == "asc" else _rev(name), name)
+        return (0, name, name)
     v = row.get(field)
     if _missing(v):
         return (1, 0.0, name)  # 兩向沉底
@@ -56,11 +56,9 @@ def sort_key(row: Dict[str, Any], field: str, sort_order: str, contract: Dict[st
     return (0, f if sort_order == "asc" else -f, name)
 
 
-def _rev(s: str) -> Tuple[int, ...]:
-    return tuple(-ord(c) for c in s)
-
-
 def sort_rows(rows: List[Dict[str, Any]], field: str, sort_order: str, contract: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if field in contract["sort_policy"]["string_fields"]:
+        return sorted(rows, key=lambda r: str(r.get("feature_name", "")), reverse=(sort_order == "desc"))
     return sorted(rows, key=lambda r: sort_key(r, field, sort_order, contract))
 
 
@@ -185,6 +183,8 @@ def build_golden(body: Dict[str, Any], raw_sha: str, contract: Dict[str, Any]) -
         "icir_desc_top5": [r["feature_name"] for r in sort_rows(rows, "icir", "desc", contract)[:5]],
         "icir_asc_top5": [r["feature_name"] for r in sort_rows(rows, "icir", "asc", contract)[:5]],
         "feature_name_asc_top5": [r["feature_name"] for r in sort_rows(rows, "feature_name", "asc", contract)[:5]],
+        "feature_name_desc_top5": [r["feature_name"] for r in sort_rows(rows, "feature_name", "desc", contract)[:5]],
+        "prefix_desc": [r["feature_name"] for r in sort_rows([{"feature_name": n} for n in ["close", "close_sma", "close_sma_20", "a", "ab"]], "feature_name", "desc", contract)],
         "four_desc": [r["feature_name"] for r in sort_rows(four, "icir", "desc", contract)],
         "four_asc": [r["feature_name"] for r in sort_rows(four, "icir", "asc", contract)],
         "three_desc": [r["feature_name"] for r in sort_rows(three, "icir", "desc", contract)],
@@ -229,6 +229,15 @@ def main() -> int:
         GOLDEN.write_text(json.dumps(golden, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         print(f"WROTE {GOLDEN} rows={golden['summary_rows']} fixture_bytes={FIXTURE_REPORT.stat().st_size}")
         return 0 if raw_sha == first_sha else 1
+    if "--rebuild" in sys.argv:
+        # 不重跑 analyze：以既有 fixture_report.json 重算 golden（golden 欄位增修時用；raw sha 不變）
+        fixture = json.loads(FIXTURE_REPORT.read_text(encoding="utf-8"))
+        body_bytes = default_result_bytes(fixture)
+        raw_sha = hashlib.sha256(body_bytes).hexdigest()
+        golden = build_golden(json.loads(body_bytes), raw_sha, contract)
+        GOLDEN.write_text(json.dumps(golden, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(f"REBUILT {GOLDEN} raw_sha={raw_sha[:12]}")
+        return 0
     # --check
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
     fixture = json.loads(FIXTURE_REPORT.read_text(encoding="utf-8"))

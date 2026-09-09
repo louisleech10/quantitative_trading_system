@@ -1631,11 +1631,14 @@ class ICAnalysisService:
 
             with self._lock:
                 task_info = self._tasks.get(task_id)
+            if task_info:
+                self._set_result(task_info, report)  # lock 外 normalize＋守衛（raise ⇒ 由下方 except 標 failed，status 不會先變 completed）
+            with self._lock:
+                task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "completed"
                     task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["progress"] = 1.0
-                    self._set_result(task_info, report)
 
             # LA-1 B3-TASK-01：completion callback 必含 root 紅標
             completed_payload: Dict[str, Any] = {
@@ -1790,15 +1793,17 @@ class ICAnalysisService:
         """唯一的 result 寫點：寫入時一次 `_to_json_compatible`＋`deny_factor_in_ok_oos`，**只保留一棵 normalized 樹**，遞增 revision。
 
         守衛 raise ⇒ 不寫入、revision 不變（初次完成由背景 try 標 failed；refilter 由呼叫端轉 422）。
-        呼叫端須持 `self._lock`。
+        🔴 呼叫端**不得**持 `self._lock`（B1 review `GROK-R1-P1-01`）：39k 報告 normalize＋守衛 ≈4 s，須在 lock 外做，
+        lock 內只做賦值／遞增 revision／快取失效（O(1)），否則寫入期間所有 /task／/result／/summary 讀取被擋。
         """
         from momentum.core.contracts import deny_factor_in_ok_oos
 
-        normalized = self._to_json_compatible(report)
+        normalized = self._to_json_compatible(report)  # lock 外
         if isinstance(normalized, dict):
-            deny_factor_in_ok_oos(normalized)
-        task_info["result"] = normalized
-        task_info["result_revision"] = (task_info.get("result_revision") or 0) + 1
+            deny_factor_in_ok_oos(normalized)  # lock 外
+        with self._lock:
+            task_info["result"] = normalized
+            task_info["result_revision"] = (task_info.get("result_revision") or 0) + 1
         try:
             _proj.sort_index_cache(load_ic_result_paging_contract()).invalidate_task(str(task_info.get("task_id") or ""))
         except Exception:  # noqa: BLE001 — 快取失效不得影響寫入
@@ -2427,13 +2432,16 @@ class ICAnalysisService:
 
             with self._lock:
                 task_info = self._tasks.get(task_id)
+            if task_info:
+                self._set_result(task_info, report)  # lock 外 normalize＋守衛
+            with self._lock:
+                task_info = self._tasks.get(task_id)
                 if task_info:
                     task_info["status"] = "completed"
                     task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["current_stage"] = "completed"
                     task_info["current_step"] = "completed"
                     task_info["progress"] = 1.0
-                    self._set_result(task_info, report)
                     task_info["deep_analysis_result"] = deep_result
 
             # LA-1 B3-TASK-01：full-analysis completion callback 必含 root 紅標
@@ -2724,12 +2732,13 @@ class ICAnalysisService:
         report = analyzer.refilter(thresholds)
         with self._lock:
             task_info = self._tasks.get(task_id)
-            if task_info:
-                # ICRESULT_PAGING §C-7(b)：先驗後寫——守衛 raise ⇒ 舊 result／revision 不變、task 仍 completed、route 422
-                try:
-                    self._set_result(task_info, report)
-                except ValueError as exc:
-                    raise ResultValidationError(str(exc)) from exc
+        if task_info:
+            # ICRESULT_PAGING §C-7(b)：先驗後寫——守衛 raise ⇒ 舊 result／revision 不變、task 仍 completed、route 422
+            # （normalize＋守衛在 lock 外，GROK-R1-P1-01）
+            try:
+                self._set_result(task_info, report)
+            except ValueError as exc:
+                raise ResultValidationError(str(exc)) from exc
 
         # 🔴 UAT B16（2026-09-02，票 `G3-D12`）：原本直接回 analyzer 的原始 dict，內含 NaN／inf（例如 decay 擬合失敗、
         #    survivors=0 時的統計）⇒ JSONResponse 500「Out of range float values」⇒ 瀏覽器只看到 Failed to fetch。
