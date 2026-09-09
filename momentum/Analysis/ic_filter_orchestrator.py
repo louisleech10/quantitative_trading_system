@@ -1340,6 +1340,11 @@ class ICFilterOrchestrator:
         if tiebreaker_effective is not None:
             metadata = dict(metadata)
             metadata["tiebreaker_effective"] = tiebreaker_effective
+        # UAT 2026-09-09：ic_mean 回退為 pooled point IC 時揭露（只在真的回退時寫鍵；全域 golden 不動）
+        _src = dict(getattr(self, "_ic_mean_source", None) or {})
+        if _src.get("pooled_point_ic", 0) > 0:
+            metadata = dict(metadata)
+            metadata["ic_window_disclosure"] = {**dict(metadata.get("ic_window_disclosure") or {}), "ic_mean_source": _src}
         stage6_results = self._stage6_redundancy(
             features_df,
             stage5_results["passed_features"],
@@ -3884,6 +3889,7 @@ class ICFilterOrchestrator:
             coverage_results,
             turnover_results,
             ic_results.get("ic_decay", {}),
+            point_ic=ic_results.get("ic_values") or {},
         )
 
         passed_features, threshold_log = self._apply_thresholds(
@@ -4284,10 +4290,30 @@ class ICFilterOrchestrator:
         coverage_results: dict,
         turnover_results: dict,
         ic_decay: dict,
+        point_ic: Optional[dict] = None,
     ) -> list[dict]:
+        """summary_table 組裝。
+
+        🔴 UAT 2026-09-09（事件 run 165 事件、1h 視窗 252/756/1512 > 事件數）：rolling 序列全空 ⇒ `icir_item.ic_mean` 全 NaN
+        ⇒ `_apply_thresholds` 之 `ic_mean_min` 把 **5909 個特徵全部砍光**（EVTWARMUP 只豁免了 ICIR，漏了 ic_mean）。
+        修法：rolling 均值缺席時，`ic_mean` 回退為同一 stage4 之 pooled point IC（`ic_results["ic_values"]`，即 HAC t/p 所檢定的統計量），
+        並於 `self._ic_mean_source` 計數供 metadata 揭露；rolling 有值時行為不變（全域 golden 逐位元組不動）。
+        """
         table: list[dict] = []
+        point_ic = point_ic or {}
+        source_counts = {"rolling_mean": 0, "pooled_point_ic": 0, "unavailable": 0}
         for feature in feature_names:
             icir_item = icir.get(feature, {})
+            ic_mean_val = icir_item.get("ic_mean")
+            if isinstance(ic_mean_val, (int, float)) and not isinstance(ic_mean_val, bool) and np.isfinite(ic_mean_val):
+                source_counts["rolling_mean"] += 1
+            else:
+                fallback = point_ic.get(feature)
+                if isinstance(fallback, (int, float)) and not isinstance(fallback, bool) and np.isfinite(fallback):
+                    ic_mean_val = float(fallback)
+                    source_counts["pooled_point_ic"] += 1
+                else:
+                    source_counts["unavailable"] += 1
             stats_item = ic_stats.get(feature, {})
             quantile_item = quantile_results.get(feature, {})
             coverage_item = coverage_results.get(feature, {})
@@ -4297,7 +4323,7 @@ class ICFilterOrchestrator:
             table.append(
                 {
                     "feature_name": feature,
-                    "ic_mean": icir_item.get("ic_mean"),
+                    "ic_mean": ic_mean_val,
                     "ic_std": icir_item.get("ic_std"),
                     "icir": icir_item.get("icir"),
                     "p_value": stats_item.get("p_value"),
@@ -4323,6 +4349,7 @@ class ICFilterOrchestrator:
         ):
             for row in table:
                 row.pop("turnover_rate", None)
+        self._ic_mean_source = source_counts  # 不放 _ic_cache（部分路徑為 None）
         return table
 
     def _apply_thresholds(

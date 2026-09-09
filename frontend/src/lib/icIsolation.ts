@@ -37,6 +37,7 @@ export function isolationLines(iso: ICIsolation | null | undefined): string[] | 
 export interface ICWindowDisclosure {
   window_unit?: string;
   timeframe_adjustment?: string;
+  ic_mean_source?: { rolling_mean?: number; pooled_point_ic?: number; unavailable?: number };
   icir_role?: 'diagnostic' | 'threshold' | string;
   adjusted_windows?: number[];
 }
@@ -51,5 +52,9 @@ export function windowDisclosureLine(metadata: Record<string, unknown> | undefin
   const role = d.icir_role === 'diagnostic'
     ? 'ICIR 在本次分析只作診斷、不當篩選門檻'
     : 'ICIR 為篩選門檻';
-  return `${adj}；${role}。`;
+  const src = (d as { ic_mean_source?: { pooled_point_ic?: number; rolling_mean?: number } }).ic_mean_source;
+  const meanNote = src && (src.pooled_point_ic ?? 0) > 0
+    ? `；IC Mean 欄＝事件樣本 pooled IC（rolling 序列為空，${src.pooled_point_ic} 個特徵回退；t／p 檢定的即此統計量）`
+    : '';
+  return `${adj}；${role}${meanNote}。`;
 }

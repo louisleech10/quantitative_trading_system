@@ -1191,7 +1191,7 @@ analysis_status=degraded_full_sample · oos_guarantees=false</p>
 <li>後端 log <strong>不再</strong>出現 <code>rolling_warmup_insufficient</code>；進度區也不再出現「切分不足…改以全樣本」的紅字。</li>
 <li>報告上方：若測試段事件 ≥30 ⇒ 沒有紅色降級橫幅、狀態 <code>ok_oos</code>；若 &lt;30 ⇒ 橫幅主標是「<strong>測試段事件不足（holdout 仍套用、無 OOS 保證）</strong>」並寫「只有 N 個，低於地板 30」——<strong>不是</strong>「Full-sample research-only」。</li>
 <li>「隔離區怎麼來的」區塊多一行：「rolling 視窗未依本 run 週期換算…ICIR 在本次分析只作診斷、不當篩選門檻」。</li>
-<li>特徵排名表的 ICIR 欄很多是 <code>--</code>（事件太少算不出 rolling），但特徵<strong>不會因此全被砍光</strong>。</li>
+<li>特徵排名表的 ICIR 欄很多是 <code>--</code>（事件太少算不出 rolling），但 <strong>IC Mean 一定有數字</strong>（rolling 算不出時改用事件樣本的 pooled IC，「隔離區怎麼來的」會多寫一句「IC Mean 欄＝事件樣本 pooled IC…回退」），特徵<strong>不會因此全被砍光</strong>。</li>
 </ol>
 <p><strong>🔴 不是這樣代表什麼</strong>：</p>
 <ul>

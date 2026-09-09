@@ -12,6 +12,7 @@ SPEC：`docs/EVTWARMUP_SPEC.md`（R2 修訂）　TODO：`docs/EVTWARMUP_TODO.md`
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -280,3 +281,23 @@ def test_global_run_unchanged_vs_golden():
     assert "tiebreaker_effective" not in m
     # TFWINDOW（B2）後全域亦寫 ic_window_disclosure，但 icir_role 必為 threshold（事件路徑才是 diagnostic）
     assert m["ic_window_disclosure"]["icir_role"] == "threshold"
+
+
+def test_event_path_ic_mean_falls_back_to_pooled_point_ic_when_rolling_empty(event_report_80):
+    """UAT 2026-09-09：事件 run 之 rolling 視窗 > 事件數 ⇒ rolling 均值全空 ⇒ ic_mean 原本全 None ⇒ ic_mean_min 把全部特徵砍光。
+    修後：ic_mean 回退為 pooled point IC（HAC t/p 所檢定者）、有限；stage5 不再因 ic_mean 全砍；metadata 揭露來源計數。
+    對照：80 事件（> 視窗 21）rolling 有值 ⇒ 不回退、不寫 ic_mean_source 鍵（全域／有 rolling 之報告逐位元組不動）。"""
+    assert "ic_mean_source" not in event_report_80["metadata"]["ic_window_disclosure"]
+    # 以「視窗 > 樣本」重現使用者實機（1h 事件 run：視窗 1512 > 可用列）⇒ rolling 序列全空；事件路徑不受 bar warmup 預檢擋
+    lv, owners = _event_inputs(80)
+    rep = run_analyze({"event_filter": {"enabled": True, "min_events": 30, "min_test_events": 30},
+                       "ic_calculation": {"rolling_windows": [5000, 6000, 7000]}},
+                      event_timestamps=list(lv), event_label_values=lv, event_label_owners=owners, event_context=CTX)
+    rows = rep["summary_table"]
+    assert rows and all(isinstance(r.get("ic_mean"), float) and math.isfinite(r["ic_mean"]) for r in rows)
+    thr = _find_key(rep, "stage5_thresholds") or {}
+    removed = thr.get("removed_features") or {}
+    assert len(removed.get("ic_mean", [])) < len(rows), "ic_mean 門檻不得因 rolling 空而砍光"
+    src = rep["metadata"]["ic_window_disclosure"].get("ic_mean_source") or {}
+    assert src.get("pooled_point_ic", 0) == len(rows) and src.get("rolling_mean", 0) == 0
+    assert all(r.get("icir") is None for r in rows)   # ICIR 仍為診斷缺值（rolling 空）
