@@ -232,7 +232,11 @@ export function useICAnalysis() {
             }
             if (controller.signal.aborted || !detail) return resolve(null);
             const current = useICAnalysisStore.getState().resultRevision;
-            if (current !== null && detail.result_revision !== current) return resolve(null); // 舊世代／無戳：丟棄
+            if (current !== null && detail.result_revision !== current) {
+              // 舊世代／無戳：丟棄，且狀態機收斂為 error（可重試；B2 review R2 CODEX-R2-P1-01／GROK-R2-P2-01）
+              setFeatureDetail(null, 'error', detail.result_revision === null ? '後端回應缺少 result_revision（版本不相容）' : '收到舊世代的特徵詳情，已丟棄；請重試');
+              return resolve(null);
+            }
             setFeatureDetail(detail, 'ready');
             resolve(detail);
           } catch (err) {

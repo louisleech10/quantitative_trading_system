@@ -9,8 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import type { ICFeatureDetail, ICFeatureInfo, ICReportLight } from '@/lib/types';
 
+let urlParams = '';
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(urlParams),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => '/ic-analysis',
 }));
@@ -163,5 +164,26 @@ describe('IC 分析頁 — ICRESULT_PAGING 整合', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(400); });
     expect(calls.filter((u) => u.includes('/feature/')).length).toBe(before + 1);
     expect(screen.queryByTestId('ic-feature-charts-error')).toBeNull();
+  });
+});
+
+describe('IC 分析頁 — URL limit clamp（B2 review R2 CODEX-R2-P2-01）', () => {
+  beforeEach(() => {
+    calls.length = 0;
+    urlParams = 'limit=99999&page=1';
+    useICAnalysisStore.getState().resetReport();
+    useICAnalysisStore.setState({ taskId: 'task-x', status: 'completed', error: null });
+    useICAnalysisStore.getState().setReport(light);
+    class MockWebSocket { close = vi.fn(); send = vi.fn(); onmessage = null; onerror = null; onclose = null; onopen = null; }
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
+    installFetch(defaultHandler);
+  });
+  afterEach(() => { urlParams = ''; cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+  it('?limit=99999 ⇒ clamp 為 500，請求 limit=500，可翻頁', async () => {
+    render(<ICAnalysisPage />);
+    await waitFor(() => expect(calls.some((u) => u.includes('/summary') && u.includes('limit=500'))).toBe(true));
+    expect(useICAnalysisStore.getState().summaryParams.limit).toBe(500);
+    expect(calls.some((u) => u.includes('limit=99999'))).toBe(false);
   });
 });

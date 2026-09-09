@@ -198,5 +198,7 @@ describe('useICAnalysis — B2 review R1 閉合', () => {
     act(() => { void result.current.fetchFeatureDetail('t1', 'stale'); });
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(useICAnalysisStore.getState().featureDetail).toBeNull();
+    expect(useICAnalysisStore.getState().featureDetailStatus).toBe('error');
+    expect(useICAnalysisStore.getState().featureDetailError).toContain('result_revision');
   });
 });

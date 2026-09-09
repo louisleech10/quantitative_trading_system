@@ -164,7 +164,8 @@ function ICAnalysisPageContent() {
     const sortOrder = searchParams.get('sort_order') || '';
     const search = searchParams.get('search') || '';
     const patch: Partial<SummaryPageParams> = {};
-    if (Number.isFinite(limit) && limit > 0) patch.limit = limit;
+    // URL limit 依 contract limit_max=500 clamp（B2 review R2 CODEX-R2-P2-01：後端只回 500，UI 不得以 99999 算頁數）
+    if (Number.isFinite(limit) && limit > 0) patch.limit = Math.min(limit, 500);
     if (Number.isFinite(page) && page > 1) patch.offset = (page - 1) * (patch.limit ?? summaryParams.limit);
     if (sortBy) patch.sort_by = sortBy;
     if (sortOrder === 'asc' || sortOrder === 'desc') patch.sort_order = sortOrder;
