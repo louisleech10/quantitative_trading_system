@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "session_id": "20260910-evtlabel-x-review-r2",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260910-evtlabel-x-review-r2/sources/20260910-evtlabel-x-review-r2-codex.md",
+      "sha256": "9e7308ee7036254f30fe16340d3977df4dfe0f3159e4ada3bdb842057a1a6e54",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260910-evtlabel-x-review-r2/sources/20260910-evtlabel-x-review-r2-composer.md",
+      "sha256": "08c06106624f292b1b71bed50b68f5f58b3c0a906eed883cde0f1904dee0ebff",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260910-evtlabel-x-review-r2/sources/20260910-evtlabel-x-review-r2-grok.md",
+      "sha256": "55a8e92620bc3d3c9a5f943566609573d01d3cec1c0e80065e8aecdad7dcfc31",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-09-09T15:43:28Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "1403a8fd-bb19-4cd8-bce7-5fe560573524"
+}
