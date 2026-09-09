@@ -132,6 +132,10 @@ B2 review R2（synth M1–M2，債清）：composer／grok「可合併、可進 
 最終 gate 3 PASS（`handoffs/run_receipts/icresult_gate3_final.log`）；vitest 655 綠、tsc 既有 8；pytest `test_icresult_paging.py` 41 綠。
 殘留 TW-RESID-1..3／IP-RESID-1..5 已登記 `docs/IC_QUANT_GAP_REGISTRY.md`。白話 B34 已寫。
 
+## UAT 2026-09-09 晚（使用者在線）兩條實機修補
+① IC service 之 registry 為啟動時快照 ⇒ 啟動後新生成的 FF run 一律「run not found」⇒ 解析 run 前 `reload_registry()`（`39377e29`）。
+② 事件 run（165 事件、1h 視窗 1512）rolling 序列全空 ⇒ `summary_table.ic_mean` 全 NaN ⇒ `ic_mean_min` 把 5909 特徵**全部砍光**（EVTWARMUP 只豁免 ICIR 漏了 ic_mean）⇒ 回退為 pooled point IC＋`ic_mean_source` 揭露（`1c692029`）；全域 golden 位元組不動。
+
 ## 下一步
 **使用者 UAT B26–B34**（後端須重啟；B34＝39k 結果頁）→ UAT 通過後 ICRESULT_PAGING／EVTWARMUP 各開 stamp 輪（三家 RECONCILE-STAMP）結案。
 → EVTWARMUP 之 stamp 輪＋EW-RESID-1..6／TW-RESID-1..3 登記。
