@@ -432,13 +432,13 @@
 - 實作要點：
   1. 讀 `momentum/Analysis/event_samples/pattern_bridge.py:52-64,89-105` 之 `survivor_v2` 入口簽名；以 Task 3.10 探針落地之 payload 餵入。
   2. 斷言：接收成功；`sample_scope.event.label_source=="imported_binary_label"`；`label_binary` 四鍵保留；倖存特徵集合 == payload `survivors`。
-  3. `return_rule` payload：接收成功、`label_binary is None`；suppressed stub（`status=suppressed`）⇒ consumer raise／回拒收（不得靜默回空）。
+  3. `return_rule` payload：接收成功、`label_binary is None`；suppressed stub（無 `survivors` 鍵）⇒ 既有 `_survivor_feature_names` raise（`pattern_bridge.py:20-21`）；倖存者 0 之空 `survivors[]` ⇒ 既有 raise（`:24`）；`schema_version=1` ⇒ 既有 raise（`:17-18`）。三者只釘住，不改。
 - 修改檔案：`tests/momentum/Analysis/test_evtlabel_survivor_consumer.py`（新）。既有 caller：無；**不改** `pattern_bridge.py`。
 - 路徑：
   - tests/momentum/Analysis/test_evtlabel_survivor_consumer.py
   - momentum/Analysis/event_samples/pattern_bridge.py
 - 不可做：不接 ML 訓練殼、不加 API caller、不改 consumer 行為。
-- 邊界：①倖存者 0 之 stub ⇒ 回空集合不 raise；②`schema_version=1` ⇒ 既有 validator 拒收。
+- 邊界：①倖存者 0 之空 `survivors[]` ⇒ 既有 loud raise；②`schema_version=1` ⇒ 既有 validator 拒收；③suppressed stub 無 `survivors` 鍵 ⇒ 既有 raise。
 - 風險緩解：⊘
 - **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q -k suppressed_not_consumable WHEN survivor_status=suppressed THEN rc=0`。
 - **存活至**：全票完工後保留。

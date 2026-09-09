@@ -279,7 +279,7 @@ P1（小）①報告＋隔離區揭露實際 label 規則（h／k／進場價／
 - 既有 caller/影響面：無（測試）；**不接** ML 訓練殼、不加 API caller（成熟度地圖 2026-08-17 禁改殼）。
 - 改法：以 Task 3.10 之 binary run 產出 survivor payload → 餵 `pattern_bridge` 之 `survivor_v2` 入口 → 斷言接收成功、`sample_scope.event.label_source=="imported_binary_label"`、`label_binary` 四鍵保留、倖存特徵集合與 payload 一致；`return_rule` payload 同測（`label_binary=null`）。
 - **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q -k suppressed_not_consumable WHEN survivor_status=suppressed THEN rc=0`（negative_control_failed 之 payload 餵入 ⇒ consumer raise／拒收）。
-- **邊界**：①倖存者 0 之 stub payload ⇒ consumer 回空集合不 raise；②`schema_version=1` 舊 payload ⇒ 既有 validator 拒收。
+- **邊界**：①倖存者 0 之 stub payload ⇒ consumer **loud raise**（既有 `_survivor_feature_names` 對空 `survivors[]` raise，`pattern_bridge.py:24`；Claude 讀碼 2026-09-10）；②`schema_version=1` 舊 payload ⇒ 既有 validator 拒收（`:17-18`）；③suppressed stub 無 `survivors` 鍵 ⇒ 既有 raise（`:20-21`）——三者皆為「不得靜默回空」之既有行為，測試只釘住不改。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不改 `pattern_bridge` 行為；不建 ML pipeline caller。
