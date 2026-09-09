@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-09 凌晨｜狀態：EVTALIGN 五批＋EVTWARMUP 兩批（含 TFWINDOW）實作完成；TFWINDOW code review R5 四條已修（`26076e40`）、債清；使用者 UAT B26–B33 待驗。**
+**更新：2026-09-09 上午｜狀態：EVTALIGN／EVTWARMUP／TFWINDOW／ICRESULT_PAGING 皆已實作 commit；ICRESULT_PAGING 前端 code review 尚在跑；使用者 UAT B26–B34 待驗（後端須重啟）。**
 
 ## 使用者最後兩條指示（逐字）
 > 「那這個修正後的排序改SPEC。B26/B27等上述完成後再驗收。我要先睡了」
@@ -117,9 +117,21 @@ gate 3 PASS（T1／T2 紅、C1 綠；`handoffs/run_receipts/tfwindow_mutate_phas
 SPEC 邊界③④改寫（analyze 層切分先 fail-closed、引擎層才 `not_applied:*`；三家一致）；殘留 `TW-RESID-2`（pinned-sha 代 atol）、`TW-RESID-3`（`test_flag_toggles_path` 既有紅）。
 codex 反例期望 `[2,5,11]` 實為 `[2,5,10]`（126/12=10.5 半偶捨入，既有行為）。mutation T3／T4 加入 phase 3。
 
+## ICRESULT_PAGING（2026-09-09，使用者 UAT 抓到 39k 特徵結果頁凍住）
+根因：報告 JSON 119 MB（turnover 51 MB／ic_decay 16 MB／summary 14.5 MB／metadata 8.4 MB＝39,346 個 per-feature 描述子污染）＋前端一次畫 39k 列。
+SPEC／TODO `docs/ICRESULT_PAGING_{SPEC,TODO}.md`：六輪三家 adversarial（R1 P0 G-4∩G-5 互斥 → … → R6 兩句）＋R7 三家 RECONCILE-STAMP APPROVED（`handoffs/reconcile/20260909-icresultpaging-x-review-r6/synth.md`）。
+使用者兩條指示已入 SPEC：效率／體驗預算（§C-9／10、G-9）、參數名對齊 Feature Factory `/browse`（`sort_by`／`sort_order`／`search`）。
+**B0**（`3df3ee20`）contract JSON／shape fixture／fixture_report＋golden（raw body sha）／三態探針／mutation 骨架／gate parser。
+**B1**（`0154587e`＋修補 `ddbcca84` `fdccd3ee`）：`_set_result` 唯一寫點（normalize＋守衛 lock 外、單一樹、revision、快取失效）；`/summary`（int32 索引 LRU 快取）；`/feature/{name}`；`/result?view=light`；refilter view＋422；409。
+實測 39k：light 28,681 bytes（原 119 MB）；latency light p50/p95 4.4/7.5 ms、summary ≈2 ms、feature ≈1.5 ms（receipt `handoffs/run_receipts/icresult_{size_budget,latency}.log`）。
+gate 1 PASS（17 mutation 紅、UNCOVERED=0）；gate 3 PASS。B1 review R1：composer 可合併；grok 2（lock 內 normalize、字串 desc 錯序）＋codex 2（快取 key None/""、探針 setup 失敗無 token）皆修，synth Q1–Q4，債清。
+**B2**（`bf3afad1`）：前端單批 cutover——`ICReportLight`（Omit 七段）、hook（light／summary／feature／refilter handshake／409 重拉／舊世代丟棄／abort）、表格伺服器分頁＋Set 勾選＋300 ms 去抖＋skeleton、六圖吃 featureDetail、漏斗 adapter、URL query 同步；vitest 647 綠、tsc 既有 8。
+🔴 順手抓到 TFWINDOW 遺漏：`test_ic_la1_degraded_gate` 兩條自 `a17b57e7` 起紅（1h 視窗 ×12），A/B receipt `icresult_la1_{pre_tfwindow,b0}.log`，以 `reference_tf=1h` 修（`ed7563f4`）。
+**B2 review R1 派出中**（session `20260909-icresultpaging-b2-review-r1`，brief `handoffs/20260909-ICRESULTPAGING-B2-REVIEW-R1-BRIEF.md`）。白話 B34 已寫。
+
 ## 下一步
-gate 3 重跑 receipt（`handoffs/run_receipts/tfwindow_gate3_r5.log`）→ push → **使用者 UAT B26–B33**（後端須重啟才吃新碼）
-→ EVTWARMUP 收案 stamp 輪（三家以 R5 同一反例複驗：probe rc、`0h`／`infh` 注入、override `reference_tf=1h`）＋ EW-RESID-1..6／TW-RESID-1..3 登記。
+前端 review 收斂＋修 → **使用者 UAT B26–B34**（後端須重啟；B34＝39k 結果頁）→ 本票結案前登記 IP-RESID-1～5 於 `docs/IC_QUANT_GAP_REGISTRY.md`
+→ EVTWARMUP 之 stamp 輪＋EW-RESID-1..6／TW-RESID-1..3 登記。
 **使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
 UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
 
