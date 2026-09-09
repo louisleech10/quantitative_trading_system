@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "session_id": "20260909-icresultpaging-x-stamp-r7",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-stamp-r7/sources/20260909-ICRESULTPAGING-X-STAMP-R7-codex.md",
+      "sha256": "2410e8ed285cc2c2d75cc2cf78d2ff2a8d920466e3042f313813026fd41ad733",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-stamp-r7/sources/20260909-ICRESULTPAGING-X-STAMP-R7-composer.md",
+      "sha256": "8e76e53c6da0bfb77fae9d83c4b950c9f02f9fb8d98ca679b58915c0e8401215",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-stamp-r7/sources/20260909-ICRESULTPAGING-X-STAMP-R7-grok.md",
+      "sha256": "61e986bff7e6a545b075647a98f574ae75e67e0b72d94467299accfb4f158fbb",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-09-09T01:20:12Z",
+  "closure_state": "FROZEN",
+  "mode": "discovery"
+}
