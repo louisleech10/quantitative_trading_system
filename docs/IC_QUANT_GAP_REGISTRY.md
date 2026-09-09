@@ -165,6 +165,23 @@ report `metadata.split_method`（枚舉住 `momentum/Analysis/contracts/ic_repor
 > G2-R4（前端表格）**不是殘留**：使用者 2026-08-18 白話閘裁定納入 B5（表格＋`marginal_ic` toggle 預設開）。
 > 🏁 **GAP-2 收案（2026-08-19）**：B1–B5 各三家 code review＋三家 RECONCILE-STAMP（收斂檔 `handoffs/reconcile/20260818-gap2-b1-review-r12`／`20260819-gap2-b{2,3,4,5}-review-r{15,18,21,24}`）；延伸檔 A1-1..A1-11；§V 24 條 mutation 最終實跑 receipts `20260819T031612Z/031810Z/031911Z/032022Z-gap2-B{1..4}-probe.log`；§G-1 改前==改後 golden PASS（A1-10）；殘留 G2-R1／R2／R3／R5／R6／R7／R8。
 
+
+## TFWINDOW／ICRESULT_PAGING 待補完登記（不遺忘機制；2026-09-09）
+
+> 兩票 SPEC §N 之殘留同步登記於此（`docs/TFWINDOW_SPEC.md` §N、`docs/ICRESULT_PAGING_SPEC.md` §N），每條附三值理由與觸發條件；
+> 皆經三家 adversarial（TFWINDOW R5／ICRESULT_PAGING R1–R7）逐條攻「其實現在就能做嗎」。本表為權威登記處；ROADMAP 只放 pointer。
+
+| # | 待補完項 | 為何現在不做 | 觸發條件 | 落地時之驗收錨點 |
+|---|---|---|---|---|
+| TW-RESID-1 | 1h 短歷史 run 因 rolling 視窗 ×12（warmup 1517 根）而全域 fallback 增多 | user-ruling: 2026-09-08 三家「正確化方向，接受並揭露」 | UAT 出現非預期 fallback ⇒ 檢討 `rolling_windows` 預設 | 1h golden `tests/golden/tfwindow/rolling_keys_1h.json` 之 `analysis_status` 改為 `ok_oos` 需重凍並三家審 |
+| TW-RESID-2 | 1h golden 值比對以 canonical-JSON sha 取代 SPEC 原文 `atol=1e-12`（跨平台浮點漂移會假紅） | needs-research: 本專案單機無 CI，漂移證據尚無 | 他機跑 `test_1h_golden_rolling_keys_values` 假紅 | 改逐值 `np.allclose(atol=1e-12)` 後同 golden 仍 PASS |
+| TW-RESID-3 | `test_ic_1a_cut1_oos.py::test_flag_toggles_path` 既有紅（`7a1dd8f0` 亦紅；ICHC 小 fixture＋1h meta 之 fixture 債） | blocked-by: ICHC 測試面整理票 | ICHC 測試面整理票開工 | 該測試綠且不改斷言 |
+| IP-RESID-1 | `metadata` 被 39,346 個 per-feature 描述子（`{category,layer,name}`）扁平污染（reporter 寫入面；光 metadata 8.4 MB） | blocked-by: 改 reporter 動落檔格式與 gap2／ic1d golden（命中 a），須另票三方簽核 | 下一次 reporter 改版 | 落檔 metadata 鍵數 == 保留鍵數；gap2 golden 重凍 diff 只含該搬移 |
+| IP-RESID-2 | `turnover_analysis` 每特徵含全長 `time_series`（119 MB 報告中 51 MB 主因）落檔量 | blocked-by: 同 IP-RESID-1（落檔格式） | 同上 | 同上 |
+| IP-RESID-3 | 既有 `schema_version=2`（`IC_RESPONSE_V2`，top-N＋artifact URI）與 `view=light` 並存 | user-ruling: 2026-06-25 IC Phase1 決策為既定契約；R1 三家裁並存＋precedence 矩陣測試 | v2 契約消費者出現時統一 | `test_light_view_v2_matrix` 四格仍綠 |
+| IP-RESID-4 | `metadata_keep_keys` 唯一來源為 contract；`handoffs/20260909-probe-icresult-size.py` 讀 contract（已收） | blocked-by: 已於 B0 收（探針讀 `load_ic_result_paging_contract()`） | — | 已落地；留此行避免 SPEC §N 編號斷裂 |
+| IP-RESID-5 | `ICAnalysisService._tasks` 無界、無完成 task 淘汰／TTL（既有）；本票只保證排序快取有 process-wide 上限（32 task×8 組 int32） | blocked-by: task 生命週期屬 service 既有設計，涉 WS／輪詢／deep-analysis 消費者，須另票 | 多 run 後 RSS 持續增長之實機觀測 | 多 task memory receipt（`handoffs/run_receipts/icresult_memory.log`，尚未產）≤ 單樹×N＋快取上限 |
+
 ## 治理測試長期紅登記（2026-09-05；G-7 停用後首次跑通全套才曝出）
 
 > **出生事故**：`pre-push` 於 2026-08-14 改跑 `--fast` 後，全套 `pytest tests/governance` 變成手動關卡；

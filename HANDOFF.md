@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-09 上午｜狀態：EVTALIGN／EVTWARMUP／TFWINDOW／ICRESULT_PAGING 皆已實作 commit；ICRESULT_PAGING 前端 code review 尚在跑；使用者 UAT B26–B34 待驗（後端須重啟）。**
+**更新：2026-09-09 中午｜狀態：EVTALIGN／EVTWARMUP／TFWINDOW／ICRESULT_PAGING 皆已實作 commit 且 code review 收斂；唯一待辦＝使用者 UAT B26–B34（後端須重啟）。**
 
 ## 使用者最後兩條指示（逐字）
 > 「那這個修正後的排序改SPEC。B26/B27等上述完成後再驗收。我要先睡了」
@@ -127,10 +127,13 @@ SPEC／TODO `docs/ICRESULT_PAGING_{SPEC,TODO}.md`：六輪三家 adversarial（R
 gate 1 PASS（17 mutation 紅、UNCOVERED=0）；gate 3 PASS。B1 review R1：composer 可合併；grok 2（lock 內 normalize、字串 desc 錯序）＋codex 2（快取 key None/""、探針 setup 失敗無 token）皆修，synth Q1–Q4，債清。
 **B2**（`bf3afad1`）：前端單批 cutover——`ICReportLight`（Omit 七段）、hook（light／summary／feature／refilter handshake／409 重拉／舊世代丟棄／abort）、表格伺服器分頁＋Set 勾選＋300 ms 去抖＋skeleton、六圖吃 featureDetail、漏斗 adapter、URL query 同步；vitest 647 綠、tsc 既有 8。
 🔴 順手抓到 TFWINDOW 遺漏：`test_ic_la1_degraded_gate` 兩條自 `a17b57e7` 起紅（1h 視窗 ×12），A/B receipt `icresult_la1_{pre_tfwindow,b0}.log`，以 `reference_tf=1h` 修（`ed7563f4`）。
-**B2 review R1 派出中**（session `20260909-icresultpaging-b2-review-r1`，brief `handoffs/20260909-ICRESULTPAGING-B2-REVIEW-R1-BRIEF.md`）。白話 B34 已寫。
+B2 review R1（synth N1–N6，債清）：三家各抓實作缺陷——refilter 無 light 守衛（三家）、`grouped_ic` 實機三層被一層投影 ⇒ 兩圖靜默空白（grok）、取消全選清全部頁、漏斗以 output 回填、detail 409 無重拉、revision null 當萬用、批次 Watchlist 僅當頁未揭露、URL search 不同步；皆修（`4940f967`）。
+B2 review R2（synth M1–M2，債清）：composer／grok「可合併、可進 B3」；codex 兩條（detail 丟棄後永停 loading、URL limit 未 clamp）已修（`109bf9f8`）。
+最終 gate 3 PASS（`handoffs/run_receipts/icresult_gate3_final.log`）；vitest 655 綠、tsc 既有 8；pytest `test_icresult_paging.py` 41 綠。
+殘留 TW-RESID-1..3／IP-RESID-1..5 已登記 `docs/IC_QUANT_GAP_REGISTRY.md`。白話 B34 已寫。
 
 ## 下一步
-前端 review 收斂＋修 → **使用者 UAT B26–B34**（後端須重啟；B34＝39k 結果頁）→ 本票結案前登記 IP-RESID-1～5 於 `docs/IC_QUANT_GAP_REGISTRY.md`
+**使用者 UAT B26–B34**（後端須重啟；B34＝39k 結果頁）→ UAT 通過後 ICRESULT_PAGING／EVTWARMUP 各開 stamp 輪（三家 RECONCILE-STAMP）結案。
 → EVTWARMUP 之 stamp 輪＋EW-RESID-1..6／TW-RESID-1..3 登記。
 **使用者 UAT B26–B31**（`白話說明/GAP-3驗收清單.md`；B26/B27 掃描瀏覽器、B28 期間對齊、B29 進度、B30 事件 label、B31 隔離區）。
 UAT 回報後依結果修；EVTALIGN 收案條件＝UAT 通過＋`EA-RESID-1..6` 皆已登記三值理由（SPEC §N）。
