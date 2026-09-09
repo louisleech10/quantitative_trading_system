@@ -1,6 +1,6 @@
 # EVTLABEL — TODO
 
-**SPEC**：`docs/EVTLABEL_SPEC.md`　**票**：`EVTLABEL`　**日期**：2026-09-10　**狀態**：DRAFT v2（R1 三家 27 條已收斂 C1–C14，`handoffs/reconcile/20260910-evtlabel-x-review-r1/synth.md`；待 R2 閉合輪）
+**SPEC**：`docs/EVTLABEL_SPEC.md`　**票**：`EVTLABEL`　**日期**：2026-09-10　**狀態**：v4；R1/R2/R3 三家戳記 APPROVED（`0dbe40ff`）。**Phase 0–2（B0–B2）FROZEN，可動工**（使用者 9/10 放行 purge 部分）；**Phase 3（B3–B6）Internal Frozen，待使用者放行**。
 **實作端**：Claude 主委自任（`scripts/governance_roles.json` implementer=claude）；review＝codex＋composer＋grok。
 
 ---

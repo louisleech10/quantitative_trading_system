@@ -184,6 +184,16 @@
 </table></div>
 <p>一句話：<strong>全域 run 的答案是平台算的、窗只有 5 小時、沒有事先「偷看」，所以隔離只要 5 根。事件 run 的答案是你定的（窗隨 h 變），而且你挑事件時已經用了未來 6 天的資訊，所以要多空 144 根。</strong> 兩邊不一樣不是 bug，是答案的來源和「事先看了多遠」本來就不同；EVTLABEL 第 2 段修的是「事件 run 的 purge 應該跟你的 h 走，而不是抄全域的 5」。</p>
 <p>另外你問「全域 purge 是不是要按選的每個 horizon 各做一次」：不用。跨越訓練／驗證邊界的答案只有 <code>return_5</code> 那條；你選的其他 horizon（1,2,3,8,13,21）是「IC 衰減」圖，只在驗證段裡面算、不跨邊界，所以 purge 不必跟著它們變。</p>
+<h2 id="附你-910-追問的四題逐字整理">附：你 9/10 追問的四題（逐字整理）</h2>
+<p><strong>Q1 全域 horizon 選 1,3,8,21（沒選 5）purge 怎麼算？</strong>
+purge ＝ 主線那條 label 的 horizon。清單有 5 就用 5；沒有 5 就默默取清單第一個（這例＝1，主線 label 變 <code>return_1</code>、purge 1）。一致所以不洩漏，但畫面沒揭露——<strong>你已裁定另開小票修</strong>（見 ROADMAP「GLOBALH」）。其他 horizon 只在驗證段算 IC 衰減，不影響 purge。</p>
+<p><strong>Q2 事件 h 超過 12（14、16）怎麼辦？</strong>
+12 不是上限。h=14 ⇒ purge 168、總隔離 312；h=16 ⇒ purge 192、總隔離 336。副作用：驗證段被吃更多列（仍夠）；匯入標籤模式的區塊置換要 ≥10 個區塊，165 事件時 <strong>h≥17 會不足 ⇒ 該 run 標「不可餵 ML」（R-7，琥珀提示，不是 bug）</strong>；h 太大時尾端事件算不出答案，UI 的 <code>h_max_feasible</code> 會擋。</p>
+<p><strong>Q3 為什麼 purge 不是「最大答案窗」＋embargo？「答案由平台算、無未來洩漏」是什麼意思？</strong>
+就是那條公式，只是「最大」是對<strong>跨越訓練／驗證邊界</strong>的答案取，不是對畫面上所有 horizon 取。全域 run 訓練段只用 <code>return_5</code>，其他 horizon 只在驗證段內算 ⇒ purge 5。embargo 管的是<strong>挑樣本時偷看了多遠</strong>：全域樣本＝全部 K 線、沒有挑 ⇒ 0；事件樣本是你用「之後 12 根 12h 漲幅」挑的 ⇒ 挑的動作已含 6 天未來 ⇒ 144。<strong>purge＝跨邊界最大答案窗，embargo＝挑樣本時偷看多遠</strong>；全域 5＋0，事件 max(5, h 視窗)＋144。</p>
+<p><strong>Q4 CSV 帶 1–12 根報酬、我用 1／3／6 篩、UI h=2，事件型 purge／embargo 是什麼？</strong>
+purge ＝ max(5, 2×12) ＝ <strong>24</strong>（只看 UI 的 h；你篩選用的 1/3/6 不影響）。embargo ＝ 匯入時宣告的深度×12：CSV 匯出預設宣告 12（附的最大 horizon）⇒ <strong>144</strong>；你可在匯入表單改宣告 6 ⇒ 72，但平台驗不了你用哪幾欄篩，要勾「無法驗證」，宣告比實際小＝自己製造洩漏；懶得想就留 12。總隔離 24＋144＝168。</p>
+<p><strong>你的裁定（9/10）</strong>：purge 部分同意；全域靜默用第一個 horizon 另開票；標籤（P3）那部分你還沒看。⇒ 我先凍結 P1／P2 動工（三家 R2/R3 皆判可獨立凍結），P3 等你看完再放行。</p>
 <h2 id="我要你回答的">我要你回答的</h2>
 <ol>
 <li>「餵 ML」交付到倖存者檔＋接收端契約測試為止——<strong>接受／不接受</strong>。</li>

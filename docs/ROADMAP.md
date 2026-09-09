@@ -33,6 +33,8 @@
 | 票 B（多標的橫截面 attribution） | **未開票，條件觸發** | 只有宇宙變多標的才成立 | 本檔下節 |
 | FU-1 exposure `fillna` fail-closed | 未做 | 碰到再處理 | 本檔下節 |
 | FU-2 cache close carrier index 對齊 | 未做 | **票 A／B 的硬前置** | 本檔下節 |
+| **EVTLABEL 事件型 label 三缺陷＋匯入標籤模式**（2026-09-09 使用者裁定） | SPEC/TODO v4（`24e011dc`）三輪三家對抗審 27→16→11 全採納；R1/R2/R3 reconcile 三家 RECONCILE-STAMP APPROVED（`0dbe40ff`）；**P1／P2 使用者 9/10 放行凍結、P3（匯入標籤）待使用者看完白話再放行** | B0 scaffold → B1（P1 揭露）→ B2（P2 purge）；每批三家 code review；P3 放行後 B3–B6 | `docs/EVTLABEL_SPEC.md`／`白話說明/EVTLABEL規格白話.md`；殘留 R-1..R-7（SPEC §N） |
+| **GLOBALH 全域模式主線 horizon 靜默取清單第一個**（小票；2026-09-10 使用者裁定另開） | 未開票 | 全域 run 若 `horizons` 不含 `default_horizon`，`_resolve_effective_label_horizon` 靜默取第一個並以之為 purge，UI 無揭露；修＝報告與 IC 頁揭露「主線 horizon＝X（來源）」或由使用者指定；不插隊 EVTLABEL | `ic_filter_orchestrator.py:376-417` |
 
 🔴 **優先序（2026-08-14 使用者明示「現在開始就是要回去做量化主線」）**：
 量化主線 **優先於** 治理。此句覆蓋兩條舊裁決——P0 之「完成後才回 IC」（2026-07-05）、

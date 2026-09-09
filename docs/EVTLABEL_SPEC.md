@@ -2,6 +2,7 @@
 
 > 來源 PLAN/診斷：`HANDOFF.md` 🔴 EVTLABEL 段（2026-09-09 晚使用者裁定）｜日期：2026-09-10｜對應 TODO：`docs/EVTLABEL_TODO.md`
 > 票：`EVTLABEL`　起草：Claude（主委）　審查：Codex＋Composer＋Grok 三家 adversarial（`scripts/governance_roles.json`）
+> **狀態（2026-09-10）**：v4；R1/R2/R3 三家 RECONCILE-STAMP APPROVED（`0dbe40ff`）。**Phase 1／Phase 2 FROZEN**（使用者 9/10 白話閘：「purge 的部分同意」）；**Phase 3 Internal Frozen，待使用者看完標籤部分放行**。全域主線 horizon 靜默取第一個 ⇒ 另開小票 GLOBALH（ROADMAP），不入本票。
 
 **使用者主目標（逐字，不得改寫；任何審查裁定把本目標延後＝否決點，主委須以 AskUserQuestion 阻塞彈窗，不得自行接受）**：
 > 「我在外面標好正反例（標的＋t₀＋0/1 標籤）匯入，平台找出 t₀ 之前哪些特徵能把正反例分開，再把這些特徵餵 ML。」
