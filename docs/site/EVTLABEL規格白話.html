@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EVTLABEL 規格白話（給你否決用）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">EVTLABEL規格白話.md</span></nav>
+<main>
+<h1 id="evtlabel-規格白話給你否決用">EVTLABEL 規格白話（給你否決用）</h1>
+<blockquote>
+<p>規格書：<code>docs/EVTLABEL_SPEC.md</code>（v4，<code>24e011dc</code>）；施工清單：<code>docs/EVTLABEL_TODO.md</code>。
+三家委員三輪找碴（R1 27 條、R2 16 條、R3 11 條）全部採納，戳記輪進行中。
+<strong>你只要看這份。</strong> 看完回我「可以動工」或「哪裡不對」。</p>
+</blockquote>
+<hr />
+<h2 id="-頭條你的主目標做到哪有沒有被延後">🔴 頭條：你的主目標做到哪、有沒有被延後</h2>
+<p>你的原話：「我在外面標好正反例（標的＋t₀＋0/1 標籤）匯入，平台找出 t₀ 之前哪些特徵能把正反例分開，再把這些特徵餵 ML。」</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>你要的</th>
+<th>這票做不做</th>
+<th>做到哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>匯入標好的 0/1</td>
+<td>✅ 已經能匯入（之前就存起來了，只是 IC 沒去讀）</td>
+<td>第 3 段接線</td>
+</tr>
+<tr>
+<td>找出 t₀ 前能分開正反例的特徵</td>
+<td>✅ <strong>第 3 段主體</strong>：IC 直接對你的 0/1 算</td>
+<td>完整</td>
+</tr>
+<tr>
+<td>把這些特徵餵 ML</td>
+<td>⚠️ <strong>只做到「交出一份 ML 能吃的倖存者檔」</strong>，並用測試證明既有的接收端真的吃得下。<strong>ML 訓練本身不在這票</strong>（8/17 你定的成熟度地圖：ML 層還不完整，禁改殼）。</td>
+<td>邊界</td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>要你決定的只有一件</strong>：「餵 ML」這一半，這票交付到「倖存者檔 ＋ 接收端契約測試」為止，ML 訓練另開票。<strong>接受嗎？</strong> 不接受就說，我改規格。
+（三家委員對此的判定：不算偷換主目標，但必須頭條告訴你——我照做。）</p>
+<p><strong>沒有任何一段被延後。</strong> 三段順序照你定的：揭露 → purge 換算 → 匯入標籤模式。</p>
+<hr />
+<h2 id="三段各做什麼一段一句">三段各做什麼（一段一句）</h2>
+<h3 id="第-1-段小報告和畫面老實說用了什麼-label-規則">第 1 段（小）：報告和畫面老實說用了什麼 label 規則</h3>
+<ul>
+<li>報告多一塊「本次 label 怎麼算」：h 幾根、k 幾根、進場價、報酬公式，並明寫 <strong>h 的單位＝事件週期的根數</strong>（你那批：h=1 ＝ 12h 一根 ＝ 1h 特徵的第 12 根）。</li>
+<li>同一塊也寫「你的 0/1 標籤：有（正 136／反 29）；本次有沒有用到」。</li>
+<li>IC 頁事件 h／k 輸入框旁邊直接標單位。</li>
+</ul>
+<h3 id="第-2-段中purge-改成真的照-label-視窗算">第 2 段（中）：purge 改成真的照 label 視窗算</h3>
+<ul>
+<li>現況：purge 寫 5（是主線的數字，跟事件無關），label 視窗 12 根被塞在 embargo 裡，靠 embargo 144 才沒漏。<strong>不是洩漏</strong>，是標籤貼錯位置。</li>
+<li>改後：purge ＝ max(主線 5, label 視窗 12) ＝ 12；embargo ＝ max(設定值, 批次宣告的往後看深度 144) ＝ 144；總隔離 149 → 156（更保守）。隔離區那段文字改成講真話。</li>
+<li>改法用<strong>顯式參數</strong>傳，不走 config 覆蓋（委員實測：config 對不認識的鍵會<strong>默默吞掉</strong>，走那條路等於沒改）。</li>
+</ul>
+<h3 id="第-3-段大匯入標籤模式">第 3 段（大）：匯入標籤模式</h3>
+<ol>
+<li><strong>怎麼算「分得開」</strong>：對每個特徵，看正例組的特徵值是否整體高於／低於反例組。用的是 Mann-Whitney 檢定；報 AUC（0.5＝分不開，1＝完美分開）和 rank-biserial（＝2×AUC−1，正負表示方向）。</li>
+<li><strong>顯著性</strong>：Mann-Whitney 的 p 值 → BH-FDR 校正（跟現在一樣）。<strong>效應量門檻改看絕對值</strong>（委員 R1 抓到：原本會把「反向但很強」的特徵殺掉）。</li>
+<li><strong>防運氣</strong>（兩道）：
+<ul>
+<li>每個倖存特徵再用「打亂標籤重算」驗一次（block 置換，會考慮事件時間上的重疊）；打亂後也一樣顯著的，<strong>不交付</strong>。</li>
+<li>整批做 50 次打亂，看隨機能篩出幾個；你的真倖存數若沒贏過隨機的 95 分位，整批標「負對照失敗」、<strong>不交倖存者檔</strong>（R2 委員算過：這種誤殺率約 5%，可接受並已預註冊）。</li>
+</ul>
+</li>
+<li><strong>什麼時候自動用 0/1</strong>：切分後，驗證段（test）正反各 ≥ 10 筆就自動用；不夠就退回報酬規則並在畫面上明講原因。你也可以手動指定；手動指定但不夠時，<strong>上傳當下就 422</strong>，不用等 11 分鐘預處理。</li>
+<li><strong>報酬版 IC 留第二欄</strong>，報告寫明主統計是哪個。</li>
+<li><strong>倖存者檔</strong>帶 <code>sample_scope=event</code>、標籤來源＝你的匯入批（批 ID、正反數）。</li>
+<li><strong>防「驗了一份、算另一份」</strong>：驗證過的 0/1 向量凍結成不可變物件，算統計前再逐筆對證（這是上一票 EVTALIGN 抓到過的病，這次事先堵）。</li>
+</ol>
+<hr />
+<h2 id="委員三輪抓到我改掉的最重要五件">委員三輪抓到、我改掉的最重要五件</h2>
+<ol>
+<li>效應量門檻看有號值 → <strong>改絕對值＋獨立門檻</strong>（不再共用 IC 的 0.02）。</li>
+<li>自動判定看整批正反數，但統計在驗證段算 → <strong>改在切分後看驗證段</strong>。</li>
+<li>負對照「打亂後有 1 個就整批殺」→ 委員算出 39k 特徵下這會常態誤殺 → <strong>改 50 次打亂取 95 分位</strong>。</li>
+<li>驗證過的向量與實際算的向量沒綁死 → <strong>凍結＋逐筆對證＋列序守衛</strong>。</li>
+<li>purge 改法走 config 覆蓋會被默默吞掉 → <strong>改顯式參數＋入口守衛</strong>。</li>
+</ol>
+<hr />
+<h2 id="殘留這票不做每條有理由">殘留（這票不做，每條有理由）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>為何現在不做</th>
+<th>何時做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R-1 事件序列的 HAC／依賴感知解析 p</td>
+<td>needs-research：事件不等距，估計式未定義；先用 block 置換擋</td>
+<td>委員會定出估計式</td>
+</tr>
+<tr>
+<td>R-2 跨 symbol 合併</td>
+<td>blocked-by：Pooled/Panel IC 票</td>
+<td>該票開</td>
+</tr>
+<tr>
+<td>R-3 triple-barrier 出場</td>
+<td>user-ruling 8/19</td>
+<td>回測層成熟</td>
+</tr>
+<tr>
+<td><strong>R-4 ML 訓練殼吃倖存者檔</strong></td>
+<td>blocked-by：成熟度地圖禁改 ML 殼</td>
+<td>ML 殼契約票</td>
+</tr>
+<tr>
+<td>R-5 h/k 掃描 × 0/1</td>
+<td>user-ruling 9/9：0/1 不隨 h/k 變</td>
+<td>你提需求</td>
+</tr>
+<tr>
+<td>R-6 與 GAP-3 B1.4 合流</td>
+<td>blocked-by：兩者切分模型不同</td>
+<td>切分統一票</td>
+</tr>
+<tr>
+<td>R-7 label 視窗太長時 block 不足 10 → 不交倖存者</td>
+<td>needs-research：這是保守，不是 bug；畫面會明講</td>
+<td>同 R-1</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="我要你回答的">我要你回答的</h2>
+<ol>
+<li>「餵 ML」交付到倖存者檔＋接收端契約測試為止——<strong>接受／不接受</strong>。</li>
+<li>其餘規格——<strong>可以動工／哪裡不對</strong>。</li>
+</ol>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/EVTLABEL規格白話.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
