@@ -13,6 +13,8 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from api.core.logging import get_logger
 from api.models.ic_models import (
+    ICFeatureDetailResponse,
+    ICSummaryPageResponse,
     DeepAnalysisRequest,
     DeepAnalysisResponse,
     FeatureListItem,
@@ -26,7 +28,8 @@ from api.models.ic_models import (
     ICRefilterRequest,
 )
 from api.core.config import settings
-from api.services.ic_analysis_service import ic_analysis_service
+from api.services.ic_analysis_service import ResultRevisionMismatch, ResultValidationError, ic_analysis_service
+from api.services.ic_result_projection import SortByNotAllowed
 from momentum.factories import load_ic_config
 
 
@@ -344,17 +347,76 @@ async def cancel_task(task_id: str):
 
 
 @router.get("/result/{task_id}")
-async def get_result(task_id: str, schema_version: Optional[int] = Query(None)):
-    """Get IC analysis result."""
+async def get_result(task_id: str, schema_version: Optional[int] = Query(None), view: Optional[str] = Query(None)):
+    """Get IC analysis result.
+
+    ICRESULT_PAGING：`view=light` ⇒ 摘要視圖（docs/ICRESULT_PAGING_SPEC.md §C-6）；無 `view` ⇒ 既有全量回應逐位元組不變（G-1）。
+    """
     try:
-        result = ic_analysis_service.get_result(task_id, schema_version)
+        if view is not None and view != "light":
+            raise HTTPException(status_code=400, detail=f"unknown view: {view}")
+        if view == "light" and schema_version == 2:
+            raise HTTPException(status_code=400, detail="view=light and schema_version=2 are mutually exclusive")
+        result = ic_analysis_service.get_result(task_id, schema_version, view=view)
         if result is None:
             raise HTTPException(status_code=404, detail=f"Result not found: {task_id}")
         return result
     except HTTPException:
         raise
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error("Failed to get result: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/result/{task_id}/summary", response_model=ICSummaryPageResponse)
+async def get_result_summary_page(
+    task_id: str,
+    sort_by: str = Query("icir"),
+    sort_order: str = Query("desc"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1),
+    pass_class: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    revision: Optional[int] = Query(None),
+):
+    """ICRESULT_PAGING Task 1.1：summary 分頁（命名對齊 Feature Factory /browse）。"""
+    try:
+        page = ic_analysis_service.get_result_summary_page(
+            task_id, sort_by=sort_by, sort_order=sort_order, offset=offset, limit=limit,
+            pass_class=pass_class, search=search, revision=revision,
+        )
+        if page is None:
+            raise HTTPException(status_code=404, detail=f"Result not found: {task_id}")
+        return page
+    except HTTPException:
+        raise
+    except SortByNotAllowed as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except ResultRevisionMismatch as exc:
+        raise HTTPException(status_code=409, detail={"message": str(exc), "current_revision": exc.current_revision})
+    except Exception as exc:
+        logger.error("Failed to page summary: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/result/{task_id}/feature/{feature_name:path}", response_model=ICFeatureDetailResponse)
+async def get_result_feature_detail(task_id: str, feature_name: str, revision: Optional[int] = Query(None)):
+    """ICRESULT_PAGING Task 1.2：單特徵詳情（per_feature_sections 各段＋summary_row）。"""
+    try:
+        detail = ic_analysis_service.get_result_feature_detail(task_id, feature_name, revision=revision)
+        if detail is None:
+            raise HTTPException(status_code=404, detail=f"Result not found: {task_id}")
+        if detail.get("_missing"):
+            raise HTTPException(status_code=404, detail=f"Feature not found: {feature_name}")
+        return detail
+    except HTTPException:
+        raise
+    except ResultRevisionMismatch as exc:
+        raise HTTPException(status_code=409, detail={"message": str(exc), "current_revision": exc.current_revision})
+    except Exception as exc:
+        logger.error("Failed to project feature: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -598,13 +660,22 @@ async def update_config(config_override: Dict[str, Any] = Body(...)):
 async def refilter(
     request: ICRefilterRequest,
     task_id: Optional[str] = Query(None),
+    view: Optional[str] = Query(None),
 ):
-    """Refilter IC results with new thresholds."""
+    """Refilter IC results with new thresholds.
+
+    ICRESULT_PAGING §C-7：`view=light` ⇒ 回 light 視圖（含新 result_revision）；無 `view` ⇒ 既有全量回應不變。
+    守衛未過（先驗後寫）⇒ 422、舊 result 不變。
+    """
     try:
         resolved_task_id = task_id or ic_analysis_service.get_last_task_id()
         if not resolved_task_id:
             raise HTTPException(status_code=404, detail="Task not found")
-        return await ic_analysis_service.refilter(resolved_task_id, request.thresholds)
+        if view is not None and view != "light":
+            raise HTTPException(status_code=400, detail=f"unknown view: {view}")
+        return await ic_analysis_service.refilter(resolved_task_id, request.thresholds, view=view)
+    except ResultValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except ValueError as exc:
         logger.error("Invalid refilter request: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))

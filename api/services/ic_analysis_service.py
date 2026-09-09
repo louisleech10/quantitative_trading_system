@@ -11,7 +11,7 @@ from io import BytesIO
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import h5py
 import numpy as np
@@ -19,7 +19,9 @@ import pandas as pd
 
 from api.core.config import settings
 from api.core.logging import get_logger
+from api.services import ic_result_projection as _proj
 from api.models.ic_models import (
+    load_ic_result_paging_contract,
     DeepAnalysisRequest,
     ICAnalyzeRequest,
     ICFullAnalysisRequest,
@@ -40,6 +42,19 @@ from momentum.core.exceptions import AnalysisCancelled
 
 
 logger = get_logger("api.ic_analysis_service")
+
+
+class ResultRevisionMismatch(Exception):
+    """ICRESULT_PAGING §C-7：請求帶 revision 與現行不符（route 409）。"""
+
+    def __init__(self, current_revision: Optional[int], requested: Optional[int]) -> None:
+        super().__init__(f"result revision mismatch: current={current_revision} requested={requested}")
+        self.current_revision = current_revision
+        self.requested = requested
+
+
+class ResultValidationError(Exception):
+    """ICRESULT_PAGING §C-7(b)：refilter 結果未過出口守衛（先驗後寫；route 422）。"""
 
 #: 合理性上界＝2100-01-01（epoch 秒）。超出即判 parse failure（SPEC Task 7.7 ④ 之字面）。
 _EPOCH_SECONDS_UPPER_BOUND = 4102444800
@@ -1620,7 +1635,7 @@ class ICAnalysisService:
                     task_info["status"] = "completed"
                     task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["progress"] = 1.0
-                    task_info["result"] = report
+                    self._set_result(task_info, report)
 
             # LA-1 B3-TASK-01：completion callback 必含 root 紅標
             completed_payload: Dict[str, Any] = {
@@ -1736,6 +1751,7 @@ class ICAnalysisService:
                 # 降級重跑之原因（進行中即有；沒有降級 ⇒ None）
                 "fallback": task_info.get("fallback"),
                 "cancel_requested": bool(task_info.get("cancel_requested")),
+                "result_revision": task_info.get("result_revision"),
             }
             # 🔴 `GAP3_EVENT_DISCLOSURE` Task 1.3：降級原因**刻意不進 task status**。
             #    它住 `report.metadata.oos_downgrade`（orchestrator 之單一寫出點），
@@ -1769,8 +1785,89 @@ class ICAnalysisService:
                     )
             return payload
 
-    def get_result(self, task_id: str, schema_version: Optional[int] = None) -> Optional[Any]:
-        """Get task result."""
+    # ── ICRESULT_PAGING（docs/ICRESULT_PAGING_SPEC.md §C-7／§C-9）────────────────────────────
+    def _set_result(self, task_info: Dict[str, Any], report: Any) -> int:
+        """唯一的 result 寫點：寫入時一次 `_to_json_compatible`＋`deny_factor_in_ok_oos`，**只保留一棵 normalized 樹**，遞增 revision。
+
+        守衛 raise ⇒ 不寫入、revision 不變（初次完成由背景 try 標 failed；refilter 由呼叫端轉 422）。
+        呼叫端須持 `self._lock`。
+        """
+        from momentum.core.contracts import deny_factor_in_ok_oos
+
+        normalized = self._to_json_compatible(report)
+        if isinstance(normalized, dict):
+            deny_factor_in_ok_oos(normalized)
+        task_info["result"] = normalized
+        task_info["result_revision"] = (task_info.get("result_revision") or 0) + 1
+        try:
+            _proj.sort_index_cache(load_ic_result_paging_contract()).invalidate_task(str(task_info.get("task_id") or ""))
+        except Exception:  # noqa: BLE001 — 快取失效不得影響寫入
+            pass
+        return int(task_info["result_revision"])
+
+    def _snapshot_result(self, task_id: str) -> Optional[Tuple[Any, Optional[int]]]:
+        """lock 內同時取 `(result, result_revision)`；投影只吃此 snapshot（不可變）。"""
+        with self._lock:
+            task_info = self._tasks.get(task_id)
+            if not task_info or task_info.get("result") is None:
+                return None
+            return task_info.get("result"), task_info.get("result_revision")
+
+    def _require_snapshot(self, task_id: str, revision: Optional[int]) -> Optional[Tuple[Any, Optional[int]]]:
+        """取 snapshot；呼叫端帶 `revision` 且不符 ⇒ ResultRevisionMismatch（route 409）。"""
+        snap = self._snapshot_result(task_id)
+        if snap is None:
+            return None
+        if revision is not None and snap[1] != revision:
+            raise ResultRevisionMismatch(current_revision=snap[1], requested=revision)
+        return snap
+
+    def get_result_summary_page(self, task_id: str, *, sort_by: str, sort_order: str, offset: int, limit: int, pass_class: Optional[str] = None, search: Optional[str] = None, revision: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        snap = self._require_snapshot(task_id, revision)
+        if snap is None:
+            return None
+        report, rev = snap
+        rows = report.get("summary_table") if isinstance(report, dict) else None
+        page = _proj.paginate_summary(
+            list(rows or []), sort_by=sort_by, sort_order=sort_order, offset=offset, limit=limit,
+            pass_class=pass_class, search=search, contract=load_ic_result_paging_contract(),
+            task_id=task_id, revision=rev,
+        )
+        page["result_revision"] = rev
+        return page
+
+    def get_result_feature_detail(self, task_id: str, feature_name: str, *, revision: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """回 None ⇒ task／result 缺席（404）；回 {"_missing": True} ⇒ 特徵不存在（404，由 route 區分）。"""
+        snap = self._require_snapshot(task_id, revision)
+        if snap is None:
+            return None
+        report, rev = snap
+        if not isinstance(report, dict):
+            return None
+        detail = _proj.project_feature(report, feature_name, load_ic_result_paging_contract())
+        if detail is None:
+            return {"_missing": True}
+        detail["result_revision"] = rev
+        return detail
+
+    def get_result(self, task_id: str, schema_version: Optional[int] = None, view: Optional[str] = None) -> Optional[Any]:
+        """Get task result.
+
+        ICRESULT_PAGING：`view="light"` 走投影（只讀 `_snapshot_result`，不再全樹正規化／守衛——已於 `_set_result` 做過）；
+        無 `view` ⇒ 既有路徑逐位元組不變（G-1）。`view=light` 與 `schema_version=2` 互斥 ⇒ ValueError（route 400）。
+        """
+        if view is not None and view != "light":
+            raise ValueError(f"unknown view: {view}")
+        if view == "light":
+            if schema_version == 2:
+                raise ValueError("view=light and schema_version=2 are mutually exclusive")
+            snap = self._require_snapshot(task_id, None)
+            if snap is None:
+                return None
+            report, revision = snap
+            if not isinstance(report, dict):
+                raise ValueError("light view requires a dict report")
+            return _proj.project_light_view(report, load_ic_result_paging_contract(), task_id=task_id, revision=revision)
         with self._lock:
             task_info = self._tasks.get(task_id)
             if not task_info:
@@ -2336,7 +2433,7 @@ class ICAnalysisService:
                     task_info["current_stage"] = "completed"
                     task_info["current_step"] = "completed"
                     task_info["progress"] = 1.0
-                    task_info["result"] = report
+                    self._set_result(task_info, report)
                     task_info["deep_analysis_result"] = deep_result
 
             # LA-1 B3-TASK-01：full-analysis completion callback 必含 root 紅標
@@ -2618,7 +2715,7 @@ class ICAnalysisService:
             "Re-run IC analysis with a valid symbol+timeframe or features_path."
         )
 
-    async def refilter(self, task_id: str, thresholds: Dict[str, Any]) -> Dict[str, Any]:
+    async def refilter(self, task_id: str, thresholds: Dict[str, Any], view: Optional[str] = None) -> Dict[str, Any]:
         """Refilter using cached IC results."""
         analyzer = self.get_analyzer(task_id)
         if analyzer is None:
@@ -2628,12 +2725,18 @@ class ICAnalysisService:
         with self._lock:
             task_info = self._tasks.get(task_id)
             if task_info:
-                task_info["result"] = report
+                # ICRESULT_PAGING §C-7(b)：先驗後寫——守衛 raise ⇒ 舊 result／revision 不變、task 仍 completed、route 422
+                try:
+                    self._set_result(task_info, report)
+                except ValueError as exc:
+                    raise ResultValidationError(str(exc)) from exc
 
         # 🔴 UAT B16（2026-09-02，票 `G3-D12`）：原本直接回 analyzer 的原始 dict，內含 NaN／inf（例如 decay 擬合失敗、
         #    survivors=0 時的統計）⇒ JSONResponse 500「Out of range float values」⇒ 瀏覽器只看到 Failed to fetch。
         #    `/result` 走 `get_result()`（`_to_json_compatible` 把非有限值轉 null＋F2 sanitizer）而沒事；
         #    refilter 必須走**同一出口**，不得另一份序列化規則。
+        if view is not None:  # route 已驗只准 light
+            return self.get_result(task_id, view="light")
         return self.get_result(task_id)
 
     def register_notification_callback(

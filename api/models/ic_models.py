@@ -326,6 +326,7 @@ class ICTaskStatusResponse(BaseModel):
     warnings: List[Dict[str, Any]] = Field(default_factory=list)
     fallback: Optional[Dict[str, Any]] = None
     cancel_requested: bool = False
+    result_revision: Optional[int] = None  # ICRESULT_PAGING §C-7 世代戳
 
 
 class ICTopFeaturesRequest(BaseModel):
@@ -425,3 +426,25 @@ def load_ic_result_paging_contract() -> Dict[str, Any]:
 
         _IC_RESULT_PAGING_CONTRACT_CACHE = _json.loads(_IC_RESULT_PAGING_CONTRACT_PATH.read_text(encoding="utf-8"))
     return _IC_RESULT_PAGING_CONTRACT_CACHE
+
+
+class ICSummaryPageResponse(BaseModel):
+    """ICRESULT_PAGING Task 1.1：summary 分頁（欄位語意見 contract）。"""
+
+    total: int
+    offset: int
+    limit: int
+    sort_by: str
+    sort_order: str
+    result_revision: Optional[int] = None
+    rows: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ICFeatureDetailResponse(BaseModel):
+    """ICRESULT_PAGING Task 1.2：單特徵詳情（per_feature_sections 各段＋summary_row）。"""
+
+    model_config = ConfigDict(extra="allow")
+
+    feature_name: str
+    summary_row: Dict[str, Any]
+    result_revision: Optional[int] = None
