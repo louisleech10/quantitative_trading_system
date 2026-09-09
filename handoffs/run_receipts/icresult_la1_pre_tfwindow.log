@@ -1,0 +1,56 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/685bd204-8ce3-4eee-a547-f6c750bc9bef/scratchpad/wt_b0
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 28 items / 26 deselected / 2 selected
+
+tests/api/test_ic_la1_degraded_gate.py::test_b3_test01_gc_persisted_output_has_status 
+-------------------------------- live log call ---------------------------------
+09:52:19 [INFO] IC config loaded
+09:52:19 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+09:52:19 [INFO] Read 20352 klines from BTCUSDT/1h in 0.009s
+09:52:19 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:52:19 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:52:19 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=80 test_rows=15 min_test_rows=10000 fit_mode=full_sample
+09:52:19 [INFO] Read 20352 klines from BTCUSDT/1h in 0.009s
+09:52:19 [INFO] Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+09:52:19 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+09:52:19 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:52:19 [INFO] IC autocorr persistent: count=14
+09:52:19 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+09:52:20 [INFO] Decay: 15/15 fit warnings summarized (insufficient_points=15)
+09:52:20 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:52:20 [INFO] Redundancy filter completed: method=greedy input=10 output=6
+09:52:28 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=6 removed=4 n_regressions=16 fit_scope=full_sample
+09:52:28 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_lk_fnxsz/features/BTCUSDT_1h_filtered.h5
+09:52:28 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_lk_fnxsz/reports/ic_report_ic_gatekeeper.json
+09:52:28 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_lk_fnxsz/reports/ic_survivors_ic_gatekeeper.json
+09:52:28 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_lk_fnxsz/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 50%]
+tests/api/test_ic_la1_degraded_gate.py::test_callback_completion_ok_real_chain_a 
+-------------------------------- live log call ---------------------------------
+09:52:28 [INFO] Loaded feature registry with 15 entries
+09:52:28 [INFO] Loaded feature registry with 15 entries
+09:52:28 [INFO] IC config loaded
+09:52:28 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+09:52:28 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+09:52:28 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:52:28 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:52:28 [INFO] Data preprocessing complete: columns=15 fit_mode=train_mask oos_guarantees=True
+09:52:28 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+09:52:28 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:52:28 [INFO] IC autocorr persistent: count=10
+09:52:28 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+09:52:29 [INFO] Decay: 3/15 fit warnings summarized (low_r2=3)
+09:52:36 [INFO] Redundancy filter completed: method=greedy input=14 output=9
+09:52:51 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=9 removed=5 n_regressions=23 fit_scope=train
+09:52:51 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_lk_fnxsz/features/BTCUSDT_1h_filtered.h5
+09:52:51 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_lk_fnxsz/reports/ic_report_ic_gatekeeper.json
+09:52:51 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_lk_fnxsz/reports/ic_survivors_ic_gatekeeper.json
+09:52:51 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_lk_fnxsz/reports/ic_report_ic_gatekeeper.json
+09:52:51 [INFO] IC analysis task completed: b3-cb-chain-a-ok
+PASSED                                                                   [100%]
+
+====================== 2 passed, 26 deselected in 32.37s =======================

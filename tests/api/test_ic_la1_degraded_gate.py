@@ -713,6 +713,9 @@ def test_b3_test01_gc_persisted_output_has_status() -> None:
         config_override={
             "ic_train_test_split": True,
             "min_test_rows": 10_000,
+            # TFWINDOW（2026-09-09）：1h fixture 之 rolling 視窗會 ×12（warmup 1517）；本測試驗的是 status 鏈非視窗，
+            # 以 reference_tf=1h 讓因子為 1，維持改前門檻（TW-RESID-1 之測試面體現）
+            "ic_calculation": {"icir": {"reference_tf": "1h"}},
             "thresholds": {
                 "ic_mean_min": -1.0,
                 "icir_min": -1.0,
@@ -792,6 +795,8 @@ def _la1_degraded_config_override() -> Dict[str, Any]:
     return {
         "ic_train_test_split": True,
         "min_test_rows": 10_000,
+        # TFWINDOW：1h fixture 視窗 ×12 ⇒ 以 reference_tf=1h 維持改前 warmup 門檻（測 status 鏈非視窗）
+        "ic_calculation": {"icir": {"reference_tf": "1h"}},
         "thresholds": {
             "ic_mean_min": -1.0,
             "icir_min": -1.0,
